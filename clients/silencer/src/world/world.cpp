@@ -11,9 +11,10 @@
 #include "objecttypes.h"
 #include "terminal.h"
 #include "basedoor.h"
-#include "interface.h"
 #include "bodypart.h"
 #include "gasloader.h"
+#include "gamestateobject.h"
+#include "text_wrap.h"
 #include <algorithm>
 
 #define DELTAENABLED 1
@@ -72,12 +73,23 @@ World::World(bool mode) : lobby(this), lagsimulator(&sockethandle), audio(Audio:
 	pancamerareturncount = 0;
 	pancamerax = 0;
 	pancameray = 0;
+	viewedpeerid = 0;
+	spectator.freecam = false;
+	spectator.camx = 0;
+	spectator.camy = 0;
+	spectator.camvx = 0;
+	spectator.camvy = 0;
+	spectator.holdshowallnames = false;
+	spectator.initialized = false;
+	gameMode = GameModeFactory(GAMEMODE_DATA_RETRIEVAL);
 }
 
 World::~World(){
 	Disconnect();
     shutdown(sockethandle, SHUT_RDWR);
     closesocket(sockethandle);
+	delete gameMode;
+	gameMode = nullptr;
 	for(std::vector<BuyableItem *>::iterator it = buyableitems.begin(); it != buyableitems.end(); it++){
 		delete (*it);
 	}
@@ -122,6 +134,34 @@ void World::Tick(void){
 		DestroyMarkedObjects();
 	}else{
 		TickObjects();
+		if(gameMode){
+			gameMode->Tick(*this);
+		}
+		// Poll IsMatchOver + time limit each tick on authority.
+		if(gameMode && !winningteamid && gameplaystate == INGAME){
+			bool over = gameMode->IsMatchOver(*this);
+			if(!over){
+				const GameModeConfig* cfg = GASLoader::Get().GetGameModeConfig((int)gameMode->Id());
+				const int tps = GASLoader::Get().gameengine.ticksPerSecond;
+				if(cfg && cfg->timeLimitSecs > 0 && tps > 0 && (int)(tickcount / tps) >= cfg->timeLimitSecs){
+					over = true;
+				}
+			}
+			if(over){
+				winningteamid = gameMode->WinningTeamId(*this);
+				if(!winningteamid) winningteamid = 0xFFFF; // draw
+			}
+		}
+		// Fire OnMatchEnd exactly once when the match transitions to over.
+		if(gameMode && winningteamid && !matchEndCalled){
+			matchEndCalled = true;
+			gameMode->OnMatchEnd(*this);
+		}
+		// Create the replicated match-state object once per match on authority.
+		if(gameplaystate == INGAME && objectsbytype[ObjectTypes::GAMESTATEOBJ].empty()){
+			GameStateObject* gso = (GameStateObject*)CreateObject(ObjectTypes::GAMESTATEOBJ);
+			gso->modeId = gameMode ? gameMode->Id() : GAMEMODE_DATA_RETRIEVAL;
+		}
 		for(int i = 0; i < maxpeers; i++){
 			Peer * peer = peerlist[i];
 			if(peer){
@@ -279,7 +319,7 @@ void World::DoNetwork_Authority(void){
 				Serializer response;
 				Uint8 code = MSG_CONNECT;
 				response.Put(code);
-				if(gameplaystate == INLOBBY){
+				if(gameplaystate == INLOBBY || gameplaystate == INGAME){
 					char * host = inet_ntoa(senderaddr.sin_addr);
 					unsigned short port = ntohs(senderaddr.sin_port);
 					Uint8 agency;
@@ -293,6 +333,7 @@ void World::DoNetwork_Authority(void){
 					for(int i = 0; i < passwordsize; i++){
 						data.Get(temp[i]);
 					}
+					bool observerRequest = data.GetBit();
 					bool canjoin = true;
 					if(strcmp(gameinfo.password, temp) != 0){
 						if(!(dedicatedserver.active && accountid == dedicatedserver.accountid)){
@@ -300,13 +341,70 @@ void World::DoNetwork_Authority(void){
 							canjoin = false;
 						}
 					}
+					// Find a parked peer to rebind, if any. Done before the
+					// maxplayers gate so a rejoiner reclaiming their existing
+					// slot isn't rejected for a full lobby.
+					Peer * rejoinpeer = 0;
+					if(accountid != 0){
+						for(unsigned int i = 1; i < maxpeers; i++){
+							if(peerlist[i] && peerlist[i]->disconnected && peerlist[i]->accountid == accountid){
+								rejoinpeer = peerlist[i];
+								break;
+							}
+						}
+					}
 					if(dedicatedserver.active){
-						if(dedicatedserver.IsBanned(accountid) || peercount >= gameinfo.maxplayers){
-							//printf("banned or too many players\n");
+						if(dedicatedserver.IsBanned(accountid)){
+							canjoin = false;
+						}
+						if(!rejoinpeer && !observerRequest && peercount >= gameinfo.maxplayers){
 							canjoin = false;
 						}
 					}
-					if(canjoin){
+					if(canjoin && observerRequest && !gameinfo.spectatable){
+						// defense-in-depth: button gating already prevents this in normal flow
+						canjoin = false;
+					}
+					if(canjoin && gameplaystate == INGAME && !rejoinpeer && !observerRequest){
+						// mid-game connects are only for rejoiners or observers
+						canjoin = false;
+					}
+					if(canjoin && rejoinpeer){
+						rejoinpeer->ip = ntohl(inet_addr(host));
+						rejoinpeer->port = port;
+						rejoinpeer->lastpacket = SDL_GetTicks();
+						rejoinpeer->disconnected = false;
+						for(std::list<Uint16>::iterator it = rejoinpeer->controlledlist.begin(); it != rejoinpeer->controlledlist.end(); it++){
+							Object * obj = GetObjectFromId(*it);
+							if(obj && obj->type == ObjectTypes::PLAYER){
+								Player * p = static_cast<Player *>(obj);
+								map.RandomPlayerStartLocation(*this, p->x, p->y);
+								p->oldx = p->x;
+								p->oldy = p->y;
+								p->health = p->maxhealth;
+								p->shield = p->maxshield;
+								p->state = Player::DEPLOYING;
+								p->state_i = GASLoader::Get().player.deployWaitTicks;
+								p->draw = false;
+								p->collidable = false;
+							}
+						}
+						response.PutBit(true);
+						response.Put(rejoinpeer->id);
+						SendGameInfo(rejoinpeer->id);
+						SendPeerList();
+					}else if(canjoin && observerRequest){
+						Peer * newpeer = AddPeer(host, port, agency, accountid, true);
+						if(newpeer){
+							newpeer->observer = true;
+							response.PutBit(true);
+							response.Put(newpeer->id);
+							SendGameInfo(newpeer->id);
+							SendPeerList();
+						}else{
+							response.PutBit(false);
+						}
+					}else if(canjoin){
 						Peer * newpeer = AddPeer(host, port, agency, accountid);
 						if(newpeer){
 							if(dedicatedserver.active){
@@ -330,12 +428,6 @@ void World::DoNetwork_Authority(void){
 							//printf("couldnt add peer\n");
 							response.PutBit(false);
 						}
-						/*if(newpeer){
-							SendPeerList();
-							if(!newpeer->ishost){
-								SendGameInfo(newpeer->id);
-							}
-						}*/
 					}else{
 						response.PutBit(false);
 					}
@@ -348,7 +440,7 @@ void World::DoNetwork_Authority(void){
 				SendPacket(&temppeer, response.data, response.BitsToBytes(response.offset));
 			}break;
 			case MSG_INPUT:{ // client sending input
-				if(peer && gameplaystate == INGAME){
+				if(peer && !peer->observer && gameplaystate == INGAME){
 					totalinputpackets++;
 					peer->totalinputs++;
 					Serializer * inputcopy = new Serializer;
@@ -430,6 +522,9 @@ void World::DoNetwork_Authority(void){
 					Player * player = GetPeerPlayer(peer->id);
 					Uint8 to;
 					data.Get(to);
+					if(peer->observer && to == 1){
+						to = 0;
+					}
 					Serializer response;
 					Uint8 code = MSG_CHAT;
 					response.Put(code);
@@ -621,7 +716,7 @@ void World::DoNetwork_Authority(void){
 							if(gameplaystate == World::INGAME){
 								KillByGovt(*p);
 							}
-							HandleDisconnect(p->id);
+							HandleDisconnect(p->id, true);
 							break;
 						}
 					}
@@ -633,7 +728,7 @@ void World::DoNetwork_Authority(void){
 		Uint32 tickcheck = SDL_GetTicks();
 		for(int i = 0; i < maxpeers; i++){
 			if(peerlist[i]){
-				if(i != localpeerid && !peerlist[i]->isbot && peerlist[i]->lastpacket < tickcheck && tickcheck - peerlist[i]->lastpacket >= peertimeout){
+				if(i != localpeerid && !peerlist[i]->isbot && !peerlist[i]->disconnected && peerlist[i]->lastpacket < tickcheck && tickcheck - peerlist[i]->lastpacket >= peertimeout){
 					HandleDisconnect(i);
 				}
 			}
@@ -670,6 +765,7 @@ void World::DoNetwork_Replica(void){
 				if(peer){
 					if(data.GetBit()){
 						data.Get(localpeerid);
+						viewedpeerid = localpeerid;
 						//printf("we are connected, our peer id is %d\n", localpeerid);
 						RequestPeerList();
 					}else{
@@ -701,6 +797,7 @@ void World::DoNetwork_Replica(void){
 							if(i == authoritypeer) continue;
 							if(peerlist[i] && peerlist[i]->accountid == lobby.accountid){
 								localpeerid = i;
+								viewedpeerid = i;
 								break;
 							}
 						}
@@ -752,7 +849,7 @@ void World::DoNetwork_Replica(void){
 				chatmsg.append(":\xA0");
 				chatmsg.append(&data.data[1 + 4]);
 				
-				char * wrapped = Interface::WordWrap(chatmsg.c_str(), 36);
+				char * wrapped = silencer::ui::WordWrapText(chatmsg.c_str(), 36);
 				char * line = strtok(wrapped, "\n");
 				while(line){
 					chatlines.push_back(line);
@@ -883,7 +980,7 @@ void World::DoNetwork_Replica(void){
 	}
 }
 
-Peer * World::AddPeer(char * address, unsigned short port, Uint8 agency, Uint32 accountid){
+Peer * World::AddPeer(char * address, unsigned short port, Uint8 agency, Uint32 accountid, bool observer){
 	Uint8 newpeerid = 0;
 	sockaddr_in addr;
 	addr.sin_addr.s_addr = inet_addr(address);
@@ -904,10 +1001,12 @@ Peer * World::AddPeer(char * address, unsigned short port, Uint8 agency, Uint32 
 		newpeer->port = port;
 		newpeer->accountid = accountid;
 		if(peeradded){
-			if(!FindTeamForPeer(*newpeer, agency)){
-				//printf("could not find team for new peer\n");
-				delete newpeer;
-				return 0;
+			if(!observer){
+				if(!FindTeamForPeer(*newpeer, agency)){
+					//printf("could not find team for new peer\n");
+					delete newpeer;
+					return 0;
+				}
 			}
 			peerlist[newpeerid] = newpeer;
 			peercount++;
@@ -1219,16 +1318,23 @@ void World::DeleteOldSnapshots(Uint8 peerid){
 	}
 }
 
-void World::HandleDisconnect(Uint8 peerid){
+void World::HandleDisconnect(Uint8 peerid, bool permanent){
 	//printf("peer %d disconnected\n", peerid);
 	if(replay.IsRecording()){
 		replay.WriteDisconnect(peerid);
 	}
+	bool park = (!permanent && mode == AUTHORITY && gameplaystate == INGAME && peerlist[peerid] && peerlist[peerid]->accountid != 0 && !peerlist[peerid]->isbot && !peerlist[peerid]->observer);
 	for(std::list<Uint16>::iterator i = peerlist[peerid]->controlledlist.begin(); i != peerlist[peerid]->controlledlist.end(); i++){
 		Object * object = GetObjectFromId((*i));
 		if(object){
 			object->HandleDisconnect(*this, peerid);
 		}
+	}
+	if(park){
+		peerlist[peerid]->disconnected = true;
+		peerlist[peerid]->isready = false;
+		SendPeerList();
+		return;
 	}
 	ClearSnapshotQueue();
 	// Capture team before RemovePeer strips the peer from all teams.
@@ -1515,7 +1621,7 @@ void World::DisplayChatMessage(Uint32 accountid, const char * msg){
 	chatmsg.append(":\xA0");
 	chatmsg.append(msg);
 	
-	char * wrapped = Interface::WordWrap(chatmsg.c_str(), 36, "\n ");
+	char * wrapped = silencer::ui::WordWrapText(chatmsg.c_str(), 36, "\n ");
 	char * line = strtok(wrapped, "\n");
 	while(line){
 		chatlines.push_back(line);
@@ -1625,7 +1731,7 @@ unsigned short World::Bind(unsigned short port){
 	return false;
 }
 
-void World::Connect(Uint8 agency, Uint32 accountid, const char * password){
+void World::Connect(Uint8 agency, Uint32 accountid, const char * password, bool observer){
 	AllocateMapData(65535);
 	sockaddr_in addr;
 	addr.sin_addr.s_addr = htonl(GetAuthorityPeer()->ip);
@@ -1645,6 +1751,7 @@ void World::Connect(Uint8 agency, Uint32 accountid, const char * password){
 	for(int i = 0; i < passwordsize; i++){
 		data.Put(password[i]);
 	}
+	data.PutBit(observer);
 	SendPacket(GetAuthorityPeer(), data.data, data.BitsToBytes(data.offset));
 }
 
@@ -1652,6 +1759,14 @@ void World::Disconnect(void){
 	ClearSnapshotQueue();
 	ClearMapData();
 	state = IDLE;
+	viewedpeerid = 0;
+	spectator.freecam = false;
+	spectator.camx = 0;
+	spectator.camy = 0;
+	spectator.camvx = 0;
+	spectator.camvy = 0;
+	spectator.holdshowallnames = false;
+	spectator.initialized = false;
 	char data[1];
 	data[0] = MSG_DISCONNECT;
 	if(mode == AUTHORITY){
@@ -1713,6 +1828,11 @@ Peer * World::GetAuthorityPeer(void){
 		peerlist[authoritypeer]->id = authoritypeer;
 	}
 	return peerlist[authoritypeer];
+}
+
+Peer * World::GetPeer(Uint8 peerid){
+	if(peerid >= maxpeers) return 0;
+	return peerlist[peerid];
 }
 
 Player * World::GetPeerPlayer(Uint8 peerid){
@@ -1812,7 +1932,7 @@ bool World::FindTeamForPeer(Peer & peer, Uint8 agency, int start){
 void World::SendSnapshots(void){
 	for(unsigned int i = 0; i < maxpeers; i++){
 		Peer * peer = peerlist[i];
-		if(peer && i != localpeerid && !peer->isbot){
+		if(peer && i != localpeerid && !peer->isbot && !peer->disconnected){
 			Serializer data;
 			Uint8 code = MSG_SNAPSHOT;
 			data.Put(code);
@@ -1913,7 +2033,7 @@ void World::SendPeerList(Uint8 peerid){
 		}
 		for(unsigned int i = 0; i < maxpeers; i++){
 			Peer * peer = peerlist[i];
-			if(peer && i != localpeerid && (!peerid || peerid == peer->id)){
+			if(peer && i != localpeerid && (!peerid || peerid == peer->id) && !peer->disconnected){
 				SendPacket(peer, data.data, data.BitsToBytes(data.offset));
 			}
 		}
@@ -1931,10 +2051,24 @@ void World::SwitchToLocalAuthorityMode(void){
 	peercount = 0;
 	authoritypeer = GetAuthorityPeer()->id;
 	localpeerid = authoritypeer;
+	viewedpeerid = localpeerid;
 }
 
 bool World::IsAuthority(void){
 	return mode == AUTHORITY;
+}
+
+bool World::IsLocalObserver(void){
+	Peer * lp = peerlist[localpeerid];
+	return lp && lp->observer;
+}
+
+bool World::IsConnected() const {
+	return state == CONNECTED;
+}
+
+bool World::IsIdle() const {
+	return state == IDLE;
 }
 
 void World::Illuminate(void){
@@ -2351,6 +2485,7 @@ Object * World::GetObjectFromId(Uint16 id){
 void World::SaveSnapshot(Serializer & data, Uint8 peerid){
 	if(mode == AUTHORITY){
 		Player * player = GetPeerPlayer(peerid);
+		bool isobserver = peerlist[peerid] && peerlist[peerid]->observer;
 		Serializer ** oldsnapshotptr = &oldsnapshots[peerid][tickcount % maxoldsnapshots];
 		Serializer ** deltasnapshotptr = &oldsnapshots[peerid][peerlist[peerid]->lasttick % maxoldsnapshots];
 		if(tickcount - peerlist[peerid]->lasttick >= maxoldsnapshots){
@@ -2421,7 +2556,7 @@ void World::SaveSnapshot(Serializer & data, Uint8 peerid){
 			
 			// Write all new objects
 			for(std::list<Object *>::iterator i = objectlist.begin(); i != objectlist.end(); i++){
-				if((*i)->RequiresAuthority() && RelevantToPlayer(player, (*i))){
+				if((*i)->RequiresAuthority() && (isobserver || RelevantToPlayer(player, (*i)))){
 					(*i)->Serialize(Serializer::WRITE, **oldsnapshotptr);
 					if(oldobjects.find((*i)->id) == oldobjects.end()){
 						data.PutBit(0);
@@ -2433,7 +2568,7 @@ void World::SaveSnapshot(Serializer & data, Uint8 peerid){
 		}else{
 			// Write all relevant objects, no delta compression
 			for(std::list<Object *>::iterator i = objectlist.begin(); i != objectlist.end(); i++){
-				if((*i)->RequiresAuthority() && RelevantToPlayer(player, (*i))){
+				if((*i)->RequiresAuthority() && (isobserver || RelevantToPlayer(player, (*i)))){
 					(*i)->Serialize(Serializer::WRITE, **oldsnapshotptr);
 					data.PutBit(0);
 					(*i)->Serialize(Serializer::WRITE, data);

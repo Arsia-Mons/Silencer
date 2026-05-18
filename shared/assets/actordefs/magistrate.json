@@ -1,0 +1,314 @@
+{
+  "id": "magistrate",
+  "props": {
+    "hp": 150,
+    "shield": 0,
+    "speed": 3,
+    "faction": "enemy",
+    "spawnWeight": 0
+  },
+  "sequences": {
+    "STANDING": {
+      "loop": true,
+      "frames": [
+        {
+          "bank": 207,
+          "index": 0,
+          "duration": 1,
+          "hurtbox": [
+            -14,
+            -74,
+            14,
+            0
+          ]
+        }
+      ]
+    },
+    "WALKING": {
+      "loop": true,
+      "frames": [
+        {
+          "bank": 207,
+          "index": 0,
+          "duration": 1,
+          "hurtbox": [
+            -14,
+            -74,
+            14,
+            0
+          ]
+        },
+        {
+          "bank": 207,
+          "index": 1,
+          "duration": 1,
+          "hurtbox": [
+            -14,
+            -74,
+            14,
+            0
+          ]
+        },
+        {
+          "bank": 207,
+          "index": 2,
+          "duration": 1,
+          "hurtbox": [
+            -14,
+            -74,
+            14,
+            0
+          ]
+        },
+        {
+          "bank": 207,
+          "index": 3,
+          "duration": 1,
+          "hurtbox": [
+            -14,
+            -74,
+            14,
+            0
+          ]
+        },
+        {
+          "bank": 207,
+          "index": 4,
+          "duration": 1,
+          "hurtbox": [
+            -14,
+            -74,
+            14,
+            0
+          ]
+        },
+        {
+          "bank": 207,
+          "index": 5,
+          "duration": 1,
+          "hurtbox": [
+            -14,
+            -74,
+            14,
+            0
+          ],
+          "sound": "stostep1.wav",
+          "soundVolume": 64
+        },
+        {
+          "bank": 207,
+          "index": 6,
+          "duration": 1,
+          "hurtbox": [
+            -14,
+            -74,
+            14,
+            0
+          ]
+        },
+        {
+          "bank": 207,
+          "index": 7,
+          "duration": 1,
+          "hurtbox": [
+            -14,
+            -74,
+            14,
+            0
+          ]
+        },
+        {
+          "bank": 207,
+          "index": 8,
+          "duration": 1,
+          "hurtbox": [
+            -14,
+            -74,
+            14,
+            0
+          ]
+        },
+        {
+          "bank": 207,
+          "index": 9,
+          "duration": 1,
+          "hurtbox": [
+            -14,
+            -74,
+            14,
+            0
+          ]
+        },
+        {
+          "bank": 207,
+          "index": 10,
+          "duration": 1,
+          "hurtbox": [
+            -14,
+            -74,
+            14,
+            0
+          ]
+        },
+        {
+          "bank": 207,
+          "index": 11,
+          "duration": 1,
+          "hurtbox": [
+            -14,
+            -74,
+            14,
+            0
+          ]
+        },
+        {
+          "bank": 207,
+          "index": 12,
+          "duration": 1,
+          "hurtbox": [
+            -14,
+            -74,
+            14,
+            0
+          ]
+        },
+        {
+          "bank": 207,
+          "index": 13,
+          "duration": 1,
+          "hurtbox": [
+            -14,
+            -74,
+            14,
+            0
+          ]
+        },
+        {
+          "bank": 207,
+          "index": 14,
+          "duration": 1,
+          "hurtbox": [
+            -14,
+            -74,
+            14,
+            0
+          ]
+        },
+        {
+          "bank": 207,
+          "index": 15,
+          "duration": 1,
+          "hurtbox": [
+            -14,
+            -74,
+            14,
+            0
+          ],
+          "sound": "stostepr.wav",
+          "soundVolume": 64
+        },
+        {
+          "bank": 207,
+          "index": 16,
+          "duration": 1,
+          "hurtbox": [
+            -14,
+            -74,
+            14,
+            0
+          ]
+        },
+        {
+          "bank": 207,
+          "index": 17,
+          "duration": 1,
+          "hurtbox": [
+            -14,
+            -74,
+            14,
+            0
+          ]
+        },
+        {
+          "bank": 207,
+          "index": 18,
+          "duration": 1,
+          "hurtbox": [
+            -14,
+            -74,
+            14,
+            0
+          ]
+        },
+        {
+          "bank": 207,
+          "index": 19,
+          "duration": 1,
+          "hurtbox": [
+            -14,
+            -74,
+            14,
+            0
+          ]
+        },
+        {
+          "bank": 207,
+          "index": 20,
+          "duration": 1,
+          "hurtbox": [
+            -14,
+            -74,
+            14,
+            0
+          ]
+        }
+      ]
+    },
+    "DYING": {
+      "loop": false,
+      "frames": [
+        {
+          "bank": 207,
+          "index": 0,
+          "duration": 10,
+          "hurtbox": [
+            -14,
+            -74,
+            14,
+            0
+          ]
+        }
+      ]
+    }
+  },
+  "stateMachine": {
+    "initial": "STANDING",
+    "positions": {},
+    "transitions": [
+      {
+        "id": "mag_sw",
+        "from": "STANDING",
+        "to": "WALKING",
+        "condition": "velocity_nonzero"
+      },
+      {
+        "id": "mag_ws",
+        "from": "WALKING",
+        "to": "STANDING",
+        "condition": "velocity_zero"
+      },
+      {
+        "id": "mag_sd",
+        "from": "STANDING",
+        "to": "DYING",
+        "condition": "hp_zero"
+      },
+      {
+        "id": "mag_wd",
+        "from": "WALKING",
+        "to": "DYING",
+        "condition": "hp_zero"
+      }
+    ]
+  }
+}

@@ -18,7 +18,7 @@ Resources::Resources(){
 	gamemusic = 0;
 }
 
-bool Resources::Load(Game & game, bool dedicatedserver){
+bool Resources::Load(Game * game, bool dedicatedserver){
 	progress = 0;
 	totalprogressitems = 621;
 	CDResDir();
@@ -40,7 +40,7 @@ bool Resources::Load(Game & game, bool dedicatedserver){
 	return true;
 }
 
-bool Resources::LoadSprites(Game & game, bool dedicatedserver){
+bool Resources::LoadSprites(Game * game, bool dedicatedserver){
 	char FileName[256];
 	SDL_IOStream * file = SDL_IOFromFile((GetResDir() + "BIN_SPR.DAT").c_str(), "rb");
 	if(!file){
@@ -51,7 +51,7 @@ bool Resources::LoadSprites(Game & game, bool dedicatedserver){
 	SDL_ReadIO(file, headers, 64 * 256);
 	for(unsigned int i = 0; i < 256; i++){
 		progress++;
-		game.LoadProgressCallback(progress, totalprogressitems);
+		if(game) game->LoadProgressCallback(progress, totalprogressitems);
 		if(headers[i][2]){
 			sprintf(FileName, "bin_spr/SPR_%.3d.BIN", i);
 			SDL_IOStream * file2 = SDL_IOFromFile((GetResDir() + FileName).c_str(), "rb");
@@ -168,7 +168,7 @@ bool Resources::LoadSprites(Game & game, bool dedicatedserver){
 	return true;
 }
 
-bool Resources::LoadTiles(Game & game, bool dedicatedserver){
+bool Resources::LoadTiles(Game * game, bool dedicatedserver){
 	if(dedicatedserver){
 		progress += 255;
 		return true;
@@ -183,7 +183,7 @@ bool Resources::LoadTiles(Game & game, bool dedicatedserver){
 	SDL_ReadIO(file, headers, 64 * 256);
 	for(unsigned int i = 0; i < 256; i++){
 		progress++;
-		game.LoadProgressCallback(progress, totalprogressitems);
+		if(game) game->LoadProgressCallback(progress, totalprogressitems);
 		if(headers[i][2]){
 			sprintf(filename, "bin_til/TIL_%.3d.BIN", i);
 			SDL_IOStream * file2 = SDL_IOFromFile((GetResDir() + filename).c_str(), "rb");
@@ -233,7 +233,7 @@ bool Resources::LoadTiles(Game & game, bool dedicatedserver){
 	return true;
 }
 
-bool Resources::LoadSounds(Game & game, bool dedicatedserver){
+bool Resources::LoadSounds(Game * game, bool dedicatedserver){
 	if(dedicatedserver){
 		progress += 101;
 		return true;
@@ -255,7 +255,7 @@ bool Resources::LoadSounds(Game & game, bool dedicatedserver){
 	SDL_ReadIO(file, &soundssize, sizeof(soundssize));
 	for(unsigned int i = 0; i < numsounds; i++){
 		progress++;
-		game.LoadProgressCallback(progress, totalprogressitems);
+		if(game) game->LoadProgressCallback(progress, totalprogressitems);
 		SDL_SeekIO(file, sizeof(numsounds) + sizeof(soundssize) + (i * sizeof(soundheader)), SDL_IO_SEEK_SET);
 		SDL_ReadIO(file, &soundheader, sizeof(soundheader));
 		memcpy(&name, &soundheader[4], 0x10);

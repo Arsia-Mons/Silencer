@@ -31,14 +31,23 @@ Lobby::Lobby(World * world){
 	presencechanged = false;
 	channelchanged = false;
 	channel[0] = 0;
+	lastchannel[0] = 0;
 	serverip[0] = 0;
 	sockethandle = -1;
 	statupgraded = false;
 	updateavailable = false;
 	updateurl.clear();
 	memset(updatesha256, 0, sizeof(updatesha256));
+	selectedagency = 0;
 	selectedcharid = 0;
 	charactersreceived = false;
+	localusername[0] = '\0';
+}
+
+void Lobby::SetLocalUsername(const char * name){
+	if(!name) return;
+	strncpy(localusername, name, sizeof(localusername) - 1);
+	localusername[sizeof(localusername) - 1] = '\0';
 }
 
 Lobby::~Lobby(){
@@ -95,6 +104,10 @@ void Lobby::Disconnect(void){
 	sendbufferoffset = 0;
 	presence.clear();
 	presencechanged = true;
+	characters.clear();
+	selectedcharid = 0;
+	selectedagency = 0;
+	charactersreceived = false;
     shutdown(sockethandle, SHUT_RDWR);
     closesocket(sockethandle);
 	sockethandle = -1;
@@ -216,6 +229,22 @@ void Lobby::DoNetwork(void){
 									LobbyGame * lobbygame = new LobbyGame;
 									lobbygame->createdtime = SDL_GetTicks();
 									lobbygame->Serialize(Serializer::READ, data);
+									// Trailing can-rejoin byte the lobby derives per recipient
+									// (set when our accountid matches one of the dedicated server's
+									// parked peers — signals that "Join" on an INGAME row will rebind
+									// our preserved slot via PR #152's rejoin path).
+									{
+										unsigned int consumed_bits = data.readoffset;
+										unsigned int total_bits = data.offset;
+										unsigned int remaining_bytes = (total_bits > consumed_bits)
+											? (total_bits - consumed_bits) / 8
+											: 0;
+										if(remaining_bytes >= 1){
+											Uint8 canrejoinflag;
+											data.Get(canrejoinflag);
+											lobbygame->canrejoin = (canrejoinflag != 0);
+										}
+									}
 									//printf("password: %s\n", lobbygame->password);
 									for(std::list<LobbyGame *>::iterator dit = games.begin(); dit != games.end(); ){
 										if((*dit)->id == lobbygame->id){
@@ -557,6 +586,10 @@ void Lobby::SendCredentials(const char * username, const char * password){
 		return;
 		//username[maxusername] = 0;
 	}
+	characters.clear();
+	selectedcharid = 0;
+	selectedagency = 0;
+	charactersreceived = false;
 	char msg[256];
 	memset(msg, 0, sizeof(msg));
 	msg[0] = MSG_AUTH;
@@ -598,7 +631,7 @@ void Lobby::JoinChannel(const char * channel){
 	SendMessage(msg, size);
 }
 
-void Lobby::CreateGame(const char * name, const char * map, const unsigned char maphash[20], const char * password, Uint8 securitylevel, Uint8 minlevel, Uint8 maxlevel, Uint8 maxplayers, Uint8 maxteams){
+void Lobby::CreateGame(const char * name, const char * map, const unsigned char maphash[20], const char * password, Uint8 securitylevel, Uint8 minlevel, Uint8 maxlevel, Uint8 maxplayers, Uint8 maxteams, bool spectatable){
 	Serializer data;
 	Uint8 code = MSG_NEWGAME;
 	data.Put(code);
@@ -613,6 +646,7 @@ void Lobby::CreateGame(const char * name, const char * map, const unsigned char 
 	lobbygame.maxlevel = maxlevel;
 	lobbygame.maxplayers = maxplayers;
 	lobbygame.maxteams = maxteams;
+	lobbygame.spectatable = spectatable;
 	//lobbygame.CalculateMapHash();
 	memcpy(lobbygame.maphash, maphash, sizeof(lobbygame.maphash));
 	lobbygame.Serialize(Serializer::WRITE, data);
@@ -747,6 +781,28 @@ void Lobby::SelectCharacter(Uint32 charID){
 	data.Put(code);
 	data.Put(charID);
 	SendMessage(data.data, data.BitsToBytes(data.offset));
+}
+
+const Lobby::Character * Lobby::GetSelectedCharacter() const{
+	if(selectedcharid == 0){
+		return nullptr;
+	}
+	for(const Character& ch : characters){
+		if(ch.id == selectedcharid){
+			return &ch;
+		}
+	}
+	return nullptr;
+}
+
+Uint8 Lobby::GetSelectedAgencyOrDefault(Uint8 fallback) const{
+	if(const Character * ch = GetSelectedCharacter()){
+		return ch->agencyIdx;
+	}
+	if(selectedcharid != 0){
+		return selectedagency;
+	}
+	return fallback;
 }
 
 bool Lobby::Send(const char * data, unsigned int size){

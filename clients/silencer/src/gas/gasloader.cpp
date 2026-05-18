@@ -468,6 +468,8 @@ static void LoadEnemies(const std::string& dir, std::vector<EnemyDef>& out,
             e.warpTeleportTick = ej.value("warpTeleportTick", e.warpTeleportTick);
             e.runDurationTicks = ej.value("runDurationTicks",  e.runDurationTicks);
             e.deadRespawnTicks = ej.value("deadRespawnTicks",  e.deadRespawnTicks);
+            e.activationTicks   = ej.value("activationTicks",   e.activationTicks);
+            e.behaviorTree     = ej.value("behaviorTree",      std::string{});
             if (ej.contains("lookBoxes") && ej["lookBoxes"].is_array()) {
                 for (const auto& lb : ej["lookBoxes"]) {
                     int dir = lb.value("dir", -1);
@@ -715,6 +717,31 @@ static void LoadLights(const std::string& dir, std::vector<LightDef>& out,
 
 // ---------------------------------------------------------------------------
 
+static void LoadGameModes(const std::string& dir, std::vector<GameModeConfig>& out,
+                          std::vector<GASLoadError>& errors) {
+    json j;
+    if (!OpenJson(dir + "/gamemodes.json", j, errors)) return;
+    try {
+        out.clear();
+        for (const auto& m : j.at("gameModes")) {
+            GameModeConfig c;
+            c.id           = m.value("id",            c.id);
+            c.name         = m.value("name",           c.name);
+            c.timeLimitSecs = m.value("timeLimitSecs", c.timeLimitSecs);
+            c.scoreLimit   = m.value("scoreLimit",     c.scoreLimit);
+            c.fragLimit    = m.value("fragLimit",      c.fragLimit);
+            c.friendlyFire = m.value("friendlyFire",   c.friendlyFire);
+            c.respawn      = m.value("respawn",        c.respawn);
+            out.push_back(std::move(c));
+        }
+    } catch (const std::exception& ex) {
+        errors.push_back({"gamemodes.json", "", "FIELD_ERROR", ex.what()});
+        out.clear();
+    }
+}
+
+// ---------------------------------------------------------------------------
+
 bool GASLoader::Load(const std::string& gasDir) {
     lastLoadErrors.clear();
     LoadGameEngine(gasDir, gameengine);
@@ -729,11 +756,12 @@ bool GASLoader::Load(const std::string& gasDir) {
     LoadTerminals(gasDir, terminals, lastLoadErrors);
     LoadEffects(gasDir, effects, lastLoadErrors);
     LoadLights(gasDir, lights, lastLoadErrors);
+    LoadGameModes(gasDir, gameModes, lastLoadErrors);
     loaded = true;
-    fprintf(stderr, "[gas] loaded: %zu agencies, %zu weapons, %zu items, %zu enemies, %zu abilities, %zu gameObjects, %zu terminals, %zu effects, %zu lights (%zu errors)\n",
+    fprintf(stderr, "[gas] loaded: %zu agencies, %zu weapons, %zu items, %zu enemies, %zu abilities, %zu gameObjects, %zu terminals, %zu effects, %zu lights, %zu gameModes (%zu errors)\n",
             agencies.size(), weapons.size(), items.size(),
             enemies.size(), abilities.size(), gameObjects.size(), terminals.size(),
-            effects.size(), lights.size(), lastLoadErrors.size());
+            effects.size(), lights.size(), gameModes.size(), lastLoadErrors.size());
     return lastLoadErrors.empty();
 }
 
@@ -752,6 +780,7 @@ void GASLoader::Reload(const std::string& gasDir) {
     terminals.clear();
     effects.clear();
     lights.clear();
+    gameModes.clear();
     loaded = false;
     Load(gasDir);
 }
@@ -811,5 +840,11 @@ const EffectDef* GASLoader::GetEffectDef(const std::string& id) const {
 const LightDef* GASLoader::GetLightDef(const std::string& id) const {
     for (const auto& l : lights)
         if (l.id == id) return &l;
+    return nullptr;
+}
+
+const GameModeConfig* GASLoader::GetGameModeConfig(int modeId) const {
+    for (const auto& m : gameModes)
+        if (m.id == modeId) return &m;
     return nullptr;
 }

@@ -42,7 +42,7 @@ public:
 	void SendCredentials(const char * username, const char * password);
 	void SendChat(const char * channel, const char * message);
 	void JoinChannel(const char * channel);
-	void CreateGame(const char * name, const char * map, const unsigned char maphash[20], const char * password = 0, Uint8 securitylevel = LobbyGame::SECMEDIUM, Uint8 minlevel = 0, Uint8 maxlevel = 99, Uint8 maxplayers = 24, Uint8 maxteams = 6);
+	void CreateGame(const char * name, const char * map, const unsigned char maphash[20], const char * password = 0, Uint8 securitylevel = LobbyGame::SECMEDIUM, Uint8 minlevel = 0, Uint8 maxlevel = 99, Uint8 maxplayers = 24, Uint8 maxteams = 6, bool spectatable = true);
 	//void ConnectToGame(LobbyGame & lobbygame, Uint8 agency);
 	void ClearGames(void);
 	LobbyGame * GetGameById(Uint32 id);
@@ -54,6 +54,8 @@ public:
 	void SendSetGame(Uint32 gameid, Uint8 status);
 	void CreateCharacter(const char * name, Uint8 agencyIdx);
 	void SelectCharacter(Uint32 charID);
+	const Character * GetSelectedCharacter() const;
+	Uint8 GetSelectedAgencyOrDefault(Uint8 fallback) const;
 	char failmessage[256];
 	Uint32 accountid;
 	char motd[2048];
@@ -68,6 +70,10 @@ public:
 	bool presencechanged;
 	char channel[64];
 	bool channelchanged;
+	// First channel name observed this session, captured by ChatPanel on the
+	// initial channel rename. GoBack rejoins this channel after a game-join
+	// flow ends. Empty until the first channelchanged tick.
+	char lastchannel[64];
 	char serverip[256];
 	bool versionchecked;
 	bool versionok;
@@ -80,7 +86,15 @@ public:
 	Uint32 selectedcharid;
 	bool charactersreceived;
 
+	// Username the player typed at the LobbyConnect screen, captured before
+	// SendCredentials runs. CharacterPanel reads this back to render the
+	// "Welcome, <name>" line.
+	void SetLocalUsername(const char * name);
+	const char * GetLocalUsername() const { return localusername; }
+
 private:
+	char localusername[17];
+
 	bool Send(const char * data, unsigned int size);
 	void SendMessage(const char msg[0xFF], Uint8 size);
 	void ResolveHostname(const char * host);

@@ -15,6 +15,60 @@ export interface ChangelogRelease {
 
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: 'v00051',
+    date: '2026-05-13',
+    title: 'Complete NPC behavior tree migration',
+    entries: [
+      {
+        category: 'CLIENT',
+        changes: [
+          'Guard 100% BT-only (#136) — removed ~560-line legacy if(!bt_) state machine fallback. Guard already ran via its 44-leaf BT; the fallback was dead code.',
+          'Guard patrol ledge fix (#136) — minWallDistance=35 > guard speed (~5 px/tick) caused the turnaround check to fire every tick inside the edge zone, making the guard oscillate and stick at ledges. Fixed with edge-triggered flip: mirrored flips only on first tick entering the zone (tracked in ctx.state).',
+          'Civilian Uint8 state_i overflow fix (#136) — state_i = -1 as Uint8 = 255; the RUNNING duration check (255 >= 150) passed immediately every tick so the civilian never actually ran. Fixed by returning Running immediately on WALKING→RUNNING transition.',
+          'Civilian threat detection (#136) — switched from projectile TestAABB (projectiles have requiresauthority=true, unreliable on client) to Player::IsShooting() (weaponfirecool > 0, ~7 tick window per shot).',
+          'Civilian flee direction locking (#136) — direction is locked at flee trigger time for the full RUNNING duration; wall-bounce (DistanceToEnd) is the sole redirect, preventing oscillation into walls.',
+          'Robot confirmed 100% BT-only — no changes needed.',
+        ],
+      },
+    ],
+  },
+  {
+    version: 'v00050',
+    date: '2026-05-12',
+    title: 'Spectator mode + mid-game rejoin',
+    entries: [
+      {
+        category: 'CLIENT',
+        changes: [
+          'Spectator mode (#156) — spectatable flag on the lobby wire protocol, surfaced in Create Game UI, persisted via Config::lastspectatable. Peer::observer flag on the wire; AUTHORITY admits observers in MSG_CONNECT without consuming a player slot. viewedpeerid drives camera and HUD focus; free-cam, cycle-target, and Activate-names bindings rebound for spectators. ESC exits match cleanly.',
+          'Rejoin mid-game (#152) — HandleDisconnect parks the peer (Player object stays alive, retaining team/tech/credits/inventory/weapons/ammo/snapshot history) instead of evicting while AUTHORITY + INGAME + real accountid. AUTHORITY accepts reconnects matching a parked peer, rebinding ip/port and resuming. Parked peers are skipped by sweep and SendSnapshots; on rejoin the player redeploys at a deploy station.',
+          'Scrollable Game Options form (#156) — variable-height scrollbar with drag support.',
+          'Game.cpp refactor foundation (#140) — Screen/Panel/Modal base classes + ScreenContext; widget primitives moved to src/ui/components/. No behavior change; groundwork for breaking up the 6,544-line Game god-class.',
+          'Fix: world.gameinfo on create-game (#147) — post-create handler dropped the lobbygame→world.gameinfo Serialize roundtrip, leaving gameinfo.loaded=false on host; host never sent MSG_GAMEINFO so AllPeersLoadedGameInfo() stayed false and Ready never advanced to INGAME.',
+        ],
+      },
+    ],
+  },
+  {
+    version: 'v00049',
+    date: '2026-05-10',
+    title: 'macOS auto-updater fix + DMG installer',
+    entries: [
+      {
+        category: 'CLIENT',
+        changes: [
+          'Fix: macOS auto-updater Info.plist seal (#146) — production-signed binaries bind their code signature to the bundle Info.plist. Stage-1 mirrored the binary and Frameworks/ into /tmp/silencer-stage2.app/ but not Info.plist; AMFI rejected the signature at execve() ("Team ID, but validating its signature failed") and SIGKILLed stage-2 before main(), silent under hardened runtime. Now mirrors Info.plist into the stage-2 bundle so AMFI accepts the binary. Same root-cause shape as the earlier Frameworks/ mirror fix.',
+        ],
+      },
+      {
+        category: 'INFRASTRUCTURE',
+        changes: [
+          'macOS DMG installer (#146) — release workflow ships a notarized + stapled DMG alongside the existing zip. The DMG is the user-facing install: Finder shows the drag-to-/Applications affordance, and copying out of it clears quarantine so the app runs from its real path instead of being App-Translocated to a read-only mount (which is what breaks the auto-updater\'s in-place rename when users launch from ~/Downloads/). The zip artifact stays for the in-app updater path (consumed by updaterstage2.cpp, referenced by lobby update.go MacOSURL). Release notes list DMG (recommended) + zip.',
+        ],
+      },
+    ],
+  },
+  {
     version: 'v00048',
     date: '2026-05-09',
     title: 'Mission scripting, controller support, 2D audio',

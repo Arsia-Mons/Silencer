@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import { useAuth } from '../../../lib/auth';
 import { useWsConnected } from '../../../lib/socket';
@@ -15,6 +15,7 @@ export default function BehaviorTreePage() {
   useAuth();
   const wsConnected = useWsConnected();
   const { id } = useParams<{ id: string }>();
+  const router = useRouter();
   const [bt, setBt] = useState<BehaviorTree | null>(null);
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -50,6 +51,25 @@ export default function BehaviorTreePage() {
     }
   }
 
+  function handleNewTree() {
+    const name = window.prompt('New behavior tree name (no spaces, no .json):');
+    if (!name || !name.trim()) return;
+    const newId = name.trim().replace(/[^a-z0-9_-]/gi, '_').toLowerCase();
+    const rootId = 'root_selector';
+    const newBt: BehaviorTree = {
+      version: 1,
+      id: newId,
+      rootId,
+      nodes: {
+        [rootId]: { type: 'Selector', label: 'Root', children: [], props: {} },
+      },
+      blackboard: [],
+      positions: { [rootId]: { x: 400, y: 200 } },
+    };
+    writeToStore(newId, newBt);
+    router.push(`/behavior-trees/${newId}`);
+  }
+
   return (
     <div className="flex min-h-screen bg-game-bg text-game-text">
       <Sidebar wsConnected={wsConnected} />
@@ -67,6 +87,18 @@ export default function BehaviorTreePage() {
           <div style={{ flex: 1 }} />
           {error && <span style={{ color: '#f87171', fontSize: 11 }}>{error}</span>}
           {dirty && <span style={{ color: '#f59e0b', fontSize: 11 }}>● unsaved</span>}
+          {folderName && (
+            <button
+              onClick={handleNewTree}
+              style={{
+                padding: '6px 14px', background: '#161b22', border: '1px solid #4a5568',
+                color: '#a0aec0', fontFamily: 'monospace', fontSize: 12,
+                letterSpacing: 2, cursor: 'pointer',
+              }}
+            >
+              + NEW TREE
+            </button>
+          )}
           <button
             onClick={handleSave}
             disabled={saving || !dirty}

@@ -214,6 +214,42 @@ func TestVector_UpgradeStatRequest_Decode(t *testing.T) {
 	}
 }
 
+func TestVector_CreateCharacterRequest_Decode(t *testing.T) {
+	v := mustGet(t, loadVectors(t), "create_character_request")
+	op, body := unframe(t, unhex(t, v.Hex))
+	if op != opCreateCharacter {
+		t.Fatalf("op: got %d want %d", op, opCreateCharacter)
+	}
+	r := newReader(body)
+	name, err := r.lenBytes()
+	if err != nil {
+		t.Fatalf("name: %v", err)
+	}
+	agency, err := r.u8()
+	if err != nil {
+		t.Fatalf("agency: %v", err)
+	}
+	if name != "Shade" || agency != 1 {
+		t.Errorf("request: name=%q agency=%d", name, agency)
+	}
+}
+
+func TestVector_SelectCharacterRequest_Decode(t *testing.T) {
+	v := mustGet(t, loadVectors(t), "select_character_request")
+	op, body := unframe(t, unhex(t, v.Hex))
+	if op != opSelectCharacter {
+		t.Fatalf("op: got %d want %d", op, opSelectCharacter)
+	}
+	r := newReader(body)
+	id, err := r.u32()
+	if err != nil {
+		t.Fatalf("character id: %v", err)
+	}
+	if id != 300 {
+		t.Errorf("character id: got %d want 300", id)
+	}
+}
+
 func TestVector_RegisterStatsRequest_Decode(t *testing.T) {
 	v := mustGet(t, loadVectors(t), "register_stats_request")
 	op, body := unframe(t, unhex(t, v.Hex))
@@ -408,7 +444,7 @@ func TestVector_NewGamePush_Encode(t *testing.T) {
 		MaxLevel:      99,
 		MaxPlayers:    24,
 		MaxTeams:      6,
-		Extra:         0,
+		ModeId:        0,
 		Port:          5000,
 	}
 	for i := 0; i < 20; i += 4 {
@@ -421,6 +457,7 @@ func TestVector_NewGamePush_Encode(t *testing.T) {
 	w.u8(opNewGame)
 	w.u8(1) // status
 	g.Encode(w)
+	w.u8(0) // can_rejoin — trailing per-recipient bit; 0 in the golden vector
 	got := framePayload(w.b)
 	if !bytes.Equal(got, unhex(t, v.Hex)) {
 		t.Errorf("got %x want %s", got, v.Hex)
@@ -466,17 +503,49 @@ func TestVector_ChatPush_Encode(t *testing.T) {
 func TestVector_UserInfoReply_Encode(t *testing.T) {
 	v := mustGet(t, loadVectors(t), "userinfo_reply")
 	u := &User{
-		AccountID: 200,
-		Name:      "admin",
+		AccountID:      200,
+		Name:           "admin",
+		SelectedCharID: 300,
+		Characters: []Character{
+			{
+				ID:        300,
+				Name:      "Shade",
+				AgencyIdx: 1,
+				Stats:     Agency{Wins: 10, Losses: 11, XPToNextLevel: 12, Level: 13, Endurance: 14, Shield: 15, Jetpack: 16, TechSlots: 17, Hacking: 18, Contacts: 19},
+			},
+		},
 	}
-	u.Agency[0] = Agency{Wins: 10, Losses: 1, XPToNextLevel: 2, Level: 3, Endurance: 4, Shield: 5, Jetpack: 6, TechSlots: 7, Hacking: 8, Contacts: 9}
-	u.Agency[1] = Agency{Wins: 10, Losses: 11, XPToNextLevel: 12, Level: 13, Endurance: 14, Shield: 15, Jetpack: 16, TechSlots: 17, Hacking: 18, Contacts: 19}
-	u.Agency[2] = Agency{Wins: 20, Losses: 21, Shield: 22, TechSlots: 23, Hacking: 24}
-	u.Agency[3] = Agency{Wins: 25}
 	w := &writer{}
 	w.u8(opUserInfo)
 	encodeUser(w, u)
 	got := framePayload(w.b)
+	if !bytes.Equal(got, unhex(t, v.Hex)) {
+		t.Errorf("got %x want %s", got, v.Hex)
+	}
+}
+
+func TestVector_CharactersPush_Encode(t *testing.T) {
+	v := mustGet(t, loadVectors(t), "characters_push")
+	u := &User{
+		AccountID:      200,
+		Name:           "admin",
+		SelectedCharID: 300,
+		Characters: []Character{
+			{
+				ID:        300,
+				Name:      "Shade",
+				AgencyIdx: 1,
+				Stats:     Agency{Wins: 10, Losses: 11, XPToNextLevel: 12, Level: 13, Endurance: 14, Shield: 15, Jetpack: 16, TechSlots: 17, Hacking: 18, Contacts: 19},
+			},
+			{
+				ID:        301,
+				Name:      "Vanta",
+				AgencyIdx: 3,
+				Stats:     Agency{Wins: 1, Losses: 2, XPToNextLevel: 3, Level: 4, Endurance: 5, Shield: 6, Jetpack: 7, TechSlots: 8, Hacking: 9, Contacts: 10},
+			},
+		},
+	}
+	got := framePayload(encodeCharacters(u))
 	if !bytes.Equal(got, unhex(t, v.Hex)) {
 		t.Errorf("got %x want %s", got, v.Hex)
 	}

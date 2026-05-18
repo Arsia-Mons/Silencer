@@ -321,7 +321,7 @@ func (h *Hub) failPending(gid uint32, reason string) {
 }
 
 // OnHeartbeat is called from the UDP listener when a dedicated server pings.
-func (h *Hub) OnHeartbeat(gameID uint32, sourceIP string, port uint16, state uint8) {
+func (h *Hub) OnHeartbeat(gameID uint32, sourceIP string, port uint16, state uint8, parked []uint32) {
 	h.mu.Lock()
 	if pg, ok := h.pending[gameID]; ok {
 		delete(h.pending, gameID)
@@ -335,6 +335,7 @@ func (h *Hub) OnHeartbeat(gameID uint32, sourceIP string, port uint16, state uin
 		pg.game.Hostname = host + "," + itoa(port)
 		pg.game.Port = port
 		pg.game.State = state
+		pg.game.ParkedAccountIDs = parked
 		h.games[gameID] = pg.game
 
 		others := make([]*Client, 0, len(h.clients))
@@ -366,8 +367,9 @@ func (h *Hub) OnHeartbeat(gameID uint32, sourceIP string, port uint16, state uin
 		log.Printf("[udp] heartbeat for unknown game %d", gameID)
 		return
 	}
-	changed := g.State != state
+	changed := g.State != state || !uint32SliceEq(g.ParkedAccountIDs, parked)
 	g.State = state
+	g.ParkedAccountIDs = parked
 	snapshot := *g
 	peers := make([]*Client, 0, len(h.clients))
 	if changed {
@@ -379,6 +381,18 @@ func (h *Hub) OnHeartbeat(gameID uint32, sourceIP string, port uint16, state uin
 	for _, c := range peers {
 		c.sendNewGame(1, &snapshot)
 	}
+}
+
+func uint32SliceEq(a, b []uint32) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
 }
 
 // Chat scopes messages to clients in the same channel.

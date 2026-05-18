@@ -75,6 +75,8 @@ public:
     void request_user_info(uint32_t account_id);
     void upgrade_stat(uint8_t agency_idx, uint8_t stat_id);
     void set_game(uint32_t game_id, GameStatus status);
+    void create_character(const std::string& name, uint8_t agency_idx);
+    void select_character(uint32_t character_id);
     void register_stats(uint32_t game_id, uint8_t team_number, uint32_t account_id,
                         uint8_t stats_agency, bool won, uint32_t xp,
                         const MatchStats& stats);
@@ -89,6 +91,7 @@ public:
     using NewGameFn      = std::function<void(const NewGameEvent&)>;
     using DelGameFn      = std::function<void(uint32_t game_id)>;
     using UserInfoFn     = std::function<void(const UserInfo&)>;
+    using CharactersFn   = std::function<void(const CharactersPayload&)>;
     using PresenceFn     = std::function<void(const PresenceUpdate&)>;
     using StatUpgradedFn = std::function<void()>;
     using ErrorFn        = std::function<void(const std::string&)>;
@@ -102,6 +105,7 @@ public:
     void on_new_game(NewGameFn fn)           { new_game_cb_  = std::move(fn); }
     void on_del_game(DelGameFn fn)           { del_game_cb_  = std::move(fn); }
     void on_user_info(UserInfoFn fn)         { user_info_cb_ = std::move(fn); }
+    void on_characters(CharactersFn fn)      { characters_cb_ = std::move(fn); }
     void on_presence(PresenceFn fn)          { presence_cb_  = std::move(fn); }
     void on_stat_upgraded(StatUpgradedFn fn) { stat_cb_      = std::move(fn); }
     void on_error(ErrorFn fn)                { error_cb_     = std::move(fn); }
@@ -137,6 +141,7 @@ private:
     NewGameFn      new_game_cb_;
     DelGameFn      del_game_cb_;
     UserInfoFn     user_info_cb_;
+    CharactersFn   characters_cb_;
     PresenceFn     presence_cb_;
     StatUpgradedFn stat_cb_;
     ErrorFn        error_cb_;

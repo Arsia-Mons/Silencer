@@ -10,6 +10,7 @@ public:
 	Surface();
 	Surface(int w, int h, Uint8 clearcolor = 0);
 	void Clear(Uint8 color);
+	void Resize(int width, int height, Uint8 clearcolor = 0);
 	Uint8 * GetPixels(void);
 	int w;
 	int h;

@@ -29,6 +29,8 @@ jobs:
        startsWith(github.event.workflow_run.head_branch, 'v'))
     runs-on: ubuntu-24.04-arm
     timeout-minutes: 15
+    env:
+      SCCACHE_GHA_ENABLED: "true"
     steps:
       - name: Resolve deploy context
         id: ctx
@@ -73,7 +75,7 @@ jobs:
       - name: Install C++ build deps
         uses: awalsh128/cache-apt-pkgs-action@v1
         with:
-          packages: cmake build-essential zlib1g-dev libcurl4-openssl-dev libminizip-dev patchelf
+          packages: cmake ninja-build build-essential zlib1g-dev libcurl4-openssl-dev libminizip-dev patchelf
           version: 2.0
 
       # SDL3 + SDL3_mixer aren't in Ubuntu Noble's apt repos. Install via
@@ -87,11 +89,8 @@ jobs:
           version: 3-latest
           version-sdl-mixer: 3-latest
 
-      - name: Setup ccache
-        uses: hendrikmuhs/ccache-action@v1
-        with:
-          key: ${{ runner.os }}-${{ github.job }}
-          max-size: 500M
+      - name: Setup sccache
+        uses: mozilla-actions/sccache-action@v0.0.10
 
       - name: Build lobby server
         working-directory: services/lobby
@@ -101,14 +100,13 @@ jobs:
         env:
           LOBBY_HOST: ${{ vars.LOBBY_HOST }}
         run: |
-          mkdir -p build && cd build
-          cmake \
-            -DCMAKE_C_COMPILER_LAUNCHER=ccache \
-            -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
+          cmake -B build -S clients/silencer \
+            -G Ninja \
+            -DCMAKE_C_COMPILER_LAUNCHER=sccache \
+            -DCMAKE_CXX_COMPILER_LAUNCHER=sccache \
             -DSILENCER_UNITY_BUILD=ON \
-            -DSILENCER_LOBBY_HOST="${LOBBY_HOST:-lobby.arsiamons.com}" \
-            ../clients/silencer
-          make -j"$(nproc)"
+            -DSILENCER_LOBBY_HOST="${LOBBY_HOST:-lobby.arsiamons.com}"
+          cmake --build build -j"$(nproc)"
 
       # Ship SDL3 + SDL3_mixer .so files in lib/ next to the binary, with
       # rpath = $ORIGIN/lib, so the dedicated server runs on the lobby box
@@ -166,12 +164,11 @@ jobs:
           rm silencer-macos-arm64.zip silencer-windows-x64.zip
 
       - name: Tailscale
-        run: |
-          curl -fsSL https://tailscale.com/install.sh | sh
-          sudo tailscale up \
-            --authkey='${{ secrets.TS_AUTHKEY }}' \
-            --hostname=gh-runner-${{ github.run_id }} \
-            --advertise-tags=tag:server
+        uses: tailscale/github-action@v3
+        with:
+          authkey: ${{ secrets.TS_AUTHKEY }}
+          hostname: gh-runner-${{ github.run_id }}
+          args: --advertise-tags=tag:server
 
       - name: Configure SSH
         run: |
@@ -227,7 +224,10 @@ jobs:
             printf '[Service]\nExecStart=\nExecStart=/opt/silencer/current/silencer-lobby -addr :517 -db /var/lib/silencer/lobby.json -maps-dir /var/lib/silencer/maps -map-api-addr :15172 -update-manifest /opt/silencer/update.json -public-addr 54.241.183.70 -game-binary /opt/silencer/current/silencer\n' | sudo tee /etc/systemd/system/silencer-lobby.service.d/map-api.conf > /dev/null
             sudo systemctl daemon-reload
             sudo systemctl restart silencer-lobby
-            sleep 2
+            for i in 1 2 3 4 5; do
+              sudo systemctl is-active silencer-lobby && break
+              sleep 3
+            done
             sudo systemctl is-active silencer-lobby
           "
 

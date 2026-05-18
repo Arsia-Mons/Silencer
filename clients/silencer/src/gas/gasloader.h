@@ -431,7 +431,9 @@ struct EnemyDef {
     int warpTeleportTick  = 12;   // state_warp value at which warp completes
     int runDurationTicks  = 150;  // civilian: ticks in RUNNING state before reverting
     int deadRespawnTicks  = 100;  // civilian: ticks in DEAD state before respawning
+    int activationTicks   = 7200; // magistrate: ticks after level start before becoming active (default 2 min @ 60fps)
     std::map<int, GuardLookBox> lookBoxes; // guard: vision AABB per direction index
+    std::string behaviorTree = "";         // override BT asset ID (empty = use class default)
 };
 
 // ---- Ability ---------------------------------------------------------------
@@ -602,6 +604,17 @@ struct GameEngineDef {
     int shrapnelLifeLaser    = 13;   // ticks before laser shrapnel (bank 110) self-destructs
 };
 
+// Per-mode config block. All limits use 0 to mean "disabled / no limit".
+struct GameModeConfig {
+    int         id            = 0;
+    std::string name;
+    int timeLimitSecs  = 0;  // 0 = no time limit
+    int scoreLimit     = 0;  // 0 = no score limit (frags, points, etc.)
+    int fragLimit      = 0;  // 0 = no frag limit (deathmatch modes)
+    bool friendlyFire  = false;
+    bool respawn       = true;
+};
+
 // ---------------------------------------------------------------------------
 // GASLoader singleton
 // ---------------------------------------------------------------------------
@@ -629,6 +642,7 @@ public:
     const TerminalDef*   GetTerminalDef(const std::string& id) const;
     const EffectDef*     GetEffectDef(const std::string& id) const;
     const LightDef*      GetLightDef(const std::string& id) const;
+    const GameModeConfig* GetGameModeConfig(int modeId) const;
 
     PlayerDef                player;
     WorldDef                 world;
@@ -642,6 +656,7 @@ public:
     std::vector<TerminalDef>   terminals;
     std::vector<EffectDef>     effects;
     std::vector<LightDef>      lights;
+    std::vector<GameModeConfig> gameModes;
 
     // Errors from the most recent Load() / Reload(). Cleared at the
     // start of each load. Read-only consumers should treat

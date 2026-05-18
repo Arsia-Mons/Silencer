@@ -74,7 +74,7 @@ shorthand for the most common arg (`click LABEL`,
 | `inspect` | `[--interface-id N]` | `{widgets:[{id,x,y,kind,label,w,h,enabled,...}], interface_id}` — every widget on the current screen, so you know what `click` / `set_text` can target |
 | `world_state` | — | `{map, peers, players:[{id,hp,x,y}], objects_count}` — only meaningful in-game |
 | `click` | `--label X` or `--id N` | `{widget_id}`. Matches a button or toggle; toggles flip their `selected` state. |
-| `set_text` | `--label X --text Y` | `{}` — clears a textbox then types into it |
+| `set_text` | `--label X --text Y` *or* `--uid N --text Y` | `{}` — clears a textbox/textinput then types into it. `--uid` addresses by the widget's developer-assigned uid (visible in `inspect`); `--label` matches by id when the widget has no human label. Targets `kind: "textbox"` or `kind: "textinput"`. |
 | `select` | `--label X --index N` or `--text Y` | `{}` — chooses an entry in a selectbox |
 | `back` | — | `{went_back: bool}` — same as pressing Escape |
 | `screenshot` | `[--out PATH]` | `{path}`. With no `--out`, the game writes to `$TEMP/silencer-<frame>.png` (or `/tmp/...` on Unix). |
@@ -273,7 +273,11 @@ bun clients/cli/index.ts lobby ls | jq '.sessions[] | {name,state,accountId}'
 - **Label matching is case-insensitive** and must be unambiguous —
   multiple matches return `WIDGET_AMBIGUOUS`.
 - **`click` only matches buttons or toggles.** Use `set_text` for
-  textboxes, `select` for selectboxes.
+  textboxes / textinputs (login fields, chat send), `select` for
+  selectboxes. Address textinputs by `--uid` from `inspect`.
+- **Password textinputs are masked in `inspect`.** The `text` field
+  echoes asterisks rather than the typed value — so you can verify
+  that *something* was typed, but not what.
 - **Logs.** `start_silencer` redirects the game's stdout+stderr to
   `/tmp/silencer-e2e-<PORT>.log`. Read it when the game misbehaves.
 - **`gas validate` is local.** No game, no `--port`. Don't wrap it in

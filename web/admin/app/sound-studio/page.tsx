@@ -4,7 +4,7 @@ import { useAuth } from '../../lib/auth';
 import Sidebar from '../../components/Sidebar';
 import { apiFetch } from '../../lib/api';
 import { useServerReachable } from '../../lib/socket';
-import { decodeAdpcmWav } from './adpcm';
+import { decodeAdpcmWav } from '../../lib/adpcm';
 import * as audioStore from '../../lib/audio-store';
 import * as soundStudioStore from '../../lib/sound-studio-store';
 

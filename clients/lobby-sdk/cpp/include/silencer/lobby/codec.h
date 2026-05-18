@@ -89,6 +89,8 @@ std::vector<uint8_t> encode_user_info_request(uint32_t account_id);
 std::vector<uint8_t> encode_ping_ack();
 std::vector<uint8_t> encode_upgrade_stat(uint8_t agency_idx, uint8_t stat_id);
 std::vector<uint8_t> encode_set_game(uint32_t game_id, GameStatus status);
+std::vector<uint8_t> encode_create_character(const std::string& name, uint8_t agency_idx);
+std::vector<uint8_t> encode_select_character(uint32_t character_id);
 std::vector<uint8_t> encode_register_stats(uint32_t game_id, uint8_t team_number,
                                            uint32_t account_id, uint8_t stats_agency,
                                            bool won, uint32_t xp,
@@ -104,6 +106,7 @@ NewGameEvent   decode_new_game(Reader& r);
 uint32_t       decode_del_game(Reader& r);
 std::string    decode_channel(Reader& r);
 UserInfo       decode_user_info(Reader& r);
+CharactersPayload decode_characters(Reader& r);
 PresenceUpdate decode_presence(Reader& r);
 // MOTD is special: the full payload is the chunk text, terminator
 // is signalled by a payload that is exactly the opcode + a single
@@ -118,6 +121,7 @@ void decode_lobby_game(Reader& r, LobbyGame& g);
 // Encodes the body of a UserInfo reply (without opcode byte). Exposed
 // for round-trip testing of inbound shapes.
 void encode_user_info_body(Writer& w, const UserInfo& u);
+void encode_characters_body(Writer& w, const CharactersPayload& payload);
 void encode_auth_reply(Writer& w, const AuthResult& a);
 void encode_version_reply(Writer& w, const VersionResult& v);
 void encode_chat_push(Writer& w, const ChatMessage& m);

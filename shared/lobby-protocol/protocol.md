@@ -65,6 +65,9 @@ opUpgradeStat   = 10
 opRegisterStats = 11
 opPresence      = 12
 opSetGame       = 13
+opCharacters    = 14
+opCreateCharacter = 15
+opSelectCharacter = 16
 ```
 
 ## Connection lifecycle
@@ -75,6 +78,7 @@ opSetGame       = 13
 4. If OK, client sends `opAuth` with username + SHA-1(password).
 5. Server replies with `opAuth` (success → account ID, or failure → error message).
 6. On success, server pushes:
+   - `opCharacters` for the authenticated account's playable characters,
    - `opMOTD` chunks then a terminator (`opMOTD` with empty payload),
    - `opChannel` (current channel name),
    - one or more `opNewGame` / `opPresence` frames per existing game/player.
@@ -144,12 +148,20 @@ u8     brightness    (0–255, default 128)
 
 **Push** (`S → C`):
 ```
-u8           status   (1 = success / advertise existing, 2 = create failed)
+u8           status     (1 = success / advertise existing, 2 = create failed)
 LobbyGame    game
+u8           can_rejoin (1 = recipient has a parked-peer slot on this
+                        game's dedicated server; 0 = no rejoin path)
 ```
 A push where `game.account_id == self.account_id` AND `status == 2`
 means "your CreateGame request failed" (e.g. heartbeat timeout from
 the spawned dedicated). Otherwise it's a normal advertisement.
+
+`can_rejoin` is per-recipient: the lobby derives it by checking whether
+the recipient's `account_id` matches one of the dedicated server's
+parked-peer accountids (reported via the UDP heartbeat — see below).
+For backward compat, decoders MUST treat absence of the trailing byte
+as `can_rejoin = 0`.
 
 ### `opDelGame` (4)
 
@@ -206,18 +218,21 @@ does not respond, the client fills them locally.
 **Reply** (`S → C`):
 ```
 u32    account_id
-struct[5] agency:                     (5 agencies × 13 bytes = 65 bytes)
-   u16  wins
-   u16  losses
-   u16  xp_to_next_level
-   u8   level
-   u8   endurance
-   u8   shield
-   u8   jetpack
-   u8   tech_slots
-   u8   hacking
-   u8   contacts
-lenstr name                           (≤ 16 bytes; client only reads first 16)
+u32    selected_char_id               (0 if no character is selected)
+u8     agency_idx                     (selected character agency, 0 if none)
+struct AgencyStats:                   (selected character stats)
+  u16   wins
+  u16   losses
+  u16   xp_to_next_level
+  u8    level
+  u8    endurance
+  u8    shield
+  u8    jetpack
+  u8    tech_slots
+  u8    hacking
+  u8    contacts
+lenstr name                           (account name, ≤ 16 bytes)
+lenstr character_name                 (selected character name, empty if none)
 ```
 
 ### `opPing` (9)
@@ -316,10 +331,54 @@ u8     status         (0 = lobby, 1 = pregame, 2 = playing)
 ```
 No reply.
 
+### `opCharacters` (14)
+
+**Push** (`S → C`), sent after auth and after create/select changes:
+```
+u8     count                          (number of characters in this frame)
+u32    selected_char_id               (0 if no character is selected)
+struct[count] character:
+  u32   id
+  u8    agency_idx
+  struct AgencyStats:
+    u16 wins
+    u16 losses
+    u16 xp_to_next_level
+    u8  level
+    u8  endurance
+    u8  shield
+    u8  jetpack
+    u8  tech_slots
+    u8  hacking
+    u8  contacts
+  lenstr name
+```
+
+### `opCreateCharacter` (15)
+
+**Request** (`C → S`):
+```
+lenstr name
+u8     agency_idx
+```
+The server creates the character, selects it, and replies with
+`opCharacters`. On rejection, the server sends an `opCharacters` frame
+for the current account state so the client can remain on the create
+screen.
+
+### `opSelectCharacter` (16)
+
+**Request** (`C → S`):
+```
+u32    character_id
+```
+The server selects the existing character and replies with
+`opCharacters`.
+
 ## `LobbyGame` wire layout
 
-Used inside `opNewGame` pushes. 16-byte hash is raw SHA-1 of the map
-file.
+Used inside `opNewGame` requests and pushes. The map hash is raw
+SHA-1 of the map file.
 
 ```
 u32    id
@@ -337,6 +396,7 @@ u8     max_level
 u8     max_players
 u8     max_teams
 u8     extra
+u8     spectatable    (0 = no spectators, 1 = accepts spectators; password gate applies equally)
 u16    port
 ```
 
@@ -350,7 +410,15 @@ u8     0x00           (constant, "heartbeat" tag)
 u32    game_id
 u16    port
 u8     state
+u8     parked_count   (optional; recipients of pre-rejoin servers
+                      treat absence as 0)
+u32[]  parked_accts   (parked_count entries; accountids of peers
+                      that disconnected mid-game and are eligible
+                      to rejoin)
 ```
+
+`parked_accts` feeds the per-recipient `can_rejoin` bit on the
+`opNewGame` push.
 
 ## Limits & constants
 

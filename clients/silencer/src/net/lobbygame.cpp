@@ -15,7 +15,9 @@ LobbyGame::LobbyGame(){
 	maxlevel = 99;
 	maxplayers = 24;
 	maxteams = 6;
-	extra = 0;
+	modeId = 0;
+	spectatable = false;
+	canrejoin = false;
 	port = 0;
 	players = 0;
 	state = 0;
@@ -61,7 +63,12 @@ void LobbyGame::Serialize(bool write, Serializer & data){
 	data.Serialize(write, maxlevel);
 	data.Serialize(write, maxplayers);
 	data.Serialize(write, maxteams);
-	data.Serialize(write, extra);
+	data.Serialize(write, modeId);
+	Uint8 spectatableflag = spectatable ? 1 : 0;
+	data.Serialize(write, spectatableflag);
+	if(write == Serializer::READ){
+		spectatable = spectatableflag != 0;
+	}
 	char * host = strtok(hostname, ",");
 	if(host){
 		char * portstr = strtok(NULL, ",");

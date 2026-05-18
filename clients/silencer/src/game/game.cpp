@@ -3,15 +3,7 @@
 #include "sdl3gpubackend.h"
 #include "tuibackend.h"
 #include <math.h>
-#include "overlay.h"
-#include "interface.h"
-#include "textbox.h"
-#include "textinput.h"
-#include "button.h"
-#include "toggle.h"
 #include "state.h"
-#include "selectbox.h"
-#include "scrollbar.h"
 #include "os.h"
 #include "team.h"
 #include "player.h"
@@ -20,13 +12,39 @@
 #include "config.h"
 #include "cocoawrapper.h"
 #include "sha1.h"
-#include "updaterstage2.h"
 #include "mapfetch.h"
 #include "actordef.h"
 #include "behaviortree.h"
 #include "gasloader.h"
+#include "screen.h"
+#include "modal.h"
+#include "message_modal.h"
+#include "password_modal.h"
+#include "main_menu_screen.h"
+#include "options_screen.h"
+#include "options_controls_screen.h"
+#include "options_display_screen.h"
+#include "options_audio_screen.h"
+#include "character_create_screen.h"
+#include "lobby_connect_screen.h"
+#include "camera.h"
+#include "detonator.h"
+#include "objecttypes.h"
+#include "client/ui/hud/InGameHud.h"
+#include "client/ui/hud/InGameOverlays.h"
+#include "client/ui/views/HudView.h"
+#include "clay_ui_compositor.h"
+#include "runtime/UiInteractionRegistry.h"
+#ifdef SILENCER_HAVE_LOBBY_UI
+#include "lobby_screen.h"
+#endif
+#include "update_screen.h"
+#include "mission_summary_screen.h"
 #include <algorithm>
 #include <stdio.h>
+#include <vector>
+
+using namespace GameState;
 
 #ifndef SILENCER_LOBBY_HOST
 #define SILENCER_LOBBY_HOST "127.0.0.1"
@@ -41,23 +59,20 @@
 #define SILENCER_MAP_API_URL "http://127.0.0.1:8080"
 #endif
 
-static bool IsBuiltinProfile(const std::string& name);
-
-Game::Game() : renderer(world), screenbuffer(640, 480){
+Game::Game() : renderer(world), screenbuffer(640, 480),
+               uiClayService(uiClayBackend),
+               clientUi(uiClayService),
+               inGameUiController(world),
+               mapDownloader(world),
+               ambienceMixer(world, renderer, mapDownloader, fade_i),
+               screenContext(*this, world, renderer, world.lobby, keymap, updater, ambienceMixer, mapDownloader, window, renderdevice){
 	world.SetVersion(SILENCER_VERSION);
 	frames = 0;
 	fps = 0;
 	state = MAINMENU;
 	stateisnew = true;
 	fade_i = 0;
-	lobbyinterface = 0;
-	gamecreateinterface = 0;
-	gamejoininterface = 0;
-	gametechinterface = 0;
-	gameselectinterface = 0;
-	mappreviewinterface = 0;
-	updateinterface = 0;
-	modalinterface = 0;
+	fadeStartMs = 0;
 	sharedstate = 0;
 	currentlobbygameid = 0;
 	lastannouncedgameid = 0;
@@ -67,36 +82,19 @@ Game::Game() : renderer(world), screenbuffer(640, 480){
 	gamepad = nullptr;
 	singleplayermessage = 0;
 	updatetitle = true;
-	oldselectedagency = -1;
-	createCharEnterCount = 0;
-	createCharSubState = 0;
-	createCharLastAgencyIdx = -1;
-	memset(createCharTempName, 0, sizeof(createCharTempName));
-	agencychanged = true;
-	currentinterface = 0;
-	lastchannel[0] = 0;
 	minimized = false;
-	modaldialoghasok = false;
 	window = 0;
 	renderdevice = nullptr;
 	memset(palettecolors, 0, sizeof(palettecolors));
-	oldambiencelevel = 0;
 	nextstateprocessed = false;
-	lastmapchunkrequest = 0;
-	strcpy(localusername, "");
-	lastmusicplaytime = 0;
 #ifdef OUYA
 	quitscancode = SDL_SCANCODE_HOME;
 #else
 	quitscancode = SDL_SCANCODE_ESCAPE;
 #endif
-	mapexistchecked = false;
+	chatEnterDebounce = false;
 	fullscreentoggled = false;
 	replayfile = 0;
-	tui_prev_mouse_x = 0;
-	tui_prev_mouse_y = 0;
-	tui_prev_mouse_down = false;
-	tui_have_prev_mouse = false;
 	controlPort = 0;
 	tuiInputPort = 0;
 	headless = false;
@@ -104,18 +102,13 @@ Game::Game() : renderer(world), screenbuffer(640, 480){
 	paused = false;
 	stepFramesRemaining = 0;
 	stepWallclockDeadlineMs = 0;
-	stage2spawned = false;
 }
 
 Game::~Game(){
 	// Join background download threads before tearing down SDL so they don't
-	// reference freed resources. Increment generation first so any in-flight
-	// result is discarded after the join returns.
-	mapjoingeneration.fetch_add(1, std::memory_order_relaxed);
-	if(mapjointhread.joinable()) mapjointhread.join();
-	if(dlthread.joinable()) dlthread.join();
-	mapUploadGeneration.fetch_add(1, std::memory_order_relaxed);
-	if(mapUploadThread.joinable()) mapUploadThread.join();
+	// reference freed resources. The MapDownloader destructor would also do
+	// this, but it runs after SDL teardown — call it explicitly here.
+	mapDownloader.JoinAndShutdown();
 	// Bring the control server down first. Stop() runs the shutdown drain we
 	// registered at Load() time, fulfilling promises for both queued and
 	// pendingWaits commands so handler threads can unblock from fut.get() before
@@ -139,6 +132,11 @@ Game::~Game(){
 }
 
 bool Game::Load(char * cmdline){
+	// CLI overrides for the lobby host / port — applied AFTER Config::Load
+	// below so the on-disk config doesn't clobber them. Empty strings / 0
+	// mean "no override; use the config value".
+	char lobbyHostOverride[256] = {0};
+	int  lobbyPortOverride = 0;
 	if((cmdline = strtok(cmdline, " "))){
 		do{
 			if(strncmp(cmdline, "-s", 2) == 0){ // dedicated server
@@ -205,10 +203,30 @@ bool Game::Load(char * cmdline){
 			else if(strcmp(cmdline, "--tui") == 0){
 				tui = true;
 			}
+			else if(strcmp(cmdline, "--lobby-host") == 0){
+				char * host = strtok(NULL, " ");
+				if(host){
+					strncpy(lobbyHostOverride, host, sizeof(lobbyHostOverride) - 1);
+					lobbyHostOverride[sizeof(lobbyHostOverride) - 1] = '\0';
+				}
+			}
+			else if(strcmp(cmdline, "--lobby-port") == 0){
+				char * portstr = strtok(NULL, " ");
+				if(portstr){
+					lobbyPortOverride = atoi(portstr);
+				}
+			}
 		}while((cmdline = strtok(0, " ")));
 	}
 	Config::GetInstance().Load();
-	LoadActiveKeymap();
+	if(lobbyHostOverride[0]){
+		strncpy(Config::GetInstance().lobbyhost, lobbyHostOverride, sizeof(Config::GetInstance().lobbyhost) - 1);
+		Config::GetInstance().lobbyhost[sizeof(Config::GetInstance().lobbyhost) - 1] = '\0';
+	}
+	if(lobbyPortOverride > 0){
+		Config::GetInstance().lobbyport = lobbyPortOverride;
+	}
+	LoadActiveKeymap(keymap);
 	if(world.dedicatedserver.active){
 		// Dedicated server: SDL3 always initialises the timer subsystem; no flags needed.
 		if(!SDL_Init(0)){
@@ -265,8 +283,11 @@ bool Game::Load(char * cmdline){
 			//SDL_EnableUNICODE(true);
 			//SDL_EnableKeyRepeat(SDL_DEFAULT_REPEAT_DELAY, SDL_DEFAULT_REPEAT_INTERVAL);
 			//screen = SDL_SetVideoMode(640, 480, 8, SDL_DOUBLEBUF | SDL_SWSURFACE);
-			window = SDL_CreateWindow("Silencer", screenbuffer.w, screenbuffer.h, SDL_WINDOW_RESIZABLE | (Config::GetInstance().fullscreen ? SDL_WINDOW_FULLSCREEN : 0));
+			window = SDL_CreateWindow("Silencer", screenbuffer.w, screenbuffer.h,
+				SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIGH_PIXEL_DENSITY |
+				(Config::GetInstance().fullscreen ? SDL_WINDOW_FULLSCREEN : 0));
 			SDL_StartTextInput(window);
+			SyncRenderSurfaceToWindowPixels();
 			if(!SetupRenderDevice()){
 				printf("Could not initialize GPU render device\n");
 				return false;
@@ -280,7 +301,7 @@ bool Game::Load(char * cmdline){
 		// so the palette is always populated by the time a screenshot is captured.
 	}
 	printf("Loading resources...\n");
-	if(!world.resources.Load(*this, world.dedicatedserver.active)){
+	if(!world.resources.Load(this, world.dedicatedserver.active)){
 		printf("Could not load resources\n");
 		return false;
 	}
@@ -289,6 +310,7 @@ bool Game::Load(char * cmdline){
 	world.LoadBuyableItems();
 	printf("Resources loaded\n");
 	lasttick = SDL_GetTicks();
+	RestartPaletteFade();
 	if(controlPort > 0){
 		auto drainPendingWaits = [this](){
 			for(auto& w : pendingWaits){
@@ -336,6 +358,234 @@ bool Game::SetupRenderDevice(void){
 	return true;
 }
 
+static const int kLegacyRenderWidth = 640;
+static const int kLegacyRenderHeight = 480;
+
+static float GameplayUiScaleForSurface(int width, int height) {
+	int scaleX = width / kLegacyRenderWidth;
+	int scaleY = height / kLegacyRenderHeight;
+	int uiScale = scaleX < scaleY ? scaleX : scaleY;
+	return static_cast<float>(uiScale > 0 ? uiScale : 1);
+}
+
+static float MenuUiScaleForSurface(int width, int height) {
+	// Menus keep the legacy 640x480 design density as a lower bound, but the
+	// scale changes continuously instead of snapping between integer steps.
+	// That preserves readable bitmap text/chrome while avoiding the abrupt
+	// "everything halves" jump as a desktop window crosses a 640px/480px
+	// multiple.
+	float scaleX = static_cast<float>(width) / static_cast<float>(kLegacyRenderWidth);
+	float scaleY = static_cast<float>(height) / static_cast<float>(kLegacyRenderHeight);
+	float uiScale = scaleX < scaleY ? scaleX : scaleY;
+	return uiScale > 1.0f ? uiScale : 1.0f;
+}
+
+static void CenteredLayoutOffset(int surfaceW, int surfaceH,
+                                 int virtualW, int virtualH,
+                                 float scale, int& offsetX, int& offsetY) {
+	int scaledW = static_cast<int>(virtualW * scale + 0.5f);
+	int scaledH = static_cast<int>(virtualH * scale + 0.5f);
+	offsetX = scaledW < surfaceW ? (surfaceW - scaledW) / 2 : 0;
+	offsetY = scaledH < surfaceH ? (surfaceH - scaledH) / 2 : 0;
+}
+
+bool Game::ResizeRenderSurfacePixels(int width, int height){
+	if(width < 1 || height < 1) return false;
+	if(screenbuffer.w == width && screenbuffer.h == height) return true;
+	screenbuffer.Resize(width, height, 0);
+	return true;
+}
+
+bool Game::SyncRenderSurfaceToWindowPixels(){
+	if(world.map.loaded){
+		return ResizeRenderSurfacePixels(kLegacyRenderWidth, kLegacyRenderHeight);
+	}
+	if(!window) return false;
+	int width = 0;
+	int height = 0;
+	if(!SDL_GetWindowSizeInPixels(window, &width, &height) || width < 1 || height < 1){
+		SDL_GetWindowSize(window, &width, &height);
+	}
+	return ResizeRenderSurfacePixels(width, height);
+}
+
+bool Game::ResizeRenderSurface(int width, int height){
+	if(width < 1 || height < 1) return false;
+	if(window){
+		SDL_SetWindowSize(window, width, height);
+		if(world.map.loaded){
+			return ResizeRenderSurfacePixels(kLegacyRenderWidth, kLegacyRenderHeight);
+		}
+		return SyncRenderSurfaceToWindowPixels();
+	}
+	if(world.map.loaded){
+		return ResizeRenderSurfacePixels(kLegacyRenderWidth, kLegacyRenderHeight);
+	}
+	return ResizeRenderSurfacePixels(width, height);
+}
+
+bool Game::HasUiInputTarget() {
+	if(GetTopScreen()) return true;
+	return inGameUiController.HasInputTarget(world.localpeerid);
+}
+
+void Game::PrepareClientUiFrame(Surface& surface) {
+	// UI magnification factor: gameplay keeps the strict legacy 640x480 fit,
+	// while menus use a continuous scale so bitmap UI density changes smoothly
+	// as the window resizes. Clay still lays out in virtual space; the
+	// compositor scales the authored pixels back up into the native surface.
+	float uiScale = world.map.loaded
+		? GameplayUiScaleForSurface(surface.w, surface.h)
+		: MenuUiScaleForSurface(surface.w, surface.h);
+	int virtualW;
+	int virtualH;
+	if(world.map.loaded){
+		// In-game: the whole frame is authored at the legacy 640x480 size.
+		// The render backend stretches that final frame to the swapchain,
+		// preserving origin/main's presentation behavior and frame cost.
+		virtualW = kLegacyRenderWidth;
+		virtualH = kLegacyRenderHeight;
+	}else{
+		// Menus reflow responsively — Clay lays out at the native surface
+		// size divided by uiScale.
+		virtualW = std::max(1, static_cast<int>(surface.w / uiScale));
+		virtualH = std::max(1, static_cast<int>(surface.h / uiScale));
+	}
+	float mx = static_cast<float>(world.localinput.mousex);
+	float my = static_cast<float>(world.localinput.mousey);
+	bool down = world.localinput.mousedown;
+	if(window){
+		Uint32 buttons = SDL_GetMouseState(&mx, &my);
+		down = (buttons & SDL_BUTTON_MASK(SDL_BUTTON_LEFT)) != 0;
+		int windowW = 0;
+		int windowH = 0;
+		SDL_GetWindowSize(window, &windowW, &windowH);
+		float pixelX = mx;
+		float pixelY = my;
+		if(windowW > 0 && windowH > 0 && surface.w > 0 && surface.h > 0){
+			pixelX = (mx / static_cast<float>(windowW)) * static_cast<float>(surface.w);
+			pixelY = (my / static_cast<float>(windowH)) * static_cast<float>(surface.h);
+		}
+		int offsetX = 0;
+		int offsetY = 0;
+		CenteredLayoutOffset(surface.w, surface.h, virtualW, virtualH,
+		                     uiScale, offsetX, offsetY);
+		clientUiInput.SetPolledSurfacePointer(
+			(pixelX - static_cast<float>(offsetX)) / static_cast<float>(uiScale),
+			(pixelY - static_cast<float>(offsetY)) / static_cast<float>(uiScale),
+			down);
+	}else{
+		clientUiInput.SetPolledSurfacePointer(mx, my, down);
+	}
+	float deltaTimeSeconds =
+		static_cast<float>(GASLoader::Get().gameengine.tickIntervalMs) / 1000.0f;
+	preparedUiInput = clientUiInput.BuildFrame(virtualW, virtualH, uiScale, deltaTimeSeconds);
+	Uint64 now = SDL_GetTicks();
+	float animationDeltaSeconds = 0.0f;
+	if(lastUiAnimationMs != 0 && now >= lastUiAnimationMs){
+		animationDeltaSeconds = static_cast<float>(now - lastUiAnimationMs) / 1000.0f;
+		if(animationDeltaSeconds > 0.25f) animationDeltaSeconds = 0.25f;
+	}
+	lastUiAnimationMs = now;
+	preparedUiInput.animationDeltaSeconds = animationDeltaSeconds;
+	preparedUiInput.animationStepSeconds = LegacyUiAnimationStepSeconds();
+	hasPreparedUiInput = true;
+}
+
+void Game::BeginPreparedClientUiFrame() {
+	if(!hasPreparedUiInput) {
+		PrepareClientUiFrame(screenbuffer);
+	}
+	silencer::clay_bridge::SetTextMeasureResources(&world.resources);
+	clientUi.BeginFrame(preparedUiInput);
+}
+
+Clay_RenderCommandArray Game::EndClientUiFrame() {
+	clientUi.EndFrame();
+	hasPreparedUiInput = false;
+	return uiClayBackend.Commands();
+}
+
+void Game::BuildVisibleClientUi(Surface& surface, float frametime) {
+	clientUi.BuildVisibleScreens(screenContext, surface, frametime);
+	if(world.map.loaded){
+		// HUD owns Clay layout only; the system-camera insets + minimap are
+		// world pixels drawn into the world surface by the render loop.
+		// Build the HUD/overlay Clay declarations from the snapshot view.
+		silencer::client_ui::HudView hudView =
+			silencer::client_ui::BuildHudView(world);
+		silencer::client_ui::BuildInGameHudUi(
+			renderer, world.resources, hudView, &surface, clientUi.Interactions());
+		silencer::client_ui::BuildInGameOverlaysUi(renderer, world.resources, hudView, &surface);
+	}
+}
+
+void Game::DrawInGameWorldInsets(Surface& surface, float frametime) {
+	Player * localplayer = world.GetPeerPlayer(world.GetLocalPeerId());
+	if(!localplayer) return;
+	Renderer::Rect dstrect;
+	for(int slot = 0; slot < 2; ++slot){
+		if(!world.IsSystemCameraActive(slot)) continue;
+		Surface systemscreen(135, 44, 1);
+		Camera camera(135 * 2, 44 * 2);
+		Object * followobject = world.GetObjectFromId(world.GetSystemCameraFollowId(slot));
+		int px = 0;
+		int py = 0;
+		if(followobject){
+			px = followobject->x + ((followobject->oldx - followobject->x) * frametime);
+			py = followobject->y + ((followobject->oldy - followobject->y) * frametime);
+			if(slot == 1 && followobject->type == ObjectTypes::DETONATOR){
+				Detonator * detonator = static_cast<Detonator*>(followobject);
+				if(detonator->HasDetonated() && py < detonator->lowestypos){
+					py = detonator->lowestypos;
+				}
+			}
+		}
+		camera.Follow(world,
+		              px + world.GetSystemCameraX(slot),
+		              py + world.GetSystemCameraY(slot),
+		              0, 0, 0, 0);
+		renderer.DrawWorldScaled(&systemscreen, camera, 3, frametime);
+		renderer.EffectRampColor(&systemscreen, 0, 190);
+		dstrect.x = (slot == 0) ? 5 : 500;
+		dstrect.y = (slot == 0) ? 349 : 348;
+		Renderer::BlitSurface(&systemscreen, 0, &surface, &dstrect);
+	}
+	dstrect.x = 235;
+	dstrect.y = 419;
+	Renderer::BlitSurface(&world.map.minimap.surface, 0, &surface, &dstrect);
+}
+
+void Game::RenderClientUiFrame(Surface& surface, float frametime) {
+	if(!clientUi.HasScreens() && !world.map.loaded){
+		return;
+	}
+
+	PrepareClientUiFrame(surface);
+	BeginPreparedClientUiFrame();
+	BuildVisibleClientUi(surface, frametime);
+	Clay_RenderCommandArray cmds = EndClientUiFrame();
+	silencer::clay_bridge::Render(*this, &surface, cmds);
+	if(state != FADEOUT){
+		std::vector<silencer::ui::UiAction> unhandledUiActions =
+			clientUi.DispatchInput(screenContext, preparedUiInput);
+		if(!clientUi.HasScreens() && world.map.loaded){
+			inGameUiController.ApplyActions(
+				world.localpeerid, unhandledUiActions, clientUi.Interactions());
+		}
+	}
+}
+
+void Game::ResetUiFrameDeltas() {
+	clientUiInput.EndFrame();
+	preparedUiInput.pointer.wheelX = 0.0f;
+	preparedUiInput.pointer.wheelY = 0.0f;
+	preparedUiInput.textInput.clear();
+	preparedUiInput.navActions.clear();
+	preparedUiInput.bindingInputs.clear();
+	preparedUiInput.controlCommands.clear();
+}
+
 void Game::Present(void){
 	if(renderdevice){
 		renderdevice->UploadFrame(screenbuffer.pixels.data(), screenbuffer.w, screenbuffer.h);
@@ -349,10 +599,10 @@ void Game::LoadProgressCallback(int progress, int totalprogressitems){
 	}
 	HandleSDLEvents();
 	if(SDL_GetTicks() - lasttick >= 100){
-		int width = 500;
+		int width = std::min(500, screenbuffer.w - 32);
 		int widthp = (float(progress) / totalprogressitems) * width;
-		int barx = (640 - width) / 2;
-		int bary = (480 - 32) / 2;
+		int barx = (screenbuffer.w - width) / 2;
+		int bary = (screenbuffer.h - 32) / 2;
 		renderer.DrawFilledRectangle(&screenbuffer, barx, bary, barx + width, bary + 32, 101);
 		if(widthp > 0){
 			for(int c = 0; c < 13; c++){
@@ -373,6 +623,54 @@ void Game::SetColors(SDL_Color * colors){
 	}
 }
 
+void Game::RestartPaletteFade(){
+	fadeStartMs = SDL_GetTicks();
+	fade_i = 0;
+}
+
+float Game::LegacyUiAnimationStepSeconds() const {
+	const int hz = GASLoader::Get().gameengine.ticksPerSecond > 0
+		? GASLoader::Get().gameengine.ticksPerSecond
+		: 24;
+	return 1.0f / static_cast<float>(hz);
+}
+
+Uint8 Game::PaletteFadePhaseFromClock() const {
+	if(fadeStartMs == 0) return fade_i;
+	Uint64 now = SDL_GetTicks();
+	float elapsedSeconds = 0.0f;
+	if(now >= fadeStartMs){
+		elapsedSeconds = static_cast<float>(now - fadeStartMs) / 1000.0f;
+	}
+	int phase = static_cast<int>(elapsedSeconds / LegacyUiAnimationStepSeconds());
+	if(phase < 0) phase = 0;
+	if(phase > 16) phase = 16;
+	return static_cast<Uint8>(phase);
+}
+
+bool Game::PaletteFadeFinished() const {
+	return PaletteFadePhaseFromClock() >= 16;
+}
+
+void Game::ApplyPaletteFade(bool fadeOut){
+	fade_i = PaletteFadePhaseFromClock();
+	int phase = fade_i;
+	if(phase > 15) phase = 15;
+	if(fadeOut){
+		SDL_Color * fadedpalette =
+			renderer.palette.CopyWithBrightness(renderer.palette.GetColors(), (15 - phase) * 8);
+		SetColors(fadedpalette);
+		return;
+	}
+	if(phase >= 15){
+		SetColors(renderer.palette.GetColors());
+		return;
+	}
+	SDL_Color * fadedpalette =
+		renderer.palette.CopyWithBrightness(renderer.palette.GetColors(), phase * 8);
+	SetColors(fadedpalette);
+}
+
 Uint32 Game::TimerCallback(void * userdata, SDL_TimerID timerID, Uint32 interval){
 	Game * game = static_cast<Game *>(userdata);
 	game->updatetitle = true;
@@ -381,7 +679,7 @@ Uint32 Game::TimerCallback(void * userdata, SDL_TimerID timerID, Uint32 interval
 }
 
 bool Game::Loop(void){
-	if(stage2spawned){
+	if(updater.IsStage2Spawned()){
 		// Stage-2 child has been spawned and is waiting on our PID to exit.
 		// Tell main to unwind so ~Game() tears down SDL/audio cleanly.
 		return false;
@@ -442,11 +740,12 @@ bool Game::Loop(void){
 		//   - action snapshot   → ORed on top so programmatic / CLI clients
 		//                          can drive Input fields directly without
 		//                          knowing the keymap.
-		// Edge events (menu nav, text input) still arrive via the control
-		// socket "key" op and bypass this path entirely.
+		// Edge events (menu nav, text input) arrive as normalized per-frame
+		// UI input and are dispatched by ClientUi after layout.
 		if(tui){
 			Uint8 newkeystate[SDL_SCANCODE_COUNT];
 			if(inputserver.LatestScancodes(newkeystate)){
+				std::vector<int> pressedScancodes;
 				// Edge-detect: feed press/release transitions through the
 				// same handlers the SDL path uses, so the in-game ESC
 				// quitstate machine, F1 player-list, debug overlay etc.
@@ -455,10 +754,17 @@ bool Game::Loop(void){
 					bool was = keystate[sc] != 0;
 					bool now = newkeystate[sc] != 0;
 					if(was == now) continue;
-					if(now) OnScancodeDown(sc);
-					else    OnScancodeUp(sc);
+					if(now){
+						OnScancodeDown(sc);
+						pressedScancodes.push_back(sc);
+					}else{
+						OnScancodeUp(sc);
+					}
 				}
 				memcpy(keystate, newkeystate, sizeof(keystate));
+				for(int sc : pressedScancodes){
+					QueueUiKeyboardInputForScancode(sc);
+				}
 			}
 			UpdateInputState(world.localinput);
 			Input action;
@@ -504,42 +810,12 @@ bool Game::Loop(void){
 				world.localinput.mousex    = mx;
 				world.localinput.mousey    = my;
 				world.localinput.mousedown = md;
-				// Edge-detect transitions and dispatch to the current
-				// interface — mirrors HandleSDLEvents' SDL_EVENT_MOUSE_*
-				// handlers (game.cpp ~6275). Without this the menu UI
-				// never sees the mouse, since iface state is driven by
-				// ProcessMousePress / ProcessMouseMove rather than
-				// world.localinput reads.
-				Interface * iface = (Interface *)world.GetObjectFromId(currentinterface);
-				if(iface){
-					bool moved = !tui_have_prev_mouse ||
-					             mx != tui_prev_mouse_x ||
-					             my != tui_prev_mouse_y;
-					bool downChanged = !tui_have_prev_mouse ||
-					                   md != tui_prev_mouse_down;
-					if(moved){
-						iface->ProcessMouseMove(world, mx, my);
-					}
-					if(downChanged){
-						iface->ProcessMousePress(world, md, mx, my);
-					}
-				}
-				tui_prev_mouse_x    = mx;
-				tui_prev_mouse_y    = my;
-				tui_prev_mouse_down = md;
-				tui_have_prev_mouse = true;
 			}
 		} else {
 			UpdateInputState(world.localinput);
-			// If a rebind slot is waiting for input, zero out gamepad-driven
-			// localinput so button presses don't leak into gameplay/UI actions.
-			if(currentinterface){
-				Interface* rebindIface = (Interface*)world.GetObjectFromId(currentinterface);
-				if(rebindIface && rebindIface->disabled){
-					world.localinput.keyup = world.localinput.keydown =
-					world.localinput.keyleft = world.localinput.keyright = false;
-				}
-			}
+			clientUiInput.CaptureGamepadBindingEdges(
+				gamepadstate.buttons, gamepadstate.axes,
+				SDL_GAMEPAD_AXIS_COUNT, AXIS_DEADZONE);
 			TickGamepadMenuNav();
 		}
 		world.SendInput();
@@ -555,7 +831,7 @@ bool Game::Loop(void){
 		}
 		if(world.gameplaystate == World::INGAME){
 			Uint8 newambiencelevel = renderer.GetAmbienceLevel();
-			if(newambiencelevel != oldambiencelevel || fade_i <= 15){
+			if(newambiencelevel != ambienceMixer.oldambiencelevel || fade_i <= 15){
 				SDL_Color * colors = renderer.palette.GetColors();
 				if(fade_i <= 15){
 					colors = renderer.palette.GetTempPalette();
@@ -563,12 +839,8 @@ bool Game::Loop(void){
 				SDL_Color * ambiencepalette = renderer.palette.CopyWithBrightness(colors, newambiencelevel, 2, 114);
 				SetColors(ambiencepalette);
 				renderer.palette.CalculateLighted(newambiencelevel);
-				oldambiencelevel = newambiencelevel;
+				ambienceMixer.oldambiencelevel = newambiencelevel;
 			}
-		}
-		fade_i++;
-		if(fade_i >= 16){
-			fade_i = 16;
 		}
 		lasttick += wait;
 	}
@@ -579,12 +851,25 @@ bool Game::Loop(void){
 	ControlDispatch::TickWaits(*this);
 	world.DoNetwork();
 	if(!world.dedicatedserver.active){
-		screenbuffer.Clear(0);
 		world.DoNetwork();
-		renderer.Draw(&screenbuffer, 1 - (float(tickcheck - lasttick) / wait));
+		float ft = 1 - (float(tickcheck - lasttick) / wait);
+		if(world.map.loaded){
+			// origin/main rendered one 640x480 paletted frame and let the GPU
+			// present pass stretch it to the window. Keep that path for
+			// gameplay; native-sized CPU frames are too expensive fullscreen.
+			ResizeRenderSurfacePixels(kLegacyRenderWidth, kLegacyRenderHeight);
+			screenbuffer.Clear(0);
+			renderer.Draw(&screenbuffer, ft);
+			DrawInGameWorldInsets(screenbuffer, ft);
+		}else{
+			if(window) SyncRenderSurfaceToWindowPixels();
+			screenbuffer.Clear(0);
+			renderer.Draw(&screenbuffer, ft);
+		}
+		RenderClientUiFrame(screenbuffer, ft);
 #ifdef POSIX
 		if(world.replay.IsPlaying() && world.replay.ffmpeg && world.replay.ffmpegvideo && deploymessageshown){
-			Uint8 buffer[640 * 480 * 3];
+			std::vector<Uint8> buffer(screenbuffer.w * screenbuffer.h * 3);
 			int i = 0;
 			int j = 0;
 			for(int y = screenbuffer.h; y > 0; y--){
@@ -595,7 +880,7 @@ bool Game::Loop(void){
 					j++;
 				}
 			}
-			fwrite(buffer, sizeof(buffer), 1, world.replay.ffmpeg);
+			fwrite(buffer.data(), buffer.size(), 1, world.replay.ffmpeg);
 		}
 #endif
 		/*char fpstext[16];
@@ -614,6 +899,7 @@ bool Game::Loop(void){
 		if(tui && renderdevice && !renderdevice->IsAlive()){
 			quitRequested = true;
 		}
+		ResetUiFrameDeltas();
 		// SDL3GPUBackend's swapchain Present blocks on vsync (~16 ms) so the
 		// non-TUI loop self-throttles. TUIBackend writes to a TCP socket that
 		// never blocks the engine, so without an explicit cap the loop runs
@@ -634,7 +920,11 @@ bool Game::Loop(void){
 }
 
 bool Game::Tick(void){
-	ProcessInGameInterfaces();
+	clientUi.ClearScreensIfRequested(screenContext);
+	if(state != FADEOUT){
+		clientUi.TickVisibleScreens(screenContext);
+	}
+	inGameUiController.UpdateOverlayState(world.localpeerid);
 	if(!world.dedicatedserver.active){
 		if(world.lobby.state == Lobby::AUTHENTICATED){
 			// 0 = main lobby, 1 = pregame (game-specific lobby, waiting for
@@ -668,23 +958,14 @@ bool Game::Tick(void){
 			}
 		}
 		if(world.gameplaystate == World::INLOBBY){
-			ProcessMapDownload();
-			if(gamejoininterface){
-				Interface * gamejoiniface = static_cast<Interface *>(world.GetObjectFromId(gamejoininterface));
-				if(gamejoiniface){
-					Button * readybtn = static_cast<Button *>(gamejoiniface->GetObjectWithUid(world, 25));
-					if(readybtn){
-						Peer * localpeer = world.peerlist[world.localpeerid];
-						bool blocked = localpeer && localpeer->ishost && !world.AllPeersDownloadedMap();
-						strcpy(readybtn->text, blocked ? "Waiting..." : "Ready");
-					}
-				}
-			}
+			mapDownloader.ProcessMapDownload();
+			// Ready-button text refresh ("Waiting..." vs "Ready") happens
+			// in GameJoinPanelTick — runs each frame from LobbyScreen::Tick.
 		}
 		/*Peer * localpeer = world.peerlist[world.localpeerid];
 		if(localpeer){
 			if(localpeer->gameinfoloaded && !world.dedicatedserver.checkedhavemap){
-				if(FindMap(world.gameinfo.mapname, &world.gameinfo.maphash).size() > 0){
+				if(mapDownloader.FindMap(world.gameinfo.mapname, &world.gameinfo.maphash).size() > 0){
 					localpeer->mapdownloaded = true;
 					world.SendPeerList();
 				}
@@ -722,7 +1003,7 @@ bool Game::Tick(void){
 	}
 	
 	if(world.gameplaystate == World::INGAME && (state == INGAME || state == SINGLEPLAYERGAME || state == TESTGAME)){
-		UpdateAmbienceChannels();
+		ambienceMixer.UpdateAmbienceChannels();
 		if(!headless) SDL_HideCursor();
 	}else{
 		if(!headless) SDL_ShowCursor();
@@ -744,16 +1025,7 @@ bool Game::Tick(void){
 	}
 	
 	switch(state){
-		case FADEOUT:{
-			world.intutorialmode = false;
-			SDL_Color * fadedpalette = renderer.palette.CopyWithBrightness(renderer.palette.GetColors(), (15 - fade_i) * 8);
-			SetColors(fadedpalette);
-			if(fade_i >= 16){
-				state = nextstate;
-				fade_i = 0;
-				stateisnew = true;
-			}
-		}break;
+		case FADEOUT: TickFadeOut(); break;
 		case MAINMENU:{
 			if(stateisnew){
 				world.Disconnect();
@@ -762,24 +1034,14 @@ bool Game::Tick(void){
 				UnloadGame();
 				world.GetAuthorityPeer()->controlledlist.clear();
 				world.DestroyAllObjects();
-				currentinterface = CreateMainMenuInterface()->id;
-				world.GetAuthorityPeer()->controlledlist.push_back(currentinterface);
-				renderer.camera.SetPosition(320, 240);
-				renderer.palette.SetPalette(1);
-				screenbuffer.Clear(0);
-				SetColors(renderer.palette.GetColors());
+				PushScreen(std::make_unique<MainMenuScreen>());
 				stateisnew = false;
 			}else{
-				if(FadedIn()){
-					//Audio::GetInstance().PlayMusic(world.resources.menumusic);
-					PlayMusic(world.resources.menumusic);
+				if(ambienceMixer.FadedIn()){
+					ambienceMixer.PlayMusic(world.resources.menumusic);
 				}
-				Interface * iface = (Interface *)world.GetObjectFromId(currentinterface);
-				if(iface){
-					if(!ProcessMainMenuInterface(iface)){
-						return false;
-					}
-				}
+				// Button-click handling lives in MainMenuScreen::Tick, dispatched
+				// by ClientUi's navigation stack at the top of Game::Tick.
 			}
 		}break;
 		case LOBBYCONNECT:{
@@ -787,520 +1049,45 @@ bool Game::Tick(void){
 				world.GetAuthorityPeer()->controlledlist.clear();
 				world.DestroyAllObjects();
 				world.lobby.ClearGames();
-				currentinterface = CreateLobbyConnectInterface()->id;
-				world.GetAuthorityPeer()->controlledlist.push_back(currentinterface);
-				renderer.palette.SetPalette(2);
 				world.lobby.state = Lobby::WAITING;
-				motdprinted = false;
-				screenbuffer.Clear(0);
-				SetColors(renderer.palette.GetColors());
+				PushScreen(std::make_unique<LobbyConnectScreen>());
 				stateisnew = false;
 			}else{
-				if(FadedIn()){
-					//Audio::GetInstance().PlayMusic(world.resources.menumusic);
-					PlayMusic(world.resources.menumusic);
-					Interface * iface = (Interface *)world.GetObjectFromId(currentinterface);
-					if(iface){
-						ProcessLobbyConnectInterface(iface);
-					}
+				if(ambienceMixer.FadedIn()){
+					ambienceMixer.PlayMusic(world.resources.menumusic);
 				}
 			}
 		}break;
 		case LOBBY:{
 			if(stateisnew){
 				world.lobby.ForgetAllUserInfo();
-				// Re-seed our own user from cached characters so the panel shows immediately.
-				world.lobby.LockMutex();
-				if(world.lobby.accountid != 0 && !world.lobby.characters.empty()){
-					for(const auto& ch : world.lobby.characters){
-						if(ch.id == world.lobby.selectedcharid){
-							User * self = world.lobby.GetUserInfo(world.lobby.accountid);
-							self->statsagency = ch.agencyIdx;
-							self->selectedcharid = ch.id;
-							strncpy(self->charname, ch.name, 16);
-							self->charname[16] = 0;
-							auto& a = self->agency[ch.agencyIdx];
-							a.wins          = ch.stats.wins;
-							a.losses        = ch.stats.losses;
-							a.xptonextlevel = ch.stats.xp;
-							a.level         = ch.stats.level;
-							a.endurance     = ch.stats.endurance;
-							a.shield        = ch.stats.shield;
-							a.jetpack       = ch.stats.jetpack;
-							a.techslots     = ch.stats.techslots;
-							a.hacking       = ch.stats.hacking;
-							a.contacts      = ch.stats.contacts;
-							break;
-						}
-					}
-				}
-				world.lobby.UnlockMutex();
 				world.gameplaystate = World::INLOBBY;
-				agencychanged = true;
 				UnloadGame();
 				world.Disconnect();
-				renderer.camera.SetPosition(320, 240);
-				lobbyinterface = 0;
-				characterinterface = 0;
-				chatinterface = 0;
-				gameselectinterface = 0;
-				gamecreateinterface = 0;
-				gamejoininterface = 0;
-				gametechinterface = 0;
-				gamesummaryinterface = 0;
-				modalinterface = 0;
-				passwordinterface = 0;
 				world.choosingtech = false;
 				world.lobby.channelchanged = true;
-				lobbyinterface = CreateLobbyInterface()->id;
-				currentinterface = lobbyinterface;
-				world.GetAuthorityPeer()->controlledlist.push_back(currentinterface);
-				renderer.palette.SetPalette(2);
-				screenbuffer.Clear(0);
-				SetColors(renderer.palette.GetColors());
+#ifdef SILENCER_HAVE_LOBBY_UI
+				PushScreen(std::make_unique<LobbyScreen>());
+#endif
 				stateisnew = false;
 			}else{
-				if(FadedIn()){
-					//Audio::GetInstance().PlayMusic(world.resources.menumusic);
-					PlayMusic(world.resources.menumusic);
+				if(ambienceMixer.FadedIn()){
+					ambienceMixer.PlayMusic(world.resources.menumusic);
 				}
-				// Re-seed panel when MSG_CHARACTERS arrives after lobby entry.
-				world.lobby.LockMutex();
-				if(world.lobby.charactersreceived){
-					world.lobby.charactersreceived = false;
-					if(world.lobby.accountid != 0 && !world.lobby.characters.empty()){
-						for(const auto& ch : world.lobby.characters){
-							if(ch.id == world.lobby.selectedcharid){
-								User * self = world.lobby.GetUserInfo(world.lobby.accountid);
-								self->statsagency = ch.agencyIdx;
-								self->selectedcharid = ch.id;
-								strncpy(self->charname, ch.name, 16);
-								self->charname[16] = 0;
-								auto& a = self->agency[ch.agencyIdx];
-								a.wins          = ch.stats.wins;
-								a.losses        = ch.stats.losses;
-								a.xptonextlevel = ch.stats.xp;
-								a.level         = ch.stats.level;
-								a.endurance     = ch.stats.endurance;
-								a.shield        = ch.stats.shield;
-								a.jetpack       = ch.stats.jetpack;
-								a.techslots     = ch.stats.techslots;
-								a.hacking       = ch.stats.hacking;
-								a.contacts      = ch.stats.contacts;
-								break;
-							}
-						}
-					}
-					agencychanged = true;
-				}
-				world.lobby.UnlockMutex();
-				if(world.lobby.state == Lobby::DISCONNECTED){
-					world.Disconnect();
-					GoToState(LOBBYCONNECT);
-					break;
-				}
-				if(lobbyinterface){
-					Interface * iface = static_cast<Interface *>(world.GetObjectFromId(lobbyinterface));
-					if(iface){
-						ProcessLobbyInterface(iface);
-					}
-				}
-				if(gamecreateinterface){
-					// Handle deferred CreateGame after map upload completes.
-					int us = mapUploadState.load(std::memory_order_acquire);
-					if(us == 2){
-						mapUploadState.store(0, std::memory_order_relaxed);
-						const char * pw = pendingCreate.password.empty() ? nullptr : pendingCreate.password.c_str();
-						world.lobby.CreateGame(
-							pendingCreate.gamename.c_str(),
-							pendingCreate.mapname.c_str(),
-							pendingCreate.maphash,
-							pw,
-							pendingCreate.securitylevel,
-							pendingCreate.minlevel,
-							pendingCreate.maxlevel,
-							pendingCreate.maxplayers,
-							pendingCreate.maxteams);
-					}else if(us == 3){
-						mapUploadState.store(0, std::memory_order_relaxed);
-						creategameclicked = false;
-						CreateModalDialog("Could not upload map");
-					}
-					if(world.lobby.creategamestatus == 1){
-						world.lobby.creategamestatus = 0;
-						Peer * authoritypeer = world.GetAuthorityPeer();
-						LobbyGame * lobbygame = world.lobby.GetGameById(world.lobby.createdgameid);
-						if(lobbygame){
-							Serializer data;
-							lobbygame->Serialize(Serializer::WRITE, data);
-							world.gameinfo.Serialize(Serializer::READ, data);
-							authoritypeer->ip = ntohl(inet_addr(lobbygame->hostname));
-							//authoritypeer->ip = ntohl(inet_addr("127.0.0.1")); // temporary
-							authoritypeer->port = lobbygame->port;
-							sharedstate = 0;
-							currentlobbygameid = lobbygame->id;
-							world.Connect(GetSelectedAgency(), world.lobby.accountid, lobbygame->password);
-							LoadMapData(FindMap(lobbygame->mapname, &lobbygame->maphash).c_str());
-							joininggame = true;
-						}
-						/*Team * team = (Team *)world.CreateObject(ObjectTypes::TEAM);
-						team->AddPeer(world.GetAuthorityPeer()->id);
-						team->agency = GetSelectedAgency();*/
-					}else
-					if(world.lobby.creategamestatus != 1 && world.lobby.creategamestatus != 100 && world.lobby.creategamestatus != 0){ // failed and not creating
-						world.lobby.creategamestatus = 0;
-						CreateModalDialog("Could not create game");
-					}
-				}
-				if(gameselectinterface || gamecreateinterface){
-					if(joininggame){
-						if(world.state == World::CONNECTED){
-							joininggame = false;
-						}
-						if(world.state == World::IDLE){
-							joininggame = false;
-							CreateModalDialog("Unable to join game");
-						}
-					}
-					if(modalinterface && !modaldialoghasok){
-						Interface * modaliface = static_cast<Interface *>(world.GetObjectFromId(modalinterface));
-						if(modaliface){
-							for(std::vector<Uint16>::iterator it = modaliface->objects.begin(); it != modaliface->objects.end(); it++){
-								Object * object = world.GetObjectFromId(*it);
-								if(object && object->type == ObjectTypes::OVERLAY){
-									Overlay * overlay = static_cast<Overlay *>(object);
-									if(overlay->text.length() > 0){
-										overlay->text = (mapUploadState.load(std::memory_order_relaxed) == 1)
-											? "Uploading map" : "Creating game";
-										int dots = (world.tickcount / 4) % 6;
-										if(dots > 3){
-											dots = 6 - dots;
-										}
-										for(int i = 0; i < dots; i++){
-											overlay->text += ".";
-										}
-									}
-								}
-							}
-						}
-					}
-					if(!modaldialoghasok && world.lobby.creategamestatus != 100 && mapUploadState.load(std::memory_order_relaxed) == 0 && (world.state == World::CONNECTED || world.state == World::IDLE)){
-						DestroyModalDialog();
-						creategameclicked = false;
-					}
-					if(world.state == World::CONNECTED && lobbyinterface){
-						Peer * peer = world.peerlist[world.localpeerid];
-						if(peer){
-							if(gameselectinterface){
-								Interface * lobbyiface = static_cast<Interface *>(world.GetObjectFromId(lobbyinterface));
-								if(lobbyiface){
-									Interface * gameselectiface = static_cast<Interface *>(world.GetObjectFromId(gameselectinterface));
-									if(gameselectiface){
-										gameselectiface->DestroyInterface(world, lobbyiface);
-									}
-								}
-								gameselectinterface = 0;
-							}
-							if(gamecreateinterface){
-								Interface * lobbyiface = static_cast<Interface *>(world.GetObjectFromId(lobbyinterface));
-								if(lobbyiface){
-									Interface * gamecreateiface = static_cast<Interface *>(world.GetObjectFromId(gamecreateinterface));
-									if(gamecreateiface){
-										gamecreateiface->DestroyInterface(world, lobbyiface);
-									}
-								}
-								gamecreateinterface = 0;
-							}
-							mapexistchecked = false;
-						// Invalidate any in-flight server map fetch for the previous
-						// game; the thread will see the stale generation and discard
-						// its result. Detach so we don't block here.
-						mapjoingeneration.fetch_add(1, std::memory_order_relaxed);
-						mapjoinstate.store(0, std::memory_order_relaxed);
-						if(mapjointhread.joinable()) mapjointhread.detach();
-							world.SetTech(Config::GetInstance().defaulttechchoices[GetSelectedAgency()]);
-							gamejoininterface = CreateGameJoinInterface()->id;
-							LobbyGame * lobbygame = world.lobby.GetGameById(currentlobbygameid);
-							if(lobbygame){
-								char temp[256];
-								GetGameChannelName(*lobbygame, temp);
-								strcpy(lastchannel, world.lobby.channel);
-								world.lobby.JoinChannel(temp);
-								UpdateLobbyMapName(lobbygame->mapname);
-								/*if(FindMap(lobbygame->mapname, &lobbygame->maphash).size() > 0){
-									world.SendMapDownloaded();
-								}*/
-							}
-							Interface * lobbyiface = static_cast<Interface *>(world.GetObjectFromId(lobbyinterface));
-							if(lobbyiface){
-								lobbyiface->AddObject(gamejoininterface);
-							}
-						}
-					}
-				}
-				
-				ProcessMapDownload();
-				
-				
-				if(world.state != World::CONNECTED && !modalinterface){
-					if(gamejoininterface || gametechinterface){
-						CreateModalDialog("Disconnected from game");
-					}
-				}
+				// Lobby pump (state-machine + deferred-create) lives in
+				// LobbyScreen::Tick, dispatched by ClientUi's navigation stack
+				// at the top of Game::Tick.
 			}
 		}break;
 		case CREATECHARACTER:{
 			if(stateisnew){
-				createCharSubState = 0;
-				createCharLastAgencyIdx = -1;
-				memset(createCharTempName, 0, sizeof(createCharTempName));
 				world.GetAuthorityPeer()->controlledlist.clear();
 				world.DestroyAllObjects();
-				currentinterface = CreateSelectAgentInterface()->id;
-				world.GetAuthorityPeer()->controlledlist.push_back(currentinterface);
-				world.lobby.LockMutex();
-				createCharEnterCount = world.lobby.characters.size();
-				// Populate character list in the SelectBox
-				Interface * initface = (Interface *)world.GetObjectFromId(currentinterface);
-				if(initface){
-					for(auto it = initface->objects.begin(); it != initface->objects.end(); it++){
-						Object * o = world.GetObjectFromId(*it);
-						if(o && o->type == ObjectTypes::SELECTBOX){
-							SelectBox * sb = static_cast<SelectBox *>(o);
-							if(sb->uid == 1){
-								sb->AddItem("Create New Character", 0);
-								for(auto & ch : world.lobby.characters){
-									sb->AddItem(ch.name, ch.id);
-								}
-							}
-						}
-					}
-				}
-				world.lobby.UnlockMutex();
-				renderer.palette.SetPalette(2);
-				screenbuffer.Clear(0);
-				SetColors(renderer.palette.GetColors());
+				PushScreen(std::make_unique<CharacterCreateScreen>());
 				stateisnew = false;
 			}else{
-				if(FadedIn()){
-					PlayMusic(world.resources.menumusic);
-					bool navigated = false;
-
-					if(createCharSubState == 0){
-						// SELECT AGENT — handle selectbox selection (Enter key or mouse click)
-						Interface * iface = (Interface *)world.GetObjectFromId(currentinterface);
-						if(iface){
-							for(auto it = iface->objects.begin(); it != iface->objects.end() && !navigated; it++){
-								Object * o = world.GetObjectFromId(*it);
-								if(!o) continue;
-								if(o->type == ObjectTypes::SELECTBOX){
-									SelectBox * sb = static_cast<SelectBox *>(o);
-									if(sb->uid != 1) continue;
-									// Sync scrollbar
-									Object * sbobj = world.GetObjectFromId(iface->scrollbar);
-									if(sbobj && sbobj->type == ObjectTypes::SCROLLBAR){
-										ScrollBar * scrollbar = static_cast<ScrollBar *>(sbobj);
-										sb->scrolled = scrollbar->scrollposition;
-									}
-									// Detect click on a list item
-									bool triggered = false;
-									int clickedIndex = -1;
-									if(iface->mousedown){
-										int idx = sb->MouseInside(world, iface->mousex, iface->mousey);
-										if(idx >= 0 && idx == sb->selecteditem){
-											triggered = true;
-											clickedIndex = idx;
-										} else if(idx >= 0){
-											sb->selecteditem = idx;
-										}
-									}
-									if(sb->enterpressed){
-										sb->enterpressed = false;
-										triggered = true;
-										clickedIndex = sb->selecteditem;
-									}
-									if(triggered && clickedIndex >= 0){
-										navigated = true;
-										if(clickedIndex == 0){
-											world.GetAuthorityPeer()->controlledlist.clear();
-											world.DestroyAllObjects();
-											createCharSubState = 1;
-											currentinterface = CreateEnterAliasInterface()->id;
-											world.GetAuthorityPeer()->controlledlist.push_back(currentinterface);
-										}else{
-											Uint32 charId = sb->IndexToId(clickedIndex);
-											world.lobby.LockMutex();
-											world.lobby.SelectCharacter(charId);
-											world.lobby.UnlockMutex();
-											GoToState(LOBBY);
-										}
-									}
-								}
-							}
-						}
-					}
-
-					if(!navigated && createCharSubState == 1){
-						// SILENCER ALIAS — handle Next / Back
-						Interface * iface = (Interface *)world.GetObjectFromId(currentinterface);
-						if(iface){
-							for(auto it = iface->objects.begin(); it != iface->objects.end() && !navigated; it++){
-								Object * o = world.GetObjectFromId(*it);
-								if(!o || o->type != ObjectTypes::BUTTON) continue;
-								Button * button = static_cast<Button *>(o);
-								if(button->uid == 20 && button->clicked){ // Next
-									button->clicked = false;
-									memset(createCharTempName, 0, sizeof(createCharTempName));
-									for(auto it2 = iface->objects.begin(); it2 != iface->objects.end(); it2++){
-										Object * o2 = world.GetObjectFromId(*it2);
-										if(o2 && o2->type == ObjectTypes::TEXTINPUT){
-											TextInput * ti = static_cast<TextInput *>(o2);
-											if(ti->uid == 1){
-												strncpy(createCharTempName, ti->text, 16);
-												createCharTempName[16] = 0;
-											}
-										}
-									}
-									if(strlen(createCharTempName) > 0){
-										navigated = true;
-										world.GetAuthorityPeer()->controlledlist.clear();
-										world.DestroyAllObjects();
-										createCharSubState = 2;
-										createCharLastAgencyIdx = -1;
-										currentinterface = CreateSelectAgencyInterface()->id;
-										world.GetAuthorityPeer()->controlledlist.push_back(currentinterface);
-									}
-								}
-								if(!navigated && button->uid == 21 && button->clicked){ // Back
-									button->clicked = false;
-									navigated = true;
-									world.GetAuthorityPeer()->controlledlist.clear();
-									world.DestroyAllObjects();
-									createCharSubState = 0;
-									currentinterface = CreateSelectAgentInterface()->id;
-									world.GetAuthorityPeer()->controlledlist.push_back(currentinterface);
-									Interface * newiface = (Interface *)world.GetObjectFromId(currentinterface);
-									if(newiface){
-										for(auto it2 = newiface->objects.begin(); it2 != newiface->objects.end(); it2++){
-											Object * o2 = world.GetObjectFromId(*it2);
-											if(o2 && o2->type == ObjectTypes::SELECTBOX){
-												SelectBox * sb = static_cast<SelectBox *>(o2);
-												if(sb->uid == 1){
-													sb->AddItem("Create New Character", 0);
-													world.lobby.LockMutex();
-													for(auto & ch : world.lobby.characters)
-														sb->AddItem(ch.name, ch.id);
-													world.lobby.UnlockMutex();
-												}
-											}
-										}
-									}
-								}
-							}
-						}
-					}
-
-					if(!navigated && createCharSubState == 2){
-						// SELECT AGENCY — check for creation, handle description and buttons
-						world.lobby.LockMutex();
-						bool created = world.lobby.charactersreceived && world.lobby.characters.size() > createCharEnterCount;
-						world.lobby.UnlockMutex();
-						if(created){ GoToState(LOBBY); break; }
-
-						Interface * iface = (Interface *)world.GetObjectFromId(currentinterface);
-						if(iface){
-							SelectBox * agencyselect = nullptr;
-							TextBox * descbox = nullptr;
-							Overlay * advtext = nullptr;
-							for(auto it = iface->objects.begin(); it != iface->objects.end(); it++){
-								Object * o = world.GetObjectFromId(*it);
-								if(!o) continue;
-								if(o->type == ObjectTypes::SELECTBOX){
-									SelectBox * sb = static_cast<SelectBox *>(o);
-									if(sb->uid == 1){
-										agencyselect = sb;
-										Object * sbobj = world.GetObjectFromId(iface->scrollbar);
-										if(sbobj && sbobj->type == ObjectTypes::SCROLLBAR){
-											ScrollBar * scrollbar = static_cast<ScrollBar *>(sbobj);
-											sb->scrolled = scrollbar->scrollposition;
-										}
-										if(iface->mousedown){
-											int idx = sb->MouseInside(world, iface->mousex, iface->mousey);
-											if(idx >= 0) sb->selecteditem = idx;
-										}
-									}
-								}
-								if(o->type == ObjectTypes::TEXTBOX){
-									TextBox * tb = static_cast<TextBox *>(o);
-									if(tb->uid == 2) descbox = tb;
-								}
-								if(o->type == ObjectTypes::OVERLAY){
-									Overlay * ov = static_cast<Overlay *>(o);
-									if(ov->uid == 3) advtext = ov;
-								}
-							}
-							// Update right panel when selection changes
-							if(agencyselect && descbox && agencyselect->selecteditem != createCharLastAgencyIdx){
-								createCharLastAgencyIdx = agencyselect->selecteditem;
-								descbox->text.clear();
-								if(advtext) advtext->text = "";
-								switch(createCharLastAgencyIdx){
-									case 0:
-										if(advtext) advtext->text = "Endurance +3    Jump +5";
-										descbox->AddText("The Noxis corporation terraformed the majority of Mars' habitable sectors. Their agents train in bio-sporria rich environments with advanced oxygen processors for enhanced endurance and mobility.");
-										break;
-									case 1:
-										if(advtext) advtext->text = "Shield +3    Hacking +2";
-										descbox->AddText("Lazarus specializes in nano-regeneration technology and black market medical operations. Their agents use adaptive shielding and neural implants to enhance defensive and technical capabilities.");
-										break;
-									case 2:
-										if(advtext) advtext->text = "Contacts +3    Tech Slots +1";
-										descbox->AddText("Caliber is the premier arms manufacturer on Mars, supplying all agencies. Their agents leverage a vast supplier network and customized tech loadouts for superior firepower and adaptability.");
-										break;
-									case 3:
-										if(advtext) advtext->text = "Hacking +3    Tech Slots +1";
-										descbox->AddText("Static operates in the electromagnetic spectrum, specializing in electronic warfare and surveillance. Their agents master jamming, infiltration, and disrupting enemy communications.");
-										break;
-									case 4:
-										if(advtext) advtext->text = "Contacts +5";
-										descbox->AddText("Black Rose is a shadow organization with ties to every faction. Their agents possess the most extensive network of contacts on Mars, enabling access to intelligence and resources from anywhere.");
-										break;
-								}
-							}
-							for(auto it = iface->objects.begin(); it != iface->objects.end() && !navigated; it++){
-								Object * o = world.GetObjectFromId(*it);
-								if(!o || o->type != ObjectTypes::BUTTON) continue;
-								Button * button = static_cast<Button *>(o);
-								if(button->uid == 20 && button->clicked){ // Create
-									button->clicked = false;
-									Uint8 idx = (agencyselect && agencyselect->selecteditem >= 0) ? (Uint8)agencyselect->selecteditem : 0;
-									world.lobby.LockMutex();
-									world.lobby.CreateCharacter(createCharTempName, idx);
-									world.lobby.UnlockMutex();
-								}
-								if(button->uid == 21 && button->clicked){ // Back
-									button->clicked = false;
-									navigated = true;
-									world.GetAuthorityPeer()->controlledlist.clear();
-									world.DestroyAllObjects();
-									createCharSubState = 1;
-									createCharLastAgencyIdx = -1;
-									currentinterface = CreateEnterAliasInterface()->id;
-									world.GetAuthorityPeer()->controlledlist.push_back(currentinterface);
-									Interface * newiface2 = (Interface *)world.GetObjectFromId(currentinterface);
-									if(newiface2){
-										for(auto it2 = newiface2->objects.begin(); it2 != newiface2->objects.end(); it2++){
-											Object * o2 = world.GetObjectFromId(*it2);
-											if(o2 && o2->type == ObjectTypes::TEXTINPUT){
-												TextInput * ti = static_cast<TextInput *>(o2);
-												if(ti->uid == 1) ti->SetText(createCharTempName);
-											}
-										}
-									}
-								}
-							}
-						}
-					}
+				if(ambienceMixer.FadedIn()){
+					ambienceMixer.PlayMusic(world.resources.menumusic);
 				}
 			}
 		}break;
@@ -1308,1258 +1095,63 @@ bool Game::Tick(void){
 			if(stateisnew){
 				world.GetAuthorityPeer()->controlledlist.clear();
 				world.DestroyAllObjects();
-				CreateUpdateInterface();
-				world.GetAuthorityPeer()->controlledlist.push_back(currentinterface);
-				renderer.palette.SetPalette(2);
-				screenbuffer.Clear(0);
-				SetColors(renderer.palette.GetColors());
+				PushScreen(std::make_unique<UpdateScreen>());
 				stateisnew = false;
 			}else{
-				if(FadedIn()){
-					PlayMusic(world.resources.menumusic);
-				}
-				Interface * iface = static_cast<Interface *>(world.GetObjectFromId(updateinterface));
-				if(iface){
-					ProcessUpdateInterface(iface);
+				if(ambienceMixer.FadedIn()){
+					ambienceMixer.PlayMusic(world.resources.menumusic);
 				}
 			}
 		}break;
-		case INGAME:{
-			if(/*!world.map.loaded && */stateisnew){
-				for(std::list<Object *>::iterator it = world.objectlist.begin(); it != world.objectlist.end(); it++){
-					Object * object = *it;
-					switch(object->type){
-						case ObjectTypes::TEAM:{
-							Team * team = static_cast<Team *>(object);
-							team->DestroyOverlays(world);
-						}break;
-						case ObjectTypes::INTERFACE:{
-							Interface * iface = static_cast<Interface *>(object);
-							iface->DestroyInterface(world, iface);
-						}break;
-					}
-				}
-				screenbuffer.Clear(0);
-				//char mapname[7 + 256];
-				//sprintf(mapname, "level/%s", world.gameinfo.mapname);
-				if(!LoadMap(FindMap(world.gameinfo.mapname, &world.gameinfo.maphash).c_str())){
-					printf("Unable to load map\n");
-					if(world.replay.IsPlaying()){
-						world.replay.EndPlaying();
-					}
-					world.Disconnect();
-					if(world.lobby.state == Lobby::AUTHENTICATED){
-						world.lobby.JoinChannel(lastchannel);
-						GoToState(LOBBY);
-					}else{
-						GoToState(MAINMENU);
-					}
-					break;
-				}
-				State * sharedstateobject = static_cast<State *>(world.GetObjectFromId(sharedstate));
-				if(sharedstateobject){
-					sharedstateobject->state = 2;
-				}
-				if(world.replay.IsRecording()){
-					world.replay.WriteStart();
-				}
-				ShowDeployMessage();
-				Audio::GetInstance().StopMusic();
-				world.gameplaystate = World::INGAME;
-				for(std::list<Object *>::iterator it = world.objectlist.begin(); it != world.objectlist.end(); it++){
-					Object * object = *it;
-					switch(object->type){
-						case ObjectTypes::TEAM:{
-							Team * team = static_cast<Team *>(object);
-							for(int i = 0; i < team->numpeers; i++){
-								Peer * peer = world.peerlist[team->peers[i]];
-								if(peer){
-									world.ingameusers.push_back(peer->accountid);
-									User * user = world.lobby.GetUserInfo(peer->accountid);
-									if(user){
-										user->statsagency = team->agency;
-										user->teamnumber = team->number;
-									}
-									Player * player = (Player *)world.CreateObject(ObjectTypes::PLAYER);
-									if(player){
-										world.map.RandomPlayerStartLocation(world, player->x, player->y);
-										player->oldx = player->x;
-										player->oldy = player->y;
-										Uint8 teamcolor = team->GetColor();
-										player->suitcolor = teamcolor;//(((teamcolor >> 4) - i) << 4) + (teamcolor & 0xF);
-										peer->controlledlist.clear();
-										peer->controlledlist.push_back(player->id);
-										GiveDefaultItems(*player);
-									}
-								}
-							}
-						}break;
-					}
-				}
-				world.SendPeerList();
-				currentinterface = 0;
-				renderer.palette.SetPalette(0);
-				renderer.palette.SetParallaxColors(world.map.parallax);
-				screenbuffer.Clear(0);
-				SetColors(renderer.palette.GetColors());
-				LoadRandomGameMusic();
-				stateisnew = false;
-			}else{
-				if(FadedIn()){
-					//Audio::GetInstance().PlayMusic(world.resources.gamemusic);
-					PlayMusic(world.resources.gamemusic);
-				}
-				if(world.replay.IsPlaying()){
-					// replay controls
-					if(world.localpeerid == world.authoritypeer && !deploymessageshown){
-						for(int i = 0; i < world.maxpeers; i++){
-							if(world.peerlist[i] && i != world.authoritypeer){
-								world.localpeerid = i;
-								break;
-							}
-						}
-					}
-					world.replay.oldx = world.replay.x;
-					world.replay.oldy = world.replay.y;
-					if(world.localinput.keymoveleft || world.localinput.keymoveright || world.localinput.keymoveup || world.localinput.keymovedown){
-						world.localpeerid = world.authoritypeer;
-						bool inbase = false;
-						if(world.replay.y > world.map.height * 64){
-							inbase = true;
-						}
-						if(world.localinput.keymoveleft){
-							if(world.replay.xv > 0){
-								world.replay.xv = 0;
-							}
-							world.replay.xv -= 3;
-							world.replay.x += world.replay.xv;
-							if(world.replay.x < 320){
-								world.replay.x = 320;
-							}
-						}else
-						if(world.localinput.keymoveright){
-							if(world.replay.xv < 0){
-								world.replay.xv = 0;
-							}
-							world.replay.xv += 3;
-							world.replay.x += world.replay.xv;
-							if(world.replay.x > ((inbase ? world.map.expandedwidth : world.map.width) * 64) - 320){
-								world.replay.x = ((inbase ? world.map.expandedwidth : world.map.width) * 64) - 320;
-							}
-						}else{
-							world.replay.xv = 0;
-						}
-						if(world.localinput.keymoveup){
-							if(world.replay.yv > 0){
-								world.replay.yv = 0;
-							}
-							world.replay.yv -= 3;
-							world.replay.y += world.replay.yv;
-							if(world.replay.y < 240){
-								world.replay.y = 240;
-							}
-						}else
-						if(world.localinput.keymovedown){
-							if(world.replay.yv < 0){
-								world.replay.yv = 0;
-							}
-							world.replay.yv += 3;
-							world.replay.y += world.replay.yv;
-							if(world.replay.y > ((inbase ? world.map.expandedheight : world.map.height) * 64) - 240){
-								world.replay.y = ((inbase ? world.map.expandedheight : world.map.height) * 64) - 240;
-							}
-						}else{
-							world.replay.yv = 0;
-						}
-					}else{
-						world.replay.xv = 0;
-						world.replay.yv = 0;
-					}
-					if(world.localinput.keyprevcam && !world.localinputhistory[(world.tickcount - 1) % world.maxlocalinputhistory].keyprevcam){
-						for(int i = world.localpeerid - 1; i > 0; i--){
-							if(world.peerlist[i] && i != world.authoritypeer){
-								world.localpeerid = i;
-								break;
-							}
-						}
-					}
-					if(world.localinput.keynextcam && !world.localinputhistory[(world.tickcount - 1) % world.maxlocalinputhistory].keynextcam){
-						for(int i = world.localpeerid + 1; i < world.maxpeers; i++){
-							if(world.peerlist[i] && i != world.authoritypeer){
-								world.localpeerid = i;
-								break;
-							}
-						}
-
-					}
-					world.replay.speed = 1;
-					if(world.localinput.keydetonate){
-						world.replay.speed = 0.05;
-					}
-					if(world.localinput.keyuse){
-						world.replay.speed = 2;
-					}
-					if(world.localinput.keyjump){
-						world.replay.showallnames = true;
-					}else{
-						world.replay.showallnames = false;
-					}
-					//
-					if(!world.replay.ReadToNextTick(world)){
-						world.replay.EndPlaying();
-						GoToState(MAINMENU);
-					}
-				}
-				Peer * localpeer = world.peerlist[world.localpeerid];
-				if(localpeer && world.localpeerid != world.authoritypeer){
-					if(localpeer->controlledlist.size() == 0){
-						world.RequestPeerList();
-					}
-				}
-				if(!deploymessageshown && world.messagetype == 1 && world.message_i == 63){
-					world.ShowMessage((char *)"Location : Base Arsia Mons, Surface Temperature : -7C", 96, 1);
-					deploymessageshown = true;
-				}
-				if(CheckForQuit()){
-					world.Disconnect();
-					if(world.lobby.state == Lobby::AUTHENTICATED){
-						GoToState(LOBBY);
-						world.lobby.JoinChannel(lastchannel);
-					}else{
-						if(world.replay.IsPlaying()){
-							world.replay.EndPlaying();
-						}
-						GoToState(MAINMENU);
-					}
-				}
-				if(CheckForEndOfGame()){
-					if(world.lobby.state == Lobby::AUTHENTICATED){
-						GoToState(MISSIONSUMMARY);
-					}else{
-						if(world.replay.IsPlaying()){
-							world.replay.EndPlaying();
-						}
-						GoToState(MAINMENU);
-					}
-				}
-				if(CheckForConnectionLost()){
-					if(world.lobby.state == Lobby::AUTHENTICATED){
-						GoToState(LOBBY);
-						world.lobby.JoinChannel(lastchannel);
-					}else{
-						GoToState(MAINMENU);
-					}
-				}
-			}
-		}break;
+		case INGAME: TickInGame(); break;
 		case MISSIONSUMMARY:{
 			if(stateisnew){
 				UnloadGame();
-				gamesummaryinfoloaded = false;
 				world.Disconnect();
-				renderer.camera.SetPosition(320, 240);
-				User * user = world.lobby.GetUserInfo(world.lobby.accountid);
-				gamesummaryinterface = CreateGameSummaryInterface(user->statscopy, user->statsagency)->id;
-				currentinterface = gamesummaryinterface;
-				renderer.palette.SetPalette(1);
-				screenbuffer.Clear(0);
-				SetColors(renderer.palette.GetColors());
+				PushScreen(std::make_unique<MissionSummaryScreen>());
 				stateisnew = false;
 			}else{
-				if(FadedIn()){
-					//Audio::GetInstance().PlayMusic(world.resources.menumusic);
-					PlayMusic(world.resources.menumusic);
-				}
-				Interface * gamesummaryiface = static_cast<Interface *>(world.GetObjectFromId(gamesummaryinterface));
-				if(gamesummaryiface){
-					ProcessGameSummaryInterface(gamesummaryiface);
+				if(ambienceMixer.FadedIn()){
+					ambienceMixer.PlayMusic(world.resources.menumusic);
 				}
 			}
 		}break;
-		case SINGLEPLAYERGAME:{
-			if(stateisnew){
-				world.GetAuthorityPeer()->controlledlist.clear();
-				world.DestroyAllObjects();
-				world.gameplaystate = World::INGAME;
-				world.intutorialmode = true;
-				currentinterface = 0;
-				world.GetAuthorityPeer()->techchoices = World::BUY_LASER | World::BUY_ROCKET;
-				//world.Listen(23456);
-				Team * team = (Team *)world.CreateObject(ObjectTypes::TEAM);
-				team->AddPeer(world.GetAuthorityPeer()->id);
-				team->agency = Team::NOXIS;
-				team->color = ((8 << 4) + 13);
-				Player * player = (Player *)world.CreateObject(ObjectTypes::PLAYER);
-				player->suitcolor = team->color;
-				player->laserammo = 0;
-				player->credits = GASLoader::Get().player.startingCredits;
-				player->RemoveInventoryItem(Player::INV_BASEDOOR);
-				ShowDeployMessage();
-				world.GetAuthorityPeer()->controlledlist.push_back(player->id);
-				world.gameinfo.securitylevel = LobbyGame::SECNONE;
-				if(!LoadMap((GetResDir() + "AGENCY04.SIL").c_str())){
-					GoToState(MAINMENU);
-				}
-				Audio::GetInstance().StopMusic();
-				world.map.RandomPlayerStartLocation(world, player->x, player->y);
-				player->oldx = player->x;
-				player->oldy = player->y;
-				renderer.palette.SetPalette(0);
-				renderer.palette.SetParallaxColors(world.map.parallax);
-				screenbuffer.Clear(0);
-				SetColors(renderer.palette.GetColors());
-				singleplayermessage = 0;
-				stateisnew = false;
-				LoadRandomGameMusic();
-			}
-			if(FadedIn()){
-				//Audio::GetInstance().PlayMusic(world.resources.gamemusic);
-				PlayMusic(world.resources.gamemusic);
-			}
-			Player * player = world.GetPeerPlayer(world.localpeerid);
-			if(player){
-				switch(singleplayermessage){
-					case 0:{
-						if(!world.message_i){
-							char text[256];
-							sprintf(text, "Move your agent left and right\nBy tapping %s and %s.", GetActionKeyDisplayName(Action::MoveLeft), GetActionKeyDisplayName(Action::MoveRight));
-							world.ShowMessage(text, 128);
-						}
-						if(player->state == Player::RUNNING){
-							singleplayermessage++;
-							world.message_i = 0;
-						}
-					}break;
-					case 1:{
-						if(!world.message_i){
-							char text[256];
-							sprintf(text, "Make your agent jump by striking %s.", GetActionKeyDisplayName(Action::Jump));
-							world.ShowMessage(text, 128);
-						}
-						if(player->state == Player::JUMPING){
-							singleplayermessage++;
-							world.message_i = 0;
-						}
-					}break;
-					case 2:{
-						if(!world.message_i){
-							char text[256];
-							sprintf(text, "If you hold the %s key down, it will\nactivate your agent's jet-pack.", GetActionKeyDisplayName(Action::Jetpack));
-							world.ShowMessage(text, 128);
-						}
-						if(player->state == Player::JETPACK){
-							singleplayermessage++;
-							world.message_i = 0;
-						}
-					}break;
-					case 3:{
-						if(!world.message_i){
-							char text[256];
-							sprintf(text, "Make your agent kneel by holding %s.", GetActionKeyDisplayName(Action::MoveDown));
-							world.ShowMessage(text, 128);
-						}
-						if(player->state == Player::CROUCHED){
-							singleplayermessage++;
-							world.message_i = 0;
-						}
-					}break;
-					case 4:{
-						if(!world.message_i){
-							char text[256];
-							sprintf(text, "Make your agent roll by kneeling,\nthen striking %s or %s.", GetActionKeyDisplayName(Action::MoveLeft), GetActionKeyDisplayName(Action::MoveRight));
-							world.ShowMessage(text, 128);
-						}
-						if(player->state == Player::ROLLING){
-							singleplayermessage++;
-							world.message_i = 0;
-						}
-					}break;
-					case 5:{
-						if(!world.message_i){
-							char text[256];
-							sprintf(text, "To disguise as a civilian, press the %s key.", GetActionKeyDisplayName(Action::Disguise));
-							world.ShowMessage(text, 128);
-						}
-						if(player->IsDisguised()){
-							singleplayermessage++;
-							world.message_i = 0;
-						}
-					}break;
-					case 6:{
-						if(!world.message_i){
-							char text[256];
-							sprintf(text, "To return to normal, press the %s key again.", GetActionKeyDisplayName(Action::Disguise));
-							world.ShowMessage(text, 128);
-						}
-						if(!player->IsDisguised()){
-							singleplayermessage++;
-							world.message_i = 0;
-						}
-					}break;
-					case 7:{
-						if(!world.message_i){
-							char text[256];
-							sprintf(text, "The %s key fires your current weapon,\nthe Blaster.", GetActionKeyDisplayName(Action::Fire));
-							world.ShowMessage(text, 128);
-						}
-						if(player->state == Player::STANDINGSHOOT || player->state == Player::CROUCHEDSHOOT || player->state == Player::FALLINGSHOOT || player->state == Player::JETPACKSHOOT || player->state == Player::LADDERSHOOT){
-							singleplayermessage++;
-							world.message_i = 0;
-						}
-					}break;
-					case 8:{
-						if(!world.message_i){
-							char text[256];
-#ifdef OUYA
-							sprintf(text, "To change weapons, press %s", GetActionKeyDisplayName(Action::NextWeapon));
-#else
-							sprintf(text, "To change weapons, press the 1, 2, 3, or 4 keys");
-#endif
-							world.ShowMessage(text, 128);
-							
-						}
-						if(player->laserammo == 0){
-							player->laserammo = 15;
-						}
-						if(player->currentweapon != 0){
-							singleplayermessage++;
-							world.message_i = 0;
-						}
-					}break;
-					case 9:{
-						if(!world.message_i){
-							char text[256];
-							sprintf(text, "Good job, agent.\n\nYou have been given a base-building device.");
-							world.ShowMessage(text, 128);
-							player->AddInventoryItem(Player::INV_BASEDOOR);
-							singleplayermessage++;
-						}
-					}break;
-					case 10:{
-						if(!world.message_i){
-							char text[256];
-							sprintf(text, "Hit %s to build your base.", GetActionKeyDisplayName(Action::Use));
-							world.ShowMessage(text, 128);
-						}
-						Team * team = player->GetTeam(world);
-						if(team && team->basedoorid){
-							singleplayermessage++;
-							world.message_i = 0;
-						}
-					}break;
-					case 11:{
-						if(!world.message_i){
-							char text[256];
-							sprintf(text, "To enter your base, hit %s when your\nSilencer is at the base entrance.", GetActionKeyDisplayName(Action::Activate));
-							world.ShowMessage(text, 128);
-						}
-						if(player->InBase(world)){
-							singleplayermessage++;
-							world.message_i = 0;
-						}
-					}break;
-					case 12:{
-						if(!world.message_i){
-							char text[256];
-							sprintf(text, "You are now inside your agent's secret base.\nWalk right to the flashing green computer screen\nand hit %s to activate it.", GetActionKeyDisplayName(Action::Activate));
-							world.ShowMessage(text, 255);
-						}
-						if(!player->InBase(world)){
-							singleplayermessage = 11;
-							world.message_i = 0;
-						}
-						if(player->buyinterfaceid){
-							singleplayermessage++;
-							world.message_i = 0;
-						}
-					}break;
-					case 13:{
-						if(!world.message_i){
-							char text[256];
-#ifdef OUYA
-							const char * button = "O";
-#else
-							const char * button = "Enter";
-#endif
-							sprintf(text, "Use the Up and Down keys to select Rocket ammo\nand press %s to purchase.", button);
-							world.ShowMessage(text, 255);
-						}
-						if(!player->InBase(world)){
-							singleplayermessage = 11;
-							world.message_i = 0;
-						}
-						if(player->credits < 250){
-						player->credits = GASLoader::Get().player.creditFloor;
-						}
-						if(player->rocketammo > 0){
-							singleplayermessage++;
-							world.message_i = 0;
-						}
-					}break;
-					case 14:{
-						if(!world.message_i){
-							char text[256];
-							sprintf(text, "Good, now hit %s or %s to exit the menu.", GetActionKeyDisplayName(Action::MoveLeft), GetActionKeyDisplayName(Action::MoveRight));
-							world.ShowMessage(text, 128);
-						}
-						if(player->rocketammo > 0){
-							singleplayermessage++;
-							world.message_i = 0;
-						}
-					}break;
-					case 15:{
-						if(!world.message_i){
-							char text[256];
-							sprintf(text, "To leave your base, walk Left through\nthe door you entered.");
-							world.ShowMessage(text, 128);
-						}
-						if(!player->InBase(world)){
-							singleplayermessage++;
-							world.message_i = 0;
-						}
-					}break;
-					case 16:{
-						if(!world.message_i){
-							char text[256];
-							sprintf(text, "In the playfield, you need to hack into\ndata terminals to collect information.");
-							world.ShowMessage(text, 192);
-						}
-						if(world.message_i >= 192 - 1){
-							singleplayermessage++;
-							world.message_i = 0;
-						}
-					}break;
-					case 17:{
-						if(!world.message_i){
-							char text[256];
-							sprintf(text, "Walk around until you see a\nflashing green data port.\nStanding in front of the data port, hit %s\nto initiate hacking.", GetActionKeyDisplayName(Action::Activate));
-							world.ShowMessage(text, 255);
-						}
-						if(player->state == Player::HACKING && player->files >= 100){
-							singleplayermessage++;
-							world.message_i = 0;
-						}
-					}break;
-					case 18:{
-						if(!world.message_i){
-							char text[256];
-							sprintf(text, "Return with the information to your base door,\nhitting %s to enter the base.", GetActionKeyDisplayName(Action::Activate));
-							world.ShowMessage(text, 128);
-						}
-						if(player->InBase(world)){
-							singleplayermessage++;
-							world.message_i = 0;
-						}
-					}break;
-					case 19:{
-						if(!world.message_i){
-							char text[256];
-							sprintf(text, "Walk to the Right, through the agency receiver\nto deliver the information to your agency.");
-							world.ShowMessage(text, 128);
-						}
-						if(!player->InBase(world)){
-							singleplayermessage = 18;
-							world.message_i = 0;
-						}
-						if(!player->files){
-							singleplayermessage++;
-							world.message_i = 0;
-						}
-					}break;
-					case 20:{
-						if(!world.message_i){
-							char text[256];
-							sprintf(text, "Good job, agent.\nYou're ready for the final training exercise.");
-							world.ShowMessage(text, 128);
-						}
-						if(world.message_i >= 128 - 1){
-							singleplayermessage++;
-							world.message_i = 0;
-						}
-					}break;
-					case 21:{
-						if(!world.message_i){
-							world.highlightsecrets = true;
-							char text[256];
-							sprintf(text, "This indicator shows your progress towards\ndiscovering the location of a secret.\nKeep collecting files\nuntil all stages are lit.");
-							world.ShowMessage(text, 255);
-						}
-						Team * team = player->GetTeam(world);
-						if(team && team->beamingterminalid){
-							world.highlightsecrets = false;
-							singleplayermessage++;
-							world.message_i = 0;
-						}
-					}break;
-					case 22:{
-						if(!world.message_i){
-							world.highlightminimap = true;
-							char text[256];
-							sprintf(text, "The narrowing circle on your radar shows\nyour agency acquiring a lock on the secret.\nWhen the lock is completed, the\nsecret can be picked up by your team.");
-							world.ShowMessage(text, 255);
-						}
-						Team * team = player->GetTeam(world);
-						bool advance22 = player->hassecret || (team && team->secrets > 0);
-						if(!advance22 && team && team->beamingterminalid){
-							Terminal * terminal = static_cast<Terminal *>(world.GetObjectFromId(team->beamingterminalid));
-							if(terminal){
-								if(terminal->beamingtime > 45){
-									terminal->beamingtime = 45;
-								}
-								if(terminal->state == Terminal::SECRETREADY){
-									advance22 = true;
-								}
-							}
-						}
-						if(advance22){
-							world.highlightminimap = false;
-							singleplayermessage++;
-							world.message_i = 0;
-						}
-					}break;
-					case 23:{
-						if(!world.message_i){
-							char text[256];
-							sprintf(text, "Pick up the secret at the location shown\non your radar map");
-							world.ShowMessage(text, 128);
-						}
-						Team * team23 = player->GetTeam(world);
-						if(player->hassecret || (team23 && team23->secrets > 0)){
-							singleplayermessage++;
-							world.message_i = 0;
-						}
-					}break;
-					case 24:{
-						if(!world.message_i){
-							char text[256];
-							sprintf(text, "Now, you must return the secret to your base.\nIf this were a real government secret,\nyou would have limited time before\nthe government traced your location.");
-							world.ShowMessage(text, 255);
-						}
-						Team * team24 = player->GetTeam(world);
-						if(player->InBase(world) || (team24 && team24->secrets > 0)){
-							singleplayermessage++;
-							world.message_i = 0;
-						}
-					}break;
-					case 25:{
-						if(!world.message_i){
-							char text[256];
-							sprintf(text, "To stash the secret data, it must be brought\nto the memory bank at the\nfar right of your base.");
-							world.ShowMessage(text, 128);
-						}
-						Team * team = player->GetTeam(world);
-						if(team && team->secrets > 0){
-							singleplayermessage++;
-							world.message_i = 0;
-						}
-					}break;
-					case 26:{
-						if(!world.message_i){
-							char text[256];
-							sprintf(text, "Good job, agent.\n\nYou're ready to begin real agency missions.");
-							world.ShowMessage(text, 255);
-						}
-						if(world.message_i == 12){
-							player->state = Player::UNDEPLOYING;
-							player->state_i = 0;
-						}
-						if(world.message_i >= 128 - 1){
-							GoToState(MAINMENU);
-						}
-					}break;
-				}
-			}
-			if(CheckForQuit() || CheckForEndOfGame()){
-				GoToState(MAINMENU);
-			}
-		}break;
+		case SINGLEPLAYERGAME: TickSinglePlayerGame(); break;
 		case OPTIONS:{
 			if(stateisnew){
 				world.DestroyAllObjects();
-				currentinterface = CreateOptionsInterface()->id;
+				PushScreen(std::make_unique<OptionsScreen>());
 				stateisnew = false;
-			}
-			Interface * iface = (Interface *)world.GetObjectFromId(currentinterface);
-			if(iface){
-				for(std::vector<Uint16>::iterator it = iface->objects.begin(); it != iface->objects.end(); it++){
-					Object * object = world.GetObjectFromId(*it);
-					if(object->type == ObjectTypes::BUTTON){
-						Button * button = static_cast<Button *>(object);
-						if(button && button->clicked){
-							switch(button->uid){
-								case 0:{
-									GoToState(MAINMENU);
-								}break;
-								case 1:{
-									GoToState(OPTIONSCONTROLS);
-								}break;
-								case 2:{
-									GoToState(OPTIONSDISPLAY);
-								}break;
-								case 3:{
-									GoToState(OPTIONSAUDIO);
-								}break;
-							}
-							button->clicked = false;
-						}
-					}
-				}
 			}
 		}break;
 		case OPTIONSCONTROLS:{
 			if(stateisnew){
 				world.DestroyAllObjects();
-				currentinterface = CreateOptionsControlsInterface()->id;
+				PushScreen(std::make_unique<OptionsControlsScreen>());
 				stateisnew = false;
-			}
-			Interface * iface = (Interface *)world.GetObjectFromId(currentinterface);
-			if(iface){
-				ScrollBar * scrollbar = (ScrollBar *)world.GetObjectFromId(iface->scrollbar);
-				if(!iface->disabled){
-					for(int i = 0; i < 5; i++){
-						int row = i + scrollbar->scrollposition;
-						if(row < 0 || row >= (int)Action::Count) continue;
-						Action a = ACTION_TABLE[row].action;
-						keynameoverlay[i]->text = std::string(GetActionInfo(a).label) + ":";
-						std::string lbl0 = GetBindingLabel(a, 0);
-						std::string lbl1 = GetBindingLabel(a, 1);
-						strncpy(c1button[i]->text, lbl0.c_str(), sizeof(c1button[i]->text) - 1);
-						c1button[i]->text[sizeof(c1button[i]->text) - 1] = 0;
-						strncpy(c2button[i]->text, lbl1.c_str(), sizeof(c2button[i]->text) - 1);
-						c2button[i]->text[sizeof(c2button[i]->text) - 1] = 0;
-					}
-					// Preset button text reflects the active profile's label.
-					// The static "Preset:" overlay to its left supplies the noun.
-					std::string presetText = !keymap.label.empty() ? keymap.label
-					                       : !keymap.name.empty()  ? keymap.name
-					                       : std::string(Config::GetInstance().active_keybind_profile);
-					if(presetText.size() >= sizeof(presetbutton->text)){
-						presetText.resize(sizeof(presetbutton->text) - 1);
-					}
-					strcpy(presetbutton->text, presetText.c_str());
-				}
-				iface->buttonenter = 200;
-				for(std::vector<Uint16>::iterator it = iface->objects.begin(); it != iface->objects.end(); it++){
-					Object * object = world.GetObjectFromId(*it);
-					if(object->type == ObjectTypes::BUTTON){
-						Button * button = static_cast<Button *>(object);
-						if(button){
-							if(button->state == Button::ACTIVE || button->state == Button::ACTIVATING){
-								if((button->uid >= 0 && button->uid < 200) || button->uid == 250){
-									iface->buttonenter = button->id;
-								}
-							}
-							if(button->uid >= 150 && button->uid < 200){
-								int row = button->uid - 150 + scrollbar->scrollposition;
-								if(row >= 0 && row < (int)Action::Count){
-									Action a = ACTION_TABLE[row].action;
-									strcpy(button->text, ViewLegacy(keymap, a).and_ ? "AND" : "OR");
-								}
-							}
-							if(button->uid >= 0 && button->uid < 150){
-								const int timeout = 72;
-								// Check for newly-pressed gamepad button/axis during rebind wait.
-								if(iface->disabled && button->state == Button::ACTIVE && gamepadstate.connected){
-									int slot = button->uid;
-									int row  = (slot < 100 ? slot : slot - 100) + scrollbar->scrollposition;
-									BindingKey padKey{}; bool padFound = false;
-									for(int b = 0; b < SDL_GAMEPAD_BUTTON_COUNT && !padFound; b++){
-										bool was = (rebindGamepadButtons >> b) & 1;
-										bool is  = (gamepadstate.buttons >> b) & 1;
-										if(is && !was){
-											padKey.device = BindingDevice::GamepadButton;
-											padKey.code   = b; padKey.axisDir = 0;
-											padFound = true;
-										}
-									}
-									for(int ax = 0; ax < SDL_GAMEPAD_AXIS_COUNT && !padFound; ax++){
-										int16_t was = rebindGamepadAxes[ax];
-										int16_t is  = gamepadstate.axes[ax];
-										if(abs(is) > AXIS_DEADZONE && abs(was) <= AXIS_DEADZONE){
-											padKey.device  = BindingDevice::GamepadAxis;
-											padKey.code    = ax;
-											padKey.axisDir = (is > 0) ? 1 : -1;
-											padFound = true;
-										}
-									}
-									if(padFound && row >= 0 && row < (int)Action::Count){
-										ForkActiveProfileIfBuiltin();
-										auto& ab = keymap.Get(ACTION_TABLE[row].action);
-										Binding binding; binding.keys.push_back(padKey);
-										if(slot < 100){
-											if(ab.bindings.empty()) ab.bindings.push_back(binding);
-											else ab.bindings[0] = binding;
-										} else {
-											if(ab.bindings.empty()) ab.bindings.push_back(Binding{});
-											if(ab.bindings.size() < 2) ab.bindings.push_back(binding);
-											else ab.bindings[1] = binding;
-										}
-										std::string label = Stringify(padKey);
-										auto colon = label.find(':');
-										if(colon != std::string::npos) label = label.substr(colon + 1);
-										strncpy(button->text, label.c_str(), sizeof(button->text) - 1);
-										button->text[sizeof(button->text) - 1] = 0;
-										iface->disabled = false;
-									}
-								}
-								if(iface->disabled && button->state == Button::ACTIVE && (iface->lastsym != SDL_SCANCODE_UNKNOWN || world.tickcount - optionscontrolstick > timeout)){
-									int slot = button->uid;     // 0..99 = primary; 100..149 = secondary
-									int row  = (slot < 100 ? slot : slot - 100) + scrollbar->scrollposition;
-									SDL_Scancode sym = iface->lastsym;
-									if(world.tickcount - optionscontrolstick > timeout){
-										sym = SDL_SCANCODE_UNKNOWN;
-									}
-#ifndef OUYA
-									if(sym == SDL_SCANCODE_ESCAPE){
-										sym = SDL_SCANCODE_UNKNOWN;
-									}
-#endif
-									strcpy(button->text, GetKeyName(sym));
-									if(row >= 0 && row < (int)Action::Count){
-										Action a = ACTION_TABLE[row].action;
-										LegacyView v = ViewLegacy(keymap, a);
-										if(slot < 100) v.key1 = sym; else v.key2 = sym;
-										ForkActiveProfileIfBuiltin();
-										WriteLegacy(keymap, a, v.key1, v.key2, v.and_);
-									}
-									iface->disabled = false;
-								}
-							}
-							if(button->clicked){
-								if(button->uid >= 0 && button->uid < 150){
-									strcpy(button->text, "-");
-									iface->disabled = true;
-									optionscontrolstick = world.tickcount;
-									iface->lastsym = SDL_SCANCODE_UNKNOWN;
-									rebindGamepadButtons = gamepadstate.buttons;
-									memcpy(rebindGamepadAxes, gamepadstate.axes, sizeof(rebindGamepadAxes));
-								}
-								if(button->uid >= 150 && button->uid < 200){
-									int row = button->uid - 150 + scrollbar->scrollposition;
-									if(row >= 0 && row < (int)Action::Count){
-										Action a = ACTION_TABLE[row].action;
-										LegacyView v = ViewLegacy(keymap, a);
-										v.and_ = !v.and_;
-										ForkActiveProfileIfBuiltin();
-										WriteLegacy(keymap, a, v.key1, v.key2, v.and_);
-									}
-								}
-								if(button->uid == 250){
-									CycleKeybindPreset();
-								}
-								switch(button->uid){
-									case 200:{
-										// Persist the live keymap to the active profile's
-										// writable file, then save the rest of Config (which
-										// is now just the active_keybind_profile pointer plus
-										// graphics/audio/network). Skip writing built-ins —
-										// any edit forks via ForkActiveProfileIfBuiltin, so a
-										// built-in name here means cycle-only (no edits) and
-										// shouldn't shadow the on-disk built-in with a copy.
-										const std::string active = Config::GetInstance().active_keybind_profile;
-										if(!IsBuiltinProfile(active)){
-											keymap.SaveFile(WritableProfilePath(active));
-										}
-										Config::GetInstance().Save();
-										GoToState(OPTIONS);
-									}break;
-									case 201:{
-										// Cancel: reload the keymap from disk so any in-UI
-										// edits are discarded.
-										LoadActiveKeymap();
-										Config::GetInstance().Load();
-										GoToState(OPTIONS);
-									}break;
-								}
-								button->clicked = false;
-							}
-						}
-					}
-				}
 			}
 		}break;
 		case OPTIONSDISPLAY:{
 			if(stateisnew){
 				world.DestroyAllObjects();
-				currentinterface = CreateOptionsDisplayInterface()->id;
+				PushScreen(std::make_unique<OptionsDisplayScreen>());
 				stateisnew = false;
-			}
-			Interface * iface = (Interface *)world.GetObjectFromId(currentinterface);
-			if(iface){
-				iface->buttonenter = 200;
-				for(std::vector<Uint16>::iterator it = iface->objects.begin(); it != iface->objects.end(); it++){
-					Object * object = world.GetObjectFromId(*it);
-					if(object->type == ObjectTypes::OVERLAY){
-						Overlay * overlay = static_cast<Overlay *>(object);
-						if(overlay){
-							switch(overlay->uid){
-								case 20:{
-									if(Config::GetInstance().fullscreen){
-										overlay->res_index = 12;
-									}else{
-										overlay->res_index = 13;
-									}
-								}break;
-								case 21:{
-									if(Config::GetInstance().scalefilter){
-										overlay->res_index = 12;
-									}else{
-										overlay->res_index = 13;
-									}
-								}break;
-								case 40:{
-									if(Config::GetInstance().fullscreen){
-										overlay->res_index = 15;
-									}else{
-										overlay->res_index = 14;
-									}
-								}break;
-								case 41:{
-									if(Config::GetInstance().scalefilter){
-										overlay->res_index = 15;
-									}else{
-										overlay->res_index = 14;
-									}
-								}break;
-							}
-						}
-					}else
-					if(object->type == ObjectTypes::BUTTON){
-						Button * button = static_cast<Button *>(object);
-						if(button){
-							if(button->state == Button::ACTIVE || button->state == Button::ACTIVATING){
-								if(button->uid >= 0 && button->uid < 200){
-									iface->buttonenter = button->id;
-								}
-							}
-							if(button->clicked){
-								switch(button->uid){
-									case 0:{ // fullscreen
-										Config::GetInstance().fullscreen = Config::GetInstance().fullscreen ? false : true;
-										if(Config::GetInstance().fullscreen){
-											SDL_SetWindowFullscreen(window, true);
-										}else{
-											SDL_SetWindowFullscreen(window, false);
-										}
-									}break;
-									case 1:{ // smooth scaling
-										Config::GetInstance().scalefilter = Config::GetInstance().scalefilter ? false : true;
-										if(renderdevice) renderdevice->SetScaleFilter(Config::GetInstance().scalefilter);
-									}break;
-									case 200:{
-										Config::GetInstance().Save();
-										GoToState(OPTIONS);
-									}break;
-									case 201:{
-										Config::GetInstance().Load();
-										if(renderdevice) renderdevice->SetScaleFilter(Config::GetInstance().scalefilter);
-										if(Config::GetInstance().fullscreen){
-											SDL_SetWindowFullscreen(window, true);
-										}else{
-											SDL_SetWindowFullscreen(window, false);
-										}
-										GoToState(OPTIONS);
-									}break;
-								}
-								button->clicked = false;
-							}
-						}
-					}
-				}
 			}
 		}break;
 		case OPTIONSAUDIO:{
 			if(stateisnew){
 				world.DestroyAllObjects();
-				currentinterface = CreateOptionsAudioInterface()->id;
+				PushScreen(std::make_unique<OptionsAudioScreen>());
 				stateisnew = false;
 			}
-			Interface * iface = (Interface *)world.GetObjectFromId(currentinterface);
-			if(iface){
-				iface->buttonenter = 200;
-				for(std::vector<Uint16>::iterator it = iface->objects.begin(); it != iface->objects.end(); it++){
-					Object * object = world.GetObjectFromId(*it);
-					if(object->type == ObjectTypes::OVERLAY){
-						Overlay * overlay = static_cast<Overlay *>(object);
-						if(overlay){
-							switch(overlay->uid){
-								case 20:{
-									if(Config::GetInstance().music){
-										overlay->res_index = 12;
-									}else{
-										overlay->res_index = 13;
-									}
-								}break;
-								case 40:{
-									if(Config::GetInstance().music){
-										overlay->res_index = 15;
-									}else{
-										overlay->res_index = 14;
-									}
-								}break;
-							}
-						}
-					}else
-						if(object->type == ObjectTypes::BUTTON){
-							Button * button = static_cast<Button *>(object);
-							if(button){
-								if(button->state == Button::ACTIVE || button->state == Button::ACTIVATING){
-									if(button->uid >= 0 && button->uid < 200){
-										iface->buttonenter = button->id;
-									}
-								}
-								if(button->clicked){
-									switch(button->uid){
-										case 0:{ // music
-											Config::GetInstance().music = Config::GetInstance().music ? false : true;
-											if(Config::GetInstance().music){
-												Audio::GetInstance().ResumeMusic();
-											}else{
-												Audio::GetInstance().PauseMusic();
-											}
-										}break;
-										case 200:{
-											Config::GetInstance().Save();
-											GoToState(OPTIONS);
-										}break;
-										case 201:{
-											Config::GetInstance().Load();
-											if(Config::GetInstance().music){
-												Audio::GetInstance().ResumeMusic();
-											}else{
-												Audio::GetInstance().PauseMusic();
-											}
-											GoToState(OPTIONS);
-										}break;
-									}
-									button->clicked = false;
-								}
-							}
-						}
-				}
-			}
 		}break;
-		case HOSTGAME:{
-			if(stateisnew){
-				world.lagsimulator.Activate(200, 200, 0.0f);
-				world.Listen(12456);
-				world.DestroyAllObjects();
-				Audio::GetInstance().StopMusic();
-				world.gameplaystate = World::INLOBBY;
-				world.gameinfo.accountid = 1;
-				world.dedicatedserver.active = true;
-				world.dedicatedserver.accountid = 1;
-				currentinterface = 0;
-				State * newsharedstateobject = static_cast<State *>(world.CreateObject(ObjectTypes::STATE));
-				sharedstate = newsharedstateobject->id;
-				newsharedstateobject->state = 0;
-				world.replay.BeginRecording("testrecording.zsr");
-				if(world.replay.IsRecording()){
-					world.replay.WriteHeader(world);
-					world.replay.WriteGameInfo(world.gameinfo);
-				}
-				stateisnew = false;
-			}
-			ProcessMapDownload();
-			/*if(world.tickcount % 48 == 0){
-				world.SendPeerList();
-			}*/
-			if(!world.map.loaded && world.peercount >= 1 && world.AllPeersLoadedGameInfo() && world.AllPeersDownloadedMap()){
-				screenbuffer.Clear(0);
-				if(world.replay.IsRecording()){
-					world.replay.WriteStart();
-				}
-				//char mapname[256];
-				//sprintf(mapname, "level/%s", world.gameinfo.mapname);
-				LoadMap(FindMap(world.gameinfo.mapname, &world.gameinfo.maphash).c_str());
-				renderer.palette.SetPalette(0);
-				renderer.palette.SetParallaxColors(world.map.parallax);
-				SetColors(renderer.palette.GetColors());
-				State * sharedstateobject = static_cast<State *>(world.GetObjectFromId(sharedstate));
-				if(sharedstateobject){
-					sharedstateobject->state = 2;
-				}
-				//world.GetAuthorityPeer()->controlledlist.clear();
-				world.gameplaystate = World::INGAME;
-				for(std::list<Object *>::iterator it = world.objectlist.begin(); it != world.objectlist.end(); it++){
-					Object * object = *it;
-					switch(object->type){
-						case ObjectTypes::TEAM:{
-							Team * team = static_cast<Team *>(object);
-							if(team){
-								for(int i = 0; i < team->numpeers; i++){
-									Player * player = (Player *)world.CreateObject(ObjectTypes::PLAYER);
-									if(player){
-										world.map.RandomPlayerStartLocation(world, player->x, player->y);
-										player->oldx = player->x;
-										player->oldy = player->y;
-										//player->AddInventoryItem(Player::INV_VIRUS);
-										player->credits = GASLoader::Get().player.startingCredits;
-										Uint8 teamcolor = team->GetColor();
-										player->suitcolor = (((teamcolor >> 4) - i) << 4) + (teamcolor & 0xF);
-										for(int j = 0; j < 5; j++){
-											world.peerlist[team->peers[i]]->techchoices |= 1 << (rand() % 10);
-										}
-										world.peerlist[team->peers[i]]->techchoices = 0xffffffff;
-										world.peerlist[team->peers[i]]->controlledlist.clear();
-										world.peerlist[team->peers[i]]->controlledlist.push_back(player->id);
-										GiveDefaultItems(*player);
-									}
-								}
-							}
-						}break;
-					}
-				}
-				world.SendPeerList();
-			}
-		}break;
-		case JOINGAME:{
-			if(stateisnew){
-				strcpy(world.gameinfo.mapname, "STAR72.SIL");
-				CalculateMapHash(FindMap(world.gameinfo.mapname).c_str(), &world.gameinfo.maphash);
-				world.gameinfo.accountid = 1;
-				world.gameinfo.loaded = true;
-				sharedstate = 0;
-				Peer * authoritypeer = world.GetAuthorityPeer();
-				authoritypeer->ip = ntohl(inet_addr("127.0.0.1"));
-				authoritypeer->port = 12456;
-				world.Connect(rand() % 5, 1);
-				LoadMapData(FindMap(world.gameinfo.mapname, &world.gameinfo.maphash).c_str());
-				//printf("map data: %d %d\n", world.currentmapdatalength, world.currentmapdatamax);
-				Audio::GetInstance().StopMusic();
-				currentinterface = 0;
-				world.DestroyAllObjects();
-				stateisnew = false;
-			}else{
-				State * sharedstateobject = static_cast<State *>(world.GetObjectFromId(sharedstate));
-				if(sharedstateobject && sharedstateobject->state == 2){
-					world.gameplaystate = World::INGAME;
-				}
-				ProcessMapDownload();
-			}
-		}break;
-		case TESTGAME:{
-			if(stateisnew){
-				world.GetAuthorityPeer()->controlledlist.clear();
-				world.DestroyAllObjects();
-				world.gameplaystate = World::INGAME;
-				currentinterface = 0;
-				Audio::GetInstance().StopMusic();
-				world.GetAuthorityPeer()->techchoices = 0xffffffff;//World::BUY_LASER | World::BUY_ROCKET;
-				Team * team = (Team *)world.CreateObject(ObjectTypes::TEAM);
-				team->AddPeer(world.GetAuthorityPeer()->id);
-				team->agency = Team::LAZARUS;
-				//team->color = ((8 << 4) + 13);
-				Player * player = (Player *)world.CreateObject(ObjectTypes::PLAYER);
-				player->suitcolor = team->GetColor();
-				player->laserammo = 0;
-				player->credits = GASLoader::Get().player.creditCap;
-				player->oldx = player->x;
-				player->oldy = player->y;
-				world.GetAuthorityPeer()->controlledlist.push_back(player->id);
-				GiveDefaultItems(*player);
-				int botnum = 0;
-				// Spawn a mix of difficulties: 4 easy, 4 medium, 2 hard
-				const PlayerAI::Difficulty diffs[10] = {
-					PlayerAI::EASY, PlayerAI::EASY, PlayerAI::EASY, PlayerAI::EASY,
-					PlayerAI::MEDIUM, PlayerAI::MEDIUM, PlayerAI::MEDIUM, PlayerAI::MEDIUM,
-					PlayerAI::HARD, PlayerAI::HARD
-				};
-				for(int i = 0; i < 10; i++){
-					Uint8 agency;
-					do{
-						agency = rand() % 5;
-					}while(agency == Team::BLACKROSE);
-					Peer * botpeer = world.AddBot(agency);
-					if(botpeer){
-						botpeer->accountid = 0xFFFFFFFF - botnum;
-						Team * botteam = world.GetPeerTeam(botpeer->id);
-						Player * botplayer = (Player *)world.CreateObject(ObjectTypes::PLAYER);
-						botplayer->suitcolor = botteam->GetColor();
-						botplayer->laserammo = 0;
-						botplayer->credits = GASLoader::Get().player.startingCredits;
-						botplayer->ai = new PlayerAI(*botplayer, diffs[botnum]);
-						botpeer->controlledlist.push_back(botplayer->id);
-						world.map.RandomPlayerStartLocation(world, botplayer->x, botplayer->y);
-						botplayer->oldx = botplayer->x;
-						botplayer->oldy = botplayer->y;
-						botnum++;
-					}
-				}
-				world.gameinfo.securitylevel = LobbyGame::SECHIGH;
-				LoadMap("level/ALLY10c.sil");
-				for(std::list<Object *>::iterator it = world.objectlist.begin(); it != world.objectlist.end(); it++){
-					if((*it)->type == ObjectTypes::PLAYER){
-						Player * player = static_cast<Player *>(*it);
-						world.map.RandomPlayerStartLocation(world, player->x, player->y);
-					}
-				}
-				ShowDeployMessage();
-				renderer.palette.SetPalette(0);
-				renderer.palette.SetParallaxColors(world.map.parallax);
-				screenbuffer.Clear(0);
-				SetColors(renderer.palette.GetColors());
-				singleplayermessage = 0;
-				stateisnew = false;
-			}else{
-				/*Player * localplayer = world.GetPeerPlayer(world.authoritypeer);
-				if(localplayer){
-					if(localplayer->state == Player::STANDINGSHOOT){
-						for(std::list<Object *>::iterator it = world.objectlist.begin(); it != world.objectlist.end(); it++){
-							if((*it)->type == ObjectTypes::PLAYER){
-								Player * player = static_cast<Player *>(*it);
-								if(player->ai){
-									//player->ai->SetTarget(world, localplayer->x, localplayer->y);
-									player->hassecret = true;
-									break;
-								}
-							}
-						}
-					}
-				}*/
-				if(CheckForQuit() || CheckForEndOfGame()){
-					GoToState(MAINMENU);
-				}
-			}
-		}break;
-		case REPLAYGAME:{
-			if(stateisnew){
-				world.Disconnect();
-				world.lobby.Disconnect();
-				UnloadGame();
-				world.GetAuthorityPeer()->controlledlist.clear();
-				world.DestroyAllObjects();
-				stateisnew = false;
-				world.gameplaystate = World::INLOBBY;
-				world.replay.BeginPlaying(replayfile);
-				if((world.replay.IsPlaying() && !world.replay.ReadHeader(world)) || !world.replay.IsPlaying()){
-					printf("Replay error\n");
-					world.replay.EndPlaying();
-					GoToState(MAINMENU);
-				}
-			}else{
-				while(world.replay.ReadToNextTick(world)){
-					if(world.replay.GameStarted()){
-						GoToState(INGAME);
-						break;
-					}
-					world.Tick();
-				}
-				if(!world.replay.GameStarted()){
-					world.replay.EndPlaying();
-					GoToState(MAINMENU);
-				}
-			}
-		}break;
+		case HOSTGAME: TickHostGame(); break;
+		case JOINGAME: TickJoinGame(); break;
+		case TESTGAME: TickTestGame(); break;
+		case REPLAYGAME: TickReplayGame(); break;
 	}
 	if(fade_i < 16 && state != FADEOUT){
-		// Fade IN the palette
-		SDL_Color * fadedpalette = renderer.palette.CopyWithBrightness(renderer.palette.GetColors(), (fade_i) * 8);
-		if(fade_i == 15){
-			SetColors(renderer.palette.GetColors());
-		}else{
-			SetColors(fadedpalette);
-		}
+		ApplyPaletteFade(false);
 	}
 	if(!nextstateprocessed){
 		nextstateprocessed = true;
@@ -2568,3676 +1160,27 @@ bool Game::Tick(void){
 	return true;
 }
 
-// Captureless lambdas decay to function pointers, so this table costs nothing
-// at runtime vs. the old hand-written cascade. New actions get one row here
-// (and one row in ACTION_TABLE) — that's the entire fan-out for adding one.
-typedef bool& (*InputField)(Input&);
-static const struct { Action a; InputField field; } INPUT_FIELDS[] = {
-	{ Action::MoveUp,        [](Input& i) -> bool& { return i.keymoveup;        } },
-	{ Action::MoveDown,      [](Input& i) -> bool& { return i.keymovedown;      } },
-	{ Action::MoveLeft,      [](Input& i) -> bool& { return i.keymoveleft;      } },
-	{ Action::MoveRight,     [](Input& i) -> bool& { return i.keymoveright;     } },
-	{ Action::LookUpLeft,    [](Input& i) -> bool& { return i.keylookupleft;    } },
-	{ Action::LookUpRight,   [](Input& i) -> bool& { return i.keylookupright;   } },
-	{ Action::LookDownLeft,  [](Input& i) -> bool& { return i.keylookdownleft;  } },
-	{ Action::LookDownRight, [](Input& i) -> bool& { return i.keylookdownright; } },
-	{ Action::Jump,          [](Input& i) -> bool& { return i.keyjump;          } },
-	{ Action::Jetpack,       [](Input& i) -> bool& { return i.keyjetpack;       } },
-	{ Action::Activate,      [](Input& i) -> bool& { return i.keyactivate;      } },
-	{ Action::Use,            [](Input& i) -> bool& { return i.keyuse;          } },
-	{ Action::Fire,          [](Input& i) -> bool& { return i.keyfire;          } },
-	{ Action::Chat,          [](Input& i) -> bool& { return i.keychat;          } },
-	{ Action::NextInv,       [](Input& i) -> bool& { return i.keynextinv;       } },
-	{ Action::NextCam,       [](Input& i) -> bool& { return i.keynextcam;       } },
-	{ Action::PrevCam,       [](Input& i) -> bool& { return i.keyprevcam;       } },
-	{ Action::Detonate,      [](Input& i) -> bool& { return i.keydetonate;      } },
-	{ Action::Disguise,      [](Input& i) -> bool& { return i.keydisguise;      } },
-	{ Action::NextWeapon,    [](Input& i) -> bool& { return i.keynextweapon;    } },
-	{ Action::Weapon1,       [](Input& i) -> bool& { return i.keyweapon[0];     } },
-	{ Action::Weapon2,       [](Input& i) -> bool& { return i.keyweapon[1];     } },
-	{ Action::Weapon3,       [](Input& i) -> bool& { return i.keyweapon[2];     } },
-	{ Action::Weapon4,       [](Input& i) -> bool& { return i.keyweapon[3];     } },
-	{ Action::UiUp,          [](Input& i) -> bool& { return i.keyup;            } },
-	{ Action::UiDown,        [](Input& i) -> bool& { return i.keydown;          } },
-	{ Action::UiLeft,        [](Input& i) -> bool& { return i.keyleft;          } },
-	{ Action::UiRight,       [](Input& i) -> bool& { return i.keyright;         } },
-};
-
-void Game::UpdateInputState(Input & input){
-	float mousex;
-	float mousey;
-	Uint32 mousestate = SDL_GetMouseState(&mousex, &mousey);
-	PollGamepadState();
-	gamepadstate.mouseButtons = 0;
-	for(int b = 1; b <= 5; ++b){
-		if(mousestate & SDL_BUTTON_MASK(b)) gamepadstate.mouseButtons |= (1u << (b - 1));
-	}
-	for(const auto& f : INPUT_FIELDS){
-		f.field(input) = keymap.IsPressed(f.a, keystate, gamepadstate);
-	}
-	input.mousex = (Uint16)mousex;
-	input.mousey = (Uint16)mousey;
-	input.mousedown = SDL_BUTTON_LEFT & mousestate ? true : false;
-	
-	Player * localplayer = world.GetPeerPlayer(world.localpeerid);
-	if(localplayer){
-		if(input.keynextweapon && !localplayer->input.keynextweapon){
-			switch(localplayer->currentweapon){
-				case 0:
-					if(localplayer->laserammo > 0){
-						input.keyweapon[1] = true;
-					}else
-					if(localplayer->rocketammo > 0){
-						input.keyweapon[2] = true;
-					}else
-					if(localplayer->flamerammo > 0){
-						input.keyweapon[3] = true;
-					}
-				break;
-				case 1:
-					if(localplayer->rocketammo > 0){
-						input.keyweapon[2] = true;
-					}else
-					if(localplayer->flamerammo > 0){
-						input.keyweapon[3] = true;
-					}else{
-						input.keyweapon[0] = true;
-					}
-				break;
-				case 2:
-					if(localplayer->flamerammo > 0){
-						input.keyweapon[3] = true;
-					}else{
-						input.keyweapon[0] = true;
-					}
-				break;
-				case 3:
-					input.keyweapon[0] = true;
-				break;
-			}
-		}
-		if(!world.replay.IsPlaying()){
-			if(interfaceenterfix && !keystate[SDL_SCANCODE_RETURN]){
-				interfaceenterfix = false;
-			}
-			if(localplayer->chatinterfaceid || interfaceenterfix){
-				Input zeroinput;
-				input = zeroinput;
-				interfaceenterfix = true;
-			}
-			if(localplayer->buyinterfaceid || localplayer->techinterfaceid || interfaceenterfix){
-				Input zeroinput;
-				zeroinput.keyactivate = input.keyactivate;
-				zeroinput.keymoveleft = input.keymoveleft;
-				zeroinput.keymoveright = input.keymoveright;
-				input = zeroinput;
-				interfaceenterfix = true;
-			}
-		}
-	}
-}
-
-bool Game::LoadMap(const char * name){
-	if(!world.map.Load(name, world)){
-		return false;
-	}
-	if(!world.dedicatedserver.active){
-		CreateAmbienceChannels();
-		renderer.palette.SetParallaxColors(world.map.parallax);
-	}
-	return true;
-}
-
-void Game::UnloadGame(void){
-	Audio::GetInstance().StopAll(GASLoader::Get().gameengine.audioStopAllFadeMs);
-	currentlobbygameid = 0;
-	for(int i = 0; i < sizeof(bgchannel) / sizeof(int); i++){
-		bgchannel[i] = -1;
-	}
-	world.SwitchToLocalAuthorityMode();
-	if(world.map.loaded){ // if the map was loaded, then the music was played
-		Audio::GetInstance().StopMusic();
-	}
-	world.map.Unload();
-	world.pancameraactive = false;
-	world.pancamerareturn = false;
-	world.pancamerareturncount = 0;
-	world.message_i = 0;
-	world.winningteamid = 0;
-	world.DestroyAllObjects();
-	world.chatlines.clear();
-	world.messagetype = 0;
-	world.highlightminimap = false;
-	world.highlightsecrets = false;
-	world.quitstate = 0;
-	world.ingameusers.clear();
-}
-
-bool Game::CheckForQuit(void){
-	if(keystate[SDL_SCANCODE_RETURN]){
-		if(world.quitstate == 1 || world.quitstate == 2){
-			world.quitstate = 0;
-			return true;
-		}
-	}
-	return false;
-}
-
-bool Game::CheckForEndOfGame(void){
-	if(world.winningteamid){
-		if(world.message_i == GASLoader::Get().gameengine.ticksPerSecond * 3){
-			if(world.IsAuthority()){
-				if(world.replay.IsRecording()){
-					world.replay.EndRecording();
-				}
-				for(std::vector<Uint32>::iterator it = world.ingameusers.begin(); it != world.ingameusers.end(); it++){
-					Uint32 accountid = *it;
-					User * user = world.lobby.GetUserInfo(accountid);
-					if(user){
-						Uint8 won = 0;
-						for(int i = 0; i < world.maxpeers; i++){
-							Peer * peer = world.peerlist[i];
-							if(peer){
-								if(peer->accountid == user->accountid){
-									Team * team = world.GetPeerTeam(peer->id);
-									user->statscopy = peer->stats;
-									user->statsagency = team->agency;
-									user->teamnumber = team->number;
-									world.SendStats(*peer);
-									if(team && team->id == world.winningteamid){
-										won = 1;
-									}
-								}
-							}
-						}
-						world.lobby.RegisterStats(*user, won, world.gameinfo.id);
-					}
-				}
-			}
-		}
-		if(world.message_i >= 240){
-			return true;
-		}
-	}
-	return false;
-}
-
-bool Game::CheckForConnectionLost(void){
-	if(world.replay.IsPlaying()){
-		return false;
-	}
-	if(world.state == World::IDLE && world.message_i >= 48){
-		return true;
-	}
-	return false;
-}
-
-void Game::ProcessInGameInterfaces(void){
-	Player * localplayer = world.GetPeerPlayer(world.localpeerid);
-	if(localplayer){
-		if(localplayer->buyinterfaceid || localplayer->techinterfaceid){
-			currentinterface = localplayer->buyinterfaceid;
-			if(!currentinterface){
-				currentinterface = localplayer->techinterfaceid;
-			}
-		}else{
-			oldselecteditem = 0;
-		}
-		if(localplayer->chatinterfaceid){
-			currentinterface = localplayer->chatinterfaceid;
-		}
-		if(!localplayer->chatinterfaceid && !localplayer->buyinterfaceid && !localplayer->techinterfaceid){
-			currentinterface = 0;
-		}
-		Interface * iface = (Interface *)world.GetObjectFromId(currentinterface);
-		if(iface){
-			if(iface->id == localplayer->chatinterfaceid){
-				TextInput * textinput = (TextInput *)iface->GetObjectWithUid(world, 1);
-				if(textinput){
-					if(textinput->tabpressed){
-						localplayer->chatwithteam = !localplayer->chatwithteam;
-						textinput->tabpressed = false;
-					}
-					if(textinput->enterpressed){
-						if(strlen(textinput->text) > 0){
-							world.SendChat(localplayer->chatwithteam, textinput->text);
-						}
-						iface->DestroyInterface(world, iface);
-						localplayer->chatinterfaceid = 0;
-					}
-					if(keystate[quitscancode]){
-						iface->DestroyInterface(world, iface);
-						localplayer->chatinterfaceid = 0;
-					}
-				}
-			}else
-			if(iface->id == localplayer->buyinterfaceid || iface->id == localplayer->techinterfaceid){
-				bool buying = false;
-				if(iface->id == localplayer->buyinterfaceid){
-					buying = true;
-				}
-				SelectBox * selectbox = (SelectBox *)iface->GetObjectWithUid(world, 1);
-				if(selectbox){
-					if(selectbox->selecteditem != oldselecteditem){
-						Audio::GetInstance().Play(world.resources.soundbank[GASLoader::Get().player.soundRoundCountdown], 64);
-						oldselecteditem = selectbox->selecteditem;
-						if(buying){
-							localplayer->buyifacelastitem = selectbox->selecteditem;
-						}
-					}
-					if(selectbox->selecteditem >= selectbox->scrolled + 5){
-						selectbox->scrolled = selectbox->selecteditem - 4;
-					}
-					if(selectbox->selecteditem < selectbox->scrolled){
-						selectbox->scrolled = selectbox->selecteditem;
-					}
-					if(buying){
-						localplayer->buyifacelastscrolled = selectbox->scrolled;
-					}
-					if(selectbox->enterpressed){
-						BuyableItem * buyableitem = 0;
-						for(std::vector<BuyableItem *>::iterator it = world.buyableitems.begin(); it != world.buyableitems.end(); it++){
-							if((*it)->id == selectbox->IndexToId(selectbox->selecteditem)){
-								buyableitem = (*it);
-								break;
-							}
-						}
-						if(buyableitem){
-							if(buying){
-								localplayer->BuyItem(world, buyableitem->id);
-							}else{
-								if(localplayer->InOwnBase(world)){
-									localplayer->RepairItem(world, buyableitem->id);
-								}else{
-									localplayer->VirusItem(world, buyableitem->id);
-								}
-							}
-						}
-						selectbox->enterpressed = false;
-					}
-				}
-			}
-		}
-	}
-}
-
-void Game::ShowDeployMessage(void){
-	world.ShowMessage((char *)"STANDBY FOR TEAM DEPLOYMENT", 64, 1);
-	deploymessageshown = false;
-}
-
-void Game::GiveDefaultItems(Player & player){
-	Team * team = player.GetTeam(world);
-	if(team){
-		for(std::vector<BuyableItem *>::iterator it = world.buyableitems.begin(); it != world.buyableitems.end(); it++){
-			BuyableItem * buyableitem = *it;
-			switch(buyableitem->id){
-				case World::BUY_LASER:{
-					if(team->GetAvailableTech(world) & buyableitem->techchoice){
-						const ItemDef* def = GASLoader::Get().GetItemDef("laser");
-						player.laserammo = def ? def->spawnAmmo : 5;
-					}
-				}break;
-				case World::BUY_ROCKET:{
-					if(team->GetAvailableTech(world) & buyableitem->techchoice){
-						const ItemDef* def = GASLoader::Get().GetItemDef("rocket");
-						player.rocketammo = def ? def->spawnAmmo : 3;
-					}
-				}break;
-				case World::BUY_FLAMER:{
-					if(team->GetAvailableTech(world) & buyableitem->techchoice){
-						const ItemDef* def = GASLoader::Get().GetItemDef("flamer");
-						player.flamerammo = def ? def->spawnAmmo : 15;
-					}
-				}break;
-				case World::BUY_HEALTH:{
-					if(team->GetAvailableTech(world) & buyableitem->techchoice){
-						const ItemDef* def = GASLoader::Get().GetItemDef("healthpack");
-						int count = def ? def->spawnInventoryCount : 1;
-						for(int i = 0; i < count; i++) player.AddInventoryItem(Player::INV_HEALTHPACK);
-					}
-				}break;
-				case World::BUY_VIRUS:{
-					if(team->GetAvailableTech(world) & buyableitem->techchoice){
-						const ItemDef* def = GASLoader::Get().GetItemDef("virus");
-						int count = def ? def->spawnInventoryCount : 1;
-						for(int i = 0; i < count; i++) player.AddInventoryItem(Player::INV_VIRUS);
-					}
-				}break;
-				case World::BUY_POISON:{
-					if(team->GetAvailableTech(world) & buyableitem->techchoice){
-						const ItemDef* def = GASLoader::Get().GetItemDef("poison");
-						int count = def ? def->spawnInventoryCount : 2;
-						for(int i = 0; i < count; i++) player.AddInventoryItem(Player::INV_POISON);
-					}
-				}break;
-				case World::BUY_TRACT:{
-					if(team->GetAvailableTech(world) & buyableitem->techchoice){
-						const ItemDef* def = GASLoader::Get().GetItemDef("lazarustract");
-						int count = def ? def->spawnInventoryCount : 1;
-						for(int i = 0; i < count; i++) player.AddInventoryItem(Player::INV_LAZARUSTRACT);
-					}
-				}break;
-			}
-		}
-	}
-}
-
-void Game::JoinGame(LobbyGame & lobbygame, char * password){
-	strcpy(world.mapname, lobbygame.mapname);
-	Peer * peer = world.GetAuthorityPeer();
-	peer->ip = ntohl(inet_addr(lobbygame.hostname));
-	//peer->ip = ntohl(inet_addr("127.0.0.1")); // temporary
-	peer->port = lobbygame.port;
-	sharedstate = 0;
-	world.mode = World::REPLICA;
-	world.Connect(GetSelectedAgency(), world.lobby.accountid, password);
-	joininggame = true;
-}
 
 void Game::GoToState(Uint8 newstate){
 	nextstate = newstate;
 	state = FADEOUT;
-	fade_i = 0;
+	RestartPaletteFade();
 	stateisnew = true;
 	nextstateprocessed = false;
-}
-
-Interface * Game::CreateMainMenuInterface(void){
-	Overlay * background = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
-	background->res_bank = 6;
-	background->res_index = 0;
-	Overlay * logo = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
-	logo->res_bank = 208;
-	Overlay * version = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
-	version->text = "Silencer v";
-	version->text += world.version;
-	version->textbank = 133;
-	version->textwidth = 11;
-	version->x = 10;
-	version->y = 480 - 10 - 7;
-	Button * startbutton = (Button *)world.CreateObject(ObjectTypes::BUTTON);
-	startbutton->y = -134;
-	startbutton->x = 40;
-	startbutton->uid = 0;
-	strcpy(startbutton->text, "Tutorial");
-	Button * lobbybutton = (Button *)world.CreateObject(ObjectTypes::BUTTON);
-	lobbybutton->y = -67;
-	lobbybutton->x = 80;
-	lobbybutton->uid = 1;
-	strcpy(lobbybutton->text, "Connect To Lobby");
-	Button * optionsbutton = (Button *)world.CreateObject(ObjectTypes::BUTTON);
-	strcpy(optionsbutton->text, "Options");
-	optionsbutton->x = 40;
-	optionsbutton->uid = 2;
-	Button * exitbutton = (Button *)world.CreateObject(ObjectTypes::BUTTON);
-	strcpy(exitbutton->text, "Exit");
-	exitbutton->x = 0;
-	exitbutton->y = 67;
-	exitbutton->uid = 3;
-	
-	Interface * iface = (Interface *)world.CreateObject(ObjectTypes::INTERFACE);
-	iface->AddObject(startbutton->id);
-	iface->AddObject(lobbybutton->id);
-	iface->AddObject(optionsbutton->id);
-	iface->AddObject(exitbutton->id);
-	iface->AddTabObject(startbutton->id);
-	iface->AddTabObject(lobbybutton->id);
-	iface->AddTabObject(optionsbutton->id);
-	iface->AddTabObject(exitbutton->id);
-	iface->activeobject = 0;
-	iface->buttonescape = exitbutton->id;
-	return iface;
-}
-
-Interface * Game::CreateOptionsInterface(void){
-	Overlay * background = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
-	background->res_bank = 6;
-	background->res_index = 0;
-	Button * controlsbutton = (Button *)world.CreateObject(ObjectTypes::BUTTON);
-	controlsbutton->y = -142;
-	controlsbutton->x = -89;
-	controlsbutton->uid = 1;
-	strcpy(controlsbutton->text, "Controls");
-	Button * displaybutton = (Button *)world.CreateObject(ObjectTypes::BUTTON);
-	displaybutton->y = -90;
-	displaybutton->x = -89;
-	displaybutton->uid = 2;
-	strcpy(displaybutton->text, "Display");
-	Button * audiobutton = (Button *)world.CreateObject(ObjectTypes::BUTTON);
-	audiobutton->y = -38;
-	audiobutton->x = -89;
-	audiobutton->uid = 3;
-	strcpy(audiobutton->text, "Audio");
-	Button * gobackbutton = (Button *)world.CreateObject(ObjectTypes::BUTTON);
-	gobackbutton->y = 15;
-	gobackbutton->x = -89;
-	gobackbutton->uid = 0;
-	strcpy(gobackbutton->text, "Go Back");
-	Interface * iface = (Interface *)world.CreateObject(ObjectTypes::INTERFACE);
-	iface->AddObject(controlsbutton->id);
-	iface->AddObject(displaybutton->id);
-	iface->AddObject(audiobutton->id);
-	iface->AddObject(gobackbutton->id);
-	iface->AddTabObject(controlsbutton->id);
-	iface->AddTabObject(displaybutton->id);
-	iface->AddTabObject(audiobutton->id);
-	iface->AddTabObject(gobackbutton->id);
-	iface->activeobject = 0;
-	iface->buttonescape = gobackbutton->id;
-	return iface;
-}
-
-Interface * Game::CreateOptionsControlsInterface(void){
-	Overlay * background = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
-	background->res_bank = 6;
-	background->res_index = 0;
-	Overlay * background2 = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
-	background2->res_bank = 7;
-	background2->res_index = 7;
-	Overlay * title = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
-	title->text = "Configure Controls";
-	title->textbank = 135;
-	title->textwidth = 12;
-	title->x = 320 - ((title->text.length() * title->textwidth) / 2);
-	title->y = 14;
-	Interface * iface = (Interface *)world.CreateObject(ObjectTypes::INTERFACE);
-
-	// Preset cycle row. Static "Preset:" label on the left at the same x/y as
-	// binding row labels; cycle button on the right carrying the profile name.
-	// B220x33 keeps the same vertical sprite anchor as the (now-shifted)
-	// binding row buttons (B112x33), so y=0 places it where row 0 used to
-	// render. x left-aligns the visible button with c1button below; both
-	// render with bank-6 sprites but at different indices, so we add the
-	// sprite-offset delta (B220x33 res_index 23 vs B112x33 res_index 28) to
-	// c1's obj-space x — see resources.cpp:66 for the header read.
-	Overlay * presetlabel = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
-	presetlabel->text = "Preset:";
-	presetlabel->textbank  = 134;
-	presetlabel->textwidth = 10;
-	presetlabel->x = 80;
-	presetlabel->y = 95;
-
-	presetbutton = (Button *)world.CreateObject(ObjectTypes::BUTTON);
-	presetbutton->SetType(Button::B220x33);
-	presetbutton->x = -30 + (world.resources.spriteoffsetx[6][23] - world.resources.spriteoffsetx[6][28]);
-	presetbutton->y = 0;
-	presetbutton->uid = 250;
-	strcpy(presetbutton->text, "");
-	iface->AddObject(presetbutton->id);
-	iface->AddTabObject(presetbutton->id);
-
-	for(int i = 0; i < 5; i++){
-		int slot = i + 1;  // visual row index — preset takes slot 0
-		Overlay * name = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
-		keynameoverlay[i] = name;
-		name->textbank = 134;
-		name->textwidth = 10;
-		name->x = 80;
-		name->y = 95 + (slot * 53);
-
-		Button * c1button = (Button *)world.CreateObject(ObjectTypes::BUTTON);
-		Game::c1button[i] = c1button;
-		c1button->SetType(Button::B112x33);
-		c1button->y = 0 + (slot * 53);
-		c1button->x = -30;
-		c1button->uid = i;
-		strcpy(c1button->text, "");
-		iface->AddObject(c1button->id);
-		iface->AddTabObject(c1button->id);
-
-		Button * buttonop = (Button *)world.CreateObject(ObjectTypes::BUTTON);
-		Game::cobutton[i] = buttonop;
-		buttonop->SetType(Button::BNONE);
-		buttonop->y = 95 + (slot * 53);
-		buttonop->x = 383;
-		buttonop->uid = 150 + i;
-		buttonop->width = 40;
-		buttonop->height = 30;
-		buttonop->textbank = 134;
-		buttonop->textwidth = 9;
-		strcpy(buttonop->text, "");
-		iface->AddObject(buttonop->id);
-
-		Button * c2button = (Button *)world.CreateObject(ObjectTypes::BUTTON);
-		Game::c2button[i] = c2button;
-		c2button->SetType(Button::B112x33);
-		c2button->y = 0 + (slot * 53);
-		c2button->x = 120;
-		c2button->uid = 100 + i;
-		strcpy(c2button->text, "");
-		iface->AddObject(c2button->id);
-		iface->AddTabObject(c2button->id);
-	}
-	iface->objectupscroll = c1button[0]->id;
-	iface->objectdownscroll = c2button[4]->id;
-
-	ScrollBar * scrollbar = (ScrollBar *)world.CreateObject(ObjectTypes::SCROLLBAR);
-	scrollbar->res_index = 9;
-	scrollbar->scrollpixels = 53;
-	scrollbar->scrollposition = 0;
-	scrollbar->scrollmax = (int)Action::Count - 5;
-	iface->AddObject(scrollbar->id);
-	iface->scrollbar = scrollbar->id;
-	
-	Button * savebutton = (Button *)world.CreateObject(ObjectTypes::BUTTON);
-	savebutton->y = 117;
-	savebutton->x = -200;
-	savebutton->uid = 200;
-	strcpy(savebutton->text, "Save");
-	iface->AddObject(savebutton->id);
-	iface->AddTabObject(savebutton->id);
-	
-	Button * cancelbutton = (Button *)world.CreateObject(ObjectTypes::BUTTON);
-	cancelbutton->y = 117;
-	cancelbutton->x = 20;
-	cancelbutton->uid = 201;
-	strcpy(cancelbutton->text, "Cancel");
-	iface->AddObject(cancelbutton->id);
-	iface->AddTabObject(cancelbutton->id);
-	iface->activeobject = 0;
-	iface->buttonenter = savebutton->id;
-	iface->buttonescape = cancelbutton->id;
-	return iface;
-}
-
-Interface * Game::CreateOptionsDisplayInterface(void){
-	Overlay * background = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
-	background->res_bank = 6;
-	background->res_index = 0;
-	Overlay * title = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
-	title->text = "Display Options";
-	title->textbank = 135;
-	title->textwidth = 12;
-	title->x = 320 - ((title->text.length() * title->textwidth) / 2);
-	title->y = 14;
-	Interface * iface = (Interface *)world.CreateObject(ObjectTypes::INTERFACE);
-	
-	const char * names[] = {"Fullscreen", "Smooth Scaling"};
-	for(int i = 0; i < 2; i++){
-		Button * c1button = (Button *)world.CreateObject(ObjectTypes::BUTTON);
-		c1button->SetType(Button::B220x33);
-		c1button->y = 50 + (i * 53);
-		c1button->x = 100;
-		c1button->uid = 0 + i;
-		strcpy(c1button->text, names[i]);
-		iface->AddObject(c1button->id);
-		iface->AddTabObject(c1button->id);
-		
-		Overlay * off = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
-		off->y = 137 + (i * 53);
-		off->x = 420;
-		off->res_bank = 6;
-		off->res_index = 12;
-		off->uid = 20 + i;
-		iface->AddObject(off->id);
-		
-		Overlay * on = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
-		on->y = 137 + (i * 53);
-		on->x = 450;
-		on->res_bank = 6;
-		on->res_index = 14;
-		on->uid = 40 + i;
-		iface->AddObject(on->id);
-	}
-	
-	Button * savebutton = (Button *)world.CreateObject(ObjectTypes::BUTTON);
-	savebutton->y = 117;
-	savebutton->x = -200;
-	savebutton->uid = 200;
-	strcpy(savebutton->text, "Save");
-	iface->AddObject(savebutton->id);
-	iface->AddTabObject(savebutton->id);
-	
-	Button * cancelbutton = (Button *)world.CreateObject(ObjectTypes::BUTTON);
-	cancelbutton->y = 117;
-	cancelbutton->x = 20;
-	cancelbutton->uid = 201;
-	strcpy(cancelbutton->text, "Cancel");
-	iface->AddObject(cancelbutton->id);
-	iface->AddTabObject(cancelbutton->id);
-	iface->activeobject = 0;
-	iface->buttonenter = savebutton->id;
-	iface->buttonescape = cancelbutton->id;
-	return iface;
-}
-
-Interface * Game::CreateOptionsAudioInterface(void){
-	Overlay * background = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
-	background->res_bank = 6;
-	background->res_index = 0;
-	Overlay * title = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
-	title->text = "Audio Options";
-	title->textbank = 135;
-	title->textwidth = 12;
-	title->x = 320 - ((title->text.length() * title->textwidth) / 2);
-	title->y = 14;
-	Interface * iface = (Interface *)world.CreateObject(ObjectTypes::INTERFACE);
-	
-	const char * names[] = {"Music"};
-	for(int i = 0; i < 1; i++){
-		Button * c1button = (Button *)world.CreateObject(ObjectTypes::BUTTON);
-		c1button->SetType(Button::B220x33);
-		c1button->y = 50 + (i * 53);
-		c1button->x = 100;
-		c1button->uid = 0 + i;
-		strcpy(c1button->text, names[i]);
-		iface->AddObject(c1button->id);
-		iface->AddTabObject(c1button->id);
-		
-		Overlay * off = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
-		off->y = 137 + (i * 53);
-		off->x = 420;
-		off->res_bank = 6;
-		off->res_index = 12;
-		off->uid = 20 + i;
-		iface->AddObject(off->id);
-		
-		Overlay * on = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
-		on->y = 137 + (i * 53);
-		on->x = 450;
-		on->res_bank = 6;
-		on->res_index = 14;
-		on->uid = 40 + i;
-		iface->AddObject(on->id);
-	}
-	
-	Button * savebutton = (Button *)world.CreateObject(ObjectTypes::BUTTON);
-	savebutton->y = 117;
-	savebutton->x = -200;
-	savebutton->uid = 200;
-	strcpy(savebutton->text, "Save");
-	iface->AddObject(savebutton->id);
-	iface->AddTabObject(savebutton->id);
-	
-	Button * cancelbutton = (Button *)world.CreateObject(ObjectTypes::BUTTON);
-	cancelbutton->y = 117;
-	cancelbutton->x = 20;
-	cancelbutton->uid = 201;
-	strcpy(cancelbutton->text, "Cancel");
-	iface->AddObject(cancelbutton->id);
-	iface->AddTabObject(cancelbutton->id);
-	iface->activeobject = 0;
-	iface->buttonenter = savebutton->id;
-	iface->buttonescape = cancelbutton->id;
-	return iface;
-}
-
-Interface * Game::CreateLobbyConnectInterface(void){
-	Overlay * background = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
-	background->res_bank = 7;
-	background->res_index = 2;
-	Button * loginbutton = (Button *)world.CreateObject(ObjectTypes::BUTTON);
-	loginbutton->y = 339;
-	loginbutton->x = 264;
-	loginbutton->SetType(Button::B52x21);
-	loginbutton->uid = 0;
-	strcpy(loginbutton->text, "Login");
-	Button * cancelbutton = (Button *)world.CreateObject(ObjectTypes::BUTTON);
-	cancelbutton->y = 339;
-	cancelbutton->x = 321;
-	cancelbutton->SetType(Button::B52x21);
-	cancelbutton->uid = 1;
-	strcpy(cancelbutton->text, "Cancel");
-	TextBox * textbox = (TextBox *)world.CreateObject(ObjectTypes::TEXTBOX);
-	textbox->x = 185;
-	textbox->y = 101;
-	textbox->width = 250;
-	textbox->height = 170;
-	textbox->res_bank = 133;
-	textbox->lineheight = 11;
-	textbox->fontwidth = 6;
-	Overlay * usernametext = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
-	usernametext->text = "Username";
-	usernametext->textbank = 134;
-	usernametext->textwidth = 9;
-	usernametext->x = 190;
-	usernametext->y = 291;
-	Overlay * passwordtext = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
-	passwordtext->text = "Password";
-	passwordtext->textbank = 134;
-	passwordtext->textwidth = 9;
-	passwordtext->x = 190;
-	passwordtext->y = 318;
-	TextInput * usernameinput = (TextInput *)world.CreateObject(ObjectTypes::TEXTINPUT);
-	usernameinput->x = 275;
-	usernameinput->y = 293;
-	usernameinput->width = 180;
-	usernameinput->height = 14;
-	usernameinput->res_bank = 133;
-	usernameinput->fontwidth = 6;
-	usernameinput->maxchars = 16;
-	usernameinput->maxwidth = 16;
-	usernameinput->uid = 1;
-	TextInput * passwordinput = (TextInput *)world.CreateObject(ObjectTypes::TEXTINPUT);
-	passwordinput->x = 275;
-	passwordinput->y = 320;
-	passwordinput->width = 180;
-	passwordinput->height = 14;
-	passwordinput->res_bank = 133;
-	passwordinput->fontwidth = 6;
-	passwordinput->maxchars = 28;
-	passwordinput->maxwidth = 28;
-	passwordinput->password = true;
-	passwordinput->uid = 2;
-	Interface * iface = (Interface *)world.CreateObject(ObjectTypes::INTERFACE);
-#ifdef OUYA
-	Overlay * helptext = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
-	helptext->text = "Use the trackpad to click on input boxes";
-	helptext->textbank = 134;
-	helptext->textwidth = 9;
-	helptext->x = 320 - ((strlen(helptextstring) * helptext->textwidth) / 2);
-	helptext->y = 400;
-#endif
-	
-	iface->AddObject(textbox->id);
-	iface->AddObject(usernameinput->id);
-	iface->AddObject(passwordinput->id);
-	iface->AddObject(loginbutton->id);
-	iface->AddObject(cancelbutton->id);
-	iface->AddTabObject(usernameinput->id);
-	iface->AddTabObject(passwordinput->id);
-	iface->AddTabObject(loginbutton->id);
-	iface->AddTabObject(cancelbutton->id);
-	iface->activeobject = usernameinput->id;
-	iface->ActiveChanged(world, iface, false);
-	iface->buttonenter = loginbutton->id;
-	iface->buttonescape = cancelbutton->id;
-	return iface;
-}
-
-Interface * Game::CreateLobbyInterface(void){
-	chatlinesprinted = 0;
-	Overlay * background = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
-	background->res_bank = 7;
-	background->res_index = 1;
-	Overlay * toptext = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
-	toptext->text = "Silencer";
-	toptext->textbank = 135;
-	toptext->textwidth = 11;
-	toptext->effectcolor = 152;
-	toptext->x = 15;
-	toptext->y = 32;
-	Overlay * vertext = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
-	vertext->text = "v.";
-	vertext->text += world.version;
-	vertext->textbank = 133;
-	vertext->textwidth = 6;
-	vertext->effectcolor = 189;
-	vertext->x = 115;
-	vertext->y = 39;
-	Overlay * mapnametext = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
-	mapnametext->textbank = 135;
-	mapnametext->textwidth = 11;
-	mapnametext->effectcolor = 129;
-	mapnametext->effectbrightness = 128 + 32;
-	mapnametext->textcolorramp = true;
-	mapnametext->x = 180;
-	mapnametext->y = 32;
-	mapnametext->uid = 8;
-	Button * exitbutton = (Button *)world.CreateObject(ObjectTypes::BUTTON);
-	exitbutton->y = 29;
-	exitbutton->x = 473;
-	exitbutton->SetType(Button::B156x21);
-	exitbutton->uid = 10;
-	strcpy(exitbutton->text, "Go Back");
-	
-	characterinterface = CreateCharacterInterface()->id;
-	gameselectinterface = CreateGameSelectInterface()->id;
-	chatinterface = CreateChatInterface()->id;
-	
-	Interface * iface = (Interface *)world.CreateObject(ObjectTypes::INTERFACE);
-	iface->AddObject(background->id);
-	iface->AddObject(toptext->id);
-	iface->AddObject(vertext->id);
-	iface->AddObject(mapnametext->id);
-	iface->AddObject(exitbutton->id);
-	iface->AddObject(chatinterface);
-	iface->AddObject(characterinterface);
-	iface->AddObject(gameselectinterface);
-	iface->buttonescape = exitbutton->id;
-	iface->activeobject = chatinterface;
-	iface->ActiveChanged(world, iface, false);
-	return iface;
-}
-
-Interface * Game::CreateCharacterInterface(void){
-	Interface * characterinterface = (Interface *)world.CreateObject(ObjectTypes::INTERFACE);
-	characterinterface->x = 10;
-	characterinterface->y = 64;
-	characterinterface->width = 217;
-	characterinterface->height = 120;
-	Overlay * usertext = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
-	usertext->text = localusername;
-	usertext->textbank = 134;
-	usertext->textwidth = 8;
-	usertext->effectcolor = 200;
-	usertext->x = 20;
-	usertext->y = 71;
-	Overlay * leveltext = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
-	leveltext->uid = 2;
-	leveltext->textbank = 133;
-	leveltext->textwidth = 7;
-	leveltext->effectcolor = 129;
-	leveltext->effectbrightness = 128 + 32;
-	leveltext->textcolorramp = true;
-	leveltext->x = 17;
-	leveltext->y = 130;
-	Overlay * winstext = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
-	winstext->uid = 3;
-	winstext->textbank = 133;
-	winstext->textwidth = 7;
-	winstext->effectcolor = 129;
-	winstext->effectbrightness = 128 + 32;
-	winstext->textcolorramp = true;
-	winstext->x = 17;
-	winstext->y = 143;
-	Overlay * lossestext = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
-	lossestext->uid = 4;
-	lossestext->textbank = 133;
-	lossestext->textwidth = 7;
-	lossestext->effectcolor = 129;
-	lossestext->effectbrightness = 128 + 32;
-	lossestext->textcolorramp = true;
-	lossestext->x = 17;
-	lossestext->y = 156;
-	Overlay * etctext = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
-	etctext->uid = 5;
-	etctext->textbank = 133;
-	etctext->textwidth = 7;
-	etctext->effectcolor = 129;
-	etctext->effectbrightness = 128 + 32;
-	etctext->textcolorramp = true;
-	etctext->x = 17;
-	etctext->y = 169;
-	// Character name overlay (uid 6) — updated dynamically when characters arrive.
-	Overlay * charnametext = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
-	charnametext->uid = 6;
-	charnametext->textbank = 133;
-	charnametext->textwidth = 7;
-	charnametext->effectcolor = 200;
-	charnametext->effectbrightness = 128 + 32;
-	charnametext->x = 17;
-	charnametext->y = 90;
-	// Agency icon for the active character (uid 7) — toggle is read-only (visual only).
-	Toggle * agencyicon = (Toggle *)world.CreateObject(ObjectTypes::TOGGLE);
-	agencyicon->uid = 7;
-	agencyicon->y = 105;
-	agencyicon->x = 20;
-	agencyicon->res_bank = 181;
-	agencyicon->res_index = 0;
-	agencyicon->set = 0; // no toggle set — not interactive
-	agencyicon->selected = true;
-	// "New Character" button (uid 8).
-	Button * newcharbutton = (Button *)world.CreateObject(ObjectTypes::BUTTON);
-	newcharbutton->uid = 8;
-	newcharbutton->y = 105;
-	newcharbutton->x = 65;
-	newcharbutton->SetType(Button::B156x21);
-	strcpy(newcharbutton->text, "New Character");
-	characterinterface->AddObject(usertext->id);
-	characterinterface->AddObject(leveltext->id);
-	characterinterface->AddObject(winstext->id);
-	characterinterface->AddObject(lossestext->id);
-	characterinterface->AddObject(etctext->id);
-	characterinterface->AddObject(charnametext->id);
-	characterinterface->AddObject(agencyicon->id);
-	characterinterface->AddObject(newcharbutton->id);
-	return characterinterface;
-}
-
-Interface * Game::CreateSelectAgentInterface(void){
-	Overlay * background = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
-	background->res_bank = 7;
-	background->res_index = 1;
-	Overlay * title = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
-	title->text = "SELECT AGENT";
-	title->textbank = 135;
-	title->textwidth = 11;
-	title->effectcolor = 152;
-	title->x = 15;
-	title->y = 32;
-	SelectBox * agentselect = (SelectBox *)world.CreateObject(ObjectTypes::SELECTBOX);
-	agentselect->x = 12;
-	agentselect->y = 62;
-	agentselect->width = 210;
-	agentselect->height = 370;
-	agentselect->lineheight = 20;
-	agentselect->uid = 1;
-	ScrollBar * scrollbar = (ScrollBar *)world.CreateObject(ObjectTypes::SCROLLBAR);
-	scrollbar->res_index = 9;
-	scrollbar->scrollpixels = agentselect->lineheight;
-	scrollbar->scrollposition = 0;
-	Interface * iface = (Interface *)world.CreateObject(ObjectTypes::INTERFACE);
-	iface->AddObject(background->id);
-	iface->AddObject(title->id);
-	iface->AddObject(agentselect->id);
-	iface->AddObject(scrollbar->id);
-	iface->AddTabObject(agentselect->id);
-	iface->activeobject = agentselect->id;
-	iface->ActiveChanged(world, iface, false);
-	iface->scrollbar = scrollbar->id;
-	return iface;
-}
-
-Interface * Game::CreateEnterAliasInterface(void){
-	Overlay * background = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
-	background->res_bank = 7;
-	background->res_index = 2;
-	Overlay * title = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
-	title->text = "SILENCER ALIAS";
-	title->textbank = 135;
-	title->textwidth = 11;
-	title->x = 320 - ((Sint16)(title->text.length() * title->textwidth) / 2);
-	title->y = 210;
-	TextInput * nameinput = (TextInput *)world.CreateObject(ObjectTypes::TEXTINPUT);
-	nameinput->x = 185;
-	nameinput->y = 270;
-	nameinput->width = 270;
-	nameinput->height = 18;
-	nameinput->res_bank = 133;
-	nameinput->fontwidth = 6;
-	nameinput->maxchars = 16;
-	nameinput->maxwidth = 16;
-	nameinput->uid = 1;
-	Button * nextbutton = (Button *)world.CreateObject(ObjectTypes::BUTTON);
-	nextbutton->y = 330;
-	nextbutton->x = 215;
-	nextbutton->SetType(Button::B112x33);
-	nextbutton->uid = 20;
-	strcpy(nextbutton->text, "Next");
-	Button * backbutton = (Button *)world.CreateObject(ObjectTypes::BUTTON);
-	backbutton->y = 330;
-	backbutton->x = 340;
-	backbutton->SetType(Button::B112x33);
-	backbutton->uid = 21;
-	strcpy(backbutton->text, "Back");
-	Interface * iface = (Interface *)world.CreateObject(ObjectTypes::INTERFACE);
-	iface->AddObject(background->id);
-	iface->AddObject(title->id);
-	iface->AddObject(nameinput->id);
-	iface->AddObject(nextbutton->id);
-	iface->AddObject(backbutton->id);
-	iface->AddTabObject(nameinput->id);
-	iface->AddTabObject(nextbutton->id);
-	iface->AddTabObject(backbutton->id);
-	iface->activeobject = nameinput->id;
-	iface->ActiveChanged(world, iface, false);
-	iface->buttonenter = nextbutton->id;
-	iface->buttonescape = backbutton->id;
-	return iface;
-}
-
-Interface * Game::CreateSelectAgencyInterface(void){
-	Overlay * background = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
-	background->res_bank = 7;
-	background->res_index = 1;
-	Overlay * title = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
-	title->text = "SELECT AGENCY";
-	title->textbank = 135;
-	title->textwidth = 11;
-	title->effectcolor = 152;
-	title->x = 15;
-	title->y = 32;
-	SelectBox * agencyselect = (SelectBox *)world.CreateObject(ObjectTypes::SELECTBOX);
-	agencyselect->x = 12;
-	agencyselect->y = 62;
-	agencyselect->width = 210;
-	agencyselect->height = 260;
-	agencyselect->lineheight = 26;
-	agencyselect->uid = 1;
-	agencyselect->AddItem("Noxis",     Team::NOXIS);
-	agencyselect->AddItem("Lazarus",   Team::LAZARUS);
-	agencyselect->AddItem("Caliber",   Team::CALIBER);
-	agencyselect->AddItem("Static",    Team::STATIC);
-	agencyselect->AddItem("Black Rose",Team::BLACKROSE);
-	ScrollBar * scrollbar = (ScrollBar *)world.CreateObject(ObjectTypes::SCROLLBAR);
-	scrollbar->res_index = 9;
-	scrollbar->scrollpixels = agencyselect->lineheight;
-	scrollbar->scrollposition = 0;
-	// Right panel: advantages label (uid=3) + description (uid=2)
-	Overlay * advlabel = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
-	advlabel->text = "Advantages";
-	advlabel->textbank = 134;
-	advlabel->textwidth = 9;
-	advlabel->x = 252;
-	advlabel->y = 68;
-	Overlay * advtext = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
-	advtext->uid = 3;
-	advtext->textbank = 133;
-	advtext->textwidth = 6;
-	advtext->effectcolor = 129;
-	advtext->effectbrightness = 128 + 32;
-	advtext->x = 252;
-	advtext->y = 82;
-	TextBox * descbox = (TextBox *)world.CreateObject(ObjectTypes::TEXTBOX);
-	descbox->uid = 2;
-	descbox->x = 252;
-	descbox->y = 115;
-	descbox->width = 380;
-	descbox->height = 250;
-	descbox->res_bank = 133;
-	descbox->lineheight = 11;
-	descbox->fontwidth = 6;
-	Button * createbutton = (Button *)world.CreateObject(ObjectTypes::BUTTON);
-	createbutton->y = 390;
-	createbutton->x = 252;
-	createbutton->SetType(Button::B156x21);
-	createbutton->uid = 20;
-	strcpy(createbutton->text, "Create");
-	Button * backbutton = (Button *)world.CreateObject(ObjectTypes::BUTTON);
-	backbutton->y = 390;
-	backbutton->x = 420;
-	backbutton->SetType(Button::B156x21);
-	backbutton->uid = 21;
-	strcpy(backbutton->text, "Back");
-	Interface * iface = (Interface *)world.CreateObject(ObjectTypes::INTERFACE);
-	iface->AddObject(background->id);
-	iface->AddObject(title->id);
-	iface->AddObject(agencyselect->id);
-	iface->AddObject(scrollbar->id);
-	iface->AddObject(advlabel->id);
-	iface->AddObject(advtext->id);
-	iface->AddObject(descbox->id);
-	iface->AddObject(createbutton->id);
-	iface->AddObject(backbutton->id);
-	iface->AddTabObject(agencyselect->id);
-	iface->AddTabObject(createbutton->id);
-	iface->AddTabObject(backbutton->id);
-	iface->scrollbar = scrollbar->id;
-	iface->buttonenter = createbutton->id;
-	iface->buttonescape = backbutton->id;
-	return iface;
-}
-
-Interface * Game::CreateGameSelectInterface(void){
-	Interface * gameselectinterface = (Interface *)world.CreateObject(ObjectTypes::INTERFACE);
-	gameselectinterface->x = 403;
-	gameselectinterface->y = 87;
-	gameselectinterface->width = 222;
-	gameselectinterface->height = 267;
-	Overlay * rightborder = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
-	rightborder->res_bank = 7;
-	rightborder->res_index = 8;
-	Overlay * gamestext = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
-	gamestext->text = "Active Games";
-	gamestext->textbank = 134;
-	gamestext->textwidth = 8;
-	gamestext->x = 405;
-	gamestext->y = 70;
-	SelectBox * gameselect = (SelectBox *)world.CreateObject(ObjectTypes::SELECTBOX);
-	gameselect->x = 407;
-	gameselect->y = 89;
-	gameselect->width = 214;
-	gameselect->height = 265;
-	gameselect->lineheight = 14;
-	gameselect->uid = 10;
-	ScrollBar * gamescrollbar = (ScrollBar *)world.CreateObject(ObjectTypes::SCROLLBAR);
-	gamescrollbar->res_index = 9;
-	gamescrollbar->scrollpixels = gameselect->lineheight;
-	gamescrollbar->scrollposition = gameselect->scrolled;
-	Overlay * gamenametext = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
-	gamenametext->textbank = 133;
-	gamenametext->textwidth = 6;
-	gamenametext->x = 405;
-	gamenametext->y = 358;
-	gamenametext->uid = 1;
-	Overlay * gamemaptext = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
-	gamemaptext->textbank = 133;
-	gamemaptext->textwidth = 6;
-	gamemaptext->x = 405;
-	gamemaptext->y = 370;
-	gamemaptext->uid = 2;
-	Overlay * gameplayerstext = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
-	gameplayerstext->textbank = 133;
-	gameplayerstext->textwidth = 6;
-	gameplayerstext->x = 405;
-	gameplayerstext->y = 382;
-	gameplayerstext->uid = 3;
-	Overlay * gamecreatortext = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
-	gamecreatortext->textbank = 133;
-	gamecreatortext->textwidth = 6;
-	gamecreatortext->x = 405;
-	gamecreatortext->y = 394;
-	gamecreatortext->uid = 4;
-	Overlay * gameinfotext = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
-	gameinfotext->textbank = 133;
-	gameinfotext->textwidth = 6;
-	gameinfotext->x = 405;
-	gameinfotext->y = 406;
-	gameinfotext->uid = 5;
-	
-	Button * gamejoinbutton = (Button *)world.CreateObject(ObjectTypes::BUTTON);
-	gamejoinbutton->y = 430;
-	gamejoinbutton->x = 436;
-	gamejoinbutton->SetType(Button::B156x21);
-	gamejoinbutton->uid = 20;
-	strcpy(gamejoinbutton->text, "Join Game");
-	Button * gamecreatebutton = (Button *)world.CreateObject(ObjectTypes::BUTTON);
-	gamecreatebutton->y = 68;
-	gamecreatebutton->x = 242;
-	gamecreatebutton->SetType(Button::B156x21);
-	gamecreatebutton->uid = 30;
-	strcpy(gamecreatebutton->text, "Create Game");
-	gameselectinterface->AddObject(rightborder->id);
-	gameselectinterface->AddObject(gamestext->id);
-	gameselectinterface->AddObject(gamejoinbutton->id);
-	gameselectinterface->AddObject(gamecreatebutton->id);
-	gameselectinterface->AddObject(gameselect->id);
-	gameselectinterface->AddObject(gamescrollbar->id);
-	gameselectinterface->AddObject(gamenametext->id);
-	gameselectinterface->AddObject(gamemaptext->id);
-	gameselectinterface->AddObject(gameplayerstext->id);
-	gameselectinterface->AddObject(gamecreatortext->id);
-	gameselectinterface->AddObject(gameinfotext->id);
-	gameselectinterface->buttonenter = gamejoinbutton->id;
-	gameselectinterface->scrollbar = gamescrollbar->id;
-	return gameselectinterface;
-}
-
-Interface * Game::CreateChatInterface(void){
-	Interface * chatinterface = (Interface *)world.CreateObject(ObjectTypes::INTERFACE);
-	chatinterface->x = 15;
-	chatinterface->y = 216;
-	chatinterface->width = 368;
-	chatinterface->height = 234;
-	Overlay * chatborder = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
-	chatborder->res_bank = 7;
-	chatborder->res_index = 11;
-	Overlay * chatinputborder = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
-	chatinputborder->res_bank = 7;
-	chatinputborder->res_index = 14;
-	Overlay * channeltext = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
-	channeltext->uid = 1;
-	channeltext->textbank = 134;
-	channeltext->textwidth = 8;
-	channeltext->x = 15;
-	channeltext->y = 200;
-	TextBox * textbox = (TextBox *)world.CreateObject(ObjectTypes::TEXTBOX);
-	textbox->x = 19;
-	textbox->y = 220;
-	textbox->width = 242;
-	textbox->height = 207;
-	textbox->res_bank = 133;
-	textbox->lineheight = 11;
-	textbox->fontwidth = 6;
-	textbox->bottomtotop = true;
-	TextBox * presencebox = (TextBox *)world.CreateObject(ObjectTypes::TEXTBOX);
-	presencebox->x = 267;
-	presencebox->y = 220;
-	presencebox->width = 110;
-	presencebox->height = 207;
-	presencebox->res_bank = 133;
-	presencebox->lineheight = 11;
-	presencebox->fontwidth = 6;
-	presencebox->bottomtotop = false;
-	presencebox->uid = 9;
-	/*for(int i = 0; i < 0; i++){
-		char line[256];
-		sprintf(line, "line %d", i);
-		textbox->AddLine(line);
-	}*/
-	TextInput * chatinput = (TextInput *)world.CreateObject(ObjectTypes::TEXTINPUT);
-	chatinput->x = 18;
-	chatinput->y = 437;
-	chatinput->width = 360;
-	chatinput->height = 14;
-	chatinput->res_bank = 133;
-	chatinput->fontwidth = 6;
-	chatinput->maxchars = 200;
-	chatinput->maxwidth = 60;
-	chatinput->uid = 1;
-	ScrollBar * chatscrollbar = (ScrollBar *)world.CreateObject(ObjectTypes::SCROLLBAR);
-	chatscrollbar->res_index = 12;
-	chatscrollbar->barres_index = 13;
-	chatscrollbar->scrollpixels = textbox->lineheight;
-	chatscrollbar->scrollposition = textbox->scrolled;
-	chatinterface->AddObject(chatborder->id);
-	chatinterface->AddObject(chatinputborder->id);
-	chatinterface->AddObject(channeltext->id);
-	chatinterface->AddObject(textbox->id);
-	chatinterface->AddObject(presencebox->id);
-	chatinterface->AddObject(chatinput->id);
-	chatinterface->AddObject(chatscrollbar->id);
-	chatinterface->AddTabObject(chatinput->id);
-	chatinterface->scrollbar = chatscrollbar->id;
-	//chatinterface->ActiveChanged(&world, chatinterface, false);
-	return chatinterface;
-}
-
-Interface * Game::CreateGameCreateInterface(void){
-	creategameclicked = false;
-	selectedmap = -1;
-	Interface * gamecreateinterface = (Interface *)world.CreateObject(ObjectTypes::INTERFACE);
-	gamecreateinterface->x = 403;
-	gamecreateinterface->y = 87;
-	gamecreateinterface->width = 222;
-	gamecreateinterface->height = 390;
-	Overlay * rightborder = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
-	rightborder->res_bank = 7;
-	rightborder->res_index = 8;
-	
-	Overlay * optionstext = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
-	optionstext->text = "Game Options";
-	optionstext->textbank = 134;
-	optionstext->textwidth = 8;
-	optionstext->x = 272;
-	optionstext->y = 70;
-	
-	int yoffset = 6;
-	int yspace = 18;
-	
-	Overlay * securitytext = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
-	securitytext->text = "Security:";
-	securitytext->textbank = 134;
-	securitytext->textwidth = 8;
-	securitytext->x = 245;
-	securitytext->y = 87 + (yspace * 0) + yoffset;
-	Button * buttonsecurity = (Button *)world.CreateObject(ObjectTypes::BUTTON);
-	buttonsecurity->SetType(Button::BNONE);
-	buttonsecurity->x = 323;
-	buttonsecurity->y = 87 + (yspace * 0) + yoffset;
-	buttonsecurity->uid = 40;
-	buttonsecurity->width = 70;
-	buttonsecurity->height = 20;
-	buttonsecurity->textbank = 134;
-	buttonsecurity->textwidth = 9;
-	strcpy(buttonsecurity->text, "Medium");
-	
-	Overlay * minleveltext = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
-	minleveltext->text = "Min Level:";
-	minleveltext->textbank = 134;
-	minleveltext->textwidth = 8;
-	minleveltext->x = 245;
-	minleveltext->y = 87 + (yspace * 1) + yoffset;
-	
-	TextInput * minlevelinput = (TextInput *)world.CreateObject(ObjectTypes::TEXTINPUT);
-	minlevelinput->x = 350;
-	minlevelinput->y = 87 + (yspace * 1) + yoffset;
-	minlevelinput->width = 20;
-	minlevelinput->height = 20;
-	minlevelinput->res_bank = 134;
-	minlevelinput->fontwidth = 8;
-	minlevelinput->maxchars = 2;
-	minlevelinput->maxwidth = 50;
-	minlevelinput->uid = 41;
-	minlevelinput->numbersonly = true;
-	minlevelinput->SetText("0");
-	
-	Overlay * maxleveltext = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
-	maxleveltext->text = "Max Level:";
-	maxleveltext->textbank = 134;
-	maxleveltext->textwidth = 8;
-	maxleveltext->x = 245;
-	maxleveltext->y = 87 + (yspace * 2) + yoffset;
-	
-	TextInput * maxlevelinput = (TextInput *)world.CreateObject(ObjectTypes::TEXTINPUT);
-	maxlevelinput->x = 350;
-	maxlevelinput->y = 87 + (yspace * 2) + yoffset;
-	maxlevelinput->width = 20;
-	maxlevelinput->height = 20;
-	maxlevelinput->res_bank = 134;
-	maxlevelinput->fontwidth = 8;
-	maxlevelinput->maxchars = 2;
-	maxlevelinput->maxwidth = 50;
-	maxlevelinput->uid = 42;
-	maxlevelinput->numbersonly = true;
-	maxlevelinput->SetText("99");
-	
-	Overlay * maxplayerstext = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
-	maxplayerstext->text = "Max Players:";
-	maxplayerstext->textbank = 134;
-	maxplayerstext->textwidth = 8;
-	maxplayerstext->x = 245;
-	maxplayerstext->y = 87 + (yspace * 3) + yoffset;
-	
-	TextInput * maxplayersinput = (TextInput *)world.CreateObject(ObjectTypes::TEXTINPUT);
-	maxplayersinput->x = 350;
-	maxplayersinput->y = 87 + (yspace * 3) + yoffset;
-	maxplayersinput->width = 20;
-	maxplayersinput->height = 20;
-	maxplayersinput->res_bank = 134;
-	maxplayersinput->fontwidth = 8;
-	maxplayersinput->maxchars = 2;
-	maxplayersinput->maxwidth = 50;
-	maxplayersinput->uid = 43;
-	maxplayersinput->numbersonly = true;
-	maxplayersinput->SetText("24");
-	
-	Overlay * maxteamstext = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
-	maxteamstext->text = "Max Teams:";
-	maxteamstext->textbank = 134;
-	maxteamstext->textwidth = 8;
-	maxteamstext->x = 245;
-	maxteamstext->y = 87 + (yspace * 4) + yoffset;
-	
-	TextInput * maxteamsinput = (TextInput *)world.CreateObject(ObjectTypes::TEXTINPUT);
-	maxteamsinput->x = 350;
-	maxteamsinput->y = 87 + (yspace * 4) + yoffset;
-	maxteamsinput->width = 20;
-	maxteamsinput->height = 20;
-	maxteamsinput->res_bank = 134;
-	maxteamsinput->fontwidth = 8;
-	maxteamsinput->maxchars = 2;
-	maxteamsinput->maxwidth = 50;
-	maxteamsinput->uid = 44;
-	maxteamsinput->numbersonly = true;
-	maxteamsinput->SetText("6");
-	
-	Overlay * selectmaptext = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
-	selectmaptext->text = "Select Map";
-	selectmaptext->textbank = 134;
-	selectmaptext->textwidth = 8;
-	selectmaptext->x = 405;
-	selectmaptext->y = 70;
-	SelectBox * mapselect = (SelectBox *)world.CreateObject(ObjectTypes::SELECTBOX);
-	mapselect->x = 407;
-	mapselect->y = 89;
-	mapselect->width = 214;
-	mapselect->height = 265;
-	mapselect->lineheight = 14;
-	mapselect->uid = 4;
-	//mapselect->ListFiles("level");
-#ifdef __ANDROID__
-	// need to get android directory enumeration working, hardcoded for now
-	const char * maps[] = {"ALLY10c.sil", "CRAN01h.SIL", "EASY05c.SIL", "PIT16d.SIL", "STAR72.SIL", "THET06e.SIL"};
-	for(int i = 0; i < sizeof(maps) / sizeof(const char *); i++){
-		mapselect->AddItem(maps[i]);
-	}
-#else
-	std::vector<std::string> maps;
-	std::vector<std::string> files;
-	CDResDir();
-	files = ListFiles((GetResDir() + "level").c_str());
-	maps.insert(maps.end(), files.begin(), files.end());
-	CDDataDir();
-	files = ListFiles((GetDataDir() + "level/download").c_str());
-	for(std::vector<std::string>::iterator it = files.begin(); it != files.end(); it++){
-		if(std::find(maps.begin(), maps.end(), (*it)) == maps.end()){
-			maps.push_back(*it);
-		}
-	}
-	//maps.insert(maps.end(), files.begin(), files.end());
-	std::sort(maps.begin(), maps.end());
-	for(std::vector<std::string>::iterator it = maps.begin(); it != maps.end(); it++){
-		mapselect->AddItem((*it).c_str());
-	}
-	// Add server-only maps (not yet downloaded) with a download prefix
-	servermaps.clear();
-	auto serverlist = FetchServerMapList(Config::GetInstance().mapapiurl);
-	for(auto & entry : serverlist){
-		bool alreadylocal = std::find(maps.begin(), maps.end(), entry.first) != maps.end();
-		if(!alreadylocal){
-			std::string label = "[DL] " + entry.first;
-			mapselect->AddItem(label.c_str());
-			servermaps[label] = entry.second;
-		}
-	}
-#endif
-	mapselect->scrolled = 0;
-	ScrollBar * mapscrollbar = (ScrollBar *)world.CreateObject(ObjectTypes::SCROLLBAR);
-	mapscrollbar->res_index = 9;
-	mapscrollbar->scrollpixels = mapselect->lineheight;
-	mapscrollbar->scrollposition = mapselect->scrolled;
-	mapscrollbar->scrollmax = mapselect->items.size();
-	mapscrollbar->scrollposition = 0;
-	Overlay * nametext = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
-	nametext->text = "Game name:";
-	nametext->textbank = 134;
-	nametext->textwidth = 8;
-	nametext->x = 405;
-	nametext->y = 360;
-	TextInput * nametextinput = (TextInput *)world.CreateObject(ObjectTypes::TEXTINPUT);
-	nametextinput->x = 410;
-	nametextinput->y = 375;
-	nametextinput->width = 210;
-	nametextinput->height = 14;
-	nametextinput->res_bank = 133;
-	nametextinput->fontwidth = 6;
-	nametextinput->maxchars = 35;
-	nametextinput->maxwidth = 35;
-	nametextinput->uid = 5;
-	nametextinput->SetText(Config::GetInstance().defaultgamename);
-	Overlay * passwordtext = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
-	passwordtext->text = "Password (optional):";
-	passwordtext->textbank = 134;
-	passwordtext->textwidth = 8;
-	passwordtext->x = 405;
-	passwordtext->y = 390;
-	TextInput * passwordtextinput = (TextInput *)world.CreateObject(ObjectTypes::TEXTINPUT);
-	passwordtextinput->x = 410;
-	passwordtextinput->y = 405;
-	passwordtextinput->width = 210;
-	passwordtextinput->height = 14;
-	passwordtextinput->res_bank = 133;
-	passwordtextinput->fontwidth = 6;
-	passwordtextinput->maxchars = 20;
-	passwordtextinput->maxwidth = 20;
-	passwordtextinput->uid = 6;
-	passwordtextinput->password = true;
-	Button * gamecreatebutton = (Button *)world.CreateObject(ObjectTypes::BUTTON);
-	gamecreatebutton->y = 430;
-	gamecreatebutton->x = 436;
-	gamecreatebutton->SetType(Button::B156x21);
-	gamecreatebutton->uid = 35;
-	strcpy(gamecreatebutton->text, "Create");
-	gamecreateinterface->AddObject(rightborder->id);
-	gamecreateinterface->AddObject(optionstext->id);
-	gamecreateinterface->AddObject(securitytext->id);
-	gamecreateinterface->AddObject(buttonsecurity->id);
-	gamecreateinterface->AddObject(minleveltext->id);
-	gamecreateinterface->AddObject(minlevelinput->id);
-	gamecreateinterface->AddObject(maxleveltext->id);
-	gamecreateinterface->AddObject(maxlevelinput->id);
-	gamecreateinterface->AddObject(maxplayerstext->id);
-	gamecreateinterface->AddObject(maxplayersinput->id);
-	gamecreateinterface->AddObject(maxteamstext->id);
-	gamecreateinterface->AddObject(maxteamsinput->id);
-	gamecreateinterface->AddObject(selectmaptext->id);
-	gamecreateinterface->AddObject(mapselect->id);
-	gamecreateinterface->AddObject(mapscrollbar->id);
-	gamecreateinterface->AddObject(nametext->id);
-	gamecreateinterface->AddObject(nametextinput->id);
-	gamecreateinterface->AddObject(passwordtext->id);
-	gamecreateinterface->AddObject(passwordtextinput->id);
-	gamecreateinterface->AddObject(gamecreatebutton->id);
-	//gamecreateinterface->AddTabObject(buttonsecurity->id);
-	gamecreateinterface->AddTabObject(nametextinput->id);
-	gamecreateinterface->AddTabObject(passwordtextinput->id);
-	gamecreateinterface->AddTabObject(gamecreatebutton->id);
-	gamecreateinterface->AddTabObject(minlevelinput->id);
-	gamecreateinterface->AddTabObject(maxlevelinput->id);
-	gamecreateinterface->AddTabObject(maxplayersinput->id);
-	gamecreateinterface->AddTabObject(maxteamsinput->id);
-	gamecreateinterface->scrollbar = mapscrollbar->id;
-	gamecreateinterface->buttonenter = gamecreatebutton->id;
-	gamecreateinterface->activeobject = nametextinput->id;
-	return gamecreateinterface;
-}
-
-Interface * Game::CreateGameJoinInterface(void){
-	Interface * gamejoininterface = (Interface *)world.CreateObject(ObjectTypes::INTERFACE);
-	gamejoininterface->x = 403;
-	gamejoininterface->y = 87;
-	gamejoininterface->width = 222;
-	gamejoininterface->height = 267;
-	Button * gamestartbutton = (Button *)world.CreateObject(ObjectTypes::BUTTON);
-	gamestartbutton->x = 242;
-	gamestartbutton->y = 160;
-	gamestartbutton->SetType(Button::B156x21);
-	gamestartbutton->uid = 25;
-	//if(ishost){
-	//	strcpy(gamestartbutton->text, "Start Game");
-	//}else{
-		strcpy(gamestartbutton->text, "Ready");
-	//}
-	Button * techbutton = (Button *)world.CreateObject(ObjectTypes::BUTTON);
-	techbutton->x = 242;
-	techbutton->y = 68;
-	techbutton->SetType(Button::B156x21);
-	techbutton->uid = 27;
-	strcpy(techbutton->text, "Choose Tech");
-	Button * changeteambutton = (Button *)world.CreateObject(ObjectTypes::BUTTON);
-	changeteambutton->x = 242;
-	changeteambutton->y = 100;
-	changeteambutton->SetType(Button::B156x21);
-	changeteambutton->uid = 26;
-	strcpy(changeteambutton->text, "Change Team");
-	gamejoininterface->AddObject(techbutton->id);
-	gamejoininterface->AddObject(changeteambutton->id);
-	gamejoininterface->AddObject(gamestartbutton->id);
-	gamejoininterface->buttonenter = gamestartbutton->id;
-	return gamejoininterface;
-}
-
-Interface * Game::CreateGameTechInterface(void){
-	Interface * gametechinterface = (Interface *)world.CreateObject(ObjectTypes::INTERFACE);
-	gametechinterface->x = 403;
-	gametechinterface->y = 87;
-	gametechinterface->width = 222;
-	gametechinterface->height = 390;
-	Button * teamsbutton = (Button *)world.CreateObject(ObjectTypes::BUTTON);
-	teamsbutton->x = 242;
-	teamsbutton->y = 68;
-	teamsbutton->SetType(Button::B156x21);
-	teamsbutton->uid = 28;
-	strcpy(teamsbutton->text, "Back To Teams");
-	Overlay * techslotsoverlay = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
-	if(techslotsoverlay){
-		techslotsoverlay->x = 455;
-		techslotsoverlay->y = 100;
-		techslotsoverlay->textbank = 133;
-		techslotsoverlay->textwidth = 6;
-		techslotsoverlay->effectcolor = 129;
-		techslotsoverlay->effectbrightness = 128 + 16;
-		techslotsoverlay->textcolorramp = true;
-		techslotsoverlay->uid = 70;
-		gametechinterface->AddObject(techslotsoverlay->id);
-	}
-	for(int i = 0; i < 3; i++){
-		int j = 2 - i;
-		Overlay * techoverlay = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
-		if(techoverlay){
-			techoverlay->text = "Player ";
-			techoverlay->text += std::to_string(i + 1);
-			techoverlay->textbank = 133;
-			techoverlay->textwidth = 6;
-			techoverlay->uid = 80 + i;
-			techoverlay->x = 375 - (techoverlay->text.length() * techoverlay->textwidth);
-			techoverlay->y = 112 + (j * 16);
-			techoverlay->draw = false;
-			gametechinterface->AddObject(techoverlay->id);
-		}
-		Overlay * techlineoverlay = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
-		if(techlineoverlay){
-			techlineoverlay->x = 0;
-			techlineoverlay->y = 0;
-			techlineoverlay->uid = 90 + i;
-			techlineoverlay->res_bank = 7;
-			techlineoverlay->res_index = 20 + j;
-			techlineoverlay->draw = false;
-			gametechinterface->AddObject(techlineoverlay->id);
-		}
-	}
-	Team * team = world.GetPeerTeam(world.localpeerid);
-	if(team){
-		for(int x = 0; x < 4; x++){
-			int i = 0;
-			int ipos = 0;
-			for(std::vector<BuyableItem *>::iterator it = world.buyableitems.begin(); it != world.buyableitems.end(); it++){
-				BuyableItem * buyableitem = *it;
-				if(buyableitem->techslots){
-					if(buyableitem->agencyspecific == -1 || (buyableitem->agencyspecific == team->agency)){
-						Button * button = (Button *)world.CreateObject(ObjectTypes::BUTTON);
-						if(button){
-							button->x = 410 + (x * 14);
-							button->y = 125 + (ipos * 13);
-							button->uid = 110 + (30 * x) + i;
-							button->SetType(Button::BCHECKBOX);
-							if(x < 3){
-								button->effectbrightness = 64;
-								button->draw = false;
-							}
-							gametechinterface->AddObject(button->id);
-							if(x == 3){
-								Overlay * technameoverlay = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
-								if(technameoverlay){
-									technameoverlay->text = buyableitem->name;
-									technameoverlay->text += " (" + std::to_string(buyableitem->techslots) + ")";
-									technameoverlay->x = 425 + (x * 14);
-									technameoverlay->y = 127 + (ipos * 13);
-									technameoverlay->textbank = 133;
-									technameoverlay->textwidth = 6;
-									technameoverlay->uid = 230 + i;
-									gametechinterface->AddObject(technameoverlay->id);
-								}
-							}
-						}
-						ipos++;
-					}
-					i++;
-				}
-			}
-		}
-	}
-	Overlay * techname = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
-	if(techname){
-		techname->textbank = 134;
-		techname->textwidth = 8;
-		techname->uid = 60;
-		techname->x = 401 + (116 - ((techname->text.length() * techname->textwidth) / 2));
-		techname->y = 350;
-		gametechinterface->AddObject(techname->id);
-	}
-	for(int i = 0; i < 8; i++){
-		Overlay * techdesc = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
-		if(techdesc){
-			techdesc->textbank = 133;
-			techdesc->textwidth = 6;
-			techdesc->effectcolor = 129;
-			techdesc->effectbrightness = 128 + 16;
-			techdesc->textcolorramp = true;
-			techdesc->uid = 61 + i;
-			techdesc->x = 405;
-			techdesc->y = 370 + (i * 10);
-			gametechinterface->AddObject(techdesc->id);
-		}
-	}
-	gametechinterface->AddObject(teamsbutton->id);
-	gametechinterface->buttonescape = teamsbutton->id;
-	return gametechinterface;
-}
-
-Interface * Game::CreateGameSummaryInterface(Stats & stats, Uint8 agency){
-	Overlay * background = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
-	background->res_bank = 6;
-	background->res_index = 0;
-	Overlay * background2 = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
-	background2->res_bank = 7;
-	background2->res_index = 5;
-	Overlay * title = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
-	title->text = "Mission Summary";
-	title->textbank = 135;
-	title->textwidth = 12;
-	title->x = 192 - ((title->text.length() * title->textwidth) / 2);
-	title->y = 44;
-	Interface * iface = (Interface *)world.CreateObject(ObjectTypes::INTERFACE);
-	TextBox * textbox = (TextBox *)world.CreateObject(ObjectTypes::TEXTBOX);
-	textbox->x = 89;
-	textbox->y = 92;
-	textbox->width = 180;
-	textbox->height = 300;
-	textbox->res_bank = 133;
-	textbox->lineheight = 11;
-	textbox->fontwidth = 6;
-	
-	AddSummaryLine(*textbox, "Kills:", stats.kills);
-	AddSummaryLine(*textbox, "Deaths:", stats.deaths);
-	AddSummaryLine(*textbox, "Suicides", stats.suicides);
-	textbox->AddLine("");
-	textbox->AddLine("Secrets");
-	AddSummaryLine(*textbox, "  Returned:", stats.secretsreturned);
-	AddSummaryLine(*textbox, "  Stolen:", stats.secretsstolen);
-	AddSummaryLine(*textbox, "  Picked up:", stats.secretspickedup);
-	AddSummaryLine(*textbox, "  Fumbled:", stats.secretsdropped);
-	textbox->AddLine("");
-	AddSummaryLine(*textbox, "Civilians killed:", stats.civilianskilled);
-	AddSummaryLine(*textbox, "Guards killed:", stats.guardskilled);
-	AddSummaryLine(*textbox, "Robots killed:", stats.robotskilled);
-	AddSummaryLine(*textbox, "Defenses destroyed:", stats.defensekilled);
-	AddSummaryLine(*textbox, "Fixed Cannons destroyed:", stats.fixedcannonsdestroyed);
-	textbox->AddLine("");
-	textbox->AddLine("Files");
-	AddSummaryLine(*textbox, "  Hacked:", stats.fileshacked);
-	AddSummaryLine(*textbox, "  Returned:", stats.filesreturned);
-	textbox->AddLine("");
-	AddSummaryLine(*textbox, "Powerups picked up:", stats.powerupspickedup);
-	AddSummaryLine(*textbox, "Health packs used:", stats.healthpacksused);
-	AddSummaryLine(*textbox, "Cameras placed:", stats.camerasplanted);
-	AddSummaryLine(*textbox, "Detonators planted:", stats.detsplanted);
-	AddSummaryLine(*textbox, "Fixed Cannons placed:", stats.fixedcannonsplaced);
-	AddSummaryLine(*textbox, "Viruses used:", stats.virusesused);
-	AddSummaryLine(*textbox, "Poisons:", stats.poisons);
-	AddSummaryLine(*textbox, "Lazarus Tracts planted:", stats.tractsplanted);
-	textbox->AddLine("");
-	textbox->AddLine("Grenades thrown");
-	AddSummaryLine(*textbox, "  E.M.P:", stats.empsthrown);
-	AddSummaryLine(*textbox, "  Plasma:", stats.plasmasthrown);
-	AddSummaryLine(*textbox, "  Shaped:", stats.shapedthrown);
-	AddSummaryLine(*textbox, "  Flare:", stats.flaresthrown);
-	AddSummaryLine(*textbox, "  Poison Flare:", stats.poisonflaresthrown);
-	AddSummaryLine(*textbox, "  Neutron:", stats.neutronsthrown);
-	for(int i = 0; i < 4; i++){
-		textbox->AddLine("");
-		switch(i){
-			case 0: textbox->AddLine("Blaster"); break;
-			case 1: textbox->AddLine("Laser"); break;
-			case 2: textbox->AddLine("Rocket"); break;
-			case 3: textbox->AddLine("Flamer"); break;
-		}
-		AddSummaryLine(*textbox, "  Shots fired:", stats.weaponfires[i]);
-		AddSummaryLine(*textbox, "  Hits:", stats.weaponhits[i]);
-		AddSummaryLine(*textbox, "  Accuracy:", (float(stats.weaponhits[i]) / stats.weaponfires[i]) * 100, true);
-		AddSummaryLine(*textbox, "  Player kills:", stats.playerkillsweapon[i]);
-	}
-	ScrollBar * scrollbar = (ScrollBar *)world.CreateObject(ObjectTypes::SCROLLBAR);
-	scrollbar->res_index = 9;
-	scrollbar->scrollposition = 0;
-	scrollbar->scrollmax = textbox->text.size() - (textbox->height / textbox->lineheight);
-	scrollbar->scrollpixels = textbox->lineheight;
-	scrollbar->scrollposition = 0;
-	
-	Overlay * xptext = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
-	xptext->text = "+ ";
-	xptext->text += std::to_string(stats.CalculateExperience()) + " XP";
-	xptext->textbank = 136;
-	xptext->textwidth = 15;
-	xptext->x = 467 - ((xptext->text.length() * xptext->textwidth) / 2);
-	xptext->y = 45;
-	
-	//bool upgradeavailable = true;
-	
-	Overlay * line1text = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
-	line1text->text = "*NEW UPGRADE AVAILABLE*";
-	line1text->textbank = 133;
-	line1text->effectcolor = 129;
-	line1text->effectbrightness = 128 + 32;
-	line1text->textcolorramp = true;
-	line1text->textwidth = 6;
-	line1text->uid = 1;
-	line1text->x = 467 - ((line1text->text.length() * line1text->textwidth) / 2);
-	line1text->y = 77;
-	line1text->draw = false;
-	iface->AddObject(line1text->id);
-	/*if(upgradeavailable){
-		line1text->draw = true;
-	}else{
-		line1text->draw = false;
-	}*/
-	
-	for(int i = 0; i < 6; i++){
-		Overlay * text = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
-		Overlay * textlevel = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
-		switch(i){
-			default:
-			case 0: text->text = "Current Endurance Level:"; break;
-			case 1: text->text = "Current Shield Level:"; break;
-			case 2: text->text = "Current Jetpack Level:"; break;
-			case 3: text->text = "Current Tech Slot Level:"; break;
-			case 4: text->text = "Current Hacking Level:"; break;
-			case 5: text->text = "Current Contacts Level:"; break;
-		}
-		text->textbank = 133;
-		textlevel->textbank = 133;
-		text->textwidth = 6;
-		textlevel->textwidth = 6;
-		textlevel->uid = 20 + i;
-		text->x = 390;
-		textlevel->x = 556 - (textlevel->text.length() * textlevel->textwidth);
-		text->y = 97 + (i * 46);
-		textlevel->y = text->y;
-		iface->AddObject(text->id);
-		iface->AddObject(textlevel->id);
-	}
-	
-	Button * okbutton = (Button *)world.CreateObject(ObjectTypes::BUTTON);
-	okbutton->y = 100;
-	okbutton->x = 62;
-	okbutton->uid = 0;
-	strcpy(okbutton->text, "Done");
-	iface->AddObject(background->id);
-	iface->AddObject(background2->id);
-	iface->AddObject(title->id);
-	iface->AddObject(textbox->id);
-	iface->AddObject(scrollbar->id);
-	iface->AddObject(okbutton->id);
-	iface->buttonenter = okbutton->id;
-	iface->buttonescape = okbutton->id;
-	iface->scrollbar = scrollbar->id;
-	gamesummaryinterface = iface->id;
-	UpdateGameSummaryInterface();
-	return iface;
-}
-
-Interface * Game::CreateModalDialog(const char * message, bool ok){
-	DestroyModalDialog();
-	// 40:4 model dialog background
-	Overlay * background = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
-	background->renderpass = 3;
-	background->res_bank = 40;
-	background->res_index = 4;
-	Overlay * text = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
-	text->renderpass = 3;
-	text->text = message;
-	text->textbank = 134;
-	text->textwidth = 8;
-	text->x = 320 - ((text->text.length() * text->textwidth) / 2);
-	text->y = 200;
-	Interface * dialoginterface = (Interface *)world.CreateObject(ObjectTypes::INTERFACE);
-	if(ok){
-		Button * okbutton = (Button *)world.CreateObject(ObjectTypes::BUTTON);
-		okbutton->renderpass = 3;
-		okbutton->x = 242;
-		okbutton->y = 230;
-		okbutton->SetType(Button::B156x21);
-		okbutton->uid = 50;
-		strcpy(okbutton->text, "OK");
-		dialoginterface->AddObject(okbutton->id);
-		dialoginterface->buttonenter = okbutton->id;
-	}else{
-		text->y = 218;
-	}
-	modaldialoghasok = ok;
-	dialoginterface->AddObject(background->id);
-	dialoginterface->AddObject(text->id);
-	dialoginterface->modal = true;
-	modalinterface = dialoginterface->id;
-	Interface * iface = static_cast<Interface *>(world.GetObjectFromId(currentinterface));
-	if(iface){
-		iface->AddObject(modalinterface);
-	}
-	aftermodalinterface = currentinterface;
-	currentinterface = dialoginterface->id;
-	return dialoginterface;
-}
-
-Interface * Game::CreateUpdateInterface(void){
-	Interface * iface = static_cast<Interface *>(world.CreateObject(ObjectTypes::INTERFACE));
-	// Background (reuse modal-dialog sprite — same one CreateModalDialog uses;
-	// its baked-in offsets center it, so no x/y needed).
-	Overlay * background = static_cast<Overlay *>(world.CreateObject(ObjectTypes::OVERLAY));
-	background->renderpass = 3;
-	background->res_bank = 40;
-	background->res_index = 4;
-	// Status line (mutated each frame; x re-centered in ProcessUpdateInterface
-	// since text length varies with state).
-	Overlay * status = static_cast<Overlay *>(world.CreateObject(ObjectTypes::OVERLAY));
-	status->renderpass = 3;
-	status->text = "";
-	status->textbank = 134;
-	status->textwidth = 8;
-	status->x = 320;
-	status->y = 200;
-	status->uid = 1;
-	// Progress bar (sized by ProcessUpdateInterface while DOWNLOADING).
-	Overlay * progress = static_cast<Overlay *>(world.CreateObject(ObjectTypes::OVERLAY));
-	progress->renderpass = 3;
-	progress->text = "";
-	progress->textbank = 134;
-	progress->textwidth = 8;
-	progress->x = 320;
-	progress->y = 215;
-	progress->uid = 2;
-	// Action buttons — uids 250, 252, 253 share the left slot; exactly one is
-	// visible based on Updater state. Cancel (251) is always on the right.
-	// Two B156x21 side-by-side centered on x=320 (mirrors horizontal pair
-	// in CreateLobbyConnectInterface, scaled up).
-	Button * updatebutton = static_cast<Button *>(world.CreateObject(ObjectTypes::BUTTON));
-	updatebutton->renderpass = 3;
-	updatebutton->x = 161;
-	updatebutton->y = 230;
-	updatebutton->SetType(Button::B156x21);
-	updatebutton->uid = 250;
-	strcpy(updatebutton->text, "Update");
-	Button * cancelbutton = static_cast<Button *>(world.CreateObject(ObjectTypes::BUTTON));
-	cancelbutton->renderpass = 3;
-	cancelbutton->x = 322;
-	cancelbutton->y = 230;
-	cancelbutton->SetType(Button::B156x21);
-	cancelbutton->uid = 251;
-	strcpy(cancelbutton->text, "Cancel");
-	Button * retrybutton = static_cast<Button *>(world.CreateObject(ObjectTypes::BUTTON));
-	retrybutton->renderpass = 3;
-	retrybutton->x = 161;
-	retrybutton->y = 230;
-	retrybutton->SetType(Button::B156x21);
-	retrybutton->uid = 252;
-	strcpy(retrybutton->text, "Retry");
-	Button * openbutton = static_cast<Button *>(world.CreateObject(ObjectTypes::BUTTON));
-	openbutton->renderpass = 3;
-	openbutton->x = 161;
-	openbutton->y = 230;
-	openbutton->SetType(Button::B156x21);
-	openbutton->uid = 253;
-	strcpy(openbutton->text, "Download");
-	iface->AddObject(background->id);
-	iface->AddObject(status->id);
-	iface->AddObject(progress->id);
-	iface->AddObject(updatebutton->id);
-	iface->AddObject(cancelbutton->id);
-	iface->AddObject(retrybutton->id);
-	iface->AddObject(openbutton->id);
-	iface->modal = true;
-	updateinterface = iface->id;
-	currentinterface = iface->id;
-	return iface;
-}
-
-void Game::ProcessUpdateInterface(Interface * iface){
-	Updater::State ustate = updater.GetState();
-	// Pass 1: update status/progress overlays and button inactive flags.
-	for(std::vector<Uint16>::iterator it = iface->objects.begin(); it != iface->objects.end(); it++){
-		Object * object = world.GetObjectFromId(*it);
-		if(!object){
-			continue;
-		}
-		if(object->type == ObjectTypes::OVERLAY){
-			Overlay * overlay = static_cast<Overlay *>(object);
-			if(overlay->uid == 1){
-				switch(ustate){
-					case Updater::PROMPTING:
-						overlay->text = "An update is required to play online.";
-					break;
-					case Updater::DOWNLOADING:{
-						char buf[32];
-						snprintf(buf, sizeof(buf), "%d%%", int(updater.GetProgress() * 100));
-						overlay->text = buf;
-					}break;
-					case Updater::VERIFYING:
-						overlay->text = "Verifying...";
-					break;
-					case Updater::STAGING:
-						overlay->text = "Restarting...";
-					break;
-					case Updater::FAILED:
-						overlay->text = updater.GetErrorMessage();
-					break;
-					case Updater::IDLE:
-					case Updater::DONE:
-					default:
-						overlay->text = "";
-					break;
-				}
-				overlay->x = 320 - ((overlay->text.length() * overlay->textwidth) / 2);
-			}else if(overlay->uid == 2){
-				// Simple textual progress indicator for now; real bar rendering
-				// can be introduced later without re-touching the state wiring.
-				if(ustate == Updater::DOWNLOADING){
-					int width = int(updater.GetProgress() * 20.0f);
-					std::string bar = "[";
-					for(int i = 0; i < 20; i++){
-						bar += (i < width) ? "=" : " ";
-					}
-					bar += "]";
-					overlay->text = bar;
-				}else{
-					overlay->text = "";
-				}
-				overlay->x = 320 - ((overlay->text.length() * overlay->textwidth) / 2);
-			}
-		}else if(object->type == ObjectTypes::BUTTON){
-			Button * button = static_cast<Button *>(object);
-			bool active = false;
-			switch(button->uid){
-				case 250: // Update
-					active = (ustate == Updater::PROMPTING);
-				break;
-				case 251: // Cancel
-					active = (ustate == Updater::PROMPTING || ustate == Updater::DOWNLOADING || ustate == Updater::FAILED);
-				break;
-				case 252: // Retry
-					active = (ustate == Updater::FAILED && updater.GetRetryCount() < 3);
-				break;
-				case 253: // Download (opens browser to release page)
-					active = (ustate == Updater::FAILED && updater.GetRetryCount() >= 3);
-				break;
-				default:
-					continue;
-			}
-			// 250/252/253 overlap (same x/y); only the active one draws.
-			// Cancel (251) always draws; the click handler below guards by
-			// ustate so stale clicks during VERIFYING/STAGING are no-ops.
-			// Don't touch button->state here — Interface::Tick owns hover
-			// activation, and fighting it causes the hover sound to spam
-			// every frame the mouse isn't over the button.
-			button->draw = active || (button->uid == 251);
-		}
-	}
-	// Pass 2: dispatch button clicks.
-	for(std::vector<Uint16>::iterator it = iface->objects.begin(); it != iface->objects.end(); it++){
-		Object * object = world.GetObjectFromId(*it);
-		if(!object || object->type != ObjectTypes::BUTTON){
-			continue;
-		}
-		Button * button = static_cast<Button *>(object);
-		if(!button->clicked){
-			continue;
-		}
-		switch(button->uid){
-			case 250:{
-				if(ustate == Updater::PROMPTING){
-					updater.Consent();
-				}
-			}break;
-			case 251:{
-				if(ustate == Updater::PROMPTING || ustate == Updater::DOWNLOADING || ustate == Updater::FAILED){
-					if(ustate == Updater::DOWNLOADING){
-						updater.Cancel();
-					}
-					GoToState(MAINMENU);
-				}
-			}break;
-			case 252:{
-				if(ustate == Updater::FAILED && updater.GetRetryCount() < 3){
-					updater.Retry();
-				}
-			}break;
-			case 253:{
-				if(ustate == Updater::FAILED && updater.GetRetryCount() >= 3){
-					std::string url = updater.GetDownloadURL();
-#ifdef _WIN32
-					std::string cmd = "start \"\" \"" + url + "\"";
-#elif defined(__APPLE__)
-					std::string cmd = "open '" + url + "'";
-#else
-					std::string cmd = "xdg-open '" + url + "' &";
-#endif
-					system(cmd.c_str());
-					GoToState(MAINMENU);
-				}
-			}break;
-		}
-		button->clicked = false;
-	}
-	// If the updater reached STAGING, hand off to the stage-2 launcher.
-	if(updater.GetState() == Updater::STAGING){
-		LaunchStage2();
-	}
-}
-
-void Game::LaunchStage2(void){
-	std::string zippath =
-#ifdef _WIN32
-		std::string(getenv("TEMP") ? getenv("TEMP") : ".") + "\\silencer-update.zip";
-#else
-		"/tmp/silencer-update.zip";
-#endif
-	fprintf(stderr, "[updater] Game::LaunchStage2 invoking UpdaterStage2::Launch with zip=%s\n",
-		zippath.c_str());
-	// Launch now returns after a successful spawn (rather than exit(0)ing),
-	// so main() can unwind normally and ~Game() can close SDL + the audio
-	// device cleanly before the new client process opens them. An exit(0)
-	// here would skip the destructor on `Game game;` in main() and leave
-	// the audio device open, producing a pop on restart.
-	if(UpdaterStage2::Launch(zippath)){
-		stage2spawned = true;
-		return;
-	}
-	fprintf(stderr, "[updater] UpdaterStage2::Launch failed; returning to main menu\n");
-	GoToState(MAINMENU);
-}
-
-Interface * Game::CreateMapPreview(const char * filename){
-	Interface * previewinterface = static_cast<Interface *>(world.CreateObject(ObjectTypes::INTERFACE));
-	Overlay * minimap = static_cast<Overlay *>(world.CreateObject(ObjectTypes::OVERLAY));
-	minimap->customsprite.resize(172 * 62);
-	minimap->uid = 1;
-	memset(minimap->customsprite.data(), 0, minimap->customsprite.size());
-	Overlay * mapname = static_cast<Overlay *>(world.CreateObject(ObjectTypes::OVERLAY));
-	mapname->textbank = 133;
-	mapname->textwidth = 7;
-	mapname->effectcolor = 129;
-	mapname->effectbrightness = 128 + 32;
-	mapname->textcolorramp = true;
-	mapname->uid = 2;
-	std::string smallfilename = filename;
-	int lastslash = smallfilename.find_last_of("/");
-	if(lastslash){
-		smallfilename.erase(0, lastslash + 1);
-	}
-	mapname->text = smallfilename.substr(0, 29);
-	Overlay * maptext = static_cast<Overlay *>(world.CreateObject(ObjectTypes::OVERLAY));
-	maptext->textbank = 133;
-	maptext->textwidth = 7;
-	maptext->textallownewline = true;
-	maptext->textlineheight = 10;
-	maptext->effectcolor = 129;
-	maptext->effectbrightness = 128 + 32;
-	maptext->textcolorramp = true;
-	maptext->uid = 3;
-	char mapdesc[0x80];
-	strcpy(mapdesc, "");
-	CDDataDir();
-	SDL_IOStream * file = SDL_IOFromFile(filename, "rb");
-	if(!file){
-		CDResDir();
-		file = SDL_IOFromFile(filename, "rb");
-	}
-	if(file){
-		Map::Header header;
-		Map::LoadHeader(file, header);
-		strcpy(mapdesc, header.description);
-		Map::UncompressMinimap((Uint8 (*)[172 * 62])minimap->customsprite.data(), header.minimapcompressed, header.minimapcompressedsize);
-		minimap->customspritew = 172;
-		minimap->customspriteh = 62;
-		SDL_CloseIO(file);
-	}
-	maptext->text = Interface::WordWrap(mapdesc, 29);
-	previewinterface->AddObject(mapname->id);
-	previewinterface->AddObject(minimap->id);
-	previewinterface->AddObject(maptext->id);
-	return previewinterface;
-}
-
-void Game::PlayMusic(Mix_Music * music){
-	if(music && Audio::GetInstance().PlayMusic(music)){
-		lastmusicplaytime = world.tickcount;
-		char text[256];
-		snprintf(text, sizeof(text) - 1, "Playing: %s", currentmusictrack);
-		world.ShowTopMessage(text);
-	}
-}
-
-void Game::DestroyModalDialog(void){
-	if(modalinterface){
-		currentinterface = aftermodalinterface;
-		aftermodalinterface = 0;
-		Interface * iface = static_cast<Interface *>(world.GetObjectFromId(currentinterface));
-		if(iface){
-			Interface * modaliface = static_cast<Interface *>(world.GetObjectFromId(modalinterface));
-			if(modaliface){
-				modaliface->DestroyInterface(world, iface);
-			}
-		}
-		modalinterface = 0;
-	}
-}
-
-Interface * Game::CreatePasswordDialog(void){
-	// 40:2 model dialog password input
-	DestroyModalDialog();
-	Overlay * background = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
-	background->renderpass = 3;
-	background->res_bank = 40;
-	background->res_index = 2;
-	background->x = 320 - (world.resources.spritewidth[background->res_bank][background->res_index] / 2);
-	background->y = 240 - (world.resources.spriteheight[background->res_bank][background->res_index] / 2);
-	Interface * dialoginterface = (Interface *)world.CreateObject(ObjectTypes::INTERFACE);
-	Overlay * text = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
-	text->renderpass = 3;
-	text->text = "This game requires a password";
-	text->textbank = 134;
-	text->textwidth = 8;
-	text->x = 320 - ((text->text.length() * text->textwidth) / 2);
-	text->y = 196;
-	TextInput * passwordinput = (TextInput *)world.CreateObject(ObjectTypes::TEXTINPUT);
-	passwordinput->renderpass = 3;
-	passwordinput->x = 210;
-	passwordinput->y = 243;
-	passwordinput->width = 180;
-	passwordinput->height = 14;
-	passwordinput->res_bank = 135;
-	passwordinput->fontwidth = 11;
-	passwordinput->maxchars = 20;
-	passwordinput->maxwidth = 20;
-	passwordinput->password = true;
-	passwordinput->uid = 1;
-	modaldialoghasok = true;
-	Button * okbutton = (Button *)world.CreateObject(ObjectTypes::BUTTON);
-	okbutton->renderpass = 3;
-	okbutton->x = 242;
-	okbutton->y = 267;
-	okbutton->SetType(Button::B156x21);
-	okbutton->uid = 50;
-	strcpy(okbutton->text, "OK");
-	dialoginterface->AddObject(background->id);
-	dialoginterface->AddObject(text->id);
-	dialoginterface->AddObject(passwordinput->id);
-	dialoginterface->AddObject(okbutton->id);
-	dialoginterface->AddTabObject(passwordinput->id);
-	dialoginterface->AddTabObject(okbutton->id);
-	dialoginterface->activeobject = passwordinput->id;
-	dialoginterface->buttonenter = okbutton->id;
-	dialoginterface->buttonescape = okbutton->id;
-	dialoginterface->modal = true;
-	modalinterface = dialoginterface->id;
-	aftermodalinterface = currentinterface;
-	Interface * iface = static_cast<Interface *>(world.GetObjectFromId(currentinterface));
-	if(iface){
-		iface->AddObject(modalinterface);
-	}
-	currentinterface = dialoginterface->id;
-	passwordinterface = dialoginterface->id;
-	return dialoginterface;
+	// Keep the outgoing Clay screen mounted until TickFadeOut reaches black.
+	// Legacy retained its world UI objects across FADEOUT, so there were still
+	// pixels for the palette fade to dim before the next state rebuilt UI.
 }
 
 bool Game::GoBack(void){
-	if(gamejoininterface || gametechinterface){
-		world.Disconnect();
-		UpdateLobbyMapName("");
-		world.lobby.gamesprocessed = false;
-		world.lobby.channelchanged = true;
-		world.SwitchToLocalAuthorityMode();
-		sharedstate = 0;
-		Object * object = world.GetObjectFromId(currentinterface);
-		Interface * iface = static_cast<Interface *>(object);
-		if(gamejoininterface){
-			Interface * gamejoiniface = static_cast<Interface *>(world.GetObjectFromId(gamejoininterface));
-			if(gamejoiniface){
-				gamejoiniface->DestroyInterface(world, iface);
-			}
-			gamejoininterface = 0;
-			for(std::list<Object *>::iterator it = world.objectlist.begin(); it != world.objectlist.end(); it++){
-				Object * object = *it;
-				switch(object->type){
-					case ObjectTypes::TEAM:{
-						Team * team = static_cast<Team *>(object);
-						team->DestroyOverlays(world);
-						world.MarkDestroyObject(object->id);
-					}break;
-				}
-			}
-		}else
-		if(gametechinterface){
-			Interface * gametechiface = static_cast<Interface *>(world.GetObjectFromId(gametechinterface));
-			if(gametechiface){
-				gametechiface->DestroyInterface(world, iface);
-			}
-			gametechinterface = 0;
-			world.choosingtech = false;
-			for(std::list<Object *>::iterator it = world.objectlist.begin(); it != world.objectlist.end(); it++){
-				Object * object = *it;
-				switch(object->type){
-					case ObjectTypes::TEAM:{
-						Team * team = static_cast<Team *>(object);
-						team->DestroyOverlays(world);
-						world.MarkDestroyObject(object->id);
-					}break;
-				}
-			}
-		}
-		gameselectinterface = CreateGameSelectInterface()->id;
-		world.lobby.JoinChannel(lastchannel);
-		iface->AddObject(gameselectinterface);
-		currentinterface = iface->id;
-		return true;
-	}else
-	if(gamecreateinterface){
-		Object * object = world.GetObjectFromId(currentinterface);
-		Interface * iface = static_cast<Interface *>(object);
-		Interface * gamecreateiface = static_cast<Interface *>(world.GetObjectFromId(gamecreateinterface));
-		if(gamecreateiface){
-			gamecreateiface->DestroyInterface(world, iface);
-		}
-		gamecreateinterface = 0;
-		gameselectinterface = CreateGameSelectInterface()->id;
-		world.lobby.gamesprocessed = false;
-		iface->AddObject(gameselectinterface);
-		currentinterface = iface->id;
-		return true;
-	}else{
-		GoToState(MAINMENU);
-	}
+	Screen * top = GetTopScreen();
+	if(top && top->HandleBack(screenContext)) return true;
+	GoToState(MAINMENU);
 	return false;
 }
 
-bool Game::ProcessMainMenuInterface(Interface * iface){
-	for(std::vector<Uint16>::iterator it = iface->objects.begin(); it != iface->objects.end(); it++){
-		Object * object = world.GetObjectFromId(*it);
-		if(object->type == ObjectTypes::BUTTON){
-			Button * button = static_cast<Button *>(object);
-			if(button->clicked){
-				switch(button->uid){
-					case 0:
-						GoToState(SINGLEPLAYERGAME);
-					break;
-					case 1:
-						GoToState(LOBBYCONNECT);
-					break;
-					case 2:
-						GoToState(OPTIONS);
-					break;
-					case 3:
-						return false;
-					break;
-				}
-			}
-		}
-	}
-	return true;
-}
 
-void Game::ProcessLobbyConnectInterface(Interface * iface){
-	for(std::vector<Uint16>::iterator it = iface->objects.begin(); it != iface->objects.end(); it++){
-		Object * object = world.GetObjectFromId(*it);
-		if(object->type == ObjectTypes::TEXTBOX){
-			TextBox * textbox = static_cast<TextBox *>(object);
-			if(textbox){
-				world.lobby.LockMutex();
-				switch(world.lobby.state){
-					case Lobby::CONNECTING:
-					
-					break;
-					case Lobby::WAITINGFORRESOLVER:
-						
-					break;
-					case Lobby::AUTHSENT:
-						
-					break;
-					case Lobby::IDLE:
-						
-					break;
-					case Lobby::WAITING:{
-						char line[128];
-						snprintf(line, sizeof(line), "Connecting to %s:%d", Config::GetInstance().lobbyhost, Config::GetInstance().lobbyport);
-						textbox->AddLine(line);
-						world.lobby.Connect(Config::GetInstance().lobbyhost, Config::GetInstance().lobbyport);
-						//world.lobby.state = Lobby::AUTHENTICATED;
-					}break;
-					case Lobby::RESOLVING:
-						textbox->AddLine("Resolving hostname...");
-						world.lobby.state = Lobby::WAITINGFORRESOLVER;
-					break;
-					case Lobby::RESOLVEFAILED:
-						textbox->AddLine("Could not resolve hostname");
-						//world.lobby.Disconnect();
-						world.lobby.state = Lobby::IDLE;
-					break;
-					case Lobby::RESOLVED:
-						textbox->AddLine("Hostname resolved");
-						world.lobby.Connect(Config::GetInstance().lobbyhost, Config::GetInstance().lobbyport);
-					break;
-					case Lobby::CONNECTED:
-						textbox->AddLine("Connected");
-						textbox->AddLine("Checking version...");
-						world.lobby.SendVersion();
-						world.lobby.state = Lobby::CHECKINGVERSION;
-					break;
-					case Lobby::CHECKINGVERSION:
-						if(world.lobby.versionchecked){
-							if(world.lobby.versionok){
-								textbox->AddLine("Software version is current");
-								world.lobby.state = Lobby::AUTHENTICATING;
-							}else{
-								if(world.lobby.updateavailable){
-									// Route into the auto-updater flow.
-									updater.PresentUpdate(world.lobby.updateurl, world.lobby.updatesha256);
-									world.lobby.Disconnect();
-									world.lobby.state = Lobby::IDLE;
-									world.lobby.UnlockMutex();
-									GoToState(UPDATING);
-									return;
-								}else{
-									textbox->AddLine("Software is out of date");
-									textbox->AddLine("Get latest version at:");
-									textbox->AddLine("https://github.com/Arsia-Mons/Silencer");
-									world.lobby.Disconnect();
-									world.lobby.state = Lobby::IDLE;
-								}
-							}
-						}
-					break;
-					case Lobby::AUTHENTICATING:
-						//world.lobby.state = Lobby::AUTHENTICATED;
-					break;
-					case Lobby::AUTHFAILED:
-						textbox->AddLine("Authentication failed");
-						if(strlen(world.lobby.failmessage) > 0){
-							textbox->AddLine(world.lobby.failmessage);
-						}
-						world.lobby.state = Lobby::AUTHENTICATING;
-						//world.lobby.Disconnect();
-					break;
-					case Lobby::AUTHENTICATED:
-						textbox->AddLine("Authenticated");
-						if(!world.lobby.charactersreceived){
-							// Wait for MSG_CHARACTERS which arrives right after auth.
-							break;
-						}
-						if(world.lobby.characters.empty()){
-							GoToState(CREATECHARACTER);
-						}else{
-							GoToState(LOBBY);
-						}
-					break;
-					case Lobby::CONNECTIONFAILED:
-						textbox->AddLine("Connection failed");
-						world.lobby.state = Lobby::IDLE;
-					break;
-					case Lobby::DISCONNECTED:
-						textbox->AddLine("Disconnected");
-						world.lobby.state = Lobby::IDLE;
-					break;
-				}
-				if(world.lobby.motdreceived && !motdprinted){
-					char * line = strtok(world.lobby.motd, "\n");
-					while(line != 0){
-						textbox->AddLine(line);
-						line = strtok(NULL, "\n");
-					}
-					motdprinted = true;
-				}
-				world.lobby.UnlockMutex();
-			}
-		}else
-		if(object->type == ObjectTypes::BUTTON){
-			Button * button = static_cast<Button *>(object);
-			if(button && button->clicked){
-				switch(button->uid){
-					case 0:{
-						if(world.lobby.state == Lobby::AUTHENTICATING){
-							TextInput * usernameinput = static_cast<TextInput *>(iface->GetObjectWithUid(world, 1));
-							TextInput * passwordinput = static_cast<TextInput *>(iface->GetObjectWithUid(world, 2));
-							if(usernameinput && passwordinput){
-								strcpy(localusername, usernameinput->text);
-								world.lobby.SendCredentials(usernameinput->text, passwordinput->text);
-								world.lobby.state = Lobby::AUTHSENT;
-							}
-						}
-					}break;
-					case 1:{
-						GoToState(MAINMENU);
-					}break;
-				}
-				button->clicked = false;
-			}
-		}else
-		if(object->type == ObjectTypes::TEXTINPUT){
-			TextInput * textinput = static_cast<TextInput *>(object);
-			if(textinput){
-				if(world.lobby.state == Lobby::AUTHSENT){
-					textinput->inactive = true;
-				}else{
-					textinput->inactive = false;
-				}
-			}
-		}
-	}
-}
 
-bool Game::ProcessLobbyInterface(Interface * iface){
-	UpdateTechInterface();
-	if(mappreviewinterface && !gamecreateinterface){
-		Interface * mappreviewiface = static_cast<Interface *>(world.GetObjectFromId(mappreviewinterface));
-		if(mappreviewiface){
-			mappreviewiface->DestroyInterface(world);
-		}
-		mappreviewinterface = 0;
-	}
-	for(int i = 0; i < iface->objects.size(); i++){
-		if(i >= iface->objects.size()){
-			return false;
-		}
-		Uint16 id = iface->objects[i];
-		Object * object = world.GetObjectFromId(id);
-		if(object){
-			switch(object->type){
-				case ObjectTypes::SCROLLBAR:{
-					ScrollBar * scrollbar = static_cast<ScrollBar *>(object);
-					if(scrollbar){
-						
-					}
-				}break;
-				case ObjectTypes::INTERFACE:{
-					Interface * iface = static_cast<Interface *>(object);
-					if(iface){
-						if(!ProcessLobbyInterface(iface)){
-							return false;
-						}
-					}
-				}break;
-				case ObjectTypes::TEXTINPUT:{
-					TextInput * textinput = static_cast<TextInput *>(object);
-					if(textinput){
-						Interface * chatiface = static_cast<Interface *>(world.GetObjectFromId(chatinterface));
-						if(chatiface && iface->activeobject == chatiface->activeobject){
-							if(textinput->enterpressed && strlen(textinput->text) > 0){
-								world.lobby.SendChat(world.lobby.channel, textinput->text);
-								textinput->Clear();
-							}
-						}
-						if(textinput->enterpressed){
-							textinput->enterpressed = false;
-						}
-					}
-				}break;
-				case ObjectTypes::SELECTBOX:{
-					SelectBox * selectbox = static_cast<SelectBox *>(object);
-					if(selectbox){
-						Object * object = world.GetObjectFromId(iface->scrollbar);
-						ScrollBar * scrollbar = static_cast<ScrollBar *>(object);
-						if(scrollbar){
-							selectbox->scrolled = scrollbar->scrollposition;
-							if(selectbox->items.size() > ceil(float(selectbox->height) / selectbox->lineheight)){
-								scrollbar->draw = true;
-								scrollbar->scrollmax = selectbox->items.size() - ceil(float(selectbox->height) / selectbox->lineheight);
-							}else{
-								scrollbar->draw = false;
-							}
-							if(selectbox->uid == 4){ // map select
-								// Poll async download completion each frame
-								if(!dlitemname.empty()){
-									int res = dlresult.load();
-									if(res == 1){ // success — rebuild interface the same way the Create button does
-										selectbox->downloadprogress = -1;
-										selectbox->downloaditem[0] = '\0';
-										servermaps.erase(dlitemname);
-										dlitemname.clear();
-										Interface * parentIface = static_cast<Interface *>(world.GetObjectFromId(currentinterface));
-										Interface * old_create = static_cast<Interface *>(world.GetObjectFromId(gamecreateinterface));
-										if(old_create && parentIface) old_create->DestroyInterface(world, parentIface);
-										gamecreateinterface = CreateGameCreateInterface()->id;
-										if(parentIface){
-											parentIface->AddObject(gamecreateinterface);
-											parentIface->activeobject = gamecreateinterface;
-											parentIface->ActiveChanged(world, parentIface, false);
-										}
-										return false;
-									}else if(res == -1){ // failed
-										selectbox->downloadprogress = -1;
-										selectbox->downloaditem[0] = '\0';
-										dlitemname.clear();
-										CreateModalDialog("Download failed");
-									}else{ // still in progress — update progress bar
-										selectbox->downloadprogress = dlprogress.load();
-									}
-								}
-								int index = selectbox->MouseInside(world, iface->mousex, iface->mousey);
-								// DL badge click: raw coord check (badge lives in the 16px right margin MouseInside excludes)
-								if(iface->mousedown && dlitemname.empty() &&
-								   iface->mousex >= selectbox->x + selectbox->width - 16 &&
-								   iface->mousey >= selectbox->y && iface->mousey < selectbox->y + selectbox->height){
-									int row = (iface->mousey - selectbox->y) / selectbox->lineheight + selectbox->scrolled;
-									if(row >= 0 && row < (int)selectbox->items.size()){
-										std::string clickeditem = selectbox->GetItemName(row);
-										auto dlit = servermaps.find(clickeditem);
-										if(dlit != servermaps.end()){
-											const std::string & hex = dlit->second;
-											unsigned char sha1bytes[20] = {};
-											bool ok = hex.size() == 40;
-											for(int j = 0; ok && j < 20; j++){
-												auto hv = [](char c) -> int {
-													if(c >= '0' && c <= '9') return c - '0';
-													if(c >= 'a' && c <= 'f') return c - 'a' + 10;
-													if(c >= 'A' && c <= 'F') return c - 'A' + 10;
-													return -1;
-												};
-												int hi = hv(hex[2*j]), lo = hv(hex[2*j+1]);
-												if(hi < 0 || lo < 0){ ok = false; break; }
-												sha1bytes[j] = (unsigned char)((hi << 4) | lo);
-											}
-											if(ok){
-												std::string dlname = clickeditem.substr(5);
-												dlitemname = clickeditem;
-												dlresult.store(0);
-												dlprogress.store(0);
-												snprintf(selectbox->downloaditem, sizeof(selectbox->downloaditem), "%s", dlname.c_str());
-												selectbox->downloadprogress = 0;
-												if(dlthread.joinable()) dlthread.join();
-												std::string apiURL = Config::GetInstance().mapapiurl;
-												dlthread = std::thread([this, dlname, sha1bytes, apiURL]() mutable {
-													std::string res = FetchMapFromServer(dlname.c_str(), sha1bytes, apiURL.c_str(), &dlprogress);
-													dlresult.store(res.empty() ? -1 : 1);
-												});
-											}
-										}
-									}
-								}
-								if(index != -1){
-									std::string itemname = selectbox->GetItemName(index);
-									bool isserver = servermaps.count(itemname) > 0;
-									if(index != selectedmap){
-										if(mappreviewinterface){
-											Interface * mappreviewiface = static_cast<Interface *>(world.GetObjectFromId(mappreviewinterface));
-											if(mappreviewiface){
-												mappreviewiface->DestroyInterface(world);
-											}
-											mappreviewinterface = 0;
-										}
-										if(!isserver){
-											std::string filename = FindMap(itemname.c_str());
-											mappreviewinterface = CreateMapPreview(filename.c_str())->id;
-										}
-										selectedmap = index;
-									}
-									if(!isserver && mappreviewinterface){
-										Interface * mappreviewiface = static_cast<Interface *>(world.GetObjectFromId(mappreviewinterface));
-										if(mappreviewiface){
-											for(std::vector<Uint16>::iterator it2 = mappreviewiface->objects.begin(); it2 != mappreviewiface->objects.end(); it2++){
-												Object * object = world.GetObjectFromId(*it2);
-												switch(object->type){
-													case ObjectTypes::OVERLAY:{
-														Overlay * overlay = static_cast<Overlay *>(object);
-														switch(overlay->uid){
-															case 1:
-																overlay->x = iface->mousex - 200 + 15;
-																overlay->y = iface->mousey - 30;
-															break;
-															case 2:
-																overlay->x = iface->mousex - 200 + 2;
-																overlay->y = iface->mousey - 30 - 7 - 5;
-															break;
-															case 3:
-																overlay->x = iface->mousex - 200 + 2;
-																overlay->y = iface->mousey - 30 + 62 + 5;
-															break;
-														}
-													}break;
-												}
-											}
-										}
-									}
-								}else{
-									Interface * mappreviewiface = static_cast<Interface *>(world.GetObjectFromId(mappreviewinterface));
-									if(mappreviewiface){
-										mappreviewiface->DestroyInterface(world);
-									}
-									selectedmap = -1;
-									mappreviewinterface = 0;
-								}
-							}else
-							if(selectbox->uid == 10){ // game select
-								if(!world.lobby.gamesprocessed){
-									bool deleted;
-									do{
-										deleted = false;
-										unsigned int index = 0;
-										for(std::deque<Uint32>::iterator it2 = selectbox->itemids.begin(); it2 != selectbox->itemids.end(); it2++, index++){
-											Uint32 gameid = (*it2);
-											if(!world.lobby.GetGameById(gameid)){
-												selectbox->DeleteItem(index);
-												deleted = true;
-												break;
-											}
-										}
-									}while(deleted);
-									for(std::list<LobbyGame *>::iterator it2 = world.lobby.games.begin(); it2 != world.lobby.games.end(); it2++){
-										LobbyGame * lobbygame = (*it2);
-										if(selectbox->IdToIndex(lobbygame->id) == -1){
-											selectbox->AddItem(lobbygame->name, lobbygame->id);
-										}
-									}
-									world.lobby.gamesprocessed = true;
-								}
-								
-								LobbyGame * lobbygame = world.lobby.GetGameById(selectbox->IndexToId(selectbox->selecteditem));
-								Object * tobject = iface->GetObjectWithUid(world, 1);
-								if(tobject && tobject->type == ObjectTypes::OVERLAY){
-									Overlay * overlay = static_cast<Overlay *>(tobject);
-									if(overlay){
-										if(lobbygame){
-											overlay->text = lobbygame->name;
-										}else{
-											overlay->text = "";
-										}
-									}
-								}
-								tobject = iface->GetObjectWithUid(world, 2);
-								if(tobject && tobject->type == ObjectTypes::OVERLAY){
-									Overlay * overlay = static_cast<Overlay *>(tobject);
-									if(overlay){
-										if(lobbygame){
-											overlay->text = "Map: ";
-											overlay->text += lobbygame->mapname;
-										}else{
-											overlay->text = "";
-										}
-									}
-								}
-								tobject = iface->GetObjectWithUid(world, 3);
-								if(tobject && tobject->type == ObjectTypes::OVERLAY){
-									Overlay * overlay = static_cast<Overlay *>(tobject);
-									if(overlay){
-										if(lobbygame){
-											const char * passwordlock = "";
-											if(strlen(lobbygame->password) > 0){
-												passwordlock = "*PASSWORD LOCK*";
-											}
-											std::string security = "No";
-											switch(lobbygame->securitylevel){
-												case LobbyGame::SECLOW:
-													security = "Low";
-													break;
-												case LobbyGame::SECMEDIUM:
-													security = "Medium";
-													break;
-												case LobbyGame::SECHIGH:
-													security = "High";
-													break;
-											}
-											overlay->text = security + " Security";
-											while(overlay->text.length() < 21){
-												overlay->text += " ";
-											}
-											overlay->text += passwordlock;
-										}else{
-											overlay->text = "";
-										}
-									}
-								}
-								tobject = iface->GetObjectWithUid(world, 4);
-								if(tobject && tobject->type == ObjectTypes::OVERLAY){
-									Overlay * overlay = static_cast<Overlay *>(tobject);
-									if(overlay){
-										if(lobbygame){
-											overlay->text = "Creator: ";
-											overlay->text += world.lobby.GetUserInfo(lobbygame->accountid)->name;
-										}else{
-											overlay->text = "";
-										}
-									}
-								}
-								tobject = iface->GetObjectWithUid(world, 5);
-								if(tobject && tobject->type == ObjectTypes::OVERLAY){
-									Overlay * overlay = static_cast<Overlay *>(tobject);
-									if(overlay){
-										if(lobbygame){
-											overlay->text = "MinLv:" + std::to_string(lobbygame->minlevel) + " MaxLv:" + std::to_string(lobbygame->maxlevel) + " MaxPl:" + std::to_string(lobbygame->maxplayers) + " MaxTm:" + std::to_string(lobbygame->maxteams);
-										}else{
-											overlay->text = "";
-										}
-									}
-								}
-							}
-						}
-					}
-				}break;
-				case ObjectTypes::TEXTBOX:{
-					TextBox * textbox = static_cast<TextBox *>(object);
-					if(textbox && textbox->uid == 9){
-						if(world.lobby.presencechanged || !world.lobby.gamesprocessed){
-							textbox->text.clear();
-							textbox->scrolled = 0;
-							struct Row { Uint8 group; std::string label; };
-							std::vector<Row> rows;
-							for(auto & kv : world.lobby.presence){
-								Lobby::PresenceEntry & e = kv.second;
-								Row r;
-								r.label = e.name;
-								r.group = (e.status <= 2) ? e.status : 0;
-								if(e.gameid != 0){
-									LobbyGame * g = world.lobby.GetGameById(e.gameid);
-									if(g){
-										r.label += " [";
-										r.label += g->name;
-										r.label += "]";
-									}
-								}
-								rows.push_back(r);
-							}
-							std::sort(rows.begin(), rows.end(), [](const Row & a, const Row & b){
-								if(a.group != b.group) return a.group < b.group;
-								return a.label < b.label;
-							});
-							Uint8 lastgroup = 255;
-							for(auto & r : rows){
-								if(r.group != lastgroup){
-									const char * header = (r.group == 0) ? "In Lobby" : (r.group == 1) ? "Pregame" : "Playing";
-									textbox->AddText(header, 0, 128 + 32, 0, false);
-									lastgroup = r.group;
-								}
-								textbox->AddText(r.label.c_str(), 0, 128, 2, false);
-							}
-							world.lobby.presencechanged = false;
-						}
-					}else
-					if(textbox){
-						Object * object = world.GetObjectFromId(iface->scrollbar);
-						ScrollBar * scrollbar = static_cast<ScrollBar *>(object);
-						if(minimized && world.lobby.chatmessages.size() > chatlinesprinted){
-#ifdef _WIN32
-							HWND hwnd = (HWND)SDL_GetPointerProperty(SDL_GetWindowProperties(window), SDL_PROP_WINDOW_WIN32_HWND_POINTER, NULL);
-							if(hwnd){
-								FLASHWINFO flashinfo;
-								flashinfo.cbSize = sizeof(flashinfo);
-								flashinfo.hwnd = hwnd;
-								flashinfo.dwFlags = FLASHW_ALL | FLASHW_TIMERNOFG;
-								flashinfo.uCount = 0xFFFFFFFF;
-								flashinfo.dwTimeout = 0;
-								FlashWindowEx(&flashinfo);
-							}
-#endif
-#ifdef __APPLE__
-							RequestUserAttention();
-#endif
-						}
-						bool scroll = false;
-						while(world.lobby.chatmessages.size() > chatlinesprinted){
-							auto message = world.lobby.chatmessages.front();
-							Uint8 color = message[strlen(message.data()) + 1];
-							Uint8 brightness = message[strlen(message.data()) + 2];
-							if(scrollbar && scrollbar->scrollposition == scrollbar->scrollmax){
-								scroll = true;
-							}
-							textbox->AddText(message.data(), color, brightness, 2, scroll);
-							world.lobby.chatmessages.pop_front();
-							if(scrollbar){
-								scrollbar->scrollposition = textbox->scrolled;
-							}
-						}
-						if(scrollbar){
-							textbox->scrolled = scrollbar->scrollposition;
-							if(textbox->text.size() > ceil(float(textbox->height) / textbox->lineheight)){
-								scrollbar->draw = true;
-								scrollbar->scrollmax = textbox->text.size() - ceil(float(textbox->height) / textbox->lineheight);
-							}else{
-								scrollbar->draw = false;
-							}
-						}
-					}
-				}break;
-				case ObjectTypes::OVERLAY:{
-					Overlay * overlay = static_cast<Overlay *>(object);
-					if(overlay){
-						switch(overlay->uid){
-							case 1:{
-								if(world.lobby.channelchanged){
-									if(strlen(lastchannel) == 0){
-										strcpy(lastchannel, world.lobby.channel);
-									}
-									overlay->text = world.lobby.channel;
-									world.lobby.channelchanged = false;
-								}
-							}break;
-						}
-						if(agencychanged && iface->id == characterinterface){
-							//printf("agency changed\n");
-							User * user = world.lobby.GetUserInfo(world.lobby.accountid);
-							if(user && !user->retrieving){
-								Uint8 selectedagency = GetSelectedAgency();
-								switch(overlay->uid){
-									case 2:{
-										overlay->text = "LEVEL: " + std::to_string(user->agency[selectedagency].level);
-									}break;
-									case 3:{
-										overlay->text = "WINS: " + std::to_string(user->agency[selectedagency].wins);
-									}break;
-									case 4:{
-										overlay->text = "LOSSES: " + std::to_string(user->agency[selectedagency].losses);
-									}break;
-									case 5:{
-										// xptonextlevel is accumulated XP toward current level;
-										// threshold is 100*(level+1). Display the remaining amount.
-										int lvl = user->agency[selectedagency].level;
-										int remaining = 100 * (lvl + 1) - (int)user->agency[selectedagency].xptonextlevel;
-										overlay->text = "XP TO NEXT LEVEL: " + std::to_string(remaining);
-									}break;
-									case 6:{
-										// Character name.
-										if(strlen(user->charname) > 0){
-											overlay->text = user->charname;
-										}else if(!world.lobby.characters.empty()){
-											for(const auto& ch : world.lobby.characters){
-												if(ch.id == world.lobby.selectedcharid){
-													overlay->text = ch.name;
-													break;
-												}
-											}
-										}else{
-											overlay->text = "";
-										}
-										agencychanged = false; // cleared after last overlay uid
-									}break;
-								}
-							}
-						}
-					}
-				}break;
-				case ObjectTypes::TOGGLE:{
-					Toggle * tog = static_cast<Toggle *>(object);
-					if(tog && iface->id == characterinterface && tog->uid == 7){
-						// Always sync agency icon sprite to the selected character's agency.
-						tog->res_index = GetSelectedAgency();
-					}
-				}break;
-				case ObjectTypes::BUTTON:{
-					Button * button = static_cast<Button *>(object);
-					if(button && button->clicked && button->type != Button::BCHECKBOX){
-						button->clicked = false;
-						switch(button->uid){
-							case 8:{ // New Character button in character panel
-								GoToState(CREATECHARACTER);
-								return false;
-							}break;
-							case 10:{ // go back
-								if(GoBack()){
-									return false;
-								}
-							}break;
-							case 20:{ // join game
-								if(gameselectinterface){
-									Interface * gameselectiface = static_cast<Interface *>(world.GetObjectFromId(gameselectinterface));
-									if(gameselectiface){
-										for(std::vector<Uint16>::iterator it2 = gameselectiface->objects.begin(); it2 != gameselectiface->objects.end(); it2++){
-											Object * object = world.GetObjectFromId(*it2);
-											if(object && object->type == ObjectTypes::SELECTBOX){
-												SelectBox * selectbox = static_cast<SelectBox *>(object);
-												if(selectbox->selecteditem != -1){
-													Uint32 gameid = selectbox->IndexToId(selectbox->selecteditem);
-													if(gameid){
-														LobbyGame * lobbygame = world.lobby.GetGameById(gameid);
-														if(lobbygame){
-															if(world.state == World::IDLE){
-																User * user = world.lobby.GetUserInfo(world.lobby.accountid);
-																bool canjoin = true;
-																if(user){
-																	if(lobbygame->minlevel > user->agency[GetSelectedAgency()].level){
-																		canjoin = false;
-																		CreateModalDialog("Your player level is too low");
-																	}else
-																	if(lobbygame->maxlevel < user->agency[GetSelectedAgency()].level){
-																		canjoin = false;
-																		CreateModalDialog("Your player level is too high");
-																	}
-																}
-																if(canjoin){
-																	currentlobbygameid = lobbygame->id;
-																	if(strlen(lobbygame->password) > 0 && lobbygame->accountid != world.lobby.accountid){
-																		currentinterface = CreatePasswordDialog()->id;
-																	}else{
-																		JoinGame(*lobbygame);
-																	}
-																}
-															}
-														}
-													}
-												}else{
-													CreateModalDialog("No game selected");
-												}
-											}
-										}
-									}
-								}
-							}break;
-							case 25:{ // start game/ready
-								if(gamejoininterface){
-									Peer * localpeer = world.peerlist[world.localpeerid];
-									bool ishost = localpeer && localpeer->ishost;
-									if(!ishost || world.AllPeersDownloadedMap()){
-										world.SendReady();
-									}
-								}
-							}break;
-							case 26:{ // change team
-								if(gamejoininterface){
-									world.ChangeTeam();
-								}
-							}break;
-							case 27:{ // choose tech
-								if(gamejoininterface){
-									Object * object = world.GetObjectFromId(currentinterface);
-									Interface * iface = static_cast<Interface *>(object);
-									Interface * gamejoiniface = static_cast<Interface *>(world.GetObjectFromId(gamejoininterface));
-									if(gamejoiniface){
-										gamejoiniface->DestroyInterface(world, iface);
-									}
-									world.choosingtech = true;
-									ShowTeamOverlays(false);
-									world.RequestPeerList();
-									gamejoininterface = 0;
-									gametechinterface = CreateGameTechInterface()->id;
-									iface->AddObject(gametechinterface);
-									iface->activeobject = gametechinterface;
-									Interface * chatiface = static_cast<Interface *>(world.GetObjectFromId(chatinterface));
-									if(chatiface){
-										chatiface->activeobject = 0;
-									}
-									currentinterface = iface->id;
-									iface->ActiveChanged(world, iface, false);
-									UpdateTechInterface();
-									return false;
-								}
-							}break;
-							case 28:{ // back to teams
-								if(!gamejoininterface){
-									Object * object = world.GetObjectFromId(currentinterface);
-									Interface * iface = static_cast<Interface *>(object);
-									Interface * gametechiface = static_cast<Interface *>(world.GetObjectFromId(gametechinterface));
-									if(gametechiface){
-										gametechiface->DestroyInterface(world, iface);
-									}
-									gametechinterface = 0;
-									gamejoininterface = CreateGameJoinInterface()->id;
-									iface->AddObject(gamejoininterface);
-									world.choosingtech = false;
-									ShowTeamOverlays(true);
-									iface->activeobject = gamejoininterface;
-									Interface * chatiface = static_cast<Interface *>(world.GetObjectFromId(chatinterface));
-									if(chatiface){
-										chatiface->activeobject = 0;
-									}
-									iface->ActiveChanged(world, iface, false);
-									return false;
-								}
-							}break;
-							case 30:{ // create game
-								if(gameselectinterface){
-									Object * object = world.GetObjectFromId(currentinterface);
-									Interface * iface = static_cast<Interface *>(object);
-									if(gameselectinterface){
-										Interface * gameselectiface = static_cast<Interface *>(world.GetObjectFromId(gameselectinterface));
-										if(gameselectiface){
-											gameselectiface->DestroyInterface(world, iface);
-										}
-										gameselectinterface = 0;
-									}
-									gamecreateinterface = CreateGameCreateInterface()->id;
-									iface->AddObject(gamecreateinterface);
-									iface->activeobject = gamecreateinterface;
-									Interface * chatiface = static_cast<Interface *>(world.GetObjectFromId(chatinterface));
-									if(chatiface){
-										chatiface->activeobject = 0;
-									}
-									iface->ActiveChanged(world, iface, false);
-									return false;
-								}
-							}break;
-							case 35:{ // create game create
-								if(!creategameclicked){
-									const char * gamename = "";
-									const char * mapname = "";
-									const char * password = 0;
-									Interface * gamecreateiface = static_cast<Interface *>(world.GetObjectFromId(gamecreateinterface));
-									if(gamecreateiface){
-										Object * tobject = gamecreateiface->GetObjectWithUid(world, 5);
-										if(tobject){
-											TextInput * textinput = static_cast<TextInput *>(tobject);
-											gamename = textinput->text;
-										}
-										tobject = gamecreateiface->GetObjectWithUid(world, 6);
-										if(tobject){
-											TextInput * textinput = static_cast<TextInput *>(tobject);
-											if(strlen(textinput->text) > 0){
-												password = textinput->text;
-											}
-										}
-										Uint8 securitylevel = LobbyGame::SECNONE;
-										tobject = gamecreateiface->GetObjectWithUid(world, 40);
-										if(tobject){
-											Button * button = static_cast<Button *>(tobject);
-											if(strcmp(button->text, "Low") == 0){
-												securitylevel = LobbyGame::SECLOW;
-											}else
-											if(strcmp(button->text, "Medium") == 0){
-												securitylevel = LobbyGame::SECMEDIUM;
-											}else
-											if(strcmp(button->text, "High") == 0){
-												securitylevel = LobbyGame::SECHIGH;
-											}
-										}
-										Uint8 minlevel = 0;
-										tobject = gamecreateiface->GetObjectWithUid(world, 41);
-										if(tobject){
-											TextInput * textinput = static_cast<TextInput *>(tobject);
-											minlevel = atoi(textinput->text);
-										}
-										Uint8 maxlevel = 0;
-										tobject = gamecreateiface->GetObjectWithUid(world, 42);
-										if(tobject){
-											TextInput * textinput = static_cast<TextInput *>(tobject);
-											maxlevel = atoi(textinput->text);
-										}
-										Uint8 maxplayers = 0;
-										tobject = gamecreateiface->GetObjectWithUid(world, 43);
-										if(tobject){
-											TextInput * textinput = static_cast<TextInput *>(tobject);
-											maxplayers = atoi(textinput->text);
-										}
-										if(maxplayers <= 0){
-											maxplayers = 1;
-										}
-										Uint8 maxteams = 0;
-										tobject = gamecreateiface->GetObjectWithUid(world, 44);
-										if(tobject){
-											TextInput * textinput = static_cast<TextInput *>(tobject);
-											maxteams = atoi(textinput->text);
-										}
-										if(maxteams <= 0){
-											maxteams = 1;
-										}
-										if(strlen(gamename) == 0){
-											CreateModalDialog("No game name");
-										}else{
-											tobject = gamecreateiface->GetObjectWithUid(world, 4);
-											if(tobject){
-												SelectBox * selectbox = static_cast<SelectBox *>(tobject);
-												if(selectbox->selecteditem >= 0){
-													mapname = selectbox->GetItemName(selectbox->selecteditem);
-												if(servermaps.count(mapname) > 0){
-													CreateModalDialog("Download the map first");
-												}else{
-													unsigned char maphash[20];
-													CalculateMapHash(FindMap(mapname).c_str(), &maphash);
-													// Store args for deferred CreateGame after upload.
-													pendingCreate.gamename = gamename;
-													pendingCreate.mapname  = mapname;
-													pendingCreate.password = password ? password : "";
-													memcpy(pendingCreate.maphash, maphash, 20);
-													pendingCreate.securitylevel = securitylevel;
-													pendingCreate.minlevel      = minlevel;
-													pendingCreate.maxlevel      = maxlevel;
-													pendingCreate.maxplayers    = maxplayers;
-													pendingCreate.maxteams      = maxteams;
-													// Upload map before creating so the dedicated server
-													// can find it by filename.  Duplicate SHA-1 is a no-op.
-													if(mapUploadThread.joinable()) mapUploadThread.detach();
-													uint32_t gen = ++mapUploadGeneration;
-													std::string mppath = FindMap(mapname);
-													std::string dataDir = GetDataDir();
-													bool isBundledMap = dataDir.empty() || mppath.substr(0, dataDir.size()) != dataDir;
-													std::string apiURL = Config::GetInstance().mapapiurl;
-													if(isBundledMap){
-														// Bundled maps ship with the game; no upload needed.
-														mapUploadState.store(2, std::memory_order_release);
-													}else{
-														mapUploadState.store(1, std::memory_order_relaxed);
-														mapUploadThread = std::thread([this, mapname_str=std::string(mapname), mppath, apiURL, gen](){
-															bool ok = UploadMapToServer(mapname_str.c_str(), mppath.c_str(), apiURL.c_str());
-															if(mapUploadGeneration.load(std::memory_order_relaxed) != gen) return;
-															mapUploadState.store(ok ? 2 : 3, std::memory_order_release);
-														});
-													}
-													creategameclicked = true;
-													strcpy(Config::GetInstance().defaultgamename, gamename);
-													Config::GetInstance().Save();
-													CreateModalDialog("Uploading map...", false);
-												}
-												}else{
-													CreateModalDialog("No map selected");
-												}
-											}
-										}
-									}
-								}
-							}break;
-							case 40:{ // security level
-								if(gamecreateinterface){
-									Interface * gamecreateiface = static_cast<Interface *>(world.GetObjectFromId(gamecreateinterface));
-									if(gamecreateiface){
-										if(strcmp(button->text, "Off") == 0){
-											strcpy(button->text, "Low");
-										}else
-										if(strcmp(button->text, "Low") == 0){
-											strcpy(button->text, "Medium");
-										}else
-										if(strcmp(button->text, "Medium") == 0){
-											strcpy(button->text, "High");
-										}else
-										if(strcmp(button->text, "High") == 0){
-											strcpy(button->text, "Off");
-										}
-									}
-								}
-							}break;
-						case 50: // modal ok button pressed
-								if(modalinterface){
-									Interface * modaliface = static_cast<Interface *>(world.GetObjectFromId(modalinterface));
-									if(iface->id == passwordinterface && modaliface){
-										TextInput * passwordinput = static_cast<TextInput *>(modaliface->GetObjectWithUid(world, 1));
-										LobbyGame * lobbygame = world.lobby.GetGameById(currentlobbygameid);
-										if(lobbygame && passwordinput){
-											JoinGame(*lobbygame, passwordinput->text);
-										}
-									}
-									DestroyModalDialog();
-									creategameclicked = false;
-									if(gamejoininterface || gametechinterface){
-										if(GoBack()){
-											return false;
-										}
-									}
-									return false;
-								}
-							break;
-						}
-					}
-				}break;
-			}
-		}
-	}
-	return true;
-}
-
-void Game::ProcessGameSummaryInterface(Interface * iface){
-	if(world.lobby.statupgraded || !gamesummaryinfoloaded){
-		User * user = world.lobby.GetUserInfo(world.lobby.accountid);
-		if(user && !user->retrieving){
-			UpdateGameSummaryInterface();
-			world.lobby.statupgraded = false;
-		}
-	}
-	for(std::vector<Uint16>::iterator it = iface->objects.begin(); it != iface->objects.end(); it++){
-		Object * object = world.GetObjectFromId(*it);
-		if(object){
-			switch(object->type){
-				case ObjectTypes::TEXTBOX:{
-					TextBox * textbox = static_cast<TextBox *>(object);
-					if(textbox){
-						Object * object = world.GetObjectFromId(iface->scrollbar);
-						ScrollBar * scrollbar = static_cast<ScrollBar *>(object);
-						if(scrollbar){
-							textbox->scrolled = scrollbar->scrollposition;
-						}
-					}
-				}break;
-				case ObjectTypes::BUTTON:{
-					Button * button = static_cast<Button *>(object);
-					if(button && button->clicked){
-						button->clicked = false;
-						User * user = world.lobby.GetUserInfo(world.lobby.accountid);
-						switch(button->uid){
-							case 0:{ // continue
-								if(world.lobby.state == Lobby::AUTHENTICATED){
-									GoToState(LOBBY);
-									world.lobby.JoinChannel(lastchannel);
-								}else{
-									GoToState(MAINMENU);
-								}
-							}break;
-							case 10:{ // upgrade endurance
-								world.lobby.UpgradeStat(user->statsagency, 0);
-							}break;
-							case 11:{ // upgrade shield
-								world.lobby.UpgradeStat(user->statsagency, 1);
-							}break;
-							case 12:{ // upgrade jetpack
-								world.lobby.UpgradeStat(user->statsagency, 2);
-							}break;
-							case 13:{ // upgrade techslots
-								world.lobby.UpgradeStat(user->statsagency, 3);
-							}break;
-							case 14:{ // upgrade hacking
-								world.lobby.UpgradeStat(user->statsagency, 4);
-							}break;
-							case 15:{ // upgrade contacts
-								world.lobby.UpgradeStat(user->statsagency, 5);
-							}break;
-						}
-					}
-				}
-			}
-		}
-	}
-}
-
-void Game::UpdateLobbyMapName(const char * name){
-	Interface * lobbyiface = static_cast<Interface *>(world.GetObjectFromId(lobbyinterface));
-	if(lobbyiface){
-		for(std::vector<Uint16>::iterator it = lobbyiface->objects.begin(); it != lobbyiface->objects.end(); it++){
-			Object * object = world.GetObjectFromId(*it);
-			if(object->type == ObjectTypes::OVERLAY){
-				Overlay * overlay = static_cast<Overlay *>(object);
-				if(overlay->uid == 8){
-					overlay->text = name;
-					overlay->text = overlay->text.substr(0, 25);
-				}
-			}
-		}
-	}
-}
-
-void Game::UpdateTechInterface(void){
-	if(gametechinterface){
-		int techslotsleft = 0;
-		Interface * gametechiface = static_cast<Interface *>(world.GetObjectFromId(gametechinterface));
-		if(gametechiface){
-			Overlay * overlay = static_cast<Overlay *>(gametechiface->GetObjectWithUid(world, 70));
-			if(overlay){
-				Peer * peer = world.peerlist[world.localpeerid];
-				if(peer){
-					Team * team = world.GetPeerTeam(world.localpeerid);
-					User * user = world.lobby.GetUserInfo(peer->accountid);
-					if(user && team){
-						techslotsleft = user->agency[team->agency].techslots - world.TechSlotsUsed(*peer);
-						overlay->text = "Tech slots left: " + std::to_string(techslotsleft);
-					}
-				}else{
-					if(world.tickcount % 12 == 0){
-						// fix for when the tech interface doesnt appear if the peerlist packet was lost
-						world.RequestPeerList();
-					}
-				}
-			}
-		}
-		Team * team = world.GetPeerTeam(world.localpeerid);
-		if(team){
-			int peerindex = 0;
-			for(int i = 0; i < 4; i++){
-				Peer * peer = world.peerlist[team->peers[i]];
-				User * user = 0;
-				if(peer){
-					user = world.lobby.GetUserInfo(peer->accountid);
-				}
-				bool draw = true;
-				if(i >= team->numpeers){
-					draw = false;
-				}
-				int b = 0;
-				int bpos = 0;
-				for(std::vector<BuyableItem *>::iterator it = world.buyableitems.begin(); it != world.buyableitems.end(); it++){
-					BuyableItem * buyableitem = *it;
-					if(buyableitem->techslots){
-						if(buyableitem->agencyspecific == -1 || buyableitem->agencyspecific == team->agency){
-							bool usable = true;
-							Uint8 uid = 110 + (30 * peerindex) + b;
-							if(team->peers[i] == world.localpeerid){
-								uid = 110 + (30 * 3) + b;
-								if(buyableitem->techslots <= techslotsleft || (peer && peer->techchoices & buyableitem->techchoice)){
-									usable = false;
-								}
-							}
-							Interface * gametechiface = static_cast<Interface *>(world.GetObjectFromId(gametechinterface));
-							if(gametechiface){
-								Button * button = static_cast<Button *>(gametechiface->GetObjectWithUid(world, uid));
-								if(button){
-									if(peer && peer->techchoices & buyableitem->techchoice){
-										button->res_index = 18; // on
-									}else{
-										button->res_index = 19; // off
-									}
-									if(team->peers[i] == world.localpeerid){
-										if(!usable){
-											button->effectbrightness = 128;
-										}else{
-											button->effectbrightness = 64;
-										}
-									}
-									if(button && button->type == Button::BCHECKBOX){
-										if(button->clicked){
-											if(button->uid >= 200 && button->effectbrightness == 128){
-												//Uint32 techchoice = 1 << (button->uid - 200);
-												Peer * peer = world.peerlist[world.localpeerid];
-												//printf("tech slots used: %d, %d\n", world.TechSlotsUsed(*peer), peer->techchoices);
-												if(peer){
-													world.SetTech(peer->techchoices ^ buyableitem->techchoice);
-													Team * team = world.GetPeerTeam(world.localpeerid);
-													if(team){
-														Config::GetInstance().defaulttechchoices[team->agency] = peer->techchoices ^ buyableitem->techchoice;
-														Config::GetInstance().Save();
-													}
-												}
-											}
-											button->clicked = false;
-										}
-									}
-									button->draw = draw;
-								}
-							}
-							if(gametechiface){
-								Overlay * overlay = static_cast<Overlay *>(gametechiface->GetObjectWithUid(world, 230 + b));
-								if(overlay){
-									if(overlay->clicked){
-										overlay->clicked = false;
-										Overlay * nameoverlay = static_cast<Overlay *>(gametechiface->GetObjectWithUid(world, 60));
-										if(nameoverlay){
-											nameoverlay->text = "-" + std::string(buyableitem->name) + "-";
-											nameoverlay->x = 401 + (116 - ((nameoverlay->text.length() * nameoverlay->textwidth) / 2));
-										}
-										char desc[1024];
-										strcpy(desc, buyableitem->description);
-										int linenum = 0;
-										char * descline = strtok(desc, "\n");
-										while(descline){
-											Overlay * descoverlay = static_cast<Overlay *>(gametechiface->GetObjectWithUid(world, 61 + linenum));
-											if(descoverlay){
-												descoverlay->text = descline;
-											}
-											linenum++;
-											descline = strtok(NULL, "\n");
-										}
-										for(int i = linenum; i < 9; i++){
-											Overlay * descoverlay = static_cast<Overlay *>(gametechiface->GetObjectWithUid(world, 61 + i));
-											if(descoverlay){
-												descoverlay->text = "";
-											}
-										}
-									}
-									if(team->peers[i] == world.localpeerid){
-										if(!usable){
-											overlay->effectbrightness = 128;
-										}else{
-											overlay->effectbrightness = 64;
-										}
-									}
-								}
-							}
-							bpos++;
-						}
-						b++;
-					}
-				}
-				if(team->peers[i] != world.localpeerid){
-					Interface * gametechiface = static_cast<Interface *>(world.GetObjectFromId(gametechinterface));
-					if(gametechiface){
-						Overlay * overlay = static_cast<Overlay *>(gametechiface->GetObjectWithUid(world, 80 + peerindex));
-						Overlay * overlayline = static_cast<Overlay *>(gametechiface->GetObjectWithUid(world, 90 + peerindex));
-						if(overlay && overlayline){
-							overlay->draw = draw;
-							if(user){
-								overlay->text = user->name;
-								overlay->x = 375 - (overlay->text.length() * overlay->textwidth);
-							}
-							overlayline->draw = draw;
-						}
-					}
-					peerindex++;
-				}
-			}
-		}
-	}
-}
-
-void Game::UpdateGameSummaryInterface(void){
-	if(!gamesummaryinterface){
-		return;
-	}
-	Interface * gamesummaryiface = static_cast<Interface *>(world.GetObjectFromId(gamesummaryinterface));
-	if(gamesummaryiface){
-		//printf("Updated game summary\n");
-		bool upgradeavailable = false;
-		bool upgradesavailable[6];
-		for(int i = 0; i < 6; i++){
-			upgradesavailable[i] = false;
-		}
-		int totalbonusupgrades = 0;
-		User * user = world.lobby.GetUserInfo(world.lobby.accountid);
-		if(user && !user->retrieving){
-			//printf("user found\n");
-			gamesummaryinfoloaded = true;
-			totalbonusupgrades += user->agency[user->statsagency].endurance;
-			totalbonusupgrades += user->agency[user->statsagency].shield;
-			totalbonusupgrades += user->agency[user->statsagency].jetpack;
-			totalbonusupgrades += user->agency[user->statsagency].techslots;
-			totalbonusupgrades += user->agency[user->statsagency].hacking;
-			totalbonusupgrades += user->agency[user->statsagency].contacts;
-			if(user->agency[user->statsagency].endurance < user->agency[user->statsagency].maxendurance){
-				upgradesavailable[0] = true;
-			}
-			if(user->agency[user->statsagency].shield < user->agency[user->statsagency].maxshield){
-				upgradesavailable[1] = true;
-			}
-			if(user->agency[user->statsagency].jetpack < user->agency[user->statsagency].maxjetpack){
-				upgradesavailable[2] = true;
-			}
-			if(user->agency[user->statsagency].techslots < user->agency[user->statsagency].maxtechslots){
-				upgradesavailable[3] = true;
-			}
-			if(user->agency[user->statsagency].hacking < user->agency[user->statsagency].maxhacking){
-				upgradesavailable[4] = true;
-			}
-			if(user->agency[user->statsagency].contacts < user->agency[user->statsagency].maxcontacts){
-				upgradesavailable[5] = true;
-			}
-			int maxupgrades = user->agency[user->statsagency].level;
-			if(maxupgrades > user->TotalUpgradePointsPossible(user->statsagency)){
-				maxupgrades = user->TotalUpgradePointsPossible(user->statsagency);
-			}
-			if(totalbonusupgrades - user->agency[user->statsagency].defaultbonuses < maxupgrades){
-				upgradeavailable = true;
-			}
-		}
-		for(int i = 0; i < 6; i++){
-			if(upgradesavailable[i] && upgradeavailable){
-				if(!gamesummaryiface->GetObjectWithUid(world, 10 + i)){
-					Button * button = (Button *)world.CreateObject(ObjectTypes::BUTTON);
-					button->y = -180 + (i * 46);
-					button->x = 62;
-					button->uid = 10 + i;
-					switch(i){
-						case 0: sprintf(button->text, "+1 Endurance"); break;
-						case 1: sprintf(button->text, "+1 Shield   "); break;
-						case 2: sprintf(button->text, "+1 Jetpack  "); break;
-						case 3: sprintf(button->text, "+1 Tech Slot"); break;
-						case 4: sprintf(button->text, "+1 Hacking  "); break;
-						case 5: sprintf(button->text, "+1 Contacts "); break;
-					}
-					gamesummaryiface->AddObject(button->id);
-				}
-			}else{
-				Button * button = static_cast<Button *>(gamesummaryiface->GetObjectWithUid(world, 10 + i));
-				if(button){
-					gamesummaryiface->RemoveObject(button->id);
-					world.MarkDestroyObject(button->id);
-				}
-			}
-			Overlay * overlay = static_cast<Overlay *>(gamesummaryiface->GetObjectWithUid(world, 20 + i));
-			if(overlay){
-				switch(i){
-					case 0: overlay->text = std::to_string(user->agency[user->statsagency].endurance); break;
-					case 1: overlay->text = std::to_string(user->agency[user->statsagency].shield); break;
-					case 2: overlay->text = std::to_string(user->agency[user->statsagency].jetpack); break;
-					case 3: overlay->text = std::to_string(user->agency[user->statsagency].techslots); break;
-					case 4: overlay->text = std::to_string(user->agency[user->statsagency].hacking); break;
-					case 5: overlay->text = std::to_string(user->agency[user->statsagency].contacts); break;
-				}
-				overlay->x = 556 - (overlay->text.length() * overlay->textwidth);
-			}
-		}
-		Overlay * overlay = static_cast<Overlay *>(gamesummaryiface->GetObjectWithUid(world, 1));
-		if(overlay){
-			if(upgradeavailable){
-				overlay->draw = true;
-			}else{
-				overlay->draw = false;
-			}
-		}
-	}
-}
-
-void Game::AddSummaryLine(TextBox & textbox, const char * name, Uint32 value, bool percentage){
-	char string[256];
-	char valuetext[64];
-	sprintf(valuetext, "%d%s", value, percentage ? "%" : " ");
-	int maxchars = textbox.width / textbox.fontwidth;
-	int used = strlen(name) + strlen(valuetext);
-	strcpy(string, name);
-	for(int i = 0; i < maxchars - used; i++){
-		strcat(string, " ");
-	}
-	strcat(string, valuetext);
-	textbox.AddLine(string);
-}
-
-void Game::ShowTeamOverlays(bool show){
-	for(std::list<Object *>::iterator it = world.objectlist.begin(); it != world.objectlist.end(); it++){
-		Object * object = *it;
-		if(object->type == ObjectTypes::TEAM){
-			Team * team = static_cast<Team *>(object);
-			team->ShowOverlays(world, show);
-		}
-	}
-}
-
-Uint8 Game::GetSelectedAgency(void){
-	// Agency is locked to the selected character; derive it from the lobby's
-	// character list rather than the toggle UI.
-	if(world.lobby.selectedcharid != 0){
-		for(const auto& ch : world.lobby.characters){
-			if(ch.id == world.lobby.selectedcharid){
-				return ch.agencyIdx;
-			}
-		}
-	}
-	// Fallback to the legacy toggle panel for offline / no-character cases.
-	Interface * characteriface = static_cast<Interface *>(world.GetObjectFromId(characterinterface));
-	if(!characteriface) return 0;
-	for(std::vector<Uint16>::iterator it = characteriface->objects.begin(); it != characteriface->objects.end(); it++){
-		Object * object = world.GetObjectFromId(*it);
-		if(object && object->type == ObjectTypes::TOGGLE){
-			Toggle * toggle = static_cast<Toggle *>(object);
-			if(toggle && toggle->selected){
-				switch(toggle->uid){
-					case 1: return Team::NOXIS;
-					case 2: return Team::LAZARUS;
-					case 3: return Team::CALIBER;
-					case 4: return Team::STATIC;
-					case 5: return Team::BLACKROSE;
-				}
-			}
-		}
-	}
-	return 0;
-}
-
-// Two-key view of an action's bindings used by the controls UI. The new
-// data model is OR-of-AND with arbitrary list size; the existing UI shows
-// fixed primary/secondary slots plus an OR/AND toggle. ViewLegacy/WriteLegacy
-// round-trip those two shapes losslessly:
-//
-//   bindings = []                            → key1=UNK, key2=UNK
-//   bindings = [[k1]]                        → key1=k1,  key2=UNK
-//   bindings = [[k1], [k2]]                  → key1=k1,  key2=k2,  AND=false
-//   bindings = [[k1, k2]]                    → key1=k1,  key2=k2,  AND=true
-//
-// CLI-set or JSON-edited bindings of other shapes (mouse, gamepad, more
-// than 2 keys) survive a UI render but get clobbered if the user touches
-// the row through the UI. By design — power-users use the CLI.
-Game::LegacyView Game::ViewLegacy(const KeyMap& km, Action a){
-	LegacyView v;
-	const auto& ab = km.Get(a);
-	if(ab.bindings.empty()) return v;
-	const auto& b0 = ab.bindings[0];
-	if(b0.keys.size() >= 2 &&
-	   b0.keys[0].device == BindingDevice::Keyboard &&
-	   b0.keys[1].device == BindingDevice::Keyboard){
-		v.key1 = (SDL_Scancode)b0.keys[0].code;
-		v.key2 = (SDL_Scancode)b0.keys[1].code;
-		v.and_ = true;
-		return v;
-	}
-	if(!b0.keys.empty() && b0.keys[0].device == BindingDevice::Keyboard){
-		v.key1 = (SDL_Scancode)b0.keys[0].code;
-	}
-	if(ab.bindings.size() >= 2){
-		const auto& b1 = ab.bindings[1];
-		if(!b1.keys.empty() && b1.keys[0].device == BindingDevice::Keyboard){
-			v.key2 = (SDL_Scancode)b1.keys[0].code;
-		}
-	}
-	return v;
-}
-
-void Game::WriteLegacy(KeyMap& km, Action a, SDL_Scancode key1, SDL_Scancode key2, bool and_){
-	auto& ab = km.Get(a);
-	ab.bindings.clear();
-	auto mk = [](SDL_Scancode sc){
-		BindingKey k;
-		k.device  = BindingDevice::Keyboard;
-		k.code    = (int)sc;
-		k.axisDir = 0;
-		return k;
-	};
-	if(key1 == SDL_SCANCODE_UNKNOWN && key2 == SDL_SCANCODE_UNKNOWN) return;
-	if(and_ && key1 != SDL_SCANCODE_UNKNOWN && key2 != SDL_SCANCODE_UNKNOWN){
-		Binding b; b.keys.push_back(mk(key1)); b.keys.push_back(mk(key2));
-		ab.bindings.push_back(std::move(b));
-		return;
-	}
-	if(key1 != SDL_SCANCODE_UNKNOWN){
-		Binding b; b.keys.push_back(mk(key1));
-		ab.bindings.push_back(std::move(b));
-	}
-	if(key2 != SDL_SCANCODE_UNKNOWN){
-		Binding b; b.keys.push_back(mk(key2));
-		ab.bindings.push_back(std::move(b));
-	}
-}
-
-void Game::LoadActiveKeymap(){
-	const char* name = Config::GetInstance().active_keybind_profile;
-	if(!name || !*name) name = "default";
-	std::string path = ResolveProfilePath(name);
-	if(path.empty()){
-		// No file by that name anywhere — fall back to the built-in default.
-		path = ResolveProfilePath("default");
-	}
-	keymap.Clear();
-	if(!path.empty()){
-		keymap.LoadFile(path);
-	}
-	if(keymap.name.empty()) keymap.name = name;
-}
-
-static bool IsBuiltinProfile(const std::string& name){
-	return name == "default" || name == "wasd" || name == "gamepad";
-}
-
-void Game::CycleKeybindPreset(){
-	ProfileListing pl = ListProfiles();
-	if(pl.all.empty()) return;
-	std::string current = Config::GetInstance().active_keybind_profile;
-	size_t next = 0;
-	for(size_t i = 0; i < pl.all.size(); i++){
-		if(pl.all[i] == current){ next = (i + 1) % pl.all.size(); break; }
-	}
-	const std::string& chosen = pl.all[next];
-	std::strncpy(Config::GetInstance().active_keybind_profile, chosen.c_str(),
-	             sizeof(Config::GetInstance().active_keybind_profile) - 1);
-	Config::GetInstance().active_keybind_profile[sizeof(Config::GetInstance().active_keybind_profile) - 1] = '\0';
-	LoadActiveKeymap();
-}
-
-void Game::ForkActiveProfileIfBuiltin(){
-	std::string active = Config::GetInstance().active_keybind_profile;
-	if(!IsBuiltinProfile(active)) return;
-	std::string forked = active + "-custom";
-	std::string forkedLabel = (keymap.label.empty() ? active : keymap.label) + "-Custom";
-	std::strncpy(Config::GetInstance().active_keybind_profile, forked.c_str(),
-	             sizeof(Config::GetInstance().active_keybind_profile) - 1);
-	Config::GetInstance().active_keybind_profile[sizeof(Config::GetInstance().active_keybind_profile) - 1] = '\0';
-	keymap.name = forked;
-	keymap.label = forkedLabel;
-}
 
 void Game::TickRumble(){
 	if(!gamepad || world.gameplaystate != World::INGAME) return;
@@ -6261,66 +1204,18 @@ void Game::TickRumble(){
 	}
 }
 
-void Game::OpenFirstGamepad(){
-	if(gamepad){ SDL_CloseGamepad(gamepad); gamepad = nullptr; }
-	int count = 0;
-	SDL_JoystickID* ids = SDL_GetGamepads(&count);
-	if(ids){
-		if(count > 0) gamepad = SDL_OpenGamepad(ids[0]);
-		SDL_free(ids);
-	}
-	gamepadstate.connected = (gamepad != nullptr);
-	if(gamepadstate.connected){
-		// Auto-switch to the gamepad keybind profile, but only if the current
-		// profile isn't already gamepad-derived (e.g. "gamepad-custom" saved
-		// from a previous session — don't clobber it with the built-in).
-		const char* cur = Config::GetInstance().active_keybind_profile;
-		std::string curStr = (cur && *cur) ? cur : "default";
-		bool alreadyGamepad = (curStr.find("gamepad") != std::string::npos);
-		if(!alreadyGamepad){
-			prevGamepadProfile = curStr;
-			std::strncpy(Config::GetInstance().active_keybind_profile, "gamepad",
-			             sizeof(Config::GetInstance().active_keybind_profile) - 1);
-			Config::GetInstance().active_keybind_profile[
-				sizeof(Config::GetInstance().active_keybind_profile) - 1] = '\0';
-			LoadActiveKeymap();
-		}
-	}
-}
-
-void Game::PollGamepadState(){
-	if(!gamepad){
-		// Try (cheaply) to pick up a pad plugged in mid-session.
-		OpenFirstGamepad();
-	}
-	gamepadstate.connected = (gamepad != nullptr);
-	gamepadstate.buttons   = 0;
-	for(auto& a : gamepadstate.axes) a = 0;
-	if(!gamepad) return;
-	for(int b = 0; b < SDL_GAMEPAD_BUTTON_COUNT; ++b){
-		if(SDL_GetGamepadButton(gamepad, (SDL_GamepadButton)b)){
-			gamepadstate.buttons |= (1u << b);
-		}
-	}
-	for(int a = 0; a < SDL_GAMEPAD_AXIS_COUNT; ++a){
-		gamepadstate.axes[a] = SDL_GetGamepadAxis(gamepad, (SDL_GamepadAxis)a);
-	}
-}
 
 void Game::TickGamepadMenuNav(){
-	// Only meaningful when a gamepad is connected and a menu interface is open.
 	if(!gamepadstate.connected) return;
-	Interface* iface = (Interface*)world.GetObjectFromId(currentinterface);
-	if(!iface) return;
-
-	// During rebind-wait (iface->disabled=true) the rebind capture code owns
-	// all gamepad input.  Don't let nav/confirm/cancel fire as side effects.
-	if(iface->disabled) return;
+	Player * localplayer = world.GetPeerPlayer(world.localpeerid);
+	bool inGameUi = localplayer && (localplayer->chatActive || localplayer->isbuying || localplayer->techstationactive);
+	Screen * top = GetTopScreen();
+	if(!top && !inGameUi) return;
 
 	Uint32 now = SDL_GetTicks();
 
 	// Helper: fire a nav key press with software repeat on held direction.
-	auto tick = [&](GamepadNavDir& dir, Action action, Uint8 ascii){
+	auto tick = [&](GamepadNavDir& dir, Action action, silencer::ui::UiNavAction navAction){
 		bool pressed = keymap.IsPressed(action, keystate, gamepadstate);
 		if(!pressed){
 			dir.held    = false;
@@ -6331,78 +1226,37 @@ void Game::TickGamepadMenuNav(){
 			// First frame held — fire immediately.
 			dir.held     = true;
 			dir.nextfire = now + GAMEPAD_NAV_DELAY_MS;
-			iface->ProcessKeyPress(world, ascii);
+			clientUiInput.QueueNavAction(navAction);
 		} else if(now >= dir.nextfire){
 			// Repeat.
 			dir.nextfire = now + GAMEPAD_NAV_REPEAT_MS;
-			iface->ProcessKeyPress(world, ascii);
+			clientUiInput.QueueNavAction(navAction);
 		}
 	};
 
-	tick(gamepadNavUp,    Action::UiUp,    3);
-	tick(gamepadNavDown,  Action::UiDown,  4);
-	tick(gamepadNavLeft,  Action::UiLeft,  1);
-	tick(gamepadNavRight, Action::UiRight, 2);
+	tick(gamepadNavUp,    Action::UiUp,    silencer::ui::UiNavAction::Up);
+	tick(gamepadNavDown,  Action::UiDown,  silencer::ui::UiNavAction::Down);
+	tick(gamepadNavLeft,  Action::UiLeft,  silencer::ui::UiNavAction::Left);
+	tick(gamepadNavRight, Action::UiRight, silencer::ui::UiNavAction::Right);
 
-	// Confirm (A/Cross) — no repeat, edge-detect only.
-	// If nothing is focused, auto-focus the first item so the user sees where
-	// they are before committing.
+	// Confirm (A/Cross) is edge-triggered; directional nav handles repeat.
 	{
 		bool confirmNow = keymap.IsPressed(Action::UiConfirm, keystate, gamepadstate);
 		static bool confirmPrev = false;
 		if(confirmNow && !confirmPrev){
-			if(iface->activeobject == 0 && !iface->tabobjects.empty()){
-				iface->ProcessKeyPress(world, 4);  // focus first item; next A confirms
-			} else {
-				iface->ProcessKeyPress(world, '\n');
-			}
+			clientUiInput.QueueNavAction(silencer::ui::UiNavAction::Confirm);
 		}
 		confirmPrev = confirmNow;
 	}
-}
 
-// Maps an SDL gamepad button/axis name (after stripping "PAD:" prefix) to a
-// short display label appropriate for the connected controller type.
-// e.g. "leftshoulder" → "LB" (Xbox) or "L1" (PS).
-static std::string GamepadShortLabel(const std::string& raw, SDL_GamepadType type) {
-	// Strip trailing axis direction modifier (+/-)
-	std::string base = raw;
-	if(!base.empty() && (base.back() == '+' || base.back() == '-'))
-		base.pop_back();
-
-	static const struct { const char* sdl; const char* xbox; const char* ps; } kTable[] = {
-		{"south",         "A",       "Cross"},
-		{"north",         "Y",       "Tri"},
-		{"east",          "B",       "Circle"},
-		{"west",          "X",       "Square"},
-		{"back",          "Back",    "Select"},
-		{"guide",         "Guide",   "PS"},
-		{"start",         "Menu",    "Options"},
-		{"leftstick",     "LS",      "L3"},
-		{"rightstick",    "RS",      "R3"},
-		{"leftshoulder",  "LB",      "L1"},
-		{"rightshoulder", "RB",      "R1"},
-		{"dpup",          "D-Up",    "D-Up"},
-		{"dpdown",        "D-Dn",    "D-Dn"},
-		{"dpleft",        "D-Lt",    "D-Lt"},
-		{"dpright",       "D-Rt",    "D-Rt"},
-		{"lefttrigger",   "LT",      "L2"},
-		{"righttrigger",  "RT",      "R2"},
-		{"leftx",         "L-X",     "L-X"},
-		{"lefty",         "L-Y",     "L-Y"},
-		{"rightx",        "R-X",     "R-X"},
-		{"righty",        "R-Y",     "R-Y"},
-		{"misc1",         "Share",   "Share"},
-		{"touchpad",      "Touch",   "Touch"},
-	};
-	bool isPs = (type == SDL_GAMEPAD_TYPE_PS3 ||
-	             type == SDL_GAMEPAD_TYPE_PS4 ||
-	             type == SDL_GAMEPAD_TYPE_PS5);
-	for(const auto& e : kTable){
-		if(base == e.sdl)
-			return isPs ? e.ps : e.xbox;
+	{
+		bool cancelNow = keymap.IsPressed(Action::UiCancel, keystate, gamepadstate);
+		static bool cancelPrev = false;
+		if(cancelNow && !cancelPrev){
+			clientUiInput.QueueNavAction(silencer::ui::UiNavAction::Cancel);
+		}
+		cancelPrev = cancelNow;
 	}
-	return raw; // unknown: return original (already has suffix stripped)
 }
 
 const char * Game::GetActionKeyDisplayName(Action a){
@@ -6414,7 +1268,7 @@ const char * Game::GetActionKeyDisplayName(Action a){
 		if(b.keys.empty()) continue;
 		const auto& k = b.keys[0];
 		if(k.device == BindingDevice::Keyboard){
-			return GetKeyName((SDL_Scancode)k.code);
+			return KeyMap::GetKeyName((SDL_Scancode)k.code);
 		}
 		if(!fallback) fallback = &k;
 	}
@@ -6432,779 +1286,7 @@ const char * Game::GetActionKeyDisplayName(Action a){
 	return buf;
 }
 
-std::string Game::GetBindingLabel(Action a, int slot) const {
-	const auto& ab = keymap.Get(a);
-	int found = 0;
-	for(const auto& b : ab.bindings){
-		if(b.keys.empty()) continue;
-		if(found == slot){
-			const auto& k = b.keys[0];
-			if(k.device == BindingDevice::Keyboard){
-				return GetKeyName((SDL_Scancode)k.code);
-			}
-			// Gamepad/mouse: strip device prefix ("PAD:south" → "south") then shorten
-			std::string s = Stringify(k);
-			auto colon = s.find(':');
-			std::string raw = (colon != std::string::npos) ? s.substr(colon + 1) : s;
-			return GamepadShortLabel(raw, gamepad ? SDL_GetGamepadType(gamepad) : SDL_GAMEPAD_TYPE_UNKNOWN);
-		}
-		found++;
-	}
-	return GetKeyName(SDL_SCANCODE_UNKNOWN);
-}
 
-const char * Game::GetKeyName(SDL_Scancode sym) const{
-#ifdef OUYA // Custom scancodes for ouya controller
-	switch((int)sym){
-		case SDL_SCANCODE_LALT: return "L2"; break;
-		case SDL_SCANCODE_RALT: return "R2"; break;
-		case SDL_SCANCODE_HOME: return "Menu"; break;
-		case SDL_SCANCODE_RETURN: return "O"; break;
-		case SDL_SCANCODE_ESCAPE: return "A"; break;
-		case 99: return "U"; break;
-		case 100: return "Y"; break;
-		case 102: return "L1"; break;
-		case 103: return "R1"; break;
-		case 106: return "L3"; break;
-		case 107: return "R3"; break;
-		case SDL_SCANCODE_KP_2: return "RUp"; break;
-		case SDL_SCANCODE_KP_4: return "RLeft"; break;
-		case SDL_SCANCODE_KP_6: return "RRight"; break;
-		case SDL_SCANCODE_KP_8: return "RDown"; break;
-	}
-#endif
-	switch(sym){
-		case SDL_SCANCODE_UNKNOWN: return ""; break;
-		case SDL_SCANCODE_UP: return "Up"; break;
-		case SDL_SCANCODE_DOWN: return "Down"; break;
-		case SDL_SCANCODE_LEFT: return "Left"; break;
-		case SDL_SCANCODE_RIGHT: return "Right"; break;
-		case SDL_SCANCODE_TAB: return "Tab"; break;
-		case SDL_SCANCODE_CAPSLOCK: return "CapsLock"; break;
-		case SDL_SCANCODE_RSHIFT: return "RShift"; break;
-		case SDL_SCANCODE_LSHIFT: return "LShift"; break;
-		case SDL_SCANCODE_RETURN: return "Enter"; break;
-		case SDL_SCANCODE_SEMICOLON: return ";"; break;
-		case SDL_SCANCODE_COMMA: return ","; break;
-		case SDL_SCANCODE_PERIOD: return "."; break;
-		case SDL_SCANCODE_LEFTBRACKET: return "("; break;
-		case SDL_SCANCODE_RIGHTBRACKET: return ")"; break;
-		case SDL_SCANCODE_BACKSLASH: return "Backslash"; break;
-		case SDL_SCANCODE_BACKSPACE: return "Backspace"; break;
-		case SDL_SCANCODE_SLASH: return "Slash"; break;
-		case SDL_SCANCODE_SPACE: return "Space"; break;
-		case SDL_SCANCODE_RALT: return "RAlt"; break;
-		case SDL_SCANCODE_LALT: return "LAlt"; break;
-		case SDL_SCANCODE_RCTRL: return "RCtrl"; break;
-		case SDL_SCANCODE_LCTRL: return "LCtrl"; break;
-		case SDL_SCANCODE_EQUALS: return "="; break;
-		case SDL_SCANCODE_MINUS: return "Minus"; break;
-		case SDL_SCANCODE_RGUI: return "RWin"; break;
-		case SDL_SCANCODE_LGUI: return "LWin"; break;
-		case SDL_SCANCODE_APOSTROPHE: return "'"; break;
-		case SDL_SCANCODE_GRAVE: return "'"; break;
-		case SDL_SCANCODE_ESCAPE: return "Escape"; break;
-		case SDL_SCANCODE_INSERT: return "Insert"; break;
-		case SDL_SCANCODE_HOME: return "Home"; break;
-		case SDL_SCANCODE_END: return "End"; break;
-		case SDL_SCANCODE_PAGEUP: return "Page Up"; break;
-		case SDL_SCANCODE_PAGEDOWN: return "Page Down"; break;
-		case SDL_SCANCODE_NUMLOCKCLEAR: return "NumLock"; break;
-		case SDL_SCANCODE_SCROLLLOCK: return "ScrollLock"; break;
-		case SDL_SCANCODE_KP_0: return "NumPad 0"; break;
-		case SDL_SCANCODE_KP_1: return "NumPad 1"; break;
-		case SDL_SCANCODE_KP_2: return "NumPad 2"; break;
-		case SDL_SCANCODE_KP_3: return "NumPad 3"; break;
-		case SDL_SCANCODE_KP_4: return "NumPad 4"; break;
-		case SDL_SCANCODE_KP_5: return "NumPad 5"; break;
-		case SDL_SCANCODE_KP_6: return "NumPad 6"; break;
-		case SDL_SCANCODE_KP_7: return "NumPad 7"; break;
-		case SDL_SCANCODE_KP_8: return "NumPad 8"; break;
-		case SDL_SCANCODE_KP_9: return "NumPad 9"; break;
-		case SDL_SCANCODE_KP_PERIOD: return "NumPad ."; break;
-		case SDL_SCANCODE_KP_DIVIDE: return "NumPad /"; break;
-		case SDL_SCANCODE_KP_ENTER: return "NumPad E"; break;
-		case SDL_SCANCODE_KP_EQUALS: return "NumPad ="; break;
-		case SDL_SCANCODE_KP_MINUS: return "NumPad -"; break;
-		case SDL_SCANCODE_KP_MULTIPLY: return "NumPad x"; break;
-		case SDL_SCANCODE_KP_PLUS: return "NumPad +"; break;
-		case SDL_SCANCODE_F1: return "F1"; break;
-		case SDL_SCANCODE_F2: return "F2"; break;
-		case SDL_SCANCODE_F3: return "F3"; break;
-		case SDL_SCANCODE_F4: return "F4"; break;
-		case SDL_SCANCODE_F5: return "F5"; break;
-		case SDL_SCANCODE_F6: return "F6"; break;
-		case SDL_SCANCODE_F7: return "F7"; break;
-		case SDL_SCANCODE_F8: return "F8"; break;
-		case SDL_SCANCODE_F9: return "F9"; break;
-		case SDL_SCANCODE_F10: return "F10"; break;
-		case SDL_SCANCODE_F11: return "F11"; break;
-		case SDL_SCANCODE_F12: return "F12"; break;
-		case SDL_SCANCODE_F13: return "F13"; break;
-		case SDL_SCANCODE_F14: return "F14"; break;
-		case SDL_SCANCODE_F15: return "F15"; break;
-		case SDL_SCANCODE_A: return "A"; break;
-		case SDL_SCANCODE_B: return "B"; break;
-		case SDL_SCANCODE_C: return "C"; break;
-		case SDL_SCANCODE_D: return "D"; break;
-		case SDL_SCANCODE_E: return "E"; break;
-		case SDL_SCANCODE_F: return "F"; break;
-		case SDL_SCANCODE_G: return "G"; break;
-		case SDL_SCANCODE_H: return "H"; break;
-		case SDL_SCANCODE_I: return "I"; break;
-		case SDL_SCANCODE_J: return "J"; break;
-		case SDL_SCANCODE_K: return "K"; break;
-		case SDL_SCANCODE_L: return "L"; break;
-		case SDL_SCANCODE_M: return "M"; break;
-		case SDL_SCANCODE_N: return "N"; break;
-		case SDL_SCANCODE_O: return "O"; break;
-		case SDL_SCANCODE_P: return "P"; break;
-		case SDL_SCANCODE_Q: return "Q"; break;
-		case SDL_SCANCODE_R: return "R"; break;
-		case SDL_SCANCODE_S: return "S"; break;
-		case SDL_SCANCODE_T: return "T"; break;
-		case SDL_SCANCODE_U: return "U"; break;
-		case SDL_SCANCODE_V: return "V"; break;
-		case SDL_SCANCODE_W: return "W"; break;
-		case SDL_SCANCODE_X: return "X"; break;
-		case SDL_SCANCODE_Y: return "Y"; break;
-		case SDL_SCANCODE_Z: return "Z"; break;
-		case SDL_SCANCODE_1: return "1"; break;
-		case SDL_SCANCODE_2: return "2"; break;
-		case SDL_SCANCODE_3: return "3"; break;
-		case SDL_SCANCODE_4: return "4"; break;
-		case SDL_SCANCODE_5: return "5"; break;
-		case SDL_SCANCODE_6: return "6"; break;
-		case SDL_SCANCODE_7: return "7"; break;
-		case SDL_SCANCODE_8: return "8"; break;
-		case SDL_SCANCODE_9: return "9"; break;
-		case SDL_SCANCODE_0: return "0"; break;
-		default: return "?"; break;
-	}
-}
-
-void Game::GetGameChannelName(LobbyGame & lobbygame, char * name){
-	sprintf(name, "#%s-%d", lobbygame.name, lobbygame.id);
-}
-
-void Game::CreateAmbienceChannels(void){
-	const WorldDef& wd = GASLoader::Get().world;
-	const std::string bgchannelbanks[3] = {wd.soundAmbience1, wd.soundAmbience2, wd.soundAmbience3};
-	for(int i = 0; i < sizeof(bgchannel) / sizeof(int); i++){
-		if(bgchannel[i] == -1){
-			bgchannel[i] = Audio::GetInstance().Play(world.resources.soundbank[bgchannelbanks[i]], 0, true);
-		}
-	}
-}
-
-void Game::UpdateAmbienceChannels(void){
-	Player * localplayer = world.GetPeerPlayer(world.localpeerid);
-	if(localplayer){
-		int columns = 5;
-		int rows = 5;
-		int w = 640;
-		int h = 480;
-		int outsideamount = 0;
-		int maxamount = columns * rows;
-		for(int x = 0; x < columns; x++){
-			for(int y = 0; y < rows; y++){
-				int x1 = (w * (x / float(columns))) - (w / 2);
-				x1 += - renderer.camera.GetXOffset();
-				int x2 = (w * ((x + 1) / float(columns))) - (w / 2);
-				x2 += - renderer.camera.GetXOffset();
-				int y1 = (h * (y / float(rows))) - (h / 2);
-				y1 += - renderer.camera.GetYOffset();
-				int y2 = (h * ((y + 1) / float(rows))) - (h / 2);
-				y2 += - renderer.camera.GetYOffset();
-				if(world.map.TestAABB(x1, y1, x2, y2, Platform::OUTSIDEROOM)){
-					outsideamount++;
-				}
-			}
-		}
-		if(localplayer->InBase(world)){
-			Audio::GetInstance().SetVolume(bgchannel[BG_BASE], 32);
-			Audio::GetInstance().SetVolume(bgchannel[BG_AMBIENT], 0);
-			Audio::GetInstance().SetVolume(bgchannel[BG_OUTSIDE], 0);
-		}else{
-			Audio::GetInstance().SetVolume(bgchannel[BG_BASE], 0);
-			Audio::GetInstance().SetVolume(bgchannel[BG_AMBIENT], 8 * (1 - (outsideamount / float(maxamount))));
-			Audio::GetInstance().SetVolume(bgchannel[BG_OUTSIDE], 8 * (outsideamount / float(maxamount)));
-		}
-	}
-}
-
-bool Game::FadedIn(void){
-	if(fade_i == 16){
-		return true;
-	}
-	return false;
-}
-
-std::vector<std::string> Game::ListFiles(const char * directory){
-	std::vector<std::string> files;
-#ifdef POSIX
-	DIR * dir = opendir(directory);
-	if(dir){
-		dirent * info;
-		while((info = readdir(dir))){
-			struct stat st;
-			char filename[PATH_MAX];
-			strcpy(filename, directory);
-			strcat(filename, "/");
-			strcat(filename, info->d_name);
-			if(stat(filename, &st) == 0){
-				if(info->d_type != DT_DIR && !S_ISDIR(st.st_mode) && info->d_name[0] != '.'){
-					files.push_back(std::string(info->d_name));
-				}
-			}
-		}
-		closedir(dir);
-	}
-#elif _WIN32
-	WIN32_FIND_DATA info;
-	char directory2[MAX_PATH];
-	strcpy(directory2, directory);
-	strcat(directory2, "\\*");
-	HANDLE dir = FindFirstFile(directory2, &info);
-	if(dir != INVALID_HANDLE_VALUE){
-		do{
-			char fullname[MAX_PATH];
-			sprintf(fullname, "%s\\%s", directory, info.cFileName);
-			if(!(GetFileAttributes(fullname) & FILE_ATTRIBUTE_DIRECTORY)){
-				files.push_back(std::string(info.cFileName));
-			}
-		}while(FindNextFile(dir, &info));
-		FindClose(dir);
-	}
-#endif
-	return files;
-}
-
-void Game::LoadRandomGameMusic(void){
-	if(!Config::GetInstance().music){
-		return;
-	}
-	if(world.resources.gamemusic){
-		Audio::GetInstance().StopMusic();
-		MIX_DestroyAudio(world.resources.gamemusic);
-		world.resources.gamemusic = 0;
-	}
-	if(!world.resources.gamemusic){
-		const char * directory = "music";
-		CDDataDir();
-		std::vector<std::string> files = ListFiles(directory);
-		if(files.size() == 0){
-			CDResDir();
-			files = ListFiles(directory);
-		}
-		if(files.size() > 0){
-			char filename[1024];
-			strcpy(filename, directory);
-			strcat(filename, "/");
-			const char * randomfile = files[rand() % files.size()].c_str();
-			strcat(filename, randomfile);
-			strncpy(currentmusictrack, randomfile, sizeof(currentmusictrack) - 1);
-			world.resources.gamemusic = MIX_LoadAudio(Audio::GetInstance().GetMixer(), filename, false);
-		}
-	}
-}
-
-std::string Game::FindMap(const char * name, unsigned char (*hash)[20], const char * directory){
-	if(!directory){
-		std::string result;
-		result = FindMap(name, hash, "level");
-		if(result.length() > 0){
-			return result;
-		}
-		result = FindMap(name, hash, "level/download");
-		if(result.length() > 0){
-			return result;
-		}
-		result = FindMap(name, hash, "level/archive");
-		if(result.length() > 0){
-			return result;
-		}
-	}else{
-		//printf("searching %s\n", directory);
-		bool isarchive = false;
-		if(strcmp(directory, "level/archive") == 0){
-			isarchive = true;
-		}
-		CDResDir();
-		// Capture the absolute resources path while cwd = Resources (GetResDir returns "" on macOS).
-		std::string absResDir = GetResDir();
-		if(absResDir.empty()){
-			char _cwd[PATH_MAX];
-			if(getcwd(_cwd, PATH_MAX)) absResDir = std::string(_cwd) + "/";
-		}
-		std::vector<std::string> files = ListFiles((GetResDir() + directory).c_str());
-		CDDataDir();
-		std::vector<std::string> files2 = ListFiles((GetDataDir() + directory).c_str());
-		files.insert(files.end(), files2.begin(), files2.end());
-		for(std::vector<std::string>::iterator it = files.begin(); it != files.end(); it++){
-			std::string cname = (*it);
-			if(isarchive){
-				std::size_t p = cname.find_first_of(".");
-				if(p != std::string::npos){
-					cname.erase(0, p + 1);
-				}
-			}
-			//printf("map: %s cname: %s\n", (*it).c_str(), cname.c_str());
-			if(cname.compare(name) == 0){
-				std::string filename = GetDataDir() + directory;
-				filename.append("/");
-				filename.append(*it);
-				SDL_IOStream * file = SDL_IOFromFile(filename.c_str(), "rb");
-				if(!file){
-					filename = absResDir + directory;
-					filename.append("/");
-					filename.append(*it);
-				}else{
-					SDL_CloseIO(file);
-				}
-				//printf("found %s\n", filename.c_str());
-				if(!hash){
-					return filename;
-				}else{
-					unsigned char filehash[20];
-					CalculateMapHash(filename.c_str(), &filehash);
-					if(memcmp(*hash, filehash, sizeof(*hash)) == 0){
-						//printf("hash matches\n");
-						return filename;
-					}
-				}
-			}
-		}
-	}
-	std::string empty;
-	return empty;
-}
-
-std::string Game::SaveMap(const char * name, unsigned char * data, int size){
-	CDDataDir();
-	std::string filename = GetDataDir() + "level/download/";
-	CreateDirectory((GetDataDir() + "level/download").c_str());
-	CreateDirectory((GetDataDir() + "level/archive").c_str());
-	filename.append(name);
-	SDL_IOStream * file = SDL_IOFromFile(filename.c_str(), "wb");
-	if(file){
-		SDL_WriteIO(file, data, size);
-		SDL_CloseIO(file);
-	}
-	unsigned char hash[20];
-	CalculateMapHash(filename.c_str(), &hash);
-	std::string archivefilename = GetDataDir() + "level/archive/";
-	archivefilename.append(StringFromHash(&hash));
-	archivefilename.append(".");
-	archivefilename.append(name);
-	file = SDL_IOFromFile(archivefilename.c_str(), "wb");
-	if(file){
-		SDL_WriteIO(file, data, size);
-		SDL_CloseIO(file);
-	}
-	return filename;
-}
-
-bool Game::CalculateMapHash(const char * filename, unsigned char (*hash)[20]){
-	std::vector<Uint8> mapdata(65535);
-	CDDataDir();
-	SDL_IOStream * file = SDL_IOFromFile(filename, "rb");
-	if(!file){
-		CDResDir();
-		file = SDL_IOFromFile(filename, "rb");
-	}
-	if(file){
-		int mapdatasize = SDL_ReadIO(file, mapdata.data(), mapdata.size());
-		SDL_CloseIO(file);
-		sha1::calc(mapdata.data(), mapdatasize, *hash);
-		return true;
-	}
-	return false;
-}
-
-std::string Game::StringFromHash(unsigned char (*hash)[20]){
-	char hashstring[(20 * 2) + 1];
-	memset(hashstring, 0, sizeof(hashstring));
-	for(int i = 0; i < 20; i++){
-		unsigned char byte = (*hash)[i];
-		sprintf(&hashstring[i * 2], "%.2X", byte);
-	}
-	return std::string(hashstring);
-}
-
-void Game::LoadMapData(const char * filename){
-	//printf("loading map data from %s\n", filename);
-	CDDataDir();
-	SDL_IOStream * file = SDL_IOFromFile((GetDataDir() + filename).c_str(), "rb");
-	if(!file){
-		CDResDir();
-		file = SDL_IOFromFile((GetResDir() + filename).c_str(), "rb");
-	}
-	if(file){
-		int length = SDL_ReadIO(file, world.currentmapdata.data(), world.currentmapdata.size());
-		world.currentmapdata.resize(length);
-		world.currentmapdataend = true;
-		//printf("length: %d %s\n", world.currentmapdata.size(), SDL_GetError());
-		SDL_CloseIO(file);
-	}
-}
-
-void Game::ProcessMapDownload(void){
-	Peer * localpeer = world.peerlist[world.localpeerid];
-	if(localpeer){
-		if(localpeer->gameinfoloaded){
-			if(!localpeer->mapdownloaded){
-				if(!mapexistchecked){
-					std::string mapfilename = FindMap(world.gameinfo.mapname, &world.gameinfo.maphash);
-					if(mapfilename.size() > 0){
-						world.SendMapDownloaded();
-						LoadMapData(mapfilename.c_str());
-						mapexistchecked = true;
-					} else {
-						// Map not available locally. Try the community map server
-						// asynchronously so the game loop (and UDP keepalives) stay
-						// responsive during the fetch. Falling back to peer-to-peer
-						// chunk transfer happens once the async result is known.
-						int js = mapjoinstate.load(std::memory_order_acquire);
-						if(js == 0){
-							mapjoinstate.store(1, std::memory_order_relaxed);
-							uint32_t gen = mapjoingeneration.load(std::memory_order_relaxed);
-							std::string dlname = world.gameinfo.mapname;
-							std::array<unsigned char, 20> sha1;
-							memcpy(sha1.data(), world.gameinfo.maphash, 20);
-							std::string apiURL = Config::GetInstance().mapapiurl;
-							mapjointhread = std::thread([this, dlname, sha1, apiURL, gen]() mutable {
-								std::string path = FetchMapFromServer(dlname.c_str(), sha1.data(), apiURL.c_str());
-								if(mapjoingeneration.load(std::memory_order_relaxed) != gen) return;
-								std::lock_guard<std::mutex> lk(mapjoinmutex);
-								mapjoinpath = path;
-								mapjoinstate.store(path.empty() ? 3 : 2, std::memory_order_release);
-							});
-						} else if(js == 2){
-							// Server had the map; hand it to the engine.
-							std::string path;
-							{ std::lock_guard<std::mutex> lk(mapjoinmutex); path = mapjoinpath; }
-							world.SendMapDownloaded();
-							LoadMapData(path.c_str());
-							mapexistchecked = true;
-						} else if(js == 3){
-							// Server doesn't have it; fall through to P2P chunk transfer.
-							mapexistchecked = true;
-						}
-						// js == 1: fetch in progress; come back next tick.
-					}
-				}else{
-					if(!world.currentmapdataprocessed || world.tickcount - lastmapchunkrequest > 24){
-						// request map chunks after received, or if last request was a while ago
-						if(world.currentmapdataend){
-							//printf("map done downloading\n");
-							std::string mapfilename = SaveMap(world.gameinfo.mapname, world.currentmapdata.data(), world.currentmapdata.size());
-							world.SendMapDownloaded();
-							LoadMapData(mapfilename.c_str());
-						}else{
-							world.GetMapChunk(world.currentmapdata.size());
-							world.currentmapdataprocessed = true;
-						}
-					}
-					if(world.currentmapdataend && world.tickcount % 48 == 0){
-						// this is just in case the SendMapDownloaded packet is lost
-						if(FindMap(world.gameinfo.mapname, &world.gameinfo.maphash).size() > 0){
-							world.SendMapDownloaded();
-						}
-					}
-				}
-			}
-		}
-	}
-}
-
-bool Game::HandleSDLEvents(void){
-	if(world.dedicatedserver.active){
-		return true;
-	}
-	if(headless || tui){
-		// SDL_INIT_VIDEO was skipped, so `window` is NULL; event handlers below
-		// would deref it via SDL_GetWindowSize. Bail before SDL_PollEvent.
-		return true;
-	}
-	SDL_Event event;
-	while(SDL_PollEvent(&event) > 0){
-		switch(event.type){
-			case SDL_EVENT_WINDOW_RESIZED:{
-				// SDL3 GPU swapchain resizes automatically.
-			}break;
-			case SDL_EVENT_WINDOW_FOCUS_GAINED:{
-				if(!world.replay.IsPlaying()){
-					Audio::GetInstance().Unmute();
-				}
-				minimized = false;
-			}break;
-			case SDL_EVENT_WINDOW_FOCUS_LOST:{
-				if(!world.replay.IsPlaying()){
-					Audio::GetInstance().Mute(25);
-				}
-				minimized = true;
-			}break;
-			case SDL_EVENT_WINDOW_MINIMIZED:{
-				minimized = true;
-			}break;
-			case SDL_EVENT_WINDOW_MAXIMIZED:{
-				minimized = false;
-			}break;
-			case SDL_EVENT_WINDOW_RESTORED:{
-				minimized = false;
-			}break;
-			case SDL_EVENT_TEXT_INPUT:{
-				char ascii = event.text.text[0] & 0x7F;
-				bool skip = true;
-				if(ascii >= 0x20 && ascii <= 0x7F){
-					skip = false;
-				}
-				switch(ascii){
-					case '[':
-					case '\\':
-					case ']':
-					case '^':
-					case '_':
-					case '`':
-					case '{':
-					case '|':
-					case '}':
-					case '~':
-						skip = true;
-					break;
-				}
-				Interface * iface = (Interface *)world.GetObjectFromId(currentinterface);
-				if(iface){
-					//iface->lastsym = ascii;
-					if(!skip){
-						iface->ProcessKeyPress(world, ascii);
-					}
-				}
-			}break;
-			case SDL_EVENT_KEY_DOWN:{
-				OnScancodeDown(event.key.scancode);
-				keystate[event.key.scancode] = true;
-			bool skip = true;
-			Uint8 ascii;
-			switch(event.key.scancode){
-					case SDL_SCANCODE_LEFT:
-						ascii = 1;
-						skip = false;
-					break;
-					case SDL_SCANCODE_RIGHT:
-						ascii = 2;
-						skip = false;
-					break;
-					case SDL_SCANCODE_UP:
-						ascii = 3;
-						skip = false;
-					break;
-					case SDL_SCANCODE_DOWN:
-						ascii = 4;
-						skip = false;
-					break;
-					case SDL_SCANCODE_BACKSPACE:
-						ascii = '\b';
-						skip = false;
-					break;
-					case SDL_SCANCODE_TAB:
-						ascii = '\t';
-						skip = false;
-					break;
-					case SDL_SCANCODE_RETURN:
-						ascii = '\n';
-						skip = false;
-					break;
-					case SDL_SCANCODE_ESCAPE:
-						ascii = 0x1B;
-						skip = false;
-					break;
-					default:{
-						if(keymap.IsPressed(Action::MoveUp, keystate, gamepadstate)){
-							ascii = 3;
-							skip = false;
-						}
-						if(keymap.IsPressed(Action::MoveDown, keystate, gamepadstate)){
-							ascii = 4;
-							skip = false;
-						}
-					}break;
-				}
-				Interface * iface = (Interface *)world.GetObjectFromId(currentinterface);
-				if(iface){
-					iface->lastsym = event.key.scancode;
-					if(!skip){
-						iface->ProcessKeyPress(world, ascii);
-					}
-				}
-			}break;
-			case SDL_EVENT_KEY_UP:{
-				OnScancodeUp(event.key.scancode);
-				keystate[event.key.scancode] = false;
-			}break;
-			case SDL_EVENT_MOUSE_WHEEL:{
-				Interface * iface = (Interface *)world.GetObjectFromId(currentinterface);
-				if(iface){
-					if(event.wheel.y > 0){
-						iface->ProcessMouseWheelUp(world);
-					}else
-					if(event.wheel.y < 0){
-						iface->ProcessMouseWheelDown(world);
-					}
-				}
-			}break;
-			case SDL_EVENT_MOUSE_BUTTON_DOWN:{
-				Interface * iface = (Interface *)world.GetObjectFromId(currentinterface);
-				if(iface){
-					if(event.button.button == SDL_BUTTON_LEFT){
-						int w, h;
-						SDL_GetWindowSize(window, &w, &h);
-						iface->ProcessMousePress(world, true, (float(event.button.x) / w) * 640, (float(event.button.y) / h) * 480);
-					}
-				}
-			}break;
-			case SDL_EVENT_MOUSE_BUTTON_UP:{
-				if(event.button.button == SDL_BUTTON_LEFT){
-					Interface * iface = (Interface *)world.GetObjectFromId(currentinterface);
-					if(iface){
-						int w, h;
-						SDL_GetWindowSize(window, &w, &h);
-						iface->ProcessMousePress(world, false, (float(event.button.x) / w) * 640, (float(event.button.y) / h) * 480);
-					}
-				}
-			}break;
-			case SDL_EVENT_MOUSE_MOTION:{
-				Interface * iface = (Interface *)world.GetObjectFromId(currentinterface);
-				if(iface){
-					int w, h;
-					SDL_GetWindowSize(window, &w, &h);
-					iface->ProcessMouseMove(world, (float(event.button.x) / w) * 640, (float(event.button.y) / h) * 480);
-				}
-			}break;
-			case SDL_EVENT_GAMEPAD_ADDED:{
-				// SDL3 doesn't auto-open gamepads; without this, a pad plugged
-				// in mid-session is only picked up by PollGamepadState's
-				// fallback (which itself stops working if `gamepad` is stale).
-				if(!gamepad) OpenFirstGamepad();
-			}break;
-			case SDL_EVENT_GAMEPAD_REMOVED:{
-				// SDL keeps the SDL_Gamepad* valid until SDL_CloseGamepad, so
-				// we must explicitly close + null on removal — otherwise
-				// PollGamepadState's `if(!gamepad)` reopen guard never fires.
-				if(gamepad && event.gdevice.which == SDL_GetGamepadID(gamepad)){
-					SDL_CloseGamepad(gamepad);
-					gamepad = nullptr;
-					gamepadstate.connected = false;
-					// Restore the pre-gamepad keybind profile if we auto-switched.
-					if(!prevGamepadProfile.empty()){
-						std::strncpy(Config::GetInstance().active_keybind_profile,
-						             prevGamepadProfile.c_str(),
-						             sizeof(Config::GetInstance().active_keybind_profile) - 1);
-						Config::GetInstance().active_keybind_profile[
-							sizeof(Config::GetInstance().active_keybind_profile) - 1] = '\0';
-						LoadActiveKeymap();
-						prevGamepadProfile.clear();
-					}
-				}
-			}break;
-			case SDL_EVENT_QUIT:
-				return false;
-			break;
-		}
-	}
-	return true;
-}
-
-void Game::OnScancodeDown(int sc){
-	if(sc == quitscancode){
-		Player * localplayer = world.GetPeerPlayer(world.localpeerid);
-		if(localplayer && !localplayer->chatinterfaceid && !localplayer->buyinterfaceid){
-			if(world.quitstate == 0){
-				world.quitstate = 1;
-			}else
-			if(world.quitstate == 2){
-				world.quitstate = 3;
-			}
-		}
-	}
-	if(sc == SDL_SCANCODE_F1){
-		world.showplayerlist = true;
-	}
-	if(sc == SDL_SCANCODE_F2){
-		world.showteamcolors = !world.showteamcolors;
-	}
-	if(sc == SDL_SCANCODE_F5){
-		LoadRandomGameMusic();
-		PlayMusic(world.resources.gamemusic);
-	}
-	if(sc == SDL_SCANCODE_F4){
-		if(Config::GetInstance().music){
-			if(Audio::GetInstance().MusicPaused()){
-				Audio::GetInstance().ResumeMusic();
-				world.ShowTopMessage("           MUSIC RESUMED");
-			}else{
-				Audio::GetInstance().PauseMusic();
-				world.ShowTopMessage("          *MUSIC PAUSED*");
-			}
-		}
-	}
-	if(sc == SDL_SCANCODE_F9){
-		world.debugoverlay = !world.debugoverlay;
-		world.ShowTopMessage(world.debugoverlay ? "        DEBUG OVERLAY ON" : "       DEBUG OVERLAY OFF");
-	}
-}
-
-void Game::OnScancodeUp(int sc){
-	if(sc == quitscancode){
-		if(world.quitstate == 1){
-			world.quitstate = 2;
-		}
-		if(world.quitstate == 3){
-			world.quitstate = 0;
-		}
-	}
-	if(sc == SDL_SCANCODE_F1){
-		world.showplayerlist = false;
-	}
-}
-
-void Game::DrainControlQueue(){
-	if(controlPort <= 0) return;
-	auto cmds = controlserver.DrainImmediate();
-	for(auto& c : cmds){
-		if(c.phase == ControlCommand::MULTI_FRAME){
-			ControlDispatch::EnqueueWait(*this, std::move(c));
-		} else {
-			ControlDispatch::HandleImmediate(*this, c);
-		}
-	}
-	// TickWaits intentionally NOT called here — it runs after the sim while-loop
-	// in Loop() so the very first tick after enqueue counts.
-	// Dedicated server has no rendering and never calls PostFrameReplies(), so
-	// any POST_RENDER op (e.g. screenshot) would block its handler thread
-	// forever. Fail them at receive time.
-	if(world.dedicatedserver.active){
-		auto pr = controlserver.DrainPostRender();
-		for(auto& c : pr){
-			if(!c.reply) continue;
-			ControlReply rpl;
-			rpl.id = c.id;
-			rpl.ok = false;
-			rpl.code = "WRONG_STATE";
-			rpl.error = "post-render ops not supported in dedicated server mode";
-			c.reply->set_value(rpl);
-		}
-	}
-}
-
-void Game::PostFrameReplies(){
-	if(controlPort <= 0) return;
-	auto cmds = controlserver.DrainPostRender();
-	for(auto& c : cmds){
-		ControlDispatch::HandlePostRender(*this, c);
-	}
-}
 
 const char* Game::StateName(Uint8 s){
 	switch(s){
@@ -7230,29 +1312,67 @@ const char* Game::StateName(Uint8 s){
 	}
 }
 
-nlohmann::json Game::GetWorldSummary(){
-	nlohmann::json r;
-	r["map"] = world.gameinfo.mapname;
-	r["peers"] = (int)world.peercount;
-	nlohmann::json players = nlohmann::json::array();
-	int objcount = 0;
+Game::WorldSummary Game::GetWorldSummary(){
+	WorldSummary summary;
+	summary.map = world.gameinfo.mapname;
+	summary.peers = static_cast<int>(world.peercount);
+	summary.localPeerId = static_cast<int>(world.localpeerid);
+	summary.viewedPeerId = static_cast<int>(world.viewedpeerid);
+	summary.authorityPeer = static_cast<int>(world.authoritypeer);
+	summary.lobbyAccountId = static_cast<unsigned int>(world.lobby.accountid);
+	summary.isLocalObserver = world.IsLocalObserver();
+	summary.spectatorInitialized = world.spectator.initialized;
+	summary.spectatorFreecam = world.spectator.freecam;
+	summary.messageText = world.GetMessageText();
+	summary.messageProgress = static_cast<int>(world.GetMessageProgress());
+	summary.messageType = static_cast<int>(world.GetMessageType());
+	summary.messageTime = static_cast<int>(world.GetMessageTime());
+	summary.topMessageText = world.GetTopMessageText();
+	summary.topMessageProgress = static_cast<int>(world.GetTopMessageProgress());
+	for(unsigned int i = 0; i < world.maxpeers; i++){
+		Peer * p = world.peerlist[i];
+		if(!p) continue;
+		WorldPeerSummary peer;
+		peer.id = static_cast<int>(i);
+		peer.accountId = static_cast<unsigned int>(p->accountid);
+		peer.observer = p->observer;
+		peer.disconnected = p->disconnected;
+		for(Uint16 cid : p->controlledlist){
+			peer.controlledList.push_back(static_cast<int>(cid));
+		}
+		summary.peerList.push_back(std::move(peer));
+	}
 	for(auto* o : world.objectlist){
-		++objcount;
+		++summary.objectsCount;
 		if(o && o->type == ObjectTypes::PLAYER){
 			Player* p = (Player*)o;
-			nlohmann::json pj;
-			pj["id"] = p->id;
-			pj["hp"] = (int)p->health;
-			pj["x"] = (int)p->x;
-			pj["y"] = (int)p->y;
-			players.push_back(std::move(pj));
+			WorldPlayerSummary player;
+			player.id = static_cast<int>(p->id);
+			player.hp = static_cast<int>(p->health);
+			player.x = static_cast<int>(p->x);
+			player.y = static_cast<int>(p->y);
+			summary.players.push_back(player);
 		}
 	}
-	r["players"] = players;
-	r["objects_count"] = objcount;
-	return r;
+	return summary;
 }
 
 bool Game::IsLiveMultiplayer() const {
 	return (world.peercount > 1) && (world.gameplaystate == World::INGAME);
+}
+
+void Game::PushScreen(std::unique_ptr<Screen> s){
+	clientUi.PushScreen(std::move(s), screenContext);
+}
+
+void Game::PopScreen(){
+	clientUi.PopScreen(screenContext);
+}
+
+void Game::ReplaceScreen(std::unique_ptr<Screen> s){
+	clientUi.ReplaceScreen(std::move(s), screenContext);
+}
+
+Screen * Game::GetTopScreen() const {
+	return clientUi.TopScreen();
 }

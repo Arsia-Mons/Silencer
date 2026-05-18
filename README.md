@@ -51,14 +51,28 @@ Compiling on Windows
 --------------------
 SDL3 and SDL3_mixer development libraries will have to be installed (vcpkg
 manifest mode picks them up automatically when configured with the vcpkg
-toolchain — see `clients/silencer/vcpkg.json`). Configure with:
+toolchain — see `clients/silencer/vcpkg.json`).
+
+The fastest path uses the bundled `clients/silencer/CMakePresets.json`,
+which selects the Ninja generator. On a 24-core box this builds in ~15 s
+clean versus ~150 s with the default Visual Studio generator — Ninja
+saturates all cores; MSBuild leaves most idle.
 
 ```pwsh
-cmake -B build -S clients/silencer -A x64 `
-  -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake" `
-  -DVCPKG_TARGET_TRIPLET=x64-windows
-cmake --build build --config Release
+$env:VCPKG_ROOT = "$env:USERPROFILE\vcpkg"   # one-time, set wherever vcpkg lives
+cd clients\silencer
+cmake --preset win-ninja-unity               # configure (Release + jumbo TUs)
+cmake --build --preset win-ninja-unity       # build silencer target
 ```
+
+Run from a *Developer PowerShell for VS* (or after sourcing `vcvars64.bat`)
+so `cl.exe` and `ninja.exe` are on PATH. Available presets:
+
+| Preset                | Generator | Config  | Unity | When to use                       |
+|-----------------------|-----------|---------|-------|-----------------------------------|
+| `win-ninja`           | Ninja     | Debug   | off   | Iterating on a single .cpp        |
+| `win-ninja-release`   | Ninja     | Release | off   | Optimized build, fast incremental |
+| `win-ninja-unity`     | Ninja     | Release | on    | Fastest clean build               |
 
 Supported platforms
 -------------------

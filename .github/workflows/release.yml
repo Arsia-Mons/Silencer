@@ -13,65 +13,23 @@ jobs:
   build-macos:
     runs-on: macos-latest
     timeout-minutes: 20
+    env:
+      SCCACHE_GHA_ENABLED: "true"
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install deps (Homebrew)
-        # SDL3 and especially SDL3_mixer aren't reliably in homebrew-core
-        # on the macos-latest runner image — install via setup-sdl below
-        # (same approach as deploy.yml's Linux build).
-        run: brew install minizip dylibbundler
+      - name: Compute version from tag
+        run: echo "SILENCER_VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
 
-      - name: Install SDL3 + SDL3_mixer
-        uses: libsdl-org/setup-sdl@main
+      - name: Install create-dmg
+        # Release-only; the shared composite installs minizip + dylibbundler.
+        run: brew install create-dmg
+
+      - name: Build silencer
+        uses: ./.github/actions/build-silencer-macos
         with:
-          version: 3-latest
-          version-sdl-mixer: 3-latest
-
-      - name: Configure
-        env:
-          LOBBY_HOST: ${{ vars.LOBBY_HOST }}
-        run: |
-          lobby="${LOBBY_HOST:-lobby.arsiamons.com}"
-          cmake -B build -S clients/silencer \
-            -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0 \
-            -DSILENCER_UNITY_BUILD=ON \
-            -DSILENCER_LOBBY_HOST="$lobby" \
-            -DSILENCER_MAP_API_URL="https://admin.arsiamons.com" \
-            -DSILENCER_VERSION="${GITHUB_REF_NAME#v}"
-
-      - name: Build
-        run: cmake --build build --config Release -j"$(sysctl -n hw.ncpu)"
-
-      - name: Bundle dylibs
-        working-directory: build
-        run: |
-          mkdir -p Silencer.app/Contents/Frameworks
-          # setup-sdl exports SDL3_ROOT + SDL3_mixer_ROOT env vars pointing
-          # at the per-runner install dirs (/var/folders/.../setupsdl/...).
-          # Pass them to dylibbundler as -s search paths so it can resolve
-          # @rpath/libSDL3*.dylib references in the binary. Without these,
-          # dylibbundler drops into an interactive prompt loop and hangs.
-          echo "--- SDL3 install roots ---"
-          echo "  SDL3_ROOT=$SDL3_ROOT"
-          echo "  SDL3_mixer_ROOT=$SDL3_mixer_ROOT"
-          dylibbundler \
-            -s "$SDL3_ROOT/lib" \
-            -s "$SDL3_mixer_ROOT/lib" \
-            --overwrite-dir \
-            --bundle-deps \
-            --create-dir \
-            --fix-file Silencer.app/Contents/MacOS/Silencer \
-            --dest-dir Silencer.app/Contents/Frameworks/ \
-            --install-path @rpath/ \
-            </dev/null
-          install_name_tool -add_rpath @executable_path/../Frameworks \
-            Silencer.app/Contents/MacOS/Silencer 2>/dev/null || true
-          echo "--- bundled dylibs ---"
-          ls Silencer.app/Contents/Frameworks/
-          echo "--- main binary linkage ---"
-          otool -L Silencer.app/Contents/MacOS/Silencer
+          lobby-host: ${{ vars.LOBBY_HOST || 'lobby.arsiamons.com' }}
+          silencer-version: ${{ env.SILENCER_VERSION }}
 
       - name: Import Developer ID cert
         env:
@@ -129,7 +87,47 @@ jobs:
           xcrun stapler validate Silencer.app
           spctl -a -vv -t execute Silencer.app
 
-      - name: Package .app
+      - name: Build, sign, notarize, staple DMG
+        working-directory: build
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        # The DMG is the user-facing download: Finder presents the
+        # drag-to-/Applications affordance, and an explicit copy to
+        # /Applications avoids App Translocation (which broke our
+        # auto-updater's in-place rename for users running from
+        # ~/Downloads). The Silencer.app inside is already stapled, so
+        # both the DMG itself and its contents are notarized/stapled —
+        # offline launch works either way.
+        run: |
+          create-dmg \
+            --volname "Silencer" \
+            --window-pos 200 120 \
+            --window-size 600 400 \
+            --icon-size 100 \
+            --icon "Silencer.app" 175 200 \
+            --hide-extension "Silencer.app" \
+            --app-drop-link 425 200 \
+            silencer-macos-arm64.dmg \
+            Silencer.app
+          codesign --force --timestamp \
+            --sign "Developer ID Application" \
+            silencer-macos-arm64.dmg
+          xcrun notarytool submit silencer-macos-arm64.dmg \
+            --apple-id "$APPLE_ID" \
+            --password "$APPLE_APP_PASSWORD" \
+            --team-id "$APPLE_TEAM_ID" \
+            --wait
+          xcrun stapler staple silencer-macos-arm64.dmg
+          xcrun stapler validate silencer-macos-arm64.dmg
+          spctl -a -vv -t open --context context:primary-signature \
+            silencer-macos-arm64.dmg
+
+      - name: Package .app for auto-updater
+        # The DMG is the install channel; the in-app updater still
+        # consumes a zip (see clients/silencer/src/updater/updaterstage2.cpp
+        # and services/lobby/update.go's MacOSURL field). Ship both.
         working-directory: build
         run: |
           ditto -ck --sequesterRsrc --keepParent Silencer.app silencer-macos-arm64.zip
@@ -145,70 +143,33 @@ jobs:
           path: build/silencer-macos-arm64.zip
           if-no-files-found: error
 
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos-arm64-dmg
+          path: build/silencer-macos-arm64.dmg
+          if-no-files-found: error
+
   build-windows:
     runs-on: windows-latest
     timeout-minutes: 30
+    env:
+      SCCACHE_GHA_ENABLED: "true"
     steps:
       - uses: actions/checkout@v4
 
-      - name: Cache vcpkg binaries
-        uses: actions/cache@v4
-        with:
-          path: ${{ github.workspace }}/.vcpkg-cache
-          key: vcpkg-${{ runner.os }}-${{ hashFiles('clients/silencer/vcpkg.json') }}
-          restore-keys: |
-            vcpkg-${{ runner.os }}-
+      - name: Compute version from tag
+        shell: bash
+        run: echo "SILENCER_VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
 
-      - name: Cache vcpkg tool downloads
-        uses: actions/cache@v4
+      - name: Build silencer
+        uses: ./.github/actions/build-silencer-windows
         with:
-          path: C:\vcpkg\downloads\tools
-          key: vcpkg-tools-${{ runner.os }}-v1
+          lobby-host: ${{ vars.LOBBY_HOST || 'lobby.arsiamons.com' }}
+          silencer-version: ${{ env.SILENCER_VERSION }}
 
-      - name: Setup MSVC dev environment
-        uses: ilammy/msvc-dev-cmd@v1
-        with:
-          arch: x64
-
-      - name: Configure
+      - name: Zip portable bundle
         shell: pwsh
-        env:
-          LOBBY_HOST: ${{ vars.LOBBY_HOST }}
-          VCPKG_BINARY_SOURCES: "clear;files,${{ github.workspace }}/.vcpkg-cache,readwrite"
-        run: |
-          $lobby = if ($env:LOBBY_HOST) { $env:LOBBY_HOST } else { "lobby.arsiamons.com" }
-          $ver = $env:GITHUB_REF_NAME -replace '^v', ''
-          cmake -B build -S clients/silencer `
-            -G Ninja `
-            -DCMAKE_BUILD_TYPE=Release `
-            -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake" `
-            -DVCPKG_TARGET_TRIPLET=x64-windows `
-            -DSILENCER_UNITY_BUILD=ON `
-            -DSILENCER_LOBBY_HOST="$lobby" `
-            -DSILENCER_MAP_API_URL="https://admin.arsiamons.com" `
-            -DSILENCER_VERSION="$ver"
-
-      - name: Build
-        run: cmake --build build
-
-      - name: Package
-        shell: pwsh
-        run: |
-          $stage = "build/package/silencer"
-          New-Item -ItemType Directory -Force -Path $stage | Out-Null
-          Copy-Item build/Silencer.exe $stage/
-          # SDL3 / SDL3_mixer / zlib + transitive audio codec DLLs live in
-          # the vcpkg manifest-mode install dir. Bulk-copy them so the zip
-          # is self-contained — without these, Silencer.exe fails to start
-          # with a missing SDL3.dll error on machines without vcpkg.
-          $vcpkgBin = "build/vcpkg_installed/x64-windows/bin"
-          Copy-Item "$vcpkgBin/*.dll" $stage/
-          # Ship assets next to the .exe as `assets/` — Windows runtime
-          # (`os.cpp` GetResDir) looks for `<exepath>\assets\`.
-          Copy-Item -Recurse shared/assets $stage/assets
-          Write-Host "--- packaged files ---"
-          Get-ChildItem $stage
-          Compress-Archive -Path "build/package/silencer" -DestinationPath build/silencer-windows-x64.zip -Force
+        run: Compress-Archive -Path "build/package/silencer" -DestinationPath build/silencer-windows-x64.zip -Force
 
       - uses: actions/upload-artifact@v4
         with:
@@ -222,9 +183,8 @@ jobs:
       - name: Build installer
         shell: pwsh
         run: |
-          $ver = $env:GITHUB_REF_NAME -replace '^v', ''
           & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" `
-            "/DMyAppVersion=$ver" `
+            "/DMyAppVersion=$env:SILENCER_VERSION" `
             clients/silencer/installer/silencer.iss
           if ($LASTEXITCODE -ne 0) { throw "ISCC.exe failed" }
           # ISCC writes to <iss-dir>/Output by default. Hoist into build/ so
@@ -240,81 +200,22 @@ jobs:
   build-linux:
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    env:
+      SCCACHE_GHA_ENABLED: "true"
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install build deps
-        # SDL3 itself comes from setup-sdl below (built from source). The list
-        # here is what setup-sdl needs at configure time + minizip + patchelf
-        # (used post-build to point the binary's RUNPATH at $ORIGIN so it
-        # loads the bundled SDL3 from the same dir as the executable).
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends \
-            build-essential cmake ninja-build patchelf pkg-config \
-            libminizip-dev libcurl4-openssl-dev \
-            libasound2-dev libpulse-dev libudev-dev libxext-dev \
-            libxinerama-dev libxcursor-dev libxrandr-dev libxss-dev \
-            libwayland-dev libxkbcommon-dev libdbus-1-dev libibus-1.0-dev
+      - name: Compute version from tag
+        run: echo "SILENCER_VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
 
-      - name: Install SDL3 + SDL3_mixer
-        uses: libsdl-org/setup-sdl@main
+      - name: Build silencer
+        uses: ./.github/actions/build-silencer-linux
         with:
-          version: 3-latest
-          version-sdl-mixer: 3-latest
-
-      - name: Configure
-        env:
-          LOBBY_HOST: ${{ vars.LOBBY_HOST }}
-        run: |
-          lobby="${LOBBY_HOST:-lobby.arsiamons.com}"
-          cmake -B build -S clients/silencer \
-            -G Ninja \
-            -DCMAKE_BUILD_TYPE=Release \
-            -DSILENCER_UNITY_BUILD=ON \
-            -DSILENCER_LOBBY_HOST="$lobby" \
-            -DSILENCER_MAP_API_URL="https://admin.arsiamons.com" \
-            -DSILENCER_VERSION="${GITHUB_REF_NAME#v}"
-
-      - name: Build
-        run: cmake --build build -j"$(nproc)"
-
-      - name: Bundle SDL3 + assets
-        run: |
-          stage="build/package/silencer"
-          mkdir -p "$stage"
-          cp build/silencer "$stage/"
-          # setup-sdl exposes per-runner install roots via SDL3_ROOT /
-          # SDL3_mixer_ROOT (same env as the macOS job uses for dylibbundler).
-          # Copy each .so dereferenced — the binary's NEEDED entry is the
-          # soname (libSDL3.so.0), so a single regular file at that path is
-          # what dlopen wants.
-          echo "--- SDL3 install roots ---"
-          echo "  SDL3_ROOT=$SDL3_ROOT"
-          echo "  SDL3_mixer_ROOT=$SDL3_mixer_ROOT"
-          cp -L "$SDL3_ROOT/lib/libSDL3.so.0" "$stage/"
-          cp -L "$SDL3_mixer_ROOT/lib/libSDL3_mixer.so.0" "$stage/"
-          # Point the binary at $ORIGIN so the bundled SDL3 loads from the
-          # same directory as the executable instead of the build-time
-          # install paths (which don't exist on users' machines).
-          patchelf --set-rpath '$ORIGIN' "$stage/silencer"
-          # Assets next to the binary — `os.cpp` CDResDir's Linux fallback
-          # is `<exe>/assets/`.
-          cp -r shared/assets "$stage/assets"
-          echo "--- bundled files ---"
-          ls -la "$stage"
-          echo "--- ldd output ---"
-          ldd "$stage/silencer"
-          # Fail loudly if the dynamic loader can't resolve everything from
-          # the bundle + base system.
-          if ldd "$stage/silencer" | grep -F "not found"; then
-            echo "ERROR: missing dynamic library dependencies"
-            exit 1
-          fi
+          lobby-host: ${{ vars.LOBBY_HOST || 'lobby.arsiamons.com' }}
+          silencer-version: ${{ env.SILENCER_VERSION }}
 
       - name: Package
-        run: |
-          tar czf build/silencer-linux-x64.tar.gz -C build/package silencer
+        run: tar czf build/silencer-linux-x64.tar.gz -C build/package silencer
 
       - uses: actions/upload-artifact@v4
         with:
@@ -354,13 +255,15 @@ jobs:
           generate_release_notes: true
           files: |
             artifacts/macos-arm64/*
+            artifacts/macos-arm64-dmg/*
             artifacts/windows-x64/*
             artifacts/windows-x64-setup/*
             artifacts/linux-x64/*
           body: |
             ## Downloads
 
-            - **macOS (Apple Silicon):** `silencer-macos-arm64.zip`
+            - **macOS (Apple Silicon) — DMG (recommended):** `silencer-macos-arm64.dmg` (drag to Applications)
+            - **macOS (Apple Silicon) — portable zip:** `silencer-macos-arm64.zip`
             - **Windows (x64) — installer (recommended):** `silencer-windows-x64-setup-*.exe`
             - **Windows (x64) — portable zip:** `silencer-windows-x64.zip`
             - **Linux (x64):** `silencer-linux-x64.tar.gz`

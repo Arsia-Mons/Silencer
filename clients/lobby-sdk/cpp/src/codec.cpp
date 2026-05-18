@@ -1,6 +1,7 @@
 #include "silencer/lobby/codec.h"
 
 #include <cstring>
+#include <utility>
 
 namespace silencer {
 namespace lobby {
@@ -124,6 +125,7 @@ void encode_lobby_game(Writer& w, const LobbyGame& g) {
     w.u8(g.max_players);
     w.u8(g.max_teams);
     w.u8(g.extra);
+    w.u8(g.spectatable);
     w.u16_le(g.port);
 }
 
@@ -143,6 +145,7 @@ void decode_lobby_game(Reader& r, LobbyGame& g) {
     g.max_players    = r.u8();
     g.max_teams      = r.u8();
     g.extra          = r.u8();
+    g.spectatable    = r.u8();
     g.port           = r.u16_le();
 }
 
@@ -212,6 +215,21 @@ std::vector<uint8_t> encode_set_game(uint32_t game_id, GameStatus status) {
     w.u8(OpSetGame);
     w.u32_le(game_id);
     w.u8(static_cast<uint8_t>(status));
+    return std::move(w).take();
+}
+
+std::vector<uint8_t> encode_create_character(const std::string& name, uint8_t agency_idx) {
+    Writer w;
+    w.u8(OpCreateCharacter);
+    w.lenstr(name.size() > 16 ? name.substr(0, 16) : name);
+    w.u8(agency_idx);
+    return std::move(w).take();
+}
+
+std::vector<uint8_t> encode_select_character(uint32_t character_id) {
+    Writer w;
+    w.u8(OpSelectCharacter);
+    w.u32_le(character_id);
     return std::move(w).take();
 }
 
@@ -308,6 +326,10 @@ NewGameEvent decode_new_game(Reader& r) {
     NewGameEvent ev;
     ev.status = r.u8();
     decode_lobby_game(r, ev.game);
+    // Per-recipient can-rejoin bit. Older servers omit it; treat absent as 0.
+    if (r.remaining() >= 1) {
+        ev.can_rejoin = r.u8();
+    }
     return ev;
 }
 
@@ -315,24 +337,59 @@ uint32_t decode_del_game(Reader& r) { return r.u32_le(); }
 
 std::string decode_channel(Reader& r) { return r.cstr(64); }
 
+static AgencyStats decode_agency_stats(Reader& r) {
+    AgencyStats a;
+    a.wins             = r.u16_le();
+    a.losses           = r.u16_le();
+    a.xp_to_next_level = r.u16_le();
+    a.level            = r.u8();
+    a.endurance        = r.u8();
+    a.shield           = r.u8();
+    a.jetpack          = r.u8();
+    a.tech_slots       = r.u8();
+    a.hacking          = r.u8();
+    a.contacts         = r.u8();
+    return a;
+}
+
+static void encode_agency_stats(Writer& w, const AgencyStats& a) {
+    w.u16_le(a.wins);
+    w.u16_le(a.losses);
+    w.u16_le(a.xp_to_next_level);
+    w.u8(a.level);
+    w.u8(a.endurance);
+    w.u8(a.shield);
+    w.u8(a.jetpack);
+    w.u8(a.tech_slots);
+    w.u8(a.hacking);
+    w.u8(a.contacts);
+}
+
 UserInfo decode_user_info(Reader& r) {
     UserInfo u;
     u.account_id = r.u32_le();
-    for (int i = 0; i < 5; ++i) {
-        AgencyStats& a = u.agencies[i];
-        a.wins             = r.u16_le();
-        a.losses           = r.u16_le();
-        a.xp_to_next_level = r.u16_le();
-        a.level            = r.u8();
-        a.endurance        = r.u8();
-        a.shield           = r.u8();
-        a.jetpack          = r.u8();
-        a.tech_slots       = r.u8();
-        a.hacking          = r.u8();
-        a.contacts         = r.u8();
-    }
+    u.selected_char_id = r.u32_le();
+    u.agency_idx = r.u8();
+    u.stats = decode_agency_stats(r);
     u.name = r.lenstr();
+    u.character_name = r.lenstr();
     return u;
+}
+
+CharactersPayload decode_characters(Reader& r) {
+    CharactersPayload payload;
+    uint8_t count = r.u8();
+    payload.selected_char_id = r.u32_le();
+    payload.characters.reserve(count);
+    for(uint8_t i = 0; i < count; ++i){
+        CharacterInfo ch;
+        ch.id = r.u32_le();
+        ch.agency_idx = r.u8();
+        ch.stats = decode_agency_stats(r);
+        ch.name = r.lenstr();
+        payload.characters.push_back(std::move(ch));
+    }
+    return payload;
 }
 
 PresenceUpdate decode_presence(Reader& r) {
@@ -365,20 +422,22 @@ MotdChunk decode_motd(Reader& r, size_t payload_size) {
 
 void encode_user_info_body(Writer& w, const UserInfo& u) {
     w.u32_le(u.account_id);
-    for (int i = 0; i < 5; ++i) {
-        const AgencyStats& a = u.agencies[i];
-        w.u16_le(a.wins);
-        w.u16_le(a.losses);
-        w.u16_le(a.xp_to_next_level);
-        w.u8(a.level);
-        w.u8(a.endurance);
-        w.u8(a.shield);
-        w.u8(a.jetpack);
-        w.u8(a.tech_slots);
-        w.u8(a.hacking);
-        w.u8(a.contacts);
-    }
+    w.u32_le(u.selected_char_id);
+    w.u8(u.agency_idx);
+    encode_agency_stats(w, u.stats);
     w.lenstr(u.name);
+    w.lenstr(u.character_name);
+}
+
+void encode_characters_body(Writer& w, const CharactersPayload& payload) {
+    w.u8(static_cast<uint8_t>(payload.characters.size()));
+    w.u32_le(payload.selected_char_id);
+    for(const CharacterInfo& ch : payload.characters){
+        w.u32_le(ch.id);
+        w.u8(ch.agency_idx);
+        encode_agency_stats(w, ch.stats);
+        w.lenstr(ch.name);
+    }
 }
 
 void encode_auth_reply(Writer& w, const AuthResult& a) {

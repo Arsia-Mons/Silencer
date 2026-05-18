@@ -18,6 +18,8 @@
 #include "overlay.h"
 #include "team.h"
 #include "warper.h"
+#include "magistrate.h"
+#include "vanta.h"
 #include "gasloader.h"
 #include "walldefense.h"
 #include "pickup.h"
@@ -28,6 +30,7 @@ Map::Map(){
 	width = 0;
 	height = 0;
 	ambience = 0;
+	supportedModes = 0;
 	memset(description, 0, sizeof(description));
 	loaded = false;
 }
@@ -170,6 +173,7 @@ bool Map::LoadFile(const char * filename, World & world, Team * team){
 		}*/
 		Map::parallax = header.parallax;
 		Map::ambience = header.ambience;
+		Map::supportedModes = header.flags & 0x3FF; // bits 0–9 = game mode bitmask
 		/*if(uncompress(minimap.pixels, &minimapsizeuncompressed, header.minimapcompressed, header.minimapcompressedsize) != Z_OK){
 			return false;
 		}*/
@@ -700,6 +704,50 @@ bool Map::LoadFile(const char * filename, World & world, Team * team){
 					overlay->y = actory;
 				}
 			}break;
+				case 72:{
+						// magistrate boss NPC
+						if(world.SecurityIDCanSpawn(actorsecurityid)){
+							Magistrate * magistrate = (Magistrate *)world.CreateObject(ObjectTypes::MAGISTRATE);
+							if(magistrate){
+								magistrate->x = actorx;
+								magistrate->y = actory;
+								magistrate->mirrored = actordirection ? true : false;
+								magistrate->originalx = magistrate->x;
+								magistrate->originaly = magistrate->y;
+								magistrate->originalmirrored = magistrate->mirrored;
+								// actor.type bits 0-7 = radius; bits 8-23 = activationTicks (0=GAS default); bits 24-31 = secretTriggerN
+									Uint8  radius         = (Uint8)(actortype & 0xFF);
+									Uint16 activationTicks = (Uint16)((actortype >> 8) & 0xFFFF);
+									Uint8  secretTriggerN  = (Uint8)((actortype >> 24) & 0xFF);
+									magistrate->deathSpawnRadius  = radius ? radius : 64;
+									magistrate->deathSpawnEntries = actormatchid ? actormatchid : 0x03;
+									if(activationTicks) magistrate->activationTicks = activationTicks;
+									magistrate->secretTriggerN = secretTriggerN;
+							}
+						}
+					}break;
+				case 73:{
+						// vanta boss NPC
+						if(world.SecurityIDCanSpawn(actorsecurityid)){
+							Vanta * vanta = (Vanta *)world.CreateObject(ObjectTypes::VANTA);
+							if(vanta){
+								vanta->x = actorx;
+								vanta->y = actory;
+								vanta->mirrored = actordirection ? true : false;
+								vanta->originalx = vanta->x;
+								vanta->originaly = vanta->y;
+								vanta->originalmirrored = vanta->mirrored;
+								// actor.type bits 0-7 = radius; bits 8-23 = activationTicks (0=GAS default); bits 24-31 = secretTriggerN
+								Uint8  radius          = (Uint8)(actortype & 0xFF);
+								Uint16 activationTicks = (Uint16)((actortype >> 8) & 0xFFFF);
+								Uint8  secretTriggerN  = (Uint8)((actortype >> 24) & 0xFF);
+								vanta->deathSpawnRadius  = radius ? radius : 64;
+								vanta->deathSpawnEntries = actormatchid ? actormatchid : 0x03;
+								if(activationTicks) vanta->activationTicks = activationTicks;
+								vanta->secretTriggerN = secretTriggerN;
+							}
+						}
+					}break;
 		}
 		// Apply destructible / collectible flags packed into actorunknown
 		// bit 0: destructible, bit 1: collectible, bits 8-15: max health (0 = default 100)

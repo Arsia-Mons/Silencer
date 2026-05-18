@@ -1,0 +1,85 @@
+name: Build Silencer (macOS)
+description: Configure + build + bundle dylibs for the silencer client on macOS arm64. Used by CI and release. Caller must have run actions/checkout first; codesign / notarize / DMG live in the caller (release-only).
+
+inputs:
+  lobby-host:
+    default: lobby.arsiamons.com
+  silencer-version:
+    default: "00000"
+  map-api-url:
+    default: https://admin.arsiamons.com
+  admin-api-url:
+    default: https://admin.arsiamons.com
+
+runs:
+  using: composite
+  steps:
+    - name: Install Homebrew deps
+      shell: bash
+      run: brew install minizip dylibbundler
+
+    - name: Install SDL3 + SDL3_mixer
+      uses: libsdl-org/setup-sdl@main
+      with:
+        version: 3-latest
+        version-sdl-mixer: 3-latest
+
+    - name: Setup sccache
+      uses: mozilla-actions/sccache-action@v0.0.10
+
+    - name: Configure
+      shell: bash
+      env:
+        LOBBY_HOST: ${{ inputs.lobby-host }}
+        SILENCER_VERSION_INPUT: ${{ inputs.silencer-version }}
+        MAP_API_URL: ${{ inputs.map-api-url }}
+        ADMIN_API_URL: ${{ inputs.admin-api-url }}
+      run: |
+        cmake -B build -S clients/silencer \
+          -DCMAKE_BUILD_TYPE=Release \
+          -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0 \
+          -DCMAKE_C_COMPILER_LAUNCHER=sccache \
+          -DCMAKE_CXX_COMPILER_LAUNCHER=sccache \
+          -DSILENCER_UNITY_BUILD=ON \
+          -DSILENCER_LOBBY_HOST="$LOBBY_HOST" \
+          -DSILENCER_MAP_API_URL="$MAP_API_URL" \
+          -DSILENCER_ADMIN_API_URL="$ADMIN_API_URL" \
+          -DSILENCER_VERSION="$SILENCER_VERSION_INPUT"
+
+    - name: Build
+      shell: bash
+      run: cmake --build build --config Release -j"$(sysctl -n hw.ncpu)"
+
+    - name: sccache stats
+      if: always()
+      shell: bash
+      run: sccache --show-stats
+
+    - name: Bundle dylibs
+      shell: bash
+      working-directory: build
+      # setup-sdl exports SDL3_ROOT + SDL3_mixer_ROOT pointing at the
+      # per-runner install dirs. dylibbundler needs them as -s search
+      # paths to resolve @rpath/libSDL3*.dylib references; without
+      # them it drops into an interactive prompt loop and hangs.
+      run: |
+        echo "--- SDL3 install roots ---"
+        echo "  SDL3_ROOT=$SDL3_ROOT"
+        echo "  SDL3_mixer_ROOT=$SDL3_mixer_ROOT"
+        mkdir -p Silencer.app/Contents/Frameworks
+        dylibbundler \
+          -s "$SDL3_ROOT/lib" \
+          -s "$SDL3_mixer_ROOT/lib" \
+          --overwrite-dir \
+          --bundle-deps \
+          --create-dir \
+          --fix-file Silencer.app/Contents/MacOS/Silencer \
+          --dest-dir Silencer.app/Contents/Frameworks/ \
+          --install-path @rpath/ \
+          </dev/null
+        install_name_tool -add_rpath @executable_path/../Frameworks \
+          Silencer.app/Contents/MacOS/Silencer 2>/dev/null || true
+        echo "--- bundled dylibs ---"
+        ls Silencer.app/Contents/Frameworks/
+        echo "--- main binary linkage ---"
+        otool -L Silencer.app/Contents/MacOS/Silencer

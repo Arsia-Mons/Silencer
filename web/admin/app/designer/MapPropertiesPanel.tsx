@@ -2,6 +2,19 @@
 import { useState, useEffect, useRef } from 'react';
 import type { MapHeader, SpriteEntry } from '../../lib/types';
 
+const GAME_MODES = [
+  'Data Retrieval',
+  'Deathmatch',
+  'Team Deathmatch',
+  'Survival',
+  'Extraction',
+  'Assassination',
+  'Sabotage',
+  'Manhunt',
+  'Control Points',
+  'Escort',
+] as const;
+
 function BgThumb({ idx, spriteImages, selected, onSelect }: {
   idx: number;
   spriteImages: Map<number, (SpriteEntry | null)[]> | null | undefined;
@@ -65,6 +78,8 @@ export default function MapPropertiesPanel({ header, onUpdate, onClose, spriteIm
     maxplayers:  String(header?.maxplayers ?? 8),
     maxteams:    String(header?.maxteams   ?? 2),
   });
+  // 0 = all modes (backwards compat), otherwise bitmask
+  const [supportedModes, setSupportedModes] = useState(header?.supportedModes ?? 0);
 
   useEffect(() => {
     setFields({
@@ -73,7 +88,24 @@ export default function MapPropertiesPanel({ header, onUpdate, onClose, spriteIm
       maxplayers:  String(header?.maxplayers ?? 8),
       maxteams:    String(header?.maxteams   ?? 2),
     });
+    setSupportedModes(header?.supportedModes ?? 0);
   }, [header]);
+
+  const allModesSelected = supportedModes === 0;
+
+  const toggleAllModes = () => {
+    setSupportedModes(allModesSelected ? 0x3FF : 0);
+  };
+
+  const toggleMode = (bit: number) => {
+    // If currently "all modes" (0), switching to explicit: start with all 10 bits set, then toggle
+    const base = allModesSelected ? 0x3FF : supportedModes;
+    const next = base ^ (1 << bit);
+    // If all 10 bits are set, normalize back to 0 (all modes)
+    setSupportedModes(next === 0x3FF ? 0 : next);
+  };
+
+  const isModeOn = (bit: number) => allModesSelected || Boolean(supportedModes & (1 << bit));
 
   const apply = () => {
     onUpdate({
@@ -81,6 +113,7 @@ export default function MapPropertiesPanel({ header, onUpdate, onClose, spriteIm
       ambience:    Math.max(-128, Math.min(127, parseInt(fields.ambience,   10) || 0)),
       maxplayers:  Math.max(1,    Math.min(8,   parseInt(fields.maxplayers, 10) || 8)),
       maxteams:    Math.max(1,    Math.min(4,   parseInt(fields.maxteams,   10) || 2)),
+      supportedModes,
     });
   };
 
@@ -159,6 +192,45 @@ export default function MapPropertiesPanel({ header, onUpdate, onClose, spriteIm
           </button>
         </div>
       </div>
+
+      {/* Supported Game Modes */}
+      <div>
+        <div className={`${lbl} mb-1`}>Supported Game Modes</div>
+        <div className="flex flex-wrap gap-2">
+          <label className="flex items-center gap-1.5 cursor-pointer select-none group">
+            <input
+              type="checkbox"
+              checked={allModesSelected}
+              onChange={toggleAllModes}
+              className="accent-game-primary"
+            />
+            <span className="text-[11px] font-mono text-game-textDim group-hover:text-game-text transition-colors">
+              All Modes
+            </span>
+          </label>
+          {GAME_MODES.map((name, bit) => (
+            <label key={bit} className="flex items-center gap-1.5 cursor-pointer select-none group">
+              <input
+                type="checkbox"
+                checked={isModeOn(bit)}
+                onChange={() => toggleMode(bit)}
+                className="accent-game-primary"
+              />
+              <span className={`text-[11px] font-mono transition-colors ${
+                isModeOn(bit) ? 'text-game-text' : 'text-game-textDim'
+              } group-hover:text-game-text`}>
+                {name}
+              </span>
+            </label>
+          ))}
+        </div>
+        <div className="text-[10px] font-mono text-game-textDim mt-1">
+          {allModesSelected
+            ? 'All modes supported (default)'
+            : `${GAME_MODES.filter((_, i) => supportedModes & (1 << i)).length} of ${GAME_MODES.length} modes enabled`}
+        </div>
+      </div>
     </div>
   );
 }
+

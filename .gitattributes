@@ -1,0 +1,25 @@
+# Repo-level line-ending policy.
+#
+# Normalize all text to LF in the repository and let Git pick the
+# working-tree ending per platform, except where a tool requires a
+# specific ending regardless of platform.
+* text=auto
+
+# Shell / Bash scripts must be LF everywhere. CRLF breaks them on
+# every platform (bad interpreter, `\r` in arguments), including
+# Windows checkouts with core.autocrlf=true.
+*.sh   text eol=lf
+*.bash text eol=lf
+
+# Windows command scripts must stay CRLF.
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# Binary assets — never run EOL conversion or diff as text.
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.gif  binary
+*.ico  binary
+*.wav  binary
+*.mp3  binary

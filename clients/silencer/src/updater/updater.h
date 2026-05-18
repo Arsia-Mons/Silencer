@@ -49,6 +49,13 @@ public:
     int  GetRetryCount();             // starts at 0, bumped on Retry()
     std::string GetDownloadURL();     // for the "open download page" escape hatch
 
+    // Set by UpdateScreen after a successful UpdaterStage2::Launch. Game::Loop
+    // reads this and returns false so main() unwinds and ~Game tears down
+    // SDL/audio cleanly before the new client process opens the device —
+    // skipping that teardown produces an audible pop on the restarted client.
+    void MarkStage2Spawned();
+    bool IsStage2Spawned() const;
+
     // Trampolines into the private atomic state from the progress callback.
     friend void UpdaterSetProgress(Updater &u, uint64_t got, uint64_t total);
     friend void UpdaterCheckCancel(Updater &u, bool *out);
@@ -66,6 +73,7 @@ private:
     std::atomic<bool> cancel_flag;
     std::thread worker;
     int retries;
+    bool stage2spawned = false;
 };
 
 void UpdaterSetProgress(Updater &u, uint64_t got, uint64_t total);

@@ -3,10 +3,12 @@
 #include "walldefense.h"
 #include "player.h"
 #include "robot.h"
+#include "magistrate.h"
 #include "fixedcannon.h"
 #include "flamerprojectile.h"
 #include "flareprojectile.h"
 #include "../gas/gasloader.h"
+#include "../game/gamemode.h"
 
 Projectile::Projectile(){
 	shielddamage = 0;
@@ -57,6 +59,7 @@ bool Projectile::TestCollision(Object & object, World & world, Platform ** colli
 		types.push_back(ObjectTypes::CIVILIAN);
 		types.push_back(ObjectTypes::GUARD);
 		types.push_back(ObjectTypes::ROBOT);
+		types.push_back(ObjectTypes::MAGISTRATE);
 		types.push_back(ObjectTypes::FIXEDCANNON);
 		types.push_back(ObjectTypes::TECHSTATION);
 		if(object.type != ObjectTypes::WALLPROJECTILE){
@@ -96,6 +99,8 @@ bool Projectile::TestCollision(Object & object, World & world, Platform ** colli
 	if(object.type == ObjectTypes::PLASMAPROJECTILE || object.type == ObjectTypes::FLAREPROJECTILE){
 		skipobject = 0;
 		teamid = 0;
+	} else if(teamid && world.gameMode && world.gameMode->AllowFriendlyFire(world)){
+		teamid = 0; // friendly fire on — don't exclude teammates from collision
 	}
 	Object * thecollidedobject = world.TestIncr(object.x - radius, object.y - radius, object.x + radius, object.y + radius, &xe, &ye, types, skipobject, teamid);
 	bool collided = false;

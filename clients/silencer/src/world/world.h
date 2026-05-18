@@ -21,6 +21,13 @@
 #include "buyableitem.h"
 #include "replay.h"
 #include "TriggerGraph.h"
+#include "gamemode.h"
+
+class Renderer;
+class Surface;
+class World;
+class Player;
+class Team;
 
 class World
 {
@@ -33,6 +40,17 @@ public:
 	Uint32 pancamerareturncount; // ticks remaining in return pan; releases input at 0
 	Sint16 pancamerax;
 	Sint16 pancameray;
+	// Camera/HUD focus peer. Equals localpeerid for normal players; overridden
+	// each tick by the spectator-controls block when the local peer is an
+	// observer. Purely client-local; never serialized.
+	Uint8 viewedpeerid;
+	struct SpectatorView {
+		bool freecam;
+		int camx, camy;
+		int camvx, camvy;
+		bool holdshowallnames;
+		bool initialized; // becomes true once default-mode follow has picked a peer
+	} spectator;
 	class Object * CreateObject(Uint8 type, Uint16 id = 0);
 	Object * GetObjectFromId(Uint16 id);
 	void MarkDestroyObject(Uint16 id);
@@ -43,17 +61,50 @@ public:
 	void Tick(void);
 	void TickObjects(void);
 	void SetVersion(const char * version);
+	const char * GetVersion() const { return version; }
 	bool Listen(unsigned short port = 0);
 	unsigned short Bind(unsigned short port = 0);
-	void Connect(Uint8 agency, Uint32 accountid, const char * password = 0);
+	void Connect(Uint8 agency, Uint32 accountid, const char * password = 0, bool observer = false);
 	void Disconnect(void);
 	Peer * GetAuthorityPeer(void);
+	Peer * GetPeer(Uint8 peerid);
+	Uint8 GetLocalPeerId() const { return localpeerid; }
 	class Player * GetPeerPlayer(Uint8 peerid);
 	Team * GetPeerTeam(Uint8 peerid);
+
+	// In-game UI session flags. Paired with the public mutable showchat_i.
+	bool IsShowingPlayerList() const { return showplayerlist; }
+	void SetShowingPlayerList(bool show) { showplayerlist = show; }
+	bool IsShowingTeamColors() const { return showteamcolors; }
+	void SetShowingTeamColors(bool show) { showteamcolors = show; }
+
+	// Decorative HUD highlights (set by gameplay; read by HUD).
+	bool ShouldHighlightSecrets() const { return highlightsecrets; }
+	bool ShouldHighlightMinimap() const { return highlightminimap; }
+
+	// In-game messages (timed overlays).
+	const char * GetMessageText() const { return message; }
+	Uint8 GetMessageProgress() const { return message_i; }
+	Uint8 GetMessageType() const { return messagetype; }
+	Uint8 GetMessageTime() const { return messagetime; }
+	const char * GetTopMessageText() const { return topmessage; }
+	Uint8 GetTopMessageProgress() const { return topmessage_i; }
+
+	// System-camera insets (two slots).
+	bool IsSystemCameraActive(int slot) const { return systemcameraactive[slot]; }
+	Uint16 GetSystemCameraFollowId(int slot) const { return systemcamerafollow[slot]; }
+	Sint16 GetSystemCameraX(int slot) const { return systemcamerax[slot]; }
+	Sint16 GetSystemCameraY(int slot) const { return systemcameray[slot]; }
+
+	const std::vector<Uint16> & GetObjectsByType(Uint8 type) const { return objectsbytype[type]; }
 	bool FindTeamForPeer(Peer & peer, Uint8 agency, int start = 0);
 	void SendInput(void);
 	void SwitchToLocalAuthorityMode(void);
 	bool IsAuthority(void);
+	bool IsConnected() const;
+	bool IsIdle() const;
+	bool IsLocalObserver(void);
+	Uint16 GetWinningTeamId() const { return winningteamid; }
 	void Illuminate(void);
 	void ShowMessage(const char * message, Uint8 time = 255, Uint8 type = 0, bool networked = false, Peer * peer = 0);
 	void ShowStatus(const char * status, Uint8 color = 0, bool networked = false, Peer * peer = 0);
@@ -116,9 +167,14 @@ public:
 	TriggerGraph triggerGraph;
 	bool input_locked = false; // set by LOCK_INPUT action, cleared by UNLOCK_INPUT
 	bool player_spawn_emitted = false;
-	
+	int secretsBeamed = 0;  // total secrets successfully delivered to base (authority-side counter)
+	GameMode* gameMode = nullptr;  // authority-only; owns current match mode logic
+	bool matchEndCalled = false;  // ensures OnMatchEnd fires exactly once per match
+
 	friend class Renderer;
 	friend class Game;
+	friend class MapDownloader;
+	friend class AmbienceMixer;
 	friend class Team;
 	friend class Lobby;
 	friend class Player;
@@ -126,6 +182,10 @@ public:
 	friend class RocketProjectile;
 	friend class DedicatedServer;
 	friend class SurveillanceMonitor;
+	friend class Magistrate;
+	friend class Vanta;
+	friend class GameStateObject;
+	friend class DataRetrievalMode;
 	friend class Warper;
 	friend class Grenade;
 	friend class BaseDoor;
@@ -134,13 +194,20 @@ public:
 	friend class Replay;
 	friend class Audio;
 	friend class TriggerGraph;
-	
+	// LobbyScreen reads/writes World state across the entire lobby
+	// surface: seeds gameinfo from the lobby record after a successful
+	// host-side CreateGame, reads localpeer state to refresh the Ready
+	// button label, calls RequestPeerList/SetTech on the tech-choice
+	// surface, etc. Routes panels' world access through thin pass-through
+	// helpers on the screen rather than friending each panel.
+	friend class LobbyScreen;
+
 protected:
 	std::list<class Object *> objectlist;
 	std::list<class Object *> tobjectlist;
 	void SaveSnapshot(Serializer & data, Uint8 peerid);
 	void LoadSnapshot(Serializer & data, bool create = true, Serializer * delta = 0, Uint16 objectid = 0);
-	Peer * AddPeer(char * address, unsigned short port, Uint8 agency, Uint32 accountid);
+	Peer * AddPeer(char * address, unsigned short port, Uint8 agency, Uint32 accountid, bool observer = false);
 	Peer * AddBot(Uint8 agency);
 	LagSimulator lagsimulator;
 	char mapname[256];
@@ -174,7 +241,7 @@ private:
 	void SendPacket(Peer * peer, char * data, unsigned int size);
 	void SwitchToMode(bool newmode);
 	void DeleteOldSnapshots(Uint8 peerid);
-	void HandleDisconnect(Uint8 peerid);
+	void HandleDisconnect(Uint8 peerid, bool permanent = false);
 	bool RelevantToPlayer(class Player * player, Object * object);
 	bool BelongsToTeam(Object & object, Uint16 teamid);
 	void ActivateTerminals(void);

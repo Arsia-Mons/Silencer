@@ -25,6 +25,9 @@ enum Op : uint8_t {
     OpRegisterStats = 11,
     OpPresence      = 12,
     OpSetGame       = 13,
+    OpCharacters    = 14,
+    OpCreateCharacter = 15,
+    OpSelectCharacter = 16,
 };
 
 enum class Platform : uint8_t {
@@ -61,9 +64,24 @@ struct AgencyStats {
 };
 
 struct UserInfo {
-    uint32_t                       account_id = 0;
-    std::array<AgencyStats, 5>     agencies   = {};
-    std::string                    name;
+    uint32_t    account_id       = 0;
+    uint32_t    selected_char_id = 0;
+    uint8_t     agency_idx       = 0;
+    AgencyStats stats            = {};
+    std::string name;
+    std::string character_name;
+};
+
+struct CharacterInfo {
+    uint32_t    id         = 0;
+    uint8_t     agency_idx = 0;
+    AgencyStats stats      = {};
+    std::string name;
+};
+
+struct CharactersPayload {
+    uint32_t selected_char_id = 0;
+    std::vector<CharacterInfo> characters;
 };
 
 struct LobbyGame {
@@ -82,6 +100,7 @@ struct LobbyGame {
     uint8_t                   max_players     = 24;
     uint8_t                   max_teams       = 6;
     uint8_t                   extra           = 0;
+    uint8_t                   spectatable     = 0;
     uint16_t                  port            = 0;
 };
 
@@ -159,8 +178,12 @@ struct PresenceUpdate {
 };
 
 struct NewGameEvent {
-    uint8_t   status = 0; // 1 = success/advertise, 2 = create failed
+    uint8_t   status     = 0; // 1 = success/advertise, 2 = create failed
     LobbyGame game;
+    // Per-recipient bit derived by the lobby: 1 = this client has a parked
+    // peer slot on the game's dedicated server and can rejoin via the
+    // existing MSG_CONNECT rejoin path; 0 = no rejoin available.
+    uint8_t   can_rejoin = 0;
 };
 
 } // namespace lobby

@@ -4,6 +4,88 @@ All notable changes to Silencer are documented here.
 
 ## [Unreleased]
 
+## [v00052] — 2026-05-17
+
+### Game client
+
+#### Magistrate boss NPC (#164)
+
+- **New NPC — Magistrate** — fully BT-driven boss enemy. Patrols on a platform using the Civilian wall-turn pattern (immediate `mirrored` flip at edge, always returns Running — no pause or stuck frames). Activates after a configurable delay, broadcasts a spawn sound on appearance, and broadcasts a death sound + spawns death guards when killed.
+- **Spawn / death sounds — all clients** — spawn sound plays on every client via draw-transition detection in `Tick()` (NEW state lasts 1 tick, too brief for snapshot delivery). Death sound plays via health-drop detection (`health > 0 → 0`). Both bypass distance attenuation with `EmitGlobalSound`.
+- **DeathFade duration** — extended from 10 → 120 ticks so the DYING state is reliably snapshotted by clients before the Magistrate is removed.
+- **Death guard spawning** — `SpawnDeathGuards` BT leaf is idempotent; safe to run multiple times during the extended DYING window.
+- **Sound keys fixed** — BT JSON `sound` props now use `.wav` extension (`mgbegin.wav`, `mgend.wav`) matching the soundbank key format.
+
+#### Behavior tree — Phase 2 & 3 (#164)
+
+- **`EmitSound` leaf — global broadcast** — new `global` prop; when true, sound plays at full volume on every client regardless of distance.
+- **`Walk` BT leaf** — Magistrate Walk leaf checks `DistanceToEnd` and flips `mirrored` inline each tick (Civilian pattern), always returning Running.
+
+### Admin web
+
+#### BT editor
+
+- **Magistrate action dropdown** — all 8 Magistrate-specific leaf actions (`Patrol`, `Walk`, `TurnAround`, `Stand`, `CheckActivation`, `EmitSpawnSound`, `EmitDeathSound`, `SpawnDeathGuards`, `DeathFade`) now appear in the ACTION selector with descriptions.
+- **`EmitSpawnSound` / `EmitDeathSound` inspector** — dedicated sound file dropdown prevents free-text key mistakes.
+- **`EmitSound` inspector** — global / spatial toggle added alongside the sound dropdown.
+
+#### Map designer
+
+- **Magistrate spawn conditions** — right-click context menu now exposes **Activation delay (seconds)** and **Secrets to activate** fields. Values are packed into unused high bits of `actor.type` (bits 8–23 = activationTicks, bits 24–31 = secretTriggerN); `0` in either field falls back to the GAS default.
+
+### Game client — bug fixes
+
+- **`map.cpp` case 72** — reads and applies per-actor `activationTicks` and `secretTriggerN` from the new packed encoding in `actor.type`.
+
+## [v00051] — 2026-05-13
+
+### Game client
+
+#### AI — Complete behavior tree migration (#136, issue #15)
+
+- **Guard — 100% BT-only** — removed the ~560-line `if(!bt_)` legacy state machine fallback; the guard BT was already running (44 leaf actions covering all states) and the fallback was dead code. Guard now crashes fast if the BT file is missing rather than silently falling back.
+- **Guard — patrol ledge turnaround fix** — `minWallDistance=35 > guard speed (~5 px/tick)` caused the turnaround check to fire every tick while inside the edge zone, making the guard oscillate and appear stuck. Fixed with an edge-triggered flip: `mirrored` is flipped only on the first tick entering the zone (tracked via `ctx.state`), not on every tick.
+- **Civilian — `Uint8 state_i` overflow bug** — `state_i = -1` (a `Uint8`) produced 255; the RUNNING duration check (`255 >= 150`) passed immediately every tick, so RUNNING exited before any movement. Civilian now returns `Running` immediately on WALKING→RUNNING transition; `Tick`'s `state_i++` wraps 255→0 cleanly.
+- **Civilian — threat detection** — switched from projectile `TestAABB` (unreliable: projectiles have `requiresauthority=true` and don't exist on the client) to `Player::IsShooting()` (`weaponfirecool > 0`, set for ~7 ticks per shot).
+- **Civilian — flee direction locking** — flee direction is locked at trigger time for the full RUNNING duration; `DistanceToEnd` wall-bounce is the sole redirect, preventing direction oscillation against walls.
+- **Robot** — confirmed 100% BT-only; no changes needed.
+
+## [v00050] — 2026-05-12
+
+### Game client
+
+#### Spectator (#156)
+
+- **Phase 1 — Spectatable flag** — per-game `spectatable` bit added to the lobby wire protocol, surfaced as a toggle in the Create Game UI and persisted via `Config::lastspectatable`. Server browser plumbs the new `can_rejoin` bit alongside it.
+- **Phase 3 — Native observer joins** — `Peer::observer` flag on the wire; AUTHORITY admits observers in `MSG_CONNECT` without consuming a player slot. Observers free their slot on disconnect, and observer chat fans out to everyone.
+- **Phase 4 — Spectator camera + controls** — `viewedpeerid` drives camera and HUD focus; free-cam, cycle-target, and Activate-names bindings rebound for spectators. ESC exits the match cleanly. Joiner-camera, visibility, and create-game guard fixes folded in.
+- **Scrollable Game Options form** — variable-height scrollbar with drag support, plus font and padding fixes so longer option lists fit the panel.
+
+#### Rejoin mid-game (#152)
+
+- **Parked-peer rejoin** — `HandleDisconnect` parks the peer instead of evicting them while AUTHORITY + INGAME + real accountid (not bot, not permanent kick). The `Player` object stays alive in the world, retaining team, tech choices, credits, inventory, weapons, ammo, and snapshot history. `UnDeploy()` still runs so the body disappears while the player is gone.
+- **MSG_CONNECT in INGAME** — AUTHORITY now accepts reconnects whose accountid matches a parked peer, rebinding ip/port and resuming. Brand-new joiners mid-game stay rejected — this is rejoin, not join-in-progress. `MSG_KICK` carries `permanent=true` so kicks remain terminal.
+- **Sweep hygiene** — peer-timeout sweep and `SendSnapshots` skip parked peers; on rejoin the player redeploys at a deploy station like a normal life with all state intact.
+
+#### Game.cpp refactor foundation (#140)
+
+- **Screen / Panel / Modal infrastructure** — base classes plus a `ScreenContext` (curated subsystem refs + state-machine actions, all stubbed) lay groundwork for breaking up the 6,544-line `Game` god-class. No behavior change in this PR; the screen stack starts empty and every menu still flows through the existing `Game::Create*Interface` / `Process*Interface` helpers. Screens migrate over the new tier in follow-up work.
+- **Widget primitives moved to `src/ui/components/`** — `button`, `interface`, `overlay`, `scrollbar`, `selectbox`, `stats`, `teambillboard`, `textbox`, `textinput`, `toggle`. Bare-filename includes still resolve via the updated CMake include path.
+
+### Game client — bug fixes
+
+- **`world.gameinfo` on create-game (#147)** — regression from #140. The post-create handler in `LobbyScreen::Tick` dropped the `lobbygame → world.gameinfo` Serialize roundtrip, leaving `world.gameinfo.loaded = false` on the host. The `world.cpp:709` gate (`ishost && !gameinfoloaded && gameinfo.loaded`) never fired, so the host never sent `MSG_GAMEINFO` to the dedicated server, `AllPeersLoadedGameInfo()` stayed false forever, and Ready never advanced to INGAME. Fix re-adds the Serialize roundtrip before `JoinGame` in the create-game path.
+
+## [v00049] — 2026-05-10
+
+### Game client — bug fixes
+
+- **macOS auto-updater Info.plist seal (#146)** — production-signed binaries have their embedded code signature bound to the bundle's `Info.plist` (the `Info.plist entries=N` line in `codesign -dvvv`). Stage-1 mirrored the binary and `Frameworks/` into `/tmp/silencer-stage2.app/` but not `Info.plist`; at `execve()`, AMFI rejected the signature ("The code contains a Team ID, but validating its signature failed") and SIGKILLed stage-2 before `main()`. Silent under hardened runtime since the parent's TTY is gone, so users saw the app close and never restart. Fix mirrors `Info.plist` into the stage-2 bundle so AMFI's execve hook accepts the binary. Same root-cause shape as the earlier `Frameworks/` mirror fix.
+
+### Release / CI
+
+- **macOS DMG installer (#146)** — release workflow now ships a notarized + stapled DMG alongside the existing zip. The DMG is the user-facing install: Finder presents the drag-to-`/Applications` affordance, and an explicit copy out of the DMG clears quarantine so the app runs from its real path instead of being App-Translocated to a read-only mount under `/private/var/folders/.../AppTranslocation/` (which is what breaks the auto-updater's in-place rename when users run `Silencer.app` straight out of `~/Downloads/`). The zip artifact stays for the in-app updater path (consumed by `clients/silencer/src/updater/updaterstage2.cpp` and referenced by `services/lobby/update.go`'s `MacOSURL` field). Release notes list DMG (recommended) + zip, mirroring the Windows pattern.
+
 ## [v00048] — 2026-05-09
 
 ### Game client

@@ -17,6 +17,8 @@ Peer::Peer(){
 	isbot = false;
 	firstinputtime = 0;
 	totalinputs = 0;
+	disconnected = false;
+	observer = false;
 }
 
 void Peer::Serialize(bool write, Serializer & data){
@@ -30,6 +32,7 @@ void Peer::Serialize(bool write, Serializer & data){
 	//data.Serialize(write, publicport);
 	//data.Serialize(write, ip);
 	data.Serialize(write, accountid);
+	data.Serialize(write, observer);
 	Uint8 count = controlledlist.size();
 	data.Serialize(write, count);
 	if(write){

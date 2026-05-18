@@ -243,6 +243,20 @@ func (c *Client) sendNewGame(status uint8, g *LobbyGame) {
 	w.u8(opNewGame)
 	w.u8(status)
 	g.Encode(w)
+	// Per-recipient can-rejoin bit. Set when this client's accountid
+	// matches one of the dedicated server's parked peers, signalling
+	// that clicking "Join" on this INGAME row will rebind to their
+	// preserved slot (PR #152 rejoin mechanism).
+	var canrejoin uint8
+	if c.accountID != 0 {
+		for _, acct := range g.ParkedAccountIDs {
+			if acct == c.accountID {
+				canrejoin = 1
+				break
+			}
+		}
+	}
+	w.u8(canrejoin)
 	c.send(w.b)
 }
 

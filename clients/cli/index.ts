@@ -18,9 +18,16 @@ function usage(): never {
       `       silencer-cli state\n` +
       `       silencer-cli inspect [--interface-id N]\n` +
       `       silencer-cli world_state\n` +
+      `       silencer-cli ingame_ui_mode --mode chat|buy|tech|playerlist|all|clear|status\n` +
+      `       silencer-cli resize --w 1280 --h 720\n` +
       `       silencer-cli click --label "OPTIONS"\n` +
+      `       silencer-cli click_at --x 320 --y 240\n` +
       `       silencer-cli set_text --label TEXT_ID --text "hi"\n` +
+      `       silencer-cli set_text --uid 1 --text "alice"   (textbox or textinput)\n` +
       `       silencer-cli select --label LISTBOX --index 0\n` +
+      `       silencer-cli scroll --label "Controls List" [--amount 3]\n` +
+      `       silencer-cli show_password_modal\n` +
+      `       silencer-cli password_modal_result\n` +
       `       silencer-cli back\n` +
       `       silencer-cli screenshot [--out /path/x.png]\n` +
       `       silencer-cli wait_for_state --state OPTIONS [--timeout-ms 5000]\n` +
@@ -114,6 +121,18 @@ const STRING_FLAGS: Record<string, Record<string, Set<string>>> = {
     tail: new Set(["as"]),
   },
 };
+// Per-op (no subop): flags whose values must stay strings. Used for
+// game-control ops that don't take a subop. `set_text --label 12345`
+// with a purely-numeric global object id would otherwise be encoded
+// as a JSON number, and the C++ handler's
+// `args["label"].get<std::string>()` would throw `type_error 302`
+// and abort the silencer process.
+const STRING_FLAGS_NO_SUBOP: Record<string, Set<string>> = {
+  click: new Set(["label"]),
+  set_text: new Set(["label"]),
+  select: new Set(["label"]),
+  scroll: new Set(["label"]),
+};
 // Bindings within VARIADIC_FLAGS that accept comma-separated chord syntax:
 // `--bindings KEY:Up,KEY:Left` becomes JSON `[["KEY:Up","KEY:Left"]]` (an
 // AND-chord) instead of `["KEY:Up","KEY:Left"]` (two OR'd singles).
@@ -144,7 +163,9 @@ function parseArgs(argv: string[]): {
       const key = a.slice(2).replace(/-/g, "_");
       const variadic = op && subop && VARIADIC_FLAGS[op]?.[subop]?.has(key);
       const chordSplit = op && subop && CHORD_SPLIT_FLAGS[op]?.[subop]?.has(key);
-      const stringOnly = op && subop && STRING_FLAGS[op]?.[subop]?.has(key);
+      const stringOnly =
+        (op && subop && STRING_FLAGS[op]?.[subop]?.has(key)) ||
+        (op && !subop && STRING_FLAGS_NO_SUBOP[op]?.has(key));
       if (variadic) {
         // Consume every following non-flag token as a list element. If the
         // flag accepts comma-chord syntax, a token like "KEY:Up,KEY:Left"
@@ -180,7 +201,11 @@ function parseArgs(argv: string[]): {
     } else {
       // positional after op → treat as shorthand for the most common arg.
       if (op === "click" && args["label"] === undefined) args["label"] = a;
-      else if ((op === "set_text" || op === "select") && args["label"] === undefined)
+      else if (
+        (op === "set_text" || op === "select") &&
+        args["label"] === undefined &&
+        !(op === "set_text" && args["uid"] !== undefined)
+      )
         args["label"] = a;
       else if (op === "set_text" && args["text"] === undefined) args["text"] = a;
       else if (op === "select" && args["index"] === undefined) {
