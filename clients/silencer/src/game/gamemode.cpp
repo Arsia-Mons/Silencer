@@ -17,6 +17,11 @@ bool GameMode::AllowRespawn(const World&) const {
 	return cfg ? cfg->respawn : true;
 }
 
+bool GameMode::AllowFriendlyFire(const World&) const {
+	const GameModeConfig* cfg = GASLoader::Get().GetGameModeConfig((int)Id());
+	return cfg ? cfg->friendlyFire : false;
+}
+
 GameMode* GameModeFactory(GameModeId id) {
 	switch(id){
 		case GAMEMODE_DEATHMATCH:      return new DeathmatchMode();

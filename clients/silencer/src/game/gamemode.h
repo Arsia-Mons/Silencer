@@ -66,6 +66,10 @@ public:
 	// Returns the GAS per-mode respawn flag by default.
 	virtual bool AllowRespawn(const World&) const;
 
+	// Returns true if players on the same team can damage each other.
+	// Returns the GAS per-mode friendlyFire flag by default.
+	virtual bool AllowFriendlyFire(const World&) const;
+
 	// Returns true when the match should end.
 	virtual bool IsMatchOver(const World&) const = 0;
 
