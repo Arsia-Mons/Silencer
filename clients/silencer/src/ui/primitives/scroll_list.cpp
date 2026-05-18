@@ -10,13 +10,14 @@ namespace silencer::ui::primitives {
 
 namespace {
 
-// Legacy SelectBox drew the selection bar 11px tall inside a 14px row slot
-// and inset from the slot edges, so consecutive rows read as separate items
+// Legacy SelectBox drew the selection bar shorter than the row slot and
+// inset from the slot edges, so consecutive rows read as separate items
 // with breathing room. The Clay migration filled the whole slot edge-to-edge,
 // which made list items look cramped (issue #178). Re-inset the row body so
-// the highlight and text sit inside the slot like legacy.
+// the highlight and text sit inside the slot like legacy, vertically
+// centered within the full row pitch.
 constexpr Uint16 kRowInsetX     = 4;  // left/right gap between bar and slot
-constexpr Uint16 kRowBottomGap  = 3;  // separation between consecutive rows
+constexpr Uint16 kRowGapY       = 3;  // total vertical separation between rows
 constexpr Uint16 kRowTextPadX   = 6;  // text inset from the bar's left edge
 
 constexpr int kPayloadCapacity = 64;
@@ -123,33 +124,43 @@ void ScrollList(Clay_String id,
 				const int i = static_cast<int>(scrollPosition) + line;
 				if(i < 0 || i >= itemCount) break;
 				const bool isSelected = (i == selectedIndex);
-				const Uint8 bgIdx = isSelected ? opts.highlightColor : 0;
 
 				// The slot keeps the full legacy row pitch and stays the
-				// clickable/hit-tested element. The inset inner body carries
-				// the highlight + text so consecutive rows read as separate
-				// items with margins, like legacy SelectBox (issue #178).
+				// clickable/hit-tested element. It vertically centers an
+				// inset inner body so consecutive rows read as separate
+				// items with margins and the text sits centered in the
+				// slot, like legacy SelectBox (issue #178).
+				float barH = rowH - static_cast<float>(kRowGapY);
+				if(barH < 0.0f) barH = 0.0f;
 				CLAY({ .id = CLAY_SIDI(id, static_cast<uint32_t>(i + 1)),
 				       .layout = {
 				           .sizing = { CLAY_SIZING_FIXED(rowsW),
 				                       CLAY_SIZING_FIXED(rowH) },
-				           .padding = { kRowInsetX, kRowInsetX,
-				                        0, kRowBottomGap },
+				           .padding = { kRowInsetX, kRowInsetX, 0, 0 },
+				           .childAlignment = { CLAY_ALIGN_X_LEFT,
+				                               CLAY_ALIGN_Y_CENTER },
 				       } }) {
 					if(handle.hoveredIndexOut && ::Clay_Hovered()){
 						*handle.hoveredIndexOut = i;
 					}
 					RegisterRowWidget(id, items[i], i, isSelected, handle);
+					// Only the selected row gets a highlight bar; an
+					// unselected row has no background at all (alpha 0,
+					// so Clay emits no rectangle — no black fill).
+					Clay_Color barColor =
+						isSelected
+							? Clay_Color{ static_cast<float>(opts.highlightColor),
+							              0.0f, 0.0f, 255.0f }
+							: Clay_Color{ 0.0f, 0.0f, 0.0f, 0.0f };
 					CLAY({ .id = CLAY_SIDI(id, 0x20000000u + static_cast<uint32_t>(i)),
 					       .layout = {
 					           .sizing = { CLAY_SIZING_GROW(0),
-					                       CLAY_SIZING_GROW(0) },
+					                       CLAY_SIZING_FIXED(barH) },
 					           .padding = { kRowTextPadX, kRowTextPadX, 0, 0 },
 					           .childAlignment = { CLAY_ALIGN_X_LEFT,
 					                               CLAY_ALIGN_Y_CENTER },
 					       },
-					       .backgroundColor = { static_cast<float>(bgIdx),
-					                            0.0f, 0.0f, 255.0f } }) {
+					       .backgroundColor = barColor }) {
 						Text(items[i], opts.text);
 					}
 				}
