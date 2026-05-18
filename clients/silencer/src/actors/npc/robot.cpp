@@ -6,11 +6,7 @@
 #include "fixedcannon.h"
 #include "plume.h"
 #include "gasloader.h"
-
-// MSVC's <cstdlib> overload set has no exact int match (it pulls in
-// long/__int64/double/float/long double overloads), so `abs(int_expr)` is
-// ambiguous when the unity batch or transitive headers bring those in.
-static inline int RobotAbsInt(int v) { return v < 0 ? -v : v; }
+#include "npc_math.h"
 
 Robot::Robot() : Object(ObjectTypes::ROBOT){
 	requiresauthority = true;
@@ -142,7 +138,7 @@ void Robot::InitBT() {
 			return BTResult::Failure;
 		}
 		mirrored = (signed(originalx) < signed(x));
-		if (RobotAbsInt(signed(x) - signed(originalx)) <= (_rd ? _rd->returnProximity : 20)) {
+		if (npc_math::AbsInt(signed(x) - signed(originalx)) <= (_rd ? _rd->returnProximity : 20)) {
 			state = SLEEPING;
 			state_i = -1;
 			return BTResult::Success;
