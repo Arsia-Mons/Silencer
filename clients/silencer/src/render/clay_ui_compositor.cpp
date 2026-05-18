@@ -954,8 +954,20 @@ void RenderInto(::Resources & resources, ::Renderer & renderer,
 							effectiveBandThickness(p->outerHaloWidth) +
 							effectiveBandThickness(p->strokeWidth) +
 							effectiveBandThickness(p->innerHaloWidth);
-						const bool openRightBottomLeftCorner =
-							sLeft && !sRight && sBottom;
+						// A suppressed side means an adjacent box owns that
+						// edge of the composed (L / stepped) lobby outline.
+						// Extend the present perpendicular stripes outward
+						// past this bbox by the full band depth so their
+						// stroke + halo bands overlap the neighbour's stroke
+						// and the shared corner stays contiguous. This
+						// generalises the old single-corner special case
+						// (issue #176) and is a no-op for closed boxes (all
+						// extents 0), so plain rectangular chrome is
+						// unchanged.
+						const int extL = sLeft   ? 0 : totalBandDepth;
+						const int extR = sRight  ? 0 : totalBandDepth;
+						const int extT = sTop    ? 0 : totalBandDepth;
+						const int extB = sBottom ? 0 : totalBandDepth;
 						auto drawRing = [&](int inset, int thickness, Uint8 color, Uint8 opacity){
 							int t = thickness;
 							if(t < 1) return;
@@ -966,45 +978,37 @@ void RenderInto(::Resources & resources, ::Renderer & renderer,
 							int topRightTrim = sRight ? inset : 0;
 							int bottomLeftTrim = sLeft ? inset : 0;
 							int bottomRightTrim = sRight ? inset : 0;
-							const int fullStackTrim = std::max(0, totalBandDepth - t);
-							if(openRightBottomLeftCorner){
-								bottomLeftTrim = 0;
-							}
 							int leftTopTrim = sTop ? inset : 0;
 							int leftBottomTrim = sBottom ? inset : 0;
-							if(openRightBottomLeftCorner){
-								leftBottomTrim = fullStackTrim;
-							}
 							int rightTopTrim = sTop ? inset : 0;
 							int rightBottomTrim = sBottom ? inset : 0;
 							// Top stripe.
 							if(sTop){
-								int x = bx + topLeftTrim;
+								int x = bx + topLeftTrim - extL;
 								int y = by + inset;
-								int w = bw - topLeftTrim - topRightTrim;
+								int w = bw - topLeftTrim - topRightTrim + extL + extR;
 								fillStripe(x, y, w, t, color, opacity);
 							}
 							// Bottom stripe.
 							if(sBottom){
-								int x = bx + bottomLeftTrim;
+								int x = bx + bottomLeftTrim - extL;
 								int y = by + bh - inset - t;
-								int w = bw - bottomLeftTrim - bottomRightTrim;
+								int w = bw - bottomLeftTrim - bottomRightTrim + extL + extR;
 								fillStripe(x, y, w, t, color, opacity);
 							}
 							// Vertical edges. Closed rectangles keep the
-							// classic stepped ownership. The upper-shelf
-							// bottom-left corner in the lobby instead hands
-							// the whole lower stack to the bottom run so the
-							// elbow stays continuous without brightening.
-							int leftVy0 = by + leftTopTrim + (sTop ? t : 0);
-							int leftVy1 = by + bh - leftBottomTrim - (sBottom ? t : 0);
+							// classic stepped ownership; an open top/bottom
+							// extends the verticals outward to meet the
+							// neighbour that owns the missing horizontal.
+							int leftVy0 = by + leftTopTrim + (sTop ? t : 0) - extT;
+							int leftVy1 = by + bh - leftBottomTrim - (sBottom ? t : 0) + extB;
 							int leftVh  = leftVy1 - leftVy0;
 							if(sLeft && leftVh > 0){
 								int x = bx + inset;
 								fillStripe(x, leftVy0, t, leftVh, color, opacity);
 							}
-							int rightVy0 = by + rightTopTrim + (sTop ? t : 0);
-							int rightVy1 = by + bh - rightBottomTrim - (sBottom ? t : 0);
+							int rightVy0 = by + rightTopTrim + (sTop ? t : 0) - extT;
+							int rightVy1 = by + bh - rightBottomTrim - (sBottom ? t : 0) + extB;
 							int rightVh  = rightVy1 - rightVy0;
 							if(sRight && rightVh > 0){
 								int x = bx + bw - inset - t;
