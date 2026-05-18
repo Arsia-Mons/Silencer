@@ -18,6 +18,7 @@
 #include "buyableitem.h"
 #include "config.h"
 
+#include <algorithm>
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
@@ -42,6 +43,7 @@ constexpr const char * kActionDescriptionPrefix = "lobby.game_tech.description."
 
 // Upper stepped-pane slot interior layout knobs.
 constexpr uint16_t kUpperBackPadLeft = 4;
+constexpr uint16_t kUpperBackPadRight = 4;
 constexpr uint16_t kUpperBackPadTop  = 4;
 constexpr uint16_t kUpperPeerColPadLeft = 4;
 constexpr uint16_t kUpperPeerColPadTop  = 7;
@@ -57,6 +59,20 @@ Clay_String FromStd(const std::string & s) {
 	cs.length = static_cast<int32_t>(s.size());
 	cs.chars  = s.c_str();
 	return cs;
+}
+
+ButtonOpts FullWidthUpperButtonOpts(Uint16 panelWidth) {
+	const int buttonWidth = std::max(
+		1,
+		static_cast<int>(panelWidth)
+			- static_cast<int>(kUpperBackPadLeft)
+			- static_cast<int>(kUpperBackPadRight));
+	return ButtonOpts{
+		.variant = ButtonVariant::Chrome,
+		.size = ButtonSize::Auto,
+		.minWidth = buttonWidth,
+		.maxWidth = buttonWidth,
+	};
 }
 
 bool StartsWith(const std::string & value, const char * prefix) {
@@ -179,6 +195,7 @@ bool GameTechPanelHandleUiIntent(GameTechPanelState & state,
 }
 
 void BuildGameTechUpperTree(GameTechPanelState & state,
+                            Uint16 panelWidth,
                             World & world,
                             Resources & resources,
                             LobbyScreen & owner,
@@ -192,8 +209,7 @@ void BuildGameTechUpperTree(GameTechPanelState & state,
 	       .layout = { .padding = { game_tech_panel_detail::kUpperBackPadLeft, 0,
 	                                game_tech_panel_detail::kUpperBackPadTop,  0 } } }) {
 		Button(CLAY_STRING("GameTechBackButton"), CLAY_STRING("Back To Teams"),
-		           ButtonOpts{ .variant = ButtonVariant::Chrome,
-		                       .size = ButtonSize::Compact },
+		           game_tech_panel_detail::FullWidthUpperButtonOpts(panelWidth),
 		           ButtonHandle{ /*hoveredOut*/ nullptr,
 		                             /*actionId*/   game_tech_panel_detail::kActionBack,
 		                             /*interactions*/ &interactions });

@@ -110,6 +110,8 @@ struct ButtonCheckResult {
 	int ovalWallClockNextBrightness;     // Expect 130 after the next legacy tick.
 	int compactWidth;
 	int compactHeight;
+	int chromeAutoWidth;
+	int chromeAutoHeight;
 	int textCompactWidth;
 	int textCompactHeight;
 	int textCompactTextXOffset;

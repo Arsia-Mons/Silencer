@@ -58,6 +58,7 @@ bool GameTechPanelHandleUiIntent(GameTechPanelState & state,
 // block; flex children only (no floating).
 // BeginFrame requirements: TextBeginFrame, ButtonBeginFrame.
 void BuildGameTechUpperTree(GameTechPanelState & state,
+                            Uint16 panelWidth,
                             World & world,
                             Resources & resources,
                             LobbyScreen & owner,

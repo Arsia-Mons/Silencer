@@ -97,8 +97,8 @@ fi
 CHECK=$(cli --port "$PORT" clay_button_check)
 echo "check = $CHECK"
 # Extract fields with a tiny Bun one-liner — jq isn't required.
-read CLICK_PRESS CLICK_HELD HOVER_BR IDLE_BR CHROME_IDX OVAL_HOVER_IDX OVAL_HOVER_BR OVAL_UNHOVER_IDX OVAL_UNHOVER_BR OVAL_FOCUS_IDX OVAL_FOCUS_BR OVAL_WC_PARTIAL_IDX OVAL_WC_PARTIAL_BR OVAL_WC_NEXT_IDX OVAL_WC_NEXT_BR COMPACT_W COMPACT_H TEXT_COMPACT_W TEXT_COMPACT_H TEXT_COMPACT_XOFF TEXT_COMPACT_TEXT_W TEXT_COMPACT_YOFF AUTO_SHORT AUTO_LONG AUTO_MULTI_H <<EOF
-$(bun -e "const j=JSON.parse(process.argv[1]); console.log([j.clicks_fired_on_press,j.clicks_fired_when_held,j.chrome_brightness_hover,j.chrome_brightness_idle,j.chrome_sprite_index_hover,j.oval_hover_sprite_indices.join(','),j.oval_hover_brightness.join(','),j.oval_unhover_sprite_indices.join(','),j.oval_unhover_brightness.join(','),j.oval_focus_sprite_index,j.oval_focus_brightness,j.oval_wall_clock_partial_sprite_index,j.oval_wall_clock_partial_brightness,j.oval_wall_clock_next_sprite_index,j.oval_wall_clock_next_brightness,j.compact_width,j.compact_height,j.text_compact_width,j.text_compact_height,j.text_compact_text_x_offset,j.text_compact_text_width,j.text_compact_text_y_offset,j.auto_short_width,j.auto_long_width,j.auto_multiline_height].join(' '))" "$CHECK")
+read CLICK_PRESS CLICK_HELD HOVER_BR IDLE_BR CHROME_IDX OVAL_HOVER_IDX OVAL_HOVER_BR OVAL_UNHOVER_IDX OVAL_UNHOVER_BR OVAL_FOCUS_IDX OVAL_FOCUS_BR OVAL_WC_PARTIAL_IDX OVAL_WC_PARTIAL_BR OVAL_WC_NEXT_IDX OVAL_WC_NEXT_BR COMPACT_W COMPACT_H CHROME_AUTO_W CHROME_AUTO_H TEXT_COMPACT_W TEXT_COMPACT_H TEXT_COMPACT_XOFF TEXT_COMPACT_TEXT_W TEXT_COMPACT_YOFF AUTO_SHORT AUTO_LONG AUTO_MULTI_H <<EOF
+$(bun -e "const j=JSON.parse(process.argv[1]); console.log([j.clicks_fired_on_press,j.clicks_fired_when_held,j.chrome_brightness_hover,j.chrome_brightness_idle,j.chrome_sprite_index_hover,j.oval_hover_sprite_indices.join(','),j.oval_hover_brightness.join(','),j.oval_unhover_sprite_indices.join(','),j.oval_unhover_brightness.join(','),j.oval_focus_sprite_index,j.oval_focus_brightness,j.oval_wall_clock_partial_sprite_index,j.oval_wall_clock_partial_brightness,j.oval_wall_clock_next_sprite_index,j.oval_wall_clock_next_brightness,j.compact_width,j.compact_height,j.chrome_auto_width,j.chrome_auto_height,j.text_compact_width,j.text_compact_height,j.text_compact_text_x_offset,j.text_compact_text_width,j.text_compact_text_y_offset,j.auto_short_width,j.auto_long_width,j.auto_multiline_height].join(' '))" "$CHECK")
 EOF
 
 assert_eq() {
@@ -126,6 +126,8 @@ assert_eq "clicks_fired_on_press"   "$CLICK_PRESS" "1"
 assert_eq "clicks_fired_when_held"  "$CLICK_HELD"  "0"
 assert_eq "compact_width"           "$COMPACT_W"   "156"
 assert_eq "compact_height"          "$COMPACT_H"   "21"
+assert_eq "chrome_auto_width"       "$CHROME_AUTO_W" "212"
+assert_eq "chrome_auto_height"      "$CHROME_AUTO_H" "21"
 assert_eq "text_compact_width"       "$TEXT_COMPACT_W" "52"
 assert_eq "text_compact_height"      "$TEXT_COMPACT_H" "21"
 assert_eq "text_compact_text_y_offset" "$TEXT_COMPACT_YOFF" "8"

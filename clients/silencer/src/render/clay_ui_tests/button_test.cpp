@@ -429,6 +429,14 @@ bool RunButtonCheck(::Game & game, ButtonCheckResult & out) {
 	                        .wrapText = true },
 	            multilineW,
 	            out.autoMultilineHeight);
+	probeButton("test.button.chrome_auto_wide",
+	            CLAY_STRING("Create Game"),
+	            ButtonOpts{ .variant = ButtonVariant::Chrome,
+	                        .size = ButtonSize::Auto,
+	                        .minWidth = 212,
+	                        .maxWidth = 212 },
+	            out.chromeAutoWidth,
+	            out.chromeAutoHeight);
 
 	int textCompactTextRows = 0;
 	bool textCompactTextOffsetMatches = false;

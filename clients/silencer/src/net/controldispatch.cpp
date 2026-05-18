@@ -418,6 +418,8 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 		r["oval_wall_clock_next_brightness"] = res.ovalWallClockNextBrightness;
 		r["compact_width"] = res.compactWidth;
 		r["compact_height"] = res.compactHeight;
+		r["chrome_auto_width"] = res.chromeAutoWidth;
+		r["chrome_auto_height"] = res.chromeAutoHeight;
 		r["text_compact_width"] = res.textCompactWidth;
 		r["text_compact_height"] = res.textCompactHeight;
 		r["text_compact_text_x_offset"] = res.textCompactTextXOffset;

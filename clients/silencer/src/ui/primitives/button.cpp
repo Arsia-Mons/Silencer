@@ -66,13 +66,19 @@ struct ResolvedButton {
 	Uint16 spriteIndex = 0;
 	int fixedWidth = 0;
 	int fixedHeight = 0;
+	int minHeight = 0;
 	TextSize textSize = TextSize::BodySm;
 	TextMetrics textMetrics = ResolveTextMetrics(TextSize::BodySm);
 	int yOffset = 0;
 	int visualTextPaddingTop = 0;
 	int defaultPaddingX = 0;
 	int defaultPaddingY = 0;
+	bool centerContentY = false;
 	bool measureTextInk = false;
+	Uint8 leftCap = 16;
+	Uint8 rightCap = 16;
+	Uint8 topCap = 16;
+	Uint8 bottomCap = 16;
 };
 
 Clay_String EmptyString() {
@@ -125,9 +131,11 @@ ResolvedButton ResolveButton(const ButtonOpts& opts) {
 					out.spriteIndex = 7;
 					out.fixedWidth = 0;
 					out.fixedHeight = 0;
+					out.minHeight = 33;
 					out.nineSlice = true;
 					out.defaultPaddingX = 24;
 					out.defaultPaddingY = 7;
+					out.centerContentY = true;
 					break;
 				case ButtonSize::Md:
 				default:
@@ -142,6 +150,14 @@ ResolvedButton ResolveButton(const ButtonOpts& opts) {
 			out.fixedHeight = 21;
 			out.textSize = TextSize::Heading;
 			out.yOffset = 4;
+			if(opts.size == ButtonSize::Auto){
+				out.fixedWidth = 0;
+				out.nineSlice = true;
+				out.leftCap = 12;
+				out.rightCap = 12;
+				out.topCap = 4;
+				out.bottomCap = 4;
+			}
 			break;
 		case ButtonVariant::Text:
 			out.textSize = TextSize::BodySm;
@@ -350,16 +366,22 @@ AllocSpritePayload(Uint8 bank, Uint16 index, Uint8 brightness) {
 }
 
 silencer::clay_bridge::ButtonNineSlicePayload *
-AllocNineSlicePayload(Uint8 bank, Uint16 index, Uint8 brightness) {
+AllocNineSlicePayload(Uint8 bank,
+                      Uint16 index,
+                      Uint8 brightness,
+                      Uint8 leftCap,
+                      Uint8 rightCap,
+                      Uint8 topCap,
+                      Uint8 bottomCap) {
 	if(g_nineSlicePayloadCount >= kNineSlicePayloadCapacity) return nullptr;
 	auto * p = &g_nineSlicePayloads[g_nineSlicePayloadCount++];
 	p->bank = bank;
 	p->index = index;
 	p->brightness = brightness;
-	p->leftCap = 16;
-	p->rightCap = 16;
-	p->topCap = 16;
-	p->bottomCap = 16;
+	p->leftCap = leftCap;
+	p->rightCap = rightCap;
+	p->topCap = topCap;
+	p->bottomCap = bottomCap;
 	return p;
 }
 
@@ -457,7 +479,7 @@ void Button(Clay_String id,
 	int height = resolved.fixedHeight > 0 ? resolved.fixedHeight
 	                                      : contentHeight + paddingY * 2;
 	if(resolved.fixedWidth == 0) width = ClampAutoWidth(width, opts);
-	if(resolved.nineSlice && height < 33) height = 33;
+	if(resolved.minHeight > 0 && height < resolved.minHeight) height = resolved.minHeight;
 	if(height < 1) height = 1;
 
 	const float boxW = static_cast<float>(width);
@@ -469,7 +491,13 @@ void Button(Clay_String id,
 
 	if(resolved.hasSprite){
 		void * payload = resolved.nineSlice
-			? static_cast<void *>(AllocNineSlicePayload(resolved.spriteBank, resolved.spriteIndex, 128))
+			? static_cast<void *>(AllocNineSlicePayload(resolved.spriteBank,
+			                                           resolved.spriteIndex,
+			                                           128,
+			                                           resolved.leftCap,
+			                                           resolved.rightCap,
+			                                           resolved.topCap,
+			                                           resolved.bottomCap))
 			: static_cast<void *>(AllocSpritePayload(resolved.spriteBank, resolved.spriteIndex, 128));
 		auto * ccd = AllocCustomData(
 			resolved.nineSlice ? silencer::clay_bridge::CustomKind::ButtonNineSlice
@@ -480,11 +508,14 @@ void Button(Clay_String id,
 		           .sizing = { CLAY_SIZING_FIXED(boxW), CLAY_SIZING_FIXED(boxH) },
 		           .padding = { static_cast<uint16_t>(paddingX),
 		                        static_cast<uint16_t>(paddingX),
-		                        static_cast<uint16_t>(resolved.nineSlice ? paddingY : resolved.yOffset),
+		                        static_cast<uint16_t>(resolved.nineSlice && resolved.centerContentY
+		                                               ? paddingY
+		                                               : resolved.yOffset),
 		                        static_cast<uint16_t>(paddingY) },
 		           .childGap = 0,
 		           .childAlignment = { alignX,
-		                               resolved.nineSlice ? CLAY_ALIGN_Y_CENTER
+		                               resolved.nineSlice && resolved.centerContentY
+		                                                  ? CLAY_ALIGN_Y_CENTER
 		                                                  : CLAY_ALIGN_Y_TOP },
 		           .layoutDirection = CLAY_TOP_TO_BOTTOM,
 		       },

@@ -146,11 +146,25 @@ void BuildRightUpperContents(LobbyMainAreaPanels & panels,
 			resources,
 			interactions);
 	}else if(panels.gameJoinActive){
-		BuildGameJoinUpperTree(panels.gameJoin, resources, interactions);
+		BuildGameJoinUpperTree(
+			panels.gameJoin,
+			static_cast<Uint16>(std::max(0, layout.rightUpperW)),
+			resources,
+			interactions);
 	}else if(panels.gameTechActive){
-		BuildGameTechUpperTree(panels.gameTech, world, resources, owner, interactions);
+		BuildGameTechUpperTree(
+			panels.gameTech,
+			static_cast<Uint16>(std::max(0, layout.rightUpperW)),
+			world,
+			resources,
+			owner,
+			interactions);
 	}else{
-		BuildGameSelectUpperTree(panels.gameSelect, resources, interactions);
+		BuildGameSelectUpperTree(
+			panels.gameSelect,
+			static_cast<Uint16>(std::max(0, layout.rightUpperW)),
+			resources,
+			interactions);
 	}
 }
 

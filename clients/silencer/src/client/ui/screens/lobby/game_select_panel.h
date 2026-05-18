@@ -85,6 +85,7 @@ bool GameSelectPanelHandleUiIntent(GameSelectPanelState & state,
 // floating).
 // BeginFrame requirements: ButtonBeginFrame.
 void BuildGameSelectUpperTree(GameSelectPanelState & state,
+                              Uint16 panelWidth,
                               Resources & resources,
                               silencer::ui::UiInteractionRegistry& interactions);
 

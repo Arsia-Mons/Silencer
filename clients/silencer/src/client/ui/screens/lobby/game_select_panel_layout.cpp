@@ -35,6 +35,7 @@ constexpr Uint8  kScrollbarBank = 7;
 
 // Upper stepped-pane slot interior layout knobs.
 constexpr uint16_t kUpperBtnPadLeft = 4;
+constexpr uint16_t kUpperBtnPadRight = 4;
 constexpr uint16_t kUpperBtnPadTop  = 4;
 
 // Tall stepped-pane slot interior layout knobs.
@@ -74,6 +75,20 @@ Clay_String FromStd(const std::string & s) {
 
 Clay_String StaticId(const char * s) {
 	return Clay_String{ true, static_cast<int32_t>(strlen(s)), s };
+}
+
+ButtonOpts FullWidthUpperButtonOpts(Uint16 panelWidth) {
+	const int buttonWidth = std::max(
+		1,
+		static_cast<int>(panelWidth)
+			- static_cast<int>(kUpperBtnPadLeft)
+			- static_cast<int>(kUpperBtnPadRight));
+	return ButtonOpts{
+		.variant = ButtonVariant::Chrome,
+		.size = ButtonSize::Auto,
+		.minWidth = buttonWidth,
+		.maxWidth = buttonWidth,
+	};
 }
 
 GameSelectTallLayout ResolveTallLayout(Uint16 panelWidth,
@@ -224,6 +239,7 @@ void BuildGameSelectActionButtons(const GameSelectPanelState & state,
 }  // namespace game_select_panel_layout_detail
 
 void BuildGameSelectUpperTree(GameSelectPanelState & state,
+                              Uint16 panelWidth,
                               Resources & resources,
                               silencer::ui::UiInteractionRegistry& interactions) {
 	(void)state;
@@ -234,8 +250,7 @@ void BuildGameSelectUpperTree(GameSelectPanelState & state,
 	       .layout = { .padding = { game_select_panel_layout_detail::kUpperBtnPadLeft, 0,
 	                                game_select_panel_layout_detail::kUpperBtnPadTop,  0 } } }) {
 		Button(CLAY_STRING("GameSelectCreateButton"), CLAY_STRING("Create Game"),
-		           ButtonOpts{ .variant = ButtonVariant::Chrome,
-		                       .size = ButtonSize::Compact },
+		           game_select_panel_layout_detail::FullWidthUpperButtonOpts(panelWidth),
 		           ButtonHandle{ /*hoveredOut*/ nullptr,
 		                             /*actionId*/   game_select_panel_layout_detail::kActionCreate,
 		                             /*interactions*/ &interactions });

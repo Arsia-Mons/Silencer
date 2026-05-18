@@ -73,6 +73,7 @@ bool GameJoinPanelHandleUiIntent(GameJoinPanelState & state,
 // CLAY block; emits flex children only (no floating). Caller's BeginFrame
 // requirements: ButtonBeginFrame.
 void BuildGameJoinUpperTree(GameJoinPanelState & state,
+                            Uint16 panelWidth,
                             Resources & resources,
                             silencer::ui::UiInteractionRegistry& interactions);
 
