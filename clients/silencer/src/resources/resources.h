@@ -16,8 +16,7 @@ class Resources
 public:
 	Resources();
 	// `game` may be null — when null, the progress callback is suppressed.
-	// The demo target (tools/clay-demo/) passes null to avoid pulling in a
-	// full Game instance just to load sprites.
+	// This allows callers to load sprites without a full Game instance.
 	bool Load(class Game * game, bool dedicatedserver = false);
 	bool LoadSprites(class Game * game, bool dedicatedserver = false);
 	bool LoadTiles(class Game * game, bool dedicatedserver = false);

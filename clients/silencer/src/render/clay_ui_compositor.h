@@ -56,8 +56,8 @@ void SetTextMeasureResources(const Resources * resources);
 // Walks `cmds` and dispatches each command to the matching Renderer
 // primitive, writing into `dst`. Resources supplies sprite-bank lookups
 // (IMAGE / CUSTOM dispatch); Renderer supplies the actual draw routines
-// (DrawText / EffectBrightness / etc.). Game-free entry point — used by
-// the standalone clay-demo tool. Inside the silencer binary, callers
+// (DrawText / EffectBrightness / etc.). Game-free entry point for callers
+// that already own Resources + Renderer. Inside the silencer binary, callers
 // typically use the `Render(Game&, ...)` thin wrapper below.
 void Render(::Resources & resources, ::Renderer & renderer,
             Surface * dst, ::Clay_RenderCommandArray cmds);

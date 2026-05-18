@@ -69,7 +69,6 @@ RUN cmake -B build -S clients/silencer \
         -DSILENCER_VERSION="${SILENCER_VERSION}" \
         -DSILENCER_LOBBY_HOST="127.0.0.1" \
         -DSILENCER_LOBBY_PORT=15170 \
-        -DSILENCER_BUILD_CLAY_DEMO=OFF \
         -DSDL3_DIR=/opt/sdl3/lib/cmake/SDL3 \
         -DSDL3_mixer_DIR=/opt/sdl3/lib/cmake/SDL3_mixer \
     && cmake --build build -j"$(nproc)"

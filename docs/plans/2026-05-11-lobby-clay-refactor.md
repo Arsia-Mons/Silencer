@@ -180,9 +180,6 @@ Implementation sequence sketch:
 18. `GameTechPanel` Clay.
 19. CLI `inspect` compatibility (Clay tree → widget list).
 20. Delete legacy lobby files; final E2E pass.
-21. Dogfood pass: build a tiny demo screen (`tools/clay-demo/`) that
-    uses every primitive once *without touching lobby code*. Proves
-    primitives are screen-agnostic.
 
 Each iteration: one item, one commit, screenshot DM'd to the user.
 
