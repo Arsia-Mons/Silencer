@@ -6,7 +6,7 @@
 #include "gasloader.h"
 #include "os.h"
 #include "shared.h"
-#include "clay_ui_compositor.h"
+#include "clay_ui_tests/clay_ui_checks.h"
 #include "runtime/UiInteractionRegistry.h"
 #include "screen.h"
 #include "password_modal.h"
@@ -325,67 +325,6 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 		cmd.reply->set_value(OkResult(cmd.id, r));
 		return;
 	}
-	if(cmd.op == "clay_bridge_smoke"){
-		std::string out = cmd.args.value("out", std::string());
-		if(out.empty()){
-			cmd.reply->set_value(Err(cmd.id, "BAD_ARGS",
-				"clay_bridge_smoke requires --out <path>"));
-			return;
-		}
-		bool ok = silencer::clay_bridge::RunSmoke(game, out.c_str());
-		if(!ok){
-			cmd.reply->set_value(Err(cmd.id, "INTERNAL",
-				"smoke render failed (PNG write): " + out));
-			return;
-		}
-		nlohmann::json r;
-		r["path"] = out;
-		cmd.reply->set_value(OkResult(cmd.id, r));
-		return;
-	}
-	if(cmd.op == "clay_text_test"){
-		std::string out = cmd.args.value("out", std::string());
-		if(out.empty()){
-			cmd.reply->set_value(Err(cmd.id, "BAD_ARGS",
-				"clay_text_test requires --out <path>"));
-			return;
-		}
-		bool ok = silencer::clay_bridge::RunTextTest(game, out.c_str());
-		if(!ok){
-			cmd.reply->set_value(Err(cmd.id, "INTERNAL",
-				"text test render failed (PNG write): " + out));
-			return;
-		}
-		nlohmann::json r;
-		r["path"] = out;
-		cmd.reply->set_value(OkResult(cmd.id, r));
-		return;
-	}
-	if(cmd.op == "clay_button_test"){
-		std::string out = cmd.args.value("out", std::string());
-		std::string variant = cmd.args.value("variant", std::string("chrome"));
-		std::string size = cmd.args.value("size", std::string("compact"));
-		std::string label = cmd.args.value("label", std::string("default"));
-		if(out.empty()){
-			cmd.reply->set_value(Err(cmd.id, "BAD_ARGS",
-				"clay_button_test requires --out <path>"));
-			return;
-		}
-		bool ok = silencer::clay_bridge::RunButtonTest(
-			game, variant.c_str(), size.c_str(), label.c_str(), out.c_str());
-		if(!ok){
-			cmd.reply->set_value(Err(cmd.id, "INTERNAL",
-				"button test render failed (PNG write): " + out));
-			return;
-		}
-		nlohmann::json r;
-		r["path"] = out;
-		r["variant"] = variant;
-		r["size"] = size;
-		r["label"] = label;
-		cmd.reply->set_value(OkResult(cmd.id, r));
-		return;
-	}
 	if(cmd.op == "clay_button_check"){
 		silencer::clay_bridge::ButtonCheckResult res{};
 		bool ok = silencer::clay_bridge::RunButtonCheck(game, res);
@@ -431,27 +370,6 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 		cmd.reply->set_value(OkResult(cmd.id, r));
 		return;
 	}
-	if(cmd.op == "clay_toggle_test"){
-		std::string out = cmd.args.value("out", std::string());
-		std::string state = cmd.args.value("state", std::string("unselected"));
-		if(out.empty()){
-			cmd.reply->set_value(Err(cmd.id, "BAD_ARGS",
-				"clay_toggle_test requires --out <path>"));
-			return;
-		}
-		bool ok = silencer::clay_bridge::RunToggleTest(
-			game, state.c_str(), out.c_str());
-		if(!ok){
-			cmd.reply->set_value(Err(cmd.id, "INTERNAL",
-				"toggle test render failed (PNG write): " + out));
-			return;
-		}
-		nlohmann::json r;
-		r["path"] = out;
-		r["state"] = state;
-		cmd.reply->set_value(OkResult(cmd.id, r));
-		return;
-	}
 	if(cmd.op == "clay_toggle_check"){
 		silencer::clay_bridge::ToggleCheckResult res{};
 		bool ok = silencer::clay_bridge::RunToggleCheck(game, res);
@@ -466,24 +384,6 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 		r["clicks_toggle_2"] = res.clicksToggle2;
 		r["selected_brightness"] = res.selectedBrightness;
 		r["unselected_brightness"] = res.unselectedBrightness;
-		cmd.reply->set_value(OkResult(cmd.id, r));
-		return;
-	}
-	if(cmd.op == "clay_scroll_list_test"){
-		std::string out = cmd.args.value("out", std::string());
-		if(out.empty()){
-			cmd.reply->set_value(Err(cmd.id, "BAD_ARGS",
-				"clay_scroll_list_test requires --out <path>"));
-			return;
-		}
-		bool ok = silencer::clay_bridge::RunScrollListTest(game, out.c_str());
-		if(!ok){
-			cmd.reply->set_value(Err(cmd.id, "INTERNAL",
-				"scroll_list test render failed (PNG write): " + out));
-			return;
-		}
-		nlohmann::json r;
-		r["path"] = out;
 		cmd.reply->set_value(OkResult(cmd.id, r));
 		return;
 	}
@@ -507,24 +407,6 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 		cmd.reply->set_value(OkResult(cmd.id, r));
 		return;
 	}
-	if(cmd.op == "clay_scroll_text_box_test"){
-		std::string out = cmd.args.value("out", std::string());
-		if(out.empty()){
-			cmd.reply->set_value(Err(cmd.id, "BAD_ARGS",
-				"clay_scroll_text_box_test requires --out <path>"));
-			return;
-		}
-		bool ok = silencer::clay_bridge::RunScrollTextBoxTest(game, out.c_str());
-		if(!ok){
-			cmd.reply->set_value(Err(cmd.id, "INTERNAL",
-				"scroll_text_box test render failed (PNG write): " + out));
-			return;
-		}
-		nlohmann::json r;
-		r["path"] = out;
-		cmd.reply->set_value(OkResult(cmd.id, r));
-		return;
-	}
 	if(cmd.op == "clay_scroll_text_box_check"){
 		silencer::clay_bridge::ScrollTextBoxCheckResult res{};
 		bool ok = silencer::clay_bridge::RunScrollTextBoxCheck(game, res);
@@ -537,24 +419,6 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 		r["at_bottom_prev_pos"] = res.atBottom_prevPos;
 		r["not_at_bottom_prev_pos"] = res.notAtBottom_prevPos;
 		r["at_bottom_overflow_prev_pos"] = res.atBottomOverflow_prevPos;
-		cmd.reply->set_value(OkResult(cmd.id, r));
-		return;
-	}
-	if(cmd.op == "clay_text_input_test"){
-		std::string out = cmd.args.value("out", std::string());
-		if(out.empty()){
-			cmd.reply->set_value(Err(cmd.id, "BAD_ARGS",
-				"clay_text_input_test requires --out <path>"));
-			return;
-		}
-		bool ok = silencer::clay_bridge::RunTextInputTest(game, out.c_str());
-		if(!ok){
-			cmd.reply->set_value(Err(cmd.id, "INTERNAL",
-				"text_input test render failed (PNG write): " + out));
-			return;
-		}
-		nlohmann::json r;
-		r["path"] = out;
 		cmd.reply->set_value(OkResult(cmd.id, r));
 		return;
 	}
@@ -572,136 +436,6 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 		r["password_mask_applied_len"] = res.passwordMaskAppliedLen;
 		r["overflow_tail_applied_len"] = res.overflowTailAppliedLen;
 		r["overflow_tail_matches"] = res.overflowTailMatches;
-		cmd.reply->set_value(OkResult(cmd.id, r));
-		return;
-	}
-	if(cmd.op == "clay_form_border_test"){
-		std::string out = cmd.args.value("out", std::string());
-		if(out.empty()){
-			cmd.reply->set_value(Err(cmd.id, "BAD_ARGS",
-				"clay_form_border_test requires --out <path>"));
-			return;
-		}
-		bool ok = silencer::clay_bridge::RunFormBorderTest(game, out.c_str());
-		if(!ok){
-			cmd.reply->set_value(Err(cmd.id, "INTERNAL",
-				"form_border test render failed (PNG write): " + out));
-			return;
-		}
-		nlohmann::json r;
-		r["path"] = out;
-		cmd.reply->set_value(OkResult(cmd.id, r));
-		return;
-	}
-	if(cmd.op == "clay_label_value_row_test"){
-		std::string out = cmd.args.value("out", std::string());
-		if(out.empty()){
-			cmd.reply->set_value(Err(cmd.id, "BAD_ARGS",
-				"clay_label_value_row_test requires --out <path>"));
-			return;
-		}
-		bool ok = silencer::clay_bridge::RunLabelValueRowTest(game, out.c_str());
-		if(!ok){
-			cmd.reply->set_value(Err(cmd.id, "INTERNAL",
-				"label_value_row test render failed (PNG write): " + out));
-			return;
-		}
-		nlohmann::json r;
-		r["path"] = out;
-		cmd.reply->set_value(OkResult(cmd.id, r));
-		return;
-	}
-	if(cmd.op == "clay_box_test"){
-		std::string out = cmd.args.value("out", std::string());
-		if(out.empty()){
-			cmd.reply->set_value(Err(cmd.id, "BAD_ARGS",
-				"clay_box_test requires --out <path>"));
-			return;
-		}
-		bool ok = silencer::clay_bridge::RunBoxTest(game, out.c_str());
-		if(!ok){
-			cmd.reply->set_value(Err(cmd.id, "INTERNAL",
-				"box test render failed (PNG write): " + out));
-			return;
-		}
-		nlohmann::json r;
-		r["path"] = out;
-		cmd.reply->set_value(OkResult(cmd.id, r));
-		return;
-	}
-	if(cmd.op == "clay_box_halo_test"){
-		std::string out = cmd.args.value("out", std::string());
-		if(out.empty()){
-			cmd.reply->set_value(Err(cmd.id, "BAD_ARGS",
-				"clay_box_halo_test requires --out <path>"));
-			return;
-		}
-		bool ok = silencer::clay_bridge::RunBoxHaloTest(game, out.c_str());
-		if(!ok){
-			cmd.reply->set_value(Err(cmd.id, "INTERNAL",
-				"box halo test render failed (PNG write): " + out));
-			return;
-		}
-		nlohmann::json r;
-		r["path"] = out;
-		cmd.reply->set_value(OkResult(cmd.id, r));
-		return;
-	}
-	if(cmd.op == "clay_box_parity_chat"){
-		std::string out = cmd.args.value("out", std::string());
-		if(out.empty()){
-			cmd.reply->set_value(Err(cmd.id, "BAD_ARGS",
-				"clay_box_parity_chat requires --out <path>"));
-			return;
-		}
-		bool ok = silencer::clay_bridge::RunBoxParityChatTest(game, out.c_str());
-		if(!ok){
-			cmd.reply->set_value(Err(cmd.id, "INTERNAL",
-				"box parity chat render failed (PNG write): " + out));
-			return;
-		}
-		nlohmann::json r;
-		r["path"] = out;
-		cmd.reply->set_value(OkResult(cmd.id, r));
-		return;
-	}
-	if(cmd.op == "clay_rectangle_alpha_test"){
-		std::string out = cmd.args.value("out", std::string());
-		if(out.empty()){
-			cmd.reply->set_value(Err(cmd.id, "BAD_ARGS",
-				"clay_rectangle_alpha_test requires --out <path>"));
-			return;
-		}
-		bool ok = silencer::clay_bridge::RunRectangleAlphaTest(
-			game, out.c_str());
-		if(!ok){
-			cmd.reply->set_value(Err(cmd.id, "INTERNAL",
-				"rectangle alpha test render failed (PNG write): " + out));
-			return;
-		}
-		nlohmann::json r;
-		r["path"] = out;
-		cmd.reply->set_value(OkResult(cmd.id, r));
-		return;
-	}
-	if(cmd.op == "clay_panel_test"){
-		std::string variant = cmd.args.value("variant", std::string("right"));
-		std::string out = cmd.args.value("out", std::string());
-		if(out.empty()){
-			cmd.reply->set_value(Err(cmd.id, "BAD_ARGS",
-				"clay_panel_test requires --out <path>"));
-			return;
-		}
-		bool ok = silencer::clay_bridge::RunPanelTest(
-			game, variant.c_str(), out.c_str());
-		if(!ok){
-			cmd.reply->set_value(Err(cmd.id, "INTERNAL",
-				"panel test render failed (PNG write): " + out));
-			return;
-		}
-		nlohmann::json r;
-		r["path"] = out;
-		r["variant"] = variant;
 		cmd.reply->set_value(OkResult(cmd.id, r));
 		return;
 	}

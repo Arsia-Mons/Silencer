@@ -34,5 +34,5 @@ This UI is actively migrating toward good flexbox layout, Clay lifecycle, and sh
 ## Verification
 
 - Build through `clients/silencer/build.ps1` or `clients/silencer/build.sh`; do not run raw CMake/Ninja commands.
-- For primitive/API work, run targeted lobby UI tests such as `tests/lobby-ui/button_test/run.sh`. For the stepped right-pane chrome specifically, use `tests/lobby-ui/lobby_stepped_pane_test/run.sh` rather than the retired legacy-parity right-pane panel harnesses. Add `tests/cli-agent/e2e/60_ui_architecture_boundaries.sh` when ownership boundaries change.
+- For primitive/API work, run `tests/lobby-ui/clay_ui_checks/run.sh` for the retained control-socket checks. For the stepped right-pane chrome specifically, use `tests/lobby-ui/lobby_stepped_pane_test/run.sh` rather than the retired legacy-parity right-pane panel harnesses. Add `tests/cli-agent/e2e/60_ui_architecture_boundaries.sh` when ownership boundaries change.
 - If visual or interaction behavior is in question, verify the real runtime through the client/control socket/screenshots, not compile success alone.

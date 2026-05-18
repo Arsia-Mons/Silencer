@@ -1,27 +1,15 @@
-// P7 unit test scenes for the ScrollList primitive.
+// Assertion probes for the ScrollList primitive.
 //
-// `RunScrollListTest(outPath)` renders one ScrollList (30 items,
-// selectedIndex=8, scrollPosition=3) into a 640x480 Surface and writes a
-// PNG. The committed reference at tests/lobby-ui/scroll_list_test/
-// reference.png is the pinned baseline.
-//
-// `RunScrollListCheck(out)` lays out a 10-item list and drives a press
+// `RunScrollListCheck(out)` lays out a 30-item list and drives a press
 // timeline over the bbox of a known visible row, asserting that exactly
 // one Select action is emitted with the correct index.
-//
-// Invoked via the JSON-lines control ops `clay_scroll_list_test` and
-// `clay_scroll_list_check`.
 
+#include "clay_ui_tests/clay_ui_checks.h"
 #include "clay_ui_compositor.h"
 #include "clay/clay.h"
 #include "primitives/scroll_list.h"
 #include "runtime/UiInteractionRegistry.h"
 #include "runtime/UiInputRouter.h"
-
-#include "game.h"
-#include "palette.h"
-#include "renderer.h"
-#include "surface.h"
 
 #include <cstdio>
 #include <vector>
@@ -48,45 +36,8 @@ void BuildItems() {
 
 }  // namespace
 
-bool RunScrollListTest(::Game & game, const char * outPath) {
-	const int W = 640;
-	const int H = 480;
-	EnsureInitialized(W, H);
-	silencer::ui::primitives::ScrollListBeginFrame();
-	silencer::ui::primitives::TextBeginFrame();
-	BuildItems();
-
-	::Clay_BeginLayout();
-
-	// Root: position the list at (50, 50) via padding.
-	CLAY({ .id = CLAY_ID("ScrollListTestRoot"),
-	       .layout = {
-	           .sizing  = { CLAY_SIZING_FIXED(W), CLAY_SIZING_FIXED(H) },
-	           .padding = { 50, 0, 50, 0 },
-	           .layoutDirection = CLAY_TOP_TO_BOTTOM,
-	       } }) {
-		silencer::ui::primitives::ScrollList(
-			CLAY_STRING("list"),
-			g_items,
-			kTestItemCount,
-			/*selectedIndex=*/8,
-			/*scrollPosition=*/3,
-			{ .width = 200,
-			  .height = 130,
-			  .lineHeight = 13,
-			  .scrollbarBank = 7 });
-	}
-
-	::Clay_RenderCommandArray cmds = ::Clay_EndLayout();
-
-	Surface dst(W, H, /*clearcolor=*/0);
-	Render(game, &dst, cmds);
-
-	::Renderer & r = game.GetRenderer();
-	return r.CapturePNG(dst, r.palette.GetColors(), outPath);
-}
-
 bool RunScrollListCheck(::Game & game, ScrollListCheckResult & out) {
+	(void)game;
 	constexpr int W = 640;
 	constexpr int H = 480;
 	EnsureInitialized(W, H);

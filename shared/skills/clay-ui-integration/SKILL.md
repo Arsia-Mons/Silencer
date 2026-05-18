@@ -108,7 +108,7 @@ For scrollable UI, choose one owner. If Clay owns scrolling, feed pointer state 
 Before calling a Clay UI change correct, verify the relevant surface:
 
 - Build through `clients/silencer/build.ps1` or `clients/silencer/build.sh`.
-- Run targeted primitive/control tests such as `tests/lobby-ui/button_test/run.sh` when primitive behavior changes.
+- Run `tests/lobby-ui/clay_ui_checks/run.sh` for the retained primitive/control checks when primitive behavior changes.
 - Run `tests/cli-agent/e2e/60_ui_architecture_boundaries.sh` when ownership boundaries change.
 - Use runtime screenshots or the control socket when layout, clipping, interaction, audio feedback, or visual behavior is at risk.
 

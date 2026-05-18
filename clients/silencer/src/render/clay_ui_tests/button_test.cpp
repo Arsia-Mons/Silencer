@@ -1,5 +1,6 @@
 // Render and interaction probes for the Button primitive.
 
+#include "clay_ui_tests/clay_ui_checks.h"
 #include "clay_ui_compositor.h"
 #include "clay/clay.h"
 #include "primitives/text.h"
@@ -8,9 +9,6 @@
 #include "runtime/UiInputRouter.h"
 
 #include "game.h"
-#include "palette.h"
-#include "renderer.h"
-#include "surface.h"
 
 #include <cstring>
 #include <cstdlib>
@@ -26,44 +24,6 @@ using silencer::ui::primitives::ButtonHandle;
 using silencer::ui::primitives::ButtonOpts;
 using silencer::ui::primitives::ButtonSize;
 using silencer::ui::primitives::ButtonVariant;
-
-ButtonVariant ParseVariant(const char * v) {
-	if(v && std::strcmp(v, "oval") == 0) return ButtonVariant::Oval;
-	if(v && std::strcmp(v, "text") == 0) return ButtonVariant::Text;
-	if(v && std::strcmp(v, "ghost") == 0) return ButtonVariant::Ghost;
-	return ButtonVariant::Chrome;
-}
-
-ButtonSize ParseSize(const char * s) {
-	if(s && std::strcmp(s, "sm") == 0) return ButtonSize::Sm;
-	if(s && std::strcmp(s, "lg") == 0) return ButtonSize::Lg;
-	if(s && std::strcmp(s, "compact") == 0) return ButtonSize::Compact;
-	if(s && std::strcmp(s, "auto") == 0) return ButtonSize::Auto;
-	return ButtonSize::Md;
-}
-
-Clay_String LabelFor(const char * name) {
-	if(name && std::strcmp(name, "short") == 0) return CLAY_STRING("OK");
-	if(name && std::strcmp(name, "long") == 0) return CLAY_STRING("Connect To Lobby");
-	if(name && std::strcmp(name, "multiline") == 0) return CLAY_STRING("Invite Friends\nTo Game");
-	return CLAY_STRING("Create Game");
-}
-
-ButtonOpts OptsFor(ButtonVariant variant, ButtonSize size, const char * labelName) {
-	ButtonOpts opts;
-	opts.variant = variant;
-	opts.size = size;
-	if(size == ButtonSize::Auto){
-		opts.paddingX = (variant == ButtonVariant::Oval) ? 24 : 0;
-		opts.paddingY = (variant == ButtonVariant::Oval) ? 7 : 4;
-		if(variant == ButtonVariant::Oval) opts.minWidth = 64;
-	}
-	if(labelName && std::strcmp(labelName, "multiline") == 0){
-		opts.wrapText = true;
-		opts.maxWidth = 180;
-	}
-	return opts;
-}
 
 const silencer::ui::UiInteractable * FindButton(
 	silencer::ui::UiInteractionRegistry& interactions,
@@ -105,42 +65,6 @@ ButtonProbe FirstButtonProbe(::Clay_RenderCommandArray cmds) {
 }
 
 }  // namespace
-
-bool RunButtonTest(::Game & game,
-                   const char * variantName,
-                   const char * sizeName,
-                   const char * labelName,
-                   const char * outPath) {
-	const int W = 640;
-	const int H = 480;
-	SetTextMeasureResources(&game.GetWorld().resources);
-	EnsureInitialized(W, H);
-	silencer::ui::primitives::TextBeginFrame();
-	silencer::ui::primitives::ButtonBeginFrame();
-
-	const ButtonVariant variant = ParseVariant(variantName);
-	const ButtonSize size = ParseSize(sizeName);
-	const Clay_String label = LabelFor(labelName);
-	ButtonOpts opts = OptsFor(variant, size, labelName);
-
-	::Clay_BeginLayout();
-	CLAY({ .id = CLAY_ID("ButtonTestRoot"),
-	       .layout = {
-	           .sizing = { CLAY_SIZING_FIXED(W), CLAY_SIZING_FIXED(H) },
-	           .padding = { 242, 0, 68, 0 },
-	           .layoutDirection = CLAY_TOP_TO_BOTTOM,
-	       } }) {
-		Button(CLAY_STRING("ButtonTestSubject"), label, opts);
-	}
-
-	::Clay_RenderCommandArray cmds = ::Clay_EndLayout();
-
-	Surface dst(W, H, /*clearcolor=*/0);
-	Render(game, &dst, cmds);
-
-	::Renderer & r = game.GetRenderer();
-	return r.CapturePNG(dst, r.palette.GetColors(), outPath);
-}
 
 bool RunButtonCheck(::Game & game, ButtonCheckResult & out) {
 	constexpr int W = 640;

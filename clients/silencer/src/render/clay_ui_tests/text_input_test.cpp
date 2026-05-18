@@ -1,64 +1,20 @@
-// P9 unit test scenes for the TextInput primitive.
-//
-// `RunTextInputTest(outPath)` renders one focused TextInput (text
-// "Player1", caret visible, title-sized text) into
-// a 640x480 Surface and writes a PNG. The committed reference at
-// tests/lobby-ui/text_input_test/reference.png is the pinned baseline.
+// Assertion probes for the TextInput primitive.
 //
 // `RunTextInputCheck(out)` verifies the registry/action-drain path:
 //   • Enter queues SubmitText exactly once.
 //   • text input queues SetText but not SubmitText.
 //   • The password variant masks rendered glyphs (asserted via the
 //     emitted CUSTOM payload's textLen).
-//
-// Invoked via the JSON-lines control ops `clay_text_input_test` and
-// `clay_text_input_check`.
 
+#include "clay_ui_tests/clay_ui_checks.h"
 #include "clay_ui_compositor.h"
 #include "clay/clay.h"
 #include "primitives/text_input.h"
 #include "runtime/UiInteractionRegistry.h"
 
-#include "game.h"
-#include "palette.h"
-#include "renderer.h"
-#include "surface.h"
-
 #include <cstring>
 
 namespace silencer::clay_bridge {
-
-bool RunTextInputTest(::Game & game, const char * outPath) {
-	const int W = 640;
-	const int H = 480;
-	EnsureInitialized(W, H);
-	silencer::ui::primitives::TextInputBeginFrame();
-
-	::Clay_BeginLayout();
-
-	CLAY({ .id = CLAY_ID("TextInputTestRoot"),
-	       .layout = {
-	           .sizing  = { CLAY_SIZING_FIXED(W), CLAY_SIZING_FIXED(H) },
-	           .padding = { 50, 0, 50, 0 },
-	           .layoutDirection = CLAY_TOP_TO_BOTTOM,
-	       } }) {
-		silencer::ui::primitives::TextInput(
-			CLAY_STRING("name_input"),
-			"Player1",
-			{ .widthPx = 90,
-			  .heightPx = 19,
-			  .textSize = silencer::ui::primitives::TextSize::FieldLarge,
-			  .showCaret = true });
-	}
-
-	::Clay_RenderCommandArray cmds = ::Clay_EndLayout();
-
-	Surface dst(W, H, /*clearcolor=*/0);
-	Render(game, &dst, cmds);
-
-	::Renderer & r = game.GetRenderer();
-	return r.CapturePNG(dst, r.palette.GetColors(), outPath);
-}
 
 bool RunTextInputCheck(::Game & game, TextInputCheckResult & out) {
 	const int W = 640;
