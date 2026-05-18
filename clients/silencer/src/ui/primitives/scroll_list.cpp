@@ -1,6 +1,7 @@
 #include "scroll_list.h"
 
 #include "clay_ui_payloads.h"
+#include "primitives/text_internal.h"
 #include "runtime/UiInteractionRegistry.h"
 
 #include <cstdint>
@@ -18,7 +19,7 @@ namespace {
 // centered within the full row pitch.
 constexpr Uint16 kRowInsetX     = 4;  // left/right gap between bar and slot
 constexpr Uint16 kRowGapY       = 3;  // total vertical separation between rows
-constexpr Uint16 kRowTextPadX   = 6;  // text inset from the bar's left edge
+constexpr Uint16 kRowTextPadR   = 6;  // text inset from the bar's right edge
 
 constexpr int kPayloadCapacity = 64;
 silencer::clay_bridge::ScrollBarPayload g_payloads[kPayloadCapacity];
@@ -156,12 +157,18 @@ void ScrollList(Clay_String id,
 					       .layout = {
 					           .sizing = { CLAY_SIZING_GROW(0),
 					                       CLAY_SIZING_FIXED(barH) },
-					           .padding = { kRowTextPadX, kRowTextPadX, 0, 0 },
+					           .padding = { 0, kRowTextPadR, 0, 0 },
 					           .childAlignment = { CLAY_ALIGN_X_LEFT,
 					                               CLAY_ALIGN_Y_CENTER },
 					       },
 					       .backgroundColor = barColor }) {
-						Text(items[i], opts.text);
+						// Measure visible glyph bounds so the row text sits
+						// flush with the bar's left edge (leading whitespace
+						// trimmed) and optically centered in the bar's height
+						// rather than top-aligned in the font's line box.
+						text_internal::TextWithInternalOptions(
+							items[i], opts.text,
+							text_internal::InternalTextOpts{ .measureInk = true });
 					}
 				}
 			}
