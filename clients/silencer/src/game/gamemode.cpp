@@ -1,17 +1,14 @@
 #include "gamemode.h"
-#include "world.h"
-
-// ── DataRetrievalMode ─────────────────────────────────────────────────────────
-
-bool DataRetrievalMode::IsMatchOver(const World& w) const {
-	return w.GetWinningTeamId() != 0;
-}
-
-Uint16 DataRetrievalMode::WinningTeamId(const World& w) const {
-	return w.GetWinningTeamId();
-}
-
-// ── Factory ───────────────────────────────────────────────────────────────────
+#include "data_retrieval_mode.h"
+#include "deathmatch_mode.h"
+#include "team_deathmatch_mode.h"
+#include "survival_mode.h"
+#include "extraction_mode.h"
+#include "assassination_mode.h"
+#include "sabotage_mode.h"
+#include "manhunt_mode.h"
+#include "control_points_mode.h"
+#include "escort_mode.h"
 
 GameMode* GameModeFactory(GameModeId id) {
 	switch(id){
@@ -28,3 +25,4 @@ GameMode* GameModeFactory(GameModeId id) {
 		default:                       return new DataRetrievalMode();
 	}
 }
+
