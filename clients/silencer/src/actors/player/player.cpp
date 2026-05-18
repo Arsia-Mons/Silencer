@@ -30,6 +30,7 @@
 #include "bodypart.h"
 #include "walldefense.h"
 #include "actordef.h"
+#include "gamemode.h"
 #include <math.h>
 
 // Apply a data-driven animation sequence to res_bank/res_index.
@@ -2480,7 +2481,7 @@ void Player::Tick(World & world){
 			}
 			x += xe;
 			y += ye;
-			if(((input.keyactivate && !oldinput.keyactivate) || state_i > GASLoader::Get().player.deadAutoRespawnTick) && !state_warp && !world.winningteamid){
+			if(((input.keyactivate && !oldinput.keyactivate) || state_i > GASLoader::Get().player.deadAutoRespawnTick) && !state_warp && !world.winningteamid && (!world.gameMode || world.gameMode->AllowRespawn(world))){
 				state_hit = 0;
 				Team * team = GetTeam(world);
 				if(team && team->agency == Team::LAZARUS && canresurrect && !world.winningteamid){

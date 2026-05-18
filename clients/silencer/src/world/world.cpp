@@ -137,6 +137,21 @@ void World::Tick(void){
 		if(gameMode){
 			gameMode->Tick(*this);
 		}
+		// Poll IsMatchOver + time limit each tick on authority.
+		if(gameMode && !winningteamid && gameplaystate == INGAME){
+			bool over = gameMode->IsMatchOver(*this);
+			if(!over){
+				const GameModeConfig* cfg = GASLoader::Get().GetGameModeConfig((int)gameMode->Id());
+				const int tps = GASLoader::Get().gameengine.ticksPerSecond;
+				if(cfg && cfg->timeLimitSecs > 0 && tps > 0 && (int)(tickcount / tps) >= cfg->timeLimitSecs){
+					over = true;
+				}
+			}
+			if(over){
+				winningteamid = gameMode->WinningTeamId(*this);
+				if(!winningteamid) winningteamid = 0xFFFF; // draw
+			}
+		}
 		// Create the replicated match-state object once per match on authority.
 		if(gameplaystate == INGAME && objectsbytype[ObjectTypes::GAMESTATEOBJ].empty()){
 			GameStateObject* gso = (GameStateObject*)CreateObject(ObjectTypes::GAMESTATEOBJ);

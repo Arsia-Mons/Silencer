@@ -45,6 +45,10 @@ public:
 		(void)victim; (void)attacker;
 	}
 
+	// Called by Player when deciding whether a dead player may respawn.
+	// Returns the GAS per-mode respawn flag by default.
+	virtual bool AllowRespawn(const World&) const;
+
 	// Returns true when the match should end.
 	virtual bool IsMatchOver(const World&) const = 0;
 

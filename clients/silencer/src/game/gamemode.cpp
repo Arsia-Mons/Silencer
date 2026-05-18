@@ -1,4 +1,6 @@
 #include "gamemode.h"
+#include "gasloader.h"
+#include "world.h"
 #include "data_retrieval_mode.h"
 #include "deathmatch_mode.h"
 #include "team_deathmatch_mode.h"
@@ -9,6 +11,11 @@
 #include "manhunt_mode.h"
 #include "control_points_mode.h"
 #include "escort_mode.h"
+
+bool GameMode::AllowRespawn(const World&) const {
+	const GameModeConfig* cfg = GASLoader::Get().GetGameModeConfig((int)Id());
+	return cfg ? cfg->respawn : true;
+}
 
 GameMode* GameModeFactory(GameModeId id) {
 	switch(id){

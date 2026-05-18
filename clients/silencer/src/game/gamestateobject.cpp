@@ -21,5 +21,12 @@ void GameStateObject::Tick(World& world) {
 	if(tps > 0){
 		matchTimeSecs = (Uint16)(world.tickcount / tps);
 	}
-	(void)world;
+	// Update match phase: 0=warmup, 1=active, 2=over.
+	if(world.winningteamid){
+		matchPhase = 2;
+	} else if(world.gameplaystate == World::INGAME){
+		matchPhase = 1;
+	} else {
+		matchPhase = 0;
+	}
 }
