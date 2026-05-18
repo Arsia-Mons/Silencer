@@ -2,7 +2,10 @@
 #include "audio.h"
 #include "config.h"
 #include "gasloader.h"
+#include "gamemode.h"
+#include "gamestateobject.h"
 #include "interface.h"
+#include "objecttypes.h"
 #include "player.h"
 #include "selectbox.h"
 #include "team.h"
@@ -37,7 +40,11 @@ void Game::UnloadGame(void){
 	world.pancamerareturncount = 0;
 	world.message_i = 0;
 	world.winningteamid = 0;
+	world.matchEndCalled = false;
 	world.DestroyAllObjects();
+	// Reset game mode to default for the next match.
+	delete world.gameMode;
+	world.gameMode = GameModeFactory(GAMEMODE_DATA_RETRIEVAL);
 	world.chatlines.clear();
 	world.messagetype = 0;
 	world.highlightminimap = false;

@@ -72,128 +72,16 @@ void Team::Tick(World & world){
 		secrets++;
 		world.secretsBeamed++;
 		world.SendSound(GASLoader::Get().player.soundTeamHQ.c_str());
-		Player * player = static_cast<Player *>(world.GetObjectFromId(secretdelivered));
-		if(player){
-			player->EmitSound(world, world.resources.soundbank[GASLoader::Get().player.soundTeamHeal], 48);
-			Peer * peer = player->GetPeer(world);
-			if(peer){
-				User * user = world.lobby.GetUserInfo(peer->accountid);
-				bool stolen = false;
-				if(player->secretteamid != id){
-					stolen = true;
-				}
-				int remaining = GASLoader::Get().player.secretsNeededToWin - secrets;
-				char text[128];
-				sprintf(text, "%s returned a %s\n( %d remaining )\n\nTeam awarded %d credits", user->name, stolen ? "stolen secret" : "secret", remaining, GASLoader::Get().player.secretDeliveryCredits);
-				if(!world.intutorialmode){
-					world.ShowMessage(text, 128, 0, true);
-				}
-			}
-		}
-		for(int i = 0; i < numpeers; i++){
-			Player * player = world.GetPeerPlayer(peers[i]);
-			if(player){
-				player->AddCredits(GASLoader::Get().player.secretDeliveryCredits);
-			}
-		}
-		world.Illuminate();
-		if(secrets >= GASLoader::Get().player.secretsNeededToWin){
-			// game won
-			if(!world.winningteamid){
-				world.winningteamid = id;
-				for(std::list<Object *>::iterator it = world.objectlist.begin(); it != world.objectlist.end(); it++){
-					Object * object = *it;
-					if(object->type == ObjectTypes::PLAYER){
-						Player * player = static_cast<Player *>(object);
-						Team * team = player->GetTeam(world);
-						if(team && team->id == world.winningteamid){
-							player->UnDeploy();
-						}else{
-							Peer * peer = player->GetPeer(world);
-							if(peer){
-								world.KillByGovt(*peer);
-							}
-						}
-					}
-				}
-				for(int i = 0; i < world.maxpeers; i++){
-					Peer * peer = world.peerlist[i];
-					if(peer){
-						Uint8 type = 10;
-						char fs[64];
-						strcpy(fs, "MISSION SUCCESS\n");
-						bool isourteam = false;
-						for(int i = 0; i < numpeers; i++){
-							Peer * peer2 = world.peerlist[peers[i]];
-							if(peer2){
-								if(peer2->id == peer->id){
-									isourteam = true;
-								}
-							}
-						}
-						if(!isourteam){
-							strcpy(fs, "MISSION FAILED\n");
-							type = 11;
-						}
-						char message[256];
-						sprintf(message, "%sAll secrets retrieved\nby %s agents:\n\n", fs, GetAgencyName());
-						for(int i = 0; i < numpeers; i++){
-							Peer * peer2 = world.peerlist[peers[i]];
-							if(peer2){
-								User * user = world.lobby.GetUserInfo(peer2->accountid);
-								strcat(message, user->name);
-								strcat(message, "\n");
-							}
-						}
-						world.ShowMessage(message, 255, type, true, peer);
-					}
-				}
-			}
+		if(world.gameMode){
+			world.gameMode->OnSecretDelivered(world, *this);
 		}
 		secretdelivered = 0;
-	}
-	if(secrets >= GASLoader::Get().player.secretsNeededToWin){
-		// bug fix for when secretdelivered packet is lost
-		if(!world.winningteamid){
-			world.winningteamid = id;
-		}
 	}
 	if(secretprogress >= GASLoader::Get().player.secretProgressBeamThresh && oldsecretprogress > 0){
 		secretprogress = 0;
 		oldsecretprogress = 0;
-		if(world.IsAuthority()){
-			std::vector<Terminal *> terminals;
-			for(std::list<Object *>::iterator it = world.objectlist.begin(); it != world.objectlist.end(); it++){
-				Object * object = (*it);
-				if(object->type == ObjectTypes::TERMINAL){
-					Terminal * terminal = static_cast<Terminal *>(object);
-					if(terminal && terminal->isbig && terminal->state != Terminal::SECRETBEAMING && terminal->state != Terminal::SECRETREADY){
-						terminals.push_back(terminal);
-					}
-				}
-			}
-			if(terminals.size() > 0){
-				Terminal * terminal = terminals[world.Random() % terminals.size()];
-				terminal->state = Terminal::SECRETBEAMING;
-				terminal->state_i = 0;
-				beamingterminalid = terminal->id;
-				{ const TerminalDef* _td = GASLoader::Get().GetTerminalDef("big"); terminal->beamingtime = _td ? _td->beaconTimeSecs : 65; }
-				char teamtext[256];
-				char enemytext[256];
-				sprintf(teamtext, "TOP SECRET LOCATION DETERMINED\n\nApproximate time : %d seconds", terminal->beamingtime);
-				sprintf(enemytext, "ENEMY BEAMING DETECTED\n\nTracking location on radar");
-				for(int i = 0; i < world.maxpeers; i++){
-					Peer * peer = world.peerlist[i];
-					if(peer){
-						if(world.GetPeerTeam(peer->id) == this){
-							world.ShowMessage(teamtext, 128, 0, true, peer);
-						}else{
-							world.ShowMessage(enemytext, 128, 0, true, peer);
-						}
-					}
-				}
-				world.SendSound(GASLoader::Get().player.soundTeamHack.c_str());
-			}
+		if(world.gameMode){
+			world.gameMode->OnSecretBeamReady(world, *this);
 		}
 	}
 	if(world.gameplaystate == World::INLOBBY){

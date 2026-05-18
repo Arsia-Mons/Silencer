@@ -604,6 +604,17 @@ struct GameEngineDef {
     int shrapnelLifeLaser    = 13;   // ticks before laser shrapnel (bank 110) self-destructs
 };
 
+// Per-mode config block. All limits use 0 to mean "disabled / no limit".
+struct GameModeConfig {
+    int         id            = 0;
+    std::string name;
+    int timeLimitSecs  = 0;  // 0 = no time limit
+    int scoreLimit     = 0;  // 0 = no score limit (frags, points, etc.)
+    int fragLimit      = 0;  // 0 = no frag limit (deathmatch modes)
+    bool friendlyFire  = false;
+    bool respawn       = true;
+};
+
 // ---------------------------------------------------------------------------
 // GASLoader singleton
 // ---------------------------------------------------------------------------
@@ -631,6 +642,7 @@ public:
     const TerminalDef*   GetTerminalDef(const std::string& id) const;
     const EffectDef*     GetEffectDef(const std::string& id) const;
     const LightDef*      GetLightDef(const std::string& id) const;
+    const GameModeConfig* GetGameModeConfig(int modeId) const;
 
     PlayerDef                player;
     WorldDef                 world;
@@ -644,6 +656,7 @@ public:
     std::vector<TerminalDef>   terminals;
     std::vector<EffectDef>     effects;
     std::vector<LightDef>      lights;
+    std::vector<GameModeConfig> gameModes;
 
     // Errors from the most recent Load() / Reload(). Cleared at the
     // start of each load. Read-only consumers should treat

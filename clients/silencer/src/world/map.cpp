@@ -30,6 +30,7 @@ Map::Map(){
 	width = 0;
 	height = 0;
 	ambience = 0;
+	supportedModes = 0;
 	memset(description, 0, sizeof(description));
 	loaded = false;
 }
@@ -172,6 +173,7 @@ bool Map::LoadFile(const char * filename, World & world, Team * team){
 		}*/
 		Map::parallax = header.parallax;
 		Map::ambience = header.ambience;
+		Map::supportedModes = header.flags & 0x3FF; // bits 0–9 = game mode bitmask
 		/*if(uncompress(minimap.pixels, &minimapsizeuncompressed, header.minimapcompressed, header.minimapcompressedsize) != Z_OK){
 			return false;
 		}*/

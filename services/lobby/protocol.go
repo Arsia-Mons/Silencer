@@ -214,7 +214,7 @@ type LobbyGame struct {
 	MaxLevel         uint8
 	MaxPlayers       uint8
 	MaxTeams         uint8
-	Extra            uint8
+	ModeId           uint8  // GameModeId carried in the wire field formerly named Extra
 	Spectatable      uint8
 	Port             uint16
 	ParkedAccountIDs []uint32
@@ -266,7 +266,7 @@ func (g *LobbyGame) Decode(r *reader) error {
 	if g.MaxTeams, err = r.u8(); err != nil {
 		return err
 	}
-	if g.Extra, err = r.u8(); err != nil {
+	if g.ModeId, err = r.u8(); err != nil {
 		return err
 	}
 	if g.Spectatable, err = r.u8(); err != nil {
@@ -293,7 +293,7 @@ func (g *LobbyGame) Encode(w *writer) {
 	w.u8(g.MaxLevel)
 	w.u8(g.MaxPlayers)
 	w.u8(g.MaxTeams)
-	w.u8(g.Extra)
+	w.u8(g.ModeId)
 	w.u8(g.Spectatable)
 	w.u16(g.Port)
 }
