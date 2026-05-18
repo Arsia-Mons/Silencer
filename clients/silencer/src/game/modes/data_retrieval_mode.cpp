@@ -8,6 +8,21 @@
 #include "terminal.h"
 #include "world.h"
 
+// Re-fire OnSecretDelivered each tick for any team that has reached the
+// secret threshold but whose win hasn't been registered yet — guards against
+// lost network packets on the delivery event.
+void DataRetrievalMode::Tick(World& world) {
+	if(world.winningteamid) return;
+	for(Object* obj : world.objectlist){
+		if(obj->type != ObjectTypes::TEAM) continue;
+		Team* team = static_cast<Team*>(obj);
+		if(team->secrets >= GASLoader::Get().player.secretsNeededToWin){
+			OnSecretDelivered(world, *team);
+			return;
+		}
+	}
+}
+
 bool DataRetrievalMode::IsMatchOver(const World& w) const {
 	return w.GetWinningTeamId() != 0;
 }

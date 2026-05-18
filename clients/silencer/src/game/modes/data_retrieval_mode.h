@@ -9,6 +9,7 @@ class DataRetrievalMode : public GameMode {
 public:
 	GameModeId  Id()   const override { return GAMEMODE_DATA_RETRIEVAL; }
 	const char* Name() const override { return "Data Retrieval"; }
+	void   Tick(World& world) override;
 	void   OnSecretDelivered(World& world, Team& team) override;
 	void   OnSecretBeamReady(World& world, Team& team) override;
 	bool   IsMatchOver(const World& w) const override;

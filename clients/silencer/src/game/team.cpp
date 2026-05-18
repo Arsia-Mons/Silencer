@@ -102,14 +102,6 @@ void Team::Tick(World & world){
 		}
 		secretdelivered = 0;
 	}
-	if(secrets >= GASLoader::Get().player.secretsNeededToWin){
-		// Bug fix: if the secretdelivered packet was lost, OnSecretDelivered
-		// may not have fired. Dispatch again so the active GameMode can set
-		// winningteamid before the next tick's CheckForEndOfGame.
-		if(!world.winningteamid && world.gameMode){
-			world.gameMode->OnSecretDelivered(world, *this);
-		}
-	}
 	if(secretprogress >= GASLoader::Get().player.secretProgressBeamThresh && oldsecretprogress > 0){
 		secretprogress = 0;
 		oldsecretprogress = 0;
