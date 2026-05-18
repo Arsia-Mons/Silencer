@@ -102,11 +102,16 @@ int KeybindListVisibleRowsForContentHeight(int contentHeight) {
 	                         - controls_keybind_list_detail::kActionTopGap
 	                         - controls_keybind_list_detail::kActionRowH
 	                         - controls_keybind_list_detail::kSectionGap * 3;
-	if(viewportHeight <= 0) return kKeybindListMinVisibleRows;
+	if(viewportHeight <= 0) return 1;
+	// Whole rows that fit at the design row height. The rows GROW to absorb
+	// any leftover space (see BuildKeybindListBody), so flooring here keeps
+	// the last row from clipping while the list still fills the content area.
+	// Forcing a higher minimum overflowed the viewport and clipped the last
+	// row at the smallest panel size (issue #179).
 	const int rows = (viewportHeight + controls_keybind_list_detail::kRowGap)
 	               / (controls_keybind_list_detail::kRowH
 	                  + controls_keybind_list_detail::kRowGap);
-	return std::max(kKeybindListMinVisibleRows, rows);
+	return std::max(1, rows);
 }
 
 void BuildKeybindListBody(const KeybindListView & view,
@@ -181,7 +186,7 @@ void BuildKeybindListBody(const KeybindListView & view,
 				const KeybindRowView & row = view.rows[i];
 				CLAY({ .id = CLAY_IDI("ControlsRow", (uint32_t)i),
 				       .layout = {
-				           .sizing = { CLAY_SIZING_GROW(0), CLAY_SIZING_FIXED(controls_keybind_list_detail::kRowH) },
+				           .sizing = { CLAY_SIZING_GROW(0), CLAY_SIZING_GROW(controls_keybind_list_detail::kRowH) },
 				           .childGap = controls_keybind_list_detail::kColumnGap,
 				           .childAlignment = { CLAY_ALIGN_X_LEFT, CLAY_ALIGN_Y_CENTER },
 				           .layoutDirection = CLAY_LEFT_TO_RIGHT,
