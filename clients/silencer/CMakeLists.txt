@@ -115,8 +115,9 @@ if(SILENCER_UNITY_BUILD)
 	set_source_files_properties(${_clay_unsafe_sources} PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON)
 endif()
 
-# Compile HLSL → DXIL bytecode headers for the SDL3 GPU backend. macOS keeps
-# the existing MSL source strings; SPIRV/Linux is a separate change.
+# Compile HLSL → DXIL (Windows/D3D12) and SPIR-V (Linux/Vulkan) bytecode headers.
+# macOS uses inline MSL source strings. All generated headers are committed so
+# builds work without dxc installed — edit a .hlsl to trigger regeneration.
 include(CompileShaders)
 silencer_compile_shader(vert_screen   vertex  vert_screen)
 silencer_compile_shader(frag_remap    pixel   frag_remap)
@@ -125,6 +126,13 @@ silencer_compile_shader(frag_light    pixel   frag_light)
 silencer_compile_shader(vert_particle vertex  vert_particle)
 silencer_compile_shader(frag_particle pixel   frag_particle)
 silencer_compile_shader(comp_particle compute update_particles)
+silencer_compile_shader_spirv(vert_screen   vertex  vert_screen)
+silencer_compile_shader_spirv(frag_remap    pixel   frag_remap)
+silencer_compile_shader_spirv(frag_upscale  pixel   frag_upscale)
+silencer_compile_shader_spirv(frag_light    pixel   frag_light)
+silencer_compile_shader_spirv(vert_particle vertex  vert_particle)
+silencer_compile_shader_spirv(frag_particle pixel   frag_particle)
+silencer_compile_shader_spirv(comp_particle compute update_particles)
 silencer_finalize_shaders(
     vert_screen frag_remap frag_upscale frag_light
     vert_particle frag_particle comp_particle

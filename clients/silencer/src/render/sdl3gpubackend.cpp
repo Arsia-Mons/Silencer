@@ -1,9 +1,8 @@
 #include "sdl3gpubackend.h"
 #include <string.h>
 
-// DXIL bytecode generated from the HLSL sources in clients/silencer/shaders/
-// at build time by dxc. The headers define `static const unsigned char
-// k<Name>DXIL[]`; size comes from `sizeof()` — dxc -Fh doesn't emit one.
+// DXIL bytecode (Windows/D3D12) — generated from HLSL by dxc, committed.
+// Symbols: static const unsigned char k<Name>DXIL[].
 #include "vert_screen.dxil.h"
 #include "frag_remap.dxil.h"
 #include "frag_upscale.dxil.h"
@@ -11,6 +10,16 @@
 #include "vert_particle.dxil.h"
 #include "frag_particle.dxil.h"
 #include "comp_particle.dxil.h"
+
+// SPIR-V bytecode (Linux/Vulkan) — generated from HLSL by Vulkan SDK dxc -spirv.
+// Symbols: const unsigned char k<Name>SPV[].
+#include "vert_screen.spv.h"
+#include "frag_remap.spv.h"
+#include "frag_upscale.spv.h"
+#include "frag_light.spv.h"
+#include "vert_particle.spv.h"
+#include "frag_particle.spv.h"
+#include "comp_particle.spv.h"
 
 // ---------------------------------------------------------------------------
 // MSL Shaders (Metal Shading Language — macOS/Metal backend).
@@ -150,13 +159,13 @@ kernel void update_particles(
 // Per-shader bundles: every Init/CreatePipeline call picks msl_src vs dxil
 // based on `chosen_format` set at backend Init.
 // ---------------------------------------------------------------------------
-static const ShaderBundle kVertScreen   = { kVertScreenMSL,   kVertScreenDXIL,   sizeof(kVertScreenDXIL),   "vert_screen"      };
-static const ShaderBundle kFragRemap    = { kFragRemapMSL,    kFragRemapDXIL,    sizeof(kFragRemapDXIL),    "frag_remap"       };
-static const ShaderBundle kFragUpscale  = { kFragUpscaleMSL,  kFragUpscaleDXIL,  sizeof(kFragUpscaleDXIL),  "frag_upscale"     };
-static const ShaderBundle kFragLight    = { kFragLightMSL,    kFragLightDXIL,    sizeof(kFragLightDXIL),    "frag_light"       };
-static const ShaderBundle kVertParticle = { kVertParticleMSL, kVertParticleDXIL, sizeof(kVertParticleDXIL), "vert_particle"    };
-static const ShaderBundle kFragParticle = { kFragParticleMSL, kFragParticleDXIL, sizeof(kFragParticleDXIL), "frag_particle"    };
-static const ShaderBundle kCompParticle = { kComputeParticleMSL, kCompParticleDXIL, sizeof(kCompParticleDXIL), "update_particles" };
+static const ShaderBundle kVertScreen   = { kVertScreenMSL,      kVertScreenDXIL,   sizeof(kVertScreenDXIL),   kVertScreenSPV,   sizeof(kVertScreenSPV),   "vert_screen"      };
+static const ShaderBundle kFragRemap    = { kFragRemapMSL,       kFragRemapDXIL,    sizeof(kFragRemapDXIL),    kFragRemapSPV,    sizeof(kFragRemapSPV),    "frag_remap"       };
+static const ShaderBundle kFragUpscale  = { kFragUpscaleMSL,     kFragUpscaleDXIL,  sizeof(kFragUpscaleDXIL),  kFragUpscaleSPV,  sizeof(kFragUpscaleSPV),  "frag_upscale"     };
+static const ShaderBundle kFragLight    = { kFragLightMSL,       kFragLightDXIL,    sizeof(kFragLightDXIL),    kFragLightSPV,    sizeof(kFragLightSPV),    "frag_light"       };
+static const ShaderBundle kVertParticle = { kVertParticleMSL,    kVertParticleDXIL, sizeof(kVertParticleDXIL), kVertParticleSPV, sizeof(kVertParticleSPV), "vert_particle"    };
+static const ShaderBundle kFragParticle = { kFragParticleMSL,    kFragParticleDXIL, sizeof(kFragParticleDXIL), kFragParticleSPV, sizeof(kFragParticleSPV), "frag_particle"    };
+static const ShaderBundle kCompParticle = { kComputeParticleMSL, kCompParticleDXIL, sizeof(kCompParticleDXIL), kCompParticleSPV, sizeof(kCompParticleSPV), "update_particles" };
 
 // ---------------------------------------------------------------------------
 SDL3GPUBackend::SDL3GPUBackend() = default;
@@ -166,25 +175,27 @@ bool SDL3GPUBackend::Init(SDL_Window *win) {
 	window = win;
 
 	const SDL_GPUShaderFormat formats =
-	    SDL_GPU_SHADERFORMAT_DXIL | SDL_GPU_SHADERFORMAT_MSL;
+	    SDL_GPU_SHADERFORMAT_DXIL | SDL_GPU_SHADERFORMAT_MSL | SDL_GPU_SHADERFORMAT_SPIRV;
 	device = SDL_CreateGPUDevice(formats, false, NULL);
 	if (!device) {
 		SDL_Log("SDL3GPUBackend: SDL_CreateGPUDevice failed: %s", SDL_GetError());
 		return false;
 	}
 
-	// Reduce the device's reported format set to the one we actually feed
-	// shaders in. Prefer DXIL on Windows/D3D12, MSL on Apple/Metal.
+	// Pick the best available shader format: DXIL on Windows, MSL on Apple,
+	// SPIR-V on Linux/Vulkan.
 	const SDL_GPUShaderFormat avail = SDL_GetGPUShaderFormats(device);
-	if (avail & SDL_GPU_SHADERFORMAT_DXIL)      chosen_format = SDL_GPU_SHADERFORMAT_DXIL;
-	else if (avail & SDL_GPU_SHADERFORMAT_MSL)  chosen_format = SDL_GPU_SHADERFORMAT_MSL;
+	if (avail & SDL_GPU_SHADERFORMAT_DXIL)        chosen_format = SDL_GPU_SHADERFORMAT_DXIL;
+	else if (avail & SDL_GPU_SHADERFORMAT_MSL)    chosen_format = SDL_GPU_SHADERFORMAT_MSL;
+	else if (avail & SDL_GPU_SHADERFORMAT_SPIRV)  chosen_format = SDL_GPU_SHADERFORMAT_SPIRV;
 	else {
 		SDL_Log("SDL3GPUBackend: no compatible shader format (driver reports 0x%x)",
 		        (unsigned)avail);
 		return false;
 	}
 	SDL_Log("SDL3GPUBackend: chosen shader format=%s",
-	        chosen_format == SDL_GPU_SHADERFORMAT_DXIL ? "DXIL" : "MSL");
+	        chosen_format == SDL_GPU_SHADERFORMAT_DXIL  ? "DXIL"  :
+	        chosen_format == SDL_GPU_SHADERFORMAT_MSL   ? "MSL"   : "SPIR-V");
 
 	if (!SDL_ClaimWindowForGPUDevice(device, window)) {
 		SDL_Log("SDL3GPUBackend: SDL_ClaimWindowForGPUDevice failed: %s", SDL_GetError());
@@ -255,6 +266,10 @@ SDL_GPUShader *SDL3GPUBackend::LoadShader(SDL_GPUShaderStage stage,
 		info.code      = b.dxil;
 		info.code_size = b.dxil_size;
 		info.format    = SDL_GPU_SHADERFORMAT_DXIL;
+	} else if (chosen_format == SDL_GPU_SHADERFORMAT_SPIRV) {
+		info.code      = b.spv;
+		info.code_size = b.spv_size;
+		info.format    = SDL_GPU_SHADERFORMAT_SPIRV;
 	} else {
 		info.code      = (const Uint8 *)b.msl_src;
 		info.code_size = strlen(b.msl_src);
