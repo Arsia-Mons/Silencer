@@ -135,6 +135,7 @@ public:
 	bool player_spawn_emitted = false;
 	int secretsBeamed = 0;  // total secrets successfully delivered to base (authority-side counter)
 	GameMode* gameMode = nullptr;  // authority-only; owns current match mode logic
+	bool matchEndCalled = false;  // ensures OnMatchEnd fires exactly once per match
 
 	friend class Renderer;
 	friend class Game;

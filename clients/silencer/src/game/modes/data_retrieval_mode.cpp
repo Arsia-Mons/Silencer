@@ -1,4 +1,5 @@
 #include "data_retrieval_mode.h"
+#include "gamestateobject.h"
 #include "gasloader.h"
 #include "lobby.h"
 #include "objecttypes.h"
@@ -12,6 +13,16 @@ bool DataRetrievalMode::IsMatchOver(const World& w) const {
 
 Uint16 DataRetrievalMode::WinningTeamId(const World& w) const {
 	return w.GetWinningTeamId();
+}
+
+void DataRetrievalMode::UpdateScores(GameStateObject& gso, const World& w) const {
+	for(Object* obj : w.objectlist){
+		if(obj->type != ObjectTypes::TEAM) continue;
+		const Team* team = static_cast<const Team*>(obj);
+		if(team->number < 6){
+			gso.score[team->number] = team->secrets;
+		}
+	}
 }
 
 void DataRetrievalMode::OnSecretDelivered(World& world, Team& team) {

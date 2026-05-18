@@ -17,6 +17,7 @@ public:
 	GameModeId modeId        = GAMEMODE_DATA_RETRIEVAL;
 	Uint8      matchPhase    = 0;  // 0=warmup 1=active 2=over
 	Uint16     matchTimeSecs = 0;  // elapsed match seconds
+	Uint16     winningTeamId = 0;  // 0=none/draw, 0xFFFF=draw (time limit)
 	Uint16     score[6]      = {}; // per-team score (index = team slot, up to World::maxteams)
 };
 

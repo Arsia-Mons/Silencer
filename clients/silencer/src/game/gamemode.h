@@ -7,6 +7,7 @@ class World;
 class Player;
 class Object;
 class Team;
+class GameStateObject;
 
 // Numeric id transmitted in GameStateObject and game config.
 enum GameModeId : Uint8 {
@@ -44,6 +45,22 @@ public:
 	virtual void OnPlayerDied(World&, Player& victim, Object* attacker) {
 		(void)victim; (void)attacker;
 	}
+
+	// Called when all players on a team are eliminated (dead/disconnected).
+	// Useful for last-team-standing logic (Survival, Manhunt).
+	virtual void OnTeamEliminated(World&, Team&) {}
+
+	// Called when a team completes a mode-specific objective (capture point,
+	// deliver item, plant bomb, etc.). Meaning is mode-defined.
+	virtual void OnObjectiveCaptured(World&, Team&) {}
+
+	// Called once by World when winningteamid is first set (match over).
+	// Override to broadcast results, apply bonuses, record stats, etc.
+	virtual void OnMatchEnd(World&) {}
+
+	// Called each authority tick by GameStateObject to let the mode write
+	// per-team scores into gso.score[]. Index = team.number.
+	virtual void UpdateScores(GameStateObject&, const World&) const {}
 
 	// Called by Player when deciding whether a dead player may respawn.
 	// Returns the GAS per-mode respawn flag by default.

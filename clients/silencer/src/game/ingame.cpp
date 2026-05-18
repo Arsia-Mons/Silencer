@@ -40,6 +40,7 @@ void Game::UnloadGame(void){
 	world.pancamerareturncount = 0;
 	world.message_i = 0;
 	world.winningteamid = 0;
+	world.matchEndCalled = false;
 	world.DestroyAllObjects();
 	// Reset game mode to default for the next match.
 	delete world.gameMode;

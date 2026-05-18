@@ -152,6 +152,11 @@ void World::Tick(void){
 				if(!winningteamid) winningteamid = 0xFFFF; // draw
 			}
 		}
+		// Fire OnMatchEnd exactly once when the match transitions to over.
+		if(gameMode && winningteamid && !matchEndCalled){
+			matchEndCalled = true;
+			gameMode->OnMatchEnd(*this);
+		}
 		// Create the replicated match-state object once per match on authority.
 		if(gameplaystate == INGAME && objectsbytype[ObjectTypes::GAMESTATEOBJ].empty()){
 			GameStateObject* gso = (GameStateObject*)CreateObject(ObjectTypes::GAMESTATEOBJ);
