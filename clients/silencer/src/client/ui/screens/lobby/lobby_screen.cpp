@@ -134,7 +134,7 @@ void LobbyScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime, s
 	           .layoutDirection = CLAY_TOP_TO_BOTTOM,
 	       },
 	       .image = { .imageData = silencer::clay_bridge::PackImageStretch(7, 1) } }) {
-		BuildLobbyTitleBar(version, mapName, layoutWidth, interactions);
+		BuildLobbyTitleBar(version, mapName, world.resources, layoutWidth, interactions);
 
 		LobbyMainAreaPanels panels{
 			characterState,

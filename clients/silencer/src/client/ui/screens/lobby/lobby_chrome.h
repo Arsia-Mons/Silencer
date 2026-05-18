@@ -8,6 +8,8 @@
 #include <cstdint>
 #include <string>
 
+class Resources;
+
 namespace silencer::ui {
 class UiInteractionRegistry;
 }
@@ -21,6 +23,7 @@ uint16_t LobbyTitleBarHeight();
 // Go Back button hit rect at its legacy screen coordinates.
 void BuildLobbyTitleBar(const std::string & version,
                         const std::string & mapName,
+                        const Resources & resources,
                         int surfaceW,
                         silencer::ui::UiInteractionRegistry& interactions);
 
