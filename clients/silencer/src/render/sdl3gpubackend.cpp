@@ -796,16 +796,26 @@ void SDL3GPUBackend::Present() {
 		return;
 	}
 
-	// ---- 6. Upscale pass: scene_tex → swapchain ----
+	// ---- 6. Upscale pass: scene_tex → swapchain (letterboxed) ----
 	if (scene_tex) {
 		SDL_GPUColorTargetInfo ct = {};
 		ct.texture     = swapchain;
-		ct.load_op     = SDL_GPU_LOADOP_CLEAR;
+		ct.load_op     = SDL_GPU_LOADOP_CLEAR;   // fills black bars
 		ct.store_op    = SDL_GPU_STOREOP_STORE;
 		ct.clear_color = {0, 0, 0, 1};
 
 		SDL_GPURenderPass *pass = SDL_BeginGPURenderPass(cmd, &ct, 1, nullptr);
 		if (pass) {
+			// Constrain to aspect-ratio-correct sub-region; clear above fills bars.
+			float vp_x, vp_y, vp_w, vp_h;
+			ComputeLetterboxViewport(
+				(int)sw_w, (int)sw_h,
+				scene_tex_w ? scene_tex_w : 640,
+				scene_tex_h ? scene_tex_h : 480,
+				vp_x, vp_y, vp_w, vp_h);
+			SDL_GPUViewport vp = {vp_x, vp_y, vp_w, vp_h, 0.0f, 1.0f};
+			SDL_SetGPUViewport(pass, &vp);
+
 			SDL_BindGPUGraphicsPipeline(pass, upscale_pipeline);
 			SDL_GPUSampler *up_samp = use_linear ? linear_sampler : nearest_sampler;
 			SDL_GPUTextureSamplerBinding bind = {scene_tex, up_samp};

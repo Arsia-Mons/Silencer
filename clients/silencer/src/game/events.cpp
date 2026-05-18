@@ -53,8 +53,18 @@ void Game::UpdateInputState(Input & input){
 	for(const auto& f : INPUT_FIELDS){
 		f.field(input) = keymap.IsPressed(f.a, keystate, gamepadstate);
 	}
-	input.mousex = (Uint16)mousex;
-	input.mousey = (Uint16)mousey;
+	// Map raw mouse position through the letterbox viewport so coordinates
+	// are always in [0,640) × [0,480) regardless of window size or aspect ratio.
+	{
+		int win_w, win_h;
+		SDL_GetWindowSize(window, &win_w, &win_h);
+		float vp_x, vp_y, vp_w, vp_h;
+		ComputeLetterboxViewport(win_w, win_h, 640, 480, vp_x, vp_y, vp_w, vp_h);
+		float gx = (mousex - vp_x) * 640.0f / vp_w;
+		float gy = (mousey - vp_y) * 480.0f / vp_h;
+		input.mousex = (Uint16)SDL_clamp(gx, 0.0f, 639.0f);
+		input.mousey = (Uint16)SDL_clamp(gy, 0.0f, 479.0f);
+	}
 	input.mousedown = SDL_BUTTON_LEFT & mousestate ? true : false;
 
 	Player * localplayer = world.GetPeerPlayer(world.localpeerid);
@@ -303,7 +313,11 @@ bool Game::HandleSDLEvents(void){
 					if(event.button.button == SDL_BUTTON_LEFT){
 						int w, h;
 						SDL_GetWindowSize(window, &w, &h);
-						iface->ProcessMousePress(world, true, (float(event.button.x) / w) * 640, (float(event.button.y) / h) * 480);
+						float vp_x, vp_y, vp_w, vp_h;
+						ComputeLetterboxViewport(w, h, 640, 480, vp_x, vp_y, vp_w, vp_h);
+						iface->ProcessMousePress(world, true,
+							SDL_clamp((event.button.x - vp_x) * 640.0f / vp_w, 0.0f, 639.0f),
+							SDL_clamp((event.button.y - vp_y) * 480.0f / vp_h, 0.0f, 479.0f));
 					}
 				}
 			}break;
@@ -313,7 +327,11 @@ bool Game::HandleSDLEvents(void){
 					if(iface){
 						int w, h;
 						SDL_GetWindowSize(window, &w, &h);
-						iface->ProcessMousePress(world, false, (float(event.button.x) / w) * 640, (float(event.button.y) / h) * 480);
+						float vp_x, vp_y, vp_w, vp_h;
+						ComputeLetterboxViewport(w, h, 640, 480, vp_x, vp_y, vp_w, vp_h);
+						iface->ProcessMousePress(world, false,
+							SDL_clamp((event.button.x - vp_x) * 640.0f / vp_w, 0.0f, 639.0f),
+							SDL_clamp((event.button.y - vp_y) * 480.0f / vp_h, 0.0f, 479.0f));
 					}
 				}
 			}break;
@@ -322,7 +340,11 @@ bool Game::HandleSDLEvents(void){
 				if(iface){
 					int w, h;
 					SDL_GetWindowSize(window, &w, &h);
-					iface->ProcessMouseMove(world, (float(event.motion.x) / w) * 640, (float(event.motion.y) / h) * 480);
+					float vp_x, vp_y, vp_w, vp_h;
+					ComputeLetterboxViewport(w, h, 640, 480, vp_x, vp_y, vp_w, vp_h);
+					iface->ProcessMouseMove(world,
+						SDL_clamp((event.motion.x - vp_x) * 640.0f / vp_w, 0.0f, 639.0f),
+						SDL_clamp((event.motion.y - vp_y) * 480.0f / vp_h, 0.0f, 479.0f));
 				}
 			}break;
 			case SDL_EVENT_GAMEPAD_ADDED:{

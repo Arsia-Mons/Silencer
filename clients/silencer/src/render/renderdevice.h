@@ -85,4 +85,32 @@ public:
 	virtual void DrawParticles(int /*handle*/, Uint32 /*count*/) {}
 };
 
+// Compute an aspect-ratio-correct letterbox/pillarbox viewport.
+// The scene (scene_w × scene_h) is fitted inside win_w × win_h with black
+// bars on the uncovered sides.  All out-params are in the same coordinate
+// space as the inputs (logical window pixels or physical pixels — caller
+// decides which pair to pass; use them consistently in mouse mapping and
+// the GPU viewport).
+inline void ComputeLetterboxViewport(
+		int win_w, int win_h,
+		int scene_w, int scene_h,
+		float& vp_x, float& vp_y, float& vp_w, float& vp_h)
+{
+	float scene_ar = (float)scene_w / (float)scene_h;
+	float win_ar   = (float)win_w   / (float)win_h;
+	if(win_ar > scene_ar){
+		// Window wider than scene → pillarbox (bars on left/right)
+		vp_h = (float)win_h;
+		vp_w = win_h * scene_ar;
+		vp_x = (win_w - vp_w) * 0.5f;
+		vp_y = 0.0f;
+	} else {
+		// Window taller than scene → letterbox (bars on top/bottom)
+		vp_w = (float)win_w;
+		vp_h = win_w / scene_ar;
+		vp_x = 0.0f;
+		vp_y = (win_h - vp_h) * 0.5f;
+	}
+}
+
 #endif
