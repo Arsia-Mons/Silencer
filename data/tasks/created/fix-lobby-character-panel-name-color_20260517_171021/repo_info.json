@@ -1,9 +1,0 @@
-{
-  "remote_urls": [
-    "git@github.com:Arsia-Mons/Silencer.git"
-  ],
-  "branch": "hv/clay-ui-migration",
-  "start_commit": "ec8d3ba9722481f68b63bd8ec69a2463ccd55151",
-  "end_commit": "db0920b23f19ebdb9c18a7081c6c3e6324f701f6",
-  "touched_files": []
-}
