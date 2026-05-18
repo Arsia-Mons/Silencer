@@ -3,15 +3,7 @@
 #include "sdl3gpubackend.h"
 #include "tuibackend.h"
 #include <math.h>
-#include "overlay.h"
-#include "interface.h"
-#include "textbox.h"
-#include "textinput.h"
-#include "button.h"
-#include "toggle.h"
 #include "state.h"
-#include "selectbox.h"
-#include "scrollbar.h"
 #include "os.h"
 #include "team.h"
 #include "player.h"
@@ -34,11 +26,22 @@
 #include "options_display_screen.h"
 #include "options_audio_screen.h"
 #include "lobby_connect_screen.h"
+#include "camera.h"
+#include "detonator.h"
+#include "objecttypes.h"
+#include "client/ui/hud/InGameHud.h"
+#include "client/ui/hud/InGameOverlays.h"
+#include "client/ui/views/HudView.h"
+#include "clay_ui_compositor.h"
+#include "runtime/UiInteractionRegistry.h"
+#ifdef SILENCER_HAVE_LOBBY_UI
 #include "lobby_screen.h"
+#endif
 #include "update_screen.h"
 #include "mission_summary_screen.h"
 #include <algorithm>
 #include <stdio.h>
+#include <vector>
 
 using namespace GameState;
 
@@ -56,6 +59,9 @@ using namespace GameState;
 #endif
 
 Game::Game() : renderer(world), screenbuffer(640, 480),
+               uiClayService(uiClayBackend),
+               clientUi(uiClayService),
+               inGameUiController(world),
                mapDownloader(world),
                ambienceMixer(world, renderer, mapDownloader, fade_i),
                screenContext(*this, world, renderer, world.lobby, keymap, updater, ambienceMixer, mapDownloader, window, renderdevice){
@@ -65,6 +71,7 @@ Game::Game() : renderer(world), screenbuffer(640, 480),
 	state = MAINMENU;
 	stateisnew = true;
 	fade_i = 0;
+	fadeStartMs = 0;
 	sharedstate = 0;
 	currentlobbygameid = 0;
 	lastannouncedgameid = 0;
@@ -74,7 +81,6 @@ Game::Game() : renderer(world), screenbuffer(640, 480),
 	gamepad = nullptr;
 	singleplayermessage = 0;
 	updatetitle = true;
-	currentinterface = 0;
 	minimized = false;
 	window = 0;
 	renderdevice = nullptr;
@@ -85,12 +91,9 @@ Game::Game() : renderer(world), screenbuffer(640, 480),
 #else
 	quitscancode = SDL_SCANCODE_ESCAPE;
 #endif
+	chatEnterDebounce = false;
 	fullscreentoggled = false;
 	replayfile = 0;
-	tui_prev_mouse_x = 0;
-	tui_prev_mouse_y = 0;
-	tui_prev_mouse_down = false;
-	tui_have_prev_mouse = false;
 	controlPort = 0;
 	tuiInputPort = 0;
 	headless = false;
@@ -279,8 +282,11 @@ bool Game::Load(char * cmdline){
 			//SDL_EnableUNICODE(true);
 			//SDL_EnableKeyRepeat(SDL_DEFAULT_REPEAT_DELAY, SDL_DEFAULT_REPEAT_INTERVAL);
 			//screen = SDL_SetVideoMode(640, 480, 8, SDL_DOUBLEBUF | SDL_SWSURFACE);
-			window = SDL_CreateWindow("Silencer", screenbuffer.w, screenbuffer.h, SDL_WINDOW_RESIZABLE | (Config::GetInstance().fullscreen ? SDL_WINDOW_FULLSCREEN : 0));
+			window = SDL_CreateWindow("Silencer", screenbuffer.w, screenbuffer.h,
+				SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIGH_PIXEL_DENSITY |
+				(Config::GetInstance().fullscreen ? SDL_WINDOW_FULLSCREEN : 0));
 			SDL_StartTextInput(window);
+			SyncRenderSurfaceToWindowPixels();
 			if(!SetupRenderDevice()){
 				printf("Could not initialize GPU render device\n");
 				return false;
@@ -294,7 +300,7 @@ bool Game::Load(char * cmdline){
 		// so the palette is always populated by the time a screenshot is captured.
 	}
 	printf("Loading resources...\n");
-	if(!world.resources.Load(*this, world.dedicatedserver.active)){
+	if(!world.resources.Load(this, world.dedicatedserver.active)){
 		printf("Could not load resources\n");
 		return false;
 	}
@@ -303,6 +309,7 @@ bool Game::Load(char * cmdline){
 	world.LoadBuyableItems();
 	printf("Resources loaded\n");
 	lasttick = SDL_GetTicks();
+	RestartPaletteFade();
 	if(controlPort > 0){
 		auto drainPendingWaits = [this](){
 			for(auto& w : pendingWaits){
@@ -350,6 +357,234 @@ bool Game::SetupRenderDevice(void){
 	return true;
 }
 
+static const int kLegacyRenderWidth = 640;
+static const int kLegacyRenderHeight = 480;
+
+static float GameplayUiScaleForSurface(int width, int height) {
+	int scaleX = width / kLegacyRenderWidth;
+	int scaleY = height / kLegacyRenderHeight;
+	int uiScale = scaleX < scaleY ? scaleX : scaleY;
+	return static_cast<float>(uiScale > 0 ? uiScale : 1);
+}
+
+static float MenuUiScaleForSurface(int width, int height) {
+	// Menus keep the legacy 640x480 design density as a lower bound, but the
+	// scale changes continuously instead of snapping between integer steps.
+	// That preserves readable bitmap text/chrome while avoiding the abrupt
+	// "everything halves" jump as a desktop window crosses a 640px/480px
+	// multiple.
+	float scaleX = static_cast<float>(width) / static_cast<float>(kLegacyRenderWidth);
+	float scaleY = static_cast<float>(height) / static_cast<float>(kLegacyRenderHeight);
+	float uiScale = scaleX < scaleY ? scaleX : scaleY;
+	return uiScale > 1.0f ? uiScale : 1.0f;
+}
+
+static void CenteredLayoutOffset(int surfaceW, int surfaceH,
+                                 int virtualW, int virtualH,
+                                 float scale, int& offsetX, int& offsetY) {
+	int scaledW = static_cast<int>(virtualW * scale + 0.5f);
+	int scaledH = static_cast<int>(virtualH * scale + 0.5f);
+	offsetX = scaledW < surfaceW ? (surfaceW - scaledW) / 2 : 0;
+	offsetY = scaledH < surfaceH ? (surfaceH - scaledH) / 2 : 0;
+}
+
+bool Game::ResizeRenderSurfacePixels(int width, int height){
+	if(width < 1 || height < 1) return false;
+	if(screenbuffer.w == width && screenbuffer.h == height) return true;
+	screenbuffer.Resize(width, height, 0);
+	return true;
+}
+
+bool Game::SyncRenderSurfaceToWindowPixels(){
+	if(world.map.loaded){
+		return ResizeRenderSurfacePixels(kLegacyRenderWidth, kLegacyRenderHeight);
+	}
+	if(!window) return false;
+	int width = 0;
+	int height = 0;
+	if(!SDL_GetWindowSizeInPixels(window, &width, &height) || width < 1 || height < 1){
+		SDL_GetWindowSize(window, &width, &height);
+	}
+	return ResizeRenderSurfacePixels(width, height);
+}
+
+bool Game::ResizeRenderSurface(int width, int height){
+	if(width < 1 || height < 1) return false;
+	if(window){
+		SDL_SetWindowSize(window, width, height);
+		if(world.map.loaded){
+			return ResizeRenderSurfacePixels(kLegacyRenderWidth, kLegacyRenderHeight);
+		}
+		return SyncRenderSurfaceToWindowPixels();
+	}
+	if(world.map.loaded){
+		return ResizeRenderSurfacePixels(kLegacyRenderWidth, kLegacyRenderHeight);
+	}
+	return ResizeRenderSurfacePixels(width, height);
+}
+
+bool Game::HasUiInputTarget() {
+	if(GetTopScreen()) return true;
+	return inGameUiController.HasInputTarget(world.localpeerid);
+}
+
+void Game::PrepareClientUiFrame(Surface& surface) {
+	// UI magnification factor: gameplay keeps the strict legacy 640x480 fit,
+	// while menus use a continuous scale so bitmap UI density changes smoothly
+	// as the window resizes. Clay still lays out in virtual space; the
+	// compositor scales the authored pixels back up into the native surface.
+	float uiScale = world.map.loaded
+		? GameplayUiScaleForSurface(surface.w, surface.h)
+		: MenuUiScaleForSurface(surface.w, surface.h);
+	int virtualW;
+	int virtualH;
+	if(world.map.loaded){
+		// In-game: the whole frame is authored at the legacy 640x480 size.
+		// The render backend stretches that final frame to the swapchain,
+		// preserving origin/main's presentation behavior and frame cost.
+		virtualW = kLegacyRenderWidth;
+		virtualH = kLegacyRenderHeight;
+	}else{
+		// Menus reflow responsively — Clay lays out at the native surface
+		// size divided by uiScale.
+		virtualW = std::max(1, static_cast<int>(surface.w / uiScale));
+		virtualH = std::max(1, static_cast<int>(surface.h / uiScale));
+	}
+	float mx = static_cast<float>(world.localinput.mousex);
+	float my = static_cast<float>(world.localinput.mousey);
+	bool down = world.localinput.mousedown;
+	if(window){
+		Uint32 buttons = SDL_GetMouseState(&mx, &my);
+		down = (buttons & SDL_BUTTON_MASK(SDL_BUTTON_LEFT)) != 0;
+		int windowW = 0;
+		int windowH = 0;
+		SDL_GetWindowSize(window, &windowW, &windowH);
+		float pixelX = mx;
+		float pixelY = my;
+		if(windowW > 0 && windowH > 0 && surface.w > 0 && surface.h > 0){
+			pixelX = (mx / static_cast<float>(windowW)) * static_cast<float>(surface.w);
+			pixelY = (my / static_cast<float>(windowH)) * static_cast<float>(surface.h);
+		}
+		int offsetX = 0;
+		int offsetY = 0;
+		CenteredLayoutOffset(surface.w, surface.h, virtualW, virtualH,
+		                     uiScale, offsetX, offsetY);
+		clientUiInput.SetPolledSurfacePointer(
+			(pixelX - static_cast<float>(offsetX)) / static_cast<float>(uiScale),
+			(pixelY - static_cast<float>(offsetY)) / static_cast<float>(uiScale),
+			down);
+	}else{
+		clientUiInput.SetPolledSurfacePointer(mx, my, down);
+	}
+	float deltaTimeSeconds =
+		static_cast<float>(GASLoader::Get().gameengine.tickIntervalMs) / 1000.0f;
+	preparedUiInput = clientUiInput.BuildFrame(virtualW, virtualH, uiScale, deltaTimeSeconds);
+	Uint64 now = SDL_GetTicks();
+	float animationDeltaSeconds = 0.0f;
+	if(lastUiAnimationMs != 0 && now >= lastUiAnimationMs){
+		animationDeltaSeconds = static_cast<float>(now - lastUiAnimationMs) / 1000.0f;
+		if(animationDeltaSeconds > 0.25f) animationDeltaSeconds = 0.25f;
+	}
+	lastUiAnimationMs = now;
+	preparedUiInput.animationDeltaSeconds = animationDeltaSeconds;
+	preparedUiInput.animationStepSeconds = LegacyUiAnimationStepSeconds();
+	hasPreparedUiInput = true;
+}
+
+void Game::BeginPreparedClientUiFrame() {
+	if(!hasPreparedUiInput) {
+		PrepareClientUiFrame(screenbuffer);
+	}
+	silencer::clay_bridge::SetTextMeasureResources(&world.resources);
+	clientUi.BeginFrame(preparedUiInput);
+}
+
+Clay_RenderCommandArray Game::EndClientUiFrame() {
+	clientUi.EndFrame();
+	hasPreparedUiInput = false;
+	return uiClayBackend.Commands();
+}
+
+void Game::BuildVisibleClientUi(Surface& surface, float frametime) {
+	clientUi.BuildVisibleScreens(screenContext, surface, frametime);
+	if(world.map.loaded){
+		// HUD owns Clay layout only; the system-camera insets + minimap are
+		// world pixels drawn into the world surface by the render loop.
+		// Build the HUD/overlay Clay declarations from the snapshot view.
+		silencer::client_ui::HudView hudView =
+			silencer::client_ui::BuildHudView(world);
+		silencer::client_ui::BuildInGameHudUi(
+			renderer, world.resources, hudView, &surface, clientUi.Interactions());
+		silencer::client_ui::BuildInGameOverlaysUi(renderer, world.resources, hudView, &surface);
+	}
+}
+
+void Game::DrawInGameWorldInsets(Surface& surface, float frametime) {
+	Player * localplayer = world.GetPeerPlayer(world.GetLocalPeerId());
+	if(!localplayer) return;
+	Renderer::Rect dstrect;
+	for(int slot = 0; slot < 2; ++slot){
+		if(!world.IsSystemCameraActive(slot)) continue;
+		Surface systemscreen(135, 44, 1);
+		Camera camera(135 * 2, 44 * 2);
+		Object * followobject = world.GetObjectFromId(world.GetSystemCameraFollowId(slot));
+		int px = 0;
+		int py = 0;
+		if(followobject){
+			px = followobject->x + ((followobject->oldx - followobject->x) * frametime);
+			py = followobject->y + ((followobject->oldy - followobject->y) * frametime);
+			if(slot == 1 && followobject->type == ObjectTypes::DETONATOR){
+				Detonator * detonator = static_cast<Detonator*>(followobject);
+				if(detonator->HasDetonated() && py < detonator->lowestypos){
+					py = detonator->lowestypos;
+				}
+			}
+		}
+		camera.Follow(world,
+		              px + world.GetSystemCameraX(slot),
+		              py + world.GetSystemCameraY(slot),
+		              0, 0, 0, 0);
+		renderer.DrawWorldScaled(&systemscreen, camera, 3, frametime);
+		renderer.EffectRampColor(&systemscreen, 0, 190);
+		dstrect.x = (slot == 0) ? 5 : 500;
+		dstrect.y = (slot == 0) ? 349 : 348;
+		Renderer::BlitSurface(&systemscreen, 0, &surface, &dstrect);
+	}
+	dstrect.x = 235;
+	dstrect.y = 419;
+	Renderer::BlitSurface(&world.map.minimap.surface, 0, &surface, &dstrect);
+}
+
+void Game::RenderClientUiFrame(Surface& surface, float frametime) {
+	if(!clientUi.HasScreens() && !world.map.loaded){
+		return;
+	}
+
+	PrepareClientUiFrame(surface);
+	BeginPreparedClientUiFrame();
+	BuildVisibleClientUi(surface, frametime);
+	Clay_RenderCommandArray cmds = EndClientUiFrame();
+	silencer::clay_bridge::Render(*this, &surface, cmds);
+	if(state != FADEOUT){
+		std::vector<silencer::ui::UiAction> unhandledUiActions =
+			clientUi.DispatchInput(screenContext, preparedUiInput);
+		if(!clientUi.HasScreens() && world.map.loaded){
+			inGameUiController.ApplyActions(
+				world.localpeerid, unhandledUiActions, clientUi.Interactions());
+		}
+	}
+}
+
+void Game::ResetUiFrameDeltas() {
+	clientUiInput.EndFrame();
+	preparedUiInput.pointer.wheelX = 0.0f;
+	preparedUiInput.pointer.wheelY = 0.0f;
+	preparedUiInput.textInput.clear();
+	preparedUiInput.navActions.clear();
+	preparedUiInput.bindingInputs.clear();
+	preparedUiInput.controlCommands.clear();
+}
+
 void Game::Present(void){
 	if(renderdevice){
 		renderdevice->UploadFrame(screenbuffer.pixels.data(), screenbuffer.w, screenbuffer.h);
@@ -363,10 +598,10 @@ void Game::LoadProgressCallback(int progress, int totalprogressitems){
 	}
 	HandleSDLEvents();
 	if(SDL_GetTicks() - lasttick >= 100){
-		int width = 500;
+		int width = std::min(500, screenbuffer.w - 32);
 		int widthp = (float(progress) / totalprogressitems) * width;
-		int barx = (640 - width) / 2;
-		int bary = (480 - 32) / 2;
+		int barx = (screenbuffer.w - width) / 2;
+		int bary = (screenbuffer.h - 32) / 2;
 		renderer.DrawFilledRectangle(&screenbuffer, barx, bary, barx + width, bary + 32, 101);
 		if(widthp > 0){
 			for(int c = 0; c < 13; c++){
@@ -385,6 +620,54 @@ void Game::SetColors(SDL_Color * colors){
 	if(renderdevice){
 		renderdevice->SetPalette(colors, 256);
 	}
+}
+
+void Game::RestartPaletteFade(){
+	fadeStartMs = SDL_GetTicks();
+	fade_i = 0;
+}
+
+float Game::LegacyUiAnimationStepSeconds() const {
+	const int hz = GASLoader::Get().gameengine.ticksPerSecond > 0
+		? GASLoader::Get().gameengine.ticksPerSecond
+		: 24;
+	return 1.0f / static_cast<float>(hz);
+}
+
+Uint8 Game::PaletteFadePhaseFromClock() const {
+	if(fadeStartMs == 0) return fade_i;
+	Uint64 now = SDL_GetTicks();
+	float elapsedSeconds = 0.0f;
+	if(now >= fadeStartMs){
+		elapsedSeconds = static_cast<float>(now - fadeStartMs) / 1000.0f;
+	}
+	int phase = static_cast<int>(elapsedSeconds / LegacyUiAnimationStepSeconds());
+	if(phase < 0) phase = 0;
+	if(phase > 16) phase = 16;
+	return static_cast<Uint8>(phase);
+}
+
+bool Game::PaletteFadeFinished() const {
+	return PaletteFadePhaseFromClock() >= 16;
+}
+
+void Game::ApplyPaletteFade(bool fadeOut){
+	fade_i = PaletteFadePhaseFromClock();
+	int phase = fade_i;
+	if(phase > 15) phase = 15;
+	if(fadeOut){
+		SDL_Color * fadedpalette =
+			renderer.palette.CopyWithBrightness(renderer.palette.GetColors(), (15 - phase) * 8);
+		SetColors(fadedpalette);
+		return;
+	}
+	if(phase >= 15){
+		SetColors(renderer.palette.GetColors());
+		return;
+	}
+	SDL_Color * fadedpalette =
+		renderer.palette.CopyWithBrightness(renderer.palette.GetColors(), phase * 8);
+	SetColors(fadedpalette);
 }
 
 Uint32 Game::TimerCallback(void * userdata, SDL_TimerID timerID, Uint32 interval){
@@ -456,11 +739,12 @@ bool Game::Loop(void){
 		//   - action snapshot   → ORed on top so programmatic / CLI clients
 		//                          can drive Input fields directly without
 		//                          knowing the keymap.
-		// Edge events (menu nav, text input) still arrive via the control
-		// socket "key" op and bypass this path entirely.
+		// Edge events (menu nav, text input) arrive as normalized per-frame
+		// UI input and are dispatched by ClientUi after layout.
 		if(tui){
 			Uint8 newkeystate[SDL_SCANCODE_COUNT];
 			if(inputserver.LatestScancodes(newkeystate)){
+				std::vector<int> pressedScancodes;
 				// Edge-detect: feed press/release transitions through the
 				// same handlers the SDL path uses, so the in-game ESC
 				// quitstate machine, F1 player-list, debug overlay etc.
@@ -469,10 +753,17 @@ bool Game::Loop(void){
 					bool was = keystate[sc] != 0;
 					bool now = newkeystate[sc] != 0;
 					if(was == now) continue;
-					if(now) OnScancodeDown(sc);
-					else    OnScancodeUp(sc);
+					if(now){
+						OnScancodeDown(sc);
+						pressedScancodes.push_back(sc);
+					}else{
+						OnScancodeUp(sc);
+					}
 				}
 				memcpy(keystate, newkeystate, sizeof(keystate));
+				for(int sc : pressedScancodes){
+					QueueUiKeyboardInputForScancode(sc);
+				}
 			}
 			UpdateInputState(world.localinput);
 			Input action;
@@ -518,42 +809,12 @@ bool Game::Loop(void){
 				world.localinput.mousex    = mx;
 				world.localinput.mousey    = my;
 				world.localinput.mousedown = md;
-				// Edge-detect transitions and dispatch to the current
-				// interface — mirrors HandleSDLEvents' SDL_EVENT_MOUSE_*
-				// handlers (game.cpp ~6275). Without this the menu UI
-				// never sees the mouse, since iface state is driven by
-				// ProcessMousePress / ProcessMouseMove rather than
-				// world.localinput reads.
-				Interface * iface = (Interface *)world.GetObjectFromId(currentinterface);
-				if(iface){
-					bool moved = !tui_have_prev_mouse ||
-					             mx != tui_prev_mouse_x ||
-					             my != tui_prev_mouse_y;
-					bool downChanged = !tui_have_prev_mouse ||
-					                   md != tui_prev_mouse_down;
-					if(moved){
-						iface->ProcessMouseMove(world, mx, my);
-					}
-					if(downChanged){
-						iface->ProcessMousePress(world, md, mx, my);
-					}
-				}
-				tui_prev_mouse_x    = mx;
-				tui_prev_mouse_y    = my;
-				tui_prev_mouse_down = md;
-				tui_have_prev_mouse = true;
 			}
 		} else {
 			UpdateInputState(world.localinput);
-			// If a rebind slot is waiting for input, zero out gamepad-driven
-			// localinput so button presses don't leak into gameplay/UI actions.
-			if(currentinterface){
-				Interface* rebindIface = (Interface*)world.GetObjectFromId(currentinterface);
-				if(rebindIface && rebindIface->disabled){
-					world.localinput.keyup = world.localinput.keydown =
-					world.localinput.keyleft = world.localinput.keyright = false;
-				}
-			}
+			clientUiInput.CaptureGamepadBindingEdges(
+				gamepadstate.buttons, gamepadstate.axes,
+				SDL_GAMEPAD_AXIS_COUNT, AXIS_DEADZONE);
 			TickGamepadMenuNav();
 		}
 		world.SendInput();
@@ -580,10 +841,6 @@ bool Game::Loop(void){
 				ambienceMixer.oldambiencelevel = newambiencelevel;
 			}
 		}
-		fade_i++;
-		if(fade_i >= 16){
-			fade_i = 16;
-		}
 		lasttick += wait;
 	}
 	// Tick multi-frame waits AFTER the sim loop so wait_frames --n 1 and
@@ -593,12 +850,25 @@ bool Game::Loop(void){
 	ControlDispatch::TickWaits(*this);
 	world.DoNetwork();
 	if(!world.dedicatedserver.active){
-		screenbuffer.Clear(0);
 		world.DoNetwork();
-		renderer.Draw(&screenbuffer, 1 - (float(tickcheck - lasttick) / wait));
+		float ft = 1 - (float(tickcheck - lasttick) / wait);
+		if(world.map.loaded){
+			// origin/main rendered one 640x480 paletted frame and let the GPU
+			// present pass stretch it to the window. Keep that path for
+			// gameplay; native-sized CPU frames are too expensive fullscreen.
+			ResizeRenderSurfacePixels(kLegacyRenderWidth, kLegacyRenderHeight);
+			screenbuffer.Clear(0);
+			renderer.Draw(&screenbuffer, ft);
+			DrawInGameWorldInsets(screenbuffer, ft);
+		}else{
+			if(window) SyncRenderSurfaceToWindowPixels();
+			screenbuffer.Clear(0);
+			renderer.Draw(&screenbuffer, ft);
+		}
+		RenderClientUiFrame(screenbuffer, ft);
 #ifdef POSIX
 		if(world.replay.IsPlaying() && world.replay.ffmpeg && world.replay.ffmpegvideo && deploymessageshown){
-			Uint8 buffer[640 * 480 * 3];
+			std::vector<Uint8> buffer(screenbuffer.w * screenbuffer.h * 3);
 			int i = 0;
 			int j = 0;
 			for(int y = screenbuffer.h; y > 0; y--){
@@ -609,7 +879,7 @@ bool Game::Loop(void){
 					j++;
 				}
 			}
-			fwrite(buffer, sizeof(buffer), 1, world.replay.ffmpeg);
+			fwrite(buffer.data(), buffer.size(), 1, world.replay.ffmpeg);
 		}
 #endif
 		/*char fpstext[16];
@@ -628,6 +898,7 @@ bool Game::Loop(void){
 		if(tui && renderdevice && !renderdevice->IsAlive()){
 			quitRequested = true;
 		}
+		ResetUiFrameDeltas();
 		// SDL3GPUBackend's swapchain Present blocks on vsync (~16 ms) so the
 		// non-TUI loop self-throttles. TUIBackend writes to a TCP socket that
 		// never blocks the engine, so without an explicit cap the loop runs
@@ -648,12 +919,11 @@ bool Game::Loop(void){
 }
 
 bool Game::Tick(void){
-	if(screenStackPendingTeardown){
-		while(!screenStack.empty()) PopScreen();
-		screenStackPendingTeardown = false;
+	clientUi.ClearScreensIfRequested(screenContext);
+	if(state != FADEOUT){
+		clientUi.TickVisibleScreens(screenContext);
 	}
-	TickActiveScreen();
-	ProcessInGameInterfaces();
+	inGameUiController.UpdateOverlayState(world.localpeerid);
 	if(!world.dedicatedserver.active){
 		if(world.lobby.state == Lobby::AUTHENTICATED){
 			// 0 = main lobby, 1 = pregame (game-specific lobby, waiting for
@@ -688,8 +958,8 @@ bool Game::Tick(void){
 		}
 		if(world.gameplaystate == World::INLOBBY){
 			mapDownloader.ProcessMapDownload();
-			// Ready-button text refresh ("Waiting..." vs "Ready") moved into
-			// GameJoinPanel::Tick — runs each frame from LobbyScreen::Tick.
+			// Ready-button text refresh ("Waiting..." vs "Ready") happens
+			// in GameJoinPanelTick — runs each frame from LobbyScreen::Tick.
 		}
 		/*Peer * localpeer = world.peerlist[world.localpeerid];
 		if(localpeer){
@@ -770,7 +1040,7 @@ bool Game::Tick(void){
 					ambienceMixer.PlayMusic(world.resources.menumusic);
 				}
 				// Button-click handling lives in MainMenuScreen::Tick, dispatched
-				// by TickActiveScreen() at the top of Game::Tick.
+				// by ClientUi's navigation stack at the top of Game::Tick.
 			}
 		}break;
 		case LOBBYCONNECT:{
@@ -795,15 +1065,17 @@ bool Game::Tick(void){
 				world.Disconnect();
 				world.choosingtech = false;
 				world.lobby.channelchanged = true;
+#ifdef SILENCER_HAVE_LOBBY_UI
 				PushScreen(std::make_unique<LobbyScreen>());
+#endif
 				stateisnew = false;
 			}else{
 				if(ambienceMixer.FadedIn()){
 					ambienceMixer.PlayMusic(world.resources.menumusic);
 				}
 				// Lobby pump (state-machine + deferred-create) lives in
-				// LobbyScreen::Tick, dispatched by TickActiveScreen() at the
-				// top of Game::Tick.
+				// LobbyScreen::Tick, dispatched by ClientUi's navigation stack
+				// at the top of Game::Tick.
 			}
 		}break;
 		case UPDATING:{
@@ -866,13 +1138,7 @@ bool Game::Tick(void){
 		case REPLAYGAME: TickReplayGame(); break;
 	}
 	if(fade_i < 16 && state != FADEOUT){
-		// Fade IN the palette
-		SDL_Color * fadedpalette = renderer.palette.CopyWithBrightness(renderer.palette.GetColors(), (fade_i) * 8);
-		if(fade_i == 15){
-			SetColors(renderer.palette.GetColors());
-		}else{
-			SetColors(fadedpalette);
-		}
+		ApplyPaletteFade(false);
 	}
 	if(!nextstateprocessed){
 		nextstateprocessed = true;
@@ -885,13 +1151,12 @@ bool Game::Tick(void){
 void Game::GoToState(Uint8 newstate){
 	nextstate = newstate;
 	state = FADEOUT;
-	fade_i = 0;
+	RestartPaletteFade();
 	stateisnew = true;
 	nextstateprocessed = false;
-	// Defer the teardown so the active screen's Tick (which may have called
-	// GoToState in response to a button click) can return safely before its
-	// destructor runs.
-	screenStackPendingTeardown = true;
+	// Keep the outgoing Clay screen mounted until TickFadeOut reaches black.
+	// Legacy retained its world UI objects across FADEOUT, so there were still
+	// pixels for the palette fade to dim before the next state rebuilt UI.
 }
 
 bool Game::GoBack(void){
@@ -928,19 +1193,16 @@ void Game::TickRumble(){
 
 
 void Game::TickGamepadMenuNav(){
-	// Only meaningful when a gamepad is connected and a menu interface is open.
 	if(!gamepadstate.connected) return;
-	Interface* iface = (Interface*)world.GetObjectFromId(currentinterface);
-	if(!iface) return;
-
-	// During rebind-wait (iface->disabled=true) the rebind capture code owns
-	// all gamepad input.  Don't let nav/confirm/cancel fire as side effects.
-	if(iface->disabled) return;
+	Player * localplayer = world.GetPeerPlayer(world.localpeerid);
+	bool inGameUi = localplayer && (localplayer->chatActive || localplayer->isbuying || localplayer->techstationactive);
+	Screen * top = GetTopScreen();
+	if(!top && !inGameUi) return;
 
 	Uint32 now = SDL_GetTicks();
 
 	// Helper: fire a nav key press with software repeat on held direction.
-	auto tick = [&](GamepadNavDir& dir, Action action, Uint8 ascii){
+	auto tick = [&](GamepadNavDir& dir, Action action, silencer::ui::UiNavAction navAction){
 		bool pressed = keymap.IsPressed(action, keystate, gamepadstate);
 		if(!pressed){
 			dir.held    = false;
@@ -951,33 +1213,36 @@ void Game::TickGamepadMenuNav(){
 			// First frame held — fire immediately.
 			dir.held     = true;
 			dir.nextfire = now + GAMEPAD_NAV_DELAY_MS;
-			iface->ProcessKeyPress(world, ascii);
+			clientUiInput.QueueNavAction(navAction);
 		} else if(now >= dir.nextfire){
 			// Repeat.
 			dir.nextfire = now + GAMEPAD_NAV_REPEAT_MS;
-			iface->ProcessKeyPress(world, ascii);
+			clientUiInput.QueueNavAction(navAction);
 		}
 	};
 
-	tick(gamepadNavUp,    Action::UiUp,    3);
-	tick(gamepadNavDown,  Action::UiDown,  4);
-	tick(gamepadNavLeft,  Action::UiLeft,  1);
-	tick(gamepadNavRight, Action::UiRight, 2);
+	tick(gamepadNavUp,    Action::UiUp,    silencer::ui::UiNavAction::Up);
+	tick(gamepadNavDown,  Action::UiDown,  silencer::ui::UiNavAction::Down);
+	tick(gamepadNavLeft,  Action::UiLeft,  silencer::ui::UiNavAction::Left);
+	tick(gamepadNavRight, Action::UiRight, silencer::ui::UiNavAction::Right);
 
-	// Confirm (A/Cross) — no repeat, edge-detect only.
-	// If nothing is focused, auto-focus the first item so the user sees where
-	// they are before committing.
+	// Confirm (A/Cross) is edge-triggered; directional nav handles repeat.
 	{
 		bool confirmNow = keymap.IsPressed(Action::UiConfirm, keystate, gamepadstate);
 		static bool confirmPrev = false;
 		if(confirmNow && !confirmPrev){
-			if(iface->activeobject == 0 && !iface->tabobjects.empty()){
-				iface->ProcessKeyPress(world, 4);  // focus first item; next A confirms
-			} else {
-				iface->ProcessKeyPress(world, '\n');
-			}
+			clientUiInput.QueueNavAction(silencer::ui::UiNavAction::Confirm);
 		}
 		confirmPrev = confirmNow;
+	}
+
+	{
+		bool cancelNow = keymap.IsPressed(Action::UiCancel, keystate, gamepadstate);
+		static bool cancelPrev = false;
+		if(cancelNow && !cancelPrev){
+			clientUiInput.QueueNavAction(silencer::ui::UiNavAction::Cancel);
+		}
+		cancelPrev = cancelNow;
 	}
 }
 
@@ -1033,49 +1298,49 @@ const char* Game::StateName(Uint8 s){
 	}
 }
 
-nlohmann::json Game::GetWorldSummary(){
-	nlohmann::json r;
-	r["map"] = world.gameinfo.mapname;
-	r["peers"] = (int)world.peercount;
-	r["localpeerid"] = (int)world.localpeerid;
-	r["viewedpeerid"] = (int)world.viewedpeerid;
-	r["authoritypeer"] = (int)world.authoritypeer;
-	r["lobby_accountid"] = (unsigned int)world.lobby.accountid;
-	r["is_local_observer"] = world.IsLocalObserver();
-	r["spectator_initialized"] = world.spectator.initialized;
-	r["spectator_freecam"] = world.spectator.freecam;
-	nlohmann::json peerlist = nlohmann::json::array();
+Game::WorldSummary Game::GetWorldSummary(){
+	WorldSummary summary;
+	summary.map = world.gameinfo.mapname;
+	summary.peers = static_cast<int>(world.peercount);
+	summary.localPeerId = static_cast<int>(world.localpeerid);
+	summary.viewedPeerId = static_cast<int>(world.viewedpeerid);
+	summary.authorityPeer = static_cast<int>(world.authoritypeer);
+	summary.lobbyAccountId = static_cast<unsigned int>(world.lobby.accountid);
+	summary.isLocalObserver = world.IsLocalObserver();
+	summary.spectatorInitialized = world.spectator.initialized;
+	summary.spectatorFreecam = world.spectator.freecam;
+	summary.messageText = world.GetMessageText();
+	summary.messageProgress = static_cast<int>(world.GetMessageProgress());
+	summary.messageType = static_cast<int>(world.GetMessageType());
+	summary.messageTime = static_cast<int>(world.GetMessageTime());
+	summary.topMessageText = world.GetTopMessageText();
+	summary.topMessageProgress = static_cast<int>(world.GetTopMessageProgress());
 	for(unsigned int i = 0; i < world.maxpeers; i++){
 		Peer * p = world.peerlist[i];
 		if(!p) continue;
-		nlohmann::json pj;
-		pj["id"] = i;
-		pj["accountid"] = (unsigned int)p->accountid;
-		pj["observer"] = p->observer;
-		pj["disconnected"] = p->disconnected;
-		nlohmann::json controlled = nlohmann::json::array();
-		for(Uint16 cid : p->controlledlist) controlled.push_back(cid);
-		pj["controlledlist"] = controlled;
-		peerlist.push_back(std::move(pj));
+		WorldPeerSummary peer;
+		peer.id = static_cast<int>(i);
+		peer.accountId = static_cast<unsigned int>(p->accountid);
+		peer.observer = p->observer;
+		peer.disconnected = p->disconnected;
+		for(Uint16 cid : p->controlledlist){
+			peer.controlledList.push_back(static_cast<int>(cid));
+		}
+		summary.peerList.push_back(std::move(peer));
 	}
-	r["peerlist"] = peerlist;
-	nlohmann::json players = nlohmann::json::array();
-	int objcount = 0;
 	for(auto* o : world.objectlist){
-		++objcount;
+		++summary.objectsCount;
 		if(o && o->type == ObjectTypes::PLAYER){
 			Player* p = (Player*)o;
-			nlohmann::json pj;
-			pj["id"] = p->id;
-			pj["hp"] = (int)p->health;
-			pj["x"] = (int)p->x;
-			pj["y"] = (int)p->y;
-			players.push_back(std::move(pj));
+			WorldPlayerSummary player;
+			player.id = static_cast<int>(p->id);
+			player.hp = static_cast<int>(p->health);
+			player.x = static_cast<int>(p->x);
+			player.y = static_cast<int>(p->y);
+			summary.players.push_back(player);
 		}
 	}
-	r["players"] = players;
-	r["objects_count"] = objcount;
-	return r;
+	return summary;
 }
 
 bool Game::IsLiveMultiplayer() const {
@@ -1083,40 +1348,17 @@ bool Game::IsLiveMultiplayer() const {
 }
 
 void Game::PushScreen(std::unique_ptr<Screen> s){
-	if(!s) return;
-	s->Build(screenContext);
-	screenStack.push_back(std::move(s));
-	currentinterface = screenStack.back()->interfaceId;
-	if(currentinterface){
-		world.GetAuthorityPeer()->controlledlist.push_back(currentinterface);
-	}
+	clientUi.PushScreen(std::move(s), screenContext);
 }
 
 void Game::PopScreen(){
-	if(screenStack.empty()) return;
-	screenStack.back()->Destroy(screenContext);
-	screenStack.pop_back();
-	currentinterface = screenStack.empty() ? 0 : screenStack.back()->interfaceId;
+	clientUi.PopScreen(screenContext);
 }
 
 void Game::ReplaceScreen(std::unique_ptr<Screen> s){
-	PopScreen();
-	PushScreen(std::move(s));
+	clientUi.ReplaceScreen(std::move(s), screenContext);
 }
 
 Screen * Game::GetTopScreen() const {
-	return screenStack.empty() ? nullptr : screenStack.back().get();
-}
-
-void Game::TickActiveScreen(){
-	if(screenStack.empty()) return;
-	// Tick the topmost non-overlay plus every overlay stacked above it. Modals
-	// are overlays — the screen beneath continues to tick (and run its
-	// per-frame state polling) while the modal is up. Input dispatch is
-	// blocked by `currentinterface` already pointing at the topmost iface.
-	int start = (int)screenStack.size() - 1;
-	while(start > 0 && screenStack[start]->IsOverlay()) --start;
-	for(size_t i = (size_t)start; i < screenStack.size(); ++i){
-		screenStack[i]->Tick(screenContext);
-	}
+	return clientUi.TopScreen();
 }

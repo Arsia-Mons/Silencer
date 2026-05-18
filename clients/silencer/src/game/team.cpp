@@ -1,5 +1,4 @@
 #include "team.h"
-#include "overlay.h"
 #include "terminal.h"
 #include "player.h"
 #include "../gas/gasloader.h"
@@ -10,7 +9,6 @@ Team::Team() : Object(ObjectTypes::TEAM){
 	color = 0;
 	requiresauthority = true;
 	requiresmaptobeloaded = false;
-	overlayid = 0;
 	secrets = 0;
 	secretdelivered = 0;
 	secretprogress = 0;
@@ -19,10 +17,6 @@ Team::Team() : Object(ObjectTypes::TEAM){
 	beamingterminalid = 0;
 	for(int i = 0; i < 4; i++){
 		peers[i] = 0;
-		peeroverlayids[i] = 0;
-		peerreadyoverlayids[i] = 0;
-		peerleveloverlayids[i] = 0;
-		peermapoverlayids[i] = 0;
 	}
 	peerschecksum = 0;
 	oldsecretprogress = 0;
@@ -84,126 +78,14 @@ void Team::Tick(World & world){
 			world.gameMode->OnSecretBeamReady(world, *this);
 		}
 	}
-	if(world.gameplaystate == World::INLOBBY){
-		if(!overlayid){
-			Overlay * overlay = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
-			if(overlay){
-				overlay->res_bank = 181;
-				overlay->res_index = agency;
-				overlay->x = 420;
-				overlay->y = 70 + (number * 55);
-				overlay->renderpass = 1;
-				overlay->draw = world.choosingtech ? false : true;
-				overlayid = overlay->id;
-			}
-		}else{
-			Overlay * overlay = static_cast<Overlay *>(world.GetObjectFromId(overlayid));
-			if(overlay && overlay->res_index != agency){
-				overlay->res_index = agency;
-			}
-		}
-		if(newpeerschecksum != peerschecksum){
-			for(int i = 0; i < 4; i++){
-				if(peeroverlayids[i]){
-					world.MarkDestroyObject(peeroverlayids[i]);
-					peeroverlayids[i] = 0;
-				}
-				if(peerleveloverlayids[i]){
-					world.MarkDestroyObject(peerleveloverlayids[i]);
-					peerleveloverlayids[i] = 0;
-				}
-				if(peerreadyoverlayids[i]){
-					world.MarkDestroyObject(peerreadyoverlayids[i]);
-					peerreadyoverlayids[i] = 0;
-				}
-				if(peermapoverlayids[i]){
-					world.MarkDestroyObject(peermapoverlayids[i]);
-					peermapoverlayids[i] = 0;
-				}
-			}
-		}
-		for(int i = 0; i < numpeers; i++){
-			Peer * peer = world.peerlist[peers[i]];
-			if(peer){
-				if(!peeroverlayids[i]){
-					User * user = world.lobby.GetUserInfo(peer->accountid);
-					if(!user->retrieving){
-						Overlay * overlay = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
-						if(overlay){
-							overlay->text = user->name;
-							overlay->textbank = 133;
-							overlay->textwidth = 6;
-							overlay->x = 473;
-							overlay->y = 72 + (number * 55) + (i * 13);
-							overlay->draw = world.choosingtech ? false : true;
-							peeroverlayids[i] = overlay->id;
-						}
-						Overlay * leveloverlay = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
-						if(leveloverlay){
-							leveloverlay->text = "L:" + std::to_string(user->agency[agency].level);
-							leveloverlay->textbank = 132;
-							leveloverlay->textwidth = 4;
-							leveloverlay->effectcolor = 170;
-							leveloverlay->x = 473 + (strlen(user->name) * 6) + 3;
-							leveloverlay->y = 72 + (number * 55) + (i * 13);
-							leveloverlay->draw = world.choosingtech ? false : true;
-							peerleveloverlayids[i] = leveloverlay->id;
-						}
-					}
-				}
-				if(!peerreadyoverlayids[i]){
-					Overlay * overlay = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
-					if(overlay){
-						overlay->x = 455;
-						overlay->y = 70 + (number * 55) + (i * 13);
-						overlay->res_bank = 7;
-						overlay->res_index = 19;
-						overlay->draw = world.choosingtech ? false : true;
-						peerreadyoverlayids[i] = overlay->id;
-					}
-				}else{
-					Overlay * overlay = static_cast<Overlay *>(world.GetObjectFromId(peerreadyoverlayids[i]));
-					if(overlay){
-						if(peer->isready){
-							overlay->res_index = 18;
-						}else{
-							overlay->res_index = 19;
-						}
-					}
-				}
-				if(!peermapoverlayids[i]){
-					if(peeroverlayids[i]){
-						User * user = world.lobby.GetUserInfo(peer->accountid);
-						Overlay * mapoverlay = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
-						if(mapoverlay){
-							mapoverlay->text = "(dl)";
-							mapoverlay->textbank = 132;
-							mapoverlay->textwidth = 4;
-							mapoverlay->effectcolor = 170;
-							mapoverlay->x = 473 + (strlen(user->name) * 6) + 3 + 20;
-							mapoverlay->y = 72 + (number * 55) + (i * 13);
-							mapoverlay->draw = !peer->mapdownloaded && !world.choosingtech;
-							peermapoverlayids[i] = mapoverlay->id;
-						}
-					}
-				}else{
-					Overlay * mapoverlay = static_cast<Overlay *>(world.GetObjectFromId(peermapoverlayids[i]));
-					if(mapoverlay){
-						mapoverlay->draw = !peer->mapdownloaded && !world.choosingtech;
-					}
-				}
-			}
-		}
-	}
 	if(numpeers == 0){
-		DestroyOverlays(world);
 		world.MarkDestroyObject(id);
 	}
 	peerschecksum = newpeerschecksum;
 }
 
 void Team::OnDestroy(World & world){
-	DestroyOverlays(world);
+	(void)world;
 }
 
 bool Team::AddPeer(Uint8 id){
@@ -230,31 +112,6 @@ void Team::RemovePeer(Uint8 id){
 			}
 			numpeers--;
 		}
-	}
-}
-
-void Team::DestroyOverlays(World & world){
-	for(int i = 0; i < 4; i++){
-		if(peeroverlayids[i]){
-			world.MarkDestroyObject(peeroverlayids[i]);
-			peeroverlayids[i] = 0;
-		}
-		if(peerreadyoverlayids[i]){
-			world.MarkDestroyObject(peerreadyoverlayids[i]);
-			peerreadyoverlayids[i] = 0;
-		}
-		if(peerleveloverlayids[i]){
-			world.MarkDestroyObject(peerleveloverlayids[i]);
-			peerleveloverlayids[i] = 0;
-		}
-		if(peermapoverlayids[i]){
-			world.MarkDestroyObject(peermapoverlayids[i]);
-			peermapoverlayids[i] = 0;
-		}
-	}
-	if(overlayid){
-		world.MarkDestroyObject(overlayid);
-		overlayid = 0;
 	}
 }
 
@@ -312,26 +169,4 @@ Uint32 Team::GetAvailableTech(World & world){
 		}
 	}
 	return tech;
-}
-
-void Team::ShowOverlays(World & world, bool show){
-	Object * object;
-	object = world.GetObjectFromId(overlayid);
-	if(object){
-		object->draw = show;
-	}
-	for(int i = 0; i < 4; i++){
-		object = world.GetObjectFromId(peeroverlayids[i]);
-		if(object){
-			object->draw = show;
-		}
-		object = world.GetObjectFromId(peerleveloverlayids[i]);
-		if(object){
-			object->draw = show;
-		}
-		object = world.GetObjectFromId(peerreadyoverlayids[i]);
-		if(object){
-			object->draw = show;
-		}
-	}
 }

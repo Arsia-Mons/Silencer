@@ -2,9 +2,9 @@
 #include "btdebug.h"
 #include "projectile.h"
 #include "bodypart.h"
+#include "npc_math.h"
 #include "player.h"
 #include "plasmaprojectile.h"
-#include "gasloader.h"
 #include "gasloader.h"
 
 Civilian::Civilian() : Object(ObjectTypes::CIVILIAN){
@@ -328,7 +328,7 @@ void Civilian::HandleHit(World & world, Uint8 x, Uint8 y, Object & projectile){
 		state = DYINGBACKWARD;
 	}
 	if((xpcnt < 0 && xv < 0) || (xpcnt > 0 && xv > 0)){
-		xv = abs(xv) * xpcnt;
+		xv = npc_math::AbsInt(xv) * xpcnt;
 	}else{
 		xv = speed * xpcnt;
 	}

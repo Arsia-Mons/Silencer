@@ -42,8 +42,9 @@ directly with `-G Ninja` (if `ninja` is on `PATH`).
   `vcvars64.bat`. No VS with that toolset → hard error.
 - **`VCPKG_ROOT`.** Windows resolves it process env → persisted User
   env → hard error (with the `SetEnvironmentVariable` hint). macOS/
-  Linux requires it exported in your shell profile. Either way it
-  must contain `scripts/buildsystems/vcpkg.cmake`.
+  Linux uses it when exported; otherwise it keeps the historical
+  CMake/pkg-config system package discovery path. When set, it must
+  contain `scripts/buildsystems/vcpkg.cmake`.
 - **No concurrent configures.** Aborts if a build tool is already
   running (`cmake`/`ninja`/`cl`/`MSBuild` on Windows;
   `cmake`/`ninja`/`cc1plus`/`clang` elsewhere) — concurrent

@@ -4,7 +4,7 @@
 # LobbyConnect → fill username/password → Login → LOBBY → Go Back →
 # MainMenu. Exercises LobbyScreen end-to-end (chrome, character/chat
 # panels, lobby pump, GoBack), the Lobby Go service's TCP auth path, and
-# the CLI's set_text-on-TEXTINPUT support.
+# the normalized CLI key-to-text path.
 set -euo pipefail
 . "$(dirname "$0")/lib.sh"
 
@@ -39,15 +39,18 @@ CTRL_PORT=$(pick_port)
 # rejects the handshake with "Wrong version". Probe the same build dirs
 # lib.sh probes for the binary.
 SILENCER_VERSION=""
-for d in build build-unity build-release; do
-  cache="$REPO_ROOT/clients/silencer/$d/CMakeCache.txt"
+for cache in \
+  "$REPO_ROOT/build/CMakeCache.txt" \
+  "$REPO_ROOT/clients/silencer/build/CMakeCache.txt" \
+  "$REPO_ROOT/clients/silencer/build-unity/CMakeCache.txt" \
+  "$REPO_ROOT/clients/silencer/build-release/CMakeCache.txt"; do
   if [ -f "$cache" ]; then
     SILENCER_VERSION=$(awk -F= '/^SILENCER_VERSION:STRING=/{print $2}' "$cache")
     if [ -n "$SILENCER_VERSION" ]; then break; fi
   fi
 done
 if [ -z "$SILENCER_VERSION" ]; then
-  echo "could not read SILENCER_VERSION from CMakeCache.txt under clients/silencer/build*/" >&2
+  echo "could not read SILENCER_VERSION from any CMakeCache.txt" >&2
   exit 1
 fi
 
@@ -102,29 +105,37 @@ HOME="$SILENCER_HOME" "$SILENCER_BIN" \
 SILENCER_PID=$!
 wait_alive "$CTRL_PORT"
 
-# wait_for_state resolves the frame state flips, which is one frame BEFORE
-# the case body runs PushScreen + sets currentinterface. Poll until the
-# interface is built so set_text / click have something to dispatch onto.
-wait_for_iface() {
+wait_for_widget() {
+  local label="$1"
   for i in $(seq 1 100); do
-    iface=$(cli --port "$CTRL_PORT" state | bun -e \
-      'const t=await new Response(Bun.stdin.stream()).text(); console.log(JSON.parse(t).current_interface_id||0);')
-    if [ "${iface:-0}" != "0" ]; then return 0; fi
+    found=$(cli --port "$CTRL_PORT" inspect | LABEL="$label" bun -e \
+      'const t=await new Response(Bun.stdin.stream()).text();
+       const r=JSON.parse(t);
+       const label=process.env.LABEL;
+       console.log(r.widgets.some((w)=>w.label===label) ? "yes" : "no");' 2>/dev/null || echo no)
+    if [ "$found" = "yes" ]; then return 0; fi
     sleep 0.05
   done
-  echo "current_interface_id never became non-zero" >&2
+  echo "widget '$label' never appeared" >&2
+  cli --port "$CTRL_PORT" inspect >&2 || true
   return 1
 }
 
 cli --port "$CTRL_PORT" wait_for_state --state MAINMENU --timeout-ms 15000
-wait_for_iface
+wait_for_widget "Connect To Lobby"
 cli --port "$CTRL_PORT" click --label "Connect To Lobby" >/dev/null
 cli --port "$CTRL_PORT" wait_for_state --state LOBBYCONNECT --timeout-ms 5000
-wait_for_iface
+wait_for_widget "Login"
 
-# Type the credentials (auto-creates the account on first login).
-cli --port "$CTRL_PORT" set_text --uid 1 --text "alice" >/dev/null
-cli --port "$CTRL_PORT" set_text --uid 2 --text "secret" >/dev/null
+# Type the credentials through the same key path real text input uses
+# (auto-creates the account on first login).
+for ch in a l i c e; do
+  cli --port "$CTRL_PORT" key --key "$ch" >/dev/null
+done
+cli --port "$CTRL_PORT" key --key tab >/dev/null
+for ch in s e c r e t; do
+  cli --port "$CTRL_PORT" key --key "$ch" >/dev/null
+done
 
 # The Login button only dispatches credentials when the lobby state machine
 # has advanced through Connect → version-check → AUTHENTICATING; a click
@@ -147,7 +158,7 @@ cli --port "$CTRL_PORT" click --label "Login" >/dev/null
 
 # Auth + lobby state pump can take a couple of seconds in CI.
 cli --port "$CTRL_PORT" wait_for_state --state LOBBY --timeout-ms 15000
-wait_for_iface
+wait_for_widget "Create Game"
 
 # Go Back from the lobby returns to MAINMENU (FADEOUT is a brief
 # transient that wait_for_state will skip past).

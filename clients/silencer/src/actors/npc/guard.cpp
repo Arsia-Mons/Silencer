@@ -8,6 +8,7 @@
 #include "rocketprojectile.h"
 #include "pickup.h"
 #include "gasloader.h"
+#include "npc_math.h"
 #include <math.h>
 
 static const char* ActorDefName(Uint8 weapon) {
@@ -171,7 +172,7 @@ void Guard::InitBT(){
 		if(!f) return BTResult::Failure;
 		if(f->type == ObjectTypes::PLAYER){
 			Player* p = static_cast<Player*>(f);
-			if(p && abs(p->x - x) < GASLoader::Get().GetEnemyDef("guard-blaster")->chaseRangeClose){
+			if(p && npc_math::AbsInt(signed(p->x) - signed(x)) < GASLoader::Get().GetEnemyDef("guard-blaster")->chaseRangeClose){
 				// Too close for this angle — mark seen so leaf_uncrouch won't fire, then chase.
 				ctx.bbSet("target_seen", true);
 				updateChasing(f, world);
@@ -225,12 +226,12 @@ void Guard::InitBT(){
 		int cooldown   = gd ? gd->ladderCooldown    : 120;
 
 		int ydiff = signed(target_y) - signed(y);
-		if(dir != "up" && dir != "down" && abs(ydiff) <= threshold) return BTResult::Failure;
+		if(dir != "up" && dir != "down" && npc_math::AbsInt(ydiff) <= threshold) return BTResult::Failure;
 
 		Platform* ladder = world.map.TestAABB(x - 8, y, x + 8, y, Platform::LADDER);
 		if(!ladder) return BTResult::Failure;
 		Uint32 center = ((ladder->x2 - ladder->x1) / 2) + ladder->x1;
-		if(abs(signed(center) - signed(x)) > tolerance) return BTResult::Failure;
+		if(npc_math::AbsInt(signed(center) - signed(x)) > tolerance) return BTResult::Failure;
 
 		if(ydiff < 0 && signed(ladder->y1) < signed(y)){
 			x = center; yv = -climbspeed; state = LADDER; state_i = 0;
@@ -256,9 +257,10 @@ void Guard::InitBT(){
 			if(p->InBase(world) || p->IsInvisible(world)){ chasing = 0; return BTResult::Failure; }
 		}
 		if(state == STANDING || state == WALKING){
-			if(abs(obj->x - x) <= GASLoader::Get().GetEnemyDef("guard-blaster")->chaseRangeMax && abs(obj->x - x) > GASLoader::Get().GetEnemyDef("guard-blaster")->chaseRangeStop){
+			int xdist = npc_math::AbsInt(signed(obj->x) - signed(x));
+			if(xdist <= GASLoader::Get().GetEnemyDef("guard-blaster")->chaseRangeMax && xdist > GASLoader::Get().GetEnemyDef("guard-blaster")->chaseRangeStop){
 				mirrored = (obj->x < x);
-			} else if(abs(obj->x - x) > GASLoader::Get().GetEnemyDef("guard-blaster")->chaseRangeMax){
+			} else if(xdist > GASLoader::Get().GetEnemyDef("guard-blaster")->chaseRangeMax){
 				state = WALKING;
 				mirrored = (obj->x < x);
 			} else {
@@ -316,7 +318,7 @@ void Guard::InitBT(){
 							return BTResult::Running;
 						}
 					}
-					int dist = abs(signed(obj->x) - signed(x));
+					int dist = npc_math::AbsInt(signed(obj->x) - signed(x));
 					if (dist > ([]{ const EnemyDef* _g = GASLoader::Get().GetEnemyDef("guard-blaster"); return _g ? _g->chaseRangeStop : 80; }())) {
 						mirrored = (obj->x < x); // orient toward target
 					}
@@ -340,7 +342,7 @@ void Guard::InitBT(){
 		// Return-to-post phase: face toward spawn, climb ladders back if needed
 		if (state == STANDING || state == LOOKING) { state = WALKING; state_i = 0; }
 		{ const EnemyDef* _ggr = GASLoader::Get().GetEnemyDef("guard-blaster");
-		if (abs(signed(x) - signed(originalx)) <= (_ggr?_ggr->patrolReturnProximity:20)) {
+		if (npc_math::AbsInt(signed(x) - signed(originalx)) <= (_ggr?_ggr->patrolReturnProximity:20)) {
 			chasing = 0;
 			bt_walk_ticks_ = 0;
 			state = STANDING;
@@ -654,7 +656,7 @@ void Guard::Tick(World & world){
 				int dist = -1;
 				if (chasing != 0) {
 					Object* obj = world.GetObjectFromId(chasing);
-					if (obj) dist = (int)abs(signed(x) - signed(obj->x));
+					if (obj) dist = npc_math::AbsInt(signed(x) - signed(obj->x));
 				}
 				btctx_.bbSet("dist_to_target", dist);
 			}
@@ -748,7 +750,7 @@ void Guard::Tick(World & world){
 				Player* player = static_cast<Player*>(found);
 				if(player){
 					const EnemyDef* _gcp = GASLoader::Get().GetEnemyDef("guard-blaster");
-					if(abs(player->x - x) < (_gcp ? _gcp->chaseProximityX : 60)){
+					if(npc_math::AbsInt(signed(player->x) - signed(x)) < (_gcp ? _gcp->chaseProximityX : 60)){
 						break;
 					}
 				}
@@ -1152,14 +1154,15 @@ void Guard::Tick(World & world){
 				}
 			}
 			if(state == STANDING || state == WALKING){
-				if(abs(object->x - x) <= GASLoader::Get().GetEnemyDef("guard-blaster")->chaseRangeMax && abs(object->x - x) > GASLoader::Get().GetEnemyDef("guard-blaster")->chaseRangeStop){
+				int xdist = npc_math::AbsInt(signed(object->x) - signed(x));
+				if(xdist <= GASLoader::Get().GetEnemyDef("guard-blaster")->chaseRangeMax && xdist > GASLoader::Get().GetEnemyDef("guard-blaster")->chaseRangeStop){
 					if(object->x > x){
 						mirrored = false;
 					}else{
 						mirrored = true;
 					}
 				}else
-					if(abs(object->x - x) > GASLoader::Get().GetEnemyDef("guard-blaster")->chaseRangeMax){
+					if(xdist > GASLoader::Get().GetEnemyDef("guard-blaster")->chaseRangeMax){
 						state = WALKING;
 						if(object->x > x){
 							mirrored = false;
@@ -1169,10 +1172,11 @@ void Guard::Tick(World & world){
 					}else{
 						state = WALKING;
 					}
-				Platform * ladder = world.map.TestAABB(x - abs(xv), y, x + abs(xv), y, Platform::LADDER);
+				int xspan = npc_math::AbsInt((int)xv);
+				Platform * ladder = world.map.TestAABB(x - xspan, y, x + xspan, y, Platform::LADDER);
 				if(ladder){
 					Uint32 center = ((ladder->x2 - ladder->x1) / 2) + ladder->x1;
-					if(abs(signed(center) - x) <= abs(ceil(float(xv)))){
+					if(npc_math::AbsInt(signed(center) - x) <= npc_math::AbsInt((int)ceil(float(xv)))){
 						if(ladder->y2 == object->y && y != object->y && ladder->y2 > y){
 							x = center;
 							{ const EnemyDef* _gls = GASLoader::Get().GetEnemyDef("guard-blaster"); yv = _gls ? _gls->ladderClimbSpeed : 5; }
@@ -1242,9 +1246,9 @@ void Guard::HandleHit(World & world, Uint8 x, Uint8 y, Object & projectile){
 		FollowGround(*this, world, xv);
 	}
 	/*if(x < 50){
-		xv = abs(xv) * (mirrored ? -1 : 1);
+		xv = npc_math::AbsInt(xv) * (mirrored ? -1 : 1);
 	}else{
-		xv = -abs(speed) * (mirrored ? -1 : 1);
+		xv = -npc_math::AbsInt(speed) * (mirrored ? -1 : 1);
 	}*/
 	if(projectile.type == ObjectTypes::ROCKETPROJECTILE || projectile.type == ObjectTypes::PLASMAPROJECTILE){
 		if(health == 0 && state != DYINGEXPLODE){

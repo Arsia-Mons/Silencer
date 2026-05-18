@@ -15,10 +15,12 @@ class Resources
 {
 public:
 	Resources();
-	bool Load(class Game & game, bool dedicatedserver = false);
-	bool LoadSprites(class Game & game, bool dedicatedserver = false);
-	bool LoadTiles(class Game & game, bool dedicatedserver = false);
-	bool LoadSounds(class Game & game, bool dedicatedserver = false);
+	// `game` may be null — when null, the progress callback is suppressed.
+	// This allows callers to load sprites without a full Game instance.
+	bool Load(class Game * game, bool dedicatedserver = false);
+	bool LoadSprites(class Game * game, bool dedicatedserver = false);
+	bool LoadTiles(class Game * game, bool dedicatedserver = false);
+	bool LoadSounds(class Game * game, bool dedicatedserver = false);
 	void UnloadSounds(void);
 	std::vector<std::vector<std::shared_ptr<Surface> > > spritebank;
 	std::vector<std::vector<std::shared_ptr<Surface> > > tilebank;

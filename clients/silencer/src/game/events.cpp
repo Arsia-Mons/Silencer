@@ -1,10 +1,10 @@
 #include "game.h"
 #include "audio.h"
 #include "config.h"
-#include "interface.h"
 #include "player.h"
 #include "world.h"
 #include <cstring>
+#include <vector>
 
 // Captureless lambdas decay to function pointers, so this table costs nothing
 // at runtime vs. the old hand-written cascade. New actions get one row here
@@ -95,21 +95,21 @@ void Game::UpdateInputState(Input & input){
 			}
 		}
 		if(!world.replay.IsPlaying()){
-			if(interfaceenterfix && !keystate[SDL_SCANCODE_RETURN]){
-				interfaceenterfix = false;
+			if(chatEnterDebounce && !keystate[SDL_SCANCODE_RETURN]){
+				chatEnterDebounce = false;
 			}
-			if(localplayer->chatinterfaceid || interfaceenterfix){
+			if(localplayer->chatActive || chatEnterDebounce){
 				Input zeroinput;
 				input = zeroinput;
-				interfaceenterfix = true;
+				chatEnterDebounce = true;
 			}
-			if(localplayer->buyinterfaceid || localplayer->techinterfaceid || interfaceenterfix){
+			if(localplayer->isbuying || localplayer->techstationactive || chatEnterDebounce){
 				Input zeroinput;
 				zeroinput.keyactivate = input.keyactivate;
 				zeroinput.keymoveleft = input.keymoveleft;
 				zeroinput.keymoveright = input.keymoveright;
 				input = zeroinput;
-				interfaceenterfix = true;
+				chatEnterDebounce = true;
 			}
 		}
 	}
@@ -173,8 +173,12 @@ bool Game::HandleSDLEvents(void){
 	SDL_Event event;
 	while(SDL_PollEvent(&event) > 0){
 		switch(event.type){
-			case SDL_EVENT_WINDOW_RESIZED:{
-				// SDL3 GPU swapchain resizes automatically.
+			case SDL_EVENT_WINDOW_RESIZED:
+			case SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED:{
+				// SDL3 GPU swapchain resizes automatically; the CPU
+				// framebuffer must follow the drawable pixel size, not the
+				// logical window-coordinate size, on HiDPI displays.
+				SyncRenderSurfaceToWindowPixels();
 			}break;
 			case SDL_EVENT_WINDOW_FOCUS_GAINED:{
 				if(!world.replay.IsPlaying()){
@@ -199,131 +203,47 @@ bool Game::HandleSDLEvents(void){
 			}break;
 			case SDL_EVENT_TEXT_INPUT:{
 				char ascii = event.text.text[0] & 0x7F;
-				bool skip = true;
-				if(ascii >= 0x20 && ascii <= 0x7F){
-					skip = false;
-				}
-				switch(ascii){
-					case '[':
-					case '\\':
-					case ']':
-					case '^':
-					case '_':
-					case '`':
-					case '{':
-					case '|':
-					case '}':
-					case '~':
-						skip = true;
-					break;
-				}
-				Interface * iface = (Interface *)world.GetObjectFromId(currentinterface);
-				if(iface){
-					//iface->lastsym = ascii;
-					if(!skip){
-						iface->ProcessKeyPress(world, ascii);
-					}
-				}
+				clientUiInput.QueueTextInput(ascii);
 			}break;
 			case SDL_EVENT_KEY_DOWN:{
 				OnScancodeDown(event.key.scancode);
 				keystate[event.key.scancode] = true;
-			bool skip = true;
-			Uint8 ascii;
-			switch(event.key.scancode){
-					case SDL_SCANCODE_LEFT:
-						ascii = 1;
-						skip = false;
-					break;
-					case SDL_SCANCODE_RIGHT:
-						ascii = 2;
-						skip = false;
-					break;
-					case SDL_SCANCODE_UP:
-						ascii = 3;
-						skip = false;
-					break;
-					case SDL_SCANCODE_DOWN:
-						ascii = 4;
-						skip = false;
-					break;
-					case SDL_SCANCODE_BACKSPACE:
-						ascii = '\b';
-						skip = false;
-					break;
-					case SDL_SCANCODE_TAB:
-						ascii = '\t';
-						skip = false;
-					break;
-					case SDL_SCANCODE_RETURN:
-						ascii = '\n';
-						skip = false;
-					break;
-					case SDL_SCANCODE_ESCAPE:
-						ascii = 0x1B;
-						skip = false;
-					break;
-					default:{
-						if(keymap.IsPressed(Action::MoveUp, keystate, gamepadstate)){
-							ascii = 3;
-							skip = false;
-						}
-						if(keymap.IsPressed(Action::MoveDown, keystate, gamepadstate)){
-							ascii = 4;
-							skip = false;
-						}
-					}break;
-				}
-				Interface * iface = (Interface *)world.GetObjectFromId(currentinterface);
-				if(iface){
-					iface->lastsym = event.key.scancode;
-					if(!skip){
-						iface->ProcessKeyPress(world, ascii);
-					}
-				}
+				QueueUiKeyboardInputForScancode(event.key.scancode);
 			}break;
 			case SDL_EVENT_KEY_UP:{
 				OnScancodeUp(event.key.scancode);
 				keystate[event.key.scancode] = false;
 			}break;
 			case SDL_EVENT_MOUSE_WHEEL:{
-				Interface * iface = (Interface *)world.GetObjectFromId(currentinterface);
-				if(iface){
-					if(event.wheel.y > 0){
-						iface->ProcessMouseWheelUp(world);
-					}else
-					if(event.wheel.y < 0){
-						iface->ProcessMouseWheelDown(world);
-					}
-				}
+				clientUiInput.AddWheelDelta(event.wheel.x, event.wheel.y);
 			}break;
 			case SDL_EVENT_MOUSE_BUTTON_DOWN:{
-				Interface * iface = (Interface *)world.GetObjectFromId(currentinterface);
-				if(iface){
-					if(event.button.button == SDL_BUTTON_LEFT){
-						int w, h;
-						SDL_GetWindowSize(window, &w, &h);
-						iface->ProcessMousePress(world, true, (float(event.button.x) / w) * 640, (float(event.button.y) / h) * 480);
-					}
+				if(event.button.button == SDL_BUTTON_LEFT){
+					int windowW = 0;
+					int windowH = 0;
+					SDL_GetWindowSize(window, &windowW, &windowH);
+					clientUiInput.QueuePointerWindowEvent(
+						event.button.x, event.button.y, windowW, windowH,
+						screenbuffer.w, screenbuffer.h, true, false);
 				}
 			}break;
 			case SDL_EVENT_MOUSE_BUTTON_UP:{
 				if(event.button.button == SDL_BUTTON_LEFT){
-					Interface * iface = (Interface *)world.GetObjectFromId(currentinterface);
-					if(iface){
-						int w, h;
-						SDL_GetWindowSize(window, &w, &h);
-						iface->ProcessMousePress(world, false, (float(event.button.x) / w) * 640, (float(event.button.y) / h) * 480);
-					}
+					int windowW = 0;
+					int windowH = 0;
+					SDL_GetWindowSize(window, &windowW, &windowH);
+					clientUiInput.QueuePointerWindowEvent(
+						event.button.x, event.button.y, windowW, windowH,
+						screenbuffer.w, screenbuffer.h, false, true);
 				}
 			}break;
 			case SDL_EVENT_MOUSE_MOTION:{
-				Interface * iface = (Interface *)world.GetObjectFromId(currentinterface);
-				if(iface){
-					int w, h;
-					SDL_GetWindowSize(window, &w, &h);
-					iface->ProcessMouseMove(world, (float(event.motion.x) / w) * 640, (float(event.motion.y) / h) * 480);
-				}
+				int windowW = 0;
+				int windowH = 0;
+				SDL_GetWindowSize(window, &windowW, &windowH);
+				clientUiInput.QueuePointerWindowEvent(
+					event.motion.x, event.motion.y, windowW, windowH,
+					screenbuffer.w, screenbuffer.h, false, false);
 			}break;
 			case SDL_EVENT_GAMEPAD_ADDED:{
 				// SDL3 doesn't auto-open gamepads; without this, a pad plugged
@@ -359,12 +279,76 @@ bool Game::HandleSDLEvents(void){
 	return true;
 }
 
+void Game::QueueUiKeyboardInputForScancode(int sc){
+	clientUiInput.QueueBindingKeyDown(sc);
+	std::vector<silencer::ui::UiNavAction> queued;
+	auto queue = [&](silencer::ui::UiNavAction action){
+		for(auto existing : queued){
+			if(existing == action) return;
+		}
+		clientUiInput.QueueNavAction(action);
+		queued.push_back(action);
+	};
+
+	switch(sc){
+		case SDL_SCANCODE_LEFT:
+			queue(silencer::ui::UiNavAction::Left);
+		break;
+		case SDL_SCANCODE_RIGHT:
+			queue(silencer::ui::UiNavAction::Right);
+		break;
+		case SDL_SCANCODE_UP:
+			queue(silencer::ui::UiNavAction::Up);
+		break;
+		case SDL_SCANCODE_DOWN:
+			queue(silencer::ui::UiNavAction::Down);
+		break;
+		case SDL_SCANCODE_BACKSPACE:
+			queue(silencer::ui::UiNavAction::Backspace);
+		break;
+		case SDL_SCANCODE_TAB:
+			if(keystate[SDL_SCANCODE_LSHIFT] || keystate[SDL_SCANCODE_RSHIFT]){
+				queue(silencer::ui::UiNavAction::FocusPrevious);
+			}else{
+				queue(silencer::ui::UiNavAction::FocusNext);
+			}
+		break;
+		case SDL_SCANCODE_RETURN:
+			queue(silencer::ui::UiNavAction::Confirm);
+		break;
+		case SDL_SCANCODE_ESCAPE:
+			queue(silencer::ui::UiNavAction::Cancel);
+		break;
+		default:
+		break;
+	}
+
+	if(keymap.IsPressed(Action::UiUp, keystate, gamepadstate)){
+		queue(silencer::ui::UiNavAction::Up);
+	}
+	if(keymap.IsPressed(Action::UiDown, keystate, gamepadstate)){
+		queue(silencer::ui::UiNavAction::Down);
+	}
+	if(keymap.IsPressed(Action::UiLeft, keystate, gamepadstate)){
+		queue(silencer::ui::UiNavAction::Left);
+	}
+	if(keymap.IsPressed(Action::UiRight, keystate, gamepadstate)){
+		queue(silencer::ui::UiNavAction::Right);
+	}
+	if(keymap.IsPressed(Action::UiConfirm, keystate, gamepadstate)){
+		queue(silencer::ui::UiNavAction::Confirm);
+	}
+	if(keymap.IsPressed(Action::UiCancel, keystate, gamepadstate)){
+		queue(silencer::ui::UiNavAction::Cancel);
+	}
+}
+
 void Game::OnScancodeDown(int sc){
 	if(sc == quitscancode){
 		Peer * lp = world.peerlist[world.localpeerid];
 		bool isobserver = lp && lp->observer;
 		Player * localplayer = world.GetPeerPlayer(world.localpeerid);
-		bool playerok = localplayer && !localplayer->chatinterfaceid && !localplayer->buyinterfaceid;
+		bool playerok = localplayer && !localplayer->chatActive && !localplayer->isbuying && !localplayer->techstationactive;
 		if(isobserver || playerok){
 			if(world.quitstate == 0){
 				world.quitstate = 1;
@@ -375,10 +359,10 @@ void Game::OnScancodeDown(int sc){
 		}
 	}
 	if(sc == SDL_SCANCODE_F1){
-		world.showplayerlist = true;
+		world.SetShowingPlayerList(true);
 	}
 	if(sc == SDL_SCANCODE_F2){
-		world.showteamcolors = !world.showteamcolors;
+		world.SetShowingTeamColors(!world.IsShowingTeamColors());
 	}
 	if(sc == SDL_SCANCODE_F5){
 		ambienceMixer.LoadRandomGameMusic();
@@ -411,6 +395,6 @@ void Game::OnScancodeUp(int sc){
 		}
 	}
 	if(sc == SDL_SCANCODE_F1){
-		world.showplayerlist = false;
+		world.SetShowingPlayerList(false);
 	}
 }

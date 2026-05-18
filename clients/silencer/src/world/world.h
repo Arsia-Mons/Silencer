@@ -23,6 +23,12 @@
 #include "TriggerGraph.h"
 #include "gamemode.h"
 
+class Renderer;
+class Surface;
+class World;
+class Player;
+class Team;
+
 class World
 {
 public:
@@ -61,8 +67,36 @@ public:
 	void Connect(Uint8 agency, Uint32 accountid, const char * password = 0, bool observer = false);
 	void Disconnect(void);
 	Peer * GetAuthorityPeer(void);
+	Peer * GetPeer(Uint8 peerid);
+	Uint8 GetLocalPeerId() const { return localpeerid; }
 	class Player * GetPeerPlayer(Uint8 peerid);
 	Team * GetPeerTeam(Uint8 peerid);
+
+	// In-game UI session flags. Paired with the public mutable showchat_i.
+	bool IsShowingPlayerList() const { return showplayerlist; }
+	void SetShowingPlayerList(bool show) { showplayerlist = show; }
+	bool IsShowingTeamColors() const { return showteamcolors; }
+	void SetShowingTeamColors(bool show) { showteamcolors = show; }
+
+	// Decorative HUD highlights (set by gameplay; read by HUD).
+	bool ShouldHighlightSecrets() const { return highlightsecrets; }
+	bool ShouldHighlightMinimap() const { return highlightminimap; }
+
+	// In-game messages (timed overlays).
+	const char * GetMessageText() const { return message; }
+	Uint8 GetMessageProgress() const { return message_i; }
+	Uint8 GetMessageType() const { return messagetype; }
+	Uint8 GetMessageTime() const { return messagetime; }
+	const char * GetTopMessageText() const { return topmessage; }
+	Uint8 GetTopMessageProgress() const { return topmessage_i; }
+
+	// System-camera insets (two slots).
+	bool IsSystemCameraActive(int slot) const { return systemcameraactive[slot]; }
+	Uint16 GetSystemCameraFollowId(int slot) const { return systemcamerafollow[slot]; }
+	Sint16 GetSystemCameraX(int slot) const { return systemcamerax[slot]; }
+	Sint16 GetSystemCameraY(int slot) const { return systemcameray[slot]; }
+
+	const std::vector<Uint16> & GetObjectsByType(Uint8 type) const { return objectsbytype[type]; }
 	bool FindTeamForPeer(Peer & peer, Uint8 agency, int start = 0);
 	void SendInput(void);
 	void SwitchToLocalAuthorityMode(void);
@@ -160,19 +194,13 @@ public:
 	friend class Replay;
 	friend class Audio;
 	friend class TriggerGraph;
-	// Stage F of the game.cpp refactor: LobbyScreen::ShowGameTech calls
-	// World::RequestPeerList from the gametech-view enter path. Removed
-	// in stage G when the call moves into GameTechPanel::Build.
+	// LobbyScreen reads/writes World state across the entire lobby
+	// surface: seeds gameinfo from the lobby record after a successful
+	// host-side CreateGame, reads localpeer state to refresh the Ready
+	// button label, calls RequestPeerList/SetTech on the tech-choice
+	// surface, etc. Routes panels' world access through thin pass-through
+	// helpers on the screen rather than friending each panel.
 	friend class LobbyScreen;
-	// GameJoinPanel reads localpeer state (peerlist[localpeerid].ishost,
-	// AllPeersDownloadedMap, gameplaystate) to refresh the Ready button
-	// label, and dispatches SendReady on click.
-	friend class GameJoinPanel;
-	// GameTechPanel ports the legacy Game::UpdateTechInterface — reads
-	// peerlist[team peers] to drive the per-peer tech checkbox grid, calls
-	// RequestPeerList when the local-peer slot is empty (recovery for a
-	// dropped peerlist packet).
-	friend class GameTechPanel;
 
 protected:
 	std::list<class Object *> objectlist;

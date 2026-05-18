@@ -10,6 +10,7 @@
 #include "basedoor.h"
 #include "projectile.h"
 #include "gasloader.h"
+#include "buyableitem.h"
 #include "blasterprojectile.h"
 #include "laserprojectile.h"
 #include "rocketprojectile.h"
@@ -18,9 +19,6 @@
 #include "healmachine.h"
 #include "creditmachine.h"
 #include "secretreturn.h"
-#include "interface.h"
-#include "textinput.h"
-#include "selectbox.h"
 #include "inventorystation.h"
 #include "techstation.h"
 #include "detonator.h"
@@ -97,9 +95,8 @@ Player::Player() : Object(ObjectTypes::PLAYER){
 	hacksoundchannel = -1;
 	jetpacksoundchannel = -1;
 	flamersoundchannel = -1;
-	chatinterfaceid = 0;
-	buyinterfaceid = 0;
-	techinterfaceid = 0;
+	chatActive = false;
+	chatText[0] = '\0';
 	chatwithteam = false;
 	fallingnudge = 0;
 	oldfiles = 0;
@@ -124,6 +121,8 @@ Player::Player() : Object(ObjectTypes::PLAYER){
 	oldgrenadelistsize = 0;
 	buyifacelastitem = 0;
 	buyifacelastscrolled = 0;
+	techifacelastitem = 0;
+	techifacelastscrolled = 0;
 	justjumpedfromladder = false;
 	currentprojectileid = 0;
 	ishittable = true;
@@ -259,27 +258,10 @@ void Player::Tick(World & world){
 	if(ai){
 		ai->Tick(world);
 	}
-	if(input.keychat && !chatinterfaceid && !buyinterfaceid && !techinterfaceid && this == world.GetPeerPlayer(world.localpeerid)){
+	if(input.keychat && !chatActive && !isbuying && !techstationactive && this == world.GetPeerPlayer(world.localpeerid)){
 		if(!world.replay.IsPlaying()){
-			Interface * iface = (Interface *)world.CreateObject(ObjectTypes::INTERFACE);
-			if(iface){
-				TextInput * textinput = (TextInput *)world.CreateObject(ObjectTypes::TEXTINPUT);
-				if(textinput){
-					textinput->x = 100;
-					textinput->y = 100;
-					textinput->res_bank = 133;
-					textinput->fontwidth = 6;
-					textinput->draw = false;
-					textinput->uid = 1;
-					textinput->maxchars = 100;
-					textinput->maxwidth = 28;
-					//strcpy(textinput->text, "sdfsdf");
-					iface->AddObject(textinput->id);
-					iface->activeobject = textinput->id;
-					iface->ActiveChanged(world, iface, false);
-				}
-				chatinterfaceid = iface->id;
-			}
+			chatActive = true;
+			chatText[0] = '\0';
 		}
 	}
 	if(state_warp){
@@ -529,71 +511,6 @@ void Player::Tick(World & world){
 		}
 		if(techstationactive){
 			techstationactive = false;
-		}
-	}
-	if(world.GetPeerPlayer(world.localpeerid) == this){
-		if(isbuying && !buyinterfaceid){
-			Interface * iface = (Interface *)world.CreateObject(ObjectTypes::INTERFACE);
-			if(iface){
-				SelectBox * selectbox = (SelectBox *)world.CreateObject(ObjectTypes::SELECTBOX);
-				selectbox->draw = false;
-				selectbox->uid = 1;
-				int i = 0;
-				for(std::vector<BuyableItem *>::iterator it = world.buyableitems.begin(); it != world.buyableitems.end(); it++, i++){
-					if(BuyAvailable(world, (*it)->id)){
-						selectbox->AddItem((*it)->name, (*it)->id);
-					}
-				}
-				selectbox->selecteditem = buyifacelastitem;
-				selectbox->scrolled = buyifacelastscrolled;
-				iface->AddObject(selectbox->id);
-				iface->activeobject = selectbox->id;
-				Audio::GetInstance().Play(world.resources.soundbank[GASLoader::Get().player.soundMenuSelect], 96);
-				buyinterfaceid = iface->id;
-			}
-		}else
-		if(!isbuying && buyinterfaceid && !world.replaying){
-			Interface * iface = (Interface *)world.GetObjectFromId(buyinterfaceid);
-			if(iface){
-				iface->DestroyInterface(world, iface);
-			}
-			buyinterfaceid = 0;
-		}
-		
-		if(techstationactive && !techinterfaceid){
-			Interface * iface = (Interface *)world.CreateObject(ObjectTypes::INTERFACE);
-			if(iface){
-				Team * team = GetTeam(world);
-				SelectBox * selectbox = (SelectBox *)world.CreateObject(ObjectTypes::SELECTBOX);
-				selectbox->draw = false;
-				selectbox->uid = 1;
-				int i = 0;
-				for(std::vector<BuyableItem *>::iterator it = world.buyableitems.begin(); it != world.buyableitems.end(); it++, i++){
-					BuyableItem * buyableitem = *it;
-					if(InOwnBase(world)){
-						if(team && buyableitem->techchoice & team->disabledtech){
-							selectbox->AddItem((*it)->name, (*it)->id);
-						}
-					}else{
-						Team * otherteam = TeamOfCurrentBase(world);
-						if(otherteam && buyableitem->techchoice & otherteam->GetAvailableTech(world)){
-							selectbox->AddItem((*it)->name, (*it)->id);
-						}
-					}
-				}
-				selectbox->selecteditem = 0;
-				iface->AddObject(selectbox->id);
-				iface->activeobject = selectbox->id;
-				Audio::GetInstance().Play(world.resources.soundbank[GASLoader::Get().player.soundMenuSelect], 96);
-				techinterfaceid = iface->id;
-			}
-		}else
-		if(!techstationactive && techinterfaceid && !world.replaying){
-			Interface * iface = (Interface *)world.GetObjectFromId(techinterfaceid);
-			if(iface){
-				iface->DestroyInterface(world, iface);
-			}
-			techinterfaceid = 0;
 		}
 	}
 	if(fuel < maxfuel){
@@ -4760,4 +4677,26 @@ bool Player::BuyAvailable(World & world, Uint8 id){
 		}
 	}
 	return false;
+}
+
+void Player::CollectBuyMenuItems(World & world, bool tech, std::vector<BuyableItem *> & items){
+	items.clear();
+	Team * team = GetTeam(world);
+	for(std::vector<BuyableItem *>::iterator it = world.buyableitems.begin(); it != world.buyableitems.end(); it++){
+		BuyableItem * buyableitem = *it;
+		if(!tech){
+			if(BuyAvailable(world, buyableitem->id)){
+				items.push_back(buyableitem);
+			}
+		}else if(InOwnBase(world)){
+			if(team && (buyableitem->techchoice & team->disabledtech)){
+				items.push_back(buyableitem);
+			}
+		}else{
+			Team * otherteam = TeamOfCurrentBase(world);
+			if(otherteam && (buyableitem->techchoice & otherteam->GetAvailableTech(world))){
+				items.push_back(buyableitem);
+			}
+		}
+	}
 }

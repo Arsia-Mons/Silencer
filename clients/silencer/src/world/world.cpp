@@ -11,10 +11,10 @@
 #include "objecttypes.h"
 #include "terminal.h"
 #include "basedoor.h"
-#include "interface.h"
 #include "bodypart.h"
 #include "gasloader.h"
 #include "gamestateobject.h"
+#include "text_wrap.h"
 #include <algorithm>
 
 #define DELTAENABLED 1
@@ -849,7 +849,7 @@ void World::DoNetwork_Replica(void){
 				chatmsg.append(":\xA0");
 				chatmsg.append(&data.data[1 + 4]);
 				
-				char * wrapped = Interface::WordWrap(chatmsg.c_str(), 36);
+				char * wrapped = silencer::ui::WordWrapText(chatmsg.c_str(), 36);
 				char * line = strtok(wrapped, "\n");
 				while(line){
 					chatlines.push_back(line);
@@ -1621,7 +1621,7 @@ void World::DisplayChatMessage(Uint32 accountid, const char * msg){
 	chatmsg.append(":\xA0");
 	chatmsg.append(msg);
 	
-	char * wrapped = Interface::WordWrap(chatmsg.c_str(), 36, "\n ");
+	char * wrapped = silencer::ui::WordWrapText(chatmsg.c_str(), 36, "\n ");
 	char * line = strtok(wrapped, "\n");
 	while(line){
 		chatlines.push_back(line);
@@ -1828,6 +1828,11 @@ Peer * World::GetAuthorityPeer(void){
 		peerlist[authoritypeer]->id = authoritypeer;
 	}
 	return peerlist[authoritypeer];
+}
+
+Peer * World::GetPeer(Uint8 peerid){
+	if(peerid >= maxpeers) return 0;
+	return peerlist[peerid];
 }
 
 Player * World::GetPeerPlayer(Uint8 peerid){
