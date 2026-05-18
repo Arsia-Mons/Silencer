@@ -88,15 +88,18 @@ struct BoxStrokeStyle {
 namespace BoxVariants {
 
 // Lobby chrome look. Bright primary stroke (palette idx 216) flanked
-// by 1-px halo bands of the SAME color at reduced opacity — the
-// alpha-blend resolves to a dimmer green against any backdrop
-// (including pure black, via the bridge's math fallback). Matches the
-// legacy lobby BG sprite's bright-bracketed-by-dim-green stroke rule.
+// by 1-px halo bands of discrete dark-green palette entries at full
+// opacity — exactly what the legacy lobby BG sprite baked in (bright
+// 216 bracketed by solid dark-green). The previous alpha-blended
+// 216@50% halo routed through the RGB math fallback over the lobby's
+// pure-black backdrop, which resolved to a muddy/rough flank instead
+// of a crisp line (issue #177). Solid discrete entries keep the line
+// smooth and match legacy.
 constexpr BoxStrokeStyle Chrome{
 	/*strokeColor=*/216, /*strokeWidth=*/1,
-	/*outerHaloColor=*/216, /*outerHaloWidth=*/1,
-	/*innerHaloColor=*/216, /*innerHaloWidth=*/1,
-	/*haloOpacity=*/128,
+	/*outerHaloColor=*/75, /*outerHaloWidth=*/1,
+	/*innerHaloColor=*/77, /*innerHaloWidth=*/1,
+	/*haloOpacity=*/255,
 };
 
 // Single 1-px stroke at idx 216, no halo. Use for non-chrome borders
