@@ -21,6 +21,12 @@ services/lobby/run/
 *.obj
 *~
 
+# macOS Finder metadata
+.DS_Store
+
+# Ad-hoc screenshot/log scratch dirs from UI debugging sessions
+.tmp-*/
+
 # Local-run artifacts produced by the client
 config.cfg
 PALETTECALC*.BIN
