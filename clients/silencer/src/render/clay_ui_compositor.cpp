@@ -221,6 +221,141 @@ Uint8 AlphaSrcIndex(Uint8 color, Uint8 /*opacity255*/) {
 	return static_cast<Uint8>(rampBase + 8);
 }
 
+// ---------------------------------------------------------------------------
+// Stroke corner join model (issue #176).
+//
+// Composed L / stepped chrome (the lobby right pane) is built from several
+// adjacent `BoxStroke` boxes whose shared edges are suppressed. Each box
+// insets its stroke bands from its OWN bbox, so where two boxes meet the two
+// perpendicular runs of the same band never share a pixel — the elbow notches.
+//
+// Instead of per-box geometry hacks we render strokes in two passes:
+//
+//   Pass 1 (during the command walk): every active band edge a box draws
+//   registers its two endpoints as corners. A corner is keyed by its snapped
+//   pixel position plus the band's visual identity (color/opacity/thickness)
+//   and accumulates a 4-bit mask of the cardinal directions in which that band
+//   continues — across ALL boxes, so a shared junction sees connectivity from
+//   both neighbours.
+//
+//   Pass 2 (after the walk): every collected corner is filled with one
+//   band-thickness square placed by how many directions connect there. Two
+//   perpendicular runs that stopped short of each other now both reach the
+//   shared square, so the join is contiguous. For a plain closed rectangle the
+//   square lands exactly on the existing stepped-ownership overlap, so
+//   ordinary chrome is unchanged.
+namespace corner_dir {
+constexpr Uint8 Up    = 1 << 0;  // a vertical run goes upward from here
+constexpr Uint8 Down  = 1 << 1;
+constexpr Uint8 Left  = 1 << 2;  // a horizontal run goes leftward from here
+constexpr Uint8 Right = 1 << 3;
+}  // namespace corner_dir
+
+struct StrokeCorner {
+	int   x;          // snapped pixel position of the join centre
+	int   y;
+	int   thickness;  // band thickness (square side)
+	Uint8 color;
+	Uint8 opacity;
+	Uint8 dirs;       // OR of corner_dir bits, accumulated across boxes
+	ClipRect clip;    // active clip when the owning edge was emitted
+};
+
+// Per-frame corner set. Cleared at the top of RenderInto and drained by the
+// pass-2 corner render before RenderInto returns.
+std::vector<StrokeCorner> g_strokeCorners;
+
+// Register one band endpoint as a corner. Corners that match position + band
+// identity + clip merge so their direction masks accumulate.
+void AddStrokeCorner(int x, int y, int thickness,
+                     Uint8 color, Uint8 opacity, Uint8 dir,
+                     const ClipRect & clip) {
+	for(StrokeCorner & sc : g_strokeCorners){
+		if(sc.x == x && sc.y == y && sc.thickness == thickness &&
+		   sc.color == color && sc.opacity == opacity &&
+		   sc.clip.x == clip.x && sc.clip.y == clip.y &&
+		   sc.clip.w == clip.w && sc.clip.h == clip.h){
+			sc.dirs |= dir;
+			return;
+		}
+	}
+	g_strokeCorners.push_back(
+		StrokeCorner{x, y, thickness, color, opacity, dir, clip});
+}
+
+// Fill an axis-aligned stripe through `clip`. When `opacity` is 255 it is a
+// solid palette fill; otherwise the colour is alpha-blended against each
+// underlying pixel through the palette's alphaed LUT, with an RGB
+// ClosestMatch fallback for destination indices outside the LUT's [2, 226)
+// range (notably the lobby's pure-black backdrop). Shared by the stroke edge
+// pass and the corner join pass so both blend identically.
+void FillStrokeStripe(::Renderer & renderer, Surface * dst,
+                      const ClipRect & clip,
+                      int x, int y, int w, int h,
+                      Uint8 color, Uint8 opacity) {
+	if(w <= 0 || h <= 0 || !dst) return;
+	int x1 = std::max(x, clip.x);
+	int y1 = std::max(y, clip.y);
+	int x2 = std::min(x + w, clip.x + clip.w);
+	int y2 = std::min(y + h, clip.y + clip.h);
+	if(x2 <= x1 || y2 <= y1) return;
+	x = x1; y = y1; w = x2 - x1; h = y2 - y1;
+	if(opacity == 255){
+		Renderer::DrawFilledRectangle(dst, x, y, x + w, y + h, color);
+		return;
+	}
+	Uint8 srcLUT = AlphaSrcIndex(color, opacity);
+	SDL_Color * colors = renderer.palette.GetColors();
+	SDL_Color srcRgb = colors[color];
+	const float alpha = 0.5f;  // matches LUT quantization
+	Uint8 fallbackCache[256];
+	bool  fallbackCached[256] = {false};
+	for(int py = y; py < y + h; py++){
+		for(int px = x; px < x + w; px++){
+			Uint8 d = Renderer::GetPixel(dst, px, py);
+			Uint8 blended;
+			if(d >= 2 && d < 226){
+				blended = renderer.palette.Alpha(srcLUT, d);
+			}else if(fallbackCached[d]){
+				blended = fallbackCache[d];
+			}else{
+				// Inline RGB lerp — `Palette::Alpha(SDL_Color,...)` is
+				// private. Mirrors palette.cpp:442-447.
+				SDL_Color dstRgb = colors[d];
+				SDL_Color rgb;
+				rgb.r = (Uint8)(srcRgb.r * alpha + dstRgb.r * (1.0f - alpha));
+				rgb.g = (Uint8)(srcRgb.g * alpha + dstRgb.g * (1.0f - alpha));
+				rgb.b = (Uint8)(srcRgb.b * alpha + dstRgb.b * (1.0f - alpha));
+				rgb.a = 255;
+				blended = renderer.palette.ClosestMatch(rgb);
+				fallbackCache[d]  = blended;
+				fallbackCached[d] = true;
+			}
+			Renderer::SetPixel(dst, px, py, blended);
+		}
+	}
+}
+
+// Pass 2: render every collected stroke corner. A corner is one
+// band-thickness square; the connected-direction mask only decides whether
+// this corner actually needs a join (>= 2 directions) — an endpoint cap
+// (1 direction) or stray point (0) does not, since the straight edge pass
+// already covered it. The square is centred so its band sits flush with the
+// runs that feed it, which is exactly the pixel both perpendicular runs of a
+// composed elbow stopped short of.
+void RenderStrokeCorners(::Renderer & renderer, Surface * dst) {
+	for(const StrokeCorner & sc : g_strokeCorners){
+		if(sc.thickness < 1) continue;
+		// Count connected cardinal directions.
+		int n = 0;
+		for(int b = 0; b < 4; b++) if(sc.dirs & (1 << b)) n++;
+		if(n < 2) continue;  // straight edge pass already drew it
+		FillStrokeStripe(renderer, dst, sc.clip,
+		                 sc.x, sc.y, sc.thickness, sc.thickness,
+		                 sc.color, sc.opacity);
+	}
+}
+
 void DispatchRectangle(::Renderer & renderer,
                        Surface * dst,
                        const ::Clay_BoundingBox & bb,
@@ -590,6 +725,7 @@ void SetTextMeasureResources(const Resources * resources) {
 void RenderInto(::Resources & resources, ::Renderer & renderer,
                 Surface * dst, ::Clay_RenderCommandArray cmds) {
 	g_clipStack.clear();
+	g_strokeCorners.clear();
 	if(!dst) return;
 	for(int i = 0; i < cmds.length; i++){
 		::Clay_RenderCommand * c = &cmds.internalArray[i];
@@ -884,136 +1020,91 @@ void RenderInto(::Resources & resources, ::Renderer & renderer,
 						bool sRight  = (sides & 0x2) != 0;
 						bool sBottom = (sides & 0x4) != 0;
 						bool sLeft   = (sides & 0x8) != 0;
-						// Draw the active sides of a 1-band ring at the
-						// given concentric `inset` from the bbox edge.
-						// Closed rectangles keep the classic stepped
-						// corner ownership: horizontal bands inset around
-						// active verticals, and vertical bands inset
-						// around active horizontals.
-						// Fill a stripe at (x, y, w, h) with `color`. When
-						// `opacity` is 255 it's a solid fill; otherwise blend
-						// the color against the underlying pixel so the same
-						// palette entry reads as a dimmer band (the legacy
-						// chrome's halo bands are alpha-blended copies of the
-						// primary, not separate palette indices).
-						//
-						// Fast path: the palette's alphaed LUT covers
-						// `dst ∈ [2, 226)`. Outside that range — notably the
-						// lobby's pure-black backdrop at idx 0 — fall back to
-						// computing the blend in RGB and resolving via
-						// ClosestMatch. Per-pixel cost; reserved for chrome.
-						auto fillStripe = [&](int x, int y, int w, int h, Uint8 color, Uint8 opacity){
-							if(w <= 0 || h <= 0) return;
-							if(!ClipDrawRect(dst->w, dst->h, x, y, w, h)) return;
-							if(opacity == 255){
-								Renderer::DrawFilledRectangle(dst, x, y, x+w, y+h, color);
-								return;
-							}
-							Uint8 srcLUT = AlphaSrcIndex(color, opacity);
-							SDL_Color * colors = renderer.palette.GetColors();
-							SDL_Color srcRgb = colors[color];
-							const float alpha = 0.5f;  // matches LUT quantization
-							// Cache the math fallback per-dst — most chrome
-							// halos draw over uniform backdrop pixels so we
-							// only resolve ClosestMatch a couple of times.
-							Uint8 fallbackCache[256];
-							bool   fallbackCached[256] = {false};
-							for(int py = y; py < y + h; py++){
-								for(int px = x; px < x + w; px++){
-									Uint8 d = Renderer::GetPixel(dst, px, py);
-									Uint8 blended;
-									if(d >= 2 && d < 226){
-										blended = renderer.palette.Alpha(srcLUT, d);
-									}else if(fallbackCached[d]){
-										blended = fallbackCache[d];
-									}else{
-										// Inline RGB lerp — `Palette::Alpha(SDL_Color,...)`
-										// is private. Mirrors palette.cpp:442-447.
-										SDL_Color dstRgb = colors[d];
-										SDL_Color rgb;
-										rgb.r = (Uint8)(srcRgb.r * alpha + dstRgb.r * (1.0f - alpha));
-										rgb.g = (Uint8)(srcRgb.g * alpha + dstRgb.g * (1.0f - alpha));
-										rgb.b = (Uint8)(srcRgb.b * alpha + dstRgb.b * (1.0f - alpha));
-										rgb.a = 255;
-										blended = renderer.palette.ClosestMatch(rgb);
-										fallbackCache[d]  = blended;
-										fallbackCached[d] = true;
-									}
-									Renderer::SetPixel(dst, px, py, blended);
-								}
-							}
-						};
-						auto effectiveBandThickness = [&](int thickness){
-							int t = thickness;
-							if(t < 1) return 0;
-							if(t * 2 > bw) t = bw / 2;
-							if(t * 2 > bh) t = bh / 2;
-							return t > 0 ? t : 0;
-						};
-						const int totalBandDepth =
-							effectiveBandThickness(p->outerHaloWidth) +
-							effectiveBandThickness(p->strokeWidth) +
-							effectiveBandThickness(p->innerHaloWidth);
-						// A suppressed side means an adjacent box owns that
-						// edge of the composed (L / stepped) lobby outline.
-						// Extend the present perpendicular stripes outward
-						// past this bbox by the full band depth so their
-						// stroke + halo bands overlap the neighbour's stroke
-						// and the shared corner stays contiguous. This
-						// generalises the old single-corner special case
-						// (issue #176) and is a no-op for closed boxes (all
-						// extents 0), so plain rectangular chrome is
-						// unchanged.
-						const int extL = sLeft   ? 0 : totalBandDepth;
-						const int extR = sRight  ? 0 : totalBandDepth;
-						const int extT = sTop    ? 0 : totalBandDepth;
-						const int extB = sBottom ? 0 : totalBandDepth;
+						ClipRect clip;
+						if(!CurrentClip(dst->w, dst->h, clip)) break;
+						// Each concentric band (outer halo / stroke / inner
+						// halo) draws as up to four straight runs at the
+						// box's OWN bbox -- no per-box outward extension.
+						// Where two composed boxes meet, each run stops at
+						// its own bbox and pass 1 records the band's four
+						// corner cells with the directions the band
+						// continues in. Pass 2 (RenderStrokeCorners, after
+						// the whole command stream) fills one
+						// band-thickness square at every corner that ended
+						// up connected from two or more directions, so the
+						// shared elbow is contiguous. A plain closed
+						// rectangle's corner cell lands exactly on the old
+						// stepped-ownership overlap, so ordinary chrome is
+						// byte-identical (issue #176).
 						auto drawRing = [&](int inset, int thickness, Uint8 color, Uint8 opacity){
 							int t = thickness;
 							if(t < 1) return;
 							if(t * 2 > bw) t = bw / 2;
 							if(t * 2 > bh) t = bh / 2;
 							if(t < 1) return;
-							int topLeftTrim = sLeft ? inset : 0;
-							int topRightTrim = sRight ? inset : 0;
-							int bottomLeftTrim = sLeft ? inset : 0;
-							int bottomRightTrim = sRight ? inset : 0;
-							int leftTopTrim = sTop ? inset : 0;
-							int leftBottomTrim = sBottom ? inset : 0;
-							int rightTopTrim = sTop ? inset : 0;
-							int rightBottomTrim = sBottom ? inset : 0;
-							// Top stripe.
+							// Top-left of each thickness-square corner cell.
+							const int cx0 = bx + inset;           // left
+							const int cx1 = bx + bw - inset - t;   // right
+							const int cy0 = by + inset;            // top
+							const int cy1 = by + bh - inset - t;   // bottom
+							// Classic stepped ownership: a run is trimmed
+							// by `t` at each end that has an active
+							// perpendicular side, leaving the corner cell
+							// for pass 2.
+							int hLeftTrim  = sLeft   ? t : 0;
+							int hRightTrim = sRight  ? t : 0;
+							int vTopTrim   = sTop    ? t : 0;
+							int vBotTrim   = sBottom ? t : 0;
+							// Top run.
 							if(sTop){
-								int x = bx + topLeftTrim - extL;
-								int y = by + inset;
-								int w = bw - topLeftTrim - topRightTrim + extL + extR;
-								fillStripe(x, y, w, t, color, opacity);
+								int x = cx0 + hLeftTrim;
+								int w = bw - 2 * inset - hLeftTrim - hRightTrim;
+								FillStrokeStripe(renderer, dst, clip,
+								                 x, cy0, w, t, color, opacity);
 							}
-							// Bottom stripe.
+							// Bottom run.
 							if(sBottom){
-								int x = bx + bottomLeftTrim - extL;
-								int y = by + bh - inset - t;
-								int w = bw - bottomLeftTrim - bottomRightTrim + extL + extR;
-								fillStripe(x, y, w, t, color, opacity);
+								int x = cx0 + hLeftTrim;
+								int w = bw - 2 * inset - hLeftTrim - hRightTrim;
+								FillStrokeStripe(renderer, dst, clip,
+								                 x, cy1, w, t, color, opacity);
 							}
-							// Vertical edges. Closed rectangles keep the
-							// classic stepped ownership; an open top/bottom
-							// extends the verticals outward to meet the
-							// neighbour that owns the missing horizontal.
-							int leftVy0 = by + leftTopTrim + (sTop ? t : 0) - extT;
-							int leftVy1 = by + bh - leftBottomTrim - (sBottom ? t : 0) + extB;
-							int leftVh  = leftVy1 - leftVy0;
-							if(sLeft && leftVh > 0){
-								int x = bx + inset;
-								fillStripe(x, leftVy0, t, leftVh, color, opacity);
+							// Left run.
+							if(sLeft){
+								int y = cy0 + vTopTrim;
+								int h = bh - 2 * inset - vTopTrim - vBotTrim;
+								FillStrokeStripe(renderer, dst, clip,
+								                 cx0, y, t, h, color, opacity);
 							}
-							int rightVy0 = by + rightTopTrim + (sTop ? t : 0) - extT;
-							int rightVy1 = by + bh - rightBottomTrim - (sBottom ? t : 0) + extB;
-							int rightVh  = rightVy1 - rightVy0;
-							if(sRight && rightVh > 0){
-								int x = bx + bw - inset - t;
-								fillStripe(x, rightVy0, t, rightVh, color, opacity);
+							// Right run.
+							if(sRight){
+								int y = cy0 + vTopTrim;
+								int h = bh - 2 * inset - vTopTrim - vBotTrim;
+								FillStrokeStripe(renderer, dst, clip,
+								                 cx1, y, t, h, color, opacity);
 							}
+							// Pass 1: register the band's four corner cells
+							// with the directions this band continues in.
+							// The direction mask accumulates across every
+							// box sharing the cell, so a composed junction
+							// sees both neighbours' connectivity.
+							auto reg = [&](int cx, int cy, Uint8 dirs){
+								if(dirs)
+									AddStrokeCorner(cx, cy, t, color,
+									                opacity, dirs, clip);
+							};
+							reg(cx0, cy0,
+							    (sTop  ? corner_dir::Right : (Uint8)0) |
+							    (sLeft ? corner_dir::Down  : (Uint8)0));
+							reg(cx1, cy0,
+							    (sTop   ? corner_dir::Left : (Uint8)0) |
+							    (sRight ? corner_dir::Down : (Uint8)0));
+							reg(cx0, cy1,
+							    (sBottom ? corner_dir::Right : (Uint8)0) |
+							    (sLeft   ? corner_dir::Up    : (Uint8)0));
+							reg(cx1, cy1,
+							    (sBottom ? corner_dir::Left : (Uint8)0) |
+							    (sRight  ? corner_dir::Up   : (Uint8)0));
 						};
 						int inset = 0;
 						if(p->outerHaloWidth > 0){
@@ -1082,6 +1173,11 @@ void RenderInto(::Resources & resources, ::Renderer & renderer,
 				break;
 		}
 	}
+	// Pass 2: bridge every stroke corner that ended up connected from
+	// two or more directions. Runs once after the whole command stream
+	// so a corner shared by adjacent composed boxes has accumulated
+	// connectivity from all of them (issue #176).
+	RenderStrokeCorners(renderer, dst);
 }
 
 // Clay lays out in a virtual coordinate space (the native surface size
