@@ -9,6 +9,7 @@
 #include "platformset.h"
 #include "minimap.h"
 #include "TriggerDef.h"
+#include "gamemode.h"
 #include <zlib.h>
 
 class Map
@@ -40,6 +41,12 @@ public:
 	void Unload(void);
 	void MiniMapCoords(int & x, int & y);
 	void RandomPlayerStartLocation(World & world, Sint16 & x, Sint16 & y);
+	// Returns true if the given mode is supported by this map.
+	// Returns true for any mode when supportedModes == 0 (all modes).
+	bool SupportsMode(GameModeId mode) const {
+		if(!supportedModes) return true;
+		return (supportedModes & (1u << (Uint8)mode)) != 0;
+	}
 	void CalculateRainPuddleLocations(void);
 	void CalculateAdjacentPlatforms(void);
 	void CalculatePlatformSets(void);
@@ -97,6 +104,10 @@ public:
 	std::vector<ObjectiveDef> objectives;
 	std::vector<TriggerZone> zones;
 	
+	// Supported game modes bitmask (bits 0–9 map to GameModeId 0–9).
+	// 0 means all modes are supported (backwards compatible with old maps).
+	Uint32 supportedModes;
+
 //private:
 	static bool CompareType(std::shared_ptr<Platform> a, std::shared_ptr<Platform> b);
 	std::vector<std::shared_ptr<Platform>> platforms;

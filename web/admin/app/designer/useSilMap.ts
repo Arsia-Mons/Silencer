@@ -28,6 +28,7 @@ function parseHeader(dv: DataView): ParsedHeader {
   const parallax    = dv.getUint8(9);
   const ambience    = dv.getInt8(10);
   const flags       = dv.getUint32(13, false);  // big-endian
+  const supportedModes = flags & 0x3FF;  // bits 0–9 = game mode bitmask
   const descBytes   = new Uint8Array(dv.buffer, dv.byteOffset + 17, 128);
   let descEnd = descBytes.indexOf(0);
   if (descEnd === -1) descEnd = 128;
@@ -41,7 +42,7 @@ function parseHeader(dv: DataView): ParsedHeader {
   const levelStart   = minimapEnd + 4;
 
   return {
-    header: { firstbyte, version, maxplayers, maxteams, parallax, ambience, flags, description },
+    header: { firstbyte, version, maxplayers, maxteams, parallax, ambience, flags, description, supportedModes },
     width, height,
     rawMinimap: rawMinimap.slice(),
     levelDataOffset: levelStart,
@@ -432,7 +433,7 @@ export function useSilMap(): UseSilMapReturn {
     futureRef.current = [];
     syncUndoRedo();
     setMapData({
-      header: { firstbyte: 0, version: 0, maxplayers: 8, maxteams: 2, parallax: 0, ambience: -20, flags: 0, description: description || 'New Map' },
+      header: { firstbyte: 0, version: 0, maxplayers: 8, maxteams: 2, parallax: 0, ambience: -20, flags: 0, description: description || 'New Map', supportedModes: 0 },
       width, height,
       fileName: 'new_map.SIL',
       layers: {
@@ -645,7 +646,7 @@ export function useSilMap(): UseSilMapReturn {
     fdv.setUint16(6, height, false);
     fdv.setUint8(9, header.parallax);
     fdv.setInt8(10, header.ambience);
-    fdv.setUint32(13, header.flags, false);
+    fdv.setUint32(13, (header.flags & ~0x3FF) | (header.supportedModes & 0x3FF), false);
     fBytes.set(descBuf, 17);
     fdv.setUint32(145, rawMinimap.length, true);
     fBytes.set(rawMinimap, 149);
@@ -1088,7 +1089,7 @@ export function useSilMap(): UseSilMapReturn {
     fdv.setUint16(6, height, false);
     fdv.setUint8(9, header.parallax);
     fdv.setInt8(10, header.ambience);
-    fdv.setUint32(13, header.flags, false);
+    fdv.setUint32(13, (header.flags & ~0x3FF) | (header.supportedModes & 0x3FF), false);
     fBytes.set(descBuf, 17);
     fdv.setUint32(145, rawMinimap.length, true);
     fBytes.set(rawMinimap, 149);

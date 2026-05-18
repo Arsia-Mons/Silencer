@@ -146,6 +146,8 @@ export interface MapHeader {
   ambience: number;
   flags: number;
   description: string;
+  /** Bitmask: bit N = GameModeId N is supported. 0 means all modes supported. */
+  supportedModes: number;
 }
 
 export interface MapActor {
