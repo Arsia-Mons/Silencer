@@ -1,0 +1,29 @@
+{
+  "task_id": "commit-chat-panel-stroke-color-fix_20260517_171738",
+  "metadata": {
+    "title": "Commit chat panel stroke color fix",
+    "tags": [
+      "clients/silencer",
+      "client",
+      "verified",
+      "ui",
+      "git"
+    ]
+  },
+  "repo": {
+    "git_url": "git@github.com:Arsia-Mons/Silencer.git",
+    "branch": "hv/clay-ui-migration",
+    "start_commit_sha": "4901afab781d0fe7c18c702bf8ead387714a1f10",
+    "end_commit_sha": "4901afab781d0fe7c18c702bf8ead387714a1f10",
+    "subdir": "",
+    "sparse_checkout": []
+  },
+  "lm": {
+    "instructions": ""
+  },
+  "evaluation": {
+    "content_rubric": [],
+    "location_rubric": [],
+    "clarity_rubric": []
+  }
+}
