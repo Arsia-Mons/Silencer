@@ -153,15 +153,12 @@ void BuildCharacterPanelTree(CharacterPanelState & state,
 	           .layoutDirection = CLAY_TOP_TO_BOTTOM,
 	       } }) {
 
-		// Username header. The legacy palette index 200 renders a dark
-		// blue that is illegible against the lobby's dark background (the
-		// name looked missing). Use the same readable green ramp the
-		// adjacent LEVEL/WINS/LOSSES/XP stats use, kept at the larger
-		// Heading size so it still reads as the panel's title.
+		// Username header. Match the legacy character panel treatment:
+		// font bank 134 / width 8 with palette color 200.
 		CLAY({ .id = CLAY_ID("CharUserWrap") }) {
 			Text(character_panel_detail::FromStd(character_panel_detail::g_stats.username),
 			     { .size = TextSize::Heading,
-			       .effect = TextEffect::LegacyPalette(129, 160, true) });
+			       .effect = TextEffect::LegacyPalette(200) });
 		}
 
 		// Five agency toggles in a horizontal strip. The row fills the
