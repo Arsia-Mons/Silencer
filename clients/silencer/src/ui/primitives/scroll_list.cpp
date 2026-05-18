@@ -10,6 +10,15 @@ namespace silencer::ui::primitives {
 
 namespace {
 
+// Legacy SelectBox drew the selection bar 11px tall inside a 14px row slot
+// and inset from the slot edges, so consecutive rows read as separate items
+// with breathing room. The Clay migration filled the whole slot edge-to-edge,
+// which made list items look cramped (issue #178). Re-inset the row body so
+// the highlight and text sit inside the slot like legacy.
+constexpr Uint16 kRowInsetX     = 4;  // left/right gap between bar and slot
+constexpr Uint16 kRowBottomGap  = 3;  // separation between consecutive rows
+constexpr Uint16 kRowTextPadX   = 6;  // text inset from the bar's left edge
+
 constexpr int kPayloadCapacity = 64;
 silencer::clay_bridge::ScrollBarPayload g_payloads[kPayloadCapacity];
 int g_payloadCount = 0;
@@ -116,22 +125,33 @@ void ScrollList(Clay_String id,
 				const bool isSelected = (i == selectedIndex);
 				const Uint8 bgIdx = isSelected ? opts.highlightColor : 0;
 
+				// The slot keeps the full legacy row pitch and stays the
+				// clickable/hit-tested element. The inset inner body carries
+				// the highlight + text so consecutive rows read as separate
+				// items with margins, like legacy SelectBox (issue #178).
 				CLAY({ .id = CLAY_SIDI(id, static_cast<uint32_t>(i + 1)),
 				       .layout = {
 				           .sizing = { CLAY_SIZING_FIXED(rowsW),
 				                       CLAY_SIZING_FIXED(rowH) },
-				           // Center the text line within the fixed legacy row slot
-				           // so lobby list items don't ride too high.
-				           .childAlignment = { CLAY_ALIGN_X_LEFT,
-				                               CLAY_ALIGN_Y_CENTER },
-				       },
-				       .backgroundColor = { static_cast<float>(bgIdx),
-				                            0.0f, 0.0f, 255.0f } }) {
+				           .padding = { kRowInsetX, kRowInsetX,
+				                        0, kRowBottomGap },
+				       } }) {
 					if(handle.hoveredIndexOut && ::Clay_Hovered()){
 						*handle.hoveredIndexOut = i;
 					}
 					RegisterRowWidget(id, items[i], i, isSelected, handle);
-					Text(items[i], opts.text);
+					CLAY({ .id = CLAY_SIDI(id, 0x20000000u + static_cast<uint32_t>(i)),
+					       .layout = {
+					           .sizing = { CLAY_SIZING_GROW(0),
+					                       CLAY_SIZING_GROW(0) },
+					           .padding = { kRowTextPadX, kRowTextPadX, 0, 0 },
+					           .childAlignment = { CLAY_ALIGN_X_LEFT,
+					                               CLAY_ALIGN_Y_CENTER },
+					       },
+					       .backgroundColor = { static_cast<float>(bgIdx),
+					                            0.0f, 0.0f, 255.0f } }) {
+						Text(items[i], opts.text);
+					}
 				}
 			}
 		}
