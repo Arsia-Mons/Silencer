@@ -242,7 +242,20 @@ void OptionsControlsScreen::BuildUi(ScreenContext & ctx, Surface & dst, float fr
 		KeybindListVisibleRowsForContentHeight(contentHeight));
 	scrollPosition = std::max(0, std::min(MaxScroll(), scrollPosition));
 
+	// The keybind list's interior widths are hardcoded legacy pixels (designed
+	// for the 640-wide viewport). Scale them down with the window so the panel
+	// interior never overflows a narrow window horizontally (issue #179
+	// follow-up). Capped at 1.0 so large windows keep the design width.
+	const float keybindHScale = std::min(
+		1.0f,
+		static_cast<float>(layoutWidth)
+			/ static_cast<float>(options_controls_screen_detail::kLegacyViewportW));
+	const int panelPadX = std::max(
+		1,
+		static_cast<int>(options_controls_screen_detail::kPanelPadX * keybindHScale + 0.5f));
+
 	keybindListView_ = KeybindListView{};
+	keybindListView_.hScale = keybindHScale;
 	keybindListView_.presetText = !ctx.keymap.label.empty() ? ctx.keymap.label
 	                            : !ctx.keymap.name.empty() ? ctx.keymap.name
 	                            : std::string(Config::GetInstance().active_keybind_profile);
@@ -282,9 +295,9 @@ void OptionsControlsScreen::BuildUi(ScreenContext & ctx, Surface & dst, float fr
 	       .image = { .imageData = PackImageStretch(6, 0) } }) {
 		CLAY({ .id = CLAY_ID("OptionsControlsPanel"),
 		       .layout = {
-		           .sizing = { CLAY_SIZING_GROW(options_controls_screen_detail::kPanelMinW),
+		           .sizing = { CLAY_SIZING_GROW(0),
 		                       CLAY_SIZING_GROW(options_controls_screen_detail::kPanelMinH) },
-		           .padding = { options_controls_screen_detail::kPanelPadX, options_controls_screen_detail::kPanelPadX,
+		           .padding = { static_cast<uint16_t>(panelPadX), static_cast<uint16_t>(panelPadX),
 		                        options_controls_screen_detail::kPanelPadTop, static_cast<uint16_t>(panelPadBottom) },
 		           .childAlignment = { CLAY_ALIGN_X_CENTER, CLAY_ALIGN_Y_TOP },
 		           .layoutDirection = CLAY_TOP_TO_BOTTOM,
