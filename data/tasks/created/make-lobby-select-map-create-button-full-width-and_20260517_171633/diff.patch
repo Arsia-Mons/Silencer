@@ -1,0 +1,8 @@
+diff --git a/tests/lobby-ui/chat_panel_test/legacy.png b/tests/lobby-ui/chat_panel_test/legacy.png
+new file mode 100644
+index 0000000..dee0fe5
+Binary files /dev/null and b/tests/lobby-ui/chat_panel_test/legacy.png differ
+diff --git a/tests/lobby-ui/chat_panel_test/screenshot.png b/tests/lobby-ui/chat_panel_test/screenshot.png
+new file mode 100644
+index 0000000..961cb41
+Binary files /dev/null and b/tests/lobby-ui/chat_panel_test/screenshot.png differ

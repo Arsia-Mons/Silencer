@@ -314,6 +314,7 @@ void BuildNameAndPassword(GameCreatePanelState & state,
 	inputOpts.heightPx  = kInputH;
 	inputOpts.textSize  = TextSize::Body;
 	inputOpts.showCaret = false;
+	const int buttonWidth = std::max<int>(1, layout.inputWidth);
 
 	CLAY({ .id = CLAY_ID("GCrtFooter"),
 	       .layout = {
@@ -347,11 +348,15 @@ void BuildNameAndPassword(GameCreatePanelState & state,
 
 		CLAY({ .id = CLAY_ID("GCrtCreateBtnWrap"),
 		       .layout = {
+		           .sizing = { CLAY_SIZING_FIXED(static_cast<float>(buttonWidth)),
+		                       CLAY_SIZING_FIT(0) },
 		           .childAlignment = { .x = CLAY_ALIGN_X_CENTER },
 		       } }) {
 			Button(CLAY_STRING("GameCreateCreateButton"), CLAY_STRING("Create"),
 			       ButtonOpts{ .variant = ButtonVariant::Chrome,
-			                   .size = ButtonSize::Compact },
+			                   .size = ButtonSize::Auto,
+			                   .minWidth = buttonWidth,
+			                   .maxWidth = buttonWidth },
 			       ButtonHandle{ nullptr, kActionCreate, &interactions });
 		}
 	}
