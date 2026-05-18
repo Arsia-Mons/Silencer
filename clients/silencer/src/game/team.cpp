@@ -97,65 +97,17 @@ void Team::Tick(World & world){
 			}
 		}
 		world.Illuminate();
-		if(secrets >= GASLoader::Get().player.secretsNeededToWin){
-			// game won
-			if(!world.winningteamid){
-				world.winningteamid = id;
-				for(std::list<Object *>::iterator it = world.objectlist.begin(); it != world.objectlist.end(); it++){
-					Object * object = *it;
-					if(object->type == ObjectTypes::PLAYER){
-						Player * player = static_cast<Player *>(object);
-						Team * team = player->GetTeam(world);
-						if(team && team->id == world.winningteamid){
-							player->UnDeploy();
-						}else{
-							Peer * peer = player->GetPeer(world);
-							if(peer){
-								world.KillByGovt(*peer);
-							}
-						}
-					}
-				}
-				for(int i = 0; i < world.maxpeers; i++){
-					Peer * peer = world.peerlist[i];
-					if(peer){
-						Uint8 type = 10;
-						char fs[64];
-						strcpy(fs, "MISSION SUCCESS\n");
-						bool isourteam = false;
-						for(int i = 0; i < numpeers; i++){
-							Peer * peer2 = world.peerlist[peers[i]];
-							if(peer2){
-								if(peer2->id == peer->id){
-									isourteam = true;
-								}
-							}
-						}
-						if(!isourteam){
-							strcpy(fs, "MISSION FAILED\n");
-							type = 11;
-						}
-						char message[256];
-						sprintf(message, "%sAll secrets retrieved\nby %s agents:\n\n", fs, GetAgencyName());
-						for(int i = 0; i < numpeers; i++){
-							Peer * peer2 = world.peerlist[peers[i]];
-							if(peer2){
-								User * user = world.lobby.GetUserInfo(peer2->accountid);
-								strcat(message, user->name);
-								strcat(message, "\n");
-							}
-						}
-						world.ShowMessage(message, 255, type, true, peer);
-					}
-				}
-			}
+		if(world.gameMode){
+			world.gameMode->OnSecretDelivered(world, *this);
 		}
 		secretdelivered = 0;
 	}
 	if(secrets >= GASLoader::Get().player.secretsNeededToWin){
-		// bug fix for when secretdelivered packet is lost
-		if(!world.winningteamid){
-			world.winningteamid = id;
+		// Bug fix: if the secretdelivered packet was lost, OnSecretDelivered
+		// may not have fired. Dispatch again so the active GameMode can set
+		// winningteamid before the next tick's CheckForEndOfGame.
+		if(!world.winningteamid && world.gameMode){
+			world.gameMode->OnSecretDelivered(world, *this);
 		}
 	}
 	if(secretprogress >= GASLoader::Get().player.secretProgressBeamThresh && oldsecretprogress > 0){

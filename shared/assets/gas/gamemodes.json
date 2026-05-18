@@ -1,0 +1,94 @@
+{
+  "gameModes": [
+    {
+      "id": 0,
+      "name": "Data Retrieval",
+      "timeLimitSecs": 0,
+      "scoreLimit": 0,
+      "fragLimit": 0,
+      "friendlyFire": false,
+      "respawn": true
+    },
+    {
+      "id": 1,
+      "name": "Deathmatch",
+      "timeLimitSecs": 600,
+      "scoreLimit": 0,
+      "fragLimit": 30,
+      "friendlyFire": false,
+      "respawn": true
+    },
+    {
+      "id": 2,
+      "name": "Team Deathmatch",
+      "timeLimitSecs": 600,
+      "scoreLimit": 0,
+      "fragLimit": 50,
+      "friendlyFire": false,
+      "respawn": true
+    },
+    {
+      "id": 3,
+      "name": "Survival",
+      "timeLimitSecs": 0,
+      "scoreLimit": 0,
+      "fragLimit": 0,
+      "friendlyFire": false,
+      "respawn": false
+    },
+    {
+      "id": 4,
+      "name": "Extraction",
+      "timeLimitSecs": 480,
+      "scoreLimit": 0,
+      "fragLimit": 0,
+      "friendlyFire": false,
+      "respawn": true
+    },
+    {
+      "id": 5,
+      "name": "Assassination",
+      "timeLimitSecs": 300,
+      "scoreLimit": 0,
+      "fragLimit": 0,
+      "friendlyFire": false,
+      "respawn": false
+    },
+    {
+      "id": 6,
+      "name": "Sabotage",
+      "timeLimitSecs": 480,
+      "scoreLimit": 0,
+      "fragLimit": 0,
+      "friendlyFire": false,
+      "respawn": true
+    },
+    {
+      "id": 7,
+      "name": "Manhunt",
+      "timeLimitSecs": 360,
+      "scoreLimit": 0,
+      "fragLimit": 0,
+      "friendlyFire": false,
+      "respawn": false
+    },
+    {
+      "id": 8,
+      "name": "Control Points",
+      "timeLimitSecs": 600,
+      "scoreLimit": 500,
+      "fragLimit": 0,
+      "friendlyFire": false,
+      "respawn": true
+    },
+    {
+      "id": 9,
+      "name": "Escort",
+      "timeLimitSecs": 480,
+      "scoreLimit": 0,
+      "fragLimit": 0,
+      "friendlyFire": false,
+      "respawn": true
+    }
+  ]
+}

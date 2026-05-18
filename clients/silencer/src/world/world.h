@@ -150,6 +150,7 @@ public:
 	friend class Magistrate;
 	friend class Vanta;
 	friend class GameStateObject;
+	friend class DataRetrievalMode;
 	friend class Warper;
 	friend class Grenade;
 	friend class BaseDoor;
