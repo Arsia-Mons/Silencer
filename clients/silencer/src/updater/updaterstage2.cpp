@@ -246,13 +246,24 @@ void StripQuarantineRecursive(const std::string &path) {
             path.c_str(), strerror(errno));
     }
     struct stat st;
-    if (lstat(path.c_str(), &st) != 0 || !S_ISDIR(st.st_mode)) return;
+    if (lstat(path.c_str(), &st) != 0) {
+        Logf("lstat failed on %s: %s", path.c_str(), strerror(errno));
+        return;
+    }
+    if (!S_ISDIR(st.st_mode)) return;
     DIR *d = opendir(path.c_str());
-    if (!d) return;
+    if (!d) {
+        Logf("opendir failed on %s: %s", path.c_str(), strerror(errno));
+        return;
+    }
     struct dirent *e;
     while ((e = readdir(d)) != NULL) {
         std::string n = e->d_name;
         if (n == "." || n == "..") continue;
+        if (n.find('/') != std::string::npos) {
+            Logf("unexpected slash in dir entry %s under %s", n.c_str(), path.c_str());
+            continue;
+        }
         StripQuarantineRecursive(path + "/" + n);
     }
     closedir(d);
