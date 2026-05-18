@@ -161,6 +161,7 @@ struct BoxStrokePayload {
 	Uint8 innerHaloColor;
 	Uint8 innerHaloWidth;
 	Uint8 haloOpacity;
+	Uint8 glowWidth;
 	Uint8 sides;
 };
 

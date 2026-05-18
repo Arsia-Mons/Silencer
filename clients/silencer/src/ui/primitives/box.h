@@ -63,9 +63,7 @@ constexpr Uint8 All    = Top | Right | Bottom | Left;
 // `innerHaloColor`). They CAN be the same as `strokeColor` — paired
 // with `haloOpacity < 255`, that gives the "same color, less opacity"
 // look. With `haloOpacity == 255` (the default) halo bands draw as
-// solid palette entries, which is what the legacy lobby BG sprite
-// actually contains (discrete dark-green entries 75/77 flanking the
-// bright 216 primary).
+// solid palette entries.
 //
 // `haloOpacity` routes the halo pixels through the palette's alphaed
 // LUT (`palette.cpp` `Palette::Alpha`). The LUT collapses any
@@ -74,6 +72,17 @@ constexpr Uint8 All    = Top | Right | Bottom | Left;
 // (e.g. the screen-clear value 0) blend to 0, so alpha-blended halos
 // disappear against pure-black backgrounds — keep `haloOpacity == 255`
 // (solid) unless there's a non-black backdrop under the chrome.
+//
+// `glowWidth` is an alternative to the halo bands that reproduces the
+// soft, photoshop-style blur the legacy lobby BG sprite baked into the
+// chrome line (issue #177). When non-zero, the renderer brackets the
+// bright primary with `glowWidth` 1-px rings on each side that step
+// down the palette's green ramp (216 → 215 → … toward black), so the
+// edge fades smoothly to the pure-black backdrop instead of ending in
+// a hard 1-px stroke. Solid discrete entries (no alpha LUT), so it is
+// correct over black. The step uses descending palette indices from
+// `strokeColor`, matching the contiguous green ramp at idx 210..218.
+// `glowWidth` and the halo bands are independent; Chrome uses glow.
 struct BoxStrokeStyle {
 	Uint8 strokeColor      = 0;
 	Uint8 strokeWidth      = 0;
@@ -82,24 +91,25 @@ struct BoxStrokeStyle {
 	Uint8 innerHaloColor   = 0;
 	Uint8 innerHaloWidth   = 0;
 	Uint8 haloOpacity      = 255;
+	Uint8 glowWidth        = 0;
 	Uint8 sides            = BoxSides::All;
 };
 
 namespace BoxVariants {
 
-// Lobby chrome look. Bright primary stroke (palette idx 216) flanked
-// by 1-px halo bands of discrete dark-green palette entries at full
-// opacity — exactly what the legacy lobby BG sprite baked in (bright
-// 216 bracketed by solid dark-green). The previous alpha-blended
-// 216@50% halo routed through the RGB math fallback over the lobby's
-// pure-black backdrop, which resolved to a muddy/rough flank instead
-// of a crisp line (issue #177). Solid discrete entries keep the line
-// smooth and match legacy.
+// Lobby chrome look. Bright primary stroke (palette idx 216) wrapped
+// in a soft green glow that fades to the black backdrop over a few
+// pixels on each side — reproducing the photoshop-style blur the
+// legacy lobby BG sprite baked into the line (issue #177). The glow
+// steps down the contiguous green palette ramp (216 → 215 → … → 210)
+// with solid discrete entries, so it stays smooth and correct over
+// pure black (no broken alpha path). No halo bands — `glowWidth`
+// supplies the entire soft edge.
 constexpr BoxStrokeStyle Chrome{
 	/*strokeColor=*/216, /*strokeWidth=*/1,
-	/*outerHaloColor=*/75, /*outerHaloWidth=*/1,
-	/*innerHaloColor=*/77, /*innerHaloWidth=*/1,
-	/*haloOpacity=*/255,
+	/*outerHaloColor=*/0, /*outerHaloWidth=*/0,
+	/*innerHaloColor=*/0, /*innerHaloWidth=*/0,
+	/*haloOpacity=*/255, /*glowWidth=*/6,
 };
 
 // Single 1-px stroke at idx 216, no halo. Use for non-chrome borders

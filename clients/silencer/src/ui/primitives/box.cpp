@@ -25,6 +25,7 @@ AllocPayload(const BoxStrokeStyle & s) {
 	p->innerHaloColor = s.innerHaloColor;
 	p->innerHaloWidth = s.innerHaloWidth;
 	p->haloOpacity    = s.haloOpacity;
+	p->glowWidth      = s.glowWidth;
 	p->sides          = s.sides;
 	return p;
 }
@@ -46,10 +47,11 @@ void BoxBeginFrame() {
 }
 
 Clay_ElementDeclaration Box(BoxStrokeStyle style, Clay_ElementDeclaration extras) {
-	bool haveHalos = (style.outerHaloWidth > 0) || (style.innerHaloWidth > 0);
+	bool haveHalos = (style.outerHaloWidth > 0) || (style.innerHaloWidth > 0) ||
+	                 (style.glowWidth > 0);
 
 	if(haveHalos){
-		// Route the entire stroke (primary + halos) through
+		// Route the entire stroke (primary + halos/glow) through
 		// CustomKind::BoxStroke so the bridge renders concentric rings.
 		// Native .border stays untouched — the CUSTOM command supplies
 		// the stroke.

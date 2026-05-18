@@ -1033,20 +1033,26 @@ void RenderInto(::Resources & resources, ::Renderer & renderer,
 						bool sLeft   = (sides & 0x8) != 0;
 						ClipRect clip;
 						if(!CurrentClip(dst->w, dst->h, clip)) break;
-						// Each concentric band (outer halo / stroke / inner
-						// halo) draws as up to four straight runs at the
-						// box's OWN bbox -- no per-box outward extension.
-						// Where two composed boxes meet, each run stops at
-						// its own bbox and pass 1 records the band's four
-						// corner cells with the directions the band
-						// continues in. Pass 2 (RenderStrokeCorners, after
-						// the whole command stream) fills one
-						// band-thickness square at every corner that ended
-						// up connected from two or more directions, so the
-						// shared elbow is contiguous. A plain closed
-						// rectangle's corner cell lands exactly on the old
-						// stepped-ownership overlap, so ordinary chrome is
-						// byte-identical (issue #176).
+						auto effectiveBandThickness = [&](int thickness){
+							int t = thickness;
+							if(t < 1) return 0;
+							if(t * 2 > bw) t = bw / 2;
+							if(t * 2 > bh) t = bh / 2;
+							return t > 0 ? t : 0;
+						};
+						const int kGreenRampFloor = 210;
+						auto glowColorAtStep = [&](int step) -> Uint8 {
+							int c = static_cast<int>(p->strokeColor) - step;
+							if(c < kGreenRampFloor) c = kGreenRampFloor;
+							if(c < 0) c = 0;
+							return static_cast<Uint8>(c);
+						};
+						const int glowW = effectiveBandThickness(p->glowWidth);
+						// Each concentric band, including the #177 glow,
+						// draws as straight runs plus PR #192's pass-2
+						// corner cells. Keeping glow in this model prevents
+						// rectangular overlaps from creating plus-shaped
+						// corner artifacts.
 						auto drawRing = [&](int inset, int thickness, Uint8 color, Uint8 opacity){
 							int t = thickness;
 							if(t < 1) return;
@@ -1118,6 +1124,15 @@ void RenderInto(::Resources & resources, ::Renderer & renderer,
 							    (sRight  ? corner_dir::Up   : (Uint8)0));
 						};
 						int inset = 0;
+						// Outer glow: dimmest ring first (furthest out),
+						// brightening one ramp step per pixel toward the
+						// primary. Step glowW is adjacent to the primary
+						// so the transition into idx 216 is seamless.
+						for(int g = 0; g < glowW; g++){
+							int step = glowW - g;  // glowW (dim) .. 1 (bright)
+							drawRing(inset, 1, glowColorAtStep(step), 255);
+							inset += 1;
+						}
 						if(p->outerHaloWidth > 0){
 							drawRing(inset, p->outerHaloWidth, p->outerHaloColor, p->haloOpacity);
 							inset += p->outerHaloWidth;
@@ -1128,6 +1143,15 @@ void RenderInto(::Resources & resources, ::Renderer & renderer,
 						}
 						if(p->innerHaloWidth > 0){
 							drawRing(inset, p->innerHaloWidth, p->innerHaloColor, p->haloOpacity);
+							inset += p->innerHaloWidth;
+						}
+						// Inner glow: mirror of the outer falloff —
+						// brightest ring adjacent to the primary, fading
+						// one ramp step per pixel inward to the backdrop.
+						for(int g = 0; g < glowW; g++){
+							int step = g + 1;  // 1 (bright) .. glowW (dim)
+							drawRing(inset, 1, glowColorAtStep(step), 255);
+							inset += 1;
 						}
 						break;
 					}
