@@ -61,7 +61,7 @@ done
 stop_silencer "$PID" "$PORT"
 ```
 
-For lobby/options/in-game baselines, follow whichever flow `tests/lobby-ui/` and `tests/cli-agent/e2e/51_ingame_ui_overlays.sh` already use to reach those states. Reuse the harness — do not invent new state-reaching code.
+For lobby/options/in-game baselines, follow the CLI/control-socket flow used by `tests/cli-agent/e2e/51_ingame_ui_overlays.sh` and nearby journey scripts. Reuse the harness pattern; do not invent new state-reaching code.
 
 Expected: PNGs exist and are visually correct screenshots of the targeted surfaces.
 

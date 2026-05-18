@@ -303,7 +303,7 @@ if(SILENCER_BUILD_CLAY_DEMO)
 	# non-lobby executable. Source list = silencer sources MINUS `src/main.cpp`
 	# and `src/client/ui/screens/lobby/*`. The `SILENCER_HAVE_LOBBY_UI` define
 	# is NOT set, so `game.cpp` and `controldispatch.cpp` compile their
-	# lobby-ui references out. Result: the binary does not link against any
+	# lobby UI references out. Result: the binary does not link against any
 	# `clients/silencer/src/client/ui/screens/lobby/` symbol (P21 pass_check).
 	set(clay_demo_sources ${sources})
 	list(FILTER clay_demo_sources EXCLUDE REGEX "/src/main\\.cpp$")

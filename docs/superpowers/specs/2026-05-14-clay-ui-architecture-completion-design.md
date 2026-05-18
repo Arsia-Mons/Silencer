@@ -302,8 +302,8 @@ Visual:
 
 - `tools/pixdiff` of each affected surface against the baseline snapshot
   captured before Move 1. Max-pixel-delta and mean-color-delta must stay
-  within the existing visual-parity tolerances already encoded in
-  `tests/lobby-ui/` and the pixdiff harness.
+  within the existing visual-parity tolerances encoded in the pixdiff and
+  CLI screenshot harnesses.
 
 ## Acceptance
 

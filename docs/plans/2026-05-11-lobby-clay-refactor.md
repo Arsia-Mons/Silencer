@@ -125,19 +125,18 @@ the same call sites.
 
 ## Verification
 
-The original plan (pixdiff each migrated UI capture against the immutable
-`tests/lobby-ui/baselines/*.png` committed in P2) couldn't be reached:
+The original plan (pixdiff each migrated UI capture against immutable
+baseline PNGs committed in P2) couldn't be reached:
 the legacy lobby's animated chrome (agency-icon idle, chat indicators,
 palette fade) makes a frozen baseline non-reproducible even by the
 legacy capture script against itself — re-capturing at a different tick
 phase shows ~25% legacy-vs-self in the chrome strip.
 
-Actual gate: **migrated UI vs. fresh-legacy, same run.** Each panel test
-(`tests/lobby-ui/<panel>/run.sh`) boots one lobby instance, then runs
-two silencer clients sequentially against it — first legacy (no env
-var), then the migrated UI — drives both through the
-same milestone-based wait, then pixdiffs the two captures over the
-panel's crop rect.
+Actual gate: **migrated UI vs. fresh-legacy, same run.** Each panel check
+boots one lobby instance, then runs two Silencer clients sequentially against
+it — first legacy, then the migrated UI — drives both through the same
+milestone-based wait, then pixdiffs the two captures over the panel's crop
+rect.
 
 Determinism trick: after the milestone wait, both clients run
 `cli step --frames N` (typically 30) instead of `wait_frames`.
@@ -152,9 +151,9 @@ so both implementations land at the same tick phase.
   final sweep: all 7 panels ≤0.63%; P15 GameCreatePanel highest at
   1.45% in its own iteration's sweep (ScrollList scrollbar render-path
   divergence accounts for the floor).
-- `tests/lobby-ui/baselines/*.png` are kept as informational
-  artifacts only — they show the expected ~20-37% per-panel diff
-  against any live capture and are not the pass gate.
+- Frozen baseline PNGs are informational artifacts only — they show the
+  expected ~20-37% per-panel diff against any live capture and are not the
+  pass gate.
 - Final pass: `tests/cli-agent/e2e/` regression suite still green.
 
 ## Ralph backlog

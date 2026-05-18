@@ -1,7 +1,7 @@
 # tools/pixdiff
 
-Tiny C++ PNG pixel-diff utility used by the manual `tests/lobby-ui/`
-visual harnesses.
+Tiny C++ PNG pixel-diff utility used by screenshot-based CLI/E2E and
+visual-regression harnesses.
 
 Build from this directory with CMake:
 
