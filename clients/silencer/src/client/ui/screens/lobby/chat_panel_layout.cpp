@@ -132,7 +132,7 @@ void BuildChatPanelTree(ChatPanelState & state,
 			}
 		}
 
-		CLAY(Box(BoxVariants::Plain, {
+		CLAY(Box(BoxVariants::Inset, {
 		         .id = CLAY_ID("ChatMainBorder"),
 		         .layout = {
 		             .sizing = { CLAY_SIZING_GROW(0),
@@ -169,7 +169,7 @@ void BuildChatPanelTree(ChatPanelState & state,
 		                       CLAY_SIZING_FIXED((float)metrics.mainGap) },
 		       } }) {}
 
-		CLAY(Box(BoxVariants::Plain, {
+		CLAY(Box(BoxVariants::Inset, {
 		         .id = CLAY_ID("ChatInputBorder"),
 		         .layout = {
 		             .sizing = { CLAY_SIZING_GROW(0),
