@@ -34,6 +34,11 @@ struct KeybindListView {
 	std::vector<KeybindRowView> rows;
 	int visibleRowCount = 0;
 	float titleOffsetY = 8.0f;
+	// Horizontal scale (<= 1) applied to the list's hardcoded legacy-pixel
+	// widths so the panel interior shrinks with the window instead of
+	// overflowing it at small sizes (issue #179 follow-up). 1.0 == legacy
+	// design width (640-wide viewport); set by the screen.
+	float hScale = 1.0f;
 };
 
 int KeybindListVisibleRowsForContentHeight(int contentHeight);
