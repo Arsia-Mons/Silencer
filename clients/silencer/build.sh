@@ -112,7 +112,7 @@ if [ "${#toolchain[@]}" -gt 0 ]; then
 else
     echo "build.sh: VCPKG_ROOT not set; using system CMake/package discovery"
 fi
-cmake -S "$script_dir" -B "$bdir" "${gen[@]}" \
+cmake -S "$script_dir" -B "$bdir" "${gen[@]+"${gen[@]}"}" \
     -DCMAKE_BUILD_TYPE="$btype" \
     -DSILENCER_UNITY_BUILD="$unity" \
     ${toolchain+"${toolchain[@]}"}
