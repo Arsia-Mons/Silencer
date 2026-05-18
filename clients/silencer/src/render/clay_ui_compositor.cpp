@@ -1034,17 +1034,12 @@ void RenderInto(::Resources & resources, ::Renderer & renderer,
 						int x = static_cast<int>(c->boundingBox.x);
 						int y = static_cast<int>(c->boundingBox.y);
 						int boxH = static_cast<int>(c->boundingBox.height);
-						TextInkMetrics ink = MeasureInkBounds(
-							g_textMeasureResources,
-							p->text,
-							static_cast<int32_t>(p->textLen),
-							style.bank,
-							style.advance);
-						if(ink.hasInk && ink.height > 0){
-							y += std::max(0, (boxH - ink.height) / 2) - ink.minY;
-						}else{
-							y += std::max(0, (boxH - static_cast<int>(style.lineHeight)) / 2);
-						}
+						// Center on the fixed font line box, never on per-string
+						// ink bounds: ink height/minY change with descenders
+						// (e.g. 'y'), which made the whole string jump up a
+						// pixel or two (issue #175). Legacy DrawTextInput drew
+						// at a fixed y for the same reason.
+						y += std::max(0, (boxH - static_cast<int>(style.lineHeight)) / 2);
 						renderer.DrawText(dst,
 						                  static_cast<Uint16>(x),
 						                  static_cast<Uint16>(y),
