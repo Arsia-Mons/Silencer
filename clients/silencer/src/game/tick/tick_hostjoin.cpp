@@ -30,21 +30,21 @@ void Game::TickHostGame(){
 		}
 		stateisnew = false;
 	}
-	mapDownloader.ProcessMapDownload();
+	gameSession.MapDownloaderRef().ProcessMapDownload();
 	/*if(world.tickcount % 48 == 0){
 		world.SendPeerList();
 	}*/
 	if(!world.map.loaded && world.peercount >= 1 && world.AllPeersLoadedGameInfo() && world.AllPeersDownloadedMap()){
-		screenbuffer.Clear(0);
+		GetScreenBuffer().Clear(0);
 		if(world.replay.IsRecording()){
 			world.replay.WriteStart();
 		}
 		//char mapname[256];
 		//sprintf(mapname, "level/%s", world.gameinfo.mapname);
-		LoadMap(mapDownloader.FindMap(world.gameinfo.mapname, &world.gameinfo.maphash).c_str());
+		gameSession.LoadMap(gameSession.MapDownloaderRef().FindMap(world.gameinfo.mapname, &world.gameinfo.maphash).c_str());
 		renderer.palette.SetPalette(0);
 		renderer.palette.SetParallaxColors(world.map.parallax);
-		SetColors(renderer.palette.GetColors());
+		gameRenderer.SetColors(renderer.palette.GetColors());
 		State * sharedstateobject = static_cast<State *>(world.GetObjectFromId(sharedstate));
 		if(sharedstateobject){
 			sharedstateobject->state = 2;
@@ -73,7 +73,7 @@ void Game::TickHostGame(){
 								world.peerlist[team->peers[i]]->techchoices = 0xffffffff;
 								world.peerlist[team->peers[i]]->controlledlist.clear();
 								world.peerlist[team->peers[i]]->controlledlist.push_back(player->id);
-								GiveDefaultItems(*player);
+								gameSession.GiveDefaultItems(*player);
 							}
 						}
 					}
@@ -87,7 +87,7 @@ void Game::TickHostGame(){
 void Game::TickJoinGame(){
 	if(stateisnew){
 		strcpy(world.gameinfo.mapname, "STAR72.SIL");
-		mapDownloader.CalculateMapHash(mapDownloader.FindMap(world.gameinfo.mapname).c_str(), &world.gameinfo.maphash);
+		gameSession.MapDownloaderRef().CalculateMapHash(gameSession.MapDownloaderRef().FindMap(world.gameinfo.mapname).c_str(), &world.gameinfo.maphash);
 		world.gameinfo.accountid = 1;
 		world.gameinfo.loaded = true;
 		sharedstate = 0;
@@ -95,7 +95,7 @@ void Game::TickJoinGame(){
 		authoritypeer->ip = ntohl(inet_addr("127.0.0.1"));
 		authoritypeer->port = 12456;
 		world.Connect(rand() % 5, 1);
-		mapDownloader.LoadMapData(mapDownloader.FindMap(world.gameinfo.mapname, &world.gameinfo.maphash).c_str());
+		gameSession.MapDownloaderRef().LoadMapData(gameSession.MapDownloaderRef().FindMap(world.gameinfo.mapname, &world.gameinfo.maphash).c_str());
 		//printf("map data: %d %d\n", world.currentmapdatalength, world.currentmapdatamax);
 		Audio::GetInstance().StopMusic();
 		world.DestroyAllObjects();
@@ -105,7 +105,7 @@ void Game::TickJoinGame(){
 		if(sharedstateobject && sharedstateobject->state == 2){
 			world.gameplaystate = World::INGAME;
 		}
-		mapDownloader.ProcessMapDownload();
+		gameSession.MapDownloaderRef().ProcessMapDownload();
 	}
 }
 
@@ -127,7 +127,7 @@ void Game::TickTestGame(){
 		player->oldx = player->x;
 		player->oldy = player->y;
 		world.GetAuthorityPeer()->controlledlist.push_back(player->id);
-		GiveDefaultItems(*player);
+		gameSession.GiveDefaultItems(*player);
 		int botnum = 0;
 		// Spawn a mix of difficulties: 4 easy, 4 medium, 2 hard
 		const PlayerAI::Difficulty diffs[10] = {
@@ -157,18 +157,18 @@ void Game::TickTestGame(){
 			}
 		}
 		world.gameinfo.securitylevel = LobbyGame::SECHIGH;
-		LoadMap("level/ALLY10c.sil");
+		gameSession.LoadMap("level/ALLY10c.sil");
 		for(std::list<Object *>::iterator it = world.objectlist.begin(); it != world.objectlist.end(); it++){
 			if((*it)->type == ObjectTypes::PLAYER){
 				Player * player = static_cast<Player *>(*it);
 				world.map.RandomPlayerStartLocation(world, player->x, player->y);
 			}
 		}
-		ShowDeployMessage();
+		gameSession.ShowDeployMessage();
 		renderer.palette.SetPalette(0);
 		renderer.palette.SetParallaxColors(world.map.parallax);
-		screenbuffer.Clear(0);
-		SetColors(renderer.palette.GetColors());
+		GetScreenBuffer().Clear(0);
+		gameRenderer.SetColors(renderer.palette.GetColors());
 		singleplayermessage = 0;
 		stateisnew = false;
 	}else{
@@ -187,7 +187,7 @@ void Game::TickTestGame(){
 				}
 			}
 		}*/
-		if(CheckForQuit() || CheckForEndOfGame()){
+		if(gameSession.CheckForQuit() || gameSession.CheckForEndOfGame()){
 			GoToState(MAINMENU);
 		}
 	}

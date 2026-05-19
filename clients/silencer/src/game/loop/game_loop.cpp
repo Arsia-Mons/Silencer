@@ -34,10 +34,10 @@ bool Game::Loop(void){
 	DrainControlQueue();
 	unsigned int wait = GASLoader::Get().gameengine.tickIntervalMs;
 	if(updatetitle){
-		if(!headless && window){
+		if(!headless && gameRenderer.GetWindow()){
 			char title[128];
 			sprintf(title, "Silencer - %d FPS  Latency: %d ms [%d]  B/s: D:%d U:%d", fps, world.GetPingTime(), (int)world.snapshotqueue.size(), world.totalbytesread, world.totalbytessent);
-			SDL_SetWindowTitle(window, title);
+			SDL_SetWindowTitle(gameRenderer.GetWindow(), title);
 		}
 		updatetitle = false;
 		frames = 1;
@@ -97,22 +97,22 @@ bool Game::Loop(void){
 				// quitstate machine, F1 player-list, debug overlay etc.
 				// behave identically with a TUI keyboard.
 				for(int sc = 0; sc < SDL_SCANCODE_COUNT; ++sc){
-					bool was = keystate[sc] != 0;
+					bool was = gameInput.GetKeystate()[sc] != 0;
 					bool now = newkeystate[sc] != 0;
 					if(was == now) continue;
 					if(now){
-						OnScancodeDown(sc);
+						gameInput.OnScancodeDown(sc);
 						pressedScancodes.push_back(sc);
 					}else{
-						OnScancodeUp(sc);
+						gameInput.OnScancodeUp(sc);
 					}
 				}
-				memcpy(keystate, newkeystate, sizeof(keystate));
+				memcpy(gameInput.GetKeystate(), newkeystate, SDL_SCANCODE_COUNT * sizeof(Uint8));
 				for(int sc : pressedScancodes){
-					QueueUiKeyboardInputForScancode(sc);
+					gameInput.QueueUiKeyboardInputForScancode(sc);
 				}
 			}
-			UpdateInputState(world.localinput);
+			gameInput.UpdateInputState(world.localinput);
 			Input action;
 			if(inputserver.LatestAction(action)){
 				world.localinput.keymoveup        |= action.keymoveup;
@@ -158,11 +158,11 @@ bool Game::Loop(void){
 				world.localinput.mousedown = md;
 			}
 		} else {
-			UpdateInputState(world.localinput);
-			clientUiInput.CaptureGamepadBindingEdges(
-				gamepadstate.buttons, gamepadstate.axes,
+			gameInput.UpdateInputState(world.localinput);
+			UiInput().CaptureGamepadBindingEdges(
+				gameInput.GetGamepadState().buttons, gameInput.GetGamepadState().axes,
 				SDL_GAMEPAD_AXIS_COUNT, AXIS_DEADZONE);
-			TickGamepadMenuNav();
+			gameInput.TickGamepadMenuNav();
 		}
 		world.SendInput();
 		if(!Tick()){
@@ -170,22 +170,22 @@ bool Game::Loop(void){
 		}
 		if(!world.replay.IsPlaying() || (world.replay.IsPlaying() && world.gameplaystate == World::INGAME)){
 			world.Tick();
-			TickRumble();
+			gameInput.TickRumble();
 		}
 		if(!world.dedicatedserver.active){
 			renderer.Tick();
 		}
 		if(world.gameplaystate == World::INGAME){
 			Uint8 newambiencelevel = renderer.GetAmbienceLevel();
-			if(newambiencelevel != ambienceMixer.oldambiencelevel || fade_i <= 15){
+			if(newambiencelevel != gameSession.AmbienceMixerRef().oldambiencelevel || gameRenderer.FadePhaseRef() <= 15){
 				SDL_Color * colors = renderer.palette.GetColors();
-				if(fade_i <= 15){
+				if(gameRenderer.FadePhaseRef() <= 15){
 					colors = renderer.palette.GetTempPalette();
 				}
 				SDL_Color * ambiencepalette = renderer.palette.CopyWithBrightness(colors, newambiencelevel, 2, 114);
-				SetColors(ambiencepalette);
+				gameRenderer.SetColors(ambiencepalette);
 				renderer.palette.CalculateLighted(newambiencelevel);
-				ambienceMixer.oldambiencelevel = newambiencelevel;
+				gameSession.AmbienceMixerRef().oldambiencelevel = newambiencelevel;
 			}
 		}
 		lasttick += wait;
@@ -204,25 +204,25 @@ bool Game::Loop(void){
 			// present pass stretch it to the window. Keep that path for
 			// gameplay; native-sized CPU frames are too expensive fullscreen.
 			ResizeRenderSurfacePixels(kLegacyRenderWidth, kLegacyRenderHeight);
-			screenbuffer.Clear(0);
-			renderer.Draw(&screenbuffer, ft);
-			DrawInGameWorldInsets(screenbuffer, ft);
+			GetScreenBuffer().Clear(0);
+			renderer.Draw(&GetScreenBuffer(), ft);
+			gameUiPipeline.DrawInGameWorldInsets(GetScreenBuffer(), ft);
 		}else{
-			if(window) SyncRenderSurfaceToWindowPixels();
-			screenbuffer.Clear(0);
-			renderer.Draw(&screenbuffer, ft);
+			if(gameRenderer.GetWindow()) SyncRenderSurfaceToWindowPixels();
+			GetScreenBuffer().Clear(0);
+			renderer.Draw(&GetScreenBuffer(), ft);
 		}
-		RenderClientUiFrame(screenbuffer, ft);
+		gameUiPipeline.RenderClientUiFrame(GetScreenBuffer(), ft);
 #ifdef POSIX
-		if(world.replay.IsPlaying() && world.replay.ffmpeg && world.replay.ffmpegvideo && deploymessageshown){
-			std::vector<Uint8> buffer(screenbuffer.w * screenbuffer.h * 3);
+		if(world.replay.IsPlaying() && world.replay.ffmpeg && world.replay.ffmpegvideo && gameSession.DeployMessageShownRef()){
+			std::vector<Uint8> buffer(GetScreenBuffer().w * GetScreenBuffer().h * 3);
 			int i = 0;
 			int j = 0;
-			for(int y = screenbuffer.h; y > 0; y--){
-				for(int x = screenbuffer.w; x > 0; x--){
-					buffer[i++] = palettecolors[screenbuffer.pixels[j]].r;
-					buffer[i++] = palettecolors[screenbuffer.pixels[j]].g;
-					buffer[i++] = palettecolors[screenbuffer.pixels[j]].b;
+			for(int y = GetScreenBuffer().h; y > 0; y--){
+				for(int x = GetScreenBuffer().w; x > 0; x--){
+					buffer[i++] = GetPaletteColors()[GetScreenBuffer().pixels[j]].r;
+					buffer[i++] = GetPaletteColors()[GetScreenBuffer().pixels[j]].g;
+					buffer[i++] = GetPaletteColors()[GetScreenBuffer().pixels[j]].b;
 					j++;
 				}
 			}
@@ -242,10 +242,10 @@ bool Game::Loop(void){
 		// (terminal closed, host process killed). TUIBackend tears the socket
 		// down on any write failure; we observe that here and exit cleanly
 		// rather than burning CPU rendering frames nobody reads.
-		if(tui && renderdevice && !renderdevice->IsAlive()){
+		if(tui && gameRenderer.GetRenderDevice() && !gameRenderer.GetRenderDevice()->IsAlive()){
 			quitRequested = true;
 		}
-		ResetUiFrameDeltas();
+		gameUiPipeline.ResetUiFrameDeltas();
 		// SDL3GPUBackend's swapchain Present blocks on vsync (~16 ms) so the
 		// non-TUI loop self-throttles. TUIBackend writes to a TCP socket that
 		// never blocks the engine, so without an explicit cap the loop runs
@@ -266,11 +266,11 @@ bool Game::Loop(void){
 }
 
 bool Game::Tick(void){
-	clientUi.ClearScreensIfRequested(screenContext);
+	gameUiPipeline.ClientUiRef().ClearScreensIfRequested(screenContext);
 	if(state != FADEOUT){
-		clientUi.TickVisibleScreens(screenContext);
+		gameUiPipeline.ClientUiRef().TickVisibleScreens(screenContext);
 	}
-	inGameUiController.UpdateOverlayState(world.localpeerid);
+	gameUiPipeline.InGameUi().UpdateOverlayState(world.localpeerid);
 	if(!world.dedicatedserver.active){
 		if(world.lobby.state == Lobby::AUTHENTICATED){
 			// 0 = main lobby, 1 = pregame (game-specific lobby, waiting for
@@ -281,14 +281,14 @@ bool Game::Tick(void){
 				targetgid = currentlobbygameid;
 				targetstatus = (world.gameplaystate == World::INGAME) ? 2 : 1;
 			}
-			if(targetgid != lastannouncedgameid || targetstatus != lastannouncedstatus){
+			if(targetgid != gameSession.LastAnnouncedGameIdRef() || targetstatus != gameSession.LastAnnouncedStatusRef()){
 				world.lobby.SendSetGame(targetgid, targetstatus);
-				lastannouncedgameid = targetgid;
-				lastannouncedstatus = targetstatus;
+				gameSession.LastAnnouncedGameIdRef() = targetgid;
+				gameSession.LastAnnouncedStatusRef() = targetstatus;
 			}
 		}else{
-			lastannouncedgameid = 0;
-			lastannouncedstatus = 0;
+			gameSession.LastAnnouncedGameIdRef() = 0;
+			gameSession.LastAnnouncedStatusRef() = 0;
 		}
 	}
 	if(world.dedicatedserver.active && state != HOSTGAME){
@@ -304,7 +304,7 @@ bool Game::Tick(void){
 			}
 		}
 		if(world.gameplaystate == World::INLOBBY){
-			mapDownloader.ProcessMapDownload();
+			gameSession.MapDownloaderRef().ProcessMapDownload();
 			// Ready-button text refresh ("Waiting..." vs "Ready") happens
 			// in GameJoinPanelTick — runs each frame from LobbyScreen::Tick.
 		}
@@ -349,19 +349,19 @@ bool Game::Tick(void){
 	}
 	
 	if(world.gameplaystate == World::INGAME && (state == INGAME || state == SINGLEPLAYERGAME || state == TESTGAME)){
-		ambienceMixer.UpdateAmbienceChannels();
+		gameSession.AmbienceMixerRef().UpdateAmbienceChannels();
 		if(!headless) SDL_HideCursor();
 	}else{
 		if(!headless) SDL_ShowCursor();
 	}
 
-	if(!headless && window){
-		if(keystate[SDL_SCANCODE_RALT] && keystate[SDL_SCANCODE_RETURN]){
+	if(!headless && gameRenderer.GetWindow()){
+		if(gameInput.GetKeystate()[SDL_SCANCODE_RALT] && gameInput.GetKeystate()[SDL_SCANCODE_RETURN]){
 			if(!fullscreentoggled){
-				if(SDL_GetWindowFlags(window) & SDL_WINDOW_FULLSCREEN){
-					SDL_SetWindowFullscreen(window, false);
+				if(SDL_GetWindowFlags(gameRenderer.GetWindow()) & SDL_WINDOW_FULLSCREEN){
+					SDL_SetWindowFullscreen(gameRenderer.GetWindow(), false);
 				}else{
-					SDL_SetWindowFullscreen(window, true);
+					SDL_SetWindowFullscreen(gameRenderer.GetWindow(), true);
 				}
 				fullscreentoggled = true;
 			}
@@ -377,14 +377,14 @@ bool Game::Tick(void){
 				world.Disconnect();
 				world.gameplaystate = World::NONE;
 				world.lobby.Disconnect();
-				UnloadGame();
+				gameSession.UnloadGame();
 				world.GetAuthorityPeer()->controlledlist.clear();
 				world.DestroyAllObjects();
 				PushScreen(std::make_unique<MainMenuScreen>());
 				stateisnew = false;
 			}else{
-				if(ambienceMixer.FadedIn()){
-					ambienceMixer.PlayMusic(world.resources.menumusic);
+				if(gameSession.AmbienceMixerRef().FadedIn()){
+					gameSession.AmbienceMixerRef().PlayMusic(world.resources.menumusic);
 				}
 				// Button-click handling lives in MainMenuScreen::Tick, dispatched
 				// by ClientUi's navigation stack at the top of Game::Tick.
@@ -399,8 +399,8 @@ bool Game::Tick(void){
 				PushScreen(std::make_unique<LobbyConnectScreen>());
 				stateisnew = false;
 			}else{
-				if(ambienceMixer.FadedIn()){
-					ambienceMixer.PlayMusic(world.resources.menumusic);
+				if(gameSession.AmbienceMixerRef().FadedIn()){
+					gameSession.AmbienceMixerRef().PlayMusic(world.resources.menumusic);
 				}
 			}
 		}break;
@@ -408,7 +408,7 @@ bool Game::Tick(void){
 			if(stateisnew){
 				world.lobby.ForgetAllUserInfo();
 				world.gameplaystate = World::INLOBBY;
-				UnloadGame();
+				gameSession.UnloadGame();
 				world.Disconnect();
 				world.choosingtech = false;
 				world.lobby.channelchanged = true;
@@ -417,8 +417,8 @@ bool Game::Tick(void){
 #endif
 				stateisnew = false;
 			}else{
-				if(ambienceMixer.FadedIn()){
-					ambienceMixer.PlayMusic(world.resources.menumusic);
+				if(gameSession.AmbienceMixerRef().FadedIn()){
+					gameSession.AmbienceMixerRef().PlayMusic(world.resources.menumusic);
 				}
 				// Lobby pump (state-machine + deferred-create) lives in
 				// LobbyScreen::Tick, dispatched by ClientUi's navigation stack
@@ -432,21 +432,21 @@ bool Game::Tick(void){
 				PushScreen(std::make_unique<UpdateScreen>());
 				stateisnew = false;
 			}else{
-				if(ambienceMixer.FadedIn()){
-					ambienceMixer.PlayMusic(world.resources.menumusic);
+				if(gameSession.AmbienceMixerRef().FadedIn()){
+					gameSession.AmbienceMixerRef().PlayMusic(world.resources.menumusic);
 				}
 			}
 		}break;
 		case INGAME: TickInGame(); break;
 		case MISSIONSUMMARY:{
 			if(stateisnew){
-				UnloadGame();
+				gameSession.UnloadGame();
 				world.Disconnect();
 				PushScreen(std::make_unique<MissionSummaryScreen>());
 				stateisnew = false;
 			}else{
-				if(ambienceMixer.FadedIn()){
-					ambienceMixer.PlayMusic(world.resources.menumusic);
+				if(gameSession.AmbienceMixerRef().FadedIn()){
+					gameSession.AmbienceMixerRef().PlayMusic(world.resources.menumusic);
 				}
 			}
 		}break;
@@ -484,8 +484,8 @@ bool Game::Tick(void){
 		case TESTGAME: TickTestGame(); break;
 		case REPLAYGAME: TickReplayGame(); break;
 	}
-	if(fade_i < 16 && state != FADEOUT){
-		ApplyPaletteFade(false);
+	if(gameRenderer.FadePhaseRef() < 16 && state != FADEOUT){
+		gameRenderer.ApplyPaletteFade(false);
 	}
 	if(!nextstateprocessed){
 		nextstateprocessed = true;
@@ -498,7 +498,7 @@ bool Game::Tick(void){
 void Game::GoToState(Uint8 newstate){
 	nextstate = newstate;
 	state = FADEOUT;
-	RestartPaletteFade();
+	gameRenderer.RestartPaletteFade();
 	stateisnew = true;
 	nextstateprocessed = false;
 	// Keep the outgoing Clay screen mounted until TickFadeOut reaches black.
@@ -536,7 +536,7 @@ const char* Game::StateName(Uint8 s){
 	}
 }
 
-Game::WorldSummary Game::GetWorldSummary(){
+WorldSummary Game::GetWorldSummary(){
 	WorldSummary summary;
 	summary.map = world.gameinfo.mapname;
 	summary.peers = static_cast<int>(world.peercount);

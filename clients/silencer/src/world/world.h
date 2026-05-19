@@ -173,6 +173,10 @@ public:
 
 	friend class Renderer;
 	friend class Game;
+	friend class GameRenderer;
+	friend class GameInput;
+	friend class GameUiPipeline;
+	friend class GameSession;
 	friend class MapDownloader;
 	friend class AmbienceMixer;
 	friend class Team;

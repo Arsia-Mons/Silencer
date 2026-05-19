@@ -8,7 +8,7 @@ void Game::TickReplayGame(){
 	if(stateisnew){
 		world.Disconnect();
 		world.lobby.Disconnect();
-		UnloadGame();
+		gameSession.UnloadGame();
 		world.GetAuthorityPeer()->controlledlist.clear();
 		world.DestroyAllObjects();
 		stateisnew = false;

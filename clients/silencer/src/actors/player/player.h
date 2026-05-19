@@ -109,6 +109,7 @@ public:
 	friend class Warper;
 	friend class PickUp;
 	friend class Game;
+	friend class GameInput;
 	friend class PlayerAI;
 	friend class Projectile;
 
