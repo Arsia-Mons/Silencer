@@ -164,3 +164,10 @@ SDL_Color * fadedpalette =
 game.renderer.palette.CopyWithBrightness(game.renderer.palette.GetColors(), phase * 8);
 SetColors(fadedpalette);
 }
+
+Uint32 GameRenderer::TimerCallback(void * userdata, SDL_TimerID timerID, Uint32 interval){
+	Game * g = static_cast<Game *>(userdata);
+	g->updatetitle = true;
+	g->fps = g->frames;
+	return 1000;
+}
