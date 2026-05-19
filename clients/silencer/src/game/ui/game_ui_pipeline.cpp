@@ -15,8 +15,6 @@
 #include <vector>
 
 namespace {
-static const int kLegacyRenderWidth = 640;
-static const int kLegacyRenderHeight = 480;
 
 static float GameplayUiScaleForSurface(int width, int height) {
 int scaleX = width / kLegacyRenderWidth;

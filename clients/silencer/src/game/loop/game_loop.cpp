@@ -21,8 +21,6 @@
 
 using namespace GameState;
 
-static const int kLegacyRenderWidth = 640;
-static const int kLegacyRenderHeight = 480;
 
 bool Game::Loop(void){
 	if(updater.IsStage2Spawned()){

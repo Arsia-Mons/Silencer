@@ -188,6 +188,9 @@ bool Game::Load(char * cmdline){
 		}
 	}
 	if(!world.dedicatedserver.active){
+		// Must be set before SDL_Init — tells SDL to show the OS on-screen
+		// keyboard when SDL_StartTextInput is active (handheld Windows, etc.).
+		SDL_SetHint(SDL_HINT_ENABLE_SCREEN_KEYBOARD, "1");
 		// SDL_INIT_GAMEPAD is opt-in; without it SDL_GetGamepads() returns
 		// nothing. Headless builds (CI / control-socket smoke tests) skip it
 		// since they don't need controller input. TUI mode keeps audio so the

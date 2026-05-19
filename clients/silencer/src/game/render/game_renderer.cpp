@@ -8,10 +8,6 @@
 #include <algorithm>
 #include <cstring>
 
-namespace {
-static const int kLegacyRenderWidth = 640;
-static const int kLegacyRenderHeight = 480;
-}
 
 GameRenderer::GameRenderer(Game & g)
 : game(g), renderdevice(nullptr), screenbuffer(640, 480), window(nullptr), fade_i(0), fadeStartMs(0) {
