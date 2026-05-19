@@ -8,10 +8,6 @@
 #include <algorithm>
 #include <cstring>
 
-namespace {
-static const int kRendererLegacyWidth = 640;
-static const int kRendererLegacyHeight = 480;
-}
 
 GameRenderer::GameRenderer(Game & g)
 : game(g), renderdevice(nullptr), screenbuffer(640, 480), window(nullptr), fade_i(0), fadeStartMs(0) {
@@ -54,7 +50,7 @@ return true;
 
 bool GameRenderer::SyncRenderSurfaceToWindowPixels(){
 if(game.world.map.loaded){
-return ResizeRenderSurfacePixels(kRendererLegacyWidth, kRendererLegacyHeight);
+return ResizeRenderSurfacePixels(kLegacyRenderWidth, kLegacyRenderHeight);
 }
 if(!window) return false;
 int width = 0;
@@ -70,12 +66,12 @@ if(width < 1 || height < 1) return false;
 if(window){
 SDL_SetWindowSize(window, width, height);
 if(game.world.map.loaded){
-return ResizeRenderSurfacePixels(kRendererLegacyWidth, kRendererLegacyHeight);
+return ResizeRenderSurfacePixels(kLegacyRenderWidth, kLegacyRenderHeight);
 }
 return SyncRenderSurfaceToWindowPixels();
 }
 if(game.world.map.loaded){
-return ResizeRenderSurfacePixels(kRendererLegacyWidth, kRendererLegacyHeight);
+return ResizeRenderSurfacePixels(kLegacyRenderWidth, kLegacyRenderHeight);
 }
 return ResizeRenderSurfacePixels(width, height);
 }

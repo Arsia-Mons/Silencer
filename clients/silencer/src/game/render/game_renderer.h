@@ -5,6 +5,11 @@
 #include "surface.h"
 #include <SDL3/SDL.h>
 
+// Virtual resolution that the game was originally designed for.
+// Used by the renderer, UI pipeline, and game loop to compute scale factors.
+inline constexpr int kLegacyRenderWidth  = 640;
+inline constexpr int kLegacyRenderHeight = 480;
+
 class Game;
 struct SDL_Window;
 
