@@ -7,6 +7,7 @@
 #include "render/game_renderer.h"
 #include "renderer.h"
 #include "screen_context.h"
+#include "game_summary.h"
 #include "state.h"
 #include "state/game_state.h"
 #include "session/game_session.h"
@@ -43,39 +44,6 @@ static const char * StateName(Uint8 s);
 Uint8 GetState() const { return state; }
 World & GetWorld() { return world; }
 ScreenContext & GetScreenContext() { return screenContext; }
-struct WorldPeerSummary {
-int id = 0;
-unsigned int accountId = 0;
-bool observer = false;
-bool disconnected = false;
-std::vector<int> controlledList;
-};
-struct WorldPlayerSummary {
-int id = 0;
-int hp = 0;
-int x = 0;
-int y = 0;
-};
-struct WorldSummary {
-std::string map;
-int peers = 0;
-int localPeerId = 0;
-int viewedPeerId = 0;
-int authorityPeer = 0;
-unsigned int lobbyAccountId = 0;
-bool isLocalObserver = false;
-bool spectatorInitialized = false;
-bool spectatorFreecam = false;
-std::vector<WorldPeerSummary> peerList;
-std::vector<WorldPlayerSummary> players;
-int objectsCount = 0;
-std::string messageText;
-int messageProgress = 0;
-int messageType = 0;
-int messageTime = 0;
-std::string topMessageText;
-int topMessageProgress = 0;
-};
 WorldSummary GetWorldSummary();
 Surface & GetScreenBuffer() { return gameRenderer.GetScreenBuffer(); }
 const Surface & GetScreenBuffer() const { return gameRenderer.GetScreenBuffer(); }

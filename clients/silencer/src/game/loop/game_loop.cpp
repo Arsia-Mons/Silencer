@@ -536,7 +536,7 @@ const char* Game::StateName(Uint8 s){
 	}
 }
 
-Game::WorldSummary Game::GetWorldSummary(){
+WorldSummary Game::GetWorldSummary(){
 	WorldSummary summary;
 	summary.map = world.gameinfo.mapname;
 	summary.peers = static_cast<int>(world.peercount);
