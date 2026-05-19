@@ -32,6 +32,8 @@ public:
 
 private:
 	World & world;
+
+public:
 	std::list<Object *> objectlist;
 	std::list<Object *> tobjectlist;
 	std::map<Uint16, Object *> objectidlookup;

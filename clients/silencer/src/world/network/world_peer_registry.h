@@ -38,6 +38,8 @@ public:
 
 private:
 	World & world;
+
+public:
 	Peer * peerlist[maxpeers];
 	unsigned int authoritypeer;
 	unsigned int peercount;

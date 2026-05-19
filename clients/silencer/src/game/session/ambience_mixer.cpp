@@ -32,7 +32,7 @@ void AmbienceMixer::CreateAmbienceChannels(void){
 }
 
 void AmbienceMixer::UpdateAmbienceChannels(void){
-	Player * localplayer = world.GetPeerPlayer(world.localpeerid);
+	Player * localplayer = world.GetPeerPlayer(world.peers.localpeerid);
 	if(localplayer){
 		int columns = 5;
 		int rows = 5;

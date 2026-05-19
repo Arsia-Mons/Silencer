@@ -39,6 +39,8 @@ public:
 
 private:
 	World & world;
+
+public:
 	Serializer * oldsnapshots[25][maxoldsnapshots];
 	Input localinputhistory[maxlocalinputhistory];
 	Uint32 localtoremoteticks[maxoldsnapshots];

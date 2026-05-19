@@ -168,7 +168,7 @@ void WorldPeerRegistry::HandleDisconnect(Uint8 peerid, bool permanent){
 	// Capture team before RemovePeer strips the peer from all teams.
 	// GetPeerTeam searches team membership lists, so it must run first.
 	Team * leavingTeam = (world.mode == World::AUTHORITY) ? GetPeerTeam(peerid) : 0;
-	for(std::list<Object *>::iterator it = world.objectlist.begin(); it != world.objectlist.end(); it++){
+	for(std::list<Object *>::iterator it = world.objects.objectlist.begin(); it != world.objects.objectlist.end(); it++){
 		Object * object = *it;
 		if(object->type == ObjectTypes::TEAM){
 			Team * team = static_cast<Team *>(object);
@@ -184,7 +184,7 @@ void WorldPeerRegistry::HandleDisconnect(Uint8 peerid, bool permanent){
 		if(peerid == authoritypeer){
 			world.ShowMessage("CONNECTION LOST", 128, 20);
 			world.SwitchToLocalAuthorityMode();
-			world.state = World::IDLE;
+			world.network.state = World::IDLE;
 		}
 	}else
 	if(world.mode == World::AUTHORITY){
@@ -204,9 +204,9 @@ void WorldPeerRegistry::HandleDisconnect(Uint8 peerid, bool permanent){
 		peerlist[peerid] = 0;
 		peercount--;
 		for(int i = 0; i < World::maxoldsnapshots; i++){
-			if(world.oldsnapshots[peerid][i]){
-				delete world.oldsnapshots[peerid][i];
-				world.oldsnapshots[peerid][i] = 0;
+			if(world.replication.oldsnapshots[peerid][i]){
+				delete world.replication.oldsnapshots[peerid][i];
+				world.replication.oldsnapshots[peerid][i] = 0;
 			}
 		}
 		SendPeerList();
@@ -265,7 +265,7 @@ Player * WorldPeerRegistry::GetPeerPlayer(Uint8 peerid){
 
 Team * WorldPeerRegistry::GetPeerTeam(Uint8 peerid){
 	if(peerlist[peerid]){
-		for(std::vector<Uint16>::iterator it = world.objectsbytype[ObjectTypes::TEAM].begin(); it != world.objectsbytype[ObjectTypes::TEAM].end(); it++){
+		for(std::vector<Uint16>::iterator it = world.objects.objectsbytype[ObjectTypes::TEAM].begin(); it != world.objects.objectsbytype[ObjectTypes::TEAM].end(); it++){
 			Team * team = static_cast<Team *>(world.GetObjectFromId((*it)));
 			for(int i = 0; i < team->numpeers; i++){
 				if(team->peers[i] == peerid){
@@ -292,7 +292,7 @@ bool WorldPeerRegistry::FindTeamForPeer(Peer & peer, Uint8 agency, int start){
 	bool teamfound = false;
 	bool slotfound = true;
 	std::vector<Team *> teamlist;
-	for(std::list<Object *>::iterator it = world.objectlist.begin(); it != world.objectlist.end(); it++){
+	for(std::list<Object *>::iterator it = world.objects.objectlist.begin(); it != world.objects.objectlist.end(); it++){
 		Object * object = (*it);
 		if(object->type == ObjectTypes::TEAM){
 			Team * team = static_cast<Team *>(object);

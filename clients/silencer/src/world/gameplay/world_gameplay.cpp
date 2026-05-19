@@ -32,7 +32,7 @@ void World::AllocateMapData(int size){
 
 void World::ActivateTerminals(void){
 	std::vector<Terminal *> terminallist;
-	for(std::list<Object *>::iterator it = objectlist.begin(); it != objectlist.end(); it++){
+	for(std::list<Object *>::iterator it = objects.objectlist.begin(); it != objects.objectlist.end(); it++){
 		Object * object = *it;
 		if(object->type == ObjectTypes::TERMINAL){
 			Terminal * terminal = static_cast<Terminal *>(object);
@@ -130,7 +130,7 @@ void World::VirusItem(Uint8 id){
 }
 
 void World::ChangeTeam(Uint8 peerid){
-	Peer * peer = peerlist[peerid];
+	Peer * peer = peers.peerlist[peerid];
 	if(peer){
 		Team * peerteam = GetPeerTeam(peer->id);
 		if(peerteam){
@@ -145,7 +145,7 @@ void World::ChangeTeam(Uint8 peerid){
 }
 
 void World::SetTech(Uint8 peerid, Uint32 techchoices){
-	Peer * peer = peerlist[peerid];
+	Peer * peer = peers.peerlist[peerid];
 	if(peer){
 		lobby.GetUserInfo(peer->accountid);
 		peer->wantedtechchoices = techchoices;
@@ -193,7 +193,7 @@ void World::KillByGovt(Peer & peer){
 		msg[0] = MSG_GOVTKILL;
 		msg[1] = peer.id;
 		for(unsigned int i = 0; i < maxpeers; i++){
-			Peer * ipeer = peerlist[i];
+			Peer * ipeer = peers.peerlist[i];
 			if(ipeer){
 				SendPacket(ipeer, msg, 2);
 				if(ipeer->id == peer.id){
@@ -275,7 +275,7 @@ int World::TechSlotsUsed(Peer & peer){
 
 void World::SendMapDownloaded(void){
 	if(IsAuthority()){
-		peerlist[localpeerid]->mapdownloaded = true;
+		peers.peerlist[peers.localpeerid]->mapdownloaded = true;
 		SendPeerList();
 	}else{
 		char data[2];
@@ -314,7 +314,7 @@ void World::GetMapChunk(Uint32 offset){
 	if(IsAuthority()){
 		// get map chunk from host peer who has it already
 		for(int i = 0; i < maxpeers; i++){
-			Peer * peer = peerlist[i];
+			Peer * peer = peers.peerlist[i];
 			if(peer && peer->mapdownloaded){
 				SendPacket(peer, data, sizeof(data));
 				break;

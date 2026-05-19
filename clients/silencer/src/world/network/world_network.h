@@ -35,6 +35,8 @@ public:
 
 private:
 	World & world;
+
+public:
 	SOCKET sockethandle;
 	unsigned short boundport;
 	int state;

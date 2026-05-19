@@ -61,8 +61,8 @@ void WorldMessaging::ShowMessage(const char * message, Uint8 time, Uint8 type, b
 		msg[1 + strlen(message) + 1 + 1] = type;
 		if(!peer){
 			for(unsigned int i = 0; i < World::maxpeers; i++){
-				Peer * peer = world.peerlist[i];
-				if(peer && i != world.localpeerid){
+				Peer * peer = world.peers.peerlist[i];
+				if(peer && i != world.peers.localpeerid){
 					world.SendPacket(peer, msg, msgsize);
 				}
 			}
@@ -71,7 +71,7 @@ void WorldMessaging::ShowMessage(const char * message, Uint8 time, Uint8 type, b
 		}
 		delete[] msg;
 	}
-	if(!networked || (world.IsAuthority() && !peer) || (world.IsAuthority() && peer && peer->id == world.localpeerid)){
+	if(!networked || (world.IsAuthority() && !peer) || (world.IsAuthority() && peer && peer->id == world.peers.localpeerid)){
 		if(messagetype >= 10){ // Skip any messages after end of game messages, so it is not replaced
 			return;
 		}
@@ -92,8 +92,8 @@ void WorldMessaging::ShowStatus(const char * status, Uint8 color, bool networked
 		memcpy(&msg[1], newstatus, strlen(status) + 1 + 1 + 1);
 		if(!peer){
 			for(unsigned int i = 0; i < World::maxpeers; i++){
-				Peer * peer = world.peerlist[i];
-				if(peer && i != world.localpeerid){
+				Peer * peer = world.peers.peerlist[i];
+				if(peer && i != world.peers.localpeerid){
 					world.SendPacket(peer, msg, msgsize);
 				}
 			}
@@ -102,7 +102,7 @@ void WorldMessaging::ShowStatus(const char * status, Uint8 color, bool networked
 		}
 		delete[] msg;
 	}
-	if(!networked || (world.IsAuthority() && !peer) || (world.IsAuthority() && peer && peer->id == world.localpeerid)){
+	if(!networked || (world.IsAuthority() && !peer) || (world.IsAuthority() && peer && peer->id == world.peers.localpeerid)){
 		PushStatusString(newstatus);
 	}
 }
@@ -127,7 +127,7 @@ void WorldMessaging::SendChat(bool toteam, char * message){
 
 void WorldMessaging::SendSound(const char * name, Peer * peer, Uint8 volume){
 	if(world.IsAuthority()){
-		if(!peer || (peer && peer->id == world.localpeerid)){
+		if(!peer || (peer && peer->id == world.peers.localpeerid)){
 			Audio::GetInstance().Play(world.resources.soundbank[name], volume);
 		}
 		char msg[2 + 255];
@@ -137,13 +137,13 @@ void WorldMessaging::SendSound(const char * name, Peer * peer, Uint8 volume){
 		msg[2 + strlen(name)] = 0;
 		if(!peer){
 			for(unsigned int i = 0; i < World::maxpeers; i++){
-				Peer * peer = world.peerlist[i];
-				if(peer && i != world.localpeerid){
+				Peer * peer = world.peers.peerlist[i];
+				if(peer && i != world.peers.localpeerid){
 					world.SendPacket(peer, msg, 2 + strlen(name) + 1);
 				}
 			}
 		}else{
-			if(peer->id != world.localpeerid){
+			if(peer->id != world.peers.localpeerid){
 				world.SendPacket(peer, msg, 2 + strlen(name) + 1);
 			}
 		}
@@ -159,8 +159,8 @@ void WorldMessaging::BroadcastTriggerState() {
     msg[0] = World::MSG_TRIGGER_STATE;
     memcpy(&msg[1], payload.data, payload.offset);
     for(unsigned int i = 0; i < World::maxpeers; i++) {
-        if(world.peerlist[i] && i != world.localpeerid) {
-            world.SendPacket(world.peerlist[i], msg, msgsize);
+        if(world.peers.peerlist[i] && i != world.peers.localpeerid) {
+            world.SendPacket(world.peers.peerlist[i], msg, msgsize);
         }
     }
     delete[] msg;

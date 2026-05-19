@@ -339,13 +339,13 @@ void Lobby::DoNetwork(void){
 									addr.sin_family = AF_INET;
 									addr.sin_port = htons(port);
 									addr.sin_addr.s_addr = inet_addr(host);
-									int ret = sendto(world->sockethandle, response.data, response.BitsToBytes(response.offset), 0, (sockaddr *)&addr, sizeof(addr));
+									int ret = sendto(world->network.sockethandle, response.data, response.BitsToBytes(response.offset), 0, (sockaddr *)&addr, sizeof(addr));
 									addr.sin_family = AF_INET;
 									addr.sin_port = htons(publicport);
 									addr.sin_addr.s_addr = inet_addr(host);
 									//response.offset = oldoffset;
 									//response.Put(publicport);
-									int ret2 = sendto(world->sockethandle, response.data, response.BitsToBytes(response.offset), 0, (sockaddr *)&addr, sizeof(addr));
+									int ret2 = sendto(world->network.sockethandle, response.data, response.BitsToBytes(response.offset), 0, (sockaddr *)&addr, sizeof(addr));
 									printf("sent MSG_CONNECTs to client (%d:%d, %d:%d)\n", port, ret, publicport, ret2);*/
 								}break;
 								case MSG_VERSION:{
@@ -407,7 +407,7 @@ void Lobby::DoNetwork(void){
 									user->Serialize(Serializer::READ, data);
 									//printf("account id = %d\n", user->accountid);
 									for(int i = 0; i < world->maxpeers; i++){
-										Peer * peer = world->peerlist[i];
+										Peer * peer = world->peers.peerlist[i];
 										if(peer && peer->accountid == accountid){
 											world->UserInfoReceived(*peer);
 										}
@@ -592,7 +592,7 @@ void Lobby::CreateGame(const char * name, const char * map, const unsigned char 
 	data.Put(agency);
 	world->GetAuthorityPeer()->port = lobbygame.port;
 	world->GetAuthorityPeer()->publicport = lobbygame.publicport;
-	world->state = World::CONNECTING;
+	world->network.state = World::CONNECTING;
 	SendMessage(data.data, data.BitsToBytes(data.offset));
 	printf("requested thru lobby server to connect to game id %d, (ports %d,%d) agency %d\n", lobbygame.accountid, port, publicport, agency);
 }*/

@@ -50,7 +50,7 @@ void Warper::Tick(World & world){
 }
 
 void Warper::FindMatch(World & world){
-	for(std::list<Object *>::iterator it = world.objectlist.begin(); it != world.objectlist.end(); it++){
+	for(std::list<Object *>::iterator it = world.objects.objectlist.begin(); it != world.objects.objectlist.end(); it++){
 		Object * object = (*it);
 		if(object->type == ObjectTypes::WARPER){
 			Warper * warper2 = static_cast<Warper *>(object);

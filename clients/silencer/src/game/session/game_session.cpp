@@ -46,14 +46,14 @@ game.world.map.Unload();
 game.world.pancameraactive = false;
 game.world.pancamerareturn = false;
 game.world.pancamerareturncount = 0;
-game.world.message_i = 0;
+game.world.messaging.message_i = 0;
 game.world.winningteamid = 0;
 game.world.matchEndCalled = false;
 game.world.DestroyAllObjects();
 delete game.world.gameMode;
 game.world.gameMode = GameModeFactory(GAMEMODE_DATA_RETRIEVAL);
-game.world.chatlines.clear();
-game.world.messagetype = 0;
+game.world.messaging.chatlines.clear();
+game.world.messaging.messagetype = 0;
 game.world.highlightminimap = false;
 game.world.highlightsecrets = false;
 game.world.quitstate = 0;
@@ -88,7 +88,7 @@ game.world.lobby.gamesprocessed = false;
 game.world.lobby.channelchanged = true;
 game.world.SwitchToLocalAuthorityMode();
 game.sharedstate = 0;
-for(std::list<Object *>::iterator it = game.world.objectlist.begin(); it != game.world.objectlist.end(); it++){
+for(std::list<Object *>::iterator it = game.world.objects.objectlist.begin(); it != game.world.objects.objectlist.end(); it++){
 Object * object = *it;
 if(object->type == ObjectTypes::TEAM){
 game.world.MarkDestroyObject(object->id);
@@ -171,7 +171,7 @@ return false;
 
 bool GameSession::CheckForEndOfGame(){
 if(game.world.winningteamid){
-if(game.world.message_i == GASLoader::Get().gameengine.ticksPerSecond * 3){
+if(game.world.messaging.message_i == GASLoader::Get().gameengine.ticksPerSecond * 3){
 if(game.world.IsAuthority()){
 	if(game.world.replay.IsRecording()){
 		game.world.replay.EndRecording();
@@ -182,7 +182,7 @@ if(game.world.IsAuthority()){
 		if(user){
 			Uint8 won = 0;
 			for(int i = 0; i < game.world.maxpeers; i++){
-				Peer * peer = game.world.peerlist[i];
+				Peer * peer = game.world.peers.peerlist[i];
 				if(peer){
 					if(peer->accountid == user->accountid){
 						Team * team = game.world.GetPeerTeam(peer->id);
@@ -201,7 +201,7 @@ if(game.world.IsAuthority()){
 	}
 }
 }
-if(game.world.message_i >= 240){
+if(game.world.messaging.message_i >= 240){
 return true;
 }
 }
@@ -212,7 +212,7 @@ bool GameSession::CheckForConnectionLost(){
 if(game.world.replay.IsPlaying()){
 return false;
 }
-if(game.world.state == World::IDLE && game.world.message_i >= 48){
+if(game.world.network.state == World::IDLE && game.world.messaging.message_i >= 48){
 return true;
 }
 return false;

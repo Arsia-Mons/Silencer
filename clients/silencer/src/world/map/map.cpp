@@ -59,7 +59,7 @@ bool Map::Load(const char * filename, World & world){
 	bool result = LoadFile(filename, world, 0);
 	if(result){
 		std::vector<Team *> teams;
-		for(std::list<Object *>::iterator it = world.objectlist.begin(); it != world.objectlist.end(); it++){
+		for(std::list<Object *>::iterator it = world.objects.objectlist.begin(); it != world.objects.objectlist.end(); it++){
 			Object * object = *it;
 			if(object->type == ObjectTypes::TEAM){
 				teams.push_back(static_cast<Team *>(object));
@@ -268,7 +268,7 @@ bool Map::LoadFile(const char * filename, World & world, Team * team){
 		actory += yoffset * 64;
 		//printf("(%u, %u) %d id:%u type:%d match:%u subp:%u unk:%x secid:%d\n", actorx, actory, actordirection, actorid, actortype, actormatchid, actorsubplane, actorunknown, actorsecurityid);
 		
-		Object* prevBack = world.objectlist.empty() ? nullptr : world.objectlist.back();
+		Object* prevBack = world.objects.objectlist.empty() ? nullptr : world.objects.objectlist.back();
 		switch(actorid){
 			case 0:{
 				// agent guard (has blaster)
@@ -751,8 +751,8 @@ bool Map::LoadFile(const char * filename, World & world, Team * team){
 		}
 		// Apply destructible / collectible flags packed into actorunknown
 		// bit 0: destructible, bit 1: collectible, bits 8-15: max health (0 = default 100)
-		if (actorunknown && !world.objectlist.empty() && world.objectlist.back() != prevBack) {
-			Object* obj = world.objectlist.back();
+		if (actorunknown && !world.objects.objectlist.empty() && world.objects.objectlist.back() != prevBack) {
+			Object* obj = world.objects.objectlist.back();
 			if (actorunknown & 1) {
 				obj->destructible = true;
 				Uint8 hp = (actorunknown >> 8) & 0xFF;

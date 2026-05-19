@@ -196,9 +196,9 @@ bool Replay::ReadToNextTick(World & world){
 				SDL_ReadIO(file, &msgsize, 1);
 				SDL_ReadIO(file, msg, msgsize);
 				msg[msgsize] = 0;
-				Peer * peer = world.peerlist[peerid];
+				Peer * peer = world.peers.peerlist[peerid];
 				if(peer){
-					if(to == 0 || world.GetPeerTeam(peer->id) == world.GetPeerTeam(world.localpeerid)){
+					if(to == 0 || world.GetPeerTeam(peer->id) == world.GetPeerTeam(world.peers.localpeerid)){
 						world.DisplayChatMessage(peer->accountid, msg);
 					}
 				}
@@ -211,7 +211,7 @@ bool Replay::ReadToNextTick(World & world){
 				SDL_ReadIO(file, &peerid, 1);
 				SDL_ReadIO(file, &action, 1);
 				SDL_ReadIO(file, &itemid, 1);
-				Peer * peer = world.peerlist[peerid];
+				Peer * peer = world.peers.peerlist[peerid];
 				if(peer){
 					Player * player = world.GetPeerPlayer(peer->id);
 					if(player){
@@ -230,7 +230,7 @@ bool Replay::ReadToNextTick(World & world){
 				Serializer * data = new Serializer;
 				SDL_ReadIO(file, data->data, GetInputSize());
 				data->offset = GetInputSize() * 8;
-				world.inputqueue[peerid].push_back(data);
+				world.replication.inputqueue[peerid].push_back(data);
 			}break;
 			case RPL_DISCONNECT:{
 				printf("RPL_DISCONNECT\n");

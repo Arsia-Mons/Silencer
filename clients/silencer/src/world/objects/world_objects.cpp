@@ -26,18 +26,18 @@ WorldObjectRegistry::WorldObjectRegistry(World & world) : world(world){
 }
 
 void World::TickObjects(void){
-	for(std::list<Object *>::reverse_iterator i = objectlist.rbegin(); i != objectlist.rend(); i++){
+	for(std::list<Object *>::reverse_iterator i = objects.objectlist.rbegin(); i != objects.objectlist.rend(); i++){
 		Object * object = (*i);
 		bool peercontrolled = false;
 		bool localpeercontrolled = false;
 		if(object->iscontrollable){
 			for(int i = 0; i < maxpeers; i++){
-				Peer * peer = peerlist[i];
+				Peer * peer = peers.peerlist[i];
 				if(peer && !peer->isbot){
 					for(std::list<Uint16>::iterator it = peer->controlledlist.begin(); it != peer->controlledlist.end(); it++){
 						if((*it) == object->id){
 							peercontrolled = true;
-							if(peer == peerlist[localpeerid]){
+							if(peer == peers.peerlist[peers.localpeerid]){
 								localpeercontrolled = true;
 							}
 						}
@@ -69,7 +69,7 @@ void World::TickObjects(void){
 		}
 	}
 	DestroyMarkedObjects();
-	Player * localplayer = GetPeerPlayer(localpeerid);
+	Player * localplayer = GetPeerPlayer(peers.localpeerid);
 	if(localplayer){
 		audio.UpdateAllVolumes(*this, localplayer->x, localplayer->y, GASLoader::Get().world.audioRange);
 	}else{
@@ -102,7 +102,7 @@ bool World::RelevantToPlayer(Player * player, Object * object){
 	if(!player){
 		return false;
 	}
-	if(rand() % objectlist.size() == 0){
+	if(rand() % objects.objectlist.size() == 0){
 		return true;
 	}
 	if(object->snapshotinterval >= 0 && tickcount % (object->snapshotinterval + 1) == 0){
@@ -113,7 +113,7 @@ bool World::RelevantToPlayer(Player * player, Object * object){
 		if(abs(player->x - object->x) <= _wd.networkSyncRangeX && abs(player->y - object->y) <= _wd.networkSyncRangeY){
 			return true;
 		}
-		for(std::vector<Uint16>::iterator it = objectsbytype[ObjectTypes::SURVEILLANCEMONITOR].begin(); it != objectsbytype[ObjectTypes::SURVEILLANCEMONITOR].end(); it++){
+		for(std::vector<Uint16>::iterator it = objects.objectsbytype[ObjectTypes::SURVEILLANCEMONITOR].begin(); it != objects.objectsbytype[ObjectTypes::SURVEILLANCEMONITOR].end(); it++){
 			Object * obj = GetObjectFromId((*it));
 			if(obj){
 				if(abs(player->x - obj->x) <= _wd.networkSyncRangeX && abs(player->y - obj->y) <= _wd.networkSyncRangeY){
@@ -196,7 +196,7 @@ bool World::IsCollidable(Uint8 type){
 }
 
 void World::Illuminate(void){
-	illuminate = GASLoader::Get().world.illuminateLevel;
+	objects.illuminate = GASLoader::Get().world.illuminateLevel;
 }
 
 void World::SetSystemCamera(bool system, Uint16 objectfollow, Sint16 x, Sint16 y){
@@ -213,8 +213,8 @@ void World::BroadcastCamera(Sint16 x, Sint16 y){
 	memcpy(&msg[1], &x, 2);
 	memcpy(&msg[3], &y, 2);
 	for(unsigned int i = 0; i < maxpeers; i++){
-		Peer * p = peerlist[i];
-		if(p && i != localpeerid) SendPacket(p, msg, 5);
+		Peer * p = peers.peerlist[i];
+		if(p && i != peers.localpeerid) SendPacket(p, msg, 5);
 	}
 }
 

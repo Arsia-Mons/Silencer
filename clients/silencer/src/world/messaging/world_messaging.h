@@ -36,6 +36,8 @@ public:
 
 private:
 	World & world;
+
+public:
 	char message[256];
 	Uint8 message_i;
 	Uint8 messagetype;
