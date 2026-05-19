@@ -1,0 +1,8 @@
+name: Build Silencer (Xbox / GDK)
+description: Placeholder — GDK toolchain setup and Xbox build steps to be implemented.
+runs:
+  using: composite
+  steps:
+    - name: Not yet implemented
+      shell: bash
+      run: echo "Xbox GDK build action — work in progress (issue #200)"
