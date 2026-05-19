@@ -1,5 +1,6 @@
 #include "sdl3gpubackend.h"
 #include <string.h>
+#include <vector>
 
 // DXIL bytecode generated from the HLSL sources in clients/silencer/shaders/
 // at build time by dxc. The headers define `static const unsigned char
@@ -57,6 +58,63 @@ fragment float4 frag_upscale(VOut in [[stage_in]],
     texture2d<float> scene [[texture(0)]],
     sampler samp [[sampler(0)]]) {
     return scene.sample(samp, in.uv);
+}
+)msl";
+
+// Lobby panel-border post-process. This intentionally samples the rendered
+// scene texture, spreading the existing border pixels outward without tying
+// the effect to any palette index.
+static const char *kFragLobbyPanelBlurMSL = R"msl(
+#include <metal_stdlib>
+using namespace metal;
+struct VOut { float4 pos [[position]]; float2 uv; };
+fragment float4 frag_upscale(VOut in [[stage_in]],
+    texture2d<float> scene  [[texture(0)]],
+    texture2d<float> border [[texture(1)]],
+    sampler samp [[sampler(0)]]) {
+    const float2 texel = 1.0 / float2(scene.get_width(), scene.get_height());
+    float4 base = scene.sample(samp, in.uv);
+    float3 accum = float3(0.0);
+    float alpha = 0.0;
+    const float radiusLimit = 10.0;
+
+    for (int i = 1; i <= 10; ++i) {
+        float radius = float(i) - 0.35;
+        float diagonal = radius * 0.70710678;
+        float falloff = 1.0 - (float(i) / (radiusLimit + 1.0));
+        float weight = falloff * falloff * 0.18;
+
+        float4 tap = border.sample(samp, in.uv + float2( radius, 0.0) * texel);
+        accum += tap.rgb * tap.a * weight;
+        alpha += tap.a * weight;
+        tap = border.sample(samp, in.uv + float2(-radius, 0.0) * texel);
+        accum += tap.rgb * tap.a * weight;
+        alpha += tap.a * weight;
+        tap = border.sample(samp, in.uv + float2(0.0,  radius) * texel);
+        accum += tap.rgb * tap.a * weight;
+        alpha += tap.a * weight;
+        tap = border.sample(samp, in.uv + float2(0.0, -radius) * texel);
+        accum += tap.rgb * tap.a * weight;
+        alpha += tap.a * weight;
+        tap = border.sample(samp, in.uv + float2( diagonal,  diagonal) * texel);
+        accum += tap.rgb * tap.a * weight;
+        alpha += tap.a * weight;
+        tap = border.sample(samp, in.uv + float2(-diagonal,  diagonal) * texel);
+        accum += tap.rgb * tap.a * weight;
+        alpha += tap.a * weight;
+        tap = border.sample(samp, in.uv + float2( diagonal, -diagonal) * texel);
+        accum += tap.rgb * tap.a * weight;
+        alpha += tap.a * weight;
+        tap = border.sample(samp, in.uv + float2(-diagonal, -diagonal) * texel);
+        accum += tap.rgb * tap.a * weight;
+        alpha += tap.a * weight;
+    }
+
+    if (alpha <= 0.0001) {
+        return base;
+    }
+    float3 blurred = accum / alpha;
+    return float4(mix(base.rgb, blurred, saturate(alpha)), base.a);
 }
 )msl";
 
@@ -153,10 +211,101 @@ kernel void update_particles(
 static const ShaderBundle kVertScreen   = { kVertScreenMSL,   kVertScreenDXIL,   sizeof(kVertScreenDXIL),   "vert_screen"      };
 static const ShaderBundle kFragRemap    = { kFragRemapMSL,    kFragRemapDXIL,    sizeof(kFragRemapDXIL),    "frag_remap"       };
 static const ShaderBundle kFragUpscale  = { kFragUpscaleMSL,  kFragUpscaleDXIL,  sizeof(kFragUpscaleDXIL),  "frag_upscale"     };
+static const ShaderBundle kFragLobbyPanelBlur = { kFragLobbyPanelBlurMSL, kFragUpscaleDXIL, sizeof(kFragUpscaleDXIL), "frag_upscale" };
 static const ShaderBundle kFragLight    = { kFragLightMSL,    kFragLightDXIL,    sizeof(kFragLightDXIL),    "frag_light"       };
 static const ShaderBundle kVertParticle = { kVertParticleMSL, kVertParticleDXIL, sizeof(kVertParticleDXIL), "vert_particle"    };
 static const ShaderBundle kFragParticle = { kFragParticleMSL, kFragParticleDXIL, sizeof(kFragParticleDXIL), "frag_particle"    };
 static const ShaderBundle kCompParticle = { kComputeParticleMSL, kCompParticleDXIL, sizeof(kCompParticleDXIL), "update_particles" };
+
+namespace {
+
+constexpr int kLobbyPanelBlurRadius = 10;
+
+struct LobbyPanelBlurRects {
+	std::vector<SDL_Rect> blur;
+	std::vector<SDL_Rect> restore;
+};
+
+SDL_Rect ClampRect(SDL_Rect r, int w, int h) {
+	if (r.x < 0) {
+		r.w += r.x;
+		r.x = 0;
+	}
+	if (r.y < 0) {
+		r.h += r.y;
+		r.y = 0;
+	}
+	if (r.x + r.w > w) r.w = w - r.x;
+	if (r.y + r.h > h) r.h = h - r.y;
+	if (r.w < 0) r.w = 0;
+	if (r.h < 0) r.h = 0;
+	return r;
+}
+
+int CeilScaled(float value) {
+	return static_cast<int>(value + 0.9999f);
+}
+
+SDL_Rect ScaleLobbyPanelRect(SDL_Rect rect,
+                             int virtualW,
+                             int virtualH,
+                             float scale,
+                             int targetW,
+                             int targetH) {
+	if (virtualW <= 0 || virtualH <= 0 || scale <= 0.0f) {
+		return ClampRect(rect, targetW, targetH);
+	}
+	const int scaledW = static_cast<int>((float)virtualW * scale + 0.5f);
+	const int scaledH = static_cast<int>((float)virtualH * scale + 0.5f);
+	const int offsetX = scaledW < targetW ? (targetW - scaledW) / 2 : 0;
+	const int offsetY = scaledH < targetH ? (targetH - scaledH) / 2 : 0;
+	const int x0 = offsetX + static_cast<int>((float)rect.x * scale);
+	const int y0 = offsetY + static_cast<int>((float)rect.y * scale);
+	const int x1 = offsetX + CeilScaled((float)(rect.x + rect.w) * scale);
+	const int y1 = offsetY + CeilScaled((float)(rect.y + rect.h) * scale);
+	return ClampRect(SDL_Rect{ x0, y0, x1 - x0, y1 - y0 }, targetW, targetH);
+}
+
+void AddLobbyPanelBlurRect(LobbyPanelBlurRects &rects,
+                           SDL_Rect exact,
+                           int blurRadius,
+                           int w,
+                           int h) {
+	exact = ClampRect(exact, w, h);
+	if (exact.w <= 0 || exact.h <= 0) return;
+	rects.restore.push_back(exact);
+
+	SDL_Rect blur = {
+		exact.x - blurRadius,
+		exact.y - blurRadius,
+		exact.w + blurRadius * 2,
+		exact.h + blurRadius * 2,
+	};
+	blur = ClampRect(blur, w, h);
+	if (blur.w > 0 && blur.h > 0) rects.blur.push_back(blur);
+}
+
+LobbyPanelBlurRects BuildLobbyPanelBlurRects(const std::vector<SDL_Rect> & source,
+                                             int w,
+                                             int h,
+                                             int virtualW,
+                                             int virtualH,
+                                             float scale,
+                                             int blurRadius) {
+	LobbyPanelBlurRects rects;
+	if (w <= 0 || h <= 0) return rects;
+	for (const SDL_Rect & rect : source) {
+		AddLobbyPanelBlurRect(
+			rects,
+			ScaleLobbyPanelRect(rect, virtualW, virtualH, scale, w, h),
+			blurRadius,
+			w,
+			h);
+	}
+	return rects;
+}
+
+}  // namespace
 
 // ---------------------------------------------------------------------------
 SDL3GPUBackend::SDL3GPUBackend() = default;
@@ -223,8 +372,12 @@ void SDL3GPUBackend::Shutdown() {
 	if (frame_tex)         { SDL_ReleaseGPUTexture(device, frame_tex);          frame_tex         = nullptr; }
 	if (palette_tex)       { SDL_ReleaseGPUTexture(device, palette_tex);        palette_tex       = nullptr; }
 	if (scene_tex)         { SDL_ReleaseGPUTexture(device, scene_tex);          scene_tex         = nullptr; }
+	if (lobby_panel_source_tex) { SDL_ReleaseGPUTexture(device, lobby_panel_source_tex); lobby_panel_source_tex = nullptr; }
+	if (lobby_panel_mask_tex) { SDL_ReleaseGPUTexture(device, lobby_panel_mask_tex); lobby_panel_mask_tex = nullptr; }
 	if (remap_pipeline)    { SDL_ReleaseGPUGraphicsPipeline(device, remap_pipeline);   remap_pipeline   = nullptr; }
 	if (upscale_pipeline)  { SDL_ReleaseGPUGraphicsPipeline(device, upscale_pipeline); upscale_pipeline = nullptr; }
+	if (lobby_panel_blur_pipeline) { SDL_ReleaseGPUGraphicsPipeline(device, lobby_panel_blur_pipeline); lobby_panel_blur_pipeline = nullptr; }
+	if (lobby_panel_copy_pipeline) { SDL_ReleaseGPUGraphicsPipeline(device, lobby_panel_copy_pipeline); lobby_panel_copy_pipeline = nullptr; }
 	if (light_pipeline)    { SDL_ReleaseGPUGraphicsPipeline(device, light_pipeline);   light_pipeline   = nullptr; }
 	if (particle_pipeline) { SDL_ReleaseGPUGraphicsPipeline(device, particle_pipeline); particle_pipeline = nullptr; }
 	if (particle_compute)  { SDL_ReleaseGPUComputePipeline(device, particle_compute);  particle_compute  = nullptr; }
@@ -329,6 +482,64 @@ bool SDL3GPUBackend::CreatePipelines() {
 		}
 	}
 
+	return CreateLobbyPanelBlurPipeline();
+}
+
+bool SDL3GPUBackend::CreateLobbyPanelBlurPipeline() {
+	const Uint32 blurSamplers =
+		chosen_format == SDL_GPU_SHADERFORMAT_MSL ? 2u : 1u;
+	SDL_GPUShader *vs = LoadShader(SDL_GPU_SHADERSTAGE_VERTEX,   kVertScreen,  0);
+	SDL_GPUShader *fs = LoadShader(SDL_GPU_SHADERSTAGE_FRAGMENT,
+	                               kFragLobbyPanelBlur,
+	                               blurSamplers);
+	if (!vs || !fs) {
+		SDL_Log("SDL3GPUBackend: lobby panel blur shaders failed: %s", SDL_GetError());
+		if (vs) SDL_ReleaseGPUShader(device, vs);
+		if (fs) SDL_ReleaseGPUShader(device, fs);
+		return false;
+	}
+
+	SDL_GPUColorTargetDescription ct = {};
+	ct.format = SDL_GPU_TEXTUREFORMAT_R8G8B8A8_UNORM;
+
+	SDL_GPUGraphicsPipelineCreateInfo pi = {};
+	pi.vertex_shader   = vs;
+	pi.fragment_shader = fs;
+	pi.primitive_type  = SDL_GPU_PRIMITIVETYPE_TRIANGLELIST;
+	pi.target_info.color_target_descriptions = &ct;
+	pi.target_info.num_color_targets         = 1;
+
+	lobby_panel_blur_pipeline = SDL_CreateGPUGraphicsPipeline(device, &pi);
+	SDL_ReleaseGPUShader(device, vs);
+	SDL_ReleaseGPUShader(device, fs);
+	if (!lobby_panel_blur_pipeline) {
+		SDL_Log("SDL3GPUBackend: lobby panel blur pipeline failed: %s", SDL_GetError());
+		return false;
+	}
+
+	vs = LoadShader(SDL_GPU_SHADERSTAGE_VERTEX,   kVertScreen,  0);
+	fs = LoadShader(SDL_GPU_SHADERSTAGE_FRAGMENT, kFragUpscale, 1);
+	if (!vs || !fs) {
+		SDL_Log("SDL3GPUBackend: lobby panel copy shaders failed: %s", SDL_GetError());
+		if (vs) SDL_ReleaseGPUShader(device, vs);
+		if (fs) SDL_ReleaseGPUShader(device, fs);
+		return false;
+	}
+
+	pi = {};
+	pi.vertex_shader   = vs;
+	pi.fragment_shader = fs;
+	pi.primitive_type  = SDL_GPU_PRIMITIVETYPE_TRIANGLELIST;
+	pi.target_info.color_target_descriptions = &ct;
+	pi.target_info.num_color_targets         = 1;
+
+	lobby_panel_copy_pipeline = SDL_CreateGPUGraphicsPipeline(device, &pi);
+	SDL_ReleaseGPUShader(device, vs);
+	SDL_ReleaseGPUShader(device, fs);
+	if (!lobby_panel_copy_pipeline) {
+		SDL_Log("SDL3GPUBackend: lobby panel copy pipeline failed: %s", SDL_GetError());
+		return false;
+	}
 	return true;
 }
 
@@ -473,6 +684,20 @@ void SDL3GPUBackend::SetScaleFilter(bool linear) {
 	use_linear = linear;
 }
 
+void SDL3GPUBackend::BeginLobbyPanelBorderBlur(int virtualWidth,
+                                               int virtualHeight,
+                                               float uiScale) {
+	pending_lobby_panel_border_blur_rects.clear();
+	pending_lobby_panel_blur_virtual_w = virtualWidth;
+	pending_lobby_panel_blur_virtual_h = virtualHeight;
+	pending_lobby_panel_blur_scale = uiScale > 0.0f ? uiScale : 1.0f;
+}
+
+void SDL3GPUBackend::AddLobbyPanelBorderBlurRect(const SDL_Rect & rect) {
+	if (rect.w <= 0 || rect.h <= 0) return;
+	pending_lobby_panel_border_blur_rects.push_back(rect);
+}
+
 // Phase 3 — lighting
 void SDL3GPUBackend::BeginLighting() {
 	pending_light_count = 0;
@@ -593,6 +818,42 @@ void SDL3GPUBackend::Present() {
 			scene_tex_w = pending_w;
 			scene_tex_h = pending_h;
 		}
+
+		if (!lobby_panel_source_tex ||
+		    lobby_panel_source_w != pending_w ||
+		    lobby_panel_source_h != pending_h) {
+			if (lobby_panel_source_tex) SDL_ReleaseGPUTexture(device, lobby_panel_source_tex);
+			SDL_GPUTextureCreateInfo ti = {};
+			ti.type                 = SDL_GPU_TEXTURETYPE_2D;
+			ti.format               = SDL_GPU_TEXTUREFORMAT_R8G8B8A8_UNORM;
+			ti.usage                = SDL_GPU_TEXTUREUSAGE_SAMPLER |
+			                          SDL_GPU_TEXTUREUSAGE_COLOR_TARGET;
+			ti.width                = (Uint32)pending_w;
+			ti.height               = (Uint32)pending_h;
+			ti.layer_count_or_depth = 1;
+			ti.num_levels           = 1;
+			lobby_panel_source_tex = SDL_CreateGPUTexture(device, &ti);
+			lobby_panel_source_w = pending_w;
+			lobby_panel_source_h = pending_h;
+		}
+
+		if (!lobby_panel_mask_tex ||
+		    lobby_panel_mask_w != pending_w ||
+		    lobby_panel_mask_h != pending_h) {
+			if (lobby_panel_mask_tex) SDL_ReleaseGPUTexture(device, lobby_panel_mask_tex);
+			SDL_GPUTextureCreateInfo ti = {};
+			ti.type                 = SDL_GPU_TEXTURETYPE_2D;
+			ti.format               = SDL_GPU_TEXTUREFORMAT_R8G8B8A8_UNORM;
+			ti.usage                = SDL_GPU_TEXTUREUSAGE_SAMPLER |
+			                          SDL_GPU_TEXTUREUSAGE_COLOR_TARGET;
+			ti.width                = (Uint32)pending_w;
+			ti.height               = (Uint32)pending_h;
+			ti.layer_count_or_depth = 1;
+			ti.num_levels           = 1;
+			lobby_panel_mask_tex = SDL_CreateGPUTexture(device, &ti);
+			lobby_panel_mask_w = pending_w;
+			lobby_panel_mask_h = pending_h;
+		}
 	}
 
 	// Lazily create palette texture.
@@ -618,11 +879,22 @@ void SDL3GPUBackend::Present() {
 	SDL_GPUCommandBuffer *cmd = SDL_AcquireGPUCommandBuffer(device);
 	if (!cmd) return;
 
+	LobbyPanelBlurRects lobby_blur_rects =
+		BuildLobbyPanelBlurRects(
+			pending_lobby_panel_border_blur_rects,
+			pending_w,
+			pending_h,
+			pending_lobby_panel_blur_virtual_w,
+			pending_lobby_panel_blur_virtual_h,
+			pending_lobby_panel_blur_scale,
+			kLobbyPanelBlurRadius);
+
 	// ---- 1. Copy pass: upload frame + palette ----
-	if ((frame_dirty && pending_pixels && frame_tex && frame_tbuf) || palette_dirty) {
+	bool upload_frame = frame_dirty && pending_pixels && frame_tex && frame_tbuf;
+	if (upload_frame || palette_dirty) {
 		SDL_GPUCopyPass *copy = SDL_BeginGPUCopyPass(cmd);
 
-		if (frame_dirty && pending_pixels && frame_tex && frame_tbuf) {
+		if (upload_frame) {
 			Uint8 *dst = (Uint8 *)SDL_MapGPUTransferBuffer(device, frame_tbuf, false);
 			if (dst) {
 				memcpy(dst, pending_pixels, (size_t)(pending_w * pending_h));
@@ -705,7 +977,80 @@ void SDL3GPUBackend::Present() {
 		}
 	}
 
-	// ---- 4. Effects pass: particles + lights → scene_tex (LOAD, additive) ----
+	// ---- 4. Lobby panel blur pass: scene-sampled border blur → scene_tex ----
+	if (!lobby_blur_rects.blur.empty() &&
+	    lobby_panel_source_tex &&
+	    lobby_panel_mask_tex &&
+	    lobby_panel_blur_pipeline &&
+	    lobby_panel_copy_pipeline &&
+	    scene_tex) {
+		SDL_GPUBlitInfo copyInfo = {};
+		copyInfo.source.texture = scene_tex;
+		copyInfo.source.w = (Uint32)scene_tex_w;
+		copyInfo.source.h = (Uint32)scene_tex_h;
+		copyInfo.destination.texture = lobby_panel_source_tex;
+		copyInfo.destination.w = (Uint32)scene_tex_w;
+		copyInfo.destination.h = (Uint32)scene_tex_h;
+		copyInfo.load_op = SDL_GPU_LOADOP_DONT_CARE;
+		copyInfo.filter = SDL_GPU_FILTER_NEAREST;
+		SDL_BlitGPUTexture(cmd, &copyInfo);
+
+		SDL_GPUColorTargetInfo maskCt = {};
+		maskCt.texture = lobby_panel_mask_tex;
+		maskCt.load_op = SDL_GPU_LOADOP_CLEAR;
+		maskCt.store_op = SDL_GPU_STOREOP_STORE;
+		maskCt.clear_color = {0, 0, 0, 0};
+
+		bool maskReady = false;
+		SDL_GPURenderPass *maskPass = SDL_BeginGPURenderPass(cmd, &maskCt, 1, nullptr);
+		if (maskPass) {
+			SDL_BindGPUGraphicsPipeline(maskPass, lobby_panel_copy_pipeline);
+			SDL_GPUTextureSamplerBinding sourceBind = {lobby_panel_source_tex, nearest_sampler};
+			SDL_BindGPUFragmentSamplers(maskPass, 0, &sourceBind, 1);
+			for (const SDL_Rect &rect : lobby_blur_rects.restore) {
+				SDL_SetGPUScissor(maskPass, &rect);
+				SDL_DrawGPUPrimitives(maskPass, 3, 1, 0, 0);
+			}
+			SDL_EndGPURenderPass(maskPass);
+			maskReady = true;
+		}
+
+		SDL_GPUColorTargetInfo ct = {};
+		ct.texture  = scene_tex;
+		ct.load_op  = SDL_GPU_LOADOP_LOAD;
+		ct.store_op = SDL_GPU_STOREOP_STORE;
+
+		SDL_GPURenderPass *pass = maskReady
+			? SDL_BeginGPURenderPass(cmd, &ct, 1, nullptr)
+			: nullptr;
+		if (pass) {
+			SDL_BindGPUGraphicsPipeline(pass, lobby_panel_blur_pipeline);
+			SDL_GPUTextureSamplerBinding blurBinds[2] = {
+				{lobby_panel_source_tex, linear_sampler},
+				{lobby_panel_mask_tex,   linear_sampler},
+			};
+			SDL_BindGPUFragmentSamplers(
+				pass,
+				0,
+				blurBinds,
+				chosen_format == SDL_GPU_SHADERFORMAT_MSL ? 2 : 1);
+			for (const SDL_Rect &rect : lobby_blur_rects.blur) {
+				SDL_SetGPUScissor(pass, &rect);
+				SDL_DrawGPUPrimitives(pass, 3, 1, 0, 0);
+			}
+
+			SDL_BindGPUGraphicsPipeline(pass, lobby_panel_copy_pipeline);
+			SDL_GPUTextureSamplerBinding sourceBind = {lobby_panel_source_tex, nearest_sampler};
+			SDL_BindGPUFragmentSamplers(pass, 0, &sourceBind, 1);
+			for (const SDL_Rect &rect : lobby_blur_rects.restore) {
+				SDL_SetGPUScissor(pass, &rect);
+				SDL_DrawGPUPrimitives(pass, 3, 1, 0, 0);
+			}
+			SDL_EndGPURenderPass(pass);
+		}
+	}
+
+	// ---- 5. Effects pass: particles + lights → scene_tex (LOAD, additive) ----
 	bool has_particles = (pending_particle_draw_count > 0) && particle_pipeline;
 	bool has_lights    = (pending_light_count > 0) && lighting_active;
 
@@ -771,8 +1116,9 @@ void SDL3GPUBackend::Present() {
 	pending_particle_draw_count = 0;
 	pending_light_count         = 0;
 	lighting_active             = false;
+	pending_lobby_panel_border_blur_rects.clear();
 
-	// ---- 5. Acquire swapchain — null when minimized ----
+	// ---- 6. Acquire swapchain — null when minimized ----
 	SDL_GPUTexture *swapchain = nullptr;
 	Uint32 sw_w = 0, sw_h = 0;
 	SDL_WaitAndAcquireGPUSwapchainTexture(cmd, window, &swapchain, &sw_w, &sw_h);
@@ -781,7 +1127,7 @@ void SDL3GPUBackend::Present() {
 		return;
 	}
 
-	// ---- 6. Upscale pass: scene_tex → swapchain ----
+	// ---- 7. Upscale pass: scene_tex → swapchain ----
 	if (scene_tex) {
 		SDL_GPUColorTargetInfo ct = {};
 		ct.texture     = swapchain;
