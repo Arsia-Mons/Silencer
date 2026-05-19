@@ -1,3 +1,4 @@
+#include "world_replication.h"
 #include "world.h"
 #include "serializer.h"
 #include "player.h"
@@ -19,7 +20,16 @@
 
 #define DELTAENABLED 1
 
-bool World::ProcessInputQueue(Peer & peer){
+WorldReplication::WorldReplication(World & world) : world(world){
+	memset(oldsnapshots, 0, sizeof(oldsnapshots));
+	totalsnapshots = 0;
+	totalinputpackets = 0;
+	snapshotqueueminsize = GASLoader::Get().gameengine.snapshotQueueMinSize;
+	snapshotqueuemaxsize = GASLoader::Get().gameengine.snapshotQueueInitMaxSize;
+	lastsnapshotqueueadjust = 0;
+}
+
+bool WorldReplication::ProcessInputQueue(Peer & peer){
 	if(inputqueue[peer.id].size() > 0){
 		Serializer * data = inputqueue[peer.id].front();
 		Uint32 theirlasttick;
@@ -32,16 +42,16 @@ bool World::ProcessInputQueue(Peer & peer){
 			//peer.port = ntohs(senderaddr.sin_port);
 			peer.input.Serialize(Serializer::READ, *data);
 			for(std::list<Uint16>::iterator i = peer.controlledlist.begin(); i != peer.controlledlist.end(); i++){
-				Object * object = GetObjectFromId((*i));
+				Object * object = world.GetObjectFromId((*i));
 				if(object){
-					//if(!replaying){
+					//if(!world.replaying){
 						object->oldx = object->x;
 						object->oldy = object->y;
 					//}
-					if (!input_locked) object->HandleInput(peer.input);
-					object->Tick(*this);
-					object->lasttick = tickcount;
-					//printf("Processed input for peer %d at tick %d\n", peer.id, tickcount);
+					if (!world.input_locked) object->HandleInput(peer.input);
+					object->Tick(world);
+					object->lasttick = world.tickcount;
+					//printf("Processed input for peer %d at tick %d\n", peer.id, world.tickcount);
 				}
 			}
 		}
@@ -52,8 +62,8 @@ bool World::ProcessInputQueue(Peer & peer){
 	return false;
 }
 
-void World::ProcessSnapshotQueue(void){
-	if(!peerlist[localpeerid]){
+void WorldReplication::ProcessSnapshotQueue(void){
+	if(!world.peerlist[world.localpeerid]){
 		return;
 	}
 	int maxruns = 1;
@@ -65,10 +75,10 @@ void World::ProcessSnapshotQueue(void){
 			snapshotqueuemaxsize++;
 		}
 	}
-	if(tickcount - lastsnapshotqueueadjust > (Uint32)GASLoader::Get().gameengine.snapshotQueueShrinkTicks){
+	if(world.tickcount - lastsnapshotqueueadjust > (Uint32)GASLoader::Get().gameengine.snapshotQueueShrinkTicks){
 		if(snapshotqueuemaxsize - snapshotqueueminsize > 1){
 			snapshotqueuemaxsize--;
-			lastsnapshotqueueadjust = tickcount;
+			lastsnapshotqueueadjust = world.tickcount;
 		}
 	}
 	if(snapshotqueue.size() < snapshotqueueminsize){
@@ -87,25 +97,25 @@ void World::ProcessSnapshotQueue(void){
 			Uint32 deltatick;
 			data->Get(deltatick);
 			data->readoffset = readoffsetbeforedelta;
-			Serializer ** deltasnapshotptr = &oldsnapshots[localpeerid][deltatick % maxoldsnapshots];
+			Serializer ** deltasnapshotptr = &oldsnapshots[world.localpeerid][deltatick % World::maxoldsnapshots];
 			
-			if(DELTAENABLED && *deltasnapshotptr && tick - deltatick < maxoldsnapshots){
+			if(DELTAENABLED && *deltasnapshotptr && tick - deltatick < World::maxoldsnapshots){
 				LoadSnapshot(*data, true, *deltasnapshotptr);
 			}else{
 				LoadSnapshot(*data, true);
 			}
 			
-			Serializer ** newsnapshotptr = &oldsnapshots[localpeerid][tick % maxoldsnapshots];
+			Serializer ** newsnapshotptr = &oldsnapshots[world.localpeerid][tick % World::maxoldsnapshots];
 			if(!*newsnapshotptr){
 				*newsnapshotptr = new Serializer;
 			}
 			(*newsnapshotptr)->offset = 0;
-			SaveSnapshot(**newsnapshotptr, localpeerid);
+			SaveSnapshot(**newsnapshotptr, world.localpeerid);
 			
-			TickObjects();
+			world.TickObjects();
 			
-			if(tick > peerlist[localpeerid]->lasttick){
-				peerlist[localpeerid]->lasttick = tick;
+			if(tick > world.peerlist[world.localpeerid]->lasttick){
+				world.peerlist[world.localpeerid]->lasttick = tick;
 				ClientSidePredict(ourtick);
 			}
 
@@ -116,29 +126,29 @@ void World::ProcessSnapshotQueue(void){
 	}
 }
 
-void World::ClientSidePredict(Uint32 ourtick){
+void WorldReplication::ClientSidePredict(Uint32 ourtick){
 	// Perform client side predication
-	int replayticks = tickcount - ourtick - 1;
-	if(replayticks < maxlocalinputhistory - 1){
+	int replayticks = world.tickcount - ourtick - 1;
+	if(replayticks < World::maxlocalinputhistory - 1){
 		for(int i = replayticks; i > 0; i--){
-			for(std::list<Uint16>::iterator it = peerlist[localpeerid]->controlledlist.begin(); it != peerlist[localpeerid]->controlledlist.end(); it++){
-				Object * object = GetObjectFromId((*it));
+			for(std::list<Uint16>::iterator it = world.peerlist[world.localpeerid]->controlledlist.begin(); it != world.peerlist[world.localpeerid]->controlledlist.end(); it++){
+				Object * object = world.GetObjectFromId((*it));
 				if(object){
 					// set the oldinput
 					if(object->type == ObjectTypes::PLAYER){
 						Player * player = (Player *)object;
-						player->oldinput = localinputhistory[(tickcount - i - 1) % maxlocalinputhistory];
+						player->oldinput = localinputhistory[(world.tickcount - i - 1) % World::maxlocalinputhistory];
 					}
 					//
-					object->HandleInput(localinputhistory[(tickcount - i) % maxlocalinputhistory]);
+					object->HandleInput(localinputhistory[(world.tickcount - i) % World::maxlocalinputhistory]);
 					object->oldx = object->x;
 					object->oldy = object->y;
-					replaying = true;
-					audio.enabled = false;
-					object->Tick(*this);
-					object->lasttick = tickcount;
-					audio.enabled = true;
-					replaying = false;
+					world.replaying = true;
+					world.audio.enabled = false;
+					object->Tick(world);
+					object->lasttick = world.tickcount;
+					world.audio.enabled = true;
+					world.replaying = false;
 				}
 			}
 		}
@@ -146,29 +156,29 @@ void World::ClientSidePredict(Uint32 ourtick){
 	//
 }
 
-void World::CheckExists(void){
+void WorldReplication::CheckExists(void){
 	Serializer data;
-	Uint8 code = MSG_EXISTS;
+	Uint8 code = World::MSG_EXISTS;
 	data.Put(code);
 	int count = 0;
 	Uint8 types[] = {ObjectTypes::PICKUP, ObjectTypes::FIXEDCANNON, ObjectTypes::DETONATOR};
 	// check for these objects, because they can get destroyed while we are not there, and they wont get deleted
 	for(int i = 0; i < sizeof(types) / sizeof(Uint8); i++){
-		for(std::vector<Uint16>::iterator it = objectsbytype[types[i]].begin(); it != objectsbytype[types[i]].end(); it++){
+		for(std::vector<Uint16>::iterator it = world.objectsbytype[types[i]].begin(); it != world.objectsbytype[types[i]].end(); it++){
 			if(count >= GASLoader::Get().gameengine.maxStaleSnapshots){
 				break;
 			}
-			Object * object = GetObjectFromId(*it);
-			if(object && tickcount - object->lastsnapshottick > maxoldsnapshots){
+			Object * object = world.GetObjectFromId(*it);
+			if(object && world.tickcount - object->lastsnapshottick > World::maxoldsnapshots){
 				data.Put((*it));
 				count++;
 			}
 		}
 	}
-	SendPacket(GetAuthorityPeer(), data.data, data.BitsToBytes(data.offset));
+	world.SendPacket(world.GetAuthorityPeer(), data.data, data.BitsToBytes(data.offset));
 }
 
-void World::ClearSnapshotQueue(void){
+void WorldReplication::ClearSnapshotQueue(void){
 	for(std::list<Serializer *>::iterator it = snapshotqueue.begin(); it != snapshotqueue.end(); it++){
 		Serializer * data = *it;
 		delete data;
@@ -176,8 +186,8 @@ void World::ClearSnapshotQueue(void){
 	snapshotqueue.clear();
 }
 
-void World::DeleteOldSnapshots(Uint8 peerid){
-	for(unsigned int i = 0; i < maxoldsnapshots; i++){
+void WorldReplication::DeleteOldSnapshots(Uint8 peerid){
+	for(unsigned int i = 0; i < World::maxoldsnapshots; i++){
 		if(oldsnapshots[peerid][i]){
 			delete oldsnapshots[peerid][i];
 			oldsnapshots[peerid][i] = 0;
@@ -185,7 +195,7 @@ void World::DeleteOldSnapshots(Uint8 peerid){
 	}
 }
 
-bool World::CompareSnapshot(Serializer * snapshot1, Serializer * snapshot2){
+bool WorldReplication::CompareSnapshot(Serializer * snapshot1, Serializer * snapshot2){
 	unsigned int oldreadoffset = snapshot1->readoffset;
 	Uint32 tick1;
 	snapshot1->Get(tick1);
@@ -197,87 +207,87 @@ bool World::CompareSnapshot(Serializer * snapshot1, Serializer * snapshot2){
 	return(tick1 < tick2);
 }
 
-void World::SendInput(void){
+void WorldReplication::SendInput(void){
 	Peer * peer = 0;
-	localinputhistory[tickcount % maxlocalinputhistory] = localinput;
-	if(mode == REPLICA && state == CONNECTED && gameplaystate == INGAME){
-		peer = peerlist[localpeerid];
+	localinputhistory[world.tickcount % World::maxlocalinputhistory] = world.localinput;
+	if(world.mode == World::REPLICA && world.state == World::CONNECTED && world.gameplaystate == World::INGAME){
+		peer = world.peerlist[world.localpeerid];
 		if(peer && peer->controlledlist.size() > 0){
-			peer->input = localinput;
+			peer->input = world.localinput;
 			peer->input.mousex = 0xFFFF;
 			peer->input.mousey = 0xFFFF;
 			Serializer data;
-			Uint8 code = MSG_INPUT;
+			Uint8 code = World::MSG_INPUT;
 			data.Put(code);
-			data.Put(tickcount);
-			data.Put(peerlist[localpeerid]->lasttick);
+			data.Put(world.tickcount);
+			data.Put(world.peerlist[world.localpeerid]->lasttick);
 			peer->input.Serialize(Serializer::WRITE, data);
-			SendPacket(GetAuthorityPeer(), data.data, data.BitsToBytes(data.offset));
+			world.SendPacket(world.GetAuthorityPeer(), data.data, data.BitsToBytes(data.offset));
 		}
 	}else
-	if(mode == AUTHORITY){
-		peer = GetAuthorityPeer();
-		peer->input = localinput;
+	if(world.mode == World::AUTHORITY){
+		peer = world.GetAuthorityPeer();
+		peer->input = world.localinput;
 	}
 	if(peer){
 		for(std::list<Uint16>::iterator i = peer->controlledlist.begin(); i != peer->controlledlist.end(); i++){
-			Object * object = GetObjectFromId((*i));
+			Object * object = world.GetObjectFromId((*i));
 			if(object){
-				//if(!replaying){
+				//if(!world.replaying){
 					object->oldx = object->x;
 					object->oldy = object->y;
 				//}
-				if (!input_locked) object->HandleInput(peer->input);
-				object->Tick(*this);
-				object->lasttick = tickcount;
+				if (!world.input_locked) object->HandleInput(peer->input);
+				object->Tick(world);
+				object->lasttick = world.tickcount;
 			}
 		}
 	}
 }
 
-void World::SendSnapshots(void){
-	for(unsigned int i = 0; i < maxpeers; i++){
-		Peer * peer = peerlist[i];
-		if(peer && i != localpeerid && !peer->isbot && !peer->disconnected){
+void WorldReplication::SendSnapshots(void){
+	for(unsigned int i = 0; i < World::maxpeers; i++){
+		Peer * peer = world.peerlist[i];
+		if(peer && i != world.localpeerid && !peer->isbot && !peer->disconnected){
 			Serializer data;
-			Uint8 code = MSG_SNAPSHOT;
+			Uint8 code = World::MSG_SNAPSHOT;
 			data.Put(code);
-			data.Put(tickcount);
+			data.Put(world.tickcount);
 			data.Put(peer->theirlasttick);
 			SaveSnapshot(data, i);
-			SendPacket(peer, data.data, data.BitsToBytes(data.offset));
+			world.SendPacket(peer, data.data, data.BitsToBytes(data.offset));
 		}
 	}
 }
 
-void World::SendGameInfo(Uint8 peerid){
-	Peer * peer = peerlist[peerid];
+void WorldReplication::SendGameInfo(Uint8 peerid){
+	Peer * peer = world.peerlist[peerid];
 	if(peer){
 		Serializer data;
-		Uint8 code = MSG_GAMEINFO;
+		Uint8 code = World::MSG_GAMEINFO;
 		data.Put(code);
-		gameinfo.Serialize(Serializer::WRITE, data);
-		SendPacket(peer, data.data, data.BitsToBytes(data.offset));
+		world.gameinfo.Serialize(Serializer::WRITE, data);
+		world.SendPacket(peer, data.data, data.BitsToBytes(data.offset));
 	}
 }
 
-void World::SendGameInfoLoaded(void){
+void WorldReplication::SendGameInfoLoaded(void){
 	char data[1];
-	data[0] = MSG_GAMEINFO;
-	SendPacket(GetAuthorityPeer(), data, sizeof(data));
+	data[0] = World::MSG_GAMEINFO;
+	world.SendPacket(world.GetAuthorityPeer(), data, sizeof(data));
 }
 
-void World::SendReady(void){
+void WorldReplication::SendReady(void){
 	Serializer data;
-	Uint8 code = MSG_READY;
+	Uint8 code = World::MSG_READY;
 	data.Put(code);
-	SendPacket(GetAuthorityPeer(), data.data, data.BitsToBytes(data.offset));
+	world.SendPacket(world.GetAuthorityPeer(), data.data, data.BitsToBytes(data.offset));
 }
 
-bool World::AllPeersReady(Uint8 except){
+bool WorldReplication::AllPeersReady(Uint8 except){
 	bool allready = true;
-	for(int i = 0; i < maxpeers; i++){
-		Peer * peer = peerlist[i];
+	for(int i = 0; i < World::maxpeers; i++){
+		Peer * peer = world.peerlist[i];
 		if(peer){
 			if(!peer->isready && peer->id != except){
 				allready = false;
@@ -288,10 +298,10 @@ bool World::AllPeersReady(Uint8 except){
 	return allready;
 }
 
-bool World::AllPeersLoadedGameInfo(void){
+bool WorldReplication::AllPeersLoadedGameInfo(void){
 	bool allloaded = true;
-	for(int i = 0; i < maxpeers; i++){
-		Peer * peer = peerlist[i];
+	for(int i = 0; i < World::maxpeers; i++){
+		Peer * peer = world.peerlist[i];
 		if(peer){
 			if(!peer->gameinfoloaded){
 				allloaded = false;
@@ -302,11 +312,11 @@ bool World::AllPeersLoadedGameInfo(void){
 	return allloaded;
 }
 
-bool World::AllPeersDownloadedMap(void){
+bool WorldReplication::AllPeersDownloadedMap(void){
 	bool allloaded = true;
-	for(int i = 0; i < maxpeers; i++){
-		if(i == authoritypeer) continue; // dedicated server doesn't download maps
-		Peer * peer = peerlist[i];
+	for(int i = 0; i < World::maxpeers; i++){
+		if(i == world.authoritypeer) continue; // dedicated server doesn't download maps
+		Peer * peer = world.peerlist[i];
 		if(peer){
 			if(!peer->mapdownloaded){
 				allloaded = false;
@@ -317,13 +327,13 @@ bool World::AllPeersDownloadedMap(void){
 	return allloaded;
 }
 
-void World::SaveSnapshot(Serializer & data, Uint8 peerid){
-	if(mode == AUTHORITY){
-		Player * player = GetPeerPlayer(peerid);
-		bool isobserver = peerlist[peerid] && peerlist[peerid]->observer;
-		Serializer ** oldsnapshotptr = &oldsnapshots[peerid][tickcount % maxoldsnapshots];
-		Serializer ** deltasnapshotptr = &oldsnapshots[peerid][peerlist[peerid]->lasttick % maxoldsnapshots];
-		if(tickcount - peerlist[peerid]->lasttick >= maxoldsnapshots){
+void WorldReplication::SaveSnapshot(Serializer & data, Uint8 peerid){
+	if(world.mode == World::AUTHORITY){
+		Player * player = world.GetPeerPlayer(peerid);
+		bool isobserver = world.peerlist[peerid] && world.peerlist[peerid]->observer;
+		Serializer ** oldsnapshotptr = &oldsnapshots[peerid][world.tickcount % World::maxoldsnapshots];
+		Serializer ** deltasnapshotptr = &oldsnapshots[peerid][world.peerlist[peerid]->lasttick % World::maxoldsnapshots];
+		if(world.tickcount - world.peerlist[peerid]->lasttick >= World::maxoldsnapshots){
 			*deltasnapshotptr = 0;
 		}
 		if(!(*oldsnapshotptr)){
@@ -332,11 +342,11 @@ void World::SaveSnapshot(Serializer & data, Uint8 peerid){
 		
 		// Find deleted objects
 		std::vector<Uint16> deletedobjects;
-		for(int i = peerlist[peerid]->lasttick; i < tickcount; i++){
+		for(int i = world.peerlist[peerid]->lasttick; i < world.tickcount; i++){
 			// Go through all the snapshots sent to the peer since the last acknowledged one
 			// and find objects that no longer exist.  Alternative is to create a reliable
 			// packet and just send them when objects are deleted - TODO
-			Serializer ** tempdeltasnapshotptr = &oldsnapshots[peerid][(tickcount - i) % maxoldsnapshots];
+			Serializer ** tempdeltasnapshotptr = &oldsnapshots[peerid][(world.tickcount - i) % World::maxoldsnapshots];
 			if(*tempdeltasnapshotptr){
 				(*tempdeltasnapshotptr)->readoffset = 0;
 				while((*tempdeltasnapshotptr)->MoreBytesToRead()){
@@ -346,21 +356,21 @@ void World::SaveSnapshot(Serializer & data, Uint8 peerid){
 					(*tempdeltasnapshotptr)->Get(type);
 					(*tempdeltasnapshotptr)->Get(id);
 					(*tempdeltasnapshotptr)->readoffset = oldreadoffset;
-					Object * object = GetObjectFromId(id);
+					Object * object = world.GetObjectFromId(id);
 					if(!object && std::find(deletedobjects.begin(), deletedobjects.end(), id) == deletedobjects.end()){
 						deletedobjects.push_back(id);
 					}
-					(*tempdeltasnapshotptr)->readoffset += objecttypes.SerializedSize(type);
+					(*tempdeltasnapshotptr)->readoffset += world.objecttypes.SerializedSize(type);
 				}
 			}
-			if(i > maxoldsnapshots){
+			if(i > World::maxoldsnapshots){
 				break;
 			}
 		}
 		Uint16 deletedobjectscount = deletedobjects.size();
 		//
 		
-		data.Put(peerlist[peerid]->lasttick);
+		data.Put(world.peerlist[peerid]->lasttick);
 		data.Put(deletedobjectscount);
 		for(std::vector<Uint16>::iterator it = deletedobjects.begin(); it != deletedobjects.end(); it++){
 			data.Put(*it);
@@ -378,20 +388,20 @@ void World::SaveSnapshot(Serializer & data, Uint8 peerid){
 				(*deltasnapshotptr)->Get(type);
 				(*deltasnapshotptr)->Get(id);
 				(*deltasnapshotptr)->readoffset = oldreadoffset;
-				Object * object = GetObjectFromId(id);
+				Object * object = world.GetObjectFromId(id);
 				if(object){
 					oldobjects[id] = object;
 					data.PutBit(1);
 					object->Serialize(Serializer::WRITE, data, *deltasnapshotptr);
 				}else{
-					(*deltasnapshotptr)->readoffset += objecttypes.SerializedSize(type);
+					(*deltasnapshotptr)->readoffset += world.objecttypes.SerializedSize(type);
 				}
 			}
 			//
 			
 			// Write all new objects
-			for(std::list<Object *>::iterator i = objectlist.begin(); i != objectlist.end(); i++){
-				if((*i)->RequiresAuthority() && (isobserver || RelevantToPlayer(player, (*i)))){
+			for(std::list<Object *>::iterator i = world.objectlist.begin(); i != world.objectlist.end(); i++){
+				if((*i)->RequiresAuthority() && (isobserver || world.RelevantToPlayer(player, (*i)))){
 					(*i)->Serialize(Serializer::WRITE, **oldsnapshotptr);
 					if(oldobjects.find((*i)->id) == oldobjects.end()){
 						data.PutBit(0);
@@ -402,8 +412,8 @@ void World::SaveSnapshot(Serializer & data, Uint8 peerid){
 			//
 		}else{
 			// Write all relevant objects, no delta compression
-			for(std::list<Object *>::iterator i = objectlist.begin(); i != objectlist.end(); i++){
-				if((*i)->RequiresAuthority() && (isobserver || RelevantToPlayer(player, (*i)))){
+			for(std::list<Object *>::iterator i = world.objectlist.begin(); i != world.objectlist.end(); i++){
+				if((*i)->RequiresAuthority() && (isobserver || world.RelevantToPlayer(player, (*i)))){
 					(*i)->Serialize(Serializer::WRITE, **oldsnapshotptr);
 					data.PutBit(0);
 					(*i)->Serialize(Serializer::WRITE, data);
@@ -412,12 +422,12 @@ void World::SaveSnapshot(Serializer & data, Uint8 peerid){
 			//
 		}
 	}else
-	if(mode == REPLICA){
+	if(world.mode == World::REPLICA){
 		Uint32 nulltickcount = 0;
 		data.Put(nulltickcount);
 		Uint16 nulldeletedobjectscount = 0;
 		data.Put(nulldeletedobjectscount);
-		for(std::list<Object *>::iterator i = objectlist.begin(); i != objectlist.end(); i++){
+		for(std::list<Object *>::iterator i = world.objectlist.begin(); i != world.objectlist.end(); i++){
 			if((*i)->RequiresAuthority()){
 				data.PutBit(0);
 				(*i)->Serialize(Serializer::WRITE, data);
@@ -426,7 +436,7 @@ void World::SaveSnapshot(Serializer & data, Uint8 peerid){
 	}
 }
 
-void World::LoadSnapshot(Serializer & data, bool create, Serializer * delta, Uint16 objectid){
+void WorldReplication::LoadSnapshot(Serializer & data, bool create, Serializer * delta, Uint16 objectid){
 	Uint32 deltatick;
 	data.Get(deltatick);
 	Uint16 deletedobjectscount;
@@ -434,9 +444,9 @@ void World::LoadSnapshot(Serializer & data, bool create, Serializer * delta, Uin
 	for(int i = 0; i < deletedobjectscount; i++){
 		Uint16 objectid;
 		data.Get(objectid);
-		if(GetObjectFromId(objectid)){
+		if(world.GetObjectFromId(objectid)){
 			//printf("deleted %d\n", objectid);
-			MarkDestroyObject(objectid);
+			world.MarkDestroyObject(objectid);
 		}
 	}
 	while(data.MoreBytesToRead()){
@@ -448,22 +458,22 @@ void World::LoadSnapshot(Serializer & data, bool create, Serializer * delta, Uin
 		data.Get(id);
 		data.readoffset = readoffset;
 		if(objectid && id != objectid){
-			data.readoffset += objecttypes.SerializedSize(type);
+			data.readoffset += world.objecttypes.SerializedSize(type);
 			continue;
 		}
-		Object * object = GetObjectFromId(id);
+		Object * object = world.GetObjectFromId(id);
 		if(!object && create){
-			object = CreateObject(type, id);
+			object = world.CreateObject(type, id);
 		}
 		if(object){
-			object->lastsnapshottick = tickcount;
+			object->lastsnapshottick = world.tickcount;
 			if(object->type != type){
 				//printf("OBJECT TYPE DOES NOT MATCH IN SNAPSHOT\n");
-				MarkDestroyObject(object->id);
-				data.readoffset += objecttypes.SerializedSize(type);
+				world.MarkDestroyObject(object->id);
+				data.readoffset += world.objecttypes.SerializedSize(type);
 			}else{
 				if(object->iscontrollable){
-					//if(!replaying){
+					//if(!world.replaying){
 						object->oldx = object->x;
 						object->oldy = object->y;
 					//}
@@ -479,7 +489,7 @@ void World::LoadSnapshot(Serializer & data, bool create, Serializer * delta, Uin
 				}
 			}
 		}else{
-			data.readoffset += objecttypes.SerializedSize(type);
+			data.readoffset += world.objecttypes.SerializedSize(type);
 		}
 	}
 }

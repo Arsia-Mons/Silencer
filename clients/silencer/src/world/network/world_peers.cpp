@@ -1,3 +1,4 @@
+#include "world_peer_registry.h"
 #include "world.h"
 #include "serializer.h"
 #include "player.h"
@@ -19,7 +20,15 @@
 
 #define DELTAENABLED 1
 
-Peer * World::AddPeer(char * address, unsigned short port, Uint8 agency, Uint32 accountid, bool observer){
+WorldPeerRegistry::WorldPeerRegistry(World & world) : world(world){
+	memset(peerlist, 0, sizeof(peerlist));
+	peercount = 0;
+	authoritypeer = 0;
+	localpeerid = 0;
+	localpublicport = 0;
+}
+
+Peer * WorldPeerRegistry::AddPeer(char * address, unsigned short port, Uint8 agency, Uint32 accountid, bool observer){
 	Uint8 newpeerid = 0;
 	sockaddr_in addr;
 	addr.sin_addr.s_addr = inet_addr(address);
@@ -63,7 +72,7 @@ Peer * World::AddPeer(char * address, unsigned short port, Uint8 agency, Uint32 
 	return 0;
 }
 
-Peer * World::AddBot(Uint8 agency){
+Peer * WorldPeerRegistry::AddBot(Uint8 agency){
 	Uint8 newpeerid = 0;
 	bool peeradded = false;
 	for(unsigned int i = 1; i < maxpeers; i++){
@@ -93,7 +102,7 @@ Peer * World::AddBot(Uint8 agency){
 	return 0;
 }
 
-Peer * World::FindPeer(sockaddr_in & sockaddr){
+Peer * WorldPeerRegistry::FindPeer(sockaddr_in & sockaddr){
 	Peer * peer = 0;
 	for(int i = 0; i < maxpeers; i++){
 		if(peerlist[i]){
@@ -107,7 +116,7 @@ Peer * World::FindPeer(sockaddr_in & sockaddr){
 	return peer;
 }
 
-void World::ReadPeerList(Serializer & data){
+void WorldPeerRegistry::ReadPeerList(Serializer & data){
 	for(unsigned int i = 0; i < maxpeers; i++){
 		if(i == authoritypeer){
 			continue;
@@ -137,16 +146,16 @@ void World::ReadPeerList(Serializer & data){
 	}
 }
 
-void World::HandleDisconnect(Uint8 peerid, bool permanent){
+void WorldPeerRegistry::HandleDisconnect(Uint8 peerid, bool permanent){
 	//printf("peer %d disconnected\n", peerid);
-	if(replay.IsRecording()){
-		replay.WriteDisconnect(peerid);
+	if(world.replay.IsRecording()){
+		world.replay.WriteDisconnect(peerid);
 	}
-	bool park = (!permanent && mode == AUTHORITY && gameplaystate == INGAME && peerlist[peerid] && peerlist[peerid]->accountid != 0 && !peerlist[peerid]->isbot && !peerlist[peerid]->observer);
+	bool park = (!permanent && world.mode == World::AUTHORITY && world.gameplaystate == World::INGAME && peerlist[peerid] && peerlist[peerid]->accountid != 0 && !peerlist[peerid]->isbot && !peerlist[peerid]->observer);
 	for(std::list<Uint16>::iterator i = peerlist[peerid]->controlledlist.begin(); i != peerlist[peerid]->controlledlist.end(); i++){
-		Object * object = GetObjectFromId((*i));
+		Object * object = world.GetObjectFromId((*i));
 		if(object){
-			object->HandleDisconnect(*this, peerid);
+			object->HandleDisconnect(world, peerid);
 		}
 	}
 	if(park){
@@ -155,11 +164,11 @@ void World::HandleDisconnect(Uint8 peerid, bool permanent){
 		SendPeerList();
 		return;
 	}
-	ClearSnapshotQueue();
+	world.ClearSnapshotQueue();
 	// Capture team before RemovePeer strips the peer from all teams.
 	// GetPeerTeam searches team membership lists, so it must run first.
-	Team * leavingTeam = (mode == AUTHORITY) ? GetPeerTeam(peerid) : 0;
-	for(std::list<Object *>::iterator it = objectlist.begin(); it != objectlist.end(); it++){
+	Team * leavingTeam = (world.mode == World::AUTHORITY) ? GetPeerTeam(peerid) : 0;
+	for(std::list<Object *>::iterator it = world.objectlist.begin(); it != world.objectlist.end(); it++){
 		Object * object = *it;
 		if(object->type == ObjectTypes::TEAM){
 			Team * team = static_cast<Team *>(object);
@@ -168,62 +177,62 @@ void World::HandleDisconnect(Uint8 peerid, bool permanent){
 			}
 		}
 	}
-	if(mode == REPLICA){
+	if(world.mode == World::REPLICA){
 		delete peerlist[peerid];
 		peerlist[peerid] = 0;
 		peercount--;
 		if(peerid == authoritypeer){
-			ShowMessage("CONNECTION LOST", 128, 20);
-			SwitchToLocalAuthorityMode();
-			state = IDLE;
+			world.ShowMessage("CONNECTION LOST", 128, 20);
+			world.SwitchToLocalAuthorityMode();
+			world.state = World::IDLE;
 		}
 	}else
-	if(mode == AUTHORITY){
+	if(world.mode == World::AUTHORITY){
 		// If a player disconnects mid-game, record their partial stats immediately
 		// so their progress isn't lost (won=0 since they left before the game ended).
-		if(gameplaystate == INGAME && peerlist[peerid]->accountid != 0){
+		if(world.gameplaystate == World::INGAME && peerlist[peerid]->accountid != 0){
 			Peer * leavingPeer = peerlist[peerid];
-			User * user = lobby.GetUserInfo(leavingPeer->accountid);
+			User * user = world.lobby.GetUserInfo(leavingPeer->accountid);
 			if(user && leavingTeam){
 				user->statscopy = leavingPeer->stats;
 				user->statsagency = leavingTeam->agency;
 				user->teamnumber = leavingTeam->number;
-				lobby.RegisterStats(*user, 0, gameinfo.id);
+				world.lobby.RegisterStats(*user, 0, world.gameinfo.id);
 			}
 		}
 		delete peerlist[peerid];
 		peerlist[peerid] = 0;
 		peercount--;
-		for(int i = 0; i < maxoldsnapshots; i++){
-			if(oldsnapshots[peerid][i]){
-				delete oldsnapshots[peerid][i];
-				oldsnapshots[peerid][i] = 0;
+		for(int i = 0; i < World::maxoldsnapshots; i++){
+			if(world.oldsnapshots[peerid][i]){
+				delete world.oldsnapshots[peerid][i];
+				world.oldsnapshots[peerid][i] = 0;
 			}
 		}
 		SendPeerList();
 	}
 }
 
-void World::SendStats(Peer & peer){
+void WorldPeerRegistry::SendStats(Peer & peer){
 	Serializer msg;
-	Uint8 code = MSG_STATS;
+	Uint8 code = World::MSG_STATS;
 	msg.Put(code);
 	peer.stats.Serialize(Serializer::WRITE, msg);
-	SendPacket(&peer, msg.data, msg.BitsToBytes(msg.offset));
+	world.SendPacket(&peer, msg.data, msg.BitsToBytes(msg.offset));
 }
 
-void World::UserInfoReceived(Peer & peer){
-	if(replay.IsRecording()){
-		replay.WriteUserInfo(*lobby.GetUserInfo(peer.accountid));
+void WorldPeerRegistry::UserInfoReceived(Peer & peer){
+	if(world.replay.IsRecording()){
+		world.replay.WriteUserInfo(*world.lobby.GetUserInfo(peer.accountid));
 	}
-	ApplyWantedTech(peer);
+	world.ApplyWantedTech(peer);
 }
 
-bool World::CompareTeamByNumber(Team * team1, Team * team2){
+bool WorldPeerRegistry::CompareTeamByNumber(Team * team1, Team * team2){
 	return(team1->number < team2->number);
 }
 
-Peer * World::GetAuthorityPeer(void){
+Peer * WorldPeerRegistry::GetAuthorityPeer(void){
 	if(!peerlist[authoritypeer]){
 		peerlist[authoritypeer] = new Peer();
 		peerlist[authoritypeer]->ip = INADDR_ANY;
@@ -232,17 +241,17 @@ Peer * World::GetAuthorityPeer(void){
 	return peerlist[authoritypeer];
 }
 
-Peer * World::GetPeer(Uint8 peerid){
+Peer * WorldPeerRegistry::GetPeer(Uint8 peerid){
 	if(peerid >= maxpeers) return 0;
 	return peerlist[peerid];
 }
 
-Player * World::GetPeerPlayer(Uint8 peerid){
+Player * WorldPeerRegistry::GetPeerPlayer(Uint8 peerid){
 	Object * object = 0;
 	Player * player = 0;
 	if(peerlist[peerid]){
 		if(peerlist[peerid]->controlledlist.size() > 0){
-			object = GetObjectFromId((*peerlist[peerid]->controlledlist.begin()));
+			object = world.GetObjectFromId((*peerlist[peerid]->controlledlist.begin()));
 			if(object && object->type == ObjectTypes::PLAYER){
 				player = static_cast<Player *>(object);
 				if(player){
@@ -254,10 +263,10 @@ Player * World::GetPeerPlayer(Uint8 peerid){
 	return 0;
 }
 
-Team * World::GetPeerTeam(Uint8 peerid){
+Team * WorldPeerRegistry::GetPeerTeam(Uint8 peerid){
 	if(peerlist[peerid]){
-		for(std::vector<Uint16>::iterator it = objectsbytype[ObjectTypes::TEAM].begin(); it != objectsbytype[ObjectTypes::TEAM].end(); it++){
-			Team * team = static_cast<Team *>(GetObjectFromId((*it)));
+		for(std::vector<Uint16>::iterator it = world.objectsbytype[ObjectTypes::TEAM].begin(); it != world.objectsbytype[ObjectTypes::TEAM].end(); it++){
+			Team * team = static_cast<Team *>(world.GetObjectFromId((*it)));
 			for(int i = 0; i < team->numpeers; i++){
 				if(team->peers[i] == peerid){
 					return team;
@@ -268,10 +277,10 @@ Team * World::GetPeerTeam(Uint8 peerid){
 	return 0;
 }
 
-bool World::FindTeamForPeer(Peer & peer, Uint8 agency, int start){
+bool WorldPeerRegistry::FindTeamForPeer(Peer & peer, Uint8 agency, int start){
 	int maxteams2 = maxteams;
-	if(dedicatedserver.active){
-		maxteams2 = gameinfo.maxteams;
+	if(world.dedicatedserver.active){
+		maxteams2 = world.gameinfo.maxteams;
 		if(maxteams2 > maxteams){
 			maxteams2 = maxteams;
 		}
@@ -283,7 +292,7 @@ bool World::FindTeamForPeer(Peer & peer, Uint8 agency, int start){
 	bool teamfound = false;
 	bool slotfound = true;
 	std::vector<Team *> teamlist;
-	for(std::list<Object *>::iterator it = objectlist.begin(); it != objectlist.end(); it++){
+	for(std::list<Object *>::iterator it = world.objectlist.begin(); it != world.objectlist.end(); it++){
 		Object * object = (*it);
 		if(object->type == ObjectTypes::TEAM){
 			Team * team = static_cast<Team *>(object);
@@ -292,7 +301,7 @@ bool World::FindTeamForPeer(Peer & peer, Uint8 agency, int start){
 			}
 		}
 	}
-	std::sort(teamlist.begin(), teamlist.end(), CompareTeamByNumber);
+	std::sort(teamlist.begin(), teamlist.end(), WorldPeerRegistry::CompareTeamByNumber);
 	std::vector<Team *>::iterator it = teamlist.begin();
 	while(it != teamlist.end()){
 		Team * team = *it;
@@ -323,7 +332,7 @@ bool World::FindTeamForPeer(Peer & peer, Uint8 agency, int start){
 		if(teamlist.size() >= maxteams2){
 			return false;
 		}
-		Team * newteam = (Team *)CreateObject(ObjectTypes::TEAM);
+		Team * newteam = (Team *)world.CreateObject(ObjectTypes::TEAM);
 		newteam->agency = agency;
 		newteam->number = teamnumber;
 		newteam->AddPeer(peer.id);
@@ -331,19 +340,19 @@ bool World::FindTeamForPeer(Peer & peer, Uint8 agency, int start){
 	return true;
 }
 
-void World::RequestPeerList(void){
+void WorldPeerRegistry::RequestPeerList(void){
 	if(authoritypeer != localpeerid){
 		Serializer data;
-		Uint8 code = MSG_PEERLIST;
+		Uint8 code = World::MSG_PEERLIST;
 		data.Put(code);
-		SendPacket(GetAuthorityPeer(), data.data, data.BitsToBytes(data.offset));
+		world.SendPacket(GetAuthorityPeer(), data.data, data.BitsToBytes(data.offset));
 	}
 }
 
-void World::SendPeerList(Uint8 peerid){
-	if(mode == AUTHORITY){
+void WorldPeerRegistry::SendPeerList(Uint8 peerid){
+	if(world.mode == World::AUTHORITY){
 		Serializer data;
-		Uint8 code = MSG_PEERLIST;
+		Uint8 code = World::MSG_PEERLIST;
 		data.Put(code);
 		for(unsigned int i = 0; i < maxpeers; i++){
 			Peer * peer = peerlist[i];
@@ -354,7 +363,7 @@ void World::SendPeerList(Uint8 peerid){
 		for(unsigned int i = 0; i < maxpeers; i++){
 			Peer * peer = peerlist[i];
 			if(peer && i != localpeerid && (!peerid || peerid == peer->id) && !peer->disconnected){
-				SendPacket(peer, data.data, data.BitsToBytes(data.offset));
+				world.SendPacket(peer, data.data, data.BitsToBytes(data.offset));
 			}
 		}
 	}

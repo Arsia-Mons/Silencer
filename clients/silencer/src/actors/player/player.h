@@ -104,6 +104,8 @@ public:
 
 	friend class Renderer;
 	friend class World;
+	friend class WorldNetwork;
+	friend class WorldReplication;
 	friend class Terminal;
 	friend class Grenade;
 	friend class Warper;

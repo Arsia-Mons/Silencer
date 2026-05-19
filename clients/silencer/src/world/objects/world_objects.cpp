@@ -1,3 +1,4 @@
+#include "world_object_registry.h"
 #include "world.h"
 #include "serializer.h"
 #include "player.h"
@@ -18,6 +19,11 @@
 #include <algorithm>
 
 #define DELTAENABLED 1
+
+WorldObjectRegistry::WorldObjectRegistry(World & world) : world(world){
+	currentid = 1;
+	illuminate = 0;
+}
 
 void World::TickObjects(void){
 	for(std::list<Object *>::reverse_iterator i = objectlist.rbegin(); i != objectlist.rend(); i++){
@@ -212,25 +218,25 @@ void World::BroadcastCamera(Sint16 x, Sint16 y){
 	}
 }
 
-Object * World::GetObjectFromId(Uint16 id){
+Object * WorldObjectRegistry::GetObjectFromId(Uint16 id){
 	if(objectidlookup.find(id) != objectidlookup.end()){
 		return objectidlookup[id];
 	}
 	return 0;
 }
 
-Object * World::CreateObject(Uint8 type, Uint16 id){
-	if(replaying){ // Do not create objects when rewinding/replaying game state
+Object * WorldObjectRegistry::CreateObject(Uint8 type, Uint16 id){
+	if(world.replaying){ // Do not create objects when rewinding/replaying game state
 		return 0;
 	}
 	if(objectlist.size() == maxobjects){
 		return 0;
 	}
-	Object * object = objecttypes.CreateFromType(type);
+	Object * object = world.objecttypes.CreateFromType(type);
 	if(!object){
 		return 0;
 	}
-	if(id == 0 && object->RequiresAuthority() && mode != AUTHORITY){
+	if(id == 0 && object->RequiresAuthority() && world.mode != World::AUTHORITY){
 		delete object;
 		return 0;
 	}
@@ -257,7 +263,7 @@ Object * World::CreateObject(Uint8 type, Uint16 id){
 		object->id = id;
 	}
 	objectlist.push_back(object);
-	if(IsCollidable(type)){
+	if(world.IsCollidable(type)){
 		tobjectlist.push_back(object);
 	}
 	objectsbytype[type].push_back(object->id);
@@ -265,8 +271,8 @@ Object * World::CreateObject(Uint8 type, Uint16 id){
 	return object;
 }
 
-void World::MarkDestroyObject(Uint16 id){
-	if(replaying){
+void WorldObjectRegistry::MarkDestroyObject(Uint16 id){
+	if(world.replaying){
 		return;
 	}
 	Object * object = GetObjectFromId(id);
@@ -276,20 +282,20 @@ void World::MarkDestroyObject(Uint16 id){
 	}
 }
 
-void World::DestroyMarkedObjects(void){
+void WorldObjectRegistry::DestroyMarkedObjects(void){
 	for(std::list<Uint16>::iterator i = objectdestroylist.begin(); i != objectdestroylist.end(); i++){
 		DestroyObject((*i));
 	}
 	objectdestroylist.clear();
 }
 
-void World::DestroyObject(Uint16 id){
+void WorldObjectRegistry::DestroyObject(Uint16 id){
 	Object * object = GetObjectFromId(id);
 	if(object){
 		objectidlookup.erase(object->id);
-		object->OnDestroy(*this);
+		object->OnDestroy(world);
 		objectlist.remove(object);
-		if(IsCollidable(object->type)){
+		if(world.IsCollidable(object->type)){
 			tobjectlist.remove(object);
 		}
 		std::vector<Uint16>::iterator f = std::find(objectsbytype[object->type].begin(), objectsbytype[object->type].end(), id);
@@ -300,9 +306,9 @@ void World::DestroyObject(Uint16 id){
 	}
 }
 
-void World::DestroyAllObjects(void){
+void WorldObjectRegistry::DestroyAllObjects(void){
 	for(std::list<Object *>::iterator j = objectlist.begin(); j != objectlist.end(); j++){
-		(*j)->OnDestroy(*this);
+		(*j)->OnDestroy(world);
 		delete (*j);
 	}
 	objectlist.clear();
@@ -314,9 +320,9 @@ void World::DestroyAllObjects(void){
 	}
 }
 
-bool World::TestAABB(int x1, int y1, int x2, int y2, Object * object, std::vector<Uint8> & types, bool onlycollidable){
+bool WorldObjectRegistry::TestAABB(int x1, int y1, int x2, int y2, Object * object, std::vector<Uint8> & types, bool onlycollidable){
 	int sx1 = 0, sy1 = 0, sx2 = 0, sy2 = 0;
-	object->GetAABB(resources, &sx1, &sy1, &sx2, &sy2);
+	object->GetAABB(world.resources, &sx1, &sy1, &sx2, &sy2);
 	Uint8 type = object->type;
 	if(types.size() > 0 && std::find(types.begin(), types.end(), type) == types.end()){
 		return false;
@@ -328,14 +334,14 @@ bool World::TestAABB(int x1, int y1, int x2, int y2, Object * object, std::vecto
 	return false;
 }
 
-std::vector<Object *> World::TestAABB(int x1, int y1, int x2, int y2, std::vector<Uint8> & types, Uint16 except, Uint16 teamid, bool onlycollidable){
+std::vector<Object *> WorldObjectRegistry::TestAABB(int x1, int y1, int x2, int y2, std::vector<Uint8> & types, Uint16 except, Uint16 teamid, bool onlycollidable){
 	std::vector<Object *> objects;
 	for(std::list<Object *>::iterator i = tobjectlist.begin(); i != tobjectlist.end(); i++){
 		Object * object = (*i);
 		if(object->issprite){
 			if(object->id != except){
 				if(!object->isphysical || !onlycollidable || (object->isphysical && object->collidable)){
-					if(!teamid || (teamid && !BelongsToTeam(*object, teamid))){
+					if(!teamid || (teamid && !world.BelongsToTeam(*object, teamid))){
 						if(TestAABB(x1, y1, x2, y2, object, types)){
 							objects.push_back(object);
 						}
@@ -347,7 +353,7 @@ std::vector<Object *> World::TestAABB(int x1, int y1, int x2, int y2, std::vecto
 	return objects;
 }
 
-Object * World::TestIncr(int x1, int y1, int x2, int y2, int * xv, int * yv, std::vector<Uint8> & types, Uint16 except, Uint16 teamid){
+Object * WorldObjectRegistry::TestIncr(int x1, int y1, int x2, int y2, int * xv, int * yv, std::vector<Uint8> & types, Uint16 except, Uint16 teamid){
 	int xb1 = x1 + (*xv < 0 ? *xv : 0);
 	int yb1 = y1 + (*yv < 0 ? *yv : 0);
 	int xb2 = x2 + (*xv > 0 ? *xv : 0);

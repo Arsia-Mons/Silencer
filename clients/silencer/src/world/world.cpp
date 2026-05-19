@@ -19,55 +19,25 @@
 
 #define DELTAENABLED 1
 
-World::World(bool mode) : lobby(this), lagsimulator(&sockethandle), audio(Audio::GetInstance()){
+World::World(bool mode) : messaging(*this), objects(*this), network(*this), peers(*this), replication(*this), chatlines(messaging.chatlines), showchat_i(messaging.showchat_i), statusmessages(messaging.statusmessages), message(messaging.message), message_i(messaging.message_i), messagetype(messaging.messagetype), messagetime(messaging.messagetime), topmessage(messaging.topmessage), topmessage_i(messaging.topmessage_i), objectlist(objects.objectlist), tobjectlist(objects.tobjectlist), peerlist(peers.peerlist), authoritypeer(peers.authoritypeer), peercount(peers.peercount), localpeerid(peers.localpeerid), localpublicport(peers.localpublicport), objectsbytype(objects.objectsbytype), objectidlookup(objects.objectidlookup), objectdestroylist(objects.objectdestroylist), currentid(objects.currentid), oldsnapshots(replication.oldsnapshots), localinputhistory(replication.localinputhistory), localtoremoteticks(replication.localtoremoteticks), snapshotqueue(replication.snapshotqueue), snapshotqueueminsize(replication.snapshotqueueminsize), snapshotqueuemaxsize(replication.snapshotqueuemaxsize), lastsnapshotqueueadjust(replication.lastsnapshotqueueadjust), inputqueue(replication.inputqueue), illuminate(objects.illuminate), audio(Audio::GetInstance()), lobby(this), totalbytesread(network.totalbytesread), totalbytessent(network.totalbytessent), totalsnapshots(replication.totalsnapshots), totalinputpackets(replication.totalinputpackets), lagsimulator(network.lagsimulator), sockethandle(network.sockethandle), boundport(network.boundport), state(network.state), pinghistory(network.pinghistory), lastpingsent(network.lastpingsent), lastpingid(network.lastpingid), pingtime(network.pingtime){
 	this->mode = mode;
-	sockethandle = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
-	unsigned long iomode = 1;
-    ioctl(sockethandle, FIONBIO, &iomode);
-	currentid = 1;
-	memset(peerlist, 0, sizeof(peerlist));
-	peercount = 0;
-	authoritypeer = 0;
-	localpeerid = 0;
 	tickcount = 0;
-	memset(oldsnapshots, 0, sizeof(oldsnapshots));
-	totalsnapshots = 0;
-	totalinputpackets = 0;
 	gravity         = GASLoader::Get().player.worldGravity;
 	maxyvelocity    = GASLoader::Get().player.worldMaxYVelocity;
 	minwalldistance = GASLoader::Get().world.minWallDistance;
 	replaying = false;
-	state = IDLE;
-	illuminate = 0;
-	totalbytesread = 0;
-	totalbytessent = 0;
 	quitstate = 0;
 	winningteamid = 0;
-	message[0] = 0;
-	message_i = 0;
-	showchat_i = 0;
 	gameplaystate = NONE;
 	// LoadBuyableItems() is called from Game::Init() after GAS loads via resources.Load()
-	lastpingsent = 0;
-	pingtime = 0;
 	highlightsecrets = false;
 	highlightminimap = false;
 	intutorialmode = false;
 	choosingtech = false;
-	boundport = 0;
-	snapshotqueueminsize = GASLoader::Get().gameengine.snapshotQueueMinSize;
-	snapshotqueuemaxsize = GASLoader::Get().gameengine.snapshotQueueInitMaxSize;
-	lastsnapshotqueueadjust = 0;
-	for(int i = 0; i < sizeof(pinghistory) / sizeof(int); i++){
-		pinghistory[i] = 0;
-	}
-	lastpingid = 0;
 	ClearMapData();
 	showteamcolors = false;
 	showplayerlist = false;
 	debugoverlay = false;
-	memset(topmessage, 0, sizeof(topmessage));
-	topmessage_i = 0;
 	pancameraactive = false;
 	pancamerareturn = false;
 	pancamerareturncount = 0;
@@ -211,8 +181,7 @@ void World::Tick(void){
 	if(message_i){
 		message_i++;
 		if(message_i >= messagetime){
-			message_i = 0;
-		}
+				}
 	}
 	if(topmessage_i){
 		topmessage_i++;
