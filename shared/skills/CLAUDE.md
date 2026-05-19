@@ -26,6 +26,11 @@ before relying on the skill's content.
   Silencer UI with correct `ClientUi`/`ClayService` lifecycle, responsive
   primitives, `UiInteractionRegistry` actions, stable IDs, render dispatch, and
   runtime verification.
+- `image-comparison-review/` — compare screenshots, video grabs, current
+  captures, design references, and sprite frames by first stitching them into
+  one side-by-side composite for reliable visual review. Harness paths:
+  `.codex/skills/image-comparison-review` and
+  `.claude/skills/image-comparison-review`.
 - `visual-regression-journeys/` — capture every reachable UI surface on the
   current branch and a baseline git ref, build side-by-side composites, and
   diff. Catches regressions invisible to unit tests, E2E scripts, and
