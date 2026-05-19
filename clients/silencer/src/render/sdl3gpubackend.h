@@ -3,6 +3,8 @@
 
 #include "renderdevice.h"
 
+#include <vector>
+
 // SDL3 GPU API backend — Metal on macOS, D3D12 on Windows.
 //
 // Phase 2 — palette remap shader: frame_tex (R8_UNORM) → scene_tex (RGBA8)
@@ -12,6 +14,7 @@
 //   copy pass   — upload frame_tex and palette_tex (dirty-flagged)
 //   compute pass — advance particle positions (one dispatch per pending update)
 //   remap pass  — indexed frame → scene_tex  (CLEAR, remap_pipeline)
+//   lobby panel blur pass — scene-sampled border blur → scene_tex (LOAD)
 //   effects pass — particles + lights → scene_tex  (LOAD, additive blend)
 //   upscale pass — scene_tex → swapchain  (CLEAR, nearest or bilinear)
 //
@@ -44,6 +47,8 @@ public:
 	void UploadFrame(const Uint8 *indexed_pixels, int w, int h) override;
 	void Present() override;
 	void SetScaleFilter(bool linear) override;
+	void BeginLobbyPanelBorderBlur(int virtualWidth, int virtualHeight, float uiScale) override;
+	void AddLobbyPanelBorderBlurRect(const SDL_Rect & rect) override;
 
 	// Phase 3 — lighting
 	void BeginLighting() override;
@@ -61,6 +66,7 @@ private:
 	bool CreatePipelines();
 	bool CreateLightPipeline();
 	bool CreateParticlePipelines();
+	bool CreateLobbyPanelBlurPipeline();
 	SDL_GPUShader *LoadShader(SDL_GPUShaderStage stage,
 	                          const ShaderBundle &b,
 	                          Uint32 num_samplers,
@@ -89,9 +95,19 @@ private:
 	int             scene_tex_w = 0;
 	int             scene_tex_h = 0;
 
+	// --- Lobby panel-border blur source ---
+	SDL_GPUTexture *lobby_panel_source_tex = nullptr; // full-res scene copy
+	SDL_GPUTexture *lobby_panel_mask_tex = nullptr; // border pixels only
+	int             lobby_panel_source_w   = 0;
+	int             lobby_panel_source_h   = 0;
+	int             lobby_panel_mask_w     = 0;
+	int             lobby_panel_mask_h     = 0;
+
 	// --- Pipelines ---
 	SDL_GPUGraphicsPipeline *remap_pipeline    = nullptr; // indexed → scene_tex
 	SDL_GPUGraphicsPipeline *upscale_pipeline  = nullptr; // scene_tex → swapchain
+	SDL_GPUGraphicsPipeline *lobby_panel_blur_pipeline = nullptr; // scene taps → scene_tex
+	SDL_GPUGraphicsPipeline *lobby_panel_copy_pipeline = nullptr; // source → scene_tex
 	SDL_GPUGraphicsPipeline *light_pipeline    = nullptr; // additive disc → scene_tex
 	SDL_GPUGraphicsPipeline *particle_pipeline = nullptr; // particles → scene_tex
 	SDL_GPUComputePipeline  *particle_compute  = nullptr; // update particle positions
@@ -134,6 +150,11 @@ private:
 	PendingParticleDraw   pending_particle_draws[kMaxParticleBuffers];
 	int pending_particle_update_count = 0;
 	int pending_particle_draw_count   = 0;
+
+	std::vector<SDL_Rect> pending_lobby_panel_border_blur_rects;
+	int pending_lobby_panel_blur_virtual_w = 0;
+	int pending_lobby_panel_blur_virtual_h = 0;
+	float pending_lobby_panel_blur_scale = 1.0f;
 };
 
 #endif

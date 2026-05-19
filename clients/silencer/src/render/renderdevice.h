@@ -38,6 +38,13 @@ public:
 	// Nearest-pixel is always used for the indexed→palette remap step regardless.
 	virtual void SetScaleFilter(bool linear) = 0;
 
+	// Queue post-process blur around already-rendered lobby panel border pixels.
+	// Backends that do not implement post-processing ignore these.
+	virtual void BeginLobbyPanelBorderBlur(int /*virtualWidth*/,
+	                                       int /*virtualHeight*/,
+	                                       float /*uiScale*/) {}
+	virtual void AddLobbyPanelBorderBlurRect(const SDL_Rect & /*rect*/) {}
+
 	// Returns false if the backend has lost its presentation target and can no
 	// longer render (e.g. TUI frame socket closed by the frontend). Game loop
 	// uses this to exit cleanly instead of spinning on broken writes.

@@ -40,6 +40,8 @@ struct LobbyMainAreaPanels {
 void BuildLobbyMainArea(LobbyMainAreaPanels & panels,
                         ScreenContext & ctx,
                         LobbyScreen & owner,
+                        int bodyX,
+                        int bodyY,
                         int bodyW,
                         int bodyH,
                         int regionGap,

@@ -1033,72 +1033,54 @@ void RenderInto(::Resources & resources, ::Renderer & renderer,
 						bool sLeft   = (sides & 0x8) != 0;
 						ClipRect clip;
 						if(!CurrentClip(dst->w, dst->h, clip)) break;
-						auto effectiveBandThickness = [&](int thickness){
-							int t = thickness;
-							if(t < 1) return 0;
-							if(t * 2 > bw) t = bw / 2;
-							if(t * 2 > bh) t = bh / 2;
-							return t > 0 ? t : 0;
-						};
-						const int kGreenRampFloor = 210;
-						auto glowColorAtStep = [&](int step) -> Uint8 {
-							int c = static_cast<int>(p->strokeColor) - step;
-							if(c < kGreenRampFloor) c = kGreenRampFloor;
-							if(c < 0) c = 0;
-							return static_cast<Uint8>(c);
-						};
-						const int glowW = effectiveBandThickness(p->glowWidth);
-						// Each concentric band, including the #177 glow,
-						// draws as straight runs plus PR #192's pass-2
-						// corner cells. Keeping glow in this model prevents
-						// rectangular overlaps from creating plus-shaped
-						// corner artifacts.
+						// Each concentric band (outer halo / stroke / inner
+						// halo) draws as straight runs plus PR #192's pass-2
+						// corner cells.
 						auto drawRing = [&](int inset, int thickness, Uint8 color, Uint8 opacity){
 							int t = thickness;
 							if(t < 1) return;
 							if(t * 2 > bw) t = bw / 2;
 							if(t * 2 > bh) t = bh / 2;
 							if(t < 1) return;
-							// Top-left of each thickness-square corner cell.
-							const int cx0 = bx + inset;           // left
-							const int cx1 = bx + bw - inset - t;   // right
-							const int cy0 = by + inset;            // top
-							const int cy1 = by + bh - inset - t;   // bottom
-							// Classic stepped ownership: a run is trimmed
-							// by `t` at each end that has an active
-							// perpendicular side, leaving the corner cell
-							// for pass 2.
-							int hLeftTrim  = sLeft   ? t : 0;
-							int hRightTrim = sRight  ? t : 0;
-							int vTopTrim   = sTop    ? t : 0;
-							int vBotTrim   = sBottom ? t : 0;
+							const int leftBandX = bx + inset;
+							const int rightBandX = bx + bw - inset - t;
+							const int topBandY = by + inset;
+							const int bottomBandY = by + bh - inset - t;
+							// Closed corners reserve a thickness-square cell
+							// for pass 2. At suppressed sides, extend the
+							// perpendicular run to the real bbox edge so
+							// open L-panel caps remain contiguous.
+							int hStart = sLeft ? leftBandX + t : bx;
+							int hEnd = sRight ? rightBandX : bx + bw;
+							int vStart = sTop ? topBandY + t : by;
+							int vEnd = sBottom ? bottomBandY : by + bh;
 							// Top run.
 							if(sTop){
-								int x = cx0 + hLeftTrim;
-								int w = bw - 2 * inset - hLeftTrim - hRightTrim;
 								FillStrokeStripe(renderer, dst, clip,
-								                 x, cy0, w, t, color, opacity);
+								                 hStart, topBandY,
+								                 hEnd - hStart, t,
+								                 color, opacity);
 							}
 							// Bottom run.
 							if(sBottom){
-								int x = cx0 + hLeftTrim;
-								int w = bw - 2 * inset - hLeftTrim - hRightTrim;
 								FillStrokeStripe(renderer, dst, clip,
-								                 x, cy1, w, t, color, opacity);
+								                 hStart, bottomBandY,
+								                 hEnd - hStart, t,
+								                 color, opacity);
 							}
 							// Left run.
 							if(sLeft){
-								int y = cy0 + vTopTrim;
-								int h = bh - 2 * inset - vTopTrim - vBotTrim;
 								FillStrokeStripe(renderer, dst, clip,
-								                 cx0, y, t, h, color, opacity);
+								                 leftBandX, vStart,
+								                 t, vEnd - vStart,
+								                 color, opacity);
 							}
 							// Right run.
 							if(sRight){
-								int y = cy0 + vTopTrim;
-								int h = bh - 2 * inset - vTopTrim - vBotTrim;
 								FillStrokeStripe(renderer, dst, clip,
-								                 cx1, y, t, h, color, opacity);
+								                 rightBandX, vStart,
+								                 t, vEnd - vStart,
+								                 color, opacity);
 							}
 							// Pass 1: register the band's four corner cells
 							// with the directions this band continues in.
@@ -1110,29 +1092,20 @@ void RenderInto(::Resources & resources, ::Renderer & renderer,
 									AddStrokeCorner(cx, cy, t, color,
 									                opacity, dirs, clip);
 							};
-							reg(cx0, cy0,
+							reg(leftBandX, topBandY,
 							    (sTop  ? corner_dir::Right : (Uint8)0) |
 							    (sLeft ? corner_dir::Down  : (Uint8)0));
-							reg(cx1, cy0,
+							reg(rightBandX, topBandY,
 							    (sTop   ? corner_dir::Left : (Uint8)0) |
 							    (sRight ? corner_dir::Down : (Uint8)0));
-							reg(cx0, cy1,
+							reg(leftBandX, bottomBandY,
 							    (sBottom ? corner_dir::Right : (Uint8)0) |
 							    (sLeft   ? corner_dir::Up    : (Uint8)0));
-							reg(cx1, cy1,
+							reg(rightBandX, bottomBandY,
 							    (sBottom ? corner_dir::Left : (Uint8)0) |
 							    (sRight  ? corner_dir::Up   : (Uint8)0));
 						};
 						int inset = 0;
-						// Outer glow: dimmest ring first (furthest out),
-						// brightening one ramp step per pixel toward the
-						// primary. Step glowW is adjacent to the primary
-						// so the transition into idx 216 is seamless.
-						for(int g = 0; g < glowW; g++){
-							int step = glowW - g;  // glowW (dim) .. 1 (bright)
-							drawRing(inset, 1, glowColorAtStep(step), 255);
-							inset += 1;
-						}
 						if(p->outerHaloWidth > 0){
 							drawRing(inset, p->outerHaloWidth, p->outerHaloColor, p->haloOpacity);
 							inset += p->outerHaloWidth;
@@ -1143,15 +1116,6 @@ void RenderInto(::Resources & resources, ::Renderer & renderer,
 						}
 						if(p->innerHaloWidth > 0){
 							drawRing(inset, p->innerHaloWidth, p->innerHaloColor, p->haloOpacity);
-							inset += p->innerHaloWidth;
-						}
-						// Inner glow: mirror of the outer falloff —
-						// brightest ring adjacent to the primary, fading
-						// one ramp step per pixel inward to the backdrop.
-						for(int g = 0; g < glowW; g++){
-							int step = g + 1;  // 1 (bright) .. glowW (dim)
-							drawRing(inset, 1, glowColorAtStep(step), 255);
-							inset += 1;
 						}
 						break;
 					}
