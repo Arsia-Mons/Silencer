@@ -8,7 +8,7 @@
 #include "flamerprojectile.h"
 #include "flareprojectile.h"
 #include "../gas/gasloader.h"
-#include "../game/gamemode.h"
+#include "gamemode.h"
 
 Projectile::Projectile(){
 	shielddamage = 0;

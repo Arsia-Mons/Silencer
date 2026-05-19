@@ -23,33 +23,27 @@ using namespace GameState;
 #define SILENCER_MAP_API_URL "http://127.0.0.1:8080"
 #endif
 
-Game::Game() : renderer(world), screenbuffer(640, 480),
-               uiClayService(uiClayBackend),
-               clientUi(uiClayService),
-               inGameUiController(world),
-               mapDownloader(world),
-               ambienceMixer(world, renderer, mapDownloader, fade_i),
-               screenContext(*this, world, renderer, world.lobby, keymap, updater, ambienceMixer, mapDownloader, window, renderdevice){
+Game::Game()
+	: renderer(world),
+	  gameRenderer(*this),
+	  gameInput(*this),
+	  gameUiPipeline(*this),
+	  gameSession(*this),
+	  currentlobbygameid(gameSession.CurrentLobbyGameIdRef()),
+	  joininggame(gameSession.JoiningGameRef()),
+	  screenContext(*this, world, renderer, world.lobby, gameInput.GetKeyMap(), updater,
+	                gameSession.AmbienceMixerRef(), gameSession.MapDownloaderRef(),
+	                gameRenderer.WindowRef(), gameRenderer.RenderDeviceRef()) {
 	world.SetVersion(SILENCER_VERSION);
 	frames = 0;
 	fps = 0;
 	state = MAINMENU;
 	stateisnew = true;
-	fade_i = 0;
-	fadeStartMs = 0;
 	sharedstate = 0;
-	currentlobbygameid = 0;
-	lastannouncedgameid = 0;
-	lastannouncedstatus = 0;
-	joininggame = false;
-	memset(keystate, 0, sizeof(keystate));
-	gamepad = nullptr;
 	singleplayermessage = 0;
 	updatetitle = true;
 	minimized = false;
-	window = 0;
-	renderdevice = nullptr;
-	memset(palettecolors, 0, sizeof(palettecolors));
+	creategameclicked = false;
 	nextstateprocessed = false;
 #ifdef OUYA
 	quitscancode = SDL_SCANCODE_HOME;
@@ -69,29 +63,24 @@ Game::Game() : renderer(world), screenbuffer(640, 480),
 }
 
 Game::~Game(){
-	// Join background download threads before tearing down SDL so they don't
-	// reference freed resources. The MapDownloader destructor would also do
-	// this, but it runs after SDL teardown — call it explicitly here.
-	mapDownloader.JoinAndShutdown();
-	// Bring the control server down first. Stop() runs the shutdown drain we
-	// registered at Load() time, fulfilling promises for both queued and
-	// pendingWaits commands so handler threads can unblock from fut.get() before
-	// we join them. Doing this before tearing down anything else keeps members
-	// pendingWaits/etc alive while the drain runs.
+	gameSession.MapDownloaderRef().JoinAndShutdown();
 	controlserver.Stop();
 	inputserver.Stop();
-	if(renderdevice){
-		renderdevice->Shutdown();
-		delete renderdevice;
-		renderdevice = nullptr;
+	if(gameRenderer.GetRenderDevice()){
+		gameRenderer.GetRenderDevice()->Shutdown();
+		delete gameRenderer.GetRenderDevice();
+		gameRenderer.RenderDeviceRef() = nullptr;
 	}
-	if(window){
-		SDL_DestroyWindow(window);
+	if(gameRenderer.GetWindow()){
+		SDL_DestroyWindow(gameRenderer.GetWindow());
 	}
 	world.resources.UnloadSounds();
 	Audio::GetInstance().Close();
 	MIX_Quit();
-	if(gamepad){ SDL_CloseGamepad(gamepad); gamepad = nullptr; }
+	if(gameInput.GetGamepad()){
+		SDL_CloseGamepad(gameInput.GetGamepad());
+		gameInput.GamepadRef() = nullptr;
+	}
 	SDL_Quit();
 }
 
@@ -190,7 +179,7 @@ bool Game::Load(char * cmdline){
 	if(lobbyPortOverride > 0){
 		Config::GetInstance().lobbyport = lobbyPortOverride;
 	}
-	LoadActiveKeymap(keymap);
+	LoadActiveKeymap(gameInput.GetKeyMap());
 	if(world.dedicatedserver.active){
 		// Dedicated server: SDL3 always initialises the timer subsystem; no flags needed.
 		if(!SDL_Init(0)){
@@ -247,10 +236,10 @@ bool Game::Load(char * cmdline){
 			//SDL_EnableUNICODE(true);
 			//SDL_EnableKeyRepeat(SDL_DEFAULT_REPEAT_DELAY, SDL_DEFAULT_REPEAT_INTERVAL);
 			//screen = SDL_SetVideoMode(640, 480, 8, SDL_DOUBLEBUF | SDL_SWSURFACE);
-			window = SDL_CreateWindow("Silencer", screenbuffer.w, screenbuffer.h,
+			gameRenderer.WindowRef() = SDL_CreateWindow("Silencer", GetScreenBuffer().w, GetScreenBuffer().h,
 				SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIGH_PIXEL_DENSITY |
 				(Config::GetInstance().fullscreen ? SDL_WINDOW_FULLSCREEN : 0));
-			SDL_StartTextInput(window);
+			SDL_StartTextInput(gameRenderer.GetWindow());
 			SyncRenderSurfaceToWindowPixels();
 			if(!SetupRenderDevice()){
 				printf("Could not initialize GPU render device\n");
@@ -300,24 +289,3 @@ bool Game::Load(char * cmdline){
 	return true;
 }
 
-bool Game::SetupRenderDevice(void){
-	if(tui){
-		TUIBackend *backend = new TUIBackend();
-		if(!backend->Init(nullptr)){
-			delete backend;
-			return false;
-		}
-		renderdevice = backend;
-		// TUIBackend ignores SetScaleFilter; safe to call.
-		renderdevice->SetScaleFilter(false);
-		return true;
-	}
-	SDL3GPUBackend *backend = new SDL3GPUBackend();
-	if(!backend->Init(window)){
-		delete backend;
-		return false;
-	}
-	renderdevice = backend;
-	renderdevice->SetScaleFilter(Config::GetInstance().scalefilter);
-	return true;
-}

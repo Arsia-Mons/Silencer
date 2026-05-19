@@ -10,10 +10,10 @@ using namespace GameState;
 
 void Game::TickInGame(){
 if(/*!world.map.loaded && */stateisnew){
-	screenbuffer.Clear(0);
+	GetScreenBuffer().Clear(0);
 	//char mapname[7 + 256];
 	//sprintf(mapname, "level/%s", world.gameinfo.mapname);
-	if(!LoadMap(mapDownloader.FindMap(world.gameinfo.mapname, &world.gameinfo.maphash).c_str())){
+	if(!LoadMap(gameSession.MapDownloaderRef().FindMap(world.gameinfo.mapname, &world.gameinfo.maphash).c_str())){
 		printf("Unable to load map\n");
 		if(world.replay.IsPlaying()){
 			world.replay.EndPlaying();
@@ -70,22 +70,22 @@ if(/*!world.map.loaded && */stateisnew){
 	world.SendPeerList();
 	renderer.palette.SetPalette(0);
 	renderer.palette.SetParallaxColors(world.map.parallax);
-	screenbuffer.Clear(0);
+	GetScreenBuffer().Clear(0);
 	SetColors(renderer.palette.GetColors());
-	ambienceMixer.LoadRandomGameMusic();
+	gameSession.AmbienceMixerRef().LoadRandomGameMusic();
 	// Activate the game mode specified by the lobby config.
 	delete world.gameMode;
 	world.gameMode = GameModeFactory((GameModeId)world.gameinfo.modeId);
 	world.gameMode->OnMatchStart(world);
 	stateisnew = false;
 }else{
-	if(ambienceMixer.FadedIn()){
+	if(gameSession.AmbienceMixerRef().FadedIn()){
 		//Audio::GetInstance().ambienceMixer.PlayMusic(world.resources.gamemusic);
-		ambienceMixer.PlayMusic(world.resources.gamemusic);
+		gameSession.AmbienceMixerRef().PlayMusic(world.resources.gamemusic);
 	}
 	if(world.replay.IsPlaying()){
 		// replay controls
-		if(world.localpeerid == world.authoritypeer && !deploymessageshown){
+		if(world.localpeerid == world.authoritypeer && !gameSession.DeployMessageShownRef()){
 			for(int i = 0; i < world.maxpeers; i++){
 				if(world.peerlist[i] && i != world.authoritypeer){
 					world.localpeerid = i;
@@ -284,9 +284,9 @@ if(/*!world.map.loaded && */stateisnew){
 			world.RequestPeerList();
 		}
 	}
-	if(!deploymessageshown && world.messagetype == 1 && world.message_i == 63){
+	if(!gameSession.DeployMessageShownRef() && world.messagetype == 1 && world.message_i == 63){
 		world.ShowMessage((char *)"Location : Base Arsia Mons, Surface Temperature : -7C", 96, 1);
-		deploymessageshown = true;
+		gameSession.DeployMessageShownRef() = true;
 	}
 	if(CheckForQuit()){
 		world.Disconnect();

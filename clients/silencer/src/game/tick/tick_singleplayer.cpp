@@ -40,15 +40,15 @@ if(stateisnew){
 	player->oldy = player->y;
 	renderer.palette.SetPalette(0);
 	renderer.palette.SetParallaxColors(world.map.parallax);
-	screenbuffer.Clear(0);
+	GetScreenBuffer().Clear(0);
 	SetColors(renderer.palette.GetColors());
 	singleplayermessage = 0;
 	stateisnew = false;
-	ambienceMixer.LoadRandomGameMusic();
+	gameSession.AmbienceMixerRef().LoadRandomGameMusic();
 }
-if(ambienceMixer.FadedIn()){
+if(gameSession.AmbienceMixerRef().FadedIn()){
 	//Audio::GetInstance().ambienceMixer.PlayMusic(world.resources.gamemusic);
-	ambienceMixer.PlayMusic(world.resources.gamemusic);
+	gameSession.AmbienceMixerRef().PlayMusic(world.resources.gamemusic);
 }
 Player * player = world.GetPeerPlayer(world.localpeerid);
 if(player){
