@@ -47,6 +47,8 @@ export async function startConsumer() {
 }
 
 async function persistEvent(type, data) {
+  // Heartbeats are high-frequency state pings — skip the audit log to avoid noise.
+  if (type === 'game.heartbeat') return;
   // Always write to audit log
   await Event.create({ type, accountId: data.accountId, gameId: data.gameId, data, ts: new Date(data.ts || Date.now()) });
 
