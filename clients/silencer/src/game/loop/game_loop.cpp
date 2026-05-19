@@ -21,8 +21,8 @@
 
 using namespace GameState;
 
-static const int kLegacyRenderWidth = 640;
-static const int kLegacyRenderHeight = 480;
+static const int kLoopLegacyRenderWidth = 640;
+static const int kLoopLegacyRenderHeight = 480;
 
 bool Game::Loop(void){
 	if(updater.IsStage2Spawned()){
@@ -203,7 +203,7 @@ bool Game::Loop(void){
 			// origin/main rendered one 640x480 paletted frame and let the GPU
 			// present pass stretch it to the window. Keep that path for
 			// gameplay; native-sized CPU frames are too expensive fullscreen.
-			ResizeRenderSurfacePixels(kLegacyRenderWidth, kLegacyRenderHeight);
+			ResizeRenderSurfacePixels(kLoopLegacyRenderWidth, kLoopLegacyRenderHeight);
 			GetScreenBuffer().Clear(0);
 			renderer.Draw(&GetScreenBuffer(), ft);
 			gameUiPipeline.DrawInGameWorldInsets(GetScreenBuffer(), ft);

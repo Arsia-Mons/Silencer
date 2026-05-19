@@ -15,19 +15,19 @@
 #include <vector>
 
 namespace {
-static const int kLegacyRenderWidth = 640;
-static const int kLegacyRenderHeight = 480;
+static const int kUiPipelineLegacyWidth = 640;
+static const int kUiPipelineLegacyHeight = 480;
 
 static float GameplayUiScaleForSurface(int width, int height) {
-int scaleX = width / kLegacyRenderWidth;
-int scaleY = height / kLegacyRenderHeight;
+int scaleX = width / kUiPipelineLegacyWidth;
+int scaleY = height / kUiPipelineLegacyHeight;
 int uiScale = scaleX < scaleY ? scaleX : scaleY;
 return static_cast<float>(uiScale > 0 ? uiScale : 1);
 }
 
 static float MenuUiScaleForSurface(int width, int height) {
-float scaleX = static_cast<float>(width) / static_cast<float>(kLegacyRenderWidth);
-float scaleY = static_cast<float>(height) / static_cast<float>(kLegacyRenderHeight);
+float scaleX = static_cast<float>(width) / static_cast<float>(kUiPipelineLegacyWidth);
+float scaleY = static_cast<float>(height) / static_cast<float>(kUiPipelineLegacyHeight);
 float uiScale = scaleX < scaleY ? scaleX : scaleY;
 return uiScale > 1.0f ? uiScale : 1.0f;
 }
@@ -49,8 +49,8 @@ float uiScale = game.world.map.loaded
 int virtualW;
 int virtualH;
 if(game.world.map.loaded){
-virtualW = kLegacyRenderWidth;
-virtualH = kLegacyRenderHeight;
+virtualW = kUiPipelineLegacyWidth;
+virtualH = kUiPipelineLegacyHeight;
 }else{
 virtualW = std::max(1, static_cast<int>(surface.w / uiScale));
 virtualH = std::max(1, static_cast<int>(surface.h / uiScale));
