@@ -14,6 +14,7 @@ namespace silencer::ui::primitives {
 enum class ButtonVariant : Uint8 {
 	Oval,
 	Chrome,
+	LegacyRow,
 	Text,
 	Ghost,
 };

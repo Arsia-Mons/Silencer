@@ -5,7 +5,6 @@
 #include "shared.h"
 #include "clay/clay.h"
 
-#include <array>
 #include <string>
 #include <vector>
 
@@ -50,7 +49,6 @@ private:
 	bool focusAliasRequested = false;
 	char alias[17] = {};
 	std::vector<std::string> agentRows;
-	std::array<Clay_String, 32> agentItems{};
 };
 
 #endif

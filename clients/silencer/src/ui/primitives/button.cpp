@@ -159,6 +159,15 @@ ResolvedButton ResolveButton(const ButtonOpts& opts) {
 				out.bottomCap = 4;
 			}
 			break;
+		case ButtonVariant::LegacyRow:
+			out.hasSprite = true;
+			out.spriteBank = 6;
+			out.spriteIndex = 2;
+			out.fixedWidth = 236;
+			out.fixedHeight = 27;
+			out.textSize = TextSize::Heading;
+			out.yOffset = 6;
+			break;
 		case ButtonVariant::Text:
 			out.textSize = TextSize::BodySm;
 			out.defaultPaddingX = 0;
@@ -281,6 +290,9 @@ Uint16 SpriteIndexForFrame(const ResolvedButton& resolved,
                            const ButtonOpts& opts,
                            int phase) {
 	if(opts.variant == ButtonVariant::Oval){
+		return static_cast<Uint16>(resolved.spriteIndex + ClampPhase(phase));
+	}
+	if(opts.variant == ButtonVariant::LegacyRow){
 		return static_cast<Uint16>(resolved.spriteIndex + ClampPhase(phase));
 	}
 	return resolved.spriteIndex;
@@ -525,7 +537,7 @@ void Button(Clay_String id,
 			bool focused = !opts.disabled && IsButtonFocused(handle);
 			ButtonVisualFrame visual = StepVisualState(
 				clayId.id,
-				!opts.disabled && (hovered || focused));
+				!opts.disabled && (hovered || focused || opts.selected));
 			Uint16 spriteIndex = SpriteIndexForFrame(resolved, opts, visual.phase);
 			if(resolved.nineSlice){
 				auto * p = reinterpret_cast<silencer::clay_bridge::ButtonNineSlicePayload *>(payload);
