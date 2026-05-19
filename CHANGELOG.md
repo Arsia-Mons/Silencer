@@ -12,6 +12,11 @@ All notable changes to Silencer are documented here.
 - All callers updated to go through the subsystem public API; reference shims removed.
 - `World` is now a thin coordinator. Public API and runtime behaviour unchanged.
 
+#### Bug fixes
+
+- Fixed on-screen keyboard not appearing on ROG Ally / handheld Windows (#220) — `SDL_HINT_ENABLE_SCREEN_KEYBOARD` was not set; SDL3 requires it (before `SDL_Init`) to show the OS keyboard when `SDL_StartTextInput` is active.
+- Fixed unity build collision on `kLegacyRenderWidth/Height` (#220) — constants are now defined once in `game_renderer.h` as `inline constexpr` instead of per-file.
+
 ## [v00053] — 2026-05-18
 
 ### Game client
