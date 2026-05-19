@@ -14,11 +14,18 @@ type Hub struct {
 	proc       *procManager
 	events     *EventPublisher // nil if RabbitMQ not configured
 
-	mu      sync.Mutex
-	nextGID uint32
-	games   map[uint32]*LobbyGame
-	pending map[uint32]*pendingGame
-	clients map[*Client]struct{}
+	mu         sync.Mutex
+	nextGID    uint32
+	games      map[uint32]*LobbyGame
+	pending    map[uint32]*pendingGame
+	clients    map[*Client]struct{}
+	heartbeats map[uint32]heartbeatState
+}
+
+type heartbeatState struct {
+	LastHeartbeat time.Time
+	TickCount     uint32
+	AliveMask     uint32
 }
 
 type pendingGame struct {
@@ -40,6 +47,7 @@ func NewHub(store *Store, motd, publicAddr string, proc *procManager, events *Ev
 		games:      map[uint32]*LobbyGame{},
 		pending:    map[uint32]*pendingGame{},
 		clients:    map[*Client]struct{}{},
+		heartbeats: map[uint32]heartbeatState{},
 	}
 }
 
@@ -109,6 +117,7 @@ func (h *Hub) Leave(c *Client) {
 	}
 	for _, id := range dropReady {
 		delete(h.games, id)
+		delete(h.heartbeats, id)
 	}
 
 	var dropPending []uint32
@@ -163,6 +172,7 @@ func (h *Hub) GameExited(gameID uint32) {
 	_, inGames := h.games[gameID]
 	if inGames {
 		delete(h.games, gameID)
+		delete(h.heartbeats, gameID)
 	}
 	clients := make([]*Client, 0, len(h.clients))
 	for c := range h.clients {
@@ -241,6 +251,7 @@ func (h *Hub) RequestCreateGame(owner *Client, g *LobbyGame) {
 	}
 	for _, id := range dropExisting {
 		delete(h.games, id)
+		delete(h.heartbeats, id)
 	}
 	var dropPendingExisting []uint32
 	for id, pg := range h.pending {
@@ -318,7 +329,7 @@ func (h *Hub) failPending(gid uint32, reason string) {
 }
 
 // OnHeartbeat is called from the UDP listener when a dedicated server pings.
-func (h *Hub) OnHeartbeat(gameID uint32, sourceIP string, port uint16, state uint8, parked []uint32) {
+func (h *Hub) OnHeartbeat(gameID uint32, sourceIP string, port uint16, state uint8, parked []uint32, tickCount uint32, aliveMask uint32) {
 	h.mu.Lock()
 	if pg, ok := h.pending[gameID]; ok {
 		delete(h.pending, gameID)
@@ -367,7 +378,9 @@ func (h *Hub) OnHeartbeat(gameID uint32, sourceIP string, port uint16, state uin
 	changed := g.State != state || !uint32SliceEq(g.ParkedAccountIDs, parked)
 	g.State = state
 	g.ParkedAccountIDs = parked
+	h.heartbeats[gameID] = heartbeatState{LastHeartbeat: time.Now(), TickCount: tickCount, AliveMask: aliveMask}
 	snapshot := *g
+	hb := h.heartbeats[gameID]
 	peers := make([]*Client, 0, len(h.clients))
 	if changed {
 		for c := range h.clients {
@@ -377,6 +390,14 @@ func (h *Hub) OnHeartbeat(gameID uint32, sourceIP string, port uint16, state uin
 	h.mu.Unlock()
 	for _, c := range peers {
 		c.sendNewGame(1, &snapshot)
+	}
+	if h.events != nil {
+		h.events.Publish("game.heartbeat", gameHeartbeatEvent{
+			GameID:    gameID,
+			TickCount: hb.TickCount,
+			AliveMask: hb.AliveMask,
+			Timestamp: hb.LastHeartbeat.UnixMilli(),
+		})
 	}
 }
 

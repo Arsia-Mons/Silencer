@@ -236,3 +236,10 @@ type gameEndedEvent struct {
 	GameID    uint32 `json:"gameId"`
 	Timestamp int64  `json:"ts"`
 }
+
+type gameHeartbeatEvent struct {
+	GameID    uint32 `json:"gameId"`
+	TickCount uint32 `json:"tickCount"`
+	AliveMask uint32 `json:"aliveMask"`
+	Timestamp int64  `json:"ts"`
+}

@@ -9,6 +9,7 @@
 DedicatedServer::DedicatedServer(){
 	active = false;
 	state_i = GASLoader::Get().gameengine.heartbeatIntervalTicks;
+	tickcount = 0;
 	sockethandle = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
 	unsigned long iomode = 1;
     ioctl(sockethandle, FIONBIO, &iomode);
@@ -59,6 +60,7 @@ void DedicatedServer::Tick(World & world){
 		state_i = 0;
 	}
 	state_i++;
+	tickcount++;
 }
 
 void DedicatedServer::SendHeartBeat(World & world, Uint8 state){
@@ -85,6 +87,17 @@ void DedicatedServer::SendHeartBeat(World & world, Uint8 state){
 		Uint32 acct = parked[i];
 		data.Put(acct);
 	}
+	// Extended fields for live game monitor (issue #23).
+	// Lobby reads these if bytes are present; older lobbies ignore them.
+	data.Put(tickcount);
+	Uint32 aliveMask = 0;
+	for(int i = 0; i < world.maxpeers && i < 32; i++){
+		Peer * p = world.peerlist[i];
+		if(p && !p->disconnected){
+			aliveMask |= (1u << i);
+		}
+	}
+	data.Put(aliveMask);
 	sockaddr_in addr;
 	addr.sin_family = AF_INET;
 	addr.sin_port = htons(lobbyport);
