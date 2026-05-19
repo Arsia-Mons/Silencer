@@ -28,10 +28,10 @@ if(stateisnew){
 	player->laserammo = 0;
 	player->credits = GASLoader::Get().player.startingCredits;
 	player->RemoveInventoryItem(Player::INV_BASEDOOR);
-	ShowDeployMessage();
+	gameSession.ShowDeployMessage();
 	world.GetAuthorityPeer()->controlledlist.push_back(player->id);
 	world.gameinfo.securitylevel = LobbyGame::SECNONE;
-	if(!LoadMap((GetResDir() + "AGENCY04.SIL").c_str())){
+	if(!gameSession.LoadMap((GetResDir() + "AGENCY04.SIL").c_str())){
 		GoToState(MAINMENU);
 	}
 	Audio::GetInstance().StopMusic();
@@ -41,7 +41,7 @@ if(stateisnew){
 	renderer.palette.SetPalette(0);
 	renderer.palette.SetParallaxColors(world.map.parallax);
 	GetScreenBuffer().Clear(0);
-	SetColors(renderer.palette.GetColors());
+	gameRenderer.SetColors(renderer.palette.GetColors());
 	singleplayermessage = 0;
 	stateisnew = false;
 	gameSession.AmbienceMixerRef().LoadRandomGameMusic();
@@ -56,7 +56,7 @@ if(player){
 		case 0:{
 			if(!world.message_i){
 				char text[256];
-				sprintf(text, "Move your agent left and right\nBy tapping %s and %s.", GetActionKeyDisplayName(Action::MoveLeft), GetActionKeyDisplayName(Action::MoveRight));
+				sprintf(text, "Move your agent left and right\nBy tapping %s and %s.", gameInput.GetActionKeyDisplayName(Action::MoveLeft), gameInput.GetActionKeyDisplayName(Action::MoveRight));
 				world.ShowMessage(text, 128);
 			}
 			if(player->state == Player::RUNNING){
@@ -67,7 +67,7 @@ if(player){
 		case 1:{
 			if(!world.message_i){
 				char text[256];
-				sprintf(text, "Make your agent jump by striking %s.", GetActionKeyDisplayName(Action::Jump));
+				sprintf(text, "Make your agent jump by striking %s.", gameInput.GetActionKeyDisplayName(Action::Jump));
 				world.ShowMessage(text, 128);
 			}
 			if(player->state == Player::JUMPING){
@@ -78,7 +78,7 @@ if(player){
 		case 2:{
 			if(!world.message_i){
 				char text[256];
-				sprintf(text, "If you hold the %s key down, it will\nactivate your agent's jet-pack.", GetActionKeyDisplayName(Action::Jetpack));
+				sprintf(text, "If you hold the %s key down, it will\nactivate your agent's jet-pack.", gameInput.GetActionKeyDisplayName(Action::Jetpack));
 				world.ShowMessage(text, 128);
 			}
 			if(player->state == Player::JETPACK){
@@ -89,7 +89,7 @@ if(player){
 		case 3:{
 			if(!world.message_i){
 				char text[256];
-				sprintf(text, "Make your agent kneel by holding %s.", GetActionKeyDisplayName(Action::MoveDown));
+				sprintf(text, "Make your agent kneel by holding %s.", gameInput.GetActionKeyDisplayName(Action::MoveDown));
 				world.ShowMessage(text, 128);
 			}
 			if(player->state == Player::CROUCHED){
@@ -100,7 +100,7 @@ if(player){
 		case 4:{
 			if(!world.message_i){
 				char text[256];
-				sprintf(text, "Make your agent roll by kneeling,\nthen striking %s or %s.", GetActionKeyDisplayName(Action::MoveLeft), GetActionKeyDisplayName(Action::MoveRight));
+				sprintf(text, "Make your agent roll by kneeling,\nthen striking %s or %s.", gameInput.GetActionKeyDisplayName(Action::MoveLeft), gameInput.GetActionKeyDisplayName(Action::MoveRight));
 				world.ShowMessage(text, 128);
 			}
 			if(player->state == Player::ROLLING){
@@ -111,7 +111,7 @@ if(player){
 		case 5:{
 			if(!world.message_i){
 				char text[256];
-				sprintf(text, "To disguise as a civilian, press the %s key.", GetActionKeyDisplayName(Action::Disguise));
+				sprintf(text, "To disguise as a civilian, press the %s key.", gameInput.GetActionKeyDisplayName(Action::Disguise));
 				world.ShowMessage(text, 128);
 			}
 			if(player->IsDisguised()){
@@ -122,7 +122,7 @@ if(player){
 		case 6:{
 			if(!world.message_i){
 				char text[256];
-				sprintf(text, "To return to normal, press the %s key again.", GetActionKeyDisplayName(Action::Disguise));
+				sprintf(text, "To return to normal, press the %s key again.", gameInput.GetActionKeyDisplayName(Action::Disguise));
 				world.ShowMessage(text, 128);
 			}
 			if(!player->IsDisguised()){
@@ -133,7 +133,7 @@ if(player){
 		case 7:{
 			if(!world.message_i){
 				char text[256];
-				sprintf(text, "The %s key fires your current weapon,\nthe Blaster.", GetActionKeyDisplayName(Action::Fire));
+				sprintf(text, "The %s key fires your current weapon,\nthe Blaster.", gameInput.GetActionKeyDisplayName(Action::Fire));
 				world.ShowMessage(text, 128);
 			}
 			if(player->state == Player::STANDINGSHOOT || player->state == Player::CROUCHEDSHOOT || player->state == Player::FALLINGSHOOT || player->state == Player::JETPACKSHOOT || player->state == Player::LADDERSHOOT){
@@ -145,7 +145,7 @@ if(player){
 			if(!world.message_i){
 				char text[256];
 #ifdef OUYA
-				sprintf(text, "To change weapons, press %s", GetActionKeyDisplayName(Action::NextWeapon));
+				sprintf(text, "To change weapons, press %s", gameInput.GetActionKeyDisplayName(Action::NextWeapon));
 #else
 				sprintf(text, "To change weapons, press the 1, 2, 3, or 4 keys");
 #endif
@@ -172,7 +172,7 @@ if(player){
 		case 10:{
 			if(!world.message_i){
 				char text[256];
-				sprintf(text, "Hit %s to build your base.", GetActionKeyDisplayName(Action::Use));
+				sprintf(text, "Hit %s to build your base.", gameInput.GetActionKeyDisplayName(Action::Use));
 				world.ShowMessage(text, 128);
 			}
 			Team * team = player->GetTeam(world);
@@ -184,7 +184,7 @@ if(player){
 		case 11:{
 			if(!world.message_i){
 				char text[256];
-				sprintf(text, "To enter your base, hit %s when your\nSilencer is at the base entrance.", GetActionKeyDisplayName(Action::Activate));
+				sprintf(text, "To enter your base, hit %s when your\nSilencer is at the base entrance.", gameInput.GetActionKeyDisplayName(Action::Activate));
 				world.ShowMessage(text, 128);
 			}
 			if(player->InBase(world)){
@@ -195,7 +195,7 @@ if(player){
 		case 12:{
 			if(!world.message_i){
 				char text[256];
-				sprintf(text, "You are now inside your agent's secret base.\nWalk right to the flashing green computer screen\nand hit %s to activate it.", GetActionKeyDisplayName(Action::Activate));
+				sprintf(text, "You are now inside your agent's secret base.\nWalk right to the flashing green computer screen\nand hit %s to activate it.", gameInput.GetActionKeyDisplayName(Action::Activate));
 				world.ShowMessage(text, 255);
 			}
 			if(!player->InBase(world)){
@@ -233,7 +233,7 @@ if(player){
 		case 14:{
 			if(!world.message_i){
 				char text[256];
-				sprintf(text, "Good, now hit %s or %s to exit the menu.", GetActionKeyDisplayName(Action::MoveLeft), GetActionKeyDisplayName(Action::MoveRight));
+				sprintf(text, "Good, now hit %s or %s to exit the menu.", gameInput.GetActionKeyDisplayName(Action::MoveLeft), gameInput.GetActionKeyDisplayName(Action::MoveRight));
 				world.ShowMessage(text, 128);
 			}
 			if(player->rocketammo > 0){
@@ -266,7 +266,7 @@ if(player){
 		case 17:{
 			if(!world.message_i){
 				char text[256];
-				sprintf(text, "Walk around until you see a\nflashing green data port.\nStanding in front of the data port, hit %s\nto initiate hacking.", GetActionKeyDisplayName(Action::Activate));
+				sprintf(text, "Walk around until you see a\nflashing green data port.\nStanding in front of the data port, hit %s\nto initiate hacking.", gameInput.GetActionKeyDisplayName(Action::Activate));
 				world.ShowMessage(text, 255);
 			}
 			if(player->state == Player::HACKING && player->files >= 100){
@@ -277,7 +277,7 @@ if(player){
 		case 18:{
 			if(!world.message_i){
 				char text[256];
-				sprintf(text, "Return with the information to your base door,\nhitting %s to enter the base.", GetActionKeyDisplayName(Action::Activate));
+				sprintf(text, "Return with the information to your base door,\nhitting %s to enter the base.", gameInput.GetActionKeyDisplayName(Action::Activate));
 				world.ShowMessage(text, 128);
 			}
 			if(player->InBase(world)){
@@ -403,7 +403,7 @@ if(player){
 		}break;
 	}
 }
-if(CheckForQuit() || CheckForEndOfGame()){
+if(gameSession.CheckForQuit() || gameSession.CheckForEndOfGame()){
 	GoToState(MAINMENU);
 }
 }

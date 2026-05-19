@@ -23,11 +23,12 @@ explicit GameInput(Game & game);
 
 void UpdateInputState(Input & input);
 void TickGamepadMenuNav();
-void TickRumble(Player * localPlayer);
+void TickRumble();
 void OpenFirstGamepad();
 void PollGamepadState();
 void OnScancodeDown(int scancode);
 void OnScancodeUp(int scancode);
+void QueueUiKeyboardInputForScancode(int scancode);
 const char * GetActionKeyDisplayName(Action a);
 
 KeyMap & GetKeyMap() { return keymap; }

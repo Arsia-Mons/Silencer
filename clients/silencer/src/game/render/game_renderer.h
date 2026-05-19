@@ -14,6 +14,7 @@ public:
 explicit GameRenderer(Game & game);
 
 bool Setup(SDL_Window ** outWindow);
+static Uint32 TimerCallback(void * userdata, SDL_TimerID timerID, Uint32 interval);
 void Present();
 bool ResizeRenderSurface(int width, int height);
 bool ResizeRenderSurfacePixels(int width, int height);

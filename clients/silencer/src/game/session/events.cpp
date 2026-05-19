@@ -39,12 +39,12 @@ char ascii = event.text.text[0] & 0x7F;
 UiInput().QueueTextInput(ascii);
 } break;
 case SDL_EVENT_KEY_DOWN:
-OnScancodeDown(event.key.scancode);
+gameInput.OnScancodeDown(event.key.scancode);
 gameInput.GetKeystate()[event.key.scancode] = true;
-QueueUiKeyboardInputForScancode(event.key.scancode);
+gameInput.QueueUiKeyboardInputForScancode(event.key.scancode);
 break;
 case SDL_EVENT_KEY_UP:
-OnScancodeUp(event.key.scancode);
+gameInput.OnScancodeUp(event.key.scancode);
 gameInput.GetKeystate()[event.key.scancode] = false;
 break;
 case SDL_EVENT_MOUSE_WHEEL:
@@ -79,7 +79,7 @@ event.motion.x, event.motion.y, windowW, windowH,
 GetScreenBuffer().w, GetScreenBuffer().h, false, false);
 } break;
 case SDL_EVENT_GAMEPAD_ADDED:
-if(!gameInput.GetGamepad()) OpenFirstGamepad();
+if(!gameInput.GetGamepad()) gameInput.OpenFirstGamepad();
 break;
 case SDL_EVENT_GAMEPAD_REMOVED:
 if(gameInput.GetGamepad() && event.gdevice.which == SDL_GetGamepadID(gameInput.GetGamepad())){

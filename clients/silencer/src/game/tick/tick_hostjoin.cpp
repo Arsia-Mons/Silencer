@@ -41,10 +41,10 @@ void Game::TickHostGame(){
 		}
 		//char mapname[256];
 		//sprintf(mapname, "level/%s", world.gameinfo.mapname);
-		LoadMap(gameSession.MapDownloaderRef().FindMap(world.gameinfo.mapname, &world.gameinfo.maphash).c_str());
+		gameSession.LoadMap(gameSession.MapDownloaderRef().FindMap(world.gameinfo.mapname, &world.gameinfo.maphash).c_str());
 		renderer.palette.SetPalette(0);
 		renderer.palette.SetParallaxColors(world.map.parallax);
-		SetColors(renderer.palette.GetColors());
+		gameRenderer.SetColors(renderer.palette.GetColors());
 		State * sharedstateobject = static_cast<State *>(world.GetObjectFromId(sharedstate));
 		if(sharedstateobject){
 			sharedstateobject->state = 2;
@@ -73,7 +73,7 @@ void Game::TickHostGame(){
 								world.peerlist[team->peers[i]]->techchoices = 0xffffffff;
 								world.peerlist[team->peers[i]]->controlledlist.clear();
 								world.peerlist[team->peers[i]]->controlledlist.push_back(player->id);
-								GiveDefaultItems(*player);
+								gameSession.GiveDefaultItems(*player);
 							}
 						}
 					}
@@ -127,7 +127,7 @@ void Game::TickTestGame(){
 		player->oldx = player->x;
 		player->oldy = player->y;
 		world.GetAuthorityPeer()->controlledlist.push_back(player->id);
-		GiveDefaultItems(*player);
+		gameSession.GiveDefaultItems(*player);
 		int botnum = 0;
 		// Spawn a mix of difficulties: 4 easy, 4 medium, 2 hard
 		const PlayerAI::Difficulty diffs[10] = {
@@ -157,18 +157,18 @@ void Game::TickTestGame(){
 			}
 		}
 		world.gameinfo.securitylevel = LobbyGame::SECHIGH;
-		LoadMap("level/ALLY10c.sil");
+		gameSession.LoadMap("level/ALLY10c.sil");
 		for(std::list<Object *>::iterator it = world.objectlist.begin(); it != world.objectlist.end(); it++){
 			if((*it)->type == ObjectTypes::PLAYER){
 				Player * player = static_cast<Player *>(*it);
 				world.map.RandomPlayerStartLocation(world, player->x, player->y);
 			}
 		}
-		ShowDeployMessage();
+		gameSession.ShowDeployMessage();
 		renderer.palette.SetPalette(0);
 		renderer.palette.SetParallaxColors(world.map.parallax);
 		GetScreenBuffer().Clear(0);
-		SetColors(renderer.palette.GetColors());
+		gameRenderer.SetColors(renderer.palette.GetColors());
 		singleplayermessage = 0;
 		stateisnew = false;
 	}else{
@@ -187,7 +187,7 @@ void Game::TickTestGame(){
 				}
 			}
 		}*/
-		if(CheckForQuit() || CheckForEndOfGame()){
+		if(gameSession.CheckForQuit() || gameSession.CheckForEndOfGame()){
 			GoToState(MAINMENU);
 		}
 	}

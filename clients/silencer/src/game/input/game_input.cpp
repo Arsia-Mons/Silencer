@@ -47,7 +47,8 @@ static const struct { Action a; InputField field; } INPUT_FIELDS[] = {
 { Action::UiRight,       [](Input& i) -> bool& { return i.keyright;         } },
 };
 
-void GameInput::TickRumble(Player * localPlayer){
+void GameInput::TickRumble(){
+Player * localPlayer = game.world.GetPeerPlayer(game.world.localpeerid);
 if(!gamepad || game.world.gameplaystate != World::INGAME || !localPlayer) return;
 
 if(localPlayer->rumbleFire){
@@ -305,4 +306,12 @@ game.world.quitstate = 0;
 if(sc == SDL_SCANCODE_F1){
 game.world.SetShowingPlayerList(false);
 }
+}
+
+void GameInput::QueueUiKeyboardInputForScancode(int scancode){
+game.gameUiPipeline.QueueKeyboardInputForScancode(
+scancode,
+keystate,
+keymap,
+gamepadstate);
 }

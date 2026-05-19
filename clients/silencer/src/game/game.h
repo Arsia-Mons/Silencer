@@ -2,7 +2,6 @@
 #define GAME_H
 
 #include "controlserver.h"
-#include "input.h"
 #include "input/game_input.h"
 #include "inputserver.h"
 #include "render/game_renderer.h"
@@ -20,7 +19,6 @@
 
 class Screen;
 class Modal;
-class Player;
 class LobbyGame;
 
 class Game
@@ -135,38 +133,7 @@ void TickJoinGame();
 void TickTestGame();
 void TickReplayGame();
 void Present();
-bool SetupRenderDevice();
-void OnScancodeDown(int scancode);
-void OnScancodeUp(int scancode);
-void QueueUiKeyboardInputForScancode(int scancode);
-static Uint32 TimerCallback(void * userdata, SDL_TimerID timerID, Uint32 interval);
-void SetColors(SDL_Color * colors);
-void UpdateInputState(Input & input);
-bool LoadMap(const char * name);
-void UnloadGame();
-bool CheckForQuit();
-bool CheckForEndOfGame();
-bool CheckForConnectionLost();
-void ShowDeployMessage();
-void GiveDefaultItems(Player & player);
 void GoToState(Uint8 newstate);
-void RestartPaletteFade();
-float LegacyUiAnimationStepSeconds() const;
-Uint8 PaletteFadePhaseFromClock() const;
-bool PaletteFadeFinished() const;
-void ApplyPaletteFade(bool fadeOut);
-void PrepareClientUiFrame(Surface& surface);
-void BeginPreparedClientUiFrame();
-Clay_RenderCommandArray EndClientUiFrame();
-void RenderClientUiFrame(Surface& surface, float frametime);
-void ResetUiFrameDeltas();
-void BuildVisibleClientUi(Surface& surface, float frametime);
-void DrawInGameWorldInsets(Surface& surface, float frametime);
-const char * GetActionKeyDisplayName(Action a);
-void OpenFirstGamepad();
-void PollGamepadState();
-void TickGamepadMenuNav();
-void TickRumble();
 void DrainControlQueue();
 void PostFrameReplies();
 

@@ -204,7 +204,7 @@ bool Game::Load(char * cmdline){
 			printf("Could not initialize SDL %s\n", SDL_GetError());
 			return false;
 		}
-		if(!headless && !tui) OpenFirstGamepad();
+		if(!headless && !tui) gameInput.OpenFirstGamepad();
 		printf("Loading palette...\n");
 		if(!renderer.palette.SetPalette(0)){
 			return false;
@@ -219,11 +219,11 @@ bool Game::Load(char * cmdline){
 			Audio::GetInstance().SetMusicVolume(Config::GetInstance().musicvolume);
 			// No SDL_AddTimer (FPS counter title bar is window-only).
 			// No window — TUIBackend connects to the TS frontend over TCP.
-			if(!SetupRenderDevice()){
+			if(!gameRenderer.Setup(&gameRenderer.WindowRef())){
 				printf("Could not initialize TUI render device\n");
 				return false;
 			}
-			SetColors(renderer.palette.GetColors());
+			gameRenderer.SetColors(renderer.palette.GetColors());
 		}else if(!headless){
 			if(!MIX_Init()){
 				printf("Could not initialize SDL_mixer: %s\n", SDL_GetError());
@@ -232,7 +232,7 @@ bool Game::Load(char * cmdline){
 				printf("Could not initialize audio\n");
 			}
 			Audio::GetInstance().SetMusicVolume(Config::GetInstance().musicvolume);
-			SDL_AddTimer(1000, TimerCallback, this);
+			SDL_AddTimer(1000, GameRenderer::TimerCallback, this);
 			//SDL_EnableUNICODE(true);
 			//SDL_EnableKeyRepeat(SDL_DEFAULT_REPEAT_DELAY, SDL_DEFAULT_REPEAT_INTERVAL);
 			//screen = SDL_SetVideoMode(640, 480, 8, SDL_DOUBLEBUF | SDL_SWSURFACE);
@@ -241,11 +241,11 @@ bool Game::Load(char * cmdline){
 				(Config::GetInstance().fullscreen ? SDL_WINDOW_FULLSCREEN : 0));
 			SDL_StartTextInput(gameRenderer.GetWindow());
 			SyncRenderSurfaceToWindowPixels();
-			if(!SetupRenderDevice()){
+			if(!gameRenderer.Setup(&gameRenderer.WindowRef())){
 				printf("Could not initialize GPU render device\n");
 				return false;
 			}
-			SetColors(renderer.palette.GetColors());
+			gameRenderer.SetColors(renderer.palette.GetColors());
 			//SDL_Flip(screen);
 		}
 		// Headless mode skips SetColors() above, so palettecolors[] starts zeroed.
@@ -263,7 +263,7 @@ bool Game::Load(char * cmdline){
 	world.LoadBuyableItems();
 	printf("Resources loaded\n");
 	lasttick = SDL_GetTicks();
-	RestartPaletteFade();
+	gameRenderer.RestartPaletteFade();
 	if(controlPort > 0){
 		auto drainPendingWaits = [this](){
 			for(auto& w : pendingWaits){

@@ -5,11 +5,11 @@ using namespace GameState;
 
 void Game::TickFadeOut(){
 	world.intutorialmode = false;
-	ApplyPaletteFade(true);
-	if(PaletteFadeFinished()){
+	gameRenderer.ApplyPaletteFade(true);
+	if(gameRenderer.PaletteFadeFinished()){
 		gameUiPipeline.ClientUiRef().RequestClearScreens();
 		state = nextstate;
-		RestartPaletteFade();
+		gameRenderer.RestartPaletteFade();
 		stateisnew = true;
 	}
 }

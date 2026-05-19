@@ -13,7 +13,7 @@ if(/*!world.map.loaded && */stateisnew){
 	GetScreenBuffer().Clear(0);
 	//char mapname[7 + 256];
 	//sprintf(mapname, "level/%s", world.gameinfo.mapname);
-	if(!LoadMap(gameSession.MapDownloaderRef().FindMap(world.gameinfo.mapname, &world.gameinfo.maphash).c_str())){
+	if(!gameSession.LoadMap(gameSession.MapDownloaderRef().FindMap(world.gameinfo.mapname, &world.gameinfo.maphash).c_str())){
 		printf("Unable to load map\n");
 		if(world.replay.IsPlaying()){
 			world.replay.EndPlaying();
@@ -34,7 +34,7 @@ if(/*!world.map.loaded && */stateisnew){
 	if(world.replay.IsRecording()){
 		world.replay.WriteStart();
 	}
-	ShowDeployMessage();
+	gameSession.ShowDeployMessage();
 	Audio::GetInstance().StopMusic();
 	world.gameplaystate = World::INGAME;
 	for(std::list<Object *>::iterator it = world.objectlist.begin(); it != world.objectlist.end(); it++){
@@ -60,7 +60,7 @@ if(/*!world.map.loaded && */stateisnew){
 							player->suitcolor = teamcolor;//(((teamcolor >> 4) - i) << 4) + (teamcolor & 0xF);
 							peer->controlledlist.clear();
 							peer->controlledlist.push_back(player->id);
-							GiveDefaultItems(*player);
+							gameSession.GiveDefaultItems(*player);
 						}
 					}
 				}
@@ -71,7 +71,7 @@ if(/*!world.map.loaded && */stateisnew){
 	renderer.palette.SetPalette(0);
 	renderer.palette.SetParallaxColors(world.map.parallax);
 	GetScreenBuffer().Clear(0);
-	SetColors(renderer.palette.GetColors());
+	gameRenderer.SetColors(renderer.palette.GetColors());
 	gameSession.AmbienceMixerRef().LoadRandomGameMusic();
 	// Activate the game mode specified by the lobby config.
 	delete world.gameMode;
@@ -288,7 +288,7 @@ if(/*!world.map.loaded && */stateisnew){
 		world.ShowMessage((char *)"Location : Base Arsia Mons, Surface Temperature : -7C", 96, 1);
 		gameSession.DeployMessageShownRef() = true;
 	}
-	if(CheckForQuit()){
+	if(gameSession.CheckForQuit()){
 		world.Disconnect();
 		if(world.lobby.state == Lobby::AUTHENTICATED){
 			GoToState(LOBBY);
@@ -300,7 +300,7 @@ if(/*!world.map.loaded && */stateisnew){
 			GoToState(MAINMENU);
 		}
 	}
-	if(CheckForEndOfGame()){
+	if(gameSession.CheckForEndOfGame()){
 		if(world.lobby.state == Lobby::AUTHENTICATED){
 			GoToState(MISSIONSUMMARY);
 		}else{
@@ -310,7 +310,7 @@ if(/*!world.map.loaded && */stateisnew){
 			GoToState(MAINMENU);
 		}
 	}
-	if(CheckForConnectionLost()){
+	if(gameSession.CheckForConnectionLost()){
 		if(world.lobby.state == Lobby::AUTHENTICATED){
 			GoToState(LOBBY);
 			world.lobby.JoinChannel(world.lobby.lastchannel);

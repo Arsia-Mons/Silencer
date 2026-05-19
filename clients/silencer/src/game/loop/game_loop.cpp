@@ -101,18 +101,18 @@ bool Game::Loop(void){
 					bool now = newkeystate[sc] != 0;
 					if(was == now) continue;
 					if(now){
-						OnScancodeDown(sc);
+						gameInput.OnScancodeDown(sc);
 						pressedScancodes.push_back(sc);
 					}else{
-						OnScancodeUp(sc);
+						gameInput.OnScancodeUp(sc);
 					}
 				}
 				memcpy(gameInput.GetKeystate(), newkeystate, SDL_SCANCODE_COUNT * sizeof(Uint8));
 				for(int sc : pressedScancodes){
-					QueueUiKeyboardInputForScancode(sc);
+					gameInput.QueueUiKeyboardInputForScancode(sc);
 				}
 			}
-			UpdateInputState(world.localinput);
+			gameInput.UpdateInputState(world.localinput);
 			Input action;
 			if(inputserver.LatestAction(action)){
 				world.localinput.keymoveup        |= action.keymoveup;
@@ -158,11 +158,11 @@ bool Game::Loop(void){
 				world.localinput.mousedown = md;
 			}
 		} else {
-			UpdateInputState(world.localinput);
+			gameInput.UpdateInputState(world.localinput);
 			UiInput().CaptureGamepadBindingEdges(
 				gameInput.GetGamepadState().buttons, gameInput.GetGamepadState().axes,
 				SDL_GAMEPAD_AXIS_COUNT, AXIS_DEADZONE);
-			TickGamepadMenuNav();
+			gameInput.TickGamepadMenuNav();
 		}
 		world.SendInput();
 		if(!Tick()){
@@ -170,7 +170,7 @@ bool Game::Loop(void){
 		}
 		if(!world.replay.IsPlaying() || (world.replay.IsPlaying() && world.gameplaystate == World::INGAME)){
 			world.Tick();
-			TickRumble();
+			gameInput.TickRumble();
 		}
 		if(!world.dedicatedserver.active){
 			renderer.Tick();
@@ -183,7 +183,7 @@ bool Game::Loop(void){
 					colors = renderer.palette.GetTempPalette();
 				}
 				SDL_Color * ambiencepalette = renderer.palette.CopyWithBrightness(colors, newambiencelevel, 2, 114);
-				SetColors(ambiencepalette);
+				gameRenderer.SetColors(ambiencepalette);
 				renderer.palette.CalculateLighted(newambiencelevel);
 				gameSession.AmbienceMixerRef().oldambiencelevel = newambiencelevel;
 			}
@@ -206,13 +206,13 @@ bool Game::Loop(void){
 			ResizeRenderSurfacePixels(kLegacyRenderWidth, kLegacyRenderHeight);
 			GetScreenBuffer().Clear(0);
 			renderer.Draw(&GetScreenBuffer(), ft);
-			DrawInGameWorldInsets(GetScreenBuffer(), ft);
+			gameUiPipeline.DrawInGameWorldInsets(GetScreenBuffer(), ft);
 		}else{
 			if(gameRenderer.GetWindow()) SyncRenderSurfaceToWindowPixels();
 			GetScreenBuffer().Clear(0);
 			renderer.Draw(&GetScreenBuffer(), ft);
 		}
-		RenderClientUiFrame(GetScreenBuffer(), ft);
+		gameUiPipeline.RenderClientUiFrame(GetScreenBuffer(), ft);
 #ifdef POSIX
 		if(world.replay.IsPlaying() && world.replay.ffmpeg && world.replay.ffmpegvideo && gameSession.DeployMessageShownRef()){
 			std::vector<Uint8> buffer(GetScreenBuffer().w * GetScreenBuffer().h * 3);
@@ -245,7 +245,7 @@ bool Game::Loop(void){
 		if(tui && gameRenderer.GetRenderDevice() && !gameRenderer.GetRenderDevice()->IsAlive()){
 			quitRequested = true;
 		}
-		ResetUiFrameDeltas();
+		gameUiPipeline.ResetUiFrameDeltas();
 		// SDL3GPUBackend's swapchain Present blocks on vsync (~16 ms) so the
 		// non-TUI loop self-throttles. TUIBackend writes to a TCP socket that
 		// never blocks the engine, so without an explicit cap the loop runs
@@ -377,7 +377,7 @@ bool Game::Tick(void){
 				world.Disconnect();
 				world.gameplaystate = World::NONE;
 				world.lobby.Disconnect();
-				UnloadGame();
+				gameSession.UnloadGame();
 				world.GetAuthorityPeer()->controlledlist.clear();
 				world.DestroyAllObjects();
 				PushScreen(std::make_unique<MainMenuScreen>());
@@ -408,7 +408,7 @@ bool Game::Tick(void){
 			if(stateisnew){
 				world.lobby.ForgetAllUserInfo();
 				world.gameplaystate = World::INLOBBY;
-				UnloadGame();
+				gameSession.UnloadGame();
 				world.Disconnect();
 				world.choosingtech = false;
 				world.lobby.channelchanged = true;
@@ -440,7 +440,7 @@ bool Game::Tick(void){
 		case INGAME: TickInGame(); break;
 		case MISSIONSUMMARY:{
 			if(stateisnew){
-				UnloadGame();
+				gameSession.UnloadGame();
 				world.Disconnect();
 				PushScreen(std::make_unique<MissionSummaryScreen>());
 				stateisnew = false;
@@ -485,7 +485,7 @@ bool Game::Tick(void){
 		case REPLAYGAME: TickReplayGame(); break;
 	}
 	if(gameRenderer.FadePhaseRef() < 16 && state != FADEOUT){
-		ApplyPaletteFade(false);
+		gameRenderer.ApplyPaletteFade(false);
 	}
 	if(!nextstateprocessed){
 		nextstateprocessed = true;
@@ -498,7 +498,7 @@ bool Game::Tick(void){
 void Game::GoToState(Uint8 newstate){
 	nextstate = newstate;
 	state = FADEOUT;
-	RestartPaletteFade();
+	gameRenderer.RestartPaletteFade();
 	stateisnew = true;
 	nextstateprocessed = false;
 	// Keep the outgoing Clay screen mounted until TickFadeOut reaches black.
