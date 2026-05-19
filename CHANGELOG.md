@@ -4,6 +4,14 @@ All notable changes to Silencer are documented here.
 
 ## [Unreleased]
 
+### Game client
+
+#### World subsystem class extraction — phase 2 (#216)
+
+- `World` decomposed into 5 owned subsystem classes, each with its own `.h` + `.cpp` in `src/world/`: `WorldObjectRegistry`, `WorldMessaging`, `WorldNetwork`, `WorldPeerRegistry`, `WorldReplication`.
+- All callers updated to go through the subsystem public API; reference shims removed.
+- `World` is now a thin coordinator. Public API and runtime behaviour unchanged.
+
 ## [v00053] — 2026-05-18
 
 ### Game client
