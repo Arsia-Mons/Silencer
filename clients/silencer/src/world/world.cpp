@@ -160,7 +160,7 @@ void World::Tick(void){
 		// Create the replicated match-state object once per match on authority.
 		if(gameplaystate == INGAME && objectsbytype[ObjectTypes::GAMESTATEOBJ].empty()){
 			GameStateObject* gso = (GameStateObject*)CreateObject(ObjectTypes::GAMESTATEOBJ);
-			gso->modeId = gameMode ? gameMode->Id() : GAMEMODE_DATA_RETRIEVAL;
+			if(gso) gso->modeId = gameMode ? gameMode->Id() : GAMEMODE_DATA_RETRIEVAL;
 		}
 		for(int i = 0; i < maxpeers; i++){
 			Peer * peer = peerlist[i];

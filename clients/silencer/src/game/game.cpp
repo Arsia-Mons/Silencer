@@ -573,6 +573,15 @@ void Game::RenderClientUiFrame(Surface& surface, float frametime) {
 			inGameUiController.ApplyActions(
 				world.localpeerid, unhandledUiActions, clientUi.Interactions());
 		}
+		// Sync on-screen keyboard visibility with text input focus so handheld
+		// devices (ROG Ally, Steam Deck, touchscreens) show/hide the OS keyboard.
+		bool nowFocused = clientUi.Interactions().HasTextInputFocus();
+		if(nowFocused && !textInputFocused){
+			SDL_StartTextInput(window);
+		}else if(!nowFocused && textInputFocused){
+			SDL_StopTextInput(window);
+		}
+		textInputFocused = nowFocused;
 	}
 }
 

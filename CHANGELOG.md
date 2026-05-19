@@ -4,6 +4,20 @@ All notable changes to Silencer are documented here.
 
 ## [Unreleased]
 
+## [v00053] — 2026-05-18
+
+### Game client
+
+#### On-screen keyboard for handheld Windows (#197)
+
+- `SDL_StartTextInput` / `SDL_StopTextInput` now called on text field focus/blur in `Game::RenderClientUiFrame`, triggering the OS on-screen keyboard on handheld Windows devices (ROG Ally, Steam Deck, etc.).
+- `UiInteractionRegistry::HasTextInputFocus()` added to track which field holds focus.
+
+#### Bug fixes
+
+- Fixed null-pointer dereference on `GameStateObject` after `CreateObject` — was causing a SIGSEGV crash on ALLY10c.
+- Fixed `build.sh` crash when `ninja` is not installed (empty `gen` array with `set -u`).
+
 ## [v00052] — 2026-05-17
 
 ### Game client

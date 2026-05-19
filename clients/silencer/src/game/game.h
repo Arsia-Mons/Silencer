@@ -226,6 +226,7 @@ private:
 	silencer::ui::UiInputState preparedUiInput;
 	bool hasPreparedUiInput = false;
 	Uint64 lastUiAnimationMs = 0;
+	bool textInputFocused = false; // tracks on-screen keyboard state
 	int frames;
 	int fps;
 	Uint64 lasttick;

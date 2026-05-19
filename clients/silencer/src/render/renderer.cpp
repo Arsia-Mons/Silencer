@@ -53,6 +53,7 @@ void Renderer::Draw(Surface * surface, float frametime){
 		camera.w = surface->w;
 		camera.h = surface->h;
 	}
+	// DEBUG: log camera/player state for the first 60 frames while a map is loaded
 	// FPS tracking
 	Uint32 now = SDL_GetTicks();
 	fpsFrameCount++;
