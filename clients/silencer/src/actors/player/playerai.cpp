@@ -239,7 +239,7 @@ void PlayerAI::Tick(World & world){
 	if(!player.hassecret && state != RETREAT && !player.InBase(world)){
 		Team* myTeam = player.GetTeam(world);
 		Player* secretHolder = nullptr;
-		for(Uint16 sid : world.objectsbytype[ObjectTypes::PLAYER]){
+		for(Uint16 sid : world.objects.objectsbytype[ObjectTypes::PLAYER]){
 			Object* sobj = world.GetObjectFromId(sid);
 			if(!sobj) continue;
 			Player* sp = static_cast<Player*>(sobj);
@@ -288,7 +288,7 @@ void PlayerAI::Tick(World & world){
 		} else if(state == KILLSECRET){
 			// Navigate toward enemy secret holder; re-target each time we clear
 			Team* myTeam = player.GetTeam(world);
-			for(Uint16 sid : world.objectsbytype[ObjectTypes::PLAYER]){
+			for(Uint16 sid : world.objects.objectsbytype[ObjectTypes::PLAYER]){
 				Object* sobj = world.GetObjectFromId(sid);
 				if(!sobj) continue;
 				Player* sp = static_cast<Player*>(sobj);
@@ -945,7 +945,7 @@ std::vector<Terminal *> PlayerAI::FindNearestTerminals(World & world){
 
 	// Collect terminals already claimed by a teammate bot
 	std::vector<Terminal *> claimed;
-	for(Uint16 id : world.objectsbytype[ObjectTypes::PLAYER]){
+	for(Uint16 id : world.objects.objectsbytype[ObjectTypes::PLAYER]){
 		Object* obj = world.GetObjectFromId(id);
 		if(!obj) continue;
 		Player* p = static_cast<Player*>(obj);
@@ -955,7 +955,7 @@ std::vector<Terminal *> PlayerAI::FindNearestTerminals(World & world){
 	}
 
 	std::vector<Terminal *> terminals;
-	for(std::list<Object *>::iterator it = world.objectlist.begin(); it != world.objectlist.end(); it++){
+	for(std::list<Object *>::iterator it = world.objects.objectlist.begin(); it != world.objects.objectlist.end(); it++){
 		if((*it)->type == ObjectTypes::TERMINAL){
 			Terminal * terminal = static_cast<Terminal *>(*it);
 			if(terminal->state == Terminal::READY || terminal->state == Terminal::HACKERGONE || (terminal->state == Terminal::SECRETREADY && team && team->beamingterminalid == terminal->id)){
@@ -968,7 +968,7 @@ std::vector<Terminal *> PlayerAI::FindNearestTerminals(World & world){
 	}
 	// Fall back to all available terminals if everything is claimed
 	if(terminals.empty()){
-		for(std::list<Object *>::iterator it = world.objectlist.begin(); it != world.objectlist.end(); it++){
+		for(std::list<Object *>::iterator it = world.objects.objectlist.begin(); it != world.objects.objectlist.end(); it++){
 			if((*it)->type == ObjectTypes::TERMINAL){
 				Terminal * terminal = static_cast<Terminal *>(*it);
 				if(terminal->state == Terminal::READY || terminal->state == Terminal::HACKERGONE || (terminal->state == Terminal::SECRETREADY && team && team->beamingterminalid == terminal->id))
@@ -992,7 +992,7 @@ BaseExit * PlayerAI::GetBaseExit(World & world){
 	if(player.InBase(world)){
 		BaseDoor * basedoor = static_cast<BaseDoor *>(world.GetObjectFromId(player.basedoorentering));
 		if(basedoor){
-			for(std::list<Object *>::iterator it = world.objectlist.begin(); it != world.objectlist.end(); it++){
+			for(std::list<Object *>::iterator it = world.objects.objectlist.begin(); it != world.objects.objectlist.end(); it++){
 				if((*it)->type == ObjectTypes::BASEEXIT){
 					BaseExit * baseexit = static_cast<BaseExit *>(*it);
 					if(baseexit->teamid == basedoor->teamid){
@@ -1008,7 +1008,7 @@ BaseExit * PlayerAI::GetBaseExit(World & world){
 SecretReturn * PlayerAI::GetSecretReturn(World & world){
 	if(player.InOwnBase(world)){
 		Team * team = player.GetTeam(world);
-		for(std::list<Object *>::iterator it = world.objectlist.begin(); it != world.objectlist.end(); it++){
+		for(std::list<Object *>::iterator it = world.objects.objectlist.begin(); it != world.objects.objectlist.end(); it++){
 			if((*it)->type == ObjectTypes::SECRETRETURN){
 				SecretReturn * secretreturn = static_cast<SecretReturn *>(*it);
 				if(secretreturn->teamid == team->id){
@@ -1024,7 +1024,7 @@ BaseDoor * PlayerAI::GetBaseDoor(World & world){
 	if(!player.InBase(world)){
 		Team * team = player.GetTeam(world);
 		if(team){
-			for(std::list<Object *>::iterator it = world.objectlist.begin(); it != world.objectlist.end(); it++){
+			for(std::list<Object *>::iterator it = world.objects.objectlist.begin(); it != world.objects.objectlist.end(); it++){
 				if((*it)->type == ObjectTypes::BASEDOOR){
 					BaseDoor * basedoor = static_cast<BaseDoor *>(*it);
 					if(basedoor->teamid == team->id){
@@ -1054,7 +1054,7 @@ HealMachine * PlayerAI::GetHealMachine(World & world){
 	// (checks team->basedoorid == basedoorentering), so any machine in own base works.
 	HealMachine * best = 0;
 	int bestDist = INT_MAX;
-	for(std::list<Object *>::iterator it = world.objectlist.begin(); it != world.objectlist.end(); it++){
+	for(std::list<Object *>::iterator it = world.objects.objectlist.begin(); it != world.objects.objectlist.end(); it++){
 		if((*it)->type == ObjectTypes::HEALMACHINE){
 			HealMachine * hm = static_cast<HealMachine *>(*it);
 			int dist = abs(hm->x - player.x) + abs(hm->y - player.y);

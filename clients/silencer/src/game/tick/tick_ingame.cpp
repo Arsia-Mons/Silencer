@@ -37,13 +37,13 @@ if(/*!world.map.loaded && */stateisnew){
 	gameSession.ShowDeployMessage();
 	Audio::GetInstance().StopMusic();
 	world.gameplaystate = World::INGAME;
-	for(std::list<Object *>::iterator it = world.objectlist.begin(); it != world.objectlist.end(); it++){
+	for(std::list<Object *>::iterator it = world.objects.objectlist.begin(); it != world.objects.objectlist.end(); it++){
 		Object * object = *it;
 		switch(object->type){
 			case ObjectTypes::TEAM:{
 				Team * team = static_cast<Team *>(object);
 				for(int i = 0; i < team->numpeers; i++){
-					Peer * peer = world.peerlist[team->peers[i]];
+					Peer * peer = world.peers.peerlist[team->peers[i]];
 					if(peer){
 						world.ingameusers.push_back(peer->accountid);
 						User * user = world.lobby.GetUserInfo(peer->accountid);
@@ -85,10 +85,10 @@ if(/*!world.map.loaded && */stateisnew){
 	}
 	if(world.replay.IsPlaying()){
 		// replay controls
-		if(world.localpeerid == world.authoritypeer && !gameSession.DeployMessageShownRef()){
+		if(world.peers.localpeerid == world.peers.authoritypeer && !gameSession.DeployMessageShownRef()){
 			for(int i = 0; i < world.maxpeers; i++){
-				if(world.peerlist[i] && i != world.authoritypeer){
-					world.localpeerid = i;
+				if(world.peers.peerlist[i] && i != world.peers.authoritypeer){
+					world.peers.localpeerid = i;
 					world.viewedpeerid = i;
 					break;
 				}
@@ -97,8 +97,8 @@ if(/*!world.map.loaded && */stateisnew){
 		world.replay.oldx = world.replay.x;
 		world.replay.oldy = world.replay.y;
 		if(world.localinput.keymoveleft || world.localinput.keymoveright || world.localinput.keymoveup || world.localinput.keymovedown){
-			world.localpeerid = world.authoritypeer;
-			world.viewedpeerid = world.authoritypeer;
+			world.peers.localpeerid = world.peers.authoritypeer;
+			world.viewedpeerid = world.peers.authoritypeer;
 			bool inbase = false;
 			if(world.replay.y > world.map.height * 64){
 				inbase = true;
@@ -151,19 +151,19 @@ if(/*!world.map.loaded && */stateisnew){
 			world.replay.xv = 0;
 			world.replay.yv = 0;
 		}
-		if(world.localinput.keyprevcam && !world.localinputhistory[(world.tickcount - 1) % world.maxlocalinputhistory].keyprevcam){
-			for(int i = world.localpeerid - 1; i > 0; i--){
-				if(world.peerlist[i] && i != world.authoritypeer){
-					world.localpeerid = i;
+		if(world.localinput.keyprevcam && !world.replication.localinputhistory[(world.tickcount - 1) % world.maxlocalinputhistory].keyprevcam){
+			for(int i = world.peers.localpeerid - 1; i > 0; i--){
+				if(world.peers.peerlist[i] && i != world.peers.authoritypeer){
+					world.peers.localpeerid = i;
 					world.viewedpeerid = i;
 					break;
 				}
 			}
 		}
-		if(world.localinput.keynextcam && !world.localinputhistory[(world.tickcount - 1) % world.maxlocalinputhistory].keynextcam){
-			for(int i = world.localpeerid + 1; i < world.maxpeers; i++){
-				if(world.peerlist[i] && i != world.authoritypeer){
-					world.localpeerid = i;
+		if(world.localinput.keynextcam && !world.replication.localinputhistory[(world.tickcount - 1) % world.maxlocalinputhistory].keynextcam){
+			for(int i = world.peers.localpeerid + 1; i < world.maxpeers; i++){
+				if(world.peers.peerlist[i] && i != world.peers.authoritypeer){
+					world.peers.localpeerid = i;
 					world.viewedpeerid = i;
 					break;
 				}
@@ -192,15 +192,15 @@ if(/*!world.map.loaded && */stateisnew){
 	// localinput edges and writes to World::viewedpeerid + World::spectator,
 	// not localpeerid (network identity stays put for observers).
 	if(world.IsLocalObserver()){
-		Input & prevtick = world.localinputhistory[(world.tickcount - 1) % world.maxlocalinputhistory];
+		Input & prevtick = world.replication.localinputhistory[(world.tickcount - 1) % world.maxlocalinputhistory];
 		// Default-mode follow: first applicable tick after a candidate exists.
 		if(!world.spectator.initialized){
 			Uint8 picked = world.viewedpeerid;
 			bool found = false;
 			for(int i = 0; i < (int)world.maxpeers; i++){
-				Peer * p = world.peerlist[i];
+				Peer * p = world.peers.peerlist[i];
 				if(!p) continue;
-				if(i == (int)world.authoritypeer) continue;
+				if(i == (int)world.peers.authoritypeer) continue;
 				if(p->observer) continue;
 				if(p->controlledlist.empty()) continue;
 				Player * pl = world.GetPeerPlayer((Uint8)i);
@@ -212,9 +212,9 @@ if(/*!world.map.loaded && */stateisnew){
 			}
 			if(!found){
 				for(int i = 0; i < (int)world.maxpeers; i++){
-					Peer * p = world.peerlist[i];
+					Peer * p = world.peers.peerlist[i];
 					if(!p) continue;
-					if(i == (int)world.authoritypeer) continue;
+					if(i == (int)world.peers.authoritypeer) continue;
 					if(p->observer) continue;
 					if(p->controlledlist.empty()) continue;
 					picked = (Uint8)i;
@@ -231,15 +231,15 @@ if(/*!world.map.loaded && */stateisnew){
 		// its Player), auto-step to the next valid candidate so the
 		// spectator's view doesn't freeze.
 		if(world.spectator.initialized && !world.spectator.freecam){
-			Peer * cur = world.peerlist[world.viewedpeerid];
+			Peer * cur = world.peers.peerlist[world.viewedpeerid];
 			bool stale = !cur || cur->observer || cur->controlledlist.empty()
-				|| world.viewedpeerid == (Uint8)world.authoritypeer;
+				|| world.viewedpeerid == (Uint8)world.peers.authoritypeer;
 			if(stale){
 				for(int step = 1; step <= (int)world.maxpeers; step++){
 					int i = (world.viewedpeerid + step) % world.maxpeers;
-					Peer * p = world.peerlist[i];
+					Peer * p = world.peers.peerlist[i];
 					if(!p) continue;
-					if(i == (int)world.authoritypeer) continue;
+					if(i == (int)world.peers.authoritypeer) continue;
 					if(p->observer) continue;
 					if(p->controlledlist.empty()) continue;
 					world.viewedpeerid = (Uint8)i;
@@ -253,9 +253,9 @@ if(/*!world.map.loaded && */stateisnew){
 		if(world.localinput.keymoveright && !prevtick.keymoveright){
 			for(int step = 1; step <= (int)world.maxpeers; step++){
 				int i = (world.viewedpeerid + step) % world.maxpeers;
-				Peer * p = world.peerlist[i];
+				Peer * p = world.peers.peerlist[i];
 				if(!p) continue;
-				if(i == (int)world.authoritypeer) continue;
+				if(i == (int)world.peers.authoritypeer) continue;
 				if(p->observer) continue;
 				if(p->controlledlist.empty()) continue;
 				world.viewedpeerid = (Uint8)i;
@@ -265,9 +265,9 @@ if(/*!world.map.loaded && */stateisnew){
 		if(world.localinput.keymoveleft && !prevtick.keymoveleft){
 			for(int step = 1; step <= (int)world.maxpeers; step++){
 				int i = ((int)world.viewedpeerid - step + (int)world.maxpeers) % world.maxpeers;
-				Peer * p = world.peerlist[i];
+				Peer * p = world.peers.peerlist[i];
 				if(!p) continue;
-				if(i == (int)world.authoritypeer) continue;
+				if(i == (int)world.peers.authoritypeer) continue;
 				if(p->observer) continue;
 				if(p->controlledlist.empty()) continue;
 				world.viewedpeerid = (Uint8)i;
@@ -278,13 +278,13 @@ if(/*!world.map.loaded && */stateisnew){
 		// path is preserved but no input drives it.
 		world.spectator.holdshowallnames = world.localinput.keyactivate;
 	}
-	Peer * localpeer = world.peerlist[world.localpeerid];
-	if(localpeer && world.localpeerid != world.authoritypeer){
+	Peer * localpeer = world.peers.peerlist[world.peers.localpeerid];
+	if(localpeer && world.peers.localpeerid != world.peers.authoritypeer){
 		if(localpeer->controlledlist.size() == 0){
 			world.RequestPeerList();
 		}
 	}
-	if(!gameSession.DeployMessageShownRef() && world.messagetype == 1 && world.message_i == 63){
+	if(!gameSession.DeployMessageShownRef() && world.messaging.messagetype == 1 && world.messaging.message_i == 63){
 		world.ShowMessage((char *)"Location : Base Arsia Mons, Surface Temperature : -7C", 96, 1);
 		gameSession.DeployMessageShownRef() = true;
 	}

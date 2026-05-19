@@ -19,55 +19,25 @@
 
 #define DELTAENABLED 1
 
-World::World(bool mode) : lobby(this), lagsimulator(&sockethandle), audio(Audio::GetInstance()){
+World::World(bool mode) : messaging(*this), objects(*this), network(*this), peers(*this), replication(*this), audio(Audio::GetInstance()), lobby(this){
 	this->mode = mode;
-	sockethandle = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
-	unsigned long iomode = 1;
-    ioctl(sockethandle, FIONBIO, &iomode);
-	currentid = 1;
-	memset(peerlist, 0, sizeof(peerlist));
-	peercount = 0;
-	authoritypeer = 0;
-	localpeerid = 0;
 	tickcount = 0;
-	memset(oldsnapshots, 0, sizeof(oldsnapshots));
-	totalsnapshots = 0;
-	totalinputpackets = 0;
 	gravity         = GASLoader::Get().player.worldGravity;
 	maxyvelocity    = GASLoader::Get().player.worldMaxYVelocity;
 	minwalldistance = GASLoader::Get().world.minWallDistance;
 	replaying = false;
-	state = IDLE;
-	illuminate = 0;
-	totalbytesread = 0;
-	totalbytessent = 0;
 	quitstate = 0;
 	winningteamid = 0;
-	message[0] = 0;
-	message_i = 0;
-	showchat_i = 0;
 	gameplaystate = NONE;
 	// LoadBuyableItems() is called from Game::Init() after GAS loads via resources.Load()
-	lastpingsent = 0;
-	pingtime = 0;
 	highlightsecrets = false;
 	highlightminimap = false;
 	intutorialmode = false;
 	choosingtech = false;
-	boundport = 0;
-	snapshotqueueminsize = GASLoader::Get().gameengine.snapshotQueueMinSize;
-	snapshotqueuemaxsize = GASLoader::Get().gameengine.snapshotQueueInitMaxSize;
-	lastsnapshotqueueadjust = 0;
-	for(int i = 0; i < sizeof(pinghistory) / sizeof(int); i++){
-		pinghistory[i] = 0;
-	}
-	lastpingid = 0;
 	ClearMapData();
 	showteamcolors = false;
 	showplayerlist = false;
 	debugoverlay = false;
-	memset(topmessage, 0, sizeof(topmessage));
-	topmessage_i = 0;
 	pancameraactive = false;
 	pancamerareturn = false;
 	pancamerareturncount = 0;
@@ -86,8 +56,8 @@ World::World(bool mode) : lobby(this), lagsimulator(&sockethandle), audio(Audio:
 
 World::~World(){
 	Disconnect();
-    shutdown(sockethandle, SHUT_RDWR);
-    closesocket(sockethandle);
+    shutdown(network.sockethandle, SHUT_RDWR);
+    closesocket(network.sockethandle);
 	delete gameMode;
 	gameMode = nullptr;
 	for(std::vector<BuyableItem *>::iterator it = buyableitems.begin(); it != buyableitems.end(); it++){
@@ -97,10 +67,10 @@ World::~World(){
 	DestroyAllObjects();
 	for(unsigned int i = 0; i < maxpeers; i++){
 		DeleteOldSnapshots(i);
-		if(peerlist[i]){
-			delete peerlist[i];
-			peerlist[i] = 0;
-			peercount--;
+		if(peers.peerlist[i]){
+			delete peers.peerlist[i];
+			peers.peerlist[i] = 0;
+			peers.peercount--;
 		}
 	}
 }
@@ -148,16 +118,16 @@ void World::Tick(void){
 			gameMode->OnMatchEnd(*this);
 		}
 		// Create the replicated match-state object once per match on authority.
-		if(gameplaystate == INGAME && objectsbytype[ObjectTypes::GAMESTATEOBJ].empty()){
+		if(gameplaystate == INGAME && objects.objectsbytype[ObjectTypes::GAMESTATEOBJ].empty()){
 			GameStateObject* gso = (GameStateObject*)CreateObject(ObjectTypes::GAMESTATEOBJ);
 			if(gso) gso->modeId = gameMode ? gameMode->Id() : GAMEMODE_DATA_RETRIEVAL;
 		}
 		for(int i = 0; i < maxpeers; i++){
-			Peer * peer = peerlist[i];
+			Peer * peer = peers.peerlist[i];
 			if(peer){
 				Player * player = GetPeerPlayer(peer->id);
 				bool processed = false;
-				while(player && player->CanExhaustInputQueue(*this, inputqueue[peer->id].size()) && ProcessInputQueue(*peer)){ processed = true; };
+				while(player && player->CanExhaustInputQueue(*this, replication.inputqueue[peer->id].size()) && ProcessInputQueue(*peer)){ processed = true; };
 				if(!processed){
 					ProcessInputQueue(*peer);
 				}
@@ -177,10 +147,10 @@ void World::Tick(void){
 
 	// Emit PLAYER_SPAWN the first time the local player exists in the world.
 	if (!player_spawn_emitted && IsAuthority() && gameplaystate == World::INGAME) {
-		Player* pp = GetPeerPlayer(localpeerid);
+		Player* pp = GetPeerPlayer(peers.localpeerid);
 		// Fallback for solo/TESTGAME mode where peerlist[localpeerid] may be null
-		if (!pp && objectsbytype[ObjectTypes::PLAYER].size() > 0) {
-			pp = static_cast<Player*>(GetObjectFromId(objectsbytype[ObjectTypes::PLAYER].front()));
+		if (!pp && objects.objectsbytype[ObjectTypes::PLAYER].size() > 0) {
+			pp = static_cast<Player*>(GetObjectFromId(objects.objectsbytype[ObjectTypes::PLAYER].front()));
 		}
 		if (pp != nullptr) {
 			player_spawn_emitted = true;
@@ -208,25 +178,24 @@ void World::Tick(void){
 	if(replay.IsRecording()){
 		replay.WriteTick();
 	}
-	if(message_i){
-		message_i++;
-		if(message_i >= messagetime){
-			message_i = 0;
-		}
+	if(messaging.message_i){
+		messaging.message_i++;
+		if(messaging.message_i >= messaging.messagetime){
+				}
 	}
-	if(topmessage_i){
-		topmessage_i++;
+	if(messaging.topmessage_i){
+		messaging.topmessage_i++;
 	}
-	if(showchat_i){
-		showchat_i--;
+	if(messaging.showchat_i){
+		messaging.showchat_i--;
 	}
-	for(std::deque<char *>::iterator it = statusmessages.begin(); it != statusmessages.end(); it++){
+	for(std::deque<char *>::iterator it = messaging.statusmessages.begin(); it != messaging.statusmessages.end(); it++){
 		char * status = *it;
 		char * time = &status[strlen(status) + 1];
 		(*time)--;
 		if(*time == 0){
 			delete[] status;
-			statusmessages.erase(it);
+			messaging.statusmessages.erase(it);
 			break;
 		}
 	}

@@ -45,17 +45,17 @@ void Team::Serialize(bool write, Serializer & data, Serializer * old){
 void Team::Tick(World & world){
 	int newpeerschecksum = numpeers;
 	for(int i = 0; i < numpeers; i++){
-		if(world.peerlist[peers[i]]){
-			newpeerschecksum += world.peerlist[peers[i]]->ip;
+		if(world.peers.peerlist[peers[i]]){
+			newpeerschecksum += world.peers.peerlist[peers[i]]->ip;
 		}
 	}
 	if(secretprogress - oldsecretprogress >= GASLoader::Get().player.secretProgressSoundThresh){
-		/*Player * localplayer = world.GetPeerPlayer(world.localpeerid);
+		/*Player * localplayer = world.GetPeerPlayer(world.peers.localpeerid);
 		if(localplayer && this == localplayer->GetTeam(world)){
 			Audio::GetInstance().Play(world.resources.soundbank["select2.wav"], 32);
 		}*/
 		for(int i = 0; i < numpeers; i++){
-			Peer * peer = world.peerlist[peers[i]];
+			Peer * peer = world.peers.peerlist[peers[i]];
 			if(peer){
 				world.SendSound(GASLoader::Get().player.soundTeamJoin.c_str(), peer, 32);
 			}
@@ -163,7 +163,7 @@ const char * Team::GetAgencyName(void){
 Uint32 Team::GetAvailableTech(World & world){
 	Uint32 tech = 0;
 	for(int i = 0; i < numpeers; i++){
-		Peer * peer = world.peerlist[peers[i]];
+		Peer * peer = world.peers.peerlist[peers[i]];
 		if(peer){
 			tech |= peer->techchoices;
 		}

@@ -83,7 +83,7 @@ void Renderer::Draw(Surface * surface, float frametime){
 	localplayer = world.GetPeerPlayer(world.viewedpeerid);
 	// Uncomment this to follow a player when there is no local peer
 	/*if(!localplayer && world.IsAuthority()){
-		for(std::vector<Uint16>::iterator it = world.objectsbytype[ObjectTypes::PLAYER].begin(); it != world.objectsbytype[ObjectTypes::PLAYER].end(); it++){
+		for(std::vector<Uint16>::iterator it = world.objects.objectsbytype[ObjectTypes::PLAYER].begin(); it != world.objects.objectsbytype[ObjectTypes::PLAYER].end(); it++){
 			localplayer = static_cast<Player *>(world.GetObjectFromId((*it)));
 			break;
 		}
@@ -182,7 +182,7 @@ void Renderer::Draw(Surface * surface, float frametime){
 			ObjectTypes::ROBOT,  ObjectTypes::CIVILIAN
 		};
 		for(Uint8 t : debugtypes){
-			for(Uint16 id : world.objectsbytype[t]){
+			for(Uint16 id : world.objects.objectsbytype[t]){
 				Object* obj = world.GetObjectFromId(id);
 				if(!obj || !obj->draw) continue;
 				Sprite* spr = dynamic_cast<Sprite*>(obj);
@@ -301,8 +301,8 @@ void Renderer::Tick(void){
 		}
 	}
 	//
-	if(world.illuminate > 0){
-		world.illuminate--;
+	if(world.objects.illuminate > 0){
+		world.objects.illuminate--;
 		ambience_r += 4;
 		if(ambience_r > 40){
 			ambience_r = 40;
@@ -337,7 +337,7 @@ void Renderer::DrawWorld(Surface * surface, Camera & camera, bool drawminimap, b
 	// Gather map lights using radius-aware screen overlap, not the sprite bounds.
 	// This prevents lights from popping out when only their tiny sprite goes off-screen.
 	if(drawluminance){
-		for(Object * obj : world.objectlist){
+		for(Object * obj : world.objects.objectlist){
 			if(!obj->draw || obj->res_bank != 222) continue;
 			Overlay * ov = static_cast<Overlay *>(obj);
 			if(!ov->mapLight) continue;
@@ -351,7 +351,7 @@ void Renderer::DrawWorld(Surface * surface, Camera & camera, bool drawminimap, b
 		}
 	}
 	for(unsigned int renderpass = 0; renderpass < 4; renderpass++){
-		for(std::list<Object *>::iterator i = world.objectlist.begin(); i != world.objectlist.end(); i++){
+		for(std::list<Object *>::iterator i = world.objects.objectlist.begin(); i != world.objects.objectlist.end(); i++){
 			Object * object = *i;
 			Uint8 lightingsurfacebank = 0;
 			Uint8 lightingsurfaceindex = 0;
@@ -581,7 +581,7 @@ void Renderer::DrawWorld(Surface * surface, Camera & camera, bool drawminimap, b
 							case ObjectTypes::CREDITMACHINE:{
 								CreditMachine * creditmachine = static_cast<CreditMachine *>(object);
 								Team * creditmachineteam = 0;
-								for(std::vector<Uint16>::iterator it = world.objectsbytype[ObjectTypes::TEAM].begin(); it != world.objectsbytype[ObjectTypes::TEAM].end(); it++){
+								for(std::vector<Uint16>::iterator it = world.objects.objectsbytype[ObjectTypes::TEAM].begin(); it != world.objects.objectsbytype[ObjectTypes::TEAM].end(); it++){
 									Team * team = static_cast<Team *>(world.GetObjectFromId(*it));
 									if(team->number == world.map.TeamNumberFromY(creditmachine->y)){
 										creditmachineteam = team;
@@ -1007,7 +1007,7 @@ void Renderer::DrawWorld(Surface * surface, Camera & camera, bool drawminimap, b
 			static const Uint8 dynTypes[] = { ObjectTypes::PLAYER, ObjectTypes::GUARD, ObjectTypes::CIVILIAN, ObjectTypes::ROBOT };
 			std::vector<DynOccluder> allDynOccluders;
 			for(Uint8 t : dynTypes){
-				for(Uint16 oid : world.objectsbytype[t]){
+				for(Uint16 oid : world.objects.objectsbytype[t]){
 					Object * obj = world.GetObjectFromId(oid);
 					if(!obj || !obj->draw) continue;
 					int ox1, oy1, ox2, oy2;
@@ -1155,7 +1155,7 @@ void Renderer::DrawMiniMap(Object * object){
 								}
 							}
 						}else{
-							for(std::vector<Uint16>::iterator it = world.objectsbytype[ObjectTypes::TEAM].begin(); it != world.objectsbytype[ObjectTypes::TEAM].end(); it++){
+							for(std::vector<Uint16>::iterator it = world.objects.objectsbytype[ObjectTypes::TEAM].begin(); it != world.objects.objectsbytype[ObjectTypes::TEAM].end(); it++){
 								Team * team = static_cast<Team*>(world.GetObjectFromId((*it)));
 								if(team && team->beamingterminalid == terminal->id){
 									color = team->GetColor();
@@ -1182,7 +1182,7 @@ void Renderer::DrawMiniMap(Object * object){
 								}
 							}
 						}else{
-							for(std::vector<Uint16>::iterator it = world.objectsbytype[ObjectTypes::TEAM].begin(); it != world.objectsbytype[ObjectTypes::TEAM].end(); it++){
+							for(std::vector<Uint16>::iterator it = world.objects.objectsbytype[ObjectTypes::TEAM].begin(); it != world.objects.objectsbytype[ObjectTypes::TEAM].end(); it++){
 								Team * team = static_cast<Team *>(world.GetObjectFromId((*it)));
 								if(team && team->beamingterminalid == terminal->id){
 									color = team->GetColor();
@@ -1739,13 +1739,13 @@ void Renderer::DrawDebug(Surface * surface){
 	char temp[1234];
 	sprintf(temp, "%d %d %d %d %d %d", world.localinput.keymovedown, world.localinput.keymoveup, world.localinput.keymoveleft, world.localinput.keymoveright, world.localinput.keyjump, world.localinput.keyjetpack);
 	DrawText(surface, 10, 30, temp, 133, 7, false, -16);
-	sprintf(temp, "mode: %s(%d), snapshots: %d, input packets: %d, ambience: %d objects: %d", world.mode ? "REPLICA" : "AUTHORITY", world.localpeerid, world.totalsnapshots, world.totalinputpackets, world.map.ambience, int(world.objectlist.size()));
+	sprintf(temp, "mode: %s(%d), snapshots: %d, input packets: %d, ambience: %d objects: %d", world.mode ? "REPLICA" : "AUTHORITY", world.peers.localpeerid, world.replication.totalsnapshots, world.replication.totalinputpackets, world.map.ambience, int(world.objects.objectlist.size()));
 	DrawText(surface, 10, 40, temp, 133, 7, false, -64);
 	for(int i = 0; i < world.maxpeers; i++){
-		if(world.peerlist[i]){
+		if(world.peers.peerlist[i]){
 			char controlled[1234];
 			controlled[0] = 0;
-			for(std::list<Uint16>::iterator it = world.peerlist[i]->controlledlist.begin(); it != world.peerlist[i]->controlledlist.end(); it++){
+			for(std::list<Uint16>::iterator it = world.peers.peerlist[i]->controlledlist.begin(); it != world.peers.peerlist[i]->controlledlist.end(); it++){
 				Object * object = world.GetObjectFromId(*it);
 				if(object){
 					sprintf(controlled, " %d(%d, %d) ", (*it), object->x, object->y);
@@ -1756,7 +1756,7 @@ void Renderer::DrawDebug(Surface * surface){
 			DrawText(surface, 10, 50 + (10 * i), temp, 133, 7, false, -48);
 			
 			/*for(int j = 0; j < world.maxoldsnapshots; j++){
-				Serializer * oldsnapshot = world.oldsnapshots[i][j];
+				Serializer * oldsnapshot = world.replication.oldsnapshots[i][j];
 				if(oldsnapshot){
 					sprintf(temp, "peerlist(%d)->oldsnapshots[%d] = offset:%d", i, j, oldsnapshot->offset);
 					DrawText(surface, 10, 100 + (10 * j), temp, 133, 7, false, -48);

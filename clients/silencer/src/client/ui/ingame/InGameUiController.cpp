@@ -195,7 +195,7 @@ InGameUiControlResult InGameUiController::ConfigureForControl(InGameUiControlMod
 		result.chatActive = player->chatActive;
 		result.buyActive = player->isbuying;
 		result.techActive = player->techstationactive;
-		result.showChatTicks = world_.showchat_i;
+		result.showChatTicks = world_.messaging.showchat_i;
 		result.showPlayerList = world_.IsShowingPlayerList();
 		result.buyItemCount = static_cast<int>(buyItems.size());
 		result.techItemCount = static_cast<int>(techItems.size());
@@ -208,7 +208,7 @@ InGameUiControlResult InGameUiController::ConfigureForControl(InGameUiControlMod
 		player->chatText[0] = '\0';
 		player->isbuying = false;
 		player->techstationactive = false;
-		world_.showchat_i = 0;
+		world_.messaging.showchat_i = 0;
 		world_.SetShowingPlayerList(false);
 	};
 
@@ -224,7 +224,7 @@ InGameUiControlResult InGameUiController::ConfigureForControl(InGameUiControlMod
 		player->chatwithteam = false;
 		std::strncpy(player->chatText, "clay chat smoke", sizeof(player->chatText) - 1);
 		player->chatText[sizeof(player->chatText) - 1] = '\0';
-		world_.showchat_i = GASLoader::Get().gameengine.chatDisplayTicks;
+		world_.messaging.showchat_i = GASLoader::Get().gameengine.chatDisplayTicks;
 	}
 	if(mode == InGameUiControlMode::Buy || mode == InGameUiControlMode::All){
 		player->isbuying = true;

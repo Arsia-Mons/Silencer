@@ -143,7 +143,7 @@ void Audio::UpdateVolume(World & world, int channel, Sint16 x, Sint16 y, int rad
 	if(!object) return;
 
 	// Local player's own sounds are never attenuated, filtered, or panned.
-	Player * localplayer = world.GetPeerPlayer(world.localpeerid);
+	Player * localplayer = world.GetPeerPlayer(world.peers.localpeerid);
 	if(localplayer && objectid == localplayer->id){
 		MIX_SetTrackGain(tracks[channel], (channelvolume[channel] / 128.0f) * effectvolume);
 		filterAlpha[channel] = 1.0f;

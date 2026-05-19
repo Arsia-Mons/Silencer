@@ -172,7 +172,7 @@ std::vector<silencer::ui::UiAction> unhandledUiActions =
 clientUi.DispatchInput(game.screenContext, preparedUiInput);
 if(!clientUi.HasScreens() && game.world.map.loaded){
 inGameUiController.ApplyActions(
-game.world.localpeerid, unhandledUiActions, clientUi.Interactions());
+game.world.peers.localpeerid, unhandledUiActions, clientUi.Interactions());
 }
 bool nowFocused = clientUi.Interactions().HasTextInputFocus();
 if(nowFocused && !textInputFocused){
@@ -201,7 +201,7 @@ GameUiPipeline::GameUiPipeline(Game & g)
 
 bool GameUiPipeline::HasInputTarget() {
 if(Top()) return true;
-return inGameUiController.HasInputTarget(game.world.localpeerid);
+return inGameUiController.HasInputTarget(game.world.peers.localpeerid);
 }
 
 void GameUiPipeline::Push(std::unique_ptr<Screen> s){

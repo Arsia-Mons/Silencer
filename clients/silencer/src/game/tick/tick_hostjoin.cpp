@@ -12,7 +12,7 @@ using namespace GameState;
 
 void Game::TickHostGame(){
 	if(stateisnew){
-		world.lagsimulator.Activate(200, 200, 0.0f);
+		world.network.lagsimulator.Activate(200, 200, 0.0f);
 		world.Listen(12456);
 		world.DestroyAllObjects();
 		Audio::GetInstance().StopMusic();
@@ -34,7 +34,7 @@ void Game::TickHostGame(){
 	/*if(world.tickcount % 48 == 0){
 		world.SendPeerList();
 	}*/
-	if(!world.map.loaded && world.peercount >= 1 && world.AllPeersLoadedGameInfo() && world.AllPeersDownloadedMap()){
+	if(!world.map.loaded && world.peers.peercount >= 1 && world.AllPeersLoadedGameInfo() && world.AllPeersDownloadedMap()){
 		GetScreenBuffer().Clear(0);
 		if(world.replay.IsRecording()){
 			world.replay.WriteStart();
@@ -51,7 +51,7 @@ void Game::TickHostGame(){
 		}
 		//world.GetAuthorityPeer()->controlledlist.clear();
 		world.gameplaystate = World::INGAME;
-		for(std::list<Object *>::iterator it = world.objectlist.begin(); it != world.objectlist.end(); it++){
+		for(std::list<Object *>::iterator it = world.objects.objectlist.begin(); it != world.objects.objectlist.end(); it++){
 			Object * object = *it;
 			switch(object->type){
 				case ObjectTypes::TEAM:{
@@ -68,11 +68,11 @@ void Game::TickHostGame(){
 								Uint8 teamcolor = team->GetColor();
 								player->suitcolor = (((teamcolor >> 4) - i) << 4) + (teamcolor & 0xF);
 								for(int j = 0; j < 5; j++){
-									world.peerlist[team->peers[i]]->techchoices |= 1 << (rand() % 10);
+									world.peers.peerlist[team->peers[i]]->techchoices |= 1 << (rand() % 10);
 								}
-								world.peerlist[team->peers[i]]->techchoices = 0xffffffff;
-								world.peerlist[team->peers[i]]->controlledlist.clear();
-								world.peerlist[team->peers[i]]->controlledlist.push_back(player->id);
+								world.peers.peerlist[team->peers[i]]->techchoices = 0xffffffff;
+								world.peers.peerlist[team->peers[i]]->controlledlist.clear();
+								world.peers.peerlist[team->peers[i]]->controlledlist.push_back(player->id);
 								gameSession.GiveDefaultItems(*player);
 							}
 						}
@@ -158,7 +158,7 @@ void Game::TickTestGame(){
 		}
 		world.gameinfo.securitylevel = LobbyGame::SECHIGH;
 		gameSession.LoadMap("level/ALLY10c.sil");
-		for(std::list<Object *>::iterator it = world.objectlist.begin(); it != world.objectlist.end(); it++){
+		for(std::list<Object *>::iterator it = world.objects.objectlist.begin(); it != world.objects.objectlist.end(); it++){
 			if((*it)->type == ObjectTypes::PLAYER){
 				Player * player = static_cast<Player *>(*it);
 				world.map.RandomPlayerStartLocation(world, player->x, player->y);
@@ -172,10 +172,10 @@ void Game::TickTestGame(){
 		singleplayermessage = 0;
 		stateisnew = false;
 	}else{
-		/*Player * localplayer = world.GetPeerPlayer(world.authoritypeer);
+		/*Player * localplayer = world.GetPeerPlayer(world.peers.authoritypeer);
 		if(localplayer){
 			if(localplayer->state == Player::STANDINGSHOOT){
-				for(std::list<Object *>::iterator it = world.objectlist.begin(); it != world.objectlist.end(); it++){
+				for(std::list<Object *>::iterator it = world.objects.objectlist.begin(); it != world.objects.objectlist.end(); it++){
 					if((*it)->type == ObjectTypes::PLAYER){
 						Player * player = static_cast<Player *>(*it);
 						if(player->ai){

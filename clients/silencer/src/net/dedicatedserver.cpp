@@ -32,7 +32,7 @@ void DedicatedServer::Start(char * lobbyaddress, unsigned short lobbyport, Uint3
 void DedicatedServer::Tick(World & world){
 	if(world.gameplaystate == World::INLOBBY){
 		for(int i = 0; i < world.maxpeers; i++){
-			Peer * peer = world.peerlist[i];
+			Peer * peer = world.peers.peerlist[i];
 			if(peer){
 				User * user = world.lobby.GetUserInfo(peer->accountid);
 				if(!user->retrieving){
@@ -46,7 +46,7 @@ void DedicatedServer::Tick(World & world){
 			}
 		}
 	}
-	if(world.peercount < 1){
+	if(world.peers.peercount < 1){
 		nopeerstime++;
 	}else{
 		nopeerstime = 0;
@@ -69,14 +69,14 @@ void DedicatedServer::SendHeartBeat(World & world, Uint8 state){
 	char code = 0;
 	data.Put(code);
 	data.Put(gameid);
-	data.Put(world.boundport);
+	data.Put(world.network.boundport);
 	data.Put(state);
 	// Parked-peer accountids — lobby derives a per-recipient can-rejoin bit
 	// for the game-list payload so clients can offer "Join" on INGAME rows
 	// they previously disconnected from.
 	std::vector<Uint32> parked;
 	for(int i = 1; i < world.maxpeers; i++){
-		Peer * p = world.peerlist[i];
+		Peer * p = world.peers.peerlist[i];
 		if(p && p->disconnected && p->accountid != 0 && !p->isbot){
 			parked.push_back(p->accountid);
 		}
@@ -92,7 +92,7 @@ void DedicatedServer::SendHeartBeat(World & world, Uint8 state){
 	data.Put(tickcount);
 	Uint32 aliveMask = 0;
 	for(int i = 0; i < world.maxpeers && i < 32; i++){
-		Peer * p = world.peerlist[i];
+		Peer * p = world.peers.peerlist[i];
 		if(p && !p->disconnected){
 			aliveMask |= (1u << i);
 		}

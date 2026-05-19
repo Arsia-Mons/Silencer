@@ -36,13 +36,13 @@ bool Game::Loop(void){
 	if(updatetitle){
 		if(!headless && gameRenderer.GetWindow()){
 			char title[128];
-			sprintf(title, "Silencer - %d FPS  Latency: %d ms [%d]  B/s: D:%d U:%d", fps, world.GetPingTime(), (int)world.snapshotqueue.size(), world.totalbytesread, world.totalbytessent);
+			sprintf(title, "Silencer - %d FPS  Latency: %d ms [%d]  B/s: D:%d U:%d", fps, world.GetPingTime(), (int)world.replication.snapshotqueue.size(), world.network.totalbytesread, world.network.totalbytessent);
 			SDL_SetWindowTitle(gameRenderer.GetWindow(), title);
 		}
 		updatetitle = false;
 		frames = 1;
-		world.totalbytesread = 0;
-		world.totalbytessent = 0;
+		world.network.totalbytesread = 0;
+		world.network.totalbytessent = 0;
 	}
 	/*while(SDL_GetTicks() - lasttick <= wait){
 		//SDL_Delay(1);
@@ -270,14 +270,14 @@ bool Game::Tick(void){
 	if(state != FADEOUT){
 		gameUiPipeline.ClientUiRef().TickVisibleScreens(screenContext);
 	}
-	gameUiPipeline.InGameUi().UpdateOverlayState(world.localpeerid);
+	gameUiPipeline.InGameUi().UpdateOverlayState(world.peers.localpeerid);
 	if(!world.dedicatedserver.active){
 		if(world.lobby.state == Lobby::AUTHENTICATED){
 			// 0 = main lobby, 1 = pregame (game-specific lobby, waiting for
 			// match start), 2 = playing (gameplaystate == INGAME).
 			Uint32 targetgid = 0;
 			Uint8 targetstatus = 0;
-			if(currentlobbygameid != 0 && world.state == World::CONNECTED){
+			if(currentlobbygameid != 0 && world.network.state == World::CONNECTED){
 				targetgid = currentlobbygameid;
 				targetstatus = (world.gameplaystate == World::INGAME) ? 2 : 1;
 			}
@@ -298,7 +298,7 @@ bool Game::Tick(void){
 		}
 		if(sharedstate){
 			State * sharedstateobject = static_cast<State *>(world.GetObjectFromId(sharedstate));
-			if(sharedstateobject && sharedstateobject->state == 0 && world.peercount >= 1 && world.AllPeersReady(world.localpeerid) && world.AllPeersLoadedGameInfo() && world.AllPeersDownloadedMap()){
+			if(sharedstateobject && sharedstateobject->state == 0 && world.peers.peercount >= 1 && world.AllPeersReady(world.peers.localpeerid) && world.AllPeersLoadedGameInfo() && world.AllPeersDownloadedMap()){
 				sharedstateobject->state = 1;
 				GoToState(INGAME);
 			}
@@ -308,7 +308,7 @@ bool Game::Tick(void){
 			// Ready-button text refresh ("Waiting..." vs "Ready") happens
 			// in GameJoinPanelTick — runs each frame from LobbyScreen::Tick.
 		}
-		/*Peer * localpeer = world.peerlist[world.localpeerid];
+		/*Peer * localpeer = world.peers.peerlist[world.peers.localpeerid];
 		if(localpeer){
 			if(localpeer->gameinfoloaded && !world.dedicatedserver.checkedhavemap){
 				if(mapDownloader.FindMap(world.gameinfo.mapname, &world.gameinfo.maphash).size() > 0){
@@ -321,7 +321,7 @@ bool Game::Tick(void){
 	}
 	if(!sharedstate && !world.IsAuthority()){
 		//printf("no shared state!");
-		for(std::list<Object *>::iterator it = world.objectlist.begin(); it != world.objectlist.end(); it++){
+		for(std::list<Object *>::iterator it = world.objects.objectlist.begin(); it != world.objects.objectlist.end(); it++){
 			Object * object = *it;
 			if(object->type == ObjectTypes::STATE){
 				sharedstate = object->id;
@@ -539,10 +539,10 @@ const char* Game::StateName(Uint8 s){
 WorldSummary Game::GetWorldSummary(){
 	WorldSummary summary;
 	summary.map = world.gameinfo.mapname;
-	summary.peers = static_cast<int>(world.peercount);
-	summary.localPeerId = static_cast<int>(world.localpeerid);
+	summary.peers = static_cast<int>(world.peers.peercount);
+	summary.localPeerId = static_cast<int>(world.peers.localpeerid);
 	summary.viewedPeerId = static_cast<int>(world.viewedpeerid);
-	summary.authorityPeer = static_cast<int>(world.authoritypeer);
+	summary.authorityPeer = static_cast<int>(world.peers.authoritypeer);
 	summary.lobbyAccountId = static_cast<unsigned int>(world.lobby.accountid);
 	summary.isLocalObserver = world.IsLocalObserver();
 	summary.spectatorInitialized = world.spectator.initialized;
@@ -554,7 +554,7 @@ WorldSummary Game::GetWorldSummary(){
 	summary.topMessageText = world.GetTopMessageText();
 	summary.topMessageProgress = static_cast<int>(world.GetTopMessageProgress());
 	for(unsigned int i = 0; i < world.maxpeers; i++){
-		Peer * p = world.peerlist[i];
+		Peer * p = world.peers.peerlist[i];
 		if(!p) continue;
 		WorldPeerSummary peer;
 		peer.id = static_cast<int>(i);
@@ -566,7 +566,7 @@ WorldSummary Game::GetWorldSummary(){
 		}
 		summary.peerList.push_back(std::move(peer));
 	}
-	for(auto* o : world.objectlist){
+	for(auto* o : world.objects.objectlist){
 		++summary.objectsCount;
 		if(o && o->type == ObjectTypes::PLAYER){
 			Player* p = (Player*)o;
@@ -582,5 +582,5 @@ WorldSummary Game::GetWorldSummary(){
 }
 
 bool Game::IsLiveMultiplayer() const {
-	return (world.peercount > 1) && (world.gameplaystate == World::INGAME);
+	return (world.peers.peercount > 1) && (world.gameplaystate == World::INGAME);
 }

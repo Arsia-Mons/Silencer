@@ -201,7 +201,7 @@ void MapDownloader::LoadMapData(const char * filename){
 }
 
 void MapDownloader::ProcessMapDownload(void){
-	Peer * localpeer = world.peerlist[world.localpeerid];
+	Peer * localpeer = world.peers.peerlist[world.peers.localpeerid];
 	if(localpeer){
 		if(localpeer->gameinfoloaded){
 			if(!localpeer->mapdownloaded){

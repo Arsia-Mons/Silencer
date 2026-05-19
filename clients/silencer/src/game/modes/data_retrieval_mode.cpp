@@ -13,7 +13,7 @@
 // lost network packets on the delivery event.
 void DataRetrievalMode::Tick(World& world) {
 	if(world.winningteamid) return;
-	for(Object* obj : world.objectlist){
+	for(Object* obj : world.objects.objectlist){
 		if(obj->type != ObjectTypes::TEAM) continue;
 		Team* team = static_cast<Team*>(obj);
 		if(team->secrets >= GASLoader::Get().player.secretsNeededToWin){
@@ -32,7 +32,7 @@ Uint16 DataRetrievalMode::WinningTeamId(const World& w) const {
 }
 
 void DataRetrievalMode::UpdateScores(GameStateObject& gso, const World& w) const {
-	for(Object* obj : w.objectlist){
+	for(Object* obj : w.objects.objectlist){
 		if(obj->type != ObjectTypes::TEAM) continue;
 		const Team* team = static_cast<const Team*>(obj);
 		if(team->number < 6){
@@ -45,7 +45,7 @@ void DataRetrievalMode::OnSecretBeamReady(World& world, Team& team) {
 	if(!world.IsAuthority()) return;
 
 	std::vector<Terminal*> terminals;
-	for(auto* obj : world.objectlist){
+	for(auto* obj : world.objects.objectlist){
 		if(obj->type != ObjectTypes::TERMINAL) continue;
 		Terminal* terminal = static_cast<Terminal*>(obj);
 		if(terminal->isbig &&
@@ -68,7 +68,7 @@ void DataRetrievalMode::OnSecretBeamReady(World& world, Team& team) {
 	sprintf(teamtext, "TOP SECRET LOCATION DETERMINED\n\nApproximate time : %d seconds", terminal->beamingtime);
 	sprintf(enemytext, "ENEMY BEAMING DETECTED\n\nTracking location on radar");
 	for(int i = 0; i < world.maxpeers; i++){
-		Peer* peer = world.peerlist[i];
+		Peer* peer = world.peers.peerlist[i];
 		if(!peer) continue;
 		if(world.GetPeerTeam(peer->id) == &team){
 			world.ShowMessage(teamtext, 128, 0, true, peer);
@@ -111,7 +111,7 @@ void DataRetrievalMode::OnSecretDelivered(World& world, Team& team) {
 	world.winningteamid = team.id;
 
 	// Un-deploy winners; terminate everyone else.
-	for(auto* obj : world.objectlist){
+	for(auto* obj : world.objects.objectlist){
 		if(obj->type != ObjectTypes::PLAYER) continue;
 		Player* player = static_cast<Player*>(obj);
 		Team* pt = player->GetTeam(world);
@@ -125,12 +125,12 @@ void DataRetrievalMode::OnSecretDelivered(World& world, Team& team) {
 
 	// Broadcast result to all peers.
 	for(int i = 0; i < world.maxpeers; i++){
-		Peer* peer = world.peerlist[i];
+		Peer* peer = world.peers.peerlist[i];
 		if(!peer) continue;
 
 		bool isourteam = false;
 		for(int j = 0; j < team.numpeers; j++){
-			Peer* tp = world.peerlist[team.peers[j]];
+			Peer* tp = world.peers.peerlist[team.peers[j]];
 			if(tp && tp->id == peer->id){ isourteam = true; break; }
 		}
 
@@ -147,7 +147,7 @@ void DataRetrievalMode::OnSecretDelivered(World& world, Team& team) {
 		char message[256];
 		sprintf(message, "%sAll secrets retrieved\nby %s agents:\n\n", fs, team.GetAgencyName());
 		for(int j = 0; j < team.numpeers; j++){
-			Peer* tp = world.peerlist[team.peers[j]];
+			Peer* tp = world.peers.peerlist[team.peers[j]];
 			if(tp){
 				User* user = world.lobby.GetUserInfo(tp->accountid);
 				strcat(message, user->name);

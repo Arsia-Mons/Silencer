@@ -48,7 +48,7 @@ static const struct { Action a; InputField field; } INPUT_FIELDS[] = {
 };
 
 void GameInput::TickRumble(){
-Player * localPlayer = game.world.GetPeerPlayer(game.world.localpeerid);
+Player * localPlayer = game.world.GetPeerPlayer(game.world.peers.localpeerid);
 if(!gamepad || game.world.gameplaystate != World::INGAME || !localPlayer) return;
 
 if(localPlayer->rumbleFire){
@@ -67,7 +67,7 @@ SDL_RumbleGamepad(gamepad, 18000, 0, 120);
 
 void GameInput::TickGamepadMenuNav(){
 if(!gamepadstate.connected) return;
-Player * localplayer = game.world.GetPeerPlayer(game.world.localpeerid);
+Player * localplayer = game.world.GetPeerPlayer(game.world.peers.localpeerid);
 bool inGameUi = localplayer && (localplayer->chatActive || localplayer->isbuying || localplayer->techstationactive);
 Screen * top = game.GetTopScreen();
 if(!top && !inGameUi) return;
@@ -156,7 +156,7 @@ input.mousex = (Uint16)mousex;
 input.mousey = (Uint16)mousey;
 input.mousedown = SDL_BUTTON_LEFT & mousestate ? true : false;
 
-Player * localplayer = game.world.GetPeerPlayer(game.world.localpeerid);
+Player * localplayer = game.world.GetPeerPlayer(game.world.peers.localpeerid);
 if(localplayer){
 if(input.keynextweapon && !localplayer->input.keynextweapon){
 switch(localplayer->currentweapon){
@@ -255,9 +255,9 @@ gamepadstate.axes[a] = SDL_GetGamepadAxis(gamepad, (SDL_GamepadAxis)a);
 
 void GameInput::OnScancodeDown(int sc){
 if(sc == game.quitscancode){
-Peer * lp = game.world.peerlist[game.world.localpeerid];
+Peer * lp = game.world.peers.peerlist[game.world.peers.localpeerid];
 bool isobserver = lp && lp->observer;
-Player * localplayer = game.world.GetPeerPlayer(game.world.localpeerid);
+Player * localplayer = game.world.GetPeerPlayer(game.world.peers.localpeerid);
 bool playerok = localplayer && !localplayer->chatActive && !localplayer->isbuying && !localplayer->techstationactive;
 if(isobserver || playerok){
 if(game.world.quitstate == 0){
