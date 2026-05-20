@@ -10,6 +10,7 @@ import ReactFlow, {
   MiniMap,
   Node,
   NodeProps,
+  Panel,
   Position,
   ReactFlowProvider,
   useEdgesState,
@@ -263,6 +264,8 @@ function VolumeNode({ data, id, selected }: NodeProps) {
       <div style={{ fontSize: 11 }}>
         <div style={{ color: C.dim, fontSize: 9, marginBottom: 3 }}>scalar ×{scalar.toFixed(2)}</div>
         <input type="range" min={0} max={4} step={0.01} value={scalar} className="nodrag"
+          onPointerDown={e => e.stopPropagation()}
+          onInput={e => setScalar(parseFloat((e.target as HTMLInputElement).value))}
           onChange={e => setScalar(parseFloat(e.target.value))}
           style={{ width: 140, accentColor: C.primary }} />
       </div>
@@ -283,6 +286,8 @@ function PitchNode({ data, id, selected }: NodeProps) {
           {semitones >= 0 ? '+' : ''}{semitones} semitones
         </div>
         <input type="range" min={-24} max={24} step={1} value={semitones} className="nodrag"
+          onPointerDown={e => e.stopPropagation()}
+          onInput={e => setSemitones(parseInt((e.target as HTMLInputElement).value))}
           onChange={e => setSemitones(parseInt(e.target.value))}
           style={{ width: 140, accentColor: C.primary }} />
       </div>
@@ -452,6 +457,7 @@ function CueCanvas({ cue, onChange, activePath }: {
   const [nodes, setNodes, onNodesChange] = useNodesState(initNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initEdges);
   const [soundList, setSoundList] = useState<string[]>([]);
+  const [selCount, setSelCount] = useState(0);
   const wrapperRef = useRef<HTMLDivElement>(null);
   const { screenToFlowPosition } = useReactFlow();
   const mountedRef = useRef(false);       // skip first-render onChange
@@ -542,6 +548,11 @@ function CueCanvas({ cue, onChange, activePath }: {
         0%,100% { box-shadow: 0 0 8px 2px rgba(0,255,85,0.5); outline-color: #00ff55; }
         50%      { box-shadow: 0 0 22px 6px rgba(0,255,85,0.9), 0 0 40px 10px rgba(0,163,40,0.4); outline-color: #80ffaa; }
       }
+      .react-flow__edge.selected .react-flow__edge-path {
+        stroke: #00ff55 !important;
+        stroke-width: 2.5px !important;
+        filter: drop-shadow(0 0 4px rgba(0,255,85,0.7));
+      }
     `}</style>
     <div style={{ flex: 1, height: '100%', display: 'flex' }}>
       {/* Canvas */}
@@ -553,12 +564,28 @@ function CueCanvas({ cue, onChange, activePath }: {
           onConnect={onConnect}
           isValidConnection={isValidConnection}
           nodeTypes={NODE_TYPES}
+          deleteKeyCode={['Delete', 'Backspace']}
+          onSelectionChange={({ nodes: sn, edges: se }) => setSelCount(sn.length + se.length)}
           fitView
           style={{ background: C.bg }}
         >
           <Background color={C.border} gap={20} />
           <Controls style={{ background: C.card, border: `1px solid ${C.border}` }} />
           <MiniMap style={{ background: C.card }} nodeColor={n => NODE_COLORS[n.type ?? ''] ?? C.muted} />
+          {selCount > 0 && (
+            <Panel position="top-center">
+              <div style={{
+                background: 'rgba(10,18,10,0.9)', border: `1px solid ${C.border}`,
+                borderRadius: 4, padding: '3px 10px', fontSize: 11, color: C.dim,
+                display: 'flex', alignItems: 'center', gap: 6,
+              }}>
+                <span style={{ color: C.text }}>{selCount} selected</span>
+                <span>·</span>
+                <kbd style={{ background: C.border, color: C.text, borderRadius: 3, padding: '1px 5px', fontSize: 10 }}>DEL</kbd>
+                <span>to delete</span>
+              </div>
+            </Panel>
+          )}
         </ReactFlow>
       </div>
 
