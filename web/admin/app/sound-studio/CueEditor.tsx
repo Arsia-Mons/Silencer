@@ -921,6 +921,7 @@ export default function CueEditor({ cueFiles, onCueFilesChange, soundList, parse
   const [newCueName, setNewCueName] = useState('');
   const [creating, setCreating] = useState(false);
   const [activePath, setActivePath] = useState<string[]>([]);
+  const initialCueIdRef = useRef(initialCueId);
 
   const openCue = openCueId ? (cueFiles[openCueId] ?? null) : null;
   const cueList = Object.keys(cueFiles).sort().map(id => ({
@@ -928,6 +929,21 @@ export default function CueEditor({ cueFiles, onCueFilesChange, soundList, parse
     nodeCount: cueFiles[id].nodes.length,
     edgeCount: cueFiles[id].edges.length,
   }));
+
+  // Keep URL ?cue= in sync with open cue
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const url = new URL(window.location.href);
+    if (openCueId) url.searchParams.set('cue', openCueId);
+    else url.searchParams.delete('cue');
+    window.history.replaceState(null, '', url.toString());
+  }, [openCueId]);
+
+  // If cueFiles load after mount (folder picked later), auto-open the initial cue
+  useEffect(() => {
+    const id = initialCueIdRef.current;
+    if (id && cueFiles[id] && !openCueId) setOpenCueId(id);
+  }, [cueFiles, openCueId]);
 
   useEffect(() => {
     if (!openCueId || cueFiles[openCueId]) return;
