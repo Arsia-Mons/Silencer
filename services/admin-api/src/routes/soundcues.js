@@ -74,7 +74,7 @@ router.put('/:id', requireAuth, async (req, res) => {
   const id = sanitizeId(req.params.id);
   const path = join(CUES_DIR, `${id}.json`);
   try {
-    const body = await req.json();
+    const body = { ...req.body };
     // Enforce id field matches URL
     body.id = id;
     // Basic validation
