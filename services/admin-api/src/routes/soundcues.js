@@ -15,7 +15,7 @@
 import { Router } from 'express';
 import { existsSync, readdirSync, readFileSync, writeFileSync, unlinkSync, mkdirSync } from 'fs';
 import { join, basename } from 'path';
-import { requireAuth } from '../middleware/auth.js';
+import { requireAuth } from '../auth/jwt.js';
 
 const router = Router();
 
