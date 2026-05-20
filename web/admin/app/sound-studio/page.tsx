@@ -462,6 +462,9 @@ export default function SoundStudioPage() {
     if (typeof window === 'undefined') return 'sounds';
     return parseTabParam(new URLSearchParams(window.location.search).get('tab'));
   });
+  const initialCueId = typeof window !== 'undefined'
+    ? (new URLSearchParams(window.location.search).get('cue') ?? null)
+    : null;
   const [sounds, setSounds] = useState<SoundEntry[]>(_saved?.sounds ?? []);
   const [refs, setRefs] = useState<Record<string, SoundRef>>(_saved?.refs ?? {});
   const [levels, setLevels] = useState<Record<string, LevelInfo>>({});
@@ -2012,6 +2015,7 @@ export default function SoundStudioPage() {
               }}
               soundList={parsedBin?.entries.map(e => e.name) ?? []}
               parsedBin={parsedBinForCues}
+              initialCueId={initialCueId}
             />
           </div>
         )}

@@ -6,7 +6,11 @@ export default function SoundCueRedirectPage() {
   const router = useRouter();
 
   useEffect(() => {
-    router.replace('/sound-studio?tab=cues');
+    const cue = new URLSearchParams(window.location.search).get('cue');
+    const dest = cue
+      ? `/sound-studio?tab=cues&cue=${encodeURIComponent(cue)}`
+      : '/sound-studio?tab=cues';
+    router.replace(dest);
   }, [router]);
 
   return null;

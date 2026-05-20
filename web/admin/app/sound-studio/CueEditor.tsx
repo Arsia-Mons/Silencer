@@ -910,11 +910,12 @@ export interface CueEditorProps {
   onCueFilesChange: (files: Record<string, SoundCue>) => void;
   soundList: string[];
   parsedBin: ParsedSoundBinForCues | null;
+  initialCueId?: string | null;
 }
 
-export default function CueEditor({ cueFiles, onCueFilesChange, soundList, parsedBin }: CueEditorProps) {
+export default function CueEditor({ cueFiles, onCueFilesChange, soundList, parsedBin, initialCueId }: CueEditorProps) {
   const audioCtxRef = useRef<AudioContext | null>(null);
-  const [openCueId, setOpenCueId] = useState<string | null>(null);
+  const [openCueId, setOpenCueId] = useState<string | null>(initialCueId ?? null);
   const [dirty, setDirty] = useState(false);
   const [status, setStatus] = useState('');
   const [newCueName, setNewCueName] = useState('');
