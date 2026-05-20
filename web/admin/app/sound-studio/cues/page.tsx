@@ -1,5 +1,5 @@
 'use client';
-import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
+import { Suspense, createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import ReactFlow, {
   addEdge,
   Background,
@@ -21,6 +21,7 @@ import 'reactflow/dist/style.css';
 import { useAuth } from '../../../lib/auth';
 import Sidebar from '../../../components/Sidebar';
 import { apiFetch } from '../../../lib/api';
+import { useRouter, useSearchParams } from 'next/navigation';
 import * as store from '../../../lib/sound-cue-store';
 import type { CueEdge, CueListEntry, CueNode, CueNodeData, SoundCue } from '../../../lib/sound-cue-store';
 import { decodeAdpcmWav } from '../../sound-studio/adpcm';
@@ -820,7 +821,13 @@ function CueCanvas({ cue, onChange, activePath }: {
 
 // ─── Main page ────────────────────────────────────────────────────────────────
 export default function SoundCuePage() {
+  return <Suspense><SoundCuePageInner /></Suspense>;
+}
+
+function SoundCuePageInner() {
   useAuth();
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [cueList, setCueList] = useState<CueListEntry[]>(store.getList());
   const [openCue, setOpenCue] = useState<SoundCue | null>(store.getOpenCue());
   const [dirty, setDirty] = useState(false);
@@ -831,17 +838,28 @@ export default function SoundCuePage() {
   const [activePath, setActivePath] = useState<string[]>([]);
   const audioCtxRef = useRef<AudioContext | null>(null);
 
+  // Load cue list, then open ?cue= if present
   useEffect(() => {
-    if (store.getList().length === 0) {
-      apiFetch('/sound-cues')
-        .then(list => { store.setList(list as CueListEntry[]); setCueList(list as CueListEntry[]); })
-        .catch(() => {});
-    }
-  }, []);
+    const load = async () => {
+      let list = store.getList();
+      if (list.length === 0) {
+        list = await apiFetch('/sound-cues') as CueListEntry[];
+        store.setList(list); setCueList(list);
+      } else {
+        setCueList(list);
+      }
+      const id = searchParams.get('cue');
+      if (id && !store.getOpenCue()) {
+        try { await openCueById(id); } catch {}
+      }
+    };
+    load().catch(() => {});
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function openCueById(id: string) {
     const cue = await apiFetch(`/sound-cues/${id}`) as SoundCue;
     store.setOpenCue(cue); setOpenCue(cue); setDirty(false); setActivePath([]);
+    router.replace(`/sound-studio/cues?cue=${encodeURIComponent(id)}`);
   }
 
   function handleCueChange(updated: SoundCue) {
@@ -887,7 +905,10 @@ export default function SoundCuePage() {
   async function deleteCue(id: string) {
     if (!confirm(`Delete cue "${id}"?`)) return;
     await apiFetch(`/sound-cues/${id}`, { method: 'DELETE' });
-    if (openCue?.id === id) { setOpenCue(null); store.setOpenCue(null); }
+    if (openCue?.id === id) {
+      setOpenCue(null); store.setOpenCue(null);
+      router.replace('/sound-studio/cues');
+    }
     const list = await apiFetch('/sound-cues') as CueListEntry[];
     store.setList(list); setCueList(list);
   }
