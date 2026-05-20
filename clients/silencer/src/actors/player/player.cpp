@@ -28,6 +28,7 @@
 #include "bodypart.h"
 #include "walldefense.h"
 #include "actordef.h"
+#include "soundcue.h"
 #include "gamemode.h"
 #include <math.h>
 
@@ -1415,7 +1416,7 @@ void Player::Tick(World & world){
 					res_bank = 66;
 					res_index = state_i;
 					if(res_index == 3){
-						EmitSound(world, world.resources.soundbank[GASLoader::Get().player.soundFootstepCrouchL], 64);
+						{ auto _r = ResolveSound(GASLoader::Get().player.soundFootstepCrouchL, world.resources); if(_r.chunk) EmitSound(world, _r.chunk, static_cast<int>(64 * _r.volume)); };
 					}
 				}
 			}
@@ -1429,17 +1430,17 @@ void Player::Tick(World & world){
 					res_bank = 123;
 				}
 				if(res_index == 4){
-					EmitSound(world, world.resources.soundbank[GASLoader::Get().player.soundFootstepCrouchL], 64);
+					{ auto _r = ResolveSound(GASLoader::Get().player.soundFootstepCrouchL, world.resources); if(_r.chunk) EmitSound(world, _r.chunk, static_cast<int>(64 * _r.volume)); };
 				}
 				if(res_index == 11){
-					EmitSound(world, world.resources.soundbank[GASLoader::Get().player.soundFootstepCrouchR], 64);
+					{ auto _r = ResolveSound(GASLoader::Get().player.soundFootstepCrouchR, world.resources); if(_r.chunk) EmitSound(world, _r.chunk, static_cast<int>(64 * _r.volume)); };
 				}
 			}
 			if(state_i >= 21 && state_i < 25){
 				res_bank = 67;
 				res_index = state_i - 21;
 				if(res_index == 3){
-					EmitSound(world, world.resources.soundbank[GASLoader::Get().player.soundFootstepCrouchL], 64);
+					{ auto _r = ResolveSound(GASLoader::Get().player.soundFootstepCrouchL, world.resources); if(_r.chunk) EmitSound(world, _r.chunk, static_cast<int>(64 * _r.volume)); };
 				}
 				if(input.keymoveleft || input.keymoveright){
 					state_i = -1;
@@ -1461,10 +1462,10 @@ void Player::Tick(World & world){
 					state_i = 25 - 1;
 				}
 				if(res_index == 5){
-					EmitSound(world, world.resources.soundbank[GASLoader::Get().player.soundFootstepStairL], 48);
+					{ auto _r = ResolveSound(GASLoader::Get().player.soundFootstepStairL, world.resources); if(_r.chunk) EmitSound(world, _r.chunk, static_cast<int>(48 * _r.volume)); };
 				}
 				if(res_index == 15){
-					EmitSound(world, world.resources.soundbank[GASLoader::Get().player.soundFootstepStairR], 48);
+					{ auto _r = ResolveSound(GASLoader::Get().player.soundFootstepStairR, world.resources); if(_r.chunk) EmitSound(world, _r.chunk, static_cast<int>(48 * _r.volume)); };
 				}
 			}
 			//printf("bank: %d  index: %d\n", res_bank, res_index);
@@ -2994,7 +2995,7 @@ bool Player::CheckForGround(World & world, Platform & platform){
 	justjumpedfromladder = false;
 	int yt = platform.XtoY(x);
 	if(y <= yt || ((platform.type == Platform::STAIRSUP || platform.type == Platform::STAIRSDOWN) && y <= yt + 1)){
-		EmitSound(world, world.resources.soundbank[GASLoader::Get().player.soundFootstepCrouchR], 32);
+		{ auto _r = ResolveSound(GASLoader::Get().player.soundFootstepCrouchR, world.resources); if(_r.chunk) EmitSound(world, _r.chunk, static_cast<int>(32 * _r.volume)); };
 		EmitSound(world, world.resources.soundbank[GASLoader::Get().player.soundLandCrouch], 96);
 		yv = 0;
 		currentplatformid = platform.id;

@@ -1,0 +1,14 @@
+{
+  "id": "footstep_stair",
+  "nodes": [
+    { "id": "out", "type": "Output",     "position": { "x": 700, "y": 200 } },
+    { "id": "seq", "type": "Sequence",   "position": { "x": 420, "y": 200 }, "data": { "shuffle": false } },
+    { "id": "w1",  "type": "WavePlayer", "position": { "x": 100, "y":  80 }, "data": { "file": "stostep1.wav", "weight": 1 } },
+    { "id": "w2",  "type": "WavePlayer", "position": { "x": 100, "y": 220 }, "data": { "file": "stostepr.wav", "weight": 1 } }
+  ],
+  "edges": [
+    { "id": "e1", "source": "w1", "sourceHandle": "out", "target": "seq", "targetHandle": "in-0" },
+    { "id": "e2", "source": "w2", "sourceHandle": "out", "target": "seq", "targetHandle": "in-1" },
+    { "id": "e3", "source": "seq", "sourceHandle": "out", "target": "out", "targetHandle": "in" }
+  ]
+}

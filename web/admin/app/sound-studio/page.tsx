@@ -874,6 +874,12 @@ export default function SoundStudioPage() {
                 {t}
               </button>
             ))}
+            <a href="/sound-studio/cues"
+              style={{ padding: '2px 10px', fontSize: 11, fontFamily: 'monospace',
+                background: 'transparent', border: '1px solid #333', color: '#666',
+                borderRadius: 3, cursor: 'pointer', textDecoration: 'none' }}>
+              cues
+            </a>
           </div>
 
           {tab === 'sounds' && hasPending && (
