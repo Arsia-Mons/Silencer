@@ -96,38 +96,37 @@ function WavePlayerNode({ data, id, selected }: NodeProps) {
   const { setNodes } = useReactFlow();
   const sounds = useContext(SoundListCtx);
 
-  function setFile(file: string) {
-    setNodes(nds => nds.map(n => n.id !== id ? n : { ...n, data: { ...n.data, file } }));
+  function setField(key: string, val: unknown) {
+    setNodes(nds => nds.map(n => n.id !== id ? n : { ...n, data: { ...n.data, [key]: val } }));
   }
 
   return (
     <NodeShell type="WavePlayer" hasInput={false} selected={selected}>
-      {sounds.length > 0 ? (
-        <select
-          className="nodrag"
-          value={data.file || ''}
-          onChange={e => setFile(e.target.value)}
-          style={{
-            background: C.bg, border: `1px solid ${C.border}`, color: data.file ? C.light : C.muted,
-            borderRadius: 3, padding: '3px 5px', fontSize: 11, width: '100%', cursor: 'pointer',
-          }}
-        >
-          <option value="">— select sound —</option>
-          {sounds.map(s => <option key={s} value={s}>{s}</option>)}
-        </select>
-      ) : (
+      {/* Use datalist so async load never resets the current value */}
+      <input
+        list={`sounds-${id}`}
+        className="nodrag"
+        value={data.file || ''}
+        onChange={e => setField('file', e.target.value)}
+        placeholder="type or pick a sound…"
+        style={{
+          background: C.bg, border: `1px solid ${C.border}`, color: data.file ? C.light : C.muted,
+          borderRadius: 3, padding: '3px 5px', fontSize: 11, width: '100%',
+        }}
+      />
+      <datalist id={`sounds-${id}`}>
+        {sounds.map(s => <option key={s} value={s} />)}
+      </datalist>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4 }}>
+        <span style={{ color: C.dim, fontSize: 10 }}>weight</span>
         <input
+          type="number" min={0.1} max={100} step={0.1}
+          value={data.weight ?? 1}
           className="nodrag"
-          value={data.file || ''}
-          onChange={e => setFile(e.target.value)}
-          placeholder="sound name"
-          style={{
-            background: C.bg, border: `1px solid ${C.border}`, color: C.light,
-            borderRadius: 3, padding: '3px 5px', fontSize: 11, width: '100%',
-          }}
+          onChange={e => setField('weight', parseFloat(e.target.value) || 1)}
+          style={{ background: C.bg, border: `1px solid ${C.border}`, color: C.text, borderRadius: 3, padding: '2px 4px', fontSize: 11, width: 60 }}
         />
-      )}
-      <div style={{ color: C.dim, fontSize: 10, marginTop: 3 }}>weight: {data.weight ?? 1}</div>
+      </div>
     </NodeShell>
   );
 }
@@ -227,27 +226,63 @@ function SequenceNode(props: NodeProps) { return <MultiInputNode {...props} type
 function MixerNode(props: NodeProps)    { return <MultiInputNode {...props} type="Mixer" />; }
 
 // ─── Single-param nodes ───────────────────────────────────────────────────────
-function DelayNode({ data }: NodeProps) {
+function DelayNode({ data, id, selected }: NodeProps) {
+  const { setNodes } = useReactFlow();
+  function setField(key: string, val: number) {
+    setNodes(nds => nds.map(n => n.id !== id ? n : { ...n, data: { ...n.data, [key]: val } }));
+  }
+  const inputStyle = { background: C.bg, border: `1px solid ${C.border}`, color: C.text, borderRadius: 3, padding: '2px 4px', fontSize: 11, width: 58 };
   return (
-    <NodeShell type="Delay">
-      <div style={{ fontSize: 11 }}>min: {data.minSec ?? 0}s &nbsp; max: {data.maxSec ?? 0}s</div>
+    <NodeShell type="Delay" selected={selected}>
+      <div style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 11 }}>
+        <div>
+          <div style={{ color: C.dim, fontSize: 9, marginBottom: 2 }}>min (s)</div>
+          <input type="number" min={0} max={10} step={0.01} value={data.minSec ?? 0} className="nodrag"
+            onChange={e => setField('minSec', parseFloat(e.target.value) || 0)} style={inputStyle} />
+        </div>
+        <div>
+          <div style={{ color: C.dim, fontSize: 9, marginBottom: 2 }}>max (s)</div>
+          <input type="number" min={0} max={10} step={0.01} value={data.maxSec ?? 0.1} className="nodrag"
+            onChange={e => setField('maxSec', parseFloat(e.target.value) || 0.1)} style={inputStyle} />
+        </div>
+      </div>
     </NodeShell>
   );
 }
 
-function VolumeNode({ data }: NodeProps) {
+function VolumeNode({ data, id, selected }: NodeProps) {
+  const { setNodes } = useReactFlow();
+  const scalar = data.scalar ?? 1;
+  function setScalar(v: number) {
+    setNodes(nds => nds.map(n => n.id !== id ? n : { ...n, data: { ...n.data, scalar: v } }));
+  }
   return (
-    <NodeShell type="Volume">
-      <div style={{ fontSize: 11 }}>scalar: ×{(data.scalar ?? 1).toFixed(2)}</div>
-    </NodeShell>
-  );
-}
-
-function PitchNode({ data }: NodeProps) {
-  return (
-    <NodeShell type="Pitch">
+    <NodeShell type="Volume" selected={selected}>
       <div style={{ fontSize: 11 }}>
-        {(data.semitones ?? 0) >= 0 ? '+' : ''}{data.semitones ?? 0} st
+        <div style={{ color: C.dim, fontSize: 9, marginBottom: 3 }}>scalar ×{scalar.toFixed(2)}</div>
+        <input type="range" min={0} max={4} step={0.01} value={scalar} className="nodrag"
+          onChange={e => setScalar(parseFloat(e.target.value))}
+          style={{ width: 140, accentColor: C.primary }} />
+      </div>
+    </NodeShell>
+  );
+}
+
+function PitchNode({ data, id, selected }: NodeProps) {
+  const { setNodes } = useReactFlow();
+  const semitones = data.semitones ?? 0;
+  function setSemitones(v: number) {
+    setNodes(nds => nds.map(n => n.id !== id ? n : { ...n, data: { ...n.data, semitones: v } }));
+  }
+  return (
+    <NodeShell type="Pitch" selected={selected}>
+      <div style={{ fontSize: 11 }}>
+        <div style={{ color: C.dim, fontSize: 9, marginBottom: 3 }}>
+          {semitones >= 0 ? '+' : ''}{semitones} semitones
+        </div>
+        <input type="range" min={-24} max={24} step={1} value={semitones} className="nodrag"
+          onChange={e => setSemitones(parseInt(e.target.value))}
+          style={{ width: 140, accentColor: C.primary }} />
       </div>
     </NodeShell>
   );
@@ -410,6 +445,8 @@ function CueCanvas({ cue, onChange, activePath }: {
   const [soundList, setSoundList] = useState<string[]>([]);
   const wrapperRef = useRef<HTMLDivElement>(null);
   const { screenToFlowPosition } = useReactFlow();
+  const mountedRef = useRef(false);       // skip first-render onChange
+  const suppressRef = useRef(false);      // suppress onChange during activePath highlight
 
   useEffect(() => {
     apiFetch('/sounds')
@@ -418,6 +455,8 @@ function CueCanvas({ cue, onChange, activePath }: {
   }, []);
 
   useEffect(() => {
+    if (!mountedRef.current) { mountedRef.current = true; return; }
+    if (suppressRef.current) return;
     onChange(flowToCue(cue.id, nodes, edges));
   }, [nodes, edges]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -425,6 +464,7 @@ function CueCanvas({ cue, onChange, activePath }: {
   useEffect(() => {
     if (!activePath.length) return;
     const pathSet = new Set(activePath);
+    suppressRef.current = true;
     setNodes(nds => nds.map(n => ({
       ...n,
       style: pathSet.has(n.id)
@@ -438,8 +478,9 @@ function CueCanvas({ cue, onChange, activePath }: {
     const t = setTimeout(() => {
       setNodes(nds => nds.map(n => ({ ...n, style: {} })));
       setEdges(eds => eds.map(e => ({ ...e, style: { stroke: C.muted } })));
+      suppressRef.current = false;
     }, 3000);
-    return () => clearTimeout(t);
+    return () => { clearTimeout(t); suppressRef.current = false; };
   }, [activePath]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const isValidConnection = useCallback((conn: Connection) => {
@@ -572,7 +613,7 @@ export default function SoundCuePage() {
 
   async function openCueById(id: string) {
     const cue = await apiFetch(`/sound-cues/${id}`) as SoundCue;
-    store.setOpenCue(cue); setOpenCue(cue); setDirty(false);
+    store.setOpenCue(cue); setOpenCue(cue); setDirty(false); setActivePath([]);
   }
 
   function handleCueChange(updated: SoundCue) {
@@ -583,11 +624,16 @@ export default function SoundCuePage() {
     if (!openCue) return;
     setSaving(true);
     try {
-      await apiFetch(`/sound-cues/${openCue.id}`, {
+      const token = getToken();
+      const resp = await fetch(`/api/sound-cues/${openCue.id}`, {
         method: 'PUT',
-        headers: { 'content-type': 'application/json' },
+        headers: { 'content-type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
         body: JSON.stringify(openCue),
       });
+      if (!resp.ok) {
+        const body = await resp.json().catch(() => ({})) as any;
+        throw new Error(body?.error || `${resp.status} ${resp.statusText}`);
+      }
       store.setOpenCue(openCue); setDirty(false);
       setStatus('Saved'); setTimeout(() => setStatus(''), 2000);
       const list = await apiFetch('/sound-cues') as CueListEntry[];
