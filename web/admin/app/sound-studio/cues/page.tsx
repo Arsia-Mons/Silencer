@@ -447,6 +447,31 @@ const NODE_TYPE_LIST: CueNode['type'][] = [
   'WavePlayer', 'Random', 'Sequence', 'Mixer', 'Delay', 'Volume', 'Pitch',
 ];
 
+// ─── Context menu primitives ──────────────────────────────────────────────────
+function CtxItem({ label, shortcut, onClick, danger = false, disabled = false }: {
+  label: string; shortcut?: string; onClick?: () => void; danger?: boolean; disabled?: boolean;
+}) {
+  return (
+    <div
+      onClick={disabled ? undefined : onClick}
+      style={{
+        padding: '7px 14px', fontSize: 12, cursor: disabled ? 'default' : 'pointer',
+        color: disabled ? C.muted : danger ? '#ff5555' : C.text,
+        display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 20,
+        transition: 'background 0.1s',
+      }}
+      onMouseEnter={e => { if (!disabled) e.currentTarget.style.background = C.border; }}
+      onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
+    >
+      <span>{label}</span>
+      {shortcut && <span style={{ fontSize: 10, color: C.dim, fontFamily: 'monospace' }}>{shortcut}</span>}
+    </div>
+  );
+}
+function CtxSep() {
+  return <div style={{ borderTop: `1px solid ${C.border}`, margin: '2px 0' }} />;
+}
+
 // ─── Canvas + right palette ───────────────────────────────────────────────────
 function CueCanvas({ cue, onChange, activePath }: {
   cue: SoundCue;
@@ -458,10 +483,21 @@ function CueCanvas({ cue, onChange, activePath }: {
   const [edges, setEdges, onEdgesChange] = useEdgesState(initEdges);
   const [soundList, setSoundList] = useState<string[]>([]);
   const [selCount, setSelCount] = useState(0);
+  const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; nodeId?: string } | null>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
   const { screenToFlowPosition } = useReactFlow();
-  const mountedRef = useRef(false);       // skip first-render onChange
-  const suppressRef = useRef(false);      // suppress onChange during activePath highlight
+  const mountedRef    = useRef(false);
+  const suppressRef   = useRef(false);
+  const isUndoRedoRef = useRef(false);
+  // Always-current refs so keyboard handler closure is always fresh
+  const nodesRef = useRef(nodes);
+  const edgesRef = useRef(edges);
+  useEffect(() => { nodesRef.current = nodes; }, [nodes]);
+  useEffect(() => { edgesRef.current = edges; }, [edges]);
+  // History
+  const historyRef    = useRef<{ nodes: Node[]; edges: Edge[] }[]>([]);
+  const historyIdxRef = useRef(-1);
+  const clipboardRef  = useRef<{ nodes: Node[]; edges: Edge[] } | null>(null);
 
   useEffect(() => {
     apiFetch('/sounds')
@@ -469,9 +505,84 @@ function CueCanvas({ cue, onChange, activePath }: {
       .catch(() => {});
   }, []);
 
+  // Keyboard shortcuts — all read from refs so closure never goes stale
   useEffect(() => {
-    if (!mountedRef.current) { mountedRef.current = true; return; }
-    if (suppressRef.current) return;
+    function onKey(e: KeyboardEvent) {
+      const ctrl = e.ctrlKey || e.metaKey;
+      if (!ctrl) return;
+
+      if (e.key === 'z' && !e.shiftKey) {
+        e.preventDefault();
+        if (historyIdxRef.current <= 0) return;
+        historyIdxRef.current--;
+        isUndoRedoRef.current = true;
+        const snap = historyRef.current[historyIdxRef.current];
+        setNodes(snap.nodes); setEdges(snap.edges);
+        return;
+      }
+      if (e.key === 'y' || (e.key === 'z' && e.shiftKey)) {
+        e.preventDefault();
+        if (historyIdxRef.current >= historyRef.current.length - 1) return;
+        historyIdxRef.current++;
+        isUndoRedoRef.current = true;
+        const snap = historyRef.current[historyIdxRef.current];
+        setNodes(snap.nodes); setEdges(snap.edges);
+        return;
+      }
+      if (e.key === 'c') {
+        e.preventDefault();
+        const sel = nodesRef.current.filter(n => n.selected);
+        if (!sel.length) return;
+        const ids = new Set(sel.map(n => n.id));
+        clipboardRef.current = { nodes: sel, edges: edgesRef.current.filter(ed => ids.has(ed.source) && ids.has(ed.target)) };
+        return;
+      }
+      if (e.key === 'v') {
+        e.preventDefault();
+        const cb = clipboardRef.current;
+        if (!cb) return;
+        const stamp = Date.now();
+        const idMap: Record<string, string> = {};
+        cb.nodes.forEach((n, i) => { idMap[n.id] = `${n.type ?? 'node'}-paste-${stamp}-${i}`; });
+        const newNodes = cb.nodes.map(n => ({ ...n, id: idMap[n.id], position: { x: n.position.x + 60, y: n.position.y + 60 }, selected: true, style: {} }));
+        const newEdges = cb.edges.map((ed, i) => ({ ...ed, id: `e-paste-${stamp}-${i}`, source: idMap[ed.source] ?? ed.source, target: idMap[ed.target] ?? ed.target }));
+        setNodes(nds => [...nds.map(n => ({ ...n, selected: false })), ...newNodes]);
+        setEdges(eds => [...eds, ...newEdges]);
+        return;
+      }
+      if (e.key === 'd') {
+        e.preventDefault();
+        const sel = nodesRef.current.filter(n => n.selected);
+        if (!sel.length) return;
+        const ids = new Set(sel.map(n => n.id));
+        const intEdges = edgesRef.current.filter(ed => ids.has(ed.source) && ids.has(ed.target));
+        const stamp = Date.now();
+        const idMap: Record<string, string> = {};
+        sel.forEach((n, i) => { idMap[n.id] = `${n.type ?? 'node'}-dup-${stamp}-${i}`; });
+        const newNodes = sel.map(n => ({ ...n, id: idMap[n.id], position: { x: n.position.x + 60, y: n.position.y + 60 }, selected: true, style: {} }));
+        const newEdges = intEdges.map((ed, i) => ({ ...ed, id: `e-dup-${stamp}-${i}`, source: idMap[ed.source] ?? ed.source, target: idMap[ed.target] ?? ed.target }));
+        setNodes(nds => [...nds.map(n => ({ ...n, selected: false })), ...newNodes]);
+        setEdges(eds => [...eds, ...newEdges]);
+      }
+    }
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (!mountedRef.current) {
+      mountedRef.current = true;
+      historyRef.current = [{ nodes: nodes.map(n => ({ ...n, style: {} })), edges }];
+      historyIdxRef.current = 0;
+      return;
+    }
+    if (suppressRef.current) { isUndoRedoRef.current = false; return; }
+    if (!isUndoRedoRef.current) {
+      const snap = { nodes: nodes.map(n => ({ ...n, style: {} })), edges };
+      historyRef.current = [...historyRef.current.slice(0, historyIdxRef.current + 1), snap];
+      historyIdxRef.current = historyRef.current.length - 1;
+    }
+    isUndoRedoRef.current = false;
     onChange(flowToCue(cue.id, nodes, edges));
   }, [nodes, edges]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -541,6 +652,52 @@ function CueCanvas({ cue, onChange, activePath }: {
     setNodes(nds => [...nds, makeNode(type)]);
   }
 
+  function onNodeContextMenu(e: React.MouseEvent, node: Node) {
+    e.preventDefault();
+    const rect = wrapperRef.current?.getBoundingClientRect() ?? { left: 0, top: 0 };
+    setCtxMenu({ x: e.clientX - rect.left, y: e.clientY - rect.top, nodeId: node.id });
+  }
+
+  function onPaneContextMenu(e: React.MouseEvent) {
+    e.preventDefault();
+    const rect = wrapperRef.current?.getBoundingClientRect() ?? { left: 0, top: 0 };
+    setCtxMenu({ x: e.clientX - rect.left, y: e.clientY - rect.top });
+  }
+
+  function ctxCopyNode(nodeId: string) {
+    const node = nodesRef.current.find(n => n.id === nodeId);
+    if (!node) return;
+    clipboardRef.current = { nodes: [node], edges: [] };
+    setCtxMenu(null);
+  }
+
+  function ctxDuplicateNode(nodeId: string) {
+    const node = nodesRef.current.find(n => n.id === nodeId);
+    if (!node) return;
+    const newId = `${node.type ?? 'node'}-dup-${Date.now()}`;
+    setNodes(nds => [...nds.map(n => ({ ...n, selected: false })), { ...node, id: newId, position: { x: node.position.x + 60, y: node.position.y + 60 }, selected: true, style: {} }]);
+    setCtxMenu(null);
+  }
+
+  function ctxDeleteNode(nodeId: string) {
+    setNodes(nds => nds.filter(n => n.id !== nodeId));
+    setEdges(eds => eds.filter(e => e.source !== nodeId && e.target !== nodeId));
+    setCtxMenu(null);
+  }
+
+  function ctxPaste() {
+    const cb = clipboardRef.current;
+    if (!cb) return;
+    const stamp = Date.now();
+    const idMap: Record<string, string> = {};
+    cb.nodes.forEach((n, i) => { idMap[n.id] = `${n.type ?? 'node'}-paste-${stamp}-${i}`; });
+    const newNodes = cb.nodes.map(n => ({ ...n, id: idMap[n.id], position: { x: n.position.x + 60, y: n.position.y + 60 }, selected: true, style: {} }));
+    const newEdges = cb.edges.map((ed, i) => ({ ...ed, id: `e-paste-${stamp}-${i}`, source: idMap[ed.source] ?? ed.source, target: idMap[ed.target] ?? ed.target }));
+    setNodes(nds => [...nds.map(n => ({ ...n, selected: false })), ...newNodes]);
+    setEdges(eds => [...eds, ...newEdges]);
+    setCtxMenu(null);
+  }
+
   return (
     <SoundListCtx.Provider value={soundList}>
     <style>{`
@@ -556,7 +713,7 @@ function CueCanvas({ cue, onChange, activePath }: {
     `}</style>
     <div style={{ flex: 1, height: '100%', display: 'flex' }}>
       {/* Canvas */}
-      <div ref={wrapperRef} style={{ flex: 1, height: '100%' }}
+      <div ref={wrapperRef} style={{ flex: 1, height: '100%', position: 'relative' }}
         onDrop={onDrop} onDragOver={e => e.preventDefault()}>
         <ReactFlow
           nodes={nodes} edges={edges}
@@ -566,27 +723,52 @@ function CueCanvas({ cue, onChange, activePath }: {
           nodeTypes={NODE_TYPES}
           deleteKeyCode={['Delete', 'Backspace']}
           onSelectionChange={({ nodes: sn, edges: se }) => setSelCount(sn.length + se.length)}
+          onNodeContextMenu={onNodeContextMenu}
+          onPaneContextMenu={onPaneContextMenu}
+          onPaneClick={() => setCtxMenu(null)}
           fitView
           style={{ background: C.bg }}
         >
           <Background color={C.border} gap={20} />
           <Controls style={{ background: C.card, border: `1px solid ${C.border}` }} />
           <MiniMap style={{ background: C.card }} nodeColor={n => NODE_COLORS[n.type ?? ''] ?? C.muted} />
-          {selCount > 0 && (
-            <Panel position="top-center">
-              <div style={{
-                background: 'rgba(10,18,10,0.9)', border: `1px solid ${C.border}`,
-                borderRadius: 4, padding: '3px 10px', fontSize: 11, color: C.dim,
-                display: 'flex', alignItems: 'center', gap: 6,
-              }}>
-                <span style={{ color: C.text }}>{selCount} selected</span>
-                <span>·</span>
+          <Panel position="top-center">
+            <div style={{
+              background: 'rgba(10,18,10,0.85)', border: `1px solid ${C.border}`,
+              borderRadius: 4, padding: '3px 10px', fontSize: 11, color: C.dim,
+              display: 'flex', alignItems: 'center', gap: 8,
+            }}>
+              {selCount > 0
+                ? <><span style={{ color: C.text }}>{selCount} selected</span><span>·</span></>
+                : null}
+              <span>⌘Z undo</span><span>·</span><span>⌘Y redo</span>
+              {selCount > 0 && <><span>·</span><span>⌘C copy</span><span>·</span><span>⌘D dup</span><span>·</span>
                 <kbd style={{ background: C.border, color: C.text, borderRadius: 3, padding: '1px 5px', fontSize: 10 }}>DEL</kbd>
-                <span>to delete</span>
-              </div>
-            </Panel>
-          )}
+              </>}
+            </div>
+          </Panel>
         </ReactFlow>
+
+        {/* Context menu */}
+        {ctxMenu && (
+          <div
+            style={{
+              position: 'absolute', left: ctxMenu.x, top: ctxMenu.y, zIndex: 1000,
+              background: C.card, border: `1px solid ${C.border}`, borderRadius: 6,
+              boxShadow: '0 6px 24px rgba(0,0,0,0.7)', minWidth: 170, overflow: 'hidden',
+            }}
+            onMouseLeave={() => setCtxMenu(null)}
+          >
+            {ctxMenu.nodeId ? (<>
+              <CtxItem label="Copy"      shortcut="⌘C" onClick={() => ctxCopyNode(ctxMenu.nodeId!)} />
+              <CtxItem label="Duplicate" shortcut="⌘D" onClick={() => ctxDuplicateNode(ctxMenu.nodeId!)} />
+              <CtxSep />
+              <CtxItem label="Delete" danger onClick={() => ctxDeleteNode(ctxMenu.nodeId!)} />
+            </>) : (<>
+              <CtxItem label="Paste" shortcut="⌘V" disabled={!clipboardRef.current} onClick={ctxPaste} />
+            </>)}
+          </div>
+        )}
       </div>
 
       {/* Right palette */}
