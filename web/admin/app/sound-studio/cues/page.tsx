@@ -436,14 +436,14 @@ export default function SoundCuePage() {
   // Load cue list
   useEffect(() => {
     if (store.getList().length === 0) {
-      apiFetch('/api/sound-cues')
+      apiFetch('/sound-cues')
         .then(list => { store.setList(list as CueListEntry[]); setCueList(list as CueListEntry[]); })
         .catch(() => {});
     }
   }, []);
 
   async function openCueById(id: string) {
-    const cue = await apiFetch(`/api/sound-cues/${id}`) as SoundCue;
+    const cue = await apiFetch(`/sound-cues/${id}`) as SoundCue;
     store.setOpenCue(cue);
     setOpenCue(cue);
     setDirty(false);
@@ -459,7 +459,7 @@ export default function SoundCuePage() {
     if (!openCue) return;
     setSaving(true);
     try {
-      await apiFetch(`/api/sound-cues/${openCue.id}`, {
+      await apiFetch(`/sound-cues/${openCue.id}`, {
         method: 'PUT',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify(openCue),
@@ -469,7 +469,7 @@ export default function SoundCuePage() {
       setStatus('Saved');
       setTimeout(() => setStatus(''), 2000);
       // Refresh list
-      const list = await apiFetch('/api/sound-cues') as CueListEntry[];
+      const list = await apiFetch('/sound-cues') as CueListEntry[];
       store.setList(list); setCueList(list);
     } catch (e: any) {
       setStatus(`Error: ${e.message}`);
@@ -486,12 +486,12 @@ export default function SoundCuePage() {
       nodes: [makeOutputNode()],
       edges: [],
     };
-    await apiFetch(`/api/sound-cues/${id}`, {
+    await apiFetch(`/sound-cues/${id}`, {
       method: 'PUT',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify(blank),
     });
-    const list = await apiFetch('/api/sound-cues') as CueListEntry[];
+    const list = await apiFetch('/sound-cues') as CueListEntry[];
     store.setList(list); setCueList(list);
     setNewCueName(''); setCreating(false);
     openCueById(id);
@@ -499,11 +499,11 @@ export default function SoundCuePage() {
 
   async function deleteCue(id: string) {
     if (!confirm(`Delete cue "${id}"?`)) return;
-    await apiFetch(`/api/sound-cues/${id}`, {
+    await apiFetch(`/sound-cues/${id}`, {
       method: 'DELETE',
     });
     if (openCue?.id === id) { setOpenCue(null); store.setOpenCue(null); }
-    const list = await apiFetch('/api/sound-cues') as CueListEntry[];
+    const list = await apiFetch('/sound-cues') as CueListEntry[];
     store.setList(list); setCueList(list);
   }
 
