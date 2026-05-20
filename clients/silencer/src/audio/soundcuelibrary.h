@@ -31,6 +31,8 @@ private:
     std::unordered_map<std::string, SoundCue> cues_;
     // Per-cue Sequence counters: cueId → (nodeId → counter)
     std::unordered_map<std::string, std::unordered_map<std::string, int>> seqCounters_;
+    // Per-cue Random last-pick: cueId → (nodeId → last chosen index)
+    std::unordered_map<std::string, std::unordered_map<std::string, int>> randomLastPick_;
     bool loaded_ = false;
 
     static SoundCue ParseCue(const std::string& path);

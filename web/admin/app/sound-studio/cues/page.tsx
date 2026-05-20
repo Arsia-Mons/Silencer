@@ -353,6 +353,9 @@ function flowToCue(id: string, nodes: Node[], edges: Edge[]): SoundCue {
 
 // ─── Evaluate cue client-side (mirrors C++ logic) ────────────────────────────
 // Returns the resolved file AND the ordered list of node IDs on the winning path.
+// Persists across evalCue calls — tracks last picked input index per Random node id.
+const randomLastPick: Record<string, number> = {};
+
 function evalCue(cue: SoundCue): { file: string | null; path: string[] } {
   const nodeMap = Object.fromEntries(cue.nodes.map(n => [n.id, n]));
   const edgesTo: Record<string, CueEdge[]> = {};
@@ -376,7 +379,9 @@ function evalCue(cue: SoundCue): { file: string | null; path: string[] } {
       case 'WavePlayer': return n.data.file ?? null;
       case 'Random': {
         if (!inputs.length) return null;
-        const weights = inputs.map(inp => {
+        const weights = inputs.map((inp, i) => {
+          // Zero weight for last pick if there are other options.
+          if (inputs.length > 1 && i === (randomLastPick[id] ?? -1)) return 0;
           const w = nodeMap[inp]?.data?.weight;
           return typeof w === 'number' && w > 0 ? w : 1;
         });
@@ -384,9 +389,11 @@ function evalCue(cue: SoundCue): { file: string | null; path: string[] } {
         let draw = Math.random() * total;
         for (let i = 0; i < inputs.length; i++) {
           draw -= weights[i];
-          if (draw < 0) return evalNode(inputs[i]);
+          if (draw < 0) { randomLastPick[id] = i; return evalNode(inputs[i]); }
         }
-        return evalNode(inputs[inputs.length - 1]);
+        const last = inputs.length - 1;
+        randomLastPick[id] = last;
+        return evalNode(inputs[last]);
       }
       case 'Sequence': {
         if (!inputs.length) return null;

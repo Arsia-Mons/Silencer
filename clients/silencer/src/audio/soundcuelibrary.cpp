@@ -21,6 +21,7 @@ SoundCueLibrary& SoundCueLibrary::Get() {
 void SoundCueLibrary::Load(const std::string& dir, Resources& /*res*/) {
     cues_.clear();
     seqCounters_.clear();
+    randomLastPick_.clear();
 
     if (!fs::exists(dir)) return;
 
@@ -30,6 +31,7 @@ void SoundCueLibrary::Load(const std::string& dir, Resources& /*res*/) {
             SoundCue cue = ParseCue(entry.path().string());
             if (!cue.id.empty()) {
                 seqCounters_[cue.id] = {};
+                randomLastPick_[cue.id] = {};
                 cues_[cue.id] = std::move(cue);
             }
         } catch (...) {
@@ -45,7 +47,7 @@ void SoundCueLibrary::Load(const std::string& dir, Resources& /*res*/) {
 SoundCueResult SoundCueLibrary::Evaluate(const std::string& cueId, Resources& res) {
     auto it = cues_.find(cueId);
     if (it == cues_.end()) return {};
-    return it->second.Evaluate(res, seqCounters_[cueId]);
+    return it->second.Evaluate(res, seqCounters_[cueId], randomLastPick_[cueId]);
 }
 
 // ---------------------------------------------------------------------------

@@ -73,15 +73,18 @@ public:
 
     // Evaluate the graph. seqCounters tracks round-robin state per Sequence
     // node id and must persist across calls (owned by SoundCueLibrary per cue).
+    // randomLastPick tracks the last chosen input index per Random node (no-repeat).
     SoundCueResult Evaluate(
         Resources& res,
-        std::unordered_map<std::string, int>& seqCounters) const;
+        std::unordered_map<std::string, int>& seqCounters,
+        std::unordered_map<std::string, int>& randomLastPick) const;
 
 private:
     SoundCueResult EvalNode(
         const std::string& nodeId,
         Resources& res,
-        std::unordered_map<std::string, int>& seqCounters) const;
+        std::unordered_map<std::string, int>& seqCounters,
+        std::unordered_map<std::string, int>& randomLastPick) const;
 };
 
 // ---------------------------------------------------------------------------
