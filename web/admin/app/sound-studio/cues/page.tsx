@@ -20,19 +20,13 @@ import ReactFlow, {
 import 'reactflow/dist/style.css';
 import { useAuth } from '../../../lib/auth';
 import Sidebar from '../../../components/Sidebar';
-import { apiFetch } from '../../../lib/api';
 import { useRouter, useSearchParams } from 'next/navigation';
 import dagre from 'dagre';
-import * as store from '../../../lib/sound-cue-store';
-import type { CueEdge, CueListEntry, CueNode, CueNodeData, SoundCue } from '../../../lib/sound-cue-store';
+import type { CueEdge, CueNode, CueNodeData, SoundCue } from '../../../lib/sound-cue-store';
 import { decodeAdpcmWav } from '../../sound-studio/adpcm';
 
-const getToken = () => typeof window !== 'undefined' ? localStorage.getItem('zs_token') : '';
-
-// ─── Sound list context (loaded once in CueCanvas) ────────────────────────────
 const SoundListCtx = createContext<string[]>([]);
 
-// ─── Silencer green palette ───────────────────────────────────────────────────
 const C = {
   bg:      '#050a05',
   card:    '#0a120a',
@@ -67,13 +61,79 @@ const NODE_LABELS: Record<string, string> = {
   Output:     'Output',
 };
 
-// ─── Shared node shell ────────────────────────────────────────────────────────
 const SEL_STYLE: React.CSSProperties = {
   border: '2px solid #ffffff',
   outline: '2px solid #00ff55',
   outlineOffset: 2,
   animation: 'silencer-sel-pulse 0.9s ease-in-out infinite',
 };
+
+function parseSoundBin(buf: ArrayBuffer): { names: string[]; getWav: (name: string) => Uint8Array | null } {
+  const v = new DataView(buf);
+  const b = new Uint8Array(buf);
+  const numsounds = v.getUint32(0, true);
+  const dataBase = 8 + numsounds * 96;
+  const entries: { name: string; offset: number; storedLength: number }[] = [];
+
+  for (let i = 0; i < numsounds; i++) {
+    const h = 8 + i * 96;
+    let name = '';
+    for (let j = h + 4; j < h + 20; j++) {
+      if (b[j] === 0) break;
+      name += String.fromCharCode(b[j]);
+    }
+    name = name.trim();
+    const offset = v.getUint32(h + 20, true);
+    const storedLength = v.getUint32(h + 24, true);
+    if (!name || storedLength < 256) continue;
+    entries.push({ name, offset, storedLength });
+  }
+
+  const names = entries.map(entry => entry.name);
+
+  function getWav(name: string): Uint8Array | null {
+    const entry = entries.find(candidate => candidate.name === name);
+    if (!entry) return null;
+    const D = entry.storedLength - 36;
+    const adpcm = b.slice(dataBase + entry.offset, dataBase + entry.offset + D);
+    const out = new Uint8Array(60 + D);
+    const ov = new DataView(out.buffer);
+    let p = 0;
+    out[p++] = 82; out[p++] = 73; out[p++] = 70; out[p++] = 70;
+    ov.setUint32(p, D + 52, true); p += 4;
+    out[p++] = 87; out[p++] = 65; out[p++] = 86; out[p++] = 69;
+    out[p++] = 102; out[p++] = 109; out[p++] = 116; out[p++] = 32;
+    ov.setUint32(p, 20, true); p += 4;
+    ov.setUint16(p, 0x0011, true); p += 2;
+    ov.setUint16(p, 1, true); p += 2;
+    ov.setUint32(p, 11025, true); p += 4;
+    ov.setUint32(p, 5588, true); p += 4;
+    ov.setUint16(p, 256, true); p += 2;
+    ov.setUint16(p, 4, true); p += 2;
+    ov.setUint16(p, 2, true); p += 2;
+    ov.setUint16(p, 505, true); p += 2;
+    out[p++] = 102; out[p++] = 97; out[p++] = 99; out[p++] = 116;
+    ov.setUint32(p, 4, true); p += 4;
+    ov.setUint32(p, 46399, true); p += 4;
+    out[p++] = 100; out[p++] = 97; out[p++] = 116; out[p++] = 97;
+    ov.setUint32(p, D, true); p += 4;
+    out.set(adpcm, p);
+    return out;
+  }
+
+  return { names, getWav };
+}
+
+function downloadCueFile(cue: SoundCue): void {
+  const json = JSON.stringify(cue, null, 2);
+  const blob = new Blob([json], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `${cue.id}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
 
 function NodeShell({ type, children, hasInput = true, hasOutput = true, selected = false }:
   { type: string; children?: React.ReactNode; hasInput?: boolean; hasOutput?: boolean; selected?: boolean }) {
@@ -96,7 +156,6 @@ function NodeShell({ type, children, hasInput = true, hasOutput = true, selected
   );
 }
 
-// ─── WavePlayer node ──────────────────────────────────────────────────────────
 function WavePlayerNode({ data, id, selected }: NodeProps) {
   const { setNodes } = useReactFlow();
   const sounds = useContext(SoundListCtx);
@@ -107,7 +166,6 @@ function WavePlayerNode({ data, id, selected }: NodeProps) {
 
   return (
     <NodeShell type="WavePlayer" hasInput={false} selected={selected}>
-      {/* Use datalist so async load never resets the current value */}
       <input
         list={`sounds-${id}`}
         className="nodrag"
@@ -120,7 +178,7 @@ function WavePlayerNode({ data, id, selected }: NodeProps) {
         }}
       />
       <datalist id={`sounds-${id}`}>
-        {sounds.map(s => <option key={s} value={s} />)}
+        {sounds.map(sound => <option key={sound} value={sound} />)}
       </datalist>
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4 }}>
         <span style={{ color: C.dim, fontSize: 10 }}>weight</span>
@@ -136,7 +194,6 @@ function WavePlayerNode({ data, id, selected }: NodeProps) {
   );
 }
 
-// ─── Multi-input node (Random / Sequence / Mixer) ─────────────────────────────
 function MultiInputNode({ data, id, type, selected }: NodeProps & { type: string }) {
   const { setNodes, setEdges } = useReactFlow();
   const inputCount = data._inputCount ?? 2;
@@ -219,7 +276,7 @@ function MultiInputNode({ data, id, type, selected }: NodeProps & { type: string
         })}
       </div>
       <div style={{ display: 'flex', gap: 6, padding: '2px 10px 4px' }}>
-        <span onClick={addInput}    style={{ color: C.light,   cursor: 'pointer', fontSize: 11 }}>⊕ Add</span>
+        <span onClick={addInput} style={{ color: C.light, cursor: 'pointer', fontSize: 11 }}>⊕ Add</span>
         <span onClick={removeInput} style={{ color: inputCount <= 1 ? C.muted : '#ef4444', cursor: inputCount <= 1 ? 'default' : 'pointer', fontSize: 11 }}>⊖ Remove</span>
       </div>
     </div>
@@ -230,13 +287,15 @@ function RandomNode(props: NodeProps)   { return <MultiInputNode {...props} type
 function SequenceNode(props: NodeProps) { return <MultiInputNode {...props} type="Sequence" />; }
 function MixerNode(props: NodeProps)    { return <MultiInputNode {...props} type="Mixer" />; }
 
-// ─── Single-param nodes ───────────────────────────────────────────────────────
 function DelayNode({ data, id, selected }: NodeProps) {
   const { setNodes } = useReactFlow();
+
   function setField(key: string, val: number) {
     setNodes(nds => nds.map(n => n.id !== id ? n : { ...n, data: { ...n.data, [key]: val } }));
   }
+
   const inputStyle = { background: C.bg, border: `1px solid ${C.border}`, color: C.text, borderRadius: 3, padding: '2px 4px', fontSize: 11, width: 58 };
+
   return (
     <NodeShell type="Delay" selected={selected}>
       <div style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 11 }}>
@@ -258,9 +317,11 @@ function DelayNode({ data, id, selected }: NodeProps) {
 function VolumeNode({ data, id, selected }: NodeProps) {
   const { setNodes } = useReactFlow();
   const scalar = data.scalar ?? 1;
+
   function setScalar(v: number) {
     setNodes(nds => nds.map(n => n.id !== id ? n : { ...n, data: { ...n.data, scalar: v } }));
   }
+
   return (
     <NodeShell type="Volume" selected={selected}>
       <div style={{ fontSize: 11 }}>
@@ -278,9 +339,11 @@ function VolumeNode({ data, id, selected }: NodeProps) {
 function PitchNode({ data, id, selected }: NodeProps) {
   const { setNodes } = useReactFlow();
   const semitones = data.semitones ?? 0;
+
   function setSemitones(v: number) {
     setNodes(nds => nds.map(n => n.id !== id ? n : { ...n, data: { ...n.data, semitones: v } }));
   }
+
   return (
     <NodeShell type="Pitch" selected={selected}>
       <div style={{ fontSize: 11 }}>
@@ -297,7 +360,6 @@ function PitchNode({ data, id, selected }: NodeProps) {
   );
 }
 
-// ─── Output node ──────────────────────────────────────────────────────────────
 function OutputNode({ selected }: NodeProps) {
   return (
     <div style={{
@@ -323,7 +385,6 @@ const NODE_TYPES = {
   Output:     OutputNode,
 };
 
-// ─── Cue ↔ ReactFlow conversion ───────────────────────────────────────────────
 function cueToFlow(cue: SoundCue): { nodes: Node[]; edges: Edge[] } {
   const inputCounts: Record<string, number> = {};
   for (const e of cue.edges) {
@@ -348,7 +409,7 @@ function flowToCue(id: string, nodes: Node[], edges: Edge[]): SoundCue {
     nodes: nodes.map(n => ({
       id: n.id, type: n.type as CueNode['type'], position: n.position,
       data: Object.fromEntries(
-        Object.entries(n.data as CueNodeData).filter(([k]) => k !== '_inputCount')
+        Object.entries(n.data as CueNodeData).filter(([key]) => key !== '_inputCount')
       ) as CueNodeData,
     })),
     edges: edges.map(e => ({
@@ -358,9 +419,6 @@ function flowToCue(id: string, nodes: Node[], edges: Edge[]): SoundCue {
   };
 }
 
-// ─── Evaluate cue client-side (mirrors C++ logic) ────────────────────────────
-// Returns the resolved file AND the ordered list of node IDs on the winning path.
-// Persists across evalCue calls — tracks last picked input index per Random node id.
 const randomLastPick: Record<string, number> = {};
 
 function evalCue(cue: SoundCue): { file: string | null; path: string[]; semitones: number; volume: number; delaySec: number } {
@@ -425,6 +483,7 @@ function evalCue(cue: SoundCue): { file: string | null; path: string[]; semitone
         return { ...r, delaySec: r.delaySec + min + Math.random() * Math.max(0, max - min) };
       }
     }
+
     return { file: null, semitones: 0, volume: 1, delaySec: 0 };
   }
 
@@ -433,7 +492,6 @@ function evalCue(cue: SoundCue): { file: string | null; path: string[]; semitone
   return { ...result, path };
 }
 
-// ─── Node factory ─────────────────────────────────────────────────────────────
 let _nodeCounter = 100;
 function makeNode(type: CueNode['type'], position?: { x: number; y: number }): Node {
   const defaults: CueNodeData = (() => {
@@ -459,7 +517,6 @@ const NODE_TYPE_LIST: CueNode['type'][] = [
   'WavePlayer', 'Random', 'Sequence', 'Mixer', 'Delay', 'Volume', 'Pitch',
 ];
 
-// ─── Context menu primitives ──────────────────────────────────────────────────
 function CtxItem({ label, shortcut, onClick, danger = false, disabled = false }: {
   label: string; shortcut?: string; onClick?: () => void; danger?: boolean; disabled?: boolean;
 }) {
@@ -480,44 +537,36 @@ function CtxItem({ label, shortcut, onClick, danger = false, disabled = false }:
     </div>
   );
 }
+
 function CtxSep() {
   return <div style={{ borderTop: `1px solid ${C.border}`, margin: '2px 0' }} />;
 }
 
-// ─── Canvas + right palette ───────────────────────────────────────────────────
-function CueCanvas({ cue, onChange, activePath }: {
+function CueCanvas({ cue, onChange, activePath, soundList }: {
   cue: SoundCue;
   onChange: (c: SoundCue) => void;
   activePath: string[];
+  soundList: string[];
 }) {
   const { nodes: initNodes, edges: initEdges } = cueToFlow(cue);
   const [nodes, setNodes, onNodesChange] = useNodesState(initNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initEdges);
-  const [soundList, setSoundList] = useState<string[]>([]);
   const [selCount, setSelCount] = useState(0);
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; nodeId?: string } | null>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
   const { screenToFlowPosition, fitView } = useReactFlow();
-  const mountedRef    = useRef(false);
-  const suppressRef   = useRef(false);
+  const mountedRef = useRef(false);
+  const suppressRef = useRef(false);
   const isUndoRedoRef = useRef(false);
-  // Always-current refs so keyboard handler closure is always fresh
   const nodesRef = useRef(nodes);
   const edgesRef = useRef(edges);
+  const historyRef = useRef<{ nodes: Node[]; edges: Edge[] }[]>([]);
+  const historyIdxRef = useRef(-1);
+  const clipboardRef = useRef<{ nodes: Node[]; edges: Edge[] } | null>(null);
+
   useEffect(() => { nodesRef.current = nodes; }, [nodes]);
   useEffect(() => { edgesRef.current = edges; }, [edges]);
-  // History
-  const historyRef    = useRef<{ nodes: Node[]; edges: Edge[] }[]>([]);
-  const historyIdxRef = useRef(-1);
-  const clipboardRef  = useRef<{ nodes: Node[]; edges: Edge[] } | null>(null);
 
-  useEffect(() => {
-    apiFetch('/sounds')
-      .then((list: any) => setSoundList((list as { name: string }[]).map(s => s.name).sort()))
-      .catch(() => {});
-  }, []);
-
-  // Keyboard shortcuts — all read from refs so closure never goes stale
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       const ctrl = e.ctrlKey || e.metaKey;
@@ -529,7 +578,8 @@ function CueCanvas({ cue, onChange, activePath }: {
         historyIdxRef.current--;
         isUndoRedoRef.current = true;
         const snap = historyRef.current[historyIdxRef.current];
-        setNodes(snap.nodes); setEdges(snap.edges);
+        setNodes(snap.nodes);
+        setEdges(snap.edges);
         return;
       }
       if (e.key === 'y' || (e.key === 'z' && e.shiftKey)) {
@@ -538,7 +588,8 @@ function CueCanvas({ cue, onChange, activePath }: {
         historyIdxRef.current++;
         isUndoRedoRef.current = true;
         const snap = historyRef.current[historyIdxRef.current];
-        setNodes(snap.nodes); setEdges(snap.edges);
+        setNodes(snap.nodes);
+        setEdges(snap.edges);
         return;
       }
       if (e.key === 'c') {
@@ -577,6 +628,7 @@ function CueCanvas({ cue, onChange, activePath }: {
         setEdges(eds => [...eds, ...newEdges]);
       }
     }
+
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -588,7 +640,10 @@ function CueCanvas({ cue, onChange, activePath }: {
       historyIdxRef.current = 0;
       return;
     }
-    if (suppressRef.current) { isUndoRedoRef.current = false; return; }
+    if (suppressRef.current) {
+      isUndoRedoRef.current = false;
+      return;
+    }
     if (!isUndoRedoRef.current) {
       const snap = { nodes: nodes.map(n => ({ ...n, style: {} })), edges };
       historyRef.current = [...historyRef.current.slice(0, historyIdxRef.current + 1), snap];
@@ -598,7 +653,6 @@ function CueCanvas({ cue, onChange, activePath }: {
     onChange(flowToCue(cue.id, nodes, edges));
   }, [nodes, edges]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Highlight the active path when Play is pressed
   useEffect(() => {
     if (!activePath.length) return;
     const pathSet = new Set(activePath);
@@ -622,10 +676,10 @@ function CueCanvas({ cue, onChange, activePath }: {
   }, [activePath]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const isValidConnection = useCallback((conn: Connection) => {
-    const SINGLE_INPUT = new Set(['Output', 'Delay', 'Volume', 'Pitch']);
+    const singleInput = new Set(['Output', 'Delay', 'Volume', 'Pitch']);
     const targetNode = nodes.find(n => n.id === conn.target);
     if (!targetNode) return false;
-    if (SINGLE_INPUT.has(targetNode.type ?? '')) {
+    if (singleInput.has(targetNode.type ?? '')) {
       const handle = conn.targetHandle ?? 'in';
       if (edges.some(e => e.target === conn.target && (e.targetHandle ?? 'in') === handle)) return false;
     }
@@ -636,7 +690,7 @@ function CueCanvas({ cue, onChange, activePath }: {
       if (from === goal) return true;
       if (seen.has(from)) return false;
       seen.add(from);
-      return (adjOut[from] ?? []).some(n => reaches(n, goal, seen));
+      return (adjOut[from] ?? []).some(next => reaches(next, goal, seen));
     }
     return !reaches(conn.target ?? '', conn.source ?? '');
   }, [nodes, edges]);
@@ -726,130 +780,126 @@ function CueCanvas({ cue, onChange, activePath }: {
 
   return (
     <SoundListCtx.Provider value={soundList}>
-    <style>{`
-      @keyframes silencer-sel-pulse {
-        0%,100% { box-shadow: 0 0 8px 2px rgba(0,255,85,0.5); outline-color: #00ff55; }
-        50%      { box-shadow: 0 0 22px 6px rgba(0,255,85,0.9), 0 0 40px 10px rgba(0,163,40,0.4); outline-color: #80ffaa; }
-      }
-      .react-flow__edge.selected .react-flow__edge-path {
-        stroke: #00ff55 !important;
-        stroke-width: 2.5px !important;
-        filter: drop-shadow(0 0 4px rgba(0,255,85,0.7));
-      }
-    `}</style>
-    <div style={{ flex: 1, height: '100%', display: 'flex' }}>
-      {/* Canvas */}
-      <div ref={wrapperRef} style={{ flex: 1, height: '100%', position: 'relative' }}
-        onDrop={onDrop} onDragOver={e => e.preventDefault()}>
-        <ReactFlow
-          nodes={nodes} edges={edges}
-          onNodesChange={onNodesChange} onEdgesChange={onEdgesChange}
-          onConnect={onConnect}
-          isValidConnection={isValidConnection}
-          nodeTypes={NODE_TYPES}
-          deleteKeyCode={['Delete', 'Backspace']}
-          onSelectionChange={({ nodes: sn, edges: se }) => setSelCount(sn.length + se.length)}
-          onNodeContextMenu={onNodeContextMenu}
-          onPaneContextMenu={onPaneContextMenu}
-          onPaneClick={() => setCtxMenu(null)}
-          fitView
-          style={{ background: C.bg }}
-        >
-          <Background color={C.border} gap={20} />
-          <Controls style={{ background: C.card, border: `1px solid ${C.border}` }} />
-          <MiniMap style={{ background: C.card }} nodeColor={n => NODE_COLORS[n.type ?? ''] ?? C.muted} />
-          <Panel position="top-center">
-            <div style={{
-              background: 'rgba(10,18,10,0.85)', border: `1px solid ${C.border}`,
-              borderRadius: 4, padding: '3px 10px', fontSize: 11, color: C.dim,
-              display: 'flex', alignItems: 'center', gap: 8,
-            }}>
-              {selCount > 0
-                ? <><span style={{ color: C.text }}>{selCount} selected</span><span>·</span></>
-                : null}
-              <span>⌘Z undo</span><span>·</span><span>⌘Y redo</span>
-              {selCount > 0 && <><span>·</span><span>⌘C copy</span><span>·</span><span>⌘D dup</span><span>·</span>
-                <kbd style={{ background: C.border, color: C.text, borderRadius: 3, padding: '1px 5px', fontSize: 10 }}>DEL</kbd>
+      <style>{`
+        @keyframes silencer-sel-pulse {
+          0%,100% { box-shadow: 0 0 8px 2px rgba(0,255,85,0.5); outline-color: #00ff55; }
+          50%      { box-shadow: 0 0 22px 6px rgba(0,255,85,0.9), 0 0 40px 10px rgba(0,163,40,0.4); outline-color: #80ffaa; }
+        }
+        .react-flow__edge.selected .react-flow__edge-path {
+          stroke: #00ff55 !important;
+          stroke-width: 2.5px !important;
+          filter: drop-shadow(0 0 4px rgba(0,255,85,0.7));
+        }
+      `}</style>
+      <div style={{ flex: 1, height: '100%', display: 'flex' }}>
+        <div ref={wrapperRef} style={{ flex: 1, height: '100%', position: 'relative' }}
+          onDrop={onDrop} onDragOver={e => e.preventDefault()}>
+          <ReactFlow
+            nodes={nodes} edges={edges}
+            onNodesChange={onNodesChange} onEdgesChange={onEdgesChange}
+            onConnect={onConnect}
+            isValidConnection={isValidConnection}
+            nodeTypes={NODE_TYPES}
+            deleteKeyCode={['Delete', 'Backspace']}
+            onSelectionChange={({ nodes: selectedNodes, edges: selectedEdges }) => setSelCount(selectedNodes.length + selectedEdges.length)}
+            onNodeContextMenu={onNodeContextMenu}
+            onPaneContextMenu={onPaneContextMenu}
+            onPaneClick={() => setCtxMenu(null)}
+            fitView
+            style={{ background: C.bg }}
+          >
+            <Background color={C.border} gap={20} />
+            <Controls style={{ background: C.card, border: `1px solid ${C.border}` }} />
+            <MiniMap style={{ background: C.card }} nodeColor={n => NODE_COLORS[n.type ?? ''] ?? C.muted} />
+            <Panel position="top-center">
+              <div style={{
+                background: 'rgba(10,18,10,0.85)', border: `1px solid ${C.border}`,
+                borderRadius: 4, padding: '3px 10px', fontSize: 11, color: C.dim,
+                display: 'flex', alignItems: 'center', gap: 8,
+              }}>
+                {selCount > 0
+                  ? <><span style={{ color: C.text }}>{selCount} selected</span><span>·</span></>
+                  : null}
+                <span>⌘Z undo</span><span>·</span><span>⌘Y redo</span>
+                {selCount > 0 && <><span>·</span><span>⌘C copy</span><span>·</span><span>⌘D dup</span><span>·</span>
+                  <kbd style={{ background: C.border, color: C.text, borderRadius: 3, padding: '1px 5px', fontSize: 10 }}>DEL</kbd>
+                </>}
+              </div>
+            </Panel>
+          </ReactFlow>
+
+          {ctxMenu && (
+            <div
+              style={{
+                position: 'absolute', left: ctxMenu.x, top: ctxMenu.y, zIndex: 1000,
+                background: C.card, border: `1px solid ${C.border}`, borderRadius: 6,
+                boxShadow: '0 6px 24px rgba(0,0,0,0.7)', minWidth: 170, overflow: 'hidden',
+              }}
+              onMouseLeave={() => setCtxMenu(null)}
+            >
+              {ctxMenu.nodeId ? <>
+                <CtxItem label="Copy" shortcut="⌘C" onClick={() => ctxCopyNode(ctxMenu.nodeId!)} />
+                <CtxItem label="Duplicate" shortcut="⌘D" onClick={() => ctxDuplicateNode(ctxMenu.nodeId!)} />
+                <CtxSep />
+                <CtxItem label="Delete" danger onClick={() => ctxDeleteNode(ctxMenu.nodeId!)} />
+              </> : <>
+                <CtxItem label="Paste" shortcut="⌘V" disabled={!clipboardRef.current} onClick={ctxPaste} />
               </>}
             </div>
-          </Panel>
-        </ReactFlow>
-
-        {/* Context menu */}
-        {ctxMenu && (
-          <div
-            style={{
-              position: 'absolute', left: ctxMenu.x, top: ctxMenu.y, zIndex: 1000,
-              background: C.card, border: `1px solid ${C.border}`, borderRadius: 6,
-              boxShadow: '0 6px 24px rgba(0,0,0,0.7)', minWidth: 170, overflow: 'hidden',
-            }}
-            onMouseLeave={() => setCtxMenu(null)}
-          >
-            {ctxMenu.nodeId ? (<>
-              <CtxItem label="Copy"      shortcut="⌘C" onClick={() => ctxCopyNode(ctxMenu.nodeId!)} />
-              <CtxItem label="Duplicate" shortcut="⌘D" onClick={() => ctxDuplicateNode(ctxMenu.nodeId!)} />
-              <CtxSep />
-              <CtxItem label="Delete" danger onClick={() => ctxDeleteNode(ctxMenu.nodeId!)} />
-            </>) : (<>
-              <CtxItem label="Paste" shortcut="⌘V" disabled={!clipboardRef.current} onClick={ctxPaste} />
-            </>)}
-          </div>
-        )}
-      </div>
-
-      {/* Right palette */}
-      <div style={{
-        width: 140, borderLeft: `1px solid ${C.border}`, background: C.card,
-        display: 'flex', flexDirection: 'column', padding: '8px 6px', gap: 6, overflowY: 'auto',
-      }}>
-        <div style={{ fontSize: 10, color: C.dim, fontWeight: 700, letterSpacing: 1, paddingBottom: 4, borderBottom: `1px solid ${C.border}` }}>
-          NODES
+          )}
         </div>
-        {NODE_TYPE_LIST.map(type => (
-          <div
-            key={type}
-            draggable
-            onDragStart={e => e.dataTransfer.setData('application/reactflow', type)}
-            onClick={() => addNodeAtCenter(type)}
-            title={`Drag or click to add ${NODE_LABELS[type]}`}
-            style={{
-              padding: '7px 8px', background: NODE_COLORS[type], borderRadius: 4,
-              color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'grab',
-              userSelect: 'none', border: `1px solid rgba(255,255,255,0.1)`,
-              boxShadow: '0 1px 4px rgba(0,0,0,0.4)',
-              transition: 'opacity 0.1s',
-            }}
-            onMouseEnter={e => (e.currentTarget.style.opacity = '0.85')}
-            onMouseLeave={e => (e.currentTarget.style.opacity = '1')}
-          >
-            {NODE_LABELS[type]}
+
+        <div style={{
+          width: 140, borderLeft: `1px solid ${C.border}`, background: C.card,
+          display: 'flex', flexDirection: 'column', padding: '8px 6px', gap: 6, overflowY: 'auto',
+        }}>
+          <div style={{ fontSize: 10, color: C.dim, fontWeight: 700, letterSpacing: 1, paddingBottom: 4, borderBottom: `1px solid ${C.border}` }}>
+            NODES
           </div>
-        ))}
-        <div style={{ fontSize: 9, color: C.muted, marginTop: 4, lineHeight: 1.4 }}>
-          Drag onto canvas or click to add
+          {NODE_TYPE_LIST.map(type => (
+            <div
+              key={type}
+              draggable
+              onDragStart={e => e.dataTransfer.setData('application/reactflow', type)}
+              onClick={() => addNodeAtCenter(type)}
+              title={`Drag or click to add ${NODE_LABELS[type]}`}
+              style={{
+                padding: '7px 8px', background: NODE_COLORS[type], borderRadius: 4,
+                color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'grab',
+                userSelect: 'none', border: `1px solid rgba(255,255,255,0.1)`,
+                boxShadow: '0 1px 4px rgba(0,0,0,0.4)',
+                transition: 'opacity 0.1s',
+              }}
+              onMouseEnter={e => (e.currentTarget.style.opacity = '0.85')}
+              onMouseLeave={e => (e.currentTarget.style.opacity = '1')}
+            >
+              {NODE_LABELS[type]}
+            </div>
+          ))}
+          <div style={{ fontSize: 9, color: C.muted, marginTop: 4, lineHeight: 1.4 }}>
+            Drag onto canvas or click to add
+          </div>
+          <div style={{ flex: 1 }} />
+          <button
+            onClick={tidyLayout}
+            title="Auto-arrange nodes left-to-right"
+            style={{
+              marginTop: 8, padding: '7px 8px', background: C.border,
+              border: `1px solid ${C.muted}`, borderRadius: 4,
+              color: C.text, fontSize: 11, fontWeight: 600, cursor: 'pointer',
+              transition: 'background 0.15s',
+            }}
+            onMouseEnter={e => (e.currentTarget.style.background = C.muted)}
+            onMouseLeave={e => (e.currentTarget.style.background = C.border)}
+          >
+            ⬡ Tidy
+          </button>
         </div>
-        <div style={{ flex: 1 }} />
-        <button
-          onClick={tidyLayout}
-          title="Auto-arrange nodes left-to-right"
-          style={{
-            marginTop: 8, padding: '7px 8px', background: C.border,
-            border: `1px solid ${C.muted}`, borderRadius: 4,
-            color: C.text, fontSize: 11, fontWeight: 600, cursor: 'pointer',
-            transition: 'background 0.15s',
-          }}
-          onMouseEnter={e => (e.currentTarget.style.background = C.muted)}
-          onMouseLeave={e => (e.currentTarget.style.background = C.border)}
-        >
-          ⬡ Tidy
-        </button>
       </div>
-    </div>
     </SoundListCtx.Provider>
   );
 }
 
-// ─── Main page ────────────────────────────────────────────────────────────────
 export default function SoundCuePage() {
   return <Suspense><SoundCuePageInner /></Suspense>;
 }
@@ -858,112 +908,166 @@ function SoundCuePageInner() {
   useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [cueList, setCueList] = useState<CueListEntry[]>(store.getList());
-  const [openCue, setOpenCue] = useState<SoundCue | null>(store.getOpenCue());
+  const cuesFolderRef = useRef<HTMLInputElement>(null);
+  const soundBinRef = useRef<HTMLInputElement>(null);
+  const audioCtxRef = useRef<AudioContext | null>(null);
+  const [cueFolderName, setCueFolderName] = useState<string | null>(null);
+  const [cueFiles, setCueFiles] = useState<Record<string, SoundCue>>({});
+  const [soundBin, setSoundBin] = useState<ReturnType<typeof parseSoundBin> | null>(null);
+  const [openCueId, setOpenCueId] = useState<string | null>(null);
   const [dirty, setDirty] = useState(false);
-  const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState('');
   const [newCueName, setNewCueName] = useState('');
   const [creating, setCreating] = useState(false);
   const [activePath, setActivePath] = useState<string[]>([]);
-  const audioCtxRef = useRef<AudioContext | null>(null);
 
-  // Load cue list, then open ?cue= if present
+  const openCue = openCueId ? (cueFiles[openCueId] ?? null) : null;
+  const cueList = Object.keys(cueFiles).sort().map(id => ({
+    id,
+    nodeCount: cueFiles[id].nodes.length,
+    edgeCount: cueFiles[id].edges.length,
+  }));
+  const soundList = soundBin?.names ?? [];
+
   useEffect(() => {
-    const load = async () => {
-      let list = store.getList();
-      if (list.length === 0) {
-        list = await apiFetch('/sound-cues') as CueListEntry[];
-        store.setList(list); setCueList(list);
-      } else {
-        setCueList(list);
-      }
-      const id = searchParams.get('cue');
-      if (id && !store.getOpenCue()) {
-        try { await openCueById(id); } catch {}
-      }
-    };
-    load().catch(() => {});
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    if (!cueFolderName) return;
+    const id = searchParams.get('cue');
+    if (id && cueFiles[id]) {
+      setOpenCueId(id);
+    } else if (!id) {
+      setOpenCueId(null);
+    } else if (!cueFiles[id]) {
+      setOpenCueId(null);
+    }
+  }, [cueFiles, cueFolderName, searchParams]);
 
-  async function openCueById(id: string) {
-    const cue = await apiFetch(`/sound-cues/${id}`) as SoundCue;
-    store.setOpenCue(cue); setOpenCue(cue); setDirty(false); setActivePath([]);
+  async function handleCuesFolderPicked(e: React.ChangeEvent<HTMLInputElement>) {
+    const picked = e.target.files;
+    if (!picked || picked.length === 0) return;
+    const first = picked[0] as { webkitRelativePath?: string } & File;
+    const folderName = first?.webkitRelativePath?.split('/')[0] ?? 'sound-cues';
+    const files: Record<string, SoundCue> = {};
+    await Promise.all(
+      Array.from(picked)
+        .filter(file => file.name.endsWith('.json'))
+        .map(file => file.text().then(text => {
+          try {
+            const cue = JSON.parse(text) as SoundCue;
+            const id = cue.id ?? file.name.replace('.json', '');
+            files[id] = { ...cue, id };
+          } catch {}
+        }))
+    );
+    setCueFolderName(folderName);
+    setCueFiles(files);
+    setOpenCueId(null);
+    setDirty(false);
+    setActivePath([]);
+    setCreating(false);
+    setStatus('');
+    e.target.value = '';
+    const id = searchParams.get('cue');
+    if (id && files[id]) setOpenCueId(id);
+  }
+
+  async function handleSoundBinPicked(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const buf = await file.arrayBuffer();
+    setSoundBin(parseSoundBin(buf));
+    setStatus(`Loaded ${file.name}`);
+    setTimeout(() => setStatus(''), 2000);
+    e.target.value = '';
+  }
+
+  function openCueById(id: string) {
+    setOpenCueId(id);
+    setActivePath([]);
+    setStatus('');
     router.replace(`/sound-studio/cues?cue=${encodeURIComponent(id)}`);
   }
 
+  function handleCloseFolder() {
+    setCueFolderName(null);
+    setCueFiles({});
+    setOpenCueId(null);
+    setDirty(false);
+    setStatus('');
+    setNewCueName('');
+    setCreating(false);
+    setActivePath([]);
+    router.replace('/sound-studio/cues');
+  }
+
   function handleCueChange(updated: SoundCue) {
-    setOpenCue(updated); store.markDirty(); setDirty(true);
+    setCueFiles(prev => ({ ...prev, [updated.id]: updated }));
+    setDirty(true);
   }
 
-  async function save() {
+  function save() {
     if (!openCue) return;
-    setSaving(true);
-    try {
-      const token = getToken();
-      const resp = await fetch(`/api/sound-cues/${openCue.id}`, {
-        method: 'PUT',
-        headers: { 'content-type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-        body: JSON.stringify(openCue),
-      });
-      if (!resp.ok) {
-        const body = await resp.json().catch(() => ({})) as any;
-        throw new Error(body?.error || `${resp.status} ${resp.statusText}`);
-      }
-      store.setOpenCue(openCue); setDirty(false);
-      setStatus('Saved'); setTimeout(() => setStatus(''), 2000);
-      const list = await apiFetch('/sound-cues') as CueListEntry[];
-      store.setList(list); setCueList(list);
-    } catch (e: any) {
-      setStatus(`Error: ${e.message}`);
-    } finally { setSaving(false); }
+    downloadCueFile(openCue);
+    setDirty(false);
+    setStatus('Downloaded');
+    setTimeout(() => setStatus(''), 2000);
   }
 
-  async function createCue() {
+  function createCue() {
     if (!newCueName.trim()) return;
     const id = newCueName.trim().toLowerCase().replace(/[^a-z0-9_-]/g, '_');
     const blank: SoundCue = { id, nodes: [{ id: 'out', type: 'Output', position: { x: 700, y: 200 }, data: {} }], edges: [] };
-    await apiFetch(`/sound-cues/${id}`, {
-      method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify(blank),
-    });
-    const list = await apiFetch('/sound-cues') as CueListEntry[];
-    store.setList(list); setCueList(list);
-    setNewCueName(''); setCreating(false);
-    openCueById(id);
+    setCueFiles(prev => ({ ...prev, [id]: blank }));
+    setOpenCueId(id);
+    setNewCueName('');
+    setCreating(false);
+    setActivePath([]);
+    router.replace(`/sound-studio/cues?cue=${encodeURIComponent(id)}`);
+    downloadCueFile(blank);
+    setDirty(false);
+    setStatus('Downloaded blank cue');
+    setTimeout(() => setStatus(''), 2000);
   }
 
-  async function deleteCue(id: string) {
-    if (!confirm(`Delete cue "${id}"?`)) return;
-    await apiFetch(`/sound-cues/${id}`, { method: 'DELETE' });
-    if (openCue?.id === id) {
-      setOpenCue(null); store.setOpenCue(null);
+  function deleteCue(id: string) {
+    if (!confirm(`Remove "${id}" from editor? (original file not deleted)`)) return;
+    setCueFiles(prev => {
+      const next = { ...prev };
+      delete next[id];
+      return next;
+    });
+    setActivePath([]);
+    setDirty(openCueId === id ? false : dirty);
+    if (openCueId === id) {
+      setOpenCueId(null);
       router.replace('/sound-studio/cues');
     }
-    const list = await apiFetch('/sound-cues') as CueListEntry[];
-    store.setList(list); setCueList(list);
   }
 
   async function playCue() {
     if (!openCue) return;
     const { file, path, semitones, volume, delaySec } = evalCue(openCue);
-    if (!file) { setStatus('No sound resolved'); setTimeout(() => setStatus(''), 2000); return; }
+    if (!file) {
+      setStatus('No sound resolved');
+      setTimeout(() => setStatus(''), 2000);
+      return;
+    }
+    if (!soundBin) {
+      setStatus('Load sound.bin to preview audio');
+      setTimeout(() => setStatus(''), 3000);
+      return;
+    }
     setActivePath(path);
     try {
-      const token = getToken();
-      const resp = await fetch(`/api/sounds/${encodeURIComponent(file)}/play`, {
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-      });
-      if (!resp.ok) throw new Error(`${resp.status} ${resp.statusText}`);
-      const buf = await resp.arrayBuffer();
+      const wavBytes = soundBin.getWav(file);
+      if (!wavBytes) throw new Error(`"${file}" not found in sound.bin`);
       if (!audioCtxRef.current) audioCtxRef.current = new AudioContext();
       const ctx = audioCtxRef.current;
       if (ctx.state === 'suspended') await ctx.resume();
-      const decoded = await decodeAdpcmWav(buf, ctx);
+      const wavBuffer = Uint8Array.from(wavBytes).buffer;
+      const decoded = await decodeAdpcmWav(wavBuffer, ctx);
       const src = ctx.createBufferSource();
       src.buffer = decoded;
-      // Apply pitch: semitones → cents (100 cents per semitone)
       src.detune.value = semitones * 100;
-      // Apply volume via GainNode
       const gain = ctx.createGain();
       gain.gain.value = Math.max(0, volume);
       src.connect(gain);
@@ -971,84 +1075,150 @@ function SoundCuePageInner() {
       src.start(ctx.currentTime + Math.max(0, delaySec));
       const parts = [`▶ ${file}`];
       if (semitones !== 0) parts.push(`pitch ${semitones > 0 ? '+' : ''}${semitones}st`);
-      if (volume !== 1)    parts.push(`vol ×${volume.toFixed(2)}`);
-      if (delaySec > 0)    parts.push(`delay ${delaySec.toFixed(2)}s`);
-      setStatus(parts.join(' · ')); setTimeout(() => setStatus(''), 3000);
-    } catch (e: any) { setStatus(`Play failed: ${e.message}`); }
+      if (volume !== 1) parts.push(`vol ×${volume.toFixed(2)}`);
+      if (delaySec > 0) parts.push(`delay ${delaySec.toFixed(2)}s`);
+      setStatus(parts.join(' · '));
+      setTimeout(() => setStatus(''), 3000);
+    } catch (e: any) {
+      setStatus(`Play failed: ${e.message}`);
+    }
   }
 
   return (
     <div style={{ display: 'flex', height: '100vh', background: C.bg, color: C.text, fontFamily: 'monospace' }}>
       <Sidebar />
 
-      {/* ── Cue list panel ── */}
-      <div style={{ width: 220, borderRight: `1px solid ${C.border}`, display: 'flex', flexDirection: 'column', overflowY: 'auto', background: C.card }}>
-        <div style={{ padding: '12px 10px 6px', fontWeight: 700, fontSize: 12, color: C.primary, letterSpacing: 1, borderBottom: `1px solid ${C.border}` }}>
-          SOUND CUES
-        </div>
-        {cueList.map(c => (
-          <div key={c.id} onClick={() => openCueById(c.id)} style={{
-            padding: '7px 10px', cursor: 'pointer', fontSize: 12,
-            background: openCue?.id === c.id ? 'rgba(0,163,40,0.12)' : 'transparent',
-            borderLeft: `3px solid ${openCue?.id === c.id ? C.primary : 'transparent'}`,
-            display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-          }}>
-            <span style={{ color: openCue?.id === c.id ? C.light : C.dim }}>{c.id}</span>
-            <button onClick={e => { e.stopPropagation(); deleteCue(c.id); }}
-              style={{ background: 'none', border: 'none', color: C.muted, cursor: 'pointer', fontSize: 14 }}>✕</button>
-          </div>
-        ))}
+      <input
+        ref={cuesFolderRef}
+        type="file"
+        accept=".json,application/json"
+        style={{ display: 'none' }}
+        {...({ webkitdirectory: '', multiple: true } as unknown as React.InputHTMLAttributes<HTMLInputElement>)}
+        onChange={handleCuesFolderPicked}
+      />
+      <input
+        ref={soundBinRef}
+        type="file"
+        accept=".bin"
+        style={{ display: 'none' }}
+        onChange={handleSoundBinPicked}
+      />
 
-        {creating ? (
-          <div style={{ padding: '8px 10px', display: 'flex', gap: 4 }}>
-            <input
-              autoFocus value={newCueName} onChange={e => setNewCueName(e.target.value)}
-              onKeyDown={e => { if (e.key === 'Enter') createCue(); if (e.key === 'Escape') setCreating(false); }}
-              placeholder="cue_id"
-              style={{ flex: 1, background: C.bg, border: `1px solid ${C.border}`, color: C.text, borderRadius: 4, padding: '3px 6px', fontSize: 12 }}
-            />
-            <button onClick={createCue}
-              style={{ background: C.dark, border: `1px solid ${C.primary}`, color: C.primary, borderRadius: 4, padding: '3px 8px', cursor: 'pointer', fontSize: 12 }}>✓</button>
-          </div>
-        ) : (
-          <button onClick={() => setCreating(true)}
-            style={{ margin: 8, background: 'rgba(0,163,40,0.1)', border: `1px solid ${C.dark}`, color: C.primary, borderRadius: 4, padding: '5px 8px', cursor: 'pointer', fontSize: 11, letterSpacing: 0.5 }}>
-            + NEW CUE
-          </button>
-        )}
-      </div>
-
-      {/* ── Canvas area ── */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-        {/* Toolbar */}
-        <div style={{ height: 42, borderBottom: `1px solid ${C.border}`, display: 'flex', alignItems: 'center', gap: 8, padding: '0 12px', background: C.card }}>
-          {openCue && <>
-            <span style={{ fontWeight: 700, color: C.primary, fontSize: 13, letterSpacing: 1 }}>{openCue.id}</span>
-            {dirty && <span style={{ color: '#f59e0b', fontSize: 11 }}>●</span>}
-            <button onClick={save} disabled={!dirty || saving}
-              style={{ background: dirty ? 'rgba(0,163,40,0.15)' : 'transparent', border: `1px solid ${dirty ? C.primary : C.border}`, color: dirty ? C.primary : C.muted, borderRadius: 4, padding: '3px 12px', cursor: dirty ? 'pointer' : 'default', fontSize: 11, letterSpacing: 0.5 }}>
-              {saving ? 'SAVING…' : 'SAVE'}
+      {!cueFolderName ? (
+        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 24 }}>
+            <div style={{ fontSize: 48, opacity: 0.5 }}>🔊</div>
+            <div>
+              <p style={{ color: C.text, fontSize: 16, fontWeight: 700, marginBottom: 4 }}>SOUND CUE EDITOR</p>
+              <p style={{ color: C.dim, fontSize: 13 }}>Open <code style={{ color: C.primary }}>shared/assets/gas/sound-cues/</code> to start editing</p>
+            </div>
+            <button
+              onClick={() => cuesFolderRef.current?.click()}
+              style={{ padding: '12px 32px', border: `1px solid ${C.primary}`, color: C.primary, background: 'transparent', fontSize: 14, letterSpacing: 2, fontWeight: 700, cursor: 'pointer' }}
+            >
+              📁 OPEN SOUND-CUES FOLDER
             </button>
-            <button onClick={playCue}
-              style={{ background: 'rgba(15,168,53,0.15)', border: `1px solid ${C.light}`, color: C.light, borderRadius: 4, padding: '3px 12px', cursor: 'pointer', fontSize: 11, letterSpacing: 0.5 }}>
-              ▶ PLAY
+          </div>
+        </div>
+      ) : <>
+        <div style={{ width: 220, borderRight: `1px solid ${C.border}`, display: 'flex', flexDirection: 'column', overflowY: 'auto', background: C.card }}>
+          <div style={{ padding: '12px 10px 6px', fontWeight: 700, fontSize: 12, color: C.primary, letterSpacing: 1, borderBottom: `1px solid ${C.border}` }}>
+            SOUND CUES
+          </div>
+          {cueList.map(c => (
+            <div key={c.id} onClick={() => openCueById(c.id)} style={{
+              padding: '7px 10px', cursor: 'pointer', fontSize: 12,
+              background: openCue?.id === c.id ? 'rgba(0,163,40,0.12)' : 'transparent',
+              borderLeft: `3px solid ${openCue?.id === c.id ? C.primary : 'transparent'}`,
+              display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8,
+            }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 }}>
+                <span style={{ color: openCue?.id === c.id ? C.light : C.dim, overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.id}</span>
+                <span style={{ color: C.muted, fontSize: 10 }}>{c.nodeCount} nodes · {c.edgeCount} edges</span>
+              </div>
+              <button
+                onClick={e => { e.stopPropagation(); deleteCue(c.id); }}
+                style={{ background: 'none', border: 'none', color: C.muted, cursor: 'pointer', fontSize: 14 }}
+                title="Remove from editor"
+              >
+                ✕
+              </button>
+            </div>
+          ))}
+
+          {creating ? (
+            <div style={{ padding: '8px 10px', display: 'flex', gap: 4 }}>
+              <input
+                autoFocus value={newCueName} onChange={e => setNewCueName(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') createCue(); if (e.key === 'Escape') setCreating(false); }}
+                placeholder="cue_id"
+                style={{ flex: 1, background: C.bg, border: `1px solid ${C.border}`, color: C.text, borderRadius: 4, padding: '3px 6px', fontSize: 12 }}
+              />
+              <button onClick={createCue}
+                style={{ background: C.dark, border: `1px solid ${C.primary}`, color: C.primary, borderRadius: 4, padding: '3px 8px', cursor: 'pointer', fontSize: 12 }}>✓</button>
+            </div>
+          ) : (
+            <button onClick={() => setCreating(true)}
+              style={{ margin: 8, background: 'rgba(0,163,40,0.1)', border: `1px solid ${C.dark}`, color: C.primary, borderRadius: 4, padding: '5px 8px', cursor: 'pointer', fontSize: 11, letterSpacing: 0.5 }}>
+              + NEW CUE
             </button>
-            {status && <span style={{ fontSize: 11, color: status.startsWith('Error') || status.startsWith('Play failed') ? '#ef4444' : C.dim, marginLeft: 8 }}>{status}</span>}
-          </>}
-          {!openCue && <span style={{ color: C.muted, fontSize: 12 }}>Select or create a cue to edit</span>}
+          )}
         </div>
 
-        {/* Canvas */}
-        {openCue ? (
-          <ReactFlowProvider>
-            <CueCanvas key={openCue.id} cue={openCue} onChange={handleCueChange} activePath={activePath} />
-          </ReactFlowProvider>
-        ) : (
-          <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: C.border, fontSize: 14, letterSpacing: 2 }}>
-            NO CUE OPEN
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+          <div style={{ minHeight: 42, borderBottom: `1px solid ${C.border}`, display: 'flex', alignItems: 'center', gap: 8, padding: '6px 12px', background: C.card, flexWrap: 'wrap' }}>
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '4px 8px', border: `1px solid ${C.border}`, borderRadius: 999, color: C.dim, fontSize: 11 }}>
+              <span>📁 {cueFolderName}</span>
+              <button
+                onClick={handleCloseFolder}
+                style={{ background: 'none', border: 'none', color: C.muted, cursor: 'pointer', fontSize: 12, padding: 0 }}
+                title="Close folder"
+              >
+                ✕
+              </button>
+            </div>
+
+            <button
+              onClick={() => soundBinRef.current?.click()}
+              style={{
+                background: soundBin ? 'rgba(15,168,53,0.12)' : 'transparent',
+                border: `1px solid ${soundBin ? C.light : C.border}`,
+                color: soundBin ? C.light : C.dim,
+                borderRadius: 999,
+                padding: '4px 10px',
+                cursor: 'pointer',
+                fontSize: 11,
+              }}
+            >
+              {soundBin ? `🔊 sound.bin · ${soundList.length} sounds` : '📂 Load sound.bin'}
+            </button>
+
+            {openCue ? <>
+              <span style={{ fontWeight: 700, color: C.primary, fontSize: 13, letterSpacing: 1 }}>{openCue.id}</span>
+              {dirty && <span style={{ color: '#f59e0b', fontSize: 11 }}>●</span>}
+              <button onClick={save}
+                style={{ background: 'rgba(0,163,40,0.15)', border: `1px solid ${C.primary}`, color: C.primary, borderRadius: 4, padding: '3px 12px', cursor: 'pointer', fontSize: 11, letterSpacing: 0.5 }}>
+                DOWNLOAD
+              </button>
+              <button onClick={playCue}
+                style={{ background: 'rgba(15,168,53,0.15)', border: `1px solid ${C.light}`, color: C.light, borderRadius: 4, padding: '3px 12px', cursor: 'pointer', fontSize: 11, letterSpacing: 0.5 }}>
+                ▶ PLAY
+              </button>
+              {status && <span style={{ fontSize: 11, color: status.startsWith('Play failed') ? '#ef4444' : C.dim }}>{status}</span>}
+            </> : <span style={{ color: C.muted, fontSize: 12 }}>Select or create a cue to edit</span>}
           </div>
-        )}
-      </div>
+
+          {openCue ? (
+            <ReactFlowProvider>
+              <CueCanvas key={openCue.id} cue={openCue} onChange={handleCueChange} activePath={activePath} soundList={soundList} />
+            </ReactFlowProvider>
+          ) : (
+            <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: C.border, fontSize: 14, letterSpacing: 2 }}>
+              NO CUE OPEN
+            </div>
+          )}
+        </div>
+      </>}
     </div>
   );
 }
