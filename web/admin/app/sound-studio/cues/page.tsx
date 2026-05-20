@@ -66,8 +66,10 @@ const NODE_LABELS: Record<string, string> = {
 
 // ─── Shared node shell ────────────────────────────────────────────────────────
 const SEL_STYLE: React.CSSProperties = {
-  boxShadow: '0 0 0 2px #00a328, 0 0 16px rgba(0,163,40,0.6)',
-  animation: 'silencer-sel-pulse 1.1s ease-in-out infinite',
+  border: '2px solid #ffffff',
+  outline: '2px solid #00ff55',
+  outlineOffset: 2,
+  animation: 'silencer-sel-pulse 0.9s ease-in-out infinite',
 };
 
 function NodeShell({ type, children, hasInput = true, hasOutput = true, selected = false }:
@@ -530,8 +532,8 @@ function CueCanvas({ cue, onChange, activePath }: {
     <SoundListCtx.Provider value={soundList}>
     <style>{`
       @keyframes silencer-sel-pulse {
-        0%,100% { box-shadow: 0 0 0 2px #00a328, 0 0 10px rgba(0,163,40,0.5); }
-        50%      { box-shadow: 0 0 0 3px #0fa835, 0 0 24px rgba(15,168,53,0.8), 0 0 40px rgba(0,163,40,0.3); }
+        0%,100% { box-shadow: 0 0 8px 2px rgba(0,255,85,0.5); outline-color: #00ff55; }
+        50%      { box-shadow: 0 0 22px 6px rgba(0,255,85,0.9), 0 0 40px 10px rgba(0,163,40,0.4); outline-color: #80ffaa; }
       }
     `}</style>
     <div style={{ flex: 1, height: '100%', display: 'flex' }}>
