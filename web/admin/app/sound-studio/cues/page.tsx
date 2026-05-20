@@ -23,6 +23,8 @@ import { apiFetch } from '../../../lib/api';
 import * as store from '../../../lib/sound-cue-store';
 import type { CueEdge, CueListEntry, CueNode, CueNodeData, SoundCue } from '../../../lib/sound-cue-store';
 
+import { decodeAdpcmWav } from '../../sound-studio/adpcm';
+
 const getToken = () => typeof window !== 'undefined' ? localStorage.getItem('zs_token') : '';
 
 // ─── Palette ─────────────────────────────────────────────────────────────────
@@ -519,12 +521,14 @@ export default function SoundCuePage() {
     if (!file) { setStatus('No sound resolved'); setTimeout(() => setStatus(''), 2000); return; }
     try {
       const token = getToken();
-      const resp = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'}/api/sounds/${encodeURIComponent(file)}/play`, {
+      const resp = await fetch(`/api/sounds/${encodeURIComponent(file)}/play`, {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
+      if (!resp.ok) throw new Error(`${resp.status} ${resp.statusText}`);
       const buf = await resp.arrayBuffer();
       if (!audioCtxRef.current) audioCtxRef.current = new AudioContext();
-      const decoded = await audioCtxRef.current.decodeAudioData(buf);
+      if (audioCtxRef.current.state === 'suspended') await audioCtxRef.current.resume();
+      const decoded = await decodeAdpcmWav(buf, audioCtxRef.current);
       const src = audioCtxRef.current.createBufferSource();
       src.buffer = decoded;
       src.connect(audioCtxRef.current.destination);
