@@ -1,7 +1,8 @@
 'use client';
-import { useEffect, useRef, useState, useCallback, DragEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, useCallback, DragEvent } from 'react';
 import { useAuth } from '../../lib/auth';
 import Sidebar from '../../components/Sidebar';
+import { useRouter } from 'next/navigation';
 import { apiFetch } from '../../lib/api';
 import { useServerReachable } from '../../lib/socket';
 import { decodeAdpcmWav } from '../../lib/adpcm';
@@ -9,6 +10,7 @@ import * as audioStore from '../../lib/audio-store';
 import * as soundStudioStore from '../../lib/sound-studio-store';
 import * as cueStore from '../../lib/sound-cue-store';
 import type { SoundCue } from '../../lib/sound-cue-store';
+import CueEditor from './CueEditor';
 
 interface SoundEntry {
   name: string;
@@ -52,7 +54,11 @@ interface PendingDiff {
 }
 
 type FilterMode = 'all' | 'cpp' | 'actordef' | 'orphaned' | 'missing' | 'ambient' | 'headroom' | 'loop' | 'attenuated' | 'ui';
-type TabMode = 'sounds' | 'music' | 'ambient';
+type TabMode = 'sounds' | 'music' | 'ambient' | 'cues';
+
+function parseTabParam(value: string | null): TabMode {
+  return value === 'music' || value === 'ambient' || value === 'cues' ? value : 'sounds';
+}
 type SortKey = 'name' | 'size' | 'duration' | 'level' | 'refs';
 
 // Sounds hardcoded by name in C++ source (from grep `soundbank["`) plus
@@ -451,7 +457,11 @@ export default function SoundStudioPage() {
 
   // ── State ───────────────────────────────────────────────────────────────────
   const _saved = soundStudioStore.get();
-  const [tab, setTab] = useState<TabMode>('sounds');
+  const router = useRouter();
+  const [tab, setTab] = useState<TabMode>(() => {
+    if (typeof window === 'undefined') return 'sounds';
+    return parseTabParam(new URLSearchParams(window.location.search).get('tab'));
+  });
   const [sounds, setSounds] = useState<SoundEntry[]>(_saved?.sounds ?? []);
   const [refs, setRefs] = useState<Record<string, SoundRef>>(_saved?.refs ?? {});
   const [levels, setLevels] = useState<Record<string, LevelInfo>>({});
@@ -472,6 +482,7 @@ export default function SoundStudioPage() {
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
   const [parsedBin, setParsedBin] = useState<ParsedSoundBin | null>(_saved?.parsedBin ?? null);
   const [folderName, setFolderName] = useState<string | null>(_saved?.folderName ?? null);
+  const [cueFiles, setCueFiles] = useState<Record<string, SoundCue>>(() => cueStore.getCueFiles() ?? {});
 
   // A→B compare
   const [compareA, setCompareA] = useState<string | null>(null);
@@ -527,6 +538,43 @@ export default function SoundStudioPage() {
   useEffect(() => { selectedVolCtxRef.current = selectedVolCtx; }, [selectedVolCtx]);
   useEffect(() => {
     parsedBinNamesRef.current = new Set(parsedBin?.entries.map(e => e.name) ?? []);
+  }, [parsedBin]);
+
+  const parsedBinForCues = useMemo(() => {
+    if (!parsedBin) return null;
+    const b = new Uint8Array(parsedBin.buf);
+    return {
+      names: parsedBin.entries.map(e => e.name),
+      getWav(name: string): Uint8Array | null {
+        const e = parsedBin.entries.find(x => x.name === name);
+        if (!e) return null;
+        const D = e.storedLength - 36;
+        const adpcm = b.slice(parsedBin.dataBase + e.offset, parsedBin.dataBase + e.offset + D);
+        const out = new Uint8Array(60 + D);
+        const ov = new DataView(out.buffer);
+        let p = 0;
+        out[p++]=82;out[p++]=73;out[p++]=70;out[p++]=70;
+        ov.setUint32(p, D + 52, true); p += 4;
+        out[p++]=87;out[p++]=65;out[p++]=86;out[p++]=69;
+        out[p++]=102;out[p++]=109;out[p++]=116;out[p++]=32;
+        ov.setUint32(p, 20, true); p += 4;
+        ov.setUint16(p, 0x0011, true); p += 2;
+        ov.setUint16(p, 1, true); p += 2;
+        ov.setUint32(p, 11025, true); p += 4;
+        ov.setUint32(p, 5588, true); p += 4;
+        ov.setUint16(p, 256, true); p += 2;
+        ov.setUint16(p, 4, true); p += 2;
+        ov.setUint16(p, 2, true); p += 2;
+        ov.setUint16(p, 505, true); p += 2;
+        out[p++]=102;out[p++]=97;out[p++]=99;out[p++]=116;
+        ov.setUint32(p, 4, true); p += 4;
+        ov.setUint32(p, 46399, true); p += 4;
+        out[p++]=100;out[p++]=97;out[p++]=116;out[p++]=97;
+        ov.setUint32(p, D, true); p += 4;
+        out.set(adpcm, p);
+        return out;
+      },
+    };
   }, [parsedBin]);
 
   const getToken = () => typeof window !== 'undefined' ? localStorage.getItem('zs_token') : '';
@@ -624,23 +672,23 @@ export default function SoundStudioPage() {
         parsedBin: parsedSoundBin,
       });
 
-      // Parse gas/sound-cues/*.json and store for the cues page
+      // Parse gas/sound-cues/*.json and store for the cues tab
       const cueFileObjs = pickedFiles.filter(f => {
         const rel = (f as File & { webkitRelativePath?: string }).webkitRelativePath as string;
         return rel.includes('/sound-cues/') && f.name.endsWith('.json');
       });
-      if (cueFileObjs.length > 0) {
-        const cueFiles: Record<string, SoundCue> = {};
-        await Promise.all(cueFileObjs.map(async f => {
-          try {
-            const text = await f.text();
-            const cue = JSON.parse(text) as SoundCue;
-            const id = cue.id ?? f.name.replace('.json', '');
-            cueFiles[id] = { ...cue, id };
-          } catch {}
-        }));
-        cueStore.setCueFiles(cueFiles, rootFolder || 'assets');
-      }
+      const cueFiles: Record<string, SoundCue> = {};
+      await Promise.all(cueFileObjs.map(async f => {
+        try {
+          const text = await f.text();
+          const cue = JSON.parse(text) as SoundCue;
+          const id = cue.id ?? f.name.replace('.json', '');
+          cueFiles[id] = { ...cue, id };
+        } catch {}
+      }));
+      setCueFiles(cueFiles);
+      if (Object.keys(cueFiles).length > 0) cueStore.setCueFiles(cueFiles, rootFolder || 'assets');
+      else cueStore.clearCueFiles();
 
       setStatus(soundBinFile
         ? `Loaded ${soundEntries.length} sound${soundEntries.length === 1 ? '' : 's'} from ${rootFolder || 'assets'}`
@@ -675,6 +723,7 @@ export default function SoundStudioPage() {
     setRenameTarget(null);
     audioStore.clear();
     soundStudioStore.clear();
+    setCueFiles({});
     cueStore.clearCueFiles();
   }
 
@@ -688,6 +737,32 @@ export default function SoundStudioPage() {
   }, []);
 
   useEffect(() => { if (tab === 'music') loadMusic(); }, [tab, loadMusic]);
+
+  useEffect(() => {
+    function syncTabFromUrl() {
+      setTab(parseTabParam(new URLSearchParams(window.location.search).get('tab')));
+    }
+    syncTabFromUrl();
+    window.addEventListener('popstate', syncTabFromUrl);
+    return () => window.removeEventListener('popstate', syncTabFromUrl);
+  }, []);
+
+  const selectTab = useCallback((next: TabMode) => {
+    setTab(next);
+    router.replace(`/sound-studio?tab=${next}`, { scroll: false });
+  }, [router]);
+
+  useEffect(() => {
+    if (folderName) {
+      soundStudioStore.set({ folderName, sounds, refs, parsedBin });
+    }
+  }, [folderName, sounds, refs, parsedBin]);
+
+  useEffect(() => {
+    if (!folderName) return;
+    if (Object.keys(cueFiles).length > 0) cueStore.setCueFiles(cueFiles, folderName);
+    else cueStore.clearCueFiles();
+  }, [folderName, cueFiles]);
 
   // ── Distance gain update ────────────────────────────────────────────────────
   useEffect(() => {
@@ -1351,21 +1426,15 @@ export default function SoundStudioPage() {
 
           {/* Tab switcher */}
           <div style={{ display: 'flex', gap: 2, marginLeft: 6 }}>
-            {(['sounds','music','ambient'] as TabMode[]).map(t => (
-              <button key={t} onClick={() => setTab(t)}
+            {(['sounds', 'music', 'ambient', 'cues'] as TabMode[]).map(t => (
+              <button key={t} onClick={() => selectTab(t)}
                 style={{ padding: '2px 10px', fontSize: 11, fontFamily: 'monospace',
                   background: tab === t ? '#2a2a3a' : 'transparent',
                   border: `1px solid ${tab === t ? '#66a' : '#333'}`,
                   color: tab === t ? '#aaf' : '#666', borderRadius: 3, cursor: 'pointer' }}>
-                {t}
+                {t.toUpperCase()}
               </button>
             ))}
-            <a href="/sound-studio/cues"
-              style={{ padding: '2px 10px', fontSize: 11, fontFamily: 'monospace',
-                background: 'transparent', border: '1px solid #333', color: '#666',
-                borderRadius: 3, cursor: 'pointer', textDecoration: 'none' }}>
-              cues
-            </a>
           </div>
 
           {tab === 'sounds' && editingEnabled && hasPending && (
@@ -1442,7 +1511,7 @@ export default function SoundStudioPage() {
           </div>
         )}
 
-        {!folderName ? (
+        {!folderName && tab !== 'cues' ? (
           <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#050a05' }}>
             <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 24 }}>
               <div style={{ fontSize: 56, opacity: 0.5 }}>🔊</div>
@@ -1466,7 +1535,7 @@ export default function SoundStudioPage() {
               </div>
             </div>
           </div>
-        ) : tab === 'sounds' && <>
+        ) : tab === 'sounds' ? <>
 
           {/* Missing banner */}
           {missingNames.length > 0 && filter !== 'missing' && (
@@ -1931,7 +2000,21 @@ export default function SoundStudioPage() {
             {editingEnabled ? <span>drop WAV to stage</span> : <span>local playback mode</span>}
             <span style={{ marginLeft: 'auto', color: '#2a2a2a' }}>↑↓ navigate &amp; play</span>
           </div>
-        </>}
+        </> : null}
+
+        {tab === 'cues' && (
+          <div style={{ flex: 1, minHeight: 0 }}>
+            <CueEditor
+              cueFiles={cueFiles}
+              onCueFilesChange={files => {
+                setCueFiles(files);
+                cueStore.setCueFiles(files, folderName ?? 'assets');
+              }}
+              soundList={parsedBin?.entries.map(e => e.name) ?? []}
+              parsedBin={parsedBinForCues}
+            />
+          </div>
+        )}
 
         {/* ── MUSIC TAB ────────────────────────────────────────────────────── */}
         {folderName && tab === 'music' && binLoaded && (
