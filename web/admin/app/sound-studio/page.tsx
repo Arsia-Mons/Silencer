@@ -693,6 +693,9 @@ export default function SoundStudioPage() {
       if (Object.keys(cueFiles).length > 0) cueStore.setCueFiles(cueFiles, rootFolder || 'assets');
       else cueStore.clearCueFiles();
 
+      // If the URL has ?cue=, switch to cues tab so the deep link resolves
+      if (initialCueId && cueFiles[initialCueId]) setTab('cues');
+
       setStatus(soundBinFile
         ? `Loaded ${soundEntries.length} sound${soundEntries.length === 1 ? '' : 's'} from ${rootFolder || 'assets'}`
         : `Opened ${rootFolder || 'assets'} — sound.bin not found, refs only.`);
