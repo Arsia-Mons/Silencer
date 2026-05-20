@@ -1,5 +1,5 @@
 'use client';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import ReactFlow, {
   addEdge,
   Background,
@@ -25,6 +25,9 @@ import type { CueEdge, CueListEntry, CueNode, CueNodeData, SoundCue } from '../.
 import { decodeAdpcmWav } from '../../sound-studio/adpcm';
 
 const getToken = () => typeof window !== 'undefined' ? localStorage.getItem('zs_token') : '';
+
+// ─── Sound list context (loaded once in CueCanvas) ────────────────────────────
+const SoundListCtx = createContext<string[]>([]);
 
 // ─── Silencer green palette ───────────────────────────────────────────────────
 const C = {
@@ -62,12 +65,18 @@ const NODE_LABELS: Record<string, string> = {
 };
 
 // ─── Shared node shell ────────────────────────────────────────────────────────
-function NodeShell({ type, children, hasInput = true, hasOutput = true }:
-  { type: string; children?: React.ReactNode; hasInput?: boolean; hasOutput?: boolean }) {
+const SEL_STYLE: React.CSSProperties = {
+  boxShadow: '0 0 0 2px #00a328, 0 0 16px rgba(0,163,40,0.6)',
+  animation: 'silencer-sel-pulse 1.1s ease-in-out infinite',
+};
+
+function NodeShell({ type, children, hasInput = true, hasOutput = true, selected = false }:
+  { type: string; children?: React.ReactNode; hasInput?: boolean; hasOutput?: boolean; selected?: boolean }) {
   return (
     <div style={{
       background: C.card, border: `2px solid ${NODE_COLORS[type] ?? C.muted}`,
       borderRadius: 6, minWidth: 180, fontSize: 12, color: C.text,
+      ...(selected ? SEL_STYLE : {}),
     }}>
       <div style={{
         background: NODE_COLORS[type] ?? C.muted, padding: '4px 8px',
@@ -83,19 +92,48 @@ function NodeShell({ type, children, hasInput = true, hasOutput = true }:
 }
 
 // ─── WavePlayer node ──────────────────────────────────────────────────────────
-function WavePlayerNode({ data }: NodeProps) {
+function WavePlayerNode({ data, id, selected }: NodeProps) {
+  const { setNodes } = useReactFlow();
+  const sounds = useContext(SoundListCtx);
+
+  function setFile(file: string) {
+    setNodes(nds => nds.map(n => n.id !== id ? n : { ...n, data: { ...n.data, file } }));
+  }
+
   return (
-    <NodeShell type="WavePlayer" hasInput={false}>
-      <div style={{ color: data.file ? C.light : C.muted, fontStyle: data.file ? 'normal' : 'italic' }}>
-        {data.file || 'no file selected'}
-      </div>
-      <div style={{ color: C.dim, fontSize: 11 }}>weight: {data.weight ?? 1}</div>
+    <NodeShell type="WavePlayer" hasInput={false} selected={selected}>
+      {sounds.length > 0 ? (
+        <select
+          className="nodrag"
+          value={data.file || ''}
+          onChange={e => setFile(e.target.value)}
+          style={{
+            background: C.bg, border: `1px solid ${C.border}`, color: data.file ? C.light : C.muted,
+            borderRadius: 3, padding: '3px 5px', fontSize: 11, width: '100%', cursor: 'pointer',
+          }}
+        >
+          <option value="">— select sound —</option>
+          {sounds.map(s => <option key={s} value={s}>{s}</option>)}
+        </select>
+      ) : (
+        <input
+          className="nodrag"
+          value={data.file || ''}
+          onChange={e => setFile(e.target.value)}
+          placeholder="sound name"
+          style={{
+            background: C.bg, border: `1px solid ${C.border}`, color: C.light,
+            borderRadius: 3, padding: '3px 5px', fontSize: 11, width: '100%',
+          }}
+        />
+      )}
+      <div style={{ color: C.dim, fontSize: 10, marginTop: 3 }}>weight: {data.weight ?? 1}</div>
     </NodeShell>
   );
 }
 
 // ─── Multi-input node (Random / Sequence / Mixer) ─────────────────────────────
-function MultiInputNode({ data, id, type }: NodeProps & { type: string }) {
+function MultiInputNode({ data, id, type, selected }: NodeProps & { type: string }) {
   const { setNodes, setEdges } = useReactFlow();
   const inputCount = data._inputCount ?? 2;
   const handles = Array.from({ length: inputCount }, (_, i) => i);
@@ -140,6 +178,7 @@ function MultiInputNode({ data, id, type }: NodeProps & { type: string }) {
       background: C.card, border: `2px solid ${NODE_COLORS[type]}`,
       borderRadius: 6, minWidth: 180, fontSize: 12, color: C.text, position: 'relative',
       paddingBottom: 4,
+      ...(selected ? SEL_STYLE : {}),
     }}>
       <div style={{
         background: NODE_COLORS[type], padding: '4px 8px',
@@ -215,12 +254,13 @@ function PitchNode({ data }: NodeProps) {
 }
 
 // ─── Output node ──────────────────────────────────────────────────────────────
-function OutputNode() {
+function OutputNode({ selected }: NodeProps) {
   return (
     <div style={{
       background: C.card, border: `2px solid ${C.primary}`, borderRadius: 8,
       width: 80, height: 80, display: 'flex', alignItems: 'center',
       justifyContent: 'center', fontSize: 28,
+      ...(selected ? SEL_STYLE : {}),
     }}>
       <Handle type="target" position={Position.Left} id="in" style={{ background: C.light, border: '1px solid #fff' }} />
       🔊
@@ -367,8 +407,15 @@ function CueCanvas({ cue, onChange, activePath }: {
   const { nodes: initNodes, edges: initEdges } = cueToFlow(cue);
   const [nodes, setNodes, onNodesChange] = useNodesState(initNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initEdges);
+  const [soundList, setSoundList] = useState<string[]>([]);
   const wrapperRef = useRef<HTMLDivElement>(null);
   const { screenToFlowPosition } = useReactFlow();
+
+  useEffect(() => {
+    apiFetch('/sounds')
+      .then((list: any) => setSoundList((list as { name: string }[]).map(s => s.name).sort()))
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     onChange(flowToCue(cue.id, nodes, edges));
@@ -439,6 +486,13 @@ function CueCanvas({ cue, onChange, activePath }: {
   }
 
   return (
+    <SoundListCtx.Provider value={soundList}>
+    <style>{`
+      @keyframes silencer-sel-pulse {
+        0%,100% { box-shadow: 0 0 0 2px #00a328, 0 0 10px rgba(0,163,40,0.5); }
+        50%      { box-shadow: 0 0 0 3px #0fa835, 0 0 24px rgba(15,168,53,0.8), 0 0 40px rgba(0,163,40,0.3); }
+      }
+    `}</style>
     <div style={{ flex: 1, height: '100%', display: 'flex' }}>
       {/* Canvas */}
       <div ref={wrapperRef} style={{ flex: 1, height: '100%' }}
@@ -491,6 +545,7 @@ function CueCanvas({ cue, onChange, activePath }: {
         </div>
       </div>
     </div>
+    </SoundListCtx.Provider>
   );
 }
 
