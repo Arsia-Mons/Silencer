@@ -22,6 +22,7 @@ import { useAuth } from '../../../lib/auth';
 import Sidebar from '../../../components/Sidebar';
 import { apiFetch } from '../../../lib/api';
 import { useRouter, useSearchParams } from 'next/navigation';
+import dagre from 'dagre';
 import * as store from '../../../lib/sound-cue-store';
 import type { CueEdge, CueListEntry, CueNode, CueNodeData, SoundCue } from '../../../lib/sound-cue-store';
 import { decodeAdpcmWav } from '../../sound-studio/adpcm';
@@ -496,7 +497,7 @@ function CueCanvas({ cue, onChange, activePath }: {
   const [selCount, setSelCount] = useState(0);
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; nodeId?: string } | null>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
-  const { screenToFlowPosition } = useReactFlow();
+  const { screenToFlowPosition, fitView } = useReactFlow();
   const mountedRef    = useRef(false);
   const suppressRef   = useRef(false);
   const isUndoRedoRef = useRef(false);
@@ -709,6 +710,20 @@ function CueCanvas({ cue, onChange, activePath }: {
     setCtxMenu(null);
   }
 
+  function tidyLayout() {
+    const g = new dagre.graphlib.Graph();
+    g.setDefaultEdgeLabel(() => ({}));
+    g.setGraph({ rankdir: 'LR', ranksep: 80, nodesep: 40, marginx: 30, marginy: 30 });
+    nodesRef.current.forEach(n => g.setNode(n.id, { width: 200, height: 80 }));
+    edgesRef.current.forEach(e => g.setEdge(e.source, e.target));
+    dagre.layout(g);
+    setNodes(nds => nds.map(n => {
+      const gn = g.node(n.id);
+      return gn ? { ...n, position: { x: gn.x - 100, y: gn.y - 40 } } : n;
+    }));
+    setTimeout(() => fitView({ padding: 0.15, duration: 300 }), 50);
+  }
+
   return (
     <SoundListCtx.Provider value={soundList}>
     <style>{`
@@ -813,6 +828,21 @@ function CueCanvas({ cue, onChange, activePath }: {
         <div style={{ fontSize: 9, color: C.muted, marginTop: 4, lineHeight: 1.4 }}>
           Drag onto canvas or click to add
         </div>
+        <div style={{ flex: 1 }} />
+        <button
+          onClick={tidyLayout}
+          title="Auto-arrange nodes left-to-right"
+          style={{
+            marginTop: 8, padding: '7px 8px', background: C.border,
+            border: `1px solid ${C.muted}`, borderRadius: 4,
+            color: C.text, fontSize: 11, fontWeight: 600, cursor: 'pointer',
+            transition: 'background 0.15s',
+          }}
+          onMouseEnter={e => (e.currentTarget.style.background = C.muted)}
+          onMouseLeave={e => (e.currentTarget.style.background = C.border)}
+        >
+          ⬡ Tidy
+        </button>
       </div>
     </div>
     </SoundListCtx.Provider>
