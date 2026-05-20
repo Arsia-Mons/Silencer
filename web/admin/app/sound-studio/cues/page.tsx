@@ -275,13 +275,16 @@ function flowToCue(id: string, nodes: Node[], edges: Edge[]): SoundCue {
 }
 
 // ─── Evaluate cue client-side (mirrors C++ logic) ────────────────────────────
-function evalCue(cue: SoundCue): string | null {
+// Returns the resolved file AND the ordered list of node IDs on the winning path.
+function evalCue(cue: SoundCue): { file: string | null; path: string[] } {
   const nodeMap = Object.fromEntries(cue.nodes.map(n => [n.id, n]));
   const edgesTo: Record<string, CueEdge[]> = {};
   for (const e of cue.edges) (edgesTo[e.target] ??= []).push(e);
   const seqCounters: Record<string, number> = {};
+  const path: string[] = [];
 
   function evalNode(id: string): string | null {
+    path.push(id);
     const n = nodeMap[id];
     if (!n) return null;
     const inputs = (edgesTo[id] ?? [])
@@ -325,7 +328,8 @@ function evalCue(cue: SoundCue): string | null {
   }
 
   const output = cue.nodes.find(n => n.type === 'Output');
-  return output ? evalNode(output.id) : null;
+  const file = output ? evalNode(output.id) : null;
+  return { file, path };
 }
 
 // ─── Node factory ─────────────────────────────────────────────────────────────
@@ -355,7 +359,11 @@ const NODE_TYPE_LIST: CueNode['type'][] = [
 ];
 
 // ─── Canvas + right palette ───────────────────────────────────────────────────
-function CueCanvas({ cue, onChange }: { cue: SoundCue; onChange: (c: SoundCue) => void }) {
+function CueCanvas({ cue, onChange, activePath }: {
+  cue: SoundCue;
+  onChange: (c: SoundCue) => void;
+  activePath: string[];
+}) {
   const { nodes: initNodes, edges: initEdges } = cueToFlow(cue);
   const [nodes, setNodes, onNodesChange] = useNodesState(initNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initEdges);
@@ -365,6 +373,27 @@ function CueCanvas({ cue, onChange }: { cue: SoundCue; onChange: (c: SoundCue) =
   useEffect(() => {
     onChange(flowToCue(cue.id, nodes, edges));
   }, [nodes, edges]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Highlight the active path when Play is pressed
+  useEffect(() => {
+    if (!activePath.length) return;
+    const pathSet = new Set(activePath);
+    setNodes(nds => nds.map(n => ({
+      ...n,
+      style: pathSet.has(n.id)
+        ? { filter: 'drop-shadow(0 0 6px #00a328) drop-shadow(0 0 16px #0fa835)', zIndex: 10 }
+        : { opacity: 0.35 },
+    })));
+    setEdges(eds => eds.map(e => {
+      const active = pathSet.has(e.source) && pathSet.has(e.target);
+      return { ...e, style: { stroke: active ? '#0fa835' : '#1a2e1a', strokeWidth: active ? 3 : 1, transition: 'stroke 0.2s, stroke-width 0.2s' } };
+    }));
+    const t = setTimeout(() => {
+      setNodes(nds => nds.map(n => ({ ...n, style: {} })));
+      setEdges(eds => eds.map(e => ({ ...e, style: { stroke: C.muted } })));
+    }, 3000);
+    return () => clearTimeout(t);
+  }, [activePath]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const isValidConnection = useCallback((conn: Connection) => {
     const SINGLE_INPUT = new Set(['Output', 'Delay', 'Volume', 'Pitch']);
@@ -475,6 +504,7 @@ export default function SoundCuePage() {
   const [status, setStatus] = useState('');
   const [newCueName, setNewCueName] = useState('');
   const [creating, setCreating] = useState(false);
+  const [activePath, setActivePath] = useState<string[]>([]);
   const audioCtxRef = useRef<AudioContext | null>(null);
 
   useEffect(() => {
@@ -535,8 +565,9 @@ export default function SoundCuePage() {
 
   async function playCue() {
     if (!openCue) return;
-    const file = evalCue(openCue);
+    const { file, path } = evalCue(openCue);
     if (!file) { setStatus('No sound resolved'); setTimeout(() => setStatus(''), 2000); return; }
+    setActivePath(path);
     try {
       const token = getToken();
       const resp = await fetch(`/api/sounds/${encodeURIComponent(file)}/play`, {
@@ -617,7 +648,7 @@ export default function SoundCuePage() {
         {/* Canvas */}
         {openCue ? (
           <ReactFlowProvider>
-            <CueCanvas key={openCue.id} cue={openCue} onChange={handleCueChange} />
+            <CueCanvas key={openCue.id} cue={openCue} onChange={handleCueChange} activePath={activePath} />
           </ReactFlowProvider>
         ) : (
           <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: C.border, fontSize: 14, letterSpacing: 2 }}>
