@@ -6,7 +6,6 @@ import { apiFetch } from '../../lib/api';
 import { useServerReachable } from '../../lib/socket';
 import { decodeAdpcmWav } from '../../lib/adpcm';
 import * as audioStore from '../../lib/audio-store';
-import * as soundStudioStore from '../../lib/sound-studio-store';
 
 interface SoundEntry {
   name: string;
@@ -52,6 +51,347 @@ interface PendingDiff {
 type FilterMode = 'all' | 'cpp' | 'actordef' | 'orphaned' | 'missing' | 'ambient' | 'headroom' | 'loop' | 'attenuated' | 'ui';
 type TabMode = 'sounds' | 'music' | 'ambient';
 type SortKey = 'name' | 'size' | 'duration' | 'level' | 'refs';
+
+// Sounds hardcoded by name in C++ source (from grep `soundbank["`) plus
+// string literals used in sounds[] arrays and bgchannelbanks.
+const CPP_REFS = new Set([
+  '!laserel.wav','!laserew.wav','!laserme.wav','airlokj.wav','airvent2.wav',
+  'alarm3a.wav','alinvest.wav','alwarn.wav','ambloop4.wav','ambloop5.wav',
+  'ammo01.wav','ammo02.wav','ammo03.wav','ammo05.wav','breath2.wav',
+  'cathdoor.wav','charged.wav','cliksel2.wav','cphum11.wav','disguise.wav',
+  'drop4.wav','fall2b.wav','flamebg2.wav','freeze3.wav','freezrt1.wav',
+  'futstonl.wav','futstonr.wav','grenade1.wav','grenthro.wav','grndown.wav',
+  'groan2.wav','groan2a.wav','grunt2a.wav','if15.wav','intrude.wav',
+  'jackin.wav','jackout.wav','jetpak1.wav','jetpak2a.wav','juunewne.wav',
+  'ladder1.wav','ladder2.wav','land1.wav','land11.wav','portal1.wav',
+  'portpas2.wav','power11.wav','pwrcon1.wav','q_expl02.wav','reload2.wav',
+  'repair.wav','rico1.wav','rico2.wav','robot3l.wav','robot3r.wav',
+  'robotarm.wav','rocket1.wav','rocket4.wav','rocket9.wav','roll2.wav',
+  's_flmc01.wav','s_hita01.wav','s_hitb01.wav','seekexp1.wav','select2.wav',
+  'shield2.wav','shlddn1.wav','stop4.wav','stostep1.wav','stostepr.wav',
+  'strike01.wav','strike02.wav','strike03.wav','strike04.wav','theres3.wav',
+  'transrev.wav','type1.wav','type2.wav','type3.wav','type4.wav','type5.wav',
+  'typerev6.wav','vModDeto.wav','whoom.wav','wndloop1.wav','wndloopb.wav',
+  'wndloopc.wav','wndloope.wav',
+]);
+
+// Background ambient channel roles (game/game.cpp bgchannelbanks)
+const AMBIENT_ROLES = {
+  'wndloopb.wav': 'BG_BASE',
+  'cphum11.wav':  'BG_AMBIENT',
+  'wndloop1.wav': 'BG_OUTSIDE',
+};
+
+// Sounds called with loop=true anywhere in the game source
+const LOOP_SOUNDS = new Set([
+  'wndloopb.wav','cphum11.wav','wndloop1.wav', // BG channels
+  'ambloop4.wav',  // terminal hum
+  'ambloop5.wav',  // player hacking
+  'wndloopc.wav',  // base exit portal
+  'wndloope.wav',  // robot fly
+  'flamebg2.wav',  // player flamethrower
+  'jetpak1.wav',   // player jetpack
+  // rocket4/rocket9 are one-shot sounds stopped with 100ms fadeout — NOT looped
+]);
+
+// Fadeout duration (ms) when Audio::Stop() is called for each loop sound.
+// Derived from grepping Stop(channel, ms) in game source.
+const FADEOUT_MAP = {
+  'ambloop4.wav': 1000, // terminal.cpp: Stop(soundchannel, 1000)
+  'ambloop5.wav': 700,  // player.cpp: Stop(hacksoundchannel, 700)
+  'wndloope.wav': 800,  // robot.cpp: Stop(soundchannel, 800)
+  'flamebg2.wav': 200,  // player.cpp: Stop(flamersoundchannel, 200)
+  'jetpak1.wav':  200,  // player.cpp: Stop(jetpacksoundchannel, 200)
+  'rocket4.wav':  100,  // rocketprojectile.cpp: Stop(soundchannel, 100)
+  'rocket9.wav':  100,  // rocketprojectile.cpp: Stop(soundchannel, 100)
+};
+
+// Sound sets — groups of interchangeable variants chosen randomly by the game.
+// Replacing individual members without updating the whole set breaks uniformity.
+const SOUND_SETS = {
+  'type1.wav':    'hacking-typing',   // player.cpp: random during hacking bonus
+  'type2.wav':    'hacking-typing',
+  'type3.wav':    'hacking-typing',
+  'type4.wav':    'hacking-typing',
+  'type5.wav':    'hacking-typing',
+  // typerev6.wav is standalone (terminal delete key / objectives screen) — NOT in the random set
+  'ammo01.wav':   'ammo-pickup',
+  'ammo02.wav':   'ammo-pickup',
+  'ammo03.wav':   'ammo-pickup',
+  'ammo05.wav':   'ammo-pickup',
+  'groan2.wav':   'npc-pain',
+  'groan2a.wav':  'npc-pain',
+  'grunt2a.wav':  'npc-pain',
+  'strike01.wav': 'wall-impact',
+  'strike02.wav': 'wall-impact',
+  'strike03.wav': 'wall-impact',
+  'strike04.wav': 'wall-impact',
+  'rico1.wav':    'ricochet',
+  'rico2.wav':    'ricochet',
+  'stostep1.wav': 'guard-steps',
+  'stostepr.wav': 'guard-steps',
+  'futstonl.wav': 'player-steps',
+  'futstonr.wav': 'player-steps',
+  'robot3l.wav':  'robot-steps',
+  'robot3r.wav':  'robot-steps',
+  'theres3.wav':  'guard-speech',
+  'stop4.wav':    'guard-speech',
+  'freeze3.wav':  'guard-speech',
+  'freezrt1.wav': 'guard-speech',
+  'drop4.wav':    'guard-speech',
+  'wndloopb.wav': 'bg-channels',
+  'cphum11.wav':  'bg-channels',
+  'wndloop1.wav': 'bg-channels',
+  'land1.wav':    'landing',
+  'land11.wav':   'landing',
+};
+
+// Sound category assignments derived from C++ call sites
+const SOUND_CATEGORIES = {
+  // Player movement & actions
+  'breath2.wav':'player','fall2b.wav':'player','ladder1.wav':'player',
+  'ladder2.wav':'player','land1.wav':'player','land11.wav':'player',
+  'roll2.wav':'player','jetpak1.wav':'player','jetpak2a.wav':'player',
+  'reload2.wav':'player','disguise.wav':'player','jackin.wav':'player',
+  'jackout.wav':'player','repair.wav':'player','ambloop5.wav':'player',
+  'transrev.wav':'player','portpas2.wav':'player','juunewne.wav':'player',
+  'charged.wav':'player','flamebg2.wav':'player','power11.wav':'player',
+  's_hita01.wav':'player','s_hitb01.wav':'player','grunt2a.wav':'player',
+  // Guards, NPCs, robots
+  'stostep1.wav':'npc','stostepr.wav':'npc','futstonl.wav':'npc',
+  'futstonr.wav':'npc','groan2.wav':'npc','groan2a.wav':'npc',
+  'theres3.wav':'npc','stop4.wav':'npc','freeze3.wav':'npc',
+  'freezrt1.wav':'npc','drop4.wav':'npc','alinvest.wav':'npc',
+  'alwarn.wav':'npc','alarm3a.wav':'npc','intrude.wav':'npc',
+  'robot3l.wav':'npc','robot3r.wav':'npc','robotarm.wav':'npc',
+  'airlokj.wav':'npc','wndloope.wav':'npc',
+  // Weapons & projectiles & impacts
+  '!laserel.wav':'weapon','!laserew.wav':'weapon','!laserme.wav':'weapon',
+  'rocket1.wav':'weapon','rocket4.wav':'weapon','rocket9.wav':'weapon',
+  'grenthro.wav':'weapon','grndown.wav':'weapon','grenade1.wav':'weapon',
+  'seekexp1.wav':'weapon','q_expl02.wav':'weapon','rico1.wav':'weapon',
+  'rico2.wav':'weapon','ammo01.wav':'weapon','ammo02.wav':'weapon',
+  'ammo03.wav':'weapon','ammo05.wav':'weapon','s_flmc01.wav':'weapon',
+  'strike01.wav':'weapon','strike02.wav':'weapon','strike03.wav':'weapon',
+  'strike04.wav':'weapon','shield2.wav':'weapon','shlddn1.wav':'weapon',
+  'vModDeto.wav':'weapon',
+  // World objects & environment
+  'portal1.wav':'world','airvent2.wav':'world','cathdoor.wav':'world',
+  'wndloopc.wav':'world','pwrcon1.wav':'world','if15.wav':'world',
+  'ambloop4.wav':'world',
+  // UI
+  'whoom.wav':'ui','select2.wav':'ui','cliksel2.wav':'ui',
+  'typerev6.wav':'ui','type1.wav':'ui','type2.wav':'ui',
+  'type3.wav':'ui','type4.wav':'ui','type5.wav':'ui',
+  // Ambient background
+  'wndloopb.wav':'ambient','cphum11.wav':'ambient','wndloop1.wav':'ambient',
+};
+
+// Per-sound C++ call sites with volumes (0-128 scale).
+// Derived from grepping EmitSound / Audio::Play calls in game source.
+const CPP_VOLUME_MAP = {
+  '!laserel.wav': [{ctx:'laser projectile hit',vol:128},{ctx:'wall projectile hit',vol:64}],
+  '!laserew.wav': [{ctx:'wall defense fire',vol:64},{ctx:'fixed cannon fire',vol:64},{ctx:'robot fire',vol:64}],
+  '!laserme.wav': [{ctx:'blaster projectile',vol:128}],
+  'q_expl02.wav': [{ctx:'tech station explode',vol:96},{ctx:'wall defense explode',vol:96},{ctx:'fixed cannon explode',vol:96},{ctx:'detonator small explode',vol:64},{ctx:'grenade explode',vol:96}],
+  'ambloop4.wav': [{ctx:'terminal hum (small)',vol:32},{ctx:'terminal hum (big)',vol:45}],
+  'ambloop5.wav': [{ctx:'player hacking loop',vol:40}],
+  'wndloopc.wav': [{ctx:'base exit portal loop',vol:16}],
+  'wndloope.wav': [{ctx:'robot flight loop',vol:32}],
+  'flamebg2.wav': [{ctx:'player flamethrower loop',vol:128}],
+  'jetpak1.wav':  [{ctx:'player jetpack loop',vol:64}],
+  'rocket4.wav':  [{ctx:'rocket engine (one-shot, 100ms fadeout on stop)',vol:128}],
+  'rocket9.wav':  [{ctx:'seeking rocket engine (one-shot, 100ms fadeout on stop)',vol:128}],
+  'pwrcon1.wav':  [{ctx:'credit machine activate',vol:96}],
+  'if15.wav':     [{ctx:'heal machine use',vol:96},{ctx:'team respawn',vol:48}],
+  'whoom.wav':    [{ctx:'UI button click — game applies 20ms PCM ramp at load to remove click artifact (resources.cpp)',vol:128}],
+  'airvent2.wav': [{ctx:'vent open',vol:96}],
+  'portal1.wav':  [{ctx:'base door open',vol:64}],
+  'shield2.wav':  [{ctx:'fixed cannon shield',vol:96},{ctx:'detonator arm',vol:96}],
+  'seekexp1.wav': [{ctx:'detonator detonate',vol:128},{ctx:'robot explode',vol:128},{ctx:'seeker grenade explode',vol:128}],
+  'strike01.wav': [{ctx:'wall hit (stone)',vol:96}],
+  'strike02.wav': [{ctx:'wall hit (metal)',vol:96}],
+  'strike03.wav': [{ctx:'wall hit (heavy)',vol:96}],
+  'strike04.wav': [{ctx:'wall hit (spark)',vol:96}],
+  's_flmc01.wav': [{ctx:'flamethrower hit',vol:128}],
+  'shlddn1.wav':  [{ctx:'shield destroyed',vol:128}],
+  'select2.wav':  [{ctx:'team select',vol:32}],
+  'grndown.wav':  [{ctx:'grenade bounce',vol:64}],
+  'grunt2a.wav':  [{ctx:'player hit',vol:128},{ctx:'guard pain',vol:128},{ctx:'civilian pain',vol:128}],
+  'groan2.wav':   [{ctx:'guard/civilian pain A',vol:128}],
+  'groan2a.wav':  [{ctx:'guard/civilian pain B',vol:128}],
+  'disguise.wav': [{ctx:'player disguise',vol:64}],
+  'jackout.wav':  [{ctx:'player jack out',vol:20}],
+  'jackin.wav':   [{ctx:'player jack in',vol:30}],
+  'jetpak2a.wav': [{ctx:'jetpack burst thrust',vol:64}],
+  'cliksel2.wav': [{ctx:'UI click',vol:96}],
+  'charged.wav':  [{ctx:'weapon fully charged',vol:96}],
+  'ammo01.wav':   [{ctx:'ammo pickup',vol:128}],
+  'ammo02.wav':   [{ctx:'ammo pickup',vol:128}],
+  'ammo03.wav':   [{ctx:'ammo pickup',vol:128}],
+  'ammo05.wav':   [{ctx:'ammo pickup',vol:128}],
+  'transrev.wav': [{ctx:'player teleport',vol:96},{ctx:'player warp ability',vol:64},{ctx:'player warp in',vol:96}],
+  'breath2.wav':  [{ctx:'player breathing',vol:16}],
+  'futstonl.wav': [{ctx:'civilian step L',vol:24},{ctx:'player step L',vol:24}],
+  'futstonr.wav': [{ctx:'player step R',vol:24},{ctx:'player land (hard)',vol:32},{ctx:'civilian step R',vol:24}],
+  'stostep1.wav': [{ctx:'guard/NPC step',vol:16}],
+  'stostepr.wav': [{ctx:'guard/NPC step R',vol:16}],
+  'portpas2.wav': [{ctx:'portal passenger teleport',vol:32}],
+  'roll2.wav':    [{ctx:'player roll',vol:32}],
+  'juunewne.wav': [{ctx:'player jump',vol:96}],
+  'repair.wav':   [{ctx:'player repair object',vol:128}],
+  's_hita01.wav': [{ctx:'player receive hit A',vol:128}],
+  's_hitb01.wav': [{ctx:'player receive hit B',vol:128}],
+  'reload2.wav':  [{ctx:'weapon reload',vol:96}],
+  'land1.wav':    [{ctx:'player land',vol:96},{ctx:'grenade bounce land',vol:'dyn'}],
+  'land11.wav':   [{ctx:'civilian land',vol:96}],
+  'fall2b.wav':   [{ctx:'player fall',vol:96}],
+  'ladder1.wav':  [{ctx:'ladder step up',vol:24}],
+  'ladder2.wav':  [{ctx:'ladder step down',vol:24}],
+  'power11.wav':  [{ctx:'inventory power activate',vol:64},{ctx:'power use',vol:96}],
+  'airlokj.wav':  [{ctx:'robot airlok gate',vol:64}],
+  'robotarm.wav': [{ctx:'robot arm extend',vol:128}],
+  'robot3l.wav':  [{ctx:'robot step L',vol:48}],
+  'robot3r.wav':  [{ctx:'robot step R',vol:48}],
+  'rocket1.wav':  [{ctx:'rocket launch',vol:128}],
+  'grenthro.wav': [{ctx:'grenade throw',vol:64}],
+  'rico1.wav':    [{ctx:'bullet ricochet A',vol:32}],
+  'rico2.wav':    [{ctx:'bullet ricochet B',vol:32}],
+  // Guard speech — random array in guard.cpp, EmitSound vol 128
+  'theres3.wav':  [{ctx:'guard speech "there he is"',vol:128}],
+  'stop4.wav':    [{ctx:'guard speech "stop"',vol:128}],
+  'freeze3.wav':  [{ctx:'guard speech "freeze"',vol:128}],
+  'freezrt1.wav': [{ctx:'guard speech "freeze right there"',vol:128}],
+  'drop4.wav':    [{ctx:'guard speech "drop it"',vol:128}],
+  // Alarms — world.SendSound (default vol 128 unless stated)
+  'alarm3a.wav':  [{ctx:'intrusion alarm (player triggers)',vol:96}],
+  'intrude.wav':  [{ctx:'intrusion alarm (per-peer)',vol:96}],
+  'alinvest.wav': [{ctx:'secret picked up – guard investigate',vol:128}],
+  'alwarn.wav':   [{ctx:'secret picked up – all secrets taken',vol:128}],
+  // Hacking typing — random array, player.cpp EmitSound vol 64
+  'type1.wav':    [{ctx:'player hacking typing (random)',vol:64}],
+  'type2.wav':    [{ctx:'player hacking typing (random)',vol:64}],
+  'type3.wav':    [{ctx:'player hacking typing (random)',vol:64}],
+  'type4.wav':    [{ctx:'player hacking typing (random)',vol:64}],
+  'type5.wav':    [{ctx:'player hacking typing (random)',vol:64}],
+  // Standalone terminal / objectives sounds via SendSound vol 128
+  'typerev6.wav': [{ctx:'terminal delete key / objectives type',vol:128}],
+  'cathdoor.wav': [{ctx:'team cathedral door open',vol:128}],
+  // Weapon / world events via SendSound vol 128
+  'grenade1.wav': [{ctx:'grenade pin pull',vol:128}],
+  'vModDeto.wav': [{ctx:'secret data trace countdown',vol:128}],
+};
+
+interface ParsedSoundEntry {
+  name: string;
+  offset: number;
+  storedLength: number;
+}
+
+interface ParsedSoundBin {
+  entries: ParsedSoundEntry[];
+  buf: ArrayBuffer;
+  dataBase: number;
+}
+
+function parseSoundBinBrowser(buf: ArrayBuffer): ParsedSoundBin {
+  const v = new DataView(buf);
+  const b = new Uint8Array(buf);
+  const numsounds = v.getUint32(0, true);
+  const dataBase = 8 + numsounds * 96;
+  const entries: ParsedSoundEntry[] = [];
+  for (let i = 0; i < numsounds; i++) {
+    const h = 8 + i * 96;
+    let name = '';
+    for (let j = h + 4; j < h + 20; j++) {
+      if (b[j] === 0) break;
+      name += String.fromCharCode(b[j]);
+    }
+    name = name.trim();
+    const offset = v.getUint32(h + 20, true);
+    const storedLength = v.getUint32(h + 24, true);
+    if (!name || storedLength < 256) continue;
+    entries.push({ name, offset, storedLength });
+  }
+  return { entries, buf, dataBase };
+}
+
+function extractSoundWav(parsed: ParsedSoundBin, name: string): ArrayBuffer | null {
+  const e = parsed.entries.find(x => x.name === name);
+  if (!e) return null;
+  const D = e.storedLength - 36;
+  const b = new Uint8Array(parsed.buf);
+  const adpcm = b.slice(parsed.dataBase + e.offset, parsed.dataBase + e.offset + D);
+  // Build WAV header (60 bytes) — matches server buildWav()
+  const out = new Uint8Array(60 + D);
+  const ov = new DataView(out.buffer);
+  let p = 0;
+  // RIFF
+  out[p++]=82;out[p++]=73;out[p++]=70;out[p++]=70;
+  ov.setUint32(p, D + 52, true); p += 4;
+  out[p++]=87;out[p++]=65;out[p++]=86;out[p++]=69;
+  // fmt
+  out[p++]=102;out[p++]=109;out[p++]=116;out[p++]=32;
+  ov.setUint32(p, 20, true); p += 4;
+  ov.setUint16(p, 0x0011, true); p += 2;
+  ov.setUint16(p, 1, true); p += 2;
+  ov.setUint32(p, 11025, true); p += 4;
+  ov.setUint32(p, 5588, true); p += 4;
+  ov.setUint16(p, 256, true); p += 2;
+  ov.setUint16(p, 4, true); p += 2;
+  ov.setUint16(p, 2, true); p += 2;
+  ov.setUint16(p, 505, true); p += 2;
+  // fact
+  out[p++]=102;out[p++]=97;out[p++]=99;out[p++]=116;
+  ov.setUint32(p, 4, true); p += 4;
+  ov.setUint32(p, 46399, true); p += 4;
+  // data
+  out[p++]=100;out[p++]=97;out[p++]=116;out[p++]=97;
+  ov.setUint32(p, D, true); p += 4;
+  out.set(adpcm, p);
+  return out.buffer;
+}
+
+function buildRefsLocally(
+  binEntries: ParsedSoundEntry[],
+  actordefFiles: Record<string, string>,
+): Record<string, SoundRef> {
+  const actorRefs = new Map<string, string[]>();
+  for (const [filename, text] of Object.entries(actordefFiles)) {
+    try {
+      const def = JSON.parse(text);
+      const actorId = filename.replace('.json', '');
+      const json = JSON.stringify(def);
+      const matches = json.match(/[a-zA-Z0-9!._-]+\.wav/g) ?? [];
+      for (const m of [...new Set(matches)]) {
+        if (!actorRefs.has(m)) actorRefs.set(m, []);
+        actorRefs.get(m)!.push(actorId);
+      }
+    } catch {}
+  }
+
+  const binNames = new Set(binEntries.map(e => e.name));
+  const allReferenced = new Set([...CPP_REFS, ...actorRefs.keys()]);
+  const result: Record<string, SoundRef> = {};
+
+  function makeRef(name: string): SoundRef {
+    return {
+      inBin: binNames.has(name),
+      cpp: CPP_REFS.has(name),
+      actordefs: actorRefs.get(name) ?? [],
+      role: AMBIENT_ROLES[name as keyof typeof AMBIENT_ROLES] ?? null,
+      loop: LOOP_SOUNDS.has(name),
+      category: SOUND_CATEGORIES[name as keyof typeof SOUND_CATEGORIES] ?? null,
+      volumeCalls: CPP_VOLUME_MAP[name as keyof typeof CPP_VOLUME_MAP] ?? [],
+      fadeoutMs: FADEOUT_MAP[name as keyof typeof FADEOUT_MAP] ?? null,
+      soundSet: SOUND_SETS[name as keyof typeof SOUND_SETS] ?? null,
+    };
+  }
+
+  for (const name of binNames) result[name] = makeRef(name);
+  for (const name of allReferenced) if (!result[name]) result[name] = makeRef(name);
+  return result;
+}
 
 const CATEGORY_LABELS: Record<string, string> = {
   player: 'Player', npc: 'NPCs / Enemies', weapon: 'Weapons',
@@ -108,10 +448,10 @@ export default function SoundStudioPage() {
 
   // ── State ───────────────────────────────────────────────────────────────────
   const [tab, setTab] = useState<TabMode>('sounds');
-  const [sounds, setSounds] = useState<SoundEntry[]>(() => soundStudioStore.get()?.sounds ?? []);
-  const [refs, setRefs] = useState<Record<string, SoundRef>>(() => soundStudioStore.get()?.refs ?? {});
+  const [sounds, setSounds] = useState<SoundEntry[]>([]);
+  const [refs, setRefs] = useState<Record<string, SoundRef>>({});
   const [levels, setLevels] = useState<Record<string, LevelInfo>>({});
-  const [binLoaded, setBinLoaded] = useState(() => soundStudioStore.isLoaded());
+  const [binLoaded, setBinLoaded] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [status, setStatus] = useState('');
@@ -126,6 +466,8 @@ export default function SoundStudioPage() {
   const [inGameVol, setInGameVol] = useState(true);
   const [sortKey, setSortKey] = useState<SortKey | null>(null);
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
+  const [parsedBin, setParsedBin] = useState<ParsedSoundBin | null>(null);
+  const [folderName, setFolderName] = useState<string | null>(null);
 
   // A→B compare
   const [compareA, setCompareA] = useState<string | null>(null);
@@ -169,9 +511,9 @@ export default function SoundStudioPage() {
   const [selectedIdx, setSelectedIdx] = useState<number>(-1);
   const [multiSel, setMultiSel] = useState<Set<string>>(new Set());
   const fileInputRef = useRef<HTMLInputElement | null>(null);
-  const binInputRef = useRef<HTMLInputElement | null>(null);
+  const assetsFolderRef = useRef<HTMLInputElement | null>(null);
   const rowRefs = useRef<(HTMLTableRowElement | null)[]>([]);
-  const soundsRef = useRef<SoundEntry[]>([]);
+  const parsedBinNamesRef = useRef<Set<string>>(new Set());
   const visibleNonDeletedRef = useRef<(SoundEntry & { missing?: boolean })[]>([]);
   const waveformCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const compareSourceRef = useRef<AudioBufferSourceNode | null>(null);
@@ -179,51 +521,129 @@ export default function SoundStudioPage() {
   const bgGainsRef = useRef<(GainNode | null)[]>([null, null, null]);
 
   useEffect(() => { selectedVolCtxRef.current = selectedVolCtx; }, [selectedVolCtx]);
+  useEffect(() => {
+    parsedBinNamesRef.current = new Set(parsedBin?.entries.map(e => e.name) ?? []);
+  }, [parsedBin]);
 
   const getToken = () => typeof window !== 'undefined' ? localStorage.getItem('zs_token') : '';
 
-  // ── Load ────────────────────────────────────────────────────────────────────
-  const load = useCallback(async () => {
-    setLoading(true); setError('');
-    try {
-      const [soundsData, refsData] = await Promise.all([
-        apiFetch('/sounds') as Promise<SoundEntry[]>,
-        apiFetch('/sounds/refs') as Promise<Record<string, SoundRef>>,
-      ]);
-      setSounds(soundsData); setRefs(refsData);
-      setBinLoaded(true);
-      soundStudioStore.set({ sounds: soundsData, refs: refsData });
-    } catch (e: any) { setError(e.message); }
-    finally { setLoading(false); }
-  }, []);
+  function stopAllAudio() {
+    try { audioSourceRef.current?.stop(); } catch {}
+    try { loopingSourceRef.current?.stop(); } catch {}
+    try { compareSourceRef.current?.stop(); } catch {}
+    try { musicSourceRef.current?.stop(); } catch {}
+    bgSourcesRef.current.forEach(src => { try { src?.stop(); } catch {} });
+    audioSourceRef.current = null;
+    loopingSourceRef.current = null;
+    loopingGainRef.current = null;
+    compareSourceRef.current = null;
+    musicSourceRef.current = null;
+    bgSourcesRef.current = [null, null, null];
+    bgGainsRef.current = [null, null, null];
+    setPlaying(null);
+    setLooping(null);
+    setComparePlaying(null);
+    setPlayingMusic(null);
+    setBgRunning(false);
+  }
 
-  // Auto-load from API on mount if store is empty
-  useEffect(() => {
-    if (!soundStudioStore.isLoaded()) load();
-  }, [load]);
+  function requireServer(): boolean {
+    if (serverReachable) return true;
+    setError('Server unreachable — local playback only. Upload/repack stays hidden until the API is back.');
+    return false;
+  }
 
-  const handleBinFile = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setLoading(true); setError('');
+  async function handleAssetsFolderPicked(e: React.ChangeEvent<HTMLInputElement>) {
+    const picked = e.target.files;
+    if (!picked || picked.length === 0) return;
+    const firstPath = (picked[0] as File & { webkitRelativePath?: string }).webkitRelativePath as string;
+    const rootFolder = firstPath.split('/')[0];
+    setFolderName(rootFolder || 'assets');
+    setLoading(true);
+    setError('');
+    setStatus('');
+
     try {
-      const buf = await file.arrayBuffer();
-      const token = getToken();
-      const res = await fetch(`${(process.env.NEXT_PUBLIC_API_URL || '') + '/api'}/sounds/upload`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/octet-stream',
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-        body: buf,
+      stopAllAudio();
+      const pickedFiles = Array.from(picked);
+      const soundBinFile = pickedFiles.find(f => {
+        const rel = (f as File & { webkitRelativePath?: string }).webkitRelativePath as string;
+        return rel.endsWith('/sound.bin') || rel === 'sound.bin';
       });
-      if (!res.ok) throw new Error(`Upload failed: ${res.status} ${res.statusText}`);
-      audioStore.clear(); // new sound.bin — old decoded buffers are stale
-      soundStudioStore.clear(); // force re-fetch of updated sound list
-      await load();
-    } catch (e: any) { setError(e.message); setLoading(false); }
-    if (e.target) e.target.value = '';
-  }, [load]);
+
+      let parsedSoundBin: ParsedSoundBin | null = null;
+      let soundEntries: SoundEntry[] = [];
+
+      if (soundBinFile) {
+        const buf = await soundBinFile.arrayBuffer();
+        parsedSoundBin = parseSoundBinBrowser(buf);
+        setParsedBin(parsedSoundBin);
+        soundEntries = parsedSoundBin.entries.map(e => ({
+          name: e.name,
+          storedLength: e.storedLength,
+          adpcmBytes: e.storedLength - 36,
+          source: 'bin' as const,
+          pendingDelete: false,
+          pendingRenameTo: null,
+        }));
+      } else {
+        setParsedBin(null);
+      }
+
+      const actordefFiles: Record<string, string> = {};
+      const actordefFileObjs = pickedFiles.filter(f => {
+        const rel = (f as File & { webkitRelativePath?: string }).webkitRelativePath as string;
+        return rel.includes('/actordefs/') && f.name.endsWith('.json');
+      });
+      await Promise.all(actordefFileObjs.map(async f => {
+        actordefFiles[f.name] = await f.text();
+      }));
+
+      const refsData = buildRefsLocally(parsedSoundBin?.entries ?? [], actordefFiles);
+
+      setSounds(soundEntries);
+      setRefs(refsData);
+      setBinLoaded(true);
+      setLevels({});
+      setSelectedIdx(-1);
+      setMultiSel(new Set());
+      setCompareA(null);
+      setCompareB(null);
+      setRenameTarget(null);
+      audioStore.clear();
+      setStatus(soundBinFile
+        ? `Loaded ${soundEntries.length} sound${soundEntries.length === 1 ? '' : 's'} from ${rootFolder || 'assets'}`
+        : `Opened ${rootFolder || 'assets'} — sound.bin not found, refs only.`);
+    } catch (ex: any) {
+      setError(`Failed to load folder: ${ex.message}`);
+      setFolderName(null);
+      setParsedBin(null);
+      setSounds([]);
+      setRefs({});
+      setBinLoaded(false);
+    } finally {
+      setLoading(false);
+    }
+    e.target.value = '';
+  }
+
+  function closeFolder() {
+    stopAllAudio();
+    setFolderName(null);
+    setParsedBin(null);
+    setSounds([]);
+    setRefs({});
+    setLevels({});
+    setBinLoaded(false);
+    setStatus('');
+    setError('');
+    setSelectedIdx(-1);
+    setMultiSel(new Set());
+    setCompareA(null);
+    setCompareB(null);
+    setRenameTarget(null);
+    audioStore.clear();
+  }
 
   const loadMusic = useCallback(async () => {
     setMusicLoading(true);
@@ -328,13 +748,13 @@ export default function SoundStudioPage() {
             : Math.max(prev - 1, 0);
           rowRefs.current[next]?.scrollIntoView({ block: 'nearest' });
           setSelectedVolCtx(0);
-          play(list[next].name);
+          if (parsedBinNamesRef.current.has(list[next].name)) play(list[next].name);
           return next;
         });
       } else if (e.key === ' ') {
         e.preventDefault();
         setSelectedIdx(prev => {
-          if (prev >= 0 && prev < list.length) play(list[prev].name);
+          if (prev >= 0 && prev < list.length && parsedBinNamesRef.current.has(list[prev].name)) play(list[prev].name);
           return prev;
         });
       }
@@ -355,17 +775,12 @@ export default function SoundStudioPage() {
   async function fetchAndDecode(name: string): Promise<AudioBuffer> {
     const cached = audioStore.get(name);
     if (cached) return cached;
-    const r = await fetch(`/api/sounds/${encodeURIComponent(name)}/play`, {
-      headers: { Authorization: `Bearer ${getToken()}` },
-    });
-    if (!r.ok) {
-      const err = await r.json().catch(() => ({ error: r.statusText })) as { error?: string };
-      throw new Error(err.error || r.statusText);
-    }
-    const arrayBuf = await r.arrayBuffer();
+    if (!parsedBin) throw new Error('No sound.bin loaded');
+    const wavBuf = extractSoundWav(parsedBin, name);
+    if (!wavBuf) throw new Error(`"${name}" not found in sound.bin`);
     const audioCtx = getAudioCtx();
     if (audioCtx.state === 'suspended') await audioCtx.resume();
-    const decoded = await decodeAdpcmWav(arrayBuf, audioCtx);
+    const decoded = await decodeAdpcmWav(wavBuf, audioCtx);
     audioStore.set(name, decoded);
     return decoded;
   }
@@ -459,6 +874,7 @@ export default function SoundStudioPage() {
 
   // ── Upload ──────────────────────────────────────────────────────────────────
   async function uploadFile(file: File) {
+    if (!requireServer()) return;
     const name = file.name.replace(/[^a-zA-Z0-9!._-]/g, '_');
     setStatus(`Uploading ${name}…`);
     try {
@@ -468,33 +884,53 @@ export default function SoundStudioPage() {
         headers: { 'Content-Type': 'application/octet-stream', 'X-Filename': name },
         body: buf,
       });
-      setStatus(`Staged ${name}`); load();
+      setSounds(prev => {
+        const withoutExisting = prev.filter(s => !(s.source === 'staged' && s.name === name));
+        return [...withoutExisting, {
+          name,
+          storedLength: null,
+          adpcmBytes: null,
+          size: file.size,
+          source: 'staged',
+          pendingDelete: false,
+          pendingRenameTo: null,
+        }];
+      });
+      setStatus(`Staged ${name} on server. Repack, then re-open shared/assets/ to refresh playback.`);
     } catch (e: any) { setError(e.message); setStatus(''); }
   }
   function onFileInput(e: React.ChangeEvent<HTMLInputElement>) {
     Array.from(e.target.files || []).forEach(uploadFile); e.target.value = '';
   }
   function onDrop(e: DragEvent<HTMLDivElement>) {
-    e.preventDefault(); setDragOver(false);
+    e.preventDefault();
+    setDragOver(false);
+    if (!requireServer()) return;
     Array.from(e.dataTransfer.files).forEach(uploadFile);
   }
 
   // ── Delete / Restore / Rename / Repack ─────────────────────────────────────
   async function deleteSnd(name: string) {
+    if (!requireServer()) return;
     try {
       await apiFetch(`/sounds/${encodeURIComponent(name)}`, { method: 'DELETE' });
-      setStatus(`${name} marked for deletion`); load();
+      setSounds(prev => prev
+        .filter(s => !(s.name === name && s.source === 'staged'))
+        .map(s => s.name === name && s.source === 'bin' ? { ...s, pendingDelete: true } : s));
+      setStatus(`${name} marked for deletion on server`);
     } catch (e: any) { setError(e.message); }
   }
   async function restoreSnd(name: string) {
+    if (!requireServer()) return;
     try {
       await apiFetch(`/sounds/${encodeURIComponent(name)}/restore`, { method: 'POST' });
-      setStatus(`${name} restored`); load();
+      setSounds(prev => prev.map(s => s.name === name ? { ...s, pendingDelete: false } : s));
+      setStatus(`${name} restored on server`);
     } catch (e: any) { setError(e.message); }
   }
   function openRename(name: string) { setRenameTarget(name); setRenameValue(name); }
   async function submitRename() {
-    if (!renameTarget || !renameValue.trim() || renaming) return;
+    if (!renameTarget || !renameValue.trim() || renaming || !requireServer()) return;
     setRenaming(true);
     try {
       const result = await apiFetch(`/sounds/${encodeURIComponent(renameTarget)}/rename`, {
@@ -505,22 +941,26 @@ export default function SoundStudioPage() {
       let msg = `Renamed ${renameTarget} → ${result.newName}`;
       if (result.updatedActors.length) msg += `. Updated: ${result.updatedActors.join(', ')}`;
       if (result.cppWarning) msg += '. ⚠ C++ source needs manual update!';
-      setStatus(msg); setRenameTarget(null); load();
+      msg += ' Re-open shared/assets/ to refresh local refs.';
+      setStatus(msg);
+      setRenameTarget(null);
     } catch (e: any) { setError(e.message); }
     finally { setRenaming(false); }
   }
   async function clearStaged() {
+    if (!requireServer()) return;
     const toRemove = sounds.filter(s => s.source === 'staged');
     if (!toRemove.length) return;
     if (!confirm(`Remove ${toRemove.length} staged upload${toRemove.length > 1 ? 's' : ''}? Bin sounds are unaffected.`)) return;
     for (const s of toRemove) {
       try { await apiFetch(`/sounds/${encodeURIComponent(s.name)}`, { method: 'DELETE' }); } catch {}
     }
-    setStatus(`Cleared ${toRemove.length} staged files`);
-    load();
+    setSounds(prev => prev.filter(s => s.source !== 'staged'));
+    setStatus(`Cleared ${toRemove.length} staged file${toRemove.length == 1 ? '' : 's'} on server`);
   }
 
   async function repack() {
+    if (!requireServer()) return;
     if (!confirm('Rebuild sound.bin now? The new file will download automatically.')) return;
     setRepacking(true); setStatus('Repacking…'); setError('');
     try {
@@ -538,8 +978,7 @@ export default function SoundStudioPage() {
       const a = document.createElement('a');
       a.href = url; a.download = 'sound.bin'; a.click();
       URL.revokeObjectURL(url);
-      setStatus(`Repacked — downloaded sound.bin${normalize ? ' (normalized)' : ''}`);
-      load();
+      setStatus(`Repacked — downloaded sound.bin${normalize ? ' (normalized)' : ''}. Re-open shared/assets/ to load the new pack.`);
     } catch (e: any) { setError(e.message); setStatus(''); }
     finally { setRepacking(false); }
   }
@@ -674,6 +1113,7 @@ export default function SoundStudioPage() {
 
   // ── Repack Diff ──────────────────────────────────────────────────────────────
   async function fetchDiff() {
+    if (!requireServer()) return;
     setDiffLoading(true);
     try {
       const data = await apiFetch('/sounds/pending') as PendingDiff;
@@ -684,6 +1124,7 @@ export default function SoundStudioPage() {
   }
 
   async function repackFromDiff() {
+    if (!requireServer()) return;
     setShowDiff(false);
     await repack();
   }
@@ -729,6 +1170,8 @@ export default function SoundStudioPage() {
   }
 
   // ── Derived ─────────────────────────────────────────────────────────────────
+  const editingEnabled = serverReachable && !!folderName;
+  const parsedBinNames = new Set(parsedBin?.entries.map(e => e.name) ?? []);
   const staged = sounds.filter(s => s.source === 'staged');
   const pendingDels = sounds.filter(s => s.pendingDelete);
   const pendingRenames = sounds.filter(s => s.pendingRenameTo);
@@ -859,6 +1302,16 @@ export default function SoundStudioPage() {
 
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
 
+        <input
+          ref={assetsFolderRef}
+          type="file"
+          // @ts-expect-error non-standard attribute
+          webkitdirectory=""
+          multiple
+          style={{ display: 'none' }}
+          onChange={handleAssetsFolderPicked}
+        />
+
         {/* Header */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 14px', borderBottom: '1px solid #333', background: '#151515', flexWrap: 'wrap' }}>
           <span style={{ fontSize: 15, color: '#aaa', fontWeight: 'bold' }}>[ SOUND STUDIO ]</span>
@@ -882,7 +1335,7 @@ export default function SoundStudioPage() {
             </a>
           </div>
 
-          {tab === 'sounds' && hasPending && (
+          {tab === 'sounds' && editingEnabled && hasPending && (
             <span style={{ background: '#f90', color: '#000', padding: '1px 7px', borderRadius: 4, fontSize: 10 }}>
               {staged.length > 0 && `+${staged.length}`}
               {pendingDels.length > 0 && ` -${pendingDels.length}`}
@@ -892,7 +1345,28 @@ export default function SoundStudioPage() {
 
           <div style={{ flex: 1 }} />
 
-          {tab === 'sounds' && <>
+          {folderName ? (
+            <>
+              <span style={{ padding: '3px 8px', border: '1px solid #264126', borderRadius: 4, color: '#7ab87a', fontFamily: 'monospace', fontSize: 11 }}>
+                📁 {folderName}
+              </span>
+              <button onClick={closeFolder}
+                style={{ padding: '3px 9px', background: 'transparent', color: '#866', border: '1px solid #533', borderRadius: 4, cursor: 'pointer', fontFamily: 'monospace', fontSize: 11 }}>
+                ✕ CLOSE
+              </button>
+            </>
+          ) : (
+            <button onClick={() => assetsFolderRef.current?.click()} disabled={loading}
+              style={{ padding: '5px 14px', border: '1px solid #00a328', color: '#00a328', background: 'transparent', fontSize: 12, letterSpacing: 1.5, fontWeight: 700, cursor: loading ? 'default' : 'pointer', fontFamily: 'monospace', opacity: loading ? 0.6 : 1 }}>
+              {loading ? 'OPENING…' : '📁 OPEN ASSETS FOLDER'}
+            </button>
+          )}
+
+          {folderName && !serverReachable && (
+            <span style={{ color: '#a88', fontSize: 10, fontFamily: 'monospace' }}>server offline — playback only</span>
+          )}
+
+          {tab === 'sounds' && editingEnabled && <>
             <label style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, color: '#777', cursor: 'pointer' }}>
               <input type="checkbox" checked={normalize} onChange={e => setNormalize(e.target.checked)} />
               normalize
@@ -935,22 +1409,28 @@ export default function SoundStudioPage() {
           </div>
         )}
 
-        {/* ── SOUNDS TAB ───────────────────────────────────────────────────── */}
-        {!binLoaded ? (
-          <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16, padding: 48, border: '1px solid #2a2a2a', borderRadius: 4 }}>
-              <div style={{ fontSize: 32 }}>📦</div>
-              <div style={{ fontSize: 13, color: '#666' }}>
-                Select your local <code style={{ color: '#88a' }}>sound.bin</code> to upload and start editing.
+        {!folderName ? (
+          <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#050a05' }}>
+            <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 24 }}>
+              <div style={{ fontSize: 56, opacity: 0.5 }}>🔊</div>
+              <div>
+                <p style={{ color: '#d1fad7', fontSize: 16, fontWeight: 700, marginBottom: 6 }}>SOUND STUDIO</p>
+                <p style={{ color: '#7ab87a', fontSize: 13 }}>
+                  Open <code style={{ color: '#00a328' }}>shared/assets/</code> to load sounds, cues, and refs
+                </p>
               </div>
               <button
-                    onClick={() => binInputRef.current?.click()}
-                    disabled={loading}
-                    style={{ padding: '10px 28px', border: '1px solid #66a', color: '#aaf', background: 'none', cursor: loading ? 'default' : 'pointer', fontFamily: 'monospace', fontSize: 13, letterSpacing: 2, opacity: loading ? 0.5 : 1 }}>
-                {loading ? 'LOADING…' : '[ OPEN SOUND.BIN ]'}
+                onClick={() => assetsFolderRef.current?.click()}
+                style={{ padding: '12px 32px', border: '1px solid #00a328', color: '#00a328', background: 'transparent', fontSize: 14, letterSpacing: 2, fontWeight: 700, cursor: 'pointer', fontFamily: 'monospace' }}
+              >
+                📁 OPEN ASSETS FOLDER
               </button>
-              <input ref={binInputRef} type="file" accept=".bin" style={{ display: 'none' }} onChange={handleBinFile} />
-              {error && <div style={{ fontSize: 11, color: '#f66' }}>{error}</div>}
+              <div style={{ fontSize: 11, color: '#4a7a4a', fontFamily: 'monospace', lineHeight: 1.6, border: '1px solid #1a2e1a', padding: '12px 20px', textAlign: 'left' }}>
+                <p>✦ Parses sound.bin locally — no server needed</p>
+                <p>✦ Scans actordefs/ for sound references</p>
+                <p>✦ All playback runs in browser via WebAudio</p>
+                <p>✦ Arrow keys to navigate · Space to play</p>
+              </div>
             </div>
           </div>
         ) : tab === 'sounds' && <>
@@ -978,15 +1458,19 @@ export default function SoundStudioPage() {
           )}
 
           {/* Orphaned bulk-delete banner */}
-          {filter === 'orphaned' && orphanedCount > 0 && (
+          {editingEnabled && filter === 'orphaned' && orphanedCount > 0 && (
             <div style={{ padding: '4px 14px', fontSize: 11, background: '#1a1a1a', color: '#666', borderBottom: '1px solid #2a2a2a', display: 'flex', alignItems: 'center', gap: 10 }}>
               <span>{orphanedCount} orphaned sounds not referenced by game</span>
               <button onClick={async () => {
                 const toDelete = sounds.filter(s => { const r = refs[s.name]; return !!r && !r.cpp && !r.actordefs?.length && !s.pendingDelete; });
                 if (!toDelete.length) return;
                 if (!confirm(`Stage ${toDelete.length} orphaned sound${toDelete.length > 1 ? 's' : ''} for deletion?`)) return;
-                for (const s of toDelete) { try { await apiFetch(`/sounds/${encodeURIComponent(s.name)}`, { method: 'DELETE' }); } catch {} }
-                setStatus(`Staged ${toDelete.length} orphaned sounds for deletion`); load();
+                if (!requireServer()) return;
+                for (const s of toDelete) {
+                  try { await apiFetch(`/sounds/${encodeURIComponent(s.name)}`, { method: 'DELETE' }); } catch {}
+                }
+                setSounds(prev => prev.map(s => toDelete.some(x => x.name === s.name) ? { ...s, pendingDelete: true } : s));
+                setStatus(`Staged ${toDelete.length} orphaned sounds for deletion`);
               }} style={{ background: 'none', border: '1px solid #444', color: '#888', borderRadius: 3, padding: '0 7px', cursor: 'pointer', fontFamily: 'monospace', fontSize: 10 }}>
                 delete all orphaned
               </button>
@@ -1056,17 +1540,19 @@ export default function SoundStudioPage() {
           </div>
 
           {/* Multi-select bulk ops bar */}
-          {multiSel.size > 0 && (
+          {editingEnabled && multiSel.size > 0 && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 14px', background: '#0e1e0e', borderBottom: '1px solid #2a4a2a', fontSize: 11 }}>
               <span style={{ color: '#4a8', fontFamily: 'monospace' }}>{multiSel.size} selected</span>
               <button onClick={() => setMultiSel(new Set())}
                 style={{ background: 'none', border: '1px solid #333', color: '#555', borderRadius: 3, padding: '0 6px', cursor: 'pointer', fontFamily: 'monospace', fontSize: 10 }}>✕ clear</button>
               <button onClick={async () => {
+                if (!requireServer()) return;
                 for (const name of multiSel) {
                   const s = sounds.find(x => x.name === name);
                   if (s && !s.pendingDelete) { try { await apiFetch(`/sounds/${encodeURIComponent(name)}`, { method: 'DELETE' }); } catch {} }
                 }
-                setMultiSel(new Set()); load();
+                setSounds(prev => prev.map(s => multiSel.has(s.name) ? { ...s, pendingDelete: true } : s));
+                setMultiSel(new Set());
               }} style={{ background: 'none', border: '1px solid #4a2a2a', color: '#f66', borderRadius: 3, padding: '0 8px', cursor: 'pointer', fontFamily: 'monospace', fontSize: 10 }}>
                 ✕ stage delete ({multiSel.size})
               </button>
@@ -1079,9 +1565,9 @@ export default function SoundStudioPage() {
 
             {/* Sound list */}
             <div style={{ flex: 1, overflow: 'auto', position: 'relative' }}
-              onDragOver={e => { e.preventDefault(); setDragOver(true); }}
+              onDragOver={e => { if (!editingEnabled) return; e.preventDefault(); setDragOver(true); }}
               onDragLeave={() => setDragOver(false)} onDrop={onDrop}>
-              {dragOver && (
+              {editingEnabled && dragOver && (
                 <div style={{ position: 'absolute', inset: 0, background: 'rgba(80,200,120,0.12)', border: '2px dashed #4a8', zIndex: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, color: '#4a8', pointerEvents: 'none' }}>
                   Drop WAV files to stage
                 </div>
@@ -1133,6 +1619,7 @@ export default function SoundStudioPage() {
                         const lvl = levels[s.name];
                         const isMissing = !!(s as any).missing;
                         const isLoop = ref?.loop;
+                        const hasLocalAudio = parsedBinNames.has(s.name);
                         return (
                           <tr key={s.name}
                             ref={el => { if (!s.pendingDelete && visIdx >= 0) rowRefs.current[visIdx] = el; }}
@@ -1149,8 +1636,9 @@ export default function SoundStudioPage() {
                                 return;
                               }
                               setMultiSel(new Set());
-                              if (!isMissing) { setSelectedIdx(visIdx); setSelectedVolCtx(0); play(s.name); }
-                              else { setSelectedIdx(visIdx); setSelectedVolCtx(0); }
+                              setSelectedIdx(visIdx);
+                              setSelectedVolCtx(0);
+                              if (!isMissing && hasLocalAudio) play(s.name);
                             }}
                             style={{
                               borderBottom: '1px solid #1a1a1a',
@@ -1161,9 +1649,9 @@ export default function SoundStudioPage() {
                             }}>
                             <td style={{ padding: '3px 5px', textAlign: 'center' }}>
                               {!isMissing ? (
-                                <button onClick={e => { e.stopPropagation(); if (!s.pendingDelete) { setSelectedIdx(visIdx); play(s.name); } }}
-                                  disabled={s.pendingDelete}
-                                  style={{ background: 'none', border: 'none', color: isPlaying ? '#4a8' : '#8a8', cursor: 'pointer', fontSize: 13, padding: 0 }}>
+                                <button onClick={e => { e.stopPropagation(); if (!s.pendingDelete && hasLocalAudio) { setSelectedIdx(visIdx); play(s.name); } }}
+                                  disabled={s.pendingDelete || !hasLocalAudio}
+                                  style={{ background: 'none', border: 'none', color: hasLocalAudio ? (isPlaying ? '#4a8' : '#8a8') : '#333', cursor: hasLocalAudio ? 'pointer' : 'default', fontSize: 13, padding: 0 }}>
                                   {isPlaying ? '⏹' : '▶'}
                                 </button>
                               ) : <span style={{ color: '#f90', fontSize: 10 }}>✗</span>}
@@ -1214,7 +1702,7 @@ export default function SoundStudioPage() {
                             </td>
                             <td style={{ padding: '3px 5px', textAlign: 'right' }}>
                               <span style={{ display: 'inline-flex', gap: 3 }}>
-                                {!isMissing && (
+                                {!isMissing && hasLocalAudio && (
                                   <>
                                     <button onClick={e => { e.stopPropagation(); setCompareA(s.name); }}
                                       title="Set as compare A"
@@ -1224,26 +1712,26 @@ export default function SoundStudioPage() {
                                       style={{ background: compareB === s.name ? '#1a1a2a' : 'none', border: `1px solid ${compareB === s.name ? '#66a' : '#222'}`, color: compareB === s.name ? '#88f' : '#445', borderRadius: 3, padding: '0 3px', cursor: 'pointer', fontFamily: 'monospace', fontSize: 9 }}>B</button>
                                   </>
                                 )}
-                                {isLoop && !isMissing && (
+                                {isLoop && !isMissing && hasLocalAudio && (
                                   <button onClick={e => { e.stopPropagation(); toggleLoop(s.name); }}
                                     title={isLooping ? 'Stop loop' : 'Loop test'}
                                     style={{ background: isLooping ? '#1a2a3a' : 'none', border: `1px solid ${isLooping ? '#4af' : '#2a2a2a'}`, color: isLooping ? '#8cf' : '#556', borderRadius: 3, padding: '0 4px', cursor: 'pointer', fontFamily: 'monospace', fontSize: 10 }}>
                                     {isLooping ? '⏹↺' : '↺'}
                                   </button>
                                 )}
-                                {!isMissing && !s.pendingDelete && (
+                                {!isMissing && !s.pendingDelete && hasLocalAudio && (
                                   <button onClick={e => { e.stopPropagation(); exportWav(s.name); }}
                                     title="Export as decoded WAV"
                                     style={{ background: 'none', border: '1px solid #2a2a2a', color: '#556', borderRadius: 3, padding: '0 4px', cursor: 'pointer', fontFamily: 'monospace', fontSize: 10 }}>↓</button>
                                 )}
-                                {!isMissing && !s.pendingDelete && (
+                                {editingEnabled && !isMissing && !s.pendingDelete && (
                                   <button onClick={e => { e.stopPropagation(); openRename(s.name); }}
                                     style={{ background: 'none', border: '1px solid #2a2a2a', color: '#666', borderRadius: 3, padding: '0 4px', cursor: 'pointer', fontFamily: 'monospace', fontSize: 10 }}>✎</button>
                                 )}
-                                {s.pendingDelete ? (
+                                {editingEnabled && s.pendingDelete ? (
                                   <button onClick={e => { e.stopPropagation(); restoreSnd(s.name); }}
                                     style={{ background: 'none', border: '1px solid #555', color: '#8a8', borderRadius: 3, padding: '0 5px', cursor: 'pointer', fontFamily: 'monospace', fontSize: 10 }}>Restore</button>
-                                ) : !isMissing ? (
+                                ) : editingEnabled && !isMissing ? (
                                   <button onClick={e => { e.stopPropagation(); deleteSnd(s.name); }}
                                     style={{ background: 'none', border: '1px solid #2a2a2a', color: '#844', borderRadius: 3, padding: '0 5px', cursor: 'pointer', fontFamily: 'monospace', fontSize: 10 }}>✕</button>
                                 ) : null}
@@ -1407,13 +1895,13 @@ export default function SoundStudioPage() {
             {staged.length > 0 && <span style={{ color: '#88f' }}>{staged.length} staged</span>}
             {pendingDels.length > 0 && <span style={{ color: '#f66' }}>{pendingDels.length} pending deletion</span>}
             {missingNames.length > 0 && <span style={{ color: '#f90' }}>{missingNames.length} missing</span>}
-            <span>drop WAV to stage</span>
+            {editingEnabled ? <span>drop WAV to stage</span> : <span>local playback mode</span>}
             <span style={{ marginLeft: 'auto', color: '#2a2a2a' }}>↑↓ navigate &amp; play</span>
           </div>
         </>}
 
         {/* ── MUSIC TAB ────────────────────────────────────────────────────── */}
-        {tab === 'music' && binLoaded && (
+        {folderName && tab === 'music' && binLoaded && (
           <div style={{ flex: 1, overflow: 'auto', padding: 16 }}>
             <div style={{ fontSize: 11, color: '#555', marginBottom: 10 }}>
               Music files in <code>shared/assets/</code> — loaded by the game separately from sound.bin.
@@ -1467,7 +1955,7 @@ export default function SoundStudioPage() {
             )}
           </div>
         )}
-        {tab === 'ambient' && binLoaded && (
+        {folderName && tab === 'ambient' && binLoaded && (
           <div style={{ flex: 1, overflow: 'auto', padding: 16, fontFamily: 'monospace' }}>
             <div style={{ fontSize: 11, color: '#555', marginBottom: 12 }}>
               BG Channel Mixer — simulates how the game blends background ambient sounds based on outdoor tile coverage.
