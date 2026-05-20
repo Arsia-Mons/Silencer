@@ -83,14 +83,34 @@ function WavePlayerNode({ data, id }: NodeProps) {
 
 // ─── Multi-input node (Random / Sequence / Mixer) ────────────────────────────
 function MultiInputNode({ data, id, type }: NodeProps & { type: string }) {
+  const { setNodes } = useReactFlow();
   const inputCount = data._inputCount ?? 2;
   const handles = Array.from({ length: inputCount }, (_, i) => i);
   const baseTop = 36;
-  const spacing = 24;
+  const spacing = type === 'Mixer' ? 52 : 24;
+
+  function addInput() {
+    setNodes(nds => nds.map(n => {
+      if (n.id !== id) return n;
+      const next = (n.data._inputCount ?? 2) + 1;
+      const vols = n.type === 'Mixer' ? [...(n.data.mixerVolumes ?? []), 1.0] : n.data.mixerVolumes;
+      return { ...n, data: { ...n.data, _inputCount: next, ...(vols !== undefined ? { mixerVolumes: vols } : {}) } };
+    }));
+  }
+
+  function setMixerVol(portIdx: number, val: number) {
+    setNodes(nds => nds.map(n => {
+      if (n.id !== id) return n;
+      const vols = [...(n.data.mixerVolumes ?? handles.map(() => 1.0))];
+      vols[portIdx] = val;
+      return { ...n, data: { ...n.data, mixerVolumes: vols } };
+    }));
+  }
+
   return (
     <div style={{
       background: '#1a1a1f', border: `2px solid ${NODE_COLORS[type]}`,
-      borderRadius: 6, minWidth: 160, fontSize: 12, color: '#ccc', position: 'relative',
+      borderRadius: 6, minWidth: 180, fontSize: 12, color: '#ccc', position: 'relative',
       paddingBottom: 4,
     }}>
       <div style={{
@@ -110,11 +130,27 @@ function MultiInputNode({ data, id, type }: NodeProps & { type: string }) {
       ))}
       <Handle type="source" position={Position.Right} id="out" style={{ background: '#aaa' }} />
       <div style={{ padding: '4px 10px', minHeight: handles.length * spacing }}>
-        {type === 'Mixer' && (data.mixerVolumes ?? []).map((v: number, i: number) => (
-          <div key={i} style={{ fontSize: 11, color: '#888' }}>in-{i}: {v.toFixed(2)}</div>
-        ))}
+        {type === 'Mixer' && handles.map(i => {
+          const vol = (data.mixerVolumes ?? [])[i] ?? 1.0;
+          return (
+            <div key={i} style={{ marginBottom: 4 }}>
+              <div style={{ fontSize: 10, color: '#888', marginBottom: 2 }}>
+                in-{i} &nbsp;<span style={{ color: '#aaa' }}>×{vol.toFixed(2)}</span>
+              </div>
+              <input
+                type="range" min={0} max={2} step={0.01} value={vol}
+                className="nodrag"
+                onChange={e => setMixerVol(i, parseFloat(e.target.value))}
+                style={{ width: 120, accentColor: NODE_COLORS['Mixer'] }}
+              />
+            </div>
+          );
+        })}
       </div>
-      <div style={{ padding: '2px 10px 4px', color: '#5a8', cursor: 'pointer', fontSize: 11 }}>
+      <div
+        onClick={addInput}
+        style={{ padding: '2px 10px 4px', color: '#5a8', cursor: 'pointer', fontSize: 11 }}
+      >
         ⊕ Add input
       </div>
     </div>
@@ -293,17 +329,52 @@ function CueCanvas({ cue, onChange }: { cue: SoundCue; onChange: (c: SoundCue) =
   const { nodes: initNodes, edges: initEdges } = cueToFlow(cue);
   const [nodes, setNodes, onNodesChange] = useNodesState(initNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initEdges);
-  const { project } = useReactFlow();
 
   // Sync up to parent on change
   useEffect(() => {
     onChange(flowToCue(cue.id, nodes, edges));
   }, [nodes, edges]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const onConnect = useCallback(
-    (conn: Connection) => setEdges(eds => addEdge({ ...conn, style: { stroke: '#666' } }, eds)),
-    [setEdges],
-  );
+  // Validate connections: no cycles, enforce single-input arity on Output/Delay/Volume/Pitch
+  const isValidConnection = useCallback((conn: Connection) => {
+    const SINGLE_INPUT = new Set(['Output', 'Delay', 'Volume', 'Pitch']);
+    const targetNode = nodes.find(n => n.id === conn.target);
+    if (!targetNode) return false;
+
+    // Single-input nodes: reject if any edge already targets this handle
+    if (SINGLE_INPUT.has(targetNode.type ?? '')) {
+      const handle = conn.targetHandle ?? 'in';
+      if (edges.some(e => e.target === conn.target && (e.targetHandle ?? 'in') === handle)) return false;
+    }
+
+    // No self-connections
+    if (conn.source === conn.target) return false;
+
+    // Cycle check: would adding source→target create a path from target back to source?
+    const adjOut: Record<string, string[]> = {};
+    for (const e of edges) (adjOut[e.source] ??= []).push(e.target);
+
+    function reaches(from: string, goal: string, seen = new Set<string>()): boolean {
+      if (from === goal) return true;
+      if (seen.has(from)) return false;
+      seen.add(from);
+      return (adjOut[from] ?? []).some(n => reaches(n, goal, seen));
+    }
+
+    return !reaches(conn.target ?? '', conn.source ?? '');
+  }, [nodes, edges]);
+
+  const onConnect = useCallback((conn: Connection) => {
+    setEdges(eds => addEdge({ ...conn, style: { stroke: '#666' } }, eds));
+    // When wiring a new input to Mixer, ensure mixerVolumes stays in sync
+    const portIdx = parseInt(conn.targetHandle?.replace('in-', '') ?? '0');
+    setNodes(nds => nds.map(n => {
+      if (n.id !== conn.target || n.type !== 'Mixer') return n;
+      const vols = [...(n.data.mixerVolumes ?? [])];
+      while (vols.length <= portIdx) vols.push(1.0);
+      return { ...n, data: { ...n.data, mixerVolumes: vols } };
+    }));
+  }, [setEdges, setNodes]);
 
   return (
     <div style={{ flex: 1, height: '100%' }}>
@@ -311,6 +382,7 @@ function CueCanvas({ cue, onChange }: { cue: SoundCue; onChange: (c: SoundCue) =
         nodes={nodes} edges={edges}
         onNodesChange={onNodesChange} onEdgesChange={onEdgesChange}
         onConnect={onConnect}
+        isValidConnection={isValidConnection}
         nodeTypes={NODE_TYPES}
         fitView
         style={{ background: '#0e0e12' }}
