@@ -23,6 +23,8 @@ import Sidebar from '../../../components/Sidebar';
 import { useRouter, useSearchParams } from 'next/navigation';
 import dagre from 'dagre';
 import type { CueEdge, CueNode, CueNodeData, SoundCue } from '../../../lib/sound-cue-store';
+import * as cueStore from '../../../lib/sound-cue-store';
+import * as soundStudioStore from '../../../lib/sound-studio-store';
 import { decodeAdpcmWav } from '../../sound-studio/adpcm';
 
 const SoundListCtx = createContext<string[]>([]);
@@ -911,9 +913,55 @@ function SoundCuePageInner() {
   const cuesFolderRef = useRef<HTMLInputElement>(null);
   const soundBinRef = useRef<HTMLInputElement>(null);
   const audioCtxRef = useRef<AudioContext | null>(null);
-  const [cueFolderName, setCueFolderName] = useState<string | null>(null);
-  const [cueFiles, setCueFiles] = useState<Record<string, SoundCue>>({});
-  const [soundBin, setSoundBin] = useState<ReturnType<typeof parseSoundBin> | null>(null);
+
+  // Hydrate from stores populated by sound-studio page's folder picker
+  const _storedCues = cueStore.getCueFiles();
+  const _storedBin  = soundStudioStore.get()?.parsedBin ?? null;
+
+  const [cueFolderName, setCueFolderName] = useState<string | null>(
+    cueStore.getCuesFolderName()
+  );
+  const [cueFiles, setCueFiles] = useState<Record<string, SoundCue>>(
+    _storedCues ?? {}
+  );
+  const [soundBin, setSoundBin] = useState<ReturnType<typeof parseSoundBin> | null>(
+    _storedBin ? (() => {
+      // Re-wrap stored bin in the same shape parseSoundBin returns
+      const b = new Uint8Array(_storedBin.buf);
+      return {
+        names: _storedBin.entries.map(e => e.name),
+        getWav(name: string) {
+          const e = _storedBin.entries.find(x => x.name === name);
+          if (!e) return null;
+          const D = e.storedLength - 36;
+          const adpcm = b.slice(_storedBin.dataBase + e.offset, _storedBin.dataBase + e.offset + D);
+          const out = new Uint8Array(60 + D);
+          const ov = new DataView(out.buffer);
+          let p = 0;
+          out[p++]=82;out[p++]=73;out[p++]=70;out[p++]=70;
+          ov.setUint32(p, D + 52, true); p += 4;
+          out[p++]=87;out[p++]=65;out[p++]=86;out[p++]=69;
+          out[p++]=102;out[p++]=109;out[p++]=116;out[p++]=32;
+          ov.setUint32(p, 20, true); p += 4;
+          ov.setUint16(p, 0x0011, true); p += 2;
+          ov.setUint16(p, 1, true); p += 2;
+          ov.setUint32(p, 11025, true); p += 4;
+          ov.setUint32(p, 5588, true); p += 4;
+          ov.setUint16(p, 256, true); p += 2;
+          ov.setUint16(p, 4, true); p += 2;
+          ov.setUint16(p, 2, true); p += 2;
+          ov.setUint16(p, 505, true); p += 2;
+          out[p++]=102;out[p++]=97;out[p++]=99;out[p++]=116;
+          ov.setUint32(p, 4, true); p += 4;
+          ov.setUint32(p, 46399, true); p += 4;
+          out[p++]=100;out[p++]=97;out[p++]=116;out[p++]=97;
+          ov.setUint32(p, D, true); p += 4;
+          out.set(adpcm, p);
+          return out;
+        },
+      };
+    })() : null
+  );
   const [openCueId, setOpenCueId] = useState<string | null>(null);
   const [dirty, setDirty] = useState(false);
   const [status, setStatus] = useState('');
@@ -960,6 +1008,7 @@ function SoundCuePageInner() {
     );
     setCueFolderName(folderName);
     setCueFiles(files);
+    cueStore.setCueFiles(files, folderName);
     setOpenCueId(null);
     setDirty(false);
     setActivePath([]);

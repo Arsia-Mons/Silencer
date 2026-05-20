@@ -6,6 +6,9 @@ import { apiFetch } from '../../lib/api';
 import { useServerReachable } from '../../lib/socket';
 import { decodeAdpcmWav } from '../../lib/adpcm';
 import * as audioStore from '../../lib/audio-store';
+import * as soundStudioStore from '../../lib/sound-studio-store';
+import * as cueStore from '../../lib/sound-cue-store';
+import type { SoundCue } from '../../lib/sound-cue-store';
 
 interface SoundEntry {
   name: string;
@@ -447,11 +450,12 @@ export default function SoundStudioPage() {
   const serverReachable = useServerReachable();
 
   // ── State ───────────────────────────────────────────────────────────────────
+  const _saved = soundStudioStore.get();
   const [tab, setTab] = useState<TabMode>('sounds');
-  const [sounds, setSounds] = useState<SoundEntry[]>([]);
-  const [refs, setRefs] = useState<Record<string, SoundRef>>({});
+  const [sounds, setSounds] = useState<SoundEntry[]>(_saved?.sounds ?? []);
+  const [refs, setRefs] = useState<Record<string, SoundRef>>(_saved?.refs ?? {});
   const [levels, setLevels] = useState<Record<string, LevelInfo>>({});
-  const [binLoaded, setBinLoaded] = useState(false);
+  const [binLoaded, setBinLoaded] = useState(_saved != null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [status, setStatus] = useState('');
@@ -466,8 +470,8 @@ export default function SoundStudioPage() {
   const [inGameVol, setInGameVol] = useState(true);
   const [sortKey, setSortKey] = useState<SortKey | null>(null);
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
-  const [parsedBin, setParsedBin] = useState<ParsedSoundBin | null>(null);
-  const [folderName, setFolderName] = useState<string | null>(null);
+  const [parsedBin, setParsedBin] = useState<ParsedSoundBin | null>(_saved?.parsedBin ?? null);
+  const [folderName, setFolderName] = useState<string | null>(_saved?.folderName ?? null);
 
   // A→B compare
   const [compareA, setCompareA] = useState<string | null>(null);
@@ -611,6 +615,33 @@ export default function SoundStudioPage() {
       setCompareB(null);
       setRenameTarget(null);
       audioStore.clear();
+
+      // Persist so navigating away and back restores state
+      soundStudioStore.set({
+        folderName: rootFolder || 'assets',
+        sounds: soundEntries,
+        refs: refsData,
+        parsedBin: parsedSoundBin,
+      });
+
+      // Parse gas/sound-cues/*.json and store for the cues page
+      const cueFileObjs = pickedFiles.filter(f => {
+        const rel = (f as File & { webkitRelativePath?: string }).webkitRelativePath as string;
+        return rel.includes('/sound-cues/') && f.name.endsWith('.json');
+      });
+      if (cueFileObjs.length > 0) {
+        const cueFiles: Record<string, SoundCue> = {};
+        await Promise.all(cueFileObjs.map(async f => {
+          try {
+            const text = await f.text();
+            const cue = JSON.parse(text) as SoundCue;
+            const id = cue.id ?? f.name.replace('.json', '');
+            cueFiles[id] = { ...cue, id };
+          } catch {}
+        }));
+        cueStore.setCueFiles(cueFiles, rootFolder || 'assets');
+      }
+
       setStatus(soundBinFile
         ? `Loaded ${soundEntries.length} sound${soundEntries.length === 1 ? '' : 's'} from ${rootFolder || 'assets'}`
         : `Opened ${rootFolder || 'assets'} — sound.bin not found, refs only.`);
@@ -643,6 +674,8 @@ export default function SoundStudioPage() {
     setCompareB(null);
     setRenameTarget(null);
     audioStore.clear();
+    soundStudioStore.clear();
+    cueStore.clearCueFiles();
   }
 
   const loadMusic = useCallback(async () => {
