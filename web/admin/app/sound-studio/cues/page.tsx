@@ -361,17 +361,17 @@ function flowToCue(id: string, nodes: Node[], edges: Edge[]): SoundCue {
 // Persists across evalCue calls — tracks last picked input index per Random node id.
 const randomLastPick: Record<string, number> = {};
 
-function evalCue(cue: SoundCue): { file: string | null; path: string[] } {
+function evalCue(cue: SoundCue): { file: string | null; path: string[]; semitones: number; volume: number; delaySec: number } {
   const nodeMap = Object.fromEntries(cue.nodes.map(n => [n.id, n]));
   const edgesTo: Record<string, CueEdge[]> = {};
   for (const e of cue.edges) (edgesTo[e.target] ??= []).push(e);
   const seqCounters: Record<string, number> = {};
   const path: string[] = [];
 
-  function evalNode(id: string): string | null {
+  function evalNode(id: string): { file: string | null; semitones: number; volume: number; delaySec: number } {
     path.push(id);
     const n = nodeMap[id];
-    if (!n) return null;
+    if (!n) return { file: null, semitones: 0, volume: 1, delaySec: 0 };
     const inputs = (edgesTo[id] ?? [])
       .sort((a, b) => {
         const ai = parseInt(a.targetHandle?.replace('in-', '') ?? '0');
@@ -381,11 +381,10 @@ function evalCue(cue: SoundCue): { file: string | null; path: string[] } {
       .map(e => e.source);
 
     switch (n.type) {
-      case 'WavePlayer': return n.data.file ?? null;
+      case 'WavePlayer': return { file: n.data.file ?? null, semitones: 0, volume: 1, delaySec: 0 };
       case 'Random': {
-        if (!inputs.length) return null;
+        if (!inputs.length) return { file: null, semitones: 0, volume: 1, delaySec: 0 };
         const weights = inputs.map((inp, i) => {
-          // Zero weight for last pick if there are other options.
           if (inputs.length > 1 && i === (randomLastPick[id] ?? -1)) return 0;
           const w = nodeMap[inp]?.data?.weight;
           return typeof w === 'number' && w > 0 ? w : 1;
@@ -401,24 +400,35 @@ function evalCue(cue: SoundCue): { file: string | null; path: string[] } {
         return evalNode(inputs[last]);
       }
       case 'Sequence': {
-        if (!inputs.length) return null;
+        if (!inputs.length) return { file: null, semitones: 0, volume: 1, delaySec: 0 };
         const idx = (seqCounters[id] ?? 0) % inputs.length;
         seqCounters[id] = idx + 1;
         return evalNode(inputs[idx]);
       }
       case 'Mixer':
-      case 'Delay':
-      case 'Volume':
-      case 'Pitch':
       case 'Output':
-        return inputs.length ? evalNode(inputs[0]) : null;
+        return inputs.length ? evalNode(inputs[0]) : { file: null, semitones: 0, volume: 1, delaySec: 0 };
+      case 'Pitch': {
+        const r = inputs.length ? evalNode(inputs[0]) : { file: null, semitones: 0, volume: 1, delaySec: 0 };
+        return { ...r, semitones: r.semitones + (n.data.semitones ?? 0) };
+      }
+      case 'Volume': {
+        const r = inputs.length ? evalNode(inputs[0]) : { file: null, semitones: 0, volume: 1, delaySec: 0 };
+        return { ...r, volume: r.volume * (n.data.scalar ?? 1) };
+      }
+      case 'Delay': {
+        const r = inputs.length ? evalNode(inputs[0]) : { file: null, semitones: 0, volume: 1, delaySec: 0 };
+        const min = n.data.minSec ?? 0;
+        const max = n.data.maxSec ?? 0;
+        return { ...r, delaySec: r.delaySec + min + Math.random() * Math.max(0, max - min) };
+      }
     }
-    return null;
+    return { file: null, semitones: 0, volume: 1, delaySec: 0 };
   }
 
   const output = cue.nodes.find(n => n.type === 'Output');
-  const file = output ? evalNode(output.id) : null;
-  return { file, path };
+  const result = output ? evalNode(output.id) : { file: null, semitones: 0, volume: 1, delaySec: 0 };
+  return { ...result, path };
 }
 
 // ─── Node factory ─────────────────────────────────────────────────────────────
@@ -884,7 +894,7 @@ export default function SoundCuePage() {
 
   async function playCue() {
     if (!openCue) return;
-    const { file, path } = evalCue(openCue);
+    const { file, path, semitones, volume, delaySec } = evalCue(openCue);
     if (!file) { setStatus('No sound resolved'); setTimeout(() => setStatus(''), 2000); return; }
     setActivePath(path);
     try {
@@ -895,11 +905,24 @@ export default function SoundCuePage() {
       if (!resp.ok) throw new Error(`${resp.status} ${resp.statusText}`);
       const buf = await resp.arrayBuffer();
       if (!audioCtxRef.current) audioCtxRef.current = new AudioContext();
-      if (audioCtxRef.current.state === 'suspended') await audioCtxRef.current.resume();
-      const decoded = await decodeAdpcmWav(buf, audioCtxRef.current);
-      const src = audioCtxRef.current.createBufferSource();
-      src.buffer = decoded; src.connect(audioCtxRef.current.destination); src.start();
-      setStatus(`▶ ${file}`); setTimeout(() => setStatus(''), 3000);
+      const ctx = audioCtxRef.current;
+      if (ctx.state === 'suspended') await ctx.resume();
+      const decoded = await decodeAdpcmWav(buf, ctx);
+      const src = ctx.createBufferSource();
+      src.buffer = decoded;
+      // Apply pitch: semitones → cents (100 cents per semitone)
+      src.detune.value = semitones * 100;
+      // Apply volume via GainNode
+      const gain = ctx.createGain();
+      gain.gain.value = Math.max(0, volume);
+      src.connect(gain);
+      gain.connect(ctx.destination);
+      src.start(ctx.currentTime + Math.max(0, delaySec));
+      const parts = [`▶ ${file}`];
+      if (semitones !== 0) parts.push(`pitch ${semitones > 0 ? '+' : ''}${semitones}st`);
+      if (volume !== 1)    parts.push(`vol ×${volume.toFixed(2)}`);
+      if (delaySec > 0)    parts.push(`delay ${delaySec.toFixed(2)}s`);
+      setStatus(parts.join(' · ')); setTimeout(() => setStatus(''), 3000);
     } catch (e: any) { setStatus(`Play failed: ${e.message}`); }
   }
 
