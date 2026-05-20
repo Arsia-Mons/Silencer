@@ -755,7 +755,9 @@ export default function SoundStudioPage() {
 
   const selectTab = useCallback((next: TabMode) => {
     setTab(next);
-    router.replace(`/sound-studio?tab=${next}`, { scroll: false });
+    const url = new URL(window.location.href);
+    url.searchParams.set('tab', next);
+    router.replace(url.pathname + url.search, { scroll: false });
   }, [router]);
 
   useEffect(() => {
