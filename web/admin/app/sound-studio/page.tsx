@@ -757,8 +757,8 @@ export default function SoundStudioPage() {
     setTab(next);
     const url = new URL(window.location.href);
     url.searchParams.set('tab', next);
-    router.replace(url.pathname + url.search, { scroll: false });
-  }, [router]);
+    window.history.replaceState(null, '', url.toString());
+  }, []);
 
   useEffect(() => {
     if (folderName) {
