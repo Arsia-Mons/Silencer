@@ -1,4 +1,5 @@
 'use client';
+import { zipSync, strToU8 } from 'fflate';
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import ReactFlow, {
   addEdge,
@@ -141,6 +142,21 @@ function downloadCueFile(cue: SoundCue): void {
   const a = document.createElement('a');
   a.href = url;
   a.download = `${cue.id}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function downloadAllCues(cueFiles: Record<string, SoundCue>): void {
+  const files: Record<string, Uint8Array> = {};
+  for (const [id, cue] of Object.entries(cueFiles)) {
+    files[`${id}.json`] = strToU8(JSON.stringify(cue, null, 2));
+  }
+  const zipped = zipSync(files, { level: 0 });
+  const blob = new Blob([zipped.buffer as ArrayBuffer], { type: 'application/zip' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'sound-cues.zip';
   a.click();
   URL.revokeObjectURL(url);
 }
@@ -1320,8 +1336,17 @@ export default function CueEditor({ cueFiles, onCueFilesChange, soundList, parse
   return (
     <div style={{ display: 'flex', height: '100%', minHeight: 0, background: C.bg, color: C.text, fontFamily: 'monospace' }}>
       <div style={{ width: 220, borderRight: `1px solid ${C.border}`, display: 'flex', flexDirection: 'column', overflowY: 'auto', background: C.card }}>
-        <div style={{ padding: '12px 10px 6px', fontWeight: 700, fontSize: 12, color: C.primary, letterSpacing: 1, borderBottom: `1px solid ${C.border}` }}>
-          SOUND CUES
+        <div style={{ padding: '8px 10px', fontWeight: 700, fontSize: 12, color: C.primary, letterSpacing: 1, borderBottom: `1px solid ${C.border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <span>SOUND CUES</span>
+          {cueList.length > 0 && (
+            <button
+              onClick={() => downloadAllCues(cueFiles)}
+              title="Download all cues as zip"
+              style={{ background: 'none', border: `1px solid ${C.border}`, color: C.dim, borderRadius: 4, padding: '2px 6px', cursor: 'pointer', fontSize: 10, letterSpacing: 0.5 }}
+            >
+              ↓ ALL
+            </button>
+          )}
         </div>
         {cueList.length === 0 && (
           <div style={{ padding: '10px', fontSize: 11, color: C.muted, lineHeight: 1.5 }}>
