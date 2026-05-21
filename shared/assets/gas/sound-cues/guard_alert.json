@@ -5,8 +5,8 @@
       "id": "out",
       "type": "Output",
       "position": {
-        "x": 560,
-        "y": 200
+        "x": 870,
+        "y": 270
       },
       "data": {}
     },
@@ -14,8 +14,8 @@
       "id": "rng",
       "type": "Random",
       "position": {
-        "x": 320,
-        "y": 200
+        "x": 310,
+        "y": 270
       },
       "data": {}
     },
@@ -23,8 +23,8 @@
       "id": "w1",
       "type": "WavePlayer",
       "position": {
-        "x": 80,
-        "y": 60
+        "x": 30,
+        "y": 30
       },
       "data": {
         "file": "theres3.wav",
@@ -35,8 +35,8 @@
       "id": "w2",
       "type": "WavePlayer",
       "position": {
-        "x": 80,
-        "y": 160
+        "x": 30,
+        "y": 150
       },
       "data": {
         "file": "stop4.wav",
@@ -47,8 +47,8 @@
       "id": "w3",
       "type": "WavePlayer",
       "position": {
-        "x": 80,
-        "y": 260
+        "x": 30,
+        "y": 270
       },
       "data": {
         "file": "freeze3.wav",
@@ -59,8 +59,8 @@
       "id": "w4",
       "type": "WavePlayer",
       "position": {
-        "x": 80,
-        "y": 360
+        "x": 30,
+        "y": 390
       },
       "data": {
         "file": "freezrt1.wav",
@@ -71,12 +71,26 @@
       "id": "w5",
       "type": "WavePlayer",
       "position": {
-        "x": 80,
-        "y": 460
+        "x": 30,
+        "y": 510
       },
       "data": {
         "file": "drop4.wav",
         "weight": 1
+      }
+    },
+    {
+      "id": "n102",
+      "type": "Modulator",
+      "position": {
+        "x": 590,
+        "y": 270
+      },
+      "data": {
+        "volumeMin": 1,
+        "volumeMax": 1,
+        "pitchMin": -3.5,
+        "pitchMax": 2.5
       }
     }
   ],
@@ -84,38 +98,86 @@
     {
       "id": "e1",
       "source": "w1",
+      "sourceHandle": "out",
       "target": "rng",
       "targetHandle": "i0"
     },
     {
       "id": "e2",
       "source": "w2",
+      "sourceHandle": "out",
       "target": "rng",
       "targetHandle": "i1"
     },
     {
       "id": "e3",
       "source": "w3",
+      "sourceHandle": "out",
       "target": "rng",
       "targetHandle": "i2"
     },
     {
       "id": "e4",
       "source": "w4",
+      "sourceHandle": "out",
       "target": "rng",
       "targetHandle": "i3"
     },
     {
       "id": "e5",
       "source": "w5",
+      "sourceHandle": "out",
       "target": "rng",
       "targetHandle": "i4"
     },
     {
-      "id": "e6",
+      "id": "reactflow__edge-w1out-rngin-0",
+      "source": "w1",
+      "sourceHandle": "out",
+      "target": "rng",
+      "targetHandle": "in-0"
+    },
+    {
+      "id": "reactflow__edge-w2out-rngin-1",
+      "source": "w2",
+      "sourceHandle": "out",
+      "target": "rng",
+      "targetHandle": "in-1"
+    },
+    {
+      "id": "reactflow__edge-w3out-rngin-2",
+      "source": "w3",
+      "sourceHandle": "out",
+      "target": "rng",
+      "targetHandle": "in-2"
+    },
+    {
+      "id": "reactflow__edge-w4out-rngin-3",
+      "source": "w4",
+      "sourceHandle": "out",
+      "target": "rng",
+      "targetHandle": "in-3"
+    },
+    {
+      "id": "reactflow__edge-w5out-rngin-4",
+      "source": "w5",
+      "sourceHandle": "out",
+      "target": "rng",
+      "targetHandle": "in-4"
+    },
+    {
+      "id": "reactflow__edge-rngout-n102in",
       "source": "rng",
+      "sourceHandle": "out",
+      "target": "n102",
+      "targetHandle": "in"
+    },
+    {
+      "id": "reactflow__edge-n102out-outin",
+      "source": "n102",
+      "sourceHandle": "out",
       "target": "out",
-      "targetHandle": "i0"
+      "targetHandle": "in"
     }
   ]
 }

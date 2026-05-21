@@ -5,8 +5,8 @@
       "id": "out",
       "type": "Output",
       "position": {
-        "x": 600,
-        "y": 200
+        "x": 590,
+        "y": 30
       },
       "data": {}
     },
@@ -14,12 +14,12 @@
       "id": "mod",
       "type": "Modulator",
       "position": {
-        "x": 350,
-        "y": 200
+        "x": 310,
+        "y": 30
       },
       "data": {
         "volumeMin": 0.85,
-        "volumeMax": 1.0,
+        "volumeMax": 1,
         "pitchMin": -2,
         "pitchMax": 2
       }
@@ -28,8 +28,8 @@
       "id": "w1",
       "type": "WavePlayer",
       "position": {
-        "x": 100,
-        "y": 200
+        "x": 30,
+        "y": 30
       },
       "data": {
         "file": "seekexp1.wav",
@@ -41,12 +41,14 @@
     {
       "id": "e1",
       "source": "w1",
+      "sourceHandle": "out",
       "target": "mod",
       "targetHandle": "i0"
     },
     {
       "id": "e2",
       "source": "mod",
+      "sourceHandle": "out",
       "target": "out",
       "targetHandle": "i0"
     }

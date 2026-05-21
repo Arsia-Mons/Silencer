@@ -5,8 +5,8 @@
       "id": "out",
       "type": "Output",
       "position": {
-        "x": 560,
-        "y": 200
+        "x": 870,
+        "y": 90
       },
       "data": {}
     },
@@ -14,8 +14,8 @@
       "id": "rng",
       "type": "Random",
       "position": {
-        "x": 320,
-        "y": 200
+        "x": 310,
+        "y": 90
       },
       "data": {}
     },
@@ -23,8 +23,8 @@
       "id": "w1",
       "type": "WavePlayer",
       "position": {
-        "x": 80,
-        "y": 100
+        "x": 30,
+        "y": 30
       },
       "data": {
         "file": "strike01.wav",
@@ -35,12 +35,26 @@
       "id": "w2",
       "type": "WavePlayer",
       "position": {
-        "x": 80,
-        "y": 300
+        "x": 30,
+        "y": 150
       },
       "data": {
         "file": "strike02.wav",
         "weight": 1
+      }
+    },
+    {
+      "id": "n106",
+      "type": "Modulator",
+      "position": {
+        "x": 590,
+        "y": 90
+      },
+      "data": {
+        "volumeMin": 1,
+        "volumeMax": 1,
+        "pitchMin": -3.5,
+        "pitchMax": 2.5
       }
     }
   ],
@@ -48,20 +62,44 @@
     {
       "id": "e1",
       "source": "w1",
+      "sourceHandle": "out",
       "target": "rng",
       "targetHandle": "i0"
     },
     {
       "id": "e2",
       "source": "w2",
+      "sourceHandle": "out",
       "target": "rng",
       "targetHandle": "i1"
     },
     {
-      "id": "e3",
-      "source": "rng",
+      "id": "reactflow__edge-w1out-rngin-0",
+      "source": "w1",
+      "sourceHandle": "out",
+      "target": "rng",
+      "targetHandle": "in-0"
+    },
+    {
+      "id": "reactflow__edge-w2out-rngin-1",
+      "source": "w2",
+      "sourceHandle": "out",
+      "target": "rng",
+      "targetHandle": "in-1"
+    },
+    {
+      "id": "reactflow__edge-n106out-outin",
+      "source": "n106",
+      "sourceHandle": "out",
       "target": "out",
-      "targetHandle": "i0"
+      "targetHandle": "in"
+    },
+    {
+      "id": "reactflow__edge-rngout-n106in",
+      "source": "rng",
+      "sourceHandle": "out",
+      "target": "n106",
+      "targetHandle": "in"
     }
   ]
 }

@@ -5,8 +5,8 @@
       "id": "out",
       "type": "Output",
       "position": {
-        "x": 700,
-        "y": 200
+        "x": 590,
+        "y": 90
       },
       "data": {}
     },
@@ -14,8 +14,8 @@
       "id": "rng",
       "type": "Random",
       "position": {
-        "x": 420,
-        "y": 200.50815217391306
+        "x": 310,
+        "y": 90
       },
       "data": {}
     },
@@ -23,8 +23,8 @@
       "id": "w1",
       "type": "WavePlayer",
       "position": {
-        "x": 100,
-        "y": 80
+        "x": 30,
+        "y": 30
       },
       "data": {
         "file": "futstonl.wav",
@@ -35,8 +35,8 @@
       "id": "w2",
       "type": "WavePlayer",
       "position": {
-        "x": 100,
-        "y": 220
+        "x": 30,
+        "y": 150
       },
       "data": {
         "file": "futstonr.wav",

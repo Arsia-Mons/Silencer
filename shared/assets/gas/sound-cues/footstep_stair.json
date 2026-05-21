@@ -5,8 +5,8 @@
       "id": "out",
       "type": "Output",
       "position": {
-        "x": 700,
-        "y": 200
+        "x": 590,
+        "y": 90
       },
       "data": {}
     },
@@ -14,8 +14,8 @@
       "id": "w1",
       "type": "WavePlayer",
       "position": {
-        "x": 100,
-        "y": 80
+        "x": 30,
+        "y": 30
       },
       "data": {
         "file": "stostep1.wav",
@@ -26,8 +26,8 @@
       "id": "w2",
       "type": "WavePlayer",
       "position": {
-        "x": 100,
-        "y": 220
+        "x": 30,
+        "y": 150
       },
       "data": {
         "file": "stostepr.wav",
@@ -38,8 +38,8 @@
       "id": "n100",
       "type": "Random",
       "position": {
-        "x": 437.4592391304348,
-        "y": 176.1576086956522
+        "x": 310,
+        "y": 90
       },
       "data": {}
     }

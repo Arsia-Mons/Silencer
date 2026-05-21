@@ -5,17 +5,8 @@
       "id": "out",
       "type": "Output",
       "position": {
-        "x": 600,
-        "y": 200
-      },
-      "data": {}
-    },
-    {
-      "id": "rng",
-      "type": "Random",
-      "position": {
-        "x": 350,
-        "y": 200
+        "x": 870,
+        "y": 90
       },
       "data": {}
     },
@@ -23,26 +14,12 @@
       "id": "mod1",
       "type": "Modulator",
       "position": {
-        "x": 180,
-        "y": 100
+        "x": 590,
+        "y": 90
       },
       "data": {
         "volumeMin": 0.9,
-        "volumeMax": 1.0,
-        "pitchMin": -1,
-        "pitchMax": 1
-      }
-    },
-    {
-      "id": "mod2",
-      "type": "Modulator",
-      "position": {
-        "x": 180,
-        "y": 300
-      },
-      "data": {
-        "volumeMin": 0.9,
-        "volumeMax": 1.0,
+        "volumeMax": 1,
         "pitchMin": -1,
         "pitchMax": 1
       }
@@ -51,8 +28,8 @@
       "id": "w1",
       "type": "WavePlayer",
       "position": {
-        "x": 20,
-        "y": 100
+        "x": 30,
+        "y": 30
       },
       "data": {
         "file": "robot3r.wav",
@@ -63,45 +40,52 @@
       "id": "w2",
       "type": "WavePlayer",
       "position": {
-        "x": 20,
-        "y": 300
+        "x": 30,
+        "y": 150
       },
       "data": {
         "file": "robot3l.wav",
         "weight": 1
       }
+    },
+    {
+      "id": "n113",
+      "type": "Random",
+      "position": {
+        "x": 310,
+        "y": 90
+      },
+      "data": {}
     }
   ],
   "edges": [
     {
-      "id": "e1",
+      "id": "reactflow__edge-w1out-n113in-0",
       "source": "w1",
-      "target": "mod1",
-      "targetHandle": "i0"
+      "sourceHandle": "out",
+      "target": "n113",
+      "targetHandle": "in-0"
     },
     {
-      "id": "e2",
+      "id": "reactflow__edge-w2out-n113in-1",
       "source": "w2",
-      "target": "mod2",
-      "targetHandle": "i0"
+      "sourceHandle": "out",
+      "target": "n113",
+      "targetHandle": "in-1"
     },
     {
-      "id": "e3",
+      "id": "reactflow__edge-n113out-mod1in",
+      "source": "n113",
+      "sourceHandle": "out",
+      "target": "mod1",
+      "targetHandle": "in"
+    },
+    {
+      "id": "reactflow__edge-mod1out-outin",
       "source": "mod1",
-      "target": "rng",
-      "targetHandle": "i0"
-    },
-    {
-      "id": "e4",
-      "source": "mod2",
-      "target": "rng",
-      "targetHandle": "i1"
-    },
-    {
-      "id": "e5",
-      "source": "rng",
+      "sourceHandle": "out",
       "target": "out",
-      "targetHandle": "i0"
+      "targetHandle": "in"
     }
   ]
 }
