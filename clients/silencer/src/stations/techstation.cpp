@@ -2,6 +2,7 @@
 #include "plume.h"
 #include "team.h"
 #include "gasloader.h"
+#include "audio/soundcue.h"
 #include <algorithm>
 
 TechStation::TechStation() : Object(ObjectTypes::TECHSTATION){
@@ -50,8 +51,10 @@ void TechStation::HandleHit(World & world, Uint8 x, Uint8 y, Object & projectile
 	Hittable::HandleHit(*this, world, x, y, projectile);
 	if(oldhealth != health && health == 0 && projectile.healthdamage > 0){
 		collidable = false;
-		{ const GameObjectDef* _d = GASLoader::Get().GetGameObjectDef("techStation");
-		EmitSound(world, world.resources.soundbank[(_d && !_d->soundDestroy.empty()) ? _d->soundDestroy : "q_expl02.wav"], 96); }
+		const GameObjectDef* _d = GASLoader::Get().GetGameObjectDef("techStation");
+		const std::string& sfx = (_d && !_d->soundDestroy.empty()) ? _d->soundDestroy : "q_expl02.wav";
+		auto _r = ResolveSound(sfx, world.resources);
+		if(_r.chunk) EmitSound(world, _r.chunk, static_cast<int>(96 * _r.volume));
 		Team * team = static_cast<Team *>(world.GetObjectFromId(teamid));
 		if(team){
 			Uint32 tech = team->GetAvailableTech(world);

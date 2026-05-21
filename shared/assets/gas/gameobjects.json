@@ -22,7 +22,7 @@
       "reloadTick": 60,
       "detectionRange": 600,
       "soundFire": "!laserew.wav",
-      "soundDestroy": "q_expl02.wav",
+      "soundDestroy": "cue:object_destroy",
       "_note": "health=neutral state (teamid=0). Each upgrade adds healthRegen up to healthMax. shieldMax applied when health reaches healthMax."
     },
     {
@@ -30,17 +30,17 @@
       "techHealth": 240,
       "techShield": 240,
       "techPlumeYV": 25,
-      "soundDestroy": "q_expl02.wav"
+      "soundDestroy": "cue:object_destroy"
     },
     {
       "id": "creditMachine",
       "cooldownTicks": 0,
-      "soundPurchase": "pwrcon1.wav"
+      "soundPurchase": "cue:station_purchase"
     },
     {
       "id": "healMachine",
       "cooldownTicks": 240,
-      "soundHeal": "if15.wav"
+      "soundHeal": "cue:station_heal"
     },
     {
       "id": "vent",
@@ -56,7 +56,7 @@
     },
     {
       "id": "baseDoor",
-      "soundOpen": "portal1.wav",
+      "soundOpen": "cue:door_open",
       "detectionWidth": 320,
       "detectionHeight": 240
     },

@@ -24,6 +24,7 @@
       "patrolTurnInterval": 3,
       "deathDropXVRange": 4,
       "soundHurt": "cue:guard_hurt",
+      "soundAlert": "cue:guard_alert",
       "snapshotInterval": 48,
       "warpTeleportTick": 12,
       "lookBoxes": [
@@ -114,6 +115,7 @@
       "ammoDropQuantity": 5,
       "deathDropYV": 15,
       "soundHurt": "cue:guard_hurt",
+      "soundAlert": "cue:guard_alert",
       "snapshotInterval": 48,
       "warpTeleportTick": 12,
       "lookBoxes": [
@@ -204,6 +206,7 @@
       "ammoDropQuantity": 3,
       "deathDropYV": 15,
       "soundHurt": "cue:guard_hurt",
+      "soundAlert": "cue:guard_alert",
       "snapshotInterval": 48,
       "warpTeleportTick": 12,
       "lookBoxes": [
@@ -300,10 +303,10 @@
       "soundFire": "!laserew.wav",
       "soundActivate": "airlokj.wav",
       "soundAmbient": "wndloope.wav",
-      "soundMelee": "robotarm.wav",
-      "soundMoveRight": "robot3r.wav",
-      "soundMoveLeft": "robot3l.wav",
-      "soundDeath": "seekexp1.wav",
+      "soundMelee": "cue:robot_melee",
+      "soundMoveRight": "cue:robot_move",
+      "soundMoveLeft": "cue:robot_move",
+      "soundDeath": "cue:robot_death",
       "snapshotInterval": 48
     },
     {
@@ -318,7 +321,7 @@
       "threatDetectX": 200,
       "threatDetectY": 100,
       "soundHurt": "cue:civilian_hurt",
-      "soundDeath": "seekexp1.wav",
+      "soundDeath": "cue:civilian_death",
       "snapshotInterval": 72,
       "warpTeleportTick": 12,
       "runDurationTicks": 150,

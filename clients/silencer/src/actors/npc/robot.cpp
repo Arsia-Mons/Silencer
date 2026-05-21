@@ -286,7 +286,10 @@ void Robot::Tick(World & world){
 		case AWAKENING:{
 			if(state_i == 0){
 				StopAmbience();
-				{ const EnemyDef* rd = GASLoader::Get().GetEnemyDef("robot"); EmitSound(world, world.resources.soundbank[(rd && !rd->soundMelee.empty()) ? rd->soundMelee : "robotarm.wav"], 128); }
+				const EnemyDef* rd = GASLoader::Get().GetEnemyDef("robot");
+				const std::string& sfx = (rd && !rd->soundMelee.empty()) ? rd->soundMelee : "robotarm.wav";
+				auto _r = ResolveSound(sfx, world.resources);
+				if(_r.chunk) EmitSound(world, _r.chunk, static_cast<int>(128 * _r.volume));
 			}
 			if(state_i >= 15){
 				state = WALKING;
@@ -302,11 +305,17 @@ void Robot::Tick(World & world){
 			}
 			if(state_i % 20 == 1){
 				StopAmbience();
-				{ const EnemyDef* rd = GASLoader::Get().GetEnemyDef("robot"); EmitSound(world, world.resources.soundbank[(rd && !rd->soundMoveRight.empty()) ? rd->soundMoveRight : "robot3r.wav"], 48); }
+				const EnemyDef* rd = GASLoader::Get().GetEnemyDef("robot");
+				const std::string& sfx = (rd && !rd->soundMoveRight.empty()) ? rd->soundMoveRight : "robot3r.wav";
+				auto _r = ResolveSound(sfx, world.resources);
+				if(_r.chunk) EmitSound(world, _r.chunk, static_cast<int>(48 * _r.volume));
 			}
 			if(state_i % 20 == 10){
 				StopAmbience();
-				{ const EnemyDef* rd = GASLoader::Get().GetEnemyDef("robot"); EmitSound(world, world.resources.soundbank[(rd && !rd->soundMoveLeft.empty()) ? rd->soundMoveLeft : "robot3l.wav"], 48); }
+				const EnemyDef* rd = GASLoader::Get().GetEnemyDef("robot");
+				const std::string& sfx = (rd && !rd->soundMoveLeft.empty()) ? rd->soundMoveLeft : "robot3l.wav";
+				auto _r = ResolveSound(sfx, world.resources);
+				if(_r.chunk) EmitSound(world, _r.chunk, static_cast<int>(48 * _r.volume));
 			}
 			res_bank = 45;
 			res_index = state_i % 20;
@@ -438,12 +447,18 @@ void Robot::Tick(World & world){
 			}
 			if(state_i == 4 * 2){
 				StopAmbience();
-				{ const EnemyDef* rd = GASLoader::Get().GetEnemyDef("robot"); EmitSound(world, world.resources.soundbank[(rd && !rd->soundDeath.empty()) ? rd->soundDeath : "seekexp1.wav"], 128); }
+				const EnemyDef* rd = GASLoader::Get().GetEnemyDef("robot");
+				const std::string& sfx = (rd && !rd->soundDeath.empty()) ? rd->soundDeath : "seekexp1.wav";
+				auto _r = ResolveSound(sfx, world.resources);
+				if(_r.chunk) EmitSound(world, _r.chunk, static_cast<int>(128 * _r.volume));
 			}
 			collidable = false;
 			{ const EnemyDef* _rdd = GASLoader::Get().GetEnemyDef("robot");
 			  if(state_i >= (_rdd ? _rdd->deathExplosionDelayTicks : 96)){
-				{ const EnemyDef* rd = GASLoader::Get().GetEnemyDef("robot"); EmitSound(world, world.resources.soundbank[(rd && !rd->soundDeath.empty()) ? rd->soundDeath : "seekexp1.wav"], 128); }
+				const EnemyDef* rd = GASLoader::Get().GetEnemyDef("robot");
+				const std::string& sfx = (rd && !rd->soundDeath.empty()) ? rd->soundDeath : "seekexp1.wav";
+				auto _r = ResolveSound(sfx, world.resources);
+				if(_r.chunk) EmitSound(world, _r.chunk, static_cast<int>(128 * _r.volume));
 				Sint8 xvs[] = {-14, 14, -10, 10, -10, 10};
 				Sint8 yvs[] = {-25, -25, -10, -10, -5, -5};
 				Sint8 ys[] = {0, 0, 0, 0, 0, 0, 0, 0};
@@ -544,7 +559,10 @@ void Robot::HandleHit(World & world, Uint8 x, Uint8 y, Object & projectile){
 		}
 	} else if (health > 0 && (state == ASLEEP || state == SLEEPING)) {
 		StopAmbience();
-		{ const EnemyDef* rd = GASLoader::Get().GetEnemyDef("robot"); EmitSound(world, world.resources.soundbank[(rd && !rd->soundMelee.empty()) ? rd->soundMelee : "robotarm.wav"], 128); }
+		const EnemyDef* rd = GASLoader::Get().GetEnemyDef("robot");
+		const std::string& sfx = (rd && !rd->soundMelee.empty()) ? rd->soundMelee : "robotarm.wav";
+		auto _r = ResolveSound(sfx, world.resources);
+		if(_r.chunk) EmitSound(world, _r.chunk, static_cast<int>(128 * _r.volume));
 		state = AWAKENING;
 		state_i = -1;
 	}

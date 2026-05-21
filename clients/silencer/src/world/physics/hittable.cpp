@@ -3,6 +3,7 @@
 #include "projectile.h"
 #include "shrapnel.h"
 #include "gasloader.h"
+#include "audio/soundcue.h"
 #include "EventBus.h"
 #include <math.h>
 
@@ -91,19 +92,17 @@ void Hittable::HandleHit(Object & object, World & world, Uint8 x, Uint8 y, Objec
 	}
 	switch(projectile.type){
 		case ObjectTypes::BLASTERPROJECTILE:{
-			const PlayerDef& pd = GASLoader::Get().player;
-			const std::string& s = (rand() % 2 == 0) ? pd.soundImpactBlaster1 : pd.soundImpactBlaster2;
-			object.EmitSound(world, world.resources.soundbank[s], 96);
+			auto _r = ResolveSound(GASLoader::Get().player.soundImpactBlaster, world.resources);
+			if(_r.chunk) object.EmitSound(world, _r.chunk, static_cast<int>(96 * _r.volume));
 		}break;
 		case ObjectTypes::WALLPROJECTILE:
 		case ObjectTypes::LASERPROJECTILE:{
-			const PlayerDef& pd = GASLoader::Get().player;
 			if(damagedshield){
-				const std::string& s = (rand() % 2 == 0) ? pd.soundImpactLaserShield1 : pd.soundImpactLaserShield2;
-				object.EmitSound(world, world.resources.soundbank[s], 96);
+				auto _r = ResolveSound(GASLoader::Get().player.soundImpactLaserShield, world.resources);
+				if(_r.chunk) object.EmitSound(world, _r.chunk, static_cast<int>(96 * _r.volume));
 			}else{
-				const std::string& s = (rand() % 2 == 0) ? pd.soundImpactLaser1 : pd.soundImpactLaser2;
-				object.EmitSound(world, world.resources.soundbank[s], 96);
+				auto _r = ResolveSound(GASLoader::Get().player.soundImpactLaser, world.resources);
+				if(_r.chunk) object.EmitSound(world, _r.chunk, static_cast<int>(96 * _r.volume));
 			}
 		}break;
 		case ObjectTypes::ROCKETPROJECTILE:{

@@ -1,5 +1,5 @@
 {
-  "_comment": "Weapon definitions — numeric values 1:1 from *projectile.cpp constructors. Sprite banks and sounds extracted from hardcoded values in each projectile Tick(). Do not change balance during migration.",
+  "_comment": "Weapon definitions \u2014 numeric values 1:1 from *projectile.cpp constructors. Sprite banks and sounds extracted from hardcoded values in each projectile Tick(). Do not change balance during migration.",
   "weapons": [
     {
       "id": "blaster",
@@ -158,7 +158,7 @@
         79
       ],
       "soundThrow": "cue:grenade_throw",
-      "soundLand": "land1.wav",
+      "soundLand": "cue:grenade_land_impact",
       "radius": 5,
       "bounceDamping": 0.8,
       "snapshotInterval": 6
@@ -166,7 +166,7 @@
     {
       "id": "plasmadetonator",
       "projectileType": "grenade",
-      "_comment": "Plasma detonator — remote-detonated device. soundFire=arm/deploy, iscamera=true uses soundHit1, iscamera=false uses soundExplosion.",
+      "_comment": "Plasma detonator \u2014 remote-detonated device. soundFire=arm/deploy, iscamera=true uses soundHit1, iscamera=false uses soundExplosion.",
       "soundFire": "shield2.wav",
       "soundExplosion": "cue:plasma_explosion",
       "soundHit1": "cue:plasma_explosion",
@@ -237,7 +237,7 @@
     {
       "id": "empbomb",
       "projectileType": "grenade",
-      "_comment": "EMP grenade — stuns shields across the whole team row.",
+      "_comment": "EMP grenade \u2014 stuns shields across the whole team row.",
       "spriteBanks": [
         79,
         79,
@@ -256,7 +256,7 @@
     {
       "id": "shapedbomb",
       "projectileType": "grenade",
-      "_comment": "Shaped-charge grenade — fires a tight spray of plasma bolts upward.",
+      "_comment": "Shaped-charge grenade \u2014 fires a tight spray of plasma bolts upward.",
       "spriteBanks": [
         79,
         79,
@@ -315,7 +315,7 @@
     {
       "id": "plasmabomb",
       "projectileType": "grenade",
-      "_comment": "Plasma grenade — releases a wide spread of plasma bolts.",
+      "_comment": "Plasma grenade \u2014 releases a wide spread of plasma bolts.",
       "spriteBanks": [
         79,
         79,
@@ -386,7 +386,7 @@
     {
       "id": "neutronbomb",
       "projectileType": "grenade",
-      "_comment": "Neutron grenade — large-radius explosion that passes through shielding.",
+      "_comment": "Neutron grenade \u2014 large-radius explosion that passes through shielding.",
       "spriteBanks": [
         79,
         79,
@@ -407,7 +407,7 @@
     {
       "id": "flarebomb",
       "projectileType": "grenade",
-      "_comment": "Flare bomb (INV_FLARE) — illumination grenade, stays airborne after exploding.",
+      "_comment": "Flare bomb (INV_FLARE) \u2014 illumination grenade, stays airborne after exploding.",
       "spriteBanks": [
         79,
         79,
@@ -424,7 +424,7 @@
     {
       "id": "poisonflare",
       "projectileType": "grenade",
-      "_comment": "Poison flare bomb — like flarebomb but inflicts poison damage in radius.",
+      "_comment": "Poison flare bomb \u2014 like flarebomb but inflicts poison damage in radius.",
       "spriteBanks": [
         79,
         79,

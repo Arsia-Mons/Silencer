@@ -124,8 +124,10 @@ void WallDefense::HandleHit(World & world, Uint8 x, Uint8 y, Object & projectile
 	if(health == 0 && state != DEAD){
 		state = DEAD;
 		state_i = 0;
-		{ const GameObjectDef* _wd = GASLoader::Get().GetGameObjectDef("wallDefense");
-		EmitSound(world, world.resources.soundbank[(_wd && !_wd->soundDestroy.empty()) ? _wd->soundDestroy : "q_expl02.wav"], 96); }
+		const GameObjectDef* _wd = GASLoader::Get().GetGameObjectDef("wallDefense");
+		const std::string& sfx = (_wd && !_wd->soundDestroy.empty()) ? _wd->soundDestroy : "q_expl02.wav";
+		auto _r = ResolveSound(sfx, world.resources);
+		if(_r.chunk) EmitSound(world, _r.chunk, static_cast<int>(96 * _r.volume));
 		for(int i = 0; i < 6; i++){
 			Plume * plume = (Plume *)world.CreateObject(ObjectTypes::PLUME);
 			if(plume){

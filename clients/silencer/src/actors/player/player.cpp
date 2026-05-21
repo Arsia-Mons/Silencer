@@ -28,7 +28,7 @@
 #include "bodypart.h"
 #include "walldefense.h"
 #include "actordef.h"
-#include "soundcue.h"
+#include "audio/soundcue.h"
 #include "gamemode.h"
 #include <math.h>
 
@@ -325,7 +325,8 @@ void Player::Tick(World & world){
 				}
 				state = DYING;
 				state_i = 0;
-				EmitSound(world, world.resources.soundbank[GASLoader::Get().player.soundGrunt]);
+				auto _r = ResolveSound(GASLoader::Get().player.soundGrunt, world.resources);
+				if(_r.chunk) EmitSound(world, _r.chunk, static_cast<int>(128 * _r.volume));
 			}
 		}
 		poisoned_i++;
@@ -2126,9 +2127,9 @@ void Player::Tick(World & world){
 							oldfiles += 6;
 						}*/
 						if(hackingbonustime > world.tickcount && world.tickcount % ((rand() % GASLoader::Get().player.hackingSoundIntervalRandom) + GASLoader::Get().player.hackingSoundIntervalBase) == 0){
-							{ const PlayerDef& _pd = GASLoader::Get().player;
-							  const std::string* typesounds[] = {&_pd.soundType1, &_pd.soundType2, &_pd.soundType3, &_pd.soundType4, &_pd.soundType5};
-							  EmitSound(world, world.resources.soundbank[*typesounds[rand() % (int)(sizeof(typesounds)/sizeof(typesounds[0]))]], 64); }
+							const PlayerDef& _pd = GASLoader::Get().player;
+							auto _r = ResolveSound(_pd.soundType, world.resources);
+							if(_r.chunk) EmitSound(world, _r.chunk, static_cast<int>(64 * _r.volume));
 						}
 						effecthacking = true;
 						effecthackingcontinue = GASLoader::Get().player.hackingEffectTicks;
@@ -2658,11 +2659,8 @@ void Player::HandleHit(World & world, Uint8 x, Uint8 y, Object & projectile){
 	Hittable::HandleHit(*this, world, x, y, projectile);
 	UnDisguise(world);
 	if(world.tickcount - hitsoundplaytick > (unsigned)GASLoader::Get().player.hitSoundCooldownTicks){
-		if(rand() % 2 == 0){
-			EmitSound(world, world.resources.soundbank[GASLoader::Get().player.soundHurtA]);
-		}else{
-			EmitSound(world, world.resources.soundbank[GASLoader::Get().player.soundHurtB]);
-		}
+		auto _r = ResolveSound(GASLoader::Get().player.soundHurt, world.resources);
+		if(_r.chunk) EmitSound(world, _r.chunk, static_cast<int>(128 * _r.volume));
 		hitsoundplaytick = world.tickcount;
 	}
 	if(state_hit / 32 == 1){
@@ -2772,7 +2770,8 @@ void Player::HandleHit(World & world, Uint8 x, Uint8 y, Object & projectile){
 		}
 		state = DYING;
 		state_i = 0;
-		EmitSound(world, world.resources.soundbank[GASLoader::Get().player.soundGrunt]);
+		auto _r = ResolveSound(GASLoader::Get().player.soundGrunt, world.resources);
+		if(_r.chunk) EmitSound(world, _r.chunk, static_cast<int>(128 * _r.volume));
 
 		if (world.IsAuthority()) {
 			if(world.gameMode){
@@ -2996,7 +2995,8 @@ bool Player::CheckForGround(World & world, Platform & platform){
 	int yt = platform.XtoY(x);
 	if(y <= yt || ((platform.type == Platform::STAIRSUP || platform.type == Platform::STAIRSDOWN) && y <= yt + 1)){
 		{ auto _r = ResolveSound(GASLoader::Get().player.soundFootstepCrouchR, world.resources); if(_r.chunk) EmitSound(world, _r.chunk, static_cast<int>(32 * _r.volume)); };
-		EmitSound(world, world.resources.soundbank[GASLoader::Get().player.soundLandCrouch], 96);
+		auto _land = ResolveSound(GASLoader::Get().player.soundLandCrouch, world.resources);
+		if(_land.chunk) EmitSound(world, _land.chunk, static_cast<int>(96 * _land.volume));
 		yv = 0;
 		currentplatformid = platform.id;
 		y = yt;
@@ -3900,7 +3900,8 @@ bool Player::ProcessJetpackState(World & world){
 			xv /= 2;
 			yv /= 2;
 			if(abs(xv) >= 2 || abs(yv) >= 2){
-				EmitSound(world, world.resources.soundbank[GASLoader::Get().player.soundLand], 96);
+				auto _r = ResolveSound(GASLoader::Get().player.soundLand, world.resources);
+				if(_r.chunk) EmitSound(world, _r.chunk, static_cast<int>(96 * _r.volume));
 			}
 		}
 	}
@@ -3971,7 +3972,8 @@ bool Player::ProcessFallingState(World & world){
 			xv = (xn * abs(xv)) / 2;
 			yv = (yn * abs(yv)) / 2;
 			if(abs(xv) >= 2 || abs(yv) >= 2){
-				EmitSound(world, world.resources.soundbank[GASLoader::Get().player.soundFall], 96);
+				auto _r = ResolveSound(GASLoader::Get().player.soundFall, world.resources);
+				if(_r.chunk) EmitSound(world, _r.chunk, static_cast<int>(96 * _r.volume));
 			}
 		}
 	}else{
@@ -4211,11 +4213,9 @@ bool Player::ProcessLadderState(World &world){
 		res_bank = 16;
 	}
 	res_index = state_i;
-	if(res_index == 4){
-		EmitSound(world, world.resources.soundbank[GASLoader::Get().player.soundLadder1], 24);
-	}
-	if(res_index == 15){
-		EmitSound(world, world.resources.soundbank[GASLoader::Get().player.soundLadder2], 24);
+	if(res_index == 4 || res_index == 15){
+		auto _r = ResolveSound(GASLoader::Get().player.soundLadder, world.resources);
+		if(_r.chunk) EmitSound(world, _r.chunk, static_cast<int>(24 * _r.volume));
 	}
 	return false;
 }

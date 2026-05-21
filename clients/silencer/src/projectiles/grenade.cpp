@@ -390,7 +390,10 @@ void Grenade::Move(Object & object, World & world, int v){
 		object.xv = 0;
 		object.yv = 0;
 	}else{
-		object.EmitSound(world, world.resources.soundbank[GASLoader::Get().GetWeaponDef("grenade") && !GASLoader::Get().GetWeaponDef("grenade")->soundLand.empty() ? GASLoader::Get().GetWeaponDef("grenade")->soundLand : "land1.wav"], volume);
+		const WeaponDef* gw = GASLoader::Get().GetWeaponDef("grenade");
+		const std::string& sfx = (gw && !gw->soundLand.empty()) ? gw->soundLand : "land1.wav";
+		auto _r = ResolveSound(sfx, world.resources);
+		if(_r.chunk) object.EmitSound(world, _r.chunk, static_cast<int>(volume * _r.volume));
 		object.yv += world.gravity;
 	}
 }

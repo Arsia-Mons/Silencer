@@ -1,0 +1,70 @@
+{
+  "id": "player_ladder",
+  "nodes": [
+    {
+      "id": "out",
+      "type": "Output",
+      "position": {
+        "x": 560,
+        "y": 200
+      },
+      "data": {}
+    },
+    {
+      "id": "seq",
+      "type": "Sequence",
+      "position": {
+        "x": 320,
+        "y": 200
+      },
+      "data": {
+        "shuffle": false
+      }
+    },
+    {
+      "id": "w1",
+      "type": "WavePlayer",
+      "position": {
+        "x": 80,
+        "y": 100
+      },
+      "data": {
+        "file": "ladder1.wav",
+        "weight": 1
+      }
+    },
+    {
+      "id": "w2",
+      "type": "WavePlayer",
+      "position": {
+        "x": 80,
+        "y": 300
+      },
+      "data": {
+        "file": "ladder2.wav",
+        "weight": 1
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "e1",
+      "source": "w1",
+      "target": "seq",
+      "targetHandle": "in-0"
+    },
+    {
+      "id": "e2",
+      "source": "w2",
+      "target": "seq",
+      "targetHandle": "in-1"
+    },
+    {
+      "id": "e3",
+      "source": "seq",
+      "sourceHandle": "out",
+      "target": "out",
+      "targetHandle": "in"
+    }
+  ]
+}

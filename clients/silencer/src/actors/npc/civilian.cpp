@@ -389,7 +389,10 @@ bool Civilian::CheckTractVictim(World & world){
 		if(team && team->id != tractteamid){
 			world.Explode(*this, suitcolor, 1);
 			state = DYINGEXPLODE;
-			{ const EnemyDef* def = GASLoader::Get().GetEnemyDef("civilian"); EmitSound(world, world.resources.soundbank[(def && !def->soundDeath.empty()) ? def->soundDeath : "seekexp1.wav"], 128); }
+			const EnemyDef* def = GASLoader::Get().GetEnemyDef("civilian");
+			const std::string& sfx = (def && !def->soundDeath.empty()) ? def->soundDeath : "seekexp1.wav";
+			auto _r = ResolveSound(sfx, world.resources);
+			if(_r.chunk) EmitSound(world, _r.chunk, static_cast<int>(128 * _r.volume));
 			Object tractprojectile(ObjectTypes::PLASMAPROJECTILE);
 		{
 			const EnemyDef* def = GASLoader::Get().GetEnemyDef("civilian");

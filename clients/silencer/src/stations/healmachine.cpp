@@ -1,5 +1,6 @@
 #include "healmachine.h"
 #include "gasloader.h"
+#include "audio/soundcue.h"
 
 HealMachine::HealMachine() : Object(ObjectTypes::HEALMACHINE){
 	res_bank = 172;
@@ -22,8 +23,10 @@ void HealMachine::Tick(World & world){
 		}
 		if(state_i > 0){
 			if(state_i == 2){
-				{ const GameObjectDef* _d = GASLoader::Get().GetGameObjectDef("healMachine");
-				EmitSound(world, world.resources.soundbank[(_d && !_d->soundHeal.empty()) ? _d->soundHeal : "if15.wav"], 96); }
+				const GameObjectDef* _d = GASLoader::Get().GetGameObjectDef("healMachine");
+				const std::string& sfx = (_d && !_d->soundHeal.empty()) ? _d->soundHeal : "if15.wav";
+				auto _r = ResolveSound(sfx, world.resources);
+				if(_r.chunk) EmitSound(world, _r.chunk, static_cast<int>(96 * _r.volume));
 			}
 			state_i++;
 			if(state_i >= 10){

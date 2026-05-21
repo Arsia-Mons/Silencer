@@ -45,7 +45,8 @@ void FixedCannon::Tick(World & world){
 			state_warp = GASLoader::Get().player.warpTeleportTick;
 			{	const GameObjectDef* d = GASLoader::Get().GetGameObjectDef("fixedCannon");
 				const std::string& sfx = (d && !d->soundDeploy.empty()) ? d->soundDeploy : "shield2.wav";
-				EmitSound(world, world.resources.soundbank[sfx], 96); }
+				auto _r = ResolveSound(sfx, world.resources);
+				if(_r.chunk) EmitSound(world, _r.chunk, static_cast<int>(96 * _r.volume)); }
 			state = UP;
 		}break;
 		case UP:{
@@ -191,7 +192,8 @@ void FixedCannon::Tick(World & world){
 			if(state_i == 0){
 				{	const GameObjectDef* d = GASLoader::Get().GetGameObjectDef("fixedCannon");
 					const std::string& sfx = (d && !d->soundDestroy.empty()) ? d->soundDestroy : "q_expl02.wav";
-					EmitSound(world, world.resources.soundbank[sfx], 96); }
+					auto _r = ResolveSound(sfx, world.resources);
+					if(_r.chunk) EmitSound(world, _r.chunk, static_cast<int>(96 * _r.volume)); }
 				for(int i = 0; i < 6; i++){
 					Plume * plume = (Plume *)world.CreateObject(ObjectTypes::PLUME);
 					if(plume){

@@ -1,0 +1,121 @@
+{
+  "id": "player_type",
+  "nodes": [
+    {
+      "id": "out",
+      "type": "Output",
+      "position": {
+        "x": 560,
+        "y": 200
+      },
+      "data": {}
+    },
+    {
+      "id": "rng",
+      "type": "Random",
+      "position": {
+        "x": 320,
+        "y": 200
+      },
+      "data": {}
+    },
+    {
+      "id": "w1",
+      "type": "WavePlayer",
+      "position": {
+        "x": 80,
+        "y": 60
+      },
+      "data": {
+        "file": "type1.wav",
+        "weight": 1
+      }
+    },
+    {
+      "id": "w2",
+      "type": "WavePlayer",
+      "position": {
+        "x": 80,
+        "y": 160
+      },
+      "data": {
+        "file": "type2.wav",
+        "weight": 1
+      }
+    },
+    {
+      "id": "w3",
+      "type": "WavePlayer",
+      "position": {
+        "x": 80,
+        "y": 260
+      },
+      "data": {
+        "file": "type3.wav",
+        "weight": 1
+      }
+    },
+    {
+      "id": "w4",
+      "type": "WavePlayer",
+      "position": {
+        "x": 80,
+        "y": 360
+      },
+      "data": {
+        "file": "type4.wav",
+        "weight": 1
+      }
+    },
+    {
+      "id": "w5",
+      "type": "WavePlayer",
+      "position": {
+        "x": 80,
+        "y": 460
+      },
+      "data": {
+        "file": "type5.wav",
+        "weight": 1
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "e1",
+      "source": "w1",
+      "target": "rng",
+      "targetHandle": "i0"
+    },
+    {
+      "id": "e2",
+      "source": "w2",
+      "target": "rng",
+      "targetHandle": "i1"
+    },
+    {
+      "id": "e3",
+      "source": "w3",
+      "target": "rng",
+      "targetHandle": "i2"
+    },
+    {
+      "id": "e4",
+      "source": "w4",
+      "target": "rng",
+      "targetHandle": "i3"
+    },
+    {
+      "id": "e5",
+      "source": "w5",
+      "target": "rng",
+      "targetHandle": "i4"
+    },
+    {
+      "id": "e6",
+      "source": "rng",
+      "target": "out",
+      "targetHandle": "i0"
+    }
+  ]
+}

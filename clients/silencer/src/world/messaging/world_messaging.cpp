@@ -16,6 +16,7 @@
 #include "gasloader.h"
 #include "gamestateobject.h"
 #include "text_wrap.h"
+#include "audio/soundcue.h"
 #include <algorithm>
 
 #define DELTAENABLED 1
@@ -128,7 +129,8 @@ void WorldMessaging::SendChat(bool toteam, char * message){
 void WorldMessaging::SendSound(const char * name, Peer * peer, Uint8 volume){
 	if(world.IsAuthority()){
 		if(!peer || (peer && peer->id == world.peers.localpeerid)){
-			Audio::GetInstance().Play(world.resources.soundbank[name], volume);
+			auto _r = ResolveSound(name, world.resources);
+			if(_r.chunk) Audio::GetInstance().Play(_r.chunk, static_cast<int>(volume * _r.volume));
 		}
 		char msg[2 + 255];
 		msg[0] = World::MSG_SOUND;
