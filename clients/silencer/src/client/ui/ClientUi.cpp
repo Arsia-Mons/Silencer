@@ -68,7 +68,7 @@ void PlayMenuButtonSound(ScreenContext& ctx) {
 	const std::string& sound = GASLoader::Get().player.soundUIClick;
 	auto it = ctx.world.resources.soundbank.find(sound);
 	if(it == ctx.world.resources.soundbank.end() || !it->second) return;
-	audio.Play(it->second);
+	audio.PlayUI(it->second);
 #endif
 }
 

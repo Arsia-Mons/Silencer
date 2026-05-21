@@ -1,5 +1,6 @@
 #include "creditmachine.h"
 #include "../gas/gasloader.h"
+#include "audio/soundcue.h"
 
 CreditMachine::CreditMachine() : Object(ObjectTypes::CREDITMACHINE){
 	res_bank = 80;
@@ -18,8 +19,10 @@ void CreditMachine::Tick(World & world){
 		res_index = state_i;
 		if(state_i > 0){
 			if(state_i == 4){
-				{ const GameObjectDef* _d = GASLoader::Get().GetGameObjectDef("creditMachine");
-				EmitSound(world, world.resources.soundbank[(_d && !_d->soundPurchase.empty()) ? _d->soundPurchase : "pwrcon1.wav"], 96); }
+				const GameObjectDef* _d = GASLoader::Get().GetGameObjectDef("creditMachine");
+				const std::string& sfx = (_d && !_d->soundPurchase.empty()) ? _d->soundPurchase : "pwrcon1.wav";
+				auto _r = ResolveSound(sfx, world.resources);
+				if(_r.chunk) EmitSound(world, _r.chunk, static_cast<int>(96 * _r.volume));
 			}
 			state_i++;
 			if(state_i >= 18){

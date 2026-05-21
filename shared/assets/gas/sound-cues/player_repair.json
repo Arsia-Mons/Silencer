@@ -1,0 +1,54 @@
+{
+  "id": "player_repair",
+  "nodes": [
+    {
+      "id": "out",
+      "type": "Output",
+      "position": {
+        "x": 600,
+        "y": 200
+      },
+      "data": {}
+    },
+    {
+      "id": "mod",
+      "type": "Modulator",
+      "position": {
+        "x": 350,
+        "y": 200
+      },
+      "data": {
+        "volumeMin": 0.9,
+        "volumeMax": 1.0,
+        "pitchMin": -2,
+        "pitchMax": 2
+      }
+    },
+    {
+      "id": "w1",
+      "type": "WavePlayer",
+      "position": {
+        "x": 100,
+        "y": 200
+      },
+      "data": {
+        "file": "repair.wav",
+        "weight": 1
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "e1",
+      "source": "w1",
+      "target": "mod",
+      "targetHandle": "i0"
+    },
+    {
+      "id": "e2",
+      "source": "mod",
+      "target": "out",
+      "targetHandle": "i0"
+    }
+  ]
+}

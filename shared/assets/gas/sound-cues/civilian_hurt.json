@@ -1,0 +1,110 @@
+{
+  "id": "civilian_hurt",
+  "nodes": [
+    {
+      "id": "out",
+      "type": "Output",
+      "position": {
+        "x": 870,
+        "y": 150
+      },
+      "data": {}
+    },
+    {
+      "id": "rng",
+      "type": "Random",
+      "position": {
+        "x": 310,
+        "y": 150
+      },
+      "data": {}
+    },
+    {
+      "id": "w1",
+      "type": "WavePlayer",
+      "position": {
+        "x": 30,
+        "y": 30
+      },
+      "data": {
+        "file": "groan2.wav",
+        "weight": 1
+      }
+    },
+    {
+      "id": "w2",
+      "type": "WavePlayer",
+      "position": {
+        "x": 30,
+        "y": 150
+      },
+      "data": {
+        "file": "groan2a.wav",
+        "weight": 1
+      }
+    },
+    {
+      "id": "w3",
+      "type": "WavePlayer",
+      "position": {
+        "x": 30,
+        "y": 270
+      },
+      "data": {
+        "file": "grunt2a.wav",
+        "weight": 1
+      }
+    },
+    {
+      "id": "n101",
+      "type": "Modulator",
+      "position": {
+        "x": 590,
+        "y": 150
+      },
+      "data": {
+        "volumeMin": 1,
+        "volumeMax": 1,
+        "pitchMin": -4.5,
+        "pitchMax": 3.5
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "e1",
+      "source": "w1",
+      "sourceHandle": "out",
+      "target": "rng",
+      "targetHandle": "in-0"
+    },
+    {
+      "id": "e2",
+      "source": "w2",
+      "sourceHandle": "out",
+      "target": "rng",
+      "targetHandle": "in-1"
+    },
+    {
+      "id": "e3",
+      "source": "w3",
+      "sourceHandle": "out",
+      "target": "rng",
+      "targetHandle": "in-2"
+    },
+    {
+      "id": "reactflow__edge-rngout-n101in",
+      "source": "rng",
+      "sourceHandle": "out",
+      "target": "n101",
+      "targetHandle": "in"
+    },
+    {
+      "id": "reactflow__edge-n101out-outin",
+      "source": "n101",
+      "sourceHandle": "out",
+      "target": "out",
+      "targetHandle": "in"
+    }
+  ]
+}

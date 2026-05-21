@@ -2,6 +2,7 @@
 #include "shrapnel.h"
 #include "overlay.h"
 #include "gasloader.h"
+#include "audio/soundcue.h"
 
 LaserProjectile::LaserProjectile() : Object(ObjectTypes::LASERPROJECTILE){
 	requiresauthority = true;
@@ -40,7 +41,8 @@ void LaserProjectile::Tick(World & world){
 	Uint8 life = (w && w->projectileLife) ? (Uint8)w->projectileLife : 10;
 	if(state_i == 1){
 		const std::string& sfx = w && !w->soundFire.empty() ? w->soundFire : "!laserel.wav";
-		EmitSound(world, world.resources.soundbank[sfx], 128);
+		auto _r = ResolveSound(sfx, world.resources);
+		if(_r.chunk) EmitSound(world, _r.chunk, static_cast<int>(128 * _r.volume));
 	}
 	if(state_i < 7){
 		res_index = state_i;
@@ -68,13 +70,9 @@ void LaserProjectile::Tick(World & world){
 				overlay->x = x;
 				overlay->y = y;
 				if(platform){
-					const std::string& h1 = w && !w->soundHit1.empty() ? w->soundHit1 : "strike03.wav";
-					const std::string& h2 = w && !w->soundHit2.empty() ? w->soundHit2 : "strike04.wav";
-					if(rand() % 2 == 0){
-						overlay->EmitSound(world, world.resources.soundbank[h1], 96);
-					}else{
-						overlay->EmitSound(world, world.resources.soundbank[h2], 96);
-					}
+					const std::string& hitSlot = w && !w->soundHit1.empty() ? w->soundHit1 : "strike03.wav";
+					auto _r = ResolveSound(hitSlot, world.resources);
+					if(_r.chunk) overlay->EmitSound(world, _r.chunk, static_cast<int>(96 * _r.volume));
 				}
 			}
 			float xn = 0, yn = 0;

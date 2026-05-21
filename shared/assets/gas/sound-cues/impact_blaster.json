@@ -1,0 +1,105 @@
+{
+  "id": "impact_blaster",
+  "nodes": [
+    {
+      "id": "out",
+      "type": "Output",
+      "position": {
+        "x": 870,
+        "y": 90
+      },
+      "data": {}
+    },
+    {
+      "id": "rng",
+      "type": "Random",
+      "position": {
+        "x": 310,
+        "y": 90
+      },
+      "data": {}
+    },
+    {
+      "id": "w1",
+      "type": "WavePlayer",
+      "position": {
+        "x": 30,
+        "y": 30
+      },
+      "data": {
+        "file": "strike03.wav",
+        "weight": 1
+      }
+    },
+    {
+      "id": "w2",
+      "type": "WavePlayer",
+      "position": {
+        "x": 30,
+        "y": 150
+      },
+      "data": {
+        "file": "strike04.wav",
+        "weight": 1
+      }
+    },
+    {
+      "id": "n104",
+      "type": "Modulator",
+      "position": {
+        "x": 590,
+        "y": 90
+      },
+      "data": {
+        "volumeMin": 1,
+        "volumeMax": 1,
+        "pitchMin": -4,
+        "pitchMax": 3
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "e1",
+      "source": "w1",
+      "sourceHandle": "out",
+      "target": "rng",
+      "targetHandle": "i0"
+    },
+    {
+      "id": "e2",
+      "source": "w2",
+      "sourceHandle": "out",
+      "target": "rng",
+      "targetHandle": "i1"
+    },
+    {
+      "id": "reactflow__edge-w1out-rngin-0",
+      "source": "w1",
+      "sourceHandle": "out",
+      "target": "rng",
+      "targetHandle": "in-0"
+    },
+    {
+      "id": "reactflow__edge-w2out-rngin-1",
+      "source": "w2",
+      "sourceHandle": "out",
+      "target": "rng",
+      "targetHandle": "in-1"
+    },
+    {
+      "id": "reactflow__edge-rngout-n104in",
+      "source": "rng",
+      "sourceHandle": "out",
+      "target": "n104",
+      "targetHandle": "in"
+    },
+    {
+      "id": "reactflow__edge-n104out-outin",
+      "source": "n104",
+      "sourceHandle": "out",
+      "target": "out",
+      "targetHandle": "in"
+    }
+  ]
+}

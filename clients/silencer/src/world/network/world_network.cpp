@@ -16,6 +16,7 @@
 #include "gasloader.h"
 #include "gamestateobject.h"
 #include "text_wrap.h"
+#include "audio/soundcue.h"
 #include <algorithm>
 
 #define DELTAENABLED 1
@@ -663,7 +664,8 @@ void WorldNetwork::DoNetwork_Replica(void){
 				if(peer){
 					Uint8 volume = data.data[data.BitsToBytes(data.readoffset)];
 					char * name = &data.data[data.BitsToBytes(data.readoffset) + 1];
-					Audio::GetInstance().Play(world.resources.soundbank[name], volume);
+					auto _r = ResolveSound(name, world.resources);
+					if(_r.chunk) Audio::GetInstance().Play(_r.chunk, static_cast<int>(volume * _r.volume));
 					//printf("World::MSG_SOUND %d %s\n", volume, name);
 				}
 			}break;

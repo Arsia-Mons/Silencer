@@ -1,0 +1,91 @@
+{
+  "id": "player_ladder",
+  "nodes": [
+    {
+      "id": "out",
+      "type": "Output",
+      "position": {
+        "x": 870,
+        "y": 90
+      },
+      "data": {}
+    },
+    {
+      "id": "w1",
+      "type": "WavePlayer",
+      "position": {
+        "x": 30,
+        "y": 30
+      },
+      "data": {
+        "file": "ladder1.wav",
+        "weight": 1
+      }
+    },
+    {
+      "id": "w2",
+      "type": "WavePlayer",
+      "position": {
+        "x": 30,
+        "y": 150
+      },
+      "data": {
+        "file": "ladder2.wav",
+        "weight": 1
+      }
+    },
+    {
+      "id": "n110",
+      "type": "Modulator",
+      "position": {
+        "x": 590,
+        "y": 90
+      },
+      "data": {
+        "volumeMin": 0.9,
+        "volumeMax": 1,
+        "pitchMin": -2.5,
+        "pitchMax": 3
+      }
+    },
+    {
+      "id": "n111",
+      "type": "Random",
+      "position": {
+        "x": 310,
+        "y": 90
+      },
+      "data": {}
+    }
+  ],
+  "edges": [
+    {
+      "id": "reactflow__edge-n110out-outin",
+      "source": "n110",
+      "sourceHandle": "out",
+      "target": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "reactflow__edge-n111out-n110in",
+      "source": "n111",
+      "sourceHandle": "out",
+      "target": "n110",
+      "targetHandle": "in"
+    },
+    {
+      "id": "reactflow__edge-w1out-n111in-0",
+      "source": "w1",
+      "sourceHandle": "out",
+      "target": "n111",
+      "targetHandle": "in-0"
+    },
+    {
+      "id": "reactflow__edge-w2out-n111in-1",
+      "source": "w2",
+      "sourceHandle": "out",
+      "target": "n111",
+      "targetHandle": "in-1"
+    }
+  ]
+}

@@ -22,7 +22,7 @@ public:
 	virtual void HandleHit(class World & world, Uint8 x, Uint8 y, class Object & projectile);
 	virtual void HandleInput(Input & input);
 	virtual void HandleDisconnect(World & world, Uint8 peerid);
-	int EmitSound(class World & world, Mix_Chunk * chunk, Uint8 volume = 128, bool loop = false);
+	int EmitSound(class World & world, Mix_Chunk * chunk, Uint8 volume = 128, bool loop = false, int maxInstances = 0);
 	// Play sound at full volume globally (no distance/occlusion attenuation).
 	int EmitGlobalSound(class World & world, Mix_Chunk * chunk, Uint8 volume = 128);
 	bool requiresauthority;

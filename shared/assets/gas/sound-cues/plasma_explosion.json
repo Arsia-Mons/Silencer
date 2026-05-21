@@ -1,0 +1,56 @@
+{
+  "id": "plasma_explosion",
+  "nodes": [
+    {
+      "id": "out",
+      "type": "Output",
+      "position": {
+        "x": 590,
+        "y": 30
+      },
+      "data": {}
+    },
+    {
+      "id": "w1",
+      "type": "WavePlayer",
+      "position": {
+        "x": 30,
+        "y": 30
+      },
+      "data": {
+        "file": "seekexp1.wav",
+        "weight": 1
+      }
+    },
+    {
+      "id": "n108",
+      "type": "Modulator",
+      "position": {
+        "x": 310,
+        "y": 30
+      },
+      "data": {
+        "volumeMin": 0.84,
+        "volumeMax": 1,
+        "pitchMin": -3,
+        "pitchMax": 2
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "reactflow__edge-w1out-n108in",
+      "source": "w1",
+      "sourceHandle": "out",
+      "target": "n108",
+      "targetHandle": "in"
+    },
+    {
+      "id": "reactflow__edge-n108out-outin",
+      "source": "n108",
+      "sourceHandle": "out",
+      "target": "out",
+      "targetHandle": "in"
+    }
+  ]
+}

@@ -8,6 +8,7 @@
 #include "rocketprojectile.h"
 #include "pickup.h"
 #include "gasloader.h"
+#include "audio/soundcue.h"
 #include "npc_math.h"
 #include <math.h>
 
@@ -61,14 +62,9 @@ void Guard::InitBT(){
 			  static const EnemyDef _def;
 			  if(world.tickcount - lastspoke > (Uint32)(_ag ? _ag->speakCooldownTicks : 240)){
 				lastspoke = world.tickcount;
-				const std::string* alerts[] = {
-					_ag ? &_ag->soundAlert1 : &_def.soundAlert1,
-					_ag ? &_ag->soundAlert2 : &_def.soundAlert2,
-					_ag ? &_ag->soundAlert3 : &_def.soundAlert3,
-					_ag ? &_ag->soundAlert4 : &_def.soundAlert4,
-					_ag ? &_ag->soundAlert5 : &_def.soundAlert5
-				};
-				EmitSound(world, world.resources.soundbank[*alerts[rand() % (int)(sizeof(alerts)/sizeof(alerts[0]))]], 128);
+				const std::string& alertSlot = _ag ? _ag->soundAlert : _def.soundAlert;
+				auto _r = ResolveSound(alertSlot, world.resources);
+				if(_r.chunk) EmitSound(world, _r.chunk, static_cast<int>(128 * _r.volume));
 			  }
 			}
 		} else {
@@ -770,14 +766,9 @@ void Guard::Tick(World & world){
 				  static const EnemyDef _def;
 				  if(world.tickcount - lastspoke > (Uint32)(_ag ? _ag->speakCooldownTicks : 240)){
 					lastspoke = world.tickcount;
-					const std::string* alerts[] = {
-						_ag ? &_ag->soundAlert1 : &_def.soundAlert1,
-						_ag ? &_ag->soundAlert2 : &_def.soundAlert2,
-						_ag ? &_ag->soundAlert3 : &_def.soundAlert3,
-						_ag ? &_ag->soundAlert4 : &_def.soundAlert4,
-						_ag ? &_ag->soundAlert5 : &_def.soundAlert5
-					};
-					EmitSound(world, world.resources.soundbank[*alerts[rand() % (int)(sizeof(alerts)/sizeof(alerts[0]))]], 128);
+					const std::string& alertSlot = _ag ? _ag->soundAlert : _def.soundAlert;
+					auto _r = ResolveSound(alertSlot, world.resources);
+					if(_r.chunk) EmitSound(world, _r.chunk, static_cast<int>(128 * _r.volume));
 				  }
 				}
 			}
@@ -1084,12 +1075,11 @@ void Guard::Tick(World & world){
 			if(state_i == 0){
 				const EnemyDef* gd = GASLoader::Get().GetEnemyDef(ActorDefName(weapon));
 				static const EnemyDef _ged;
-				const std::string* hurts[] = {
-					gd ? &gd->soundHurt1 : &_ged.soundHurt1,
-					gd ? &gd->soundHurt2 : &_ged.soundHurt2,
-					gd ? &gd->soundHurt3 : &_ged.soundHurt3
-				};
-				EmitSound(world, world.resources.soundbank[*hurts[rand() % (int)(sizeof(hurts)/sizeof(hurts[0]))]], 128);
+				const std::string& hurtSlot = gd ? gd->soundHurt : _ged.soundHurt;
+				if(!hurtSlot.empty()){
+					auto r = ResolveSound(hurtSlot, world.resources);
+					if(r.chunk) EmitSound(world, r.chunk, static_cast<int>(128 * r.volume));
+				}
 			}
 			collidable = false;
 			if(state_i >= 10){

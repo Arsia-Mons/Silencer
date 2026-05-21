@@ -1,8 +1,8 @@
 // Module-level singleton — survives client-side navigation.
-// Holds the sound list and refs so navigating back to Sound Studio
-// skips the API reload and the "upload sound.bin" prompt.
+// Holds sound list, refs, and the parsed sound.bin so navigating back to
+// Sound Studio restores state without re-picking the folder.
 
-interface SoundEntry {
+export interface SoundEntry {
   name: string;
   storedLength: number | null;
   adpcmBytes: number | null;
@@ -13,7 +13,7 @@ interface SoundEntry {
   pendingRenameTo: string | null;
 }
 
-interface SoundRef {
+export interface SoundRef {
   inBin: boolean;
   cpp: boolean;
   actordefs: string[];
@@ -25,9 +25,23 @@ interface SoundRef {
   soundSet: string | null;
 }
 
+export interface ParsedBinEntry {
+  name: string;
+  offset: number;
+  storedLength: number;
+}
+
+export interface StoredParsedBin {
+  entries: ParsedBinEntry[];
+  buf: ArrayBuffer;
+  dataBase: number;
+}
+
 interface SoundStudioData {
+  folderName: string;
   sounds: SoundEntry[];
   refs: Record<string, SoundRef>;
+  parsedBin: StoredParsedBin | null;
 }
 
 let _data: SoundStudioData | null = null;
@@ -39,3 +53,5 @@ export function get(): SoundStudioData | null { return _data; }
 export function set(data: SoundStudioData): void { _data = data; }
 
 export function clear(): void { _data = null; }
+
+export function getFolderName(): string | null { return _data?.folderName ?? null; }
