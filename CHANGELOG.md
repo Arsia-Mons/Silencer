@@ -6,6 +6,16 @@ All notable changes to Silencer are documented here.
 
 ### Game client
 
+#### Sound Cue system (#223)
+
+- Visual node-based cue editor in Sound Studio (admin web): Random, Sequence, Modulator, Delay, and Concatenate nodes with wiring, volume/pitch controls, and live preview.
+- Download All Cues button — exports all cue JSON files as a zip via fflate.
+- All game sounds migrated from raw soundbank arrays to cue JSON files: weapon/projectile fire and hit sounds, NPC alert/hurt/death/melee sounds, player action sounds (roll, reload, pickup, repair, powerup, disguise, jack in/out, undeploy, jetpack, weapon charged, security pass, breath), impact sounds, footsteps, ambient object sounds (door, station, grenade), and UI sounds.
+- Random nodes replace all manual `rand()` array picks in C++; GAS fields consolidated (e.g. `soundAlert1-5` → `soundAlert`).
+- `world_messaging` and `world_network` support `cue:` prefixed sound names sent from the server.
+- Audio stacking fix: `Audio::PlayUI()` uses a dedicated interrupt channel (127) with a 30 ms per-chunk cooldown to prevent UI hover sounds from stacking and clipping. `Audio::Play()` gains an optional `maxInstances` cap that interrupts the oldest playing instance of a chunk instead of spawning unbounded copies.
+- Map select list now plays the UI sound once per newly hovered row.
+
 #### World subsystem class extraction — phase 2 (#216)
 
 - `World` decomposed into 5 owned subsystem classes, each with its own `.h` + `.cpp` in `src/world/`: `WorldObjectRegistry`, `WorldMessaging`, `WorldNetwork`, `WorldPeerRegistry`, `WorldReplication`.
