@@ -1854,7 +1854,7 @@ void Player::Tick(World & world){
 			}
 			////
 			
-			{ auto _r = ResolveSound(GASLoader::Get().player.soundPickup, world.resources); if (_r.chunk) EmitSound(world, _r.chunk, static_cast<int>(96 * _r.volume)); };
+			{ auto _r = ResolveSound(GASLoader::Get().player.soundPickup, world.resources); if (_r.chunk) EmitSound(world, _r.chunk, static_cast<int>(96 * _r.volume), false, 2); };
 			yv = v;
 			xv2 = xv;
 			yv2 = yv;
@@ -2461,7 +2461,7 @@ void Player::Tick(World & world){
 			res_bank = 199;
 			res_index = state_i / 2;
 			if(state_i == 2){
-				{ auto _r = ResolveSound(GASLoader::Get().player.soundRepair, world.resources); if (_r.chunk) EmitSound(world, _r.chunk, static_cast<int>(128 * _r.volume)); };
+				{ auto _r = ResolveSound(GASLoader::Get().player.soundRepair, world.resources); if (_r.chunk) EmitSound(world, _r.chunk, static_cast<int>(128 * _r.volume), false, 2); };
 			}
 			if(state_i >= 27 * 2){
 				health = maxhealth;
@@ -3401,7 +3401,7 @@ bool Player::BuyItem(World & world, Uint8 id){
 			}break;
 		}
 		if(bought){
-			{ auto _r = ResolveSound(GASLoader::Get().player.soundReload, world.resources); if (_r.chunk) EmitSound(world, _r.chunk, static_cast<int>(96 * _r.volume)); };
+			{ auto _r = ResolveSound(GASLoader::Get().player.soundReload, world.resources); if (_r.chunk) EmitSound(world, _r.chunk, static_cast<int>(96 * _r.volume), false, 2); };
 			world.BuyItem(id);
 			Peer * peer = GetPeer(world);
 			if(peer) peer->stats.creditsspent += buyableitem->price;
@@ -3432,7 +3432,7 @@ bool Player::RepairItem(World & world, Uint8 id){
 			}
 			
 			team->disabledtech &= ~(buyableitem->techchoice);
-			{ auto _r = ResolveSound(GASLoader::Get().player.soundReload, world.resources); if (_r.chunk) EmitSound(world, _r.chunk, static_cast<int>(96 * _r.volume)); };
+			{ auto _r = ResolveSound(GASLoader::Get().player.soundReload, world.resources); if (_r.chunk) EmitSound(world, _r.chunk, static_cast<int>(96 * _r.volume), false, 2); };
 			world.RepairItem(id);
 			Peer * peer = GetPeer(world);
 			if(peer) peer->stats.creditsspent += buyableitem->repairprice;
@@ -3465,7 +3465,7 @@ bool Player::VirusItem(World & world, Uint8 id){
 				}
 				
 				team->disabledtech |= buyableitem->techchoice;
-				{ auto _r = ResolveSound(GASLoader::Get().player.soundReload, world.resources); if (_r.chunk) EmitSound(world, _r.chunk, static_cast<int>(96 * _r.volume)); };
+				{ auto _r = ResolveSound(GASLoader::Get().player.soundReload, world.resources); if (_r.chunk) EmitSound(world, _r.chunk, static_cast<int>(96 * _r.volume), false, 2); };
 				world.VirusItem(id);
 				RemoveInventoryItem(INV_VIRUS);
 				return true;
@@ -4290,7 +4290,7 @@ bool Player::PickUpItem(World & world, PickUp & pickup){
 			}
 			effecthacking = true;
 			effecthackingcontinue = 5;
-			{ auto _r = ResolveSound(GASLoader::Get().player.soundPowerUp, world.resources); if (_r.chunk) EmitSound(world, _r.chunk, static_cast<int>(64 * _r.volume)); };
+			{ auto _r = ResolveSound(GASLoader::Get().player.soundPowerUp, world.resources); if (_r.chunk) EmitSound(world, _r.chunk, static_cast<int>(64 * _r.volume), false, 2); };
 		}break;
 		case PickUp::LASERAMMO:{
 			laserammo += pickup.quantity;
@@ -4305,7 +4305,7 @@ bool Player::PickUpItem(World & world, PickUp & pickup){
 				sprintf(temp, "Picked up %d Laser ammo", pickup.quantity);
 				world.ShowStatus(temp);
 			}
-			{ auto _r = ResolveSound(GASLoader::Get().player.soundReload, world.resources); if (_r.chunk) EmitSound(world, _r.chunk, static_cast<int>(96 * _r.volume)); };
+			{ auto _r = ResolveSound(GASLoader::Get().player.soundReload, world.resources); if (_r.chunk) EmitSound(world, _r.chunk, static_cast<int>(96 * _r.volume), false, 2); };
 		}break;
 		case PickUp::ROCKETAMMO:{
 			rocketammo += pickup.quantity;
@@ -4320,7 +4320,7 @@ bool Player::PickUpItem(World & world, PickUp & pickup){
 				sprintf(temp, "Picked up %d Rocket ammo", pickup.quantity);
 				world.ShowStatus(temp);
 			}
-			{ auto _r = ResolveSound(GASLoader::Get().player.soundReload, world.resources); if (_r.chunk) EmitSound(world, _r.chunk, static_cast<int>(96 * _r.volume)); };
+			{ auto _r = ResolveSound(GASLoader::Get().player.soundReload, world.resources); if (_r.chunk) EmitSound(world, _r.chunk, static_cast<int>(96 * _r.volume), false, 2); };
 		}break;
 		case PickUp::FLAMERAMMO:{
 			flamerammo += pickup.quantity;
@@ -4335,7 +4335,7 @@ bool Player::PickUpItem(World & world, PickUp & pickup){
 				sprintf(temp, "Picked up %d Flamer ammo", pickup.quantity);
 				world.ShowStatus(temp);
 			}
-			{ auto _r = ResolveSound(GASLoader::Get().player.soundReload, world.resources); if (_r.chunk) EmitSound(world, _r.chunk, static_cast<int>(96 * _r.volume)); };
+			{ auto _r = ResolveSound(GASLoader::Get().player.soundReload, world.resources); if (_r.chunk) EmitSound(world, _r.chunk, static_cast<int>(96 * _r.volume), false, 2); };
 		}break;
 		case PickUp::NEUTRONBOMB:{
 			if(!pickup.powerup){
@@ -4384,7 +4384,7 @@ bool Player::PickUpItem(World & world, PickUp & pickup){
 			}
 		}
 		if(added){
-			{ auto _r = ResolveSound(GASLoader::Get().player.soundReload, world.resources); if (_r.chunk) EmitSound(world, _r.chunk, static_cast<int>(96 * _r.volume)); };
+			{ auto _r = ResolveSound(GASLoader::Get().player.soundReload, world.resources); if (_r.chunk) EmitSound(world, _r.chunk, static_cast<int>(96 * _r.volume), false, 2); };
 			if(islocalplayer){
 				char temp[256];
 				sprintf(temp, "Picked up %d %s", pickup.quantity, invname);
@@ -4452,7 +4452,7 @@ bool Player::PickUpItem(World & world, PickUp & pickup){
 				sprintf(temp, "%s", powerupname);
 				world.ShowStatus(temp);
 			}
-			{ auto _r = ResolveSound(GASLoader::Get().player.soundPowerUp, world.resources); if (_r.chunk) EmitSound(world, _r.chunk, static_cast<int>(96 * _r.volume)); };
+			{ auto _r = ResolveSound(GASLoader::Get().player.soundPowerUp, world.resources); if (_r.chunk) EmitSound(world, _r.chunk, static_cast<int>(96 * _r.volume), false, 2); };
 		}
 		/*	pickup.draw = false;
 			pickup.quantity = pickup.poweruprespawntime;
