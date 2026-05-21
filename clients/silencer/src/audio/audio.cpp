@@ -140,8 +140,9 @@ int Audio::PlayUI(MIX_Audio * chunk, int volume){
 	if(it != uiLastPlayed.end() && (now - it->second) < (Uint64)uiCooldownMs)
 		return -1;
 	uiLastPlayed[chunk] = now;
-	// Interrupt any sound currently on the UI channel.
-	if(MIX_TrackPlaying(tracks[uiChannel])) MIX_StopTrack(tracks[uiChannel], 0);
+	// Don't hard-stop the previous sound — that causes an audible click/pop.
+	// The cooldown above already prevents stacking; just let the old sound finish.
+	if(MIX_TrackPlaying(tracks[uiChannel])) return uiChannel;
 	occlusionCache[uiChannel] = 1.0f;
 	filterAlpha[uiChannel]    = 1.0f;
 	filterState[uiChannel][0] = filterState[uiChannel][1] =
