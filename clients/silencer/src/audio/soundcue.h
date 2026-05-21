@@ -29,6 +29,10 @@ struct SoundCueNode {
         Delay,
         Volume,
         Pitch,
+        Modulator,    // randomizes volume + pitch per trigger
+        Concatenator, // plays inputs sequentially
+        Looping,      // repeats input N times or forever
+        Branch,       // picks input based on named bool param
         Output,
     };
 
@@ -39,7 +43,7 @@ struct SoundCueNode {
     std::string file;
     float weight = 1.0f;
 
-    // Random / Sequence / Mixer: list of input node ids (in port order)
+    // Input node ids (in port order).
     std::vector<std::string> inputs;
 
     // Sequence
@@ -57,6 +61,19 @@ struct SoundCueNode {
 
     // Pitch
     float semitones = 0.0f;
+
+    // Modulator
+    float volumeMin = 1.0f;
+    float volumeMax = 1.0f;
+    float pitchMin = 0.0f; // semitones
+    float pitchMax = 0.0f; // semitones
+
+    // Looping
+    int loopCount = 0; // 0 = indefinite
+    bool loopIndefinite = false;
+
+    // Branch (inputs[0] = false, inputs[1] = true)
+    std::string paramName;
 };
 
 // ---------------------------------------------------------------------------
@@ -71,20 +88,22 @@ public:
     std::unordered_map<std::string, SoundCueNode> nodes;
     std::string outputNodeId;
 
-    // Evaluate the graph. seqCounters tracks round-robin state per Sequence
-    // node id and must persist across calls (owned by SoundCueLibrary per cue).
-    // randomLastPick tracks the last chosen input index per Random node (no-repeat).
+    // Evaluate the graph. seqCounters tracks round-robin state per Sequence/
+    // Concatenator node id and must persist across calls (owned by SoundCueLibrary
+    // per cue). randomLastPick tracks the last chosen input index per Random node.
     SoundCueResult Evaluate(
         Resources& res,
         std::unordered_map<std::string, int>& seqCounters,
-        std::unordered_map<std::string, int>& randomLastPick) const;
+        std::unordered_map<std::string, int>& randomLastPick,
+        const std::unordered_map<std::string, bool>& params = {}) const;
 
 private:
     SoundCueResult EvalNode(
         const std::string& nodeId,
         Resources& res,
         std::unordered_map<std::string, int>& seqCounters,
-        std::unordered_map<std::string, int>& randomLastPick) const;
+        std::unordered_map<std::string, int>& randomLastPick,
+        const std::unordered_map<std::string, bool>& params) const;
 };
 
 // ---------------------------------------------------------------------------

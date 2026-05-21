@@ -37,25 +37,33 @@ const C = {
 };
 
 const NODE_COLORS: Record<string, string> = {
-  WavePlayer: '#005b1c',
-  Random:     '#006b35',
-  Sequence:   '#1a5c3a',
-  Mixer:      '#2a5c1a',
-  Delay:      '#005b40',
-  Volume:     '#1a5c10',
-  Pitch:      '#3a5c05',
-  Output:     '#00a328',
+  WavePlayer:   '#005b1c',
+  Random:       '#006b35',
+  Sequence:     '#1a5c3a',
+  Mixer:        '#2a5c1a',
+  Delay:        '#005b40',
+  Volume:       '#1a5c10',
+  Pitch:        '#3a5c05',
+  Modulator:    '#7a4a0a',
+  Concatenator: '#0a4a7a',
+  Looping:      '#4a0a7a',
+  Branch:       '#4a4a0a',
+  Output:       '#00a328',
 };
 
 const NODE_LABELS: Record<string, string> = {
-  WavePlayer: 'Wave Player',
-  Random:     'Random',
-  Sequence:   'Sequence',
-  Mixer:      'Mixer',
-  Delay:      'Delay',
-  Volume:     'Volume',
-  Pitch:      'Pitch',
-  Output:     'Output',
+  WavePlayer:   'Wave Player',
+  Random:       'Random',
+  Sequence:     'Sequence',
+  Mixer:        'Mixer',
+  Delay:        'Delay',
+  Volume:       'Volume',
+  Pitch:        'Pitch',
+  Modulator:    'MODULATOR',
+  Concatenator: 'CONCAT',
+  Looping:      'LOOP',
+  Branch:       'BRANCH',
+  Output:       'Output',
 };
 
 const SEL_STYLE: React.CSSProperties = {
@@ -137,12 +145,32 @@ function downloadCueFile(cue: SoundCue): void {
   URL.revokeObjectURL(url);
 }
 
-function NodeShell({ type, children, hasInput = true, hasOutput = true, selected = false }:
-  { type: string; children?: React.ReactNode; hasInput?: boolean; hasOutput?: boolean; selected?: boolean }) {
+function NodeShell({
+  type,
+  children,
+  hasInput = true,
+  hasOutput = true,
+  selected = false,
+  inputs = 1,
+  inputLabels,
+}: {
+  type: string;
+  children?: React.ReactNode;
+  hasInput?: boolean;
+  hasOutput?: boolean;
+  selected?: boolean;
+  inputs?: number;
+  inputLabels?: string[];
+}) {
+  const inputCount = hasInput ? Math.max(1, inputs) : 0;
+  const multiInput = inputCount > 1;
+  const baseTop = 36;
+  const spacing = 24;
+
   return (
     <div style={{
       background: C.card, border: `2px solid ${NODE_COLORS[type] ?? C.muted}`,
-      borderRadius: 6, minWidth: 180, fontSize: 12, color: C.text,
+      borderRadius: 6, minWidth: 180, fontSize: 12, color: C.text, position: 'relative',
       ...(selected ? SEL_STYLE : {}),
     }}>
       <div style={{
@@ -151,9 +179,43 @@ function NodeShell({ type, children, hasInput = true, hasOutput = true, selected
       }}>
         {NODE_LABELS[type] ?? type}
       </div>
-      {hasInput  && <Handle type="target" position={Position.Left}  id="in"  style={{ background: C.light, border: '1px solid #fff' }} />}
+      {hasInput && !multiInput && (
+        <Handle type="target" position={Position.Left} id="in" style={{ background: C.light, border: '1px solid #fff' }} />
+      )}
+      {hasInput && multiInput && Array.from({ length: inputCount }, (_, i) => (
+        <div key={i}>
+          <Handle
+            type="target"
+            position={Position.Left}
+            id={`in-${i}`}
+            style={{ top: baseTop + i * spacing, background: C.light, border: '1px solid #fff' }}
+          />
+          {inputLabels?.[i] && (
+            <div style={{
+              position: 'absolute',
+              top: baseTop + i * spacing - 8,
+              left: 12,
+              color: C.dim,
+              fontSize: 9,
+              fontWeight: 700,
+              letterSpacing: 0.4,
+              pointerEvents: 'none',
+            }}>
+              {inputLabels[i]}
+            </div>
+          )}
+        </div>
+      ))}
       {hasOutput && <Handle type="source" position={Position.Right} id="out" style={{ background: C.primary, border: '1px solid #fff' }} />}
-      {children && <div style={{ padding: '6px 10px' }}>{children}</div>}
+      {children && (
+        <div style={{
+          padding: '6px 10px',
+          paddingLeft: multiInput && inputLabels?.length ? 48 : 10,
+          minHeight: multiInput ? (inputCount - 1) * spacing + 18 : undefined,
+        }}>
+          {children}
+        </div>
+      )}
     </div>
   );
 }
@@ -285,9 +347,10 @@ function MultiInputNode({ data, id, type, selected }: NodeProps & { type: string
   );
 }
 
-function RandomNode(props: NodeProps)   { return <MultiInputNode {...props} type="Random" />; }
-function SequenceNode(props: NodeProps) { return <MultiInputNode {...props} type="Sequence" />; }
-function MixerNode(props: NodeProps)    { return <MultiInputNode {...props} type="Mixer" />; }
+function RandomNode(props: NodeProps)       { return <MultiInputNode {...props} type="Random" />; }
+function SequenceNode(props: NodeProps)     { return <MultiInputNode {...props} type="Sequence" />; }
+function MixerNode(props: NodeProps)        { return <MultiInputNode {...props} type="Mixer" />; }
+function ConcatenatorNode(props: NodeProps) { return <MultiInputNode {...props} type="Concatenator" />; }
 
 function DelayNode({ data, id, selected }: NodeProps) {
   const { setNodes } = useReactFlow();
@@ -362,6 +425,140 @@ function PitchNode({ data, id, selected }: NodeProps) {
   );
 }
 
+function ModulatorNode({ data, id, selected }: NodeProps) {
+  const { setNodes } = useReactFlow();
+
+  function setField(key: string, val: number) {
+    setNodes(nds => nds.map(n => n.id !== id ? n : { ...n, data: { ...n.data, [key]: val } }));
+  }
+
+  return (
+    <NodeShell type="Modulator" selected={selected} inputs={1}>
+      <div style={{ fontSize: 11, color: C.dim, marginBottom: 4 }}>Volume</div>
+      <div style={{ display: 'flex', gap: 4, alignItems: 'center', marginBottom: 4 }}>
+        <span style={{ color: C.dim, fontSize: 10, width: 24 }}>min</span>
+        <input
+          type="range"
+          min={0}
+          max={2}
+          step={0.01}
+          value={data.volumeMin ?? 1}
+          className="nodrag"
+          onPointerDown={e => e.stopPropagation()}
+          onChange={e => setField('volumeMin', parseFloat(e.target.value))}
+          style={{ flex: 1 }}
+        />
+        <span style={{ color: C.text, fontSize: 10, width: 28 }}>{(data.volumeMin ?? 1).toFixed(2)}</span>
+      </div>
+      <div style={{ display: 'flex', gap: 4, alignItems: 'center', marginBottom: 8 }}>
+        <span style={{ color: C.dim, fontSize: 10, width: 24 }}>max</span>
+        <input
+          type="range"
+          min={0}
+          max={2}
+          step={0.01}
+          value={data.volumeMax ?? 1}
+          className="nodrag"
+          onPointerDown={e => e.stopPropagation()}
+          onChange={e => setField('volumeMax', parseFloat(e.target.value))}
+          style={{ flex: 1 }}
+        />
+        <span style={{ color: C.text, fontSize: 10, width: 28 }}>{(data.volumeMax ?? 1).toFixed(2)}</span>
+      </div>
+      <div style={{ fontSize: 11, color: C.dim, marginBottom: 4 }}>Pitch (semitones)</div>
+      <div style={{ display: 'flex', gap: 4, alignItems: 'center', marginBottom: 4 }}>
+        <span style={{ color: C.dim, fontSize: 10, width: 24 }}>min</span>
+        <input
+          type="range"
+          min={-24}
+          max={24}
+          step={0.5}
+          value={data.pitchMin ?? 0}
+          className="nodrag"
+          onPointerDown={e => e.stopPropagation()}
+          onChange={e => setField('pitchMin', parseFloat(e.target.value))}
+          style={{ flex: 1 }}
+        />
+        <span style={{ color: C.text, fontSize: 10, width: 28 }}>{(data.pitchMin ?? 0).toFixed(1)}</span>
+      </div>
+      <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+        <span style={{ color: C.dim, fontSize: 10, width: 24 }}>max</span>
+        <input
+          type="range"
+          min={-24}
+          max={24}
+          step={0.5}
+          value={data.pitchMax ?? 0}
+          className="nodrag"
+          onPointerDown={e => e.stopPropagation()}
+          onChange={e => setField('pitchMax', parseFloat(e.target.value))}
+          style={{ flex: 1 }}
+        />
+        <span style={{ color: C.text, fontSize: 10, width: 28 }}>{(data.pitchMax ?? 0).toFixed(1)}</span>
+      </div>
+    </NodeShell>
+  );
+}
+
+function LoopingNode({ data, id, selected }: NodeProps) {
+  const { setNodes } = useReactFlow();
+
+  function setField(key: string, val: number | boolean) {
+    setNodes(nds => nds.map(n => n.id !== id ? n : { ...n, data: { ...n.data, [key]: val } }));
+  }
+
+  return (
+    <NodeShell type="Looping" selected={selected} inputs={1}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+        <label style={{ color: C.dim, fontSize: 10 }}>Indefinite</label>
+        <input
+          type="checkbox"
+          checked={data.loopIndefinite ?? false}
+          className="nodrag"
+          onPointerDown={e => e.stopPropagation()}
+          onChange={e => setField('loopIndefinite', e.target.checked)}
+        />
+      </div>
+      {!(data.loopIndefinite ?? false) && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <label style={{ color: C.dim, fontSize: 10 }}>Count</label>
+          <input
+            type="number"
+            min={1}
+            max={100}
+            value={data.loopCount ?? 2}
+            className="nodrag"
+            onPointerDown={e => e.stopPropagation()}
+            onChange={e => setField('loopCount', Math.max(1, parseInt(e.target.value) || 1))}
+            style={{ width: 48, background: C.bg, color: C.text, border: `1px solid ${C.border}`, borderRadius: 3, padding: '2px 4px', fontSize: 11 }}
+          />
+        </div>
+      )}
+    </NodeShell>
+  );
+}
+
+function BranchNode({ data, id, selected }: NodeProps) {
+  const { setNodes } = useReactFlow();
+
+  return (
+    <NodeShell type="Branch" selected={selected} inputs={2} inputLabels={['FALSE', 'TRUE']}>
+      <div style={{ marginTop: 4 }}>
+        <div style={{ fontSize: 10, color: C.dim, marginBottom: 2 }}>Param name</div>
+        <input
+          type="text"
+          placeholder="e.g. is_crouching"
+          value={data.paramName ?? ''}
+          className="nodrag"
+          onPointerDown={e => e.stopPropagation()}
+          onChange={e => setNodes(nds => nds.map(n => n.id !== id ? n : { ...n, data: { ...n.data, paramName: e.target.value } }))}
+          style={{ width: '100%', background: C.bg, color: C.text, border: `1px solid ${C.border}`, borderRadius: 3, padding: '2px 4px', fontSize: 11, boxSizing: 'border-box' }}
+        />
+      </div>
+    </NodeShell>
+  );
+}
+
 function OutputNode({ selected }: NodeProps) {
   return (
     <div style={{
@@ -377,14 +574,18 @@ function OutputNode({ selected }: NodeProps) {
 }
 
 const NODE_TYPES = {
-  WavePlayer: WavePlayerNode,
-  Random:     RandomNode,
-  Sequence:   SequenceNode,
-  Mixer:      MixerNode,
-  Delay:      DelayNode,
-  Volume:     VolumeNode,
-  Pitch:      PitchNode,
-  Output:     OutputNode,
+  WavePlayer:   WavePlayerNode,
+  Random:       RandomNode,
+  Sequence:     SequenceNode,
+  Mixer:        MixerNode,
+  Delay:        DelayNode,
+  Volume:       VolumeNode,
+  Pitch:        PitchNode,
+  Modulator:    ModulatorNode,
+  Concatenator: ConcatenatorNode,
+  Looping:      LoopingNode,
+  Branch:       BranchNode,
+  Output:       OutputNode,
 };
 
 function cueToFlow(cue: SoundCue): { nodes: Node[]; edges: Edge[] } {
@@ -408,12 +609,55 @@ function cueToFlow(cue: SoundCue): { nodes: Node[]; edges: Edge[] } {
 function flowToCue(id: string, nodes: Node[], edges: Edge[]): SoundCue {
   return {
     id,
-    nodes: nodes.map(n => ({
-      id: n.id, type: n.type as CueNode['type'], position: n.position,
-      data: Object.fromEntries(
-        Object.entries(n.data as CueNodeData).filter(([key]) => key !== '_inputCount')
-      ) as CueNodeData,
-    })),
+    nodes: nodes.map(node => {
+      const type = node.type as CueNode['type'];
+      const n: CueNode = {
+        id: node.id,
+        type,
+        position: node.position,
+        data: {},
+      };
+
+      switch (type) {
+        case 'WavePlayer':
+          n.data = { file: node.data.file ?? '', weight: node.data.weight ?? 1 };
+          break;
+        case 'Sequence':
+          n.data = { shuffle: node.data.shuffle ?? false };
+          break;
+        case 'Mixer':
+          n.data = { mixerVolumes: [...(node.data.mixerVolumes ?? [])] };
+          break;
+        case 'Delay':
+          n.data = { minSec: node.data.minSec ?? 0, maxSec: node.data.maxSec ?? 0.1 };
+          break;
+        case 'Volume':
+          n.data = { scalar: node.data.scalar ?? 1 };
+          break;
+        case 'Pitch':
+          n.data = { semitones: node.data.semitones ?? 0 };
+          break;
+        case 'Modulator':
+          n.data = {
+            volumeMin: node.data.volumeMin ?? 1,
+            volumeMax: node.data.volumeMax ?? 1,
+            pitchMin: node.data.pitchMin ?? 0,
+            pitchMax: node.data.pitchMax ?? 0,
+          };
+          break;
+        case 'Looping':
+          n.data = { loopCount: node.data.loopCount ?? 2, loopIndefinite: node.data.loopIndefinite ?? false };
+          break;
+        case 'Branch':
+          n.data = { paramName: node.data.paramName ?? '' };
+          break;
+        default:
+          n.data = {};
+          break;
+      }
+
+      return n;
+    }),
     edges: edges.map(e => ({
       id: e.id, source: e.source, sourceHandle: e.sourceHandle ?? 'out',
       target: e.target, targetHandle: e.targetHandle ?? 'in',
@@ -443,7 +687,8 @@ function evalCue(cue: SoundCue): { file: string | null; path: string[]; semitone
       .map(e => e.source);
 
     switch (n.type) {
-      case 'WavePlayer': return { file: n.data.file ?? null, semitones: 0, volume: 1, delaySec: 0 };
+      case 'WavePlayer':
+        return { file: n.data.file ?? null, semitones: 0, volume: 1, delaySec: 0 };
       case 'Random': {
         if (!inputs.length) return { file: null, semitones: 0, volume: 1, delaySec: 0 };
         const weights = inputs.map((inp, i) => {
@@ -455,7 +700,10 @@ function evalCue(cue: SoundCue): { file: string | null; path: string[]; semitone
         let draw = Math.random() * total;
         for (let i = 0; i < inputs.length; i++) {
           draw -= weights[i];
-          if (draw < 0) { randomLastPick[id] = i; return evalNode(inputs[i]); }
+          if (draw < 0) {
+            randomLastPick[id] = i;
+            return evalNode(inputs[i]);
+          }
         }
         const last = inputs.length - 1;
         randomLastPick[id] = last;
@@ -467,6 +715,8 @@ function evalCue(cue: SoundCue): { file: string | null; path: string[]; semitone
         seqCounters[id] = idx + 1;
         return evalNode(inputs[idx]);
       }
+      case 'Concatenator':
+        return inputs.length ? evalNode(inputs[0]) : { file: null, semitones: 0, volume: 1, delaySec: 0 };
       case 'Mixer':
       case 'Output':
         return inputs.length ? evalNode(inputs[0]) : { file: null, semitones: 0, volume: 1, delaySec: 0 };
@@ -484,6 +734,24 @@ function evalCue(cue: SoundCue): { file: string | null; path: string[]; semitone
         const max = n.data.maxSec ?? 0;
         return { ...r, delaySec: r.delaySec + min + Math.random() * Math.max(0, max - min) };
       }
+      case 'Modulator': {
+        if (!inputs.length) return { file: null, semitones: 0, volume: 1, delaySec: 0 };
+        const r = evalNode(inputs[0]);
+        const frand = (lo: number, hi: number): number => (hi <= lo ? lo : lo + Math.random() * (hi - lo));
+        const vMin = n.data.volumeMin ?? 1;
+        const vMax = n.data.volumeMax ?? 1;
+        const pMin = n.data.pitchMin ?? 0;
+        const pMax = n.data.pitchMax ?? 0;
+        return {
+          ...r,
+          volume: r.volume * frand(vMin, vMax),
+          semitones: r.semitones + frand(pMin, pMax),
+        };
+      }
+      case 'Looping':
+        return inputs.length ? evalNode(inputs[0]) : { file: null, semitones: 0, volume: 1, delaySec: 0 };
+      case 'Branch':
+        return inputs.length >= 2 ? evalNode(inputs[0]) : { file: null, semitones: 0, volume: 1, delaySec: 0 };
     }
 
     return { file: null, semitones: 0, volume: 1, delaySec: 0 };
@@ -498,25 +766,30 @@ let _nodeCounter = 100;
 function makeNode(type: CueNode['type'], position?: { x: number; y: number }): Node {
   const defaults: CueNodeData = (() => {
     switch (type) {
-      case 'WavePlayer': return { file: '', weight: 1 };
-      case 'Sequence':   return { shuffle: false };
-      case 'Mixer':      return { mixerVolumes: [1, 1] };
-      case 'Delay':      return { minSec: 0, maxSec: 0.1 };
-      case 'Volume':     return { scalar: 1 };
-      case 'Pitch':      return { semitones: 0 };
-      default:           return {};
+      case 'WavePlayer':   return { file: '', weight: 1 };
+      case 'Sequence':     return { shuffle: false };
+      case 'Mixer':        return { mixerVolumes: [1, 1] };
+      case 'Delay':        return { minSec: 0, maxSec: 0.1 };
+      case 'Volume':       return { scalar: 1 };
+      case 'Pitch':        return { semitones: 0 };
+      case 'Modulator':    return { volumeMin: 1, volumeMax: 1, pitchMin: 0, pitchMax: 0 };
+      case 'Looping':      return { loopCount: 2, loopIndefinite: false };
+      case 'Branch':       return { paramName: '' };
+      default:             return {};
     }
   })();
+  const needsInputCount = new Set<CueNode['type']>(['Random', 'Sequence', 'Mixer', 'Concatenator']);
   return {
     id: `n${_nodeCounter++}`,
     type,
     position: position ?? { x: 200 + Math.random() * 120, y: 80 + Math.random() * 200 },
-    data: { ...defaults, _inputCount: 2 },
+    data: needsInputCount.has(type) ? { ...defaults, _inputCount: 2 } : defaults,
   };
 }
 
 const NODE_TYPE_LIST: CueNode['type'][] = [
   'WavePlayer', 'Random', 'Sequence', 'Mixer', 'Delay', 'Volume', 'Pitch',
+  'Modulator', 'Concatenator', 'Looping', 'Branch',
 ];
 
 function CtxItem({ label, shortcut, onClick, danger = false, disabled = false }: {
@@ -546,10 +819,10 @@ function CtxSep() {
 
 
 export function isValidConnection(conn: Connection, nodes: Node[], edges: Edge[]): boolean {
-  const singleInput = new Set(['Output', 'Delay', 'Volume', 'Pitch']);
+  const fixedInputs = new Set(['Output', 'Delay', 'Volume', 'Pitch', 'Modulator', 'Looping', 'Branch']);
   const targetNode = nodes.find(n => n.id === conn.target);
   if (!targetNode) return false;
-  if (singleInput.has(targetNode.type ?? '')) {
+  if (fixedInputs.has(targetNode.type ?? '')) {
     const handle = conn.targetHandle ?? 'in';
     if (edges.some(e => e.target === conn.target && (e.targetHandle ?? 'in') === handle)) return false;
   }

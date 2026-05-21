@@ -44,10 +44,13 @@ void SoundCueLibrary::Load(const std::string& dir, Resources& /*res*/) {
 // ---------------------------------------------------------------------------
 // Evaluate
 // ---------------------------------------------------------------------------
-SoundCueResult SoundCueLibrary::Evaluate(const std::string& cueId, Resources& res) {
+SoundCueResult SoundCueLibrary::Evaluate(
+    const std::string& cueId,
+    Resources& res,
+    const std::unordered_map<std::string, bool>& params) {
     auto it = cues_.find(cueId);
     if (it == cues_.end()) return {};
-    return it->second.Evaluate(res, seqCounters_[cueId], randomLastPick_[cueId]);
+    return it->second.Evaluate(res, seqCounters_[cueId], randomLastPick_[cueId], params);
 }
 
 // ---------------------------------------------------------------------------
@@ -66,14 +69,18 @@ SoundCue SoundCueLibrary::ParseCue(const std::string& path) {
         node.id   = jn.at("id").get<std::string>();
         std::string typeStr = jn.at("type").get<std::string>();
 
-        if      (typeStr == "WavePlayer") node.type = SoundCueNode::Type::WavePlayer;
-        else if (typeStr == "Random")     node.type = SoundCueNode::Type::Random;
-        else if (typeStr == "Sequence")   node.type = SoundCueNode::Type::Sequence;
-        else if (typeStr == "Mixer")      node.type = SoundCueNode::Type::Mixer;
-        else if (typeStr == "Delay")      node.type = SoundCueNode::Type::Delay;
-        else if (typeStr == "Volume")     node.type = SoundCueNode::Type::Volume;
-        else if (typeStr == "Pitch")      node.type = SoundCueNode::Type::Pitch;
-        else if (typeStr == "Output")     node.type = SoundCueNode::Type::Output;
+        if      (typeStr == "WavePlayer")   node.type = SoundCueNode::Type::WavePlayer;
+        else if (typeStr == "Random")       node.type = SoundCueNode::Type::Random;
+        else if (typeStr == "Sequence")     node.type = SoundCueNode::Type::Sequence;
+        else if (typeStr == "Mixer")        node.type = SoundCueNode::Type::Mixer;
+        else if (typeStr == "Delay")        node.type = SoundCueNode::Type::Delay;
+        else if (typeStr == "Volume")       node.type = SoundCueNode::Type::Volume;
+        else if (typeStr == "Pitch")        node.type = SoundCueNode::Type::Pitch;
+        else if (typeStr == "Modulator")    node.type = SoundCueNode::Type::Modulator;
+        else if (typeStr == "Concatenator") node.type = SoundCueNode::Type::Concatenator;
+        else if (typeStr == "Looping")      node.type = SoundCueNode::Type::Looping;
+        else if (typeStr == "Branch")       node.type = SoundCueNode::Type::Branch;
+        else if (typeStr == "Output")       node.type = SoundCueNode::Type::Output;
 
         if (jn.contains("data") && !jn["data"].is_null()) {
             const auto& d = jn["data"];
@@ -84,6 +91,13 @@ SoundCue SoundCueLibrary::ParseCue(const std::string& path) {
             node.semitones = d.value("semitones", 0.0f);
             node.minSec    = d.value("minSec",    0.0f);
             node.maxSec    = d.value("maxSec",    0.0f);
+            node.volumeMin = d.value("volumeMin", 1.0f);
+            node.volumeMax = d.value("volumeMax", 1.0f);
+            node.pitchMin  = d.value("pitchMin",  0.0f);
+            node.pitchMax  = d.value("pitchMax",  0.0f);
+            node.loopCount = d.value("loopCount", 0);
+            node.loopIndefinite = d.value("loopIndefinite", false);
+            node.paramName = d.value("paramName", std::string{});
             if (d.contains("mixerVolumes") && d["mixerVolumes"].is_array()) {
                 for (float v : d["mixerVolumes"]) node.mixerVolumes.push_back(v);
             }

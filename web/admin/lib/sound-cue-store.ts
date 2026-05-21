@@ -22,11 +22,33 @@ export interface CueNodeData {
   scalar?: number;
   // Pitch
   semitones?: number;
+  // Modulator
+  volumeMin?: number;
+  volumeMax?: number;
+  pitchMin?: number;
+  pitchMax?: number;
+  // Looping
+  loopCount?: number;
+  loopIndefinite?: boolean;
+  // Branch
+  paramName?: string;
 }
 
 export interface CueNode {
   id: string;
-  type: 'WavePlayer' | 'Random' | 'Sequence' | 'Mixer' | 'Delay' | 'Volume' | 'Pitch' | 'Output';
+  type:
+    | 'WavePlayer'
+    | 'Random'
+    | 'Sequence'
+    | 'Mixer'
+    | 'Delay'
+    | 'Volume'
+    | 'Pitch'
+    | 'Modulator'
+    | 'Concatenator'
+    | 'Looping'
+    | 'Branch'
+    | 'Output';
   position: { x: number; y: number };
   data: CueNodeData;
 }

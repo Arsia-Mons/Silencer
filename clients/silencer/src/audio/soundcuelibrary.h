@@ -8,7 +8,7 @@ class Resources;
 // ---------------------------------------------------------------------------
 // SoundCueLibrary — singleton.
 // Loads every *.json in shared/assets/gas/sound-cues/ at startup.
-// Call SoundCueLibrary::Get().Evaluate(cueId, res) to play a cue.
+// Call SoundCueLibrary::Get().Evaluate(cueId, res, params) to play a cue.
 // ---------------------------------------------------------------------------
 class SoundCueLibrary {
 public:
@@ -21,7 +21,10 @@ public:
 
     // Evaluate cue by id. Returns an empty SoundCueResult (chunk==nullptr)
     // if the cue is not found.
-    SoundCueResult Evaluate(const std::string& cueId, Resources& res);
+    SoundCueResult Evaluate(
+        const std::string& cueId,
+        Resources& res,
+        const std::unordered_map<std::string, bool>& params = {});
 
     bool IsLoaded() const { return loaded_; }
 

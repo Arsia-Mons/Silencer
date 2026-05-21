@@ -11,13 +11,14 @@
 SoundCueResult SoundCue::Evaluate(
     Resources& res,
     std::unordered_map<std::string, int>& seqCounters,
-    std::unordered_map<std::string, int>& randomLastPick) const
+    std::unordered_map<std::string, int>& randomLastPick,
+    const std::unordered_map<std::string, bool>& params) const
 {
     if (outputNodeId.empty()) return {};
     const auto it = nodes.find(outputNodeId);
     if (it == nodes.end()) return {};
     if (it->second.inputs.empty()) return {};
-    return EvalNode(it->second.inputs[0], res, seqCounters, randomLastPick);
+    return EvalNode(it->second.inputs[0], res, seqCounters, randomLastPick, params);
 }
 
 // ---------------------------------------------------------------------------
@@ -27,7 +28,8 @@ SoundCueResult SoundCue::EvalNode(
     const std::string& nodeId,
     Resources& res,
     std::unordered_map<std::string, int>& seqCounters,
-    std::unordered_map<std::string, int>& randomLastPick) const
+    std::unordered_map<std::string, int>& randomLastPick,
+    const std::unordered_map<std::string, bool>& params) const
 {
     const auto it = nodes.find(nodeId);
     if (it == nodes.end()) return {};
@@ -69,11 +71,11 @@ SoundCueResult SoundCue::EvalNode(
             acc += weights[i];
             if (draw < acc) {
                 randomLastPick[nodeId] = static_cast<int>(i);
-                return EvalNode(node.inputs[i], res, seqCounters, randomLastPick);
+                return EvalNode(node.inputs[i], res, seqCounters, randomLastPick, params);
             }
         }
         randomLastPick[nodeId] = static_cast<int>(node.inputs.size()) - 1;
-        return EvalNode(node.inputs.back(), res, seqCounters, randomLastPick);
+        return EvalNode(node.inputs.back(), res, seqCounters, randomLastPick, params);
     }
 
     case SoundCueNode::Type::Sequence: {
@@ -81,12 +83,12 @@ SoundCueResult SoundCue::EvalNode(
         int& counter = seqCounters[nodeId];
         int idx = counter % static_cast<int>(node.inputs.size());
         ++counter;
-        return EvalNode(node.inputs[idx], res, seqCounters, randomLastPick);
+        return EvalNode(node.inputs[idx], res, seqCounters, randomLastPick, params);
     }
 
     case SoundCueNode::Type::Mixer: {
         if (node.inputs.empty()) return {};
-        SoundCueResult r = EvalNode(node.inputs[0], res, seqCounters, randomLastPick);
+        SoundCueResult r = EvalNode(node.inputs[0], res, seqCounters, randomLastPick, params);
         for (size_t i = 0; i < node.inputs.size() && i < node.mixerVolumes.size(); ++i) {
             if (i == 0) r.volume *= node.mixerVolumes[i];
         }
@@ -95,7 +97,7 @@ SoundCueResult SoundCue::EvalNode(
 
     case SoundCueNode::Type::Delay: {
         if (node.inputs.empty()) return {};
-        SoundCueResult r = EvalNode(node.inputs[0], res, seqCounters, randomLastPick);
+        SoundCueResult r = EvalNode(node.inputs[0], res, seqCounters, randomLastPick, params);
         float range = node.maxSec - node.minSec;
         if (range < 0.f) range = 0.f;
         r.delaySec += node.minSec + (static_cast<float>(std::rand()) / RAND_MAX) * range;
@@ -104,16 +106,51 @@ SoundCueResult SoundCue::EvalNode(
 
     case SoundCueNode::Type::Volume: {
         if (node.inputs.empty()) return {};
-        SoundCueResult r = EvalNode(node.inputs[0], res, seqCounters, randomLastPick);
+        SoundCueResult r = EvalNode(node.inputs[0], res, seqCounters, randomLastPick, params);
         r.volume *= node.scalar;
         return r;
     }
 
     case SoundCueNode::Type::Pitch: {
         if (node.inputs.empty()) return {};
-        SoundCueResult r = EvalNode(node.inputs[0], res, seqCounters, randomLastPick);
+        SoundCueResult r = EvalNode(node.inputs[0], res, seqCounters, randomLastPick, params);
         r.pitch += node.semitones;
         return r;
+    }
+
+    case SoundCueNode::Type::Modulator: {
+        if (node.inputs.empty()) return {};
+        SoundCueResult r = EvalNode(node.inputs[0], res, seqCounters, randomLastPick, params);
+        auto frand = [](float lo, float hi) -> float {
+            if (hi <= lo) return lo;
+            return lo + (hi - lo) * (static_cast<float>(std::rand()) / RAND_MAX);
+        };
+        r.volume *= frand(node.volumeMin, node.volumeMax);
+        r.pitch += frand(node.pitchMin, node.pitchMax);
+        return r;
+    }
+
+    case SoundCueNode::Type::Concatenator: {
+        // Sequential playback requires stateful audio tracking; at runtime
+        // we evaluate the indexed input only.
+        if (node.inputs.empty()) return {};
+        int& counter = seqCounters[nodeId];
+        int idx = counter % static_cast<int>(node.inputs.size());
+        ++counter;
+        return EvalNode(node.inputs[idx], res, seqCounters, randomLastPick, params);
+    }
+
+    case SoundCueNode::Type::Looping: {
+        if (node.inputs.empty()) return {};
+        return EvalNode(node.inputs[0], res, seqCounters, randomLastPick, params);
+    }
+
+    case SoundCueNode::Type::Branch: {
+        if (node.inputs.size() < 2) return {};
+        bool val = false;
+        auto pit = params.find(node.paramName);
+        if (pit != params.end()) val = pit->second;
+        return EvalNode(node.inputs[val ? 1 : 0], res, seqCounters, randomLastPick, params);
     }
 
     case SoundCueNode::Type::Output:
