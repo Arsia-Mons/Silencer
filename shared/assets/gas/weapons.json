@@ -19,9 +19,8 @@
         161
       ],
       "hitOverlayBank": 222,
-      "soundFire": "!laserme.wav",
-      "soundHit1": "rico1.wav",
-      "soundHit2": "rico2.wav",
+      "soundFire": "cue:blaster_fire",
+      "soundHit1": "cue:blaster_hit",
       "projectileLife": 6,
       "snapshotInterval": 6
     },
@@ -44,9 +43,8 @@
         166
       ],
       "hitOverlayBank": 222,
-      "soundFire": "!laserel.wav",
-      "soundHit1": "strike03.wav",
-      "soundHit2": "strike04.wav",
+      "soundFire": "cue:laser_fire",
+      "soundHit1": "cue:laser_hit",
       "projectileLife": 10,
       "emitOffset": 24,
       "snapshotInterval": 6
@@ -89,8 +87,8 @@
         87
       ],
       "soundLoop": "rocket4.wav",
-      "soundExplosion": "seekexp1.wav",
-      "soundFire": "rocket9.wav",
+      "soundExplosion": "cue:explosion",
+      "soundFire": "cue:rocket_fire",
       "exhaustPlumes": 6,
       "rocketExplosionPlumeSpeed": 15,
       "snapshotInterval": 6
@@ -122,9 +120,8 @@
       "projectileLife": 20,
       "snapshotInterval": 6,
       "hitOverlayBank": 222,
-      "soundFire": "grenthro.wav",
-      "soundHit1": "strike03.wav",
-      "soundHit2": "strike04.wav"
+      "soundFire": "cue:laser_fire",
+      "soundHit1": "cue:laser_hit"
     },
     {
       "id": "grenade",
@@ -160,7 +157,7 @@
         79,
         79
       ],
-      "soundThrow": "grenthro.wav",
+      "soundThrow": "cue:grenade_throw",
       "soundLand": "land1.wav",
       "radius": 5,
       "bounceDamping": 0.8,
@@ -171,8 +168,8 @@
       "projectileType": "grenade",
       "_comment": "Plasma detonator — remote-detonated device. soundFire=arm/deploy, iscamera=true uses soundHit1, iscamera=false uses soundExplosion.",
       "soundFire": "shield2.wav",
-      "soundExplosion": "seekexp1.wav",
-      "soundHit1": "q_expl02.wav",
+      "soundExplosion": "cue:plasma_explosion",
+      "soundHit1": "cue:plasma_explosion",
       "primaryVectors": [
         {
           "xv": -14,
@@ -251,10 +248,10 @@
         79,
         79
       ],
-      "soundExplosion": "q_expl02.wav",
+      "soundExplosion": "cue:plasma_explosion",
       "healthDamage": 0,
       "shieldDamage": 65535,
-      "soundThrow": "grenthro.wav"
+      "soundThrow": "cue:grenade_throw"
     },
     {
       "id": "shapedbomb",
@@ -270,7 +267,7 @@
         79,
         79
       ],
-      "soundExplosion": "seekexp1.wav",
+      "soundExplosion": "cue:explosion",
       "primaryCount": 5,
       "secondaryCount": 4,
       "primaryVectors": [
@@ -313,7 +310,7 @@
           "yv": -29
         }
       ],
-      "soundThrow": "grenthro.wav"
+      "soundThrow": "cue:grenade_throw"
     },
     {
       "id": "plasmabomb",
@@ -329,7 +326,7 @@
         79,
         79
       ],
-      "soundExplosion": "seekexp1.wav",
+      "soundExplosion": "cue:plasma_explosion",
       "primaryCount": 6,
       "secondaryCount": 6,
       "primaryVectors": [
@@ -384,7 +381,7 @@
           "yv": -15
         }
       ],
-      "soundThrow": "grenthro.wav"
+      "soundThrow": "cue:grenade_throw"
     },
     {
       "id": "neutronbomb",
@@ -401,11 +398,11 @@
         79
       ],
       "soundHit1": "grenade1.wav",
-      "soundExplosion": "q_expl02.wav",
+      "soundExplosion": "cue:plasma_explosion",
       "soundWarn": "vModDeto.wav",
       "healthDamage": 65535,
       "shieldDamage": 65535,
-      "soundThrow": "grenthro.wav"
+      "soundThrow": "cue:grenade_throw"
     },
     {
       "id": "flarebomb",
@@ -422,7 +419,7 @@
         79
       ],
       "soundExplosion": "rocket1.wav",
-      "soundThrow": "grenthro.wav"
+      "soundThrow": "cue:grenade_throw"
     },
     {
       "id": "poisonflare",
@@ -442,7 +439,7 @@
       "poisonRate": 1,
       "poisonMax": 3,
       "poisonCheckInterval": 6,
-      "soundThrow": "grenthro.wav"
+      "soundThrow": "cue:grenade_throw"
     }
   ]
 }

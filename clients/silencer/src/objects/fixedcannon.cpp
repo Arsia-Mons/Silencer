@@ -5,6 +5,7 @@
 #include "team.h"
 #include "plume.h"
 #include "gasloader.h"
+#include "audio/soundcue.h"
 
 FixedCannon::FixedCannon() : Object(ObjectTypes::FIXEDCANNON){
 	requiresauthority = true;
@@ -144,7 +145,8 @@ void FixedCannon::Tick(World & world){
 			if(state_i == 0){
 				{	const GameObjectDef* d = GASLoader::Get().GetGameObjectDef("fixedCannon");
 					const std::string& sfx = (d && !d->soundFire.empty()) ? d->soundFire : "!laserew.wav";
-					EmitSound(world, world.resources.soundbank[sfx], 64); }
+					auto _r = ResolveSound(sfx, world.resources);
+					if(_r.chunk) EmitSound(world, _r.chunk, static_cast<int>(64 * _r.volume)); }
 				LaserProjectile * laserprojectile = (LaserProjectile *)world.CreateObject(ObjectTypes::LASERPROJECTILE);
 				if(laserprojectile){
 					laserprojectile->x = x + ((mirrored ? -1 : 1) * (45 + laserprojectile->emitoffset));
@@ -166,7 +168,8 @@ void FixedCannon::Tick(World & world){
 			if(state_i == 0){
 				{	const GameObjectDef* d = GASLoader::Get().GetGameObjectDef("fixedCannon");
 					const std::string& sfx = (d && !d->soundFire.empty()) ? d->soundFire : "!laserew.wav";
-					EmitSound(world, world.resources.soundbank[sfx], 64); }
+					auto _r = ResolveSound(sfx, world.resources);
+					if(_r.chunk) EmitSound(world, _r.chunk, static_cast<int>(64 * _r.volume)); }
 				LaserProjectile * laserprojectile = (LaserProjectile *)world.CreateObject(ObjectTypes::LASERPROJECTILE);
 				if(laserprojectile){
 					laserprojectile->x = x + ((mirrored ? -1 : 1) * (45 + laserprojectile->emitoffset));

@@ -2,6 +2,7 @@
 #include "overlay.h"
 #include "shrapnel.h"
 #include "gasloader.h"
+#include "audio/soundcue.h"
 
 WallProjectile::WallProjectile() : Object(ObjectTypes::WALLPROJECTILE){
 	requiresauthority = true;
@@ -30,7 +31,8 @@ void WallProjectile::Tick(World & world){
 	Uint8 life = (w && w->projectileLife) ? (Uint8)w->projectileLife : 20;
 	if(state_i == 1){
 		const std::string& sfx = w && !w->soundFire.empty() ? w->soundFire : "!laserel.wav";
-		EmitSound(world, world.resources.soundbank[sfx], 64);
+		auto _r = ResolveSound(sfx, world.resources);
+		if(_r.chunk) EmitSound(world, _r.chunk, static_cast<int>(64 * _r.volume));
 	}
 	if(state_i < 7){
 		res_index = state_i;
@@ -58,13 +60,9 @@ void WallProjectile::Tick(World & world){
 				overlay->x = x;
 				overlay->y = y;
 				if(platform){
-					const std::string& h1 = w && !w->soundHit1.empty() ? w->soundHit1 : "strike03.wav";
-					const std::string& h2 = w && !w->soundHit2.empty() ? w->soundHit2 : "strike04.wav";
-					if(rand() % 2 == 0){
-						overlay->EmitSound(world, world.resources.soundbank[h1], 96);
-					}else{
-						overlay->EmitSound(world, world.resources.soundbank[h2], 96);
-					}
+					const std::string& hitSlot = w && !w->soundHit1.empty() ? w->soundHit1 : "strike03.wav";
+					auto _r = ResolveSound(hitSlot, world.resources);
+					if(_r.chunk) overlay->EmitSound(world, _r.chunk, static_cast<int>(96 * _r.volume));
 				}
 			}
 			float xn = 0, yn = 0;
