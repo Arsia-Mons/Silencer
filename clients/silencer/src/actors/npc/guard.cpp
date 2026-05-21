@@ -8,6 +8,7 @@
 #include "rocketprojectile.h"
 #include "pickup.h"
 #include "gasloader.h"
+#include "audio/soundcue.h"
 #include "npc_math.h"
 #include <math.h>
 
@@ -1084,12 +1085,11 @@ void Guard::Tick(World & world){
 			if(state_i == 0){
 				const EnemyDef* gd = GASLoader::Get().GetEnemyDef(ActorDefName(weapon));
 				static const EnemyDef _ged;
-				const std::string* hurts[] = {
-					gd ? &gd->soundHurt1 : &_ged.soundHurt1,
-					gd ? &gd->soundHurt2 : &_ged.soundHurt2,
-					gd ? &gd->soundHurt3 : &_ged.soundHurt3
-				};
-				EmitSound(world, world.resources.soundbank[*hurts[rand() % (int)(sizeof(hurts)/sizeof(hurts[0]))]], 128);
+				const std::string& hurtSlot = gd ? gd->soundHurt : _ged.soundHurt;
+				if(!hurtSlot.empty()){
+					auto r = ResolveSound(hurtSlot, world.resources);
+					if(r.chunk) EmitSound(world, r.chunk, static_cast<int>(128 * r.volume));
+				}
 			}
 			collidable = false;
 			if(state_i >= 10){

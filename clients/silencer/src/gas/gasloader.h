@@ -410,9 +410,7 @@ struct EnemyDef {
     std::string soundMoveRight  = "";   // footstep / movement right
     std::string soundMoveLeft   = "";   // footstep / movement left
     std::string soundDeath      = "";   // death/explosion
-    std::string soundHurt1      = "";   // pain sound variant 1
-    std::string soundHurt2      = "";   // pain sound variant 2
-    std::string soundHurt3      = "";   // pain sound variant 3
+    std::string soundHurt       = "";   // hurt sound slot (wav name or cue:id)
     std::string soundAlert1     = "theres3.wav";  // guard spotted-target voice 1
     std::string soundAlert2     = "stop4.wav";    // guard spotted-target voice 2
     std::string soundAlert3     = "freeze3.wav";  // guard spotted-target voice 3

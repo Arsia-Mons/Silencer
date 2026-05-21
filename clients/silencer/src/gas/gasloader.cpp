@@ -448,9 +448,7 @@ static void LoadEnemies(const std::string& dir, std::vector<EnemyDef>& out,
             e.soundMoveRight = ej.value("soundMoveRight", std::string{});
             e.soundMoveLeft  = ej.value("soundMoveLeft",  std::string{});
             e.soundDeath     = ej.value("soundDeath",     std::string{});
-            e.soundHurt1     = ej.value("soundHurt1",     std::string{});
-            e.soundHurt2     = ej.value("soundHurt2",     std::string{});
-            e.soundHurt3     = ej.value("soundHurt3",     std::string{});
+            e.soundHurt      = ej.value("soundHurt",      std::string{});
             e.soundAlert1    = ej.value("soundAlert1",    e.soundAlert1);
             e.soundAlert2    = ej.value("soundAlert2",    e.soundAlert2);
             e.soundAlert3    = ej.value("soundAlert3",    e.soundAlert3);
