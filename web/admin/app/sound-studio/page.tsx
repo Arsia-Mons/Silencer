@@ -1519,7 +1519,7 @@ export default function SoundStudioPage() {
           </div>
         )}
 
-        {!folderName && tab !== 'cues' ? (
+        {!folderName ? (
           <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#050a05' }}>
             <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 24 }}>
               <div style={{ fontSize: 56, opacity: 0.5 }}>🔊</div>
