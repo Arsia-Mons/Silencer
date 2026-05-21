@@ -15,7 +15,7 @@
       "type": "Random",
       "position": {
         "x": 420,
-        "y": 200
+        "y": 200.50815217391306
       },
       "data": {}
     },
@@ -42,18 +42,6 @@
         "file": "futstonr.wav",
         "weight": 1
       }
-    },
-    {
-      "id": "w3",
-      "type": "WavePlayer",
-      "position": {
-        "x": 100,
-        "y": 360
-      },
-      "data": {
-        "file": "stostep1.wav",
-        "weight": 1
-      }
     }
   ],
   "edges": [
@@ -70,13 +58,6 @@
       "sourceHandle": "out",
       "target": "rng",
       "targetHandle": "in-1"
-    },
-    {
-      "id": "e3",
-      "source": "w3",
-      "sourceHandle": "out",
-      "target": "rng",
-      "targetHandle": "in-2"
     },
     {
       "id": "e4",
