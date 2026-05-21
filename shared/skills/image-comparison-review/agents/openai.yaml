@@ -1,0 +1,4 @@
+interface:
+  display_name: "Image Comparison Review"
+  short_description: "Stitch images before visual review."
+  default_prompt: "Use this skill when comparing screenshots, design references, video grabs, current captures, or sprite frames. Build one side-by-side composite first, inspect that single image, then report concrete visual mismatches."

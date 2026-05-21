@@ -77,6 +77,16 @@ export function handleLobbyEvent(type, data) {
       liveState.activeGames = activeGames.size;
       broadcast('game.ready', data);
       break;
+    case 'game.heartbeat':
+      if (activeGames.has(data.gameId)) {
+        Object.assign(activeGames.get(data.gameId), {
+          lastHeartbeat: data.ts,
+          tickCount: data.tickCount,
+          aliveMask: data.aliveMask,
+        });
+      }
+      broadcast('game.heartbeat', data);
+      break;
     case 'game.ended':
       activeGames.delete(data.gameId);
       liveState.activeGames = activeGames.size;

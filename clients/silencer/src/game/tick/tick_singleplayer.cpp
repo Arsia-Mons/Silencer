@@ -17,7 +17,6 @@ if(stateisnew){
 	world.DestroyAllObjects();
 	world.gameplaystate = World::INGAME;
 	world.intutorialmode = true;
-	currentinterface = 0;
 	world.GetAuthorityPeer()->techchoices = World::BUY_LASER | World::BUY_ROCKET;
 	//world.Listen(23456);
 	Team * team = (Team *)world.CreateObject(ObjectTypes::TEAM);
@@ -29,10 +28,10 @@ if(stateisnew){
 	player->laserammo = 0;
 	player->credits = GASLoader::Get().player.startingCredits;
 	player->RemoveInventoryItem(Player::INV_BASEDOOR);
-	ShowDeployMessage();
+	gameSession.ShowDeployMessage();
 	world.GetAuthorityPeer()->controlledlist.push_back(player->id);
 	world.gameinfo.securitylevel = LobbyGame::SECNONE;
-	if(!LoadMap((GetResDir() + "AGENCY04.SIL").c_str())){
+	if(!gameSession.LoadMap((GetResDir() + "AGENCY04.SIL").c_str())){
 		GoToState(MAINMENU);
 	}
 	Audio::GetInstance().StopMusic();
@@ -41,112 +40,112 @@ if(stateisnew){
 	player->oldy = player->y;
 	renderer.palette.SetPalette(0);
 	renderer.palette.SetParallaxColors(world.map.parallax);
-	screenbuffer.Clear(0);
-	SetColors(renderer.palette.GetColors());
+	GetScreenBuffer().Clear(0);
+	gameRenderer.SetColors(renderer.palette.GetColors());
 	singleplayermessage = 0;
 	stateisnew = false;
-	ambienceMixer.LoadRandomGameMusic();
+	gameSession.AmbienceMixerRef().LoadRandomGameMusic();
 }
-if(ambienceMixer.FadedIn()){
+if(gameSession.AmbienceMixerRef().FadedIn()){
 	//Audio::GetInstance().ambienceMixer.PlayMusic(world.resources.gamemusic);
-	ambienceMixer.PlayMusic(world.resources.gamemusic);
+	gameSession.AmbienceMixerRef().PlayMusic(world.resources.gamemusic);
 }
-Player * player = world.GetPeerPlayer(world.localpeerid);
+Player * player = world.GetPeerPlayer(world.peers.localpeerid);
 if(player){
 	switch(singleplayermessage){
 		case 0:{
-			if(!world.message_i){
+			if(!world.messaging.message_i){
 				char text[256];
-				sprintf(text, "Move your agent left and right\nBy tapping %s and %s.", GetActionKeyDisplayName(Action::MoveLeft), GetActionKeyDisplayName(Action::MoveRight));
+				sprintf(text, "Move your agent left and right\nBy tapping %s and %s.", gameInput.GetActionKeyDisplayName(Action::MoveLeft), gameInput.GetActionKeyDisplayName(Action::MoveRight));
 				world.ShowMessage(text, 128);
 			}
 			if(player->state == Player::RUNNING){
 				singleplayermessage++;
-				world.message_i = 0;
+				world.messaging.message_i = 0;
 			}
 		}break;
 		case 1:{
-			if(!world.message_i){
+			if(!world.messaging.message_i){
 				char text[256];
-				sprintf(text, "Make your agent jump by striking %s.", GetActionKeyDisplayName(Action::Jump));
+				sprintf(text, "Make your agent jump by striking %s.", gameInput.GetActionKeyDisplayName(Action::Jump));
 				world.ShowMessage(text, 128);
 			}
 			if(player->state == Player::JUMPING){
 				singleplayermessage++;
-				world.message_i = 0;
+				world.messaging.message_i = 0;
 			}
 		}break;
 		case 2:{
-			if(!world.message_i){
+			if(!world.messaging.message_i){
 				char text[256];
-				sprintf(text, "If you hold the %s key down, it will\nactivate your agent's jet-pack.", GetActionKeyDisplayName(Action::Jetpack));
+				sprintf(text, "If you hold the %s key down, it will\nactivate your agent's jet-pack.", gameInput.GetActionKeyDisplayName(Action::Jetpack));
 				world.ShowMessage(text, 128);
 			}
 			if(player->state == Player::JETPACK){
 				singleplayermessage++;
-				world.message_i = 0;
+				world.messaging.message_i = 0;
 			}
 		}break;
 		case 3:{
-			if(!world.message_i){
+			if(!world.messaging.message_i){
 				char text[256];
-				sprintf(text, "Make your agent kneel by holding %s.", GetActionKeyDisplayName(Action::MoveDown));
+				sprintf(text, "Make your agent kneel by holding %s.", gameInput.GetActionKeyDisplayName(Action::MoveDown));
 				world.ShowMessage(text, 128);
 			}
 			if(player->state == Player::CROUCHED){
 				singleplayermessage++;
-				world.message_i = 0;
+				world.messaging.message_i = 0;
 			}
 		}break;
 		case 4:{
-			if(!world.message_i){
+			if(!world.messaging.message_i){
 				char text[256];
-				sprintf(text, "Make your agent roll by kneeling,\nthen striking %s or %s.", GetActionKeyDisplayName(Action::MoveLeft), GetActionKeyDisplayName(Action::MoveRight));
+				sprintf(text, "Make your agent roll by kneeling,\nthen striking %s or %s.", gameInput.GetActionKeyDisplayName(Action::MoveLeft), gameInput.GetActionKeyDisplayName(Action::MoveRight));
 				world.ShowMessage(text, 128);
 			}
 			if(player->state == Player::ROLLING){
 				singleplayermessage++;
-				world.message_i = 0;
+				world.messaging.message_i = 0;
 			}
 		}break;
 		case 5:{
-			if(!world.message_i){
+			if(!world.messaging.message_i){
 				char text[256];
-				sprintf(text, "To disguise as a civilian, press the %s key.", GetActionKeyDisplayName(Action::Disguise));
+				sprintf(text, "To disguise as a civilian, press the %s key.", gameInput.GetActionKeyDisplayName(Action::Disguise));
 				world.ShowMessage(text, 128);
 			}
 			if(player->IsDisguised()){
 				singleplayermessage++;
-				world.message_i = 0;
+				world.messaging.message_i = 0;
 			}
 		}break;
 		case 6:{
-			if(!world.message_i){
+			if(!world.messaging.message_i){
 				char text[256];
-				sprintf(text, "To return to normal, press the %s key again.", GetActionKeyDisplayName(Action::Disguise));
+				sprintf(text, "To return to normal, press the %s key again.", gameInput.GetActionKeyDisplayName(Action::Disguise));
 				world.ShowMessage(text, 128);
 			}
 			if(!player->IsDisguised()){
 				singleplayermessage++;
-				world.message_i = 0;
+				world.messaging.message_i = 0;
 			}
 		}break;
 		case 7:{
-			if(!world.message_i){
+			if(!world.messaging.message_i){
 				char text[256];
-				sprintf(text, "The %s key fires your current weapon,\nthe Blaster.", GetActionKeyDisplayName(Action::Fire));
+				sprintf(text, "The %s key fires your current weapon,\nthe Blaster.", gameInput.GetActionKeyDisplayName(Action::Fire));
 				world.ShowMessage(text, 128);
 			}
 			if(player->state == Player::STANDINGSHOOT || player->state == Player::CROUCHEDSHOOT || player->state == Player::FALLINGSHOOT || player->state == Player::JETPACKSHOOT || player->state == Player::LADDERSHOOT){
 				singleplayermessage++;
-				world.message_i = 0;
+				world.messaging.message_i = 0;
 			}
 		}break;
 		case 8:{
-			if(!world.message_i){
+			if(!world.messaging.message_i){
 				char text[256];
 #ifdef OUYA
-				sprintf(text, "To change weapons, press %s", GetActionKeyDisplayName(Action::NextWeapon));
+				sprintf(text, "To change weapons, press %s", gameInput.GetActionKeyDisplayName(Action::NextWeapon));
 #else
 				sprintf(text, "To change weapons, press the 1, 2, 3, or 4 keys");
 #endif
@@ -158,11 +157,11 @@ if(player){
 			}
 			if(player->currentweapon != 0){
 				singleplayermessage++;
-				world.message_i = 0;
+				world.messaging.message_i = 0;
 			}
 		}break;
 		case 9:{
-			if(!world.message_i){
+			if(!world.messaging.message_i){
 				char text[256];
 				sprintf(text, "Good job, agent.\n\nYou have been given a base-building device.");
 				world.ShowMessage(text, 128);
@@ -171,45 +170,45 @@ if(player){
 			}
 		}break;
 		case 10:{
-			if(!world.message_i){
+			if(!world.messaging.message_i){
 				char text[256];
-				sprintf(text, "Hit %s to build your base.", GetActionKeyDisplayName(Action::Use));
+				sprintf(text, "Hit %s to build your base.", gameInput.GetActionKeyDisplayName(Action::Use));
 				world.ShowMessage(text, 128);
 			}
 			Team * team = player->GetTeam(world);
 			if(team && team->basedoorid){
 				singleplayermessage++;
-				world.message_i = 0;
+				world.messaging.message_i = 0;
 			}
 		}break;
 		case 11:{
-			if(!world.message_i){
+			if(!world.messaging.message_i){
 				char text[256];
-				sprintf(text, "To enter your base, hit %s when your\nSilencer is at the base entrance.", GetActionKeyDisplayName(Action::Activate));
+				sprintf(text, "To enter your base, hit %s when your\nSilencer is at the base entrance.", gameInput.GetActionKeyDisplayName(Action::Activate));
 				world.ShowMessage(text, 128);
 			}
 			if(player->InBase(world)){
 				singleplayermessage++;
-				world.message_i = 0;
+				world.messaging.message_i = 0;
 			}
 		}break;
 		case 12:{
-			if(!world.message_i){
+			if(!world.messaging.message_i){
 				char text[256];
-				sprintf(text, "You are now inside your agent's secret base.\nWalk right to the flashing green computer screen\nand hit %s to activate it.", GetActionKeyDisplayName(Action::Activate));
+				sprintf(text, "You are now inside your agent's secret base.\nWalk right to the flashing green computer screen\nand hit %s to activate it.", gameInput.GetActionKeyDisplayName(Action::Activate));
 				world.ShowMessage(text, 255);
 			}
 			if(!player->InBase(world)){
 				singleplayermessage = 11;
-				world.message_i = 0;
+				world.messaging.message_i = 0;
 			}
-			if(player->buyinterfaceid){
+			if(player->isbuying){
 				singleplayermessage++;
-				world.message_i = 0;
+				world.messaging.message_i = 0;
 			}
 		}break;
 		case 13:{
-			if(!world.message_i){
+			if(!world.messaging.message_i){
 				char text[256];
 #ifdef OUYA
 				const char * button = "O";
@@ -221,99 +220,99 @@ if(player){
 			}
 			if(!player->InBase(world)){
 				singleplayermessage = 11;
-				world.message_i = 0;
+				world.messaging.message_i = 0;
 			}
 			if(player->credits < 250){
 			player->credits = GASLoader::Get().player.creditFloor;
 			}
 			if(player->rocketammo > 0){
 				singleplayermessage++;
-				world.message_i = 0;
+				world.messaging.message_i = 0;
 			}
 		}break;
 		case 14:{
-			if(!world.message_i){
+			if(!world.messaging.message_i){
 				char text[256];
-				sprintf(text, "Good, now hit %s or %s to exit the menu.", GetActionKeyDisplayName(Action::MoveLeft), GetActionKeyDisplayName(Action::MoveRight));
+				sprintf(text, "Good, now hit %s or %s to exit the menu.", gameInput.GetActionKeyDisplayName(Action::MoveLeft), gameInput.GetActionKeyDisplayName(Action::MoveRight));
 				world.ShowMessage(text, 128);
 			}
 			if(player->rocketammo > 0){
 				singleplayermessage++;
-				world.message_i = 0;
+				world.messaging.message_i = 0;
 			}
 		}break;
 		case 15:{
-			if(!world.message_i){
+			if(!world.messaging.message_i){
 				char text[256];
 				sprintf(text, "To leave your base, walk Left through\nthe door you entered.");
 				world.ShowMessage(text, 128);
 			}
 			if(!player->InBase(world)){
 				singleplayermessage++;
-				world.message_i = 0;
+				world.messaging.message_i = 0;
 			}
 		}break;
 		case 16:{
-			if(!world.message_i){
+			if(!world.messaging.message_i){
 				char text[256];
 				sprintf(text, "In the playfield, you need to hack into\ndata terminals to collect information.");
 				world.ShowMessage(text, 192);
 			}
-			if(world.message_i >= 192 - 1){
+			if(world.messaging.message_i >= 192 - 1){
 				singleplayermessage++;
-				world.message_i = 0;
+				world.messaging.message_i = 0;
 			}
 		}break;
 		case 17:{
-			if(!world.message_i){
+			if(!world.messaging.message_i){
 				char text[256];
-				sprintf(text, "Walk around until you see a\nflashing green data port.\nStanding in front of the data port, hit %s\nto initiate hacking.", GetActionKeyDisplayName(Action::Activate));
+				sprintf(text, "Walk around until you see a\nflashing green data port.\nStanding in front of the data port, hit %s\nto initiate hacking.", gameInput.GetActionKeyDisplayName(Action::Activate));
 				world.ShowMessage(text, 255);
 			}
 			if(player->state == Player::HACKING && player->files >= 100){
 				singleplayermessage++;
-				world.message_i = 0;
+				world.messaging.message_i = 0;
 			}
 		}break;
 		case 18:{
-			if(!world.message_i){
+			if(!world.messaging.message_i){
 				char text[256];
-				sprintf(text, "Return with the information to your base door,\nhitting %s to enter the base.", GetActionKeyDisplayName(Action::Activate));
+				sprintf(text, "Return with the information to your base door,\nhitting %s to enter the base.", gameInput.GetActionKeyDisplayName(Action::Activate));
 				world.ShowMessage(text, 128);
 			}
 			if(player->InBase(world)){
 				singleplayermessage++;
-				world.message_i = 0;
+				world.messaging.message_i = 0;
 			}
 		}break;
 		case 19:{
-			if(!world.message_i){
+			if(!world.messaging.message_i){
 				char text[256];
 				sprintf(text, "Walk to the Right, through the agency receiver\nto deliver the information to your agency.");
 				world.ShowMessage(text, 128);
 			}
 			if(!player->InBase(world)){
 				singleplayermessage = 18;
-				world.message_i = 0;
+				world.messaging.message_i = 0;
 			}
 			if(!player->files){
 				singleplayermessage++;
-				world.message_i = 0;
+				world.messaging.message_i = 0;
 			}
 		}break;
 		case 20:{
-			if(!world.message_i){
+			if(!world.messaging.message_i){
 				char text[256];
 				sprintf(text, "Good job, agent.\nYou're ready for the final training exercise.");
 				world.ShowMessage(text, 128);
 			}
-			if(world.message_i >= 128 - 1){
+			if(world.messaging.message_i >= 128 - 1){
 				singleplayermessage++;
-				world.message_i = 0;
+				world.messaging.message_i = 0;
 			}
 		}break;
 		case 21:{
-			if(!world.message_i){
+			if(!world.messaging.message_i){
 				world.highlightsecrets = true;
 				char text[256];
 				sprintf(text, "This indicator shows your progress towards\ndiscovering the location of a secret.\nKeep collecting files\nuntil all stages are lit.");
@@ -323,11 +322,11 @@ if(player){
 			if(team && team->beamingterminalid){
 				world.highlightsecrets = false;
 				singleplayermessage++;
-				world.message_i = 0;
+				world.messaging.message_i = 0;
 			}
 		}break;
 		case 22:{
-			if(!world.message_i){
+			if(!world.messaging.message_i){
 				world.highlightminimap = true;
 				char text[256];
 				sprintf(text, "The narrowing circle on your radar shows\nyour agency acquiring a lock on the secret.\nWhen the lock is completed, the\nsecret can be picked up by your team.");
@@ -349,11 +348,11 @@ if(player){
 			if(advance22){
 				world.highlightminimap = false;
 				singleplayermessage++;
-				world.message_i = 0;
+				world.messaging.message_i = 0;
 			}
 		}break;
 		case 23:{
-			if(!world.message_i){
+			if(!world.messaging.message_i){
 				char text[256];
 				sprintf(text, "Pick up the secret at the location shown\non your radar map");
 				world.ShowMessage(text, 128);
@@ -361,11 +360,11 @@ if(player){
 			Team * team23 = player->GetTeam(world);
 			if(player->hassecret || (team23 && team23->secrets > 0)){
 				singleplayermessage++;
-				world.message_i = 0;
+				world.messaging.message_i = 0;
 			}
 		}break;
 		case 24:{
-			if(!world.message_i){
+			if(!world.messaging.message_i){
 				char text[256];
 				sprintf(text, "Now, you must return the secret to your base.\nIf this were a real government secret,\nyou would have limited time before\nthe government traced your location.");
 				world.ShowMessage(text, 255);
@@ -373,11 +372,11 @@ if(player){
 			Team * team24 = player->GetTeam(world);
 			if(player->InBase(world) || (team24 && team24->secrets > 0)){
 				singleplayermessage++;
-				world.message_i = 0;
+				world.messaging.message_i = 0;
 			}
 		}break;
 		case 25:{
-			if(!world.message_i){
+			if(!world.messaging.message_i){
 				char text[256];
 				sprintf(text, "To stash the secret data, it must be brought\nto the memory bank at the\nfar right of your base.");
 				world.ShowMessage(text, 128);
@@ -385,26 +384,26 @@ if(player){
 			Team * team = player->GetTeam(world);
 			if(team && team->secrets > 0){
 				singleplayermessage++;
-				world.message_i = 0;
+				world.messaging.message_i = 0;
 			}
 		}break;
 		case 26:{
-			if(!world.message_i){
+			if(!world.messaging.message_i){
 				char text[256];
 				sprintf(text, "Good job, agent.\n\nYou're ready to begin real agency missions.");
 				world.ShowMessage(text, 255);
 			}
-			if(world.message_i == 12){
+			if(world.messaging.message_i == 12){
 				player->state = Player::UNDEPLOYING;
 				player->state_i = 0;
 			}
-			if(world.message_i >= 128 - 1){
+			if(world.messaging.message_i >= 128 - 1){
 				GoToState(MAINMENU);
 			}
 		}break;
 	}
 }
-if(CheckForQuit() || CheckForEndOfGame()){
+if(gameSession.CheckForQuit() || gameSession.CheckForEndOfGame()){
 	GoToState(MAINMENU);
 }
 }

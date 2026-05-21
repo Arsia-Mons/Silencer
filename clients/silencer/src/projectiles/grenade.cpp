@@ -97,7 +97,7 @@ void Grenade::Tick(World & world){
 							plume->SetPosition(x + (rand() % 33) - 16, y + (rand() % 33) - 16);
 						}
 					}
-					for(std::list<Object *>::iterator it = world.objectlist.begin(); it != world.objectlist.end(); it++){
+					for(std::list<Object *>::iterator it = world.objects.objectlist.begin(); it != world.objects.objectlist.end(); it++){
 						Object * object = *it;
 						//int radius = 500;
 						if(object && object->ishittable && object->id != ownerid && world.map.TeamNumberFromY(y) == world.map.TeamNumberFromY(object->y)){
@@ -389,7 +389,7 @@ void Grenade::Move(Object & object, World & world, int v){
 }
 
 void Grenade::NeutronBlast(World & world, Sint16 y, Uint16 ownerid){
-	for(std::list<Object *>::iterator it = world.objectlist.begin(); it != world.objectlist.end(); it++){
+	for(std::list<Object *>::iterator it = world.objects.objectlist.begin(); it != world.objects.objectlist.end(); it++){
 		Object * object = *it;
 		if(object && object->ishittable && world.map.TeamNumberFromY(y) == world.map.TeamNumberFromY(object->y)){
 			bool invulnerable = false;

@@ -4,6 +4,33 @@ All notable changes to Silencer are documented here.
 
 ## [Unreleased]
 
+### Game client
+
+#### World subsystem class extraction — phase 2 (#216)
+
+- `World` decomposed into 5 owned subsystem classes, each with its own `.h` + `.cpp` in `src/world/`: `WorldObjectRegistry`, `WorldMessaging`, `WorldNetwork`, `WorldPeerRegistry`, `WorldReplication`.
+- All callers updated to go through the subsystem public API; reference shims removed.
+- `World` is now a thin coordinator. Public API and runtime behaviour unchanged.
+
+#### Bug fixes
+
+- Fixed on-screen keyboard not appearing on ROG Ally / handheld Windows (#220) — `SDL_HINT_ENABLE_SCREEN_KEYBOARD` was not set; SDL3 requires it (before `SDL_Init`) to show the OS keyboard when `SDL_StartTextInput` is active.
+- Fixed unity build collision on `kLegacyRenderWidth/Height` (#220) — constants are now defined once in `game_renderer.h` as `inline constexpr` instead of per-file.
+
+## [v00053] — 2026-05-18
+
+### Game client
+
+#### On-screen keyboard for handheld Windows (#197)
+
+- `SDL_StartTextInput` / `SDL_StopTextInput` now called on text field focus/blur in `Game::RenderClientUiFrame`, triggering the OS on-screen keyboard on handheld Windows devices (ROG Ally, Steam Deck, etc.).
+- `UiInteractionRegistry::HasTextInputFocus()` added to track which field holds focus.
+
+#### Bug fixes
+
+- Fixed null-pointer dereference on `GameStateObject` after `CreateObject` — was causing a SIGSEGV crash on ALLY10c.
+- Fixed `build.sh` crash when `ninja` is not installed (empty `gen` array with `set -u`).
+
 ## [v00052] — 2026-05-17
 
 ### Game client

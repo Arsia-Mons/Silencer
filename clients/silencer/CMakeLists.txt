@@ -66,7 +66,7 @@ else()
 	add_executable(${SILENCER_TARGET} ${sources})
 endif()
 
-target_compile_features(${SILENCER_TARGET} PUBLIC cxx_std_14)
+target_compile_features(${SILENCER_TARGET} PUBLIC cxx_std_20)
 
 if(WIN32)
 	# Strip <winsock.h> (and other legacy subsystems) out of <windows.h>.
@@ -95,6 +95,24 @@ if(SILENCER_UNITY_BUILD)
 		file(GLOB_RECURSE _mm_sources src/*.mm)
 		set_source_files_properties(${_mm_sources} PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON)
 	endif()
+	# The Clay primitives and the lobby panels each use an anonymous
+	# namespace with a shared vocabulary (`g_payloads`, `g_customData`,
+	# `kPayloadCapacity`, `AllocCustomData`, `FromStd`, `kScrollbarBank`,
+	# `OnCreateClicked`, …). Anonymous namespaces re-open in the same
+	# translation unit, so concatenating two of these into one jumbo TU
+	# produces redefinition errors on every shared symbol — and the
+	# panel files also bring `TextInput` / `Box` / etc. into the global
+	# namespace via `using`, which trips sibling screen TUs in the same
+	# batch (e.g. lobby_connect_screen.cpp's `TextInput * passwordinput`
+	# becomes ambiguous). Until the per-file arenas + `using` decls are
+	# refactored into uniquely-scoped storage, build these as individual
+	# TUs.
+	file(GLOB _clay_unsafe_sources
+		src/ui/primitives/*.cpp
+		src/ui/runtime/*.cpp
+		src/render/clay_ui_tests/*.cpp
+		src/client/ui/screens/lobby/*.cpp)
+	set_source_files_properties(${_clay_unsafe_sources} PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON)
 endif()
 
 # Compile HLSL → DXIL bytecode headers for the SDL3 GPU backend. macOS keeps
@@ -125,6 +143,12 @@ target_include_directories(${SILENCER_TARGET} PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}/src/audio"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/input"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/world"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/world/network"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/world/objects"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/world/gameplay"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/world/messaging"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/world/map"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/world/physics"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/actors"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/actors/core"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/actors/bt"
@@ -134,20 +158,23 @@ target_include_directories(${SILENCER_TARGET} PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}/src/objects"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/stations"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/ui"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/ui/components"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/ui/panels"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/ui/modals"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/ui/screens"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/ui/screens/main_menu"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/ui/screens/options"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/ui/screens/lobby_connect"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/ui/screens/update"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/ui/screens/lobby"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/ui/screens/lobby/panels"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/ui/screens/lobby/modals"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/ui/screens/mission_summary"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/ui/runtime"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/client/ui"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/client/ui/modals"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/client/ui/screens"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/client/ui/screens/main_menu"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/client/ui/screens/options"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/client/ui/screens/lobby_connect"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/client/ui/screens/update"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/client/ui/screens/lobby"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/client/ui/screens/mission_summary"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/net"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/game"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/game/modes"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/game/session"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/game/actor"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/game/state"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/game/replay"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/updater"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/resources"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/gas"
@@ -180,6 +207,7 @@ target_compile_definitions(${SILENCER_TARGET} PRIVATE
 	SILENCER_VERSION="${SILENCER_VERSION}"
 	SILENCER_MAP_API_URL="${SILENCER_MAP_API_URL}"
 	SILENCER_ADMIN_API_URL="${SILENCER_ADMIN_API_URL}"
+	SILENCER_HAVE_LOBBY_UI=1
 )
 
 find_package(ZLIB REQUIRED)

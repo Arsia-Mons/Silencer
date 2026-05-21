@@ -6,8 +6,17 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 
 # Cross-platform binary detection: macOS uses an .app bundle. On
 # Windows the win-ninja-unity preset writes to build-unity/.
+# Prefer the worktree-root build/ first — in worktrees the canonical
+# build lives there and clients/silencer/build/ may be a stale leftover
+# from a pre-worktree checkout (see progress.txt P19 / P20).
 if [ -z "${SILENCER_BIN:-}" ]; then
-  if [ -x "$REPO_ROOT/clients/silencer/build/Silencer.app/Contents/MacOS/Silencer" ]; then
+  if [ -x "$REPO_ROOT/build/Silencer.app/Contents/MacOS/Silencer" ]; then
+    SILENCER_BIN="$REPO_ROOT/build/Silencer.app/Contents/MacOS/Silencer"
+  elif [ -x "$REPO_ROOT/build/silencer" ]; then
+    SILENCER_BIN="$REPO_ROOT/build/silencer"
+  elif [ -x "$REPO_ROOT/build/Silencer.exe" ]; then
+    SILENCER_BIN="$REPO_ROOT/build/Silencer.exe"
+  elif [ -x "$REPO_ROOT/clients/silencer/build/Silencer.app/Contents/MacOS/Silencer" ]; then
     SILENCER_BIN="$REPO_ROOT/clients/silencer/build/Silencer.app/Contents/MacOS/Silencer"
   elif [ -x "$REPO_ROOT/clients/silencer/build/silencer" ]; then
     SILENCER_BIN="$REPO_ROOT/clients/silencer/build/silencer"
@@ -18,7 +27,7 @@ if [ -z "${SILENCER_BIN:-}" ]; then
   elif [ -x "$REPO_ROOT/clients/silencer/build-release/Silencer.exe" ]; then
     SILENCER_BIN="$REPO_ROOT/clients/silencer/build-release/Silencer.exe"
   else
-    echo "no silencer binary found under clients/silencer/build*/" >&2
+    echo "no silencer binary found under build*/ or clients/silencer/build*/" >&2
     exit 1
   fi
 fi

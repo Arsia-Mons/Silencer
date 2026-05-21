@@ -23,6 +23,7 @@ public:
 	
 private:
 	Uint8 state_i;
+	Uint32 tickcount;
 	SOCKET sockethandle;
 	std::vector<Uint32> banlist;
 };

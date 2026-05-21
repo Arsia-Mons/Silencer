@@ -1,12 +1,5 @@
 #include "objecttypes.h"
 #include "overlay.h"
-#include "interface.h"
-#include "button.h"
-#include "toggle.h"
-#include "selectbox.h"
-#include "scrollbar.h"
-#include "textbox.h"
-#include "textinput.h"
 #include "state.h"
 #include "team.h"
 #include "player.h"
@@ -42,6 +35,7 @@
 #include "magistrate.h"
 #include "vanta.h"
 #include "baseexit.h"
+#include "gamestateobject.h"
 
 ObjectTypes::ObjectTypes(){
 	memset(serializedsize, 0, sizeof(serializedsize));
@@ -51,27 +45,6 @@ Object * ObjectTypes::CreateFromType(Uint8 type){
 	switch(type){
 		case OVERLAY:
 			return (Object *)new Overlay();
-		break;
-		case INTERFACE:
-			return (Object *)new Interface();
-		break;
-		case BUTTON:
-			return (Object *)new Button();
-		break;
-		case TOGGLE:
-			return (Object *)new Toggle();
-		break;
-		case SELECTBOX:
-			return (Object *)new SelectBox();
-		break;
-		case SCROLLBAR:
-			return (Object *)new ScrollBar();
-		break;
-		case TEXTBOX:
-			return (Object *)new TextBox();
-		break;
-		case TEXTINPUT:
-			return (Object *)new TextInput();
 		break;
 		case STATE:
 			return (Object *)new State();
@@ -177,6 +150,9 @@ Object * ObjectTypes::CreateFromType(Uint8 type){
 		break;
 		case VANTA:
 			return (Object *)new Vanta();
+		break;
+		case GAMESTATEOBJ:
+			return (Object *)new GameStateObject();
 		break;
 	}
 	return 0;

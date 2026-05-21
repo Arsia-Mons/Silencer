@@ -1,225 +1,142 @@
 #ifndef GAME_H
 #define GAME_H
 
-#include "renderdevice.h"
-#include "renderer.h"
-#include "input.h"
-#include "keybinds.h"
-#include "state.h"
-#include "interface.h"
-#include "button.h"
-#include "overlay.h"
-#include "textbox.h"
-#include "updater.h"
 #include "controlserver.h"
+#include "input/game_input.h"
 #include "inputserver.h"
+#include "render/game_renderer.h"
+#include "renderer.h"
 #include "screen_context.h"
-#include "game_state.h"
-#include "map_downloader.h"
-#include "ambience_mixer.h"
-#include <array>
+#include "game_summary.h"
+#include "state.h"
+#include "state/game_state.h"
+#include "session/game_session.h"
+#include "ui/game_ui_pipeline.h"
+#include "updater.h"
+#include "world.h"
 #include <memory>
+#include <string>
 #include <vector>
 
 class Screen;
 class Modal;
+class LobbyGame;
 
 class Game
 {
 public:
-	Game();
-	~Game();
-	bool Load(char * cmdline);
-	bool Loop(void);
-	bool HandleSDLEvents(void);
-	void LoadProgressCallback(int progress, int totalprogressitems);
+Game();
+~Game();
+bool Load(char * cmdline);
+bool Loop();
+bool HandleSDLEvents();
+void LoadProgressCallback(int progress, int totalprogressitems);
 
-	friend class Audio;
-	friend class ScreenContext;
+friend class Audio;
+friend class ScreenContext;
+friend class GameRenderer;
+friend class GameInput;
+friend class GameUiPipeline;
+friend class GameSession;
 
-public:
-	// Exposed for ControlDispatch (game-thread only).
-	int GetFrameCount() const { return frames; }
-	static const char* StateName(Uint8 s);
-	Uint8 GetState() const { return state; }
-	Uint16 GetCurrentInterfaceId() const { return currentinterface; }
-	class World& GetWorld() { return world; }
-	nlohmann::json GetWorldSummary();
-	const Surface& GetScreenBuffer() const { return screenbuffer; }
-	const SDL_Color* GetPaletteColors() const { return palettecolors; }
-	Renderer& GetRenderer() { return renderer; }
-	bool IsLiveMultiplayer() const;
-	bool GoBack(void);
-	struct PendingWait {
-		ControlCommand cmd;
-		Uint64 deadline_ms = 0;   // 0 = no wallclock deadline
-		int frames_left = -1;     // <0 = no frame deadline
-		std::string wait_state;   // for wait_for_state
-	};
-	std::vector<PendingWait> pendingWaits;
-	bool quitRequested = false;
-	bool paused;
-	int stepFramesRemaining;
-	Uint64 stepWallclockDeadlineMs;
-	int controlPort;
-	int tuiInputPort;
-	bool headless;
-	// TUI mode: audio enabled, no SDL window/events, frames stream to a TS
-	// frontend over TCP via TUIBackend. Input arrives via the dedicated binary
-	// input channel (InputServer, --tui-input-port) rather than SDL keyboard
-	// polling. Edge-triggered key events for menu nav still use the control
-	// socket "key" op.
-	bool tui;
+int GetFrameCount() const { return frames; }
+static const char * StateName(Uint8 s);
+Uint8 GetState() const { return state; }
+World & GetWorld() { return world; }
+ScreenContext & GetScreenContext() { return screenContext; }
+WorldSummary GetWorldSummary();
+Surface & GetScreenBuffer() { return gameRenderer.GetScreenBuffer(); }
+const Surface & GetScreenBuffer() const { return gameRenderer.GetScreenBuffer(); }
+const SDL_Color * GetPaletteColors() const { return gameRenderer.GetPaletteColors(); }
+Renderer & GetRenderer() { return renderer; }
+silencer::client_ui::ClientUiInput & UiInput() { return gameUiPipeline.UiInput(); }
+const silencer::client_ui::ClientUiInput & UiInput() const { return gameUiPipeline.UiInput(); }
+const silencer::ui::UiInputState & CurrentUiInput() const { return gameUiPipeline.CurrentUiInput(); }
+silencer::ui::UiInteractionRegistry & UiInteractions() { return gameUiPipeline.UiInteractions(); }
+const silencer::ui::UiInteractionRegistry & UiInteractions() const { return gameUiPipeline.UiInteractions(); }
+silencer::client_ui::InGameUiController & InGameUi() { return gameUiPipeline.InGameUi(); }
+bool ResizeRenderSurface(int width, int height);
+bool ResizeRenderSurfacePixels(int width, int height);
+bool SyncRenderSurfaceToWindowPixels();
+bool IsLiveMultiplayer() const;
+bool GoBack();
+struct PendingWait {
+ControlCommand cmd;
+Uint64 deadline_ms = 0;
+int frames_left = -1;
+std::string wait_state;
+};
+std::vector<PendingWait> pendingWaits;
+bool quitRequested = false;
+bool paused;
+int stepFramesRemaining;
+Uint64 stepWallclockDeadlineMs;
+int controlPort;
+int tuiInputPort;
+bool headless;
+bool tui;
 
-	// Screen-stack ops. Every menu surface is a Screen; the stack drives
-	// rendering and input via TickActiveScreen() at the top of Tick().
-	void PushScreen(std::unique_ptr<Screen> s);
-	void PopScreen();
-	void ReplaceScreen(std::unique_ptr<Screen> s);
-	Screen * GetTopScreen() const;
+void PushScreen(std::unique_ptr<Screen> s);
+void PopScreen();
+void ReplaceScreen(std::unique_ptr<Screen> s);
+Screen * GetTopScreen() const;
+bool HasUiInputTarget();
 
-	// Keybind access for ControlDispatch.
-	KeyMap& GetKeyMap() { return keymap; }
-	const KeyMap& GetKeyMap() const { return keymap; }
+KeyMap & GetKeyMap() { return gameInput.GetKeyMap(); }
+const KeyMap & GetKeyMap() const { return gameInput.GetKeyMap(); }
+const GamepadState & GetGamepadState() const { return gameInput.GetGamepadState(); }
+SDL_Gamepad * GetGamepad() const { return gameInput.GetGamepad(); }
 
-	// Gamepad access for screens that need to capture rebind input or
-	// query the connected pad type (e.g. OptionsControlsScreen).
-	const GamepadState& GetGamepadState() const { return gamepadstate; }
-	SDL_Gamepad * GetGamepad() const { return gamepad; }
-
-	// LobbyScreen + per-panel interop. Public so panels can reach in via
-	// `ScreenContext::game`.
-	Uint16 currentinterface;
-	Uint32 currentlobbygameid;
-	bool minimized;
-	bool creategameclicked;
-	bool joininggame;
-	void JoinGame(LobbyGame & lobbygame, char * password = 0);
-	void SpectateGame(LobbyGame & lobbygame, char * password = 0);
-	// Tear down a joined game's session/world state (Disconnect, switch
-	// authority, destroy team overlays, rejoin previous chat channel). UI
-	// concerns (panel swap, map-name overlay) stay on LobbyScreen.
-	void LeaveJoinedGame();
-	// Toggle in-lobby team overlay visibility. Called by LobbyScreen's
-	// right-side panel swaps (ShowGameTech / TearDownRightPanels) when
-	// entering / leaving the tech-choice surface.
-	void ShowTeamOverlays(bool show);
+void JoinGame(LobbyGame & lobbygame, char * password = 0);
+void SpectateGame(LobbyGame & lobbygame, char * password = 0);
+void LeaveJoinedGame();
 
 private:
-	bool Tick(void);
-	// Gameplay-state Tick bodies — one per state. Each lives in its own
-	// src/game/tick/tick_*.cpp file. The switch in Tick() dispatches to
-	// these. Menu/screen states (MAINMENU, LOBBY, OPTIONS*, …) stay inline
-	// in the dispatcher — they're trivial PushScreen wrappers.
-	void TickFadeOut();
-	void TickInGame();
-	void TickSinglePlayerGame();
-	void TickHostGame();
-	void TickJoinGame();
-	void TickTestGame();
-	void TickReplayGame();
-	void Present(void);
-	bool SetupRenderDevice(void);
-	// Edge-triggered scancode handlers. Called from HandleSDLEvents on real
-	// SDL key events, and from Loop()'s TUI branch when comparing the
-	// previous scancode bitmask against a freshly received one. Centralising
-	// them keeps the in-game ESC quitstate machine, F1 player-list overlay,
-	// debug toggles, etc. working identically in both paths.
-	void OnScancodeDown(int scancode);
-	void OnScancodeUp(int scancode);
-	static Uint32 TimerCallback(void * userdata, SDL_TimerID timerID, Uint32 interval);
-	void SetColors(SDL_Color * colors);
-	void UpdateInputState(Input & input);
-	bool LoadMap(const char * name);
-	void UnloadGame(void);
-	bool CheckForQuit(void);
-	bool CheckForEndOfGame(void);
-	bool CheckForConnectionLost(void);
-	void ProcessInGameInterfaces(void);
-	void ShowDeployMessage(void);
-	void GiveDefaultItems(Player & player);
-	void GoToState(Uint8 newstate);
-	Updater updater;
-	// Display name for the first key bound to an action; "(unbound)" if none.
-	// Used by tutorial overlays that say "press %s to fire".
-	const char * GetActionKeyDisplayName(Action a);
-	KeyMap keymap;
-	GamepadState gamepadstate;
-	SDL_Gamepad * gamepad;
-	void OpenFirstGamepad(void);
-	void PollGamepadState(void);
-	Uint8 keystate[SDL_SCANCODE_COUNT];
-	Uint8 state;
-	Uint8 nextstate;
-	Uint8 fade_i;
-	bool stateisnew;
-	bool nextstateprocessed;
-	class World world;
-	Renderer renderer;
-	SDL_Window * window;
-	RenderDevice * renderdevice;
-	SDL_Color palettecolors[256]; // CPU copy — for ffmpeg replay pixel export
-	Surface screenbuffer;
-	int frames;
-	int fps;
-	Uint64 lasttick;
-	Uint16 sharedstate;
-	int oldselecteditem;
-	Uint8 singleplayermessage;
-	bool updatetitle;
-	Uint32 lastannouncedgameid;
-	Uint8 lastannouncedstatus;
-	bool deploymessageshown;
-	int quitscancode;
-	bool interfaceenterfix;
-	bool fullscreentoggled;
-	char * replayfile;
-	ControlServer controlserver;
-	InputServer inputserver;
-	// TUI mouse edge-detection state. Tracks the last (x, y, down) we
-	// applied so the TUI loop can synthesize ProcessMousePress / Move
-	// calls on transitions, mirroring HandleSDLEvents on native.
-	Uint16 tui_prev_mouse_x;
-	Uint16 tui_prev_mouse_y;
-	bool   tui_prev_mouse_down;
-	bool   tui_have_prev_mouse;
-	void DrainControlQueue();
-	void PostFrameReplies();
+bool Tick();
+void TickFadeOut();
+void TickInGame();
+void TickSinglePlayerGame();
+void TickHostGame();
+void TickJoinGame();
+void TickTestGame();
+void TickReplayGame();
+void Present();
+void GoToState(Uint8 newstate);
+void DrainControlQueue();
+void PostFrameReplies();
 
-	// mapDownloader must be declared before ambienceMixer — the latter's
-	// constructor captures it by reference (for ListFiles in music selection).
-	MapDownloader mapDownloader;
-	AmbienceMixer ambienceMixer;
+World world;
+Renderer renderer;
+GameRenderer gameRenderer;
+GameInput gameInput;
+GameUiPipeline gameUiPipeline;
+GameSession gameSession;
 
-	std::vector<std::unique_ptr<Screen>> screenStack;
-	ScreenContext screenContext;
-	void TickActiveScreen();
-	// Set by GoToState; processed at the next Tick() entry to pop screens
-	// safely after the active screen's Tick has returned. Avoids destroying
-	// a screen mid-Tick when a button click triggers a state transition.
-	bool screenStackPendingTeardown = false;
+public:
+bool minimized;
+bool creategameclicked;
+Uint32 & currentlobbygameid;
+bool & joininggame;
 
-	// Profile to restore when a gamepad disconnects.  Stays empty when the
-	// active profile was already "gamepad" before the pad was connected.
-	std::string prevGamepadProfile;
-
-	// Per-direction software-repeat state for gamepad menu navigation.
-	// Gamepad events are polled each frame, not event-driven, so we
-	// synthesise key-repeat manually: first press fires immediately, further
-	// repeats fire after GAMEPAD_NAV_DELAY_MS then every GAMEPAD_NAV_REPEAT_MS.
-	static constexpr Uint32 GAMEPAD_NAV_DELAY_MS  = 300;
-	static constexpr Uint32 GAMEPAD_NAV_REPEAT_MS = 120;
-	struct GamepadNavDir {
-		bool       held     = false;
-		Uint32     nextfire = 0;  // SDL_GetTicks() value at which next repeat fires
-	};
-	GamepadNavDir gamepadNavUp;
-	GamepadNavDir gamepadNavDown;
-	GamepadNavDir gamepadNavLeft;
-	GamepadNavDir gamepadNavRight;
-	void TickGamepadMenuNav();
-	// Trigger SDL_RumbleGamepad for fire/hit/land events on the local player.
-	void TickRumble();
+private:
+Updater updater;
+ScreenContext screenContext;
+ControlServer controlserver;
+InputServer inputserver;
+Uint8 state;
+Uint8 nextstate;
+bool stateisnew;
+bool nextstateprocessed;
+Uint16 sharedstate;
+Uint8 singleplayermessage;
+bool updatetitle;
+int quitscancode;
+bool chatEnterDebounce;
+bool fullscreentoggled;
+char * replayfile;
+int frames;
+int fps;
+Uint64 lasttick;
 };
 
 #endif

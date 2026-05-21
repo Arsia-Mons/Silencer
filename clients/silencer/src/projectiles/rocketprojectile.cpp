@@ -216,7 +216,7 @@ void RocketProjectile::Tick(World & world){
 	if(state_i >= 25){
 		world.MarkDestroyObject(id);
 	}else{
-		Player * localplayer = world.GetPeerPlayer(world.localpeerid);
+		Player * localplayer = world.GetPeerPlayer(world.peers.localpeerid);
 		if(localplayer && ownerid == localplayer->id){
 			//if(!world.systemcameraactive[0]){
 				world.SetSystemCamera(0, id, 0, 20);

@@ -25,7 +25,7 @@ public:
 	Uint8 maxlevel;
 	Uint8 maxplayers;
 	Uint8 maxteams;
-	Uint8 extra;
+	Uint8 modeId;      // GameModeId — carried in the wire field formerly named 'extra'
 	bool spectatable;
 	// Set from the trailing byte the lobby appends to MSG_NEWGAME (lobby→client
 	// only). Not part of LobbyGame::Serialize — see lobby.cpp MSG_NEWGAME handler.

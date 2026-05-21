@@ -12,7 +12,7 @@ using namespace GameState;
 
 void Game::TickHostGame(){
 	if(stateisnew){
-		world.lagsimulator.Activate(200, 200, 0.0f);
+		world.network.lagsimulator.Activate(200, 200, 0.0f);
 		world.Listen(12456);
 		world.DestroyAllObjects();
 		Audio::GetInstance().StopMusic();
@@ -20,7 +20,6 @@ void Game::TickHostGame(){
 		world.gameinfo.accountid = 1;
 		world.dedicatedserver.active = true;
 		world.dedicatedserver.accountid = 1;
-		currentinterface = 0;
 		State * newsharedstateobject = static_cast<State *>(world.CreateObject(ObjectTypes::STATE));
 		sharedstate = newsharedstateobject->id;
 		newsharedstateobject->state = 0;
@@ -31,28 +30,28 @@ void Game::TickHostGame(){
 		}
 		stateisnew = false;
 	}
-	mapDownloader.ProcessMapDownload();
+	gameSession.MapDownloaderRef().ProcessMapDownload();
 	/*if(world.tickcount % 48 == 0){
 		world.SendPeerList();
 	}*/
-	if(!world.map.loaded && world.peercount >= 1 && world.AllPeersLoadedGameInfo() && world.AllPeersDownloadedMap()){
-		screenbuffer.Clear(0);
+	if(!world.map.loaded && world.peers.peercount >= 1 && world.AllPeersLoadedGameInfo() && world.AllPeersDownloadedMap()){
+		GetScreenBuffer().Clear(0);
 		if(world.replay.IsRecording()){
 			world.replay.WriteStart();
 		}
 		//char mapname[256];
 		//sprintf(mapname, "level/%s", world.gameinfo.mapname);
-		LoadMap(mapDownloader.FindMap(world.gameinfo.mapname, &world.gameinfo.maphash).c_str());
+		gameSession.LoadMap(gameSession.MapDownloaderRef().FindMap(world.gameinfo.mapname, &world.gameinfo.maphash).c_str());
 		renderer.palette.SetPalette(0);
 		renderer.palette.SetParallaxColors(world.map.parallax);
-		SetColors(renderer.palette.GetColors());
+		gameRenderer.SetColors(renderer.palette.GetColors());
 		State * sharedstateobject = static_cast<State *>(world.GetObjectFromId(sharedstate));
 		if(sharedstateobject){
 			sharedstateobject->state = 2;
 		}
 		//world.GetAuthorityPeer()->controlledlist.clear();
 		world.gameplaystate = World::INGAME;
-		for(std::list<Object *>::iterator it = world.objectlist.begin(); it != world.objectlist.end(); it++){
+		for(std::list<Object *>::iterator it = world.objects.objectlist.begin(); it != world.objects.objectlist.end(); it++){
 			Object * object = *it;
 			switch(object->type){
 				case ObjectTypes::TEAM:{
@@ -69,12 +68,12 @@ void Game::TickHostGame(){
 								Uint8 teamcolor = team->GetColor();
 								player->suitcolor = (((teamcolor >> 4) - i) << 4) + (teamcolor & 0xF);
 								for(int j = 0; j < 5; j++){
-									world.peerlist[team->peers[i]]->techchoices |= 1 << (rand() % 10);
+									world.peers.peerlist[team->peers[i]]->techchoices |= 1 << (rand() % 10);
 								}
-								world.peerlist[team->peers[i]]->techchoices = 0xffffffff;
-								world.peerlist[team->peers[i]]->controlledlist.clear();
-								world.peerlist[team->peers[i]]->controlledlist.push_back(player->id);
-								GiveDefaultItems(*player);
+								world.peers.peerlist[team->peers[i]]->techchoices = 0xffffffff;
+								world.peers.peerlist[team->peers[i]]->controlledlist.clear();
+								world.peers.peerlist[team->peers[i]]->controlledlist.push_back(player->id);
+								gameSession.GiveDefaultItems(*player);
 							}
 						}
 					}
@@ -88,7 +87,7 @@ void Game::TickHostGame(){
 void Game::TickJoinGame(){
 	if(stateisnew){
 		strcpy(world.gameinfo.mapname, "STAR72.SIL");
-		mapDownloader.CalculateMapHash(mapDownloader.FindMap(world.gameinfo.mapname).c_str(), &world.gameinfo.maphash);
+		gameSession.MapDownloaderRef().CalculateMapHash(gameSession.MapDownloaderRef().FindMap(world.gameinfo.mapname).c_str(), &world.gameinfo.maphash);
 		world.gameinfo.accountid = 1;
 		world.gameinfo.loaded = true;
 		sharedstate = 0;
@@ -96,10 +95,9 @@ void Game::TickJoinGame(){
 		authoritypeer->ip = ntohl(inet_addr("127.0.0.1"));
 		authoritypeer->port = 12456;
 		world.Connect(rand() % 5, 1);
-		mapDownloader.LoadMapData(mapDownloader.FindMap(world.gameinfo.mapname, &world.gameinfo.maphash).c_str());
+		gameSession.MapDownloaderRef().LoadMapData(gameSession.MapDownloaderRef().FindMap(world.gameinfo.mapname, &world.gameinfo.maphash).c_str());
 		//printf("map data: %d %d\n", world.currentmapdatalength, world.currentmapdatamax);
 		Audio::GetInstance().StopMusic();
-		currentinterface = 0;
 		world.DestroyAllObjects();
 		stateisnew = false;
 	}else{
@@ -107,7 +105,7 @@ void Game::TickJoinGame(){
 		if(sharedstateobject && sharedstateobject->state == 2){
 			world.gameplaystate = World::INGAME;
 		}
-		mapDownloader.ProcessMapDownload();
+		gameSession.MapDownloaderRef().ProcessMapDownload();
 	}
 }
 
@@ -116,7 +114,6 @@ void Game::TickTestGame(){
 		world.GetAuthorityPeer()->controlledlist.clear();
 		world.DestroyAllObjects();
 		world.gameplaystate = World::INGAME;
-		currentinterface = 0;
 		Audio::GetInstance().StopMusic();
 		world.GetAuthorityPeer()->techchoices = 0xffffffff;//World::BUY_LASER | World::BUY_ROCKET;
 		Team * team = (Team *)world.CreateObject(ObjectTypes::TEAM);
@@ -130,7 +127,7 @@ void Game::TickTestGame(){
 		player->oldx = player->x;
 		player->oldy = player->y;
 		world.GetAuthorityPeer()->controlledlist.push_back(player->id);
-		GiveDefaultItems(*player);
+		gameSession.GiveDefaultItems(*player);
 		int botnum = 0;
 		// Spawn a mix of difficulties: 4 easy, 4 medium, 2 hard
 		const PlayerAI::Difficulty diffs[10] = {
@@ -160,25 +157,25 @@ void Game::TickTestGame(){
 			}
 		}
 		world.gameinfo.securitylevel = LobbyGame::SECHIGH;
-		LoadMap("level/ALLY10c.sil");
-		for(std::list<Object *>::iterator it = world.objectlist.begin(); it != world.objectlist.end(); it++){
+		gameSession.LoadMap("level/ALLY10c.sil");
+		for(std::list<Object *>::iterator it = world.objects.objectlist.begin(); it != world.objects.objectlist.end(); it++){
 			if((*it)->type == ObjectTypes::PLAYER){
 				Player * player = static_cast<Player *>(*it);
 				world.map.RandomPlayerStartLocation(world, player->x, player->y);
 			}
 		}
-		ShowDeployMessage();
+		gameSession.ShowDeployMessage();
 		renderer.palette.SetPalette(0);
 		renderer.palette.SetParallaxColors(world.map.parallax);
-		screenbuffer.Clear(0);
-		SetColors(renderer.palette.GetColors());
+		GetScreenBuffer().Clear(0);
+		gameRenderer.SetColors(renderer.palette.GetColors());
 		singleplayermessage = 0;
 		stateisnew = false;
 	}else{
-		/*Player * localplayer = world.GetPeerPlayer(world.authoritypeer);
+		/*Player * localplayer = world.GetPeerPlayer(world.peers.authoritypeer);
 		if(localplayer){
 			if(localplayer->state == Player::STANDINGSHOOT){
-				for(std::list<Object *>::iterator it = world.objectlist.begin(); it != world.objectlist.end(); it++){
+				for(std::list<Object *>::iterator it = world.objects.objectlist.begin(); it != world.objects.objectlist.end(); it++){
 					if((*it)->type == ObjectTypes::PLAYER){
 						Player * player = static_cast<Player *>(*it);
 						if(player->ai){
@@ -190,7 +187,7 @@ void Game::TickTestGame(){
 				}
 			}
 		}*/
-		if(CheckForQuit() || CheckForEndOfGame()){
+		if(gameSession.CheckForQuit() || gameSession.CheckForEndOfGame()){
 			GoToState(MAINMENU);
 		}
 	}

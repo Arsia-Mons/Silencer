@@ -1,4 +1,5 @@
 #include "bodypart.h"
+#include "npc_math.h"
 #include "../gas/gasloader.h"
 
 BodyPart::BodyPart() : Object(ObjectTypes::BODYPART){
@@ -33,8 +34,8 @@ void BodyPart::Tick(World & world){
 	if(platform){
 		float xn, yn;
 		platform->GetNormal(x, y, &xn, &yn);
-		xv = (xn * abs(xv)) / 2;
-		yv = (yn * abs(yv)) / 2;
+		xv = (xn * npc_math::AbsInt(xv)) / 2;
+		yv = (yn * npc_math::AbsInt(yv)) / 2;
 	}
 	x += xv;
 	y += yv;

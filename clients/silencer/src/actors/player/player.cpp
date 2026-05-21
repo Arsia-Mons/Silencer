@@ -10,6 +10,7 @@
 #include "basedoor.h"
 #include "projectile.h"
 #include "gasloader.h"
+#include "buyableitem.h"
 #include "blasterprojectile.h"
 #include "laserprojectile.h"
 #include "rocketprojectile.h"
@@ -18,9 +19,6 @@
 #include "healmachine.h"
 #include "creditmachine.h"
 #include "secretreturn.h"
-#include "interface.h"
-#include "textinput.h"
-#include "selectbox.h"
 #include "inventorystation.h"
 #include "techstation.h"
 #include "detonator.h"
@@ -30,6 +28,7 @@
 #include "bodypart.h"
 #include "walldefense.h"
 #include "actordef.h"
+#include "gamemode.h"
 #include <math.h>
 
 // Apply a data-driven animation sequence to res_bank/res_index.
@@ -96,9 +95,8 @@ Player::Player() : Object(ObjectTypes::PLAYER){
 	hacksoundchannel = -1;
 	jetpacksoundchannel = -1;
 	flamersoundchannel = -1;
-	chatinterfaceid = 0;
-	buyinterfaceid = 0;
-	techinterfaceid = 0;
+	chatActive = false;
+	chatText[0] = '\0';
 	chatwithteam = false;
 	fallingnudge = 0;
 	oldfiles = 0;
@@ -123,6 +121,8 @@ Player::Player() : Object(ObjectTypes::PLAYER){
 	oldgrenadelistsize = 0;
 	buyifacelastitem = 0;
 	buyifacelastscrolled = 0;
+	techifacelastitem = 0;
+	techifacelastscrolled = 0;
 	justjumpedfromladder = false;
 	currentprojectileid = 0;
 	ishittable = true;
@@ -258,27 +258,10 @@ void Player::Tick(World & world){
 	if(ai){
 		ai->Tick(world);
 	}
-	if(input.keychat && !chatinterfaceid && !buyinterfaceid && !techinterfaceid && this == world.GetPeerPlayer(world.localpeerid)){
+	if(input.keychat && !chatActive && !isbuying && !techstationactive && this == world.GetPeerPlayer(world.peers.localpeerid)){
 		if(!world.replay.IsPlaying()){
-			Interface * iface = (Interface *)world.CreateObject(ObjectTypes::INTERFACE);
-			if(iface){
-				TextInput * textinput = (TextInput *)world.CreateObject(ObjectTypes::TEXTINPUT);
-				if(textinput){
-					textinput->x = 100;
-					textinput->y = 100;
-					textinput->res_bank = 133;
-					textinput->fontwidth = 6;
-					textinput->draw = false;
-					textinput->uid = 1;
-					textinput->maxchars = 100;
-					textinput->maxwidth = 28;
-					//strcpy(textinput->text, "sdfsdf");
-					iface->AddObject(textinput->id);
-					iface->activeobject = textinput->id;
-					iface->ActiveChanged(world, iface, false);
-				}
-				chatinterfaceid = iface->id;
-			}
+			chatActive = true;
+			chatText[0] = '\0';
 		}
 	}
 	if(state_warp){
@@ -370,7 +353,7 @@ void Player::Tick(World & world){
 	}
 	std::vector<Uint16> detlist;
 	std::vector<Uint16> grenadelist;
-	for(std::list<Object *>::reverse_iterator it = world.objectlist.rbegin(); it != world.objectlist.rend(); it++){
+	for(std::list<Object *>::reverse_iterator it = world.objects.objectlist.rbegin(); it != world.objects.objectlist.rend(); it++){
 		Object * object = *it;
 		if(object->type == ObjectTypes::DETONATOR){
 			Detonator * detonator = static_cast<Detonator *>(object);
@@ -396,7 +379,7 @@ void Player::Tick(World & world){
 	if(currentdetonator){
 		Detonator * detonator = (Detonator *)world.GetObjectFromId(currentdetonator);
 		if(detonator){
-			if(this == world.GetPeerPlayer(world.localpeerid)){
+			if(this == world.GetPeerPlayer(world.peers.localpeerid)){
 				world.SetSystemCamera(1, detonator->id, 0, -35);
 			}
 		}else{
@@ -407,7 +390,7 @@ void Player::Tick(World & world){
 		Grenade * grenade = (Grenade *)world.GetObjectFromId(currentgrenade);
 		if(grenade){
 			if(grenade->WasThrown()){
-				if(this == world.GetPeerPlayer(world.localpeerid)){
+				if(this == world.GetPeerPlayer(world.peers.localpeerid)){
 					world.SetSystemCamera(0, grenade->id, 0, -30);
 				}
 			}else{
@@ -530,71 +513,6 @@ void Player::Tick(World & world){
 			techstationactive = false;
 		}
 	}
-	if(world.GetPeerPlayer(world.localpeerid) == this){
-		if(isbuying && !buyinterfaceid){
-			Interface * iface = (Interface *)world.CreateObject(ObjectTypes::INTERFACE);
-			if(iface){
-				SelectBox * selectbox = (SelectBox *)world.CreateObject(ObjectTypes::SELECTBOX);
-				selectbox->draw = false;
-				selectbox->uid = 1;
-				int i = 0;
-				for(std::vector<BuyableItem *>::iterator it = world.buyableitems.begin(); it != world.buyableitems.end(); it++, i++){
-					if(BuyAvailable(world, (*it)->id)){
-						selectbox->AddItem((*it)->name, (*it)->id);
-					}
-				}
-				selectbox->selecteditem = buyifacelastitem;
-				selectbox->scrolled = buyifacelastscrolled;
-				iface->AddObject(selectbox->id);
-				iface->activeobject = selectbox->id;
-				Audio::GetInstance().Play(world.resources.soundbank[GASLoader::Get().player.soundMenuSelect], 96);
-				buyinterfaceid = iface->id;
-			}
-		}else
-		if(!isbuying && buyinterfaceid && !world.replaying){
-			Interface * iface = (Interface *)world.GetObjectFromId(buyinterfaceid);
-			if(iface){
-				iface->DestroyInterface(world, iface);
-			}
-			buyinterfaceid = 0;
-		}
-		
-		if(techstationactive && !techinterfaceid){
-			Interface * iface = (Interface *)world.CreateObject(ObjectTypes::INTERFACE);
-			if(iface){
-				Team * team = GetTeam(world);
-				SelectBox * selectbox = (SelectBox *)world.CreateObject(ObjectTypes::SELECTBOX);
-				selectbox->draw = false;
-				selectbox->uid = 1;
-				int i = 0;
-				for(std::vector<BuyableItem *>::iterator it = world.buyableitems.begin(); it != world.buyableitems.end(); it++, i++){
-					BuyableItem * buyableitem = *it;
-					if(InOwnBase(world)){
-						if(team && buyableitem->techchoice & team->disabledtech){
-							selectbox->AddItem((*it)->name, (*it)->id);
-						}
-					}else{
-						Team * otherteam = TeamOfCurrentBase(world);
-						if(otherteam && buyableitem->techchoice & otherteam->GetAvailableTech(world)){
-							selectbox->AddItem((*it)->name, (*it)->id);
-						}
-					}
-				}
-				selectbox->selecteditem = 0;
-				iface->AddObject(selectbox->id);
-				iface->activeobject = selectbox->id;
-				Audio::GetInstance().Play(world.resources.soundbank[GASLoader::Get().player.soundMenuSelect], 96);
-				techinterfaceid = iface->id;
-			}
-		}else
-		if(!techstationactive && techinterfaceid && !world.replaying){
-			Interface * iface = (Interface *)world.GetObjectFromId(techinterfaceid);
-			if(iface){
-				iface->DestroyInterface(world, iface);
-			}
-			techinterfaceid = 0;
-		}
-	}
 	if(fuel < maxfuel){
 		if(!fuellow){
 			fuel--;
@@ -610,7 +528,7 @@ void Player::Tick(World & world){
 		}
 	}
 	if(fuel == maxfuel && fuellow){
-		Player * localplayer = world.GetPeerPlayer(world.localpeerid);
+		Player * localplayer = world.GetPeerPlayer(world.peers.localpeerid);
 		if(localplayer && localplayer->id == id){
 			Audio::GetInstance().Play(world.resources.soundbank[GASLoader::Get().player.soundWeaponCharged], 96);
 		}
@@ -688,7 +606,7 @@ void Player::Tick(World & world){
 		break;
 	}
 	if(currentweapon != oldweapon && !world.replaying){
-		Player * localplayer = world.GetPeerPlayer(world.localpeerid);
+		Player * localplayer = world.GetPeerPlayer(world.peers.localpeerid);
 		if(localplayer && localplayer->id == id && world.tickcount - lastweaponchangesound >= 4){
 			switch(currentweapon){
 				case 0:
@@ -1107,7 +1025,7 @@ void Player::Tick(World & world){
 									}
 								}
 							}else{
-								//if(this == world.GetPeerPlayer(world.localpeerid)){
+								//if(this == world.GetPeerPlayer(world.peers.localpeerid)){
 									world.ShowStatus("Can't build a base here", 208, true, GetPeer(world));
 								//}
 							}
@@ -1131,12 +1049,12 @@ void Player::Tick(World & world){
 										RemoveInventoryItem(INV_BASEDOOR);
 									}
 								}else{
-									//if(this == world.GetPeerPlayer(world.localpeerid)){
+									//if(this == world.GetPeerPlayer(world.peers.localpeerid)){
 										world.ShowStatus("Can't build a base here", 208, true, GetPeer(world));
 									//}
 								}
 							}else{
-								//if(this == world.GetPeerPlayer(world.localpeerid)){
+								//if(this == world.GetPeerPlayer(world.peers.localpeerid)){
 									world.ShowStatus("Cannot acquire dimensional grid", 208, true, GetPeer(world));
 								//}
 							}
@@ -1576,7 +1494,7 @@ void Player::Tick(World & world){
 							discovered = true;
 						}
 						for(int i = 0; i < 4; i++){
-							Peer * peer = world.peerlist[team->peers[i]];
+							Peer * peer = world.peers.peerlist[team->peers[i]];
 							if(peer){
 								world.SendSound(GASLoader::Get().player.soundBaseAlarm.c_str(), peer, 96);
 								if(discovered){
@@ -1585,7 +1503,7 @@ void Player::Tick(World & world){
 							}
 						}
 					}
-					/*Player * localplayer = world.GetPeerPlayer(world.localpeerid);
+					/*Player * localplayer = world.GetPeerPlayer(world.peers.localpeerid);
 					if(localplayer && id != localplayer->id && basedoor->teamid != teamid){
 						basealarmplaytick = world.tickcount;
 						Team * team = localplayer->GetTeam(world);
@@ -2480,7 +2398,7 @@ void Player::Tick(World & world){
 			}
 			x += xe;
 			y += ye;
-			if(((input.keyactivate && !oldinput.keyactivate) || state_i > GASLoader::Get().player.deadAutoRespawnTick) && !state_warp && !world.winningteamid){
+			if(((input.keyactivate && !oldinput.keyactivate) || state_i > GASLoader::Get().player.deadAutoRespawnTick) && !state_warp && !world.winningteamid && (!world.gameMode || world.gameMode->AllowRespawn(world))){
 				state_hit = 0;
 				Team * team = GetTeam(world);
 				if(team && team->agency == Team::LAZARUS && canresurrect && !world.winningteamid){
@@ -2774,10 +2692,10 @@ void Player::HandleHit(World & world, Uint8 x, Uint8 y, Object & projectile){
 	}*/
 	if(health == 0 && state != DYING && state != DEAD){
 		Peer * peer = GetPeer(world);
+		Object * owner = world.GetObjectFromId(projectile.ownerid);
 		if(peer){
 			const char * killedby = "?";
 			bool killedself = false;
-			Object * owner = world.GetObjectFromId(projectile.ownerid);
 			if(owner){
 				switch(owner->type){
 					case ObjectTypes::WALLDEFENSE:{
@@ -2856,6 +2774,28 @@ void Player::HandleHit(World & world, Uint8 x, Uint8 y, Object & projectile){
 		EmitSound(world, world.resources.soundbank[GASLoader::Get().player.soundGrunt]);
 
 		if (world.IsAuthority()) {
+			if(world.gameMode){
+				world.gameMode->OnPlayerDied(world, *this, owner);
+			}
+
+			// Check if the victim's entire team has been eliminated.
+			Team* victimTeam = world.GetPeerTeam(peer ? peer->id : 0);
+			if(victimTeam && world.gameMode){
+				bool teamAlive = false;
+				for(auto* obj : world.objects.objectlist){
+					if(obj->type != ObjectTypes::PLAYER || obj->id == id) continue;
+					Player* p = static_cast<Player*>(obj);
+					if(world.GetPeerTeam(p->GetPeer(world) ? p->GetPeer(world)->id : 0) != victimTeam) continue;
+					if(p->state != DYING && p->state != DEAD){
+						teamAlive = true;
+						break;
+					}
+				}
+				if(!teamAlive){
+					world.gameMode->OnTeamEliminated(world, *victimTeam);
+				}
+			}
+
 			// Emit PLAYER_DIED so trigger scripts can respond.
 			GameEvent ev;
 			ev.type      = EventType::PLAYER_DIED;
@@ -2867,8 +2807,8 @@ void Player::HandleHit(World & world, Uint8 x, Uint8 y, Object & projectile){
 
 			// Check if ALL players are dead and emit ALL_PLAYERS_DIED.
 			bool any_alive = false;
-			for (std::list<Object *>::iterator it = world.objectlist.begin();
-			     it != world.objectlist.end(); ++it) {
+			for (std::list<Object *>::iterator it = world.objects.objectlist.begin();
+			     it != world.objects.objectlist.end(); ++it) {
 				Object * obj = *it;
 				if (obj->type != ObjectTypes::PLAYER || obj->id == id) continue;
 				Player * p = static_cast<Player *>(obj);
@@ -2906,7 +2846,7 @@ void Player::HandleInput(Input & input){
 void Player::HandleDisconnect(World & world, Uint8 peerid){
 	UnDeploy();
 	if(world.IsAuthority()){
-		Peer * peer = world.peerlist[peerid];
+		Peer * peer = world.peers.peerlist[peerid];
 		if(peer){
 			User * user = world.lobby.GetUserInfo(peer->accountid);
 			if(user){
@@ -2950,7 +2890,7 @@ Team * Player::TeamOfCurrentBase(World & world){
 	Team * team = 0;
 	int teamnumber = world.map.TeamNumberFromY(y);
 	if(teamnumber != -1){
-		for(std::vector<Uint16>::iterator it = world.objectsbytype[ObjectTypes::TEAM].begin(); it != world.objectsbytype[ObjectTypes::TEAM].end(); it++){
+		for(std::vector<Uint16>::iterator it = world.objects.objectsbytype[ObjectTypes::TEAM].begin(); it != world.objects.objectsbytype[ObjectTypes::TEAM].end(); it++){
 			Team * tempteam = static_cast<Team *>(world.GetObjectFromId(*it));
 			if(tempteam && tempteam->number == teamnumber){
 				team = tempteam;
@@ -3162,15 +3102,15 @@ Team * Player::GetTeam(World & world){
 		}
 	}
 	std::vector<Team *> teams;
-	for(std::vector<Uint16>::iterator it = world.objectsbytype[ObjectTypes::TEAM].begin(); it != world.objectsbytype[ObjectTypes::TEAM].end(); it++){
+	for(std::vector<Uint16>::iterator it = world.objects.objectsbytype[ObjectTypes::TEAM].begin(); it != world.objects.objectsbytype[ObjectTypes::TEAM].end(); it++){
 		Object * object = world.GetObjectFromId((*it));
 		teams.push_back(static_cast<Team *>(object));
 	}
 	for(std::vector<Team *>::iterator it = teams.begin(); it != teams.end(); it++){
 		Team * team = *it;
 		for(int i = 0; i < team->numpeers; i++){
-			if(world.peerlist[team->peers[i]]){
-				Player * player = world.GetPeerPlayer(world.peerlist[team->peers[i]]->id);
+			if(world.peers.peerlist[team->peers[i]]){
+				Player * player = world.GetPeerPlayer(world.peers.peerlist[team->peers[i]]->id);
 				if(player && player->id == id){
 					teamid = team->id;
 					return team;
@@ -3382,7 +3322,7 @@ bool Player::BuyItem(World & world, Uint8 id){
 				}
 			}break;
 			case World::BUY_DEFENSE:{
-				for(std::list<Object *>::iterator it = world.objectlist.begin(); it != world.objectlist.end(); it++){
+				for(std::list<Object *>::iterator it = world.objects.objectlist.begin(); it != world.objects.objectlist.end(); it++){
 					Object * object = *it;
 					if(object->type == ObjectTypes::WALLDEFENSE){
 						WallDefense * walldefense = static_cast<WallDefense *>(object);
@@ -3594,7 +3534,7 @@ void Player::UnDeploy(void){
 
 bool Player::CanExhaustInputQueue(World & world, int queuesize){
 	/*bool otherplayersinview = false;
-	for(std::vector<Uint16>::iterator it = world.objectsbytype[ObjectTypes::PLAYER].begin(); it != world.objectsbytype[ObjectTypes::PLAYER].end(); it++){
+	for(std::vector<Uint16>::iterator it = world.objects.objectsbytype[ObjectTypes::PLAYER].begin(); it != world.objects.objectsbytype[ObjectTypes::PLAYER].end(); it++){
 		Player * player = static_cast<Player *>(world.GetObjectFromId(*it));
 		if(player->id != id){
 			if(abs(player->x - x) < 400 && abs(player->y - y) < 400){
@@ -4309,7 +4249,7 @@ void Player::Warp(World & world, Sint16 x, Sint16 y){
 
 bool Player::PickUpItem(World & world, PickUp & pickup){
 	bool islocalplayer = false;
-	if(this == world.GetPeerPlayer(world.localpeerid)){
+	if(this == world.GetPeerPlayer(world.peers.localpeerid)){
 		islocalplayer = true;
 	}
 	bool pickedup = true;
@@ -4527,7 +4467,7 @@ bool Player::PickUpItem(World & world, PickUp & pickup){
 
 Peer * Player::GetPeer(World & world){
 	for(int i = 0; i < world.maxpeers; i++){
-		Peer * peer = world.peerlist[i];
+		Peer * peer = world.peers.peerlist[i];
 		if(peer){
 			for(std::list<Uint16>::iterator it = peer->controlledlist.begin(); it != peer->controlledlist.end(); it++){
 				Object * object = world.GetObjectFromId(*it);
@@ -4714,27 +4654,49 @@ bool Player::BuyAvailable(World & world, Uint8 id){
 	}*/
 	if(id == World::BUY_GIVE0){
 		Team * team = GetTeam(world);
-		if(team && team->numpeers >= 1 && team->peers[0] != world.localpeerid){
+		if(team && team->numpeers >= 1 && team->peers[0] != world.peers.localpeerid){
 			return true;
 		}
 	}
 	if(id == World::BUY_GIVE1){
 		Team * team = GetTeam(world);
-		if(team && team->numpeers >= 2 && team->peers[1] != world.localpeerid){
+		if(team && team->numpeers >= 2 && team->peers[1] != world.peers.localpeerid){
 			return true;
 		}
 	}
 	if(id == World::BUY_GIVE2){
 		Team * team = GetTeam(world);
-		if(team && team->numpeers >= 3 && team->peers[2] != world.localpeerid){
+		if(team && team->numpeers >= 3 && team->peers[2] != world.peers.localpeerid){
 			return true;
 		}
 	}
 	if(id == World::BUY_GIVE3){
 		Team * team = GetTeam(world);
-		if(team && team->numpeers >= 4 && team->peers[3] != world.localpeerid){
+		if(team && team->numpeers >= 4 && team->peers[3] != world.peers.localpeerid){
 			return true;
 		}
 	}
 	return false;
+}
+
+void Player::CollectBuyMenuItems(World & world, bool tech, std::vector<BuyableItem *> & items){
+	items.clear();
+	Team * team = GetTeam(world);
+	for(std::vector<BuyableItem *>::iterator it = world.buyableitems.begin(); it != world.buyableitems.end(); it++){
+		BuyableItem * buyableitem = *it;
+		if(!tech){
+			if(BuyAvailable(world, buyableitem->id)){
+				items.push_back(buyableitem);
+			}
+		}else if(InOwnBase(world)){
+			if(team && (buyableitem->techchoice & team->disabledtech)){
+				items.push_back(buyableitem);
+			}
+		}else{
+			Team * otherteam = TeamOfCurrentBase(world);
+			if(otherteam && (buyableitem->techchoice & otherteam->GetAvailableTech(world))){
+				items.push_back(buyableitem);
+			}
+		}
+	}
 }

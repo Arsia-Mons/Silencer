@@ -1,6 +1,6 @@
 #include "game.h"
 #include "audio.h"
-#include "interface.h"
+#include "gamemode.h"
 #include "player.h"
 #include "team.h"
 #include "world.h"
@@ -10,23 +10,10 @@ using namespace GameState;
 
 void Game::TickInGame(){
 if(/*!world.map.loaded && */stateisnew){
-	for(std::list<Object *>::iterator it = world.objectlist.begin(); it != world.objectlist.end(); it++){
-		Object * object = *it;
-		switch(object->type){
-			case ObjectTypes::TEAM:{
-				Team * team = static_cast<Team *>(object);
-				team->DestroyOverlays(world);
-			}break;
-			case ObjectTypes::INTERFACE:{
-				Interface * iface = static_cast<Interface *>(object);
-				iface->DestroyInterface(world, iface);
-			}break;
-		}
-	}
-	screenbuffer.Clear(0);
+	GetScreenBuffer().Clear(0);
 	//char mapname[7 + 256];
 	//sprintf(mapname, "level/%s", world.gameinfo.mapname);
-	if(!LoadMap(mapDownloader.FindMap(world.gameinfo.mapname, &world.gameinfo.maphash).c_str())){
+	if(!gameSession.LoadMap(gameSession.MapDownloaderRef().FindMap(world.gameinfo.mapname, &world.gameinfo.maphash).c_str())){
 		printf("Unable to load map\n");
 		if(world.replay.IsPlaying()){
 			world.replay.EndPlaying();
@@ -47,16 +34,16 @@ if(/*!world.map.loaded && */stateisnew){
 	if(world.replay.IsRecording()){
 		world.replay.WriteStart();
 	}
-	ShowDeployMessage();
+	gameSession.ShowDeployMessage();
 	Audio::GetInstance().StopMusic();
 	world.gameplaystate = World::INGAME;
-	for(std::list<Object *>::iterator it = world.objectlist.begin(); it != world.objectlist.end(); it++){
+	for(std::list<Object *>::iterator it = world.objects.objectlist.begin(); it != world.objects.objectlist.end(); it++){
 		Object * object = *it;
 		switch(object->type){
 			case ObjectTypes::TEAM:{
 				Team * team = static_cast<Team *>(object);
 				for(int i = 0; i < team->numpeers; i++){
-					Peer * peer = world.peerlist[team->peers[i]];
+					Peer * peer = world.peers.peerlist[team->peers[i]];
 					if(peer){
 						world.ingameusers.push_back(peer->accountid);
 						User * user = world.lobby.GetUserInfo(peer->accountid);
@@ -73,7 +60,7 @@ if(/*!world.map.loaded && */stateisnew){
 							player->suitcolor = teamcolor;//(((teamcolor >> 4) - i) << 4) + (teamcolor & 0xF);
 							peer->controlledlist.clear();
 							peer->controlledlist.push_back(player->id);
-							GiveDefaultItems(*player);
+							gameSession.GiveDefaultItems(*player);
 						}
 					}
 				}
@@ -81,24 +68,27 @@ if(/*!world.map.loaded && */stateisnew){
 		}
 	}
 	world.SendPeerList();
-	currentinterface = 0;
 	renderer.palette.SetPalette(0);
 	renderer.palette.SetParallaxColors(world.map.parallax);
-	screenbuffer.Clear(0);
-	SetColors(renderer.palette.GetColors());
-	ambienceMixer.LoadRandomGameMusic();
+	GetScreenBuffer().Clear(0);
+	gameRenderer.SetColors(renderer.palette.GetColors());
+	gameSession.AmbienceMixerRef().LoadRandomGameMusic();
+	// Activate the game mode specified by the lobby config.
+	delete world.gameMode;
+	world.gameMode = GameModeFactory((GameModeId)world.gameinfo.modeId);
+	world.gameMode->OnMatchStart(world);
 	stateisnew = false;
 }else{
-	if(ambienceMixer.FadedIn()){
+	if(gameSession.AmbienceMixerRef().FadedIn()){
 		//Audio::GetInstance().ambienceMixer.PlayMusic(world.resources.gamemusic);
-		ambienceMixer.PlayMusic(world.resources.gamemusic);
+		gameSession.AmbienceMixerRef().PlayMusic(world.resources.gamemusic);
 	}
 	if(world.replay.IsPlaying()){
 		// replay controls
-		if(world.localpeerid == world.authoritypeer && !deploymessageshown){
+		if(world.peers.localpeerid == world.peers.authoritypeer && !gameSession.DeployMessageShownRef()){
 			for(int i = 0; i < world.maxpeers; i++){
-				if(world.peerlist[i] && i != world.authoritypeer){
-					world.localpeerid = i;
+				if(world.peers.peerlist[i] && i != world.peers.authoritypeer){
+					world.peers.localpeerid = i;
 					world.viewedpeerid = i;
 					break;
 				}
@@ -107,8 +97,8 @@ if(/*!world.map.loaded && */stateisnew){
 		world.replay.oldx = world.replay.x;
 		world.replay.oldy = world.replay.y;
 		if(world.localinput.keymoveleft || world.localinput.keymoveright || world.localinput.keymoveup || world.localinput.keymovedown){
-			world.localpeerid = world.authoritypeer;
-			world.viewedpeerid = world.authoritypeer;
+			world.peers.localpeerid = world.peers.authoritypeer;
+			world.viewedpeerid = world.peers.authoritypeer;
 			bool inbase = false;
 			if(world.replay.y > world.map.height * 64){
 				inbase = true;
@@ -161,19 +151,19 @@ if(/*!world.map.loaded && */stateisnew){
 			world.replay.xv = 0;
 			world.replay.yv = 0;
 		}
-		if(world.localinput.keyprevcam && !world.localinputhistory[(world.tickcount - 1) % world.maxlocalinputhistory].keyprevcam){
-			for(int i = world.localpeerid - 1; i > 0; i--){
-				if(world.peerlist[i] && i != world.authoritypeer){
-					world.localpeerid = i;
+		if(world.localinput.keyprevcam && !world.replication.localinputhistory[(world.tickcount - 1) % world.maxlocalinputhistory].keyprevcam){
+			for(int i = world.peers.localpeerid - 1; i > 0; i--){
+				if(world.peers.peerlist[i] && i != world.peers.authoritypeer){
+					world.peers.localpeerid = i;
 					world.viewedpeerid = i;
 					break;
 				}
 			}
 		}
-		if(world.localinput.keynextcam && !world.localinputhistory[(world.tickcount - 1) % world.maxlocalinputhistory].keynextcam){
-			for(int i = world.localpeerid + 1; i < world.maxpeers; i++){
-				if(world.peerlist[i] && i != world.authoritypeer){
-					world.localpeerid = i;
+		if(world.localinput.keynextcam && !world.replication.localinputhistory[(world.tickcount - 1) % world.maxlocalinputhistory].keynextcam){
+			for(int i = world.peers.localpeerid + 1; i < world.maxpeers; i++){
+				if(world.peers.peerlist[i] && i != world.peers.authoritypeer){
+					world.peers.localpeerid = i;
 					world.viewedpeerid = i;
 					break;
 				}
@@ -202,15 +192,15 @@ if(/*!world.map.loaded && */stateisnew){
 	// localinput edges and writes to World::viewedpeerid + World::spectator,
 	// not localpeerid (network identity stays put for observers).
 	if(world.IsLocalObserver()){
-		Input & prevtick = world.localinputhistory[(world.tickcount - 1) % world.maxlocalinputhistory];
+		Input & prevtick = world.replication.localinputhistory[(world.tickcount - 1) % world.maxlocalinputhistory];
 		// Default-mode follow: first applicable tick after a candidate exists.
 		if(!world.spectator.initialized){
 			Uint8 picked = world.viewedpeerid;
 			bool found = false;
 			for(int i = 0; i < (int)world.maxpeers; i++){
-				Peer * p = world.peerlist[i];
+				Peer * p = world.peers.peerlist[i];
 				if(!p) continue;
-				if(i == (int)world.authoritypeer) continue;
+				if(i == (int)world.peers.authoritypeer) continue;
 				if(p->observer) continue;
 				if(p->controlledlist.empty()) continue;
 				Player * pl = world.GetPeerPlayer((Uint8)i);
@@ -222,9 +212,9 @@ if(/*!world.map.loaded && */stateisnew){
 			}
 			if(!found){
 				for(int i = 0; i < (int)world.maxpeers; i++){
-					Peer * p = world.peerlist[i];
+					Peer * p = world.peers.peerlist[i];
 					if(!p) continue;
-					if(i == (int)world.authoritypeer) continue;
+					if(i == (int)world.peers.authoritypeer) continue;
 					if(p->observer) continue;
 					if(p->controlledlist.empty()) continue;
 					picked = (Uint8)i;
@@ -241,15 +231,15 @@ if(/*!world.map.loaded && */stateisnew){
 		// its Player), auto-step to the next valid candidate so the
 		// spectator's view doesn't freeze.
 		if(world.spectator.initialized && !world.spectator.freecam){
-			Peer * cur = world.peerlist[world.viewedpeerid];
+			Peer * cur = world.peers.peerlist[world.viewedpeerid];
 			bool stale = !cur || cur->observer || cur->controlledlist.empty()
-				|| world.viewedpeerid == (Uint8)world.authoritypeer;
+				|| world.viewedpeerid == (Uint8)world.peers.authoritypeer;
 			if(stale){
 				for(int step = 1; step <= (int)world.maxpeers; step++){
 					int i = (world.viewedpeerid + step) % world.maxpeers;
-					Peer * p = world.peerlist[i];
+					Peer * p = world.peers.peerlist[i];
 					if(!p) continue;
-					if(i == (int)world.authoritypeer) continue;
+					if(i == (int)world.peers.authoritypeer) continue;
 					if(p->observer) continue;
 					if(p->controlledlist.empty()) continue;
 					world.viewedpeerid = (Uint8)i;
@@ -263,9 +253,9 @@ if(/*!world.map.loaded && */stateisnew){
 		if(world.localinput.keymoveright && !prevtick.keymoveright){
 			for(int step = 1; step <= (int)world.maxpeers; step++){
 				int i = (world.viewedpeerid + step) % world.maxpeers;
-				Peer * p = world.peerlist[i];
+				Peer * p = world.peers.peerlist[i];
 				if(!p) continue;
-				if(i == (int)world.authoritypeer) continue;
+				if(i == (int)world.peers.authoritypeer) continue;
 				if(p->observer) continue;
 				if(p->controlledlist.empty()) continue;
 				world.viewedpeerid = (Uint8)i;
@@ -275,9 +265,9 @@ if(/*!world.map.loaded && */stateisnew){
 		if(world.localinput.keymoveleft && !prevtick.keymoveleft){
 			for(int step = 1; step <= (int)world.maxpeers; step++){
 				int i = ((int)world.viewedpeerid - step + (int)world.maxpeers) % world.maxpeers;
-				Peer * p = world.peerlist[i];
+				Peer * p = world.peers.peerlist[i];
 				if(!p) continue;
-				if(i == (int)world.authoritypeer) continue;
+				if(i == (int)world.peers.authoritypeer) continue;
 				if(p->observer) continue;
 				if(p->controlledlist.empty()) continue;
 				world.viewedpeerid = (Uint8)i;
@@ -288,17 +278,17 @@ if(/*!world.map.loaded && */stateisnew){
 		// path is preserved but no input drives it.
 		world.spectator.holdshowallnames = world.localinput.keyactivate;
 	}
-	Peer * localpeer = world.peerlist[world.localpeerid];
-	if(localpeer && world.localpeerid != world.authoritypeer){
+	Peer * localpeer = world.peers.peerlist[world.peers.localpeerid];
+	if(localpeer && world.peers.localpeerid != world.peers.authoritypeer){
 		if(localpeer->controlledlist.size() == 0){
 			world.RequestPeerList();
 		}
 	}
-	if(!deploymessageshown && world.messagetype == 1 && world.message_i == 63){
+	if(!gameSession.DeployMessageShownRef() && world.messaging.messagetype == 1 && world.messaging.message_i == 63){
 		world.ShowMessage((char *)"Location : Base Arsia Mons, Surface Temperature : -7C", 96, 1);
-		deploymessageshown = true;
+		gameSession.DeployMessageShownRef() = true;
 	}
-	if(CheckForQuit()){
+	if(gameSession.CheckForQuit()){
 		world.Disconnect();
 		if(world.lobby.state == Lobby::AUTHENTICATED){
 			GoToState(LOBBY);
@@ -310,7 +300,7 @@ if(/*!world.map.loaded && */stateisnew){
 			GoToState(MAINMENU);
 		}
 	}
-	if(CheckForEndOfGame()){
+	if(gameSession.CheckForEndOfGame()){
 		if(world.lobby.state == Lobby::AUTHENTICATED){
 			GoToState(MISSIONSUMMARY);
 		}else{
@@ -320,7 +310,7 @@ if(/*!world.map.loaded && */stateisnew){
 			GoToState(MAINMENU);
 		}
 	}
-	if(CheckForConnectionLost()){
+	if(gameSession.CheckForConnectionLost()){
 		if(world.lobby.state == Lobby::AUTHENTICATED){
 			GoToState(LOBBY);
 			world.lobby.JoinChannel(world.lobby.lastchannel);

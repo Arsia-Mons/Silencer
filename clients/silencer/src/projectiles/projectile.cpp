@@ -8,6 +8,7 @@
 #include "flamerprojectile.h"
 #include "flareprojectile.h"
 #include "../gas/gasloader.h"
+#include "gamemode.h"
 
 Projectile::Projectile(){
 	shielddamage = 0;
@@ -98,6 +99,8 @@ bool Projectile::TestCollision(Object & object, World & world, Platform ** colli
 	if(object.type == ObjectTypes::PLASMAPROJECTILE || object.type == ObjectTypes::FLAREPROJECTILE){
 		skipobject = 0;
 		teamid = 0;
+	} else if(teamid && world.gameMode && world.gameMode->AllowFriendlyFire(world)){
+		teamid = 0; // friendly fire on — don't exclude teammates from collision
 	}
 	Object * thecollidedobject = world.TestIncr(object.x - radius, object.y - radius, object.x + radius, object.y + radius, &xe, &ye, types, skipobject, teamid);
 	bool collided = false;

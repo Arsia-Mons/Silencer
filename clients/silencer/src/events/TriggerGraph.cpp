@@ -59,7 +59,7 @@ void TriggerGraph::Tick(World & world, float dt) {
             const Sint16 zy1 = std::min(zone.y1, zone.y2);
             const Sint16 zx2 = std::max(zone.x1, zone.x2);
             const Sint16 zy2 = std::max(zone.y1, zone.y2);
-            for (const Object * obj : world.objectlist) {
+            for (const Object * obj : world.objects.objectlist) {
                 if (obj->type != ObjectTypes::PLAYER) continue;
                 if (obj->x >= zx1 && obj->x <= zx2 && obj->y >= zy1 && obj->y <= zy2) {
                     current_occupants.insert({zone.id, static_cast<Uint16>(obj->id)});
@@ -266,7 +266,7 @@ bool TriggerGraph::EvalConditions(const TriggerNode & node, const GameEvent & ev
             case ConditionType::PLAYER_COUNT: {
                 // Count active players — scan objectlist directly (public).
                 int count = 0;
-                for (const Object * obj : world.objectlist) {
+                for (const Object * obj : world.objects.objectlist) {
                     if (obj->type == ObjectTypes::PLAYER) count++;
                 }
                 pass = (count >= cond.player_count);
