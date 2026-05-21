@@ -167,6 +167,7 @@ ResolvedButton ResolveButton(const ButtonOpts& opts) {
 			out.fixedHeight = 27;
 			out.textSize = TextSize::Heading;
 			out.yOffset = 6;
+			out.measureTextInk = true;
 			break;
 		case ButtonVariant::Text:
 			out.textSize = TextSize::BodySm;

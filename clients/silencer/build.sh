@@ -58,7 +58,15 @@ for p in cmake ninja cc1plus clang; do
 done
 
 # --- Refuse if a previously-built instance is running (locks the link target) ---
-if pgrep -f "$bdir/.*[Ss]ilencer" >/dev/null 2>&1; then
+running_silencer_pid=""
+while IFS= read -r pid; do
+    args="$(ps -p "$pid" -o args= 2>/dev/null || true)"
+    exe="${args%% *}"
+    case "$exe" in
+        "$bdir"/*[Ss]ilencer*) running_silencer_pid="$pid"; break ;;
+    esac
+done < <(pgrep -f "$bdir/.*[Ss]ilencer" || true)
+if [ -n "$running_silencer_pid" ]; then
     fail "a built Silencer instance from $bdir is running — it locks the link target; stop it, then rebuild"
 fi
 

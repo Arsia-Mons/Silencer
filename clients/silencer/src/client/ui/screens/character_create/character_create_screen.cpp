@@ -10,6 +10,7 @@
 
 #include "clay/clay.h"
 #include "clay_ui_compositor.h"
+#include "clay_ui_payloads.h"
 #include "runtime/UiInteractionRegistry.h"
 #include "primitives/button.h"
 #include "primitives/text.h"
@@ -17,9 +18,11 @@
 #include "primitives/toggle.h"
 
 #include <algorithm>
+#include <cctype>
 #include <cstring>
 #include <cstdlib>
 #include <string>
+#include <vector>
 
 namespace character_create_screen_detail {
 
@@ -31,6 +34,7 @@ using silencer::ui::primitives::ButtonVariant;
 using silencer::ui::primitives::Text;
 using silencer::ui::primitives::TextEffect;
 using silencer::ui::primitives::TextOpts;
+using silencer::ui::primitives::TextLineHeight;
 using silencer::ui::primitives::TextSize;
 using silencer::ui::primitives::TextInput;
 using silencer::ui::primitives::TextInputHandle;
@@ -54,19 +58,42 @@ constexpr int kColumnGap = 78;
 constexpr int kLeftColumnW = 236;
 constexpr int kRightColumnW = 196;
 constexpr int kTitleH = 33;
+// The baked title pill in sprite 7/5 is centered 11px right of the row column.
+constexpr int kTitlePlateCenterOffsetX = 11;
+constexpr int kTitleTextPadLeft = kTitlePlateCenterOffsetX * 2;
 constexpr int kTitleToRowsGap = 14;
 constexpr int kRowH = 27;
 constexpr int kRowGap = 5;
 constexpr int kAgentRowsH = 272;
 constexpr int kAgencyRowsH = 168;
 constexpr int kDetailTopPad = 42;
+constexpr int kAgentDetailPadLeft = 22;
+constexpr int kAgentHeaderH = 46;
+constexpr int kAgentNameLineTop = 16;
+constexpr int kAgentNameIndent = 20;
+constexpr int kAgentIconX = 116;
+constexpr int kAgentIconW = 32;
+constexpr int kAgentIconH = 30;
+constexpr int kAgentStatsTopGap = 14;
+constexpr int kAgentStatsLineGap = 1;
+constexpr int kAgentAdvantagesTopGap = 17;
+constexpr int kAgentAdvantagesLineGap = 1;
+constexpr int kAdvantageListIndent = 20;
+constexpr int kAdvantageMetadataGap = 4;
+constexpr Uint8 kAdvantageBracketFontBank = 134;
+constexpr Uint16 kAdvantageLeftBracketGlyph = static_cast<Uint16>('[' - 33);
+constexpr Uint16 kAdvantageRightBracketGlyph = static_cast<Uint16>(']' - 33);
+constexpr int kAdvantageBracketW = 4;
+constexpr int kAdvantageBracketH = 11;
+constexpr Uint8 kDetailTextColor = 129;
+constexpr Uint8 kAdvantageMetadataColor = 224;
 constexpr int kAliasModalW = 284;
-constexpr int kAliasBodyW = 284;
-constexpr int kAliasModalH = 127;
+constexpr int kAliasModalH = 108;
 constexpr int kAliasModalTop = 161;
 constexpr int kAliasModalOffsetX = 0;
-constexpr int kAliasBodyTopOffset = 15;
-constexpr int kAliasModalBodyH = 94;
+constexpr int kAliasTitleH = 33;
+constexpr int kAliasInputX = 24;
+constexpr int kAliasInputY = 49;
 constexpr int kAliasInputFrameW = 236;
 constexpr int kAliasInputW = 224;
 constexpr int kMaxRows = 32;
@@ -88,6 +115,19 @@ struct AgencyDef {
 	const char * ability;
 	const char * description;
 };
+
+struct AdvantageLine {
+	std::string label;
+	std::string metadata;
+};
+
+constexpr int kAdvantageGlyphPayloadCapacity = 32;
+silencer::clay_bridge::SpritePayload g_advantageGlyphPayloads[
+	kAdvantageGlyphPayloadCapacity];
+silencer::clay_bridge::ClayCustomData g_advantageGlyphCustomData[
+	kAdvantageGlyphPayloadCapacity];
+int g_advantageGlyphPayloadCount = 0;
+int g_advantageGlyphCustomDataCount = 0;
 
 const AgencyDef kAgencies[5] = {
 	{ Team::NOXIS,
@@ -168,28 +208,291 @@ void Title(Clay_String text)
 void DetailHeading(Clay_String text)
 {
 	Text(text, { .size = TextSize::Heading,
-	             .effect = TextEffect::LegacyPalette(129, 160, true) });
+	             .effect = TextEffect::LegacyPalette(kDetailTextColor, 160, true) });
+}
+
+void DetailTitleText(Clay_String text)
+{
+	Text(text, { .size = TextSize::Heading,
+	             .effect = TextEffect::LegacyPalette(kDetailTextColor, 160, true) });
+}
+
+void DetailStatText(Clay_String text)
+{
+	Text(text, { .size = TextSize::BodySm,
+	             .effect = TextEffect::LegacyPalette(kDetailTextColor, 160, true) });
 }
 
 void DetailText(Clay_String text)
 {
 	Text(text, { .size = TextSize::BodySm,
 	             .wrap = silencer::ui::primitives::TextWrap::Newlines,
-	             .effect = TextEffect::LegacyPalette(129, 160, true) });
+	             .effect = TextEffect::LegacyPalette(kDetailTextColor, 160, true) });
+}
+
+std::string TrimCopy(const std::string& value)
+{
+	size_t begin = 0;
+	while(begin < value.size() &&
+	      std::isspace(static_cast<unsigned char>(value[begin]))){
+		++begin;
+	}
+	size_t end = value.size();
+	while(end > begin &&
+	      std::isspace(static_cast<unsigned char>(value[end - 1]))){
+		--end;
+	}
+	return value.substr(begin, end - begin);
+}
+
+bool IsNumericMetadata(const std::string& value)
+{
+	if(value.size() < 2) return false;
+	if(value[0] != '+' && value[0] != '-') return false;
+	for(size_t i = 1; i < value.size(); ++i){
+		if(!std::isdigit(static_cast<unsigned char>(value[i]))) return false;
+	}
+	return true;
+}
+
+AdvantageLine ParseAdvantageLine(const std::string& raw)
+{
+	AdvantageLine line;
+	std::string text = TrimCopy(raw);
+	const std::string abilitySuffix = " Ability";
+	if(text.size() > abilitySuffix.size() &&
+	   text.compare(text.size() - abilitySuffix.size(),
+	                abilitySuffix.size(),
+	                abilitySuffix) == 0){
+		line.label = TrimCopy(text.substr(0, text.size() - abilitySuffix.size()));
+		line.metadata = "Ability";
+		return line;
+	}
+	size_t split = text.find_last_of(' ');
+	if(split != std::string::npos){
+		std::string suffix = TrimCopy(text.substr(split + 1));
+		if(IsNumericMetadata(suffix)){
+			line.label = TrimCopy(text.substr(0, split));
+			line.metadata = suffix;
+			return line;
+		}
+	}
+	line.label = text;
+	return line;
+}
+
+std::vector<AdvantageLine> ParseAdvantageLines(const char * text)
+{
+	std::vector<AdvantageLine> out;
+	if(!text) return out;
+	const char * start = text;
+	for(const char * p = text; ; ++p){
+		if(*p == '\n' || *p == '\0'){
+			out.push_back(ParseAdvantageLine(std::string(start, p - start)));
+			if(*p == '\0') break;
+			start = p + 1;
+		}
+	}
+	return out;
+}
+
+void ResetAdvantageGlyphPayloads()
+{
+	g_advantageGlyphPayloadCount = 0;
+	g_advantageGlyphCustomDataCount = 0;
+}
+
+silencer::clay_bridge::SpritePayload *
+AllocAdvantageGlyphPayload(Uint16 glyph, Sint16 srcX)
+{
+	if(g_advantageGlyphPayloadCount >= kAdvantageGlyphPayloadCapacity) return nullptr;
+	auto * p = &g_advantageGlyphPayloads[g_advantageGlyphPayloadCount++];
+	*p = silencer::clay_bridge::SpritePayload(
+		kAdvantageBracketFontBank,
+		glyph,
+		srcX,
+		0,
+		kAdvantageBracketW,
+		kAdvantageBracketH,
+		0,
+		128,
+		kAdvantageMetadataColor,
+		0,
+		0,
+		0);
+	return p;
+}
+
+silencer::clay_bridge::ClayCustomData *
+AllocAdvantageGlyphCustomData(void * payload)
+{
+	if(g_advantageGlyphCustomDataCount >= kAdvantageGlyphPayloadCapacity) return nullptr;
+	auto * c = &g_advantageGlyphCustomData[g_advantageGlyphCustomDataCount++];
+	c->kind = silencer::clay_bridge::CustomKind::Sprite;
+	c->payload = payload;
+	return c;
+}
+
+void AdvantageBracket(Clay_String id, int index, bool left)
+{
+	const Uint16 glyph = left ? kAdvantageLeftBracketGlyph
+	                          : kAdvantageRightBracketGlyph;
+	const Sint16 srcX = left ? 0 : 1;
+	auto * payload = AllocAdvantageGlyphPayload(glyph, srcX);
+	auto * ccd = AllocAdvantageGlyphCustomData(payload);
+	CLAY({ .id = CLAY_SIDI(id, static_cast<uint32_t>(0x300 + index * 2 +
+	                                                (left ? 0 : 1))),
+	       .layout = {
+	           .sizing = { CLAY_SIZING_FIXED(kAdvantageBracketW),
+	                       CLAY_SIZING_FIXED(kAdvantageBracketH) },
+	       },
+	       .custom = { .customData = ccd } }) {}
+}
+
+void AdvantageLineText(Clay_String id, int index, const AdvantageLine& line)
+{
+	CLAY({ .id = CLAY_SIDI(id, static_cast<uint32_t>(0x100 + index)),
+	       .layout = {
+	           .sizing = { CLAY_SIZING_GROW(0), CLAY_SIZING_FIT(0) },
+	           .padding = { kAdvantageListIndent, 0, 0, 0 },
+	       } }) {
+		CLAY({ .id = CLAY_SIDI(id, static_cast<uint32_t>(0x200 + index)),
+		       .layout = {
+		           .sizing = { CLAY_SIZING_FIT(0), CLAY_SIZING_FIT(0) },
+		           .childGap = 0,
+		           .layoutDirection = CLAY_LEFT_TO_RIGHT,
+		       } }) {
+			Text(FromStd(line.label),
+			     { .size = TextSize::BodySm,
+			       .effect = TextEffect::LegacyPalette(kDetailTextColor, 160, true) });
+			if(!line.metadata.empty()){
+				const std::string& metadata = line.metadata;
+				CLAY({ .id = CLAY_SIDI(id, static_cast<uint32_t>(0x280 + index)),
+				       .layout = {
+				           .sizing = { CLAY_SIZING_FIXED(kAdvantageMetadataGap),
+				                       CLAY_SIZING_FIXED(1) },
+				       } }) {}
+				AdvantageBracket(id, index, true);
+				Text(FromStd(metadata),
+				     { .size = TextSize::BodySm,
+				       .effect = TextEffect::LegacyPalette(kAdvantageMetadataColor,
+				                                           128,
+				                                           true) });
+				AdvantageBracket(id, index, false);
+			}
+		}
+	}
+}
+
+void AdvantageLines(Clay_String id, const char * text)
+{
+	std::vector<AdvantageLine> lines = ParseAdvantageLines(text);
+	int rendered = 0;
+	for(const AdvantageLine& line : lines){
+		if(line.metadata == "Ability") continue;
+		AdvantageLineText(id, rendered++, line);
+	}
+	for(const AdvantageLine& line : lines){
+		if(line.metadata != "Ability") continue;
+		AdvantageLineText(id, rendered++, line);
+	}
+}
+
+void AgentDetailHeader(const AgencyDef& agency)
+{
+	CLAY({ .id = CLAY_ID("CharacterCreateAgentAgencyHeader"),
+	       .layout = {
+	           .sizing = { CLAY_SIZING_GROW(0), CLAY_SIZING_FIXED(kAgentHeaderH) },
+	       } }) {
+		DetailTitleText(CLAY_STRING("Agency"));
+		CLAY({ .id = CLAY_ID("CharacterCreateAgentAgencyNameLine"),
+		       .layout = {
+		           .sizing = { CLAY_SIZING_GROW(0),
+		                       CLAY_SIZING_FIXED(static_cast<float>(
+		                           TextLineHeight(TextSize::Heading))) },
+		           .padding = { kAgentNameIndent, 0, 0, 0 },
+		       },
+		       .floating = {
+		           .offset = { 0.0f, static_cast<float>(kAgentNameLineTop) },
+		           .zIndex = 1,
+		           .attachPoints = { .element = CLAY_ATTACH_POINT_LEFT_TOP,
+		                             .parent = CLAY_ATTACH_POINT_LEFT_TOP },
+		           .pointerCaptureMode = CLAY_POINTER_CAPTURE_MODE_PASSTHROUGH,
+		           .attachTo = CLAY_ATTACH_TO_PARENT,
+		       } }) {
+			DetailTitleText(FromCStr(agency.displayName));
+		}
+		CLAY({ .id = CLAY_ID("CharacterCreateAgentAgencyIconFloat"),
+		       .layout = {
+		           .sizing = { CLAY_SIZING_FIXED(kAgentIconW),
+		                       CLAY_SIZING_FIXED(kAgentIconH) },
+		       },
+		       .floating = {
+		           .offset = { static_cast<float>(kAgentIconX), 0.0f },
+		           .zIndex = 1,
+		           .attachPoints = { .element = CLAY_ATTACH_POINT_LEFT_TOP,
+		                             .parent = CLAY_ATTACH_POINT_LEFT_TOP },
+		           .pointerCaptureMode = CLAY_POINTER_CAPTURE_MODE_PASSTHROUGH,
+		           .attachTo = CLAY_ATTACH_TO_PARENT,
+		       } }) {
+			Toggle(CLAY_STRING("CharacterCreateAgentAgencyIcon"),
+			       181,
+			       agency.agency,
+			       true,
+			       ToggleOpts{ .width = kAgentIconW,
+			                   .height = kAgentIconH,
+			                   .effectColor = 112,
+			                   .selectedBrightness = 128,
+			                   .unselectedBrightness = 128 });
+		}
+	}
+}
+
+void Spacer(Clay_String id, int height)
+{
+	CLAY({ .id = CLAY_SID(id),
+	       .layout = {
+	           .sizing = { CLAY_SIZING_GROW(0),
+	                       CLAY_SIZING_FIXED(static_cast<float>(height)) },
+	       } }) {}
+}
+
+void AgentStatsBlock(Clay_String id, const std::vector<std::string>& lines)
+{
+	CLAY({ .id = CLAY_SID(id),
+	       .layout = {
+	           .sizing = { CLAY_SIZING_GROW(0), CLAY_SIZING_FIT(0) },
+	           .childGap = kAgentStatsLineGap,
+	           .layoutDirection = CLAY_TOP_TO_BOTTOM,
+	       } }) {
+		int index = 0;
+		for(const std::string& line : lines){
+				CLAY({ .id = CLAY_SIDI(id, static_cast<uint32_t>(index)),
+				       .layout = {
+				           .sizing = { CLAY_SIZING_GROW(0),
+				                       CLAY_SIZING_FIXED(static_cast<float>(
+				                           TextLineHeight(TextSize::BodySm))) },
+			       } }) {
+				DetailStatText(FromStd(line));
+			}
+			++index;
+		}
+	}
 }
 
 void DetailParagraph(Clay_String text)
 {
 	Text(text, { .size = TextSize::BodySm,
 	             .wrap = silencer::ui::primitives::TextWrap::Words,
-	             .effect = TextEffect::LegacyPalette(129, 160, true) });
+	             .effect = TextEffect::LegacyPalette(kDetailTextColor, 160, true) });
 }
 
 void ListButton(Clay_String id,
                 Clay_String label,
                 const char * action,
                 silencer::ui::UiInteractionRegistry& interactions,
-                bool selected = false)
+                bool selected = false,
+                bool * hoveredOut = nullptr)
 {
 	Button(id,
 	       label,
@@ -197,7 +500,7 @@ void ListButton(Clay_String id,
 	                   .size = ButtonSize::Auto,
 	                   .selected = selected,
 	                   .minWidth = kLeftColumnW },
-	       ButtonHandle{ nullptr, action, &interactions });
+	       ButtonHandle{ hoveredOut, action, &interactions });
 }
 
 std::string AgentActionId(int index)
@@ -231,7 +534,7 @@ int CreateRowIndex(size_t characterCount)
 
 void CharacterCreateScreen::Build(ScreenContext & ctx)
 {
-	ctx.ResetPresentation(2);
+	ctx.ResetPresentation(1);
 	ctx.renderer.camera.SetPosition(320, 240);
 	step = Step::SelectAgent;
 	selectedAgentIndex = 0;
@@ -274,6 +577,7 @@ void CharacterCreateScreen::BuildUi(ScreenContext & ctx,
 	using namespace silencer::clay_bridge;
 	using namespace character_create_screen_detail;
 
+	ResetAdvantageGlyphPayloads();
 	RebuildAgentRows(ctx);
 	if(agentScrollDelta != 0){
 		int next = static_cast<int>(agentScroll) + agentScrollDelta;
@@ -300,7 +604,7 @@ void CharacterCreateScreen::BuildUi(ScreenContext & ctx,
 		                        kFrameMarginTop,
 		                        kFrameMarginBottom },
 		       },
-		       .image = { .imageData = PackImageStretch(6, 0) } }) {
+		       .image = { .imageData = PackImage(6, 0) } }) {
 			CLAY({ .id = CLAY_ID("CharacterCreatePanel"),
 			       .layout = {
 			           .sizing = { CLAY_SIZING_FIXED(kPanelMinW),
@@ -329,6 +633,7 @@ void CharacterCreateScreen::BuildSelectAgent(ScreenContext & ctx,
                                              silencer::ui::UiInteractionRegistry& interactions)
 {
 	using namespace character_create_screen_detail;
+	int detailAgentIndex = selectedAgentIndex;
 
 	CLAY({ .id = CLAY_ID("CharacterCreateAgentColumn"),
 	       .layout = {
@@ -341,6 +646,7 @@ void CharacterCreateScreen::BuildSelectAgent(ScreenContext & ctx,
 		CLAY({ .id = CLAY_ID("CharacterCreateAgentTitle"),
 		       .layout = {
 		           .sizing = { CLAY_SIZING_GROW(0), CLAY_SIZING_FIXED(kTitleH) },
+		           .padding = { kTitleTextPadLeft, 0, 0, 0 },
 		           .childAlignment = { .x = CLAY_ALIGN_X_CENTER,
 		                               .y = CLAY_ALIGN_Y_CENTER },
 		} }) {
@@ -363,73 +669,63 @@ void CharacterCreateScreen::BuildSelectAgent(ScreenContext & ctx,
 				if(index < 0 || index >= count) break;
 				const std::string id = std::string("CharacterCreateAgentRow") + std::to_string(index);
 				const std::string action = AgentActionId(index);
+				const bool existingAgent =
+					index < static_cast<int>(ctx.lobby.characters.size());
+				bool hovered = false;
 				ListButton(FromStd(id),
 				           FromStd(agentRows[static_cast<size_t>(index)]),
 				           action.c_str(),
 				           interactions,
-				           index == selectedAgentIndex);
+				           existingAgent && index == selectedAgentIndex,
+				           &hovered);
+				if(hovered && existingAgent){
+					detailAgentIndex = index;
+				}
 			}
 		}
 	}
 
-	CLAY({ .id = CLAY_ID("CharacterCreateAgentDetails"),
-	       .layout = {
-	           .sizing = { CLAY_SIZING_FIXED(kRightColumnW),
-	                       CLAY_SIZING_GROW(0) },
-	           .padding = { 0, 0, kDetailTopPad, 0 },
-	           .childGap = 8,
-	           .layoutDirection = CLAY_TOP_TO_BOTTOM,
-	       } }) {
-		const int createIndex = CreateRowIndex(ctx.lobby.characters.size());
-		if(selectedAgentIndex >= 0 &&
-		   selectedAgentIndex < static_cast<int>(ctx.lobby.characters.size()) &&
-		   selectedAgentIndex != createIndex){
-			const Lobby::Character& ch = ctx.lobby.characters[static_cast<size_t>(selectedAgentIndex)];
-			const AgencyDef& agency = AgencyByIndex(static_cast<int>(ch.agencyIdx));
-			CLAY({ .id = CLAY_ID("CharacterCreateAgentAgencyRow"),
-			       .layout = {
-			           .sizing = { CLAY_SIZING_GROW(0), CLAY_SIZING_FIXED(24) },
-			           .layoutDirection = CLAY_LEFT_TO_RIGHT,
-			           .childGap = 8,
-			           .childAlignment = { .x = CLAY_ALIGN_X_LEFT,
-			                               .y = CLAY_ALIGN_Y_CENTER },
-			       } }) {
-				DetailText(CLAY_STRING("Agency"));
-				DetailText(FromCStr(agency.displayName));
-				Toggle(CLAY_STRING("CharacterCreateAgentAgencyIcon"),
-				       181,
-				       agency.agency,
-				       true,
-				       ToggleOpts{ .width = 20,
-				                   .height = 20,
-				                   .effectColor = 112,
-				                   .selectedBrightness = 128,
-				                   .unselectedBrightness = 128 });
-			}
-			std::string security = std::string("Security Level ") + std::to_string(ch.stats.level);
-			DetailText(FromStd(security));
-			std::string tech = std::string("Technology Slots: ") + std::to_string(ch.stats.techslots);
-			std::string points = std::string("Agency Points: ") + std::to_string(ch.stats.xp);
-			std::string next = std::string("Next Level At: ") + std::to_string((ch.stats.level + 1) * 100);
-			std::string missions = std::string("Successful Missions: ") + std::to_string(ch.stats.wins);
-			DetailText(FromStd(tech));
-			DetailText(FromStd(points));
-			DetailText(FromStd(next));
-			DetailText(FromStd(missions));
-			CLAY({ .id = CLAY_ID("CharacterCreateAgentAdvantages"),
-			       .layout = {
-			           .sizing = { CLAY_SIZING_GROW(0), CLAY_SIZING_FIT(0) },
-			           .padding = { 0, 0, 10, 0 },
-			           .childGap = 2,
-			           .layoutDirection = CLAY_TOP_TO_BOTTOM,
-			       } }) {
-				DetailHeading(CLAY_STRING("Advantages"));
-				DetailText(FromCStr(agency.advantages));
-				DetailText(FromCStr(agency.ability));
+		CLAY({ .id = CLAY_ID("CharacterCreateAgentDetails"),
+		       .layout = {
+		           .sizing = { CLAY_SIZING_FIXED(kRightColumnW),
+		                       CLAY_SIZING_GROW(0) },
+		           .padding = { kAgentDetailPadLeft, 0, kDetailTopPad, 0 },
+		           .childGap = 0,
+		           .layoutDirection = CLAY_TOP_TO_BOTTOM,
+		       } }) {
+			const int createIndex = CreateRowIndex(ctx.lobby.characters.size());
+			if(detailAgentIndex >= 0 &&
+			   detailAgentIndex < static_cast<int>(ctx.lobby.characters.size()) &&
+			   detailAgentIndex != createIndex){
+				const Lobby::Character& ch = ctx.lobby.characters[static_cast<size_t>(detailAgentIndex)];
+				const AgencyDef& agency = AgencyByIndex(static_cast<int>(ch.agencyIdx));
+				AgentDetailHeader(agency);
+				std::string security = std::string("Security Level ") + std::to_string(ch.stats.level);
+				DetailTitleText(FromStd(security));
+				Spacer(CLAY_STRING("CharacterCreateAgentStatsTopGap"),
+				       kAgentStatsTopGap);
+				std::vector<std::string> statLines;
+				statLines.push_back(std::string("Technology Slots:") + std::to_string(ch.stats.techslots));
+				statLines.push_back(std::string("Agency Points:") + std::to_string(ch.stats.xp));
+				statLines.push_back(std::string("Next Level At:") + std::to_string((ch.stats.level + 1) * 100));
+				statLines.push_back(std::string("Successful Missions:") + std::to_string(ch.stats.wins));
+				AgentStatsBlock(CLAY_STRING("CharacterCreateAgentStats"),
+				                statLines);
+				Spacer(CLAY_STRING("CharacterCreateAgentAdvantagesTopGap"),
+				       kAgentAdvantagesTopGap);
+				CLAY({ .id = CLAY_ID("CharacterCreateAgentAdvantages"),
+				       .layout = {
+				           .sizing = { CLAY_SIZING_GROW(0), CLAY_SIZING_FIT(0) },
+				           .childGap = kAgentAdvantagesLineGap,
+				           .layoutDirection = CLAY_TOP_TO_BOTTOM,
+				       } }) {
+					DetailHeading(CLAY_STRING("Advantages"));
+					AdvantageLines(CLAY_STRING("CharacterCreateAgentAdvantageList"),
+					               agency.advantages);
+				}
 			}
 		}
 	}
-}
 
 void CharacterCreateScreen::BuildEnterAlias(ScreenContext & ctx,
                                             silencer::ui::UiInteractionRegistry& interactions)
@@ -444,9 +740,6 @@ void CharacterCreateScreen::BuildEnterAlias(ScreenContext & ctx,
 	       .layout = {
 	           .sizing = { CLAY_SIZING_FIXED(kAliasModalW),
 	                       CLAY_SIZING_FIXED(kAliasModalH) },
-	           .childGap = 0,
-	           .childAlignment = { .x = CLAY_ALIGN_X_CENTER },
-	           .layoutDirection = CLAY_TOP_TO_BOTTOM,
 	       },
 	       .floating = {
 	           .offset = { static_cast<float>(kAliasModalOffsetX),
@@ -459,13 +752,14 @@ void CharacterCreateScreen::BuildEnterAlias(ScreenContext & ctx,
 	                             .parent = CLAY_ATTACH_POINT_CENTER_CENTER },
 	           .pointerCaptureMode = CLAY_POINTER_CAPTURE_MODE_CAPTURE,
 	           .attachTo = CLAY_ATTACH_TO_PARENT,
-	       } }) {
+	       },
+	       .image = { .imageData = silencer::clay_bridge::PackImage(40, 2) } }) {
 		CLAY({ .id = CLAY_ID("CharacterAliasTitleFloat"),
 		       .layout = {
 		           .sizing = { CLAY_SIZING_FIXED(kAliasModalW),
-		                       CLAY_SIZING_FIXED(kTitleH) },
+		                       CLAY_SIZING_FIXED(kAliasTitleH) },
 		           .childAlignment = { .x = CLAY_ALIGN_X_CENTER,
-		                               .y = CLAY_ALIGN_Y_TOP },
+		                               .y = CLAY_ALIGN_Y_CENTER },
 		       },
 		       .floating = {
 		           .offset = { 0.0f, 0.0f },
@@ -475,47 +769,38 @@ void CharacterCreateScreen::BuildEnterAlias(ScreenContext & ctx,
 		           .pointerCaptureMode = CLAY_POINTER_CAPTURE_MODE_CAPTURE,
 		           .attachTo = CLAY_ATTACH_TO_PARENT,
 		       } }) {
-			Button(CLAY_STRING("CharacterAliasTitle"),
-			       CLAY_STRING("SILENCER ALIAS"),
-			       ButtonOpts{ .variant = ButtonVariant::Oval,
-			                   .size = ButtonSize::Auto,
-			                   .minWidth = 254,
-			                   .textEffect = TextEffect::LegacyPalette(0) });
+			Text(CLAY_STRING("SILENCER ALIAS"),
+			     { .size = TextSize::Title,
+			       .effect = TextEffect::LegacyPalette(0) });
 		}
-		CLAY({ .id = CLAY_ID("CharacterAliasBodyOffset"),
+		CLAY({ .id = CLAY_ID("CharacterAliasInputFloat"),
 		       .layout = {
-		           .sizing = { CLAY_SIZING_GROW(0),
-		                       CLAY_SIZING_FIXED(kAliasBodyTopOffset) },
-		       } }) {}
-		CLAY({ .id = CLAY_ID("CharacterAliasModalBody"),
-		       .layout = {
-		           .sizing = { CLAY_SIZING_FIXED(kAliasBodyW),
-		                       CLAY_SIZING_FIXED(kAliasModalBodyH) },
-		           .padding = { 24, 24, 31, 0 },
-		           .childAlignment = { .x = CLAY_ALIGN_X_CENTER },
+		           .sizing = { CLAY_SIZING_FIXED(kAliasInputFrameW),
+		                       CLAY_SIZING_FIXED(kRowH) },
 		       },
-		       .image = { .imageData = silencer::clay_bridge::PackImageStretch(7, 27) } }) {
-			CLAY({ .id = CLAY_ID("CharacterAliasInputFrame"),
-			       .layout = {
-			           .sizing = { CLAY_SIZING_FIXED(kAliasInputFrameW),
-			                       CLAY_SIZING_FIXED(kRowH) },
-			           .padding = { 6, 6, 0, 0 },
-			       },
-			       .image = { .imageData = silencer::clay_bridge::PackImageStretch(7, 24) } }) {
-				TextInput(CLAY_STRING("CharacterAliasInput"),
-				          alias,
-				          TextInputOpts{ .widthPx = kAliasInputW,
-				                         .heightPx = kRowH,
-				                         .textSize = TextSize::Body,
-				                         .showCaret = focused && blink },
-				          TextInputHandle{ nullptr,
-				                           kActionAlias,
-				                           "Alias",
-				                           &interactions,
-				                           kAliasInputUid,
-				                           16,
-				                           true });
-			}
+		       .floating = {
+		           .offset = { static_cast<float>(kAliasInputX),
+		                       static_cast<float>(kAliasInputY) },
+		           .zIndex = 3,
+		           .attachPoints = { .element = CLAY_ATTACH_POINT_LEFT_TOP,
+		                             .parent = CLAY_ATTACH_POINT_LEFT_TOP },
+		           .pointerCaptureMode = CLAY_POINTER_CAPTURE_MODE_CAPTURE,
+		           .attachTo = CLAY_ATTACH_TO_PARENT,
+		       } }) {
+			TextInput(CLAY_STRING("CharacterAliasInput"),
+			          alias,
+			          TextInputOpts{ .widthPx = kAliasInputFrameW,
+			                         .heightPx = kRowH,
+			                         .textSize = TextSize::Body,
+			                         .showCaret = focused && blink,
+			                         .contentInsetX = static_cast<Uint16>(kAliasInputFrameW - kAliasInputW) },
+			          TextInputHandle{ nullptr,
+			                           kActionAlias,
+			                           "Alias",
+			                           &interactions,
+			                           kAliasInputUid,
+			                           16,
+			                           true });
 		}
 		if(focusAliasRequested){
 			ctx.game.UiInteractions().FocusTextInputByUid(kAliasInputUid);
@@ -529,7 +814,7 @@ void CharacterCreateScreen::BuildSelectAgency(ScreenContext & ctx,
 {
 	(void)ctx;
 	using namespace character_create_screen_detail;
-	const AgencyDef& agency = SelectedAgency(selectedAgency);
+	Uint8 detailAgency = selectedAgency;
 
 	CLAY({ .id = CLAY_ID("CharacterAgencyColumn"),
 	       .layout = {
@@ -542,6 +827,7 @@ void CharacterCreateScreen::BuildSelectAgency(ScreenContext & ctx,
 		CLAY({ .id = CLAY_ID("CharacterAgencyTitle"),
 		       .layout = {
 		           .sizing = { CLAY_SIZING_GROW(0), CLAY_SIZING_FIXED(kTitleH) },
+		           .padding = { kTitleTextPadLeft, 0, 0, 0 },
 		           .childAlignment = { .x = CLAY_ALIGN_X_CENTER,
 		                               .y = CLAY_ALIGN_Y_CENTER },
 		} }) {
@@ -560,15 +846,21 @@ void CharacterCreateScreen::BuildSelectAgency(ScreenContext & ctx,
 			for(int i = 0; i < 5; ++i){
 				const std::string id = std::string("CharacterAgencyRow") + std::to_string(i);
 				const std::string action = AgencyActionId(i);
+				bool hovered = false;
 				ListButton(FromStd(id),
 				           FromCStr(kAgencies[i].displayName),
 				           action.c_str(),
 				           interactions,
-				           kAgencies[i].agency == selectedAgency);
+				           kAgencies[i].agency == selectedAgency,
+				           &hovered);
+				if(hovered){
+					detailAgency = kAgencies[i].agency;
+				}
 			}
 		}
 	}
 
+	const AgencyDef& agency = SelectedAgency(detailAgency);
 	CLAY({ .id = CLAY_ID("CharacterAgencyInfo"),
 	       .layout = {
 	           .sizing = { CLAY_SIZING_FIXED(kRightColumnW),
@@ -578,7 +870,8 @@ void CharacterCreateScreen::BuildSelectAgency(ScreenContext & ctx,
 	           .layoutDirection = CLAY_TOP_TO_BOTTOM,
 	       } }) {
 		DetailHeading(CLAY_STRING("Advantages"));
-		DetailText(FromCStr(agency.advantages));
+		AdvantageLines(CLAY_STRING("CharacterAgencyAdvantageList"),
+		               agency.advantages);
 		DetailHeading(CLAY_STRING("Description"));
 		CLAY({ .id = CLAY_ID("CharacterAgencyDescription"),
 		       .layout = {
