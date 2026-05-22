@@ -6,6 +6,7 @@ export type UiAlign = 'start' | 'center' | 'end';
 export type UiJustify = 'start' | 'center' | 'end';
 export type UiSizeMode = 'fit' | 'grow' | 'fixed';
 export type UiFont = 'ui' | 'uiLarge' | 'title' | 'tiny';
+export type UiMovePlacement = 'inside' | 'before' | 'after';
 
 export interface UiSize {
   mode: UiSizeMode;
@@ -216,21 +217,45 @@ export function insertAfter(document: UiDocument, siblingId: string, nodeToInser
   });
 }
 
+export function insertBefore(document: UiDocument, siblingId: string, nodeToInsert: UiNode): UiDocument {
+  const parent = findParent(document.root, siblingId);
+  if (!parent) return document;
+
+  return updateNode(document, parent.id, node => {
+    const children = node.children ?? [];
+    const siblingIndex = children.findIndex(child => child.id === siblingId);
+    if (siblingIndex < 0) return node;
+    return {
+      ...node,
+      children: [
+        ...children.slice(0, siblingIndex),
+        nodeToInsert,
+        ...children.slice(siblingIndex),
+      ],
+    };
+  });
+}
+
 export function removeNode(document: UiDocument, id: string): UiDocument {
   if (document.root.id === id) return document;
   return { ...document, root: removeNodeFromTree(document.root, id) };
 }
 
-export function moveNode(document: UiDocument, nodeId: string, targetId: string): UiDocument {
-  if (nodeId === document.root.id || nodeId === targetId) return document;
+export function moveNode(
+  document: UiDocument,
+  nodeId: string,
+  target: { targetId: string; placement: UiMovePlacement },
+): UiDocument {
+  if (nodeId === document.root.id || nodeId === target.targetId) return document;
   const moving = findNode(document.root, nodeId);
-  const target = findNode(document.root, targetId);
-  if (!moving || !target || containsNode(moving, targetId)) return document;
+  const targetNode = findNode(document.root, target.targetId);
+  if (!moving || !targetNode || containsNode(moving, target.targetId)) return document;
+  if (target.placement === 'inside' && !canHaveChildren(targetNode.kind)) return document;
 
   const withoutMoving = removeNode(document, nodeId);
-  return canHaveChildren(target.kind)
-    ? insertChild(withoutMoving, targetId, moving)
-    : insertAfter(withoutMoving, targetId, moving);
+  if (target.placement === 'inside') return insertChild(withoutMoving, target.targetId, moving);
+  if (target.placement === 'before') return insertBefore(withoutMoving, target.targetId, moving);
+  return insertAfter(withoutMoving, target.targetId, moving);
 }
 
 export function duplicateNode(document: UiDocument, id: string): UiDocument {

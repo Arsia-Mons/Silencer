@@ -1,7 +1,9 @@
 import {
   PALETTE_NODE_KINDS,
+  canHaveChildren,
   findNode,
   type UiDocument,
+  type UiMovePlacement,
   type UiNodeKind,
 } from '../../../lib/ui-layout';
 import { type ClientPreviewElement, type ClientPreviewState } from '../useClientPreview';
@@ -14,7 +16,7 @@ interface CanvasProps {
   clientPreview: ClientPreviewState;
   onSelect: (id: string) => void;
   onDropNode: (targetId: string, kind: UiNodeKind) => void;
-  onMoveNode: (nodeId: string, targetId: string) => void;
+  onMoveNode: (nodeId: string, targetId: string, placement: UiMovePlacement) => void;
 }
 
 export function Canvas({ document, selectedId, zoom, clientPreview, onSelect, onDropNode, onMoveNode }: CanvasProps) {
@@ -83,7 +85,7 @@ function ClientPreviewOverlay({ elements, document, selectedId, onSelect, onDrop
   selectedId: string;
   onSelect: (id: string) => void;
   onDropNode: (targetId: string, kind: UiNodeKind) => void;
-  onMoveNode: (nodeId: string, targetId: string) => void;
+  onMoveNode: (nodeId: string, targetId: string, placement: UiMovePlacement) => void;
 }) {
   return (
     <div className="absolute inset-0">
@@ -108,7 +110,7 @@ function ClientPreviewOverlayTarget({ element, document, selectedId, onSelect, o
   selectedId: string;
   onSelect: (id: string) => void;
   onDropNode: (targetId: string, kind: UiNodeKind) => void;
-  onMoveNode: (nodeId: string, targetId: string) => void;
+  onMoveNode: (nodeId: string, targetId: string, placement: UiMovePlacement) => void;
 }) {
   if (!element.id) return null;
   const node = findNode(document.root, element.id);
@@ -136,7 +138,7 @@ function ClientPreviewOverlayTarget({ element, document, selectedId, onSelect, o
         if (movingId) {
           event.preventDefault();
           event.stopPropagation();
-          onMoveNode(movingId, element.id!);
+          onMoveNode(movingId, element.id!, canHaveChildren(node.kind) ? 'inside' : 'after');
           return;
         }
         const kind = event.dataTransfer.getData('application/silencer-ui-kind') as UiNodeKind;

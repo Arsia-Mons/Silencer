@@ -18,6 +18,7 @@ import {
   updateNode,
   validateUiDocument,
   type UiDocument,
+  type UiMovePlacement,
   type UiNode,
   type UiNodeKind,
   type UiStyle,
@@ -104,8 +105,8 @@ export default function UiEditorPage() {
     commit(next, node.id);
   }
 
-  function moveExistingNode(nodeId: string, targetId: string) {
-    const next = moveNode(document, nodeId, targetId);
+  function moveExistingNode(nodeId: string, targetId: string, placement: UiMovePlacement) {
+    const next = moveNode(document, nodeId, { targetId, placement });
     if (next === document) return;
     commit(next, nodeId);
   }

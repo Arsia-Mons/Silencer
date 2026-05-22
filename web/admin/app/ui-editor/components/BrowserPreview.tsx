@@ -6,6 +6,7 @@ import {
   type UiDocument,
   type UiFont,
   type UiJustify,
+  type UiMovePlacement,
   type UiNode,
   type UiNodeKind,
   type UiSize,
@@ -17,7 +18,7 @@ export function PreviewNode({ node, selectedId, rootViewport, onSelect, onDropNo
   rootViewport: UiDocument['viewport'];
   onSelect: (id: string) => void;
   onDropNode: (targetId: string, kind: UiNodeKind) => void;
-  onMoveNode: (nodeId: string, targetId: string) => void;
+  onMoveNode: (nodeId: string, targetId: string, placement: UiMovePlacement) => void;
 }) {
   const isSelected = node.id === selectedId;
   const style = nodeToCss(node, rootViewport);
@@ -27,7 +28,7 @@ export function PreviewNode({ node, selectedId, rootViewport, onSelect, onDropNo
     if (nodeId) {
       event.preventDefault();
       event.stopPropagation();
-      onMoveNode(nodeId, node.id);
+      onMoveNode(nodeId, node.id, canHaveChildren(node.kind) ? 'inside' : 'after');
       return;
     }
     const kind = event.dataTransfer.getData('application/silencer-ui-kind') as UiNodeKind;

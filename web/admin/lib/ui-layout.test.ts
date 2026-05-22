@@ -43,16 +43,32 @@ describe('ui-layout model', () => {
     const document = createDefaultUiDocument();
     const text = createNode('text', 'status', { text: 'READY' });
     const withText = insertChild(document, 'main-menu-root', text);
-    const movedIntoPanel = moveNode(withText, 'text-status', 'main-menu-panel');
+    const movedIntoPanel = moveNode(withText, 'text-status', { targetId: 'main-menu-panel', placement: 'inside' });
 
     expect(findNode(movedIntoPanel.root, 'main-menu-panel')?.children?.at(-1)?.id).toBe('text-status');
     expect(findNode(movedIntoPanel.root, 'main-menu-root')?.children?.some(child => child.id === 'text-status')).toBe(false);
 
-    const rejectedRootMove = moveNode(movedIntoPanel, 'main-menu-root', 'main-menu-panel');
+    const reorderedButtons = moveNode(movedIntoPanel, 'button-options', { targetId: 'button-host-game', placement: 'before' });
+    expect(findNode(reorderedButtons.root, 'main-menu-panel')?.children?.map(child => child.id).slice(0, 3).join(',')).toBe(
+      'button-options,button-host-game,button-join-game',
+    );
+
+    const panelA = createNode('panel', 'alpha');
+    const panelB = createNode('panel', 'beta');
+    const withPanels = insertChild(insertChild(document, 'main-menu-root', panelA), 'main-menu-root', panelB);
+    const reorderedContainers = moveNode(withPanels, 'panel-alpha', { targetId: 'panel-beta', placement: 'after' });
+    expect(findNode(reorderedContainers.root, 'main-menu-root')?.children?.map(child => child.id).slice(-2).join(',')).toBe(
+      'panel-beta,panel-alpha',
+    );
+
+    const rejectedRootMove = moveNode(movedIntoPanel, 'main-menu-root', { targetId: 'main-menu-panel', placement: 'inside' });
     expect(rejectedRootMove).toBe(movedIntoPanel);
 
-    const rejectedCycle = moveNode(movedIntoPanel, 'main-menu-panel', 'text-status');
+    const rejectedCycle = moveNode(movedIntoPanel, 'main-menu-panel', { targetId: 'text-status', placement: 'inside' });
     expect(rejectedCycle).toBe(movedIntoPanel);
+
+    const rejectedLeafInside = moveNode(movedIntoPanel, 'button-options', { targetId: 'text-status', placement: 'inside' });
+    expect(rejectedLeafInside).toBe(movedIntoPanel);
   });
 
   test('validates imported documents and exports a Clay scaffold', () => {

@@ -11,7 +11,7 @@ inputs, and containers.
 
 - Palette for adding panel, stack, row, text, button, input, and spacer nodes.
 - Hierarchy tree for selecting layout nodes by stable ID and dragging existing
-  nodes to reparent or reorder them.
+  nodes to reparent them, or to reorder siblings by dropping near a row edge.
 - Live scaled browser fallback for common Silencer viewport sizes.
 - Live client preview through the Silencer control socket: each edit is sent to
   the running client, rendered by the production `ClientUi`/Clay frame, captured

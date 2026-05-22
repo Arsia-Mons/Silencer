@@ -1,11 +1,16 @@
+import { type DragEvent } from 'react';
 import { KIND_LABELS } from '../ui-editor-constants';
-import { type UiNode } from '../../../lib/ui-layout';
+import {
+  canHaveChildren,
+  type UiMovePlacement,
+  type UiNode,
+} from '../../../lib/ui-layout';
 
 export function Hierarchy({ root, selectedId, onSelect, onMoveNode }: {
   root: UiNode;
   selectedId: string;
   onSelect: (id: string) => void;
-  onMoveNode: (nodeId: string, targetId: string) => void;
+  onMoveNode: (nodeId: string, targetId: string, placement: UiMovePlacement) => void;
 }) {
   return (
     <div className="min-h-0 flex-1 overflow-auto p-4">
@@ -20,7 +25,7 @@ function HierarchyNode({ node, depth, selectedId, onSelect, onMoveNode }: {
   depth: number;
   selectedId: string;
   onSelect: (id: string) => void;
-  onMoveNode: (nodeId: string, targetId: string) => void;
+  onMoveNode: (nodeId: string, targetId: string, placement: UiMovePlacement) => void;
 }) {
   const selected = node.id === selectedId;
   return (
@@ -38,7 +43,7 @@ function HierarchyNode({ node, depth, selectedId, onSelect, onMoveNode }: {
           if (!nodeId) return;
           event.preventDefault();
           event.stopPropagation();
-          onMoveNode(nodeId, node.id);
+          onMoveNode(nodeId, node.id, hierarchyDropPlacement(event, node));
         }}
         onClick={() => onSelect(node.id)}
         className={`w-full text-left py-1.5 pr-2 text-[12px] border-l transition-colors ${
@@ -62,4 +67,13 @@ function HierarchyNode({ node, depth, selectedId, onSelect, onMoveNode }: {
       ))}
     </div>
   );
+}
+
+function hierarchyDropPlacement(event: DragEvent<HTMLButtonElement>, node: UiNode): UiMovePlacement {
+  if (node.kind === 'screen') return 'inside';
+  const rect = event.currentTarget.getBoundingClientRect();
+  const y = event.clientY - rect.top;
+  if (y < rect.height * 0.25) return 'before';
+  if (y > rect.height * 0.75) return 'after';
+  return canHaveChildren(node.kind) ? 'inside' : 'after';
 }
