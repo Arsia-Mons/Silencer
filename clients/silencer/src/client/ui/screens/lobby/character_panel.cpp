@@ -19,7 +19,6 @@
 using silencer::ui::primitives::Text;
 using silencer::ui::primitives::TextEffect;
 using silencer::ui::primitives::TextOpts;
-using silencer::ui::primitives::TextTone;
 using silencer::ui::primitives::TextAdvance;
 using silencer::ui::primitives::TextLineHeight;
 using silencer::ui::primitives::MeasureText;
@@ -37,11 +36,12 @@ namespace character_panel_detail {
 
 constexpr const char * kActionAgents = "lobby.character.agents";
 constexpr uint16_t kPanelPad = 6;
-// Uniform vertical gap between the content bands (name, body, button).
-constexpr uint16_t kBandGap = 6;
+constexpr uint16_t kBandGap = 4;
 constexpr uint16_t kStatRowGap = 2;
-constexpr uint16_t kEmblemGap = 12;      // emblem ↔ stat table
-constexpr uint16_t kButtonHeight = 26;
+constexpr uint16_t kEmblemGap = 10;
+constexpr uint16_t kButtonHeight = 22;
+constexpr int kActionButtonMinWidth = 92;
+constexpr int kActionButtonPaddingX = 12;
 constexpr uint16_t kAgencySpriteBank = 181;
 // Emblem occupies a fixed slice of the inner width and grows to the body
 // height; the IMAGE compositor scales the sprite (Contain) to fit, so a big
@@ -214,9 +214,9 @@ void BuildCharacterPanelTree(CharacterPanelState & state,
 	const int labelColumnWidth = static_cast<int>(
 		MeasureText(CLAY_STRING("LOSSES"), TextSize::Body).width) + 4;
 
-	// Four content bands: name, divider, body (grows), Agents button. The
+	// Three content bands: name, body (grows), compact action row. The
 	// growing body centers its content vertically, so any extra panel height
-	// becomes balanced breathing room rather than a void above the button.
+	// becomes balanced breathing room rather than a footer slab.
 	// The parent LobbyCharacterBox is supplied by the lobby shell; this
 	// function emits only content.
 	CLAY({ .id = CLAY_ID("CharacterPanelContent"),
@@ -239,7 +239,7 @@ void BuildCharacterPanelTree(CharacterPanelState & state,
 			Text(character_panel_detail::FromStd(character_panel_detail::g_stats.name),
 			     TextOpts{ .size = TextSize::Heading,
 			               .wrap = TextWrap::None,
-			               .effect = TextEffect::LegacyPalette(0) });
+			               .effect = TextEffect::LegacyPalette(200) });
 		}
 
 		CLAY({ .id = CLAY_ID("CharacterPanelBody"),
@@ -270,7 +270,7 @@ void BuildCharacterPanelTree(CharacterPanelState & state,
 		       .layout = {
 		           .sizing = { CLAY_SIZING_GROW(0),
 		                       CLAY_SIZING_FIXED(character_panel_detail::kButtonHeight) },
-		           .childAlignment = { .x = CLAY_ALIGN_X_CENTER,
+		           .childAlignment = { .x = CLAY_ALIGN_X_RIGHT,
 		                               .y = CLAY_ALIGN_Y_CENTER },
 		       },
 		       .clip = { .horizontal = true } }) {
@@ -278,9 +278,8 @@ void BuildCharacterPanelTree(CharacterPanelState & state,
 			       CLAY_STRING("Agents"),
 			       ButtonOpts{ .variant = ButtonVariant::Chrome,
 			                   .size = ButtonSize::Auto,
-			                   .minWidth = innerWidth,
-			                   .maxWidth = innerWidth,
-			                   .paddingX = 12 },
+			                   .minWidth = character_panel_detail::kActionButtonMinWidth,
+			                   .paddingX = character_panel_detail::kActionButtonPaddingX },
 			       ButtonHandle{ nullptr, character_panel_detail::kActionAgents, &interactions });
 		}
 	}
