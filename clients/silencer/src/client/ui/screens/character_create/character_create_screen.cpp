@@ -594,7 +594,8 @@ void CharacterCreateScreen::BuildUi(ScreenContext & ctx,
 	           .sizing = { CLAY_SIZING_GROW(0),
 	                       CLAY_SIZING_GROW(0) },
 	           .childAlignment = { CLAY_ALIGN_X_CENTER, CLAY_ALIGN_Y_CENTER },
-	       } }) {
+	       },
+	       .image = { .imageData = PackImage(6, 0) } }) {
 		CLAY({ .id = CLAY_ID("CharacterCreateStage"),
 		       .layout = {
 		           .sizing = { CLAY_SIZING_FIXED(kStageW),
@@ -603,8 +604,7 @@ void CharacterCreateScreen::BuildUi(ScreenContext & ctx,
 		                        kFrameMarginRight,
 		                        kFrameMarginTop,
 		                        kFrameMarginBottom },
-		       },
-		       .image = { .imageData = PackImage(6, 0) } }) {
+		       } }) {
 			CLAY({ .id = CLAY_ID("CharacterCreatePanel"),
 			       .layout = {
 			           .sizing = { CLAY_SIZING_FIXED(kPanelMinW),
