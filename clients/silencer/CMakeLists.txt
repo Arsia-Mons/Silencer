@@ -122,12 +122,13 @@ include(CompileShaders)
 silencer_compile_shader(vert_screen   vertex  vert_screen)
 silencer_compile_shader(frag_remap    pixel   frag_remap)
 silencer_compile_shader(frag_upscale  pixel   frag_upscale)
+silencer_compile_shader(frag_lobby_panel_blur pixel frag_lobby_panel_blur)
 silencer_compile_shader(frag_light    pixel   frag_light)
 silencer_compile_shader(vert_particle vertex  vert_particle)
 silencer_compile_shader(frag_particle pixel   frag_particle)
 silencer_compile_shader(comp_particle compute update_particles)
 silencer_finalize_shaders(
-    vert_screen frag_remap frag_upscale frag_light
+    vert_screen frag_remap frag_upscale frag_lobby_panel_blur frag_light
     vert_particle frag_particle comp_particle
 )
 add_dependencies(${SILENCER_TARGET} silencer_shaders)
