@@ -4,7 +4,7 @@ import { useSocket } from '../../lib/socket';
 import Sidebar from '../../components/Sidebar';
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { useGameData } from './useGameData';
-import { useSilMap } from './useSilMap';
+import { useSilMap, PHYSICS_MATERIAL_NAMES } from './useSilMap';
 import Toolbar, { ACTOR_DEFS, PLATFORM_TOOL_TYPES } from './Toolbar';
 import MapCanvas from './MapCanvas';
 import type { DragPlatform } from './MapCanvas';
@@ -52,7 +52,7 @@ export default function DesignerPage() {
   useEffect(() => { loadLights(); }, [loadLights]);
   const { map, openMap, saveMap, publishMap, createMap, updateTile, patchTile, applyTileBatch, applyAllLayersBatch, beginPaint, commitPaint,
           addPlatform, removePlatform, addActor, removeActor, updateActor, moveActor,
-          updateHeader, updatePlatform, addShadowZone, removeShadowZone,
+          updateHeader, updatePlatform, updatePlatformMaterial, addShadowZone, removeShadowZone,
           addNavLink, removeNavLink, updateNavLink,
           setTriggers, setObjectives, setZones, setZonesLive,
           undo, redo, canUndo, canRedo, resizeMap } = useSilMap();
@@ -1120,6 +1120,29 @@ export default function DesignerPage() {
           onDelete={removeActor}
           onClose={() => { setActorMenu(null); setHighlightActorIdx(null); }}
         />
+      )}
+
+      {/* Platform properties panel — shown when a platform is selected in SELECT mode */}
+      {selectedPlatformIdx !== null && map?.platforms[selectedPlatformIdx] && (
+        <div className="fixed bottom-12 left-64 z-40 bg-game-bgCard border border-game-primary rounded p-3 font-mono text-xs shadow-2xl min-w-[220px]">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-game-primary tracking-widest text-[10px]">PLATFORM #{selectedPlatformIdx}</span>
+            <button onClick={() => setSelectedPlatformIdx(null)} className="text-game-textDim hover:text-game-text ml-4">✕</button>
+          </div>
+          <div className="text-game-textDim mb-1 text-[9px]">
+            {map.platforms[selectedPlatformIdx].typeName}
+          </div>
+          <label className="text-game-textDim text-[9px] block mb-1">PHYSICS MATERIAL</label>
+          <select
+            value={map.platforms[selectedPlatformIdx].physicsMaterial ?? 'Concrete'}
+            onChange={e => updatePlatformMaterial(selectedPlatformIdx, e.target.value)}
+            className="w-full bg-game-dark border border-game-border text-game-text text-[10px] font-mono rounded px-1 py-0.5 focus:outline-none focus:border-game-primary"
+          >
+            {PHYSICS_MATERIAL_NAMES.map(name => (
+              <option key={name} value={name}>{name}</option>
+            ))}
+          </select>
+        </div>
       )}
 
       {/* Keyboard shortcut cheatsheet overlay */}

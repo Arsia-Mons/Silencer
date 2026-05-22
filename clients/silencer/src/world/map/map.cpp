@@ -979,6 +979,19 @@ bool Map::LoadFile(const char * filename, World & world, Team * team){
 		}
 	}
 
+	// Platform physics materials — optional trailing section (one uint8 per platform, in load order).
+	// Old maps simply lack this section; all platforms default to PhysicsMaterial::Concrete (0).
+	if(i + 8 <= level.size()){
+			Uint32 numMats = 0;
+			memcpy(&numMats, &level[i], 4); numMats = SDL_Swap32LE(numMats);
+			i += 8; // count + padding
+			for(Uint32 m = 0; m < numMats && i < level.size(); m++, i++){
+				if(m < platforms.size()){
+					platforms[m]->physicsMaterial = static_cast<PhysicsMaterial>(level[i]);
+				}
+			}
+	}
+
 	return true;
 }
 

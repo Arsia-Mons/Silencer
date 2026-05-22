@@ -1,0 +1,166 @@
+{
+  "physicsMaterials": [
+    {
+      "id": "Concrete",
+      "footstepL": "futstonl.wav",
+      "footstepR": "futstonr.wav",
+      "footstepCrouchL": "futstonl.wav",
+      "footstepCrouchR": "futstonr.wav",
+      "footstepStairL": "stostep1.wav",
+      "footstepStairR": "stostepr.wav"
+    },
+    {
+      "id": "Asphalt",
+      "footstepL": "futstonl.wav",
+      "footstepR": "futstonr.wav",
+      "footstepStairL": "stostep1.wav",
+      "footstepStairR": "stostepr.wav"
+    },
+    {
+      "id": "MetalSolid",
+      "footstepL": "metal_step_l.wav",
+      "footstepR": "metal_step_r.wav",
+      "footstepCrouchL": "metal_crouch_l.wav",
+      "footstepCrouchR": "metal_crouch_r.wav",
+      "footstepStairL": "metal_stair_l.wav",
+      "footstepStairR": "metal_stair_r.wav"
+    },
+    {
+      "id": "MetalGrate",
+      "footstepL": "metal_grate_l.wav",
+      "footstepR": "metal_grate_r.wav",
+      "footstepCrouchL": "metal_grate_crouch_l.wav",
+      "footstepCrouchR": "metal_grate_crouch_r.wav",
+      "footstepStairL": "metal_grate_stair_l.wav",
+      "footstepStairR": "metal_grate_stair_r.wav"
+    },
+    {
+      "id": "Glass",
+      "footstepL": "glass_step_l.wav",
+      "footstepR": "glass_step_r.wav"
+    },
+    {
+      "id": "Tile",
+      "footstepL": "tile_step_l.wav",
+      "footstepR": "tile_step_r.wav"
+    },
+    {
+      "id": "Carpet",
+      "footstepL": "carpet_step_l.wav",
+      "footstepR": "carpet_step_r.wav"
+    },
+    {
+      "id": "Linoleum",
+      "footstepL": "linoleum_step_l.wav",
+      "footstepR": "linoleum_step_r.wav"
+    },
+    {
+      "id": "GrassDry",
+      "footstepL": "grass_dry_l.wav",
+      "footstepR": "grass_dry_r.wav"
+    },
+    {
+      "id": "GrassLush",
+      "footstepL": "grass_lush_l.wav",
+      "footstepR": "grass_lush_r.wav"
+    },
+    {
+      "id": "Dirt",
+      "footstepL": "dirt_step_l.wav",
+      "footstepR": "dirt_step_r.wav",
+      "footstepCrouchL": "dirt_crouch_l.wav",
+      "footstepCrouchR": "dirt_crouch_r.wav",
+      "footstepStairL": "dirt_stair_l.wav",
+      "footstepStairR": "dirt_stair_r.wav"
+    },
+    {
+      "id": "Mud",
+      "footstepL": "mud_step_l.wav",
+      "footstepR": "mud_step_r.wav"
+    },
+    {
+      "id": "Sand",
+      "footstepL": "sand_step_l.wav",
+      "footstepR": "sand_step_r.wav"
+    },
+    {
+      "id": "Gravel",
+      "footstepL": "gravel_step_l.wav",
+      "footstepR": "gravel_step_r.wav"
+    },
+    {
+      "id": "Rock",
+      "footstepL": "rock_step_l.wav",
+      "footstepR": "rock_step_r.wav"
+    },
+    {
+      "id": "WaterShallow",
+      "footstepL": "water_shallow_l.wav",
+      "footstepR": "water_shallow_r.wav"
+    },
+    {
+      "id": "WaterDeep",
+      "footstepL": "water_deep_l.wav",
+      "footstepR": "water_deep_r.wav"
+    },
+    {
+      "id": "SnowPowder",
+      "footstepL": "snow_powder_l.wav",
+      "footstepR": "snow_powder_r.wav"
+    },
+    {
+      "id": "SnowCrust",
+      "footstepL": "snow_crust_l.wav",
+      "footstepR": "snow_crust_r.wav"
+    },
+    {
+      "id": "Ice",
+      "footstepL": "ice_step_l.wav",
+      "footstepR": "ice_step_r.wav"
+    },
+    {
+      "id": "Puddle",
+      "footstepL": "puddle_step_l.wav",
+      "footstepR": "puddle_step_r.wav"
+    },
+    {
+      "id": "WoodSolid",
+      "footstepL": "wood_solid_l.wav",
+      "footstepR": "wood_solid_r.wav",
+      "footstepCrouchL": "wood_solid_crouch_l.wav",
+      "footstepCrouchR": "wood_solid_crouch_r.wav",
+      "footstepStairL": "wood_solid_stair_l.wav",
+      "footstepStairR": "wood_solid_stair_r.wav"
+    },
+    {
+      "id": "WoodCreaky",
+      "footstepL": "wood_creaky_l.wav",
+      "footstepR": "wood_creaky_r.wav"
+    },
+    {
+      "id": "Marble",
+      "footstepL": "marble_step_l.wav",
+      "footstepR": "marble_step_r.wav"
+    },
+    {
+      "id": "Brick",
+      "footstepL": "brick_step_l.wav",
+      "footstepR": "brick_step_r.wav"
+    },
+    {
+      "id": "FleshOrganic",
+      "footstepL": "flesh_step_l.wav",
+      "footstepR": "flesh_step_r.wav"
+    },
+    {
+      "id": "EnergyForcefield",
+      "footstepL": "energy_step_l.wav",
+      "footstepR": "energy_step_r.wav"
+    },
+    {
+      "id": "MagmaAsh",
+      "footstepL": "magma_step_l.wav",
+      "footstepR": "magma_step_r.wav"
+    }
+  ]
+}

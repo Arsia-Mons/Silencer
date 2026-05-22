@@ -2,6 +2,7 @@
 #include <string>
 #include <vector>
 #include <map>
+#include <unordered_map>
 #include <cstdint>
 
 // ---------------------------------------------------------------------------
@@ -15,6 +16,19 @@
 // All values in the seed JSON files are 1:1 copies of the original C++
 // hardcoded values — no balance changes during migration.
 // ---------------------------------------------------------------------------
+
+// ---- Physics material ------------------------------------------------------
+
+// Sound set resolved for a platform's PhysicsMaterial at footstep-play time.
+// Fields that are empty fall back to footstepL/R (flat walk variants).
+struct PhysicsMaterialDef {
+    std::string footstepL;
+    std::string footstepR;
+    std::string footstepCrouchL;
+    std::string footstepCrouchR;
+    std::string footstepStairL;
+    std::string footstepStairR;
+};
 
 // ---- Agency ----------------------------------------------------------------
 
@@ -642,6 +656,20 @@ public:
     std::vector<EffectDef>     effects;
     std::vector<LightDef>      lights;
     std::vector<GameModeConfig> gameModes;
+    // Keyed by PhysicsMaterial cast to uint8_t.
+    std::unordered_map<uint8_t, PhysicsMaterialDef> physicsMaterials;
+
+    // Returns the material def for the given PhysicsMaterial value.
+    // Falls back to the Concrete entry (key 0) if the requested key is absent,
+    // and returns an empty def if even Concrete is missing.
+    const PhysicsMaterialDef& GetPhysicsMaterialDef(uint8_t mat) const {
+        auto it = physicsMaterials.find(mat);
+        if (it != physicsMaterials.end()) return it->second;
+        auto fb = physicsMaterials.find(0);
+        if (fb != physicsMaterials.end()) return fb->second;
+        static const PhysicsMaterialDef empty{};
+        return empty;
+    }
 
     // Errors from the most recent Load() / Reload(). Cleared at the
     // start of each load. Read-only consumers should treat
