@@ -177,7 +177,7 @@ void WorldNetwork::DoNetwork_Authority(void){
 								world.SendGameInfo(newpeer->id);
 							}
 							if(world.replay.IsRecording()){
-								world.replay.WriteNewPeer(agency, accountid);
+								world.replay.WriteNewPeer(agency, accountid, selectedcharid);
 							}
 						}else{
 							//printf("couldnt add peer\n");
