@@ -32,8 +32,6 @@ using silencer::ui::primitives::Box;
 namespace BoxVariants = silencer::ui::primitives::BoxVariants;
 
 constexpr const char * kActionGoBack = "lobby.go_back";
-constexpr uint8_t kPanelFillColor = 74;
-constexpr uint8_t kPanelFillOpacity = 128;
 constexpr int kTitleRowH = 21;
 
 int ClampInt(int value, int lo, int hi) {
@@ -206,8 +204,6 @@ void BuildLobbyTitleBar(const std::string & version,
 		             .childAlignment = { .y = CLAY_ALIGN_Y_CENTER },
 		             .layoutDirection = CLAY_LEFT_TO_RIGHT,
 		         },
-		         .backgroundColor = { lobby_chrome_detail::kPanelFillColor, 0, 0,
-		                              lobby_chrome_detail::kPanelFillOpacity },
 		     })) {
 		CLAY({ .id = CLAY_ID("LobbyTitleRow"),
 		       .layout = {
