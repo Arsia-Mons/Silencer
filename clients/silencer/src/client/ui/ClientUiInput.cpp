@@ -62,6 +62,14 @@ void ClientUiInput::QueueControlPointerPress(int x, int y) {
 	controlCommands_.push_back(command);
 }
 
+void ClientUiInput::QueueControlPointerHover(int x, int y) {
+	silencer::ui::UiControlCommand command;
+	command.kind = silencer::ui::UiControlCommandKind::PointerHover;
+	command.x = x;
+	command.y = y;
+	controlCommands_.push_back(command);
+}
+
 void ClientUiInput::QueuePointerWindowEvent(float windowX,
                                             float windowY,
                                             int windowW,

@@ -613,8 +613,8 @@ void CharacterCreateScreen::BuildUi(ScreenContext & ctx,
 			                        kContentPadRight,
 			                        kContentPadTop,
 			                        kContentPadBottom },
-			           .layoutDirection = CLAY_LEFT_TO_RIGHT,
 			           .childGap = kColumnGap,
+			           .layoutDirection = CLAY_LEFT_TO_RIGHT,
 			       },
 			       .image = { .imageData = PackImageStretch(7, 5) } }) {
 				if(step == Step::SelectAgent){
@@ -639,9 +639,9 @@ void CharacterCreateScreen::BuildSelectAgent(ScreenContext & ctx,
 	       .layout = {
 	           .sizing = { CLAY_SIZING_FIXED(kLeftColumnW),
 	                       CLAY_SIZING_GROW(0) },
+	           .childGap = kRowGap,
 	           .childAlignment = { .x = CLAY_ALIGN_X_CENTER },
 	           .layoutDirection = CLAY_TOP_TO_BOTTOM,
-	           .childGap = kRowGap,
 	       } }) {
 		CLAY({ .id = CLAY_ID("CharacterCreateAgentTitle"),
 		       .layout = {
@@ -659,8 +659,8 @@ void CharacterCreateScreen::BuildSelectAgent(ScreenContext & ctx,
 		CLAY({ .id = CLAY_ID("CharacterCreateAgentRows"),
 		       .layout = {
 		           .sizing = { CLAY_SIZING_GROW(0), CLAY_SIZING_FIXED(kAgentRowsH) },
-		           .layoutDirection = CLAY_TOP_TO_BOTTOM,
 		           .childGap = kRowGap,
+		           .layoutDirection = CLAY_TOP_TO_BOTTOM,
 		       } }) {
 			const int visibleRows = kAgentRowsH / (kRowH + kRowGap);
 			const int count = std::min(static_cast<int>(agentRows.size()), kMaxRows);
@@ -741,6 +741,7 @@ void CharacterCreateScreen::BuildEnterAlias(ScreenContext & ctx,
 	           .sizing = { CLAY_SIZING_FIXED(kAliasModalW),
 	                       CLAY_SIZING_FIXED(kAliasModalH) },
 	       },
+	       .image = { .imageData = silencer::clay_bridge::PackImage(40, 2) },
 	       .floating = {
 	           .offset = { static_cast<float>(kAliasModalOffsetX),
 	                       static_cast<float>(kAliasModalTop +
@@ -752,8 +753,7 @@ void CharacterCreateScreen::BuildEnterAlias(ScreenContext & ctx,
 	                             .parent = CLAY_ATTACH_POINT_CENTER_CENTER },
 	           .pointerCaptureMode = CLAY_POINTER_CAPTURE_MODE_CAPTURE,
 	           .attachTo = CLAY_ATTACH_TO_PARENT,
-	       },
-	       .image = { .imageData = silencer::clay_bridge::PackImage(40, 2) } }) {
+	       } }) {
 		CLAY({ .id = CLAY_ID("CharacterAliasTitleFloat"),
 		       .layout = {
 		           .sizing = { CLAY_SIZING_FIXED(kAliasModalW),
@@ -820,9 +820,9 @@ void CharacterCreateScreen::BuildSelectAgency(ScreenContext & ctx,
 	       .layout = {
 	           .sizing = { CLAY_SIZING_FIXED(kLeftColumnW),
 	                       CLAY_SIZING_GROW(0) },
+	           .childGap = kRowGap,
 	           .childAlignment = { .x = CLAY_ALIGN_X_CENTER },
 	           .layoutDirection = CLAY_TOP_TO_BOTTOM,
-	           .childGap = kRowGap,
 	       } }) {
 		CLAY({ .id = CLAY_ID("CharacterAgencyTitle"),
 		       .layout = {
@@ -840,8 +840,8 @@ void CharacterCreateScreen::BuildSelectAgency(ScreenContext & ctx,
 		CLAY({ .id = CLAY_ID("CharacterAgencyRows"),
 		       .layout = {
 		           .sizing = { CLAY_SIZING_GROW(0), CLAY_SIZING_FIXED(kAgencyRowsH) },
-		           .layoutDirection = CLAY_TOP_TO_BOTTOM,
 		           .childGap = kRowGap,
+		           .layoutDirection = CLAY_TOP_TO_BOTTOM,
 		       } }) {
 			for(int i = 0; i < 5; ++i){
 				const std::string id = std::string("CharacterAgencyRow") + std::to_string(i);

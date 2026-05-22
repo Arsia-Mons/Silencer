@@ -473,6 +473,10 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 			nlohmann::json w;
 			w["source"] = "clay";
 			if(!cw.id.empty()) w["id"] = cw.id;
+			const auto * el = cw.id.empty()
+				? nullptr
+				: game.UiInteractions().FindById(cw.id);
+			w["focused"] = el ? el->focused : false;
 			w["x"] = cw.x; w["y"] = cw.y;
 			w["w"] = cw.w; w["h"] = cw.h;
 			if(silencer::ui::UiInteractableLabel(cw))
@@ -635,6 +639,25 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 			return;
 		}
 		game.UiInput().QueueControlPointerPress(x, y);
+		nlohmann::json r;
+		r["source"] = "clay";
+		r["x"] = x;
+		r["y"] = y;
+		cmd.reply->set_value(OkResult(cmd.id, r));
+		return;
+	}
+	if(cmd.op == "hover_at"){
+		// Move the UI pointer without pressing. Control-socket callers use the
+		// same virtual Clay coordinates that inspect/click_at expose.
+		if(!cmd.args.contains("x") || !cmd.args.contains("y")){
+			cmd.reply->set_value(Err(cmd.id, "BAD_REQUEST", "hover_at needs x and y"));
+			return;
+		}
+		int x = cmd.args["x"].get<int>();
+		int y = cmd.args["y"].get<int>();
+		if(x < 0) x = 0;
+		if(y < 0) y = 0;
+		game.UiInput().QueueControlPointerHover(x, y);
 		nlohmann::json r;
 		r["source"] = "clay";
 		r["x"] = x;

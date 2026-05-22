@@ -98,6 +98,11 @@ public:
 	bool FocusNextInteractive();
 	bool FocusPreviousInteractive();
 	bool FocusDirectional(UiNavAction action);
+	// Moves the single focused element to whatever interactable sits under a
+	// MOVED pointer, so mouse hover and keyboard navigation share one focus
+	// state. A resting pointer or empty space leaves focus untouched; text
+	// inputs are skipped so hovering never steals caret focus.
+	bool FocusHovered(float x, float y);
 	bool ActivateFocused();
 	void QueueAction(UiAction action);
 	std::vector<UiAction> DrainActions();
@@ -118,6 +123,9 @@ private:
 	int focusedUid_ = -1;
 	UiInteractableKind focusedKind_ = UiInteractableKind::Button;
 	std::string focusedLabel_;
+	float hoverSampleX_ = 0.0f;
+	float hoverSampleY_ = 0.0f;
+	bool haveHoverSample_ = false;
 };
 
 }  // namespace ui

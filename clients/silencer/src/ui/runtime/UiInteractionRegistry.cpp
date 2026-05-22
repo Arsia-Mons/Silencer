@@ -486,6 +486,31 @@ bool UiInteractionRegistry::FocusDirectional(UiNavAction action) {
 	return true;
 }
 
+bool UiInteractionRegistry::FocusHovered(float x, float y) {
+	// Only react to actual pointer movement. A resting pointer that happens to
+	// sit over a row must not keep yanking focus back from the keyboard.
+	if(haveHoverSample_ && x == hoverSampleX_ && y == hoverSampleY_){
+		return false;
+	}
+	haveHoverSample_ = true;
+	hoverSampleX_ = x;
+	hoverSampleY_ = y;
+
+	const int ix = static_cast<int>(x);
+	const int iy = static_cast<int>(y);
+	for(auto it = interactables_.rbegin(); it != interactables_.rend(); ++it){
+		if(it->kind == UiInteractableKind::TextInput) continue;
+		if(!UiInteractableIsInteractive(*it)) continue;
+		if(!registry_detail::PointIn(*it, ix, iy)) continue;
+		if(MatchesFocus(*it)) return true;  // already the focused element
+		SetFocus(*it);
+		QueueAction(UiActionKind::Navigate, *it, "hover");
+		return true;
+	}
+	// Over empty space or a text field: leave the existing focus in place.
+	return false;
+}
+
 bool UiInteractionRegistry::ActivateFocused() {
 	const UiInteractable * widget = FocusedInteractable();
 	if(!widget || widget->inactive) return false;

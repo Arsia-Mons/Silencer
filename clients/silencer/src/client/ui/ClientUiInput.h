@@ -17,6 +17,7 @@ public:
 	void QueueBindingKeyDown(int keyCode);
 	void QueueControlAction(silencer::ui::UiAction action);
 	void QueueControlPointerPress(int x, int y);
+	void QueueControlPointerHover(int x, int y);
 
 	void QueuePointerWindowEvent(float windowX,
 	                             float windowY,
