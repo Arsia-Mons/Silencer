@@ -179,7 +179,7 @@ bool LobbyScreen::HandleUiIntent(ScreenContext & ctx, const silencer::ui::UiActi
 		goBackClicked = true;
 		return true;
 	}
-	if(silencer::client_ui::lobby::CharacterPanelHandleUiIntent(characterState, action)){
+	if(silencer::client_ui::lobby::CharacterPanelHandleUiIntent(characterState, ctx.world, action)){
 		return true;
 	}
 	if(silencer::client_ui::lobby::ChatPanelHandleUiIntent(chatState, ctx.world, action)){

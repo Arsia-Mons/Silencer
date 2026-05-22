@@ -31,6 +31,7 @@ struct CharacterPanelState {
 	// reconcile on entry (matches legacy's initial agencychanged=true).
 	int lastReconciled = -1;
 	bool newCharacterRequested = false;
+	bool agentSelectionLocked = false;
 };
 
 // Initialise state from Config (defaultagency).
@@ -40,6 +41,7 @@ void CharacterPanelInit(CharacterPanelState & state);
 // LobbyScreen::Tick.
 void CharacterPanelTick(CharacterPanelState & state, World & world);
 bool CharacterPanelHandleUiIntent(CharacterPanelState & state,
+                                  World & world,
                                   const silencer::ui::UiAction & action);
 
 // Emit the panel subtree. Must be called inside an open Clay layout pass,

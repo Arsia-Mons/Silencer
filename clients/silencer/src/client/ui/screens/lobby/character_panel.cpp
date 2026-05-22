@@ -285,6 +285,7 @@ namespace silencer::client_ui::lobby {
 
     void CharacterPanelTick(CharacterPanelState &state, World &world) {
         state.selectedAgency = world.lobby.GetSelectedAgencyOrDefault(Config::GetInstance().defaultagency);
+        state.agentSelectionLocked = world.IsConnected();
         if (static_cast<int>(state.selectedAgency) != state.lastReconciled) {
             state.lastReconciled = state.selectedAgency;
             if (world.IsConnected()) {
@@ -294,9 +295,11 @@ namespace silencer::client_ui::lobby {
     }
 
     bool CharacterPanelHandleUiIntent(CharacterPanelState &state,
+                                      World &world,
                                       const silencer::ui::UiAction &action) {
         if (action.kind != silencer::ui::UiActionKind::Activate) return false;
         if (action.id == character_panel_detail::kActionAgents) {
+            if (world.IsConnected()) return true;
             state.newCharacterRequested = true;
             return true;
         }
@@ -492,6 +495,7 @@ namespace silencer::client_ui::lobby {
                                    ButtonOpts{
                                        .variant = ButtonVariant::Chrome,
                                        .size = ButtonSize::Auto,
+                                       .disabled = state.agentSelectionLocked,
                                        .minWidth = character_panel_detail::kActionButtonMinWidth,
                                        .paddingX = character_panel_detail::kActionButtonPaddingX
                                    },

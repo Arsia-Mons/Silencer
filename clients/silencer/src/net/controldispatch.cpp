@@ -483,6 +483,7 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 				? nullptr
 				: game.UiInteractions().FindById(cw.id);
 			w["focused"] = el ? el->focused : false;
+			w["enabled"] = !cw.inactive;
 			w["x"] = cw.x; w["y"] = cw.y;
 			w["w"] = cw.w; w["h"] = cw.h;
 			if(silencer::ui::UiInteractableLabel(cw))

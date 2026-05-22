@@ -215,5 +215,19 @@ cli --port "$CTRL_PORT" click --label "Create" >/dev/null
 # this test we just want to confirm Create dispatched without hitting the
 # WIDGET_NOT_FOUND path.
 cli --port "$CTRL_PORT" step --frames 30 >/dev/null
+for i in $(seq 1 100); do
+  if cli --port "$CTRL_PORT" inspect | bun -e '
+    const t = await new Response(Bun.stdin.stream()).text();
+    const r = JSON.parse(t);
+    const agents = (r.widgets ?? []).find((w) => w.label === "Agents" && w.kind === "button");
+    process.exit(agents && agents.enabled === false ? 0 : 1);
+  ' >/dev/null 2>&1; then
+    echo "PASS 40_lobby_basic"
+    exit 0
+  fi
+  sleep 0.1
+done
 
-echo "PASS 40_lobby_basic"
+echo "Agents button was not disabled after joining created game" >&2
+cli --port "$CTRL_PORT" inspect >&2 || true
+exit 1

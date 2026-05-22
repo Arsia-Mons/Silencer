@@ -232,6 +232,7 @@ func (s *Store) SelectCharacter(accountID uint32, charID uint32) (*User, bool) {
 			if ch.ID == charID {
 				u.SelectedCharID = charID
 				_ = s.save()
+				s.mongo.SyncPlayer(u)
 				return u, true
 			}
 		}
