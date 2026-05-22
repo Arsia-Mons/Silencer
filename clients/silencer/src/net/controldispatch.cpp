@@ -489,7 +489,7 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 			return;
 		}
 
-		silencer::client_ui::UiEditorPreviewDocument document;
+		silencer::ui::UiEditorPreviewDocument document;
 		std::string error;
 		if(!silencer::net::ParseUiEditorPreviewDocument(documentJson, document, error)){
 			cmd.reply->set_value(Err(cmd.id, "BAD_REQUEST", error));

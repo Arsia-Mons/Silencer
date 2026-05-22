@@ -55,4 +55,12 @@ describe('ui-layout model', () => {
 
     expect(() => validateUiDocument(imported)).toThrow('Duplicate node id: main-menu-title');
   });
+
+  test('rejects layout values that the client preview cannot render', () => {
+    const document = createDefaultUiDocument();
+    const imported = JSON.parse(JSON.stringify(document));
+    imported.root.style.justify = 'between';
+
+    expect(() => validateUiDocument(imported)).toThrow('Node main-menu-root has invalid justify.');
+  });
 });

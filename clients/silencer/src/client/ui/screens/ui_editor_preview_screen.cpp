@@ -18,6 +18,9 @@ namespace {
 
 using silencer::ui::UiElementKind;
 using silencer::ui::UiElementSnapshot;
+using silencer::ui::UiEditorNode;
+using silencer::ui::UiEditorPreviewDocument;
+using silencer::ui::UiEditorSize;
 using silencer::ui::UiInteractionRegistry;
 using silencer::ui::primitives::Button;
 using silencer::ui::primitives::ButtonHandle;

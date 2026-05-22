@@ -2,8 +2,8 @@ export const UI_LAYOUT_SCHEMA_VERSION = 1 as const;
 
 export type UiNodeKind = 'screen' | 'panel' | 'stack' | 'row' | 'text' | 'button' | 'input' | 'spacer';
 export type UiAxis = 'row' | 'column';
-export type UiAlign = 'start' | 'center' | 'end' | 'stretch';
-export type UiJustify = 'start' | 'center' | 'end' | 'between';
+export type UiAlign = 'start' | 'center' | 'end';
+export type UiJustify = 'start' | 'center' | 'end';
 export type UiSizeMode = 'fit' | 'grow' | 'fixed';
 export type UiFont = 'ui' | 'uiLarge' | 'title' | 'tiny';
 
@@ -50,6 +50,10 @@ export interface UiDocument {
   };
   root: UiNode;
 }
+
+type UiNodeOverrides = Omit<Partial<UiNode>, 'style'> & {
+  style?: Partial<UiStyle>;
+};
 
 const KIND_LABELS: Record<UiNodeKind, string> = {
   screen: 'Screen',
@@ -112,7 +116,7 @@ export function createDefaultUiDocument(): UiDocument {
             width: { mode: 'fixed', value: 360 },
             height: { mode: 'fit' },
             direction: 'column',
-            align: 'stretch',
+            align: 'center',
             justify: 'start',
             padding: 18,
             gap: 10,
@@ -126,9 +130,21 @@ export function createDefaultUiDocument(): UiDocument {
             radius: 2,
           },
           children: [
-            createNode('button', 'host-game', { text: 'HOST GAME', action: 'open-host-game' }),
-            createNode('button', 'join-game', { text: 'JOIN GAME', action: 'open-join-game' }),
-            createNode('button', 'options', { text: 'OPTIONS', action: 'open-options' }),
+            createNode('button', 'host-game', {
+              text: 'HOST GAME',
+              action: 'open-host-game',
+              style: { width: { mode: 'fixed', value: 320 } },
+            }),
+            createNode('button', 'join-game', {
+              text: 'JOIN GAME',
+              action: 'open-join-game',
+              style: { width: { mode: 'fixed', value: 320 } },
+            }),
+            createNode('button', 'options', {
+              text: 'OPTIONS',
+              action: 'open-options',
+              style: { width: { mode: 'fixed', value: 320 } },
+            }),
           ],
         },
       ],
@@ -136,7 +152,7 @@ export function createDefaultUiDocument(): UiDocument {
   };
 }
 
-export function createNode(kind: UiNodeKind, idSeed = nextIdSeed(), overrides: Partial<UiNode> = {}): UiNode {
+export function createNode(kind: UiNodeKind, idSeed = nextIdSeed(), overrides: UiNodeOverrides = {}): UiNode {
   const id = `${kind}-${idSeed}`;
   const base: UiNode = {
     id,
@@ -253,7 +269,7 @@ function defaultStyleForKind(kind: UiNodeKind): UiStyle {
       width: { mode: 'fixed', value: 1280 },
       height: { mode: 'fixed', value: 720 },
       direction: 'column',
-      align: 'stretch',
+      align: 'start',
       justify: 'start',
       padding: 24,
       gap: 12,
@@ -269,7 +285,7 @@ function defaultStyleForKind(kind: UiNodeKind): UiStyle {
       width: { mode: 'fixed', value: 320 },
       height: { mode: 'fit' },
       direction: 'column',
-      align: 'stretch',
+      align: 'start',
       justify: 'start',
       padding: 14,
       gap: 8,
@@ -288,7 +304,7 @@ function defaultStyleForKind(kind: UiNodeKind): UiStyle {
       width: { mode: 'grow' },
       height: { mode: 'fit' },
       direction: kind === 'row' ? 'row' : 'column',
-      align: 'stretch',
+      align: 'start',
       justify: 'start',
       padding: 0,
       gap: 8,
@@ -355,6 +371,10 @@ function validateNode(node: UiNode, seenIds: Set<string>): void {
   if (!node.style || typeof node.style !== 'object') throw new Error(`Node ${node.id} style is missing.`);
   validateSize(node, 'width');
   validateSize(node, 'height');
+  validateEnum(node, 'direction', ['row', 'column']);
+  validateEnum(node, 'align', ['start', 'center', 'end']);
+  validateEnum(node, 'justify', ['start', 'center', 'end']);
+  validateEnum(node, 'font', ['ui', 'uiLarge', 'title', 'tiny']);
   validatePalette(node, 'backgroundPalette');
   validatePalette(node, 'borderPalette');
   validatePalette(node, 'textPalette');
@@ -362,6 +382,14 @@ function validateNode(node: UiNode, seenIds: Set<string>): void {
     throw new Error(`Node ${node.id} cannot have children.`);
   }
   for (const child of node.children ?? []) validateNode(child, seenIds);
+}
+
+function validateEnum<T extends string>(node: UiNode, key: 'direction' | 'align' | 'justify' | 'font', values: T[]): void {
+  const value = node.style[key];
+  if (value === undefined) return;
+  if (typeof value !== 'string' || !values.includes(value as T)) {
+    throw new Error(`Node ${node.id} has invalid ${key}.`);
+  }
 }
 
 function validatePalette(node: UiNode, key: 'backgroundPalette' | 'borderPalette' | 'textPalette'): void {

@@ -1,6 +1,7 @@
 #include "ui_editor_preview_document.h"
 
 #include <algorithm>
+#include <initializer_list>
 #include <unordered_set>
 #include <utility>
 
@@ -8,10 +9,10 @@ namespace silencer::net {
 
 namespace {
 
-using silencer::client_ui::UiEditorNode;
-using silencer::client_ui::UiEditorPreviewDocument;
-using silencer::client_ui::UiEditorSize;
-using silencer::client_ui::UiEditorStyle;
+using silencer::ui::UiEditorNode;
+using silencer::ui::UiEditorPreviewDocument;
+using silencer::ui::UiEditorSize;
+using silencer::ui::UiEditorStyle;
 
 constexpr int kSchemaVersion = 1;
 constexpr int kMinViewport = 160;
@@ -42,6 +43,30 @@ int IntValue(const nlohmann::json& json, const char * key, int fallback = 0) {
 
 int ClampInt(int value, int minValue, int maxValue) {
 	return std::max(minValue, std::min(value, maxValue));
+}
+
+bool ParseStringEnum(const nlohmann::json& json,
+                     const char * key,
+                     const char * fallback,
+                     std::initializer_list<const char *> allowed,
+                     std::string& out,
+                     std::string& error) {
+	auto it = json.find(key);
+	out = fallback;
+	if(it == json.end()) return true;
+	if(!it->is_string()){
+		error = std::string("style.") + key + " must be a string";
+		return false;
+	}
+	const std::string value = it->get<std::string>();
+	for(const char * candidate : allowed){
+		if(value == candidate){
+			out = value;
+			return true;
+		}
+	}
+	error = std::string("style.") + key + " is unsupported: " + value;
+	return false;
 }
 
 bool ParseSize(const nlohmann::json& json,
@@ -114,13 +139,25 @@ bool ParseStyle(const nlohmann::json& json,
 	fallbackHeight.mode = UiEditorSize::Mode::Fit;
 	if(!ParseSize(json, "height", out.height, error, fallbackHeight)) return false;
 
-	out.direction = StringValue(json, "direction", "column");
-	out.align = StringValue(json, "align", "stretch");
-	out.justify = StringValue(json, "justify", "start");
+	if(!ParseStringEnum(json, "direction", "column", { "column", "row" },
+	                    out.direction, error)){
+		return false;
+	}
+	if(!ParseStringEnum(json, "align", "start", { "start", "center", "end" },
+	                    out.align, error)){
+		return false;
+	}
+	if(!ParseStringEnum(json, "justify", "start", { "start", "center", "end" },
+	                    out.justify, error)){
+		return false;
+	}
 	out.padding = ClampInt(IntValue(json, "padding", 0), 0, 512);
 	out.gap = ClampInt(IntValue(json, "gap", 0), 0, 512);
 	out.radius = ClampInt(IntValue(json, "radius", 0), 0, 64);
-	out.font = StringValue(json, "font", "ui");
+	if(!ParseStringEnum(json, "font", "ui", { "ui", "uiLarge", "title", "tiny" },
+	                    out.font, error)){
+		return false;
+	}
 	if(!ParsePalette(json, "backgroundPalette", -1, -1, out.backgroundPalette, error)) return false;
 	if(!ParsePalette(json, "borderPalette", -1, -1, out.borderPalette, error)) return false;
 	if(!ParsePalette(json, "textPalette", 0, 0, out.textPalette, error)) return false;
