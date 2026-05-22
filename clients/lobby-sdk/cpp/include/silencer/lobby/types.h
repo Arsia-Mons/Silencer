@@ -50,6 +50,15 @@ enum class GameStatus : uint8_t {
     Playing = 2,
 };
 
+enum class StatId : uint8_t {
+    Endurance = 1,
+    Shield    = 2,
+    Jetpack   = 3,
+    TechSlots = 4,
+    Hacking   = 5,
+    Contacts  = 6,
+};
+
 struct AgencyStats {
     uint16_t wins             = 0;
     uint16_t losses           = 0;

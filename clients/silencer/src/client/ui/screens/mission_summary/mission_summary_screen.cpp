@@ -71,6 +71,15 @@ const char * kLevelLabels[6] = {
 	"Current Contacts Level:",
 };
 
+constexpr Lobby::StatID kUpgradeStatIds[6] = {
+	Lobby::STAT_ENDURANCE,
+	Lobby::STAT_SHIELD,
+	Lobby::STAT_JETPACK,
+	Lobby::STAT_TECHSLOTS,
+	Lobby::STAT_HACKING,
+	Lobby::STAT_CONTACTS,
+};
+
 Clay_String FromStd(const std::string & s)
 {
 	return Clay_String{ false, static_cast<int32_t>(s.size()), s.c_str() };
@@ -135,13 +144,14 @@ void MissionSummaryScreen::Tick(ScreenContext & ctx)
 		}
 	}
 	if(upgradeClicked >= 0){
-			int idx = upgradeClicked;
-			upgradeClicked = -1;
-			User * user = world.lobby.GetUserInfo(world.lobby.accountid);
-			if(user && idx >= 0 && idx < 6){
-				world.lobby.UpgradeStat(user->selectedcharid, user->statsagency, idx);
-			}
+		int idx = upgradeClicked;
+		upgradeClicked = -1;
+		User * user = world.lobby.GetUserInfo(world.lobby.accountid);
+		if(user && idx >= 0 && idx < 6){
+			world.lobby.UpgradeStat(user->selectedcharid, user->statsagency,
+			                        mission_summary_screen_detail::kUpgradeStatIds[idx]);
 		}
+	}
 	if(doneClicked){
 		doneClicked = false;
 		if(world.lobby.state == Lobby::AUTHENTICATED){

@@ -134,7 +134,7 @@ func TestProgressionUsesExplicitCharacterID(t *testing.T) {
 	} else if agencyIdx != 1 || updated.Wins != 1 || updated.Level != 1 || updated.XPToNextLevel != 50 {
 		t.Fatalf("UpdateStats first wrong: agency=%d stats=%#v", agencyIdx, updated)
 	}
-	if updated, agencyIdx, ok := store.UpgradeStat(user.AccountID, firstID, 0); !ok {
+	if updated, agencyIdx, ok := store.UpgradeStat(user.AccountID, firstID, statEndurance); !ok {
 		t.Fatalf("UpgradeStat first rejected")
 	} else if agencyIdx != 1 || updated.Endurance != 1 {
 		t.Fatalf("UpgradeStat first wrong: agency=%d stats=%#v", agencyIdx, updated)
@@ -161,5 +161,62 @@ func TestProgressionUsesExplicitCharacterID(t *testing.T) {
 	}
 	if user.SelectedCharID != secondID {
 		t.Fatalf("progression changed selection: got %d want %d", user.SelectedCharID, secondID)
+	}
+}
+
+func TestUpgradeStatUsesWireStatIDs(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "lobby.json")
+	store, err := NewStore(path)
+	if err != nil {
+		t.Fatalf("NewStore: %v", err)
+	}
+	user, ok, banned := store.Login("alice", hashPassword("secret"))
+	if !ok || banned {
+		t.Fatalf("Login: ok=%v banned=%v", ok, banned)
+	}
+	user, ok = store.CreateCharacter(user.AccountID, "Shade", 2)
+	if !ok {
+		t.Fatalf("CreateCharacter rejected")
+	}
+	charID := user.SelectedCharID
+
+	cases := []struct {
+		name string
+		stat uint8
+		want Agency
+	}{
+		{"endurance", statEndurance, Agency{Endurance: 1, TechSlots: 3}},
+		{"shield", statShield, Agency{Endurance: 1, Shield: 1, TechSlots: 3}},
+		{"jetpack", statJetpack, Agency{Endurance: 1, Shield: 1, Jetpack: 1, TechSlots: 3}},
+		{"tech_slots", statTechSlots, Agency{Endurance: 1, Shield: 1, Jetpack: 1, TechSlots: 4}},
+		{"hacking", statHacking, Agency{Endurance: 1, Shield: 1, Jetpack: 1, TechSlots: 4, Hacking: 1}},
+		{"contacts", statContacts, Agency{Endurance: 1, Shield: 1, Jetpack: 1, TechSlots: 4, Hacking: 1, Contacts: 1}},
+	}
+	for _, tc := range cases {
+		updated, agencyIdx, ok := store.UpgradeStat(user.AccountID, charID, tc.stat)
+		if !ok {
+			t.Fatalf("UpgradeStat %s rejected", tc.name)
+		}
+		if agencyIdx != 2 {
+			t.Fatalf("UpgradeStat %s agency: got %d want 2", tc.name, agencyIdx)
+		}
+		if updated != tc.want {
+			t.Fatalf("UpgradeStat %s stats: got %#v want %#v", tc.name, updated, tc.want)
+		}
+	}
+
+	user = store.ByName["alice"]
+	ch := characterByID(user, charID)
+	if ch == nil {
+		t.Fatalf("character missing after upgrades")
+	}
+	before := ch.Stats
+	for _, invalid := range []uint8{0, statContacts + 1} {
+		if updated, _, ok := store.UpgradeStat(user.AccountID, charID, invalid); ok {
+			t.Fatalf("UpgradeStat accepted invalid id %d: %#v", invalid, updated)
+		}
+	}
+	if ch.Stats != before {
+		t.Fatalf("invalid stat id mutated stats: got %#v want %#v", ch.Stats, before)
 	}
 }

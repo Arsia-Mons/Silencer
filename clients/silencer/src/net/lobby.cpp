@@ -738,13 +738,14 @@ void Lobby::ForgetAllUserInfo(void){
 	userinfos.clear();
 }
 
-void Lobby::UpgradeStat(Uint32 charID, Uint8 agency, Uint8 stat){
+void Lobby::UpgradeStat(Uint32 charID, Uint8 agency, StatID stat){
 	Serializer msg;
 	Uint8 code = MSG_UPGRADESTAT;
 	msg.Put(code);
 	msg.Put(agency);
 	msg.Put(charID);
-	msg.Put(stat);
+	Uint8 statID = static_cast<Uint8>(stat);
+	msg.Put(statID);
 	SendMessage(msg.data, msg.BitsToBytes(msg.offset));
 }
 

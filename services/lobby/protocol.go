@@ -26,6 +26,15 @@ const (
 	opSelectCharacter = 16 // client→server: select an existing character
 )
 
+const (
+	statEndurance uint8 = iota + 1
+	statShield
+	statJetpack
+	statTechSlots
+	statHacking
+	statContacts
+)
+
 const maxFrame = 255
 const maxUpdateURL = 200 // leaves room for [framelen][op][success][urllen u16][sha256] in a 255-byte frame
 const maxCharacterNameBytes = 16

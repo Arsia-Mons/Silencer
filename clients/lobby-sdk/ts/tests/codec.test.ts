@@ -45,6 +45,7 @@ import {
   Reader,
   SecurityLevel,
   GameStatus,
+  StatId,
   sha1,
   Writer,
   type LobbyGame,
@@ -362,7 +363,7 @@ describe("golden vectors", () => {
 
   test("upgradestat_request", () => {
     const v = need("upgradestat_request");
-    expect(framedHex(encodeUpgradeStat(300, 2, 3))).toBe(v.hex);
+    expect(framedHex(encodeUpgradeStat(300, 2, StatId.Jetpack))).toBe(v.hex);
   });
 
   test("upgradestat_reply", () => {

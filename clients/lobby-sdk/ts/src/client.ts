@@ -39,6 +39,7 @@ import {
   Op,
   type Platform,
   type PresenceUpdate,
+  type StatId,
   type UserInfo,
   type VersionResult,
 } from "./types.ts";
@@ -356,7 +357,7 @@ export class LobbyClient {
   requestUserInfo(accountId: number): void {
     this.sendRaw(encodeUserInfoRequest(accountId));
   }
-  upgradeStat(characterId: number, agencyIdx: number, statId: number): void {
+  upgradeStat(characterId: number, agencyIdx: number, statId: StatId): void {
     this.sendRaw(encodeUpgradeStat(characterId, agencyIdx, statId));
   }
   setGame(gameId: number, status: GameStatus): void {

@@ -23,6 +23,14 @@ public:
 	void UnlockMutex(void);
 	enum {IDLE, WAITING, CONNECTING, RESOLVING, WAITINGFORRESOLVER, RESOLVED, RESOLVEFAILED, CONNECTIONFAILED, CONNECTED, CHECKINGVERSION, AUTHENTICATING, AUTHSENT, AUTHENTICATED, AUTHFAILED, DISCONNECTED} state;
 	enum {MSG_AUTH, MSG_MOTD, MSG_CHAT, MSG_NEWGAME, MSG_DELGAME, MSG_CHANNEL, MSG_CONNECT, MSG_VERSION, MSG_USERINFO, MSG_PING, MSG_UPGRADESTAT, MSG_REGISTERSTATS, MSG_PRESENCE, MSG_SETGAME, MSG_CHARACTERS, MSG_CREATECHARACTER, MSG_SELECTCHARACTER};
+	enum StatID {
+		STAT_ENDURANCE = 1,
+		STAT_SHIELD = 2,
+		STAT_JETPACK = 3,
+		STAT_TECHSLOTS = 4,
+		STAT_HACKING = 5,
+		STAT_CONTACTS = 6,
+	};
 	struct PresenceEntry {
 		Uint32 accountid;
 		Uint32 gameid; // 0 = main lobby
@@ -49,7 +57,7 @@ public:
 	User * GetUserInfo(Uint32 accountid);
 	void ForgetUserInfo(Uint32 accountid);
 	void ForgetAllUserInfo(void);
-	void UpgradeStat(Uint32 charID, Uint8 agency, Uint8 stat);
+	void UpgradeStat(Uint32 charID, Uint8 agency, StatID stat);
 	void RegisterStats(User & user, Uint8 won, Uint32 gameid);
 	void SendSetGame(Uint32 gameid, Uint8 status);
 	void CreateCharacter(const char * name, Uint8 agencyIdx);

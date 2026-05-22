@@ -45,6 +45,16 @@ export const GameStatus = {
 } as const;
 export type GameStatus = (typeof GameStatus)[keyof typeof GameStatus];
 
+export const StatId = {
+  Endurance: 1,
+  Shield: 2,
+  Jetpack: 3,
+  TechSlots: 4,
+  Hacking: 5,
+  Contacts: 6,
+} as const;
+export type StatId = (typeof StatId)[keyof typeof StatId];
+
 export interface AgencyStats {
   wins: number;
   losses: number;

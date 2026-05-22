@@ -16,6 +16,7 @@ import {
   type PresenceUpdate,
   SecurityLevel,
   GameStatus,
+  type StatId,
   type UserInfo,
   type VersionResult,
   type WeaponStats,
@@ -263,7 +264,7 @@ export function encodePingAck(): Uint8Array {
 export function encodeUpgradeStat(
   characterId: number,
   agencyIdx: number,
-  statId: number,
+  statId: StatId,
 ): Uint8Array {
   const w = new Writer();
   w.u8(Op.UpgradeStat);

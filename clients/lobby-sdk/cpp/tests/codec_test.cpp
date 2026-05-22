@@ -371,7 +371,7 @@ static void test_ping_ack(const std::string& hex) {
 }
 
 static void test_upgradestat_request(const std::string& hex) {
-    auto enc = frame(encode_upgrade_stat(300, 2, 3));
+    auto enc = frame(encode_upgrade_stat(300, 2, StatId::Jetpack));
     CHECK_EQ(to_hex(enc), hex);
 }
 

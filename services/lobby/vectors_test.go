@@ -210,8 +210,8 @@ func TestVector_UpgradeStatRequest_Decode(t *testing.T) {
 		t.Fatalf("op: got %d want %d", op, opUpgradeStat)
 	}
 	if len(body) != 6 || body[0] != 2 || body[1] != 0x2c || body[2] != 0x01 ||
-		body[3] != 0 || body[4] != 0 || body[5] != 3 {
-		t.Errorf("body: %v want [2 44 1 0 0 3]", body)
+		body[3] != 0 || body[4] != 0 || body[5] != statJetpack {
+		t.Errorf("body: %v want [2 44 1 0 0 %d]", body, statJetpack)
 	}
 }
 

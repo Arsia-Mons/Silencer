@@ -325,7 +325,7 @@ void Client::request_user_info(uint32_t account_id) {
     send_raw(encode_user_info_request(account_id));
 }
 
-void Client::upgrade_stat(uint32_t character_id, uint8_t agency_idx, uint8_t stat_id) {
+void Client::upgrade_stat(uint32_t character_id, uint8_t agency_idx, StatId stat_id) {
     send_raw(encode_upgrade_stat(character_id, agency_idx, stat_id));
 }
 

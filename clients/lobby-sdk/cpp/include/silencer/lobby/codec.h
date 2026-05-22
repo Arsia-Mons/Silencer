@@ -87,7 +87,7 @@ std::vector<uint8_t> encode_join_channel(const std::string& current_channel,
 std::vector<uint8_t> encode_new_game(const LobbyGame& g);
 std::vector<uint8_t> encode_user_info_request(uint32_t account_id);
 std::vector<uint8_t> encode_ping_ack();
-std::vector<uint8_t> encode_upgrade_stat(uint32_t character_id, uint8_t agency_idx, uint8_t stat_id);
+std::vector<uint8_t> encode_upgrade_stat(uint32_t character_id, uint8_t agency_idx, StatId stat_id);
 std::vector<uint8_t> encode_set_game(uint32_t game_id, GameStatus status);
 std::vector<uint8_t> encode_create_character(const std::string& name, uint8_t agency_idx);
 std::vector<uint8_t> encode_select_character(uint32_t character_id);

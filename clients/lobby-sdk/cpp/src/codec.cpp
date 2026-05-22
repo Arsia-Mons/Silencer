@@ -202,12 +202,12 @@ std::vector<uint8_t> encode_ping_ack() {
     return std::move(w).take();
 }
 
-std::vector<uint8_t> encode_upgrade_stat(uint32_t character_id, uint8_t agency_idx, uint8_t stat_id) {
+std::vector<uint8_t> encode_upgrade_stat(uint32_t character_id, uint8_t agency_idx, StatId stat_id) {
     Writer w;
     w.u8(OpUpgradeStat);
     w.u8(agency_idx);
     w.u32_le(character_id);
-    w.u8(stat_id);
+    w.u8(static_cast<uint8_t>(stat_id));
     return std::move(w).take();
 }
 

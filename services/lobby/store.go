@@ -315,14 +315,6 @@ func (s *Store) UpgradeStat(accountID uint32, charID uint32, stat uint8) (Agency
 			return Agency{}, 0, false
 		}
 		a := &ch.Stats
-		const (
-			statEndurance = iota
-			statShield
-			statJetpack
-			statTechSlots
-			statHacking
-			statContacts
-		)
 		max := uint8(5)
 		if stat == statTechSlots {
 			max = 8
