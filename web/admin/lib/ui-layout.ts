@@ -370,6 +370,9 @@ function validateNode(node: UiNode, seenIds: Set<string>): void {
   seenIds.add(node.id);
   if (!node.kind || !KIND_LABELS[node.kind]) throw new Error(`Unsupported node kind: ${String(node.kind)}`);
   if (!node.name || typeof node.name !== 'string') throw new Error(`Node ${node.id} name is missing.`);
+  validateOptionalString(node, 'text');
+  validateOptionalString(node, 'placeholder');
+  validateOptionalString(node, 'action');
   if (!node.style || typeof node.style !== 'object') throw new Error(`Node ${node.id} style is missing.`);
   validateSize(node, 'width');
   validateSize(node, 'height');
@@ -390,6 +393,14 @@ function validateNode(node: UiNode, seenIds: Set<string>): void {
     throw new Error(`Node ${node.id} cannot have children.`);
   }
   for (const child of node.children ?? []) validateNode(child, seenIds);
+}
+
+function validateOptionalString(node: UiNode, key: 'text' | 'placeholder' | 'action'): void {
+  const value = node[key];
+  if (value === undefined) return;
+  if (typeof value !== 'string') {
+    throw new Error(`Node ${node.id} has invalid ${key}.`);
+  }
 }
 
 function validateViewport(viewport: UiDocument['viewport']): void {

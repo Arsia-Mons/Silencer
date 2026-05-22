@@ -106,7 +106,8 @@ export function Inspector({ node, parent, isRoot, onPatch, onStyle, onDelete, on
 function StyleInspector({ node, onStyle }: { node: UiNode; onStyle: (style: Partial<UiStyle>) => void }) {
   const style = node.style;
   const supportsBoxStyle = canHaveChildren(node.kind) || node.kind === 'text' || node.kind === 'spacer';
-  const supportsFont = node.kind !== 'spacer';
+  const supportsHeight = node.kind !== 'button';
+  const supportsFont = node.kind !== 'spacer' && node.kind !== 'button';
   const supportsTextColor = canHaveChildren(node.kind) || node.kind === 'text';
   const supportsTextPalette = node.kind === 'button' || node.kind === 'text' || canHaveChildren(node.kind);
   const supportsRadius = canHaveChildren(node.kind);
@@ -115,7 +116,9 @@ function StyleInspector({ node, onStyle }: { node: UiNode; onStyle: (style: Part
       <div className="text-xs tracking-widest text-game-primary">LAYOUT</div>
       <div className="grid grid-cols-2 gap-3">
         <SizeField label="WIDTH" size={style.width} onChange={width => onStyle({ width })} />
-        <SizeField label="HEIGHT" size={style.height} onChange={height => onStyle({ height })} />
+        {supportsHeight && (
+          <SizeField label="HEIGHT" size={style.height} onChange={height => onStyle({ height })} />
+        )}
       </div>
 
       {canHaveChildren(node.kind) && (

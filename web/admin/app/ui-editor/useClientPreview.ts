@@ -42,7 +42,10 @@ export function useClientPreview(document: UiDocument, hydrated: boolean): Clien
         });
         const data = await response.json();
         if (controller.signal.aborted || seq !== requestSeq.current) return;
-        if (!response.ok || !data.ok) throw new Error(data.error ?? 'CLIENT PREVIEW FAILED');
+        if (!response.ok || !data.ok) {
+          if (data.stale) return;
+          throw new Error(data.error ?? 'CLIENT PREVIEW FAILED');
+        }
         setClientPreview({
           status: 'live',
           screenshot: data.screenshot,

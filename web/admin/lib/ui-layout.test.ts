@@ -73,4 +73,14 @@ describe('ui-layout model', () => {
     invalid.viewport.width = Number.NaN;
     expect(() => validateUiDocument(invalid)).toThrow('Document viewport width is invalid.');
   });
+
+  test('rejects imported nodes with invalid optional scalar fields', () => {
+    const document = JSON.parse(JSON.stringify(createDefaultUiDocument()));
+    document.root.children[0].text = {};
+    expect(() => validateUiDocument(document)).toThrow('Node main-menu-title has invalid text.');
+
+    const actionDocument = JSON.parse(JSON.stringify(createDefaultUiDocument()));
+    actionDocument.root.children[1].children[0].action = 42;
+    expect(() => validateUiDocument(actionDocument)).toThrow('Node button-host-game has invalid action.');
+  });
 });
