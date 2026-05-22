@@ -325,8 +325,8 @@ void Client::request_user_info(uint32_t account_id) {
     send_raw(encode_user_info_request(account_id));
 }
 
-void Client::upgrade_stat(uint8_t agency_idx, uint8_t stat_id) {
-    send_raw(encode_upgrade_stat(agency_idx, stat_id));
+void Client::upgrade_stat(uint32_t character_id, uint8_t agency_idx, uint8_t stat_id) {
+    send_raw(encode_upgrade_stat(character_id, agency_idx, stat_id));
 }
 
 void Client::set_game(uint32_t game_id, GameStatus status) {
@@ -342,9 +342,9 @@ void Client::select_character(uint32_t character_id) {
 }
 
 void Client::register_stats(uint32_t game_id, uint8_t team_number, uint32_t account_id,
-                            uint8_t stats_agency, bool won, uint32_t xp,
+                            uint32_t character_id, uint8_t stats_agency, bool won, uint32_t xp,
                             const MatchStats& stats) {
-    send_raw(encode_register_stats(game_id, team_number, account_id, stats_agency,
+    send_raw(encode_register_stats(game_id, team_number, account_id, character_id, stats_agency,
                                    won, xp, stats));
 }
 

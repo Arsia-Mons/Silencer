@@ -260,8 +260,17 @@ export function encodePingAck(): Uint8Array {
   return new Uint8Array([Op.Ping, 1]);
 }
 
-export function encodeUpgradeStat(agencyIdx: number, statId: number): Uint8Array {
-  return new Uint8Array([Op.UpgradeStat, agencyIdx & 0xff, statId & 0xff]);
+export function encodeUpgradeStat(
+  characterId: number,
+  agencyIdx: number,
+  statId: number,
+): Uint8Array {
+  const w = new Writer();
+  w.u8(Op.UpgradeStat);
+  w.u8(agencyIdx);
+  w.u32Le(characterId);
+  w.u8(statId);
+  return w.bytes();
 }
 
 export function encodeSetGame(gameId: number, status: GameStatus): Uint8Array {
@@ -291,6 +300,7 @@ export function encodeRegisterStats(
   gameId: number,
   teamNumber: number,
   accountId: number,
+  characterId: number,
   statsAgency: number,
   won: boolean,
   xp: number,
@@ -301,6 +311,7 @@ export function encodeRegisterStats(
   w.u32Le(gameId);
   w.u8(teamNumber);
   w.u32Le(accountId);
+  w.u32Le(characterId);
   w.u8(statsAgency);
   w.u8(won ? 1 : 0);
   w.u32Le(xp);

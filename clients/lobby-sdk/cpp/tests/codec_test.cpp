@@ -371,7 +371,7 @@ static void test_ping_ack(const std::string& hex) {
 }
 
 static void test_upgradestat_request(const std::string& hex) {
-    auto enc = frame(encode_upgrade_stat(2, 3));
+    auto enc = frame(encode_upgrade_stat(300, 2, 3));
     CHECK_EQ(to_hex(enc), hex);
 }
 
@@ -516,11 +516,12 @@ static void test_register_stats_request(const std::string& hex) {
     // because every field has a distinguishable value.
     auto s = make_register_stats_fixture();
     auto enc = frame(encode_register_stats(/*game_id*/ 7, /*team*/ 1, /*acct*/ 9,
-                                           /*ag*/ 2, /*won*/ true, /*xp*/ 1234, s));
+                                           /*char*/ 300, /*ag*/ 2, /*won*/ true,
+                                           /*xp*/ 1234, s));
     CHECK_EQ(to_hex(enc), hex);
-    // Sanity: 44 × u32 = 176 stats bytes; full payload = 192; wire = 193.
-    CHECK_EQ(enc.size(), 193u);
-    CHECK_EQ(enc[0], static_cast<uint8_t>(192));
+    // Sanity: 44 × u32 = 176 stats bytes; full payload = 196; wire = 197.
+    CHECK_EQ(enc.size(), 197u);
+    CHECK_EQ(enc[0], static_cast<uint8_t>(196));
     CHECK_EQ(enc[1], OpRegisterStats);
 }
 

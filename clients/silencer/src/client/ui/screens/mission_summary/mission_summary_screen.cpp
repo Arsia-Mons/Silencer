@@ -135,13 +135,13 @@ void MissionSummaryScreen::Tick(ScreenContext & ctx)
 		}
 	}
 	if(upgradeClicked >= 0){
-		int idx = upgradeClicked;
-		upgradeClicked = -1;
-		User * user = world.lobby.GetUserInfo(world.lobby.accountid);
-		if(user && idx >= 0 && idx < 6){
-			world.lobby.UpgradeStat(user->statsagency, idx);
+			int idx = upgradeClicked;
+			upgradeClicked = -1;
+			User * user = world.lobby.GetUserInfo(world.lobby.accountid);
+			if(user && idx >= 0 && idx < 6){
+				world.lobby.UpgradeStat(user->selectedcharid, user->statsagency, idx);
+			}
 		}
-	}
 	if(doneClicked){
 		doneClicked = false;
 		if(world.lobby.state == Lobby::AUTHENTICATED){

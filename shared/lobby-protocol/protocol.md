@@ -255,6 +255,7 @@ window — any read resets the deadline.
 **Request** (`C → S`):
 ```
 u8     agency_idx     (0–4)
+u32    character_id
 u8     stat_id        (1=endurance 2=shield 3=jetpack 4=tech_slots 5=hacking 6=contacts)
 ```
 
@@ -268,6 +269,7 @@ client re-fetches its own user info to see the new value.
 u32    game_id
 u8     team_number
 u32    account_id
+u32    character_id
 u8     stats_agency
 u8     won            (0 or 1)
 u32    xp

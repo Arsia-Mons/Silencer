@@ -356,8 +356,8 @@ export class LobbyClient {
   requestUserInfo(accountId: number): void {
     this.sendRaw(encodeUserInfoRequest(accountId));
   }
-  upgradeStat(agencyIdx: number, statId: number): void {
-    this.sendRaw(encodeUpgradeStat(agencyIdx, statId));
+  upgradeStat(characterId: number, agencyIdx: number, statId: number): void {
+    this.sendRaw(encodeUpgradeStat(characterId, agencyIdx, statId));
   }
   setGame(gameId: number, status: GameStatus): void {
     this.sendRaw(encodeSetGame(gameId, status));
@@ -374,6 +374,7 @@ export class LobbyClient {
     gameId: number;
     teamNumber: number;
     accountId: number;
+    characterId: number;
     statsAgency: number;
     won: boolean;
     xp: number;
@@ -384,6 +385,7 @@ export class LobbyClient {
         args.gameId,
         args.teamNumber,
         args.accountId,
+        args.characterId,
         args.statsAgency,
         args.won,
         args.xp,

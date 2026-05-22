@@ -49,7 +49,7 @@ public:
 	User * GetUserInfo(Uint32 accountid);
 	void ForgetUserInfo(Uint32 accountid);
 	void ForgetAllUserInfo(void);
-	void UpgradeStat(Uint8 agency, Uint8 stat);
+	void UpgradeStat(Uint32 charID, Uint8 agency, Uint8 stat);
 	void RegisterStats(User & user, Uint8 won, Uint32 gameid);
 	void SendSetGame(Uint32 gameid, Uint8 status);
 	void CreateCharacter(const char * name, Uint8 agencyIdx);

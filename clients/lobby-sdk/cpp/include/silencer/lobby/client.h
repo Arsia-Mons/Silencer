@@ -73,12 +73,12 @@ public:
     void join_channel(const std::string& channel);
     void create_game(const LobbyGame& g);
     void request_user_info(uint32_t account_id);
-    void upgrade_stat(uint8_t agency_idx, uint8_t stat_id);
+    void upgrade_stat(uint32_t character_id, uint8_t agency_idx, uint8_t stat_id);
     void set_game(uint32_t game_id, GameStatus status);
     void create_character(const std::string& name, uint8_t agency_idx);
     void select_character(uint32_t character_id);
     void register_stats(uint32_t game_id, uint8_t team_number, uint32_t account_id,
-                        uint8_t stats_agency, bool won, uint32_t xp,
+                        uint32_t character_id, uint8_t stats_agency, bool won, uint32_t xp,
                         const MatchStats& stats);
 
     // ---- callbacks --------------------------------------------------

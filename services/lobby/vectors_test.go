@@ -209,8 +209,9 @@ func TestVector_UpgradeStatRequest_Decode(t *testing.T) {
 	if op != opUpgradeStat {
 		t.Fatalf("op: got %d want %d", op, opUpgradeStat)
 	}
-	if len(body) != 2 || body[0] != 2 || body[1] != 3 {
-		t.Errorf("body: %v want [2 3]", body)
+	if len(body) != 6 || body[0] != 2 || body[1] != 0x2c || body[2] != 0x01 ||
+		body[3] != 0 || body[4] != 0 || body[5] != 3 {
+		t.Errorf("body: %v want [2 44 1 0 0 3]", body)
 	}
 }
 
@@ -260,12 +261,13 @@ func TestVector_RegisterStatsRequest_Decode(t *testing.T) {
 	gameID, _ := r.u32()
 	team, _ := r.u8()
 	acct, _ := r.u32()
+	charID, _ := r.u32()
 	agency, _ := r.u8()
 	won, _ := r.u8()
 	xp, _ := r.u32()
-	if gameID != 7 || team != 1 || acct != 9 || agency != 2 || won != 1 || xp != 1234 {
-		t.Errorf("header: game=%d team=%d acct=%d agency=%d won=%d xp=%d",
-			gameID, team, acct, agency, won, xp)
+	if gameID != 7 || team != 1 || acct != 9 || charID != 300 || agency != 2 || won != 1 || xp != 1234 {
+		t.Errorf("header: game=%d team=%d acct=%d char=%d agency=%d won=%d xp=%d",
+			gameID, team, acct, charID, agency, won, xp)
 	}
 	ms := readMatchStats(r)
 	// 44 fields, declaration order, values 100..143. A field-order

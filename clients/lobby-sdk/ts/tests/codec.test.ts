@@ -362,7 +362,7 @@ describe("golden vectors", () => {
 
   test("upgradestat_request", () => {
     const v = need("upgradestat_request");
-    expect(framedHex(encodeUpgradeStat(2, 3))).toBe(v.hex);
+    expect(framedHex(encodeUpgradeStat(300, 2, 3))).toBe(v.hex);
   });
 
   test("upgradestat_reply", () => {
@@ -467,11 +467,11 @@ describe("register_stats", () => {
   test("encodes the golden vector exactly", () => {
     const v = need("register_stats_request");
     const enc = frameEncode(
-      encodeRegisterStats(7, 1, 9, 2, true, 1234, makeRegisterStatsFixture()),
+      encodeRegisterStats(7, 1, 9, 300, 2, true, 1234, makeRegisterStatsFixture()),
     );
     expect(toHex(enc)).toBe(v.hex);
-    expect(enc.length).toBe(193);
-    expect(enc[0]).toBe(192);
+    expect(enc.length).toBe(197);
+    expect(enc[0]).toBe(196);
     expect(enc[1]).toBe(Op.RegisterStats);
   });
 });

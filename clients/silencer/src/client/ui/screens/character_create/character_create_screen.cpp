@@ -157,12 +157,12 @@ bool CharacterCreateScreen::HandleUiIntent(ScreenContext & ctx,
 		}
 	}
 	if(action.kind == silencer::ui::UiActionKind::SetText &&
-	   action.id == kActionAlias){
+	   step == Step::EnterAlias && action.id == kActionAlias){
 		CopyAlias(action.value);
 		return true;
 	}
 	if(action.kind == silencer::ui::UiActionKind::SubmitText &&
-	   action.id == kActionAlias){
+	   step == Step::EnterAlias && action.id == kActionAlias){
 		CopyAlias(action.value);
 		AdvanceAliasStep(ctx);
 		return true;
@@ -171,14 +171,14 @@ bool CharacterCreateScreen::HandleUiIntent(ScreenContext & ctx,
 		return false;
 	}
 	int agentIndex = SuffixInt(action.id, kActionAgentPrefix);
-	if(agentIndex >= 0){
+	if(step == Step::SelectAgent && agentIndex >= 0){
 		selectedAgentIndex = agentIndex;
 		previewAgentIndex = agentIndex;
 		SelectCurrentAgent(ctx);
 		return true;
 	}
 	int agencyIndex = SuffixInt(action.id, kActionAgencyPrefix);
-	if(agencyIndex >= 0){
+	if(step == Step::SelectAgency && agencyIndex >= 0){
 		if(agencyIndex < 5){
 			selectedAgency = AgencyForIndex(agencyIndex);
 			previewAgencyIndex = agencyIndex;
@@ -188,7 +188,7 @@ bool CharacterCreateScreen::HandleUiIntent(ScreenContext & ctx,
 		}
 		return true;
 	}
-	if(action.id == kActionCreate){
+	if(step == Step::SelectAgency && action.id == kActionCreate){
 		CreateCurrentAgent(ctx);
 		return true;
 	}

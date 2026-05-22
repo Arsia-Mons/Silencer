@@ -105,16 +105,16 @@ cli --port "$CTRL_PORT" click --label "Login" >/dev/null
 # Walk the create flow up to the SELECT AGENCY stage (5 oval agency rows).
 cli --port "$CTRL_PORT" wait_for_state --state CREATECHARACTER --timeout-ms 15000 >/dev/null
 wait_for_widget "Create New Character"
-cli --port "$CTRL_PORT" click --label "Create New Character" >/dev/null
-wait_for_widget "Alias"
-
 read -r CREATE_HX CREATE_HY < <(cli --port "$CTRL_PORT" inspect | bun -e '
 const t = await new Response(Bun.stdin.stream()).text();
 const r = JSON.parse(t);
 const row = (r.widgets ?? []).find((w) => w.label === "Create New Character" && w.w > 0 && w.h > 0);
-if (!row) { console.error("Create New Character row missing while alias modal is open"); process.exit(1); }
+if (!row) { console.error("Create New Character row missing before alias modal opens"); process.exit(1); }
 console.log(`${Math.round(row.x + row.w / 2)} ${Math.round(row.y + row.h / 2)}`);
 ')
+cli --port "$CTRL_PORT" click --label "Create New Character" >/dev/null
+wait_for_widget "Alias"
+
 cli --port "$CTRL_PORT" hover_at --x "$CREATE_HX" --y "$CREATE_HY" >/dev/null
 cli --port "$CTRL_PORT" wait_frames --n 2 >/dev/null
 ALIAS_HOVER="$TMP/alias-hover.json"
@@ -128,6 +128,27 @@ if (alias.focused !== true) {
   process.exit(1);
 }
 ' "$ALIAS_HOVER"
+
+if cli --port "$CTRL_PORT" click_at --x "$CREATE_HX" --y "$CREATE_HY" >/dev/null 2>&1; then
+  echo "background agent row accepted a click while alias modal was open" >&2
+  exit 1
+fi
+cli --port "$CTRL_PORT" wait_frames --n 2 >/dev/null
+CURRENT_STATE=$(cli --port "$CTRL_PORT" state | bun -e '
+const t = await new Response(Bun.stdin.stream()).text();
+console.log(JSON.parse(t).state || "");
+')
+if [ "$CURRENT_STATE" != "CREATECHARACTER" ]; then
+  echo "background click escaped alias modal into state $CURRENT_STATE" >&2
+  exit 1
+fi
+ALIAS_CLICK="$TMP/alias-click.json"
+cli --port "$CTRL_PORT" inspect > "$ALIAS_CLICK"
+bun -e '
+const r = JSON.parse(await Bun.file(process.argv[1]).text());
+const alias = (r.widgets ?? []).find((w) => w.label === "Alias");
+if (!alias) { console.error("Alias text input missing after background click"); process.exit(1); }
+' "$ALIAS_CLICK"
 
 cli --port "$CTRL_PORT" set_text --label "Alias" --text "Alice" >/dev/null
 cli --port "$CTRL_PORT" key --key enter >/dev/null

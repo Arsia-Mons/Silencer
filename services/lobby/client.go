@@ -344,22 +344,31 @@ func (c *Client) handleUpgradeStat(r *reader) error {
 	if c.accountID == 0 {
 		return nil
 	}
-	// agency byte kept for wire compat but ignored — server uses selected character.
-	if _, err := r.u8(); err != nil {
+	// agency byte is retained for admin/event consumers; character id is the
+	// authoritative progression key.
+	requestedAgency, err := r.u8()
+	if err != nil {
+		return err
+	}
+	charID, err := r.u32()
+	if err != nil {
 		return err
 	}
 	stat, err := r.u8()
 	if err != nil {
 		return err
 	}
-	if updatedAgency, ok := c.hub.store.UpgradeStat(c.accountID, 0, stat); ok {
+	if updatedAgency, agencyIdx, ok := c.hub.store.UpgradeStat(c.accountID, charID, stat); ok {
 		c.send([]byte{opUpgradeStat})
 		if c.hub.events != nil {
 			c.hub.events.Publish("player.upgrade", playerUpgradeEvent{
-				AccountID: c.accountID, AgencyIdx: 0, StatID: stat,
+				AccountID: c.accountID, AgencyIdx: agencyIdx, StatID: stat,
 				Agency: agencyToEvent(updatedAgency), Timestamp: time.Now().UnixMilli(),
 			})
 		}
+	} else {
+		log.Printf("[upgrade] UpgradeStat failed: acct=%d char=%d agency=%d stat=%d",
+			c.accountID, charID, requestedAgency, stat)
 	}
 	return nil
 }
@@ -441,6 +450,10 @@ func (c *Client) handleRegisterStats(r *reader) error {
 	if err != nil {
 		return err
 	}
+	charID, err := r.u32()
+	if err != nil {
+		return err
+	}
 	statsagency, err := r.u8()
 	if err != nil {
 		return err
@@ -453,26 +466,26 @@ func (c *Client) handleRegisterStats(r *reader) error {
 	if err != nil {
 		return err
 	}
-	log.Printf("[stats] game=%d acct=%d agency=%d won=%d xp=%d", gameID, acct, statsagency, won, xp)
+	log.Printf("[stats] game=%d acct=%d char=%d agency=%d won=%d xp=%d", gameID, acct, charID, statsagency, won, xp)
 
 	ms := readMatchStats(r)
 
-	if updatedAgency, ok := c.hub.store.UpdateStats(acct, statsagency, won != 0, xp); ok {
-		log.Printf("[stats] saved: acct=%d agency=%d wins=%d losses=%d level=%d xp=%d",
-			acct, statsagency, updatedAgency.Wins, updatedAgency.Losses, updatedAgency.Level, updatedAgency.XPToNextLevel)
+	if updatedAgency, agencyIdx, ok := c.hub.store.UpdateStats(acct, charID, won != 0, xp); ok {
+		log.Printf("[stats] saved: acct=%d char=%d agency=%d wins=%d losses=%d level=%d xp=%d",
+			acct, charID, agencyIdx, updatedAgency.Wins, updatedAgency.Losses, updatedAgency.Level, updatedAgency.XPToNextLevel)
 		if c.hub.events != nil {
 			now := time.Now().UnixMilli()
 			c.hub.events.Publish("player.stats_update", playerStatsUpdateEvent{
-				AccountID: acct, AgencyIdx: statsagency,
+				AccountID: acct, AgencyIdx: agencyIdx,
 				Agency: agencyToEvent(updatedAgency), Timestamp: now,
 			})
 			c.hub.events.Publish("player.match_stats", playerMatchStatsEvent{
-				AccountID: acct, GameID: gameID, AgencyIdx: statsagency,
+				AccountID: acct, GameID: gameID, AgencyIdx: agencyIdx,
 				Won: won != 0, XP: xp, Stats: ms, Timestamp: now,
 			})
 		}
 	} else {
-		log.Printf("[stats] UpdateStats failed: acct=%d not found in store", acct)
+		log.Printf("[stats] UpdateStats failed: acct=%d char=%d not found in store", acct, charID)
 	}
 	return nil
 }

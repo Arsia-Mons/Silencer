@@ -84,7 +84,7 @@ class World {
     // Network
     bool           Listen(unsigned short port = 0)       { return network.Listen(port); }
     unsigned short Bind(unsigned short port = 0)         { return network.Bind(port); }
-    void           Connect(Uint8 agency, Uint32 accountid, const char * password = 0, bool observer = false) { network.Connect(agency, accountid, password, observer); }
+    void           Connect(Uint8 agency, Uint32 accountid, Uint32 selectedcharid = 0, const char * password = 0, bool observer = false) { network.Connect(agency, accountid, selectedcharid, password, observer); }
     void           Disconnect()                          { network.Disconnect(); }
     bool           IsAuthority()                         { return network.IsAuthority(); }
     bool           IsConnected() const                   { return network.IsConnected(); }
@@ -209,7 +209,7 @@ class World {
     protected:
     void   SaveSnapshot(Serializer & data, Uint8 peerid)                                    { replication.SaveSnapshot(data, peerid); }
     void   LoadSnapshot(Serializer & data, bool create = true, Serializer * delta = 0, Uint16 objectid = 0) { replication.LoadSnapshot(data, create, delta, objectid); }
-    Peer * AddPeer(char * address, unsigned short port, Uint8 agency, Uint32 accountid, bool observer = false) { return peers.AddPeer(address, port, agency, accountid, observer); }
+    Peer * AddPeer(char * address, unsigned short port, Uint8 agency, Uint32 accountid, Uint32 selectedcharid = 0, bool observer = false) { return peers.AddPeer(address, port, agency, accountid, selectedcharid, observer); }
     Peer * AddBot(Uint8 agency)                                                              { return peers.AddBot(agency); }
 
     char              mapname[256];

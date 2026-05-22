@@ -738,12 +738,14 @@ void Lobby::ForgetAllUserInfo(void){
 	userinfos.clear();
 }
 
-void Lobby::UpgradeStat(Uint8 agency, Uint8 stat){
-	char msg[3];
-	msg[0] = MSG_UPGRADESTAT;
-	msg[1] = agency;
-	msg[2] = stat;
-	SendMessage(msg, sizeof(msg));
+void Lobby::UpgradeStat(Uint32 charID, Uint8 agency, Uint8 stat){
+	Serializer msg;
+	Uint8 code = MSG_UPGRADESTAT;
+	msg.Put(code);
+	msg.Put(agency);
+	msg.Put(charID);
+	msg.Put(stat);
+	SendMessage(msg.data, msg.BitsToBytes(msg.offset));
 }
 
 void Lobby::RegisterStats(User & user, Uint8 won, Uint32 gameid){
@@ -753,6 +755,7 @@ void Lobby::RegisterStats(User & user, Uint8 won, Uint32 gameid){
 	msg.Put(gameid);
 	msg.Put(user.teamnumber);
 	msg.Put(user.accountid);
+	msg.Put(user.selectedcharid);
 	msg.Put(user.statsagency);
 	msg.Put(won);
 	Uint32 xp = user.statscopy.CalculateExperience();

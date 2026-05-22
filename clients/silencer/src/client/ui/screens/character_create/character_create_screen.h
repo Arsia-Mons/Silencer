@@ -30,7 +30,9 @@ private:
 		SelectAgency,
 	};
 
-	void BuildSelectAgent(ScreenContext & ctx, silencer::ui::UiInteractionRegistry& interactions);
+	void BuildSelectAgent(ScreenContext & ctx,
+	                      silencer::ui::UiInteractionRegistry& interactions,
+	                      bool interactive = true);
 	void BuildEnterAlias(ScreenContext & ctx, silencer::ui::UiInteractionRegistry& interactions);
 	void BuildSelectAgency(ScreenContext & ctx, silencer::ui::UiInteractionRegistry& interactions);
 	void SelectCurrentAgent(ScreenContext & ctx);

@@ -243,10 +243,9 @@ func (s *Store) SelectCharacter(accountID uint32, charID uint32) (*User, bool) {
 // selectedChar returns the currently selected Character for the user (nil if none).
 // Must be called under s.mu.
 func selectedChar(u *User) *Character {
-	for i := range u.Characters {
-		if u.Characters[i].ID == u.SelectedCharID {
-			return &u.Characters[i]
-		}
+	ch := characterByID(u, u.SelectedCharID)
+	if ch != nil {
+		return ch
 	}
 	if len(u.Characters) > 0 {
 		return &u.Characters[0]
@@ -254,18 +253,29 @@ func selectedChar(u *User) *Character {
 	return nil
 }
 
-// UpdateStats records a match result and XP gain for the player's selected character.
+// characterByID returns the character with charID for the user (nil if absent).
+// Must be called under s.mu.
+func characterByID(u *User, charID uint32) *Character {
+	for i := range u.Characters {
+		if u.Characters[i].ID == charID {
+			return &u.Characters[i]
+		}
+	}
+	return nil
+}
+
+// UpdateStats records a match result and XP gain for the character that played.
 // Returns the updated Agency and true if the player and character were found.
-func (s *Store) UpdateStats(accountID uint32, _ uint8, won bool, xpGained uint32) (Agency, bool) {
+func (s *Store) UpdateStats(accountID uint32, charID uint32, won bool, xpGained uint32) (Agency, uint8, bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	for _, u := range s.ByName {
 		if u.AccountID != accountID {
 			continue
 		}
-		ch := selectedChar(u)
+		ch := characterByID(u, charID)
 		if ch == nil {
-			return Agency{}, false
+			return Agency{}, 0, false
 		}
 		a := &ch.Stats
 		if won {
@@ -285,23 +295,23 @@ func (s *Store) UpdateStats(accountID uint32, _ uint8, won bool, xpGained uint32
 		a.XPToNextLevel = uint16(x)
 		_ = s.save()
 		s.mongo.SyncPlayer(u)
-		return *a, true
+		return *a, ch.AgencyIdx, true
 	}
-	return Agency{}, false
+	return Agency{}, 0, false
 }
 
-// UpgradeStat increments a single stat for the player's selected character.
+// UpgradeStat increments a single stat for the requested character.
 // Returns the updated Agency and true if the upgrade was applied.
-func (s *Store) UpgradeStat(accountID uint32, _ uint8, stat uint8) (Agency, bool) {
+func (s *Store) UpgradeStat(accountID uint32, charID uint32, stat uint8) (Agency, uint8, bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	for _, u := range s.ByName {
 		if u.AccountID != accountID {
 			continue
 		}
-		ch := selectedChar(u)
+		ch := characterByID(u, charID)
 		if ch == nil {
-			return Agency{}, false
+			return Agency{}, 0, false
 		}
 		a := &ch.Stats
 		const (
@@ -341,11 +351,11 @@ func (s *Store) UpgradeStat(accountID uint32, _ uint8, stat uint8) (Agency, bool
 		if ok {
 			_ = s.save()
 			s.mongo.SyncPlayer(u)
-			return *a, true
+			return *a, ch.AgencyIdx, true
 		}
-		return *a, false
+		return *a, ch.AgencyIdx, false
 	}
-	return Agency{}, false
+	return Agency{}, 0, false
 }
 
 // SetBan sets the banned flag for a player by accountId.

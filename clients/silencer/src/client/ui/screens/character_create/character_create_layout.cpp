@@ -597,7 +597,8 @@ void CharacterCreateScreen::BuildUi(ScreenContext & ctx,
 }
 
 void CharacterCreateScreen::BuildSelectAgent(ScreenContext & ctx,
-                                             silencer::ui::UiInteractionRegistry& interactions)
+                                             silencer::ui::UiInteractionRegistry& interactions,
+                                             bool interactive)
 {
 	using namespace character_create_screen_detail;
 	int detailAgentIndex = previewAgentIndex >= 0
@@ -645,13 +646,13 @@ void CharacterCreateScreen::BuildSelectAgent(ScreenContext & ctx,
 				const bool selectedVisual = selected && previewAgentIndex == index;
 				ListButton(FromStd(id),
 				           FromStd(agentRows[static_cast<size_t>(index)]),
-				           action.c_str(),
+				           interactive ? action.c_str() : nullptr,
 				           interactions,
 				           selected,
 				           selectedVisual,
-				           &hovered);
-				const auto * snapshot = interactions.FindById(action);
-				if((hovered || (snapshot && snapshot->focused)) && existingAgent){
+				           interactive ? &hovered : nullptr);
+				const auto * snapshot = interactive ? interactions.FindById(action) : nullptr;
+				if(interactive && (hovered || (snapshot && snapshot->focused)) && existingAgent){
 					detailAgentIndex = index;
 				}
 			}
@@ -707,7 +708,7 @@ void CharacterCreateScreen::BuildEnterAlias(ScreenContext & ctx,
 	const bool focused = interactions.IsTextInputFocused(kAliasInputUid);
 	const bool blink = (ctx.renderer.GetHudAnimationPhase() % 32) < 16;
 
-	BuildSelectAgent(ctx, interactions);
+	BuildSelectAgent(ctx, interactions, false);
 
 	CLAY({ .id = CLAY_ID("CharacterAliasModalWrap"),
 	       .layout = {

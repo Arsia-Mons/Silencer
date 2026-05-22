@@ -202,10 +202,11 @@ std::vector<uint8_t> encode_ping_ack() {
     return std::move(w).take();
 }
 
-std::vector<uint8_t> encode_upgrade_stat(uint8_t agency_idx, uint8_t stat_id) {
+std::vector<uint8_t> encode_upgrade_stat(uint32_t character_id, uint8_t agency_idx, uint8_t stat_id) {
     Writer w;
     w.u8(OpUpgradeStat);
     w.u8(agency_idx);
+    w.u32_le(character_id);
     w.u8(stat_id);
     return std::move(w).take();
 }
@@ -234,7 +235,8 @@ std::vector<uint8_t> encode_select_character(uint32_t character_id) {
 }
 
 std::vector<uint8_t> encode_register_stats(uint32_t game_id, uint8_t team_number,
-                                           uint32_t account_id, uint8_t stats_agency,
+                                           uint32_t account_id, uint32_t character_id,
+                                           uint8_t stats_agency,
                                            bool won, uint32_t xp,
                                            const MatchStats& s) {
     Writer w;
@@ -242,6 +244,7 @@ std::vector<uint8_t> encode_register_stats(uint32_t game_id, uint8_t team_number
     w.u32_le(game_id);
     w.u8(team_number);
     w.u32_le(account_id);
+    w.u32_le(character_id);
     w.u8(stats_agency);
     w.u8(won ? 1 : 0);
     w.u32_le(xp);

@@ -22,7 +22,8 @@ public:
 	void SwitchToMode(bool newmode);
 	bool Listen(unsigned short port = 0);
 	unsigned short Bind(unsigned short port = 0);
-	void Connect(Uint8 agency, Uint32 accountid, const char * password = 0, bool observer = false);
+	void Connect(Uint8 agency, Uint32 accountid, Uint32 selectedcharid = 0,
+	             const char * password = 0, bool observer = false);
 	void Disconnect();
 	void SwitchToLocalAuthorityMode();
 	bool IsAuthority();
