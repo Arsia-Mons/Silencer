@@ -104,11 +104,14 @@ public:
 
 	friend class Renderer;
 	friend class World;
+	friend class WorldNetwork;
+	friend class WorldReplication;
 	friend class Terminal;
 	friend class Grenade;
 	friend class Warper;
 	friend class PickUp;
 	friend class Game;
+	friend class GameInput;
 	friend class PlayerAI;
 	friend class Projectile;
 

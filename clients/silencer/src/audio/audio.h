@@ -4,6 +4,7 @@
 #include "shared.h"
 #include <map>
 #include <string>
+#include <unordered_map>
 
 class Audio
 {
@@ -13,13 +14,18 @@ public:
 	static Audio & GetInstance(void);
 	bool Init(class Game * game);
 	void Close(void);
-	int Play(MIX_Audio * chunk, int volume = 128, bool loop = false);
+	// Play on any free channel. maxInstances > 0 caps simultaneous copies of the
+	// same chunk; the oldest playing instance is interrupted when the cap is hit.
+	int Play(MIX_Audio * chunk, int volume = 128, bool loop = false, int maxInstances = 0);
+	// Play on the reserved UI channel, interrupting any previous UI sound.
+	// Calls within uiCooldownMs of the last play of the same chunk are silently dropped.
+	int PlayUI(MIX_Audio * chunk, int volume = 128);
 	void Stop(int channel, int fadeoutms = 0);
 	void StopAll(int fadeoutms = 0);
 	void Pause(int channel);
 	void Resume(int channel);
 	bool Paused(int channel);
-	int EmitSound(class World & world, Uint16 objectid, MIX_Audio * chunk, int volume = 128, bool loop = false);
+	int EmitSound(class World & world, Uint16 objectid, MIX_Audio * chunk, int volume = 128, bool loop = false, int maxInstances = 0);
 	void UpdateVolume(class World & world, int channel, Sint16 x, Sint16 y, int radius);
 	void UpdateAllVolumes(class World & world, Sint16 x, Sint16 y, int radius);
 	void SetVolume(int channel, int volume);
@@ -52,6 +58,8 @@ private:
 	float ComputeOcclusion(class Map &map, int lx, int ly, int ex, int ey, float dampenRect, float dampenStairs, float * outFilterFactor = nullptr);
 
 	static const int maxchannels = 128;
+	static const int uiChannel   = maxchannels - 1; // reserved for UI interrupt sounds
+	static const int uiCooldownMs = 30;             // drop duplicate UI sounds within this window
 	MIX_Mixer *mixer;
 	MIX_Track *tracks[maxchannels];
 	MIX_Track *musictrack;
@@ -64,6 +72,8 @@ private:
 	float filterState[maxchannels][4]; // 2-pole IIR history per channel (p1L, p1R, p2L, p2R)
 	Sint16 lastx, lasty;
 	int musicvolume;
+	// Per-chunk last-played timestamp (ms) for UI cooldown
+	std::unordered_map<MIX_Audio*, Uint64> uiLastPlayed;
 };
 
 #endif

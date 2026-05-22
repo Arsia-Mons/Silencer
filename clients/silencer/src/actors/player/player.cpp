@@ -28,6 +28,7 @@
 #include "bodypart.h"
 #include "walldefense.h"
 #include "actordef.h"
+#include "audio/soundcue.h"
 #include "gamemode.h"
 #include <math.h>
 
@@ -258,7 +259,7 @@ void Player::Tick(World & world){
 	if(ai){
 		ai->Tick(world);
 	}
-	if(input.keychat && !chatActive && !isbuying && !techstationactive && this == world.GetPeerPlayer(world.localpeerid)){
+	if(input.keychat && !chatActive && !isbuying && !techstationactive && this == world.GetPeerPlayer(world.peers.localpeerid)){
 		if(!world.replay.IsPlaying()){
 			chatActive = true;
 			chatText[0] = '\0';
@@ -324,7 +325,8 @@ void Player::Tick(World & world){
 				}
 				state = DYING;
 				state_i = 0;
-				EmitSound(world, world.resources.soundbank[GASLoader::Get().player.soundGrunt]);
+				auto _r = ResolveSound(GASLoader::Get().player.soundGrunt, world.resources);
+				if(_r.chunk) EmitSound(world, _r.chunk, static_cast<int>(128 * _r.volume));
 			}
 		}
 		poisoned_i++;
@@ -353,7 +355,7 @@ void Player::Tick(World & world){
 	}
 	std::vector<Uint16> detlist;
 	std::vector<Uint16> grenadelist;
-	for(std::list<Object *>::reverse_iterator it = world.objectlist.rbegin(); it != world.objectlist.rend(); it++){
+	for(std::list<Object *>::reverse_iterator it = world.objects.objectlist.rbegin(); it != world.objects.objectlist.rend(); it++){
 		Object * object = *it;
 		if(object->type == ObjectTypes::DETONATOR){
 			Detonator * detonator = static_cast<Detonator *>(object);
@@ -379,7 +381,7 @@ void Player::Tick(World & world){
 	if(currentdetonator){
 		Detonator * detonator = (Detonator *)world.GetObjectFromId(currentdetonator);
 		if(detonator){
-			if(this == world.GetPeerPlayer(world.localpeerid)){
+			if(this == world.GetPeerPlayer(world.peers.localpeerid)){
 				world.SetSystemCamera(1, detonator->id, 0, -35);
 			}
 		}else{
@@ -390,7 +392,7 @@ void Player::Tick(World & world){
 		Grenade * grenade = (Grenade *)world.GetObjectFromId(currentgrenade);
 		if(grenade){
 			if(grenade->WasThrown()){
-				if(this == world.GetPeerPlayer(world.localpeerid)){
+				if(this == world.GetPeerPlayer(world.peers.localpeerid)){
 					world.SetSystemCamera(0, grenade->id, 0, -30);
 				}
 			}else{
@@ -448,7 +450,7 @@ void Player::Tick(World & world){
 			if(state != JETPACK && state != DEPLOYING && state != DYING && state != DEAD){
 				if(currentplatformid || !OnGround()){
 					disguised = pd.disguiseActivationTicks;
-					EmitSound(world, world.resources.soundbank[GASLoader::Get().player.soundDisguise], 64);
+					{ auto _r = ResolveSound(GASLoader::Get().player.soundDisguise, world.resources); if (_r.chunk) EmitSound(world, _r.chunk, static_cast<int>(64 * _r.volume)); };
 					if(OnGround()){
 						state = RUNNING;
 						state_i = 25;
@@ -468,7 +470,7 @@ void Player::Tick(World & world){
 	}
 	if(state != HACKING || state_i >= GASLoader::Get().player.hackingExitThreshold){
 		if(!world.replaying && hacksoundchannel != -1){
-			EmitSound(world, world.resources.soundbank[GASLoader::Get().player.soundJackout], 20);
+			{ auto _r = ResolveSound(GASLoader::Get().player.soundJackout, world.resources); if (_r.chunk) EmitSound(world, _r.chunk, static_cast<int>(20 * _r.volume)); };
 			Audio::GetInstance().Stop(hacksoundchannel, GASLoader::Get().player.audioFadeHackMs);
 			hacksoundchannel = -1;
 		}
@@ -477,7 +479,7 @@ void Player::Tick(World & world){
 		if(state != JETPACK && state != JETPACKSHOOT){
 			if(!world.replaying){
 				//GetTeam(*world)->secretdelivered = true;
-				EmitSound(world, world.resources.soundbank[GASLoader::Get().player.soundJetpack], 64);
+				{ auto _r = ResolveSound(GASLoader::Get().player.soundJetpack, world.resources); if (_r.chunk) EmitSound(world, _r.chunk, static_cast<int>(64 * _r.volume)); };
 				Audio::GetInstance().Stop(jetpacksoundchannel, GASLoader::Get().player.audioFadeJetpackMs);
 				jetpacksoundchannel = -1;
 			}
@@ -528,9 +530,9 @@ void Player::Tick(World & world){
 		}
 	}
 	if(fuel == maxfuel && fuellow){
-		Player * localplayer = world.GetPeerPlayer(world.localpeerid);
+		Player * localplayer = world.GetPeerPlayer(world.peers.localpeerid);
 		if(localplayer && localplayer->id == id){
-			Audio::GetInstance().Play(world.resources.soundbank[GASLoader::Get().player.soundWeaponCharged], 96);
+			{ auto _r = ResolveSound(GASLoader::Get().player.soundWeaponCharged, world.resources); if (_r.chunk) Audio::GetInstance().Play(_r.chunk, static_cast<int>(96 * _r.volume)); };
 		}
 		fuellow = false;
 	}
@@ -606,7 +608,7 @@ void Player::Tick(World & world){
 		break;
 	}
 	if(currentweapon != oldweapon && !world.replaying){
-		Player * localplayer = world.GetPeerPlayer(world.localpeerid);
+		Player * localplayer = world.GetPeerPlayer(world.peers.localpeerid);
 		if(localplayer && localplayer->id == id && world.tickcount - lastweaponchangesound >= 4){
 			switch(currentweapon){
 				case 0:
@@ -1025,7 +1027,7 @@ void Player::Tick(World & world){
 									}
 								}
 							}else{
-								//if(this == world.GetPeerPlayer(world.localpeerid)){
+								//if(this == world.GetPeerPlayer(world.peers.localpeerid)){
 									world.ShowStatus("Can't build a base here", 208, true, GetPeer(world));
 								//}
 							}
@@ -1049,12 +1051,12 @@ void Player::Tick(World & world){
 										RemoveInventoryItem(INV_BASEDOOR);
 									}
 								}else{
-									//if(this == world.GetPeerPlayer(world.localpeerid)){
+									//if(this == world.GetPeerPlayer(world.peers.localpeerid)){
 										world.ShowStatus("Can't build a base here", 208, true, GetPeer(world));
 									//}
 								}
 							}else{
-								//if(this == world.GetPeerPlayer(world.localpeerid)){
+								//if(this == world.GetPeerPlayer(world.peers.localpeerid)){
 									world.ShowStatus("Cannot acquire dimensional grid", 208, true, GetPeer(world));
 								//}
 							}
@@ -1100,7 +1102,7 @@ void Player::Tick(World & world){
 		case UNDEPLOYING:{
 			collidable = false;
 			if(state_i == 0 && !world.winningteamid){
-				EmitSound(world, world.resources.soundbank[GASLoader::Get().player.soundUndeploy], 96);			}
+				{ auto _r = ResolveSound(GASLoader::Get().player.soundUndeploy, world.resources); if (_r.chunk) EmitSound(world, _r.chunk, static_cast<int>(96 * _r.volume)); };			}
 			if(!ApplyActorSeq(world, "player", "UNDEPLOYING", state_i, res_bank, res_index)){
 				res_bank  = 68;
 				res_index = (8 - state_i);
@@ -1116,7 +1118,7 @@ void Player::Tick(World & world){
 			xv = 0;
 			yv = 0;
 			if(state_i == 12 && world.map.TestAABB(x, y, x, y, Platform::OUTSIDEROOM)){
-				EmitSound(world, world.resources.soundbank[GASLoader::Get().player.soundBreath], 16);
+				{ auto _r = ResolveSound(GASLoader::Get().player.soundBreath, world.resources); if (_r.chunk) EmitSound(world, _r.chunk, static_cast<int>(16 * _r.volume)); };
 				Plume * plume = static_cast<Plume *>(world.CreateObject(ObjectTypes::PLUME));
 				if(plume){
 					plume->type = 8;
@@ -1415,7 +1417,7 @@ void Player::Tick(World & world){
 					res_bank = 66;
 					res_index = state_i;
 					if(res_index == 3){
-						EmitSound(world, world.resources.soundbank[GASLoader::Get().player.soundFootstepCrouchL], 64);
+						{ auto _r = ResolveSound(GASLoader::Get().player.soundFootstepCrouchL, world.resources); if(_r.chunk) EmitSound(world, _r.chunk, static_cast<int>(64 * _r.volume)); };
 					}
 				}
 			}
@@ -1429,17 +1431,17 @@ void Player::Tick(World & world){
 					res_bank = 123;
 				}
 				if(res_index == 4){
-					EmitSound(world, world.resources.soundbank[GASLoader::Get().player.soundFootstepCrouchL], 64);
+					{ auto _r = ResolveSound(GASLoader::Get().player.soundFootstepCrouchL, world.resources); if(_r.chunk) EmitSound(world, _r.chunk, static_cast<int>(64 * _r.volume)); };
 				}
 				if(res_index == 11){
-					EmitSound(world, world.resources.soundbank[GASLoader::Get().player.soundFootstepCrouchR], 64);
+					{ auto _r = ResolveSound(GASLoader::Get().player.soundFootstepCrouchR, world.resources); if(_r.chunk) EmitSound(world, _r.chunk, static_cast<int>(64 * _r.volume)); };
 				}
 			}
 			if(state_i >= 21 && state_i < 25){
 				res_bank = 67;
 				res_index = state_i - 21;
 				if(res_index == 3){
-					EmitSound(world, world.resources.soundbank[GASLoader::Get().player.soundFootstepCrouchL], 64);
+					{ auto _r = ResolveSound(GASLoader::Get().player.soundFootstepCrouchL, world.resources); if(_r.chunk) EmitSound(world, _r.chunk, static_cast<int>(64 * _r.volume)); };
 				}
 				if(input.keymoveleft || input.keymoveright){
 					state_i = -1;
@@ -1461,10 +1463,10 @@ void Player::Tick(World & world){
 					state_i = 25 - 1;
 				}
 				if(res_index == 5){
-					EmitSound(world, world.resources.soundbank[GASLoader::Get().player.soundFootstepStairL], 48);
+					{ auto _r = ResolveSound(GASLoader::Get().player.soundFootstepStairL, world.resources); if(_r.chunk) EmitSound(world, _r.chunk, static_cast<int>(48 * _r.volume)); };
 				}
 				if(res_index == 15){
-					EmitSound(world, world.resources.soundbank[GASLoader::Get().player.soundFootstepStairR], 48);
+					{ auto _r = ResolveSound(GASLoader::Get().player.soundFootstepStairR, world.resources); if(_r.chunk) EmitSound(world, _r.chunk, static_cast<int>(48 * _r.volume)); };
 				}
 			}
 			//printf("bank: %d  index: %d\n", res_bank, res_index);
@@ -1494,7 +1496,7 @@ void Player::Tick(World & world){
 							discovered = true;
 						}
 						for(int i = 0; i < 4; i++){
-							Peer * peer = world.peerlist[team->peers[i]];
+							Peer * peer = world.peers.peerlist[team->peers[i]];
 							if(peer){
 								world.SendSound(GASLoader::Get().player.soundBaseAlarm.c_str(), peer, 96);
 								if(discovered){
@@ -1503,7 +1505,7 @@ void Player::Tick(World & world){
 							}
 						}
 					}
-					/*Player * localplayer = world.GetPeerPlayer(world.localpeerid);
+					/*Player * localplayer = world.GetPeerPlayer(world.peers.localpeerid);
 					if(localplayer && id != localplayer->id && basedoor->teamid != teamid){
 						basealarmplaytick = world.tickcount;
 						Team * team = localplayer->GetTeam(world);
@@ -1522,7 +1524,7 @@ void Player::Tick(World & world){
 				res_index = state_i;
 			}
 			if(state_i == 1){
-				EmitSound(world, world.resources.soundbank[GASLoader::Get().player.soundSecurityPass], 32);
+				{ auto _r = ResolveSound(GASLoader::Get().player.soundSecurityPass, world.resources); if (_r.chunk) EmitSound(world, _r.chunk, static_cast<int>(32 * _r.volume)); };
 			}
 			if(state_i >= 15){
 				collidable = true;
@@ -1556,7 +1558,7 @@ void Player::Tick(World & world){
 			collidable = false;
 			xv = 0;
 			if(state_i == 0){
-				EmitSound(world, world.resources.soundbank[GASLoader::Get().player.soundSecurityPass], 32);
+				{ auto _r = ResolveSound(GASLoader::Get().player.soundSecurityPass, world.resources); if (_r.chunk) EmitSound(world, _r.chunk, static_cast<int>(32 * _r.volume)); };
 			}
 			if(!ApplyActorSeq(world, "player", "WALKOUT", state_i, res_bank, res_index)){
 				res_bank  = 19;
@@ -1629,7 +1631,7 @@ void Player::Tick(World & world){
 		}break;
 		case CROUCHED:{
 			if(state_i == 12 && world.map.TestAABB(x, y, x, y, Platform::OUTSIDEROOM)){
-				EmitSound(world, world.resources.soundbank[GASLoader::Get().player.soundBreath], 16);
+				{ auto _r = ResolveSound(GASLoader::Get().player.soundBreath, world.resources); if (_r.chunk) EmitSound(world, _r.chunk, static_cast<int>(16 * _r.volume)); };
 				Plume * plume = static_cast<Plume *>(world.CreateObject(ObjectTypes::PLUME));
 				if(plume){
 					plume->type = 8;
@@ -1765,7 +1767,7 @@ void Player::Tick(World & world){
 				res_index = state_i;
 			}
 			if(res_index == 0 && res_bank == 88){
-				EmitSound(world, world.resources.soundbank[GASLoader::Get().player.soundRoll], 32);
+				{ auto _r = ResolveSound(GASLoader::Get().player.soundRoll, world.resources); if (_r.chunk) EmitSound(world, _r.chunk, static_cast<int>(32 * _r.volume)); };
 			}
 			if(state_i >= 8){
 				if(state_i >= 10){
@@ -1852,7 +1854,7 @@ void Player::Tick(World & world){
 			}
 			////
 			
-			EmitSound(world, world.resources.soundbank[GASLoader::Get().player.soundPickup], 96);
+			{ auto _r = ResolveSound(GASLoader::Get().player.soundPickup, world.resources); if (_r.chunk) EmitSound(world, _r.chunk, static_cast<int>(96 * _r.volume), false, 2); };
 			yv = v;
 			xv2 = xv;
 			yv2 = yv;
@@ -2079,7 +2081,7 @@ void Player::Tick(World & world){
 			}
 			if(hackable && terminal){
 				if(state_i == 14){
-					EmitSound(world, world.resources.soundbank[GASLoader::Get().player.soundJackIn], 30);
+					{ auto _r = ResolveSound(GASLoader::Get().player.soundJackIn, world.resources); if (_r.chunk) EmitSound(world, _r.chunk, static_cast<int>(30 * _r.volume)); };
 				}
 				if(state_i >= 14 && state_i <= 16){
 					if(hacksoundchannel == -1){
@@ -2125,9 +2127,9 @@ void Player::Tick(World & world){
 							oldfiles += 6;
 						}*/
 						if(hackingbonustime > world.tickcount && world.tickcount % ((rand() % GASLoader::Get().player.hackingSoundIntervalRandom) + GASLoader::Get().player.hackingSoundIntervalBase) == 0){
-							{ const PlayerDef& _pd = GASLoader::Get().player;
-							  const std::string* typesounds[] = {&_pd.soundType1, &_pd.soundType2, &_pd.soundType3, &_pd.soundType4, &_pd.soundType5};
-							  EmitSound(world, world.resources.soundbank[*typesounds[rand() % (int)(sizeof(typesounds)/sizeof(typesounds[0]))]], 64); }
+							const PlayerDef& _pd = GASLoader::Get().player;
+							auto _r = ResolveSound(_pd.soundType, world.resources);
+							if(_r.chunk) EmitSound(world, _r.chunk, static_cast<int>(64 * _r.volume));
 						}
 						effecthacking = true;
 						effecthackingcontinue = GASLoader::Get().player.hackingEffectTicks;
@@ -2430,7 +2432,7 @@ void Player::Tick(World & world){
 			draw = true;
 			res_bank = 198;
 			if(state_i == 0){
-				EmitSound(world, world.resources.soundbank[GASLoader::Get().player.soundUndeploy], 64);
+				{ auto _r = ResolveSound(GASLoader::Get().player.soundUndeploy, world.resources); if (_r.chunk) EmitSound(world, _r.chunk, static_cast<int>(64 * _r.volume)); };
 			}
 			if(state_i / 2 > 27){
 				//rocketammo = 10;
@@ -2459,7 +2461,7 @@ void Player::Tick(World & world){
 			res_bank = 199;
 			res_index = state_i / 2;
 			if(state_i == 2){
-				EmitSound(world, world.resources.soundbank[GASLoader::Get().player.soundRepair], 128);
+				{ auto _r = ResolveSound(GASLoader::Get().player.soundRepair, world.resources); if (_r.chunk) EmitSound(world, _r.chunk, static_cast<int>(128 * _r.volume), false, 2); };
 			}
 			if(state_i >= 27 * 2){
 				health = maxhealth;
@@ -2657,11 +2659,8 @@ void Player::HandleHit(World & world, Uint8 x, Uint8 y, Object & projectile){
 	Hittable::HandleHit(*this, world, x, y, projectile);
 	UnDisguise(world);
 	if(world.tickcount - hitsoundplaytick > (unsigned)GASLoader::Get().player.hitSoundCooldownTicks){
-		if(rand() % 2 == 0){
-			EmitSound(world, world.resources.soundbank[GASLoader::Get().player.soundHurtA]);
-		}else{
-			EmitSound(world, world.resources.soundbank[GASLoader::Get().player.soundHurtB]);
-		}
+		auto _r = ResolveSound(GASLoader::Get().player.soundHurt, world.resources);
+		if(_r.chunk) EmitSound(world, _r.chunk, static_cast<int>(128 * _r.volume));
 		hitsoundplaytick = world.tickcount;
 	}
 	if(state_hit / 32 == 1){
@@ -2771,7 +2770,8 @@ void Player::HandleHit(World & world, Uint8 x, Uint8 y, Object & projectile){
 		}
 		state = DYING;
 		state_i = 0;
-		EmitSound(world, world.resources.soundbank[GASLoader::Get().player.soundGrunt]);
+		auto _r = ResolveSound(GASLoader::Get().player.soundGrunt, world.resources);
+		if(_r.chunk) EmitSound(world, _r.chunk, static_cast<int>(128 * _r.volume));
 
 		if (world.IsAuthority()) {
 			if(world.gameMode){
@@ -2782,7 +2782,7 @@ void Player::HandleHit(World & world, Uint8 x, Uint8 y, Object & projectile){
 			Team* victimTeam = world.GetPeerTeam(peer ? peer->id : 0);
 			if(victimTeam && world.gameMode){
 				bool teamAlive = false;
-				for(auto* obj : world.objectlist){
+				for(auto* obj : world.objects.objectlist){
 					if(obj->type != ObjectTypes::PLAYER || obj->id == id) continue;
 					Player* p = static_cast<Player*>(obj);
 					if(world.GetPeerTeam(p->GetPeer(world) ? p->GetPeer(world)->id : 0) != victimTeam) continue;
@@ -2807,8 +2807,8 @@ void Player::HandleHit(World & world, Uint8 x, Uint8 y, Object & projectile){
 
 			// Check if ALL players are dead and emit ALL_PLAYERS_DIED.
 			bool any_alive = false;
-			for (std::list<Object *>::iterator it = world.objectlist.begin();
-			     it != world.objectlist.end(); ++it) {
+			for (std::list<Object *>::iterator it = world.objects.objectlist.begin();
+			     it != world.objects.objectlist.end(); ++it) {
 				Object * obj = *it;
 				if (obj->type != ObjectTypes::PLAYER || obj->id == id) continue;
 				Player * p = static_cast<Player *>(obj);
@@ -2846,7 +2846,7 @@ void Player::HandleInput(Input & input){
 void Player::HandleDisconnect(World & world, Uint8 peerid){
 	UnDeploy();
 	if(world.IsAuthority()){
-		Peer * peer = world.peerlist[peerid];
+		Peer * peer = world.peers.peerlist[peerid];
 		if(peer){
 			User * user = world.lobby.GetUserInfo(peer->accountid);
 			if(user){
@@ -2890,7 +2890,7 @@ Team * Player::TeamOfCurrentBase(World & world){
 	Team * team = 0;
 	int teamnumber = world.map.TeamNumberFromY(y);
 	if(teamnumber != -1){
-		for(std::vector<Uint16>::iterator it = world.objectsbytype[ObjectTypes::TEAM].begin(); it != world.objectsbytype[ObjectTypes::TEAM].end(); it++){
+		for(std::vector<Uint16>::iterator it = world.objects.objectsbytype[ObjectTypes::TEAM].begin(); it != world.objects.objectsbytype[ObjectTypes::TEAM].end(); it++){
 			Team * tempteam = static_cast<Team *>(world.GetObjectFromId(*it));
 			if(tempteam && tempteam->number == teamnumber){
 				team = tempteam;
@@ -2911,7 +2911,7 @@ bool Player::IsDisguised(void){
 void Player::UnDisguise(World & world){
 	if(IsDisguised()){
 		disguised = GASLoader::Get().player.disguiseDeactivationTicks;
-		EmitSound(world, world.resources.soundbank[GASLoader::Get().player.soundDisguise], 64);
+		{ auto _r = ResolveSound(GASLoader::Get().player.soundDisguise, world.resources); if (_r.chunk) EmitSound(world, _r.chunk, static_cast<int>(64 * _r.volume)); };
 	}
 }
 
@@ -2994,8 +2994,9 @@ bool Player::CheckForGround(World & world, Platform & platform){
 	justjumpedfromladder = false;
 	int yt = platform.XtoY(x);
 	if(y <= yt || ((platform.type == Platform::STAIRSUP || platform.type == Platform::STAIRSDOWN) && y <= yt + 1)){
-		EmitSound(world, world.resources.soundbank[GASLoader::Get().player.soundFootstepCrouchR], 32);
-		EmitSound(world, world.resources.soundbank[GASLoader::Get().player.soundLandCrouch], 96);
+		{ auto _r = ResolveSound(GASLoader::Get().player.soundFootstepCrouchR, world.resources); if(_r.chunk) EmitSound(world, _r.chunk, static_cast<int>(32 * _r.volume)); };
+		auto _land = ResolveSound(GASLoader::Get().player.soundLandCrouch, world.resources);
+		if(_land.chunk) EmitSound(world, _land.chunk, static_cast<int>(96 * _land.volume));
 		yv = 0;
 		currentplatformid = platform.id;
 		y = yt;
@@ -3102,15 +3103,15 @@ Team * Player::GetTeam(World & world){
 		}
 	}
 	std::vector<Team *> teams;
-	for(std::vector<Uint16>::iterator it = world.objectsbytype[ObjectTypes::TEAM].begin(); it != world.objectsbytype[ObjectTypes::TEAM].end(); it++){
+	for(std::vector<Uint16>::iterator it = world.objects.objectsbytype[ObjectTypes::TEAM].begin(); it != world.objects.objectsbytype[ObjectTypes::TEAM].end(); it++){
 		Object * object = world.GetObjectFromId((*it));
 		teams.push_back(static_cast<Team *>(object));
 	}
 	for(std::vector<Team *>::iterator it = teams.begin(); it != teams.end(); it++){
 		Team * team = *it;
 		for(int i = 0; i < team->numpeers; i++){
-			if(world.peerlist[team->peers[i]]){
-				Player * player = world.GetPeerPlayer(world.peerlist[team->peers[i]]->id);
+			if(world.peers.peerlist[team->peers[i]]){
+				Player * player = world.GetPeerPlayer(world.peers.peerlist[team->peers[i]]->id);
 				if(player && player->id == id){
 					teamid = team->id;
 					return team;
@@ -3322,7 +3323,7 @@ bool Player::BuyItem(World & world, Uint8 id){
 				}
 			}break;
 			case World::BUY_DEFENSE:{
-				for(std::list<Object *>::iterator it = world.objectlist.begin(); it != world.objectlist.end(); it++){
+				for(std::list<Object *>::iterator it = world.objects.objectlist.begin(); it != world.objects.objectlist.end(); it++){
 					Object * object = *it;
 					if(object->type == ObjectTypes::WALLDEFENSE){
 						WallDefense * walldefense = static_cast<WallDefense *>(object);
@@ -3400,7 +3401,7 @@ bool Player::BuyItem(World & world, Uint8 id){
 			}break;
 		}
 		if(bought){
-			EmitSound(world, world.resources.soundbank[GASLoader::Get().player.soundReload], 96);
+			{ auto _r = ResolveSound(GASLoader::Get().player.soundReload, world.resources); if (_r.chunk) EmitSound(world, _r.chunk, static_cast<int>(96 * _r.volume), false, 2); };
 			world.BuyItem(id);
 			Peer * peer = GetPeer(world);
 			if(peer) peer->stats.creditsspent += buyableitem->price;
@@ -3431,7 +3432,7 @@ bool Player::RepairItem(World & world, Uint8 id){
 			}
 			
 			team->disabledtech &= ~(buyableitem->techchoice);
-			EmitSound(world, world.resources.soundbank[GASLoader::Get().player.soundReload], 96);
+			{ auto _r = ResolveSound(GASLoader::Get().player.soundReload, world.resources); if (_r.chunk) EmitSound(world, _r.chunk, static_cast<int>(96 * _r.volume), false, 2); };
 			world.RepairItem(id);
 			Peer * peer = GetPeer(world);
 			if(peer) peer->stats.creditsspent += buyableitem->repairprice;
@@ -3464,7 +3465,7 @@ bool Player::VirusItem(World & world, Uint8 id){
 				}
 				
 				team->disabledtech |= buyableitem->techchoice;
-				EmitSound(world, world.resources.soundbank[GASLoader::Get().player.soundReload], 96);
+				{ auto _r = ResolveSound(GASLoader::Get().player.soundReload, world.resources); if (_r.chunk) EmitSound(world, _r.chunk, static_cast<int>(96 * _r.volume), false, 2); };
 				world.VirusItem(id);
 				RemoveInventoryItem(INV_VIRUS);
 				return true;
@@ -3534,7 +3535,7 @@ void Player::UnDeploy(void){
 
 bool Player::CanExhaustInputQueue(World & world, int queuesize){
 	/*bool otherplayersinview = false;
-	for(std::vector<Uint16>::iterator it = world.objectsbytype[ObjectTypes::PLAYER].begin(); it != world.objectsbytype[ObjectTypes::PLAYER].end(); it++){
+	for(std::vector<Uint16>::iterator it = world.objects.objectsbytype[ObjectTypes::PLAYER].begin(); it != world.objects.objectsbytype[ObjectTypes::PLAYER].end(); it++){
 		Player * player = static_cast<Player *>(world.GetObjectFromId(*it));
 		if(player->id != id){
 			if(abs(player->x - x) < 400 && abs(player->y - y) < 400){
@@ -3899,7 +3900,8 @@ bool Player::ProcessJetpackState(World & world){
 			xv /= 2;
 			yv /= 2;
 			if(abs(xv) >= 2 || abs(yv) >= 2){
-				EmitSound(world, world.resources.soundbank[GASLoader::Get().player.soundLand], 96);
+				auto _r = ResolveSound(GASLoader::Get().player.soundLand, world.resources);
+				if(_r.chunk) EmitSound(world, _r.chunk, static_cast<int>(96 * _r.volume));
 			}
 		}
 	}
@@ -3970,7 +3972,8 @@ bool Player::ProcessFallingState(World & world){
 			xv = (xn * abs(xv)) / 2;
 			yv = (yn * abs(yv)) / 2;
 			if(abs(xv) >= 2 || abs(yv) >= 2){
-				EmitSound(world, world.resources.soundbank[GASLoader::Get().player.soundFall], 96);
+				auto _r = ResolveSound(GASLoader::Get().player.soundFall, world.resources);
+				if(_r.chunk) EmitSound(world, _r.chunk, static_cast<int>(96 * _r.volume));
 			}
 		}
 	}else{
@@ -4210,11 +4213,9 @@ bool Player::ProcessLadderState(World &world){
 		res_bank = 16;
 	}
 	res_index = state_i;
-	if(res_index == 4){
-		EmitSound(world, world.resources.soundbank[GASLoader::Get().player.soundLadder1], 24);
-	}
-	if(res_index == 15){
-		EmitSound(world, world.resources.soundbank[GASLoader::Get().player.soundLadder2], 24);
+	if(res_index == 4 || res_index == 15){
+		auto _r = ResolveSound(GASLoader::Get().player.soundLadder, world.resources);
+		if(_r.chunk) EmitSound(world, _r.chunk, static_cast<int>(24 * _r.volume));
 	}
 	return false;
 }
@@ -4243,13 +4244,13 @@ void Player::Warp(World & world, Sint16 x, Sint16 y){
 		warpx = x;
 		warpy = y;
 		state_warp = 1;
-		EmitSound(world, world.resources.soundbank[GASLoader::Get().player.soundUndeploy], 96);
+		{ auto _r = ResolveSound(GASLoader::Get().player.soundUndeploy, world.resources); if (_r.chunk) EmitSound(world, _r.chunk, static_cast<int>(96 * _r.volume)); };
 	}
 }
 
 bool Player::PickUpItem(World & world, PickUp & pickup){
 	bool islocalplayer = false;
-	if(this == world.GetPeerPlayer(world.localpeerid)){
+	if(this == world.GetPeerPlayer(world.peers.localpeerid)){
 		islocalplayer = true;
 	}
 	bool pickedup = true;
@@ -4289,7 +4290,7 @@ bool Player::PickUpItem(World & world, PickUp & pickup){
 			}
 			effecthacking = true;
 			effecthackingcontinue = 5;
-			EmitSound(world, world.resources.soundbank[GASLoader::Get().player.soundPowerUp], 64);
+			{ auto _r = ResolveSound(GASLoader::Get().player.soundPowerUp, world.resources); if (_r.chunk) EmitSound(world, _r.chunk, static_cast<int>(64 * _r.volume), false, 2); };
 		}break;
 		case PickUp::LASERAMMO:{
 			laserammo += pickup.quantity;
@@ -4304,7 +4305,7 @@ bool Player::PickUpItem(World & world, PickUp & pickup){
 				sprintf(temp, "Picked up %d Laser ammo", pickup.quantity);
 				world.ShowStatus(temp);
 			}
-			EmitSound(world, world.resources.soundbank[GASLoader::Get().player.soundReload], 96);
+			{ auto _r = ResolveSound(GASLoader::Get().player.soundReload, world.resources); if (_r.chunk) EmitSound(world, _r.chunk, static_cast<int>(96 * _r.volume), false, 2); };
 		}break;
 		case PickUp::ROCKETAMMO:{
 			rocketammo += pickup.quantity;
@@ -4319,7 +4320,7 @@ bool Player::PickUpItem(World & world, PickUp & pickup){
 				sprintf(temp, "Picked up %d Rocket ammo", pickup.quantity);
 				world.ShowStatus(temp);
 			}
-			EmitSound(world, world.resources.soundbank[GASLoader::Get().player.soundReload], 96);
+			{ auto _r = ResolveSound(GASLoader::Get().player.soundReload, world.resources); if (_r.chunk) EmitSound(world, _r.chunk, static_cast<int>(96 * _r.volume), false, 2); };
 		}break;
 		case PickUp::FLAMERAMMO:{
 			flamerammo += pickup.quantity;
@@ -4334,7 +4335,7 @@ bool Player::PickUpItem(World & world, PickUp & pickup){
 				sprintf(temp, "Picked up %d Flamer ammo", pickup.quantity);
 				world.ShowStatus(temp);
 			}
-			EmitSound(world, world.resources.soundbank[GASLoader::Get().player.soundReload], 96);
+			{ auto _r = ResolveSound(GASLoader::Get().player.soundReload, world.resources); if (_r.chunk) EmitSound(world, _r.chunk, static_cast<int>(96 * _r.volume), false, 2); };
 		}break;
 		case PickUp::NEUTRONBOMB:{
 			if(!pickup.powerup){
@@ -4383,7 +4384,7 @@ bool Player::PickUpItem(World & world, PickUp & pickup){
 			}
 		}
 		if(added){
-			EmitSound(world, world.resources.soundbank[GASLoader::Get().player.soundReload], 96);
+			{ auto _r = ResolveSound(GASLoader::Get().player.soundReload, world.resources); if (_r.chunk) EmitSound(world, _r.chunk, static_cast<int>(96 * _r.volume), false, 2); };
 			if(islocalplayer){
 				char temp[256];
 				sprintf(temp, "Picked up %d %s", pickup.quantity, invname);
@@ -4451,7 +4452,7 @@ bool Player::PickUpItem(World & world, PickUp & pickup){
 				sprintf(temp, "%s", powerupname);
 				world.ShowStatus(temp);
 			}
-			EmitSound(world, world.resources.soundbank[GASLoader::Get().player.soundPowerUp], 96);
+			{ auto _r = ResolveSound(GASLoader::Get().player.soundPowerUp, world.resources); if (_r.chunk) EmitSound(world, _r.chunk, static_cast<int>(96 * _r.volume), false, 2); };
 		}
 		/*	pickup.draw = false;
 			pickup.quantity = pickup.poweruprespawntime;
@@ -4467,7 +4468,7 @@ bool Player::PickUpItem(World & world, PickUp & pickup){
 
 Peer * Player::GetPeer(World & world){
 	for(int i = 0; i < world.maxpeers; i++){
-		Peer * peer = world.peerlist[i];
+		Peer * peer = world.peers.peerlist[i];
 		if(peer){
 			for(std::list<Uint16>::iterator it = peer->controlledlist.begin(); it != peer->controlledlist.end(); it++){
 				Object * object = world.GetObjectFromId(*it);
@@ -4654,25 +4655,25 @@ bool Player::BuyAvailable(World & world, Uint8 id){
 	}*/
 	if(id == World::BUY_GIVE0){
 		Team * team = GetTeam(world);
-		if(team && team->numpeers >= 1 && team->peers[0] != world.localpeerid){
+		if(team && team->numpeers >= 1 && team->peers[0] != world.peers.localpeerid){
 			return true;
 		}
 	}
 	if(id == World::BUY_GIVE1){
 		Team * team = GetTeam(world);
-		if(team && team->numpeers >= 2 && team->peers[1] != world.localpeerid){
+		if(team && team->numpeers >= 2 && team->peers[1] != world.peers.localpeerid){
 			return true;
 		}
 	}
 	if(id == World::BUY_GIVE2){
 		Team * team = GetTeam(world);
-		if(team && team->numpeers >= 3 && team->peers[2] != world.localpeerid){
+		if(team && team->numpeers >= 3 && team->peers[2] != world.peers.localpeerid){
 			return true;
 		}
 	}
 	if(id == World::BUY_GIVE3){
 		Team * team = GetTeam(world);
-		if(team && team->numpeers >= 4 && team->peers[3] != world.localpeerid){
+		if(team && team->numpeers >= 4 && team->peers[3] != world.peers.localpeerid){
 			return true;
 		}
 	}

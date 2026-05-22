@@ -23,6 +23,7 @@
 
 #ifdef __APPLE__
 #include <mach-o/dyld.h>
+#include <sys/xattr.h>
 #endif
 
 namespace {
@@ -237,6 +238,44 @@ std::string FindSingleTopDir(const std::string &dir) {
 #endif
 }
 
+#ifdef __APPLE__
+// Defense in depth on the freshly installed bundle. A notarized + stapled
+// app launches even while quarantined as long as its signature seal is
+// intact (the real "damaged" cause — broken seal from generic unzip — is
+// fixed in updaterzip.cpp by extracting with `ditto`). But if the update
+// zip ever carried a quarantine xattr, ditto restores it; clearing it on
+// the installed tree avoids a Gatekeeper first-launch assessment on relaunch.
+void StripQuarantineRecursive(const std::string &path) {
+    if (removexattr(path.c_str(), "com.apple.quarantine", 0) != 0 &&
+        errno != ENOATTR && errno != ENOTSUP && errno != ENOENT) {
+        Logf("removexattr(quarantine) failed on %s: %s",
+            path.c_str(), strerror(errno));
+    }
+    struct stat st;
+    if (lstat(path.c_str(), &st) != 0) {
+        Logf("lstat failed on %s: %s", path.c_str(), strerror(errno));
+        return;
+    }
+    if (!S_ISDIR(st.st_mode)) return;
+    DIR *d = opendir(path.c_str());
+    if (!d) {
+        Logf("opendir failed on %s: %s", path.c_str(), strerror(errno));
+        return;
+    }
+    struct dirent *e;
+    while ((e = readdir(d)) != NULL) {
+        std::string n = e->d_name;
+        if (n == "." || n == "..") continue;
+        if (n.find('/') != std::string::npos) {
+            Logf("unexpected slash in dir entry %s under %s", n.c_str(), path.c_str());
+            continue;
+        }
+        StripQuarantineRecursive(path + "/" + n);
+    }
+    closedir(d);
+}
+#endif
+
 #ifdef _WIN32
 // Retries on AV-induced failures (Defender opens scanned files without
 // FILE_SHARE_DELETE, briefly blocking renames). Sidelines a locked dst as
@@ -419,6 +458,9 @@ int Run(int argc, char **argv) {
     if (!wrapper.empty()) {
         rmdir(staging.c_str());
     }
+#ifdef __APPLE__
+    StripQuarantineRecursive(install_dir);
+#endif
 #endif
 
     std::string new_exe = exe_to_relaunch;

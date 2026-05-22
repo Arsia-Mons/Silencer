@@ -3,6 +3,7 @@
 #include "plume.h"
 #include "grenade.h"
 #include "gasloader.h"
+#include "audio/soundcue.h"
 
 Detonator::Detonator() : Object(ObjectTypes::DETONATOR){
 	requiresauthority = true;
@@ -35,7 +36,8 @@ void Detonator::Tick(World & world){
 	if(state_i == 0){
 		{ const WeaponDef* dw = GASLoader::Get().GetWeaponDef("plasmadetonator");
 		  const std::string& arm = (dw && !dw->soundFire.empty()) ? dw->soundFire : std::string("shield2.wav");
-		  EmitSound(world, world.resources.soundbank[arm], 96); }
+		  auto _r = ResolveSound(arm, world.resources);
+		  if(_r.chunk) EmitSound(world, _r.chunk, static_cast<int>(96 * _r.volume)); }
 		state_warp = GASLoader::Get().player.warpTeleportTick;
 	}
 	res_index = (state_i / 4) % 4;
@@ -54,7 +56,8 @@ void Detonator::Tick(World & world){
 				if(iscamera){
 					draw = false;
 					const std::string& sfx = (dw && !dw->soundHit1.empty()) ? dw->soundHit1 : "q_expl02.wav";
-					EmitSound(world, world.resources.soundbank[sfx], 64);
+					auto _r = ResolveSound(sfx, world.resources);
+					if(_r.chunk) EmitSound(world, _r.chunk, static_cast<int>(64 * _r.volume));
 					for(int i = 0; i < 8; i++){
 						Plume * plume = (Plume *)world.CreateObject(ObjectTypes::PLUME);
 						if(plume){
@@ -64,7 +67,8 @@ void Detonator::Tick(World & world){
 					}
 				}else{
 					const std::string& sfx = (dw && !dw->soundExplosion.empty()) ? dw->soundExplosion : "seekexp1.wav";
-					EmitSound(world, world.resources.soundbank[sfx], 128);
+					auto _r = ResolveSound(sfx, world.resources);
+					if(_r.chunk) EmitSound(world, _r.chunk, static_cast<int>(128 * _r.volume));
 					{ const WeaponDef* dw2 = GASLoader::Get().GetWeaponDef("plasmadetonator");
 					static const Sint8 fbx[] = {-14, 14, -10, 10, -10, 10};
 					static const Sint8 fby[] = {-25, -25, 0, 0, 5, 5};

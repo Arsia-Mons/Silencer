@@ -54,7 +54,7 @@ void LagSimulator::Process(World & world){
 				if((float(rand()) / RAND_MAX) * 100 > packetloss){
 					int ret = sendto(*sockethandle, (*i2), (*i3), 0, (sockaddr *)&recvaddr, sizeof(recvaddr));
 					if(ret > 0){
-						world.totalbytessent += ret;
+						world.network.totalbytessent += ret;
 					}
 				}
 				delete[] (*i2);

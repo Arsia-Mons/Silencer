@@ -251,7 +251,7 @@ HudView BuildHudView(::World& world) {
 	view.highlightMinimap = world.ShouldHighlightMinimap();
 	view.showPlayerList = world.IsShowingPlayerList();
 	view.quitState = world.quitstate;
-	view.showChatTicks = world.showchat_i;
+	view.showChatTicks = world.messaging.showchat_i;
 
 	// System camera state
 	for(int slot = 0; slot < 2; ++slot){
@@ -274,8 +274,8 @@ HudView BuildHudView(::World& world) {
 	}
 
 	// Status messages: each entry encodes text, then time, then color in adjacent bytes.
-	for(std::deque<char*>::const_iterator it = world.statusmessages.begin();
-	    it != world.statusmessages.end(); ++it){
+	for(std::deque<char*>::const_iterator it = world.messaging.statusmessages.begin();
+	    it != world.messaging.statusmessages.end(); ++it){
 		char* raw = *it;
 		InGameStatusLineView line;
 		line.text = raw;
@@ -285,7 +285,7 @@ HudView BuildHudView(::World& world) {
 	}
 
 	// Chat history (overlay reads the stored deque verbatim).
-	for(const std::string& line : world.chatlines){
+	for(const std::string& line : world.messaging.chatlines){
 		view.chatLines.push_back(line);
 	}
 

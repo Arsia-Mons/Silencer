@@ -144,7 +144,7 @@ static nlohmann::json InGameUiControlResultToJson(
 	return r;
 }
 
-static nlohmann::json WorldSummaryToJson(const Game::WorldSummary& summary){
+static nlohmann::json WorldSummaryToJson(const WorldSummary& summary){
 	nlohmann::json r;
 	r["map"] = summary.map;
 	r["peers"] = summary.peers;
@@ -157,7 +157,7 @@ static nlohmann::json WorldSummaryToJson(const Game::WorldSummary& summary){
 	r["spectator_freecam"] = summary.spectatorFreecam;
 
 	nlohmann::json peerlist = nlohmann::json::array();
-	for(const Game::WorldPeerSummary& peer : summary.peerList){
+	for(const WorldPeerSummary& peer : summary.peerList){
 		nlohmann::json p;
 		p["id"] = peer.id;
 		p["accountid"] = peer.accountId;
@@ -171,7 +171,7 @@ static nlohmann::json WorldSummaryToJson(const Game::WorldSummary& summary){
 	r["peerlist"] = peerlist;
 
 	nlohmann::json players = nlohmann::json::array();
-	for(const Game::WorldPlayerSummary& player : summary.players){
+	for(const WorldPlayerSummary& player : summary.players){
 		nlohmann::json p;
 		p["id"] = player.id;
 		p["hp"] = player.hp;

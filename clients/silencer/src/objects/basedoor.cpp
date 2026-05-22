@@ -1,6 +1,7 @@
 #include "basedoor.h"
 #include "player.h"
 #include "../gas/gasloader.h"
+#include "audio/soundcue.h"
 
 BaseDoor::BaseDoor() : Object(ObjectTypes::BASEDOOR){
 	requiresauthority = true;
@@ -29,8 +30,10 @@ void BaseDoor::Serialize(bool write, Serializer & data, Serializer * old){
 
 void BaseDoor::Tick(World & world){
 	if(state_i == 0){
-		{ const GameObjectDef* _d = GASLoader::Get().GetGameObjectDef("baseDoor");
-		EmitSound(world, world.resources.soundbank[(_d && !_d->soundOpen.empty()) ? _d->soundOpen : "portal1.wav"], 64); }
+		const GameObjectDef* _d = GASLoader::Get().GetGameObjectDef("baseDoor");
+		const std::string& sfx = (_d && !_d->soundOpen.empty()) ? _d->soundOpen : "portal1.wav";
+		auto _r = ResolveSound(sfx, world.resources);
+		if(_r.chunk) EmitSound(world, _r.chunk, static_cast<int>(64 * _r.volume));
 	}
 	if(state_i < 41){
 		CheckForPlayersInView(world);

@@ -68,9 +68,44 @@ void Audio::Close(void){
 	}
 }
 
-int Audio::Play(MIX_Audio * chunk, int volume, bool loop){
+int Audio::Play(MIX_Audio * chunk, int volume, bool loop, int maxInstances){
 	if(enabled && chunk){
-		for(int i = 0; i < maxchannels; i++){
+		// Instance cap: if too many copies of this chunk are already playing,
+		// interrupt the first (oldest) one rather than spawning another.
+		if(maxInstances > 0){
+			int count = 0, firstPlaying = -1;
+			for(int i = 0; i < uiChannel; i++){
+				if(MIX_TrackPlaying(tracks[i]) && !MIX_TrackPaused(tracks[i])){
+					MIX_Audio* playing = MIX_GetTrackAudio(tracks[i]);
+					if(playing == chunk){
+						if(firstPlaying == -1) firstPlaying = i;
+						count++;
+					}
+				}
+			}
+			if(count >= maxInstances && firstPlaying != -1){
+				// Reuse the oldest channel: stop it and fall through to play there.
+				MIX_StopTrack(tracks[firstPlaying], 0);
+				occlusionCache[firstPlaying] = 1.0f;
+				filterAlpha[firstPlaying]    = 1.0f;
+				filterState[firstPlaying][0] = filterState[firstPlaying][1] =
+				filterState[firstPlaying][2] = filterState[firstPlaying][3] = 0.0f;
+				MIX_SetTrackStereo(tracks[firstPlaying], nullptr);
+				MIX_SetTrackAudio(tracks[firstPlaying], chunk);
+				MIX_SetTrackGain(tracks[firstPlaying], (volume / 128.0f) * effectvolume);
+				SDL_PropertiesID options = 0;
+				if(loop){
+					options = SDL_CreateProperties();
+					SDL_SetNumberProperty(options, MIX_PROP_PLAY_LOOPS_NUMBER, -1);
+				}
+				MIX_PlayTrack(tracks[firstPlaying], options);
+				if(options) SDL_DestroyProperties(options);
+				channelobject[firstPlaying] = 0;
+				channelvolume[firstPlaying] = volume;
+				return firstPlaying;
+			}
+		}
+		for(int i = 0; i < uiChannel; i++){
 			if(!MIX_TrackPlaying(tracks[i]) && !MIX_TrackPaused(tracks[i])){
 				// Reset per-channel spatial state before reuse so stale occlusion
 				// from a previous sound never bleeds into the new one.
@@ -95,6 +130,31 @@ int Audio::Play(MIX_Audio * chunk, int volume, bool loop){
 		}
 	}
 	return -1;
+}
+
+int Audio::PlayUI(MIX_Audio * chunk, int volume){
+	if(!enabled || !chunk) return -1;
+	// Drop duplicate UI triggers within the cooldown window.
+	Uint64 now = SDL_GetTicks();
+	auto it = uiLastPlayed.find(chunk);
+	if(it != uiLastPlayed.end() && (now - it->second) < (Uint64)uiCooldownMs)
+		return -1;
+	uiLastPlayed[chunk] = now;
+	// Don't hard-stop the previous sound — that causes an audible click/pop.
+	// The cooldown above already prevents stacking; just let the old sound finish.
+	if(MIX_TrackPlaying(tracks[uiChannel])) return uiChannel;
+	occlusionCache[uiChannel] = 1.0f;
+	filterAlpha[uiChannel]    = 1.0f;
+	filterState[uiChannel][0] = filterState[uiChannel][1] =
+	filterState[uiChannel][2] = filterState[uiChannel][3] = 0.0f;
+	MIX_SetTrackStereo(tracks[uiChannel], nullptr);
+	MIX_SetTrackAudio(tracks[uiChannel], chunk);
+	MIX_SetTrackGain(tracks[uiChannel], (volume / 128.0f) * effectvolume);
+	SDL_PropertiesID uiOptions = 0;
+	MIX_PlayTrack(tracks[uiChannel], uiOptions);
+	channelobject[uiChannel] = 0;
+	channelvolume[uiChannel] = volume;
+	return uiChannel;
 }
 
 void Audio::Stop(int channel, int fadeoutms){
@@ -127,8 +187,8 @@ bool Audio::Paused(int channel){
 	return MIX_TrackPaused(tracks[channel]);
 }
 
-int Audio::EmitSound(World & world, Uint16 objectid, MIX_Audio * chunk, int volume, bool loop){
-	int channel = Play(chunk, volume * effectvolume, loop);
+int Audio::EmitSound(World & world, Uint16 objectid, MIX_Audio * chunk, int volume, bool loop, int maxInstances){
+	int channel = Play(chunk, volume * effectvolume, loop, maxInstances);
 	if(channel != -1){
 		channelobject[channel] = objectid;
 		UpdateVolume(world, channel, lastx, lasty, GASLoader::Get().world.audioRange);
@@ -143,7 +203,7 @@ void Audio::UpdateVolume(World & world, int channel, Sint16 x, Sint16 y, int rad
 	if(!object) return;
 
 	// Local player's own sounds are never attenuated, filtered, or panned.
-	Player * localplayer = world.GetPeerPlayer(world.localpeerid);
+	Player * localplayer = world.GetPeerPlayer(world.peers.localpeerid);
 	if(localplayer && objectid == localplayer->id){
 		MIX_SetTrackGain(tracks[channel], (channelvolume[channel] / 128.0f) * effectvolume);
 		filterAlpha[channel] = 1.0f;

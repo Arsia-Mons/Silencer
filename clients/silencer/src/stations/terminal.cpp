@@ -74,12 +74,12 @@ void Terminal::Tick(World & world){
 			if(!secretreadynotified){
 				{ const TerminalDef* _td = GASLoader::Get().GetTerminalDef(isbig ? "big" : "small");
 				world.SendSound((_td && !_td->soundHack.empty()) ? _td->soundHack.c_str() : "typerev6.wav"); }
-				for(std::list<Object *>::iterator it = world.objectlist.begin(); it != world.objectlist.end(); it++){
+				for(std::list<Object *>::iterator it = world.objects.objectlist.begin(); it != world.objects.objectlist.end(); it++){
 					if((*it)->type == ObjectTypes::TEAM){
 						Team * team = static_cast<Team *>(*it);
 						if(team->beamingterminalid == id){
 							for(int i = 0; i < team->numpeers; i++){
-								Peer * peer = world.peerlist[team->peers[i]];
+								Peer * peer = world.peers.peerlist[team->peers[i]];
 								if(peer){
 									if(!world.intutorialmode){
 										char text[256];
@@ -146,7 +146,7 @@ void Terminal::Tick(World & world){
 	if(tracetime > 0 && world.tickcount % GASLoader::Get().gameengine.ticksPerSecond == 0 && world.IsAuthority()){
 		tracetime--;
 		if(tracetime == 0){
-			for(std::list<Object *>::iterator it = world.objectlist.begin(); it != world.objectlist.end(); it++){
+			for(std::list<Object *>::iterator it = world.objects.objectlist.begin(); it != world.objects.objectlist.end(); it++){
 				Object * object = *it;
 				if(object->type == ObjectTypes::TEAM){
 					Team * team = static_cast<Team *>(object);
@@ -166,7 +166,7 @@ void Terminal::Tick(World & world){
 			if(!world.intutorialmode){
 				const TerminalDef* tdef = GASLoader::Get().GetTerminalDef(isbig ? "big" : "small");
 				tracetime = tdef ? tdef->traceTimeBase : 90;
-				for(std::vector<Uint16>::iterator it = world.objectsbytype[ObjectTypes::TEAM].begin(); it != world.objectsbytype[ObjectTypes::TEAM].end(); it++){
+				for(std::vector<Uint16>::iterator it = world.objects.objectsbytype[ObjectTypes::TEAM].begin(); it != world.objects.objectsbytype[ObjectTypes::TEAM].end(); it++){
 					Team * team = static_cast<Team *>(world.GetObjectFromId(*it));
 					if(team && team->beamingterminalid == id){
 						switch(team->secrets){

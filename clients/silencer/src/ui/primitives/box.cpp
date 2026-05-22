@@ -46,13 +46,15 @@ void BoxBeginFrame() {
 }
 
 Clay_ElementDeclaration Box(BoxStrokeStyle style, Clay_ElementDeclaration extras) {
+	Uint8 sides = style.sides ? style.sides : BoxSides::All;
 	bool haveHalos = (style.outerHaloWidth > 0) || (style.innerHaloWidth > 0);
+	bool customStroke = haveHalos || (sides != BoxSides::All);
 
-	if(haveHalos){
+	if(customStroke){
 		// Route the entire stroke (primary + halos) through
 		// CustomKind::BoxStroke so the bridge renders concentric rings.
-		// Native .border stays untouched — the CUSTOM command supplies
-		// the stroke.
+		// Side-masked strokes also use this path so composed L corners
+		// join as one contiguous line.
 		auto * payload = AllocPayload(style);
 		auto * ccd     = AllocCustomData(
 			silencer::clay_bridge::CustomKind::BoxStroke, payload);
@@ -64,7 +66,6 @@ Clay_ElementDeclaration Box(BoxStrokeStyle style, Clay_ElementDeclaration extras
 		// No halos → Clay's native .border path (cheap; no CUSTOM
 		// dispatch). Per-side widths come from the side mask; suppressed
 		// sides get width 0. The bridge reads palette idx from `.r`.
-		Uint8 sides = style.sides ? style.sides : BoxSides::All;
 		Uint16 w = style.strokeWidth;
 		extras.border.color = {
 			/*r=*/static_cast<float>(style.strokeColor),

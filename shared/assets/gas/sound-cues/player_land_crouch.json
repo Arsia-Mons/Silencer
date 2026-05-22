@@ -1,0 +1,56 @@
+{
+  "id": "player_land_crouch",
+  "nodes": [
+    {
+      "id": "out",
+      "type": "Output",
+      "position": {
+        "x": 590,
+        "y": 30
+      },
+      "data": {}
+    },
+    {
+      "id": "mod",
+      "type": "Modulator",
+      "position": {
+        "x": 310,
+        "y": 30
+      },
+      "data": {
+        "volumeMin": 0.85,
+        "volumeMax": 1,
+        "pitchMin": -1,
+        "pitchMax": 1
+      }
+    },
+    {
+      "id": "w1",
+      "type": "WavePlayer",
+      "position": {
+        "x": 30,
+        "y": 30
+      },
+      "data": {
+        "file": "land11.wav",
+        "weight": 1
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "e1",
+      "source": "w1",
+      "sourceHandle": "out",
+      "target": "mod",
+      "targetHandle": "i0"
+    },
+    {
+      "id": "e2",
+      "source": "mod",
+      "sourceHandle": "out",
+      "target": "out",
+      "targetHandle": "i0"
+    }
+  ]
+}

@@ -4,6 +4,7 @@
 #include "robot.h"
 #include "guard.h"
 #include "gasloader.h"
+#include "audio/soundcue.h"
 #include <math.h>
 
 RocketProjectile::RocketProjectile() : Object(ObjectTypes::ROCKETPROJECTILE){
@@ -84,7 +85,9 @@ void RocketProjectile::Tick(World & world){
 		{ const WeaponDef* _gd = GASLoader::Get().GetWeaponDef("rocket"); float _s = _gd ? _gd->rocketSlowInitial : 0.2f;
 		xv = ceil(float(xv) * _s);
 		yv = ceil(float(yv) * _s); }
-		soundchannel = EmitSound(world, world.resources.soundbank[w && !w->soundFire.empty() ? w->soundFire : "rocket9.wav"], 128);
+		const std::string& fireSlot = w && !w->soundFire.empty() ? w->soundFire : "rocket9.wav";
+		auto _r = ResolveSound(fireSlot, world.resources);
+		soundchannel = _r.chunk ? EmitSound(world, _r.chunk, static_cast<int>(128 * _r.volume)) : 0;
 	}
 	if(state_i == 3){
 		res_bank = defaultBank;
@@ -196,7 +199,9 @@ void RocketProjectile::Tick(World & world){
 			if(soundchannel){
 				Audio::GetInstance().Stop(soundchannel, w ? w->audioFadePropulsionMs : 100);
 			}
-			EmitSound(world, world.resources.soundbank[w && !w->soundExplosion.empty() ? w->soundExplosion : "seekexp1.wav"], 128);
+			const std::string& explosionSlot = w && !w->soundExplosion.empty() ? w->soundExplosion : "seekexp1.wav";
+			auto _r = ResolveSound(explosionSlot, world.resources);
+			if(_r.chunk) EmitSound(world, _r.chunk, static_cast<int>(128 * _r.volume));
 		}
 		for(int i = 0; i < 2; i++){
 			int xv2 = (signed(oldx) - x) * (1.25 * i);
@@ -216,7 +221,7 @@ void RocketProjectile::Tick(World & world){
 	if(state_i >= 25){
 		world.MarkDestroyObject(id);
 	}else{
-		Player * localplayer = world.GetPeerPlayer(world.localpeerid);
+		Player * localplayer = world.GetPeerPlayer(world.peers.localpeerid);
 		if(localplayer && ownerid == localplayer->id){
 			//if(!world.systemcameraactive[0]){
 				world.SetSystemCamera(0, id, 0, 20);

@@ -6,6 +6,7 @@
 #include "player.h"
 #include "plasmaprojectile.h"
 #include "gasloader.h"
+#include "audio/soundcue.h"
 
 Civilian::Civilian() : Object(ObjectTypes::CIVILIAN){
 	requiresauthority = true;
@@ -249,12 +250,11 @@ void Civilian::Tick(World & world){
 			if(state_i == 0){
 				const EnemyDef* gd = GASLoader::Get().GetEnemyDef("civilian");
 				static const EnemyDef _ced;
-				const std::string* hurts[] = {
-					gd ? &gd->soundHurt1 : &_ced.soundHurt1,
-					gd ? &gd->soundHurt2 : &_ced.soundHurt2,
-					gd ? &gd->soundHurt3 : &_ced.soundHurt3
-				};
-				EmitSound(world, world.resources.soundbank[*hurts[rand() % (int)(sizeof(hurts)/sizeof(hurts[0]))]], 128);
+				const std::string& hurtSlot = gd ? gd->soundHurt : _ced.soundHurt;
+				if(!hurtSlot.empty()){
+					auto r = ResolveSound(hurtSlot, world.resources);
+					if(r.chunk) EmitSound(world, r.chunk, static_cast<int>(128 * r.volume));
+				}
 			}
 			collidable = false;
 			if(state_i >= 14){
@@ -271,12 +271,11 @@ void Civilian::Tick(World & world){
 			if(state_i == 0){
 				const EnemyDef* gd = GASLoader::Get().GetEnemyDef("civilian");
 				static const EnemyDef _ced;
-				const std::string* hurts[] = {
-					gd ? &gd->soundHurt1 : &_ced.soundHurt1,
-					gd ? &gd->soundHurt2 : &_ced.soundHurt2,
-					gd ? &gd->soundHurt3 : &_ced.soundHurt3
-				};
-				EmitSound(world, world.resources.soundbank[*hurts[rand() % (int)(sizeof(hurts)/sizeof(hurts[0]))]], 128);
+				const std::string& hurtSlot = gd ? gd->soundHurt : _ced.soundHurt;
+				if(!hurtSlot.empty()){
+					auto r = ResolveSound(hurtSlot, world.resources);
+					if(r.chunk) EmitSound(world, r.chunk, static_cast<int>(128 * r.volume));
+				}
 			}
 			collidable = false;
 			if(state_i >= 14){
@@ -390,7 +389,10 @@ bool Civilian::CheckTractVictim(World & world){
 		if(team && team->id != tractteamid){
 			world.Explode(*this, suitcolor, 1);
 			state = DYINGEXPLODE;
-			{ const EnemyDef* def = GASLoader::Get().GetEnemyDef("civilian"); EmitSound(world, world.resources.soundbank[(def && !def->soundDeath.empty()) ? def->soundDeath : "seekexp1.wav"], 128); }
+			const EnemyDef* def = GASLoader::Get().GetEnemyDef("civilian");
+			const std::string& sfx = (def && !def->soundDeath.empty()) ? def->soundDeath : "seekexp1.wav";
+			auto _r = ResolveSound(sfx, world.resources);
+			if(_r.chunk) EmitSound(world, _r.chunk, static_cast<int>(128 * _r.volume));
 			Object tractprojectile(ObjectTypes::PLASMAPROJECTILE);
 		{
 			const EnemyDef* def = GASLoader::Get().GetEnemyDef("civilian");

@@ -18,15 +18,28 @@ interface GameState {
   accountId?: string;
   hostname?: string;
   port?: number;
+  lastHeartbeat?: number;
+  tickCount?: number;
+  aliveMask?: number;
 }
 
 const STATE_LABELS: Record<string, string> = { created: 'STARTING', ready: 'IN ROOM', playing: 'IN GAME' };
 const STATE_COLORS: Record<string, string> = { created: 'text-game-warning', ready: 'text-game-primary', playing: 'text-game-info' };
 
+function HeartbeatBadge({ lastHeartbeat }: { lastHeartbeat?: number }) {
+  if (!lastHeartbeat) return <span className="text-xs font-mono text-game-muted">NO HB</span>;
+  const ageMs = Date.now() - lastHeartbeat;
+  const ageSec = Math.floor(ageMs / 1000);
+  const color = ageMs < 5000 ? 'text-green-400' : ageMs < 15000 ? 'text-yellow-400' : 'text-red-400';
+  const dot = ageMs < 5000 ? '●' : ageMs < 15000 ? '◐' : '○';
+  return <span className={`text-xs font-mono ${color}`}>{dot} {ageSec}s</span>;
+}
+
 export default function Dashboard() {
   useAuth();
   const [players, setPlayers] = useState<Record<string, PlayerState>>({});
   const [games,   setGames]   = useState<Record<string, GameState>>({});
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
 
   const wsConnected = useSocket({
     snapshot: (...args: unknown[]) => {
@@ -56,14 +69,28 @@ export default function Dashboard() {
       const d = args[0] as { gameId: string; hostname: string; port: number };
       setGames(prev => ({ ...prev, [d.gameId]: { ...prev[d.gameId], hostname: d.hostname, port: d.port, state: 'ready' } }));
     },
+    'game.heartbeat': (...args: unknown[]) => {
+      const d = args[0] as { gameId: string; ts: number; tickCount: number; aliveMask: number };
+      setGames(prev => {
+        if (!prev[d.gameId]) return prev;
+        return { ...prev, [d.gameId]: { ...prev[d.gameId], lastHeartbeat: d.ts, tickCount: d.tickCount, aliveMask: d.aliveMask } };
+      });
+    },
     'game.ended': (...args: unknown[]) => {
       const d = args[0] as { gameId: string };
       setGames(prev => { const n = { ...prev }; delete n[d.gameId]; return n; });
+      setExpanded(prev => { const n = { ...prev }; delete n[d.gameId]; return n; });
     },
   });
 
   const playerList = Object.entries(players);
   const gameList   = Object.entries(games);
+
+  const toggleExpand = (gid: string) =>
+    setExpanded(prev => ({ ...prev, [gid]: !prev[gid] }));
+
+  const playersInGame = (gid: string) =>
+    playerList.filter(([, p]) => String(p.gameId) === gid);
 
   return (
     <div className="flex min-h-screen">
@@ -85,22 +112,66 @@ export default function Dashboard() {
             <h2 className="text-xs tracking-widest text-game-textDim mb-3">ACTIVE GAMES</h2>
             {gameList.length === 0
               ? <div className="text-game-muted text-xs py-8 text-center border border-game-border rounded">NO ACTIVE GAMES</div>
-              : gameList.map(([gid, g]) => (
-                <div key={gid} className="bg-game-bgCard border border-game-border rounded p-4 mb-3 hover:border-game-primary transition-colors">
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <div className="font-mono text-game-text text-sm">{g.name || `GAME #${gid}`}</div>
-                      <div className="text-xs text-game-textDim mt-0.5">{g.mapName}</div>
+              : gameList.map(([gid, g]) => {
+                  const inGame = playersInGame(gid);
+                  const isExpanded = expanded[gid];
+                  return (
+                    <div key={gid} className="bg-game-bgCard border border-game-border rounded mb-3 overflow-hidden">
+                      <button
+                        className="w-full text-left p-4 hover:bg-game-bgHover transition-colors"
+                        onClick={() => toggleExpand(gid)}
+                      >
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <div className="font-mono text-game-text text-sm">{g.name || `GAME #${gid}`}</div>
+                            <div className="text-xs text-game-textDim mt-0.5">{g.mapName}</div>
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <HeartbeatBadge lastHeartbeat={g.lastHeartbeat} />
+                            <span className={`text-xs font-mono ${STATE_COLORS[g.state] || 'text-game-muted'}`}>
+                              {STATE_LABELS[g.state] || g.state?.toUpperCase()}
+                            </span>
+                            <span className="text-game-muted text-xs">{isExpanded ? '▲' : '▼'}</span>
+                          </div>
+                        </div>
+                        {g.hostname && (
+                          <div className="text-xs text-game-muted mt-2">{g.hostname}:{g.port}</div>
+                        )}
+                      </button>
+
+                      {isExpanded && (
+                        <div className="border-t border-game-border px-4 pb-3 pt-2">
+                          {g.tickCount !== undefined && (
+                            <div className="text-xs text-game-textDim mb-2">TICK {g.tickCount}</div>
+                          )}
+                          {inGame.length === 0
+                            ? <div className="text-xs text-game-muted py-2">NO PLAYERS IN THIS GAME</div>
+                            : (
+                              <table className="w-full text-xs font-mono">
+                                <thead>
+                                  <tr className="text-game-textDim">
+                                    <th className="text-left py-1">PLAYER</th>
+                                    <th className="text-left py-1">STATUS</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {inGame.map(([aid, p]) => (
+                                    <tr key={aid} className="border-t border-game-border">
+                                      <td className="py-1 text-game-text">{p.name}</td>
+                                      <td className={`py-1 ${p.gameStatus === 2 ? 'text-game-warning' : 'text-game-primary'}`}>
+                                        {p.gameStatus === 2 ? 'PLAYING' : 'IN ROOM'}
+                                      </td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            )
+                          }
+                        </div>
+                      )}
                     </div>
-                    <span className={`text-xs font-mono ${STATE_COLORS[g.state] || 'text-game-muted'}`}>
-                      {STATE_LABELS[g.state] || g.state?.toUpperCase()}
-                    </span>
-                  </div>
-                  {g.hostname && (
-                    <div className="text-xs text-game-muted mt-2">{g.hostname}:{g.port}</div>
-                  )}
-                </div>
-              ))
+                  );
+                })
             }
           </section>
 

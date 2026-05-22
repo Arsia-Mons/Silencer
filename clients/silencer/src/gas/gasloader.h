@@ -147,16 +147,13 @@ struct PlayerDef {
     // Hacking powerup
     double hackingPowerupBonus      = 1.0;  // hacking speed bonus multiplier when powerup active
     // ---- Hittable impact sounds ------------------------------------------------
-    std::string soundImpactBlaster1     = "strike03.wav";
-    std::string soundImpactBlaster2     = "strike04.wav";
-    std::string soundImpactLaserShield1 = "strike01.wav";
-    std::string soundImpactLaserShield2 = "strike02.wav";
-    std::string soundImpactLaser1       = "strike03.wav";
-    std::string soundImpactLaser2       = "strike04.wav";
+    std::string soundImpactBlaster      = "cue:impact_blaster";
+    std::string soundImpactLaserShield  = "cue:impact_laser_shield";
+    std::string soundImpactLaser        = "cue:impact_laser";
     std::string soundImpactFlamer       = "s_flmc01.wav";
     std::string soundShieldDown         = "shlddn1.wav";
     // ---- Player action sounds --------------------------------------------------
-    std::string soundGrunt              = "grunt2a.wav";
+    std::string soundGrunt              = "cue:player_grunt";
     std::string soundDisguise           = "disguise.wav";
     std::string soundJackout            = "jackout.wav";
     std::string soundJetpack            = "jetpak2a.wav";
@@ -188,23 +185,17 @@ struct PlayerDef {
     std::string soundRoll              = "roll2.wav";    // roll / dodge
     std::string soundPickup            = "juunewne.wav"; // item pickup
     std::string soundJackIn            = "jackin.wav";   // hacking jack-in
-    std::string soundHackAmbient       = "ambloop5.wav"; // hacking ambient loop
-    std::string soundType1             = "type1.wav";    // typing SFX variant 1
-    std::string soundType2             = "type2.wav";    // typing SFX variant 2
-    std::string soundType3             = "type3.wav";    // typing SFX variant 3
-    std::string soundType4             = "type4.wav";    // typing SFX variant 4
-    std::string soundType5             = "type5.wav";    // typing SFX variant 5
-    std::string soundRepair            = "repair.wav";   // resurrection / repair
-    std::string soundHurtA             = "s_hita01.wav"; // player hurt variant A
-    std::string soundHurtB             = "s_hitb01.wav"; // player hurt variant B
-    std::string soundLandCrouch        = "land11.wav";   // landing while crouching
-    std::string soundReload            = "reload2.wav";  // weapon reload / buy
-    std::string soundJetpackLoop       = "jetpak1.wav";  // jetpack looping engine
-    std::string soundLand              = "land1.wav";    // standard landing
-    std::string soundFall              = "fall2b.wav";   // fall impact / wall bounce
-    std::string soundLadder1           = "ladder1.wav";  // ladder step 1
-    std::string soundLadder2           = "ladder2.wav";  // ladder step 2
-    std::string soundPowerUp           = "power11.wav";  // powerup pickup
+    std::string soundHackAmbient       = "ambloop5.wav";          // hacking ambient loop
+    std::string soundType              = "cue:player_type";       // typing SFX cue
+    std::string soundRepair            = "repair.wav";            // resurrection / repair
+    std::string soundHurt              = "cue:player_hurt";       // player hurt cue
+    std::string soundLandCrouch        = "cue:player_land_crouch";// landing while crouching
+    std::string soundReload            = "reload2.wav";           // weapon reload / buy
+    std::string soundJetpackLoop       = "jetpak1.wav";           // jetpack looping engine
+    std::string soundLand              = "cue:player_land";       // standard landing
+    std::string soundFall              = "cue:player_fall";       // fall impact / wall bounce
+    std::string soundLadder            = "cue:player_ladder";     // ladder step cue
+    std::string soundPowerUp           = "power11.wav";           // powerup pickup
     // ---- World physics --------------------------------------------------------
     int worldGravity      = 3;   // gravitational acceleration (px/tick²)
     int worldMaxYVelocity = 45;  // terminal falling velocity cap (px/tick)
@@ -403,21 +394,15 @@ struct EnemyDef {
     int lookDirY1       = -10;  // directional: top of box
     int lookDirY2       = -100; // directional: bottom of box
     // ---- Enemy sounds -----------------------------------------------------------
-    std::string soundFire       = "";   // ranged attack shot
-    std::string soundActivate   = "";   // activation/alert sound
-    std::string soundAmbient    = "";   // ambient loop (robots)
-    std::string soundMelee      = "";   // melee attack swing
-    std::string soundMoveRight  = "";   // footstep / movement right
-    std::string soundMoveLeft   = "";   // footstep / movement left
-    std::string soundDeath      = "";   // death/explosion
-    std::string soundHurt1      = "";   // pain sound variant 1
-    std::string soundHurt2      = "";   // pain sound variant 2
-    std::string soundHurt3      = "";   // pain sound variant 3
-    std::string soundAlert1     = "theres3.wav";  // guard spotted-target voice 1
-    std::string soundAlert2     = "stop4.wav";    // guard spotted-target voice 2
-    std::string soundAlert3     = "freeze3.wav";  // guard spotted-target voice 3
-    std::string soundAlert4     = "freezrt1.wav"; // guard spotted-target voice 4
-    std::string soundAlert5     = "drop4.wav";    // guard spotted-target voice 5
+    std::string soundFire       = "";                // ranged attack shot
+    std::string soundActivate   = "";                // activation/alert sound
+    std::string soundAmbient    = "";                // ambient loop (robots)
+    std::string soundMelee      = "";                // melee attack swing
+    std::string soundMoveRight  = "";                // footstep / movement right
+    std::string soundMoveLeft   = "";                // footstep / movement left
+    std::string soundDeath      = "";                // death/explosion
+    std::string soundHurt       = "";                // hurt sound slot (wav name or cue:id)
+    std::string soundAlert      = "cue:guard_alert"; // guard spotted-target voice cue
     int searchTimeoutTicks      = 600; // ticks guard searches before giving up (0 = never)
     int speakCooldownTicks      = 240; // guard: min ticks between alert voice lines
     int standingDurationTicks   = 48;  // guard: ticks in STANDING state before resuming patrol

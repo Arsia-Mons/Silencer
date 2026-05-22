@@ -13,7 +13,7 @@ function getAudioCtx(): AudioContext {
   return audioCtxRef.current;
 }
 
-async function playSound(name: string, volume: number) {
+async function playWav(name: string, volume: number) {
   const r = await fetch(`/api/sounds/${encodeURIComponent(name)}/play`);
   if (!r.ok) return;
   const buf = await r.arrayBuffer();
@@ -29,18 +29,44 @@ async function playSound(name: string, volume: number) {
   src.start(0);
 }
 
-function useSounds(): string[] {
-  const [sounds, setSounds] = useState<string[]>([]);
+async function playCuePreview(cueId: string, volume: number) {
+  try {
+    const data = await apiFetch(`/sound-cues/${encodeURIComponent(cueId)}`) as Record<string, unknown>;
+    const nodes: { type: string; data?: { file?: string } }[] = Array.isArray(data?.nodes) ? data.nodes as { type: string; data?: { file?: string } }[] : [];
+    const wavNodes = nodes.filter(n => n.type === 'WavePlayer' && n.data?.file);
+    if (!wavNodes.length) return;
+    const pick = wavNodes[Math.floor(Math.random() * wavNodes.length)];
+    if (pick.data?.file) await playWav(pick.data.file, volume);
+  } catch {}
+}
+
+async function playSlot(slot: string, volume: number) {
+  if (slot.startsWith('cue:')) await playCuePreview(slot.slice(4), volume);
+  else await playWav(slot, volume);
+}
+
+// Keep legacy name used in timeline playback
+const playSound = playSlot;
+
+interface SoundLists { wavs: string[]; cues: string[] }
+
+function useSounds(): SoundLists {
+  const [lists, setLists] = useState<SoundLists>({ wavs: [], cues: [] });
   useEffect(() => {
-    apiFetch('/sounds')
-      .then(data => {
-        if (Array.isArray(data)) {
-          setSounds((data as unknown[]).map(s => s && typeof s === 'object' && 'name' in s ? String((s as {name: unknown}).name) : String(s)).filter(Boolean));
-        }
-      })
-      .catch(() => {});
+    Promise.all([
+      apiFetch('/sounds').catch(() => []),
+      apiFetch('/sound-cues').catch(() => []),
+    ]).then(([wavData, cueData]) => {
+      const wavs = Array.isArray(wavData)
+        ? (wavData as unknown[]).map(s => s && typeof s === 'object' && 'name' in s ? String((s as {name: unknown}).name) : String(s)).filter(Boolean)
+        : [];
+      const cues = Array.isArray(cueData)
+        ? (cueData as unknown[]).map(c => c && typeof c === 'object' && 'id' in c ? `cue:${String((c as {id: unknown}).id)}` : '').filter(Boolean)
+        : [];
+      setLists({ wavs, cues });
+    });
   }, []);
-  return sounds;
+  return lists;
 }
 
 interface FrameDef {
@@ -216,15 +242,19 @@ function PreviewCanvas({ sequence, scale, speed }: { sequence: AnimSequence | nu
 function SoundPicker({ value, volume, sounds, onChange }: {
   value: string | undefined;
   volume: number | undefined;
-  sounds: string[];
+  sounds: SoundLists;
   onChange: (v: string | undefined) => void;
 }) {
   const [open, setOpen] = useState(false);
   const [filter, setFilter] = useState('');
   const ref = useRef<HTMLDivElement>(null);
-  const filtered = useMemo(
-    () => sounds.filter(s => s.toLowerCase().includes(filter.toLowerCase())),
-    [sounds, filter]
+  const filteredWavs = useMemo(
+    () => sounds.wavs.filter(s => s.toLowerCase().includes(filter.toLowerCase())),
+    [sounds.wavs, filter]
+  );
+  const filteredCues = useMemo(
+    () => sounds.cues.filter(s => s.toLowerCase().includes(filter.toLowerCase())),
+    [sounds.cues, filter]
   );
   useEffect(() => {
     if (!open) return;
@@ -242,14 +272,16 @@ function SoundPicker({ value, volume, sounds, onChange }: {
         onClick={() => { setOpen(o => !o); setFilter(''); }}
         title={value}
       >
-        {value ?? <span className="text-game-textDim">— none —</span>}
+        {value
+          ? <span className={value.startsWith('cue:') ? 'text-game-primary' : ''}>{value}</span>
+          : <span className="text-game-textDim">— none —</span>}
       </button>
       {value && (
         <button
           type="button"
           title="Preview sound"
           className="text-game-textDim hover:text-game-primary text-xs px-1"
-          onClick={() => playSound(value, volume ?? 128)}
+          onClick={() => playSlot(value, volume ?? 128)}
         >▶</button>
       )}
       {open && (
@@ -262,13 +294,32 @@ function SoundPicker({ value, volume, sounds, onChange }: {
             value={filter}
             onChange={e => setFilter(e.target.value)}
           />
-          <div className="overflow-y-auto max-h-48">
+          <div className="overflow-y-auto max-h-56">
             <button
               type="button"
               className="w-full text-left px-2 py-1 text-xs text-game-textDim hover:bg-game-border/30"
               onClick={() => { onChange(undefined); setOpen(false); }}
             >— none —</button>
-            {filtered.map(s => (
+            {filteredCues.length > 0 && <>
+              <div className="px-2 py-0.5 text-[10px] text-game-primary font-mono border-b border-game-border/50 tracking-widest">CUES</div>
+              {filteredCues.map(s => (
+                <div key={s} className="flex items-center">
+                  <button
+                    type="button"
+                    className={`flex-1 text-left px-2 py-1 text-xs font-mono hover:bg-game-border/30 ${s === value ? 'text-game-primary' : 'text-game-primary/70'}`}
+                    onClick={() => { onChange(s); setOpen(false); }}
+                  >{s}</button>
+                  <button
+                    type="button"
+                    title="Preview"
+                    className="px-2 text-game-textDim hover:text-game-primary text-xs"
+                    onClick={() => playSlot(s, volume ?? 128)}
+                  >▶</button>
+                </div>
+              ))}
+              {filteredWavs.length > 0 && <div className="px-2 py-0.5 text-[10px] text-game-textDim font-mono border-b border-game-border/50 tracking-widest">SOUNDS</div>}
+            </>}
+            {filteredWavs.map(s => (
               <div key={s} className="flex items-center">
                 <button
                   type="button"
@@ -279,7 +330,7 @@ function SoundPicker({ value, volume, sounds, onChange }: {
                   type="button"
                   title="Preview"
                   className="px-2 text-game-textDim hover:text-game-primary text-xs"
-                  onClick={() => playSound(s, volume ?? 128)}
+                  onClick={() => playSlot(s, volume ?? 128)}
                 >▶</button>
               </div>
             ))}
@@ -296,7 +347,7 @@ function FrameRow({
 }: {
   f: FrameDef;
   idx: number;
-  sounds: string[];
+  sounds: SoundLists;
   onChange: (f: FrameDef) => void;
   onDelete: () => void;
   onMoveUp: () => void;

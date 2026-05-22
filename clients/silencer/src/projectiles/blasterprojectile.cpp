@@ -2,6 +2,7 @@
 #include "shrapnel.h"
 #include "overlay.h"
 #include "gasloader.h"
+#include "audio/soundcue.h"
 
 BlasterProjectile::BlasterProjectile() : Object(ObjectTypes::BLASTERPROJECTILE){
 	requiresauthority = true;
@@ -38,7 +39,8 @@ void BlasterProjectile::Tick(World & world){
 	Uint8 life = (w && w->projectileLife) ? (Uint8)w->projectileLife : 6;
 	if(state_i == 4){
 		const std::string& sfx = w && !w->soundFire.empty() ? w->soundFire : "!laserme.wav";
-		EmitSound(world, world.resources.soundbank[sfx], 128);
+		auto _r = ResolveSound(sfx, world.resources);
+		if(_r.chunk) EmitSound(world, _r.chunk, static_cast<int>(128 * _r.volume));
 	}
 	if(state_i < 7){
 		res_index = state_i;
@@ -65,13 +67,9 @@ void BlasterProjectile::Tick(World & world){
 				overlay->res_bank = hob;
 				overlay->x = x;
 				overlay->y = y;
-				const std::string& h1 = w && !w->soundHit1.empty() ? w->soundHit1 : "rico1.wav";
-				const std::string& h2 = w && !w->soundHit2.empty() ? w->soundHit2 : "rico2.wav";
-				if(rand() % 2 == 0){
-					overlay->EmitSound(world, world.resources.soundbank[h1], 32);
-				}else{
-					overlay->EmitSound(world, world.resources.soundbank[h2], 32);
-				}
+				const std::string& hitSlot = w && !w->soundHit1.empty() ? w->soundHit1 : "rico1.wav";
+				auto _r = ResolveSound(hitSlot, world.resources);
+				if(_r.chunk) overlay->EmitSound(world, _r.chunk, static_cast<int>(32 * _r.volume));
 			}
 			float xn = 0, yn = 0;
 			if(platform){

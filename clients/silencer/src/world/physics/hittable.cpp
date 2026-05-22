@@ -1,0 +1,136 @@
+#include "hittable.h"
+#include "object.h"
+#include "projectile.h"
+#include "shrapnel.h"
+#include "gasloader.h"
+#include "audio/soundcue.h"
+#include "EventBus.h"
+#include <math.h>
+
+Hittable::Hittable(){
+	state_hit = 0;
+	hitx = 0;
+	hity = 0;
+	health = 0;
+	maxhealth = 0;
+	shield = 0;
+	destructible = false;
+}
+
+void Hittable::Serialize(bool write, Serializer & data, Serializer * old){
+	data.Serialize(write, state_hit, old);
+	data.Serialize(write, health, old);
+	data.Serialize(write, shield, old);
+	data.Serialize(write, hitx, old);
+	data.Serialize(write, hity, old);
+}
+
+void Hittable::Tick(Object & object, World & world){
+	if(state_hit){
+		state_hit++;
+	}
+	if(state_hit % 32 == 31){
+		state_hit = 0;
+	}
+}
+
+void Hittable::HandleHit(Object & object, World & world, Uint8 x, Uint8 y, Object & projectile){
+	bool damagedshield = false;
+	if(projectile.healthdamage > 0 && (!shield || projectile.bypassshield)){
+		if(health - projectile.healthdamage < 0){
+			health = 0;
+		}else{
+			health -= projectile.healthdamage;
+		}
+		rumbleHit = true;
+		state_hit = 1 + (0 * 32);
+	}else{
+		damagedshield = true;
+		if(shield - projectile.shielddamage <= 0){
+			int more = abs(shield - projectile.shielddamage);
+			more = (float(more) / projectile.shielddamage) * projectile.healthdamage;
+			shield = 0;
+			if(health - more < 0){
+				health = 0;
+			}else{
+				health -= more;
+			}
+			state_hit = 1 + (1 * 32);
+		}else{
+			shield -= projectile.shielddamage;
+			state_hit = 1 + (2 * 32);
+		}
+		if(shield <= GASLoader::Get().player.shieldShrapnelThreshold){
+			switch(projectile.type){
+				case ObjectTypes::BLASTERPROJECTILE:
+				case ObjectTypes::LASERPROJECTILE:
+				case ObjectTypes::ROCKETPROJECTILE:{
+					const PlayerDef& _pd = GASLoader::Get().player;
+					if(shield <= _pd.shieldShrapnelThreshold){
+						int _n = _pd.shrapnelCount;
+						float _spd = _pd.shrapnelSpeed;
+						for(int i = 0; i < _n; i++){
+							Shrapnel * shrapnel = (Shrapnel *)world.CreateObject(ObjectTypes::SHRAPNEL);
+							if(shrapnel){
+								shrapnel->x = projectile.x;
+								shrapnel->y = projectile.y;
+								shrapnel->res_index = rand() % 9;
+								shrapnel->res_bank = 110;
+								float angle = (i / float(_n)) * (2 * 3.14);
+								angle += (rand() % 10) / float(10);
+								shrapnel->xv = (sin(angle)) * _spd;
+								shrapnel->yv = (cos(angle)) * _spd;
+							}
+						}
+					}
+				}
+				break;
+				default:
+				break;
+			}
+		}
+	}
+	switch(projectile.type){
+		case ObjectTypes::BLASTERPROJECTILE:{
+			auto _r = ResolveSound(GASLoader::Get().player.soundImpactBlaster, world.resources);
+			if(_r.chunk) object.EmitSound(world, _r.chunk, static_cast<int>(96 * _r.volume));
+		}break;
+		case ObjectTypes::WALLPROJECTILE:
+		case ObjectTypes::LASERPROJECTILE:{
+			if(damagedshield){
+				auto _r = ResolveSound(GASLoader::Get().player.soundImpactLaserShield, world.resources);
+				if(_r.chunk) object.EmitSound(world, _r.chunk, static_cast<int>(96 * _r.volume));
+			}else{
+				auto _r = ResolveSound(GASLoader::Get().player.soundImpactLaser, world.resources);
+				if(_r.chunk) object.EmitSound(world, _r.chunk, static_cast<int>(96 * _r.volume));
+			}
+		}break;
+		case ObjectTypes::ROCKETPROJECTILE:{
+			
+		}break;
+		case ObjectTypes::FLAMERPROJECTILE:{
+			if(world.tickcount % GASLoader::Get().player.flamerSoundInterval == 0){
+				object.EmitSound(world, world.resources.soundbank[GASLoader::Get().player.soundImpactFlamer], 128);
+			}
+		}break;
+	}
+	Uint8 hit_type = state_hit / 32;
+	if(hit_type == 1 && health > 0){
+		object.EmitSound(world, world.resources.soundbank[GASLoader::Get().player.soundShieldDown]);
+	}
+	hitx = x;
+	hity = y;
+
+	if (destructible && world.IsAuthority()) {
+		GameEvent ev;
+		ev.actor_id = object.id;
+		if (health == 0) {
+			ev.type = EventType::ACTOR_KILLED;
+			world.triggerGraph.Bus().Emit(ev);
+		} else {
+			ev.type  = EventType::ACTOR_DAMAGED;
+			ev.value = static_cast<Sint32>(projectile.healthdamage);
+			world.triggerGraph.Bus().Emit(ev);
+		}
+	}
+}

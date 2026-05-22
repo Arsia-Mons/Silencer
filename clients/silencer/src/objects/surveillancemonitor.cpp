@@ -49,7 +49,7 @@ void SurveillanceMonitor::Tick(World & world){
 							}
 						}break;
 						case 10:{
-							for(std::list<Object *>::iterator it = world.objectlist.begin(); it != world.objectlist.end(); it++){
+							for(std::list<Object *>::iterator it = world.objects.objectlist.begin(); it != world.objects.objectlist.end(); it++){
 								Object * object = *it;
 								if(object->type == ObjectTypes::SECRETRETURN){
 									SecretReturn * secretreturn = static_cast<SecretReturn *>(object);
@@ -60,7 +60,7 @@ void SurveillanceMonitor::Tick(World & world){
 							}
 						}break;
 						case 11:{
-							for(std::list<Object *>::iterator it = world.objectlist.begin(); it != world.objectlist.end(); it++){
+							for(std::list<Object *>::iterator it = world.objects.objectlist.begin(); it != world.objects.objectlist.end(); it++){
 								Object * object = *it;
 								if(object->type == ObjectTypes::INVENTORYSTATION){
 									InventoryStation * inventorystation = static_cast<InventoryStation *>(object);
@@ -71,7 +71,7 @@ void SurveillanceMonitor::Tick(World & world){
 							}
 						}break;
 						case 12:{
-							for(std::list<Object *>::iterator it = world.objectlist.begin(); it != world.objectlist.end(); it++){
+							for(std::list<Object *>::iterator it = world.objects.objectlist.begin(); it != world.objects.objectlist.end(); it++){
 								Object * object = *it;
 								if(object->type == ObjectTypes::TECHSTATION){
 									TechStation * techstation = static_cast<TechStation *>(object);
@@ -106,9 +106,9 @@ void SurveillanceMonitor::Tick(World & world){
 				}
 			}
 		}else{
-			int index = rand() % world.objectlist.size();
+			int index = rand() % world.objects.objectlist.size();
 			int i = 0;
-			for(std::list<Object *>::iterator it = world.objectlist.begin(); it != world.objectlist.end(); it++, i++){
+			for(std::list<Object *>::iterator it = world.objects.objectlist.begin(); it != world.objects.objectlist.end(); it++, i++){
 				if(i == index){
 					objectfollowing = (*it)->id;
 					break;

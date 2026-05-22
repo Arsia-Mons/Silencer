@@ -6,6 +6,7 @@
 
 #include "screen_context.h"
 #include "game.h"
+#include "renderdevice.h"
 #include "world.h"
 #include "renderer.h"
 #include "surface.h"
@@ -38,6 +39,14 @@ int ScaleLegacyPx(int base,
 	if(legacy <= 0) return ClampInt(base, minValue, maxValue);
 	const int scaled = static_cast<int>((static_cast<long long>(base) * actual + legacy / 2) / legacy);
 	return ClampInt(scaled, minValue, maxValue);
+}
+
+void AddPanelBorderBlur(RenderDevice * renderdevice, SDL_Rect rect) {
+	if(!renderdevice || rect.w <= 0 || rect.h <= 0) return;
+	renderdevice->AddLobbyPanelBorderBlurRect({ rect.x, rect.y, rect.w, 1 });
+	renderdevice->AddLobbyPanelBorderBlurRect({ rect.x, rect.y + rect.h - 1, rect.w, 1 });
+	renderdevice->AddLobbyPanelBorderBlurRect({ rect.x, rect.y, 1, rect.h });
+	renderdevice->AddLobbyPanelBorderBlurRect({ rect.x + rect.w - 1, rect.y, 1, rect.h });
 }
 
 }  // namespace lobby_screen_detail
@@ -121,6 +130,18 @@ void LobbyScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime, s
 	const int bodyW = std::max(0, layoutWidth - rootPadX * 2);
 	const int bodyH = std::max(0, layoutHeight - rootPadTop - rootPadBottom
 	                              - (int)titleBarH - regionGap);
+	const int bodyX = rootPadX;
+	const int bodyY = rootPadTop + (int)titleBarH + regionGap;
+
+	if(ctx.renderdevice){
+		ctx.renderdevice->BeginLobbyPanelBorderBlur(
+			layoutWidth,
+			layoutHeight,
+			input.uiScale);
+		lobby_screen_detail::AddPanelBorderBlur(
+			ctx.renderdevice,
+			SDL_Rect{ rootPadX, rootPadTop, bodyW, (int)titleBarH });
+	}
 
 	CLAY({ .id = CLAY_ID("LobbyRoot"),
 	       .layout = {
@@ -147,7 +168,8 @@ void LobbyScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime, s
 			gameJoinActive,
 			gameTechActive,
 		};
-		BuildLobbyMainArea(panels, ctx, *this, bodyW, bodyH, regionGap, interactions);
+		BuildLobbyMainArea(
+			panels, ctx, *this, bodyX, bodyY, bodyW, bodyH, regionGap, interactions);
 		if(gameCreateActive){
 			BuildGameCreatePreviewOverlay(gameCreateState, ctx);
 		}

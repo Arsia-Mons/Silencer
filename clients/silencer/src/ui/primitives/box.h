@@ -20,14 +20,15 @@
 //
 // Halo rendering: when either halo width is non-zero, the stroke routes
 // through a CUSTOM render command (`CustomKind::BoxStroke`) that paints
-// concentric inset rings: outer halo, primary, inner halo. When both
-// halo widths are zero the primitive falls through to Clay's native
-// `.border` path (cheap; no CUSTOM dispatch). `strokeWidth == 0` with
-// zero halo widths emits no stroke at all.
+// concentric inset rings: outer halo, primary, inner halo. Side-masked
+// strokes also use the CUSTOM path so composed L corners join cleanly.
+// Plain full-box strokes fall through to Clay's native `.border` path
+// (cheap; no CUSTOM dispatch). `strokeWidth == 0` with zero halo widths
+// emits no stroke at all.
 //
-// Halo-using variants MUST be preceded by `BoxBeginFrame()` once per
+// CUSTOM-using variants MUST be preceded by `BoxBeginFrame()` once per
 // layout pass before `Clay_BeginLayout()` to reset the per-frame payload
-// arena. No-halo callers can skip it — that path doesn't touch the arena.
+// arena. Plain full-box strokes can skip it — that path doesn't touch the arena.
 //
 // Fill: pass `extras.backgroundColor` directly. The bridge alpha-blends
 // non-{0,255} opacities through the palette LUT (`palette.cpp`). The
@@ -63,9 +64,7 @@ constexpr Uint8 All    = Top | Right | Bottom | Left;
 // `innerHaloColor`). They CAN be the same as `strokeColor` — paired
 // with `haloOpacity < 255`, that gives the "same color, less opacity"
 // look. With `haloOpacity == 255` (the default) halo bands draw as
-// solid palette entries, which is what the legacy lobby BG sprite
-// actually contains (discrete dark-green entries 75/77 flanking the
-// bright 216 primary).
+// solid palette entries.
 //
 // `haloOpacity` routes the halo pixels through the palette's alphaed
 // LUT (`palette.cpp` `Palette::Alpha`). The LUT collapses any
@@ -74,6 +73,7 @@ constexpr Uint8 All    = Top | Right | Bottom | Left;
 // (e.g. the screen-clear value 0) blend to 0, so alpha-blended halos
 // disappear against pure-black backgrounds — keep `haloOpacity == 255`
 // (solid) unless there's a non-black backdrop under the chrome.
+//
 struct BoxStrokeStyle {
 	Uint8 strokeColor      = 0;
 	Uint8 strokeWidth      = 0;
@@ -87,16 +87,14 @@ struct BoxStrokeStyle {
 
 namespace BoxVariants {
 
-// Lobby chrome look. Bright primary stroke (palette idx 216) flanked
-// by 1-px halo bands of the SAME color at reduced opacity — the
-// alpha-blend resolves to a dimmer green against any backdrop
-// (including pure black, via the bridge's math fallback). Matches the
-// legacy lobby BG sprite's bright-bracketed-by-dim-green stroke rule.
+// Lobby chrome look: a single solid 1-px stroke at palette idx 216.
+// The SDL3GPU backend applies the legacy soft edge as a post-process
+// over lobby panel borders; the indexed UI draw itself stays solid.
 constexpr BoxStrokeStyle Chrome{
 	/*strokeColor=*/216, /*strokeWidth=*/1,
-	/*outerHaloColor=*/216, /*outerHaloWidth=*/1,
-	/*innerHaloColor=*/216, /*innerHaloWidth=*/1,
-	/*haloOpacity=*/128,
+	/*outerHaloColor=*/0, /*outerHaloWidth=*/0,
+	/*innerHaloColor=*/0, /*innerHaloWidth=*/0,
+	/*haloOpacity=*/255,
 };
 
 // Single 1-px stroke at idx 216, no halo. Use for non-chrome borders
@@ -120,7 +118,7 @@ constexpr BoxStrokeStyle None{};
 
 // Reset the Box primitive's per-frame BoxStroke payload arena. Call
 // once before `Clay_BeginLayout()` in any layout pass that uses a
-// halo-bearing variant. Safe to call when no halos are used.
+// custom stroke. Safe to call when no custom strokes are used.
 void BoxBeginFrame();
 
 // Build a Clay element declaration with the variant's stroke baked in.

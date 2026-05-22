@@ -93,10 +93,10 @@ void LobbyScreen::Tick(ScreenContext & ctx)
 	// transition.
 	if(!gameJoinActive && !gameTechActive){
 		if(game.joininggame){
-			if(world.state == World::CONNECTED){
+			if(world.network.state == World::CONNECTED){
 				game.joininggame = false;
 			}
-			if(world.state == World::IDLE){
+			if(world.network.state == World::IDLE){
 				game.joininggame = false;
 				lobby_controller_detail::DismissProgressModal(ctx);
 				ctx.ShowMessage("Unable to join game");
@@ -112,12 +112,12 @@ void LobbyScreen::Tick(ScreenContext & ctx)
 		}
 		if(lobby_controller_detail::TopAsProgressModal(ctx) && world.lobby.creategamestatus != 100 &&
 		   mapDownloader.mapUploadState.load(std::memory_order_relaxed) == 0 &&
-		   (world.state == World::CONNECTED || world.state == World::IDLE)){
+		   (world.network.state == World::CONNECTED || world.network.state == World::IDLE)){
 			ctx.PopScreen();
 			game.creategameclicked = false;
 		}
-		if(world.state == World::CONNECTED){
-			Peer * peer = world.peerlist[world.localpeerid];
+		if(world.network.state == World::CONNECTED){
+			Peer * peer = world.peers.peerlist[world.peers.localpeerid];
 			if(peer){
 				mapDownloader.mapexistchecked = false;
 				mapDownloader.mapjoingeneration.fetch_add(1, std::memory_order_relaxed);
@@ -143,7 +143,7 @@ void LobbyScreen::Tick(ScreenContext & ctx)
 	// Disconnect-from-game modal — fires on the joined-game surface
 	// (gameJoinActive || gameTechActive) when the world drops out of
 	// CONNECTED.
-	if(world.state != World::CONNECTED && !lobby_controller_detail::TopIsModal(ctx)){
+	if(world.network.state != World::CONNECTED && !lobby_controller_detail::TopIsModal(ctx)){
 		if(gameJoinActive || gameTechActive){
 			Game * gamePtr = &game;
 			ctx.ShowMessage("Disconnected from game", [gamePtr]() { gamePtr->GoBack(); });
@@ -216,13 +216,13 @@ bool LobbyScreen::JoinPanelInLobby(World & world) const
 
 bool LobbyScreen::JoinPanelReadyBlocked(World & world) const
 {
-	Peer * localpeer = world.peerlist[world.localpeerid];
+	Peer * localpeer = world.peers.peerlist[world.peers.localpeerid];
 	return localpeer && localpeer->ishost && !world.AllPeersDownloadedMap();
 }
 
 void LobbyScreen::JoinPanelSendReady(World & world)
 {
-	Peer * localpeer = world.peerlist[world.localpeerid];
+	Peer * localpeer = world.peers.peerlist[world.peers.localpeerid];
 	bool ishost = localpeer && localpeer->ishost;
 	if(!ishost || world.AllPeersDownloadedMap()){
 		world.SendReady();
@@ -236,12 +236,12 @@ void LobbyScreen::JoinPanelChangeTeam(World & world)
 
 Uint8 LobbyScreen::TechPanelLocalPeerId(World & world) const
 {
-	return world.localpeerid;
+	return world.peers.localpeerid;
 }
 
 Peer * LobbyScreen::TechPanelPeer(World & world, Uint8 peerid) const
 {
-	return world.peerlist[peerid];
+	return world.peers.peerlist[peerid];
 }
 
 void LobbyScreen::TechPanelRequestPeerList(World & world)

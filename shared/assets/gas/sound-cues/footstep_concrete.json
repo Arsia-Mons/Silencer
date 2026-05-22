@@ -1,0 +1,70 @@
+{
+  "id": "footstep_concrete",
+  "nodes": [
+    {
+      "id": "out",
+      "type": "Output",
+      "position": {
+        "x": 590,
+        "y": 90
+      },
+      "data": {}
+    },
+    {
+      "id": "rng",
+      "type": "Random",
+      "position": {
+        "x": 310,
+        "y": 90
+      },
+      "data": {}
+    },
+    {
+      "id": "w1",
+      "type": "WavePlayer",
+      "position": {
+        "x": 30,
+        "y": 30
+      },
+      "data": {
+        "file": "futstonl.wav",
+        "weight": 1
+      }
+    },
+    {
+      "id": "w2",
+      "type": "WavePlayer",
+      "position": {
+        "x": 30,
+        "y": 150
+      },
+      "data": {
+        "file": "futstonr.wav",
+        "weight": 1
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "e1",
+      "source": "w1",
+      "sourceHandle": "out",
+      "target": "rng",
+      "targetHandle": "in-0"
+    },
+    {
+      "id": "e2",
+      "source": "w2",
+      "sourceHandle": "out",
+      "target": "rng",
+      "targetHandle": "in-1"
+    },
+    {
+      "id": "e4",
+      "source": "rng",
+      "sourceHandle": "out",
+      "target": "out",
+      "targetHandle": "in"
+    }
+  ]
+}
