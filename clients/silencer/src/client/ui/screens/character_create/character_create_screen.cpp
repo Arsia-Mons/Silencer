@@ -112,6 +112,7 @@ bool CharacterCreateScreen::HandleBack(ScreenContext & ctx)
 	if(!ctx.lobby.characters.empty()){
 		ctx.GoToState(GameState::LOBBY);
 	}else{
+		ctx.lobby.Disconnect();
 		ctx.GoToState(GameState::LOBBYCONNECT);
 	}
 	return true;
