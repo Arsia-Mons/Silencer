@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"sync"
 	"testing"
 )
 
@@ -219,4 +220,57 @@ func TestUpgradeStatUsesWireStatIDs(t *testing.T) {
 	if ch.Stats != before {
 		t.Fatalf("invalid stat id mutated stats: got %#v want %#v", ch.Stats, before)
 	}
+}
+
+func TestStoreSnapshotsAreSafeForConcurrentEncoding(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "lobby.json")
+	store, err := NewStore(path)
+	if err != nil {
+		t.Fatalf("NewStore: %v", err)
+	}
+	user, ok, banned := store.Login("alice", hashPassword("secret"))
+	if !ok || banned {
+		t.Fatalf("Login: ok=%v banned=%v", ok, banned)
+	}
+	user, ok = store.CreateCharacter(user.AccountID, "Shade", 2)
+	if !ok {
+		t.Fatalf("CreateCharacter Shade rejected")
+	}
+	firstID := user.SelectedCharID
+	user, ok = store.CreateCharacter(user.AccountID, "Vanta", 3)
+	if !ok {
+		t.Fatalf("CreateCharacter Vanta rejected")
+	}
+	secondID := user.SelectedCharID
+
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func(accountID uint32) {
+		defer wg.Done()
+		for i := 0; i < 1000; i++ {
+			snapshot := store.ByAccountID(accountID)
+			if snapshot == nil {
+				t.Errorf("ByAccountID returned nil")
+				return
+			}
+			var w writer
+			w.u8(opUserInfo)
+			encodeUser(&w, snapshot)
+			_ = encodeCharacters(snapshot)
+		}
+	}(user.AccountID)
+
+	for i := 0; i < 1000; i++ {
+		if _, ok := store.SelectCharacter(user.AccountID, firstID); !ok {
+			t.Fatalf("SelectCharacter first rejected")
+		}
+		_, _, _ = store.UpgradeStat(user.AccountID, firstID, statShield)
+		if _, _, ok := store.UpdateStats(user.AccountID, secondID, i%2 == 0, 1); !ok {
+			t.Fatalf("UpdateStats second rejected")
+		}
+		if _, ok := store.SelectCharacter(user.AccountID, secondID); !ok {
+			t.Fatalf("SelectCharacter second rejected")
+		}
+	}
+	wg.Wait()
 }

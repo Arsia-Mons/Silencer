@@ -145,7 +145,7 @@ func (s *Store) Authenticate(name string, sha1sum []byte) (*User, bool) {
 	if !ok || u.PassHash != hash || u.Banned {
 		return nil, false
 	}
-	return u, true
+	return cloneUser(u), true
 }
 
 func (s *Store) Login(name string, sha1sum []byte) (user *User, ok bool, banned bool) {
@@ -164,7 +164,7 @@ func (s *Store) Login(name string, sha1sum []byte) (user *User, ok bool, banned 
 		s.NextID++
 		_ = s.save()
 		s.mongo.SyncPlayer(u)
-		return u, true, false
+		return cloneUser(u), true, false
 	}
 	if u.PassHash != hash {
 		return nil, false, false
@@ -172,7 +172,7 @@ func (s *Store) Login(name string, sha1sum []byte) (user *User, ok bool, banned 
 	if u.Banned {
 		return nil, false, true
 	}
-	return u, true, false
+	return cloneUser(u), true, false
 }
 
 func (s *Store) ByAccountID(id uint32) *User {
@@ -180,7 +180,7 @@ func (s *Store) ByAccountID(id uint32) *User {
 	defer s.mu.Unlock()
 	for _, u := range s.ByName {
 		if u.AccountID == id {
-			return u
+			return cloneUser(u)
 		}
 	}
 	return nil
@@ -214,7 +214,7 @@ func (s *Store) CreateCharacter(accountID uint32, name string, agencyIdx uint8) 
 		u.SelectedCharID = ch.ID
 		_ = s.save()
 		s.mongo.SyncPlayer(u)
-		return u, true
+		return cloneUser(u), true
 	}
 	return nil, false
 }
@@ -233,7 +233,7 @@ func (s *Store) SelectCharacter(accountID uint32, charID uint32) (*User, bool) {
 				u.SelectedCharID = charID
 				_ = s.save()
 				s.mongo.SyncPlayer(u)
-				return u, true
+				return cloneUser(u), true
 			}
 		}
 		return nil, false
@@ -242,7 +242,7 @@ func (s *Store) SelectCharacter(accountID uint32, charID uint32) (*User, bool) {
 }
 
 // selectedChar returns the currently selected Character for the user (nil if none).
-// Must be called under s.mu.
+// Callers must hold s.mu or pass an immutable user snapshot.
 func selectedChar(u *User) *Character {
 	ch := characterByID(u, u.SelectedCharID)
 	if ch != nil {
@@ -255,7 +255,7 @@ func selectedChar(u *User) *Character {
 }
 
 // characterByID returns the character with charID for the user (nil if absent).
-// Must be called under s.mu.
+// Callers must hold s.mu or pass an immutable user snapshot.
 func characterByID(u *User, charID uint32) *Character {
 	for i := range u.Characters {
 		if u.Characters[i].ID == charID {
@@ -381,7 +381,14 @@ func (s *Store) DeletePlayer(accountID uint32) bool {
 	return false
 }
 
-func wireUser(u *User) *User { return u }
+func cloneUser(u *User) *User {
+	if u == nil {
+		return nil
+	}
+	out := *u
+	out.Characters = append([]Character(nil), u.Characters...)
+	return &out
+}
 
 func hashPassword(plain string) []byte {
 	h := sha1.Sum([]byte(plain))

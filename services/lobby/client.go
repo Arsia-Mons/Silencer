@@ -388,17 +388,11 @@ func (c *Client) handleCreateCharacter(r *reader) error {
 	u, ok := c.hub.store.CreateCharacter(c.accountID, name, agencyIdx)
 	if !ok {
 		// Reject — send empty characters frame so client stays in create screen.
-		c.mu.Lock()
-		user := c.user
-		c.mu.Unlock()
-		if user != nil {
+		if user := c.hub.store.ByAccountID(c.accountID); user != nil {
 			c.send(encodeCharacters(user))
 		}
 		return nil
 	}
-	c.mu.Lock()
-	c.user = u
-	c.mu.Unlock()
 	c.send(encodeCharacters(u))
 	return nil
 }
@@ -415,9 +409,6 @@ func (c *Client) handleSelectCharacter(r *reader) error {
 	if !ok {
 		return nil
 	}
-	c.mu.Lock()
-	c.user = u
-	c.mu.Unlock()
 	c.send(encodeCharacters(u))
 	return nil
 }
