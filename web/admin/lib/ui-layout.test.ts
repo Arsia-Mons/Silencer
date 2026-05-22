@@ -83,4 +83,18 @@ describe('ui-layout model', () => {
     actionDocument.root.children[1].children[0].action = 42;
     expect(() => validateUiDocument(actionDocument)).toThrow('Node button-host-game has invalid action.');
   });
+
+  test('rejects style fields unsupported by the client primitive preview', () => {
+    const document = JSON.parse(JSON.stringify(createDefaultUiDocument()));
+    document.root.children[1].children[0].style.font = 'title';
+    expect(() => validateUiDocument(document)).toThrow('Node button-host-game has unsupported font style.');
+
+    const cssDocument = JSON.parse(JSON.stringify(createDefaultUiDocument()));
+    cssDocument.root.style.background = '#00ff00';
+    expect(() => validateUiDocument(cssDocument)).toThrow('Node main-menu-root has unsupported background style.');
+
+    const heightDocument = JSON.parse(JSON.stringify(createDefaultUiDocument()));
+    heightDocument.root.children[1].children[0].style.height = { mode: 'fixed', value: 48 };
+    expect(() => validateUiDocument(heightDocument)).toThrow('Node button-host-game button height must be fit.');
+  });
 });

@@ -193,6 +193,7 @@ void ControlServer::HandleConnection(int cfd) {
 	std::condition_variable pending_cv;
 	std::atomic<bool> reader_done{false};
 	std::atomic<bool> write_failed{false};
+	std::vector<std::shared_ptr<std::atomic<bool>>> cancel_tokens;
 
 	std::thread writer([&](){
 		while(true){
@@ -256,7 +257,10 @@ void ControlServer::HandleConnection(int cfd) {
 		cmd.phase = ControlDispatch::PhaseFor(cmd.op);
 		auto promise = std::make_shared<std::promise<ControlReply>>();
 		auto fut = promise->get_future().share();
+		auto cancelled = std::make_shared<std::atomic<bool>>(false);
 		cmd.reply = promise;
+		cmd.cancelled = cancelled;
+		cancel_tokens.push_back(cancelled);
 		// Queue for the dispatcher first so the future is guaranteed reachable
 		// before the writer can pop it.
 		{
@@ -274,6 +278,9 @@ void ControlServer::HandleConnection(int cfd) {
 		}
 		// noreply=true: future is fulfilled by the dispatcher and quietly
 		// dropped. No wire chatter, no allocation pressure on the writer.
+	}
+	for(auto& cancelled : cancel_tokens){
+		cancelled->store(true);
 	}
 	reader_done.store(true);
 	pending_cv.notify_one();

@@ -1,6 +1,7 @@
 #include "ui_editor_preview_document.h"
 
 #include <algorithm>
+#include <cmath>
 #include <initializer_list>
 #include <unordered_set>
 #include <utility>
@@ -35,14 +36,73 @@ std::string StringValue(const nlohmann::json& json,
 	return it->get<std::string>();
 }
 
-int IntValue(const nlohmann::json& json, const char * key, int fallback = 0) {
+bool RequiredString(const nlohmann::json& json,
+                    const char * key,
+                    std::string& out,
+                    std::string& error) {
 	auto it = json.find(key);
-	if(it == json.end() || !it->is_number_integer()) return fallback;
-	return it->get<int>();
+	if(it == json.end() || !it->is_string()){
+		error = std::string(key) + " must be a string";
+		return false;
+	}
+	out = it->get<std::string>();
+	return true;
 }
 
-int ClampInt(int value, int minValue, int maxValue) {
-	return std::max(minValue, std::min(value, maxValue));
+bool OptionalString(const nlohmann::json& json,
+                    const char * key,
+                    std::string& out,
+                    std::string& error) {
+	auto it = json.find(key);
+	out.clear();
+	if(it == json.end()) return true;
+	if(!it->is_string()){
+		error = std::string(key) + " must be a string";
+		return false;
+	}
+	out = it->get<std::string>();
+	return true;
+}
+
+bool RequiredIntInRange(const nlohmann::json& json,
+                        const char * key,
+                        int minValue,
+                        int maxValue,
+                        int& out,
+                        std::string& error) {
+	auto it = json.find(key);
+	if(it == json.end() || !it->is_number_integer()){
+		error = std::string(key) + " must be an integer";
+		return false;
+	}
+	out = it->get<int>();
+	if(out < minValue || out > maxValue){
+		error = std::string(key) + " is out of range";
+		return false;
+	}
+	return true;
+}
+
+bool OptionalIntInRange(const nlohmann::json& json,
+                        const char * key,
+                        int fallback,
+                        int minValue,
+                        int maxValue,
+                        int& out,
+                        std::string& error) {
+	auto it = json.find(key);
+	out = fallback;
+	if(it == json.end()) return true;
+	if(!it->is_number_integer()){
+		error = std::string("style.") + key + " must be an integer";
+		return false;
+	}
+	out = it->get<int>();
+	if(out < minValue || out > maxValue){
+		error = std::string("style.") + key + " is out of range";
+		return false;
+	}
+	return true;
 }
 
 bool ParseStringEnum(const nlohmann::json& json,
@@ -72,12 +132,11 @@ bool ParseStringEnum(const nlohmann::json& json,
 bool ParseSize(const nlohmann::json& json,
                const char * key,
                UiEditorSize& out,
-               std::string& error,
-               const UiEditorSize& fallback) {
+               std::string& error) {
 	auto it = json.find(key);
 	if(it == json.end()){
-		out = fallback;
-		return true;
+		error = std::string("style.") + key + " is required";
+		return false;
 	}
 	if(!it->is_object()){
 		error = std::string("style.") + key + " must be an object";
@@ -100,8 +159,13 @@ bool ParseSize(const nlohmann::json& json,
 			error = std::string("style.") + key + ".value must be numeric for fixed sizing";
 			return false;
 		}
+		const double value = valueIt->get<double>();
+		if(!std::isfinite(value) || value < 0.0 || value > 4096.0){
+			error = std::string("style.") + key + ".value is out of range";
+			return false;
+		}
 		out.mode = UiEditorSize::Mode::Fixed;
-		out.value = std::max(0.0f, valueIt->get<float>());
+		out.value = static_cast<float>(value);
 		return true;
 	}
 	error = std::string("style.") + key + ".mode must be fit, grow, or fixed";
@@ -123,21 +187,57 @@ bool ParsePalette(const nlohmann::json& json,
 		error = std::string("style.") + key + " must be an integer palette index";
 		return false;
 	}
-	out = ClampInt(it->get<int>(), minValue, 255);
+	out = it->get<int>();
+	if(out < minValue || out > 255){
+		error = std::string("style.") + key + " is out of range";
+		return false;
+	}
 	return true;
 }
 
+bool StyleFieldAllowed(const std::string& kind, const std::string& key) {
+	if(key == "width" || key == "height") return true;
+	if(IsContainerKind(kind)){
+		return key == "direction" || key == "align" || key == "justify" ||
+		       key == "padding" || key == "gap" ||
+		       key == "backgroundPalette" || key == "borderPalette" ||
+		       key == "radius";
+	}
+	if(kind == "text"){
+		return key == "padding" || key == "backgroundPalette" ||
+		       key == "borderPalette" || key == "textPalette" ||
+		       key == "font" || key == "radius";
+	}
+	if(kind == "button"){
+		return key == "padding" || key == "textPalette";
+	}
+	if(kind == "input"){
+		return key == "padding" || key == "font";
+	}
+	return false;
+}
+
 bool ParseStyle(const nlohmann::json& json,
+                const std::string& kind,
                 UiEditorStyle& out,
                 std::string& error) {
 	if(!json.is_object()){
 		error = "node style must be an object";
 		return false;
 	}
-	if(!ParseSize(json, "width", out.width, error, UiEditorSize{})) return false;
-	UiEditorSize fallbackHeight;
-	fallbackHeight.mode = UiEditorSize::Mode::Fit;
-	if(!ParseSize(json, "height", out.height, error, fallbackHeight)) return false;
+	out = UiEditorStyle{};
+	for(auto it = json.begin(); it != json.end(); ++it){
+		if(!StyleFieldAllowed(kind, it.key())){
+			error = "unsupported style field for " + kind + ": " + it.key();
+			return false;
+		}
+	}
+	if(!ParseSize(json, "width", out.width, error)) return false;
+	if(!ParseSize(json, "height", out.height, error)) return false;
+	if(kind == "button" && out.height.mode != UiEditorSize::Mode::Fit){
+		error = "button height must be fit";
+		return false;
+	}
 
 	if(!ParseStringEnum(json, "direction", "column", { "column", "row" },
 	                    out.direction, error)){
@@ -151,9 +251,9 @@ bool ParseStyle(const nlohmann::json& json,
 	                    out.justify, error)){
 		return false;
 	}
-	out.padding = ClampInt(IntValue(json, "padding", 0), 0, 512);
-	out.gap = ClampInt(IntValue(json, "gap", 0), 0, 512);
-	out.radius = ClampInt(IntValue(json, "radius", 0), 0, 64);
+	if(!OptionalIntInRange(json, "padding", 0, 0, 512, out.padding, error)) return false;
+	if(!OptionalIntInRange(json, "gap", 0, 0, 512, out.gap, error)) return false;
+	if(!OptionalIntInRange(json, "radius", 0, 0, 64, out.radius, error)) return false;
 	if(!ParseStringEnum(json, "font", "ui", { "ui", "uiLarge", "title", "tiny" },
 	                    out.font, error)){
 		return false;
@@ -172,14 +272,18 @@ bool ParseNode(const nlohmann::json& json,
 		error = "node must be an object";
 		return false;
 	}
-	out.id = StringValue(json, "id");
-	out.kind = StringValue(json, "kind");
-	out.name = StringValue(json, "name", out.id);
-	out.text = StringValue(json, "text");
-	out.placeholder = StringValue(json, "placeholder");
-	out.action = StringValue(json, "action");
+	if(!RequiredString(json, "id", out.id, error)) return false;
+	if(!RequiredString(json, "kind", out.kind, error)) return false;
+	if(!RequiredString(json, "name", out.name, error)) return false;
+	if(!OptionalString(json, "text", out.text, error)) return false;
+	if(!OptionalString(json, "placeholder", out.placeholder, error)) return false;
+	if(!OptionalString(json, "action", out.action, error)) return false;
 	if(out.id.empty()){
 		error = "node id is required";
+		return false;
+	}
+	if(out.name.empty()){
+		error = "node name is required";
 		return false;
 	}
 	if(!seenIds.insert(out.id).second){
@@ -191,7 +295,7 @@ bool ParseNode(const nlohmann::json& json,
 		return false;
 	}
 	auto styleIt = json.find("style");
-	if(styleIt == json.end() || !ParseStyle(*styleIt, out.style, error)){
+	if(styleIt == json.end() || !ParseStyle(*styleIt, out.kind, out.style, error)){
 		if(error.empty()) error = "node style is required";
 		return false;
 	}
@@ -224,22 +328,32 @@ bool ParseUiEditorPreviewDocument(const nlohmann::json& json,
 		error = "document must be an object";
 		return false;
 	}
-	if(IntValue(json, "schemaVersion", 0) != kSchemaVersion){
+	int schemaVersion = 0;
+	if(!RequiredIntInRange(json, "schemaVersion", kSchemaVersion, kSchemaVersion,
+	                       schemaVersion, error)){
 		error = "unsupported ui editor schema version";
 		return false;
 	}
-	document.surface = StringValue(json, "surface", "ui-preview");
+	if(!RequiredString(json, "surface", document.surface, error)) return false;
+	if(document.surface.empty()){
+		error = "surface is required";
+		return false;
+	}
 	auto viewportIt = json.find("viewport");
 	if(viewportIt == json.end() || !viewportIt->is_object()){
 		error = "viewport is required";
 		return false;
 	}
-	document.viewportWidth = ClampInt(IntValue(*viewportIt, "width", 640),
-	                                  kMinViewport,
-	                                  kMaxViewport);
-	document.viewportHeight = ClampInt(IntValue(*viewportIt, "height", 480),
-	                                   kMinViewport,
-	                                   kMaxViewport);
+	if(!RequiredIntInRange(*viewportIt, "width", kMinViewport, kMaxViewport,
+	                       document.viewportWidth, error)){
+		error = "viewport width is invalid";
+		return false;
+	}
+	if(!RequiredIntInRange(*viewportIt, "height", kMinViewport, kMaxViewport,
+	                       document.viewportHeight, error)){
+		error = "viewport height is invalid";
+		return false;
+	}
 	auto rootIt = json.find("root");
 	if(rootIt == json.end()){
 		error = "root is required";

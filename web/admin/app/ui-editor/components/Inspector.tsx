@@ -20,7 +20,7 @@ import {
   type UiSizeMode,
   type UiStyle,
 } from '../../../lib/ui-layout';
-import { ColorInput, Field, NumberInput, Select, TextInput } from './EditorControls';
+import { Field, NumberInput, Select, TextInput } from './EditorControls';
 
 interface InspectorProps {
   node: UiNode;
@@ -105,12 +105,11 @@ export function Inspector({ node, parent, isRoot, onPatch, onStyle, onDelete, on
 
 function StyleInspector({ node, onStyle }: { node: UiNode; onStyle: (style: Partial<UiStyle>) => void }) {
   const style = node.style;
-  const supportsBoxStyle = canHaveChildren(node.kind) || node.kind === 'text' || node.kind === 'spacer';
   const supportsHeight = node.kind !== 'button';
-  const supportsFont = node.kind !== 'spacer' && node.kind !== 'button';
-  const supportsTextColor = canHaveChildren(node.kind) || node.kind === 'text';
-  const supportsTextPalette = node.kind === 'button' || node.kind === 'text' || canHaveChildren(node.kind);
-  const supportsRadius = canHaveChildren(node.kind);
+  const supportsFont = node.kind === 'text' || node.kind === 'input';
+  const supportsTextPalette = node.kind === 'button' || node.kind === 'text';
+  const supportsBoxPalette = canHaveChildren(node.kind) || node.kind === 'text';
+  const supportsRadius = canHaveChildren(node.kind) || node.kind === 'text';
   return (
     <div className="space-y-4">
       <div className="text-xs tracking-widest text-game-primary">LAYOUT</div>
@@ -155,21 +154,6 @@ function StyleInspector({ node, onStyle }: { node: UiNode; onStyle: (style: Part
 
       <div className="text-xs tracking-widest text-game-primary">STYLE</div>
       <div className="grid grid-cols-2 gap-3">
-        {supportsBoxStyle && (
-          <>
-            <Field label="BACKGROUND">
-              <ColorInput value={style.background ?? '#000000'} onChange={background => onStyle({ background })} />
-            </Field>
-            <Field label="BORDER">
-              <ColorInput value={style.border ?? '#000000'} onChange={border => onStyle({ border })} />
-            </Field>
-          </>
-        )}
-        {supportsTextColor && (
-          <Field label="TEXT">
-            <ColorInput value={style.textColor ?? '#d1fad7'} onChange={textColor => onStyle({ textColor })} />
-          </Field>
-        )}
         {supportsFont && (
           <Field label="FONT">
             <Select value={style.font ?? 'ui'} options={FONTS} onChange={value => onStyle({ font: value as UiFont })} />
@@ -177,7 +161,7 @@ function StyleInspector({ node, onStyle }: { node: UiNode; onStyle: (style: Part
         )}
       </div>
       <div className="grid grid-cols-3 gap-3">
-        {supportsBoxStyle && (
+        {supportsBoxPalette && (
           <>
             <Field label="BG IDX">
               <NumberInput value={style.backgroundPalette ?? -1} min={-1} max={255} onChange={backgroundPalette => onStyle({ backgroundPalette })} />

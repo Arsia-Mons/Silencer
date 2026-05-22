@@ -1,5 +1,4 @@
 import { type ReactNode } from 'react';
-import { normalizeColor } from '../ui-editor-utils';
 
 export function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
@@ -53,17 +52,6 @@ export function Select({ value, options, onChange }: {
     >
       {options.map(option => <option key={option} value={option}>{option}</option>)}
     </select>
-  );
-}
-
-export function ColorInput({ value, onChange }: { value: string; onChange: (value: string) => void }) {
-  return (
-    <input
-      type="color"
-      value={normalizeColor(value)}
-      onChange={event => onChange(event.target.value)}
-      className="h-[34px] w-full bg-game-bg border border-game-border p-1"
-    />
   );
 }
 

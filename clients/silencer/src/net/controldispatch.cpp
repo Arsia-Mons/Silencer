@@ -84,6 +84,10 @@ static ControlReply Err(int id, const char* code, const std::string& msg){
 	return rpl;
 }
 
+static ControlReply Cancelled(int id){
+	return Err(id, "CANCELLED", "control command cancelled");
+}
+
 static const char * ModeName(silencer::client_ui::InGameUiControlMode mode){
 	using Mode = silencer::client_ui::InGameUiControlMode;
 	switch(mode){
@@ -385,6 +389,10 @@ static void HandleKeybind(Game& game, ControlCommand& cmd);
 static void HandleGas(Game& game, ControlCommand& cmd);
 
 void HandleImmediate(Game& game, ControlCommand& cmd) {
+	if(cmd.IsCancelled()){
+		cmd.reply->set_value(Cancelled(cmd.id));
+		return;
+	}
 	if(cmd.op == "ping"){
 		nlohmann::json r;
 		r["version"] = SILENCER_VERSION;
@@ -579,8 +587,16 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 			cmd.reply->set_value(Err(cmd.id, "BAD_REQUEST", error));
 			return;
 		}
+		if(cmd.IsCancelled()){
+			cmd.reply->set_value(Cancelled(cmd.id));
+			return;
+		}
 		if(!game.ResizeRenderSurface(document.viewportWidth, document.viewportHeight)){
 			cmd.reply->set_value(Err(cmd.id, "INTERNAL", "resize failed for ui editor preview"));
+			return;
+		}
+		if(cmd.IsCancelled()){
+			cmd.reply->set_value(Cancelled(cmd.id));
 			return;
 		}
 
@@ -590,6 +606,10 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 		const std::string surface = document.surface;
 		const int width = document.viewportWidth;
 		const int height = document.viewportHeight;
+		if(cmd.IsCancelled()){
+			cmd.reply->set_value(Cancelled(cmd.id));
+			return;
+		}
 		if(preview){
 			preview->SetDocument(std::move(document));
 		}else{
@@ -630,28 +650,34 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 			cmd.reply->set_value(Err(cmd.id, "BAD_REQUEST", error));
 			return;
 		}
+		if(cmd.IsCancelled()){
+			cmd.reply->set_value(Cancelled(cmd.id));
+			return;
+		}
 		if(!game.ResizeRenderSurface(document.viewportWidth, document.viewportHeight)){
 			cmd.reply->set_value(Err(cmd.id, "INTERNAL", "resize failed for ui editor preview"));
+			return;
+		}
+		if(cmd.IsCancelled()){
+			cmd.reply->set_value(Cancelled(cmd.id));
 			return;
 		}
 
 		const std::string surface = document.surface;
 		const int width = document.viewportWidth;
 		const int height = document.viewportHeight;
-		Screen * top = game.GetTopScreen();
-		auto * previewScreen =
-			dynamic_cast<silencer::client_ui::UiEditorPreviewScreen *>(top);
-		if(previewScreen){
-			previewScreen->SetDocument(std::move(document));
-		}else{
-			game.ReplaceScreen(std::make_unique<silencer::client_ui::UiEditorPreviewScreen>(
-				std::move(document)));
+		if(cmd.IsCancelled()){
+			cmd.reply->set_value(Cancelled(cmd.id));
+			return;
 		}
+		game.PushScreen(std::make_unique<silencer::client_ui::UiEditorPreviewScreen>(
+			std::move(document)));
 
 		game.GetScreenBuffer().Clear(0);
 		game.RenderClientUiFrameWithoutDispatch(0.0f);
 		nlohmann::json inspect = InspectInteractionsToJson(game.UiInteractions());
 		if(inspect["widgets"].empty() && inspect["elements"].empty()){
+			game.PopScreen();
 			cmd.reply->set_value(Err(cmd.id, "WRONG_STATE", "no clay widgets"));
 			return;
 		}
@@ -660,6 +686,7 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 		if(out.empty()){
 			char buf[256];
 			if(!WriteTempPath(buf, sizeof(buf), "silencer-ui-preview", game.GetFrameCount())){
+				game.PopScreen();
 				cmd.reply->set_value(Err(cmd.id, "INTERNAL", "failed to create preview path"));
 				return;
 			}
@@ -667,6 +694,7 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 		}
 		bool ok = game.GetRenderer().CapturePNG(game.GetScreenBuffer(),
 			game.GetPaletteColors(), out.c_str());
+		game.PopScreen();
 		if(!ok){
 			cmd.reply->set_value(Err(cmd.id, "INTERNAL", "stbi_write_png failed: " + out));
 			return;

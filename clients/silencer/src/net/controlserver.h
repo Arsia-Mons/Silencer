@@ -26,9 +26,12 @@ struct ControlCommand {
 	std::string op;
 	nlohmann::json args = nlohmann::json::object();
 	std::shared_ptr<std::promise<ControlReply>> reply;
+	std::shared_ptr<std::atomic<bool>> cancelled;
 	// "post-render" (screenshot) and "wait" commands tag themselves so the
 	// dispatcher can route them through the right queue.
 	enum Phase { IMMEDIATE, POST_RENDER, MULTI_FRAME } phase = IMMEDIATE;
+
+	bool IsCancelled() const { return cancelled && cancelled->load(); }
 };
 
 class ControlServer {

@@ -20,7 +20,8 @@ const CONTROL_HOST = process.env.SILENCER_CONTROL_HOST ?? '127.0.0.1';
 const CONTROL_PORT = Number.parseInt(process.env.SILENCER_CONTROL_PORT ?? '5170', 10);
 const CONTROL_TIMEOUT_MS = Number.parseInt(process.env.SILENCER_CONTROL_TIMEOUT_MS ?? '5000', 10);
 let previewQueue: Promise<unknown> = Promise.resolve();
-let latestPreviewId = 0;
+const latestPreviewGenerationBySession = new Map<string, number>();
+const activePreviewBySession = new Map<string, AbortController>();
 
 class StalePreviewError extends Error {
   constructor() {
@@ -28,23 +29,30 @@ class StalePreviewError extends Error {
   }
 }
 
-function controlRequest(op: string, args: Record<string, unknown> = {}): Promise<unknown> {
+function controlRequest(op: string, args: Record<string, unknown> = {}, signal?: AbortSignal): Promise<unknown> {
   return new Promise((resolve, reject) => {
     const id = Math.floor(Math.random() * 1_000_000) + 1;
     const socket = connect({ host: CONTROL_HOST, port: CONTROL_PORT });
     let buffer = '';
     let settled = false;
     let timeout: ReturnType<typeof setTimeout> | undefined;
+    const abort = () => fail(new StalePreviewError());
 
     const settle = <T,>(callback: (value: T) => void, value: T) => {
       if (settled) return;
       settled = true;
       if (timeout) clearTimeout(timeout);
+      signal?.removeEventListener('abort', abort);
       socket.destroy();
       callback(value);
     };
     const fail = (error: Error) => settle(reject, error);
     const succeed = (value: unknown) => settle(resolve, value);
+    if (signal?.aborted) {
+      fail(new StalePreviewError());
+      return;
+    }
+    signal?.addEventListener('abort', abort, { once: true });
     timeout = setTimeout(() => {
       fail(new Error(`control request timed out: ${op}`));
     }, CONTROL_TIMEOUT_MS);
@@ -83,22 +91,27 @@ function controlRequest(op: string, args: Record<string, unknown> = {}): Promise
   });
 }
 
-function assertLatestPreview(id: number) {
-  if (id !== latestPreviewId) throw new StalePreviewError();
+function assertLatestPreview(sessionId: string, generation: number) {
+  if (latestPreviewGenerationBySession.get(sessionId) !== generation) {
+    throw new StalePreviewError();
+  }
 }
 
-async function renderPreview(id: number, document: unknown) {
+async function renderPreview(sessionId: string, generation: number, document: unknown, signal: AbortSignal) {
   let tempDir: string | null = null;
   try {
-    assertLatestPreview(id);
+    if (signal.aborted) throw new StalePreviewError();
+    assertLatestPreview(sessionId, generation);
     tempDir = await mkdtemp(join(tmpdir(), 'silencer-ui-preview-'));
     const screenshotPath = join(tempDir, `${randomUUID()}.png`);
-    assertLatestPreview(id);
+    if (signal.aborted) throw new StalePreviewError();
+    assertLatestPreview(sessionId, generation);
     const capture = await controlRequest('ui_editor_preview_capture', {
       document,
       out: screenshotPath,
-    }) as { preview?: unknown; inspect?: unknown };
-    assertLatestPreview(id);
+    }, signal) as { preview?: unknown; inspect?: unknown };
+    if (signal.aborted) throw new StalePreviewError();
+    assertLatestPreview(sessionId, generation);
     const png = await readFile(screenshotPath);
 
     return {
@@ -111,22 +124,53 @@ async function renderPreview(id: number, document: unknown) {
   }
 }
 
-function enqueuePreview(id: number, document: unknown) {
+function enqueuePreview(sessionId: string, generation: number, document: unknown, signal: AbortSignal) {
   const run = previewQueue
     .catch(() => undefined)
-    .then(() => renderPreview(id, document));
+    .then(() => renderPreview(sessionId, generation, document, signal));
   previewQueue = run.catch(() => undefined);
   return run;
+}
+
+function makePreviewSignal(sessionId: string, requestSignal: AbortSignal): { signal: AbortSignal; dispose: () => void } {
+  const controller = new AbortController();
+  const abort = () => controller.abort();
+  requestSignal.addEventListener('abort', abort, { once: true });
+  activePreviewBySession.get(sessionId)?.abort();
+  activePreviewBySession.set(sessionId, controller);
+  const dispose = () => {
+    requestSignal.removeEventListener('abort', abort);
+    if (activePreviewBySession.get(sessionId) === controller) {
+      activePreviewBySession.delete(sessionId);
+    }
+  };
+  controller.signal.addEventListener('abort', dispose, { once: true });
+  return { signal: controller.signal, dispose };
 }
 
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     const document = validateUiDocument(body.document);
-    const previewId = latestPreviewId + 1;
-    latestPreviewId = previewId;
+    const sessionId = typeof body.sessionId === 'string' && body.sessionId.length > 0
+      ? body.sessionId
+      : 'default';
+    const latestForSession = latestPreviewGenerationBySession.get(sessionId) ?? 0;
+    const generation = typeof body.generation === 'number' && Number.isInteger(body.generation)
+      ? body.generation
+      : 0;
+    if (generation < latestForSession) throw new StalePreviewError();
+    const previewGeneration = generation > 0 ? generation : latestForSession + 1;
+    latestPreviewGenerationBySession.set(sessionId, previewGeneration);
+    if (req.signal.aborted) throw new StalePreviewError();
+    const previewSignal = makePreviewSignal(sessionId, req.signal);
 
-    const result = await enqueuePreview(previewId, document);
+    let result: Awaited<ReturnType<typeof enqueuePreview>>;
+    try {
+      result = await enqueuePreview(sessionId, previewGeneration, document, previewSignal.signal);
+    } finally {
+      previewSignal.dispose();
+    }
 
     return NextResponse.json({
       ok: true,

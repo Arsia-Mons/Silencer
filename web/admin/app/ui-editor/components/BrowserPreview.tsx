@@ -82,9 +82,11 @@ function nodeToCss(node: UiNode, rootViewport: UiDocument['viewport']): CSSPrope
   const style = node.style;
   const css: CSSProperties = {
     boxSizing: 'border-box',
-    color: style.textColor,
-    backgroundColor: style.background,
-    border: style.border ? `1px solid ${style.border}` : undefined,
+    color: paletteColor(style.textPalette, 'text'),
+    backgroundColor: paletteColor(style.backgroundPalette, 'surface'),
+    border: style.borderPalette !== undefined && style.borderPalette >= 0
+      ? `1px solid ${paletteColor(style.borderPalette, 'surface')}`
+      : undefined,
     borderRadius: style.radius,
     padding: style.padding,
     gap: style.gap,
@@ -158,4 +160,16 @@ function fontSize(font: UiFont | undefined): number {
   if (font === 'tiny') return 9;
   if (font === 'uiLarge') return 13;
   return 11;
+}
+
+function paletteColor(index: number | undefined, role: 'surface' | 'text'): string | undefined {
+  if (index === undefined || index < 0) return undefined;
+  if (role === 'text' && index === 0) return undefined;
+  const knownPalette: Record<number, string> = {
+    0: '#000000',
+    74: '#a8541c',
+    112: '#549c68',
+    216: '#085400',
+  };
+  return knownPalette[index] ?? `hsl(${(index * 47) % 360} 58% 42%)`;
 }

@@ -20,9 +20,6 @@ export interface UiStyle {
   justify?: UiJustify;
   padding?: number;
   gap?: number;
-  background?: string;
-  border?: string;
-  textColor?: string;
   backgroundPalette?: number;
   borderPalette?: number;
   textPalette?: number;
@@ -89,11 +86,7 @@ export function createDefaultUiDocument(): UiDocument {
         justify: 'center',
         padding: 48,
         gap: 28,
-        background: '#050a05',
-        textColor: '#d1fad7',
         backgroundPalette: 0,
-        textPalette: 112,
-        font: 'ui',
       },
       children: [
         {
@@ -104,8 +97,8 @@ export function createDefaultUiDocument(): UiDocument {
           style: {
             width: { mode: 'fit' },
             height: { mode: 'fit' },
-            textColor: '#00a328',
             font: 'title',
+            textPalette: 112,
           },
         },
         {
@@ -120,13 +113,8 @@ export function createDefaultUiDocument(): UiDocument {
             justify: 'start',
             padding: 18,
             gap: 10,
-            background: '#10141c',
-            border: '#565e6f',
-            textColor: '#e0e7f1',
             backgroundPalette: 74,
             borderPalette: 216,
-            textPalette: 0,
-            font: 'ui',
             radius: 2,
           },
           children: [
@@ -275,11 +263,7 @@ function defaultStyleForKind(kind: UiNodeKind): UiStyle {
       justify: 'start',
       padding: 24,
       gap: 12,
-      background: '#050a05',
-      textColor: '#d1fad7',
       backgroundPalette: 0,
-      textPalette: 0,
-      font: 'ui',
     };
   }
   if (kind === 'panel') {
@@ -291,13 +275,8 @@ function defaultStyleForKind(kind: UiNodeKind): UiStyle {
       justify: 'start',
       padding: 14,
       gap: 8,
-      background: '#10141c',
-      border: '#565e6f',
-      textColor: '#e0e7f1',
       backgroundPalette: 74,
       borderPalette: 216,
-      textPalette: 0,
-      font: 'ui',
       radius: 2,
     };
   }
@@ -310,9 +289,6 @@ function defaultStyleForKind(kind: UiNodeKind): UiStyle {
       justify: 'start',
       padding: 0,
       gap: 8,
-      textColor: '#d1fad7',
-      textPalette: 0,
-      font: 'ui',
     };
   }
   if (kind === 'spacer') {
@@ -321,17 +297,27 @@ function defaultStyleForKind(kind: UiNodeKind): UiStyle {
       height: { mode: 'fixed', value: 12 },
     };
   }
+  if (kind === 'text') {
+    return {
+      width: { mode: 'fit' },
+      height: { mode: 'fit' },
+      font: 'uiLarge',
+      textPalette: 0,
+    };
+  }
+  if (kind === 'button') {
+    return {
+      width: { mode: 'fit' },
+      height: { mode: 'fit' },
+      textPalette: 0,
+      padding: 10,
+    };
+  }
   return {
     width: { mode: 'fit' },
     height: { mode: 'fit' },
-    textColor: kind === 'button' ? '#050a05' : '#d1fad7',
-    font: kind === 'text' ? 'uiLarge' : 'ui',
-    background: kind === 'button' ? '#00a328' : undefined,
-    border: kind === 'input' ? '#565e6f' : undefined,
-    borderPalette: kind === 'input' ? 216 : undefined,
-    textPalette: 0,
-    padding: kind === 'button' || kind === 'input' ? 10 : 0,
-    radius: 2,
+    font: 'ui',
+    padding: 10,
   };
 }
 
@@ -374,14 +360,13 @@ function validateNode(node: UiNode, seenIds: Set<string>): void {
   validateOptionalString(node, 'placeholder');
   validateOptionalString(node, 'action');
   if (!node.style || typeof node.style !== 'object') throw new Error(`Node ${node.id} style is missing.`);
+  validateStyleFields(node);
   validateSize(node, 'width');
   validateSize(node, 'height');
+  validateKindSpecificStyleValues(node);
   validateNumber(node, 'padding', 0, 512);
   validateNumber(node, 'gap', 0, 512);
   validateNumber(node, 'radius', 0, 64);
-  validateColor(node, 'background');
-  validateColor(node, 'border');
-  validateColor(node, 'textColor');
   validateEnum(node, 'direction', ['row', 'column']);
   validateEnum(node, 'align', ['start', 'center', 'end']);
   validateEnum(node, 'justify', ['start', 'center', 'end']);
@@ -403,11 +388,58 @@ function validateOptionalString(node: UiNode, key: 'text' | 'placeholder' | 'act
   }
 }
 
+function validateStyleFields(node: UiNode): void {
+  const allowed = allowedStyleFields(node.kind);
+  for (const key of Object.keys(node.style)) {
+    if (!allowed.has(key as keyof UiStyle)) {
+      throw new Error(`Node ${node.id} has unsupported ${key} style.`);
+    }
+  }
+}
+
+function allowedStyleFields(kind: UiNodeKind): Set<keyof UiStyle> {
+  if (canHaveChildren(kind)) {
+    return new Set([
+      'width',
+      'height',
+      'direction',
+      'align',
+      'justify',
+      'padding',
+      'gap',
+      'backgroundPalette',
+      'borderPalette',
+      'radius',
+    ]);
+  }
+  if (kind === 'text') {
+    return new Set([
+      'width',
+      'height',
+      'padding',
+      'backgroundPalette',
+      'borderPalette',
+      'textPalette',
+      'font',
+      'radius',
+    ]);
+  }
+  if (kind === 'button') return new Set(['width', 'height', 'padding', 'textPalette']);
+  if (kind === 'input') return new Set(['width', 'height', 'padding', 'font']);
+  return new Set(['width', 'height']);
+}
+
+function validateKindSpecificStyleValues(node: UiNode): void {
+  if (node.kind === 'button' && node.style.height.mode !== 'fit') {
+    throw new Error(`Node ${node.id} button height must be fit.`);
+  }
+}
+
 function validateViewport(viewport: UiDocument['viewport']): void {
-  if (!Number.isFinite(viewport.width) || viewport.width < 160 || viewport.width > 4096) {
+  if (!Number.isInteger(viewport.width) || viewport.width < 160 || viewport.width > 4096) {
     throw new Error('Document viewport width is invalid.');
   }
-  if (!Number.isFinite(viewport.height) || viewport.height < 160 || viewport.height > 4096) {
+  if (!Number.isInteger(viewport.height) || viewport.height < 160 || viewport.height > 4096) {
     throw new Error('Document viewport height is invalid.');
   }
 }
@@ -415,15 +447,7 @@ function validateViewport(viewport: UiDocument['viewport']): void {
 function validateNumber(node: UiNode, key: 'padding' | 'gap' | 'radius', min: number, max: number): void {
   const value = node.style[key];
   if (value === undefined) return;
-  if (!Number.isFinite(value) || value < min || value > max) {
-    throw new Error(`Node ${node.id} has invalid ${key}.`);
-  }
-}
-
-function validateColor(node: UiNode, key: 'background' | 'border' | 'textColor'): void {
-  const value = node.style[key];
-  if (value === undefined) return;
-  if (typeof value !== 'string' || !/^#[0-9a-f]{6}$/i.test(value)) {
+  if (!Number.isInteger(value) || value < min || value > max) {
     throw new Error(`Node ${node.id} has invalid ${key}.`);
   }
 }

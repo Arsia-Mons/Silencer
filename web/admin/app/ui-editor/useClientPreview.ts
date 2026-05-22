@@ -25,6 +25,11 @@ export function useClientPreview(document: UiDocument, hydrated: boolean): Clien
     elements: [],
   });
   const requestSeq = useRef(0);
+  const sessionId = useRef<string>(
+    typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+      ? crypto.randomUUID()
+      : `${Date.now()}-${Math.random()}`,
+  );
 
   useEffect(() => {
     if (!hydrated) return;
@@ -37,7 +42,7 @@ export function useClientPreview(document: UiDocument, hydrated: boolean): Clien
         const response = await fetch('/api/ui-editor/preview', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ document }),
+          body: JSON.stringify({ document, sessionId: sessionId.current, generation: seq }),
           signal: controller.signal,
         });
         const data = await response.json();
