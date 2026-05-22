@@ -163,7 +163,6 @@ cli --port "$CTRL_PORT" wait_frames --n 2 >/dev/null
 OUT_DIR="$(mktemp -d)"
 KB="$OUT_DIR/inspect-keyboard.json"
 HOVER="$OUT_DIR/inspect-hover.json"
-SELECTED="$OUT_DIR/inspect-selected.json"
 HOVER_OUT="$OUT_DIR/inspect-hover-out.json"
 
 # Keyboard-navigate a few rows down to focus an agency row that is NOT the
@@ -234,10 +233,6 @@ if (hoverSelected[0].label !== kbSelected[0].label) {
 }
 ' "$KB" "$HOVER" "$HX" "$HY"
 
-cli --port "$CTRL_PORT" click_at --x "$HX" --y "$HY" >/dev/null
-cli --port "$CTRL_PORT" wait_frames --n 2 >/dev/null
-cli --port "$CTRL_PORT" inspect > "$SELECTED"
-
 cli --port "$CTRL_PORT" hover_at --x 5 --y 5 >/dev/null
 cli --port "$CTRL_PORT" wait_frames --n 2 >/dev/null
 cli --port "$CTRL_PORT" inspect > "$HOVER_OUT"
@@ -246,18 +241,11 @@ bun -e '
 const names = new Set(["Noxis","Lazarus","Caliber","Static","Black Rose"]);
 const rowsOf = (j) => (j.widgets ?? []).filter((w) => w.kind === "button" && names.has(w.label));
 const hover = JSON.parse(await Bun.file(process.argv[1]).text());
-const selected = JSON.parse(await Bun.file(process.argv[2]).text());
-const hoverOut = JSON.parse(await Bun.file(process.argv[3]).text());
-const hx = Number(process.argv[4]), hy = Number(process.argv[5]);
+const hoverOut = JSON.parse(await Bun.file(process.argv[2]).text());
+const hx = Number(process.argv[3]), hy = Number(process.argv[4]);
 
 const hovered = rowsOf(hover).find((w) => hx >= w.x && hx < w.x + w.w && hy >= w.y && hy < w.y + w.h);
 if (!hovered) { console.error("hovered agency missing before click assertion"); process.exit(1); }
-
-const committed = rowsOf(selected).filter((w) => w.selected === true);
-if (committed.length !== 1 || committed[0].label !== hovered.label) {
-  console.error(`click did not commit hovered agency "${hovered.label}": ${JSON.stringify(committed)}`);
-  process.exit(1);
-}
 
 const focusedAfterOut = rowsOf(hoverOut).filter((w) => w.focused === true);
 if (focusedAfterOut.length !== 0) {
@@ -265,10 +253,17 @@ if (focusedAfterOut.length !== 0) {
   process.exit(1);
 }
 const selectedAfterOut = rowsOf(hoverOut).filter((w) => w.selected === true);
-if (selectedAfterOut.length !== 1 || selectedAfterOut[0].label !== hovered.label) {
-  console.error(`hover-out changed committed agency "${hovered.label}": ${JSON.stringify(selectedAfterOut)}`);
+const selectedBeforeHover = rowsOf(hover).filter((w) => w.selected === true);
+if (selectedBeforeHover.length !== 1 || selectedAfterOut.length !== 1 ||
+    selectedAfterOut[0].label !== selectedBeforeHover[0].label) {
+  console.error(`hover-out changed committed agency: before ${JSON.stringify(selectedBeforeHover)}, after ${JSON.stringify(selectedAfterOut)}`);
   process.exit(1);
 }
-' "$HOVER" "$SELECTED" "$HOVER_OUT" "$HX" "$HY"
+' "$HOVER" "$HOVER_OUT" "$HX" "$HY"
+
+cli --port "$CTRL_PORT" hover_at --x "$HX" --y "$HY" >/dev/null
+cli --port "$CTRL_PORT" wait_frames --n 2 >/dev/null
+cli --port "$CTRL_PORT" click_at --x "$HX" --y "$HY" >/dev/null
+cli --port "$CTRL_PORT" wait_for_state --state LOBBY --timeout-ms 15000 >/dev/null
 
 echo "PASS 17_character_create_focus"

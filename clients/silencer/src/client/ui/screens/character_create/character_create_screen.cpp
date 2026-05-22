@@ -679,8 +679,7 @@ void CharacterCreateScreen::BuildSelectAgent(ScreenContext & ctx,
 					index < static_cast<int>(ctx.lobby.characters.size());
 				bool hovered = false;
 				const bool selected = existingAgent && index == selectedAgentIndex;
-				const bool selectedVisual =
-					selected && (previewAgentIndex < 0 || previewAgentIndex == index);
+				const bool selectedVisual = selected && previewAgentIndex == index;
 				ListButton(FromStd(id),
 				           FromStd(agentRows[static_cast<size_t>(index)]),
 				           action.c_str(),
@@ -862,8 +861,7 @@ void CharacterCreateScreen::BuildSelectAgency(ScreenContext & ctx,
 				const std::string action = AgencyActionId(i);
 				bool hovered = false;
 				const bool selected = kAgencies[i].agency == selectedAgency;
-				const bool selectedVisual =
-					selected && (previewAgencyIndex < 0 || previewAgencyIndex == i);
+				const bool selectedVisual = selected && previewAgencyIndex == i;
 				ListButton(FromStd(id),
 				           FromCStr(kAgencies[i].displayName),
 				           action.c_str(),
@@ -992,11 +990,10 @@ bool CharacterCreateScreen::HandleUiIntent(ScreenContext & ctx,
 	int agencyIndex = SuffixInt(action.id, kActionAgencyPrefix);
 	if(agencyIndex >= 0){
 		if(agencyIndex < 5){
-			if(kAgencies[agencyIndex].agency == selectedAgency && alias[0] != '\0'){
+			selectedAgency = kAgencies[agencyIndex].agency;
+			previewAgencyIndex = agencyIndex;
+			if(alias[0] != '\0'){
 				CreateCurrentAgent(ctx);
-			}else{
-				selectedAgency = kAgencies[agencyIndex].agency;
-				previewAgencyIndex = agencyIndex;
 			}
 		}
 		return true;
