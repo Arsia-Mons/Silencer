@@ -1,9 +1,10 @@
 #ifndef SILENCER_CLIENT_UI_LOBBY_CHARACTER_PANEL_H
 #define SILENCER_CLIENT_UI_LOBBY_CHARACTER_PANEL_H
 
-// Screen-side lobby CharacterPanel. Composes the Toggle + Text primitives
-// into the legacy character box layout (username header, 5 agency toggles,
-// LEVEL / WINS / LOSSES / XP readouts).
+// Screen-side lobby CharacterPanel. Composes Text, sprite chrome, and Button
+// primitives into the compact lobby identity panel: fitted agent name,
+// selected agency emblem, core record stats, and navigation to the
+// character selection/create screen.
 //
 // Domain glue (Config::Save, World::SetAgency, agency-change detection)
 // lives HERE in the screen — not in the primitives. The primitives stay
@@ -42,8 +43,9 @@ bool CharacterPanelHandleUiIntent(CharacterPanelState & state,
                                   const silencer::ui::UiAction & action);
 
 // Emit the panel subtree. Must be called inside an open Clay layout pass,
-// after TextBeginFrame() + ToggleBeginFrame() have been invoked.
+// after the UI frame payload arenas have been reset.
 void BuildCharacterPanelTree(CharacterPanelState & state,
+                             Uint16 panelWidth,
                              World & world,
                              Resources & resources,
                              silencer::ui::UiInteractionRegistry& interactions);

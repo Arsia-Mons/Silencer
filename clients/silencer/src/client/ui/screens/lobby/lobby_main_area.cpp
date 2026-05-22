@@ -296,7 +296,12 @@ void BuildLobbySteppedPane(LobbyMainAreaPanels & panels,
 				         },
 				         .clip = { .horizontal = true, .vertical = true },
 				     })) {
-					BuildCharacterPanelTree(panels.character, world, resources, interactions);
+					BuildCharacterPanelTree(
+						panels.character,
+						static_cast<Uint16>(std::max(0, layout.characterW)),
+						world,
+						resources,
+						interactions);
 				}
 
 				CLAY(Box(OpenRightChrome(), {
