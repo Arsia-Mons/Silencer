@@ -15,6 +15,20 @@ export interface ChangelogRelease {
 
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    date: '2026-05-22',
+    title: 'UI Editor',
+    entries: [
+      {
+        category: 'DASHBOARD',
+        changes: [
+          'UI Editor (#227) — new /ui-editor route with palette, hierarchy, inspector controls, local JSON persistence, JSON import/download, generated Clay scaffold output, and live screenshots rendered by the real client through the control socket.',
+          'Versioned UI layout model — web/admin/lib/ui-layout.ts defines stable element IDs, Clay-style sizing, flex direction, padding, gaps, alignment, Silencer palette indexes, text/buttons/inputs, immutable tree edits, import validation, and scaffold generation.',
+          'Client preview bridge — ui_editor_preview maps editor documents into the production ClientUi/Clay frame and returns screenshot plus inspect bounds for the editor overlay.',
+        ],
+      },
+    ],
+  },
+  {
     version: 'v00053',
     date: '2026-05-18',
     title: 'On-screen keyboard for handheld Windows',

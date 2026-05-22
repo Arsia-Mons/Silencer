@@ -9,6 +9,8 @@
 #include "clay_ui_tests/clay_ui_checks.h"
 #include "runtime/UiInteractionRegistry.h"
 #include "screen.h"
+#include "ui_editor_preview_screen.h"
+#include "ui_editor_preview_document.h"
 #include "password_modal.h"
 #include <SDL3/SDL_keyboard.h>
 #ifdef SILENCER_HAVE_LOBBY_UI
@@ -18,6 +20,7 @@
 #include <cstring>
 #include <cstdio>
 #include <fstream>
+#include <memory>
 #include <utility>
 #ifdef _WIN32
 #include <direct.h>
@@ -463,6 +466,57 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 		}else{
 			r["lobby_state"] = "UNKNOWN";
 		}
+		cmd.reply->set_value(OkResult(cmd.id, r));
+		return;
+	}
+	if(cmd.op == "ui_editor_preview"){
+		nlohmann::json documentJson;
+		if(!cmd.args.contains("document")){
+			cmd.reply->set_value(Err(cmd.id, "BAD_REQUEST",
+				"ui_editor_preview requires args.document"));
+			return;
+		}
+		try{
+			const nlohmann::json& raw = cmd.args["document"];
+			if(raw.is_string()){
+				documentJson = nlohmann::json::parse(raw.get<std::string>());
+			}else{
+				documentJson = raw;
+			}
+		}catch(const std::exception& ex){
+			cmd.reply->set_value(Err(cmd.id, "BAD_REQUEST",
+				std::string("invalid ui editor document json: ") + ex.what()));
+			return;
+		}
+
+		silencer::client_ui::UiEditorPreviewDocument document;
+		std::string error;
+		if(!silencer::net::ParseUiEditorPreviewDocument(documentJson, document, error)){
+			cmd.reply->set_value(Err(cmd.id, "BAD_REQUEST", error));
+			return;
+		}
+		if(!game.ResizeRenderSurface(document.viewportWidth, document.viewportHeight)){
+			cmd.reply->set_value(Err(cmd.id, "INTERNAL", "resize failed for ui editor preview"));
+			return;
+		}
+
+		Screen * top = game.GetTopScreen();
+		auto * preview =
+			dynamic_cast<silencer::client_ui::UiEditorPreviewScreen *>(top);
+		const std::string surface = document.surface;
+		const int width = document.viewportWidth;
+		const int height = document.viewportHeight;
+		if(preview){
+			preview->SetDocument(std::move(document));
+		}else{
+			game.ReplaceScreen(std::make_unique<silencer::client_ui::UiEditorPreviewScreen>(
+				std::move(document)));
+		}
+
+		nlohmann::json r;
+		r["surface"] = surface;
+		r["width"] = width;
+		r["height"] = height;
 		cmd.reply->set_value(OkResult(cmd.id, r));
 		return;
 	}

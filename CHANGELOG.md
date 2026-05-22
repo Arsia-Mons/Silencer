@@ -4,6 +4,14 @@ All notable changes to Silencer are documented here.
 
 ## [Unreleased]
 
+### Admin web
+
+#### UI Editor (#227)
+
+- Added `/ui-editor`, a WYSIWYG Silencer UI layout editor with palette, hierarchy, inspector controls, local JSON persistence, JSON import/download, generated Clay scaffold output, and live preview screenshots rendered by the real client through the control socket.
+- Added a versioned `web/admin/lib/ui-layout.ts` document model for stable IDs, Clay-style sizing, flex direction, padding, gaps, alignment, Silencer palette indexes, text, buttons, inputs, and containers.
+- Added a client `ui_editor_preview` control op and preview screen that maps editor documents into the production `ClientUi`/Clay frame for real-time editor feedback.
+
 ### Game client
 
 #### Sound Cue system (#223)

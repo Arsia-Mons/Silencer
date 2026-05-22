@@ -25,6 +25,7 @@ const NAV = [
   { href: '/users',           label: '[ USER MGMT ]',         icon: '⬡', minRank: 3 },
   { href: '/actors',          label: '[ ACTOR EDITOR ]',      icon: '◉', minRank: 3 },
   { href: '/behavior-trees',  label: '[ BEHAVIOR TREES ]',    icon: '◬', minRank: 3 },
+  { href: '/ui-editor',       label: '[ UI EDITOR ]',          icon: '▣', minRank: 3 },
   { href: '/designer',        label: '[ MAP DESIGNER ]',      icon: '◫', minRank: 3 },
   { href: '/sound-studio',    label: '[ SOUND STUDIO ]',      icon: '♪', minRank: 3 },
   { href: '/gas',             label: '[ GAS EDITOR ]',         icon: '⚡', minRank: 3 },
