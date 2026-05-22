@@ -11,11 +11,19 @@ import {
   type UiNodeKind,
   type UiSize,
 } from '../../../lib/ui-layout';
+import {
+  UI_NODE_DRAG_TYPE,
+  UI_PALETTE_DRAG_TYPE,
+  dropAxisFromDirection,
+  resolveEventMovePlacement,
+  type DropAxis,
+} from '../ui-editor-dnd';
 
-export function PreviewNode({ node, selectedId, rootViewport, onSelect, onDropNode, onMoveNode }: {
+export function PreviewNode({ node, selectedId, rootViewport, dropAxis = 'vertical', onSelect, onDropNode, onMoveNode }: {
   node: UiNode;
   selectedId: string;
   rootViewport: UiDocument['viewport'];
+  dropAxis?: DropAxis;
   onSelect: (id: string) => void;
   onDropNode: (targetId: string, kind: UiNodeKind) => void;
   onMoveNode: (nodeId: string, targetId: string, placement: UiMovePlacement) => void;
@@ -24,14 +32,14 @@ export function PreviewNode({ node, selectedId, rootViewport, onSelect, onDropNo
   const style = nodeToCss(node, rootViewport);
 
   function handleDrop(event: DragEvent<HTMLDivElement>) {
-    const nodeId = event.dataTransfer.getData('application/silencer-ui-node-id');
+    const nodeId = event.dataTransfer.getData(UI_NODE_DRAG_TYPE);
     if (nodeId) {
       event.preventDefault();
       event.stopPropagation();
-      onMoveNode(nodeId, node.id, canHaveChildren(node.kind) ? 'inside' : 'after');
+      onMoveNode(nodeId, node.id, resolveEventMovePlacement(event, node, dropAxis));
       return;
     }
-    const kind = event.dataTransfer.getData('application/silencer-ui-kind') as UiNodeKind;
+    const kind = event.dataTransfer.getData(UI_PALETTE_DRAG_TYPE) as UiNodeKind;
     if (!kind || !PALETTE_NODE_KINDS.includes(kind)) return;
     event.preventDefault();
     event.stopPropagation();
@@ -45,7 +53,7 @@ export function PreviewNode({ node, selectedId, rootViewport, onSelect, onDropNo
       onDragStart={event => {
         if (node.kind === 'screen') return;
         event.dataTransfer.effectAllowed = 'move';
-        event.dataTransfer.setData('application/silencer-ui-node-id', node.id);
+        event.dataTransfer.setData(UI_NODE_DRAG_TYPE, node.id);
       }}
       onClick={event => {
         event.stopPropagation();
@@ -69,6 +77,7 @@ export function PreviewNode({ node, selectedId, rootViewport, onSelect, onDropNo
           node={child}
           selectedId={selectedId}
           rootViewport={rootViewport}
+          dropAxis={dropAxisFromDirection(node.style.direction)}
           onSelect={onSelect}
           onDropNode={onDropNode}
           onMoveNode={onMoveNode}

@@ -64,6 +64,14 @@ describe('ui-layout model', () => {
     const rejectedRootMove = moveNode(movedIntoPanel, 'main-menu-root', { targetId: 'main-menu-panel', placement: 'inside' });
     expect(rejectedRootMove).toBe(movedIntoPanel);
 
+    const rejectedBeforeRoot = moveNode(movedIntoPanel, 'main-menu-panel', { targetId: 'main-menu-root', placement: 'before' });
+    expect(rejectedBeforeRoot).toBe(movedIntoPanel);
+    expect(findNode(rejectedBeforeRoot.root, 'main-menu-panel')?.id).toBe('main-menu-panel');
+
+    const rejectedAfterRoot = moveNode(movedIntoPanel, 'main-menu-panel', { targetId: 'main-menu-root', placement: 'after' });
+    expect(rejectedAfterRoot).toBe(movedIntoPanel);
+    expect(findNode(rejectedAfterRoot.root, 'main-menu-panel')?.id).toBe('main-menu-panel');
+
     const rejectedCycle = moveNode(movedIntoPanel, 'main-menu-panel', { targetId: 'text-status', placement: 'inside' });
     expect(rejectedCycle).toBe(movedIntoPanel);
 

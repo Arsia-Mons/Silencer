@@ -1,12 +1,18 @@
 import {
   PALETTE_NODE_KINDS,
-  canHaveChildren,
   findNode,
+  findParent,
   type UiDocument,
   type UiMovePlacement,
   type UiNodeKind,
 } from '../../../lib/ui-layout';
 import { type ClientPreviewElement, type ClientPreviewState } from '../useClientPreview';
+import {
+  UI_NODE_DRAG_TYPE,
+  UI_PALETTE_DRAG_TYPE,
+  dropAxisFromDirection,
+  resolveEventMovePlacement,
+} from '../ui-editor-dnd';
 import { PreviewNode } from './BrowserPreview';
 
 interface CanvasProps {
@@ -124,7 +130,7 @@ function ClientPreviewOverlayTarget({ element, document, selectedId, onSelect, o
       onDragStart={event => {
         if (element.id === document.root.id) return;
         event.dataTransfer.effectAllowed = 'move';
-        event.dataTransfer.setData('application/silencer-ui-node-id', element.id!);
+        event.dataTransfer.setData(UI_NODE_DRAG_TYPE, element.id!);
       }}
       onClick={event => {
         event.stopPropagation();
@@ -134,14 +140,19 @@ function ClientPreviewOverlayTarget({ element, document, selectedId, onSelect, o
         event.preventDefault();
       }}
       onDrop={event => {
-        const movingId = event.dataTransfer.getData('application/silencer-ui-node-id');
+        const movingId = event.dataTransfer.getData(UI_NODE_DRAG_TYPE);
         if (movingId) {
           event.preventDefault();
           event.stopPropagation();
-          onMoveNode(movingId, element.id!, canHaveChildren(node.kind) ? 'inside' : 'after');
+          const parent = findParent(document.root, element.id!);
+          onMoveNode(movingId, element.id!, resolveEventMovePlacement(
+            event,
+            node,
+            dropAxisFromDirection(parent?.style.direction),
+          ));
           return;
         }
-        const kind = event.dataTransfer.getData('application/silencer-ui-kind') as UiNodeKind;
+        const kind = event.dataTransfer.getData(UI_PALETTE_DRAG_TYPE) as UiNodeKind;
         if (!kind || !PALETTE_NODE_KINDS.includes(kind)) return;
         event.preventDefault();
         event.stopPropagation();

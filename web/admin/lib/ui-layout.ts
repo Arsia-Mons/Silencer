@@ -251,6 +251,7 @@ export function moveNode(
   const targetNode = findNode(document.root, target.targetId);
   if (!moving || !targetNode || containsNode(moving, target.targetId)) return document;
   if (target.placement === 'inside' && !canHaveChildren(targetNode.kind)) return document;
+  if (target.placement !== 'inside' && !findParent(document.root, target.targetId)) return document;
 
   const withoutMoving = removeNode(document, nodeId);
   if (target.placement === 'inside') return insertChild(withoutMoving, target.targetId, moving);

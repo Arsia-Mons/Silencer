@@ -1,10 +1,12 @@
-import { type DragEvent } from 'react';
 import { KIND_LABELS } from '../ui-editor-constants';
 import {
-  canHaveChildren,
   type UiMovePlacement,
   type UiNode,
 } from '../../../lib/ui-layout';
+import {
+  UI_NODE_DRAG_TYPE,
+  resolveEventMovePlacement,
+} from '../ui-editor-dnd';
 
 export function Hierarchy({ root, selectedId, onSelect, onMoveNode }: {
   root: UiNode;
@@ -35,15 +37,15 @@ function HierarchyNode({ node, depth, selectedId, onSelect, onMoveNode }: {
         onDragStart={event => {
           if (depth === 0) return;
           event.dataTransfer.effectAllowed = 'move';
-          event.dataTransfer.setData('application/silencer-ui-node-id', node.id);
+          event.dataTransfer.setData(UI_NODE_DRAG_TYPE, node.id);
         }}
         onDragOver={event => event.preventDefault()}
         onDrop={event => {
-          const nodeId = event.dataTransfer.getData('application/silencer-ui-node-id');
+          const nodeId = event.dataTransfer.getData(UI_NODE_DRAG_TYPE);
           if (!nodeId) return;
           event.preventDefault();
           event.stopPropagation();
-          onMoveNode(nodeId, node.id, hierarchyDropPlacement(event, node));
+          onMoveNode(nodeId, node.id, resolveEventMovePlacement(event, node, 'vertical'));
         }}
         onClick={() => onSelect(node.id)}
         className={`w-full text-left py-1.5 pr-2 text-[12px] border-l transition-colors ${
@@ -67,13 +69,4 @@ function HierarchyNode({ node, depth, selectedId, onSelect, onMoveNode }: {
       ))}
     </div>
   );
-}
-
-function hierarchyDropPlacement(event: DragEvent<HTMLButtonElement>, node: UiNode): UiMovePlacement {
-  if (node.kind === 'screen') return 'inside';
-  const rect = event.currentTarget.getBoundingClientRect();
-  const y = event.clientY - rect.top;
-  if (y < rect.height * 0.25) return 'before';
-  if (y > rect.height * 0.75) return 'after';
-  return canHaveChildren(node.kind) ? 'inside' : 'after';
 }

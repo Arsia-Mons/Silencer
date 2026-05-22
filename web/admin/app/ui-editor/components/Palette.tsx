@@ -1,5 +1,6 @@
 import { KIND_LABELS } from '../ui-editor-constants';
 import { PALETTE_NODE_KINDS, type UiNodeKind } from '../../../lib/ui-layout';
+import { UI_PALETTE_DRAG_TYPE } from '../ui-editor-dnd';
 
 export function Palette({ onAdd }: { onAdd: (kind: UiNodeKind) => void }) {
   return (
@@ -10,7 +11,7 @@ export function Palette({ onAdd }: { onAdd: (kind: UiNodeKind) => void }) {
           <button
             key={kind}
             draggable
-            onDragStart={event => event.dataTransfer.setData('application/silencer-ui-kind', kind)}
+            onDragStart={event => event.dataTransfer.setData(UI_PALETTE_DRAG_TYPE, kind)}
             onClick={() => onAdd(kind)}
             className="border border-game-border bg-game-bg px-2 py-2 text-[11px] tracking-widest text-game-textDim hover:border-game-primary hover:text-game-text"
           >
