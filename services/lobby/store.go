@@ -95,24 +95,19 @@ func NewStore(path string) (*Store, error) {
 			delete(s.ByName, key)
 		}
 	}
+	for _, u := range s.ByName {
+		normalizeSelectedCharacter(u)
+		for _, ch := range u.Characters {
+			if ch.ID >= s.NextCharID {
+				s.NextCharID = ch.ID + 1
+			}
+		}
+	}
 	// Migrate legacy Agency[5] to Characters.
-	agencyNames := [5]string{"Noxis", "Lazarus", "Caliber", "Static", "BlackRose"}
 	for _, u := range s.ByName {
 		if len(u.Characters) == 0 {
-			for i, a := range u.LegacyAgency {
-				if a.Wins > 0 || a.Losses > 0 || a.Level > 0 {
-					u.Characters = append(u.Characters, Character{
-						ID:        s.NextCharID,
-						Name:      agencyNames[i],
-						AgencyIdx: uint8(i),
-						Stats:     a,
-					})
-					if u.SelectedCharID == 0 {
-						u.SelectedCharID = s.NextCharID
-					}
-					s.NextCharID++
-				}
-			}
+			migrateLegacyAgencies(u, &s.NextCharID)
+			normalizeSelectedCharacter(u)
 			// Clear legacy field so it doesn't accumulate in JSON.
 			u.LegacyAgency = [5]Agency{}
 		}
@@ -192,7 +187,8 @@ func (s *Store) ByAccountID(id uint32) *User {
 }
 
 // CreateCharacter adds a new character to the account and selects it.
-// Returns the updated User and true on success; false if name is blank or >16 chars.
+// Returns the updated User and true on success; false if name is blank, too
+// long, invalid, or the fixed-size lobby character-list frame is full.
 func (s *Store) CreateCharacter(accountID uint32, name string, agencyIdx uint8) (*User, bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -203,6 +199,9 @@ func (s *Store) CreateCharacter(accountID uint32, name string, agencyIdx uint8) 
 	for _, u := range s.ByName {
 		if u.AccountID != accountID {
 			continue
+		}
+		if len(u.Characters) >= maxCharactersPerUser {
+			return nil, false
 		}
 		ch := Character{
 			ID:        s.NextCharID,
@@ -390,3 +389,47 @@ func defaultAgency() Agency {
 	return Agency{TechSlots: 3}
 }
 
+func migrateLegacyAgencies(u *User, nextCharID *uint32) {
+	agencyNames := [5]string{"Noxis", "Lazarus", "Caliber", "Static", "BlackRose"}
+	for i, a := range u.LegacyAgency {
+		if !hasLegacyAgencyProgress(a) {
+			continue
+		}
+		u.Characters = append(u.Characters, Character{
+			ID:        *nextCharID,
+			Name:      agencyNames[i],
+			AgencyIdx: uint8(i),
+			Stats:     a,
+		})
+		if u.SelectedCharID == 0 {
+			u.SelectedCharID = *nextCharID
+		}
+		*nextCharID++
+	}
+}
+
+func hasLegacyAgencyProgress(a Agency) bool {
+	return a.Wins != 0 ||
+		a.Losses != 0 ||
+		a.XPToNextLevel != 0 ||
+		a.Level != 0 ||
+		a.Endurance != 0 ||
+		a.Shield != 0 ||
+		a.Jetpack != 0 ||
+		a.TechSlots != 0 ||
+		a.Hacking != 0 ||
+		a.Contacts != 0
+}
+
+func normalizeSelectedCharacter(u *User) {
+	if len(u.Characters) == 0 {
+		u.SelectedCharID = 0
+		return
+	}
+	for _, ch := range u.Characters {
+		if ch.ID == u.SelectedCharID {
+			return
+		}
+	}
+	u.SelectedCharID = u.Characters[0].ID
+}

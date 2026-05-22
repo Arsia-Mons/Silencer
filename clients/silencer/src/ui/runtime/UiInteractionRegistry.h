@@ -102,6 +102,7 @@ public:
 	// Active text inputs keep caret focus through hover, and moving over empty
 	// space clears pointer-origin focus without disturbing keyboard/gamepad focus.
 	bool FocusHovered(float x, float y);
+	bool FocusControlHovered(float x, float y);
 	bool ActivateFocused();
 	void QueueAction(UiAction action);
 	std::vector<UiAction> DrainActions();
@@ -119,6 +120,7 @@ private:
 	const UiInteractable* FocusedInteractable() const;
 	UiInteractable* FocusedInteractable();
 	void SetFocus(const UiInteractable& widget, FocusOrigin origin);
+	bool FocusHoveredAt(float x, float y, bool recordPhysicalSample);
 	void QueueAction(UiActionKind kind, const UiInteractable& widget, const char * value);
 	void RefreshElementState();
 

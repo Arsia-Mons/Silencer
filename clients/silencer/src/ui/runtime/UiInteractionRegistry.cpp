@@ -494,14 +494,24 @@ bool UiInteractionRegistry::FocusDirectional(UiNavAction action) {
 }
 
 bool UiInteractionRegistry::FocusHovered(float x, float y) {
+	return FocusHoveredAt(x, y, true);
+}
+
+bool UiInteractionRegistry::FocusControlHovered(float x, float y) {
+	return FocusHoveredAt(x, y, false);
+}
+
+bool UiInteractionRegistry::FocusHoveredAt(float x, float y, bool recordPhysicalSample) {
 	// Only react to actual pointer movement. A resting pointer that happens to
 	// sit over a row must not keep yanking focus back from the keyboard.
-	if(haveHoverSample_ && x == hoverSampleX_ && y == hoverSampleY_){
+	if(recordPhysicalSample && haveHoverSample_ && x == hoverSampleX_ && y == hoverSampleY_){
 		return false;
 	}
-	haveHoverSample_ = true;
-	hoverSampleX_ = x;
-	hoverSampleY_ = y;
+	if(recordPhysicalSample){
+		haveHoverSample_ = true;
+		hoverSampleX_ = x;
+		hoverSampleY_ = y;
+	}
 
 	const UiInteractable * focused = FocusedInteractable();
 	if(focused && focused->kind == UiInteractableKind::TextInput && !focused->inactive){

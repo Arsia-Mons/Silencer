@@ -204,6 +204,7 @@ silencer::ui::UiInputState ClientUiInput::BuildFrame(int width,
 
 void ClientUiInput::EndFrame() {
 	pointerWasDown_ = lastFramePointerDown_;
+	controlPointerActive_ = false;
 	wheelX_ = 0.0f;
 	wheelY_ = 0.0f;
 	textInput_.clear();

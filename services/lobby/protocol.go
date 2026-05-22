@@ -7,27 +7,31 @@ import (
 )
 
 const (
-	opAuth             = 0
-	opMOTD             = 1
-	opChat             = 2
-	opNewGame          = 3
-	opDelGame          = 4
-	opChannel          = 5
-	opConnect          = 6
-	opVersion          = 7
-	opUserInfo         = 8
-	opPing             = 9
-	opUpgradeStat      = 10
-	opRegisterStats    = 11
-	opPresence         = 12
-	opSetGame          = 13
-	opCharacters       = 14 // server→client: full character list for the authed player
-	opCreateCharacter  = 15 // client→server: create a new character
-	opSelectCharacter  = 16 // client→server: select an existing character
+	opAuth            = 0
+	opMOTD            = 1
+	opChat            = 2
+	opNewGame         = 3
+	opDelGame         = 4
+	opChannel         = 5
+	opConnect         = 6
+	opVersion         = 7
+	opUserInfo        = 8
+	opPing            = 9
+	opUpgradeStat     = 10
+	opRegisterStats   = 11
+	opPresence        = 12
+	opSetGame         = 13
+	opCharacters      = 14 // server→client: full character list for the authed player
+	opCreateCharacter = 15 // client→server: create a new character
+	opSelectCharacter = 16 // client→server: select an existing character
 )
 
 const maxFrame = 255
 const maxUpdateURL = 200 // leaves room for [framelen][op][success][urllen u16][sha256] in a 255-byte frame
+const maxCharacterNameBytes = 16
+const characterListHeaderBytes = 1 + 1 + 4 // op + count + selectedCharID
+const characterFixedBytes = 4 + 1 + 2 + 2 + 2 + 1 + 1 + 1 + 1 + 1 + 1 + 1
+const maxCharactersPerUser = (maxFrame - characterListHeaderBytes) / (characterFixedBytes + 1 + maxCharacterNameBytes)
 
 func readFrame(r io.Reader) ([]byte, error) {
 	var sz [1]byte
@@ -217,7 +221,7 @@ type LobbyGame struct {
 	MaxLevel         uint8
 	MaxPlayers       uint8
 	MaxTeams         uint8
-	ModeId           uint8  // GameModeId carried in the wire field formerly named Extra
+	ModeId           uint8 // GameModeId carried in the wire field formerly named Extra
 	Spectatable      uint8
 	Port             uint16
 	ParkedAccountIDs []uint32
@@ -308,10 +312,18 @@ func encodeUser(w *writer, u *User) {
 	w.u32(u.AccountID)
 	ch := selectedChar(u)
 	if ch == nil {
-		w.u32(0)             // charID
-		w.u8(0)              // agencyIdx
-		w.u16(0); w.u16(0); w.u16(0) // wins, losses, xp
-		w.u8(0); w.u8(0); w.u8(0); w.u8(0); w.u8(0); w.u8(0); w.u8(0) // stats + level
+		w.u32(0) // charID
+		w.u8(0)  // agencyIdx
+		w.u16(0)
+		w.u16(0)
+		w.u16(0) // wins, losses, xp
+		w.u8(0)
+		w.u8(0)
+		w.u8(0)
+		w.u8(0)
+		w.u8(0)
+		w.u8(0)
+		w.u8(0) // stats + level
 		w.lenStr(u.Name)
 		w.lenStr("")
 		return
@@ -342,11 +354,24 @@ func encodeCharacters(u *User) []byte {
 	var w writer
 	w.u8(opCharacters)
 	count := len(u.Characters)
-	if count > 255 {
-		count = 255
+	if count > maxCharactersPerUser {
+		count = maxCharactersPerUser
 	}
 	w.u8(uint8(count))
-	w.u32(u.SelectedCharID)
+	selectedCharID := u.SelectedCharID
+	if count > 0 {
+		found := false
+		for i := 0; i < count; i++ {
+			if u.Characters[i].ID == selectedCharID {
+				found = true
+				break
+			}
+		}
+		if !found {
+			selectedCharID = u.Characters[0].ID
+		}
+	}
+	w.u32(selectedCharID)
 	for i := 0; i < count; i++ {
 		ch := &u.Characters[i]
 		a := &ch.Stats

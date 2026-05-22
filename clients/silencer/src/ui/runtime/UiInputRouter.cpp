@@ -35,7 +35,7 @@ std::vector<UiAction> UiInputRouter::Route(const UiInputState& input) {
 			registry_.PressAt(command.x, command.y);
 		}else if(command.kind == UiControlCommandKind::PointerHover){
 			hasControlPointerCommand = true;
-			registry_.FocusHovered(static_cast<float>(command.x), static_cast<float>(command.y));
+			registry_.FocusControlHovered(static_cast<float>(command.x), static_cast<float>(command.y));
 		}else{
 			registry_.QueueAction(command.action);
 		}

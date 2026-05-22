@@ -8,18 +8,7 @@
 set -euo pipefail
 . "$(dirname "$0")/lib.sh"
 
-LOBBY_BIN=""
-for candidate in \
-  "$REPO_ROOT/services/lobby/lobby" \
-  "$REPO_ROOT/services/lobby/lobby.exe" \
-  "$REPO_ROOT/services/lobby/silencer-lobby" \
-  "$REPO_ROOT/services/lobby/silencer-lobby.exe"; do
-  if [ -x "$candidate" ]; then LOBBY_BIN="$candidate"; break; fi
-done
-if [ -z "$LOBBY_BIN" ]; then
-  echo "lobby binary missing under services/lobby/ — build it via 'cd services/lobby && go build'" >&2
-  exit 1
-fi
+LOBBY_BIN="$(lobby_bin)"
 
 # Per-run scratch — both for the lobby's user db (-db) and the silencer's
 # config dir (HOME-rooted on macOS / Linux). Two separate pid/log files so
@@ -35,24 +24,9 @@ PLAYER_AUTH_PORT=$(pick_port)
 MAP_API_PORT=$(pick_port)
 CTRL_PORT=$(pick_port)
 
-# Match the version baked into the silencer binary — without this the lobby
-# rejects the handshake with "Wrong version". Probe the same build dirs
-# lib.sh probes for the binary.
-SILENCER_VERSION=""
-for cache in \
-  "$REPO_ROOT/build/CMakeCache.txt" \
-  "$REPO_ROOT/clients/silencer/build/CMakeCache.txt" \
-  "$REPO_ROOT/clients/silencer/build-unity/CMakeCache.txt" \
-  "$REPO_ROOT/clients/silencer/build-release/CMakeCache.txt"; do
-  if [ -f "$cache" ]; then
-    SILENCER_VERSION=$(awk -F= '/^SILENCER_VERSION:STRING=/{print $2}' "$cache")
-    if [ -n "$SILENCER_VERSION" ]; then break; fi
-  fi
-done
-if [ -z "$SILENCER_VERSION" ]; then
-  echo "could not read SILENCER_VERSION from any CMakeCache.txt" >&2
-  exit 1
-fi
+# Match the version baked into the selected silencer binary — without this the
+# lobby rejects the handshake with "Wrong version".
+SILENCER_VERSION="$(silencer_version)"
 
 cleanup() {
   if [ -n "${SILENCER_PID:-}" ]; then
