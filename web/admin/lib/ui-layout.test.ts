@@ -6,6 +6,7 @@ import {
   exportClaySnippet,
   findNode,
   insertChild,
+  moveNode,
   removeNode,
   validateUiDocument,
 } from './ui-layout';
@@ -36,6 +37,22 @@ describe('ui-layout model', () => {
     expect(rootChildren).toHaveLength(3);
     expect(rootChildren[2].id).not.toBe('main-menu-panel');
     expect(rootChildren[2].children?.[0].id).not.toBe('button-host-game');
+  });
+
+  test('moves existing nodes without allowing invalid cycles', () => {
+    const document = createDefaultUiDocument();
+    const text = createNode('text', 'status', { text: 'READY' });
+    const withText = insertChild(document, 'main-menu-root', text);
+    const movedIntoPanel = moveNode(withText, 'text-status', 'main-menu-panel');
+
+    expect(findNode(movedIntoPanel.root, 'main-menu-panel')?.children?.at(-1)?.id).toBe('text-status');
+    expect(findNode(movedIntoPanel.root, 'main-menu-root')?.children?.some(child => child.id === 'text-status')).toBe(false);
+
+    const rejectedRootMove = moveNode(movedIntoPanel, 'main-menu-root', 'main-menu-panel');
+    expect(rejectedRootMove).toBe(movedIntoPanel);
+
+    const rejectedCycle = moveNode(movedIntoPanel, 'main-menu-panel', 'text-status');
+    expect(rejectedCycle).toBe(movedIntoPanel);
   });
 
   test('validates imported documents and exports a Clay scaffold', () => {

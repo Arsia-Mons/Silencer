@@ -13,6 +13,7 @@ import {
   findParent,
   insertAfter,
   insertChild,
+  moveNode,
   removeNode,
   updateNode,
   validateUiDocument,
@@ -103,6 +104,12 @@ export default function UiEditorPage() {
     commit(next, node.id);
   }
 
+  function moveExistingNode(nodeId: string, targetId: string) {
+    const next = moveNode(document, nodeId, targetId);
+    if (next === document) return;
+    commit(next, nodeId);
+  }
+
   function deleteSelectedNode() {
     if (selectedNode.id === document.root.id) return;
     const fallbackId = selectedParent?.id ?? document.root.id;
@@ -172,7 +179,12 @@ export default function UiEditorPage() {
         <div className="min-h-0 flex-1 grid grid-cols-[260px_minmax(0,1fr)_340px] border-t border-game-border">
           <section className="min-h-0 border-r border-game-border bg-game-bgCard/90 flex flex-col">
             <Palette onAdd={addNode} />
-            <Hierarchy selectedId={selectedNode.id} root={document.root} onSelect={setSelectedId} />
+            <Hierarchy
+              selectedId={selectedNode.id}
+              root={document.root}
+              onSelect={setSelectedId}
+              onMoveNode={moveExistingNode}
+            />
           </section>
 
           <section className="min-w-0 min-h-0 flex flex-col bg-black/45">
@@ -183,6 +195,7 @@ export default function UiEditorPage() {
               clientPreview={clientPreview}
               onSelect={setSelectedId}
               onDropNode={(targetId, kind) => addNode(kind, targetId)}
+              onMoveNode={moveExistingNode}
             />
             <ExportPanel
               exportMode={exportMode}

@@ -10,12 +10,14 @@ inputs, and containers.
 ## Current Surface
 
 - Palette for adding panel, stack, row, text, button, input, and spacer nodes.
-- Hierarchy tree for selecting layout nodes by stable ID.
+- Hierarchy tree for selecting layout nodes by stable ID and dragging existing
+  nodes to reparent or reorder them.
 - Live scaled browser fallback for common Silencer viewport sizes.
 - Live client preview through the Silencer control socket: each edit is sent to
   the running client, rendered by the production `ClientUi`/Clay frame, captured
   as a screenshot, and returned with `inspect` bounds for editor selection
-  outlines.
+  outlines. Existing elements can also be dragged from those live overlay
+  bounds onto another element to move them in the layout tree.
 - Inspector controls for identity, text/action data, sizing, flex layout,
   padding, gap, radius, colors, and font family.
 - JSON import and download for `.silencer-ui.json` documents.

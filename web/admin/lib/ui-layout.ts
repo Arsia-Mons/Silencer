@@ -221,6 +221,18 @@ export function removeNode(document: UiDocument, id: string): UiDocument {
   return { ...document, root: removeNodeFromTree(document.root, id) };
 }
 
+export function moveNode(document: UiDocument, nodeId: string, targetId: string): UiDocument {
+  if (nodeId === document.root.id || nodeId === targetId) return document;
+  const moving = findNode(document.root, nodeId);
+  const target = findNode(document.root, targetId);
+  if (!moving || !target || containsNode(moving, targetId)) return document;
+
+  const withoutMoving = removeNode(document, nodeId);
+  return canHaveChildren(target.kind)
+    ? insertChild(withoutMoving, targetId, moving)
+    : insertAfter(withoutMoving, targetId, moving);
+}
+
 export function duplicateNode(document: UiDocument, id: string): UiDocument {
   const node = findNode(document.root, id);
   if (!node || node.id === document.root.id) return document;
@@ -338,6 +350,11 @@ function removeNodeFromTree(node: UiNode, id: string): UiNode {
       .filter(child => child.id !== id)
       .map(child => removeNodeFromTree(child, id)),
   };
+}
+
+function containsNode(node: UiNode, id: string): boolean {
+  if (node.id === id) return true;
+  return (node.children ?? []).some(child => containsNode(child, id));
 }
 
 function cloneNodeWithNewIds(node: UiNode): UiNode {

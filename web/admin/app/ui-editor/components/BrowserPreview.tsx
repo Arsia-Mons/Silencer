@@ -11,18 +11,25 @@ import {
   type UiSize,
 } from '../../../lib/ui-layout';
 
-export function PreviewNode({ node, selectedId, rootViewport, onSelect, onDropNode }: {
+export function PreviewNode({ node, selectedId, rootViewport, onSelect, onDropNode, onMoveNode }: {
   node: UiNode;
   selectedId: string;
   rootViewport: UiDocument['viewport'];
   onSelect: (id: string) => void;
   onDropNode: (targetId: string, kind: UiNodeKind) => void;
+  onMoveNode: (nodeId: string, targetId: string) => void;
 }) {
   const isSelected = node.id === selectedId;
-  const allowsDrop = canHaveChildren(node.kind);
   const style = nodeToCss(node, rootViewport);
 
   function handleDrop(event: DragEvent<HTMLDivElement>) {
+    const nodeId = event.dataTransfer.getData('application/silencer-ui-node-id');
+    if (nodeId) {
+      event.preventDefault();
+      event.stopPropagation();
+      onMoveNode(nodeId, node.id);
+      return;
+    }
     const kind = event.dataTransfer.getData('application/silencer-ui-kind') as UiNodeKind;
     if (!kind || !PALETTE_NODE_KINDS.includes(kind)) return;
     event.preventDefault();
@@ -33,12 +40,18 @@ export function PreviewNode({ node, selectedId, rootViewport, onSelect, onDropNo
   return (
     <div
       data-node-id={node.id}
+      draggable={node.kind !== 'screen'}
+      onDragStart={event => {
+        if (node.kind === 'screen') return;
+        event.dataTransfer.effectAllowed = 'move';
+        event.dataTransfer.setData('application/silencer-ui-node-id', node.id);
+      }}
       onClick={event => {
         event.stopPropagation();
         onSelect(node.id);
       }}
       onDragOver={event => {
-        if (allowsDrop) event.preventDefault();
+        event.preventDefault();
       }}
       onDrop={handleDrop}
       style={{
@@ -57,6 +70,7 @@ export function PreviewNode({ node, selectedId, rootViewport, onSelect, onDropNo
           rootViewport={rootViewport}
           onSelect={onSelect}
           onDropNode={onDropNode}
+          onMoveNode={onMoveNode}
         />
       ))}
     </div>

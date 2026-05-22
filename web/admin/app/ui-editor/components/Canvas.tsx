@@ -1,6 +1,5 @@
 import {
   PALETTE_NODE_KINDS,
-  canHaveChildren,
   findNode,
   type UiDocument,
   type UiNodeKind,
@@ -15,9 +14,10 @@ interface CanvasProps {
   clientPreview: ClientPreviewState;
   onSelect: (id: string) => void;
   onDropNode: (targetId: string, kind: UiNodeKind) => void;
+  onMoveNode: (nodeId: string, targetId: string) => void;
 }
 
-export function Canvas({ document, selectedId, zoom, clientPreview, onSelect, onDropNode }: CanvasProps) {
+export function Canvas({ document, selectedId, zoom, clientPreview, onSelect, onDropNode, onMoveNode }: CanvasProps) {
   const live = clientPreview.status === 'live' && clientPreview.screenshot;
   return (
     <div className="min-h-0 flex-1 overflow-auto p-6">
@@ -50,6 +50,7 @@ export function Canvas({ document, selectedId, zoom, clientPreview, onSelect, on
                 selectedId={selectedId}
                 onSelect={onSelect}
                 onDropNode={onDropNode}
+                onMoveNode={onMoveNode}
               />
             </>
           ) : (
@@ -59,6 +60,7 @@ export function Canvas({ document, selectedId, zoom, clientPreview, onSelect, on
               rootViewport={document.viewport}
               onSelect={onSelect}
               onDropNode={onDropNode}
+              onMoveNode={onMoveNode}
             />
           )}
           <div className="absolute left-2 top-2 border border-game-border bg-game-bg/85 px-2 py-1 text-[10px] tracking-widest text-game-textDim">
@@ -75,12 +77,13 @@ export function Canvas({ document, selectedId, zoom, clientPreview, onSelect, on
   );
 }
 
-function ClientPreviewOverlay({ elements, document, selectedId, onSelect, onDropNode }: {
+function ClientPreviewOverlay({ elements, document, selectedId, onSelect, onDropNode, onMoveNode }: {
   elements: ClientPreviewElement[];
   document: UiDocument;
   selectedId: string;
   onSelect: (id: string) => void;
   onDropNode: (targetId: string, kind: UiNodeKind) => void;
+  onMoveNode: (nodeId: string, targetId: string) => void;
 }) {
   return (
     <div className="absolute inset-0">
@@ -92,18 +95,20 @@ function ClientPreviewOverlay({ elements, document, selectedId, onSelect, onDrop
           selectedId={selectedId}
           onSelect={onSelect}
           onDropNode={onDropNode}
+          onMoveNode={onMoveNode}
         />
       ))}
     </div>
   );
 }
 
-function ClientPreviewOverlayTarget({ element, document, selectedId, onSelect, onDropNode }: {
+function ClientPreviewOverlayTarget({ element, document, selectedId, onSelect, onDropNode, onMoveNode }: {
   element: ClientPreviewElement;
   document: UiDocument;
   selectedId: string;
   onSelect: (id: string) => void;
   onDropNode: (targetId: string, kind: UiNodeKind) => void;
+  onMoveNode: (nodeId: string, targetId: string) => void;
 }) {
   if (!element.id) return null;
   const node = findNode(document.root, element.id);
@@ -112,16 +117,28 @@ function ClientPreviewOverlayTarget({ element, document, selectedId, onSelect, o
   return (
     <div
       className="absolute"
+      draggable={element.id !== document.root.id}
       title={element.label ?? element.id}
+      onDragStart={event => {
+        if (element.id === document.root.id) return;
+        event.dataTransfer.effectAllowed = 'move';
+        event.dataTransfer.setData('application/silencer-ui-node-id', element.id!);
+      }}
       onClick={event => {
         event.stopPropagation();
         onSelect(element.id!);
       }}
       onDragOver={event => {
-        if (canHaveChildren(node.kind)) event.preventDefault();
+        event.preventDefault();
       }}
       onDrop={event => {
-        if (!canHaveChildren(node.kind)) return;
+        const movingId = event.dataTransfer.getData('application/silencer-ui-node-id');
+        if (movingId) {
+          event.preventDefault();
+          event.stopPropagation();
+          onMoveNode(movingId, element.id!);
+          return;
+        }
         const kind = event.dataTransfer.getData('application/silencer-ui-kind') as UiNodeKind;
         if (!kind || !PALETTE_NODE_KINDS.includes(kind)) return;
         event.preventDefault();
