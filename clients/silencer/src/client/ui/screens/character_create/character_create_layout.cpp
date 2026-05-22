@@ -493,12 +493,14 @@ void ListButton(Clay_String id,
                 silencer::ui::UiInteractionRegistry& interactions,
                 bool selected = false,
                 bool selectedVisual = true,
-                bool * hoveredOut = nullptr)
+                bool * hoveredOut = nullptr,
+                bool disabled = false)
 {
 	Button(id,
 	       label,
 	       ButtonOpts{ .variant = ButtonVariant::LegacyRow,
 	                   .size = ButtonSize::Auto,
+	                   .disabled = disabled,
 	                   .selected = selected,
 	                   .selectedVisual = selectedVisual,
 	                   .minWidth = kLeftColumnW },
@@ -832,9 +834,10 @@ void CharacterCreateScreen::BuildSelectAgency(ScreenContext & ctx,
 				           interactions,
 				           selected,
 				           selectedVisual,
-				           &hovered);
+				           &hovered,
+				           waitingForCreate);
 				const auto * row = interactions.FindById(action);
-				if(hovered || (row && row->focused)){
+				if(!waitingForCreate && (hovered || (row && row->focused))){
 					detailAgency = kAgencies[i].agency;
 				}
 			}

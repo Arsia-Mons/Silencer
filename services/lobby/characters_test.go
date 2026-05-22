@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"sync"
@@ -19,7 +20,7 @@ func TestCreateCharacterEnforcesFrameCapacity(t *testing.T) {
 		t.Fatalf("Login: ok=%v banned=%v", ok, banned)
 	}
 	for i := 0; i < maxCharactersPerUser; i++ {
-		name := "Agent12345678901"
+		name := fmt.Sprintf("Agent%011d", i)
 		user, ok = store.CreateCharacter(user.AccountID, name, uint8(i%5))
 		if !ok {
 			t.Fatalf("CreateCharacter %d rejected before capacity", i)
@@ -31,6 +32,32 @@ func TestCreateCharacterEnforcesFrameCapacity(t *testing.T) {
 	}
 	if _, ok = store.CreateCharacter(user.AccountID, "Overflow", 0); ok {
 		t.Fatalf("CreateCharacter accepted more than %d characters", maxCharactersPerUser)
+	}
+}
+
+func TestCreateCharacterRejectsDuplicateAlias(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "lobby.json")
+	store, err := NewStore(path)
+	if err != nil {
+		t.Fatalf("NewStore: %v", err)
+	}
+	user, ok, banned := store.Login("alice", hashPassword("secret"))
+	if !ok || banned {
+		t.Fatalf("Login: ok=%v banned=%v", ok, banned)
+	}
+	user, ok = store.CreateCharacter(user.AccountID, "Shade", 1)
+	if !ok {
+		t.Fatalf("CreateCharacter Shade rejected")
+	}
+	if _, ok = store.CreateCharacter(user.AccountID, " shade ", 2); ok {
+		t.Fatalf("CreateCharacter accepted duplicate alias")
+	}
+	user = store.ByName["alice"]
+	if len(user.Characters) != 1 {
+		t.Fatalf("duplicate alias changed characters: %#v", user.Characters)
+	}
+	if user.Characters[0].Name != "Shade" || user.Characters[0].AgencyIdx != 1 {
+		t.Fatalf("existing character changed: %#v", user.Characters[0])
 	}
 }
 

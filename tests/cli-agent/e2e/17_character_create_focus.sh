@@ -260,6 +260,17 @@ if (selectedBeforeHover.length !== 1 || selectedAfterOut.length !== 1 ||
 cli --port "$CTRL_PORT" hover_at --x "$HX" --y "$HY" >/dev/null
 cli --port "$CTRL_PORT" wait_frames --n 2 >/dev/null
 cli --port "$CTRL_PORT" click_at --x "$HX" --y "$HY" >/dev/null
+cli --port "$CTRL_PORT" click_at --x "$HX" --y "$HY" >/dev/null 2>&1 || true
 cli --port "$CTRL_PORT" wait_for_state --state LOBBY --timeout-ms 15000 >/dev/null
+CREATED_COUNT=$(bun -e '
+const db = JSON.parse(await Bun.file(process.argv[1]).text());
+const chars = db.users?.alice?.chars ?? [];
+console.log(chars.filter((c) => c.name === "Alice").length);
+' "$LOBBY_DB")
+if [ "$CREATED_COUNT" != "1" ]; then
+  echo "rapid agency submit created $CREATED_COUNT Alice characters" >&2
+  cat "$LOBBY_DB" >&2
+  exit 1
+fi
 
 echo "PASS 17_character_create_focus"

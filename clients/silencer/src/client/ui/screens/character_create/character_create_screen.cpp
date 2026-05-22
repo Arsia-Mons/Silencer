@@ -151,6 +151,7 @@ bool CharacterCreateScreen::HandleUiIntent(ScreenContext & ctx,
 		}
 		int agencyIndex = SuffixInt(action.id, kActionAgencyPrefix);
 		if(step == Step::SelectAgency && agencyIndex >= 0 && agencyIndex < 5){
+			if(waitingForCreate) return true;
 			selectedAgency = AgencyForIndex(agencyIndex);
 			previewAgencyIndex = agencyIndex;
 			return true;
@@ -179,6 +180,7 @@ bool CharacterCreateScreen::HandleUiIntent(ScreenContext & ctx,
 	}
 	int agencyIndex = SuffixInt(action.id, kActionAgencyPrefix);
 	if(step == Step::SelectAgency && agencyIndex >= 0){
+		if(waitingForCreate) return true;
 		if(agencyIndex < 5){
 			selectedAgency = AgencyForIndex(agencyIndex);
 			previewAgencyIndex = agencyIndex;
@@ -189,6 +191,7 @@ bool CharacterCreateScreen::HandleUiIntent(ScreenContext & ctx,
 		return true;
 	}
 	if(step == Step::SelectAgency && action.id == kActionCreate){
+		if(waitingForCreate) return true;
 		CreateCurrentAgent(ctx);
 		return true;
 	}
@@ -225,6 +228,9 @@ void CharacterCreateScreen::SelectCurrentAgent(ScreenContext & ctx)
 
 void CharacterCreateScreen::CreateCurrentAgent(ScreenContext & ctx)
 {
+	if(waitingForCreate){
+		return;
+	}
 	if(alias[0] == '\0'){
 		ctx.ShowMessage("Enter an alias");
 		step = Step::EnterAlias;

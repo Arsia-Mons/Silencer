@@ -200,6 +200,11 @@ func (s *Store) CreateCharacter(accountID uint32, name string, agencyIdx uint8) 
 		if u.AccountID != accountID {
 			continue
 		}
+		for _, existing := range u.Characters {
+			if strings.EqualFold(existing.Name, name) {
+				return nil, false
+			}
+		}
 		if len(u.Characters) >= maxCharactersPerUser {
 			return nil, false
 		}
