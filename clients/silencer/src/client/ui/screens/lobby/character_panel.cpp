@@ -39,16 +39,17 @@ constexpr uint16_t kPanelPad = 6;
 constexpr uint16_t kBandGap = 4;
 constexpr uint16_t kStatRowGap = 2;
 constexpr uint16_t kEmblemGap = 10;
-constexpr uint16_t kButtonHeight = 22;
+constexpr uint16_t kDetailsGap = 8;
+constexpr uint16_t kButtonHeight = 21;
 constexpr int kActionButtonMinWidth = 92;
 constexpr int kActionButtonPaddingX = 12;
 constexpr uint16_t kAgencySpriteBank = 181;
 // Emblem occupies a fixed slice of the inner width and grows to the body
 // height; the IMAGE compositor scales the sprite (Contain) to fit, so a big
 // crest anchors the left instead of a lost native-size icon.
-constexpr int kEmblemWidthPct = 36;
+constexpr int kEmblemWidthPct = 31;
 constexpr int kEmblemMinWidth = 48;
-constexpr int kEmblemMaxWidth = 132;
+constexpr int kEmblemMaxWidth = 112;
 
 // Per-frame text buffers. The layout pass keeps pointers to these for the
 // duration of the layout, so they MUST live past BuildCharacterPanelTree's
@@ -214,9 +215,11 @@ void BuildCharacterPanelTree(CharacterPanelState & state,
 	const int labelColumnWidth = static_cast<int>(
 		MeasureText(CLAY_STRING("LOSSES"), TextSize::Body).width) + 4;
 
-	// Three content bands: name, body (grows), compact action row. The
+	// Two content bands: name plus a body row. The right column owns the
+	// record stats and its action button so the button reads as part of the
+	// details area instead of a detached footer.
 	// growing body centers its content vertically, so any extra panel height
-	// becomes balanced breathing room rather than a footer slab.
+	// becomes balanced breathing room.
 	// The parent LobbyCharacterBox is supplied by the lobby shell; this
 	// function emits only content.
 	CLAY({ .id = CLAY_ID("CharacterPanelContent"),
@@ -253,34 +256,44 @@ void BuildCharacterPanelTree(CharacterPanelState & state,
 		       .clip = { .horizontal = true, .vertical = true } }) {
 			character_panel_detail::AgencyEmblem(a, emblemBoxW);
 
-			CLAY({ .id = CLAY_ID("CharacterPanelStatTable"),
+			CLAY({ .id = CLAY_ID("CharacterPanelDetailsColumn"),
 			       .layout = {
-			           .sizing = { CLAY_SIZING_FIT(0), CLAY_SIZING_GROW(0) },
-			           .childGap = character_panel_detail::kStatRowGap,
+			           .sizing = { CLAY_SIZING_FIT(0), CLAY_SIZING_FIT(0) },
+			           .childGap = character_panel_detail::kDetailsGap,
+			           .childAlignment = { .x = CLAY_ALIGN_X_LEFT,
+			                               .y = CLAY_ALIGN_Y_CENTER },
 			           .layoutDirection = CLAY_TOP_TO_BOTTOM,
 			       },
 			       .clip = { .horizontal = true } }) {
-				character_panel_detail::StatRow(0, "LEVEL", character_panel_detail::g_stats.level, labelColumnWidth);
-				character_panel_detail::StatRow(1, "WINS", character_panel_detail::g_stats.wins, labelColumnWidth);
-				character_panel_detail::StatRow(2, "LOSSES", character_panel_detail::g_stats.losses, labelColumnWidth);
-			}
-		}
+				CLAY({ .id = CLAY_ID("CharacterPanelStatTable"),
+				       .layout = {
+				           .sizing = { CLAY_SIZING_FIT(0), CLAY_SIZING_FIT(0) },
+				           .childGap = character_panel_detail::kStatRowGap,
+				           .layoutDirection = CLAY_TOP_TO_BOTTOM,
+				       },
+				       .clip = { .horizontal = true } }) {
+					character_panel_detail::StatRow(0, "LEVEL", character_panel_detail::g_stats.level, labelColumnWidth);
+					character_panel_detail::StatRow(1, "WINS", character_panel_detail::g_stats.wins, labelColumnWidth);
+					character_panel_detail::StatRow(2, "LOSSES", character_panel_detail::g_stats.losses, labelColumnWidth);
+				}
 
-		CLAY({ .id = CLAY_ID("CharacterPanelActionsRow"),
-		       .layout = {
-		           .sizing = { CLAY_SIZING_GROW(0),
-		                       CLAY_SIZING_FIXED(character_panel_detail::kButtonHeight) },
-		           .childAlignment = { .x = CLAY_ALIGN_X_RIGHT,
-		                               .y = CLAY_ALIGN_Y_CENTER },
-		       },
-		       .clip = { .horizontal = true } }) {
-			Button(CLAY_STRING("CharacterPanelAgentsButton"),
-			       CLAY_STRING("Agents"),
-			       ButtonOpts{ .variant = ButtonVariant::Chrome,
-			                   .size = ButtonSize::Auto,
-			                   .minWidth = character_panel_detail::kActionButtonMinWidth,
-			                   .paddingX = character_panel_detail::kActionButtonPaddingX },
-			       ButtonHandle{ nullptr, character_panel_detail::kActionAgents, &interactions });
+				CLAY({ .id = CLAY_ID("CharacterPanelActionsRow"),
+				       .layout = {
+				           .sizing = { CLAY_SIZING_FIT(0),
+				                       CLAY_SIZING_FIXED(character_panel_detail::kButtonHeight) },
+				           .childAlignment = { .x = CLAY_ALIGN_X_LEFT,
+				                               .y = CLAY_ALIGN_Y_CENTER },
+				       },
+				       .clip = { .horizontal = true } }) {
+					Button(CLAY_STRING("CharacterPanelAgentsButton"),
+					       CLAY_STRING("Agents"),
+					       ButtonOpts{ .variant = ButtonVariant::Chrome,
+					                   .size = ButtonSize::Auto,
+					                   .minWidth = character_panel_detail::kActionButtonMinWidth,
+					                   .paddingX = character_panel_detail::kActionButtonPaddingX },
+					       ButtonHandle{ nullptr, character_panel_detail::kActionAgents, &interactions });
+				}
+			}
 		}
 	}
 }
