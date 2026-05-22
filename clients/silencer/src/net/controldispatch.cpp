@@ -356,6 +356,12 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 		r["oval_wall_clock_partial_brightness"] = res.ovalWallClockPartialBrightness;
 		r["oval_wall_clock_next_sprite_index"] = res.ovalWallClockNextSpriteIndex;
 		r["oval_wall_clock_next_brightness"] = res.ovalWallClockNextBrightness;
+		r["legacy_selected_suppressed_sprite_index"] =
+			res.legacySelectedSuppressedSpriteIndex;
+		r["legacy_selected_suppressed_brightness"] =
+			res.legacySelectedSuppressedBrightness;
+		r["legacy_selected_suppressed_metadata"] =
+			res.legacySelectedSuppressedMetadata;
 		r["compact_width"] = res.compactWidth;
 		r["compact_height"] = res.compactHeight;
 		r["chrome_auto_width"] = res.chromeAutoWidth;
@@ -484,7 +490,10 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 			if(cw.uid >= 0) w["uid"] = cw.uid;
 			using K = silencer::ui::UiInteractableKind;
 			switch(cw.kind){
-				case K::Button:    w["kind"] = "button"; break;
+				case K::Button:
+					w["kind"] = "button";
+					w["selected"] = cw.selected;
+					break;
 				case K::Toggle:
 					w["kind"] = "toggle";
 					w["selected"] = cw.selected;

@@ -98,10 +98,9 @@ public:
 	bool FocusNextInteractive();
 	bool FocusPreviousInteractive();
 	bool FocusDirectional(UiNavAction action);
-	// Moves the single focused element to whatever interactable sits under a
-	// MOVED pointer, so mouse hover and keyboard navigation share one focus
-	// state. A resting pointer or empty space leaves focus untouched; text
-	// inputs are skipped so hovering never steals caret focus.
+	// Moves pointer-origin focus to the non-text control under a MOVED pointer.
+	// Active text inputs keep caret focus through hover, and moving over empty
+	// space clears pointer-origin focus without disturbing keyboard/gamepad focus.
 	bool FocusHovered(float x, float y);
 	bool ActivateFocused();
 	void QueueAction(UiAction action);
@@ -109,10 +108,17 @@ public:
 	void ResolveClayBoundsFromClay();
 
 private:
+	enum class FocusOrigin {
+		None,
+		Pointer,
+		Navigation,
+		Text,
+	};
+
 	bool MatchesFocus(const UiInteractable& widget) const;
 	const UiInteractable* FocusedInteractable() const;
 	UiInteractable* FocusedInteractable();
-	void SetFocus(const UiInteractable& widget);
+	void SetFocus(const UiInteractable& widget, FocusOrigin origin);
 	void QueueAction(UiActionKind kind, const UiInteractable& widget, const char * value);
 	void RefreshElementState();
 
@@ -123,6 +129,7 @@ private:
 	int focusedUid_ = -1;
 	UiInteractableKind focusedKind_ = UiInteractableKind::Button;
 	std::string focusedLabel_;
+	FocusOrigin focusedOrigin_ = FocusOrigin::None;
 	float hoverSampleX_ = 0.0f;
 	float hoverSampleY_ = 0.0f;
 	bool haveHoverSample_ = false;

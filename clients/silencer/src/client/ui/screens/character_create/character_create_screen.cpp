@@ -492,6 +492,7 @@ void ListButton(Clay_String id,
                 const char * action,
                 silencer::ui::UiInteractionRegistry& interactions,
                 bool selected = false,
+                bool selectedVisual = true,
                 bool * hoveredOut = nullptr)
 {
 	Button(id,
@@ -499,6 +500,7 @@ void ListButton(Clay_String id,
 	       ButtonOpts{ .variant = ButtonVariant::LegacyRow,
 	                   .size = ButtonSize::Auto,
 	                   .selected = selected,
+	                   .selectedVisual = selectedVisual,
 	                   .minWidth = kLeftColumnW },
 	       ButtonHandle{ hoveredOut, action, &interactions });
 }
@@ -538,9 +540,11 @@ void CharacterCreateScreen::Build(ScreenContext & ctx)
 	ctx.renderer.camera.SetPosition(320, 240);
 	step = Step::SelectAgent;
 	selectedAgentIndex = 0;
+	previewAgentIndex = -1;
 	agentScroll = 0;
 	agentScrollDelta = 0;
 	selectedAgency = Team::NOXIS;
+	previewAgencyIndex = -1;
 	characterCountOnEntry = ctx.lobby.characters.size();
 	waitingForCreate = false;
 	focusAliasRequested = false;
@@ -633,7 +637,9 @@ void CharacterCreateScreen::BuildSelectAgent(ScreenContext & ctx,
                                              silencer::ui::UiInteractionRegistry& interactions)
 {
 	using namespace character_create_screen_detail;
-	int detailAgentIndex = selectedAgentIndex;
+	int detailAgentIndex = previewAgentIndex >= 0
+		? previewAgentIndex
+		: selectedAgentIndex;
 
 	CLAY({ .id = CLAY_ID("CharacterCreateAgentColumn"),
 	       .layout = {
@@ -672,13 +678,18 @@ void CharacterCreateScreen::BuildSelectAgent(ScreenContext & ctx,
 				const bool existingAgent =
 					index < static_cast<int>(ctx.lobby.characters.size());
 				bool hovered = false;
+				const bool selected = existingAgent && index == selectedAgentIndex;
+				const bool selectedVisual =
+					selected && (previewAgentIndex < 0 || previewAgentIndex == index);
 				ListButton(FromStd(id),
 				           FromStd(agentRows[static_cast<size_t>(index)]),
 				           action.c_str(),
 				           interactions,
-				           existingAgent && index == selectedAgentIndex,
+				           selected,
+				           selectedVisual,
 				           &hovered);
-				if(hovered && existingAgent){
+				const auto * snapshot = interactions.FindById(action);
+				if((hovered || (snapshot && snapshot->focused)) && existingAgent){
 					detailAgentIndex = index;
 				}
 			}
@@ -814,7 +825,10 @@ void CharacterCreateScreen::BuildSelectAgency(ScreenContext & ctx,
 {
 	(void)ctx;
 	using namespace character_create_screen_detail;
-	Uint8 detailAgency = selectedAgency;
+	const int initialDetailAgencyIndex = previewAgencyIndex >= 0
+		? previewAgencyIndex
+		: AgencyIndex(selectedAgency);
+	Uint8 detailAgency = AgencyByIndex(initialDetailAgencyIndex).agency;
 
 	CLAY({ .id = CLAY_ID("CharacterAgencyColumn"),
 	       .layout = {
@@ -847,13 +861,18 @@ void CharacterCreateScreen::BuildSelectAgency(ScreenContext & ctx,
 				const std::string id = std::string("CharacterAgencyRow") + std::to_string(i);
 				const std::string action = AgencyActionId(i);
 				bool hovered = false;
+				const bool selected = kAgencies[i].agency == selectedAgency;
+				const bool selectedVisual =
+					selected && (previewAgencyIndex < 0 || previewAgencyIndex == i);
 				ListButton(FromStd(id),
 				           FromCStr(kAgencies[i].displayName),
 				           action.c_str(),
 				           interactions,
-				           kAgencies[i].agency == selectedAgency,
+				           selected,
+				           selectedVisual,
 				           &hovered);
-				if(hovered){
+				const auto * row = interactions.FindById(action);
+				if(hovered || (row && row->focused)){
 					detailAgency = kAgencies[i].agency;
 				}
 			}
@@ -891,11 +910,13 @@ bool CharacterCreateScreen::HandleBack(ScreenContext & ctx)
 {
 	if(step == Step::SelectAgency){
 		step = Step::EnterAlias;
+		previewAgencyIndex = -1;
 		focusAliasRequested = true;
 		return true;
 	}
 	if(step == Step::EnterAlias){
 		step = Step::SelectAgent;
+		previewAgentIndex = -1;
 		return true;
 	}
 	if(!ctx.lobby.characters.empty()){
@@ -921,16 +942,29 @@ bool CharacterCreateScreen::HandleUiIntent(ScreenContext & ctx,
 		}
 		return false;
 	}
-	if(action.kind == silencer::ui::UiActionKind::Navigate ||
-	   action.kind == silencer::ui::UiActionKind::Select){
+	if(action.kind == silencer::ui::UiActionKind::Navigate){
+		int agentIndex = SuffixInt(action.id, kActionAgentPrefix);
+		if(step == Step::SelectAgent && agentIndex >= 0){
+			previewAgentIndex = agentIndex;
+			return true;
+		}
+		int agencyIndex = SuffixInt(action.id, kActionAgencyPrefix);
+		if(step == Step::SelectAgency && agencyIndex >= 0 && agencyIndex < 5){
+			previewAgencyIndex = agencyIndex;
+			return true;
+		}
+	}
+	if(action.kind == silencer::ui::UiActionKind::Select){
 		int agentIndex = SuffixInt(action.id, kActionAgentPrefix);
 		if(step == Step::SelectAgent && agentIndex >= 0){
 			selectedAgentIndex = agentIndex;
+			previewAgentIndex = agentIndex;
 			return true;
 		}
 		int agencyIndex = SuffixInt(action.id, kActionAgencyPrefix);
 		if(step == Step::SelectAgency && agencyIndex >= 0 && agencyIndex < 5){
 			selectedAgency = kAgencies[agencyIndex].agency;
+			previewAgencyIndex = agencyIndex;
 			return true;
 		}
 	}
@@ -951,6 +985,7 @@ bool CharacterCreateScreen::HandleUiIntent(ScreenContext & ctx,
 	int agentIndex = SuffixInt(action.id, kActionAgentPrefix);
 	if(agentIndex >= 0){
 		selectedAgentIndex = agentIndex;
+		previewAgentIndex = agentIndex;
 		SelectCurrentAgent(ctx);
 		return true;
 	}
@@ -961,6 +996,7 @@ bool CharacterCreateScreen::HandleUiIntent(ScreenContext & ctx,
 				CreateCurrentAgent(ctx);
 			}else{
 				selectedAgency = kAgencies[agencyIndex].agency;
+				previewAgencyIndex = agencyIndex;
 			}
 		}
 		return true;
@@ -1028,6 +1064,9 @@ void CharacterCreateScreen::RebuildAgentRows(ScreenContext & ctx)
 	if(selectedAgentIndex > maxIndex){
 		selectedAgentIndex = maxIndex;
 	}
+	if(previewAgentIndex > maxIndex){
+		previewAgentIndex = -1;
+	}
 }
 
 void CharacterCreateScreen::CopyAlias(const std::string& value)
@@ -1045,4 +1084,5 @@ void CharacterCreateScreen::AdvanceAliasStep(ScreenContext & ctx)
 		return;
 	}
 	step = Step::SelectAgency;
+	previewAgencyIndex = -1;
 }

@@ -536,9 +536,10 @@ void Button(Clay_String id,
 			bool hovered = ::Clay_Hovered() && !opts.disabled;
 			RegisterButtonWidget(stableLabel, opts, handle, clayId);
 			bool focused = !opts.disabled && IsButtonFocused(handle);
+			const bool selectedVisual = opts.selected && opts.selectedVisual;
 			ButtonVisualFrame visual = StepVisualState(
 				clayId.id,
-				!opts.disabled && (hovered || focused || opts.selected));
+				!opts.disabled && (hovered || focused || selectedVisual));
 			Uint16 spriteIndex = SpriteIndexForFrame(resolved, opts, visual.phase);
 			if(resolved.nineSlice){
 				auto * p = reinterpret_cast<silencer::clay_bridge::ButtonNineSlicePayload *>(payload);

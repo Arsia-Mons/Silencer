@@ -63,6 +63,7 @@ private:
 	std::vector<silencer::ui::UiControlCommand> controlCommands_;
 
 	bool havePointerPosition_ = false;
+	bool controlPointerActive_ = false;
 	float pointerX_ = 0.0f;
 	float pointerY_ = 0.0f;
 	bool pointerDown_ = false;

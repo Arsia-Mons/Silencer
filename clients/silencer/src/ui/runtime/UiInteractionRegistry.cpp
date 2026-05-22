@@ -271,10 +271,12 @@ UiInteractable* UiInteractionRegistry::FocusedInteractable() {
 	return nullptr;
 }
 
-void UiInteractionRegistry::SetFocus(const UiInteractable& widget) {
+void UiInteractionRegistry::SetFocus(const UiInteractable& widget,
+                                     FocusOrigin origin) {
 	focusedUid_ = widget.uid;
 	focusedKind_ = widget.kind;
 	focusedLabel_ = registry_detail::InteractableId(widget);
+	focusedOrigin_ = origin;
 	RefreshElementState();
 }
 
@@ -297,7 +299,7 @@ bool UiInteractionRegistry::FocusTextInputAt(int x, int y) {
 	for(auto it = interactables_.rbegin(); it != interactables_.rend(); ++it){
 		if(it->kind == UiInteractableKind::TextInput &&
 		   !it->inactive && registry_detail::PointIn(*it, x, y)){
-			SetFocus(*it);
+			SetFocus(*it, FocusOrigin::Text);
 			QueueAction(UiActionKind::Select, *it, it->value.c_str());
 			return true;
 		}
@@ -309,7 +311,7 @@ bool UiInteractionRegistry::FocusTextInputByUid(int uid) {
 	for(const auto& widget : interactables_){
 		if(widget.kind == UiInteractableKind::TextInput &&
 		   widget.uid == uid && !widget.inactive){
-			SetFocus(widget);
+			SetFocus(widget, FocusOrigin::Text);
 			QueueAction(UiActionKind::Select, widget, widget.value.c_str());
 			return true;
 		}
@@ -320,7 +322,9 @@ bool UiInteractionRegistry::FocusTextInputByUid(int uid) {
 bool UiInteractionRegistry::FocusInteractableById(const std::string& id) {
 	const UiInteractable * widget = FindInteractableById(id);
 	if(!widget || !UiInteractableIsInteractive(*widget)) return false;
-	SetFocus(*widget);
+	SetFocus(*widget, widget->kind == UiInteractableKind::TextInput
+	                  ? FocusOrigin::Text
+	                  : FocusOrigin::Navigation);
 	return true;
 }
 
@@ -343,6 +347,7 @@ void UiInteractionRegistry::ClearFocus() {
 	focusedUid_ = -1;
 	focusedKind_ = UiInteractableKind::Button;
 	focusedLabel_.clear();
+	focusedOrigin_ = FocusOrigin::None;
 	RefreshElementState();
 }
 
@@ -392,7 +397,9 @@ bool UiInteractionRegistry::CancelFocused() {
 bool UiInteractionRegistry::PressAt(int x, int y) {
 	for(auto it = interactables_.rbegin(); it != interactables_.rend(); ++it){
 		if(UiInteractableIsInteractive(*it) && registry_detail::PointIn(*it, x, y)){
-			SetFocus(*it);
+			SetFocus(*it, it->kind == UiInteractableKind::TextInput
+			              ? FocusOrigin::Text
+			              : FocusOrigin::Pointer);
 			switch(it->kind){
 				case UiInteractableKind::Button:
 				case UiInteractableKind::Toggle:
@@ -425,7 +432,7 @@ bool UiInteractionRegistry::FocusNextInteractive() {
 		}
 	}
 	int next = (current + 1) % static_cast<int>(items.size());
-	SetFocus(*items[next]);
+	SetFocus(*items[next], FocusOrigin::Navigation);
 	QueueAction(UiActionKind::Navigate, *items[next], "focus_next");
 	return true;
 }
@@ -445,7 +452,7 @@ bool UiInteractionRegistry::FocusPreviousInteractive() {
 	}
 	int next = current - 1;
 	if(next < 0) next = static_cast<int>(items.size()) - 1;
-	SetFocus(*items[next]);
+	SetFocus(*items[next], FocusOrigin::Navigation);
 	QueueAction(UiActionKind::Navigate, *items[next], "focus_previous");
 	return true;
 }
@@ -475,7 +482,7 @@ bool UiInteractionRegistry::FocusDirectional(UiNavAction action) {
 		}
 	}
 	if(!best) return false;
-	SetFocus(*best);
+	SetFocus(*best, FocusOrigin::Navigation);
 	switch(action){
 		case UiNavAction::Up: QueueAction(UiActionKind::Navigate, *best, "up"); break;
 		case UiNavAction::Down: QueueAction(UiActionKind::Navigate, *best, "down"); break;
@@ -496,18 +503,33 @@ bool UiInteractionRegistry::FocusHovered(float x, float y) {
 	hoverSampleX_ = x;
 	hoverSampleY_ = y;
 
+	const UiInteractable * focused = FocusedInteractable();
+	if(focused && focused->kind == UiInteractableKind::TextInput && !focused->inactive){
+		return false;
+	}
+
 	const int ix = static_cast<int>(x);
 	const int iy = static_cast<int>(y);
 	for(auto it = interactables_.rbegin(); it != interactables_.rend(); ++it){
 		if(it->kind == UiInteractableKind::TextInput) continue;
 		if(!UiInteractableIsInteractive(*it)) continue;
 		if(!registry_detail::PointIn(*it, ix, iy)) continue;
-		if(MatchesFocus(*it)) return true;  // already the focused element
-		SetFocus(*it);
+		if(MatchesFocus(*it)){
+			if(focusedOrigin_ != FocusOrigin::Pointer){
+				SetFocus(*it, FocusOrigin::Pointer);
+			}
+			return true;
+		}
+		SetFocus(*it, FocusOrigin::Pointer);
 		QueueAction(UiActionKind::Navigate, *it, "hover");
 		return true;
 	}
-	// Over empty space or a text field: leave the existing focus in place.
+	if(focusedOrigin_ == FocusOrigin::Pointer &&
+	   (focusedUid_ >= 0 || !focusedLabel_.empty())){
+		ClearFocus();
+		return true;
+	}
+	// Over empty space or a text field: leave keyboard/gamepad/text focus in place.
 	return false;
 }
 

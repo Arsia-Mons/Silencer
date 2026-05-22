@@ -32,6 +32,8 @@ struct ButtonOpts {
 	ButtonSize size = ButtonSize::Md;
 	bool disabled = false;
 	bool selected = false;
+	// Selection remains semantic metadata even when its active visual is suppressed.
+	bool selectedVisual = true;
 	bool alignLeft = false;
 	TextEffect textEffect = TextEffect::Default();
 	int minWidth = 0;

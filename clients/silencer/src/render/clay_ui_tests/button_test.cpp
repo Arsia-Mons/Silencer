@@ -291,6 +291,32 @@ bool RunButtonCheck(::Game & game, ButtonCheckResult & out) {
 	                                        nullptr,
 	                                        kVisualStepSeconds);
 
+	const std::string legacySelectedClayId = "ButtonCheckLegacySelectedSuppressed";
+	const std::string legacySelectedActionId = "test.button.legacy_selected";
+	ButtonOpts legacySelectedOpts{ .variant = ButtonVariant::LegacyRow,
+	                               .size = ButtonSize::Auto,
+	                               .selected = true,
+	                               .selectedVisual = false };
+	silencer::ui::UiInteractionRegistry legacySelectedInteractions;
+	bool legacySelectedWasDown = false;
+	ButtonProbe legacySelectedProbe;
+	for(int i = 0; i < 5; ++i){
+		legacySelectedProbe = runOneFrame(legacySelectedInteractions,
+		                                  legacySelectedWasDown,
+		                                  legacySelectedClayId,
+		                                  legacySelectedActionId,
+		                                  legacySelectedOpts,
+		                                  -1.0f,
+		                                  -1.0f,
+		                                  false);
+	}
+	const auto * legacySelectedWidget =
+		FindButton(legacySelectedInteractions, legacySelectedActionId.c_str());
+	out.legacySelectedSuppressedSpriteIndex = legacySelectedProbe.spriteIndex;
+	out.legacySelectedSuppressedBrightness = legacySelectedProbe.brightness;
+	out.legacySelectedSuppressedMetadata =
+		legacySelectedWidget && legacySelectedWidget->selected ? 1 : 0;
+
 	auto probeButton = [&](const char * id,
 	                       Clay_String label,
 	                       ButtonOpts opts,
@@ -480,7 +506,10 @@ bool RunButtonCheck(::Game & game, ButtonCheckResult & out) {
 	   out.ovalWallClockPartialSpriteIndex != 7 ||
 	   out.ovalWallClockPartialBrightness != 128 ||
 	   out.ovalWallClockNextSpriteIndex != 8 ||
-	   out.ovalWallClockNextBrightness != 130){
+	   out.ovalWallClockNextBrightness != 130 ||
+	   out.legacySelectedSuppressedSpriteIndex != 2 ||
+	   out.legacySelectedSuppressedBrightness != 128 ||
+	   out.legacySelectedSuppressedMetadata != 1){
 		return false;
 	}
 	if(ovalMdLongWidth != 196 ||

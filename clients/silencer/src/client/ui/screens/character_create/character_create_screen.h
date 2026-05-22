@@ -41,9 +41,11 @@ private:
 
 	Step step = Step::SelectAgent;
 	int selectedAgentIndex = 0;
+	int previewAgentIndex = -1;
 	Uint16 agentScroll = 0;
 	int agentScrollDelta = 0;
 	Uint8 selectedAgency = 0;
+	int previewAgencyIndex = -1;
 	size_t characterCountOnEntry = 0;
 	bool waitingForCreate = false;
 	bool focusAliasRequested = false;

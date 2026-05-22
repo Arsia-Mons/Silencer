@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Mouse hover and keyboard navigation must share ONE focus highlight. Moving
-# the mouse over a different button moves the single focused state to it; the
-# previously keyboard-focused button must stop being focused.
+# Mouse hover and keyboard navigation must share one focus highlight while the
+# pointer is over a button. Moving the pointer away clears pointer-origin focus
+# without restoring the earlier keyboard-focused button.
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 source "$SCRIPT_DIR/lib.sh"
@@ -24,6 +24,7 @@ cli --port "$PORT" wait_frames --n 3 >/dev/null
 OUT_DIR="$(mktemp -d)"
 KB="$OUT_DIR/inspect-keyboard.json"
 HOVER="$OUT_DIR/inspect-hover.json"
+HOVER_OUT="$OUT_DIR/inspect-hover-out.json"
 
 # Keyboard-focus the first menu button (Tutorial).
 cli --port "$PORT" key --key down >/dev/null
@@ -35,9 +36,16 @@ cli --port "$PORT" hover_at --x 448 --y 304 >/dev/null
 cli --port "$PORT" wait_frames --n 2 >/dev/null
 cli --port "$PORT" inspect > "$HOVER"
 
+# Moving the pointer off interactables clears pointer-origin focus; keyboard
+# focus remains durable only until hover has explicitly taken pointer focus.
+cli --port "$PORT" hover_at --x 20 --y 20 >/dev/null
+cli --port "$PORT" wait_frames --n 2 >/dev/null
+cli --port "$PORT" inspect > "$HOVER_OUT"
+
 bun -e '
 const kb = JSON.parse(await Bun.file(process.argv[1]).text()).widgets ?? [];
 const hover = JSON.parse(await Bun.file(process.argv[2]).text()).widgets ?? [];
+const hoverOut = JSON.parse(await Bun.file(process.argv[3]).text()).widgets ?? [];
 const buttons = (ws) => ws.filter((w) => w.source === "clay" && w.kind === "button");
 const focused = (ws) => buttons(ws).filter((w) => w.focused === true);
 
@@ -60,6 +68,12 @@ if (hoverFocused[0].label !== "Options") {
   console.error(`hover did not move focus: expected "Options" focused, got "${hoverFocused[0].label}"`);
   process.exit(1);
 }
-' "$KB" "$HOVER"
+
+const hoverOutFocused = focused(hoverOut);
+if (hoverOutFocused.length !== 0) {
+  console.error(`expected no focused button after hover-out, got ${hoverOutFocused.length}: ${JSON.stringify(buttons(hoverOut).map((b) => ({ label: b.label, focused: b.focused })))}`);
+  process.exit(1);
+}
+' "$KB" "$HOVER" "$HOVER_OUT"
 
 echo "PASS 16_focus_follows_hover ($OUT_DIR)"
