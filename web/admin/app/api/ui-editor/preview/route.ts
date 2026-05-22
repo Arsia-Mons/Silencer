@@ -19,15 +19,7 @@ type ControlReply = {
 const CONTROL_HOST = process.env.SILENCER_CONTROL_HOST ?? '127.0.0.1';
 const CONTROL_PORT = Number.parseInt(process.env.SILENCER_CONTROL_PORT ?? '5170', 10);
 const CONTROL_TIMEOUT_MS = Number.parseInt(process.env.SILENCER_CONTROL_TIMEOUT_MS ?? '5000', 10);
-
-let latestPreviewToken = '';
 let previewQueue: Promise<unknown> = Promise.resolve();
-
-class StalePreviewError extends Error {
-  constructor() {
-    super('stale preview request');
-  }
-}
 
 function controlRequest(op: string, args: Record<string, unknown> = {}): Promise<unknown> {
   return new Promise((resolve, reject) => {
@@ -84,30 +76,20 @@ function controlRequest(op: string, args: Record<string, unknown> = {}): Promise
   });
 }
 
-function assertFreshPreview(token: string) {
-  if (token !== latestPreviewToken) throw new StalePreviewError();
-}
-
-async function renderPreview(token: string, document: unknown) {
+async function renderPreview(document: unknown) {
   let tempDir: string | null = null;
   try {
-    assertFreshPreview(token);
-    const preview = await controlRequest('ui_editor_preview', { document });
-    assertFreshPreview(token);
-    await controlRequest('wait_frames', { n: 2 });
-    assertFreshPreview(token);
-    const inspect = await controlRequest('inspect');
-    assertFreshPreview(token);
-
     tempDir = await mkdtemp(join(tmpdir(), 'silencer-ui-preview-'));
     const screenshotPath = join(tempDir, `${randomUUID()}.png`);
-    await controlRequest('screenshot', { out: screenshotPath });
-    assertFreshPreview(token);
+    const capture = await controlRequest('ui_editor_preview_capture', {
+      document,
+      out: screenshotPath,
+    }) as { preview?: unknown; inspect?: unknown };
     const png = await readFile(screenshotPath);
 
     return {
-      preview,
-      inspect,
+      preview: capture.preview ?? {},
+      inspect: capture.inspect ?? {},
       screenshot: `data:image/png;base64,${png.toString('base64')}`,
     };
   } finally {
@@ -115,10 +97,10 @@ async function renderPreview(token: string, document: unknown) {
   }
 }
 
-function enqueuePreview(token: string, document: unknown) {
+function enqueuePreview(document: unknown) {
   const run = previewQueue
     .catch(() => undefined)
-    .then(() => renderPreview(token, document));
+    .then(() => renderPreview(document));
   previewQueue = run.catch(() => undefined);
   return run;
 }
@@ -127,19 +109,14 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     const document = validateUiDocument(body.document);
-    const token = randomUUID();
-    latestPreviewToken = token;
 
-    const result = await enqueuePreview(token, document);
+    const result = await enqueuePreview(document);
 
     return NextResponse.json({
       ok: true,
       ...result,
     });
   } catch (error) {
-    if (error instanceof StalePreviewError) {
-      return NextResponse.json({ ok: false, stale: true }, { status: 409 });
-    }
     return NextResponse.json({
       ok: false,
       error: error instanceof Error ? error.message : String(error),

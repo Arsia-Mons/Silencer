@@ -19,6 +19,7 @@
 #include "screen_context.h"
 #include <cstring>
 #include <cstdio>
+#include <cstdlib>
 #include <fstream>
 #include <memory>
 #include <utility>
@@ -35,6 +36,16 @@ namespace ControlDispatch {
 namespace {
 std::string g_controlPasswordModalValue;
 bool g_controlPasswordModalSubmitted = false;
+}
+
+static bool WriteTempPath(char * buffer, size_t bufferSize, const char * prefix, int frame) {
+	if(!buffer || bufferSize == 0) return false;
+#ifdef _WIN32
+	const char* tmp = getenv("TEMP"); if(!tmp) tmp = ".";
+	return snprintf(buffer, bufferSize, "%s\\%s-%d.png", tmp, prefix, frame) > 0;
+#else
+	return snprintf(buffer, bufferSize, "/tmp/%s-%d.png", prefix, frame) > 0;
+#endif
 }
 
 ControlCommand::Phase PhaseFor(const std::string& op) {
@@ -189,6 +200,79 @@ static nlohmann::json WorldSummaryToJson(const WorldSummary& summary){
 	r["message_time"] = summary.messageTime;
 	r["topmessage_text"] = summary.topMessageText;
 	r["topmessage_progress"] = summary.topMessageProgress;
+	return r;
+}
+
+static nlohmann::json InspectInteractionsToJson(
+	const silencer::ui::UiInteractionRegistry& interactions) {
+	nlohmann::json widgets = nlohmann::json::array();
+	for(const auto & cw : interactions.Interactables()){
+		nlohmann::json w;
+		w["source"] = "clay";
+		if(!cw.id.empty()) w["id"] = cw.id;
+		w["x"] = cw.x; w["y"] = cw.y;
+		w["w"] = cw.w; w["h"] = cw.h;
+		if(silencer::ui::UiInteractableLabel(cw))
+			w["label"] = silencer::ui::UiInteractableLabel(cw);
+		if(cw.uid >= 0) w["uid"] = cw.uid;
+		using K = silencer::ui::UiInteractableKind;
+		switch(cw.kind){
+			case K::Button:    w["kind"] = "button"; break;
+			case K::Toggle:
+				w["kind"] = "toggle";
+				w["selected"] = cw.selected;
+				break;
+			case K::TextInput:
+				w["kind"] = "textinput";
+				w["password"] = cw.isPassword;
+				w["text"] = cw.isPassword
+					? std::string(cw.value.size(), '*')
+					: cw.value;
+				w["maxchars"] = cw.maxLength;
+				break;
+			case K::ListRow:
+				w["kind"] = "listrow";
+				w["row_index"] = cw.index;
+				w["selected"] = cw.selected;
+				break;
+		}
+		widgets.push_back(std::move(w));
+	}
+	nlohmann::json elements = nlohmann::json::array();
+	for(const auto & element : interactions.Elements()){
+		if(!element.id.empty() && interactions.FindInteractableById(element.id)){
+			continue;
+		}
+		nlohmann::json e;
+		e["source"] = "clay";
+		if(!element.id.empty()) e["id"] = element.id;
+		if(!element.label.empty()) e["label"] = element.label;
+		if(!element.value.empty()) e["value"] = element.value;
+		e["x"] = element.bounds.x;
+		e["y"] = element.bounds.y;
+		e["w"] = element.bounds.width;
+		e["h"] = element.bounds.height;
+		e["enabled"] = element.enabled;
+		e["focused"] = element.focused;
+		e["selected"] = element.selected;
+		using EK = silencer::ui::UiElementKind;
+		switch(element.kind){
+			case EK::Container: e["kind"] = "container"; break;
+			case EK::Button: e["kind"] = "button"; break;
+			case EK::Text: e["kind"] = "text"; break;
+			case EK::TextField: e["kind"] = "textfield"; break;
+			case EK::ListItem: e["kind"] = "listitem"; break;
+			case EK::Tab: e["kind"] = "tab"; break;
+			case EK::Slider: e["kind"] = "slider"; break;
+			case EK::Progress: e["kind"] = "progress"; break;
+		}
+		elements.push_back(std::move(e));
+	}
+
+	nlohmann::json r;
+	r["widgets"] = widgets;
+	r["elements"] = elements;
+	r["interface_id"] = 0;
 	return r;
 }
 
@@ -520,79 +604,91 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 		cmd.reply->set_value(OkResult(cmd.id, r));
 		return;
 	}
-	if(cmd.op == "inspect"){
-		nlohmann::json widgets = nlohmann::json::array();
-		for(const auto & cw : game.UiInteractions().Interactables()){
-			nlohmann::json w;
-			w["source"] = "clay";
-			if(!cw.id.empty()) w["id"] = cw.id;
-			w["x"] = cw.x; w["y"] = cw.y;
-			w["w"] = cw.w; w["h"] = cw.h;
-			if(silencer::ui::UiInteractableLabel(cw))
-				w["label"] = silencer::ui::UiInteractableLabel(cw);
-			if(cw.uid >= 0) w["uid"] = cw.uid;
-			using K = silencer::ui::UiInteractableKind;
-			switch(cw.kind){
-				case K::Button:    w["kind"] = "button"; break;
-				case K::Toggle:
-					w["kind"] = "toggle";
-					w["selected"] = cw.selected;
-					break;
-				case K::TextInput:
-					w["kind"] = "textinput";
-					w["password"] = cw.isPassword;
-					w["text"] = cw.isPassword
-						? std::string(cw.value.size(), '*')
-						: cw.value;
-					w["maxchars"] = cw.maxLength;
-					break;
-				case K::ListRow:
-					w["kind"] = "listrow";
-					w["row_index"] = cw.index;
-					w["selected"] = cw.selected;
-					break;
-			}
-			widgets.push_back(std::move(w));
+	if(cmd.op == "ui_editor_preview_capture"){
+		nlohmann::json documentJson;
+		if(!cmd.args.contains("document")){
+			cmd.reply->set_value(Err(cmd.id, "BAD_REQUEST",
+				"ui_editor_preview_capture requires args.document"));
+			return;
 		}
-		nlohmann::json elements = nlohmann::json::array();
-		for(const auto & element : game.UiInteractions().Elements()){
-			if(!element.id.empty() &&
-			   game.UiInteractions().FindInteractableById(element.id)){
-				continue;
+		try{
+			const nlohmann::json& raw = cmd.args["document"];
+			if(raw.is_string()){
+				documentJson = nlohmann::json::parse(raw.get<std::string>());
+			}else{
+				documentJson = raw;
 			}
-			nlohmann::json e;
-			e["source"] = "clay";
-			if(!element.id.empty()) e["id"] = element.id;
-			if(!element.label.empty()) e["label"] = element.label;
-			if(!element.value.empty()) e["value"] = element.value;
-			e["x"] = element.bounds.x;
-			e["y"] = element.bounds.y;
-			e["w"] = element.bounds.width;
-			e["h"] = element.bounds.height;
-			e["enabled"] = element.enabled;
-			e["focused"] = element.focused;
-			e["selected"] = element.selected;
-			using EK = silencer::ui::UiElementKind;
-			switch(element.kind){
-				case EK::Container: e["kind"] = "container"; break;
-				case EK::Button: e["kind"] = "button"; break;
-				case EK::Text: e["kind"] = "text"; break;
-				case EK::TextField: e["kind"] = "textfield"; break;
-				case EK::ListItem: e["kind"] = "listitem"; break;
-				case EK::Tab: e["kind"] = "tab"; break;
-				case EK::Slider: e["kind"] = "slider"; break;
-				case EK::Progress: e["kind"] = "progress"; break;
-			}
-			elements.push_back(std::move(e));
+		}catch(const std::exception& ex){
+			cmd.reply->set_value(Err(cmd.id, "BAD_REQUEST",
+				std::string("invalid ui editor document json: ") + ex.what()));
+			return;
 		}
-		if(widgets.empty() && elements.empty()){
+
+		silencer::ui::UiEditorPreviewDocument document;
+		std::string error;
+		if(!silencer::net::ParseUiEditorPreviewDocument(documentJson, document, error)){
+			cmd.reply->set_value(Err(cmd.id, "BAD_REQUEST", error));
+			return;
+		}
+		if(!game.ResizeRenderSurface(document.viewportWidth, document.viewportHeight)){
+			cmd.reply->set_value(Err(cmd.id, "INTERNAL", "resize failed for ui editor preview"));
+			return;
+		}
+
+		const std::string surface = document.surface;
+		const int width = document.viewportWidth;
+		const int height = document.viewportHeight;
+		Screen * top = game.GetTopScreen();
+		auto * previewScreen =
+			dynamic_cast<silencer::client_ui::UiEditorPreviewScreen *>(top);
+		if(previewScreen){
+			previewScreen->SetDocument(std::move(document));
+		}else{
+			game.ReplaceScreen(std::make_unique<silencer::client_ui::UiEditorPreviewScreen>(
+				std::move(document)));
+		}
+
+		game.GetScreenBuffer().Clear(0);
+		game.RenderClientUiFrameWithoutDispatch(0.0f);
+		nlohmann::json inspect = InspectInteractionsToJson(game.UiInteractions());
+		if(inspect["widgets"].empty() && inspect["elements"].empty()){
 			cmd.reply->set_value(Err(cmd.id, "WRONG_STATE", "no clay widgets"));
 			return;
 		}
+
+		std::string out = cmd.args.value("out", std::string());
+		if(out.empty()){
+			char buf[256];
+			if(!WriteTempPath(buf, sizeof(buf), "silencer-ui-preview", game.GetFrameCount())){
+				cmd.reply->set_value(Err(cmd.id, "INTERNAL", "failed to create preview path"));
+				return;
+			}
+			out = buf;
+		}
+		bool ok = game.GetRenderer().CapturePNG(game.GetScreenBuffer(),
+			game.GetPaletteColors(), out.c_str());
+		if(!ok){
+			cmd.reply->set_value(Err(cmd.id, "INTERNAL", "stbi_write_png failed: " + out));
+			return;
+		}
+
+		nlohmann::json previewJson;
+		previewJson["surface"] = surface;
+		previewJson["width"] = width;
+		previewJson["height"] = height;
 		nlohmann::json r;
-		r["widgets"] = widgets;
-		r["elements"] = elements;
-		r["interface_id"] = 0;
+		r["preview"] = std::move(previewJson);
+		r["inspect"] = std::move(inspect);
+		r["screenshot"] = out;
+		cmd.reply->set_value(OkResult(cmd.id, r));
+		return;
+	}
+	if(cmd.op == "inspect"){
+		nlohmann::json r = InspectInteractionsToJson(game.UiInteractions());
+		if(r["widgets"].empty() && r["elements"].empty()){
+			cmd.reply->set_value(Err(cmd.id, "WRONG_STATE", "no clay widgets"));
+			return;
+		}
 		cmd.reply->set_value(OkResult(cmd.id, r));
 		return;
 	}
@@ -1034,12 +1130,10 @@ void HandlePostRender(Game& game, ControlCommand& cmd) {
 		std::string out = cmd.args.value("out", std::string());
 		if(out.empty()){
 			char buf[256];
-		#ifdef _WIN32
-			const char* tmp = getenv("TEMP"); if(!tmp) tmp = ".";
-			snprintf(buf, sizeof(buf), "%s\\silencer-%d.png", tmp, game.GetFrameCount());
-		#else
-			snprintf(buf, sizeof(buf), "/tmp/silencer-%d.png", game.GetFrameCount());
-		#endif
+			if(!WriteTempPath(buf, sizeof(buf), "silencer", game.GetFrameCount())){
+				cmd.reply->set_value(Err(cmd.id, "INTERNAL", "failed to create screenshot path"));
+				return;
+			}
 			out = buf;
 		}
 		bool ok = game.GetRenderer().CapturePNG(game.GetScreenBuffer(),

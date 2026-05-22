@@ -247,6 +247,8 @@ export function validateUiDocument(value: unknown): UiDocument {
   }
   if (!candidate.root || typeof candidate.root !== 'object') throw new Error('Document root is missing.');
   if (!candidate.surface || typeof candidate.surface !== 'string') throw new Error('Surface name is missing.');
+  if (!candidate.viewport || typeof candidate.viewport !== 'object') throw new Error('Document viewport is missing.');
+  validateViewport(candidate.viewport);
   if (candidate.root.kind !== 'screen') throw new Error('Document root must be a screen node.');
   validateNode(candidate.root, new Set<string>());
   return candidate as UiDocument;
@@ -371,6 +373,12 @@ function validateNode(node: UiNode, seenIds: Set<string>): void {
   if (!node.style || typeof node.style !== 'object') throw new Error(`Node ${node.id} style is missing.`);
   validateSize(node, 'width');
   validateSize(node, 'height');
+  validateNumber(node, 'padding', 0, 512);
+  validateNumber(node, 'gap', 0, 512);
+  validateNumber(node, 'radius', 0, 64);
+  validateColor(node, 'background');
+  validateColor(node, 'border');
+  validateColor(node, 'textColor');
   validateEnum(node, 'direction', ['row', 'column']);
   validateEnum(node, 'align', ['start', 'center', 'end']);
   validateEnum(node, 'justify', ['start', 'center', 'end']);
@@ -382,6 +390,31 @@ function validateNode(node: UiNode, seenIds: Set<string>): void {
     throw new Error(`Node ${node.id} cannot have children.`);
   }
   for (const child of node.children ?? []) validateNode(child, seenIds);
+}
+
+function validateViewport(viewport: UiDocument['viewport']): void {
+  if (!Number.isFinite(viewport.width) || viewport.width < 160 || viewport.width > 4096) {
+    throw new Error('Document viewport width is invalid.');
+  }
+  if (!Number.isFinite(viewport.height) || viewport.height < 160 || viewport.height > 4096) {
+    throw new Error('Document viewport height is invalid.');
+  }
+}
+
+function validateNumber(node: UiNode, key: 'padding' | 'gap' | 'radius', min: number, max: number): void {
+  const value = node.style[key];
+  if (value === undefined) return;
+  if (!Number.isFinite(value) || value < min || value > max) {
+    throw new Error(`Node ${node.id} has invalid ${key}.`);
+  }
+}
+
+function validateColor(node: UiNode, key: 'background' | 'border' | 'textColor'): void {
+  const value = node.style[key];
+  if (value === undefined) return;
+  if (typeof value !== 'string' || !/^#[0-9a-f]{6}$/i.test(value)) {
+    throw new Error(`Node ${node.id} has invalid ${key}.`);
+  }
 }
 
 function validateEnum<T extends string>(node: UiNode, key: 'direction' | 'align' | 'justify' | 'font', values: T[]): void {
@@ -406,8 +439,14 @@ function validateSize(node: UiNode, key: 'width' | 'height'): void {
   if (!size || (size.mode !== 'fit' && size.mode !== 'grow' && size.mode !== 'fixed')) {
     throw new Error(`Node ${node.id} has invalid ${key} sizing.`);
   }
-  if (size.mode === 'fixed' && typeof size.value !== 'number') {
-    throw new Error(`Node ${node.id} fixed ${key} sizing needs a value.`);
+  if (size.mode === 'fixed') {
+    const value = size.value;
+    if (typeof value !== 'number') {
+      throw new Error(`Node ${node.id} fixed ${key} sizing needs a value.`);
+    }
+    if (!Number.isFinite(value) || value < 0 || value > 4096) {
+      throw new Error(`Node ${node.id} has invalid fixed ${key} sizing.`);
+    }
   }
 }
 

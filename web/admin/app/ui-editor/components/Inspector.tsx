@@ -105,6 +105,11 @@ export function Inspector({ node, parent, isRoot, onPatch, onStyle, onDelete, on
 
 function StyleInspector({ node, onStyle }: { node: UiNode; onStyle: (style: Partial<UiStyle>) => void }) {
   const style = node.style;
+  const supportsBoxStyle = canHaveChildren(node.kind) || node.kind === 'text' || node.kind === 'spacer';
+  const supportsFont = node.kind !== 'spacer';
+  const supportsTextColor = canHaveChildren(node.kind) || node.kind === 'text';
+  const supportsTextPalette = node.kind === 'button' || node.kind === 'text' || canHaveChildren(node.kind);
+  const supportsRadius = canHaveChildren(node.kind);
   return (
     <div className="space-y-4">
       <div className="text-xs tracking-widest text-game-primary">LAYOUT</div>
@@ -138,36 +143,52 @@ function StyleInspector({ node, onStyle }: { node: UiNode; onStyle: (style: Part
         <Field label="PADDING">
           <NumberInput value={style.padding ?? 0} min={0} max={96} onChange={padding => onStyle({ padding })} />
         </Field>
-        <Field label="RADIUS">
-          <NumberInput value={style.radius ?? 0} min={0} max={8} onChange={radius => onStyle({ radius })} />
-        </Field>
+        {supportsRadius && (
+          <Field label="RADIUS">
+            <NumberInput value={style.radius ?? 0} min={0} max={8} onChange={radius => onStyle({ radius })} />
+          </Field>
+        )}
       </div>
 
       <div className="text-xs tracking-widest text-game-primary">STYLE</div>
       <div className="grid grid-cols-2 gap-3">
-        <Field label="BACKGROUND">
-          <ColorInput value={style.background ?? '#000000'} onChange={background => onStyle({ background })} />
-        </Field>
-        <Field label="BORDER">
-          <ColorInput value={style.border ?? '#000000'} onChange={border => onStyle({ border })} />
-        </Field>
-        <Field label="TEXT">
-          <ColorInput value={style.textColor ?? '#d1fad7'} onChange={textColor => onStyle({ textColor })} />
-        </Field>
-        <Field label="FONT">
-          <Select value={style.font ?? 'ui'} options={FONTS} onChange={value => onStyle({ font: value as UiFont })} />
-        </Field>
+        {supportsBoxStyle && (
+          <>
+            <Field label="BACKGROUND">
+              <ColorInput value={style.background ?? '#000000'} onChange={background => onStyle({ background })} />
+            </Field>
+            <Field label="BORDER">
+              <ColorInput value={style.border ?? '#000000'} onChange={border => onStyle({ border })} />
+            </Field>
+          </>
+        )}
+        {supportsTextColor && (
+          <Field label="TEXT">
+            <ColorInput value={style.textColor ?? '#d1fad7'} onChange={textColor => onStyle({ textColor })} />
+          </Field>
+        )}
+        {supportsFont && (
+          <Field label="FONT">
+            <Select value={style.font ?? 'ui'} options={FONTS} onChange={value => onStyle({ font: value as UiFont })} />
+          </Field>
+        )}
       </div>
       <div className="grid grid-cols-3 gap-3">
-        <Field label="BG IDX">
-          <NumberInput value={style.backgroundPalette ?? -1} min={-1} max={255} onChange={backgroundPalette => onStyle({ backgroundPalette })} />
-        </Field>
-        <Field label="BORDER IDX">
-          <NumberInput value={style.borderPalette ?? -1} min={-1} max={255} onChange={borderPalette => onStyle({ borderPalette })} />
-        </Field>
-        <Field label="TEXT IDX">
-          <NumberInput value={style.textPalette ?? 0} min={0} max={255} onChange={textPalette => onStyle({ textPalette })} />
-        </Field>
+        {supportsBoxStyle && (
+          <>
+            <Field label="BG IDX">
+              <NumberInput value={style.backgroundPalette ?? -1} min={-1} max={255} onChange={backgroundPalette => onStyle({ backgroundPalette })} />
+            </Field>
+            <Field label="BORDER IDX">
+              <NumberInput value={style.borderPalette ?? -1} min={-1} max={255} onChange={borderPalette => onStyle({ borderPalette })} />
+            </Field>
+          </>
+        )}
+        {supportsTextPalette && (
+          <Field label="TEXT IDX">
+            <NumberInput value={style.textPalette ?? 0} min={0} max={255} onChange={textPalette => onStyle({ textPalette })} />
+          </Field>
+        )}
       </div>
     </div>
   );

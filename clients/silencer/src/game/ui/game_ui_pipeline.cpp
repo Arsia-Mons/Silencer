@@ -182,6 +182,18 @@ textInputFocused = nowFocused;
 }
 }
 
+void GameUiPipeline::RenderClientUiFrameWithoutDispatch(Surface& surface, float frametime) {
+if(!clientUi.HasScreens() && !game.world.map.loaded){
+return;
+}
+
+PrepareClientUiFrame(surface);
+BeginPreparedClientUiFrame();
+BuildVisibleClientUi(surface, frametime);
+Clay_RenderCommandArray cmds = EndClientUiFrame();
+silencer::clay_bridge::Render(game, &surface, cmds);
+}
+
 void GameUiPipeline::ResetUiFrameDeltas() {
 clientUiInput.EndFrame();
 preparedUiInput.pointer.wheelX = 0.0f;

@@ -41,9 +41,9 @@ content fields such as `text`, `placeholder`, and `action`. Container nodes
 editor document into real Silencer UI primitives inside the existing
 `ClientUi`/Clay frame. The admin route at
 `web/admin/app/api/ui-editor/preview/route.ts` sends documents to the client
-with the `ui_editor_preview` control-socket op, waits for the frame to render,
-captures a real client screenshot, and returns the screenshot plus `inspect`
-metadata.
+with the `ui_editor_preview_capture` control-socket op. That single game-thread
+operation validates the document, renders the preview, captures a real client
+screenshot, and returns the screenshot plus `inspect` metadata.
 
 The browser preview is only a fallback when no client is listening on
 `SILENCER_CONTROL_HOST` / `SILENCER_CONTROL_PORT`. The client screenshot is the

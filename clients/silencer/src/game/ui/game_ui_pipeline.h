@@ -25,6 +25,7 @@ Clay_RenderCommandArray EndClientUiFrame();
 void BuildVisibleClientUi(Surface & surface, float frametime);
 void DrawInGameWorldInsets(Surface & surface, float frametime);
 void RenderClientUiFrame(Surface & surface, float frametime);
+void RenderClientUiFrameWithoutDispatch(Surface & surface, float frametime);
 void ResetUiFrameDeltas();
 bool HasInputTarget();
 void Push(std::unique_ptr<Screen> s);

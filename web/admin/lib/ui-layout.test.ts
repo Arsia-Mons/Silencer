@@ -63,4 +63,14 @@ describe('ui-layout model', () => {
 
     expect(() => validateUiDocument(imported)).toThrow('Node main-menu-root has invalid justify.');
   });
+
+  test('rejects imported documents with missing or invalid viewport', () => {
+    const missing = JSON.parse(JSON.stringify(createDefaultUiDocument()));
+    delete missing.viewport;
+    expect(() => validateUiDocument(missing)).toThrow('Document viewport is missing.');
+
+    const invalid = JSON.parse(JSON.stringify(createDefaultUiDocument()));
+    invalid.viewport.width = Number.NaN;
+    expect(() => validateUiDocument(invalid)).toThrow('Document viewport width is invalid.');
+  });
 });

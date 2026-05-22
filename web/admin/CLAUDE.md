@@ -46,10 +46,10 @@ directly). If you need to bake an explicit URL in, pass it as a
   scaffold output, and a real client preview returned by
   `app/api/ui-editor/preview/route.ts`.
 - `app/api/ui-editor/preview/route.ts` — talks to the Silencer control socket
-  (`SILENCER_CONTROL_HOST` / `SILENCER_CONTROL_PORT`), sends
-  `ui_editor_preview`, waits for render, captures a screenshot, and returns
-  client `inspect` bounds for editor overlays. Browser layout preview is only
-  fallback when no client is running.
+  (`SILENCER_CONTROL_HOST` / `SILENCER_CONTROL_PORT`), sends one
+  `ui_editor_preview_capture` request, and returns the client screenshot plus
+  `inspect` bounds for editor overlays. Browser layout preview is only fallback
+  when no client is running.
 - `app/api/behaviortrees/[...path]/route.ts` — Next.js proxy that forwards
   `GET/PUT/DELETE /api/behaviortrees/*` to admin-api. Required because the
   browser can't hit admin-api directly on HTTPS in prod.
