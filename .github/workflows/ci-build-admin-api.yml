@@ -41,6 +41,10 @@ jobs:
         if: steps.changes.outputs.relevant == 'true'
         run: bun install --frozen-lockfile
 
+      - name: Typecheck UI layout contract
+        if: steps.changes.outputs.relevant == 'true'
+        run: bun run --filter @silencer/ui-layout typecheck
+
       - name: Typecheck admin API
         if: steps.changes.outputs.relevant == 'true'
         run: bun run --filter silencer-admin-api typecheck

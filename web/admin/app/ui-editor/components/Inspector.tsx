@@ -2,6 +2,11 @@ import { ALIGNS, AXES, FONTS, JUSTIFIES, KIND_LABELS, SIZE_MODES } from "../ui-e
 import { slugify } from "../ui-editor-utils";
 import {
   PALETTE_NODE_KINDS,
+  UI_ATTACH_POINTS,
+  UI_ATTACH_TO_VALUES,
+  UI_BUTTON_SIZES,
+  UI_BUTTON_VARIANTS,
+  UI_IMAGE_MODES,
   canHaveChildren,
   type UiAlign,
   type UiAttachPoint,
@@ -20,21 +25,11 @@ import {
 } from "../../../lib/ui-layout";
 import { Field, NumberInput, Select, TextInput } from "./EditorControls";
 
-const BUTTON_VARIANTS: UiButtonVariant[] = ["oval", "chrome", "text", "ghost"];
-const BUTTON_SIZES: UiButtonSize[] = ["sm", "md", "lg", "compact", "auto"];
-const IMAGE_MODES: UiImageMode[] = ["normal", "contain", "stretch"];
-const ATTACH_TO: UiAttachTo[] = ["parent", "root"];
-const ATTACH_POINTS: UiAttachPoint[] = [
-  "left-top",
-  "left-center",
-  "left-bottom",
-  "center-top",
-  "center",
-  "center-bottom",
-  "right-top",
-  "right-center",
-  "right-bottom",
-];
+const BUTTON_VARIANTS: UiButtonVariant[] = [...UI_BUTTON_VARIANTS];
+const BUTTON_SIZES: UiButtonSize[] = [...UI_BUTTON_SIZES];
+const IMAGE_MODES: UiImageMode[] = [...UI_IMAGE_MODES];
+const ATTACH_TO: UiAttachTo[] = [...UI_ATTACH_TO_VALUES];
+const ATTACH_POINTS: UiAttachPoint[] = [...UI_ATTACH_POINTS];
 
 interface InspectorProps {
   node: UiNode;
@@ -172,7 +167,8 @@ function StyleInspector({
 }) {
   const style = node.style;
   const supportsHeight = node.kind !== "button";
-  const sizeModes: UiSizeMode[] = node.kind === "button" ? ["fit", "fixed"] : SIZE_MODES;
+  const sizeModes: UiSizeMode[] =
+    node.kind === "button" ? SIZE_MODES.filter((mode) => mode !== "grow") : SIZE_MODES;
   const supportsSizeBounds = node.kind !== "button";
   const supportsPadding = node.kind !== "spacer";
   const supportsFont = node.kind === "text";

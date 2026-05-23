@@ -4,6 +4,7 @@
 #include "clay_ui_payloads.h"
 #include "primitives/text.h"
 #include "runtime/UiInteractionRegistry.h"
+#include "ui_layout_contract.generated.h"
 
 #include <algorithm>
 #include <utility>
@@ -48,55 +49,55 @@ Clay_SizingAxis UiDocumentSizing(const UiEditorSize& size) {
 }
 
 Clay_LayoutAlignmentX UiDocumentAlignX(const std::string& value) {
-	if(value == "center") return CLAY_ALIGN_X_CENTER;
-	if(value == "end") return CLAY_ALIGN_X_RIGHT;
+	if(value == silencer::net::ui_layout_contract::kAlignCenter) return CLAY_ALIGN_X_CENTER;
+	if(value == silencer::net::ui_layout_contract::kAlignEnd) return CLAY_ALIGN_X_RIGHT;
 	return CLAY_ALIGN_X_LEFT;
 }
 
 Clay_LayoutAlignmentY UiDocumentAlignY(const std::string& value) {
-	if(value == "center") return CLAY_ALIGN_Y_CENTER;
-	if(value == "end") return CLAY_ALIGN_Y_BOTTOM;
+	if(value == silencer::net::ui_layout_contract::kAlignCenter) return CLAY_ALIGN_Y_CENTER;
+	if(value == silencer::net::ui_layout_contract::kAlignEnd) return CLAY_ALIGN_Y_BOTTOM;
 	return CLAY_ALIGN_Y_TOP;
 }
 
 TextSize UiDocumentTextSizeForFont(const std::string& font) {
-	if(font == "title") return TextSize::ScreenTitle;
-	if(font == "uiLarge") return TextSize::Heading;
-	if(font == "tiny") return TextSize::Tiny;
-	if(font == "footer") return TextSize::Footer;
+	if(font == silencer::net::ui_layout_contract::kFontTitle) return TextSize::ScreenTitle;
+	if(font == silencer::net::ui_layout_contract::kFontUiLarge) return TextSize::Heading;
+	if(font == silencer::net::ui_layout_contract::kFontTiny) return TextSize::Tiny;
+	if(font == silencer::net::ui_layout_contract::kFontFooter) return TextSize::Footer;
 	return TextSize::Body;
 }
 
 silencer::ui::primitives::ButtonVariant UiDocumentButtonVariantForNode(
 	const UiEditorNode& node,
 	silencer::ui::primitives::ButtonVariant fallback) {
-	if(node.buttonVariant == "oval") return silencer::ui::primitives::ButtonVariant::Oval;
-	if(node.buttonVariant == "chrome") return silencer::ui::primitives::ButtonVariant::Chrome;
-	if(node.buttonVariant == "text") return silencer::ui::primitives::ButtonVariant::Text;
-	if(node.buttonVariant == "ghost") return silencer::ui::primitives::ButtonVariant::Ghost;
+	if(node.buttonVariant == silencer::net::ui_layout_contract::kButtonVariantOval) return silencer::ui::primitives::ButtonVariant::Oval;
+	if(node.buttonVariant == silencer::net::ui_layout_contract::kButtonVariantChrome) return silencer::ui::primitives::ButtonVariant::Chrome;
+	if(node.buttonVariant == silencer::net::ui_layout_contract::kButtonVariantText) return silencer::ui::primitives::ButtonVariant::Text;
+	if(node.buttonVariant == silencer::net::ui_layout_contract::kButtonVariantGhost) return silencer::ui::primitives::ButtonVariant::Ghost;
 	return fallback;
 }
 
 silencer::ui::primitives::ButtonSize UiDocumentButtonSizeForNode(
 	const UiEditorNode& node,
 	silencer::ui::primitives::ButtonSize fallback) {
-	if(node.buttonSize == "sm") return silencer::ui::primitives::ButtonSize::Sm;
-	if(node.buttonSize == "md") return silencer::ui::primitives::ButtonSize::Md;
-	if(node.buttonSize == "lg") return silencer::ui::primitives::ButtonSize::Lg;
-	if(node.buttonSize == "compact") return silencer::ui::primitives::ButtonSize::Compact;
-	if(node.buttonSize == "auto") return silencer::ui::primitives::ButtonSize::Auto;
+	if(node.buttonSize == silencer::net::ui_layout_contract::kButtonSizeSm) return silencer::ui::primitives::ButtonSize::Sm;
+	if(node.buttonSize == silencer::net::ui_layout_contract::kButtonSizeMd) return silencer::ui::primitives::ButtonSize::Md;
+	if(node.buttonSize == silencer::net::ui_layout_contract::kButtonSizeLg) return silencer::ui::primitives::ButtonSize::Lg;
+	if(node.buttonSize == silencer::net::ui_layout_contract::kButtonSizeCompact) return silencer::ui::primitives::ButtonSize::Compact;
+	if(node.buttonSize == silencer::net::ui_layout_contract::kButtonSizeAuto) return silencer::ui::primitives::ButtonSize::Auto;
 	return fallback;
 }
 
 Clay_FloatingAttachPointType UiDocumentAttachPoint(const std::string& value) {
-	if(value == "left-center") return CLAY_ATTACH_POINT_LEFT_CENTER;
-	if(value == "left-bottom") return CLAY_ATTACH_POINT_LEFT_BOTTOM;
-	if(value == "center-top") return CLAY_ATTACH_POINT_CENTER_TOP;
-	if(value == "center") return CLAY_ATTACH_POINT_CENTER_CENTER;
-	if(value == "center-bottom") return CLAY_ATTACH_POINT_CENTER_BOTTOM;
-	if(value == "right-top") return CLAY_ATTACH_POINT_RIGHT_TOP;
-	if(value == "right-center") return CLAY_ATTACH_POINT_RIGHT_CENTER;
-	if(value == "right-bottom") return CLAY_ATTACH_POINT_RIGHT_BOTTOM;
+	if(value == silencer::net::ui_layout_contract::kAttachPointLeftCenter) return CLAY_ATTACH_POINT_LEFT_CENTER;
+	if(value == silencer::net::ui_layout_contract::kAttachPointLeftBottom) return CLAY_ATTACH_POINT_LEFT_BOTTOM;
+	if(value == silencer::net::ui_layout_contract::kAttachPointCenterTop) return CLAY_ATTACH_POINT_CENTER_TOP;
+	if(value == silencer::net::ui_layout_contract::kAttachPointCenter) return CLAY_ATTACH_POINT_CENTER_CENTER;
+	if(value == silencer::net::ui_layout_contract::kAttachPointCenterBottom) return CLAY_ATTACH_POINT_CENTER_BOTTOM;
+	if(value == silencer::net::ui_layout_contract::kAttachPointRightTop) return CLAY_ATTACH_POINT_RIGHT_TOP;
+	if(value == silencer::net::ui_layout_contract::kAttachPointRightCenter) return CLAY_ATTACH_POINT_RIGHT_CENTER;
+	if(value == silencer::net::ui_layout_contract::kAttachPointRightBottom) return CLAY_ATTACH_POINT_RIGHT_BOTTOM;
 	return CLAY_ATTACH_POINT_LEFT_TOP;
 }
 
@@ -138,7 +139,8 @@ Clay_ElementDeclaration UiDocumentDeclarationForNode(const UiEditorNode& node) {
 		static_cast<uint16_t>(node.style.padding),
 	};
 	decl.layout.childGap = static_cast<uint16_t>(node.style.gap);
-	const bool row = node.style.direction == "row" || node.kind == "row";
+	const bool row = node.style.direction == silencer::net::ui_layout_contract::kAxisRow ||
+	                 node.kind == silencer::net::ui_layout_contract::kNodeKindRow;
 	decl.layout.layoutDirection = row ? CLAY_LEFT_TO_RIGHT : CLAY_TOP_TO_BOTTOM;
 	if(row){
 		decl.layout.childAlignment = {
@@ -172,11 +174,11 @@ Clay_ElementDeclaration UiDocumentDeclarationForNode(const UiEditorNode& node) {
 		decl.cornerRadius = CLAY_CORNER_RADIUS(static_cast<float>(node.style.radius));
 	}
 	if(node.image.enabled){
-		if(node.image.mode == "contain"){
+		if(node.image.mode == silencer::net::ui_layout_contract::kImageModeContain){
 			decl.image.imageData = silencer::clay_bridge::PackImageContain(
 				static_cast<Uint8>(node.image.bank),
 				static_cast<Uint16>(node.image.index));
-		}else if(node.image.mode == "stretch"){
+		}else if(node.image.mode == silencer::net::ui_layout_contract::kImageModeStretch){
 			decl.image.imageData = silencer::clay_bridge::PackImageStretch(
 				static_cast<Uint8>(node.image.bank),
 				static_cast<Uint16>(node.image.index));
@@ -193,7 +195,7 @@ Clay_ElementDeclaration UiDocumentDeclarationForNode(const UiEditorNode& node) {
 			UiDocumentAttachPoint(node.floating.elementAttach),
 			UiDocumentAttachPoint(node.floating.parentAttach),
 		};
-		decl.floating.attachTo = node.floating.attachTo == "root"
+		decl.floating.attachTo = node.floating.attachTo == silencer::net::ui_layout_contract::kAttachToRoot
 			? CLAY_ATTACH_TO_ROOT
 			: CLAY_ATTACH_TO_PARENT;
 		if(node.floating.pointerPassthrough){

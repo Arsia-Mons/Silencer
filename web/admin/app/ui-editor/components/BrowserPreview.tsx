@@ -1,6 +1,13 @@
 import { type CSSProperties, type DragEvent } from "react";
 import {
   PALETTE_NODE_KINDS,
+  UI_ALIGNS,
+  UI_AXES,
+  UI_FONTS,
+  UI_IMAGE_MODES,
+  UI_JUSTIFIES,
+  UI_NODE_KINDS,
+  UI_SIZE_MODES,
   canHaveChildren,
   type UiAlign,
   type UiDocument,
@@ -129,7 +136,7 @@ function nodeToCss(node: UiNode, rootViewport: UiDocument["viewport"]): CSSPrope
   };
   if (node.image) {
     css.backgroundImage = `linear-gradient(135deg, rgba(84,156,104,0.35), rgba(8,84,0,0.35))`;
-    css.backgroundSize = node.image.mode === "normal" ? undefined : "cover";
+    css.backgroundSize = node.image.mode === UI_IMAGE_MODES[0] ? undefined : "cover";
   }
 
   applySize(css, "width", style.width);
@@ -143,9 +150,10 @@ function nodeToCss(node: UiNode, rootViewport: UiDocument["viewport"]): CSSPrope
 
   if (canHaveChildren(node.kind)) {
     css.display = "flex";
-    css.flexDirection = style.direction ?? (node.kind === "row" ? "row" : "column");
-    css.alignItems = alignToCss(style.align ?? "start");
-    css.justifyContent = justifyToCss(style.justify ?? "start");
+    css.flexDirection =
+      style.direction ?? (node.kind === UI_NODE_KINDS[3] ? UI_AXES[1] : UI_AXES[0]);
+    css.alignItems = alignToCss(style.align ?? UI_ALIGNS[0]);
+    css.justifyContent = justifyToCss(style.justify ?? UI_JUSTIFIES[0]);
   } else if (node.kind === "spacer") {
     css.minHeight = style.height.mode === "fixed" ? style.height.value : 8;
   } else {
@@ -170,11 +178,11 @@ function applySize(css: CSSProperties, property: "width" | "height", size: UiSiz
   const minProperty = property === "width" ? "minWidth" : "minHeight";
   if (size.max !== undefined) css[maxProperty] = size.max;
   if (size.min !== undefined) css[minProperty] = size.min;
-  if (size.mode === "fixed") {
+  if (size.mode === UI_SIZE_MODES[2]) {
     css[property] = size.value ?? 0;
     return;
   }
-  if (size.mode === "grow") {
+  if (size.mode === UI_SIZE_MODES[1]) {
     css.flexGrow = 1;
     if (property === "width") css.alignSelf = "stretch";
     return;
@@ -183,30 +191,30 @@ function applySize(css: CSSProperties, property: "width" | "height", size: UiSiz
 }
 
 function alignToCss(align: UiAlign): CSSProperties["alignItems"] {
-  if (align === "start") return "flex-start";
-  if (align === "end") return "flex-end";
+  if (align === UI_ALIGNS[0]) return "flex-start";
+  if (align === UI_ALIGNS[2]) return "flex-end";
   return align;
 }
 
 function justifyToCss(justify: UiJustify): CSSProperties["justifyContent"] {
-  if (justify === "start") return "flex-start";
-  if (justify === "end") return "flex-end";
+  if (justify === UI_JUSTIFIES[0]) return "flex-start";
+  if (justify === UI_JUSTIFIES[2]) return "flex-end";
   return justify;
 }
 
 function fontFamily(font: UiFont | undefined): string {
-  if (font === "title") return '"Silencer Title", "Courier New", monospace';
-  if (font === "tiny") return '"Silencer Tiny", "Courier New", monospace';
-  if (font === "footer") return '"Silencer UI", "Courier New", monospace';
-  if (font === "uiLarge") return '"Silencer UI Large", "Courier New", monospace';
+  if (font === UI_FONTS[2]) return '"Silencer Title", "Courier New", monospace';
+  if (font === UI_FONTS[3]) return '"Silencer Tiny", "Courier New", monospace';
+  if (font === UI_FONTS[4]) return '"Silencer UI", "Courier New", monospace';
+  if (font === UI_FONTS[1]) return '"Silencer UI Large", "Courier New", monospace';
   return '"Silencer UI", "Courier New", monospace';
 }
 
 function fontSize(font: UiFont | undefined): number {
-  if (font === "title") return 64;
-  if (font === "tiny") return 9;
-  if (font === "footer") return 11;
-  if (font === "uiLarge") return 13;
+  if (font === UI_FONTS[2]) return 64;
+  if (font === UI_FONTS[3]) return 9;
+  if (font === UI_FONTS[4]) return 11;
+  if (font === UI_FONTS[1]) return 13;
   return 11;
 }
 

@@ -1,4 +1,9 @@
 import {
+  UI_ALIGNS,
+  UI_AXES,
+  UI_FONTS,
+  UI_JUSTIFIES,
+  UI_SIZE_MODES,
   type UiAlign,
   type UiAxis,
   type UiFont,
@@ -26,8 +31,8 @@ export const PRESETS = [
   { name: "640 x 480", width: 640, height: 480, zoom: 1 },
 ];
 
-export const SIZE_MODES: UiSizeMode[] = ["fit", "grow", "fixed"];
-export const AXES: UiAxis[] = ["column", "row"];
-export const ALIGNS: UiAlign[] = ["start", "center", "end"];
-export const JUSTIFIES: UiJustify[] = ["start", "center", "end"];
-export const FONTS: UiFont[] = ["ui", "uiLarge", "title", "tiny", "footer"];
+export const SIZE_MODES: UiSizeMode[] = [...UI_SIZE_MODES];
+export const AXES: UiAxis[] = [...UI_AXES];
+export const ALIGNS: UiAlign[] = [...UI_ALIGNS];
+export const JUSTIFIES: UiJustify[] = [...UI_JUSTIFIES];
+export const FONTS: UiFont[] = [...UI_FONTS];

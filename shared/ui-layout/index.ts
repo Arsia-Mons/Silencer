@@ -1,11 +1,43 @@
 import {
+  UI_ALIGNS,
+  UI_ATTACH_POINTS,
+  UI_ATTACH_TO_VALUES,
+  UI_AXES,
+  UI_BUTTON_SIZES,
+  UI_BUTTON_VARIANTS,
   UI_CONTAINER_NODE_KINDS,
   UI_DOCUMENT_FIELDS,
+  UI_FONTS,
   UI_FLOATING_FIELDS,
   UI_IMAGE_FIELDS,
+  UI_IMAGE_MODES,
+  UI_JUSTIFIES,
   UI_NODE_FIELDS,
   UI_NODE_KINDS,
   UI_SIZE_FIELDS,
+  UI_SIZE_MODES,
+  UI_STYLE_FIELDS_BY_KIND,
+  UI_VIEWPORT_FIELDS,
+} from "./contract";
+
+export {
+  UI_ALIGNS,
+  UI_ATTACH_POINTS,
+  UI_ATTACH_TO_VALUES,
+  UI_AXES,
+  UI_BUTTON_SIZES,
+  UI_BUTTON_VARIANTS,
+  UI_CONTAINER_NODE_KINDS,
+  UI_DOCUMENT_FIELDS,
+  UI_FONTS,
+  UI_FLOATING_FIELDS,
+  UI_IMAGE_FIELDS,
+  UI_IMAGE_MODES,
+  UI_JUSTIFIES,
+  UI_NODE_FIELDS,
+  UI_NODE_KINDS,
+  UI_SIZE_FIELDS,
+  UI_SIZE_MODES,
   UI_STYLE_FIELDS_BY_KIND,
   UI_VIEWPORT_FIELDS,
 } from "./contract";
@@ -13,26 +45,17 @@ import {
 export const UI_LAYOUT_SCHEMA_VERSION = 1 as const;
 
 export type UiNodeKind = (typeof UI_NODE_KINDS)[number];
-export type UiAxis = "row" | "column";
-export type UiAlign = "start" | "center" | "end";
-export type UiJustify = "start" | "center" | "end";
-export type UiSizeMode = "fit" | "grow" | "fixed";
-export type UiFont = "ui" | "uiLarge" | "title" | "tiny" | "footer";
+export type UiAxis = (typeof UI_AXES)[number];
+export type UiAlign = (typeof UI_ALIGNS)[number];
+export type UiJustify = (typeof UI_JUSTIFIES)[number];
+export type UiSizeMode = (typeof UI_SIZE_MODES)[number];
+export type UiFont = (typeof UI_FONTS)[number];
 export type UiMovePlacement = "inside" | "before" | "after";
-export type UiButtonVariant = "oval" | "chrome" | "text" | "ghost";
-export type UiButtonSize = "sm" | "md" | "lg" | "compact" | "auto";
-export type UiImageMode = "normal" | "contain" | "stretch";
-export type UiAttachTo = "parent" | "root";
-export type UiAttachPoint =
-  | "left-top"
-  | "left-center"
-  | "left-bottom"
-  | "center-top"
-  | "center"
-  | "center-bottom"
-  | "right-top"
-  | "right-center"
-  | "right-bottom";
+export type UiButtonVariant = (typeof UI_BUTTON_VARIANTS)[number];
+export type UiButtonSize = (typeof UI_BUTTON_SIZES)[number];
+export type UiImageMode = (typeof UI_IMAGE_MODES)[number];
+export type UiAttachTo = (typeof UI_ATTACH_TO_VALUES)[number];
+export type UiAttachPoint = (typeof UI_ATTACH_POINTS)[number];
 
 export interface UiSize {
   mode: UiSizeMode;
@@ -129,6 +152,16 @@ const SIZE_FIELDS = new Set<string>(UI_SIZE_FIELDS);
 const IMAGE_FIELDS = new Set<string>(UI_IMAGE_FIELDS);
 const FLOATING_FIELDS = new Set<string>(UI_FLOATING_FIELDS);
 const CONTAINER_NODE_KINDS = new Set<string>(UI_CONTAINER_NODE_KINDS);
+const AXES = new Set<string>(UI_AXES);
+const ALIGNS = new Set<string>(UI_ALIGNS);
+const JUSTIFIES = new Set<string>(UI_JUSTIFIES);
+const SIZE_MODES = new Set<string>(UI_SIZE_MODES);
+const FONTS = new Set<string>(UI_FONTS);
+const BUTTON_VARIANTS = new Set<string>(UI_BUTTON_VARIANTS);
+const BUTTON_SIZES = new Set<string>(UI_BUTTON_SIZES);
+const IMAGE_MODES = new Set<string>(UI_IMAGE_MODES);
+const ATTACH_TO_VALUES = new Set<string>(UI_ATTACH_TO_VALUES);
+const ATTACH_POINTS = new Set<string>(UI_ATTACH_POINTS);
 
 const KIND_LABELS: Record<UiNodeKind, string> = {
   screen: "Screen",
@@ -536,11 +569,11 @@ function defaultStyleForKind(kind: UiNodeKind): UiStyle {
       radius: 2,
     };
   }
-  if (kind === "stack" || kind === "row") {
+  if (kind === UI_NODE_KINDS[2] || kind === UI_NODE_KINDS[3]) {
     return {
       width: { mode: "grow" },
       height: { mode: "fit" },
-      direction: kind === "row" ? "row" : "column",
+      direction: kind === UI_NODE_KINDS[3] ? UI_AXES[1] : UI_AXES[0],
       align: "start",
       justify: "start",
       padding: 0,
@@ -661,10 +694,10 @@ function validateNode(value: unknown, seenIds: Set<string>): void {
   validateNumber(node, "padding", 0, 512);
   validateNumber(node, "gap", 0, 512);
   validateNumber(node, "radius", 0, 64);
-  validateEnum(node, "direction", ["row", "column"]);
-  validateEnum(node, "align", ["start", "center", "end"]);
-  validateEnum(node, "justify", ["start", "center", "end"]);
-  validateEnum(node, "font", ["ui", "uiLarge", "title", "tiny", "footer"]);
+  validateEnum(node, "direction", AXES);
+  validateEnum(node, "align", ALIGNS);
+  validateEnum(node, "justify", JUSTIFIES);
+  validateEnum(node, "font", FONTS);
   validatePalette(node, "backgroundPalette");
   validatePalette(node, "borderPalette");
   validatePalette(node, "textPalette");
@@ -699,18 +732,12 @@ function validateTokenArray(value: unknown, key: string): string[] {
 
 function validateButtonSettings(node: UiNode): void {
   if (node.buttonVariant !== undefined) {
-    if (
-      typeof node.buttonVariant !== "string" ||
-      !["oval", "chrome", "text", "ghost"].includes(node.buttonVariant)
-    ) {
+    if (typeof node.buttonVariant !== "string" || !BUTTON_VARIANTS.has(node.buttonVariant)) {
       throw new Error(`Node ${node.id} has invalid buttonVariant.`);
     }
   }
   if (node.buttonSize !== undefined) {
-    if (
-      typeof node.buttonSize !== "string" ||
-      !["sm", "md", "lg", "compact", "auto"].includes(node.buttonSize)
-    ) {
+    if (typeof node.buttonSize !== "string" || !BUTTON_SIZES.has(node.buttonSize)) {
       throw new Error(`Node ${node.id} has invalid buttonSize.`);
     }
   }
@@ -759,7 +786,7 @@ function validateImage(node: UiNode): void {
     throw new Error(`Node ${node.id} has invalid image index.`);
   }
   const mode = node.image.mode ?? "normal";
-  if (!["normal", "contain", "stretch"].includes(mode)) {
+  if (!IMAGE_MODES.has(mode)) {
     throw new Error(`Node ${node.id} has invalid image mode.`);
   }
 }
@@ -770,7 +797,7 @@ function validateFloating(node: UiNode): void {
     throw new Error(`Node ${node.id} has invalid floating.`);
   }
   rejectUnknownObjectFields(node.floating, FLOATING_FIELDS, `Node ${node.id} floating`);
-  if (!["parent", "root"].includes(node.floating.attachTo)) {
+  if (!ATTACH_TO_VALUES.has(node.floating.attachTo)) {
     throw new Error(`Node ${node.id} has invalid floating attachTo.`);
   }
   validateAttachPoint(node, node.floating.elementAttach, "elementAttach");
@@ -791,20 +818,7 @@ function validateAttachPoint(
   value: UiAttachPoint,
   key: "elementAttach" | "parentAttach",
 ): void {
-  if (
-    typeof value !== "string" ||
-    ![
-      "left-top",
-      "left-center",
-      "left-bottom",
-      "center-top",
-      "center",
-      "center-bottom",
-      "right-top",
-      "right-center",
-      "right-bottom",
-    ].includes(value)
-  ) {
+  if (typeof value !== "string" || !ATTACH_POINTS.has(value)) {
     throw new Error(`Node ${node.id} has invalid floating ${key}.`);
   }
 }
@@ -885,14 +899,14 @@ function validateNumber(
   }
 }
 
-function validateEnum<T extends string>(
+function validateEnum(
   node: UiNode,
   key: "direction" | "align" | "justify" | "font",
-  values: T[],
+  values: ReadonlySet<string>,
 ): void {
   const value = node.style[key];
   if (value === undefined) return;
-  if (typeof value !== "string" || !values.includes(value as T)) {
+  if (typeof value !== "string" || !values.has(value)) {
     throw new Error(`Node ${node.id} has invalid ${key}.`);
   }
 }
@@ -915,7 +929,7 @@ function validateSize(node: UiNode, key: "width" | "height"): void {
     throw new Error(`Node ${node.id} has invalid ${key} sizing.`);
   }
   rejectUnknownObjectFields(size, SIZE_FIELDS, `Node ${node.id} ${key} sizing`);
-  if (size.mode !== "fit" && size.mode !== "grow" && size.mode !== "fixed") {
+  if (typeof size.mode !== "string" || !SIZE_MODES.has(size.mode)) {
     throw new Error(`Node ${node.id} has invalid ${key} sizing.`);
   }
   validateSizeBound(node, key, "min");

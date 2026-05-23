@@ -39,6 +39,27 @@ export const UI_FLOATING_FIELDS = [
   "pointerPassthrough",
 ] as const;
 
+export const UI_AXES = ["column", "row"] as const;
+export const UI_ALIGNS = ["start", "center", "end"] as const;
+export const UI_JUSTIFIES = ["start", "center", "end"] as const;
+export const UI_SIZE_MODES = ["fit", "grow", "fixed"] as const;
+export const UI_FONTS = ["ui", "uiLarge", "title", "tiny", "footer"] as const;
+export const UI_BUTTON_VARIANTS = ["oval", "chrome", "text", "ghost"] as const;
+export const UI_BUTTON_SIZES = ["sm", "md", "lg", "compact", "auto"] as const;
+export const UI_IMAGE_MODES = ["normal", "contain", "stretch"] as const;
+export const UI_ATTACH_TO_VALUES = ["parent", "root"] as const;
+export const UI_ATTACH_POINTS = [
+  "left-top",
+  "left-center",
+  "left-bottom",
+  "center-top",
+  "center",
+  "center-bottom",
+  "right-top",
+  "right-center",
+  "right-bottom",
+] as const;
+
 export const UI_STYLE_FIELDS_BY_KIND = {
   screen: [
     "width",

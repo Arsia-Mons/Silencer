@@ -4,7 +4,6 @@
 
 #include <algorithm>
 #include <cmath>
-#include <initializer_list>
 #include <cstddef>
 #include <unordered_set>
 #include <utility>
@@ -146,7 +145,8 @@ bool OptionalFloatInRange(const nlohmann::json& json,
 bool ParseStringEnum(const nlohmann::json& json,
                      const char * key,
                      const char * fallback,
-                     std::initializer_list<const char *> allowed,
+                     const char * const * allowed,
+                     std::size_t allowedCount,
                      std::string& out,
                      std::string& error) {
 	auto it = json.find(key);
@@ -157,11 +157,9 @@ bool ParseStringEnum(const nlohmann::json& json,
 		return false;
 	}
 	const std::string value = it->get<std::string>();
-	for(const char * candidate : allowed){
-		if(value == candidate){
-			out = value;
-			return true;
-		}
+	if(ContractContains(allowed, allowedCount, value)){
+		out = value;
+		return true;
 	}
 	error = std::string("style.") + key + " is unsupported: " + value;
 	return false;
@@ -169,7 +167,8 @@ bool ParseStringEnum(const nlohmann::json& json,
 
 bool RequiredStringEnum(const nlohmann::json& json,
                         const char * key,
-                        std::initializer_list<const char *> allowed,
+                        const char * const * allowed,
+                        std::size_t allowedCount,
                         std::string& out,
                         std::string& error) {
 	auto it = json.find(key);
@@ -178,11 +177,9 @@ bool RequiredStringEnum(const nlohmann::json& json,
 		return false;
 	}
 	const std::string value = it->get<std::string>();
-	for(const char * candidate : allowed){
-		if(value == candidate){
-			out = value;
-			return true;
-		}
+	if(ContractContains(allowed, allowedCount, value)){
+		out = value;
+		return true;
 	}
 	error = std::string(key) + " is unsupported: " + value;
 	return false;
@@ -243,7 +240,7 @@ bool ParseSize(const nlohmann::json& json,
 		error = std::string("style.") + key + ".min cannot exceed max";
 		return false;
 	}
-	if(mode == "fit"){
+	if(mode == ui_layout_contract::kSizeModeFit){
 		if(it->find("value") != it->end()){
 			error = std::string("style.") + key +
 			        ".value is only valid for fixed sizing";
@@ -253,7 +250,7 @@ bool ParseSize(const nlohmann::json& json,
 		out.value = 0.0f;
 		return true;
 	}
-	if(mode == "grow"){
+	if(mode == ui_layout_contract::kSizeModeGrow){
 		if(it->find("value") != it->end()){
 			error = std::string("style.") + key +
 			        ".value is only valid for fixed sizing";
@@ -263,7 +260,7 @@ bool ParseSize(const nlohmann::json& json,
 		out.value = 0.0f;
 		return true;
 	}
-	if(mode == "fixed"){
+	if(mode == ui_layout_contract::kSizeModeFixed){
 		if(it->find("min") != it->end() || it->find("max") != it->end()){
 			error = std::string("style.") + key +
 			        " fixed sizing cannot use min or max";
@@ -310,13 +307,6 @@ bool ParsePalette(const nlohmann::json& json,
 	return true;
 }
 
-bool IsOneOf(const std::string& value, std::initializer_list<const char *> allowed) {
-	for(const char * candidate : allowed){
-		if(value == candidate) return true;
-	}
-	return false;
-}
-
 bool StyleFieldAllowed(const std::string& kind, const std::string& key) {
 	for(std::size_t i = 0; i < ui_layout_contract::kStyleFieldsByKindCount; ++i){
 		const auto& entry = ui_layout_contract::kStyleFieldsByKind[i];
@@ -351,7 +341,11 @@ bool ParseImage(const nlohmann::json& json,
 		error = "image index is invalid";
 		return false;
 	}
-	if(!ParseStringEnum(*it, "mode", "normal", { "normal", "contain", "stretch" },
+	if(!ParseStringEnum(*it,
+	                    "mode",
+	                    ui_layout_contract::kImageModeNormal,
+	                    ui_layout_contract::kImageModes,
+	                    ui_layout_contract::kImageModesCount,
 	                    out.image.mode, error)){
 		error = "image mode is invalid";
 		return false;
@@ -377,16 +371,18 @@ bool ParseFloating(const nlohmann::json& json,
 	                        error)){
 		return false;
 	}
-	if(!RequiredStringEnum(*it, "attachTo", { "parent", "root" },
+	if(!RequiredStringEnum(*it,
+	                       "attachTo",
+	                       ui_layout_contract::kAttachToValues,
+	                       ui_layout_contract::kAttachToValuesCount,
 	                       out.floating.attachTo, error)){
 		error = "floating attachTo is invalid";
 		return false;
 	}
 	if(!RequiredStringEnum(*it,
 	                       "elementAttach",
-	                       { "left-top", "left-center", "left-bottom",
-	                         "center-top", "center", "center-bottom",
-	                         "right-top", "right-center", "right-bottom" },
+	                       ui_layout_contract::kAttachPoints,
+	                       ui_layout_contract::kAttachPointsCount,
 	                       out.floating.elementAttach,
 	                       error)){
 		error = "floating elementAttach is invalid";
@@ -394,9 +390,8 @@ bool ParseFloating(const nlohmann::json& json,
 	}
 	if(!RequiredStringEnum(*it,
 	                       "parentAttach",
-	                       { "left-top", "left-center", "left-bottom",
-	                         "center-top", "center", "center-bottom",
-	                         "right-top", "right-center", "right-bottom" },
+	                       ui_layout_contract::kAttachPoints,
+	                       ui_layout_contract::kAttachPointsCount,
 	                       out.floating.parentAttach,
 	                       error)){
 		error = "floating parentAttach is invalid";
@@ -501,22 +496,38 @@ bool ParseStyle(const nlohmann::json& json,
 			return false;
 		}
 	}
-	if(!ParseStringEnum(json, "direction", "column", { "column", "row" },
+	if(!ParseStringEnum(json,
+	                    "direction",
+	                    ui_layout_contract::kAxisColumn,
+	                    ui_layout_contract::kAxes,
+	                    ui_layout_contract::kAxesCount,
 	                    out.direction, error)){
 		return false;
 	}
-	if(!ParseStringEnum(json, "align", "start", { "start", "center", "end" },
+	if(!ParseStringEnum(json,
+	                    "align",
+	                    ui_layout_contract::kAlignStart,
+	                    ui_layout_contract::kAligns,
+	                    ui_layout_contract::kAlignsCount,
 	                    out.align, error)){
 		return false;
 	}
-	if(!ParseStringEnum(json, "justify", "start", { "start", "center", "end" },
+	if(!ParseStringEnum(json,
+	                    "justify",
+	                    ui_layout_contract::kJustifyStart,
+	                    ui_layout_contract::kJustifies,
+	                    ui_layout_contract::kJustifiesCount,
 	                    out.justify, error)){
 		return false;
 	}
 	if(!OptionalIntInRange(json, "padding", 0, 0, 512, out.padding, error)) return false;
 	if(!OptionalIntInRange(json, "gap", 0, 0, 512, out.gap, error)) return false;
 	if(!OptionalIntInRange(json, "radius", 0, 0, 64, out.radius, error)) return false;
-	if(!ParseStringEnum(json, "font", "ui", { "ui", "uiLarge", "title", "tiny", "footer" },
+	if(!ParseStringEnum(json,
+	                    "font",
+	                    ui_layout_contract::kFontUi,
+	                    ui_layout_contract::kFonts,
+	                    ui_layout_contract::kFontsCount,
 	                    out.font, error)){
 		return false;
 	}
@@ -571,12 +582,16 @@ bool ParseNode(const nlohmann::json& json,
 		return false;
 	}
 	if(!out.buttonVariant.empty() &&
-	   !IsOneOf(out.buttonVariant, { "oval", "chrome", "text", "ghost" })){
+	   !ContractContains(ui_layout_contract::kButtonVariants,
+	                     ui_layout_contract::kButtonVariantsCount,
+	                     out.buttonVariant)){
 		error = "invalid buttonVariant for node: " + out.id;
 		return false;
 	}
 	if(!out.buttonSize.empty() &&
-	   !IsOneOf(out.buttonSize, { "sm", "md", "lg", "compact", "auto" })){
+	   !ContractContains(ui_layout_contract::kButtonSizes,
+	                     ui_layout_contract::kButtonSizesCount,
+	                     out.buttonSize)){
 		error = "invalid buttonSize for node: " + out.id;
 		return false;
 	}

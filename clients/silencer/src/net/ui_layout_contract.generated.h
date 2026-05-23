@@ -21,6 +21,14 @@ constexpr const char * kNodeKinds[] = {
 	"component",
 };
 constexpr std::size_t kNodeKindsCount = 8;
+constexpr const char * kNodeKindScreen = "screen";
+constexpr const char * kNodeKindPanel = "panel";
+constexpr const char * kNodeKindStack = "stack";
+constexpr const char * kNodeKindRow = "row";
+constexpr const char * kNodeKindText = "text";
+constexpr const char * kNodeKindButton = "button";
+constexpr const char * kNodeKindSpacer = "spacer";
+constexpr const char * kNodeKindComponent = "component";
 
 constexpr const char * kContainerNodeKinds[] = {
 	"screen",
@@ -29,6 +37,10 @@ constexpr const char * kContainerNodeKinds[] = {
 	"row",
 };
 constexpr std::size_t kContainerNodeKindsCount = 4;
+constexpr const char * kContainerNodeKindScreen = "screen";
+constexpr const char * kContainerNodeKindPanel = "panel";
+constexpr const char * kContainerNodeKindStack = "stack";
+constexpr const char * kContainerNodeKindRow = "row";
 
 constexpr const char * kDocumentFields[] = {
 	"schemaVersion",
@@ -86,6 +98,124 @@ constexpr const char * kFloatingFields[] = {
 	"pointerPassthrough",
 };
 constexpr std::size_t kFloatingFieldsCount = 7;
+
+constexpr const char * kAxes[] = {
+	"column",
+	"row",
+};
+constexpr std::size_t kAxesCount = 2;
+constexpr const char * kAxisColumn = "column";
+constexpr const char * kAxisRow = "row";
+
+constexpr const char * kAligns[] = {
+	"start",
+	"center",
+	"end",
+};
+constexpr std::size_t kAlignsCount = 3;
+constexpr const char * kAlignStart = "start";
+constexpr const char * kAlignCenter = "center";
+constexpr const char * kAlignEnd = "end";
+
+constexpr const char * kJustifies[] = {
+	"start",
+	"center",
+	"end",
+};
+constexpr std::size_t kJustifiesCount = 3;
+constexpr const char * kJustifyStart = "start";
+constexpr const char * kJustifyCenter = "center";
+constexpr const char * kJustifyEnd = "end";
+
+constexpr const char * kSizeModes[] = {
+	"fit",
+	"grow",
+	"fixed",
+};
+constexpr std::size_t kSizeModesCount = 3;
+constexpr const char * kSizeModeFit = "fit";
+constexpr const char * kSizeModeGrow = "grow";
+constexpr const char * kSizeModeFixed = "fixed";
+
+constexpr const char * kFonts[] = {
+	"ui",
+	"uiLarge",
+	"title",
+	"tiny",
+	"footer",
+};
+constexpr std::size_t kFontsCount = 5;
+constexpr const char * kFontUi = "ui";
+constexpr const char * kFontUiLarge = "uiLarge";
+constexpr const char * kFontTitle = "title";
+constexpr const char * kFontTiny = "tiny";
+constexpr const char * kFontFooter = "footer";
+
+constexpr const char * kButtonVariants[] = {
+	"oval",
+	"chrome",
+	"text",
+	"ghost",
+};
+constexpr std::size_t kButtonVariantsCount = 4;
+constexpr const char * kButtonVariantOval = "oval";
+constexpr const char * kButtonVariantChrome = "chrome";
+constexpr const char * kButtonVariantText = "text";
+constexpr const char * kButtonVariantGhost = "ghost";
+
+constexpr const char * kButtonSizes[] = {
+	"sm",
+	"md",
+	"lg",
+	"compact",
+	"auto",
+};
+constexpr std::size_t kButtonSizesCount = 5;
+constexpr const char * kButtonSizeSm = "sm";
+constexpr const char * kButtonSizeMd = "md";
+constexpr const char * kButtonSizeLg = "lg";
+constexpr const char * kButtonSizeCompact = "compact";
+constexpr const char * kButtonSizeAuto = "auto";
+
+constexpr const char * kImageModes[] = {
+	"normal",
+	"contain",
+	"stretch",
+};
+constexpr std::size_t kImageModesCount = 3;
+constexpr const char * kImageModeNormal = "normal";
+constexpr const char * kImageModeContain = "contain";
+constexpr const char * kImageModeStretch = "stretch";
+
+constexpr const char * kAttachToValues[] = {
+	"parent",
+	"root",
+};
+constexpr std::size_t kAttachToValuesCount = 2;
+constexpr const char * kAttachToParent = "parent";
+constexpr const char * kAttachToRoot = "root";
+
+constexpr const char * kAttachPoints[] = {
+	"left-top",
+	"left-center",
+	"left-bottom",
+	"center-top",
+	"center",
+	"center-bottom",
+	"right-top",
+	"right-center",
+	"right-bottom",
+};
+constexpr std::size_t kAttachPointsCount = 9;
+constexpr const char * kAttachPointLeftTop = "left-top";
+constexpr const char * kAttachPointLeftCenter = "left-center";
+constexpr const char * kAttachPointLeftBottom = "left-bottom";
+constexpr const char * kAttachPointCenterTop = "center-top";
+constexpr const char * kAttachPointCenter = "center";
+constexpr const char * kAttachPointCenterBottom = "center-bottom";
+constexpr const char * kAttachPointRightTop = "right-top";
+constexpr const char * kAttachPointRightCenter = "right-center";
+constexpr const char * kAttachPointRightBottom = "right-bottom";
 
 constexpr const char * kScreenStyleFields[] = {
 	"width",

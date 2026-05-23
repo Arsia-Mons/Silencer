@@ -2,13 +2,23 @@ import { existsSync, readFileSync, writeFileSync } from "fs";
 import { join } from "path";
 
 import {
+  UI_ALIGNS,
+  UI_ATTACH_POINTS,
+  UI_ATTACH_TO_VALUES,
+  UI_AXES,
+  UI_BUTTON_SIZES,
+  UI_BUTTON_VARIANTS,
   UI_CONTAINER_NODE_KINDS,
   UI_DOCUMENT_FIELDS,
+  UI_FONTS,
   UI_FLOATING_FIELDS,
   UI_IMAGE_FIELDS,
+  UI_IMAGE_MODES,
+  UI_JUSTIFIES,
   UI_NODE_FIELDS,
   UI_NODE_KINDS,
   UI_SIZE_FIELDS,
+  UI_SIZE_MODES,
   UI_STYLE_FIELDS_BY_KIND,
   UI_VIEWPORT_FIELDS,
 } from "../contract";
@@ -33,6 +43,12 @@ function pascalCase(value: string): string {
     .filter(Boolean)
     .map((part) => `${part.charAt(0).toUpperCase()}${part.slice(1)}`)
     .join("");
+}
+
+function cppNamedConstants(prefix: string, values: readonly string[]): string {
+  return values
+    .map((value) => `constexpr const char * ${prefix}${pascalCase(value)} = ${cppString(value)};`)
+    .join("\n");
 }
 
 function styleFieldArrays(): string {
@@ -71,8 +87,10 @@ namespace net {
 namespace ui_layout_contract {
 
 ${cppArray("kNodeKinds", UI_NODE_KINDS)}
+${cppNamedConstants("kNodeKind", UI_NODE_KINDS)}
 
 ${cppArray("kContainerNodeKinds", UI_CONTAINER_NODE_KINDS)}
+${cppNamedConstants("kContainerNodeKind", UI_CONTAINER_NODE_KINDS)}
 
 ${cppArray("kDocumentFields", UI_DOCUMENT_FIELDS)}
 
@@ -85,6 +103,36 @@ ${cppArray("kSizeFields", UI_SIZE_FIELDS)}
 ${cppArray("kImageFields", UI_IMAGE_FIELDS)}
 
 ${cppArray("kFloatingFields", UI_FLOATING_FIELDS)}
+
+${cppArray("kAxes", UI_AXES)}
+${cppNamedConstants("kAxis", UI_AXES)}
+
+${cppArray("kAligns", UI_ALIGNS)}
+${cppNamedConstants("kAlign", UI_ALIGNS)}
+
+${cppArray("kJustifies", UI_JUSTIFIES)}
+${cppNamedConstants("kJustify", UI_JUSTIFIES)}
+
+${cppArray("kSizeModes", UI_SIZE_MODES)}
+${cppNamedConstants("kSizeMode", UI_SIZE_MODES)}
+
+${cppArray("kFonts", UI_FONTS)}
+${cppNamedConstants("kFont", UI_FONTS)}
+
+${cppArray("kButtonVariants", UI_BUTTON_VARIANTS)}
+${cppNamedConstants("kButtonVariant", UI_BUTTON_VARIANTS)}
+
+${cppArray("kButtonSizes", UI_BUTTON_SIZES)}
+${cppNamedConstants("kButtonSize", UI_BUTTON_SIZES)}
+
+${cppArray("kImageModes", UI_IMAGE_MODES)}
+${cppNamedConstants("kImageMode", UI_IMAGE_MODES)}
+
+${cppArray("kAttachToValues", UI_ATTACH_TO_VALUES)}
+${cppNamedConstants("kAttachTo", UI_ATTACH_TO_VALUES)}
+
+${cppArray("kAttachPoints", UI_ATTACH_POINTS)}
+${cppNamedConstants("kAttachPoint", UI_ATTACH_POINTS)}
 
 ${styleFieldArrays()}
 
