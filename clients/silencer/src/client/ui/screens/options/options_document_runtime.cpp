@@ -15,6 +15,23 @@ Clay_String ClayStringFromStd(const std::string& value)
 
 }  // namespace
 
+namespace silencer::client_ui::options_menu {
+
+bool IsOptionsMenuAction(const std::string& action)
+{
+	return action == kActionControls ||
+	       action == kActionDisplay ||
+	       action == kActionAudio ||
+	       action == kActionBack;
+}
+
+void ApplyOptionsMenuRuntimeHandlers(UiDocumentRendererOptions& options)
+{
+	options.canHandleAction = IsOptionsMenuAction;
+}
+
+}  // namespace silencer::client_ui::options_menu
+
 namespace silencer::client_ui::options_display {
 
 bool IsOptionsDisplayComponent(const std::string& component)
@@ -23,9 +40,18 @@ bool IsOptionsDisplayComponent(const std::string& component)
 	       component == kComponentSmoothScalingIndicator;
 }
 
+bool IsOptionsDisplayAction(const std::string& action)
+{
+	return action == kActionFullscreen ||
+	       action == kActionSmoothScaling ||
+	       action == kActionSave ||
+	       action == kActionCancel;
+}
+
 void ApplyOptionsDisplayRuntimeHandlers(UiDocumentRendererOptions& options)
 {
 	options.canBuildComponent = IsOptionsDisplayComponent;
+	options.canHandleAction = IsOptionsDisplayAction;
 	options.buildComponent = [](const silencer::ui::UiEditorNode& node) {
 		Config & cfg = Config::GetInstance();
 		bool selected = false;
@@ -53,9 +79,17 @@ bool IsOptionsAudioComponent(const std::string& component)
 	return component == kComponentMusicIndicator;
 }
 
+bool IsOptionsAudioAction(const std::string& action)
+{
+	return action == kActionMusic ||
+	       action == kActionSave ||
+	       action == kActionCancel;
+}
+
 void ApplyOptionsAudioRuntimeHandlers(UiDocumentRendererOptions& options)
 {
 	options.canBuildComponent = IsOptionsAudioComponent;
+	options.canHandleAction = IsOptionsAudioAction;
 	options.buildComponent = [](const silencer::ui::UiEditorNode& node) {
 		if(node.component != kComponentMusicIndicator){
 			return false;

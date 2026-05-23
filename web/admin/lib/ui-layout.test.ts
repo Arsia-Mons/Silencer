@@ -165,6 +165,12 @@ describe("ui-layout model", () => {
 
     expect(button.action).toBe("options_display.fullscreen");
     expect(component.component).toBe("options_display.fullscreen_indicator");
+    expect(() => createNode("button", "missing-action")).toThrow(
+      "Button node creation needs a surface action token.",
+    );
+    expect(() => createNode("component", "missing-component")).toThrow(
+      "Component node creation needs a surface component token.",
+    );
     expect(canCreateUiNodeKind("button", manifest)).toBe(true);
     expect(canCreateUiNodeKind("component", getUiSurfaceTokenManifest("options"))).toBe(false);
   });

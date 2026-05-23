@@ -63,29 +63,6 @@ const ui_layout_contract::SurfaceTokens * FindUiLayoutSurfaceTokens(
 	return nullptr;
 }
 
-bool UiLayoutSurfaceAllowsComponent(const std::string& surface,
-                                    const std::string& component) {
-	const ui_layout_contract::SurfaceTokens * tokens =
-		FindUiLayoutSurfaceTokens(surface);
-	return tokens &&
-	       Contains(tokens->components, tokens->componentCount, component);
-}
-
-bool UiLayoutSurfaceAllowsTextBinding(const std::string& surface,
-                                      const std::string& binding) {
-	const ui_layout_contract::SurfaceTokens * tokens =
-		FindUiLayoutSurfaceTokens(surface);
-	return tokens &&
-	       Contains(tokens->textBindings, tokens->textBindingCount, binding);
-}
-
-bool UiLayoutSurfaceAllowsAction(const std::string& surface,
-                                 const std::string& action) {
-	const ui_layout_contract::SurfaceTokens * tokens =
-		FindUiLayoutSurfaceTokens(surface);
-	return tokens && Contains(tokens->actions, tokens->actionCount, action);
-}
-
 bool ValidateUiDocumentGeneratedSurfaceTokens(
 	const silencer::ui::UiEditorPreviewDocument& document,
 	std::string& error) {

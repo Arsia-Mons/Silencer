@@ -11,13 +11,6 @@ namespace silencer::net {
 const ui_layout_contract::SurfaceTokens * FindUiLayoutSurfaceTokens(
 	const std::string& surface);
 
-bool UiLayoutSurfaceAllowsComponent(const std::string& surface,
-                                    const std::string& component);
-bool UiLayoutSurfaceAllowsTextBinding(const std::string& surface,
-                                      const std::string& binding);
-bool UiLayoutSurfaceAllowsAction(const std::string& surface,
-                                 const std::string& action);
-
 bool ValidateUiDocumentGeneratedSurfaceTokens(
 	const silencer::ui::UiEditorPreviewDocument& document,
 	std::string& error);

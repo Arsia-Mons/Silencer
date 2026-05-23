@@ -45,14 +45,11 @@ void UiEditorPreviewScreen::BuildUi(ScreenContext& ctx,
 	if(document_.surface == silencer::client_ui::main_menu::kMainMenuSurface){
 		versionText_ = "Silencer v";
 		versionText_ += ctx.world.GetVersion();
-		options.buildComponent = [&](const silencer::ui::UiEditorNode& node) {
-			return silencer::client_ui::main_menu::BuildMainMenuComponent(
-				node, ctx.world.resources, mainMenuLogo_);
-		};
-		options.resolveTextBinding = [&](const std::string& binding, std::string& out) {
-			return silencer::client_ui::main_menu::ResolveMainMenuTextBinding(
-				binding, versionText_, out);
-		};
+		silencer::client_ui::main_menu::ApplyMainMenuRuntimeHandlers(
+			options,
+			&ctx.world.resources,
+			&mainMenuLogo_,
+			&versionText_);
 	}
 	BuildUiDocument(document_, interactions, options);
 }

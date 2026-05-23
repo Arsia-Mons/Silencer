@@ -19,6 +19,9 @@ constexpr const char * kActionAudio =
 constexpr const char * kActionBack =
 	silencer::net::ui_layout_contract::kUiActionOptionsBack;
 
+bool IsOptionsMenuAction(const std::string& action);
+void ApplyOptionsMenuRuntimeHandlers(UiDocumentRendererOptions& options);
+
 }  // namespace silencer::client_ui::options_menu
 
 namespace silencer::client_ui::options_display {
@@ -39,6 +42,7 @@ constexpr const char * kActionCancel =
 	silencer::net::ui_layout_contract::kUiActionOptionsDisplayCancel;
 
 bool IsOptionsDisplayComponent(const std::string& component);
+bool IsOptionsDisplayAction(const std::string& action);
 void ApplyOptionsDisplayRuntimeHandlers(UiDocumentRendererOptions& options);
 
 }  // namespace silencer::client_ui::options_display
@@ -57,6 +61,7 @@ constexpr const char * kActionCancel =
 	silencer::net::ui_layout_contract::kUiActionOptionsAudioCancel;
 
 bool IsOptionsAudioComponent(const std::string& component);
+bool IsOptionsAudioAction(const std::string& action);
 void ApplyOptionsAudioRuntimeHandlers(UiDocumentRendererOptions& options);
 
 }  // namespace silencer::client_ui::options_audio

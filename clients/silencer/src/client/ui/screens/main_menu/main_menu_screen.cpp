@@ -88,14 +88,11 @@ void MainMenuScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime
 	silencer::client_ui::UiDocumentRendererOptions options =
 		silencer::client_ui::UiDocumentRendererOptionsForSurface(
 			silencer::client_ui::main_menu::kMainMenuSurface);
-	options.buildComponent = [&](const silencer::ui::UiEditorNode& node) {
-		return silencer::client_ui::main_menu::BuildMainMenuComponent(
-			node, ctx.world.resources, logo);
-	};
-	options.resolveTextBinding = [&](const std::string& binding, std::string& out) {
-		return silencer::client_ui::main_menu::ResolveMainMenuTextBinding(
-			binding, versionText_, out);
-	};
+	silencer::client_ui::main_menu::ApplyMainMenuRuntimeHandlers(
+		options,
+		&ctx.world.resources,
+		&logo,
+		&versionText_);
 	silencer::client_ui::BuildUiDocument(layoutDocument_, interactions, options);
 }
 

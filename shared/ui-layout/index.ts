@@ -270,12 +270,18 @@ export function createNode(
 
   if (kind === "text") base.text = "Text";
   if (kind === "button") {
+    const action = overrides.action ?? options.tokenManifest?.actions[0];
+    if (!action) throw new Error("Button node creation needs a surface action token.");
     base.text = "Button";
-    base.action = options.tokenManifest?.actions[0] ?? "action-id";
+    base.action = action;
     base.buttonVariant = "chrome";
     base.buttonSize = "auto";
   }
-  if (kind === "component") base.component = options.tokenManifest?.components[0] ?? "component-id";
+  if (kind === "component") {
+    const component = overrides.component ?? options.tokenManifest?.components[0];
+    if (!component) throw new Error("Component node creation needs a surface component token.");
+    base.component = component;
+  }
   if (canHaveChildren(kind)) base.children = [];
 
   return {
