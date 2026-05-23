@@ -702,6 +702,12 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 			cmd.reply->set_value(Cancelled(cmd.id));
 			return;
 		}
+		if(!game.GetRenderer().palette.SetPalette(1)){
+			restorePreviewState();
+			cmd.reply->set_value(Err(cmd.id, "INTERNAL", "set palette failed for ui editor preview"));
+			return;
+		}
+		game.SetPaletteColors(game.GetRenderer().palette.GetColors());
 
 		const std::string surface = document.surface;
 		const int width = document.viewportWidth;
@@ -711,14 +717,13 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 			cmd.reply->set_value(Cancelled(cmd.id));
 			return;
 		}
-		game.PushScreen(std::make_unique<silencer::client_ui::UiEditorPreviewScreen>(
-			std::move(document)));
 
+		silencer::client_ui::UiEditorPreviewScreen previewScreen(std::move(document));
+		silencer::ui::UiInteractionRegistry previewInteractions;
 		game.GetScreenBuffer().Clear(0);
-		game.RenderClientUiPreviewFrameWithoutDispatch(0.0f);
-		nlohmann::json inspect = InspectInteractionsToJson(game.UiInteractions());
+		game.RenderIsolatedClientUiPreviewFrame(previewScreen, previewInteractions, 0.0f);
+		nlohmann::json inspect = InspectInteractionsToJson(previewInteractions);
 		if(inspect["widgets"].empty() && inspect["elements"].empty()){
-			game.PopScreen();
 			restorePreviewState();
 			cmd.reply->set_value(Err(cmd.id, "WRONG_STATE", "no clay widgets"));
 			return;
@@ -727,7 +732,6 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 		std::vector<unsigned char> pngBytes;
 		bool ok = game.GetRenderer().CapturePNGBytes(game.GetScreenBuffer(),
 			game.GetPaletteColors(), pngBytes);
-		game.PopScreen();
 		restorePreviewState();
 		if(!ok){
 			cmd.reply->set_value(Err(cmd.id, "INTERNAL", "stbi_write_png_to_func failed"));

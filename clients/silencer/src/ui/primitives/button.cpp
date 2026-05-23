@@ -455,6 +455,27 @@ void ButtonBeginFrame(float animationDeltaSeconds, float animationStepSeconds) {
 	g_visualStepSeconds = std::max(0.001f, animationStepSeconds);
 }
 
+struct ButtonVisualStateGuard::Snapshot {
+	std::unordered_map<uint32_t, ButtonVisualState> visualStates;
+	float visualDeltaSeconds = 1.0f / 24.0f;
+	float visualStepSeconds = 1.0f / 24.0f;
+};
+
+ButtonVisualStateGuard::ButtonVisualStateGuard()
+	: snapshot_(new Snapshot{
+		g_visualStates,
+		g_visualDeltaSeconds,
+		g_visualStepSeconds,
+	}) {
+}
+
+ButtonVisualStateGuard::~ButtonVisualStateGuard() {
+	if(!snapshot_) return;
+	g_visualStates = snapshot_->visualStates;
+	g_visualDeltaSeconds = snapshot_->visualDeltaSeconds;
+	g_visualStepSeconds = snapshot_->visualStepSeconds;
+}
+
 void Button(Clay_String id,
             Clay_String label,
             ButtonOpts opts,

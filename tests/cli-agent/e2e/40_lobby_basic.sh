@@ -39,22 +39,6 @@ cat > "$SILENCER_HOME/Library/Application Support/Silencer/config.cfg" <<EOF
 mapapiurl=http://127.0.0.1:$MAP_API_PORT
 EOF
 
-SILENCER_VERSION=""
-for cache in \
-  "$REPO_ROOT/build/CMakeCache.txt" \
-  "$REPO_ROOT/clients/silencer/build/CMakeCache.txt" \
-  "$REPO_ROOT/clients/silencer/build-unity/CMakeCache.txt" \
-  "$REPO_ROOT/clients/silencer/build-release/CMakeCache.txt"; do
-  if [ -f "$cache" ]; then
-    SILENCER_VERSION=$(awk -F= '/^SILENCER_VERSION:STRING=/{print $2}' "$cache")
-    if [ -n "$SILENCER_VERSION" ]; then break; fi
-  fi
-done
-if [ -z "$SILENCER_VERSION" ]; then
-  echo "could not read SILENCER_VERSION from any CMakeCache.txt" >&2
-  exit 1
-fi
-
 cleanup() {
   if [ -n "${SILENCER_PID:-}" ]; then
     stop_silencer "$SILENCER_PID" "$CTRL_PORT" || true

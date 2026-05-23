@@ -4,6 +4,7 @@
 #include "clay/clay.h"
 #include "primitives/text.h"
 #include "shared.h"
+#include <memory>
 
 namespace silencer::ui {
 class UiInteractionRegistry;
@@ -48,6 +49,19 @@ struct ButtonHandle {
 
 void ButtonBeginFrame(float animationDeltaSeconds = 1.0f / 24.0f,
                       float animationStepSeconds = 1.0f / 24.0f);
+
+class ButtonVisualStateGuard {
+public:
+	ButtonVisualStateGuard();
+	~ButtonVisualStateGuard();
+
+	ButtonVisualStateGuard(const ButtonVisualStateGuard&) = delete;
+	ButtonVisualStateGuard& operator=(const ButtonVisualStateGuard&) = delete;
+
+private:
+	struct Snapshot;
+	std::unique_ptr<Snapshot> snapshot_;
+};
 
 void Button(Clay_String id,
             Clay_String label,

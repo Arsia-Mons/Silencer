@@ -11,6 +11,7 @@
 #include "client/ui/hud/InGameOverlays.h"
 #include "client/ui/views/HudView.h"
 #include "clay_ui_compositor.h"
+#include "primitives/button.h"
 #include <algorithm>
 #include <vector>
 
@@ -37,6 +38,19 @@ int scaledW = static_cast<int>(virtualW * scale + 0.5f);
 int scaledH = static_cast<int>(virtualH * scale + 0.5f);
 offsetX = scaledW < surfaceW ? (surfaceW - scaledW) / 2 : 0;
 offsetY = scaledH < surfaceH ? (surfaceH - scaledH) / 2 : 0;
+}
+
+static silencer::ui::UiInputState BuildPreviewInputForSurface(Surface& surface,
+                                                              float animationStepSeconds) {
+silencer::ui::UiInputState input;
+input.width = surface.w;
+input.height = surface.h;
+input.uiScale = 1.0f;
+input.deltaTimeSeconds =
+static_cast<float>(GASLoader::Get().gameengine.tickIntervalMs) / 1000.0f;
+input.animationDeltaSeconds = 0.0f;
+input.animationStepSeconds = animationStepSeconds;
+return input;
 }
 } // namespace
 
@@ -82,22 +96,6 @@ clientUiInput.SetPolledSurfacePointer(mx, my, down);
 float deltaTimeSeconds =
 static_cast<float>(GASLoader::Get().gameengine.tickIntervalMs) / 1000.0f;
 preparedUiInput = clientUiInput.BuildFrame(virtualW, virtualH, uiScale, deltaTimeSeconds);
-Uint64 now = SDL_GetTicks();
-float animationDeltaSeconds = 0.0f;
-if(lastUiAnimationMs != 0 && now >= lastUiAnimationMs){
-animationDeltaSeconds = static_cast<float>(now - lastUiAnimationMs) / 1000.0f;
-if(animationDeltaSeconds > 0.25f) animationDeltaSeconds = 0.25f;
-}
-lastUiAnimationMs = now;
-preparedUiInput.animationDeltaSeconds = animationDeltaSeconds;
-preparedUiInput.animationStepSeconds = game.gameRenderer.LegacyUiAnimationStepSeconds();
-hasPreparedUiInput = true;
-}
-
-void GameUiPipeline::PrepareClientUiPreviewFrame(Surface& surface) {
-float deltaTimeSeconds =
-static_cast<float>(GASLoader::Get().gameengine.tickIntervalMs) / 1000.0f;
-preparedUiInput = clientUiInput.BuildFrame(surface.w, surface.h, 1.0f, deltaTimeSeconds);
 Uint64 now = SDL_GetTicks();
 float animationDeltaSeconds = 0.0f;
 if(lastUiAnimationMs != 0 && now >= lastUiAnimationMs){
@@ -210,16 +208,24 @@ Clay_RenderCommandArray cmds = EndClientUiFrame();
 silencer::clay_bridge::Render(game, &surface, cmds);
 }
 
-void GameUiPipeline::RenderClientUiPreviewFrameWithoutDispatch(Surface& surface, float frametime) {
-if(!clientUi.HasScreens()){
-return;
-}
+void GameUiPipeline::RenderIsolatedClientUiPreviewFrame(
+Surface& surface,
+Screen& screen,
+silencer::ui::UiInteractionRegistry& interactions,
+float frametime) {
+silencer::ui::primitives::ButtonVisualStateGuard buttonVisualStateGuard;
+silencer::client_ui::ClayBridgeFrameBackend previewClayBackend;
+silencer::ui::ClayService previewClayService(previewClayBackend);
+silencer::client_ui::ClientUi previewUi(previewClayService);
+silencer::ui::UiInputState previewInput =
+BuildPreviewInputForSurface(surface, game.gameRenderer.LegacyUiAnimationStepSeconds());
 
-PrepareClientUiPreviewFrame(surface);
-BeginPreparedClientUiFrame();
-clientUi.BuildVisibleScreens(game.screenContext, surface, frametime);
-Clay_RenderCommandArray cmds = EndClientUiFrame();
-silencer::clay_bridge::Render(game, &surface, cmds);
+silencer::clay_bridge::SetTextMeasureResources(&game.world.resources);
+previewUi.BeginFrame(previewInput);
+screen.BuildUi(game.screenContext, surface, frametime, previewUi.Interactions());
+previewUi.EndFrame();
+interactions = previewUi.Interactions();
+silencer::clay_bridge::Render(game, &surface, previewClayBackend.Commands());
 }
 
 void GameUiPipeline::ResetUiFrameDeltas() {

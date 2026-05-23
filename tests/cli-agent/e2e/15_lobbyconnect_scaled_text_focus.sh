@@ -28,19 +28,6 @@ PLAYER_AUTH_PORT=$(pick_port)
 MAP_API_PORT=$(pick_port)
 CTRL_PORT=$(pick_port)
 
-SILENCER_VERSION=""
-for cache in \
-  "$REPO_ROOT/build/CMakeCache.txt" \
-  "$REPO_ROOT/clients/silencer/build/CMakeCache.txt" \
-  "$REPO_ROOT/clients/silencer/build-unity/CMakeCache.txt" \
-  "$REPO_ROOT/clients/silencer/build-release/CMakeCache.txt"; do
-  if [ -f "$cache" ]; then
-    SILENCER_VERSION=$(awk -F= '/^SILENCER_VERSION:STRING=/{print $2}' "$cache")
-    [ -n "$SILENCER_VERSION" ] && break
-  fi
-done
-[ -z "$SILENCER_VERSION" ] && { echo "no SILENCER_VERSION in CMakeCache.txt" >&2; exit 1; }
-
 cleanup() {
   if [ -n "${SILENCER_PID:-}" ]; then
     stop_silencer "$SILENCER_PID" "$CTRL_PORT" || true
