@@ -722,14 +722,20 @@ void EnsureInitialized(int width, int height) {
 }
 
 IsolatedContext::IsolatedContext()
-	: arenaMemory_(nullptr), context_(nullptr), width_(-1), height_(-1) {
+	: arenaMemory_(nullptr), context_(nullptr), previousContext_(nullptr),
+	  width_(-1), height_(-1), hasPreviousContext_(false) {
 }
 
 IsolatedContext::~IsolatedContext() {
+	RestorePrevious();
 	std::free(arenaMemory_);
 }
 
 void IsolatedContext::SetCurrent(int width, int height) {
+	if(!hasPreviousContext_){
+		previousContext_ = ::Clay_GetCurrentContext();
+		hasPreviousContext_ = true;
+	}
 	if(!context_){
 		uint64_t mem = ::Clay_MinMemorySize();
 		arenaMemory_ = std::malloc(static_cast<size_t>(mem));
@@ -754,13 +760,11 @@ void IsolatedContext::SetCurrent(int width, int height) {
 	}
 }
 
-void RestorePrimaryContext() {
-	if(!g_initialized || !g_context) return;
-	::Clay_SetCurrentContext(g_context);
-	if(g_lastW > 0 && g_lastH > 0){
-		::Clay_SetLayoutDimensions(::Clay_Dimensions{
-			static_cast<float>(g_lastW), static_cast<float>(g_lastH)});
-	}
+void IsolatedContext::RestorePrevious() {
+	if(!hasPreviousContext_) return;
+	::Clay_SetCurrentContext(previousContext_);
+	hasPreviousContext_ = false;
+	previousContext_ = nullptr;
 }
 
 void SetUiScale(float scale) {

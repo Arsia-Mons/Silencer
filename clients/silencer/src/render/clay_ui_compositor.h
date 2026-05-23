@@ -50,18 +50,16 @@ public:
 	IsolatedContext& operator=(const IsolatedContext&) = delete;
 
 	void SetCurrent(int width, int height);
+	void RestorePrevious();
 
 private:
 	void * arenaMemory_;
 	::Clay_Context * context_;
+	::Clay_Context * previousContext_;
 	int width_;
 	int height_;
+	bool hasPreviousContext_;
 };
-
-// Restores the process-wide production Clay context after an isolated layout
-// has resolved its bounds. No-op if the production context has not been
-// initialized yet.
-void RestorePrimaryContext();
 
 // Magnification applied to bitmap glyph/sprite/chrome draws so a
 // virtual-resolution Clay layout fills a larger native surface. Default 1

@@ -26,7 +26,7 @@ public:
 	void UpdateScrollContainers(float wheelX, float wheelY, float deltaTimeSeconds) override;
 	void BeginLayout() override;
 	std::vector<silencer::ui::UiRenderCommand> EndLayout() override;
-	void RestorePrimaryContext();
+	void RestorePreviousContext();
 
 	Clay_RenderCommandArray Commands() const { return commands_; }
 

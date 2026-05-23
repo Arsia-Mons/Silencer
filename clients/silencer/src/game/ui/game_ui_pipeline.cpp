@@ -52,6 +52,15 @@ input.animationDeltaSeconds = 0.0f;
 input.animationStepSeconds = animationStepSeconds;
 return input;
 }
+
+class ScopedUiScaleRestore {
+public:
+	ScopedUiScaleRestore() : previous_(silencer::clay_bridge::UiScale()) {}
+	~ScopedUiScaleRestore() { silencer::clay_bridge::SetUiScale(previous_); }
+
+private:
+	float previous_;
+};
 } // namespace
 
 void GameUiPipeline::PrepareClientUiFrame(Surface& surface) {
@@ -214,7 +223,7 @@ Screen& screen,
 silencer::ui::UiInteractionRegistry& interactions,
 float frametime) {
 silencer::ui::primitives::ButtonVisualStateGuard buttonVisualStateGuard;
-const float previousUiScale = silencer::clay_bridge::UiScale();
+ScopedUiScaleRestore uiScaleRestore;
 silencer::client_ui::ClayBridgeFrameBackend previewClayBackend(true);
 silencer::ui::ClayService previewClayService(previewClayBackend);
 silencer::client_ui::ClientUi previewUi(previewClayService);
@@ -226,9 +235,8 @@ previewUi.BeginFrame(previewInput);
 screen.BuildUi(game.screenContext, surface, frametime, previewUi.Interactions());
 previewUi.EndFrame();
 interactions = previewUi.Interactions();
-previewClayBackend.RestorePrimaryContext();
+previewClayBackend.RestorePreviousContext();
 silencer::clay_bridge::Render(game, &surface, previewClayBackend.Commands());
-silencer::clay_bridge::SetUiScale(previousUiScale);
 }
 
 void GameUiPipeline::ResetUiFrameDeltas() {

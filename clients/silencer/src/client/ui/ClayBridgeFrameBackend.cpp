@@ -14,7 +14,7 @@ ClayBridgeFrameBackend::ClayBridgeFrameBackend(bool isolated)
 }
 
 ClayBridgeFrameBackend::~ClayBridgeFrameBackend() {
-	RestorePrimaryContext();
+	RestorePreviousContext();
 }
 
 void ClayBridgeFrameBackend::SetCurrentContext() {
@@ -59,9 +59,9 @@ std::vector<silencer::ui::UiRenderCommand> ClayBridgeFrameBackend::EndLayout() {
 	return std::vector<silencer::ui::UiRenderCommand>();
 }
 
-void ClayBridgeFrameBackend::RestorePrimaryContext() {
+void ClayBridgeFrameBackend::RestorePreviousContext() {
 	if(isolated_){
-		silencer::clay_bridge::RestorePrimaryContext();
+		isolatedContext_->RestorePrevious();
 	}
 }
 
