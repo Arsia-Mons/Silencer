@@ -24,7 +24,7 @@ void Present();
 bool ResizeRenderSurface(int width, int height);
 bool ResizeRenderSurfacePixels(int width, int height);
 bool SyncRenderSurfaceToWindowPixels();
-void SetColors(SDL_Color * colors);
+void SetColors(const SDL_Color * colors);
 void RestartPaletteFade();
 bool PaletteFadeFinished() const;
 Uint8 PaletteFadePhaseFromClock() const;

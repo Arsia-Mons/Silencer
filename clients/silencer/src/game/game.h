@@ -48,6 +48,7 @@ WorldSummary GetWorldSummary();
 Surface & GetScreenBuffer() { return gameRenderer.GetScreenBuffer(); }
 const Surface & GetScreenBuffer() const { return gameRenderer.GetScreenBuffer(); }
 const SDL_Color * GetPaletteColors() const { return gameRenderer.GetPaletteColors(); }
+void SetPaletteColors(const SDL_Color * colors) { gameRenderer.SetColors(colors); }
 Renderer & GetRenderer() { return renderer; }
 silencer::client_ui::ClientUiInput & UiInput() { return gameUiPipeline.UiInput(); }
 const silencer::client_ui::ClientUiInput & UiInput() const { return gameUiPipeline.UiInput(); }

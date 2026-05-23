@@ -106,7 +106,7 @@ game.lasttick = SDL_GetTicks();
 }
 }
 
-void GameRenderer::SetColors(SDL_Color * colors){
+void GameRenderer::SetColors(const SDL_Color * colors){
 std::memcpy(palettecolors, colors, 256 * sizeof(SDL_Color));
 if(renderdevice){
 renderdevice->SetPalette(colors, 256);

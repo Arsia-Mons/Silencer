@@ -20,6 +20,7 @@
 #include <cstring>
 #include <cstdio>
 #include <cstdlib>
+#include <array>
 #include <fstream>
 #include <memory>
 #include <utility>
@@ -673,11 +674,31 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 			cmd.reply->set_value(Cancelled(cmd.id));
 			return;
 		}
-		if(!game.ResizeRenderSurface(document.viewportWidth, document.viewportHeight)){
+		const int previousWidth = game.GetScreenBuffer().w;
+		const int previousHeight = game.GetScreenBuffer().h;
+		std::vector<Uint8> previousPixels = game.GetScreenBuffer().pixels;
+		std::array<SDL_Color, 256> previousPaletteColors;
+		std::memcpy(previousPaletteColors.data(), game.GetPaletteColors(),
+			previousPaletteColors.size() * sizeof(SDL_Color));
+		const Uint8 previousPalette = game.GetRenderer().palette.CurrentPalette();
+		auto restorePreviewState = [&game, previousWidth, previousHeight,
+		                            previousPixels, previousPalette,
+		                            previousPaletteColors]() {
+			game.ResizeRenderSurfacePixels(previousWidth, previousHeight);
+			if(game.GetScreenBuffer().w == previousWidth &&
+			   game.GetScreenBuffer().h == previousHeight &&
+			   game.GetScreenBuffer().pixels.size() == previousPixels.size()){
+				game.GetScreenBuffer().pixels = previousPixels;
+			}
+			game.GetRenderer().palette.SetPalette(previousPalette);
+			game.SetPaletteColors(previousPaletteColors.data());
+		};
+		if(!game.ResizeRenderSurfacePixels(document.viewportWidth, document.viewportHeight)){
 			cmd.reply->set_value(Err(cmd.id, "INTERNAL", "resize failed for ui editor preview"));
 			return;
 		}
 		if(cmd.IsCancelled()){
+			restorePreviewState();
 			cmd.reply->set_value(Cancelled(cmd.id));
 			return;
 		}
@@ -686,6 +707,7 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 		const int width = document.viewportWidth;
 		const int height = document.viewportHeight;
 		if(cmd.IsCancelled()){
+			restorePreviewState();
 			cmd.reply->set_value(Cancelled(cmd.id));
 			return;
 		}
@@ -697,6 +719,7 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 		nlohmann::json inspect = InspectInteractionsToJson(game.UiInteractions());
 		if(inspect["widgets"].empty() && inspect["elements"].empty()){
 			game.PopScreen();
+			restorePreviewState();
 			cmd.reply->set_value(Err(cmd.id, "WRONG_STATE", "no clay widgets"));
 			return;
 		}
@@ -705,6 +728,7 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 		bool ok = game.GetRenderer().CapturePNGBytes(game.GetScreenBuffer(),
 			game.GetPaletteColors(), pngBytes);
 		game.PopScreen();
+		restorePreviewState();
 		if(!ok){
 			cmd.reply->set_value(Err(cmd.id, "INTERNAL", "stbi_write_png_to_func failed"));
 			return;

@@ -452,7 +452,7 @@ function validateNode(node: UiNode, seenIds: Set<string>): void {
   if (!node.id || typeof node.id !== "string") throw new Error("Node id is missing.");
   if (seenIds.has(node.id)) throw new Error(`Duplicate node id: ${node.id}`);
   seenIds.add(node.id);
-  if (!node.kind || !KIND_LABELS[node.kind])
+  if (!node.kind || !Object.prototype.hasOwnProperty.call(KIND_LABELS, node.kind))
     throw new Error(`Unsupported node kind: ${String(node.kind)}`);
   if (!node.name || typeof node.name !== "string")
     throw new Error(`Node ${node.id} name is missing.`);

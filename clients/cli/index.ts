@@ -1,5 +1,6 @@
 #!/usr/bin/env bun
 
+import { writeFileSync } from "node:fs";
 import { connect } from "node:net";
 import { LOBBY_HANDLERS } from "./src/lobby/commands.ts";
 
@@ -270,7 +271,8 @@ async function main() {
       sock.end();
       const reply = JSON.parse(line) as Reply;
       if (reply.ok) {
-        process.stdout.write(JSON.stringify(reply.result ?? {}) + "\n");
+        const result = materializeControlArtifacts(op, args, reply.result);
+        process.stdout.write(JSON.stringify(result ?? {}) + "\n");
         process.exit(0);
       } else {
         process.stderr.write(`[${reply.code ?? "ERR"}] ${reply.error ?? ""}\n`);
@@ -286,3 +288,21 @@ main().catch((e) => {
   process.stderr.write(`[TRANSPORT] ${e instanceof Error ? e.message : String(e)}\n`);
   process.exit(2);
 });
+
+function materializeControlArtifacts(
+  op: string,
+  args: Record<string, unknown>,
+  result: unknown,
+): unknown {
+  if (op !== "ui_editor_preview_capture" || typeof args.out !== "string") return result;
+  if (!result || typeof result !== "object") return result;
+  const payload = result as { screenshot?: unknown };
+  if (typeof payload.screenshot !== "string" || payload.screenshot.length === 0) return result;
+  writeFileSync(args.out, Buffer.from(stripDataUrlPrefix(payload.screenshot), "base64"));
+  return result;
+}
+
+function stripDataUrlPrefix(value: string): string {
+  const comma = value.indexOf(",");
+  return value.startsWith("data:") && comma >= 0 ? value.slice(comma + 1) : value;
+}
