@@ -63,7 +63,7 @@ func TestCreateCharacterRejectsDuplicateAlias(t *testing.T) {
 
 func TestLegacyAgencyMigrationKeepsAnyProgressField(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "lobby.json")
-	before := Store{
+	before := &Store{
 		NextID:     2,
 		NextCharID: 1,
 		ByName: map[string]*User{
