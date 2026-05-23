@@ -4,6 +4,7 @@
 #include "primitives/button.h"
 #include "ui_editor_preview_model.h"
 
+#include <cstddef>
 #include <functional>
 #include <string>
 
@@ -24,6 +25,12 @@ struct UiDocumentRendererOptions {
 	std::function<bool(const std::string&)> canBuildComponent;
 	std::function<bool(const std::string&)> canResolveTextBinding;
 	std::function<bool(const std::string&)> canHandleAction;
+	const char * const * runtimeComponents = nullptr;
+	std::size_t runtimeComponentCount = 0;
+	const char * const * runtimeTextBindings = nullptr;
+	std::size_t runtimeTextBindingCount = 0;
+	const char * const * runtimeActions = nullptr;
+	std::size_t runtimeActionCount = 0;
 };
 
 void BuildUiDocument(const silencer::ui::UiEditorPreviewDocument& document,

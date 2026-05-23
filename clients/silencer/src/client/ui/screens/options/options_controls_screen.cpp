@@ -25,10 +25,26 @@ namespace options_controls_screen_detail {
 
 constexpr int REBIND_TIMEOUT_TICKS = 72;
 constexpr int kLegacyViewportW = 640;
-constexpr int kRowsViewportH = 234;
 
 bool IsBuiltinKeybindProfile(const std::string & name) {
 	return name == "default" || name == "wasd" || name == "gamepad";
+}
+
+const silencer::ui::UiEditorNode * FindNodeByComponent(
+	const silencer::ui::UiEditorNode& node,
+	const char * component) {
+	if(node.component == component) return &node;
+	for(const silencer::ui::UiEditorNode& child : node.children){
+		const silencer::ui::UiEditorNode * found =
+			FindNodeByComponent(child, component);
+		if(found) return found;
+	}
+	return nullptr;
+}
+
+int FixedSizeOr(const silencer::ui::UiEditorSize& size, int fallback) {
+	if(size.mode != silencer::ui::UiEditorSize::Mode::Fixed) return fallback;
+	return std::max(1, static_cast<int>(size.value + 0.5f));
 }
 
 }  // namespace options_controls_screen_detail
@@ -185,10 +201,23 @@ void OptionsControlsScreen::BuildUi(ScreenContext & ctx, Surface & dst, float fr
 
 	const silencer::ui::UiInputState & input = ctx.game.CurrentUiInput();
 	const int layoutWidth = std::max(1, input.width);
+	const silencer::ui::UiEditorNode * keybindRowsNode =
+		options_controls_screen_detail::FindNodeByComponent(
+			layoutDocument_.root,
+			silencer::client_ui::options_controls::kComponentKeybindRows);
+	const int keybindRowsWidth = keybindRowsNode
+		? options_controls_screen_detail::FixedSizeOr(
+			keybindRowsNode->style.width,
+			kKeybindRowsDefaultWidth)
+		: kKeybindRowsDefaultWidth;
+	const int keybindRowsHeight = keybindRowsNode
+		? options_controls_screen_detail::FixedSizeOr(
+			keybindRowsNode->style.height,
+			kKeybindRowsDefaultHeight)
+		: kKeybindRowsDefaultHeight;
 	visibleRowCapacity_ = std::min<int>(
 		(int)Action::Count,
-		KeybindRowsVisibleRowsForHeight(
-			options_controls_screen_detail::kRowsViewportH));
+		KeybindRowsVisibleRowsForHeight(keybindRowsHeight));
 	scrollPosition = std::max(0, std::min(MaxScroll(), scrollPosition));
 
 	// The keybind list's interior widths are hardcoded legacy pixels (designed
@@ -201,6 +230,8 @@ void OptionsControlsScreen::BuildUi(ScreenContext & ctx, Surface & dst, float fr
 			/ static_cast<float>(options_controls_screen_detail::kLegacyViewportW));
 
 	keybindListView_ = KeybindListView{};
+	keybindListView_.contentWidth = keybindRowsWidth;
+	keybindListView_.viewportHeight = keybindRowsHeight;
 	keybindListView_.hScale = keybindHScale;
 	keybindListView_.presetText = !ctx.keymap.label.empty() ? ctx.keymap.label
 	                            : !ctx.keymap.name.empty() ? ctx.keymap.name
@@ -226,7 +257,8 @@ void OptionsControlsScreen::BuildUi(ScreenContext & ctx, Surface & dst, float fr
 			silencer::client_ui::options_controls::kOptionsControlsSurface);
 	silencer::client_ui::options_controls::ApplyOptionsControlsRuntimeHandlers(
 		options,
-		&keybindListView_);
+		silencer::client_ui::options_controls::OptionsControlsLiveRuntimeContext(
+			keybindListView_));
 	silencer::client_ui::BuildUiDocument(layoutDocument_, interactions, options);
 }
 

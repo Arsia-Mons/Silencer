@@ -250,6 +250,86 @@ bool ValidateUiDocumentRuntimeTokensForNode(const UiEditorNode& node,
 	return true;
 }
 
+bool TokenListContains(const char * const * values,
+                       std::size_t valueCount,
+                       const std::string& value) {
+	for(std::size_t i = 0; i < valueCount; ++i){
+		if(value == values[i]) return true;
+	}
+	return false;
+}
+
+const silencer::net::ui_layout_contract::SurfaceTokens * FindGeneratedSurfaceTokens(
+	const std::string& surface) {
+	for(std::size_t i = 0; i < silencer::net::ui_layout_contract::kSurfaceTokensCount; ++i){
+		const auto& candidate = silencer::net::ui_layout_contract::kSurfaceTokens[i];
+		if(surface == candidate.surface) return &candidate;
+	}
+	return nullptr;
+}
+
+bool ValidateRuntimeTokenList(const char * label,
+                              const char * const * generated,
+                              std::size_t generatedCount,
+                              const char * const * runtime,
+                              std::size_t runtimeCount,
+                              std::string& error) {
+	if(generatedCount != runtimeCount){
+		error = std::string("runtime ") + label + " token count does not match generated contract";
+		return false;
+	}
+	if((generatedCount > 0 && !generated) || (runtimeCount > 0 && !runtime)){
+		error = std::string("runtime ") + label + " token table is missing";
+		return false;
+	}
+	for(std::size_t i = 0; i < generatedCount; ++i){
+		if(!TokenListContains(runtime, runtimeCount, generated[i])){
+			error = std::string("runtime ") + label +
+			        " token table is missing generated token " + generated[i];
+			return false;
+		}
+	}
+	for(std::size_t i = 0; i < runtimeCount; ++i){
+		if(!TokenListContains(generated, generatedCount, runtime[i])){
+			error = std::string("runtime ") + label +
+			        " token table contains non-generated token " + runtime[i];
+			return false;
+		}
+	}
+	return true;
+}
+
+bool ValidateRuntimeSurfaceTokenTables(
+	const std::string& surface,
+	const UiDocumentRendererOptions& options,
+	std::string& error) {
+	const silencer::net::ui_layout_contract::SurfaceTokens * generated =
+		FindGeneratedSurfaceTokens(surface);
+	if(!generated) return true;
+	if(!ValidateRuntimeTokenList("component",
+	                             generated->components,
+	                             generated->componentCount,
+	                             options.runtimeComponents,
+	                             options.runtimeComponentCount,
+	                             error)){
+		return false;
+	}
+	if(!ValidateRuntimeTokenList("text binding",
+	                             generated->textBindings,
+	                             generated->textBindingCount,
+	                             options.runtimeTextBindings,
+	                             options.runtimeTextBindingCount,
+	                             error)){
+		return false;
+	}
+	return ValidateRuntimeTokenList("action",
+	                                generated->actions,
+	                                generated->actionCount,
+	                                options.runtimeActions,
+	                                options.runtimeActionCount,
+	                                error);
+}
+
 }  // namespace
 
 void BuildUiDocument(const silencer::ui::UiEditorPreviewDocument& document,
@@ -332,6 +412,9 @@ bool ValidateUiDocumentRuntimeTokens(
 	const silencer::ui::UiEditorPreviewDocument& document,
 	const UiDocumentRendererOptions& options,
 	std::string& error) {
+	if(!ValidateRuntimeSurfaceTokenTables(document.surface, options, error)){
+		return false;
+	}
 	return ValidateUiDocumentRuntimeTokensForNode(document.root, options, error);
 }
 

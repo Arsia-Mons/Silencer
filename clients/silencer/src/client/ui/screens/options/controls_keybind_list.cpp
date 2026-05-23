@@ -26,7 +26,6 @@ using silencer::ui::primitives::ButtonOpts;
 using silencer::ui::primitives::ButtonSize;
 using silencer::ui::primitives::ButtonVariant;
 
-constexpr uint16_t kContentW = 486;
 constexpr uint16_t kRowH = 43;
 constexpr uint16_t kRowGap = 10;
 constexpr uint16_t kActionNameW = 180;
@@ -118,7 +117,8 @@ void BuildKeybindRows(const KeybindListView & view,
 		int r = static_cast<int>(v * hs + 0.5f);
 		return r < 1 ? 1 : r;
 	};
-	const float    contentW    = static_cast<float>(S(controls_keybind_list_detail::kContentW));
+	const float    contentW    = static_cast<float>(S(view.contentWidth));
+	const float    viewportH   = static_cast<float>(std::max(1, view.viewportHeight));
 	const float    actionNameW = static_cast<float>(S(controls_keybind_list_detail::kActionNameW));
 	const int      operatorW   = S(controls_keybind_list_detail::kOperatorW);
 	const uint16_t columnGap   = static_cast<uint16_t>(S(controls_keybind_list_detail::kColumnGap));
@@ -127,7 +127,7 @@ void BuildKeybindRows(const KeybindListView & view,
 	CLAY({ .id = scrollAreaId,
 	       .layout = {
 	           .sizing = { CLAY_SIZING_FIXED(contentW),
-	                       CLAY_SIZING_GROW(0) },
+	                       CLAY_SIZING_FIXED(viewportH) },
 	           .childGap = controls_keybind_list_detail::kRowGap,
 	           .layoutDirection = CLAY_TOP_TO_BOTTOM,
 	       },

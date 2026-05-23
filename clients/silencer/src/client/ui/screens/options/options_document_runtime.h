@@ -76,14 +76,21 @@ struct OptionsControlsAction {
 using OptionsControlsActionHandler =
 	std::function<bool(const OptionsControlsAction&)>;
 
+struct OptionsControlsRuntimeContext {
+	const options::KeybindListView * keybindListView = nullptr;
+};
+
 bool IsOptionsControlsComponent(const std::string& component);
 bool IsOptionsControlsTextBinding(const std::string& binding);
 bool IsOptionsControlsAction(const std::string& action);
 bool HandleOptionsControlsAction(const std::string& action,
                                  const OptionsControlsActionHandler& handler);
+OptionsControlsRuntimeContext OptionsControlsPreviewRuntimeContext();
+OptionsControlsRuntimeContext OptionsControlsLiveRuntimeContext(
+	const options::KeybindListView& keybindListView);
 void ApplyOptionsControlsRuntimeHandlers(
 	UiDocumentRendererOptions& options,
-	const options::KeybindListView * keybindListView = nullptr);
+	const OptionsControlsRuntimeContext& context);
 
 }  // namespace silencer::client_ui::options_controls
 

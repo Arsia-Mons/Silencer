@@ -16,6 +16,15 @@ const MainMenuActionDescriptor kMainMenuActions[] = {
 	{ kActionExit, MainMenuAction::Exit },
 };
 
+const char * const kMainMenuComponents[] = { kMainMenuLogoComponent };
+const char * const kMainMenuTextBindings[] = { kClientVersionBinding };
+const char * const kMainMenuActionTokens[] = {
+	kActionTutorial,
+	kActionLobby,
+	kActionOptions,
+	kActionExit,
+};
+
 const MainMenuActionDescriptor * FindMainMenuAction(const std::string& action) {
 	for(const auto& descriptor : kMainMenuActions){
 		if(action == descriptor.token) return &descriptor;
@@ -66,6 +75,12 @@ void ApplyMainMenuRuntimeHandlers(UiDocumentRendererOptions& options,
 	options.canBuildComponent = IsMainMenuComponent;
 	options.canResolveTextBinding = IsMainMenuTextBinding;
 	options.canHandleAction = IsMainMenuAction;
+	options.runtimeComponents = kMainMenuComponents;
+	options.runtimeComponentCount = 1;
+	options.runtimeTextBindings = kMainMenuTextBindings;
+	options.runtimeTextBindingCount = 1;
+	options.runtimeActions = kMainMenuActionTokens;
+	options.runtimeActionCount = 4;
 	if(resources && logo){
 		options.buildComponent = [resources, logo](
 			const silencer::ui::UiEditorNode& node,

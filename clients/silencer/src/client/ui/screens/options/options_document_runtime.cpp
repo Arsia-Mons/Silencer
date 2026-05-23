@@ -55,6 +55,13 @@ const OptionsMenuActionDescriptor kOptionsMenuActions[] = {
 	{ kActionBack, OptionsMenuAction::Back },
 };
 
+const char * const kOptionsMenuActionTokens[] = {
+	kActionControls,
+	kActionDisplay,
+	kActionAudio,
+	kActionBack,
+};
+
 const OptionsMenuActionDescriptor * FindOptionsMenuAction(
 	const std::string& action) {
 	for(const auto& descriptor : kOptionsMenuActions){
@@ -81,6 +88,8 @@ bool HandleOptionsMenuAction(const std::string& action,
 void ApplyOptionsMenuRuntimeHandlers(UiDocumentRendererOptions& options)
 {
 	options.canHandleAction = IsOptionsMenuAction;
+	options.runtimeActions = kOptionsMenuActionTokens;
+	options.runtimeActionCount = 4;
 }
 
 }  // namespace silencer::client_ui::options_menu
@@ -100,6 +109,14 @@ const OptionsControlsStaticActionDescriptor kOptionsControlsStaticActions[] = {
 	{ kActionCancel, OptionsControlsAction::Kind::Cancel },
 };
 
+const char * const kOptionsControlsComponents[] = { kComponentKeybindRows };
+const char * const kOptionsControlsTextBindings[] = { kPresetLabelBinding };
+const char * const kOptionsControlsActionTokens[] = {
+	kActionPreset,
+	kActionSave,
+	kActionCancel,
+};
+
 const OptionsControlsStaticActionDescriptor * FindOptionsControlsStaticAction(
 	const std::string& action) {
 	for(const auto& descriptor : kOptionsControlsStaticActions){
@@ -115,6 +132,27 @@ bool HandleRowAction(const std::string& action,
 	const int row = SuffixInt(action, prefix);
 	if(row < 0) return false;
 	return handler && handler(OptionsControlsAction{ kind, row });
+}
+
+options::KeybindListView MakeOptionsControlsPreviewKeybindListView() {
+	options::KeybindListView view;
+	view.presetText = "Default";
+	view.contentWidth = options::kKeybindRowsDefaultWidth;
+	view.viewportHeight = options::kKeybindRowsDefaultHeight;
+	view.visibleRowCount = options::kKeybindListDefaultVisibleRows;
+	view.rows = {
+		options::KeybindRowView{ "Move Up:", "Up", "", "OR", false, false },
+		options::KeybindRowView{ "Move Down:", "Down", "", "OR", false, false },
+		options::KeybindRowView{ "Move Left:", "Left", "", "OR", false, false },
+		options::KeybindRowView{ "Move Right:", "Right", "", "OR", false, false },
+	};
+	return view;
+}
+
+const options::KeybindListView& OptionsControlsPreviewKeybindListView() {
+	static const options::KeybindListView view =
+		MakeOptionsControlsPreviewKeybindListView();
+	return view;
 }
 
 }  // namespace
@@ -156,11 +194,31 @@ bool HandleOptionsControlsAction(const std::string& action,
 	                       OptionsControlsAction::Kind::Operator, handler);
 }
 
+OptionsControlsRuntimeContext OptionsControlsPreviewRuntimeContext()
+{
+	return OptionsControlsRuntimeContext{ &OptionsControlsPreviewKeybindListView() };
+}
+
+OptionsControlsRuntimeContext OptionsControlsLiveRuntimeContext(
+	const options::KeybindListView& keybindListView)
+{
+	return OptionsControlsRuntimeContext{ &keybindListView };
+}
+
 void ApplyOptionsControlsRuntimeHandlers(
 	UiDocumentRendererOptions& options,
-	const options::KeybindListView * keybindListView)
+	const OptionsControlsRuntimeContext& context)
 {
-	options.canBuildComponent = IsOptionsControlsComponent;
+	const options::KeybindListView * keybindListView = context.keybindListView;
+	options.runtimeComponents = kOptionsControlsComponents;
+	options.runtimeComponentCount = 1;
+	options.runtimeTextBindings = kOptionsControlsTextBindings;
+	options.runtimeTextBindingCount = 1;
+	options.runtimeActions = kOptionsControlsActionTokens;
+	options.runtimeActionCount = 3;
+	options.canBuildComponent = [keybindListView](const std::string& component) {
+		return keybindListView && IsOptionsControlsComponent(component);
+	};
 	options.canResolveTextBinding = IsOptionsControlsTextBinding;
 	options.canHandleAction = IsOptionsControlsAction;
 	options.resolveTextBinding = [keybindListView](const std::string& binding,
@@ -171,17 +229,15 @@ void ApplyOptionsControlsRuntimeHandlers(
 			: std::string("default");
 		return true;
 	};
-	if(keybindListView){
-		options.buildComponent = [keybindListView](
-			const silencer::ui::UiEditorNode& node,
-			silencer::ui::UiInteractionRegistry& interactions) {
-			if(node.component != kComponentKeybindRows) return false;
-			silencer::client_ui::options::BuildKeybindRows(
-				*keybindListView,
-				interactions);
-			return true;
-		};
-	}
+	options.buildComponent = [keybindListView](
+		const silencer::ui::UiEditorNode& node,
+		silencer::ui::UiInteractionRegistry& interactions) {
+		if(!keybindListView || node.component != kComponentKeybindRows) return false;
+		silencer::client_ui::options::BuildKeybindRows(
+			*keybindListView,
+			interactions);
+		return true;
+	};
 }
 
 }  // namespace silencer::client_ui::options_controls
@@ -200,6 +256,17 @@ const OptionsDisplayActionDescriptor kOptionsDisplayActions[] = {
 	{ kActionSmoothScaling, OptionsDisplayAction::SmoothScaling },
 	{ kActionSave, OptionsDisplayAction::Save },
 	{ kActionCancel, OptionsDisplayAction::Cancel },
+};
+
+const char * const kOptionsDisplayComponents[] = {
+	kComponentFullscreenIndicator,
+	kComponentSmoothScalingIndicator,
+};
+const char * const kOptionsDisplayActionTokens[] = {
+	kActionFullscreen,
+	kActionSmoothScaling,
+	kActionSave,
+	kActionCancel,
 };
 
 const OptionsDisplayActionDescriptor * FindOptionsDisplayAction(
@@ -233,6 +300,10 @@ bool HandleOptionsDisplayAction(const std::string& action,
 
 void ApplyOptionsDisplayRuntimeHandlers(UiDocumentRendererOptions& options)
 {
+	options.runtimeComponents = kOptionsDisplayComponents;
+	options.runtimeComponentCount = 2;
+	options.runtimeActions = kOptionsDisplayActionTokens;
+	options.runtimeActionCount = 4;
 	options.canBuildComponent = IsOptionsDisplayComponent;
 	options.canHandleAction = IsOptionsDisplayAction;
 	options.buildComponent = [](const silencer::ui::UiEditorNode& node,
@@ -272,6 +343,13 @@ const OptionsAudioActionDescriptor kOptionsAudioActions[] = {
 	{ kActionCancel, OptionsAudioAction::Cancel },
 };
 
+const char * const kOptionsAudioComponents[] = { kComponentMusicIndicator };
+const char * const kOptionsAudioActionTokens[] = {
+	kActionMusic,
+	kActionSave,
+	kActionCancel,
+};
+
 const OptionsAudioActionDescriptor * FindOptionsAudioAction(
 	const std::string& action) {
 	for(const auto& descriptor : kOptionsAudioActions){
@@ -302,6 +380,10 @@ bool HandleOptionsAudioAction(const std::string& action,
 
 void ApplyOptionsAudioRuntimeHandlers(UiDocumentRendererOptions& options)
 {
+	options.runtimeComponents = kOptionsAudioComponents;
+	options.runtimeComponentCount = 1;
+	options.runtimeActions = kOptionsAudioActionTokens;
+	options.runtimeActionCount = 3;
 	options.canBuildComponent = IsOptionsAudioComponent;
 	options.canHandleAction = IsOptionsAudioAction;
 	options.buildComponent = [](const silencer::ui::UiEditorNode& node,

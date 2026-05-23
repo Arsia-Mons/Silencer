@@ -13,7 +13,9 @@ UiDocumentRendererOptions UiDocumentRendererOptionsForSurface(
 	}else if(surface == options_menu::kOptionsSurface){
 		options_menu::ApplyOptionsMenuRuntimeHandlers(options);
 	}else if(surface == options_controls::kOptionsControlsSurface){
-		options_controls::ApplyOptionsControlsRuntimeHandlers(options);
+		options_controls::ApplyOptionsControlsRuntimeHandlers(
+			options,
+			options_controls::OptionsControlsPreviewRuntimeContext());
 	}else if(surface == options_display::kOptionsDisplaySurface){
 		options_display::ApplyOptionsDisplayRuntimeHandlers(options);
 	}else if(surface == options_audio::kOptionsAudioSurface){

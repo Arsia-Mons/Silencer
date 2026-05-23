@@ -121,6 +121,27 @@ if (component.w !== expectedWidth) {
 '
 }
 
+expect_controls_preview_rows() {
+  local path="$TMP_DIR/options-controls.json"
+  local png="$TMP_DIR/options-controls-rows.png"
+  local log="$TMP_DIR/options-controls-rows.out"
+  make_surface_doc "$path" "options-controls"
+  cli --port "$PORT" ui_editor_preview_capture --document "$(cat "$path")" --out "$png" >"$log"
+  test -s "$png"
+  LOG="$log" bun -e '
+const result = JSON.parse(await Bun.file(process.env.LOG).text());
+const widgets = result.inspect?.widgets ?? [];
+if (!widgets.some((candidate) =>
+  candidate.kind === "button" &&
+  candidate.id === "options_controls.primary.0" &&
+  candidate.label === "Up"
+)) {
+  console.error("options-controls preview did not render fixture keybind row widgets");
+  process.exit(1);
+}
+'
+}
+
 expect_button_width() {
   local name="$1" mutator="$2" label="$3" expected="$4"
   local path="$TMP_DIR/$name.json"
@@ -156,6 +177,7 @@ test -s "$valid_png"
 expect_button_width "fixed-small-button" "fixed-small-button" "OK" "80"
 expect_button_width "fixed-long-button" "fixed-long-button" "VERY LONG PREVIEW BUTTON LABEL" "120"
 expect_surface_preview_component "options-controls" "Save" "OptionsControlsKeybindRows" "486"
+expect_controls_preview_rows
 expect_surface_preview_component "options-display" "Smooth Scaling" "OptionsDisplaySmoothScalingIndicator" "50"
 expect_surface_preview_component "options-audio" "Music" "OptionsAudioMusicIndicator" "50"
 
