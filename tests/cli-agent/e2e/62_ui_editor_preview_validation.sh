@@ -63,6 +63,16 @@ writeFileSync(process.env.OUT, JSON.stringify(document));
 '
 }
 
+make_surface_doc() {
+  local out="$1" surface="$2"
+  SURFACE="$surface" OUT="$out" bun -e '
+import { writeFileSync } from "node:fs";
+import { createDefaultUiDocument } from "./web/admin/lib/ui-layout.ts";
+
+writeFileSync(process.env.OUT, JSON.stringify(createDefaultUiDocument(process.env.SURFACE)));
+'
+}
+
 expect_bad_document() {
   local name="$1" mutator="$2"
   local path="$TMP_DIR/$name.json"
@@ -78,6 +88,37 @@ expect_bad_document() {
     cat "$log" >&2
     exit 1
   fi
+}
+
+expect_surface_preview_component() {
+  local surface="$1" label="$2" component_id="$3" expected_width="$4"
+  local path="$TMP_DIR/$surface.json"
+  local png="$TMP_DIR/$surface.png"
+  local log="$TMP_DIR/$surface.out"
+  make_surface_doc "$path" "$surface"
+  cli --port "$PORT" ui_editor_preview_capture --document "$(cat "$path")" --out "$png" >"$log"
+  test -s "$png"
+  LOG="$log" LABEL="$label" COMPONENT_ID="$component_id" EXPECTED_WIDTH="$expected_width" bun -e '
+const result = JSON.parse(await Bun.file(process.env.LOG).text());
+const widgets = result.inspect?.widgets ?? [];
+const elements = result.inspect?.elements ?? [];
+if (!widgets.some((candidate) =>
+  candidate.kind === "button" && candidate.label === process.env.LABEL
+)) {
+  console.error(`button ${process.env.LABEL} missing in ${process.env.LOG}`);
+  process.exit(1);
+}
+const component = elements.find((candidate) => candidate.id === process.env.COMPONENT_ID);
+if (!component) {
+  console.error(`component ${process.env.COMPONENT_ID} missing in ${process.env.LOG}`);
+  process.exit(1);
+}
+const expectedWidth = Number(process.env.EXPECTED_WIDTH);
+if (component.w !== expectedWidth) {
+  console.error(`component ${process.env.COMPONENT_ID} width ${component.w} !== ${expectedWidth}`);
+  process.exit(1);
+}
+'
 }
 
 expect_button_width() {
@@ -114,6 +155,8 @@ test -s "$valid_png"
 
 expect_button_width "fixed-small-button" "fixed-small-button" "OK" "80"
 expect_button_width "fixed-long-button" "fixed-long-button" "VERY LONG PREVIEW BUTTON LABEL" "120"
+expect_surface_preview_component "options-display" "Smooth Scaling" "OptionsDisplaySmoothScalingIndicator" "50"
+expect_surface_preview_component "options-audio" "Music" "OptionsAudioMusicIndicator" "50"
 
 expect_bad_document "invalid-viewport" "invalid-viewport"
 expect_bad_document "empty-surface" "empty-surface"

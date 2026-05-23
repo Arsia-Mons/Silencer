@@ -1,7 +1,9 @@
 import { describe, expect, test } from "bun:test";
 import {
+  canCreateUiNodeKind,
   createDefaultUiDocument,
   createNode,
+  createNodeForSurface,
   duplicateNode,
   findNode,
   getUiSurfaceTokenManifest,
@@ -141,16 +143,30 @@ describe("ui-layout model", () => {
 
     const display = createDefaultUiDocument("options-display");
     expect(display.surface).toBe("options-display");
-    expect(findNode(display.root, "OptionsDisplayFullscreenRow")?.component).toBe(
-      "options_display.fullscreen_row",
+    expect(findNode(display.root, "OptionsDisplayFullscreenButton")?.action).toBe(
+      "options_display.fullscreen",
+    );
+    expect(findNode(display.root, "OptionsDisplayFullscreenIndicator")?.component).toBe(
+      "options_display.fullscreen_indicator",
     );
   });
 
   test("returns built-in surface token manifests for editor authoring", () => {
     expect(getUiSurfaceTokenManifest("main-menu")?.actions).toContain("main_menu.options");
     expect(getUiSurfaceTokenManifest("options-display")?.components).toContain(
-      "options_display.smooth_scaling_row",
+      "options_display.smooth_scaling_indicator",
     );
+  });
+
+  test("creates token-bearing nodes from the current surface manifest", () => {
+    const manifest = getUiSurfaceTokenManifest("options-display");
+    const button = createNodeForSurface("button", manifest, "display-button");
+    const component = createNodeForSurface("component", manifest, "display-indicator");
+
+    expect(button.action).toBe("options_display.fullscreen");
+    expect(component.component).toBe("options_display.fullscreen_indicator");
+    expect(canCreateUiNodeKind("button", manifest)).toBe(true);
+    expect(canCreateUiNodeKind("component", getUiSurfaceTokenManifest("options"))).toBe(false);
   });
 
   test("rejects duplicate imported node ids", () => {

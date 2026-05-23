@@ -17,6 +17,7 @@ import {
   UI_SIZE_RULES_BY_KIND,
   UI_STYLE_FIELDS_BY_KIND,
   canHaveChildren,
+  canCreateUiNodeKind,
   type UiAlign,
   type UiAttachPoint,
   type UiAttachTo,
@@ -147,8 +148,9 @@ export function Inspector({
             {PALETTE_NODE_KINDS.map((kind) => (
               <button
                 key={kind}
+                disabled={!canCreateUiNodeKind(kind, tokenManifest)}
                 onClick={() => onAddChild(kind)}
-                className="border border-game-border px-2 py-1.5 text-[11px] tracking-widest text-game-textDim hover:text-game-text hover:border-game-primary"
+                className="border border-game-border px-2 py-1.5 text-[11px] tracking-widest text-game-textDim hover:text-game-text hover:border-game-primary disabled:opacity-35"
               >
                 + {KIND_LABELS[kind]}
               </button>

@@ -22,7 +22,9 @@ constexpr uint16_t kIndicatorGap = 10;
 constexpr uint16_t kIndicatorSpriteW = 20;
 constexpr uint16_t kIndicatorSpriteH = 33;
 
-void BooleanIndicator(Clay_String id, bool selected)
+}  // namespace
+
+void BooleanSettingIndicator(Clay_String id, bool selected)
 {
 	CLAY({ .id = CLAY_SIDI(id, 2),
 	       .layout = {
@@ -46,8 +48,6 @@ void BooleanIndicator(Clay_String id, bool selected)
 	}
 }
 
-}  // namespace
-
 void BooleanSettingRow(Clay_String id,
                        Clay_String buttonId,
                        Clay_String label,
@@ -65,7 +65,7 @@ void BooleanSettingRow(Clay_String id,
 		Button(buttonId, label,
 		       ButtonOpts{ .variant = ButtonVariant::Oval, .size = ButtonSize::Lg },
 		       ButtonHandle{ nullptr, actionId, &interactions });
-		BooleanIndicator(id, selected);
+		BooleanSettingIndicator(id, selected);
 	}
 }
 

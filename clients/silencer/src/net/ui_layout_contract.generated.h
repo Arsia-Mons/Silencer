@@ -552,9 +552,9 @@ constexpr const char * kUiSurfaceOptionsDisplay = "options-display";
 constexpr const char * kUiSurfaceOptionsAudio = "options-audio";
 
 constexpr const char * kUiComponentMainMenuLogo = "main-menu.logo";
-constexpr const char * kUiComponentOptionsDisplayFullscreenRow = "options_display.fullscreen_row";
-constexpr const char * kUiComponentOptionsDisplaySmoothScalingRow = "options_display.smooth_scaling_row";
-constexpr const char * kUiComponentOptionsAudioMusicRow = "options_audio.music_row";
+constexpr const char * kUiComponentOptionsDisplayFullscreenIndicator = "options_display.fullscreen_indicator";
+constexpr const char * kUiComponentOptionsDisplaySmoothScalingIndicator = "options_display.smooth_scaling_indicator";
+constexpr const char * kUiComponentOptionsAudioMusicIndicator = "options_audio.music_indicator";
 constexpr const char * kUiTextBindingClientVersion = "client.version";
 constexpr const char * kUiActionMainMenuTutorial = "main_menu.tutorial";
 constexpr const char * kUiActionMainMenuLobby = "main_menu.lobby";
@@ -609,8 +609,8 @@ constexpr const char * kOptionsActions[] = {
 constexpr std::size_t kOptionsActionsCount = 4;
 
 constexpr const char * kOptionsDisplayComponents[] = {
-	"options_display.fullscreen_row",
-	"options_display.smooth_scaling_row",
+	"options_display.fullscreen_indicator",
+	"options_display.smooth_scaling_indicator",
 };
 constexpr std::size_t kOptionsDisplayComponentsCount = 2;
 
@@ -628,7 +628,7 @@ constexpr const char * kOptionsDisplayActions[] = {
 constexpr std::size_t kOptionsDisplayActionsCount = 4;
 
 constexpr const char * kOptionsAudioComponents[] = {
-	"options_audio.music_row",
+	"options_audio.music_indicator",
 };
 constexpr std::size_t kOptionsAudioComponentsCount = 1;
 

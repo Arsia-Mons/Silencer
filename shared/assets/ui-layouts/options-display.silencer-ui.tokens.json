@@ -1,8 +1,8 @@
 {
   "surface": "options-display",
   "components": [
-    "options_display.fullscreen_row",
-    "options_display.smooth_scaling_row"
+    "options_display.fullscreen_indicator",
+    "options_display.smooth_scaling_indicator"
   ],
   "textBindings": [],
   "actions": [

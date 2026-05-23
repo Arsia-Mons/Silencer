@@ -1,5 +1,6 @@
 #include "layout/ui_document_runtime_registry.h"
 
+#include "options/options_document_runtime.h"
 #include "ui_layout_surface_tokens.h"
 
 namespace silencer::client_ui {
@@ -16,6 +17,11 @@ UiDocumentRendererOptions UiDocumentRendererOptionsForSurface(
 	options.canHandleAction = [surface](const std::string& action) {
 		return silencer::net::UiLayoutSurfaceAllowsAction(surface, action);
 	};
+	if(surface == options_display::kOptionsDisplaySurface){
+		options_display::ApplyOptionsDisplayRuntimeHandlers(options);
+	}else if(surface == options_audio::kOptionsAudioSurface){
+		options_audio::ApplyOptionsAudioRuntimeHandlers(options);
+	}
 	return options;
 }
 

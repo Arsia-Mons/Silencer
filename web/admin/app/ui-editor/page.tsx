@@ -6,8 +6,9 @@ import { useAuth } from "../../lib/auth";
 import { useWsConnected } from "../../lib/socket";
 import {
   canHaveChildren,
+  canCreateUiNodeKind,
   createDefaultUiDocument,
-  createNode,
+  createNodeForSurface,
   duplicateNode,
   findNode,
   findParent,
@@ -184,8 +185,12 @@ export default function UiEditorPage() {
   }
 
   function addNode(kind: UiNodeKind, targetId = selectedNode.id) {
+    if (!canCreateUiNodeKind(kind, currentTokenManifest)) {
+      setStatus(`NO ${kind.toUpperCase()} TOKEN FOR ${document.surface}`);
+      return;
+    }
     const target = findNode(document.root, targetId) ?? document.root;
-    const node = createNode(kind);
+    const node = createNodeForSurface(kind, currentTokenManifest);
     const next = canHaveChildren(target.kind)
       ? insertChild(document, target.id, node)
       : insertAfter(document, target.id, node);
@@ -331,7 +336,7 @@ export default function UiEditorPage() {
 
         <div className="min-h-0 flex-1 grid grid-cols-[260px_minmax(0,1fr)_340px] border-t border-game-border">
           <section className="min-h-0 border-r border-game-border bg-game-bgCard/90 flex flex-col">
-            <Palette onAdd={addNode} />
+            <Palette tokenManifest={currentTokenManifest} onAdd={addNode} />
             <Hierarchy
               selectedId={selectedNode.id}
               root={document.root}

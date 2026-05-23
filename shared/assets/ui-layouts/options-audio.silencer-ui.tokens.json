@@ -1,7 +1,7 @@
 {
   "surface": "options-audio",
   "components": [
-    "options_audio.music_row"
+    "options_audio.music_indicator"
   ],
   "textBindings": [],
   "actions": [

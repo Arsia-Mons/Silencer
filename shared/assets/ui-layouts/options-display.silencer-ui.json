@@ -98,9 +98,8 @@
             "children": [
               {
                 "id": "OptionsDisplayFullscreenRow",
-                "kind": "component",
+                "kind": "row",
                 "name": "Fullscreen Row",
-                "component": "options_display.fullscreen_row",
                 "style": {
                   "width": {
                     "mode": "fit"
@@ -108,14 +107,54 @@
                   "height": {
                     "mode": "fixed",
                     "value": 33
+                  },
+                  "direction": "row",
+                  "align": "center",
+                  "justify": "start",
+                  "padding": 0,
+                  "gap": 24
+                },
+                "children": [
+                  {
+                    "id": "OptionsDisplayFullscreenButton",
+                    "kind": "button",
+                    "name": "Fullscreen Button",
+                    "text": "Fullscreen",
+                    "action": "options_display.fullscreen",
+                    "buttonVariant": "oval",
+                    "buttonSize": "lg",
+                    "style": {
+                      "width": {
+                        "mode": "fit"
+                      },
+                      "height": {
+                        "mode": "fit"
+                      },
+                      "padding": 0,
+                      "textPalette": 0
+                    }
+                  },
+                  {
+                    "id": "OptionsDisplayFullscreenIndicator",
+                    "kind": "component",
+                    "name": "Fullscreen Indicator",
+                    "component": "options_display.fullscreen_indicator",
+                    "style": {
+                      "width": {
+                        "mode": "fit"
+                      },
+                      "height": {
+                        "mode": "fixed",
+                        "value": 33
+                      }
+                    }
                   }
-                }
+                ]
               },
               {
                 "id": "OptionsDisplaySmoothScalingRow",
-                "kind": "component",
+                "kind": "row",
                 "name": "Smooth Scaling Row",
-                "component": "options_display.smooth_scaling_row",
                 "style": {
                   "width": {
                     "mode": "fit"
@@ -123,8 +162,49 @@
                   "height": {
                     "mode": "fixed",
                     "value": 33
+                  },
+                  "direction": "row",
+                  "align": "center",
+                  "justify": "start",
+                  "padding": 0,
+                  "gap": 24
+                },
+                "children": [
+                  {
+                    "id": "OptionsDisplaySmoothScalingButton",
+                    "kind": "button",
+                    "name": "Smooth Scaling Button",
+                    "text": "Smooth Scaling",
+                    "action": "options_display.smooth_scaling",
+                    "buttonVariant": "oval",
+                    "buttonSize": "lg",
+                    "style": {
+                      "width": {
+                        "mode": "fit"
+                      },
+                      "height": {
+                        "mode": "fit"
+                      },
+                      "padding": 0,
+                      "textPalette": 0
+                    }
+                  },
+                  {
+                    "id": "OptionsDisplaySmoothScalingIndicator",
+                    "kind": "component",
+                    "name": "Smooth Scaling Indicator",
+                    "component": "options_display.smooth_scaling_indicator",
+                    "style": {
+                      "width": {
+                        "mode": "fit"
+                      },
+                      "height": {
+                        "mode": "fixed",
+                        "value": 33
+                      }
+                    }
                   }
-                }
+                ]
               }
             ]
           },

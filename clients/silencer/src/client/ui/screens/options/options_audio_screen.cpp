@@ -9,7 +9,6 @@
 #include "config.h"
 #include "audio.h"
 
-#include "components/boolean_setting_row.h"
 #include "layout/ui_document_renderer.h"
 #include "layout/ui_document_runtime_registry.h"
 #include "runtime/UiInteractionRegistry.h"
@@ -21,11 +20,6 @@
 
 namespace options_audio_screen_detail
 {
-
-Clay_String ClayStringFromStd(const std::string& value)
-{
-	return Clay_String{ false, static_cast<int32_t>(value.size()), value.c_str() };
-}
 
 void ApplyMusicSetting(bool on)
 {
@@ -52,23 +46,6 @@ bool LoadAudioDocument(silencer::ui::UiEditorPreviewDocument& document,
 		document,
 		options,
 		error);
-}
-
-bool BuildAudioComponent(const silencer::ui::UiEditorNode& node,
-                         silencer::ui::UiInteractionRegistry& interactions)
-{
-	if(node.component != silencer::client_ui::options_audio::kComponentMusicRow){
-		return false;
-	}
-	const std::string rowId = node.id + "Content";
-	silencer::client_ui::options::BooleanSettingRow(
-		ClayStringFromStd(rowId),
-		CLAY_STRING("OptionsAudioMusicButton"),
-		CLAY_STRING("Music"),
-		Config::GetInstance().music,
-		silencer::client_ui::options_audio::kActionMusic,
-		interactions);
-	return true;
 }
 } // namespace options_audio_screen_detail
 
@@ -120,9 +97,6 @@ void OptionsAudioScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frame
 	silencer::client_ui::UiDocumentRendererOptions options =
 		silencer::client_ui::UiDocumentRendererOptionsForSurface(
 			silencer::client_ui::options_audio::kOptionsAudioSurface);
-	options.buildComponent = [&interactions](const silencer::ui::UiEditorNode& node) {
-		return options_audio_screen_detail::BuildAudioComponent(node, interactions);
-	};
 	silencer::client_ui::BuildUiDocument(layoutDocument_, interactions, options);
 }
 

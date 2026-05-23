@@ -9,24 +9,16 @@
 #include "config.h"
 #include "renderdevice.h"
 
-#include "components/boolean_setting_row.h"
 #include "layout/ui_document_renderer.h"
 #include "layout/ui_document_runtime_registry.h"
 #include "runtime/UiInteractionRegistry.h"
 #include "ui_document_assets.h"
 
 #include <SDL3/SDL.h>
-#include <SDL3/SDL_video.h>
-
 #include <cstdio>
 
 namespace options_display_screen_detail
 {
-
-Clay_String ClayStringFromStd(const std::string& value)
-{
-	return Clay_String{ false, static_cast<int32_t>(value.size()), value.c_str() };
-}
 
 bool LoadDisplayDocument(silencer::ui::UiEditorPreviewDocument& document,
                          std::string& error)
@@ -44,34 +36,6 @@ bool LoadDisplayDocument(silencer::ui::UiEditorPreviewDocument& document,
 		document,
 		options,
 		error);
-}
-
-bool BuildDisplayComponent(const silencer::ui::UiEditorNode& node,
-                           silencer::ui::UiInteractionRegistry& interactions)
-{
-	Config & cfg = Config::GetInstance();
-	const std::string rowId = node.id + "Content";
-	if(node.component == silencer::client_ui::options_display::kComponentFullscreenRow){
-		silencer::client_ui::options::BooleanSettingRow(
-			ClayStringFromStd(rowId),
-			CLAY_STRING("OptionsDisplayFullscreenButton"),
-			CLAY_STRING("Fullscreen"),
-			cfg.fullscreen,
-			silencer::client_ui::options_display::kActionFullscreen,
-			interactions);
-		return true;
-	}
-	if(node.component == silencer::client_ui::options_display::kComponentSmoothScalingRow){
-		silencer::client_ui::options::BooleanSettingRow(
-			ClayStringFromStd(rowId),
-			CLAY_STRING("OptionsDisplaySmoothScalingButton"),
-			CLAY_STRING("Smooth Scaling"),
-			cfg.scalefilter,
-			silencer::client_ui::options_display::kActionSmoothScaling,
-			interactions);
-		return true;
-	}
-	return false;
 }
 } // namespace options_display_screen_detail
 
@@ -131,9 +95,6 @@ void OptionsDisplayScreen::BuildUi(ScreenContext & ctx, Surface & dst, float fra
 	silencer::client_ui::UiDocumentRendererOptions options =
 		silencer::client_ui::UiDocumentRendererOptionsForSurface(
 			silencer::client_ui::options_display::kOptionsDisplaySurface);
-	options.buildComponent = [&interactions](const silencer::ui::UiEditorNode& node) {
-		return options_display_screen_detail::BuildDisplayComponent(node, interactions);
-	};
 	silencer::client_ui::BuildUiDocument(layoutDocument_, interactions, options);
 }
 

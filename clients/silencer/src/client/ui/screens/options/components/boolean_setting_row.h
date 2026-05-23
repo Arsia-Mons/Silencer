@@ -9,6 +9,8 @@ class UiInteractionRegistry;
 
 namespace silencer::client_ui::options {
 
+void BooleanSettingIndicator(Clay_String id, bool selected);
+
 void BooleanSettingRow(Clay_String id,
                        Clay_String buttonId,
                        Clay_String label,

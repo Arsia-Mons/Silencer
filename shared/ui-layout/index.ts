@@ -162,6 +162,10 @@ export interface UiDocumentValidationOptions {
   requireTokenManifestForSurfaceTokens?: boolean;
 }
 
+export interface UiNodeCreationOptions {
+  tokenManifest?: UiSurfaceTokenManifest | null;
+}
+
 type UiNodeOverrides = Omit<Partial<UiNode>, "style"> & {
   style?: Partial<UiStyle>;
 };
@@ -254,6 +258,7 @@ export function createNode(
   kind: UiNodeKind,
   idSeed = nextIdSeed(),
   overrides: UiNodeOverrides = {},
+  options: UiNodeCreationOptions = {},
 ): UiNode {
   const id = `${kind}-${idSeed}`;
   const base: UiNode = {
@@ -266,11 +271,11 @@ export function createNode(
   if (kind === "text") base.text = "Text";
   if (kind === "button") {
     base.text = "Button";
-    base.action = "action-id";
+    base.action = options.tokenManifest?.actions[0] ?? "action-id";
     base.buttonVariant = "chrome";
     base.buttonSize = "auto";
   }
-  if (kind === "component") base.component = "component-id";
+  if (kind === "component") base.component = options.tokenManifest?.components[0] ?? "component-id";
   if (canHaveChildren(kind)) base.children = [];
 
   return {
@@ -279,6 +284,24 @@ export function createNode(
     style: { ...base.style, ...overrides.style },
     children: overrides.children ?? base.children,
   };
+}
+
+export function createNodeForSurface(
+  kind: UiNodeKind,
+  tokenManifest: UiSurfaceTokenManifest | null | undefined,
+  idSeed = nextIdSeed(),
+  overrides: UiNodeOverrides = {},
+): UiNode {
+  return createNode(kind, idSeed, overrides, { tokenManifest });
+}
+
+export function canCreateUiNodeKind(
+  kind: UiNodeKind,
+  tokenManifest: UiSurfaceTokenManifest | null | undefined,
+): boolean {
+  if (kind === "button") return Boolean(tokenManifest?.actions.length);
+  if (kind === "component") return Boolean(tokenManifest?.components.length);
+  return true;
 }
 
 export function findNode(root: UiNode, id: string): UiNode | null {

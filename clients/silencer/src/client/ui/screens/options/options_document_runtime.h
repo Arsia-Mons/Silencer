@@ -1,7 +1,10 @@
 #ifndef OPTIONS_DOCUMENT_RUNTIME_H
 #define OPTIONS_DOCUMENT_RUNTIME_H
 
+#include "layout/ui_document_renderer.h"
 #include "ui_layout_contract.generated.h"
+
+#include <string>
 
 namespace silencer::client_ui::options_menu {
 
@@ -22,10 +25,10 @@ namespace silencer::client_ui::options_display {
 
 constexpr const char * kOptionsDisplaySurface =
 	silencer::net::ui_layout_contract::kUiSurfaceOptionsDisplay;
-constexpr const char * kComponentFullscreenRow =
-	silencer::net::ui_layout_contract::kUiComponentOptionsDisplayFullscreenRow;
-constexpr const char * kComponentSmoothScalingRow =
-	silencer::net::ui_layout_contract::kUiComponentOptionsDisplaySmoothScalingRow;
+constexpr const char * kComponentFullscreenIndicator =
+	silencer::net::ui_layout_contract::kUiComponentOptionsDisplayFullscreenIndicator;
+constexpr const char * kComponentSmoothScalingIndicator =
+	silencer::net::ui_layout_contract::kUiComponentOptionsDisplaySmoothScalingIndicator;
 constexpr const char * kActionFullscreen =
 	silencer::net::ui_layout_contract::kUiActionOptionsDisplayFullscreen;
 constexpr const char * kActionSmoothScaling =
@@ -35,20 +38,26 @@ constexpr const char * kActionSave =
 constexpr const char * kActionCancel =
 	silencer::net::ui_layout_contract::kUiActionOptionsDisplayCancel;
 
+bool IsOptionsDisplayComponent(const std::string& component);
+void ApplyOptionsDisplayRuntimeHandlers(UiDocumentRendererOptions& options);
+
 }  // namespace silencer::client_ui::options_display
 
 namespace silencer::client_ui::options_audio {
 
 constexpr const char * kOptionsAudioSurface =
 	silencer::net::ui_layout_contract::kUiSurfaceOptionsAudio;
-constexpr const char * kComponentMusicRow =
-	silencer::net::ui_layout_contract::kUiComponentOptionsAudioMusicRow;
+constexpr const char * kComponentMusicIndicator =
+	silencer::net::ui_layout_contract::kUiComponentOptionsAudioMusicIndicator;
 constexpr const char * kActionMusic =
 	silencer::net::ui_layout_contract::kUiActionOptionsAudioMusic;
 constexpr const char * kActionSave =
 	silencer::net::ui_layout_contract::kUiActionOptionsAudioSave;
 constexpr const char * kActionCancel =
 	silencer::net::ui_layout_contract::kUiActionOptionsAudioCancel;
+
+bool IsOptionsAudioComponent(const std::string& component);
+void ApplyOptionsAudioRuntimeHandlers(UiDocumentRendererOptions& options);
 
 }  // namespace silencer::client_ui::options_audio
 

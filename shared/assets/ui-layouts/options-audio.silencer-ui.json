@@ -80,9 +80,8 @@
           },
           {
             "id": "OptionsAudioMusicRow",
-            "kind": "component",
+            "kind": "row",
             "name": "Music Row",
-            "component": "options_audio.music_row",
             "style": {
               "width": {
                 "mode": "fit"
@@ -90,8 +89,49 @@
               "height": {
                 "mode": "fixed",
                 "value": 33
+              },
+              "direction": "row",
+              "align": "center",
+              "justify": "start",
+              "padding": 0,
+              "gap": 24
+            },
+            "children": [
+              {
+                "id": "OptionsAudioMusicButton",
+                "kind": "button",
+                "name": "Music Button",
+                "text": "Music",
+                "action": "options_audio.music",
+                "buttonVariant": "oval",
+                "buttonSize": "lg",
+                "style": {
+                  "width": {
+                    "mode": "fit"
+                  },
+                  "height": {
+                    "mode": "fit"
+                  },
+                  "padding": 0,
+                  "textPalette": 0
+                }
+              },
+              {
+                "id": "OptionsAudioMusicIndicator",
+                "kind": "component",
+                "name": "Music Indicator",
+                "component": "options_audio.music_indicator",
+                "style": {
+                  "width": {
+                    "mode": "fit"
+                  },
+                  "height": {
+                    "mode": "fixed",
+                    "value": 33
+                  }
+                }
               }
-            }
+            ]
           },
           {
             "id": "OptionsAudioActions",

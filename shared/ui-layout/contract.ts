@@ -265,7 +265,10 @@ export const UI_SURFACE_TOKENS_BY_SURFACE = {
     actions: ["options.controls", "options.display", "options.audio", "options.back"],
   },
   "options-display": {
-    components: ["options_display.fullscreen_row", "options_display.smooth_scaling_row"],
+    components: [
+      "options_display.fullscreen_indicator",
+      "options_display.smooth_scaling_indicator",
+    ],
     textBindings: [],
     actions: [
       "options_display.fullscreen",
@@ -275,7 +278,7 @@ export const UI_SURFACE_TOKENS_BY_SURFACE = {
     ],
   },
   "options-audio": {
-    components: ["options_audio.music_row"],
+    components: ["options_audio.music_indicator"],
     textBindings: [],
     actions: ["options_audio.music", "options_audio.save", "options_audio.cancel"],
   },
