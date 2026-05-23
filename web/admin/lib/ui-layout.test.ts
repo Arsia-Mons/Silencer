@@ -314,18 +314,17 @@ describe("ui-layout model", () => {
       "Node MainMenuTutorialButton fixed width sizing cannot use min or max.",
     );
 
-    const inputSizing = createNode("input", "player name");
-    inputSizing.style.width = { mode: "fit" };
-    const document = insertChild(createDefaultUiDocument(), "MainMenuRoot", inputSizing);
-    expect(() => validateUiDocument(document)).toThrow(
-      "Node input-player name input width and height must be fixed.",
-    );
-
-    const inputAction = createNode("input", "lobby password", { action: "lobby.password" });
-    const inputActionDocument = insertChild(createDefaultUiDocument(), "MainMenuRoot", inputAction);
-    expect(() => validateUiDocument(inputActionDocument)).toThrow(
-      "Node input-lobby password input cannot use action.",
-    );
+    const inputDocument = JSON.parse(JSON.stringify(createDefaultUiDocument()));
+    inputDocument.root.children.push({
+      id: "UnsupportedInput",
+      kind: "input",
+      name: "Unsupported Input",
+      style: {
+        width: { mode: "fixed", value: 180 },
+        height: { mode: "fixed", value: 24 },
+      },
+    });
+    expect(() => validateUiDocument(inputDocument)).toThrow("Unsupported node kind: input");
 
     const wrongKindField = JSON.parse(JSON.stringify(createDefaultUiDocument()));
     wrongKindField.root.component = "main-menu.logo";

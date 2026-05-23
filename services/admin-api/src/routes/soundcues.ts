@@ -14,19 +14,9 @@
 
 import { existsSync, mkdirSync, readdirSync, readFileSync, unlinkSync, writeFileSync } from "fs";
 import { basename, join } from "path";
-import { Router } from "express";
+import { Router, type Request, type Response } from "express";
 
 import { requireAuth } from "../auth/jwt.js";
-
-interface RouteRequest {
-  params: Record<string, string>;
-  body: unknown;
-}
-
-interface RouteResponse {
-  json(value: unknown): void;
-  status(code: number): RouteResponse;
-}
 
 interface SoundCueNode {
   type?: string;
@@ -68,7 +58,7 @@ function soundCueBody(value: unknown): SoundCueDocument {
   return value as SoundCueDocument;
 }
 
-router.get("/", requireAuth, (_req: unknown, res: RouteResponse) => {
+router.get("/", requireAuth, (_req: Request, res: Response) => {
   ensureCuesDir();
   try {
     const files = readdirSync(CUES_DIR).filter((file) => file.endsWith(".json"));
@@ -91,7 +81,7 @@ router.get("/", requireAuth, (_req: unknown, res: RouteResponse) => {
   }
 });
 
-router.get("/:id", requireAuth, (req: RouteRequest, res: RouteResponse) => {
+router.get("/:id", requireAuth, (req: Request, res: Response) => {
   ensureCuesDir();
   const path = cuePath(req.params.id);
   if (!existsSync(path)) return res.status(404).json({ error: "Cue not found" });
@@ -102,7 +92,7 @@ router.get("/:id", requireAuth, (req: RouteRequest, res: RouteResponse) => {
   }
 });
 
-router.put("/:id", requireAuth, (req: RouteRequest, res: RouteResponse) => {
+router.put("/:id", requireAuth, (req: Request, res: Response) => {
   ensureCuesDir();
   const id = sanitizeId(req.params.id);
   const path = join(CUES_DIR, `${id}.json`);
@@ -125,7 +115,7 @@ router.put("/:id", requireAuth, (req: RouteRequest, res: RouteResponse) => {
   }
 });
 
-router.delete("/:id", requireAuth, (req: RouteRequest, res: RouteResponse) => {
+router.delete("/:id", requireAuth, (req: Request, res: Response) => {
   ensureCuesDir();
   const path = cuePath(req.params.id);
   if (!existsSync(path)) return res.status(404).json({ error: "Cue not found" });

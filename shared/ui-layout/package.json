@@ -13,7 +13,9 @@
   },
   "scripts": {
     "fmt": "oxfmt --write .",
-    "typecheck": "tsc --noEmit"
+    "generate-contract": "bun tools/generate-ui-layout-contract.ts",
+    "check-contract": "bun tools/generate-ui-layout-contract.ts --check",
+    "typecheck": "bun run check-contract && tsc --noEmit"
   },
   "devDependencies": {
     "@types/bun": "^1.3.13",

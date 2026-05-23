@@ -57,7 +57,6 @@ struct UiEditorNode {
 	std::string kind;
 	std::string name;
 	std::string text;
-	std::string placeholder;
 	std::string action;
 	std::string textBinding;
 	std::string component;

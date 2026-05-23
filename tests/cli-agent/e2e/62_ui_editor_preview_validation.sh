@@ -29,6 +29,22 @@ if (process.env.MUTATOR === "invalid-viewport") {
   button.style.font = "title";
 } else if (process.env.MUTATOR === "invalid-button-height") {
   button.style.height = { mode: "fixed", value: 48 };
+} else if (process.env.MUTATOR === "unknown-document-field") {
+  document.debug = true;
+} else if (process.env.MUTATOR === "unknown-node-field") {
+  document.root.unsupportedLayoutMode = "grid";
+} else if (process.env.MUTATOR === "unknown-size-field") {
+  document.root.style.width.preferred = 640;
+} else if (process.env.MUTATOR === "unsupported-input") {
+  document.root.children.push({
+    id: "UnsupportedInput",
+    kind: "input",
+    name: "Unsupported Input",
+    style: {
+      width: { mode: "fixed", value: 180 },
+      height: { mode: "fixed", value: 24 },
+    },
+  });
 } else if (process.env.MUTATOR === "fixed-small-button") {
   button.text = "OK";
   button.buttonVariant = "chrome";
@@ -101,5 +117,9 @@ expect_bad_document "empty-surface" "empty-surface"
 expect_bad_document "empty-name" "empty-name"
 expect_bad_document "invalid-button-font" "invalid-button-font"
 expect_bad_document "invalid-button-height" "invalid-button-height"
+expect_bad_document "unknown-document-field" "unknown-document-field"
+expect_bad_document "unknown-node-field" "unknown-node-field"
+expect_bad_document "unknown-size-field" "unknown-size-field"
+expect_bad_document "unsupported-input" "unsupported-input"
 
 echo "PASS 62_ui_editor_preview_validation"

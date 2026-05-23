@@ -1,15 +1,18 @@
+import {
+  UI_CONTAINER_NODE_KINDS,
+  UI_DOCUMENT_FIELDS,
+  UI_FLOATING_FIELDS,
+  UI_IMAGE_FIELDS,
+  UI_NODE_FIELDS,
+  UI_NODE_KINDS,
+  UI_SIZE_FIELDS,
+  UI_STYLE_FIELDS_BY_KIND,
+  UI_VIEWPORT_FIELDS,
+} from "./contract";
+
 export const UI_LAYOUT_SCHEMA_VERSION = 1 as const;
 
-export type UiNodeKind =
-  | "screen"
-  | "panel"
-  | "stack"
-  | "row"
-  | "text"
-  | "button"
-  | "input"
-  | "spacer"
-  | "component";
+export type UiNodeKind = (typeof UI_NODE_KINDS)[number];
 export type UiAxis = "row" | "column";
 export type UiAlign = "start" | "center" | "end";
 export type UiJustify = "start" | "center" | "end";
@@ -74,7 +77,6 @@ export interface UiNode {
   kind: UiNodeKind;
   name: string;
   text?: string;
-  placeholder?: string;
   action?: string;
   textBinding?: string;
   component?: string;
@@ -120,35 +122,13 @@ type UiNodeOverrides = Omit<Partial<UiNode>, "style"> & {
   style?: Partial<UiStyle>;
 };
 
-const DOCUMENT_FIELDS = new Set(["schemaVersion", "surface", "viewport", "root"]);
-const VIEWPORT_FIELDS = new Set(["width", "height"]);
-const NODE_FIELDS = new Set([
-  "id",
-  "kind",
-  "name",
-  "text",
-  "placeholder",
-  "action",
-  "textBinding",
-  "component",
-  "buttonVariant",
-  "buttonSize",
-  "image",
-  "floating",
-  "style",
-  "children",
-]);
-const SIZE_FIELDS = new Set(["mode", "value", "min", "max"]);
-const IMAGE_FIELDS = new Set(["bank", "index", "mode"]);
-const FLOATING_FIELDS = new Set([
-  "attachTo",
-  "elementAttach",
-  "parentAttach",
-  "offsetX",
-  "offsetY",
-  "zIndex",
-  "pointerPassthrough",
-]);
+const DOCUMENT_FIELDS = new Set<string>(UI_DOCUMENT_FIELDS);
+const VIEWPORT_FIELDS = new Set<string>(UI_VIEWPORT_FIELDS);
+const NODE_FIELDS = new Set<string>(UI_NODE_FIELDS);
+const SIZE_FIELDS = new Set<string>(UI_SIZE_FIELDS);
+const IMAGE_FIELDS = new Set<string>(UI_IMAGE_FIELDS);
+const FLOATING_FIELDS = new Set<string>(UI_FLOATING_FIELDS);
+const CONTAINER_NODE_KINDS = new Set<string>(UI_CONTAINER_NODE_KINDS);
 
 const KIND_LABELS: Record<UiNodeKind, string> = {
   screen: "Screen",
@@ -157,7 +137,6 @@ const KIND_LABELS: Record<UiNodeKind, string> = {
   row: "Row",
   text: "Text",
   button: "Button",
-  input: "Input",
   spacer: "Spacer",
   component: "Component",
 };
@@ -168,13 +147,12 @@ export const PALETTE_NODE_KINDS: UiNodeKind[] = [
   "row",
   "text",
   "button",
-  "input",
   "spacer",
   "component",
 ];
 
 export function canHaveChildren(kind: UiNodeKind): boolean {
-  return kind === "screen" || kind === "panel" || kind === "stack" || kind === "row";
+  return CONTAINER_NODE_KINDS.has(kind);
 }
 
 export function normalizeUiSurface(value: string): string {
@@ -371,7 +349,6 @@ export function createNode(
     base.buttonVariant = "chrome";
     base.buttonSize = "auto";
   }
-  if (kind === "input") base.placeholder = "Value";
   if (kind === "component") base.component = "component-id";
   if (canHaveChildren(kind)) base.children = [];
 
@@ -598,12 +575,8 @@ function defaultStyleForKind(kind: UiNodeKind): UiStyle {
       padding: 10,
     };
   }
-  return {
-    width: { mode: "fixed", value: 180 },
-    height: { mode: "fixed", value: 24 },
-    font: "ui",
-    padding: 10,
-  };
+  const exhaustive: never = kind;
+  throw new Error(`Unsupported node kind: ${exhaustive}`);
 }
 
 function updateNodeInTree(node: UiNode, id: string, update: (node: UiNode) => UiNode): UiNode {
@@ -669,7 +642,6 @@ function validateNode(value: unknown, seenIds: Set<string>): void {
   if (!node.name || typeof node.name !== "string")
     throw new Error(`Node ${node.id} name is missing.`);
   validateOptionalString(node, "text");
-  validateOptionalString(node, "placeholder");
   validateOptionalString(node, "action");
   validateOptionalString(node, "textBinding");
   validateOptionalString(node, "component");
@@ -704,7 +676,7 @@ function validateNode(value: unknown, seenIds: Set<string>): void {
 
 function validateOptionalString(
   node: UiNode,
-  key: "text" | "placeholder" | "action" | "textBinding" | "component",
+  key: "text" | "action" | "textBinding" | "component",
 ): void {
   const value = node[key];
   if (value === undefined) return;
@@ -748,9 +720,6 @@ function validateKindSpecificFields(node: UiNode): void {
   if (node.text !== undefined && node.kind !== "text" && node.kind !== "button") {
     throw new Error(`Node ${node.id} ${node.kind} cannot use text.`);
   }
-  if (node.placeholder !== undefined && node.kind !== "input") {
-    throw new Error(`Node ${node.id} ${node.kind} cannot use placeholder.`);
-  }
   if (node.action !== undefined && node.kind !== "button") {
     throw new Error(`Node ${node.id} ${node.kind} cannot use action.`);
   }
@@ -769,10 +738,10 @@ function validateKindSpecificFields(node: UiNode): void {
 }
 
 function validateRenderableNodeDecorators(node: UiNode): void {
-  if ((node.kind === "button" || node.kind === "input") && node.image !== undefined) {
+  if (node.kind === "button" && node.image !== undefined) {
     throw new Error(`Node ${node.id} ${node.kind} cannot use image.`);
   }
-  if ((node.kind === "button" || node.kind === "input") && node.floating !== undefined) {
+  if (node.kind === "button" && node.floating !== undefined) {
     throw new Error(`Node ${node.id} ${node.kind} cannot use floating.`);
   }
 }
@@ -870,35 +839,7 @@ function validateStyleFields(node: UiNode): void {
 }
 
 function allowedStyleFields(kind: UiNodeKind): Set<keyof UiStyle> {
-  if (canHaveChildren(kind)) {
-    return new Set([
-      "width",
-      "height",
-      "direction",
-      "align",
-      "justify",
-      "padding",
-      "gap",
-      "backgroundPalette",
-      "borderPalette",
-      "radius",
-    ]);
-  }
-  if (kind === "text") {
-    return new Set([
-      "width",
-      "height",
-      "padding",
-      "backgroundPalette",
-      "borderPalette",
-      "textPalette",
-      "font",
-      "radius",
-    ]);
-  }
-  if (kind === "button") return new Set(["width", "height", "padding", "textPalette"]);
-  if (kind === "input") return new Set(["width", "height", "padding", "font"]);
-  return new Set(["width", "height"]);
+  return new Set(UI_STYLE_FIELDS_BY_KIND[kind] as readonly (keyof UiStyle)[]);
 }
 
 function validateKindSpecificStyleValues(node: UiNode): void {
@@ -914,19 +855,6 @@ function validateKindSpecificStyleValues(node: UiNode): void {
     }
     if (node.style.height.min !== undefined || node.style.height.max !== undefined) {
       throw new Error(`Node ${node.id} button height cannot use min or max.`);
-    }
-  }
-  if (node.kind === "input") {
-    if (node.style.width.mode !== "fixed" || node.style.height.mode !== "fixed") {
-      throw new Error(`Node ${node.id} input width and height must be fixed.`);
-    }
-    if (
-      node.style.width.min !== undefined ||
-      node.style.width.max !== undefined ||
-      node.style.height.min !== undefined ||
-      node.style.height.max !== undefined
-    ) {
-      throw new Error(`Node ${node.id} input sizing cannot use min or max.`);
     }
   }
 }

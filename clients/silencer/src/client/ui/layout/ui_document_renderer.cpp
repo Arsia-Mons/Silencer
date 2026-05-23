@@ -3,7 +3,6 @@
 #include "clay/clay.h"
 #include "clay_ui_payloads.h"
 #include "primitives/text.h"
-#include "primitives/text_input.h"
 #include "runtime/UiInteractionRegistry.h"
 
 #include <algorithm>
@@ -23,9 +22,6 @@ using silencer::ui::primitives::ButtonHandle;
 using silencer::ui::primitives::ButtonOpts;
 using silencer::ui::primitives::Text;
 using silencer::ui::primitives::TextEffect;
-using silencer::ui::primitives::TextInput;
-using silencer::ui::primitives::TextInputHandle;
-using silencer::ui::primitives::TextInputOpts;
 using silencer::ui::primitives::TextSize;
 
 Clay_String UiDocumentClayString(const std::string& value) {
@@ -107,13 +103,11 @@ Clay_FloatingAttachPointType UiDocumentAttachPoint(const std::string& value) {
 UiElementKind UiDocumentElementKindFor(const UiEditorNode& node) {
 	if(node.kind == "button") return UiElementKind::Button;
 	if(node.kind == "text") return UiElementKind::Text;
-	if(node.kind == "input") return UiElementKind::TextField;
 	return UiElementKind::Container;
 }
 
 std::string UiDocumentElementLabelFor(const UiEditorNode& node) {
 	if(!node.text.empty()) return node.text;
-	if(!node.placeholder.empty()) return node.placeholder;
 	if(!node.name.empty()) return node.name;
 	return node.id;
 }
@@ -209,11 +203,6 @@ Clay_ElementDeclaration UiDocumentDeclarationForNode(const UiEditorNode& node) {
 	return decl;
 }
 
-int UiDocumentFixedOrDefault(const UiEditorSize& size, int fallback) {
-	if(size.mode != UiEditorSize::Mode::Fixed) return fallback;
-	return std::max(1, static_cast<int>(size.value + 0.5f));
-}
-
 int UiDocumentButtonWidthOverride(const UiEditorSize& size) {
 	return size.mode == UiEditorSize::Mode::Fixed
 		? std::max(1, static_cast<int>(size.value + 0.5f))
@@ -307,28 +296,6 @@ void BuildUiDocumentNode(const UiEditorNode& node,
 		}
 		return;
 	}
-	if(node.kind == "input"){
-		TextInputOpts opts;
-		opts.widthPx = static_cast<Uint16>(UiDocumentFixedOrDefault(node.style.width, 180));
-		opts.heightPx = static_cast<Uint16>(UiDocumentFixedOrDefault(node.style.height, 24));
-		opts.textSize = UiDocumentTextSizeForFont(node.style.font);
-		opts.contentInsetX = static_cast<Uint16>(std::max(0, node.style.padding));
-		const std::string action = node.action.empty() ? node.id : node.action;
-		TextInput(UiDocumentClayString(node.id),
-		          node.placeholder.empty() ? "" : node.placeholder.c_str(),
-		          opts,
-		          TextInputHandle{
-		              nullptr,
-		              action.c_str(),
-		              node.name.c_str(),
-		              &interactions,
-		              -1,
-		              128,
-		              false,
-		          });
-		return;
-	}
-
 	Clay_ElementDeclaration decl = UiDocumentDeclarationForNode(node);
 	CLAY(decl) {
 		if(node.kind == "text"){

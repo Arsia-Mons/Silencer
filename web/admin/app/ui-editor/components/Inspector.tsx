@@ -58,7 +58,7 @@ export function Inspector({
   onAddChild,
 }: InspectorProps) {
   const supportsChildren = canHaveChildren(node.kind);
-  const supportsNodeDecorators = node.kind !== "button" && node.kind !== "input";
+  const supportsNodeDecorators = node.kind !== "button";
   return (
     <aside className="min-h-0 overflow-auto border-l border-game-border bg-game-bgCard/95">
       <div className="p-4 border-b border-game-border">
@@ -84,7 +84,10 @@ export function Inspector({
         {node.kind === "button" && (
           <div className="space-y-3">
             <Field label="ACTION">
-              <TextInput value={node.action ?? ""} onChange={(value) => onPatch({ action: value.trim() })} />
+              <TextInput
+                value={node.action ?? ""}
+                onChange={(value) => onPatch({ action: value.trim() })}
+              />
             </Field>
             <div className="grid grid-cols-2 gap-3">
               <Field label="VARIANT">
@@ -103,14 +106,6 @@ export function Inspector({
               </Field>
             </div>
           </div>
-        )}
-        {node.kind === "input" && (
-          <Field label="PLACEHOLDER">
-            <TextInput
-              value={node.placeholder ?? ""}
-              onChange={(value) => onPatch({ placeholder: value })}
-            />
-          </Field>
         )}
         {node.kind === "component" && (
           <Field label="COMPONENT">
@@ -177,11 +172,10 @@ function StyleInspector({
 }) {
   const style = node.style;
   const supportsHeight = node.kind !== "button";
-  const sizeModes: UiSizeMode[] =
-    node.kind === "input" ? ["fixed"] : node.kind === "button" ? ["fit", "fixed"] : SIZE_MODES;
-  const supportsSizeBounds = node.kind !== "button" && node.kind !== "input";
+  const sizeModes: UiSizeMode[] = node.kind === "button" ? ["fit", "fixed"] : SIZE_MODES;
+  const supportsSizeBounds = node.kind !== "button";
   const supportsPadding = node.kind !== "spacer";
-  const supportsFont = node.kind === "text" || node.kind === "input";
+  const supportsFont = node.kind === "text";
   const supportsTextPalette = node.kind === "button" || node.kind === "text";
   const supportsBoxPalette = canHaveChildren(node.kind) || node.kind === "text";
   const supportsRadius = canHaveChildren(node.kind) || node.kind === "text";
@@ -200,7 +194,7 @@ function StyleInspector({
           <SizeField
             label="HEIGHT"
             size={style.height}
-            modes={node.kind === "input" ? ["fixed"] : SIZE_MODES}
+            modes={SIZE_MODES}
             supportsBounds={supportsSizeBounds}
             onChange={(height) => onStyle({ height })}
           />

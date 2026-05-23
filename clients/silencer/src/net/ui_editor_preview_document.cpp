@@ -1,8 +1,11 @@
 #include "ui_editor_preview_document.h"
 
+#include "ui_layout_contract.generated.h"
+
 #include <algorithm>
 #include <cmath>
 #include <initializer_list>
+#include <cstddef>
 #include <unordered_set>
 #include <utility>
 
@@ -19,13 +22,25 @@ constexpr int kSchemaVersion = 1;
 constexpr int kMinViewport = 160;
 constexpr int kMaxViewport = 4096;
 
+bool ContractContains(const char * const * values,
+                      std::size_t valueCount,
+                      const std::string& value) {
+	for(std::size_t i = 0; i < valueCount; ++i){
+		if(value == values[i]) return true;
+	}
+	return false;
+}
+
 bool IsContainerKind(const std::string& kind) {
-	return kind == "screen" || kind == "panel" || kind == "stack" || kind == "row";
+	return ContractContains(ui_layout_contract::kContainerNodeKinds,
+	                        ui_layout_contract::kContainerNodeKindsCount,
+	                        kind);
 }
 
 bool IsKnownKind(const std::string& kind) {
-	return IsContainerKind(kind) || kind == "text" || kind == "button" ||
-	       kind == "input" || kind == "spacer" || kind == "component";
+	return ContractContains(ui_layout_contract::kNodeKinds,
+	                        ui_layout_contract::kNodeKindsCount,
+	                        kind);
 }
 
 std::string StringValue(const nlohmann::json& json,
@@ -174,18 +189,12 @@ bool RequiredStringEnum(const nlohmann::json& json,
 }
 
 bool RejectUnknownFields(const nlohmann::json& json,
-                         std::initializer_list<const char *> allowed,
+                         const char * const * allowed,
+                         std::size_t allowedCount,
                          const std::string& label,
                          std::string& error) {
 	for(auto it = json.begin(); it != json.end(); ++it){
-		bool matched = false;
-		for(const char * candidate : allowed){
-			if(it.key() == candidate){
-				matched = true;
-				break;
-			}
-		}
-		if(!matched){
+		if(!ContractContains(allowed, allowedCount, it.key())){
 			error = label + " has unsupported field: " + it.key();
 			return false;
 		}
@@ -206,7 +215,9 @@ bool ParseSize(const nlohmann::json& json,
 		error = std::string("style.") + key + " must be an object";
 		return false;
 	}
-	if(!RejectUnknownFields(*it, { "mode", "value", "min", "max" },
+	if(!RejectUnknownFields(*it,
+	                        ui_layout_contract::kSizeFields,
+	                        ui_layout_contract::kSizeFieldsCount,
 	                        std::string("style.") + key + " sizing", error)){
 		return false;
 	}
@@ -307,23 +318,11 @@ bool IsOneOf(const std::string& value, std::initializer_list<const char *> allow
 }
 
 bool StyleFieldAllowed(const std::string& kind, const std::string& key) {
-	if(key == "width" || key == "height") return true;
-	if(IsContainerKind(kind)){
-		return key == "direction" || key == "align" || key == "justify" ||
-		       key == "padding" || key == "gap" ||
-		       key == "backgroundPalette" || key == "borderPalette" ||
-		       key == "radius";
-	}
-	if(kind == "text"){
-		return key == "padding" || key == "backgroundPalette" ||
-		       key == "borderPalette" || key == "textPalette" ||
-		       key == "font" || key == "radius";
-	}
-	if(kind == "button"){
-		return key == "padding" || key == "textPalette";
-	}
-	if(kind == "input"){
-		return key == "padding" || key == "font";
+	for(std::size_t i = 0; i < ui_layout_contract::kStyleFieldsByKindCount; ++i){
+		const auto& entry = ui_layout_contract::kStyleFieldsByKind[i];
+		if(kind == entry.kind){
+			return ContractContains(entry.fields, entry.fieldCount, key);
+		}
 	}
 	return false;
 }
@@ -338,7 +337,9 @@ bool ParseImage(const nlohmann::json& json,
 		error = "image must be an object";
 		return false;
 	}
-	if(!RejectUnknownFields(*it, { "bank", "index", "mode" },
+	if(!RejectUnknownFields(*it,
+	                        ui_layout_contract::kImageFields,
+	                        ui_layout_contract::kImageFieldsCount,
 	                        "node " + out.id + " image", error)){
 		return false;
 	}
@@ -370,9 +371,8 @@ bool ParseFloating(const nlohmann::json& json,
 		return false;
 	}
 	if(!RejectUnknownFields(*it,
-	                        { "attachTo", "elementAttach", "parentAttach",
-	                          "offsetX", "offsetY", "zIndex",
-	                          "pointerPassthrough" },
+	                        ui_layout_contract::kFloatingFields,
+	                        ui_layout_contract::kFloatingFieldsCount,
 	                        "node " + out.id + " floating",
 	                        error)){
 		return false;
@@ -448,9 +448,6 @@ bool ValidateKindSpecificNodeFields(const nlohmann::json& json,
 	if(HasField(json, "text") && node.kind != "text" && node.kind != "button"){
 		return reject("text");
 	}
-	if(HasField(json, "placeholder") && node.kind != "input"){
-		return reject("placeholder");
-	}
 	if(HasField(json, "action") && node.kind != "button"){
 		return reject("action");
 	}
@@ -504,18 +501,6 @@ bool ParseStyle(const nlohmann::json& json,
 			return false;
 		}
 	}
-	if(kind == "input"){
-		if(out.width.mode != UiEditorSize::Mode::Fixed ||
-		   out.height.mode != UiEditorSize::Mode::Fixed){
-			error = "input width and height must be fixed";
-			return false;
-		}
-		if(HasSizeBounds(out.width) || HasSizeBounds(out.height)){
-			error = "input sizing cannot use min or max";
-			return false;
-		}
-	}
-
 	if(!ParseStringEnum(json, "direction", "column", { "column", "row" },
 	                    out.direction, error)){
 		return false;
@@ -554,10 +539,8 @@ bool ParseNode(const nlohmann::json& json,
 		? "node " + idIt->get<std::string>()
 		: "node";
 	if(!RejectUnknownFields(json,
-	                        { "id", "kind", "name", "text", "placeholder",
-	                          "action", "textBinding", "component",
-	                          "buttonVariant", "buttonSize", "image",
-	                          "floating", "style", "children" },
+	                        ui_layout_contract::kNodeFields,
+	                        ui_layout_contract::kNodeFieldsCount,
 	                        nodeLabel,
 	                        error)){
 		return false;
@@ -566,7 +549,6 @@ bool ParseNode(const nlohmann::json& json,
 	if(!RequiredString(json, "kind", out.kind, error)) return false;
 	if(!RequiredString(json, "name", out.name, error)) return false;
 	if(!OptionalString(json, "text", out.text, error)) return false;
-	if(!OptionalString(json, "placeholder", out.placeholder, error)) return false;
 	if(!OptionalString(json, "action", out.action, error)) return false;
 	if(!OptionalString(json, "textBinding", out.textBinding, error)) return false;
 	if(!OptionalString(json, "component", out.component, error)) return false;
@@ -603,11 +585,11 @@ bool ParseNode(const nlohmann::json& json,
 		error = "component node requires component";
 		return false;
 	}
-	if((out.kind == "button" || out.kind == "input") && json.find("image") != json.end()){
+	if(out.kind == "button" && json.find("image") != json.end()){
 		error = out.kind + " node cannot use image: " + out.id;
 		return false;
 	}
-	if((out.kind == "button" || out.kind == "input") && json.find("floating") != json.end()){
+	if(out.kind == "button" && json.find("floating") != json.end()){
 		error = out.kind + " node cannot use floating: " + out.id;
 		return false;
 	}
@@ -647,7 +629,9 @@ bool ParseUiEditorPreviewDocument(const nlohmann::json& json,
 		error = "document must be an object";
 		return false;
 	}
-	if(!RejectUnknownFields(json, { "schemaVersion", "surface", "viewport", "root" },
+	if(!RejectUnknownFields(json,
+	                        ui_layout_contract::kDocumentFields,
+	                        ui_layout_contract::kDocumentFieldsCount,
 	                        "document", error)){
 		return false;
 	}
@@ -667,7 +651,11 @@ bool ParseUiEditorPreviewDocument(const nlohmann::json& json,
 		error = "viewport is required";
 		return false;
 	}
-	if(!RejectUnknownFields(*viewportIt, { "width", "height" }, "viewport", error)){
+	if(!RejectUnknownFields(*viewportIt,
+	                        ui_layout_contract::kViewportFields,
+	                        ui_layout_contract::kViewportFieldsCount,
+	                        "viewport",
+	                        error)){
 		return false;
 	}
 	if(!RequiredIntInRange(*viewportIt, "width", kMinViewport, kMaxViewport,
