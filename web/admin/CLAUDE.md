@@ -41,8 +41,9 @@ directly). If you need to bake an explicit URL in, pass it as a
   blackboard key list, full undo/redo. Download button exports the current
   tree. Node types match `clients/silencer/src/behaviortree.h`.
 - `app/ui-editor/` — WYSIWYG editor for Silencer UI layout documents.
-  Uses the typed `lib/ui-layout.ts` tree model, palette/hierarchy/inspector
-  panels, saved documents from `shared/assets/ui-layouts`, JSON
+  Uses the shared `@silencer/ui-layout` tree model through `lib/ui-layout.ts`,
+  palette/hierarchy/inspector panels, saved documents from
+  `shared/assets/ui-layouts`, JSON
   import/download, generated Clay scaffold output, and a real client preview
   returned by `app/api/ui-editor/preview/route.ts`.
 - `app/api/ui-editor/documents/` — local Next.js proxy for the admin API UI
@@ -50,10 +51,10 @@ directly). If you need to bake an explicit URL in, pass it as a
   local dev/proxy consistency; persistence lives in `services/admin-api`, not
   admin-web.
 - `app/api/ui-editor/preview/route.ts` — talks to the Silencer control socket
-  (`SILENCER_CONTROL_HOST` / `SILENCER_CONTROL_PORT`), sends one
-  `ui_editor_preview_capture` request, and returns the client screenshot plus
-  `inspect` bounds for editor overlays. Browser layout preview is only fallback
-  when no client is running.
+  (`SILENCER_CONTROL_HOST` / `SILENCER_CONTROL_PORT`) after validating the
+  admin bearer token, sends one `ui_editor_preview_capture` request, and
+  returns the client screenshot plus `inspect` bounds for editor overlays.
+  Browser layout preview is only fallback when no client is running.
 - `app/api/behaviortrees/[...path]/route.ts` — Next.js proxy that forwards
   `GET/PUT/DELETE /api/behaviortrees/*` to admin-api. Required because the
   browser can't hit admin-api directly on HTTPS in prod.
@@ -80,11 +81,11 @@ directly). If you need to bake an explicit URL in, pass it as a
 - `lib/folder-store.ts` — same pattern for behavior tree JSON files. Both
   stores fall back to saving via `showSaveFilePicker` (HTTPS) or a download
   trigger (HTTP) so edits can be committed to git.
-- `lib/ui-layout.ts` — schema/versioned layout document model for UI editor
-  surfaces plus immutable tree edits, import validation, and Clay scaffold
-  generation. Keep this model aligned with real `clients/silencer/src/client/ui`
-  primitive concepts and the client preview parser, not browser-only widget
-  names.
+- `lib/ui-layout.ts` — re-exports the shared `@silencer/ui-layout`
+  schema/versioned layout document model for UI editor surfaces plus immutable
+  tree edits, import validation, and Clay scaffold generation. Keep that model
+  aligned with real `clients/silencer/src/client/ui` primitive concepts and the
+  client preview parser, not browser-only widget names.
 - `lib/api.ts` — `fetch` wrapper, injects `Authorization: Bearer`
   from `zs_token` (admin) localStorage key.
 - `lib/auth.js` — two storage keys: `zs_token` (admin) and

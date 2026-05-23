@@ -55,11 +55,12 @@ export default function UiEditorPage() {
     let cancelled = false;
 
     async function loadInitialDocument() {
-      const draft = readLocalDraft();
+      let draft = readPreferredLocalDraft([]);
       try {
         const loadedDocuments = await listUiEditorDocuments();
         if (cancelled) return;
         setDocuments(loadedDocuments);
+        draft = readPreferredLocalDraft(loadedDocuments);
         if (draft) {
           setDocument(draft.document);
           setSelectedId(draft.document.root.id);
@@ -111,7 +112,7 @@ export default function UiEditorPage() {
       if (dirty) {
         writeLocalDraft(document, currentRevision);
       } else {
-        localStorage.removeItem(STORAGE_KEY);
+        clearLocalDraft(document.surface);
       }
     } catch (error) {
       setStatus(error instanceof Error ? error.message : "FAILED TO CACHE LOCAL DOCUMENT");
@@ -208,6 +209,7 @@ export default function UiEditorPage() {
   async function loadDocument(surface: string) {
     try {
       setStatus(`LOADING ${surface}`);
+      if (dirty) writeLocalDraft(document, currentRevision);
       const loaded = await getUiEditorDocument(surface);
       const parsed = validateUiDocument(loaded.document);
       setDocument(parsed);
@@ -357,9 +359,37 @@ interface LocalDraft {
   baseRevision: string | null;
 }
 
-function readLocalDraft(): LocalDraft | null {
+const DRAFT_KEY_PREFIX = `${STORAGE_KEY}:`;
+
+function draftStorageKey(surface: string): string {
+  return `${DRAFT_KEY_PREFIX}${normalizeUiSurface(surface)}`;
+}
+
+function readPreferredLocalDraft(documents: UiDocumentReference[]): LocalDraft | null {
+  const checkedKeys = new Set<string>();
+  for (const surface of ["main-menu", ...documents.map((candidate) => candidate.surface)]) {
+    const key = draftStorageKey(surface);
+    checkedKeys.add(key);
+    const draft = readLocalDraftFromKey(key);
+    if (draft) return draft;
+  }
+
+  checkedKeys.add(STORAGE_KEY);
+  const legacyDraft = readLocalDraftFromKey(STORAGE_KEY);
+  if (legacyDraft) return legacyDraft;
+
+  for (let index = 0; index < localStorage.length; index += 1) {
+    const key = localStorage.key(index);
+    if (!key || checkedKeys.has(key) || !key.startsWith(DRAFT_KEY_PREFIX)) continue;
+    const draft = readLocalDraftFromKey(key);
+    if (draft) return draft;
+  }
+  return null;
+}
+
+function readLocalDraftFromKey(key: string): LocalDraft | null {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = localStorage.getItem(key);
     if (!raw) return null;
     const parsed = JSON.parse(raw);
     if (parsed?.document) {
@@ -378,7 +408,19 @@ function readLocalDraft(): LocalDraft | null {
 }
 
 function writeLocalDraft(document: UiDocument, baseRevision: string | null) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify({ document, baseRevision }));
+  localStorage.setItem(
+    draftStorageKey(document.surface),
+    JSON.stringify({ document, baseRevision }),
+  );
+}
+
+function clearLocalDraft(surface: string) {
+  const normalizedSurface = normalizeUiSurface(surface);
+  localStorage.removeItem(draftStorageKey(normalizedSurface));
+  const legacyDraft = readLocalDraftFromKey(STORAGE_KEY);
+  if (legacyDraft && normalizeUiSurface(legacyDraft.document.surface) === normalizedSurface) {
+    localStorage.removeItem(STORAGE_KEY);
+  }
 }
 
 function applyViewportPreset(document: UiDocument, preset: (typeof PRESETS)[number]): UiDocument {

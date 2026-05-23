@@ -9,7 +9,7 @@ All notable changes to Silencer are documented here.
 #### UI Editor (#227)
 
 - Added `/ui-editor`, a WYSIWYG Silencer UI layout editor with palette, hierarchy, inspector controls, shared-asset document persistence, JSON import/download, generated Clay scaffold output, and live preview screenshots rendered by the real client through the control socket.
-- Added a versioned `web/admin/lib/ui-layout.ts` document model for stable IDs, Clay-style sizing, flex direction, padding, gaps, alignment, Silencer palette indexes, text, buttons, inputs, and containers.
+- Added a versioned `@silencer/ui-layout` TypeScript workspace for stable IDs, Clay-style sizing, flex direction, padding, gaps, alignment, Silencer palette indexes, text, buttons, inputs, and containers.
 - Added `shared/assets/ui-layouts/*.silencer-ui.json` plus authenticated `/api/ui-editor/documents` admin-api load/save routes with revision-checked atomic writes so dashboard edits are synced into the shared UI layout source tree without clobbering another editor.
 - Added a client `ui_editor_preview` control op and preview screen that maps editor documents into the production `ClientUi`/Clay frame for real-time editor feedback.
 

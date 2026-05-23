@@ -56,8 +56,9 @@ unit + env file + Mongo/LavinMQ co-location are described in
   The game client fetches these at startup for the BT interpreter.
 - `src/routes/uieditor.ts` — UI layout document endpoints. Reads/writes
   `shared/assets/ui-layouts/<surface>.silencer-ui.json` behind admin auth,
-  validates the same schema as the web editor/client preview, and uses
-  revision-checked atomic saves to avoid clobbering another dashboard edit.
+  validates with the shared `@silencer/ui-layout` TypeScript package used by
+  the web editor/client preview, and uses revision-checked atomic saves to
+  avoid clobbering another dashboard edit.
 - `src/routes/players.js` — `PATCH /:id/ban` and `DELETE /:id`
   proxy to the lobby's internal HTTP (`LOBBY_PLAYER_AUTH_URL`)
   so live clients are kicked. Lobby unreachable is logged but

@@ -29,7 +29,8 @@ inputs, and containers.
 
 ## Data Model
 
-The editor data model is implemented in `web/admin/lib/ui-layout.ts`. The root
+The editor data model is implemented in the shared `@silencer/ui-layout`
+TypeScript workspace and re-exported by `web/admin/lib/ui-layout.ts`. The root
 document contains:
 
 - `schemaVersion` — currently `1`.
@@ -55,10 +56,11 @@ successful save.
 `clients/silencer/src/client/ui/screens/ui_editor_preview_screen.*` maps the
 editor document into real Silencer UI primitives inside the existing
 `ClientUi`/Clay frame. The admin route at
-`web/admin/app/api/ui-editor/preview/route.ts` sends documents to the client
-with the `ui_editor_preview_capture` control-socket op. That single game-thread
-operation validates the document, renders the preview, captures a real client
-screenshot, and returns the screenshot plus `inspect` metadata.
+`web/admin/app/api/ui-editor/preview/route.ts` requires the admin bearer token
+before sending documents to the client with the `ui_editor_preview_capture`
+control-socket op. That single game-thread operation validates the document,
+renders the preview, captures a real client screenshot, and returns the
+screenshot plus `inspect` metadata.
 
 The browser preview is only a fallback when no client is listening on
 `SILENCER_CONTROL_HOST` / `SILENCER_CONTROL_PORT`. The client screenshot is the

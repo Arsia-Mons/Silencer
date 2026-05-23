@@ -4,7 +4,7 @@ WORKDIR /app
 # Build context is the repo root (workspace lockfile lives there).
 # Stage 1: install workspace deps once, scoped via --filter so only
 # the admin-web subtree (+ its workspace deps like
-# @silencer/gas-validation) is materialized.
+# @silencer/gas-validation and @silencer/ui-layout) is materialized.
 FROM base AS deps
 COPY package.json bun.lock ./
 COPY clients/cli/package.json            ./clients/cli/
@@ -13,6 +13,7 @@ COPY clients/tui/package.json            ./clients/tui/
 COPY services/admin-api/package.json     ./services/admin-api/
 COPY shared/fonts/package.json           ./shared/fonts/
 COPY shared/gas-validation/package.json  ./shared/gas-validation/
+COPY shared/ui-layout/package.json       ./shared/ui-layout/
 COPY web/admin/package.json              ./web/admin/
 COPY web/website/package.json            ./web/website/
 RUN bun install --frozen-lockfile --filter ./web/admin
@@ -31,6 +32,7 @@ ENV NEXT_PUBLIC_WS_URL=$NEXT_PUBLIC_WS_URL
 ENV NEXT_PUBLIC_MAP_API_URL=$NEXT_PUBLIC_MAP_API_URL
 COPY --from=deps /app /app
 COPY shared/gas-validation ./shared/gas-validation
+COPY shared/ui-layout      ./shared/ui-layout
 COPY web/admin             ./web/admin
 WORKDIR /app/web/admin
 ENV NEXT_TELEMETRY_DISABLED=1

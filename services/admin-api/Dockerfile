@@ -12,11 +12,13 @@ COPY clients/tui/package.json            ./clients/tui/
 COPY services/admin-api/package.json     ./services/admin-api/
 COPY shared/fonts/package.json           ./shared/fonts/
 COPY shared/gas-validation/package.json  ./shared/gas-validation/
+COPY shared/ui-layout/package.json       ./shared/ui-layout/
 COPY web/admin/package.json              ./web/admin/
 COPY web/website/package.json            ./web/website/
 RUN bun install --production --frozen-lockfile --filter ./services/admin-api
 
 COPY services/admin-api/src ./services/admin-api/src
+COPY shared/ui-layout       ./shared/ui-layout
 WORKDIR /app/services/admin-api
 EXPOSE 24080
 CMD ["bun", "src/index.js"]
