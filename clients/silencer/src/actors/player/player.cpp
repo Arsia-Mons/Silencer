@@ -1336,6 +1336,8 @@ void Player::Tick(World & world){
 					}
 				}
 			}
+			Platform* _cp = currentplatformid ? world.map.platformids[currentplatformid] : nullptr;
+			const auto& _mat = GASLoader::Get().GetPhysicsMaterialDef(_cp ? static_cast<uint8_t>(_cp->physicsMaterial) : 0);
 			if(input.keymoveleft || (ladder && x > center)){
 				xv -= GASLoader::Get().player.walkAcceleration;
 				if(xv > 0){
@@ -1360,7 +1362,8 @@ void Player::Tick(World & world){
 				}
 				mirrored = false;
 			}else{
-				xv *= 0.5;
+				float decelFactor = std::max(0.05f, 1.0f - 0.5f * _mat.friction);
+				xv = static_cast<int>(xv * decelFactor);
 				if(IsDisguised()){
 					if(state_i < 25){
 						state_i = 25;
@@ -1376,7 +1379,7 @@ void Player::Tick(World & world){
 					}
 				}
 			}
-			int xvmax = GASLoader::Get().player.runSpeed;
+			int xvmax = static_cast<int>(GASLoader::Get().player.runSpeed * _mat.speedMult);
 			if(IsDisguised()){
 				xvmax = GASLoader::Get().player.runSpeedDisguised;
 			}

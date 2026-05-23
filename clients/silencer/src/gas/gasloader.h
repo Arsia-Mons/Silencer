@@ -19,9 +19,13 @@
 
 // ---- Physics material ------------------------------------------------------
 
-// Sound set resolved for a platform's PhysicsMaterial at footstep-play time.
-// Fields that are empty fall back to footstepL/R (flat walk variants).
+// Properties resolved for a platform's PhysicsMaterial.
+// friction:  multiplier on walkAcceleration when decelerating (1.0 = normal, <1 = slippery, >1 = sticky)
+// speedMult: multiplier on runSpeed cap while on this surface (1.0 = normal)
+// Sound fields that are empty fall back to footstepL/R (flat walk variants).
 struct PhysicsMaterialDef {
+    float       friction        = 1.0f;
+    float       speedMult       = 1.0f;
     std::string footstepL;
     std::string footstepR;
     std::string footstepCrouchL;

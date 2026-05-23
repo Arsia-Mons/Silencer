@@ -28,6 +28,7 @@ const NAV = [
   { href: '/designer',        label: '[ MAP DESIGNER ]',      icon: '◫', minRank: 3 },
   { href: '/sound-studio',    label: '[ SOUND STUDIO ]',      icon: '♪', minRank: 3 },
   { href: '/gas',             label: '[ GAS EDITOR ]',         icon: '⚡', minRank: 3 },
+  { href: '/physics-materials', label: '[ PHYSICS MATERIALS ]', icon: '⬡', minRank: 3 },
   { href: '/sprites',         label: '[ SPRITES ]',            icon: '◈', minRank: 3 },
   { href: '/weapons',         label: '[ WEAPONS ]',            icon: '⚔', minRank: 3 },
   { href: '/items',           label: '[ ITEMS ]',              icon: '⊟', minRank: 3 },
