@@ -56,6 +56,7 @@ silencer::ui::UiInteractionRegistry & UiInteractions() { return gameUiPipeline.U
 const silencer::ui::UiInteractionRegistry & UiInteractions() const { return gameUiPipeline.UiInteractions(); }
 silencer::client_ui::InGameUiController & InGameUi() { return gameUiPipeline.InGameUi(); }
 void RenderClientUiFrameWithoutDispatch(float frametime) { gameUiPipeline.RenderClientUiFrameWithoutDispatch(GetScreenBuffer(), frametime); }
+void RenderClientUiPreviewFrameWithoutDispatch(float frametime) { gameUiPipeline.RenderClientUiPreviewFrameWithoutDispatch(GetScreenBuffer(), frametime); }
 bool ResizeRenderSurface(int width, int height);
 bool ResizeRenderSurfacePixels(int width, int height);
 bool SyncRenderSurfaceToWindowPixels();

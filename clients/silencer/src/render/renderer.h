@@ -81,6 +81,7 @@ public:
 		Uint8 GetHudAnimationPhase(void) const { return state_i; }
 	Uint8 GetAmbienceLevel(void);
 	bool CapturePNG(const class Surface & buf, const SDL_Color * palette, const char * path);
+	bool CapturePNGBytes(const class Surface & buf, const SDL_Color * palette, std::vector<unsigned char> & out);
 	Camera camera;
 	Palette palette;
 

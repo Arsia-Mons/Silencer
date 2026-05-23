@@ -94,6 +94,22 @@ preparedUiInput.animationStepSeconds = game.gameRenderer.LegacyUiAnimationStepSe
 hasPreparedUiInput = true;
 }
 
+void GameUiPipeline::PrepareClientUiPreviewFrame(Surface& surface) {
+float deltaTimeSeconds =
+static_cast<float>(GASLoader::Get().gameengine.tickIntervalMs) / 1000.0f;
+preparedUiInput = clientUiInput.BuildFrame(surface.w, surface.h, 1.0f, deltaTimeSeconds);
+Uint64 now = SDL_GetTicks();
+float animationDeltaSeconds = 0.0f;
+if(lastUiAnimationMs != 0 && now >= lastUiAnimationMs){
+animationDeltaSeconds = static_cast<float>(now - lastUiAnimationMs) / 1000.0f;
+if(animationDeltaSeconds > 0.25f) animationDeltaSeconds = 0.25f;
+}
+lastUiAnimationMs = now;
+preparedUiInput.animationDeltaSeconds = animationDeltaSeconds;
+preparedUiInput.animationStepSeconds = game.gameRenderer.LegacyUiAnimationStepSeconds();
+hasPreparedUiInput = true;
+}
+
 void GameUiPipeline::BeginPreparedClientUiFrame() {
 if(!hasPreparedUiInput) {
 PrepareClientUiFrame(game.GetScreenBuffer());
@@ -190,6 +206,18 @@ return;
 PrepareClientUiFrame(surface);
 BeginPreparedClientUiFrame();
 BuildVisibleClientUi(surface, frametime);
+Clay_RenderCommandArray cmds = EndClientUiFrame();
+silencer::clay_bridge::Render(game, &surface, cmds);
+}
+
+void GameUiPipeline::RenderClientUiPreviewFrameWithoutDispatch(Surface& surface, float frametime) {
+if(!clientUi.HasScreens()){
+return;
+}
+
+PrepareClientUiPreviewFrame(surface);
+BeginPreparedClientUiFrame();
+clientUi.BuildVisibleScreens(game.screenContext, surface, frametime);
 Clay_RenderCommandArray cmds = EndClientUiFrame();
 silencer::clay_bridge::Render(game, &surface, cmds);
 }

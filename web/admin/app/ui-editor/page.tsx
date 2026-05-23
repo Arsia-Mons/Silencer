@@ -194,6 +194,9 @@ export default function UiEditorPage() {
     if (!file) return;
     try {
       const parsed = validateUiDocument(JSON.parse(await file.text()));
+      if (normalizeUiSurface(parsed.surface) !== normalizeUiSurface(document.surface)) {
+        clearLocalDraft(document.surface);
+      }
       setDocument(parsed);
       setSelectedId(parsed.root.id);
       setCurrentRevision(null);
@@ -282,6 +285,9 @@ export default function UiEditorPage() {
           zoom={zoom}
           onZoom={setZoom}
           onDocumentChange={(next) => {
+            if (normalizeUiSurface(next.surface) !== normalizeUiSurface(document.surface)) {
+              clearLocalDraft(document.surface);
+            }
             setDocument(next);
             if (normalizeUiSurface(next.surface) !== normalizeUiSurface(document.surface)) {
               setCurrentRevision(null);
@@ -301,10 +307,13 @@ export default function UiEditorPage() {
           onDownloadJson={downloadDocument}
           onDownloadClay={downloadClay}
           onReset={() => {
-            const next = createDefaultUiDocument();
+            const next = validateUiDocument({
+              ...createDefaultUiDocument(),
+              surface: normalizeUiSurface(document.surface),
+            });
             setDocument(next);
             setSelectedId(next.root.id);
-            setCurrentRevision(null);
+            setCurrentRevision(currentRevision);
             setDirty(true);
             setStatus("RESET");
           }}

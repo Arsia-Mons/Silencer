@@ -23,6 +23,7 @@
 #include <fstream>
 #include <memory>
 #include <utility>
+#include <vector>
 #ifdef _WIN32
 #include <direct.h>
 #define MKDIR(p) _mkdir(p)
@@ -46,6 +47,24 @@ static bool WriteTempPath(char * buffer, size_t bufferSize, const char * prefix,
 #else
 	return snprintf(buffer, bufferSize, "/tmp/%s-%d.png", prefix, frame) > 0;
 #endif
+}
+
+static std::string Base64Encode(const std::vector<unsigned char>& data) {
+	static const char * chars =
+		"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+	std::string out;
+	out.reserve(((data.size() + 2) / 3) * 4);
+	for(size_t i = 0; i < data.size(); i += 3){
+		unsigned int a = data[i];
+		unsigned int b = (i + 1 < data.size()) ? data[i + 1] : 0;
+		unsigned int c = (i + 2 < data.size()) ? data[i + 2] : 0;
+		unsigned int triple = (a << 16) | (b << 8) | c;
+		out.push_back(chars[(triple >> 18) & 0x3F]);
+		out.push_back(chars[(triple >> 12) & 0x3F]);
+		out.push_back((i + 1 < data.size()) ? chars[(triple >> 6) & 0x3F] : '=');
+		out.push_back((i + 2 < data.size()) ? chars[triple & 0x3F] : '=');
+	}
+	return out;
 }
 
 ControlCommand::Phase PhaseFor(const std::string& op) {
@@ -674,7 +693,7 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 			std::move(document)));
 
 		game.GetScreenBuffer().Clear(0);
-		game.RenderClientUiFrameWithoutDispatch(0.0f);
+		game.RenderClientUiPreviewFrameWithoutDispatch(0.0f);
 		nlohmann::json inspect = InspectInteractionsToJson(game.UiInteractions());
 		if(inspect["widgets"].empty() && inspect["elements"].empty()){
 			game.PopScreen();
@@ -682,21 +701,12 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 			return;
 		}
 
-		std::string out = cmd.args.value("out", std::string());
-		if(out.empty()){
-			char buf[256];
-			if(!WriteTempPath(buf, sizeof(buf), "silencer-ui-preview", game.GetFrameCount())){
-				game.PopScreen();
-				cmd.reply->set_value(Err(cmd.id, "INTERNAL", "failed to create preview path"));
-				return;
-			}
-			out = buf;
-		}
-		bool ok = game.GetRenderer().CapturePNG(game.GetScreenBuffer(),
-			game.GetPaletteColors(), out.c_str());
+		std::vector<unsigned char> pngBytes;
+		bool ok = game.GetRenderer().CapturePNGBytes(game.GetScreenBuffer(),
+			game.GetPaletteColors(), pngBytes);
 		game.PopScreen();
 		if(!ok){
-			cmd.reply->set_value(Err(cmd.id, "INTERNAL", "stbi_write_png failed: " + out));
+			cmd.reply->set_value(Err(cmd.id, "INTERNAL", "stbi_write_png_to_func failed"));
 			return;
 		}
 
@@ -707,7 +717,7 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 		nlohmann::json r;
 		r["preview"] = std::move(previewJson);
 		r["inspect"] = std::move(inspect);
-		r["screenshot"] = out;
+		r["screenshot"] = Base64Encode(pngBytes);
 		cmd.reply->set_value(OkResult(cmd.id, r));
 		return;
 	}

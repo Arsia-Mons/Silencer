@@ -2810,7 +2810,7 @@ const char * Renderer::InvIdToLetter(Uint8 id){
 	}
 }
 
-bool Renderer::CapturePNG(const Surface& buf, const SDL_Color* palette, const char* path){
+static std::vector<unsigned char> BuildRgbBytes(const Surface& buf, const SDL_Color* palette){
 	std::vector<unsigned char> rgb(buf.w * buf.h * 3);
 	for(int i = 0; i < buf.w * buf.h; ++i){
 		Uint8 idx = buf.pixels[i];
@@ -2818,6 +2818,30 @@ bool Renderer::CapturePNG(const Surface& buf, const SDL_Color* palette, const ch
 		rgb[i*3+1] = palette[idx].g;
 		rgb[i*3+2] = palette[idx].b;
 	}
+	return rgb;
+}
+
+static void WritePngBytes(void * context, void * data, int size){
+	if(!context || !data || size <= 0) return;
+	std::vector<unsigned char> * out =
+		static_cast<std::vector<unsigned char> *>(context);
+	unsigned char * bytes = static_cast<unsigned char *>(data);
+	out->insert(out->end(), bytes, bytes + size);
+}
+
+bool Renderer::CapturePNG(const Surface& buf, const SDL_Color* palette, const char* path){
+	std::vector<unsigned char> rgb = BuildRgbBytes(buf, palette);
 	int rc = stbi_write_png(path, buf.w, buf.h, 3, rgb.data(), buf.w * 3);
+	return rc != 0;
+}
+
+bool Renderer::CapturePNGBytes(const Surface& buf,
+                               const SDL_Color* palette,
+                               std::vector<unsigned char>& out){
+	out.clear();
+	std::vector<unsigned char> rgb = BuildRgbBytes(buf, palette);
+	int rc = stbi_write_png_to_func(
+		WritePngBytes, &out, buf.w, buf.h, 3, rgb.data(), buf.w * 3);
+	if(rc == 0) out.clear();
 	return rc != 0;
 }

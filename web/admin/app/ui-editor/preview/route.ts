@@ -1,7 +1,3 @@
-import { randomUUID } from "node:crypto";
-import { mkdtemp, readFile, rm } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
 import { connect } from "node:net";
 import { type NextRequest, NextResponse } from "next/server";
 import { validateUiDocument } from "../../../lib/ui-layout";
@@ -111,34 +107,23 @@ async function renderPreview(
   document: unknown,
   signal: AbortSignal,
 ) {
-  let tempDir: string | null = null;
-  try {
-    if (signal.aborted) throw new StalePreviewError();
-    assertLatestPreview(sessionId, generation);
-    tempDir = await mkdtemp(join(tmpdir(), "silencer-ui-preview-"));
-    const screenshotPath = join(tempDir, `${randomUUID()}.png`);
-    if (signal.aborted) throw new StalePreviewError();
-    assertLatestPreview(sessionId, generation);
-    const capture = (await controlRequest(
-      "ui_editor_preview_capture",
-      {
-        document,
-        out: screenshotPath,
-      },
-      signal,
-    )) as { preview?: unknown; inspect?: unknown };
-    if (signal.aborted) throw new StalePreviewError();
-    assertLatestPreview(sessionId, generation);
-    const png = await readFile(screenshotPath);
+  if (signal.aborted) throw new StalePreviewError();
+  assertLatestPreview(sessionId, generation);
+  const capture = (await controlRequest("ui_editor_preview_capture", { document }, signal)) as {
+    preview?: unknown;
+    inspect?: unknown;
+    screenshot?: unknown;
+  };
+  if (signal.aborted) throw new StalePreviewError();
+  assertLatestPreview(sessionId, generation);
+  const screenshot = typeof capture.screenshot === "string" ? capture.screenshot : "";
+  if (!screenshot) throw new Error("preview capture did not return a screenshot");
 
-    return {
-      preview: capture.preview ?? {},
-      inspect: capture.inspect ?? {},
-      screenshot: `data:image/png;base64,${png.toString("base64")}`,
-    };
-  } finally {
-    if (tempDir) await rm(tempDir, { force: true, recursive: true });
-  }
+  return {
+    preview: capture.preview ?? {},
+    inspect: capture.inspect ?? {},
+    screenshot: screenshot.startsWith("data:") ? screenshot : `data:image/png;base64,${screenshot}`,
+  };
 }
 
 function enqueuePreview(
