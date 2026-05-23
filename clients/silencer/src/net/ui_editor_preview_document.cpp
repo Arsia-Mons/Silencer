@@ -25,7 +25,7 @@ bool IsContainerKind(const std::string& kind) {
 
 bool IsKnownKind(const std::string& kind) {
 	return IsContainerKind(kind) || kind == "text" || kind == "button" ||
-	       kind == "input" || kind == "spacer";
+	       kind == "input" || kind == "spacer" || kind == "component";
 }
 
 std::string StringValue(const nlohmann::json& json,
@@ -105,6 +105,29 @@ bool OptionalIntInRange(const nlohmann::json& json,
 	return true;
 }
 
+bool OptionalFloatInRange(const nlohmann::json& json,
+                          const char * key,
+                          float fallback,
+                          float minValue,
+                          float maxValue,
+                          float& out,
+                          std::string& error) {
+	auto it = json.find(key);
+	out = fallback;
+	if(it == json.end()) return true;
+	if(!it->is_number()){
+		error = std::string(key) + " must be numeric";
+		return false;
+	}
+	const float value = it->get<float>();
+	if(!std::isfinite(value) || value < minValue || value > maxValue){
+		error = std::string(key) + " is out of range";
+		return false;
+	}
+	out = value;
+	return true;
+}
+
 bool ParseStringEnum(const nlohmann::json& json,
                      const char * key,
                      const char * fallback,
@@ -143,6 +166,27 @@ bool ParseSize(const nlohmann::json& json,
 		return false;
 	}
 	const std::string mode = StringValue(*it, "mode");
+	auto parseBound = [&](const char * boundKey, float& target) {
+		auto boundIt = it->find(boundKey);
+		target = 0.0f;
+		if(boundIt == it->end()) return true;
+		if(!boundIt->is_number()){
+			error = std::string("style.") + key + "." + boundKey + " must be numeric";
+			return false;
+		}
+		const double value = boundIt->get<double>();
+		if(!std::isfinite(value) || value < 0.0 || value > 4096.0){
+			error = std::string("style.") + key + "." + boundKey + " is out of range";
+			return false;
+		}
+		target = static_cast<float>(value);
+		return true;
+	};
+	if(!parseBound("min", out.min) || !parseBound("max", out.max)) return false;
+	if(out.max > 0.0f && out.min > out.max){
+		error = std::string("style.") + key + ".min cannot exceed max";
+		return false;
+	}
 	if(mode == "fit"){
 		out.mode = UiEditorSize::Mode::Fit;
 		out.value = 0.0f;
@@ -195,6 +239,13 @@ bool ParsePalette(const nlohmann::json& json,
 	return true;
 }
 
+bool IsOneOf(const std::string& value, std::initializer_list<const char *> allowed) {
+	for(const char * candidate : allowed){
+		if(value == candidate) return true;
+	}
+	return false;
+}
+
 bool StyleFieldAllowed(const std::string& kind, const std::string& key) {
 	if(key == "width" || key == "height") return true;
 	if(IsContainerKind(kind)){
@@ -215,6 +266,94 @@ bool StyleFieldAllowed(const std::string& kind, const std::string& key) {
 		return key == "padding" || key == "font";
 	}
 	return false;
+}
+
+bool ParseImage(const nlohmann::json& json,
+                UiEditorNode& out,
+                std::string& error) {
+	out.image = {};
+	auto it = json.find("image");
+	if(it == json.end()) return true;
+	if(!it->is_object()){
+		error = "image must be an object";
+		return false;
+	}
+	if(!RequiredIntInRange(*it, "bank", 0, 255, out.image.bank, error)){
+		error = "image bank is invalid";
+		return false;
+	}
+	if(!RequiredIntInRange(*it, "index", 0, 65535, out.image.index, error)){
+		error = "image index is invalid";
+		return false;
+	}
+	if(!ParseStringEnum(*it, "mode", "normal", { "normal", "contain", "stretch" },
+	                    out.image.mode, error)){
+		error = "image mode is invalid";
+		return false;
+	}
+	out.image.enabled = true;
+	return true;
+}
+
+bool ParseFloating(const nlohmann::json& json,
+                   UiEditorNode& out,
+                   std::string& error) {
+	out.floating = {};
+	auto it = json.find("floating");
+	if(it == json.end()) return true;
+	if(!it->is_object()){
+		error = "floating must be an object";
+		return false;
+	}
+	if(!ParseStringEnum(*it, "attachTo", "parent", { "parent", "root" },
+	                    out.floating.attachTo, error)){
+		error = "floating attachTo is invalid";
+		return false;
+	}
+	if(!ParseStringEnum(*it,
+	                    "elementAttach",
+	                    "left-top",
+	                    { "left-top", "left-center", "left-bottom",
+	                      "center-top", "center", "center-bottom",
+	                      "right-top", "right-center", "right-bottom" },
+	                    out.floating.elementAttach,
+	                    error)){
+		error = "floating elementAttach is invalid";
+		return false;
+	}
+	if(!ParseStringEnum(*it,
+	                    "parentAttach",
+	                    "left-top",
+	                    { "left-top", "left-center", "left-bottom",
+	                      "center-top", "center", "center-bottom",
+	                      "right-top", "right-center", "right-bottom" },
+	                    out.floating.parentAttach,
+	                    error)){
+		error = "floating parentAttach is invalid";
+		return false;
+	}
+	if(!OptionalFloatInRange(*it, "offsetX", 0.0f, -4096.0f, 4096.0f,
+	                         out.floating.offsetX, error)){
+		error = "floating offsetX is invalid";
+		return false;
+	}
+	if(!OptionalFloatInRange(*it, "offsetY", 0.0f, -4096.0f, 4096.0f,
+	                         out.floating.offsetY, error)){
+		error = "floating offsetY is invalid";
+		return false;
+	}
+	if(!OptionalIntInRange(*it, "zIndex", 0, -32768, 32767,
+	                       out.floating.zIndex, error)){
+		error = "floating zIndex is invalid";
+		return false;
+	}
+	auto passthroughIt = it->find("pointerPassthrough");
+	out.floating.pointerPassthrough =
+		passthroughIt != it->end() && passthroughIt->is_boolean()
+			? passthroughIt->get<bool>()
+			: false;
+	out.floating.enabled = true;
+	return true;
 }
 
 bool ParseStyle(const nlohmann::json& json,
@@ -254,7 +393,7 @@ bool ParseStyle(const nlohmann::json& json,
 	if(!OptionalIntInRange(json, "padding", 0, 0, 512, out.padding, error)) return false;
 	if(!OptionalIntInRange(json, "gap", 0, 0, 512, out.gap, error)) return false;
 	if(!OptionalIntInRange(json, "radius", 0, 0, 64, out.radius, error)) return false;
-	if(!ParseStringEnum(json, "font", "ui", { "ui", "uiLarge", "title", "tiny" },
+	if(!ParseStringEnum(json, "font", "ui", { "ui", "uiLarge", "title", "tiny", "footer" },
 	                    out.font, error)){
 		return false;
 	}
@@ -278,6 +417,10 @@ bool ParseNode(const nlohmann::json& json,
 	if(!OptionalString(json, "text", out.text, error)) return false;
 	if(!OptionalString(json, "placeholder", out.placeholder, error)) return false;
 	if(!OptionalString(json, "action", out.action, error)) return false;
+	if(!OptionalString(json, "textBinding", out.textBinding, error)) return false;
+	if(!OptionalString(json, "component", out.component, error)) return false;
+	if(!OptionalString(json, "buttonVariant", out.buttonVariant, error)) return false;
+	if(!OptionalString(json, "buttonSize", out.buttonSize, error)) return false;
 	if(out.id.empty()){
 		error = "node id is required";
 		return false;
@@ -294,6 +437,22 @@ bool ParseNode(const nlohmann::json& json,
 		error = "unsupported node kind: " + out.kind;
 		return false;
 	}
+	if(!out.buttonVariant.empty() &&
+	   !IsOneOf(out.buttonVariant, { "oval", "chrome", "text", "ghost" })){
+		error = "invalid buttonVariant for node: " + out.id;
+		return false;
+	}
+	if(!out.buttonSize.empty() &&
+	   !IsOneOf(out.buttonSize, { "sm", "md", "lg", "compact", "auto" })){
+		error = "invalid buttonSize for node: " + out.id;
+		return false;
+	}
+	if(out.kind == "component" && out.component.empty()){
+		error = "component node requires component";
+		return false;
+	}
+	if(!ParseImage(json, out, error)) return false;
+	if(!ParseFloating(json, out, error)) return false;
 	auto styleIt = json.find("style");
 	if(styleIt == json.end() || !ParseStyle(*styleIt, out.kind, out.style, error)){
 		if(error.empty()) error = "node style is required";

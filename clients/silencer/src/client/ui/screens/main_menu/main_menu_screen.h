@@ -3,6 +3,7 @@
 
 #include "components/silencer_logo.h"
 #include "screen.h"
+#include "ui_editor_preview_model.h"
 
 #include <string>
 
@@ -20,7 +21,10 @@ private:
 	bool lobbyClicked = false;
 	bool optionsClicked = false;
 	bool exitClicked = false;
+	bool layoutLoaded_ = false;
 	std::string versionText_;
+	std::string layoutLoadError_;
+	silencer::ui::UiEditorPreviewDocument layoutDocument_;
 	silencer::client_ui::main_menu::SilencerLogo logo;
 };
 

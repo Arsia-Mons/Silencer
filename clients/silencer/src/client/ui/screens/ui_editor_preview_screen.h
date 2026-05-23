@@ -23,9 +23,6 @@ public:
 	bool HandleUiIntent(ScreenContext& ctx, const silencer::ui::UiAction& action) override;
 
 private:
-	void BuildNode(const silencer::ui::UiEditorNode& node,
-	               silencer::ui::UiInteractionRegistry& interactions);
-
 	silencer::ui::UiEditorPreviewDocument document_;
 };
 

@@ -15,9 +15,10 @@ make_doc() {
   local out="$1" mutator="$2"
   MUTATOR="$mutator" OUT="$out" bun -e '
 import { writeFileSync } from "node:fs";
-import { createDefaultUiDocument } from "./web/admin/lib/ui-layout.ts";
+import { createDefaultUiDocument, findNode } from "./web/admin/lib/ui-layout.ts";
 
 const document = createDefaultUiDocument();
+const button = findNode(document.root, "MainMenuTutorialButton");
 if (process.env.MUTATOR === "invalid-viewport") {
   document.viewport.width = 10;
 } else if (process.env.MUTATOR === "empty-surface") {
@@ -25,15 +26,19 @@ if (process.env.MUTATOR === "invalid-viewport") {
 } else if (process.env.MUTATOR === "empty-name") {
   document.root.children[0].name = "";
 } else if (process.env.MUTATOR === "invalid-button-font") {
-  document.root.children[1].children[0].style.font = "title";
+  button.style.font = "title";
 } else if (process.env.MUTATOR === "invalid-button-height") {
-  document.root.children[1].children[0].style.height = { mode: "fixed", value: 48 };
+  button.style.height = { mode: "fixed", value: 48 };
 } else if (process.env.MUTATOR === "fixed-small-button") {
-  document.root.children[1].children[0].text = "OK";
-  document.root.children[1].children[0].style.width = { mode: "fixed", value: 80 };
+  button.text = "OK";
+  button.buttonVariant = "chrome";
+  button.buttonSize = "auto";
+  button.style.width = { mode: "fixed", value: 80 };
 } else if (process.env.MUTATOR === "fixed-long-button") {
-  document.root.children[1].children[0].text = "VERY LONG PREVIEW BUTTON LABEL";
-  document.root.children[1].children[0].style.width = { mode: "fixed", value: 120 };
+  button.text = "VERY LONG PREVIEW BUTTON LABEL";
+  button.buttonVariant = "chrome";
+  button.buttonSize = "auto";
+  button.style.width = { mode: "fixed", value: 120 };
 }
 writeFileSync(process.env.OUT, JSON.stringify(document));
 '

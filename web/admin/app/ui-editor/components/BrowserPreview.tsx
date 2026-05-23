@@ -67,7 +67,7 @@ export function PreviewNode({ node, selectedId, rootViewport, dropAxis = 'vertic
         ...style,
         outline: isSelected ? '2px solid #f59e0b' : undefined,
         outlineOffset: isSelected ? 2 : undefined,
-        position: 'relative',
+        position: node.floating ? 'absolute' : 'relative',
       }}
     >
       {renderLeaf(node)}
@@ -99,6 +99,9 @@ function renderLeaf(node: UiNode) {
   if (node.kind === 'input') {
     return <div className="min-w-[140px] text-game-textDim">{node.placeholder}</div>;
   }
+  if (node.kind === 'component') {
+    return <div className="text-[10px] tracking-widest text-game-textDim">{node.component}</div>;
+  }
   return null;
 }
 
@@ -118,6 +121,10 @@ function nodeToCss(node: UiNode, rootViewport: UiDocument['viewport']): CSSPrope
     fontSize: fontSize(style.font),
     lineHeight: 1.2,
   };
+  if (node.image) {
+    css.backgroundImage = `linear-gradient(135deg, rgba(84,156,104,0.35), rgba(8,84,0,0.35))`;
+    css.backgroundSize = node.image.mode === 'normal' ? undefined : 'cover';
+  }
 
   applySize(css, 'width', style.width);
   applySize(css, 'height', style.height);
@@ -143,11 +150,20 @@ function nodeToCss(node: UiNode, rootViewport: UiDocument['viewport']): CSSPrope
     css.minHeight = node.kind === 'button' || node.kind === 'input' ? 34 : undefined;
     css.whiteSpace = 'pre-wrap';
   }
+  if (node.floating) {
+    css.left = node.floating.offsetX ?? 0;
+    css.top = node.floating.offsetY ?? 0;
+    css.zIndex = node.floating.zIndex ?? 1;
+  }
 
   return css;
 }
 
 function applySize(css: CSSProperties, property: 'width' | 'height', size: UiSize) {
+  const maxProperty = property === 'width' ? 'maxWidth' : 'maxHeight';
+  const minProperty = property === 'width' ? 'minWidth' : 'minHeight';
+  if (size.max !== undefined) css[maxProperty] = size.max;
+  if (size.min !== undefined) css[minProperty] = size.min;
   if (size.mode === 'fixed') {
     css[property] = size.value ?? 0;
     return;
@@ -175,6 +191,7 @@ function justifyToCss(justify: UiJustify): CSSProperties['justifyContent'] {
 function fontFamily(font: UiFont | undefined): string {
   if (font === 'title') return '"Silencer Title", "Courier New", monospace';
   if (font === 'tiny') return '"Silencer Tiny", "Courier New", monospace';
+  if (font === 'footer') return '"Silencer UI", "Courier New", monospace';
   if (font === 'uiLarge') return '"Silencer UI Large", "Courier New", monospace';
   return '"Silencer UI", "Courier New", monospace';
 }
@@ -182,6 +199,7 @@ function fontFamily(font: UiFont | undefined): string {
 function fontSize(font: UiFont | undefined): number {
   if (font === 'title') return 64;
   if (font === 'tiny') return 9;
+  if (font === 'footer') return 11;
   if (font === 'uiLarge') return 13;
   return 11;
 }

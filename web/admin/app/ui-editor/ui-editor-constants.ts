@@ -18,6 +18,7 @@ export const KIND_LABELS: Record<UiNodeKind, string> = {
   button: 'BUTTON',
   input: 'INPUT',
   spacer: 'SPACER',
+  component: 'COMPONENT',
 };
 
 export const PRESETS = [
@@ -30,4 +31,4 @@ export const SIZE_MODES: UiSizeMode[] = ['fit', 'grow', 'fixed'];
 export const AXES: UiAxis[] = ['column', 'row'];
 export const ALIGNS: UiAlign[] = ['start', 'center', 'end'];
 export const JUSTIFIES: UiJustify[] = ['start', 'center', 'end'];
-export const FONTS: UiFont[] = ['ui', 'uiLarge', 'title', 'tiny'];
+export const FONTS: UiFont[] = ['ui', 'uiLarge', 'title', 'tiny', 'footer'];

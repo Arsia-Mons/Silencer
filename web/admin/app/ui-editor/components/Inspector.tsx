@@ -4,8 +4,13 @@ import {
   PALETTE_NODE_KINDS,
   canHaveChildren,
   type UiAlign,
+  type UiAttachPoint,
+  type UiAttachTo,
   type UiAxis,
+  type UiButtonSize,
+  type UiButtonVariant,
   type UiFont,
+  type UiImageMode,
   type UiJustify,
   type UiNode,
   type UiNodeKind,
@@ -14,6 +19,22 @@ import {
   type UiStyle,
 } from "../../../lib/ui-layout";
 import { Field, NumberInput, Select, TextInput } from "./EditorControls";
+
+const BUTTON_VARIANTS: UiButtonVariant[] = ["oval", "chrome", "text", "ghost"];
+const BUTTON_SIZES: UiButtonSize[] = ["sm", "md", "lg", "compact", "auto"];
+const IMAGE_MODES: UiImageMode[] = ["normal", "contain", "stretch"];
+const ATTACH_TO: UiAttachTo[] = ["parent", "root"];
+const ATTACH_POINTS: UiAttachPoint[] = [
+  "left-top",
+  "left-center",
+  "left-bottom",
+  "center-top",
+  "center",
+  "center-bottom",
+  "right-top",
+  "right-center",
+  "right-bottom",
+];
 
 interface InspectorProps {
   node: UiNode;
@@ -60,18 +81,49 @@ export function Inspector({
           </Field>
         )}
         {node.kind === "button" && (
-          <Field label="ACTION">
-            <TextInput
-              value={node.action ?? ""}
-              onChange={(value) => onPatch({ action: slugify(value) })}
-            />
-          </Field>
+          <div className="space-y-3">
+            <Field label="ACTION">
+              <TextInput value={node.action ?? ""} onChange={(value) => onPatch({ action: value.trim() })} />
+            </Field>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="VARIANT">
+                <Select
+                  value={node.buttonVariant ?? "chrome"}
+                  options={BUTTON_VARIANTS}
+                  onChange={(value) => onPatch({ buttonVariant: value as UiButtonVariant })}
+                />
+              </Field>
+              <Field label="SIZE">
+                <Select
+                  value={node.buttonSize ?? "auto"}
+                  options={BUTTON_SIZES}
+                  onChange={(value) => onPatch({ buttonSize: value as UiButtonSize })}
+                />
+              </Field>
+            </div>
+          </div>
         )}
         {node.kind === "input" && (
           <Field label="PLACEHOLDER">
             <TextInput
               value={node.placeholder ?? ""}
               onChange={(value) => onPatch({ placeholder: value })}
+            />
+          </Field>
+        )}
+        {node.kind === "component" && (
+          <Field label="COMPONENT">
+            <TextInput
+              value={node.component ?? ""}
+              onChange={(value) => onPatch({ component: value.trim() })}
+            />
+          </Field>
+        )}
+        {node.kind === "text" && (
+          <Field label="TEXT BINDING">
+            <TextInput
+              value={node.textBinding ?? ""}
+              onChange={(value) => onPatch({ textBinding: value.trim() || undefined })}
             />
           </Field>
         )}
@@ -91,6 +143,8 @@ export function Inspector({
         )}
 
         <StyleInspector node={node} onStyle={onStyle} />
+        <ImageInspector node={node} onPatch={onPatch} />
+        <FloatingInspector node={node} onPatch={onPatch} />
 
         <div className="grid grid-cols-2 gap-2 pt-2">
           <button
@@ -250,6 +304,119 @@ function StyleInspector({
   );
 }
 
+function ImageInspector({
+  node,
+  onPatch,
+}: {
+  node: UiNode;
+  onPatch: (patch: Partial<UiNode>) => void;
+}) {
+  if (!node.image) return null;
+  return (
+    <div className="space-y-3">
+      <div className="text-xs tracking-widest text-game-primary">IMAGE</div>
+      <div className="grid grid-cols-3 gap-3">
+        <Field label="BANK">
+          <NumberInput
+            value={node.image.bank}
+            min={0}
+            max={255}
+            onChange={(bank) => onPatch({ image: { ...node.image!, bank } })}
+          />
+        </Field>
+        <Field label="INDEX">
+          <NumberInput
+            value={node.image.index}
+            min={0}
+            max={65535}
+            onChange={(index) => onPatch({ image: { ...node.image!, index } })}
+          />
+        </Field>
+        <Field label="MODE">
+          <Select
+            value={node.image.mode ?? "normal"}
+            options={IMAGE_MODES}
+            onChange={(mode) => onPatch({ image: { ...node.image!, mode: mode as UiImageMode } })}
+          />
+        </Field>
+      </div>
+    </div>
+  );
+}
+
+function FloatingInspector({
+  node,
+  onPatch,
+}: {
+  node: UiNode;
+  onPatch: (patch: Partial<UiNode>) => void;
+}) {
+  if (!node.floating) return null;
+  const floating = node.floating;
+  return (
+    <div className="space-y-3">
+      <div className="text-xs tracking-widest text-game-primary">FLOATING</div>
+      <div className="grid grid-cols-2 gap-3">
+        <Field label="ATTACH TO">
+          <Select
+            value={floating.attachTo}
+            options={ATTACH_TO}
+            onChange={(attachTo) =>
+              onPatch({ floating: { ...floating, attachTo: attachTo as UiAttachTo } })
+            }
+          />
+        </Field>
+        <Field label="Z">
+          <NumberInput
+            value={floating.zIndex ?? 0}
+            min={-32768}
+            max={32767}
+            onChange={(zIndex) => onPatch({ floating: { ...floating, zIndex } })}
+          />
+        </Field>
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <Field label="ELEMENT">
+          <Select
+            value={floating.elementAttach}
+            options={ATTACH_POINTS}
+            onChange={(elementAttach) =>
+              onPatch({ floating: { ...floating, elementAttach: elementAttach as UiAttachPoint } })
+            }
+          />
+        </Field>
+        <Field label="PARENT">
+          <Select
+            value={floating.parentAttach}
+            options={ATTACH_POINTS}
+            onChange={(parentAttach) =>
+              onPatch({ floating: { ...floating, parentAttach: parentAttach as UiAttachPoint } })
+            }
+          />
+        </Field>
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <Field label="X">
+          <NumberInput
+            value={floating.offsetX ?? 0}
+            min={-4096}
+            max={4096}
+            onChange={(offsetX) => onPatch({ floating: { ...floating, offsetX } })}
+          />
+        </Field>
+        <Field label="Y">
+          <NumberInput
+            value={floating.offsetY ?? 0}
+            min={-4096}
+            max={4096}
+            onChange={(offsetY) => onPatch({ floating: { ...floating, offsetY } })}
+          />
+        </Field>
+      </div>
+    </div>
+  );
+}
+
 function SizeField({
   label,
   size,
@@ -265,7 +432,7 @@ function SizeField({
         <Select
           value={size.mode}
           options={SIZE_MODES}
-          onChange={(value) => onChange({ mode: value as UiSizeMode, value: size.value ?? 120 })}
+          onChange={(value) => onChange({ ...size, mode: value as UiSizeMode, value: size.value ?? 120 })}
         />
         <NumberInput
           value={size.value ?? 0}

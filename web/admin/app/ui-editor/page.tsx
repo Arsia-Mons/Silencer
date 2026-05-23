@@ -44,7 +44,7 @@ export default function UiEditorPage() {
   const [documents, setDocuments] = useState<UiDocumentReference[]>([]);
   const [currentRevision, setCurrentRevision] = useState<string | null>(null);
   const [dirty, setDirty] = useState(false);
-  const [selectedId, setSelectedId] = useState("main-menu-panel");
+  const [selectedId, setSelectedId] = useState("MainMenuActionGroup");
   const [hydrated, setHydrated] = useState(false);
   const [zoom, setZoom] = useState(0.72);
   const [exportMode, setExportMode] = useState<"json" | "clay">("json");

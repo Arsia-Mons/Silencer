@@ -2,123 +2,360 @@
   "schemaVersion": 1,
   "surface": "main-menu",
   "viewport": {
-    "width": 1280,
-    "height": 720
+    "width": 640,
+    "height": 480
   },
   "root": {
-    "id": "main-menu-root",
+    "id": "MainMenuRoot",
     "kind": "screen",
     "name": "Main Menu",
+    "image": {
+      "bank": 6,
+      "index": 0,
+      "mode": "normal"
+    },
     "style": {
       "width": {
-        "mode": "fixed",
-        "value": 1280
+        "mode": "grow"
       },
       "height": {
-        "mode": "fixed",
-        "value": 720
+        "mode": "grow"
       },
       "direction": "column",
       "align": "center",
       "justify": "center",
-      "padding": 48,
-      "gap": 28,
-      "backgroundPalette": 0
+      "padding": 0,
+      "gap": 0
     },
     "children": [
       {
-        "id": "main-menu-title",
-        "kind": "text",
-        "name": "Title",
-        "text": "SILENCER",
+        "id": "MainMenuLogoGroup",
+        "kind": "stack",
+        "name": "Logo Group",
         "style": {
           "width": {
-            "mode": "fit"
+            "mode": "grow",
+            "max": 350
           },
           "height": {
-            "mode": "fit"
+            "mode": "grow"
           },
-          "font": "title",
-          "textPalette": 112
-        }
+          "direction": "column",
+          "align": "center",
+          "justify": "center",
+          "padding": 0,
+          "gap": 0
+        },
+        "children": [
+          {
+            "id": "MainMenuSilencerLogo",
+            "kind": "component",
+            "name": "Silencer Logo",
+            "component": "main-menu.logo",
+            "style": {
+              "width": {
+                "mode": "fit"
+              },
+              "height": {
+                "mode": "fit"
+              }
+            }
+          }
+        ]
       },
       {
-        "id": "main-menu-panel",
+        "id": "MainMenuActionGroup",
         "kind": "panel",
-        "name": "Menu Panel",
+        "name": "Action Group",
+        "floating": {
+          "attachTo": "root",
+          "elementAttach": "center",
+          "parentAttach": "center",
+          "offsetX": 0,
+          "offsetY": 31,
+          "zIndex": 1
+        },
         "style": {
           "width": {
-            "mode": "fixed",
-            "value": 360
+            "mode": "fit"
           },
           "height": {
             "mode": "fit"
           },
           "direction": "column",
-          "align": "center",
+          "align": "start",
           "justify": "start",
-          "padding": 18,
-          "gap": 10,
-          "backgroundPalette": 74,
-          "borderPalette": 216,
-          "radius": 2
+          "padding": 0,
+          "gap": 0
         },
         "children": [
           {
-            "id": "button-host-game",
-            "kind": "button",
-            "name": "Button",
-            "text": "HOST GAME",
-            "action": "open-host-game",
+            "id": "MainMenuActionStack",
+            "kind": "stack",
+            "name": "Action Stack",
             "style": {
               "width": {
-                "mode": "fixed",
-                "value": 320
+                "mode": "fit"
               },
               "height": {
                 "mode": "fit"
               },
-              "textPalette": 0,
-              "padding": 10
-            }
-          },
-          {
-            "id": "button-join-game",
-            "kind": "button",
-            "name": "Button",
-            "text": "JOIN GAME",
-            "action": "open-join-game",
-            "style": {
-              "width": {
-                "mode": "fixed",
-                "value": 320
+              "direction": "column",
+              "align": "start",
+              "justify": "start",
+              "padding": 0,
+              "gap": 34
+            },
+            "children": [
+              {
+                "id": "MainMenuTutorialRow",
+                "kind": "row",
+                "name": "Tutorial Row",
+                "style": {
+                  "width": {
+                    "mode": "fit"
+                  },
+                  "height": {
+                    "mode": "fit"
+                  },
+                  "direction": "row",
+                  "align": "start",
+                  "justify": "start",
+                  "padding": 0,
+                  "gap": 0
+                },
+                "children": [
+                  {
+                    "id": "MainMenuTutorialSpacer",
+                    "kind": "spacer",
+                    "name": "Tutorial Offset",
+                    "style": {
+                      "width": {
+                        "mode": "fixed",
+                        "value": 40
+                      },
+                      "height": {
+                        "mode": "fixed",
+                        "value": 1
+                      }
+                    }
+                  },
+                  {
+                    "id": "MainMenuTutorialButton",
+                    "kind": "button",
+                    "name": "Tutorial Button",
+                    "text": "Tutorial",
+                    "action": "main_menu.tutorial",
+                    "buttonVariant": "oval",
+                    "buttonSize": "md",
+                    "style": {
+                      "width": {
+                        "mode": "fixed",
+                        "value": 196
+                      },
+                      "height": {
+                        "mode": "fit"
+                      },
+                      "textPalette": 0,
+                      "padding": 0
+                    }
+                  }
+                ]
               },
-              "height": {
-                "mode": "fit"
+              {
+                "id": "MainMenuConnectToLobbyRow",
+                "kind": "row",
+                "name": "Connect To Lobby Row",
+                "style": {
+                  "width": {
+                    "mode": "fit"
+                  },
+                  "height": {
+                    "mode": "fit"
+                  },
+                  "direction": "row",
+                  "align": "start",
+                  "justify": "start",
+                  "padding": 0,
+                  "gap": 0
+                },
+                "children": [
+                  {
+                    "id": "MainMenuConnectToLobbySpacer",
+                    "kind": "spacer",
+                    "name": "Connect To Lobby Offset",
+                    "style": {
+                      "width": {
+                        "mode": "fixed",
+                        "value": 80
+                      },
+                      "height": {
+                        "mode": "fixed",
+                        "value": 1
+                      }
+                    }
+                  },
+                  {
+                    "id": "MainMenuConnectToLobbyButton",
+                    "kind": "button",
+                    "name": "Connect To Lobby Button",
+                    "text": "Connect To Lobby",
+                    "action": "main_menu.lobby",
+                    "buttonVariant": "oval",
+                    "buttonSize": "md",
+                    "style": {
+                      "width": {
+                        "mode": "fixed",
+                        "value": 196
+                      },
+                      "height": {
+                        "mode": "fit"
+                      },
+                      "textPalette": 0,
+                      "padding": 0
+                    }
+                  }
+                ]
               },
-              "textPalette": 0,
-              "padding": 10
-            }
-          },
-          {
-            "id": "button-options",
-            "kind": "button",
-            "name": "Button",
-            "text": "OPTIONS",
-            "action": "open-options",
-            "style": {
-              "width": {
-                "mode": "fixed",
-                "value": 320
+              {
+                "id": "MainMenuOptionsRow",
+                "kind": "row",
+                "name": "Options Row",
+                "style": {
+                  "width": {
+                    "mode": "fit"
+                  },
+                  "height": {
+                    "mode": "fit"
+                  },
+                  "direction": "row",
+                  "align": "start",
+                  "justify": "start",
+                  "padding": 0,
+                  "gap": 0
+                },
+                "children": [
+                  {
+                    "id": "MainMenuOptionsSpacer",
+                    "kind": "spacer",
+                    "name": "Options Offset",
+                    "style": {
+                      "width": {
+                        "mode": "fixed",
+                        "value": 40
+                      },
+                      "height": {
+                        "mode": "fixed",
+                        "value": 1
+                      }
+                    }
+                  },
+                  {
+                    "id": "MainMenuOptionsButton",
+                    "kind": "button",
+                    "name": "Options Button",
+                    "text": "Options",
+                    "action": "main_menu.options",
+                    "buttonVariant": "oval",
+                    "buttonSize": "md",
+                    "style": {
+                      "width": {
+                        "mode": "fixed",
+                        "value": 196
+                      },
+                      "height": {
+                        "mode": "fit"
+                      },
+                      "textPalette": 0,
+                      "padding": 0
+                    }
+                  }
+                ]
               },
-              "height": {
-                "mode": "fit"
-              },
-              "textPalette": 0,
-              "padding": 10
-            }
+              {
+                "id": "MainMenuExitRow",
+                "kind": "row",
+                "name": "Exit Row",
+                "style": {
+                  "width": {
+                    "mode": "fit"
+                  },
+                  "height": {
+                    "mode": "fit"
+                  },
+                  "direction": "row",
+                  "align": "start",
+                  "justify": "start",
+                  "padding": 0,
+                  "gap": 0
+                },
+                "children": [
+                  {
+                    "id": "MainMenuExitSpacer",
+                    "kind": "spacer",
+                    "name": "Exit Offset",
+                    "style": {
+                      "width": {
+                        "mode": "fixed",
+                        "value": 0
+                      },
+                      "height": {
+                        "mode": "fixed",
+                        "value": 1
+                      }
+                    }
+                  },
+                  {
+                    "id": "MainMenuExitButton",
+                    "kind": "button",
+                    "name": "Exit Button",
+                    "text": "Exit",
+                    "action": "main_menu.exit",
+                    "buttonVariant": "oval",
+                    "buttonSize": "md",
+                    "style": {
+                      "width": {
+                        "mode": "fixed",
+                        "value": 196
+                      },
+                      "height": {
+                        "mode": "fit"
+                      },
+                      "textPalette": 0,
+                      "padding": 0
+                    }
+                  }
+                ]
+              }
+            ]
           }
         ]
+      },
+      {
+        "id": "MainMenuVersion",
+        "kind": "text",
+        "name": "Version Footer",
+        "text": "Silencer v00000",
+        "textBinding": "client.version",
+        "floating": {
+          "attachTo": "root",
+          "elementAttach": "left-top",
+          "parentAttach": "left-bottom",
+          "offsetX": 10,
+          "offsetY": -17,
+          "zIndex": 1,
+          "pointerPassthrough": true
+        },
+        "style": {
+          "width": {
+            "mode": "fit"
+          },
+          "height": {
+            "mode": "fit"
+          },
+          "font": "footer",
+          "textPalette": 112
+        }
       }
     ]
   }

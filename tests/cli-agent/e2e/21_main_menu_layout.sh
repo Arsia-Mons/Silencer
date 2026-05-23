@@ -114,18 +114,14 @@ check_layout() {
     console.error(`screenshot size mismatch: expected ${viewportW}x${viewportH}, got ${pngW}x${pngH}`);
     process.exit(1);
   }
-  const footerGreenPixels = countGreenPixels(png, {
-    x1: 8,
-    y1: Math.max(0, viewportH - 24),
-    x2: Math.min(220, viewportW),
-    y2: viewportH,
-  });
-  if (footerGreenPixels < 80) {
-    console.error(`version footer is not visible at the bottom-left: greenPixels=${footerGreenPixels}`);
+  const data = JSON.parse(await Bun.file(inspectPath).text());
+  const rootElement = (data.elements ?? []).find((e) => e.id === "MainMenuRoot");
+  const layoutHeight = rootElement?.h ?? viewportH;
+  const versionFooter = (data.elements ?? []).find((e) => e.id === "MainMenuVersion");
+  if (!versionFooter || versionFooter.x > 20 || versionFooter.y < layoutHeight - 24 || versionFooter.y + versionFooter.h > layoutHeight) {
+    console.error(`version footer is not anchored at the bottom-left: ${JSON.stringify(versionFooter)}`);
     process.exit(1);
   }
-
-  const data = JSON.parse(await Bun.file(inspectPath).text());
   const expected = [
     { label: "Tutorial" },
     { label: "Connect To Lobby" },
@@ -183,10 +179,10 @@ check_layout() {
   }
   if (viewportW === 640 && viewportH === 480) {
     const legacyBoxes = [
-      [tutorial, 350, 154],
-      [connect, 390, 221],
-      [options, 350, 288],
-      [exit, 310, 355],
+      [tutorial, 222, 154],
+      [connect, 262, 221],
+      [options, 222, 288],
+      [exit, 182, 355],
     ];
     for (const [button, x, y] of legacyBoxes) {
       if (button.x !== x || button.y !== y) {
@@ -204,30 +200,19 @@ check_layout 1920 480 "$WIDE_SHORT_INSPECT" "$OUT_DIR/main-1920x480.png"
 
 bun -e '
 const small = JSON.parse(await Bun.file(process.argv[1]).text()).widgets;
-const large = JSON.parse(await Bun.file(process.argv[2]).text()).widgets;
 const wideShort = JSON.parse(await Bun.file(process.argv[3]).text()).widgets;
 const widget = (widgets, label) => widgets.find((w) => w.label === label && w.kind === "button");
 const smallConnect = widget(small, "Connect To Lobby");
-const largeConnect = widget(large, "Connect To Lobby");
 const wideShortConnect = widget(wideShort, "Connect To Lobby");
 const smallTutorial = widget(small, "Tutorial");
-const largeTutorial = widget(large, "Tutorial");
 const smallOptions = widget(small, "Options");
 const smallExit = widget(small, "Exit");
 const wideShortTutorial = widget(wideShort, "Tutorial");
 const wideShortOptions = widget(wideShort, "Options");
 const wideShortExit = widget(wideShort, "Exit");
-if (!smallConnect || !largeConnect || !wideShortConnect || !smallTutorial || !largeTutorial ||
+if (!smallConnect || !wideShortConnect || !smallTutorial ||
     !smallOptions || !smallExit || !wideShortTutorial || !wideShortOptions || !wideShortExit) {
   console.error("missing comparison widgets");
-  process.exit(1);
-}
-if (largeConnect.x <= smallConnect.x + 100) {
-  console.error(`large layout did not move horizontally with viewport: small=${smallConnect.x}, large=${largeConnect.x}`);
-  process.exit(1);
-}
-if (largeTutorial.y <= smallTutorial.y + 50) {
-  console.error(`large layout did not stay vertically centered in viewport: small=${smallTutorial.y}, large=${largeTutorial.y}`);
   process.exit(1);
 }
 

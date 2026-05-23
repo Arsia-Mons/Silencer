@@ -15,6 +15,8 @@ struct UiEditorSize {
 
 	Mode mode = Mode::Fit;
 	float value = 0.0f;
+	float min = 0.0f;
+	float max = 0.0f;
 };
 
 struct UiEditorStyle {
@@ -32,6 +34,24 @@ struct UiEditorStyle {
 	std::string font;
 };
 
+struct UiEditorImage {
+	bool enabled = false;
+	int bank = 0;
+	int index = 0;
+	std::string mode;
+};
+
+struct UiEditorFloating {
+	bool enabled = false;
+	float offsetX = 0.0f;
+	float offsetY = 0.0f;
+	int zIndex = 0;
+	std::string attachTo;
+	std::string elementAttach;
+	std::string parentAttach;
+	bool pointerPassthrough = false;
+};
+
 struct UiEditorNode {
 	std::string id;
 	std::string kind;
@@ -39,6 +59,12 @@ struct UiEditorNode {
 	std::string text;
 	std::string placeholder;
 	std::string action;
+	std::string textBinding;
+	std::string component;
+	std::string buttonVariant;
+	std::string buttonSize;
+	UiEditorImage image;
+	UiEditorFloating floating;
 	UiEditorStyle style;
 	std::vector<UiEditorNode> children;
 };

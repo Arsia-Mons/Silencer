@@ -8,17 +8,34 @@ export type UiNodeKind =
   | "text"
   | "button"
   | "input"
-  | "spacer";
+  | "spacer"
+  | "component";
 export type UiAxis = "row" | "column";
 export type UiAlign = "start" | "center" | "end";
 export type UiJustify = "start" | "center" | "end";
 export type UiSizeMode = "fit" | "grow" | "fixed";
-export type UiFont = "ui" | "uiLarge" | "title" | "tiny";
+export type UiFont = "ui" | "uiLarge" | "title" | "tiny" | "footer";
 export type UiMovePlacement = "inside" | "before" | "after";
+export type UiButtonVariant = "oval" | "chrome" | "text" | "ghost";
+export type UiButtonSize = "sm" | "md" | "lg" | "compact" | "auto";
+export type UiImageMode = "normal" | "contain" | "stretch";
+export type UiAttachTo = "parent" | "root";
+export type UiAttachPoint =
+  | "left-top"
+  | "left-center"
+  | "left-bottom"
+  | "center-top"
+  | "center"
+  | "center-bottom"
+  | "right-top"
+  | "right-center"
+  | "right-bottom";
 
 export interface UiSize {
   mode: UiSizeMode;
   value?: number;
+  min?: number;
+  max?: number;
 }
 
 export interface UiStyle {
@@ -36,6 +53,22 @@ export interface UiStyle {
   radius?: number;
 }
 
+export interface UiImageRef {
+  bank: number;
+  index: number;
+  mode?: UiImageMode;
+}
+
+export interface UiFloating {
+  attachTo: UiAttachTo;
+  elementAttach: UiAttachPoint;
+  parentAttach: UiAttachPoint;
+  offsetX?: number;
+  offsetY?: number;
+  zIndex?: number;
+  pointerPassthrough?: boolean;
+}
+
 export interface UiNode {
   id: string;
   kind: UiNodeKind;
@@ -43,6 +76,12 @@ export interface UiNode {
   text?: string;
   placeholder?: string;
   action?: string;
+  textBinding?: string;
+  component?: string;
+  buttonVariant?: UiButtonVariant;
+  buttonSize?: UiButtonSize;
+  image?: UiImageRef;
+  floating?: UiFloating;
   style: UiStyle;
   children?: UiNode[];
 }
@@ -78,6 +117,7 @@ const KIND_LABELS: Record<UiNodeKind, string> = {
   button: "Button",
   input: "Input",
   spacer: "Spacer",
+  component: "Component",
 };
 
 export const PALETTE_NODE_KINDS: UiNodeKind[] = [
@@ -88,6 +128,7 @@ export const PALETTE_NODE_KINDS: UiNodeKind[] = [
   "button",
   "input",
   "spacer",
+  "component",
 ];
 
 export function canHaveChildren(kind: UiNodeKind): boolean {
@@ -112,70 +153,159 @@ export function createDefaultUiDocument(): UiDocument {
   return {
     schemaVersion: UI_LAYOUT_SCHEMA_VERSION,
     surface: "main-menu",
-    viewport: { width: 1280, height: 720 },
+    viewport: { width: 640, height: 480 },
     root: {
-      id: "main-menu-root",
+      id: "MainMenuRoot",
       kind: "screen",
       name: "Main Menu",
+      image: { bank: 6, index: 0, mode: "normal" },
       style: {
-        width: { mode: "fixed", value: 1280 },
-        height: { mode: "fixed", value: 720 },
+        width: { mode: "grow" },
+        height: { mode: "grow" },
         direction: "column",
         align: "center",
         justify: "center",
-        padding: 48,
-        gap: 28,
-        backgroundPalette: 0,
+        padding: 0,
+        gap: 0,
       },
       children: [
         {
-          id: "main-menu-title",
-          kind: "text",
-          name: "Title",
-          text: "SILENCER",
+          id: "MainMenuLogoGroup",
+          kind: "stack",
+          name: "Logo Group",
+          style: {
+            width: { mode: "grow", max: 350 },
+            height: { mode: "grow" },
+            direction: "column",
+            align: "center",
+            justify: "center",
+            padding: 0,
+            gap: 0,
+          },
+          children: [
+            {
+              id: "MainMenuSilencerLogo",
+              kind: "component",
+              name: "Silencer Logo",
+              component: "main-menu.logo",
+              style: {
+                width: { mode: "fit" },
+                height: { mode: "fit" },
+              },
+            },
+          ],
+        },
+        {
+          id: "MainMenuActionGroup",
+          kind: "panel",
+          name: "Action Group",
+          floating: {
+            attachTo: "root",
+            elementAttach: "center",
+            parentAttach: "center",
+            offsetX: 0,
+            offsetY: 31,
+            zIndex: 1,
+          },
           style: {
             width: { mode: "fit" },
             height: { mode: "fit" },
-            font: "title",
+            direction: "column",
+            align: "start",
+            justify: "start",
+            padding: 0,
+            gap: 0,
+          },
+          children: [
+            {
+              id: "MainMenuActionStack",
+              kind: "stack",
+              name: "Action Stack",
+              style: {
+                width: { mode: "fit" },
+                height: { mode: "fit" },
+                direction: "column",
+                align: "start",
+                justify: "start",
+                padding: 0,
+                gap: 34,
+              },
+              children: [
+                createMainMenuActionRow("Tutorial", 40, "main_menu.tutorial"),
+                createMainMenuActionRow("Connect To Lobby", 80, "main_menu.lobby"),
+                createMainMenuActionRow("Options", 40, "main_menu.options"),
+                createMainMenuActionRow("Exit", 0, "main_menu.exit"),
+              ],
+            },
+          ],
+        },
+        {
+          id: "MainMenuVersion",
+          kind: "text",
+          name: "Version Footer",
+          text: "Silencer v00000",
+          textBinding: "client.version",
+          floating: {
+            attachTo: "root",
+            elementAttach: "left-top",
+            parentAttach: "left-bottom",
+            offsetX: 10,
+            offsetY: -17,
+            zIndex: 1,
+            pointerPassthrough: true,
+          },
+          style: {
+            width: { mode: "fit" },
+            height: { mode: "fit" },
+            font: "footer",
             textPalette: 112,
           },
         },
-        {
-          id: "main-menu-panel",
-          kind: "panel",
-          name: "Menu Panel",
-          style: {
-            width: { mode: "fixed", value: 360 },
-            height: { mode: "fit" },
-            direction: "column",
-            align: "center",
-            justify: "start",
-            padding: 18,
-            gap: 10,
-            backgroundPalette: 74,
-            borderPalette: 216,
-            radius: 2,
-          },
-          children: [
-            createNode("button", "host-game", {
-              text: "HOST GAME",
-              action: "open-host-game",
-              style: { width: { mode: "fixed", value: 320 } },
-            }),
-            createNode("button", "join-game", {
-              text: "JOIN GAME",
-              action: "open-join-game",
-              style: { width: { mode: "fixed", value: 320 } },
-            }),
-            createNode("button", "options", {
-              text: "OPTIONS",
-              action: "open-options",
-              style: { width: { mode: "fixed", value: 320 } },
-            }),
-          ],
-        },
       ],
     },
+  };
+}
+
+function createMainMenuActionRow(label: string, offset: number, action: string): UiNode {
+  return {
+    id: `MainMenu${toPascalCase(label)}Row`,
+    kind: "row",
+    name: `${label} Row`,
+    style: {
+      width: { mode: "fit" },
+      height: { mode: "fit" },
+      direction: "row",
+      align: "start",
+      justify: "start",
+      padding: 0,
+      gap: 0,
+    },
+    children: [
+      {
+        id: `MainMenu${toPascalCase(label)}Spacer`,
+        kind: "spacer",
+        name: `${label} Offset`,
+        style: {
+          width: { mode: "fixed", value: offset },
+          height: { mode: "fixed", value: 1 },
+        },
+      },
+      {
+        id: `MainMenu${toPascalCase(label)}Button`,
+        kind: "button",
+        name: `${label} Button`,
+        text: label,
+        action,
+        buttonVariant: "oval",
+        buttonSize: "md",
+        style: {
+          width: { mode: "fixed", value: 196 },
+          height: { mode: "fit" },
+          textPalette: 0,
+          padding: 0,
+        },
+      },
+    ],
   };
 }
 
@@ -196,8 +326,11 @@ export function createNode(
   if (kind === "button") {
     base.text = "Button";
     base.action = "action-id";
+    base.buttonVariant = "chrome";
+    base.buttonSize = "auto";
   }
   if (kind === "input") base.placeholder = "Value";
+  if (kind === "component") base.component = "component-id";
   if (canHaveChildren(kind)) base.children = [];
 
   return {
@@ -390,6 +523,12 @@ function defaultStyleForKind(kind: UiNodeKind): UiStyle {
       height: { mode: "fixed", value: 12 },
     };
   }
+  if (kind === "component") {
+    return {
+      width: { mode: "fit" },
+      height: { mode: "fit" },
+    };
+  }
   if (kind === "text") {
     return {
       width: { mode: "fit" },
@@ -459,6 +598,14 @@ function validateNode(node: UiNode, seenIds: Set<string>): void {
   validateOptionalString(node, "text");
   validateOptionalString(node, "placeholder");
   validateOptionalString(node, "action");
+  validateOptionalString(node, "textBinding");
+  validateOptionalString(node, "component");
+  validateButtonSettings(node);
+  validateImage(node);
+  validateFloating(node);
+  if (node.kind === "component" && !node.component) {
+    throw new Error(`Node ${node.id} component is missing.`);
+  }
   if (!node.style || typeof node.style !== "object")
     throw new Error(`Node ${node.id} style is missing.`);
   validateStyleFields(node);
@@ -471,7 +618,7 @@ function validateNode(node: UiNode, seenIds: Set<string>): void {
   validateEnum(node, "direction", ["row", "column"]);
   validateEnum(node, "align", ["start", "center", "end"]);
   validateEnum(node, "justify", ["start", "center", "end"]);
-  validateEnum(node, "font", ["ui", "uiLarge", "title", "tiny"]);
+  validateEnum(node, "font", ["ui", "uiLarge", "title", "tiny", "footer"]);
   validatePalette(node, "backgroundPalette");
   validatePalette(node, "borderPalette");
   validatePalette(node, "textPalette");
@@ -481,11 +628,114 @@ function validateNode(node: UiNode, seenIds: Set<string>): void {
   for (const child of node.children ?? []) validateNode(child, seenIds);
 }
 
-function validateOptionalString(node: UiNode, key: "text" | "placeholder" | "action"): void {
+function validateOptionalString(
+  node: UiNode,
+  key: "text" | "placeholder" | "action" | "textBinding" | "component",
+): void {
   const value = node[key];
   if (value === undefined) return;
   if (typeof value !== "string") {
     throw new Error(`Node ${node.id} has invalid ${key}.`);
+  }
+}
+
+function validateButtonSettings(node: UiNode): void {
+  if (node.buttonVariant !== undefined) {
+    if (
+      typeof node.buttonVariant !== "string" ||
+      !["oval", "chrome", "text", "ghost"].includes(node.buttonVariant)
+    ) {
+      throw new Error(`Node ${node.id} has invalid buttonVariant.`);
+    }
+  }
+  if (node.buttonSize !== undefined) {
+    if (
+      typeof node.buttonSize !== "string" ||
+      !["sm", "md", "lg", "compact", "auto"].includes(node.buttonSize)
+    ) {
+      throw new Error(`Node ${node.id} has invalid buttonSize.`);
+    }
+  }
+}
+
+function validateImage(node: UiNode): void {
+  if (node.image === undefined) return;
+  if (!node.image || typeof node.image !== "object" || Array.isArray(node.image)) {
+    throw new Error(`Node ${node.id} has invalid image.`);
+  }
+  if (!Number.isInteger(node.image.bank) || node.image.bank < 0 || node.image.bank > 255) {
+    throw new Error(`Node ${node.id} has invalid image bank.`);
+  }
+  if (!Number.isInteger(node.image.index) || node.image.index < 0 || node.image.index > 65535) {
+    throw new Error(`Node ${node.id} has invalid image index.`);
+  }
+  const mode = node.image.mode ?? "normal";
+  if (!["normal", "contain", "stretch"].includes(mode)) {
+    throw new Error(`Node ${node.id} has invalid image mode.`);
+  }
+}
+
+function validateFloating(node: UiNode): void {
+  if (node.floating === undefined) return;
+  if (!node.floating || typeof node.floating !== "object" || Array.isArray(node.floating)) {
+    throw new Error(`Node ${node.id} has invalid floating.`);
+  }
+  if (!["parent", "root"].includes(node.floating.attachTo)) {
+    throw new Error(`Node ${node.id} has invalid floating attachTo.`);
+  }
+  validateAttachPoint(node, node.floating.elementAttach, "elementAttach");
+  validateAttachPoint(node, node.floating.parentAttach, "parentAttach");
+  validateFloatingNumber(node, "offsetX", -4096, 4096);
+  validateFloatingNumber(node, "offsetY", -4096, 4096);
+  validateFloatingNumber(node, "zIndex", -32768, 32767, true);
+  if (
+    node.floating.pointerPassthrough !== undefined &&
+    typeof node.floating.pointerPassthrough !== "boolean"
+  ) {
+    throw new Error(`Node ${node.id} has invalid floating pointerPassthrough.`);
+  }
+}
+
+function validateAttachPoint(
+  node: UiNode,
+  value: UiAttachPoint,
+  key: "elementAttach" | "parentAttach",
+): void {
+  if (
+    typeof value !== "string" ||
+    ![
+      "left-top",
+      "left-center",
+      "left-bottom",
+      "center-top",
+      "center",
+      "center-bottom",
+      "right-top",
+      "right-center",
+      "right-bottom",
+    ].includes(value)
+  ) {
+    throw new Error(`Node ${node.id} has invalid floating ${key}.`);
+  }
+}
+
+function validateFloatingNumber(
+  node: UiNode,
+  key: "offsetX" | "offsetY" | "zIndex",
+  min: number,
+  max: number,
+  integer = false,
+): void {
+  const value = node.floating?.[key];
+  if (value === undefined) return;
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    throw new Error(`Node ${node.id} has invalid floating ${key}.`);
+  }
+  if (integer && !Number.isInteger(value)) {
+    throw new Error(`Node ${node.id} has invalid floating ${key}.`);
+  }
+  if (value < min || value > max) {
+    throw new Error(`Node ${node.id} has invalid floating ${key}.`);
   }
 }
 
@@ -587,6 +837,11 @@ function validateSize(node: UiNode, key: "width" | "height"): void {
   if (!size || (size.mode !== "fit" && size.mode !== "grow" && size.mode !== "fixed")) {
     throw new Error(`Node ${node.id} has invalid ${key} sizing.`);
   }
+  validateSizeBound(node, key, "min");
+  validateSizeBound(node, key, "max");
+  if (size.max !== undefined && size.min !== undefined && size.min > size.max) {
+    throw new Error(`Node ${node.id} ${key} min cannot exceed max.`);
+  }
   if (size.mode === "fixed") {
     const value = size.value;
     if (typeof value !== "number") {
@@ -595,6 +850,18 @@ function validateSize(node: UiNode, key: "width" | "height"): void {
     if (!Number.isFinite(value) || value < 0 || value > 4096) {
       throw new Error(`Node ${node.id} has invalid fixed ${key} sizing.`);
     }
+  }
+}
+
+function validateSizeBound(
+  node: UiNode,
+  key: "width" | "height",
+  bound: "min" | "max",
+): void {
+  const value = node.style[key][bound];
+  if (value === undefined) return;
+  if (!Number.isFinite(value) || value < 0 || value > 4096) {
+    throw new Error(`Node ${node.id} has invalid ${key} ${bound}.`);
   }
 }
 
