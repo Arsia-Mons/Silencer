@@ -5,6 +5,7 @@
 // Local dev: NEXT_PUBLIC_API_URL=http://localhost:24080 (compose build arg)
 //   → API is "http://localhost:24080/api"; admin-api still serves under /api.
 import type { Player, MatchStat, AdminUser, AuditEvent, BackupStatus, BackupInfo, StatsSnapshot } from './types';
+import type { UiDocument, UiDocumentReference } from './ui-layout';
 
 export const API = (process.env.NEXT_PUBLIC_API_URL || '') + '/api';
 
@@ -62,6 +63,45 @@ export const resetAdminPassword = (id: string, password: string): Promise<unknow
 export const deleteAdminUser    = (id: string): Promise<unknown>    => apiFetch(`/auth/users/${id}`, { method: 'DELETE' });
 export const changeOwnPassword  = (currentPassword: string, newPassword: string): Promise<unknown> =>
   apiFetch('/auth/me/password', { method: 'PATCH', body: JSON.stringify({ currentPassword, newPassword }) });
+
+export interface UiEditorDocumentPayload {
+  document: UiDocument;
+  reference: UiDocumentReference;
+}
+
+async function uiEditorFetch(path: string, opts: RequestInit = {}): Promise<unknown> {
+  const token = getToken();
+  const res = await fetch(`${API}/ui-editor/documents${path}`, {
+    ...opts,
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(opts.headers as Record<string, string> | undefined),
+    },
+  });
+  const payload = await res.json();
+  if (!res.ok || payload?.ok === false) {
+    throw new Error(payload?.error ?? `${res.status} ${res.statusText}`);
+  }
+  return payload;
+}
+
+export const listUiEditorDocuments = async (): Promise<UiDocumentReference[]> => {
+  const payload = await uiEditorFetch('') as { documents: UiDocumentReference[] };
+  return payload.documents;
+};
+
+export const getUiEditorDocument = (surface: string): Promise<UiEditorDocumentPayload> =>
+  uiEditorFetch(`/${encodeURIComponent(surface)}`) as Promise<UiEditorDocumentPayload>;
+
+export const saveUiEditorDocument = (
+  document: UiDocument,
+  expectedRevision: string | null,
+): Promise<UiEditorDocumentPayload> =>
+  uiEditorFetch(`/${encodeURIComponent(document.surface)}`, {
+    method: 'PUT',
+    body: JSON.stringify({ document, expectedRevision }),
+  }) as Promise<UiEditorDocumentPayload>;
 
 export const triggerBackup  = (): Promise<unknown>          => apiFetch('/backup/trigger', { method: 'POST' });
 export const getBackupStatus = (): Promise<BackupStatus>    => apiFetch('/backup/status') as Promise<BackupStatus>;

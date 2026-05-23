@@ -47,6 +47,7 @@ export function EditorTopBar(props: EditorTopBarProps) {
           filename: `${currentSurface}.silencer-ui.json`,
           title: `${currentSurface} (unsaved)`,
           updatedAt: "",
+          revision: "",
         },
         ...documents,
       ];

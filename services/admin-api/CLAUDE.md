@@ -1,14 +1,15 @@
 # services/admin-api/ — Express admin REST + WebSocket API
 
-Bun (1.x) + Express 4 + Socket.IO 4 + Mongoose 8 + amqplib. Source
-is `.js` (ESM) — Bun runs the existing Node-style code unchanged.
+Bun (1.x) + Express 4 + Socket.IO 4 + Mongoose 8 + amqplib. Existing
+source is mostly `.js` (ESM), but new files should be TypeScript when there is
+a viable TS path. Bun runs the mixed source directly.
 Build/run, env vars, and the full route table are in `README.md`;
 this file is for editing the code.
 
 The runtime + lockfile (`bun.lock`) moved to Bun in Phase 1 of the
 production deployment plan. The source-level migration to Bun + TS +
-Hono + native WebSocket + Drizzle is Phase 2 — defer wholesale
-rewrites until then.
+Hono + native WebSocket + Drizzle is Phase 2 — defer wholesale rewrites until
+then, but do not add new raw JavaScript for isolated new modules.
 
 ## Routes mount under `/api`
 
@@ -53,6 +54,10 @@ unit + env file + Mongo/LavinMQ co-location are described in
   actors. Reads/writes `shared/assets/behaviortrees/<id>.json`. Node type
   whitelist enforced server-side (`Selector`, `Sequence`, `Leaf`, etc.).
   The game client fetches these at startup for the BT interpreter.
+- `src/routes/uieditor.ts` — UI layout document endpoints. Reads/writes
+  `shared/assets/ui-layouts/<surface>.silencer-ui.json` behind admin auth,
+  validates the same schema as the web editor/client preview, and uses
+  revision-checked atomic saves to avoid clobbering another dashboard edit.
 - `src/routes/players.js` — `PATCH /:id/ban` and `DELETE /:id`
   proxy to the lobby's internal HTTP (`LOBBY_PLAYER_AUTH_URL`)
   so live clients are kicked. Lobby unreachable is logged but

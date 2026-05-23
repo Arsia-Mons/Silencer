@@ -1,15 +1,18 @@
 import { NextResponse } from "next/server";
-import { listUiLayoutDocuments } from "../../../../lib/ui-layout-store";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+const API =
+  process.env.ADMIN_API_URL || process.env.NEXT_PUBLIC_API_URL || "http://localhost:24080";
+
+export async function GET(req: Request) {
   try {
-    return NextResponse.json({
-      ok: true,
-      documents: await listUiLayoutDocuments(),
+    const upstream = await fetch(`${API}/api/ui-editor/documents`, {
+      headers: forwardHeaders(req),
+      cache: "no-store",
     });
+    return proxyJson(upstream);
   } catch (error) {
     return NextResponse.json(
       {
@@ -19,4 +22,16 @@ export async function GET() {
       { status: 500 },
     );
   }
+}
+
+function forwardHeaders(req: Request): HeadersInit {
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  const auth = req.headers.get("authorization");
+  if (auth) headers.authorization = auth;
+  return headers;
+}
+
+async function proxyJson(response: Response): Promise<NextResponse> {
+  const payload = await response.json();
+  return NextResponse.json(payload, { status: response.status });
 }

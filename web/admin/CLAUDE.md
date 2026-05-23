@@ -17,7 +17,7 @@ is Cloudflare Tunnel; the path-routing rules that share
 `admin.arsiamons.com` between admin-web and admin-api live in
 `infra/terraform/CLAUDE.md`.
 
-## NEXT_PUBLIC_* are empty in production
+## NEXT*PUBLIC*\* are empty in production
 
 `NEXT_PUBLIC_API_URL`, `NEXT_PUBLIC_WS_URL`, `NEXT_PUBLIC_MAP_API_URL`
 are intentionally **unset** in the prod Dockerfile build. That makes
@@ -45,10 +45,10 @@ directly). If you need to bake an explicit URL in, pass it as a
   panels, saved documents from `shared/assets/ui-layouts`, JSON
   import/download, generated Clay scaffold output, and a real client preview
   returned by `app/api/ui-editor/preview/route.ts`.
-- `app/api/ui-editor/documents/` — file-backed UI layout document API. It
-  lists, loads, validates, and saves `*.silencer-ui.json` documents in
-  `shared/assets/ui-layouts`; browser localStorage is only a draft fallback
-  when this API is unavailable.
+- `app/api/ui-editor/documents/` — local Next.js proxy for the admin API UI
+  layout document routes. It forwards the admin bearer token and exists for
+  local dev/proxy consistency; persistence lives in `services/admin-api`, not
+  admin-web.
 - `app/api/ui-editor/preview/route.ts` — talks to the Silencer control socket
   (`SILENCER_CONTROL_HOST` / `SILENCER_CONTROL_PORT`), sends one
   `ui_editor_preview_capture` request, and returns the client screenshot plus
@@ -85,9 +85,6 @@ directly). If you need to bake an explicit URL in, pass it as a
   generation. Keep this model aligned with real `clients/silencer/src/client/ui`
   primitive concepts and the client preview parser, not browser-only widget
   names.
-- `lib/ui-layout-store.ts` — server-only file store for dashboard-synced UI
-  layout documents. Keep filename normalization and validation strict so the
-  stored assets remain directly consumable by the client migration.
 - `lib/api.ts` — `fetch` wrapper, injects `Authorization: Bearer`
   from `zs_token` (admin) localStorage key.
 - `lib/auth.js` — two storage keys: `zs_token` (admin) and
@@ -115,7 +112,7 @@ directly). If you need to bake an explicit URL in, pass it as a
   connection per mount.
 - **Designer parses raw `.SIL` bytes** in the browser via `pako`.
   The map binary format mirrors the engine's `world.cpp
-  AllocateMapData` 64 KiB cap; if you change the parser, mirror it
+AllocateMapData` 64 KiB cap; if you change the parser, mirror it
   in `clients/silencer/src/world.cpp` and the lobby's
   `services/lobby/maps.go` validation.
 

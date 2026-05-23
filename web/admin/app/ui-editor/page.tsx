@@ -1,6 +1,7 @@
 "use client";
 import { type ChangeEvent, useEffect, useMemo, useRef, useState } from "react";
 import Sidebar from "../../components/Sidebar";
+import { getUiEditorDocument, listUiEditorDocuments, saveUiEditorDocument } from "../../lib/api";
 import { useAuth } from "../../lib/auth";
 import { useWsConnected } from "../../lib/socket";
 import {
@@ -41,6 +42,8 @@ export default function UiEditorPage() {
   const importInputRef = useRef<HTMLInputElement | null>(null);
   const [document, setDocument] = useState<UiDocument>(() => createDefaultUiDocument());
   const [documents, setDocuments] = useState<UiDocumentReference[]>([]);
+  const [currentRevision, setCurrentRevision] = useState<string | null>(null);
+  const [dirty, setDirty] = useState(false);
   const [selectedId, setSelectedId] = useState("main-menu-panel");
   const [hydrated, setHydrated] = useState(false);
   const [zoom, setZoom] = useState(0.72);
@@ -52,40 +55,47 @@ export default function UiEditorPage() {
     let cancelled = false;
 
     async function loadInitialDocument() {
+      const draft = readLocalDraft();
       try {
-        const loadedDocuments = await fetchDocumentList();
+        const loadedDocuments = await listUiEditorDocuments();
         if (cancelled) return;
         setDocuments(loadedDocuments);
+        if (draft) {
+          setDocument(draft.document);
+          setSelectedId(draft.document.root.id);
+          setCurrentRevision(draft.baseRevision);
+          setDirty(true);
+          setStatus(`LOCAL DRAFT ${draft.document.surface}`);
+          return;
+        }
         const preferred =
           loadedDocuments.find((candidate) => candidate.surface === "main-menu") ??
           loadedDocuments[0];
         if (preferred) {
-          const parsed = await fetchDocument(preferred.surface);
+          const loaded = await getUiEditorDocument(preferred.surface);
+          const parsed = validateUiDocument(loaded.document);
           if (cancelled) return;
           setDocument(parsed);
           setSelectedId(parsed.root.id);
+          setCurrentRevision(loaded.reference.revision);
+          setDirty(false);
           setStatus(`LOADED ${preferred.surface}`);
           return;
         }
         setStatus("NO SAVED DOCUMENTS");
       } catch (error) {
         if (cancelled) return;
-        loadLocalDraft();
-        setStatus(error instanceof Error ? `LOCAL DRAFT: ${error.message}` : "LOCAL DRAFT");
+        if (draft) {
+          setDocument(draft.document);
+          setSelectedId(draft.document.root.id);
+          setCurrentRevision(draft.baseRevision);
+          setDirty(true);
+          setStatus(error instanceof Error ? `LOCAL DRAFT: ${error.message}` : "LOCAL DRAFT");
+        } else {
+          setStatus(error instanceof Error ? error.message : "LOAD FAILED");
+        }
       } finally {
         if (!cancelled) setHydrated(true);
-      }
-    }
-
-    function loadLocalDraft() {
-      try {
-        const raw = localStorage.getItem(STORAGE_KEY);
-        if (!raw) return;
-        const parsed = validateUiDocument(JSON.parse(raw));
-        setDocument(parsed);
-        setSelectedId(parsed.root.id);
-      } catch (error) {
-        setStatus(error instanceof Error ? error.message : "FAILED TO LOAD LOCAL DOCUMENT");
       }
     }
 
@@ -98,11 +108,15 @@ export default function UiEditorPage() {
   useEffect(() => {
     if (!hydrated) return;
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(document));
+      if (dirty) {
+        writeLocalDraft(document, currentRevision);
+      } else {
+        localStorage.removeItem(STORAGE_KEY);
+      }
     } catch (error) {
       setStatus(error instanceof Error ? error.message : "FAILED TO CACHE LOCAL DOCUMENT");
     }
-  }, [document, hydrated]);
+  }, [currentRevision, dirty, document, hydrated]);
 
   const selectedNode = useMemo(
     () => findNode(document.root, selectedId) ?? document.root,
@@ -118,8 +132,12 @@ export default function UiEditorPage() {
   );
 
   function commit(next: UiDocument, nextSelectedId = selectedNode.id) {
+    if (normalizeUiSurface(next.surface) !== normalizeUiSurface(document.surface)) {
+      setCurrentRevision(null);
+    }
     setDocument(next);
     setSelectedId(nextSelectedId);
+    setDirty(true);
     setStatus("DIRTY");
   }
 
@@ -177,6 +195,8 @@ export default function UiEditorPage() {
       const parsed = validateUiDocument(JSON.parse(await file.text()));
       setDocument(parsed);
       setSelectedId(parsed.root.id);
+      setCurrentRevision(null);
+      setDirty(true);
       setStatus("IMPORTED");
     } catch (error) {
       setStatus(error instanceof Error ? error.message : "IMPORT FAILED");
@@ -188,9 +208,12 @@ export default function UiEditorPage() {
   async function loadDocument(surface: string) {
     try {
       setStatus(`LOADING ${surface}`);
-      const parsed = await fetchDocument(surface);
+      const loaded = await getUiEditorDocument(surface);
+      const parsed = validateUiDocument(loaded.document);
       setDocument(parsed);
       setSelectedId(parsed.root.id);
+      setCurrentRevision(loaded.reference.revision);
+      setDirty(false);
       setStatus(`LOADED ${parsed.surface}`);
     } catch (error) {
       setStatus(error instanceof Error ? error.message : `LOAD FAILED: ${surface}`);
@@ -204,19 +227,13 @@ export default function UiEditorPage() {
         surface: normalizeUiSurface(document.surface),
       });
       setStatus(`SAVING ${next.surface}`);
-      const response = await fetch(`/api/ui-editor/documents/${encodeURIComponent(next.surface)}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ document: next }),
-      });
-      const payload = await response.json();
-      if (!response.ok || !payload.ok) {
-        throw new Error(payload.error ?? `Save failed with HTTP ${response.status}`);
-      }
-      const parsed = validateUiDocument(payload.document);
+      const saved = await saveUiEditorDocument(next, currentRevision);
+      const parsed = validateUiDocument(saved.document);
       setDocument(parsed);
       setSelectedId(selectedNode.id);
-      setDocuments((current) => upsertDocumentReference(current, payload.reference));
+      setCurrentRevision(saved.reference.revision);
+      setDirty(false);
+      setDocuments((current) => upsertDocumentReference(current, saved.reference));
       setStatus(`SAVED ${parsed.surface}`);
     } catch (error) {
       setStatus(error instanceof Error ? error.message : "SAVE FAILED");
@@ -253,12 +270,17 @@ export default function UiEditorPage() {
           onZoom={setZoom}
           onDocumentChange={(next) => {
             setDocument(next);
+            if (normalizeUiSurface(next.surface) !== normalizeUiSurface(document.surface)) {
+              setCurrentRevision(null);
+            }
+            setDirty(true);
             setStatus("DIRTY");
           }}
           onLoadDocument={loadDocument}
           onPreset={(preset) => {
             setDocument(applyViewportPreset(document, preset));
             setZoom(preset.zoom);
+            setDirty(true);
             setStatus("DIRTY");
           }}
           onImport={() => importInputRef.current?.click()}
@@ -269,6 +291,8 @@ export default function UiEditorPage() {
             const next = createDefaultUiDocument();
             setDocument(next);
             setSelectedId(next.root.id);
+            setCurrentRevision(null);
+            setDirty(true);
             setStatus("RESET");
           }}
         />
@@ -320,32 +344,41 @@ export default function UiEditorPage() {
   );
 }
 
-async function fetchDocumentList(): Promise<UiDocumentReference[]> {
-  const response = await fetch("/api/ui-editor/documents", { cache: "no-store" });
-  const payload = await response.json();
-  if (!response.ok || !payload.ok) {
-    throw new Error(payload.error ?? `Document list failed with HTTP ${response.status}`);
-  }
-  return payload.documents as UiDocumentReference[];
-}
-
-async function fetchDocument(surface: string): Promise<UiDocument> {
-  const response = await fetch(`/api/ui-editor/documents/${encodeURIComponent(surface)}`, {
-    cache: "no-store",
-  });
-  const payload = await response.json();
-  if (!response.ok || !payload.ok) {
-    throw new Error(payload.error ?? `Document load failed with HTTP ${response.status}`);
-  }
-  return validateUiDocument(payload.document);
-}
-
 function upsertDocumentReference(
   documents: UiDocumentReference[],
   reference: UiDocumentReference,
 ): UiDocumentReference[] {
   const others = documents.filter((candidate) => candidate.surface !== reference.surface);
   return [...others, reference].sort((a, b) => a.surface.localeCompare(b.surface));
+}
+
+interface LocalDraft {
+  document: UiDocument;
+  baseRevision: string | null;
+}
+
+function readLocalDraft(): LocalDraft | null {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (parsed?.document) {
+      return {
+        document: validateUiDocument(parsed.document),
+        baseRevision: typeof parsed.baseRevision === "string" ? parsed.baseRevision : null,
+      };
+    }
+    return {
+      document: validateUiDocument(parsed),
+      baseRevision: null,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function writeLocalDraft(document: UiDocument, baseRevision: string | null) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify({ document, baseRevision }));
 }
 
 function applyViewportPreset(document: UiDocument, preset: (typeof PRESETS)[number]): UiDocument {

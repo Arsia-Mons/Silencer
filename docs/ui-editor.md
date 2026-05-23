@@ -21,8 +21,9 @@ inputs, and containers.
 - Inspector controls for identity, text/action data, sizing, flex layout,
   padding, gap, radius, colors, and font family.
 - Saved document library backed by `shared/assets/ui-layouts/*.silencer-ui.json`.
-  The editor lists, loads, and saves those files through
-  `/api/ui-editor/documents` so dashboard edits update the shared source tree.
+  The editor lists, loads, and saves those files through the authenticated
+  admin API at `/api/ui-editor/documents` so dashboard edits update the shared
+  source tree.
 - JSON import and download for `.silencer-ui.json` documents.
 - Clay scaffold output for turning the edited tree into client UI code.
 
@@ -43,11 +44,11 @@ content fields such as `text`, `placeholder`, and `action`. Container nodes
 ## Stored Layouts
 
 Authoritative editor documents live under `shared/assets/ui-layouts/` with a
-`<surface>.silencer-ui.json` filename. The admin route at
-`web/admin/app/api/ui-editor/documents` validates every stored document before
-listing it, and `web/admin/app/api/ui-editor/documents/[surface]` loads or saves
-one document at a time. Local browser storage is only a draft fallback if the
-asset-backed route is unavailable.
+`<surface>.silencer-ui.json` filename. `services/admin-api/src/routes/uieditor.ts`
+validates every stored document before listing it, requires an admin JWT for
+reads and writes, and saves through revision-checked atomic file replacement.
+Local browser storage is only a dirty-draft cache and is cleared after a
+successful save.
 
 ## Runtime Integration
 

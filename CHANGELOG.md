@@ -10,7 +10,7 @@ All notable changes to Silencer are documented here.
 
 - Added `/ui-editor`, a WYSIWYG Silencer UI layout editor with palette, hierarchy, inspector controls, shared-asset document persistence, JSON import/download, generated Clay scaffold output, and live preview screenshots rendered by the real client through the control socket.
 - Added a versioned `web/admin/lib/ui-layout.ts` document model for stable IDs, Clay-style sizing, flex direction, padding, gaps, alignment, Silencer palette indexes, text, buttons, inputs, and containers.
-- Added `shared/assets/ui-layouts/*.silencer-ui.json` plus `/api/ui-editor/documents` load/save routes so admin dashboard edits are synced into the shared UI layout source tree.
+- Added `shared/assets/ui-layouts/*.silencer-ui.json` plus authenticated `/api/ui-editor/documents` admin-api load/save routes with revision-checked atomic writes so dashboard edits are synced into the shared UI layout source tree without clobbering another editor.
 - Added a client `ui_editor_preview` control op and preview screen that maps editor documents into the production `ClientUi`/Clay frame for real-time editor feedback.
 
 ### Game client
@@ -182,7 +182,7 @@ All notable changes to Silencer are documented here.
 
 ### Game client — bug fixes
 
-- **`ListFiles` stack overflow on missing directory (#139)** — `FindFirstFile` returns `INVALID_HANDLE_VALUE` (= `(HANDLE)-1`), not `NULL`, when the target dir doesn't exist. The truthy `if(dir)` check let the loop body run with an unpopulated `WIN32_FIND_DATA` whose `cFileName` had no terminator, so `sprintf("%s\\%s", directory, info.cFileName)` read past the struct, scanning 0xCC debug-fill bytes until it hit the null inside `directory2` (308 bytes later) and copied that whole run into `fullname[MAX_PATH]` — a ~228-byte stack overflow that clobbered the saved NRVO return-slot pointer at the function's home space. Crash repro: open *Create New Game* without an existing `<datadir>/level/download` directory (it's only created lazily on first map download). Latent since 2014; surfaced now because the spectatable-dialog work shifted the caller's stack just enough that the corrupted slot ended up non-recoverable. Same `if(dir)` pattern fixed in `selectbox.cpp` `ListFiles` helper.
+- **`ListFiles` stack overflow on missing directory (#139)** — `FindFirstFile` returns `INVALID_HANDLE_VALUE` (= `(HANDLE)-1`), not `NULL`, when the target dir doesn't exist. The truthy `if(dir)` check let the loop body run with an unpopulated `WIN32_FIND_DATA` whose `cFileName` had no terminator, so `sprintf("%s\\%s", directory, info.cFileName)` read past the struct, scanning 0xCC debug-fill bytes until it hit the null inside `directory2` (308 bytes later) and copied that whole run into `fullname[MAX_PATH]` — a ~228-byte stack overflow that clobbered the saved NRVO return-slot pointer at the function's home space. Crash repro: open _Create New Game_ without an existing `<datadir>/level/download` directory (it's only created lazily on first map download). Latent since 2014; surfaced now because the spectatable-dialog work shifted the caller's stack just enough that the corrupted slot ended up non-recoverable. Same `if(dir)` pattern fixed in `selectbox.cpp` `ListFiles` helper.
 
 ### Docs
 
@@ -236,7 +236,7 @@ Test release — no behavior change. Cut to validate the v00046 Windows auto-upd
 ### Game client — bug fixes
 
 - **Guards stop wedging at walls** (#126) — `WALKING` is now pure motion (`xv`, `FollowGround`, footstep sounds). Turnaround/duration decisions move into the BT: `Patrol` flips `mirrored` at chain ends and transitions WALKING→LOOKING at `walkingDurationTicks`; `SearchAndReturn` clears `chasing` when blocked at a wall in the search direction (guard searches blindly the rest of the timeout) and snaps to `STANDING` facing `originalmirrored` when blocked on the way home.
-- **Jetpack / hack / flamer / terminal / base-exit loops cut off correctly** (#125) — `Audio::Stop` was passing `MIX_MSToFrames(mixerspec.freq, ms)` to `MIX_StopTrack`, but `fade_out_frames` is in the *track input's* sample rate. With ~22 kHz ADPCM and 96 kHz mixer output, a 200 ms requested fade ran ~870 ms. Switched to `MIX_TrackMSToFrames(track, ms)`.
+- **Jetpack / hack / flamer / terminal / base-exit loops cut off correctly** (#125) — `Audio::Stop` was passing `MIX_MSToFrames(mixerspec.freq, ms)` to `MIX_StopTrack`, but `fade_out_frames` is in the _track input's_ sample rate. With ~22 kHz ADPCM and 96 kHz mixer output, a 200 ms requested fade ran ~870 ms. Switched to `MIX_TrackMSToFrames(track, ms)`.
 - **Civilian-disguise bypass** (#125, issue #3) — in `Guard::Look`'s line-shaped lookbox path (forward standing/crouched, up, down — directions 0/1/2/3), an AABB scan would set `target=true` from an undisguised player, then `TestIncr` returned a closer disguised one and the guard fired on the disguise. Now mirrors the rectangular-lookbox path and re-validates `ShouldTarget` on the `TestIncr` return.
 - **Map API URL default** — corrected to `admin.arsiamons.com` (admin-api proxies `/api/maps` to the lobby; `maps.arsiamons.com` doesn't exist).
 

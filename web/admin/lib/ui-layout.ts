@@ -62,6 +62,7 @@ export interface UiDocumentReference {
   filename: string;
   title: string;
   updatedAt: string;
+  revision: string;
 }
 
 type UiNodeOverrides = Omit<Partial<UiNode>, "style"> & {

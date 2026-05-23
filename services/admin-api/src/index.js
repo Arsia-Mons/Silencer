@@ -19,6 +19,7 @@ import behaviortreesRoutes from './routes/behaviortrees.js';
 import mapsRoutes from './routes/maps.js';
 import soundsRoutes from './routes/sounds.js';
 import soundCuesRoutes from './routes/soundcues.js';
+import uiEditorRoutes from './routes/uieditor.ts';
 import { startBackupScheduler } from './backup/scheduler.js';
 import AdminUser from './db/models/AdminUser.js';
 
@@ -47,6 +48,7 @@ api.use('/behaviortrees', behaviortreesRoutes);
 api.use('/maps',          mapsRoutes);
 api.use('/sounds',        soundsRoutes);
 api.use('/sound-cues',   soundCuesRoutes);
+api.use('/ui-editor/documents', uiEditorRoutes);
 api.get('/health',        (_req, res) => res.json({ ok: true }));
 app.use('/api', api);
 

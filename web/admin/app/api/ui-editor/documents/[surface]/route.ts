@@ -1,9 +1,10 @@
 import { type NextRequest, NextResponse } from "next/server";
-import { normalizeUiSurface, validateUiDocument } from "../../../../../lib/ui-layout";
-import { readUiLayoutDocument, writeUiLayoutDocument } from "../../../../../lib/ui-layout-store";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+const API =
+  process.env.ADMIN_API_URL || process.env.NEXT_PUBLIC_API_URL || "http://localhost:24080";
 
 interface SurfaceRouteContext {
   params: {
@@ -11,49 +12,57 @@ interface SurfaceRouteContext {
   };
 }
 
-export async function GET(_req: NextRequest, { params }: SurfaceRouteContext) {
+export async function GET(req: NextRequest, { params }: SurfaceRouteContext) {
   try {
-    return NextResponse.json({
-      ok: true,
-      document: await readUiLayoutDocument(params.surface),
-    });
+    const upstream = await fetch(
+      `${API}/api/ui-editor/documents/${encodeURIComponent(params.surface)}`,
+      {
+        headers: forwardHeaders(req),
+        cache: "no-store",
+      },
+    );
+    return proxyJson(upstream);
   } catch (error) {
     return NextResponse.json(
       {
         ok: false,
         error: error instanceof Error ? error.message : String(error),
       },
-      { status: 404 },
+      { status: 500 },
     );
   }
 }
 
 export async function PUT(req: NextRequest, { params }: SurfaceRouteContext) {
   try {
-    const body = await req.json();
-    const document = validateUiDocument(body.document);
-    const routeSurface = normalizeUiSurface(params.surface);
-    if (normalizeUiSurface(document.surface) !== routeSurface) {
-      return NextResponse.json(
-        {
-          ok: false,
-          error: `Route surface ${routeSurface} does not match document surface ${document.surface}.`,
-        },
-        { status: 400 },
-      );
-    }
-
-    return NextResponse.json({
-      ok: true,
-      ...(await writeUiLayoutDocument(document)),
-    });
+    const upstream = await fetch(
+      `${API}/api/ui-editor/documents/${encodeURIComponent(params.surface)}`,
+      {
+        method: "PUT",
+        headers: forwardHeaders(req),
+        body: await req.text(),
+      },
+    );
+    return proxyJson(upstream);
   } catch (error) {
     return NextResponse.json(
       {
         ok: false,
         error: error instanceof Error ? error.message : String(error),
       },
-      { status: 400 },
+      { status: 500 },
     );
   }
+}
+
+function forwardHeaders(req: Request): HeadersInit {
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  const auth = req.headers.get("authorization");
+  if (auth) headers.authorization = auth;
+  return headers;
+}
+
+async function proxyJson(response: Response): Promise<NextResponse> {
+  const payload = await response.json();
+  return NextResponse.json(payload, { status: response.status });
 }

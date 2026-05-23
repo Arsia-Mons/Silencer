@@ -3,8 +3,8 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "start": "node src/index.js",
-    "dev": "node --watch src/index.js"
+    "start": "bun src/index.js",
+    "dev": "bun --watch src/index.js"
   },
   "dependencies": {
     "amqplib": "^0.10.4",
