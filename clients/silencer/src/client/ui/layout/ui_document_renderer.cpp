@@ -263,6 +263,13 @@ void BuildUiDocumentNode(const UiEditorNode& node,
                          const UiDocumentRendererOptions& options) {
 	UiDocumentRegisterElement(node, interactions);
 	if(node.kind == silencer::net::ui_layout_contract::kNodeKindButton){
+		std::string label = node.text.empty() ? node.name : node.text;
+		if(!node.textBinding.empty()){
+			if(!options.resolveTextBinding ||
+			   !options.resolveTextBinding(node.textBinding, label)){
+				label = "[unresolved binding: " + node.textBinding + "]";
+			}
+		}
 		const int fixedWidth = UiDocumentButtonWidthOverride(node.style.width);
 		ButtonOpts opts{
 			.variant = UiDocumentButtonVariantForNode(node, options.buttonVariant),
@@ -279,7 +286,7 @@ void BuildUiDocumentNode(const UiEditorNode& node,
 		};
 		const std::string action = node.action.empty() ? node.id : node.action;
 		Button(UiDocumentClayString(node.id),
-		       UiDocumentClayString(node.text.empty() ? node.name : node.text),
+		       UiDocumentClayString(label),
 		       opts,
 		       ButtonHandle{ nullptr, action.c_str(), &interactions });
 		return;

@@ -5,15 +5,15 @@ import {
   type UiDocument,
   type UiMovePlacement,
   type UiNodeKind,
-} from '../../../lib/ui-layout';
-import { type ClientPreviewElement, type ClientPreviewState } from '../useClientPreview';
+} from "../../../lib/ui-layout";
+import { type ClientPreviewElement, type ClientPreviewState } from "../useClientPreview";
 import {
   UI_NODE_DRAG_TYPE,
   UI_PALETTE_DRAG_TYPE,
   dropAxisFromDirection,
   resolveEventMovePlacement,
-} from '../ui-editor-dnd';
-import { PreviewNode } from './BrowserPreview';
+} from "../ui-editor-dnd";
+import { PreviewNode } from "./BrowserPreview";
 
 interface CanvasProps {
   document: UiDocument;
@@ -25,8 +25,16 @@ interface CanvasProps {
   onMoveNode: (nodeId: string, targetId: string, placement: UiMovePlacement) => void;
 }
 
-export function Canvas({ document, selectedId, zoom, clientPreview, onSelect, onDropNode, onMoveNode }: CanvasProps) {
-  const live = clientPreview.status === 'live' && clientPreview.screenshot;
+export function Canvas({
+  document,
+  selectedId,
+  zoom,
+  clientPreview,
+  onSelect,
+  onDropNode,
+  onMoveNode,
+}: CanvasProps) {
+  const live = clientPreview.status === "live" && clientPreview.screenshot;
   return (
     <div className="min-h-0 flex-1 overflow-auto p-6">
       <div
@@ -72,11 +80,15 @@ export function Canvas({ document, selectedId, zoom, clientPreview, onSelect, on
             />
           )}
           <div className="absolute left-2 top-2 border border-game-border bg-game-bg/85 px-2 py-1 text-[10px] tracking-widest text-game-textDim">
-            {clientPreview.status === 'live' ? 'CLIENT LIVE' : clientPreview.status === 'syncing' ? 'SYNCING CLIENT' : 'BROWSER FALLBACK'}
+            {clientPreview.status === "live"
+              ? "CLIENT LIVE"
+              : clientPreview.status === "syncing"
+                ? "SYNCING CLIENT"
+                : "STRUCTURE FALLBACK"}
           </div>
         </div>
       </div>
-      {clientPreview.status === 'offline' && clientPreview.error && (
+      {clientPreview.status === "offline" && clientPreview.error && (
         <div className="mx-auto mt-3 max-w-[720px] border border-game-danger/60 bg-game-bgCard px-3 py-2 text-[11px] tracking-wider text-game-danger">
           {clientPreview.error}
         </div>
@@ -85,7 +97,14 @@ export function Canvas({ document, selectedId, zoom, clientPreview, onSelect, on
   );
 }
 
-function ClientPreviewOverlay({ elements, document, selectedId, onSelect, onDropNode, onMoveNode }: {
+function ClientPreviewOverlay({
+  elements,
+  document,
+  selectedId,
+  onSelect,
+  onDropNode,
+  onMoveNode,
+}: {
   elements: ClientPreviewElement[];
   document: UiDocument;
   selectedId: string;
@@ -95,9 +114,9 @@ function ClientPreviewOverlay({ elements, document, selectedId, onSelect, onDrop
 }) {
   return (
     <div className="absolute inset-0">
-      {elements.map(element => (
+      {elements.map((element) => (
         <ClientPreviewOverlayTarget
-          key={`${element.id ?? 'anonymous'}-${element.source}-${element.kind ?? 'element'}`}
+          key={`${element.id ?? "anonymous"}-${element.source}-${element.kind ?? "element"}`}
           element={element}
           document={document}
           selectedId={selectedId}
@@ -110,7 +129,14 @@ function ClientPreviewOverlay({ elements, document, selectedId, onSelect, onDrop
   );
 }
 
-function ClientPreviewOverlayTarget({ element, document, selectedId, onSelect, onDropNode, onMoveNode }: {
+function ClientPreviewOverlayTarget({
+  element,
+  document,
+  selectedId,
+  onSelect,
+  onDropNode,
+  onMoveNode,
+}: {
   element: ClientPreviewElement;
   document: UiDocument;
   selectedId: string;
@@ -127,29 +153,29 @@ function ClientPreviewOverlayTarget({ element, document, selectedId, onSelect, o
       className="absolute"
       draggable={element.id !== document.root.id}
       title={element.label ?? element.id}
-      onDragStart={event => {
+      onDragStart={(event) => {
         if (element.id === document.root.id) return;
-        event.dataTransfer.effectAllowed = 'move';
+        event.dataTransfer.effectAllowed = "move";
         event.dataTransfer.setData(UI_NODE_DRAG_TYPE, element.id!);
       }}
-      onClick={event => {
+      onClick={(event) => {
         event.stopPropagation();
         onSelect(element.id!);
       }}
-      onDragOver={event => {
+      onDragOver={(event) => {
         event.preventDefault();
       }}
-      onDrop={event => {
+      onDrop={(event) => {
         const movingId = event.dataTransfer.getData(UI_NODE_DRAG_TYPE);
         if (movingId) {
           event.preventDefault();
           event.stopPropagation();
           const parent = findParent(document.root, element.id!);
-          onMoveNode(movingId, element.id!, resolveEventMovePlacement(
-            event,
-            node,
-            dropAxisFromDirection(parent?.style.direction),
-          ));
+          onMoveNode(
+            movingId,
+            element.id!,
+            resolveEventMovePlacement(event, node, dropAxisFromDirection(parent?.style.direction)),
+          );
           return;
         }
         const kind = event.dataTransfer.getData(UI_PALETTE_DRAG_TYPE) as UiNodeKind;
@@ -163,7 +189,7 @@ function ClientPreviewOverlayTarget({ element, document, selectedId, onSelect, o
         top: element.y,
         width: element.w,
         height: element.h,
-        outline: selected ? '2px solid #f59e0b' : '1px solid rgba(245, 158, 11, 0.22)',
+        outline: selected ? "2px solid #f59e0b" : "1px solid rgba(245, 158, 11, 0.22)",
         outlineOffset: selected ? 2 : 0,
       }}
     />

@@ -33,6 +33,7 @@ ENV NEXT_PUBLIC_MAP_API_URL=$NEXT_PUBLIC_MAP_API_URL
 COPY --from=deps /app /app
 COPY shared/gas-validation ./shared/gas-validation
 COPY shared/ui-layout      ./shared/ui-layout
+COPY shared/assets/ui-layouts ./shared/assets/ui-layouts
 COPY web/admin             ./web/admin
 WORKDIR /app/web/admin
 ENV NEXT_TELEMETRY_DISABLED=1

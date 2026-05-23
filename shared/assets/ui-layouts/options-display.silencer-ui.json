@@ -1,0 +1,193 @@
+{
+  "schemaVersion": 1,
+  "surface": "options-display",
+  "viewport": {
+    "width": 640,
+    "height": 480
+  },
+  "root": {
+    "id": "OptionsDisplayRoot",
+    "kind": "screen",
+    "name": "Display Options",
+    "image": {
+      "bank": 6,
+      "index": 0,
+      "mode": "normal"
+    },
+    "style": {
+      "width": {
+        "mode": "grow"
+      },
+      "height": {
+        "mode": "grow"
+      },
+      "direction": "column",
+      "align": "center",
+      "justify": "start",
+      "padding": 0,
+      "gap": 0
+    },
+    "children": [
+      {
+        "id": "OptionsDisplayTopSpacer",
+        "kind": "spacer",
+        "name": "Top Offset",
+        "style": {
+          "width": {
+            "mode": "fixed",
+            "value": 1
+          },
+          "height": {
+            "mode": "fixed",
+            "value": 80
+          }
+        }
+      },
+      {
+        "id": "OptionsDisplayPanel",
+        "kind": "panel",
+        "name": "Display Options Panel",
+        "style": {
+          "width": {
+            "mode": "fixed",
+            "value": 420
+          },
+          "height": {
+            "mode": "fit"
+          },
+          "direction": "column",
+          "align": "center",
+          "justify": "start",
+          "padding": 24,
+          "gap": 22
+        },
+        "children": [
+          {
+            "id": "OptionsDisplayTitle",
+            "kind": "text",
+            "name": "Display Options Title",
+            "text": "Display Options",
+            "style": {
+              "width": {
+                "mode": "fit"
+              },
+              "height": {
+                "mode": "fit"
+              },
+              "font": "title",
+              "textPalette": 0
+            }
+          },
+          {
+            "id": "OptionsDisplayRows",
+            "kind": "stack",
+            "name": "Display Setting Rows",
+            "style": {
+              "width": {
+                "mode": "grow"
+              },
+              "height": {
+                "mode": "fit"
+              },
+              "direction": "column",
+              "align": "center",
+              "justify": "start",
+              "padding": 0,
+              "gap": 20
+            },
+            "children": [
+              {
+                "id": "OptionsDisplayFullscreenRow",
+                "kind": "component",
+                "name": "Fullscreen Row",
+                "component": "options_display.fullscreen_row",
+                "style": {
+                  "width": {
+                    "mode": "fit"
+                  },
+                  "height": {
+                    "mode": "fixed",
+                    "value": 33
+                  }
+                }
+              },
+              {
+                "id": "OptionsDisplaySmoothScalingRow",
+                "kind": "component",
+                "name": "Smooth Scaling Row",
+                "component": "options_display.smooth_scaling_row",
+                "style": {
+                  "width": {
+                    "mode": "fit"
+                  },
+                  "height": {
+                    "mode": "fixed",
+                    "value": 33
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "id": "OptionsDisplayActions",
+            "kind": "row",
+            "name": "Display Actions",
+            "style": {
+              "width": {
+                "mode": "fit"
+              },
+              "height": {
+                "mode": "fit"
+              },
+              "direction": "row",
+              "align": "start",
+              "justify": "start",
+              "padding": 0,
+              "gap": 12
+            },
+            "children": [
+              {
+                "id": "OptionsDisplaySaveButton",
+                "kind": "button",
+                "name": "Save Button",
+                "text": "Save",
+                "action": "options_display.save",
+                "buttonVariant": "oval",
+                "buttonSize": "md",
+                "style": {
+                  "width": {
+                    "mode": "fit"
+                  },
+                  "height": {
+                    "mode": "fit"
+                  },
+                  "padding": 0,
+                  "textPalette": 0
+                }
+              },
+              {
+                "id": "OptionsDisplayCancelButton",
+                "kind": "button",
+                "name": "Cancel Button",
+                "text": "Cancel",
+                "action": "options_display.cancel",
+                "buttonVariant": "oval",
+                "buttonSize": "md",
+                "style": {
+                  "width": {
+                    "mode": "fit"
+                  },
+                  "height": {
+                    "mode": "fit"
+                  },
+                  "padding": 0,
+                  "textPalette": 0
+                }
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

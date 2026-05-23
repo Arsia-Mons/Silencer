@@ -380,11 +380,12 @@ constexpr std::size_t kNodeTokenFieldsTextCount = 2;
 
 constexpr const char * kNodeTokenFieldsButton[] = {
 	"text",
+	"textBinding",
 	"action",
 	"buttonVariant",
 	"buttonSize",
 };
-constexpr std::size_t kNodeTokenFieldsButtonCount = 4;
+constexpr std::size_t kNodeTokenFieldsButtonCount = 5;
 
 constexpr const char * kNodeTokenFieldsSpacer[] = {
 	nullptr,
@@ -541,12 +542,19 @@ constexpr std::size_t kSizeRulesByKindCount = 2;
 constexpr const char * kUiSurfaces[] = {
 	"main-menu",
 	"options",
+	"options-display",
+	"options-audio",
 };
-constexpr std::size_t kUiSurfacesCount = 2;
+constexpr std::size_t kUiSurfacesCount = 4;
 constexpr const char * kUiSurfaceMainMenu = "main-menu";
 constexpr const char * kUiSurfaceOptions = "options";
+constexpr const char * kUiSurfaceOptionsDisplay = "options-display";
+constexpr const char * kUiSurfaceOptionsAudio = "options-audio";
 
 constexpr const char * kUiComponentMainMenuLogo = "main-menu.logo";
+constexpr const char * kUiComponentOptionsDisplayFullscreenRow = "options_display.fullscreen_row";
+constexpr const char * kUiComponentOptionsDisplaySmoothScalingRow = "options_display.smooth_scaling_row";
+constexpr const char * kUiComponentOptionsAudioMusicRow = "options_audio.music_row";
 constexpr const char * kUiTextBindingClientVersion = "client.version";
 constexpr const char * kUiActionMainMenuTutorial = "main_menu.tutorial";
 constexpr const char * kUiActionMainMenuLobby = "main_menu.lobby";
@@ -556,6 +564,13 @@ constexpr const char * kUiActionOptionsControls = "options.controls";
 constexpr const char * kUiActionOptionsDisplay = "options.display";
 constexpr const char * kUiActionOptionsAudio = "options.audio";
 constexpr const char * kUiActionOptionsBack = "options.back";
+constexpr const char * kUiActionOptionsDisplayFullscreen = "options_display.fullscreen";
+constexpr const char * kUiActionOptionsDisplaySmoothScaling = "options_display.smooth_scaling";
+constexpr const char * kUiActionOptionsDisplaySave = "options_display.save";
+constexpr const char * kUiActionOptionsDisplayCancel = "options_display.cancel";
+constexpr const char * kUiActionOptionsAudioMusic = "options_audio.music";
+constexpr const char * kUiActionOptionsAudioSave = "options_audio.save";
+constexpr const char * kUiActionOptionsAudioCancel = "options_audio.cancel";
 
 constexpr const char * kMainMenuComponents[] = {
 	"main-menu.logo",
@@ -593,6 +608,42 @@ constexpr const char * kOptionsActions[] = {
 };
 constexpr std::size_t kOptionsActionsCount = 4;
 
+constexpr const char * kOptionsDisplayComponents[] = {
+	"options_display.fullscreen_row",
+	"options_display.smooth_scaling_row",
+};
+constexpr std::size_t kOptionsDisplayComponentsCount = 2;
+
+constexpr const char * kOptionsDisplayTextBindings[] = {
+	nullptr,
+};
+constexpr std::size_t kOptionsDisplayTextBindingsCount = 0;
+
+constexpr const char * kOptionsDisplayActions[] = {
+	"options_display.fullscreen",
+	"options_display.smooth_scaling",
+	"options_display.save",
+	"options_display.cancel",
+};
+constexpr std::size_t kOptionsDisplayActionsCount = 4;
+
+constexpr const char * kOptionsAudioComponents[] = {
+	"options_audio.music_row",
+};
+constexpr std::size_t kOptionsAudioComponentsCount = 1;
+
+constexpr const char * kOptionsAudioTextBindings[] = {
+	nullptr,
+};
+constexpr std::size_t kOptionsAudioTextBindingsCount = 0;
+
+constexpr const char * kOptionsAudioActions[] = {
+	"options_audio.music",
+	"options_audio.save",
+	"options_audio.cancel",
+};
+constexpr std::size_t kOptionsAudioActionsCount = 3;
+
 struct SurfaceTokens {
 	const char * surface;
 	const char * const * components;
@@ -606,8 +657,10 @@ struct SurfaceTokens {
 constexpr SurfaceTokens kSurfaceTokens[] = {
 	{ kUiSurfaceMainMenu, kMainMenuComponents, kMainMenuComponentsCount, kMainMenuTextBindings, kMainMenuTextBindingsCount, kMainMenuActions, kMainMenuActionsCount },
 	{ kUiSurfaceOptions, kOptionsComponents, kOptionsComponentsCount, kOptionsTextBindings, kOptionsTextBindingsCount, kOptionsActions, kOptionsActionsCount },
+	{ kUiSurfaceOptionsDisplay, kOptionsDisplayComponents, kOptionsDisplayComponentsCount, kOptionsDisplayTextBindings, kOptionsDisplayTextBindingsCount, kOptionsDisplayActions, kOptionsDisplayActionsCount },
+	{ kUiSurfaceOptionsAudio, kOptionsAudioComponents, kOptionsAudioComponentsCount, kOptionsAudioTextBindings, kOptionsAudioTextBindingsCount, kOptionsAudioActions, kOptionsAudioActionsCount },
 };
-constexpr std::size_t kSurfaceTokensCount = 2;
+constexpr std::size_t kSurfaceTokensCount = 4;
 
 }  // namespace ui_layout_contract
 }  // namespace net

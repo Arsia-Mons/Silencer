@@ -11,6 +11,7 @@ import {
   duplicateNode,
   findNode,
   findParent,
+  getUiSurfaceTokenManifest,
   insertAfter,
   insertChild,
   moveNode,
@@ -129,6 +130,10 @@ export default function UiEditorPage() {
     [document, selectedNode.id],
   );
   const exportText = useMemo(() => JSON.stringify(document, null, 2), [document]);
+  const currentTokenManifest = useMemo(
+    () => getUiSurfaceTokenManifest(document.surface, Object.values(tokenManifests)),
+    [document.surface, tokenManifests],
+  );
 
   function commit(next: UiDocument, nextSelectedId = selectedNode.id) {
     if (normalizeUiSurface(next.surface) !== normalizeUiSurface(document.surface)) {
@@ -315,10 +320,7 @@ export default function UiEditorPage() {
           onSave={saveDocument}
           onDownloadJson={downloadDocument}
           onReset={() => {
-            const next = validateDocumentForEditor({
-              ...createDefaultUiDocument(),
-              surface: normalizeUiSurface(document.surface),
-            });
+            const next = validateDocumentForEditor(createDefaultUiDocument(document.surface));
             setDocument(next);
             setSelectedId(next.root.id);
             setCurrentRevision(currentRevision);
@@ -355,6 +357,7 @@ export default function UiEditorPage() {
             node={selectedNode}
             parent={selectedParent}
             isRoot={selectedNode.id === document.root.id}
+            tokenManifest={currentTokenManifest}
             onPatch={patchSelectedNode}
             onStyle={updateSelectedStyle}
             onDelete={deleteSelectedNode}

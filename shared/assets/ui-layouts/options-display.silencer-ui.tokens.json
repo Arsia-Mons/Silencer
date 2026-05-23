@@ -1,0 +1,14 @@
+{
+  "surface": "options-display",
+  "components": [
+    "options_display.fullscreen_row",
+    "options_display.smooth_scaling_row"
+  ],
+  "textBindings": [],
+  "actions": [
+    "options_display.fullscreen",
+    "options_display.smooth_scaling",
+    "options_display.save",
+    "options_display.cancel"
+  ]
+}

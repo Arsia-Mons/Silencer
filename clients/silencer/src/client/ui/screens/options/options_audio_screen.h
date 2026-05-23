@@ -2,6 +2,9 @@
 #define OPTIONS_AUDIO_SCREEN_H
 
 #include "screen.h"
+#include "ui_editor_preview_model.h"
+
+#include <string>
 
 class OptionsAudioScreen : public Screen
 {
@@ -16,6 +19,9 @@ private:
 	bool musicClicked = false;
 	bool saveClicked = false;
 	bool cancelClicked = false;
+	bool layoutLoaded_ = false;
+	std::string layoutLoadError_;
+	silencer::ui::UiEditorPreviewDocument layoutDocument_;
 };
 
 #endif

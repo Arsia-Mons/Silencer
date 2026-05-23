@@ -1,0 +1,158 @@
+{
+  "schemaVersion": 1,
+  "surface": "options-audio",
+  "viewport": {
+    "width": 640,
+    "height": 480
+  },
+  "root": {
+    "id": "OptionsAudioRoot",
+    "kind": "screen",
+    "name": "Audio Options",
+    "image": {
+      "bank": 6,
+      "index": 0,
+      "mode": "normal"
+    },
+    "style": {
+      "width": {
+        "mode": "grow"
+      },
+      "height": {
+        "mode": "grow"
+      },
+      "direction": "column",
+      "align": "center",
+      "justify": "start",
+      "padding": 0,
+      "gap": 0
+    },
+    "children": [
+      {
+        "id": "OptionsAudioTopSpacer",
+        "kind": "spacer",
+        "name": "Top Offset",
+        "style": {
+          "width": {
+            "mode": "fixed",
+            "value": 1
+          },
+          "height": {
+            "mode": "fixed",
+            "value": 80
+          }
+        }
+      },
+      {
+        "id": "OptionsAudioPanel",
+        "kind": "panel",
+        "name": "Audio Options Panel",
+        "style": {
+          "width": {
+            "mode": "fixed",
+            "value": 420
+          },
+          "height": {
+            "mode": "fit"
+          },
+          "direction": "column",
+          "align": "center",
+          "justify": "start",
+          "padding": 24,
+          "gap": 22
+        },
+        "children": [
+          {
+            "id": "OptionsAudioTitle",
+            "kind": "text",
+            "name": "Audio Options Title",
+            "text": "Audio Options",
+            "style": {
+              "width": {
+                "mode": "fit"
+              },
+              "height": {
+                "mode": "fit"
+              },
+              "font": "title",
+              "textPalette": 0
+            }
+          },
+          {
+            "id": "OptionsAudioMusicRow",
+            "kind": "component",
+            "name": "Music Row",
+            "component": "options_audio.music_row",
+            "style": {
+              "width": {
+                "mode": "fit"
+              },
+              "height": {
+                "mode": "fixed",
+                "value": 33
+              }
+            }
+          },
+          {
+            "id": "OptionsAudioActions",
+            "kind": "row",
+            "name": "Audio Actions",
+            "style": {
+              "width": {
+                "mode": "fit"
+              },
+              "height": {
+                "mode": "fit"
+              },
+              "direction": "row",
+              "align": "start",
+              "justify": "start",
+              "padding": 0,
+              "gap": 12
+            },
+            "children": [
+              {
+                "id": "OptionsAudioSaveButton",
+                "kind": "button",
+                "name": "Save Button",
+                "text": "Save",
+                "action": "options_audio.save",
+                "buttonVariant": "oval",
+                "buttonSize": "md",
+                "style": {
+                  "width": {
+                    "mode": "fit"
+                  },
+                  "height": {
+                    "mode": "fit"
+                  },
+                  "padding": 0,
+                  "textPalette": 0
+                }
+              },
+              {
+                "id": "OptionsAudioCancelButton",
+                "kind": "button",
+                "name": "Cancel Button",
+                "text": "Cancel",
+                "action": "options_audio.cancel",
+                "buttonVariant": "oval",
+                "buttonSize": "md",
+                "style": {
+                  "width": {
+                    "mode": "fit"
+                  },
+                  "height": {
+                    "mode": "fit"
+                  },
+                  "padding": 0,
+                  "textPalette": 0
+                }
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -1,5 +1,6 @@
 #include "options_audio_screen.h"
 
+#include "options_document_runtime.h"
 #include "screen_context.h"
 #include "game_state.h"
 #include "game.h"
@@ -9,31 +10,22 @@
 #include "audio.h"
 
 #include "components/boolean_setting_row.h"
-#include "clay/clay.h"
-#include "clay_ui_compositor.h"
+#include "layout/ui_document_renderer.h"
+#include "layout/ui_document_runtime_registry.h"
 #include "runtime/UiInteractionRegistry.h"
-#include "primitives/button.h"
-#include "primitives/text.h"
+#include "ui_document_assets.h"
 
 #include <SDL3/SDL.h>
 
+#include <cstdio>
+
 namespace options_audio_screen_detail
 {
-using silencer::ui::primitives::Button;
-using silencer::ui::primitives::ButtonHandle;
-using silencer::ui::primitives::ButtonOpts;
-using silencer::ui::primitives::ButtonSize;
-using silencer::ui::primitives::ButtonVariant;
-using silencer::ui::primitives::Text;
-using silencer::ui::primitives::TextSize;
 
-constexpr uint16_t kPanelW = 420;
-constexpr uint16_t kPanelPadX = 24;
-constexpr uint16_t kPanelPadY = 32;
-constexpr uint16_t kActionGap = 12;
-constexpr const char * kActionMusic = "options_audio.music";
-constexpr const char * kActionSave = "options_audio.save";
-constexpr const char * kActionCancel = "options_audio.cancel";
+Clay_String ClayStringFromStd(const std::string& value)
+{
+	return Clay_String{ false, static_cast<int32_t>(value.size()), value.c_str() };
+}
 
 void ApplyMusicSetting(bool on)
 {
@@ -42,6 +34,41 @@ void ApplyMusicSetting(bool on)
 	}else{
 		Audio::GetInstance().PauseMusic();
 	}
+}
+
+bool LoadAudioDocument(silencer::ui::UiEditorPreviewDocument& document,
+                       std::string& error)
+{
+	if(!silencer::net::LoadUiDocumentAsset(
+		   silencer::client_ui::options_audio::kOptionsAudioSurface,
+		   document,
+		   error)){
+		return false;
+	}
+	silencer::client_ui::UiDocumentRendererOptions options =
+		silencer::client_ui::UiDocumentRendererOptionsForSurface(
+			silencer::client_ui::options_audio::kOptionsAudioSurface);
+	return silencer::client_ui::ValidateUiDocumentRuntimeTokens(
+		document,
+		options,
+		error);
+}
+
+bool BuildAudioComponent(const silencer::ui::UiEditorNode& node,
+                         silencer::ui::UiInteractionRegistry& interactions)
+{
+	if(node.component != silencer::client_ui::options_audio::kComponentMusicRow){
+		return false;
+	}
+	const std::string rowId = node.id + "Content";
+	silencer::client_ui::options::BooleanSettingRow(
+		ClayStringFromStd(rowId),
+		CLAY_STRING("OptionsAudioMusicButton"),
+		CLAY_STRING("Music"),
+		Config::GetInstance().music,
+		silencer::client_ui::options_audio::kActionMusic,
+		interactions);
+	return true;
 }
 } // namespace options_audio_screen_detail
 
@@ -52,6 +79,12 @@ void OptionsAudioScreen::Build(ScreenContext & ctx)
 	musicClicked = false;
 	saveClicked = false;
 	cancelClicked = false;
+	layoutLoaded_ = options_audio_screen_detail::LoadAudioDocument(
+		layoutDocument_,
+		layoutLoadError_);
+	if(!layoutLoaded_){
+		std::fprintf(stderr, "[ui-layout] %s\n", layoutLoadError_.c_str());
+	}
 }
 
 void OptionsAudioScreen::Tick(ScreenContext & ctx)
@@ -79,55 +112,18 @@ void OptionsAudioScreen::Tick(ScreenContext & ctx)
 
 void OptionsAudioScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime, silencer::ui::UiInteractionRegistry& interactions)
 {
+	(void)ctx;
 	(void)frametime;
 	(void)dst;
-	using namespace silencer::clay_bridge;
+	if(!layoutLoaded_) return;
 
-	Config & cfg = Config::GetInstance();
-	CLAY({ .id = CLAY_ID("OptionsAudioRoot"),
-	       .layout = {
-	           .sizing = { CLAY_SIZING_GROW(0),
-	                       CLAY_SIZING_GROW(0) },
-	           .padding = { 0, 0, 80, 0 },
-	           .childAlignment = { CLAY_ALIGN_X_CENTER, CLAY_ALIGN_Y_TOP },
-	       },
-	       .image = { .imageData = PackImage(6, 0) } }) {
-		CLAY({ .id = CLAY_ID("OptionsAudioPanel"),
-		       .layout = {
-		           .sizing = { CLAY_SIZING_FIXED(options_audio_screen_detail::kPanelW),
-		                       CLAY_SIZING_FIT(0) },
-		           .padding = { options_audio_screen_detail::kPanelPadX, options_audio_screen_detail::kPanelPadX,
-		                        options_audio_screen_detail::kPanelPadY, options_audio_screen_detail::kPanelPadY },
-		           .childGap = 22,
-		           .childAlignment = { CLAY_ALIGN_X_CENTER, CLAY_ALIGN_Y_TOP },
-		           .layoutDirection = CLAY_TOP_TO_BOTTOM,
-		       } }) {
-			options_audio_screen_detail::Text(CLAY_STRING("Audio Options"),
-			                                  { .size = options_audio_screen_detail::TextSize::Title });
-			silencer::client_ui::options::BooleanSettingRow(
-				CLAY_STRING("OptionsAudioMusicRow"),
-				CLAY_STRING("OptionsAudioMusicButton"),
-				CLAY_STRING("Music"),
-				cfg.music,
-				options_audio_screen_detail::kActionMusic,
-				interactions);
-			CLAY({ .id = CLAY_ID("OptionsAudioActions"),
-			       .layout = {
-			           .sizing = { CLAY_SIZING_FIT(0), CLAY_SIZING_FIT(0) },
-			           .childGap = options_audio_screen_detail::kActionGap,
-			           .layoutDirection = CLAY_LEFT_TO_RIGHT,
-			       } }) {
-				options_audio_screen_detail::Button(CLAY_STRING("OptionsAudioSaveButton"), CLAY_STRING("Save"),
-				           options_audio_screen_detail::ButtonOpts{ .variant = options_audio_screen_detail::ButtonVariant::Oval,
-				                                                    .size = options_audio_screen_detail::ButtonSize::Md },
-				           options_audio_screen_detail::ButtonHandle{ nullptr, options_audio_screen_detail::kActionSave, &interactions });
-				options_audio_screen_detail::Button(CLAY_STRING("OptionsAudioCancelButton"), CLAY_STRING("Cancel"),
-				           options_audio_screen_detail::ButtonOpts{ .variant = options_audio_screen_detail::ButtonVariant::Oval,
-				                                                    .size = options_audio_screen_detail::ButtonSize::Md },
-				           options_audio_screen_detail::ButtonHandle{ nullptr, options_audio_screen_detail::kActionCancel, &interactions });
-			}
-		}
-	}
+	silencer::client_ui::UiDocumentRendererOptions options =
+		silencer::client_ui::UiDocumentRendererOptionsForSurface(
+			silencer::client_ui::options_audio::kOptionsAudioSurface);
+	options.buildComponent = [&interactions](const silencer::ui::UiEditorNode& node) {
+		return options_audio_screen_detail::BuildAudioComponent(node, interactions);
+	};
+	silencer::client_ui::BuildUiDocument(layoutDocument_, interactions, options);
 }
 
 void OptionsAudioScreen::Destroy(ScreenContext & ctx)
@@ -143,15 +139,15 @@ bool OptionsAudioScreen::HandleUiIntent(ScreenContext & ctx, const silencer::ui:
 		return true;
 	}
 	if(action.kind != silencer::ui::UiActionKind::Activate) return false;
-	if(action.id == options_audio_screen_detail::kActionMusic){
+	if(action.id == silencer::client_ui::options_audio::kActionMusic){
 		musicClicked = true;
 		return true;
 	}
-	if(action.id == options_audio_screen_detail::kActionSave){
+	if(action.id == silencer::client_ui::options_audio::kActionSave){
 		saveClicked = true;
 		return true;
 	}
-	if(action.id == options_audio_screen_detail::kActionCancel){
+	if(action.id == silencer::client_ui::options_audio::kActionCancel){
 		cancelClicked = true;
 		return true;
 	}

@@ -1,0 +1,12 @@
+{
+  "surface": "options-audio",
+  "components": [
+    "options_audio.music_row"
+  ],
+  "textBindings": [],
+  "actions": [
+    "options_audio.music",
+    "options_audio.save",
+    "options_audio.cancel"
+  ]
+}

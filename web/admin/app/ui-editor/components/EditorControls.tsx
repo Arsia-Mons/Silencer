@@ -1,4 +1,4 @@
-import { type ReactNode } from 'react';
+import { type ReactNode } from "react";
 
 export function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
@@ -9,17 +9,29 @@ export function Field({ label, children }: { label: string; children: ReactNode 
   );
 }
 
-export function TextInput({ value, onChange }: { value: string; onChange: (value: string) => void }) {
+export function TextInput({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+}) {
   return (
     <input
       value={value}
-      onChange={event => onChange(event.target.value)}
+      onChange={(event) => onChange(event.target.value)}
       className="w-full bg-game-bg border border-game-border px-2 py-1.5 text-game-text focus:outline-none focus:border-game-primary"
     />
   );
 }
 
-export function NumberInput({ value, min, max, disabled, onChange }: {
+export function NumberInput({
+  value,
+  min,
+  max,
+  disabled,
+  onChange,
+}: {
   value: number;
   min: number;
   max: number;
@@ -33,24 +45,32 @@ export function NumberInput({ value, min, max, disabled, onChange }: {
       type="number"
       min={min}
       max={max}
-      onChange={event => onChange(Number(event.target.value))}
+      onChange={(event) => onChange(Number(event.target.value))}
       className="w-full bg-game-bg border border-game-border px-2 py-1.5 text-game-text focus:outline-none focus:border-game-primary disabled:opacity-40"
     />
   );
 }
 
-export function Select({ value, options, onChange }: {
+export function Select({
+  value,
+  options,
+  onChange,
+}: {
   value: string;
-  options: string[];
+  options: readonly string[];
   onChange: (value: string) => void;
 }) {
   return (
     <select
       value={value}
-      onChange={event => onChange(event.target.value)}
+      onChange={(event) => onChange(event.target.value)}
       className="w-full bg-game-bg border border-game-border px-2 py-1.5 text-game-text focus:outline-none focus:border-game-primary"
     >
-      {options.map(option => <option key={option} value={option}>{option}</option>)}
+      {options.map((option) => (
+        <option key={option} value={option}>
+          {option}
+        </option>
+      ))}
     </select>
   );
 }

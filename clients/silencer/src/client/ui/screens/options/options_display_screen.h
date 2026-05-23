@@ -2,6 +2,9 @@
 #define OPTIONS_DISPLAY_SCREEN_H
 
 #include "screen.h"
+#include "ui_editor_preview_model.h"
+
+#include <string>
 
 class OptionsDisplayScreen : public Screen
 {
@@ -17,6 +20,9 @@ private:
 	bool smoothScalingClicked = false;
 	bool saveClicked = false;
 	bool cancelClicked = false;
+	bool layoutLoaded_ = false;
+	std::string layoutLoadError_;
+	silencer::ui::UiEditorPreviewDocument layoutDocument_;
 };
 
 #endif

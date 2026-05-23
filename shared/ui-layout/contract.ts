@@ -155,7 +155,7 @@ export const UI_NODE_TOKEN_FIELDS_BY_KIND = {
   stack: [],
   row: [],
   text: ["text", "textBinding"],
-  button: ["text", "action", "buttonVariant", "buttonSize"],
+  button: ["text", "textBinding", "action", "buttonVariant", "buttonSize"],
   spacer: [],
   component: ["component"],
 } as const satisfies Record<(typeof UI_NODE_KINDS)[number], readonly string[]>;
@@ -252,7 +252,7 @@ export const UI_STYLE_DEFAULTS_BY_KIND = {
   },
 } as const satisfies Record<(typeof UI_NODE_KINDS)[number], object>;
 
-export const UI_SURFACES = ["main-menu", "options"] as const;
+export const UI_SURFACES = ["main-menu", "options", "options-display", "options-audio"] as const;
 export const UI_SURFACE_TOKENS_BY_SURFACE = {
   "main-menu": {
     components: ["main-menu.logo"],
@@ -263,6 +263,21 @@ export const UI_SURFACE_TOKENS_BY_SURFACE = {
     components: [],
     textBindings: [],
     actions: ["options.controls", "options.display", "options.audio", "options.back"],
+  },
+  "options-display": {
+    components: ["options_display.fullscreen_row", "options_display.smooth_scaling_row"],
+    textBindings: [],
+    actions: [
+      "options_display.fullscreen",
+      "options_display.smooth_scaling",
+      "options_display.save",
+      "options_display.cancel",
+    ],
+  },
+  "options-audio": {
+    components: ["options_audio.music_row"],
+    textBindings: [],
+    actions: ["options_audio.music", "options_audio.save", "options_audio.cancel"],
   },
 } as const satisfies Record<
   (typeof UI_SURFACES)[number],

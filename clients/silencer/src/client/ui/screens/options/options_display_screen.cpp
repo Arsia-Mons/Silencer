@@ -1,5 +1,6 @@
 #include "options_display_screen.h"
 
+#include "options_document_runtime.h"
 #include "screen_context.h"
 #include "game_state.h"
 #include "game.h"
@@ -9,34 +10,69 @@
 #include "renderdevice.h"
 
 #include "components/boolean_setting_row.h"
-#include "clay/clay.h"
-#include "clay_ui_compositor.h"
+#include "layout/ui_document_renderer.h"
+#include "layout/ui_document_runtime_registry.h"
 #include "runtime/UiInteractionRegistry.h"
-#include "primitives/button.h"
-#include "primitives/text.h"
+#include "ui_document_assets.h"
 
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_video.h>
 
+#include <cstdio>
+
 namespace options_display_screen_detail
 {
-using silencer::ui::primitives::Button;
-using silencer::ui::primitives::ButtonHandle;
-using silencer::ui::primitives::ButtonOpts;
-using silencer::ui::primitives::ButtonSize;
-using silencer::ui::primitives::ButtonVariant;
-using silencer::ui::primitives::Text;
-using silencer::ui::primitives::TextSize;
 
-constexpr uint16_t kPanelW = 420;
-constexpr uint16_t kPanelPadX = 24;
-constexpr uint16_t kPanelPadY = 32;
-constexpr uint16_t kRowGap = 20;
-constexpr uint16_t kActionGap = 12;
-constexpr const char * kActionFullscreen = "options_display.fullscreen";
-constexpr const char * kActionSmoothScaling = "options_display.smooth_scaling";
-constexpr const char * kActionSave = "options_display.save";
-constexpr const char * kActionCancel = "options_display.cancel";
+Clay_String ClayStringFromStd(const std::string& value)
+{
+	return Clay_String{ false, static_cast<int32_t>(value.size()), value.c_str() };
+}
+
+bool LoadDisplayDocument(silencer::ui::UiEditorPreviewDocument& document,
+                         std::string& error)
+{
+	if(!silencer::net::LoadUiDocumentAsset(
+		   silencer::client_ui::options_display::kOptionsDisplaySurface,
+		   document,
+		   error)){
+		return false;
+	}
+	silencer::client_ui::UiDocumentRendererOptions options =
+		silencer::client_ui::UiDocumentRendererOptionsForSurface(
+			silencer::client_ui::options_display::kOptionsDisplaySurface);
+	return silencer::client_ui::ValidateUiDocumentRuntimeTokens(
+		document,
+		options,
+		error);
+}
+
+bool BuildDisplayComponent(const silencer::ui::UiEditorNode& node,
+                           silencer::ui::UiInteractionRegistry& interactions)
+{
+	Config & cfg = Config::GetInstance();
+	const std::string rowId = node.id + "Content";
+	if(node.component == silencer::client_ui::options_display::kComponentFullscreenRow){
+		silencer::client_ui::options::BooleanSettingRow(
+			ClayStringFromStd(rowId),
+			CLAY_STRING("OptionsDisplayFullscreenButton"),
+			CLAY_STRING("Fullscreen"),
+			cfg.fullscreen,
+			silencer::client_ui::options_display::kActionFullscreen,
+			interactions);
+		return true;
+	}
+	if(node.component == silencer::client_ui::options_display::kComponentSmoothScalingRow){
+		silencer::client_ui::options::BooleanSettingRow(
+			ClayStringFromStd(rowId),
+			CLAY_STRING("OptionsDisplaySmoothScalingButton"),
+			CLAY_STRING("Smooth Scaling"),
+			cfg.scalefilter,
+			silencer::client_ui::options_display::kActionSmoothScaling,
+			interactions);
+		return true;
+	}
+	return false;
+}
 } // namespace options_display_screen_detail
 
 void OptionsDisplayScreen::Build(ScreenContext & ctx)
@@ -47,6 +83,12 @@ void OptionsDisplayScreen::Build(ScreenContext & ctx)
 	smoothScalingClicked = false;
 	saveClicked = false;
 	cancelClicked = false;
+	layoutLoaded_ = options_display_screen_detail::LoadDisplayDocument(
+		layoutDocument_,
+		layoutLoadError_);
+	if(!layoutLoaded_){
+		std::fprintf(stderr, "[ui-layout] %s\n", layoutLoadError_.c_str());
+	}
 }
 
 void OptionsDisplayScreen::Tick(ScreenContext & ctx)
@@ -81,70 +123,18 @@ void OptionsDisplayScreen::Tick(ScreenContext & ctx)
 
 void OptionsDisplayScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime, silencer::ui::UiInteractionRegistry& interactions)
 {
+	(void)ctx;
 	(void)frametime;
 	(void)dst;
-	using namespace silencer::clay_bridge;
+	if(!layoutLoaded_) return;
 
-	Config & cfg = Config::GetInstance();
-	CLAY({ .id = CLAY_ID("OptionsDisplayRoot"),
-	       .layout = {
-	           .sizing = { CLAY_SIZING_GROW(0),
-	                       CLAY_SIZING_GROW(0) },
-	           .padding = { 0, 0, 80, 0 },
-	           .childAlignment = { CLAY_ALIGN_X_CENTER, CLAY_ALIGN_Y_TOP },
-	       },
-	       .image = { .imageData = PackImage(6, 0) } }) {
-		CLAY({ .id = CLAY_ID("OptionsDisplayPanel"),
-		       .layout = {
-		           .sizing = { CLAY_SIZING_FIXED(options_display_screen_detail::kPanelW),
-		                       CLAY_SIZING_FIT(0) },
-		           .padding = { options_display_screen_detail::kPanelPadX, options_display_screen_detail::kPanelPadX,
-		                        options_display_screen_detail::kPanelPadY, options_display_screen_detail::kPanelPadY },
-		           .childGap = 22,
-		           .childAlignment = { CLAY_ALIGN_X_CENTER, CLAY_ALIGN_Y_TOP },
-		           .layoutDirection = CLAY_TOP_TO_BOTTOM,
-		       } }) {
-			options_display_screen_detail::Text(CLAY_STRING("Display Options"),
-			                                    { .size = options_display_screen_detail::TextSize::Title });
-			CLAY({ .id = CLAY_ID("OptionsDisplayRows"),
-			       .layout = {
-			           .sizing = { CLAY_SIZING_GROW(0), CLAY_SIZING_FIT(0) },
-			           .childGap = options_display_screen_detail::kRowGap,
-			           .childAlignment = { CLAY_ALIGN_X_CENTER, CLAY_ALIGN_Y_TOP },
-			           .layoutDirection = CLAY_TOP_TO_BOTTOM,
-			       } }) {
-				silencer::client_ui::options::BooleanSettingRow(
-					CLAY_STRING("OptionsDisplayFullscreenRow"),
-					CLAY_STRING("OptionsDisplayFullscreenButton"),
-					CLAY_STRING("Fullscreen"),
-					cfg.fullscreen,
-					options_display_screen_detail::kActionFullscreen,
-					interactions);
-				silencer::client_ui::options::BooleanSettingRow(
-					CLAY_STRING("OptionsDisplaySmoothScalingRow"),
-					CLAY_STRING("OptionsDisplaySmoothScalingButton"),
-					CLAY_STRING("Smooth Scaling"),
-					cfg.scalefilter,
-					options_display_screen_detail::kActionSmoothScaling,
-					interactions);
-			}
-			CLAY({ .id = CLAY_ID("OptionsDisplayActions"),
-			       .layout = {
-			           .sizing = { CLAY_SIZING_FIT(0), CLAY_SIZING_FIT(0) },
-			           .childGap = options_display_screen_detail::kActionGap,
-			           .layoutDirection = CLAY_LEFT_TO_RIGHT,
-			       } }) {
-				options_display_screen_detail::Button(CLAY_STRING("OptionsDisplaySaveButton"), CLAY_STRING("Save"),
-				           options_display_screen_detail::ButtonOpts{ .variant = options_display_screen_detail::ButtonVariant::Oval,
-				                                                      .size = options_display_screen_detail::ButtonSize::Md },
-				           options_display_screen_detail::ButtonHandle{ nullptr, options_display_screen_detail::kActionSave, &interactions });
-				options_display_screen_detail::Button(CLAY_STRING("OptionsDisplayCancelButton"), CLAY_STRING("Cancel"),
-				           options_display_screen_detail::ButtonOpts{ .variant = options_display_screen_detail::ButtonVariant::Oval,
-				                                                      .size = options_display_screen_detail::ButtonSize::Md },
-				           options_display_screen_detail::ButtonHandle{ nullptr, options_display_screen_detail::kActionCancel, &interactions });
-			}
-		}
-	}
+	silencer::client_ui::UiDocumentRendererOptions options =
+		silencer::client_ui::UiDocumentRendererOptionsForSurface(
+			silencer::client_ui::options_display::kOptionsDisplaySurface);
+	options.buildComponent = [&interactions](const silencer::ui::UiEditorNode& node) {
+		return options_display_screen_detail::BuildDisplayComponent(node, interactions);
+	};
+	silencer::client_ui::BuildUiDocument(layoutDocument_, interactions, options);
 }
 
 void OptionsDisplayScreen::Destroy(ScreenContext & ctx)
@@ -160,19 +150,19 @@ bool OptionsDisplayScreen::HandleUiIntent(ScreenContext & ctx, const silencer::u
 		return true;
 	}
 	if(action.kind != silencer::ui::UiActionKind::Activate) return false;
-	if(action.id == options_display_screen_detail::kActionFullscreen){
+	if(action.id == silencer::client_ui::options_display::kActionFullscreen){
 		fullscreenClicked = true;
 		return true;
 	}
-	if(action.id == options_display_screen_detail::kActionSmoothScaling){
+	if(action.id == silencer::client_ui::options_display::kActionSmoothScaling){
 		smoothScalingClicked = true;
 		return true;
 	}
-	if(action.id == options_display_screen_detail::kActionSave){
+	if(action.id == silencer::client_ui::options_display::kActionSave){
 		saveClicked = true;
 		return true;
 	}
-	if(action.id == options_display_screen_detail::kActionCancel){
+	if(action.id == silencer::client_ui::options_display::kActionCancel){
 		cancelClicked = true;
 		return true;
 	}

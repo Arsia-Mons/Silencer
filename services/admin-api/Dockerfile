@@ -19,6 +19,7 @@ RUN bun install --production --frozen-lockfile --filter ./services/admin-api
 
 COPY services/admin-api/src ./services/admin-api/src
 COPY shared/ui-layout       ./shared/ui-layout
+COPY shared/assets/ui-layouts ./shared/assets/ui-layouts
 WORKDIR /app/services/admin-api
 EXPOSE 24080
 CMD ["bun", "src/index.js"]

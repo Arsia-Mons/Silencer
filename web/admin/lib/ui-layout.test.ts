@@ -4,6 +4,7 @@ import {
   createNode,
   duplicateNode,
   findNode,
+  getUiSurfaceTokenManifest,
   insertChild,
   moveNode,
   removeNode,
@@ -130,6 +131,26 @@ describe("ui-layout model", () => {
     expect(findNode(parsed.root, "MainMenuSilencerLogo")?.component).toBe("main-menu.logo");
     expect(findNode(parsed.root, "MainMenuActionGroup")?.floating?.parentAttach).toBe("center");
     expect(findNode(parsed.root, "MainMenuVersion")?.textBinding).toBe("client.version");
+  });
+
+  test("creates defaults from the requested surface document", () => {
+    const options = createDefaultUiDocument("options");
+    expect(options.surface).toBe("options");
+    expect(options.root.id).toBe("OptionsRoot");
+    expect(findNode(options.root, "OptionsDisplayButton")?.action).toBe("options.display");
+
+    const display = createDefaultUiDocument("options-display");
+    expect(display.surface).toBe("options-display");
+    expect(findNode(display.root, "OptionsDisplayFullscreenRow")?.component).toBe(
+      "options_display.fullscreen_row",
+    );
+  });
+
+  test("returns built-in surface token manifests for editor authoring", () => {
+    expect(getUiSurfaceTokenManifest("main-menu")?.actions).toContain("main_menu.options");
+    expect(getUiSurfaceTokenManifest("options-display")?.components).toContain(
+      "options_display.smooth_scaling_row",
+    );
   });
 
   test("rejects duplicate imported node ids", () => {

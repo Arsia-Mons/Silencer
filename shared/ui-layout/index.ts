@@ -29,6 +29,9 @@ import {
   UI_VIEWPORT_FIELDS,
 } from "./contract";
 import mainMenuDocument from "../assets/ui-layouts/main-menu.silencer-ui.json";
+import optionsAudioDocument from "../assets/ui-layouts/options-audio.silencer-ui.json";
+import optionsDisplayDocument from "../assets/ui-layouts/options-display.silencer-ui.json";
+import optionsDocument from "../assets/ui-layouts/options.silencer-ui.json";
 
 export {
   UI_ALIGNS,
@@ -189,6 +192,13 @@ const TOKEN_FIELD_KEYS = [
   "buttonVariant",
   "buttonSize",
 ] as const;
+
+const DEFAULT_UI_DOCUMENTS_BY_SURFACE = {
+  "main-menu": mainMenuDocument,
+  options: optionsDocument,
+  "options-display": optionsDisplayDocument,
+  "options-audio": optionsAudioDocument,
+} as const satisfies Record<UiSurfaceName, unknown>;
 const SIZE_AXIS_KEYS = ["width", "height"] as const;
 
 const KIND_LABELS: Record<UiNodeKind, string> = {
@@ -230,8 +240,14 @@ export function uiLayoutFilename(surface: string): string {
   return `${normalizeUiSurface(surface)}.silencer-ui.json`;
 }
 
-export function createDefaultUiDocument(): UiDocument {
-  return validateUiDocument(cloneJson(mainMenuDocument));
+export function createDefaultUiDocument(surface = "main-menu"): UiDocument {
+  const normalizedSurface = normalizeUiSurface(surface);
+  if (!SURFACES.has(normalizedSurface)) {
+    throw new Error(`No default UI document for surface: ${surface}`);
+  }
+  return validateUiDocument(
+    cloneJson(DEFAULT_UI_DOCUMENTS_BY_SURFACE[normalizedSurface as UiSurfaceName]),
+  );
 }
 
 export function createNode(
@@ -412,6 +428,13 @@ export function validateUiDocument(
   const document = { ...candidate, surface: normalizeUiSurface(candidate.surface) } as UiDocument;
   validateSurfaceTokens(document, options);
   return document;
+}
+
+export function getUiSurfaceTokenManifest(
+  surface: string,
+  manifests: readonly UiSurfaceTokenManifest[] = [],
+): UiSurfaceTokenManifest | null {
+  return surfaceTokenManifest(surface, manifests) ?? builtInSurfaceTokenManifest(surface);
 }
 
 function defaultStyleForKind(kind: UiNodeKind): UiStyle {
@@ -806,9 +829,7 @@ function validateSizeBound(node: UiNode, key: "width" | "height", bound: "min" |
 }
 
 function validateSurfaceTokens(document: UiDocument, options: UiDocumentValidationOptions): void {
-  const manifest =
-    surfaceTokenManifest(document.surface, options.tokenManifests ?? []) ??
-    builtInSurfaceTokenManifest(document.surface);
+  const manifest = getUiSurfaceTokenManifest(document.surface, options.tokenManifests ?? []);
   if (!manifest) {
     if (options.requireTokenManifestForSurfaceTokens && nodeHasSurfaceTokens(document.root)) {
       throw new Error(`Surface ${document.surface} needs a UI token manifest.`);
