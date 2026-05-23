@@ -27,6 +27,7 @@ LOBBY_PORT=$(pick_port)
 PLAYER_AUTH_PORT=$(pick_port)
 MAP_API_PORT=$(pick_port)
 CTRL_PORT=$(pick_port)
+require_silencer_version
 
 cleanup() {
   if [ -n "${SILENCER_PID:-}" ]; then

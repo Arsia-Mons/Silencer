@@ -214,7 +214,8 @@ Screen& screen,
 silencer::ui::UiInteractionRegistry& interactions,
 float frametime) {
 silencer::ui::primitives::ButtonVisualStateGuard buttonVisualStateGuard;
-silencer::client_ui::ClayBridgeFrameBackend previewClayBackend;
+const float previousUiScale = silencer::clay_bridge::UiScale();
+silencer::client_ui::ClayBridgeFrameBackend previewClayBackend(true);
 silencer::ui::ClayService previewClayService(previewClayBackend);
 silencer::client_ui::ClientUi previewUi(previewClayService);
 silencer::ui::UiInputState previewInput =
@@ -225,7 +226,9 @@ previewUi.BeginFrame(previewInput);
 screen.BuildUi(game.screenContext, surface, frametime, previewUi.Interactions());
 previewUi.EndFrame();
 interactions = previewUi.Interactions();
+previewClayBackend.RestorePrimaryContext();
 silencer::clay_bridge::Render(game, &surface, previewClayBackend.Commands());
+silencer::clay_bridge::SetUiScale(previousUiScale);
 }
 
 void GameUiPipeline::ResetUiFrameDeltas() {

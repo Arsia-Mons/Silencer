@@ -71,12 +71,24 @@ if [ -z "${SILENCER_BIN:-}" ]; then
   fi
 fi
 SILENCER_BUILD_DIR="${SILENCER_BUILD_DIR:-$(infer_silencer_build_dir "$SILENCER_BIN")}"
-SILENCER_VERSION="${SILENCER_VERSION:-$(read_silencer_version "$SILENCER_BUILD_DIR" || true)}"
-if [ -z "$SILENCER_VERSION" ]; then
-  echo "could not read SILENCER_VERSION from $SILENCER_BUILD_DIR/CMakeCache.txt" >&2
-  exit 1
-fi
-export SILENCER_BIN SILENCER_BUILD_DIR SILENCER_VERSION
+export SILENCER_BIN SILENCER_BUILD_DIR
+
+resolve_silencer_version() {
+  if [ -n "${SILENCER_VERSION:-}" ]; then
+    export SILENCER_VERSION
+    return 0
+  fi
+  SILENCER_VERSION="$(read_silencer_version "$SILENCER_BUILD_DIR" || true)"
+  [ -n "$SILENCER_VERSION" ] || return 1
+  export SILENCER_VERSION
+}
+
+require_silencer_version() {
+  if ! resolve_silencer_version; then
+    echo "could not read SILENCER_VERSION from $SILENCER_BUILD_DIR/CMakeCache.txt" >&2
+    exit 1
+  fi
+}
 
 # Function (not a variable) so $REPO_ROOT can contain spaces — assigning
 # `CLI="bun $REPO_ROOT/.../index.ts"` and then unquoted `$CLI` word-splits the

@@ -721,6 +721,48 @@ void EnsureInitialized(int width, int height) {
 	// pressed, held, released, and wheel behavior correctly.
 }
 
+IsolatedContext::IsolatedContext()
+	: arenaMemory_(nullptr), context_(nullptr), width_(-1), height_(-1) {
+}
+
+IsolatedContext::~IsolatedContext() {
+	std::free(arenaMemory_);
+}
+
+void IsolatedContext::SetCurrent(int width, int height) {
+	if(!context_){
+		uint64_t mem = ::Clay_MinMemorySize();
+		arenaMemory_ = std::malloc(static_cast<size_t>(mem));
+		::Clay_Arena arena =
+			::Clay_CreateArenaWithCapacityAndMemory(mem, arenaMemory_);
+		::Clay_ErrorHandler handler{HandleClayError, nullptr};
+		::Clay_Dimensions dims{static_cast<float>(width),
+		                       static_cast<float>(height)};
+		context_ = ::Clay_Initialize(arena, dims, handler);
+		::Clay_SetMeasureTextFunction(MeasureTextCommand, nullptr);
+		width_ = width;
+		height_ = height;
+		return;
+	}
+
+	::Clay_SetCurrentContext(context_);
+	if(width != width_ || height != height_){
+		::Clay_SetLayoutDimensions(::Clay_Dimensions{
+			static_cast<float>(width), static_cast<float>(height)});
+		width_ = width;
+		height_ = height;
+	}
+}
+
+void RestorePrimaryContext() {
+	if(!g_initialized || !g_context) return;
+	::Clay_SetCurrentContext(g_context);
+	if(g_lastW > 0 && g_lastH > 0){
+		::Clay_SetLayoutDimensions(::Clay_Dimensions{
+			static_cast<float>(g_lastW), static_cast<float>(g_lastH)});
+	}
+}
+
 void SetUiScale(float scale) {
 	g_uiScale = scale > 0.0f ? scale : 1.0f;
 }

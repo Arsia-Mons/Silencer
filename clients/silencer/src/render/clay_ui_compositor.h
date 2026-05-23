@@ -41,6 +41,28 @@ namespace silencer::clay_bridge {
 // Safe to call from any per-frame Tick before BeginLayout.
 void EnsureInitialized(int width, int height);
 
+class IsolatedContext {
+public:
+	IsolatedContext();
+	~IsolatedContext();
+
+	IsolatedContext(const IsolatedContext&) = delete;
+	IsolatedContext& operator=(const IsolatedContext&) = delete;
+
+	void SetCurrent(int width, int height);
+
+private:
+	void * arenaMemory_;
+	::Clay_Context * context_;
+	int width_;
+	int height_;
+};
+
+// Restores the process-wide production Clay context after an isolated layout
+// has resolved its bounds. No-op if the production context has not been
+// initialized yet.
+void RestorePrimaryContext();
+
 // Magnification applied to bitmap glyph/sprite/chrome draws so a
 // virtual-resolution Clay layout fills a larger native surface. Default 1
 // (no magnification). Set once per frame before Render(); persists until

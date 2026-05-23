@@ -28,6 +28,12 @@ if (process.env.MUTATOR === "invalid-viewport") {
   document.root.children[1].children[0].style.font = "title";
 } else if (process.env.MUTATOR === "invalid-button-height") {
   document.root.children[1].children[0].style.height = { mode: "fixed", value: 48 };
+} else if (process.env.MUTATOR === "fixed-small-button") {
+  document.root.children[1].children[0].text = "OK";
+  document.root.children[1].children[0].style.width = { mode: "fixed", value: 80 };
+} else if (process.env.MUTATOR === "fixed-long-button") {
+  document.root.children[1].children[0].text = "VERY LONG PREVIEW BUTTON LABEL";
+  document.root.children[1].children[0].style.width = { mode: "fixed", value: 120 };
 }
 writeFileSync(process.env.OUT, JSON.stringify(document));
 '
@@ -50,11 +56,40 @@ expect_bad_document() {
   fi
 }
 
+expect_button_width() {
+  local name="$1" mutator="$2" label="$3" expected="$4"
+  local path="$TMP_DIR/$name.json"
+  local png="$TMP_DIR/$name.png"
+  local log="$TMP_DIR/$name.json.out"
+  make_doc "$path" "$mutator"
+  cli --port "$PORT" ui_editor_preview_capture --document "$(cat "$path")" --out "$png" >"$log"
+  test -s "$png"
+  LOG="$log" LABEL="$label" EXPECTED="$expected" bun -e '
+const result = JSON.parse(await Bun.file(process.env.LOG).text());
+const widgets = result.inspect?.widgets ?? [];
+const widget = widgets.find((candidate) =>
+  candidate.kind === "button" && candidate.label === process.env.LABEL
+);
+if (!widget) {
+  console.error(`button ${process.env.LABEL} missing in ${process.env.LOG}`);
+  process.exit(1);
+}
+const expected = Number(process.env.EXPECTED);
+if (widget.w !== expected) {
+  console.error(`button ${process.env.LABEL} width ${widget.w} !== ${expected}`);
+  process.exit(1);
+}
+'
+}
+
 valid_doc="$TMP_DIR/valid.json"
 valid_png="$TMP_DIR/valid.png"
 make_doc "$valid_doc" "valid"
 cli --port "$PORT" ui_editor_preview_capture --document "$(cat "$valid_doc")" --out "$valid_png" >/dev/null
 test -s "$valid_png"
+
+expect_button_width "fixed-small-button" "fixed-small-button" "OK" "80"
+expect_button_width "fixed-long-button" "fixed-long-button" "VERY LONG PREVIEW BUTTON LABEL" "120"
 
 expect_bad_document "invalid-viewport" "invalid-viewport"
 expect_bad_document "empty-surface" "empty-surface"

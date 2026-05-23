@@ -3,12 +3,22 @@
 
 #include "clay/clay.h"
 #include "ui/runtime/ClayService.h"
+#include <memory>
+
+namespace silencer {
+namespace clay_bridge {
+class IsolatedContext;
+}
+}
 
 namespace silencer {
 namespace client_ui {
 
 class ClayBridgeFrameBackend : public silencer::ui::ClayFrameBackend {
 public:
+	explicit ClayBridgeFrameBackend(bool isolated = false);
+	~ClayBridgeFrameBackend();
+
 	void SetCurrentContext() override;
 	void SetLayoutDimensions(int width, int height) override;
 	void SetUiScale(float scale) override;
@@ -16,6 +26,7 @@ public:
 	void UpdateScrollContainers(float wheelX, float wheelY, float deltaTimeSeconds) override;
 	void BeginLayout() override;
 	std::vector<silencer::ui::UiRenderCommand> EndLayout() override;
+	void RestorePrimaryContext();
 
 	Clay_RenderCommandArray Commands() const { return commands_; }
 
@@ -23,6 +34,8 @@ private:
 	Clay_RenderCommandArray commands_{};
 	int width_ = 0;
 	int height_ = 0;
+	bool isolated_ = false;
+	std::unique_ptr<silencer::clay_bridge::IsolatedContext> isolatedContext_;
 };
 
 }  // namespace client_ui

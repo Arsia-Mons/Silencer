@@ -152,14 +152,6 @@ Clay_ElementDeclaration DeclarationForNode(const UiEditorNode& node) {
 	return decl;
 }
 
-ButtonSize ButtonSizeFor(const UiEditorNode& node) {
-	if(node.style.width.mode == UiEditorSize::Mode::Fixed &&
-	   node.style.width.value <= 128.0f){
-		return ButtonSize::Compact;
-	}
-	return ButtonSize::Auto;
-}
-
 int FixedOrDefault(const UiEditorSize& size, int fallback) {
 	if(size.mode != UiEditorSize::Mode::Fixed) return fallback;
 	return std::max(1, static_cast<int>(size.value + 0.5f));
@@ -209,13 +201,15 @@ void UiEditorPreviewScreen::BuildNode(const UiEditorNode& node,
                                       UiInteractionRegistry& interactions) {
 	RegisterElement(node, interactions);
 	if(node.kind == "button"){
+		const int fixedWidth = FixedOrDefault(node.style.width, 0);
 		ButtonOpts opts{
 			.variant = ButtonVariant::Chrome,
-			.size = ButtonSizeFor(node),
+			.size = ButtonSize::Auto,
 			.textEffect = node.style.textPalette > 0
 				? TextEffect::LegacyPalette(static_cast<Uint8>(node.style.textPalette))
 				: TextEffect::Default(),
-			.minWidth = FixedOrDefault(node.style.width, 0),
+			.minWidth = fixedWidth,
+			.maxWidth = fixedWidth,
 			.paddingX = node.style.padding > 0 ? node.style.padding : 12,
 			.paddingY = node.style.padding > 0 ? node.style.padding / 2 : 4,
 			.wrapText = true,

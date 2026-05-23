@@ -34,6 +34,7 @@ LOBBY_PORT=$(pick_port)
 PLAYER_AUTH_PORT=$(pick_port)
 MAP_API_PORT=$(pick_port)
 CTRL_PORT=$(pick_port)
+require_silencer_version
 
 cat > "$SILENCER_HOME/Library/Application Support/Silencer/config.cfg" <<EOF
 mapapiurl=http://127.0.0.1:$MAP_API_PORT

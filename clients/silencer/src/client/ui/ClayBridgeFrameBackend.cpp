@@ -5,16 +5,36 @@
 namespace silencer {
 namespace client_ui {
 
+ClayBridgeFrameBackend::ClayBridgeFrameBackend(bool isolated)
+	: isolated_(isolated),
+	  isolatedContext_(isolated
+		  ? std::unique_ptr<silencer::clay_bridge::IsolatedContext>(
+			  new silencer::clay_bridge::IsolatedContext())
+		  : nullptr) {
+}
+
+ClayBridgeFrameBackend::~ClayBridgeFrameBackend() {
+	RestorePrimaryContext();
+}
+
 void ClayBridgeFrameBackend::SetCurrentContext() {
 	if(width_ > 0 && height_ > 0) {
-		silencer::clay_bridge::EnsureInitialized(width_, height_);
+		if(isolated_){
+			isolatedContext_->SetCurrent(width_, height_);
+		}else{
+			silencer::clay_bridge::EnsureInitialized(width_, height_);
+		}
 	}
 }
 
 void ClayBridgeFrameBackend::SetLayoutDimensions(int width, int height) {
 	width_ = width;
 	height_ = height;
-	silencer::clay_bridge::EnsureInitialized(width, height);
+	if(isolated_){
+		isolatedContext_->SetCurrent(width, height);
+	}else{
+		silencer::clay_bridge::EnsureInitialized(width, height);
+	}
 }
 
 void ClayBridgeFrameBackend::SetUiScale(float scale) {
@@ -37,6 +57,12 @@ void ClayBridgeFrameBackend::BeginLayout() {
 std::vector<silencer::ui::UiRenderCommand> ClayBridgeFrameBackend::EndLayout() {
 	commands_ = Clay_EndLayout();
 	return std::vector<silencer::ui::UiRenderCommand>();
+}
+
+void ClayBridgeFrameBackend::RestorePrimaryContext() {
+	if(isolated_){
+		silencer::clay_bridge::RestorePrimaryContext();
+	}
 }
 
 }  // namespace client_ui
