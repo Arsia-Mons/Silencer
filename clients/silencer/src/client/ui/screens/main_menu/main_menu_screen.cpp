@@ -25,34 +25,6 @@ constexpr const char * kActionTutorial = "main_menu.tutorial";
 constexpr const char * kActionLobby = "main_menu.lobby";
 constexpr const char * kActionOptions = "main_menu.options";
 constexpr const char * kActionExit = "main_menu.exit";
-
-bool IsMainMenuAction(const std::string& action) {
-	return action == kActionTutorial || action == kActionLobby ||
-	       action == kActionOptions || action == kActionExit;
-}
-
-bool ValidateMainMenuNode(const silencer::ui::UiEditorNode& node,
-                          std::string& error) {
-	if(node.kind == "component" && node.component != kLogoComponent){
-		error = "main-menu layout references unknown component " + node.component +
-		        " at node " + node.id;
-		return false;
-	}
-	if(!node.textBinding.empty() && node.textBinding != kVersionBinding){
-		error = "main-menu layout references unknown text binding " +
-		        node.textBinding + " at node " + node.id;
-		return false;
-	}
-	if(node.kind == "button" && !IsMainMenuAction(node.action)){
-		error = "main-menu layout references unknown action " + node.action +
-		        " at node " + node.id;
-		return false;
-	}
-	for(const silencer::ui::UiEditorNode& child : node.children){
-		if(!ValidateMainMenuNode(child, error)) return false;
-	}
-	return true;
-}
 } // namespace main_menu_screen_detail
 
 void MainMenuScreen::Build(ScreenContext & ctx)
@@ -76,11 +48,6 @@ void MainMenuScreen::Build(ScreenContext & ctx)
 	if(!layoutLoaded_){
 		std::fprintf(stderr, "[ui-layout] %s\n", layoutLoadError_.c_str());
 		return;
-	}
-	if(!main_menu_screen_detail::ValidateMainMenuNode(layoutDocument_.root,
-	                                                  layoutLoadError_)){
-		layoutLoaded_ = false;
-		std::fprintf(stderr, "[ui-layout] %s\n", layoutLoadError_.c_str());
 	}
 	logo.Reset();
 }

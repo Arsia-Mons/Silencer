@@ -11,6 +11,10 @@ bool LoadUiDocumentAsset(const std::string& surface,
                          silencer::ui::UiEditorPreviewDocument& document,
                          std::string& error);
 
+bool ValidateUiDocumentKnownSurfaceTokens(
+	const silencer::ui::UiEditorPreviewDocument& document,
+	std::string& error);
+
 }  // namespace silencer::net
 
 #endif

@@ -436,13 +436,5 @@ function applyViewportPreset(document: UiDocument, preset: (typeof PRESETS)[numb
   return {
     ...document,
     viewport: { width: preset.width, height: preset.height },
-    root: {
-      ...document.root,
-      style: {
-        ...document.root.style,
-        width: { mode: "fixed", value: preset.width },
-        height: { mode: "fixed", value: preset.height },
-      },
-    },
   };
 }

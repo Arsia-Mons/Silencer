@@ -58,6 +58,7 @@ export function Inspector({
   onAddChild,
 }: InspectorProps) {
   const supportsChildren = canHaveChildren(node.kind);
+  const supportsNodeDecorators = node.kind !== "button" && node.kind !== "input";
   return (
     <aside className="min-h-0 overflow-auto border-l border-game-border bg-game-bgCard/95">
       <div className="p-4 border-b border-game-border">
@@ -143,8 +144,8 @@ export function Inspector({
         )}
 
         <StyleInspector node={node} onStyle={onStyle} />
-        <ImageInspector node={node} onPatch={onPatch} />
-        <FloatingInspector node={node} onPatch={onPatch} />
+        {supportsNodeDecorators && <ImageInspector node={node} onPatch={onPatch} />}
+        {supportsNodeDecorators && <FloatingInspector node={node} onPatch={onPatch} />}
 
         <div className="grid grid-cols-2 gap-2 pt-2">
           <button
@@ -176,6 +177,9 @@ function StyleInspector({
 }) {
   const style = node.style;
   const supportsHeight = node.kind !== "button";
+  const sizeModes: UiSizeMode[] =
+    node.kind === "input" ? ["fixed"] : node.kind === "button" ? ["fit", "fixed"] : SIZE_MODES;
+  const supportsSizeBounds = node.kind !== "button" && node.kind !== "input";
   const supportsPadding = node.kind !== "spacer";
   const supportsFont = node.kind === "text" || node.kind === "input";
   const supportsTextPalette = node.kind === "button" || node.kind === "text";
@@ -185,11 +189,19 @@ function StyleInspector({
     <div className="space-y-4">
       <div className="text-xs tracking-widest text-game-primary">LAYOUT</div>
       <div className="grid grid-cols-2 gap-3">
-        <SizeField label="WIDTH" size={style.width} onChange={(width) => onStyle({ width })} />
+        <SizeField
+          label="WIDTH"
+          size={style.width}
+          modes={sizeModes}
+          supportsBounds={supportsSizeBounds}
+          onChange={(width) => onStyle({ width })}
+        />
         {supportsHeight && (
           <SizeField
             label="HEIGHT"
             size={style.height}
+            modes={node.kind === "input" ? ["fixed"] : SIZE_MODES}
+            supportsBounds={supportsSizeBounds}
             onChange={(height) => onStyle({ height })}
           />
         )}
@@ -465,10 +477,14 @@ function FloatingInspector({
 function SizeField({
   label,
   size,
+  modes = SIZE_MODES,
+  supportsBounds = true,
   onChange,
 }: {
   label: string;
   size: UiSize;
+  modes?: UiSizeMode[];
+  supportsBounds?: boolean;
   onChange: (size: UiSize) => void;
 }) {
   return (
@@ -477,7 +493,7 @@ function SizeField({
         <div className="grid grid-cols-[1fr_72px] gap-2">
           <Select
             value={size.mode}
-            options={SIZE_MODES}
+            options={modes}
             onChange={(value) =>
               onChange({ ...size, mode: value as UiSizeMode, value: size.value ?? 120 })
             }
@@ -490,26 +506,28 @@ function SizeField({
             onChange={(value) => onChange({ ...size, value })}
           />
         </div>
-        <div className="grid grid-cols-2 gap-2">
-          <label className="block text-[10px] tracking-widest text-game-textDim">
-            <span className="mb-1 block">MIN</span>
-            <NumberInput
-              value={size.min ?? 0}
-              min={0}
-              max={4096}
-              onChange={(min) => onChange({ ...size, min: min > 0 ? min : undefined })}
-            />
-          </label>
-          <label className="block text-[10px] tracking-widest text-game-textDim">
-            <span className="mb-1 block">MAX</span>
-            <NumberInput
-              value={size.max ?? 0}
-              min={0}
-              max={4096}
-              onChange={(max) => onChange({ ...size, max: max > 0 ? max : undefined })}
-            />
-          </label>
-        </div>
+        {supportsBounds && (
+          <div className="grid grid-cols-2 gap-2">
+            <label className="block text-[10px] tracking-widest text-game-textDim">
+              <span className="mb-1 block">MIN</span>
+              <NumberInput
+                value={size.min ?? 0}
+                min={0}
+                max={4096}
+                onChange={(min) => onChange({ ...size, min: min > 0 ? min : undefined })}
+              />
+            </label>
+            <label className="block text-[10px] tracking-widest text-game-textDim">
+              <span className="mb-1 block">MAX</span>
+              <NumberInput
+                value={size.max ?? 0}
+                min={0}
+                max={4096}
+                onChange={(max) => onChange({ ...size, max: max > 0 ? max : undefined })}
+              />
+            </label>
+          </div>
+        )}
       </div>
     </Field>
   );

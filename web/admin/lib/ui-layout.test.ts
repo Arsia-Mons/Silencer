@@ -225,4 +225,49 @@ describe("ui-layout model", () => {
       "Node MainMenuRoot width min cannot exceed max.",
     );
   });
+
+  test("rejects surface tokens outside the manifest", () => {
+    const unknownAction = JSON.parse(JSON.stringify(createDefaultUiDocument()));
+    (findNode(unknownAction.root, "MainMenuTutorialButton") as any).action = "main_menu.credits";
+    expect(() => validateUiDocument(unknownAction)).toThrow(
+      "Node MainMenuTutorialButton references unknown action main_menu.credits.",
+    );
+
+    const unknownComponent = JSON.parse(JSON.stringify(createDefaultUiDocument()));
+    (findNode(unknownComponent.root, "MainMenuSilencerLogo") as any).component =
+      "main-menu.badge";
+    expect(() => validateUiDocument(unknownComponent)).toThrow(
+      "Node MainMenuSilencerLogo references unknown component main-menu.badge.",
+    );
+
+    const unknownSurface = JSON.parse(JSON.stringify(createDefaultUiDocument()));
+    unknownSurface.surface = "custom-screen";
+    expect(() => validateUiDocument(unknownSurface)).toThrow(
+      "Surface custom-screen needs a UI token manifest.",
+    );
+  });
+
+  test("rejects fields that the client renderer does not honor on primitives", () => {
+    const buttonImage = JSON.parse(JSON.stringify(createDefaultUiDocument()));
+    (findNode(buttonImage.root, "MainMenuTutorialButton") as any).image = {
+      bank: 6,
+      index: 0,
+    };
+    expect(() => validateUiDocument(buttonImage)).toThrow(
+      "Node MainMenuTutorialButton button cannot use image.",
+    );
+
+    const buttonSize = JSON.parse(JSON.stringify(createDefaultUiDocument()));
+    (findNode(buttonSize.root, "MainMenuTutorialButton") as any).style.width.min = 160;
+    expect(() => validateUiDocument(buttonSize)).toThrow(
+      "Node MainMenuTutorialButton button width cannot use min or max.",
+    );
+
+    const inputSizing = createNode("input", "player name");
+    inputSizing.style.width = { mode: "fit" };
+    const document = insertChild(createDefaultUiDocument(), "MainMenuRoot", inputSizing);
+    expect(() => validateUiDocument(document)).toThrow(
+      "Node input-player name input width and height must be fixed.",
+    );
+  });
 });

@@ -1,0 +1,15 @@
+{
+  "surface": "main-menu",
+  "components": [
+    "main-menu.logo"
+  ],
+  "textBindings": [
+    "client.version"
+  ],
+  "actions": [
+    "main_menu.tutorial",
+    "main_menu.lobby",
+    "main_menu.options",
+    "main_menu.exit"
+  ]
+}

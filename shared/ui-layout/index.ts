@@ -1,3 +1,5 @@
+import mainMenuSurfaceTokens from "../assets/ui-layouts/main-menu.silencer-ui.tokens.json";
+
 export const UI_LAYOUT_SCHEMA_VERSION = 1 as const;
 
 export type UiNodeKind =
@@ -104,9 +106,20 @@ export interface UiDocumentReference {
   revision: string;
 }
 
+export interface UiSurfaceTokenManifest {
+  surface: string;
+  components: string[];
+  textBindings: string[];
+  actions: string[];
+}
+
 type UiNodeOverrides = Omit<Partial<UiNode>, "style"> & {
   style?: Partial<UiStyle>;
 };
+
+const SURFACE_TOKEN_MANIFESTS: UiSurfaceTokenManifest[] = [
+  mainMenuSurfaceTokens as UiSurfaceTokenManifest,
+];
 
 const KIND_LABELS: Record<UiNodeKind, string> = {
   screen: "Screen",
@@ -465,7 +478,9 @@ export function validateUiDocument(value: unknown): UiDocument {
   validateViewport(candidate.viewport);
   if (candidate.root.kind !== "screen") throw new Error("Document root must be a screen node.");
   validateNode(candidate.root, new Set<string>());
-  return { ...candidate, surface: normalizeUiSurface(candidate.surface) } as UiDocument;
+  const document = { ...candidate, surface: normalizeUiSurface(candidate.surface) } as UiDocument;
+  validateSurfaceTokens(document);
+  return document;
 }
 
 function defaultStyleForKind(kind: UiNodeKind): UiStyle {
@@ -535,8 +550,8 @@ function defaultStyleForKind(kind: UiNodeKind): UiStyle {
     };
   }
   return {
-    width: { mode: "fit" },
-    height: { mode: "fit" },
+    width: { mode: "fixed", value: 180 },
+    height: { mode: "fixed", value: 24 },
     font: "ui",
     padding: 10,
   };
@@ -590,6 +605,7 @@ function validateNode(node: UiNode, seenIds: Set<string>): void {
   validateOptionalString(node, "textBinding");
   validateOptionalString(node, "component");
   validateButtonSettings(node);
+  validateRenderableNodeDecorators(node);
   validateImage(node);
   validateFloating(node);
   if (node.kind === "component" && !node.component) {
@@ -644,6 +660,15 @@ function validateButtonSettings(node: UiNode): void {
     ) {
       throw new Error(`Node ${node.id} has invalid buttonSize.`);
     }
+  }
+}
+
+function validateRenderableNodeDecorators(node: UiNode): void {
+  if ((node.kind === "button" || node.kind === "input") && node.image !== undefined) {
+    throw new Error(`Node ${node.id} ${node.kind} cannot use image.`);
+  }
+  if ((node.kind === "button" || node.kind === "input") && node.floating !== undefined) {
+    throw new Error(`Node ${node.id} ${node.kind} cannot use floating.`);
   }
 }
 
@@ -770,8 +795,32 @@ function allowedStyleFields(kind: UiNodeKind): Set<keyof UiStyle> {
 }
 
 function validateKindSpecificStyleValues(node: UiNode): void {
-  if (node.kind === "button" && node.style.height.mode !== "fit") {
-    throw new Error(`Node ${node.id} button height must be fit.`);
+  if (node.kind === "button") {
+    if (node.style.width.mode === "grow") {
+      throw new Error(`Node ${node.id} button width must be fit or fixed.`);
+    }
+    if (node.style.width.min !== undefined || node.style.width.max !== undefined) {
+      throw new Error(`Node ${node.id} button width cannot use min or max.`);
+    }
+    if (node.style.height.mode !== "fit") {
+      throw new Error(`Node ${node.id} button height must be fit.`);
+    }
+    if (node.style.height.min !== undefined || node.style.height.max !== undefined) {
+      throw new Error(`Node ${node.id} button height cannot use min or max.`);
+    }
+  }
+  if (node.kind === "input") {
+    if (node.style.width.mode !== "fixed" || node.style.height.mode !== "fixed") {
+      throw new Error(`Node ${node.id} input width and height must be fixed.`);
+    }
+    if (
+      node.style.width.min !== undefined ||
+      node.style.width.max !== undefined ||
+      node.style.height.min !== undefined ||
+      node.style.height.max !== undefined
+    ) {
+      throw new Error(`Node ${node.id} input sizing cannot use min or max.`);
+    }
   }
 }
 
@@ -852,6 +901,41 @@ function validateSizeBound(
   if (!Number.isFinite(value) || value < 0 || value > 4096) {
     throw new Error(`Node ${node.id} has invalid ${key} ${bound}.`);
   }
+}
+
+function validateSurfaceTokens(document: UiDocument): void {
+  const manifest = surfaceTokenManifest(document.surface);
+  if (!manifest) {
+    if (nodeHasSurfaceTokens(document.root)) {
+      throw new Error(`Surface ${document.surface} needs a UI token manifest.`);
+    }
+    return;
+  }
+  validateSurfaceNodeTokens(document.root, manifest);
+}
+
+function surfaceTokenManifest(surface: string): UiSurfaceTokenManifest | null {
+  const normalized = normalizeUiSurface(surface);
+  return SURFACE_TOKEN_MANIFESTS.find((manifest) => normalizeUiSurface(manifest.surface) === normalized) ??
+    null;
+}
+
+function validateSurfaceNodeTokens(node: UiNode, manifest: UiSurfaceTokenManifest): void {
+  if (node.kind === "component" && !manifest.components.includes(node.component ?? "")) {
+    throw new Error(`Node ${node.id} references unknown component ${node.component ?? ""}.`);
+  }
+  if (node.textBinding && !manifest.textBindings.includes(node.textBinding)) {
+    throw new Error(`Node ${node.id} references unknown text binding ${node.textBinding}.`);
+  }
+  if (node.kind === "button" && !manifest.actions.includes(node.action ?? "")) {
+    throw new Error(`Node ${node.id} references unknown action ${node.action ?? ""}.`);
+  }
+  for (const child of node.children ?? []) validateSurfaceNodeTokens(child, manifest);
+}
+
+function nodeHasSurfaceTokens(node: UiNode): boolean {
+  if (node.kind === "component" || node.kind === "button" || node.textBinding) return true;
+  return (node.children ?? []).some(nodeHasSurfaceTokens);
 }
 
 let idCounter = 0;

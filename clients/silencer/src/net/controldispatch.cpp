@@ -11,6 +11,7 @@
 #include "screen.h"
 #include "ui_editor_preview_screen.h"
 #include "ui_editor_preview_document.h"
+#include "ui_document_assets.h"
 #include "password_modal.h"
 #include <SDL3/SDL_keyboard.h>
 #ifdef SILENCER_HAVE_LOBBY_UI
@@ -607,6 +608,10 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 			cmd.reply->set_value(Err(cmd.id, "BAD_REQUEST", error));
 			return;
 		}
+		if(!silencer::net::ValidateUiDocumentKnownSurfaceTokens(document, error)){
+			cmd.reply->set_value(Err(cmd.id, "BAD_REQUEST", error));
+			return;
+		}
 		if(cmd.IsCancelled()){
 			cmd.reply->set_value(Cancelled(cmd.id));
 			return;
@@ -667,6 +672,10 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 		silencer::ui::UiEditorPreviewDocument document;
 		std::string error;
 		if(!silencer::net::ParseUiEditorPreviewDocument(documentJson, document, error)){
+			cmd.reply->set_value(Err(cmd.id, "BAD_REQUEST", error));
+			return;
+		}
+		if(!silencer::net::ValidateUiDocumentKnownSurfaceTokens(document, error)){
 			cmd.reply->set_value(Err(cmd.id, "BAD_REQUEST", error));
 			return;
 		}

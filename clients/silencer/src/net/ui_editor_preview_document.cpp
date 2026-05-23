@@ -378,6 +378,10 @@ bool ParseFloating(const nlohmann::json& json,
 	return true;
 }
 
+bool HasSizeBounds(const UiEditorSize& size) {
+	return size.min > 0.0f || size.max > 0.0f;
+}
+
 bool ParseStyle(const nlohmann::json& json,
                 const std::string& kind,
                 UiEditorStyle& out,
@@ -395,9 +399,34 @@ bool ParseStyle(const nlohmann::json& json,
 	}
 	if(!ParseSize(json, "width", out.width, error)) return false;
 	if(!ParseSize(json, "height", out.height, error)) return false;
-	if(kind == "button" && out.height.mode != UiEditorSize::Mode::Fit){
-		error = "button height must be fit";
-		return false;
+	if(kind == "button"){
+		if(out.width.mode == UiEditorSize::Mode::Grow){
+			error = "button width must be fit or fixed";
+			return false;
+		}
+		if(HasSizeBounds(out.width)){
+			error = "button width cannot use min or max";
+			return false;
+		}
+		if(out.height.mode != UiEditorSize::Mode::Fit){
+			error = "button height must be fit";
+			return false;
+		}
+		if(HasSizeBounds(out.height)){
+			error = "button height cannot use min or max";
+			return false;
+		}
+	}
+	if(kind == "input"){
+		if(out.width.mode != UiEditorSize::Mode::Fixed ||
+		   out.height.mode != UiEditorSize::Mode::Fixed){
+			error = "input width and height must be fixed";
+			return false;
+		}
+		if(HasSizeBounds(out.width) || HasSizeBounds(out.height)){
+			error = "input sizing cannot use min or max";
+			return false;
+		}
 	}
 
 	if(!ParseStringEnum(json, "direction", "column", { "column", "row" },
@@ -471,6 +500,14 @@ bool ParseNode(const nlohmann::json& json,
 	}
 	if(out.kind == "component" && out.component.empty()){
 		error = "component node requires component";
+		return false;
+	}
+	if((out.kind == "button" || out.kind == "input") && json.find("image") != json.end()){
+		error = out.kind + " node cannot use image: " + out.id;
+		return false;
+	}
+	if((out.kind == "button" || out.kind == "input") && json.find("floating") != json.end()){
+		error = out.kind + " node cannot use floating: " + out.id;
 		return false;
 	}
 	if(!ParseImage(json, out, error)) return false;
