@@ -42,6 +42,7 @@ friend class GameSession;
 int GetFrameCount() const { return frames; }
 static const char * StateName(Uint8 s);
 Uint8 GetState() const { return state; }
+bool IsStateNew() const { return stateisnew; }
 World & GetWorld() { return world; }
 ScreenContext & GetScreenContext() { return screenContext; }
 WorldSummary GetWorldSummary();
@@ -71,6 +72,7 @@ struct PendingWait {
 ControlCommand cmd;
 Uint64 deadline_ms = 0;
 int frames_left = -1;
+int state_observed_frame = -1;
 std::string wait_state;
 };
 std::vector<PendingWait> pendingWaits;

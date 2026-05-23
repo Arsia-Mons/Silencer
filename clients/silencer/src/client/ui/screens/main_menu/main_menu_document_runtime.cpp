@@ -6,19 +6,18 @@ bool IsMainMenuComponent(const std::string& component) {
 	return component == kMainMenuLogoComponent;
 }
 
-bool IsMainMenuTextBinding(const std::string& binding) {
-	return binding == kClientVersionBinding;
-}
-
-bool IsMainMenuAction(const std::string& action) {
-	return action == kActionTutorial || action == kActionLobby ||
-	       action == kActionOptions || action == kActionExit;
+bool BuildMainMenuComponent(const silencer::ui::UiEditorNode& node,
+                            Resources& resources,
+                            SilencerLogo& logo) {
+	if(!IsMainMenuComponent(node.component)) return false;
+	logo.Build(resources);
+	return true;
 }
 
 bool ResolveMainMenuTextBinding(const std::string& binding,
                                 const std::string& versionText,
                                 std::string& out) {
-	if(!IsMainMenuTextBinding(binding)) return false;
+	if(binding != kClientVersionBinding) return false;
 	out = versionText;
 	return true;
 }

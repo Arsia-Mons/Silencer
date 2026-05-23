@@ -9,16 +9,26 @@ import {
   UI_DOCUMENT_FIELDS,
   UI_FONTS,
   UI_FLOATING_FIELDS,
+  UI_FORBIDDEN_NODE_DECORATORS_BY_KIND,
   UI_IMAGE_FIELDS,
   UI_IMAGE_MODES,
   UI_JUSTIFIES,
+  UI_LAYOUT_SCHEMA_VERSION,
   UI_NODE_FIELDS,
   UI_NODE_KINDS,
+  UI_NODE_TOKEN_FIELDS_BY_KIND,
+  UI_NUMERIC_LIMITS,
+  UI_REQUIRED_TOKEN_FIELDS_BY_KIND,
   UI_SIZE_FIELDS,
   UI_SIZE_MODES,
+  UI_SIZE_RULES_BY_KIND,
   UI_STYLE_FIELDS_BY_KIND,
+  UI_STYLE_DEFAULTS_BY_KIND,
+  UI_SURFACES,
+  UI_SURFACE_TOKENS_BY_SURFACE,
   UI_VIEWPORT_FIELDS,
 } from "./contract";
+import mainMenuDocument from "../assets/ui-layouts/main-menu.silencer-ui.json";
 
 export {
   UI_ALIGNS,
@@ -31,18 +41,25 @@ export {
   UI_DOCUMENT_FIELDS,
   UI_FONTS,
   UI_FLOATING_FIELDS,
+  UI_FORBIDDEN_NODE_DECORATORS_BY_KIND,
   UI_IMAGE_FIELDS,
   UI_IMAGE_MODES,
   UI_JUSTIFIES,
+  UI_LAYOUT_SCHEMA_VERSION,
   UI_NODE_FIELDS,
   UI_NODE_KINDS,
+  UI_NODE_TOKEN_FIELDS_BY_KIND,
+  UI_NUMERIC_LIMITS,
+  UI_REQUIRED_TOKEN_FIELDS_BY_KIND,
   UI_SIZE_FIELDS,
   UI_SIZE_MODES,
+  UI_SIZE_RULES_BY_KIND,
   UI_STYLE_FIELDS_BY_KIND,
+  UI_STYLE_DEFAULTS_BY_KIND,
+  UI_SURFACES,
+  UI_SURFACE_TOKENS_BY_SURFACE,
   UI_VIEWPORT_FIELDS,
 } from "./contract";
-
-export const UI_LAYOUT_SCHEMA_VERSION = 1 as const;
 
 export type UiNodeKind = (typeof UI_NODE_KINDS)[number];
 export type UiAxis = (typeof UI_AXES)[number];
@@ -56,6 +73,7 @@ export type UiButtonSize = (typeof UI_BUTTON_SIZES)[number];
 export type UiImageMode = (typeof UI_IMAGE_MODES)[number];
 export type UiAttachTo = (typeof UI_ATTACH_TO_VALUES)[number];
 export type UiAttachPoint = (typeof UI_ATTACH_POINTS)[number];
+type UiSurfaceName = (typeof UI_SURFACES)[number];
 
 export interface UiSize {
   mode: UiSizeMode;
@@ -131,9 +149,9 @@ export interface UiDocumentReference {
 
 export interface UiSurfaceTokenManifest {
   surface: string;
-  components: string[];
-  textBindings: string[];
-  actions: string[];
+  components: readonly string[];
+  textBindings: readonly string[];
+  actions: readonly string[];
 }
 
 export interface UiDocumentValidationOptions {
@@ -162,6 +180,16 @@ const BUTTON_SIZES = new Set<string>(UI_BUTTON_SIZES);
 const IMAGE_MODES = new Set<string>(UI_IMAGE_MODES);
 const ATTACH_TO_VALUES = new Set<string>(UI_ATTACH_TO_VALUES);
 const ATTACH_POINTS = new Set<string>(UI_ATTACH_POINTS);
+const SURFACES = new Set<string>(UI_SURFACES);
+const TOKEN_FIELD_KEYS = [
+  "text",
+  "action",
+  "textBinding",
+  "component",
+  "buttonVariant",
+  "buttonSize",
+] as const;
+const SIZE_AXIS_KEYS = ["width", "height"] as const;
 
 const KIND_LABELS: Record<UiNodeKind, string> = {
   screen: "Screen",
@@ -203,163 +231,7 @@ export function uiLayoutFilename(surface: string): string {
 }
 
 export function createDefaultUiDocument(): UiDocument {
-  return {
-    schemaVersion: UI_LAYOUT_SCHEMA_VERSION,
-    surface: "main-menu",
-    viewport: { width: 640, height: 480 },
-    root: {
-      id: "MainMenuRoot",
-      kind: "screen",
-      name: "Main Menu",
-      image: { bank: 6, index: 0, mode: "normal" },
-      style: {
-        width: { mode: "grow" },
-        height: { mode: "grow" },
-        direction: "column",
-        align: "center",
-        justify: "center",
-        padding: 0,
-        gap: 0,
-      },
-      children: [
-        {
-          id: "MainMenuLogoGroup",
-          kind: "stack",
-          name: "Logo Group",
-          style: {
-            width: { mode: "grow", max: 350 },
-            height: { mode: "grow" },
-            direction: "column",
-            align: "center",
-            justify: "center",
-            padding: 0,
-            gap: 0,
-          },
-          children: [
-            {
-              id: "MainMenuSilencerLogo",
-              kind: "component",
-              name: "Silencer Logo",
-              component: "main-menu.logo",
-              style: {
-                width: { mode: "fit" },
-                height: { mode: "fit" },
-              },
-            },
-          ],
-        },
-        {
-          id: "MainMenuActionGroup",
-          kind: "panel",
-          name: "Action Group",
-          floating: {
-            attachTo: "root",
-            elementAttach: "center",
-            parentAttach: "center",
-            offsetX: 0,
-            offsetY: 31,
-            zIndex: 1,
-          },
-          style: {
-            width: { mode: "fit" },
-            height: { mode: "fit" },
-            direction: "column",
-            align: "start",
-            justify: "start",
-            padding: 0,
-            gap: 0,
-          },
-          children: [
-            {
-              id: "MainMenuActionStack",
-              kind: "stack",
-              name: "Action Stack",
-              style: {
-                width: { mode: "fit" },
-                height: { mode: "fit" },
-                direction: "column",
-                align: "start",
-                justify: "start",
-                padding: 0,
-                gap: 34,
-              },
-              children: [
-                createMainMenuActionRow("Tutorial", 40, "main_menu.tutorial"),
-                createMainMenuActionRow("Connect To Lobby", 80, "main_menu.lobby"),
-                createMainMenuActionRow("Options", 40, "main_menu.options"),
-                createMainMenuActionRow("Exit", 0, "main_menu.exit"),
-              ],
-            },
-          ],
-        },
-        {
-          id: "MainMenuVersion",
-          kind: "text",
-          name: "Version Footer",
-          text: "Silencer v00000",
-          textBinding: "client.version",
-          floating: {
-            attachTo: "root",
-            elementAttach: "left-top",
-            parentAttach: "left-bottom",
-            offsetX: 10,
-            offsetY: -17,
-            zIndex: 1,
-            pointerPassthrough: true,
-          },
-          style: {
-            width: { mode: "fit" },
-            height: { mode: "fit" },
-            font: "footer",
-            textPalette: 112,
-          },
-        },
-      ],
-    },
-  };
-}
-
-function createMainMenuActionRow(label: string, offset: number, action: string): UiNode {
-  return {
-    id: `MainMenu${toPascalCase(label)}Row`,
-    kind: "row",
-    name: `${label} Row`,
-    style: {
-      width: { mode: "fit" },
-      height: { mode: "fit" },
-      direction: "row",
-      align: "start",
-      justify: "start",
-      padding: 0,
-      gap: 0,
-    },
-    children: [
-      {
-        id: `MainMenu${toPascalCase(label)}Spacer`,
-        kind: "spacer",
-        name: `${label} Offset`,
-        style: {
-          width: { mode: "fixed", value: offset },
-          height: { mode: "fixed", value: 1 },
-        },
-      },
-      {
-        id: `MainMenu${toPascalCase(label)}Button`,
-        kind: "button",
-        name: `${label} Button`,
-        text: label,
-        action,
-        buttonVariant: "oval",
-        buttonSize: "md",
-        style: {
-          width: { mode: "fixed", value: 196 },
-          height: { mode: "fit" },
-          textPalette: 0,
-          padding: 0,
-        },
-      },
-    ],
-  };
+  return validateUiDocument(cloneJson(mainMenuDocument));
 }
 
 export function createNode(
@@ -543,73 +415,7 @@ export function validateUiDocument(
 }
 
 function defaultStyleForKind(kind: UiNodeKind): UiStyle {
-  if (kind === "screen") {
-    return {
-      width: { mode: "fixed", value: 1280 },
-      height: { mode: "fixed", value: 720 },
-      direction: "column",
-      align: "start",
-      justify: "start",
-      padding: 24,
-      gap: 12,
-      backgroundPalette: 0,
-    };
-  }
-  if (kind === "panel") {
-    return {
-      width: { mode: "fixed", value: 320 },
-      height: { mode: "fit" },
-      direction: "column",
-      align: "start",
-      justify: "start",
-      padding: 14,
-      gap: 8,
-      backgroundPalette: 74,
-      borderPalette: 216,
-      radius: 2,
-    };
-  }
-  if (kind === UI_NODE_KINDS[2] || kind === UI_NODE_KINDS[3]) {
-    return {
-      width: { mode: "grow" },
-      height: { mode: "fit" },
-      direction: kind === UI_NODE_KINDS[3] ? UI_AXES[1] : UI_AXES[0],
-      align: "start",
-      justify: "start",
-      padding: 0,
-      gap: 8,
-    };
-  }
-  if (kind === "spacer") {
-    return {
-      width: { mode: "grow" },
-      height: { mode: "fixed", value: 12 },
-    };
-  }
-  if (kind === "component") {
-    return {
-      width: { mode: "fit" },
-      height: { mode: "fit" },
-    };
-  }
-  if (kind === "text") {
-    return {
-      width: { mode: "fit" },
-      height: { mode: "fit" },
-      font: "uiLarge",
-      textPalette: 0,
-    };
-  }
-  if (kind === "button") {
-    return {
-      width: { mode: "fit" },
-      height: { mode: "fit" },
-      textPalette: 0,
-      padding: 10,
-    };
-  }
-  const exhaustive: never = kind;
-  throw new Error(`Unsupported node kind: ${exhaustive}`);
+  return cloneJson(UI_STYLE_DEFAULTS_BY_KIND[kind]) as UiStyle;
 }
 
 function updateNodeInTree(node: UiNode, id: string, update: (node: UiNode) => UiNode): UiNode {
@@ -662,6 +468,10 @@ function isRecordObject(value: unknown): value is Record<string, unknown> {
   return !!value && typeof value === "object" && !Array.isArray(value);
 }
 
+function cloneJson<T>(value: T): T {
+  return JSON.parse(JSON.stringify(value)) as T;
+}
+
 function validateNode(value: unknown, seenIds: Set<string>): void {
   if (!isRecordObject(value)) throw new Error("Node must be an object.");
   const node = value as unknown as UiNode;
@@ -691,9 +501,9 @@ function validateNode(value: unknown, seenIds: Set<string>): void {
   validateSize(node, "width");
   validateSize(node, "height");
   validateKindSpecificStyleValues(node);
-  validateNumber(node, "padding", 0, 512);
-  validateNumber(node, "gap", 0, 512);
-  validateNumber(node, "radius", 0, 64);
+  validateNumber(node, "padding", UI_NUMERIC_LIMITS.paddingMin, UI_NUMERIC_LIMITS.paddingMax);
+  validateNumber(node, "gap", UI_NUMERIC_LIMITS.gapMin, UI_NUMERIC_LIMITS.gapMax);
+  validateNumber(node, "radius", UI_NUMERIC_LIMITS.radiusMin, UI_NUMERIC_LIMITS.radiusMax);
   validateEnum(node, "direction", AXES);
   validateEnum(node, "align", ALIGNS);
   validateEnum(node, "justify", JUSTIFIES);
@@ -744,32 +554,24 @@ function validateButtonSettings(node: UiNode): void {
 }
 
 function validateKindSpecificFields(node: UiNode): void {
-  if (node.text !== undefined && node.kind !== "text" && node.kind !== "button") {
-    throw new Error(`Node ${node.id} ${node.kind} cannot use text.`);
+  const allowed = new Set<string>(UI_NODE_TOKEN_FIELDS_BY_KIND[node.kind]);
+  for (const field of TOKEN_FIELD_KEYS) {
+    if (node[field] !== undefined && !allowed.has(field)) {
+      throw new Error(`Node ${node.id} ${node.kind} cannot use ${field}.`);
+    }
   }
-  if (node.action !== undefined && node.kind !== "button") {
-    throw new Error(`Node ${node.id} ${node.kind} cannot use action.`);
-  }
-  if (node.textBinding !== undefined && node.kind !== "text") {
-    throw new Error(`Node ${node.id} ${node.kind} cannot use textBinding.`);
-  }
-  if (node.component !== undefined && node.kind !== "component") {
-    throw new Error(`Node ${node.id} ${node.kind} cannot use component.`);
-  }
-  if (node.buttonVariant !== undefined && node.kind !== "button") {
-    throw new Error(`Node ${node.id} ${node.kind} cannot use buttonVariant.`);
-  }
-  if (node.buttonSize !== undefined && node.kind !== "button") {
-    throw new Error(`Node ${node.id} ${node.kind} cannot use buttonSize.`);
+  for (const field of UI_REQUIRED_TOKEN_FIELDS_BY_KIND[node.kind]) {
+    if (!node[field as keyof UiNode]) {
+      throw new Error(`Node ${node.id} ${field} is missing.`);
+    }
   }
 }
 
 function validateRenderableNodeDecorators(node: UiNode): void {
-  if (node.kind === "button" && node.image !== undefined) {
-    throw new Error(`Node ${node.id} ${node.kind} cannot use image.`);
-  }
-  if (node.kind === "button" && node.floating !== undefined) {
-    throw new Error(`Node ${node.id} ${node.kind} cannot use floating.`);
+  for (const field of UI_FORBIDDEN_NODE_DECORATORS_BY_KIND[node.kind]) {
+    if (node[field as "image" | "floating"] !== undefined) {
+      throw new Error(`Node ${node.id} ${node.kind} cannot use ${field}.`);
+    }
   }
 }
 
@@ -779,10 +581,18 @@ function validateImage(node: UiNode): void {
     throw new Error(`Node ${node.id} has invalid image.`);
   }
   rejectUnknownObjectFields(node.image, IMAGE_FIELDS, `Node ${node.id} image`);
-  if (!Number.isInteger(node.image.bank) || node.image.bank < 0 || node.image.bank > 255) {
+  if (
+    !Number.isInteger(node.image.bank) ||
+    node.image.bank < UI_NUMERIC_LIMITS.imageBankMin ||
+    node.image.bank > UI_NUMERIC_LIMITS.imageBankMax
+  ) {
     throw new Error(`Node ${node.id} has invalid image bank.`);
   }
-  if (!Number.isInteger(node.image.index) || node.image.index < 0 || node.image.index > 65535) {
+  if (
+    !Number.isInteger(node.image.index) ||
+    node.image.index < UI_NUMERIC_LIMITS.imageIndexMin ||
+    node.image.index > UI_NUMERIC_LIMITS.imageIndexMax
+  ) {
     throw new Error(`Node ${node.id} has invalid image index.`);
   }
   const mode = node.image.mode ?? "normal";
@@ -802,9 +612,25 @@ function validateFloating(node: UiNode): void {
   }
   validateAttachPoint(node, node.floating.elementAttach, "elementAttach");
   validateAttachPoint(node, node.floating.parentAttach, "parentAttach");
-  validateFloatingNumber(node, "offsetX", -4096, 4096);
-  validateFloatingNumber(node, "offsetY", -4096, 4096);
-  validateFloatingNumber(node, "zIndex", -32768, 32767, true);
+  validateFloatingNumber(
+    node,
+    "offsetX",
+    UI_NUMERIC_LIMITS.floatingOffsetMin,
+    UI_NUMERIC_LIMITS.floatingOffsetMax,
+  );
+  validateFloatingNumber(
+    node,
+    "offsetY",
+    UI_NUMERIC_LIMITS.floatingOffsetMin,
+    UI_NUMERIC_LIMITS.floatingOffsetMax,
+  );
+  validateFloatingNumber(
+    node,
+    "zIndex",
+    UI_NUMERIC_LIMITS.floatingZIndexMin,
+    UI_NUMERIC_LIMITS.floatingZIndexMax,
+    true,
+  );
   if (
     node.floating.pointerPassthrough !== undefined &&
     typeof node.floating.pointerPassthrough !== "boolean"
@@ -857,18 +683,17 @@ function allowedStyleFields(kind: UiNodeKind): Set<keyof UiStyle> {
 }
 
 function validateKindSpecificStyleValues(node: UiNode): void {
-  if (node.kind === "button") {
-    if (node.style.width.mode === "grow") {
-      throw new Error(`Node ${node.id} button width must be fit or fixed.`);
+  const rules = UI_SIZE_RULES_BY_KIND[node.kind as keyof typeof UI_SIZE_RULES_BY_KIND];
+  if (!rules) return;
+  for (const axis of SIZE_AXIS_KEYS) {
+    const rule = rules[axis as keyof typeof rules];
+    if (!rule) continue;
+    const size = node.style[axis];
+    if (!rule.modes.includes(size.mode as never)) {
+      throw new Error(`Node ${node.id} ${node.kind} ${axis} must be ${joinHuman(rule.modes)}.`);
     }
-    if (node.style.width.min !== undefined || node.style.width.max !== undefined) {
-      throw new Error(`Node ${node.id} button width cannot use min or max.`);
-    }
-    if (node.style.height.mode !== "fit") {
-      throw new Error(`Node ${node.id} button height must be fit.`);
-    }
-    if (node.style.height.min !== undefined || node.style.height.max !== undefined) {
-      throw new Error(`Node ${node.id} button height cannot use min or max.`);
+    if (!rule.allowBounds && (size.min !== undefined || size.max !== undefined)) {
+      throw new Error(`Node ${node.id} ${node.kind} ${axis} cannot use min or max.`);
     }
   }
 }
@@ -878,10 +703,20 @@ function validateViewport(viewport: unknown): void {
   rejectUnknownObjectFields(viewport, VIEWPORT_FIELDS, "Document viewport");
   const width = viewport.width;
   const height = viewport.height;
-  if (typeof width !== "number" || !Number.isInteger(width) || width < 160 || width > 4096) {
+  if (
+    typeof width !== "number" ||
+    !Number.isInteger(width) ||
+    width < UI_NUMERIC_LIMITS.viewportMin ||
+    width > UI_NUMERIC_LIMITS.viewportMax
+  ) {
     throw new Error("Document viewport width is invalid.");
   }
-  if (typeof height !== "number" || !Number.isInteger(height) || height < 160 || height > 4096) {
+  if (
+    typeof height !== "number" ||
+    !Number.isInteger(height) ||
+    height < UI_NUMERIC_LIMITS.viewportMin ||
+    height > UI_NUMERIC_LIMITS.viewportMax
+  ) {
     throw new Error("Document viewport height is invalid.");
   }
 }
@@ -917,8 +752,9 @@ function validatePalette(
 ): void {
   const value = node.style[key];
   if (value === undefined) return;
-  const min = key === "textPalette" ? 0 : -1;
-  if (!Number.isInteger(value) || value < min || value > 255) {
+  const min =
+    key === "textPalette" ? UI_NUMERIC_LIMITS.paletteTextMin : UI_NUMERIC_LIMITS.paletteMin;
+  if (!Number.isInteger(value) || value < min || value > UI_NUMERIC_LIMITS.paletteMax) {
     throw new Error(`Node ${node.id} has invalid ${key}.`);
   }
 }
@@ -945,7 +781,11 @@ function validateSize(node: UiNode, key: "width" | "height"): void {
     if (typeof value !== "number") {
       throw new Error(`Node ${node.id} fixed ${key} sizing needs a value.`);
     }
-    if (!Number.isFinite(value) || value < 0 || value > 4096) {
+    if (
+      !Number.isFinite(value) ||
+      value < UI_NUMERIC_LIMITS.sizeMin ||
+      value > UI_NUMERIC_LIMITS.sizeMax
+    ) {
       throw new Error(`Node ${node.id} has invalid fixed ${key} sizing.`);
     }
   } else if (size.value !== undefined) {
@@ -956,13 +796,19 @@ function validateSize(node: UiNode, key: "width" | "height"): void {
 function validateSizeBound(node: UiNode, key: "width" | "height", bound: "min" | "max"): void {
   const value = node.style[key][bound];
   if (value === undefined) return;
-  if (!Number.isFinite(value) || value < 0 || value > 4096) {
+  if (
+    !Number.isFinite(value) ||
+    value < UI_NUMERIC_LIMITS.sizeMin ||
+    value > UI_NUMERIC_LIMITS.sizeMax
+  ) {
     throw new Error(`Node ${node.id} has invalid ${key} ${bound}.`);
   }
 }
 
 function validateSurfaceTokens(document: UiDocument, options: UiDocumentValidationOptions): void {
-  const manifest = surfaceTokenManifest(document.surface, options.tokenManifests ?? []);
+  const manifest =
+    surfaceTokenManifest(document.surface, options.tokenManifests ?? []) ??
+    builtInSurfaceTokenManifest(document.surface);
   if (!manifest) {
     if (options.requireTokenManifestForSurfaceTokens && nodeHasSurfaceTokens(document.root)) {
       throw new Error(`Surface ${document.surface} needs a UI token manifest.`);
@@ -974,10 +820,17 @@ function validateSurfaceTokens(document: UiDocument, options: UiDocumentValidati
 
 function surfaceTokenManifest(
   surface: string,
-  manifests: UiSurfaceTokenManifest[],
+  manifests: readonly UiSurfaceTokenManifest[],
 ): UiSurfaceTokenManifest | null {
   const normalized = normalizeUiSurface(surface);
   return manifests.find((manifest) => normalizeUiSurface(manifest.surface) === normalized) ?? null;
+}
+
+function builtInSurfaceTokenManifest(surface: string): UiSurfaceTokenManifest | null {
+  const normalized = normalizeUiSurface(surface);
+  if (!SURFACES.has(normalized)) return null;
+  const tokens = UI_SURFACE_TOKENS_BY_SURFACE[normalized as UiSurfaceName];
+  return { surface: normalized, ...tokens };
 }
 
 function validateSurfaceNodeTokens(node: UiNode, manifest: UiSurfaceTokenManifest): void {
@@ -1004,11 +857,7 @@ function nextIdSeed(): string {
   return `${Date.now().toString(36)}-${idCounter.toString(36)}`;
 }
 
-function toPascalCase(value: string): string {
-  const normalized = value.trim() || "UiSurface";
-  return normalized
-    .split(/[^a-z0-9]+/i)
-    .filter(Boolean)
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join("");
+function joinHuman(values: readonly string[]): string {
+  if (values.length <= 1) return values[0] ?? "";
+  return `${values.slice(0, -1).join(", ")} or ${values.at(-1)}`;
 }

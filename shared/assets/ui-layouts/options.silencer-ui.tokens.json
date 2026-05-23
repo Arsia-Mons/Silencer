@@ -1,0 +1,11 @@
+{
+  "surface": "options",
+  "components": [],
+  "textBindings": [],
+  "actions": [
+    "options.controls",
+    "options.display",
+    "options.audio",
+    "options.back"
+  ]
+}

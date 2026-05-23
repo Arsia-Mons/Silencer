@@ -9,6 +9,7 @@
 #include "surface.h"
 
 #include "layout/ui_document_renderer.h"
+#include "layout/ui_document_runtime_registry.h"
 #include "runtime/UiInteractionRegistry.h"
 #include "ui_document_assets.h"
 
@@ -39,13 +40,9 @@ void MainMenuScreen::Build(ScreenContext & ctx)
 		std::fprintf(stderr, "[ui-layout] %s\n", layoutLoadError_.c_str());
 		return;
 	}
-	silencer::client_ui::UiDocumentRendererOptions validationOptions;
-	validationOptions.canBuildComponent =
-		silencer::client_ui::main_menu::IsMainMenuComponent;
-	validationOptions.canResolveTextBinding =
-		silencer::client_ui::main_menu::IsMainMenuTextBinding;
-	validationOptions.canHandleAction =
-		silencer::client_ui::main_menu::IsMainMenuAction;
+	silencer::client_ui::UiDocumentRendererOptions validationOptions =
+		silencer::client_ui::UiDocumentRendererOptionsForSurface(
+			silencer::client_ui::main_menu::kMainMenuSurface);
 	if(!silencer::client_ui::ValidateUiDocumentRuntimeTokens(
 		   layoutDocument_, validationOptions, layoutLoadError_)){
 		layoutLoaded_ = false;
@@ -88,19 +85,12 @@ void MainMenuScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime
 	versionText_ += ctx.world.GetVersion();
 	if(!layoutLoaded_) return;
 
-	silencer::client_ui::UiDocumentRendererOptions options;
-	options.canBuildComponent =
-		silencer::client_ui::main_menu::IsMainMenuComponent;
-	options.canResolveTextBinding =
-		silencer::client_ui::main_menu::IsMainMenuTextBinding;
-	options.canHandleAction =
-		silencer::client_ui::main_menu::IsMainMenuAction;
+	silencer::client_ui::UiDocumentRendererOptions options =
+		silencer::client_ui::UiDocumentRendererOptionsForSurface(
+			silencer::client_ui::main_menu::kMainMenuSurface);
 	options.buildComponent = [&](const silencer::ui::UiEditorNode& node) {
-		if(!silencer::client_ui::main_menu::IsMainMenuComponent(node.component)){
-			return false;
-		}
-		logo.Build(ctx.world.resources);
-		return true;
+		return silencer::client_ui::main_menu::BuildMainMenuComponent(
+			node, ctx.world.resources, logo);
 	};
 	options.resolveTextBinding = [&](const std::string& binding, std::string& out) {
 		return silencer::client_ui::main_menu::ResolveMainMenuTextBinding(

@@ -10,13 +10,6 @@ import {
   validateUiDocument,
 } from "./ui-layout";
 
-const MAIN_MENU_TOKENS = {
-  surface: "main-menu",
-  components: ["main-menu.logo"],
-  textBindings: ["client.version"],
-  actions: ["main_menu.tutorial", "main_menu.lobby", "main_menu.options", "main_menu.exit"],
-};
-
 describe("ui-layout model", () => {
   test("inserts children into container nodes immutably", () => {
     const original = createDefaultUiDocument();
@@ -270,26 +263,21 @@ describe("ui-layout model", () => {
   test("rejects surface tokens outside the manifest", () => {
     const unknownAction = JSON.parse(JSON.stringify(createDefaultUiDocument()));
     (findNode(unknownAction.root, "MainMenuTutorialButton") as any).action = "main_menu.credits";
-    expect(() => validateUiDocument(unknownAction, { tokenManifests: [MAIN_MENU_TOKENS] })).toThrow(
+    expect(() => validateUiDocument(unknownAction)).toThrow(
       "Node MainMenuTutorialButton references unknown action main_menu.credits.",
     );
 
     const unknownComponent = JSON.parse(JSON.stringify(createDefaultUiDocument()));
     (findNode(unknownComponent.root, "MainMenuSilencerLogo") as any).component = "main-menu.badge";
-    expect(() =>
-      validateUiDocument(unknownComponent, { tokenManifests: [MAIN_MENU_TOKENS] }),
-    ).toThrow("Node MainMenuSilencerLogo references unknown component main-menu.badge.");
+    expect(() => validateUiDocument(unknownComponent)).toThrow(
+      "Node MainMenuSilencerLogo references unknown component main-menu.badge.",
+    );
 
     const unknownBinding = JSON.parse(JSON.stringify(createDefaultUiDocument()));
     (findNode(unknownBinding.root, "MainMenuVersion") as any).textBinding = "client.badge";
-    expect(() =>
-      validateUiDocument(unknownBinding, { tokenManifests: [MAIN_MENU_TOKENS] }),
-    ).toThrow("Node MainMenuVersion references unknown text binding client.badge.");
-
-    const missingManifest = JSON.parse(JSON.stringify(createDefaultUiDocument()));
-    expect(() =>
-      validateUiDocument(missingManifest, { requireTokenManifestForSurfaceTokens: true }),
-    ).toThrow("Surface main-menu needs a UI token manifest.");
+    expect(() => validateUiDocument(unknownBinding)).toThrow(
+      "Node MainMenuVersion references unknown text binding client.badge.",
+    );
 
     const unknownSurface = JSON.parse(JSON.stringify(createDefaultUiDocument()));
     unknownSurface.surface = "custom-screen";

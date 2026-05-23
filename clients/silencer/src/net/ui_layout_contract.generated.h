@@ -10,6 +10,29 @@ namespace silencer {
 namespace net {
 namespace ui_layout_contract {
 
+constexpr int kSchemaVersion = 1;
+constexpr int kMinViewport = 160;
+constexpr int kMaxViewport = 4096;
+constexpr float kMinSize = 0.0f;
+constexpr float kMaxSize = 4096.0f;
+constexpr int kMinPadding = 0;
+constexpr int kMaxPadding = 512;
+constexpr int kMinGap = 0;
+constexpr int kMaxGap = 512;
+constexpr int kMinRadius = 0;
+constexpr int kMaxRadius = 64;
+constexpr int kMinPalette = -1;
+constexpr int kMinTextPalette = 0;
+constexpr int kMaxPalette = 255;
+constexpr int kMinImageBank = 0;
+constexpr int kMaxImageBank = 255;
+constexpr int kMinImageIndex = 0;
+constexpr int kMaxImageIndex = 65535;
+constexpr float kMinFloatingOffset = -4096.0f;
+constexpr float kMaxFloatingOffset = 4096.0f;
+constexpr int kMinFloatingZIndex = -32768;
+constexpr int kMaxFloatingZIndex = 32767;
+
 constexpr const char * kNodeKinds[] = {
 	"screen",
 	"panel",
@@ -322,6 +345,269 @@ constexpr StyleFieldsForKind kStyleFieldsByKind[] = {
 	{ "component", kComponentStyleFields, kComponentStyleFieldsCount },
 };
 constexpr std::size_t kStyleFieldsByKindCount = 8;
+
+struct StringListForKind {
+	const char * kind;
+	const char * const * values;
+	std::size_t valueCount;
+};
+
+constexpr const char * kNodeTokenFieldsScreen[] = {
+	nullptr,
+};
+constexpr std::size_t kNodeTokenFieldsScreenCount = 0;
+
+constexpr const char * kNodeTokenFieldsPanel[] = {
+	nullptr,
+};
+constexpr std::size_t kNodeTokenFieldsPanelCount = 0;
+
+constexpr const char * kNodeTokenFieldsStack[] = {
+	nullptr,
+};
+constexpr std::size_t kNodeTokenFieldsStackCount = 0;
+
+constexpr const char * kNodeTokenFieldsRow[] = {
+	nullptr,
+};
+constexpr std::size_t kNodeTokenFieldsRowCount = 0;
+
+constexpr const char * kNodeTokenFieldsText[] = {
+	"text",
+	"textBinding",
+};
+constexpr std::size_t kNodeTokenFieldsTextCount = 2;
+
+constexpr const char * kNodeTokenFieldsButton[] = {
+	"text",
+	"action",
+	"buttonVariant",
+	"buttonSize",
+};
+constexpr std::size_t kNodeTokenFieldsButtonCount = 4;
+
+constexpr const char * kNodeTokenFieldsSpacer[] = {
+	nullptr,
+};
+constexpr std::size_t kNodeTokenFieldsSpacerCount = 0;
+
+constexpr const char * kNodeTokenFieldsComponent[] = {
+	"component",
+};
+constexpr std::size_t kNodeTokenFieldsComponentCount = 1;
+
+constexpr StringListForKind kNodeTokenFieldsByKind[] = {
+	{ "screen", kNodeTokenFieldsScreen, kNodeTokenFieldsScreenCount },
+	{ "panel", kNodeTokenFieldsPanel, kNodeTokenFieldsPanelCount },
+	{ "stack", kNodeTokenFieldsStack, kNodeTokenFieldsStackCount },
+	{ "row", kNodeTokenFieldsRow, kNodeTokenFieldsRowCount },
+	{ "text", kNodeTokenFieldsText, kNodeTokenFieldsTextCount },
+	{ "button", kNodeTokenFieldsButton, kNodeTokenFieldsButtonCount },
+	{ "spacer", kNodeTokenFieldsSpacer, kNodeTokenFieldsSpacerCount },
+	{ "component", kNodeTokenFieldsComponent, kNodeTokenFieldsComponentCount },
+};
+constexpr std::size_t kNodeTokenFieldsByKindCount = 8;
+
+constexpr const char * kRequiredTokenFieldsScreen[] = {
+	nullptr,
+};
+constexpr std::size_t kRequiredTokenFieldsScreenCount = 0;
+
+constexpr const char * kRequiredTokenFieldsPanel[] = {
+	nullptr,
+};
+constexpr std::size_t kRequiredTokenFieldsPanelCount = 0;
+
+constexpr const char * kRequiredTokenFieldsStack[] = {
+	nullptr,
+};
+constexpr std::size_t kRequiredTokenFieldsStackCount = 0;
+
+constexpr const char * kRequiredTokenFieldsRow[] = {
+	nullptr,
+};
+constexpr std::size_t kRequiredTokenFieldsRowCount = 0;
+
+constexpr const char * kRequiredTokenFieldsText[] = {
+	nullptr,
+};
+constexpr std::size_t kRequiredTokenFieldsTextCount = 0;
+
+constexpr const char * kRequiredTokenFieldsButton[] = {
+	nullptr,
+};
+constexpr std::size_t kRequiredTokenFieldsButtonCount = 0;
+
+constexpr const char * kRequiredTokenFieldsSpacer[] = {
+	nullptr,
+};
+constexpr std::size_t kRequiredTokenFieldsSpacerCount = 0;
+
+constexpr const char * kRequiredTokenFieldsComponent[] = {
+	"component",
+};
+constexpr std::size_t kRequiredTokenFieldsComponentCount = 1;
+
+constexpr StringListForKind kRequiredTokenFieldsByKind[] = {
+	{ "screen", kRequiredTokenFieldsScreen, kRequiredTokenFieldsScreenCount },
+	{ "panel", kRequiredTokenFieldsPanel, kRequiredTokenFieldsPanelCount },
+	{ "stack", kRequiredTokenFieldsStack, kRequiredTokenFieldsStackCount },
+	{ "row", kRequiredTokenFieldsRow, kRequiredTokenFieldsRowCount },
+	{ "text", kRequiredTokenFieldsText, kRequiredTokenFieldsTextCount },
+	{ "button", kRequiredTokenFieldsButton, kRequiredTokenFieldsButtonCount },
+	{ "spacer", kRequiredTokenFieldsSpacer, kRequiredTokenFieldsSpacerCount },
+	{ "component", kRequiredTokenFieldsComponent, kRequiredTokenFieldsComponentCount },
+};
+constexpr std::size_t kRequiredTokenFieldsByKindCount = 8;
+
+constexpr const char * kForbiddenNodeDecoratorsScreen[] = {
+	nullptr,
+};
+constexpr std::size_t kForbiddenNodeDecoratorsScreenCount = 0;
+
+constexpr const char * kForbiddenNodeDecoratorsPanel[] = {
+	nullptr,
+};
+constexpr std::size_t kForbiddenNodeDecoratorsPanelCount = 0;
+
+constexpr const char * kForbiddenNodeDecoratorsStack[] = {
+	nullptr,
+};
+constexpr std::size_t kForbiddenNodeDecoratorsStackCount = 0;
+
+constexpr const char * kForbiddenNodeDecoratorsRow[] = {
+	nullptr,
+};
+constexpr std::size_t kForbiddenNodeDecoratorsRowCount = 0;
+
+constexpr const char * kForbiddenNodeDecoratorsText[] = {
+	nullptr,
+};
+constexpr std::size_t kForbiddenNodeDecoratorsTextCount = 0;
+
+constexpr const char * kForbiddenNodeDecoratorsButton[] = {
+	"image",
+	"floating",
+};
+constexpr std::size_t kForbiddenNodeDecoratorsButtonCount = 2;
+
+constexpr const char * kForbiddenNodeDecoratorsSpacer[] = {
+	nullptr,
+};
+constexpr std::size_t kForbiddenNodeDecoratorsSpacerCount = 0;
+
+constexpr const char * kForbiddenNodeDecoratorsComponent[] = {
+	nullptr,
+};
+constexpr std::size_t kForbiddenNodeDecoratorsComponentCount = 0;
+
+constexpr StringListForKind kForbiddenNodeDecoratorsByKind[] = {
+	{ "screen", kForbiddenNodeDecoratorsScreen, kForbiddenNodeDecoratorsScreenCount },
+	{ "panel", kForbiddenNodeDecoratorsPanel, kForbiddenNodeDecoratorsPanelCount },
+	{ "stack", kForbiddenNodeDecoratorsStack, kForbiddenNodeDecoratorsStackCount },
+	{ "row", kForbiddenNodeDecoratorsRow, kForbiddenNodeDecoratorsRowCount },
+	{ "text", kForbiddenNodeDecoratorsText, kForbiddenNodeDecoratorsTextCount },
+	{ "button", kForbiddenNodeDecoratorsButton, kForbiddenNodeDecoratorsButtonCount },
+	{ "spacer", kForbiddenNodeDecoratorsSpacer, kForbiddenNodeDecoratorsSpacerCount },
+	{ "component", kForbiddenNodeDecoratorsComponent, kForbiddenNodeDecoratorsComponentCount },
+};
+constexpr std::size_t kForbiddenNodeDecoratorsByKindCount = 8;
+
+constexpr const char * kButtonWidthAllowedSizeModes[] = {
+	"fit",
+	"fixed",
+};
+constexpr std::size_t kButtonWidthAllowedSizeModesCount = 2;
+
+constexpr const char * kButtonHeightAllowedSizeModes[] = {
+	"fit",
+};
+constexpr std::size_t kButtonHeightAllowedSizeModesCount = 1;
+
+struct SizeRuleForKind {
+	const char * kind;
+	const char * axis;
+	const char * const * modes;
+	std::size_t modeCount;
+	bool allowBounds;
+};
+
+constexpr SizeRuleForKind kSizeRulesByKind[] = {
+	{ "button", "width", kButtonWidthAllowedSizeModes, kButtonWidthAllowedSizeModesCount, false },
+	{ "button", "height", kButtonHeightAllowedSizeModes, kButtonHeightAllowedSizeModesCount, false },
+};
+constexpr std::size_t kSizeRulesByKindCount = 2;
+
+constexpr const char * kUiSurfaces[] = {
+	"main-menu",
+	"options",
+};
+constexpr std::size_t kUiSurfacesCount = 2;
+constexpr const char * kUiSurfaceMainMenu = "main-menu";
+constexpr const char * kUiSurfaceOptions = "options";
+
+constexpr const char * kUiComponentMainMenuLogo = "main-menu.logo";
+constexpr const char * kUiTextBindingClientVersion = "client.version";
+constexpr const char * kUiActionMainMenuTutorial = "main_menu.tutorial";
+constexpr const char * kUiActionMainMenuLobby = "main_menu.lobby";
+constexpr const char * kUiActionMainMenuOptions = "main_menu.options";
+constexpr const char * kUiActionMainMenuExit = "main_menu.exit";
+constexpr const char * kUiActionOptionsControls = "options.controls";
+constexpr const char * kUiActionOptionsDisplay = "options.display";
+constexpr const char * kUiActionOptionsAudio = "options.audio";
+constexpr const char * kUiActionOptionsBack = "options.back";
+
+constexpr const char * kMainMenuComponents[] = {
+	"main-menu.logo",
+};
+constexpr std::size_t kMainMenuComponentsCount = 1;
+
+constexpr const char * kMainMenuTextBindings[] = {
+	"client.version",
+};
+constexpr std::size_t kMainMenuTextBindingsCount = 1;
+
+constexpr const char * kMainMenuActions[] = {
+	"main_menu.tutorial",
+	"main_menu.lobby",
+	"main_menu.options",
+	"main_menu.exit",
+};
+constexpr std::size_t kMainMenuActionsCount = 4;
+
+constexpr const char * kOptionsComponents[] = {
+	nullptr,
+};
+constexpr std::size_t kOptionsComponentsCount = 0;
+
+constexpr const char * kOptionsTextBindings[] = {
+	nullptr,
+};
+constexpr std::size_t kOptionsTextBindingsCount = 0;
+
+constexpr const char * kOptionsActions[] = {
+	"options.controls",
+	"options.display",
+	"options.audio",
+	"options.back",
+};
+constexpr std::size_t kOptionsActionsCount = 4;
+
+struct SurfaceTokens {
+	const char * surface;
+	const char * const * components;
+	std::size_t componentCount;
+	const char * const * textBindings;
+	std::size_t textBindingCount;
+	const char * const * actions;
+	std::size_t actionCount;
+};
+
+constexpr SurfaceTokens kSurfaceTokens[] = {
+	{ kUiSurfaceMainMenu, kMainMenuComponents, kMainMenuComponentsCount, kMainMenuTextBindings, kMainMenuTextBindingsCount, kMainMenuActions, kMainMenuActionsCount },
+	{ kUiSurfaceOptions, kOptionsComponents, kOptionsComponentsCount, kOptionsTextBindings, kOptionsTextBindingsCount, kOptionsActions, kOptionsActionsCount },
+};
+constexpr std::size_t kSurfaceTokensCount = 2;
 
 }  // namespace ui_layout_contract
 }  // namespace net

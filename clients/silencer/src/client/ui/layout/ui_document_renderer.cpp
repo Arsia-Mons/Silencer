@@ -34,17 +34,16 @@ Clay_String UiDocumentClayString(const std::string& value) {
 }
 
 Clay_SizingAxis UiDocumentSizing(const UiEditorSize& size) {
-	const bool hasMax = size.max > 0.0f;
 	switch(size.mode){
 		case UiEditorSize::Mode::Fixed:
 			return CLAY_SIZING_FIXED(size.value);
 		case UiEditorSize::Mode::Grow:
-			return hasMax ? CLAY_SIZING_GROW(size.min, size.max)
-			              : CLAY_SIZING_GROW(size.min);
+			return size.hasMax ? CLAY_SIZING_GROW(size.min, size.max)
+			                   : CLAY_SIZING_GROW(size.min);
 		case UiEditorSize::Mode::Fit:
 		default:
-			return hasMax ? CLAY_SIZING_FIT(size.min, size.max)
-			              : CLAY_SIZING_FIT(size.min);
+			return size.hasMax ? CLAY_SIZING_FIT(size.min, size.max)
+			                   : CLAY_SIZING_FIT(size.min);
 	}
 }
 
@@ -102,8 +101,8 @@ Clay_FloatingAttachPointType UiDocumentAttachPoint(const std::string& value) {
 }
 
 UiElementKind UiDocumentElementKindFor(const UiEditorNode& node) {
-	if(node.kind == "button") return UiElementKind::Button;
-	if(node.kind == "text") return UiElementKind::Text;
+	if(node.kind == silencer::net::ui_layout_contract::kNodeKindButton) return UiElementKind::Button;
+	if(node.kind == silencer::net::ui_layout_contract::kNodeKindText) return UiElementKind::Text;
 	return UiElementKind::Container;
 }
 
@@ -222,7 +221,7 @@ void UiDocumentUnresolvedText(const std::string& value) {
 bool ValidateUiDocumentRuntimeTokensForNode(const UiEditorNode& node,
                                             const UiDocumentRendererOptions& options,
                                             std::string& error) {
-	if(node.kind == "component"){
+	if(node.kind == silencer::net::ui_layout_contract::kNodeKindComponent){
 		if(!options.canBuildComponent || !options.canBuildComponent(node.component)){
 			error = "runtime component handler is missing for " + node.component +
 			        " at node " + node.id;
@@ -237,7 +236,7 @@ bool ValidateUiDocumentRuntimeTokensForNode(const UiEditorNode& node,
 			return false;
 		}
 	}
-	if(node.kind == "button"){
+	if(node.kind == silencer::net::ui_layout_contract::kNodeKindButton){
 		const std::string action = node.action.empty() ? node.id : node.action;
 		if(!options.canHandleAction || !options.canHandleAction(action)){
 			error = "runtime action handler is missing for " + action +
@@ -263,7 +262,7 @@ void BuildUiDocumentNode(const UiEditorNode& node,
                          UiInteractionRegistry& interactions,
                          const UiDocumentRendererOptions& options) {
 	UiDocumentRegisterElement(node, interactions);
-	if(node.kind == "button"){
+	if(node.kind == silencer::net::ui_layout_contract::kNodeKindButton){
 		const int fixedWidth = UiDocumentButtonWidthOverride(node.style.width);
 		ButtonOpts opts{
 			.variant = UiDocumentButtonVariantForNode(node, options.buttonVariant),
@@ -285,7 +284,7 @@ void BuildUiDocumentNode(const UiEditorNode& node,
 		       ButtonHandle{ nullptr, action.c_str(), &interactions });
 		return;
 	}
-	if(node.kind == "component"){
+	if(node.kind == silencer::net::ui_layout_contract::kNodeKindComponent){
 		Clay_ElementDeclaration decl = UiDocumentDeclarationForNode(node);
 		CLAY(decl) {
 			bool rendered = false;
@@ -300,7 +299,7 @@ void BuildUiDocumentNode(const UiEditorNode& node,
 	}
 	Clay_ElementDeclaration decl = UiDocumentDeclarationForNode(node);
 	CLAY(decl) {
-		if(node.kind == "text"){
+		if(node.kind == silencer::net::ui_layout_contract::kNodeKindText){
 			std::string resolvedText = node.text.empty() ? node.name : node.text;
 			if(!node.textBinding.empty()){
 				if(!options.resolveTextBinding ||

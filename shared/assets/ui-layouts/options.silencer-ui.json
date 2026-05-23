@@ -1,0 +1,134 @@
+{
+  "schemaVersion": 1,
+  "surface": "options",
+  "viewport": {
+    "width": 640,
+    "height": 480
+  },
+  "root": {
+    "id": "OptionsRoot",
+    "kind": "screen",
+    "name": "Options",
+    "image": {
+      "bank": 6,
+      "index": 0,
+      "mode": "normal"
+    },
+    "style": {
+      "width": {
+        "mode": "grow"
+      },
+      "height": {
+        "mode": "grow"
+      },
+      "direction": "column",
+      "align": "center",
+      "justify": "center",
+      "padding": 0,
+      "gap": 0
+    },
+    "children": [
+      {
+        "id": "OptionsButtonColumn",
+        "kind": "stack",
+        "name": "Options Button Column",
+        "style": {
+          "width": {
+            "mode": "fixed",
+            "value": 196
+          },
+          "height": {
+            "mode": "fit"
+          },
+          "direction": "column",
+          "align": "start",
+          "justify": "start",
+          "padding": 0,
+          "gap": 19
+        },
+        "children": [
+          {
+            "id": "OptionsControlsButton",
+            "kind": "button",
+            "name": "Controls Button",
+            "text": "Controls",
+            "action": "options.controls",
+            "buttonVariant": "oval",
+            "buttonSize": "md",
+            "style": {
+              "width": {
+                "mode": "fixed",
+                "value": 196
+              },
+              "height": {
+                "mode": "fit"
+              },
+              "padding": 0,
+              "textPalette": 0
+            }
+          },
+          {
+            "id": "OptionsDisplayButton",
+            "kind": "button",
+            "name": "Display Button",
+            "text": "Display",
+            "action": "options.display",
+            "buttonVariant": "oval",
+            "buttonSize": "md",
+            "style": {
+              "width": {
+                "mode": "fixed",
+                "value": 196
+              },
+              "height": {
+                "mode": "fit"
+              },
+              "padding": 0,
+              "textPalette": 0
+            }
+          },
+          {
+            "id": "OptionsAudioButton",
+            "kind": "button",
+            "name": "Audio Button",
+            "text": "Audio",
+            "action": "options.audio",
+            "buttonVariant": "oval",
+            "buttonSize": "md",
+            "style": {
+              "width": {
+                "mode": "fixed",
+                "value": 196
+              },
+              "height": {
+                "mode": "fit"
+              },
+              "padding": 0,
+              "textPalette": 0
+            }
+          },
+          {
+            "id": "OptionsBackButton",
+            "kind": "button",
+            "name": "Back Button",
+            "text": "Go Back",
+            "action": "options.back",
+            "buttonVariant": "oval",
+            "buttonSize": "md",
+            "style": {
+              "width": {
+                "mode": "fixed",
+                "value": 196
+              },
+              "height": {
+                "mode": "fit"
+              },
+              "padding": 0,
+              "textPalette": 0
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

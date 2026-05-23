@@ -17,6 +17,8 @@ struct UiEditorSize {
 	float value = 0.0f;
 	float min = 0.0f;
 	float max = 0.0f;
+	bool hasMin = false;
+	bool hasMax = false;
 };
 
 struct UiEditorStyle {

@@ -129,14 +129,17 @@ std::vector<silencer::ui::UiAction> ClientUi::DrainActions() {
 }
 
 void ClientUi::PushScreen(std::unique_ptr<Screen> screen, ScreenContext& ctx) {
+	interactions_.BeginFrame();
 	screens_.Push(std::move(screen), ctx);
 }
 
 void ClientUi::PopScreen(ScreenContext& ctx) {
+	interactions_.BeginFrame();
 	screens_.Pop(ctx);
 }
 
 void ClientUi::ReplaceScreen(std::unique_ptr<Screen> screen, ScreenContext& ctx) {
+	interactions_.BeginFrame();
 	screens_.Replace(std::move(screen), ctx);
 }
 

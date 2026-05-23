@@ -9,7 +9,7 @@
 #include "clay_ui_tests/clay_ui_checks.h"
 #include "runtime/UiInteractionRegistry.h"
 #include "layout/ui_document_renderer.h"
-#include "main_menu_document_runtime.h"
+#include "layout/ui_document_runtime_registry.h"
 #include "screen.h"
 #include "ui_editor_preview_screen.h"
 #include "ui_editor_preview_document.h"
@@ -45,16 +45,8 @@ bool g_controlPasswordModalSubmitted = false;
 bool ValidateUiDocumentRuntimeTokensForPreview(
 	const silencer::ui::UiEditorPreviewDocument& document,
 	std::string& error) {
-	if(document.surface != silencer::client_ui::main_menu::kMainMenuSurface){
-		return true;
-	}
-	silencer::client_ui::UiDocumentRendererOptions options;
-	options.canBuildComponent =
-		silencer::client_ui::main_menu::IsMainMenuComponent;
-	options.canResolveTextBinding =
-		silencer::client_ui::main_menu::IsMainMenuTextBinding;
-	options.canHandleAction =
-		silencer::client_ui::main_menu::IsMainMenuAction;
+	silencer::client_ui::UiDocumentRendererOptions options =
+		silencer::client_ui::UiDocumentRendererOptionsForSurface(document.surface);
 	return silencer::client_ui::ValidateUiDocumentRuntimeTokens(
 		document, options, error);
 }
@@ -1202,8 +1194,21 @@ void TickWaits(Game& game){
 		} else if(w.cmd.op == "wait_ms"){
 			if(now >= w.deadline_ms) done = true;
 		} else if(w.cmd.op == "wait_for_state"){
-			if(w.wait_state == Game::StateName(game.GetState()) &&
-			   (!StateNeedsScreen(w.wait_state) || game.GetTopScreen())){
+			const bool needsScreen = StateNeedsScreen(w.wait_state);
+			const bool stateStable =
+				w.wait_state == Game::StateName(game.GetState()) && !game.IsStateNew();
+			if(stateStable && w.state_observed_frame < 0){
+				w.state_observed_frame = game.GetFrameCount();
+			}else if(!stateStable){
+				w.state_observed_frame = -1;
+			}
+			const bool screenReady = !needsScreen ||
+				(game.GetTopScreen() &&
+				 (!game.UiInteractions().Interactables().empty() ||
+				  !game.UiInteractions().Elements().empty()));
+			if(stateStable &&
+			   game.GetFrameCount() > w.state_observed_frame &&
+			   screenReady){
 				w.cmd.reply->set_value(OkResult(w.cmd.id, nlohmann::json::object()));
 				it = v.erase(it); continue;
 			}

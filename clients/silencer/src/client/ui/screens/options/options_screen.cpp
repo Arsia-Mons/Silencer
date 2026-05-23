@@ -1,5 +1,6 @@
 #include "options_screen.h"
 
+#include "options_document_runtime.h"
 #include "screen_context.h"
 #include "game_state.h"
 #include "game.h"
@@ -7,29 +8,14 @@
 #include "world.h"
 #include "surface.h"
 
-#include "clay/clay.h"
-#include "clay_ui_compositor.h"
+#include "layout/ui_document_renderer.h"
+#include "layout/ui_document_runtime_registry.h"
 #include "runtime/UiInteractionRegistry.h"
-#include "primitives/button.h"
+#include "ui_document_assets.h"
 
 #include <SDL3/SDL.h>
 
-namespace options_screen_detail {
-
-using silencer::ui::primitives::Button;
-using silencer::ui::primitives::ButtonHandle;
-using silencer::ui::primitives::ButtonOpts;
-using silencer::ui::primitives::ButtonSize;
-using silencer::ui::primitives::ButtonVariant;
-
-// Legacy options buttons used a 52px vertical pitch; Oval/Md buttons are 33px tall.
-constexpr uint16_t kButtonGap = 19;
-constexpr const char * kActionControls = "options.controls";
-constexpr const char * kActionDisplay = "options.display";
-constexpr const char * kActionAudio = "options.audio";
-constexpr const char * kActionBack = "options.back";
-
-}  // namespace options_screen_detail
+#include <cstdio>
 
 void OptionsScreen::Build(ScreenContext & ctx)
 {
@@ -42,6 +28,23 @@ void OptionsScreen::Build(ScreenContext & ctx)
 	controlsClicked = false;
 	displayClicked = false;
 	audioClicked = false;
+	layoutLoaded_ = silencer::net::LoadUiDocumentAsset(
+		silencer::client_ui::options_menu::kOptionsSurface,
+		layoutDocument_,
+		layoutLoadError_);
+	if(!layoutLoaded_){
+		std::fprintf(stderr, "[ui-layout] %s\n", layoutLoadError_.c_str());
+		return;
+	}
+	silencer::client_ui::UiDocumentRendererOptions validationOptions =
+		silencer::client_ui::UiDocumentRendererOptionsForSurface(
+			silencer::client_ui::options_menu::kOptionsSurface);
+	if(!silencer::client_ui::ValidateUiDocumentRuntimeTokens(
+		   layoutDocument_, validationOptions, layoutLoadError_)){
+		layoutLoaded_ = false;
+		std::fprintf(stderr, "[ui-layout] %s\n", layoutLoadError_.c_str());
+		return;
+	}
 }
 
 void OptionsScreen::Tick(ScreenContext & ctx)
@@ -72,40 +75,12 @@ void OptionsScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime,
 {
 	(void)frametime;
 	(void)dst;
-	using namespace silencer::clay_bridge;
+	if(!layoutLoaded_) return;
 
-	CLAY({ .id = CLAY_ID("OptionsRoot"),
-	       .layout = {
-	           .sizing = { CLAY_SIZING_GROW(0),
-	                       CLAY_SIZING_GROW(0) },
-	           .childAlignment = { CLAY_ALIGN_X_CENTER, CLAY_ALIGN_Y_CENTER },
-	       },
-	       .image = { .imageData = PackImage(6, 0) } }) {
-		CLAY({ .id = CLAY_ID("OptionsButtonColumn"),
-		       .layout = {
-		           .sizing = { CLAY_SIZING_FIXED(196),
-		                       CLAY_SIZING_FIT(0) },
-		           .childGap = options_screen_detail::kButtonGap,
-		           .layoutDirection = CLAY_TOP_TO_BOTTOM,
-		       } }) {
-			options_screen_detail::Button(CLAY_STRING("OptionsControlsButton"), CLAY_STRING("Controls"),
-			           options_screen_detail::ButtonOpts{ .variant = options_screen_detail::ButtonVariant::Oval,
-			                                             .size = options_screen_detail::ButtonSize::Md },
-			           options_screen_detail::ButtonHandle{ nullptr, options_screen_detail::kActionControls, &interactions });
-			options_screen_detail::Button(CLAY_STRING("OptionsDisplayButton"), CLAY_STRING("Display"),
-			           options_screen_detail::ButtonOpts{ .variant = options_screen_detail::ButtonVariant::Oval,
-			                                             .size = options_screen_detail::ButtonSize::Md },
-			           options_screen_detail::ButtonHandle{ nullptr, options_screen_detail::kActionDisplay, &interactions });
-			options_screen_detail::Button(CLAY_STRING("OptionsAudioButton"), CLAY_STRING("Audio"),
-			           options_screen_detail::ButtonOpts{ .variant = options_screen_detail::ButtonVariant::Oval,
-			                                             .size = options_screen_detail::ButtonSize::Md },
-			           options_screen_detail::ButtonHandle{ nullptr, options_screen_detail::kActionAudio, &interactions });
-			options_screen_detail::Button(CLAY_STRING("OptionsBackButton"), CLAY_STRING("Go Back"),
-			           options_screen_detail::ButtonOpts{ .variant = options_screen_detail::ButtonVariant::Oval,
-			                                             .size = options_screen_detail::ButtonSize::Md },
-			           options_screen_detail::ButtonHandle{ nullptr, options_screen_detail::kActionBack, &interactions });
-		}
-	}
+	silencer::client_ui::UiDocumentRendererOptions options =
+		silencer::client_ui::UiDocumentRendererOptionsForSurface(
+			silencer::client_ui::options_menu::kOptionsSurface);
+	silencer::client_ui::BuildUiDocument(layoutDocument_, interactions, options);
 }
 
 void OptionsScreen::Destroy(ScreenContext & ctx)
@@ -120,19 +95,19 @@ bool OptionsScreen::HandleUiIntent(ScreenContext & ctx, const silencer::ui::UiAc
 		return true;
 	}
 	if(action.kind != silencer::ui::UiActionKind::Activate) return false;
-	if(action.id == options_screen_detail::kActionControls){
+	if(action.id == silencer::client_ui::options_menu::kActionControls){
 		controlsClicked = true;
 		return true;
 	}
-	if(action.id == options_screen_detail::kActionDisplay){
+	if(action.id == silencer::client_ui::options_menu::kActionDisplay){
 		displayClicked = true;
 		return true;
 	}
-	if(action.id == options_screen_detail::kActionAudio){
+	if(action.id == silencer::client_ui::options_menu::kActionAudio){
 		audioClicked = true;
 		return true;
 	}
-	if(action.id == options_screen_detail::kActionBack){
+	if(action.id == silencer::client_ui::options_menu::kActionBack){
 		goBackClicked = true;
 		return true;
 	}

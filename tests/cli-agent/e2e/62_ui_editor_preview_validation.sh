@@ -35,6 +35,9 @@ if (process.env.MUTATOR === "invalid-viewport") {
   document.root.unsupportedLayoutMode = "grid";
 } else if (process.env.MUTATOR === "unknown-size-field") {
   document.root.style.width.preferred = 640;
+} else if (process.env.MUTATOR === "invalid-size-bounds") {
+  document.root.style.width.min = 1;
+  document.root.style.width.max = 0;
 } else if (process.env.MUTATOR === "unsupported-input") {
   document.root.children.push({
     id: "UnsupportedInput",
@@ -120,6 +123,7 @@ expect_bad_document "invalid-button-height" "invalid-button-height"
 expect_bad_document "unknown-document-field" "unknown-document-field"
 expect_bad_document "unknown-node-field" "unknown-node-field"
 expect_bad_document "unknown-size-field" "unknown-size-field"
+expect_bad_document "invalid-size-bounds" "invalid-size-bounds"
 expect_bad_document "unsupported-input" "unsupported-input"
 
 echo "PASS 62_ui_editor_preview_validation"

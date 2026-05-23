@@ -17,10 +17,6 @@ using silencer::ui::UiEditorPreviewDocument;
 using silencer::ui::UiEditorSize;
 using silencer::ui::UiEditorStyle;
 
-constexpr int kSchemaVersion = 1;
-constexpr int kMinViewport = 160;
-constexpr int kMaxViewport = 4096;
-
 bool ContractContains(const char * const * values,
                       std::size_t valueCount,
                       const std::string& value) {
@@ -40,6 +36,79 @@ bool IsKnownKind(const std::string& kind) {
 	return ContractContains(ui_layout_contract::kNodeKinds,
 	                        ui_layout_contract::kNodeKindsCount,
 	                        kind);
+}
+
+const ui_layout_contract::StringListForKind * FindKindStringList(
+	const ui_layout_contract::StringListForKind * table,
+	std::size_t tableCount,
+	const std::string& kind) {
+	for(std::size_t i = 0; i < tableCount; ++i){
+		if(kind == table[i].kind) return &table[i];
+	}
+	return nullptr;
+}
+
+bool KindStringListContains(const ui_layout_contract::StringListForKind * table,
+                            std::size_t tableCount,
+                            const std::string& kind,
+                            const std::string& value) {
+	const ui_layout_contract::StringListForKind * list =
+		FindKindStringList(table, tableCount, kind);
+	return list && ContractContains(list->values, list->valueCount, value);
+}
+
+bool IsAnyNodeTokenField(const std::string& field) {
+	for(std::size_t i = 0; i < ui_layout_contract::kNodeTokenFieldsByKindCount; ++i){
+		const auto& entry = ui_layout_contract::kNodeTokenFieldsByKind[i];
+		if(ContractContains(entry.values, entry.valueCount, field)) return true;
+	}
+	return false;
+}
+
+std::string NodeTokenFieldValue(const UiEditorNode& node,
+                                const std::string& field) {
+	if(field == "text") return node.text;
+	if(field == "action") return node.action;
+	if(field == "textBinding") return node.textBinding;
+	if(field == "component") return node.component;
+	if(field == "buttonVariant") return node.buttonVariant;
+	if(field == "buttonSize") return node.buttonSize;
+	return std::string();
+}
+
+std::string JoinHuman(const char * const * values, std::size_t valueCount) {
+	if(valueCount == 0) return std::string();
+	if(valueCount == 1) return values[0];
+	std::string joined;
+	for(std::size_t i = 0; i < valueCount; ++i){
+		if(i > 0){
+			joined += i + 1 == valueCount ? " or " : ", ";
+		}
+		joined += values[i];
+	}
+	return joined;
+}
+
+std::string SizeModeName(const UiEditorSize& size) {
+	switch(size.mode){
+		case UiEditorSize::Mode::Fixed:
+			return ui_layout_contract::kSizeModeFixed;
+		case UiEditorSize::Mode::Grow:
+			return ui_layout_contract::kSizeModeGrow;
+		case UiEditorSize::Mode::Fit:
+		default:
+			return ui_layout_contract::kSizeModeFit;
+	}
+}
+
+const ui_layout_contract::SizeRuleForKind * FindSizeRuleForKind(
+	const std::string& kind,
+	const std::string& axis) {
+	for(std::size_t i = 0; i < ui_layout_contract::kSizeRulesByKindCount; ++i){
+		const auto& rule = ui_layout_contract::kSizeRulesByKind[i];
+		if(kind == rule.kind && axis == rule.axis) return &rule;
+	}
+	return nullptr;
 }
 
 std::string StringValue(const nlohmann::json& json,
@@ -219,24 +288,34 @@ bool ParseSize(const nlohmann::json& json,
 		return false;
 	}
 	const std::string mode = StringValue(*it, "mode");
-	auto parseBound = [&](const char * boundKey, float& target) {
+	bool hasMin = false;
+	bool hasMax = false;
+	auto parseBound = [&](const char * boundKey, float& target, bool& found) {
 		auto boundIt = it->find(boundKey);
 		target = 0.0f;
+		found = false;
 		if(boundIt == it->end()) return true;
+		found = true;
 		if(!boundIt->is_number()){
 			error = std::string("style.") + key + "." + boundKey + " must be numeric";
 			return false;
 		}
 		const double value = boundIt->get<double>();
-		if(!std::isfinite(value) || value < 0.0 || value > 4096.0){
+		if(!std::isfinite(value) || value < ui_layout_contract::kMinSize ||
+		   value > ui_layout_contract::kMaxSize){
 			error = std::string("style.") + key + "." + boundKey + " is out of range";
 			return false;
 		}
 		target = static_cast<float>(value);
 		return true;
 	};
-	if(!parseBound("min", out.min) || !parseBound("max", out.max)) return false;
-	if(out.max > 0.0f && out.min > out.max){
+	if(!parseBound("min", out.min, hasMin) ||
+	   !parseBound("max", out.max, hasMax)){
+		return false;
+	}
+	out.hasMin = hasMin;
+	out.hasMax = hasMax;
+	if(hasMin && hasMax && out.min > out.max){
 		error = std::string("style.") + key + ".min cannot exceed max";
 		return false;
 	}
@@ -261,7 +340,7 @@ bool ParseSize(const nlohmann::json& json,
 		return true;
 	}
 	if(mode == ui_layout_contract::kSizeModeFixed){
-		if(it->find("min") != it->end() || it->find("max") != it->end()){
+		if(hasMin || hasMax){
 			error = std::string("style.") + key +
 			        " fixed sizing cannot use min or max";
 			return false;
@@ -272,7 +351,8 @@ bool ParseSize(const nlohmann::json& json,
 			return false;
 		}
 		const double value = valueIt->get<double>();
-		if(!std::isfinite(value) || value < 0.0 || value > 4096.0){
+		if(!std::isfinite(value) || value < ui_layout_contract::kMinSize ||
+		   value > ui_layout_contract::kMaxSize){
 			error = std::string("style.") + key + ".value is out of range";
 			return false;
 		}
@@ -300,7 +380,7 @@ bool ParsePalette(const nlohmann::json& json,
 		return false;
 	}
 	out = it->get<int>();
-	if(out < minValue || out > 255){
+	if(out < minValue || out > ui_layout_contract::kMaxPalette){
 		error = std::string("style.") + key + " is out of range";
 		return false;
 	}
@@ -333,11 +413,21 @@ bool ParseImage(const nlohmann::json& json,
 	                        "node " + out.id + " image", error)){
 		return false;
 	}
-	if(!RequiredIntInRange(*it, "bank", 0, 255, out.image.bank, error)){
+	if(!RequiredIntInRange(*it,
+	                       "bank",
+	                       ui_layout_contract::kMinImageBank,
+	                       ui_layout_contract::kMaxImageBank,
+	                       out.image.bank,
+	                       error)){
 		error = "image bank is invalid";
 		return false;
 	}
-	if(!RequiredIntInRange(*it, "index", 0, 65535, out.image.index, error)){
+	if(!RequiredIntInRange(*it,
+	                       "index",
+	                       ui_layout_contract::kMinImageIndex,
+	                       ui_layout_contract::kMaxImageIndex,
+	                       out.image.index,
+	                       error)){
 		error = "image index is invalid";
 		return false;
 	}
@@ -397,17 +487,23 @@ bool ParseFloating(const nlohmann::json& json,
 		error = "floating parentAttach is invalid";
 		return false;
 	}
-	if(!OptionalFloatInRange(*it, "offsetX", 0.0f, -4096.0f, 4096.0f,
+	if(!OptionalFloatInRange(*it, "offsetX", 0.0f,
+	                         ui_layout_contract::kMinFloatingOffset,
+	                         ui_layout_contract::kMaxFloatingOffset,
 	                         out.floating.offsetX, error)){
 		error = "floating offsetX is invalid";
 		return false;
 	}
-	if(!OptionalFloatInRange(*it, "offsetY", 0.0f, -4096.0f, 4096.0f,
+	if(!OptionalFloatInRange(*it, "offsetY", 0.0f,
+	                         ui_layout_contract::kMinFloatingOffset,
+	                         ui_layout_contract::kMaxFloatingOffset,
 	                         out.floating.offsetY, error)){
 		error = "floating offsetY is invalid";
 		return false;
 	}
-	if(!OptionalIntInRange(*it, "zIndex", 0, -32768, 32767,
+	if(!OptionalIntInRange(*it, "zIndex", 0,
+	                       ui_layout_contract::kMinFloatingZIndex,
+	                       ui_layout_contract::kMaxFloatingZIndex,
 	                       out.floating.zIndex, error)){
 		error = "floating zIndex is invalid";
 		return false;
@@ -425,7 +521,7 @@ bool ParseFloating(const nlohmann::json& json,
 }
 
 bool HasSizeBounds(const UiEditorSize& size) {
-	return size.min > 0.0f || size.max > 0.0f;
+	return size.hasMin || size.hasMax;
 }
 
 bool HasField(const nlohmann::json& json, const char * key) {
@@ -435,28 +531,58 @@ bool HasField(const nlohmann::json& json, const char * key) {
 bool ValidateKindSpecificNodeFields(const nlohmann::json& json,
                                     const UiEditorNode& node,
                                     std::string& error) {
-	auto reject = [&](const char * field) {
+	auto reject = [&](const std::string& field) {
 		error = "node " + node.id + " " + node.kind +
 		        " cannot use " + field;
 		return false;
 	};
-	if(HasField(json, "text") && node.kind != "text" && node.kind != "button"){
-		return reject("text");
+	for(auto it = json.begin(); it != json.end(); ++it){
+		if(IsAnyNodeTokenField(it.key()) &&
+		   !KindStringListContains(ui_layout_contract::kNodeTokenFieldsByKind,
+		                           ui_layout_contract::kNodeTokenFieldsByKindCount,
+		                           node.kind,
+		                           it.key())){
+			return reject(it.key());
+		}
+		if(KindStringListContains(ui_layout_contract::kForbiddenNodeDecoratorsByKind,
+		                          ui_layout_contract::kForbiddenNodeDecoratorsByKindCount,
+		                          node.kind,
+		                          it.key())){
+			return reject(it.key());
+		}
 	}
-	if(HasField(json, "action") && node.kind != "button"){
-		return reject("action");
+	const ui_layout_contract::StringListForKind * required =
+		FindKindStringList(ui_layout_contract::kRequiredTokenFieldsByKind,
+		                   ui_layout_contract::kRequiredTokenFieldsByKindCount,
+		                   node.kind);
+	if(required){
+		for(std::size_t i = 0; i < required->valueCount; ++i){
+			const std::string field = required->values[i];
+			if(NodeTokenFieldValue(node, field).empty()){
+				error = "node " + node.id + " " + field + " is missing";
+				return false;
+			}
+		}
 	}
-	if(HasField(json, "textBinding") && node.kind != "text"){
-		return reject("textBinding");
+	return true;
+}
+
+bool ValidateSizeRule(const std::string& kind,
+                      const char * axis,
+                      const UiEditorSize& size,
+                      std::string& error) {
+	const ui_layout_contract::SizeRuleForKind * rule =
+		FindSizeRuleForKind(kind, axis);
+	if(!rule) return true;
+	const std::string mode = SizeModeName(size);
+	if(!ContractContains(rule->modes, rule->modeCount, mode)){
+		error = kind + " " + axis + " must be " +
+		        JoinHuman(rule->modes, rule->modeCount);
+		return false;
 	}
-	if(HasField(json, "component") && node.kind != "component"){
-		return reject("component");
-	}
-	if(HasField(json, "buttonVariant") && node.kind != "button"){
-		return reject("buttonVariant");
-	}
-	if(HasField(json, "buttonSize") && node.kind != "button"){
-		return reject("buttonSize");
+	if(!rule->allowBounds && HasSizeBounds(size)){
+		error = kind + " " + axis + " cannot use min or max";
+		return false;
 	}
 	return true;
 }
@@ -478,24 +604,8 @@ bool ParseStyle(const nlohmann::json& json,
 	}
 	if(!ParseSize(json, "width", out.width, error)) return false;
 	if(!ParseSize(json, "height", out.height, error)) return false;
-	if(kind == "button"){
-		if(out.width.mode == UiEditorSize::Mode::Grow){
-			error = "button width must be fit or fixed";
-			return false;
-		}
-		if(HasSizeBounds(out.width)){
-			error = "button width cannot use min or max";
-			return false;
-		}
-		if(out.height.mode != UiEditorSize::Mode::Fit){
-			error = "button height must be fit";
-			return false;
-		}
-		if(HasSizeBounds(out.height)){
-			error = "button height cannot use min or max";
-			return false;
-		}
-	}
+	if(!ValidateSizeRule(kind, "width", out.width, error)) return false;
+	if(!ValidateSizeRule(kind, "height", out.height, error)) return false;
 	if(!ParseStringEnum(json,
 	                    "direction",
 	                    ui_layout_contract::kAxisColumn,
@@ -520,9 +630,18 @@ bool ParseStyle(const nlohmann::json& json,
 	                    out.justify, error)){
 		return false;
 	}
-	if(!OptionalIntInRange(json, "padding", 0, 0, 512, out.padding, error)) return false;
-	if(!OptionalIntInRange(json, "gap", 0, 0, 512, out.gap, error)) return false;
-	if(!OptionalIntInRange(json, "radius", 0, 0, 64, out.radius, error)) return false;
+	if(!OptionalIntInRange(json, "padding", 0,
+	                       ui_layout_contract::kMinPadding,
+	                       ui_layout_contract::kMaxPadding,
+	                       out.padding, error)) return false;
+	if(!OptionalIntInRange(json, "gap", 0,
+	                       ui_layout_contract::kMinGap,
+	                       ui_layout_contract::kMaxGap,
+	                       out.gap, error)) return false;
+	if(!OptionalIntInRange(json, "radius", 0,
+	                       ui_layout_contract::kMinRadius,
+	                       ui_layout_contract::kMaxRadius,
+	                       out.radius, error)) return false;
 	if(!ParseStringEnum(json,
 	                    "font",
 	                    ui_layout_contract::kFontUi,
@@ -531,9 +650,15 @@ bool ParseStyle(const nlohmann::json& json,
 	                    out.font, error)){
 		return false;
 	}
-	if(!ParsePalette(json, "backgroundPalette", -1, -1, out.backgroundPalette, error)) return false;
-	if(!ParsePalette(json, "borderPalette", -1, -1, out.borderPalette, error)) return false;
-	if(!ParsePalette(json, "textPalette", 0, 0, out.textPalette, error)) return false;
+	if(!ParsePalette(json, "backgroundPalette", -1,
+	                 ui_layout_contract::kMinPalette,
+	                 out.backgroundPalette, error)) return false;
+	if(!ParsePalette(json, "borderPalette", -1,
+	                 ui_layout_contract::kMinPalette,
+	                 out.borderPalette, error)) return false;
+	if(!ParsePalette(json, "textPalette", 0,
+	                 ui_layout_contract::kMinTextPalette,
+	                 out.textPalette, error)) return false;
 	return true;
 }
 
@@ -596,18 +721,6 @@ bool ParseNode(const nlohmann::json& json,
 		return false;
 	}
 	if(!ValidateKindSpecificNodeFields(json, out, error)) return false;
-	if(out.kind == "component" && out.component.empty()){
-		error = "component node requires component";
-		return false;
-	}
-	if(out.kind == "button" && json.find("image") != json.end()){
-		error = out.kind + " node cannot use image: " + out.id;
-		return false;
-	}
-	if(out.kind == "button" && json.find("floating") != json.end()){
-		error = out.kind + " node cannot use floating: " + out.id;
-		return false;
-	}
 	if(!ParseImage(json, out, error)) return false;
 	if(!ParseFloating(json, out, error)) return false;
 	auto styleIt = json.find("style");
@@ -651,8 +764,12 @@ bool ParseUiEditorPreviewDocument(const nlohmann::json& json,
 		return false;
 	}
 	int schemaVersion = 0;
-	if(!RequiredIntInRange(json, "schemaVersion", kSchemaVersion, kSchemaVersion,
-	                       schemaVersion, error)){
+	if(!RequiredIntInRange(json,
+	                       "schemaVersion",
+	                       ui_layout_contract::kSchemaVersion,
+	                       ui_layout_contract::kSchemaVersion,
+	                       schemaVersion,
+	                       error)){
 		error = "unsupported ui editor schema version";
 		return false;
 	}
@@ -673,12 +790,18 @@ bool ParseUiEditorPreviewDocument(const nlohmann::json& json,
 	                        error)){
 		return false;
 	}
-	if(!RequiredIntInRange(*viewportIt, "width", kMinViewport, kMaxViewport,
+	if(!RequiredIntInRange(*viewportIt,
+	                       "width",
+	                       ui_layout_contract::kMinViewport,
+	                       ui_layout_contract::kMaxViewport,
 	                       document.viewportWidth, error)){
 		error = "viewport width is invalid";
 		return false;
 	}
-	if(!RequiredIntInRange(*viewportIt, "height", kMinViewport, kMaxViewport,
+	if(!RequiredIntInRange(*viewportIt,
+	                       "height",
+	                       ui_layout_contract::kMinViewport,
+	                       ui_layout_contract::kMaxViewport,
 	                       document.viewportHeight, error)){
 		error = "viewport height is invalid";
 		return false;
@@ -690,7 +813,7 @@ bool ParseUiEditorPreviewDocument(const nlohmann::json& json,
 	}
 	std::unordered_set<std::string> seenIds;
 	if(!ParseNode(*rootIt, document.root, error, seenIds)) return false;
-	if(document.root.kind != "screen"){
+	if(document.root.kind != ui_layout_contract::kNodeKindScreen){
 		error = "root node must be a screen";
 		return false;
 	}

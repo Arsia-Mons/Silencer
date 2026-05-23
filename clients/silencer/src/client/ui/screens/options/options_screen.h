@@ -2,6 +2,9 @@
 #define OPTIONS_SCREEN_H
 
 #include "screen.h"
+#include "ui_editor_preview_model.h"
+
+#include <string>
 
 class OptionsScreen : public Screen
 {
@@ -17,6 +20,9 @@ private:
 	bool controlsClicked = false;
 	bool displayClicked = false;
 	bool audioClicked = false;
+	bool layoutLoaded_ = false;
+	std::string layoutLoadError_;
+	silencer::ui::UiEditorPreviewDocument layoutDocument_;
 };
 
 #endif

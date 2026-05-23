@@ -16,7 +16,7 @@ cli --port "$PORT" wait_for_state --state OPTIONSCONTROLS --timeout-ms 5000
 cli --port "$PORT" inspect | bun -e \
   'const t=await new Response(Bun.stdin.stream()).text();
    const r=JSON.parse(t);
-   if(!r.widgets.some((w)=>w.source==="clay" && w.label==="Preset")) process.exit(1);'
+   if(!r.widgets.some((w)=>w.source==="clay" && w.id==="options_controls.preset")) process.exit(1);'
 cli --port "$PORT" click --label CANCEL
 cli --port "$PORT" wait_for_state --state OPTIONS --timeout-ms 5000
 cli --port "$PORT" click --label DISPLAY

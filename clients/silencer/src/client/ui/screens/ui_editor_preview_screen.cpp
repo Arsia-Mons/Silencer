@@ -1,6 +1,7 @@
 #include "ui_editor_preview_screen.h"
 
 #include "layout/ui_document_renderer.h"
+#include "layout/ui_document_runtime_registry.h"
 #include "main_menu/main_menu_document_runtime.h"
 #include "game_state.h"
 #include "runtime/UiInteractionRegistry.h"
@@ -39,22 +40,14 @@ void UiEditorPreviewScreen::BuildUi(ScreenContext& ctx,
 	(void)dst;
 	(void)frametime;
 
-	UiDocumentRendererOptions options;
+	UiDocumentRendererOptions options =
+		UiDocumentRendererOptionsForSurface(document_.surface);
 	if(document_.surface == silencer::client_ui::main_menu::kMainMenuSurface){
 		versionText_ = "Silencer v";
 		versionText_ += ctx.world.GetVersion();
-		options.canBuildComponent =
-			silencer::client_ui::main_menu::IsMainMenuComponent;
-		options.canResolveTextBinding =
-			silencer::client_ui::main_menu::IsMainMenuTextBinding;
-		options.canHandleAction =
-			silencer::client_ui::main_menu::IsMainMenuAction;
 		options.buildComponent = [&](const silencer::ui::UiEditorNode& node) {
-			if(!silencer::client_ui::main_menu::IsMainMenuComponent(node.component)){
-				return false;
-			}
-			mainMenuLogo_.Build(ctx.world.resources);
-			return true;
+			return silencer::client_ui::main_menu::BuildMainMenuComponent(
+				node, ctx.world.resources, mainMenuLogo_);
 		};
 		options.resolveTextBinding = [&](const std::string& binding, std::string& out) {
 			return silencer::client_ui::main_menu::ResolveMainMenuTextBinding(
