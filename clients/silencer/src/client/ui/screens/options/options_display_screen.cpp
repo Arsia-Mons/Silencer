@@ -111,21 +111,23 @@ bool OptionsDisplayScreen::HandleUiIntent(ScreenContext & ctx, const silencer::u
 		return true;
 	}
 	if(action.kind != silencer::ui::UiActionKind::Activate) return false;
-	if(action.id == silencer::client_ui::options_display::kActionFullscreen){
-		fullscreenClicked = true;
-		return true;
-	}
-	if(action.id == silencer::client_ui::options_display::kActionSmoothScaling){
-		smoothScalingClicked = true;
-		return true;
-	}
-	if(action.id == silencer::client_ui::options_display::kActionSave){
-		saveClicked = true;
-		return true;
-	}
-	if(action.id == silencer::client_ui::options_display::kActionCancel){
-		cancelClicked = true;
-		return true;
-	}
-	return false;
+	return silencer::client_ui::options_display::HandleOptionsDisplayAction(
+		action.id,
+		[this](silencer::client_ui::options_display::OptionsDisplayAction displayAction) {
+			switch(displayAction){
+				case silencer::client_ui::options_display::OptionsDisplayAction::Fullscreen:
+					fullscreenClicked = true;
+					return true;
+				case silencer::client_ui::options_display::OptionsDisplayAction::SmoothScaling:
+					smoothScalingClicked = true;
+					return true;
+				case silencer::client_ui::options_display::OptionsDisplayAction::Save:
+					saveClicked = true;
+					return true;
+				case silencer::client_ui::options_display::OptionsDisplayAction::Cancel:
+					cancelClicked = true;
+					return true;
+			}
+			return false;
+		});
 }

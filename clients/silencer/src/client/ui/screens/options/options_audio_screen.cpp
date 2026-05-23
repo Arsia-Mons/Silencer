@@ -113,17 +113,20 @@ bool OptionsAudioScreen::HandleUiIntent(ScreenContext & ctx, const silencer::ui:
 		return true;
 	}
 	if(action.kind != silencer::ui::UiActionKind::Activate) return false;
-	if(action.id == silencer::client_ui::options_audio::kActionMusic){
-		musicClicked = true;
-		return true;
-	}
-	if(action.id == silencer::client_ui::options_audio::kActionSave){
-		saveClicked = true;
-		return true;
-	}
-	if(action.id == silencer::client_ui::options_audio::kActionCancel){
-		cancelClicked = true;
-		return true;
-	}
-	return false;
+	return silencer::client_ui::options_audio::HandleOptionsAudioAction(
+		action.id,
+		[this](silencer::client_ui::options_audio::OptionsAudioAction audioAction) {
+			switch(audioAction){
+				case silencer::client_ui::options_audio::OptionsAudioAction::Music:
+					musicClicked = true;
+					return true;
+				case silencer::client_ui::options_audio::OptionsAudioAction::Save:
+					saveClicked = true;
+					return true;
+				case silencer::client_ui::options_audio::OptionsAudioAction::Cancel:
+					cancelClicked = true;
+					return true;
+			}
+			return false;
+		});
 }

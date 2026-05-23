@@ -155,6 +155,7 @@ test -s "$valid_png"
 
 expect_button_width "fixed-small-button" "fixed-small-button" "OK" "80"
 expect_button_width "fixed-long-button" "fixed-long-button" "VERY LONG PREVIEW BUTTON LABEL" "120"
+expect_surface_preview_component "options-controls" "Save" "OptionsControlsKeybindRows" "486"
 expect_surface_preview_component "options-display" "Smooth Scaling" "OptionsDisplaySmoothScalingIndicator" "50"
 expect_surface_preview_component "options-audio" "Music" "OptionsAudioMusicIndicator" "50"
 

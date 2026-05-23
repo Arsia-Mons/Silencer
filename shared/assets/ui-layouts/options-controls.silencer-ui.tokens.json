@@ -1,0 +1,14 @@
+{
+  "surface": "options-controls",
+  "components": [
+    "options_controls.keybind_rows"
+  ],
+  "textBindings": [
+    "options_controls.preset_label"
+  ],
+  "actions": [
+    "options_controls.preset",
+    "options_controls.save",
+    "options_controls.cancel"
+  ]
+}

@@ -6,6 +6,7 @@
 #include "ui_editor_preview_model.h"
 #include "ui_layout_contract.generated.h"
 
+#include <functional>
 #include <string>
 
 class Resources;
@@ -27,9 +28,20 @@ constexpr const char * kActionOptions =
 constexpr const char * kActionExit =
 	silencer::net::ui_layout_contract::kUiActionMainMenuExit;
 
+enum class MainMenuAction {
+	Tutorial,
+	Lobby,
+	Options,
+	Exit,
+};
+
+using MainMenuActionHandler = std::function<bool(MainMenuAction)>;
+
 bool IsMainMenuComponent(const std::string& component);
 bool IsMainMenuTextBinding(const std::string& binding);
 bool IsMainMenuAction(const std::string& action);
+bool HandleMainMenuAction(const std::string& action,
+                          const MainMenuActionHandler& handler);
 bool BuildMainMenuComponent(const silencer::ui::UiEditorNode& node,
                             Resources& resources,
                             SilencerLogo& logo);

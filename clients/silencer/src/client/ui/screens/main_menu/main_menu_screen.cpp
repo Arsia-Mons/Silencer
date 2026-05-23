@@ -108,21 +108,23 @@ bool MainMenuScreen::HandleUiIntent(ScreenContext & ctx, const silencer::ui::UiA
 		return true;
 	}
 	if(action.kind != silencer::ui::UiActionKind::Activate) return false;
-	if(action.id == silencer::client_ui::main_menu::kActionTutorial){
-		tutorialClicked = true;
-		return true;
-	}
-	if(action.id == silencer::client_ui::main_menu::kActionLobby){
-		lobbyClicked = true;
-		return true;
-	}
-	if(action.id == silencer::client_ui::main_menu::kActionOptions){
-		optionsClicked = true;
-		return true;
-	}
-	if(action.id == silencer::client_ui::main_menu::kActionExit){
-		exitClicked = true;
-		return true;
-	}
-	return false;
+	return silencer::client_ui::main_menu::HandleMainMenuAction(
+		action.id,
+		[this](silencer::client_ui::main_menu::MainMenuAction menuAction) {
+			switch(menuAction){
+				case silencer::client_ui::main_menu::MainMenuAction::Tutorial:
+					tutorialClicked = true;
+					return true;
+				case silencer::client_ui::main_menu::MainMenuAction::Lobby:
+					lobbyClicked = true;
+					return true;
+				case silencer::client_ui::main_menu::MainMenuAction::Options:
+					optionsClicked = true;
+					return true;
+				case silencer::client_ui::main_menu::MainMenuAction::Exit:
+					exitClicked = true;
+					return true;
+			}
+			return false;
+		});
 }

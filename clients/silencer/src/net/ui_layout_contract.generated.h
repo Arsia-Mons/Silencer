@@ -542,20 +542,24 @@ constexpr std::size_t kSizeRulesByKindCount = 2;
 constexpr const char * kUiSurfaces[] = {
 	"main-menu",
 	"options",
+	"options-controls",
 	"options-display",
 	"options-audio",
 };
-constexpr std::size_t kUiSurfacesCount = 4;
+constexpr std::size_t kUiSurfacesCount = 5;
 constexpr const char * kUiSurfaceMainMenu = "main-menu";
 constexpr const char * kUiSurfaceOptions = "options";
+constexpr const char * kUiSurfaceOptionsControls = "options-controls";
 constexpr const char * kUiSurfaceOptionsDisplay = "options-display";
 constexpr const char * kUiSurfaceOptionsAudio = "options-audio";
 
 constexpr const char * kUiComponentMainMenuLogo = "main-menu.logo";
+constexpr const char * kUiComponentOptionsControlsKeybindRows = "options_controls.keybind_rows";
 constexpr const char * kUiComponentOptionsDisplayFullscreenIndicator = "options_display.fullscreen_indicator";
 constexpr const char * kUiComponentOptionsDisplaySmoothScalingIndicator = "options_display.smooth_scaling_indicator";
 constexpr const char * kUiComponentOptionsAudioMusicIndicator = "options_audio.music_indicator";
 constexpr const char * kUiTextBindingClientVersion = "client.version";
+constexpr const char * kUiTextBindingOptionsControlsPresetLabel = "options_controls.preset_label";
 constexpr const char * kUiActionMainMenuTutorial = "main_menu.tutorial";
 constexpr const char * kUiActionMainMenuLobby = "main_menu.lobby";
 constexpr const char * kUiActionMainMenuOptions = "main_menu.options";
@@ -564,6 +568,9 @@ constexpr const char * kUiActionOptionsControls = "options.controls";
 constexpr const char * kUiActionOptionsDisplay = "options.display";
 constexpr const char * kUiActionOptionsAudio = "options.audio";
 constexpr const char * kUiActionOptionsBack = "options.back";
+constexpr const char * kUiActionOptionsControlsPreset = "options_controls.preset";
+constexpr const char * kUiActionOptionsControlsSave = "options_controls.save";
+constexpr const char * kUiActionOptionsControlsCancel = "options_controls.cancel";
 constexpr const char * kUiActionOptionsDisplayFullscreen = "options_display.fullscreen";
 constexpr const char * kUiActionOptionsDisplaySmoothScaling = "options_display.smooth_scaling";
 constexpr const char * kUiActionOptionsDisplaySave = "options_display.save";
@@ -607,6 +614,23 @@ constexpr const char * kOptionsActions[] = {
 	"options.back",
 };
 constexpr std::size_t kOptionsActionsCount = 4;
+
+constexpr const char * kOptionsControlsComponents[] = {
+	"options_controls.keybind_rows",
+};
+constexpr std::size_t kOptionsControlsComponentsCount = 1;
+
+constexpr const char * kOptionsControlsTextBindings[] = {
+	"options_controls.preset_label",
+};
+constexpr std::size_t kOptionsControlsTextBindingsCount = 1;
+
+constexpr const char * kOptionsControlsActions[] = {
+	"options_controls.preset",
+	"options_controls.save",
+	"options_controls.cancel",
+};
+constexpr std::size_t kOptionsControlsActionsCount = 3;
 
 constexpr const char * kOptionsDisplayComponents[] = {
 	"options_display.fullscreen_indicator",
@@ -657,10 +681,11 @@ struct SurfaceTokens {
 constexpr SurfaceTokens kSurfaceTokens[] = {
 	{ kUiSurfaceMainMenu, kMainMenuComponents, kMainMenuComponentsCount, kMainMenuTextBindings, kMainMenuTextBindingsCount, kMainMenuActions, kMainMenuActionsCount },
 	{ kUiSurfaceOptions, kOptionsComponents, kOptionsComponentsCount, kOptionsTextBindings, kOptionsTextBindingsCount, kOptionsActions, kOptionsActionsCount },
+	{ kUiSurfaceOptionsControls, kOptionsControlsComponents, kOptionsControlsComponentsCount, kOptionsControlsTextBindings, kOptionsControlsTextBindingsCount, kOptionsControlsActions, kOptionsControlsActionsCount },
 	{ kUiSurfaceOptionsDisplay, kOptionsDisplayComponents, kOptionsDisplayComponentsCount, kOptionsDisplayTextBindings, kOptionsDisplayTextBindingsCount, kOptionsDisplayActions, kOptionsDisplayActionsCount },
 	{ kUiSurfaceOptionsAudio, kOptionsAudioComponents, kOptionsAudioComponentsCount, kOptionsAudioTextBindings, kOptionsAudioTextBindingsCount, kOptionsAudioActions, kOptionsAudioActionsCount },
 };
-constexpr std::size_t kSurfaceTokensCount = 4;
+constexpr std::size_t kSurfaceTokensCount = 5;
 
 }  // namespace ui_layout_contract
 }  // namespace net

@@ -252,7 +252,13 @@ export const UI_STYLE_DEFAULTS_BY_KIND = {
   },
 } as const satisfies Record<(typeof UI_NODE_KINDS)[number], object>;
 
-export const UI_SURFACES = ["main-menu", "options", "options-display", "options-audio"] as const;
+export const UI_SURFACES = [
+  "main-menu",
+  "options",
+  "options-controls",
+  "options-display",
+  "options-audio",
+] as const;
 export const UI_SURFACE_TOKENS_BY_SURFACE = {
   "main-menu": {
     components: ["main-menu.logo"],
@@ -263,6 +269,11 @@ export const UI_SURFACE_TOKENS_BY_SURFACE = {
     components: [],
     textBindings: [],
     actions: ["options.controls", "options.display", "options.audio", "options.back"],
+  },
+  "options-controls": {
+    components: ["options_controls.keybind_rows"],
+    textBindings: ["options_controls.preset_label"],
+    actions: ["options_controls.preset", "options_controls.save", "options_controls.cancel"],
   },
   "options-display": {
     components: [

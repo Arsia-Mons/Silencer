@@ -149,12 +149,24 @@ describe("ui-layout model", () => {
     expect(findNode(display.root, "OptionsDisplayFullscreenIndicator")?.component).toBe(
       "options_display.fullscreen_indicator",
     );
+
+    const controls = createDefaultUiDocument("options-controls");
+    expect(controls.surface).toBe("options-controls");
+    expect(findNode(controls.root, "OptionsControlsPresetButton")?.textBinding).toBe(
+      "options_controls.preset_label",
+    );
+    expect(findNode(controls.root, "OptionsControlsKeybindRows")?.component).toBe(
+      "options_controls.keybind_rows",
+    );
   });
 
   test("returns built-in surface token manifests for editor authoring", () => {
     expect(getUiSurfaceTokenManifest("main-menu")?.actions).toContain("main_menu.options");
     expect(getUiSurfaceTokenManifest("options-display")?.components).toContain(
       "options_display.smooth_scaling_indicator",
+    );
+    expect(getUiSurfaceTokenManifest("options-controls")?.actions).toContain(
+      "options_controls.save",
     );
   });
 

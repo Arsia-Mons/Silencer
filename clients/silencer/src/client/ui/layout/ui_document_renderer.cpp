@@ -296,7 +296,7 @@ void BuildUiDocumentNode(const UiEditorNode& node,
 		CLAY(decl) {
 			bool rendered = false;
 			if(options.buildComponent){
-				rendered = options.buildComponent(node);
+				rendered = options.buildComponent(node, interactions);
 			}
 			if(!rendered){
 				UiDocumentUnresolvedText("[unresolved component: " + node.component + "]");

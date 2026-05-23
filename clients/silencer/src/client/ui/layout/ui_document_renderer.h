@@ -18,7 +18,8 @@ struct UiDocumentRendererOptions {
 		silencer::ui::primitives::ButtonVariant::Chrome;
 	silencer::ui::primitives::ButtonSize buttonSize =
 		silencer::ui::primitives::ButtonSize::Auto;
-	std::function<bool(const silencer::ui::UiEditorNode&)> buildComponent;
+	std::function<bool(const silencer::ui::UiEditorNode&,
+	                   silencer::ui::UiInteractionRegistry&)> buildComponent;
 	std::function<bool(const std::string&, std::string&)> resolveTextBinding;
 	std::function<bool(const std::string&)> canBuildComponent;
 	std::function<bool(const std::string&)> canResolveTextBinding;

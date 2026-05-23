@@ -4,6 +4,7 @@
 #include "controls_keybind_list.h"
 #include "screen.h"
 #include "keybinds.h"
+#include "ui_editor_preview_model.h"
 
 #include <SDL3/SDL_scancode.h>
 #include <SDL3/SDL_gamepad.h>
@@ -36,8 +37,11 @@ private:
 	bool cancelClicked = false;
 	int scrollDelta = 0;
 	int operatorClickedRow = -1;
-	int visibleRowCapacity_ = silencer::client_ui::options::kKeybindListMinVisibleRows;
+	int visibleRowCapacity_ = silencer::client_ui::options::kKeybindListDefaultVisibleRows;
 	silencer::client_ui::options::KeybindListView keybindListView_;
+	bool layoutLoaded_ = false;
+	std::string layoutLoadError_;
+	silencer::ui::UiEditorPreviewDocument layoutDocument_;
 };
 
 #endif

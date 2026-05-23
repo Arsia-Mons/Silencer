@@ -1,5 +1,7 @@
 #include "controls_keybind_list.h"
 
+#include "options_document_runtime.h"
+
 #include "clay/clay.h"
 #include "clay_ui_compositor.h"
 #include "runtime/UiInteractionRegistry.h"
@@ -25,23 +27,11 @@ using silencer::ui::primitives::ButtonSize;
 using silencer::ui::primitives::ButtonVariant;
 
 constexpr uint16_t kContentW = 486;
-constexpr uint16_t kPresetRowH = 43;
 constexpr uint16_t kRowH = 43;
 constexpr uint16_t kRowGap = 10;
 constexpr uint16_t kActionNameW = 180;
 constexpr uint16_t kOperatorW = 45;
-constexpr uint16_t kActionGap = 12;
 constexpr uint16_t kColumnGap = 12;
-constexpr uint16_t kPresetGap = 12;
-constexpr uint16_t kSectionGap = 8;
-constexpr uint16_t kActionTopGap = 16;
-constexpr uint16_t kActionRowH = 33;
-constexpr const char * kActionPreset = "options_controls.preset";
-constexpr const char * kActionSave = "options_controls.save";
-constexpr const char * kActionCancel = "options_controls.cancel";
-constexpr const char * kActionPrimaryPrefix = "options_controls.primary.";
-constexpr const char * kActionSecondaryPrefix = "options_controls.secondary.";
-constexpr const char * kActionOperatorPrefix = "options_controls.operator.";
 
 Clay_String FromCStr(const char * s) {
 	return Clay_String{ false, static_cast<int32_t>(std::strlen(s)), s };
@@ -49,10 +39,6 @@ Clay_String FromCStr(const char * s) {
 
 Clay_String FromStd(const std::string & s) {
 	return Clay_String{ false, static_cast<int32_t>(s.size()), s.c_str() };
-}
-
-void TitleText(Clay_String text) {
-	Text(text, { .size = TextSize::ScreenTitle });
 }
 
 void RegisterRowsScrollArea(Clay_ElementId clayId,
@@ -74,7 +60,9 @@ void RowActionButton(Clay_String id,
                      bool rebinding,
                      silencer::ui::UiInteractionRegistry& interactions) {
 	std::string display = rebinding ? "-" : text;
-	std::string actionId = std::string(slot == 0 ? kActionPrimaryPrefix : kActionSecondaryPrefix)
+	std::string actionId = std::string(slot == 0
+	                       ? options_controls::kActionPrimaryPrefix
+	                       : options_controls::kActionSecondaryPrefix)
 	                     + std::to_string(row);
 	Button(id, FromStd(display),
 	       ButtonOpts{ .variant = ButtonVariant::Oval, .size = ButtonSize::Sm },
@@ -86,7 +74,8 @@ void RowOperatorButton(Clay_String id,
                        int row,
                        int minWidth,
                        silencer::ui::UiInteractionRegistry& interactions) {
-	std::string actionId = std::string(kActionOperatorPrefix) + std::to_string(row);
+	std::string actionId = std::string(options_controls::kActionOperatorPrefix)
+	                     + std::to_string(row);
 	Button(id, FromCStr(text),
 	       ButtonOpts{ .variant = ButtonVariant::Ghost,
 	                   .size = ButtonSize::Auto,
@@ -97,26 +86,19 @@ void RowOperatorButton(Clay_String id,
 
 }  // namespace controls_keybind_list_detail
 
-int KeybindListVisibleRowsForContentHeight(int contentHeight) {
-	const int viewportHeight = contentHeight
-	                         - controls_keybind_list_detail::kPresetRowH
-	                         - controls_keybind_list_detail::kActionTopGap
-	                         - controls_keybind_list_detail::kActionRowH
-	                         - controls_keybind_list_detail::kSectionGap * 3;
-	if(viewportHeight <= 0) return 1;
+int KeybindRowsVisibleRowsForHeight(int rowsHeight) {
+	if(rowsHeight <= 0) return 1;
 	// Whole rows that fit at the design row height. The rows GROW to absorb
-	// any leftover space (see BuildKeybindListBody), so flooring here keeps
+	// any leftover space (see BuildKeybindRows), so flooring here keeps
 	// the last row from clipping while the list still fills the content area.
-	// Forcing a higher minimum overflowed the viewport and clipped the last
-	// row at the smallest panel size (issue #179).
-	const int rows = (viewportHeight + controls_keybind_list_detail::kRowGap)
+	const int rows = (rowsHeight + controls_keybind_list_detail::kRowGap)
 	               / (controls_keybind_list_detail::kRowH
 	                  + controls_keybind_list_detail::kRowGap);
 	return std::max(1, rows);
 }
 
-void BuildKeybindListBody(const KeybindListView & view,
-                          silencer::ui::UiInteractionRegistry& interactions) {
+void BuildKeybindRows(const KeybindListView & view,
+                      silencer::ui::UiInteractionRegistry& interactions) {
 	const int rowCount = std::min(view.visibleRowCount, static_cast<int>(view.rows.size()));
 	std::vector<std::string> primaryIds(rowCount);
 	std::vector<std::string> secondaryIds(rowCount);
@@ -140,112 +122,42 @@ void BuildKeybindListBody(const KeybindListView & view,
 	const float    actionNameW = static_cast<float>(S(controls_keybind_list_detail::kActionNameW));
 	const int      operatorW   = S(controls_keybind_list_detail::kOperatorW);
 	const uint16_t columnGap   = static_cast<uint16_t>(S(controls_keybind_list_detail::kColumnGap));
-	const uint16_t actionGap   = static_cast<uint16_t>(S(controls_keybind_list_detail::kActionGap));
-	const uint16_t presetGap   = static_cast<uint16_t>(S(controls_keybind_list_detail::kPresetGap));
 
-	CLAY({ .id = CLAY_ID("ControlsTitle"),
-	       .layout = {
-	           .sizing = { CLAY_SIZING_FIT(0), CLAY_SIZING_FIT(0) },
-	           .childAlignment = { CLAY_ALIGN_X_CENTER, CLAY_ALIGN_Y_CENTER },
-	       },
-	       .floating = {
-	           .offset = { 0.0f, view.titleOffsetY },
-	           .zIndex = 1,
-	           .attachPoints = { .element = CLAY_ATTACH_POINT_CENTER_TOP,
-	                             .parent = CLAY_ATTACH_POINT_CENTER_TOP },
-	           .pointerCaptureMode = CLAY_POINTER_CAPTURE_MODE_PASSTHROUGH,
-	           .attachTo = CLAY_ATTACH_TO_PARENT,
-	       } }) {
-		controls_keybind_list_detail::TitleText(CLAY_STRING("Configure Controls"));
-	}
-
-	CLAY({ .id = CLAY_ID("ControlsContent"),
+	const Clay_ElementId scrollAreaId = CLAY_ID("ControlsRowsViewport");
+	CLAY({ .id = scrollAreaId,
 	       .layout = {
 	           .sizing = { CLAY_SIZING_FIXED(contentW),
 	                       CLAY_SIZING_GROW(0) },
-	           .childGap = controls_keybind_list_detail::kSectionGap,
-	           .childAlignment = { CLAY_ALIGN_X_CENTER, CLAY_ALIGN_Y_TOP },
+	           .childGap = controls_keybind_list_detail::kRowGap,
 	           .layoutDirection = CLAY_TOP_TO_BOTTOM,
-	       } }) {
-		CLAY({ .id = CLAY_ID("ControlsPresetRow"),
-		       .layout = {
-		           .sizing = { CLAY_SIZING_GROW(0), CLAY_SIZING_FIXED(controls_keybind_list_detail::kPresetRowH) },
-		           .childGap = presetGap,
-		           .childAlignment = { CLAY_ALIGN_X_LEFT, CLAY_ALIGN_Y_CENTER },
-		           .layoutDirection = CLAY_LEFT_TO_RIGHT,
-		       } }) {
-			CLAY({ .id = CLAY_ID("PresetLabel"),
+	       },
+	       .clip = { .vertical = true } }) {
+		controls_keybind_list_detail::RegisterRowsScrollArea(scrollAreaId, interactions);
+		for(int i = 0; i < rowCount; i++){
+			const KeybindRowView & row = view.rows[i];
+			CLAY({ .id = CLAY_IDI("ControlsRow", (uint32_t)i),
 			       .layout = {
-			           .sizing = { CLAY_SIZING_FIXED(actionNameW),
-			                       CLAY_SIZING_FIT(0) },
+			           .sizing = { CLAY_SIZING_GROW(0), CLAY_SIZING_GROW(controls_keybind_list_detail::kRowH) },
+			           .childGap = columnGap,
+			           .childAlignment = { CLAY_ALIGN_X_LEFT, CLAY_ALIGN_Y_CENTER },
+			           .layoutDirection = CLAY_LEFT_TO_RIGHT,
 			       } }) {
-				controls_keybind_list_detail::Text(
-					CLAY_STRING("Preset:"),
-					{ .size = controls_keybind_list_detail::TextSize::Heading });
-			}
-			controls_keybind_list_detail::Button(CLAY_STRING("ControlsPresetButton"),
-			              controls_keybind_list_detail::FromStd(view.presetText),
-			              controls_keybind_list_detail::ButtonOpts{ .variant = controls_keybind_list_detail::ButtonVariant::Oval,
-			                                                        .size = controls_keybind_list_detail::ButtonSize::Lg },
-			              controls_keybind_list_detail::ButtonHandle{ nullptr, controls_keybind_list_detail::kActionPreset, &interactions });
-		}
-
-		const Clay_ElementId scrollAreaId = CLAY_ID("ControlsRowsViewport");
-		CLAY({ .id = scrollAreaId,
-		       .layout = {
-		           .sizing = { CLAY_SIZING_GROW(0), CLAY_SIZING_GROW(0) },
-		           .childGap = controls_keybind_list_detail::kRowGap,
-		           .layoutDirection = CLAY_TOP_TO_BOTTOM,
-		       },
-		       .clip = { .vertical = true } }) {
-			controls_keybind_list_detail::RegisterRowsScrollArea(scrollAreaId, interactions);
-			for(int i = 0; i < rowCount; i++){
-				const KeybindRowView & row = view.rows[i];
-				CLAY({ .id = CLAY_IDI("ControlsRow", (uint32_t)i),
+				CLAY({ .id = CLAY_IDI("ControlsAction", (uint32_t)i),
 				       .layout = {
-				           .sizing = { CLAY_SIZING_GROW(0), CLAY_SIZING_GROW(controls_keybind_list_detail::kRowH) },
-				           .childGap = columnGap,
-				           .childAlignment = { CLAY_ALIGN_X_LEFT, CLAY_ALIGN_Y_CENTER },
-				           .layoutDirection = CLAY_LEFT_TO_RIGHT,
+				           .sizing = { CLAY_SIZING_FIXED(actionNameW),
+				                       CLAY_SIZING_FIT(0) },
 				       } }) {
-					CLAY({ .id = CLAY_IDI("ControlsAction", (uint32_t)i),
-					       .layout = {
-					           .sizing = { CLAY_SIZING_FIXED(actionNameW),
-					                       CLAY_SIZING_FIT(0) },
-					       } }) {
-						controls_keybind_list_detail::Text(
-							controls_keybind_list_detail::FromStd(row.actionLabel),
-							{ .size = controls_keybind_list_detail::TextSize::Heading });
-					}
-					controls_keybind_list_detail::RowActionButton(controls_keybind_list_detail::FromStd(primaryIds[i]),
-					                row.primaryLabel, i, 0, row.rebindingPrimary, interactions);
-					controls_keybind_list_detail::RowOperatorButton(controls_keybind_list_detail::FromStd(operatorIds[i]),
-					                  row.operatorLabel.c_str(), i, operatorW, interactions);
-					controls_keybind_list_detail::RowActionButton(controls_keybind_list_detail::FromStd(secondaryIds[i]),
-					                row.secondaryLabel, i, 1, row.rebindingSecondary, interactions);
+					controls_keybind_list_detail::Text(
+						controls_keybind_list_detail::FromStd(row.actionLabel),
+						{ .size = controls_keybind_list_detail::TextSize::Heading });
 				}
+				controls_keybind_list_detail::RowActionButton(controls_keybind_list_detail::FromStd(primaryIds[i]),
+				                row.primaryLabel, i, 0, row.rebindingPrimary, interactions);
+				controls_keybind_list_detail::RowOperatorButton(controls_keybind_list_detail::FromStd(operatorIds[i]),
+				                  row.operatorLabel.c_str(), i, operatorW, interactions);
+				controls_keybind_list_detail::RowActionButton(controls_keybind_list_detail::FromStd(secondaryIds[i]),
+				                row.secondaryLabel, i, 1, row.rebindingSecondary, interactions);
 			}
-		}
-
-		CLAY({ .id = CLAY_ID("ControlsActionSpacer"),
-		       .layout = {
-		           .sizing = { CLAY_SIZING_GROW(0), CLAY_SIZING_FIXED(controls_keybind_list_detail::kActionTopGap) },
-		       } }) {}
-
-		CLAY({ .id = CLAY_ID("ControlsActions"),
-		       .layout = {
-		           .sizing = { CLAY_SIZING_FIT(0), CLAY_SIZING_FIT(0) },
-		           .childGap = actionGap,
-		           .layoutDirection = CLAY_LEFT_TO_RIGHT,
-		       } }) {
-			controls_keybind_list_detail::Button(CLAY_STRING("ControlsSaveButton"), CLAY_STRING("Save"),
-			              controls_keybind_list_detail::ButtonOpts{ .variant = controls_keybind_list_detail::ButtonVariant::Oval,
-			                                                        .size = controls_keybind_list_detail::ButtonSize::Md },
-			              controls_keybind_list_detail::ButtonHandle{ nullptr, controls_keybind_list_detail::kActionSave, &interactions });
-			controls_keybind_list_detail::Button(CLAY_STRING("ControlsCancelButton"), CLAY_STRING("Cancel"),
-			              controls_keybind_list_detail::ButtonOpts{ .variant = controls_keybind_list_detail::ButtonVariant::Oval,
-			                                                        .size = controls_keybind_list_detail::ButtonSize::Md },
-			              controls_keybind_list_detail::ButtonHandle{ nullptr, controls_keybind_list_detail::kActionCancel, &interactions });
 		}
 	}
 }

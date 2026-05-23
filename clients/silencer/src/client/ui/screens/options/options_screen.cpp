@@ -95,22 +95,24 @@ bool OptionsScreen::HandleUiIntent(ScreenContext & ctx, const silencer::ui::UiAc
 		return true;
 	}
 	if(action.kind != silencer::ui::UiActionKind::Activate) return false;
-	if(action.id == silencer::client_ui::options_menu::kActionControls){
-		controlsClicked = true;
-		return true;
-	}
-	if(action.id == silencer::client_ui::options_menu::kActionDisplay){
-		displayClicked = true;
-		return true;
-	}
-	if(action.id == silencer::client_ui::options_menu::kActionAudio){
-		audioClicked = true;
-		return true;
-	}
-	if(action.id == silencer::client_ui::options_menu::kActionBack){
-		goBackClicked = true;
-		return true;
-	}
 	(void)ctx;
-	return false;
+	return silencer::client_ui::options_menu::HandleOptionsMenuAction(
+		action.id,
+		[this](silencer::client_ui::options_menu::OptionsMenuAction menuAction) {
+			switch(menuAction){
+				case silencer::client_ui::options_menu::OptionsMenuAction::Controls:
+					controlsClicked = true;
+					return true;
+				case silencer::client_ui::options_menu::OptionsMenuAction::Display:
+					displayClicked = true;
+					return true;
+				case silencer::client_ui::options_menu::OptionsMenuAction::Audio:
+					audioClicked = true;
+					return true;
+				case silencer::client_ui::options_menu::OptionsMenuAction::Back:
+					goBackClicked = true;
+					return true;
+			}
+			return false;
+		});
 }

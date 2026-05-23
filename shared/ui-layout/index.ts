@@ -30,6 +30,7 @@ import {
 } from "./contract";
 import mainMenuDocument from "../assets/ui-layouts/main-menu.silencer-ui.json";
 import optionsAudioDocument from "../assets/ui-layouts/options-audio.silencer-ui.json";
+import optionsControlsDocument from "../assets/ui-layouts/options-controls.silencer-ui.json";
 import optionsDisplayDocument from "../assets/ui-layouts/options-display.silencer-ui.json";
 import optionsDocument from "../assets/ui-layouts/options.silencer-ui.json";
 
@@ -200,6 +201,7 @@ const TOKEN_FIELD_KEYS = [
 const DEFAULT_UI_DOCUMENTS_BY_SURFACE = {
   "main-menu": mainMenuDocument,
   options: optionsDocument,
+  "options-controls": optionsControlsDocument,
   "options-display": optionsDisplayDocument,
   "options-audio": optionsAudioDocument,
 } as const satisfies Record<UiSurfaceName, unknown>;

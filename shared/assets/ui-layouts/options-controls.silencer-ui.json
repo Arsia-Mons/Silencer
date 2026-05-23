@@ -1,0 +1,210 @@
+{
+  "schemaVersion": 1,
+  "surface": "options-controls",
+  "viewport": {
+    "width": 640,
+    "height": 480
+  },
+  "root": {
+    "id": "OptionsControlsRoot",
+    "kind": "screen",
+    "name": "Controls Options",
+    "image": {
+      "bank": 6,
+      "index": 0,
+      "mode": "stretch"
+    },
+    "style": {
+      "width": {
+        "mode": "grow"
+      },
+      "height": {
+        "mode": "grow"
+      },
+      "direction": "column",
+      "align": "center",
+      "justify": "center",
+      "padding": 6,
+      "gap": 0
+    },
+    "children": [
+      {
+        "id": "OptionsControlsPanel",
+        "kind": "panel",
+        "name": "Controls Options Panel",
+        "image": {
+          "bank": 7,
+          "index": 7,
+          "mode": "stretch"
+        },
+        "style": {
+          "width": {
+            "mode": "grow",
+            "min": 560,
+            "max": 628
+          },
+          "height": {
+            "mode": "grow",
+            "min": 420,
+            "max": 468
+          },
+          "direction": "column",
+          "align": "center",
+          "justify": "start",
+          "padding": 42,
+          "gap": 14
+        },
+        "children": [
+          {
+            "id": "OptionsControlsTitle",
+            "kind": "text",
+            "name": "Controls Options Title",
+            "text": "Configure Controls",
+            "style": {
+              "width": {
+                "mode": "fit"
+              },
+              "height": {
+                "mode": "fit"
+              },
+              "font": "title",
+              "textPalette": 0
+            }
+          },
+          {
+            "id": "OptionsControlsPresetRow",
+            "kind": "row",
+            "name": "Preset Row",
+            "style": {
+              "width": {
+                "mode": "fixed",
+                "value": 486
+              },
+              "height": {
+                "mode": "fixed",
+                "value": 43
+              },
+              "direction": "row",
+              "align": "center",
+              "justify": "start",
+              "padding": 0,
+              "gap": 12
+            },
+            "children": [
+              {
+                "id": "OptionsControlsPresetLabel",
+                "kind": "text",
+                "name": "Preset Label",
+                "text": "Preset:",
+                "style": {
+                  "width": {
+                    "mode": "fixed",
+                    "value": 180
+                  },
+                  "height": {
+                    "mode": "fit"
+                  },
+                  "font": "uiLarge",
+                  "textPalette": 0
+                }
+              },
+              {
+                "id": "OptionsControlsPresetButton",
+                "kind": "button",
+                "name": "Preset Button",
+                "textBinding": "options_controls.preset_label",
+                "action": "options_controls.preset",
+                "buttonVariant": "oval",
+                "buttonSize": "lg",
+                "style": {
+                  "width": {
+                    "mode": "fit"
+                  },
+                  "height": {
+                    "mode": "fit"
+                  },
+                  "padding": 0,
+                  "textPalette": 0
+                }
+              }
+            ]
+          },
+          {
+            "id": "OptionsControlsKeybindRows",
+            "kind": "component",
+            "name": "Keybind Rows",
+            "component": "options_controls.keybind_rows",
+            "style": {
+              "width": {
+                "mode": "fixed",
+                "value": 486
+              },
+              "height": {
+                "mode": "fixed",
+                "value": 234
+              }
+            }
+          },
+          {
+            "id": "OptionsControlsActions",
+            "kind": "row",
+            "name": "Controls Actions",
+            "style": {
+              "width": {
+                "mode": "fit"
+              },
+              "height": {
+                "mode": "fit"
+              },
+              "direction": "row",
+              "align": "start",
+              "justify": "start",
+              "padding": 0,
+              "gap": 12
+            },
+            "children": [
+              {
+                "id": "OptionsControlsSaveButton",
+                "kind": "button",
+                "name": "Save Button",
+                "text": "Save",
+                "action": "options_controls.save",
+                "buttonVariant": "oval",
+                "buttonSize": "md",
+                "style": {
+                  "width": {
+                    "mode": "fit"
+                  },
+                  "height": {
+                    "mode": "fit"
+                  },
+                  "padding": 0,
+                  "textPalette": 0
+                }
+              },
+              {
+                "id": "OptionsControlsCancelButton",
+                "kind": "button",
+                "name": "Cancel Button",
+                "text": "Cancel",
+                "action": "options_controls.cancel",
+                "buttonVariant": "oval",
+                "buttonSize": "md",
+                "style": {
+                  "width": {
+                    "mode": "fit"
+                  },
+                  "height": {
+                    "mode": "fit"
+                  },
+                  "padding": 0,
+                  "textPalette": 0
+                }
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}
