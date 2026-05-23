@@ -311,35 +311,45 @@ function ImageInspector({
   node: UiNode;
   onPatch: (patch: Partial<UiNode>) => void;
 }) {
-  if (!node.image) return null;
+  const image = node.image ?? { bank: 0, index: 0, mode: "normal" as UiImageMode };
   return (
     <div className="space-y-3">
-      <div className="text-xs tracking-widest text-game-primary">IMAGE</div>
-      <div className="grid grid-cols-3 gap-3">
-        <Field label="BANK">
-          <NumberInput
-            value={node.image.bank}
-            min={0}
-            max={255}
-            onChange={(bank) => onPatch({ image: { ...node.image!, bank } })}
-          />
-        </Field>
-        <Field label="INDEX">
-          <NumberInput
-            value={node.image.index}
-            min={0}
-            max={65535}
-            onChange={(index) => onPatch({ image: { ...node.image!, index } })}
-          />
-        </Field>
-        <Field label="MODE">
-          <Select
-            value={node.image.mode ?? "normal"}
-            options={IMAGE_MODES}
-            onChange={(mode) => onPatch({ image: { ...node.image!, mode: mode as UiImageMode } })}
-          />
-        </Field>
+      <div className="flex items-center justify-between">
+        <div className="text-xs tracking-widest text-game-primary">IMAGE</div>
+        <button
+          onClick={() => onPatch({ image: node.image ? undefined : image })}
+          className="border border-game-border px-2 py-1 text-[10px] tracking-widest text-game-textDim hover:text-game-text hover:border-game-primary"
+        >
+          {node.image ? "REMOVE" : "ADD"}
+        </button>
       </div>
+      {!node.image ? null : (
+        <div className="grid grid-cols-3 gap-3">
+          <Field label="BANK">
+            <NumberInput
+              value={image.bank}
+              min={0}
+              max={255}
+              onChange={(bank) => onPatch({ image: { ...image, bank } })}
+            />
+          </Field>
+          <Field label="INDEX">
+            <NumberInput
+              value={image.index}
+              min={0}
+              max={65535}
+              onChange={(index) => onPatch({ image: { ...image, index } })}
+            />
+          </Field>
+          <Field label="MODE">
+            <Select
+              value={image.mode ?? "normal"}
+              options={IMAGE_MODES}
+              onChange={(mode) => onPatch({ image: { ...image, mode: mode as UiImageMode } })}
+            />
+          </Field>
+        </div>
+      )}
     </div>
   );
 }
@@ -351,68 +361,103 @@ function FloatingInspector({
   node: UiNode;
   onPatch: (patch: Partial<UiNode>) => void;
 }) {
-  if (!node.floating) return null;
-  const floating = node.floating;
+  const floating = node.floating ?? {
+    attachTo: "parent" as UiAttachTo,
+    elementAttach: "left-top" as UiAttachPoint,
+    parentAttach: "left-top" as UiAttachPoint,
+  };
   return (
     <div className="space-y-3">
-      <div className="text-xs tracking-widest text-game-primary">FLOATING</div>
-      <div className="grid grid-cols-2 gap-3">
-        <Field label="ATTACH TO">
-          <Select
-            value={floating.attachTo}
-            options={ATTACH_TO}
-            onChange={(attachTo) =>
-              onPatch({ floating: { ...floating, attachTo: attachTo as UiAttachTo } })
-            }
-          />
-        </Field>
-        <Field label="Z">
-          <NumberInput
-            value={floating.zIndex ?? 0}
-            min={-32768}
-            max={32767}
-            onChange={(zIndex) => onPatch({ floating: { ...floating, zIndex } })}
-          />
-        </Field>
+      <div className="flex items-center justify-between">
+        <div className="text-xs tracking-widest text-game-primary">FLOATING</div>
+        <button
+          onClick={() => onPatch({ floating: node.floating ? undefined : floating })}
+          className="border border-game-border px-2 py-1 text-[10px] tracking-widest text-game-textDim hover:text-game-text hover:border-game-primary"
+        >
+          {node.floating ? "REMOVE" : "ADD"}
+        </button>
       </div>
-      <div className="grid grid-cols-2 gap-3">
-        <Field label="ELEMENT">
-          <Select
-            value={floating.elementAttach}
-            options={ATTACH_POINTS}
-            onChange={(elementAttach) =>
-              onPatch({ floating: { ...floating, elementAttach: elementAttach as UiAttachPoint } })
-            }
-          />
-        </Field>
-        <Field label="PARENT">
-          <Select
-            value={floating.parentAttach}
-            options={ATTACH_POINTS}
-            onChange={(parentAttach) =>
-              onPatch({ floating: { ...floating, parentAttach: parentAttach as UiAttachPoint } })
-            }
-          />
-        </Field>
-      </div>
-      <div className="grid grid-cols-2 gap-3">
-        <Field label="X">
-          <NumberInput
-            value={floating.offsetX ?? 0}
-            min={-4096}
-            max={4096}
-            onChange={(offsetX) => onPatch({ floating: { ...floating, offsetX } })}
-          />
-        </Field>
-        <Field label="Y">
-          <NumberInput
-            value={floating.offsetY ?? 0}
-            min={-4096}
-            max={4096}
-            onChange={(offsetY) => onPatch({ floating: { ...floating, offsetY } })}
-          />
-        </Field>
-      </div>
+      {!node.floating ? null : (
+        <>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="ATTACH TO">
+              <Select
+                value={floating.attachTo}
+                options={ATTACH_TO}
+                onChange={(attachTo) =>
+                  onPatch({ floating: { ...floating, attachTo: attachTo as UiAttachTo } })
+                }
+              />
+            </Field>
+            <Field label="Z">
+              <NumberInput
+                value={floating.zIndex ?? 0}
+                min={-32768}
+                max={32767}
+                onChange={(zIndex) => onPatch({ floating: { ...floating, zIndex } })}
+              />
+            </Field>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="ELEMENT">
+              <Select
+                value={floating.elementAttach}
+                options={ATTACH_POINTS}
+                onChange={(elementAttach) =>
+                  onPatch({
+                    floating: { ...floating, elementAttach: elementAttach as UiAttachPoint },
+                  })
+                }
+              />
+            </Field>
+            <Field label="PARENT">
+              <Select
+                value={floating.parentAttach}
+                options={ATTACH_POINTS}
+                onChange={(parentAttach) =>
+                  onPatch({
+                    floating: { ...floating, parentAttach: parentAttach as UiAttachPoint },
+                  })
+                }
+              />
+            </Field>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="X">
+              <NumberInput
+                value={floating.offsetX ?? 0}
+                min={-4096}
+                max={4096}
+                onChange={(offsetX) => onPatch({ floating: { ...floating, offsetX } })}
+              />
+            </Field>
+            <Field label="Y">
+              <NumberInput
+                value={floating.offsetY ?? 0}
+                min={-4096}
+                max={4096}
+                onChange={(offsetY) => onPatch({ floating: { ...floating, offsetY } })}
+              />
+            </Field>
+          </div>
+          <label className="flex items-center gap-2 text-[11px] tracking-widest text-game-textDim">
+            <input
+              type="checkbox"
+              checked={floating.pointerPassthrough ?? false}
+              onChange={(event) =>
+                onPatch({
+                  floating: {
+                    ...floating,
+                    pointerPassthrough: event.target.checked ? true : undefined,
+                  },
+                })
+              }
+              className="accent-game-primary"
+            />
+            POINTER PASSTHROUGH
+          </label>
+        </>
+      )}
     </div>
   );
 }
@@ -428,19 +473,43 @@ function SizeField({
 }) {
   return (
     <Field label={label}>
-      <div className="grid grid-cols-[1fr_72px] gap-2">
-        <Select
-          value={size.mode}
-          options={SIZE_MODES}
-          onChange={(value) => onChange({ ...size, mode: value as UiSizeMode, value: size.value ?? 120 })}
-        />
-        <NumberInput
-          value={size.value ?? 0}
-          disabled={size.mode !== "fixed"}
-          min={0}
-          max={1600}
-          onChange={(value) => onChange({ ...size, value })}
-        />
+      <div className="space-y-2">
+        <div className="grid grid-cols-[1fr_72px] gap-2">
+          <Select
+            value={size.mode}
+            options={SIZE_MODES}
+            onChange={(value) =>
+              onChange({ ...size, mode: value as UiSizeMode, value: size.value ?? 120 })
+            }
+          />
+          <NumberInput
+            value={size.value ?? 0}
+            disabled={size.mode !== "fixed"}
+            min={0}
+            max={1600}
+            onChange={(value) => onChange({ ...size, value })}
+          />
+        </div>
+        <div className="grid grid-cols-2 gap-2">
+          <label className="block text-[10px] tracking-widest text-game-textDim">
+            <span className="mb-1 block">MIN</span>
+            <NumberInput
+              value={size.min ?? 0}
+              min={0}
+              max={4096}
+              onChange={(min) => onChange({ ...size, min: min > 0 ? min : undefined })}
+            />
+          </label>
+          <label className="block text-[10px] tracking-widest text-game-textDim">
+            <span className="mb-1 block">MAX</span>
+            <NumberInput
+              value={size.max ?? 0}
+              min={0}
+              max={4096}
+              onChange={(max) => onChange({ ...size, max: max > 0 ? max : undefined })}
+            />
+          </label>
+        </div>
       </div>
     </Field>
   );

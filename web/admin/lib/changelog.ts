@@ -21,8 +21,8 @@ export const CHANGELOG: ChangelogRelease[] = [
       {
         category: "DASHBOARD",
         changes: [
-          "UI Editor (#227) — new /ui-editor route with palette, hierarchy, inspector controls, shared-asset document persistence, JSON import/download, generated Clay scaffold output, and live screenshots rendered by the real client through the control socket.",
-          "Versioned UI layout model — @silencer/ui-layout defines stable element IDs, Clay-style sizing, flex direction, padding, gaps, alignment, Silencer palette indexes, text/buttons/inputs, immutable tree edits, import validation, and scaffold generation for the admin web editor and admin API.",
+          "UI Editor (#227) — new /ui-editor route with palette, hierarchy, inspector controls, shared-asset document persistence, JSON import/download, and live screenshots rendered by the real client through the control socket.",
+          "Versioned UI layout model — @silencer/ui-layout defines stable element IDs, Clay-style sizing, flex direction, padding, gaps, alignment, Silencer palette indexes, text/buttons/inputs, immutable tree edits, and import validation for the admin web editor and admin API.",
           "UI layout document sync — shared/assets/ui-layouts/*.silencer-ui.json and authenticated /api/ui-editor/documents admin-api routes let the dashboard list, load, validate, and save UI layout source documents with revision-checked atomic writes.",
           "Client preview bridge — ui_editor_preview maps editor documents into the production ClientUi/Clay frame and returns screenshot plus inspect bounds for the editor overlay.",
         ],

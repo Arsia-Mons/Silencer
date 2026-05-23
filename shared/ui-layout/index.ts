@@ -468,17 +468,6 @@ export function validateUiDocument(value: unknown): UiDocument {
   return { ...candidate, surface: normalizeUiSurface(candidate.surface) } as UiDocument;
 }
 
-export function exportClaySnippet(document: UiDocument): string {
-  const fnName = `Build${toPascalCase(document.surface)}Ui`;
-  const lines = [
-    `void ${fnName}(ScreenContext& ctx) {`,
-    `  // Generated scaffold from ${document.surface}.silencer-ui.json.`,
-    ...formatClayNode(document.root, 1),
-    `}`,
-  ];
-  return lines.join("\n");
-}
-
 function defaultStyleForKind(kind: UiNodeKind): UiStyle {
   if (kind === "screen") {
     return {
@@ -878,51 +867,4 @@ function toPascalCase(value: string): string {
     .filter(Boolean)
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
     .join("");
-}
-
-function formatClayNode(node: UiNode, depth: number): string[] {
-  const indent = "  ".repeat(depth);
-  const childIndent = "  ".repeat(depth + 1);
-  const lines = [`${indent}CLAY(CLAY_ID("${escapeForCpp(node.id)}"), ${formatClayLayout(node)}) {`];
-
-  if (node.kind === "text" && node.text) {
-    lines.push(`${childIndent}Text("${escapeForCpp(node.text)}");`);
-  } else if (node.kind === "button") {
-    lines.push(
-      `${childIndent}Button("${escapeForCpp(node.text ?? node.name)}", "${escapeForCpp(node.action ?? "")}");`,
-    );
-  } else if (node.kind === "input") {
-    lines.push(`${childIndent}TextInput("${escapeForCpp(node.placeholder ?? node.name)}");`);
-  }
-
-  for (const child of node.children ?? []) {
-    lines.push(...formatClayNode(child, depth + 1));
-  }
-  lines.push(`${indent}}`);
-  return lines;
-}
-
-function formatClayLayout(node: UiNode): string {
-  const style = node.style;
-  const parts = [
-    `.sizing = { ${formatClaySizing(style.width)}, ${formatClaySizing(style.height)} }`,
-  ];
-  if (style.direction)
-    parts.push(
-      `.layoutDirection = ${style.direction === "row" ? "CLAY_LEFT_TO_RIGHT" : "CLAY_TOP_TO_BOTTOM"}`,
-    );
-  if (style.padding) parts.push(`.padding = CLAY_PADDING_ALL(${style.padding})`);
-  if (style.gap) parts.push(`.childGap = ${style.gap}`);
-  return `{ ${parts.join(", ")} }`;
-}
-
-function formatClaySizing(size: UiSize): string {
-  if (size.mode === "fixed")
-    return `CLAY_SIZING_FIXED(${Math.max(0, Math.round(size.value ?? 0))})`;
-  if (size.mode === "grow") return "CLAY_SIZING_GROW(0)";
-  return "CLAY_SIZING_FIT(0)";
-}
-
-function escapeForCpp(value: string): string {
-  return value.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
 }

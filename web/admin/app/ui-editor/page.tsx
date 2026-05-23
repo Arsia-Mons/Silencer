@@ -9,7 +9,6 @@ import {
   createDefaultUiDocument,
   createNode,
   duplicateNode,
-  exportClaySnippet,
   findNode,
   findParent,
   insertAfter,
@@ -47,7 +46,6 @@ export default function UiEditorPage() {
   const [selectedId, setSelectedId] = useState("MainMenuActionGroup");
   const [hydrated, setHydrated] = useState(false);
   const [zoom, setZoom] = useState(0.72);
-  const [exportMode, setExportMode] = useState<"json" | "clay">("json");
   const [status, setStatus] = useState("READY");
   const clientPreview = useClientPreview(document, hydrated);
 
@@ -127,10 +125,7 @@ export default function UiEditorPage() {
     () => findParent(document.root, selectedNode.id),
     [document, selectedNode.id],
   );
-  const exportText = useMemo(
-    () => (exportMode === "json" ? JSON.stringify(document, null, 2) : exportClaySnippet(document)),
-    [document, exportMode],
-  );
+  const exportText = useMemo(() => JSON.stringify(document, null, 2), [document]);
 
   function commit(next: UiDocument, nextSelectedId = selectedNode.id) {
     if (normalizeUiSurface(next.surface) !== normalizeUiSurface(document.surface)) {
@@ -265,15 +260,6 @@ export default function UiEditorPage() {
     setStatus("EXPORTED JSON");
   }
 
-  function downloadClay() {
-    downloadText(
-      `${document.surface}.clay-scaffold.cpp`,
-      exportClaySnippet(document),
-      "text/plain",
-    );
-    setStatus("EXPORTED CLAY");
-  }
-
   return (
     <div className="flex min-h-screen bg-game-bg text-game-text">
       <Sidebar wsConnected={wsConnected} />
@@ -305,7 +291,6 @@ export default function UiEditorPage() {
           onImport={() => importInputRef.current?.click()}
           onSave={saveDocument}
           onDownloadJson={downloadDocument}
-          onDownloadClay={downloadClay}
           onReset={() => {
             const next = validateUiDocument({
               ...createDefaultUiDocument(),
@@ -340,7 +325,7 @@ export default function UiEditorPage() {
               onDropNode={(targetId, kind) => addNode(kind, targetId)}
               onMoveNode={moveExistingNode}
             />
-            <ExportPanel exportMode={exportMode} exportText={exportText} onMode={setExportMode} />
+            <ExportPanel exportText={exportText} />
           </section>
 
           <Inspector

@@ -18,7 +18,6 @@ interface EditorTopBarProps {
   onImport: () => void;
   onSave: () => void;
   onDownloadJson: () => void;
-  onDownloadClay: () => void;
   onReset: () => void;
 }
 
@@ -35,7 +34,6 @@ export function EditorTopBar(props: EditorTopBarProps) {
     onImport,
     onSave,
     onDownloadJson,
-    onDownloadClay,
     onReset,
   } = props;
   const currentSurface = normalizeUiSurface(document.surface);
@@ -116,7 +114,6 @@ export function EditorTopBar(props: EditorTopBarProps) {
         <ToolbarButton onClick={onSave}>SAVE</ToolbarButton>
         <ToolbarButton onClick={onImport}>IMPORT</ToolbarButton>
         <ToolbarButton onClick={onDownloadJson}>JSON</ToolbarButton>
-        <ToolbarButton onClick={onDownloadClay}>CLAY</ToolbarButton>
         <ToolbarButton onClick={onReset}>RESET</ToolbarButton>
       </div>
     </header>

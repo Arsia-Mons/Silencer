@@ -214,6 +214,14 @@ int UiDocumentFixedOrDefault(const UiEditorSize& size, int fallback) {
 	return std::max(1, static_cast<int>(size.value + 0.5f));
 }
 
+void UiDocumentUnresolvedText(const std::string& value) {
+	Text(UiDocumentClayString(value),
+	     {
+	         .size = TextSize::Tiny,
+	         .effect = TextEffect::LegacyPalette(11),
+	     });
+}
+
 }  // namespace
 
 void BuildUiDocument(const silencer::ui::UiEditorPreviewDocument& document,
@@ -250,8 +258,12 @@ void BuildUiDocumentNode(const UiEditorNode& node,
 	if(node.kind == "component"){
 		Clay_ElementDeclaration decl = UiDocumentDeclarationForNode(node);
 		CLAY(decl) {
+			bool rendered = false;
 			if(options.buildComponent){
-				options.buildComponent(node);
+				rendered = options.buildComponent(node);
+			}
+			if(!rendered){
+				UiDocumentUnresolvedText("[unresolved component: " + node.component + "]");
 			}
 		}
 		return;
@@ -282,8 +294,10 @@ void BuildUiDocumentNode(const UiEditorNode& node,
 	CLAY(decl) {
 		if(node.kind == "text"){
 			std::string resolvedText = node.text.empty() ? node.name : node.text;
-			if(!node.textBinding.empty() && options.resolveTextBinding){
-				resolvedText = options.resolveTextBinding(node.textBinding);
+			if(!node.textBinding.empty()){
+				resolvedText = options.resolveTextBinding
+					? options.resolveTextBinding(node.textBinding)
+					: "[unresolved binding: " + node.textBinding + "]";
 			}
 			Text(UiDocumentClayString(resolvedText),
 			     {

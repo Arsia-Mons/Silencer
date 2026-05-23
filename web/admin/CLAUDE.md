@@ -43,8 +43,7 @@ directly). If you need to bake an explicit URL in, pass it as a
 - `app/ui-editor/` — WYSIWYG editor for Silencer UI layout documents.
   Uses the shared `@silencer/ui-layout` tree model through `lib/ui-layout.ts`,
   palette/hierarchy/inspector panels, saved documents from
-  `shared/assets/ui-layouts`, JSON
-  import/download, generated Clay scaffold output, and a real client preview
+  `shared/assets/ui-layouts`, JSON import/download, and a real client preview
   returned by `app/ui-editor/preview/route.ts`.
 - `app/api/ui-editor/documents/` — local Next.js proxy for the admin API UI
   layout document routes. It forwards the admin bearer token and exists for
@@ -83,7 +82,7 @@ directly). If you need to bake an explicit URL in, pass it as a
   trigger (HTTP) so edits can be committed to git.
 - `lib/ui-layout.ts` — re-exports the shared `@silencer/ui-layout`
   schema/versioned layout document model for UI editor surfaces plus immutable
-  tree edits, import validation, and Clay scaffold generation. Keep that model
+  tree edits and import validation. Keep that model
   aligned with real `clients/silencer/src/client/ui` primitive concepts and the
   client preview parser, not browser-only widget names.
 - `lib/api.ts` — `fetch` wrapper, injects `Authorization: Bearer`

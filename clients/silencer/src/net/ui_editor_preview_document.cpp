@@ -152,6 +152,27 @@ bool ParseStringEnum(const nlohmann::json& json,
 	return false;
 }
 
+bool RequiredStringEnum(const nlohmann::json& json,
+                        const char * key,
+                        std::initializer_list<const char *> allowed,
+                        std::string& out,
+                        std::string& error) {
+	auto it = json.find(key);
+	if(it == json.end() || !it->is_string()){
+		error = std::string(key) + " must be a string";
+		return false;
+	}
+	const std::string value = it->get<std::string>();
+	for(const char * candidate : allowed){
+		if(value == candidate){
+			out = value;
+			return true;
+		}
+	}
+	error = std::string(key) + " is unsupported: " + value;
+	return false;
+}
+
 bool ParseSize(const nlohmann::json& json,
                const char * key,
                UiEditorSize& out,
@@ -305,30 +326,28 @@ bool ParseFloating(const nlohmann::json& json,
 		error = "floating must be an object";
 		return false;
 	}
-	if(!ParseStringEnum(*it, "attachTo", "parent", { "parent", "root" },
-	                    out.floating.attachTo, error)){
+	if(!RequiredStringEnum(*it, "attachTo", { "parent", "root" },
+	                       out.floating.attachTo, error)){
 		error = "floating attachTo is invalid";
 		return false;
 	}
-	if(!ParseStringEnum(*it,
-	                    "elementAttach",
-	                    "left-top",
-	                    { "left-top", "left-center", "left-bottom",
-	                      "center-top", "center", "center-bottom",
-	                      "right-top", "right-center", "right-bottom" },
-	                    out.floating.elementAttach,
-	                    error)){
+	if(!RequiredStringEnum(*it,
+	                       "elementAttach",
+	                       { "left-top", "left-center", "left-bottom",
+	                         "center-top", "center", "center-bottom",
+	                         "right-top", "right-center", "right-bottom" },
+	                       out.floating.elementAttach,
+	                       error)){
 		error = "floating elementAttach is invalid";
 		return false;
 	}
-	if(!ParseStringEnum(*it,
-	                    "parentAttach",
-	                    "left-top",
-	                    { "left-top", "left-center", "left-bottom",
-	                      "center-top", "center", "center-bottom",
-	                      "right-top", "right-center", "right-bottom" },
-	                    out.floating.parentAttach,
-	                    error)){
+	if(!RequiredStringEnum(*it,
+	                       "parentAttach",
+	                       { "left-top", "left-center", "left-bottom",
+	                         "center-top", "center", "center-bottom",
+	                         "right-top", "right-center", "right-bottom" },
+	                       out.floating.parentAttach,
+	                       error)){
 		error = "floating parentAttach is invalid";
 		return false;
 	}
@@ -348,10 +367,13 @@ bool ParseFloating(const nlohmann::json& json,
 		return false;
 	}
 	auto passthroughIt = it->find("pointerPassthrough");
-	out.floating.pointerPassthrough =
-		passthroughIt != it->end() && passthroughIt->is_boolean()
-			? passthroughIt->get<bool>()
-			: false;
+	if(passthroughIt != it->end() && !passthroughIt->is_boolean()){
+		error = "floating pointerPassthrough is invalid";
+		return false;
+	}
+	out.floating.pointerPassthrough = passthroughIt != it->end()
+		? passthroughIt->get<bool>()
+		: false;
 	out.floating.enabled = true;
 	return true;
 }

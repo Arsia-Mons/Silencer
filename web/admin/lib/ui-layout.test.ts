@@ -3,7 +3,6 @@ import {
   createDefaultUiDocument,
   createNode,
   duplicateNode,
-  exportClaySnippet,
   findNode,
   insertChild,
   moveNode,
@@ -125,14 +124,16 @@ describe("ui-layout model", () => {
     expect(rejectedLeafInside).toBe(movedIntoPanel);
   });
 
-  test("validates imported documents and exports a Clay scaffold", () => {
+  test("validates imported documents with rebuildable screen primitives", () => {
     const document = createDefaultUiDocument();
     const parsed = validateUiDocument(JSON.parse(JSON.stringify(document)));
-    const snippet = exportClaySnippet(parsed);
 
-    expect(snippet).toContain("BuildMainMenuUi");
-    expect(snippet).toContain('CLAY_ID("MainMenuRoot")');
-    expect(snippet).toContain('Button("Tutorial", "main_menu.tutorial")');
+    expect(parsed.root.image?.bank).toBe(6);
+    expect(parsed.root.image?.index).toBe(0);
+    expect(parsed.root.image?.mode).toBe("normal");
+    expect(findNode(parsed.root, "MainMenuSilencerLogo")?.component).toBe("main-menu.logo");
+    expect(findNode(parsed.root, "MainMenuActionGroup")?.floating?.parentAttach).toBe("center");
+    expect(findNode(parsed.root, "MainMenuVersion")?.textBinding).toBe("client.version");
   });
 
   test("rejects duplicate imported node ids", () => {
@@ -200,6 +201,28 @@ describe("ui-layout model", () => {
     };
     expect(() => validateUiDocument(heightDocument)).toThrow(
       "Node MainMenuTutorialButton button height must be fit.",
+    );
+  });
+
+  test("rejects invalid rebuild primitive metadata", () => {
+    const floatingDocument = JSON.parse(JSON.stringify(createDefaultUiDocument()));
+    delete (findNode(floatingDocument.root, "MainMenuActionGroup") as any).floating.parentAttach;
+    expect(() => validateUiDocument(floatingDocument)).toThrow(
+      "Node MainMenuActionGroup has invalid floating parentAttach.",
+    );
+
+    const pointerDocument = JSON.parse(JSON.stringify(createDefaultUiDocument()));
+    (findNode(pointerDocument.root, "MainMenuActionGroup") as any).floating.pointerPassthrough =
+      "yes";
+    expect(() => validateUiDocument(pointerDocument)).toThrow(
+      "Node MainMenuActionGroup has invalid floating pointerPassthrough.",
+    );
+
+    const sizeDocument = JSON.parse(JSON.stringify(createDefaultUiDocument()));
+    sizeDocument.root.style.width.min = 500;
+    sizeDocument.root.style.width.max = 200;
+    expect(() => validateUiDocument(sizeDocument)).toThrow(
+      "Node MainMenuRoot width min cannot exceed max.",
     );
   });
 });
