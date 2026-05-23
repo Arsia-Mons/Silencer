@@ -283,8 +283,8 @@ void BuildUiDocumentNode(const UiEditorNode& node,
 			.minWidth = fixedWidth,
 			.maxWidth = fixedWidth,
 			.widthOverride = fixedWidth,
-			.paddingX = node.style.padding > 0 ? node.style.padding : 12,
-			.paddingY = node.style.padding > 0 ? node.style.padding / 2 : 4,
+			.paddingX = node.style.padding,
+			.paddingY = node.style.padding / 2,
 			.wrapText = true,
 		};
 		const std::string action = node.action.empty() ? node.id : node.action;

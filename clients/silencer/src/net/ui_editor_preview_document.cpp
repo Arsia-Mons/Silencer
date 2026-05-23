@@ -209,11 +209,21 @@ bool ParseSize(const nlohmann::json& json,
 		return false;
 	}
 	if(mode == "fit"){
+		if(it->find("value") != it->end()){
+			error = std::string("style.") + key +
+			        ".value is only valid for fixed sizing";
+			return false;
+		}
 		out.mode = UiEditorSize::Mode::Fit;
 		out.value = 0.0f;
 		return true;
 	}
 	if(mode == "grow"){
+		if(it->find("value") != it->end()){
+			error = std::string("style.") + key +
+			        ".value is only valid for fixed sizing";
+			return false;
+		}
 		out.mode = UiEditorSize::Mode::Grow;
 		out.value = 0.0f;
 		return true;
@@ -405,7 +415,7 @@ bool ValidateKindSpecificNodeFields(const nlohmann::json& json,
 	if(HasField(json, "placeholder") && node.kind != "input"){
 		return reject("placeholder");
 	}
-	if(HasField(json, "action") && node.kind != "button" && node.kind != "input"){
+	if(HasField(json, "action") && node.kind != "button"){
 		return reject("action");
 	}
 	if(HasField(json, "textBinding") && node.kind != "text"){

@@ -39,6 +39,7 @@ struct ButtonOpts {
 	int widthOverride = 0;
 	int paddingX = 0;
 	int paddingY = 0;
+	bool paddingOverride = false;
 	bool wrapText = false;
 };
 

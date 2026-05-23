@@ -5,7 +5,7 @@
 // Local dev: NEXT_PUBLIC_API_URL=http://localhost:24080 (compose build arg)
 //   → API is "http://localhost:24080/api"; admin-api still serves under /api.
 import type { Player, MatchStat, AdminUser, AuditEvent, BackupStatus, BackupInfo, StatsSnapshot } from './types';
-import type { UiDocument, UiDocumentReference } from './ui-layout';
+import type { UiDocument, UiDocumentReference, UiSurfaceTokenManifest } from './ui-layout';
 
 export const API = (process.env.NEXT_PUBLIC_API_URL || '') + '/api';
 
@@ -67,6 +67,7 @@ export const changeOwnPassword  = (currentPassword: string, newPassword: string)
 export interface UiEditorDocumentPayload {
   document: UiDocument;
   reference: UiDocumentReference;
+  tokenManifest?: UiSurfaceTokenManifest | null;
 }
 
 async function uiEditorFetch(path: string, opts: RequestInit = {}): Promise<unknown> {

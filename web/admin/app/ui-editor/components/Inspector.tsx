@@ -487,6 +487,18 @@ function SizeField({
   supportsBounds?: boolean;
   onChange: (size: UiSize) => void;
 }) {
+  const changeMode = (mode: UiSizeMode) => {
+    if (mode === "fixed") {
+      onChange({ mode, value: size.value ?? size.min ?? 120 });
+      return;
+    }
+    onChange({
+      mode,
+      ...(size.min !== undefined ? { min: size.min } : {}),
+      ...(size.max !== undefined ? { max: size.max } : {}),
+    });
+  };
+
   return (
     <Field label={label}>
       <div className="space-y-2">
@@ -494,9 +506,7 @@ function SizeField({
           <Select
             value={size.mode}
             options={modes}
-            onChange={(value) =>
-              onChange({ ...size, mode: value as UiSizeMode, value: size.value ?? 120 })
-            }
+            onChange={(value) => changeMode(value as UiSizeMode)}
           />
           <NumberInput
             value={size.value ?? 0}
@@ -506,7 +516,7 @@ function SizeField({
             onChange={(value) => onChange({ ...size, value })}
           />
         </div>
-        {supportsBounds && (
+        {supportsBounds && size.mode !== "fixed" && (
           <div className="grid grid-cols-2 gap-2">
             <label className="block text-[10px] tracking-widest text-game-textDim">
               <span className="mb-1 block">MIN</span>

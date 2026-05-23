@@ -1,5 +1,3 @@
-import mainMenuSurfaceTokens from "../assets/ui-layouts/main-menu.silencer-ui.tokens.json";
-
 export const UI_LAYOUT_SCHEMA_VERSION = 1 as const;
 
 export type UiNodeKind =
@@ -113,13 +111,14 @@ export interface UiSurfaceTokenManifest {
   actions: string[];
 }
 
+export interface UiDocumentValidationOptions {
+  tokenManifests?: UiSurfaceTokenManifest[];
+  requireTokenManifestForSurfaceTokens?: boolean;
+}
+
 type UiNodeOverrides = Omit<Partial<UiNode>, "style"> & {
   style?: Partial<UiStyle>;
 };
-
-const SURFACE_TOKEN_MANIFESTS: UiSurfaceTokenManifest[] = [
-  mainMenuSurfaceTokens as UiSurfaceTokenManifest,
-];
 
 const KIND_LABELS: Record<UiNodeKind, string> = {
   screen: "Screen",
@@ -461,7 +460,26 @@ export function duplicateNode(document: UiDocument, id: string): UiDocument {
   return insertAfter(document, id, cloneNodeWithNewIds(node));
 }
 
-export function validateUiDocument(value: unknown): UiDocument {
+export function validateUiSurfaceTokenManifest(value: unknown): UiSurfaceTokenManifest {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new Error("UI surface token manifest must be an object.");
+  }
+  const candidate = value as Partial<UiSurfaceTokenManifest>;
+  if (!candidate.surface || typeof candidate.surface !== "string") {
+    throw new Error("UI surface token manifest surface is missing.");
+  }
+  return {
+    surface: normalizeUiSurface(candidate.surface),
+    components: validateTokenArray(candidate.components, "components"),
+    textBindings: validateTokenArray(candidate.textBindings, "textBindings"),
+    actions: validateTokenArray(candidate.actions, "actions"),
+  };
+}
+
+export function validateUiDocument(
+  value: unknown,
+  options: UiDocumentValidationOptions = {},
+): UiDocument {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     throw new Error("Document must be an object.");
   }
@@ -479,7 +497,7 @@ export function validateUiDocument(value: unknown): UiDocument {
   if (candidate.root.kind !== "screen") throw new Error("Document root must be a screen node.");
   validateNode(candidate.root, new Set<string>());
   const document = { ...candidate, surface: normalizeUiSurface(candidate.surface) } as UiDocument;
-  validateSurfaceTokens(document);
+  validateSurfaceTokens(document, options);
   return document;
 }
 
@@ -645,6 +663,18 @@ function validateOptionalString(
   }
 }
 
+function validateTokenArray(value: unknown, key: string): string[] {
+  if (!Array.isArray(value)) {
+    throw new Error(`UI surface token manifest ${key} must be an array.`);
+  }
+  for (const item of value) {
+    if (typeof item !== "string" || item.length === 0) {
+      throw new Error(`UI surface token manifest ${key} entries must be non-empty strings.`);
+    }
+  }
+  return [...value];
+}
+
 function validateButtonSettings(node: UiNode): void {
   if (node.buttonVariant !== undefined) {
     if (
@@ -671,7 +701,7 @@ function validateKindSpecificFields(node: UiNode): void {
   if (node.placeholder !== undefined && node.kind !== "input") {
     throw new Error(`Node ${node.id} ${node.kind} cannot use placeholder.`);
   }
-  if (node.action !== undefined && node.kind !== "button" && node.kind !== "input") {
+  if (node.action !== undefined && node.kind !== "button") {
     throw new Error(`Node ${node.id} ${node.kind} cannot use action.`);
   }
   if (node.textBinding !== undefined && node.kind !== "text") {
@@ -916,6 +946,8 @@ function validateSize(node: UiNode, key: "width" | "height"): void {
     if (!Number.isFinite(value) || value < 0 || value > 4096) {
       throw new Error(`Node ${node.id} has invalid fixed ${key} sizing.`);
     }
+  } else if (size.value !== undefined) {
+    throw new Error(`Node ${node.id} ${key} value is only valid for fixed sizing.`);
   }
 }
 
@@ -931,10 +963,13 @@ function validateSizeBound(
   }
 }
 
-function validateSurfaceTokens(document: UiDocument): void {
-  const manifest = surfaceTokenManifest(document.surface);
+function validateSurfaceTokens(
+  document: UiDocument,
+  options: UiDocumentValidationOptions,
+): void {
+  const manifest = surfaceTokenManifest(document.surface, options.tokenManifests ?? []);
   if (!manifest) {
-    if (nodeHasSurfaceTokens(document.root)) {
+    if (options.requireTokenManifestForSurfaceTokens && nodeHasSurfaceTokens(document.root)) {
       throw new Error(`Surface ${document.surface} needs a UI token manifest.`);
     }
     return;
@@ -942,9 +977,12 @@ function validateSurfaceTokens(document: UiDocument): void {
   validateSurfaceNodeTokens(document.root, manifest);
 }
 
-function surfaceTokenManifest(surface: string): UiSurfaceTokenManifest | null {
+function surfaceTokenManifest(
+  surface: string,
+  manifests: UiSurfaceTokenManifest[],
+): UiSurfaceTokenManifest | null {
   const normalized = normalizeUiSurface(surface);
-  return SURFACE_TOKEN_MANIFESTS.find((manifest) => normalizeUiSurface(manifest.surface) === normalized) ??
+  return manifests.find((manifest) => normalizeUiSurface(manifest.surface) === normalized) ??
     null;
 }
 

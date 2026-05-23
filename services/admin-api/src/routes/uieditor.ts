@@ -19,8 +19,10 @@ import {
   normalizeUiSurface,
   uiLayoutFilename,
   validateUiDocument,
+  validateUiSurfaceTokenManifest,
   type UiDocument,
   type UiDocumentReference,
+  type UiSurfaceTokenManifest,
 } from "@silencer/ui-layout";
 import { requireAuth, requireRole } from "../auth/jwt.js";
 import { ASSETS_DIR } from "../config.js";
@@ -30,6 +32,12 @@ const router = Router();
 interface UiDocumentPayload {
   document: UiDocument;
   expectedRevision?: string | null;
+}
+
+interface UiEditorDocumentResponse {
+  document: UiDocument;
+  reference: UiDocumentReference;
+  tokenManifest: UiSurfaceTokenManifest | null;
 }
 
 interface RouteRequest {
@@ -64,6 +72,31 @@ function uiLayoutsDir(): string {
 
 function diskPath(surface: string): string {
   return join(uiLayoutsDir(), uiLayoutFilename(surface));
+}
+
+function tokenManifestPath(surface: string): string {
+  return join(uiLayoutsDir(), `${normalizeUiSurface(surface)}.silencer-ui.tokens.json`);
+}
+
+function readUiSurfaceTokenManifest(surface: string): UiSurfaceTokenManifest | null {
+  const path = tokenManifestPath(surface);
+  if (!existsSync(path)) return null;
+  try {
+    return validateUiSurfaceTokenManifest(JSON.parse(readFileSync(path, "utf8")));
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(`Invalid UI token manifest ${path}: ${message}`);
+  }
+}
+
+function validateUiDocumentWithAssetTokens(value: unknown): UiDocument {
+  const raw = value as Partial<UiDocument> | null | undefined;
+  const surface = typeof raw?.surface === "string" ? normalizeUiSurface(raw.surface) : "";
+  const manifest = surface ? readUiSurfaceTokenManifest(surface) : null;
+  return validateUiDocument(value, {
+    tokenManifests: manifest ? [manifest] : [],
+    requireTokenManifestForSurfaceTokens: true,
+  });
 }
 
 function revisionForText(text: string): string {
@@ -102,6 +135,7 @@ export function listUiLayoutDocuments(): UiDocumentReference[] {
 export function readUiLayoutDocument(surface: string): {
   document: UiDocument;
   reference: UiDocumentReference;
+  tokenManifest: UiSurfaceTokenManifest | null;
 } {
   requireLayoutsDir();
   const normalizedSurface = normalizeUiSurface(surface);
@@ -116,20 +150,18 @@ export function readUiLayoutDocument(surface: string): {
   return {
     document,
     reference: referenceForDocument(document, filename, statSync(path), revisionForText(raw)),
+    tokenManifest: readUiSurfaceTokenManifest(normalizedSurface),
   };
 }
 
 export function writeUiLayoutDocument(
   surface: string,
   body: unknown,
-): {
-  document: UiDocument;
-  reference: UiDocumentReference;
-} {
+): UiEditorDocumentResponse {
   requireLayoutsDir();
   const normalizedSurface = normalizeUiSurface(surface);
   const payload = body as Partial<UiDocumentPayload> | null | undefined;
-  const document = validateUiDocument(payload?.document);
+  const document = validateUiDocumentWithAssetTokens(payload?.document);
   if (document.surface !== normalizedSurface) {
     throw new HttpError(
       `Route surface ${normalizedSurface} does not match document surface ${document.surface}.`,
@@ -157,7 +189,7 @@ export function writeUiLayoutDocument(
 
 function validateStoredDocument(filename: string, raw: string): UiDocument {
   try {
-    const document = validateUiDocument(JSON.parse(raw));
+    const document = validateUiDocumentWithAssetTokens(JSON.parse(raw));
     const expectedFilename = uiLayoutFilename(document.surface);
     if (filename !== expectedFilename) throw new Error(`filename must be ${expectedFilename}`);
     return document;

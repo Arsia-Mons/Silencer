@@ -10,6 +10,13 @@ import {
   validateUiDocument,
 } from "./ui-layout";
 
+const MAIN_MENU_TOKENS = {
+  surface: "main-menu",
+  components: ["main-menu.logo"],
+  textBindings: ["client.version"],
+  actions: ["main_menu.tutorial", "main_menu.lobby", "main_menu.options", "main_menu.exit"],
+};
+
 describe("ui-layout model", () => {
   test("inserts children into container nodes immutably", () => {
     const original = createDefaultUiDocument();
@@ -229,20 +236,35 @@ describe("ui-layout model", () => {
   test("rejects surface tokens outside the manifest", () => {
     const unknownAction = JSON.parse(JSON.stringify(createDefaultUiDocument()));
     (findNode(unknownAction.root, "MainMenuTutorialButton") as any).action = "main_menu.credits";
-    expect(() => validateUiDocument(unknownAction)).toThrow(
+    expect(() => validateUiDocument(unknownAction, { tokenManifests: [MAIN_MENU_TOKENS] })).toThrow(
       "Node MainMenuTutorialButton references unknown action main_menu.credits.",
     );
 
     const unknownComponent = JSON.parse(JSON.stringify(createDefaultUiDocument()));
     (findNode(unknownComponent.root, "MainMenuSilencerLogo") as any).component =
       "main-menu.badge";
-    expect(() => validateUiDocument(unknownComponent)).toThrow(
-      "Node MainMenuSilencerLogo references unknown component main-menu.badge.",
+    expect(() =>
+      validateUiDocument(unknownComponent, { tokenManifests: [MAIN_MENU_TOKENS] })
+    ).toThrow("Node MainMenuSilencerLogo references unknown component main-menu.badge.");
+
+    const unknownBinding = JSON.parse(JSON.stringify(createDefaultUiDocument()));
+    (findNode(unknownBinding.root, "MainMenuVersion") as any).textBinding = "client.badge";
+    expect(() =>
+      validateUiDocument(unknownBinding, { tokenManifests: [MAIN_MENU_TOKENS] })
+    ).toThrow("Node MainMenuVersion references unknown text binding client.badge.");
+
+    const missingManifest = JSON.parse(JSON.stringify(createDefaultUiDocument()));
+    expect(() =>
+      validateUiDocument(missingManifest, { requireTokenManifestForSurfaceTokens: true })
+    ).toThrow(
+      "Surface main-menu needs a UI token manifest.",
     );
 
     const unknownSurface = JSON.parse(JSON.stringify(createDefaultUiDocument()));
     unknownSurface.surface = "custom-screen";
-    expect(() => validateUiDocument(unknownSurface)).toThrow(
+    expect(() =>
+      validateUiDocument(unknownSurface, { requireTokenManifestForSurfaceTokens: true })
+    ).toThrow(
       "Surface custom-screen needs a UI token manifest.",
     );
   });
@@ -270,6 +292,12 @@ describe("ui-layout model", () => {
       "Node input-player name input width and height must be fixed.",
     );
 
+    const inputAction = createNode("input", "lobby password", { action: "lobby.password" });
+    const inputActionDocument = insertChild(createDefaultUiDocument(), "MainMenuRoot", inputAction);
+    expect(() => validateUiDocument(inputActionDocument)).toThrow(
+      "Node input-lobby password input cannot use action.",
+    );
+
     const wrongKindField = JSON.parse(JSON.stringify(createDefaultUiDocument()));
     wrongKindField.root.component = "main-menu.logo";
     expect(() => validateUiDocument(wrongKindField)).toThrow(
@@ -280,6 +308,12 @@ describe("ui-layout model", () => {
     (findNode(fixedBounds.root, "MainMenuTutorialSpacer") as any).style.width.max = 48;
     expect(() => validateUiDocument(fixedBounds)).toThrow(
       "Node MainMenuTutorialSpacer fixed width sizing cannot use min or max.",
+    );
+
+    const fitValue = JSON.parse(JSON.stringify(createDefaultUiDocument()));
+    (findNode(fitValue.root, "MainMenuActionGroup") as any).style.width.value = 220;
+    expect(() => validateUiDocument(fitValue)).toThrow(
+      "Node MainMenuActionGroup width value is only valid for fixed sizing.",
     );
   });
 });

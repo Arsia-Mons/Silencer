@@ -24,6 +24,7 @@ import {
   type UiNode,
   type UiNodeKind,
   type UiStyle,
+  type UiSurfaceTokenManifest,
 } from "../../lib/ui-layout";
 import { Canvas } from "./components/Canvas";
 import { EditorTopBar } from "./components/EditorTopBar";
@@ -41,6 +42,7 @@ export default function UiEditorPage() {
   const importInputRef = useRef<HTMLInputElement | null>(null);
   const [document, setDocument] = useState<UiDocument>(() => createDefaultUiDocument());
   const [documents, setDocuments] = useState<UiDocumentReference[]>([]);
+  const [tokenManifests, setTokenManifests] = useState<Record<string, UiSurfaceTokenManifest>>({});
   const [currentRevision, setCurrentRevision] = useState<string | null>(null);
   const [dirty, setDirty] = useState(false);
   const [selectedId, setSelectedId] = useState("MainMenuActionGroup");
@@ -72,8 +74,9 @@ export default function UiEditorPage() {
           loadedDocuments[0];
         if (preferred) {
           const loaded = await getUiEditorDocument(preferred.surface);
-          const parsed = validateUiDocument(loaded.document);
+          const parsed = validateUiDocumentForTokens(loaded.document, loaded.tokenManifest);
           if (cancelled) return;
+          rememberTokenManifest(loaded.tokenManifest);
           setDocument(parsed);
           setSelectedId(parsed.root.id);
           setCurrentRevision(loaded.reference.revision);
@@ -157,6 +160,24 @@ export default function UiEditorPage() {
     updateSelectedNode((node) => ({ ...node, style: { ...node.style, ...style } }));
   }
 
+  function rememberTokenManifest(manifest: UiSurfaceTokenManifest | null | undefined) {
+    if (!manifest) return;
+    setTokenManifests((current) => ({
+      ...current,
+      [normalizeUiSurface(manifest.surface)]: manifest,
+    }));
+  }
+
+  function validateDocumentForEditor(value: unknown): UiDocument {
+    const raw = value as Partial<UiDocument> | null | undefined;
+    const surface = typeof raw?.surface === "string" ? normalizeUiSurface(raw.surface) : "";
+    const manifest = surface ? tokenManifests[surface] : undefined;
+    return validateUiDocument(value, {
+      tokenManifests: manifest ? [manifest] : [],
+      requireTokenManifestForSurfaceTokens: Boolean(manifest),
+    });
+  }
+
   function addNode(kind: UiNodeKind, targetId = selectedNode.id) {
     const target = findNode(document.root, targetId) ?? document.root;
     const node = createNode(kind);
@@ -188,7 +209,7 @@ export default function UiEditorPage() {
     const file = event.target.files?.[0];
     if (!file) return;
     try {
-      const parsed = validateUiDocument(JSON.parse(await file.text()));
+      const parsed = validateDocumentForEditor(JSON.parse(await file.text()));
       if (normalizeUiSurface(parsed.surface) !== normalizeUiSurface(document.surface)) {
         clearLocalDraft(document.surface);
       }
@@ -220,7 +241,8 @@ export default function UiEditorPage() {
       }
 
       const loaded = await getUiEditorDocument(surface);
-      const parsed = validateUiDocument(loaded.document);
+      const parsed = validateUiDocumentForTokens(loaded.document, loaded.tokenManifest);
+      rememberTokenManifest(loaded.tokenManifest);
       setDocument(parsed);
       setSelectedId(parsed.root.id);
       setCurrentRevision(loaded.reference.revision);
@@ -233,13 +255,14 @@ export default function UiEditorPage() {
 
   async function saveDocument() {
     try {
-      const next = validateUiDocument({
+      const next = validateDocumentForEditor({
         ...document,
         surface: normalizeUiSurface(document.surface),
       });
       setStatus(`SAVING ${next.surface}`);
       const saved = await saveUiEditorDocument(next, currentRevision);
-      const parsed = validateUiDocument(saved.document);
+      const parsed = validateUiDocumentForTokens(saved.document, saved.tokenManifest);
+      rememberTokenManifest(saved.tokenManifest);
       setDocument(parsed);
       setSelectedId(selectedNode.id);
       setCurrentRevision(saved.reference.revision);
@@ -292,7 +315,7 @@ export default function UiEditorPage() {
           onSave={saveDocument}
           onDownloadJson={downloadDocument}
           onReset={() => {
-            const next = validateUiDocument({
+            const next = validateDocumentForEditor({
               ...createDefaultUiDocument(),
               surface: normalizeUiSurface(document.surface),
             });
@@ -430,6 +453,16 @@ function clearLocalDraft(surface: string) {
   if (legacyDraft && normalizeUiSurface(legacyDraft.document.surface) === normalizedSurface) {
     localStorage.removeItem(STORAGE_KEY);
   }
+}
+
+function validateUiDocumentForTokens(
+  value: unknown,
+  tokenManifest: UiSurfaceTokenManifest | null | undefined,
+): UiDocument {
+  return validateUiDocument(value, {
+    tokenManifests: tokenManifest ? [tokenManifest] : [],
+    requireTokenManifestForSurfaceTokens: Boolean(tokenManifest),
+  });
 }
 
 function applyViewportPreset(document: UiDocument, preset: (typeof PRESETS)[number]): UiDocument {
