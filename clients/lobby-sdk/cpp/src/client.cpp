@@ -246,6 +246,11 @@ void Client::dispatch_frame(const std::vector<uint8_t>& payload) {
             if (user_info_cb_) user_info_cb_(u);
             break;
         }
+        case OpCharacters: {
+            CharactersPayload c = decode_characters(r);
+            if (characters_cb_) characters_cb_(c);
+            break;
+        }
         case OpPing:
             send_raw(encode_ping_ack());
             break;
@@ -320,18 +325,26 @@ void Client::request_user_info(uint32_t account_id) {
     send_raw(encode_user_info_request(account_id));
 }
 
-void Client::upgrade_stat(uint8_t agency_idx, uint8_t stat_id) {
-    send_raw(encode_upgrade_stat(agency_idx, stat_id));
+void Client::upgrade_stat(uint32_t character_id, uint8_t agency_idx, StatId stat_id) {
+    send_raw(encode_upgrade_stat(character_id, agency_idx, stat_id));
 }
 
 void Client::set_game(uint32_t game_id, GameStatus status) {
     send_raw(encode_set_game(game_id, status));
 }
 
+void Client::create_character(const std::string& name, uint8_t agency_idx) {
+    send_raw(encode_create_character(name, agency_idx));
+}
+
+void Client::select_character(uint32_t character_id) {
+    send_raw(encode_select_character(character_id));
+}
+
 void Client::register_stats(uint32_t game_id, uint8_t team_number, uint32_t account_id,
-                            uint8_t stats_agency, bool won, uint32_t xp,
+                            uint32_t character_id, uint8_t stats_agency, bool won, uint32_t xp,
                             const MatchStats& stats) {
-    send_raw(encode_register_stats(game_id, team_number, account_id, stats_agency,
+    send_raw(encode_register_stats(game_id, team_number, account_id, character_id, stats_agency,
                                    won, xp, stats));
 }
 

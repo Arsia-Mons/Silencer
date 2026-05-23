@@ -18,7 +18,7 @@ public:
 	bool ReadHeader(class World & world);
 	bool ReadToNextTick(class World & world);
 	void WriteGameInfo(LobbyGame & gameinfo);
-	void WriteNewPeer(Uint8 agency, Uint32 accountid);
+	void WriteNewPeer(Uint8 agency, Uint32 accountid, Uint32 selectedcharid);
 	void WriteStart(void);
 	void WriteUserInfo(class User & user);
 	void WriteChangeTeam(Uint8 peerid);

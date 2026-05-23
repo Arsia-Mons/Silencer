@@ -22,6 +22,7 @@ enum : Uint8 {
 	JOINGAME,
 	REPLAYGAME,
 	TESTGAME,
+	CREATECHARACTER,
 };
 }
 

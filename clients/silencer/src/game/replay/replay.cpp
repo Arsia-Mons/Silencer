@@ -149,9 +149,11 @@ bool Replay::ReadToNextTick(World & world){
 				printf("RPL_NEWPEER\n");
 				Uint8 agency;
 				Uint32 accountid;
+				Uint32 selectedcharid;
 				SDL_ReadIO(file, &agency, 1);
 				SDL_ReadIO(file, &accountid, sizeof(accountid));
-				world.AddPeer((char *)"local", uniqueport++, agency, accountid);
+				SDL_ReadIO(file, &selectedcharid, sizeof(selectedcharid));
+				world.AddPeer((char *)"local", uniqueport++, agency, accountid, selectedcharid);
 			}break;
 			case RPL_START:{
 				printf("RPL_START\n");
@@ -260,11 +262,12 @@ void Replay::WriteGameInfo(LobbyGame & gameinfo){
 	SDL_WriteIO(file, data.data, data.BitsToBytes(data.offset));
 }
 
-void Replay::WriteNewPeer(Uint8 agency, Uint32 accountid){
+void Replay::WriteNewPeer(Uint8 agency, Uint32 accountid, Uint32 selectedcharid){
 	Uint8 code = RPL_NEWPEER;
 	SDL_WriteIO(file, &code, 1);
 	SDL_WriteIO(file, &agency, 1);
 	SDL_WriteIO(file, &accountid, sizeof(accountid));
+	SDL_WriteIO(file, &selectedcharid, sizeof(selectedcharid));
 }
 
 void Replay::WriteStart(void){

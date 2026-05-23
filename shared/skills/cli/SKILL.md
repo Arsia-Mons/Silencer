@@ -255,6 +255,69 @@ cli --port "$PORT" resume
 bun clients/cli/index.ts lobby ls | jq '.sessions[] | {name,state,accountId}'
 ```
 
+### Capture sampled E2E videos
+
+For proof videos, keep the journey script semantic and let a background
+sampler observe the framebuffer. Do **not** turn every action into a
+bespoke "capture N frames" block; that makes flows brittle. Start the
+sampler before the first UI action, run normal CLI waits/clicks/keys,
+stop it after the final state plus a short tail, then encode the dense
+PNG sequence.
+
+```bash
+. tests/cli-agent/e2e/lib.sh
+PORT=$(pick_port); PID=$(start_silencer "$PORT")
+wait_alive "$PORT"
+
+FRAMES=$(mktemp -d /tmp/silencer-e2e-video.XXXXXX)
+STOP="$FRAMES/stop-sampler"
+cleanup() {
+  touch "$STOP"
+  stop_silencer "$PID" "$PORT"
+}
+trap cleanup EXIT
+
+(
+  i=1
+  while [ ! -f "$STOP" ]; do
+    out=$(printf "%s/%05d.png" "$FRAMES" "$i")
+    tmp="$out.tmp"
+    if cli --port "$PORT" screenshot --out "$tmp" >/dev/null 2>&1 && [ -s "$tmp" ]; then
+      mv "$tmp" "$out"
+      i=$((i + 1))
+    else
+      rm -f "$tmp"
+    fi
+    sleep 0.07  # ~12 fps target; tune to screenshot throughput
+  done
+) &
+SAMPLER_PID=$!
+
+# Normal semantic journey. The sampler is the video capture mechanism.
+cli --port "$PORT" wait_for_state --state MAINMENU --timeout-ms 15000
+cli --port "$PORT" click --label "Connect To Lobby"
+cli --port "$PORT" wait_for_state --state LOBBYCONNECT --timeout-ms 12000
+
+# For visible typing, prefer `key` over `set_text`. Use --ascii for
+# digits/punctuation so the CLI parser cannot coerce the value to a number.
+for code in 101 50 101 118 105 100 101 111; do
+  cli --port "$PORT" key --ascii "$code"
+  sleep 0.12
+done
+
+sleep 1
+touch "$STOP"
+wait "$SAMPLER_PID" || true
+ffmpeg -framerate 12 -i "$FRAMES/%05d.png" -vf "format=yuv420p" \
+  -c:v libx264 -preset veryfast -crf 20 -movflags +faststart /tmp/silencer-e2e.mp4
+```
+
+Use `wait_for_state`, `inspect` polling, and small wall-clock sleeps for
+flow synchronization. Avoid `step --frames` in these videos: it pauses
+after advancing and can stall fades/transitions unless the whole script
+intentionally owns the frame clock. `set_text` is fine for setup, but
+`key --ascii` or `key --key <letter>` produces a more realistic recording.
+
 ## Gotchas
 
 - **macOS binary path.** Lives at
@@ -265,9 +328,10 @@ bun clients/cli/index.ts lobby ls | jq '.sessions[] | {name,state,accountId}'
 - **Single-player only for `pause` / `step`.** They error `WRONG_STATE`
   in live multiplayer (`peercount > 1` and INGAME). `step` always
   re-pauses after the span ends.
-- **One CLI at a time per game.** The control socket accepts one
-  client per session — don't run parallel CLI invocations against the
-  same port.
+- **Keep control commands short.** The control socket handles one
+  request per connection. A background screenshot sampler can run while
+  a semantic journey runs, but each individual CLI invocation should be
+  short-lived and the sampler should tolerate missed frames.
 - **Timeouts are milliseconds**, not seconds (`--timeout-ms`, default
   `5000`).
 - **Label matching is case-insensitive** and must be unambiguous —

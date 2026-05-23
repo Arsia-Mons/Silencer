@@ -2,18 +2,7 @@
 set -euo pipefail
 . "$(dirname "$0")/lib.sh"
 
-LOBBY_BIN=""
-for candidate in \
-  "$REPO_ROOT/services/lobby/lobby" \
-  "$REPO_ROOT/services/lobby/lobby.exe" \
-  "$REPO_ROOT/services/lobby/silencer-lobby" \
-  "$REPO_ROOT/services/lobby/silencer-lobby.exe"; do
-  if [ -x "$candidate" ]; then LOBBY_BIN="$candidate"; break; fi
-done
-if [ -z "$LOBBY_BIN" ]; then
-  echo "lobby binary missing under services/lobby/ — build it via 'cd services/lobby && go build'" >&2
-  exit 1
-fi
+LOBBY_BIN="$(lobby_bin)"
 
 PIXDIFF="$REPO_ROOT/tools/pixdiff/build/pixdiff"
 [ -x "$PIXDIFF" ] || {
@@ -37,21 +26,7 @@ cat > "$SILENCER_HOME/Library/Application Support/Silencer/config.cfg" <<EOF
 mapapiurl=http://127.0.0.1:$MAP_API_PORT
 EOF
 
-SILENCER_VERSION=""
-for cache in \
-  "$REPO_ROOT/build/CMakeCache.txt" \
-  "$REPO_ROOT/clients/silencer/build/CMakeCache.txt" \
-  "$REPO_ROOT/clients/silencer/build-unity/CMakeCache.txt" \
-  "$REPO_ROOT/clients/silencer/build-release/CMakeCache.txt"; do
-  if [ -f "$cache" ]; then
-    SILENCER_VERSION="$(awk -F= '/^SILENCER_VERSION:STRING=/{print $2}' "$cache")"
-    if [ -n "$SILENCER_VERSION" ]; then break; fi
-  fi
-done
-if [ -z "$SILENCER_VERSION" ]; then
-  echo "could not read SILENCER_VERSION from any CMakeCache.txt" >&2
-  exit 1
-fi
+SILENCER_VERSION="$(silencer_version)"
 
 cleanup() {
   if [ -n "${SILENCER_PID:-}" ]; then
@@ -134,7 +109,7 @@ cli --port "$CTRL_PORT" set_text --uid 1 --text "scrolltest" >/dev/null
 cli --port "$CTRL_PORT" set_text --uid 2 --text "secret" >/dev/null
 wait_for_lobby_state AUTHENTICATING
 cli --port "$CTRL_PORT" click --label "Login" >/dev/null
-cli --port "$CTRL_PORT" wait_for_state --state LOBBY --timeout-ms 15000 >/dev/null
+create_initial_character "Scrolltest"
 wait_for_widget "Create Game"
 cli --port "$CTRL_PORT" click --label "Create Game" >/dev/null
 cli --port "$CTRL_PORT" wait_frames --n 5 >/dev/null

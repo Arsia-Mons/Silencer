@@ -1,252 +1,521 @@
 #include "character_panel.h"
 
 #include "clay/clay.h"
-#include "clay_ui_compositor.h"
+#include "clay_ui_payloads.h"
 #include "runtime/UiInteractionRegistry.h"
+#include "primitives/button.h"
+#include "primitives/box.h"
 #include "primitives/text.h"
-#include "primitives/toggle.h"
 
 #include "config.h"
 #include "lobby.h"
 #include "resources.h"
-#include "team.h"
 #include "user.h"
 #include "world.h"
 
-#include <cstdio>
+#include <algorithm>
+#include <cstring>
 #include <string>
 
 using silencer::ui::primitives::Text;
 using silencer::ui::primitives::TextEffect;
+using silencer::ui::primitives::TextAlign;
 using silencer::ui::primitives::TextOpts;
+using silencer::ui::primitives::TextAdvance;
+using silencer::ui::primitives::TextLineHeight;
+using silencer::ui::primitives::MeasureText;
 using silencer::ui::primitives::TextSize;
-using silencer::ui::primitives::Toggle;
-using silencer::ui::primitives::ToggleHandle;
-using silencer::ui::primitives::ToggleOpts;
+using silencer::ui::primitives::TextWrap;
+using silencer::ui::primitives::Button;
+using silencer::ui::primitives::ButtonHandle;
+using silencer::ui::primitives::ButtonOpts;
+using silencer::ui::primitives::ButtonSize;
+using silencer::ui::primitives::ButtonVariant;
+using silencer::ui::primitives::Box;
+namespace BoxVariants = silencer::ui::primitives::BoxVariants;
 
 namespace silencer::client_ui::lobby {
+    namespace character_panel_detail {
+        constexpr const char *kActionAgents = "lobby.character.agents";
+        constexpr uint16_t kPanelPad = 6;
+        constexpr uint16_t kDetailsGap = 5;
+        constexpr uint16_t kStatRowGap = 2;
+        constexpr uint16_t kEmblemGap = 10;
+        constexpr uint16_t kInfoGap = 10;
+        constexpr uint16_t kButtonHeight = 21;
+        constexpr uint16_t kUpgradePanelPadX = 4;
+        constexpr uint16_t kUpgradePanelPadY = 3;
+        constexpr uint16_t kUpgradePanelHeight = 88;
+        constexpr uint16_t kUpgradeRowHeight = 12;
+        constexpr int kUpgradePanelMinWidth = 96;
+        constexpr int kUpgradeValueColumnMinWidth = 18;
+        constexpr int kActionButtonMinWidth = 92;
+        constexpr int kActionButtonPaddingX = 12;
+        constexpr uint16_t kAgencySpriteBank = 181;
+        constexpr int kEmblemWidthPct = 18;
+        constexpr int kEmblemMinWidth = 40;
+        constexpr int kEmblemMaxWidth = 64;
 
-namespace character_panel_detail {
+        // Per-frame text buffers. The layout pass keeps pointers to these for the
+        // duration of the layout, so they MUST live past BuildCharacterPanelTree's
+        // return. Static-lifetime works because the layout consumes them
+        // synchronously inside the caller's BeginLayout/EndLayout window.
+        struct StatsBuffers {
+            std::string name;
+            std::string level;
+            std::string wins;
+            std::string losses;
+            std::string xp;
+            std::string endurance;
+            std::string shield;
+            std::string jetpack;
+            std::string techslots;
+            std::string hacking;
+            std::string contacts;
+        };
 
-// Five (id, sprite-index, agency-enum) tuples. The element IDs and sprite
-// indices are 1:1 with the legacy CharacterPanel's CHR_TGL_* uids /
-// bank-181 indices, so render-time pixel layout is unchanged.
-struct AgencyDef {
-	const char * id;
-	const char * actionId;
-	Uint16 spriteIndex;
-	Uint8  agency;
-};
+        StatsBuffers g_stats;
 
-const AgencyDef kAgencies[5] = {
-	{ "CharTglNoxis",     "lobby.character.agency.noxis",     0, Team::NOXIS },
-	{ "CharTglLazarus",   "lobby.character.agency.lazarus",   1, Team::LAZARUS },
-	{ "CharTglCaliber",   "lobby.character.agency.caliber",   2, Team::CALIBER },
-	{ "CharTglStatic",    "lobby.character.agency.static",    3, Team::STATIC },
-	{ "CharTglBlackrose", "lobby.character.agency.blackrose", 4, Team::BLACKROSE },
-};
+        Clay_String FromStd(const std::string &s) {
+            Clay_String cs;
+            cs.isStaticallyAllocated = false;
+            cs.length = static_cast<int32_t>(s.size());
+            cs.chars = s.c_str();
+            return cs;
+        }
 
-// Inspector labels — one per agency, in the same order as kAgencies.
-const char * kAgencyLabels[5] = { "Noxis", "Lazarus", "Caliber", "Static", "Blackrose" };
+        Clay_String FromCStr(const char *s) {
+            Clay_String cs;
+            cs.isStaticallyAllocated = false;
+            cs.length = static_cast<int32_t>(std::strlen(s));
+            cs.chars = s;
+            return cs;
+        }
 
-// Per-frame text buffers. The layout pass keeps pointers to these for the
-// duration of the layout, so they MUST live past BuildCharacterPanelTree's
-// return. Static-lifetime works because the layout consumes them
-// synchronously inside the caller's BeginLayout/EndLayout window.
-struct StatsBuffers {
-	std::string username;
-	std::string level;
-	std::string wins;
-	std::string losses;
-	std::string xp;
-};
-StatsBuffers g_stats;
+        int ClampInt(int value, int lo, int hi) {
+            return std::max(lo, std::min(value, hi));
+        }
 
-Clay_String FromStd(const std::string & s) {
-	Clay_String cs;
-	cs.isStaticallyAllocated = false;
-	cs.length = static_cast<int32_t>(s.size());
-	cs.chars = s.c_str();
-	return cs;
-}
+        std::string FitMiddleEllipsis(const std::string &text,
+                                      TextSize size,
+                                      int availablePx) {
+            const int advance = std::max(1, static_cast<int>(TextAdvance(size)));
+            const int maxChars = availablePx / advance;
+            if (maxChars <= 0) return "";
+            if (static_cast<int>(text.size()) <= maxChars) return text;
+            if (maxChars <= 3) return text.substr(0, static_cast<size_t>(maxChars));
 
-const TextOpts kStatsOpts{
-	.size = TextSize::BodySm,
-	.effect = TextEffect::LegacyPalette(129, 160, true),
-};
+            const int kept = maxChars - 3;
+            const int front = (kept + 1) / 2;
+            const int back = kept - front;
+            return text.substr(0, static_cast<size_t>(front)) + "..." +
+                   text.substr(text.size() - static_cast<size_t>(back));
+        }
 
-constexpr uint16_t kPanelPad       = 6;
-constexpr uint16_t kStatsPadTop    = 10;
-constexpr int kStatsChildGap    = 2;
+        int BodyTextWidth(const std::string &text) {
+            return static_cast<int>(
+                MeasureText(FromStd(text), TextSize::Body).width);
+        }
 
-}  // namespace character_panel_detail
+        // One stat row: a fixed-width label column followed by its value, kept as a
+        // tight pair (the Game Options label/value convention). The fixed label
+        // column aligns all three values into a clean column. Rows grow to fill the
+        // table height; styling is default Body text.
+        void StatRow(int index,
+                     const char *label,
+                     const std::string &value,
+                     int labelColumnWidth) {
+            CLAY({ .id = CLAY_IDI("CharacterPanelStatRow", index),
+                 .layout = {
+                 .sizing = { CLAY_SIZING_FIT(0), CLAY_SIZING_GROW(0) },
+                 .childGap = 8,
+                 .childAlignment = { .x = CLAY_ALIGN_X_LEFT,
+                 .y = CLAY_ALIGN_Y_CENTER },
+                 .layoutDirection = CLAY_LEFT_TO_RIGHT,
+                 },
+                 .clip = { .horizontal = true } }) {
+                CLAY({ .id = CLAY_IDI("CharacterPanelStatLabel", index),
+                     .layout = {
+                     .sizing = { CLAY_SIZING_FIXED(static_cast<float>(labelColumnWidth)),
+                     CLAY_SIZING_GROW(0) },
+                     .childAlignment = { .x = CLAY_ALIGN_X_LEFT,
+                     .y = CLAY_ALIGN_Y_CENTER },
+                     },
+                     .clip = { .horizontal = true } }) {
+                    Text(FromCStr(label),
+                         TextOpts{.size = TextSize::Body, .wrap = TextWrap::None});
+                }
+                Text(FromStd(value),
+                     TextOpts{.size = TextSize::Body, .wrap = TextWrap::None});
+            }
+        }
 
-void CharacterPanelInit(CharacterPanelState & state) {
-	state.selectedAgency = Config::GetInstance().defaultagency;
-	state.lastReconciled = -1;  // forces first-frame reconcile pass
-}
+        void UpgradeRow(int index,
+                        const char *label,
+                        const std::string &value,
+                        int valueColumnWidth) {
+            CLAY({ .id = CLAY_IDI("CharacterPanelUpgradeRow", index),
+                 .layout = {
+                 .sizing = {
+                 CLAY_SIZING_GROW(0),
+                 CLAY_SIZING_FIXED(static_cast<float>(kUpgradeRowHeight)),
+                 },
+                 .childGap = 6,
+                 .childAlignment = { .x = CLAY_ALIGN_X_LEFT,
+                 .y = CLAY_ALIGN_Y_CENTER },
+                 .layoutDirection = CLAY_LEFT_TO_RIGHT,
+                 },
+                 .clip = { .horizontal = true } }) {
+                CLAY({ .id = CLAY_IDI("CharacterPanelUpgradeLabel", index),
+                     .layout = {
+                     .sizing = { CLAY_SIZING_GROW(0),
+                     CLAY_SIZING_GROW(0) },
+                     .childAlignment = { .x = CLAY_ALIGN_X_LEFT,
+                     .y = CLAY_ALIGN_Y_CENTER },
+                     },
+                     .clip = { .horizontal = true } }) {
+                    Text(FromCStr(label),
+                         TextOpts{.size = TextSize::Body, .wrap = TextWrap::None});
+                }
 
-void CharacterPanelTick(CharacterPanelState & state, World & world) {
-	if(static_cast<int>(state.selectedAgency) != state.lastReconciled){
-		Config::GetInstance().defaultagency = state.selectedAgency;
-		Config::GetInstance().Save();
-		state.lastReconciled = state.selectedAgency;
-		if(world.IsConnected()){
-			world.SetAgency(state.selectedAgency);
-		}
-	}
-}
+                CLAY({ .id = CLAY_IDI("CharacterPanelUpgradeValue", index),
+                     .layout = {
+                     .sizing = {
+                     CLAY_SIZING_FIXED(static_cast<float>(valueColumnWidth)),
+                     CLAY_SIZING_GROW(0),
+                     },
+                     .childAlignment = { .x = CLAY_ALIGN_X_RIGHT,
+                     .y = CLAY_ALIGN_Y_CENTER },
+                     },
+                     .clip = { .horizontal = true } }) {
+                    Text(FromStd(value),
+                         TextOpts{
+                             .size = TextSize::Body,
+                             .align = TextAlign::Right,
+                             .wrap = TextWrap::None
+                         });
+                }
+            }
+        }
 
-bool CharacterPanelHandleUiIntent(CharacterPanelState & state,
-                                  const silencer::ui::UiAction & action) {
-	if(action.kind != silencer::ui::UiActionKind::Activate) return false;
-	for(const character_panel_detail::AgencyDef & def : character_panel_detail::kAgencies){
-		if(action.id == def.actionId){
-			state.selectedAgency = def.agency;
-			return true;
-		}
-	}
-	return false;
-}
+        // Render the agency crest as a scaling IMAGE element: it fills a fixed-width,
+        // body-height box and the compositor scales the sprite up (Contain, crisp
+        // nearest sampling) in its own palette — no green tint, no native-size cap.
+        void AgencyEmblem(Uint8 agency, int boxWidth) {
+            CLAY({ .id = CLAY_ID("CharacterPanelAgencyEmblem"),
+                 .layout = {
+                 .sizing = { CLAY_SIZING_FIXED(static_cast<float>(boxWidth)),
+                 CLAY_SIZING_FIXED(static_cast<float>(boxWidth)) },
+                 },
+                 .image = { .imageData = silencer::clay_bridge::PackImageContain(
+                     static_cast<Uint8>(kAgencySpriteBank), agency) } }) {
+            }
+        }
 
-void BuildCharacterPanelTree(CharacterPanelState & state,
-                             World & world,
-                             Resources & resources,
-                             silencer::ui::UiInteractionRegistry& interactions) {
-	// Refresh stat strings each frame. The legacy panel gated this behind
-	// `agencychanged` because Overlay objects retained their text from
-	// frame to frame; Clay rebuilds every frame from scratch, so we
-	// recompute unconditionally. The cost is five short string
-	// concatenations.
-	const Uint8 a = state.selectedAgency;
-	const char * uname = world.lobby.GetLocalUsername();
-	character_panel_detail::g_stats.username = uname ? uname : "";
+        void LevelBadge(const std::string &level, int width) {
+            CLAY({ .id = CLAY_ID("CharacterPanelLevelBadge"),
+                 .layout = {
+                 .sizing = { CLAY_SIZING_FIXED(static_cast<float>(width)),
+                 CLAY_SIZING_FIXED(static_cast<float>(
+                     TextLineHeight(TextSize::Body))) },
+                 .childAlignment = { .x = CLAY_ALIGN_X_CENTER,
+                 .y = CLAY_ALIGN_Y_CENTER },
+                 },
+                 .clip = { .horizontal = true } }) {
+                Text(FromStd(level),
+                     TextOpts{
+                         .size = TextSize::Body,
+                         .align = TextAlign::Center,
+                         .wrap = TextWrap::None
+                     });
+            }
+        }
 
-	User * user = world.lobby.GetUserInfo(world.lobby.accountid);
-	if(user && !user->retrieving){
-		// xptonextlevel is accumulated XP toward current level; threshold
-		// is 100*(level+1). Display the remaining amount. Mirrors the
-		// legacy formula exactly.
-		const int lvl = user->agency[a].level;
-		const int remaining = 100 * (lvl + 1) - static_cast<int>(user->agency[a].xptonextlevel);
-		character_panel_detail::g_stats.level  = "LEVEL: "             + std::to_string(lvl);
-		character_panel_detail::g_stats.wins   = "WINS: "              + std::to_string(user->agency[a].wins);
-		character_panel_detail::g_stats.losses = "LOSSES: "            + std::to_string(user->agency[a].losses);
-		character_panel_detail::g_stats.xp     = "XP TO NEXT LEVEL: "  + std::to_string(remaining);
-	}else{
-		// User info not yet retrieved. Render empty stats — the legacy
-		// behavior was to leave Overlay::text empty until the lobby
-		// replied, which renders nothing.
-		character_panel_detail::g_stats.level.clear();
-		character_panel_detail::g_stats.wins.clear();
-		character_panel_detail::g_stats.losses.clear();
-		character_panel_detail::g_stats.xp.clear();
-	}
+        void XpBadge(const std::string &Xp, int width) {
+            CLAY({ .id = CLAY_ID("CharacterPanelLevelBadge"),
+                 .layout = {
+                 .sizing = { CLAY_SIZING_FIXED(static_cast<float>(width)),
+                 CLAY_SIZING_FIXED(static_cast<float>(
+                     TextLineHeight(TextSize::Body))) },
+                 .childAlignment = { .x = CLAY_ALIGN_X_CENTER,
+                 .y = CLAY_ALIGN_Y_CENTER },
+                 },
+                 .clip = { .horizontal = true } }) {
+                Text(FromStd(Xp),
+                     TextOpts{
+                         .size = TextSize::Body,
+                         .align = TextAlign::Center,
+                         .wrap = TextWrap::None
+                     });
+            }
+        }
 
-	// The parent LobbyCharacterBox is supplied by the lobby shell. This
-	// function emits only content, so the layout owns a single scene graph instead
-	// of a Box nested inside another Box or root-attached legacy coordinates.
-	CLAY({ .id = CLAY_ID("CharacterPanelContent"),
-	       .layout = {
-	           .sizing = { CLAY_SIZING_GROW(0), CLAY_SIZING_GROW(0) },
-	           .padding = { character_panel_detail::kPanelPad, character_panel_detail::kPanelPad, character_panel_detail::kPanelPad, character_panel_detail::kPanelPad },
-	           .layoutDirection = CLAY_TOP_TO_BOTTOM,
-	       } }) {
+        void UpgradePanel(int valueColumnWidth) {
+            CLAY(Box(BoxVariants::Inset, {
+                .id = CLAY_ID("CharacterPanelUpgradePanel"),
+                .layout = {
+                .sizing = { CLAY_SIZING_GROW(0),
+                CLAY_SIZING_GROW(0) },
+                .padding = {
+                kUpgradePanelPadX,
+                kUpgradePanelPadX,
+                kUpgradePanelPadY,
+                kUpgradePanelPadY,
+                },
+                .childGap = character_panel_detail::kStatRowGap,
+                .layoutDirection = CLAY_TOP_TO_BOTTOM,
+                },
+                .clip = { .horizontal = true, .vertical = true },
+                })) {
+                UpgradeRow(10, "ENDURANCE:", g_stats.endurance, valueColumnWidth);
+                UpgradeRow(11, "SHIELD:", g_stats.shield, valueColumnWidth);
+                UpgradeRow(12, "JETPACK:", g_stats.jetpack, valueColumnWidth);
+                UpgradeRow(13, "TECH SLOTS:", g_stats.techslots, valueColumnWidth);
+                UpgradeRow(14, "HACKING:", g_stats.hacking, valueColumnWidth);
+                UpgradeRow(15, "CONTACTS:", g_stats.contacts, valueColumnWidth);
+            }
+        }
+    } // namespace character_panel_detail
 
-		// Username header. Match the legacy character panel treatment:
-		// font bank 134 / width 8 with palette color 200.
-		CLAY({ .id = CLAY_ID("CharUserWrap") }) {
-			Text(character_panel_detail::FromStd(character_panel_detail::g_stats.username),
-			     { .size = TextSize::Heading,
-			       .effect = TextEffect::LegacyPalette(200) });
-		}
+    void CharacterPanelInit(CharacterPanelState &state) {
+        state.selectedAgency = Config::GetInstance().defaultagency;
+        state.lastReconciled = -1; // forces first-frame reconcile pass
+        state.newCharacterRequested = false;
+    }
 
-		// Five agency toggles in a horizontal strip. The row fills the
-		// fixed-width character box and a flexible spacer between each
-		// toggle distributes the slack evenly, so all five fit regardless
-		// of their intrinsic sprite widths (a fixed childGap overflowed
-		// the clipped box and dropped the last agency).
-		CLAY({ .id = CLAY_ID("CharToggleRow"),
-		       .layout = {
-		           .sizing = { CLAY_SIZING_GROW(0), CLAY_SIZING_FIT(0) },
-		           .padding = { 0, 0, 4, 0 },
-		           .layoutDirection = CLAY_LEFT_TO_RIGHT,
-		       } }) {
-			for(int i = 0; i < 5; ++i){
-				if(i > 0){
-					CLAY({ .id = CLAY_IDI("CharToggleGap", i),
-					       .layout = {
-					           .sizing = { CLAY_SIZING_GROW(0),
-					                       CLAY_SIZING_FIXED(0) },
-					       } }) {}
-				}
-				const character_panel_detail::AgencyDef & def = character_panel_detail::kAgencies[i];
-				const Uint16 spriteW = resources.spritewidth[181][def.spriteIndex];
-				const Uint16 spriteH = resources.spriteheight[181][def.spriteIndex];
+    void CharacterPanelTick(CharacterPanelState &state, World &world) {
+        state.selectedAgency = world.lobby.GetSelectedAgencyOrDefault(Config::GetInstance().defaultagency);
+        state.agentSelectionLocked = world.IsConnected();
+        if (static_cast<int>(state.selectedAgency) != state.lastReconciled) {
+            state.lastReconciled = state.selectedAgency;
+            if (world.IsConnected()) {
+                world.SetAgency(state.selectedAgency);
+            }
+        }
+    }
 
-				Clay_String tglId;
-				tglId.isStaticallyAllocated = true;
-				tglId.length = static_cast<int32_t>(strlen(def.id));
-				tglId.chars  = def.id;
+    bool CharacterPanelHandleUiIntent(CharacterPanelState &state,
+                                      World &world,
+                                      const silencer::ui::UiAction &action) {
+        if (action.kind != silencer::ui::UiActionKind::Activate) return false;
+        if (action.id == character_panel_detail::kActionAgents) {
+            if (world.IsConnected()) return true;
+            state.newCharacterRequested = true;
+            return true;
+        }
+        return false;
+    }
 
-				Toggle(tglId,
-				       /*spriteBank=*/  181,
-				       /*spriteIndex=*/ def.spriteIndex,
-				       /*selected=*/    state.selectedAgency == def.agency,
-				       ToggleOpts{ .width  = spriteW > 0 ? spriteW : (Uint16)16,
-				                   .height = spriteH > 0 ? spriteH : (Uint16)16,
-				                   .effectColor          = 112,
-				                   .selectedBrightness   = 128,
-				                   .unselectedBrightness = 32 },
-				       ToggleHandle{ .hoveredOut = nullptr,
-				                     .actionId   = def.actionId,
-				                     .interactions = &interactions });
+    void BuildCharacterPanelTree(CharacterPanelState &state,
+                                 Uint16 panelWidth,
+                                 World &world,
+                                 Resources &resources,
+                                 silencer::ui::UiInteractionRegistry &interactions) {
+        // Refresh display strings each frame. Clay rebuilds this compact panel
+        // from scratch, so the buffers only need to remain stable through the
+        // current layout pass.
+        const Uint8 a = state.selectedAgency;
+        const Lobby::Character *ch = world.lobby.GetSelectedCharacter();
+        const int innerWidth = std::max(1,
+                                        static_cast<int>(panelWidth) -
+                                        2 * static_cast<int>(character_panel_detail::kPanelPad));
+        const int emblemBoxW = character_panel_detail::ClampInt(
+            innerWidth * character_panel_detail::kEmblemWidthPct / 100,
+            character_panel_detail::kEmblemMinWidth,
+            character_panel_detail::kEmblemMaxWidth);
+        const int detailsWidth = std::max(0,
+                                          innerWidth - emblemBoxW - static_cast<int>(
+                                              character_panel_detail::kEmblemGap));
+        character_panel_detail::g_stats.name =
+                character_panel_detail::FitMiddleEllipsis(
+                    ch ? std::string(ch->name) : std::string("No Agent"),
+                    TextSize::Heading,
+                    detailsWidth);
 
-				// Inspector hit rect uses the legacy on-screen coords so
-				// label-keyed CLI clicks keep working without depending on
-				// the flex-derived bbox being byte-identical. The CLAY
-				// inspector dispatch is label-based; the rect is only used
-				// when geometric hit-testing is requested.
-				const int tx = 20 + i * 42;
-				silencer::ui::UiInteractable w;
-				w.id = def.actionId;
-				w.labelText = character_panel_detail::kAgencyLabels[i];
-				w.kind  = silencer::ui::UiInteractableKind::Toggle;
-				w.x = tx; w.y = 90;
-				w.w = spriteW > 0 ? spriteW : (Uint16)16;
-				w.h = spriteH > 0 ? spriteH : (Uint16)16;
-				w.selected  = (state.selectedAgency == def.agency);
-				interactions.RegisterInteractable(w);
-			}
-		}
+        User *user = world.lobby.GetUserInfo(world.lobby.accountid);
+        if (user && !user->retrieving) {
+            const auto &stats = user->agency[a];
+            character_panel_detail::g_stats.level = "LV " + std::to_string(stats.level);
+            character_panel_detail::g_stats.wins = std::to_string(stats.wins);
+            character_panel_detail::g_stats.losses = std::to_string(stats.losses);
+            if (stats.level >= User::maxlevel) {
+                character_panel_detail::g_stats.xp = "MAX";
+            } else {
+                const int nextLevelXp = 100 * (static_cast<int>(stats.level) + 1);
+                character_panel_detail::g_stats.xp =
+                        std::to_string(stats.xptonextlevel) + "/" + std::to_string(nextLevelXp);
+            }
+            character_panel_detail::g_stats.endurance = std::to_string(stats.endurance);
+            character_panel_detail::g_stats.shield = std::to_string(stats.shield);
+            character_panel_detail::g_stats.jetpack = std::to_string(stats.jetpack);
+            character_panel_detail::g_stats.techslots = std::to_string(stats.techslots);
+            character_panel_detail::g_stats.hacking = std::to_string(stats.hacking);
+            character_panel_detail::g_stats.contacts = std::to_string(stats.contacts);
+        } else {
+            character_panel_detail::g_stats.level = "LV 0";
+            character_panel_detail::g_stats.wins = "0";
+            character_panel_detail::g_stats.losses = "0";
+            character_panel_detail::g_stats.xp = "0/100";
+            character_panel_detail::g_stats.endurance = "0";
+            character_panel_detail::g_stats.shield = "0";
+            character_panel_detail::g_stats.jetpack = "0";
+            character_panel_detail::g_stats.techslots = "0";
+            character_panel_detail::g_stats.hacking = "0";
+            character_panel_detail::g_stats.contacts = "0";
+        }
 
-		// LEVEL / WINS / LOSSES / XP — bank 133 / w7 / eff=129,
-		// brightness 160 (128+32), ramp on.
-		CLAY({ .id = CLAY_ID("CharStats"),
-		       .layout = {
-		           .padding = { 0, 0, character_panel_detail::kStatsPadTop, 0 },
-		           .childGap = (uint16_t)character_panel_detail::kStatsChildGap,
-		           .layoutDirection = CLAY_TOP_TO_BOTTOM,
-		       } }) {
-			const struct { const std::string * txt; const char * id; } kStatsRows[4] = {
-				{ &character_panel_detail::g_stats.level,  "CharStatLvl" },
-				{ &character_panel_detail::g_stats.wins,   "CharStatWin" },
-				{ &character_panel_detail::g_stats.losses, "CharStatLoss" },
-				{ &character_panel_detail::g_stats.xp,     "CharStatXp" },
-			};
-			for(int i = 0; i < 4; ++i){
-				if(kStatsRows[i].txt->empty()) continue;
-				Clay_String wrapId;
-				wrapId.isStaticallyAllocated = true;
-				wrapId.length = static_cast<int32_t>(strlen(kStatsRows[i].id));
-				wrapId.chars  = kStatsRows[i].id;
-				CLAY({ .id = CLAY_SID(wrapId) }) {
-					Text(character_panel_detail::FromStd(*kStatsRows[i].txt),
-					         character_panel_detail::kStatsOpts);
-				}
-			}
-		}
-	}
-}
+        // Fixed label column = widest label, so the three values align in a clean
+        // column without stretching label and value apart.
+        const int labelColumnWidth = static_cast<int>(
+                                         MeasureText(CLAY_STRING("LOSSES"), TextSize::Body).width) + 4;
+        int upgradeValueColumnWidth = character_panel_detail::BodyTextWidth(
+            character_panel_detail::g_stats.endurance);
+        upgradeValueColumnWidth = std::max(
+            upgradeValueColumnWidth,
+            character_panel_detail::BodyTextWidth(character_panel_detail::g_stats.shield));
+        upgradeValueColumnWidth = std::max(
+            upgradeValueColumnWidth,
+            character_panel_detail::BodyTextWidth(character_panel_detail::g_stats.jetpack));
+        upgradeValueColumnWidth = std::max(
+            upgradeValueColumnWidth,
+            character_panel_detail::BodyTextWidth(character_panel_detail::g_stats.techslots));
+        upgradeValueColumnWidth = std::max(
+            upgradeValueColumnWidth,
+            character_panel_detail::BodyTextWidth(character_panel_detail::g_stats.hacking));
+        upgradeValueColumnWidth = std::max(
+            upgradeValueColumnWidth,
+            character_panel_detail::BodyTextWidth(character_panel_detail::g_stats.contacts));
+        upgradeValueColumnWidth = std::max(
+            upgradeValueColumnWidth + 4,
+            character_panel_detail::kUpgradeValueColumnMinWidth);
 
-}  // namespace silencer::client_ui::lobby
+        // Crest + details column. The crest spans the identity/stat rows; the
+        // action stays in the right column below them, so the card reads as
+        // "crest, name/stats, then action" instead of a large avatar poster.
+        // The parent LobbyCharacterBox is supplied by the lobby shell; this
+        // function emits only content.
+        CLAY({ .id = CLAY_ID("CharacterPanelContent"),
+             .layout = {
+             .sizing = { CLAY_SIZING_GROW(0), CLAY_SIZING_GROW(0) },
+             .padding = { character_panel_detail::kPanelPad, character_panel_detail::kPanelPad,
+             character_panel_detail::kPanelPad, character_panel_detail::kPanelPad },
+             .childGap = character_panel_detail::kEmblemGap,
+             .childAlignment = { .x = CLAY_ALIGN_X_LEFT,
+             .y = CLAY_ALIGN_Y_TOP },
+             .layoutDirection = CLAY_LEFT_TO_RIGHT,
+             },
+             .clip = { .horizontal = true, .vertical = true } }) {
+            CLAY({ .id = CLAY_ID("CharacterPanelLeftRail"),
+                 .layout = {
+                 .sizing = { CLAY_SIZING_FIXED(static_cast<float>(emblemBoxW)),
+                 CLAY_SIZING_FIT(0) },
+                 .childGap = 4,
+                 .childAlignment = { .x = CLAY_ALIGN_X_CENTER,
+                 .y = CLAY_ALIGN_Y_TOP },
+                 .layoutDirection = CLAY_TOP_TO_BOTTOM,
+                 },
+                 .clip = { .horizontal = true } }) {
+                character_panel_detail::AgencyEmblem(a, emblemBoxW);
+                character_panel_detail::LevelBadge(
+                    character_panel_detail::g_stats.level,
+                    emblemBoxW);
+                character_panel_detail::XpBadge(
+                    "XP " + character_panel_detail::g_stats.xp,
+                    emblemBoxW);
+            }
+
+            CLAY({ .id = CLAY_ID("CharacterPanelInfoArea"),
+                 .layout = {
+                 .sizing = { CLAY_SIZING_GROW(0),
+                 CLAY_SIZING_GROW(0) },
+                .childGap = character_panel_detail::kDetailsGap,
+                 .childAlignment = { .x = CLAY_ALIGN_X_LEFT,
+                 .y = CLAY_ALIGN_Y_TOP },
+                 .layoutDirection = CLAY_TOP_TO_BOTTOM,
+                 },
+                 .clip = { .horizontal = true } }) {
+                CLAY({ .id = CLAY_ID("CharacterPanelNameHeader"),
+                     .layout = {
+                     .sizing = { CLAY_SIZING_GROW(0),
+                     CLAY_SIZING_FIXED(static_cast<float>(
+                         TextLineHeight(TextSize::Heading))) },
+                     .childAlignment = { .x = CLAY_ALIGN_X_LEFT,
+                     .y = CLAY_ALIGN_Y_TOP },
+                     },
+                     .clip = { .horizontal = true } }) {
+                    Text(character_panel_detail::FromStd(character_panel_detail::g_stats.name),
+                         TextOpts{
+                             .size = TextSize::Heading,
+                             .wrap = TextWrap::None,
+                             .effect = TextEffect::LegacyPalette(200)
+                         });
+                }
+                CLAY({ .id = CLAY_ID("CharacterPanelDetailsArea"),
+                     .layout = {
+                     .sizing = { CLAY_SIZING_GROW(), CLAY_SIZING_GROW(0) },
+                     .childGap = character_panel_detail::kDetailsGap,
+                     .childAlignment = { .x = CLAY_ALIGN_X_LEFT,
+                     .y = CLAY_ALIGN_Y_CENTER },
+                     .layoutDirection = CLAY_LEFT_TO_RIGHT,
+                     },
+                     .clip = { .horizontal = true } }) {
+                    CLAY({ .id = CLAY_ID("CharacterPanelStatsColumn"),
+                         .layout = {
+                         .sizing = { CLAY_SIZING_FIT(0),
+                         CLAY_SIZING_GROW(0) },
+                         .childGap = character_panel_detail::kInfoGap,
+                         .childAlignment = { .x = CLAY_ALIGN_X_LEFT,
+                         .y = CLAY_ALIGN_Y_TOP },
+                         .layoutDirection = CLAY_TOP_TO_BOTTOM,
+                         },
+                         .clip = { .horizontal = true } }) {
+                        CLAY({ .id = CLAY_ID("CharacterPanelStatTable"),
+                             .layout = {
+                             .sizing = { CLAY_SIZING_FIT(0), CLAY_SIZING_FIT(0) },
+                             .childGap = character_panel_detail::kStatRowGap,
+                             .layoutDirection = CLAY_TOP_TO_BOTTOM,
+                             },
+                             .clip = { .horizontal = true } }) {
+                            character_panel_detail::StatRow(0, "WINS", character_panel_detail::g_stats.wins,
+                                                            labelColumnWidth);
+                            character_panel_detail::StatRow(1, "LOSSES", character_panel_detail::g_stats.losses,
+                                                            labelColumnWidth);
+                        }
+
+                        CLAY({ .id = CLAY_ID("CharacterPanelActionsRow"),
+                             .layout = {
+                             .sizing = { CLAY_SIZING_GROW(0),
+                             CLAY_SIZING_FIXED(character_panel_detail::kButtonHeight) },
+                             .childAlignment = { .x = CLAY_ALIGN_X_LEFT,
+                             .y = CLAY_ALIGN_Y_CENTER },
+                             },
+                             .clip = { .horizontal = true } }) {
+                            Button(CLAY_STRING("CharacterPanelAgentsButton"),
+                                   CLAY_STRING("Agents"),
+                                   ButtonOpts{
+                                       .variant = ButtonVariant::Chrome,
+                                       .size = ButtonSize::Auto,
+                                       .disabled = state.agentSelectionLocked,
+                                       .minWidth = character_panel_detail::kActionButtonMinWidth,
+                                       .paddingX = character_panel_detail::kActionButtonPaddingX
+                                   },
+                                   ButtonHandle{nullptr, character_panel_detail::kActionAgents, &interactions});
+                        }
+                    }
+
+                    CLAY({ .id = CLAY_ID("CharacterPanelUpgradeWrap"),
+                         .layout = {
+                         .sizing = { CLAY_SIZING_GROW(0),
+                         CLAY_SIZING_GROW(0) },
+                         .childAlignment = { .x = CLAY_ALIGN_X_LEFT,
+                         .y = CLAY_ALIGN_Y_TOP },
+                         },
+                         .clip = { .horizontal = true } }) {
+                        character_panel_detail::UpgradePanel(
+                            upgradeValueColumnWidth);
+                    }
+                }
+            }
+        }
+    }
+} // namespace silencer::client_ui::lobby

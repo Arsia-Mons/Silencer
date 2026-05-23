@@ -73,14 +73,16 @@ void WorldNetwork::DoNetwork_Authority(void){
 				Uint8 code = World::MSG_CONNECT;
 				response.Put(code);
 				if(world.gameplaystate == World::INLOBBY || world.gameplaystate == World::INGAME){
-					char * host = inet_ntoa(senderaddr.sin_addr);
-					unsigned short port = ntohs(senderaddr.sin_port);
-					Uint8 agency;
-					data.Get(agency);
-					Uint32 accountid;
-					data.Get(accountid);
-					Uint8 passwordsize;
-					data.Get(passwordsize);
+						char * host = inet_ntoa(senderaddr.sin_addr);
+						unsigned short port = ntohs(senderaddr.sin_port);
+						Uint8 agency;
+						data.Get(agency);
+						Uint32 accountid;
+						data.Get(accountid);
+						Uint32 selectedcharid;
+						data.Get(selectedcharid);
+						Uint8 passwordsize;
+						data.Get(passwordsize);
 					char temp[256];
 					memset(temp, 0, sizeof(temp));
 					for(int i = 0; i < passwordsize; i++){
@@ -147,7 +149,7 @@ void WorldNetwork::DoNetwork_Authority(void){
 						world.SendGameInfo(rejoinpeer->id);
 						world.SendPeerList();
 					}else if(canjoin && observerRequest){
-						Peer * newpeer = world.AddPeer(host, port, agency, accountid, true);
+						Peer * newpeer = world.AddPeer(host, port, agency, accountid, selectedcharid, true);
 						if(newpeer){
 							newpeer->observer = true;
 							response.PutBit(true);
@@ -158,7 +160,7 @@ void WorldNetwork::DoNetwork_Authority(void){
 							response.PutBit(false);
 						}
 					}else if(canjoin){
-						Peer * newpeer = world.AddPeer(host, port, agency, accountid);
+						Peer * newpeer = world.AddPeer(host, port, agency, accountid, selectedcharid);
 						if(newpeer){
 							if(world.dedicatedserver.active){
 								world.lobby.GetUserInfo(newpeer->accountid);
@@ -175,7 +177,7 @@ void WorldNetwork::DoNetwork_Authority(void){
 								world.SendGameInfo(newpeer->id);
 							}
 							if(world.replay.IsRecording()){
-								world.replay.WriteNewPeer(agency, accountid);
+								world.replay.WriteNewPeer(agency, accountid, selectedcharid);
 							}
 						}else{
 							//printf("couldnt add peer\n");
@@ -644,6 +646,7 @@ void WorldNetwork::DoNetwork_Replica(void){
 							user = world.lobby.GetUserInfo(localpeer->accountid);
 							strcpy(user->name, namecopy);
 							user->statscopy = localpeer->stats;
+							user->selectedcharid = localpeer->selectedcharid;
 							user->statsagency = team->agency;
 							user->teamnumber = team->number;
 						}
@@ -809,7 +812,7 @@ unsigned short WorldNetwork::Bind(unsigned short port){
 	return false;
 }
 
-void WorldNetwork::Connect(Uint8 agency, Uint32 accountid, const char * password, bool observer){
+void WorldNetwork::Connect(Uint8 agency, Uint32 accountid, Uint32 selectedcharid, const char * password, bool observer){
 	world.AllocateMapData(65535);
 	sockaddr_in addr;
 	addr.sin_addr.s_addr = htonl(world.GetAuthorityPeer()->ip);
@@ -824,6 +827,7 @@ void WorldNetwork::Connect(Uint8 agency, Uint32 accountid, const char * password
 	data.Put(code);
 	data.Put(agency);
 	data.Put(accountid);
+	data.Put(selectedcharid);
 	Uint8 passwordsize = password ? strlen(password) : 0;
 	data.Put(passwordsize);
 	for(int i = 0; i < passwordsize; i++){
@@ -919,4 +923,3 @@ int WorldNetwork::AveragePingJitter(void){
 	average /= sizeof(pinghistory) / sizeof(int);
 	return average;
 }
-

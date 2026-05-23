@@ -28,9 +28,14 @@ UiInputRouter::UiInputRouter(UiInteractionRegistry& registry)
 	: registry_(registry) {}
 
 std::vector<UiAction> UiInputRouter::Route(const UiInputState& input) {
+	bool hasControlPointerCommand = false;
 	for(const UiControlCommand& command : input.controlCommands){
 		if(command.kind == UiControlCommandKind::PointerPress){
+			hasControlPointerCommand = true;
 			registry_.PressAt(command.x, command.y);
+		}else if(command.kind == UiControlCommandKind::PointerHover){
+			hasControlPointerCommand = true;
+			registry_.FocusControlHovered(static_cast<float>(command.x), static_cast<float>(command.y));
 		}else{
 			registry_.QueueAction(command.action);
 		}
@@ -40,6 +45,13 @@ std::vector<UiAction> UiInputRouter::Route(const UiInputState& input) {
 		registry_.PressAt(
 			static_cast<int>(input.pointer.x),
 			static_cast<int>(input.pointer.y));
+	}
+
+	// Mouse hover and keyboard navigation share one focus state: moving the
+	// pointer over an interactable focuses it, so the keyboard-focused element
+	// stops being highlighted instead of leaving two lit at once.
+	if(!hasControlPointerCommand){
+		registry_.FocusHovered(input.pointer.x, input.pointer.y);
 	}
 
 	for(const UiBindingInput& binding : input.bindingInputs){

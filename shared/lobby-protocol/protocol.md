@@ -65,6 +65,9 @@ opUpgradeStat   = 10
 opRegisterStats = 11
 opPresence      = 12
 opSetGame       = 13
+opCharacters    = 14
+opCreateCharacter = 15
+opSelectCharacter = 16
 ```
 
 ## Connection lifecycle
@@ -75,6 +78,7 @@ opSetGame       = 13
 4. If OK, client sends `opAuth` with username + SHA-1(password).
 5. Server replies with `opAuth` (success → account ID, or failure → error message).
 6. On success, server pushes:
+   - `opCharacters` for the authenticated account's playable characters,
    - `opMOTD` chunks then a terminator (`opMOTD` with empty payload),
    - `opChannel` (current channel name),
    - one or more `opNewGame` / `opPresence` frames per existing game/player.
@@ -214,18 +218,21 @@ does not respond, the client fills them locally.
 **Reply** (`S → C`):
 ```
 u32    account_id
-struct[5] agency:                     (5 agencies × 13 bytes = 65 bytes)
-   u16  wins
-   u16  losses
-   u16  xp_to_next_level
-   u8   level
-   u8   endurance
-   u8   shield
-   u8   jetpack
-   u8   tech_slots
-   u8   hacking
-   u8   contacts
-lenstr name                           (≤ 16 bytes; client only reads first 16)
+u32    selected_char_id               (0 if no character is selected)
+u8     agency_idx                     (selected character agency, 0 if none)
+struct AgencyStats:                   (selected character stats)
+  u16   wins
+  u16   losses
+  u16   xp_to_next_level
+  u8    level
+  u8    endurance
+  u8    shield
+  u8    jetpack
+  u8    tech_slots
+  u8    hacking
+  u8    contacts
+lenstr name                           (account name, ≤ 16 bytes)
+lenstr character_name                 (selected character name, empty if none)
 ```
 
 ### `opPing` (9)
@@ -248,6 +255,7 @@ window — any read resets the deadline.
 **Request** (`C → S`):
 ```
 u8     agency_idx     (0–4)
+u32    character_id
 u8     stat_id        (1=endurance 2=shield 3=jetpack 4=tech_slots 5=hacking 6=contacts)
 ```
 
@@ -261,6 +269,7 @@ client re-fetches its own user info to see the new value.
 u32    game_id
 u8     team_number
 u32    account_id
+u32    character_id
 u8     stats_agency
 u8     won            (0 or 1)
 u32    xp
@@ -324,10 +333,54 @@ u8     status         (0 = lobby, 1 = pregame, 2 = playing)
 ```
 No reply.
 
+### `opCharacters` (14)
+
+**Push** (`S → C`), sent after auth and after create/select changes:
+```
+u8     count                          (number of characters in this frame)
+u32    selected_char_id               (0 if no character is selected)
+struct[count] character:
+  u32   id
+  u8    agency_idx
+  struct AgencyStats:
+    u16 wins
+    u16 losses
+    u16 xp_to_next_level
+    u8  level
+    u8  endurance
+    u8  shield
+    u8  jetpack
+    u8  tech_slots
+    u8  hacking
+    u8  contacts
+  lenstr name
+```
+
+### `opCreateCharacter` (15)
+
+**Request** (`C → S`):
+```
+lenstr name
+u8     agency_idx
+```
+The server creates the character, selects it, and replies with
+`opCharacters`. On rejection, the server sends an `opCharacters` frame
+for the current account state so the client can remain on the create
+screen.
+
+### `opSelectCharacter` (16)
+
+**Request** (`C → S`):
+```
+u32    character_id
+```
+The server selects the existing character and replies with
+`opCharacters`.
+
 ## `LobbyGame` wire layout
 
-Used inside `opNewGame` pushes. 16-byte hash is raw SHA-1 of the map
-file.
+Used inside `opNewGame` requests and pushes. The map hash is raw
+SHA-1 of the map file.
 
 ```
 u32    id

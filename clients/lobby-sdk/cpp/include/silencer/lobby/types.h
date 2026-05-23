@@ -25,6 +25,9 @@ enum Op : uint8_t {
     OpRegisterStats = 11,
     OpPresence      = 12,
     OpSetGame       = 13,
+    OpCharacters    = 14,
+    OpCreateCharacter = 15,
+    OpSelectCharacter = 16,
 };
 
 enum class Platform : uint8_t {
@@ -47,6 +50,15 @@ enum class GameStatus : uint8_t {
     Playing = 2,
 };
 
+enum class StatId : uint8_t {
+    Endurance = 1,
+    Shield    = 2,
+    Jetpack   = 3,
+    TechSlots = 4,
+    Hacking   = 5,
+    Contacts  = 6,
+};
+
 struct AgencyStats {
     uint16_t wins             = 0;
     uint16_t losses           = 0;
@@ -61,9 +73,24 @@ struct AgencyStats {
 };
 
 struct UserInfo {
-    uint32_t                       account_id = 0;
-    std::array<AgencyStats, 5>     agencies   = {};
-    std::string                    name;
+    uint32_t    account_id       = 0;
+    uint32_t    selected_char_id = 0;
+    uint8_t     agency_idx       = 0;
+    AgencyStats stats            = {};
+    std::string name;
+    std::string character_name;
+};
+
+struct CharacterInfo {
+    uint32_t    id         = 0;
+    uint8_t     agency_idx = 0;
+    AgencyStats stats      = {};
+    std::string name;
+};
+
+struct CharactersPayload {
+    uint32_t selected_char_id = 0;
+    std::vector<CharacterInfo> characters;
 };
 
 struct LobbyGame {

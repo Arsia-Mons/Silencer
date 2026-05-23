@@ -329,11 +329,33 @@ static void test_userinfo_reply(const std::string& hex) {
     CHECK_EQ(r.u8(), OpUserInfo);
     auto u = decode_user_info(r);
     CHECK_EQ(u.account_id, 200u);
+    CHECK_EQ(u.selected_char_id, 300u);
+    CHECK_EQ(u.agency_idx, 1);
     CHECK_EQ(u.name, std::string("admin"));
-    CHECK_EQ(u.agencies[0].wins,  10);
-    CHECK_EQ(u.agencies[1].level, 13);
+    CHECK_EQ(u.character_name, std::string("Shade"));
+    CHECK_EQ(u.stats.wins, 10);
+    CHECK_EQ(u.stats.level, 13);
 
     Writer w; w.u8(OpUserInfo); encode_user_info_body(w, u);
+    CHECK_EQ(to_hex(frame(w.bytes())), hex);
+}
+
+static void test_characters_push(const std::string& hex) {
+    auto payload = unframe(from_hex(hex));
+    Reader r(payload.data(), payload.size());
+    CHECK_EQ(r.u8(), OpCharacters);
+    auto c = decode_characters(r);
+    CHECK_EQ(c.selected_char_id, 300u);
+    CHECK_EQ(c.characters.size(), 2u);
+    CHECK_EQ(c.characters[0].id, 300u);
+    CHECK_EQ(c.characters[0].agency_idx, 1);
+    CHECK_EQ(c.characters[0].name, std::string("Shade"));
+    CHECK_EQ(c.characters[0].stats.level, 13);
+    CHECK_EQ(c.characters[1].id, 301u);
+    CHECK_EQ(c.characters[1].agency_idx, 3);
+    CHECK_EQ(c.characters[1].name, std::string("Vanta"));
+
+    Writer w; w.u8(OpCharacters); encode_characters_body(w, c);
     CHECK_EQ(to_hex(frame(w.bytes())), hex);
 }
 
@@ -349,7 +371,7 @@ static void test_ping_ack(const std::string& hex) {
 }
 
 static void test_upgradestat_request(const std::string& hex) {
-    auto enc = frame(encode_upgrade_stat(2, 3));
+    auto enc = frame(encode_upgrade_stat(300, 2, StatId::Jetpack));
     CHECK_EQ(to_hex(enc), hex);
 }
 
@@ -399,6 +421,16 @@ static void test_chat_request(const std::string& hex) {
 
 static void test_setgame_request(const std::string& hex) {
     auto enc = frame(encode_set_game(100, GameStatus::Pregame));
+    CHECK_EQ(to_hex(enc), hex);
+}
+
+static void test_create_character_request(const std::string& hex) {
+    auto enc = frame(encode_create_character("Shade", 1));
+    CHECK_EQ(to_hex(enc), hex);
+}
+
+static void test_select_character_request(const std::string& hex) {
+    auto enc = frame(encode_select_character(300));
     CHECK_EQ(to_hex(enc), hex);
 }
 
@@ -484,11 +516,12 @@ static void test_register_stats_request(const std::string& hex) {
     // because every field has a distinguishable value.
     auto s = make_register_stats_fixture();
     auto enc = frame(encode_register_stats(/*game_id*/ 7, /*team*/ 1, /*acct*/ 9,
-                                           /*ag*/ 2, /*won*/ true, /*xp*/ 1234, s));
+                                           /*char*/ 300, /*ag*/ 2, /*won*/ true,
+                                           /*xp*/ 1234, s));
     CHECK_EQ(to_hex(enc), hex);
-    // Sanity: 44 × u32 = 176 stats bytes; full payload = 192; wire = 193.
-    CHECK_EQ(enc.size(), 193u);
-    CHECK_EQ(enc[0], static_cast<uint8_t>(192));
+    // Sanity: 44 × u32 = 176 stats bytes; full payload = 196; wire = 197.
+    CHECK_EQ(enc.size(), 197u);
+    CHECK_EQ(enc[0], static_cast<uint8_t>(196));
     CHECK_EQ(enc[1], OpRegisterStats);
 }
 
@@ -522,6 +555,7 @@ int main() {
     run("channel_push",                      test_channel_push);
     run("userinfo_request",                  test_userinfo_request);
     run("userinfo_reply",                    test_userinfo_reply);
+    run("characters_push",                   test_characters_push);
     run("ping_push",                         test_ping);
     run("ping_ack",                          test_ping_ack);
     run("upgradestat_request",               test_upgradestat_request);
@@ -529,6 +563,8 @@ int main() {
     run("presence_add",                      test_presence_add);
     run("presence_remove",                   test_presence_remove);
     run("setgame_request",                   test_setgame_request);
+    run("create_character_request",          test_create_character_request);
+    run("select_character_request",          test_select_character_request);
     run("register_stats_request",            test_register_stats_request);
 
     test_sha1();

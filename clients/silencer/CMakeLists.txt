@@ -111,6 +111,7 @@ if(SILENCER_UNITY_BUILD)
 		src/ui/primitives/*.cpp
 		src/ui/runtime/*.cpp
 		src/render/clay_ui_tests/*.cpp
+		src/client/ui/screens/character_create/*.cpp
 		src/client/ui/screens/lobby/*.cpp)
 	set_source_files_properties(${_clay_unsafe_sources} PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON)
 endif()
@@ -121,12 +122,13 @@ include(CompileShaders)
 silencer_compile_shader(vert_screen   vertex  vert_screen)
 silencer_compile_shader(frag_remap    pixel   frag_remap)
 silencer_compile_shader(frag_upscale  pixel   frag_upscale)
+silencer_compile_shader(frag_lobby_panel_blur pixel frag_lobby_panel_blur)
 silencer_compile_shader(frag_light    pixel   frag_light)
 silencer_compile_shader(vert_particle vertex  vert_particle)
 silencer_compile_shader(frag_particle pixel   frag_particle)
 silencer_compile_shader(comp_particle compute update_particles)
 silencer_finalize_shaders(
-    vert_screen frag_remap frag_upscale frag_light
+    vert_screen frag_remap frag_upscale frag_lobby_panel_blur frag_light
     vert_particle frag_particle comp_particle
 )
 add_dependencies(${SILENCER_TARGET} silencer_shaders)
@@ -163,6 +165,7 @@ target_include_directories(${SILENCER_TARGET} PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}/src/client/ui/modals"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/client/ui/screens"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/client/ui/screens/main_menu"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/client/ui/screens/character_create"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/client/ui/screens/options"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/client/ui/screens/lobby_connect"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/client/ui/screens/update"
@@ -198,7 +201,7 @@ endif()
 
 set(SILENCER_LOBBY_HOST "lobby.arsiamons.com" CACHE STRING "Lobby host the client connects to at startup")
 set(SILENCER_LOBBY_PORT "517" CACHE STRING "Lobby TCP port")
-set(SILENCER_VERSION "00000" CACHE STRING "Client version string sent to the lobby during MSG_VERSION; overridden by release.yml from git tag")
+set(SILENCER_VERSION "00054" CACHE STRING "Client version string sent to the lobby during MSG_VERSION; overridden by release.yml from git tag")
 set(SILENCER_MAP_API_URL "https://admin.arsiamons.com" CACHE STRING "Base URL for the community map HTTP API (used when fetching a missing map before falling back to P2P)")
 set(SILENCER_ADMIN_API_URL "https://admin.arsiamons.com" CACHE STRING "Base URL for the admin API (actordefs sync, etc.)")
 target_compile_definitions(${SILENCER_TARGET} PRIVATE

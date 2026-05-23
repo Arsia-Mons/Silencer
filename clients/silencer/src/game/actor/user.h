@@ -13,7 +13,9 @@ public:
 	int TotalUpgradePointsPossible(Uint8 agency);
 	bool retrieving;
 	Uint32 accountid;
+	Uint32 selectedcharid;
 	char name[64];
+	char charname[17];
 	struct{
 		Uint16 wins;
 		Uint16 losses;

@@ -5,7 +5,9 @@
 User::User(){
 	retrieving = false;
 	accountid = 0;
+	selectedcharid = 0;
 	memset(name, 0, sizeof(name));
+	memset(charname, 0, sizeof(charname));
 	for(int i = 0; i < 5; i++){
 		agency[i].wins = 0;
 		agency[i].losses = 0;
@@ -47,26 +49,57 @@ User::User(){
 	teamnumber = 0;
 }
 
+// Wire format (MSG_USERINFO, matches server encodeUser):
+//   [u32 accountID][u32 charID][u8 agencyIdx]
+//   [u16 wins][u16 losses][u16 xp][u8 level]
+//   [u8 endurance][u8 shield][u8 jetpack][u8 techslots][u8 hacking][u8 contacts]
+//   [lenStr accountName][lenStr charName]
 void User::Serialize(bool write, Serializer & data){
 	data.Serialize(write, accountid);
-	for(int i = 0; i < 5; i++){
-		data.Serialize(write, agency[i].wins);
-		data.Serialize(write, agency[i].losses);
-		data.Serialize(write, agency[i].xptonextlevel);
-		data.Serialize(write, agency[i].level);
-		data.Serialize(write, agency[i].endurance);
-		data.Serialize(write, agency[i].shield);
-		data.Serialize(write, agency[i].jetpack);
-		data.Serialize(write, agency[i].techslots);
-		data.Serialize(write, agency[i].hacking);
-		data.Serialize(write, agency[i].contacts);
+	Uint32 charid = write ? selectedcharid : 0;
+	Uint8 agencyidx = write ? statsagency : 0;
+	data.Serialize(write, charid);
+	data.Serialize(write, agencyidx);
+	if(!write && agencyidx < 5){
+		// Refresh max values from GAS definitions for the active agency slot.
+		const AgencyDef* adef = GASLoader::Get().GetAgencyDef(agencyidx);
+		if(adef){
+			agency[agencyidx].defaultbonuses = adef->defaultBonuses;
+			agency[agencyidx].maxendurance   = adef->upgradeCaps.endurance;
+			agency[agencyidx].maxshield      = adef->upgradeCaps.shield;
+			agency[agencyidx].maxjetpack     = adef->upgradeCaps.jetpack;
+			agency[agencyidx].maxtechslots   = adef->upgradeCaps.techslots;
+			agency[agencyidx].maxhacking     = adef->upgradeCaps.hacking;
+			agency[agencyidx].maxcontacts    = adef->upgradeCaps.contacts;
+		}
 	}
-	Uint8 namesize = strlen(name);
+	Uint8 ai = (agencyidx < 5) ? agencyidx : 0;
+	data.Serialize(write, agency[ai].wins);
+	data.Serialize(write, agency[ai].losses);
+	data.Serialize(write, agency[ai].xptonextlevel);
+	data.Serialize(write, agency[ai].level);
+	data.Serialize(write, agency[ai].endurance);
+	data.Serialize(write, agency[ai].shield);
+	data.Serialize(write, agency[ai].jetpack);
+	data.Serialize(write, agency[ai].techslots);
+	data.Serialize(write, agency[ai].hacking);
+	data.Serialize(write, agency[ai].contacts);
+	Uint8 namesize = (Uint8)strlen(name);
 	data.Serialize(write, namesize);
 	for(int i = 0; i < namesize; i++){
 		data.Serialize(write, name[i]);
 	}
-	name[namesize] = 0;
+	if(!write) name[namesize] = 0;
+	Uint8 charnamesize = (Uint8)strlen(charname);
+	data.Serialize(write, charnamesize);
+	for(int i = 0; i < charnamesize && i < 16; i++){
+		data.Serialize(write, charname[i]);
+	}
+	if(!write){
+		charname[charnamesize < 16 ? charnamesize : 16] = 0;
+		selectedcharid = charid;
+		statsagency = agencyidx;
+	}
 }
 
 int User::TotalUpgradePointsPossible(Uint8 agencynum){

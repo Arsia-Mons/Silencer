@@ -62,6 +62,11 @@ void LobbyScreen::Tick(ScreenContext & ctx)
 	}
 
 	silencer::client_ui::lobby::CharacterPanelTick(characterState, ctx.world);
+	if(characterState.newCharacterRequested){
+		characterState.newCharacterRequested = false;
+		ctx.GoToState(GameState::CREATECHARACTER);
+		return;
+	}
 	silencer::client_ui::lobby::ChatPanelTick(chatState, ctx.world);
 
 	if(!gameCreateActive && !gameJoinActive && !gameTechActive){
@@ -118,7 +123,8 @@ void LobbyScreen::Tick(ScreenContext & ctx)
 				mapDownloader.mapjoingeneration.fetch_add(1, std::memory_order_relaxed);
 				mapDownloader.mapjoinstate.store(0, std::memory_order_relaxed);
 				if(mapDownloader.mapjointhread.joinable()) mapDownloader.mapjointhread.detach();
-				world.SetTech(Config::GetInstance().defaulttechchoices[Config::GetInstance().defaultagency]);
+				const Uint8 agency = world.lobby.GetSelectedAgencyOrDefault(Config::GetInstance().defaultagency);
+				world.SetTech(Config::GetInstance().defaulttechchoices[agency]);
 				ShowGameJoin(ctx);
 				LobbyGame * lobbygame = world.lobby.GetGameById(game.currentlobbygameid);
 				if(lobbygame){
@@ -173,7 +179,7 @@ bool LobbyScreen::HandleUiIntent(ScreenContext & ctx, const silencer::ui::UiActi
 		goBackClicked = true;
 		return true;
 	}
-	if(silencer::client_ui::lobby::CharacterPanelHandleUiIntent(characterState, action)){
+	if(silencer::client_ui::lobby::CharacterPanelHandleUiIntent(characterState, ctx.world, action)){
 		return true;
 	}
 	if(silencer::client_ui::lobby::ChatPanelHandleUiIntent(chatState, ctx.world, action)){

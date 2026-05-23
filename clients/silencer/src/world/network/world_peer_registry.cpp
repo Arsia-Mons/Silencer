@@ -28,7 +28,7 @@ WorldPeerRegistry::WorldPeerRegistry(World & world) : world(world){
 	localpublicport = 0;
 }
 
-Peer * WorldPeerRegistry::AddPeer(char * address, unsigned short port, Uint8 agency, Uint32 accountid, bool observer){
+Peer * WorldPeerRegistry::AddPeer(char * address, unsigned short port, Uint8 agency, Uint32 accountid, Uint32 selectedcharid, bool observer){
 	Uint8 newpeerid = 0;
 	sockaddr_in addr;
 	addr.sin_addr.s_addr = inet_addr(address);
@@ -48,6 +48,7 @@ Peer * WorldPeerRegistry::AddPeer(char * address, unsigned short port, Uint8 age
 		newpeer->ip = ntohl(inet_addr(address));
 		newpeer->port = port;
 		newpeer->accountid = accountid;
+		newpeer->selectedcharid = selectedcharid;
 		if(peeradded){
 			if(!observer){
 				if(!FindTeamForPeer(*newpeer, agency)){
@@ -195,6 +196,7 @@ void WorldPeerRegistry::HandleDisconnect(Uint8 peerid, bool permanent){
 			User * user = world.lobby.GetUserInfo(leavingPeer->accountid);
 			if(user && leavingTeam){
 				user->statscopy = leavingPeer->stats;
+				user->selectedcharid = leavingPeer->selectedcharid;
 				user->statsagency = leavingTeam->agency;
 				user->teamnumber = leavingTeam->number;
 				world.lobby.RegisterStats(*user, 0, world.gameinfo.id);
@@ -368,4 +370,3 @@ void WorldPeerRegistry::SendPeerList(Uint8 peerid){
 		}
 	}
 }
-

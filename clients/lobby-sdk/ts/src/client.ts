@@ -4,6 +4,7 @@ import { createHash } from "node:crypto";
 import {
   decodeAuthReply,
   decodeChannel,
+  decodeCharacters,
   decodeChatPush,
   decodeDelGame,
   decodeMotd,
@@ -15,9 +16,11 @@ import {
   encodeChat,
   encodeJoinChannel,
   encodeNewGame,
+  encodeCreateCharacter,
   encodePingAck,
   encodeRegisterStats,
   encodeSetGame,
+  encodeSelectCharacter,
   encodeUpgradeStat,
   encodeUserInfoRequest,
   encodeVersionRequest,
@@ -27,6 +30,7 @@ import {
 } from "./codec.ts";
 import {
   type AuthResult,
+  type CharactersPayload,
   type ChatMessage,
   type GameStatus,
   type LobbyGame,
@@ -35,6 +39,7 @@ import {
   Op,
   type Platform,
   type PresenceUpdate,
+  type StatId,
   type UserInfo,
   type VersionResult,
 } from "./types.ts";
@@ -68,6 +73,7 @@ export interface ClientEvents {
   newGame: (e: NewGameEvent) => void;
   delGame: (id: number) => void;
   userInfo: (u: UserInfo) => void;
+  characters: (c: CharactersPayload) => void;
   presence: (p: PresenceUpdate) => void;
   statUpgraded: () => void;
   error: (message: string) => void;
@@ -100,6 +106,7 @@ export class LobbyClient {
     newGame: new Set(),
     delGame: new Set(),
     userInfo: new Set(),
+    characters: new Set(),
     presence: new Set(),
     statUpgraded: new Set(),
     error: new Set(),
@@ -305,6 +312,9 @@ export class LobbyClient {
       case Op.UserInfo:
         this.emit("userInfo", decodeUserInfo(r));
         break;
+      case Op.Characters:
+        this.emit("characters", decodeCharacters(r));
+        break;
       case Op.Ping:
         this.sendRaw(encodePingAck());
         break;
@@ -347,16 +357,25 @@ export class LobbyClient {
   requestUserInfo(accountId: number): void {
     this.sendRaw(encodeUserInfoRequest(accountId));
   }
-  upgradeStat(agencyIdx: number, statId: number): void {
-    this.sendRaw(encodeUpgradeStat(agencyIdx, statId));
+  upgradeStat(characterId: number, agencyIdx: number, statId: StatId): void {
+    this.sendRaw(encodeUpgradeStat(characterId, agencyIdx, statId));
   }
   setGame(gameId: number, status: GameStatus): void {
     this.sendRaw(encodeSetGame(gameId, status));
+  }
+
+  createCharacter(name: string, agencyIdx: number): void {
+    this.sendRaw(encodeCreateCharacter(name, agencyIdx));
+  }
+
+  selectCharacter(characterId: number): void {
+    this.sendRaw(encodeSelectCharacter(characterId));
   }
   registerStats(args: {
     gameId: number;
     teamNumber: number;
     accountId: number;
+    characterId: number;
     statsAgency: number;
     won: boolean;
     xp: number;
@@ -367,6 +386,7 @@ export class LobbyClient {
         args.gameId,
         args.teamNumber,
         args.accountId,
+        args.characterId,
         args.statsAgency,
         args.won,
         args.xp,

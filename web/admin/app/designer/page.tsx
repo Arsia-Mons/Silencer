@@ -19,7 +19,7 @@ import Minimap from './Minimap';
 import TriggerPanel from './TriggerPanel';
 import type { MapActor } from '../../lib/types';
 import { API } from '../../lib/api';
-import { useLightsStore } from '../../lib/lights-store';
+import { useLightsStore, type LightDef } from '../../lib/lights-store';
 
 interface VisState {
   bg: boolean[];
@@ -341,7 +341,7 @@ export default function DesignerPage() {
     let type = 0;
     if (selectedActorId === 71) {
       // Light actor: seed actortype from matching LightDef (size from frame, color from defaultColor)
-      const lightDef = lightDefs.find(l => l.frame === type);
+      const lightDef = lightDefs.find((l: LightDef) => l.frame === type);
       if (lightDef?.defaultColor) {
         const m = /^#?([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(lightDef.defaultColor);
         if (m) {

@@ -4,18 +4,7 @@
 set -euo pipefail
 . "$(dirname "$0")/lib.sh"
 
-LOBBY_BIN=""
-for candidate in \
-  "$REPO_ROOT/services/lobby/lobby" \
-  "$REPO_ROOT/services/lobby/lobby.exe" \
-  "$REPO_ROOT/services/lobby/silencer-lobby" \
-  "$REPO_ROOT/services/lobby/silencer-lobby.exe"; do
-  if [ -x "$candidate" ]; then LOBBY_BIN="$candidate"; break; fi
-done
-if [ -z "$LOBBY_BIN" ]; then
-  echo "lobby binary missing under services/lobby/ — build it via 'cd services/lobby && go build'" >&2
-  exit 1
-fi
+LOBBY_BIN="$(lobby_bin)"
 
 TMP=$(mktemp -d)
 LOBBY_LOG="$TMP/lobby.log"
@@ -28,18 +17,7 @@ PLAYER_AUTH_PORT=$(pick_port)
 MAP_API_PORT=$(pick_port)
 CTRL_PORT=$(pick_port)
 
-SILENCER_VERSION=""
-for cache in \
-  "$REPO_ROOT/build/CMakeCache.txt" \
-  "$REPO_ROOT/clients/silencer/build/CMakeCache.txt" \
-  "$REPO_ROOT/clients/silencer/build-unity/CMakeCache.txt" \
-  "$REPO_ROOT/clients/silencer/build-release/CMakeCache.txt"; do
-  if [ -f "$cache" ]; then
-    SILENCER_VERSION=$(awk -F= '/^SILENCER_VERSION:STRING=/{print $2}' "$cache")
-    [ -n "$SILENCER_VERSION" ] && break
-  fi
-done
-[ -z "$SILENCER_VERSION" ] && { echo "no SILENCER_VERSION in CMakeCache.txt" >&2; exit 1; }
+SILENCER_VERSION="$(silencer_version)"
 
 cleanup() {
   if [ -n "${SILENCER_PID:-}" ]; then

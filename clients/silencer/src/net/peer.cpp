@@ -7,6 +7,7 @@ Peer::Peer(){
 	port = 0;
 	ip = 0;
 	accountid = 0;
+	selectedcharid = 0;
 	lastpacket = SDL_GetTicks();
 	ishost = false;
 	gameinfoloaded = false;
@@ -32,6 +33,7 @@ void Peer::Serialize(bool write, Serializer & data){
 	//data.Serialize(write, publicport);
 	//data.Serialize(write, ip);
 	data.Serialize(write, accountid);
+	data.Serialize(write, selectedcharid);
 	data.Serialize(write, observer);
 	Uint8 count = controlledlist.size();
 	data.Serialize(write, count);

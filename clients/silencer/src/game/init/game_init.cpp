@@ -17,7 +17,7 @@ using namespace GameState;
 #define SILENCER_LOBBY_PORT 517
 #endif
 #ifndef SILENCER_VERSION
-#define SILENCER_VERSION "00025"
+#define SILENCER_VERSION "00054"
 #endif
 #ifndef SILENCER_MAP_API_URL
 #define SILENCER_MAP_API_URL "http://127.0.0.1:8080"

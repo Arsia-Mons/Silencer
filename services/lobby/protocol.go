@@ -7,24 +7,40 @@ import (
 )
 
 const (
-	opAuth          = 0
-	opMOTD          = 1
-	opChat          = 2
-	opNewGame       = 3
-	opDelGame       = 4
-	opChannel       = 5
-	opConnect       = 6
-	opVersion       = 7
-	opUserInfo      = 8
-	opPing          = 9
-	opUpgradeStat   = 10
-	opRegisterStats = 11
-	opPresence      = 12
-	opSetGame       = 13
+	opAuth            = 0
+	opMOTD            = 1
+	opChat            = 2
+	opNewGame         = 3
+	opDelGame         = 4
+	opChannel         = 5
+	opConnect         = 6
+	opVersion         = 7
+	opUserInfo        = 8
+	opPing            = 9
+	opUpgradeStat     = 10
+	opRegisterStats   = 11
+	opPresence        = 12
+	opSetGame         = 13
+	opCharacters      = 14 // server→client: full character list for the authed player
+	opCreateCharacter = 15 // client→server: create a new character
+	opSelectCharacter = 16 // client→server: select an existing character
+)
+
+const (
+	statEndurance uint8 = iota + 1
+	statShield
+	statJetpack
+	statTechSlots
+	statHacking
+	statContacts
 )
 
 const maxFrame = 255
 const maxUpdateURL = 200 // leaves room for [framelen][op][success][urllen u16][sha256] in a 255-byte frame
+const maxCharacterNameBytes = 16
+const characterListHeaderBytes = 1 + 1 + 4 // op + count + selectedCharID
+const characterFixedBytes = 4 + 1 + 2 + 2 + 2 + 1 + 1 + 1 + 1 + 1 + 1 + 1
+const maxCharactersPerUser = (maxFrame - characterListHeaderBytes) / (characterFixedBytes + 1 + maxCharacterNameBytes)
 
 func readFrame(r io.Reader) ([]byte, error) {
 	var sz [1]byte
@@ -214,7 +230,7 @@ type LobbyGame struct {
 	MaxLevel         uint8
 	MaxPlayers       uint8
 	MaxTeams         uint8
-	ModeId           uint8  // GameModeId carried in the wire field formerly named Extra
+	ModeId           uint8 // GameModeId carried in the wire field formerly named Extra
 	Spectatable      uint8
 	Port             uint16
 	ParkedAccountIDs []uint32
@@ -299,10 +315,77 @@ func (g *LobbyGame) Encode(w *writer) {
 }
 
 // User wire layout (matches src/user.cpp::Serialize).
+// Sends: accountID, selectedCharID, agencyIdx, active char stats, accountName, charName.
+// If no character is selected, sends zeros.
 func encodeUser(w *writer, u *User) {
 	w.u32(u.AccountID)
-	for i := 0; i < 5; i++ {
-		a := &u.Agency[i]
+	ch := selectedChar(u)
+	if ch == nil {
+		w.u32(0) // charID
+		w.u8(0)  // agencyIdx
+		w.u16(0)
+		w.u16(0)
+		w.u16(0) // wins, losses, xp
+		w.u8(0)
+		w.u8(0)
+		w.u8(0)
+		w.u8(0)
+		w.u8(0)
+		w.u8(0)
+		w.u8(0) // stats + level
+		w.lenStr(u.Name)
+		w.lenStr("")
+		return
+	}
+	a := &ch.Stats
+	w.u32(ch.ID)
+	w.u8(ch.AgencyIdx)
+	w.u16(a.Wins)
+	w.u16(a.Losses)
+	w.u16(a.XPToNextLevel)
+	w.u8(a.Level)
+	w.u8(a.Endurance)
+	w.u8(a.Shield)
+	w.u8(a.Jetpack)
+	w.u8(a.TechSlots)
+	w.u8(a.Hacking)
+	w.u8(a.Contacts)
+	w.lenStr(u.Name)
+	w.lenStr(ch.Name)
+}
+
+// encodeCharacters builds an opCharacters frame.
+// Layout: [u8 count][u32 selectedCharID][count × char]
+// Each char: [u32 id][u8 agencyIdx][u16 wins][u16 losses][u16 xp][u8 level]
+//
+//	[u8 endurance][u8 shield][u8 jetpack][u8 techslots][u8 hacking][u8 contacts][lenStr name]
+func encodeCharacters(u *User) []byte {
+	var w writer
+	w.u8(opCharacters)
+	count := len(u.Characters)
+	if count > maxCharactersPerUser {
+		count = maxCharactersPerUser
+	}
+	w.u8(uint8(count))
+	selectedCharID := u.SelectedCharID
+	if count > 0 {
+		found := false
+		for i := 0; i < count; i++ {
+			if u.Characters[i].ID == selectedCharID {
+				found = true
+				break
+			}
+		}
+		if !found {
+			selectedCharID = u.Characters[0].ID
+		}
+	}
+	w.u32(selectedCharID)
+	for i := 0; i < count; i++ {
+		ch := &u.Characters[i]
+		a := &ch.Stats
+		w.u32(ch.ID)
+		w.u8(ch.AgencyIdx)
 		w.u16(a.Wins)
 		w.u16(a.Losses)
 		w.u16(a.XPToNextLevel)
@@ -313,8 +396,9 @@ func encodeUser(w *writer, u *User) {
 		w.u8(a.TechSlots)
 		w.u8(a.Hacking)
 		w.u8(a.Contacts)
+		w.lenStr(ch.Name)
 	}
-	w.lenStr(u.Name)
+	return w.b
 }
 
 // Platform byte appended to MSG_VERSION request by updater-capable clients.

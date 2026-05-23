@@ -26,6 +26,9 @@ struct ButtonCheckResult {
 	int ovalWallClockPartialBrightness;
 	int ovalWallClockNextSpriteIndex;
 	int ovalWallClockNextBrightness;
+	int legacySelectedSuppressedSpriteIndex;
+	int legacySelectedSuppressedBrightness;
+	int legacySelectedSuppressedMetadata;
 	int compactWidth;
 	int compactHeight;
 	int chromeAutoWidth;

@@ -134,10 +134,11 @@ void HandleJoinClick(GameSelectPanelState & state, World & world, ScreenContext 
 	User * user = world.lobby.GetUserInfo(world.lobby.accountid);
 	bool canjoin = true;
 	if(user){
-		if(lobbygame->minlevel > user->agency[Config::GetInstance().defaultagency].level){
+		const Uint8 agency = world.lobby.GetSelectedAgencyOrDefault(Config::GetInstance().defaultagency);
+		if(lobbygame->minlevel > user->agency[agency].level){
 			canjoin = false;
 			ctx.ShowMessage("Your player level is too low");
-		}else if(lobbygame->maxlevel < user->agency[Config::GetInstance().defaultagency].level){
+		}else if(lobbygame->maxlevel < user->agency[agency].level){
 			canjoin = false;
 			ctx.ShowMessage("Your player level is too high");
 		}

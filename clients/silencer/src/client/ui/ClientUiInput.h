@@ -17,6 +17,7 @@ public:
 	void QueueBindingKeyDown(int keyCode);
 	void QueueControlAction(silencer::ui::UiAction action);
 	void QueueControlPointerPress(int x, int y);
+	void QueueControlPointerHover(int x, int y);
 
 	void QueuePointerWindowEvent(float windowX,
 	                             float windowY,
@@ -62,6 +63,7 @@ private:
 	std::vector<silencer::ui::UiControlCommand> controlCommands_;
 
 	bool havePointerPosition_ = false;
+	bool controlPointerActive_ = false;
 	float pointerX_ = 0.0f;
 	float pointerY_ = 0.0f;
 	bool pointerDown_ = false;

@@ -8,6 +8,7 @@
 #include "vert_screen.dxil.h"
 #include "frag_remap.dxil.h"
 #include "frag_upscale.dxil.h"
+#include "frag_lobby_panel_blur.dxil.h"
 #include "frag_light.dxil.h"
 #include "vert_particle.dxil.h"
 #include "frag_particle.dxil.h"
@@ -68,7 +69,7 @@ static const char *kFragLobbyPanelBlurMSL = R"msl(
 #include <metal_stdlib>
 using namespace metal;
 struct VOut { float4 pos [[position]]; float2 uv; };
-fragment float4 frag_upscale(VOut in [[stage_in]],
+fragment float4 frag_lobby_panel_blur(VOut in [[stage_in]],
     texture2d<float> scene  [[texture(0)]],
     texture2d<float> border [[texture(1)]],
     sampler samp [[sampler(0)]]) {
@@ -211,7 +212,7 @@ kernel void update_particles(
 static const ShaderBundle kVertScreen   = { kVertScreenMSL,   kVertScreenDXIL,   sizeof(kVertScreenDXIL),   "vert_screen"      };
 static const ShaderBundle kFragRemap    = { kFragRemapMSL,    kFragRemapDXIL,    sizeof(kFragRemapDXIL),    "frag_remap"       };
 static const ShaderBundle kFragUpscale  = { kFragUpscaleMSL,  kFragUpscaleDXIL,  sizeof(kFragUpscaleDXIL),  "frag_upscale"     };
-static const ShaderBundle kFragLobbyPanelBlur = { kFragLobbyPanelBlurMSL, kFragUpscaleDXIL, sizeof(kFragUpscaleDXIL), "frag_upscale" };
+static const ShaderBundle kFragLobbyPanelBlur = { kFragLobbyPanelBlurMSL, kFragLobbyPanelBlurDXIL, sizeof(kFragLobbyPanelBlurDXIL), "frag_lobby_panel_blur" };
 static const ShaderBundle kFragLight    = { kFragLightMSL,    kFragLightDXIL,    sizeof(kFragLightDXIL),    "frag_light"       };
 static const ShaderBundle kVertParticle = { kVertParticleMSL, kVertParticleDXIL, sizeof(kVertParticleDXIL), "vert_particle"    };
 static const ShaderBundle kFragParticle = { kFragParticleMSL, kFragParticleDXIL, sizeof(kFragParticleDXIL), "frag_particle"    };
@@ -486,8 +487,7 @@ bool SDL3GPUBackend::CreatePipelines() {
 }
 
 bool SDL3GPUBackend::CreateLobbyPanelBlurPipeline() {
-	const Uint32 blurSamplers =
-		chosen_format == SDL_GPU_SHADERFORMAT_MSL ? 2u : 1u;
+	const Uint32 blurSamplers = 2u;
 	SDL_GPUShader *vs = LoadShader(SDL_GPU_SHADERSTAGE_VERTEX,   kVertScreen,  0);
 	SDL_GPUShader *fs = LoadShader(SDL_GPU_SHADERSTAGE_FRAGMENT,
 	                               kFragLobbyPanelBlur,
@@ -1033,7 +1033,7 @@ void SDL3GPUBackend::Present() {
 				pass,
 				0,
 				blurBinds,
-				chosen_format == SDL_GPU_SHADERFORMAT_MSL ? 2 : 1);
+				2);
 			for (const SDL_Rect &rect : lobby_blur_rects.blur) {
 				SDL_SetGPUScissor(pass, &rect);
 				SDL_DrawGPUPrimitives(pass, 3, 1, 0, 0);

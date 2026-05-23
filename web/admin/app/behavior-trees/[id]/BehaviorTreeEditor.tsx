@@ -396,7 +396,14 @@ export default function BehaviorTreeEditor(props: Props) {
   return <ReactFlowProvider><BehaviorTreeEditorInner {...props} /></ReactFlowProvider>;
 }
 
-function BehaviorTreeEditorInner({ bt, onChange }: Props) {
+function BehaviorTreeEditorInner({ bt: rawBt, onChange }: Props) {
+  // Normalize — guard against files loaded without all fields (e.g. wrong folder opened).
+  const bt: BehaviorTree = {
+    ...rawBt,
+    blackboard: rawBt.blackboard ?? [],
+    nodes: rawBt.nodes ?? {},
+    positions: rawBt.positions ?? {},
+  };
   const [rfNodes, setRfNodes, onNodesChange] = useNodesState([]);
   const [rfEdges, setRfEdges, onEdgesChange] = useEdgesState([]);
   const rfEdgesRef = useRef(rfEdges);

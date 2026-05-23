@@ -20,7 +20,8 @@ public:
 
 	explicit WorldPeerRegistry(World & world);
 
-	Peer * AddPeer(char * address, unsigned short port, Uint8 agency, Uint32 accountid, bool observer = false);
+	Peer * AddPeer(char * address, unsigned short port, Uint8 agency, Uint32 accountid,
+	               Uint32 selectedcharid = 0, bool observer = false);
 	Peer * AddBot(Uint8 agency);
 	Peer * FindPeer(sockaddr_in & sockaddr);
 	void ReadPeerList(Serializer & data);

@@ -247,10 +247,16 @@ void LobbyConnectScreen::Tick(ScreenContext & ctx)
 			//world.lobby.Disconnect();
 		break;
 		case Lobby::AUTHENTICATED:
+			if(!world.lobby.charactersreceived){
+				break;
+			}
 			AppendLog("Authenticated");
-			world.lobby.UnlockMutex();
-			ctx.GoToState(GameState::LOBBY);
-			return;
+			{
+				const bool needsCharacter = world.lobby.characters.empty();
+				world.lobby.UnlockMutex();
+				ctx.GoToState(needsCharacter ? GameState::CREATECHARACTER : GameState::LOBBY);
+				return;
+			}
 		case Lobby::CONNECTIONFAILED:
 			AppendLog("Connection failed");
 			world.lobby.state = Lobby::IDLE;

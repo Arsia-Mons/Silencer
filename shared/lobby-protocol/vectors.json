@@ -168,72 +168,69 @@
     {
       "name": "userinfo_reply",
       "kind": "UserInfoReply",
-      "hex": "4c08c80000000a0001000200030405060708090a000b000c000d0e0f101112131400150000000000160017180019000000000000000000000000000000000000000000000000000561646d696e",
+      "hex": "2308c80000002c010000010a000b000c000d0e0f101112130561646d696e055368616465",
       "value": {
         "account_id": 200,
-        "agencies": [
+        "selected_char_id": 300,
+        "agency_idx": 1,
+        "stats": {
+          "wins": 10,
+          "losses": 11,
+          "xp_to_next_level": 12,
+          "level": 13,
+          "endurance": 14,
+          "shield": 15,
+          "jetpack": 16,
+          "tech_slots": 17,
+          "hacking": 18,
+          "contacts": 19
+        },
+        "name": "admin",
+        "character_name": "Shade"
+      }
+    },
+    {
+      "name": "characters_push",
+      "kind": "Characters",
+      "hex": "360e022c0100002c010000010a000b000c000d0e0f101112130553686164652d010000030100020003000405060708090a0556616e7461",
+      "value": {
+        "selected_char_id": 300,
+        "characters": [
           {
-            "wins": 10,
-            "losses": 1,
-            "xp_to_next_level": 2,
-            "level": 3,
-            "endurance": 4,
-            "shield": 5,
-            "jetpack": 6,
-            "tech_slots": 7,
-            "hacking": 8,
-            "contacts": 9
+            "id": 300,
+            "agency_idx": 1,
+            "stats": {
+              "wins": 10,
+              "losses": 11,
+              "xp_to_next_level": 12,
+              "level": 13,
+              "endurance": 14,
+              "shield": 15,
+              "jetpack": 16,
+              "tech_slots": 17,
+              "hacking": 18,
+              "contacts": 19
+            },
+            "name": "Shade"
           },
           {
-            "wins": 10,
-            "losses": 11,
-            "xp_to_next_level": 12,
-            "level": 13,
-            "endurance": 14,
-            "shield": 15,
-            "jetpack": 16,
-            "tech_slots": 17,
-            "hacking": 18,
-            "contacts": 19
-          },
-          {
-            "wins": 20,
-            "losses": 21,
-            "xp_to_next_level": 0,
-            "level": 0,
-            "endurance": 0,
-            "shield": 22,
-            "jetpack": 0,
-            "tech_slots": 23,
-            "hacking": 24,
-            "contacts": 0
-          },
-          {
-            "wins": 25,
-            "losses": 0,
-            "xp_to_next_level": 0,
-            "level": 0,
-            "endurance": 0,
-            "shield": 0,
-            "jetpack": 0,
-            "tech_slots": 0,
-            "hacking": 0,
-            "contacts": 0
-          },
-          {
-            "wins": 0,
-            "losses": 0,
-            "xp_to_next_level": 0,
-            "level": 0,
-            "endurance": 0,
-            "shield": 0,
-            "jetpack": 0,
-            "tech_slots": 0,
-            "hacking": 0,
-            "contacts": 0
+            "id": 301,
+            "agency_idx": 3,
+            "stats": {
+              "wins": 1,
+              "losses": 2,
+              "xp_to_next_level": 3,
+              "level": 4,
+              "endurance": 5,
+              "shield": 6,
+              "jetpack": 7,
+              "tech_slots": 8,
+              "hacking": 9,
+              "contacts": 10
+            },
+            "name": "Vanta"
           }
-        ],
-        "name": "admin"
+        ]
       }
     },
     {
@@ -251,9 +248,10 @@
     {
       "name": "upgradestat_request",
       "kind": "UpgradeStatRequest",
-      "hex": "030a0203",
+      "hex": "070a022c01000003",
       "value": {
         "agency_idx": 2,
+        "character_id": 300,
         "stat_id": 3
       }
     },
@@ -297,19 +295,37 @@
       }
     },
     {
+      "name": "create_character_request",
+      "kind": "CreateCharacterRequest",
+      "hex": "080f05536861646501",
+      "value": {
+        "name": "Shade",
+        "agency_idx": 1
+      }
+    },
+    {
+      "name": "select_character_request",
+      "kind": "SelectCharacterRequest",
+      "hex": "05102c010000",
+      "value": {
+        "character_id": 300
+      }
+    },
+    {
       "_doc": [
-        "Largest payload in the protocol (192 bytes incl. opcode). Each",
+        "Largest payload in the protocol (196 bytes incl. opcode). Each",
         "of the 44 MatchStats u32 fields gets a distinguishable value",
         "(100..143 in declaration order) so any field-order regression",
         "in any implementation surfaces immediately."
       ],
       "name": "register_stats_request",
       "kind": "RegisterStatsRequest",
-      "hex": "c00b0700000001090000000201d20400006400000065000000660000006700000068000000690000006a0000006b0000006c0000006d0000006e0000006f000000700000007100000072000000730000007400000075000000760000007700000078000000790000007a0000007b0000007c0000007d0000007e0000007f000000800000008100000082000000830000008400000085000000860000008700000088000000890000008a0000008b0000008c0000008d0000008e0000008f000000",
+      "hex": "c40b0700000001090000002c0100000201d20400006400000065000000660000006700000068000000690000006a0000006b0000006c0000006d0000006e0000006f000000700000007100000072000000730000007400000075000000760000007700000078000000790000007a0000007b0000007c0000007d0000007e0000007f000000800000008100000082000000830000008400000085000000860000008700000088000000890000008a0000008b0000008c0000008d0000008e0000008f000000",
       "value": {
         "game_id": 7,
         "team_number": 1,
         "account_id": 9,
+        "character_id": 300,
         "stats_agency": 2,
         "won": true,
         "xp": 1234,

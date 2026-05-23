@@ -57,11 +57,13 @@ func (m *MongoSync) SyncPlayer(u *User) {
 		return
 	}
 	doc := bson.M{
-		"accountId": u.AccountID,
-		"callsign":  u.Name,
-		"banned":    u.Banned,
-		"agencies":  agenciesToBSON(u.Agency),
-		"lastSeen":  time.Now().UTC(),
+		"accountId":  u.AccountID,
+		"name":       u.Name,
+		"callsign":   u.Name,
+		"banned":     u.Banned,
+		"agencies":   agencyProjectionToBSON(u),
+		"characters": charactersToBSON(u.Characters),
+		"lastSeen":   time.Now().UTC(),
 	}
 	go func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -103,21 +105,52 @@ func (m *MongoSync) SyncAll(users map[string]*User) {
 	}()
 }
 
-func agenciesToBSON(agencies [5]Agency) []bson.M {
-	out := make([]bson.M, 5)
-	for i, a := range agencies {
-		out[i] = bson.M{
-			"wins":          a.Wins,
-			"losses":        a.Losses,
-			"xpToNextLevel": a.XPToNextLevel,
-			"level":         a.Level,
-			"endurance":     a.Endurance,
-			"shield":        a.Shield,
-			"jetpack":       a.Jetpack,
-			"techSlots":     a.TechSlots,
-			"hacking":       a.Hacking,
-			"contacts":      a.Contacts,
-		}
+func charactersToBSON(chars []Character) []bson.M {
+	out := make([]bson.M, len(chars))
+	for i, ch := range chars {
+		doc := agencyToBSON(ch.Stats)
+		doc["id"] = ch.ID
+		doc["name"] = ch.Name
+		doc["agencyIdx"] = ch.AgencyIdx
+		out[i] = doc
 	}
 	return out
+}
+
+func agencyProjectionToBSON(u *User) []bson.M {
+	stats := [5]Agency{}
+	seen := [5]bool{}
+	for i := range stats {
+		stats[i] = defaultAgency()
+	}
+	for _, ch := range u.Characters {
+		if ch.AgencyIdx >= 5 {
+			continue
+		}
+		idx := int(ch.AgencyIdx)
+		if !seen[idx] || ch.ID == u.SelectedCharID {
+			stats[idx] = ch.Stats
+			seen[idx] = true
+		}
+	}
+	out := make([]bson.M, len(stats))
+	for i, a := range stats {
+		out[i] = agencyToBSON(a)
+	}
+	return out
+}
+
+func agencyToBSON(a Agency) bson.M {
+	return bson.M{
+		"wins":          a.Wins,
+		"losses":        a.Losses,
+		"xpToNextLevel": a.XPToNextLevel,
+		"level":         a.Level,
+		"endurance":     a.Endurance,
+		"shield":        a.Shield,
+		"jetpack":       a.Jetpack,
+		"techSlots":     a.TechSlots,
+		"hacking":       a.Hacking,
+		"contacts":      a.Contacts,
+	}
 }

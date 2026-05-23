@@ -9,6 +9,7 @@
 #include <map>
 #include <memory>
 #include <string>
+#include <vector>
 
 class Lobby
 {
@@ -21,12 +22,29 @@ public:
 	void LockMutex(void);
 	void UnlockMutex(void);
 	enum {IDLE, WAITING, CONNECTING, RESOLVING, WAITINGFORRESOLVER, RESOLVED, RESOLVEFAILED, CONNECTIONFAILED, CONNECTED, CHECKINGVERSION, AUTHENTICATING, AUTHSENT, AUTHENTICATED, AUTHFAILED, DISCONNECTED} state;
-	enum {MSG_AUTH, MSG_MOTD, MSG_CHAT, MSG_NEWGAME, MSG_DELGAME, MSG_CHANNEL, MSG_CONNECT, MSG_VERSION, MSG_USERINFO, MSG_PING, MSG_UPGRADESTAT, MSG_REGISTERSTATS, MSG_PRESENCE, MSG_SETGAME};
+	enum {MSG_AUTH, MSG_MOTD, MSG_CHAT, MSG_NEWGAME, MSG_DELGAME, MSG_CHANNEL, MSG_CONNECT, MSG_VERSION, MSG_USERINFO, MSG_PING, MSG_UPGRADESTAT, MSG_REGISTERSTATS, MSG_PRESENCE, MSG_SETGAME, MSG_CHARACTERS, MSG_CREATECHARACTER, MSG_SELECTCHARACTER};
+	enum StatID {
+		STAT_ENDURANCE = 1,
+		STAT_SHIELD = 2,
+		STAT_JETPACK = 3,
+		STAT_TECHSLOTS = 4,
+		STAT_HACKING = 5,
+		STAT_CONTACTS = 6,
+	};
 	struct PresenceEntry {
 		Uint32 accountid;
 		Uint32 gameid; // 0 = main lobby
 		Uint8 status;  // 0 = lobby, 1 = pregame, 2 = playing
 		char name[17]; // matches server-side max username (16) + null
+	};
+	struct Character {
+		Uint32 id;
+		char name[17];
+		Uint8 agencyIdx;
+		struct {
+			Uint16 wins, losses, xp;
+			Uint8 level, endurance, shield, jetpack, techslots, hacking, contacts;
+		} stats;
 	};
 	void SendVersion(void);
 	void SendCredentials(const char * username, const char * password);
@@ -39,9 +57,13 @@ public:
 	User * GetUserInfo(Uint32 accountid);
 	void ForgetUserInfo(Uint32 accountid);
 	void ForgetAllUserInfo(void);
-	void UpgradeStat(Uint8 agency, Uint8 stat);
+	void UpgradeStat(Uint32 charID, Uint8 agency, StatID stat);
 	void RegisterStats(User & user, Uint8 won, Uint32 gameid);
 	void SendSetGame(Uint32 gameid, Uint8 status);
+	void CreateCharacter(const char * name, Uint8 agencyIdx);
+	void SelectCharacter(Uint32 charID);
+	const Character * GetSelectedCharacter() const;
+	Uint8 GetSelectedAgencyOrDefault(Uint8 fallback) const;
 	char failmessage[256];
 	Uint32 accountid;
 	char motd[2048];
@@ -68,6 +90,9 @@ public:
 	uint8_t updatesha256[32];
 	Uint8 selectedagency;
 	bool statupgraded;
+	std::vector<Character> characters;
+	Uint32 selectedcharid;
+	bool charactersreceived;
 
 	// Username the player typed at the LobbyConnect screen, captured before
 	// SendCredentials runs. CharacterPanel reads this back to render the

@@ -94,8 +94,11 @@ func (h *Hub) Join(c *Client) {
 		ip, _, _ := net.SplitHostPort(c.conn.RemoteAddr().String())
 		var agencies [5]AgencyEvent
 		if c.user != nil {
-			for i, a := range c.user.Agency {
-				agencies[i] = agencyToEvent(a)
+			for i, ch := range c.user.Characters {
+				if i >= 5 {
+					break
+				}
+				agencies[ch.AgencyIdx] = agencyToEvent(ch.Stats)
 			}
 		}
 		h.events.Publish("player.login", playerLoginEvent{

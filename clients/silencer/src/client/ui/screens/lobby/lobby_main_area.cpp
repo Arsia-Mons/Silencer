@@ -41,12 +41,6 @@ constexpr int kMinUpperW = 120;
 constexpr int kMinCharacterW = 140;
 constexpr int kMaxCharacterW = 300;
 constexpr int kMinLowerLeftH = 88;
-// Matches the old lobby BG's baked panel fill through the palette alpha LUT.
-// The image now acts as backdrop only; all panel boundaries are explicit Box
-// chrome.
-constexpr uint8_t kPanelFillColor = 74;
-constexpr uint8_t kPanelFillOpacity = 128;
-
 int ClampInt(int value, int lo, int hi) {
 	if(value < lo) return lo;
 	if(value > hi) return hi;
@@ -300,10 +294,14 @@ void BuildLobbySteppedPane(LobbyMainAreaPanels & panels,
 				                         CLAY_SIZING_GROW(0) },
 				             .layoutDirection = CLAY_TOP_TO_BOTTOM,
 				         },
-				         .backgroundColor = { kPanelFillColor, 0, 0, kPanelFillOpacity },
 				         .clip = { .horizontal = true, .vertical = true },
 				     })) {
-					BuildCharacterPanelTree(panels.character, world, resources, interactions);
+					BuildCharacterPanelTree(
+						panels.character,
+						static_cast<Uint16>(std::max(0, layout.characterW)),
+						world,
+						resources,
+						interactions);
 				}
 
 				CLAY(Box(OpenRightChrome(), {
@@ -313,7 +311,6 @@ void BuildLobbySteppedPane(LobbyMainAreaPanels & panels,
 				                         CLAY_SIZING_GROW(0) },
 				             .layoutDirection = CLAY_TOP_TO_BOTTOM,
 				         },
-				         .backgroundColor = { kPanelFillColor, 0, 0, kPanelFillOpacity },
 				         .clip = { .horizontal = true, .vertical = true },
 				     })) {
 					BuildRightUpperContents(panels, ctx, owner, layout, interactions);
@@ -357,7 +354,6 @@ void BuildLobbySteppedPane(LobbyMainAreaPanels & panels,
 				                         CLAY_SIZING_GROW(0) },
 				             .layoutDirection = CLAY_TOP_TO_BOTTOM,
 				         },
-				         .backgroundColor = { kPanelFillColor, 0, 0, kPanelFillOpacity },
 				         .clip = { .horizontal = true, .vertical = true },
 				     })) {
 					BuildChatPanelTree(panels.chat,
@@ -384,7 +380,6 @@ void BuildLobbySteppedPane(LobbyMainAreaPanels & panels,
 			                         CLAY_SIZING_GROW(0) },
 			             .layoutDirection = CLAY_TOP_TO_BOTTOM,
 			         },
-			         .backgroundColor = { kPanelFillColor, 0, 0, kPanelFillOpacity },
 			         .clip = { .horizontal = true, .vertical = true },
 			     })) {
 			BuildRightTallContents(panels, ctx, owner, layout, interactions);

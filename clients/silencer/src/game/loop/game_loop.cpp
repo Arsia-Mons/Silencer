@@ -4,6 +4,7 @@
 #include "objecttypes.h"
 #include "player.h"
 #include "state.h"
+#include "character_create_screen.h"
 #include "lobby_connect_screen.h"
 #include "main_menu_screen.h"
 #include "mission_summary_screen.h"
@@ -423,6 +424,18 @@ bool Game::Tick(void){
 				// at the top of Game::Tick.
 			}
 		}break;
+		case CREATECHARACTER:{
+			if(stateisnew){
+				world.GetAuthorityPeer()->controlledlist.clear();
+				world.DestroyAllObjects();
+				PushScreen(std::make_unique<CharacterCreateScreen>());
+				stateisnew = false;
+			}else{
+				if(gameSession.AmbienceMixerRef().FadedIn()){
+					gameSession.AmbienceMixerRef().PlayMusic(world.resources.menumusic);
+				}
+			}
+		}break;
 		case UPDATING:{
 			if(stateisnew){
 				world.GetAuthorityPeer()->controlledlist.clear();
@@ -530,6 +543,7 @@ const char* Game::StateName(Uint8 s){
 		case JOINGAME: return "JOINGAME";
 		case REPLAYGAME: return "REPLAYGAME";
 		case TESTGAME: return "TESTGAME";
+		case CREATECHARACTER: return "CREATECHARACTER";
 		default: return "UNKNOWN";
 	}
 }

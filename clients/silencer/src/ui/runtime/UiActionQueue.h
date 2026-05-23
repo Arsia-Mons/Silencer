@@ -42,6 +42,7 @@ struct UiAction {
 enum class UiControlCommandKind {
 	Action,
 	PointerPress,
+	PointerHover,
 };
 
 struct UiControlCommand {

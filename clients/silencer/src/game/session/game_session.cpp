@@ -67,7 +67,8 @@ peer->ip = ntohl(inet_addr(lobbygame.hostname));
 peer->port = lobbygame.port;
 game.sharedstate = 0;
 game.world.mode = World::REPLICA;
-game.world.Connect(Config::GetInstance().defaultagency, game.world.lobby.accountid, password);
+const Uint8 agency = game.world.lobby.GetSelectedAgencyOrDefault(Config::GetInstance().defaultagency);
+game.world.Connect(agency, game.world.lobby.accountid, game.world.lobby.selectedcharid, password);
 joininggame = true;
 }
 
@@ -78,7 +79,8 @@ peer->ip = ntohl(inet_addr(lobbygame.hostname));
 peer->port = lobbygame.port;
 game.sharedstate = 0;
 game.world.mode = World::REPLICA;
-game.world.Connect(Config::GetInstance().defaultagency, game.world.lobby.accountid, password, true);
+const Uint8 agency = game.world.lobby.GetSelectedAgencyOrDefault(Config::GetInstance().defaultagency);
+game.world.Connect(agency, game.world.lobby.accountid, game.world.lobby.selectedcharid, password, true);
 joininggame = true;
 }
 
@@ -182,17 +184,18 @@ if(game.world.IsAuthority()){
 		if(user){
 			Uint8 won = 0;
 			for(int i = 0; i < game.world.maxpeers; i++){
-				Peer * peer = game.world.peers.peerlist[i];
-				if(peer){
-					if(peer->accountid == user->accountid){
-						Team * team = game.world.GetPeerTeam(peer->id);
-						user->statscopy = peer->stats;
-						user->statsagency = team->agency;
-						user->teamnumber = team->number;
-						game.world.SendStats(*peer);
-						if(team && team->id == game.world.winningteamid){
-							won = 1;
-						}
+					Peer * peer = game.world.peers.peerlist[i];
+					if(peer){
+						if(peer->accountid == user->accountid){
+							Team * team = game.world.GetPeerTeam(peer->id);
+							user->statscopy = peer->stats;
+							user->selectedcharid = peer->selectedcharid;
+							user->statsagency = team->agency;
+							user->teamnumber = team->number;
+							game.world.SendStats(*peer);
+							if(team && team->id == game.world.winningteamid){
+								won = 1;
+							}
 					}
 				}
 			}
