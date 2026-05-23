@@ -6,6 +6,7 @@ on:
     paths:
       - 'web/admin/**'
       - 'shared/gas-validation/**'
+      - 'shared/ui-layout/**'
       - 'package.json'
       - 'bun.lock'
       - '.github/workflows/deploy-admin-web.yml'

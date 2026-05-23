@@ -29,6 +29,7 @@ jobs:
           filters: |
             relevant:
               - 'services/admin-api/**'
+              - 'shared/ui-layout/**'
               - 'package.json'
               - 'bun.lock'
               - '.github/workflows/ci-build-admin-api.yml'

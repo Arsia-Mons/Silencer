@@ -210,6 +210,17 @@ export default function UiEditorPage() {
     try {
       setStatus(`LOADING ${surface}`);
       if (dirty) writeLocalDraft(document, currentRevision);
+
+      const draft = readLocalDraft(surface);
+      if (draft) {
+        setDocument(draft.document);
+        setSelectedId(draft.document.root.id);
+        setCurrentRevision(draft.baseRevision);
+        setDirty(true);
+        setStatus(`LOCAL DRAFT ${draft.document.surface}`);
+        return;
+      }
+
       const loaded = await getUiEditorDocument(surface);
       const parsed = validateUiDocument(loaded.document);
       setDocument(parsed);
@@ -363,6 +374,10 @@ const DRAFT_KEY_PREFIX = `${STORAGE_KEY}:`;
 
 function draftStorageKey(surface: string): string {
   return `${DRAFT_KEY_PREFIX}${normalizeUiSurface(surface)}`;
+}
+
+function readLocalDraft(surface: string): LocalDraft | null {
+  return readLocalDraftFromKey(draftStorageKey(surface));
 }
 
 function readPreferredLocalDraft(documents: UiDocumentReference[]): LocalDraft | null {

@@ -39,7 +39,7 @@ export function useClientPreview(document: UiDocument, hydrated: boolean): Clien
     const timer = window.setTimeout(async () => {
       setClientPreview((prev) => ({ ...prev, status: "syncing", error: undefined }));
       try {
-        const response = await fetch("/api/ui-editor/preview", {
+        const response = await fetch("/ui-editor/preview", {
           method: "POST",
           headers: previewHeaders(),
           body: JSON.stringify({ document, sessionId: sessionId.current, generation: seq }),

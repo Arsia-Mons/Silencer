@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - 'services/admin-api/**'
+      - 'shared/ui-layout/**'
       - 'shared/assets/**'
       - 'package.json'
       - 'bun.lock'

@@ -45,12 +45,12 @@ directly). If you need to bake an explicit URL in, pass it as a
   palette/hierarchy/inspector panels, saved documents from
   `shared/assets/ui-layouts`, JSON
   import/download, generated Clay scaffold output, and a real client preview
-  returned by `app/api/ui-editor/preview/route.ts`.
+  returned by `app/ui-editor/preview/route.ts`.
 - `app/api/ui-editor/documents/` — local Next.js proxy for the admin API UI
   layout document routes. It forwards the admin bearer token and exists for
   local dev/proxy consistency; persistence lives in `services/admin-api`, not
   admin-web.
-- `app/api/ui-editor/preview/route.ts` — talks to the Silencer control socket
+- `app/ui-editor/preview/route.ts` — talks to the Silencer control socket
   (`SILENCER_CONTROL_HOST` / `SILENCER_CONTROL_PORT`) after validating the
   admin bearer token, sends one `ui_editor_preview_capture` request, and
   returns the client screenshot plus `inspect` bounds for editor overlays.

@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { connect } from "node:net";
 import { type NextRequest, NextResponse } from "next/server";
-import { validateUiDocument } from "../../../../lib/ui-layout";
+import { validateUiDocument } from "../../../lib/ui-layout";
 
 export const runtime = "nodejs";
 

@@ -27,6 +27,7 @@ jobs:
             relevant:
               - 'web/admin/**'
               - 'shared/gas-validation/**'
+              - 'shared/ui-layout/**'
               - 'package.json'
               - 'bun.lock'
               - '.github/workflows/ci-build-admin-web.yml'

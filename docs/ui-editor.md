@@ -56,7 +56,7 @@ successful save.
 `clients/silencer/src/client/ui/screens/ui_editor_preview_screen.*` maps the
 editor document into real Silencer UI primitives inside the existing
 `ClientUi`/Clay frame. The admin route at
-`web/admin/app/api/ui-editor/preview/route.ts` requires the admin bearer token
+`web/admin/app/ui-editor/preview/route.ts` requires the admin bearer token
 before sending documents to the client with the `ui_editor_preview_capture`
 control-socket op. That single game-thread operation validates the document,
 renders the preview, captures a real client screenshot, and returns the
