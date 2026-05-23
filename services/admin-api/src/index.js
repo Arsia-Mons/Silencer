@@ -18,7 +18,7 @@ import actorsRoutes from './routes/actors.js';
 import behaviortreesRoutes from './routes/behaviortrees.js';
 import mapsRoutes from './routes/maps.js';
 import soundsRoutes from './routes/sounds.js';
-import soundCuesRoutes from './routes/soundcues.js';
+import soundCuesRoutes from './routes/soundcues.ts';
 import uiEditorRoutes from './routes/uieditor.ts';
 import { startBackupScheduler } from './backup/scheduler.js';
 import AdminUser from './db/models/AdminUser.js';

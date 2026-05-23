@@ -120,6 +120,36 @@ type UiNodeOverrides = Omit<Partial<UiNode>, "style"> & {
   style?: Partial<UiStyle>;
 };
 
+const DOCUMENT_FIELDS = new Set(["schemaVersion", "surface", "viewport", "root"]);
+const VIEWPORT_FIELDS = new Set(["width", "height"]);
+const NODE_FIELDS = new Set([
+  "id",
+  "kind",
+  "name",
+  "text",
+  "placeholder",
+  "action",
+  "textBinding",
+  "component",
+  "buttonVariant",
+  "buttonSize",
+  "image",
+  "floating",
+  "style",
+  "children",
+]);
+const SIZE_FIELDS = new Set(["mode", "value", "min", "max"]);
+const IMAGE_FIELDS = new Set(["bank", "index", "mode"]);
+const FLOATING_FIELDS = new Set([
+  "attachTo",
+  "elementAttach",
+  "parentAttach",
+  "offsetX",
+  "offsetY",
+  "zIndex",
+  "pointerPassthrough",
+]);
+
 const KIND_LABELS: Record<UiNodeKind, string> = {
   screen: "Screen",
   panel: "Panel",
@@ -483,6 +513,7 @@ export function validateUiDocument(
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     throw new Error("Document must be an object.");
   }
+  rejectUnknownObjectFields(value as Record<string, unknown>, DOCUMENT_FIELDS, "Document");
   const candidate = value as Partial<UiDocument>;
   if (candidate.schemaVersion !== UI_LAYOUT_SCHEMA_VERSION) {
     throw new Error(`Unsupported UI layout schema: ${String(candidate.schemaVersion)}`);
@@ -609,7 +640,27 @@ function cloneNodeWithNewIds(node: UiNode): UiNode {
   };
 }
 
-function validateNode(node: UiNode, seenIds: Set<string>): void {
+function rejectUnknownObjectFields(
+  value: Record<string, unknown>,
+  allowedFields: ReadonlySet<string>,
+  label: string,
+): void {
+  for (const key of Object.keys(value)) {
+    if (!allowedFields.has(key)) {
+      throw new Error(`${label} has unsupported field: ${key}.`);
+    }
+  }
+}
+
+function isRecordObject(value: unknown): value is Record<string, unknown> {
+  return !!value && typeof value === "object" && !Array.isArray(value);
+}
+
+function validateNode(value: unknown, seenIds: Set<string>): void {
+  if (!isRecordObject(value)) throw new Error("Node must be an object.");
+  const node = value as unknown as UiNode;
+  const nodeLabel = typeof value.id === "string" ? `Node ${value.id}` : "Node";
+  rejectUnknownObjectFields(value, NODE_FIELDS, nodeLabel);
   if (!node.id || typeof node.id !== "string") throw new Error("Node id is missing.");
   if (seenIds.has(node.id)) throw new Error(`Duplicate node id: ${node.id}`);
   seenIds.add(node.id);
@@ -630,8 +681,7 @@ function validateNode(node: UiNode, seenIds: Set<string>): void {
   if (node.kind === "component" && !node.component) {
     throw new Error(`Node ${node.id} component is missing.`);
   }
-  if (!node.style || typeof node.style !== "object")
-    throw new Error(`Node ${node.id} style is missing.`);
+  if (!isRecordObject(node.style)) throw new Error(`Node ${node.id} style is missing.`);
   validateStyleFields(node);
   validateSize(node, "width");
   validateSize(node, "height");
@@ -729,9 +779,10 @@ function validateRenderableNodeDecorators(node: UiNode): void {
 
 function validateImage(node: UiNode): void {
   if (node.image === undefined) return;
-  if (!node.image || typeof node.image !== "object" || Array.isArray(node.image)) {
+  if (!isRecordObject(node.image)) {
     throw new Error(`Node ${node.id} has invalid image.`);
   }
+  rejectUnknownObjectFields(node.image, IMAGE_FIELDS, `Node ${node.id} image`);
   if (!Number.isInteger(node.image.bank) || node.image.bank < 0 || node.image.bank > 255) {
     throw new Error(`Node ${node.id} has invalid image bank.`);
   }
@@ -746,9 +797,10 @@ function validateImage(node: UiNode): void {
 
 function validateFloating(node: UiNode): void {
   if (node.floating === undefined) return;
-  if (!node.floating || typeof node.floating !== "object" || Array.isArray(node.floating)) {
+  if (!isRecordObject(node.floating)) {
     throw new Error(`Node ${node.id} has invalid floating.`);
   }
+  rejectUnknownObjectFields(node.floating, FLOATING_FIELDS, `Node ${node.id} floating`);
   if (!["parent", "root"].includes(node.floating.attachTo)) {
     throw new Error(`Node ${node.id} has invalid floating attachTo.`);
   }
@@ -879,11 +931,15 @@ function validateKindSpecificStyleValues(node: UiNode): void {
   }
 }
 
-function validateViewport(viewport: UiDocument["viewport"]): void {
-  if (!Number.isInteger(viewport.width) || viewport.width < 160 || viewport.width > 4096) {
+function validateViewport(viewport: unknown): void {
+  if (!isRecordObject(viewport)) throw new Error("Document viewport is missing.");
+  rejectUnknownObjectFields(viewport, VIEWPORT_FIELDS, "Document viewport");
+  const width = viewport.width;
+  const height = viewport.height;
+  if (typeof width !== "number" || !Number.isInteger(width) || width < 160 || width > 4096) {
     throw new Error("Document viewport width is invalid.");
   }
-  if (!Number.isInteger(viewport.height) || viewport.height < 160 || viewport.height > 4096) {
+  if (typeof height !== "number" || !Number.isInteger(height) || height < 160 || height > 4096) {
     throw new Error("Document viewport height is invalid.");
   }
 }
@@ -927,7 +983,11 @@ function validatePalette(
 
 function validateSize(node: UiNode, key: "width" | "height"): void {
   const size = node.style[key];
-  if (!size || (size.mode !== "fit" && size.mode !== "grow" && size.mode !== "fixed")) {
+  if (!isRecordObject(size)) {
+    throw new Error(`Node ${node.id} has invalid ${key} sizing.`);
+  }
+  rejectUnknownObjectFields(size, SIZE_FIELDS, `Node ${node.id} ${key} sizing`);
+  if (size.mode !== "fit" && size.mode !== "grow" && size.mode !== "fixed") {
     throw new Error(`Node ${node.id} has invalid ${key} sizing.`);
   }
   validateSizeBound(node, key, "min");
@@ -951,11 +1011,7 @@ function validateSize(node: UiNode, key: "width" | "height"): void {
   }
 }
 
-function validateSizeBound(
-  node: UiNode,
-  key: "width" | "height",
-  bound: "min" | "max",
-): void {
+function validateSizeBound(node: UiNode, key: "width" | "height", bound: "min" | "max"): void {
   const value = node.style[key][bound];
   if (value === undefined) return;
   if (!Number.isFinite(value) || value < 0 || value > 4096) {
@@ -963,10 +1019,7 @@ function validateSizeBound(
   }
 }
 
-function validateSurfaceTokens(
-  document: UiDocument,
-  options: UiDocumentValidationOptions,
-): void {
+function validateSurfaceTokens(document: UiDocument, options: UiDocumentValidationOptions): void {
   const manifest = surfaceTokenManifest(document.surface, options.tokenManifests ?? []);
   if (!manifest) {
     if (options.requireTokenManifestForSurfaceTokens && nodeHasSurfaceTokens(document.root)) {
@@ -982,8 +1035,7 @@ function surfaceTokenManifest(
   manifests: UiSurfaceTokenManifest[],
 ): UiSurfaceTokenManifest | null {
   const normalized = normalizeUiSurface(surface);
-  return manifests.find((manifest) => normalizeUiSurface(manifest.surface) === normalized) ??
-    null;
+  return manifests.find((manifest) => normalizeUiSurface(manifest.surface) === normalized) ?? null;
 }
 
 function validateSurfaceNodeTokens(node: UiNode, manifest: UiSurfaceTokenManifest): void {

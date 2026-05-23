@@ -173,6 +173,26 @@ bool RequiredStringEnum(const nlohmann::json& json,
 	return false;
 }
 
+bool RejectUnknownFields(const nlohmann::json& json,
+                         std::initializer_list<const char *> allowed,
+                         const std::string& label,
+                         std::string& error) {
+	for(auto it = json.begin(); it != json.end(); ++it){
+		bool matched = false;
+		for(const char * candidate : allowed){
+			if(it.key() == candidate){
+				matched = true;
+				break;
+			}
+		}
+		if(!matched){
+			error = label + " has unsupported field: " + it.key();
+			return false;
+		}
+	}
+	return true;
+}
+
 bool ParseSize(const nlohmann::json& json,
                const char * key,
                UiEditorSize& out,
@@ -184,6 +204,10 @@ bool ParseSize(const nlohmann::json& json,
 	}
 	if(!it->is_object()){
 		error = std::string("style.") + key + " must be an object";
+		return false;
+	}
+	if(!RejectUnknownFields(*it, { "mode", "value", "min", "max" },
+	                        std::string("style.") + key + " sizing", error)){
 		return false;
 	}
 	const std::string mode = StringValue(*it, "mode");
@@ -314,6 +338,10 @@ bool ParseImage(const nlohmann::json& json,
 		error = "image must be an object";
 		return false;
 	}
+	if(!RejectUnknownFields(*it, { "bank", "index", "mode" },
+	                        "node " + out.id + " image", error)){
+		return false;
+	}
 	if(!RequiredIntInRange(*it, "bank", 0, 255, out.image.bank, error)){
 		error = "image bank is invalid";
 		return false;
@@ -339,6 +367,14 @@ bool ParseFloating(const nlohmann::json& json,
 	if(it == json.end()) return true;
 	if(!it->is_object()){
 		error = "floating must be an object";
+		return false;
+	}
+	if(!RejectUnknownFields(*it,
+	                        { "attachTo", "elementAttach", "parentAttach",
+	                          "offsetX", "offsetY", "zIndex",
+	                          "pointerPassthrough" },
+	                        "node " + out.id + " floating",
+	                        error)){
 		return false;
 	}
 	if(!RequiredStringEnum(*it, "attachTo", { "parent", "root" },
@@ -513,6 +549,19 @@ bool ParseNode(const nlohmann::json& json,
 		error = "node must be an object";
 		return false;
 	}
+	auto idIt = json.find("id");
+	const std::string nodeLabel = idIt != json.end() && idIt->is_string()
+		? "node " + idIt->get<std::string>()
+		: "node";
+	if(!RejectUnknownFields(json,
+	                        { "id", "kind", "name", "text", "placeholder",
+	                          "action", "textBinding", "component",
+	                          "buttonVariant", "buttonSize", "image",
+	                          "floating", "style", "children" },
+	                        nodeLabel,
+	                        error)){
+		return false;
+	}
 	if(!RequiredString(json, "id", out.id, error)) return false;
 	if(!RequiredString(json, "kind", out.kind, error)) return false;
 	if(!RequiredString(json, "name", out.name, error)) return false;
@@ -598,6 +647,10 @@ bool ParseUiEditorPreviewDocument(const nlohmann::json& json,
 		error = "document must be an object";
 		return false;
 	}
+	if(!RejectUnknownFields(json, { "schemaVersion", "surface", "viewport", "root" },
+	                        "document", error)){
+		return false;
+	}
 	int schemaVersion = 0;
 	if(!RequiredIntInRange(json, "schemaVersion", kSchemaVersion, kSchemaVersion,
 	                       schemaVersion, error)){
@@ -612,6 +665,9 @@ bool ParseUiEditorPreviewDocument(const nlohmann::json& json,
 	auto viewportIt = json.find("viewport");
 	if(viewportIt == json.end() || !viewportIt->is_object()){
 		error = "viewport is required";
+		return false;
+	}
+	if(!RejectUnknownFields(*viewportIt, { "width", "height" }, "viewport", error)){
 		return false;
 	}
 	if(!RequiredIntInRange(*viewportIt, "width", kMinViewport, kMaxViewport,

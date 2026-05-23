@@ -25,9 +25,7 @@ describe("ui-layout model", () => {
 
     expect(findNode(original.root, "text-status")).toBeNull();
     expect(findNode(updated.root, "text-status")?.text).toBe("READY");
-    expect(findNode(updated.root, "MainMenuActionGroup")?.children?.at(-1)?.id).toBe(
-      "text-status",
-    );
+    expect(findNode(updated.root, "MainMenuActionGroup")?.children?.at(-1)?.id).toBe("text-status");
   });
 
   test("does not remove the root node", () => {
@@ -114,9 +112,7 @@ describe("ui-layout model", () => {
       placement: "after",
     });
     expect(rejectedAfterRoot).toBe(movedIntoPanel);
-    expect(findNode(rejectedAfterRoot.root, "MainMenuActionGroup")?.id).toBe(
-      "MainMenuActionGroup",
-    );
+    expect(findNode(rejectedAfterRoot.root, "MainMenuActionGroup")?.id).toBe("MainMenuActionGroup");
 
     const rejectedCycle = moveNode(movedIntoPanel, "MainMenuActionGroup", {
       targetId: "text-status",
@@ -233,6 +229,44 @@ describe("ui-layout model", () => {
     );
   });
 
+  test("rejects fields that no client parser or renderer honors", () => {
+    const documentField = JSON.parse(JSON.stringify(createDefaultUiDocument()));
+    documentField.debug = true;
+    expect(() => validateUiDocument(documentField)).toThrow(
+      "Document has unsupported field: debug.",
+    );
+
+    const viewportField = JSON.parse(JSON.stringify(createDefaultUiDocument()));
+    viewportField.viewport.aspectRatio = "4:3";
+    expect(() => validateUiDocument(viewportField)).toThrow(
+      "Document viewport has unsupported field: aspectRatio.",
+    );
+
+    const nodeField = JSON.parse(JSON.stringify(createDefaultUiDocument()));
+    nodeField.root.unsupportedLayoutMode = "grid";
+    expect(() => validateUiDocument(nodeField)).toThrow(
+      "Node MainMenuRoot has unsupported field: unsupportedLayoutMode.",
+    );
+
+    const imageField = JSON.parse(JSON.stringify(createDefaultUiDocument()));
+    imageField.root.image.tintPalette = 44;
+    expect(() => validateUiDocument(imageField)).toThrow(
+      "Node MainMenuRoot image has unsupported field: tintPalette.",
+    );
+
+    const floatingField = JSON.parse(JSON.stringify(createDefaultUiDocument()));
+    (findNode(floatingField.root, "MainMenuActionGroup") as any).floating.anchor = "screen";
+    expect(() => validateUiDocument(floatingField)).toThrow(
+      "Node MainMenuActionGroup floating has unsupported field: anchor.",
+    );
+
+    const sizeField = JSON.parse(JSON.stringify(createDefaultUiDocument()));
+    sizeField.root.style.width.preferred = 640;
+    expect(() => validateUiDocument(sizeField)).toThrow(
+      "Node MainMenuRoot width sizing has unsupported field: preferred.",
+    );
+  });
+
   test("rejects surface tokens outside the manifest", () => {
     const unknownAction = JSON.parse(JSON.stringify(createDefaultUiDocument()));
     (findNode(unknownAction.root, "MainMenuTutorialButton") as any).action = "main_menu.credits";
@@ -241,32 +275,27 @@ describe("ui-layout model", () => {
     );
 
     const unknownComponent = JSON.parse(JSON.stringify(createDefaultUiDocument()));
-    (findNode(unknownComponent.root, "MainMenuSilencerLogo") as any).component =
-      "main-menu.badge";
+    (findNode(unknownComponent.root, "MainMenuSilencerLogo") as any).component = "main-menu.badge";
     expect(() =>
-      validateUiDocument(unknownComponent, { tokenManifests: [MAIN_MENU_TOKENS] })
+      validateUiDocument(unknownComponent, { tokenManifests: [MAIN_MENU_TOKENS] }),
     ).toThrow("Node MainMenuSilencerLogo references unknown component main-menu.badge.");
 
     const unknownBinding = JSON.parse(JSON.stringify(createDefaultUiDocument()));
     (findNode(unknownBinding.root, "MainMenuVersion") as any).textBinding = "client.badge";
     expect(() =>
-      validateUiDocument(unknownBinding, { tokenManifests: [MAIN_MENU_TOKENS] })
+      validateUiDocument(unknownBinding, { tokenManifests: [MAIN_MENU_TOKENS] }),
     ).toThrow("Node MainMenuVersion references unknown text binding client.badge.");
 
     const missingManifest = JSON.parse(JSON.stringify(createDefaultUiDocument()));
     expect(() =>
-      validateUiDocument(missingManifest, { requireTokenManifestForSurfaceTokens: true })
-    ).toThrow(
-      "Surface main-menu needs a UI token manifest.",
-    );
+      validateUiDocument(missingManifest, { requireTokenManifestForSurfaceTokens: true }),
+    ).toThrow("Surface main-menu needs a UI token manifest.");
 
     const unknownSurface = JSON.parse(JSON.stringify(createDefaultUiDocument()));
     unknownSurface.surface = "custom-screen";
     expect(() =>
-      validateUiDocument(unknownSurface, { requireTokenManifestForSurfaceTokens: true })
-    ).toThrow(
-      "Surface custom-screen needs a UI token manifest.",
-    );
+      validateUiDocument(unknownSurface, { requireTokenManifestForSurfaceTokens: true }),
+    ).toThrow("Surface custom-screen needs a UI token manifest.");
   });
 
   test("rejects fields that the client renderer does not honor on primitives", () => {
