@@ -8,8 +8,9 @@ All notable changes to Silencer are documented here.
 
 #### UI Editor (#227)
 
-- Added `/ui-editor`, a WYSIWYG Silencer UI layout editor with palette, hierarchy, inspector controls, local JSON persistence, JSON import/download, generated Clay scaffold output, and live preview screenshots rendered by the real client through the control socket.
+- Added `/ui-editor`, a WYSIWYG Silencer UI layout editor with palette, hierarchy, inspector controls, shared-asset document persistence, JSON import/download, generated Clay scaffold output, and live preview screenshots rendered by the real client through the control socket.
 - Added a versioned `web/admin/lib/ui-layout.ts` document model for stable IDs, Clay-style sizing, flex direction, padding, gaps, alignment, Silencer palette indexes, text, buttons, inputs, and containers.
+- Added `shared/assets/ui-layouts/*.silencer-ui.json` plus `/api/ui-editor/documents` load/save routes so admin dashboard edits are synced into the shared UI layout source tree.
 - Added a client `ui_editor_preview` control op and preview screen that maps editor documents into the production `ClientUi`/Clay frame for real-time editor feedback.
 
 ### Game client

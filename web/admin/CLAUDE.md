@@ -42,9 +42,13 @@ directly). If you need to bake an explicit URL in, pass it as a
   tree. Node types match `clients/silencer/src/behaviortree.h`.
 - `app/ui-editor/` — WYSIWYG editor for Silencer UI layout documents.
   Uses the typed `lib/ui-layout.ts` tree model, palette/hierarchy/inspector
-  panels, localStorage persistence, JSON import/download, generated Clay
-  scaffold output, and a real client preview returned by
-  `app/api/ui-editor/preview/route.ts`.
+  panels, saved documents from `shared/assets/ui-layouts`, JSON
+  import/download, generated Clay scaffold output, and a real client preview
+  returned by `app/api/ui-editor/preview/route.ts`.
+- `app/api/ui-editor/documents/` — file-backed UI layout document API. It
+  lists, loads, validates, and saves `*.silencer-ui.json` documents in
+  `shared/assets/ui-layouts`; browser localStorage is only a draft fallback
+  when this API is unavailable.
 - `app/api/ui-editor/preview/route.ts` — talks to the Silencer control socket
   (`SILENCER_CONTROL_HOST` / `SILENCER_CONTROL_PORT`), sends one
   `ui_editor_preview_capture` request, and returns the client screenshot plus
@@ -81,6 +85,9 @@ directly). If you need to bake an explicit URL in, pass it as a
   generation. Keep this model aligned with real `clients/silencer/src/client/ui`
   primitive concepts and the client preview parser, not browser-only widget
   names.
+- `lib/ui-layout-store.ts` — server-only file store for dashboard-synced UI
+  layout documents. Keep filename normalization and validation strict so the
+  stored assets remain directly consumable by the client migration.
 - `lib/api.ts` — `fetch` wrapper, injects `Authorization: Bearer`
   from `zs_token` (admin) localStorage key.
 - `lib/auth.js` — two storage keys: `zs_token` (admin) and

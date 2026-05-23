@@ -1,0 +1,125 @@
+{
+  "schemaVersion": 1,
+  "surface": "main-menu",
+  "viewport": {
+    "width": 1280,
+    "height": 720
+  },
+  "root": {
+    "id": "main-menu-root",
+    "kind": "screen",
+    "name": "Main Menu",
+    "style": {
+      "width": {
+        "mode": "fixed",
+        "value": 1280
+      },
+      "height": {
+        "mode": "fixed",
+        "value": 720
+      },
+      "direction": "column",
+      "align": "center",
+      "justify": "center",
+      "padding": 48,
+      "gap": 28,
+      "backgroundPalette": 0
+    },
+    "children": [
+      {
+        "id": "main-menu-title",
+        "kind": "text",
+        "name": "Title",
+        "text": "SILENCER",
+        "style": {
+          "width": {
+            "mode": "fit"
+          },
+          "height": {
+            "mode": "fit"
+          },
+          "font": "title",
+          "textPalette": 112
+        }
+      },
+      {
+        "id": "main-menu-panel",
+        "kind": "panel",
+        "name": "Menu Panel",
+        "style": {
+          "width": {
+            "mode": "fixed",
+            "value": 360
+          },
+          "height": {
+            "mode": "fit"
+          },
+          "direction": "column",
+          "align": "center",
+          "justify": "start",
+          "padding": 18,
+          "gap": 10,
+          "backgroundPalette": 74,
+          "borderPalette": 216,
+          "radius": 2
+        },
+        "children": [
+          {
+            "id": "button-host-game",
+            "kind": "button",
+            "name": "Button",
+            "text": "HOST GAME",
+            "action": "open-host-game",
+            "style": {
+              "width": {
+                "mode": "fixed",
+                "value": 320
+              },
+              "height": {
+                "mode": "fit"
+              },
+              "textPalette": 0,
+              "padding": 10
+            }
+          },
+          {
+            "id": "button-join-game",
+            "kind": "button",
+            "name": "Button",
+            "text": "JOIN GAME",
+            "action": "open-join-game",
+            "style": {
+              "width": {
+                "mode": "fixed",
+                "value": 320
+              },
+              "height": {
+                "mode": "fit"
+              },
+              "textPalette": 0,
+              "padding": 10
+            }
+          },
+          {
+            "id": "button-options",
+            "kind": "button",
+            "name": "Button",
+            "text": "OPTIONS",
+            "action": "open-options",
+            "style": {
+              "width": {
+                "mode": "fixed",
+                "value": 320
+              },
+              "height": {
+                "mode": "fit"
+              },
+              "textPalette": 0,
+              "padding": 10
+            }
+          }
+        ]
+      }
+    ]
+  }
+}
