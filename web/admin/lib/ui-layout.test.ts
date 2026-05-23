@@ -260,7 +260,7 @@ describe("ui-layout model", () => {
     const buttonSize = JSON.parse(JSON.stringify(createDefaultUiDocument()));
     (findNode(buttonSize.root, "MainMenuTutorialButton") as any).style.width.min = 160;
     expect(() => validateUiDocument(buttonSize)).toThrow(
-      "Node MainMenuTutorialButton button width cannot use min or max.",
+      "Node MainMenuTutorialButton fixed width sizing cannot use min or max.",
     );
 
     const inputSizing = createNode("input", "player name");
@@ -268,6 +268,18 @@ describe("ui-layout model", () => {
     const document = insertChild(createDefaultUiDocument(), "MainMenuRoot", inputSizing);
     expect(() => validateUiDocument(document)).toThrow(
       "Node input-player name input width and height must be fixed.",
+    );
+
+    const wrongKindField = JSON.parse(JSON.stringify(createDefaultUiDocument()));
+    wrongKindField.root.component = "main-menu.logo";
+    expect(() => validateUiDocument(wrongKindField)).toThrow(
+      "Node MainMenuRoot screen cannot use component.",
+    );
+
+    const fixedBounds = JSON.parse(JSON.stringify(createDefaultUiDocument()));
+    (findNode(fixedBounds.root, "MainMenuTutorialSpacer") as any).style.width.max = 48;
+    expect(() => validateUiDocument(fixedBounds)).toThrow(
+      "Node MainMenuTutorialSpacer fixed width sizing cannot use min or max.",
     );
   });
 });

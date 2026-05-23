@@ -499,7 +499,11 @@ void Button(Clay_String id,
 	                                    : contentWidth + paddingX * 2;
 	int height = resolved.fixedHeight > 0 ? resolved.fixedHeight
 	                                      : contentHeight + paddingY * 2;
-	if(resolved.fixedWidth == 0) width = ClampAutoWidth(width, opts);
+	if(opts.widthOverride > 0){
+		width = opts.widthOverride;
+	}else if(resolved.fixedWidth == 0){
+		width = ClampAutoWidth(width, opts);
+	}
 	if(resolved.minHeight > 0 && height < resolved.minHeight) height = resolved.minHeight;
 	if(height < 1) height = 1;
 

@@ -36,6 +36,7 @@ struct ButtonOpts {
 	TextEffect textEffect = TextEffect::Default();
 	int minWidth = 0;
 	int maxWidth = 0;
+	int widthOverride = 0;
 	int paddingX = 0;
 	int paddingY = 0;
 	bool wrapText = false;

@@ -8,6 +8,8 @@
 #include "shared.h"
 #include "clay_ui_tests/clay_ui_checks.h"
 #include "runtime/UiInteractionRegistry.h"
+#include "layout/ui_document_renderer.h"
+#include "main_menu_document_runtime.h"
 #include "screen.h"
 #include "ui_editor_preview_screen.h"
 #include "ui_editor_preview_document.h"
@@ -39,6 +41,23 @@ namespace ControlDispatch {
 namespace {
 std::string g_controlPasswordModalValue;
 bool g_controlPasswordModalSubmitted = false;
+
+bool ValidateUiDocumentRuntimeTokensForPreview(
+	const silencer::ui::UiEditorPreviewDocument& document,
+	std::string& error) {
+	if(document.surface != silencer::client_ui::main_menu::kMainMenuSurface){
+		return true;
+	}
+	silencer::client_ui::UiDocumentRendererOptions options;
+	options.canBuildComponent =
+		silencer::client_ui::main_menu::IsMainMenuComponent;
+	options.canResolveTextBinding =
+		silencer::client_ui::main_menu::IsMainMenuTextBinding;
+	options.canHandleAction =
+		silencer::client_ui::main_menu::IsMainMenuAction;
+	return silencer::client_ui::ValidateUiDocumentRuntimeTokens(
+		document, options, error);
+}
 }
 
 static bool WriteTempPath(char * buffer, size_t bufferSize, const char * prefix, int frame) {
@@ -612,6 +631,10 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 			cmd.reply->set_value(Err(cmd.id, "BAD_REQUEST", error));
 			return;
 		}
+		if(!ValidateUiDocumentRuntimeTokensForPreview(document, error)){
+			cmd.reply->set_value(Err(cmd.id, "BAD_REQUEST", error));
+			return;
+		}
 		if(cmd.IsCancelled()){
 			cmd.reply->set_value(Cancelled(cmd.id));
 			return;
@@ -676,6 +699,10 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 			return;
 		}
 		if(!silencer::net::ValidateUiDocumentKnownSurfaceTokens(document, error)){
+			cmd.reply->set_value(Err(cmd.id, "BAD_REQUEST", error));
+			return;
+		}
+		if(!ValidateUiDocumentRuntimeTokensForPreview(document, error)){
 			cmd.reply->set_value(Err(cmd.id, "BAD_REQUEST", error));
 			return;
 		}

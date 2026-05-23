@@ -1,6 +1,7 @@
 #include "ui_editor_preview_screen.h"
 
 #include "layout/ui_document_renderer.h"
+#include "main_menu/main_menu_document_runtime.h"
 #include "game_state.h"
 #include "runtime/UiInteractionRegistry.h"
 #include "screen_context.h"
@@ -13,12 +14,6 @@ namespace silencer::client_ui {
 
 using silencer::ui::UiEditorPreviewDocument;
 using silencer::ui::UiInteractionRegistry;
-
-namespace {
-constexpr const char * kMainMenuSurface = "main-menu";
-constexpr const char * kMainMenuLogoComponent = "main-menu.logo";
-constexpr const char * kClientVersionBinding = "client.version";
-}  // namespace
 
 UiEditorPreviewScreen::UiEditorPreviewScreen(UiEditorPreviewDocument document)
 	: document_(std::move(document)) {}
@@ -45,17 +40,25 @@ void UiEditorPreviewScreen::BuildUi(ScreenContext& ctx,
 	(void)frametime;
 
 	UiDocumentRendererOptions options;
-	if(document_.surface == kMainMenuSurface){
+	if(document_.surface == silencer::client_ui::main_menu::kMainMenuSurface){
 		versionText_ = "Silencer v";
 		versionText_ += ctx.world.GetVersion();
+		options.canBuildComponent =
+			silencer::client_ui::main_menu::IsMainMenuComponent;
+		options.canResolveTextBinding =
+			silencer::client_ui::main_menu::IsMainMenuTextBinding;
+		options.canHandleAction =
+			silencer::client_ui::main_menu::IsMainMenuAction;
 		options.buildComponent = [&](const silencer::ui::UiEditorNode& node) {
-			if(node.component != kMainMenuLogoComponent) return false;
+			if(!silencer::client_ui::main_menu::IsMainMenuComponent(node.component)){
+				return false;
+			}
 			mainMenuLogo_.Build(ctx.world.resources);
 			return true;
 		};
-		options.resolveTextBinding = [&](const std::string& binding) {
-			if(binding == kClientVersionBinding) return versionText_;
-			return std::string();
+		options.resolveTextBinding = [&](const std::string& binding, std::string& out) {
+			return silencer::client_ui::main_menu::ResolveMainMenuTextBinding(
+				binding, versionText_, out);
 		};
 	}
 	BuildUiDocument(document_, interactions, options);

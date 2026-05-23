@@ -1,5 +1,6 @@
 #include "main_menu_screen.h"
 
+#include "main_menu_document_runtime.h"
 #include "screen_context.h"
 #include "game_state.h"
 #include "game.h"
@@ -16,17 +17,6 @@
 #include <cstdio>
 #include <string>
 
-namespace main_menu_screen_detail
-{
-constexpr const char * kSurface = "main-menu";
-constexpr const char * kLogoComponent = "main-menu.logo";
-constexpr const char * kVersionBinding = "client.version";
-constexpr const char * kActionTutorial = "main_menu.tutorial";
-constexpr const char * kActionLobby = "main_menu.lobby";
-constexpr const char * kActionOptions = "main_menu.options";
-constexpr const char * kActionExit = "main_menu.exit";
-} // namespace main_menu_screen_detail
-
 void MainMenuScreen::Build(ScreenContext & ctx)
 {
 	ctx.ResetPresentation(1);
@@ -42,10 +32,23 @@ void MainMenuScreen::Build(ScreenContext & ctx)
 	optionsClicked = false;
 	exitClicked = false;
 	layoutLoaded_ = silencer::net::LoadUiDocumentAsset(
-		main_menu_screen_detail::kSurface,
+		silencer::client_ui::main_menu::kMainMenuSurface,
 		layoutDocument_,
 		layoutLoadError_);
 	if(!layoutLoaded_){
+		std::fprintf(stderr, "[ui-layout] %s\n", layoutLoadError_.c_str());
+		return;
+	}
+	silencer::client_ui::UiDocumentRendererOptions validationOptions;
+	validationOptions.canBuildComponent =
+		silencer::client_ui::main_menu::IsMainMenuComponent;
+	validationOptions.canResolveTextBinding =
+		silencer::client_ui::main_menu::IsMainMenuTextBinding;
+	validationOptions.canHandleAction =
+		silencer::client_ui::main_menu::IsMainMenuAction;
+	if(!silencer::client_ui::ValidateUiDocumentRuntimeTokens(
+		   layoutDocument_, validationOptions, layoutLoadError_)){
+		layoutLoaded_ = false;
 		std::fprintf(stderr, "[ui-layout] %s\n", layoutLoadError_.c_str());
 		return;
 	}
@@ -86,14 +89,22 @@ void MainMenuScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime
 	if(!layoutLoaded_) return;
 
 	silencer::client_ui::UiDocumentRendererOptions options;
+	options.canBuildComponent =
+		silencer::client_ui::main_menu::IsMainMenuComponent;
+	options.canResolveTextBinding =
+		silencer::client_ui::main_menu::IsMainMenuTextBinding;
+	options.canHandleAction =
+		silencer::client_ui::main_menu::IsMainMenuAction;
 	options.buildComponent = [&](const silencer::ui::UiEditorNode& node) {
-		if(node.component != main_menu_screen_detail::kLogoComponent) return false;
+		if(!silencer::client_ui::main_menu::IsMainMenuComponent(node.component)){
+			return false;
+		}
 		logo.Build(ctx.world.resources);
 		return true;
 	};
-	options.resolveTextBinding = [&](const std::string& binding) {
-		if(binding == main_menu_screen_detail::kVersionBinding) return versionText_;
-		return std::string();
+	options.resolveTextBinding = [&](const std::string& binding, std::string& out) {
+		return silencer::client_ui::main_menu::ResolveMainMenuTextBinding(
+			binding, versionText_, out);
 	};
 	silencer::client_ui::BuildUiDocument(layoutDocument_, interactions, options);
 }
@@ -110,19 +121,19 @@ bool MainMenuScreen::HandleUiIntent(ScreenContext & ctx, const silencer::ui::UiA
 		return true;
 	}
 	if(action.kind != silencer::ui::UiActionKind::Activate) return false;
-	if(action.id == main_menu_screen_detail::kActionTutorial){
+	if(action.id == silencer::client_ui::main_menu::kActionTutorial){
 		tutorialClicked = true;
 		return true;
 	}
-	if(action.id == main_menu_screen_detail::kActionLobby){
+	if(action.id == silencer::client_ui::main_menu::kActionLobby){
 		lobbyClicked = true;
 		return true;
 	}
-	if(action.id == main_menu_screen_detail::kActionOptions){
+	if(action.id == silencer::client_ui::main_menu::kActionOptions){
 		optionsClicked = true;
 		return true;
 	}
-	if(action.id == main_menu_screen_detail::kActionExit){
+	if(action.id == silencer::client_ui::main_menu::kActionExit){
 		exitClicked = true;
 		return true;
 	}

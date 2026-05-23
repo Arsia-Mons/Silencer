@@ -219,6 +219,11 @@ bool ParseSize(const nlohmann::json& json,
 		return true;
 	}
 	if(mode == "fixed"){
+		if(it->find("min") != it->end() || it->find("max") != it->end()){
+			error = std::string("style.") + key +
+			        " fixed sizing cannot use min or max";
+			return false;
+		}
 		auto valueIt = it->find("value");
 		if(valueIt == it->end() || !valueIt->is_number()){
 			error = std::string("style.") + key + ".value must be numeric for fixed sizing";
@@ -382,6 +387,42 @@ bool HasSizeBounds(const UiEditorSize& size) {
 	return size.min > 0.0f || size.max > 0.0f;
 }
 
+bool HasField(const nlohmann::json& json, const char * key) {
+	return json.find(key) != json.end();
+}
+
+bool ValidateKindSpecificNodeFields(const nlohmann::json& json,
+                                    const UiEditorNode& node,
+                                    std::string& error) {
+	auto reject = [&](const char * field) {
+		error = "node " + node.id + " " + node.kind +
+		        " cannot use " + field;
+		return false;
+	};
+	if(HasField(json, "text") && node.kind != "text" && node.kind != "button"){
+		return reject("text");
+	}
+	if(HasField(json, "placeholder") && node.kind != "input"){
+		return reject("placeholder");
+	}
+	if(HasField(json, "action") && node.kind != "button" && node.kind != "input"){
+		return reject("action");
+	}
+	if(HasField(json, "textBinding") && node.kind != "text"){
+		return reject("textBinding");
+	}
+	if(HasField(json, "component") && node.kind != "component"){
+		return reject("component");
+	}
+	if(HasField(json, "buttonVariant") && node.kind != "button"){
+		return reject("buttonVariant");
+	}
+	if(HasField(json, "buttonSize") && node.kind != "button"){
+		return reject("buttonSize");
+	}
+	return true;
+}
+
 bool ParseStyle(const nlohmann::json& json,
                 const std::string& kind,
                 UiEditorStyle& out,
@@ -498,6 +539,7 @@ bool ParseNode(const nlohmann::json& json,
 		error = "invalid buttonSize for node: " + out.id;
 		return false;
 	}
+	if(!ValidateKindSpecificNodeFields(json, out, error)) return false;
 	if(out.kind == "component" && out.component.empty()){
 		error = "component node requires component";
 		return false;

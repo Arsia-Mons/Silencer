@@ -214,12 +214,50 @@ int UiDocumentFixedOrDefault(const UiEditorSize& size, int fallback) {
 	return std::max(1, static_cast<int>(size.value + 0.5f));
 }
 
+int UiDocumentButtonWidthOverride(const UiEditorSize& size) {
+	return size.mode == UiEditorSize::Mode::Fixed
+		? std::max(1, static_cast<int>(size.value + 0.5f))
+		: 0;
+}
+
 void UiDocumentUnresolvedText(const std::string& value) {
 	Text(UiDocumentClayString(value),
 	     {
 	         .size = TextSize::Tiny,
 	         .effect = TextEffect::LegacyPalette(11),
 	     });
+}
+
+bool ValidateUiDocumentRuntimeTokensForNode(const UiEditorNode& node,
+                                            const UiDocumentRendererOptions& options,
+                                            std::string& error) {
+	if(node.kind == "component"){
+		if(!options.canBuildComponent || !options.canBuildComponent(node.component)){
+			error = "runtime component handler is missing for " + node.component +
+			        " at node " + node.id;
+			return false;
+		}
+	}
+	if(!node.textBinding.empty()){
+		if(!options.canResolveTextBinding ||
+		   !options.canResolveTextBinding(node.textBinding)){
+			error = "runtime text binding handler is missing for " + node.textBinding +
+			        " at node " + node.id;
+			return false;
+		}
+	}
+	if(node.kind == "button"){
+		const std::string action = node.action.empty() ? node.id : node.action;
+		if(!options.canHandleAction || !options.canHandleAction(action)){
+			error = "runtime action handler is missing for " + action +
+			        " at node " + node.id;
+			return false;
+		}
+	}
+	for(const UiEditorNode& child : node.children){
+		if(!ValidateUiDocumentRuntimeTokensForNode(child, options, error)) return false;
+	}
+	return true;
 }
 
 }  // namespace
@@ -235,7 +273,7 @@ void BuildUiDocumentNode(const UiEditorNode& node,
                          const UiDocumentRendererOptions& options) {
 	UiDocumentRegisterElement(node, interactions);
 	if(node.kind == "button"){
-		const int fixedWidth = UiDocumentFixedOrDefault(node.style.width, 0);
+		const int fixedWidth = UiDocumentButtonWidthOverride(node.style.width);
 		ButtonOpts opts{
 			.variant = UiDocumentButtonVariantForNode(node, options.buttonVariant),
 			.size = UiDocumentButtonSizeForNode(node, options.buttonSize),
@@ -244,6 +282,7 @@ void BuildUiDocumentNode(const UiEditorNode& node,
 				: TextEffect::Default(),
 			.minWidth = fixedWidth,
 			.maxWidth = fixedWidth,
+			.widthOverride = fixedWidth,
 			.paddingX = node.style.padding > 0 ? node.style.padding : 12,
 			.paddingY = node.style.padding > 0 ? node.style.padding / 2 : 4,
 			.wrapText = true,
@@ -295,9 +334,10 @@ void BuildUiDocumentNode(const UiEditorNode& node,
 		if(node.kind == "text"){
 			std::string resolvedText = node.text.empty() ? node.name : node.text;
 			if(!node.textBinding.empty()){
-				resolvedText = options.resolveTextBinding
-					? options.resolveTextBinding(node.textBinding)
-					: "[unresolved binding: " + node.textBinding + "]";
+				if(!options.resolveTextBinding ||
+				   !options.resolveTextBinding(node.textBinding, resolvedText)){
+					resolvedText = "[unresolved binding: " + node.textBinding + "]";
+				}
 			}
 			Text(UiDocumentClayString(resolvedText),
 			     {
@@ -311,6 +351,13 @@ void BuildUiDocumentNode(const UiEditorNode& node,
 			BuildUiDocumentNode(child, interactions, options);
 		}
 	}
+}
+
+bool ValidateUiDocumentRuntimeTokens(
+	const silencer::ui::UiEditorPreviewDocument& document,
+	const UiDocumentRendererOptions& options,
+	std::string& error) {
+	return ValidateUiDocumentRuntimeTokensForNode(document.root, options, error);
 }
 
 }  // namespace silencer::client_ui

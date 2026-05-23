@@ -604,6 +604,7 @@ function validateNode(node: UiNode, seenIds: Set<string>): void {
   validateOptionalString(node, "action");
   validateOptionalString(node, "textBinding");
   validateOptionalString(node, "component");
+  validateKindSpecificFields(node);
   validateButtonSettings(node);
   validateRenderableNodeDecorators(node);
   validateImage(node);
@@ -660,6 +661,30 @@ function validateButtonSettings(node: UiNode): void {
     ) {
       throw new Error(`Node ${node.id} has invalid buttonSize.`);
     }
+  }
+}
+
+function validateKindSpecificFields(node: UiNode): void {
+  if (node.text !== undefined && node.kind !== "text" && node.kind !== "button") {
+    throw new Error(`Node ${node.id} ${node.kind} cannot use text.`);
+  }
+  if (node.placeholder !== undefined && node.kind !== "input") {
+    throw new Error(`Node ${node.id} ${node.kind} cannot use placeholder.`);
+  }
+  if (node.action !== undefined && node.kind !== "button" && node.kind !== "input") {
+    throw new Error(`Node ${node.id} ${node.kind} cannot use action.`);
+  }
+  if (node.textBinding !== undefined && node.kind !== "text") {
+    throw new Error(`Node ${node.id} ${node.kind} cannot use textBinding.`);
+  }
+  if (node.component !== undefined && node.kind !== "component") {
+    throw new Error(`Node ${node.id} ${node.kind} cannot use component.`);
+  }
+  if (node.buttonVariant !== undefined && node.kind !== "button") {
+    throw new Error(`Node ${node.id} ${node.kind} cannot use buttonVariant.`);
+  }
+  if (node.buttonSize !== undefined && node.kind !== "button") {
+    throw new Error(`Node ${node.id} ${node.kind} cannot use buttonSize.`);
   }
 }
 
@@ -881,6 +906,9 @@ function validateSize(node: UiNode, key: "width" | "height"): void {
     throw new Error(`Node ${node.id} ${key} min cannot exceed max.`);
   }
   if (size.mode === "fixed") {
+    if (size.min !== undefined || size.max !== undefined) {
+      throw new Error(`Node ${node.id} fixed ${key} sizing cannot use min or max.`);
+    }
     const value = size.value;
     if (typeof value !== "number") {
       throw new Error(`Node ${node.id} fixed ${key} sizing needs a value.`);

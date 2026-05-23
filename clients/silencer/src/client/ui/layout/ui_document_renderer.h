@@ -19,7 +19,10 @@ struct UiDocumentRendererOptions {
 	silencer::ui::primitives::ButtonSize buttonSize =
 		silencer::ui::primitives::ButtonSize::Auto;
 	std::function<bool(const silencer::ui::UiEditorNode&)> buildComponent;
-	std::function<std::string(const std::string&)> resolveTextBinding;
+	std::function<bool(const std::string&, std::string&)> resolveTextBinding;
+	std::function<bool(const std::string&)> canBuildComponent;
+	std::function<bool(const std::string&)> canResolveTextBinding;
+	std::function<bool(const std::string&)> canHandleAction;
 };
 
 void BuildUiDocument(const silencer::ui::UiEditorPreviewDocument& document,
@@ -29,6 +32,11 @@ void BuildUiDocument(const silencer::ui::UiEditorPreviewDocument& document,
 void BuildUiDocumentNode(const silencer::ui::UiEditorNode& node,
                          silencer::ui::UiInteractionRegistry& interactions,
                          const UiDocumentRendererOptions& options = UiDocumentRendererOptions{});
+
+bool ValidateUiDocumentRuntimeTokens(
+	const silencer::ui::UiEditorPreviewDocument& document,
+	const UiDocumentRendererOptions& options,
+	std::string& error);
 
 }  // namespace silencer::client_ui
 
