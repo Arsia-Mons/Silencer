@@ -154,35 +154,28 @@ export default function PhysicsMaterialsPage() {
   return (
     <div className="flex h-screen bg-game-dark text-game-text font-mono overflow-hidden">
       <Sidebar />
+      {/* Single file input — always mounted so ref is stable regardless of which button triggers it */}
+      <input ref={fileInputRef} type="file" accept=".json" className="hidden" onChange={handleFilePicked} />
       <div className="flex flex-col flex-1 overflow-hidden">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-3 border-b border-game-border bg-game-bgCard shrink-0">
           <div className="flex items-center gap-3">
-            <span className="text-game-primary tracking-widest text-sm">⬡ PHYSICS MATERIALS</span>
+            <span className="text-game-textDim tracking-widest text-sm">⬡ PHYSICS MATERIALS</span>
             {fileName && (
-              <span className="text-game-textDim text-xs">{fileName}</span>
+              <span className="text-game-textDim text-xs opacity-60">{fileName}</span>
             )}
             {isDirty && <span className="text-game-warning text-xs">● unsaved</span>}
           </div>
           <div className="flex items-center gap-2">
             {saveErr && <span className="text-game-danger text-xs">{saveErr}</span>}
-            {saveMsg && <span className="text-game-primary text-xs">{saveMsg}</span>}
+            {saveMsg && <span className="text-game-textDim text-xs">{saveMsg}</span>}
             {!data ? (
-              <>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept=".json"
-                  className="hidden"
-                  onChange={handleFilePicked}
-                />
-                <button
-                  onClick={() => fileInputRef.current?.click()}
-                  className="px-3 py-1 text-xs border border-game-primary text-game-primary hover:bg-game-primary hover:text-game-dark transition-colors rounded"
-                >
-                  OPEN FILE
-                </button>
-              </>
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                className="px-3 py-1 text-xs border border-game-border text-game-textDim hover:border-game-text hover:text-game-text transition-colors rounded"
+              >
+                OPEN FILE
+              </button>
             ) : (
               <>
                 <button
@@ -194,7 +187,7 @@ export default function PhysicsMaterialsPage() {
                 <button
                   onClick={handleSave}
                   disabled={!isDirty}
-                  className="px-3 py-1 text-xs border border-game-primary text-game-primary hover:bg-game-primary hover:text-game-dark transition-colors rounded disabled:opacity-40 disabled:cursor-not-allowed"
+                  className="px-3 py-1 text-xs border border-game-border text-game-textDim hover:border-game-text hover:text-game-text transition-colors rounded disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   {isDirty ? '● SAVE' : 'SAVE'}
                 </button>
@@ -209,11 +202,10 @@ export default function PhysicsMaterialsPage() {
             <p className="text-sm">Open <span className="text-game-text">physics_materials.json</span> from your GAS folder</p>
             <button
               onClick={() => fileInputRef.current?.click()}
-              className="px-4 py-2 text-xs border border-game-primary text-game-primary hover:bg-game-primary hover:text-game-dark transition-colors rounded"
+              className="px-4 py-2 text-xs border border-game-border text-game-textDim hover:border-game-text hover:text-game-text transition-colors rounded"
             >
               OPEN FILE
             </button>
-            <input ref={fileInputRef} type="file" accept=".json" className="hidden" onChange={handleFilePicked} />
           </div>
         ) : (
           <div className="flex flex-1 overflow-hidden">
@@ -225,12 +217,12 @@ export default function PhysicsMaterialsPage() {
                   onClick={() => setSelected(m.id)}
                   className={`w-full text-left px-4 py-2 text-xs border-b border-game-border transition-colors ${
                     selected === m.id
-                      ? 'bg-game-primary/10 text-game-primary border-l-2 border-l-game-primary'
-                      : 'text-game-textDim hover:text-game-text hover:bg-white/5'
+                      ? 'bg-white/5 text-game-text border-l-2 border-l-game-textDim'
+                      : 'text-game-textDim hover:text-game-text hover:bg-white/[0.03]'
                   }`}
                 >
                   <div className="font-medium">{m.id}</div>
-                  <div className="text-[10px] opacity-60 mt-0.5">
+                  <div className="text-[10px] opacity-50 mt-0.5">
                     f:{m.friction ?? 1.0} s:{m.speedMult ?? 1.0}
                   </div>
                 </button>
@@ -243,7 +235,7 @@ export default function PhysicsMaterialsPage() {
                 <p className="text-game-textDim text-sm">Select a material</p>
               ) : (
                 <div className="max-w-lg space-y-6">
-                  <h2 className="text-game-primary tracking-widest text-sm">{mat.id}</h2>
+                  <h2 className="text-game-text tracking-widest text-sm">{mat.id}</h2>
 
                   {/* Physics */}
                   <section>
@@ -259,7 +251,7 @@ export default function PhysicsMaterialsPage() {
                           max="5"
                           value={mat.friction ?? 1.0}
                           onChange={e => patchMaterial(mat.id, { friction: parseFloat(e.target.value) || 1.0 })}
-                          className="bg-game-dark border border-game-border text-game-text text-xs font-mono rounded px-2 py-1 focus:outline-none focus:border-game-primary"
+                          className="bg-game-dark border border-game-border text-game-text text-xs font-mono rounded px-2 py-1 focus:outline-none focus:border-game-textDim"
                         />
                       </label>
                       <label className="flex flex-col gap-1">
@@ -272,7 +264,7 @@ export default function PhysicsMaterialsPage() {
                           max="3"
                           value={mat.speedMult ?? 1.0}
                           onChange={e => patchMaterial(mat.id, { speedMult: parseFloat(e.target.value) || 1.0 })}
-                          className="bg-game-dark border border-game-border text-game-text text-xs font-mono rounded px-2 py-1 focus:outline-none focus:border-game-primary"
+                          className="bg-game-dark border border-game-border text-game-text text-xs font-mono rounded px-2 py-1 focus:outline-none focus:border-game-textDim"
                         />
                       </label>
                     </div>
@@ -293,7 +285,7 @@ export default function PhysicsMaterialsPage() {
                             value={(mat[field] as string) ?? ''}
                             onChange={e => patchMaterial(mat.id, { [field]: e.target.value })}
                             placeholder={field.includes('Crouch') || field.includes('Stair') ? '← falls back to walk' : ''}
-                            className="bg-game-dark border border-game-border text-game-text text-xs font-mono rounded px-2 py-1 focus:outline-none focus:border-game-primary placeholder:text-game-border"
+                            className="bg-game-dark border border-game-border text-game-text text-xs font-mono rounded px-2 py-1 focus:outline-none focus:border-game-textDim placeholder:text-game-border"
                           />
                         </label>
                       ))}
