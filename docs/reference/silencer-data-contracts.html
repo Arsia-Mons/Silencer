@@ -1,0 +1,904 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Silencer Client Internal Data Contracts</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f6f5f1; --paper: #fffdfa; --ink: #172025; --muted: #667077;
+      --line: #d8d4c9; --accent: #0f6b68; --accent-dark: #104b52;
+      --warn: #8a4b10; --chip: #edf4f2; --code: #f0eee7;
+      --shadow: 0 1px 3px rgba(19, 26, 31, 0.12);
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0; background: var(--bg); color: var(--ink);
+      font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      font-size: 16px; line-height: 1.55; -webkit-text-size-adjust: 100%;
+    }
+    a { color: var(--accent-dark); }
+    code {
+      background: var(--code); border: 1px solid var(--line); border-radius: 4px;
+      padding: 0.08rem 0.28rem;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 0.92em; overflow-wrap: anywhere;
+    }
+    header { background: #172025; color: #f7f3ea; border-bottom: 6px solid var(--accent); }
+    .hero { width: 100%; margin: 0 auto; padding: 28px 14px 24px; }
+    .eyebrow {
+      margin: 0 0 10px; color: #9bc9c2; font-size: 0.84rem;
+      font-weight: 700; letter-spacing: 0; text-transform: uppercase;
+    }
+    h1 { margin: 0; font-size: 2rem; line-height: 1.08; letter-spacing: 0; }
+    .lede { margin: 14px 0 0; color: #dce2df; font-size: 1rem; }
+    main { width: 100%; margin: 16px auto 48px; padding: 0 10px; }
+    nav {
+      display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 14px;
+    }
+    nav a {
+      display: inline-flex; align-items: center; min-height: 34px;
+      border: 1px solid var(--line); border-radius: 4px; background: var(--paper);
+      color: var(--accent-dark); padding: 4px 9px; font-size: 0.9rem;
+      font-weight: 650; text-decoration: none;
+    }
+    section {
+      margin-top: 14px; background: var(--paper); border: 1px solid var(--line);
+      border-radius: 6px; box-shadow: var(--shadow); overflow: hidden;
+    }
+    section > h2 {
+      margin: 0; padding: 14px 14px 12px; border-bottom: 1px solid var(--line);
+      background: #fbfaf6; font-size: 1.18rem; line-height: 1.2; letter-spacing: 0;
+    }
+    .content { padding: 14px; }
+    .notice {
+      margin: 0 0 16px; padding: 10px 12px; border-left: 4px solid var(--accent);
+      background: var(--chip); color: #21383a;
+    }
+    .notice.warn {
+      border-left-color: var(--warn); background: #fbf1e5; color: #54330f;
+    }
+    .grid {
+      display: grid; grid-template-columns: 1fr; gap: 10px; margin: 14px 0 0;
+    }
+    .box {
+      border: 1px solid var(--line); border-radius: 6px; padding: 14px; background: #fffefa;
+    }
+    .box h3 { margin: 0 0 8px; font-size: 1rem; letter-spacing: 0; }
+    .box p { margin: 0; color: var(--muted); font-size: 0.95rem; }
+    table {
+      width: 100%; border-collapse: separate; border-spacing: 0;
+      margin: 10px 0 2px; font-size: 0.93rem;
+    }
+    thead {
+      position: absolute; width: 1px; height: 1px; overflow: hidden;
+      clip: rect(0 0 0 0); white-space: nowrap;
+    }
+    tbody, tr, td { display: block; }
+    tr {
+      margin: 0 0 12px; border: 1px solid var(--line); border-radius: 6px;
+      background: #fffefa; overflow: hidden;
+    }
+    td {
+      vertical-align: top; text-align: left; border: 0;
+      border-top: 1px solid var(--line); padding: 9px 10px;
+    }
+    td:first-child { border-top: 0; }
+    td::before {
+      display: block; margin: 0 0 3px; color: var(--muted); font-size: 0.75rem;
+      font-weight: 750; line-height: 1.25; text-transform: uppercase;
+    }
+    #owners td:nth-child(1)::before { content: "Data / Concern"; }
+    #owners td:nth-child(2)::before { content: "Owner"; }
+    #owners td:nth-child(3)::before { content: "Read / Retrieval API"; }
+    #owners td:nth-child(4)::before { content: "Command / Mutation API"; }
+    #owners td:nth-child(5)::before { content: "Boundary"; }
+    #data td:nth-child(1)::before { content: "Question"; }
+    #data td:nth-child(2)::before { content: "Current Contract"; }
+    #data td:nth-child(3)::before { content: "Where To Look First"; }
+    #mutations td:nth-child(1)::before { content: "Mutation"; }
+    #mutations td:nth-child(2)::before { content: "Allowed Path"; }
+    #mutations td:nth-child(3)::before { content: "Why"; }
+    #edges td:nth-child(1)::before { content: "Edge"; }
+    #edges td:nth-child(2)::before { content: "Client Owner"; }
+    #edges td:nth-child(3)::before { content: "Contract"; }
+    #edges td:nth-child(4)::before { content: "Internal Boundary"; }
+    #consumer-guide td:nth-child(1)::before { content: "If You Need"; }
+    #consumer-guide td:nth-child(2)::before { content: "Use"; }
+    #consumer-guide td:nth-child(3)::before { content: "Avoid"; }
+    th { background: #edeae0; color: #273137; font-weight: 750; }
+    tr:nth-child(even) { background: #fbfaf6; }
+    ul { margin: 10px 0 0; padding-left: 1.25rem; }
+    li { margin: 5px 0; }
+    .small { color: var(--muted); font-size: 0.9rem; }
+    @media (min-width: 760px) {
+      .hero { width: min(100% - 40px, 1180px); padding: 42px 0 30px; }
+      h1 { font-size: 3.1rem; }
+      .lede { max-width: 900px; margin-top: 18px; font-size: 1.08rem; }
+      main { width: min(100% - 40px, 1180px); margin-top: 26px; padding: 0; }
+      nav { gap: 8px; margin-bottom: 22px; }
+      nav a { min-height: 32px; padding: 4px 10px; font-size: 0.92rem; }
+      section { margin-top: 26px; border-radius: 8px; }
+      section > h2 { padding: 18px 22px 14px; font-size: 1.35rem; }
+      .content { padding: 20px 22px 22px; }
+      .grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+      table { border-collapse: collapse; margin: 14px 0 4px; font-size: 0.94rem; }
+      thead {
+        position: static; width: auto; height: auto; overflow: visible;
+        clip: auto; white-space: normal;
+      }
+      tbody { display: table-row-group; }
+      tr { display: table-row; margin: 0; border: 0; border-radius: 0; overflow: visible; }
+      th, td { display: table-cell; border: 1px solid var(--line); padding: 10px 12px; }
+      td::before { content: none !important; }
+      tr:nth-child(even) td { background: #fbfaf6; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="hero">
+      <p class="eyebrow">Silencer client reference</p>
+      <h1>Internal Data Contracts</h1>
+      <p class="lede">
+        This explainer focuses on the C++ Silencer client application: the main
+        in-process data domains, who owns them, how another client subsystem
+        should read them, and which mutation path is allowed to change them.
+        Server and admin APIs appear only where they form a client edge.
+      </p>
+    </div>
+  </header>
+
+  <main>
+    <nav aria-label="Sections">
+      <a href="#summary">Summary</a>
+      <a href="#owners">Owner Map</a>
+      <a href="#data">Client Data</a>
+      <a href="#mutations">Mutations</a>
+      <a href="#edges">External Edges</a>
+      <a href="#consumer-guide">Consumer Guide</a>
+      <a href="#sources">Sources</a>
+    </nav>
+
+    <section id="summary">
+      <h2>Summary</h2>
+      <div class="content">
+        <p class="notice">
+          Inside the client, <code>Game</code> coordinates lifecycle and the
+          frame loop; <code>World</code> owns simulation state; the current
+          <code>AUTHORITY</code> <code>World</code> is the writer for replicated
+          match state; and specialized subsystems own their own slice of data.
+          New consumers should go through the owner instead of reading or
+          mutating incidental fields in neighboring code.
+        </p>
+
+        <div class="grid">
+          <div class="box">
+            <h3>Coordination</h3>
+            <p>
+              <code>Game</code> owns process state, frame cadence, SDL/TUI
+              input collection, rendering orchestration, session transitions,
+              and local automation queues.
+            </p>
+          </div>
+          <div class="box">
+            <h3>Simulation</h3>
+            <p>
+              <code>World</code> owns map, resources, audio, lobby client,
+              trigger graph, active game mode, object registry, peer registry,
+              network transport, and replication.
+            </p>
+          </div>
+          <div class="box">
+            <h3>Authority</h3>
+            <p>
+              The authority simulates objects and sends snapshots. Replicas
+              send input/intents, load snapshots, and client-predict only their
+              local controlled objects.
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="owners">
+      <h2>Owner Map</h2>
+      <div class="content">
+        <table>
+          <thead>
+            <tr>
+              <th>Data / Concern</th>
+              <th>Owner</th>
+              <th>Read / Retrieval API</th>
+              <th>Command / Mutation API</th>
+              <th>Boundary</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Top-level app state and frame lifecycle</td>
+              <td><code>Game</code>, especially <code>Game::Loop()</code>.</td>
+              <td>
+                <code>Game::GetState()</code>, <code>StateName()</code>,
+                <code>GetFrameCount()</code>, and high-level accessors such as
+                <code>GetWorld()</code>, <code>GetRenderer()</code>, and
+                <code>GetWorldSummary()</code>.
+              </td>
+              <td>
+                <code>Game::Loop()</code> drains control commands, runs network
+                and simulation ticks, folds input into <code>world.localinput</code>,
+                renders, and posts automation replies.
+              </td>
+              <td>
+                <code>Game</code> coordinates. It should not own simulation data
+                just because the frame loop touches it.
+              </td>
+            </tr>
+            <tr>
+              <td>Join, spectate, leave, map load/unload, match summary</td>
+              <td><code>GameSession</code>.</td>
+              <td>
+                Use <code>Game::JoinGame()</code>, <code>SpectateGame()</code>,
+                <code>LeaveJoinedGame()</code>, and session-backed fields
+                exposed through <code>Game</code>.
+              </td>
+              <td>
+                <code>GameSession</code> copies <code>LobbyGame</code> host data
+                into the authority peer, switches <code>World</code> into replica
+                connect flow, loads/unloads maps, resets objects/game mode, and
+                submits final stats.
+              </td>
+              <td>
+                Keep session transitions here. Do not split map teardown or
+                authority reset logic across screens or random tick handlers.
+              </td>
+            </tr>
+            <tr>
+              <td>Simulation container and subsystem composition</td>
+              <td><code>World</code>.</td>
+              <td>
+                Use <code>World</code> public methods and public subsystem
+                members: <code>world.objects</code>, <code>world.network</code>,
+                <code>world.peers</code>, <code>world.replication</code>,
+                <code>world.map</code>, <code>world.resources</code>,
+                <code>world.lobby</code>, <code>world.messaging</code>,
+                <code>world.triggerGraph</code>, and <code>world.replay</code>.
+              </td>
+              <td>
+                <code>World::Tick()</code>, <code>TickObjects()</code>, and the
+                owning subsystem methods advance state.
+              </td>
+              <td>
+                Add behavior to the owning subsystem. Avoid reaching through
+                <code>World</code> to mutate private state from unrelated code.
+              </td>
+            </tr>
+            <tr>
+              <td>Match lifecycle, lobby game config, shared start state, active mode</td>
+              <td><code>GameSession</code> plus <code>World</code>.</td>
+              <td>
+                Use <code>Game::GetState()</code>/<code>StateName()</code> for
+                the app-level screen state and <code>Game::GetWorldSummary()</code>
+                for automation-level map/peer/message summary. Existing
+                in-process match code reads <code>World::gameplaystate</code>,
+                <code>gameinfo</code>, <code>sharedstate</code>, and
+                <code>gameMode</code> through the owning <code>Game</code>,
+                <code>GameSession</code>, or <code>World</code> code paths.
+              </td>
+              <td>
+                Session and tick code load <code>LobbyGame</code> config into
+                <code>World::gameinfo</code>, create/update the shared
+                <code>State</code> object that gates match start, switch
+                <code>World::gameplaystate</code>, create <code>gameMode</code>
+                from <code>gameinfo.modeId</code>, and set
+                <code>winningteamid</code>/<code>matchEndCalled</code>.
+              </td>
+              <td>
+                This is lifecycle/config state, not the scoreboard projection.
+                If a new non-friend subsystem needs raw lifecycle fields, add a
+                narrow accessor on the owner instead of using
+                <code>GameStateObject</code> as a catch-all.
+              </td>
+            </tr>
+            <tr>
+              <td>Object lifetime, lookup, collision indices</td>
+              <td><code>WorldObjectRegistry</code>, surfaced through <code>world.objects</code>.</td>
+              <td>
+                <code>GetObjectFromId()</code>, <code>GetObjectsByType()</code>,
+                <code>TestAABB()</code>, and <code>TestIncr()</code>.
+              </td>
+              <td>
+                Creation goes through <code>World::CreateObject()</code> and
+                <code>ObjectTypes</code>, then registers all parallel indices.
+                Destruction is two-phase: <code>MarkDestroyObject()</code>, then
+                <code>DestroyMarkedObjects()</code>.
+              </td>
+              <td>
+                Never push/erase <code>objectlist</code>,
+                <code>tobjectlist</code>, <code>objectsbytype</code>, or
+                <code>objectidlookup</code> directly.
+              </td>
+            </tr>
+            <tr>
+              <td>Replicated match summary: mode, phase, elapsed time, winner, scores</td>
+              <td><code>GameStateObject</code>, owned by the authority world and replicated as an object.</td>
+              <td>
+                Read the <code>ObjectTypes::GAMESTATEOBJ</code> instance from
+                the current <code>World</code> object set, then read
+                <code>modeId</code>, <code>matchPhase</code>,
+                <code>matchTimeSecs</code>, <code>winningTeamId</code>, and
+                <code>score[]</code>.
+              </td>
+              <td>
+                Authority creates the object once after
+                <code>World::gameplaystate == INGAME</code>. Its
+                <code>Tick()</code> copies authority world/game-mode state into
+                replicated summary fields; replicas receive it through normal
+                snapshot loading.
+              </td>
+              <td>
+                Use this for scoreboard/display summary. Do not use it for
+                pre-match lobby config, map download readiness, shared-state
+                gating, or session teardown.
+              </td>
+            </tr>
+            <tr>
+              <td>Object fields and replicated object serialization</td>
+              <td>Each <code>Object</code> subclass and its mixins.</td>
+              <td>
+                Get objects by ID/type from <code>WorldObjectRegistry</code>,
+                then read through the concrete object type or shared mixin state
+                when that caller already has a legitimate simulation context.
+              </td>
+              <td>
+                Authority ticks objects and writes snapshots through
+                <code>Object::Serialize()</code>. Replicas read snapshots into
+                objects through <code>WorldReplication::LoadSnapshot()</code>.
+              </td>
+              <td>
+                New replicated fields belong in the owning object
+                <code>Serialize()</code>. Replicas must not treat deserialized
+                state as locally authoritative.
+              </td>
+            </tr>
+            <tr>
+              <td>Authority/replica mode and UDP transport</td>
+              <td><code>WorldNetwork</code>, surfaced through <code>world.network</code>.</td>
+              <td>
+                <code>IsAuthority()</code>, <code>IsConnected()</code>,
+                <code>IsIdle()</code>, <code>IsLocalObserver()</code>,
+                <code>GetPingTime()</code>, <code>AveragePingJitter()</code>,
+                and network byte counters.
+              </td>
+              <td>
+                <code>World::Listen()</code>/<code>Bind()</code> bind UDP and
+                enter authority mode. <code>Connect()</code> enters replica mode
+                and sends <code>MSG_CONNECT</code>. <code>Disconnect()</code>
+                clears connection state. <code>DoNetwork()</code> dispatches
+                <code>World::MSG_*</code> packets.
+              </td>
+              <td>
+                The authority applies gameplay mutations. Replicas send input
+                and consume snapshots.
+              </td>
+            </tr>
+            <tr>
+              <td>Peers, teams, readiness, observers, parked rejoin slots</td>
+              <td><code>WorldPeerRegistry</code>, surfaced through <code>world.peers</code>.</td>
+              <td>
+                <code>GetPeer()</code>, <code>GetAuthorityPeer()</code>,
+                <code>GetLocalPeerId()</code>, <code>GetPeerPlayer()</code>,
+                <code>GetPeerTeam()</code>, and <code>FindTeamForPeer()</code>.
+              </td>
+              <td>
+                Authority <code>MSG_CONNECT</code> adds/rebinds peers.
+                <code>SendPeerList()</code> and <code>ReadPeerList()</code>
+                replicate peer summaries. Disconnect either parks a mid-game
+                player for rejoin or removes the peer.
+              </td>
+              <td>
+                Peer IDs, controlled object lists, readiness, team assignment,
+                observer state, and parking semantics stay in the peer registry.
+              </td>
+            </tr>
+            <tr>
+              <td>Snapshot replication and input queues</td>
+              <td><code>WorldReplication</code>, surfaced through <code>world.replication</code>.</td>
+              <td>
+                Most consumers should read the resulting <code>World</code>
+                objects. Diagnostics may read replication counters and queue
+                sizes from <code>world.replication</code>.
+              </td>
+              <td>
+                Replicas send <code>MSG_INPUT</code>. Authority queues and
+                processes peer input, then sends <code>MSG_SNAPSHOT</code>.
+                Replicas sort/load snapshot queues and client-predict the local
+                controlled object path.
+              </td>
+              <td>
+                Snapshot code owns delta compression, old-snapshot rings, and
+                load/save mechanics. Do not duplicate snapshot parsing elsewhere.
+              </td>
+            </tr>
+            <tr>
+              <td>Local input state</td>
+              <td><code>GameInput</code>, <code>InputServer</code>, and <code>world.localinput</code>.</td>
+              <td>
+                Read keymap/gamepad state through <code>Game</code> accessors.
+                Simulation code reads <code>Input</code> via peers or
+                <code>world.localinput</code>, not raw SDL events.
+              </td>
+              <td>
+                SDL and TUI snapshots are normalized in <code>Game::Loop()</code>.
+                Replicas serialize the current local input into
+                <code>MSG_INPUT</code>; authority applies local input directly.
+              </td>
+              <td>
+                Raw SDL event handling stays at the game boundary. Simulation
+                consumes normalized <code>Input</code>.
+              </td>
+            </tr>
+            <tr>
+              <td>Messages, chat, status lines, top message, networked sounds</td>
+              <td><code>WorldMessaging</code>, surfaced through <code>world.messaging</code> and <code>World</code> wrappers.</td>
+              <td>
+                <code>World::GetMessageText()</code>,
+                <code>GetMessageProgress()</code>, <code>GetMessageType()</code>,
+                <code>GetMessageTime()</code>, <code>GetTopMessageText()</code>,
+                and <code>GetTopMessageProgress()</code>. Current HUD/render
+                paths also read <code>world.messaging.chatlines</code> and
+                <code>statusmessages</code>.
+              </td>
+              <td>
+                <code>ShowMessage()</code>, <code>ShowStatus()</code>,
+                <code>ShowTopMessage()</code>, <code>SendChat()</code>, and
+                <code>SendSound()</code>. Network handlers for
+                <code>MSG_CHAT</code>, <code>MSG_STATUS</code>,
+                <code>MSG_MESSAGE</code>, and <code>MSG_SOUND</code> enter
+                through <code>WorldNetwork</code> and delegate here.
+              </td>
+              <td>
+                Messaging is presentation-facing world state, but it is still
+                world-owned state. Do not store a second chat/status model in a
+                screen or renderer.
+              </td>
+            </tr>
+            <tr>
+              <td>Trigger graph definitions, runtime events, authority action scheduling</td>
+              <td><code>TriggerGraph</code> and its internal <code>ActionSystem</code>, owned by <code>World</code>.</td>
+              <td>
+                <code>IsObjectiveComplete()</code>, <code>GetFlag()</code>,
+                <code>Objectives()</code>, and diagnostic dirty-state helpers.
+                Runtime event producers emit <code>GameEvent</code>s through
+                <code>triggerGraph.Bus()</code>.
+              </td>
+              <td>
+                <code>Map::Load()</code> loads trigger nodes/zones into
+                <code>TriggerGraph</code>. Authority <code>TriggerGraph::Tick()</code>
+                evaluates pending events, zone/timer events, schedules actions,
+                completes objectives, and sets flags/enabled state.
+              </td>
+              <td>
+                Pending events, elapsed timers, zone occupancy, and queued
+                actions are authority-local runtime state. They are not
+                serialized for replicas.
+              </td>
+            </tr>
+            <tr>
+              <td>Replicated trigger projection</td>
+              <td><code>TriggerGraph::SerializeState()</code> / <code>ApplySerializedState()</code>.</td>
+              <td>
+                Replicas read objective completion with
+                <code>IsObjectiveComplete()</code>, flags with
+                <code>GetFlag()</code>, and objective definitions with
+                <code>Objectives()</code> after applying trigger state.
+              </td>
+              <td>
+                Authority calls <code>World::BroadcastTriggerState()</code>,
+                which sends <code>MSG_TRIGGER_STATE</code> containing objective
+                completion, node enabled/fired flags, hit counts, and flags.
+                Replicas apply that projection with
+                <code>ApplySerializedState()</code>.
+              </td>
+              <td>
+                Action effects propagate through normal object snapshots or
+                explicit message/sound/camera packets, not through replicated
+                action timers.
+              </td>
+            </tr>
+            <tr>
+              <td>Lobby client cache: account, characters, games, presence, user info</td>
+              <td><code>Lobby</code> inside <code>World</code>.</td>
+              <td>
+                <code>GetGameById()</code>, <code>GetUserInfo()</code>,
+                <code>GetSelectedCharacter()</code>,
+                <code>GetSelectedAgencyOrDefault()</code>, <code>games</code>,
+                <code>presence</code>, and changed flags such as
+                <code>presencechanged</code> or <code>charactersreceived</code>.
+              </td>
+              <td>
+                <code>Lobby::DoNetwork()</code> reads lobby TCP frames and
+                updates caches. Send methods such as
+                <code>SendCredentials()</code>, <code>CreateGame()</code>,
+                <code>SendSetGame()</code>, <code>CreateCharacter()</code>,
+                <code>SelectCharacter()</code>, and <code>RegisterStats()</code>
+                request server-side mutations.
+              </td>
+              <td>
+                Client <code>Lobby</code> is a cache/protocol adapter. The Go
+                lobby owns persisted accounts, progression, game rows, and
+                presence truth.
+              </td>
+            </tr>
+            <tr>
+              <td>Resources and data-driven content</td>
+              <td><code>Resources</code>, <code>GASLoader</code>, <code>BehaviorTreeLibrary</code>, <code>SoundCueLibrary</code>.</td>
+              <td>
+                Read loaded sprites, tiles, sounds, actor definitions, GAS,
+                behavior trees, and sound cues from the resource/library owner
+                that loaded them.
+              </td>
+              <td>
+                <code>Resources::Load()</code> loads local asset files from the
+                resource directory. Dedicated servers skip or stub video/audio
+                heavy work where appropriate.
+              </td>
+              <td>
+                Current startup loading is local-filesystem based. HTTP actor/BT
+                fetch helpers exist, but they are not the active startup source.
+              </td>
+            </tr>
+            <tr>
+              <td>Replay recording/playback</td>
+              <td><code>Replay</code> inside <code>World</code>.</td>
+              <td>
+                <code>IsRecording()</code>, <code>IsPlaying()</code>,
+                <code>GameStarted()</code>, <code>ShowAllNames()</code>, and
+                replay camera fields for playback rendering.
+              </td>
+              <td>
+                Authority/network paths write game info, peers, user info,
+                input commands, chat, tech, station actions, disconnects, and
+                ticks. Playback reads those records back into <code>World</code>.
+              </td>
+              <td>
+                Replay is a serialized event/state view. It should not become a
+                second live state owner.
+              </td>
+            </tr>
+            <tr>
+              <td>Renderer-visible output and screenshots</td>
+              <td><code>GameRenderer</code>, <code>Renderer</code>, and render subsystems.</td>
+              <td>
+                Use <code>Game::GetScreenBuffer()</code>,
+                <code>GetPaletteColors()</code>, <code>GetRenderer()</code>,
+                and screenshot/control-socket commands for automation reads.
+              </td>
+              <td>
+                The render pipeline consumes <code>World</code> and UI state
+                after simulation/input processing and writes the screen buffer or
+                GPU output.
+              </td>
+              <td>
+                Rendering displays state. It should not own game/lobby data or
+                mutate simulation except through explicit input/action paths.
+              </td>
+            </tr>
+            <tr>
+              <td>UI navigation and UI input</td>
+              <td><code>ClientUi</code>, <code>GameUiPipeline</code>, screens/modals.</td>
+              <td>
+                <code>Game::UiInput()</code>, <code>CurrentUiInput()</code>,
+                <code>UiInteractions()</code>, <code>PushScreen()</code>,
+                <code>PopScreen()</code>, and <code>ReplaceScreen()</code>.
+              </td>
+              <td>
+                Screens declare one UI frame; typed UI actions are handled after
+                layout. <code>GameUiPipeline</code> gates SDL text input.
+              </td>
+              <td>
+                UI is a command/read surface. It is not the owner of simulation,
+                networking, resources, or persistent lobby state.
+              </td>
+            </tr>
+            <tr>
+              <td>Local automation and test control</td>
+              <td><code>ControlServer</code>, <code>ControlDispatch</code>, <code>InputServer</code>, <code>clients/cli</code>.</td>
+              <td>
+                Use <code>silencer-cli</code> or the JSON-lines control socket.
+                Prefer command results and screenshots over direct process
+                introspection.
+              </td>
+              <td>
+                <code>Game::Loop()</code> drains immediate, post-render, and
+                multi-frame wait commands. The binary input socket is
+                latest-wins state.
+              </td>
+              <td>
+                This is a local test/agent contract, not a production remote API
+                or gameplay ownership layer.
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="data">
+      <h2>Client Data Domains</h2>
+      <div class="content">
+        <table>
+          <thead>
+            <tr>
+              <th>Question</th>
+              <th>Current Contract</th>
+              <th>Where To Look First</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>What state is the application in?</td>
+              <td><code>Game</code> owns the app state enum, pending state, frame count, pause/step state, control ports, headless/TUI flags, and top-level screen stack operations.</td>
+              <td><code>clients/silencer/src/game/game.h</code>, <code>game/loop/game_loop.cpp</code>.</td>
+            </tr>
+            <tr>
+              <td>Where is match lifecycle/config state?</td>
+              <td><code>GameSession</code> and <code>World</code> own match entry, map selection, lobby game config, shared start state, active <code>GameMode</code>, and end-of-match flags. <code>GameStateObject</code> is not created until the world is already in <code>INGAME</code>.</td>
+              <td><code>world.h</code>, <code>game/session/game_session.cpp</code>, <code>game/tick/tick_hostjoin.cpp</code>, <code>game/tick/tick_ingame.cpp</code>, <code>game/loop/game_loop.cpp</code>.</td>
+            </tr>
+            <tr>
+              <td>Where is replicated match summary?</td>
+              <td><code>GameStateObject</code> carries the scoreboard/display projection: game mode id, phase, elapsed seconds, winning team, and team scores. Replicas read it from snapshots like any other replicated object.</td>
+              <td><code>game/state/gamestateobject.*</code>, <code>world.cpp</code>, <code>world/network/world_replication.cpp</code>.</td>
+            </tr>
+            <tr>
+              <td>Where is player state?</td>
+              <td>Account/selected-character data is cached in <code>world.lobby</code>. In-match peer state is in <code>Peer</code>. The live player object is an <code>ObjectTypes::PLAYER</code> entry owned by <code>WorldObjectRegistry</code>.</td>
+              <td><code>net/lobby.*</code>, <code>net/peer.*</code>, <code>player.*</code>, <code>world/objects/world_objects.cpp</code>.</td>
+            </tr>
+            <tr>
+              <td>Where are teams and readiness?</td>
+              <td><code>WorldPeerRegistry</code> assigns peers to teams and replicates peer summaries. <code>Team</code> objects carry team gameplay state.</td>
+              <td><code>world/network/world_peer_registry.cpp</code>, <code>game/actor/team.*</code>.</td>
+            </tr>
+            <tr>
+              <td>Where are map and content assets?</td>
+              <td><code>World</code> owns the current <code>Map</code>; <code>Resources::Load()</code> loads local sprites, tiles, sounds, actor defs, behavior trees, GAS, and sound cues from the resource directory.</td>
+              <td><code>resources/resources.*</code>, <code>world/map/</code>, <code>shared/assets/</code>.</td>
+            </tr>
+            <tr>
+              <td>Where are match stats before persistence?</td>
+              <td>Per-peer in-match stats live on <code>Peer::stats</code>. End-of-match code copies stats into <code>User::statscopy</code> and sends <code>Lobby::RegisterStats()</code>.</td>
+              <td><code>net/peer.h</code>, <code>game/session/game_session.cpp</code>, <code>game/actor/stats.*</code>.</td>
+            </tr>
+            <tr>
+              <td>Where are lobby game rows and presence?</td>
+              <td>The client caches lobby server pushes in <code>Lobby::games</code> and <code>Lobby::presence</code>. Those are local views of Go lobby state, not sources of truth.</td>
+              <td><code>net/lobby.h</code>, <code>net/lobby.cpp</code>, <code>shared/lobby-protocol/protocol.md</code>.</td>
+            </tr>
+            <tr>
+              <td>Where are messages, chat, and status text?</td>
+              <td><code>WorldMessaging</code> owns current message/top-message fields, chat lines, status lines, and networked sound commands. Read through <code>World</code> message getters or add a focused <code>WorldMessaging</code> getter for a new non-render consumer.</td>
+              <td><code>world/messaging/world_messaging.*</code>, <code>world/network/world_network.cpp</code>, <code>game/loop/game_loop.cpp</code>.</td>
+            </tr>
+            <tr>
+              <td>Where are objectives and trigger state?</td>
+              <td><code>TriggerGraph</code> owns loaded trigger nodes/zones, authority-local pending events, timers, zone occupancy, and action scheduling. <code>MSG_TRIGGER_STATE</code> only replicates objective completion, node enabled/fired flags, hit counts, and flags.</td>
+              <td><code>events/TriggerGraph.*</code>, <code>events/ActionSystem.h</code>, <code>events/TriggerDef.h</code>, <code>world/messaging/world_messaging.cpp</code>, <code>world/network/world_network.cpp</code>, <code>world/map/map.cpp</code>.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="mutations">
+      <h2>Mutation Paths</h2>
+      <div class="content">
+        <p class="notice warn">
+          The recurring mistake to avoid is mutating a cached or rendered view
+          instead of the owner. The table below names the intended write path.
+        </p>
+        <table>
+          <thead>
+            <tr>
+              <th>Mutation</th>
+              <th>Allowed Path</th>
+              <th>Why</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Create or destroy an object</td>
+              <td><code>World::CreateObject()</code> and <code>World::MarkDestroyObject()</code>.</td>
+              <td>Keeps all object lists, type indices, and ID lookup synchronized; avoids invalidating active iteration.</td>
+            </tr>
+            <tr>
+              <td>Change match lifecycle/config state</td>
+              <td><code>GameSession</code> and <code>Game::Loop()</code> state-transition code; map/session ticks update <code>World::gameplaystate</code>, <code>gameinfo</code>, shared <code>State</code>, <code>gameMode</code>, and match-end fields.</td>
+              <td>Those fields coordinate connection, map download, peer readiness, active mode, and teardown. Changing them outside the session/tick owners breaks the match state machine.</td>
+            </tr>
+            <tr>
+              <td>Change live gameplay state</td>
+              <td>Authority-side object/game-mode/world subsystem code, usually through a <code>World::MSG_*</code> intent from replicas.</td>
+              <td>Only authority state is replicated. Replica-only writes are overwritten or desync-prone.</td>
+            </tr>
+            <tr>
+              <td>Send player input</td>
+              <td><code>GameInput</code>/<code>InputServer</code> to <code>world.localinput</code>, then <code>WorldReplication::SendInput()</code> for replicas.</td>
+              <td>Keeps SDL/TUI/keymap handling outside simulation and preserves the existing input protocol.</td>
+            </tr>
+            <tr>
+              <td>Change team, ready state, tech, or station action</td>
+              <td>Replica sends the corresponding <code>World::MSG_*</code>; authority handles it in <code>WorldNetwork::DoNetwork_Authority()</code>.</td>
+              <td>Peer/team/gameplay choices must be validated by the authority before other clients see them.</td>
+            </tr>
+            <tr>
+              <td>Join, spectate, leave a lobby-spawned match</td>
+              <td><code>GameSession</code> via <code>Game::JoinGame()</code>, <code>SpectateGame()</code>, or <code>LeaveJoinedGame()</code>.</td>
+              <td>Session code keeps map, authority peer, world mode, lobby channel, and teardown state together.</td>
+            </tr>
+            <tr>
+              <td>Show message, chat, status, top message, or networked sound</td>
+              <td><code>WorldMessaging</code> methods, usually through <code>World</code> wrappers or <code>WorldNetwork</code> packet handlers.</td>
+              <td>Keeps transient presentation state, network fan-out, chat formatting, and local playback in one owner.</td>
+            </tr>
+            <tr>
+              <td>Change objective or trigger state</td>
+              <td>Authority <code>TriggerGraph</code> methods/actions, fed by <code>GameEvent</code>s and replicated with <code>World::BroadcastTriggerState()</code>.</td>
+              <td>Trigger truth is authority-owned; replicas should apply <code>MSG_TRIGGER_STATE</code> instead of evaluating objectives locally.</td>
+            </tr>
+            <tr>
+              <td>Update lobby account/character/progression state</td>
+              <td><code>Lobby</code> send methods over lobby TCP: auth, create/select character, upgrade stat, register stats.</td>
+              <td>The Go lobby owns persistence; the C++ client cache updates from server replies/pushes.</td>
+            </tr>
+            <tr>
+              <td>Load or change runtime content</td>
+              <td>Resource/library loaders for local assets; admin/editor workflows must still ship files through the asset package.</td>
+              <td>The current client startup path reads local resources. HTTP editor APIs are not the active runtime source.</td>
+            </tr>
+            <tr>
+              <td>Record or replay match data</td>
+              <td><code>Replay</code> write/read methods called from existing network/session paths.</td>
+              <td>Replay follows world/network events. It should not bypass the normal world mutation model.</td>
+            </tr>
+            <tr>
+              <td>Drive automated tests</td>
+              <td><code>silencer-cli</code> through control/input sockets.</td>
+              <td>Automation uses the same frame loop and command dispatch as runtime verification.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="edges">
+      <h2>External Client Edges</h2>
+      <div class="content">
+        <table>
+          <thead>
+            <tr>
+              <th>Edge</th>
+              <th>Client Owner</th>
+              <th>Contract</th>
+              <th>Internal Boundary</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Lobby TCP</td>
+              <td><code>Lobby</code>.</td>
+              <td><code>[len u8][opcode u8][payload]</code> frames for version, auth, MOTD, chat, game rows, user info, stats, presence, and characters.</td>
+              <td><code>Lobby</code> converts wire pushes into local caches. Other code should not parse lobby frames.</td>
+            </tr>
+            <tr>
+              <td>Game UDP</td>
+              <td><code>WorldNetwork</code> and <code>WorldReplication</code>.</td>
+              <td><code>World::MSG_*</code> datagrams for connect, snapshots, input, peer list, game info, map transfer, chat, gameplay intents, kicks, trigger state, and camera.</td>
+              <td>Transport dispatch stays in <code>WorldNetwork</code>; snapshot mechanics stay in <code>WorldReplication</code>.</td>
+            </tr>
+            <tr>
+              <td>Dedicated-server lobby heartbeat</td>
+              <td><code>DedicatedServer</code>.</td>
+              <td>UDP heartbeat to lobby with game id, bound port, state, parked account IDs, tick count, and alive mask.</td>
+              <td>Heartbeat summarizes a running authority. It does not define match state inside the client.</td>
+            </tr>
+            <tr>
+              <td>Map HTTP</td>
+              <td><code>mapfetch</code> helpers and map/session flows.</td>
+              <td><code>GET /api/maps</code>, <code>GET /api/maps/by-sha1/:sha1</code>, and <code>POST /api/maps</code> for community maps.</td>
+              <td>HTTP map transfer is an asset edge; loaded map state belongs to <code>World::map</code>.</td>
+            </tr>
+            <tr>
+              <td>Local control/input sockets</td>
+              <td><code>ControlServer</code>, <code>ControlDispatch</code>, <code>InputServer</code>.</td>
+              <td>JSON-lines commands and binary input snapshots used by <code>clients/cli</code> and tests.</td>
+              <td>Commands enter through <code>Game::Loop()</code> phases so automation observes the real frame lifecycle.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="consumer-guide">
+      <h2>Consumer Guide</h2>
+      <div class="content">
+        <table>
+          <thead>
+            <tr>
+              <th>If You Need...</th>
+              <th>Use...</th>
+              <th>Avoid...</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Match lifecycle/config or map/lobby game details</td>
+              <td><code>GameSession</code>/<code>World</code> owner paths, existing <code>Game::GetWorldSummary()</code> for automation summary, or a new narrow owner accessor if the raw field is currently private.</td>
+              <td>Using <code>GameStateObject</code> as a substitute for lobby config, map readiness, shared-state gates, or teardown state.</td>
+            </tr>
+            <tr>
+              <td>Current scoreboard phase, score, elapsed time, or winner</td>
+              <td><code>GameStateObject</code> read from the current <code>World</code> object set after match start.</td>
+              <td>Inventing a second scoreboard model in UI/render code, or reading it before <code>gameplaystate == INGAME</code>.</td>
+            </tr>
+            <tr>
+              <td>A player object for a peer</td>
+              <td><code>World::GetPeerPlayer(peerid)</code>.</td>
+              <td>Scanning object lists in every caller.</td>
+            </tr>
+            <tr>
+              <td>An account name or selected character details</td>
+              <td><code>world.lobby.GetUserInfo(accountid)</code> and character helpers.</td>
+              <td>Assuming peer/account IDs contain display metadata.</td>
+            </tr>
+            <tr>
+              <td>Current message, chat, or status text</td>
+              <td><code>World</code> message getters or a focused <code>WorldMessaging</code> getter for chat/status collections.</td>
+              <td>Mirroring transient message queues in a screen, renderer, or control command.</td>
+            </tr>
+            <tr>
+              <td>Objective completion or trigger flags</td>
+              <td><code>world.triggerGraph.IsObjectiveComplete()</code>, <code>GetFlag()</code>, or <code>Objectives()</code>. Treat pending events/action scheduling as authority-local.</td>
+              <td>Having replicas infer objective truth from local events or expecting action timers to be replicated trigger data.</td>
+            </tr>
+            <tr>
+              <td>To add a replicated gameplay field</td>
+              <td>The owning object or peer serialization path, plus protocol/version review.</td>
+              <td>Side-channel globals or renderer-only state.</td>
+            </tr>
+            <tr>
+              <td>To observe live world state externally</td>
+              <td>A compatible spectator/game peer over UDP, or a new authority-owned read API.</td>
+              <td>Using admin/session summaries as if they were object snapshots.</td>
+            </tr>
+            <tr>
+              <td>To test or inspect the running client</td>
+              <td><code>silencer-cli</code>, control socket commands, screenshots, and input snapshots.</td>
+              <td>Adding production-only hooks for test visibility.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="sources">
+      <h2>Source Map</h2>
+      <div class="content small">
+        <p>Primary references used for this explainer:</p>
+        <ul>
+          <li><code>clients/silencer/CLAUDE.md</code> for client-level networking, UI, object hierarchy, and dedicated-server contracts.</li>
+          <li><code>clients/silencer/src/game/CLAUDE.md</code>, <code>game.h</code>, <code>game/loop/game_loop.cpp</code>, and <code>game/session/game_session.cpp</code> for application/session lifecycle.</li>
+          <li><code>clients/silencer/src/world/CLAUDE.md</code>, <code>world.h</code>, <code>world/objects/world_objects.cpp</code>, <code>world/network/world_network.cpp</code>, <code>world/network/world_peer_registry.cpp</code>, and <code>world/network/world_replication.cpp</code> for simulation, object, peer, network, and replication ownership.</li>
+          <li><code>clients/silencer/src/world/messaging/world_messaging.*</code>, <code>events/TriggerGraph.*</code>, <code>events/ActionSystem.h</code>, and <code>events/TriggerDef.h</code> for messaging, chat/status, objectives, and trigger-state ownership.</li>
+          <li><code>clients/silencer/src/net/lobby.*</code>, <code>net/peer.*</code>, and <code>shared/lobby-protocol/protocol.md</code> for lobby-client cache and lobby wire boundaries.</li>
+          <li><code>clients/silencer/src/resources/resources.*</code>, <code>actors/core/actordef.*</code>, and <code>actors/bt/behaviortree.*</code> for resource and data-driven content loading.</li>
+          <li><code>clients/silencer/src/game/replay/replay.*</code> and <code>clients/cli/CLAUDE.md</code> for replay and automation boundaries.</li>
+        </ul>
+      </div>
+    </section>
+  </main>
+</body>
+</html>
