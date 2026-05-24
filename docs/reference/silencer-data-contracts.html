@@ -240,15 +240,19 @@
               <td>Join, spectate, leave, map load/unload, match summary</td>
               <td><code>GameSession</code>.</td>
               <td>
-                Use <code>Game::JoinGame()</code>, <code>SpectateGame()</code>,
-                <code>LeaveJoinedGame()</code>, and session-backed fields
-                exposed through <code>Game</code>.
+                Read session-backed state through <code>Game</code> accessors
+                such as <code>GetWorldSummary()</code>, current
+                <code>World</code>/<code>Lobby</code> state, and the current
+                <code>Game</code> state.
               </td>
               <td>
-                <code>GameSession</code> copies <code>LobbyGame</code> host data
-                into the authority peer, switches <code>World</code> into replica
-                connect flow, loads/unloads maps, resets objects/game mode, and
-                submits final stats.
+                <code>Game::JoinGame()</code>, <code>SpectateGame()</code>, and
+                <code>LeaveJoinedGame()</code> delegate to
+                <code>GameSession</code>. <code>GameSession</code> copies
+                <code>LobbyGame</code> host data into the authority peer,
+                switches <code>World</code> into replica connect flow,
+                loads/unloads maps, resets objects/game mode, and submits final
+                stats.
               </td>
               <td>
                 Keep session transitions here. Do not split map teardown or
@@ -390,13 +394,15 @@
               <td>
                 <code>GetPeer()</code>, <code>GetAuthorityPeer()</code>,
                 <code>GetLocalPeerId()</code>, <code>GetPeerPlayer()</code>,
-                <code>GetPeerTeam()</code>, and <code>FindTeamForPeer()</code>.
+                and <code>GetPeerTeam()</code>.
               </td>
               <td>
                 Authority <code>MSG_CONNECT</code> adds/rebinds peers.
-                <code>SendPeerList()</code> and <code>ReadPeerList()</code>
-                replicate peer summaries. Disconnect either parks a mid-game
-                player for rejoin or removes the peer.
+                <code>FindTeamForPeer()</code> assigns team membership and may
+                create a <code>TEAM</code> object. <code>SendPeerList()</code>
+                and <code>ReadPeerList()</code> replicate peer summaries.
+                Disconnect either parks a mid-game player for rejoin or removes
+                the peer.
               </td>
               <td>
                 Peer IDs, controlled object lists, readiness, team assignment,
@@ -455,9 +461,12 @@
                 <code>ShowMessage()</code>, <code>ShowStatus()</code>,
                 <code>ShowTopMessage()</code>, <code>SendChat()</code>, and
                 <code>SendSound()</code>. Network handlers for
-                <code>MSG_CHAT</code>, <code>MSG_STATUS</code>,
-                <code>MSG_MESSAGE</code>, and <code>MSG_SOUND</code> enter
-                through <code>WorldNetwork</code> and delegate here.
+                <code>MSG_CHAT</code>, <code>MSG_STATUS</code>, and
+                <code>MSG_MESSAGE</code> enter through
+                <code>WorldNetwork</code> and delegate here. Inbound
+                <code>MSG_SOUND</code> is handled directly by
+                <code>WorldNetwork</code> resolving sound assets and playing
+                through <code>Audio</code>.
               </td>
               <td>
                 Messaging is presentation-facing world state, but it is still
@@ -471,14 +480,14 @@
               <td>
                 <code>IsObjectiveComplete()</code>, <code>GetFlag()</code>,
                 <code>Objectives()</code>, and diagnostic dirty-state helpers.
-                Runtime event producers emit <code>GameEvent</code>s through
-                <code>triggerGraph.Bus()</code>.
               </td>
               <td>
                 <code>Map::Load()</code> loads trigger nodes/zones into
                 <code>TriggerGraph</code>. Authority <code>TriggerGraph::Tick()</code>
                 evaluates pending events, zone/timer events, schedules actions,
-                completes objectives, and sets flags/enabled state.
+                completes objectives, and sets flags/enabled state. Runtime event
+                producers emit <code>GameEvent</code>s through
+                <code>triggerGraph.Bus().Emit()</code>.
               </td>
               <td>
                 Pending events, elapsed timers, zone occupancy, and queued
@@ -591,12 +600,15 @@
               <td><code>ClientUi</code>, <code>GameUiPipeline</code>, screens/modals.</td>
               <td>
                 <code>Game::UiInput()</code>, <code>CurrentUiInput()</code>,
-                <code>UiInteractions()</code>, <code>PushScreen()</code>,
-                <code>PopScreen()</code>, and <code>ReplaceScreen()</code>.
+                <code>UiInteractions()</code>, <code>GetTopScreen()</code>, and
+                <code>HasUiInputTarget()</code>.
               </td>
               <td>
                 Screens declare one UI frame; typed UI actions are handled after
                 layout. <code>GameUiPipeline</code> gates SDL text input.
+                <code>PushScreen()</code>, <code>PopScreen()</code>, and
+                <code>ReplaceScreen()</code> mutate the UI stack through
+                <code>Game</code>/<code>ClientUi</code>.
               </td>
               <td>
                 UI is a command/read surface. It is not the owner of simulation,
