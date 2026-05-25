@@ -4,6 +4,16 @@ All notable changes to Silencer are documented here.
 
 ## [Unreleased]
 
+## [v00056] — 2026-05-25
+
+### Game client
+
+#### Character names and migrated renames (#242, #246)
+
+- Lobby and in-game player displays now use the selected character name instead of the account name.
+- Migrated agency-named characters can be renamed once, with lobby protocol support and Select Agent UI affordances that label the action as `Rename Once` and the modal as `ONE-TIME RENAME`.
+- The lobby character panel now shows XP directly above the `Agents` button so character progress stays visible in the main panel layout.
+
 ## [v00055] — 2026-05-25
 
 ### Game client
