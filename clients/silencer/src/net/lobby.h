@@ -35,7 +35,7 @@ public:
 		Uint32 accountid;
 		Uint32 gameid; // 0 = main lobby
 		Uint8 status;  // 0 = lobby, 1 = pregame, 2 = playing
-		char name[17]; // matches server-side max username (16) + null
+		char name[17]; // selected character display name (16) + null
 	};
 	struct Character {
 		Uint32 id;

@@ -32,7 +32,7 @@ WorldMessaging::WorldMessaging(World & world) : world(world){
 }
 
 void WorldMessaging::DisplayChatMessage(Uint32 accountid, const char * msg){
-	std::string chatmsg(world.lobby.GetUserInfo(accountid)->name);
+	std::string chatmsg(world.lobby.GetUserInfo(accountid)->DisplayName());
 	std::replace(chatmsg.begin(), chatmsg.end(), ' ', '\xA0');
 	// replace spaces with nbsp so usernames dont wordwrap
 	chatmsg.append(":\xA0");
@@ -183,4 +183,3 @@ void WorldMessaging::PushStatusString(char * statusstring){
 	}
 	statusmessages.push_front(statusstring);
 }
-

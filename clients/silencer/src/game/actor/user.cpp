@@ -49,6 +49,10 @@ User::User(){
 	teamnumber = 0;
 }
 
+const char * User::DisplayName() const{
+	return charname[0] ? charname : name;
+}
+
 // Wire format (MSG_USERINFO, matches server encodeUser):
 //   [u32 accountID][u32 charID][u8 agencyIdx]
 //   [u16 wins][u16 losses][u16 xp][u8 level]

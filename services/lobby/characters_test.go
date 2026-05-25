@@ -61,6 +61,29 @@ func TestCreateCharacterRejectsDuplicateAlias(t *testing.T) {
 	}
 }
 
+func TestClientDisplayNamePrefersSelectedCharacter(t *testing.T) {
+	c := &Client{}
+	c.setUser(&User{
+		Name:           "alice",
+		SelectedCharID: 7,
+		Characters: []Character{
+			{ID: 3, Name: "Old", AgencyIdx: 0},
+			{ID: 7, Name: "Shade", AgencyIdx: 1},
+		},
+	})
+	if got := c.displayName(); got != "Shade" {
+		t.Fatalf("displayName: got %q want %q", got, "Shade")
+	}
+}
+
+func TestClientDisplayNameFallsBackToAccountName(t *testing.T) {
+	c := &Client{}
+	c.setUser(&User{Name: "alice"})
+	if got := c.displayName(); got != "alice" {
+		t.Fatalf("displayName fallback: got %q want %q", got, "alice")
+	}
+}
+
 func TestLegacyAgencyMigrationKeepsAnyProgressField(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "lobby.json")
 	before := &Store{

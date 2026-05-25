@@ -125,9 +125,9 @@ void PopulateTeams(HudView& out, ::World& world) {
 			if(user){
 				char displayname[120];
 				if(p->isbot){
-					std::snprintf(displayname, sizeof(displayname), "%s [BOT]", user->name);
+					std::snprintf(displayname, sizeof(displayname), "%s [BOT]", user->DisplayName());
 				}else{
-					std::snprintf(displayname, sizeof(displayname), "%s", user->name);
+					std::snprintf(displayname, sizeof(displayname), "%s", user->DisplayName());
 				}
 				pv.displayName = displayname;
 				pv.agencyLevel = user->agency[team->agency].level;
@@ -173,7 +173,7 @@ void PopulateBuyTech(HudView& out, ::World& world, ::Player* player) {
 			::Peer* targetPeer = world.GetPeer(buyTechTeam->peers[peerIndex]);
 			if(targetPeer){
 				::User* user = world.lobby.GetUserInfo(targetPeer->accountid);
-				if(user) name += user->name;
+				if(user) name += user->DisplayName();
 			}
 		}
 		return name;

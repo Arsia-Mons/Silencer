@@ -306,7 +306,7 @@ void Player::Tick(World & world){
 					killedby = "a Player";
 					Peer * killedbypeer = player->GetPeer(world);
 					if(killedbypeer){
-						killedby = world.lobby.GetUserInfo(killedbypeer->accountid)->name;
+						killedby = world.lobby.GetUserInfo(killedbypeer->accountid)->DisplayName();
 						if(player->id == id){
 							killedself = true;
 						}else{
@@ -315,10 +315,10 @@ void Player::Tick(World & world){
 					}
 					char temp[256];
 					if(killedself){
-						sprintf(temp, "%s committed suicide", world.lobby.GetUserInfo(peer->accountid)->name);
+						sprintf(temp, "%s committed suicide", world.lobby.GetUserInfo(peer->accountid)->DisplayName());
 						peer->stats.suicides++;
 					}else{
-						sprintf(temp, "%s was killed by %s", world.lobby.GetUserInfo(peer->accountid)->name, killedby);
+						sprintf(temp, "%s was killed by %s", world.lobby.GetUserInfo(peer->accountid)->DisplayName(), killedby);
 						peer->stats.deaths++;
 					}
 					world.ShowStatus(temp, 160, true);
@@ -562,7 +562,7 @@ void Player::Tick(World & world){
 			if(peer && !world.intutorialmode){
 				User * user = world.lobby.GetUserInfo(peer->accountid);
 				char text[128];
-				sprintf(text, "Secret picked up by\n%s", user->name);
+				sprintf(text, "Secret picked up by\n%s", user->DisplayName());
 				world.ShowMessage(text, 128, 2, true);
 				peer->stats.secretspickedup++;
 			}
@@ -579,7 +579,7 @@ void Player::Tick(World & world){
 					}
 				}else{
 					char text[128];
-					sprintf(text, "%s dropped a secret", user->name);
+					sprintf(text, "%s dropped a secret", user->DisplayName());
 					if(!world.intutorialmode){
 						world.ShowMessage(text, 128, 3, true);
 					}
@@ -2731,7 +2731,7 @@ void Player::HandleHit(World & world, Uint8 x, Uint8 y, Object & projectile){
 						Player * player = static_cast<Player *>(owner);
 						Peer * killedbypeer = player->GetPeer(world);
 						if(killedbypeer){
-							killedby = world.lobby.GetUserInfo(killedbypeer->accountid)->name;
+							killedby = world.lobby.GetUserInfo(killedbypeer->accountid)->DisplayName();
 							if(player->id == id){
 								killedself = true;
 							}else{
@@ -2757,10 +2757,10 @@ void Player::HandleHit(World & world, Uint8 x, Uint8 y, Object & projectile){
 			}
 			char temp[256];
 			if(killedself){
-				sprintf(temp, "%s committed suicide", world.lobby.GetUserInfo(peer->accountid)->name);
+				sprintf(temp, "%s committed suicide", world.lobby.GetUserInfo(peer->accountid)->DisplayName());
 				peer->stats.suicides++;
 			}else{
-				sprintf(temp, "%s was killed by %s", world.lobby.GetUserInfo(peer->accountid)->name, killedby);
+				sprintf(temp, "%s was killed by %s", world.lobby.GetUserInfo(peer->accountid)->DisplayName(), killedby);
 				peer->stats.deaths++;
 			}
 			world.ShowStatus(temp, 160, true);
@@ -2851,7 +2851,7 @@ void Player::HandleDisconnect(World & world, Uint8 peerid){
 			User * user = world.lobby.GetUserInfo(peer->accountid);
 			if(user){
 				char temp[256];
-				sprintf(temp, "%s has left the game", user->name);
+				sprintf(temp, "%s has left the game", user->DisplayName());
 				world.ShowStatus(temp, 176, true);
 				Team * team = GetTeam(world);
 				if(team){
@@ -4413,7 +4413,7 @@ bool Player::PickUpItem(World & world, PickUp & pickup){
 					Peer * peer = GetPeer(world);
 					if(peer){
 						User * user = world.lobby.GetUserInfo(peer->accountid);
-						username = user->name;
+						username = user->DisplayName();
 					}
 					sprintf(text, "NEUTRON BOMB\nACTIVATION IN\n15 SECONDS\n\nACTIVATED BY\n%s", username);
 					world.ShowMessage(text, 128, 4, true);

@@ -641,10 +641,13 @@ void WorldNetwork::DoNetwork_Replica(void){
 						if(team){
 							User * user = world.lobby.GetUserInfo(localpeer->accountid);
 							char namecopy[64];
+							char charnamecopy[17];
 							strcpy(namecopy, user->name);
+							strcpy(charnamecopy, user->charname);
 							world.lobby.ForgetUserInfo(localpeer->accountid);
 							user = world.lobby.GetUserInfo(localpeer->accountid);
 							strcpy(user->name, namecopy);
+							strcpy(user->charname, charnamecopy);
 							user->statscopy = localpeer->stats;
 							user->selectedcharid = localpeer->selectedcharid;
 							user->statsagency = team->agency;

@@ -823,7 +823,7 @@ void Renderer::DrawWorld(Surface * surface, Camera & camera, bool drawminimap, b
 									User * user = world.lobby.GetUserInfo(peer->accountid);
 									if(user && !user->retrieving){
 										char username[64];
-										strcpy(username, user->name);
+										strcpy(username, user->DisplayName());
 										DrawText(surface, player->x + camera.GetXOffset() - ((strlen(username) * 6) / 2), player->y + camera.GetYOffset() - 80, username, 133, 6);
 									}
 								}

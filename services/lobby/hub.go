@@ -93,8 +93,8 @@ func (h *Hub) Join(c *Client) {
 	if h.events != nil && c.accountID != 0 {
 		ip, _, _ := net.SplitHostPort(c.conn.RemoteAddr().String())
 		var agencies [5]AgencyEvent
-		if c.user != nil {
-			for i, ch := range c.user.Characters {
+		if user := c.currentUser(); user != nil {
+			for i, ch := range user.Characters {
 				if i >= 5 {
 					break
 				}
@@ -195,7 +195,6 @@ func (h *Hub) GameExited(gameID uint32) {
 	}
 }
 
-
 // status: 0 = main lobby, 1 = pregame (game-specific lobby), 2 = playing.
 // gameID=0 requires status=0. Unknown non-zero IDs are rejected.
 func (h *Hub) SetClientGame(c *Client, gameID uint32, status uint8) {
@@ -221,6 +220,36 @@ func (h *Hub) SetClientGame(c *Client, gameID uint32, status uint8) {
 	c.gameID = gameID
 	c.gameStatus = status
 	acct := c.accountID
+	name := c.displayName()
+	peers := make([]*Client, 0, len(h.clients))
+	for other := range h.clients {
+		peers = append(peers, other)
+	}
+	h.mu.Unlock()
+
+	for _, p := range peers {
+		p.sendPresence(0, acct, gameID, status, name)
+	}
+
+	if h.events != nil {
+		h.events.Publish("player.presence", playerPresenceEvent{
+			AccountID: acct, Name: name, GameID: gameID, GameStatus: status,
+			Online: true, Timestamp: time.Now().UnixMilli(),
+		})
+	}
+}
+
+// BroadcastClientPresence re-sends a client's current lobby presence when
+// display-only state changes, such as selecting a different character.
+func (h *Hub) BroadcastClientPresence(c *Client) {
+	h.mu.Lock()
+	if c.accountID == 0 {
+		h.mu.Unlock()
+		return
+	}
+	acct := c.accountID
+	gameID := c.gameID
+	status := c.gameStatus
 	name := c.displayName()
 	peers := make([]*Client, 0, len(h.clients))
 	for other := range h.clients {

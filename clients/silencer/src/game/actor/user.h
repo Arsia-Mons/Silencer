@@ -10,6 +10,7 @@ class User
 public:
 	User();
 	void Serialize(bool write, Serializer & data);
+	const char * DisplayName() const;
 	int TotalUpgradePointsPossible(Uint8 agency);
 	bool retrieving;
 	Uint32 accountid;
