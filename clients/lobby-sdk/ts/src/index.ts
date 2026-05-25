@@ -20,6 +20,7 @@ export {
   encodeNewGame,
   encodePingAck,
   encodeRegisterStats,
+  encodeRenameCharacter,
   encodeSetGame,
   encodeCreateCharacter,
   encodeSelectCharacter,

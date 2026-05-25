@@ -77,6 +77,7 @@ public:
     void set_game(uint32_t game_id, GameStatus status);
     void create_character(const std::string& name, uint8_t agency_idx);
     void select_character(uint32_t character_id);
+    void rename_character(uint32_t character_id, const std::string& name);
     void register_stats(uint32_t game_id, uint8_t team_number, uint32_t account_id,
                         uint32_t character_id, uint8_t stats_agency, bool won, uint32_t xp,
                         const MatchStats& stats);

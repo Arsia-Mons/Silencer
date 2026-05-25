@@ -76,6 +76,8 @@ constexpr int kAgentIconW = 32;
 constexpr int kAgentIconH = 30;
 constexpr int kAgentStatsTopGap = 14;
 constexpr int kAgentStatsLineGap = 1;
+constexpr int kAgentRenameTopGap = 8;
+constexpr int kAgentRenameButtonW = 112;
 constexpr int kAgentAdvantagesTopGap = 17;
 constexpr int kAgentAdvantagesLineGap = 1;
 constexpr int kAdvantageListIndent = 20;
@@ -100,6 +102,7 @@ constexpr int kMaxRows = 32;
 
 constexpr const char * kActionAgentPrefix = "character_create.agent";
 constexpr const char * kActionAgencyPrefix = "character_create.agency";
+constexpr const char * kActionRenamePrefix = "character_create.rename";
 constexpr const char * kActionCreate = "character_create.create";
 constexpr const char * kActionAlias = "character_create.alias";
 
@@ -523,6 +526,14 @@ std::string AgencyActionId(int index)
 	return out;
 }
 
+std::string RenameActionId(int index)
+{
+	std::string out = kActionRenamePrefix;
+	out += ".";
+	out += std::to_string(index);
+	return out;
+}
+
 const AgencyDef& AgencyByIndex(int index)
 {
 	if(index < 0 || index >= 5) return kAgencies[0];
@@ -687,6 +698,17 @@ void CharacterCreateScreen::BuildSelectAgent(ScreenContext & ctx,
 				statLines.push_back(std::string("Successful Missions:") + std::to_string(ch.stats.wins));
 				AgentStatsBlock(CLAY_STRING("CharacterCreateAgentStats"),
 				                statLines);
+				if(interactive && ch.renameAvailable){
+					Spacer(CLAY_STRING("CharacterCreateAgentRenameTopGap"),
+					       kAgentRenameTopGap);
+					const std::string action = RenameActionId(detailAgentIndex);
+					Button(CLAY_STRING("CharacterCreateAgentRenameButton"),
+					       CLAY_STRING("Rename Once"),
+					       ButtonOpts{ .variant = ButtonVariant::Chrome,
+					                   .size = ButtonSize::Auto,
+					                   .minWidth = kAgentRenameButtonW },
+					       ButtonHandle{ nullptr, action.c_str(), &interactions });
+				}
 				Spacer(CLAY_STRING("CharacterCreateAgentAdvantagesTopGap"),
 				       kAgentAdvantagesTopGap);
 				CLAY({ .id = CLAY_ID("CharacterCreateAgentAdvantages"),
@@ -745,7 +767,7 @@ void CharacterCreateScreen::BuildEnterAlias(ScreenContext & ctx,
 		           .pointerCaptureMode = CLAY_POINTER_CAPTURE_MODE_CAPTURE,
 		           .attachTo = CLAY_ATTACH_TO_PARENT,
 		       } }) {
-			Text(CLAY_STRING("SILENCER ALIAS"),
+			Text(FromCStr(IsRenaming() ? "ONE-TIME RENAME" : "SILENCER ALIAS"),
 			     { .size = TextSize::Title,
 			       .effect = TextEffect::LegacyPalette(0) });
 		}

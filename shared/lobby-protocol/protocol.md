@@ -68,6 +68,7 @@ opSetGame       = 13
 opCharacters    = 14
 opCreateCharacter = 15
 opSelectCharacter = 16
+opRenameCharacter = 17
 ```
 
 ## Connection lifecycle
@@ -335,13 +336,14 @@ No reply.
 
 ### `opCharacters` (14)
 
-**Push** (`S → C`), sent after auth and after create/select changes:
+**Push** (`S → C`), sent after auth and after create/select/rename changes:
 ```
 u8     count                          (number of characters in this frame)
 u32    selected_char_id               (0 if no character is selected)
 struct[count] character:
   u32   id
-  u8    agency_idx
+  u8    agency_flags                  (bits 0..6 = agency_idx, bit 7 =
+                                      one-time rename available)
   struct AgencyStats:
     u16 wins
     u16 losses
@@ -355,6 +357,9 @@ struct[count] character:
     u8  contacts
   lenstr name
 ```
+Clients MUST mask `agency_idx = agency_flags & 0x7f` before indexing
+agency data. If `(agency_flags & 0x80) != 0`, the character may be
+renamed once with `opRenameCharacter`.
 
 ### `opCreateCharacter` (15)
 
@@ -376,6 +381,21 @@ u32    character_id
 ```
 The server selects the existing character and replies with
 `opCharacters`.
+
+### `opRenameCharacter` (17)
+
+**Request** (`C → S`):
+```
+u32    character_id
+lenstr name
+```
+The server applies the one-time rename only if the character belongs
+to the authenticated account and has the rename-available bit. The
+alias is trimmed, must be non-empty, must be ≤16 bytes, must differ
+from the current character name, and must not case-insensitively
+duplicate another character on the same account. Success clears the
+rename bit and replies with `opCharacters`; rejection replies with
+the unchanged `opCharacters` state.
 
 ## `LobbyGame` wire layout
 

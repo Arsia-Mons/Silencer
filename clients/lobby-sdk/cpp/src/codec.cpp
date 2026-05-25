@@ -234,6 +234,14 @@ std::vector<uint8_t> encode_select_character(uint32_t character_id) {
     return std::move(w).take();
 }
 
+std::vector<uint8_t> encode_rename_character(uint32_t character_id, const std::string& name) {
+    Writer w;
+    w.u8(OpRenameCharacter);
+    w.u32_le(character_id);
+    w.lenstr(name.size() > 16 ? name.substr(0, 16) : name);
+    return std::move(w).take();
+}
+
 std::vector<uint8_t> encode_register_stats(uint32_t game_id, uint8_t team_number,
                                            uint32_t account_id, uint32_t character_id,
                                            uint8_t stats_agency,
@@ -387,7 +395,9 @@ CharactersPayload decode_characters(Reader& r) {
     for(uint8_t i = 0; i < count; ++i){
         CharacterInfo ch;
         ch.id = r.u32_le();
-        ch.agency_idx = r.u8();
+        uint8_t agency_flags = r.u8();
+        ch.agency_idx = agency_flags & 0x7f;
+        ch.rename_available = (agency_flags & 0x80) != 0;
         ch.stats = decode_agency_stats(r);
         ch.name = r.lenstr();
         payload.characters.push_back(std::move(ch));
@@ -437,7 +447,7 @@ void encode_characters_body(Writer& w, const CharactersPayload& payload) {
     w.u32_le(payload.selected_char_id);
     for(const CharacterInfo& ch : payload.characters){
         w.u32_le(ch.id);
-        w.u8(ch.agency_idx);
+        w.u8((ch.agency_idx & 0x7f) | (ch.rename_available ? 0x80 : 0));
         encode_agency_stats(w, ch.stats);
         w.lenstr(ch.name);
     }

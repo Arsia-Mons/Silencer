@@ -22,7 +22,7 @@ public:
 	void LockMutex(void);
 	void UnlockMutex(void);
 	enum {IDLE, WAITING, CONNECTING, RESOLVING, WAITINGFORRESOLVER, RESOLVED, RESOLVEFAILED, CONNECTIONFAILED, CONNECTED, CHECKINGVERSION, AUTHENTICATING, AUTHSENT, AUTHENTICATED, AUTHFAILED, DISCONNECTED} state;
-	enum {MSG_AUTH, MSG_MOTD, MSG_CHAT, MSG_NEWGAME, MSG_DELGAME, MSG_CHANNEL, MSG_CONNECT, MSG_VERSION, MSG_USERINFO, MSG_PING, MSG_UPGRADESTAT, MSG_REGISTERSTATS, MSG_PRESENCE, MSG_SETGAME, MSG_CHARACTERS, MSG_CREATECHARACTER, MSG_SELECTCHARACTER};
+	enum {MSG_AUTH, MSG_MOTD, MSG_CHAT, MSG_NEWGAME, MSG_DELGAME, MSG_CHANNEL, MSG_CONNECT, MSG_VERSION, MSG_USERINFO, MSG_PING, MSG_UPGRADESTAT, MSG_REGISTERSTATS, MSG_PRESENCE, MSG_SETGAME, MSG_CHARACTERS, MSG_CREATECHARACTER, MSG_SELECTCHARACTER, MSG_RENAMECHARACTER};
 	enum StatID {
 		STAT_ENDURANCE = 1,
 		STAT_SHIELD = 2,
@@ -41,6 +41,7 @@ public:
 		Uint32 id;
 		char name[17];
 		Uint8 agencyIdx;
+		bool renameAvailable;
 		struct {
 			Uint16 wins, losses, xp;
 			Uint8 level, endurance, shield, jetpack, techslots, hacking, contacts;
@@ -62,6 +63,7 @@ public:
 	void SendSetGame(Uint32 gameid, Uint8 status);
 	void CreateCharacter(const char * name, Uint8 agencyIdx);
 	void SelectCharacter(Uint32 charID);
+	void RenameCharacter(Uint32 charID, const char * name);
 	const Character * GetSelectedCharacter() const;
 	Uint8 GetSelectedAgencyOrDefault(Uint8 fallback) const;
 	char failmessage[256];

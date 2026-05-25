@@ -145,6 +145,8 @@ func (c *Client) handleFrame(frame []byte, expectedVersion string, manifest *Upd
 		return c.handleCreateCharacter(r)
 	case opSelectCharacter:
 		return c.handleSelectCharacter(r)
+	case opRenameCharacter:
+		return c.handleRenameCharacter(r)
 	default:
 		log.Printf("[op] %s unknown opcode %d", c.conn.RemoteAddr(), op)
 	}
@@ -428,6 +430,31 @@ func (c *Client) handleSelectCharacter(r *reader) error {
 	}
 	u, ok := c.hub.store.SelectCharacter(c.accountID, charID)
 	if !ok {
+		return nil
+	}
+	c.setUser(u)
+	c.send(encodeCharacters(u))
+	c.hub.BroadcastClientPresence(c)
+	return nil
+}
+
+func (c *Client) handleRenameCharacter(r *reader) error {
+	if c.accountID == 0 {
+		return nil
+	}
+	charID, err := r.u32()
+	if err != nil {
+		return err
+	}
+	name, err := r.lenBytes()
+	if err != nil {
+		return err
+	}
+	u, ok := c.hub.store.RenameCharacter(c.accountID, charID, name)
+	if !ok {
+		if user := c.hub.store.ByAccountID(c.accountID); user != nil {
+			c.send(encodeCharacters(user))
+		}
 		return nil
 	}
 	c.setUser(u)

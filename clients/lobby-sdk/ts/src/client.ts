@@ -18,6 +18,7 @@ import {
   encodeNewGame,
   encodeCreateCharacter,
   encodePingAck,
+  encodeRenameCharacter,
   encodeRegisterStats,
   encodeSetGame,
   encodeSelectCharacter,
@@ -371,6 +372,11 @@ export class LobbyClient {
   selectCharacter(characterId: number): void {
     this.sendRaw(encodeSelectCharacter(characterId));
   }
+
+  renameCharacter(characterId: number, name: string): void {
+    this.sendRaw(encodeRenameCharacter(characterId, name));
+  }
+
   registerStats(args: {
     gameId: number;
     teamNumber: number;

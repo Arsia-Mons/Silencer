@@ -17,6 +17,7 @@ namespace {
 constexpr int kMaxRows = 32;
 constexpr const char * kActionAgentPrefix = "character_create.agent";
 constexpr const char * kActionAgencyPrefix = "character_create.agency";
+constexpr const char * kActionRenamePrefix = "character_create.rename";
 constexpr const char * kActionCreate = "character_create.create";
 constexpr const char * kActionAlias = "character_create.alias";
 
@@ -67,6 +68,8 @@ void CharacterCreateScreen::Build(ScreenContext & ctx)
 	previewAgencyIndex = -1;
 	characterCountOnEntry = ctx.lobby.characters.size();
 	waitingForCreate = false;
+	waitingForRename = false;
+	renameCharacterId = 0;
 	focusAliasRequested = false;
 	alias[0] = '\0';
 	RebuildAgentRows(ctx);
@@ -89,6 +92,38 @@ void CharacterCreateScreen::Tick(ScreenContext & ctx)
 			ctx.ShowMessage("Could not create character");
 		}
 	}
+	if(waitingForRename){
+		bool received = false;
+		bool renamed = false;
+		int renamedIndex = -1;
+		ctx.lobby.LockMutex();
+		received = ctx.lobby.charactersreceived;
+		for(size_t i = 0; i < ctx.lobby.characters.size(); ++i){
+			const Lobby::Character& ch = ctx.lobby.characters[i];
+			if(ch.id == renameCharacterId){
+				renamed = !ch.renameAvailable;
+				renamedIndex = static_cast<int>(i);
+				break;
+			}
+		}
+		ctx.lobby.UnlockMutex();
+		if(renamed){
+			waitingForRename = false;
+			renameCharacterId = 0;
+			alias[0] = '\0';
+			step = Step::SelectAgent;
+			if(renamedIndex >= 0){
+				selectedAgentIndex = renamedIndex;
+				previewAgentIndex = renamedIndex;
+			}
+			return;
+		}
+		if(received){
+			waitingForRename = false;
+			ctx.ShowMessage("Could not rename character");
+			focusAliasRequested = true;
+		}
+	}
 }
 
 void CharacterCreateScreen::Destroy(ScreenContext & ctx)
@@ -105,6 +140,13 @@ bool CharacterCreateScreen::HandleBack(ScreenContext & ctx)
 		return true;
 	}
 	if(step == Step::EnterAlias){
+		if(waitingForRename){
+			return true;
+		}
+		if(IsRenaming()){
+			renameCharacterId = 0;
+			alias[0] = '\0';
+		}
 		step = Step::SelectAgent;
 		previewAgentIndex = -1;
 		return true;
@@ -166,7 +208,11 @@ bool CharacterCreateScreen::HandleUiIntent(ScreenContext & ctx,
 	if(action.kind == silencer::ui::UiActionKind::SubmitText &&
 	   step == Step::EnterAlias && action.id == kActionAlias){
 		CopyAlias(action.value);
-		AdvanceAliasStep(ctx);
+		if(IsRenaming()){
+			RenameCurrentAgent(ctx);
+		}else{
+			AdvanceAliasStep(ctx);
+		}
 		return true;
 	}
 	if(action.kind != silencer::ui::UiActionKind::Activate){
@@ -177,6 +223,11 @@ bool CharacterCreateScreen::HandleUiIntent(ScreenContext & ctx,
 		selectedAgentIndex = agentIndex;
 		previewAgentIndex = agentIndex;
 		SelectCurrentAgent(ctx);
+		return true;
+	}
+	int renameIndex = SuffixInt(action.id, kActionRenamePrefix);
+	if(step == Step::SelectAgent && renameIndex >= 0){
+		StartRenameAgent(ctx, renameIndex);
 		return true;
 	}
 	int agencyIndex = SuffixInt(action.id, kActionAgencyPrefix);
@@ -204,6 +255,7 @@ void CharacterCreateScreen::SelectCurrentAgent(ScreenContext & ctx)
 	const int createIndex = CreateRowIndex(ctx.lobby.characters.size());
 	if(selectedAgentIndex == createIndex ||
 	   selectedAgentIndex >= static_cast<int>(ctx.lobby.characters.size())){
+		renameCharacterId = 0;
 		step = Step::EnterAlias;
 		focusAliasRequested = true;
 		return;
@@ -244,6 +296,53 @@ void CharacterCreateScreen::CreateCurrentAgent(ScreenContext & ctx)
 	ctx.lobby.CreateCharacter(alias, selectedAgency);
 	ctx.lobby.UnlockMutex();
 	waitingForCreate = true;
+}
+
+void CharacterCreateScreen::StartRenameAgent(ScreenContext & ctx, int agentIndex)
+{
+	if(waitingForRename){
+		return;
+	}
+	Uint32 charID = 0;
+	char currentName[17] = {};
+	ctx.lobby.LockMutex();
+	if(agentIndex >= 0 && agentIndex < static_cast<int>(ctx.lobby.characters.size())){
+		const Lobby::Character& ch = ctx.lobby.characters[static_cast<size_t>(agentIndex)];
+		if(ch.renameAvailable){
+			charID = ch.id;
+			std::strncpy(currentName, ch.name, sizeof(currentName) - 1);
+			selectedAgentIndex = agentIndex;
+			previewAgentIndex = agentIndex;
+		}
+	}
+	ctx.lobby.UnlockMutex();
+	if(charID == 0){
+		return;
+	}
+	renameCharacterId = charID;
+	CopyAlias(currentName);
+	step = Step::EnterAlias;
+	focusAliasRequested = true;
+}
+
+void CharacterCreateScreen::RenameCurrentAgent(ScreenContext & ctx)
+{
+	if(waitingForRename){
+		return;
+	}
+	if(alias[0] == '\0'){
+		ctx.ShowMessage("Enter an alias");
+		focusAliasRequested = true;
+		return;
+	}
+	if(renameCharacterId == 0){
+		return;
+	}
+	ctx.lobby.LockMutex();
+	ctx.lobby.charactersreceived = false;
+	ctx.lobby.RenameCharacter(renameCharacterId, alias);
+	ctx.lobby.UnlockMutex();
+	waitingForRename = true;
 }
 
 void CharacterCreateScreen::RebuildAgentRows(ScreenContext & ctx)

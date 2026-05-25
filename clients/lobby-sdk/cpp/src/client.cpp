@@ -341,6 +341,10 @@ void Client::select_character(uint32_t character_id) {
     send_raw(encode_select_character(character_id));
 }
 
+void Client::rename_character(uint32_t character_id, const std::string& name) {
+    send_raw(encode_rename_character(character_id, name));
+}
+
 void Client::register_stats(uint32_t game_id, uint8_t team_number, uint32_t account_id,
                             uint32_t character_id, uint8_t stats_agency, bool won, uint32_t xp,
                             const MatchStats& stats) {

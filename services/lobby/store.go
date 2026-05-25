@@ -27,10 +27,11 @@ type Agency struct {
 
 // Character is a named playable character locked to one agency.
 type Character struct {
-	ID        uint32 `json:"id"`
-	Name      string `json:"name"`
-	AgencyIdx uint8  `json:"agency"` // 0=Noxis 1=Lazarus 2=Caliber 3=Static 4=BlackRose
-	Stats     Agency `json:"stats"`
+	ID              uint32 `json:"id"`
+	Name            string `json:"name"`
+	AgencyIdx       uint8  `json:"agency"` // 0=Noxis 1=Lazarus 2=Caliber 3=Static 4=BlackRose
+	RenameAvailable bool   `json:"rename,omitempty"`
+	Stats           Agency `json:"stats"`
 }
 
 type User struct {
@@ -45,14 +46,15 @@ type User struct {
 }
 
 type Store struct {
-	path       string
-	mu         sync.Mutex
-	NextID     uint32           `json:"next"`
-	NextCharID uint32           `json:"nextchar"`
-	ByName     map[string]*User `json:"users"`
-	dirty      bool
-	saveErr    error
-	mongo      *MongoSync
+	path                  string
+	mu                    sync.Mutex
+	NextID                uint32           `json:"next"`
+	NextCharID            uint32           `json:"nextchar"`
+	ByName                map[string]*User `json:"users"`
+	LegacyRenameSweepDone bool             `json:"legacyRenameSweepDone,omitempty"`
+	dirty                 bool
+	saveErr               error
+	mongo                 *MongoSync
 }
 
 func NewStore(path string) (*Store, error) {
@@ -64,6 +66,7 @@ func NewStore(path string) (*Store, error) {
 	}
 	data, err := os.ReadFile(path)
 	if errors.Is(err, os.ErrNotExist) {
+		s.LegacyRenameSweepDone = true
 		return s, s.save()
 	}
 	if err != nil {
@@ -111,6 +114,12 @@ func NewStore(path string) (*Store, error) {
 			// Clear legacy field so it doesn't accumulate in JSON.
 			u.LegacyAgency = [5]Agency{}
 		}
+	}
+	if !s.LegacyRenameSweepDone {
+		for _, u := range s.ByName {
+			markLegacyRenameCandidates(u)
+		}
+		s.LegacyRenameSweepDone = true
 	}
 	return s, s.save()
 }
@@ -217,6 +226,38 @@ func (s *Store) CreateCharacter(accountID uint32, name string, agencyIdx uint8) 
 		s.NextCharID++
 		u.Characters = append(u.Characters, ch)
 		u.SelectedCharID = ch.ID
+		_ = s.save()
+		s.mongo.SyncPlayer(u)
+		return cloneUser(u), true
+	}
+	return nil, false
+}
+
+// RenameCharacter renames a migrated agency-name character once.
+// Returns the updated User and true on success; false if the character does not
+// belong to the account, has no rename grant, or the alias is invalid/duplicate.
+func (s *Store) RenameCharacter(accountID uint32, charID uint32, name string) (*User, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	name = strings.TrimSpace(name)
+	if name == "" || len(name) > 16 {
+		return nil, false
+	}
+	for _, u := range s.ByName {
+		if u.AccountID != accountID {
+			continue
+		}
+		ch := characterByID(u, charID)
+		if ch == nil || !ch.RenameAvailable || strings.EqualFold(ch.Name, name) {
+			return nil, false
+		}
+		for _, existing := range u.Characters {
+			if existing.ID != charID && strings.EqualFold(existing.Name, name) {
+				return nil, false
+			}
+		}
+		ch.Name = name
+		ch.RenameAvailable = false
 		_ = s.save()
 		s.mongo.SyncPlayer(u)
 		return cloneUser(u), true
@@ -404,22 +445,36 @@ func defaultAgency() Agency {
 	return Agency{TechSlots: 3}
 }
 
+var agencyCharacterNames = [5]string{"Noxis", "Lazarus", "Caliber", "Static", "BlackRose"}
+
 func migrateLegacyAgencies(u *User, nextCharID *uint32) {
-	agencyNames := [5]string{"Noxis", "Lazarus", "Caliber", "Static", "BlackRose"}
 	for i, a := range u.LegacyAgency {
 		if !hasLegacyAgencyProgress(a) {
 			continue
 		}
 		u.Characters = append(u.Characters, Character{
-			ID:        *nextCharID,
-			Name:      agencyNames[i],
-			AgencyIdx: uint8(i),
-			Stats:     a,
+			ID:              *nextCharID,
+			Name:            agencyCharacterNames[i],
+			AgencyIdx:       uint8(i),
+			RenameAvailable: true,
+			Stats:           a,
 		})
 		if u.SelectedCharID == 0 {
 			u.SelectedCharID = *nextCharID
 		}
 		*nextCharID++
+	}
+}
+
+func markLegacyRenameCandidates(u *User) {
+	for i := range u.Characters {
+		ch := &u.Characters[i]
+		if ch.AgencyIdx >= uint8(len(agencyCharacterNames)) {
+			continue
+		}
+		if ch.Name == agencyCharacterNames[ch.AgencyIdx] {
+			ch.RenameAvailable = true
+		}
 	}
 }
 

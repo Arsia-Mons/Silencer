@@ -91,6 +91,7 @@ std::vector<uint8_t> encode_upgrade_stat(uint32_t character_id, uint8_t agency_i
 std::vector<uint8_t> encode_set_game(uint32_t game_id, GameStatus status);
 std::vector<uint8_t> encode_create_character(const std::string& name, uint8_t agency_idx);
 std::vector<uint8_t> encode_select_character(uint32_t character_id);
+std::vector<uint8_t> encode_rename_character(uint32_t character_id, const std::string& name);
 std::vector<uint8_t> encode_register_stats(uint32_t game_id, uint8_t team_number,
                                            uint32_t account_id, uint32_t character_id,
                                            uint8_t stats_agency,
