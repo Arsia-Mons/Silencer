@@ -732,10 +732,13 @@
                 Authority/network paths write game info, peers, user info,
                 input commands, chat, tech, station actions, disconnects, and
                 ticks. Playback reads those records back into <code>World</code>.
+                Current playback/render code also updates replay camera,
+                speed, and display fields from local input/camera follow paths.
               </td>
               <td>
-                Replay is a serialized event/state view. It should not become a
-                second live state owner.
+                Replay is a serialized event/state view. Its current camera
+                fields are a legacy render/playback-derived state exception;
+                replay should not become a second live state owner.
               </td>
             </tr>
             <tr>
@@ -749,11 +752,14 @@
               <td>
                 The render pipeline consumes <code>World</code> and UI state
                 after simulation/input processing and writes the screen buffer or
-                GPU output.
+                GPU output. Current renderer code also rewrites derived camera
+                interpolation fields on the local player and rebuilds
+                <code>world.map.minimap.surface</code> from map minimap pixels.
               </td>
               <td>
-                Rendering displays state. It should not own game/lobby data or
-                mutate simulation except through explicit input/action paths.
+                Rendering mostly displays state, but these legacy derived-state
+                writes exist today. Do not use them as precedent for renderer
+                ownership of game/lobby data or new simulation mutations.
               </td>
             </tr>
             <tr>
@@ -772,8 +778,12 @@
                 <code>Game</code>/<code>ClientUi</code>.
               </td>
               <td>
-                UI is a command/read surface. It is not the owner of simulation,
-                networking, resources, or persistent lobby state.
+                UI is usually a command/read surface. Current lobby-connect UI
+                is a boundary leak: <code>LobbyConnectScreen::Tick()</code>
+                locks <code>world.lobby</code> and drives connect/auth
+                <code>Lobby::state</code> transitions. Keep new networking
+                transitions behind <code>Lobby</code> methods instead of
+                expanding screen ownership.
               </td>
             </tr>
             <tr>
@@ -934,8 +944,8 @@
             </tr>
             <tr>
               <td>Record or replay match data</td>
-              <td><code>Replay</code> write/read methods called from existing network/session paths.</td>
-              <td>Replay follows world/network events. It should not bypass the normal world mutation model.</td>
+              <td><code>Replay</code> write/read methods called from existing network/session paths, plus current render/playback camera field writes.</td>
+              <td>Replay follows world/network events. Existing camera/display writes are derived-state exceptions, not a general bypass around the world mutation model.</td>
             </tr>
             <tr>
               <td>Drive automated tests</td>
