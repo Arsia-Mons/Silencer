@@ -1,4 +1,0 @@
-bucket         = "silencer-tfstate-CHANGEME"
-key            = "silencer/staging.tfstate"
-region         = "us-west-1"
-dynamodb_table = "silencer-tfstate-lock"

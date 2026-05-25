@@ -20,11 +20,7 @@ across instance replacement.
 > `docs/production.md`. This file covers the *why* of the Terraform
 > code; `docs/production.md` covers the *how* of running it.
 
-Production is the only active Terraform-managed AWS environment. The
-`staging/` sibling module is retained only as the canonical destroy
-target for the retired smoke-test stack. Do not run `terraform apply`
-or `terraform destroy` there without explicit operator approval; once
-the destroy is confirmed, delete the module.
+Production is the only Terraform-managed AWS environment.
 
 ## File layout
 
