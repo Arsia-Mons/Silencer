@@ -9,6 +9,10 @@ struct TextRenderStyle {
 	Uint16 bank;
 	Uint16 advance;
 	Uint16 lineHeight;
+	Uint16 visualMinY;
+	Uint16 visualHeight;
+	Uint16 inkMinY;
+	Uint16 inkHeight;
 };
 
 struct InternalTextOpts {

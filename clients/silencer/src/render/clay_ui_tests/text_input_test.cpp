@@ -5,13 +5,16 @@
 //   • text input queues SetText but not SubmitText.
 //   • The password variant masks rendered glyphs (asserted via the
 //     emitted CUSTOM payload's textLen).
+//   • A 14px body input centers uppercase text by default.
 
 #include "clay_ui_tests/clay_ui_checks.h"
 #include "clay_ui_compositor.h"
 #include "clay/clay.h"
 #include "primitives/text_input.h"
 #include "runtime/UiInteractionRegistry.h"
+#include "surface.h"
 
+#include <algorithm>
 #include <cstring>
 
 namespace silencer::clay_bridge {
@@ -72,6 +75,8 @@ bool RunTextInputCheck(::Game & game, TextInputCheckResult & out) {
 	out.passwordMaskAppliedLen = 0;
 	out.overflowTailAppliedLen = 0;
 	out.overflowTailMatches = 0;
+	out.body14TopMargin = -1;
+	out.body14BottomMargin = -1;
 	for(int i = 0; i < cmds.length; i++){
 		::Clay_RenderCommand * c = &cmds.internalArray[i];
 		if(c->commandType != CLAY_RENDER_COMMAND_TYPE_CUSTOM) continue;
@@ -89,6 +94,42 @@ bool RunTextInputCheck(::Game & game, TextInputCheckResult & out) {
 			}
 		}
 		break;
+	}
+
+	// Vertical metrics — a 14px body input should center uppercase input
+	// text by default. The check renders through the real compositor so it
+	// catches regressions in field text placement, not just payload shape.
+	silencer::ui::primitives::TextInputBeginFrame();
+	::Clay_BeginLayout();
+	CLAY({ .id = CLAY_ID("TextInputVerticalRoot"),
+	       .layout = {
+	           .sizing = { CLAY_SIZING_FIXED(W), CLAY_SIZING_FIXED(H) },
+	       } }) {
+		silencer::ui::primitives::TextInput(
+			CLAY_STRING("vertical_input"),
+			"WWYYYYYY",
+			{ .widthPx = 80,
+			  .heightPx = 14,
+			  .textSize = silencer::ui::primitives::TextSize::Body });
+	}
+	cmds = ::Clay_EndLayout();
+
+	Surface verticalSurface(W, H, 0);
+	Render(game, &verticalSurface, cmds);
+	int minY = H;
+	int maxY = -1;
+	for(int y = 0; y < 14; y++){
+		for(int x = 0; x < 80; x++){
+			if(verticalSurface.pixels[static_cast<size_t>(y) * W + x] == 0){
+				continue;
+			}
+			minY = std::min(minY, y);
+			maxY = std::max(maxY, y);
+		}
+	}
+	if(maxY >= minY){
+		out.body14TopMargin = minY;
+		out.body14BottomMargin = 13 - maxY;
 	}
 
 	// Overflow tailing — a narrow field should keep the rightmost visible

@@ -121,22 +121,22 @@ namespace text_internal {
 
 TextRenderStyle ResolveTextRenderStyle(TextSize size) {
 	switch(size){
-		case TextSize::Title:           return {135, 11, 19};
-		case TextSize::Heading:         return {134, 8, 15};
-		case TextSize::Body:            return {133, 6, 11};
-		case TextSize::BodySm:          return {133, 7, 11};
-		case TextSize::Tiny:            return {132, 4, 7};
-		case TextSize::HudCounter:      return {135, 12, 19};
-		case TextSize::ScreenTitle:     return {135, 12, 19};
-		case TextSize::TinyCounter:     return {132, 6, 7};
-		case TextSize::MessageHeading:  return {134, 10, 15};
-		case TextSize::MessageTitle:    return {136, 25, 23};
-		case TextSize::MessageSubtitle: return {135, 13, 19};
-		case TextSize::Prompt:          return {136, 16, 23};
-		case TextSize::FieldLarge:      return {135, 9, 19};
-		case TextSize::Footer:          return {133, 11, 11};
+		case TextSize::Title:           return {135, 11, 19, 0, 15, 0, 17};
+		case TextSize::Heading:         return {134, 8, 15, 0, 11, 0, 13};
+		case TextSize::Body:            return {133, 6, 11, 0, 8, 0, 11};
+		case TextSize::BodySm:          return {133, 7, 11, 0, 8, 0, 11};
+		case TextSize::Tiny:            return {132, 4, 7, 0, 5, 0, 5};
+		case TextSize::HudCounter:      return {135, 12, 19, 0, 15, 0, 17};
+		case TextSize::ScreenTitle:     return {135, 12, 19, 0, 15, 0, 17};
+		case TextSize::TinyCounter:     return {132, 6, 7, 0, 5, 0, 5};
+		case TextSize::MessageHeading:  return {134, 10, 15, 0, 11, 0, 13};
+		case TextSize::MessageTitle:    return {136, 25, 23, 0, 20, 0, 24};
+		case TextSize::MessageSubtitle: return {135, 13, 19, 0, 15, 0, 17};
+		case TextSize::Prompt:          return {136, 16, 23, 0, 20, 0, 24};
+		case TextSize::FieldLarge:      return {135, 9, 19, 0, 15, 0, 17};
+		case TextSize::Footer:          return {133, 11, 11, 0, 8, 0, 11};
 	}
-	return {133, 6, 11};
+	return {133, 6, 11, 0, 8, 0, 11};
 }
 
 void TextWithInternalOptions(Clay_String text,

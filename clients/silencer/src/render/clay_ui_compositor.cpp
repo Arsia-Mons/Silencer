@@ -130,6 +130,23 @@ TextInkMetrics MeasureInkBounds(const Resources * resources,
 	return out;
 }
 
+int TextInputTextTop(const silencer::ui::primitives::text_internal::TextRenderStyle& style,
+                     int boxH) {
+	const int visualMinY = static_cast<int>(style.visualMinY);
+	const int visualHeight = static_cast<int>(
+		style.visualHeight ? style.visualHeight : style.lineHeight);
+	const int inkMinY = static_cast<int>(style.inkMinY);
+	const int inkHeight = static_cast<int>(
+		style.inkHeight ? style.inkHeight : style.lineHeight);
+	const int textTop = ((boxH - visualHeight) / 2) - visualMinY;
+	const int minTop = -inkMinY;
+	const int maxTop = boxH - (inkMinY + inkHeight);
+	if(maxTop < minTop){
+		return std::max(0, (boxH - static_cast<int>(style.lineHeight)) / 2);
+	}
+	return std::max(minTop, std::min(maxTop, textTop));
+}
+
 ::Clay_Dimensions MeasureTextCommand(::Clay_StringSlice text,
                                      ::Clay_TextElementConfig * config,
                                      void * /*userData*/) {
@@ -1128,12 +1145,11 @@ void RenderInto(::Resources & resources, ::Renderer & renderer,
 						int x = static_cast<int>(c->boundingBox.x);
 						int y = static_cast<int>(c->boundingBox.y);
 						int boxH = static_cast<int>(c->boundingBox.height);
-						// Center on the fixed font line box, never on per-string
+						// Center against stable font metrics, never per-string
 						// ink bounds: ink height/minY change with descenders
 						// (e.g. 'y'), which made the whole string jump up a
-						// pixel or two (issue #175). Legacy DrawTextInput drew
-						// at a fixed y for the same reason.
-						y += std::max(0, (boxH - static_cast<int>(style.lineHeight)) / 2);
+						// pixel or two (issue #175).
+						y += TextInputTextTop(style, boxH);
 						renderer.DrawText(dst,
 						                  static_cast<Uint16>(x),
 						                  static_cast<Uint16>(y),
