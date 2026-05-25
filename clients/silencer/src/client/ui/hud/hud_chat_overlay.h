@@ -1,6 +1,7 @@
 #pragma once
 
 class Surface;
+class Resources;
 
 namespace silencer {
 namespace ui {
@@ -13,6 +14,7 @@ struct HudView;
 // Bottom-right chat overlay: history + an in-progress chat input line when the
 // viewed player has chat focus.
 void BuildChatOverlay(const HudView& view,
+                      const Resources& resources,
                       Surface* surface,
                       silencer::ui::UiInteractionRegistry& interactions);
 
