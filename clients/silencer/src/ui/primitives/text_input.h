@@ -5,9 +5,9 @@
 //
 // The outer Clay element owns the clickable field bounds. The rendered text is
 // an inner custom element inset horizontally by `contentInsetX`, vertically
-// centered inside the field, and automatically tailed when the value exceeds
-// the field width so the caret stays visible and older content is hidden on
-// the left.
+// centered inside the field using stable bitmap-font metrics, and automatically
+// tailed when the value exceeds the field width so the caret stays visible and
+// older content is hidden on the left.
 //
 // The primitive owns no state and references no lobby/world/Config:
 //

@@ -162,10 +162,9 @@ void ScrollList(Clay_String id,
 					                               CLAY_ALIGN_Y_CENTER },
 					       },
 					       .backgroundColor = barColor }) {
-						// Measure visible glyph bounds so the row text sits
-						// flush with the bar's left edge (leading whitespace
-						// trimmed) and optically centered in the bar's height
-						// rather than top-aligned in the font's line box.
+						// Measure visible glyph width so the row text sits
+						// flush with the bar's left edge; vertical placement
+						// stays on stable font metrics.
 						text_internal::TextWithInternalOptions(
 							items[i], opts.text,
 							text_internal::InternalTextOpts{ .measureInk = true });

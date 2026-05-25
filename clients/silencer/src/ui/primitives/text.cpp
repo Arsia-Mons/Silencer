@@ -61,10 +61,13 @@ Clay_String CopyString(Clay_String text) {
 }
 
 silencer::clay_bridge::TextDrawData *
-AllocUserData(TextEffect effect, text_internal::InternalTextOpts internalOpts) {
+AllocUserData(TextSize size,
+              TextEffect effect,
+              text_internal::InternalTextOpts internalOpts) {
 	if(g_userDataCount >= kTextUserDataCapacity) return nullptr;
 	auto * slot = &g_userDataArena[g_userDataCount++];
 	slot->brightness = effect.Brightness();
+	slot->textSize = static_cast<Uint8>(size);
 	slot->colorRamp = effect.ColorRamp();
 	slot->drawAlpha = effect.DrawAlpha();
 	slot->measureInk = internalOpts.measureInk;
@@ -121,22 +124,62 @@ namespace text_internal {
 
 TextRenderStyle ResolveTextRenderStyle(TextSize size) {
 	switch(size){
-		case TextSize::Title:           return {135, 11, 19};
-		case TextSize::Heading:         return {134, 8, 15};
-		case TextSize::Body:            return {133, 6, 11};
-		case TextSize::BodySm:          return {133, 7, 11};
-		case TextSize::Tiny:            return {132, 4, 7};
-		case TextSize::HudCounter:      return {135, 12, 19};
-		case TextSize::ScreenTitle:     return {135, 12, 19};
-		case TextSize::TinyCounter:     return {132, 6, 7};
-		case TextSize::MessageHeading:  return {134, 10, 15};
-		case TextSize::MessageTitle:    return {136, 25, 23};
-		case TextSize::MessageSubtitle: return {135, 13, 19};
-		case TextSize::Prompt:          return {136, 16, 23};
-		case TextSize::FieldLarge:      return {135, 9, 19};
-		case TextSize::Footer:          return {133, 11, 11};
+		case TextSize::Title:           return {135, 11, 19, 0, 15, 0, 17};
+		case TextSize::Heading:         return {134, 8, 15, 0, 11, 0, 13};
+		case TextSize::Body:            return {133, 6, 11, 0, 8, 0, 11};
+		case TextSize::BodySm:          return {133, 7, 11, 0, 8, 0, 11};
+		case TextSize::Tiny:            return {132, 4, 7, 0, 5, 0, 5};
+		case TextSize::HudCounter:      return {135, 12, 19, 0, 15, 0, 17};
+		case TextSize::ScreenTitle:     return {135, 12, 19, 0, 15, 0, 17};
+		case TextSize::TinyCounter:     return {132, 6, 7, 0, 5, 0, 5};
+		case TextSize::MessageHeading:  return {134, 10, 15, 0, 11, 0, 13};
+		case TextSize::MessageTitle:    return {136, 25, 23, 0, 20, 0, 24};
+		case TextSize::MessageSubtitle: return {135, 13, 19, 0, 15, 0, 17};
+		case TextSize::Prompt:          return {136, 16, 23, 0, 20, 0, 24};
+		case TextSize::FieldLarge:      return {135, 9, 19, 0, 15, 0, 17};
+		case TextSize::Footer:          return {133, 11, 11, 0, 8, 0, 11};
 	}
-	return {133, 6, 11};
+	return {133, 6, 11, 0, 8, 0, 11};
+}
+
+namespace {
+
+int ClampTextTop(const TextRenderStyle& style, int boxH, int desiredTop) {
+	if(boxH <= 0) return 0;
+	const int inkMinY = static_cast<int>(style.inkMinY);
+	const int inkHeight = static_cast<int>(
+		style.inkHeight ? style.inkHeight : style.lineHeight);
+	const int minTop = -inkMinY;
+	const int maxTop = boxH - (inkMinY + inkHeight);
+	if(maxTop < minTop){
+		return std::max(0, (boxH - static_cast<int>(style.lineHeight)) / 2);
+	}
+	return std::max(minTop, std::min(maxTop, desiredTop));
+}
+
+}  // namespace
+
+int CenteredTextTop(const TextRenderStyle& style, int boxH) {
+	const int visualMinY = static_cast<int>(style.visualMinY);
+	const int visualHeight = static_cast<int>(
+		style.visualHeight ? style.visualHeight : style.lineHeight);
+	return ClampTextTop(style, boxH, ((boxH - visualHeight) / 2) - visualMinY);
+}
+
+int TextInkBottom(const TextRenderStyle& style, int textTop) {
+	const int inkMinY = static_cast<int>(style.inkMinY);
+	const int inkHeight = static_cast<int>(
+		style.inkHeight ? style.inkHeight : style.lineHeight);
+	return textTop + inkMinY + inkHeight;
+}
+
+int BottomAlignedTextTop(const TextRenderStyle& style,
+                         int boxH,
+                         int targetBottom) {
+	const int inkMinY = static_cast<int>(style.inkMinY);
+	const int inkHeight = static_cast<int>(
+		style.inkHeight ? style.inkHeight : style.lineHeight);
+	return ClampTextTop(style, boxH, targetBottom - (inkMinY + inkHeight));
 }
 
 void TextWithInternalOptions(Clay_String text,
@@ -147,7 +190,7 @@ void TextWithInternalOptions(Clay_String text,
 	const TextEffect effect = ResolveTextEffect(opts.tone, opts.effect);
 	void * userData = DrawDataIsDefault(effect, internalOpts)
 		? nullptr
-		: static_cast<void *>(AllocUserData(effect, internalOpts));
+		: static_cast<void *>(AllocUserData(opts.size, effect, internalOpts));
 
 	CLAY_TEXT(stableText,
 	          CLAY_TEXT_CONFIG({

@@ -443,6 +443,8 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 		r["password_mask_applied_len"] = res.passwordMaskAppliedLen;
 		r["overflow_tail_applied_len"] = res.overflowTailAppliedLen;
 		r["overflow_tail_matches"] = res.overflowTailMatches;
+		r["body14_top_margin"] = res.body14TopMargin;
+		r["body14_bottom_margin"] = res.body14BottomMargin;
 		cmd.reply->set_value(OkResult(cmd.id, r));
 		return;
 	}

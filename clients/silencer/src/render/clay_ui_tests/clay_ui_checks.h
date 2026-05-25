@@ -78,6 +78,8 @@ struct TextInputCheckResult {
 	int passwordMaskAppliedLen;
 	int overflowTailAppliedLen;
 	int overflowTailMatches;
+	int body14TopMargin;
+	int body14BottomMargin;
 };
 bool RunTextInputCheck(::Game & game, TextInputCheckResult & out);
 
