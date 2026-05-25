@@ -17,7 +17,7 @@ using namespace GameState;
 #define SILENCER_LOBBY_PORT 517
 #endif
 #ifndef SILENCER_VERSION
-#define SILENCER_VERSION "00054"
+#define SILENCER_VERSION "00055"
 #endif
 #ifndef SILENCER_MAP_API_URL
 #define SILENCER_MAP_API_URL "http://127.0.0.1:8080"
@@ -291,4 +291,3 @@ bool Game::Load(char * cmdline){
 	}
 	return true;
 }
-

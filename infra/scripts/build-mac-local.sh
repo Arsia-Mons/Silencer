@@ -5,7 +5,7 @@
 #   ./infra/scripts/build-mac-local.sh               # lobby at 127.0.0.1:15170
 #   LOBBY_HOST=1.2.3.4 ./infra/scripts/build-mac-local.sh
 #   LOBBY_PORT=517      ./infra/scripts/build-mac-local.sh
-#   VERSION=00054       ./infra/scripts/build-mac-local.sh  # must match lobby -version flag
+#   VERSION=00055       ./infra/scripts/build-mac-local.sh  # must match lobby -version flag
 #
 # The lobby host, port, and version are baked into the binary at compile time.
 # Run `docker compose -f infra/docker-compose.yml up -d` first so the lobby is ready before launching.
@@ -15,7 +15,7 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 LOBBY_HOST="${LOBBY_HOST:-127.0.0.1}"
 LOBBY_PORT="${LOBBY_PORT:-15170}"
-VERSION="${VERSION:-00054}"
+VERSION="${VERSION:-00055}"
 BUILD_DIR="$REPO_ROOT/build"
 
 echo "==> Installing/updating dependencies via Homebrew"

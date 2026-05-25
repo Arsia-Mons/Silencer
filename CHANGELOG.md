@@ -4,6 +4,20 @@ All notable changes to Silencer are documented here.
 
 ## [Unreleased]
 
+## [v00055] — 2026-05-25
+
+### Game client
+
+#### macOS updater (#247)
+
+- macOS release builds now package `updater-stage-2` as a nested, signed helper at `Silencer.app/Contents/Helpers/updater-stage-2`, so Gatekeeper validates it as part of the app bundle instead of rejecting a copied runtime executable as damaged.
+- The updater no longer stages a temporary `.app` around `updater-stage-2`; it resolves and launches the helper from the installed bundle, then keeps the actual app replacement flow in the signed helper.
+- Release signing now signs and verifies the helper inside-out, and the macOS bundle verifier enforces that the helper exists and only links against system libraries.
+
+#### Release note
+
+- Existing macOS installs that already lost or quarantined their stage-2 helper may need one manual DMG install. After that, future auto-updates use the signed nested helper.
+
 ### Infrastructure
 
 - Removed the disposable AWS smoke-test environment: automatic staging deploys, staging SSM seed entries, the retired plan documentation, and the staging Terraform module are gone after the approved destroy and cleanup (#235, #240).
