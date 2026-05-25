@@ -1,0 +1,7 @@
+{
+  "id": "SnowPowder",
+  "friction": 1.6,
+  "speedMult": 0.75,
+  "footstepL": "futstonl.wav",
+  "footstepR": "futstonr.wav"
+}

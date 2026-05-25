@@ -1,7 +1,9 @@
 #include "gasloader.h"
 #include "nlohmann/json.hpp"
+#include <filesystem>
 #include <fstream>
 #include <cstdio>
+namespace fs = std::filesystem;
 
 using json = nlohmann::json;
 
@@ -743,16 +745,19 @@ static void LoadPhysicsMaterials(const std::string& dir,
         {"Brick",           24}, {"FleshOrganic",     25}, {"EnergyForcefield",26},
         {"MagmaAsh",        27},
     };
-    json j;
-    if (!OpenJson(dir + "/physics_materials.json", j, errors)) return;
-    try {
-        out.clear();
-        for (const auto& m : j.at("physicsMaterials")) {
+    const std::string matDir = dir + "/physics_materials";
+    out.clear();
+    std::error_code ec;
+    for (const auto& entry : fs::directory_iterator(matDir, ec)) {
+        if (entry.path().extension() != ".json") continue;
+        const std::string file = entry.path().filename().string();
+        json m;
+        if (!OpenJson(entry.path().string(), m, errors)) continue;
+        try {
             std::string id = m.value("id", std::string{});
             auto it = nameToId.find(id);
             if (it == nameToId.end()) {
-                errors.push_back({"physics_materials.json", "/physicsMaterials/" + id,
-                                  "FIELD_ERROR", "unknown material id: " + id});
+                errors.push_back({file, "/id", "FIELD_ERROR", "unknown material id: " + id});
                 continue;
             }
             PhysicsMaterialDef def;
@@ -765,11 +770,11 @@ static void LoadPhysicsMaterials(const std::string& dir,
             def.footstepStairL  = m.value("footstepStairL",  def.footstepL);
             def.footstepStairR  = m.value("footstepStairR",  def.footstepR);
             out[it->second] = std::move(def);
+        } catch (const std::exception& e) {
+            errors.push_back({file, "", "FIELD_ERROR", e.what()});
         }
-    } catch (const std::exception& e) {
-        errors.push_back({"physics_materials.json", "", "FIELD_ERROR", e.what()});
-        out.clear();
     }
+    if (ec) errors.push_back({"physics_materials/", "", "FIELD_ERROR", "cannot open directory: " + ec.message()});
 }
 
 // ---------------------------------------------------------------------------

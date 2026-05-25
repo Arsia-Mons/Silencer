@@ -1,0 +1,7 @@
+{
+  "id": "MagmaAsh",
+  "friction": 2.0,
+  "speedMult": 0.6,
+  "footstepL": "futstonl.wav",
+  "footstepR": "futstonr.wav"
+}

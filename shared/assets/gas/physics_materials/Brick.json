@@ -1,0 +1,7 @@
+{
+  "id": "Brick",
+  "friction": 1.1,
+  "speedMult": 0.95,
+  "footstepL": "futstonl.wav",
+  "footstepR": "futstonr.wav"
+}

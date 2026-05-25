@@ -1,0 +1,7 @@
+{
+  "id": "WoodCreaky",
+  "friction": 1.0,
+  "speedMult": 0.95,
+  "footstepL": "futstonl.wav",
+  "footstepR": "futstonr.wav"
+}

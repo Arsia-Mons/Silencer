@@ -1,0 +1,7 @@
+{
+  "id": "Carpet",
+  "friction": 2.0,
+  "speedMult": 0.85,
+  "footstepL": "futstonl.wav",
+  "footstepR": "futstonr.wav"
+}

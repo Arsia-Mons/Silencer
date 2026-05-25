@@ -1,0 +1,7 @@
+{
+  "id": "GrassLush",
+  "friction": 1.4,
+  "speedMult": 0.85,
+  "footstepL": "futstonl.wav",
+  "footstepR": "futstonr.wav"
+}

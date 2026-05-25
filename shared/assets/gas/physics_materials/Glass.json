@@ -1,0 +1,7 @@
+{
+  "id": "Glass",
+  "friction": 0.75,
+  "speedMult": 1.05,
+  "footstepL": "futstonl.wav",
+  "footstepR": "futstonr.wav"
+}

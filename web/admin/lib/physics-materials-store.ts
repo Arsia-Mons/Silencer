@@ -1,23 +1,25 @@
 /**
- * Module-level singleton for physics_materials.json data.
- * Survives client-side navigation so the user only needs to open the file once.
+ * Module-level singleton for physics_materials/ folder data.
+ * Survives client-side navigation so the user only needs to open the folder once.
  */
 
-let _text: string | null = null;
-let _fileName: string | null = null;
+const _files = new Map<string, string>(); // material id → raw JSON text
+let _folderName: string | null = null;
 
-export function isLoaded(): boolean { return _text !== null; }
-export function getFileName(): string | null { return _fileName; }
-export function getText(): string | null { return _text; }
+export function isLoaded(): boolean { return _folderName !== null; }
+export function getFolderName(): string | null { return _folderName; }
 
-export function load(fileName: string, text: string): void {
-  _fileName = fileName;
-  _text = text;
+export function loadFolder(name: string, fileMap: Record<string, string>): void {
+  _folderName = name;
+  _files.clear();
+  for (const [k, v] of Object.entries(fileMap)) _files.set(k, v);
 }
 
-export function setText(text: string): void { _text = text; }
+export function getFile(id: string): string | null { return _files.get(id) ?? null; }
+export function setFile(id: string, text: string): void { _files.set(id, text); }
+export function getAllFiles(): Record<string, string> { return Object.fromEntries(_files); }
 
 export function clear(): void {
-  _text = null;
-  _fileName = null;
+  _files.clear();
+  _folderName = null;
 }

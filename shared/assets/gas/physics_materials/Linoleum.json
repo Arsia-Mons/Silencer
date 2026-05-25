@@ -1,0 +1,7 @@
+{
+  "id": "Linoleum",
+  "friction": 0.95,
+  "speedMult": 1.0,
+  "footstepL": "futstonl.wav",
+  "footstepR": "futstonr.wav"
+}

@@ -1,0 +1,7 @@
+{
+  "id": "EnergyForcefield",
+  "friction": 0.5,
+  "speedMult": 1.2,
+  "footstepL": "futstonl.wav",
+  "footstepR": "futstonr.wav"
+}

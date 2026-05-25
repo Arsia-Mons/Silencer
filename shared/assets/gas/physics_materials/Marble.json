@@ -1,0 +1,7 @@
+{
+  "id": "Marble",
+  "friction": 0.7,
+  "speedMult": 1.0,
+  "footstepL": "futstonl.wav",
+  "footstepR": "futstonr.wav"
+}

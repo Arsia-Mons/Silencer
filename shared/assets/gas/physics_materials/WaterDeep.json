@@ -1,0 +1,7 @@
+{
+  "id": "WaterDeep",
+  "friction": 2.0,
+  "speedMult": 0.55,
+  "footstepL": "futstonl.wav",
+  "footstepR": "futstonr.wav"
+}

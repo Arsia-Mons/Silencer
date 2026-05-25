@@ -1,0 +1,7 @@
+{
+  "id": "Ice",
+  "friction": 0.1,
+  "speedMult": 1.1,
+  "footstepL": "futstonl.wav",
+  "footstepR": "futstonr.wav"
+}

@@ -1,0 +1,7 @@
+{
+  "id": "Puddle",
+  "friction": 0.8,
+  "speedMult": 0.95,
+  "footstepL": "futstonl.wav",
+  "footstepR": "futstonr.wav"
+}

@@ -1,0 +1,7 @@
+{
+  "id": "Tile",
+  "friction": 0.9,
+  "speedMult": 1.0,
+  "footstepL": "futstonl.wav",
+  "footstepR": "futstonr.wav"
+}

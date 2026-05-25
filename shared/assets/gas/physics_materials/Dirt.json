@@ -1,0 +1,9 @@
+{
+  "id": "Dirt",
+  "friction": 1.3,
+  "speedMult": 0.9,
+  "footstepL": "futstonl.wav",
+  "footstepR": "futstonr.wav",
+  "footstepStairL": "stostep1.wav",
+  "footstepStairR": "stostepr.wav"
+}

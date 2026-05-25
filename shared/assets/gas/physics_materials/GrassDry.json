@@ -1,0 +1,7 @@
+{
+  "id": "GrassDry",
+  "friction": 1.2,
+  "speedMult": 0.9,
+  "footstepL": "futstonl.wav",
+  "footstepR": "futstonr.wav"
+}

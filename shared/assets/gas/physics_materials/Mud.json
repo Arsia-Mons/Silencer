@@ -1,0 +1,7 @@
+{
+  "id": "Mud",
+  "friction": 2.5,
+  "speedMult": 0.65,
+  "footstepL": "futstonl.wav",
+  "footstepR": "futstonr.wav"
+}

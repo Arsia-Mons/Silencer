@@ -1,0 +1,9 @@
+{
+  "id": "Asphalt",
+  "friction": 1.0,
+  "speedMult": 1.0,
+  "footstepL": "futstonl.wav",
+  "footstepR": "futstonr.wav",
+  "footstepStairL": "stostep1.wav",
+  "footstepStairR": "stostepr.wav"
+}
