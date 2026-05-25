@@ -33,6 +33,7 @@ using silencer::ui::primitives::ButtonVariant;
 using silencer::ui::primitives::Text;
 using silencer::ui::primitives::TextEffect;
 using silencer::ui::primitives::TextSize;
+using silencer::ui::primitives::MeasureText;
 using silencer::ui::primitives::ScrollTextBox;
 using silencer::ui::primitives::ScrollTextBoxLine;
 using silencer::ui::primitives::ScrollTextBoxOrigin;
@@ -47,6 +48,9 @@ constexpr int kPanelW = 628;
 constexpr int kPanelH = 441;
 constexpr uint16_t kSummaryW = 180;
 constexpr uint16_t kSummaryH = 300;
+// Legacy TextBox scroll math used the 300px logical viewport while drawing
+// one extra line at the lower edge. Keep layout rendering separate from that
+// scroll limit so the restored screen matches the pre-Clay frame.
 constexpr uint16_t kSummaryRenderH = 308;
 constexpr uint8_t kLineH = 11;
 constexpr int kTitleCenterX = 192;
@@ -64,6 +68,17 @@ constexpr int kUpgradeButtonX = 372;
 constexpr int kUpgradeButtonY = 108;
 constexpr int kDoneButtonX = 372;
 constexpr int kDoneButtonY = 388;
+constexpr int kButtonW = 196;
+constexpr int kButtonH = 33;
+constexpr int kTextLineH = 14;
+constexpr int kTitleW = 180;
+constexpr int kTitleH = 24;
+constexpr int kXpW = 160;
+constexpr int kXpH = 28;
+constexpr int kBannerW = 160;
+constexpr int kBannerH = 16;
+constexpr int kLevelLabelW = 160;
+constexpr int kLevelValueW = 24;
 constexpr int kMaxSummaryLines = 256;
 constexpr const char * kActionDone = "mission_summary.done";
 constexpr const char * kActionUpgradePrefix = "mission_summary.upgrade.";
@@ -140,16 +155,83 @@ int RelativeY(int screenY)
 	return screenY - kFrameMarginTop;
 }
 
-int TextWidth(const std::string & value, TextSize size)
+Clay_ElementDeclaration FloatingElement(Clay_ElementId id,
+                                        int screenX,
+                                        int screenY,
+                                        int width,
+                                        int height)
 {
-	return static_cast<int>(value.size()) * static_cast<int>(
-		silencer::ui::primitives::TextAdvance(size));
+	return {
+		.id = id,
+		.layout = {
+			.sizing = { CLAY_SIZING_FIXED(static_cast<float>(width)),
+			            CLAY_SIZING_FIXED(static_cast<float>(height)) },
+		},
+		.floating = {
+			.offset = { static_cast<float>(RelativeX(screenX)),
+			            static_cast<float>(RelativeY(screenY)) },
+			.zIndex = 1,
+			.attachPoints = { .element = CLAY_ATTACH_POINT_LEFT_TOP,
+			                  .parent = CLAY_ATTACH_POINT_LEFT_TOP },
+			.pointerCaptureMode = CLAY_POINTER_CAPTURE_MODE_PASSTHROUGH,
+			.attachTo = CLAY_ATTACH_TO_PARENT,
+		},
+	};
 }
 
-int TextWidth(const char * value, TextSize size)
+int TextPixelWidth(Clay_String value, TextSize size)
 {
-	return static_cast<int>(std::strlen(value)) * static_cast<int>(
-		silencer::ui::primitives::TextAdvance(size));
+	return static_cast<int>(MeasureText(value, size).width);
+}
+
+int CenteredTextX(int centerX, Clay_String value, TextSize size)
+{
+	return centerX - TextPixelWidth(value, size) / 2;
+}
+
+int RightAlignedTextX(int rightX, Clay_String value, TextSize size)
+{
+	return rightX - TextPixelWidth(value, size);
+}
+
+void BuildUpgradeRow(int index,
+                     int level,
+                     bool canUpgrade,
+                     silencer::ui::UiInteractionRegistry& interactions)
+{
+	const int rowY = kLevelStartY + index * kLevelRowGap;
+	CLAY(FloatingElement(CLAY_IDI("MissionSummaryUpgradeLabel", (uint32_t)index),
+	                     kLevelLabelX, rowY, kLevelLabelW, kTextLineH)) {
+		Text(FromCStr(kLevelLabels[index]), { .size = TextSize::Body });
+	}
+
+	std::string levelText = std::to_string(level);
+	const int valueX = RightAlignedTextX(kLevelValueRightX,
+	                                     FromStd(levelText),
+	                                     TextSize::Body);
+	CLAY(FloatingElement(CLAY_IDI("MissionSummaryUpgradeValue", (uint32_t)index),
+	                     valueX, rowY, kLevelValueW, kTextLineH)) {
+		Text(FromStd(levelText), { .size = TextSize::Body });
+	}
+
+	if(!canUpgrade) return;
+
+	std::string actionId = std::string(kActionUpgradePrefix) +
+		std::to_string(index);
+	std::string buttonId = "MissionSummaryUpgradeButton" +
+		std::to_string(index);
+	CLAY(FloatingElement(CLAY_IDI("MissionSummaryUpgradeButtonWrap",
+	                              (uint32_t)index),
+	                     kUpgradeButtonX,
+	                     kUpgradeButtonY + index * kLevelRowGap,
+	                     kButtonW,
+	                     kButtonH)) {
+		Button(FromStd(buttonId),
+		       FromCStr(kUpgradeLabels[index]),
+		       ButtonOpts{ .variant = ButtonVariant::Oval,
+		                   .size = ButtonSize::Md },
+		       ButtonHandle{ nullptr, actionId.c_str(), &interactions });
+	}
 }
 
 } // namespace mission_summary_screen_detail
@@ -210,12 +292,14 @@ void MissionSummaryScreen::BuildUi(ScreenContext & ctx, Surface & dst, float fra
 
 	int lineCount = mission_summary_screen_detail::FillSummarySlab(summaryLines);
 	std::string xp = "+ " + std::to_string(experience) + " XP";
-	const int titleX = mission_summary_screen_detail::kTitleCenterX -
-		mission_summary_screen_detail::TextWidth(
-			"Mission Summary", mission_summary_screen_detail::TextSize::ScreenTitle) / 2;
-	const int xpX = mission_summary_screen_detail::kXpCenterX -
-		mission_summary_screen_detail::TextWidth(
-			xp, mission_summary_screen_detail::TextSize::Prompt) / 2;
+	const int titleX = mission_summary_screen_detail::CenteredTextX(
+		mission_summary_screen_detail::kTitleCenterX,
+		CLAY_STRING("Mission Summary"),
+		mission_summary_screen_detail::TextSize::ScreenTitle);
+	const int xpX = mission_summary_screen_detail::CenteredTextX(
+		mission_summary_screen_detail::kXpCenterX,
+		mission_summary_screen_detail::FromStd(xp),
+		mission_summary_screen_detail::TextSize::Prompt);
 
 	CLAY({ .id = CLAY_ID("MissionSummaryRoot"),
 	       .layout = {
@@ -239,36 +323,21 @@ void MissionSummaryScreen::BuildUi(ScreenContext & ctx, Surface & dst, float fra
 			                       CLAY_SIZING_FIXED(mission_summary_screen_detail::kPanelH) },
 			       },
 			       .image = { .imageData = PackImageStretch(7, 5) } }) {
-				CLAY({ .id = CLAY_ID("MissionSummaryTitle"),
-				       .layout = {
-				           .sizing = { CLAY_SIZING_FIXED(180), CLAY_SIZING_FIXED(24) },
-				       },
-				       .floating = {
-				           .offset = { static_cast<float>(mission_summary_screen_detail::RelativeX(titleX)),
-				                       static_cast<float>(mission_summary_screen_detail::RelativeY(mission_summary_screen_detail::kTitleY)) },
-				           .zIndex = 1,
-				           .attachPoints = { .element = CLAY_ATTACH_POINT_LEFT_TOP,
-				                             .parent = CLAY_ATTACH_POINT_LEFT_TOP },
-				           .pointerCaptureMode = CLAY_POINTER_CAPTURE_MODE_PASSTHROUGH,
-				           .attachTo = CLAY_ATTACH_TO_PARENT,
-				       } }) {
+				CLAY(mission_summary_screen_detail::FloatingElement(
+					CLAY_ID("MissionSummaryTitle"),
+					titleX,
+					mission_summary_screen_detail::kTitleY,
+					mission_summary_screen_detail::kTitleW,
+					mission_summary_screen_detail::kTitleH)) {
 					mission_summary_screen_detail::Text(CLAY_STRING("Mission Summary"),
 					                                    { .size = mission_summary_screen_detail::TextSize::ScreenTitle });
 				}
-				CLAY({ .id = CLAY_ID("MissionSummaryStats"),
-				       .layout = {
-				           .sizing = { CLAY_SIZING_FIXED(mission_summary_screen_detail::kSummaryW),
-				                       CLAY_SIZING_FIXED(mission_summary_screen_detail::kSummaryRenderH) },
-				       },
-				       .floating = {
-				           .offset = { static_cast<float>(mission_summary_screen_detail::RelativeX(mission_summary_screen_detail::kSummaryX)),
-				                       static_cast<float>(mission_summary_screen_detail::RelativeY(mission_summary_screen_detail::kSummaryY)) },
-				           .zIndex = 1,
-				           .attachPoints = { .element = CLAY_ATTACH_POINT_LEFT_TOP,
-				                             .parent = CLAY_ATTACH_POINT_LEFT_TOP },
-				           .pointerCaptureMode = CLAY_POINTER_CAPTURE_MODE_PASSTHROUGH,
-				           .attachTo = CLAY_ATTACH_TO_PARENT,
-				       } }) {
+				CLAY(mission_summary_screen_detail::FloatingElement(
+					CLAY_ID("MissionSummaryStats"),
+					mission_summary_screen_detail::kSummaryX,
+					mission_summary_screen_detail::kSummaryY,
+					mission_summary_screen_detail::kSummaryW,
+					mission_summary_screen_detail::kSummaryRenderH)) {
 					mission_summary_screen_detail::ScrollTextBox(
 						CLAY_STRING("MissionSummaryStatsText"),
 						mission_summary_screen_detail::g_summarySlab, lineCount,
@@ -279,19 +348,12 @@ void MissionSummaryScreen::BuildUi(ScreenContext & ctx, Surface & dst, float fra
 						  .text = { .size = mission_summary_screen_detail::TextSize::Body },
 						  .origin = mission_summary_screen_detail::ScrollTextBoxOrigin::TopDown });
 				}
-				CLAY({ .id = CLAY_ID("MissionSummaryDoneButtonWrap"),
-				       .layout = {
-				           .sizing = { CLAY_SIZING_FIXED(196), CLAY_SIZING_FIXED(33) },
-				       },
-				       .floating = {
-				           .offset = { static_cast<float>(mission_summary_screen_detail::RelativeX(mission_summary_screen_detail::kDoneButtonX)),
-				                       static_cast<float>(mission_summary_screen_detail::RelativeY(mission_summary_screen_detail::kDoneButtonY)) },
-				           .zIndex = 1,
-				           .attachPoints = { .element = CLAY_ATTACH_POINT_LEFT_TOP,
-				                             .parent = CLAY_ATTACH_POINT_LEFT_TOP },
-				           .pointerCaptureMode = CLAY_POINTER_CAPTURE_MODE_PASSTHROUGH,
-				           .attachTo = CLAY_ATTACH_TO_PARENT,
-				       } }) {
+				CLAY(mission_summary_screen_detail::FloatingElement(
+					CLAY_ID("MissionSummaryDoneButtonWrap"),
+					mission_summary_screen_detail::kDoneButtonX,
+					mission_summary_screen_detail::kDoneButtonY,
+					mission_summary_screen_detail::kButtonW,
+					mission_summary_screen_detail::kButtonH)) {
 					mission_summary_screen_detail::Button(
 						CLAY_STRING("MissionSummaryDoneButton"), CLAY_STRING("Done"),
 						mission_summary_screen_detail::ButtonOpts{
@@ -299,41 +361,28 @@ void MissionSummaryScreen::BuildUi(ScreenContext & ctx, Surface & dst, float fra
 							.size = mission_summary_screen_detail::ButtonSize::Md },
 						mission_summary_screen_detail::ButtonHandle{ nullptr, mission_summary_screen_detail::kActionDone, &interactions });
 				}
-				CLAY({ .id = CLAY_ID("MissionSummaryXp"),
-				       .layout = {
-				           .sizing = { CLAY_SIZING_FIXED(160), CLAY_SIZING_FIXED(28) },
-				       },
-				       .floating = {
-				           .offset = { static_cast<float>(mission_summary_screen_detail::RelativeX(xpX)),
-				                       static_cast<float>(mission_summary_screen_detail::RelativeY(mission_summary_screen_detail::kXpY)) },
-				           .zIndex = 1,
-				           .attachPoints = { .element = CLAY_ATTACH_POINT_LEFT_TOP,
-				                             .parent = CLAY_ATTACH_POINT_LEFT_TOP },
-				           .pointerCaptureMode = CLAY_POINTER_CAPTURE_MODE_PASSTHROUGH,
-				           .attachTo = CLAY_ATTACH_TO_PARENT,
-				       } }) {
+				CLAY(mission_summary_screen_detail::FloatingElement(
+					CLAY_ID("MissionSummaryXp"),
+					xpX,
+					mission_summary_screen_detail::kXpY,
+					mission_summary_screen_detail::kXpW,
+					mission_summary_screen_detail::kXpH)) {
 					mission_summary_screen_detail::Text(
 						mission_summary_screen_detail::FromStd(xp),
 						{ .size = mission_summary_screen_detail::TextSize::Prompt });
 				}
 				if(upgradeBanner){
 					const char * banner = "*NEW UPGRADE AVAILABLE*";
-					const int bannerX = mission_summary_screen_detail::kXpCenterX -
-						mission_summary_screen_detail::TextWidth(
-							banner, mission_summary_screen_detail::TextSize::Body) / 2;
-					CLAY({ .id = CLAY_ID("MissionSummaryUpgradeBanner"),
-					       .layout = {
-					           .sizing = { CLAY_SIZING_FIXED(160), CLAY_SIZING_FIXED(16) },
-					       },
-					       .floating = {
-					           .offset = { static_cast<float>(mission_summary_screen_detail::RelativeX(bannerX)),
-					                       static_cast<float>(mission_summary_screen_detail::RelativeY(mission_summary_screen_detail::kUpgradeBannerY)) },
-					           .zIndex = 1,
-					           .attachPoints = { .element = CLAY_ATTACH_POINT_LEFT_TOP,
-					                             .parent = CLAY_ATTACH_POINT_LEFT_TOP },
-					           .pointerCaptureMode = CLAY_POINTER_CAPTURE_MODE_PASSTHROUGH,
-					           .attachTo = CLAY_ATTACH_TO_PARENT,
-					       } }) {
+					const int bannerX = mission_summary_screen_detail::CenteredTextX(
+						mission_summary_screen_detail::kXpCenterX,
+						mission_summary_screen_detail::FromCStr(banner),
+						mission_summary_screen_detail::TextSize::Body);
+					CLAY(mission_summary_screen_detail::FloatingElement(
+						CLAY_ID("MissionSummaryUpgradeBanner"),
+						bannerX,
+						mission_summary_screen_detail::kUpgradeBannerY,
+						mission_summary_screen_detail::kBannerW,
+						mission_summary_screen_detail::kBannerH)) {
 						mission_summary_screen_detail::Text(
 							mission_summary_screen_detail::FromCStr(banner),
 							{ .size = mission_summary_screen_detail::TextSize::Body,
@@ -342,71 +391,8 @@ void MissionSummaryScreen::BuildUi(ScreenContext & ctx, Surface & dst, float fra
 					}
 				}
 				for(int i = 0; i < 6; i++){
-					const int rowY = mission_summary_screen_detail::kLevelStartY +
-						i * mission_summary_screen_detail::kLevelRowGap;
-					CLAY({ .id = CLAY_IDI("MissionSummaryUpgradeLabel", (uint32_t)i),
-					       .layout = {
-					           .sizing = { CLAY_SIZING_FIXED(160), CLAY_SIZING_FIXED(14) },
-					       },
-					       .floating = {
-					           .offset = { static_cast<float>(mission_summary_screen_detail::RelativeX(mission_summary_screen_detail::kLevelLabelX)),
-					                       static_cast<float>(mission_summary_screen_detail::RelativeY(rowY)) },
-					           .zIndex = 1,
-					           .attachPoints = { .element = CLAY_ATTACH_POINT_LEFT_TOP,
-					                             .parent = CLAY_ATTACH_POINT_LEFT_TOP },
-					           .pointerCaptureMode = CLAY_POINTER_CAPTURE_MODE_PASSTHROUGH,
-					           .attachTo = CLAY_ATTACH_TO_PARENT,
-					       } }) {
-						mission_summary_screen_detail::Text(
-							mission_summary_screen_detail::FromCStr(mission_summary_screen_detail::kLevelLabels[i]),
-							{ .size = mission_summary_screen_detail::TextSize::Body });
-					}
-					std::string level = std::to_string(levels[i]);
-					const int valueX = mission_summary_screen_detail::kLevelValueRightX -
-						mission_summary_screen_detail::TextWidth(
-							level, mission_summary_screen_detail::TextSize::Body);
-					CLAY({ .id = CLAY_IDI("MissionSummaryUpgradeValue", (uint32_t)i),
-					       .layout = {
-					           .sizing = { CLAY_SIZING_FIXED(24), CLAY_SIZING_FIXED(14) },
-					       },
-					       .floating = {
-					           .offset = { static_cast<float>(mission_summary_screen_detail::RelativeX(valueX)),
-					                       static_cast<float>(mission_summary_screen_detail::RelativeY(rowY)) },
-					           .zIndex = 1,
-					           .attachPoints = { .element = CLAY_ATTACH_POINT_LEFT_TOP,
-					                             .parent = CLAY_ATTACH_POINT_LEFT_TOP },
-					           .pointerCaptureMode = CLAY_POINTER_CAPTURE_MODE_PASSTHROUGH,
-					           .attachTo = CLAY_ATTACH_TO_PARENT,
-					       } }) {
-						mission_summary_screen_detail::Text(
-							mission_summary_screen_detail::FromStd(level),
-							{ .size = mission_summary_screen_detail::TextSize::Body });
-					}
-					if(upgradesAvailable[i]){
-						std::string actionId = std::string(mission_summary_screen_detail::kActionUpgradePrefix) + std::to_string(i);
-						std::string buttonId = "MissionSummaryUpgradeButton" + std::to_string(i);
-						CLAY({ .id = CLAY_IDI("MissionSummaryUpgradeButtonWrap", (uint32_t)i),
-						       .layout = {
-						           .sizing = { CLAY_SIZING_FIXED(196), CLAY_SIZING_FIXED(33) },
-						       },
-						       .floating = {
-						           .offset = { static_cast<float>(mission_summary_screen_detail::RelativeX(mission_summary_screen_detail::kUpgradeButtonX)),
-						                       static_cast<float>(mission_summary_screen_detail::RelativeY(mission_summary_screen_detail::kUpgradeButtonY + i * mission_summary_screen_detail::kLevelRowGap)) },
-						           .zIndex = 1,
-						           .attachPoints = { .element = CLAY_ATTACH_POINT_LEFT_TOP,
-						                             .parent = CLAY_ATTACH_POINT_LEFT_TOP },
-						           .pointerCaptureMode = CLAY_POINTER_CAPTURE_MODE_PASSTHROUGH,
-						           .attachTo = CLAY_ATTACH_TO_PARENT,
-						       } }) {
-							mission_summary_screen_detail::Button(
-								mission_summary_screen_detail::FromStd(buttonId),
-								mission_summary_screen_detail::FromCStr(mission_summary_screen_detail::kUpgradeLabels[i]),
-								mission_summary_screen_detail::ButtonOpts{
-									.variant = mission_summary_screen_detail::ButtonVariant::Oval,
-									.size = mission_summary_screen_detail::ButtonSize::Md },
-								mission_summary_screen_detail::ButtonHandle{ nullptr, actionId.c_str(), &interactions });
-						}
-					}
+					mission_summary_screen_detail::BuildUpgradeRow(
+						i, levels[i], upgradesAvailable[i], interactions);
 				}
 			}
 		}
