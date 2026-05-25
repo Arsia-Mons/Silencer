@@ -83,8 +83,8 @@ export default function PhysicsMaterialsPage() {
       } catch {
         setSaveErr('Invalid JSON file.');
       }
-    });
-    e.target.value = '';
+      e.target.value = '';
+    }).catch(() => setSaveErr('Failed to read file.'));
   }
 
   function handleClose() {
@@ -152,11 +152,11 @@ export default function PhysicsMaterialsPage() {
   const mat = data?.physicsMaterials.find(m => m.id === selected) ?? null;
 
   return (
-    <div className="flex h-screen bg-game-dark text-game-text font-mono overflow-hidden">
+    <div className="flex h-screen bg-game-bg text-game-text font-mono overflow-hidden">
       <Sidebar />
+      <div className="flex flex-col flex-1 overflow-hidden">
       {/* Single file input — always mounted so ref is stable regardless of which button triggers it */}
       <input ref={fileInputRef} type="file" accept=".json" className="hidden" onChange={handleFilePicked} />
-      <div className="flex flex-col flex-1 overflow-hidden">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-3 border-b border-game-border bg-game-bgCard shrink-0">
           <div className="flex items-center gap-3">
