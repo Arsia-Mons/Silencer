@@ -80,8 +80,8 @@ export default function PhysicsMaterialsPage() {
         setSaveMsg('');
         store.load(file.name, text);
         setSelected(parsed.physicsMaterials[0]?.id ?? null);
-      } catch {
-        setSaveErr('Invalid JSON file.');
+      } catch (err) {
+        setSaveErr(`Parse error: ${err instanceof Error ? err.message : String(err)}`);
       }
       e.target.value = '';
     }).catch(() => setSaveErr('Failed to read file.'));
