@@ -595,6 +595,18 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 					: result.error));
 			return;
 		}
+		using Mode = silencer::client_ui::InGameUiControlMode;
+		if((controlMode == Mode::Chat || controlMode == Mode::All) &&
+		   cmd.args.contains("chat_line")){
+			std::string chatLine = cmd.args.value("chat_line", std::string());
+			if(!chatLine.empty()){
+				auto& chatlines = game.GetWorld().messaging.chatlines;
+				chatlines.push_back(chatLine);
+				while((int)chatlines.size() > GASLoader::Get().gameengine.chatMaxLines){
+					chatlines.pop_front();
+				}
+			}
+		}
 		cmd.reply->set_value(OkResult(cmd.id, InGameUiControlResultToJson(result)));
 		return;
 	}

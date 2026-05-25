@@ -555,6 +555,28 @@ Surface * ResolveSprite(::Resources & resources, Uint8 bank, Uint16 index) {
 	return src;
 }
 
+int SpriteWidth(::Resources & resources, Uint8 bank, Uint16 index) {
+	Surface * src = ResolveSprite(resources, bank, index);
+	return src ? src->w : 0;
+}
+
+int SpriteHeight(::Resources & resources, Uint8 bank, Uint16 index) {
+	Surface * src = ResolveSprite(resources, bank, index);
+	return src ? src->h : 0;
+}
+
+int SpriteOffsetX(::Resources & resources, Uint8 bank, Uint16 index) {
+	if(bank >= resources.spriteoffsetx.size()) return 0;
+	if(index >= resources.spriteoffsetx[bank].size()) return 0;
+	return resources.spriteoffsetx[bank][index];
+}
+
+int SpriteOffsetY(::Resources & resources, Uint8 bank, Uint16 index) {
+	if(bank >= resources.spriteoffsety.size()) return 0;
+	if(index >= resources.spriteoffsety[bank].size()) return 0;
+	return resources.spriteoffsety[bank][index];
+}
+
 bool BlitClipped(Surface * src,
                  Renderer::Rect srcRect,
                  Surface * dst,
@@ -669,6 +691,65 @@ void DispatchButtonNineSlice(::Resources & resources,
 	            dst, x + w - dstRight, y + h - dstBottom);
 
 	if(work != src) delete work;
+}
+
+void BlitMessageBackgroundSprite(::Resources & resources,
+                                 Surface * dst,
+                                 Uint16 index,
+                                 Renderer::Rect srcRect,
+                                 int logicalX,
+                                 int logicalY) {
+	Surface * src = ResolveSprite(resources, 188, index);
+	if(!src) return;
+	if(srcRect.w <= 0) srcRect.w = src->w;
+	if(srcRect.h <= 0) srcRect.h = src->h;
+	BlitClipped(src, srcRect, dst,
+	            logicalX - SpriteOffsetX(resources, 188, index),
+	            logicalY - SpriteOffsetY(resources, 188, index));
+}
+
+void DispatchMessageBackground(::Resources & resources,
+                               Surface * dst,
+                               const ::Clay_BoundingBox & bb,
+                               const MessageBackgroundPayload * payload) {
+	int x = static_cast<int>(bb.x);
+	int y = static_cast<int>(bb.y);
+	int w = static_cast<int>(bb.width);
+	int visibleH = static_cast<int>(bb.height);
+	int interiorH = payload ? static_cast<int>(payload->interiorHeight) : visibleH;
+	if(w <= 0 || visibleH <= 0 || interiorH <= 0) return;
+
+	Renderer::Rect srcRect{0, 0, 0, 0};
+	BlitMessageBackgroundSprite(resources, dst, 0, srcRect, x, y);
+
+	int xOffset = SpriteWidth(resources, 188, 0);
+	const int rightCapX = 36;
+	while(xOffset < w - SpriteWidth(resources, 188, 2)){
+		int tileW = w - xOffset - rightCapX;
+		int maxTileW = SpriteWidth(resources, 188, 1);
+		if(maxTileW <= 0) break;
+		if(tileW > maxTileW) tileW = maxTileW;
+		if(tileW <= 0) break;
+		Renderer::Rect tile{tileW, SpriteHeight(resources, 188, 1), 0, 0};
+		BlitMessageBackgroundSprite(resources, dst, 1, tile, x + xOffset, y);
+		xOffset += tileW;
+	}
+	BlitMessageBackgroundSprite(resources, dst, 2, srcRect, x + w - rightCapX, y);
+
+	xOffset = SpriteWidth(resources, 188, 6);
+	const int bottomY = y + interiorH;
+	BlitMessageBackgroundSprite(resources, dst, 6, srcRect, x, bottomY);
+	while(xOffset < w - SpriteWidth(resources, 188, 8)){
+		int tileW = w - xOffset - rightCapX;
+		int maxTileW = SpriteWidth(resources, 188, 7);
+		if(maxTileW <= 0) break;
+		if(tileW > maxTileW) tileW = maxTileW;
+		if(tileW <= 0) break;
+		Renderer::Rect tile{tileW, SpriteHeight(resources, 188, 7), 0, 0};
+		BlitMessageBackgroundSprite(resources, dst, 7, tile, x + xOffset, bottomY);
+		xOffset += tileW;
+	}
+	BlitMessageBackgroundSprite(resources, dst, 8, srcRect, x + w - rightCapX, bottomY);
 }
 
 void OutlineVisiblePixels(::Renderer & renderer,
@@ -915,6 +996,12 @@ void RenderInto(::Resources & resources, ::Renderer & renderer,
 							p->pixels, p->pixels + (static_cast<size_t>(p->width) * p->height));
 						Renderer::Rect dstrect{w, h, x, y};
 						Renderer::BlitSurface(&srcsurface, nullptr, dst, &dstrect);
+						break;
+					}
+					case CustomKind::MessageBackground: {
+						const auto * p =
+							reinterpret_cast<const MessageBackgroundPayload *>(ccd->payload);
+						DispatchMessageBackground(resources, dst, c->boundingBox, p);
 						break;
 					}
 					case CustomKind::ScrollBar: {

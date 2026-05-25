@@ -17,6 +17,12 @@ silencer::clay_bridge::TeamEmblemPayload g_teamEmblemPayloads[kTeamEmblemPayload
 silencer::clay_bridge::ClayCustomData    g_teamEmblemCustomData[kTeamEmblemPayloadCapacity];
 int g_teamEmblemPayloadCount = 0;
 
+silencer::clay_bridge::MessageBackgroundPayload g_messageBackgroundPayload{};
+silencer::clay_bridge::ClayCustomData g_messageBackgroundCustomData{
+	silencer::clay_bridge::CustomKind::MessageBackground,
+	&g_messageBackgroundPayload,
+};
+
 constexpr int kStringArenaCapacity = 65536;
 char g_stringArena[kStringArenaCapacity];
 int g_stringArenaOffset = 0;
@@ -75,6 +81,12 @@ silencer::clay_bridge::ClayCustomData* AllocTeamEmblemCustomData(
 		&hudpayloadarena_detail::g_teamEmblemPayloads[hudpayloadarena_detail::g_teamEmblemPayloadCount],
 	};
 	return &hudpayloadarena_detail::g_teamEmblemCustomData[hudpayloadarena_detail::g_teamEmblemPayloadCount++];
+}
+
+silencer::clay_bridge::ClayCustomData* AllocMessageBackgroundCustomData(
+	silencer::clay_bridge::MessageBackgroundPayload payload) {
+	hudpayloadarena_detail::g_messageBackgroundPayload = payload;
+	return &hudpayloadarena_detail::g_messageBackgroundCustomData;
 }
 
 }  // namespace client_ui

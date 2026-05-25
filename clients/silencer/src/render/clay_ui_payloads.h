@@ -56,11 +56,16 @@ enum class CustomKind : Uint8 {
 	Sprite,
 	TeamEmblem,
 	Surface,
+	MessageBackground,
 };
 
 struct ClayCustomData {
 	CustomKind kind;
 	void * payload;
+};
+
+struct MessageBackgroundPayload {
+	Uint16 interiorHeight;
 };
 
 struct ButtonSpritePayload {
