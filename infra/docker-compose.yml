@@ -55,7 +55,7 @@ services:
       - "-public-addr"
       - "${PUBLIC_ADDR:-127.0.0.1}"
       - "-version"
-      - "00054"
+      - "00055"
       - "-db"
       - "/data/lobby.json"
       - "-game-binary"
