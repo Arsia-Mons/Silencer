@@ -31,25 +31,56 @@ using silencer::ui::primitives::ButtonOpts;
 using silencer::ui::primitives::ButtonSize;
 using silencer::ui::primitives::ButtonVariant;
 using silencer::ui::primitives::Text;
-using silencer::ui::primitives::TextBeginFrame;
 using silencer::ui::primitives::TextEffect;
 using silencer::ui::primitives::TextSize;
+using silencer::ui::primitives::MeasureText;
 using silencer::ui::primitives::ScrollTextBox;
-using silencer::ui::primitives::ScrollTextBoxBeginFrame;
 using silencer::ui::primitives::ScrollTextBoxLine;
 using silencer::ui::primitives::ScrollTextBoxOrigin;
 
-constexpr uint16_t kRootPadX = 52;
-constexpr uint16_t kRootPadY = 42;
-constexpr uint16_t kLeftW = 242;
-constexpr uint16_t kRightW = 258;
+constexpr int kStageW = 640;
+constexpr int kStageH = 480;
+constexpr int kFrameMarginLeft = 5;
+constexpr int kFrameMarginRight = 7;
+constexpr int kFrameMarginTop = 19;
+constexpr int kFrameMarginBottom = 20;
+constexpr int kPanelW = 628;
+constexpr int kPanelH = 441;
 constexpr uint16_t kSummaryW = 180;
 constexpr uint16_t kSummaryH = 300;
+// Legacy TextBox scroll math used the 300px logical viewport while drawing
+// one extra line at the lower edge. Keep layout rendering separate from that
+// scroll limit so the restored screen matches the pre-Clay frame.
+constexpr uint16_t kSummaryRenderH = 308;
 constexpr uint8_t kLineH = 11;
+constexpr int kTitleCenterX = 192;
+constexpr int kTitleY = 44;
+constexpr int kSummaryX = 89;
+constexpr int kSummaryY = 92;
+constexpr int kXpCenterX = 467;
+constexpr int kXpY = 45;
+constexpr int kUpgradeBannerY = 77;
+constexpr int kLevelLabelX = 390;
+constexpr int kLevelValueRightX = 556;
+constexpr int kLevelStartY = 97;
+constexpr int kLevelRowGap = 46;
+constexpr int kUpgradeButtonX = 372;
+constexpr int kUpgradeButtonY = 108;
+constexpr int kDoneButtonX = 372;
+constexpr int kDoneButtonY = 388;
+constexpr int kButtonW = 196;
+constexpr int kButtonH = 33;
+constexpr int kTextLineH = 14;
+constexpr int kTitleW = 180;
+constexpr int kTitleH = 24;
+constexpr int kXpW = 160;
+constexpr int kXpH = 28;
+constexpr int kBannerW = 160;
+constexpr int kBannerH = 16;
+constexpr int kLevelLabelW = 160;
+constexpr int kLevelValueW = 24;
 constexpr int kMaxSummaryLines = 256;
 constexpr const char * kActionDone = "mission_summary.done";
-constexpr const char * kActionScrollUp = "mission_summary.scroll_up";
-constexpr const char * kActionScrollDown = "mission_summary.scroll_down";
 constexpr const char * kActionUpgradePrefix = "mission_summary.upgrade.";
 ScrollTextBoxLine g_summarySlab[kMaxSummaryLines];
 
@@ -113,6 +144,96 @@ int FillSummarySlab(const std::vector<std::string> & lines)
 	}
 	return count;
 }
+
+int RelativeX(int screenX)
+{
+	return screenX - kFrameMarginLeft;
+}
+
+int RelativeY(int screenY)
+{
+	return screenY - kFrameMarginTop;
+}
+
+Clay_ElementDeclaration FloatingElement(Clay_ElementId id,
+                                        int screenX,
+                                        int screenY,
+                                        int width,
+                                        int height)
+{
+	return {
+		.id = id,
+		.layout = {
+			.sizing = { CLAY_SIZING_FIXED(static_cast<float>(width)),
+			            CLAY_SIZING_FIXED(static_cast<float>(height)) },
+		},
+		.floating = {
+			.offset = { static_cast<float>(RelativeX(screenX)),
+			            static_cast<float>(RelativeY(screenY)) },
+			.zIndex = 1,
+			.attachPoints = { .element = CLAY_ATTACH_POINT_LEFT_TOP,
+			                  .parent = CLAY_ATTACH_POINT_LEFT_TOP },
+			.pointerCaptureMode = CLAY_POINTER_CAPTURE_MODE_PASSTHROUGH,
+			.attachTo = CLAY_ATTACH_TO_PARENT,
+		},
+	};
+}
+
+int TextPixelWidth(Clay_String value, TextSize size)
+{
+	return static_cast<int>(MeasureText(value, size).width);
+}
+
+int CenteredTextX(int centerX, Clay_String value, TextSize size)
+{
+	return centerX - TextPixelWidth(value, size) / 2;
+}
+
+int RightAlignedTextX(int rightX, Clay_String value, TextSize size)
+{
+	return rightX - TextPixelWidth(value, size);
+}
+
+void BuildUpgradeRow(int index,
+                     int level,
+                     bool canUpgrade,
+                     silencer::ui::UiInteractionRegistry& interactions)
+{
+	const int rowY = kLevelStartY + index * kLevelRowGap;
+	CLAY(FloatingElement(CLAY_IDI("MissionSummaryUpgradeLabel", (uint32_t)index),
+	                     kLevelLabelX, rowY, kLevelLabelW, kTextLineH)) {
+		Text(FromCStr(kLevelLabels[index]), { .size = TextSize::Body });
+	}
+
+	std::string levelText = std::to_string(level);
+	const int valueX = RightAlignedTextX(kLevelValueRightX,
+	                                     FromStd(levelText),
+	                                     TextSize::Body);
+	CLAY(FloatingElement(CLAY_IDI("MissionSummaryUpgradeValue", (uint32_t)index),
+	                     valueX, rowY, kLevelValueW, kTextLineH)) {
+		Text(FromStd(levelText), { .size = TextSize::Body });
+	}
+
+	if(!canUpgrade) return;
+
+	std::string actionId = std::string(kActionUpgradePrefix) +
+		std::to_string(index);
+	std::string buttonId = "MissionSummaryUpgradeButton" +
+		std::to_string(index);
+	CLAY(FloatingElement(CLAY_IDI("MissionSummaryUpgradeButtonWrap",
+	                              (uint32_t)index),
+	                     kUpgradeButtonX,
+	                     kUpgradeButtonY + index * kLevelRowGap,
+	                     kButtonW,
+	                     kButtonH)) {
+		Button(FromStd(buttonId),
+		       FromCStr(kUpgradeLabels[index]),
+		       ButtonOpts{ .variant = ButtonVariant::Oval,
+		                   .size = ButtonSize::Md },
+		       ButtonHandle{ nullptr, actionId.c_str(), &interactions });
+	}
+}
+
 } // namespace mission_summary_screen_detail
 
 void MissionSummaryScreen::Build(ScreenContext & ctx)
@@ -171,116 +292,107 @@ void MissionSummaryScreen::BuildUi(ScreenContext & ctx, Surface & dst, float fra
 
 	int lineCount = mission_summary_screen_detail::FillSummarySlab(summaryLines);
 	std::string xp = "+ " + std::to_string(experience) + " XP";
+	const int titleX = mission_summary_screen_detail::CenteredTextX(
+		mission_summary_screen_detail::kTitleCenterX,
+		CLAY_STRING("Mission Summary"),
+		mission_summary_screen_detail::TextSize::ScreenTitle);
+	const int xpX = mission_summary_screen_detail::CenteredTextX(
+		mission_summary_screen_detail::kXpCenterX,
+		mission_summary_screen_detail::FromStd(xp),
+		mission_summary_screen_detail::TextSize::Prompt);
 
 	CLAY({ .id = CLAY_ID("MissionSummaryRoot"),
 	       .layout = {
 	           .sizing = { CLAY_SIZING_GROW(0),
 	                       CLAY_SIZING_GROW(0) },
-	           .padding = { mission_summary_screen_detail::kRootPadX, mission_summary_screen_detail::kRootPadX, mission_summary_screen_detail::kRootPadY, mission_summary_screen_detail::kRootPadY },
-	           .childGap = 42,
-	           .childAlignment = { CLAY_ALIGN_X_CENTER, CLAY_ALIGN_Y_TOP },
-	           .layoutDirection = CLAY_LEFT_TO_RIGHT,
+	           .childAlignment = { CLAY_ALIGN_X_CENTER, CLAY_ALIGN_Y_CENTER },
 	       },
 	       .image = { .imageData = PackImage(6, 0) } }) {
-		CLAY({ .id = CLAY_ID("MissionSummaryPanel"),
+		CLAY({ .id = CLAY_ID("MissionSummaryStage"),
 		       .layout = {
-		           .sizing = { CLAY_SIZING_FIXED(mission_summary_screen_detail::kLeftW),
-		                       CLAY_SIZING_FIXED(390) },
-		           .padding = { 26, 20, 20, 20 },
-		           .childGap = 12,
-		           .childAlignment = { CLAY_ALIGN_X_CENTER, CLAY_ALIGN_Y_TOP },
-		           .layoutDirection = CLAY_TOP_TO_BOTTOM,
-		       },
-		       .image = { .imageData = PackImage(7, 5) } }) {
-			mission_summary_screen_detail::Text(CLAY_STRING("Mission Summary"),
-			                                    { .size = mission_summary_screen_detail::TextSize::Title });
-			CLAY({ .id = CLAY_ID("MissionSummaryStatsRow"),
-			       .layout = {
-			           .sizing = { CLAY_SIZING_FIT(0), CLAY_SIZING_FIT(0) },
-			           .childGap = 10,
-			           .layoutDirection = CLAY_LEFT_TO_RIGHT,
-			       } }) {
-				mission_summary_screen_detail::ScrollTextBox(CLAY_STRING("MissionSummaryStats"),
-				              mission_summary_screen_detail::g_summarySlab, lineCount,
-				              static_cast<Uint16>(scrollPosition),
-				              { .width = mission_summary_screen_detail::kSummaryW,
-				                .height = mission_summary_screen_detail::kSummaryH,
-				                .lineHeight = mission_summary_screen_detail::kLineH,
-				                .text = { .size = mission_summary_screen_detail::TextSize::Body },
-				                .origin = mission_summary_screen_detail::ScrollTextBoxOrigin::TopDown });
-				CLAY({ .id = CLAY_ID("MissionSummaryScrollControls"),
-				       .layout = {
-				           .sizing = { CLAY_SIZING_FIXED(34), CLAY_SIZING_FIXED(mission_summary_screen_detail::kSummaryH) },
-				           .childGap = 20,
-				           .childAlignment = { CLAY_ALIGN_X_CENTER, CLAY_ALIGN_Y_CENTER },
-				           .layoutDirection = CLAY_TOP_TO_BOTTOM,
-				       } }) {
-					mission_summary_screen_detail::Button(CLAY_STRING("MissionSummaryScrollUpButton"), CLAY_STRING("Up"),
-					           mission_summary_screen_detail::ButtonOpts{ .variant = mission_summary_screen_detail::ButtonVariant::Ghost,
-					                                                  .size = mission_summary_screen_detail::ButtonSize::Auto,
-					                                                  .minWidth = 34,
-					                                                  .paddingY = 4 },
-					           mission_summary_screen_detail::ButtonHandle{ nullptr, mission_summary_screen_detail::kActionScrollUp, &interactions });
-					mission_summary_screen_detail::Button(CLAY_STRING("MissionSummaryScrollDownButton"), CLAY_STRING("Down"),
-					           mission_summary_screen_detail::ButtonOpts{ .variant = mission_summary_screen_detail::ButtonVariant::Ghost,
-					                                                  .size = mission_summary_screen_detail::ButtonSize::Auto,
-					                                                  .minWidth = 48,
-					                                                  .paddingY = 4 },
-					           mission_summary_screen_detail::ButtonHandle{ nullptr, mission_summary_screen_detail::kActionScrollDown, &interactions });
-				}
-			}
-			mission_summary_screen_detail::Button(CLAY_STRING("MissionSummaryDoneButton"), CLAY_STRING("Done"),
-			           mission_summary_screen_detail::ButtonOpts{ .variant = mission_summary_screen_detail::ButtonVariant::Chrome,
-			                                                   .size = mission_summary_screen_detail::ButtonSize::Compact },
-			           mission_summary_screen_detail::ButtonHandle{ nullptr, mission_summary_screen_detail::kActionDone, &interactions });
-		}
-		CLAY({ .id = CLAY_ID("MissionSummaryUpgrades"),
-		       .layout = {
-		           .sizing = { CLAY_SIZING_FIXED(mission_summary_screen_detail::kRightW),
-		                       CLAY_SIZING_FIXED(390) },
-		           .padding = { 12, 12, 6, 0 },
-		           .childGap = 16,
-		           .childAlignment = { CLAY_ALIGN_X_CENTER, CLAY_ALIGN_Y_TOP },
-		           .layoutDirection = CLAY_TOP_TO_BOTTOM,
+		           .sizing = { CLAY_SIZING_FIXED(mission_summary_screen_detail::kStageW),
+		                       CLAY_SIZING_FIXED(mission_summary_screen_detail::kStageH) },
+		           .padding = { mission_summary_screen_detail::kFrameMarginLeft,
+		                        mission_summary_screen_detail::kFrameMarginRight,
+		                        mission_summary_screen_detail::kFrameMarginTop,
+		                        mission_summary_screen_detail::kFrameMarginBottom },
 		       } }) {
-			mission_summary_screen_detail::Text(mission_summary_screen_detail::FromStd(xp),
-			                                    { .size = mission_summary_screen_detail::TextSize::Title });
-			if(upgradeBanner){
-				mission_summary_screen_detail::Text(CLAY_STRING("*NEW UPGRADE AVAILABLE*"),
-				         { .size = mission_summary_screen_detail::TextSize::Body,
-				           .effect = mission_summary_screen_detail::TextEffect::LegacyPalette(
-							   129, static_cast<Uint8>(160), true) });
-			}
-			for(int i = 0; i < 6; i++){
-				CLAY({ .id = CLAY_IDI("UpgradeRow", (uint32_t)i),
-				       .layout = {
-				           .sizing = { CLAY_SIZING_GROW(0), CLAY_SIZING_FIXED(30) },
-				           .childGap = 8,
-				           .childAlignment = { CLAY_ALIGN_X_LEFT, CLAY_ALIGN_Y_CENTER },
-				           .layoutDirection = CLAY_LEFT_TO_RIGHT,
-				       } }) {
-					CLAY({ .id = CLAY_IDI("UpgradeLabel", (uint32_t)i),
-					       .layout = {
-					           .sizing = { CLAY_SIZING_GROW(0), CLAY_SIZING_FIT(0) },
-					       } }) {
-						mission_summary_screen_detail::Text(
-							mission_summary_screen_detail::FromCStr(mission_summary_screen_detail::kLevelLabels[i]),
-							{ .size = mission_summary_screen_detail::TextSize::Body });
-					}
-					std::string level = std::to_string(levels[i]);
-					mission_summary_screen_detail::Text(
-						mission_summary_screen_detail::FromStd(level),
-						{ .size = mission_summary_screen_detail::TextSize::Body });
+			CLAY({ .id = CLAY_ID("MissionSummaryPanel"),
+			       .layout = {
+			           .sizing = { CLAY_SIZING_FIXED(mission_summary_screen_detail::kPanelW),
+			                       CLAY_SIZING_FIXED(mission_summary_screen_detail::kPanelH) },
+			       },
+			       .image = { .imageData = PackImageStretch(7, 5) } }) {
+				CLAY(mission_summary_screen_detail::FloatingElement(
+					CLAY_ID("MissionSummaryTitle"),
+					titleX,
+					mission_summary_screen_detail::kTitleY,
+					mission_summary_screen_detail::kTitleW,
+					mission_summary_screen_detail::kTitleH)) {
+					mission_summary_screen_detail::Text(CLAY_STRING("Mission Summary"),
+					                                    { .size = mission_summary_screen_detail::TextSize::ScreenTitle });
 				}
-				if(upgradesAvailable[i]){
-					std::string actionId = std::string(mission_summary_screen_detail::kActionUpgradePrefix) + std::to_string(i);
-					std::string buttonId = "MissionSummaryUpgradeButton" + std::to_string(i);
-					mission_summary_screen_detail::Button(mission_summary_screen_detail::FromStd(buttonId),
-					           mission_summary_screen_detail::FromCStr(mission_summary_screen_detail::kUpgradeLabels[i]),
-					           mission_summary_screen_detail::ButtonOpts{ .variant = mission_summary_screen_detail::ButtonVariant::Oval,
-					                                                   .size = mission_summary_screen_detail::ButtonSize::Auto,
-					                                                   .minWidth = 156 },
-					           mission_summary_screen_detail::ButtonHandle{ nullptr, actionId.c_str(), &interactions });
+				CLAY(mission_summary_screen_detail::FloatingElement(
+					CLAY_ID("MissionSummaryStats"),
+					mission_summary_screen_detail::kSummaryX,
+					mission_summary_screen_detail::kSummaryY,
+					mission_summary_screen_detail::kSummaryW,
+					mission_summary_screen_detail::kSummaryRenderH)) {
+					mission_summary_screen_detail::ScrollTextBox(
+						CLAY_STRING("MissionSummaryStatsText"),
+						mission_summary_screen_detail::g_summarySlab, lineCount,
+						static_cast<Uint16>(scrollPosition),
+						{ .width = mission_summary_screen_detail::kSummaryW,
+						  .height = mission_summary_screen_detail::kSummaryRenderH,
+						  .lineHeight = mission_summary_screen_detail::kLineH,
+						  .text = { .size = mission_summary_screen_detail::TextSize::Body },
+						  .origin = mission_summary_screen_detail::ScrollTextBoxOrigin::TopDown });
+				}
+				CLAY(mission_summary_screen_detail::FloatingElement(
+					CLAY_ID("MissionSummaryDoneButtonWrap"),
+					mission_summary_screen_detail::kDoneButtonX,
+					mission_summary_screen_detail::kDoneButtonY,
+					mission_summary_screen_detail::kButtonW,
+					mission_summary_screen_detail::kButtonH)) {
+					mission_summary_screen_detail::Button(
+						CLAY_STRING("MissionSummaryDoneButton"), CLAY_STRING("Done"),
+						mission_summary_screen_detail::ButtonOpts{
+							.variant = mission_summary_screen_detail::ButtonVariant::Oval,
+							.size = mission_summary_screen_detail::ButtonSize::Md },
+						mission_summary_screen_detail::ButtonHandle{ nullptr, mission_summary_screen_detail::kActionDone, &interactions });
+				}
+				CLAY(mission_summary_screen_detail::FloatingElement(
+					CLAY_ID("MissionSummaryXp"),
+					xpX,
+					mission_summary_screen_detail::kXpY,
+					mission_summary_screen_detail::kXpW,
+					mission_summary_screen_detail::kXpH)) {
+					mission_summary_screen_detail::Text(
+						mission_summary_screen_detail::FromStd(xp),
+						{ .size = mission_summary_screen_detail::TextSize::Prompt });
+				}
+				if(upgradeBanner){
+					const char * banner = "*NEW UPGRADE AVAILABLE*";
+					const int bannerX = mission_summary_screen_detail::CenteredTextX(
+						mission_summary_screen_detail::kXpCenterX,
+						mission_summary_screen_detail::FromCStr(banner),
+						mission_summary_screen_detail::TextSize::Body);
+					CLAY(mission_summary_screen_detail::FloatingElement(
+						CLAY_ID("MissionSummaryUpgradeBanner"),
+						bannerX,
+						mission_summary_screen_detail::kUpgradeBannerY,
+						mission_summary_screen_detail::kBannerW,
+						mission_summary_screen_detail::kBannerH)) {
+						mission_summary_screen_detail::Text(
+							mission_summary_screen_detail::FromCStr(banner),
+							{ .size = mission_summary_screen_detail::TextSize::Body,
+							  .effect = mission_summary_screen_detail::TextEffect::LegacyPalette(
+								  129, static_cast<Uint8>(160), true) });
+					}
+				}
+				for(int i = 0; i < 6; i++){
+					mission_summary_screen_detail::BuildUpgradeRow(
+						i, levels[i], upgradesAvailable[i], interactions);
 				}
 			}
 		}
@@ -300,15 +412,11 @@ bool MissionSummaryScreen::HandleUiIntent(ScreenContext & ctx, const silencer::u
 		doneClicked = true;
 		return true;
 	}
+	if(action.kind == silencer::ui::UiActionKind::Scroll){
+		scrollDelta += action.amount;
+		return true;
+	}
 	if(action.kind != silencer::ui::UiActionKind::Activate) return false;
-	if(action.id == mission_summary_screen_detail::kActionScrollUp){
-		scrollDelta--;
-		return true;
-	}
-	if(action.id == mission_summary_screen_detail::kActionScrollDown){
-		scrollDelta++;
-		return true;
-	}
 	int upgrade = mission_summary_screen_detail::SuffixInt(action.id, mission_summary_screen_detail::kActionUpgradePrefix);
 	if(upgrade >= 0 && upgrade < 6){
 		upgradeClicked = upgrade;
