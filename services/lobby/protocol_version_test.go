@@ -9,8 +9,8 @@ import (
 	"testing"
 )
 
-const currentProtocolVersion = "00055"
-const currentWireFingerprint = "5ee766b2ad0c165228cc932d483d73460431b187fc8918d88672ea10731d7a79"
+const currentProtocolVersion = "00056"
+const currentWireFingerprint = "c16c0106632b187bff8887ecf00fdef413aa9a46434b90a7caaf8d96d8da80eb"
 
 var wireFingerprintPaths = []string{
 	"shared/lobby-protocol/protocol.md",

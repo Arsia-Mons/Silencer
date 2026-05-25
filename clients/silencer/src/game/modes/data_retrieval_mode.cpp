@@ -92,7 +92,7 @@ void DataRetrievalMode::OnSecretDelivered(World& world, Team& team) {
 			int remaining = GASLoader::Get().player.secretsNeededToWin - team.secrets;
 			char text[128];
 			sprintf(text, "%s returned a %s\n( %d remaining )\n\nTeam awarded %d credits",
-			        user->name, stolen ? "stolen secret" : "secret", remaining,
+			        user->DisplayName(), stolen ? "stolen secret" : "secret", remaining,
 			        GASLoader::Get().player.secretDeliveryCredits);
 			if(!world.intutorialmode){
 				world.ShowMessage(text, 128, 0, true);
@@ -150,11 +150,10 @@ void DataRetrievalMode::OnSecretDelivered(World& world, Team& team) {
 			Peer* tp = world.peers.peerlist[team.peers[j]];
 			if(tp){
 				User* user = world.lobby.GetUserInfo(tp->accountid);
-				strcat(message, user->name);
+				strcat(message, user->DisplayName());
 				strcat(message, "\n");
 			}
 		}
 		world.ShowMessage(message, 255, type, true, peer);
 	}
 }
-

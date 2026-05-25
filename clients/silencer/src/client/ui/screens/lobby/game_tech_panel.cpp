@@ -124,7 +124,7 @@ void GameTechPanelTick(GameTechPanelState & state,
 			if(i >= team->numpeers){ peerindex++; continue; }
 			Peer * peer = owner.TechPanelPeer(world, team->peers[i]);
 			User * user = peer ? world.lobby.GetUserInfo(peer->accountid) : nullptr;
-			state.peerNameStrs[peerindex] = user ? std::string(user->name) : std::string();
+			state.peerNameStrs[peerindex] = user ? std::string(user->DisplayName()) : std::string();
 			peerindex++;
 		}
 	}

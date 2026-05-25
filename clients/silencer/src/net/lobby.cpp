@@ -474,7 +474,10 @@ void Lobby::DoNetwork(void){
 										Character ch;
 										memset(&ch, 0, sizeof(ch));
 										data.Get(ch.id);
-										data.Get(ch.agencyIdx);
+										Uint8 agencyByte;
+										data.Get(agencyByte);
+										ch.renameAvailable = (agencyByte & 0x80) != 0;
+										ch.agencyIdx = agencyByte & 0x7f;
 										data.Get(ch.stats.wins);
 										data.Get(ch.stats.losses);
 										data.Get(ch.stats.xp);
@@ -784,6 +787,20 @@ void Lobby::SelectCharacter(Uint32 charID){
 	Uint8 code = MSG_SELECTCHARACTER;
 	data.Put(code);
 	data.Put(charID);
+	SendMessage(data.data, data.BitsToBytes(data.offset));
+}
+
+void Lobby::RenameCharacter(Uint32 charID, const char * name){
+	Serializer data;
+	Uint8 code = MSG_RENAMECHARACTER;
+	data.Put(code);
+	data.Put(charID);
+	Uint8 namelen = (Uint8)strnlen(name, 16);
+	data.Put(namelen);
+	for(int i = 0; i < namelen; i++){
+		char c = name[i];
+		data.Put(c);
+	}
 	SendMessage(data.data, data.BitsToBytes(data.offset));
 }
 

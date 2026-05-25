@@ -112,6 +112,7 @@ func charactersToBSON(chars []Character) []bson.M {
 		doc["id"] = ch.ID
 		doc["name"] = ch.Name
 		doc["agencyIdx"] = ch.AgencyIdx
+		doc["renameAvailable"] = ch.RenameAvailable
 		out[i] = doc
 	}
 	return out

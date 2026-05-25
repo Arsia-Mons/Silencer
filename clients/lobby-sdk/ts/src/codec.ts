@@ -297,6 +297,14 @@ export function encodeSelectCharacter(characterId: number): Uint8Array {
   return w.bytes();
 }
 
+export function encodeRenameCharacter(characterId: number, name: string): Uint8Array {
+  const w = new Writer();
+  w.u8(Op.RenameCharacter);
+  w.u32Le(characterId);
+  w.lenstr(name.length > 16 ? name.slice(0, 16) : name);
+  return w.bytes();
+}
+
 export function encodeRegisterStats(
   gameId: number,
   teamNumber: number,
@@ -445,10 +453,12 @@ export function decodeCharacters(r: Reader): CharactersPayload {
   const characters: CharacterInfo[] = [];
   for (let i = 0; i < count; i++) {
     const id = r.u32Le();
-    const agencyIdx = r.u8();
+    const agencyFlags = r.u8();
+    const agencyIdx = agencyFlags & 0x7f;
+    const renameAvailable = (agencyFlags & 0x80) !== 0;
     const stats = decodeAgencyStats(r);
     const name = r.lenstr();
-    characters.push({ id, agencyIdx, stats, name });
+    characters.push({ id, agencyIdx, renameAvailable, stats, name });
   }
   return { selectedCharId, characters };
 }
@@ -525,7 +535,7 @@ export function encodeCharactersBody(w: Writer, payload: CharactersPayload): voi
   w.u32Le(payload.selectedCharId);
   for (const ch of payload.characters) {
     w.u32Le(ch.id);
-    w.u8(ch.agencyIdx);
+    w.u8((ch.agencyIdx & 0x7f) | (ch.renameAvailable ? 0x80 : 0));
     encodeAgencyStats(w, ch.stats);
     w.lenstr(ch.name);
   }

@@ -20,6 +20,7 @@ export const Op = {
   Characters: 14,
   CreateCharacter: 15,
   SelectCharacter: 16,
+  RenameCharacter: 17,
 } as const;
 export type Op = (typeof Op)[keyof typeof Op];
 
@@ -93,6 +94,7 @@ export interface UserInfo {
 export interface CharacterInfo {
   id: number;
   agencyIdx: number;
+  renameAvailable: boolean;
   stats: AgencyStats;
   name: string;
 }

@@ -16,6 +16,7 @@ type Client struct {
 	hub  *Hub
 
 	mu        sync.Mutex
+	userMu    sync.RWMutex
 	accountID uint32
 	user      *User
 	channel   string
@@ -28,10 +29,28 @@ type Client struct {
 }
 
 func (c *Client) displayName() string {
-	if c.user != nil && c.user.Name != "" {
-		return c.user.Name
+	user := c.currentUser()
+	if user != nil {
+		if ch := selectedChar(user); ch != nil && ch.Name != "" {
+			return ch.Name
+		}
+		if user.Name != "" {
+			return user.Name
+		}
 	}
 	return "Player"
+}
+
+func (c *Client) setUser(u *User) {
+	c.userMu.Lock()
+	c.user = u
+	c.userMu.Unlock()
+}
+
+func (c *Client) currentUser() *User {
+	c.userMu.RLock()
+	defer c.userMu.RUnlock()
+	return c.user
 }
 
 func serveClient(conn net.Conn, hub *Hub, version string, manifest *UpdateManifest) {
@@ -126,6 +145,8 @@ func (c *Client) handleFrame(frame []byte, expectedVersion string, manifest *Upd
 		return c.handleCreateCharacter(r)
 	case opSelectCharacter:
 		return c.handleSelectCharacter(r)
+	case opRenameCharacter:
+		return c.handleRenameCharacter(r)
 	default:
 		log.Printf("[op] %s unknown opcode %d", c.conn.RemoteAddr(), op)
 	}
@@ -184,8 +205,8 @@ func (c *Client) handleAuth(r *reader) error {
 		c.send(w.b)
 		return nil
 	}
+	c.setUser(u)
 	c.mu.Lock()
-	c.user = u
 	c.accountID = u.AccountID
 	c.mu.Unlock()
 
@@ -393,7 +414,9 @@ func (c *Client) handleCreateCharacter(r *reader) error {
 		}
 		return nil
 	}
+	c.setUser(u)
 	c.send(encodeCharacters(u))
+	c.hub.BroadcastClientPresence(c)
 	return nil
 }
 
@@ -409,7 +432,34 @@ func (c *Client) handleSelectCharacter(r *reader) error {
 	if !ok {
 		return nil
 	}
+	c.setUser(u)
 	c.send(encodeCharacters(u))
+	c.hub.BroadcastClientPresence(c)
+	return nil
+}
+
+func (c *Client) handleRenameCharacter(r *reader) error {
+	if c.accountID == 0 {
+		return nil
+	}
+	charID, err := r.u32()
+	if err != nil {
+		return err
+	}
+	name, err := r.lenBytes()
+	if err != nil {
+		return err
+	}
+	u, ok := c.hub.store.RenameCharacter(c.accountID, charID, name)
+	if !ok {
+		if user := c.hub.store.ByAccountID(c.accountID); user != nil {
+			c.send(encodeCharacters(user))
+		}
+		return nil
+	}
+	c.setUser(u)
+	c.send(encodeCharacters(u))
+	c.hub.BroadcastClientPresence(c)
 	return nil
 }
 

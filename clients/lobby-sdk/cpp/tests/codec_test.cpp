@@ -349,10 +349,12 @@ static void test_characters_push(const std::string& hex) {
     CHECK_EQ(c.characters.size(), 2u);
     CHECK_EQ(c.characters[0].id, 300u);
     CHECK_EQ(c.characters[0].agency_idx, 1);
+    CHECK(c.characters[0].rename_available);
     CHECK_EQ(c.characters[0].name, std::string("Shade"));
     CHECK_EQ(c.characters[0].stats.level, 13);
     CHECK_EQ(c.characters[1].id, 301u);
     CHECK_EQ(c.characters[1].agency_idx, 3);
+    CHECK(!c.characters[1].rename_available);
     CHECK_EQ(c.characters[1].name, std::string("Vanta"));
 
     Writer w; w.u8(OpCharacters); encode_characters_body(w, c);
@@ -431,6 +433,11 @@ static void test_create_character_request(const std::string& hex) {
 
 static void test_select_character_request(const std::string& hex) {
     auto enc = frame(encode_select_character(300));
+    CHECK_EQ(to_hex(enc), hex);
+}
+
+static void test_rename_character_request(const std::string& hex) {
+    auto enc = frame(encode_rename_character(300, "Vesper"));
     CHECK_EQ(to_hex(enc), hex);
 }
 
@@ -565,6 +572,7 @@ int main() {
     run("setgame_request",                   test_setgame_request);
     run("create_character_request",          test_create_character_request);
     run("select_character_request",          test_select_character_request);
+    run("rename_character_request",          test_rename_character_request);
     run("register_stats_request",            test_register_stats_request);
 
     test_sha1();

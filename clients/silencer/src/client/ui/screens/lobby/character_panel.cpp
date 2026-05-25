@@ -231,20 +231,19 @@ namespace silencer::client_ui::lobby {
             }
         }
 
-        void XpBadge(const std::string &Xp, int width) {
-            CLAY({ .id = CLAY_ID("CharacterPanelLevelBadge"),
+        void XpLine(const std::string &xp) {
+            CLAY({ .id = CLAY_ID("CharacterPanelXpLine"),
                  .layout = {
-                 .sizing = { CLAY_SIZING_FIXED(static_cast<float>(width)),
+                 .sizing = { CLAY_SIZING_GROW(0),
                  CLAY_SIZING_FIXED(static_cast<float>(
                      TextLineHeight(TextSize::Body))) },
-                 .childAlignment = { .x = CLAY_ALIGN_X_CENTER,
+                 .childAlignment = { .x = CLAY_ALIGN_X_LEFT,
                  .y = CLAY_ALIGN_Y_CENTER },
                  },
                  .clip = { .horizontal = true } }) {
-                Text(FromStd(Xp),
+                Text(FromStd(xp),
                      TextOpts{
                          .size = TextSize::Body,
-                         .align = TextAlign::Center,
                          .wrap = TextWrap::None
                      });
             }
@@ -419,9 +418,6 @@ namespace silencer::client_ui::lobby {
                 character_panel_detail::LevelBadge(
                     character_panel_detail::g_stats.level,
                     emblemBoxW);
-                character_panel_detail::XpBadge(
-                    "XP " + character_panel_detail::g_stats.xp,
-                    emblemBoxW);
             }
 
             CLAY({ .id = CLAY_ID("CharacterPanelInfoArea"),
@@ -481,6 +477,9 @@ namespace silencer::client_ui::lobby {
                             character_panel_detail::StatRow(1, "LOSSES", character_panel_detail::g_stats.losses,
                                                             labelColumnWidth);
                         }
+
+                        character_panel_detail::XpLine(
+                            "XP " + character_panel_detail::g_stats.xp);
 
                         CLAY({ .id = CLAY_ID("CharacterPanelActionsRow"),
                              .layout = {

@@ -24,6 +24,7 @@ const (
 	opCharacters      = 14 // server→client: full character list for the authed player
 	opCreateCharacter = 15 // client→server: create a new character
 	opSelectCharacter = 16 // client→server: select an existing character
+	opRenameCharacter = 17 // client→server: one-time rename for migrated characters
 )
 
 const (
@@ -41,6 +42,8 @@ const maxCharacterNameBytes = 16
 const characterListHeaderBytes = 1 + 1 + 4 // op + count + selectedCharID
 const characterFixedBytes = 4 + 1 + 2 + 2 + 2 + 1 + 1 + 1 + 1 + 1 + 1 + 1
 const maxCharactersPerUser = (maxFrame - characterListHeaderBytes) / (characterFixedBytes + 1 + maxCharacterNameBytes)
+const characterAgencyMask = 0x7f
+const characterRenameFlag = 0x80
 
 func readFrame(r io.Reader) ([]byte, error) {
 	var sz [1]byte
@@ -356,9 +359,11 @@ func encodeUser(w *writer, u *User) {
 
 // encodeCharacters builds an opCharacters frame.
 // Layout: [u8 count][u32 selectedCharID][count × char]
-// Each char: [u32 id][u8 agencyIdx][u16 wins][u16 losses][u16 xp][u8 level]
+// Each char: [u32 id][u8 agencyFlags][u16 wins][u16 losses][u16 xp][u8 level]
 //
 //	[u8 endurance][u8 shield][u8 jetpack][u8 techslots][u8 hacking][u8 contacts][lenStr name]
+//
+// agencyFlags stores agencyIdx in bits 0..6 and rename availability in bit 7.
 func encodeCharacters(u *User) []byte {
 	var w writer
 	w.u8(opCharacters)
@@ -385,7 +390,11 @@ func encodeCharacters(u *User) []byte {
 		ch := &u.Characters[i]
 		a := &ch.Stats
 		w.u32(ch.ID)
-		w.u8(ch.AgencyIdx)
+		agencyByte := ch.AgencyIdx & characterAgencyMask
+		if ch.RenameAvailable {
+			agencyByte |= characterRenameFlag
+		}
+		w.u8(agencyByte)
 		w.u16(a.Wins)
 		w.u16(a.Losses)
 		w.u16(a.XPToNextLevel)

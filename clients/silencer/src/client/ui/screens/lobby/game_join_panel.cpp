@@ -102,7 +102,7 @@ void GameJoinPanelTick(GameJoinPanelState & state,
 				Peer * peer = world.GetPeer(team->peers[i]);
 				if(!peer || peer->observer || peer->disconnected) continue;
 				User * user = world.lobby.GetUserInfo(peer->accountid);
-				if(!user || user->retrieving || !user->name[0]) continue;
+				if(!user || user->retrieving || !user->DisplayName()[0]) continue;
 
 				GameJoinRosterRow row;
 				row.ready = peer->isready;
@@ -110,8 +110,8 @@ void GameJoinPanelTick(GameJoinPanelState & state,
 				row.teamNumber = team->number;
 				row.peerSlot = static_cast<Uint8>(i);
 				row.drawEmblem = !drewEmblem;
-				row.name = peer->isbot ? std::string(user->name) + " [BOT]"
-				                       : std::string(user->name);
+				row.name = peer->isbot ? std::string(user->DisplayName()) + " [BOT]"
+				                       : std::string(user->DisplayName());
 				row.level = "L:" + std::to_string(user->agency[team->agency].level);
 				state.rosterRows.push_back(row);
 				drewEmblem = true;

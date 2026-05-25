@@ -61,6 +61,29 @@ func TestCreateCharacterRejectsDuplicateAlias(t *testing.T) {
 	}
 }
 
+func TestClientDisplayNamePrefersSelectedCharacter(t *testing.T) {
+	c := &Client{}
+	c.setUser(&User{
+		Name:           "alice",
+		SelectedCharID: 7,
+		Characters: []Character{
+			{ID: 3, Name: "Old", AgencyIdx: 0},
+			{ID: 7, Name: "Shade", AgencyIdx: 1},
+		},
+	})
+	if got := c.displayName(); got != "Shade" {
+		t.Fatalf("displayName: got %q want %q", got, "Shade")
+	}
+}
+
+func TestClientDisplayNameFallsBackToAccountName(t *testing.T) {
+	c := &Client{}
+	c.setUser(&User{Name: "alice"})
+	if got := c.displayName(); got != "alice" {
+		t.Fatalf("displayName fallback: got %q want %q", got, "alice")
+	}
+}
+
 func TestLegacyAgencyMigrationKeepsAnyProgressField(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "lobby.json")
 	before := &Store{
@@ -103,11 +126,146 @@ func TestLegacyAgencyMigrationKeepsAnyProgressField(t *testing.T) {
 	if user.Characters[1].AgencyIdx != 2 || user.Characters[1].Stats.TechSlots != 4 {
 		t.Fatalf("upgrade-only agency was not preserved: %#v", user.Characters[1])
 	}
+	if !user.Characters[0].RenameAvailable || !user.Characters[1].RenameAvailable {
+		t.Fatalf("migrated characters did not receive rename grants: %#v", user.Characters)
+	}
 	if user.SelectedCharID != user.Characters[0].ID {
 		t.Fatalf("selected char: got %d want %d", user.SelectedCharID, user.Characters[0].ID)
 	}
 	if user.LegacyAgency != [5]Agency{} {
 		t.Fatalf("legacy agencies were not cleared: %#v", user.LegacyAgency)
+	}
+}
+
+func TestExistingAgencyNamedCharactersGetOneTimeRenameSweep(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "lobby.json")
+	before := &Store{
+		NextID:     2,
+		NextCharID: 12,
+		ByName: map[string]*User{
+			"alice": {
+				AccountID: 1,
+				Name:      "alice",
+				PassHash:  "pw",
+				Characters: []Character{
+					{ID: 10, Name: "Noxis", AgencyIdx: 0},
+					{ID: 11, Name: "Shade", AgencyIdx: 1},
+				},
+				SelectedCharID: 10,
+			},
+		},
+	}
+	data, err := json.Marshal(before)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	if err := os.WriteFile(path, data, 0o644); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+	store, err := NewStore(path)
+	if err != nil {
+		t.Fatalf("NewStore: %v", err)
+	}
+	user := store.ByName["alice"]
+	if !user.Characters[0].RenameAvailable {
+		t.Fatalf("agency-named character was not marked: %#v", user.Characters[0])
+	}
+	if user.Characters[1].RenameAvailable {
+		t.Fatalf("custom-named character was marked: %#v", user.Characters[1])
+	}
+	if !store.LegacyRenameSweepDone {
+		t.Fatalf("rename sweep marker was not persisted")
+	}
+
+	user.Characters[1].Name = "Lazarus"
+	user.Characters[1].RenameAvailable = false
+	if err := store.save(); err != nil {
+		t.Fatalf("save: %v", err)
+	}
+	store, err = NewStore(path)
+	if err != nil {
+		t.Fatalf("reload: %v", err)
+	}
+	if store.ByName["alice"].Characters[1].RenameAvailable {
+		t.Fatalf("rename sweep ran again after marker was persisted")
+	}
+}
+
+func TestRenameCharacterClearsGrantAndRejectsSecondRename(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "lobby.json")
+	store, err := NewStore(path)
+	if err != nil {
+		t.Fatalf("NewStore: %v", err)
+	}
+	user, ok, banned := store.Login("alice", hashPassword("secret"))
+	if !ok || banned {
+		t.Fatalf("Login: ok=%v banned=%v", ok, banned)
+	}
+	user, ok = store.CreateCharacter(user.AccountID, "Noxis", 0)
+	if !ok {
+		t.Fatalf("CreateCharacter rejected")
+	}
+	store.ByName["alice"].Characters[0].RenameAvailable = true
+	charID := user.SelectedCharID
+
+	user, ok = store.RenameCharacter(user.AccountID, charID, "Shade")
+	if !ok {
+		t.Fatalf("RenameCharacter rejected")
+	}
+	ch := characterByID(user, charID)
+	if ch == nil || ch.Name != "Shade" || ch.RenameAvailable {
+		t.Fatalf("rename did not update character and clear grant: %#v", ch)
+	}
+	if _, ok = store.RenameCharacter(user.AccountID, charID, "Vanta"); ok {
+		t.Fatalf("RenameCharacter accepted second rename")
+	}
+}
+
+func TestRenameCharacterRejectsCharactersWithoutGrant(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "lobby.json")
+	store, err := NewStore(path)
+	if err != nil {
+		t.Fatalf("NewStore: %v", err)
+	}
+	user, ok, banned := store.Login("alice", hashPassword("secret"))
+	if !ok || banned {
+		t.Fatalf("Login: ok=%v banned=%v", ok, banned)
+	}
+	user, ok = store.CreateCharacter(user.AccountID, "Shade", 1)
+	if !ok {
+		t.Fatalf("CreateCharacter rejected")
+	}
+	if _, ok = store.RenameCharacter(user.AccountID, user.SelectedCharID, "Vanta"); ok {
+		t.Fatalf("RenameCharacter accepted character without grant")
+	}
+}
+
+func TestRenameCharacterRejectsDuplicateAlias(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "lobby.json")
+	store, err := NewStore(path)
+	if err != nil {
+		t.Fatalf("NewStore: %v", err)
+	}
+	user, ok, banned := store.Login("alice", hashPassword("secret"))
+	if !ok || banned {
+		t.Fatalf("Login: ok=%v banned=%v", ok, banned)
+	}
+	user, ok = store.CreateCharacter(user.AccountID, "Noxis", 0)
+	if !ok {
+		t.Fatalf("CreateCharacter Noxis rejected")
+	}
+	firstID := user.SelectedCharID
+	user, ok = store.CreateCharacter(user.AccountID, "Shade", 1)
+	if !ok {
+		t.Fatalf("CreateCharacter Shade rejected")
+	}
+	store.ByName["alice"].Characters[0].RenameAvailable = true
+	if _, ok = store.RenameCharacter(user.AccountID, firstID, " shade "); ok {
+		t.Fatalf("RenameCharacter accepted duplicate alias")
+	}
+	user = store.ByName["alice"]
+	if user.Characters[0].Name != "Noxis" || !user.Characters[0].RenameAvailable {
+		t.Fatalf("failed duplicate rename mutated character: %#v", user.Characters[0])
 	}
 }
 

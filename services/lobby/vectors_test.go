@@ -251,6 +251,26 @@ func TestVector_SelectCharacterRequest_Decode(t *testing.T) {
 	}
 }
 
+func TestVector_RenameCharacterRequest_Decode(t *testing.T) {
+	v := mustGet(t, loadVectors(t), "rename_character_request")
+	op, body := unframe(t, unhex(t, v.Hex))
+	if op != opRenameCharacter {
+		t.Fatalf("op: got %d want %d", op, opRenameCharacter)
+	}
+	r := newReader(body)
+	id, err := r.u32()
+	if err != nil {
+		t.Fatalf("character id: %v", err)
+	}
+	name, err := r.lenBytes()
+	if err != nil {
+		t.Fatalf("name: %v", err)
+	}
+	if id != 300 || name != "Vesper" {
+		t.Errorf("request: id=%d name=%q", id, name)
+	}
+}
+
 func TestVector_RegisterStatsRequest_Decode(t *testing.T) {
 	v := mustGet(t, loadVectors(t), "register_stats_request")
 	op, body := unframe(t, unhex(t, v.Hex))
@@ -534,10 +554,11 @@ func TestVector_CharactersPush_Encode(t *testing.T) {
 		SelectedCharID: 300,
 		Characters: []Character{
 			{
-				ID:        300,
-				Name:      "Shade",
-				AgencyIdx: 1,
-				Stats:     Agency{Wins: 10, Losses: 11, XPToNextLevel: 12, Level: 13, Endurance: 14, Shield: 15, Jetpack: 16, TechSlots: 17, Hacking: 18, Contacts: 19},
+				ID:              300,
+				Name:            "Shade",
+				AgencyIdx:       1,
+				RenameAvailable: true,
+				Stats:           Agency{Wins: 10, Losses: 11, XPToNextLevel: 12, Level: 13, Endurance: 14, Shield: 15, Jetpack: 16, TechSlots: 17, Hacking: 18, Contacts: 19},
 			},
 			{
 				ID:        301,

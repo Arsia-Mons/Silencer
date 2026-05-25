@@ -28,6 +28,7 @@ enum Op : uint8_t {
     OpCharacters    = 14,
     OpCreateCharacter = 15,
     OpSelectCharacter = 16,
+    OpRenameCharacter = 17,
 };
 
 enum class Platform : uint8_t {
@@ -84,6 +85,7 @@ struct UserInfo {
 struct CharacterInfo {
     uint32_t    id         = 0;
     uint8_t     agency_idx = 0;
+    bool        rename_available = false;
     AgencyStats stats      = {};
     std::string name;
 };

@@ -30,6 +30,7 @@ import {
   encodePingAck,
   encodePresence,
   encodeRegisterStats,
+  encodeRenameCharacter,
   encodeSetGame,
   encodeCreateCharacter,
   encodeSelectCharacter,
@@ -341,7 +342,9 @@ describe("golden vectors", () => {
     expect(payload.selectedCharId).toBe(300);
     expect(payload.characters).toHaveLength(2);
     expect(payload.characters[0]!.name).toBe("Shade");
+    expect(payload.characters[0]!.renameAvailable).toBe(true);
     expect(payload.characters[1]!.agencyIdx).toBe(3);
+    expect(payload.characters[1]!.renameAvailable).toBe(false);
 
     const w = new Writer();
     w.u8(Op.Characters);
@@ -416,6 +419,11 @@ describe("golden vectors", () => {
   test("select_character_request", () => {
     const v = need("select_character_request");
     expect(framedHex(encodeSelectCharacter(300))).toBe(v.hex);
+  });
+
+  test("rename_character_request", () => {
+    const v = need("rename_character_request");
+    expect(framedHex(encodeRenameCharacter(300, "Vesper"))).toBe(v.hex);
   });
 });
 

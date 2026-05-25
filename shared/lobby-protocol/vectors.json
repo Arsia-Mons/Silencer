@@ -192,13 +192,14 @@
     {
       "name": "characters_push",
       "kind": "Characters",
-      "hex": "360e022c0100002c010000010a000b000c000d0e0f101112130553686164652d010000030100020003000405060708090a0556616e7461",
+      "hex": "360e022c0100002c010000810a000b000c000d0e0f101112130553686164652d010000030100020003000405060708090a0556616e7461",
       "value": {
         "selected_char_id": 300,
         "characters": [
           {
             "id": 300,
             "agency_idx": 1,
+            "rename_available": true,
             "stats": {
               "wins": 10,
               "losses": 11,
@@ -216,6 +217,7 @@
           {
             "id": 301,
             "agency_idx": 3,
+            "rename_available": false,
             "stats": {
               "wins": 1,
               "losses": 2,
@@ -309,6 +311,15 @@
       "hex": "05102c010000",
       "value": {
         "character_id": 300
+      }
+    },
+    {
+      "name": "rename_character_request",
+      "kind": "RenameCharacterRequest",
+      "hex": "0c112c01000006566573706572",
+      "value": {
+        "character_id": 300,
+        "name": "Vesper"
       }
     },
     {
