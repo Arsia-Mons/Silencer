@@ -4,7 +4,16 @@ All notable changes to Silencer are documented here.
 
 ## [Unreleased]
 
+## [v00054] — 2026-05-25
+
 ### Game client
+
+#### Character creation flow (#123, #145)
+
+- Agency selection moved from account-level slots to character-level identity. The lobby server now stores characters with ID, name, agency, stats, and selected character; existing populated agency slots migrate into characters on load.
+- Lobby protocol, C++ SDK, and TS SDK now support character list, create, and select messages. Auth sends the character list immediately, and protocol-version guards cover character create/select traffic.
+- New three-screen character flow: Select Agent, Silencer Alias, and Select Agency. The lobby character panel now reflects the selected character name, agency icon, and stats.
+- Replays preserve the selected character, and local lobby/client launch helpers plus E2E coverage were added for the new flow.
 
 #### Sound Cue system (#223)
 
@@ -16,16 +25,42 @@ All notable changes to Silencer are documented here.
 - Audio stacking fix: `Audio::PlayUI()` uses a dedicated interrupt channel (127) with a 30 ms per-chunk cooldown to prevent UI hover sounds from stacking and clipping. `Audio::Play()` gains an optional `maxInstances` cap that interrupts the oldest playing instance of a chunk instead of spawning unbounded copies.
 - Map select list now plays the UI sound once per newly hovered row.
 
-#### World subsystem class extraction — phase 2 (#216)
+#### World and game subsystem extraction (#210, #211, #214, #216)
 
+- `Game` and `World` implementation files were split into per-concern source files as groundwork for continued client modularization.
 - `World` decomposed into 5 owned subsystem classes, each with its own `.h` + `.cpp` in `src/world/`: `WorldObjectRegistry`, `WorldMessaging`, `WorldNetwork`, `WorldPeerRegistry`, `WorldReplication`.
 - All callers updated to go through the subsystem public API; reference shims removed.
 - `World` is now a thin coordinator. Public API and runtime behaviour unchanged.
 
+#### macOS updater (#184)
+
+- macOS update zip extraction now uses `/usr/bin/ditto -x -k`, preserving symlinks, resource forks, xattrs, and the notarized app bundle's code-signature seal. This prevents auto-updated apps from relaunching as "damaged" after the bundle is reconstructed.
+- Quarantine stripping remains as defense in depth on the freshly installed bundle before relaunch, with improved diagnostics.
+
 #### Bug fixes
 
+- Smoothed lobby panel chrome lines and glow so the Clay UI chrome matches the baked legacy green border treatment (#177, #191).
+- Restored the Mission Summary layout and simplified the layout code (#232).
+- Restored the legacy in-game chat overlay rendering path, including compositor payload support for the overlay (#234).
+- Fixed chat input text centering with shared stable text measurement and coverage for the lobby chat field (#233).
 - Fixed on-screen keyboard not appearing on ROG Ally / handheld Windows (#220) — `SDL_HINT_ENABLE_SCREEN_KEYBOARD` was not set; SDL3 requires it (before `SDL_Init`) to show the OS keyboard when `SDL_StartTextInput` is active.
 - Fixed unity build collision on `kLegacyRenderWidth/Height` (#220) — constants are now defined once in `game_renderer.h` as `inline constexpr` instead of per-file.
+
+### Admin web and API
+
+#### Live game monitor (#23, #209)
+
+- Lobby and dedicated server heartbeat health now flows through the admin API websocket pipeline.
+- Admin dashboard game cards show live heartbeat status and expand for more detail.
+
+#### Editor fixes
+
+- Behavior Tree editor no longer crashes when a non-BT folder is opened; folder loading skips files without a `nodes` field and normalizes missing BT metadata.
+
+### Docs
+
+- Added reference docs for the Sound Cue system, Sound Studio, Map Designer, Behavior Tree system/editor, Actor Editor, GAS/GAS editor, Sprite Manager, and Weapon Editor.
+- Added `CLAUDE.md` / `AGENTS.md` guidance for client subdirectories and shared GAS assets.
 
 ## [v00053] — 2026-05-18
 
