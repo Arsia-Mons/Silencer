@@ -736,7 +736,9 @@
                 Trigger actions and <code>MSG_CAMERA</code> mutate pan-camera
                 fields; spectator tick code mutates <code>viewedpeerid</code>
                 and <code>spectator</code>; world methods own system-camera
-                slot writes.
+                slot writes. <code>Game::Loop()</code> clears system-camera
+                active flags each simulation tick, while session unload and map
+                load reset pan-camera fields.
               </td>
               <td>
                 This is not renderer-owned screen-buffer state. Renderer and
