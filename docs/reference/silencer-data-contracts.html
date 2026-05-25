@@ -113,6 +113,35 @@
     ul { margin: 10px 0 0; padding-left: 1.25rem; }
     li { margin: 5px 0; }
     .small { color: var(--muted); font-size: 0.9rem; }
+    .graph-grid {
+      display: grid; grid-template-columns: 1fr; gap: 12px; margin-top: 14px;
+    }
+    .graph-panel {
+      border: 1px solid var(--line); border-radius: 6px; background: #fffefa;
+      padding: 12px;
+    }
+    .graph-panel h3 { margin: 0 0 10px; font-size: 1rem; letter-spacing: 0; }
+    .owner-tree, .owner-tree ul { list-style: none; margin: 0; padding: 0; }
+    .owner-tree ul {
+      margin: 8px 0 0 12px; padding-left: 12px; border-left: 2px solid var(--line);
+    }
+    .owner-tree li { margin: 8px 0 0; }
+    .node {
+      display: block; border: 1px solid var(--line); border-radius: 6px;
+      background: #fbfaf6; padding: 8px 10px;
+    }
+    .node strong { display: block; margin-bottom: 2px; color: var(--ink); }
+    .node span { display: block; color: var(--muted); font-size: 0.88rem; }
+    .node.primary { border-color: var(--accent); background: var(--chip); }
+    .node.external { border-color: #d2b58e; background: #fbf1e5; }
+    .edge-list {
+      display: grid; grid-template-columns: 1fr; gap: 10px; margin-top: 10px;
+    }
+    .edge {
+      border: 1px solid var(--line); border-radius: 6px; background: #fbfaf6;
+      padding: 10px;
+    }
+    .edge b { display: block; margin-bottom: 3px; }
     @media (min-width: 760px) {
       .hero { width: min(100% - 40px, 1180px); padding: 42px 0 30px; }
       h1 { font-size: 3.1rem; }
@@ -135,6 +164,22 @@
       td::before { content: none !important; }
       tr:nth-child(even) td { background: #fbfaf6; }
     }
+    @media (min-width: 1120px) {
+      .hero, main { width: min(100% - 64px, 1380px); }
+      .graph-grid { grid-template-columns: minmax(0, 1.65fr) minmax(320px, 0.8fr); gap: 18px; }
+      .owner-tree ul { margin-left: 18px; padding-left: 18px; }
+      .edge-list { grid-template-columns: 1fr 1fr; }
+      #owners table { table-layout: fixed; }
+      #owners th:nth-child(1), #owners td:nth-child(1) { width: 17%; }
+      #owners th:nth-child(2), #owners td:nth-child(2) { width: 15%; }
+      #owners th:nth-child(3), #owners td:nth-child(3) { width: 24%; }
+      #owners th:nth-child(4), #owners td:nth-child(4) { width: 25%; }
+      #owners th:nth-child(5), #owners td:nth-child(5) { width: 19%; }
+      #data table, #mutations table, #consumer-guide table { table-layout: fixed; }
+      #data th:nth-child(1), #data td:nth-child(1),
+      #mutations th:nth-child(1), #mutations td:nth-child(1),
+      #consumer-guide th:nth-child(1), #consumer-guide td:nth-child(1) { width: 23%; }
+    }
   </style>
 </head>
 <body>
@@ -154,6 +199,7 @@
   <main>
     <nav aria-label="Sections">
       <a href="#summary">Summary</a>
+      <a href="#graph">Graph</a>
       <a href="#owners">Owner Map</a>
       <a href="#data">Client Data</a>
       <a href="#mutations">Mutations</a>
@@ -198,6 +244,110 @@
               send input/intents, load snapshots, and client-predict only their
               local controlled objects.
             </p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="graph">
+      <h2>Ownership Graph</h2>
+      <div class="content">
+        <p class="notice">
+          The graph below shows containment and responsibility, not every call
+          site. A child node is owned/stored by its parent unless the label says
+          it is an adapter, projection, or external source.
+        </p>
+
+        <div class="graph-grid">
+          <div class="graph-panel">
+            <h3>In-Process Owners</h3>
+            <ul class="owner-tree">
+              <li>
+                <span class="node primary"><strong>Game</strong><span>Top-level client owner: frame loop, app state, session commands, rendering, input, UI, automation.</span></span>
+                <ul>
+                  <li>
+                    <span class="node"><strong>GameSession</strong><span>Session coordinator owned by Game.</span></span>
+                    <ul>
+                      <li><span class="node"><strong>MapDownloader</strong><span>Map lookup/download/upload helpers for session flows.</span></span></li>
+                      <li><span class="node"><strong>AmbienceMixer</strong><span>Session music and ambience channels.</span></span></li>
+                      <li><span class="node"><strong>LobbyGame</strong><span>Copied into world/session state when joining or hosting a match.</span></span></li>
+                    </ul>
+                  </li>
+                  <li>
+                    <span class="node primary"><strong>World</strong><span>Simulation container and main in-match data owner.</span></span>
+                    <ul>
+                      <li>
+                        <span class="node"><strong>WorldObjectRegistry</strong><span>Object lifetime, IDs, type lists, collision lookup.</span></span>
+                        <ul>
+                          <li><span class="node"><strong>Object subclasses</strong><span>Concrete object fields and Serialize contracts.</span></span></li>
+                          <li><span class="node"><strong>Player / Team</strong><span>Live player object and team gameplay state.</span></span></li>
+                          <li><span class="node"><strong>State / GameStateObject</strong><span>Shared match-start gate and replicated match summary.</span></span></li>
+                        </ul>
+                      </li>
+                      <li><span class="node"><strong>WorldNetwork</strong><span>Authority/replica mode, UDP packets, direct inbound packet effects.</span></span></li>
+                      <li>
+                        <span class="node"><strong>WorldPeerRegistry</strong><span>Peer slots, readiness, teams, observers, parked rejoin state.</span></span>
+                        <ul>
+                          <li><span class="node"><strong>Peer</strong><span>Account id, selected character, controlled object ids, stats.</span></span></li>
+                        </ul>
+                      </li>
+                      <li><span class="node"><strong>WorldReplication</strong><span>Snapshots, input queues, old-snapshot rings, prediction path.</span></span></li>
+                      <li><span class="node"><strong>WorldMessaging</strong><span>Messages, status, chat, top message, outbound sound fan-out.</span></span></li>
+                      <li>
+                        <span class="node"><strong>TriggerGraph</strong><span>Objectives, trigger definitions, flags, authority-local events and actions.</span></span>
+                        <ul>
+                          <li><span class="node"><strong>ActionSystem</strong><span>Queued trigger action execution.</span></span></li>
+                        </ul>
+                      </li>
+                      <li>
+                        <span class="node"><strong>Lobby</strong><span>Client cache and protocol adapter for account, game rows, characters, presence, user info.</span></span>
+                        <ul>
+                          <li><span class="node"><strong>LobbyGame rows</strong><span>Local view of lobby-advertised games.</span></span></li>
+                          <li><span class="node"><strong>UserInfo / Characters / Presence</strong><span>Local cache of account identity, selected character, and online state.</span></span></li>
+                        </ul>
+                      </li>
+                      <li><span class="node"><strong>Map / Resources</strong><span>Loaded map plus local sprites, tiles, sounds, actor defs, GAS, behavior trees.</span></span></li>
+                      <li><span class="node"><strong>Replay</strong><span>Recorded event/state stream and playback camera state.</span></span></li>
+                      <li><span class="node"><strong>GameMode / DedicatedServer</strong><span>Active match rules and authority heartbeat/runtime server wrapper.</span></span></li>
+                    </ul>
+                  </li>
+                  <li><span class="node"><strong>GameInput / InputServer</strong><span>Local input normalization and binary input automation socket.</span></span></li>
+                  <li><span class="node"><strong>GameRenderer / Renderer</strong><span>Screen buffer, palette, GPU output, screenshots.</span></span></li>
+                  <li><span class="node"><strong>GameUiPipeline / ClientUi</strong><span>UI input frame, screen stack, interaction registry.</span></span></li>
+                  <li><span class="node"><strong>ControlServer / ControlDispatch</strong><span>Local JSON-lines test and inspection API.</span></span></li>
+                </ul>
+              </li>
+            </ul>
+          </div>
+
+          <div class="graph-panel">
+            <h3>External Edges</h3>
+            <div class="edge-list">
+              <div class="edge">
+                <b>Go lobby server</b>
+                <span>Owns persisted accounts, progression, game rows, presence, characters. Client <code>Lobby</code> caches replies and pushes.</span>
+              </div>
+              <div class="edge">
+                <b>Game UDP peers</b>
+                <span><code>WorldNetwork</code> dispatches packets; <code>WorldReplication</code> owns snapshots and input queues.</span>
+              </div>
+              <div class="edge">
+                <b>Community map HTTP</b>
+                <span><code>mapfetch</code> transfers map files; loaded runtime state belongs to <code>World::map</code>.</span>
+              </div>
+              <div class="edge">
+                <b>Dedicated heartbeat</b>
+                <span><code>DedicatedServer</code> summarizes an authority world to the lobby; it does not own match truth.</span>
+              </div>
+              <div class="edge">
+                <b>Automation sockets</b>
+                <span><code>ControlServer</code> and <code>InputServer</code> enter through <code>Game::Loop()</code>.</span>
+              </div>
+              <div class="edge">
+                <b>Audio singleton</b>
+                <span><code>World</code> stores an <code>Audio&amp;</code>; message/network paths trigger playback but do not persist audio state.</span>
+              </div>
+            </div>
           </div>
         </div>
       </div>
