@@ -31,7 +31,7 @@ packages:
   - gnupg
   # Lobby's runtime shared libs — silencer-lobby itself only needs
   # libcurl + libminizip; SDL3 .so files arrive bundled alongside the
-  # dedicated-server binary via patchelf rpath (see deploy-staging.yml).
+  # dedicated-server binary via patchelf rpath.
   - libcurl4t64
   - libminizip1t64
 
@@ -91,7 +91,7 @@ write_files:
       NODE_ENV=production
       NEXT_TELEMETRY_DISABLED=1
 
-  # Image refs updated by deploy-staging.yml. EnvironmentFile-shape so
+  # Retired deploys updated these image refs. EnvironmentFile-shape so
   # systemd $${IMAGE} substitution works in ExecStart.
   - path: /etc/silencer/admin-api.image
     permissions: '0644'

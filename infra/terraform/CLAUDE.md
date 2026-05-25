@@ -20,14 +20,11 @@ across instance replacement.
 > `docs/production.md`. This file covers the *why* of the Terraform
 > code; `docs/production.md` covers the *how* of running it.
 
-> **Staging** is a separate sibling module at `staging/` — one
-> `t4g.small` running everything as a single-box smoke-test
-> environment, redeployed on every push to `main`. See `staging/CLAUDE.md`
-> and `docs/plans/2026-04-27-staging-environment.md`. The two modules
-> share the same S3 state bucket / DynamoDB lock table (only the
-> state-file `key` differs) and the same SSH pubkeys + GHCR pull token;
-> everything else (Mongo / LavinMQ / JWT / Tailscale auth keys) is
-> separately namespaced under `/silencer-staging/*`.
+Production is the only active Terraform-managed AWS environment. The
+`staging/` sibling module is retained only as the canonical destroy
+target for the retired smoke-test stack. Do not run `terraform apply`
+or `terraform destroy` there without explicit operator approval; once
+the destroy is confirmed, delete the module.
 
 ## File layout
 
