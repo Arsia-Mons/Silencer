@@ -54,7 +54,7 @@ RUN apt-get -o Acquire::Check-Valid-Until=false \
         ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
-ARG SILENCER_VERSION=00056
+ARG SILENCER_VERSION=00057
 
 WORKDIR /src
 COPY clients/silencer/CMakeLists.txt clients/silencer/
