@@ -232,9 +232,10 @@
           <div class="box">
             <h3>Simulation</h3>
             <p>
-              <code>World</code> owns map, resources, audio, lobby client,
-              trigger graph, active game mode, object registry, peer registry,
-              network transport, and replication.
+              <code>World</code> owns map, resources, lobby client, trigger
+              graph, active game mode, object registry, peer registry, network
+              transport, and replication. It borrows the <code>Audio</code>
+              singleton for playback hooks.
             </p>
           </div>
           <div class="box">
@@ -270,7 +271,7 @@
                     <ul>
                       <li><span class="node"><strong>MapDownloader</strong><span>Map lookup/download/upload helpers for session flows.</span></span></li>
                       <li><span class="node"><strong>AmbienceMixer</strong><span>Session music and ambience channels.</span></span></li>
-                      <li><span class="node"><strong>LobbyGame</strong><span>Copied into world/session state when joining or hosting a match.</span></span></li>
+                      <li><span class="node"><strong>External LobbyGame input</strong><span>Consumed by session joins; host-created UI currently seeds World::gameinfo before joining.</span></span></li>
                     </ul>
                   </li>
                   <li>
@@ -398,11 +399,14 @@
               <td>
                 <code>Game::JoinGame()</code>, <code>SpectateGame()</code>, and
                 <code>LeaveJoinedGame()</code> delegate to
-                <code>GameSession</code>. <code>GameSession</code> copies
-                <code>LobbyGame</code> host data into the authority peer,
-                switches <code>World</code> into replica connect flow,
-                loads/unloads maps, resets objects/game mode, and submits final
-                stats.
+                <code>GameSession</code>. <code>GameSession</code> reads
+                <code>LobbyGame</code> map/host fields to set
+                <code>World::mapname</code>, the authority peer endpoint,
+                replica connect flow, map load/unload, object/game-mode reset,
+                and final stats. Host-created lobby UI currently seeds
+                <code>World::gameinfo</code> through
+                <code>LobbyScreen::SeedHostGameInfo()</code> before delegating
+                to <code>JoinGame()</code>.
               </td>
               <td>
                 Keep session transitions here. Do not split map teardown or
@@ -442,12 +446,14 @@
                 <code>GameSession</code>, or <code>World</code> code paths.
               </td>
               <td>
-                Session and tick code load <code>LobbyGame</code> config into
-                <code>World::gameinfo</code>, create/update the shared
-                <code>State</code> object that gates match start, switch
-                <code>World::gameplaystate</code>, create <code>gameMode</code>
-                from <code>gameinfo.modeId</code>, and set
-                <code>winningteamid</code>/<code>matchEndCalled</code>.
+                Replicas load <code>World::gameinfo</code> from
+                <code>MSG_GAMEINFO</code>. Host-created lobby UI currently
+                seeds <code>World::gameinfo</code> from <code>LobbyGame</code>
+                through <code>LobbyScreen::SeedHostGameInfo()</code>. Session
+                and tick code create/update the shared <code>State</code> object
+                that gates match start, switch <code>World::gameplaystate</code>,
+                create <code>gameMode</code> from <code>gameinfo.modeId</code>,
+                and set <code>winningteamid</code>/<code>matchEndCalled</code>.
               </td>
               <td>
                 This is lifecycle/config state, not the scoreboard projection.
@@ -807,7 +813,7 @@
             </tr>
             <tr>
               <td>Where is match lifecycle/config state?</td>
-              <td><code>GameSession</code> and <code>World</code> own match entry, map selection, lobby game config, shared start state, active <code>GameMode</code>, and end-of-match flags. <code>GameStateObject</code> is not created until the world is already in <code>INGAME</code>.</td>
+              <td><code>GameSession</code> and <code>World</code> own match entry, map selection, lobby game config, shared start state, active <code>GameMode</code>, and end-of-match flags. Host-created lobby UI has an existing friend-of-<code>World</code> seeding path for <code>World::gameinfo</code> before session join; treat that as a boundary leak, not general UI ownership. <code>GameStateObject</code> is not created until the world is already in <code>INGAME</code>.</td>
               <td><code>world.h</code>, <code>game/session/game_session.cpp</code>, <code>game/tick/tick_hostjoin.cpp</code>, <code>game/tick/tick_ingame.cpp</code>, <code>game/loop/game_loop.cpp</code>.</td>
             </tr>
             <tr>
@@ -878,7 +884,7 @@
             </tr>
             <tr>
               <td>Change match lifecycle/config state</td>
-              <td><code>GameSession</code> and <code>Game::Loop()</code> state-transition code; map/session ticks update <code>World::gameplaystate</code>, <code>gameinfo</code>, shared <code>State</code>, <code>gameMode</code>, and match-end fields.</td>
+              <td><code>GameSession</code> and <code>Game::Loop()</code> state-transition code; host-created lobby UI currently seeds <code>World::gameinfo</code> through <code>LobbyScreen::SeedHostGameInfo()</code>, then map/session ticks update <code>World::gameplaystate</code>, shared <code>State</code>, <code>gameMode</code>, and match-end fields.</td>
               <td>Those fields coordinate connection, map download, peer readiness, active mode, and teardown. Changing them outside the session/tick owners breaks the match state machine.</td>
             </tr>
             <tr>
