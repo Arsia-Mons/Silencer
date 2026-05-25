@@ -17,6 +17,7 @@ silencer::clay_bridge::ClayCustomData* AllocSpriteCustomData(
 	silencer::clay_bridge::SpritePayload payload);
 silencer::clay_bridge::ClayCustomData* AllocTeamEmblemCustomData(
 	silencer::clay_bridge::TeamEmblemPayload payload);
+silencer::clay_bridge::ClayCustomData* AllocMessageBackgroundCustomData();
 
 }  // namespace client_ui
 }  // namespace silencer

@@ -2,19 +2,54 @@
 
 #include "clay/clay.h"
 #include "client/ui/hud/HudClayHelpers.h"
+#include "client/ui/hud/HudPayloadArena.h"
 #include "client/ui/views/HudView.h"
 #include "surface.h"
 #include "ui/primitives/text.h"
-#include "ui/primitives/box.h"
+#include "ui/primitives/text_input.h"
 #include "ui/runtime/UiInteractionRegistry.h"
 
 #include <SDL3/SDL_timer.h>
 
+#include <algorithm>
+#include <cstring>
 #include <string>
 #include <vector>
 
 namespace silencer {
 namespace client_ui {
+
+namespace {
+
+constexpr int kChatX = 400;
+constexpr int kChatY = 280;
+constexpr int kChatW = 231;
+constexpr int kChatBackgroundH = 30;
+constexpr int kTextX = 10;
+constexpr int kTextStartY = 10;
+constexpr int kLineStepY = 10;
+constexpr int kMaxHistoryChars = 36;
+constexpr int kChatInputVisibleChars = 28;
+
+Clay_ElementDeclaration ChatFloatingChild(const char* id, int x, int y, int w, int h) {
+	Clay_String idString{
+		.isStaticallyAllocated = true,
+		.length = static_cast<int32_t>(std::strlen(id)),
+		.chars = id,
+	};
+	return {
+		.id = Clay_GetElementId(idString),
+		.layout = {
+			.sizing = { CLAY_SIZING_FIXED((float)w), CLAY_SIZING_FIXED((float)h) },
+		},
+		.floating = {
+			.offset = { (float)x, (float)y },
+			.attachTo = CLAY_ATTACH_TO_PARENT,
+		},
+	};
+}
+
+}  // namespace
 
 void BuildChatOverlay(const HudView& view,
                       Surface* surface,
@@ -22,81 +57,101 @@ void BuildChatOverlay(const HudView& view,
 	using namespace silencer::ui::primitives;
 
 	const PlayerHudView& player = view.viewedPlayer;
+	if(!player.chatActive && view.showChatTicks <= 0) return;
 
 	std::vector<std::string> lines;
 	for(int i = 0; i < (int)view.chatLines.size(); i++) {
 		if(player.chatActive && i == 0 && view.chatLines.size() == 5) {
 			continue;
 		}
-		lines.push_back(view.chatLines[i].substr(0, 36));
+		lines.push_back(view.chatLines[i].substr(0, kMaxHistoryChars));
 	}
-	std::string inputPrefix;
-	std::string inputText;
-	if(player.chatActive) {
-		inputPrefix = player.chatWithTeam ? "(TEAM):" : "(ALL):";
-		inputText = inputPrefix + player.chatText;
-		if((SDL_GetTicks() / 50) % 32 < 16) {
-			inputText.push_back('|');
-		}
-		lines.push_back(inputText);
-	}
-	if(lines.empty()) return;
+	if(lines.empty() && !player.chatActive) return;
 
-	int panelH = 22 + ((int)lines.size() * 10);
-	if(panelH < 42) panelH = 42;
-	if(player.chatActive){
-		silencer::ui::UiInteractable chat;
-		chat.id = "ingame.chat";
-		chat.labelText = "In-game chat";
-		chat.kind = silencer::ui::UiInteractableKind::TextInput;
-		chat.uid = 9000;
-		chat.value = player.chatText;
-		chat.maxLength = player.chatTextCapacity - 1;
-		chat.clayId = CLAY_ID("InGameChatPanel");
-		chat.hasClayId = true;
-		chat.cancelOnEscape = true;
-		interactions.RegisterInteractable(chat);
+	const int contentLines = (int)lines.size() + (player.chatActive ? 1 : 0);
+	const int panelH = std::max(kChatBackgroundH + 20,
+	                            kTextStartY + contentLines * kLineStepY + 12);
 
-		silencer::ui::UiInteractable channel;
-		channel.id = "ingame.chat.channel";
-		channel.labelText = player.chatWithTeam ? "Team chat" : "All chat";
-		channel.kind = silencer::ui::UiInteractableKind::Toggle;
-		channel.selected = player.chatWithTeam;
-		channel.clayId = CLAY_ID("InGameChatPanel");
-		channel.hasClayId = true;
-		interactions.RegisterInteractable(channel);
-
-		if(!interactions.HasFocus()){
-			interactions.FocusInteractableById("ingame.chat");
-		}
-	}
-
-	CLAY({ .id = CLAY_ID("InGameChatRoot"),
-	       .layout = {
-	           .sizing = { CLAY_SIZING_FIXED((float)surface->w),
-	                       CLAY_SIZING_FIXED((float)surface->h) },
-	           .padding = { 0, 9, 0, 160 },
-	           .childAlignment = { CLAY_ALIGN_X_RIGHT, CLAY_ALIGN_Y_BOTTOM },
-	       },
-	       .floating = {
-	           .attachTo = CLAY_ATTACH_TO_ROOT,
-	       },
-	}) {
-		CLAY(Box(BoxVariants::Chrome, {
-		       .id = CLAY_ID("InGameChatPanel"),
+	(void)surface;
+	CLAY(HudFloatingElement("InGameChatPanel", kChatX, kChatY, kChatW, panelH)) {
+		CLAY({ .id = CLAY_ID("InGameChatBackground"),
 		       .layout = {
-		           .sizing = { CLAY_SIZING_FIXED(231), CLAY_SIZING_FIXED((float)panelH) },
-		           .padding = { 10, 10, 8, 8 },
-		           .childGap = 1,
-		           .layoutDirection = CLAY_TOP_TO_BOTTOM,
+		           .sizing = { CLAY_SIZING_FIXED((float)kChatW),
+		                       CLAY_SIZING_FIXED((float)kChatBackgroundH) },
 		       },
-		       .backgroundColor = { 0, 0, 0, 192 },
-		})) {
-			for(int i = 0; i < (int)lines.size(); i++) {
-				Uint8 brightness = (player.chatActive && i == (int)lines.size() - 1) ? 128 : 136;
+		       .floating = {
+		           .offset = { 0, 0 },
+		           .attachTo = CLAY_ATTACH_TO_PARENT,
+		       },
+		       .custom = {
+		           .customData = AllocMessageBackgroundCustomData(),
+		       } }) {}
+
+		int yoffset = kTextStartY;
+		for(int i = 0; i < (int)lines.size(); i++) {
+			CLAY({ .id = CLAY_IDI("InGameChatLine", i),
+			       .layout = {
+			           .sizing = { CLAY_SIZING_FIT(0), CLAY_SIZING_FIT(0) },
+			       },
+			       .floating = {
+			           .offset = { (float)kTextX, (float)yoffset },
+			           .attachTo = CLAY_ATTACH_TO_PARENT,
+			       } }) {
 				Text(ClayStringFromStd(lines[i]),
 				     { .size = TextSize::Body,
-				       .effect = TextEffect::LegacyPalette(0, brightness) });
+				       .effect = TextEffect::LegacyPalette(0, 136) });
+			}
+			yoffset += kLineStepY;
+		}
+
+		if(player.chatActive){
+			const char* inputPrefix = player.chatWithTeam ? "(TEAM):" : "(ALL):";
+			const int prefixW = static_cast<int>(std::strlen(inputPrefix)) *
+			                    TextAdvance(TextSize::Body);
+			CLAY(ChatFloatingChild("InGameChatInputPrefix",
+			                       kTextX,
+			                       yoffset,
+			                       prefixW,
+			                       TextLineHeight(TextSize::Body))) {
+				Text(ClayStringFromCString(inputPrefix),
+				     { .size = TextSize::Body,
+				       .effect = TextEffect::LegacyPalette(0, 136) });
+			}
+
+			CLAY(ChatFloatingChild("InGameChatInputWrap",
+			                       kTextX + prefixW,
+			                       yoffset,
+			                       kChatInputVisibleChars * TextAdvance(TextSize::Body),
+			                       TextLineHeight(TextSize::Body))) {
+				Clay_String stableChatText = AllocHudString(player.chatText);
+				TextInput(CLAY_STRING("InGameChatInput"),
+				          stableChatText.chars,
+				          { .widthPx = static_cast<Uint16>(
+				                kChatInputVisibleChars * TextAdvance(TextSize::Body)),
+				            .heightPx = TextLineHeight(TextSize::Body),
+				            .textSize = TextSize::Body,
+				            .effect = TextEffect::LegacyPalette(0, 128),
+				            .caretColor = 140,
+				            .showCaret = ((SDL_GetTicks() / 50) % 32 < 16) },
+				          { .actionId = "ingame.chat",
+				            .label = "In-game chat",
+				            .interactions = &interactions,
+				            .uid = 9000,
+				            .maxLength = player.chatTextCapacity - 1,
+				            .cancelOnEscape = true });
+			}
+
+			silencer::ui::UiInteractable channel;
+			channel.id = "ingame.chat.channel";
+			channel.labelText = player.chatWithTeam ? "Team chat" : "All chat";
+			channel.kind = silencer::ui::UiInteractableKind::Toggle;
+			channel.selected = player.chatWithTeam;
+			channel.clayId = CLAY_ID("InGameChatPanel");
+			channel.hasClayId = true;
+			interactions.RegisterInteractable(channel);
+
+			if(!interactions.HasFocus()){
+				interactions.FocusInteractableById("ingame.chat");
 			}
 		}
 	}

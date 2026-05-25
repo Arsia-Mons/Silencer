@@ -56,6 +56,7 @@ enum class CustomKind : Uint8 {
 	Sprite,
 	TeamEmblem,
 	Surface,
+	MessageBackground,
 };
 
 struct ClayCustomData {
