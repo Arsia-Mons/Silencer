@@ -4,6 +4,10 @@ All notable changes to Silencer are documented here.
 
 ## [Unreleased]
 
+### Infrastructure
+
+- Retired the disposable AWS smoke-test environment: removed automatic staging deploys and SSM seed entries, retired the plan documentation, and marked the Terraform module decommission-only until an approved destroy is completed (#235).
+
 ## [v00054] — 2026-05-25
 
 ### Game client
@@ -273,7 +277,7 @@ Test release — no behavior change. Cut to validate the v00046 Windows auto-upd
 
 ### Infrastructure
 
-- **Staging environment** (#91) — disposable `t4g.small` running the full prod stack (lobby + dedicated game servers + admin-api + admin-web + Mongo + LavinMQ) as native systemd units, redeployed on every push to `main` via GitHub Actions. `concurrency: cancel-in-progress: false` coalesces queued runs to the newest commit. Sibling Terraform module at `infra/terraform/staging/` (kept separate from prod due to cloud-init divergence and prod's `prevent_destroy` EBS volumes). Detail in `docs/plans/2026-04-27-staging-environment.md`.
+- **Temporary AWS smoke-test environment** (#91, removed in #235) — disposable `t4g.small` running the full prod stack (lobby + dedicated game servers + admin-api + admin-web + Mongo + LavinMQ) as native systemd units, redeployed on every push to `main` via GitHub Actions. `concurrency: cancel-in-progress: false` coalesces queued runs to the newest commit.
 - **URL-safe seeded credentials** — `seed-ssm` now uses base64url for the seeded Mongo and LavinMQ passwords. Plain base64's `/` and `+` broke `net/url.Parse` when the password landed inside `mongodb://` / `amqp://` URLs (bit the staging lobby on first deploy).
 
 ## [v00044] — 2026-05-01

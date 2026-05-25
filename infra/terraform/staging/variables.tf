@@ -1,5 +1,5 @@
 variable "aws_region" {
-  description = "AWS region. Defaults to the same region as prod so the SSM params seeded once are reachable from both stacks."
+  description = "AWS region for the retired staging stack."
   type        = string
   default     = "us-west-1"
 }
@@ -23,7 +23,7 @@ variable "ssh_allowed_cidr" {
 }
 
 variable "domain_name" {
-  description = "DNS name for the staging lobby (e.g. staging.example.com). Empty = use the EIP directly. Devs build clients with cmake -DSILENCER_LOBBY_HOST=<this>."
+  description = "DNS name formerly used by the staging lobby. Empty = no DNS record."
   type        = string
   default     = ""
 }
@@ -41,19 +41,19 @@ variable "root_volume_size" {
 }
 
 variable "tailscale_hostname" {
-  description = "Tailscale MagicDNS hostname for the staging box. GitHub Actions deploys to ubuntu@<this>; devs hit http://<this>:24000 for the admin dashboard."
+  description = "Tailscale MagicDNS hostname formerly used by the staging box."
   type        = string
   default     = "silencer-staging"
 }
 
 variable "admin_image_admin_api" {
-  description = "Initial OCI image ref for silencer-admin-api on first boot. Empty = unit crash-loops quietly until the deploy workflow writes /etc/silencer/admin-api.image."
+  description = "Retired initial OCI image ref for silencer-admin-api."
   type        = string
   default     = ""
 }
 
 variable "admin_image_admin_web" {
-  description = "Initial OCI image ref for silencer-admin-web on first boot. See admin_image_admin_api."
+  description = "Retired initial OCI image ref for silencer-admin-web."
   type        = string
   default     = ""
 }

@@ -1,15 +1,14 @@
-# Copy to terraform.tfvars (gitignored) and override only the knobs you
-# need. All secrets live in AWS SSM Parameter Store under
-# /silencer-staging/* and /silencer/shared/* — seed them with:
-#
-#     ./infra/scripts/seed-ssm.sh
+# Decommission-only sample values. Copy to terraform.tfvars (gitignored)
+# only when restoring local config to plan/destroy the retired stack.
+# Required secrets already live in AWS SSM Parameter Store under
+# /silencer-staging/* and /silencer/shared/* from the retired deployment.
 #
 # Restricts public-internet SSH (break-glass only — day-to-day SSH goes
 # through Tailscale). Set to your laptop's /32:
 ssh_allowed_cidr = "1.2.3.4/32"  # check with: curl ifconfig.me
 
-# Optional DNS — set both to make `staging.example.com` an A-record at
-# the staging EIP:
+# Optional DNS retained only so Terraform can destroy a matching record
+# if the retired stack managed one:
 # domain_name     = "staging.example.com"
 # route53_zone_id = "Z0123456789ABCDEFGHIJ"
 
@@ -19,7 +18,6 @@ ssh_allowed_cidr = "1.2.3.4/32"  # check with: curl ifconfig.me
 # root_volume_size      = 16
 # tailscale_hostname    = "silencer-staging"
 #
-# Initial OCI image refs — leave empty for first apply; deploy-staging.yml
-# updates /etc/silencer/<svc>.image at run time.
+# Retired OCI image refs. Leave empty unless matching historical state.
 # admin_image_admin_api = ""
 # admin_image_admin_web = ""

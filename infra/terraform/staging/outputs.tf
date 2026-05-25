@@ -1,15 +1,15 @@
 output "staging_lobby_ip" {
-  description = "Elastic IP of the staging box. Set this as `vars.STAGING_LOBBY_PUBLIC_IP` in GitHub repo settings — deploy-staging.yml bakes it into the dedicated server's -public-addr (mandatory; the C++ join path resolves with inet_addr())."
+  description = "Elastic IP of the retired staging box."
   value       = aws_eip.staging.public_ip
 }
 
 output "staging_host" {
-  description = "Host devs build the client against — domain_name if set, otherwise the EIP. Use with: cmake -DSILENCER_LOBBY_HOST=<this>"
+  description = "Retired staging host: domain_name if set, otherwise the EIP."
   value       = var.domain_name != "" ? var.domain_name : aws_eip.staging.public_ip
 }
 
 output "staging_ssh_command" {
-  description = "Break-glass SSH (Tailscale-down). Day-to-day: ssh ubuntu@<tailscale_hostname>"
+  description = "Break-glass SSH for decommission checks."
   value       = "ssh ubuntu@${aws_eip.staging.public_ip}"
 }
 
@@ -18,6 +18,6 @@ output "staging_instance_id" {
 }
 
 output "staging_tailscale_host" {
-  description = "Tailscale MagicDNS name. Devs hit http://<this>:24000 for the admin dashboard."
+  description = "Retired Tailscale MagicDNS name."
   value       = var.tailscale_hostname
 }
