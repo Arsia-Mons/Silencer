@@ -62,7 +62,7 @@ void BuildInGameHudUi(Renderer& renderer, const Resources& resources,
 	}
 
 	if(view.showChatTicks || player.chatActive){
-		BuildChatOverlay(view, surface, interactions);
+		BuildChatOverlay(view, resources, surface, interactions);
 	}
 }
 
