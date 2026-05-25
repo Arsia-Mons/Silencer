@@ -6,7 +6,7 @@ All notable changes to Silencer are documented here.
 
 ### Infrastructure
 
-- Retired the disposable AWS smoke-test environment: removed automatic staging deploys and SSM seed entries, retired the plan documentation, and marked the Terraform module decommission-only until an approved destroy is completed (#235).
+- Removed the disposable AWS smoke-test environment: automatic staging deploys, staging SSM seed entries, the retired plan documentation, and the staging Terraform module are gone after the approved destroy and cleanup (#235, #240).
 
 ## [v00054] — 2026-05-25
 
