@@ -57,6 +57,25 @@ if(APPLE)
 		MACOSX_BUNDLE_ICON_FILE "icon.icns"
 		OUTPUT_NAME "Silencer"
 	)
+	add_executable(updater-stage-2
+		tools/updater-stage-2/main.cpp
+		src/updater/updaterstage2.cpp
+		src/updater/updaterzip.cpp
+	)
+	target_compile_features(updater-stage-2 PRIVATE cxx_std_20)
+	target_include_directories(updater-stage-2 PRIVATE
+		"${CMAKE_CURRENT_SOURCE_DIR}/src/updater")
+	set_target_properties(updater-stage-2 PROPERTIES OUTPUT_NAME "updater-stage-2")
+	set(updater_stage2_bundle_dir
+		"${CMAKE_CURRENT_BINARY_DIR}/Silencer.app/Contents/Helpers")
+	add_custom_command(TARGET updater-stage-2 POST_BUILD
+		COMMAND ${CMAKE_COMMAND} -E make_directory
+			"${updater_stage2_bundle_dir}"
+		COMMAND ${CMAKE_COMMAND} -E copy_if_different
+			"$<TARGET_FILE:updater-stage-2>"
+			"${updater_stage2_bundle_dir}/updater-stage-2"
+		COMMENT "Embedding macOS updater stage-2 helper")
+	add_dependencies(${SILENCER_TARGET} updater-stage-2)
 elseif(WIN32)
 	add_executable(${SILENCER_TARGET} WIN32 ${sources})
 	set_target_properties(${SILENCER_TARGET} PROPERTIES OUTPUT_NAME "Silencer")

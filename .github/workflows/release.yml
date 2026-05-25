@@ -57,12 +57,14 @@ jobs:
           TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: |
           IDENTITY="Developer ID Application"
-          # Sign inside-out: dylibs first, then main binary, then bundle.
+          # Sign inside-out: dylibs and helper first, then main binary, then bundle.
           # --options runtime (Hardened Runtime) + --timestamp are required
           # by notarytool.
           find Silencer.app/Contents/Frameworks -name "*.dylib" -print0 \
             | xargs -0 -n1 codesign --force --timestamp --options runtime \
               --sign "$IDENTITY"
+          codesign --force --timestamp --options runtime \
+            --sign "$IDENTITY" Silencer.app/Contents/Helpers/updater-stage-2
           codesign --force --timestamp --options runtime \
             --sign "$IDENTITY" Silencer.app/Contents/MacOS/Silencer
           codesign --force --timestamp --options runtime \

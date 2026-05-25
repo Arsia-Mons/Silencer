@@ -9,21 +9,34 @@ set -euo pipefail
 APP="${1:?usage: $0 <path-to-Silencer.app>}"
 BINARY="$APP/Contents/MacOS/Silencer"
 FRAMEWORKS="$APP/Contents/Frameworks"
+HELPER="$APP/Contents/Helpers/updater-stage-2"
 
 [ -x "$BINARY" ] || { echo "no executable at $BINARY" >&2; exit 1; }
+[ -x "$HELPER" ] || { echo "no executable at $HELPER" >&2; exit 1; }
 
 errors=0
 
 check_file() {
 	local file="$1"
+	local allow_bundled_deps="${2:-1}"
 	local refs
 	refs=$(otool -L "$file" | tail -n +2 | awk '{print $1}')
 	while IFS= read -r ref; do
 		case "$ref" in
 			"") ;;
 			/System/*|/usr/lib/*) ;;
-			@executable_path/*|@loader_path/*) ;;
+			@executable_path/*|@loader_path/*)
+				if [ "$allow_bundled_deps" != "1" ]; then
+					echo "UNEXPECTED helper dependency: $ref (in $file)"
+					errors=$((errors + 1))
+				fi
+				;;
 			@rpath/*)
+				if [ "$allow_bundled_deps" != "1" ]; then
+					echo "UNEXPECTED helper dependency: $ref (in $file)"
+					errors=$((errors + 1))
+					continue
+				fi
 				local lib="${ref#@rpath/}"
 				if [ ! -f "$FRAMEWORKS/$lib" ]; then
 					echo "MISSING in Frameworks/: $lib (referenced from $file)"
@@ -43,6 +56,7 @@ check_file() {
 }
 
 check_file "$BINARY"
+check_file "$HELPER" 0
 
 if [ -d "$FRAMEWORKS" ]; then
 	while IFS= read -r dylib; do

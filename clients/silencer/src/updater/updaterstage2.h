@@ -11,8 +11,9 @@ namespace UpdaterStage2 {
 int Run(int argc, char **argv);
 
 // Called by the normal client when Updater reaches STAGING.
-// Spawns stage-2 (the same binary, copied to a temp path, reinvoked
-// with --self-update-stage2). Returns true on a successful spawn — the
+// Spawns stage-2. macOS launches the nested signed helper at
+// Contents/Helpers/updater-stage-2; Windows/Linux keep the copied-binary
+// handoff. Returns true on a successful spawn — the
 // caller is then responsible for exiting cleanly via main-return so
 // ~Game() runs (otherwise the audio device is left open, producing a
 // pop when the new process re-opens it). Returns false if the spawn

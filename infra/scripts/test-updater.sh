@@ -53,6 +53,10 @@ cmake -B build-old -S clients/silencer \
     -DSILENCER_LOBBY_PORT=15170
 cmake --build build-old -j
 
+if [ "$(uname)" = "Darwin" ]; then
+    test -x build-old/Silencer.app/Contents/Helpers/updater-stage-2
+fi
+
 cat > update.json <<EOF
 {
   "version":        "$NEW_VER",
