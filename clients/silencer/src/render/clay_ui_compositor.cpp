@@ -710,12 +710,14 @@ void BlitMessageBackgroundSprite(::Resources & resources,
 
 void DispatchMessageBackground(::Resources & resources,
                                Surface * dst,
-                               const ::Clay_BoundingBox & bb) {
+                               const ::Clay_BoundingBox & bb,
+                               const MessageBackgroundPayload * payload) {
 	int x = static_cast<int>(bb.x);
 	int y = static_cast<int>(bb.y);
 	int w = static_cast<int>(bb.width);
-	int h = static_cast<int>(bb.height);
-	if(w <= 0 || h <= 0) return;
+	int visibleH = static_cast<int>(bb.height);
+	int interiorH = payload ? static_cast<int>(payload->interiorHeight) : visibleH;
+	if(w <= 0 || visibleH <= 0 || interiorH <= 0) return;
 
 	Renderer::Rect srcRect{0, 0, 0, 0};
 	BlitMessageBackgroundSprite(resources, dst, 0, srcRect, x, y);
@@ -735,7 +737,7 @@ void DispatchMessageBackground(::Resources & resources,
 	BlitMessageBackgroundSprite(resources, dst, 2, srcRect, x + w - rightCapX, y);
 
 	xOffset = SpriteWidth(resources, 188, 6);
-	const int bottomY = y + h;
+	const int bottomY = y + interiorH;
 	BlitMessageBackgroundSprite(resources, dst, 6, srcRect, x, bottomY);
 	while(xOffset < w - SpriteWidth(resources, 188, 8)){
 		int tileW = w - xOffset - rightCapX;
@@ -997,7 +999,9 @@ void RenderInto(::Resources & resources, ::Renderer & renderer,
 						break;
 					}
 					case CustomKind::MessageBackground: {
-						DispatchMessageBackground(resources, dst, c->boundingBox);
+						const auto * p =
+							reinterpret_cast<const MessageBackgroundPayload *>(ccd->payload);
+						DispatchMessageBackground(resources, dst, c->boundingBox, p);
 						break;
 					}
 					case CustomKind::ScrollBar: {

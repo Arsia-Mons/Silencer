@@ -208,7 +208,6 @@ InGameUiControlResult InGameUiController::ConfigureForControl(InGameUiControlMod
 		player->chatText[0] = '\0';
 		player->isbuying = false;
 		player->techstationactive = false;
-		world_.messaging.chatlines.clear();
 		world_.messaging.showchat_i = 0;
 		world_.SetShowingPlayerList(false);
 	};
@@ -225,7 +224,6 @@ InGameUiControlResult InGameUiController::ConfigureForControl(InGameUiControlMod
 		player->chatwithteam = false;
 		std::strncpy(player->chatText, "clay chat smoke", sizeof(player->chatText) - 1);
 		player->chatText[sizeof(player->chatText) - 1] = '\0';
-		world_.messaging.chatlines.push_back("- test");
 		world_.messaging.showchat_i = GASLoader::Get().gameengine.chatDisplayTicks;
 	}
 	if(mode == InGameUiControlMode::Buy || mode == InGameUiControlMode::All){

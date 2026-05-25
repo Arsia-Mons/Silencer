@@ -24,7 +24,8 @@ namespace {
 constexpr int kChatX = 400;
 constexpr int kChatY = 280;
 constexpr int kChatW = 231;
-constexpr int kChatBackgroundH = 30;
+constexpr int kChatBackgroundInteriorH = 30;
+constexpr int kChatChromeH = 70;
 constexpr int kTextX = 10;
 constexpr int kTextStartY = 10;
 constexpr int kLineStepY = 10;
@@ -69,7 +70,7 @@ void BuildChatOverlay(const HudView& view,
 	if(lines.empty() && !player.chatActive) return;
 
 	const int contentLines = (int)lines.size() + (player.chatActive ? 1 : 0);
-	const int panelH = std::max(kChatBackgroundH + 20,
+	const int panelH = std::max(kChatChromeH,
 	                            kTextStartY + contentLines * kLineStepY + 12);
 
 	(void)surface;
@@ -77,14 +78,15 @@ void BuildChatOverlay(const HudView& view,
 		CLAY({ .id = CLAY_ID("InGameChatBackground"),
 		       .layout = {
 		           .sizing = { CLAY_SIZING_FIXED((float)kChatW),
-		                       CLAY_SIZING_FIXED((float)kChatBackgroundH) },
+		                       CLAY_SIZING_FIXED((float)kChatChromeH) },
 		       },
 		       .floating = {
 		           .offset = { 0, 0 },
 		           .attachTo = CLAY_ATTACH_TO_PARENT,
 		       },
 		       .custom = {
-		           .customData = AllocMessageBackgroundCustomData(),
+		           .customData = AllocMessageBackgroundCustomData(
+		               { static_cast<Uint16>(kChatBackgroundInteriorH) }),
 		       } }) {}
 
 		int yoffset = kTextStartY;

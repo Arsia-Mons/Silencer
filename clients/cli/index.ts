@@ -18,7 +18,7 @@ function usage(): never {
       `       silencer-cli state\n` +
       `       silencer-cli inspect [--interface-id N]\n` +
       `       silencer-cli world_state\n` +
-      `       silencer-cli ingame_ui_mode --mode chat|buy|tech|playerlist|all|clear|status\n` +
+      `       silencer-cli ingame_ui_mode --mode chat|buy|tech|playerlist|all|clear|status [--chat-line TEXT]\n` +
       `       silencer-cli resize --w 1280 --h 720\n` +
       `       silencer-cli click --label "OPTIONS"\n` +
       `       silencer-cli click_at --x 320 --y 240\n` +
@@ -129,6 +129,7 @@ const STRING_FLAGS: Record<string, Record<string, Set<string>>> = {
 // and abort the silencer process.
 const STRING_FLAGS_NO_SUBOP: Record<string, Set<string>> = {
   click: new Set(["label"]),
+  ingame_ui_mode: new Set(["mode", "chat_line"]),
   set_text: new Set(["label"]),
   select: new Set(["label"]),
   scroll: new Set(["label"]),

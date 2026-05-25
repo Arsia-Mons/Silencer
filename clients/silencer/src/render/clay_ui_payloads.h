@@ -64,6 +64,10 @@ struct ClayCustomData {
 	void * payload;
 };
 
+struct MessageBackgroundPayload {
+	Uint16 interiorHeight;
+};
+
 struct ButtonSpritePayload {
 	Uint8  bank;
 	Uint16 index;

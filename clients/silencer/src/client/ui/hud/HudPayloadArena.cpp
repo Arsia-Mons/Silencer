@@ -17,9 +17,10 @@ silencer::clay_bridge::TeamEmblemPayload g_teamEmblemPayloads[kTeamEmblemPayload
 silencer::clay_bridge::ClayCustomData    g_teamEmblemCustomData[kTeamEmblemPayloadCapacity];
 int g_teamEmblemPayloadCount = 0;
 
+silencer::clay_bridge::MessageBackgroundPayload g_messageBackgroundPayload{};
 silencer::clay_bridge::ClayCustomData g_messageBackgroundCustomData{
 	silencer::clay_bridge::CustomKind::MessageBackground,
-	nullptr,
+	&g_messageBackgroundPayload,
 };
 
 constexpr int kStringArenaCapacity = 65536;
@@ -82,7 +83,9 @@ silencer::clay_bridge::ClayCustomData* AllocTeamEmblemCustomData(
 	return &hudpayloadarena_detail::g_teamEmblemCustomData[hudpayloadarena_detail::g_teamEmblemPayloadCount++];
 }
 
-silencer::clay_bridge::ClayCustomData* AllocMessageBackgroundCustomData() {
+silencer::clay_bridge::ClayCustomData* AllocMessageBackgroundCustomData(
+	silencer::clay_bridge::MessageBackgroundPayload payload) {
+	hudpayloadarena_detail::g_messageBackgroundPayload = payload;
 	return &hudpayloadarena_detail::g_messageBackgroundCustomData;
 }
 
