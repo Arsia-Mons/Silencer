@@ -10,6 +10,10 @@ namespace UpdaterStage2 {
 // success path (exec replaces us).
 int Run(int argc, char **argv);
 
+// Called by the normal client on startup. Removes stale updater leftovers
+// from a prior successful or partially successful self-update.
+void CleanupPreviousUpdate();
+
 // Called by the normal client when Updater reaches STAGING.
 // Spawns stage-2. macOS launches the nested signed helper at
 // Contents/Helpers/updater-stage-2; Windows/Linux keep the copied-binary

@@ -4,6 +4,10 @@ All notable changes to Silencer are documented here.
 
 ## [Unreleased]
 
+### Game client
+
+- macOS startup now removes a stale `Silencer.app.old` sibling left by a successful auto-update once the new app has relaunched (#253).
+
 ## [v00056] — 2026-05-25
 
 ### Game client

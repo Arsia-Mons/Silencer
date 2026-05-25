@@ -144,6 +144,17 @@ bool RenameDir(const std::string &src, const std::string &dst) {
 #endif
 }
 
+bool IsDirectory(const std::string &path) {
+#ifdef _WIN32
+    DWORD attrs = GetFileAttributesA(path.c_str());
+    return attrs != INVALID_FILE_ATTRIBUTES &&
+        (attrs & FILE_ATTRIBUTE_DIRECTORY) != 0;
+#else
+    struct stat st;
+    return stat(path.c_str(), &st) == 0 && S_ISDIR(st.st_mode);
+#endif
+}
+
 // Best-effort recursive delete. Used to strip `__MACOSX/` siblings that
 // ditto --sequesterRsrc bakes alongside the real bundle — leaving them
 // in place would break FindSingleTopDir (sees 2 entries) and pollute the
@@ -314,6 +325,24 @@ bool ReplaceFileAtomic(const std::string &src, const std::string &dst) {
     return true;
 }
 
+void SweepSidelinedFiles(const std::string &dir) {
+    WIN32_FIND_DATAA fd;
+    std::string pattern = dir + "\\*";
+    HANDLE h = FindFirstFileA(pattern.c_str(), &fd);
+    if (h == INVALID_HANDLE_VALUE) return;
+    do {
+        std::string n = fd.cFileName;
+        if (n == "." || n == "..") continue;
+        std::string child = dir + "\\" + n;
+        if (fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
+            SweepSidelinedFiles(child);
+        } else if (n.find(".old-") != std::string::npos) {
+            DeleteFileA(child.c_str());
+        }
+    } while (FindNextFileA(h, &fd));
+    FindClose(h);
+}
+
 // Files in install_root that aren't in new_root are left in place — no
 // manifest of removed files yet.
 bool MergeTreeWindows(const std::string &new_root, const std::string &install_root) {
@@ -349,6 +378,26 @@ bool MergeTreeWindows(const std::string &new_root, const std::string &install_ro
 } // namespace
 
 namespace UpdaterStage2 {
+
+void CleanupPreviousUpdate() {
+    std::string self = MySelfPath();
+    if (self.empty()) return;
+    std::string install_dir = ResolveInstallDir(self);
+
+    // POSIX stage-2 swaps by renaming `<install>` to `<install>.old`; older
+    // Windows builds used the same shape before the per-file replace path.
+    std::string old_dir = install_dir + ".old";
+    if (IsDirectory(old_dir)) {
+        Logf("cleaning up prior install: %s", old_dir.c_str());
+        RemoveDirRecursive(old_dir);
+    }
+
+#ifdef _WIN32
+    // ReplaceFileAtomic sidelines locked targets as `<file>.old-<ticks>`;
+    // they're usually unlocked by next launch.
+    SweepSidelinedFiles(install_dir);
+#endif
+}
 
 int Run(int argc, char **argv) {
     std::string zip, install_dir, exe_to_relaunch;

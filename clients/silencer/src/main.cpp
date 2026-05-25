@@ -163,67 +163,7 @@ static void SyncInstalledVersionRegistry(void) {
 	RegCloseKey(key);
 }
 
-static void SweepSidelinedFiles(const std::string &dir) {
-	WIN32_FIND_DATAA fd;
-	std::string pattern = dir + "\\*";
-	HANDLE h = FindFirstFileA(pattern.c_str(), &fd);
-	if (h == INVALID_HANDLE_VALUE) return;
-	do {
-		std::string n = fd.cFileName;
-		if (n == "." || n == "..") continue;
-		std::string child = dir + "\\" + n;
-		if (fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
-			SweepSidelinedFiles(child);
-		} else if (n.find(".old-") != std::string::npos) {
-			DeleteFileA(child.c_str());
-		}
-	} while (FindNextFileA(h, &fd));
-	FindClose(h);
-}
 #endif
-
-static void CleanupPreviousUpdate(void) {
-#ifdef __APPLE__
-	// .app install: sibling foo.app.old. We don't know our exact install dir
-	// here without mach-o/dyld logic; skip cleanup on macOS and rely on the
-	// user trashing .app.old manually.
-#else
-	char buf[1024];
-	int n = 0;
-#ifdef _WIN32
-	GetModuleFileNameA(NULL, buf, sizeof(buf));
-	n = (int)strlen(buf);
-#else
-	n = (int)readlink("/proc/self/exe", buf, sizeof(buf) - 1);
-#endif
-	if (n <= 0) return;
-	buf[n] = 0;
-	std::string exe = buf;
-	size_t slash = exe.find_last_of("/\\");
-	if (slash == std::string::npos) return;
-	std::string install_dir = exe.substr(0, slash);
-
-	// Pre-per-file-replace builds left a `<install>.old` sibling; sweep until
-	// they age out.
-	std::string old_dir = install_dir + ".old";
-	struct stat st;
-	if (stat(old_dir.c_str(), &st) == 0) {
-		fprintf(stderr, "[updater] cleaning up prior install: %s\n", old_dir.c_str());
-#ifdef _WIN32
-		std::string cmd = "rd /s /q \"" + old_dir + "\"";
-#else
-		std::string cmd = "rm -rf '" + old_dir + "'";
-#endif
-		system(cmd.c_str());
-	}
-
-#ifdef _WIN32
-	// ReplaceFileAtomic sidelines locked targets as `<file>.old-<ticks>`;
-	// they're usually unlocked by next launch.
-	SweepSidelinedFiles(install_dir);
-#endif
-#endif
-}
 
 #ifdef POSIX
 int main(int argc, char * argv[]){
@@ -272,7 +212,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	}
 #endif
 
-	CleanupPreviousUpdate();
+	UpdaterStage2::CleanupPreviousUpdate();
 #ifdef _WIN32
 	SyncInstalledVersionRegistry();
 #endif
