@@ -61,10 +61,13 @@ Clay_String CopyString(Clay_String text) {
 }
 
 silencer::clay_bridge::TextDrawData *
-AllocUserData(TextEffect effect, text_internal::InternalTextOpts internalOpts) {
+AllocUserData(TextSize size,
+              TextEffect effect,
+              text_internal::InternalTextOpts internalOpts) {
 	if(g_userDataCount >= kTextUserDataCapacity) return nullptr;
 	auto * slot = &g_userDataArena[g_userDataCount++];
 	slot->brightness = effect.Brightness();
+	slot->textSize = static_cast<Uint8>(size);
 	slot->colorRamp = effect.ColorRamp();
 	slot->drawAlpha = effect.DrawAlpha();
 	slot->measureInk = internalOpts.measureInk;
@@ -139,6 +142,46 @@ TextRenderStyle ResolveTextRenderStyle(TextSize size) {
 	return {133, 6, 11, 0, 8, 0, 11};
 }
 
+namespace {
+
+int ClampTextTop(const TextRenderStyle& style, int boxH, int desiredTop) {
+	if(boxH <= 0) return 0;
+	const int inkMinY = static_cast<int>(style.inkMinY);
+	const int inkHeight = static_cast<int>(
+		style.inkHeight ? style.inkHeight : style.lineHeight);
+	const int minTop = -inkMinY;
+	const int maxTop = boxH - (inkMinY + inkHeight);
+	if(maxTop < minTop){
+		return std::max(0, (boxH - static_cast<int>(style.lineHeight)) / 2);
+	}
+	return std::max(minTop, std::min(maxTop, desiredTop));
+}
+
+}  // namespace
+
+int CenteredTextTop(const TextRenderStyle& style, int boxH) {
+	const int visualMinY = static_cast<int>(style.visualMinY);
+	const int visualHeight = static_cast<int>(
+		style.visualHeight ? style.visualHeight : style.lineHeight);
+	return ClampTextTop(style, boxH, ((boxH - visualHeight) / 2) - visualMinY);
+}
+
+int TextInkBottom(const TextRenderStyle& style, int textTop) {
+	const int inkMinY = static_cast<int>(style.inkMinY);
+	const int inkHeight = static_cast<int>(
+		style.inkHeight ? style.inkHeight : style.lineHeight);
+	return textTop + inkMinY + inkHeight;
+}
+
+int BottomAlignedTextTop(const TextRenderStyle& style,
+                         int boxH,
+                         int targetBottom) {
+	const int inkMinY = static_cast<int>(style.inkMinY);
+	const int inkHeight = static_cast<int>(
+		style.inkHeight ? style.inkHeight : style.lineHeight);
+	return ClampTextTop(style, boxH, targetBottom - (inkMinY + inkHeight));
+}
+
 void TextWithInternalOptions(Clay_String text,
                              TextOpts opts,
                              InternalTextOpts internalOpts) {
@@ -147,7 +190,7 @@ void TextWithInternalOptions(Clay_String text,
 	const TextEffect effect = ResolveTextEffect(opts.tone, opts.effect);
 	void * userData = DrawDataIsDefault(effect, internalOpts)
 		? nullptr
-		: static_cast<void *>(AllocUserData(effect, internalOpts));
+		: static_cast<void *>(AllocUserData(opts.size, effect, internalOpts));
 
 	CLAY_TEXT(stableText,
 	          CLAY_TEXT_CONFIG({

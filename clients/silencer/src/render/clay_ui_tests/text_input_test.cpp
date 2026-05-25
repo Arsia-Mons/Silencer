@@ -5,7 +5,8 @@
 //   • text input queues SetText but not SubmitText.
 //   • The password variant masks rendered glyphs (asserted via the
 //     emitted CUSTOM payload's textLen).
-//   • A 14px body input centers uppercase text by default.
+//   • A 14px body input centers uppercase text by default and does not move
+//     shared glyphs when descenders are present.
 
 #include "clay_ui_tests/clay_ui_checks.h"
 #include "clay_ui_compositor.h"
@@ -19,9 +20,65 @@
 
 namespace silencer::clay_bridge {
 
+namespace {
+
+constexpr int kSurfaceW = 640;
+constexpr int kSurfaceH = 480;
+constexpr int kBodyFieldW = 80;
+constexpr int kBodyFieldH = 14;
+
+struct PixelBounds {
+	bool hasPixels = false;
+	int minY = kSurfaceH;
+	int maxY = -1;
+};
+
+PixelBounds ScanTextPixels(const Surface & surface,
+                           int x0,
+                           int x1,
+                           int y0,
+                           int y1) {
+	PixelBounds out;
+	for(int y = y0; y < y1; y++){
+		for(int x = x0; x < x1; x++){
+			if(surface.pixels[static_cast<size_t>(y) * surface.w + x] == 0){
+				continue;
+			}
+			out.hasPixels = true;
+			out.minY = std::min(out.minY, y);
+			out.maxY = std::max(out.maxY, y);
+		}
+	}
+	return out;
+}
+
+Surface RenderBody14Input(::Game & game, const char * text) {
+	silencer::ui::primitives::TextInputBeginFrame();
+	::Clay_BeginLayout();
+	CLAY({ .id = CLAY_ID("TextInputVerticalRoot"),
+	       .layout = {
+	           .sizing = { CLAY_SIZING_FIXED(kSurfaceW),
+	                       CLAY_SIZING_FIXED(kSurfaceH) },
+	       } }) {
+		silencer::ui::primitives::TextInput(
+			CLAY_STRING("vertical_input"),
+			text,
+			{ .widthPx = kBodyFieldW,
+			  .heightPx = kBodyFieldH,
+			  .textSize = silencer::ui::primitives::TextSize::Body });
+	}
+	::Clay_RenderCommandArray cmds = ::Clay_EndLayout();
+
+	Surface surface(kSurfaceW, kSurfaceH, 0);
+	Render(game, &surface, cmds);
+	return surface;
+}
+
+}  // namespace
+
 bool RunTextInputCheck(::Game & game, TextInputCheckResult & out) {
-	const int W = 640;
-	const int H = 480;
+	const int W = kSurfaceW;
+	const int H = kSurfaceH;
 	EnsureInitialized(W, H);
 
 	// Registry routing — verify submit queues a typed action and text input
@@ -96,40 +153,23 @@ bool RunTextInputCheck(::Game & game, TextInputCheckResult & out) {
 		break;
 	}
 
-	// Vertical metrics — a 14px body input should center uppercase input
-	// text by default. The check renders through the real compositor so it
-	// catches regressions in field text placement, not just payload shape.
-	silencer::ui::primitives::TextInputBeginFrame();
-	::Clay_BeginLayout();
-	CLAY({ .id = CLAY_ID("TextInputVerticalRoot"),
-	       .layout = {
-	           .sizing = { CLAY_SIZING_FIXED(W), CLAY_SIZING_FIXED(H) },
-	       } }) {
-		silencer::ui::primitives::TextInput(
-			CLAY_STRING("vertical_input"),
-			"WWYYYYYY",
-			{ .widthPx = 80,
-			  .heightPx = 14,
-			  .textSize = silencer::ui::primitives::TextSize::Body });
-	}
-	cmds = ::Clay_EndLayout();
-
-	Surface verticalSurface(W, H, 0);
-	Render(game, &verticalSurface, cmds);
-	int minY = H;
-	int maxY = -1;
-	for(int y = 0; y < 14; y++){
-		for(int x = 0; x < 80; x++){
-			if(verticalSurface.pixels[static_cast<size_t>(y) * W + x] == 0){
-				continue;
-			}
-			minY = std::min(minY, y);
-			maxY = std::max(maxY, y);
-		}
-	}
-	if(maxY >= minY){
-		out.body14TopMargin = minY;
-		out.body14BottomMargin = 13 - maxY;
+	// Vertical metrics — render through the real compositor so this catches
+	// regressions in field text placement, not just payload shape.
+	Surface capsSurface = RenderBody14Input(game, "WWYYYYYY");
+	PixelBounds capsAll = ScanTextPixels(
+		capsSurface, 0, kBodyFieldW, 0, kBodyFieldH);
+	PixelBounds capsAnchor = ScanTextPixels(
+		capsSurface, 0, silencer::ui::primitives::TextAdvance(
+			silencer::ui::primitives::TextSize::Body), 0, kBodyFieldH);
+	Surface descenderSurface = RenderBody14Input(game, "Wyyyyyyy");
+	PixelBounds descenderAll = ScanTextPixels(
+		descenderSurface, 0, kBodyFieldW, 0, kBodyFieldH);
+	PixelBounds descenderAnchor = ScanTextPixels(
+		descenderSurface, 0, silencer::ui::primitives::TextAdvance(
+			silencer::ui::primitives::TextSize::Body), 0, kBodyFieldH);
+	if(capsAll.hasPixels){
+		out.body14TopMargin = capsAll.minY;
+		out.body14BottomMargin = (kBodyFieldH - 1) - capsAll.maxY;
 	}
 
 	// Overflow tailing — a narrow field should keep the rightmost visible
@@ -166,8 +206,18 @@ bool RunTextInputCheck(::Game & game, TextInputCheckResult & out) {
 		break;
 	}
 
-	(void)game;
-	return true;
+	return out.submitActionsForEnter == 1 &&
+	       out.submitActionsForText == 0 &&
+	       out.passwordMaskAppliedLen == 8 &&
+	       out.overflowTailAppliedLen == 4 &&
+	       out.overflowTailMatches == 1 &&
+	       out.body14TopMargin == 3 &&
+	       out.body14BottomMargin == 3 &&
+	       capsAnchor.hasPixels &&
+	       descenderAll.hasPixels &&
+	       descenderAnchor.hasPixels &&
+	       descenderAll.maxY > capsAll.maxY &&
+	       capsAnchor.minY == descenderAnchor.minY;
 }
 
 }  // namespace silencer::clay_bridge

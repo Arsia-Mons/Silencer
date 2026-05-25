@@ -7,12 +7,9 @@
 #include "primitives/text_internal.h"
 #include "primitives/button.h"
 #include "primitives/box.h"
-#include "renderer.h"
-#include "resources.h"
 
 #include <algorithm>
 #include <cstdint>
-#include <cstring>
 #include <string>
 
 namespace silencer::client_ui::lobby {
@@ -22,7 +19,6 @@ namespace lobby_chrome_detail {
 using silencer::ui::primitives::Text;
 using silencer::ui::primitives::TextEffect;
 using silencer::ui::primitives::TextSize;
-using silencer::ui::primitives::text_internal::TextRenderStyle;
 using silencer::ui::primitives::Button;
 using silencer::ui::primitives::ButtonHandle;
 using silencer::ui::primitives::ButtonOpts;
@@ -48,82 +44,23 @@ Clay_String ToClayString(const std::string & text) {
 	return out;
 }
 
-int GlyphOffsetForBank(Uint16 bank) {
-	return bank == 132 ? 34 : 33;
-}
-
-struct TextInkMetrics {
-	bool hasInk = false;
-	int minY = 0;
-	int maxY = 0;
-	int height = 0;
-};
-
-TextInkMetrics MeasureTextInk(const Resources & resources,
-                              Clay_String text,
-                              TextSize size) {
-	TextInkMetrics out;
-	if(text.length <= 0 || !text.chars) return out;
-
-	const TextRenderStyle style =
+int CenteredTextTop(TextSize size, int boxH) {
+	const auto style =
 		silencer::ui::primitives::text_internal::ResolveTextRenderStyle(size);
-	if(style.bank >= resources.spritebank.size()) return out;
-
-	const auto& glyphs = resources.spritebank[style.bank];
-	const int glyphOffset = GlyphOffsetForBank(style.bank);
-	for(int32_t i = 0; i < text.length; ++i){
-		const unsigned char ch = static_cast<unsigned char>(text.chars[i]);
-		if(ch == ' ' || ch == 0xA0) continue;
-		const int glyphIndex = static_cast<int>(ch) - glyphOffset;
-		if(glyphIndex < 0 || glyphIndex >= static_cast<int>(glyphs.size())) continue;
-		Surface * glyph = glyphs[glyphIndex].get();
-		if(!glyph || glyph->w <= 0 || glyph->h <= 0) continue;
-
-		int glyphMinY = glyph->h;
-		int glyphMaxY = -1;
-		for(int y = 0; y < glyph->h; ++y){
-			for(int x = 0; x < glyph->w; ++x){
-				if(Renderer::GetPixel(glyph, x, y) == 0) continue;
-				if(y < glyphMinY) glyphMinY = y;
-				if(y > glyphMaxY) glyphMaxY = y;
-			}
-		}
-		if(glyphMaxY >= glyphMinY){
-			if(!out.hasInk || glyphMinY < out.minY) out.minY = glyphMinY;
-			if(!out.hasInk || glyphMaxY + 1 > out.maxY) out.maxY = glyphMaxY + 1;
-			out.hasInk = true;
-		}
-	}
-
-	if(out.hasInk){
-		out.height = out.maxY - out.minY;
-	}
-	return out;
+	return silencer::ui::primitives::text_internal::CenteredTextTop(style, boxH);
 }
 
-int CenteredTextTop(const TextInkMetrics & ink,
-                    Uint16 lineHeight,
-                    int boxH) {
-	const int maxTop = std::max(0, boxH - static_cast<int>(lineHeight));
-	if(ink.hasInk && ink.height > 0){
-		return ClampInt((boxH - ink.height) / 2 - ink.minY, 0, maxTop);
-	}
-	return ClampInt((boxH - static_cast<int>(lineHeight)) / 2, 0, maxTop);
+int TextInkBottom(TextSize size, int textTop) {
+	const auto style =
+		silencer::ui::primitives::text_internal::ResolveTextRenderStyle(size);
+	return silencer::ui::primitives::text_internal::TextInkBottom(style, textTop);
 }
 
-int InkBottom(const TextInkMetrics & ink,
-              Uint16 lineHeight,
-              int textTop) {
-	return textTop + (ink.hasInk ? ink.maxY : static_cast<int>(lineHeight));
-}
-
-int BottomAlignedTextTop(const TextInkMetrics & ink,
-                         Uint16 lineHeight,
-                         int boxH,
-                         int targetBottom) {
-	const int maxTop = std::max(0, boxH - static_cast<int>(lineHeight));
-	const int inkBottom = ink.hasInk ? ink.maxY : static_cast<int>(lineHeight);
-	return ClampInt(targetBottom - inkBottom, 0, maxTop);
+int BottomAlignedTextTop(TextSize size, int boxH, int targetBottom) {
+	const auto style =
+		silencer::ui::primitives::text_internal::ResolveTextRenderStyle(size);
+	return silencer::ui::primitives::text_internal::BottomAlignedTextTop(
+		style, boxH, targetBottom);
 }
 
 void BuildAlignedTextSlot(Clay_String clayId,
@@ -153,7 +90,6 @@ uint16_t LobbyTitleBarHeight() {
 
 void BuildLobbyTitleBar(const std::string & version,
                         const std::string & mapName,
-                        const Resources & resources,
                         int surfaceW,
                         silencer::ui::UiInteractionRegistry& interactions) {
 	const uint16_t titleH = LobbyTitleBarHeight();
@@ -166,33 +102,26 @@ void BuildLobbyTitleBar(const std::string & version,
 	const Clay_String versionText = lobby_chrome_detail::ToClayString(version);
 	const Clay_String mapText = lobby_chrome_detail::ToClayString(mapName);
 
-	const auto titleInk = lobby_chrome_detail::MeasureTextInk(
-		resources, titleText, lobby_chrome_detail::TextSize::Title);
 	const int titleTop = lobby_chrome_detail::CenteredTextTop(
-		titleInk, silencer::ui::primitives::TextLineHeight(lobby_chrome_detail::TextSize::Title),
+		lobby_chrome_detail::TextSize::Title,
 		lobby_chrome_detail::kTitleRowH);
 
-	int titleBottom = lobby_chrome_detail::InkBottom(
-		titleInk, silencer::ui::primitives::TextLineHeight(lobby_chrome_detail::TextSize::Title),
+	int titleBottom = lobby_chrome_detail::TextInkBottom(
+		lobby_chrome_detail::TextSize::Title,
 		titleTop);
 	int mapTop = titleTop;
 	if(showMapName){
-		const auto mapInk = lobby_chrome_detail::MeasureTextInk(
-			resources, mapText, lobby_chrome_detail::TextSize::Title);
 		mapTop = lobby_chrome_detail::CenteredTextTop(
-			mapInk, silencer::ui::primitives::TextLineHeight(lobby_chrome_detail::TextSize::Title),
+			lobby_chrome_detail::TextSize::Title,
 			lobby_chrome_detail::kTitleRowH);
 		titleBottom = std::max(
 			titleBottom,
-			lobby_chrome_detail::InkBottom(
-				mapInk,
-				silencer::ui::primitives::TextLineHeight(lobby_chrome_detail::TextSize::Title),
+			lobby_chrome_detail::TextInkBottom(
+				lobby_chrome_detail::TextSize::Title,
 				mapTop));
 	}
-	const auto versionInk = lobby_chrome_detail::MeasureTextInk(
-		resources, versionText, lobby_chrome_detail::TextSize::Body);
 	const int versionTop = lobby_chrome_detail::BottomAlignedTextTop(
-		versionInk, silencer::ui::primitives::TextLineHeight(lobby_chrome_detail::TextSize::Body),
+		lobby_chrome_detail::TextSize::Body,
 		lobby_chrome_detail::kTitleRowH, titleBottom);
 	CLAY(lobby_chrome_detail::Box(lobby_chrome_detail::BoxVariants::Chrome, {
 		         .id = CLAY_ID("LobbyTitleBar"),

@@ -47,10 +47,13 @@ Uint16 FallbackLineHeightForClayFont(uint16_t fontId) {
 	}
 }
 
+const TextDrawData * TextDrawDataFor(void * userData) {
+	if(!userData) return nullptr;
+	return reinterpret_cast<const TextDrawData *>(userData);
+}
+
 bool UsesInkMetrics(void * userData) {
-	if(!userData) return false;
-	const TextDrawData * extra =
-		reinterpret_cast<const TextDrawData *>(userData);
+	const TextDrawData * extra = TextDrawDataFor(userData);
 	return extra && extra->measureInk;
 }
 
@@ -128,23 +131,6 @@ TextInkMetrics MeasureInkBounds(const Resources * resources,
 		out.height = out.maxY - out.minY;
 	}
 	return out;
-}
-
-int TextInputTextTop(const silencer::ui::primitives::text_internal::TextRenderStyle& style,
-                     int boxH) {
-	const int visualMinY = static_cast<int>(style.visualMinY);
-	const int visualHeight = static_cast<int>(
-		style.visualHeight ? style.visualHeight : style.lineHeight);
-	const int inkMinY = static_cast<int>(style.inkMinY);
-	const int inkHeight = static_cast<int>(
-		style.inkHeight ? style.inkHeight : style.lineHeight);
-	const int textTop = ((boxH - visualHeight) / 2) - visualMinY;
-	const int minTop = -inkMinY;
-	const int maxTop = boxH - (inkMinY + inkHeight);
-	if(maxTop < minTop){
-		return std::max(0, (boxH - static_cast<int>(style.lineHeight)) / 2);
-	}
-	return std::max(minTop, std::min(maxTop, textTop));
 }
 
 ::Clay_Dimensions MeasureTextCommand(::Clay_StringSlice text,
@@ -483,6 +469,7 @@ void DispatchText(::Resources & resources,
 	Uint8 bank   = static_cast<Uint8>(data.fontId);
 	Uint8 width  = static_cast<Uint8>(data.fontSize);
 	Uint8 color  = static_cast<Uint8>(data.textColor.r);
+	const TextDrawData * extra = TextDrawDataFor(userData);
 	TextInkMetrics ink = UsesInkMetrics(userData)
 		? MeasureInkBounds(&resources,
 		                    data.stringContents.chars,
@@ -491,15 +478,14 @@ void DispatchText(::Resources & resources,
 		                    data.fontSize)
 		: TextInkMetrics{};
 	if(ink.hasInk){
-		// Pull the first glyph's leading blank columns flush to bb.x and
-		// optically center the visible ink within the line box instead of
-		// top-aligning it (the bitmap font reserves descender space, so a
-		// line of caps would otherwise sit high). Mirrors the TextInput
-		// custom-payload path.
+		// Pull the first glyph's leading blank columns flush to bb.x while
+		// using the shared stable font placement for vertical positioning.
 		x -= ink.minX;
-		if(ink.height > 0){
-			y += std::max(0, (static_cast<int>(bb.height) - ink.height) / 2)
-			     - ink.minY;
+		if(extra){
+			const auto style = silencer::ui::primitives::text_internal::ResolveTextRenderStyle(
+				static_cast<silencer::ui::primitives::TextSize>(extra->textSize));
+			y += silencer::ui::primitives::text_internal::CenteredTextTop(
+				style, static_cast<int>(bb.height));
 		}
 	}
 	renderer.DrawText(dst, static_cast<Uint16>(x), static_cast<Uint16>(y),
@@ -1145,11 +1131,8 @@ void RenderInto(::Resources & resources, ::Renderer & renderer,
 						int x = static_cast<int>(c->boundingBox.x);
 						int y = static_cast<int>(c->boundingBox.y);
 						int boxH = static_cast<int>(c->boundingBox.height);
-						// Center against stable font metrics, never per-string
-						// ink bounds: ink height/minY change with descenders
-						// (e.g. 'y'), which made the whole string jump up a
-						// pixel or two (issue #175).
-						y += TextInputTextTop(style, boxH);
+						y += silencer::ui::primitives::text_internal::CenteredTextTop(
+							style, boxH);
 						renderer.DrawText(dst,
 						                  static_cast<Uint16>(x),
 						                  static_cast<Uint16>(y),

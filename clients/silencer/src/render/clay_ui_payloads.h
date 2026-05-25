@@ -39,6 +39,7 @@ inline void * PackImageStretch(Uint8 bank, Uint16 index) {
 // textColor tint Clay already passes through.
 struct TextDrawData {
 	Uint8 brightness;     // 128 = neutral.
+	Uint8 textSize;       // silencer::ui::primitives::TextSize value.
 	bool colorRamp;       // True -> EffectRampColor instead of EffectColor.
 	bool drawAlpha;       // True -> DrawAlphaed glyph blit.
 	bool measureInk;      // True -> Clay layout uses visible glyph bounds.
