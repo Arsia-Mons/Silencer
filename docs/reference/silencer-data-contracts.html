@@ -738,11 +738,15 @@
                 and <code>spectator</code>; world methods own system-camera
                 slot writes. <code>Game::Loop()</code> clears system-camera
                 active flags each simulation tick, while session unload and map
-                load reset pan-camera fields.
+                load reset pan-camera fields. Current renderer code clears
+                pan-camera return fields when camera follow catches up, and
+                replay camera controls switch <code>localpeerid</code> /
+                <code>viewedpeerid</code>.
               </td>
               <td>
                 This is not renderer-owned screen-buffer state. Renderer and
-                UI inset code consume these fields to choose what to draw.
+                UI inset code mostly consume these fields to choose what to draw;
+                renderer/replay writes here are legacy derived-state exceptions.
               </td>
             </tr>
             <tr>
