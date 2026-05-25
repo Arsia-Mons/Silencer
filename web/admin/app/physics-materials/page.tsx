@@ -32,8 +32,24 @@ const SOUND_LABELS: Record<string, string> = {
   footstepStairL: 'Stair L', footstepStairR: 'Stair R',
 };
 
+function extractFirstJson(text: string): string {
+  let depth = 0;
+  let inString = false;
+  let escape = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (escape) { escape = false; continue; }
+    if (c === '\\' && inString) { escape = true; continue; }
+    if (c === '"') { inString = !inString; continue; }
+    if (inString) continue;
+    if (c === '{') depth++;
+    else if (c === '}') { depth--; if (depth === 0) return text.slice(0, i + 1); }
+  }
+  return text;
+}
+
 function parse(text: string): PhysicsMaterialsFile {
-  return JSON.parse(text) as PhysicsMaterialsFile;
+  return JSON.parse(extractFirstJson(text.trimStart().replace(/^\uFEFF/, ''))) as PhysicsMaterialsFile;
 }
 
 function serialize(data: PhysicsMaterialsFile): string {
@@ -81,7 +97,7 @@ export default function PhysicsMaterialsPage() {
         store.load(file.name, text);
         setSelected(parsed.physicsMaterials[0]?.id ?? null);
       } catch (err) {
-        setSaveErr(`Parse error: ${err instanceof Error ? err.message : String(err)}`);
+        setSaveErr(`Invalid JSON: ${err instanceof Error ? err.message : String(err)}`);
       }
       e.target.value = '';
     }).catch(() => setSaveErr('Failed to read file.'));
