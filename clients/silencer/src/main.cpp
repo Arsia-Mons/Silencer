@@ -163,116 +163,7 @@ static void SyncInstalledVersionRegistry(void) {
 	RegCloseKey(key);
 }
 
-static void SweepSidelinedFiles(const std::string &dir) {
-	WIN32_FIND_DATAA fd;
-	std::string pattern = dir + "\\*";
-	HANDLE h = FindFirstFileA(pattern.c_str(), &fd);
-	if (h == INVALID_HANDLE_VALUE) return;
-	do {
-		std::string n = fd.cFileName;
-		if (n == "." || n == "..") continue;
-		std::string child = dir + "\\" + n;
-		if (fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
-			SweepSidelinedFiles(child);
-		} else if (n.find(".old-") != std::string::npos) {
-			DeleteFileA(child.c_str());
-		}
-	} while (FindNextFileA(h, &fd));
-	FindClose(h);
-}
 #endif
-
-#ifdef __APPLE__
-static void RemoveDirRecursive(const std::string &path) {
-	DIR *d = opendir(path.c_str());
-	if (!d) return;
-	struct dirent *e;
-	while ((e = readdir(d)) != NULL) {
-		std::string n = e->d_name;
-		if (n == "." || n == "..") continue;
-		std::string child = path + "/" + n;
-		struct stat st;
-		if (lstat(child.c_str(), &st) != 0) continue;
-		if (S_ISDIR(st.st_mode)) {
-			RemoveDirRecursive(child);
-		} else if (unlink(child.c_str()) != 0) {
-			fprintf(stderr, "[updater] cleanup unlink failed: %s (%s)\n",
-				child.c_str(), strerror(errno));
-		}
-	}
-	closedir(d);
-	if (rmdir(path.c_str()) != 0) {
-		fprintf(stderr, "[updater] cleanup rmdir failed: %s (%s)\n",
-			path.c_str(), strerror(errno));
-	}
-}
-
-static std::string CurrentMacAppBundlePath(void) {
-	char buf[PATH_MAX];
-	uint32_t n = sizeof(buf);
-	if (_NSGetExecutablePath(buf, &n) != 0) return "";
-	std::string exe = buf;
-	size_t slash = exe.find_last_of("/");
-	if (slash == std::string::npos) return "";
-	std::string parent = exe.substr(0, slash);
-	const std::string bundle_suffix = "/Contents/MacOS";
-	if (parent.size() < bundle_suffix.size() ||
-		parent.compare(parent.size() - bundle_suffix.size(),
-			bundle_suffix.size(), bundle_suffix) != 0) {
-		return "";
-	}
-	return parent.substr(0, parent.size() - bundle_suffix.size());
-}
-#endif
-
-static void CleanupPreviousUpdate(void) {
-#ifdef __APPLE__
-	std::string install_dir = CurrentMacAppBundlePath();
-	if (install_dir.empty()) return;
-	std::string old_dir = install_dir + ".old";
-	struct stat st;
-	if (lstat(old_dir.c_str(), &st) == 0 && S_ISDIR(st.st_mode)) {
-		fprintf(stderr, "[updater] cleaning up prior install: %s\n",
-			old_dir.c_str());
-		RemoveDirRecursive(old_dir);
-	}
-#else
-	char buf[1024];
-	int n = 0;
-#ifdef _WIN32
-	GetModuleFileNameA(NULL, buf, sizeof(buf));
-	n = (int)strlen(buf);
-#else
-	n = (int)readlink("/proc/self/exe", buf, sizeof(buf) - 1);
-#endif
-	if (n <= 0) return;
-	buf[n] = 0;
-	std::string exe = buf;
-	size_t slash = exe.find_last_of("/\\");
-	if (slash == std::string::npos) return;
-	std::string install_dir = exe.substr(0, slash);
-
-	// Pre-per-file-replace builds left a `<install>.old` sibling; sweep until
-	// they age out.
-	std::string old_dir = install_dir + ".old";
-	struct stat st;
-	if (stat(old_dir.c_str(), &st) == 0) {
-		fprintf(stderr, "[updater] cleaning up prior install: %s\n", old_dir.c_str());
-#ifdef _WIN32
-		std::string cmd = "rd /s /q \"" + old_dir + "\"";
-#else
-		std::string cmd = "rm -rf '" + old_dir + "'";
-#endif
-		system(cmd.c_str());
-	}
-
-#ifdef _WIN32
-	// ReplaceFileAtomic sidelines locked targets as `<file>.old-<ticks>`;
-	// they're usually unlocked by next launch.
-	SweepSidelinedFiles(install_dir);
-#endif
-#endif
-}
 
 #ifdef POSIX
 int main(int argc, char * argv[]){
@@ -321,7 +212,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	}
 #endif
 
-	CleanupPreviousUpdate();
+	UpdaterStage2::CleanupPreviousUpdate();
 #ifdef _WIN32
 	SyncInstalledVersionRegistry();
 #endif
