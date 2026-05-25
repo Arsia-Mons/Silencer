@@ -309,6 +309,7 @@
                         </ul>
                       </li>
                       <li><span class="node"><strong>Map / Resources</strong><span>Loaded map plus local sprites, tiles, sounds, actor defs, GAS, behavior trees.</span></span></li>
+                      <li><span class="node"><strong>World view / camera state</strong><span>Pan camera, viewed peer, spectator focus, system-camera slots.</span></span></li>
                       <li><span class="node"><strong>Replay</strong><span>Recorded event/state stream and playback camera state.</span></span></li>
                       <li><span class="node"><strong>GameMode / DedicatedServer</strong><span>Active match rules and authority heartbeat/runtime server wrapper.</span></span></li>
                     </ul>
@@ -718,6 +719,28 @@
               <td>
                 Current startup loading is local-filesystem based. HTTP actor/BT
                 fetch helpers exist, but they are not the active startup source.
+              </td>
+            </tr>
+            <tr>
+              <td>World view, pan camera, spectator focus, system-camera slots</td>
+              <td><code>World</code> camera/view fields, read by renderer and UI inset drawing.</td>
+              <td>
+                Read focus through <code>world.viewedpeerid</code>,
+                <code>World::IsLocalObserver()</code>, and system-camera
+                accessors such as <code>IsSystemCameraActive()</code>,
+                <code>GetSystemCameraFollowId()</code>,
+                <code>GetSystemCameraX()</code>, and
+                <code>GetSystemCameraY()</code>.
+              </td>
+              <td>
+                Trigger actions and <code>MSG_CAMERA</code> mutate pan-camera
+                fields; spectator tick code mutates <code>viewedpeerid</code>
+                and <code>spectator</code>; world methods own system-camera
+                slot writes.
+              </td>
+              <td>
+                This is not renderer-owned screen-buffer state. Renderer and
+                UI inset code consume these fields to choose what to draw.
               </td>
             </tr>
             <tr>
