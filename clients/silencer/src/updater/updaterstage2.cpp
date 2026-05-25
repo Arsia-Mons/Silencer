@@ -530,69 +530,15 @@ bool Launch(const std::string &zippath) {
         }
     }
 #elif defined(__APPLE__)
-    // The shipped binary is signed with hardened runtime + library
-    // validation and references its dylibs via @rpath, with LC_RPATH set
-    // to @executable_path/../Frameworks. A flat copy at /tmp/silencer-stage2
-    // resolves @executable_path to /tmp, so dyld looks in /Frameworks/ and
-    // bails before main() runs — silently, because hardened runtime
-    // suppresses dyld errors when no TTY is attached. Mirror just enough
-    // bundle structure under /tmp that Frameworks/ sits next to the binary.
-    std::string stage2_bundle = tempdir + "/silencer-stage2.app";
-    std::string stage2_contents = stage2_bundle + "/Contents";
-    std::string stage2_macos = stage2_contents + "/MacOS";
-    std::string stage2_fw = stage2_contents + "/Frameworks";
-    RemoveDirRecursive(stage2_bundle);
-    mkdir(stage2_bundle.c_str(), 0755);
-    mkdir(stage2_contents.c_str(), 0755);
-    mkdir(stage2_macos.c_str(), 0755);
-    mkdir(stage2_fw.c_str(), 0755);
-
-    std::string temp = stage2_macos + "/silencer-stage2";
-    if (!CopyFile_(self, temp)) {
-        Logf("copy self → %s failed", temp.c_str());
+    // Do not synthesize a temporary .app bundle. Gatekeeper assesses that
+    // as new downloaded code and can reject it before stage-2 reaches main().
+    // The helper is nested signed code shipped inside the notarized app.
+    std::string temp = install + "/Contents/Helpers/updater-stage-2";
+    struct stat stage2_st;
+    if (stat(temp.c_str(), &stage2_st) != 0 || !S_ISREG(stage2_st.st_mode) ||
+        access(temp.c_str(), X_OK) != 0) {
+        Logf("missing executable macOS stage-2 helper: %s", temp.c_str());
         return false;
-    }
-
-    // Production-signed binaries have their embedded LC_CODE_SIGNATURE
-    // bound to the bundle's Info.plist (the "Info.plist entries=N" line
-    // in `codesign -dvvv`). Without it, AMFI rejects the binary at
-    // execve() with "The code contains a Team ID, but validating its
-    // signature failed" and SIGKILLs stage-2 before main() — silent,
-    // since the parent's TTY is gone. Mirror Info.plist so the seal
-    // validates. Best-effort: ad-hoc-signed dev builds don't bind it.
-    if (!CopyFile_(install + "/Contents/Info.plist",
-                   stage2_contents + "/Info.plist")) {
-        Logf("copy Info.plist failed (ok for ad-hoc-signed dev builds)");
-    }
-
-    // Mirror Frameworks/ from the source bundle so @rpath dylib refs
-    // (libSDL3, libSDL3_mixer, libminizip, …) resolve. Local dev builds
-    // link against absolute /opt/homebrew paths and have an empty (or
-    // missing) Frameworks/ — that's fine, the absolute paths resolve
-    // straight from /tmp without help.
-    std::string src_fw = install + "/Contents/Frameworks";
-    DIR *fwd = opendir(src_fw.c_str());
-    if (fwd) {
-        struct dirent *e;
-        while ((e = readdir(fwd)) != NULL) {
-            std::string n = e->d_name;
-            if (n == "." || n == "..") continue;
-            std::string from = src_fw + "/" + n;
-            struct stat st;
-            if (lstat(from.c_str(), &st) != 0) continue;
-            if (S_ISDIR(st.st_mode)) {
-                Logf("skipping framework dir %s (flat-dylib layout expected)", n.c_str());
-                continue;
-            }
-            std::string to = stage2_fw + "/" + n;
-            if (!CopyFile_(from, to)) {
-                Logf("copy framework %s -> %s failed", from.c_str(), to.c_str());
-            }
-        }
-        closedir(fwd);
-    } else {
-        Logf("no Frameworks/ at %s; assuming dev build with absolute dylib paths",
-            src_fw.c_str());
     }
 #else
     std::string temp = tempdir + "/silencer-stage2";
@@ -643,6 +589,12 @@ bool Launch(const std::string &zippath) {
         return false;
     }
     if (f == 0) {
+#ifdef __APPLE__
+        if (chdir(tempdir.c_str()) != 0) {
+            Logf("chdir(%s) before stage2 failed: %s",
+                 tempdir.c_str(), strerror(errno));
+        }
+#endif
         execl(temp.c_str(), temp.c_str(), "--self-update-stage2",
               ziparg, instarg, pidarg, relarg, (char*)nullptr);
         _exit(99);

@@ -52,6 +52,8 @@ if (updater.IsStage2Spawned()) return false; // exits Game::Loop
 
 1. Normal client (`--self-update-stage2` absent): reaches STAGING, calls `UpdaterStage2::Launch(zippath)`, marks spawned, returns from game loop so `~Game()` tears down SDL cleanly.
 2. Stage-2 process (invoked with `--self-update-stage2`): `UpdaterStage2::Run` overwrites the binary, then `exec`-replaces itself with the new client.
+   - macOS launches the nested signed helper at `Silencer.app/Contents/Helpers/updater-stage-2`. Do not recreate a temporary `.app` bundle at runtime.
+   - Windows/Linux still copy the current executable to a temp path for the handoff.
 
 ## Rules
 
