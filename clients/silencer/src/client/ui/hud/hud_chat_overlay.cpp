@@ -4,6 +4,7 @@
 #include "client/ui/hud/HudClayHelpers.h"
 #include "client/ui/hud/HudPayloadArena.h"
 #include "client/ui/views/HudView.h"
+#include "resources.h"
 #include "surface.h"
 #include "ui/primitives/text.h"
 #include "ui/primitives/text_input.h"
@@ -26,11 +27,13 @@ constexpr int kChatY = 280;
 constexpr int kChatW = 231;
 constexpr int kChatBackgroundInteriorH = 30;
 constexpr int kChatChromeH = 70;
+constexpr Uint8 kChatBackgroundBank = 188;
 constexpr int kTextX = 10;
 constexpr int kTextStartY = 10;
 constexpr int kLineStepY = 10;
 constexpr int kMaxHistoryChars = 36;
 constexpr int kChatInputVisibleChars = 28;
+constexpr int kRightCapX = 36;
 
 Clay_ElementDeclaration ChatFloatingChild(const char* id, int x, int y, int w, int h) {
 	Clay_String idString{
@@ -50,9 +53,94 @@ Clay_ElementDeclaration ChatFloatingChild(const char* id, int x, int y, int w, i
 	};
 }
 
+void EmitChatBackgroundSprite(const Resources& resources,
+                              int& ordinal,
+                              Uint16 spriteIndex,
+                              int logicalX,
+                              int logicalY,
+                              int srcW = 0,
+                              int srcH = 0) {
+	const int spriteW = SpriteWidth(resources, kChatBackgroundBank, spriteIndex);
+	const int spriteH = SpriteHeight(resources, kChatBackgroundBank, spriteIndex);
+	if(spriteW <= 0 || spriteH <= 0) return;
+	if(srcW <= 0) srcW = spriteW;
+	if(srcH <= 0) srcH = spriteH;
+
+	CLAY({ .id = CLAY_IDI("InGameChatBackgroundSprite", ordinal++),
+	       .layout = {
+	           .sizing = { CLAY_SIZING_FIXED((float)srcW),
+	                       CLAY_SIZING_FIXED((float)srcH) },
+	       },
+	       .floating = {
+	           .offset = {
+	               (float)SpriteX(resources, kChatBackgroundBank, spriteIndex, logicalX),
+	               (float)SpriteY(resources, kChatBackgroundBank, spriteIndex, logicalY),
+	           },
+	           .attachTo = CLAY_ATTACH_TO_PARENT,
+	       },
+	       .custom = { .customData = AllocSpriteCustomData({
+	           kChatBackgroundBank,
+	           spriteIndex,
+	           0,
+	           0,
+	           static_cast<Sint16>(srcW),
+	           static_cast<Sint16>(srcH),
+	           0,
+	           128,
+	           0,
+	           0,
+	       }) } }) {}
+}
+
+void EmitChatBackground(const Resources& resources) {
+	int ordinal = 0;
+	EmitChatBackgroundSprite(resources, ordinal, 0, 0, 0);
+
+	int xOffset = SpriteWidth(resources, kChatBackgroundBank, 0);
+	while(xOffset < kChatW - SpriteWidth(resources, kChatBackgroundBank, 2)){
+		int tileW = kChatW - xOffset - kRightCapX;
+		const int maxTileW = SpriteWidth(resources, kChatBackgroundBank, 1);
+		if(maxTileW <= 0) break;
+		if(tileW > maxTileW) tileW = maxTileW;
+		if(tileW <= 0) break;
+		EmitChatBackgroundSprite(
+			resources,
+			ordinal,
+			1,
+			xOffset,
+			0,
+			tileW,
+			SpriteHeight(resources, kChatBackgroundBank, 1));
+		xOffset += tileW;
+	}
+	EmitChatBackgroundSprite(resources, ordinal, 2, kChatW - kRightCapX, 0);
+
+	xOffset = SpriteWidth(resources, kChatBackgroundBank, 6);
+	EmitChatBackgroundSprite(resources, ordinal, 6, 0, kChatBackgroundInteriorH);
+	while(xOffset < kChatW - SpriteWidth(resources, kChatBackgroundBank, 8)){
+		int tileW = kChatW - xOffset - kRightCapX;
+		const int maxTileW = SpriteWidth(resources, kChatBackgroundBank, 7);
+		if(maxTileW <= 0) break;
+		if(tileW > maxTileW) tileW = maxTileW;
+		if(tileW <= 0) break;
+		EmitChatBackgroundSprite(
+			resources,
+			ordinal,
+			7,
+			xOffset,
+			kChatBackgroundInteriorH,
+			tileW,
+			SpriteHeight(resources, kChatBackgroundBank, 7));
+		xOffset += tileW;
+	}
+	EmitChatBackgroundSprite(
+		resources, ordinal, 8, kChatW - kRightCapX, kChatBackgroundInteriorH);
+}
+
 }  // namespace
 
 void BuildChatOverlay(const HudView& view,
+                      const Resources& resources,
                       Surface* surface,
                       silencer::ui::UiInteractionRegistry& interactions) {
 	using namespace silencer::ui::primitives;
@@ -75,19 +163,7 @@ void BuildChatOverlay(const HudView& view,
 
 	(void)surface;
 	CLAY(HudFloatingElement("InGameChatPanel", kChatX, kChatY, kChatW, panelH)) {
-		CLAY({ .id = CLAY_ID("InGameChatBackground"),
-		       .layout = {
-		           .sizing = { CLAY_SIZING_FIXED((float)kChatW),
-		                       CLAY_SIZING_FIXED((float)kChatChromeH) },
-		       },
-		       .floating = {
-		           .offset = { 0, 0 },
-		           .attachTo = CLAY_ATTACH_TO_PARENT,
-		       },
-		       .custom = {
-		           .customData = AllocMessageBackgroundCustomData(
-		               { static_cast<Uint16>(kChatBackgroundInteriorH) }),
-		       } }) {}
+		EmitChatBackground(resources);
 
 		int yoffset = kTextStartY;
 		for(int i = 0; i < (int)lines.size(); i++) {
