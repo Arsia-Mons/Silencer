@@ -196,6 +196,7 @@ static const silencer::ui::UiInteractable * FindInteractableTarget(
 	const silencer::ui::UiInteractable * hit = nullptr;
 	int count = 0;
 	for(const auto & candidate : interactions.Interactables()){
+		if(!silencer::ui::UiInteractableIsInteractive(candidate)) continue;
 		bool matches = candidate.id == target;
 		if(!matches) matches =
 			silencer::ui::UiInteractableMatchesLabel(candidate, target.c_str());
@@ -206,6 +207,15 @@ static const silencer::ui::UiInteractable * FindInteractableTarget(
 		}
 	}
 	return count == 1 ? hit : nullptr;
+}
+
+static bool InteractableCenter(const silencer::ui::UiInteractable& widget,
+                               int& x,
+                               int& y){
+	if(widget.w <= 0 || widget.h <= 0) return false;
+	x = widget.x + widget.w / 2;
+	y = widget.y + widget.h / 2;
+	return true;
 }
 
 static bool PointInInteractable(const silencer::ui::UiInteractable& widget, int x, int y){
@@ -622,28 +632,22 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 		}
 		const auto * cw = FindInteractableTarget(game.UiInteractions(), target);
 		if(cw){
-			using K = silencer::ui::UiInteractableKind;
-			if(cw->kind == K::Button || cw->kind == K::Toggle){
-				const char * label = silencer::ui::UiInteractableLabel(*cw);
-				QueueInteractableAction(game, *cw, silencer::ui::UiActionKind::Activate,
-				                  label ? label : "");
-				nlohmann::json r;
-				r["source"] = "clay";
-				cmd.reply->set_value(OkResult(cmd.id, r));
+			int x = 0;
+			int y = 0;
+			if(!InteractableCenter(*cw, x, y)){
+				cmd.reply->set_value(Err(cmd.id, "WIDGET_NOT_FOUND",
+					"clay widget \"" + target + "\" has no clickable bounds"));
 				return;
 			}
-			if(cw->kind == K::ListRow){
-				const char * label = silencer::ui::UiInteractableLabel(*cw);
-				QueueInteractableAction(game, *cw, silencer::ui::UiActionKind::Select,
-				                  label ? label : "");
-				nlohmann::json r;
-				r["source"] = "clay";
+			game.UiInput().QueueControlPointerPress(x, y);
+			nlohmann::json r;
+			r["source"] = "clay";
+			r["x"] = x;
+			r["y"] = y;
+			if(cw->kind == silencer::ui::UiInteractableKind::ListRow){
 				r["row_index"] = cw->index;
-				cmd.reply->set_value(OkResult(cmd.id, r));
-				return;
 			}
-			cmd.reply->set_value(Err(cmd.id, "WRONG_TYPE",
-				"clay widget \"" + target + "\" is not clickable"));
+			cmd.reply->set_value(OkResult(cmd.id, r));
 			return;
 		}
 		cmd.reply->set_value(Err(cmd.id, "WIDGET_NOT_FOUND",

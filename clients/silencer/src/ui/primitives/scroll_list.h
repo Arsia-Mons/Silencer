@@ -48,6 +48,8 @@ struct ScrollListHandle {
 	const char * actionId;     // Optional row action ID prefix registered for input routing.
 	UiInteractionRegistry * interactions;  // Required when actionId is set.
 	int * hoveredIndexOut = nullptr;  // Optional. Hovered absolute row index.
+	bool requestSelectedInitialFocus = false;
+	bool requestSelectedFocus = false;
 };
 
 // Resets the per-frame click-adapter + payload arenas. Call once before

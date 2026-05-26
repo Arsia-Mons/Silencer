@@ -80,7 +80,9 @@ void FocusBox(Clay_ElementId id,
 
 void RuntimeButton(silencer::ui::UiInteractionRegistry& interactions,
                    Clay_ElementId id,
-                   const char * actionId) {
+                   const char * actionId,
+                   bool requestInitialFocus = false,
+                   bool requestFocus = false) {
 	CLAY({
 		.id = id,
 		.layout = {
@@ -93,6 +95,8 @@ void RuntimeButton(silencer::ui::UiInteractionRegistry& interactions,
 		widget.kind = silencer::ui::UiInteractableKind::Button;
 		widget.clayId = id;
 		widget.hasClayId = true;
+		widget.requestInitialFocus = requestInitialFocus;
+		widget.requestFocus = requestFocus;
 		interactions.RegisterInteractable(widget);
 	}
 }
@@ -615,7 +619,7 @@ TEST_CASE("ClientUi overlay focus is isolated from the covered screen") {
 
 	REQUIRE(overlayEntry != 0);
 	CHECK(SameId(silencer::ui::ui_focus_focused_id_for_scope(
-		             CLAY_IDI("ClientUiScreenFocusScope", 1)),
+		             CLAY_IDI("ClientUiScreenFocusScope", overlayEntry)),
 	             overlayButton));
 	CHECK(clientUi.Interactions().FindById("base.activate") == nullptr);
 	const auto * overlayElement = clientUi.Interactions().FindById("overlay.activate");
@@ -650,21 +654,98 @@ TEST_CASE("ClientUi screen focus scopes stay bounded across entry churn") {
 		input.width = 640;
 		input.height = 480;
 		clientUi.BeginFrame(input);
+		silencer::client_ui::UiScreenEntryId currentEntry = 0;
 		clientUi.BuildVisibleScreenFramesForTest(
-			[&](silencer::client_ui::UiScreenEntryId, Screen& screen, bool) {
+			[&](silencer::client_ui::UiScreenEntryId entryId, Screen& screen, bool) {
 				if(&screen == current){
+					currentEntry = entryId;
 					RuntimeButton(clientUi.Interactions(), button, "churn.visible");
 				}
 			});
 		clientUi.EndFrame();
 		(void)clientUi.DispatchInput(nullptr, input);
 
+		REQUIRE(currentEntry != 0);
 		CHECK(clientUi.FocusRuntime().errorCount == 0);
-		CHECK(clientUi.FocusRuntime().scopeCount <= 2);
+		CHECK(clientUi.FocusRuntime().scopeCount <=
+		      silencer::client_ui::CLIENT_UI_MAX_SCREENS + 1);
 		CHECK(SameId(silencer::ui::ui_focus_focused_id_for_scope(
-			             CLAY_IDI("ClientUiScreenFocusScope", 0)),
+			             CLAY_IDI("ClientUiScreenFocusScope", currentEntry)),
 		             button));
 	}
+}
+
+TEST_CASE("ClientUi retires removed screen focus scopes by entry id") {
+	RealClayBackend backend;
+	silencer::ui::ClayService clay(backend);
+	silencer::client_ui::ClientUi clientUi(clay);
+
+	auto firstScreen = std::make_unique<FrameProbeScreen>(false);
+	Screen * current = firstScreen.get();
+	REQUIRE(clientUi.PushBuiltScreenForTest(std::move(firstScreen)));
+
+	Clay_ElementId first = TestId("RetiredEntryFirst");
+	Clay_ElementId second = TestId("RetiredEntrySecond");
+	silencer::client_ui::UiScreenEntryId firstEntry = 0;
+	auto buildCurrent = [&] {
+		clientUi.BuildVisibleScreenFramesForTest(
+			[&](silencer::client_ui::UiScreenEntryId entryId, Screen& screen, bool) {
+				if(&screen == current){
+					if(firstEntry == 0) firstEntry = entryId;
+					RuntimeButton(clientUi.Interactions(), first, "retired.first");
+					RuntimeButton(clientUi.Interactions(), second, "retired.second");
+				}
+			});
+	};
+
+	silencer::ui::UiInputState input;
+	input.width = 640;
+	input.height = 480;
+	clientUi.BeginFrame(input);
+	buildCurrent();
+	clientUi.EndFrame();
+	REQUIRE(firstEntry != 0);
+	CHECK(SameId(silencer::ui::ui_focus_focused_id_for_scope(
+		             CLAY_IDI("ClientUiScreenFocusScope", firstEntry)),
+	             first));
+
+	input.navActions.push_back(silencer::ui::UiNavAction::Down);
+	input.source = silencer::ui::UiFocusSource::Keyboard;
+	clientUi.BeginFrame(input);
+	buildCurrent();
+	clientUi.EndFrame();
+	CHECK(SameId(silencer::ui::ui_focus_focused_id_for_scope(
+		             CLAY_IDI("ClientUiScreenFocusScope", firstEntry)),
+	             second));
+
+	auto replacement = std::make_unique<FrameProbeScreen>(false);
+	current = replacement.get();
+	REQUIRE(clientUi.QueuePopTop());
+	REQUIRE(clientUi.QueuePushScreen(std::move(replacement)));
+	clientUi.DrainWritesForTest();
+
+	silencer::client_ui::UiScreenEntryId replacementEntry = 0;
+	input = {};
+	input.width = 640;
+	input.height = 480;
+	clientUi.BeginFrame(input);
+	clientUi.BuildVisibleScreenFramesForTest(
+		[&](silencer::client_ui::UiScreenEntryId entryId, Screen& screen, bool) {
+			if(&screen == current){
+				replacementEntry = entryId;
+				RuntimeButton(clientUi.Interactions(), first, "retired.first");
+				RuntimeButton(clientUi.Interactions(), second, "retired.second");
+			}
+		});
+	clientUi.EndFrame();
+
+	REQUIRE(replacementEntry != 0);
+	CHECK(replacementEntry != firstEntry);
+	CHECK(silencer::ui::ui_focus_focused_id_for_scope(
+		      CLAY_IDI("ClientUiScreenFocusScope", firstEntry)).id == 0);
+	CHECK(SameId(silencer::ui::ui_focus_focused_id_for_scope(
+		             CLAY_IDI("ClientUiScreenFocusScope", replacementEntry)),
+	             first));
 }
 
 TEST_CASE("ClientUi focus supports the maximum visible overlay stack") {
@@ -859,6 +940,97 @@ TEST_CASE("ClientUi routes registered interactables through focus runtime once")
 	const auto * staleSecond = clientUi.Interactions().FindById("runtime.second");
 	REQUIRE(staleSecond != nullptr);
 	CHECK_FALSE(staleSecond->focused);
+}
+
+TEST_CASE("ClientUi applies registered initial focus requests through focus runtime") {
+	RealClayBackend backend;
+	silencer::ui::ClayService clay(backend);
+	silencer::client_ui::ClientUi clientUi(clay);
+
+	silencer::ui::UiInputState input;
+	input.width = 640;
+	input.height = 480;
+	Clay_ElementId first = TestId("InitialRequestFirst");
+	Clay_ElementId second = TestId("InitialRequestSecond");
+
+	clientUi.BeginFrame(input);
+	CLAY({
+		.id = TestId("InitialRequestStack"),
+		.layout = {
+			.layoutDirection = CLAY_TOP_TO_BOTTOM,
+			.childGap = 8,
+		},
+	}) {
+		RuntimeButton(clientUi.Interactions(), first, "initial.first");
+		RuntimeButton(clientUi.Interactions(), second, "initial.second", true);
+	}
+	clientUi.EndFrame();
+
+	CHECK(SameId(silencer::ui::ui_focus_focused_id_for_scope(
+	                 CLAY_ID("ClientUiFocusScope")),
+	             second));
+	const auto * secondElement = clientUi.Interactions().FindById("initial.second");
+	REQUIRE(secondElement != nullptr);
+	CHECK(secondElement->focused);
+
+	silencer::client_ui::UiDispatchResult result =
+		clientUi.DispatchInput(nullptr, input);
+	REQUIRE(result.unhandledActions.size() == 1);
+	CHECK(result.unhandledActions[0].kind == silencer::ui::UiActionKind::Navigate);
+	CHECK(result.unhandledActions[0].id == "initial.second");
+}
+
+TEST_CASE("ClientUi applies forced focus requests through focus runtime") {
+	RealClayBackend backend;
+	silencer::ui::ClayService clay(backend);
+	silencer::client_ui::ClientUi clientUi(clay);
+
+	silencer::ui::UiInputState input;
+	input.width = 640;
+	input.height = 480;
+	Clay_ElementId first = TestId("ForcedRequestFirst");
+	Clay_ElementId second = TestId("ForcedRequestSecond");
+
+	auto build = [&](bool forceFirst) {
+		CLAY({
+			.id = TestId("ForcedRequestStack"),
+			.layout = {
+				.layoutDirection = CLAY_TOP_TO_BOTTOM,
+				.childGap = 8,
+			},
+		}) {
+			RuntimeButton(
+				clientUi.Interactions(), first, "forced.first", false, forceFirst);
+			RuntimeButton(clientUi.Interactions(), second, "forced.second");
+		}
+	};
+
+	clientUi.BeginFrame(input);
+	build(false);
+	clientUi.EndFrame();
+	CHECK(SameId(silencer::ui::ui_focus_focused_id_for_scope(
+	                 CLAY_ID("ClientUiFocusScope")),
+	             first));
+
+	input.navActions.push_back(silencer::ui::UiNavAction::Down);
+	input.source = silencer::ui::UiFocusSource::Keyboard;
+	clientUi.BeginFrame(input);
+	build(false);
+	clientUi.EndFrame();
+	CHECK(SameId(silencer::ui::ui_focus_focused_id_for_scope(
+	                 CLAY_ID("ClientUiFocusScope")),
+	             second));
+
+	input = {};
+	input.width = 640;
+	input.height = 480;
+	clientUi.BeginFrame(input);
+	build(true);
+	clientUi.EndFrame();
+
+	CHECK(SameId(silencer::ui::ui_focus_focused_id_for_scope(
+	                 CLAY_ID("ClientUiFocusScope")),
+	             first));
 }
 
 TEST_CASE("ClientUi routes focus-next through declaration order instead of spatial down") {

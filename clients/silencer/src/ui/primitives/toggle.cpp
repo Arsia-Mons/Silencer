@@ -52,6 +52,8 @@ void RegisterToggleWidget(Clay_String id,
 	widget.selected = selected;
 	widget.clayId = CLAY_SID(id);
 	widget.hasClayId = true;
+	widget.requestInitialFocus = handle.requestInitialFocus;
+	widget.requestFocus = handle.requestFocus;
 	handle.interactions->RegisterInteractable(widget);
 }
 

@@ -138,6 +138,7 @@ struct UiFocusScope {
 	Clay_ElementId pointerPressOrigin = {};
 	UiFocusSource source = UiFocusSource::None;
 	Clay_ElementId requestedInitialFocus = {};
+	Clay_ElementId requestedFocus = {};
 	bool pointerClearedFocus = false;
 	bool autoFocusSuppressed = false;
 	uint32_t declaredFrame = 0;
@@ -181,6 +182,8 @@ void ui_focus_end_layout(const UiFocusInputFrame& input = {});
 void ui_focus_push_scope(const UiFocusScopeDesc& desc);
 void ui_focus_pop_scope();
 void ui_focus_request_initial_focus(Clay_ElementId id);
+void ui_focus_request_focus(Clay_ElementId id);
+void ui_focus_retire_scope(Clay_ElementId id);
 
 UiFocusableState ui_focusable(const UiFocusableDesc& desc);
 

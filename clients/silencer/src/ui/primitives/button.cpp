@@ -426,6 +426,8 @@ void RegisterButtonWidget(Clay_String label,
 	widget.inactive = opts.disabled;
 	widget.clayId = clayId;
 	widget.hasClayId = true;
+	widget.requestInitialFocus = handle.requestInitialFocus;
+	widget.requestFocus = handle.requestFocus;
 	handle.interactions->RegisterInteractable(widget);
 }
 

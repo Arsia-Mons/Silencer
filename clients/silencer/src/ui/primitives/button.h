@@ -47,6 +47,8 @@ struct ButtonHandle {
 	bool * hoveredOut = nullptr;
 	const char * actionId = nullptr;
 	UiInteractionRegistry * interactions = nullptr;
+	bool requestInitialFocus = false;
+	bool requestFocus = false;
 };
 
 void ButtonBeginFrame(float animationDeltaSeconds = 1.0f / 24.0f,

@@ -71,6 +71,8 @@ struct UiInteractable {
 	bool inactive = false;
 	bool numbersOnly = false;
 	bool cancelOnEscape = false;
+	bool requestInitialFocus = false;
+	bool requestFocus = false;
 };
 
 template <typename T>

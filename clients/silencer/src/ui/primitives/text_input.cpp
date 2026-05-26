@@ -68,6 +68,8 @@ void RegisterTextInputWidget(Clay_String clayId,
 	widget.inactive = opts.inactive;
 	widget.numbersOnly = opts.numbersOnly;
 	widget.cancelOnEscape = handle.cancelOnEscape;
+	widget.requestInitialFocus = handle.requestInitialFocus;
+	widget.requestFocus = handle.requestFocus;
 	handle.interactions->RegisterInteractable(widget);
 }
 

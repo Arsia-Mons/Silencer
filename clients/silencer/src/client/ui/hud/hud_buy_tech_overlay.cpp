@@ -100,10 +100,8 @@ void BuildBuyTechOverlay(const BuyTechOverlayView& view,
 			widget.selected = row.selected;
 			widget.clayId = CLAY_IDI("InGameBuyTechRow", row.index);
 			widget.hasClayId = true;
+			widget.requestFocus = row.selected;
 			interactions.RegisterInteractable(widget);
-			if(row.selected){
-				interactions.FocusInteractableById(widget.id.data(), widget.id.size());
-			}
 
 			CLAY(IndexedFloatingElement("InGameBuyTechRow", row.index,
 			                            rowX, rowY, highlightW, highlightH)) {

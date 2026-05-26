@@ -59,6 +59,8 @@ struct TextInputHandle {
 	int uid = -1;
 	int maxLength = 0;
 	bool cancelOnEscape = false;
+	bool requestInitialFocus = false;
+	bool requestFocus = false;
 };
 
 // Resets the per-frame payload + custom-data + mask-buffer arenas. Call

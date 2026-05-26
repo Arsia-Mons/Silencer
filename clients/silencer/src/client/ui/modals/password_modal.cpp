@@ -85,12 +85,8 @@ void PasswordModal::BuildUi(ScreenContext & ctx, Surface & dst, float frametime,
 	(void)frametime;
 	using namespace silencer::clay_bridge;
 
-
-
-	if(focusPasswordRequested){
-		interactions.RequestTextInputFocusByUid(password_modal_detail::kPasswordUid);
-		focusPasswordRequested = false;
-	}
+	const bool requestPasswordInitialFocus = focusPasswordRequested;
+	focusPasswordRequested = false;
 	bool focused = interactions.IsTextInputFocused(password_modal_detail::kPasswordUid);
 	bool blink = ctx.UiBlinkVisible();
 
@@ -121,7 +117,8 @@ void PasswordModal::BuildUi(ScreenContext & ctx, Surface & dst, float frametime,
 				  .password = true,
 				  .showCaret = focused && blink },
 				{ nullptr, password_modal_detail::kActionPassword, "Password",
-				  &interactions, password_modal_detail::kPasswordUid, 20 });
+				  &interactions, password_modal_detail::kPasswordUid, 20,
+				  false, requestPasswordInitialFocus });
 			password_modal_detail::Button(CLAY_STRING("PasswordModalOkButton"), CLAY_STRING("OK"),
 			           password_modal_detail::ButtonOpts{ .variant = password_modal_detail::ButtonVariant::Chrome,
 			                                             .size = password_modal_detail::ButtonSize::Compact },

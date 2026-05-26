@@ -124,11 +124,12 @@ void ScreenStack::RequestClear() {
 	clearRequested_ = true;
 }
 
-void ScreenStack::ClearIfRequested(ScreenContext& ctx) {
-	if(!clearRequested_) return;
-	if(LifecycleActive()) return;
+bool ScreenStack::ClearIfRequested(ScreenContext& ctx) {
+	if(!clearRequested_) return false;
+	if(LifecycleActive()) return false;
 	Clear(ctx);
 	clearRequested_ = false;
+	return true;
 }
 
 Screen * ScreenStack::Top() const {
@@ -179,6 +180,15 @@ VisibleScreenSpan ScreenStack::VisibleScreens() {
 		++visibleIndex;
 	}
 	return VisibleScreenSpan{visibleScreens_.data(), visibleScreenCount_};
+}
+
+int ScreenStack::CopyEntryIds(UiScreenEntryId * out, int max) const {
+	if(!out || max <= 0) return 0;
+	int copied = 0;
+	for(int i = 0; i < count_ && copied < max; ++i){
+		if(screens_[i].screen) out[copied++] = screens_[i].screen->EntryId();
+	}
+	return copied;
 }
 
 int ScreenStack::VisibleStart() const {

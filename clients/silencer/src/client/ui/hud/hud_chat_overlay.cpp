@@ -202,6 +202,7 @@ void BuildChatOverlay(const HudView& view,
 			                       kChatInputVisibleChars * TextAdvance(TextSize::Body),
 			                       TextLineHeight(TextSize::Body))) {
 				Clay_String stableChatText = AllocHudString(player.chatText);
+				const bool requestChatInitialFocus = !interactions.HasFocus();
 				TextInput(CLAY_STRING("InGameChatInput"),
 				          stableChatText.chars,
 				          { .widthPx = static_cast<Uint16>(
@@ -216,7 +217,8 @@ void BuildChatOverlay(const HudView& view,
 				            .interactions = &interactions,
 				            .uid = 9000,
 				            .maxLength = player.chatTextCapacity - 1,
-				            .cancelOnEscape = true });
+				            .cancelOnEscape = true,
+				            .requestFocus = requestChatInitialFocus });
 			}
 
 			silencer::ui::UiInteractable channel;
@@ -227,10 +229,6 @@ void BuildChatOverlay(const HudView& view,
 			channel.clayId = CLAY_ID("InGameChatPanel");
 			channel.hasClayId = true;
 			interactions.RegisterInteractable(channel);
-
-			if(!interactions.HasFocus()){
-				interactions.FocusInteractableById("ingame.chat");
-			}
 		}
 	}
 }

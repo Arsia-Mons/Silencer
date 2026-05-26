@@ -727,6 +727,8 @@ void CharacterCreateScreen::BuildEnterAlias(ScreenContext & ctx,
                                             silencer::ui::UiInteractionRegistry& interactions)
 {
 	using namespace character_create_screen_detail;
+	const bool requestAliasInitialFocus = focusAliasRequested;
+	focusAliasRequested = false;
 	const bool focused = interactions.IsTextInputFocused(kAliasInputUid);
 	const bool blink = ctx.UiBlinkVisible();
 
@@ -796,11 +798,8 @@ void CharacterCreateScreen::BuildEnterAlias(ScreenContext & ctx,
 			                           &interactions,
 			                           kAliasInputUid,
 			                           16,
-			                           true });
-		}
-		if(focusAliasRequested){
-			interactions.FocusTextInputByUid(kAliasInputUid);
-			focusAliasRequested = false;
+			                           true,
+			                           requestAliasInitialFocus });
 		}
 	}
 }

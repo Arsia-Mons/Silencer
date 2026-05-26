@@ -266,6 +266,8 @@ bool UiInteractionRegistry::RegisterInteractable(UiInteractable widget) {
 		existing->inactive = widget.inactive;
 		existing->numbersOnly = widget.numbersOnly;
 		existing->cancelOnEscape = widget.cancelOnEscape;
+		existing->requestInitialFocus = widget.requestInitialFocus;
+		existing->requestFocus = widget.requestFocus;
 	}else{
 		if(interactableCount_ >= UI_INTERACTION_MAX_INTERACTABLES) {
 			++interactableOverflowCount_;
@@ -401,6 +403,11 @@ void UiInteractionRegistry::RegisterFocusRuntimeTarget(const UiInteractable& wid
 
 	std::string id;
 	registry_detail::AssignStringFromIdentity(id, identity);
+	if(widget.requestFocus){
+		ui_focus_request_focus(widget.clayId);
+	}else if(widget.requestInitialFocus){
+		ui_focus_request_initial_focus(widget.clayId);
+	}
 	UiFocusableState state = ui_focusable({
 		widget.clayId,
 		widget.inactive,

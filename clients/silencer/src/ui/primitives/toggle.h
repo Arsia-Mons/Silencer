@@ -48,6 +48,8 @@ struct ToggleHandle {
 	bool *      hoveredOut;    // Optional. Written each frame if non-null.
 	const char * actionId;     // Optional stable UiAction id registered for input routing.
 	UiInteractionRegistry * interactions;  // Required when actionId is set.
+	bool requestInitialFocus = false;
+	bool requestFocus = false;
 };
 
 // Resets the per-frame click-adapter + payload arenas. Call once before

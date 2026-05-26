@@ -88,16 +88,35 @@ bool ActionTargetsFeedbackInteractable(const silencer::ui::UiInteractionRegistry
 	return widget && InteractableRequestsFeedback(*widget);
 }
 
-void WithScreenFocusScope(int visibleIndex,
+Clay_ElementId ScreenFocusScopeId(UiScreenEntryId entryId) {
+	return CLAY_IDI("ClientUiScreenFocusScope", entryId);
+}
+
+void WithScreenFocusScope(UiScreenEntryId entryId,
                           bool modal,
                           const std::function<void()>& build) {
 	silencer::ui::ui_focus_push_scope({
-		CLAY_IDI("ClientUiScreenFocusScope", visibleIndex),
+		ScreenFocusScopeId(entryId),
 		modal,
 		true,
 	});
 	if(build) build();
 	silencer::ui::ui_focus_pop_scope();
+}
+
+void RetireScreenFocusScope(silencer::ui::UiFocusRuntime& focus,
+                            UiScreenEntryId entryId) {
+	if(entryId == 0) return;
+	silencer::ui::ui_focus_set_current(&focus);
+	silencer::ui::ui_focus_retire_scope(ScreenFocusScopeId(entryId));
+}
+
+void RetireAllScreenFocusScopes(silencer::ui::UiFocusRuntime& focus,
+                                const UiScreenEntryId * entryIds,
+                                int count) {
+	for(int i = 0; i < count; ++i){
+		RetireScreenFocusScope(focus, entryIds[i]);
+	}
 }
 
 bool FocusRuntimeRoutedThisFrame(const silencer::ui::UiFocusRuntime& focus) {
@@ -309,11 +328,17 @@ bool ClientUi::PushScreen(std::unique_ptr<Screen> screen, ScreenContext& ctx) {
 }
 
 bool ClientUi::PopScreen(ScreenContext& ctx) {
-	return screens_.Pop(ctx);
+	const UiScreenEntryId entryId = screens_.TopEntryId();
+	const bool popped = screens_.Pop(ctx);
+	if(popped) clientui_detail::RetireScreenFocusScope(focus_, entryId);
+	return popped;
 }
 
 bool ClientUi::ReplaceScreen(std::unique_ptr<Screen> screen, ScreenContext& ctx) {
-	return screens_.Replace(std::move(screen), ctx);
+	const UiScreenEntryId entryId = screens_.TopEntryId();
+	const bool replaced = screens_.Replace(std::move(screen), ctx);
+	if(replaced) clientui_detail::RetireScreenFocusScope(focus_, entryId);
+	return replaced;
 }
 
 bool ClientUi::QueuePushScreen(std::unique_ptr<Screen> screen) {
@@ -363,11 +388,17 @@ void ClientUi::DrainWrites(ScreenContext& ctx) {
 				screens_.Push(std::move(write.screen), ctx);
 				break;
 			case WriteKind::PopCurrent:
-				screens_.PopEntry(write.entryId, ctx);
+				if(screens_.PopEntry(write.entryId, ctx)){
+					clientui_detail::RetireScreenFocusScope(focus_, write.entryId);
+				}
 				break;
-			case WriteKind::PopTop:
-				screens_.Pop(ctx);
+			case WriteKind::PopTop: {
+				const UiScreenEntryId entryId = screens_.TopEntryId();
+				if(screens_.Pop(ctx)){
+					clientui_detail::RetireScreenFocusScope(focus_, entryId);
+				}
 				break;
+			}
 			case WriteKind::Deferred:
 				if(write.deferred) write.deferred();
 				break;
@@ -406,7 +437,7 @@ void ClientUi::BuildVisibleScreenFrame(UiScreenEntryId entryId,
 				.layoutDirection = CLAY_TOP_TO_BOTTOM,
 			},
 		}) {
-			clientui_detail::WithScreenFocusScope(visibleIndex, false, build);
+			clientui_detail::WithScreenFocusScope(entryId, false, build);
 		}
 		return;
 	}
@@ -426,7 +457,7 @@ void ClientUi::BuildVisibleScreenFrame(UiScreenEntryId entryId,
 			.attachTo = CLAY_ATTACH_TO_ROOT,
 		},
 	}) {
-		clientui_detail::WithScreenFocusScope(visibleIndex, true, build);
+		clientui_detail::WithScreenFocusScope(entryId, true, build);
 	}
 }
 
@@ -435,7 +466,11 @@ void ClientUi::RequestClearScreens() {
 }
 
 void ClientUi::ClearScreensIfRequested(ScreenContext& ctx) {
-	screens_.ClearIfRequested(ctx);
+	std::array<UiScreenEntryId, CLIENT_UI_MAX_SCREENS> entryIds{};
+	const int entryCount = screens_.CopyEntryIds(entryIds.data(), CLIENT_UI_MAX_SCREENS);
+	if(screens_.ClearIfRequested(ctx)){
+		clientui_detail::RetireAllScreenFocusScopes(focus_, entryIds.data(), entryCount);
+	}
 }
 
 void ClientUi::TickVisibleScreens(ScreenContext& ctx) {
@@ -497,11 +532,17 @@ void ClientUi::DrainWritesForTest() {
 				screens_.PushBuiltForTest(std::move(write.screen));
 				break;
 			case WriteKind::PopCurrent:
-				screens_.PopEntryForTest(write.entryId);
+				if(screens_.PopEntryForTest(write.entryId)){
+					clientui_detail::RetireScreenFocusScope(focus_, write.entryId);
+				}
 				break;
-			case WriteKind::PopTop:
-				screens_.PopForTest();
+			case WriteKind::PopTop: {
+				const UiScreenEntryId entryId = screens_.TopEntryId();
+				if(screens_.PopForTest()){
+					clientui_detail::RetireScreenFocusScope(focus_, entryId);
+				}
 				break;
+			}
 			case WriteKind::Deferred:
 				if(write.deferred) write.deferred();
 				break;

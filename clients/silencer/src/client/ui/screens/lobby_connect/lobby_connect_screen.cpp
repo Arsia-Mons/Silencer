@@ -296,10 +296,8 @@ void LobbyConnectScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frame
 		scroll = static_cast<Uint16>(lineCount - visibleLines);
 	}
 	bool inactive = ctx.world.lobby.state == Lobby::AUTHSENT;
-	if(focusUsernameRequested){
-		interactions.RequestTextInputFocusByUid(lobby_connect_screen_detail::LBY_INPUT_USERNAME);
-		focusUsernameRequested = false;
-	}
+	const bool requestUsernameInitialFocus = focusUsernameRequested;
+	focusUsernameRequested = false;
 	const bool usernameFocused =
 		interactions.IsTextInputFocused(lobby_connect_screen_detail::LBY_INPUT_USERNAME);
 	const bool passwordFocused =
@@ -399,7 +397,8 @@ void LobbyConnectScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frame
 						  .contentInsetX = lobby_connect_screen_detail::kInputInsetX },
 						{ nullptr, lobby_connect_screen_detail::kActionUsername,
 						  "Username", &interactions,
-						  lobby_connect_screen_detail::LBY_INPUT_USERNAME, 16 });
+						  lobby_connect_screen_detail::LBY_INPUT_USERNAME, 16,
+						  false, requestUsernameInitialFocus });
 				}
 
 				CLAY({ .id = CLAY_ID("LobbyConnectPasswordRow"),

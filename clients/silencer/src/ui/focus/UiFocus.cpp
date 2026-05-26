@@ -550,6 +550,37 @@ void ui_focus_request_initial_focus(Clay_ElementId id) {
 	scope->requestedInitialFocus = id;
 }
 
+void ui_focus_request_focus(Clay_ElementId id) {
+	UiFocusScope * scope = ActiveScopeForDeclaration(g_current);
+	if(!scope) return;
+	scope->requestedFocus = id;
+}
+
+void ui_focus_retire_scope(Clay_ElementId id) {
+	UiFocusRuntime * runtime = g_current;
+	const int index = FindScopeIndex(runtime, id);
+	if(index < 0) return;
+
+	for(int stackIndex = 0; stackIndex < runtime->scopeStackCount;){
+		int& scopeIndex = runtime->scopeStack[stackIndex];
+		if(scopeIndex == index){
+			for(int j = stackIndex; j + 1 < runtime->scopeStackCount; ++j){
+				runtime->scopeStack[j] = runtime->scopeStack[j + 1];
+			}
+			--runtime->scopeStackCount;
+			continue;
+		}
+		if(scopeIndex > index) --scopeIndex;
+		++stackIndex;
+	}
+
+	for(int i = index; i + 1 < runtime->scopeCount; ++i){
+		runtime->scopes[i] = runtime->scopes[i + 1];
+	}
+	runtime->scopes[runtime->scopeCount - 1] = {};
+	--runtime->scopeCount;
+}
+
 UiFocusableState ui_focusable(const UiFocusableDesc& desc) {
 	UiFocusRuntime * runtime = g_current;
 	UiFocusScope * scope = ActiveScopeForDeclaration(runtime);
@@ -600,7 +631,11 @@ void ui_focus_end_layout(const UiFocusInputFrame& input) {
 		Clay_ElementId previousFocus = scope->focusedId;
 		HarvestScopeLayout(runtime, scope);
 
-		if(!ContainsEnabled(scope, scope->focusedId)){
+		if(ContainsEnabled(scope, scope->requestedFocus)){
+			scope->focusedId = scope->requestedFocus;
+			scope->source = UiFocusSource::Programmatic;
+			scope->autoFocusSuppressed = false;
+		}else if(!ContainsEnabled(scope, scope->focusedId)){
 			Clay_ElementId next = {};
 			if(ContainsEnabled(scope, scope->requestedInitialFocus)){
 				next = scope->requestedInitialFocus;
@@ -622,6 +657,7 @@ void ui_focus_end_layout(const UiFocusInputFrame& input) {
 		}
 
 		scope->requestedInitialFocus = {};
+		scope->requestedFocus = {};
 	}
 
 	UiFocusScope * active = ActiveDeclaredScope(runtime, runtime->frame);

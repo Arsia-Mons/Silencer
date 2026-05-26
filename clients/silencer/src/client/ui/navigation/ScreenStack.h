@@ -45,12 +45,13 @@ public:
 	bool Replace(std::unique_ptr<Screen> screen, ScreenContext& ctx);
 	void Clear(ScreenContext& ctx);
 	void RequestClear();
-	void ClearIfRequested(ScreenContext& ctx);
+	bool ClearIfRequested(ScreenContext& ctx);
 
 	Screen * Top() const;
 	UiScreenEntryId TopEntryId() const;
 	bool PopEntry(UiScreenEntryId entryId, ScreenContext& ctx);
 	VisibleScreenSpan VisibleScreens();
+	int CopyEntryIds(UiScreenEntryId * out, int max) const;
 
 	void TickVisible(ScreenContext& ctx);
 

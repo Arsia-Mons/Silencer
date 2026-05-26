@@ -69,6 +69,8 @@ void RegisterRowWidget(Clay_String id,
 	widget.selected = selected;
 	widget.clayId = CLAY_SIDI(id, static_cast<uint32_t>(index + 1));
 	widget.hasClayId = true;
+	widget.requestInitialFocus = selected && handle.requestSelectedInitialFocus;
+	widget.requestFocus = selected && handle.requestSelectedFocus;
 	handle.interactions->RegisterInteractable(widget);
 }
 

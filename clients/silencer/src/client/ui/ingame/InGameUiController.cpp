@@ -114,6 +114,7 @@ bool InGameUiController::ApplyActions(
 	int localPeerId,
 	const silencer::ui::UiActionList& actions,
 	silencer::ui::UiInteractionRegistry& interactions) {
+	(void)interactions;
 	Player * localplayer = world_.GetPeerPlayer(localPeerId);
 	if(!localplayer) return false;
 
@@ -149,7 +150,6 @@ bool InGameUiController::ApplyActions(
 			         action.kind == silencer::ui::UiActionKind::Activate){
 				if(action.id == "ingame.chat.channel"){
 					localplayer->chatwithteam = !localplayer->chatwithteam;
-					interactions.FocusInteractableById("ingame.chat");
 				}
 			}
 			continue;
