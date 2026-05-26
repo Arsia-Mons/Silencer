@@ -58,6 +58,14 @@ fail_if_match \
   --glob '!clients/silencer/src/ui/runtime/react.cpp'
 
 fail_if_match \
+  "\\bui_focus_(init|set_current|begin_frame|end_layout)[[:space:]]*\\(" \
+  "$REPO_ROOT/clients/silencer/src" \
+  --glob '!third_party/**' \
+  --glob '!clients/silencer/src/ui/focus/UiFocus.h' \
+  --glob '!clients/silencer/src/ui/focus/UiFocus.cpp' \
+  --glob '!clients/silencer/src/client/ui/ClientUi.cpp'
+
+fail_if_match \
   "clay_inspector" \
   "$REPO_ROOT/clients/silencer/src" \
   --glob '!third_party/**'

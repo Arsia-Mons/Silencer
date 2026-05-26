@@ -128,6 +128,7 @@ if(SILENCER_UNITY_BUILD)
 	# TUs.
 	file(GLOB _clay_unsafe_sources
 		src/ui/primitives/*.cpp
+		src/ui/focus/*.cpp
 		src/ui/runtime/*.cpp
 		src/render/clay_ui_tests/*.cpp
 		src/client/ui/screens/character_create/*.cpp

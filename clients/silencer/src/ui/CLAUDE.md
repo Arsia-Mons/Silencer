@@ -14,6 +14,9 @@ This is mid-migration toward good flexbox layout, Clay lifecycle, and shadcn-sty
   use `REACT_COMPONENT_*`, hooks, refs, effects, and providers while declaring
   UI, but it must not call `react_begin_frame`, `react_end_frame`, or
   `react_shutdown` directly outside focused runtime tests.
+- `ClientUi` owns the `UiFocusRuntime` frame lifecycle. Components may declare
+  focus scopes and focusables, but they must not call `ui_focus_begin_frame`,
+  `ui_focus_end_layout`, `ui_focus_set_current`, or `ui_focus_init` directly.
 - `UiInteractionRegistry` owns semantic metadata, focus, text editing, pointer hit testing, keyboard/gamepad navigation, automation, and typed action queuing. Clay still owns layout and final bounds.
 - Custom render payloads are the renderer bridge. Keep sprite-bank details inside payloads or existing bridge primitives; do not leak them into new public primitive APIs.
 

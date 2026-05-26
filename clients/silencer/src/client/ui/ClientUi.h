@@ -1,6 +1,7 @@
 #pragma once
 
 #include "ui/runtime/ClayService.h"
+#include "ui/focus/UiFocus.h"
 #include "ui/runtime/UiInteractionRegistry.h"
 #include "ui/runtime/UiFrameContext.h"
 #include "client/ui/navigation/ScreenStack.h"
@@ -27,6 +28,8 @@ public:
 	std::vector<silencer::ui::UiAction> DrainActions();
 	const silencer::ui::UiInteractionRegistry& Interactions() const { return interactions_; }
 	silencer::ui::UiInteractionRegistry& Interactions() { return interactions_; }
+	const silencer::ui::UiFocusRuntime& FocusRuntime() const { return focus_; }
+	silencer::ui::UiFocusRuntime& FocusRuntime() { return focus_; }
 
 	bool HasScreens() const { return !screens_.Empty(); }
 	Screen * TopScreen() const { return screens_.Top(); }
@@ -42,6 +45,8 @@ private:
 	silencer::ui::UiFrameContext frameCtx_;
 	silencer::ui::ClayService& clay_;
 	silencer::ui::UiInteractionRegistry interactions_;
+	silencer::ui::UiFocusRuntime focus_;
+	silencer::ui::UiFocusInputFrame focusInput_;
 	ScreenStack screens_;
 	std::string hoveredAudioInteractableId_;
 };

@@ -8,8 +8,10 @@ set(TEST_SRC
     updater_zip_test.cpp
     updater_sm_test.cpp
     control_widget_test.cpp
+    focus_runtime_test.cpp
     react_runtime_test.cpp
     ui_architecture_test.cpp
+    ${CMAKE_SOURCE_DIR}/src/ui/focus/UiFocus.cpp
     ${CMAKE_SOURCE_DIR}/src/ui/runtime/clay_init.cpp
     ${CMAKE_SOURCE_DIR}/src/ui/runtime/ClayService.cpp
     ${CMAKE_SOURCE_DIR}/src/ui/runtime/react.cpp
@@ -18,6 +20,7 @@ set(TEST_SRC
     ${CMAKE_SOURCE_DIR}/src/ui/runtime/UiInputRouter.cpp
     ${CMAKE_SOURCE_DIR}/src/ui/runtime/UiTextPolicy.cpp
     ${CMAKE_SOURCE_DIR}/src/ui/primitives/button.cpp
+    ${CMAKE_SOURCE_DIR}/src/ui/primitives/focusable.cpp
     ${CMAKE_SOURCE_DIR}/src/ui/primitives/text.cpp
     ${CMAKE_SOURCE_DIR}/src/ui/primitives/box.cpp
     ${CMAKE_SOURCE_DIR}/src/ui/primitives/scroll_list.cpp

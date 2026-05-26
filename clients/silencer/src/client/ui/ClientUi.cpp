@@ -59,6 +59,44 @@ bool ActionTargetsAudibleInteractable(const silencer::ui::UiInteractionRegistry&
 	return widget && IsAudibleInteractable(*widget);
 }
 
+silencer::ui::UiFocusInputFrame FocusInputFrom(
+	const silencer::ui::UiInputState& input) {
+	silencer::ui::UiFocusInputFrame out;
+	out.pointerPressed = input.pointer.pressed;
+	out.pointerDown = input.pointer.down;
+	out.pointerReleased = input.pointer.released;
+	if(input.pointer.pressed || input.pointer.released || input.pointer.down){
+		out.source = silencer::ui::UiFocusSource::Mouse;
+	}
+	for(silencer::ui::UiNavAction action : input.navActions){
+		switch(action){
+			case silencer::ui::UiNavAction::Up:
+				out.navUp = true;
+				break;
+			case silencer::ui::UiNavAction::Down:
+				out.navDown = true;
+				break;
+			case silencer::ui::UiNavAction::Left:
+				out.navLeft = true;
+				break;
+			case silencer::ui::UiNavAction::Right:
+				out.navRight = true;
+				break;
+			case silencer::ui::UiNavAction::Confirm:
+				out.confirmPressed = true;
+				out.confirmDown = true;
+				break;
+			case silencer::ui::UiNavAction::Cancel:
+				out.cancelPressed = true;
+				out.cancelDown = true;
+				break;
+			default:
+				break;
+		}
+	}
+	return out;
+}
+
 void PlayMenuButtonSound(ScreenContext& ctx) {
 #ifdef SILENCER_TEST_BUILD
 	(void)ctx;
@@ -75,18 +113,26 @@ void PlayMenuButtonSound(ScreenContext& ctx) {
 }  // namespace clientui_detail
 
 ClientUi::ClientUi(silencer::ui::ClayService& clay)
-	: clay_(clay) {}
+	: clay_(clay) {
+	silencer::ui::ui_focus_init(&focus_);
+}
 
 ClientUi::~ClientUi() = default;
 
 void ClientUi::BeginFrame(const silencer::ui::UiInputState& input) {
 	frameCtx_.BeginFrame(input.animationDeltaSeconds, input.animationStepSeconds);
 	silencer::client_ui::HudPayloadBeginFrame();
+	focusInput_ = clientui_detail::FocusInputFrom(input);
+	silencer::ui::ui_focus_set_current(&focus_);
+	silencer::ui::ui_focus_begin_frame(focusInput_);
 	clay_.BeginFrame(input, interactions_);
 }
 
 Clay_RenderCommandArray ClientUi::EndFrame() {
-	return clay_.EndFrame();
+	Clay_RenderCommandArray commands = clay_.EndFrame();
+	silencer::ui::ui_focus_set_current(&focus_);
+	silencer::ui::ui_focus_end_layout(focusInput_);
+	return commands;
 }
 
 std::vector<silencer::ui::UiAction> ClientUi::DispatchInput(
