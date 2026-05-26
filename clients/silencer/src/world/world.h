@@ -148,6 +148,7 @@ class World {
     void   ChangeTeam();
     bool   IsLocalHostWaitingForMapDownloads();
     void   SendReadyIfAllowed();
+    void   SeedGameInfoFromLobbyGame(LobbyGame & lobbyGame);
     void   SetAgency(Uint8 agency);
     void   KillByGovt(Peer & peer);
     void   Explode(Object & object, Uint8 suitcolor, float hitx);

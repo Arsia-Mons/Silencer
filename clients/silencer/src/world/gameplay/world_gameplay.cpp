@@ -194,6 +194,12 @@ void World::SendReadyIfAllowed(void){
 	}
 }
 
+void World::SeedGameInfoFromLobbyGame(LobbyGame & lobbyGame){
+	Serializer data;
+	lobbyGame.Serialize(Serializer::WRITE, data);
+	gameinfo.Serialize(Serializer::READ, data);
+}
+
 void World::SetAgency(Uint8 agency){
 	char msg[2];
 	msg[0] = MSG_SETAGENCY;

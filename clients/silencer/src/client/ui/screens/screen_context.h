@@ -61,7 +61,7 @@ public:
 		SubmittedCreateGame,
 		Failed
 	};
-	enum class CreateLobbyGameResultKind {
+	enum class CreateLobbyGameResult {
 		Pending,
 		Created,
 		Failed
@@ -82,9 +82,9 @@ public:
 		SDL_Scancode key2 = SDL_SCANCODE_UNKNOWN;
 		bool and_ = false;
 	};
-	struct CreateLobbyGameResult {
-		CreateLobbyGameResultKind kind = CreateLobbyGameResultKind::Pending;
-		LobbyGame * lobbyGame = nullptr;
+	struct CreateGameDefaults {
+		std::string name;
+		bool spectatable = true;
 	};
 	struct LobbyGameListRow {
 		Uint32 gameId = 0;
@@ -184,6 +184,9 @@ public:
 	bool IsCreateGamePending() const;
 	void SetCreateGamePending(bool pending);
 	void StartCreateGameRequest();
+	CreateGameDefaults CurrentCreateGameDefaults() const;
+	void SetCreateGameSpectatableDefault(bool spectatable);
+	void SaveDefaultCreateGameName(const char * name);
 	CreateLobbyGameResult ConsumeCreateLobbyGameResult();
 	LobbyGame * FindLobbyGame(Uint32 gameId) const;
 	LobbyGame * CurrentLobbyGame() const;
@@ -255,12 +258,12 @@ public:
 	void BeginCreateGameMapUpload(const std::string & gameName,
 	                              const std::string & mapName,
 	                              const std::string & password,
-	                              Uint8 securityLevel,
+	                              Uint8 securityIndex,
 	                              Uint8 minLevel,
 	                              Uint8 maxLevel,
 	                              Uint8 maxPlayers,
 	                              Uint8 maxTeams,
-	bool spectatable);
+	                              bool spectatable);
 	void ResetJoinMapDownload();
 	void PumpMapDownload();
 	bool LobbyNetworkIdle() const;

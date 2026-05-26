@@ -6,9 +6,9 @@
 // (security/spectatable cyclers) + ScrollList (map list) +
 // Button::Chrome (Create).
 //
-// Domain glue (CreateGame kickoff, Config persistence, async map upload)
-// lives in the screen-side GameCreatePanelTick. Primitives stay screen-
-// agnostic.
+// Domain decisions live in the screen-side GameCreatePanelTick. Create
+// defaults, security-level, and async create/join handoffs come through
+// ScreenContext; primitives stay screen-agnostic.
 
 #include "shared.h"
 #include "clay_ui_payloads.h"
@@ -17,10 +17,8 @@
 #include <string>
 #include <vector>
 
-class World;
 class Resources;
 class ScreenContext;
-class LobbyScreen;
 
 namespace silencer::ui {
 class UiInteractionRegistry;
@@ -42,7 +40,7 @@ struct GameCreatePanelState {
 
 	// Security cycler: 0=Off, 1=Low, 2=Medium (default), 3=High.
 	Uint8 securityIndex = 2;
-	bool  spectatable   = true;  // hydrated from Config::lastspectatable on init.
+	bool  spectatable   = true;  // hydrated from ScreenContext on init.
 
 	// Map list snapshot. Built once during Init from the local level dirs
 	// + community server list. Display strings include any "[DL] " prefix
@@ -76,8 +74,8 @@ struct GameCreatePanelState {
 	silencer::clay_bridge::ClayCustomData hoverPreviewCustomData{};
 };
 
-// Hydrate state from Config (defaultgamename, lastspectatable) and rebuild
-// the map list from disk + the community map API. Mirrors the legacy
+// Hydrate state from create-game defaults and rebuild the map list from disk
+// + the community map API. Mirrors the legacy
 // GameCreatePanel::Build's one-time setup.
 void GameCreatePanelInit(GameCreatePanelState & state, ScreenContext & ctx);
 
@@ -88,9 +86,7 @@ void GameCreatePanelInit(GameCreatePanelState & state, ScreenContext & ctx);
 // legacy LobbyScreen::Tick's `if(gameCreate)` block + GameCreatePanel::Tick
 // button switch.
 void GameCreatePanelTick(GameCreatePanelState & state,
-                         World & world,
-                         ScreenContext & ctx,
-                         LobbyScreen & owner);
+                         ScreenContext & ctx);
 bool GameCreatePanelHandleUiIntent(GameCreatePanelState & state,
                                    const silencer::ui::UiAction & action);
 

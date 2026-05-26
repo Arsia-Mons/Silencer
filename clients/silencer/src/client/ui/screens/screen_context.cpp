@@ -71,6 +71,16 @@ char * CopyOptionalPassword(const char * password, char * buffer, size_t bufferS
 	buffer[bufferSize - 1] = '\0';
 	return buffer;
 }
+
+Uint8 ToCreateGameSecurityLevel(Uint8 securityIndex)
+{
+	switch(securityIndex){
+		case 1: return LobbyGame::SECLOW;
+		case 2: return LobbyGame::SECMEDIUM;
+		case 3: return LobbyGame::SECHIGH;
+	}
+	return LobbyGame::SECNONE;
+}
 } // namespace
 
 ScreenContext::ScreenContext(Game & game_,
@@ -126,23 +136,43 @@ void ScreenContext::StartCreateGameRequest() {
 	world.lobby.creategamestatus = 0;
 	game.creategameclicked = true;
 }
+ScreenContext::CreateGameDefaults ScreenContext::CurrentCreateGameDefaults() const {
+	CreateGameDefaults defaults;
+	defaults.name = Config::GetInstance().defaultgamename;
+	defaults.spectatable = Config::GetInstance().lastspectatable;
+	return defaults;
+}
+void ScreenContext::SetCreateGameSpectatableDefault(bool spectatable) {
+	Config::GetInstance().lastspectatable = spectatable;
+	Config::GetInstance().Save();
+}
+void ScreenContext::SaveDefaultCreateGameName(const char * name) {
+	std::strncpy(Config::GetInstance().defaultgamename,
+	             name,
+	             sizeof(Config::GetInstance().defaultgamename) - 1);
+	Config::GetInstance().defaultgamename[
+		sizeof(Config::GetInstance().defaultgamename) - 1] = '\0';
+	Config::GetInstance().Save();
+}
 ScreenContext::CreateLobbyGameResult ScreenContext::ConsumeCreateLobbyGameResult() {
-	CreateLobbyGameResult result;
-	if(!game.creategameclicked) return result;
+	if(!game.creategameclicked) return CreateLobbyGameResult::Pending;
 	if(world.lobby.creategamestatus == 1){
 		world.lobby.creategamestatus = 0;
 		game.creategameclicked = false;
-		result.kind = CreateLobbyGameResultKind::Created;
-		result.lobbyGame = world.lobby.GetGameById(world.lobby.createdgameid);
-		return result;
+		LobbyGame * lobbyGame = world.lobby.GetGameById(world.lobby.createdgameid);
+		if(lobbyGame){
+			world.SeedGameInfoFromLobbyGame(*lobbyGame);
+			JoinLobbyGame(*lobbyGame, lobbyGame->password);
+			LoadLobbyGameMapData(*lobbyGame);
+		}
+		return CreateLobbyGameResult::Created;
 	}
 	if(world.lobby.creategamestatus != 100 && world.lobby.creategamestatus != 0){
 		world.lobby.creategamestatus = 0;
 		game.creategameclicked = false;
-		result.kind = CreateLobbyGameResultKind::Failed;
-		return result;
+		return CreateLobbyGameResult::Failed;
 	}
-	return result;
+	return CreateLobbyGameResult::Pending;
 }
 LobbyGame * ScreenContext::FindLobbyGame(Uint32 gameId) const { return world.lobby.GetGameById(gameId); }
 LobbyGame * ScreenContext::CurrentLobbyGame() const { return FindLobbyGame(game.currentlobbygameid); }
@@ -704,7 +734,7 @@ void ScreenContext::BeginLobbyTechSelection() {
 void ScreenContext::BeginCreateGameMapUpload(const std::string & gameName,
                                              const std::string & mapName,
                                              const std::string & password,
-                                             Uint8 securityLevel,
+                                             Uint8 securityIndex,
                                              Uint8 minLevel,
                                              Uint8 maxLevel,
                                              Uint8 maxPlayers,
@@ -719,7 +749,7 @@ void ScreenContext::BeginCreateGameMapUpload(const std::string & gameName,
 	pending.mapname       = mapName;
 	pending.password      = password;
 	std::memcpy(pending.maphash, mapHash, 20);
-	pending.securitylevel = securityLevel;
+	pending.securitylevel = ToCreateGameSecurityLevel(securityIndex);
 	pending.minlevel      = minLevel;
 	pending.maxlevel      = maxLevel;
 	pending.maxplayers    = maxPlayers;

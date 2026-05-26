@@ -1,14 +1,10 @@
 #include "game_create_panel.h"
 
-#include "lobby_screen.h"
 #include "screen_context.h"
-#include "world.h"
-#include "lobby.h"
-#include "lobbygame.h"
 #include "screen.h"
-#include "config.h"
 #include "message_modal.h"
 
+#include <cstdlib>
 #include <cstring>
 #include <string>
 
@@ -52,8 +48,9 @@ void BuildMapList(GameCreatePanelState & state, ScreenContext & ctx) {
 
 void GameCreatePanelInit(GameCreatePanelState & state, ScreenContext & ctx) {
 	state = GameCreatePanelState{};
-	state.spectatable = Config::GetInstance().lastspectatable;
-	std::strncpy(state.name, Config::GetInstance().defaultgamename, sizeof(state.name) - 1);
+	ScreenContext::CreateGameDefaults defaults = ctx.CurrentCreateGameDefaults();
+	state.spectatable = defaults.spectatable;
+	std::strncpy(state.name, defaults.name.c_str(), sizeof(state.name) - 1);
 	state.name[sizeof(state.name) - 1] = '\0';
 	game_create_panel_detail::BuildMapList(state, ctx);
 	ctx.SelectCreateGameMap(-1);
@@ -61,9 +58,7 @@ void GameCreatePanelInit(GameCreatePanelState & state, ScreenContext & ctx) {
 }
 
 void GameCreatePanelTick(GameCreatePanelState & state,
-                         World & world,
-                         ScreenContext & ctx,
-                         LobbyScreen & owner) {
+                         ScreenContext & ctx) {
 	if(state.mapRowClickedIndex >= 0){
 		state.mapSelectedIndex = state.mapRowClickedIndex;
 		ctx.SelectCreateGameMap(state.mapRowClickedIndex);
@@ -76,8 +71,7 @@ void GameCreatePanelTick(GameCreatePanelState & state,
 	if(state.spectatableClicked){
 		state.spectatableClicked = false;
 		state.spectatable = !state.spectatable;
-		Config::GetInstance().lastspectatable = state.spectatable;
-		Config::GetInstance().Save();
+		ctx.SetCreateGameSpectatableDefault(state.spectatable);
 	}
 
 	ScreenContext::CreateGameMapUploadResult uploadResult =
@@ -91,14 +85,7 @@ void GameCreatePanelTick(GameCreatePanelState & state,
 	}
 	ScreenContext::CreateLobbyGameResult createGameResult =
 		ctx.ConsumeCreateLobbyGameResult();
-	if(createGameResult.kind == ScreenContext::CreateLobbyGameResultKind::Created){
-		LobbyGame * lobbygame = createGameResult.lobbyGame;
-		if(lobbygame){
-			owner.SeedHostGameInfo(world, *lobbygame);
-			ctx.JoinLobbyGame(*lobbygame, lobbygame->password);
-			ctx.LoadLobbyGameMapData(*lobbygame);
-		}
-	}else if(createGameResult.kind == ScreenContext::CreateLobbyGameResultKind::Failed){
+	if(createGameResult == ScreenContext::CreateLobbyGameResult::Failed){
 		Screen * top = ctx.TopScreen();
 		MessageModal * m = dynamic_cast<MessageModal *>(top);
 		if(m && m->IsProgress()) ctx.PopScreen();
@@ -118,28 +105,20 @@ void GameCreatePanelTick(GameCreatePanelState & state,
 		ctx.ShowMessage("Download the map first"); return;
 	}
 
-	Uint8 securitylevel = LobbyGame::SECNONE;
-	switch(state.securityIndex){
-		case 1: securitylevel = LobbyGame::SECLOW;    break;
-		case 2: securitylevel = LobbyGame::SECMEDIUM; break;
-		case 3: securitylevel = LobbyGame::SECHIGH;   break;
-	}
 	Uint8 maxplayers = static_cast<Uint8>(atoi(state.maxPlayers)); if(maxplayers <= 0) maxplayers = 1;
 	Uint8 maxteams   = static_cast<Uint8>(atoi(state.maxTeams));   if(maxteams   <= 0) maxteams   = 1;
 
 	ctx.BeginCreateGameMapUpload(state.name,
 	                             mapname,
 	                             state.password,
-	                             securitylevel,
+	                             state.securityIndex,
 	                             static_cast<Uint8>(atoi(state.minLevel)),
 	                             static_cast<Uint8>(atoi(state.maxLevel)),
 	                             maxplayers,
 	                             maxteams,
 	                             state.spectatable);
 	ctx.StartCreateGameRequest();
-	std::strncpy(Config::GetInstance().defaultgamename, state.name, sizeof(Config::GetInstance().defaultgamename) - 1);
-	Config::GetInstance().defaultgamename[sizeof(Config::GetInstance().defaultgamename) - 1] = '\0';
-	Config::GetInstance().Save();
+	ctx.SaveDefaultCreateGameName(state.name);
 	ctx.PushScreen(MessageModal::Progress("Uploading map..."));
 }
 

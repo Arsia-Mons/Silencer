@@ -3,8 +3,6 @@
 #include "screen_context.h"
 #include "game_state.h"
 #include "world.h"
-#include "lobbygame.h"
-#include "serializer.h"
 #include "message_modal.h"
 
 #include <cstring>
@@ -64,7 +62,7 @@ void LobbyScreen::Tick(ScreenContext & ctx)
 	}
 	if(gameCreateActive){
 		silencer::client_ui::lobby::GameCreatePanelTick(
-			gameCreateState, ctx.world, ctx, *this);
+			gameCreateState, ctx);
 	}
 	if(gameJoinActive){
 		silencer::client_ui::lobby::GameJoinPanelTick(
@@ -159,17 +157,8 @@ bool LobbyScreen::HandleUiIntent(ScreenContext & ctx, const silencer::ui::UiActi
 	return silencer::client_ui::lobby::GameSelectPanelHandleUiIntent(gameSelectState, action);
 }
 
-// Friend-of-World helpers — these are member methods because the remaining
-// lobby panels reach into World private state through the LobbyScreen friend
-// grant. Kept alongside the controller (Tick / HandleUiIntent) since the
-// panel ticks call them.
-
-void LobbyScreen::SeedHostGameInfo(World & world, LobbyGame & lg)
-{
-	Serializer data;
-	lg.Serialize(Serializer::WRITE, data);
-	world.gameinfo.Serialize(Serializer::READ, data);
-}
+// Friend-of-World helpers for the GameTech panel. Kept alongside the
+// controller (Tick / HandleUiIntent) since the panel tick calls them.
 
 Uint8 LobbyScreen::TechPanelLocalPeerId(World & world) const
 {

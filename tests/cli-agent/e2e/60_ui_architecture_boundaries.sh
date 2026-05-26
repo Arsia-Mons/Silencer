@@ -250,6 +250,12 @@ fail_if_match \
   --glob '!**/screen_context.cpp'
 
 fail_if_match \
+  '\b(World|LobbyGame|Config)\b|\bLobby[[:space:]]*([*&]|::)|([.]|->)[[:space:]]*(world|lobby)\b|world[[:space:]]*[.]|#[[:space:]]*include[[:space:]]*[<"]([^>"]*/)?(world|lobby|lobbygame|config)[.]h[>"]|Config::GetInstance[[:space:]]*[(]|\bSeedHostGameInfo\b|\bJoinLobbyGame\b|\bLoadLobbyGameMapData\b|\bSEC(NONE|LOW|MEDIUM|HIGH)\b' \
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens/lobby/game_create_panel.cpp" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens/lobby/game_create_panel.h" \
+  --glob '!**/screen_context.cpp'
+
+fail_if_match \
   'ctx[[:space:]]*[.][[:space:]]*mapDownloader|\bmapDownloader\b|#[[:space:]]*include[[:space:]]*[<"]([^>"]*/)?map_downloader[.]h[>"]|\bmapUpload(State|Thread|Generation)\b|\bmapexistchecked\b|\bmapjoin(state|thread|generation)\b|\bProcessMapDownload[[:space:]]*[(]' \
   "$REPO_ROOT/clients/silencer/src/client/ui/screens/lobby/lobby_controller.cpp" \
   --glob '!**/screen_context.cpp'

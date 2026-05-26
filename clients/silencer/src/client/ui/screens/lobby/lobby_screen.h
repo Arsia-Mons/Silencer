@@ -41,12 +41,6 @@ public:
 	void ShowGameJoin(ScreenContext & ctx);
 	void ShowGameTech(ScreenContext & ctx);
 
-	// Friend-of-World helper: seeds `world.gameinfo` from the lobby record
-	// of the newly created game so the host's SendGameInfo path can push
-	// it to the dedicated server. Mirrors the legacy LobbyScreen::Tick
-	// host-side gameinfo seeding. Called from GameCreatePanelTick.
-	void SeedHostGameInfo(class World & world, class LobbyGame & lg);
-
 	// Friend-of-World helpers used by the GameTech panel.
 	Uint8 TechPanelLocalPeerId(class World & world) const;
 	class Peer * TechPanelPeer(class World & world, Uint8 peerid) const;
