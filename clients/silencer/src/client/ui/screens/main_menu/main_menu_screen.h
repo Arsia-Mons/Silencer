@@ -4,6 +4,7 @@
 #include "components/silencer_logo.h"
 #include "screen.h"
 
+#include <functional>
 #include <string>
 
 class MainMenuScreen : public Screen
@@ -16,10 +17,10 @@ public:
 	bool HandleUiIntent(ScreenContext & ctx, const silencer::ui::UiAction & action) override;
 
 private:
-	bool tutorialClicked = false;
-	bool lobbyClicked = false;
-	bool optionsClicked = false;
-	bool exitClicked = false;
+	std::function<void()> startTutorial;
+	std::function<void()> openLobby;
+	std::function<void()> openOptions;
+	std::function<void()> quit;
 	std::string versionText_;
 	silencer::client_ui::main_menu::SilencerLogo logo;
 };

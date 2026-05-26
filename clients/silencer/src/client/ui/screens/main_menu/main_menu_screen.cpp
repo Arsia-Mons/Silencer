@@ -1,5 +1,6 @@
 #include "main_menu_screen.h"
 
+#include "client/ui/ClientUi.h"
 #include "screen_context.h"
 #include "game_state.h"
 #include "surface.h"
@@ -47,6 +48,20 @@ constexpr const char * kActionExit = "main_menu.exit";
 Clay_String FromStd(const std::string & s)
 {
 	return Clay_String{ false, static_cast<int32_t>(s.size()), s.c_str() };
+}
+
+std::function<void()> UseQueuedAction(std::function<void()> write)
+{
+	auto queueWrite = silencer::client_ui::UseUiWriteQueue();
+	if(!queueWrite) return {};
+	return [queueWrite, write]() {
+		queueWrite(write);
+	};
+}
+
+void Invoke(const std::function<void()> & action)
+{
+	if(action) action();
 }
 
 ButtonOpts MainMenuActionButtonOpts()
@@ -145,35 +160,16 @@ void MainMenuScreen::Build(ScreenContext & ctx)
 	// resolved from Clay's real layout (ResolveClayBoundsFromClay), so no
 	// absolute coordinates are registered here.
 
-	tutorialClicked = false;
-	lobbyClicked = false;
-	optionsClicked = false;
-	exitClicked = false;
+	startTutorial = {};
+	openLobby = {};
+	openOptions = {};
+	quit = {};
 	logo.Reset();
 }
 
 void MainMenuScreen::Tick(ScreenContext & ctx)
 {
-	if(tutorialClicked){
-		tutorialClicked = false;
-		ctx.GoToState(GameState::SINGLEPLAYERGAME);
-		return;
-	}
-	if(lobbyClicked){
-		lobbyClicked = false;
-		ctx.GoToState(GameState::LOBBYCONNECT);
-		return;
-	}
-	if(optionsClicked){
-		optionsClicked = false;
-		ctx.GoToState(GameState::OPTIONS);
-		return;
-	}
-	if(exitClicked){
-		exitClicked = false;
-		ctx.RequestQuit();
-		return;
-	}
+	(void)ctx;
 }
 
 void MainMenuScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime, silencer::ui::UiInteractionRegistry& interactions)
@@ -184,6 +180,18 @@ void MainMenuScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime
 
 	versionText_ = "Silencer v";
 	versionText_ += ctx.ClientVersion();
+	startTutorial = main_menu_screen_detail::UseQueuedAction([&ctx]() {
+		ctx.GoToState(GameState::SINGLEPLAYERGAME);
+	});
+	openLobby = main_menu_screen_detail::UseQueuedAction([&ctx]() {
+		ctx.GoToState(GameState::LOBBYCONNECT);
+	});
+	openOptions = main_menu_screen_detail::UseQueuedAction([&ctx]() {
+		ctx.GoToState(GameState::OPTIONS);
+	});
+	quit = main_menu_screen_detail::UseQueuedAction([&ctx]() {
+		ctx.RequestQuit();
+	});
 
 	// Flex-first layout: legacy positions are expressed as column sizes,
 	// padding, and alignment so the menu still reflows with Clay.
@@ -269,29 +277,34 @@ void MainMenuScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime
 void MainMenuScreen::Destroy(ScreenContext & ctx)
 {
 	(void)ctx;
+	startTutorial = {};
+	openLobby = {};
+	openOptions = {};
+	quit = {};
 }
 
 bool MainMenuScreen::HandleUiIntent(ScreenContext & ctx, const silencer::ui::UiAction & action)
 {
+	(void)ctx;
 	if(action.kind == silencer::ui::UiActionKind::Cancel){
-		ctx.RequestQuit();
+		main_menu_screen_detail::Invoke(quit);
 		return true;
 	}
 	if(action.kind != silencer::ui::UiActionKind::Activate) return false;
 	if(action.id == main_menu_screen_detail::kActionTutorial){
-		tutorialClicked = true;
+		main_menu_screen_detail::Invoke(startTutorial);
 		return true;
 	}
 	if(action.id == main_menu_screen_detail::kActionLobby){
-		lobbyClicked = true;
+		main_menu_screen_detail::Invoke(openLobby);
 		return true;
 	}
 	if(action.id == main_menu_screen_detail::kActionOptions){
-		optionsClicked = true;
+		main_menu_screen_detail::Invoke(openOptions);
 		return true;
 	}
 	if(action.id == main_menu_screen_detail::kActionExit){
-		exitClicked = true;
+		main_menu_screen_detail::Invoke(quit);
 		return true;
 	}
 	return false;
