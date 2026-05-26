@@ -38,9 +38,10 @@ ScreenContext::UpdateState ToScreenUpdateState(Updater::State state)
 		case Updater::FAILED:
 			return ScreenContext::UpdateState::Failed;
 		case Updater::DONE:
-		default:
 			return ScreenContext::UpdateState::Done;
 	}
+	assert(false && "Unhandled updater state");
+	return ScreenContext::UpdateState::Idle;
 }
 } // namespace
 
