@@ -213,7 +213,7 @@ fail_if_match \
   --glob '!**/screen_context.cpp'
 
 fail_if_match \
-  '#include[[:space:]]*[<"]([^>"]*/)?(world|audio|gasloader)[.]h[>"]|Audio::|GASLoader::|soundUIClick|ctx[[:space:]]*[.][[:space:]]*world[[:space:]]*[.][[:space:]]*resources[[:space:]]*[.][[:space:]]*soundbank|\bresources[[:space:]]*[.][[:space:]]*soundbank' \
+  '#[[:space:]]*include[[:space:]]*[<"]([^>"]*/)?(world|audio|gasloader)[.]h[>"]|(Audio|GASLoader)[[:space:]]*::|soundUIClick|ctx[[:space:]]*[.][[:space:]]*world[[:space:]]*[.][[:space:]]*resources[[:space:]]*[.][[:space:]]*soundbank|\bresources[[:space:]]*[.][[:space:]]*soundbank' \
   "$REPO_ROOT/clients/silencer/src/client/ui/screens/lobby/game_create_panel_map_form.cpp" \
   --glob '!**/screen_context.cpp'
 
