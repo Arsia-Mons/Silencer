@@ -53,9 +53,9 @@ private:
 	std::function<void()> goBack;
 	bool goBackQueued = false;
 
-	// CharacterPanel state — agency selection persisted via Config +
-	// World::SetAgency on change.
-	silencer::client_ui::lobby::CharacterPanelState characterState;
+		// CharacterPanel state — agency selection and navigation handoffs are
+		// supplied by UseLobby during declaration.
+		silencer::client_ui::lobby::CharacterPanelState characterState;
 
 	// ChatPanel state — chat scrollback + presence list + input buffer +
 	// cached channel name.

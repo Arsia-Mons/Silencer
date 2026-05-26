@@ -1,7 +1,6 @@
 #include "lobby_screen.h"
 
 #include "screen_context.h"
-#include "game_state.h"
 #include "message_modal.h"
 
 #include <cstring>
@@ -38,12 +37,6 @@ void LobbyScreen::Tick(ScreenContext & ctx)
 	// Lobby disconnect → bounce back to the connect screen.
 	if(ctx.HandleLobbyDisconnect()) return;
 
-	silencer::client_ui::lobby::CharacterPanelTick(characterState, ctx);
-	if(characterState.newCharacterRequested){
-		characterState.newCharacterRequested = false;
-		ctx.GoToState(GameState::CREATECHARACTER);
-		return;
-	}
 	silencer::client_ui::lobby::ChatPanelTick(chatState, ctx);
 
 	if(!gameCreateActive && !gameJoinActive && !gameTechActive){
@@ -136,7 +129,7 @@ bool LobbyScreen::HandleUiIntent(ScreenContext & ctx, const silencer::ui::UiActi
 		QueueGoBack();
 		return true;
 	}
-	if(silencer::client_ui::lobby::CharacterPanelHandleUiIntent(characterState, ctx, action)){
+	if(silencer::client_ui::lobby::CharacterPanelHandleUiIntent(characterState, action)){
 		return true;
 	}
 	if(silencer::client_ui::lobby::ChatPanelHandleUiIntent(chatState, ctx, action)){

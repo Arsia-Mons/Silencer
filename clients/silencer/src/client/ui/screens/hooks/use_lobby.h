@@ -56,6 +56,8 @@ struct LobbyCharacterStats {
 
 struct LobbyUi {
 	bool authSent = false;
+	uint8_t selectedAgency = 0;
+	bool agentSelectionLocked = false;
 	std::function<void(std::string username, std::string password)> submitCredentials = {};
 	std::function<void(std::shared_ptr<LobbyMissionSummaryActions>)> flushMissionSummaryActions = {};
 	std::function<void(std::shared_ptr<LobbyGameJoinActions>,
@@ -63,6 +65,8 @@ struct LobbyUi {
 	                   std::function<void()> showTech)> flushGameJoinActions = {};
 	std::function<LobbyTechItemDetails(int itemIndex)> techItemDetailsForIndex = {};
 	std::function<LobbyCharacterStats(uint8_t agency)> characterStatsForAgency = {};
+	std::function<void(uint8_t agency)> syncSelectedAgency = {};
+	std::function<void()> openCharacterSelection = {};
 	std::function<void(std::shared_ptr<LobbyGameTechActions>,
 	                   std::function<bool()> gameTechStillActive,
 	                   std::function<void()> showTeams)> flushGameTechActions = {};

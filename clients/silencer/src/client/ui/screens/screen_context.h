@@ -239,9 +239,6 @@ public:
 	bool ConsumeLobbyGameListRefresh();
 	std::vector<LobbyGameListRow> LobbyGameListRows() const;
 	LobbyGameDetails LobbyGameDetailsFor(Uint32 gameId) const;
-	Uint8 DefaultLobbyAgency() const;
-	Uint8 SelectedLobbyAgency() const;
-	void SetLobbyAgency(Uint8 agency);
 	LobbyChannelChange ConsumeLobbyChannelChange();
 	bool ConsumeLobbyPresenceRefresh();
 	std::vector<LobbyPresenceRow> LobbyPresenceRows() const;

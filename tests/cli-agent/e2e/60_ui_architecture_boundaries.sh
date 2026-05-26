@@ -133,7 +133,7 @@ fail_if_match \
   --glob '!**/screen_context.cpp'
 
 fail_if_match \
-  '\b(CurrentLobbyAgencyLevel|LobbyCharacterStatsForAgency|LocalLobbyAgencyLevel|LobbyCharacterStats|[A-Za-z0-9_]*(Character[A-Za-z0-9_]*Stats|Stats[A-Za-z0-9_]*Character|Agency[A-Za-z0-9_]*Level|Level[A-Za-z0-9_]*Agency)[A-Za-z0-9_]*)\b' \
+  '\b(CurrentLobbyAgencyLevel|LobbyCharacterStatsForAgency|LocalLobbyAgencyLevel|LobbyCharacterStats|DefaultLobbyAgency|SelectedLobbyAgency|SetLobbyAgency|[A-Za-z0-9_]*(Character[A-Za-z0-9_]*Stats|Stats[A-Za-z0-9_]*Character|Agency[A-Za-z0-9_]*Level|Level[A-Za-z0-9_]*Agency)[A-Za-z0-9_]*)\b' \
   "$REPO_ROOT/clients/silencer/src/client/ui/screens/screen_context.h" \
   "$REPO_ROOT/clients/silencer/src/client/ui/screens/screen_context.cpp"
 
@@ -147,6 +147,11 @@ if awk '
   echo "Character panel tree must read lobby data through UseLobby, not ScreenContext props" >&2
   exit 1
 fi
+
+fail_if_match \
+  '\bScreenContext\b' \
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens/lobby/character_panel.h" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens/lobby/character_panel.cpp"
 
 fail_if_match \
   '#include[[:space:]]*"game[.]h"' \

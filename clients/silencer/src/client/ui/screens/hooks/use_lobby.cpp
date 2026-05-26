@@ -196,6 +196,29 @@ LobbyAgencyLevel CurrentLobbyAgencyLevel(Lobby * lobby)
 	return result;
 }
 
+uint8_t SelectedAgencyOrDefault(Lobby * lobby)
+{
+	const uint8_t fallback = Config::GetInstance().defaultagency;
+	return lobby ? lobby->GetSelectedAgencyOrDefault(fallback) : fallback;
+}
+
+bool AgentSelectionLocked(World * world)
+{
+	return world && world->IsConnected();
+}
+
+void SyncSelectedAgency(World * world, uint8_t agency)
+{
+	if(!AgentSelectionLocked(world)) return;
+	world->SetAgency(agency);
+}
+
+void OpenCharacterSelection(ScreenContext * screen, World * world)
+{
+	if(!screen || AgentSelectionLocked(world)) return;
+	screen->GoToState(GameState::CREATECHARACTER);
+}
+
 void ToggleTechChoice(World * world, int itemIndex)
 {
 	if(!world) return;
@@ -375,6 +398,8 @@ LobbyUi UseLobby()
 
 	LobbyUi result;
 	result.authSent = lobby && lobby->state == Lobby::AUTHSENT;
+	result.selectedAgency = SelectedAgencyOrDefault(lobby);
+	result.agentSelectionLocked = AgentSelectionLocked(world);
 	result.submitCredentials =
 		[queueWrite, lobby](std::string username, std::string password) {
 			if(!queueWrite || !lobby) return;
@@ -411,6 +436,18 @@ LobbyUi UseLobby()
 	};
 	result.characterStatsForAgency = [lobby](uint8_t agency) {
 		return CharacterStatsForAgency(lobby, agency);
+	};
+	result.syncSelectedAgency = [queueWrite, world](uint8_t agency) {
+		if(!queueWrite || !world) return;
+		queueWrite([world, agency]() {
+			SyncSelectedAgency(world, agency);
+		});
+	};
+	result.openCharacterSelection = [queueWrite, screen, world]() {
+		if(!queueWrite || !screen) return;
+		queueWrite([screen, world]() {
+			OpenCharacterSelection(screen, world);
+		});
 	};
 	result.flushGameTechActions =
 		[queueWrite, world](std::shared_ptr<LobbyGameTechActions> actions,

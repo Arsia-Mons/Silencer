@@ -574,18 +574,6 @@ ScreenContext::LobbyGameDetailsFor(Uint32 gameId) const {
 	return details;
 }
 
-Uint8 ScreenContext::DefaultLobbyAgency() const {
-	return Config::GetInstance().defaultagency;
-}
-
-Uint8 ScreenContext::SelectedLobbyAgency() const {
-	return world.lobby.GetSelectedAgencyOrDefault(DefaultLobbyAgency());
-}
-
-void ScreenContext::SetLobbyAgency(Uint8 agency) {
-	world.SetAgency(agency);
-}
-
 ScreenContext::LobbyChannelChange ScreenContext::ConsumeLobbyChannelChange() {
 	LobbyChannelChange result;
 	if(!world.lobby.channelchanged) return result;

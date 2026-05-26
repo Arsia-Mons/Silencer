@@ -12,7 +12,7 @@
 #include "shared.h"
 #include "runtime/UiActionQueue.h"
 
-class ScreenContext;
+#include <functional>
 
 namespace silencer::ui {
 class UiInteractionRegistry;
@@ -23,23 +23,21 @@ namespace silencer::client_ui::lobby {
 struct CharacterPanelState {
 	// Currently-selected agency (Team::NOXIS .. Team::BLACKROSE). For
 	// authenticated accounts this mirrors the selected character's locked
-	// agency; offline fallback keeps using ScreenContext's default agency.
+	// agency; offline fallback keeps using the configured default agency.
 	Uint8 selectedAgency = 0;
-	// Last selectedAgency reflected through ScreenContext. -1 forces a
-	// first-frame reconcile on entry.
+	// Last selectedAgency reflected through the lobby hook's deferred sync.
+	// -1 forces a first-frame reconcile on entry.
 	int lastReconciled = -1;
-	bool newCharacterRequested = false;
 	bool agentSelectionLocked = false;
+	std::function<void(Uint8 agency)> syncSelectedAgency = {};
+	std::function<void()> openCharacterSelection = {};
 };
 
-// Initialise state from ScreenContext's default agency.
-void CharacterPanelInit(CharacterPanelState & state, ScreenContext & ctx);
+// Initialise screen-local callback/cache state. Live lobby values come from
+// UseLobby during Clay declaration.
+void CharacterPanelInit(CharacterPanelState & state);
 
-// Reconcile selected agency with lobby runtime state. Called once per
-// LobbyScreen::Tick.
-void CharacterPanelTick(CharacterPanelState & state, ScreenContext & ctx);
 bool CharacterPanelHandleUiIntent(CharacterPanelState & state,
-                                  ScreenContext & ctx,
                                   const silencer::ui::UiAction & action);
 
 // Emit the panel subtree. Must be called inside an open Clay layout pass,

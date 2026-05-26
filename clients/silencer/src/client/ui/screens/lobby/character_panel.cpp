@@ -8,7 +8,6 @@
 #include "primitives/text.h"
 
 #include "hooks/use_lobby.h"
-#include "screen_context.h"
 
 #include <algorithm>
 #include <cstring>
@@ -273,30 +272,21 @@ namespace silencer::client_ui::lobby {
         }
     } // namespace character_panel_detail
 
-    void CharacterPanelInit(CharacterPanelState &state, ScreenContext &ctx) {
-        state.selectedAgency = ctx.DefaultLobbyAgency();
+    void CharacterPanelInit(CharacterPanelState &state) {
+        state.selectedAgency = 0;
         state.lastReconciled = -1; // forces first-frame reconcile pass
-        state.newCharacterRequested = false;
-    }
-
-    void CharacterPanelTick(CharacterPanelState &state, ScreenContext &ctx) {
-        state.selectedAgency = ctx.SelectedLobbyAgency();
-        state.agentSelectionLocked = ctx.LobbyNetworkConnected();
-        if (static_cast<int>(state.selectedAgency) != state.lastReconciled) {
-            state.lastReconciled = state.selectedAgency;
-            if (ctx.LobbyNetworkConnected()) {
-                ctx.SetLobbyAgency(state.selectedAgency);
-            }
-        }
+        state.agentSelectionLocked = false;
+        state.syncSelectedAgency = {};
+        state.openCharacterSelection = {};
     }
 
     bool CharacterPanelHandleUiIntent(CharacterPanelState &state,
-                                      ScreenContext &ctx,
                                       const silencer::ui::UiAction &action) {
         if (action.kind != silencer::ui::UiActionKind::Activate) return false;
         if (action.id == character_panel_detail::kActionAgents) {
-            if (ctx.LobbyNetworkConnected()) return true;
-            state.newCharacterRequested = true;
+            if (!state.agentSelectionLocked && state.openCharacterSelection) {
+                state.openCharacterSelection();
+            }
             return true;
         }
         return false;
@@ -308,8 +298,19 @@ namespace silencer::client_ui::lobby {
         // Refresh display strings each frame. Clay rebuilds this compact panel
         // from scratch, so the buffers only need to remain stable through the
         // current layout pass.
-        const Uint8 a = state.selectedAgency;
         const hooks::LobbyUi lobby = hooks::UseLobby();
+        state.selectedAgency = lobby.selectedAgency;
+        state.agentSelectionLocked = lobby.agentSelectionLocked;
+        state.syncSelectedAgency = lobby.syncSelectedAgency;
+        state.openCharacterSelection = lobby.openCharacterSelection;
+        if (static_cast<int>(state.selectedAgency) != state.lastReconciled) {
+            state.lastReconciled = state.selectedAgency;
+            if (state.agentSelectionLocked && state.syncSelectedAgency) {
+                state.syncSelectedAgency(state.selectedAgency);
+            }
+        }
+
+        const Uint8 a = state.selectedAgency;
         const hooks::LobbyCharacterStats characterStats =
             lobby.characterStatsForAgency
                 ? lobby.characterStatsForAgency(static_cast<uint8_t>(a))
