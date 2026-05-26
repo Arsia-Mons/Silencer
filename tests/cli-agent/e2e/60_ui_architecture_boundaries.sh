@@ -165,7 +165,7 @@ fail_if_match \
   --glob '!**/screen_context.cpp'
 
 fail_if_match \
-  '#include[[:space:]]*"keybinds[.]h"' \
+  '#include[[:space:]]*[<"]([^>"]*/)?keybinds[.]h[>"]' \
   "$REPO_ROOT/clients/silencer/src/client/ui/screens" \
   "$REPO_ROOT/clients/silencer/src/client/ui/modals" \
   --glob '!**/screen_context.cpp'
