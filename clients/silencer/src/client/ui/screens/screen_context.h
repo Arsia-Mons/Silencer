@@ -30,7 +30,7 @@ struct UiBindingInput;
 }
 
 // Bag of refs that screens use to reach transitional global subsystems
-// (World, Lobby, AmbienceMixer, MapDownloader) plus narrow handoffs for Game,
+// (World, Lobby, MapDownloader) plus narrow handoffs for Game, AmbienceMixer,
 // keymap, updater, renderer, window, render-device, and screen-stack actions.
 // Per-screen behavior lives in the screen, not here; private backing services
 // must be exposed only through named ScreenContext methods.
@@ -40,6 +40,7 @@ class ScreenContext
 	Renderer & renderer;
 	KeyMap & keymap;
 	Updater & updater;
+	AmbienceMixer & ambienceMixer;
 	SDL_Window * & window;
 	RenderDevice * & renderdevice;
 
@@ -72,7 +73,6 @@ public:
 
 	World &    world;
 	Lobby &    lobby;
-	AmbienceMixer & ambienceMixer;
 	MapDownloader & mapDownloader;
 
 	// State-machine + client UI navigation actions.
@@ -114,6 +114,8 @@ public:
 	void ResetPresentation(int paletteIdx);
 	void ResetMenuPresentation(int paletteIdx);
 	bool UiBlinkVisible() const;
+	bool LobbyMusicFadedIn() const;
+	std::string LobbyGameChannelName(LobbyGame & lobbyGame);
 	void PresentUpdate(const std::string & url, const uint8_t sha256[32]);
 	UpdateState CurrentUpdateState();
 	float UpdateProgress();

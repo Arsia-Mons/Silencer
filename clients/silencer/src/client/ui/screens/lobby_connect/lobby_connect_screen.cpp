@@ -4,7 +4,6 @@
 #include "game_state.h"
 #include "surface.h"
 #include "lobby.h"
-#include "ambience_mixer.h"
 #include "config.h"
 #include "world.h"
 
@@ -158,7 +157,7 @@ void LobbyConnectScreen::Tick(ScreenContext & ctx)
 	// WAITING and only kicks off the TCP connect on the first tick after
 	// the gate opens, so this delay shapes when the user sees "Connecting
 	// to ..." appear in the textbox.
-	if(!ctx.ambienceMixer.FadedIn()) return;
+	if(!ctx.LobbyMusicFadedIn()) return;
 
 	World & world = ctx.world;
 	world.lobby.LockMutex();

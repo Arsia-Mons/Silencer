@@ -7,7 +7,6 @@
 #include "lobbygame.h"
 #include "serializer.h"
 #include "config.h"
-#include "ambience_mixer.h"
 #include "map_downloader.h"
 #include "message_modal.h"
 #include "peer.h"
@@ -126,10 +125,9 @@ void LobbyScreen::Tick(ScreenContext & ctx)
 				ShowGameJoin(ctx);
 				LobbyGame * lobbygame = ctx.CurrentLobbyGame();
 				if(lobbygame){
-					char temp[256];
-					ctx.ambienceMixer.GetGameChannelName(*lobbygame, temp);
+					const std::string channel = ctx.LobbyGameChannelName(*lobbygame);
 					strcpy(world.lobby.lastchannel, world.lobby.channel);
-					world.lobby.JoinChannel(temp);
+					world.lobby.JoinChannel(channel.c_str());
 					SetMapNameOverlay(world, lobbygame->mapname);
 				}
 			}

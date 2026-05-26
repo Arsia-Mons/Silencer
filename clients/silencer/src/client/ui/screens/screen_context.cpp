@@ -1,5 +1,6 @@
 #include "screen_context.h"
 
+#include "ambience_mixer.h"
 #include "config.h"
 #include "game.h"
 #include "keybinds.h"
@@ -62,11 +63,11 @@ ScreenContext::ScreenContext(Game & game_,
       renderer(renderer_),
       keymap(keymap_),
       updater(updater_),
+      ambienceMixer(ambienceMixer_),
       window(window_),
       renderdevice(renderdevice_),
       world(world_),
       lobby(lobby_),
-      ambienceMixer(ambienceMixer_),
       mapDownloader(mapDownloader_)
 {
 }
@@ -249,6 +250,16 @@ void ScreenContext::ResetMenuPresentation(int paletteIdx) {
 
 bool ScreenContext::UiBlinkVisible() const {
 	return (renderer.GetHudAnimationPhase() % 32) < 16;
+}
+
+bool ScreenContext::LobbyMusicFadedIn() const {
+	return ambienceMixer.FadedIn();
+}
+
+std::string ScreenContext::LobbyGameChannelName(LobbyGame & lobbyGame) {
+	char name[256];
+	ambienceMixer.GetGameChannelName(lobbyGame, name);
+	return name;
 }
 
 void ScreenContext::PresentUpdate(const std::string & url, const uint8_t sha256[32]) {
