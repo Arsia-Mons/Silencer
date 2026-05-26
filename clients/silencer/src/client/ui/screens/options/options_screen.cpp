@@ -1,5 +1,6 @@
 #include "options_screen.h"
 
+#include "client/ui/ClientUi.h"
 #include "screen_context.h"
 #include "game_state.h"
 #include "surface.h"
@@ -8,8 +9,6 @@
 #include "clay_ui_compositor.h"
 #include "runtime/UiInteractionRegistry.h"
 #include "primitives/button.h"
-
-#include <SDL3/SDL.h>
 
 namespace options_screen_detail {
 
@@ -26,6 +25,22 @@ constexpr const char * kActionDisplay = "options.display";
 constexpr const char * kActionAudio = "options.audio";
 constexpr const char * kActionBack = "options.back";
 
+std::function<void()> UseQueuedStateTransition(ScreenContext & ctx, Uint8 state)
+{
+	auto queueWrite = silencer::client_ui::UseUiWriteQueue();
+	if(!queueWrite) return {};
+	return [queueWrite, &ctx, state]() {
+		queueWrite([&ctx, state]() {
+			ctx.GoToState(state);
+		});
+	};
+}
+
+void Invoke(const std::function<void()> & action)
+{
+	if(action) action();
+}
+
 }  // namespace options_screen_detail
 
 void OptionsScreen::Build(ScreenContext & ctx)
@@ -34,34 +49,15 @@ void OptionsScreen::Build(ScreenContext & ctx)
 
 	// Clay owns all visible options-menu structure and hit targets.
 
-	goBackClicked = false;
-	controlsClicked = false;
-	displayClicked = false;
-	audioClicked = false;
+	goBack = {};
+	openControls = {};
+	openDisplay = {};
+	openAudio = {};
 }
 
 void OptionsScreen::Tick(ScreenContext & ctx)
 {
-	if(goBackClicked){
-		goBackClicked = false;
-		ctx.GoToState(GameState::MAINMENU);
-		return;
-	}
-	if(controlsClicked){
-		controlsClicked = false;
-		ctx.GoToState(GameState::OPTIONSCONTROLS);
-		return;
-	}
-	if(displayClicked){
-		displayClicked = false;
-		ctx.GoToState(GameState::OPTIONSDISPLAY);
-		return;
-	}
-	if(audioClicked){
-		audioClicked = false;
-		ctx.GoToState(GameState::OPTIONSAUDIO);
-		return;
-	}
+	(void)ctx;
 }
 
 void OptionsScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime, silencer::ui::UiInteractionRegistry& interactions)
@@ -69,6 +65,15 @@ void OptionsScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime,
 	(void)frametime;
 	(void)dst;
 	using namespace silencer::clay_bridge;
+
+	openControls = options_screen_detail::UseQueuedStateTransition(
+		ctx, GameState::OPTIONSCONTROLS);
+	openDisplay = options_screen_detail::UseQueuedStateTransition(
+		ctx, GameState::OPTIONSDISPLAY);
+	openAudio = options_screen_detail::UseQueuedStateTransition(
+		ctx, GameState::OPTIONSAUDIO);
+	goBack = options_screen_detail::UseQueuedStateTransition(
+		ctx, GameState::MAINMENU);
 
 	CLAY({ .id = CLAY_ID("OptionsRoot"),
 	       .layout = {
@@ -107,29 +112,38 @@ void OptionsScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime,
 void OptionsScreen::Destroy(ScreenContext & ctx)
 {
 	(void)ctx;
+	goBack = {};
+	openControls = {};
+	openDisplay = {};
+	openAudio = {};
 }
 
 bool OptionsScreen::HandleUiIntent(ScreenContext & ctx, const silencer::ui::UiAction & action)
 {
 	if(action.kind == silencer::ui::UiActionKind::Cancel){
-		goBackClicked = true;
+		(void)ctx;
+		options_screen_detail::Invoke(goBack);
 		return true;
 	}
 	if(action.kind != silencer::ui::UiActionKind::Activate) return false;
 	if(action.id == options_screen_detail::kActionControls){
-		controlsClicked = true;
+		(void)ctx;
+		options_screen_detail::Invoke(openControls);
 		return true;
 	}
 	if(action.id == options_screen_detail::kActionDisplay){
-		displayClicked = true;
+		(void)ctx;
+		options_screen_detail::Invoke(openDisplay);
 		return true;
 	}
 	if(action.id == options_screen_detail::kActionAudio){
-		audioClicked = true;
+		(void)ctx;
+		options_screen_detail::Invoke(openAudio);
 		return true;
 	}
 	if(action.id == options_screen_detail::kActionBack){
-		goBackClicked = true;
+		(void)ctx;
+		options_screen_detail::Invoke(goBack);
 		return true;
 	}
 	(void)ctx;

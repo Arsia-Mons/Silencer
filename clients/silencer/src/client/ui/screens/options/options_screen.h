@@ -3,6 +3,8 @@
 
 #include "screen.h"
 
+#include <functional>
+
 class OptionsScreen : public Screen
 {
 public:
@@ -13,10 +15,10 @@ public:
 	bool HandleUiIntent(ScreenContext & ctx, const silencer::ui::UiAction & action) override;
 
 private:
-	bool goBackClicked = false;
-	bool controlsClicked = false;
-	bool displayClicked = false;
-	bool audioClicked = false;
+	std::function<void()> goBack;
+	std::function<void()> openControls;
+	std::function<void()> openDisplay;
+	std::function<void()> openAudio;
 };
 
 #endif

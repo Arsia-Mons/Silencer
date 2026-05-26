@@ -82,6 +82,12 @@ struct HookProbeStats {
 	bool sawWriteQueue = false;
 };
 
+struct DeferredActionProbe {
+	int providerCount = 0;
+	int drainCount = 0;
+	std::function<void()> action;
+};
+
 enum class HookProbeAction {
 	None,
 	PushAndDeferred,
@@ -215,6 +221,18 @@ void ProbeScreenHooks(HookProbeStats& stats,
 	}else if(action == HookProbeAction::PopCurrent){
 		if(navigator.popCurrent) navigator.popCurrent();
 	}
+}
+
+void ProbeDeferredActionAfterDeclaration(DeferredActionProbe& probe) {
+	probe.providerCount++;
+	auto queueWrite = silencer::client_ui::UseUiWriteQueue();
+	probe.action = [queueWrite, &probe]() {
+		if(queueWrite){
+			queueWrite([&probe]() {
+				probe.drainCount += 1;
+			});
+		}
+	};
 }
 
 }  // namespace
@@ -437,6 +455,48 @@ TEST_CASE("ClientUi screen hooks queue push and deferred writes until post-rende
 	CHECK(deferredCount == 1);
 	REQUIRE(pushedScreen != nullptr);
 	CHECK(clientUi.TopScreen() == pushedScreen);
+}
+
+TEST_CASE("ClientUi hook actions can queue writes after declaration before drain") {
+	RecordingClayBackend backend;
+	silencer::ui::ClayService clay(backend);
+	silencer::client_ui::ClientUi clientUi(clay);
+	HookProbeStats stats;
+	DeferredActionProbe actionProbe;
+
+	auto root = std::make_unique<HookProbeScreen>(&stats);
+	Screen * rootScreen = root.get();
+	clientUi.PushBuiltScreenForTest(std::move(root));
+
+	silencer::ui::UiInputState input;
+	input.width = 640;
+	input.height = 480;
+	clientUi.BeginFrame(input);
+	clientUi.BuildVisibleScreenProvidersForTest(
+		[&](silencer::client_ui::UiScreenEntryId, Screen& screen) {
+			CHECK(&screen == rootScreen);
+			ProbeDeferredActionAfterDeclaration(actionProbe);
+		});
+
+	CHECK(actionProbe.providerCount == 1);
+	REQUIRE(static_cast<bool>(actionProbe.action));
+	CHECK(clientUi.PendingWriteCount() == 0);
+	CHECK(actionProbe.drainCount == 0);
+
+	clientUi.EndFrame();
+	actionProbe.action();
+	CHECK(clientUi.PendingWriteCount() == 1);
+	CHECK(actionProbe.drainCount == 0);
+
+	bool sawRenderBeforeDrain = false;
+	silencer::client_ui::CompleteRenderedClientUiFrameForTest(clientUi, [&] {
+		sawRenderBeforeDrain = true;
+		CHECK(clientUi.PendingWriteCount() == 1);
+		CHECK(actionProbe.drainCount == 0);
+	});
+	CHECK(sawRenderBeforeDrain);
+	CHECK(clientUi.PendingWriteCount() == 0);
+	CHECK(actionProbe.drainCount == 1);
 }
 
 TEST_CASE("ClientUi popCurrent drains by screen entry id instead of top screen") {
