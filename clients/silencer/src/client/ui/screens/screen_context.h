@@ -114,6 +114,7 @@ public:
 	void ResetPresentation(int paletteIdx);
 	void ResetMenuPresentation(int paletteIdx);
 	bool UiBlinkVisible() const;
+	Uint32 WorldTickCount() const;
 	bool LobbyMusicFadedIn() const;
 	std::string LobbyGameChannelName(LobbyGame & lobbyGame);
 	void PresentUpdate(const std::string & url, const uint8_t sha256[32]);

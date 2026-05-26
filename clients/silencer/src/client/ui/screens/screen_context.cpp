@@ -252,6 +252,10 @@ bool ScreenContext::UiBlinkVisible() const {
 	return (renderer.GetHudAnimationPhase() % 32) < 16;
 }
 
+Uint32 ScreenContext::WorldTickCount() const {
+	return world.tickcount;
+}
+
 bool ScreenContext::LobbyMusicFadedIn() const {
 	return ambienceMixer.FadedIn();
 }

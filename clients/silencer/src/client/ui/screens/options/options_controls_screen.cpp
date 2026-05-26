@@ -8,7 +8,6 @@
 #include "game_state.h"
 #include "config.h"
 #include "surface.h"
-#include "world.h"
 
 #include "clay/clay.h"
 #include "clay_ui_compositor.h"
@@ -117,11 +116,12 @@ void OptionsControlsScreen::Tick(ScreenContext & ctx) {
 		operatorClickedRow = -1;
 	}
 	if(rebindRow >= 0){
+		const Uint32 tickCount = ctx.WorldTickCount();
 		if(optionscontrolstick == 0){
-			optionscontrolstick = ctx.world.tickcount;
+			optionscontrolstick = tickCount;
 		}
 		if(rebindRow >= 0 &&
-		   ctx.world.tickcount - optionscontrolstick > options_controls_screen_detail::REBIND_TIMEOUT_TICKS){
+		   tickCount - optionscontrolstick > options_controls_screen_detail::REBIND_TIMEOUT_TICKS){
 			FinishKeyboardRebind(ctx, rebindRow, rebindSlot, SDL_SCANCODE_UNKNOWN);
 		}
 	}else{

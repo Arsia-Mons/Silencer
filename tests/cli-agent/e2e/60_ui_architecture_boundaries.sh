@@ -196,6 +196,12 @@ fail_if_match \
   --glob '!**/screen_context.cpp'
 
 fail_if_match \
+  'ctx[.]world|#include[[:space:]]*[<"]([^>"]*/)?world[.]h[>"]' \
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens/options" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/modals" \
+  --glob '!**/screen_context.cpp'
+
+fail_if_match \
   '#include[[:space:]]*"updater(stage2)?[.]h"' \
   "$REPO_ROOT/clients/silencer/src/client/ui/screens" \
   "$REPO_ROOT/clients/silencer/src/client/ui/modals" \

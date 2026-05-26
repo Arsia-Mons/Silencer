@@ -2,7 +2,6 @@
 
 #include "screen_context.h"
 #include "game_state.h"
-#include "world.h"
 #include "surface.h"
 
 #include "clay/clay.h"
