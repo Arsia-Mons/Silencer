@@ -77,7 +77,7 @@ void LobbyScreen::ShowGameSelect(ScreenContext & ctx)
 	gameCreateActive = false;
 	gameJoinActive   = false;
 	gameTechActive   = false;
-	ctx.world.lobby.gamesprocessed = false;
+	ctx.RequestLobbyGameListRefresh();
 }
 
 void LobbyScreen::ShowGameCreate(ScreenContext & ctx)
@@ -98,8 +98,7 @@ void LobbyScreen::ShowGameJoin(ScreenContext & ctx)
 
 void LobbyScreen::ShowGameTech(ScreenContext & ctx)
 {
-	ctx.world.choosingtech = true;
-	ctx.world.RequestPeerList();
+	ctx.BeginLobbyTechSelection();
 
 	silencer::client_ui::lobby::GameTechPanelInit(gameTechState);
 	gameTechActive   = true;

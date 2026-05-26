@@ -162,6 +162,8 @@ public:
 	bool ShouldDismissCreateGameProgress() const;
 	bool BeginConnectedLobbyGame();
 	std::string JoinCurrentLobbyGameChannel();
+	void RequestLobbyGameListRefresh();
+	void BeginLobbyTechSelection();
 	void BeginCreateGameMapUpload(const std::string & gameName,
 	                              const std::string & mapName,
 	                              const std::string & password,

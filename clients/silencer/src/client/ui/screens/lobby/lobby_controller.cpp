@@ -124,7 +124,6 @@ bool LobbyScreen::HandleBack(ScreenContext & ctx)
 		return true;
 	}
 	if(gameCreateActive){
-		ctx.world.lobby.gamesprocessed = false;
 		ShowGameSelect(ctx);
 		return true;
 	}

@@ -448,6 +448,15 @@ std::string ScreenContext::JoinCurrentLobbyGameChannel() {
 	return lobbyGame->mapname;
 }
 
+void ScreenContext::RequestLobbyGameListRefresh() {
+	world.lobby.gamesprocessed = false;
+}
+
+void ScreenContext::BeginLobbyTechSelection() {
+	world.choosingtech = true;
+	world.peers.RequestPeerList();
+}
+
 void ScreenContext::BeginCreateGameMapUpload(const std::string & gameName,
                                              const std::string & mapName,
                                              const std::string & password,
