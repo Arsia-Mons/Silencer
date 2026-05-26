@@ -358,10 +358,12 @@ TEST_CASE("ClientUi dispatch returns feedback requests for audible actions") {
 	button.w = 80;
 	button.h = 30;
 	REQUIRE(clientUi.Interactions().RegisterInteractable(button));
-	REQUIRE(clientUi.Interactions().FocusInteractableById("main_menu.connect"));
+	silencer::ui::UiAction activate;
+	activate.kind = silencer::ui::UiActionKind::Activate;
+	activate.id = "main_menu.connect";
+	REQUIRE(clientUi.Interactions().QueueAction(activate));
 	clientUi.EndFrame();
 
-	input.navActions.Push(silencer::ui::UiNavAction::Confirm);
 	silencer::client_ui::UiDispatchResult result =
 		clientUi.DispatchInput(nullptr, input);
 	CHECK(result.feedbackRequested);
@@ -1134,4 +1136,50 @@ TEST_CASE("UiInputRouter routes control commands and binding capture through typ
 	CHECK(actions[0].id == "main_menu.connect");
 	CHECK(actions[1].kind == silencer::ui::UiActionKind::CaptureBinding);
 	CHECK(actions[1].binding.code == 44);
+}
+
+TEST_CASE("UiInputRouter leaves focus navigation and activation to the focus runtime") {
+	silencer::ui::UiInteractionRegistry registry;
+	registry.BeginFrame();
+
+	silencer::ui::UiInteractable first;
+	first.id = "main_menu.tutorial";
+	first.labelText = "Tutorial";
+	first.kind = silencer::ui::UiInteractableKind::Button;
+	first.x = 10;
+	first.y = 10;
+	first.w = 90;
+	first.h = 24;
+	registry.RegisterInteractable(first);
+
+	silencer::ui::UiInteractable second;
+	second.id = "main_menu.options";
+	second.labelText = "Options";
+	second.kind = silencer::ui::UiInteractableKind::Button;
+	second.x = 10;
+	second.y = 45;
+	second.w = 90;
+	second.h = 24;
+	registry.RegisterInteractable(second);
+
+	REQUIRE(registry.FocusInteractableById("main_menu.tutorial"));
+	const auto * tutorial = registry.FindById("main_menu.tutorial");
+	REQUIRE(tutorial != nullptr);
+	CHECK(tutorial->focused);
+
+	silencer::ui::UiInputState input;
+	input.navActions.push_back(silencer::ui::UiNavAction::Down);
+	input.navActions.push_back(silencer::ui::UiNavAction::FocusNext);
+	input.navActions.push_back(silencer::ui::UiNavAction::Confirm);
+
+	silencer::ui::UiInputRouter router(registry);
+	auto actions = router.Route(input);
+	CHECK(actions.empty());
+
+	tutorial = registry.FindById("main_menu.tutorial");
+	const auto * options = registry.FindById("main_menu.options");
+	REQUIRE(tutorial != nullptr);
+	REQUIRE(options != nullptr);
+	CHECK(tutorial->focused);
+	CHECK_FALSE(options->focused);
 }

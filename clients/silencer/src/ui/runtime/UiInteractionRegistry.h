@@ -137,15 +137,11 @@ public:
 	bool SubmitFocusedText();
 	bool CancelFocused();
 	bool PressAt(int x, int y);
-	bool FocusNextInteractive();
-	bool FocusPreviousInteractive();
-	bool FocusDirectional(UiNavAction action);
 	// Moves pointer-origin focus to the non-text control under a MOVED pointer.
 	// Active text inputs keep caret focus through hover, and moving over empty
 	// space clears pointer-origin focus without disturbing keyboard/gamepad focus.
 	bool FocusHovered(float x, float y);
 	bool FocusControlHovered(float x, float y);
-	bool ActivateFocused();
 	bool QueueAction(UiAction action);
 	UiActionList DrainActions();
 	int PendingActionCount() const { return actions_.Count(); }

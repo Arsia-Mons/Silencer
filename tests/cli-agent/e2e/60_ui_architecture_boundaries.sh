@@ -91,6 +91,12 @@ fail_if_match \
   "$REPO_ROOT/clients/silencer/src/client/ui/ClientUi.cpp"
 
 fail_if_match \
+  '\b(FocusNextInteractive|FocusPreviousInteractive|FocusDirectional|ActivateFocused|MovesFocusForward|MovesFocusBackward|MovesSpatially)\b' \
+  "$REPO_ROOT/clients/silencer/src/ui/runtime/UiInputRouter.cpp" \
+  "$REPO_ROOT/clients/silencer/src/ui/runtime/UiInteractionRegistry.h" \
+  "$REPO_ROOT/clients/silencer/src/ui/runtime/UiInteractionRegistry.cpp"
+
+fail_if_match \
   "clay_inspector" \
   "$REPO_ROOT/clients/silencer/src" \
   --glob '!third_party/**'

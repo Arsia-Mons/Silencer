@@ -3,27 +3,6 @@
 namespace silencer {
 namespace ui {
 
-namespace {
-
-bool MovesFocusForward(UiNavAction action) {
-	return action == UiNavAction::FocusNext ||
-	       action == UiNavAction::NextSection;
-}
-
-bool MovesFocusBackward(UiNavAction action) {
-	return action == UiNavAction::FocusPrevious ||
-	       action == UiNavAction::PreviousSection;
-}
-
-bool MovesSpatially(UiNavAction action) {
-	return action == UiNavAction::Up ||
-	       action == UiNavAction::Down ||
-	       action == UiNavAction::Left ||
-	       action == UiNavAction::Right;
-}
-
-}  // namespace
-
 UiInputRouter::UiInputRouter(UiInteractionRegistry& registry)
 	: registry_(registry) {}
 
@@ -47,9 +26,8 @@ UiActionList UiInputRouter::Route(const UiInputState& input) {
 			static_cast<int>(input.pointer.y));
 	}
 
-	// Mouse hover and keyboard navigation share one focus state: moving the
-	// pointer over an interactable focuses it, so the keyboard-focused element
-	// stops being highlighted instead of leaving two lit at once.
+	// Legacy pointer hover still updates registry focus when the focus runtime
+	// did not own the frame's declared layout.
 	if(!hasControlPointerCommand && input.pointer.moved){
 		registry_.FocusHovered(input.pointer.x, input.pointer.y);
 	}
@@ -80,15 +58,8 @@ UiActionList UiInputRouter::Route(const UiInputState& input) {
 		bool handled = false;
 		if(action == UiNavAction::Backspace){
 			handled = registry_.BackspaceFocusedText();
-		}else if(MovesFocusForward(action)){
-			handled = registry_.FocusNextInteractive();
-		}else if(MovesFocusBackward(action)){
-			handled = registry_.FocusPreviousInteractive();
-		}else if(MovesSpatially(action)){
-			handled = registry_.FocusDirectional(action);
 		}else if(action == UiNavAction::Confirm){
 			handled = registry_.SubmitFocusedText();
-			if(!handled) handled = registry_.ActivateFocused();
 		}else if(action == UiNavAction::Cancel){
 			handled = registry_.CancelFocused();
 			if(!handled){

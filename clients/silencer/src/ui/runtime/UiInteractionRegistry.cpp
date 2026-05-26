@@ -3,7 +3,6 @@
 #include "runtime/UiTextPolicy.h"
 
 #include <algorithm>
-#include <cmath>
 #include <cctype>
 #include <cstdio>
 #include <cstring>
@@ -141,48 +140,6 @@ UiElementSnapshot MetadataFromWidget(const UiInteractable& widget, bool focused)
 	metadata.focused = focused;
 	metadata.selected = widget.selected;
 	return metadata;
-}
-
-float CenterX(const UiInteractable& widget) {
-	return static_cast<float>(widget.x) + static_cast<float>(widget.w) * 0.5f;
-}
-
-float CenterY(const UiInteractable& widget) {
-	return static_cast<float>(widget.y) + static_cast<float>(widget.h) * 0.5f;
-}
-
-bool IsDirectionalCandidate(const UiInteractable& from,
-                            const UiInteractable& to,
-                            UiNavAction action,
-                            float& primary,
-                            float& secondary) {
-	const float dx = CenterX(to) - CenterX(from);
-	const float dy = CenterY(to) - CenterY(from);
-	switch(action){
-		case UiNavAction::Up:
-			if(dy >= -0.5f) return false;
-			primary = -dy;
-			secondary = std::fabs(dx);
-			return true;
-		case UiNavAction::Down:
-			if(dy <= 0.5f) return false;
-			primary = dy;
-			secondary = std::fabs(dx);
-			return true;
-		case UiNavAction::Left:
-			if(dx >= -0.5f) return false;
-			primary = -dx;
-			secondary = std::fabs(dy);
-			return true;
-		case UiNavAction::Right:
-			if(dx <= 0.5f) return false;
-			primary = dx;
-			secondary = std::fabs(dy);
-			return true;
-		default:
-			break;
-	}
-	return false;
 }
 
 }  // namespace registry_detail
@@ -625,86 +582,6 @@ bool UiInteractionRegistry::PressAt(int x, int y) {
 	return false;
 }
 
-bool UiInteractionRegistry::FocusNextInteractive() {
-	std::array<const UiInteractable *, UI_INTERACTION_MAX_INTERACTABLES> items = {};
-	int itemCount = 0;
-	for(int i = 0; i < interactableCount_; ++i){
-		const UiInteractable& widget = interactables_[i];
-		if(UiInteractableIsInteractive(widget)) items[itemCount++] = &widget;
-	}
-	if(itemCount <= 0) return false;
-	int current = -1;
-	for(int i = 0; i < itemCount; ++i){
-		if(MatchesFocus(*items[i])){
-			current = i;
-			break;
-		}
-	}
-	int next = (current + 1) % itemCount;
-	SetFocus(*items[next], FocusOrigin::Navigation);
-	QueueAction(UiActionKind::Navigate, *items[next], "focus_next");
-	return true;
-}
-
-bool UiInteractionRegistry::FocusPreviousInteractive() {
-	std::array<const UiInteractable *, UI_INTERACTION_MAX_INTERACTABLES> items = {};
-	int itemCount = 0;
-	for(int i = 0; i < interactableCount_; ++i){
-		const UiInteractable& widget = interactables_[i];
-		if(UiInteractableIsInteractive(widget)) items[itemCount++] = &widget;
-	}
-	if(itemCount <= 0) return false;
-	int current = 0;
-	for(int i = 0; i < itemCount; ++i){
-		if(MatchesFocus(*items[i])){
-			current = i;
-			break;
-		}
-	}
-	int next = current - 1;
-	if(next < 0) next = itemCount - 1;
-	SetFocus(*items[next], FocusOrigin::Navigation);
-	QueueAction(UiActionKind::Navigate, *items[next], "focus_previous");
-	return true;
-}
-
-bool UiInteractionRegistry::FocusDirectional(UiNavAction action) {
-	const UiInteractable * focused = FocusedInteractable();
-	if(!focused || !registry_detail::HasBounds(*focused)) {
-		if(action == UiNavAction::Down || action == UiNavAction::Right) return FocusNextInteractive();
-		if(action == UiNavAction::Up || action == UiNavAction::Left) return FocusPreviousInteractive();
-		return false;
-	}
-
-	const UiInteractable * best = nullptr;
-	float bestPrimary = 0.0f;
-	float bestSecondary = 0.0f;
-	for(int i = 0; i < interactableCount_; ++i){
-		const UiInteractable& widget = interactables_[i];
-		if(&widget == focused || !UiInteractableIsInteractive(widget) ||
-		   !registry_detail::HasBounds(widget)) continue;
-		float primary = 0.0f;
-		float secondary = 0.0f;
-		if(!registry_detail::IsDirectionalCandidate(*focused, widget, action, primary, secondary)) continue;
-		if(!best || primary < bestPrimary ||
-		   (primary == bestPrimary && secondary < bestSecondary)){
-			best = &widget;
-			bestPrimary = primary;
-			bestSecondary = secondary;
-		}
-	}
-	if(!best) return false;
-	SetFocus(*best, FocusOrigin::Navigation);
-	switch(action){
-		case UiNavAction::Up: QueueAction(UiActionKind::Navigate, *best, "up"); break;
-		case UiNavAction::Down: QueueAction(UiActionKind::Navigate, *best, "down"); break;
-		case UiNavAction::Left: QueueAction(UiActionKind::Navigate, *best, "left"); break;
-		case UiNavAction::Right: QueueAction(UiActionKind::Navigate, *best, "right"); break;
-		default: break;
-	}
-	return true;
-}
-
 bool UiInteractionRegistry::FocusHovered(float x, float y) {
 	return FocusHoveredAt(x, y, true);
 }
@@ -753,24 +630,6 @@ bool UiInteractionRegistry::FocusHoveredAt(float x, float y, bool recordPhysical
 		return true;
 	}
 	// Over empty space or a text field: leave keyboard/gamepad/text focus in place.
-	return false;
-}
-
-bool UiInteractionRegistry::ActivateFocused() {
-	const UiInteractable * widget = FocusedInteractable();
-	if(!widget || widget->inactive) return false;
-	switch(widget->kind){
-		case UiInteractableKind::Button:
-		case UiInteractableKind::Toggle:
-			QueueAction(UiActionKind::Activate, *widget, nullptr);
-			return true;
-		case UiInteractableKind::ListRow:
-			QueueAction(UiActionKind::Select, *widget, "activate");
-			return true;
-		case UiInteractableKind::TextInput:
-			QueueAction(UiActionKind::Select, *widget, widget->value.c_str());
-			return true;
-	}
 	return false;
 }
 
