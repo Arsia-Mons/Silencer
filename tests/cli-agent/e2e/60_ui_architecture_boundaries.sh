@@ -305,6 +305,11 @@ fail_if_match \
   "$REPO_ROOT/clients/silencer/src/client/ui/screens/lobby/lobby_main_area.h"
 
 fail_if_match \
+  'ctx[[:space:]]*[.][[:space:]]*world|#[[:space:]]*include[[:space:]]*[<"]([^>"]*/)?world[.]h[>"]' \
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens/lobby/lobby_main_area.cpp" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens/lobby/lobby_main_area.h"
+
+fail_if_match \
   '\b(World|Peer|User|Config|LobbyGame)\b|\bTeam[[:space:]]*([*&]|::)|\bTeam[[:space:]]+[A-Za-z_]|\bTeam[[:space:]]*$|\bLobby[[:space:]]*([*&]|::)|\bLobby[[:space:]]+[A-Za-z_]|\bLobby[[:space:]]*$|([.]|->)[[:space:]]*(world|lobby)\b|world[[:space:]]*[.]|#[[:space:]]*include[[:space:]]*[<"]([^>"]*/)?(world|lobby|lobbygame|peer|team|user|config)[.]h[>"]|Config::GetInstance[[:space:]]*[(]|\bAllPeersDownloadedMap[[:space:]]*[(]|\bSendReady[[:space:]]*[(]|\bChangeTeam[[:space:]]*[(]|\bGetObjectsByType\b|\bGetPeerTeam\b|\bGetPeer[[:space:]]*[(]' \
   "$REPO_ROOT/clients/silencer/src/client/ui/screens/lobby/game_join_panel.cpp" \
   "$REPO_ROOT/clients/silencer/src/client/ui/screens/lobby/game_join_panel.h" \

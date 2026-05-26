@@ -6,6 +6,7 @@
 // GameJoin / GameTech. Composes into LobbyRoot beneath the title bar.
 
 class ScreenContext;
+class Resources;
 
 namespace silencer::ui {
 class UiInteractionRegistry;
@@ -36,6 +37,7 @@ struct LobbyMainAreaPanels {
 // the current Clay frame.
 void BuildLobbyMainArea(LobbyMainAreaPanels & panels,
                         ScreenContext & ctx,
+                        Resources & resources,
                         int bodyX,
                         int bodyY,
                         int bodyW,
