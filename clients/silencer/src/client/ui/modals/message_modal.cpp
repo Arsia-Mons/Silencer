@@ -1,7 +1,6 @@
 #include "message_modal.h"
 
 #include "screen_context.h"
-#include "game.h"
 #include "renderer.h"
 #include "surface.h"
 

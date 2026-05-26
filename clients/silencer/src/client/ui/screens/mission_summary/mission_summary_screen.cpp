@@ -1,7 +1,6 @@
 #include "mission_summary_screen.h"
 
 #include "screen_context.h"
-#include "game.h"
 #include "game_state.h"
 #include "world.h"
 #include "lobby.h"

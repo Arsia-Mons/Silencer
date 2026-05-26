@@ -112,20 +112,16 @@ fail_if_match \
   --glob '!**/screen_context.cpp'
 
 fail_if_match \
-  'ctx[.]game' \
-  "$REPO_ROOT/clients/silencer/src/client/ui/screens/lobby"
+  'ctx[.]game|Game[[:space:]]*&[[:space:]]+[[:alnum:]_]+[[:space:]]*=[[:space:]]*ctx[.]game' \
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/modals" \
+  --glob '!**/screen_context.cpp'
 
 fail_if_match \
   '#include[[:space:]]*"game[.]h"' \
-  "$REPO_ROOT/clients/silencer/src/client/ui/screens/lobby"
-
-fail_if_match \
-  'ctx[.]game' \
-  "$REPO_ROOT/clients/silencer/src/client/ui/screens/options"
-
-fail_if_match \
-  '#include[[:space:]]*"game[.]h"' \
-  "$REPO_ROOT/clients/silencer/src/client/ui/screens/options"
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/modals" \
+  --glob '!**/screen_context.cpp'
 
 fail_if_match \
   'nlohmann::json[[:space:]]+(Game::)?GetWorldSummary|nlohmann::json[[:space:]]+(InGameUiController::)?ConfigureForControl' \
