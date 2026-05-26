@@ -13,6 +13,7 @@
 #include "clay_ui_compositor.h"
 #include "ui/client_ui_write_drain.h"
 #include "ui/game_ui_frame_provider.h"
+#include <array>
 #include <algorithm>
 #include <vector>
 
@@ -231,13 +232,14 @@ void GameUiPipeline::QueueKeyboardInputForScancode(int sc, const Uint8 * keystat
                                                    const KeyMap & keymap,
                                                    const GamepadState & gamepadstate) {
 clientUiInput.QueueBindingKeyDown(sc);
-std::vector<silencer::ui::UiNavAction> queued;
+std::array<silencer::ui::UiNavAction, 16> queued{};
+int queuedCount = 0;
 auto queue = [&](silencer::ui::UiNavAction action){
-for(auto existing : queued){
-if(existing == action) return;
+for(int i = 0; i < queuedCount; ++i){
+if(queued[i] == action) return;
 }
 clientUiInput.QueueNavAction(action, silencer::ui::UiFocusSource::Keyboard);
-queued.push_back(action);
+if(queuedCount < static_cast<int>(queued.size())) queued[queuedCount++] = action;
 };
 
 switch(sc){

@@ -3,7 +3,6 @@
 #include "ui/runtime/UiInputState.h"
 
 #include <cstdint>
-#include <string>
 #include <vector>
 
 namespace silencer {
@@ -60,10 +59,16 @@ private:
 
 	float wheelX_ = 0.0f;
 	float wheelY_ = 0.0f;
-	std::string textInput_;
-	std::vector<silencer::ui::UiNavAction> navActions_;
-	std::vector<silencer::ui::UiBindingInput> bindingInputs_;
-	std::vector<silencer::ui::UiControlCommand> controlCommands_;
+	silencer::ui::UiTextInputBuffer textInput_;
+	silencer::ui::UiBoundedInputList<
+		silencer::ui::UiNavAction,
+		silencer::ui::UI_INPUT_MAX_NAV_ACTIONS> navActions_;
+	silencer::ui::UiBoundedInputList<
+		silencer::ui::UiBindingInput,
+		silencer::ui::UI_INPUT_MAX_BINDING_INPUTS> bindingInputs_;
+	silencer::ui::UiBoundedInputList<
+		silencer::ui::UiControlCommand,
+		silencer::ui::UI_INPUT_MAX_CONTROL_COMMANDS> controlCommands_;
 	silencer::ui::UiFocusSource source_ = silencer::ui::UiFocusSource::None;
 
 	bool havePointerPosition_ = false;

@@ -1,5 +1,6 @@
 #include "doctest.h"
 
+#include "client/ui/ClientUiInput.h"
 #include "runtime/UiActionQueue.h"
 #include "runtime/UiInteractionRegistry.h"
 
@@ -113,4 +114,68 @@ TEST_CASE("UiInteractionRegistry bounds frame interactable registration") {
 	CHECK(interactables[interactables.size() - 1].id == "button.255");
 	CHECK(registry.FindById("button.255") != nullptr);
 	CHECK(registry.FindById("button.256") == nullptr);
+}
+
+TEST_CASE("UiInputState bounds frame-local input buffers") {
+	silencer::ui::UiInputState input;
+
+	for(int i = 0; i < silencer::ui::UI_INPUT_MAX_TEXT_CHARS + 1; ++i){
+		input.textInput.push_back('x');
+	}
+	for(int i = 0; i < silencer::ui::UI_INPUT_MAX_NAV_ACTIONS + 1; ++i){
+		input.navActions.push_back(silencer::ui::UiNavAction::Down);
+	}
+	for(int i = 0; i < silencer::ui::UI_INPUT_MAX_BINDING_INPUTS + 1; ++i){
+		silencer::ui::UiBindingInput binding;
+		binding.code = i;
+		input.bindingInputs.push_back(binding);
+	}
+	for(int i = 0; i < silencer::ui::UI_INPUT_MAX_CONTROL_COMMANDS + 1; ++i){
+		silencer::ui::UiControlCommand command;
+		command.action = MakeAction(i);
+		input.controlCommands.push_back(command);
+	}
+
+	CHECK(input.textInput.size() == silencer::ui::UI_INPUT_MAX_TEXT_CHARS);
+	CHECK(input.textInput.OverflowCount() == 1);
+	CHECK(input.navActions.size() == silencer::ui::UI_INPUT_MAX_NAV_ACTIONS);
+	CHECK(input.navActions.OverflowCount() == 1);
+	CHECK(input.bindingInputs.size() == silencer::ui::UI_INPUT_MAX_BINDING_INPUTS);
+	CHECK(input.bindingInputs.OverflowCount() == 1);
+	CHECK(input.controlCommands.size() == silencer::ui::UI_INPUT_MAX_CONTROL_COMMANDS);
+	CHECK(input.controlCommands.OverflowCount() == 1);
+
+	input.textInput.clear();
+	input.navActions.clear();
+	input.bindingInputs.clear();
+	input.controlCommands.clear();
+	CHECK(input.textInput.empty());
+	CHECK(input.navActions.empty());
+	CHECK(input.bindingInputs.empty());
+	CHECK(input.controlCommands.empty());
+	CHECK(input.textInput.OverflowCount() == 1);
+	CHECK(input.controlCommands.OverflowCount() == 1);
+}
+
+TEST_CASE("ClientUiInput builds frames from bounded input buffers") {
+	silencer::client_ui::ClientUiInput input;
+
+	for(int i = 0; i < silencer::ui::UI_INPUT_MAX_NAV_ACTIONS + 2; ++i){
+		input.QueueNavAction(silencer::ui::UiNavAction::Confirm);
+	}
+	for(int i = 0; i < silencer::ui::UI_INPUT_MAX_TEXT_CHARS + 2; ++i){
+		input.QueueTextInput('a');
+	}
+
+	silencer::ui::UiInputState frame = input.BuildFrame(640, 480, 1.0f, 1.0f / 60.0f);
+
+	CHECK(frame.navActions.size() == silencer::ui::UI_INPUT_MAX_NAV_ACTIONS);
+	CHECK(frame.navActions.OverflowCount() == 2);
+	CHECK(frame.textInput.size() == silencer::ui::UI_INPUT_MAX_TEXT_CHARS);
+	CHECK(frame.textInput.OverflowCount() == 2);
+
+	input.EndFrame();
+	frame = input.BuildFrame(640, 480, 1.0f, 1.0f / 60.0f);
+	CHECK(frame.navActions.empty());
+	CHECK(frame.textInput.empty());
 }
