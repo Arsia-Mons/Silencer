@@ -163,11 +163,18 @@ SoundCueResult SoundCue::EvalNode(
 // ResolveSound
 // ---------------------------------------------------------------------------
 SoundCueResult ResolveSound(const std::string& slot, Resources& res) {
+    if (slot.empty()) return {};
     if (slot.size() > 4 && slot.compare(0, 4, "cue:") == 0) {
         return SoundCueLibrary::Get().Evaluate(slot.substr(4), res);
     }
-    SoundCueResult r;
+    // Try soundbank first (raw WAV filename).
     auto it = res.soundbank.find(slot);
-    if (it != res.soundbank.end()) r.chunk = it->second;
-    return r;
+    if (it != res.soundbank.end()) {
+        SoundCueResult r;
+        r.chunk = it->second;
+        return r;
+    }
+    // Not found as a raw WAV — try resolving as a bare cue name (no "cue:" prefix).
+    // This supports physics material and actordef fields stored as plain cue IDs.
+    return SoundCueLibrary::Get().Evaluate(slot, res);
 }
