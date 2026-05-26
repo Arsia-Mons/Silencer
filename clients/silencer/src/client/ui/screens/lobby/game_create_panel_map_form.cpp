@@ -1,8 +1,9 @@
 #include "game_create_panel.h"
 
-#include "game.h"
 #include "screen_context.h"
+#include "map_downloader.h"
 #include "map.h"
+#include "world.h"
 #include "text_wrap.h"
 #include "audio.h"
 #include "gasloader.h"

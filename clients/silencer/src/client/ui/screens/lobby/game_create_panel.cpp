@@ -137,9 +137,8 @@ void GameCreatePanelTick(GameCreatePanelState & state,
 		LobbyGame * lobbygame = world.lobby.GetGameById(world.lobby.createdgameid);
 		if(lobbygame){
 			owner.SeedHostGameInfo(world, *lobbygame);
-			ctx.JoinGame(*lobbygame, lobbygame->password);
+			ctx.JoinLobbyGame(*lobbygame, lobbygame->password);
 			mapDownloader.LoadMapData(mapDownloader.FindMap(lobbygame->mapname, &lobbygame->maphash).c_str());
-			ctx.SetCurrentLobbyGameId(lobbygame->id);
 		}
 	}else if(world.lobby.creategamestatus != 100 && world.lobby.creategamestatus != 0 && ctx.IsCreateGamePending()){
 		world.lobby.creategamestatus = 0;

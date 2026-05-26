@@ -65,10 +65,9 @@ public:
 	void SetJoiningGame(bool joining);
 	bool IsCreateGamePending() const;
 	void SetCreateGamePending(bool pending);
-	void SetCurrentLobbyGameId(Uint32 gameId);
 	LobbyGame * CurrentLobbyGame() const;
-	void JoinGame(LobbyGame & lobbyGame, char * password = nullptr);
-	void SpectateGame(LobbyGame & lobbyGame, char * password = nullptr);
+	void JoinLobbyGame(LobbyGame & lobbyGame, char * password = nullptr);
+	void SpectateLobbyGame(LobbyGame & lobbyGame, char * password = nullptr);
 	bool PushScreen(std::unique_ptr<Screen> s);
 	bool PopScreen();
 	bool ReplaceScreen(std::unique_ptr<Screen> s);

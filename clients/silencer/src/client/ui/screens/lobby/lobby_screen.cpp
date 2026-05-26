@@ -5,7 +5,6 @@
 #include "lobby_main_area.h"
 
 #include "screen_context.h"
-#include "game.h"
 #include "renderdevice.h"
 #include "world.h"
 #include "renderer.h"

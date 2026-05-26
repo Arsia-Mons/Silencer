@@ -144,7 +144,6 @@ void HandleJoinClick(GameSelectPanelState & state, World & world, ScreenContext 
 		}
 	}
 	if(!canjoin) return;
-	ctx.SetCurrentLobbyGameId(lobbygame->id);
 	if(strlen(lobbygame->password) > 0 && lobbygame->accountid != world.lobby.accountid){
 		Uint32 gameId = lobbygame->id;
 		ctx.PushScreen(std::make_unique<PasswordModal>(
@@ -154,11 +153,11 @@ void HandleJoinClick(GameSelectPanelState & state, World & world, ScreenContext 
 					char buf[64];
 					std::strncpy(buf, password ? password : "", sizeof(buf) - 1);
 					buf[sizeof(buf) - 1] = '\0';
-					ctx.JoinGame(*lg, buf);
+					ctx.JoinLobbyGame(*lg, buf);
 				}
 			}));
 	}else{
-		ctx.JoinGame(*lobbygame);
+		ctx.JoinLobbyGame(*lobbygame);
 	}
 }
 
@@ -169,7 +168,6 @@ void HandleSpectateClick(GameSelectPanelState & state, World & world, ScreenCont
 		return;
 	}
 	if(!world.IsIdle()) return;
-	ctx.SetCurrentLobbyGameId(lobbygame->id);
 	if(strlen(lobbygame->password) > 0 && lobbygame->accountid != world.lobby.accountid){
 		Uint32 gameId = lobbygame->id;
 		ctx.PushScreen(std::make_unique<PasswordModal>(
@@ -179,11 +177,11 @@ void HandleSpectateClick(GameSelectPanelState & state, World & world, ScreenCont
 					char buf[64];
 					std::strncpy(buf, password ? password : "", sizeof(buf) - 1);
 					buf[sizeof(buf) - 1] = '\0';
-					ctx.SpectateGame(*lg, buf);
+					ctx.SpectateLobbyGame(*lg, buf);
 				}
 			}));
 	}else{
-		ctx.SpectateGame(*lobbygame);
+		ctx.SpectateLobbyGame(*lobbygame);
 	}
 }
 

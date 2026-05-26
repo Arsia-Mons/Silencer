@@ -8,7 +8,6 @@
 #include "runtime/UiInteractionRegistry.h"
 
 #include "lobby_screen.h"
-#include "game.h"
 #include "resources.h"
 #include "screen_context.h"
 #include "team.h"

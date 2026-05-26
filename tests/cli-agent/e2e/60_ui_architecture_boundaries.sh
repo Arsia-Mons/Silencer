@@ -116,6 +116,10 @@ fail_if_match \
   "$REPO_ROOT/clients/silencer/src/client/ui/screens/lobby"
 
 fail_if_match \
+  '#include[[:space:]]*"game[.]h"' \
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens/lobby"
+
+fail_if_match \
   'nlohmann::json[[:space:]]+(Game::)?GetWorldSummary|nlohmann::json[[:space:]]+(InGameUiController::)?ConfigureForControl' \
   "$REPO_ROOT/clients/silencer/src" \
   --glob '!third_party/**'
