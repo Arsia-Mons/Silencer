@@ -2,6 +2,10 @@
   "id": "WoodCreaky",
   "friction": 1.0,
   "speedMult": 0.95,
-  "footstepL": "futstonl.wav",
-  "footstepR": "futstonr.wav"
+  "footstepL": "footstep_concrete",
+  "footstepR": "footstep_concrete",
+  "footstepCrouchL": "footstep_concrete",
+  "footstepCrouchR": "footstep_concrete",
+  "footstepStairL": "footstep_concrete",
+  "footstepStairR": "footstep_concrete"
 }

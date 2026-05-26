@@ -2,6 +2,10 @@
   "id": "Mud",
   "friction": 2.5,
   "speedMult": 0.65,
-  "footstepL": "futstonl.wav",
-  "footstepR": "futstonr.wav"
+  "footstepL": "footstep_concrete",
+  "footstepR": "footstep_concrete",
+  "footstepCrouchL": "footstep_concrete",
+  "footstepCrouchR": "footstep_concrete",
+  "footstepStairL": "footstep_concrete",
+  "footstepStairR": "footstep_concrete"
 }

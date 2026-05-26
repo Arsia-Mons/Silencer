@@ -2,6 +2,10 @@
   "id": "WaterShallow",
   "friction": 1.6,
   "speedMult": 0.7,
-  "footstepL": "futstonl.wav",
-  "footstepR": "futstonr.wav"
+  "footstepL": "footstep_concrete",
+  "footstepR": "footstep_concrete",
+  "footstepCrouchL": "footstep_concrete",
+  "footstepCrouchR": "footstep_concrete",
+  "footstepStairL": "footstep_concrete",
+  "footstepStairR": "footstep_concrete"
 }

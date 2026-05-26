@@ -2,6 +2,10 @@
   "id": "Sand",
   "friction": 1.8,
   "speedMult": 0.75,
-  "footstepL": "futstonl.wav",
-  "footstepR": "futstonr.wav"
+  "footstepL": "footstep_concrete",
+  "footstepR": "footstep_concrete",
+  "footstepCrouchL": "footstep_concrete",
+  "footstepCrouchR": "footstep_concrete",
+  "footstepStairL": "footstep_concrete",
+  "footstepStairR": "footstep_concrete"
 }

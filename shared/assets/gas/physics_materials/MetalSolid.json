@@ -2,8 +2,10 @@
   "id": "MetalSolid",
   "friction": 0.9,
   "speedMult": 1.0,
-  "footstepL": "futstonl.wav",
-  "footstepR": "futstonr.wav",
-  "footstepStairL": "stostep1.wav",
-  "footstepStairR": "stostepr.wav"
+  "footstepL": "footstep_concrete",
+  "footstepR": "footstep_concrete",
+  "footstepStairL": "footstep_concrete",
+  "footstepStairR": "footstep_concrete",
+  "footstepCrouchL": "footstep_concrete",
+  "footstepCrouchR": "footstep_concrete"
 }
