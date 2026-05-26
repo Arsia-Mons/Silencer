@@ -221,6 +221,11 @@ fail_if_match \
   "$REPO_ROOT/clients/silencer/src/client/ui/modals/password_modal.h"
 
 fail_if_match \
+  '\b(updateClicked|cancelClicked|retryClicked|downloadClicked)\b' \
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens/update/update_screen.cpp" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens/update/update_screen.h"
+
+fail_if_match \
   '\b(goBackClicked|controlsClicked|displayClicked|audioClicked)\b' \
   "$REPO_ROOT/clients/silencer/src/client/ui/screens/options/options_screen.cpp" \
   "$REPO_ROOT/clients/silencer/src/client/ui/screens/options/options_screen.h"

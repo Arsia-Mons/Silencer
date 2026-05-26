@@ -3,6 +3,8 @@
 
 #include "screen.h"
 
+#include <functional>
+
 class UpdateScreen : public Screen
 {
 public:
@@ -13,10 +15,10 @@ public:
 	bool HandleUiIntent(ScreenContext & ctx, const silencer::ui::UiAction & action) override;
 
 private:
-	bool updateClicked = false;
-	bool cancelClicked = false;
-	bool retryClicked = false;
-	bool downloadClicked = false;
+	std::function<void()> consentUpdate;
+	std::function<void()> cancelUpdate;
+	std::function<void()> retryUpdate;
+	std::function<void()> openDownload;
 };
 
 #endif

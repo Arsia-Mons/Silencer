@@ -1,5 +1,6 @@
 #include "update_screen.h"
 
+#include "client/ui/ClientUi.h"
 #include "screen_context.h"
 #include "game_state.h"
 #include "surface.h"
@@ -76,47 +77,34 @@ std::string ProgressText(ScreenContext & ctx)
 	bar += "]";
 	return bar;
 }
+
+std::function<void()> UseQueuedAction(std::function<void()> write)
+{
+	auto queueWrite = silencer::client_ui::UseUiWriteQueue();
+	if(!queueWrite) return {};
+	return [queueWrite, write]() {
+		queueWrite(write);
+	};
+}
+
+void Invoke(const std::function<void()> & action)
+{
+	if(action) action();
+}
 } // namespace update_screen_detail
 
 void UpdateScreen::Build(ScreenContext & ctx)
 {
 	ctx.ResetPresentation(2);
-	updateClicked = false;
-	cancelClicked = false;
-	retryClicked = false;
-	downloadClicked = false;
+	consentUpdate = {};
+	cancelUpdate = {};
+	retryUpdate = {};
+	openDownload = {};
 }
 
 void UpdateScreen::Tick(ScreenContext & ctx)
 {
 	using update_screen_detail::UpdateState;
-	UpdateState ustate = ctx.CurrentUpdateState();
-	if(updateClicked){
-		updateClicked = false;
-		if(ustate == UpdateState::Prompting) ctx.ConsentUpdate();
-	}
-	if(cancelClicked){
-		cancelClicked = false;
-		if(ustate == UpdateState::Prompting || ustate == UpdateState::Downloading || ustate == UpdateState::Failed){
-			if(ustate == UpdateState::Downloading) ctx.CancelUpdate();
-			ctx.GoToState(GameState::MAINMENU);
-			return;
-		}
-	}
-	if(retryClicked){
-		retryClicked = false;
-		if(ustate == UpdateState::Failed && ctx.UpdateRetryCount() < 3){
-			ctx.RetryUpdate();
-		}
-	}
-	if(downloadClicked){
-		downloadClicked = false;
-		if(ustate == UpdateState::Failed && ctx.UpdateRetryCount() >= 3){
-			ctx.OpenUpdateDownloadPage();
-			ctx.GoToState(GameState::MAINMENU);
-			return;
-		}
-	}
 	if(ctx.CurrentUpdateState() == UpdateState::Staging){
 		if(ctx.LaunchStagedUpdate()) return;
 		ctx.GoToState(GameState::MAINMENU);
@@ -131,6 +119,30 @@ void UpdateScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime, 
 	using namespace silencer::clay_bridge;
 
 
+
+	consentUpdate = update_screen_detail::UseQueuedAction([&ctx]() {
+		if(ctx.CurrentUpdateState() == UpdateState::Prompting) ctx.ConsentUpdate();
+	});
+	cancelUpdate = update_screen_detail::UseQueuedAction([&ctx]() {
+		UpdateState state = ctx.CurrentUpdateState();
+		if(state == UpdateState::Prompting ||
+		   state == UpdateState::Downloading ||
+		   state == UpdateState::Failed){
+			if(state == UpdateState::Downloading) ctx.CancelUpdate();
+			ctx.GoToState(GameState::MAINMENU);
+		}
+	});
+	retryUpdate = update_screen_detail::UseQueuedAction([&ctx]() {
+		if(ctx.CurrentUpdateState() == UpdateState::Failed && ctx.UpdateRetryCount() < 3){
+			ctx.RetryUpdate();
+		}
+	});
+	openDownload = update_screen_detail::UseQueuedAction([&ctx]() {
+		if(ctx.CurrentUpdateState() == UpdateState::Failed && ctx.UpdateRetryCount() >= 3){
+			ctx.OpenUpdateDownloadPage();
+			ctx.GoToState(GameState::MAINMENU);
+		}
+	});
 
 	std::string status = update_screen_detail::StatusText(ctx);
 	std::string progress = update_screen_detail::ProgressText(ctx);
@@ -195,30 +207,34 @@ void UpdateScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime, 
 void UpdateScreen::Destroy(ScreenContext & ctx)
 {
 	(void)ctx;
+	consentUpdate = {};
+	cancelUpdate = {};
+	retryUpdate = {};
+	openDownload = {};
 }
 
 bool UpdateScreen::HandleUiIntent(ScreenContext & ctx, const silencer::ui::UiAction & action)
 {
 	(void)ctx;
 	if(action.kind == silencer::ui::UiActionKind::Cancel){
-		cancelClicked = true;
+		update_screen_detail::Invoke(cancelUpdate);
 		return true;
 	}
 	if(action.kind != silencer::ui::UiActionKind::Activate) return false;
 	if(action.id == update_screen_detail::kActionUpdate){
-		updateClicked = true;
+		update_screen_detail::Invoke(consentUpdate);
 		return true;
 	}
 	if(action.id == update_screen_detail::kActionCancel){
-		cancelClicked = true;
+		update_screen_detail::Invoke(cancelUpdate);
 		return true;
 	}
 	if(action.id == update_screen_detail::kActionRetry){
-		retryClicked = true;
+		update_screen_detail::Invoke(retryUpdate);
 		return true;
 	}
 	if(action.id == update_screen_detail::kActionDownload){
-		downloadClicked = true;
+		update_screen_detail::Invoke(openDownload);
 		return true;
 	}
 	return false;
