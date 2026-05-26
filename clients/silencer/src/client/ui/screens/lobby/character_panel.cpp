@@ -7,6 +7,7 @@
 #include "primitives/box.h"
 #include "primitives/text.h"
 
+#include "hooks/use_lobby.h"
 #include "screen_context.h"
 
 #include <algorithm>
@@ -303,14 +304,16 @@ namespace silencer::client_ui::lobby {
 
     void BuildCharacterPanelTree(CharacterPanelState &state,
                                  Uint16 panelWidth,
-                                 ScreenContext &ctx,
                                  silencer::ui::UiInteractionRegistry &interactions) {
         // Refresh display strings each frame. Clay rebuilds this compact panel
         // from scratch, so the buffers only need to remain stable through the
         // current layout pass.
         const Uint8 a = state.selectedAgency;
-        const ScreenContext::LobbyCharacterStats characterStats =
-            ctx.LobbyCharacterStatsForAgency(a);
+        const hooks::LobbyUi lobby = hooks::UseLobby();
+        const hooks::LobbyCharacterStats characterStats =
+            lobby.characterStatsForAgency
+                ? lobby.characterStatsForAgency(static_cast<uint8_t>(a))
+                : hooks::LobbyCharacterStats{};
         const int innerWidth = std::max(1,
                                         static_cast<int>(panelWidth) -
                                         2 * static_cast<int>(character_panel_detail::kPanelPad));

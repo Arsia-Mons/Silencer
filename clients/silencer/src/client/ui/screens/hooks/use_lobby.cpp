@@ -26,6 +26,11 @@ struct LobbyContext {
 	World * world = nullptr;
 };
 
+struct LobbyAgencyLevel {
+	bool found = false;
+	uint8_t level = 0;
+};
+
 ReactContext g_lobbyContextValue = {};
 
 constexpr Lobby::StatID kMissionSummaryUpgradeStatIds[6] = {
@@ -149,6 +154,48 @@ LobbyTechItemDetails TechItemDetailsForIndex(World * world, int itemIndex)
 	return details;
 }
 
+LobbyCharacterStats CharacterStatsForAgency(Lobby * lobby, uint8_t agency)
+{
+	LobbyCharacterStats result;
+	if(!lobby) return result;
+
+	const Lobby::Character * character = lobby->GetSelectedCharacter();
+	result.name = character ? character->name : "No Agent";
+
+	User * user = lobby->GetUserInfo(lobby->accountid);
+	if(!user || user->retrieving) return result;
+	if(agency >= sizeof(user->agency) / sizeof(user->agency[0])) return result;
+
+	const auto & stats = user->agency[agency];
+	result.statsAvailable = true;
+	result.maxLevel = stats.level >= User::maxlevel;
+	result.wins = stats.wins;
+	result.losses = stats.losses;
+	result.xpToNextLevel = stats.xptonextlevel;
+	result.level = stats.level;
+	result.endurance = stats.endurance;
+	result.shield = stats.shield;
+	result.jetpack = stats.jetpack;
+	result.techslots = stats.techslots;
+	result.hacking = stats.hacking;
+	result.contacts = stats.contacts;
+	return result;
+}
+
+LobbyAgencyLevel CurrentLobbyAgencyLevel(Lobby * lobby)
+{
+	LobbyAgencyLevel result;
+	if(!lobby) return result;
+	User * user = lobby->GetUserInfo(lobby->accountid);
+	if(!user) return result;
+	const uint8_t agency =
+		lobby->GetSelectedAgencyOrDefault(Config::GetInstance().defaultagency);
+	if(agency >= sizeof(user->agency) / sizeof(user->agency[0])) return result;
+	result.found = true;
+	result.level = user->agency[agency].level;
+	return result;
+}
+
 void ToggleTechChoice(World * world, int itemIndex)
 {
 	if(!world) return;
@@ -223,7 +270,7 @@ void SpectateLobbyGame(ScreenContext * screen, uint32_t gameId, const char * pas
 	screen->SpectateLobbyGameById(gameId, password);
 }
 
-void HandleJoinGameSelectAction(ScreenContext * screen, uint32_t gameId)
+void HandleJoinGameSelectAction(ScreenContext * screen, Lobby * lobby, uint32_t gameId)
 {
 	if(!screen) return;
 	ScreenContext::LobbyGameDetails lobbyGame =
@@ -233,8 +280,7 @@ void HandleJoinGameSelectAction(ScreenContext * screen, uint32_t gameId)
 		return;
 	}
 	if(!screen->LobbyNetworkIdle()) return;
-	ScreenContext::LocalLobbyAgencyLevel agencyLevel =
-		screen->CurrentLobbyAgencyLevel();
+	LobbyAgencyLevel agencyLevel = CurrentLobbyAgencyLevel(lobby);
 	if(agencyLevel.found){
 		if(lobbyGame.minLevel > agencyLevel.level){
 			screen->ShowMessage("Your player level is too low");
@@ -275,6 +321,7 @@ void HandleSpectateGameSelectAction(ScreenContext * screen, uint32_t gameId)
 }
 
 void FlushGameSelectActions(ScreenContext * screen,
+                            Lobby * lobby,
                             const std::shared_ptr<LobbyGameSelectActions> & actions,
                             const std::function<bool()> & gameSelectStillActive,
                             const std::function<uint32_t()> & selectedGameId,
@@ -294,7 +341,7 @@ void FlushGameSelectActions(ScreenContext * screen,
 
 	const uint32_t gameId = selectedGameId ? selectedGameId() : 0;
 	if(actions->join){
-		HandleJoinGameSelectAction(screen, gameId);
+		HandleJoinGameSelectAction(screen, lobby, gameId);
 	}
 	if(actions->spectate){
 		HandleSpectateGameSelectAction(screen, gameId);
@@ -362,6 +409,9 @@ LobbyUi UseLobby()
 	result.techItemDetailsForIndex = [world](int itemIndex) {
 		return TechItemDetailsForIndex(world, itemIndex);
 	};
+	result.characterStatsForAgency = [lobby](uint8_t agency) {
+		return CharacterStatsForAgency(lobby, agency);
+	};
 	result.flushGameTechActions =
 		[queueWrite, world](std::shared_ptr<LobbyGameTechActions> actions,
 		                    std::function<bool()> gameTechStillActive,
@@ -375,18 +425,20 @@ LobbyUi UseLobby()
 			});
 		};
 	result.flushGameSelectActions =
-		[queueWrite, screen](std::shared_ptr<LobbyGameSelectActions> actions,
-		                     std::function<bool()> gameSelectStillActive,
-		                     std::function<uint32_t()> selectedGameId,
-		                     std::function<void()> showCreate) {
+		[queueWrite, screen, lobby](std::shared_ptr<LobbyGameSelectActions> actions,
+		                            std::function<bool()> gameSelectStillActive,
+		                            std::function<uint32_t()> selectedGameId,
+		                            std::function<void()> showCreate) {
 			if(!queueWrite || !actions) return;
 			queueWrite([screen,
+			            lobby,
 			            actions,
 			            gameSelectStillActive = std::move(gameSelectStillActive),
 			            selectedGameId = std::move(selectedGameId),
 			            showCreate = std::move(showCreate)]() {
 				FlushGameSelectActions(
 					screen,
+					lobby,
 					actions,
 					gameSelectStillActive,
 					selectedGameId,

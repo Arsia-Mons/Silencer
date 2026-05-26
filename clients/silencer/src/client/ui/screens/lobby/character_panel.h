@@ -6,9 +6,8 @@
 // selected agency emblem, core record stats, and navigation to the
 // character selection/create screen.
 //
-// Domain decisions live here in the screen. Narrow runtime/lobby state
-// snapshots and handoffs come through ScreenContext; primitives stay
-// screen-agnostic.
+// Domain decisions live here in the screen. Domain reads used during Clay
+// declaration come through UseLobby; primitives stay screen-agnostic.
 
 #include "shared.h"
 #include "runtime/UiActionQueue.h"
@@ -47,7 +46,6 @@ bool CharacterPanelHandleUiIntent(CharacterPanelState & state,
 // after the UI frame payload arenas have been reset.
 void BuildCharacterPanelTree(CharacterPanelState & state,
                              Uint16 panelWidth,
-                             ScreenContext & ctx,
                              silencer::ui::UiInteractionRegistry& interactions);
 
 }  // namespace silencer::client_ui::lobby

@@ -133,6 +133,11 @@ fail_if_match \
   --glob '!**/screen_context.cpp'
 
 fail_if_match \
+  '\b(CurrentLobbyAgencyLevel|LobbyCharacterStatsForAgency|LocalLobbyAgencyLevel|LobbyCharacterStats)\b' \
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens/screen_context.h" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens/screen_context.cpp"
+
+fail_if_match \
   '#include[[:space:]]*"game[.]h"' \
   "$REPO_ROOT/clients/silencer/src/client/ui/screens" \
   "$REPO_ROOT/clients/silencer/src/client/ui/modals" \

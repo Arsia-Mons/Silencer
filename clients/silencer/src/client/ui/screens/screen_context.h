@@ -109,25 +109,6 @@ public:
 		Uint8 maxPlayers = 0;
 		Uint8 maxTeams = 0;
 	};
-	struct LocalLobbyAgencyLevel {
-		bool found = false;
-		Uint8 level = 0;
-	};
-	struct LobbyCharacterStats {
-		std::string name;
-		bool statsAvailable = false;
-		bool maxLevel = false;
-		Uint16 wins = 0;
-		Uint16 losses = 0;
-		Uint16 xpToNextLevel = 0;
-		Uint8 level = 0;
-		Uint8 endurance = 0;
-		Uint8 shield = 0;
-		Uint8 jetpack = 0;
-		Uint8 techslots = 0;
-		Uint8 hacking = 0;
-		Uint8 contacts = 0;
-	};
 	struct LobbyChannelChange {
 		bool changed = false;
 		std::string channel;
@@ -258,11 +239,9 @@ public:
 	bool ConsumeLobbyGameListRefresh();
 	std::vector<LobbyGameListRow> LobbyGameListRows() const;
 	LobbyGameDetails LobbyGameDetailsFor(Uint32 gameId) const;
-	LocalLobbyAgencyLevel CurrentLobbyAgencyLevel() const;
 	Uint8 DefaultLobbyAgency() const;
 	Uint8 SelectedLobbyAgency() const;
 	void SetLobbyAgency(Uint8 agency);
-	LobbyCharacterStats LobbyCharacterStatsForAgency(Uint8 agency) const;
 	LobbyChannelChange ConsumeLobbyChannelChange();
 	bool ConsumeLobbyPresenceRefresh();
 	std::vector<LobbyPresenceRow> LobbyPresenceRows() const;

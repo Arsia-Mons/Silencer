@@ -282,7 +282,6 @@ void BuildLobbySteppedPane(LobbyMainAreaPanels & panels,
 					BuildCharacterPanelTree(
 						panels.character,
 						static_cast<Uint16>(std::max(0, layout.characterW)),
-						ctx,
 						interactions);
 				}
 
