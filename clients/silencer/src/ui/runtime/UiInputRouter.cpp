@@ -27,7 +27,7 @@ bool MovesSpatially(UiNavAction action) {
 UiInputRouter::UiInputRouter(UiInteractionRegistry& registry)
 	: registry_(registry) {}
 
-std::vector<UiAction> UiInputRouter::Route(const UiInputState& input) {
+UiActionList UiInputRouter::Route(const UiInputState& input) {
 	bool hasControlPointerCommand = false;
 	for(const UiControlCommand& command : input.controlCommands){
 		if(command.kind == UiControlCommandKind::PointerPress){

@@ -12,7 +12,6 @@
 #include "runtime/UiInputRouter.h"
 
 #include <cstdio>
-#include <vector>
 
 namespace silencer::clay_bridge {
 
@@ -78,7 +77,7 @@ bool RunScrollListCheck(::Game & game, ScrollListCheckResult & out) {
 		}
 		::Clay_EndLayout();
 		interactions.ResolveClayBoundsFromClay();
-		std::vector<silencer::ui::UiAction> actions;
+		silencer::ui::UiActionList actions;
 		if(pressed){
 			silencer::ui::UiInputState input;
 			input.width = W;

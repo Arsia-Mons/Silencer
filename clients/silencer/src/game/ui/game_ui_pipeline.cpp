@@ -15,7 +15,6 @@
 #include "ui/game_ui_frame_provider.h"
 #include <array>
 #include <algorithm>
-#include <vector>
 
 namespace {
 
@@ -175,7 +174,7 @@ game.screenContext,
 [&] {
 silencer::clay_bridge::Render(game, &surface, cmds);
 if(game.state != GameState::FADEOUT){
-std::vector<silencer::ui::UiAction> unhandledUiActions =
+silencer::ui::UiActionList unhandledUiActions =
 clientUi.DispatchInput(game.screenContext, preparedUiInput);
 if(!clientUi.HasScreens() && game.world.map.loaded){
 inGameUiController.ApplyActions(

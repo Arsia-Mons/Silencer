@@ -13,8 +13,6 @@
 #include "runtime/UiInteractionRegistry.h"
 #include "runtime/UiInputRouter.h"
 
-#include <vector>
-
 namespace silencer::clay_bridge {
 
 // Click-routing check. Lays out three toggles in a horizontal row. Only
@@ -76,7 +74,7 @@ bool RunToggleCheck(::Game & game, ToggleCheckResult & out) {
 		}
 		::Clay_RenderCommandArray cmds = ::Clay_EndLayout();
 		interactions.ResolveClayBoundsFromClay();
-		std::vector<silencer::ui::UiAction> actions;
+		silencer::ui::UiActionList actions;
 		if(pressed){
 			silencer::ui::UiInputState input;
 			input.width = W;

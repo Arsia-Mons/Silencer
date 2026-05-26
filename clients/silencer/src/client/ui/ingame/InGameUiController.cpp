@@ -11,6 +11,7 @@
 #include "world.h"
 
 #include <cstring>
+#include <vector>
 
 namespace silencer {
 namespace client_ui {
@@ -110,7 +111,7 @@ void InGameUiController::UpdateOverlayState(int localPeerId) {
 
 bool InGameUiController::ApplyActions(
 	int localPeerId,
-	const std::vector<silencer::ui::UiAction>& actions,
+	const silencer::ui::UiActionList& actions,
 	silencer::ui::UiInteractionRegistry& interactions) {
 	Player * localplayer = world_.GetPeerPlayer(localPeerId);
 	if(!localplayer) return false;

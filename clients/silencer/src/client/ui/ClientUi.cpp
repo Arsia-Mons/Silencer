@@ -147,12 +147,12 @@ Clay_RenderCommandArray ClientUi::EndFrame() {
 	return commands;
 }
 
-std::vector<silencer::ui::UiAction> ClientUi::DispatchInput(
+silencer::ui::UiActionList ClientUi::DispatchInput(
 	ScreenContext& ctx,
 	const silencer::ui::UiInputState& input) {
 	Screen * top = screens_.Top();
 	silencer::ui::UiInputRouter router(interactions_);
-	std::vector<silencer::ui::UiAction> actions = router.Route(input);
+	silencer::ui::UiActionList actions = router.Route(input);
 	bool playedFeedback = false;
 	const silencer::ui::UiInteractable * hovered =
 		clientui_detail::HitAudibleInteractable(interactions_, input);
@@ -169,20 +169,20 @@ std::vector<silencer::ui::UiAction> ClientUi::DispatchInput(
 		}
 	}
 	if(!top) return actions;
-	std::vector<silencer::ui::UiAction> unhandled;
+	silencer::ui::UiActionList unhandled;
 	for(const silencer::ui::UiAction& action : actions){
 		if(top && top->HandleUiIntent(ctx, action)){
 			if(action.kind == silencer::ui::UiActionKind::CaptureBinding){
-				return std::vector<silencer::ui::UiAction>();
+				return silencer::ui::UiActionList();
 			}
 			continue;
 		}
-		unhandled.push_back(action);
+		unhandled.Push(action);
 	}
 	return unhandled;
 }
 
-std::vector<silencer::ui::UiAction> ClientUi::DrainActions() {
+silencer::ui::UiActionList ClientUi::DrainActions() {
 	return interactions_.DrainActions();
 }
 

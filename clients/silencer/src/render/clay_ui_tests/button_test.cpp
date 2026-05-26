@@ -13,7 +13,6 @@
 #include <cstring>
 #include <cstdlib>
 #include <string>
-#include <vector>
 
 namespace silencer::clay_bridge {
 
@@ -119,7 +118,7 @@ bool RunButtonCheck(::Game & game, ButtonCheckResult & out) {
 			if(widgetHeight) *widgetHeight = widget->h;
 		}
 
-		std::vector<silencer::ui::UiAction> actions;
+		silencer::ui::UiActionList actions;
 		if(pressed){
 			silencer::ui::UiInputState input;
 			input.width = W;

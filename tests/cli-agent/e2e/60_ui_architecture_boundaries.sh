@@ -43,6 +43,14 @@ fail_if_match \
   --glob '!third_party/**'
 
 fail_if_match \
+  "std::vector[[:space:]]*<[^>]*UiAction" \
+  "$REPO_ROOT/clients/silencer/src/ui/runtime" \
+  "$REPO_ROOT/clients/silencer/src/client/ui" \
+  "$REPO_ROOT/clients/silencer/src/game/ui" \
+  "$REPO_ROOT/clients/silencer/src/render/clay_ui_tests" \
+  --glob '!third_party/**'
+
+fail_if_match \
   "\\breact_(init|begin_frame|end_frame|shutdown)[[:space:]]*\\(" \
   "$REPO_ROOT/clients/silencer/src" \
   --glob '!third_party/**' \

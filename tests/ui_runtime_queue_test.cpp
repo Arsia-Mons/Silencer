@@ -7,7 +7,6 @@
 #include <array>
 #include <string>
 #include <utility>
-#include <vector>
 
 namespace {
 
@@ -32,7 +31,7 @@ TEST_CASE("UiActionQueue uses bounded storage and drops overflow actions") {
 	CHECK(queue.Count() == silencer::ui::UI_ACTION_QUEUE_MAX_ACTIONS);
 	CHECK(queue.OverflowCount() == 2);
 
-	std::vector<silencer::ui::UiAction> actions = queue.Drain();
+	silencer::ui::UiActionList actions = queue.Drain();
 	REQUIRE(actions.size() == silencer::ui::UI_ACTION_QUEUE_MAX_ACTIONS);
 	CHECK(actions.front().id == "action.0");
 	CHECK(actions.back().id == "action.127");
@@ -44,6 +43,24 @@ TEST_CASE("UiActionQueue uses bounded storage and drops overflow actions") {
 	REQUIRE(actions.size() == 1);
 	CHECK(actions[0].id == "action.200");
 	CHECK(queue.OverflowCount() == 2);
+}
+
+TEST_CASE("UiActionList uses bounded storage and drops overflow actions") {
+	silencer::ui::UiActionList actions;
+
+	for(int i = 0; i < silencer::ui::UI_ACTION_QUEUE_MAX_ACTIONS + 1; ++i){
+		const bool pushed = actions.Push(MakeAction(i));
+		CHECK(pushed == (i < silencer::ui::UI_ACTION_QUEUE_MAX_ACTIONS));
+	}
+
+	CHECK(actions.size() == silencer::ui::UI_ACTION_QUEUE_MAX_ACTIONS);
+	CHECK(actions.OverflowCount() == 1);
+	CHECK(actions.front().id == "action.0");
+	CHECK(actions.back().id == "action.127");
+
+	actions.Clear();
+	CHECK(actions.empty());
+	CHECK(actions.OverflowCount() == 1);
 }
 
 TEST_CASE("UiInteractionRegistry surfaces action queue overflow diagnostics") {
@@ -58,7 +75,7 @@ TEST_CASE("UiInteractionRegistry surfaces action queue overflow diagnostics") {
 	CHECK(registry.PendingActionCount() == silencer::ui::UI_ACTION_QUEUE_MAX_ACTIONS);
 	CHECK(registry.ActionOverflowCount() == 1);
 
-	std::vector<silencer::ui::UiAction> actions = registry.DrainActions();
+	silencer::ui::UiActionList actions = registry.DrainActions();
 	REQUIRE(actions.size() == silencer::ui::UI_ACTION_QUEUE_MAX_ACTIONS);
 	CHECK(actions.front().id == "action.0");
 	CHECK(actions.back().id == "action.127");

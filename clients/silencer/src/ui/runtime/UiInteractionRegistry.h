@@ -8,7 +8,6 @@
 #include <cstddef>
 #include <iterator>
 #include <string>
-#include <vector>
 
 namespace silencer {
 namespace ui {
@@ -142,7 +141,7 @@ public:
 	bool FocusControlHovered(float x, float y);
 	bool ActivateFocused();
 	bool QueueAction(UiAction action);
-	std::vector<UiAction> DrainActions();
+	UiActionList DrainActions();
 	int PendingActionCount() const { return actions_.Count(); }
 	int ActionOverflowCount() const { return actions_.OverflowCount(); }
 	void ResolveClayBoundsFromClay();

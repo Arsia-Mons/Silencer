@@ -3,7 +3,6 @@
 #include "ui/runtime/UiActionQueue.h"
 
 #include <string>
-#include <vector>
 
 class World;
 
@@ -45,7 +44,7 @@ public:
 	bool HasInputTarget(int localPeerId);
 	void UpdateOverlayState(int localPeerId);
 	bool ApplyActions(int localPeerId,
-	                  const std::vector<silencer::ui::UiAction>& actions,
+	                  const silencer::ui::UiActionList& actions,
 	                  silencer::ui::UiInteractionRegistry& interactions);
 	InGameUiControlResult ConfigureForControl(InGameUiControlMode mode);
 

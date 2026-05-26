@@ -10,7 +10,6 @@
 #include <functional>
 #include <memory>
 #include <string>
-#include <vector>
 
 class Screen;
 class ScreenContext;
@@ -38,8 +37,8 @@ public:
 
 	void BeginFrame(const silencer::ui::UiInputState& input);
 	Clay_RenderCommandArray EndFrame();
-	std::vector<silencer::ui::UiAction> DispatchInput(ScreenContext& ctx, const silencer::ui::UiInputState& input);
-	std::vector<silencer::ui::UiAction> DrainActions();
+	silencer::ui::UiActionList DispatchInput(ScreenContext& ctx, const silencer::ui::UiInputState& input);
+	silencer::ui::UiActionList DrainActions();
 	const silencer::ui::UiInteractionRegistry& Interactions() const { return interactions_; }
 	silencer::ui::UiInteractionRegistry& Interactions() { return interactions_; }
 	const silencer::ui::UiFocusRuntime& FocusRuntime() const { return focus_; }

@@ -596,7 +596,7 @@ bool UiInteractionRegistry::QueueAction(UiAction action) {
 	return actions_.Push(std::move(action));
 }
 
-std::vector<UiAction> UiInteractionRegistry::DrainActions() {
+UiActionList UiInteractionRegistry::DrainActions() {
 	return actions_.Drain();
 }
 
