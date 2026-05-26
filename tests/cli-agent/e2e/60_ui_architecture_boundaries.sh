@@ -112,6 +112,11 @@ fail_if_match \
   "$REPO_ROOT/clients/silencer/src/client/ui/navigation/ScreenStack.cpp"
 
 fail_if_match \
+  "std::vector|push_back|reserve|capacity[[:space:]]*\\(|\\.erase[[:space:]]*\\(" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/navigation/ScreenStack.h" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/navigation/ScreenStack.cpp"
+
+fail_if_match \
   "clay_bridge::(EnsureInitialized|Render)[[:space:]]*\\(" \
   "$REPO_ROOT/clients/silencer/src/client/ui/screens" \
   "$REPO_ROOT/clients/silencer/src/client/ui/modals" \

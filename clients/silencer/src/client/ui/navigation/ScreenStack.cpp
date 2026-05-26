@@ -2,7 +2,6 @@
 
 #include "screen.h"
 
-#include <iterator>
 #include <utility>
 
 namespace silencer {
@@ -12,15 +11,23 @@ ScreenStack::~ScreenStack() = default;
 
 void ScreenStack::Push(std::unique_ptr<Screen> screen, ScreenContext& ctx) {
 	if(!screen) return;
+	if(count_ >= CLIENT_UI_MAX_SCREENS) {
+		++overflowCount_;
+		return;
+	}
 	screen->Build(ctx);
-	screens_.push_back(Entry{ nextEntryId_++, std::move(screen) });
-	visibleScreens_.reserve(screens_.capacity());
+	Entry& entry = screens_[count_++];
+	entry.entryId = nextEntryId_++;
+	entry.screen = std::move(screen);
 }
 
 void ScreenStack::Pop(ScreenContext& ctx) {
-	if(screens_.empty()) return;
-	screens_.back().screen->Destroy(ctx);
-	screens_.pop_back();
+	if(count_ <= 0) return;
+	Entry& entry = screens_[count_ - 1];
+	if(entry.screen) entry.screen->Destroy(ctx);
+	entry.screen.reset();
+	entry.entryId = 0;
+	--count_;
 }
 
 void ScreenStack::Replace(std::unique_ptr<Screen> screen, ScreenContext& ctx) {
@@ -29,8 +36,8 @@ void ScreenStack::Replace(std::unique_ptr<Screen> screen, ScreenContext& ctx) {
 }
 
 void ScreenStack::Clear(ScreenContext& ctx) {
-	while(!screens_.empty()) Pop(ctx);
-	visibleScreens_.clear();
+	while(count_ > 0) Pop(ctx);
+	visibleScreenCount_ = 0;
 }
 
 void ScreenStack::RequestClear() {
@@ -44,75 +51,94 @@ void ScreenStack::ClearIfRequested(ScreenContext& ctx) {
 }
 
 Screen * ScreenStack::Top() const {
-	return screens_.empty() ? nullptr : screens_.back().screen.get();
+	return count_ > 0 ? screens_[count_ - 1].screen.get() : nullptr;
 }
 
 UiScreenEntryId ScreenStack::TopEntryId() const {
-	return screens_.empty() ? 0 : screens_.back().entryId;
+	return count_ > 0 ? screens_[count_ - 1].entryId : 0;
 }
 
 bool ScreenStack::PopEntry(UiScreenEntryId entryId, ScreenContext& ctx) {
 	if(entryId == 0) return false;
-	for(auto it = screens_.rbegin(); it != screens_.rend(); ++it){
-		if(it->entryId != entryId) continue;
-		it->screen->Destroy(ctx);
-		screens_.erase(std::next(it).base());
+	for(int i = count_ - 1; i >= 0; --i){
+		if(screens_[i].entryId != entryId) continue;
+		if(screens_[i].screen) screens_[i].screen->Destroy(ctx);
+		screens_[i].screen.reset();
+		for(int j = i; j + 1 < count_; ++j){
+			screens_[j] = std::move(screens_[j + 1]);
+		}
+		--count_;
+		screens_[count_].screen.reset();
+		screens_[count_].entryId = 0;
 		return true;
 	}
 	return false;
 }
 
-const std::vector<VisibleScreen>& ScreenStack::VisibleScreens() {
-	visibleScreens_.clear();
-	if(screens_.empty()) return visibleScreens_;
-	const std::size_t start = VisibleStart();
+VisibleScreenSpan ScreenStack::VisibleScreens() {
+	visibleScreenCount_ = 0;
+	if(count_ <= 0) return VisibleScreenSpan{visibleScreens_.data(), visibleScreenCount_};
+	const int start = VisibleStart();
 	int visibleIndex = 0;
-	for(std::size_t i = start; i < screens_.size(); ++i){
+	for(int i = start; i < count_; ++i){
 		Screen * screen = screens_[i].screen.get();
 		if(!screen) continue;
-		visibleScreens_.push_back(VisibleScreen{
+		visibleScreens_[visibleScreenCount_++] = VisibleScreen{
 			screens_[i].entryId,
 			screen,
 			screen->IsOverlay(),
 			visibleIndex,
-		});
+		};
 		++visibleIndex;
 	}
-	return visibleScreens_;
+	return VisibleScreenSpan{visibleScreens_.data(), visibleScreenCount_};
 }
 
-std::size_t ScreenStack::VisibleStart() const {
-	if(screens_.empty()) return 0;
-	std::size_t start = screens_.size() - 1;
+int ScreenStack::VisibleStart() const {
+	if(count_ <= 0) return 0;
+	int start = count_ - 1;
 	while(start > 0 && screens_[start].screen->IsOverlay()) --start;
 	return start;
 }
 
 void ScreenStack::TickVisible(ScreenContext& ctx) {
-	if(screens_.empty()) return;
-	const std::size_t start = VisibleStart();
-	for(std::size_t i = start; i < screens_.size(); ++i) {
-		screens_[i].screen->Tick(ctx);
+	if(count_ <= 0) return;
+	const int start = VisibleStart();
+	for(int i = start; i < count_; ++i) {
+		if(screens_[i].screen) screens_[i].screen->Tick(ctx);
 	}
 }
 
 #ifdef SILENCER_TEST_BUILD
 void ScreenStack::PushBuiltForTest(std::unique_ptr<Screen> screen) {
 	if(!screen) return;
-	screens_.push_back(Entry{ nextEntryId_++, std::move(screen) });
-	visibleScreens_.reserve(screens_.capacity());
+	if(count_ >= CLIENT_UI_MAX_SCREENS) {
+		++overflowCount_;
+		return;
+	}
+	Entry& entry = screens_[count_++];
+	entry.entryId = nextEntryId_++;
+	entry.screen = std::move(screen);
 }
 
 void ScreenStack::PopForTest() {
-	if(screens_.empty()) return;
-	screens_.pop_back();
+	if(count_ <= 0) return;
+	screens_[count_ - 1].screen.reset();
+	screens_[count_ - 1].entryId = 0;
+	--count_;
 }
 
 bool ScreenStack::PopEntryForTest(UiScreenEntryId entryId) {
 	if(entryId == 0) return false;
-	for(auto it = screens_.rbegin(); it != screens_.rend(); ++it){
-		if(it->entryId != entryId) continue;
-		screens_.erase(std::next(it).base());
+	for(int i = count_ - 1; i >= 0; --i){
+		if(screens_[i].entryId != entryId) continue;
+		screens_[i].screen.reset();
+		for(int j = i; j + 1 < count_; ++j){
+			screens_[j] = std::move(screens_[j + 1]);
+		}
+		--count_;
+		screens_[count_].screen.reset();
+		screens_[count_].entryId = 0;
 		return true;
 	}
 	return false;

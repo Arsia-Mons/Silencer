@@ -322,7 +322,7 @@ void ClientUi::TickVisibleScreens(ScreenContext& ctx) {
 }
 
 void ClientUi::BuildVisibleScreens(ScreenContext& ctx, Surface& dst, float frametime) {
-	const std::vector<VisibleScreen>& visible = screens_.VisibleScreens();
+	const VisibleScreenSpan visible = screens_.VisibleScreens();
 	for(const VisibleScreen& entry : visible){
 		if(!entry.screen) continue;
 		if(entry.visibleIndex > 0 && entry.overlay) {
@@ -343,7 +343,7 @@ void ClientUi::PushBuiltScreenForTest(std::unique_ptr<Screen> screen) {
 
 void ClientUi::BuildVisibleScreenProvidersForTest(
 	const std::function<void(UiScreenEntryId entryId, Screen& screen)>& buildScreen) {
-	const std::vector<VisibleScreen>& visible = screens_.VisibleScreens();
+	const VisibleScreenSpan visible = screens_.VisibleScreens();
 	for(const VisibleScreen& entry : visible){
 		if(!entry.screen) continue;
 		WithScreenProvider(entry.entryId, [&] {
@@ -354,7 +354,7 @@ void ClientUi::BuildVisibleScreenProvidersForTest(
 
 void ClientUi::BuildVisibleScreenFramesForTest(
 	const std::function<void(UiScreenEntryId entryId, Screen& screen, bool overlay)>& buildScreen) {
-	const std::vector<VisibleScreen>& visible = screens_.VisibleScreens();
+	const VisibleScreenSpan visible = screens_.VisibleScreens();
 	for(const VisibleScreen& entry : visible){
 		if(!entry.screen) continue;
 		if(entry.visibleIndex > 0 && entry.overlay) {

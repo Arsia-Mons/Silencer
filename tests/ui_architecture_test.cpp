@@ -327,6 +327,23 @@ TEST_CASE("ClientUi popCurrent drains by screen entry id instead of top screen")
 	CHECK(clientUi.TopScreen() == topScreen);
 }
 
+TEST_CASE("ScreenStack exposes bounded visible screen span") {
+	silencer::client_ui::ScreenStack stack;
+	for(int i = 0; i < silencer::client_ui::CLIENT_UI_MAX_SCREENS + 3; ++i){
+		stack.PushBuiltForTest(std::make_unique<HookProbeScreen>(nullptr, true));
+	}
+
+	CHECK(stack.Size() == silencer::client_ui::CLIENT_UI_MAX_SCREENS);
+	CHECK(stack.OverflowCount() == 3);
+	silencer::client_ui::VisibleScreenSpan visible = stack.VisibleScreens();
+	CHECK(visible.count == silencer::client_ui::CLIENT_UI_MAX_SCREENS);
+	for(int i = 0; i < visible.count; ++i){
+		REQUIRE(visible[i].screen != nullptr);
+		CHECK(visible[i].overlay);
+		CHECK(visible[i].visibleIndex == i);
+	}
+}
+
 TEST_CASE("GameUiFrame provider exposes frame data during screen declaration") {
 	RecordingClayBackend backend;
 	silencer::ui::ClayService clay(backend);

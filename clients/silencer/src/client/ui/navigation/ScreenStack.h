@@ -1,9 +1,9 @@
 #pragma once
 
+#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <memory>
-#include <vector>
 
 class Screen;
 class ScreenContext;
@@ -12,6 +12,7 @@ namespace silencer {
 namespace client_ui {
 
 using UiScreenEntryId = uint32_t;
+constexpr int CLIENT_UI_MAX_SCREENS = 32;
 
 struct VisibleScreen {
 	UiScreenEntryId entryId = 0;
@@ -20,12 +21,22 @@ struct VisibleScreen {
 	int visibleIndex = 0;
 };
 
+struct VisibleScreenSpan {
+	const VisibleScreen * items = nullptr;
+	int count = 0;
+
+	const VisibleScreen * begin() const { return items; }
+	const VisibleScreen * end() const { return items + count; }
+	const VisibleScreen& operator[](int index) const { return items[index]; }
+};
+
 class ScreenStack {
 public:
 	~ScreenStack();
 
-	bool Empty() const { return screens_.empty(); }
-	std::size_t Size() const { return screens_.size(); }
+	bool Empty() const { return count_ == 0; }
+	std::size_t Size() const { return static_cast<std::size_t>(count_); }
+	int OverflowCount() const { return overflowCount_; }
 
 	void Push(std::unique_ptr<Screen> screen, ScreenContext& ctx);
 	void Pop(ScreenContext& ctx);
@@ -37,7 +48,7 @@ public:
 	Screen * Top() const;
 	UiScreenEntryId TopEntryId() const;
 	bool PopEntry(UiScreenEntryId entryId, ScreenContext& ctx);
-	const std::vector<VisibleScreen>& VisibleScreens();
+	VisibleScreenSpan VisibleScreens();
 
 	void TickVisible(ScreenContext& ctx);
 
@@ -53,10 +64,13 @@ private:
 		std::unique_ptr<Screen> screen;
 	};
 
-	std::size_t VisibleStart() const;
+	int VisibleStart() const;
 
-	std::vector<Entry> screens_;
-	std::vector<VisibleScreen> visibleScreens_;
+	std::array<Entry, CLIENT_UI_MAX_SCREENS> screens_;
+	std::array<VisibleScreen, CLIENT_UI_MAX_SCREENS> visibleScreens_;
+	int count_ = 0;
+	int visibleScreenCount_ = 0;
+	int overflowCount_ = 0;
 	UiScreenEntryId nextEntryId_ = 1;
 	bool clearRequested_ = false;
 };
