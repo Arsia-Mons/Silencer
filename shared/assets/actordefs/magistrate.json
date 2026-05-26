@@ -92,7 +92,7 @@
             14,
             0
           ],
-          "sound": "stostep1.wav",
+          "sound": "footstep:L",
           "soundVolume": 64
         },
         {
@@ -204,7 +204,7 @@
             14,
             0
           ],
-          "sound": "stostepr.wav",
+          "sound": "footstep:R",
           "soundVolume": 64
         },
         {

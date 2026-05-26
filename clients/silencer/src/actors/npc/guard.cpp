@@ -9,6 +9,7 @@
 #include "pickup.h"
 #include "gasloader.h"
 #include "audio/soundcue.h"
+#include "frameevents.h"
 #include "npc_math.h"
 #include <math.h>
 
@@ -886,8 +887,7 @@ void Guard::Tick(World & world){
 			res_index = state_i % 19;
 			xv = mirrored ? -speed : speed;
 			FollowGround(*this, world, xv);
-			// Footstep: actordef frame marks trigger point; physics material (or actor override) picks the cue.
-			// Priority: actorDef.footstepL/R override > physics material cue > actorDef frame sound (legacy WAV).
+			// Footstep: frame event tag drives timing; FireFrameEvent resolves material/actor cue.
 			// Cooldown prevents double-fire from state resets and Uint8 state_i overflow (256 % 19 != 0).
 			if (walkStepCooldown_ > 0) {
 				--walkStepCooldown_;
@@ -895,19 +895,9 @@ void Guard::Tick(World & world){
 				auto adit = world.resources.actordefs.find(ActorDefName(weapon));
 				if (adit != world.resources.actordefs.end()) {
 					auto* seq = adit->second.GetSequence("WALKING");
-					std::string trigSnd; int trigVol;
-					if (seq && seq->GetFrameSoundByIndex(state_i % 19, trigSnd, trigVol)) {
-						Platform* _cp = currentplatformid ? world.map.platformids[currentplatformid] : nullptr;
-						const auto& _mat = GASLoader::Get().GetPhysicsMaterialDef(_cp ? static_cast<uint8_t>(_cp->physicsMaterial) : 0);
-						const ActorDef& adef = adit->second;
-						bool isLeft = (state_i % 19) < 10;
-						const std::string& actorOv = isLeft ? adef.footstepL : adef.footstepR;
-						const std::string& matCue  = isLeft ? _mat.footstepL : _mat.footstepR;
-						const std::string& cue = !actorOv.empty() ? actorOv
-						                       : !matCue.empty()  ? matCue
-						                       : trigSnd;
-						auto _r = ResolveSound(cue, world.resources);
-						if (_r.chunk) EmitSound(world, _r.chunk, static_cast<int>(64 * _r.volume));
+					std::string ev; int evVol;
+					if (seq && seq->GetFrameSoundByIndex(state_i % 19, ev, evVol)) {
+						FireFrameEvent(ev, &adit->second, currentplatformid, *this, world, 64);
 						walkStepCooldown_ = 10;
 					}
 				}
