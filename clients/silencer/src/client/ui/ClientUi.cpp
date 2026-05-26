@@ -119,28 +119,6 @@ void RetireAllScreenFocusScopes(silencer::ui::UiFocusRuntime& focus,
 	}
 }
 
-bool FocusRuntimeRoutedThisFrame(const silencer::ui::UiFocusRuntime& focus) {
-	for(int i = 0; i < focus.scopeCount; ++i){
-		const silencer::ui::UiFocusScope& scope = focus.scopes[i];
-		if(scope.declaredFrame == focus.frame && scope.layoutCount > 0){
-			return true;
-		}
-	}
-	return false;
-}
-
-bool FocusRuntimeHasDeclaredFocusThisFrame(const silencer::ui::UiFocusRuntime& focus) {
-	for(int i = 0; i < focus.scopeCount; ++i){
-		const silencer::ui::UiFocusScope& scope = focus.scopes[i];
-		if(scope.declaredFrame == focus.frame &&
-		   scope.layoutCount > 0 &&
-		   scope.focusedId.id != 0){
-			return true;
-		}
-	}
-	return false;
-}
-
 silencer::ui::UiFocusInputFrame FocusInputFrom(
 	const silencer::ui::UiInputState& input) {
 	silencer::ui::UiFocusInputFrame out;
@@ -267,8 +245,8 @@ Clay_RenderCommandArray ClientUi::EndFrame() {
 	Clay_RenderCommandArray commands = clay_.EndPreparedLayout();
 	silencer::ui::ui_focus_set_current(&focus_);
 	silencer::ui::ui_focus_end_layout(focusInput_);
-	if(clientui_detail::FocusRuntimeRoutedThisFrame(focus_) &&
-	   !clientui_detail::FocusRuntimeHasDeclaredFocusThisFrame(focus_)){
+	if(silencer::ui::ui_focus_has_declared_layout_this_frame(&focus_) &&
+	   !silencer::ui::ui_focus_has_declared_focus_this_frame(&focus_)){
 		interactions_.ClearFocus();
 	}
 	clay_.EndPreparedFrame();
@@ -281,7 +259,8 @@ UiDispatchResult ClientUi::DispatchInput(
 	UiDispatchResult result;
 	Screen * top = screens_.Top();
 	silencer::ui::UiInputRouter router(interactions_);
-	const bool focusRouted = clientui_detail::FocusRuntimeRoutedThisFrame(focus_);
+	const bool focusRouted =
+		silencer::ui::ui_focus_has_declared_layout_this_frame(&focus_);
 	const silencer::ui::UiInputState routedInput = focusRouted
 		? clientui_detail::InputForLegacyRouterAfterFocusRuntime(
 			input, interactions_.HasTextInputFocus())

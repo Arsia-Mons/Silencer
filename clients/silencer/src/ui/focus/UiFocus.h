@@ -191,6 +191,8 @@ Clay_ElementId ui_focus_focused_id();
 Clay_ElementId ui_focus_focused_id_for_scope(Clay_ElementId scopeId);
 UiFocusSource ui_focus_source();
 UiFocusSource ui_focus_source_for_scope(Clay_ElementId scopeId);
+bool ui_focus_has_declared_layout_this_frame(const UiFocusRuntime * runtime);
+bool ui_focus_has_declared_focus_this_frame(const UiFocusRuntime * runtime);
 int ui_focus_error_count();
 
 }  // namespace ui

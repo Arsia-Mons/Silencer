@@ -710,6 +710,30 @@ UiFocusSource ui_focus_source_for_scope(Clay_ElementId scopeId) {
 	return scope ? scope->source : UiFocusSource::None;
 }
 
+bool ui_focus_has_declared_layout_this_frame(const UiFocusRuntime * runtime) {
+	if(!runtime) return false;
+	for(int i = 0; i < runtime->scopeCount; ++i){
+		const UiFocusScope& scope = runtime->scopes[i];
+		if(scope.declaredFrame == runtime->frame && scope.layoutCount > 0){
+			return true;
+		}
+	}
+	return false;
+}
+
+bool ui_focus_has_declared_focus_this_frame(const UiFocusRuntime * runtime) {
+	if(!runtime) return false;
+	for(int i = 0; i < runtime->scopeCount; ++i){
+		const UiFocusScope& scope = runtime->scopes[i];
+		if(scope.declaredFrame == runtime->frame &&
+		   scope.layoutCount > 0 &&
+		   scope.focusedId.id != 0){
+			return true;
+		}
+	}
+	return false;
+}
+
 int ui_focus_error_count() {
 	return g_current ? g_current->errorCount : 0;
 }

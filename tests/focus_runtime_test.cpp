@@ -469,6 +469,42 @@ TEST_CASE("UiFocus unique-scope creation overflow does not leak declarations") {
 	CHECK(SameId(silencer::ui::ui_focus_focused_id_for_scope(firstScope), firstItem));
 }
 
+TEST_CASE("UiFocus reports current-frame declared layout and focus state") {
+	silencer::ui::UiFocusRuntime focus;
+	silencer::ui::ui_focus_init(&focus);
+
+	CHECK_FALSE(silencer::ui::ui_focus_has_declared_layout_this_frame(&focus));
+	CHECK_FALSE(silencer::ui::ui_focus_has_declared_focus_this_frame(&focus));
+
+	Clay_ElementId emptyScope = TestId("DeclaredEmptyScope");
+	RunFocusFrame(focus, {}, [&] {
+		silencer::ui::ui_focus_push_scope({emptyScope});
+		silencer::ui::ui_focus_pop_scope();
+	});
+	CHECK_FALSE(silencer::ui::ui_focus_has_declared_layout_this_frame(&focus));
+	CHECK_FALSE(silencer::ui::ui_focus_has_declared_focus_this_frame(&focus));
+
+	Clay_ElementId activeScope = TestId("DeclaredActiveScope");
+	Clay_ElementId activeButton = TestId("DeclaredActiveButton");
+	RunFocusFrame(focus, {}, [&] {
+		silencer::ui::ui_focus_push_scope({activeScope});
+		FocusBox(activeButton);
+		silencer::ui::ui_focus_pop_scope();
+	});
+	CHECK(silencer::ui::ui_focus_has_declared_layout_this_frame(&focus));
+	CHECK(silencer::ui::ui_focus_has_declared_focus_this_frame(&focus));
+
+	Clay_ElementId disabledScope = TestId("DeclaredDisabledScope");
+	Clay_ElementId disabledButton = TestId("DeclaredDisabledButton");
+	RunFocusFrame(focus, {}, [&] {
+		silencer::ui::ui_focus_push_scope({disabledScope});
+		FocusBox(disabledButton, true);
+		silencer::ui::ui_focus_pop_scope();
+	});
+	CHECK(silencer::ui::ui_focus_has_declared_layout_this_frame(&focus));
+	CHECK_FALSE(silencer::ui::ui_focus_has_declared_focus_this_frame(&focus));
+}
+
 TEST_CASE("ClientUi owns the UiFocus frame lifecycle") {
 	RealClayBackend backend;
 	silencer::ui::ClayService clay(backend);

@@ -87,6 +87,10 @@ fail_if_match \
   --glob '!clients/silencer/src/client/ui/ClientUi.cpp'
 
 fail_if_match \
+  '\bUiFocusScope\b|focus_[.]scopes|focus_[.]scopeCount' \
+  "$REPO_ROOT/clients/silencer/src/client/ui/ClientUi.cpp"
+
+fail_if_match \
   "clay_inspector" \
   "$REPO_ROOT/clients/silencer/src" \
   --glob '!third_party/**'
