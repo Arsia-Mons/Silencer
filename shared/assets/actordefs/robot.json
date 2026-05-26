@@ -217,7 +217,8 @@
             -98,
             38,
             0
-          ]
+          ],
+          "sound": "cue:robot_move"
         },
         {
           "bank": 45,
@@ -316,7 +317,8 @@
             -98,
             38,
             0
-          ]
+          ],
+          "sound": "cue:robot_move"
         },
         {
           "bank": 45,

@@ -8,6 +8,7 @@
 #include "gasloader.h"
 #include "audio/soundcue.h"
 #include "npc_math.h"
+#include "actors/core/frameevents.h"
 
 Robot::Robot() : Object(ObjectTypes::ROBOT){
 	requiresauthority = true;
@@ -303,19 +304,14 @@ void Robot::Tick(World & world){
 			if(state_i > 240){
 				state_i = 0;
 			}
-			if(state_i % 20 == 1){
-				StopAmbience();
-				const EnemyDef* rd = GASLoader::Get().GetEnemyDef("robot");
-				const std::string& sfx = (rd && !rd->soundMoveRight.empty()) ? rd->soundMoveRight : "robot3r.wav";
-				auto _r = ResolveSound(sfx, world.resources);
-				if(_r.chunk) EmitSound(world, _r.chunk, static_cast<int>(48 * _r.volume));
-			}
-			if(state_i % 20 == 10){
-				StopAmbience();
-				const EnemyDef* rd = GASLoader::Get().GetEnemyDef("robot");
-				const std::string& sfx = (rd && !rd->soundMoveLeft.empty()) ? rd->soundMoveLeft : "robot3l.wav";
-				auto _r = ResolveSound(sfx, world.resources);
-				if(_r.chunk) EmitSound(world, _r.chunk, static_cast<int>(48 * _r.volume));
+			{
+				auto it = world.resources.actordefs.find("robot");
+				if(it != world.resources.actordefs.end()){
+					const AnimSequence* seq = it->second.GetSequence("WALKING");
+					std::string ev; int evVol;
+					if(seq && seq->GetFrameSoundByIndex(state_i % 20, ev, evVol))
+						FireFrameEvent(ev, &it->second, currentplatformid, *this, world, 48);
+				}
 			}
 			res_bank = 45;
 			res_index = state_i % 20;
