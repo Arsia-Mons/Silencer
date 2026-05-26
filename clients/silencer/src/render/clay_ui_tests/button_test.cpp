@@ -7,6 +7,7 @@
 #include "primitives/button.h"
 #include "runtime/UiInteractionRegistry.h"
 #include "runtime/UiInputRouter.h"
+#include "ui/focus/UiFocus.h"
 
 #include "game.h"
 
@@ -33,6 +34,17 @@ const silencer::ui::UiInteractable * FindButton(
 struct ButtonProbe {
 	Uint16 spriteIndex = 0;
 	Uint8 brightness = 0;
+};
+
+struct ButtonFocusHarness {
+	ButtonFocusHarness() {
+		silencer::ui::UiFocusRuntime * previousFocus = silencer::ui::ui_focus_current();
+		silencer::ui::ui_focus_init(&focus);
+		silencer::ui::ui_focus_set_current(previousFocus);
+	}
+
+	silencer::ui::UiFocusRuntime focus;
+	silencer::ui::UiInteractionRegistry interactions;
 };
 
 ButtonProbe FirstButtonProbe(::Clay_RenderCommandArray cmds) {
@@ -143,6 +155,52 @@ bool RunButtonCheck(::Game & game, ButtonCheckResult & out) {
 		return FirstButtonProbe(cmds);
 	};
 
+	auto runFocusRuntimeButtonFrame = [&](ButtonFocusHarness& harness,
+	                                      const std::string& clayId,
+	                                      const std::string& actionId,
+	                                      ButtonOpts opts) -> ButtonProbe {
+		silencer::ui::UiFocusInputFrame focusInput;
+		focusInput.source = silencer::ui::UiFocusSource::Keyboard;
+		focusInput.pointerX = -1.0f;
+		focusInput.pointerY = -1.0f;
+		silencer::ui::UiFocusRuntime * previousFocus = silencer::ui::ui_focus_current();
+		silencer::ui::ui_focus_set_current(&harness.focus);
+		silencer::ui::ui_focus_begin_frame(focusInput);
+		::Clay_SetPointerState(::Clay_Vector2{-1.0f, -1.0f}, false);
+		::Clay_UpdateScrollContainers(false, ::Clay_Vector2{0, 0}, 0.0f);
+		::Clay_ResetMeasureTextCache();
+		harness.interactions.BeginFrame();
+		silencer::ui::primitives::TextBeginFrame();
+		silencer::ui::primitives::ButtonBeginFrame(1.0f / 24.0f,
+		                                           kVisualStepSeconds);
+
+		::Clay_BeginLayout();
+		CLAY({ .id = CLAY_ID("ButtonCheckFocusRoot"),
+		       .layout = {
+		           .sizing = { CLAY_SIZING_FIXED(W), CLAY_SIZING_FIXED(H) },
+		           .padding = { 100, 0, 100, 0 },
+		           .layoutDirection = CLAY_TOP_TO_BOTTOM,
+		       } }) {
+			silencer::ui::ui_focus_push_scope({
+				CLAY_ID("ButtonCheckFocusScope"),
+				false,
+				true,
+			});
+			Button(
+				Clay_String{ false, static_cast<int32_t>(clayId.size()), clayId.c_str() },
+				CLAY_STRING("Create Game"),
+				opts,
+				ButtonHandle{ nullptr, actionId.c_str(), &harness.interactions });
+			silencer::ui::ui_focus_pop_scope();
+		}
+		::Clay_RenderCommandArray cmds = ::Clay_EndLayout();
+		harness.interactions.ResolveClayBoundsFromClay();
+		silencer::ui::ui_focus_end_layout(focusInput);
+		silencer::ui::ui_focus_set_current(previousFocus);
+		(void)harness.interactions.DrainActions();
+		return FirstButtonProbe(cmds);
+	};
+
 	silencer::ui::UiInteractionRegistry interactions;
 	bool wasDown = false;
 	ButtonProbe idleProbe = runOneFrame(interactions,
@@ -216,32 +274,12 @@ bool RunButtonCheck(::Game & game, ButtonCheckResult & out) {
 
 	const std::string focusClayId = "ButtonCheckOvalFocus";
 	const std::string focusActionId = "test.button.oval_focus";
-	silencer::ui::UiInteractionRegistry focusInteractions;
-	bool focusWasDown = false;
-	runOneFrame(focusInteractions,
-	            focusWasDown,
-	            focusClayId,
-	            focusActionId,
-	            ovalOpts,
-	            -1.0f,
-	            -1.0f,
-	            false);
-	silencer::ui::UiInputState focusInput;
-	focusInput.width = W;
-	focusInput.height = H;
-	focusInput.navActions.push_back(silencer::ui::UiNavAction::FocusNext);
-	silencer::ui::UiInputRouter focusRouter(focusInteractions);
-	focusRouter.Route(focusInput);
+	ButtonFocusHarness focusHarness;
+	runFocusRuntimeButtonFrame(focusHarness, focusClayId, focusActionId, ovalOpts);
 	ButtonProbe focusProbe;
 	for(int i = 0; i < 5; ++i){
-		focusProbe = runOneFrame(focusInteractions,
-		                         focusWasDown,
-		                         focusClayId,
-		                         focusActionId,
-		                         ovalOpts,
-		                         -1.0f,
-		                         -1.0f,
-		                         false);
+		focusProbe = runFocusRuntimeButtonFrame(
+			focusHarness, focusClayId, focusActionId, ovalOpts);
 	}
 
 	const std::string wallClockClayId = "ButtonCheckOvalWallClock";

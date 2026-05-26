@@ -84,7 +84,8 @@ fail_if_match \
   --glob '!third_party/**' \
   --glob '!clients/silencer/src/ui/focus/UiFocus.h' \
   --glob '!clients/silencer/src/ui/focus/UiFocus.cpp' \
-  --glob '!clients/silencer/src/client/ui/ClientUi.cpp'
+  --glob '!clients/silencer/src/client/ui/ClientUi.cpp' \
+  --glob '!clients/silencer/src/render/clay_ui_tests/button_test.cpp'
 
 fail_if_match \
   '\bUiFocusScope\b|focus_[.]scopes|focus_[.]scopeCount' \
@@ -95,6 +96,10 @@ fail_if_match \
   "$REPO_ROOT/clients/silencer/src/ui/runtime/UiInputRouter.cpp" \
   "$REPO_ROOT/clients/silencer/src/ui/runtime/UiInteractionRegistry.h" \
   "$REPO_ROOT/clients/silencer/src/ui/runtime/UiInteractionRegistry.cpp"
+
+fail_if_match \
+  'UiNavAction::(FocusNext|FocusPrevious|NextSection|PreviousSection|Up|Down|Left|Right|Confirm)' \
+  "$REPO_ROOT/clients/silencer/src/render/clay_ui_tests"
 
 fail_if_match \
   "clay_inspector" \
