@@ -26,9 +26,9 @@ class UiInteractionRegistry;
 namespace silencer::client_ui::lobby {
 
 struct GameSelectPanelState {
-	// Snapshot of the games list. Rebuilt from world.lobby.games whenever
-	// world.lobby.gamesprocessed flips false. Held in screen-side storage
-	// so the layout pass can hold pointers into the std::strings safely.
+	// Snapshot of the games list. Rebuilt when ScreenContext consumes a
+	// pending lobby game-list refresh. Held in screen-side storage so the
+	// layout pass can hold pointers into the std::strings safely.
 	struct Row {
 		std::string name;
 		Uint32      gameid = 0;
@@ -59,14 +59,13 @@ struct GameSelectPanelState {
 	bool spectateVisible = false;
 };
 
-// One-time init. Clears state. The legacy panel ran a one-time games-list
-// rebuild on Build; we just clear here — the first Tick that observes
-// `gamesprocessed=false` will populate from world.lobby.games.
+// One-time init. Clears state. The first Tick that consumes a pending
+// ScreenContext lobby game-list refresh will populate copied id/name rows.
 void GameSelectPanelInit(GameSelectPanelState & state);
 
 // Per-frame pump:
-//   - Rebuilds `rows` from world.lobby.games whenever
-//     `world.lobby.gamesprocessed == false`.
+//   - Rebuilds `rows` from copied ScreenContext lobby game-list rows when a
+//     pending refresh is consumed.
 //   - Recomputes infoName/infoMap/.../joinVisible/spectateVisible from the
 //     selected game (or clears them when no game is selected).
 //   - Consumes joinClicked / spectateClicked / createClicked flags — runs
