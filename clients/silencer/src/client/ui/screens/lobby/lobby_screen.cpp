@@ -1,6 +1,7 @@
 #include "lobby_screen.h"
 
 #include "game_create_panel.h"
+#include "client/ui/ClientUi.h"
 #include "lobby_chrome.h"
 #include "lobby_main_area.h"
 
@@ -16,6 +17,7 @@
 
 #include <algorithm>
 #include <cstdint>
+#include <functional>
 #include <string>
 
 namespace lobby_screen_detail {
@@ -47,6 +49,15 @@ void AddPanelBorderBlur(ScreenContext & ctx, int x, int y, int w, int h) {
 	ctx.AddLobbyPanelBorderBlurRect(x + w - 1, y, 1, h);
 }
 
+std::function<void()> UseQueuedAction(std::function<void()> write)
+{
+	auto queueWrite = silencer::client_ui::UseUiWriteQueue();
+	if(!queueWrite) return {};
+	return [queueWrite, write]() {
+		queueWrite(write);
+	};
+}
+
 }  // namespace lobby_screen_detail
 
 LobbyScreen::LobbyScreen() = default;
@@ -60,7 +71,8 @@ void LobbyScreen::Build(ScreenContext & ctx)
 	version  = "v.";
 	version += world.GetVersion();
 	mapName.clear();
-	goBackClicked = false;
+	goBack = {};
+	goBackQueued = false;
 
 	silencer::client_ui::lobby::CharacterPanelInit(characterState, ctx);
 	silencer::client_ui::lobby::ChatPanelInit(chatState);
@@ -129,6 +141,10 @@ void LobbyScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime, s
 	                              - (int)titleBarH - regionGap);
 	const int bodyX = rootPadX;
 	const int bodyY = rootPadTop + (int)titleBarH + regionGap;
+	goBackQueued = false;
+	goBack = lobby_screen_detail::UseQueuedAction([&ctx]() {
+		ctx.GoBack();
+	});
 
 	ctx.BeginLobbyPanelBorderBlur(layoutWidth, layoutHeight, input.uiScale);
 	lobby_screen_detail::AddPanelBorderBlur(
@@ -182,6 +198,8 @@ void LobbyScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime, s
 void LobbyScreen::Destroy(ScreenContext & ctx)
 {
 	(void)ctx;
+	goBack = {};
+	goBackQueued = false;
 }
 
 void LobbyScreen::SetMapNameOverlay(const char * name)

@@ -38,13 +38,6 @@ void LobbyScreen::Tick(ScreenContext & ctx)
 	// Lobby disconnect → bounce back to the connect screen.
 	if(ctx.HandleLobbyDisconnect()) return;
 
-	// Chrome Go Back — flag was set by a typed button intent on the previous
-	// frame. Consume it before pumping anything else.
-	if(goBackClicked){
-		goBackClicked = false;
-		if(ctx.GoBack()) return;
-	}
-
 	silencer::client_ui::lobby::CharacterPanelTick(characterState, ctx);
 	if(characterState.newCharacterRequested){
 		characterState.newCharacterRequested = false;
@@ -124,16 +117,23 @@ bool LobbyScreen::HandleBack(ScreenContext & ctx)
 	return false;
 }
 
+void LobbyScreen::QueueGoBack()
+{
+	if(goBackQueued) return;
+	goBackQueued = true;
+	if(goBack) goBack();
+}
+
 bool LobbyScreen::HandleUiIntent(ScreenContext & ctx, const silencer::ui::UiAction & action)
 {
 	if(action.kind == silencer::ui::UiActionKind::Cancel){
 		if(HandleBack(ctx)) return true;
-		goBackClicked = true;
+		QueueGoBack();
 		return true;
 	}
 	if(action.kind == silencer::ui::UiActionKind::Activate &&
 	   action.id == lobby_controller_detail::kActionGoBack){
-		goBackClicked = true;
+		QueueGoBack();
 		return true;
 	}
 	if(silencer::client_ui::lobby::CharacterPanelHandleUiIntent(characterState, ctx, action)){

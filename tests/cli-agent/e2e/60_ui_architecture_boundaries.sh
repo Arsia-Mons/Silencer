@@ -246,6 +246,12 @@ fail_if_match \
   "$REPO_ROOT/clients/silencer/src/client/ui/screens/mission_summary/mission_summary_screen.cpp"
 
 fail_if_match \
+  '\bgoBackClicked\b' \
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens/lobby/lobby_controller.cpp" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens/lobby/lobby_screen.cpp" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens/lobby/lobby_screen.h"
+
+fail_if_match \
   '\b(goBackClicked|controlsClicked|displayClicked|audioClicked)\b' \
   "$REPO_ROOT/clients/silencer/src/client/ui/screens/options/options_screen.cpp" \
   "$REPO_ROOT/clients/silencer/src/client/ui/screens/options/options_screen.h"

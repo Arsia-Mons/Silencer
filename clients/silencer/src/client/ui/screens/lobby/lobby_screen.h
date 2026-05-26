@@ -8,6 +8,7 @@
 #include "game_create_panel.h"
 #include "game_join_panel.h"
 #include "game_tech_panel.h"
+#include <functional>
 #include <string>
 
 class Surface;
@@ -42,12 +43,15 @@ public:
 	void ShowGameTech(ScreenContext & ctx);
 
 private:
+	void QueueGoBack();
+
 	// Per-frame state for the chrome tree. Strings live on the screen so the
 	// layout pass can hold pointers that remain valid until the frame ends.
 	// Version is cached once at Build; mapName is updated by SetMapNameOverlay.
 	std::string version;
 	std::string mapName;
-	bool goBackClicked = false;
+	std::function<void()> goBack;
+	bool goBackQueued = false;
 
 	// CharacterPanel state — agency selection persisted via Config +
 	// World::SetAgency on change.
