@@ -1,17 +1,11 @@
 #pragma once
 
+#include "clay/clay.h"
 #include "runtime/UiInteractionRegistry.h"
 #include "runtime/UiInputState.h"
 
-#include <string>
-#include <vector>
-
 namespace silencer {
 namespace ui {
-
-struct UiRenderCommand {
-	std::string debugName;
-};
 
 class ClayFrameBackend {
 public:
@@ -22,7 +16,7 @@ public:
 	virtual void SetPointerState(float x, float y, bool down) = 0;
 	virtual void UpdateScrollContainers(float wheelX, float wheelY, float deltaTimeSeconds) = 0;
 	virtual void BeginLayout() = 0;
-	virtual std::vector<UiRenderCommand> EndLayout() = 0;
+	virtual Clay_RenderCommandArray EndLayout() = 0;
 };
 
 struct ClayFrameState {
@@ -35,7 +29,7 @@ public:
 	explicit ClayService(ClayFrameBackend& backend);
 
 	void BeginFrame(const UiInputState& input, UiInteractionRegistry& interactions);
-	std::vector<UiRenderCommand> EndFrame();
+	Clay_RenderCommandArray EndFrame();
 	const ClayFrameState& Frame() const { return frame_; }
 
 private:

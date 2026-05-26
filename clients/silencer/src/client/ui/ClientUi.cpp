@@ -85,7 +85,7 @@ void ClientUi::BeginFrame(const silencer::ui::UiInputState& input) {
 	clay_.BeginFrame(input, interactions_);
 }
 
-std::vector<silencer::ui::UiRenderCommand> ClientUi::EndFrame() {
+Clay_RenderCommandArray ClientUi::EndFrame() {
 	return clay_.EndFrame();
 }
 

@@ -34,9 +34,8 @@ void ClayBridgeFrameBackend::BeginLayout() {
 	Clay_BeginLayout();
 }
 
-std::vector<silencer::ui::UiRenderCommand> ClayBridgeFrameBackend::EndLayout() {
-	commands_ = Clay_EndLayout();
-	return std::vector<silencer::ui::UiRenderCommand>();
+Clay_RenderCommandArray ClayBridgeFrameBackend::EndLayout() {
+	return Clay_EndLayout();
 }
 
 }  // namespace client_ui

@@ -19,10 +19,10 @@ void ClayService::BeginFrame(const UiInputState& input, UiInteractionRegistry& i
 	inFrame_ = true;
 }
 
-std::vector<UiRenderCommand> ClayService::EndFrame() {
-	if(!inFrame_) return std::vector<UiRenderCommand>();
+Clay_RenderCommandArray ClayService::EndFrame() {
+	if(!inFrame_) return Clay_RenderCommandArray{};
 	inFrame_ = false;
-	std::vector<UiRenderCommand> commands = backend_.EndLayout();
+	Clay_RenderCommandArray commands = backend_.EndLayout();
 	if(frame_.interactions){
 		frame_.interactions->ResolveClayBoundsFromClay();
 	}

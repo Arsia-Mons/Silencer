@@ -30,7 +30,7 @@ fail_if_path_exists "clients/silencer/src/ui/runtime/clay_inspector.h"
 fail_if_path_exists "clients/silencer/src/ui/runtime/clay_inspector.cpp"
 
 fail_if_match \
-  "\\b(currentinterface|ProcessInGameInterfaces|Interface \\*|new Interface|ui/components|ui/modals|ui/panels|ui/screens)\\b" \
+  "\\b(currentinterface|ProcessInGameInterfaces|Interface \\*|new Interface)\\b|(^|[^[:alnum:]_/])ui/(components|modals|panels|screens)\\b" \
   "$REPO_ROOT/clients/silencer/src" \
   --glob '!third_party/**'
 

@@ -103,9 +103,9 @@ clientUi.BeginFrame(preparedUiInput);
 }
 
 Clay_RenderCommandArray GameUiPipeline::EndClientUiFrame() {
-clientUi.EndFrame();
+Clay_RenderCommandArray commands = clientUi.EndFrame();
 hasPreparedUiInput = false;
-return uiClayBackend.Commands();
+return commands;
 }
 
 void GameUiPipeline::BuildVisibleClientUi(Surface& surface, float frametime) {

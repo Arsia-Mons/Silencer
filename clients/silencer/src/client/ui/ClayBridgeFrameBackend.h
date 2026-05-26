@@ -15,12 +15,9 @@ public:
 	void SetPointerState(float x, float y, bool down) override;
 	void UpdateScrollContainers(float wheelX, float wheelY, float deltaTimeSeconds) override;
 	void BeginLayout() override;
-	std::vector<silencer::ui::UiRenderCommand> EndLayout() override;
-
-	Clay_RenderCommandArray Commands() const { return commands_; }
+	Clay_RenderCommandArray EndLayout() override;
 
 private:
-	Clay_RenderCommandArray commands_{};
 	int width_ = 0;
 	int height_ = 0;
 };

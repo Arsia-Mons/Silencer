@@ -22,7 +22,7 @@ public:
 	~ClientUi();
 
 	void BeginFrame(const silencer::ui::UiInputState& input);
-	std::vector<silencer::ui::UiRenderCommand> EndFrame();
+	Clay_RenderCommandArray EndFrame();
 	std::vector<silencer::ui::UiAction> DispatchInput(ScreenContext& ctx, const silencer::ui::UiInputState& input);
 	std::vector<silencer::ui::UiAction> DrainActions();
 	const silencer::ui::UiInteractionRegistry& Interactions() const { return interactions_; }

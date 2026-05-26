@@ -42,9 +42,12 @@ public:
 		calls.push_back("UpdateScrollContainers");
 	}
 	void BeginLayout() override { calls.push_back("BeginLayout"); }
-	std::vector<silencer::ui::UiRenderCommand> EndLayout() override {
+	Clay_RenderCommandArray EndLayout() override {
 		calls.push_back("EndLayout");
-		return { silencer::ui::UiRenderCommand{ "frame" } };
+		Clay_RenderCommandArray commands{};
+		commands.capacity = 1;
+		commands.length = 1;
+		return commands;
 	}
 };
 
@@ -67,7 +70,7 @@ TEST_CASE("ClayService uses the required central frame lifecycle order") {
 	service.BeginFrame(input, registry);
 	auto commands = service.EndFrame();
 
-	REQUIRE(commands.size() == 1);
+	REQUIRE(commands.length == 1);
 	CHECK(backend.width == 1280);
 	CHECK(backend.height == 720);
 	CHECK(backend.uiScale == 2);
@@ -96,7 +99,7 @@ TEST_CASE("ClientUi owns the frame lifecycle without demo-screen metadata") {
 	clientUi.BeginFrame(input);
 	auto commands = clientUi.EndFrame();
 
-	REQUIRE(commands.size() == 1);
+	REQUIRE(commands.length == 1);
 	CHECK(clientUi.Interactions().Elements().empty());
 	CHECK(clientUi.DrainActions().empty());
 }
