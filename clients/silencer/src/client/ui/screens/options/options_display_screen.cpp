@@ -46,18 +46,18 @@ void OptionsDisplayScreen::Build(ScreenContext & ctx)
 
 void OptionsDisplayScreen::Tick(ScreenContext & ctx)
 {
-		if(fullscreenClicked){
-			fullscreenClicked = false;
-			Config & cfg = Config::GetInstance();
-			cfg.fullscreen = !cfg.fullscreen;
-			ctx.SetWindowFullscreen(cfg.fullscreen);
-		}
+	if(fullscreenClicked){
+		fullscreenClicked = false;
+		Config & cfg = Config::GetInstance();
+		cfg.fullscreen = !cfg.fullscreen;
+		ctx.SetWindowFullscreen(cfg.fullscreen);
+	}
 	if(smoothScalingClicked){
-			smoothScalingClicked = false;
-			Config & cfg = Config::GetInstance();
-			cfg.scalefilter = !cfg.scalefilter;
-			ctx.SetScaleFilter(cfg.scalefilter);
-		}
+		smoothScalingClicked = false;
+		Config & cfg = Config::GetInstance();
+		cfg.scalefilter = !cfg.scalefilter;
+		ctx.SetScaleFilter(cfg.scalefilter);
+	}
 	if(saveClicked){
 		saveClicked = false;
 		Config::GetInstance().Save();
@@ -66,12 +66,12 @@ void OptionsDisplayScreen::Tick(ScreenContext & ctx)
 	}
 	if(cancelClicked){
 		cancelClicked = false;
-			Config & cfg = Config::GetInstance();
-			cfg.Load();
-			ctx.SetScaleFilter(cfg.scalefilter);
-			ctx.SetWindowFullscreen(cfg.fullscreen);
-			ctx.GoToState(GameState::OPTIONS);
-		}
+		Config & cfg = Config::GetInstance();
+		cfg.Load();
+		ctx.SetScaleFilter(cfg.scalefilter);
+		ctx.SetWindowFullscreen(cfg.fullscreen);
+		ctx.GoToState(GameState::OPTIONS);
+	}
 }
 
 void OptionsDisplayScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime, silencer::ui::UiInteractionRegistry& interactions)

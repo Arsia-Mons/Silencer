@@ -84,35 +84,35 @@ struct LobbySteppedPaneLayout {
 	int chatH = kLegacyBodyH - 121 - 10;
 };
 
-	void AddBorderBlurRect(ScreenContext & ctx, int x, int y, int w, int h) {
-		ctx.AddLobbyPanelBorderBlurRect(x, y, w, h);
-	}
+void AddBorderBlurRect(ScreenContext & ctx, int x, int y, int w, int h) {
+	ctx.AddLobbyPanelBorderBlurRect(x, y, w, h);
+}
 
-	void AddPanelBorderBlur(ScreenContext & ctx,
-	                        int x,
-	                        int y,
-	                        int w,
-	                        int h,
-	                        Uint8 sides) {
-		if(w <= 0 || h <= 0) return;
-		if(sides & BoxSides::Top){
-			AddBorderBlurRect(ctx, x, y, w, 1);
-		}
-		if(sides & BoxSides::Bottom){
-			AddBorderBlurRect(ctx, x, y + h - 1, w, 1);
-		}
-		if(sides & BoxSides::Left){
-			AddBorderBlurRect(ctx, x, y, 1, h);
-		}
-		if(sides & BoxSides::Right){
-			AddBorderBlurRect(ctx, x + w - 1, y, 1, h);
-		}
+void AddPanelBorderBlur(ScreenContext & ctx,
+                        int x,
+                        int y,
+                        int w,
+                        int h,
+                        Uint8 sides) {
+	if(w <= 0 || h <= 0) return;
+	if(sides & BoxSides::Top){
+		AddBorderBlurRect(ctx, x, y, w, 1);
 	}
+	if(sides & BoxSides::Bottom){
+		AddBorderBlurRect(ctx, x, y + h - 1, w, 1);
+	}
+	if(sides & BoxSides::Left){
+		AddBorderBlurRect(ctx, x, y, 1, h);
+	}
+	if(sides & BoxSides::Right){
+		AddBorderBlurRect(ctx, x + w - 1, y, 1, h);
+	}
+}
 
 void QueueLobbyPanelBorderBlurRects(ScreenContext & ctx,
-	                                    int bodyX,
-	                                    int bodyY,
-	                                    const LobbySteppedPaneLayout & layout) {
+                                    int bodyX,
+                                    int bodyY,
+                                    const LobbySteppedPaneLayout & layout) {
 		const int topY = bodyY;
 	const int lowerY = bodyY + layout.upperH + layout.regionGap;
 	const int rightX = bodyX + layout.topRowW;

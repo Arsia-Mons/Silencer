@@ -39,13 +39,13 @@ int ScaleLegacyPx(int base,
 	return ClampInt(scaled, minValue, maxValue);
 }
 
-	void AddPanelBorderBlur(ScreenContext & ctx, int x, int y, int w, int h) {
-		if(w <= 0 || h <= 0) return;
-		ctx.AddLobbyPanelBorderBlurRect(x, y, w, 1);
-		ctx.AddLobbyPanelBorderBlurRect(x, y + h - 1, w, 1);
-		ctx.AddLobbyPanelBorderBlurRect(x, y, 1, h);
-		ctx.AddLobbyPanelBorderBlurRect(x + w - 1, y, 1, h);
-	}
+void AddPanelBorderBlur(ScreenContext & ctx, int x, int y, int w, int h) {
+	if(w <= 0 || h <= 0) return;
+	ctx.AddLobbyPanelBorderBlurRect(x, y, w, 1);
+	ctx.AddLobbyPanelBorderBlurRect(x, y + h - 1, w, 1);
+	ctx.AddLobbyPanelBorderBlurRect(x, y, 1, h);
+	ctx.AddLobbyPanelBorderBlurRect(x + w - 1, y, 1, h);
+}
 
 }  // namespace lobby_screen_detail
 
@@ -131,13 +131,13 @@ void LobbyScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime, s
 	const int bodyX = rootPadX;
 	const int bodyY = rootPadTop + (int)titleBarH + regionGap;
 
-		ctx.BeginLobbyPanelBorderBlur(layoutWidth, layoutHeight, input.uiScale);
-		lobby_screen_detail::AddPanelBorderBlur(
-			ctx,
-			rootPadX,
-			rootPadTop,
-			bodyW,
-			static_cast<int>(titleBarH));
+	ctx.BeginLobbyPanelBorderBlur(layoutWidth, layoutHeight, input.uiScale);
+	lobby_screen_detail::AddPanelBorderBlur(
+		ctx,
+		rootPadX,
+		rootPadTop,
+		bodyW,
+		static_cast<int>(titleBarH));
 
 	CLAY({ .id = CLAY_ID("LobbyRoot"),
 	       .layout = {
