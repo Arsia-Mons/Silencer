@@ -21,9 +21,10 @@ struct SDL_Window;
 
 // Bag of refs that screens use to reach the global subsystems (World,
 // Renderer, Lobby, Updater, KeyMap, AmbienceMixer, the SDL window /
-// RenderDevice) plus the state-machine / screen-stack actions that touch
-// Game itself. Per-screen behavior lives in the screen, not here — when a
-// screen needs Game state directly, reach through the `game` ref.
+// RenderDevice) plus narrow state-machine / screen-stack actions that touch
+// Game itself. Per-screen behavior lives in the screen, not here. The `game`
+// ref is transitional for state not yet moved behind ScreenContext; new Game
+// or stack reads should be exposed through a narrow ScreenContext handoff.
 class ScreenContext
 {
 public:

@@ -128,7 +128,7 @@ void GameCreatePanelTick(GameCreatePanelState & state,
 	}else if(us == 3){
 		mapDownloader.mapUploadState.store(0, std::memory_order_relaxed);
 		game.creategameclicked = false;
-		Screen * top = game.GetTopScreen();
+		Screen * top = ctx.TopScreen();
 		MessageModal * m = dynamic_cast<MessageModal *>(top);
 		if(m && m->IsProgress()) ctx.PopScreen();
 		ctx.ShowMessage("Could not upload map");
@@ -146,7 +146,7 @@ void GameCreatePanelTick(GameCreatePanelState & state,
 	}else if(world.lobby.creategamestatus != 100 && world.lobby.creategamestatus != 0 && game.creategameclicked){
 		world.lobby.creategamestatus = 0;
 		game.creategameclicked = false;
-		Screen * top = game.GetTopScreen();
+		Screen * top = ctx.TopScreen();
 		MessageModal * m = dynamic_cast<MessageModal *>(top);
 		if(m && m->IsProgress()) ctx.PopScreen();
 		ctx.ShowMessage("Could not create game");

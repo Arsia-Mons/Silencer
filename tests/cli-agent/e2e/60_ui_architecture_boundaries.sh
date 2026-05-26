@@ -107,8 +107,9 @@ fail_if_match \
   "$REPO_ROOT/clients/silencer/src/client/ui"
 
 fail_if_match \
-  'ctx[.]game[.]GetTopScreen[[:space:]]*[(]' \
-  "$REPO_ROOT/clients/silencer/src/client/ui"
+  '\bGetTopScreen[[:space:]]*[(]' \
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens" \
+  --glob '!**/screen_context.cpp'
 
 fail_if_match \
   'nlohmann::json[[:space:]]+(Game::)?GetWorldSummary|nlohmann::json[[:space:]]+(InGameUiController::)?ConfigureForControl' \
