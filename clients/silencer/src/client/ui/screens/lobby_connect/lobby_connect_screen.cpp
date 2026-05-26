@@ -1,5 +1,6 @@
 #include "lobby_connect_screen.h"
 
+#include "client/ui/ClientUi.h"
 #include "screen_context.h"
 #include "game_state.h"
 #include "surface.h"
@@ -18,6 +19,7 @@
 #include <algorithm>
 #include <cstring>
 #include <cstdint>
+#include <functional>
 #include <string>
 
 namespace lobby_connect_screen_detail
@@ -75,6 +77,35 @@ Clay_String FromCStr(const char * s)
 Clay_String FromStd(const std::string & s)
 {
 	return Clay_String{ false, static_cast<int32_t>(s.size()), s.c_str() };
+}
+
+std::function<void()> UseQueuedAction(std::function<void()> write)
+{
+	auto queueWrite = silencer::client_ui::UseUiWriteQueue();
+	if(!queueWrite) return {};
+	return [queueWrite, write]() {
+		queueWrite(write);
+	};
+}
+
+std::function<void()> UseQueuedLobbyCredentials(ScreenContext & ctx,
+                                                const char * username,
+                                                const char * password)
+{
+	auto queueWrite = silencer::client_ui::UseUiWriteQueue();
+	if(!queueWrite) return {};
+	return [queueWrite, &ctx, username, password]() {
+		const std::string usernameValue = username ? username : "";
+		const std::string passwordValue = password ? password : "";
+		queueWrite([&ctx, usernameValue, passwordValue]() {
+			ctx.SubmitLobbyCredentials(usernameValue.c_str(), passwordValue.c_str());
+		});
+	};
+}
+
+void Invoke(const std::function<void()> & action)
+{
+	if(action) action();
 }
 
 template <typename Text>
@@ -142,8 +173,8 @@ void LobbyConnectScreen::Build(ScreenContext & ctx)
 {
 	ctx.ResetPresentation(2);
 	motdprinted = false;
-	loginClicked = false;
-	cancelClicked = false;
+	submitLogin = {};
+	cancel = {};
 	focusUsernameRequested = true;
 	logLines.clear();
 	username[0] = '\0';
@@ -268,20 +299,7 @@ void LobbyConnectScreen::Tick(ScreenContext & ctx)
 		}
 		motdprinted = true;
 	}
-	if(loginClicked){
-		loginClicked = false;
-		if(world.lobby.state == Lobby::AUTHENTICATING){
-			world.lobby.SetLocalUsername(username);
-			world.lobby.SendCredentials(username, password);
-			world.lobby.state = Lobby::AUTHSENT;
-		}
-	}
 	world.lobby.UnlockMutex();
-
-	if(cancelClicked){
-		cancelClicked = false;
-		ctx.GoToState(GameState::MAINMENU);
-	}
 }
 
 void LobbyConnectScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime, silencer::ui::UiInteractionRegistry& interactions)
@@ -303,6 +321,10 @@ void LobbyConnectScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frame
 	const bool passwordFocused =
 		interactions.IsTextInputFocused(lobby_connect_screen_detail::LBY_INPUT_PASSWORD);
 	const bool blink = ctx.UiBlinkVisible();
+	submitLogin = lobby_connect_screen_detail::UseQueuedLobbyCredentials(ctx, username, password);
+	cancel = lobby_connect_screen_detail::UseQueuedAction([&ctx]() {
+		ctx.GoToState(GameState::MAINMENU);
+	});
 
 	CLAY({ .id = CLAY_ID("LobbyConnectRoot"),
 	       .layout = {
@@ -478,6 +500,8 @@ void LobbyConnectScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frame
 void LobbyConnectScreen::Destroy(ScreenContext & ctx)
 {
 	ctx.ClearUiFocus();
+	submitLogin = {};
+	cancel = {};
 }
 
 bool LobbyConnectScreen::HandleUiIntent(ScreenContext & ctx, const silencer::ui::UiAction & action)
@@ -501,16 +525,16 @@ bool LobbyConnectScreen::HandleUiIntent(ScreenContext & ctx, const silencer::ui:
 		}else{
 			lobby_connect_screen_detail::CopyUiText(password, static_cast<int>(sizeof(password)), action.value);
 		}
-		loginClicked = true;
+		lobby_connect_screen_detail::Invoke(submitLogin);
 		return true;
 	}
 	if(action.kind == silencer::ui::UiActionKind::Activate && action.id == lobby_connect_screen_detail::kActionLogin){
-		loginClicked = true;
+		lobby_connect_screen_detail::Invoke(submitLogin);
 		return true;
 	}
 	if((action.kind == silencer::ui::UiActionKind::Activate && action.id == lobby_connect_screen_detail::kActionCancel) ||
 	   action.kind == silencer::ui::UiActionKind::Cancel){
-		cancelClicked = true;
+		lobby_connect_screen_detail::Invoke(cancel);
 		return true;
 	}
 	return false;

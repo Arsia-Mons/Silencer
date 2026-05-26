@@ -3,6 +3,7 @@
 
 #include "screen.h"
 
+#include <functional>
 #include <string>
 #include <vector>
 
@@ -21,8 +22,8 @@ private:
 	// Reset on entry; flipped to true after the first MOTD render so the
 	// banner doesn't re-print every tick. Migrated from Game::motdprinted.
 	bool motdprinted = false;
-	bool loginClicked = false;
-	bool cancelClicked = false;
+	std::function<void()> submitLogin;
+	std::function<void()> cancel;
 	bool focusUsernameRequested = false;
 	std::vector<std::string> logLines;
 	char username[17] = {};

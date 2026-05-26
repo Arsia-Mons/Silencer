@@ -399,6 +399,16 @@ bool ScreenContext::LobbyMusicFadedIn() const {
 	return ambienceMixer.FadedIn();
 }
 
+void ScreenContext::SubmitLobbyCredentials(const char * username, const char * password) {
+	lobby.LockMutex();
+	if(lobby.state == Lobby::AUTHENTICATING){
+		lobby.SetLocalUsername(username ? username : "");
+		lobby.SendCredentials(username ? username : "", password ? password : "");
+		lobby.state = Lobby::AUTHSENT;
+	}
+	lobby.UnlockMutex();
+}
+
 std::string ScreenContext::LobbyGameChannelName(LobbyGame & lobbyGame) {
 	char name[256];
 	ambienceMixer.GetGameChannelName(lobbyGame, name);
