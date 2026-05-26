@@ -4,6 +4,7 @@
 #include "screen.h"
 #include "screen_context.h"
 #include "runtime/UiInputRouter.h"
+#include "runtime/react.h"
 
 #ifndef SILENCER_TEST_BUILD
 #include "audio.h"
@@ -17,6 +18,13 @@ namespace silencer {
 namespace client_ui {
 
 namespace clientui_detail {
+
+struct ScreenProviderContext {
+	ClientUi * clientUi = nullptr;
+	UiScreenEntryId currentEntryId = 0;
+};
+
+static ReactContext g_screenContextValue = {};
 
 bool IsAudibleInteractable(const silencer::ui::UiInteractable& widget) {
 	if(widget.inactive) return false;
@@ -122,6 +130,7 @@ ClientUi::~ClientUi() = default;
 void ClientUi::BeginFrame(const silencer::ui::UiInputState& input) {
 	frameCtx_.BeginFrame(input.animationDeltaSeconds, input.animationStepSeconds);
 	silencer::client_ui::HudPayloadBeginFrame();
+	ClearWrites();
 	focusInput_ = clientui_detail::FocusInputFrom(input);
 	clay_.PrepareFrame(input, interactions_);
 	silencer::ui::ui_focus_set_current(&focus_);
@@ -188,6 +197,70 @@ void ClientUi::ReplaceScreen(std::unique_ptr<Screen> screen, ScreenContext& ctx)
 	screens_.Replace(std::move(screen), ctx);
 }
 
+bool ClientUi::QueuePushScreen(std::unique_ptr<Screen> screen) {
+	if(!screen) return false;
+	QueuedWrite write;
+	write.kind = WriteKind::Push;
+	write.screen = std::move(screen);
+	return QueueWrite(std::move(write));
+}
+
+bool ClientUi::QueuePopCurrent(UiScreenEntryId entryId) {
+	if(entryId == 0) return false;
+	QueuedWrite write;
+	write.kind = WriteKind::PopCurrent;
+	write.entryId = entryId;
+	return QueueWrite(std::move(write));
+}
+
+bool ClientUi::QueuePopTop() {
+	QueuedWrite write;
+	write.kind = WriteKind::PopTop;
+	return QueueWrite(std::move(write));
+}
+
+bool ClientUi::QueueDeferredWrite(UiDeferredWrite write) {
+	if(!write) return false;
+	QueuedWrite queued;
+	queued.kind = WriteKind::Deferred;
+	queued.deferred = std::move(write);
+	return QueueWrite(std::move(queued));
+}
+
+bool ClientUi::QueueWrite(QueuedWrite write) {
+	if(writeCount_ >= CLIENT_UI_MAX_WRITES) return false;
+	writes_[writeCount_++] = std::move(write);
+	return true;
+}
+
+void ClientUi::DrainWrites(ScreenContext& ctx) {
+	for(int i = 0; i < writeCount_; ++i){
+		QueuedWrite& write = writes_[i];
+		switch(write.kind){
+			case WriteKind::Push:
+				screens_.Push(std::move(write.screen), ctx);
+				break;
+			case WriteKind::PopCurrent:
+				screens_.PopEntry(write.entryId, ctx);
+				break;
+			case WriteKind::PopTop:
+				screens_.Pop(ctx);
+				break;
+			case WriteKind::Deferred:
+				if(write.deferred) write.deferred();
+				break;
+		}
+	}
+	ClearWrites();
+}
+
+void ClientUi::ClearWrites() {
+	for(int i = 0; i < writeCount_; ++i){
+		writes_[i] = {};
+	}
+	writeCount_ = 0;
+}
+
 void ClientUi::RequestClearScreens() {
 	screens_.RequestClear();
 }
@@ -201,7 +274,51 @@ void ClientUi::TickVisibleScreens(ScreenContext& ctx) {
 }
 
 void ClientUi::BuildVisibleScreens(ScreenContext& ctx, Surface& dst, float frametime) {
-	screens_.BuildVisible(ctx, dst, frametime, interactions_);
+	screens_.BuildVisible(
+		ctx,
+		dst,
+		frametime,
+		interactions_,
+		[&](UiScreenEntryId entryId, Screen& screen, bool) {
+			clientui_detail::ScreenProviderContext provider{this, entryId};
+			REACT_PROVIDER_ENTER_KEY("ScreenProvider", entryId);
+			PROVIDE(&clientui_detail::g_screenContextValue, &provider) {
+				screen.BuildUi(ctx, dst, frametime, interactions_);
+			}
+			REACT_PROVIDER_EXIT();
+		});
+}
+
+ScreenNavigator UseScreenNavigator() {
+	auto * context = static_cast<clientui_detail::ScreenProviderContext *>(
+		use_context(&clientui_detail::g_screenContextValue));
+	if(!context || !context->clientUi) return {};
+
+	ClientUi * clientUi = context->clientUi;
+	UiScreenEntryId entryId = context->currentEntryId;
+	ScreenNavigator navigator;
+	navigator.currentEntryId = entryId;
+	navigator.push = [clientUi](std::unique_ptr<Screen> screen) {
+		clientUi->QueuePushScreen(std::move(screen));
+	};
+	navigator.popCurrent = [clientUi, entryId]() {
+		clientUi->QueuePopCurrent(entryId);
+	};
+	navigator.popTop = [clientUi]() {
+		clientUi->QueuePopTop();
+	};
+	return navigator;
+}
+
+QueueUiWrite UseUiWriteQueue() {
+	auto * context = static_cast<clientui_detail::ScreenProviderContext *>(
+		use_context(&clientui_detail::g_screenContextValue));
+	if(!context || !context->clientUi) return {};
+
+	ClientUi * clientUi = context->clientUi;
+	return [clientUi](UiDeferredWrite write) {
+		clientUi->QueueDeferredWrite(std::move(write));
+	};
 }
 
 }  // namespace client_ui

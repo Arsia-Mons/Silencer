@@ -1,6 +1,8 @@
 #pragma once
 
 #include <cstddef>
+#include <cstdint>
+#include <functional>
 #include <memory>
 #include <vector>
 
@@ -13,6 +15,10 @@ namespace ui {
 class UiInteractionRegistry;
 }
 namespace client_ui {
+
+using UiScreenEntryId = uint32_t;
+using BuildVisibleScreen =
+	std::function<void(UiScreenEntryId entryId, Screen& screen, bool overlay)>;
 
 class ScreenStack {
 public:
@@ -29,17 +35,26 @@ public:
 	void ClearIfRequested(ScreenContext& ctx);
 
 	Screen * Top() const;
+	UiScreenEntryId TopEntryId() const;
+	bool PopEntry(UiScreenEntryId entryId, ScreenContext& ctx);
 
 	void TickVisible(ScreenContext& ctx);
 	void BuildVisible(ScreenContext& ctx,
 	                  Surface& dst,
 	                  float frametime,
-	                  silencer::ui::UiInteractionRegistry& interactions);
+	                  silencer::ui::UiInteractionRegistry& interactions,
+	                  const BuildVisibleScreen& buildScreen = {});
 
 private:
+	struct Entry {
+		UiScreenEntryId entryId = 0;
+		std::unique_ptr<Screen> screen;
+	};
+
 	std::size_t VisibleStart() const;
 
-	std::vector<std::unique_ptr<Screen>> screens_;
+	std::vector<Entry> screens_;
+	UiScreenEntryId nextEntryId_ = 1;
 	bool clearRequested_ = false;
 };
 

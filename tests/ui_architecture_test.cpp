@@ -2,6 +2,7 @@
 
 #include "client/ui/ClientUi.h"
 #include "client/ui/ClientUiInput.h"
+#include "client/ui/screens/screen.h"
 #include "ui/runtime/ClayService.h"
 #include "ui/runtime/UiInputRouter.h"
 
@@ -51,6 +52,22 @@ public:
 		commands.internalArray = &command;
 		return commands;
 	}
+};
+
+class DestroyCountingScreen final : public Screen {
+public:
+	explicit DestroyCountingScreen(int * destroyCount)
+		: destroyCount_(destroyCount) {}
+	~DestroyCountingScreen() override {
+		if(destroyCount_) *destroyCount_ += 1;
+	}
+
+	void Build(ScreenContext&) override {}
+	void Tick(ScreenContext&) override {}
+	void Destroy(ScreenContext&) override {}
+
+private:
+	int * destroyCount_ = nullptr;
 };
 
 }  // namespace
@@ -106,6 +123,37 @@ TEST_CASE("ClientUi owns the frame lifecycle without demo-screen metadata") {
 	CHECK(commands.internalArray == &backend.command);
 	CHECK(clientUi.Interactions().Elements().empty());
 	CHECK(clientUi.DrainActions().empty());
+}
+
+TEST_CASE("ClientUi exposes empty provider hooks outside screen declaration") {
+	auto navigator = silencer::client_ui::UseScreenNavigator();
+	CHECK(navigator.currentEntryId == 0);
+	CHECK_FALSE(static_cast<bool>(navigator.push));
+	CHECK_FALSE(static_cast<bool>(navigator.popCurrent));
+	CHECK_FALSE(static_cast<bool>(navigator.popTop));
+
+	auto queueWrite = silencer::client_ui::UseUiWriteQueue();
+	CHECK_FALSE(static_cast<bool>(queueWrite));
+}
+
+TEST_CASE("ClientUi clears stale queued writes at the next frame boundary") {
+	RecordingClayBackend backend;
+	silencer::ui::ClayService clay(backend);
+	silencer::client_ui::ClientUi clientUi(clay);
+	int destroyCount = 0;
+
+	CHECK(clientUi.QueuePushScreen(std::make_unique<DestroyCountingScreen>(&destroyCount)));
+	CHECK(clientUi.PendingWriteCount() == 1);
+	CHECK(destroyCount == 0);
+
+	silencer::ui::UiInputState input;
+	input.width = 640;
+	input.height = 480;
+	clientUi.BeginFrame(input);
+	clientUi.EndFrame();
+
+	CHECK(clientUi.PendingWriteCount() == 0);
+	CHECK(destroyCount == 1);
 }
 
 TEST_CASE("UiInteractionRegistry supports id and case-insensitive label lookup") {

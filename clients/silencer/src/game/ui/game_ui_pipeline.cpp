@@ -180,6 +180,7 @@ SDL_StopTextInput(game.gameRenderer.GetWindow());
 }
 textInputFocused = nowFocused;
 }
+clientUi.DrainWrites(game.screenContext);
 }
 
 void GameUiPipeline::ResetUiFrameDeltas() {

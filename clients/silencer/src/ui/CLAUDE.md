@@ -17,6 +17,9 @@ This is mid-migration toward good flexbox layout, Clay lifecycle, and shadcn-sty
 - `ClientUi` owns the `UiFocusRuntime` frame lifecycle. Components may declare
   focus scopes and focusables, but they must not call `ui_focus_begin_frame`,
   `ui_focus_end_layout`, `ui_focus_set_current`, or `ui_focus_init` directly.
+- Screen-local navigation and state writes should go through ClientUi's
+  screen provider hooks (`UseScreenNavigator`, `UseUiWriteQueue`) so mutations
+  drain after layout/render instead of during declaration.
 - `UiInteractionRegistry` owns semantic metadata, focus, text editing, pointer hit testing, keyboard/gamepad navigation, automation, and typed action queuing. Clay still owns layout and final bounds.
 - Custom render payloads are the renderer bridge. Keep sprite-bank details inside payloads or existing bridge primitives; do not leak them into new public primitive APIs.
 

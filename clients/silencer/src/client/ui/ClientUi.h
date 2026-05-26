@@ -6,6 +6,8 @@
 #include "ui/runtime/UiFrameContext.h"
 #include "client/ui/navigation/ScreenStack.h"
 
+#include <array>
+#include <functional>
 #include <memory>
 #include <string>
 #include <vector>
@@ -16,6 +18,18 @@ class Surface;
 
 namespace silencer {
 namespace client_ui {
+
+constexpr int CLIENT_UI_MAX_WRITES = 128;
+
+using UiDeferredWrite = std::function<void()>;
+using QueueUiWrite = std::function<void(UiDeferredWrite)>;
+
+struct ScreenNavigator {
+	UiScreenEntryId currentEntryId = 0;
+	std::function<void(std::unique_ptr<Screen>)> push = {};
+	std::function<void()> popCurrent = {};
+	std::function<void()> popTop = {};
+};
 
 class ClientUi {
 public:
@@ -36,20 +50,48 @@ public:
 	void PushScreen(std::unique_ptr<Screen> screen, ScreenContext& ctx);
 	void PopScreen(ScreenContext& ctx);
 	void ReplaceScreen(std::unique_ptr<Screen> screen, ScreenContext& ctx);
+	bool QueuePushScreen(std::unique_ptr<Screen> screen);
+	bool QueuePopCurrent(UiScreenEntryId entryId);
+	bool QueuePopTop();
+	bool QueueDeferredWrite(UiDeferredWrite write);
+	int PendingWriteCount() const { return writeCount_; }
+	void DrainWrites(ScreenContext& ctx);
 	void RequestClearScreens();
 	void ClearScreensIfRequested(ScreenContext& ctx);
 	void TickVisibleScreens(ScreenContext& ctx);
 	void BuildVisibleScreens(ScreenContext& ctx, Surface& dst, float frametime);
 
 private:
+	enum class WriteKind {
+		Push,
+		PopCurrent,
+		PopTop,
+		Deferred,
+	};
+
+	struct QueuedWrite {
+		WriteKind kind = WriteKind::PopTop;
+		UiScreenEntryId entryId = 0;
+		std::unique_ptr<Screen> screen = nullptr;
+		UiDeferredWrite deferred = {};
+	};
+
+	bool QueueWrite(QueuedWrite write);
+	void ClearWrites();
+
 	silencer::ui::UiFrameContext frameCtx_;
 	silencer::ui::ClayService& clay_;
 	silencer::ui::UiInteractionRegistry interactions_;
 	silencer::ui::UiFocusRuntime focus_;
 	silencer::ui::UiFocusInputFrame focusInput_;
 	ScreenStack screens_;
+	std::array<QueuedWrite, CLIENT_UI_MAX_WRITES> writes_;
+	int writeCount_ = 0;
 	std::string hoveredAudioInteractableId_;
 };
+
+ScreenNavigator UseScreenNavigator();
+QueueUiWrite UseUiWriteQueue();
 
 }  // namespace client_ui
 }  // namespace silencer
