@@ -113,7 +113,7 @@ struct ReplacementLifecycleProbe {
 	int buildCount = 0;
 };
 
-void ObserveReplacementBuild(Screen& screen, ScreenContext *, void * userData) {
+void ObserveLifecycleBuild(Screen& screen, ScreenContext *, void * userData) {
 	auto * probe = static_cast<ReplacementLifecycleProbe *>(userData);
 	if(!probe) return;
 	probe->buildCount += 1;
@@ -395,12 +395,27 @@ TEST_CASE("ClientUi exposes dropped write queue overflow") {
 	CHECK(clientUi.WriteOverflowCount() == 1);
 }
 
-TEST_CASE("ScreenStack replacement lifecycle validates before popping and keeps stable top during build") {
+TEST_CASE("ScreenStack retains pushed screen before lifecycle build") {
 	silencer::client_ui::ScreenStack stack;
-	HookProbeStats baseStats;
+	ReplacementLifecycleProbe probe;
+	probe.stack_ = &stack;
+	auto pushed = std::make_unique<HookProbeScreen>(nullptr);
+	Screen * pushedScreen = pushed.get();
+
+	CHECK(stack.PushWithLifecycleForTest(std::move(pushed), ObserveLifecycleBuild, &probe));
+
+	CHECK(probe.buildCount == 1);
+	CHECK(probe.observedTop == pushedScreen);
+	CHECK(probe.observedBuiltEntryId != 0);
+	CHECK(stack.Top() == pushedScreen);
+	CHECK(stack.TopEntryId() == probe.observedBuiltEntryId);
+	CHECK(pushedScreen->EntryId() == probe.observedBuiltEntryId);
+}
+
+TEST_CASE("ScreenStack replacement lifecycle validates before mutation and retains replacement during build") {
+	silencer::client_ui::ScreenStack stack;
 	HookProbeStats firstStats;
-	auto base = std::make_unique<HookProbeScreen>(&baseStats);
-	Screen * baseScreen = base.get();
+	auto base = std::make_unique<HookProbeScreen>(nullptr);
 	auto first = std::make_unique<HookProbeScreen>(&firstStats);
 	Screen * firstScreen = first.get();
 	ReplacementLifecycleProbe probe;
@@ -411,14 +426,14 @@ TEST_CASE("ScreenStack replacement lifecycle validates before popping and keeps 
 	CHECK(stack.PushBuiltForTest(std::move(base)));
 	CHECK(stack.PushBuiltForTest(std::move(first)));
 	CHECK(stack.Top() == firstScreen);
-	CHECK_FALSE(stack.ReplaceWithLifecycleForTest(nullptr, ObserveReplacementBuild, nullptr, &probe));
+	CHECK_FALSE(stack.ReplaceWithLifecycleForTest(nullptr, ObserveLifecycleBuild, nullptr, &probe));
 	CHECK(stack.Top() == firstScreen);
 	CHECK(firstStats.destructorCount == 0);
 
 	CHECK(stack.ReplaceWithLifecycleForTest(
-		std::move(replacement), ObserveReplacementBuild, nullptr, &probe));
+		std::move(replacement), ObserveLifecycleBuild, nullptr, &probe));
 	CHECK(probe.buildCount == 1);
-	CHECK(probe.observedTop == baseScreen);
+	CHECK(probe.observedTop == replacementScreen);
 	CHECK(probe.observedBuiltEntryId != 0);
 	CHECK(stack.Top() == replacementScreen);
 	CHECK(stack.TopEntryId() == probe.observedBuiltEntryId);

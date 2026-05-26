@@ -48,9 +48,10 @@ bool ScreenStack::PushWithLifecycle(std::unique_ptr<Screen> screen,
 	}
 	const UiScreenEntryId entryId = nextEntryId_++;
 	screen->SetEntryId(entryId);
-	if(build) build(*screen, ctx, userData);
+	Screen * builtScreen = screen.get();
 	Entry& entry = screens_[count_++];
 	entry.screen = std::move(screen);
+	if(build) build(*builtScreen, ctx, userData);
 	return true;
 }
 
@@ -73,8 +74,16 @@ bool ScreenStack::ReplaceWithLifecycle(std::unique_ptr<Screen> screen,
                                        LifecycleCallback destroy) {
 	if(!screen) return false;
 	if(count_ <= 0) return PushWithLifecycle(std::move(screen), ctx, userData, build);
-	if(!PopWithLifecycle(ctx, userData, destroy)) return false;
-	return PushWithLifecycle(std::move(screen), ctx, userData, build);
+	Entry& entry = screens_[count_ - 1];
+	if(entry.screen && destroy) destroy(*entry.screen, ctx, userData);
+	if(entry.screen) entry.screen->SetEntryId(0);
+
+	const UiScreenEntryId entryId = nextEntryId_++;
+	screen->SetEntryId(entryId);
+	Screen * replacement = screen.get();
+	entry.screen = std::move(screen);
+	if(build) build(*replacement, ctx, userData);
+	return true;
 }
 
 void ScreenStack::Clear(ScreenContext& ctx) {
@@ -156,6 +165,12 @@ void ScreenStack::TickVisible(ScreenContext& ctx) {
 #ifdef SILENCER_TEST_BUILD
 bool ScreenStack::PushBuiltForTest(std::unique_ptr<Screen> screen) {
 	return PushWithLifecycle(std::move(screen), nullptr, nullptr, nullptr);
+}
+
+bool ScreenStack::PushWithLifecycleForTest(std::unique_ptr<Screen> screen,
+                                           LifecycleCallback build,
+                                           void * userData) {
+	return PushWithLifecycle(std::move(screen), nullptr, userData, build);
 }
 
 bool ScreenStack::PopForTest() {

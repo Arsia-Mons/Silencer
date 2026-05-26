@@ -56,6 +56,9 @@ public:
 
 #ifdef SILENCER_TEST_BUILD
 	bool PushBuiltForTest(std::unique_ptr<Screen> screen);
+	bool PushWithLifecycleForTest(std::unique_ptr<Screen> screen,
+	                              LifecycleCallback build,
+	                              void * userData);
 	bool PopForTest();
 	bool ReplaceWithLifecycleForTest(std::unique_ptr<Screen> screen,
 	                                 LifecycleCallback build,
