@@ -17,11 +17,14 @@ void FireFrameEvent(const std::string& event,
         Platform* _cp = platformId ? world.map.platformids[platformId] : nullptr;
         const auto& mat = GASLoader::Get().GetPhysicsMaterialDef(
             _cp ? static_cast<uint8_t>(_cp->physicsMaterial) : 0);
-        const std::string& actorOv = adef
-            ? (isLeft ? adef->footstepL : adef->footstepR)
-            : std::string{};
-        const std::string& matCue = isLeft ? mat.footstepL : mat.footstepR;
-        const std::string& cue = !actorOv.empty() ? actorOv : matCue;
+        std::string cue;
+        if (adef && !adef->footstepOverrides.empty()) {
+            auto it = adef->footstepOverrides.find(mat.name);
+            if (it != adef->footstepOverrides.end())
+                cue = isLeft ? it->second.walkL : it->second.walkR;
+        }
+        if (cue.empty())
+            cue = isLeft ? mat.footstepL : mat.footstepR;
         auto r = ResolveSound(cue, world.resources);
         if (r.chunk) actor.EmitSound(world, r.chunk, static_cast<int>(baseVol * r.volume));
         return;

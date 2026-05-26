@@ -24,6 +24,7 @@
 // speedMult: multiplier on runSpeed cap while on this surface (1.0 = normal)
 // Sound fields that are empty fall back to footstepL/R (flat walk variants).
 struct PhysicsMaterialDef {
+    std::string name;           // e.g. "Concrete", "MetalSolid"
     float       friction        = 1.0f;
     float       speedMult       = 1.0f;
     std::string footstepL;

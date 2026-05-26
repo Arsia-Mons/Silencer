@@ -116,12 +116,13 @@ static bool ParseActorDef(const std::string& path, ActorDef& out) {
 		out.id = j.at("id").get<std::string>();
 		if (j.contains("footsteps")) {
 			const auto& fs = j["footsteps"];
-			out.footstepL       = fs.value("walkL",   std::string{});
-			out.footstepR       = fs.value("walkR",   std::string{});
-			out.footstepCrouchL = fs.value("crouchL", std::string{});
-			out.footstepCrouchR = fs.value("crouchR", std::string{});
-			out.footstepStairL  = fs.value("stairL",  std::string{});
-			out.footstepStairR  = fs.value("stairR",  std::string{});
+			out.footstepOverrides.clear();
+			for (auto& [matName, ov] : fs.items()) {
+				ActorFootstepOverride o;
+				o.walkL = ov.value("walkL", std::string{});
+				o.walkR = ov.value("walkR", std::string{});
+				out.footstepOverrides[matName] = std::move(o);
+			}
 		}
 		if (j.contains("sequences")) {
 			for (auto it = j["sequences"].begin(); it != j["sequences"].end(); ++it) {
@@ -257,12 +258,13 @@ int FetchActorDefs(const char* apiBase,
 			def.id = id;
 			if (j.contains("footsteps")) {
 				const auto& fs = j["footsteps"];
-				def.footstepL       = fs.value("walkL",   std::string{});
-				def.footstepR       = fs.value("walkR",   std::string{});
-				def.footstepCrouchL = fs.value("crouchL", std::string{});
-				def.footstepCrouchR = fs.value("crouchR", std::string{});
-				def.footstepStairL  = fs.value("stairL",  std::string{});
-				def.footstepStairR  = fs.value("stairR",  std::string{});
+				def.footstepOverrides.clear();
+				for (auto& [matName, ov] : fs.items()) {
+					ActorFootstepOverride o;
+					o.walkL = ov.value("walkL", std::string{});
+					o.walkR = ov.value("walkR", std::string{});
+					def.footstepOverrides[matName] = std::move(o);
+				}
 			}
 			if (j.contains("sequences")) {
 				for (auto it = j["sequences"].begin(); it != j["sequences"].end(); ++it) {

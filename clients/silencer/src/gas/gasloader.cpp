@@ -761,6 +761,7 @@ static void LoadPhysicsMaterials(const std::string& dir,
                 continue;
             }
             PhysicsMaterialDef def;
+            def.name        = id;
             def.friction        = m.value("friction",       1.0f);
             def.speedMult       = m.value("speedMult",      1.0f);
             def.footstepL       = m.value("footstepL",       std::string{});
