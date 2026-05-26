@@ -27,9 +27,9 @@ void DrawInGameWorldInsets(Surface & surface, float frametime);
 void RenderClientUiFrame(Surface & surface, float frametime);
 void ResetUiFrameDeltas();
 bool HasInputTarget();
-void Push(std::unique_ptr<Screen> s);
-void Pop();
-void Replace(std::unique_ptr<Screen> s);
+bool Push(std::unique_ptr<Screen> s);
+bool Pop();
+bool Replace(std::unique_ptr<Screen> s);
 Screen * Top() const;
 void QueueKeyboardInputForScancode(int scancode, const Uint8 * keystate,
 const KeyMap & keymap, const GamepadState & gamepadstate);

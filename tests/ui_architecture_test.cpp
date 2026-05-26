@@ -330,7 +330,8 @@ TEST_CASE("ClientUi popCurrent drains by screen entry id instead of top screen")
 TEST_CASE("ScreenStack exposes bounded visible screen span") {
 	silencer::client_ui::ScreenStack stack;
 	for(int i = 0; i < silencer::client_ui::CLIENT_UI_MAX_SCREENS + 3; ++i){
-		stack.PushBuiltForTest(std::make_unique<HookProbeScreen>(nullptr, true));
+		const bool pushed = stack.PushBuiltForTest(std::make_unique<HookProbeScreen>(nullptr, true));
+		CHECK(pushed == (i < silencer::client_ui::CLIENT_UI_MAX_SCREENS));
 	}
 
 	CHECK(stack.Size() == silencer::client_ui::CLIENT_UI_MAX_SCREENS);
@@ -342,6 +343,45 @@ TEST_CASE("ScreenStack exposes bounded visible screen span") {
 		CHECK(visible[i].overlay);
 		CHECK(visible[i].visibleIndex == i);
 	}
+}
+
+TEST_CASE("ClientUi exposes screen stack overflow from drained writes") {
+	RecordingClayBackend backend;
+	silencer::ui::ClayService clay(backend);
+	silencer::client_ui::ClientUi clientUi(clay);
+
+	for(int i = 0; i < silencer::client_ui::CLIENT_UI_MAX_SCREENS; ++i){
+		CHECK(clientUi.PushBuiltScreenForTest(std::make_unique<HookProbeScreen>(nullptr, true)));
+	}
+	CHECK(clientUi.ScreenStackOverflowCount() == 0);
+	CHECK(clientUi.QueuePushScreen(std::make_unique<HookProbeScreen>(nullptr, true)));
+	CHECK(clientUi.PendingWriteCount() == 1);
+
+	clientUi.DrainWritesForTest();
+
+	CHECK(clientUi.PendingWriteCount() == 0);
+	CHECK(clientUi.ScreenStackOverflowCount() == 1);
+}
+
+TEST_CASE("ScreenStack replacement rejects null without popping current screen") {
+	silencer::client_ui::ScreenStack stack;
+	HookProbeStats firstStats;
+	HookProbeStats secondStats;
+	auto first = std::make_unique<HookProbeScreen>(&firstStats);
+	Screen * firstScreen = first.get();
+	auto second = std::make_unique<HookProbeScreen>(&secondStats);
+	Screen * secondScreen = second.get();
+
+	CHECK(stack.PushBuiltForTest(std::move(first)));
+	CHECK(stack.Top() == firstScreen);
+	CHECK_FALSE(stack.ReplaceBuiltForTest(nullptr));
+	CHECK(stack.Top() == firstScreen);
+	CHECK(firstStats.destructorCount == 0);
+
+	CHECK(stack.ReplaceBuiltForTest(std::move(second)));
+	CHECK(stack.Top() == secondScreen);
+	CHECK(firstStats.destructorCount == 1);
+	CHECK(secondStats.destructorCount == 0);
 }
 
 TEST_CASE("GameUiFrame provider exposes frame data during screen declaration") {

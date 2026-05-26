@@ -9,30 +9,42 @@ namespace client_ui {
 
 ScreenStack::~ScreenStack() = default;
 
-void ScreenStack::Push(std::unique_ptr<Screen> screen, ScreenContext& ctx) {
-	if(!screen) return;
+bool ScreenStack::Push(std::unique_ptr<Screen> screen, ScreenContext& ctx) {
+	if(!screen) return false;
 	if(count_ >= CLIENT_UI_MAX_SCREENS) {
 		++overflowCount_;
-		return;
+		return false;
 	}
 	screen->Build(ctx);
 	Entry& entry = screens_[count_++];
 	entry.entryId = nextEntryId_++;
 	entry.screen = std::move(screen);
+	return true;
 }
 
-void ScreenStack::Pop(ScreenContext& ctx) {
-	if(count_ <= 0) return;
+bool ScreenStack::Pop(ScreenContext& ctx) {
+	if(count_ <= 0) return false;
 	Entry& entry = screens_[count_ - 1];
 	if(entry.screen) entry.screen->Destroy(ctx);
 	entry.screen.reset();
 	entry.entryId = 0;
 	--count_;
+	return true;
 }
 
-void ScreenStack::Replace(std::unique_ptr<Screen> screen, ScreenContext& ctx) {
-	Pop(ctx);
-	Push(std::move(screen), ctx);
+bool ScreenStack::Replace(std::unique_ptr<Screen> screen, ScreenContext& ctx) {
+	if(!screen) return false;
+	if(count_ <= 0) return Push(std::move(screen), ctx);
+
+	Entry& entry = screens_[count_ - 1];
+	if(entry.screen) entry.screen->Destroy(ctx);
+	entry.screen.reset();
+	entry.entryId = 0;
+
+	screen->Build(ctx);
+	entry.entryId = nextEntryId_++;
+	entry.screen = std::move(screen);
+	return true;
 }
 
 void ScreenStack::Clear(ScreenContext& ctx) {
@@ -110,22 +122,33 @@ void ScreenStack::TickVisible(ScreenContext& ctx) {
 }
 
 #ifdef SILENCER_TEST_BUILD
-void ScreenStack::PushBuiltForTest(std::unique_ptr<Screen> screen) {
-	if(!screen) return;
+bool ScreenStack::PushBuiltForTest(std::unique_ptr<Screen> screen) {
+	if(!screen) return false;
 	if(count_ >= CLIENT_UI_MAX_SCREENS) {
 		++overflowCount_;
-		return;
+		return false;
 	}
 	Entry& entry = screens_[count_++];
 	entry.entryId = nextEntryId_++;
 	entry.screen = std::move(screen);
+	return true;
 }
 
-void ScreenStack::PopForTest() {
-	if(count_ <= 0) return;
+bool ScreenStack::PopForTest() {
+	if(count_ <= 0) return false;
 	screens_[count_ - 1].screen.reset();
 	screens_[count_ - 1].entryId = 0;
 	--count_;
+	return true;
+}
+
+bool ScreenStack::ReplaceBuiltForTest(std::unique_ptr<Screen> screen) {
+	if(!screen) return false;
+	if(count_ <= 0) return PushBuiltForTest(std::move(screen));
+	screens_[count_ - 1].screen.reset();
+	screens_[count_ - 1].entryId = nextEntryId_++;
+	screens_[count_ - 1].screen = std::move(screen);
+	return true;
 }
 
 bool ScreenStack::PopEntryForTest(UiScreenEntryId entryId) {

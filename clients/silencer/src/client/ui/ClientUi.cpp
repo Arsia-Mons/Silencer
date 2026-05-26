@@ -186,16 +186,16 @@ std::vector<silencer::ui::UiAction> ClientUi::DrainActions() {
 	return interactions_.DrainActions();
 }
 
-void ClientUi::PushScreen(std::unique_ptr<Screen> screen, ScreenContext& ctx) {
-	screens_.Push(std::move(screen), ctx);
+bool ClientUi::PushScreen(std::unique_ptr<Screen> screen, ScreenContext& ctx) {
+	return screens_.Push(std::move(screen), ctx);
 }
 
-void ClientUi::PopScreen(ScreenContext& ctx) {
-	screens_.Pop(ctx);
+bool ClientUi::PopScreen(ScreenContext& ctx) {
+	return screens_.Pop(ctx);
 }
 
-void ClientUi::ReplaceScreen(std::unique_ptr<Screen> screen, ScreenContext& ctx) {
-	screens_.Replace(std::move(screen), ctx);
+bool ClientUi::ReplaceScreen(std::unique_ptr<Screen> screen, ScreenContext& ctx) {
+	return screens_.Replace(std::move(screen), ctx);
 }
 
 bool ClientUi::QueuePushScreen(std::unique_ptr<Screen> screen) {
@@ -337,8 +337,12 @@ void ClientUi::BuildVisibleScreens(ScreenContext& ctx, Surface& dst, float frame
 }
 
 #ifdef SILENCER_TEST_BUILD
-void ClientUi::PushBuiltScreenForTest(std::unique_ptr<Screen> screen) {
-	screens_.PushBuiltForTest(std::move(screen));
+bool ClientUi::PushBuiltScreenForTest(std::unique_ptr<Screen> screen) {
+	return screens_.PushBuiltForTest(std::move(screen));
+}
+
+bool ClientUi::ReplaceBuiltScreenForTest(std::unique_ptr<Screen> screen) {
+	return screens_.ReplaceBuiltForTest(std::move(screen));
 }
 
 void ClientUi::BuildVisibleScreenProvidersForTest(

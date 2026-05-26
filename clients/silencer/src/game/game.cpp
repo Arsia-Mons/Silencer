@@ -33,16 +33,16 @@ void Game::LeaveJoinedGame() {
 gameSession.LeaveJoinedGame();
 }
 
-void Game::PushScreen(std::unique_ptr<Screen> s) {
-gameUiPipeline.Push(std::move(s));
+bool Game::PushScreen(std::unique_ptr<Screen> s) {
+return gameUiPipeline.Push(std::move(s));
 }
 
-void Game::PopScreen() {
-gameUiPipeline.Pop();
+bool Game::PopScreen() {
+return gameUiPipeline.Pop();
 }
 
-void Game::ReplaceScreen(std::unique_ptr<Screen> s) {
-gameUiPipeline.Replace(std::move(s));
+bool Game::ReplaceScreen(std::unique_ptr<Screen> s) {
+return gameUiPipeline.Replace(std::move(s));
 }
 
 Screen * Game::GetTopScreen() const {

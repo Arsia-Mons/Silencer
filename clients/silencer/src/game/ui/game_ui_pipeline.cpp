@@ -211,16 +211,16 @@ if(Top()) return true;
 return inGameUiController.HasInputTarget(game.world.peers.localpeerid);
 }
 
-void GameUiPipeline::Push(std::unique_ptr<Screen> s){
-clientUi.PushScreen(std::move(s), game.screenContext);
+bool GameUiPipeline::Push(std::unique_ptr<Screen> s){
+return clientUi.PushScreen(std::move(s), game.screenContext);
 }
 
-void GameUiPipeline::Pop(){
-clientUi.PopScreen(game.screenContext);
+bool GameUiPipeline::Pop(){
+return clientUi.PopScreen(game.screenContext);
 }
 
-void GameUiPipeline::Replace(std::unique_ptr<Screen> s){
-clientUi.ReplaceScreen(std::move(s), game.screenContext);
+bool GameUiPipeline::Replace(std::unique_ptr<Screen> s){
+return clientUi.ReplaceScreen(std::move(s), game.screenContext);
 }
 
 Screen * GameUiPipeline::Top() const {

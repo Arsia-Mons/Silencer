@@ -38,9 +38,9 @@ public:
 	std::size_t Size() const { return static_cast<std::size_t>(count_); }
 	int OverflowCount() const { return overflowCount_; }
 
-	void Push(std::unique_ptr<Screen> screen, ScreenContext& ctx);
-	void Pop(ScreenContext& ctx);
-	void Replace(std::unique_ptr<Screen> screen, ScreenContext& ctx);
+	bool Push(std::unique_ptr<Screen> screen, ScreenContext& ctx);
+	bool Pop(ScreenContext& ctx);
+	bool Replace(std::unique_ptr<Screen> screen, ScreenContext& ctx);
 	void Clear(ScreenContext& ctx);
 	void RequestClear();
 	void ClearIfRequested(ScreenContext& ctx);
@@ -53,8 +53,9 @@ public:
 	void TickVisible(ScreenContext& ctx);
 
 #ifdef SILENCER_TEST_BUILD
-	void PushBuiltForTest(std::unique_ptr<Screen> screen);
-	void PopForTest();
+	bool PushBuiltForTest(std::unique_ptr<Screen> screen);
+	bool PopForTest();
+	bool ReplaceBuiltForTest(std::unique_ptr<Screen> screen);
 	bool PopEntryForTest(UiScreenEntryId entryId);
 #endif
 

@@ -47,14 +47,15 @@ public:
 
 	bool HasScreens() const { return !screens_.Empty(); }
 	Screen * TopScreen() const { return screens_.Top(); }
-	void PushScreen(std::unique_ptr<Screen> screen, ScreenContext& ctx);
-	void PopScreen(ScreenContext& ctx);
-	void ReplaceScreen(std::unique_ptr<Screen> screen, ScreenContext& ctx);
+	bool PushScreen(std::unique_ptr<Screen> screen, ScreenContext& ctx);
+	bool PopScreen(ScreenContext& ctx);
+	bool ReplaceScreen(std::unique_ptr<Screen> screen, ScreenContext& ctx);
 	bool QueuePushScreen(std::unique_ptr<Screen> screen);
 	bool QueuePopCurrent(UiScreenEntryId entryId);
 	bool QueuePopTop();
 	bool QueueDeferredWrite(UiDeferredWrite write);
 	int PendingWriteCount() const { return writeCount_; }
+	int ScreenStackOverflowCount() const { return screens_.OverflowCount(); }
 	void DrainWrites(ScreenContext& ctx);
 	void RequestClearScreens();
 	void ClearScreensIfRequested(ScreenContext& ctx);
@@ -62,7 +63,8 @@ public:
 	void BuildVisibleScreens(ScreenContext& ctx, Surface& dst, float frametime);
 
 #ifdef SILENCER_TEST_BUILD
-	void PushBuiltScreenForTest(std::unique_ptr<Screen> screen);
+	bool PushBuiltScreenForTest(std::unique_ptr<Screen> screen);
+	bool ReplaceBuiltScreenForTest(std::unique_ptr<Screen> screen);
 	void BuildVisibleScreenProvidersForTest(
 		const std::function<void(UiScreenEntryId entryId, Screen& screen)>& buildScreen);
 	void BuildVisibleScreenFramesForTest(

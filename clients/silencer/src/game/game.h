@@ -76,9 +76,9 @@ int tuiInputPort;
 bool headless;
 bool tui;
 
-void PushScreen(std::unique_ptr<Screen> s);
-void PopScreen();
-void ReplaceScreen(std::unique_ptr<Screen> s);
+bool PushScreen(std::unique_ptr<Screen> s);
+bool PopScreen();
+bool ReplaceScreen(std::unique_ptr<Screen> s);
 Screen * GetTopScreen() const;
 bool HasUiInputTarget();
 
