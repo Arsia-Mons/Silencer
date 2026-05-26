@@ -39,12 +39,12 @@ int ScaleLegacyPx(int base,
 	return ClampInt(scaled, minValue, maxValue);
 }
 
-	void AddPanelBorderBlur(ScreenContext & ctx, SDL_Rect rect) {
-		if(rect.w <= 0 || rect.h <= 0) return;
-		ctx.AddLobbyPanelBorderBlurRect({ rect.x, rect.y, rect.w, 1 });
-		ctx.AddLobbyPanelBorderBlurRect({ rect.x, rect.y + rect.h - 1, rect.w, 1 });
-		ctx.AddLobbyPanelBorderBlurRect({ rect.x, rect.y, 1, rect.h });
-		ctx.AddLobbyPanelBorderBlurRect({ rect.x + rect.w - 1, rect.y, 1, rect.h });
+	void AddPanelBorderBlur(ScreenContext & ctx, int x, int y, int w, int h) {
+		if(w <= 0 || h <= 0) return;
+		ctx.AddLobbyPanelBorderBlurRect(x, y, w, 1);
+		ctx.AddLobbyPanelBorderBlurRect(x, y + h - 1, w, 1);
+		ctx.AddLobbyPanelBorderBlurRect(x, y, 1, h);
+		ctx.AddLobbyPanelBorderBlurRect(x + w - 1, y, 1, h);
 	}
 
 }  // namespace lobby_screen_detail
@@ -134,7 +134,10 @@ void LobbyScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime, s
 		ctx.BeginLobbyPanelBorderBlur(layoutWidth, layoutHeight, input.uiScale);
 		lobby_screen_detail::AddPanelBorderBlur(
 			ctx,
-			SDL_Rect{ rootPadX, rootPadTop, bodyW, (int)titleBarH });
+			rootPadX,
+			rootPadTop,
+			bodyW,
+			static_cast<int>(titleBarH));
 
 	CLAY({ .id = CLAY_ID("LobbyRoot"),
 	       .layout = {

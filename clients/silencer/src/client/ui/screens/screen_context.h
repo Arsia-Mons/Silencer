@@ -3,7 +3,6 @@
 
 #include <SDL3/SDL_stdinc.h>
 #include <SDL3/SDL_gamepad.h>
-#include <SDL3/SDL_rect.h>
 #include <functional>
 #include <memory>
 
@@ -22,11 +21,11 @@ class Surface;
 class LobbyGame;
 struct SDL_Window;
 
-// Bag of refs that screens use to reach the global subsystems (World,
-// Renderer, Lobby, Updater, KeyMap, AmbienceMixer, the SDL window /
-// RenderDevice) plus narrow state-machine / screen-stack actions that touch
-// Game itself. Per-screen behavior lives in the screen, not here. Screen code
-// must reach Game only through named ScreenContext handoffs.
+// Bag of refs that screens use to reach transitional global subsystems
+// (World, Lobby, Updater, KeyMap, AmbienceMixer, MapDownloader) plus narrow
+// handoffs for Game, renderer, window, render-device, and screen-stack actions.
+// Per-screen behavior lives in the screen, not here; private backing services
+// must be exposed only through named ScreenContext methods.
 class ScreenContext
 {
 	Game & game;
@@ -84,7 +83,7 @@ public:
 	void SetWindowFullscreen(bool fullscreen);
 	void SetScaleFilter(bool enabled);
 	void BeginLobbyPanelBorderBlur(int width, int height, float uiScale);
-	void AddLobbyPanelBorderBlurRect(SDL_Rect rect);
+	void AddLobbyPanelBorderBlurRect(int x, int y, int w, int h);
 
 	// Clay frame ownership lives in Game/ClientUi. Screens declare UI through
 	// Screen::BuildUi only; they must not begin/end or render Clay directly.

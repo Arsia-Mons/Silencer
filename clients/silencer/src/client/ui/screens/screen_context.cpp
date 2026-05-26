@@ -102,7 +102,7 @@ void ScreenContext::BeginLobbyPanelBorderBlur(int width, int height, float uiSca
 	if(renderdevice) renderdevice->BeginLobbyPanelBorderBlur(width, height, uiScale);
 }
 
-void ScreenContext::AddLobbyPanelBorderBlurRect(SDL_Rect rect) {
-	if(!renderdevice || rect.w <= 0 || rect.h <= 0) return;
-	renderdevice->AddLobbyPanelBorderBlurRect(rect);
+void ScreenContext::AddLobbyPanelBorderBlurRect(int x, int y, int w, int h) {
+	if(!renderdevice || w <= 0 || h <= 0) return;
+	renderdevice->AddLobbyPanelBorderBlurRect(SDL_Rect{ x, y, w, h });
 }

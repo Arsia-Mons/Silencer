@@ -84,8 +84,8 @@ struct LobbySteppedPaneLayout {
 	int chatH = kLegacyBodyH - 121 - 10;
 };
 
-	void AddBorderBlurRect(ScreenContext & ctx, SDL_Rect rect) {
-		ctx.AddLobbyPanelBorderBlurRect(rect);
+	void AddBorderBlurRect(ScreenContext & ctx, int x, int y, int w, int h) {
+		ctx.AddLobbyPanelBorderBlurRect(x, y, w, h);
 	}
 
 	void AddPanelBorderBlur(ScreenContext & ctx,
@@ -96,16 +96,16 @@ struct LobbySteppedPaneLayout {
 	                        Uint8 sides) {
 		if(w <= 0 || h <= 0) return;
 		if(sides & BoxSides::Top){
-			AddBorderBlurRect(ctx, SDL_Rect{ x, y, w, 1 });
+			AddBorderBlurRect(ctx, x, y, w, 1);
 		}
 		if(sides & BoxSides::Bottom){
-			AddBorderBlurRect(ctx, SDL_Rect{ x, y + h - 1, w, 1 });
+			AddBorderBlurRect(ctx, x, y + h - 1, w, 1);
 		}
 		if(sides & BoxSides::Left){
-			AddBorderBlurRect(ctx, SDL_Rect{ x, y, 1, h });
+			AddBorderBlurRect(ctx, x, y, 1, h);
 		}
 		if(sides & BoxSides::Right){
-			AddBorderBlurRect(ctx, SDL_Rect{ x + w - 1, y, 1, h });
+			AddBorderBlurRect(ctx, x + w - 1, y, 1, h);
 		}
 	}
 
