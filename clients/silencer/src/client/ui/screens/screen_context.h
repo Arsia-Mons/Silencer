@@ -40,10 +40,10 @@ public:
 	              Lobby & lobby,
 	              KeyMap & keymap,
 	              Updater & updater,
-		              AmbienceMixer & ambienceMixer,
-		              MapDownloader & mapDownloader,
-		              SDL_Window * & window,
-		              RenderDevice * & renderdevice);
+	              AmbienceMixer & ambienceMixer,
+	              MapDownloader & mapDownloader,
+	              SDL_Window * & window,
+	              RenderDevice * & renderdevice);
 
 	World &    world;
 	Lobby &    lobby;

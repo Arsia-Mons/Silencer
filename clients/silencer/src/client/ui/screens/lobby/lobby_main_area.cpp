@@ -113,34 +113,34 @@ void QueueLobbyPanelBorderBlurRects(ScreenContext & ctx,
                                     int bodyX,
                                     int bodyY,
                                     const LobbySteppedPaneLayout & layout) {
-		const int topY = bodyY;
+	const int topY = bodyY;
 	const int lowerY = bodyY + layout.upperH + layout.regionGap;
 	const int rightX = bodyX + layout.topRowW;
 	const int characterX = bodyX;
 	const int rightUpperX = bodyX + layout.characterW + layout.regionGap;
 	const int seamX = bodyX + layout.topRowW - layout.regionGap;
 
-		AddPanelBorderBlur(ctx,
-		                   characterX, topY,
+	AddPanelBorderBlur(ctx,
+	                   characterX, topY,
 	                   layout.characterW, layout.upperH,
 	                   BoxSides::All);
-		AddPanelBorderBlur(ctx,
+	AddPanelBorderBlur(ctx,
 	                   rightUpperX, topY,
 	                   layout.rightUpperW, layout.upperH,
 	                   static_cast<Uint8>(BoxSides::Top | BoxSides::Bottom | BoxSides::Left));
-		AddPanelBorderBlur(ctx,
+	AddPanelBorderBlur(ctx,
 	                   seamX, bodyY + layout.upperH,
 	                   layout.regionGap, layout.regionGap,
 	                   BoxSides::Right);
-		AddPanelBorderBlur(ctx,
+	AddPanelBorderBlur(ctx,
 	                   bodyX, lowerY,
 	                   layout.chatW, layout.chatH,
 	                   BoxSides::All);
-		AddPanelBorderBlur(ctx,
+	AddPanelBorderBlur(ctx,
 	                   seamX, lowerY,
 	                   layout.regionGap, layout.chatH,
 	                   BoxSides::Right);
-		AddPanelBorderBlur(ctx,
+	AddPanelBorderBlur(ctx,
 	                   rightX, bodyY,
 	                   layout.rightTallW, layout.rightTallH,
 	                   static_cast<Uint8>(BoxSides::Top | BoxSides::Bottom | BoxSides::Right));

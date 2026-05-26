@@ -141,6 +141,21 @@ fail_if_match \
   "$REPO_ROOT/clients/silencer/src/client/ui/modals" \
   --glob '!**/screen_context.cpp'
 
+screen_context_header="$REPO_ROOT/clients/silencer/src/client/ui/screens/screen_context.h"
+if awk '
+  /class ScreenContext/ { in_screen_context = 1; seen_public = 0 }
+  in_screen_context && /^[[:space:]]*public:[[:space:]]*$/ { seen_public = 1 }
+  in_screen_context && /^};/ { in_screen_context = 0 }
+  in_screen_context && seen_public && /^[[:space:]]*Game[[:space:]]*&[[:space:]]*game[[:space:]]*;/ { found = 1 }
+  in_screen_context && seen_public && /^[[:space:]]*Renderer[[:space:]]*&[[:space:]]*renderer[[:space:]]*;/ { found = 1 }
+  in_screen_context && seen_public && /^[[:space:]]*SDL_Window[[:space:]]*\*[[:space:]]*&[[:space:]]*window[[:space:]]*;/ { found = 1 }
+  in_screen_context && seen_public && /^[[:space:]]*RenderDevice[[:space:]]*\*[[:space:]]*&[[:space:]]*renderdevice[[:space:]]*;/ { found = 1 }
+  END { exit(found ? 0 : 1) }
+' "$screen_context_header"; then
+  echo "ScreenContext backing Game/Renderer/window/render-device refs must stay private" >&2
+  exit 1
+fi
+
 fail_if_match \
   '#include[[:space:]]*"renderdevice[.]h"' \
   "$REPO_ROOT/clients/silencer/src/client/ui/screens" \
