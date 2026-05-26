@@ -166,11 +166,6 @@ public:
 		std::array<std::string, 3> peerNames{};
 		std::vector<LobbyTechGridRow> rows;
 	};
-	struct LobbyTechItemDetails {
-		bool found = false;
-		std::string title;
-		std::array<std::string, 8> descriptionLines{};
-	};
 	struct UiSpriteFrameMetrics {
 		int offsetX = 0;
 		int offsetY = 0;
@@ -276,8 +271,6 @@ public:
 	bool LobbyJoinReadyBlocked();
 	std::vector<LobbyJoinRosterRow> LobbyJoinRosterRows() const;
 	LobbyTechSnapshot CurrentLobbyTechSnapshot();
-	LobbyTechItemDetails LobbyTechItemDetailsForIndex(int itemIndex) const;
-	void ToggleLobbyTechChoice(int itemIndex);
 	void BeginCreateGameMapUpload(const std::string & gameName,
 	                              const std::string & mapName,
 	                              const std::string & password,

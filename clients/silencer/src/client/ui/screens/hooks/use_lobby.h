@@ -1,5 +1,6 @@
 #pragma once
 
+#include <array>
 #include <functional>
 #include <memory>
 #include <string>
@@ -19,6 +20,17 @@ struct LobbyGameJoinActions {
 	bool chooseTech = false;
 };
 
+struct LobbyGameTechActions {
+	int toggleIndex = -1;
+	bool backToTeams = false;
+};
+
+struct LobbyTechItemDetails {
+	bool found = false;
+	std::string title;
+	std::array<std::string, 8> descriptionLines{};
+};
+
 struct LobbyUi {
 	bool authSent = false;
 	std::function<void(std::string username, std::string password)> submitCredentials = {};
@@ -26,6 +38,10 @@ struct LobbyUi {
 	std::function<void(std::shared_ptr<LobbyGameJoinActions>,
 	                   std::function<bool()> gameJoinStillActive,
 	                   std::function<void()> showTech)> flushGameJoinActions = {};
+	std::function<LobbyTechItemDetails(int itemIndex)> techItemDetailsForIndex = {};
+	std::function<void(std::shared_ptr<LobbyGameTechActions>,
+	                   std::function<bool()> gameTechStillActive,
+	                   std::function<void()> showTeams)> flushGameTechActions = {};
 };
 
 void LobbyProvider(ScreenContext & ctx, const std::function<void()> & children);

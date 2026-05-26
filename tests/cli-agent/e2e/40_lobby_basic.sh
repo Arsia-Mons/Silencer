@@ -222,6 +222,14 @@ for i in $(seq 1 100); do
     const agents = (r.widgets ?? []).find((w) => w.label === "Agents" && w.kind === "button");
     process.exit(agents && agents.enabled === false ? 0 : 1);
   ' >/dev/null 2>&1; then
+    # Exercise the GameTech panel's queued lobby/back action path after the
+    # create flow has reached a joined-game surface.
+    cli --port "$CTRL_PORT" lobby_show_panel --panel tech >/dev/null
+    cli --port "$CTRL_PORT" step --frames 5 >/dev/null
+    wait_for_widget "Back To Teams"
+    cli --port "$CTRL_PORT" click --label "Back To Teams" >/dev/null
+    cli --port "$CTRL_PORT" step --frames 5 >/dev/null
+    wait_for_widget "Choose Tech"
     echo "PASS 40_lobby_basic"
     exit 0
   fi

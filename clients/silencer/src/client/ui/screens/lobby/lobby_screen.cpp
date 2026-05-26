@@ -158,6 +158,15 @@ void LobbyScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime, s
 					[this]() { return gameJoinActive && !goBackQueued; },
 					[this, &ctx]() { ShowGameTech(ctx); });
 		};
+		gameTechState.flushActions =
+			[lobby, this, &ctx](
+				std::shared_ptr<silencer::client_ui::hooks::LobbyGameTechActions> actions) {
+				if(!lobby.flushGameTechActions || !actions) return;
+				lobby.flushGameTechActions(
+					actions,
+					[this]() { return gameTechActive && !goBackQueued; },
+					[this, &ctx]() { ShowGameJoin(ctx); });
+		};
 
 		ctx.BeginLobbyPanelBorderBlur(layoutWidth, layoutHeight, input.uiScale);
 		lobby_screen_detail::AddPanelBorderBlur(

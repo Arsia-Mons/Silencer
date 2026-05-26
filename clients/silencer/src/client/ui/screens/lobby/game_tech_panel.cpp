@@ -2,6 +2,7 @@
 
 #include "clay/clay.h"
 #include "clay_ui_compositor.h"
+#include "hooks/use_lobby.h"
 #include "runtime/UiInteractionRegistry.h"
 #include "primitives/text.h"
 #include "primitives/button.h"
@@ -100,6 +101,33 @@ void CopySnapshot(GameTechPanelState & state,
 	}
 }
 
+void ClearSelectedTechDetails(GameTechPanelState & state)
+{
+	state.techNameStr.clear();
+	for(std::string & line : state.techDescLines) line.clear();
+}
+
+void ApplySelectedTechDetails(
+	GameTechPanelState & state,
+	const silencer::client_ui::hooks::LobbyTechItemDetails & details)
+{
+	if(!details.found){
+		ClearSelectedTechDetails(state);
+		return;
+	}
+	state.techNameStr = details.title;
+	state.techDescLines = details.descriptionLines;
+}
+
+void QueueActionsFlush(GameTechPanelState & state)
+{
+	if(state.actionsQueued) return;
+	state.actionsQueued = true;
+	if(state.flushActions && state.pendingActions){
+		state.flushActions(state.pendingActions);
+	}
+}
+
 }  // namespace game_tech_panel_detail
 
 void GameTechPanelInit(GameTechPanelState & state) {
@@ -108,45 +136,34 @@ void GameTechPanelInit(GameTechPanelState & state) {
 
 void GameTechPanelTick(GameTechPanelState & state,
                        ScreenContext & ctx) {
-	if(state.toggleClickedItemIndex >= 0){
-		const int idx = state.toggleClickedItemIndex;
-		state.toggleClickedItemIndex = -1;
-		ctx.ToggleLobbyTechChoice(idx);
-	}
-
 	game_tech_panel_detail::CopySnapshot(state, ctx.CurrentLobbyTechSnapshot());
-
-	if(state.descClickedItemIndex >= 0){
-		const int idx = state.descClickedItemIndex;
-		state.descClickedItemIndex = -1;
-		const ScreenContext::LobbyTechItemDetails details =
-			ctx.LobbyTechItemDetailsForIndex(idx);
-		if(details.found){
-			state.techNameStr = details.title;
-			state.techDescLines = details.descriptionLines;
-		}else{
-			state.techNameStr.clear();
-			for(std::string & line : state.techDescLines) line.clear();
-		}
-	}
-
 }
 
 bool GameTechPanelHandleUiIntent(GameTechPanelState & state,
                                  const silencer::ui::UiAction & action) {
 	if(action.kind != silencer::ui::UiActionKind::Activate) return false;
 	if(action.id == game_tech_panel_detail::kActionBack){
-		state.backClicked = true;
+		if(!state.pendingActions) return true;
+		state.pendingActions->backToTeams = true;
+		game_tech_panel_detail::QueueActionsFlush(state);
 		return true;
 	}
 	int index = game_tech_panel_detail::SuffixInt(action.id, game_tech_panel_detail::kActionTogglePrefix);
 	if(index >= 0){
-		state.toggleClickedItemIndex = index;
+		if(!state.pendingActions) return true;
+		state.pendingActions->toggleIndex = index;
+		game_tech_panel_detail::QueueActionsFlush(state);
 		return true;
 	}
 	index = game_tech_panel_detail::SuffixInt(action.id, game_tech_panel_detail::kActionDescriptionPrefix);
 	if(index >= 0){
-		state.descClickedItemIndex = index;
+		if(state.techItemDetailsForIndex){
+			game_tech_panel_detail::ApplySelectedTechDetails(
+				state,
+				state.techItemDetailsForIndex(index));
+		}else{
+			game_tech_panel_detail::ClearSelectedTechDetails(state);
+		}
 		return true;
 	}
 	return false;
@@ -155,6 +172,17 @@ bool GameTechPanelHandleUiIntent(GameTechPanelState & state,
 void BuildGameTechUpperTree(GameTechPanelState & state,
                             Uint16 panelWidth,
                             silencer::ui::UiInteractionRegistry& interactions) {
+	const silencer::client_ui::hooks::LobbyUi lobby =
+		silencer::client_ui::hooks::UseLobby();
+	if(!state.pendingActions){
+		state.pendingActions =
+			std::make_shared<silencer::client_ui::hooks::LobbyGameTechActions>();
+	}
+	state.pendingActions->toggleIndex = -1;
+	state.pendingActions->backToTeams = false;
+	state.actionsQueued = false;
+	state.techItemDetailsForIndex = lobby.techItemDetailsForIndex;
+
 	// Back To Teams button.
 	CLAY({ .id = CLAY_ID("GTechBackWrap"),
 	       .layout = { .padding = { game_tech_panel_detail::kUpperBackPadLeft, 0,

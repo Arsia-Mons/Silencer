@@ -7,13 +7,15 @@
 // overlay per local row, the centered tech-name + 8 description-line block,
 // and a "Back To Teams" chrome button.
 //
-// Domain reads/writes come through ScreenContext. Right-pane swaps stay in
-// the owning LobbyScreen controller after UI action dispatch.
+// Domain reads/writes come through lobby hooks/providers. Right-pane swaps are
+// requested through queued callbacks owned by LobbyScreen.
 
 #include "shared.h"
 #include "runtime/UiActionQueue.h"
 
 #include <array>
+#include <functional>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -21,6 +23,11 @@ class ScreenContext;
 
 namespace silencer::ui {
 class UiInteractionRegistry;
+}
+
+namespace silencer::client_ui::hooks {
+struct LobbyGameTechActions;
+struct LobbyTechItemDetails;
 }
 
 namespace silencer::client_ui::lobby {
@@ -39,11 +46,12 @@ struct GameTechGridRow {
 };
 
 struct GameTechPanelState {
-	// Per-frame click flags. Set by typed widget intents; consumed by Tick.
-	bool backClicked = false;
-	// -1 = no click this frame; otherwise the buyableitems[idx] index.
-	int  toggleClickedItemIndex = -1;
-	int  descClickedItemIndex   = -1;
+	std::shared_ptr<silencer::client_ui::hooks::LobbyGameTechActions> pendingActions = {};
+	std::function<void(std::shared_ptr<silencer::client_ui::hooks::LobbyGameTechActions>)>
+		flushActions = {};
+	std::function<silencer::client_ui::hooks::LobbyTechItemDetails(int itemIndex)>
+		techItemDetailsForIndex = {};
+	bool actionsQueued = false;
 
 	// Pointer-stable strings (lifetime spans the layout pass via screen
 	// ownership). Recomputed each Tick.
@@ -56,8 +64,8 @@ struct GameTechPanelState {
 
 void GameTechPanelInit(GameTechPanelState & state);
 
-// Per-frame pump. Recomputes slots-left, peer names, and consumes per-frame
-// click flags (toggle a tech bit, swap description, exit on Back).
+// Per-frame pump. Recomputes slots-left and peer names from ScreenContext while
+// lobby writes stay behind UseLobby callbacks.
 void GameTechPanelTick(GameTechPanelState & state,
                        ScreenContext & ctx);
 bool GameTechPanelHandleUiIntent(GameTechPanelState & state,

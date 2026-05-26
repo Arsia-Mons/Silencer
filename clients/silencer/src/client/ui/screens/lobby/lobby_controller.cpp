@@ -149,14 +149,7 @@ bool LobbyScreen::HandleUiIntent(ScreenContext & ctx, const silencer::ui::UiActi
 		return silencer::client_ui::lobby::GameJoinPanelHandleUiIntent(gameJoinState, action);
 	}
 	if(gameTechActive){
-		if(silencer::client_ui::lobby::GameTechPanelHandleUiIntent(gameTechState, action)){
-			if(gameTechState.backClicked){
-				gameTechState.backClicked = false;
-				ShowGameJoin(ctx);
-			}
-			return true;
-		}
-		return false;
+		return silencer::client_ui::lobby::GameTechPanelHandleUiIntent(gameTechState, action);
 	}
 	if(silencer::client_ui::lobby::GameSelectPanelHandleUiIntent(gameSelectState, action)){
 		if(gameSelectState.createClicked){

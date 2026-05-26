@@ -242,12 +242,23 @@ fail_if_match \
   "$REPO_ROOT/clients/silencer/src/client/ui/screens/lobby/lobby_controller.cpp"
 
 fail_if_match \
+  '\b(backClicked|toggleClickedItemIndex|descClickedItemIndex)\b' \
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens/lobby/game_tech_panel.cpp" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens/lobby/game_tech_panel.h" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens/lobby/lobby_controller.cpp"
+
+fail_if_match \
   '\b(SubmitLobbyCredentials|UpgradeMissionSummaryStat|CompleteMissionSummary)\b' \
   "$REPO_ROOT/clients/silencer/src/client/ui/screens/screen_context.cpp" \
   "$REPO_ROOT/clients/silencer/src/client/ui/screens/screen_context.h"
 
 fail_if_match \
   '\b(SendLobbyJoinReady|ChangeLobbyJoinTeam|BeginLobbyTechSelection)\b' \
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens/screen_context.cpp" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens/screen_context.h"
+
+fail_if_match \
+  '\b(ToggleLobbyTechChoice|LobbyTechItemDetailsForIndex)\b' \
   "$REPO_ROOT/clients/silencer/src/client/ui/screens/screen_context.cpp" \
   "$REPO_ROOT/clients/silencer/src/client/ui/screens/screen_context.h"
 

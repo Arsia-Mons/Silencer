@@ -1,14 +1,18 @@
 #include "hooks/use_lobby.h"
 
 #include "client/ui/ClientUi.h"
+#include "config.h"
 #include "game_state.h"
 #include "lobby.h"
+#include "peer.h"
 #include "screen_context.h"
+#include "team.h"
 #include "ui/runtime/react.h"
 #include "user.h"
 #include "world.h"
 
 #include <cstdint>
+#include <cstring>
 #include <utility>
 
 namespace silencer::client_ui::hooks {
@@ -117,6 +121,87 @@ void FlushGameJoinActions(World * world,
 	ClearGameJoinActions(*actions);
 }
 
+LobbyTechItemDetails TechItemDetailsForIndex(World * world, int itemIndex)
+{
+	LobbyTechItemDetails details;
+	if(!world || itemIndex < 0 || itemIndex >= static_cast<int>(world->buyableitems.size())){
+		return details;
+	}
+	BuyableItem * item = world->buyableitems[itemIndex];
+	if(!item) return details;
+
+	details.found = true;
+	details.title = "-";
+	details.title += item->name;
+	details.title += "-";
+
+	char desc[1024];
+	std::strncpy(desc, item->description, sizeof(desc));
+	desc[sizeof(desc) - 1] = '\0';
+	int lineNo = 0;
+	char * line = std::strtok(desc, "\n");
+	while(line && lineNo < static_cast<int>(details.descriptionLines.size())){
+		details.descriptionLines[lineNo++] = line;
+		line = std::strtok(nullptr, "\n");
+	}
+	return details;
+}
+
+void ToggleTechChoice(World * world, int itemIndex)
+{
+	if(!world) return;
+	const Uint8 localId = world->GetLocalPeerId();
+	Peer * localPeer = world->GetPeer(localId);
+	Team * team = world->GetPeerTeam(localId);
+	if(!localPeer || !team || itemIndex < 0
+	   || itemIndex >= static_cast<int>(world->buyableitems.size())){
+		return;
+	}
+
+	BuyableItem * item = world->buyableitems[itemIndex];
+	if(!item) return;
+	User * user = world->lobby.GetUserInfo(localPeer->accountid);
+	if(!user) return;
+
+	const int techSlotsLeft =
+		user->agency[team->agency].techslots - world->TechSlotsUsed(*localPeer);
+	const bool selected = (localPeer->techchoices & item->techchoice) != 0;
+	const bool interactable = (item->techslots <= techSlotsLeft) || selected;
+	if(!interactable) return;
+
+	const Uint32 newChoices = localPeer->techchoices ^ item->techchoice;
+	world->SetTech(newChoices);
+	Config::GetInstance().defaulttechchoices[team->agency] = newChoices;
+	Config::GetInstance().Save();
+}
+
+void ClearGameTechActions(LobbyGameTechActions & actions)
+{
+	actions.toggleIndex = -1;
+	actions.backToTeams = false;
+}
+
+void FlushGameTechActions(World * world,
+                          const std::shared_ptr<LobbyGameTechActions> & actions,
+                          const std::function<bool()> & gameTechStillActive,
+                          const std::function<void()> & showTeams)
+{
+	if(!actions) return;
+	if(gameTechStillActive && !gameTechStillActive()){
+		ClearGameTechActions(*actions);
+		return;
+	}
+	if(actions->backToTeams){
+		if(showTeams) showTeams();
+		ClearGameTechActions(*actions);
+		return;
+	}
+	if(actions->toggleIndex >= 0){
+		ToggleTechChoice(world, actions->toggleIndex);
+	}
+	ClearGameTechActions(*actions);
+}
+
 } // namespace
 
 void LobbyProvider(ScreenContext & ctx, const std::function<void()> & children)
@@ -172,6 +257,21 @@ LobbyUi UseLobby()
 			            gameJoinStillActive = std::move(gameJoinStillActive),
 			            showTech = std::move(showTech)]() {
 				FlushGameJoinActions(world, actions, gameJoinStillActive, showTech);
+			});
+		};
+	result.techItemDetailsForIndex = [world](int itemIndex) {
+		return TechItemDetailsForIndex(world, itemIndex);
+	};
+	result.flushGameTechActions =
+		[queueWrite, world](std::shared_ptr<LobbyGameTechActions> actions,
+		                    std::function<bool()> gameTechStillActive,
+		                    std::function<void()> showTeams) {
+			if(!queueWrite || !actions) return;
+			queueWrite([world,
+			            actions,
+			            gameTechStillActive = std::move(gameTechStillActive),
+			            showTeams = std::move(showTeams)]() {
+				FlushGameTechActions(world, actions, gameTechStillActive, showTeams);
 			});
 		};
 	return result;
