@@ -85,6 +85,28 @@ bool ActionTargetsFeedbackInteractable(const silencer::ui::UiInteractionRegistry
 	return widget && InteractableRequestsFeedback(*widget);
 }
 
+bool FocusRuntimeRoutedThisFrame(const silencer::ui::UiFocusRuntime& focus) {
+	for(int i = 0; i < focus.scopeCount; ++i){
+		const silencer::ui::UiFocusScope& scope = focus.scopes[i];
+		if(scope.declaredFrame == focus.frame && scope.layoutCount > 0){
+			return true;
+		}
+	}
+	return false;
+}
+
+bool FocusRuntimeHasDeclaredFocusThisFrame(const silencer::ui::UiFocusRuntime& focus) {
+	for(int i = 0; i < focus.scopeCount; ++i){
+		const silencer::ui::UiFocusScope& scope = focus.scopes[i];
+		if(scope.declaredFrame == focus.frame &&
+		   scope.layoutCount > 0 &&
+		   scope.focusedId.id != 0){
+			return true;
+		}
+	}
+	return false;
+}
+
 silencer::ui::UiFocusInputFrame FocusInputFrom(
 	const silencer::ui::UiInputState& input) {
 	silencer::ui::UiFocusInputFrame out;
@@ -94,8 +116,19 @@ silencer::ui::UiFocusInputFrame FocusInputFrom(
 	out.pointerPressed = input.pointer.pressed;
 	out.pointerDown = input.pointer.down;
 	out.pointerReleased = input.pointer.released;
+	out.pointerMoved = input.pointer.moved;
+	out.pointerX = input.pointer.x;
+	out.pointerY = input.pointer.y;
 	for(silencer::ui::UiNavAction action : input.navActions){
 		switch(action){
+			case silencer::ui::UiNavAction::FocusPrevious:
+			case silencer::ui::UiNavAction::PreviousSection:
+				out.navUp = true;
+				break;
+			case silencer::ui::UiNavAction::FocusNext:
+			case silencer::ui::UiNavAction::NextSection:
+				out.navDown = true;
+				break;
 			case silencer::ui::UiNavAction::Up:
 				out.navUp = true;
 				break;
@@ -123,6 +156,49 @@ silencer::ui::UiFocusInputFrame FocusInputFrom(
 	return out;
 }
 
+bool RouteAfterFocusRuntime(silencer::ui::UiNavAction action,
+                            bool keepConfirmForTextFocus) {
+	switch(action){
+		case silencer::ui::UiNavAction::Backspace:
+		case silencer::ui::UiNavAction::Cancel:
+			return true;
+		case silencer::ui::UiNavAction::Confirm:
+			return keepConfirmForTextFocus;
+		case silencer::ui::UiNavAction::FocusNext:
+		case silencer::ui::UiNavAction::FocusPrevious:
+		case silencer::ui::UiNavAction::Up:
+		case silencer::ui::UiNavAction::Down:
+		case silencer::ui::UiNavAction::Left:
+		case silencer::ui::UiNavAction::Right:
+		case silencer::ui::UiNavAction::NextSection:
+		case silencer::ui::UiNavAction::PreviousSection:
+			return false;
+	}
+	return false;
+}
+
+silencer::ui::UiInputState InputForLegacyRouterAfterFocusRuntime(
+	const silencer::ui::UiInputState& input,
+	bool keepConfirmForTextFocus) {
+	silencer::ui::UiInputState out = input;
+	out.pointer.pressed = false;
+	out.pointer.released = false;
+	out.pointer.moved = false;
+	out.navActions.clear();
+	for(silencer::ui::UiNavAction action : input.navActions){
+		if(RouteAfterFocusRuntime(action, keepConfirmForTextFocus)){
+			out.navActions.push_back(action);
+		}
+	}
+	out.controlCommands.clear();
+	for(const silencer::ui::UiControlCommand& command : input.controlCommands){
+		if(command.kind == silencer::ui::UiControlCommandKind::Action){
+			out.controlCommands.push_back(command);
+		}
+	}
+	return out;
+}
+
 }  // namespace clientui_detail
 
 ClientUi::ClientUi(silencer::ui::ClayService& clay)
@@ -141,12 +217,26 @@ void ClientUi::BeginFrame(const silencer::ui::UiInputState& input) {
 	silencer::ui::ui_focus_set_current(&focus_);
 	silencer::ui::ui_focus_begin_frame(focusInput_);
 	clay_.BeginPreparedLayout();
+	silencer::ui::ui_focus_push_scope({
+		CLAY_ID("ClientUiFocusScope"),
+		false,
+		true,
+	});
+	focusScopeOpen_ = true;
 }
 
 Clay_RenderCommandArray ClientUi::EndFrame() {
+	if(focusScopeOpen_){
+		silencer::ui::ui_focus_pop_scope();
+		focusScopeOpen_ = false;
+	}
 	Clay_RenderCommandArray commands = clay_.EndPreparedLayout();
 	silencer::ui::ui_focus_set_current(&focus_);
 	silencer::ui::ui_focus_end_layout(focusInput_);
+	if(clientui_detail::FocusRuntimeRoutedThisFrame(focus_) &&
+	   !clientui_detail::FocusRuntimeHasDeclaredFocusThisFrame(focus_)){
+		interactions_.ClearFocus();
+	}
 	clay_.EndPreparedFrame();
 	return commands;
 }
@@ -157,7 +247,12 @@ UiDispatchResult ClientUi::DispatchInput(
 	UiDispatchResult result;
 	Screen * top = screens_.Top();
 	silencer::ui::UiInputRouter router(interactions_);
-	silencer::ui::UiActionList actions = router.Route(input);
+	const bool focusRouted = clientui_detail::FocusRuntimeRoutedThisFrame(focus_);
+	const silencer::ui::UiInputState routedInput = focusRouted
+		? clientui_detail::InputForLegacyRouterAfterFocusRuntime(
+			input, interactions_.HasTextInputFocus())
+		: input;
+	silencer::ui::UiActionList actions = router.Route(routedInput);
 	const silencer::ui::UiInteractable * hovered =
 		clientui_detail::HitFeedbackInteractable(interactions_, input);
 	silencer::ui::UiActionId hoveredId;

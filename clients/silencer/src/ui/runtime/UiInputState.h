@@ -31,6 +31,7 @@ struct UiPointerState {
 	bool down = false;
 	bool pressed = false;
 	bool released = false;
+	bool moved = false;
 	float wheelX = 0.0f;
 	float wheelY = 0.0f;
 };

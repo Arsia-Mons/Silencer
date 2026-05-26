@@ -11,9 +11,8 @@ trap 'stop_silencer "$PID" "$PORT"' EXIT
 wait_alive "$PORT"
 cli --port "$PORT" wait_for_state --state MAINMENU --timeout-ms 15000 >/dev/null
 
-# Focus order is the current main-menu registry order:
-# Tutorial -> Connect To Lobby -> Options -> Exit.
-cli --port "$PORT" key --key tab >/dev/null
+# The focus runtime auto-focuses the first declared button after layout.
+# Focus order is Tutorial -> Connect To Lobby -> Options -> Exit.
 cli --port "$PORT" key --key tab >/dev/null
 cli --port "$PORT" key --key tab >/dev/null
 cli --port "$PORT" key --key enter >/dev/null

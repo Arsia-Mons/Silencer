@@ -242,6 +242,7 @@ bool UiInteractionRegistry::RegisterInteractable(UiInteractable widget) {
 		}
 	}
 
+	UiInteractable * registered = existing;
 	if(existing){
 		if(widget.hasClayId){
 			existing->clayId = widget.clayId;
@@ -271,8 +272,10 @@ bool UiInteractionRegistry::RegisterInteractable(UiInteractable widget) {
 			return false;
 		}
 		interactables_[interactableCount_++] = std::move(widget);
+		registered = &interactables_[interactableCount_ - 1];
 	}
 
+	if(registered) RegisterFocusRuntimeTarget(*registered);
 	RefreshElementState();
 	return true;
 }
@@ -387,6 +390,78 @@ void UiInteractionRegistry::SetFocus(const UiInteractable& widget,
 	registry_detail::AssignInteractableActionId(focusedLabel_, widget);
 	focusedOrigin_ = origin;
 	RefreshElementState();
+}
+
+void UiInteractionRegistry::RegisterFocusRuntimeTarget(const UiInteractable& widget) {
+	if(!widget.hasClayId || widget.clayId.id == 0) return;
+
+	registry_detail::InteractableIdentity identity;
+	registry_detail::FillInteractableIdentity(identity, widget);
+	if(identity.empty()) return;
+
+	std::string id;
+	registry_detail::AssignStringFromIdentity(id, identity);
+	UiFocusableState state = ui_focusable({
+		widget.clayId,
+		widget.inactive,
+		{},
+		[this, id] {
+			ConfirmFromFocusRuntime(id.data(), id.size());
+		},
+		[this, id] {
+			FocusFromFocusRuntime(id.data(), id.size());
+		},
+	});
+
+	if(state.focused){
+		FocusOrigin origin = FocusOrigin::Navigation;
+		UiFocusSource source = ui_focus_source();
+		if(widget.kind == UiInteractableKind::TextInput){
+			origin = FocusOrigin::Text;
+		}else if(source == UiFocusSource::Mouse || source == UiFocusSource::Touch){
+			origin = FocusOrigin::Pointer;
+		}
+		SetFocus(widget, origin);
+	}
+}
+
+void UiInteractionRegistry::FocusFromFocusRuntime(const char * id, std::size_t len) {
+	const UiInteractable * widget = FindInteractableById(id, len);
+	if(!widget || !UiInteractableIsInteractive(*widget)) return;
+
+	FocusOrigin origin = FocusOrigin::Navigation;
+	UiFocusSource source = ui_focus_source();
+	if(widget->kind == UiInteractableKind::TextInput){
+		origin = FocusOrigin::Text;
+	}else if(source == UiFocusSource::Mouse || source == UiFocusSource::Touch){
+		origin = FocusOrigin::Pointer;
+	}
+	SetFocus(*widget, origin);
+	if(widget->kind == UiInteractableKind::TextInput){
+		QueueAction(UiActionKind::Select, *widget, widget->value.c_str());
+	}else{
+		QueueAction(UiActionKind::Navigate, *widget, "focus");
+	}
+}
+
+void UiInteractionRegistry::ConfirmFromFocusRuntime(const char * id, std::size_t len) {
+	const UiInteractable * widget = FindInteractableById(id, len);
+	if(!widget || !UiInteractableIsInteractive(*widget)) return;
+
+	SetFocus(*widget, widget->kind == UiInteractableKind::TextInput
+	                  ? FocusOrigin::Text
+	                  : FocusOrigin::Navigation);
+	switch(widget->kind){
+		case UiInteractableKind::Button:
+		case UiInteractableKind::Toggle:
+			QueueAction(UiActionKind::Activate, *widget, nullptr);
+			return;
+		case UiInteractableKind::ListRow:
+			QueueAction(UiActionKind::Select, *widget, "activate");
+			return;
+		case UiInteractableKind::TextInput:
+			return;
+	}
 }
 
 bool UiInteractionRegistry::QueueAction(UiActionKind kind,

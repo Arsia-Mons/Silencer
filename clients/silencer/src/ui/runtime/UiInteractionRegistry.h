@@ -162,6 +162,9 @@ private:
 	const UiInteractable* FocusedInteractable() const;
 	UiInteractable* FocusedInteractable();
 	void SetFocus(const UiInteractable& widget, FocusOrigin origin);
+	void RegisterFocusRuntimeTarget(const UiInteractable& widget);
+	void FocusFromFocusRuntime(const char * id, std::size_t len);
+	void ConfirmFromFocusRuntime(const char * id, std::size_t len);
 	bool FocusHoveredAt(float x, float y, bool recordPhysicalSample);
 	bool QueueAction(UiActionKind kind, const UiInteractable& widget, const char * value);
 	void RefreshElementState();

@@ -78,6 +78,9 @@ struct UiFocusInputFrame {
 	bool pointerPressed = false;
 	bool pointerDown = false;
 	bool pointerReleased = false;
+	bool pointerMoved = false;
+	float pointerX = 0.0f;
+	float pointerY = 0.0f;
 
 	UiFocusSource source = UiFocusSource::Keyboard;
 };
@@ -132,6 +135,8 @@ struct UiFocusScope {
 	Clay_ElementId pointerPressOrigin = {};
 	UiFocusSource source = UiFocusSource::None;
 	Clay_ElementId requestedInitialFocus = {};
+	bool pointerClearedFocus = false;
+	bool autoFocusSuppressed = false;
 	uint32_t declaredFrame = 0;
 	uint32_t declarationOrder = 0;
 

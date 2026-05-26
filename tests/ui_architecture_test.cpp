@@ -281,6 +281,7 @@ TEST_CASE("ClientUi dispatch reports feedback without playing game audio") {
 	input.height = 480;
 	input.pointer.x = 12.0f;
 	input.pointer.y = 22.0f;
+	input.pointer.moved = true;
 
 	clientUi.BeginFrame(input);
 	silencer::ui::UiInteractable button;
@@ -308,12 +309,14 @@ TEST_CASE("ClientUi dispatch reports feedback without playing game audio") {
 
 	input.pointer.x = 200.0f;
 	input.pointer.y = 200.0f;
+	input.pointer.moved = true;
 	silencer::client_ui::UiDispatchResult away =
 		clientUi.DispatchInput(nullptr, input);
 	CHECK_FALSE(away.feedbackRequested);
 
 	input.pointer.x = 12.0f;
 	input.pointer.y = 22.0f;
+	input.pointer.moved = true;
 	silencer::client_ui::UiDispatchResult returned =
 		clientUi.DispatchInput(nullptr, input);
 	CHECK(returned.feedbackRequested);
@@ -990,6 +993,7 @@ TEST_CASE("ClientUiInput normalizes pointer and drains frame-local inputs") {
 	CHECK(frame.pointer.y == 120.0f);
 	CHECK(frame.pointer.down);
 	CHECK(frame.pointer.pressed);
+	CHECK_FALSE(frame.pointer.moved);
 	CHECK(frame.pointer.wheelY == -3.0f);
 	CHECK(frame.textInput == "x");
 	REQUIRE(frame.navActions.size() == 1);
@@ -1012,6 +1016,7 @@ TEST_CASE("ClientUiInput normalizes pointer and drains frame-local inputs") {
 	CHECK(frame.uiScale == 2);
 	CHECK(frame.pointer.down);
 	CHECK(!frame.pointer.pressed);
+	CHECK_FALSE(frame.pointer.moved);
 	CHECK(frame.source == silencer::ui::UiFocusSource::Keyboard);
 	CHECK(frame.pointer.wheelY == 0.0f);
 	CHECK(frame.textInput.empty());
@@ -1024,6 +1029,13 @@ TEST_CASE("ClientUiInput normalizes pointer and drains frame-local inputs") {
 	frame = pointerOnly.BuildFrame(640, 480, 1, 1.0f / 60.0f);
 	CHECK(frame.source == silencer::ui::UiFocusSource::Mouse);
 	CHECK(frame.pointer.pressed);
+
+	silencer::client_ui::ClientUiInput hoverOnly;
+	hoverOnly.QueuePointerSurfaceEvent(14.0f, 28.0f, false, false);
+	frame = hoverOnly.BuildFrame(640, 480, 1, 1.0f / 60.0f);
+	CHECK(frame.source == silencer::ui::UiFocusSource::Mouse);
+	CHECK(frame.pointer.moved);
+	CHECK_FALSE(frame.pointer.pressed);
 }
 
 TEST_CASE("UiInputRouter routes control commands and binding capture through typed actions") {
@@ -1046,6 +1058,9 @@ TEST_CASE("UiInputRouter routes control commands and binding capture through typ
 	click.x = 12;
 	click.y = 22;
 	input.controlCommands.push_back(click);
+	input.pointer.x = 12.0f;
+	input.pointer.y = 22.0f;
+	input.pointer.pressed = true;
 
 	silencer::ui::UiBindingInput binding;
 	binding.kind = silencer::ui::UiBindingInputKind::KeyboardKeyDown;

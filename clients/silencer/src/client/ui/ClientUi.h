@@ -103,6 +103,7 @@ private:
 	silencer::ui::UiInteractionRegistry interactions_;
 	silencer::ui::UiFocusRuntime focus_;
 	silencer::ui::UiFocusInputFrame focusInput_;
+	bool focusScopeOpen_ = false;
 	ScreenStack screens_;
 	std::array<QueuedWrite, CLIENT_UI_MAX_WRITES> writes_;
 	int writeCount_ = 0;

@@ -142,11 +142,16 @@ Clay_ElementId FirstEnabled(const UiFocusScope * scope) {
 	return {};
 }
 
-Clay_ElementId HoveredEnabled(const UiFocusScope * scope) {
+bool PointIn(Clay_BoundingBox rect, float x, float y) {
+	return x >= rect.x && y >= rect.y
+	    && x < rect.x + rect.width && y < rect.y + rect.height;
+}
+
+Clay_ElementId HoveredEnabled(const UiFocusScope * scope, float x, float y) {
 	if(!scope) return {};
 	for(int i = scope->layoutCount - 1; i >= 0; --i){
 		const UiFocusableLayout& layout = scope->layout[i];
-		if(!layout.disabled && PointerOver(layout.id)){
+		if(!layout.disabled && PointIn(layout.rect, x, y)){
 			return layout.id;
 		}
 	}
@@ -413,12 +418,13 @@ void ui_focus_begin_frame(const UiFocusInputFrame& input) {
 		if(next.id != 0 && !SameId(next, scope->focusedId)){
 			scope->focusedId = next;
 			scope->source = NavigationSource(input);
+			scope->autoFocusSuppressed = false;
 			runtime->pendingFocusCallbackId = next;
 		}
 	}
 
 	if(input.pointerPressed){
-		Clay_ElementId hovered = HoveredEnabled(scope);
+		Clay_ElementId hovered = HoveredEnabled(scope, input.pointerX, input.pointerY);
 		scope->pointerPressOrigin = hovered;
 		if(hovered.id != 0){
 			if(!SameId(scope->focusedId, hovered)){
@@ -426,11 +432,30 @@ void ui_focus_begin_frame(const UiFocusInputFrame& input) {
 			}
 			scope->focusedId = hovered;
 			scope->source = PointerSource(input);
+			scope->autoFocusSuppressed = false;
+		}
+	}
+
+	if(input.pointerMoved && !input.pointerPressed && !input.pointerReleased){
+		Clay_ElementId hovered = HoveredEnabled(scope, input.pointerX, input.pointerY);
+		if(hovered.id != 0){
+			if(!SameId(scope->focusedId, hovered)){
+				runtime->pendingFocusCallbackId = hovered;
+			}
+			scope->focusedId = hovered;
+			scope->source = PointerSource(input);
+			scope->autoFocusSuppressed = false;
+		}else if(scope->source == UiFocusSource::Mouse ||
+		         scope->source == UiFocusSource::Touch){
+			scope->focusedId = {};
+			scope->source = UiFocusSource::None;
+			scope->pointerClearedFocus = true;
+			scope->autoFocusSuppressed = true;
 		}
 	}
 
 	if(input.pointerReleased){
-		Clay_ElementId hovered = HoveredEnabled(scope);
+		Clay_ElementId hovered = HoveredEnabled(scope, input.pointerX, input.pointerY);
 		if(SameId(scope->pointerPressOrigin, hovered)){
 			runtime->pendingPointerConfirmId = hovered;
 		}
@@ -537,15 +562,19 @@ void ui_focus_end_layout(const UiFocusInputFrame& input) {
 		HarvestScopeLayout(runtime, scope);
 
 		if(!ContainsEnabled(scope, scope->focusedId)){
-			Clay_ElementId next = FirstEnabled(scope);
+			Clay_ElementId next = {};
 			if(ContainsEnabled(scope, scope->requestedInitialFocus)){
 				next = scope->requestedInitialFocus;
+				scope->autoFocusSuppressed = false;
+			}else if(!scope->pointerClearedFocus && !scope->autoFocusSuppressed){
+				next = FirstEnabled(scope);
 			}
 			scope->focusedId = next;
 			scope->source = next.id != 0
 				? UiFocusSource::Programmatic
 				: UiFocusSource::None;
 		}
+		scope->pointerClearedFocus = false;
 
 		if(!SameId(previousFocus, scope->focusedId) && scope->focusedId.id != 0){
 			InvokeFocusCallbackIfRegistered(scope, scope->focusedId);

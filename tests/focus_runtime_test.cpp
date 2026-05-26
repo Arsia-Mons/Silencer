@@ -78,6 +78,25 @@ void FocusBox(Clay_ElementId id,
 	}) {}
 }
 
+void RuntimeButton(silencer::ui::UiInteractionRegistry& interactions,
+                   Clay_ElementId id,
+                   const char * actionId) {
+	CLAY({
+		.id = id,
+		.layout = {
+			.sizing = { CLAY_SIZING_FIXED(80), CLAY_SIZING_FIXED(32) },
+		},
+	}) {
+		silencer::ui::UiInteractable widget;
+		widget.id = actionId;
+		widget.labelText = actionId;
+		widget.kind = silencer::ui::UiInteractableKind::Button;
+		widget.clayId = id;
+		widget.hasClayId = true;
+		interactions.RegisterInteractable(widget);
+	}
+}
+
 template <typename Build>
 void RunFocusFrame(silencer::ui::UiFocusRuntime& focus,
                    const silencer::ui::UiFocusInputFrame& input,
@@ -85,10 +104,13 @@ void RunFocusFrame(silencer::ui::UiFocusRuntime& focus,
                    Clay_Dimensions dimensions = {640.0f, 480.0f},
                    Clay_Vector2 pointer = {-1000.0f, -1000.0f}) {
 	EnsureClay();
+	silencer::ui::UiFocusInputFrame frameInput = input;
+	frameInput.pointerX = pointer.x;
+	frameInput.pointerY = pointer.y;
 	silencer::ui::ui_focus_set_current(&focus);
 	Clay_SetLayoutDimensions(dimensions);
-	Clay_SetPointerState(pointer, input.pointerDown);
-	silencer::ui::ui_focus_begin_frame(input);
+	Clay_SetPointerState(pointer, frameInput.pointerDown);
+	silencer::ui::ui_focus_begin_frame(frameInput);
 	Clay_BeginLayout();
 	CLAY({
 		.id = TestId("FocusTestRoot"),
@@ -101,7 +123,7 @@ void RunFocusFrame(silencer::ui::UiFocusRuntime& focus,
 		build();
 	}
 	(void)Clay_EndLayout();
-	silencer::ui::ui_focus_end_layout(input);
+	silencer::ui::ui_focus_end_layout(frameInput);
 }
 
 void SimpleStackScope(Clay_ElementId scope,
@@ -327,6 +349,54 @@ TEST_CASE("UiFocus pointer release confirms only the original hovered target") {
 	RunFocusFrame(focus, hold, build, {640.0f, 480.0f}, insideA);
 	RunFocusFrame(focus, release, build, {640.0f, 480.0f}, insideA);
 	CHECK(confirmCount == 1);
+}
+
+TEST_CASE("UiFocus pointer movement follows hover through harvested layout") {
+	silencer::ui::UiFocusRuntime focus;
+	silencer::ui::ui_focus_init(&focus);
+
+	Clay_ElementId scope = TestId("HoverScope");
+	Clay_ElementId a = TestId("HoverA");
+	Clay_ElementId b = TestId("HoverB");
+
+	auto build = [&] {
+		silencer::ui::ui_focus_push_scope({scope});
+		FocusBox(a);
+		FocusBox(b);
+		silencer::ui::ui_focus_pop_scope();
+	};
+
+	RunFocusFrame(focus, {}, build);
+	Clay_ElementData bData = Clay_GetElementData(b);
+	REQUIRE(bData.found);
+
+	silencer::ui::UiFocusInputFrame moved;
+	moved.pointerMoved = true;
+	moved.source = silencer::ui::UiFocusSource::Mouse;
+	Clay_Vector2 insideB = {
+		bData.boundingBox.x + bData.boundingBox.width * 0.5f,
+		bData.boundingBox.y + bData.boundingBox.height * 0.5f,
+	};
+	RunFocusFrame(focus, moved, build, {640.0f, 480.0f}, insideB);
+	CHECK(SameId(silencer::ui::ui_focus_focused_id_for_scope(scope), b));
+	CHECK(silencer::ui::ui_focus_source_for_scope(scope) ==
+	      silencer::ui::UiFocusSource::Mouse);
+
+	Clay_Vector2 outside = {
+		bData.boundingBox.x + bData.boundingBox.width + 200.0f,
+		bData.boundingBox.y + bData.boundingBox.height + 200.0f,
+	};
+	RunFocusFrame(focus, moved, build, {640.0f, 480.0f}, outside);
+	CHECK(silencer::ui::ui_focus_focused_id_for_scope(scope).id == 0);
+
+	RunFocusFrame(focus, {}, build);
+	CHECK(silencer::ui::ui_focus_focused_id_for_scope(scope).id == 0);
+
+	silencer::ui::UiFocusInputFrame down;
+	down.navDown = true;
+	down.source = silencer::ui::UiFocusSource::Keyboard;
+	RunFocusFrame(focus, down, build);
+	CHECK(SameId(silencer::ui::ui_focus_focused_id_for_scope(scope), a));
 }
 
 TEST_CASE("UiFocus failed scope pushes unwind without corrupting parent scope") {
@@ -561,4 +631,91 @@ TEST_CASE("ClientUi focus sees current frame pointer state before layout") {
 	clientUi.EndFrame();
 	CHECK(SameId(silencer::ui::ui_focus_focused_id_for_scope(scope), second));
 	CHECK(confirmCount == 1);
+}
+
+TEST_CASE("ClientUi routes registered interactables through focus runtime once") {
+	RealClayBackend backend;
+	silencer::ui::ClayService clay(backend);
+	silencer::client_ui::ClientUi clientUi(clay);
+
+	silencer::ui::UiInputState input;
+	input.width = 640;
+	input.height = 480;
+	Clay_ElementId first = TestId("RuntimeFirst");
+	Clay_ElementId second = TestId("RuntimeSecond");
+	Clay_ElementId third = TestId("RuntimeThird");
+
+	auto build = [&] {
+		CLAY({
+			.id = TestId("RuntimeButtonStack"),
+			.layout = {
+				.layoutDirection = CLAY_TOP_TO_BOTTOM,
+				.childGap = 8,
+			},
+		}) {
+			RuntimeButton(clientUi.Interactions(), first, "runtime.first");
+			RuntimeButton(clientUi.Interactions(), second, "runtime.second");
+			RuntimeButton(clientUi.Interactions(), third, "runtime.third");
+		}
+	};
+
+	clientUi.BeginFrame(input);
+	build();
+	clientUi.EndFrame();
+	(void)clientUi.DispatchInput(nullptr, input);
+	CHECK(SameId(silencer::ui::ui_focus_focused_id_for_scope(
+	                 CLAY_ID("ClientUiFocusScope")),
+	             first));
+
+	input.navActions.push_back(silencer::ui::UiNavAction::Down);
+	input.source = silencer::ui::UiFocusSource::Keyboard;
+	clientUi.BeginFrame(input);
+	build();
+	clientUi.EndFrame();
+
+	CHECK(SameId(silencer::ui::ui_focus_focused_id_for_scope(
+	                 CLAY_ID("ClientUiFocusScope")),
+	             second));
+	const auto * secondElement = clientUi.Interactions().FindById("runtime.second");
+	REQUIRE(secondElement != nullptr);
+	CHECK(secondElement->focused);
+
+	silencer::client_ui::UiDispatchResult result =
+		clientUi.DispatchInput(nullptr, input);
+	REQUIRE(result.unhandledActions.size() == 1);
+	CHECK(result.unhandledActions[0].kind == silencer::ui::UiActionKind::Navigate);
+	CHECK(result.unhandledActions[0].id == "runtime.second");
+	CHECK(SameId(silencer::ui::ui_focus_focused_id_for_scope(
+	                 CLAY_ID("ClientUiFocusScope")),
+	             second));
+	CHECK_FALSE(SameId(silencer::ui::ui_focus_focused_id_for_scope(
+	                      CLAY_ID("ClientUiFocusScope")),
+	                  third));
+
+	Clay_ElementData secondData = Clay_GetElementData(second);
+	REQUIRE(secondData.found);
+	input = {};
+	input.width = 640;
+	input.height = 480;
+	input.pointer.x = secondData.boundingBox.x + secondData.boundingBox.width * 0.5f;
+	input.pointer.y = secondData.boundingBox.y + secondData.boundingBox.height * 0.5f;
+	input.pointer.moved = true;
+	input.source = silencer::ui::UiFocusSource::Mouse;
+	clientUi.BeginFrame(input);
+	build();
+	clientUi.EndFrame();
+	CHECK(SameId(silencer::ui::ui_focus_focused_id_for_scope(
+	                 CLAY_ID("ClientUiFocusScope")),
+	             second));
+
+	input.pointer.x = 500.0f;
+	input.pointer.y = 440.0f;
+	clientUi.BeginFrame(input);
+	build();
+	clientUi.EndFrame();
+	CHECK(silencer::ui::ui_focus_focused_id_for_scope(
+		      CLAY_ID("ClientUiFocusScope")).id == 0);
+	const auto * staleSecond = clientUi.Interactions().FindById("runtime.second");
+	REQUIRE(staleSecond != nullptr);
+	CHECK_FALSE(staleSecond->focused);
 }

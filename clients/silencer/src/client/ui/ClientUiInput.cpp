@@ -65,6 +65,9 @@ void ClientUiInput::QueueControlPointerPress(int x, int y) {
 	pointerY_ = static_cast<float>(y);
 	havePointerPosition_ = true;
 	controlPointerActive_ = true;
+	pointerPressed_ = true;
+	pointerReleased_ = true;
+	pointerDown_ = false;
 	silencer::ui::UiControlCommand command;
 	command.kind = silencer::ui::UiControlCommandKind::PointerPress;
 	command.x = x;
@@ -78,6 +81,7 @@ void ClientUiInput::QueueControlPointerHover(int x, int y) {
 	pointerY_ = static_cast<float>(y);
 	havePointerPosition_ = true;
 	controlPointerActive_ = true;
+	pointerMoved_ = true;
 	silencer::ui::UiControlCommand command;
 	command.kind = silencer::ui::UiControlCommandKind::PointerHover;
 	command.x = x;
@@ -108,6 +112,10 @@ void ClientUiInput::QueuePointerSurfaceEvent(float surfaceX,
 	pointerX_ = surfaceX;
 	pointerY_ = surfaceY;
 	havePointerPosition_ = true;
+	if(!pressed && !released){
+		pointerMoved_ = true;
+		SetInputSource(silencer::ui::UiFocusSource::Mouse);
+	}
 	if(pressed){
 		pointerPressed_ = true;
 		pointerDown_ = true;
@@ -215,6 +223,7 @@ silencer::ui::UiInputState ClientUiInput::BuildFrame(int width,
 	input.pointer.down = pointerDown_ || pointerPressed_;
 	input.pointer.pressed = pointerPressed_ || (input.pointer.down && !pointerWasDown_);
 	input.pointer.released = pointerReleased_ || (!input.pointer.down && pointerWasDown_);
+	input.pointer.moved = pointerMoved_;
 	input.source = source_;
 	if(input.source == silencer::ui::UiFocusSource::None){
 		input.source = (input.pointer.pressed || input.pointer.released)
@@ -243,6 +252,7 @@ void ClientUiInput::EndFrame() {
 	source_ = silencer::ui::UiFocusSource::None;
 	pointerPressed_ = false;
 	pointerReleased_ = false;
+	pointerMoved_ = false;
 }
 
 }  // namespace client_ui

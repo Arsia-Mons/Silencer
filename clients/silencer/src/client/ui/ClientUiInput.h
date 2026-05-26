@@ -81,6 +81,7 @@ private:
 	bool pointerDown_ = false;
 	bool pointerPressed_ = false;
 	bool pointerReleased_ = false;
+	bool pointerMoved_ = false;
 	bool pointerWasDown_ = false;
 	bool lastFramePointerDown_ = false;
 

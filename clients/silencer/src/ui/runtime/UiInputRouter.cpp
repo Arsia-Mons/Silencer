@@ -41,7 +41,7 @@ UiActionList UiInputRouter::Route(const UiInputState& input) {
 		}
 	}
 
-	if(input.pointer.pressed){
+	if(input.pointer.pressed && !hasControlPointerCommand){
 		registry_.PressAt(
 			static_cast<int>(input.pointer.x),
 			static_cast<int>(input.pointer.y));
@@ -50,7 +50,7 @@ UiActionList UiInputRouter::Route(const UiInputState& input) {
 	// Mouse hover and keyboard navigation share one focus state: moving the
 	// pointer over an interactable focuses it, so the keyboard-focused element
 	// stops being highlighted instead of leaving two lit at once.
-	if(!hasControlPointerCommand){
+	if(!hasControlPointerCommand && input.pointer.moved){
 		registry_.FocusHovered(input.pointer.x, input.pointer.y);
 	}
 
