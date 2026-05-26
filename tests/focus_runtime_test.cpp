@@ -978,6 +978,25 @@ TEST_CASE("ClientUi applies registered initial focus requests through focus runt
 	REQUIRE(result.unhandledActions.size() == 1);
 	CHECK(result.unhandledActions[0].kind == silencer::ui::UiActionKind::Navigate);
 	CHECK(result.unhandledActions[0].id == "initial.second");
+
+	input.navActions.push_back(silencer::ui::UiNavAction::Up);
+	input.source = silencer::ui::UiFocusSource::Keyboard;
+	clientUi.BeginFrame(input);
+	CLAY({
+		.id = TestId("InitialRequestStack"),
+		.layout = {
+			.layoutDirection = CLAY_TOP_TO_BOTTOM,
+			.childGap = 8,
+		},
+	}) {
+		RuntimeButton(clientUi.Interactions(), first, "initial.first");
+		RuntimeButton(clientUi.Interactions(), second, "initial.second", true);
+	}
+	clientUi.EndFrame();
+
+	CHECK(SameId(silencer::ui::ui_focus_focused_id_for_scope(
+	                 CLAY_ID("ClientUiFocusScope")),
+	             first));
 }
 
 TEST_CASE("ClientUi applies forced focus requests through focus runtime") {
