@@ -27,6 +27,7 @@ struct ClayFrameState {
 class ClayService {
 public:
 	explicit ClayService(ClayFrameBackend& backend);
+	~ClayService();
 
 	void BeginFrame(const UiInputState& input, UiInteractionRegistry& interactions);
 	Clay_RenderCommandArray EndFrame();
@@ -36,6 +37,7 @@ private:
 	ClayFrameBackend& backend_;
 	ClayFrameState frame_;
 	bool inFrame_ = false;
+	bool reactInitialized_ = false;
 };
 
 }  // namespace ui

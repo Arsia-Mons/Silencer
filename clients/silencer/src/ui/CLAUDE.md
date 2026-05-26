@@ -10,6 +10,10 @@ This is mid-migration toward good flexbox layout, Clay lifecycle, and shadcn-sty
 
 - Do not include or depend on `Game`, `World`, `ScreenContext`, concrete screens, audio, SDL event loops, `Renderer`, or `Surface` from this layer. Use narrow runtime state, primitive options, and custom payload contracts instead.
 - `ClayService` owns production Clay frame lifecycle. Primitives declare Clay inside an existing frame; they do not begin/end layout, set pointer state, update scroll containers, or render command streams.
+- `ClayService` also brackets the React-style runtime frame. Component code may
+  use `REACT_COMPONENT_*`, hooks, refs, effects, and providers while declaring
+  UI, but it must not call `react_begin_frame`, `react_end_frame`, or
+  `react_shutdown` directly outside focused runtime tests.
 - `UiInteractionRegistry` owns semantic metadata, focus, text editing, pointer hit testing, keyboard/gamepad navigation, automation, and typed action queuing. Clay still owns layout and final bounds.
 - Custom render payloads are the renderer bridge. Keep sprite-bank details inside payloads or existing bridge primitives; do not leak them into new public primitive APIs.
 

@@ -43,6 +43,12 @@ fail_if_match \
   --glob '!third_party/**'
 
 fail_if_match \
+  "\\breact_(begin_frame|end_frame|shutdown)[[:space:]]*\\(" \
+  "$REPO_ROOT/clients/silencer/src/client/ui" \
+  "$REPO_ROOT/clients/silencer/src/game/ui" \
+  --glob '!third_party/**'
+
+fail_if_match \
   "clay_inspector" \
   "$REPO_ROOT/clients/silencer/src" \
   --glob '!third_party/**'

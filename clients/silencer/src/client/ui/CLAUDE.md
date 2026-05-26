@@ -9,6 +9,10 @@ This UI is actively migrating toward good flexbox layout, Clay lifecycle, and sh
 ## Ownership
 
 - `ClientUi` owns one visible UI frame. `Game::RenderClientUiFrame` prepares input, begins one `ClientUi`/`ClayService` frame, asks visible layers to declare UI, ends the frame, renders commands, then dispatches typed UI actions.
+- `ClayService` starts and ends the React-style hook/provider runtime for that
+  same frame. Screen migrations should introduce `{Name}ScreenView` component
+  roots with hooks returning values/functions instead of growing `ScreenContext`
+  or passing broad state bundles through helpers.
 - Screens, modals, HUD, and overlays only declare UI into the current frame. They must not call `Clay_BeginLayout`, `Clay_EndLayout`, `Clay_SetPointerState`, `clay_bridge::EnsureInitialized`, or `clay_bridge::Render`.
 - Clay owns layout, wrapping, clipping, hover state, scroll containers, and final bounds. `UiInteractionRegistry` owns semantic metadata, focus, text editing, pointer hit testing, keyboard/gamepad navigation, automation, and typed actions.
 - Prefer flexbox-style Clay layout: sizing, grow/fit, padding, gaps, alignment, and stable containers. Treat absolute coordinates and sprite-offset nudges as legacy escape hatches to remove when practical.

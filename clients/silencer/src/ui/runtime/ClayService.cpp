@@ -1,9 +1,15 @@
 #include "runtime/ClayService.h"
 
+#include "runtime/react.h"
+
 namespace silencer {
 namespace ui {
 
 ClayService::ClayService(ClayFrameBackend& backend) : backend_(backend) {}
+
+ClayService::~ClayService() {
+	if(reactInitialized_) react_shutdown();
+}
 
 void ClayService::BeginFrame(const UiInputState& input, UiInteractionRegistry& interactions) {
 	frame_.input = input;
@@ -15,6 +21,11 @@ void ClayService::BeginFrame(const UiInputState& input, UiInteractionRegistry& i
 	backend_.SetUiScale(input.uiScale);
 	backend_.SetPointerState(input.pointer.x, input.pointer.y, input.pointer.down);
 	backend_.UpdateScrollContainers(input.pointer.wheelX, input.pointer.wheelY, input.deltaTimeSeconds);
+	if(!reactInitialized_){
+		react_init(Clay_GetCurrentContext());
+		reactInitialized_ = true;
+	}
+	react_begin_frame();
 	backend_.BeginLayout();
 	inFrame_ = true;
 }
@@ -23,6 +34,7 @@ Clay_RenderCommandArray ClayService::EndFrame() {
 	if(!inFrame_) return Clay_RenderCommandArray{};
 	inFrame_ = false;
 	Clay_RenderCommandArray commands = backend_.EndLayout();
+	react_end_frame();
 	if(frame_.interactions){
 		frame_.interactions->ResolveClayBoundsFromClay();
 	}
