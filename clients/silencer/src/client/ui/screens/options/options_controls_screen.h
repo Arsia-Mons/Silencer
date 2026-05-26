@@ -3,7 +3,6 @@
 
 #include "controls_keybind_list.h"
 #include "screen.h"
-#include "keybinds.h"
 
 #include <SDL3/SDL_scancode.h>
 #include <SDL3/SDL_gamepad.h>

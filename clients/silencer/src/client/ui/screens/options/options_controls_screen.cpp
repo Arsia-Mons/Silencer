@@ -44,10 +44,6 @@ constexpr const char * kActionPrimaryPrefix = "options_controls.primary.";
 constexpr const char * kActionSecondaryPrefix = "options_controls.secondary.";
 constexpr const char * kActionOperatorPrefix = "options_controls.operator.";
 
-bool IsBuiltinKeybindProfile(const std::string & name) {
-	return name == "default" || name == "wasd" || name == "gamepad";
-}
-
 template <typename Text>
 bool StartsWith(const Text & value, const char * prefix) {
 	const size_t n = std::strlen(prefix);
@@ -110,14 +106,13 @@ void OptionsControlsScreen::Tick(ScreenContext & ctx) {
 	}
 	if(presetClicked){
 		presetClicked = false;
-		CycleKeybindPreset(ctx.keymap);
+		ctx.CycleKeybindPreset();
 	}
 	if(operatorClickedRow >= 0 && operatorClickedRow < (int)Action::Count){
 		Action a = ACTION_TABLE[operatorClickedRow].action;
-		LegacyBindingView v = ViewLegacy(ctx.keymap, a);
+		LegacyBindingView v = ViewLegacy(ctx, a);
 		v.and_ = !v.and_;
-		ForkActiveProfileIfBuiltin(ctx.keymap);
-		WriteLegacy(ctx.keymap, a, v.key1, v.key2, v.and_);
+		WriteLegacy(ctx, a, v.key1, v.key2, v.and_);
 		operatorClickedRow = -1;
 	}
 	if(rebindRow >= 0){
@@ -133,17 +128,14 @@ void OptionsControlsScreen::Tick(ScreenContext & ctx) {
 	}
 	if(saveClicked){
 		saveClicked = false;
-		const std::string active = Config::GetInstance().active_keybind_profile;
-		if(!options_controls_screen_detail::IsBuiltinKeybindProfile(active)){
-			ctx.keymap.SaveFile(WritableProfilePath(active));
-		}
+		ctx.SaveActiveKeybindProfileIfCustom();
 		Config::GetInstance().Save();
 		ctx.GoToState(GameState::OPTIONS);
 		return;
 	}
 	if(cancelClicked){
 		cancelClicked = false;
-		LoadActiveKeymap(ctx.keymap);
+		ctx.ReloadActiveKeymap();
 		Config::GetInstance().Load();
 		ctx.GoToState(GameState::OPTIONS);
 	}
@@ -259,9 +251,7 @@ void OptionsControlsScreen::BuildUi(ScreenContext & ctx, Surface & dst, float fr
 
 	keybindListView_ = KeybindListView{};
 	keybindListView_.hScale = keybindHScale;
-	keybindListView_.presetText = !ctx.keymap.label.empty() ? ctx.keymap.label
-	                            : !ctx.keymap.name.empty() ? ctx.keymap.name
-	                            : std::string(Config::GetInstance().active_keybind_profile);
+	keybindListView_.presetText = ctx.KeybindPresetText();
 	keybindListView_.titleOffsetY = static_cast<float>(
 		std::max(0,
 		         options_controls_screen_detail::ScaleLegacyPx(
@@ -274,7 +264,7 @@ void OptionsControlsScreen::BuildUi(ScreenContext & ctx, Surface & dst, float fr
 		int row = scrollPosition + i;
 		if(row >= (int)Action::Count) break;
 		Action action = ACTION_TABLE[row].action;
-		LegacyBindingView v = ViewLegacy(ctx.keymap, action);
+		LegacyBindingView v = ViewLegacy(ctx, action);
 		KeybindRowView & out = keybindListView_.rows[i];
 		out.actionLabel = std::string(GetActionInfo(action).label) + ":";
 		out.primaryLabel = GetBindingLabel(ctx, action, 0);

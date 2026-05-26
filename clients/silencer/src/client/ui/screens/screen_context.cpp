@@ -1,5 +1,6 @@
 #include "screen_context.h"
 
+#include "config.h"
 #include "game.h"
 #include "renderer.h"
 #include "screen.h"
@@ -57,12 +58,12 @@ ScreenContext::ScreenContext(Game & game_,
                              RenderDevice * & renderdevice_)
     : game(game_),
       renderer(renderer_),
+      keymap(keymap_),
       updater(updater_),
       window(window_),
       renderdevice(renderdevice_),
       world(world_),
       lobby(lobby_),
-      keymap(keymap_),
       ambienceMixer(ambienceMixer_),
       mapDownloader(mapDownloader_)
 {
@@ -103,6 +104,120 @@ bool ScreenContext::ShowMessage(const char * msg, std::function<void()> onClose)
 
 void ScreenContext::ClearUiFocus() {
 	game.UiInteractions().ClearFocus();
+}
+
+std::string ScreenContext::KeybindPresetText() const {
+	if(!keymap.label.empty()) return keymap.label;
+	if(!keymap.name.empty()) return keymap.name;
+	return Config::GetInstance().active_keybind_profile;
+}
+
+void ScreenContext::CycleKeybindPreset() {
+	::CycleKeybindPreset(keymap);
+}
+
+void ScreenContext::SaveActiveKeybindProfileIfCustom() {
+	const std::string active = Config::GetInstance().active_keybind_profile;
+	if(active == "default" || active == "wasd" || active == "gamepad") return;
+	keymap.SaveFile(WritableProfilePath(active));
+}
+
+void ScreenContext::ReloadActiveKeymap() {
+	LoadActiveKeymap(keymap);
+}
+
+ScreenContext::LegacyKeyBindingSlots ScreenContext::LegacyKeyBinding(Action action) const {
+	LegacyKeyBindingSlots out;
+	const auto & ab = keymap.Get(action);
+	if(ab.bindings.empty()) return out;
+	const auto & b0 = ab.bindings[0];
+	if(b0.keys.size() >= 2 &&
+	   b0.keys[0].device == BindingDevice::Keyboard &&
+	   b0.keys[1].device == BindingDevice::Keyboard){
+		out.key1 = static_cast<SDL_Scancode>(b0.keys[0].code);
+		out.key2 = static_cast<SDL_Scancode>(b0.keys[1].code);
+		out.and_ = true;
+		return out;
+	}
+	if(!b0.keys.empty() && b0.keys[0].device == BindingDevice::Keyboard){
+		out.key1 = static_cast<SDL_Scancode>(b0.keys[0].code);
+	}
+	if(ab.bindings.size() >= 2){
+		const auto & b1 = ab.bindings[1];
+		if(!b1.keys.empty() && b1.keys[0].device == BindingDevice::Keyboard){
+			out.key2 = static_cast<SDL_Scancode>(b1.keys[0].code);
+		}
+	}
+	return out;
+}
+
+void ScreenContext::WriteLegacyKeyBinding(Action action,
+                                          SDL_Scancode key1,
+                                          SDL_Scancode key2,
+                                          bool and_) {
+	ForkActiveProfileIfBuiltin(keymap);
+	auto & ab = keymap.Get(action);
+	ab.bindings.clear();
+	auto mk = [](SDL_Scancode sc){
+		BindingKey k;
+		k.device  = BindingDevice::Keyboard;
+		k.code    = static_cast<int>(sc);
+		k.axisDir = 0;
+		return k;
+	};
+	if(key1 == SDL_SCANCODE_UNKNOWN && key2 == SDL_SCANCODE_UNKNOWN) return;
+	if(and_ && key1 != SDL_SCANCODE_UNKNOWN && key2 != SDL_SCANCODE_UNKNOWN){
+		Binding b;
+		b.keys.push_back(mk(key1));
+		b.keys.push_back(mk(key2));
+		ab.bindings.push_back(std::move(b));
+		return;
+	}
+	if(key1 != SDL_SCANCODE_UNKNOWN){
+		Binding b;
+		b.keys.push_back(mk(key1));
+		ab.bindings.push_back(std::move(b));
+	}
+	if(key2 != SDL_SCANCODE_UNKNOWN){
+		Binding b;
+		b.keys.push_back(mk(key2));
+		ab.bindings.push_back(std::move(b));
+	}
+}
+
+std::string ScreenContext::KeyBindingSlotLabel(Action action, int slot) const {
+	const auto & ab = keymap.Get(action);
+	int found = 0;
+	for(const auto & b : ab.bindings){
+		if(b.keys.empty()) continue;
+		if(found == slot){
+			const auto & k = b.keys[0];
+			if(k.device == BindingDevice::Keyboard){
+				return KeyMap::GetKeyName(static_cast<SDL_Scancode>(k.code));
+			}
+			std::string s = Stringify(k);
+			auto colon = s.find(':');
+			std::string raw = (colon != std::string::npos) ? s.substr(colon + 1) : s;
+			return GamepadShortLabel(raw, CurrentGamepadType());
+		}
+		found++;
+	}
+	return KeyMap::GetKeyName(SDL_SCANCODE_UNKNOWN);
+}
+
+void ScreenContext::SetCapturedBinding(Action action, int slot, const BindingKey & bindingKey) {
+	ForkActiveProfileIfBuiltin(keymap);
+	auto & ab = keymap.Get(action);
+	Binding binding;
+	binding.keys.push_back(bindingKey);
+	if(slot == 0){
+		if(ab.bindings.empty()) ab.bindings.push_back(binding);
+		else ab.bindings[0] = binding;
+	}else{
+		if(ab.bindings.empty()) ab.bindings.push_back(Binding{});
+		if(ab.bindings.size() < 2) ab.bindings.push_back(binding);
+		else ab.bindings[1] = binding;
+	}
 }
 
 void ScreenContext::ResetPresentation(int paletteIdx) {

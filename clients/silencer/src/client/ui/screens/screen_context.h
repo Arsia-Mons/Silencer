@@ -8,6 +8,8 @@
 #include <memory>
 #include <string>
 
+#include "keybinds.h"
+
 class World;
 class Renderer;
 class Lobby;
@@ -24,14 +26,15 @@ class LobbyGame;
 struct SDL_Window;
 
 // Bag of refs that screens use to reach transitional global subsystems
-// (World, Lobby, KeyMap, AmbienceMixer, MapDownloader) plus narrow handoffs for
-// Game, updater, renderer, window, render-device, and screen-stack actions.
+// (World, Lobby, AmbienceMixer, MapDownloader) plus narrow handoffs for Game,
+// keymap, updater, renderer, window, render-device, and screen-stack actions.
 // Per-screen behavior lives in the screen, not here; private backing services
 // must be exposed only through named ScreenContext methods.
 class ScreenContext
 {
 	Game & game;
 	Renderer & renderer;
+	KeyMap & keymap;
 	Updater & updater;
 	SDL_Window * & window;
 	RenderDevice * & renderdevice;
@@ -45,6 +48,11 @@ public:
 		Staging,
 		Failed,
 		Done
+	};
+	struct LegacyKeyBindingSlots {
+		SDL_Scancode key1 = SDL_SCANCODE_UNKNOWN;
+		SDL_Scancode key2 = SDL_SCANCODE_UNKNOWN;
+		bool and_ = false;
 	};
 
 	ScreenContext(Game & game,
@@ -60,7 +68,6 @@ public:
 
 	World &    world;
 	Lobby &    lobby;
-	KeyMap &   keymap;
 	AmbienceMixer & ambienceMixer;
 	MapDownloader & mapDownloader;
 
@@ -86,6 +93,17 @@ public:
 	bool ShowModal(std::unique_ptr<Modal> m);
 	bool ShowMessage(const char * msg, std::function<void()> onClose = nullptr);
 	void ClearUiFocus();
+	std::string KeybindPresetText() const;
+	void CycleKeybindPreset();
+	void SaveActiveKeybindProfileIfCustom();
+	void ReloadActiveKeymap();
+	LegacyKeyBindingSlots LegacyKeyBinding(Action action) const;
+	void WriteLegacyKeyBinding(Action action,
+	                           SDL_Scancode key1,
+	                           SDL_Scancode key2,
+	                           bool and_);
+	std::string KeyBindingSlotLabel(Action action, int slot) const;
+	void SetCapturedBinding(Action action, int slot, const BindingKey & binding);
 
 	// Switch the renderer's active palette and clear the framebuffer. Called
 	// from Screen::Build by every menu surface that owns its presentation.

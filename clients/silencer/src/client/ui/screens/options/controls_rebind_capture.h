@@ -30,8 +30,8 @@ struct LegacyBindingView {
 	bool         and_ = false;
 };
 
-LegacyBindingView ViewLegacy(const KeyMap & km, Action a);
-void WriteLegacy(KeyMap & km, Action a, SDL_Scancode key1, SDL_Scancode key2, bool and_);
+LegacyBindingView ViewLegacy(const ScreenContext & ctx, Action a);
+void WriteLegacy(ScreenContext & ctx, Action a, SDL_Scancode key1, SDL_Scancode key2, bool and_);
 
 // Display label for the slot-th binding of an action. Handles keyboard,
 // gamepad button, and gamepad axis bindings.
