@@ -3,11 +3,34 @@
 #include "client/ui/ClientUi.h"
 #include "client/ui/ClientUiInput.h"
 #include "client/ui/screens/screen.h"
+#include "client/ui/screens/screen_context.h"
 #include "ui/runtime/ClayService.h"
 #include "ui/runtime/UiInputRouter.h"
 
+#include <cstdint>
 #include <sstream>
 #include <string>
+
+ScreenContext::ScreenContext(Game & game_,
+                             World & world_,
+                             Renderer & renderer_,
+                             Lobby & lobby_,
+                             KeyMap & keymap_,
+                             Updater & updater_,
+                             AmbienceMixer & ambienceMixer_,
+                             MapDownloader & mapDownloader_,
+                             SDL_Window * & window_,
+                             RenderDevice * & renderdevice_)
+	: game(game_),
+	  world(world_),
+	  renderer(renderer_),
+	  lobby(lobby_),
+	  keymap(keymap_),
+	  updater(updater_),
+	  ambienceMixer(ambienceMixer_),
+	  mapDownloader(mapDownloader_),
+	  window(window_),
+	  renderdevice(renderdevice_) {}
 
 namespace {
 
@@ -68,6 +91,122 @@ public:
 
 private:
 	int * destroyCount_ = nullptr;
+};
+
+template <typename T>
+T& UnusedRef() {
+	static std::uintptr_t storage = 0;
+	return *reinterpret_cast<T*>(&storage);
+}
+
+ScreenContext& TestScreenContext() {
+	// These tests exercise ClientUi stack/provider mechanics with screens that
+	// deliberately ignore ScreenContext. Keeping a real ScreenContext object
+	// here avoids pulling the full Game object graph into the unit test target.
+	static SDL_Window * window = nullptr;
+	static RenderDevice * renderDevice = nullptr;
+	static ScreenContext ctx(
+		UnusedRef<Game>(),
+		UnusedRef<World>(),
+		UnusedRef<Renderer>(),
+		UnusedRef<Lobby>(),
+		UnusedRef<KeyMap>(),
+		UnusedRef<Updater>(),
+		UnusedRef<AmbienceMixer>(),
+		UnusedRef<MapDownloader>(),
+		window,
+		renderDevice);
+	return ctx;
+}
+
+Surface& UnusedSurface() {
+	return UnusedRef<Surface>();
+}
+
+struct HookProbeStats {
+	int buildCount = 0;
+	int buildUiCount = 0;
+	int destroyCount = 0;
+	silencer::client_ui::UiScreenEntryId entryId = 0;
+	bool sawPush = false;
+	bool sawPopCurrent = false;
+	bool sawPopTop = false;
+	bool sawWriteQueue = false;
+};
+
+enum class HookProbeAction {
+	None,
+	PushAndDeferred,
+	PopCurrent,
+};
+
+class HookProbeScreen final : public Screen {
+public:
+	HookProbeScreen(HookProbeStats * stats,
+	                bool overlay = false,
+	                HookProbeAction action = HookProbeAction::None,
+	                HookProbeStats * pushedStats = nullptr,
+	                Screen ** pushedScreenOut = nullptr,
+	                int * deferredCount = nullptr)
+		: stats_(stats),
+		  overlay_(overlay),
+		  action_(action),
+		  pushedStats_(pushedStats),
+		  pushedScreenOut_(pushedScreenOut),
+		  deferredCount_(deferredCount) {}
+
+	void Build(ScreenContext&) override {
+		if(stats_) stats_->buildCount++;
+	}
+
+	void Tick(ScreenContext&) override {}
+
+	void BuildUi(ScreenContext&,
+	             Surface&,
+	             float,
+	             silencer::ui::UiInteractionRegistry&) override {
+		if(stats_) stats_->buildUiCount++;
+		auto navigator = silencer::client_ui::UseScreenNavigator();
+		auto queueWrite = silencer::client_ui::UseUiWriteQueue();
+		if(stats_){
+			stats_->entryId = navigator.currentEntryId;
+			stats_->sawPush = static_cast<bool>(navigator.push);
+			stats_->sawPopCurrent = static_cast<bool>(navigator.popCurrent);
+			stats_->sawPopTop = static_cast<bool>(navigator.popTop);
+			stats_->sawWriteQueue = static_cast<bool>(queueWrite);
+		}
+		if(queued_) return;
+		queued_ = true;
+		if(action_ == HookProbeAction::PushAndDeferred){
+			if(navigator.push && pushedStats_){
+				auto pushed = std::make_unique<HookProbeScreen>(pushedStats_);
+				if(pushedScreenOut_) *pushedScreenOut_ = pushed.get();
+				navigator.push(std::move(pushed));
+			}
+			if(queueWrite && deferredCount_){
+				queueWrite([count = deferredCount_] {
+					*count += 1;
+				});
+			}
+		}else if(action_ == HookProbeAction::PopCurrent){
+			if(navigator.popCurrent) navigator.popCurrent();
+		}
+	}
+
+	void Destroy(ScreenContext&) override {
+		if(stats_) stats_->destroyCount++;
+	}
+
+	bool IsOverlay() const override { return overlay_; }
+
+private:
+	HookProbeStats * stats_ = nullptr;
+	bool overlay_ = false;
+	HookProbeAction action_ = HookProbeAction::None;
+	HookProbeStats * pushedStats_ = nullptr;
+	Screen ** pushedScreenOut_ = nullptr;
+	int * deferredCount_ = nullptr;
+	bool queued_ = false;
 };
 
 }  // namespace
@@ -154,6 +293,94 @@ TEST_CASE("ClientUi clears stale queued writes at the next frame boundary") {
 
 	CHECK(clientUi.PendingWriteCount() == 0);
 	CHECK(destroyCount == 1);
+}
+
+TEST_CASE("ClientUi screen hooks queue push and deferred writes until post-render drain") {
+	RecordingClayBackend backend;
+	silencer::ui::ClayService clay(backend);
+	silencer::client_ui::ClientUi clientUi(clay);
+	HookProbeStats rootStats;
+	HookProbeStats pushedStats;
+	int deferredCount = 0;
+	Screen * pushedScreen = nullptr;
+
+	auto root = std::make_unique<HookProbeScreen>(
+		&rootStats,
+		false,
+		HookProbeAction::PushAndDeferred,
+		&pushedStats,
+		&pushedScreen,
+		&deferredCount);
+	Screen * rootScreen = root.get();
+	clientUi.PushScreen(std::move(root), TestScreenContext());
+
+	silencer::ui::UiInputState input;
+	input.width = 640;
+	input.height = 480;
+	clientUi.BeginFrame(input);
+	clientUi.BuildVisibleScreens(TestScreenContext(), UnusedSurface(), 0.0f);
+
+	CHECK(rootStats.buildCount == 1);
+	CHECK(rootStats.buildUiCount == 1);
+	CHECK(rootStats.entryId != 0);
+	CHECK(rootStats.sawPush);
+	CHECK(rootStats.sawPopCurrent);
+	CHECK(rootStats.sawPopTop);
+	CHECK(rootStats.sawWriteQueue);
+	CHECK(clientUi.TopScreen() == rootScreen);
+	CHECK(clientUi.PendingWriteCount() == 2);
+	CHECK(deferredCount == 0);
+	CHECK(pushedStats.buildCount == 0);
+
+	clientUi.EndFrame();
+	CHECK(clientUi.TopScreen() == rootScreen);
+	CHECK(clientUi.PendingWriteCount() == 2);
+	CHECK(deferredCount == 0);
+
+	clientUi.DrainWrites(TestScreenContext());
+	CHECK(clientUi.PendingWriteCount() == 0);
+	CHECK(deferredCount == 1);
+	REQUIRE(pushedScreen != nullptr);
+	CHECK(pushedStats.buildCount == 1);
+	CHECK(clientUi.TopScreen() == pushedScreen);
+}
+
+TEST_CASE("ClientUi popCurrent drains by screen entry id instead of top screen") {
+	RecordingClayBackend backend;
+	silencer::ui::ClayService clay(backend);
+	silencer::client_ui::ClientUi clientUi(clay);
+	HookProbeStats baseStats;
+	HookProbeStats popperStats;
+	HookProbeStats topStats;
+
+	auto base = std::make_unique<HookProbeScreen>(&baseStats);
+	auto popper = std::make_unique<HookProbeScreen>(
+		&popperStats, true, HookProbeAction::PopCurrent);
+	auto top = std::make_unique<HookProbeScreen>(&topStats, true);
+	Screen * topScreen = top.get();
+	clientUi.PushScreen(std::move(base), TestScreenContext());
+	clientUi.PushScreen(std::move(popper), TestScreenContext());
+	clientUi.PushScreen(std::move(top), TestScreenContext());
+
+	silencer::ui::UiInputState input;
+	input.width = 640;
+	input.height = 480;
+	clientUi.BeginFrame(input);
+	clientUi.BuildVisibleScreens(TestScreenContext(), UnusedSurface(), 0.0f);
+	clientUi.EndFrame();
+
+	CHECK(baseStats.entryId != 0);
+	CHECK(popperStats.entryId != 0);
+	CHECK(topStats.entryId != 0);
+	CHECK(baseStats.entryId != popperStats.entryId);
+	CHECK(popperStats.entryId != topStats.entryId);
+	CHECK(clientUi.TopScreen() == topScreen);
+	CHECK(clientUi.PendingWriteCount() == 1);
+
+	clientUi.DrainWrites(TestScreenContext());
+	CHECK(popperStats.destroyCount == 1);
+	CHECK(topStats.destroyCount == 0);
+	CHECK(clientUi.TopScreen() == topScreen);
 }
 
 TEST_CASE("UiInteractionRegistry supports id and case-insensitive label lookup") {
