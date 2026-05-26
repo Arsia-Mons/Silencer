@@ -1,5 +1,6 @@
 #include "options_display_screen.h"
 
+#include "client/ui/ClientUi.h"
 #include "screen_context.h"
 #include "game_state.h"
 #include "surface.h"
@@ -12,7 +13,8 @@
 #include "primitives/button.h"
 #include "primitives/text.h"
 
-#include <SDL3/SDL.h>
+#include <cstdint>
+#include <functional>
 
 namespace options_display_screen_detail
 {
@@ -33,45 +35,34 @@ constexpr const char * kActionFullscreen = "options_display.fullscreen";
 constexpr const char * kActionSmoothScaling = "options_display.smooth_scaling";
 constexpr const char * kActionSave = "options_display.save";
 constexpr const char * kActionCancel = "options_display.cancel";
+
+std::function<void()> UseQueuedAction(std::function<void()> write)
+{
+	auto queueWrite = silencer::client_ui::UseUiWriteQueue();
+	if(!queueWrite) return {};
+	return [queueWrite, write]() {
+		queueWrite(write);
+	};
+}
+
+void Invoke(const std::function<void()> & action)
+{
+	if(action) action();
+}
 } // namespace options_display_screen_detail
 
 void OptionsDisplayScreen::Build(ScreenContext & ctx)
 {
 	ctx.ResetMenuPresentation(1);
-	fullscreenClicked = false;
-	smoothScalingClicked = false;
-	saveClicked = false;
-	cancelClicked = false;
+	toggleFullscreen = {};
+	toggleSmoothScaling = {};
+	save = {};
+	cancel = {};
 }
 
 void OptionsDisplayScreen::Tick(ScreenContext & ctx)
 {
-	if(fullscreenClicked){
-		fullscreenClicked = false;
-		Config & cfg = Config::GetInstance();
-		cfg.fullscreen = !cfg.fullscreen;
-		ctx.SetWindowFullscreen(cfg.fullscreen);
-	}
-	if(smoothScalingClicked){
-		smoothScalingClicked = false;
-		Config & cfg = Config::GetInstance();
-		cfg.scalefilter = !cfg.scalefilter;
-		ctx.SetScaleFilter(cfg.scalefilter);
-	}
-	if(saveClicked){
-		saveClicked = false;
-		Config::GetInstance().Save();
-		ctx.GoToState(GameState::OPTIONS);
-		return;
-	}
-	if(cancelClicked){
-		cancelClicked = false;
-		Config & cfg = Config::GetInstance();
-		cfg.Load();
-		ctx.SetScaleFilter(cfg.scalefilter);
-		ctx.SetWindowFullscreen(cfg.fullscreen);
-		ctx.GoToState(GameState::OPTIONS);
-	}
+	(void)ctx;
 }
 
 void OptionsDisplayScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime, silencer::ui::UiInteractionRegistry& interactions)
@@ -81,6 +72,28 @@ void OptionsDisplayScreen::BuildUi(ScreenContext & ctx, Surface & dst, float fra
 	using namespace silencer::clay_bridge;
 
 	Config & cfg = Config::GetInstance();
+	toggleFullscreen = options_display_screen_detail::UseQueuedAction([&ctx]() {
+		Config & cfg = Config::GetInstance();
+		cfg.fullscreen = !cfg.fullscreen;
+		ctx.SetWindowFullscreen(cfg.fullscreen);
+	});
+	toggleSmoothScaling = options_display_screen_detail::UseQueuedAction([&ctx]() {
+		Config & cfg = Config::GetInstance();
+		cfg.scalefilter = !cfg.scalefilter;
+		ctx.SetScaleFilter(cfg.scalefilter);
+	});
+	save = options_display_screen_detail::UseQueuedAction([&ctx]() {
+		Config::GetInstance().Save();
+		ctx.GoToState(GameState::OPTIONS);
+	});
+	cancel = options_display_screen_detail::UseQueuedAction([&ctx]() {
+		Config & cfg = Config::GetInstance();
+		cfg.Load();
+		ctx.SetScaleFilter(cfg.scalefilter);
+		ctx.SetWindowFullscreen(cfg.fullscreen);
+		ctx.GoToState(GameState::OPTIONS);
+	});
+
 	CLAY({ .id = CLAY_ID("OptionsDisplayRoot"),
 	       .layout = {
 	           .sizing = { CLAY_SIZING_GROW(0),
@@ -145,30 +158,34 @@ void OptionsDisplayScreen::BuildUi(ScreenContext & ctx, Surface & dst, float fra
 void OptionsDisplayScreen::Destroy(ScreenContext & ctx)
 {
 	(void)ctx;
+	toggleFullscreen = {};
+	toggleSmoothScaling = {};
+	save = {};
+	cancel = {};
 }
 
 bool OptionsDisplayScreen::HandleUiIntent(ScreenContext & ctx, const silencer::ui::UiAction & action)
 {
 	(void)ctx;
 	if(action.kind == silencer::ui::UiActionKind::Cancel){
-		cancelClicked = true;
+		options_display_screen_detail::Invoke(cancel);
 		return true;
 	}
 	if(action.kind != silencer::ui::UiActionKind::Activate) return false;
 	if(action.id == options_display_screen_detail::kActionFullscreen){
-		fullscreenClicked = true;
+		options_display_screen_detail::Invoke(toggleFullscreen);
 		return true;
 	}
 	if(action.id == options_display_screen_detail::kActionSmoothScaling){
-		smoothScalingClicked = true;
+		options_display_screen_detail::Invoke(toggleSmoothScaling);
 		return true;
 	}
 	if(action.id == options_display_screen_detail::kActionSave){
-		saveClicked = true;
+		options_display_screen_detail::Invoke(save);
 		return true;
 	}
 	if(action.id == options_display_screen_detail::kActionCancel){
-		cancelClicked = true;
+		options_display_screen_detail::Invoke(cancel);
 		return true;
 	}
 	return false;

@@ -3,6 +3,8 @@
 
 #include "screen.h"
 
+#include <functional>
+
 class OptionsAudioScreen : public Screen
 {
 public:
@@ -13,9 +15,9 @@ public:
 	bool HandleUiIntent(ScreenContext & ctx, const silencer::ui::UiAction & action) override;
 
 private:
-	bool musicClicked = false;
-	bool saveClicked = false;
-	bool cancelClicked = false;
+	std::function<void()> toggleMusic;
+	std::function<void()> save;
+	std::function<void()> cancel;
 };
 
 #endif

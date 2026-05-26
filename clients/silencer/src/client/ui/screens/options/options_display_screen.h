@@ -3,6 +3,8 @@
 
 #include "screen.h"
 
+#include <functional>
+
 class OptionsDisplayScreen : public Screen
 {
 public:
@@ -13,10 +15,10 @@ public:
 	bool HandleUiIntent(ScreenContext & ctx, const silencer::ui::UiAction & action) override;
 
 private:
-	bool fullscreenClicked = false;
-	bool smoothScalingClicked = false;
-	bool saveClicked = false;
-	bool cancelClicked = false;
+	std::function<void()> toggleFullscreen;
+	std::function<void()> toggleSmoothScaling;
+	std::function<void()> save;
+	std::function<void()> cancel;
 };
 
 #endif

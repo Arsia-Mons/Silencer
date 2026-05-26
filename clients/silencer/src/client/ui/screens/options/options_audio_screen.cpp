@@ -1,5 +1,6 @@
 #include "options_audio_screen.h"
 
+#include "client/ui/ClientUi.h"
 #include "screen_context.h"
 #include "game_state.h"
 #include "surface.h"
@@ -13,7 +14,8 @@
 #include "primitives/button.h"
 #include "primitives/text.h"
 
-#include <SDL3/SDL.h>
+#include <cstdint>
+#include <functional>
 
 namespace options_audio_screen_detail
 {
@@ -41,37 +43,33 @@ void ApplyMusicSetting(bool on)
 		Audio::GetInstance().PauseMusic();
 	}
 }
+
+std::function<void()> UseQueuedAction(std::function<void()> write)
+{
+	auto queueWrite = silencer::client_ui::UseUiWriteQueue();
+	if(!queueWrite) return {};
+	return [queueWrite, write]() {
+		queueWrite(write);
+	};
+}
+
+void Invoke(const std::function<void()> & action)
+{
+	if(action) action();
+}
 } // namespace options_audio_screen_detail
 
 void OptionsAudioScreen::Build(ScreenContext & ctx)
 {
 	ctx.ResetMenuPresentation(1);
-	musicClicked = false;
-	saveClicked = false;
-	cancelClicked = false;
+	toggleMusic = {};
+	save = {};
+	cancel = {};
 }
 
 void OptionsAudioScreen::Tick(ScreenContext & ctx)
 {
-	if(musicClicked){
-		musicClicked = false;
-		Config & cfg = Config::GetInstance();
-		cfg.music = !cfg.music;
-		options_audio_screen_detail::ApplyMusicSetting(cfg.music);
-	}
-	if(saveClicked){
-		saveClicked = false;
-		Config::GetInstance().Save();
-		ctx.GoToState(GameState::OPTIONS);
-		return;
-	}
-	if(cancelClicked){
-		cancelClicked = false;
-		Config & cfg = Config::GetInstance();
-		cfg.Load();
-		options_audio_screen_detail::ApplyMusicSetting(cfg.music);
-		ctx.GoToState(GameState::OPTIONS);
-	}
+	(void)ctx;
 }
 
 void OptionsAudioScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime, silencer::ui::UiInteractionRegistry& interactions)
@@ -81,6 +79,22 @@ void OptionsAudioScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frame
 	using namespace silencer::clay_bridge;
 
 	Config & cfg = Config::GetInstance();
+	toggleMusic = options_audio_screen_detail::UseQueuedAction([]() {
+		Config & cfg = Config::GetInstance();
+		cfg.music = !cfg.music;
+		options_audio_screen_detail::ApplyMusicSetting(cfg.music);
+	});
+	save = options_audio_screen_detail::UseQueuedAction([&ctx]() {
+		Config::GetInstance().Save();
+		ctx.GoToState(GameState::OPTIONS);
+	});
+	cancel = options_audio_screen_detail::UseQueuedAction([&ctx]() {
+		Config & cfg = Config::GetInstance();
+		cfg.Load();
+		options_audio_screen_detail::ApplyMusicSetting(cfg.music);
+		ctx.GoToState(GameState::OPTIONS);
+	});
+
 	CLAY({ .id = CLAY_ID("OptionsAudioRoot"),
 	       .layout = {
 	           .sizing = { CLAY_SIZING_GROW(0),
@@ -130,26 +144,29 @@ void OptionsAudioScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frame
 void OptionsAudioScreen::Destroy(ScreenContext & ctx)
 {
 	(void)ctx;
+	toggleMusic = {};
+	save = {};
+	cancel = {};
 }
 
 bool OptionsAudioScreen::HandleUiIntent(ScreenContext & ctx, const silencer::ui::UiAction & action)
 {
 	(void)ctx;
 	if(action.kind == silencer::ui::UiActionKind::Cancel){
-		cancelClicked = true;
+		options_audio_screen_detail::Invoke(cancel);
 		return true;
 	}
 	if(action.kind != silencer::ui::UiActionKind::Activate) return false;
 	if(action.id == options_audio_screen_detail::kActionMusic){
-		musicClicked = true;
+		options_audio_screen_detail::Invoke(toggleMusic);
 		return true;
 	}
 	if(action.id == options_audio_screen_detail::kActionSave){
-		saveClicked = true;
+		options_audio_screen_detail::Invoke(save);
 		return true;
 	}
 	if(action.id == options_audio_screen_detail::kActionCancel){
-		cancelClicked = true;
+		options_audio_screen_detail::Invoke(cancel);
 		return true;
 	}
 	return false;
