@@ -431,6 +431,23 @@ bool ScreenContext::ShouldDismissCreateGameProgress() const {
 	       (world.IsConnected() || world.IsIdle());
 }
 
+bool ScreenContext::BeginConnectedLobbyGame() {
+	if(!world.GetPeer(world.GetLocalPeerId())) return false;
+	ResetJoinMapDownload();
+	const Uint8 agency = world.lobby.GetSelectedAgencyOrDefault(Config::GetInstance().defaultagency);
+	world.SetTech(Config::GetInstance().defaulttechchoices[agency]);
+	return true;
+}
+
+std::string ScreenContext::JoinCurrentLobbyGameChannel() {
+	LobbyGame * lobbyGame = CurrentLobbyGame();
+	if(!lobbyGame) return std::string();
+	const std::string channel = LobbyGameChannelName(*lobbyGame);
+	strcpy(world.lobby.lastchannel, world.lobby.channel);
+	world.lobby.JoinChannel(channel.c_str());
+	return lobbyGame->mapname;
+}
+
 void ScreenContext::BeginCreateGameMapUpload(const std::string & gameName,
                                              const std::string & mapName,
                                              const std::string & password,

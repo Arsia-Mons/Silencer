@@ -177,7 +177,7 @@ void LobbyScreen::Destroy(ScreenContext & ctx)
 	(void)ctx;
 }
 
-void LobbyScreen::SetMapNameOverlay(World & /*world*/, const char * name)
+void LobbyScreen::SetMapNameOverlay(const char * name)
 {
 	mapName = name ? std::string(name).substr(0, 25) : std::string();
 }

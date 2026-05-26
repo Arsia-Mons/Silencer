@@ -31,7 +31,7 @@ public:
 
 	// Map-name overlay (uid 8 on the legacy chrome) — written by the
 	// CONNECTED→GameJoin handoff and cleared by HandleBack.
-	void SetMapNameOverlay(class World & world, const char * name);
+	void SetMapNameOverlay(const char * name);
 
 	// Right-side panel swap helpers. Called by lobby panels (GameSelect's
 	// "Create Game" button, GameJoin's "Choose Tech", GameTech's "Back To

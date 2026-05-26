@@ -160,6 +160,8 @@ public:
 	std::string CreateGameProgressText() const;
 	bool CreateGameMapUploadIdle() const;
 	bool ShouldDismissCreateGameProgress() const;
+	bool BeginConnectedLobbyGame();
+	std::string JoinCurrentLobbyGameChannel();
 	void BeginCreateGameMapUpload(const std::string & gameName,
 	                              const std::string & mapName,
 	                              const std::string & password,

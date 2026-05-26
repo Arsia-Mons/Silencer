@@ -5,7 +5,6 @@
 #include "world.h"
 #include "lobbygame.h"
 #include "serializer.h"
-#include "config.h"
 #include "message_modal.h"
 #include "peer.h"
 
@@ -96,19 +95,10 @@ void LobbyScreen::Tick(ScreenContext & ctx)
 			ctx.SetCreateGamePending(false);
 		}
 		if(ctx.LobbyNetworkConnected()){
-			Peer * peer = world.peers.peerlist[world.peers.localpeerid];
-			if(peer){
-				ctx.ResetJoinMapDownload();
-				const Uint8 agency = world.lobby.GetSelectedAgencyOrDefault(Config::GetInstance().defaultagency);
-				world.SetTech(Config::GetInstance().defaulttechchoices[agency]);
+			if(ctx.BeginConnectedLobbyGame()){
 				ShowGameJoin(ctx);
-				LobbyGame * lobbygame = ctx.CurrentLobbyGame();
-				if(lobbygame){
-					const std::string channel = ctx.LobbyGameChannelName(*lobbygame);
-					strcpy(world.lobby.lastchannel, world.lobby.channel);
-					world.lobby.JoinChannel(channel.c_str());
-					SetMapNameOverlay(world, lobbygame->mapname);
-				}
+				std::string mapName = ctx.JoinCurrentLobbyGameChannel();
+				if(!mapName.empty()) SetMapNameOverlay(mapName.c_str());
 			}
 		}
 	}
@@ -129,7 +119,7 @@ bool LobbyScreen::HandleBack(ScreenContext & ctx)
 {
 	if(gameJoinActive || gameTechActive){
 		ctx.LeaveJoinedGame();
-		SetMapNameOverlay(ctx.world, "");
+		SetMapNameOverlay("");
 		ShowGameSelect(ctx);
 		return true;
 	}

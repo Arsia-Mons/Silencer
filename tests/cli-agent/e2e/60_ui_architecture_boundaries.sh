@@ -260,6 +260,11 @@ fail_if_match \
   --glob '!**/screen_context.cpp'
 
 fail_if_match \
+  'ctx[[:space:]]*[.][[:space:]]*(CurrentLobbyGame|LobbyGameChannelName)[[:space:]]*[(]|world[[:space:]]*[.][[:space:]]*lobby[[:space:]]*[.][[:space:]]*(GetSelectedAgencyOrDefault|lastchannel|channel|JoinChannel)|Config::GetInstance[[:space:]]*[(][[:space:]]*[)][[:space:]]*[.][[:space:]]*defaulttechchoices|world[[:space:]]*[.][[:space:]]*SetTech[[:space:]]*[(][[:space:]]*Config::GetInstance' \
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens/lobby/lobby_controller.cpp" \
+  --glob '!**/screen_context.cpp'
+
+fail_if_match \
   '#include[[:space:]]*"updater(stage2)?[.]h"' \
   "$REPO_ROOT/clients/silencer/src/client/ui/screens" \
   "$REPO_ROOT/clients/silencer/src/client/ui/modals" \
