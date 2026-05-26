@@ -184,6 +184,11 @@ TEST_CASE("UiInteractionRegistry matches fallback interactable identities") {
 	CHECK(interactables[0].id.empty());
 	CHECK(interactables[0].labelText == "Updated");
 	CHECK(registry.FindInteractableById("42") == &interactables[0]);
+	REQUIRE(registry.FocusInteractableById("42"));
+	const auto * uidElement = registry.FindElementForInteractable(interactables[0]);
+	REQUIRE(uidElement);
+	CHECK(uidElement->id == "42");
+	CHECK(uidElement->focused);
 
 	CHECK(registry.PressAt(41, 20));
 	silencer::ui::UiActionList actions = registry.DrainActions();
@@ -199,7 +204,13 @@ TEST_CASE("UiInteractionRegistry matches fallback interactable identities") {
 	labelWidget.w = 15;
 	labelWidget.h = 15;
 	CHECK(registry.RegisterInteractable(labelWidget));
-	CHECK(registry.FindInteractableById("Loose Label") != nullptr);
+	const auto * labelInteractable = registry.FindInteractableById("Loose Label");
+	REQUIRE(labelInteractable);
+	REQUIRE(registry.FocusInteractableById("Loose Label"));
+	const auto * labelElement = registry.FindElementForInteractable(*labelInteractable);
+	REQUIRE(labelElement);
+	CHECK(labelElement->id == "Loose Label");
+	CHECK(labelElement->focused);
 
 	CHECK(registry.PressAt(2, 3));
 	actions = registry.DrainActions();

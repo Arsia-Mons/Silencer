@@ -59,7 +59,7 @@ fail_if_match \
   "$REPO_ROOT/clients/silencer/src/ui/runtime/UiActionQueue.h"
 
 fail_if_match \
-  "std::string[[:space:]]+InteractableId|InteractableId\\(const UiInteractable|FindInteractableById\\(const std::string" \
+  "std::string[[:space:]]+InteractableId|InteractableId\\(const UiInteractable|FindInteractableById\\(const std::string|FocusInteractableById\\(const std::string" \
   "$REPO_ROOT/clients/silencer/src/ui/runtime/UiInteractionRegistry.h" \
   "$REPO_ROOT/clients/silencer/src/ui/runtime/UiInteractionRegistry.cpp"
 

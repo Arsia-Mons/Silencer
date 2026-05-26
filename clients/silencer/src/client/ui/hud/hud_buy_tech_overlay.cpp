@@ -102,7 +102,7 @@ void BuildBuyTechOverlay(const BuyTechOverlayView& view,
 			widget.hasClayId = true;
 			interactions.RegisterInteractable(widget);
 			if(row.selected){
-				interactions.FocusInteractableById(widget.id);
+				interactions.FocusInteractableById(widget.id.data(), widget.id.size());
 			}
 
 			CLAY(IndexedFloatingElement("InGameBuyTechRow", row.index,

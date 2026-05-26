@@ -119,10 +119,12 @@ public:
 	const UiInteractable* FindInteractableByUid(int uid) const;
 	const UiInteractable* FindInteractableById(const char * id) const;
 	const UiInteractable* FindInteractableById(const char * id, std::size_t len) const;
+	const UiElementSnapshot* FindElementForInteractable(const UiInteractable& widget) const;
 
 	bool FocusTextInputAt(int x, int y);
 	bool FocusTextInputByUid(int uid);
-	bool FocusInteractableById(const std::string& id);
+	bool FocusInteractableById(const char * id);
+	bool FocusInteractableById(const char * id, std::size_t len);
 	bool IsTextInputFocused(int uid) const;
 	bool HasFocus() const;
 	bool HasTextInputFocus() const;

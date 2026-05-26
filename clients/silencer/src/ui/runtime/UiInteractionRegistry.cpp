@@ -340,6 +340,21 @@ const UiInteractable* UiInteractionRegistry::FindInteractableById(const char * i
 	return nullptr;
 }
 
+const UiElementSnapshot* UiInteractionRegistry::FindElementForInteractable(
+	const UiInteractable& widget) const {
+	registry_detail::InteractableIdentity identity;
+	registry_detail::FillInteractableIdentity(identity, widget);
+	if(identity.empty()) return nullptr;
+	for(int i = elementCount_ - 1; i >= 0; --i){
+		const UiElementSnapshot& element = elements_[i];
+		if(registry_detail::TextEquals(element.id.data(), element.id.size(),
+		                               identity.text, identity.len)){
+			return &element;
+		}
+	}
+	return nullptr;
+}
+
 bool UiInteractionRegistry::MatchesFocus(const UiInteractable& widget) const {
 	if(focusedUid_ >= 0 && widget.uid == focusedUid_) return true;
 	if(!focusedLabel_.empty() &&
@@ -415,8 +430,12 @@ bool UiInteractionRegistry::FocusTextInputByUid(int uid) {
 	return false;
 }
 
-bool UiInteractionRegistry::FocusInteractableById(const std::string& id) {
-	const UiInteractable * widget = FindInteractableById(id.data(), id.size());
+bool UiInteractionRegistry::FocusInteractableById(const char * id) {
+	return FocusInteractableById(id, id ? std::strlen(id) : 0);
+}
+
+bool UiInteractionRegistry::FocusInteractableById(const char * id, std::size_t len) {
+	const UiInteractable * widget = FindInteractableById(id, len);
 	if(!widget || !UiInteractableIsInteractive(*widget)) return false;
 	SetFocus(*widget, widget->kind == UiInteractableKind::TextInput
 	                  ? FocusOrigin::Text

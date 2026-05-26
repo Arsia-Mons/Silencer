@@ -481,10 +481,9 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 		for(const auto & cw : game.UiInteractions().Interactables()){
 			nlohmann::json w;
 			w["source"] = "clay";
-			if(!cw.id.empty()) w["id"] = cw.id;
-			const auto * el = cw.id.empty()
-				? nullptr
-				: game.UiInteractions().FindById(cw.id);
+			const auto * el = game.UiInteractions().FindElementForInteractable(cw);
+			if(el && !el->id.empty()) w["id"] = el->id;
+			else if(!cw.id.empty()) w["id"] = cw.id;
 			w["focused"] = el ? el->focused : false;
 			w["enabled"] = !cw.inactive;
 			w["x"] = cw.x; w["y"] = cw.y;
