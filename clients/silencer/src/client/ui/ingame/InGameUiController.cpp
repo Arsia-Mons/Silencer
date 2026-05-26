@@ -18,7 +18,8 @@ namespace client_ui {
 
 namespace ingameuicontroller_detail {
 
-bool StartsWith(const std::string& value, const char * prefix) {
+template <typename Text>
+bool StartsWith(const Text& value, const char * prefix) {
 	return value.compare(0, std::strlen(prefix), prefix) == 0;
 }
 

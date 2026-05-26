@@ -63,6 +63,31 @@ TEST_CASE("UiActionList uses bounded storage and drops overflow actions") {
 	CHECK(actions.OverflowCount() == 1);
 }
 
+TEST_CASE("UiAction payload text uses bounded storage") {
+	silencer::ui::UiAction action;
+	const std::string longId(
+		static_cast<std::size_t>(silencer::ui::UI_ACTION_MAX_ID_CHARS + 3), 'i');
+	const std::string longValue(
+		static_cast<std::size_t>(silencer::ui::UI_ACTION_MAX_VALUE_CHARS + 4), 'v');
+
+	CHECK(!action.id.Assign(longId.data(), longId.size()));
+	CHECK(!action.value.Assign(longValue.data(), longValue.size()));
+
+	CHECK(action.id.size() == silencer::ui::UI_ACTION_MAX_ID_CHARS);
+	CHECK(action.value.size() == silencer::ui::UI_ACTION_MAX_VALUE_CHARS);
+	CHECK(action.id.OverflowCount() == 1);
+	CHECK(action.value.OverflowCount() == 1);
+	CHECK(action.id.c_str()[silencer::ui::UI_ACTION_MAX_ID_CHARS] == '\0');
+	CHECK(action.value.c_str()[silencer::ui::UI_ACTION_MAX_VALUE_CHARS] == '\0');
+
+	action.id = "main_menu.connect";
+	action.value = std::string("Connect");
+	CHECK(action.id == "main_menu.connect");
+	CHECK(action.value == "Connect");
+	CHECK(action.id.find("menu") == 5);
+	CHECK(action.id.compare(0, 9, "main_menu") == 0);
+}
+
 TEST_CASE("UiInteractionRegistry surfaces action queue overflow diagnostics") {
 	silencer::ui::UiInteractionRegistry registry;
 	registry.BeginFrame();

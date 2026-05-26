@@ -48,12 +48,14 @@ bool IsBuiltinKeybindProfile(const std::string & name) {
 	return name == "default" || name == "wasd" || name == "gamepad";
 }
 
-bool StartsWith(const std::string & value, const char * prefix) {
+template <typename Text>
+bool StartsWith(const Text & value, const char * prefix) {
 	const size_t n = std::strlen(prefix);
 	return value.size() >= n && value.compare(0, n, prefix) == 0;
 }
 
-int SuffixInt(const std::string & value, const char * prefix) {
+template <typename Text>
+int SuffixInt(const Text & value, const char * prefix) {
 	if(!StartsWith(value, prefix)) return -1;
 	return std::atoi(value.c_str() + std::strlen(prefix));
 }

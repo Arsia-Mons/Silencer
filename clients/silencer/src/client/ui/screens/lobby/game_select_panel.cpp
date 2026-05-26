@@ -26,7 +26,8 @@ constexpr const char * kActionJoin = "lobby.game_select.join";
 constexpr const char * kActionSpectate = "lobby.game_select.spectate";
 constexpr const char * kActionRowPrefix = "lobby.game_select.row";
 
-bool StartsWith(const std::string & value, const char * prefix) {
+template <typename Text>
+bool StartsWith(const Text & value, const char * prefix) {
 	const size_t n = std::strlen(prefix);
 	return value.size() >= n && value.compare(0, n, prefix) == 0;
 }

@@ -206,7 +206,8 @@ void RebuildPresenceEntries(ChatPanelState & state, World & world) {
 	state.presenceWrapDirty = true;
 }
 
-void CopyUiText(char * dst, int dstLen, const std::string & value)
+template <typename Text>
+void CopyUiText(char * dst, int dstLen, const Text & value)
 {
 	if(!dst || dstLen <= 0) return;
 	int n = static_cast<int>(value.size());

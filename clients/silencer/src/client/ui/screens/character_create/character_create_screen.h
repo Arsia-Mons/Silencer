@@ -41,6 +41,7 @@ private:
 	void RenameCurrentAgent(ScreenContext & ctx);
 	void RebuildAgentRows(ScreenContext & ctx);
 	void CopyAlias(const std::string& value);
+	void CopyAlias(const char * value, size_t len);
 	void AdvanceAliasStep(ScreenContext & ctx);
 	bool IsRenaming() const { return renameCharacterId != 0; }
 

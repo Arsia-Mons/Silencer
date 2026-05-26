@@ -51,6 +51,10 @@ fail_if_match \
   --glob '!third_party/**'
 
 fail_if_match \
+  "std::string[[:space:]]+(id|value)[[:space:]]*;" \
+  "$REPO_ROOT/clients/silencer/src/ui/runtime/UiActionQueue.h"
+
+fail_if_match \
   "\\breact_(init|begin_frame|end_frame|shutdown)[[:space:]]*\\(" \
   "$REPO_ROOT/clients/silencer/src" \
   --glob '!third_party/**' \

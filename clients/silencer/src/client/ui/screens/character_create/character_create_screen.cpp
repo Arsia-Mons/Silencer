@@ -21,13 +21,15 @@ constexpr const char * kActionRenamePrefix = "character_create.rename";
 constexpr const char * kActionCreate = "character_create.create";
 constexpr const char * kActionAlias = "character_create.alias";
 
-bool StartsWith(const std::string& value, const char * prefix)
+template <typename Text>
+bool StartsWith(const Text& value, const char * prefix)
 {
 	const size_t n = std::strlen(prefix);
 	return value.size() >= n && value.compare(0, n, prefix) == 0;
 }
 
-int SuffixInt(const std::string& value, const char * prefix)
+template <typename Text>
+int SuffixInt(const Text& value, const char * prefix)
 {
 	if(!StartsWith(value, prefix)) return -1;
 	const char * suffix = value.c_str() + std::strlen(prefix);
@@ -202,12 +204,12 @@ bool CharacterCreateScreen::HandleUiIntent(ScreenContext & ctx,
 	}
 	if(action.kind == silencer::ui::UiActionKind::SetText &&
 	   step == Step::EnterAlias && action.id == kActionAlias){
-		CopyAlias(action.value);
+		CopyAlias(action.value.data(), action.value.size());
 		return true;
 	}
 	if(action.kind == silencer::ui::UiActionKind::SubmitText &&
 	   step == Step::EnterAlias && action.id == kActionAlias){
-		CopyAlias(action.value);
+		CopyAlias(action.value.data(), action.value.size());
 		if(IsRenaming()){
 			RenameCurrentAgent(ctx);
 		}else{
@@ -363,9 +365,16 @@ void CharacterCreateScreen::RebuildAgentRows(ScreenContext & ctx)
 
 void CharacterCreateScreen::CopyAlias(const std::string& value)
 {
-	size_t n = value.size();
+	CopyAlias(value.data(), value.size());
+}
+
+void CharacterCreateScreen::CopyAlias(const char * value, size_t len)
+{
+	size_t n = len;
 	if(n > sizeof(alias) - 1) n = sizeof(alias) - 1;
-	std::memcpy(alias, value.data(), n);
+	if(n > 0){
+		std::memcpy(alias, value, n);
+	}
 	alias[n] = '\0';
 }
 

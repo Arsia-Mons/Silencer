@@ -64,7 +64,7 @@ bool ActionTargetsAudibleInteractable(const silencer::ui::UiInteractionRegistry&
 	   action.kind != silencer::ui::UiActionKind::Navigate){
 		return false;
 	}
-	const auto * widget = interactions.FindInteractableById(action.id);
+	const auto * widget = interactions.FindInteractableById(action.id.c_str());
 	return widget && IsAudibleInteractable(*widget);
 }
 

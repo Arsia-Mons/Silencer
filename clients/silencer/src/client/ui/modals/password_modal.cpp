@@ -32,7 +32,8 @@ constexpr int kPasswordUid = 1;
 constexpr const char * kActionPassword = "password_modal.password";
 constexpr const char * kActionOk = "password_modal.ok";
 
-void CopyUiText(char * dst, int dstLen, const std::string & value)
+template <typename Text>
+void CopyUiText(char * dst, int dstLen, const Text & value)
 {
 	if(!dst || dstLen <= 0) return;
 	int n = static_cast<int>(value.size());

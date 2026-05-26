@@ -35,12 +35,14 @@ constexpr const char * kActionName = "lobby.game_create.name";
 constexpr const char * kActionPassword = "lobby.game_create.password";
 constexpr const char * kActionOptionsScroll = kGameCreateOptionsScrollId;
 
-bool StartsWith(const std::string & value, const char * prefix) {
+template <typename Text>
+bool StartsWith(const Text & value, const char * prefix) {
 	const size_t n = std::strlen(prefix);
 	return value.size() >= n && value.compare(0, n, prefix) == 0;
 }
 
-void CopyUiText(char * dst, int dstLen, const std::string & value)
+template <typename Text>
+void CopyUiText(char * dst, int dstLen, const Text & value)
 {
 	if(!dst || dstLen <= 0) return;
 	int n = static_cast<int>(value.size());
