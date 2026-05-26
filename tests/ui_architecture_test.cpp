@@ -122,6 +122,14 @@ struct ReplacementLifecycleProbe {
 	int destroyCount = 0;
 };
 
+struct ReentrantDestructorProbe {
+	silencer::client_ui::ScreenStack * stack = nullptr;
+	int destructorCount = 0;
+	bool popResult = true;
+	bool pushResult = true;
+	bool replaceResult = true;
+};
+
 void AttemptLifecycleMutations(silencer::client_ui::ScreenStack * stack,
                                bool& popResult,
                                bool& pushResult,
@@ -132,6 +140,27 @@ void AttemptLifecycleMutations(silencer::client_ui::ScreenStack * stack,
 	replaceResult = stack->ReplaceWithLifecycleForTest(
 		std::make_unique<HookProbeScreen>(nullptr), nullptr, nullptr, nullptr);
 }
+
+class ReentrantDestructorScreen final : public Screen {
+public:
+	explicit ReentrantDestructorScreen(ReentrantDestructorProbe * probe)
+		: probe_(probe) {}
+	~ReentrantDestructorScreen() override {
+		if(!probe_) return;
+		probe_->destructorCount += 1;
+		AttemptLifecycleMutations(probe_->stack,
+		                          probe_->popResult,
+		                          probe_->pushResult,
+		                          probe_->replaceResult);
+	}
+
+	void Build(ScreenContext&) override {}
+	void Tick(ScreenContext&) override {}
+	void Destroy(ScreenContext&) override {}
+
+private:
+	ReentrantDestructorProbe * probe_ = nullptr;
+};
 
 void ObserveLifecycleBuild(Screen& screen, ScreenContext *, void * userData) {
 	auto * probe = static_cast<ReplacementLifecycleProbe *>(userData);
@@ -525,6 +554,88 @@ TEST_CASE("ScreenStack rejects reentrant stack mutations during lifecycle destro
 	CHECK(stack.Size() == 2);
 	CHECK(stack.Top() == replacementScreen);
 	CHECK(firstStats.destructorCount == 1);
+}
+
+TEST_CASE("ScreenStack rejects destructor-triggered mutations during pop") {
+	silencer::client_ui::ScreenStack stack;
+	ReentrantDestructorProbe probe;
+	probe.stack = &stack;
+	auto screen = std::make_unique<ReentrantDestructorScreen>(&probe);
+	Screen * screenPtr = screen.get();
+
+	CHECK(stack.PushBuiltForTest(std::move(screen)));
+	CHECK(stack.Top() == screenPtr);
+
+	CHECK(stack.PopForTest());
+
+	CHECK(probe.destructorCount == 1);
+	CHECK_FALSE(probe.popResult);
+	CHECK_FALSE(probe.pushResult);
+	CHECK_FALSE(probe.replaceResult);
+	CHECK(stack.Size() == 0);
+	CHECK(stack.Top() == nullptr);
+}
+
+TEST_CASE("ScreenStack rejects destructor-triggered mutations during replace") {
+	silencer::client_ui::ScreenStack stack;
+	ReentrantDestructorProbe probe;
+	probe.stack = &stack;
+	auto base = std::make_unique<HookProbeScreen>(nullptr);
+	auto first = std::make_unique<ReentrantDestructorScreen>(&probe);
+	auto replacement = std::make_unique<HookProbeScreen>(nullptr);
+	Screen * replacementScreen = replacement.get();
+
+	CHECK(stack.PushBuiltForTest(std::move(base)));
+	CHECK(stack.PushBuiltForTest(std::move(first)));
+
+	CHECK(stack.ReplaceWithLifecycleForTest(
+		std::move(replacement), nullptr, nullptr, nullptr));
+
+	CHECK(probe.destructorCount == 1);
+	CHECK_FALSE(probe.popResult);
+	CHECK_FALSE(probe.pushResult);
+	CHECK_FALSE(probe.replaceResult);
+	CHECK(stack.Size() == 2);
+	CHECK(stack.Top() == replacementScreen);
+}
+
+TEST_CASE("ScreenStack rejects destructor-triggered mutations during pop entry") {
+	silencer::client_ui::ScreenStack stack;
+	ReentrantDestructorProbe probe;
+	probe.stack = &stack;
+	auto base = std::make_unique<HookProbeScreen>(nullptr);
+	auto target = std::make_unique<ReentrantDestructorScreen>(&probe);
+	auto top = std::make_unique<HookProbeScreen>(nullptr);
+	Screen * topScreen = top.get();
+
+	CHECK(stack.PushBuiltForTest(std::move(base)));
+	CHECK(stack.PushBuiltForTest(std::move(target)));
+	const auto targetEntryId = stack.TopEntryId();
+	CHECK(stack.PushBuiltForTest(std::move(top)));
+
+	CHECK(stack.PopEntryForTest(targetEntryId));
+
+	CHECK(probe.destructorCount == 1);
+	CHECK_FALSE(probe.popResult);
+	CHECK_FALSE(probe.pushResult);
+	CHECK_FALSE(probe.replaceResult);
+	CHECK(stack.Size() == 2);
+	CHECK(stack.Top() == topScreen);
+}
+
+TEST_CASE("ScreenStack rejects destructor-triggered mutations during stack destruction") {
+	ReentrantDestructorProbe probe;
+	{
+		silencer::client_ui::ScreenStack stack;
+		probe.stack = &stack;
+		CHECK(stack.PushBuiltForTest(std::make_unique<ReentrantDestructorScreen>(&probe)));
+		CHECK(stack.Size() == 1);
+	}
+
+	CHECK(probe.destructorCount == 1);
+	CHECK_FALSE(probe.popResult);
+	CHECK_FALSE(probe.pushResult);
+	CHECK_FALSE(probe.replaceResult);
 }
 
 TEST_CASE("GameUiFrame provider exposes frame data during screen declaration") {

@@ -19,7 +19,15 @@ void DestroyWithContext(Screen& screen, ScreenContext * ctx, void *) {
 
 }  // namespace
 
-ScreenStack::~ScreenStack() = default;
+ScreenStack::~ScreenStack() {
+	LifecycleScope scope(*this);
+	for(int i = count_ - 1; i >= 0; --i){
+		if(screens_[i].screen) screens_[i].screen->SetEntryId(0);
+		screens_[i].screen.reset();
+	}
+	count_ = 0;
+	visibleScreenCount_ = 0;
+}
 
 ScreenStack::LifecycleScope::LifecycleScope(ScreenStack& stack_)
 	: stack(stack_) {
@@ -59,11 +67,11 @@ bool ScreenStack::PushWithLifecycle(std::unique_ptr<Screen> screen,
 	const UiScreenEntryId entryId = nextEntryId_++;
 	screen->SetEntryId(entryId);
 	Screen * builtScreen = screen.get();
-	Entry& entry = screens_[count_++];
-	entry.screen = std::move(screen);
-	if(build) {
+	{
 		LifecycleScope scope(*this);
-		build(*builtScreen, ctx, userData);
+		Entry& entry = screens_[count_++];
+		entry.screen = std::move(screen);
+		if(build) build(*builtScreen, ctx, userData);
 	}
 	return true;
 }
@@ -73,14 +81,14 @@ bool ScreenStack::PopWithLifecycle(ScreenContext * ctx,
                                    LifecycleCallback destroy) {
 	if(LifecycleActive()) return false;
 	if(count_ <= 0) return false;
-	Entry& entry = screens_[count_ - 1];
-	if(entry.screen && destroy) {
+	{
 		LifecycleScope scope(*this);
-		destroy(*entry.screen, ctx, userData);
+		Entry& entry = screens_[count_ - 1];
+		if(entry.screen && destroy) destroy(*entry.screen, ctx, userData);
+		if(entry.screen) entry.screen->SetEntryId(0);
+		entry.screen.reset();
+		--count_;
 	}
-	if(entry.screen) entry.screen->SetEntryId(0);
-	entry.screen.reset();
-	--count_;
 	return true;
 }
 
@@ -92,20 +100,16 @@ bool ScreenStack::ReplaceWithLifecycle(std::unique_ptr<Screen> screen,
 	if(LifecycleActive()) return false;
 	if(!screen) return false;
 	if(count_ <= 0) return PushWithLifecycle(std::move(screen), ctx, userData, build);
-	Entry& entry = screens_[count_ - 1];
-	if(entry.screen && destroy) {
-		LifecycleScope scope(*this);
-		destroy(*entry.screen, ctx, userData);
-	}
-	if(entry.screen) entry.screen->SetEntryId(0);
-
 	const UiScreenEntryId entryId = nextEntryId_++;
 	screen->SetEntryId(entryId);
 	Screen * replacement = screen.get();
-	entry.screen = std::move(screen);
-	if(build) {
+	{
 		LifecycleScope scope(*this);
-		build(*replacement, ctx, userData);
+		Entry& entry = screens_[count_ - 1];
+		if(entry.screen && destroy) destroy(*entry.screen, ctx, userData);
+		if(entry.screen) entry.screen->SetEntryId(0);
+		entry.screen = std::move(screen);
+		if(build) build(*replacement, ctx, userData);
 	}
 	return true;
 }
@@ -142,17 +146,17 @@ bool ScreenStack::PopEntry(UiScreenEntryId entryId, ScreenContext& ctx) {
 	if(entryId == 0) return false;
 	for(int i = count_ - 1; i >= 0; --i){
 		if(!screens_[i].screen || screens_[i].screen->EntryId() != entryId) continue;
-		if(screens_[i].screen) {
+		{
 			LifecycleScope scope(*this);
-			screens_[i].screen->Destroy(ctx);
+			if(screens_[i].screen) screens_[i].screen->Destroy(ctx);
+			if(screens_[i].screen) screens_[i].screen->SetEntryId(0);
+			screens_[i].screen.reset();
+			for(int j = i; j + 1 < count_; ++j){
+				screens_[j] = std::move(screens_[j + 1]);
+			}
+			--count_;
+			screens_[count_].screen.reset();
 		}
-		if(screens_[i].screen) screens_[i].screen->SetEntryId(0);
-		screens_[i].screen.reset();
-		for(int j = i; j + 1 < count_; ++j){
-			screens_[j] = std::move(screens_[j + 1]);
-		}
-		--count_;
-		screens_[count_].screen.reset();
 		return true;
 	}
 	return false;
@@ -219,13 +223,16 @@ bool ScreenStack::PopEntryForTest(UiScreenEntryId entryId) {
 	if(entryId == 0) return false;
 	for(int i = count_ - 1; i >= 0; --i){
 		if(!screens_[i].screen || screens_[i].screen->EntryId() != entryId) continue;
-		screens_[i].screen->SetEntryId(0);
-		screens_[i].screen.reset();
-		for(int j = i; j + 1 < count_; ++j){
-			screens_[j] = std::move(screens_[j + 1]);
+		{
+			LifecycleScope scope(*this);
+			screens_[i].screen->SetEntryId(0);
+			screens_[i].screen.reset();
+			for(int j = i; j + 1 < count_; ++j){
+				screens_[j] = std::move(screens_[j + 1]);
+			}
+			--count_;
+			screens_[count_].screen.reset();
 		}
-		--count_;
-		screens_[count_].screen.reset();
 		return true;
 	}
 	return false;
