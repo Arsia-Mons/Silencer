@@ -1003,7 +1003,7 @@ void TickWaits(Game& game){
 			if(now >= w.deadline_ms) done = true;
 		} else if(w.cmd.op == "wait_for_state"){
 			if(w.wait_state == Game::StateName(game.GetState()) &&
-			   (!StateNeedsScreen(w.wait_state) || game.GetTopScreen())){
+			   (!StateNeedsScreen(w.wait_state) || game.HasReadyStateScreen())){
 				w.cmd.reply->set_value(OkResult(w.cmd.id, nlohmann::json::object()));
 				it = v.erase(it); continue;
 			}

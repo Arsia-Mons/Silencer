@@ -49,6 +49,10 @@ Screen * Game::GetTopScreen() const {
 return gameUiPipeline.Top();
 }
 
+bool Game::HasReadyStateScreen() const {
+return !stateisnew && GetTopScreen() != nullptr;
+}
+
 bool Game::HasUiInputTarget() {
 return gameUiPipeline.HasInputTarget();
 }

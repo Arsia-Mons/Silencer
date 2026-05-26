@@ -45,6 +45,7 @@ Uint8 GetState() const { return state; }
 World & GetWorld() { return world; }
 ScreenContext & GetScreenContext() { return screenContext; }
 WorldSummary GetWorldSummary();
+bool HasReadyStateScreen() const;
 Surface & GetScreenBuffer() { return gameRenderer.GetScreenBuffer(); }
 const Surface & GetScreenBuffer() const { return gameRenderer.GetScreenBuffer(); }
 const SDL_Color * GetPaletteColors() const { return gameRenderer.GetPaletteColors(); }
