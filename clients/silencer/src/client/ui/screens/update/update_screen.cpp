@@ -12,7 +12,9 @@
 
 #include <SDL3/SDL.h>
 
+#include <cassert>
 #include <cstdio>
+#include <cstdlib>
 #include <string>
 
 namespace update_screen_detail
@@ -61,7 +63,8 @@ std::string StatusText(ScreenContext & ctx)
 		case UpdateState::Done:
 			return "";
 	}
-	return "";
+	assert(false && "Unhandled screen update state");
+	std::abort();
 }
 
 std::string ProgressText(ScreenContext & ctx)
