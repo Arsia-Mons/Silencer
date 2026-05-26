@@ -293,6 +293,34 @@ Clay_ElementId ResolveSpatial(const UiFocusScope * scope,
 	return (scope->wrap || forceWrap) ? ResolveWrap(scope, dir) : fromId;
 }
 
+Clay_ElementId ResolveSequential(const UiFocusScope * scope,
+                                  Clay_ElementId fromId,
+                                  int direction) {
+	if(!scope || direction == 0) return {};
+	int current = -1;
+	for(int i = 0; i < scope->layoutCount; ++i){
+		if(SameId(scope->layout[i].id, fromId)){
+			current = i;
+			break;
+		}
+	}
+
+	int index = direction > 0
+		? (current < 0 ? 0 : current + 1)
+		: (current < 0 ? scope->layoutCount - 1 : current - 1);
+	for(int visited = 0; visited < scope->layoutCount; ++visited){
+		if(index < 0 || index >= scope->layoutCount){
+			if(!scope->wrap) break;
+			index = direction > 0 ? 0 : scope->layoutCount - 1;
+		}
+		const UiFocusableLayout& candidate = scope->layout[index];
+		if(!candidate.disabled) return candidate.id;
+		index += direction > 0 ? 1 : -1;
+	}
+
+	return ContainsEnabled(scope, fromId) ? fromId : Clay_ElementId{};
+}
+
 Clay_ElementId ResolveNavigation(const UiFocusScope * scope,
                                  Clay_ElementId fromId,
                                  UiNavDir dir) {
@@ -413,7 +441,16 @@ void ui_focus_begin_frame(const UiFocusInputFrame& input) {
 	UiNavDir dir;
 	if(!scope) return;
 
-	if(ReadNavDir(input, &dir)){
+	if(input.focusNext || input.focusPrevious){
+		Clay_ElementId next = ResolveSequential(
+			scope, scope->focusedId, input.focusNext ? 1 : -1);
+		if(next.id != 0 && !SameId(next, scope->focusedId)){
+			scope->focusedId = next;
+			scope->source = NavigationSource(input);
+			scope->autoFocusSuppressed = false;
+			runtime->pendingFocusCallbackId = next;
+		}
+	}else if(ReadNavDir(input, &dir)){
 		Clay_ElementId next = ResolveNavigation(scope, scope->focusedId, dir);
 		if(next.id != 0 && !SameId(next, scope->focusedId)){
 			scope->focusedId = next;

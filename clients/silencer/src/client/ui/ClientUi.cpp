@@ -85,6 +85,18 @@ bool ActionTargetsFeedbackInteractable(const silencer::ui::UiInteractionRegistry
 	return widget && InteractableRequestsFeedback(*widget);
 }
 
+void WithScreenFocusScope(silencer::client_ui::UiScreenEntryId entryId,
+                          bool modal,
+                          const std::function<void()>& build) {
+	silencer::ui::ui_focus_push_scope({
+		CLAY_IDI("ClientUiScreenFocusScope", entryId),
+		modal,
+		true,
+	});
+	if(build) build();
+	silencer::ui::ui_focus_pop_scope();
+}
+
 bool FocusRuntimeRoutedThisFrame(const silencer::ui::UiFocusRuntime& focus) {
 	for(int i = 0; i < focus.scopeCount; ++i){
 		const silencer::ui::UiFocusScope& scope = focus.scopes[i];
@@ -123,11 +135,11 @@ silencer::ui::UiFocusInputFrame FocusInputFrom(
 		switch(action){
 			case silencer::ui::UiNavAction::FocusPrevious:
 			case silencer::ui::UiNavAction::PreviousSection:
-				out.navUp = true;
+				out.focusPrevious = true;
 				break;
 			case silencer::ui::UiNavAction::FocusNext:
 			case silencer::ui::UiNavAction::NextSection:
-				out.navDown = true;
+				out.focusNext = true;
 				break;
 			case silencer::ui::UiNavAction::Up:
 				out.navUp = true;
@@ -391,7 +403,7 @@ void ClientUi::BuildVisibleScreenFrame(UiScreenEntryId entryId,
 				.layoutDirection = CLAY_TOP_TO_BOTTOM,
 			},
 		}) {
-			build();
+			clientui_detail::WithScreenFocusScope(entryId, false, build);
 		}
 		return;
 	}
@@ -411,7 +423,7 @@ void ClientUi::BuildVisibleScreenFrame(UiScreenEntryId entryId,
 			.attachTo = CLAY_ATTACH_TO_ROOT,
 		},
 	}) {
-		build();
+		clientui_detail::WithScreenFocusScope(entryId, true, build);
 	}
 }
 

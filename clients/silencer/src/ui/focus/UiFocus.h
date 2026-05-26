@@ -66,6 +66,8 @@ struct UiFocusInputFrame {
 	bool navDown = false;
 	bool navLeft = false;
 	bool navRight = false;
+	bool focusNext = false;
+	bool focusPrevious = false;
 
 	bool confirmPressed = false;
 	bool confirmDown = false;
