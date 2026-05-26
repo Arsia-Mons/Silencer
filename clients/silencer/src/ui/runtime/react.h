@@ -88,6 +88,7 @@ typedef struct ReactContext {
 	void* current;
 	void* stack[REACT_CONTEXT_MAX_DEPTH];
 	int depth;
+	int overflowDepth;
 } ReactContext;
 
 void react_provider_push(ReactContext* ctx, void* value);

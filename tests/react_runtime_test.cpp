@@ -114,14 +114,34 @@ void ProviderProbe(int slot, int initial, int writeValue) {
 
 int gEffectMounts = 0;
 int gEffectCleanups = 0;
+int gBulkEffectMounts = 0;
 
 void OnMount(void*) { gEffectMounts++; }
 void OnUnmount(void*) { gEffectCleanups++; }
+void OnBulkMount(void*) { gBulkEffectMounts++; }
 
 void EffectProbe() {
 	REACT_COMPONENT_BEGIN("EffectProbe") {
 		use_effect(OnMount, OnUnmount, nullptr, 0);
 	} REACT_COMPONENT_END();
+}
+
+void BulkEffectProbe(int key) {
+	REACT_COMPONENT_BEGIN_KEY("BulkEffectProbe", key) {
+		use_effect(OnBulkMount, nullptr, nullptr, 0);
+	} REACT_COMPONENT_END();
+}
+
+int gProviderOverflowValues[17] = {};
+ReactContext gOverflowContext{};
+int gOverflowRootValue = 0;
+
+void ProviderOverflowProbe(int depth) {
+	PROVIDE(&gOverflowContext, &gProviderOverflowValues[depth]) {
+		int* value = static_cast<int*>(use_context(&gOverflowContext));
+		gProviderOverflowValues[depth] = value ? *value : -1;
+		if(depth + 1 < 17) ProviderOverflowProbe(depth + 1);
+	}
 }
 
 bool gUseRefForKindProbe = false;
@@ -229,6 +249,47 @@ TEST_CASE("React effects clean up on unmount and shutdown") {
 	CHECK(gEffectMounts == 2);
 	react_shutdown();
 	CHECK(gEffectCleanups == 2);
+}
+
+TEST_CASE("React effect queue overflow retries dropped effects next frame") {
+	EnsureClay();
+	react_init(g_clay);
+	gBulkEffectMounts = 0;
+
+	RunReactFrame([] {
+		for(int i = 0; i < 65; i++){
+			BulkEffectProbe(i);
+		}
+	});
+	CHECK(react_error_count() == 1);
+	CHECK(gBulkEffectMounts == 64);
+
+	RunReactFrame([] {
+		for(int i = 0; i < 65; i++){
+			BulkEffectProbe(i);
+		}
+	});
+	CHECK(react_error_count() == 1);
+	CHECK(gBulkEffectMounts == 65);
+}
+
+TEST_CASE("React provider overflow preserves context restoration") {
+	EnsureClay();
+	react_init(g_clay);
+	gOverflowRootValue = 1000;
+	gOverflowContext = {};
+	gOverflowContext.current = &gOverflowRootValue;
+	for(int i = 0; i < 17; i++){
+		gProviderOverflowValues[i] = i;
+	}
+
+	RunReactFrame([] { ProviderOverflowProbe(0); });
+	CHECK(react_error_count() == 1);
+	CHECK(gProviderOverflowValues[15] == 15);
+	CHECK(gProviderOverflowValues[16] == 15);
+	CHECK(gOverflowContext.current == &gOverflowRootValue);
+	CHECK(gOverflowContext.depth == 0);
+	CHECK(gOverflowContext.overflowDepth == 0);
 }
 
 TEST_CASE("React runtime diagnoses hook kind and count drift") {

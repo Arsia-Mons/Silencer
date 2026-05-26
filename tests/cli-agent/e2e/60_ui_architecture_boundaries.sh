@@ -43,10 +43,19 @@ fail_if_match \
   --glob '!third_party/**'
 
 fail_if_match \
-  "\\breact_(begin_frame|end_frame|shutdown)[[:space:]]*\\(" \
-  "$REPO_ROOT/clients/silencer/src/client/ui" \
-  "$REPO_ROOT/clients/silencer/src/game/ui" \
-  --glob '!third_party/**'
+  "\\breact_(init|begin_frame|end_frame|shutdown)[[:space:]]*\\(" \
+  "$REPO_ROOT/clients/silencer/src" \
+  --glob '!third_party/**' \
+  --glob '!clients/silencer/src/ui/runtime/react.h' \
+  --glob '!clients/silencer/src/ui/runtime/react.cpp' \
+  --glob '!clients/silencer/src/ui/runtime/ClayService.cpp'
+
+fail_if_match \
+  "\\breact_(enter|leave|provider_push|provider_pop)[[:space:]]*\\(" \
+  "$REPO_ROOT/clients/silencer/src" \
+  --glob '!third_party/**' \
+  --glob '!clients/silencer/src/ui/runtime/react.h' \
+  --glob '!clients/silencer/src/ui/runtime/react.cpp'
 
 fail_if_match \
   "clay_inspector" \

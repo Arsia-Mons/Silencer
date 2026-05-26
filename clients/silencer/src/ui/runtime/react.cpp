@@ -347,16 +347,16 @@ void use_effect(ReactEffectFn fn,
 	EffectData* effect = &slot->u.effect;
 
 	if(first || effect->deps_hash != deps_hash){
+		if(G.effect_queue_count >= kMaxEffectQueue){
+			report_error("react: effect queue full\n");
+			return;
+		}
 		effect->pending_fn = fn;
 		effect->pending_cleanup = cleanup;
 		effect->pending_user = user;
 		effect->has_pending = true;
 		effect->deps_hash = deps_hash;
-		if(G.effect_queue_count < kMaxEffectQueue){
-			G.effect_queue[G.effect_queue_count++] = {G.current->id, index};
-		}else{
-			report_error("react: effect queue full\n");
-		}
+		G.effect_queue[G.effect_queue_count++] = {G.current->id, index};
 	}
 }
 
@@ -377,11 +377,18 @@ void** use_ref(void* initial) {
 void react_provider_push(ReactContext* ctx, void* value) {
 	if(ctx->depth < REACT_CONTEXT_MAX_DEPTH){
 		ctx->stack[ctx->depth++] = ctx->current;
+		ctx->current = value;
+		return;
 	}
-	ctx->current = value;
+	ctx->overflowDepth++;
+	report_error("react: provider stack overflow (max=%d)\n", REACT_CONTEXT_MAX_DEPTH);
 }
 
 void react_provider_pop(ReactContext* ctx) {
+	if(ctx->overflowDepth > 0){
+		ctx->overflowDepth--;
+		return;
+	}
 	if(ctx->depth > 0){
 		ctx->current = ctx->stack[--ctx->depth];
 	}else{
