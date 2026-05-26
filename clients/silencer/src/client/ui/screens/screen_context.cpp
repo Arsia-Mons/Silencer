@@ -40,6 +40,7 @@ void ScreenContext::LeaveJoinedGame() { game.LeaveJoinedGame(); }
 bool ScreenContext::PushScreen(std::unique_ptr<Screen> s) { return game.PushScreen(std::move(s)); }
 bool ScreenContext::PopScreen() { return game.PopScreen(); }
 bool ScreenContext::ReplaceScreen(std::unique_ptr<Screen> s) { return game.ReplaceScreen(std::move(s)); }
+Screen * ScreenContext::TopScreen() const { return game.GetTopScreen(); }
 bool ScreenContext::ShowModal(std::unique_ptr<Modal> m) {
 	return game.PushScreen(std::unique_ptr<Screen>(static_cast<Screen *>(m.release())));
 }

@@ -62,6 +62,7 @@ public:
 	bool PushScreen(std::unique_ptr<Screen> s);
 	bool PopScreen();
 	bool ReplaceScreen(std::unique_ptr<Screen> s);
+	Screen * TopScreen() const;
 	bool ShowModal(std::unique_ptr<Modal> m);
 	bool ShowMessage(const char * msg, std::function<void()> onClose = nullptr);
 	void ClearUiFocus();

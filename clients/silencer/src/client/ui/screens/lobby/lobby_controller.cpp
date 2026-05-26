@@ -23,7 +23,7 @@ constexpr const char * kActionGoBack = "lobby.go_back";
 
 MessageModal * TopAsProgressModal(ScreenContext & ctx)
 {
-	Screen * top = ctx.game.GetTopScreen();
+	Screen * top = ctx.TopScreen();
 	if(!top) return nullptr;
 	MessageModal * m = dynamic_cast<MessageModal *>(top);
 	return (m && m->IsProgress()) ? m : nullptr;
@@ -31,7 +31,7 @@ MessageModal * TopAsProgressModal(ScreenContext & ctx)
 
 bool TopIsModal(ScreenContext & ctx)
 {
-	Screen * top = ctx.game.GetTopScreen();
+	Screen * top = ctx.TopScreen();
 	return top && top->IsOverlay();
 }
 
