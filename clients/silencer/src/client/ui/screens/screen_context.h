@@ -59,6 +59,12 @@ public:
 		SDL_Scancode key2 = SDL_SCANCODE_UNKNOWN;
 		bool and_ = false;
 	};
+	struct UiSpriteFrameMetrics {
+		int offsetX = 0;
+		int offsetY = 0;
+		int width = 0;
+		int height = 0;
+	};
 
 	ScreenContext(Game & game,
 	              World & world,
@@ -114,6 +120,8 @@ public:
 	void ResetPresentation(int paletteIdx);
 	void ResetMenuPresentation(int paletteIdx);
 	bool UiBlinkVisible() const;
+	std::string ClientVersion() const;
+	UiSpriteFrameMetrics GetUiSpriteFrameMetrics(Uint8 bank, Uint16 index) const;
 	Uint32 WorldTickCount() const;
 	bool LobbyMusicFadedIn() const;
 	std::string LobbyGameChannelName(LobbyGame & lobbyGame);

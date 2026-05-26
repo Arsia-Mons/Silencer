@@ -2,7 +2,6 @@
 
 #include "screen_context.h"
 #include "game_state.h"
-#include "world.h"
 #include "surface.h"
 
 #include "clay/clay.h"
@@ -184,7 +183,7 @@ void MainMenuScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime
 	using namespace silencer::clay_bridge;
 
 	versionText_ = "Silencer v";
-	versionText_ += ctx.world.GetVersion();
+	versionText_ += ctx.ClientVersion();
 
 	// Flex-first layout: legacy positions are expressed as column sizes,
 	// padding, and alignment so the menu still reflows with Clay.
@@ -232,7 +231,7 @@ void MainMenuScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime
 					           .childAlignment = { .x = CLAY_ALIGN_X_CENTER,
 					                               .y = CLAY_ALIGN_Y_CENTER },
 					       } }) {
-						logo.Build(ctx.world.resources);
+						logo.Build(ctx);
 					}
 				}
 

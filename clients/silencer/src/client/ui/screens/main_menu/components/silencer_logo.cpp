@@ -1,7 +1,7 @@
 #include "silencer_logo.h"
 
 #include "clay/clay.h"
-#include "resources.h"
+#include "screen_context.h"
 
 #include <SDL3/SDL_timer.h>
 
@@ -51,7 +51,7 @@ std::uint16_t SilencerLogo::CurrentFrame(std::uint64_t nowMs) const {
 			: frame);
 }
 
-bool SilencerLogo::EnsureBounds(Resources & resources) {
+bool SilencerLogo::EnsureBounds(ScreenContext & ctx) {
 	if(boundsCached_) return boundsWidth_ > 0 && boundsHeight_ > 0;
 
 	const std::uint16_t bank = silencer_logo_detail::kLogoBank;
@@ -63,10 +63,12 @@ bool SilencerLogo::EnsureBounds(Resources & resources) {
 	for(std::uint16_t frame = silencer_logo_detail::kFirstFrame;
 	    frame <= silencer_logo_detail::kHeldFrame;
 	    ++frame){
-		const int left = -resources.spriteoffsetx[bank][frame];
-		const int top = -resources.spriteoffsety[bank][frame];
-		const int right = left + static_cast<int>(resources.spritewidth[bank][frame]);
-		const int bottom = top + static_cast<int>(resources.spriteheight[bank][frame]);
+		const ScreenContext::UiSpriteFrameMetrics metrics =
+			ctx.GetUiSpriteFrameMetrics(static_cast<Uint8>(bank), frame);
+		const int left = -metrics.offsetX;
+		const int top = -metrics.offsetY;
+		const int right = left + metrics.width;
+		const int bottom = top + metrics.height;
 		minLeft = std::min(minLeft, left);
 		minTop = std::min(minTop, top);
 		maxRight = std::max(maxRight, right);
@@ -81,17 +83,17 @@ bool SilencerLogo::EnsureBounds(Resources & resources) {
 	return boundsWidth_ > 0 && boundsHeight_ > 0;
 }
 
-void SilencerLogo::Build(Resources & resources) {
+void SilencerLogo::Build(ScreenContext & ctx) {
 	if(!started_) Reset();
-	if(!EnsureBounds(resources)) return;
+	if(!EnsureBounds(ctx)) return;
 
 	using namespace silencer::clay_bridge;
 
 	const std::uint16_t frame = CurrentFrame(SDL_GetTicks());
-	const int frameLegacyLeft =
-		-resources.spriteoffsetx[silencer_logo_detail::kLogoBank][frame];
-	const int frameLegacyTop =
-		-resources.spriteoffsety[silencer_logo_detail::kLogoBank][frame];
+	const ScreenContext::UiSpriteFrameMetrics metrics =
+		ctx.GetUiSpriteFrameMetrics(silencer_logo_detail::kLogoBank, frame);
+	const int frameLegacyLeft = -metrics.offsetX;
+	const int frameLegacyTop = -metrics.offsetY;
 	spritePayload_ = SpritePayload{
 		static_cast<Uint8>(silencer_logo_detail::kLogoBank),
 		frame,

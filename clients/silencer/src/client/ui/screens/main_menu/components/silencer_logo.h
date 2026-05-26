@@ -5,14 +5,14 @@
 
 #include <cstdint>
 
-class Resources;
+class ScreenContext;
 
 namespace silencer::client_ui::main_menu {
 
 class SilencerLogo {
 public:
 	void Reset();
-	void Build(Resources & resources);
+	void Build(ScreenContext & ctx);
 
 private:
 	std::uint64_t startMs_ = 0;
@@ -26,7 +26,7 @@ private:
 	silencer::clay_bridge::ClayCustomData customData_;
 
 	std::uint16_t CurrentFrame(std::uint64_t nowMs) const;
-	bool EnsureBounds(Resources & resources);
+	bool EnsureBounds(ScreenContext & ctx);
 };
 
 }  // namespace silencer::client_ui::main_menu

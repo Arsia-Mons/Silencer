@@ -16,6 +16,7 @@
 #include "runtime/UiActionQueue.h"
 #include "updater.h"
 #include "updaterstage2.h"
+#include "world.h"
 
 #include <SDL3/SDL_video.h>
 
@@ -250,6 +251,21 @@ void ScreenContext::ResetMenuPresentation(int paletteIdx) {
 
 bool ScreenContext::UiBlinkVisible() const {
 	return (renderer.GetHudAnimationPhase() % 32) < 16;
+}
+
+std::string ScreenContext::ClientVersion() const {
+	return world.GetVersion();
+}
+
+ScreenContext::UiSpriteFrameMetrics
+ScreenContext::GetUiSpriteFrameMetrics(Uint8 bank, Uint16 index) const {
+	const Resources & resources = world.resources;
+	UiSpriteFrameMetrics metrics;
+	metrics.offsetX = resources.spriteoffsetx[bank][index];
+	metrics.offsetY = resources.spriteoffsety[bank][index];
+	metrics.width = static_cast<int>(resources.spritewidth[bank][index]);
+	metrics.height = static_cast<int>(resources.spriteheight[bank][index]);
+	return metrics;
 }
 
 Uint32 ScreenContext::WorldTickCount() const {
