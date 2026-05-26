@@ -298,6 +298,9 @@ export default function PhysicsMaterialsPage() {
                               className="bg-game-bg border border-game-border text-game-text text-xs font-mono rounded px-2 py-1 focus:outline-none focus:border-game-textDim"
                             >
                               <option value="">{isFallback ? '← falls back to walk' : '— none —'}</option>
+                              {val && !sounds.includes(val) && (
+                                <option value={val}>{val} ⚠ legacy</option>
+                              )}
                               {sounds.map(s => <option key={s} value={s}>{s}</option>)}
                             </select>
                           </label>
