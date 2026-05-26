@@ -148,13 +148,10 @@ void LobbyConnectScreen::Build(ScreenContext & ctx)
 	motdprinted = false;
 	loginClicked = false;
 	cancelClicked = false;
+	focusUsernameRequested = true;
 	logLines.clear();
 	username[0] = '\0';
 	password[0] = '\0';
-
-	lobby_connect_screen_detail::RegisterWidgets(this, username, password, false,
-	                ctx.game.UiInteractions());
-	ctx.game.UiInteractions().FocusTextInputByUid(lobby_connect_screen_detail::LBY_INPUT_USERNAME);
 }
 
 void LobbyConnectScreen::Tick(ScreenContext & ctx)
@@ -303,6 +300,10 @@ void LobbyConnectScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frame
 		scroll = static_cast<Uint16>(lineCount - visibleLines);
 	}
 	bool inactive = ctx.world.lobby.state == Lobby::AUTHSENT;
+	if(focusUsernameRequested){
+		interactions.RequestTextInputFocusByUid(lobby_connect_screen_detail::LBY_INPUT_USERNAME);
+		focusUsernameRequested = false;
+	}
 	const bool usernameFocused =
 		interactions.IsTextInputFocused(lobby_connect_screen_detail::LBY_INPUT_USERNAME);
 	const bool passwordFocused =
@@ -481,7 +482,7 @@ void LobbyConnectScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frame
 
 void LobbyConnectScreen::Destroy(ScreenContext & ctx)
 {
-	ctx.game.UiInteractions().ClearFocus();
+	ctx.ClearUiFocus();
 }
 
 bool LobbyConnectScreen::HandleUiIntent(ScreenContext & ctx, const silencer::ui::UiAction & action)

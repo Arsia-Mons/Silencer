@@ -1,7 +1,6 @@
 #include "password_modal.h"
 
 #include "screen_context.h"
-#include "game.h"
 #include "renderer.h"
 #include "surface.h"
 
@@ -68,9 +67,8 @@ void PasswordModal::Build(ScreenContext & ctx)
 {
 	(void)ctx;
 	okClicked = false;
+	focusPasswordRequested = true;
 	password[0] = '\0';
-	password_modal_detail::RegisterWidgets(this, password, ctx.game.UiInteractions());
-	ctx.game.UiInteractions().FocusTextInputByUid(password_modal_detail::kPasswordUid);
 }
 
 void PasswordModal::Tick(ScreenContext & ctx)
@@ -90,6 +88,10 @@ void PasswordModal::BuildUi(ScreenContext & ctx, Surface & dst, float frametime,
 
 
 
+	if(focusPasswordRequested){
+		interactions.RequestTextInputFocusByUid(password_modal_detail::kPasswordUid);
+		focusPasswordRequested = false;
+	}
 	bool focused = interactions.IsTextInputFocused(password_modal_detail::kPasswordUid);
 	bool blink = (ctx.renderer.GetHudAnimationPhase() % 32) < 16;
 
@@ -133,7 +135,7 @@ void PasswordModal::BuildUi(ScreenContext & ctx, Surface & dst, float frametime,
 
 void PasswordModal::Destroy(ScreenContext & ctx)
 {
-	ctx.game.UiInteractions().ClearFocus();
+	ctx.ClearUiFocus();
 }
 
 bool PasswordModal::HandleUiIntent(ScreenContext & ctx, const silencer::ui::UiAction & action)

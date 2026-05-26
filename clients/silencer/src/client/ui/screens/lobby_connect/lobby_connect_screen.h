@@ -23,6 +23,7 @@ private:
 	bool motdprinted = false;
 	bool loginClicked = false;
 	bool cancelClicked = false;
+	bool focusUsernameRequested = false;
 	std::vector<std::string> logLines;
 	char username[17] = {};
 	char password[29] = {};

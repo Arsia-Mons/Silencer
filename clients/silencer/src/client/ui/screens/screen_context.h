@@ -64,6 +64,7 @@ public:
 	bool ReplaceScreen(std::unique_ptr<Screen> s);
 	bool ShowModal(std::unique_ptr<Modal> m);
 	bool ShowMessage(const char * msg, std::function<void()> onClose = nullptr);
+	void ClearUiFocus();
 
 	// Switch the renderer's active palette and clear the framebuffer. Called
 	// from Screen::Build by every menu surface that owns its presentation.

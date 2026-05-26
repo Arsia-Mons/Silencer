@@ -218,6 +218,27 @@ TEST_CASE("UiInteractionRegistry matches fallback interactable identities") {
 	CHECK(actions[0].id == "Loose Label");
 }
 
+TEST_CASE("UiInteractionRegistry supports pending text input focus requests") {
+	silencer::ui::UiInteractionRegistry registry;
+	registry.BeginFrame();
+
+	registry.RequestTextInputFocusByUid(7);
+	CHECK(registry.IsTextInputFocused(7));
+	CHECK(registry.DrainActions().empty());
+
+	silencer::ui::UiInteractable input;
+	input.id = "login.username";
+	input.labelText = "Username";
+	input.kind = silencer::ui::UiInteractableKind::TextInput;
+	input.uid = 7;
+	input.x = 1;
+	input.y = 2;
+	input.w = 30;
+	input.h = 12;
+	CHECK(registry.RegisterInteractable(input));
+	CHECK(registry.IsTextInputFocused(7));
+}
+
 TEST_CASE("UiInputState bounds frame-local input buffers") {
 	silencer::ui::UiInputState input;
 

@@ -430,6 +430,15 @@ bool UiInteractionRegistry::FocusTextInputByUid(int uid) {
 	return false;
 }
 
+void UiInteractionRegistry::RequestTextInputFocusByUid(int uid) {
+	if(uid < 0) return;
+	focusedUid_ = uid;
+	focusedKind_ = UiInteractableKind::TextInput;
+	focusedLabel_.clear();
+	focusedOrigin_ = FocusOrigin::Text;
+	RefreshElementState();
+}
+
 bool UiInteractionRegistry::FocusInteractableById(const char * id) {
 	return FocusInteractableById(id, id ? std::strlen(id) : 0);
 }

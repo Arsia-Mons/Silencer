@@ -130,7 +130,7 @@ void CharacterCreateScreen::Tick(ScreenContext & ctx)
 
 void CharacterCreateScreen::Destroy(ScreenContext & ctx)
 {
-	ctx.game.UiInteractions().ClearFocus();
+	ctx.ClearUiFocus();
 }
 
 bool CharacterCreateScreen::HandleBack(ScreenContext & ctx)

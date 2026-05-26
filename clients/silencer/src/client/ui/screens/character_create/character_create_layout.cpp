@@ -801,7 +801,7 @@ void CharacterCreateScreen::BuildEnterAlias(ScreenContext & ctx,
 			                           true });
 		}
 		if(focusAliasRequested){
-			ctx.game.UiInteractions().FocusTextInputByUid(kAliasInputUid);
+			interactions.FocusTextInputByUid(kAliasInputUid);
 			focusAliasRequested = false;
 		}
 	}

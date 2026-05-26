@@ -123,6 +123,7 @@ public:
 
 	bool FocusTextInputAt(int x, int y);
 	bool FocusTextInputByUid(int uid);
+	void RequestTextInputFocusByUid(int uid);
 	bool FocusInteractableById(const char * id);
 	bool FocusInteractableById(const char * id, std::size_t len);
 	bool IsTextInputFocused(int uid) const;

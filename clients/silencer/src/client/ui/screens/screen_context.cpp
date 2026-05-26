@@ -6,6 +6,7 @@
 #include "modal.h"
 #include "message_modal.h"
 #include "surface.h"
+#include "runtime/UiInteractionRegistry.h"
 
 #include <cassert>
 
@@ -45,6 +46,10 @@ bool ScreenContext::ShowModal(std::unique_ptr<Modal> m) {
 
 bool ScreenContext::ShowMessage(const char * msg, std::function<void()> onClose) {
 	return game.PushScreen(std::make_unique<MessageModal>(msg ? msg : "", std::move(onClose)));
+}
+
+void ScreenContext::ClearUiFocus() {
+	game.UiInteractions().ClearFocus();
 }
 
 void ScreenContext::ResetPresentation(int paletteIdx) {

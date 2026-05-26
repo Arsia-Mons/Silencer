@@ -22,6 +22,7 @@ public:
 private:
 	std::function<void(const char *)> onSubmit;
 	bool okClicked = false;
+	bool focusPasswordRequested = false;
 	char password[21] = {};
 };
 
