@@ -55,6 +55,7 @@ public:
 	//void ConnectToGame(LobbyGame & lobbygame, Uint8 agency);
 	void ClearGames(void);
 	LobbyGame * GetGameById(Uint32 id);
+	const User * FindUserInfo(Uint32 accountid) const;
 	User * GetUserInfo(Uint32 accountid);
 	void ForgetUserInfo(Uint32 accountid);
 	void ForgetAllUserInfo(void);

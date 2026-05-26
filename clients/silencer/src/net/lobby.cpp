@@ -700,6 +700,14 @@ LobbyGame * Lobby::GetGameById(Uint32 id){
 	return 0;
 }
 
+const User * Lobby::FindUserInfo(Uint32 accountid) const{
+	auto it = userinfos.find(accountid);
+	if(it == userinfos.end()){
+		return 0;
+	}
+	return it->second.get();
+}
+
 User * Lobby::GetUserInfo(Uint32 accountid){
 	User * userinfo = 0;
 	if(!userinfos[accountid]){

@@ -162,7 +162,7 @@ LobbyCharacterStats CharacterStatsForAgency(Lobby * lobby, uint8_t agency)
 	const Lobby::Character * character = lobby->GetSelectedCharacter();
 	result.name = character ? character->name : "No Agent";
 
-	User * user = lobby->GetUserInfo(lobby->accountid);
+	const User * user = lobby->FindUserInfo(lobby->accountid);
 	if(!user || user->retrieving) return result;
 	if(agency >= sizeof(user->agency) / sizeof(user->agency[0])) return result;
 
@@ -186,7 +186,7 @@ LobbyAgencyLevel CurrentLobbyAgencyLevel(Lobby * lobby)
 {
 	LobbyAgencyLevel result;
 	if(!lobby) return result;
-	User * user = lobby->GetUserInfo(lobby->accountid);
+	const User * user = lobby->FindUserInfo(lobby->accountid);
 	if(!user) return result;
 	const uint8_t agency =
 		lobby->GetSelectedAgencyOrDefault(Config::GetInstance().defaultagency);
