@@ -58,7 +58,7 @@ void LobbyScreen::Tick(ScreenContext & ctx)
 
 	if(!gameCreateActive && !gameJoinActive && !gameTechActive){
 		silencer::client_ui::lobby::GameSelectPanelTick(
-			gameSelectState, ctx, *this);
+			gameSelectState, ctx);
 	}
 	if(gameCreateActive){
 		silencer::client_ui::lobby::GameCreatePanelTick(
@@ -66,7 +66,7 @@ void LobbyScreen::Tick(ScreenContext & ctx)
 	}
 	if(gameJoinActive){
 		silencer::client_ui::lobby::GameJoinPanelTick(
-			gameJoinState, ctx, *this);
+			gameJoinState, ctx);
 	}
 	if(gameTechActive){
 		silencer::client_ui::lobby::GameTechPanelTick(
@@ -149,7 +149,14 @@ bool LobbyScreen::HandleUiIntent(ScreenContext & ctx, const silencer::ui::UiActi
 		return silencer::client_ui::lobby::GameCreatePanelHandleUiIntent(gameCreateState, action);
 	}
 	if(gameJoinActive){
-		return silencer::client_ui::lobby::GameJoinPanelHandleUiIntent(gameJoinState, action);
+		if(silencer::client_ui::lobby::GameJoinPanelHandleUiIntent(gameJoinState, action)){
+			if(gameJoinState.techClicked){
+				gameJoinState.techClicked = false;
+				ShowGameTech(ctx);
+			}
+			return true;
+		}
+		return false;
 	}
 	if(gameTechActive){
 		if(silencer::client_ui::lobby::GameTechPanelHandleUiIntent(gameTechState, action)){
@@ -161,5 +168,12 @@ bool LobbyScreen::HandleUiIntent(ScreenContext & ctx, const silencer::ui::UiActi
 		}
 		return false;
 	}
-	return silencer::client_ui::lobby::GameSelectPanelHandleUiIntent(gameSelectState, action);
+	if(silencer::client_ui::lobby::GameSelectPanelHandleUiIntent(gameSelectState, action)){
+		if(gameSelectState.createClicked){
+			gameSelectState.createClicked = false;
+			ShowGameCreate(ctx);
+		}
+		return true;
+	}
+	return false;
 }

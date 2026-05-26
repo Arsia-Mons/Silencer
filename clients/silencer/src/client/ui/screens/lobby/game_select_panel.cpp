@@ -1,6 +1,5 @@
 #include "game_select_panel.h"
 
-#include "lobby_screen.h"
 #include "screen_context.h"
 #include "password_modal.h"
 
@@ -193,8 +192,7 @@ void GameSelectPanelInit(GameSelectPanelState & state) {
 }
 
 void GameSelectPanelTick(GameSelectPanelState & state,
-                         ScreenContext & ctx,
-                         LobbyScreen & owner) {
+                         ScreenContext & ctx) {
 	if(ctx.ConsumeLobbyGameListRefresh()){
 		game_select_panel_detail::RebuildRows(state, ctx);
 	}
@@ -206,11 +204,6 @@ void GameSelectPanelTick(GameSelectPanelState & state,
 
 	game_select_panel_detail::RecomputeInfoBlock(state, ctx);
 
-	if(state.createClicked){
-		state.createClicked = false;
-		owner.ShowGameCreate(ctx);
-		return;
-	}
 	if(state.joinClicked){
 		state.joinClicked = false;
 		game_select_panel_detail::HandleJoinClick(state, ctx);

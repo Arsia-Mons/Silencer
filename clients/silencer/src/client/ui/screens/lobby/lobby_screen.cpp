@@ -164,7 +164,7 @@ void LobbyScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime, s
 			gameTechActive,
 		};
 		BuildLobbyMainArea(
-			panels, ctx, *this, bodyX, bodyY, bodyW, bodyH, regionGap, interactions);
+			panels, ctx, bodyX, bodyY, bodyW, bodyH, regionGap, interactions);
 		if(gameCreateActive){
 			BuildGameCreatePreviewOverlay(gameCreateState, ctx);
 		}

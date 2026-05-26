@@ -10,7 +10,6 @@
 #include "game_create_panel.h"
 #include "game_join_panel.h"
 #include "game_tech_panel.h"
-#include "lobby_screen.h"
 
 #include "screen_context.h"
 #include "world.h"
@@ -189,7 +188,6 @@ LobbySteppedPaneLayout ResolveSteppedPaneLayout(int bodyW,
 
 void BuildRightUpperContents(LobbyMainAreaPanels & panels,
                              ScreenContext & ctx,
-                             LobbyScreen & owner,
                              const LobbySteppedPaneLayout & layout,
                              silencer::ui::UiInteractionRegistry& interactions) {
 	World & world = ctx.world;
@@ -223,7 +221,6 @@ void BuildRightUpperContents(LobbyMainAreaPanels & panels,
 
 void BuildRightTallContents(LobbyMainAreaPanels & panels,
                             ScreenContext & ctx,
-                            LobbyScreen & owner,
                             const LobbySteppedPaneLayout & layout,
                             silencer::ui::UiInteractionRegistry& interactions) {
 	World & world = ctx.world;
@@ -252,12 +249,8 @@ void BuildRightTallContents(LobbyMainAreaPanels & panels,
 
 void BuildLobbySteppedPane(LobbyMainAreaPanels & panels,
                            ScreenContext & ctx,
-                           LobbyScreen & owner,
                            const LobbySteppedPaneLayout & layout,
                            silencer::ui::UiInteractionRegistry& interactions) {
-	World & world = ctx.world;
-	Resources & resources = world.resources;
-
 	CLAY({ .id = CLAY_ID("LobbyBody"),
 	       .layout = {
 	           .sizing = { CLAY_SIZING_GROW(0),
@@ -305,7 +298,7 @@ void BuildLobbySteppedPane(LobbyMainAreaPanels & panels,
 				         },
 				         .clip = { .horizontal = true, .vertical = true },
 				     })) {
-					BuildRightUpperContents(panels, ctx, owner, layout, interactions);
+					BuildRightUpperContents(panels, ctx, layout, interactions);
 				}
 			}
 
@@ -372,7 +365,7 @@ void BuildLobbySteppedPane(LobbyMainAreaPanels & panels,
 			         },
 			         .clip = { .horizontal = true, .vertical = true },
 			     })) {
-			BuildRightTallContents(panels, ctx, owner, layout, interactions);
+			BuildRightTallContents(panels, ctx, layout, interactions);
 		}
 	}
 }
@@ -381,7 +374,6 @@ void BuildLobbySteppedPane(LobbyMainAreaPanels & panels,
 
 void BuildLobbyMainArea(LobbyMainAreaPanels & panels,
                         ScreenContext & ctx,
-                        LobbyScreen & owner,
                         int bodyX,
                         int bodyY,
                         int bodyW,
@@ -394,7 +386,6 @@ void BuildLobbyMainArea(LobbyMainAreaPanels & panels,
 	lobby_main_area_detail::BuildLobbySteppedPane(
 		panels,
 		ctx,
-		owner,
 		layout,
 		interactions);
 }

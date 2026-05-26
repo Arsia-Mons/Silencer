@@ -19,7 +19,6 @@
 
 class Resources;
 class ScreenContext;
-class LobbyScreen;
 
 namespace silencer::ui {
 class UiInteractionRegistry;
@@ -57,12 +56,11 @@ struct GameJoinPanelState {
 
 void GameJoinPanelInit(GameJoinPanelState & state);
 
-// Per-frame pump. Recomputes the Ready-button label and consumes the click
-// flags — ready on Ready, team change on Change Team, owner.ShowGameTech on
-// Choose Tech.
+// Per-frame pump. Recomputes the Ready-button label and consumes ready/team
+// click flags. Leaves techClicked for the owning screen to consume
+// because swapping the right-side panel is parent-owned navigation.
 void GameJoinPanelTick(GameJoinPanelState & state,
-                       ScreenContext & ctx,
-                       LobbyScreen & owner);
+                       ScreenContext & ctx);
 bool GameJoinPanelHandleUiIntent(GameJoinPanelState & state,
                                  const silencer::ui::UiAction & action);
 

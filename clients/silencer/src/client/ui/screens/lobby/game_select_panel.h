@@ -5,8 +5,8 @@
 // surface (active when no Create/Join/Tech panel is up). Composes ScrollList
 // + Text + Button primitives and owns the per-frame info-block
 // strings + the Join/Spectate/Create button click flags. Domain glue
-// (JoinGame / SpectateGame / level checks / password modal / ShowGameCreate)
-// lives here in the screen; primitives stay screen-agnostic.
+// (JoinGame / SpectateGame / level checks / password modal) lives here in
+// the screen-side panel; parent-owned panel swaps stay in the owning screen.
 
 #include "shared.h"
 #include "runtime/UiActionQueue.h"
@@ -16,7 +16,6 @@
 
 class Resources;
 class ScreenContext;
-class LobbyScreen;
 
 namespace silencer::ui {
 class UiInteractionRegistry;
@@ -46,7 +45,7 @@ struct GameSelectPanelState {
 	int    rowClickedIndex = -1;
 
 	// Cached info-block strings (recomputed each Tick from the selected
-	// game). Static-lifetime so the layout pass can hold raw c_str()s.
+	// game). Pointer-stable so the layout pass can hold raw c_str()s.
 	std::string infoName;
 	std::string infoMap;
 	std::string infoSecurity;
@@ -67,13 +66,13 @@ void GameSelectPanelInit(GameSelectPanelState & state);
 //     pending refresh is consumed.
 //   - Recomputes infoName/infoMap/.../joinVisible/spectateVisible from the
 //     selected game (or clears them when no game is selected).
-//   - Consumes joinClicked / spectateClicked / createClicked flags — runs
-//     the legacy GameSelectPanel::Tick's Join/Spectate flows (level checks,
-//     password modal, JoinGame/SpectateGame) and the Create flow (calls
-//     owner.ShowGameCreate).
+//   - Consumes joinClicked / spectateClicked flags — runs the legacy
+//     GameSelectPanel::Tick's Join/Spectate flows (level checks, password
+//     modal, JoinGame/SpectateGame).
+//   - Leaves createClicked for the owning screen to consume because
+//     swapping the right-side panel is parent-owned navigation.
 void GameSelectPanelTick(GameSelectPanelState & state,
-                         ScreenContext & ctx,
-                         LobbyScreen & owner);
+                         ScreenContext & ctx);
 bool GameSelectPanelHandleUiIntent(GameSelectPanelState & state,
                                    const silencer::ui::UiAction & action);
 

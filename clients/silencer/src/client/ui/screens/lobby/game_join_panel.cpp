@@ -7,7 +7,6 @@
 #include "primitives/text.h"
 #include "runtime/UiInteractionRegistry.h"
 
-#include "lobby_screen.h"
 #include "resources.h"
 #include "screen_context.h"
 
@@ -79,8 +78,7 @@ void GameJoinPanelInit(GameJoinPanelState & state) {
 }
 
 void GameJoinPanelTick(GameJoinPanelState & state,
-                       ScreenContext & ctx,
-                       LobbyScreen & owner) {
+                       ScreenContext & ctx) {
 	state.readyLabel = ctx.LobbyJoinReadyBlocked() ? "Waiting..." : "Ready";
 
 	state.rosterRows.clear();
@@ -96,11 +94,6 @@ void GameJoinPanelTick(GameJoinPanelState & state,
 		state.rosterRows.push_back(std::move(row));
 	}
 
-	if(state.techClicked){
-		state.techClicked = false;
-		owner.ShowGameTech(ctx);
-		return;
-	}
 	if(state.readyClicked){
 		state.readyClicked = false;
 		ctx.SendLobbyJoinReady();
