@@ -75,11 +75,11 @@ ScreenContext::ScreenContext(Game & game_,
       keymap(keymap_),
       updater(updater_),
       ambienceMixer(ambienceMixer_),
+      mapDownloader(mapDownloader_),
       window(window_),
       renderdevice(renderdevice_),
       world(world_),
-      lobby(lobby_),
-      mapDownloader(mapDownloader_)
+      lobby(lobby_)
 {
 }
 

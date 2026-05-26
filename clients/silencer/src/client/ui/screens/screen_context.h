@@ -31,7 +31,7 @@ struct UiBindingInput;
 }
 
 // Bag of refs that screens use to reach transitional global subsystems
-// (World, Lobby, MapDownloader) plus narrow handoffs for Game, AmbienceMixer,
+// (World, Lobby) plus narrow handoffs for Game, AmbienceMixer, MapDownloader,
 // keymap, updater, renderer, window, render-device, and screen-stack actions.
 // Per-screen behavior lives in the screen, not here; private backing services
 // must be exposed only through named ScreenContext methods.
@@ -42,6 +42,7 @@ class ScreenContext
 	KeyMap & keymap;
 	Updater & updater;
 	AmbienceMixer & ambienceMixer;
+	MapDownloader & mapDownloader;
 	SDL_Window * & window;
 	RenderDevice * & renderdevice;
 
@@ -85,7 +86,6 @@ public:
 
 	World &    world;
 	Lobby &    lobby;
-	MapDownloader & mapDownloader;
 
 	// State-machine + client UI navigation actions.
 	void GoToState(Uint8 newState);

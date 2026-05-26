@@ -151,11 +151,12 @@ if awk '
   in_screen_context && seen_public && /^[[:space:]]*KeyMap[[:space:]]*&[[:space:]]*keymap[[:space:]]*;/ { found = 1 }
   in_screen_context && seen_public && /^[[:space:]]*Updater[[:space:]]*&[[:space:]]*updater[[:space:]]*;/ { found = 1 }
   in_screen_context && seen_public && /^[[:space:]]*AmbienceMixer[[:space:]]*&[[:space:]]*ambienceMixer[[:space:]]*;/ { found = 1 }
+  in_screen_context && seen_public && /^[[:space:]]*MapDownloader[[:space:]]*&[[:space:]]*mapDownloader[[:space:]]*;/ { found = 1 }
   in_screen_context && seen_public && /^[[:space:]]*SDL_Window[[:space:]]*\*[[:space:]]*&[[:space:]]*window[[:space:]]*;/ { found = 1 }
   in_screen_context && seen_public && /^[[:space:]]*RenderDevice[[:space:]]*\*[[:space:]]*&[[:space:]]*renderdevice[[:space:]]*;/ { found = 1 }
   END { exit(found ? 0 : 1) }
 ' "$screen_context_header"; then
-  echo "ScreenContext backing Game/Renderer/KeyMap/Updater/AmbienceMixer/window/render-device refs must stay private" >&2
+  echo "ScreenContext backing Game/Renderer/KeyMap/Updater/AmbienceMixer/MapDownloader/window/render-device refs must stay private" >&2
   exit 1
 fi
 
@@ -191,6 +192,12 @@ fail_if_match \
 
 fail_if_match \
   '#include[[:space:]]*[<"]([^>"]*/)?ambience_mixer[.]h[>"]' \
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/modals" \
+  --glob '!**/screen_context.cpp'
+
+fail_if_match \
+  'ctx[.]mapDownloader|#include[[:space:]]*[<"]([^>"]*/)?map_downloader[.]h[>"]' \
   "$REPO_ROOT/clients/silencer/src/client/ui/screens" \
   "$REPO_ROOT/clients/silencer/src/client/ui/modals" \
   --glob '!**/screen_context.cpp'
