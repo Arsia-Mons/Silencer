@@ -1,5 +1,5 @@
 'use client';
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { useAuth } from '../../lib/auth';
 import Sidebar from '../../components/Sidebar';
 import * as store from '../../lib/physics-materials-store';
@@ -27,6 +27,78 @@ const SOUND_LABELS: Record<string, string> = {
   footstepCrouchL: 'Crouch L', footstepCrouchR: 'Crouch R',
   footstepStairL: 'Stair L', footstepStairR: 'Stair R',
 };
+
+/** Searchable cue picker — matches the actor editor's sound picker style. */
+function CuePicker({ value, cues, placeholder, onChange }: {
+  value: string;
+  cues: string[];
+  placeholder: string;
+  onChange: (v: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [filter, setFilter] = useState('');
+  const ref = useRef<HTMLDivElement>(null);
+  const filtered = useMemo(
+    () => cues.filter(c => c.toLowerCase().includes(filter.toLowerCase())),
+    [cues, filter]
+  );
+  useEffect(() => {
+    if (!open) return;
+    function onDown(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener('mousedown', onDown);
+    return () => document.removeEventListener('mousedown', onDown);
+  }, [open]);
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        type="button"
+        className="w-full bg-game-bg border border-game-border px-2 py-1 text-xs font-mono text-left truncate hover:border-game-text"
+        onClick={() => { setOpen(o => !o); setFilter(''); }}
+        title={value || placeholder}
+      >
+        {value
+          ? <span className="text-game-primary">{value}</span>
+          : <span className="text-game-textDim">{placeholder}</span>}
+      </button>
+      {open && (
+        <div className="absolute z-50 top-full left-0 mt-0.5 w-full min-w-[14rem] bg-[#050a05] border border-game-border shadow-lg flex flex-col">
+          <input
+            autoFocus
+            type="text"
+            placeholder="filter..."
+            className="bg-game-bg border-b border-game-border px-2 py-1 text-xs font-mono focus:outline-none"
+            value={filter}
+            onChange={e => setFilter(e.target.value)}
+          />
+          <div className="overflow-y-auto max-h-56">
+            <button
+              type="button"
+              className="w-full text-left px-2 py-1 text-xs text-game-textDim hover:bg-game-border/30"
+              onClick={() => { onChange(''); setOpen(false); }}
+            >{placeholder}</button>
+            {filtered.map(c => (
+              <button
+                key={c}
+                type="button"
+                className={`w-full text-left px-2 py-1 text-xs font-mono hover:bg-game-border/30 ${c === value ? 'text-game-primary' : 'text-game-primary/70'}`}
+                onClick={() => { onChange(c); setOpen(false); }}
+              >{c}</button>
+            ))}
+            {value && !cues.includes(value) && (
+              <button
+                type="button"
+                className="w-full text-left px-2 py-1 text-xs font-mono text-game-warning/70 hover:bg-game-border/30"
+                onClick={() => setOpen(false)}
+              >{value} ⚠ legacy</button>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 function parseMaterial(text: string): PhysicsMaterialEntry {
   const raw = text.trimStart().replace(/^\uFEFF/, '');
@@ -292,17 +364,12 @@ export default function PhysicsMaterialsPage() {
                         return (
                           <label key={field} className="flex flex-col gap-1">
                             <span className="text-[10px] text-game-textDim">{SOUND_LABELS[field]}</span>
-                            <select
+                            <CuePicker
                               value={val}
-                              onChange={e => patchMaterial(mat.id, { [field]: e.target.value })}
-                              className="bg-game-bg border border-game-border text-game-text text-xs font-mono rounded px-2 py-1 focus:outline-none focus:border-game-textDim"
-                            >
-                              <option value="">{isFallback ? '← falls back to walk' : '— none —'}</option>
-                              {val && !sounds.includes(val) && (
-                                <option value={val}>{val} ⚠ legacy</option>
-                              )}
-                              {sounds.map(s => <option key={s} value={s}>{s}</option>)}
-                            </select>
+                              cues={sounds}
+                              placeholder={isFallback ? '← falls back to walk' : '— none —'}
+                              onChange={v => patchMaterial(mat.id, { [field]: v })}
+                            />
                           </label>
                         );
                       })}
