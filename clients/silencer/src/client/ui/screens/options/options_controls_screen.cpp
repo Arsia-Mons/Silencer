@@ -3,6 +3,7 @@
 #include "controls_keybind_list.h"
 #include "controls_rebind_capture.h"
 
+#include "action_catalog.h"
 #include "screen_context.h"
 #include "game_state.h"
 #include "config.h"

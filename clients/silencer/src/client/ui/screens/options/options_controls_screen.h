@@ -20,8 +20,8 @@ public:
 	bool HandleUiIntent(ScreenContext & ctx, const silencer::ui::UiAction & action) override;
 
 private:
-	// Two-slot rebind state machine + label resolution lives in
-	// controls_rebind_capture.{h,cpp}; these stay as the per-frame state.
+	// The screen owns only the in-flight row/slot state. Binding labels and
+	// writes are requested through ScreenContext.
 	void BeginRebindFromVisibleRow(int row, int slot);
 	void ToggleOperatorFromVisibleRow(int row);
 	int MaxScroll() const;

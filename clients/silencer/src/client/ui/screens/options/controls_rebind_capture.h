@@ -5,7 +5,6 @@
 // "next press captures" sinks. The keymap storage shape stays behind
 // ScreenContext; this helper only consumes the screen's in-flight row/slot state.
 
-#include "keybinds.h"
 #include "runtime/UiActionQueue.h"
 
 #include <SDL3/SDL_scancode.h>

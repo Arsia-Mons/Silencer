@@ -1,41 +1,12 @@
 #ifndef KEYBINDS_H
 #define KEYBINDS_H
 
+#include "action_catalog.h"
 #include "shared.h"
 #include <SDL3/SDL_gamepad.h>
 #include <string>
 #include <vector>
 #include <cstdint>
-
-// All player-controlled actions in the game. The Action enum is the single
-// source of truth — IndexToConfigKey, keynames[], and the per-action poll
-// cascade all consume ACTION_TABLE below instead of duplicating this list.
-//
-// Order is the order shown in the controls UI and the order rows appear in
-// profile JSON files. New actions go at the end.
-enum class Action : uint8_t {
-	MoveUp, MoveDown, MoveLeft, MoveRight,
-	LookUpLeft, LookUpRight, LookDownLeft, LookDownRight,
-	Jump, Jetpack, Activate, Use, Fire,
-	Chat, NextInv, NextCam, PrevCam, Detonate,
-	Disguise, NextWeapon,
-	Weapon1, Weapon2, Weapon3, Weapon4,
-	UiUp, UiDown, UiLeft, UiRight,
-	UiConfirm, UiCancel,
-	Count
-};
-
-struct ActionInfo {
-	Action      action;
-	const char* id;     // "fire" — stable string for files & CLI
-	const char* label;  // "Fire" — human-readable, shown in UI
-};
-
-extern const ActionInfo ACTION_TABLE[(int)Action::Count];
-
-// Lookup helpers (linear scans over a 28-entry table — call freely).
-const ActionInfo* FindAction(const std::string& id);
-const ActionInfo& GetActionInfo(Action a);
 
 // Tagged binding key. Round-trips with strings of the form:
 //   KEY:Up           keyboard scancode (SDL_GetScancodeName/FromName)

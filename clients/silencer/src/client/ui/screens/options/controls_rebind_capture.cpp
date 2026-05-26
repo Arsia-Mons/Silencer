@@ -1,5 +1,6 @@
 #include "controls_rebind_capture.h"
 
+#include "action_catalog.h"
 #include "screen_context.h"
 
 #include <SDL3/SDL.h>
