@@ -29,6 +29,7 @@ set(TEST_SRC
     ${CMAKE_SOURCE_DIR}/src/ui/primitives/toggle.cpp
     ${CMAKE_SOURCE_DIR}/src/client/ui/ClientUi.cpp
     ${CMAKE_SOURCE_DIR}/src/client/ui/ClientUiInput.cpp
+    ${CMAKE_SOURCE_DIR}/src/game/ui/client_ui_write_drain.cpp
     ${CMAKE_SOURCE_DIR}/src/client/ui/hud/HudPayloadArena.cpp
     ${CMAKE_SOURCE_DIR}/src/client/ui/navigation/ScreenStack.cpp
     ${CMAKE_SOURCE_DIR}/src/updater/updatersha256.cpp

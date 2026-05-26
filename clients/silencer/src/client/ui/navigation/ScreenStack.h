@@ -45,6 +45,13 @@ public:
 	                  silencer::ui::UiInteractionRegistry& interactions,
 	                  const BuildVisibleScreen& buildScreen = {});
 
+#ifdef SILENCER_TEST_BUILD
+	void PushBuiltForTest(std::unique_ptr<Screen> screen);
+	void PopForTest();
+	bool PopEntryForTest(UiScreenEntryId entryId);
+	void BuildVisibleForTest(const BuildVisibleScreen& buildScreen);
+#endif
+
 private:
 	struct Entry {
 		UiScreenEntryId entryId = 0;

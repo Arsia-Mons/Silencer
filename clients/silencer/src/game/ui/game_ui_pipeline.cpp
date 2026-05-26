@@ -11,6 +11,7 @@
 #include "client/ui/hud/InGameOverlays.h"
 #include "client/ui/views/HudView.h"
 #include "clay_ui_compositor.h"
+#include "ui/client_ui_write_drain.h"
 #include <algorithm>
 #include <vector>
 
@@ -164,6 +165,10 @@ PrepareClientUiFrame(surface);
 BeginPreparedClientUiFrame();
 BuildVisibleClientUi(surface, frametime);
 Clay_RenderCommandArray cmds = EndClientUiFrame();
+silencer::client_ui::CompleteRenderedClientUiFrame(
+clientUi,
+game.screenContext,
+[&] {
 silencer::clay_bridge::Render(game, &surface, cmds);
 if(game.state != GameState::FADEOUT){
 std::vector<silencer::ui::UiAction> unhandledUiActions =
@@ -180,7 +185,7 @@ SDL_StopTextInput(game.gameRenderer.GetWindow());
 }
 textInputFocused = nowFocused;
 }
-clientUi.DrainWrites(game.screenContext);
+});
 }
 
 void GameUiPipeline::ResetUiFrameDeltas() {

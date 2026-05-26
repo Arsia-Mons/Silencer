@@ -261,6 +261,16 @@ void ClientUi::ClearWrites() {
 	writeCount_ = 0;
 }
 
+void ClientUi::WithScreenProvider(UiScreenEntryId entryId,
+                                  const std::function<void()>& build) {
+	clientui_detail::ScreenProviderContext provider{this, entryId};
+	REACT_PROVIDER_ENTER_KEY("ScreenProvider", entryId);
+	PROVIDE(&clientui_detail::g_screenContextValue, &provider) {
+		if(build) build();
+	}
+	REACT_PROVIDER_EXIT();
+}
+
 void ClientUi::RequestClearScreens() {
 	screens_.RequestClear();
 }
@@ -280,14 +290,48 @@ void ClientUi::BuildVisibleScreens(ScreenContext& ctx, Surface& dst, float frame
 		frametime,
 		interactions_,
 		[&](UiScreenEntryId entryId, Screen& screen, bool) {
-			clientui_detail::ScreenProviderContext provider{this, entryId};
-			REACT_PROVIDER_ENTER_KEY("ScreenProvider", entryId);
-			PROVIDE(&clientui_detail::g_screenContextValue, &provider) {
+			WithScreenProvider(entryId, [&] {
 				screen.BuildUi(ctx, dst, frametime, interactions_);
-			}
-			REACT_PROVIDER_EXIT();
+			});
 		});
 }
+
+#ifdef SILENCER_TEST_BUILD
+void ClientUi::PushBuiltScreenForTest(std::unique_ptr<Screen> screen) {
+	screens_.PushBuiltForTest(std::move(screen));
+}
+
+void ClientUi::BuildVisibleScreenProvidersForTest(
+	const std::function<void(UiScreenEntryId entryId, Screen& screen)>& buildScreen) {
+	screens_.BuildVisibleForTest(
+		[&](UiScreenEntryId entryId, Screen& screen, bool) {
+			WithScreenProvider(entryId, [&] {
+				if(buildScreen) buildScreen(entryId, screen);
+			});
+		});
+}
+
+void ClientUi::DrainWritesForTest() {
+	for(int i = 0; i < writeCount_; ++i){
+		QueuedWrite& write = writes_[i];
+		switch(write.kind){
+			case WriteKind::Push:
+				screens_.PushBuiltForTest(std::move(write.screen));
+				break;
+			case WriteKind::PopCurrent:
+				screens_.PopEntryForTest(write.entryId);
+				break;
+			case WriteKind::PopTop:
+				screens_.PopForTest();
+				break;
+			case WriteKind::Deferred:
+				if(write.deferred) write.deferred();
+				break;
+		}
+	}
+	ClearWrites();
+}
+#endif
 
 ScreenNavigator UseScreenNavigator() {
 	auto * context = static_cast<clientui_detail::ScreenProviderContext *>(

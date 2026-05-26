@@ -61,6 +61,13 @@ public:
 	void TickVisibleScreens(ScreenContext& ctx);
 	void BuildVisibleScreens(ScreenContext& ctx, Surface& dst, float frametime);
 
+#ifdef SILENCER_TEST_BUILD
+	void PushBuiltScreenForTest(std::unique_ptr<Screen> screen);
+	void BuildVisibleScreenProvidersForTest(
+		const std::function<void(UiScreenEntryId entryId, Screen& screen)>& buildScreen);
+	void DrainWritesForTest();
+#endif
+
 private:
 	enum class WriteKind {
 		Push,
@@ -78,6 +85,7 @@ private:
 
 	bool QueueWrite(QueuedWrite write);
 	void ClearWrites();
+	void WithScreenProvider(UiScreenEntryId entryId, const std::function<void()>& build);
 
 	silencer::ui::UiFrameContext frameCtx_;
 	silencer::ui::ClayService& clay_;

@@ -96,5 +96,36 @@ void ScreenStack::BuildVisible(ScreenContext& ctx,
 	}
 }
 
+#ifdef SILENCER_TEST_BUILD
+void ScreenStack::PushBuiltForTest(std::unique_ptr<Screen> screen) {
+	if(!screen) return;
+	screens_.push_back(Entry{ nextEntryId_++, std::move(screen) });
+}
+
+void ScreenStack::PopForTest() {
+	if(screens_.empty()) return;
+	screens_.pop_back();
+}
+
+bool ScreenStack::PopEntryForTest(UiScreenEntryId entryId) {
+	if(entryId == 0) return false;
+	for(auto it = screens_.rbegin(); it != screens_.rend(); ++it){
+		if(it->entryId != entryId) continue;
+		screens_.erase(std::next(it).base());
+		return true;
+	}
+	return false;
+}
+
+void ScreenStack::BuildVisibleForTest(const BuildVisibleScreen& buildScreen) {
+	if(!buildScreen || screens_.empty()) return;
+	const std::size_t start = VisibleStart();
+	for(std::size_t i = start; i < screens_.size(); ++i) {
+		Screen& screen = *screens_[i].screen;
+		buildScreen(screens_[i].entryId, screen, screen.IsOverlay());
+	}
+}
+#endif
+
 }  // namespace client_ui
 }  // namespace silencer
