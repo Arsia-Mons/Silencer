@@ -1,6 +1,7 @@
 #pragma once
 
 #include <array>
+#include <cstdint>
 #include <functional>
 #include <memory>
 #include <string>
@@ -25,6 +26,12 @@ struct LobbyGameTechActions {
 	bool backToTeams = false;
 };
 
+struct LobbyGameSelectActions {
+	bool create = false;
+	bool join = false;
+	bool spectate = false;
+};
+
 struct LobbyTechItemDetails {
 	bool found = false;
 	std::string title;
@@ -42,6 +49,10 @@ struct LobbyUi {
 	std::function<void(std::shared_ptr<LobbyGameTechActions>,
 	                   std::function<bool()> gameTechStillActive,
 	                   std::function<void()> showTeams)> flushGameTechActions = {};
+	std::function<void(std::shared_ptr<LobbyGameSelectActions>,
+	                   std::function<bool()> gameSelectStillActive,
+	                   std::function<uint32_t()> selectedGameId,
+	                   std::function<void()> showCreate)> flushGameSelectActions = {};
 };
 
 void LobbyProvider(ScreenContext & ctx, const std::function<void()> & children);

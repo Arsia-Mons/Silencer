@@ -4,6 +4,7 @@
 #include "config.h"
 #include "game_state.h"
 #include "lobby.h"
+#include "password_modal.h"
 #include "peer.h"
 #include "screen_context.h"
 #include "team.h"
@@ -13,6 +14,7 @@
 
 #include <cstdint>
 #include <cstring>
+#include <memory>
 #include <utility>
 
 namespace silencer::client_ui::hooks {
@@ -202,6 +204,104 @@ void FlushGameTechActions(World * world,
 	ClearGameTechActions(*actions);
 }
 
+void ClearGameSelectActions(LobbyGameSelectActions & actions)
+{
+	actions.create = false;
+	actions.join = false;
+	actions.spectate = false;
+}
+
+void JoinLobbyGame(ScreenContext * screen, uint32_t gameId, const char * password)
+{
+	if(!screen || gameId == 0) return;
+	screen->JoinLobbyGameById(gameId, password);
+}
+
+void SpectateLobbyGame(ScreenContext * screen, uint32_t gameId, const char * password)
+{
+	if(!screen || gameId == 0) return;
+	screen->SpectateLobbyGameById(gameId, password);
+}
+
+void HandleJoinGameSelectAction(ScreenContext * screen, uint32_t gameId)
+{
+	if(!screen) return;
+	ScreenContext::LobbyGameDetails lobbyGame =
+		screen->LobbyGameDetailsFor(gameId);
+	if(!lobbyGame.found){
+		screen->ShowMessage("No game selected");
+		return;
+	}
+	if(!screen->LobbyNetworkIdle()) return;
+	ScreenContext::LocalLobbyAgencyLevel agencyLevel =
+		screen->CurrentLobbyAgencyLevel();
+	if(agencyLevel.found){
+		if(lobbyGame.minLevel > agencyLevel.level){
+			screen->ShowMessage("Your player level is too low");
+			return;
+		}else if(lobbyGame.maxLevel < agencyLevel.level){
+			screen->ShowMessage("Your player level is too high");
+			return;
+		}
+	}
+	if(lobbyGame.passwordRequiredForLocalAccount){
+		screen->PushScreen(std::make_unique<PasswordModal>(
+			[screen, gameId](const char * password) {
+				JoinLobbyGame(screen, gameId, password ? password : "");
+			}));
+	}else{
+		JoinLobbyGame(screen, lobbyGame.gameId, nullptr);
+	}
+}
+
+void HandleSpectateGameSelectAction(ScreenContext * screen, uint32_t gameId)
+{
+	if(!screen) return;
+	ScreenContext::LobbyGameDetails lobbyGame =
+		screen->LobbyGameDetailsFor(gameId);
+	if(!lobbyGame.found){
+		screen->ShowMessage("No game selected");
+		return;
+	}
+	if(!screen->LobbyNetworkIdle()) return;
+	if(lobbyGame.passwordRequiredForLocalAccount){
+		screen->PushScreen(std::make_unique<PasswordModal>(
+			[screen, gameId](const char * password) {
+				SpectateLobbyGame(screen, gameId, password ? password : "");
+			}));
+	}else{
+		SpectateLobbyGame(screen, lobbyGame.gameId, nullptr);
+	}
+}
+
+void FlushGameSelectActions(ScreenContext * screen,
+                            const std::shared_ptr<LobbyGameSelectActions> & actions,
+                            const std::function<bool()> & gameSelectStillActive,
+                            const std::function<uint32_t()> & selectedGameId,
+                            const std::function<void()> & showCreate)
+{
+	if(!actions) return;
+	if(gameSelectStillActive && !gameSelectStillActive()){
+		ClearGameSelectActions(*actions);
+		return;
+	}
+
+	if(actions->create){
+		if(showCreate) showCreate();
+		ClearGameSelectActions(*actions);
+		return;
+	}
+
+	const uint32_t gameId = selectedGameId ? selectedGameId() : 0;
+	if(actions->join){
+		HandleJoinGameSelectAction(screen, gameId);
+	}
+	if(actions->spectate){
+		HandleSpectateGameSelectAction(screen, gameId);
+	}
+	ClearGameSelectActions(*actions);
+}
+
 } // namespace
 
 void LobbyProvider(ScreenContext & ctx, const std::function<void()> & children)
@@ -272,6 +372,25 @@ LobbyUi UseLobby()
 			            gameTechStillActive = std::move(gameTechStillActive),
 			            showTeams = std::move(showTeams)]() {
 				FlushGameTechActions(world, actions, gameTechStillActive, showTeams);
+			});
+		};
+	result.flushGameSelectActions =
+		[queueWrite, screen](std::shared_ptr<LobbyGameSelectActions> actions,
+		                     std::function<bool()> gameSelectStillActive,
+		                     std::function<uint32_t()> selectedGameId,
+		                     std::function<void()> showCreate) {
+			if(!queueWrite || !actions) return;
+			queueWrite([screen,
+			            actions,
+			            gameSelectStillActive = std::move(gameSelectStillActive),
+			            selectedGameId = std::move(selectedGameId),
+			            showCreate = std::move(showCreate)]() {
+				FlushGameSelectActions(
+					screen,
+					actions,
+					gameSelectStillActive,
+					selectedGameId,
+					showCreate);
 			});
 		};
 	return result;

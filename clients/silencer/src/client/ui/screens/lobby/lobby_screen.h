@@ -61,9 +61,9 @@ private:
 	// cached channel name.
 	silencer::client_ui::lobby::ChatPanelState chatState;
 
-	// GameSelect state — snapshot of the games list + selection + scroll
-	// + per-frame click flags. Always-on right-pane surface; suppressed
-	// when another right-side panel is active.
+	// GameSelect state — snapshot of the games list + selection + scroll.
+	// Always-on right-pane surface; suppressed when another right-side panel
+	// is active.
 	silencer::client_ui::lobby::GameSelectPanelState gameSelectState;
 
 	// GameCreate state + active flag. When `gameCreateActive` is true the

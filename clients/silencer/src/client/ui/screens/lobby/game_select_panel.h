@@ -4,13 +4,14 @@
 // Screen-side lobby GameSelectPanel: the always-on right-side games list
 // surface (active when no Create/Join/Tech panel is up). Composes ScrollList
 // + Text + Button primitives and owns the per-frame info-block
-// strings + the Join/Spectate/Create button click flags. Domain glue
-// (JoinGame / SpectateGame / level checks / password modal) lives here in
-// the screen-side panel; parent-owned panel swaps stay in the owning screen.
+// strings. Domain writes and parent-owned panel swaps are requested through
+// queued lobby hook callbacks.
 
 #include "shared.h"
 #include "runtime/UiActionQueue.h"
 
+#include <functional>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -19,6 +20,10 @@ class ScreenContext;
 
 namespace silencer::ui {
 class UiInteractionRegistry;
+}
+
+namespace silencer::client_ui::hooks {
+struct LobbyGameSelectActions;
 }
 
 namespace silencer::client_ui::lobby {
@@ -35,14 +40,10 @@ struct GameSelectPanelState {
 	int    selectedIndex = -1;  // -1 = no selection.
 	Uint16 scrollPos     = 0;
 
-	// Per-frame click flags. Set by typed widget intents; consumed
-	// once by GameSelectPanelTick on the next frame.
-	bool   joinClicked     = false;
-	bool   spectateClicked = false;
-	bool   createClicked   = false;
-
-	// Per-row click flag — the row that was last pressed. -1 = none.
-	int    rowClickedIndex = -1;
+	std::shared_ptr<silencer::client_ui::hooks::LobbyGameSelectActions> pendingActions = {};
+	std::function<void(std::shared_ptr<silencer::client_ui::hooks::LobbyGameSelectActions>)>
+		flushActions = {};
+	bool actionsQueued = false;
 
 	// Cached info-block strings (recomputed each Tick from the selected
 	// game). Pointer-stable so the layout pass can hold raw c_str()s.
@@ -66,11 +67,6 @@ void GameSelectPanelInit(GameSelectPanelState & state);
 //     pending refresh is consumed.
 //   - Recomputes infoName/infoMap/.../joinVisible/spectateVisible from the
 //     selected game (or clears them when no game is selected).
-//   - Consumes joinClicked / spectateClicked flags — runs the legacy
-//     GameSelectPanel::Tick's Join/Spectate flows (level checks, password
-//     modal, JoinGame/SpectateGame).
-//   - Leaves createClicked for the owning screen to consume because
-//     swapping the right-side panel is parent-owned navigation.
 void GameSelectPanelTick(GameSelectPanelState & state,
                          ScreenContext & ctx);
 bool GameSelectPanelHandleUiIntent(GameSelectPanelState & state,

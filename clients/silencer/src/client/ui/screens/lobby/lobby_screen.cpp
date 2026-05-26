@@ -167,6 +167,28 @@ void LobbyScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime, s
 					[this]() { return gameTechActive && !goBackQueued; },
 					[this, &ctx]() { ShowGameJoin(ctx); });
 		};
+		gameSelectState.flushActions =
+			[lobby, this, &ctx](
+				std::shared_ptr<silencer::client_ui::hooks::LobbyGameSelectActions> actions) {
+				if(!lobby.flushGameSelectActions || !actions) return;
+				lobby.flushGameSelectActions(
+					actions,
+					[this]() {
+						return !gameCreateActive
+						    && !gameJoinActive
+						    && !gameTechActive
+						    && !goBackQueued;
+					},
+					[this]() -> uint32_t {
+						if(gameSelectState.selectedIndex < 0
+						   || gameSelectState.selectedIndex >=
+						      static_cast<int>(gameSelectState.rows.size())){
+							return 0;
+						}
+						return gameSelectState.rows[gameSelectState.selectedIndex].gameid;
+					},
+					[this, &ctx]() { ShowGameCreate(ctx); });
+		};
 
 		ctx.BeginLobbyPanelBorderBlur(layoutWidth, layoutHeight, input.uiScale);
 		lobby_screen_detail::AddPanelBorderBlur(

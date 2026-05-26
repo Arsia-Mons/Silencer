@@ -2,6 +2,7 @@
 
 #include "clay/clay.h"
 #include "clay_ui_compositor.h"
+#include "hooks/use_lobby.h"
 #include "runtime/UiInteractionRegistry.h"
 #include "primitives/box.h"
 #include "primitives/text.h"
@@ -242,8 +243,15 @@ void BuildGameSelectUpperTree(GameSelectPanelState & state,
                               Uint16 panelWidth,
                               Resources & resources,
                               silencer::ui::UiInteractionRegistry& interactions) {
-	(void)state;
 	(void)resources;
+	if(!state.pendingActions){
+		state.pendingActions =
+			std::make_shared<silencer::client_ui::hooks::LobbyGameSelectActions>();
+	}
+	state.pendingActions->create = false;
+	state.pendingActions->join = false;
+	state.pendingActions->spectate = false;
+	state.actionsQueued = false;
 
 	// Create Game button — single flex child of the Upper box.
 	CLAY({ .id = CLAY_ID("GSelBtnCreateWrap"),

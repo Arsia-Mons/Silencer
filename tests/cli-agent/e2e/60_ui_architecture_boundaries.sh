@@ -248,6 +248,12 @@ fail_if_match \
   "$REPO_ROOT/clients/silencer/src/client/ui/screens/lobby/lobby_controller.cpp"
 
 fail_if_match \
+  '\b(joinClicked|spectateClicked|createClicked|rowClickedIndex)\b' \
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens/lobby/game_select_panel.cpp" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens/lobby/game_select_panel.h" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens/lobby/lobby_controller.cpp"
+
+fail_if_match \
   '\b(SubmitLobbyCredentials|UpgradeMissionSummaryStat|CompleteMissionSummary)\b' \
   "$REPO_ROOT/clients/silencer/src/client/ui/screens/screen_context.cpp" \
   "$REPO_ROOT/clients/silencer/src/client/ui/screens/screen_context.h"

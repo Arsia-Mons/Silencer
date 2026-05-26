@@ -151,12 +151,5 @@ bool LobbyScreen::HandleUiIntent(ScreenContext & ctx, const silencer::ui::UiActi
 	if(gameTechActive){
 		return silencer::client_ui::lobby::GameTechPanelHandleUiIntent(gameTechState, action);
 	}
-	if(silencer::client_ui::lobby::GameSelectPanelHandleUiIntent(gameSelectState, action)){
-		if(gameSelectState.createClicked){
-			gameSelectState.createClicked = false;
-			ShowGameCreate(ctx);
-		}
-		return true;
-	}
-	return false;
+	return silencer::client_ui::lobby::GameSelectPanelHandleUiIntent(gameSelectState, action);
 }

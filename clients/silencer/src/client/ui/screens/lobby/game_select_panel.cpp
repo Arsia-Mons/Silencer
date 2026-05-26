@@ -1,10 +1,9 @@
 #include "game_select_panel.h"
 
+#include "hooks/use_lobby.h"
 #include "screen_context.h"
-#include "password_modal.h"
 
 #include <cstring>
-#include <memory>
 #include <string>
 
 namespace silencer::client_ui::lobby {
@@ -57,6 +56,15 @@ Uint32 GetSelectedGameId(const GameSelectPanelState & state) {
 		return 0;
 	}
 	return state.rows[state.selectedIndex].gameid;
+}
+
+void QueueActionsFlush(GameSelectPanelState & state)
+{
+	if(state.actionsQueued) return;
+	state.actionsQueued = true;
+	if(state.flushActions && state.pendingActions){
+		state.flushActions(state.pendingActions);
+	}
 }
 
 void RecomputeInfoBlock(GameSelectPanelState & state, ScreenContext & ctx) {
@@ -124,64 +132,15 @@ void RecomputeInfoBlock(GameSelectPanelState & state, ScreenContext & ctx) {
 	}
 }
 
-void HandleJoinClick(GameSelectPanelState & state, ScreenContext & ctx) {
-	ScreenContext::LobbyGameDetails lobbyGame =
-		ctx.LobbyGameDetailsFor(GetSelectedGameId(state));
-	if(!lobbyGame.found){
-		ctx.ShowMessage("No game selected");
-		return;
-	}
-	if(!ctx.LobbyNetworkIdle()) return;
-	ScreenContext::LocalLobbyAgencyLevel agencyLevel = ctx.CurrentLobbyAgencyLevel();
-	if(agencyLevel.found){
-		if(lobbyGame.minLevel > agencyLevel.level){
-			ctx.ShowMessage("Your player level is too low");
-			return;
-		}else if(lobbyGame.maxLevel < agencyLevel.level){
-			ctx.ShowMessage("Your player level is too high");
-			return;
-		}
-	}
-	if(lobbyGame.passwordRequiredForLocalAccount){
-		Uint32 gameId = lobbyGame.gameId;
-		ctx.PushScreen(std::make_unique<PasswordModal>(
-			[&ctx, gameId](const char * password){
-				ctx.JoinLobbyGameById(gameId, password ? password : "");
-			}));
-	}else{
-		ctx.JoinLobbyGameById(lobbyGame.gameId);
-	}
-}
-
-void HandleSpectateClick(GameSelectPanelState & state, ScreenContext & ctx) {
-	ScreenContext::LobbyGameDetails lobbyGame =
-		ctx.LobbyGameDetailsFor(GetSelectedGameId(state));
-	if(!lobbyGame.found){
-		ctx.ShowMessage("No game selected");
-		return;
-	}
-	if(!ctx.LobbyNetworkIdle()) return;
-	if(lobbyGame.passwordRequiredForLocalAccount){
-		Uint32 gameId = lobbyGame.gameId;
-		ctx.PushScreen(std::make_unique<PasswordModal>(
-			[&ctx, gameId](const char * password){
-				ctx.SpectateLobbyGameById(gameId, password ? password : "");
-			}));
-	}else{
-		ctx.SpectateLobbyGameById(lobbyGame.gameId);
-	}
-}
-
 }  // namespace game_select_panel_detail
 
 void GameSelectPanelInit(GameSelectPanelState & state) {
 	state.rows.clear();
 	state.selectedIndex   = -1;
 	state.scrollPos       = 0;
-	state.joinClicked     = false;
-	state.spectateClicked = false;
-	state.createClicked   = false;
-	state.rowClickedIndex = -1;
+	state.pendingActions  = {};
+	state.flushActions    = {};
+	state.actionsQueued   = false;
 	state.infoName.clear();
 	state.infoMap.clear();
 	state.infoSecurity.clear();
@@ -197,42 +156,34 @@ void GameSelectPanelTick(GameSelectPanelState & state,
 		game_select_panel_detail::RebuildRows(state, ctx);
 	}
 
-	if(state.rowClickedIndex >= 0){
-		state.selectedIndex = state.rowClickedIndex;
-		state.rowClickedIndex = -1;
-	}
-
 	game_select_panel_detail::RecomputeInfoBlock(state, ctx);
-
-	if(state.joinClicked){
-		state.joinClicked = false;
-		game_select_panel_detail::HandleJoinClick(state, ctx);
-	}
-	if(state.spectateClicked){
-		state.spectateClicked = false;
-		game_select_panel_detail::HandleSpectateClick(state, ctx);
-	}
 }
 
 bool GameSelectPanelHandleUiIntent(GameSelectPanelState & state,
                                    const silencer::ui::UiAction & action) {
 	if(action.kind == silencer::ui::UiActionKind::Activate){
 		if(action.id == game_select_panel_detail::kActionCreate){
-			state.createClicked = true;
+			if(!state.pendingActions) return true;
+			state.pendingActions->create = true;
+			game_select_panel_detail::QueueActionsFlush(state);
 			return true;
 		}
 		if(action.id == game_select_panel_detail::kActionJoin){
-			state.joinClicked = true;
+			if(!state.pendingActions) return true;
+			state.pendingActions->join = true;
+			game_select_panel_detail::QueueActionsFlush(state);
 			return true;
 		}
 		if(action.id == game_select_panel_detail::kActionSpectate){
-			state.spectateClicked = true;
+			if(!state.pendingActions) return true;
+			state.pendingActions->spectate = true;
+			game_select_panel_detail::QueueActionsFlush(state);
 			return true;
 		}
 	}
 	if(action.kind == silencer::ui::UiActionKind::Select &&
 	   game_select_panel_detail::StartsWith(action.id, game_select_panel_detail::kActionRowPrefix)){
-		state.rowClickedIndex = action.index;
+		state.selectedIndex = action.index;
 		return true;
 	}
 	return false;
