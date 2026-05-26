@@ -2,7 +2,6 @@
 
 #include <cstddef>
 #include <cstdint>
-#include <functional>
 #include <memory>
 #include <vector>
 
@@ -10,14 +9,16 @@ class Screen;
 class ScreenContext;
 
 namespace silencer {
-namespace ui {
-class UiInteractionRegistry;
-}
 namespace client_ui {
 
 using UiScreenEntryId = uint32_t;
-using BuildVisibleScreen =
-	std::function<void(UiScreenEntryId entryId, Screen& screen, bool overlay, int visibleIndex)>;
+
+struct VisibleScreen {
+	UiScreenEntryId entryId = 0;
+	Screen * screen = nullptr;
+	bool overlay = false;
+	int visibleIndex = 0;
+};
 
 class ScreenStack {
 public:
@@ -36,16 +37,14 @@ public:
 	Screen * Top() const;
 	UiScreenEntryId TopEntryId() const;
 	bool PopEntry(UiScreenEntryId entryId, ScreenContext& ctx);
+	const std::vector<VisibleScreen>& VisibleScreens();
 
 	void TickVisible(ScreenContext& ctx);
-	void BuildVisible(silencer::ui::UiInteractionRegistry& interactions,
-	                  const BuildVisibleScreen& buildScreen);
 
 #ifdef SILENCER_TEST_BUILD
 	void PushBuiltForTest(std::unique_ptr<Screen> screen);
 	void PopForTest();
 	bool PopEntryForTest(UiScreenEntryId entryId);
-	void BuildVisibleForTest(const BuildVisibleScreen& buildScreen);
 #endif
 
 private:
@@ -57,6 +56,7 @@ private:
 	std::size_t VisibleStart() const;
 
 	std::vector<Entry> screens_;
+	std::vector<VisibleScreen> visibleScreens_;
 	UiScreenEntryId nextEntryId_ = 1;
 	bool clearRequested_ = false;
 };

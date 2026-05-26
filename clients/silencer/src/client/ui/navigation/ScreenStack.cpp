@@ -1,6 +1,5 @@
 #include "client/ui/navigation/ScreenStack.h"
 
-#include "runtime/UiInteractionRegistry.h"
 #include "screen.h"
 
 #include <iterator>
@@ -15,6 +14,7 @@ void ScreenStack::Push(std::unique_ptr<Screen> screen, ScreenContext& ctx) {
 	if(!screen) return;
 	screen->Build(ctx);
 	screens_.push_back(Entry{ nextEntryId_++, std::move(screen) });
+	visibleScreens_.reserve(screens_.capacity());
 }
 
 void ScreenStack::Pop(ScreenContext& ctx) {
@@ -30,6 +30,7 @@ void ScreenStack::Replace(std::unique_ptr<Screen> screen, ScreenContext& ctx) {
 
 void ScreenStack::Clear(ScreenContext& ctx) {
 	while(!screens_.empty()) Pop(ctx);
+	visibleScreens_.clear();
 }
 
 void ScreenStack::RequestClear() {
@@ -61,6 +62,25 @@ bool ScreenStack::PopEntry(UiScreenEntryId entryId, ScreenContext& ctx) {
 	return false;
 }
 
+const std::vector<VisibleScreen>& ScreenStack::VisibleScreens() {
+	visibleScreens_.clear();
+	if(screens_.empty()) return visibleScreens_;
+	const std::size_t start = VisibleStart();
+	int visibleIndex = 0;
+	for(std::size_t i = start; i < screens_.size(); ++i){
+		Screen * screen = screens_[i].screen.get();
+		if(!screen) continue;
+		visibleScreens_.push_back(VisibleScreen{
+			screens_[i].entryId,
+			screen,
+			screen->IsOverlay(),
+			visibleIndex,
+		});
+		++visibleIndex;
+	}
+	return visibleScreens_;
+}
+
 std::size_t ScreenStack::VisibleStart() const {
 	if(screens_.empty()) return 0;
 	std::size_t start = screens_.size() - 1;
@@ -76,25 +96,11 @@ void ScreenStack::TickVisible(ScreenContext& ctx) {
 	}
 }
 
-void ScreenStack::BuildVisible(silencer::ui::UiInteractionRegistry& interactions,
-                               const BuildVisibleScreen& buildScreen) {
-	if(!buildScreen || screens_.empty()) return;
-	const std::size_t start = VisibleStart();
-	int visibleIndex = 0;
-	for(std::size_t i = start; i < screens_.size(); ++i) {
-		Screen& screen = *screens_[i].screen;
-		if(i > start && screen.IsOverlay()) {
-			interactions.BeginFrame();
-		}
-		buildScreen(screens_[i].entryId, screen, screen.IsOverlay(), visibleIndex);
-		++visibleIndex;
-	}
-}
-
 #ifdef SILENCER_TEST_BUILD
 void ScreenStack::PushBuiltForTest(std::unique_ptr<Screen> screen) {
 	if(!screen) return;
 	screens_.push_back(Entry{ nextEntryId_++, std::move(screen) });
+	visibleScreens_.reserve(screens_.capacity());
 }
 
 void ScreenStack::PopForTest() {
@@ -110,17 +116,6 @@ bool ScreenStack::PopEntryForTest(UiScreenEntryId entryId) {
 		return true;
 	}
 	return false;
-}
-
-void ScreenStack::BuildVisibleForTest(const BuildVisibleScreen& buildScreen) {
-	if(!buildScreen || screens_.empty()) return;
-	const std::size_t start = VisibleStart();
-	int visibleIndex = 0;
-	for(std::size_t i = start; i < screens_.size(); ++i) {
-		Screen& screen = *screens_[i].screen;
-		buildScreen(screens_[i].entryId, screen, screen.IsOverlay(), visibleIndex);
-		++visibleIndex;
-	}
 }
 #endif
 

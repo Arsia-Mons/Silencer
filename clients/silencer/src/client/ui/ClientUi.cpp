@@ -322,15 +322,18 @@ void ClientUi::TickVisibleScreens(ScreenContext& ctx) {
 }
 
 void ClientUi::BuildVisibleScreens(ScreenContext& ctx, Surface& dst, float frametime) {
-	screens_.BuildVisible(
-		interactions_,
-		[&](UiScreenEntryId entryId, Screen& screen, bool overlay, int visibleIndex) {
-			BuildVisibleScreenFrame(entryId, overlay, visibleIndex, [&] {
-				WithScreenProvider(entryId, [&] {
-					screen.BuildUi(ctx, dst, frametime, interactions_);
-				});
+	const std::vector<VisibleScreen>& visible = screens_.VisibleScreens();
+	for(const VisibleScreen& entry : visible){
+		if(!entry.screen) continue;
+		if(entry.visibleIndex > 0 && entry.overlay) {
+			interactions_.BeginFrame();
+		}
+		BuildVisibleScreenFrame(entry.entryId, entry.overlay, entry.visibleIndex, [&] {
+			WithScreenProvider(entry.entryId, [&] {
+				entry.screen->BuildUi(ctx, dst, frametime, interactions_);
 			});
 		});
+	}
 }
 
 #ifdef SILENCER_TEST_BUILD
@@ -340,24 +343,29 @@ void ClientUi::PushBuiltScreenForTest(std::unique_ptr<Screen> screen) {
 
 void ClientUi::BuildVisibleScreenProvidersForTest(
 	const std::function<void(UiScreenEntryId entryId, Screen& screen)>& buildScreen) {
-	screens_.BuildVisibleForTest(
-		[&](UiScreenEntryId entryId, Screen& screen, bool, int) {
-			WithScreenProvider(entryId, [&] {
-				if(buildScreen) buildScreen(entryId, screen);
-			});
+	const std::vector<VisibleScreen>& visible = screens_.VisibleScreens();
+	for(const VisibleScreen& entry : visible){
+		if(!entry.screen) continue;
+		WithScreenProvider(entry.entryId, [&] {
+			if(buildScreen) buildScreen(entry.entryId, *entry.screen);
 		});
+	}
 }
 
 void ClientUi::BuildVisibleScreenFramesForTest(
 	const std::function<void(UiScreenEntryId entryId, Screen& screen, bool overlay)>& buildScreen) {
-	screens_.BuildVisibleForTest(
-		[&](UiScreenEntryId entryId, Screen& screen, bool overlay, int visibleIndex) {
-			BuildVisibleScreenFrame(entryId, overlay, visibleIndex, [&] {
-				WithScreenProvider(entryId, [&] {
-					if(buildScreen) buildScreen(entryId, screen, overlay);
-				});
+	const std::vector<VisibleScreen>& visible = screens_.VisibleScreens();
+	for(const VisibleScreen& entry : visible){
+		if(!entry.screen) continue;
+		if(entry.visibleIndex > 0 && entry.overlay) {
+			interactions_.BeginFrame();
+		}
+		BuildVisibleScreenFrame(entry.entryId, entry.overlay, entry.visibleIndex, [&] {
+			WithScreenProvider(entry.entryId, [&] {
+				if(buildScreen) buildScreen(entry.entryId, *entry.screen, entry.overlay);
 			});
 		});
+	}
 }
 
 void ClientUi::DrainWritesForTest() {
