@@ -4,6 +4,7 @@
 #include "runtime/UiInteractionRegistry.h"
 
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace {
@@ -61,4 +62,55 @@ TEST_CASE("UiInteractionRegistry surfaces action queue overflow diagnostics") {
 	CHECK(actions.back().id == "action.127");
 	CHECK(registry.PendingActionCount() == 0);
 	CHECK(registry.ActionOverflowCount() == 1);
+}
+
+TEST_CASE("UiInteractionRegistry bounds frame metadata registration") {
+	silencer::ui::UiInteractionRegistry registry;
+	registry.BeginFrame();
+
+	for(int i = 0; i < silencer::ui::UI_INTERACTION_MAX_REGISTERED_ELEMENTS + 2; ++i){
+		silencer::ui::UiElementSnapshot element;
+		element.id = "element." + std::to_string(i);
+		const bool registered = registry.Register(std::move(element));
+		CHECK(registered == (i < silencer::ui::UI_INTERACTION_MAX_REGISTERED_ELEMENTS));
+	}
+
+	auto elements = registry.Elements();
+	CHECK(elements.size() == silencer::ui::UI_INTERACTION_MAX_REGISTERED_ELEMENTS);
+	CHECK(registry.ElementOverflowCount() == 2);
+	REQUIRE(!elements.empty());
+	CHECK(elements[0].id == "element.0");
+	CHECK(elements[elements.size() - 1].id == "element.511");
+
+	registry.BeginFrame();
+	CHECK(registry.Elements().empty());
+	CHECK(registry.ElementOverflowCount() == 2);
+	CHECK(registry.Register(silencer::ui::UiElementSnapshot{}));
+	CHECK(registry.Elements().size() == 1);
+}
+
+TEST_CASE("UiInteractionRegistry bounds frame interactable registration") {
+	silencer::ui::UiInteractionRegistry registry;
+	registry.BeginFrame();
+
+	for(int i = 0; i < silencer::ui::UI_INTERACTION_MAX_INTERACTABLES + 1; ++i){
+		silencer::ui::UiInteractable widget;
+		widget.id = "button." + std::to_string(i);
+		widget.labelText = "Button " + std::to_string(i);
+		widget.kind = silencer::ui::UiInteractableKind::Button;
+		const bool registered = registry.RegisterInteractable(std::move(widget));
+		CHECK(registered == (i < silencer::ui::UI_INTERACTION_MAX_INTERACTABLES));
+	}
+
+	auto interactables = registry.Interactables();
+	auto elements = registry.Elements();
+	CHECK(interactables.size() == silencer::ui::UI_INTERACTION_MAX_INTERACTABLES);
+	CHECK(elements.size() == silencer::ui::UI_INTERACTION_MAX_INTERACTABLES);
+	CHECK(registry.InteractableOverflowCount() == 1);
+	CHECK(registry.ElementOverflowCount() == 0);
+	REQUIRE(!interactables.empty());
+	CHECK(interactables[0].id == "button.0");
+	CHECK(interactables[interactables.size() - 1].id == "button.255");
+	CHECK(registry.FindById("button.255") != nullptr);
+	CHECK(registry.FindById("button.256") == nullptr);
 }

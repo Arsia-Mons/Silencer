@@ -4,11 +4,19 @@
 #include "runtime/UiActionQueue.h"
 #include "runtime/UiInputState.h"
 
+#include <array>
+#include <cstddef>
+#include <iterator>
 #include <string>
 #include <vector>
 
 namespace silencer {
 namespace ui {
+
+constexpr int UI_INTERACTION_MAX_REGISTERED_ELEMENTS = 512;
+constexpr int UI_INTERACTION_MAX_INTERACTABLES = 256;
+constexpr int UI_INTERACTION_MAX_ELEMENTS =
+	UI_INTERACTION_MAX_REGISTERED_ELEMENTS + UI_INTERACTION_MAX_INTERACTABLES;
 
 enum class UiElementKind {
 	Container,
@@ -66,6 +74,33 @@ struct UiInteractable {
 	bool cancelOnEscape = false;
 };
 
+template <typename T>
+class UiConstSpan {
+public:
+	using const_iterator = const T *;
+	using const_reverse_iterator = std::reverse_iterator<const_iterator>;
+
+	UiConstSpan() = default;
+	UiConstSpan(const T * items, int count)
+		: items_(items), count_(count) {}
+
+	const_iterator begin() const { return items_; }
+	const_iterator end() const { return items_ ? items_ + count_ : nullptr; }
+	const_reverse_iterator rbegin() const { return const_reverse_iterator(end()); }
+	const_reverse_iterator rend() const { return const_reverse_iterator(begin()); }
+	bool empty() const { return count_ == 0; }
+	std::size_t size() const { return static_cast<std::size_t>(count_); }
+	int count() const { return count_; }
+	const T& operator[](std::size_t index) const { return items_[index]; }
+
+private:
+	const T * items_ = nullptr;
+	int count_ = 0;
+};
+
+using UiElementSnapshotSpan = UiConstSpan<UiElementSnapshot>;
+using UiInteractableSpan = UiConstSpan<UiInteractable>;
+
 const char * UiInteractableLabel(const UiInteractable& widget);
 bool UiInteractableMatchesLabel(const UiInteractable& widget, const char * label);
 bool UiInteractableIsInteractive(const UiInteractable& widget);
@@ -73,10 +108,12 @@ bool UiInteractableIsInteractive(const UiInteractable& widget);
 class UiInteractionRegistry {
 public:
 	void BeginFrame();
-	void Register(UiElementSnapshot metadata);
-	void RegisterInteractable(UiInteractable interactable);
-	const std::vector<UiElementSnapshot>& Elements() const;
-	const std::vector<UiInteractable>& Interactables() const;
+	bool Register(UiElementSnapshot metadata);
+	bool RegisterInteractable(UiInteractable interactable);
+	UiElementSnapshotSpan Elements() const;
+	UiInteractableSpan Interactables() const;
+	int ElementOverflowCount() const { return elementOverflowCount_; }
+	int InteractableOverflowCount() const { return interactableOverflowCount_; }
 	const UiElementSnapshot* FindById(const std::string& id) const;
 	const UiElementSnapshot* FindByLabel(const std::string& label) const;
 	const UiInteractable* FindInteractableByLabel(const char * label) const;
@@ -126,10 +163,15 @@ private:
 	bool QueueAction(UiActionKind kind, const UiInteractable& widget, const char * value);
 	void RefreshElementState();
 
-	std::vector<UiElementSnapshot> elements_;
-	std::vector<UiElementSnapshot> registeredElements_;
-	std::vector<UiInteractable> interactables_;
+	std::array<UiElementSnapshot, UI_INTERACTION_MAX_ELEMENTS> elements_ = {};
+	std::array<UiElementSnapshot, UI_INTERACTION_MAX_REGISTERED_ELEMENTS> registeredElements_ = {};
+	std::array<UiInteractable, UI_INTERACTION_MAX_INTERACTABLES> interactables_ = {};
 	UiActionQueue actions_;
+	int elementCount_ = 0;
+	int registeredElementCount_ = 0;
+	int interactableCount_ = 0;
+	int elementOverflowCount_ = 0;
+	int interactableOverflowCount_ = 0;
 	int focusedUid_ = -1;
 	UiInteractableKind focusedKind_ = UiInteractableKind::Button;
 	std::string focusedLabel_;
