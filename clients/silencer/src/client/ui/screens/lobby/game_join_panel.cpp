@@ -3,6 +3,7 @@
 #include "client/ui/hud/HudPayloadArena.h"
 #include "clay/clay.h"
 #include "clay_ui_compositor.h"
+#include "hooks/use_lobby.h"
 #include "primitives/button.h"
 #include "primitives/text.h"
 #include "runtime/UiInteractionRegistry.h"
@@ -71,6 +72,15 @@ ButtonOpts FullWidthUpperButtonOpts(Uint16 panelWidth) {
 	};
 }
 
+void QueueActionsFlush(GameJoinPanelState & state)
+{
+	if(state.actionsQueued) return;
+	state.actionsQueued = true;
+	if(state.flushActions && state.pendingActions){
+		state.flushActions(state.pendingActions);
+	}
+}
+
 }  // namespace game_join_panel_detail
 
 void GameJoinPanelInit(GameJoinPanelState & state) {
@@ -93,30 +103,27 @@ void GameJoinPanelTick(GameJoinPanelState & state,
 		row.level = sourceRow.level;
 		state.rosterRows.push_back(std::move(row));
 	}
-
-	if(state.readyClicked){
-		state.readyClicked = false;
-		ctx.SendLobbyJoinReady();
-	}
-	if(state.teamClicked){
-		state.teamClicked = false;
-		ctx.ChangeLobbyJoinTeam();
-	}
 }
 
 bool GameJoinPanelHandleUiIntent(GameJoinPanelState & state,
                                  const silencer::ui::UiAction & action) {
 	if(action.kind != silencer::ui::UiActionKind::Activate) return false;
 	if(action.id == game_join_panel_detail::kActionTech){
-		state.techClicked = true;
+		if(!state.pendingActions) return true;
+		state.pendingActions->chooseTech = true;
+		game_join_panel_detail::QueueActionsFlush(state);
 		return true;
 	}
 	if(action.id == game_join_panel_detail::kActionTeam){
-		state.teamClicked = true;
+		if(!state.pendingActions) return true;
+		state.pendingActions->changeTeam = true;
+		game_join_panel_detail::QueueActionsFlush(state);
 		return true;
 	}
 	if(action.id == game_join_panel_detail::kActionReady){
-		state.readyClicked = true;
+		if(!state.pendingActions) return true;
+		state.pendingActions->ready = true;
+		game_join_panel_detail::QueueActionsFlush(state);
 		return true;
 	}
 	return false;
@@ -127,6 +134,15 @@ void BuildGameJoinUpperTree(GameJoinPanelState & state,
                             Resources & resources,
                             silencer::ui::UiInteractionRegistry& interactions) {
 	(void)resources;
+	if(!state.pendingActions){
+		state.pendingActions =
+			std::make_shared<silencer::client_ui::hooks::LobbyGameJoinActions>();
+	}
+	state.pendingActions->ready = false;
+	state.pendingActions->changeTeam = false;
+	state.pendingActions->chooseTech = false;
+	state.actionsQueued = false;
+
 	const ButtonOpts buttonOpts =
 		game_join_panel_detail::FullWidthUpperButtonOpts(panelWidth);
 

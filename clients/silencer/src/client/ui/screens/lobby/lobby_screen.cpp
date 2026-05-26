@@ -2,6 +2,7 @@
 
 #include "game_create_panel.h"
 #include "client/ui/ClientUi.h"
+#include "hooks/use_lobby.h"
 #include "lobby_chrome.h"
 #include "lobby_main_area.h"
 
@@ -110,7 +111,7 @@ void LobbyScreen::ShowGameJoin(ScreenContext & ctx)
 
 void LobbyScreen::ShowGameTech(ScreenContext & ctx)
 {
-	ctx.BeginLobbyTechSelection();
+	(void)ctx;
 
 	silencer::client_ui::lobby::GameTechPanelInit(gameTechState);
 	gameTechActive   = true;
@@ -142,57 +143,70 @@ void LobbyScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime, s
 	const int bodyX = rootPadX;
 	const int bodyY = rootPadTop + (int)titleBarH + regionGap;
 	goBackQueued = false;
-	goBack = lobby_screen_detail::UseQueuedAction([&ctx]() {
-		ctx.GoBack();
-	});
-
-	ctx.BeginLobbyPanelBorderBlur(layoutWidth, layoutHeight, input.uiScale);
-	lobby_screen_detail::AddPanelBorderBlur(
-		ctx,
-		rootPadX,
-		rootPadTop,
-		bodyW,
-		static_cast<int>(titleBarH));
-
-	CLAY({ .id = CLAY_ID("LobbyRoot"),
-	       .layout = {
-	           .sizing = { CLAY_SIZING_GROW(0),
-	                       CLAY_SIZING_GROW(0) },
-	           .padding = { static_cast<uint16_t>(rootPadX),
-	                        static_cast<uint16_t>(rootPadX),
-	                        static_cast<uint16_t>(rootPadTop),
-	                        static_cast<uint16_t>(rootPadBottom) },
-	           .childGap = static_cast<uint16_t>(regionGap),
-	           .layoutDirection = CLAY_TOP_TO_BOTTOM,
-	       },
-	       .image = { .imageData = silencer::clay_bridge::PackImageStretch(7, 1) } }) {
-		BuildLobbyTitleBar(version, mapName, layoutWidth, interactions);
-
-		LobbyMainAreaPanels panels{
-			characterState,
-			chatState,
-			gameSelectState,
-			gameCreateState,
-			gameJoinState,
-			gameTechState,
-			gameCreateActive,
-			gameJoinActive,
-			gameTechActive,
+	silencer::client_ui::hooks::LobbyProvider(ctx, [&]() {
+		const silencer::client_ui::hooks::LobbyUi lobby =
+			silencer::client_ui::hooks::UseLobby();
+		goBack = lobby_screen_detail::UseQueuedAction([&ctx]() {
+			ctx.GoBack();
+		});
+		gameJoinState.flushActions =
+			[lobby, this, &ctx](
+				std::shared_ptr<silencer::client_ui::hooks::LobbyGameJoinActions> actions) {
+				if(!lobby.flushGameJoinActions || !actions) return;
+				lobby.flushGameJoinActions(
+					actions,
+					[this]() { return gameJoinActive && !goBackQueued; },
+					[this, &ctx]() { ShowGameTech(ctx); });
 		};
-		BuildLobbyMainArea(
-			panels,
+
+		ctx.BeginLobbyPanelBorderBlur(layoutWidth, layoutHeight, input.uiScale);
+		lobby_screen_detail::AddPanelBorderBlur(
 			ctx,
-			ctx.world.resources,
-			bodyX,
-			bodyY,
+			rootPadX,
+			rootPadTop,
 			bodyW,
-			bodyH,
-			regionGap,
-			interactions);
-		if(gameCreateActive){
-			BuildGameCreatePreviewOverlay(gameCreateState, ctx);
+			static_cast<int>(titleBarH));
+
+		CLAY({ .id = CLAY_ID("LobbyRoot"),
+		       .layout = {
+		           .sizing = { CLAY_SIZING_GROW(0),
+		                       CLAY_SIZING_GROW(0) },
+		           .padding = { static_cast<uint16_t>(rootPadX),
+		                        static_cast<uint16_t>(rootPadX),
+		                        static_cast<uint16_t>(rootPadTop),
+		                        static_cast<uint16_t>(rootPadBottom) },
+		           .childGap = static_cast<uint16_t>(regionGap),
+		           .layoutDirection = CLAY_TOP_TO_BOTTOM,
+		       },
+		       .image = { .imageData = silencer::clay_bridge::PackImageStretch(7, 1) } }) {
+			BuildLobbyTitleBar(version, mapName, layoutWidth, interactions);
+
+			LobbyMainAreaPanels panels{
+				characterState,
+				chatState,
+				gameSelectState,
+				gameCreateState,
+				gameJoinState,
+				gameTechState,
+				gameCreateActive,
+				gameJoinActive,
+				gameTechActive,
+			};
+			BuildLobbyMainArea(
+				panels,
+				ctx,
+				ctx.world.resources,
+				bodyX,
+				bodyY,
+				bodyW,
+				bodyH,
+				regionGap,
+				interactions);
+			if(gameCreateActive){
+				BuildGameCreatePreviewOverlay(gameCreateState, ctx);
+			}
 		}
-	}
+	});
 }
 
 void LobbyScreen::Destroy(ScreenContext & ctx)

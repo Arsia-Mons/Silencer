@@ -907,7 +907,12 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 		if(which == "create")      lobby->ShowGameCreate(ctx);
 		else if(which == "select") lobby->ShowGameSelect(ctx);
 		else if(which == "join")   lobby->ShowGameJoin(ctx);
-		else if(which == "tech")   lobby->ShowGameTech(ctx);
+		else if(which == "tech"){
+			World & world = game.GetWorld();
+			world.choosingtech = true;
+			world.peers.RequestPeerList();
+			lobby->ShowGameTech(ctx);
+		}
 		else{
 			cmd.reply->set_value(Err(cmd.id, "BAD_REQUEST",
 				"lobby_show_panel needs --panel select|create|join|tech"));

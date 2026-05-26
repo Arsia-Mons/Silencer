@@ -236,7 +236,18 @@ fail_if_match \
   "$REPO_ROOT/clients/silencer/src/client/ui/screens/mission_summary/mission_summary_screen.h"
 
 fail_if_match \
+  '\b(readyClicked|teamClicked|techClicked)\b' \
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens/lobby/game_join_panel.cpp" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens/lobby/game_join_panel.h" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens/lobby/lobby_controller.cpp"
+
+fail_if_match \
   '\b(SubmitLobbyCredentials|UpgradeMissionSummaryStat|CompleteMissionSummary)\b' \
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens/screen_context.cpp" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens/screen_context.h"
+
+fail_if_match \
+  '\b(SendLobbyJoinReady|ChangeLobbyJoinTeam|BeginLobbyTechSelection)\b' \
   "$REPO_ROOT/clients/silencer/src/client/ui/screens/screen_context.cpp" \
   "$REPO_ROOT/clients/silencer/src/client/ui/screens/screen_context.h"
 

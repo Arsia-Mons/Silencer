@@ -77,8 +77,8 @@ private:
 	silencer::client_ui::lobby::GameJoinPanelState gameJoinState;
 	bool gameJoinActive = false;
 
-	// GameTech state + active flag. ShowGameTech also sets
-	// `world.choosingtech = true`.
+	// GameTech state + active flag. Lobby write hooks set
+	// `world.choosingtech` before this panel is shown from UI.
 	silencer::client_ui::lobby::GameTechPanelState gameTechState;
 	bool gameTechActive = false;
 };

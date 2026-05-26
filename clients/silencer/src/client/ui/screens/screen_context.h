@@ -275,9 +275,6 @@ public:
 	void SendLobbyChat(const char * message);
 	bool LobbyJoinReadyBlocked();
 	std::vector<LobbyJoinRosterRow> LobbyJoinRosterRows() const;
-	void SendLobbyJoinReady();
-	void ChangeLobbyJoinTeam();
-	void BeginLobbyTechSelection();
 	LobbyTechSnapshot CurrentLobbyTechSnapshot();
 	LobbyTechItemDetails LobbyTechItemDetailsForIndex(int itemIndex) const;
 	void ToggleLobbyTechChoice(int itemIndex);

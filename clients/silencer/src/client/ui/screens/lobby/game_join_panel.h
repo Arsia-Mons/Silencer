@@ -7,13 +7,15 @@
 // "Waiting..." while the host is still waiting for peers to finish
 // downloading the map.
 //
-// Domain decisions live in the screen-side GameJoinPanelTick. Narrow roster
-// and join-team handoffs come through ScreenContext; primitives stay
-// screen-agnostic.
+// Domain reads live in the screen-side GameJoinPanelTick. Button callbacks are
+// captured during BuildUi through lobby hooks/providers and drained after Clay
+// declaration.
 
 #include "shared.h"
 #include "runtime/UiActionQueue.h"
 
+#include <functional>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -22,6 +24,10 @@ class ScreenContext;
 
 namespace silencer::ui {
 class UiInteractionRegistry;
+}
+
+namespace silencer::client_ui::hooks {
+struct LobbyGameJoinActions;
 }
 
 namespace silencer::client_ui::lobby {
@@ -37,11 +43,10 @@ struct GameJoinRosterRow {
 };
 
 struct GameJoinPanelState {
-	// Per-frame click flags. Set by typed widget intents; consumed once
-	// by GameJoinPanelTick on the next frame.
-	bool readyClicked = false;
-	bool teamClicked  = false;
-	bool techClicked  = false;
+	std::shared_ptr<silencer::client_ui::hooks::LobbyGameJoinActions> pendingActions = {};
+	std::function<void(std::shared_ptr<silencer::client_ui::hooks::LobbyGameJoinActions>)>
+		flushActions = {};
+	bool actionsQueued = false;
 
 	// Cached Ready-button label — recomputed each Tick from ScreenContext's
 	// joined-game ready state.
@@ -56,9 +61,8 @@ struct GameJoinPanelState {
 
 void GameJoinPanelInit(GameJoinPanelState & state);
 
-// Per-frame pump. Recomputes the Ready-button label and consumes ready/team
-// click flags. Leaves techClicked for the owning screen to consume
-// because swapping the right-side panel is parent-owned navigation.
+// Per-frame pump. Recomputes the Ready-button label and roster snapshot from
+// ScreenContext while lobby writes stay behind UseLobby callbacks.
 void GameJoinPanelTick(GameJoinPanelState & state,
                        ScreenContext & ctx);
 bool GameJoinPanelHandleUiIntent(GameJoinPanelState & state,

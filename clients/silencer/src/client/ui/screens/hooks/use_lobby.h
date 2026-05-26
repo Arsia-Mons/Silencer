@@ -13,10 +13,19 @@ struct LobbyMissionSummaryActions {
 	bool done = false;
 };
 
+struct LobbyGameJoinActions {
+	bool ready = false;
+	bool changeTeam = false;
+	bool chooseTech = false;
+};
+
 struct LobbyUi {
 	bool authSent = false;
 	std::function<void(std::string username, std::string password)> submitCredentials = {};
 	std::function<void(std::shared_ptr<LobbyMissionSummaryActions>)> flushMissionSummaryActions = {};
+	std::function<void(std::shared_ptr<LobbyGameJoinActions>,
+	                   std::function<bool()> gameJoinStillActive,
+	                   std::function<void()> showTech)> flushGameJoinActions = {};
 };
 
 void LobbyProvider(ScreenContext & ctx, const std::function<void()> & children);

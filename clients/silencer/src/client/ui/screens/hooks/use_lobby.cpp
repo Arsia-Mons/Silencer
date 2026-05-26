@@ -65,6 +65,58 @@ void CompleteMissionSummary(ScreenContext * screen, Lobby * lobby)
 	}
 }
 
+void SendJoinReady(World * world)
+{
+	if(!world) return;
+	world->SendReadyIfAllowed();
+}
+
+void ChangeJoinTeam(World * world)
+{
+	if(!world) return;
+	world->ChangeTeam();
+}
+
+void BeginTechSelection(World * world)
+{
+	if(!world) return;
+	world->choosingtech = true;
+	world->peers.RequestPeerList();
+}
+
+void ClearGameJoinActions(LobbyGameJoinActions & actions)
+{
+	actions.ready = false;
+	actions.changeTeam = false;
+	actions.chooseTech = false;
+}
+
+void FlushGameJoinActions(World * world,
+                          const std::shared_ptr<LobbyGameJoinActions> & actions,
+                          const std::function<bool()> & gameJoinStillActive,
+                          const std::function<void()> & showTech)
+{
+	if(!actions) return;
+	if(gameJoinStillActive && !gameJoinStillActive()){
+		ClearGameJoinActions(*actions);
+		return;
+	}
+
+	if(actions->chooseTech){
+		BeginTechSelection(world);
+		if(showTech) showTech();
+		ClearGameJoinActions(*actions);
+		return;
+	}
+	if(actions->ready){
+		SendJoinReady(world);
+	}
+	if(actions->changeTeam){
+		ChangeJoinTeam(world);
+	}
+	ClearGameJoinActions(*actions);
+}
+
 } // namespace
 
 void LobbyProvider(ScreenContext & ctx, const std::function<void()> & children)
@@ -108,6 +160,18 @@ LobbyUi UseLobby()
 				if(actions->done){
 					CompleteMissionSummary(screen, lobby);
 				}
+			});
+		};
+	result.flushGameJoinActions =
+		[queueWrite, world](std::shared_ptr<LobbyGameJoinActions> actions,
+		                    std::function<bool()> gameJoinStillActive,
+		                    std::function<void()> showTech) {
+			if(!queueWrite || !actions) return;
+			queueWrite([world,
+			            actions,
+			            gameJoinStillActive = std::move(gameJoinStillActive),
+			            showTech = std::move(showTech)]() {
+				FlushGameJoinActions(world, actions, gameJoinStillActive, showTech);
 			});
 		};
 	return result;

@@ -722,19 +722,6 @@ ScreenContext::LobbyJoinRosterRows() const {
 	return rows;
 }
 
-void ScreenContext::SendLobbyJoinReady() {
-	world.SendReadyIfAllowed();
-}
-
-void ScreenContext::ChangeLobbyJoinTeam() {
-	world.ChangeTeam();
-}
-
-void ScreenContext::BeginLobbyTechSelection() {
-	world.choosingtech = true;
-	world.peers.RequestPeerList();
-}
-
 ScreenContext::LobbyTechSnapshot ScreenContext::CurrentLobbyTechSnapshot() {
 	LobbyTechSnapshot snapshot;
 	const Uint8 localId = world.GetLocalPeerId();
