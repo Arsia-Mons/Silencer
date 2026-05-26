@@ -41,7 +41,7 @@ ScreenContext::UpdateState ToScreenUpdateState(Updater::State state)
 			return ScreenContext::UpdateState::Done;
 	}
 	assert(false && "Unhandled updater state");
-	return ScreenContext::UpdateState::Idle;
+	std::abort();
 }
 } // namespace
 

@@ -59,9 +59,9 @@ std::string StatusText(ScreenContext & ctx)
 			return ctx.UpdateErrorMessage();
 		case UpdateState::Idle:
 		case UpdateState::Done:
-		default:
 			return "";
 	}
+	return "";
 }
 
 std::string ProgressText(ScreenContext & ctx)
