@@ -151,10 +151,15 @@ void ClientUiInput::CaptureGamepadBindingEdges(uint32_t buttons,
                                                int axisCount,
                                                int16_t axisDeadzone) {
 	if(axisCount < 0) axisCount = 0;
+	if(axisCount > CLIENT_UI_INPUT_MAX_GAMEPAD_AXES){
+		axisCount = CLIENT_UI_INPUT_MAX_GAMEPAD_AXES;
+		++gamepadBindingAxisOverflowCount_;
+	}
 	if(!gamepadBindingInitialized_){
 		gamepadBindingInitialized_ = true;
 		gamepadBindingButtons_ = buttons;
-		gamepadBindingAxes_.assign(axisCount, 0);
+		gamepadBindingAxisCount_ = axisCount;
+		gamepadBindingAxes_.fill(0);
 		for(int axis = 0; axis < axisCount; ++axis){
 			gamepadBindingAxes_[axis] = axes ? axes[axis] : 0;
 		}
@@ -174,8 +179,9 @@ void ClientUiInput::CaptureGamepadBindingEdges(uint32_t buttons,
 		}
 	}
 
-	if(static_cast<int>(gamepadBindingAxes_.size()) != axisCount){
-		gamepadBindingAxes_.assign(axisCount, 0);
+	if(gamepadBindingAxisCount_ != axisCount){
+		gamepadBindingAxisCount_ = axisCount;
+		gamepadBindingAxes_.fill(0);
 	}
 	for(int axis = 0; axis < axisCount; ++axis){
 		int16_t was = gamepadBindingAxes_[axis];

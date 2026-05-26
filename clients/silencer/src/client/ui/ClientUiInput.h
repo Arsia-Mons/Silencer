@@ -2,11 +2,13 @@
 
 #include "ui/runtime/UiInputState.h"
 
+#include <array>
 #include <cstdint>
-#include <vector>
 
 namespace silencer {
 namespace client_ui {
+
+constexpr int CLIENT_UI_INPUT_MAX_GAMEPAD_AXES = 16;
 
 class ClientUiInput {
 public:
@@ -44,6 +46,7 @@ public:
 
 	silencer::ui::UiInputState BuildFrame(int width, int height, float uiScale, float deltaTimeSeconds);
 	void EndFrame();
+	int GamepadBindingAxisOverflowCount() const { return gamepadBindingAxisOverflowCount_; }
 
 private:
 	static void WindowToSurface(float windowX,
@@ -83,7 +86,9 @@ private:
 
 	bool gamepadBindingInitialized_ = false;
 	uint32_t gamepadBindingButtons_ = 0;
-	std::vector<int16_t> gamepadBindingAxes_;
+	std::array<int16_t, CLIENT_UI_INPUT_MAX_GAMEPAD_AXES> gamepadBindingAxes_ = {};
+	int gamepadBindingAxisCount_ = 0;
+	int gamepadBindingAxisOverflowCount_ = 0;
 };
 
 }  // namespace client_ui

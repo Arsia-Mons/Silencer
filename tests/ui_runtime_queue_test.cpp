@@ -4,6 +4,7 @@
 #include "runtime/UiActionQueue.h"
 #include "runtime/UiInteractionRegistry.h"
 
+#include <array>
 #include <string>
 #include <utility>
 #include <vector>
@@ -178,4 +179,29 @@ TEST_CASE("ClientUiInput builds frames from bounded input buffers") {
 	frame = input.BuildFrame(640, 480, 1.0f, 1.0f / 60.0f);
 	CHECK(frame.navActions.empty());
 	CHECK(frame.textInput.empty());
+}
+
+TEST_CASE("ClientUiInput bounds gamepad axis edge storage") {
+	silencer::client_ui::ClientUiInput input;
+	std::array<int16_t, silencer::client_ui::CLIENT_UI_INPUT_MAX_GAMEPAD_AXES + 2> axes = {};
+
+	input.CaptureGamepadBindingEdges(0, axes.data(), static_cast<int>(axes.size()), 1000);
+	CHECK(input.GamepadBindingAxisOverflowCount() == 1);
+
+	axes[0] = 12000;
+	axes[silencer::client_ui::CLIENT_UI_INPUT_MAX_GAMEPAD_AXES - 1] = -12000;
+	axes[silencer::client_ui::CLIENT_UI_INPUT_MAX_GAMEPAD_AXES] = 12000;
+
+	input.CaptureGamepadBindingEdges(0, axes.data(), static_cast<int>(axes.size()), 1000);
+	silencer::ui::UiInputState frame = input.BuildFrame(640, 480, 1.0f, 1.0f / 60.0f);
+
+	CHECK(input.GamepadBindingAxisOverflowCount() == 2);
+	REQUIRE(frame.bindingInputs.size() == 2);
+	CHECK(frame.bindingInputs[0].kind == silencer::ui::UiBindingInputKind::GamepadAxisMoved);
+	CHECK(frame.bindingInputs[0].code == 0);
+	CHECK(frame.bindingInputs[0].axisDir == 1);
+	CHECK(frame.bindingInputs[1].kind == silencer::ui::UiBindingInputKind::GamepadAxisMoved);
+	CHECK(frame.bindingInputs[1].code == silencer::client_ui::CLIENT_UI_INPUT_MAX_GAMEPAD_AXES - 1);
+	CHECK(frame.bindingInputs[1].axisDir == -1);
+	CHECK(frame.source == silencer::ui::UiFocusSource::Gamepad);
 }
