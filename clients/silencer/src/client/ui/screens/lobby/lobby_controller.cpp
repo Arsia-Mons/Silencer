@@ -2,7 +2,6 @@
 
 #include "screen_context.h"
 #include "game_state.h"
-#include "world.h"
 #include "message_modal.h"
 
 #include <cstring>
@@ -38,8 +37,6 @@ void LobbyScreen::Tick(ScreenContext & ctx)
 {
 	// Lobby disconnect → bounce back to the connect screen.
 	if(ctx.HandleLobbyDisconnect()) return;
-
-	World & world = ctx.world;
 
 	// Chrome Go Back — flag was set by a typed button intent on the previous
 	// frame. Consume it before pumping anything else.
