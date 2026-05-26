@@ -276,7 +276,7 @@ fail_if_match \
   --glob '!**/screen_context.cpp'
 
 fail_if_match \
-  '\b(World|Lobby|User|Config|Resources)\b|ctx[[:space:]]*[.][[:space:]]*(world|lobby)|world[[:space:]]*[.]|#[[:space:]]*include[[:space:]]*[<"]([^>"]*/)?(world|lobby|user|config|resources)[.]h[>"]|Config::GetInstance[[:space:]]*[(]' \
+  '\b(World|Lobby|User|Config|Resources)\b|([.]|->)[[:space:]]*(world|lobby)\b|world[[:space:]]*[.]|#[[:space:]]*include[[:space:]]*[<"]([^>"]*/)?(world|lobby|user|config|resources)[.]h[>"]|Config::GetInstance[[:space:]]*[(]' \
   "$REPO_ROOT/clients/silencer/src/client/ui/screens/lobby/character_panel.cpp" \
   "$REPO_ROOT/clients/silencer/src/client/ui/screens/lobby/character_panel.h" \
   --glob '!**/screen_context.cpp'
