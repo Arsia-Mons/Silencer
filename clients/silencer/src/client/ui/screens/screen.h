@@ -2,6 +2,7 @@
 #define SCREEN_H
 
 #include <SDL3/SDL_stdinc.h>
+#include "client/ui/navigation/ScreenEntryId.h"
 #include "runtime/UiActionQueue.h"
 #include "runtime/UiInputState.h"
 
@@ -20,6 +21,9 @@ class Screen
 {
 public:
 	virtual ~Screen() = default;
+
+	silencer::client_ui::UiScreenEntryId EntryId() const { return entryId_; }
+	void SetEntryId(silencer::client_ui::UiScreenEntryId entryId) { entryId_ = entryId; }
 
 	// Initialize screen-owned UI state. Called once on push.
 	virtual void Build(ScreenContext & ctx) = 0;
@@ -59,6 +63,9 @@ public:
 
 	// Modals draw the screen below them; non-modal Screens hide what's beneath.
 	virtual bool IsOverlay() const { return false; }
+
+private:
+	silencer::client_ui::UiScreenEntryId entryId_ = 0;
 };
 
 #endif

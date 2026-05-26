@@ -109,14 +109,16 @@ private:
 struct ReplacementLifecycleProbe {
 	silencer::client_ui::ScreenStack * stack_ = nullptr;
 	Screen * observedTop = nullptr;
+	silencer::client_ui::UiScreenEntryId observedBuiltEntryId = 0;
 	int buildCount = 0;
 };
 
-void ObserveReplacementBuild(Screen&, ScreenContext *, void * userData) {
+void ObserveReplacementBuild(Screen& screen, ScreenContext *, void * userData) {
 	auto * probe = static_cast<ReplacementLifecycleProbe *>(userData);
 	if(!probe) return;
 	probe->buildCount += 1;
 	probe->observedTop = probe->stack_ ? probe->stack_->Top() : nullptr;
+	probe->observedBuiltEntryId = screen.EntryId();
 }
 
 void ProbeScreenHooks(HookProbeStats& stats,
@@ -353,6 +355,8 @@ TEST_CASE("ScreenStack exposes bounded visible screen span") {
 	CHECK(visible.count == silencer::client_ui::CLIENT_UI_MAX_SCREENS);
 	for(int i = 0; i < visible.count; ++i){
 		REQUIRE(visible[i].screen != nullptr);
+		CHECK(visible[i].entryId != 0);
+		CHECK(visible[i].entryId == visible[i].screen->EntryId());
 		CHECK(visible[i].overlay);
 		CHECK(visible[i].visibleIndex == i);
 	}
@@ -415,7 +419,10 @@ TEST_CASE("ScreenStack replacement lifecycle validates before popping and keeps 
 		std::move(replacement), ObserveReplacementBuild, nullptr, &probe));
 	CHECK(probe.buildCount == 1);
 	CHECK(probe.observedTop == baseScreen);
+	CHECK(probe.observedBuiltEntryId != 0);
 	CHECK(stack.Top() == replacementScreen);
+	CHECK(stack.TopEntryId() == probe.observedBuiltEntryId);
+	CHECK(replacementScreen->EntryId() == probe.observedBuiltEntryId);
 	CHECK(firstStats.destructorCount == 1);
 }
 

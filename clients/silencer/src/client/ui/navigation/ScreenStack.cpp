@@ -46,9 +46,10 @@ bool ScreenStack::PushWithLifecycle(std::unique_ptr<Screen> screen,
 		++overflowCount_;
 		return false;
 	}
+	const UiScreenEntryId entryId = nextEntryId_++;
+	screen->SetEntryId(entryId);
 	if(build) build(*screen, ctx, userData);
 	Entry& entry = screens_[count_++];
-	entry.entryId = nextEntryId_++;
 	entry.screen = std::move(screen);
 	return true;
 }
@@ -59,8 +60,8 @@ bool ScreenStack::PopWithLifecycle(ScreenContext * ctx,
 	if(count_ <= 0) return false;
 	Entry& entry = screens_[count_ - 1];
 	if(entry.screen && destroy) destroy(*entry.screen, ctx, userData);
+	if(entry.screen) entry.screen->SetEntryId(0);
 	entry.screen.reset();
-	entry.entryId = 0;
 	--count_;
 	return true;
 }
@@ -96,21 +97,23 @@ Screen * ScreenStack::Top() const {
 }
 
 UiScreenEntryId ScreenStack::TopEntryId() const {
-	return count_ > 0 ? screens_[count_ - 1].entryId : 0;
+	return count_ > 0 && screens_[count_ - 1].screen
+		? screens_[count_ - 1].screen->EntryId()
+		: 0;
 }
 
 bool ScreenStack::PopEntry(UiScreenEntryId entryId, ScreenContext& ctx) {
 	if(entryId == 0) return false;
 	for(int i = count_ - 1; i >= 0; --i){
-		if(screens_[i].entryId != entryId) continue;
+		if(!screens_[i].screen || screens_[i].screen->EntryId() != entryId) continue;
 		if(screens_[i].screen) screens_[i].screen->Destroy(ctx);
+		if(screens_[i].screen) screens_[i].screen->SetEntryId(0);
 		screens_[i].screen.reset();
 		for(int j = i; j + 1 < count_; ++j){
 			screens_[j] = std::move(screens_[j + 1]);
 		}
 		--count_;
 		screens_[count_].screen.reset();
-		screens_[count_].entryId = 0;
 		return true;
 	}
 	return false;
@@ -125,7 +128,7 @@ VisibleScreenSpan ScreenStack::VisibleScreens() {
 		Screen * screen = screens_[i].screen.get();
 		if(!screen) continue;
 		visibleScreens_[visibleScreenCount_++] = VisibleScreen{
-			screens_[i].entryId,
+			screen->EntryId(),
 			screen,
 			screen->IsOverlay(),
 			visibleIndex,
@@ -169,14 +172,14 @@ bool ScreenStack::ReplaceWithLifecycleForTest(std::unique_ptr<Screen> screen,
 bool ScreenStack::PopEntryForTest(UiScreenEntryId entryId) {
 	if(entryId == 0) return false;
 	for(int i = count_ - 1; i >= 0; --i){
-		if(screens_[i].entryId != entryId) continue;
+		if(!screens_[i].screen || screens_[i].screen->EntryId() != entryId) continue;
+		screens_[i].screen->SetEntryId(0);
 		screens_[i].screen.reset();
 		for(int j = i; j + 1 < count_; ++j){
 			screens_[j] = std::move(screens_[j + 1]);
 		}
 		--count_;
 		screens_[count_].screen.reset();
-		screens_[count_].entryId = 0;
 		return true;
 	}
 	return false;

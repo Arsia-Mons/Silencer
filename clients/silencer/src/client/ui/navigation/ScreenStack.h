@@ -1,8 +1,9 @@
 #pragma once
 
+#include "client/ui/navigation/ScreenEntryId.h"
+
 #include <array>
 #include <cstddef>
-#include <cstdint>
 #include <memory>
 
 class Screen;
@@ -11,7 +12,6 @@ class ScreenContext;
 namespace silencer {
 namespace client_ui {
 
-using UiScreenEntryId = uint32_t;
 constexpr int CLIENT_UI_MAX_SCREENS = 32;
 
 struct VisibleScreen {
@@ -66,7 +66,6 @@ public:
 
 private:
 	struct Entry {
-		UiScreenEntryId entryId = 0;
 		std::unique_ptr<Screen> screen;
 	};
 
