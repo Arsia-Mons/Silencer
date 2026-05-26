@@ -16,6 +16,9 @@ namespace client_ui {
 
 namespace clientui_detail {
 
+static_assert(silencer::ui::UI_FOCUS_MAX_SCOPES >= CLIENT_UI_MAX_SCREENS + 1,
+              "ClientUi needs one focus scope per visible screen plus the root scope");
+
 struct ScreenProviderContext {
 	ClientUi * clientUi = nullptr;
 	UiScreenEntryId currentEntryId = 0;

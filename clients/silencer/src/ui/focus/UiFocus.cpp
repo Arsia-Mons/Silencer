@@ -405,7 +405,9 @@ void InvokeFocusCallbackIfRegistered(UiFocusScope * scope, Clay_ElementId id) {
 
 void ui_focus_init(UiFocusRuntime * runtime, UiRuntimeLimits limits) {
 	if(!runtime) return;
-	*runtime = {};
+	*runtime = UiFocusRuntime{};
+	runtime->scopesStorage.reset(new UiFocusScopeStorage{});
+	runtime->scopes = runtime->scopesStorage->data();
 	runtime->limits.maxFocusScopes = ClampLimit(
 		limits.maxFocusScopes, UI_FOCUS_MAX_SCOPES, UI_FOCUS_MAX_SCOPES);
 	runtime->limits.maxFocusablesPerScope = ClampLimit(

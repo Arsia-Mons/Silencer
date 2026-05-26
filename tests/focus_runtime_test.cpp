@@ -667,6 +667,57 @@ TEST_CASE("ClientUi screen focus scopes stay bounded across entry churn") {
 	}
 }
 
+TEST_CASE("ClientUi focus supports the maximum visible overlay stack") {
+	RealClayBackend backend;
+	silencer::ui::ClayService clay(backend);
+	silencer::client_ui::ClientUi clientUi(clay);
+
+	auto base = std::make_unique<FrameProbeScreen>(false);
+	REQUIRE(clientUi.PushBuiltScreenForTest(std::move(base)));
+	Screen * topOverlay = nullptr;
+	for(int i = 0; i < 20; ++i){
+		auto overlay = std::make_unique<FrameProbeScreen>(true);
+		topOverlay = overlay.get();
+		REQUIRE(clientUi.PushBuiltScreenForTest(std::move(overlay)));
+	}
+
+	auto buildVisible = [&] {
+		clientUi.BuildVisibleScreenFramesForTest(
+			[&](silencer::client_ui::UiScreenEntryId entryId,
+			    Screen& screen,
+			    bool) {
+				RuntimeButton(
+					clientUi.Interactions(),
+					CLAY_IDI("ManyOverlayButton", entryId),
+					&screen == topOverlay ? "top.overlay" : "covered.overlay");
+			});
+	};
+
+	silencer::ui::UiInputState input;
+	input.width = 640;
+	input.height = 480;
+	clientUi.BeginFrame(input);
+	buildVisible();
+	clientUi.EndFrame();
+	CHECK(clientUi.FocusRuntime().errorCount == 0);
+	const auto * topElement = clientUi.Interactions().FindById("top.overlay");
+	REQUIRE(topElement != nullptr);
+	CHECK(topElement->focused);
+	(void)clientUi.DispatchInput(nullptr, input);
+
+	input.navActions.push_back(silencer::ui::UiNavAction::Confirm);
+	input.source = silencer::ui::UiFocusSource::Keyboard;
+	clientUi.BeginFrame(input);
+	buildVisible();
+	clientUi.EndFrame();
+	silencer::client_ui::UiDispatchResult result =
+		clientUi.DispatchInput(nullptr, input);
+	REQUIRE(result.unhandledActions.size() == 1);
+	CHECK(result.unhandledActions[0].kind == silencer::ui::UiActionKind::Activate);
+	CHECK(result.unhandledActions[0].id == "top.overlay");
+	CHECK(clientUi.FocusRuntime().errorCount == 0);
+}
+
 TEST_CASE("ClientUi focus sees current frame pointer state before layout") {
 	RealClayBackend backend;
 	silencer::ui::ClayService clay(backend);

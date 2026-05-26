@@ -5,6 +5,7 @@
 #include <array>
 #include <cstdint>
 #include <functional>
+#include <memory>
 
 namespace silencer {
 namespace ui {
@@ -20,7 +21,7 @@ struct Span {
 };
 
 struct UiRuntimeLimits {
-	int maxFocusScopes = 16;
+	int maxFocusScopes = 33;
 	int maxFocusablesPerScope = 256;
 	int maxUiIntents = 128;
 	int maxScreens = 32;
@@ -110,7 +111,7 @@ struct UiFocusableState {
 	bool disabled = false;
 };
 
-constexpr int UI_FOCUS_MAX_SCOPES = 16;
+constexpr int UI_FOCUS_MAX_SCOPES = 33;
 constexpr int UI_FOCUS_MAX_FOCUSABLES_PER_SCOPE = 256;
 
 struct UiFocusableLayout {
@@ -149,9 +150,12 @@ struct UiFocusScope {
 	int layoutCount = 0;
 };
 
+using UiFocusScopeStorage = std::array<UiFocusScope, UI_FOCUS_MAX_SCOPES>;
+
 struct UiFocusRuntime {
 	UiRuntimeLimits limits = {};
-	std::array<UiFocusScope, UI_FOCUS_MAX_SCOPES> scopes = {};
+	std::unique_ptr<UiFocusScopeStorage> scopesStorage = {};
+	UiFocusScope * scopes = nullptr;
 	int scopeCount = 0;
 
 	int scopeStack[UI_FOCUS_MAX_SCOPES] = {};
