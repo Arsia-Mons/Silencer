@@ -15,6 +15,8 @@
 #include "runtime/UiInteractionRegistry.h"
 #include "lobby.h"
 #include "lobbygame.h"
+#include "mapfetch.h"
+#include "os.h"
 #include "renderdevice.h"
 #include "runtime/UiActionQueue.h"
 #include "updater.h"
@@ -23,10 +25,12 @@
 
 #include <SDL3/SDL_video.h>
 
+#include <algorithm>
 #include <cassert>
 #include <cstdio>
 #include <cstdlib>
 #include <string>
+#include <vector>
 
 namespace
 {
@@ -293,6 +297,32 @@ std::string ScreenContext::LobbyGameChannelName(LobbyGame & lobbyGame) {
 	char name[256];
 	ambienceMixer.GetGameChannelName(lobbyGame, name);
 	return name;
+}
+
+std::vector<std::string> ScreenContext::CreateGameMapLabels() {
+	std::vector<std::string> maps;
+	CDResDir();
+	auto files = mapDownloader.ListFiles((GetResDir() + "level").c_str());
+	maps.insert(maps.end(), files.begin(), files.end());
+	CDDataDir();
+	files = mapDownloader.ListFiles((GetDataDir() + "level/download").c_str());
+	for(auto & f : files){
+		if(std::find(maps.begin(), maps.end(), f) == maps.end()) maps.push_back(f);
+	}
+	std::sort(maps.begin(), maps.end());
+	mapDownloader.servermaps.clear();
+	for(auto & entry : FetchServerMapList(Config::GetInstance().mapapiurl)){
+		if(std::find(maps.begin(), maps.end(), entry.first) == maps.end()){
+			std::string label = "[DL] " + entry.first;
+			maps.push_back(label);
+			mapDownloader.servermaps[label] = entry.second;
+		}
+	}
+	return maps;
+}
+
+void ScreenContext::SelectCreateGameMap(int mapIndex) {
+	mapDownloader.selectedmap = mapIndex;
 }
 
 bool ScreenContext::IsServerMapLabel(const std::string & mapLabel) const {

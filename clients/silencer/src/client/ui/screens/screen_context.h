@@ -8,6 +8,7 @@
 #include <functional>
 #include <memory>
 #include <string>
+#include <vector>
 
 class World;
 class Renderer;
@@ -127,6 +128,8 @@ public:
 	Uint32 WorldTickCount() const;
 	bool LobbyMusicFadedIn() const;
 	std::string LobbyGameChannelName(LobbyGame & lobbyGame);
+	std::vector<std::string> CreateGameMapLabels();
+	void SelectCreateGameMap(int mapIndex);
 	bool IsServerMapLabel(const std::string & mapLabel) const;
 	std::string FindMapPath(const char * mapName);
 	void LoadLobbyGameMapData(LobbyGame & lobbyGame);

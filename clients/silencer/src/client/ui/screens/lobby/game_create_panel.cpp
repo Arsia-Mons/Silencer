@@ -12,11 +12,9 @@
 #include "mapfetch.h"
 #include "message_modal.h"
 
-#include <algorithm>
 #include <cstring>
 #include <string>
 #include <thread>
-#include <vector>
 
 namespace silencer::client_ui::lobby {
 
@@ -51,27 +49,7 @@ void CopyUiText(char * dst, int dstLen, const Text & value)
 }
 
 void BuildMapList(GameCreatePanelState & state, ScreenContext & ctx) {
-	state.maps.clear();
-	MapDownloader & mapDownloader = ctx.mapDownloader;
-	std::vector<std::string> maps;
-	CDResDir();
-	auto files = mapDownloader.ListFiles((GetResDir() + "level").c_str());
-	maps.insert(maps.end(), files.begin(), files.end());
-	CDDataDir();
-	files = mapDownloader.ListFiles((GetDataDir() + "level/download").c_str());
-	for(auto & f : files){
-		if(std::find(maps.begin(), maps.end(), f) == maps.end()) maps.push_back(f);
-	}
-	std::sort(maps.begin(), maps.end());
-	for(auto & m : maps) state.maps.push_back(m);
-	mapDownloader.servermaps.clear();
-	for(auto & entry : FetchServerMapList(Config::GetInstance().mapapiurl)){
-		if(std::find(maps.begin(), maps.end(), entry.first) == maps.end()){
-			std::string label = "[DL] " + entry.first;
-			state.maps.push_back(label);
-			mapDownloader.servermaps[label] = entry.second;
-		}
-	}
+	state.maps = ctx.CreateGameMapLabels();
 }
 
 }  // namespace game_create_panel_detail
@@ -82,7 +60,7 @@ void GameCreatePanelInit(GameCreatePanelState & state, ScreenContext & ctx) {
 	std::strncpy(state.name, Config::GetInstance().defaultgamename, sizeof(state.name) - 1);
 	state.name[sizeof(state.name) - 1] = '\0';
 	game_create_panel_detail::BuildMapList(state, ctx);
-	ctx.mapDownloader.selectedmap = -1;
+	ctx.SelectCreateGameMap(-1);
 	ctx.SetCreateGamePending(false);
 }
 
@@ -94,7 +72,7 @@ void GameCreatePanelTick(GameCreatePanelState & state,
 
 	if(state.mapRowClickedIndex >= 0){
 		state.mapSelectedIndex = state.mapRowClickedIndex;
-		mapDownloader.selectedmap = state.mapRowClickedIndex;
+		ctx.SelectCreateGameMap(state.mapRowClickedIndex);
 		state.mapRowClickedIndex = -1;
 	}
 	if(state.securityClicked){
