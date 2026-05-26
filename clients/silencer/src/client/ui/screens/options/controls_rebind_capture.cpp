@@ -1,7 +1,6 @@
 #include "controls_rebind_capture.h"
 
 #include "screen_context.h"
-#include "game.h"
 
 #include <SDL3/SDL.h>
 
@@ -72,12 +71,11 @@ std::string GetBindingLabel(ScreenContext & ctx, Action a, int slot) {
 			if(k.device == BindingDevice::Keyboard){
 				return KeyMap::GetKeyName((SDL_Scancode)k.code);
 			}
-			std::string s = Stringify(k);
-			auto colon = s.find(':');
-			std::string raw = (colon != std::string::npos) ? s.substr(colon + 1) : s;
-			SDL_Gamepad * pad = ctx.game.GetGamepad();
-			return GamepadShortLabel(raw, pad ? SDL_GetGamepadType(pad) : SDL_GAMEPAD_TYPE_UNKNOWN);
-		}
+				std::string s = Stringify(k);
+				auto colon = s.find(':');
+				std::string raw = (colon != std::string::npos) ? s.substr(colon + 1) : s;
+				return GamepadShortLabel(raw, ctx.CurrentGamepadType());
+			}
 		found++;
 	}
 	return KeyMap::GetKeyName(SDL_SCANCODE_UNKNOWN);

@@ -52,6 +52,10 @@ void ScreenContext::SpectateLobbyGame(LobbyGame & lobbyGame, char * password) {
 	game.currentlobbygameid = lobbyGame.id;
 	game.SpectateGame(lobbyGame, password);
 }
+SDL_GamepadType ScreenContext::CurrentGamepadType() const {
+	SDL_Gamepad * pad = game.GetGamepad();
+	return pad ? SDL_GetGamepadType(pad) : SDL_GAMEPAD_TYPE_UNKNOWN;
+}
 bool ScreenContext::PushScreen(std::unique_ptr<Screen> s) { return game.PushScreen(std::move(s)); }
 bool ScreenContext::PopScreen() { return game.PopScreen(); }
 bool ScreenContext::ReplaceScreen(std::unique_ptr<Screen> s) { return game.ReplaceScreen(std::move(s)); }

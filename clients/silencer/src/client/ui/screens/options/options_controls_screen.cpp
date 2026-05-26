@@ -4,10 +4,11 @@
 #include "controls_rebind_capture.h"
 
 #include "screen_context.h"
-#include "game.h"
 #include "game_state.h"
 #include "config.h"
+#include "renderer.h"
 #include "surface.h"
+#include "world.h"
 
 #include "clay/clay.h"
 #include "clay_ui_compositor.h"

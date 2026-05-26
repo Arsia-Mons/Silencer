@@ -2,6 +2,7 @@
 #define SCREEN_CONTEXT_H
 
 #include <SDL3/SDL_stdinc.h>
+#include <SDL3/SDL_gamepad.h>
 #include <functional>
 #include <memory>
 
@@ -68,6 +69,7 @@ public:
 	LobbyGame * CurrentLobbyGame() const;
 	void JoinLobbyGame(LobbyGame & lobbyGame, char * password = nullptr);
 	void SpectateLobbyGame(LobbyGame & lobbyGame, char * password = nullptr);
+	SDL_GamepadType CurrentGamepadType() const;
 	bool PushScreen(std::unique_ptr<Screen> s);
 	bool PopScreen();
 	bool ReplaceScreen(std::unique_ptr<Screen> s);
