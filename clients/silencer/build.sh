@@ -35,9 +35,9 @@ for a in "$@"; do [ "$a" = "--clean" ] && clean=1; done
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 case "$preset" in
-    win-ninja)         bdir="$script_dir/build";         btype=Debug;   unity=OFF ;;
-    win-ninja-release) bdir="$script_dir/build-release"; btype=Release; unity=OFF ;;
-    win-ninja-unity)   bdir="$script_dir/build-unity";   btype=Release; unity=ON  ;;
+    win-ninja)         bdir="$script_dir/build";         btype=Debug;   unity=OFF; tests=ON  ;;
+    win-ninja-release) bdir="$script_dir/build-release"; btype=Release; unity=OFF; tests=OFF ;;
+    win-ninja-unity)   bdir="$script_dir/build-unity";   btype=Release; unity=ON;  tests=OFF ;;
     *) fail "unknown preset '$preset' (use win-ninja | win-ninja-release | win-ninja-unity)" ;;
 esac
 
@@ -123,6 +123,7 @@ fi
 cmake -S "$script_dir" -B "$bdir" "${gen[@]+"${gen[@]}"}" \
     -DCMAKE_BUILD_TYPE="$btype" \
     -DSILENCER_UNITY_BUILD="$unity" \
+    -DSILENCER_BUILD_TESTS="$tests" \
     ${toolchain+"${toolchain[@]}"}
 cmake --build "$bdir" --parallel
 echo "build.sh: OK ($preset)"

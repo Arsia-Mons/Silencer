@@ -30,8 +30,16 @@ fail_if_path_exists "clients/silencer/src/ui/runtime/clay_inspector.h"
 fail_if_path_exists "clients/silencer/src/ui/runtime/clay_inspector.cpp"
 
 fail_if_match \
-  "\\b(currentinterface|ProcessInGameInterfaces|Interface \\*|new Interface)\\b|(^|[^[:alnum:]_/])ui/(components|modals|panels|screens)\\b" \
+  "\\b(currentinterface|ProcessInGameInterfaces|Interface \\*|new Interface)\\b|(^|[^[:alnum:]_/])((clients/silencer/)?src/)?ui/(components|modals|panels|screens)\\b" \
   "$REPO_ROOT/clients/silencer/src" \
+  --glob '!third_party/**'
+
+fail_if_match \
+  "\\bUiRenderCommand\\b|\\bCommands[[:space:]]*\\(" \
+  "$REPO_ROOT/clients/silencer/src/ui/runtime" \
+  "$REPO_ROOT/clients/silencer/src/client/ui" \
+  "$REPO_ROOT/clients/silencer/src/game/ui" \
+  "$REPO_ROOT/tests/ui_architecture_test.cpp" \
   --glob '!third_party/**'
 
 fail_if_match \

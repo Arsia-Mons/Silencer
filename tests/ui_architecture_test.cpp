@@ -13,6 +13,7 @@ namespace {
 class RecordingClayBackend : public silencer::ui::ClayFrameBackend {
 public:
 	std::vector<std::string> calls;
+	Clay_RenderCommand command{};
 	int width = 0;
 	int height = 0;
 	float uiScale = 0.0f;
@@ -47,6 +48,7 @@ public:
 		Clay_RenderCommandArray commands{};
 		commands.capacity = 1;
 		commands.length = 1;
+		commands.internalArray = &command;
 		return commands;
 	}
 };
@@ -71,6 +73,7 @@ TEST_CASE("ClayService uses the required central frame lifecycle order") {
 	auto commands = service.EndFrame();
 
 	REQUIRE(commands.length == 1);
+	CHECK(commands.internalArray == &backend.command);
 	CHECK(backend.width == 1280);
 	CHECK(backend.height == 720);
 	CHECK(backend.uiScale == 2);
@@ -100,6 +103,7 @@ TEST_CASE("ClientUi owns the frame lifecycle without demo-screen metadata") {
 	auto commands = clientUi.EndFrame();
 
 	REQUIRE(commands.length == 1);
+	CHECK(commands.internalArray == &backend.command);
 	CHECK(clientUi.Interactions().Elements().empty());
 	CHECK(clientUi.DrainActions().empty());
 }

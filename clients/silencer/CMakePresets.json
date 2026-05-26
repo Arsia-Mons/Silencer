@@ -11,6 +11,7 @@
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Debug",
                 "CMAKE_TOOLCHAIN_FILE": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake",
+                "SILENCER_BUILD_TESTS": "ON",
                 "VCPKG_TARGET_TRIPLET": "x64-windows"
             },
             "condition": { "type": "equals", "lhs": "${hostSystemName}", "rhs": "Windows" }
@@ -20,7 +21,10 @@
             "inherits": "win-ninja",
             "displayName": "Windows / Ninja / Release",
             "binaryDir": "${sourceDir}/build-release",
-            "cacheVariables": { "CMAKE_BUILD_TYPE": "Release" }
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Release",
+                "SILENCER_BUILD_TESTS": "OFF"
+            }
         },
         {
             "name": "win-ninja-unity",
@@ -34,7 +38,7 @@
         {
             "name": "win-ninja",
             "configurePreset": "win-ninja",
-            "targets": [ "silencer" ]
+            "targets": [ "silencer", "silencer_tests" ]
         },
         {
             "name": "win-ninja-release",
