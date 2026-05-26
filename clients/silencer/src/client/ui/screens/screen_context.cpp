@@ -370,6 +370,21 @@ ScreenContext::ConsumeCreateGameMapUploadResult() {
 	return CreateGameMapUploadResult::Idle;
 }
 
+std::string ScreenContext::CreateGameProgressText() const {
+	std::string text =
+		(mapDownloader.mapUploadState.load(std::memory_order_relaxed) == 1)
+			? "Uploading map"
+			: "Creating game";
+	int dots = (world.tickcount / 4) % 6;
+	if(dots > 3) dots = 6 - dots;
+	for(int i = 0; i < dots; i++) text += ".";
+	return text;
+}
+
+bool ScreenContext::CreateGameMapUploadIdle() const {
+	return mapDownloader.mapUploadState.load(std::memory_order_relaxed) == 0;
+}
+
 void ScreenContext::BeginCreateGameMapUpload(const std::string & gameName,
                                              const std::string & mapName,
                                              const std::string & password,
@@ -413,6 +428,17 @@ void ScreenContext::BeginCreateGameMapUpload(const std::string & gameName,
 				uploadStatePtr->store(ok ? 2 : 3, std::memory_order_release);
 			});
 	}
+}
+
+void ScreenContext::ResetJoinMapDownload() {
+	mapDownloader.mapexistchecked = false;
+	mapDownloader.mapjoingeneration.fetch_add(1, std::memory_order_relaxed);
+	mapDownloader.mapjoinstate.store(0, std::memory_order_relaxed);
+	if(mapDownloader.mapjointhread.joinable()) mapDownloader.mapjointhread.detach();
+}
+
+void ScreenContext::PumpMapDownload() {
+	mapDownloader.ProcessMapDownload();
 }
 
 void ScreenContext::PresentUpdate(const std::string & url, const uint8_t sha256[32]) {

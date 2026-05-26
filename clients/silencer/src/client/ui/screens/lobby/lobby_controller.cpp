@@ -7,7 +7,6 @@
 #include "lobbygame.h"
 #include "serializer.h"
 #include "config.h"
-#include "map_downloader.h"
 #include "message_modal.h"
 #include "peer.h"
 
@@ -83,8 +82,6 @@ void LobbyScreen::Tick(ScreenContext & ctx)
 			gameTechState, ctx.world, ctx, *this);
 	}
 
-	MapDownloader & mapDownloader = ctx.mapDownloader;
-
 	// Pre-CONNECTED surfaces (gameselect / gamecreate) — join finalisation,
 	// progress-modal spinner update, auto-dismiss, CONNECTED→GameJoin
 	// transition.
@@ -100,15 +97,10 @@ void LobbyScreen::Tick(ScreenContext & ctx)
 			}
 		}
 		if(MessageModal * progress = lobby_controller_detail::TopAsProgressModal(ctx)){
-			std::string text = (mapDownloader.mapUploadState.load(std::memory_order_relaxed) == 1)
-				? "Uploading map" : "Creating game";
-			int dots = (world.tickcount / 4) % 6;
-			if(dots > 3) dots = 6 - dots;
-			for(int i = 0; i < dots; i++) text += ".";
-			progress->SetText(ctx, text);
+			progress->SetText(ctx, ctx.CreateGameProgressText());
 		}
 		if(lobby_controller_detail::TopAsProgressModal(ctx) && world.lobby.creategamestatus != 100 &&
-		   mapDownloader.mapUploadState.load(std::memory_order_relaxed) == 0 &&
+		   ctx.CreateGameMapUploadIdle() &&
 		   (world.network.state == World::CONNECTED || world.network.state == World::IDLE)){
 			ctx.PopScreen();
 			ctx.SetCreateGamePending(false);
@@ -116,10 +108,7 @@ void LobbyScreen::Tick(ScreenContext & ctx)
 		if(world.network.state == World::CONNECTED){
 			Peer * peer = world.peers.peerlist[world.peers.localpeerid];
 			if(peer){
-				mapDownloader.mapexistchecked = false;
-				mapDownloader.mapjoingeneration.fetch_add(1, std::memory_order_relaxed);
-				mapDownloader.mapjoinstate.store(0, std::memory_order_relaxed);
-				if(mapDownloader.mapjointhread.joinable()) mapDownloader.mapjointhread.detach();
+				ctx.ResetJoinMapDownload();
 				const Uint8 agency = world.lobby.GetSelectedAgencyOrDefault(Config::GetInstance().defaultagency);
 				world.SetTech(Config::GetInstance().defaulttechchoices[agency]);
 				ShowGameJoin(ctx);
@@ -134,7 +123,7 @@ void LobbyScreen::Tick(ScreenContext & ctx)
 		}
 	}
 
-	mapDownloader.ProcessMapDownload();
+	ctx.PumpMapDownload();
 
 	// Disconnect-from-game modal — fires on the joined-game surface
 	// (gameJoinActive || gameTechActive) when the world drops out of

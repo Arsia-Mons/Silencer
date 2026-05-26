@@ -139,6 +139,8 @@ public:
 	std::string FindMapPath(const char * mapName);
 	void LoadLobbyGameMapData(LobbyGame & lobbyGame);
 	CreateGameMapUploadResult ConsumeCreateGameMapUploadResult();
+	std::string CreateGameProgressText() const;
+	bool CreateGameMapUploadIdle() const;
 	void BeginCreateGameMapUpload(const std::string & gameName,
 	                              const std::string & mapName,
 	                              const std::string & password,
@@ -147,7 +149,9 @@ public:
 	                              Uint8 maxLevel,
 	                              Uint8 maxPlayers,
 	                              Uint8 maxTeams,
-	                              bool spectatable);
+	bool spectatable);
+	void ResetJoinMapDownload();
+	void PumpMapDownload();
 	void PresentUpdate(const std::string & url, const uint8_t sha256[32]);
 	UpdateState CurrentUpdateState();
 	float UpdateProgress();

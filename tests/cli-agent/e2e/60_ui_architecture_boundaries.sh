@@ -238,6 +238,11 @@ fail_if_match \
   --glob '!**/screen_context.cpp'
 
 fail_if_match \
+  'ctx[[:space:]]*[.][[:space:]]*mapDownloader|\bmapDownloader\b|#[[:space:]]*include[[:space:]]*[<"]([^>"]*/)?map_downloader[.]h[>"]|\bmapUpload(State|Thread|Generation)\b|\bmapexistchecked\b|\bmapjoin(state|thread|generation)\b|\bProcessMapDownload[[:space:]]*[(]' \
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens/lobby/lobby_controller.cpp" \
+  --glob '!**/screen_context.cpp'
+
+fail_if_match \
   '#include[[:space:]]*"updater(stage2)?[.]h"' \
   "$REPO_ROOT/clients/silencer/src/client/ui/screens" \
   "$REPO_ROOT/clients/silencer/src/client/ui/modals" \
