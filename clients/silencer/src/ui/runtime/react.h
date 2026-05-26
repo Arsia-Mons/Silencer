@@ -29,6 +29,8 @@ Clay_ElementId react_make_instance_id(Clay_String name,
                                       uint32_t index,
                                       bool keyed);
 
+// Runtime-private identity helpers for the component/provider macros below.
+// Call REACT_COMPONENT_* or REACT_PROVIDER_* from UI code instead.
 #define REACT_INSTANCE_ID(name_literal) \
 	react_make_instance_id(CLAY_STRING(name_literal), react_next_child_index(), false)
 
