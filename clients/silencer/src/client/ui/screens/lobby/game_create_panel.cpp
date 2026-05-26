@@ -138,7 +138,7 @@ void GameCreatePanelTick(GameCreatePanelState & state,
 		if(lobbygame){
 			owner.SeedHostGameInfo(world, *lobbygame);
 			ctx.JoinLobbyGame(*lobbygame, lobbygame->password);
-			mapDownloader.LoadMapData(mapDownloader.FindMap(lobbygame->mapname, &lobbygame->maphash).c_str());
+			ctx.LoadLobbyGameMapData(*lobbygame);
 		}
 	}else if(world.lobby.creategamestatus != 100 && world.lobby.creategamestatus != 0 && ctx.IsCreateGamePending()){
 		world.lobby.creategamestatus = 0;
@@ -158,7 +158,7 @@ void GameCreatePanelTick(GameCreatePanelState & state,
 		ctx.ShowMessage("No map selected"); return;
 	}
 	std::string mapname = state.maps[state.mapSelectedIndex];
-	if(mapDownloader.servermaps.count(mapname) > 0){
+	if(ctx.IsServerMapLabel(mapname)){
 		ctx.ShowMessage("Download the map first"); return;
 	}
 
@@ -172,7 +172,7 @@ void GameCreatePanelTick(GameCreatePanelState & state,
 	Uint8 maxteams   = static_cast<Uint8>(atoi(state.maxTeams));   if(maxteams   <= 0) maxteams   = 1;
 
 	unsigned char maphash[20];
-	mapDownloader.CalculateMapHash(mapDownloader.FindMap(mapname.c_str()).c_str(), &maphash);
+	mapDownloader.CalculateMapHash(ctx.FindMapPath(mapname.c_str()).c_str(), &maphash);
 	auto & pc = mapDownloader.pendingCreate;
 	pc.gamename      = state.name;
 	pc.mapname       = mapname;
@@ -187,7 +187,7 @@ void GameCreatePanelTick(GameCreatePanelState & state,
 
 	if(mapDownloader.mapUploadThread.joinable()) mapDownloader.mapUploadThread.detach();
 	uint32_t gen = ++mapDownloader.mapUploadGeneration;
-	std::string mppath = mapDownloader.FindMap(mapname.c_str());
+	std::string mppath = ctx.FindMapPath(mapname.c_str());
 	std::string dataDir = GetDataDir();
 	bool isBundledMap = dataDir.empty() || mppath.substr(0, dataDir.size()) != dataDir;
 	if(isBundledMap){

@@ -303,6 +303,11 @@ std::string ScreenContext::FindMapPath(const char * mapName) {
 	return mapDownloader.FindMap(mapName);
 }
 
+void ScreenContext::LoadLobbyGameMapData(LobbyGame & lobbyGame) {
+	mapDownloader.LoadMapData(
+		mapDownloader.FindMap(lobbyGame.mapname, &lobbyGame.maphash).c_str());
+}
+
 void ScreenContext::PresentUpdate(const std::string & url, const uint8_t sha256[32]) {
 	updater.PresentUpdate(url, sha256);
 }
