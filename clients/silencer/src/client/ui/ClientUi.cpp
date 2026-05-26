@@ -229,7 +229,10 @@ bool ClientUi::QueueDeferredWrite(UiDeferredWrite write) {
 }
 
 bool ClientUi::QueueWrite(QueuedWrite write) {
-	if(writeCount_ >= CLIENT_UI_MAX_WRITES) return false;
+	if(writeCount_ >= CLIENT_UI_MAX_WRITES) {
+		++writeOverflowCount_;
+		return false;
+	}
 	writes_[writeCount_++] = std::move(write);
 	return true;
 }
@@ -339,10 +342,6 @@ void ClientUi::BuildVisibleScreens(ScreenContext& ctx, Surface& dst, float frame
 #ifdef SILENCER_TEST_BUILD
 bool ClientUi::PushBuiltScreenForTest(std::unique_ptr<Screen> screen) {
 	return screens_.PushBuiltForTest(std::move(screen));
-}
-
-bool ClientUi::ReplaceBuiltScreenForTest(std::unique_ptr<Screen> screen) {
-	return screens_.ReplaceBuiltForTest(std::move(screen));
 }
 
 void ClientUi::BuildVisibleScreenProvidersForTest(

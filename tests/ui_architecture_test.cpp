@@ -106,6 +106,19 @@ private:
 	bool overlay_ = false;
 };
 
+struct ReplacementLifecycleProbe {
+	silencer::client_ui::ScreenStack * stack_ = nullptr;
+	Screen * observedTop = nullptr;
+	int buildCount = 0;
+};
+
+void ObserveReplacementBuild(Screen&, ScreenContext *, void * userData) {
+	auto * probe = static_cast<ReplacementLifecycleProbe *>(userData);
+	if(!probe) return;
+	probe->buildCount += 1;
+	probe->observedTop = probe->stack_ ? probe->stack_->Top() : nullptr;
+}
+
 void ProbeScreenHooks(HookProbeStats& stats,
                       HookProbeAction action = HookProbeAction::None,
                       HookProbeStats * pushedStats = nullptr,
@@ -363,25 +376,47 @@ TEST_CASE("ClientUi exposes screen stack overflow from drained writes") {
 	CHECK(clientUi.ScreenStackOverflowCount() == 1);
 }
 
-TEST_CASE("ScreenStack replacement rejects null without popping current screen") {
+TEST_CASE("ClientUi exposes dropped write queue overflow") {
+	RecordingClayBackend backend;
+	silencer::ui::ClayService clay(backend);
+	silencer::client_ui::ClientUi clientUi(clay);
+
+	for(int i = 0; i < silencer::client_ui::CLIENT_UI_MAX_WRITES + 1; ++i){
+		const bool queued =
+			clientUi.QueuePushScreen(std::make_unique<HookProbeScreen>(nullptr, true));
+		CHECK(queued == (i < silencer::client_ui::CLIENT_UI_MAX_WRITES));
+	}
+
+	CHECK(clientUi.PendingWriteCount() == silencer::client_ui::CLIENT_UI_MAX_WRITES);
+	CHECK(clientUi.WriteOverflowCount() == 1);
+}
+
+TEST_CASE("ScreenStack replacement lifecycle validates before popping and keeps stable top during build") {
 	silencer::client_ui::ScreenStack stack;
+	HookProbeStats baseStats;
 	HookProbeStats firstStats;
-	HookProbeStats secondStats;
+	auto base = std::make_unique<HookProbeScreen>(&baseStats);
+	Screen * baseScreen = base.get();
 	auto first = std::make_unique<HookProbeScreen>(&firstStats);
 	Screen * firstScreen = first.get();
-	auto second = std::make_unique<HookProbeScreen>(&secondStats);
-	Screen * secondScreen = second.get();
+	ReplacementLifecycleProbe probe;
+	probe.stack_ = &stack;
+	auto replacement = std::make_unique<HookProbeScreen>(nullptr);
+	Screen * replacementScreen = replacement.get();
 
+	CHECK(stack.PushBuiltForTest(std::move(base)));
 	CHECK(stack.PushBuiltForTest(std::move(first)));
 	CHECK(stack.Top() == firstScreen);
-	CHECK_FALSE(stack.ReplaceBuiltForTest(nullptr));
+	CHECK_FALSE(stack.ReplaceWithLifecycleForTest(nullptr, ObserveReplacementBuild, nullptr, &probe));
 	CHECK(stack.Top() == firstScreen);
 	CHECK(firstStats.destructorCount == 0);
 
-	CHECK(stack.ReplaceBuiltForTest(std::move(second)));
-	CHECK(stack.Top() == secondScreen);
+	CHECK(stack.ReplaceWithLifecycleForTest(
+		std::move(replacement), ObserveReplacementBuild, nullptr, &probe));
+	CHECK(probe.buildCount == 1);
+	CHECK(probe.observedTop == baseScreen);
+	CHECK(stack.Top() == replacementScreen);
 	CHECK(firstStats.destructorCount == 1);
-	CHECK(secondStats.destructorCount == 0);
 }
 
 TEST_CASE("GameUiFrame provider exposes frame data during screen declaration") {

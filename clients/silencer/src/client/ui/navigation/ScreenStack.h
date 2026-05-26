@@ -32,6 +32,8 @@ struct VisibleScreenSpan {
 
 class ScreenStack {
 public:
+	using LifecycleCallback = void (*)(Screen& screen, ScreenContext * ctx, void * userData);
+
 	~ScreenStack();
 
 	bool Empty() const { return count_ == 0; }
@@ -55,7 +57,10 @@ public:
 #ifdef SILENCER_TEST_BUILD
 	bool PushBuiltForTest(std::unique_ptr<Screen> screen);
 	bool PopForTest();
-	bool ReplaceBuiltForTest(std::unique_ptr<Screen> screen);
+	bool ReplaceWithLifecycleForTest(std::unique_ptr<Screen> screen,
+	                                 LifecycleCallback build,
+	                                 LifecycleCallback destroy,
+	                                 void * userData);
 	bool PopEntryForTest(UiScreenEntryId entryId);
 #endif
 
@@ -65,6 +70,18 @@ private:
 		std::unique_ptr<Screen> screen;
 	};
 
+	bool PushWithLifecycle(std::unique_ptr<Screen> screen,
+	                       ScreenContext * ctx,
+	                       void * userData,
+	                       LifecycleCallback build);
+	bool PopWithLifecycle(ScreenContext * ctx,
+	                      void * userData,
+	                      LifecycleCallback destroy);
+	bool ReplaceWithLifecycle(std::unique_ptr<Screen> screen,
+	                          ScreenContext * ctx,
+	                          void * userData,
+	                          LifecycleCallback build,
+	                          LifecycleCallback destroy);
 	int VisibleStart() const;
 
 	std::array<Entry, CLIENT_UI_MAX_SCREENS> screens_;

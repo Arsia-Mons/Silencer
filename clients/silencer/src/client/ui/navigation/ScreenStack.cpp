@@ -7,44 +7,73 @@
 namespace silencer {
 namespace client_ui {
 
+namespace {
+
+void BuildWithContext(Screen& screen, ScreenContext * ctx, void *) {
+	if(ctx) screen.Build(*ctx);
+}
+
+void DestroyWithContext(Screen& screen, ScreenContext * ctx, void *) {
+	if(ctx) screen.Destroy(*ctx);
+}
+
+}  // namespace
+
 ScreenStack::~ScreenStack() = default;
 
 bool ScreenStack::Push(std::unique_ptr<Screen> screen, ScreenContext& ctx) {
+	return PushWithLifecycle(std::move(screen), &ctx, nullptr, BuildWithContext);
+}
+
+bool ScreenStack::Pop(ScreenContext& ctx) {
+	return PopWithLifecycle(&ctx, nullptr, DestroyWithContext);
+}
+
+bool ScreenStack::Replace(std::unique_ptr<Screen> screen, ScreenContext& ctx) {
+	return ReplaceWithLifecycle(std::move(screen),
+	                            &ctx,
+	                            nullptr,
+	                            BuildWithContext,
+	                            DestroyWithContext);
+}
+
+bool ScreenStack::PushWithLifecycle(std::unique_ptr<Screen> screen,
+                                    ScreenContext * ctx,
+                                    void * userData,
+                                    LifecycleCallback build) {
 	if(!screen) return false;
 	if(count_ >= CLIENT_UI_MAX_SCREENS) {
 		++overflowCount_;
 		return false;
 	}
-	screen->Build(ctx);
+	if(build) build(*screen, ctx, userData);
 	Entry& entry = screens_[count_++];
 	entry.entryId = nextEntryId_++;
 	entry.screen = std::move(screen);
 	return true;
 }
 
-bool ScreenStack::Pop(ScreenContext& ctx) {
+bool ScreenStack::PopWithLifecycle(ScreenContext * ctx,
+                                   void * userData,
+                                   LifecycleCallback destroy) {
 	if(count_ <= 0) return false;
 	Entry& entry = screens_[count_ - 1];
-	if(entry.screen) entry.screen->Destroy(ctx);
+	if(entry.screen && destroy) destroy(*entry.screen, ctx, userData);
 	entry.screen.reset();
 	entry.entryId = 0;
 	--count_;
 	return true;
 }
 
-bool ScreenStack::Replace(std::unique_ptr<Screen> screen, ScreenContext& ctx) {
+bool ScreenStack::ReplaceWithLifecycle(std::unique_ptr<Screen> screen,
+                                       ScreenContext * ctx,
+                                       void * userData,
+                                       LifecycleCallback build,
+                                       LifecycleCallback destroy) {
 	if(!screen) return false;
-	if(count_ <= 0) return Push(std::move(screen), ctx);
-
-	Entry& entry = screens_[count_ - 1];
-	if(entry.screen) entry.screen->Destroy(ctx);
-	entry.screen.reset();
-	entry.entryId = 0;
-
-	screen->Build(ctx);
-	entry.entryId = nextEntryId_++;
-	entry.screen = std::move(screen);
-	return true;
+	if(count_ <= 0) return PushWithLifecycle(std::move(screen), ctx, userData, build);
+	if(!PopWithLifecycle(ctx, userData, destroy)) return false;
+	return PushWithLifecycle(std::move(screen), ctx, userData, build);
 }
 
 void ScreenStack::Clear(ScreenContext& ctx) {
@@ -123,32 +152,18 @@ void ScreenStack::TickVisible(ScreenContext& ctx) {
 
 #ifdef SILENCER_TEST_BUILD
 bool ScreenStack::PushBuiltForTest(std::unique_ptr<Screen> screen) {
-	if(!screen) return false;
-	if(count_ >= CLIENT_UI_MAX_SCREENS) {
-		++overflowCount_;
-		return false;
-	}
-	Entry& entry = screens_[count_++];
-	entry.entryId = nextEntryId_++;
-	entry.screen = std::move(screen);
-	return true;
+	return PushWithLifecycle(std::move(screen), nullptr, nullptr, nullptr);
 }
 
 bool ScreenStack::PopForTest() {
-	if(count_ <= 0) return false;
-	screens_[count_ - 1].screen.reset();
-	screens_[count_ - 1].entryId = 0;
-	--count_;
-	return true;
+	return PopWithLifecycle(nullptr, nullptr, nullptr);
 }
 
-bool ScreenStack::ReplaceBuiltForTest(std::unique_ptr<Screen> screen) {
-	if(!screen) return false;
-	if(count_ <= 0) return PushBuiltForTest(std::move(screen));
-	screens_[count_ - 1].screen.reset();
-	screens_[count_ - 1].entryId = nextEntryId_++;
-	screens_[count_ - 1].screen = std::move(screen);
-	return true;
+bool ScreenStack::ReplaceWithLifecycleForTest(std::unique_ptr<Screen> screen,
+                                              LifecycleCallback build,
+                                              LifecycleCallback destroy,
+                                              void * userData) {
+	return ReplaceWithLifecycle(std::move(screen), nullptr, userData, build, destroy);
 }
 
 bool ScreenStack::PopEntryForTest(UiScreenEntryId entryId) {

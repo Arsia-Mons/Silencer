@@ -55,6 +55,7 @@ public:
 	bool QueuePopTop();
 	bool QueueDeferredWrite(UiDeferredWrite write);
 	int PendingWriteCount() const { return writeCount_; }
+	int WriteOverflowCount() const { return writeOverflowCount_; }
 	int ScreenStackOverflowCount() const { return screens_.OverflowCount(); }
 	void DrainWrites(ScreenContext& ctx);
 	void RequestClearScreens();
@@ -64,7 +65,6 @@ public:
 
 #ifdef SILENCER_TEST_BUILD
 	bool PushBuiltScreenForTest(std::unique_ptr<Screen> screen);
-	bool ReplaceBuiltScreenForTest(std::unique_ptr<Screen> screen);
 	void BuildVisibleScreenProvidersForTest(
 		const std::function<void(UiScreenEntryId entryId, Screen& screen)>& buildScreen);
 	void BuildVisibleScreenFramesForTest(
@@ -103,6 +103,7 @@ private:
 	ScreenStack screens_;
 	std::array<QueuedWrite, CLIENT_UI_MAX_WRITES> writes_;
 	int writeCount_ = 0;
+	int writeOverflowCount_ = 0;
 	std::string hoveredAudioInteractableId_;
 };
 
