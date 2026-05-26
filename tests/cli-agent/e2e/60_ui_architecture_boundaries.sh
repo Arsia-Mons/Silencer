@@ -233,6 +233,11 @@ fail_if_match \
   --glob '!**/screen_context.cpp'
 
 fail_if_match \
+  'ctx[[:space:]]*[.][[:space:]]*mapDownloader|\bmapDownloader\b|#[[:space:]]*include[[:space:]]*[<"]([^>"]*/)?(map_downloader|mapfetch)[.]h[>"]|\bUploadMapToServer\b|\bmapUpload(State|Thread|Generation)\b|\bpendingCreate\b|\bCalculateMapHash\b' \
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens/lobby/game_create_panel.cpp" \
+  --glob '!**/screen_context.cpp'
+
+fail_if_match \
   '#include[[:space:]]*"updater(stage2)?[.]h"' \
   "$REPO_ROOT/clients/silencer/src/client/ui/screens" \
   "$REPO_ROOT/clients/silencer/src/client/ui/modals" \

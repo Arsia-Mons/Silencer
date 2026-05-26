@@ -55,6 +55,11 @@ public:
 		Failed,
 		Done
 	};
+	enum class CreateGameMapUploadResult {
+		Idle,
+		SubmittedCreateGame,
+		Failed
+	};
 	struct LegacyKeyBindingSlots {
 		SDL_Scancode key1 = SDL_SCANCODE_UNKNOWN;
 		SDL_Scancode key2 = SDL_SCANCODE_UNKNOWN;
@@ -133,6 +138,16 @@ public:
 	bool IsServerMapLabel(const std::string & mapLabel) const;
 	std::string FindMapPath(const char * mapName);
 	void LoadLobbyGameMapData(LobbyGame & lobbyGame);
+	CreateGameMapUploadResult ConsumeCreateGameMapUploadResult();
+	void BeginCreateGameMapUpload(const std::string & gameName,
+	                              const std::string & mapName,
+	                              const std::string & password,
+	                              Uint8 securityLevel,
+	                              Uint8 minLevel,
+	                              Uint8 maxLevel,
+	                              Uint8 maxPlayers,
+	                              Uint8 maxTeams,
+	                              bool spectatable);
 	void PresentUpdate(const std::string & url, const uint8_t sha256[32]);
 	UpdateState CurrentUpdateState();
 	float UpdateProgress();

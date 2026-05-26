@@ -7,14 +7,10 @@
 #include "lobbygame.h"
 #include "screen.h"
 #include "config.h"
-#include "os.h"
-#include "map_downloader.h"
-#include "mapfetch.h"
 #include "message_modal.h"
 
 #include <cstring>
 #include <string>
-#include <thread>
 
 namespace silencer::client_ui::lobby {
 
@@ -68,8 +64,6 @@ void GameCreatePanelTick(GameCreatePanelState & state,
                          World & world,
                          ScreenContext & ctx,
                          LobbyScreen & owner) {
-	MapDownloader & mapDownloader = ctx.mapDownloader;
-
 	if(state.mapRowClickedIndex >= 0){
 		state.mapSelectedIndex = state.mapRowClickedIndex;
 		ctx.SelectCreateGameMap(state.mapRowClickedIndex);
@@ -86,23 +80,9 @@ void GameCreatePanelTick(GameCreatePanelState & state,
 		Config::GetInstance().Save();
 	}
 
-	int us = mapDownloader.mapUploadState.load(std::memory_order_acquire);
-	if(us == 2){
-		mapDownloader.mapUploadState.store(0, std::memory_order_relaxed);
-		const char * pw = mapDownloader.pendingCreate.password.empty() ? nullptr : mapDownloader.pendingCreate.password.c_str();
-		world.lobby.CreateGame(
-			mapDownloader.pendingCreate.gamename.c_str(),
-			mapDownloader.pendingCreate.mapname.c_str(),
-			mapDownloader.pendingCreate.maphash,
-			pw,
-			mapDownloader.pendingCreate.securitylevel,
-			mapDownloader.pendingCreate.minlevel,
-			mapDownloader.pendingCreate.maxlevel,
-			mapDownloader.pendingCreate.maxplayers,
-			mapDownloader.pendingCreate.maxteams,
-			mapDownloader.pendingCreate.spectatable);
-	}else if(us == 3){
-		mapDownloader.mapUploadState.store(0, std::memory_order_relaxed);
+	ScreenContext::CreateGameMapUploadResult uploadResult =
+		ctx.ConsumeCreateGameMapUploadResult();
+	if(uploadResult == ScreenContext::CreateGameMapUploadResult::Failed){
 		ctx.SetCreateGamePending(false);
 		Screen * top = ctx.TopScreen();
 		MessageModal * m = dynamic_cast<MessageModal *>(top);
@@ -149,38 +129,15 @@ void GameCreatePanelTick(GameCreatePanelState & state,
 	Uint8 maxplayers = static_cast<Uint8>(atoi(state.maxPlayers)); if(maxplayers <= 0) maxplayers = 1;
 	Uint8 maxteams   = static_cast<Uint8>(atoi(state.maxTeams));   if(maxteams   <= 0) maxteams   = 1;
 
-	unsigned char maphash[20];
-	mapDownloader.CalculateMapHash(ctx.FindMapPath(mapname.c_str()).c_str(), &maphash);
-	auto & pc = mapDownloader.pendingCreate;
-	pc.gamename      = state.name;
-	pc.mapname       = mapname;
-	pc.password      = state.password;
-	memcpy(pc.maphash, maphash, 20);
-	pc.securitylevel = securitylevel;
-	pc.minlevel      = static_cast<Uint8>(atoi(state.minLevel));
-	pc.maxlevel      = static_cast<Uint8>(atoi(state.maxLevel));
-	pc.maxplayers    = maxplayers;
-	pc.maxteams      = maxteams;
-	pc.spectatable   = state.spectatable;
-
-	if(mapDownloader.mapUploadThread.joinable()) mapDownloader.mapUploadThread.detach();
-	uint32_t gen = ++mapDownloader.mapUploadGeneration;
-	std::string mppath = ctx.FindMapPath(mapname.c_str());
-	std::string dataDir = GetDataDir();
-	bool isBundledMap = dataDir.empty() || mppath.substr(0, dataDir.size()) != dataDir;
-	if(isBundledMap){
-		mapDownloader.mapUploadState.store(2, std::memory_order_release);
-	}else{
-		mapDownloader.mapUploadState.store(1, std::memory_order_relaxed);
-		std::string apiURL = Config::GetInstance().mapapiurl;
-		std::atomic<int> * uploadStatePtr     = &mapDownloader.mapUploadState;
-		std::atomic<uint32_t> * uploadGenPtr  = &mapDownloader.mapUploadGeneration;
-		mapDownloader.mapUploadThread = std::thread([mapname, mppath, apiURL, gen, uploadStatePtr, uploadGenPtr](){
-			bool ok = UploadMapToServer(mapname.c_str(), mppath.c_str(), apiURL.c_str());
-			if(uploadGenPtr->load(std::memory_order_relaxed) != gen) return;
-			uploadStatePtr->store(ok ? 2 : 3, std::memory_order_release);
-		});
-	}
+	ctx.BeginCreateGameMapUpload(state.name,
+	                             mapname,
+	                             state.password,
+	                             securitylevel,
+	                             static_cast<Uint8>(atoi(state.minLevel)),
+	                             static_cast<Uint8>(atoi(state.maxLevel)),
+	                             maxplayers,
+	                             maxteams,
+	                             state.spectatable);
 	world.lobby.creategamestatus = 0;
 	ctx.SetCreateGamePending(true);
 	std::strncpy(Config::GetInstance().defaultgamename, state.name, sizeof(Config::GetInstance().defaultgamename) - 1);

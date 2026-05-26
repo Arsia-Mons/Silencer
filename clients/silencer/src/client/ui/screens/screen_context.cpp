@@ -26,10 +26,13 @@
 #include <SDL3/SDL_video.h>
 
 #include <algorithm>
+#include <atomic>
 #include <cassert>
+#include <cstring>
 #include <cstdio>
 #include <cstdlib>
 #include <string>
+#include <thread>
 #include <vector>
 
 namespace
@@ -336,6 +339,80 @@ std::string ScreenContext::FindMapPath(const char * mapName) {
 void ScreenContext::LoadLobbyGameMapData(LobbyGame & lobbyGame) {
 	mapDownloader.LoadMapData(
 		mapDownloader.FindMap(lobbyGame.mapname, &lobbyGame.maphash).c_str());
+}
+
+ScreenContext::CreateGameMapUploadResult
+ScreenContext::ConsumeCreateGameMapUploadResult() {
+	int uploadState = mapDownloader.mapUploadState.load(std::memory_order_acquire);
+	if(uploadState == 2){
+		mapDownloader.mapUploadState.store(0, std::memory_order_relaxed);
+		const char * password =
+			mapDownloader.pendingCreate.password.empty()
+				? nullptr
+				: mapDownloader.pendingCreate.password.c_str();
+		world.lobby.CreateGame(
+			mapDownloader.pendingCreate.gamename.c_str(),
+			mapDownloader.pendingCreate.mapname.c_str(),
+			mapDownloader.pendingCreate.maphash,
+			password,
+			mapDownloader.pendingCreate.securitylevel,
+			mapDownloader.pendingCreate.minlevel,
+			mapDownloader.pendingCreate.maxlevel,
+			mapDownloader.pendingCreate.maxplayers,
+			mapDownloader.pendingCreate.maxteams,
+			mapDownloader.pendingCreate.spectatable);
+		return CreateGameMapUploadResult::SubmittedCreateGame;
+	}
+	if(uploadState == 3){
+		mapDownloader.mapUploadState.store(0, std::memory_order_relaxed);
+		return CreateGameMapUploadResult::Failed;
+	}
+	return CreateGameMapUploadResult::Idle;
+}
+
+void ScreenContext::BeginCreateGameMapUpload(const std::string & gameName,
+                                             const std::string & mapName,
+                                             const std::string & password,
+                                             Uint8 securityLevel,
+                                             Uint8 minLevel,
+                                             Uint8 maxLevel,
+                                             Uint8 maxPlayers,
+                                             Uint8 maxTeams,
+                                             bool spectatable) {
+	unsigned char mapHash[20];
+	const std::string mapPath = mapDownloader.FindMap(mapName.c_str());
+	mapDownloader.CalculateMapHash(mapPath.c_str(), &mapHash);
+
+	auto & pending = mapDownloader.pendingCreate;
+	pending.gamename      = gameName;
+	pending.mapname       = mapName;
+	pending.password      = password;
+	std::memcpy(pending.maphash, mapHash, 20);
+	pending.securitylevel = securityLevel;
+	pending.minlevel      = minLevel;
+	pending.maxlevel      = maxLevel;
+	pending.maxplayers    = maxPlayers;
+	pending.maxteams      = maxTeams;
+	pending.spectatable   = spectatable;
+
+	if(mapDownloader.mapUploadThread.joinable()) mapDownloader.mapUploadThread.detach();
+	uint32_t generation = ++mapDownloader.mapUploadGeneration;
+	std::string dataDir = GetDataDir();
+	bool isBundledMap = dataDir.empty() || mapPath.substr(0, dataDir.size()) != dataDir;
+	if(isBundledMap){
+		mapDownloader.mapUploadState.store(2, std::memory_order_release);
+	}else{
+		mapDownloader.mapUploadState.store(1, std::memory_order_relaxed);
+		std::string apiURL = Config::GetInstance().mapapiurl;
+		std::atomic<int> * uploadStatePtr = &mapDownloader.mapUploadState;
+		std::atomic<uint32_t> * uploadGenerationPtr = &mapDownloader.mapUploadGeneration;
+		mapDownloader.mapUploadThread =
+			std::thread([mapName, mapPath, apiURL, generation, uploadStatePtr, uploadGenerationPtr](){
+				bool ok = UploadMapToServer(mapName.c_str(), mapPath.c_str(), apiURL.c_str());
+				if(uploadGenerationPtr->load(std::memory_order_relaxed) != generation) return;
+				uploadStatePtr->store(ok ? 2 : 3, std::memory_order_release);
+			});
+	}
 }
 
 void ScreenContext::PresentUpdate(const std::string & url, const uint8_t sha256[32]) {
