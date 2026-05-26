@@ -587,6 +587,69 @@ ScreenContext::LobbyCharacterStatsForAgency(Uint8 agency) const {
 	return result;
 }
 
+ScreenContext::LobbyChannelChange ScreenContext::ConsumeLobbyChannelChange() {
+	LobbyChannelChange result;
+	if(!world.lobby.channelchanged) return result;
+	if(world.lobby.lastchannel[0] == '\0'){
+		std::strcpy(world.lobby.lastchannel, world.lobby.channel);
+	}
+	result.changed = true;
+	result.channel = world.lobby.channel;
+	world.lobby.channelchanged = false;
+	return result;
+}
+
+bool ScreenContext::ConsumeLobbyPresenceRefresh() {
+	const bool refresh = world.lobby.presencechanged || !world.lobby.gamesprocessed;
+	world.lobby.presencechanged = false;
+	return refresh;
+}
+
+std::vector<ScreenContext::LobbyPresenceRow>
+ScreenContext::LobbyPresenceRows() const {
+	std::vector<LobbyPresenceRow> rows;
+	rows.reserve(world.lobby.presence.size());
+	for(const auto & kv : world.lobby.presence){
+		const Lobby::PresenceEntry & entry = kv.second;
+		LobbyPresenceRow row;
+		row.label = entry.name;
+		row.group = (entry.status <= 2) ? entry.status : 0;
+		if(entry.gameid != 0){
+			LobbyGame * lobbyGame = world.lobby.GetGameById(entry.gameid);
+			if(lobbyGame){
+				row.label += " [";
+				row.label += lobbyGame->name;
+				row.label += "]";
+			}
+		}
+		rows.push_back(std::move(row));
+	}
+	return rows;
+}
+
+std::vector<ScreenContext::LobbyChatMessage>
+ScreenContext::DrainLobbyChatMessages() {
+	std::vector<LobbyChatMessage> messages;
+	messages.reserve(world.lobby.chatmessages.size());
+	while(!world.lobby.chatmessages.empty()){
+		auto message = world.lobby.chatmessages.front();
+		const char * text = message.data();
+		const size_t length = std::strlen(text);
+		LobbyChatMessage chatMessage;
+		chatMessage.text = text ? std::string(text) : std::string();
+		chatMessage.color = static_cast<Uint8>(message[length + 1]);
+		chatMessage.brightness = static_cast<Uint8>(message[length + 2]);
+		messages.push_back(std::move(chatMessage));
+		world.lobby.chatmessages.pop_front();
+	}
+	return messages;
+}
+
+void ScreenContext::SendLobbyChat(const char * message) {
+	if(!message || message[0] == '\0') return;
+	world.lobby.SendChat(world.lobby.channel, message);
+}
+
 void ScreenContext::BeginLobbyTechSelection() {
 	world.choosingtech = true;
 	world.peers.RequestPeerList();

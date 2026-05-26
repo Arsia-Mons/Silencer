@@ -352,8 +352,6 @@ void BuildLobbySteppedPane(LobbyMainAreaPanels & panels,
 				         .clip = { .horizontal = true, .vertical = true },
 				     })) {
 					BuildChatPanelTree(panels.chat,
-					                   world,
-					                   resources,
 					                   static_cast<Uint16>(std::max(0, layout.chatW)),
 					                   static_cast<Uint16>(std::max(0, layout.chatH)),
 					                   interactions);

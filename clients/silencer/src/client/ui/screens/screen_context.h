@@ -127,6 +127,19 @@ public:
 		Uint8 hacking = 0;
 		Uint8 contacts = 0;
 	};
+	struct LobbyChannelChange {
+		bool changed = false;
+		std::string channel;
+	};
+	struct LobbyPresenceRow {
+		Uint8 group = 0;
+		std::string label;
+	};
+	struct LobbyChatMessage {
+		std::string text;
+		Uint8 color = 0;
+		Uint8 brightness = 128;
+	};
 	struct UiSpriteFrameMetrics {
 		int offsetX = 0;
 		int offsetY = 0;
@@ -220,6 +233,11 @@ public:
 	Uint8 SelectedLobbyAgency() const;
 	void SetLobbyAgency(Uint8 agency);
 	LobbyCharacterStats LobbyCharacterStatsForAgency(Uint8 agency) const;
+	LobbyChannelChange ConsumeLobbyChannelChange();
+	bool ConsumeLobbyPresenceRefresh();
+	std::vector<LobbyPresenceRow> LobbyPresenceRows() const;
+	std::vector<LobbyChatMessage> DrainLobbyChatMessages();
+	void SendLobbyChat(const char * message);
 	void BeginLobbyTechSelection();
 	void BeginCreateGameMapUpload(const std::string & gameName,
 	                              const std::string & mapName,

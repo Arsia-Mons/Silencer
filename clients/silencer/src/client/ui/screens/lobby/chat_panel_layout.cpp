@@ -61,14 +61,9 @@ int FillSlab(ScrollTextBoxLine * slab, const std::vector<ChatLine> & lines) {
 }  // namespace chat_panel_layout_detail
 
 void BuildChatPanelTree(ChatPanelState & state,
-                        World & world,
-                        Resources & resources,
                         Uint16 panelWidth,
                         Uint16 panelHeight,
                         silencer::ui::UiInteractionRegistry& interactions) {
-	(void)resources;
-	(void)world;
-
 	ChatPanelSyncLayout(state, panelWidth, panelHeight);
 	const ChatPanelLayoutMetrics metrics =
 		ResolveChatPanelLayout(panelWidth, panelHeight);

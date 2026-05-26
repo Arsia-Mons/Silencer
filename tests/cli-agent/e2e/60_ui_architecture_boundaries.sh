@@ -282,6 +282,13 @@ fail_if_match \
   --glob '!**/screen_context.cpp'
 
 fail_if_match \
+  '\b(World|LobbyGame|User|Config|Resources)\b|\bLobby[[:space:]]*([*&]|::)|([.]|->)[[:space:]]*(world|lobby)\b|world[[:space:]]*[.]|#[[:space:]]*include[[:space:]]*[<"]([^>"]*/)?(world|lobby|lobbygame|user|config|resources)[.]h[>"]|Config::GetInstance[[:space:]]*[(]|\bSendChat\b|\bchatmessages\b|\bpresencechanged\b|\bchannelchanged\b|\bgamesprocessed\b' \
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens/lobby/chat_panel.cpp" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens/lobby/chat_panel.h" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens/lobby/chat_panel_layout.cpp" \
+  --glob '!**/screen_context.cpp'
+
+fail_if_match \
   '#include[[:space:]]*"updater(stage2)?[.]h"' \
   "$REPO_ROOT/clients/silencer/src/client/ui/screens" \
   "$REPO_ROOT/clients/silencer/src/client/ui/modals" \

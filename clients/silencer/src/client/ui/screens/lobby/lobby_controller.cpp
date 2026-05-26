@@ -57,7 +57,7 @@ void LobbyScreen::Tick(ScreenContext & ctx)
 		ctx.GoToState(GameState::CREATECHARACTER);
 		return;
 	}
-	silencer::client_ui::lobby::ChatPanelTick(chatState, ctx.world);
+	silencer::client_ui::lobby::ChatPanelTick(chatState, ctx);
 
 	if(!gameCreateActive && !gameJoinActive && !gameTechActive){
 		silencer::client_ui::lobby::GameSelectPanelTick(
@@ -145,7 +145,7 @@ bool LobbyScreen::HandleUiIntent(ScreenContext & ctx, const silencer::ui::UiActi
 	if(silencer::client_ui::lobby::CharacterPanelHandleUiIntent(characterState, ctx, action)){
 		return true;
 	}
-	if(silencer::client_ui::lobby::ChatPanelHandleUiIntent(chatState, ctx.world, action)){
+	if(silencer::client_ui::lobby::ChatPanelHandleUiIntent(chatState, ctx, action)){
 		return true;
 	}
 	if(gameCreateActive){

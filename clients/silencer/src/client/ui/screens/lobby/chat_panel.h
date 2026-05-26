@@ -5,9 +5,9 @@
 // presence list) and TextInput primitives plus a small set of background
 // sprites + the channel-name header.
 //
-// Domain glue lives HERE: draining `world.lobby.chatmessages`, watching
-// `presencechanged` / `channelchanged`, and routing the input field's Enter
-// to `world.lobby.SendChat`. The primitives stay screen-agnostic.
+// Domain decisions live here in the screen. Narrow lobby snapshots and
+// chat/presence handoffs come through ScreenContext; primitives stay
+// screen-agnostic.
 
 #include "shared.h"
 #include "runtime/UiActionQueue.h"
@@ -15,8 +15,7 @@
 #include <string>
 #include <vector>
 
-class World;
-class Resources;
+class ScreenContext;
 
 namespace silencer::ui {
 class UiInteractionRegistry;
@@ -77,19 +76,18 @@ struct ChatPanelState {
 	Uint16 chatViewportHeight = 0;
 	bool chatWrapDirty = true;
 	bool presenceWrapDirty = true;
-	std::string channel;          // cached channel name, updated on channelchanged.
+	std::string channel;          // cached channel name from ScreenContext.
 	char inputBuffer[201]         = {0};  // legacy maxchars = 200 + NUL.
 };
 
 // One-time init. Clears state.
 void ChatPanelInit(ChatPanelState & state);
 
-// Per-frame pump: drains chatmessages, rebuilds presenceLines on
-// presencechanged, caches channel name on channelchanged. Mirrors legacy
-// ChatPanel::Tick.
-void ChatPanelTick(ChatPanelState & state, World & world);
+// Per-frame pump: drains chat messages, rebuilds presenceLines on pending
+// refresh, and caches channel name on channel changes.
+void ChatPanelTick(ChatPanelState & state, ScreenContext & ctx);
 bool ChatPanelHandleUiIntent(ChatPanelState & state,
-                             World & world,
+                             ScreenContext & ctx,
                              const silencer::ui::UiAction & action);
 ChatPanelLayoutMetrics ResolveChatPanelLayout(Uint16 panelWidth,
                                               Uint16 panelHeight);
@@ -100,8 +98,6 @@ void ChatPanelSyncLayout(ChatPanelState & state,
 // Emits the panel subtree. Must be called inside an open Clay layout pass
 // AFTER TextBeginFrame() + ScrollTextBoxBeginFrame() + TextInputBeginFrame().
 void BuildChatPanelTree(ChatPanelState & state,
-                        World & world,
-                        Resources & resources,
                         Uint16 panelWidth,
                         Uint16 panelHeight,
                         silencer::ui::UiInteractionRegistry& interactions);
