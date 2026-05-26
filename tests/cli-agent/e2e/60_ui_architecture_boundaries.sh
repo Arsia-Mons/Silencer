@@ -245,6 +245,11 @@ fail_if_match \
   --glob '!**/screen_context.cpp'
 
 fail_if_match \
+  'world[[:space:]]*[.][[:space:]]*lobby[[:space:]]*[.][[:space:]]*(creategamestatus|createdgameid|GetGameById)' \
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens/lobby/game_create_panel.cpp" \
+  --glob '!**/screen_context.cpp'
+
+fail_if_match \
   'ctx[[:space:]]*[.][[:space:]]*mapDownloader|\bmapDownloader\b|#[[:space:]]*include[[:space:]]*[<"]([^>"]*/)?map_downloader[.]h[>"]|\bmapUpload(State|Thread|Generation)\b|\bmapexistchecked\b|\bmapjoin(state|thread|generation)\b|\bProcessMapDownload[[:space:]]*[(]' \
   "$REPO_ROOT/clients/silencer/src/client/ui/screens/lobby/lobby_controller.cpp" \
   --glob '!**/screen_context.cpp'

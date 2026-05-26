@@ -61,10 +61,19 @@ public:
 		SubmittedCreateGame,
 		Failed
 	};
+	enum class CreateLobbyGameResultKind {
+		Pending,
+		Created,
+		Failed
+	};
 	struct LegacyKeyBindingSlots {
 		SDL_Scancode key1 = SDL_SCANCODE_UNKNOWN;
 		SDL_Scancode key2 = SDL_SCANCODE_UNKNOWN;
 		bool and_ = false;
+	};
+	struct CreateLobbyGameResult {
+		CreateLobbyGameResultKind kind = CreateLobbyGameResultKind::Pending;
+		LobbyGame * lobbyGame = nullptr;
 	};
 	struct UiSpriteFrameMetrics {
 		int offsetX = 0;
@@ -98,6 +107,8 @@ public:
 	void SetJoiningGame(bool joining);
 	bool IsCreateGamePending() const;
 	void SetCreateGamePending(bool pending);
+	void StartCreateGameRequest();
+	CreateLobbyGameResult ConsumeCreateLobbyGameResult();
 	LobbyGame * FindLobbyGame(Uint32 gameId) const;
 	LobbyGame * CurrentLobbyGame() const;
 	void JoinLobbyGame(LobbyGame & lobbyGame, char * password = nullptr);

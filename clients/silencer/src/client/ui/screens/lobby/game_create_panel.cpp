@@ -89,18 +89,16 @@ void GameCreatePanelTick(GameCreatePanelState & state,
 		if(m && m->IsProgress()) ctx.PopScreen();
 		ctx.ShowMessage("Could not upload map");
 	}
-	if(world.lobby.creategamestatus == 1 && ctx.IsCreateGamePending()){
-		world.lobby.creategamestatus = 0;
-		ctx.SetCreateGamePending(false);
-		LobbyGame * lobbygame = world.lobby.GetGameById(world.lobby.createdgameid);
+	ScreenContext::CreateLobbyGameResult createGameResult =
+		ctx.ConsumeCreateLobbyGameResult();
+	if(createGameResult.kind == ScreenContext::CreateLobbyGameResultKind::Created){
+		LobbyGame * lobbygame = createGameResult.lobbyGame;
 		if(lobbygame){
 			owner.SeedHostGameInfo(world, *lobbygame);
 			ctx.JoinLobbyGame(*lobbygame, lobbygame->password);
 			ctx.LoadLobbyGameMapData(*lobbygame);
 		}
-	}else if(world.lobby.creategamestatus != 100 && world.lobby.creategamestatus != 0 && ctx.IsCreateGamePending()){
-		world.lobby.creategamestatus = 0;
-		ctx.SetCreateGamePending(false);
+	}else if(createGameResult.kind == ScreenContext::CreateLobbyGameResultKind::Failed){
 		Screen * top = ctx.TopScreen();
 		MessageModal * m = dynamic_cast<MessageModal *>(top);
 		if(m && m->IsProgress()) ctx.PopScreen();
@@ -138,8 +136,7 @@ void GameCreatePanelTick(GameCreatePanelState & state,
 	                             maxplayers,
 	                             maxteams,
 	                             state.spectatable);
-	world.lobby.creategamestatus = 0;
-	ctx.SetCreateGamePending(true);
+	ctx.StartCreateGameRequest();
 	std::strncpy(Config::GetInstance().defaultgamename, state.name, sizeof(Config::GetInstance().defaultgamename) - 1);
 	Config::GetInstance().defaultgamename[sizeof(Config::GetInstance().defaultgamename) - 1] = '\0';
 	Config::GetInstance().Save();

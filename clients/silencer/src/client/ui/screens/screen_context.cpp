@@ -91,6 +91,28 @@ bool ScreenContext::IsJoiningGame() const { return game.joininggame; }
 void ScreenContext::SetJoiningGame(bool joining) { game.joininggame = joining; }
 bool ScreenContext::IsCreateGamePending() const { return game.creategameclicked; }
 void ScreenContext::SetCreateGamePending(bool pending) { game.creategameclicked = pending; }
+void ScreenContext::StartCreateGameRequest() {
+	world.lobby.creategamestatus = 0;
+	game.creategameclicked = true;
+}
+ScreenContext::CreateLobbyGameResult ScreenContext::ConsumeCreateLobbyGameResult() {
+	CreateLobbyGameResult result;
+	if(!game.creategameclicked) return result;
+	if(world.lobby.creategamestatus == 1){
+		world.lobby.creategamestatus = 0;
+		game.creategameclicked = false;
+		result.kind = CreateLobbyGameResultKind::Created;
+		result.lobbyGame = world.lobby.GetGameById(world.lobby.createdgameid);
+		return result;
+	}
+	if(world.lobby.creategamestatus != 100 && world.lobby.creategamestatus != 0){
+		world.lobby.creategamestatus = 0;
+		game.creategameclicked = false;
+		result.kind = CreateLobbyGameResultKind::Failed;
+		return result;
+	}
+	return result;
+}
 LobbyGame * ScreenContext::FindLobbyGame(Uint32 gameId) const { return world.lobby.GetGameById(gameId); }
 LobbyGame * ScreenContext::CurrentLobbyGame() const { return FindLobbyGame(game.currentlobbygameid); }
 void ScreenContext::JoinLobbyGame(LobbyGame & lobbyGame, char * password) {
