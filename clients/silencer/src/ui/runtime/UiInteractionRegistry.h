@@ -104,8 +104,10 @@ public:
 	bool FocusHovered(float x, float y);
 	bool FocusControlHovered(float x, float y);
 	bool ActivateFocused();
-	void QueueAction(UiAction action);
+	bool QueueAction(UiAction action);
 	std::vector<UiAction> DrainActions();
+	int PendingActionCount() const { return actions_.Count(); }
+	int ActionOverflowCount() const { return actions_.OverflowCount(); }
 	void ResolveClayBoundsFromClay();
 
 private:
@@ -121,7 +123,7 @@ private:
 	UiInteractable* FocusedInteractable();
 	void SetFocus(const UiInteractable& widget, FocusOrigin origin);
 	bool FocusHoveredAt(float x, float y, bool recordPhysicalSample);
-	void QueueAction(UiActionKind kind, const UiInteractable& widget, const char * value);
+	bool QueueAction(UiActionKind kind, const UiInteractable& widget, const char * value);
 	void RefreshElementState();
 
 	std::vector<UiElementSnapshot> elements_;

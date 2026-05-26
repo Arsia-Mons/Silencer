@@ -280,7 +280,7 @@ void UiInteractionRegistry::SetFocus(const UiInteractable& widget,
 	RefreshElementState();
 }
 
-void UiInteractionRegistry::QueueAction(UiActionKind kind,
+bool UiInteractionRegistry::QueueAction(UiActionKind kind,
                                        const UiInteractable& widget,
                                        const char * value) {
 	UiAction action;
@@ -292,7 +292,7 @@ void UiInteractionRegistry::QueueAction(UiActionKind kind,
 		if(label) action.value = label;
 	}
 	action.index = widget.index;
-	actions_.Push(std::move(action));
+	return actions_.Push(std::move(action));
 }
 
 bool UiInteractionRegistry::FocusTextInputAt(int x, int y) {
@@ -561,8 +561,8 @@ bool UiInteractionRegistry::ActivateFocused() {
 	return false;
 }
 
-void UiInteractionRegistry::QueueAction(UiAction action) {
-	actions_.Push(std::move(action));
+bool UiInteractionRegistry::QueueAction(UiAction action) {
+	return actions_.Push(std::move(action));
 }
 
 std::vector<UiAction> UiInteractionRegistry::DrainActions() {

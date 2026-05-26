@@ -11,6 +11,7 @@ set(TEST_SRC
     focus_runtime_test.cpp
     react_runtime_test.cpp
     ui_architecture_test.cpp
+    ui_runtime_queue_test.cpp
     ${CMAKE_SOURCE_DIR}/src/ui/focus/UiFocus.cpp
     ${CMAKE_SOURCE_DIR}/src/ui/runtime/clay_init.cpp
     ${CMAKE_SOURCE_DIR}/src/ui/runtime/ClayService.cpp

@@ -1,6 +1,9 @@
 #pragma once
 
+#include <array>
+#include <cstddef>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace silencer {
@@ -52,20 +55,38 @@ struct UiControlCommand {
 	int y = 0;
 };
 
+constexpr int UI_ACTION_QUEUE_MAX_ACTIONS = 128;
+
 class UiActionQueue {
 public:
-	void Push(UiAction action) { actions_.push_back(action); }
-	bool Empty() const { return actions_.empty(); }
-	const std::vector<UiAction>& Pending() const { return actions_; }
+	bool Push(UiAction action) {
+		if(count_ >= UI_ACTION_QUEUE_MAX_ACTIONS) {
+			++overflowCount_;
+			return false;
+		}
+		actions_[count_++] = std::move(action);
+		return true;
+	}
+
+	bool Empty() const { return count_ == 0; }
+	int Count() const { return count_; }
+	int OverflowCount() const { return overflowCount_; }
 
 	std::vector<UiAction> Drain() {
 		std::vector<UiAction> out;
-		out.swap(actions_);
+		out.reserve(static_cast<std::size_t>(count_));
+		for(int i = 0; i < count_; ++i){
+			out.push_back(std::move(actions_[i]));
+			actions_[i] = {};
+		}
+		count_ = 0;
 		return out;
 	}
 
 private:
-	std::vector<UiAction> actions_;
+	std::array<UiAction, UI_ACTION_QUEUE_MAX_ACTIONS> actions_;
+	int count_ = 0;
+	int overflowCount_ = 0;
 };
 
 }  // namespace ui
