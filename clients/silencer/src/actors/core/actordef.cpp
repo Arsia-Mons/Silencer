@@ -114,6 +114,15 @@ static bool ParseActorDef(const std::string& path, ActorDef& out) {
 		json j;
 		f >> j;
 		out.id = j.at("id").get<std::string>();
+		if (j.contains("footsteps")) {
+			const auto& fs = j["footsteps"];
+			out.footstepL       = fs.value("walkL",   std::string{});
+			out.footstepR       = fs.value("walkR",   std::string{});
+			out.footstepCrouchL = fs.value("crouchL", std::string{});
+			out.footstepCrouchR = fs.value("crouchR", std::string{});
+			out.footstepStairL  = fs.value("stairL",  std::string{});
+			out.footstepStairR  = fs.value("stairR",  std::string{});
+		}
 		if (j.contains("sequences")) {
 			for (auto it = j["sequences"].begin(); it != j["sequences"].end(); ++it) {
 				out.sequences[it.key()] = ParseSequence(it.value());
@@ -246,6 +255,15 @@ int FetchActorDefs(const char* apiBase,
 			json j = json::parse(body);
 			ActorDef def;
 			def.id = id;
+			if (j.contains("footsteps")) {
+				const auto& fs = j["footsteps"];
+				def.footstepL       = fs.value("walkL",   std::string{});
+				def.footstepR       = fs.value("walkR",   std::string{});
+				def.footstepCrouchL = fs.value("crouchL", std::string{});
+				def.footstepCrouchR = fs.value("crouchR", std::string{});
+				def.footstepStairL  = fs.value("stairL",  std::string{});
+				def.footstepStairR  = fs.value("stairR",  std::string{});
+			}
 			if (j.contains("sequences")) {
 				for (auto it = j["sequences"].begin(); it != j["sequences"].end(); ++it) {
 					def.sequences[it.key()] = ParseSequence(it.value());

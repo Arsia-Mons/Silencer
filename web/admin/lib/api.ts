@@ -130,12 +130,22 @@ export interface ActorProps {
   spawnWeight: number;
 }
 
+export interface ActorFootsteps {
+  walkL?: string;
+  walkR?: string;
+  crouchL?: string;
+  crouchR?: string;
+  stairL?: string;
+  stairR?: string;
+}
+
 export interface ActorDef {
   id?: string;
   props?: ActorProps;
   sequences?: Record<string, AnimSequence>;
   stateMachine?: StateMachine;
   behaviortreeId?: string;
+  footsteps?: ActorFootsteps;
   [key: string]: unknown;
 }
 

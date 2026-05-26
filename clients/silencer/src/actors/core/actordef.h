@@ -49,6 +49,14 @@ struct AnimSequence {
 struct ActorDef {
 	std::string id;
 
+	// Per-actor footstep sound overrides. Empty string = use physics material default.
+	std::string footstepL;
+	std::string footstepR;
+	std::string footstepCrouchL;
+	std::string footstepCrouchR;
+	std::string footstepStairL;
+	std::string footstepStairR;
+
 	// sequences keyed by player-state name (e.g. "CROUCHING").
 	// Only states whose animation can be fully driven from state_i live here;
 	// complex states (STANDINGSHOOT etc.) remain hardcoded for now.

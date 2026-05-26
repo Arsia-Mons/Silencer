@@ -1338,6 +1338,8 @@ void Player::Tick(World & world){
 			}
 			Platform* _cp = currentplatformid ? world.map.platformids[currentplatformid] : nullptr;
 			const auto& _mat = GASLoader::Get().GetPhysicsMaterialDef(_cp ? static_cast<uint8_t>(_cp->physicsMaterial) : 0);
+			const ActorDef* _pActorDef = nullptr;
+			{ auto _ait = world.resources.actordefs.find("player"); if (_ait != world.resources.actordefs.end()) _pActorDef = &_ait->second; }
 			if(input.keymoveleft || (ladder && x > center)){
 				xv -= GASLoader::Get().player.walkAcceleration;
 				if(xv > 0){
@@ -1420,7 +1422,7 @@ void Player::Tick(World & world){
 					res_bank = 66;
 					res_index = state_i;
 					if(res_index == 3){
-						{ Platform* _cp = currentplatformid ? world.map.platformids[currentplatformid] : nullptr; const auto& _m = GASLoader::Get().GetPhysicsMaterialDef(_cp ? static_cast<uint8_t>(_cp->physicsMaterial) : 0); auto _r = ResolveSound(_m.footstepCrouchL, world.resources); if(_r.chunk) EmitSound(world, _r.chunk, static_cast<int>(64 * _r.volume)); };
+						{ Platform* _cp = currentplatformid ? world.map.platformids[currentplatformid] : nullptr; const auto& _m = GASLoader::Get().GetPhysicsMaterialDef(_cp ? static_cast<uint8_t>(_cp->physicsMaterial) : 0); const std::string& _fs = (_pActorDef && !_pActorDef->footstepCrouchL.empty()) ? _pActorDef->footstepCrouchL : _m.footstepCrouchL; auto _r = ResolveSound(_fs, world.resources); if(_r.chunk) EmitSound(world, _r.chunk, static_cast<int>(64 * _r.volume)); };
 					}
 				}
 			}
@@ -1434,17 +1436,17 @@ void Player::Tick(World & world){
 					res_bank = 123;
 				}
 				if(res_index == 4){
-					{ Platform* _cp = currentplatformid ? world.map.platformids[currentplatformid] : nullptr; const auto& _m = GASLoader::Get().GetPhysicsMaterialDef(_cp ? static_cast<uint8_t>(_cp->physicsMaterial) : 0); auto _r = ResolveSound(_m.footstepCrouchL, world.resources); if(_r.chunk) EmitSound(world, _r.chunk, static_cast<int>(64 * _r.volume)); };
+					{ Platform* _cp = currentplatformid ? world.map.platformids[currentplatformid] : nullptr; const auto& _m = GASLoader::Get().GetPhysicsMaterialDef(_cp ? static_cast<uint8_t>(_cp->physicsMaterial) : 0); const std::string& _fs = (_pActorDef && !_pActorDef->footstepCrouchL.empty()) ? _pActorDef->footstepCrouchL : _m.footstepCrouchL; auto _r = ResolveSound(_fs, world.resources); if(_r.chunk) EmitSound(world, _r.chunk, static_cast<int>(64 * _r.volume)); };
 				}
 				if(res_index == 11){
-					{ Platform* _cp = currentplatformid ? world.map.platformids[currentplatformid] : nullptr; const auto& _m = GASLoader::Get().GetPhysicsMaterialDef(_cp ? static_cast<uint8_t>(_cp->physicsMaterial) : 0); auto _r = ResolveSound(_m.footstepCrouchR, world.resources); if(_r.chunk) EmitSound(world, _r.chunk, static_cast<int>(64 * _r.volume)); };
+					{ Platform* _cp = currentplatformid ? world.map.platformids[currentplatformid] : nullptr; const auto& _m = GASLoader::Get().GetPhysicsMaterialDef(_cp ? static_cast<uint8_t>(_cp->physicsMaterial) : 0); const std::string& _fs = (_pActorDef && !_pActorDef->footstepCrouchR.empty()) ? _pActorDef->footstepCrouchR : _m.footstepCrouchR; auto _r = ResolveSound(_fs, world.resources); if(_r.chunk) EmitSound(world, _r.chunk, static_cast<int>(64 * _r.volume)); };
 				}
 			}
 			if(state_i >= 21 && state_i < 25){
 				res_bank = 67;
 				res_index = state_i - 21;
 				if(res_index == 3){
-					{ Platform* _cp = currentplatformid ? world.map.platformids[currentplatformid] : nullptr; const auto& _m = GASLoader::Get().GetPhysicsMaterialDef(_cp ? static_cast<uint8_t>(_cp->physicsMaterial) : 0); auto _r = ResolveSound(_m.footstepCrouchL, world.resources); if(_r.chunk) EmitSound(world, _r.chunk, static_cast<int>(64 * _r.volume)); };
+					{ Platform* _cp = currentplatformid ? world.map.platformids[currentplatformid] : nullptr; const auto& _m = GASLoader::Get().GetPhysicsMaterialDef(_cp ? static_cast<uint8_t>(_cp->physicsMaterial) : 0); const std::string& _fs = (_pActorDef && !_pActorDef->footstepCrouchL.empty()) ? _pActorDef->footstepCrouchL : _m.footstepCrouchL; auto _r = ResolveSound(_fs, world.resources); if(_r.chunk) EmitSound(world, _r.chunk, static_cast<int>(64 * _r.volume)); };
 				}
 				if(input.keymoveleft || input.keymoveright){
 					state_i = -1;
@@ -1466,10 +1468,10 @@ void Player::Tick(World & world){
 					state_i = 25 - 1;
 				}
 				if(res_index == 5){
-					{ Platform* _cp = currentplatformid ? world.map.platformids[currentplatformid] : nullptr; const auto& _m = GASLoader::Get().GetPhysicsMaterialDef(_cp ? static_cast<uint8_t>(_cp->physicsMaterial) : 0); auto _r = ResolveSound(_m.footstepStairL, world.resources); if(_r.chunk) EmitSound(world, _r.chunk, static_cast<int>(48 * _r.volume)); };
+					{ Platform* _cp = currentplatformid ? world.map.platformids[currentplatformid] : nullptr; const auto& _m = GASLoader::Get().GetPhysicsMaterialDef(_cp ? static_cast<uint8_t>(_cp->physicsMaterial) : 0); const std::string& _fs = (_pActorDef && !_pActorDef->footstepStairL.empty()) ? _pActorDef->footstepStairL : _m.footstepStairL; auto _r = ResolveSound(_fs, world.resources); if(_r.chunk) EmitSound(world, _r.chunk, static_cast<int>(48 * _r.volume)); };
 				}
 				if(res_index == 15){
-					{ Platform* _cp = currentplatformid ? world.map.platformids[currentplatformid] : nullptr; const auto& _m = GASLoader::Get().GetPhysicsMaterialDef(_cp ? static_cast<uint8_t>(_cp->physicsMaterial) : 0); auto _r = ResolveSound(_m.footstepStairR, world.resources); if(_r.chunk) EmitSound(world, _r.chunk, static_cast<int>(48 * _r.volume)); };
+					{ Platform* _cp = currentplatformid ? world.map.platformids[currentplatformid] : nullptr; const auto& _m = GASLoader::Get().GetPhysicsMaterialDef(_cp ? static_cast<uint8_t>(_cp->physicsMaterial) : 0); const std::string& _fs = (_pActorDef && !_pActorDef->footstepStairR.empty()) ? _pActorDef->footstepStairR : _m.footstepStairR; auto _r = ResolveSound(_fs, world.resources); if(_r.chunk) EmitSound(world, _r.chunk, static_cast<int>(48 * _r.volume)); };
 				}
 			}
 			//printf("bank: %d  index: %d\n", res_bank, res_index);
@@ -2997,7 +2999,7 @@ bool Player::CheckForGround(World & world, Platform & platform){
 	justjumpedfromladder = false;
 	int yt = platform.XtoY(x);
 	if(y <= yt || ((platform.type == Platform::STAIRSUP || platform.type == Platform::STAIRSDOWN) && y <= yt + 1)){
-		{ const auto& _m = GASLoader::Get().GetPhysicsMaterialDef(static_cast<uint8_t>(platform.physicsMaterial)); auto _r = ResolveSound(_m.footstepCrouchR, world.resources); if(_r.chunk) EmitSound(world, _r.chunk, static_cast<int>(32 * _r.volume)); };
+		{ const auto& _m = GASLoader::Get().GetPhysicsMaterialDef(static_cast<uint8_t>(platform.physicsMaterial)); auto _ait = world.resources.actordefs.find("player"); const ActorDef* _pAd = (_ait != world.resources.actordefs.end()) ? &_ait->second : nullptr; const std::string& _fs = (_pAd && !_pAd->footstepCrouchR.empty()) ? _pAd->footstepCrouchR : _m.footstepCrouchR; auto _r = ResolveSound(_fs, world.resources); if(_r.chunk) EmitSound(world, _r.chunk, static_cast<int>(32 * _r.volume)); };
 		auto _land = ResolveSound(GASLoader::Get().player.soundLandCrouch, world.resources);
 		if(_land.chunk) EmitSound(world, _land.chunk, static_cast<int>(96 * _land.volume));
 		yv = 0;

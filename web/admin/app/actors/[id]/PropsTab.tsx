@@ -1,9 +1,10 @@
 'use client';
 /**
- * C7: Actor properties panel — HP, speed, faction, etc.
+ * C7: Actor properties panel — HP, speed, faction, footstep overrides, etc.
  * The save is handled by the parent (ActorEditorPage) via onChange.
  */
-import { type ActorDef } from '../../../lib/api';
+import { useEffect, useState } from 'react';
+import { type ActorDef, type ActorFootsteps } from '../../../lib/api';
 
 interface ActorProps {
   hp?: number;
@@ -62,14 +63,36 @@ export default function PropsTab({
   onChange: (patch: Partial<ActorDef>) => void;
 }) {
   const props = getProps(def);
+  const footsteps: ActorFootsteps = (def.footsteps as ActorFootsteps) ?? {};
+
+  const [cues, setCues] = useState<string[]>([]);
+  useEffect(() => {
+    fetch('/api/sound-cues')
+      .then(r => r.ok ? r.json() : [])
+      .then((data: unknown) => Array.isArray(data) ? setCues(data as string[]) : setCues([]))
+      .catch(() => setCues([]));
+  }, []);
 
   function update(patch: Partial<ActorProps>) {
     onChange({ props: { ...props, ...patch } as import('../../../lib/api').ActorProps });
   }
 
+  function updateFootstep(key: keyof ActorFootsteps, value: string) {
+    onChange({ footsteps: { ...footsteps, [key]: value || undefined } });
+  }
+
   const seqCount = Object.keys((def.sequences as Record<string, unknown>) ?? {}).length;
   const totalFrames = Object.values((def.sequences as Record<string, { frames: unknown[] }>) ?? {})
     .reduce((s, seq) => s + (seq.frames?.length ?? 0), 0);
+
+  const FOOTSTEP_FIELDS: { key: keyof ActorFootsteps; label: string }[] = [
+    { key: 'walkL',   label: 'WALK LEFT'    },
+    { key: 'walkR',   label: 'WALK RIGHT'   },
+    { key: 'crouchL', label: 'CROUCH LEFT'  },
+    { key: 'crouchR', label: 'CROUCH RIGHT' },
+    { key: 'stairL',  label: 'STAIR LEFT'   },
+    { key: 'stairR',  label: 'STAIR RIGHT'  },
+  ];
 
   return (
     <div className="p-8 max-w-2xl">
@@ -81,6 +104,31 @@ export default function PropsTab({
         <NumField label="SPEED"        value={props.speed}       onChange={v => update({ speed: v })}       min={0} />
         <NumField label="SPAWN WEIGHT" value={props.spawnWeight} onChange={v => update({ spawnWeight: v })} min={0} max={100} />
         <TextField label="FACTION"    value={props.faction}     onChange={v => update({ faction: v })} />
+      </div>
+
+      <h2 className="text-sm font-bold tracking-widest text-game-primary mb-4">FOOTSTEP OVERRIDES</h2>
+      <p className="text-xs text-game-textDim mb-4">
+        Override physics material footstep sounds for this actor. Leave blank to use the material default.
+      </p>
+      <div className="bg-game-bgCard border border-game-border p-6 space-y-4 mb-8">
+        {FOOTSTEP_FIELDS.map(({ key, label }) => (
+          <div key={key} className="flex items-center justify-between">
+            <label className="text-xs text-game-textDim tracking-widest w-28">{label}</label>
+            <select
+              className="w-52 bg-game-bg border border-game-border px-3 py-1.5 text-sm font-mono focus:outline-none focus:border-game-primary"
+              value={footsteps[key] ?? ''}
+              onChange={e => updateFootstep(key, e.target.value)}
+            >
+              <option value="">— material default —</option>
+              {cues.map(cue => (
+                <option key={cue} value={cue}>{cue}</option>
+              ))}
+              {footsteps[key] && !cues.includes(footsteps[key]!) && (
+                <option value={footsteps[key]}>{footsteps[key]} ⚠ legacy</option>
+              )}
+            </select>
+          </div>
+        ))}
       </div>
 
       <h2 className="text-sm font-bold tracking-widest text-game-primary mb-4">SUMMARY</h2>
