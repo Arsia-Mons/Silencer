@@ -51,12 +51,12 @@ export default function PhysicsMaterialsPage() {
   const [saveErr, setSaveErr]         = useState('');
   const [sounds, setSounds]           = useState<string[]>([]);
 
-  // Fetch available sounds for dropdowns
+  // Fetch available sound cues for dropdowns
   useEffect(() => {
     const token = localStorage.getItem('zs_token');
-    fetch('/api/sounds', { headers: token ? { authorization: `Bearer ${token}` } : {} })
+    fetch('/api/sound-cues', { headers: token ? { authorization: `Bearer ${token}` } : {} })
       .then(r => r.ok ? r.json() : [])
-      .then((list: { name: string }[]) => setSounds(list.map(s => s.name).sort()))
+      .then((list: { id: string }[]) => setSounds(list.map(s => s.id).sort()))
       .catch(() => {});
   }, []);
 
