@@ -4,6 +4,7 @@
 #include "client/ui/ClientUiInput.h"
 #include "client/ui/screens/screen.h"
 #include "ui/client_ui_write_drain.h"
+#include "ui/game_ui_frame_provider.h"
 #include "ui/runtime/ClayService.h"
 #include "ui/runtime/UiInputRouter.h"
 
@@ -324,6 +325,44 @@ TEST_CASE("ClientUi popCurrent drains by screen entry id instead of top screen")
 	CHECK(popperStats.destructorCount == 1);
 	CHECK(topStats.destructorCount == 0);
 	CHECK(clientUi.TopScreen() == topScreen);
+}
+
+TEST_CASE("GameUiFrame provider exposes frame data during screen declaration") {
+	RecordingClayBackend backend;
+	silencer::ui::ClayService clay(backend);
+	silencer::client_ui::ClientUi clientUi(clay);
+	HookProbeStats stats;
+	auto screen = std::make_unique<HookProbeScreen>(&stats);
+	Screen * screenPtr = screen.get();
+	clientUi.PushBuiltScreenForTest(std::move(screen));
+
+	silencer::game_ui::GameUiFrame frame;
+	frame.input.width = 320;
+	frame.input.height = 200;
+	frame.input.uiScale = 2.0f;
+	frame.input.pointer.x = 14.0f;
+	frame.input.pointer.y = 27.0f;
+	frame.surfaceWidth = 640;
+	frame.surfaceHeight = 400;
+
+	CHECK(silencer::game_ui::UseGameUiFrame() == nullptr);
+	silencer::game_ui::WithGameUiFrameProvider(frame, [&] {
+		clientUi.BuildVisibleScreenProvidersForTest(
+			[&](silencer::client_ui::UiScreenEntryId, Screen& screen) {
+				REQUIRE(&screen == screenPtr);
+				const silencer::game_ui::GameUiFrame * current =
+					silencer::game_ui::UseGameUiFrame();
+				REQUIRE(current != nullptr);
+				CHECK(current->input.width == 320);
+				CHECK(current->input.height == 200);
+				CHECK(current->input.uiScale == 2.0f);
+				CHECK(current->input.pointer.x == 14.0f);
+				CHECK(current->input.pointer.y == 27.0f);
+				CHECK(current->surfaceWidth == 640);
+				CHECK(current->surfaceHeight == 400);
+			});
+	});
+	CHECK(silencer::game_ui::UseGameUiFrame() == nullptr);
 }
 
 TEST_CASE("UiInteractionRegistry supports id and case-insensitive label lookup") {

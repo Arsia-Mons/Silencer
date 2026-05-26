@@ -23,6 +23,9 @@ This is mid-migration toward good flexbox layout, Clay lifecycle, and shadcn-sty
 - Screen-local navigation and state writes should go through ClientUi's
   screen provider hooks (`UseScreenNavigator`, `UseUiWriteQueue`) so mutations
   drain after layout/render instead of during declaration.
+- Game frame data belongs to the game UI provider hook
+  (`silencer::game_ui::UseGameUiFrame`) rather than broad `ScreenContext`
+  access from component-style declarations.
 - `UiInteractionRegistry` owns semantic metadata, focus, text editing, pointer hit testing, keyboard/gamepad navigation, automation, and typed action queuing. Clay still owns layout and final bounds.
 - Custom render payloads are the renderer bridge. Keep sprite-bank details inside payloads or existing bridge primitives; do not leak them into new public primitive APIs.
 
