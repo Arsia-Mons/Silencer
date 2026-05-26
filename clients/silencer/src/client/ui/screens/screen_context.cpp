@@ -81,7 +81,8 @@ bool ScreenContext::IsJoiningGame() const { return game.joininggame; }
 void ScreenContext::SetJoiningGame(bool joining) { game.joininggame = joining; }
 bool ScreenContext::IsCreateGamePending() const { return game.creategameclicked; }
 void ScreenContext::SetCreateGamePending(bool pending) { game.creategameclicked = pending; }
-LobbyGame * ScreenContext::CurrentLobbyGame() const { return world.lobby.GetGameById(game.currentlobbygameid); }
+LobbyGame * ScreenContext::FindLobbyGame(Uint32 gameId) const { return world.lobby.GetGameById(gameId); }
+LobbyGame * ScreenContext::CurrentLobbyGame() const { return FindLobbyGame(game.currentlobbygameid); }
 void ScreenContext::JoinLobbyGame(LobbyGame & lobbyGame, char * password) {
 	game.currentlobbygameid = lobbyGame.id;
 	game.JoinGame(lobbyGame, password);

@@ -92,6 +92,7 @@ public:
 	void SetJoiningGame(bool joining);
 	bool IsCreateGamePending() const;
 	void SetCreateGamePending(bool pending);
+	LobbyGame * FindLobbyGame(Uint32 gameId) const;
 	LobbyGame * CurrentLobbyGame() const;
 	void JoinLobbyGame(LobbyGame & lobbyGame, char * password = nullptr);
 	void SpectateLobbyGame(LobbyGame & lobbyGame, char * password = nullptr);

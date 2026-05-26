@@ -148,7 +148,7 @@ void HandleJoinClick(GameSelectPanelState & state, World & world, ScreenContext 
 		Uint32 gameId = lobbygame->id;
 		ctx.PushScreen(std::make_unique<PasswordModal>(
 			[&ctx, gameId](const char * password){
-				LobbyGame * lg = ctx.world.lobby.GetGameById(gameId);
+				LobbyGame * lg = ctx.FindLobbyGame(gameId);
 				if(lg){
 					char buf[64];
 					std::strncpy(buf, password ? password : "", sizeof(buf) - 1);
@@ -172,7 +172,7 @@ void HandleSpectateClick(GameSelectPanelState & state, World & world, ScreenCont
 		Uint32 gameId = lobbygame->id;
 		ctx.PushScreen(std::make_unique<PasswordModal>(
 			[&ctx, gameId](const char * password){
-				LobbyGame * lg = ctx.world.lobby.GetGameById(gameId);
+				LobbyGame * lg = ctx.FindLobbyGame(gameId);
 				if(lg){
 					char buf[64];
 					std::strncpy(buf, password ? password : "", sizeof(buf) - 1);
