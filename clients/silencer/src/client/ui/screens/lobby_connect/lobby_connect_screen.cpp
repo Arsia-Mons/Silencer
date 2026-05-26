@@ -2,7 +2,6 @@
 
 #include "screen_context.h"
 #include "game_state.h"
-#include "renderer.h"
 #include "surface.h"
 #include "lobby.h"
 #include "updater.h"
@@ -307,7 +306,7 @@ void LobbyConnectScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frame
 		interactions.IsTextInputFocused(lobby_connect_screen_detail::LBY_INPUT_USERNAME);
 	const bool passwordFocused =
 		interactions.IsTextInputFocused(lobby_connect_screen_detail::LBY_INPUT_PASSWORD);
-	const bool blink = (ctx.renderer.GetHudAnimationPhase() % 32) < 16;
+	const bool blink = ctx.UiBlinkVisible();
 
 	CLAY({ .id = CLAY_ID("LobbyConnectRoot"),
 	       .layout = {

@@ -1,7 +1,6 @@
 #include "password_modal.h"
 
 #include "screen_context.h"
-#include "renderer.h"
 #include "surface.h"
 
 #include "clay/clay.h"
@@ -93,7 +92,7 @@ void PasswordModal::BuildUi(ScreenContext & ctx, Surface & dst, float frametime,
 		focusPasswordRequested = false;
 	}
 	bool focused = interactions.IsTextInputFocused(password_modal_detail::kPasswordUid);
-	bool blink = (ctx.renderer.GetHudAnimationPhase() % 32) < 16;
+	bool blink = ctx.UiBlinkVisible();
 
 	CLAY({ .id = CLAY_ID("PasswordModalRoot"),
 	       .layout = {

@@ -2,7 +2,6 @@
 
 #include "screen_context.h"
 #include "game_state.h"
-#include "renderer.h"
 #include "world.h"
 #include "surface.h"
 
@@ -140,8 +139,7 @@ void MainMenuActionStack(silencer::ui::UiInteractionRegistry& interactions)
 
 void MainMenuScreen::Build(ScreenContext & ctx)
 {
-	ctx.ResetPresentation(1);
-	ctx.renderer.camera.SetPosition(320, 240);
+	ctx.ResetMenuPresentation(1);
 
 	// Clay owns every visible main-menu element. No retained Interface/Object
 	// widget graph is built for this screen. Button hit-test bounds are

@@ -29,6 +29,7 @@ struct SDL_Window;
 class ScreenContext
 {
 	Game & game;
+	Renderer & renderer;
 
 public:
 	ScreenContext(Game & game,
@@ -40,10 +41,9 @@ public:
 	              AmbienceMixer & ambienceMixer,
 	              MapDownloader & mapDownloader,
 	              SDL_Window * & window,
-	              RenderDevice * & renderdevice);
+	RenderDevice * & renderdevice);
 
 	World &    world;
-	Renderer & renderer;
 	Lobby &    lobby;
 	KeyMap &   keymap;
 	Updater &  updater;
@@ -81,6 +81,8 @@ public:
 	// Switch the renderer's active palette and clear the framebuffer. Called
 	// from Screen::Build by every menu surface that owns its presentation.
 	void ResetPresentation(int paletteIdx);
+	void ResetMenuPresentation(int paletteIdx);
+	bool UiBlinkVisible() const;
 
 	// Clay frame ownership lives in Game/ClientUi. Screens declare UI through
 	// Screen::BuildUi only; they must not begin/end or render Clay directly.

@@ -2,7 +2,6 @@
 
 #include "screen_context.h"
 #include "game_state.h"
-#include "renderer.h"
 #include "surface.h"
 #include "config.h"
 #include "renderdevice.h"
@@ -40,8 +39,7 @@ constexpr const char * kActionCancel = "options_display.cancel";
 
 void OptionsDisplayScreen::Build(ScreenContext & ctx)
 {
-	ctx.ResetPresentation(1);
-	ctx.renderer.camera.SetPosition(320, 240);
+	ctx.ResetMenuPresentation(1);
 	fullscreenClicked = false;
 	smoothScalingClicked = false;
 	saveClicked = false;

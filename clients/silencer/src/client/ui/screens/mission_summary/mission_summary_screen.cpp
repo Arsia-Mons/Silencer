@@ -6,7 +6,6 @@
 #include "lobby.h"
 #include "user.h"
 #include "stats.h"
-#include "renderer.h"
 #include "surface.h"
 
 #include "clay/clay.h"
@@ -239,8 +238,7 @@ void BuildUpgradeRow(int index,
 
 void MissionSummaryScreen::Build(ScreenContext & ctx)
 {
-	ctx.ResetPresentation(1);
-	ctx.renderer.camera.SetPosition(320, 240);
+	ctx.ResetMenuPresentation(1);
 	infoLoaded = false;
 	doneClicked = false;
 	upgradeClicked = -1;

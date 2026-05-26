@@ -2,7 +2,6 @@
 
 #include "screen_context.h"
 #include "game_state.h"
-#include "renderer.h"
 #include "world.h"
 #include "surface.h"
 
@@ -32,8 +31,7 @@ constexpr const char * kActionBack = "options.back";
 
 void OptionsScreen::Build(ScreenContext & ctx)
 {
-	ctx.ResetPresentation(1);
-	ctx.renderer.camera.SetPosition(320, 240);
+	ctx.ResetMenuPresentation(1);
 
 	// Clay owns all visible options-menu structure and hit targets.
 

@@ -7,7 +7,6 @@
 #include "screen_context.h"
 #include "renderdevice.h"
 #include "world.h"
-#include "renderer.h"
 #include "surface.h"
 
 #include "clay/clay.h"
@@ -57,8 +56,7 @@ LobbyScreen::~LobbyScreen() = default;
 void LobbyScreen::Build(ScreenContext & ctx)
 {
 	World & world = ctx.world;
-	ctx.ResetPresentation(2);
-	ctx.renderer.camera.SetPosition(320, 240);
+	ctx.ResetMenuPresentation(2);
 
 	version  = "v.";
 	version += world.GetVersion();

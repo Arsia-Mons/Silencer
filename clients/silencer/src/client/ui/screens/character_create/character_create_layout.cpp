@@ -3,7 +3,6 @@
 #include "screen_context.h"
 #include "game_state.h"
 #include "lobby.h"
-#include "renderer.h"
 #include "surface.h"
 #include "team.h"
 
@@ -729,7 +728,7 @@ void CharacterCreateScreen::BuildEnterAlias(ScreenContext & ctx,
 {
 	using namespace character_create_screen_detail;
 	const bool focused = interactions.IsTextInputFocused(kAliasInputUid);
-	const bool blink = (ctx.renderer.GetHudAnimationPhase() % 32) < 16;
+	const bool blink = ctx.UiBlinkVisible();
 
 	BuildSelectAgent(ctx, interactions, false);
 

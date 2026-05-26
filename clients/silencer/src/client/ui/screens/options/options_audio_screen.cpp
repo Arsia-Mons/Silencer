@@ -2,7 +2,6 @@
 
 #include "screen_context.h"
 #include "game_state.h"
-#include "renderer.h"
 #include "surface.h"
 #include "config.h"
 #include "audio.h"
@@ -46,8 +45,7 @@ void ApplyMusicSetting(bool on)
 
 void OptionsAudioScreen::Build(ScreenContext & ctx)
 {
-	ctx.ResetPresentation(1);
-	ctx.renderer.camera.SetPosition(320, 240);
+	ctx.ResetMenuPresentation(1);
 	musicClicked = false;
 	saveClicked = false;
 	cancelClicked = false;

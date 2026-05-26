@@ -22,9 +22,9 @@ ScreenContext::ScreenContext(Game & game_,
                              MapDownloader & mapDownloader_,
                              SDL_Window * & window_,
                              RenderDevice * & renderdevice_)
-    : game(game_),
-      world(world_),
-      renderer(renderer_),
+	    : game(game_),
+	      renderer(renderer_),
+	      world(world_),
       lobby(lobby_),
       keymap(keymap_),
       updater(updater_),
@@ -76,4 +76,13 @@ void ScreenContext::ResetPresentation(int paletteIdx) {
 	renderer.palette.SetPalette(paletteIdx);
 	game.GetScreenBuffer().Clear(0);
 	game.gameRenderer.SetColors(renderer.palette.GetColors());
+}
+
+void ScreenContext::ResetMenuPresentation(int paletteIdx) {
+	ResetPresentation(paletteIdx);
+	renderer.camera.SetPosition(320, 240);
+}
+
+bool ScreenContext::UiBlinkVisible() const {
+	return (renderer.GetHudAnimationPhase() % 32) < 16;
 }

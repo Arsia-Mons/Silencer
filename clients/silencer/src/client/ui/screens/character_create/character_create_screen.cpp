@@ -3,7 +3,6 @@
 #include "screen_context.h"
 #include "game_state.h"
 #include "lobby.h"
-#include "renderer.h"
 #include "team.h"
 
 #include <algorithm>
@@ -58,8 +57,7 @@ int CreateRowIndex(size_t characterCount)
 
 void CharacterCreateScreen::Build(ScreenContext & ctx)
 {
-	ctx.ResetPresentation(1);
-	ctx.renderer.camera.SetPosition(320, 240);
+	ctx.ResetMenuPresentation(1);
 	step = Step::SelectAgent;
 	selectedAgentIndex = 0;
 	previewAgentIndex = -1;

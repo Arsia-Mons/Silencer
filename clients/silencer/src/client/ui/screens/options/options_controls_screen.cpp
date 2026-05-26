@@ -6,7 +6,6 @@
 #include "screen_context.h"
 #include "game_state.h"
 #include "config.h"
-#include "renderer.h"
 #include "surface.h"
 #include "world.h"
 
@@ -78,8 +77,7 @@ int OptionsControlsScreen::MaxScroll() const {
 }
 
 void OptionsControlsScreen::Build(ScreenContext & ctx) {
-	ctx.ResetPresentation(1);
-	ctx.renderer.camera.SetPosition(320, 240);
+	ctx.ResetMenuPresentation(1);
 	scrollPosition = 0;
 	rebindRow = -1;
 	rebindSlot = -1;
