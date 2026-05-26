@@ -1,8 +1,10 @@
 #include "screen_context.h"
 
 #include "ambience_mixer.h"
+#include "audio.h"
 #include "config.h"
 #include "game.h"
+#include "gasloader.h"
 #include "keybinds.h"
 #include "renderer.h"
 #include "screen.h"
@@ -109,6 +111,15 @@ bool ScreenContext::ShowMessage(const char * msg, std::function<void()> onClose)
 
 void ScreenContext::ClearUiFocus() {
 	game.UiInteractions().ClearFocus();
+}
+
+void ScreenContext::PlayUiClickSound() {
+	Audio & audio = Audio::GetInstance();
+	if(!audio.enabled) return;
+	const std::string & sound = GASLoader::Get().player.soundUIClick;
+	auto it = world.resources.soundbank.find(sound);
+	if(it == world.resources.soundbank.end() || !it->second) return;
+	audio.PlayUI(it->second);
 }
 
 std::string ScreenContext::KeybindPresetText() const {

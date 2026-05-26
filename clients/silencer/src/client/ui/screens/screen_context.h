@@ -104,6 +104,7 @@ public:
 	bool ShowModal(std::unique_ptr<Modal> m);
 	bool ShowMessage(const char * msg, std::function<void()> onClose = nullptr);
 	void ClearUiFocus();
+	void PlayUiClickSound();
 	std::string KeybindPresetText() const;
 	void CycleKeybindPreset();
 	void SaveActiveKeybindProfileIfCustom();

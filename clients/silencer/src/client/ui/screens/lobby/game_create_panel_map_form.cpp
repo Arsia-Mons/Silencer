@@ -3,10 +3,7 @@
 #include "screen_context.h"
 #include "map_downloader.h"
 #include "map.h"
-#include "world.h"
 #include "text_wrap.h"
-#include "audio.h"
-#include "gasloader.h"
 
 #include "clay/clay.h"
 #include "clay_ui_compositor.h"
@@ -310,10 +307,7 @@ void BuildMapList(GameCreatePanelState & state,
 		           ScrollListHandle{ nullptr, kActionMapPrefix, &interactions, &hoveredIndex });
 	}
 	if(hoveredIndex >= 0 && hoveredIndex != state.lastHoveredMapIndex){
-		const std::string & snd = GASLoader::Get().player.soundUIClick;
-		auto it = ctx.world.resources.soundbank.find(snd);
-		if(it != ctx.world.resources.soundbank.end() && it->second)
-			Audio::GetInstance().PlayUI(it->second);
+		ctx.PlayUiClickSound();
 	}
 	state.lastHoveredMapIndex = hoveredIndex;
 	UpdateHoverPreview(state, ctx, hoveredIndex);
