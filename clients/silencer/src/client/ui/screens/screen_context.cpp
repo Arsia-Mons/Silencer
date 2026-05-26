@@ -409,6 +409,33 @@ void ScreenContext::SubmitLobbyCredentials(const char * username, const char * p
 	lobby.UnlockMutex();
 }
 
+void ScreenContext::UpgradeMissionSummaryStat(int upgradeIndex) {
+	static const Lobby::StatID kUpgradeStatIds[6] = {
+		Lobby::STAT_ENDURANCE,
+		Lobby::STAT_SHIELD,
+		Lobby::STAT_JETPACK,
+		Lobby::STAT_TECHSLOTS,
+		Lobby::STAT_HACKING,
+		Lobby::STAT_CONTACTS,
+	};
+	if(upgradeIndex < 0 || upgradeIndex >= 6) return;
+	User * user = world.lobby.GetUserInfo(world.lobby.accountid);
+	if(user){
+		world.lobby.UpgradeStat(user->selectedcharid,
+		                        user->statsagency,
+		                        kUpgradeStatIds[upgradeIndex]);
+	}
+}
+
+void ScreenContext::CompleteMissionSummary() {
+	if(world.lobby.state == Lobby::AUTHENTICATED){
+		GoToState(GameState::LOBBY);
+		world.lobby.JoinChannel(world.lobby.lastchannel);
+	}else{
+		GoToState(GameState::MAINMENU);
+	}
+}
+
 std::string ScreenContext::LobbyGameChannelName(LobbyGame & lobbyGame) {
 	char name[256];
 	ambienceMixer.GetGameChannelName(lobbyGame, name);

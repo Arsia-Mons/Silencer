@@ -4,6 +4,7 @@
 #include "screen.h"
 
 #include <array>
+#include <functional>
 #include <string>
 #include <vector>
 
@@ -27,8 +28,8 @@ private:
 	void AddSummaryLine(const char * name, Uint32 value, bool percentage = false);
 
 	bool infoLoaded = false;
-	bool doneClicked = false;
-	int upgradeClicked = -1;
+	std::function<void()> done;
+	std::array<std::function<void()>, 6> upgradeActions = {};
 	int scrollDelta = 0;
 	int scrollPosition = 0;
 	bool upgradeBanner = false;

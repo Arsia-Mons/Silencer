@@ -1,9 +1,8 @@
 #include "mission_summary_screen.h"
 
+#include "client/ui/ClientUi.h"
 #include "screen_context.h"
-#include "game_state.h"
 #include "world.h"
-#include "lobby.h"
 #include "user.h"
 #include "stats.h"
 #include "surface.h"
@@ -20,6 +19,7 @@
 #include <algorithm>
 #include <cstdio>
 #include <cstring>
+#include <functional>
 
 namespace mission_summary_screen_detail
 {
@@ -100,15 +100,6 @@ const char * kLevelLabels[6] = {
 	"Current Contacts Level:",
 };
 
-constexpr Lobby::StatID kUpgradeStatIds[6] = {
-	Lobby::STAT_ENDURANCE,
-	Lobby::STAT_SHIELD,
-	Lobby::STAT_JETPACK,
-	Lobby::STAT_TECHSLOTS,
-	Lobby::STAT_HACKING,
-	Lobby::STAT_CONTACTS,
-};
-
 Clay_String FromStd(const std::string & s)
 {
 	return Clay_String{ false, static_cast<int32_t>(s.size()), s.c_str() };
@@ -131,6 +122,20 @@ int SuffixInt(const Text & value, const char * prefix)
 {
 	if(!StartsWith(value, prefix)) return -1;
 	return std::atoi(value.c_str() + std::strlen(prefix));
+}
+
+std::function<void()> UseQueuedAction(std::function<void()> write)
+{
+	auto queueWrite = silencer::client_ui::UseUiWriteQueue();
+	if(!queueWrite) return {};
+	return [queueWrite, write]() {
+		queueWrite(write);
+	};
+}
+
+void Invoke(const std::function<void()> & action)
+{
+	if(action) action();
 }
 
 int FillSummarySlab(const std::vector<std::string> & lines)
@@ -240,8 +245,8 @@ void MissionSummaryScreen::Build(ScreenContext & ctx)
 {
 	ctx.ResetMenuPresentation(1);
 	infoLoaded = false;
-	doneClicked = false;
-	upgradeClicked = -1;
+	done = {};
+	for(auto & action : upgradeActions) action = {};
 	scrollDelta = 0;
 	scrollPosition = 0;
 	Refresh(ctx);
@@ -263,24 +268,6 @@ void MissionSummaryScreen::Tick(ScreenContext & ctx)
 			world.lobby.statupgraded = false;
 		}
 	}
-	if(upgradeClicked >= 0){
-		int idx = upgradeClicked;
-		upgradeClicked = -1;
-		User * user = world.lobby.GetUserInfo(world.lobby.accountid);
-		if(user && idx >= 0 && idx < 6){
-			world.lobby.UpgradeStat(user->selectedcharid, user->statsagency,
-			                        mission_summary_screen_detail::kUpgradeStatIds[idx]);
-		}
-	}
-	if(doneClicked){
-		doneClicked = false;
-		if(world.lobby.state == Lobby::AUTHENTICATED){
-			ctx.GoToState(GameState::LOBBY);
-			world.lobby.JoinChannel(world.lobby.lastchannel);
-		}else{
-			ctx.GoToState(GameState::MAINMENU);
-		}
-	}
 }
 
 void MissionSummaryScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime, silencer::ui::UiInteractionRegistry& interactions)
@@ -299,6 +286,14 @@ void MissionSummaryScreen::BuildUi(ScreenContext & ctx, Surface & dst, float fra
 		mission_summary_screen_detail::kXpCenterX,
 		mission_summary_screen_detail::FromStd(xp),
 		mission_summary_screen_detail::TextSize::Prompt);
+	done = mission_summary_screen_detail::UseQueuedAction([&ctx]() {
+		ctx.CompleteMissionSummary();
+	});
+	for(int i = 0; i < 6; i++){
+		upgradeActions[i] = mission_summary_screen_detail::UseQueuedAction([&ctx, i]() {
+			ctx.UpgradeMissionSummaryStat(i);
+		});
+	}
 
 	CLAY({ .id = CLAY_ID("MissionSummaryRoot"),
 	       .layout = {
@@ -401,6 +396,8 @@ void MissionSummaryScreen::BuildUi(ScreenContext & ctx, Surface & dst, float fra
 void MissionSummaryScreen::Destroy(ScreenContext & ctx)
 {
 	(void)ctx;
+	done = {};
+	for(auto & action : upgradeActions) action = {};
 }
 
 bool MissionSummaryScreen::HandleUiIntent(ScreenContext & ctx, const silencer::ui::UiAction & action)
@@ -408,7 +405,7 @@ bool MissionSummaryScreen::HandleUiIntent(ScreenContext & ctx, const silencer::u
 	(void)ctx;
 	if(action.kind == silencer::ui::UiActionKind::Cancel ||
 	   (action.kind == silencer::ui::UiActionKind::Activate && action.id == mission_summary_screen_detail::kActionDone)){
-		doneClicked = true;
+		mission_summary_screen_detail::Invoke(done);
 		return true;
 	}
 	if(action.kind == silencer::ui::UiActionKind::Scroll){
@@ -418,7 +415,7 @@ bool MissionSummaryScreen::HandleUiIntent(ScreenContext & ctx, const silencer::u
 	if(action.kind != silencer::ui::UiActionKind::Activate) return false;
 	int upgrade = mission_summary_screen_detail::SuffixInt(action.id, mission_summary_screen_detail::kActionUpgradePrefix);
 	if(upgrade >= 0 && upgrade < 6){
-		upgradeClicked = upgrade;
+		mission_summary_screen_detail::Invoke(upgradeActions[upgrade]);
 		return true;
 	}
 	return false;
