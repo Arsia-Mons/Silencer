@@ -6,6 +6,7 @@
 #include "game.h"
 #include "gasloader.h"
 #include "keybinds.h"
+#include "map_downloader.h"
 #include "renderer.h"
 #include "screen.h"
 #include "modal.h"
