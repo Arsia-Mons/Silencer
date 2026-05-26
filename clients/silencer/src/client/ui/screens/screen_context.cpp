@@ -387,6 +387,10 @@ ScreenContext::GetUiSpriteFrameMetrics(Uint8 bank, Uint16 index) const {
 	return metrics;
 }
 
+Uint32 ScreenContext::FrameCount() const {
+	return static_cast<Uint32>(game.GetFrameCount());
+}
+
 Uint32 ScreenContext::WorldTickCount() const {
 	return world.tickcount;
 }

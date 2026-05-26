@@ -244,6 +244,7 @@ public:
 	bool UiBlinkVisible() const;
 	std::string ClientVersion() const;
 	UiSpriteFrameMetrics GetUiSpriteFrameMetrics(Uint8 bank, Uint16 index) const;
+	Uint32 FrameCount() const;
 	Uint32 WorldTickCount() const;
 	bool LobbyMusicFadedIn() const;
 	std::string LobbyGameChannelName(LobbyGame & lobbyGame);

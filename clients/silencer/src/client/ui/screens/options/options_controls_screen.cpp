@@ -113,6 +113,8 @@ void OptionsControlsScreen::Build(ScreenContext & ctx) {
 	cancel = {};
 	applyKeyboardRebind = {};
 	applyBindingRebind = {};
+	pendingTimeoutRebindRow = -1;
+	pendingTimeoutRebindSlot = -1;
 	scrollDelta = 0;
 	toggleOperatorActions_.clear();
 }
@@ -159,15 +161,15 @@ void OptionsControlsScreen::Tick(ScreenContext & ctx) {
 		scrollDelta = 0;
 	}
 	if(rebindRow >= 0){
-		const Uint32 tickCount = ctx.WorldTickCount();
+		const Uint32 tickCount = ctx.FrameCount();
 		if(optionscontrolstick == 0){
 			optionscontrolstick = tickCount;
 		}
 		if(rebindRow >= 0 &&
 		   tickCount - optionscontrolstick > options_controls_screen_detail::REBIND_TIMEOUT_TICKS){
-			if(QueueKeyboardRebind(rebindRow, rebindSlot, SDL_SCANCODE_UNKNOWN)){
-				ClearRebind();
-			}
+			pendingTimeoutRebindRow = rebindRow;
+			pendingTimeoutRebindSlot = rebindSlot;
+			ClearRebind();
 		}
 	}else{
 		optionscontrolstick = 0;
@@ -262,6 +264,12 @@ void OptionsControlsScreen::BuildUi(ScreenContext & ctx, Surface & dst, float fr
 				ApplyBindingRebind(ctx, row, slot, input);
 			});
 		};
+	}
+	if(pendingTimeoutRebindRow >= 0 &&
+	   QueueKeyboardRebind(
+	       pendingTimeoutRebindRow, pendingTimeoutRebindSlot, SDL_SCANCODE_UNKNOWN)){
+		pendingTimeoutRebindRow = -1;
+		pendingTimeoutRebindSlot = -1;
 	}
 
 	const silencer::ui::UiInputState & input =
@@ -386,5 +394,7 @@ void OptionsControlsScreen::Destroy(ScreenContext & ctx) {
 	cancel = {};
 	applyKeyboardRebind = {};
 	applyBindingRebind = {};
+	pendingTimeoutRebindRow = -1;
+	pendingTimeoutRebindSlot = -1;
 	toggleOperatorActions_.clear();
 }

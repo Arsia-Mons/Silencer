@@ -34,6 +34,8 @@ private:
 	int scrollPosition = 0;
 	int rebindRow = -1;
 	int rebindSlot = -1;
+	int pendingTimeoutRebindRow = -1;
+	int pendingTimeoutRebindSlot = -1;
 	Uint32    optionscontrolstick = 0;
 	std::function<void()> cyclePreset;
 	std::function<void()> save;
