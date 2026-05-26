@@ -7,8 +7,9 @@
 // "Waiting..." while the host is still waiting for peers to finish
 // downloading the map.
 //
-// Domain glue (SendReady, ChangeTeam, ShowGameTech) lives in the screen-side
-// GameJoinPanelTick. Primitives stay screen-agnostic.
+// Domain decisions live in the screen-side GameJoinPanelTick. Narrow roster
+// and join-team handoffs come through ScreenContext; primitives stay
+// screen-agnostic.
 
 #include "shared.h"
 #include "runtime/UiActionQueue.h"
@@ -16,7 +17,6 @@
 #include <string>
 #include <vector>
 
-class World;
 class Resources;
 class ScreenContext;
 class LobbyScreen;
@@ -44,8 +44,8 @@ struct GameJoinPanelState {
 	bool teamClicked  = false;
 	bool techClicked  = false;
 
-	// Cached Ready-button label — recomputed each Tick from
-	// world.gameplaystate / localpeer.ishost / AllPeersDownloadedMap.
+	// Cached Ready-button label — recomputed each Tick from ScreenContext's
+	// joined-game ready state.
 	// Pointer-stable across Build calls because it's std::string-owned
 	// on the screen.
 	std::string readyLabel = "Ready";
@@ -57,12 +57,10 @@ struct GameJoinPanelState {
 
 void GameJoinPanelInit(GameJoinPanelState & state);
 
-// Per-frame pump. Recomputes the Ready-button label (legacy
-// `if(world.gameplaystate == INLOBBY) ...` block) and consumes the click
-// flags — SendReady on Ready, ChangeTeam on Change Team, owner.ShowGameTech
-// on Choose Tech.
+// Per-frame pump. Recomputes the Ready-button label and consumes the click
+// flags — ready on Ready, team change on Change Team, owner.ShowGameTech on
+// Choose Tech.
 void GameJoinPanelTick(GameJoinPanelState & state,
-                       World & world,
                        ScreenContext & ctx,
                        LobbyScreen & owner);
 bool GameJoinPanelHandleUiIntent(GameJoinPanelState & state,

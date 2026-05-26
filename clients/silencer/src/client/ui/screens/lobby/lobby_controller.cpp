@@ -69,7 +69,7 @@ void LobbyScreen::Tick(ScreenContext & ctx)
 	}
 	if(gameJoinActive){
 		silencer::client_ui::lobby::GameJoinPanelTick(
-			gameJoinState, ctx.world, ctx, *this);
+			gameJoinState, ctx, *this);
 	}
 	if(gameTechActive){
 		silencer::client_ui::lobby::GameTechPanelTick(
@@ -160,8 +160,8 @@ bool LobbyScreen::HandleUiIntent(ScreenContext & ctx, const silencer::ui::UiActi
 	return silencer::client_ui::lobby::GameSelectPanelHandleUiIntent(gameSelectState, action);
 }
 
-// Friend-of-World helpers — these are member methods because the lobby
-// panels reach into World private state through the LobbyScreen friend
+// Friend-of-World helpers — these are member methods because the remaining
+// lobby panels reach into World private state through the LobbyScreen friend
 // grant. Kept alongside the controller (Tick / HandleUiIntent) since the
 // panel ticks call them.
 
@@ -172,13 +172,9 @@ void LobbyScreen::SeedHostGameInfo(World & world, LobbyGame & lg)
 	world.gameinfo.Serialize(Serializer::READ, data);
 }
 
-bool LobbyScreen::JoinPanelInLobby(World & world) const
-{
-	return world.gameplaystate == World::INLOBBY;
-}
-
 bool LobbyScreen::JoinPanelReadyBlocked(World & world) const
 {
+	if(world.gameplaystate != World::INLOBBY) return false;
 	Peer * localpeer = world.peers.peerlist[world.peers.localpeerid];
 	return localpeer && localpeer->ishost && !world.AllPeersDownloadedMap();
 }

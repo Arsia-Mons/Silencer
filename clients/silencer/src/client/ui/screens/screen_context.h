@@ -23,6 +23,7 @@ class MapDownloader;
 class RenderDevice;
 class Surface;
 class LobbyGame;
+class LobbyScreen;
 struct SDL_Window;
 enum class Action : uint8_t;
 
@@ -140,6 +141,15 @@ public:
 		Uint8 color = 0;
 		Uint8 brightness = 128;
 	};
+	struct LobbyJoinRosterRow {
+		bool ready = false;
+		Uint8 agency = 0;
+		Uint8 teamNumber = 0;
+		Uint8 peerSlot = 0;
+		bool drawEmblem = false;
+		std::string name;
+		std::string level;
+	};
 	struct UiSpriteFrameMetrics {
 		int offsetX = 0;
 		int offsetY = 0;
@@ -238,6 +248,10 @@ public:
 	std::vector<LobbyPresenceRow> LobbyPresenceRows() const;
 	std::vector<LobbyChatMessage> DrainLobbyChatMessages();
 	void SendLobbyChat(const char * message);
+	bool LobbyJoinReadyBlocked(LobbyScreen & owner) const;
+	std::vector<LobbyJoinRosterRow> LobbyJoinRosterRows() const;
+	void SendLobbyJoinReady(LobbyScreen & owner);
+	void ChangeLobbyJoinTeam(LobbyScreen & owner);
 	void BeginLobbyTechSelection();
 	void BeginCreateGameMapUpload(const std::string & gameName,
 	                              const std::string & mapName,

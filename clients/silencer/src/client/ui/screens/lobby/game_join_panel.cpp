@@ -10,11 +10,9 @@
 #include "lobby_screen.h"
 #include "resources.h"
 #include "screen_context.h"
-#include "team.h"
-#include "user.h"
-#include "world.h"
 
 #include <algorithm>
+#include <utility>
 
 using silencer::ui::primitives::Button;
 using silencer::ui::primitives::ButtonHandle;
@@ -81,41 +79,21 @@ void GameJoinPanelInit(GameJoinPanelState & state) {
 }
 
 void GameJoinPanelTick(GameJoinPanelState & state,
-                       World & world,
                        ScreenContext & ctx,
                        LobbyScreen & owner) {
-	if(owner.JoinPanelInLobby(world)){
-		state.readyLabel = owner.JoinPanelReadyBlocked(world) ? "Waiting..." : "Ready";
-	}else{
-		state.readyLabel = "Ready";
-	}
+	state.readyLabel = ctx.LobbyJoinReadyBlocked(owner) ? "Waiting..." : "Ready";
 
 	state.rosterRows.clear();
-	if(world.IsConnected()){
-		const std::vector<Uint16> & teamIds = world.GetObjectsByType(ObjectTypes::TEAM);
-		for(Uint16 teamId : teamIds){
-			Team * team = static_cast<Team *>(world.GetObjectFromId(teamId));
-			if(!team || team->numpeers == 0) continue;
-			bool drewEmblem = false;
-			for(int i = 0; i < team->numpeers; ++i){
-				Peer * peer = world.GetPeer(team->peers[i]);
-				if(!peer || peer->observer || peer->disconnected) continue;
-				User * user = world.lobby.GetUserInfo(peer->accountid);
-				if(!user || user->retrieving || !user->DisplayName()[0]) continue;
-
-				GameJoinRosterRow row;
-				row.ready = peer->isready;
-				row.agency = team->agency;
-				row.teamNumber = team->number;
-				row.peerSlot = static_cast<Uint8>(i);
-				row.drawEmblem = !drewEmblem;
-				row.name = peer->isbot ? std::string(user->DisplayName()) + " [BOT]"
-				                       : std::string(user->DisplayName());
-				row.level = "L:" + std::to_string(user->agency[team->agency].level);
-				state.rosterRows.push_back(row);
-				drewEmblem = true;
-			}
-		}
+	for(const ScreenContext::LobbyJoinRosterRow & sourceRow : ctx.LobbyJoinRosterRows()){
+		GameJoinRosterRow row;
+		row.ready = sourceRow.ready;
+		row.agency = sourceRow.agency;
+		row.teamNumber = sourceRow.teamNumber;
+		row.peerSlot = sourceRow.peerSlot;
+		row.drawEmblem = sourceRow.drawEmblem;
+		row.name = sourceRow.name;
+		row.level = sourceRow.level;
+		state.rosterRows.push_back(std::move(row));
 	}
 
 	if(state.techClicked){
@@ -125,11 +103,11 @@ void GameJoinPanelTick(GameJoinPanelState & state,
 	}
 	if(state.readyClicked){
 		state.readyClicked = false;
-		owner.JoinPanelSendReady(world);
+		ctx.SendLobbyJoinReady(owner);
 	}
 	if(state.teamClicked){
 		state.teamClicked = false;
-		owner.JoinPanelChangeTeam(world);
+		ctx.ChangeLobbyJoinTeam(owner);
 	}
 }
 
