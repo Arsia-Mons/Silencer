@@ -97,7 +97,7 @@ void OptionsControlsScreen::Build(ScreenContext & ctx) {
 	save = {};
 	cancel = {};
 	scrollDelta = 0;
-	operatorClickedRow = -1;
+	toggleOperatorActions_.clear();
 }
 
 void OptionsControlsScreen::BeginRebindFromVisibleRow(int row, int slot) {
@@ -107,10 +107,9 @@ void OptionsControlsScreen::BeginRebindFromVisibleRow(int row, int slot) {
 	rebindSlot = slot;
 }
 
-void OptionsControlsScreen::ToggleOperatorFromVisibleRow(int row) {
-	int absolute = scrollPosition + row;
-	if(absolute < 0 || absolute >= (int)Action::Count) return;
-	operatorClickedRow = absolute;
+void OptionsControlsScreen::InvokeOperatorForVisibleRow(int row) {
+	if(row < 0 || row >= static_cast<int>(toggleOperatorActions_.size())) return;
+	options_controls_screen_detail::Invoke(toggleOperatorActions_[row]);
 }
 
 void OptionsControlsScreen::Tick(ScreenContext & ctx) {
@@ -119,13 +118,6 @@ void OptionsControlsScreen::Tick(ScreenContext & ctx) {
 	if(scrollDelta != 0){
 		scrollPosition = std::max(0, std::min(MaxScroll(), scrollPosition + scrollDelta));
 		scrollDelta = 0;
-	}
-	if(operatorClickedRow >= 0 && operatorClickedRow < (int)Action::Count){
-		Action a = ACTION_TABLE[operatorClickedRow].action;
-		ScreenContext::LegacyKeyBindingSlots v = ctx.LegacyKeyBinding(a);
-		v.and_ = !v.and_;
-		ctx.WriteLegacyKeyBinding(a, v.key1, v.key2, v.and_);
-		operatorClickedRow = -1;
 	}
 	if(rebindRow >= 0){
 		const Uint32 tickCount = ctx.WorldTickCount();
@@ -185,7 +177,7 @@ bool OptionsControlsScreen::HandleUiIntent(ScreenContext & ctx, const silencer::
 	}
 	row = options_controls_screen_detail::SuffixInt(action.id, options_controls_screen_detail::kActionOperatorPrefix);
 	if(row >= 0){
-		ToggleOperatorFromVisibleRow(row);
+		InvokeOperatorForVisibleRow(row);
 		return true;
 	}
 	return false;
@@ -250,6 +242,8 @@ void OptionsControlsScreen::BuildUi(ScreenContext & ctx, Surface & dst, float fr
 		(int)Action::Count,
 		KeybindListVisibleRowsForContentHeight(contentHeight));
 	scrollPosition = std::max(0, std::min(MaxScroll(), scrollPosition));
+	toggleOperatorActions_.clear();
+	toggleOperatorActions_.resize(static_cast<size_t>(visibleRowCapacity_));
 
 	// The keybind list's interior widths are hardcoded legacy pixels (designed
 	// for the 640-wide viewport). Scale them down with the window so the panel
@@ -286,6 +280,15 @@ void OptionsControlsScreen::BuildUi(ScreenContext & ctx, Surface & dst, float fr
 		out.operatorLabel = v.and_ ? "AND" : "OR";
 		out.rebindingPrimary = (rebindRow == row && rebindSlot == 0);
 		out.rebindingSecondary = (rebindRow == row && rebindSlot == 1);
+		toggleOperatorActions_[static_cast<size_t>(i)] =
+			options_controls_screen_detail::UseQueuedAction([&ctx, row]() {
+				Action action = ACTION_TABLE[row].action;
+				ScreenContext::LegacyKeyBindingSlots slots =
+					ctx.LegacyKeyBinding(action);
+				slots.and_ = !slots.and_;
+				ctx.WriteLegacyKeyBinding(
+					action, slots.key1, slots.key2, slots.and_);
+			});
 		keybindListView_.visibleRowCount = i + 1;
 	}
 
@@ -320,4 +323,5 @@ void OptionsControlsScreen::Destroy(ScreenContext & ctx) {
 	cyclePreset = {};
 	save = {};
 	cancel = {};
+	toggleOperatorActions_.clear();
 }

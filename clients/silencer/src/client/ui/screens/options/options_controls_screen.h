@@ -9,6 +9,7 @@
 
 #include <functional>
 #include <string>
+#include <vector>
 
 class Overlay;
 class OptionsControlsScreen : public Screen
@@ -24,7 +25,7 @@ private:
 	// The screen owns only the in-flight row/slot state. Binding labels and
 	// writes are requested through ScreenContext.
 	void BeginRebindFromVisibleRow(int row, int slot);
-	void ToggleOperatorFromVisibleRow(int row);
+	void InvokeOperatorForVisibleRow(int row);
 	int MaxScroll() const;
 
 	int scrollPosition = 0;
@@ -35,7 +36,7 @@ private:
 	std::function<void()> save;
 	std::function<void()> cancel;
 	int scrollDelta = 0;
-	int operatorClickedRow = -1;
+	std::vector<std::function<void()>> toggleOperatorActions_;
 	int visibleRowCapacity_ = silencer::client_ui::options::kKeybindListMinVisibleRows;
 	silencer::client_ui::options::KeybindListView keybindListView_;
 };

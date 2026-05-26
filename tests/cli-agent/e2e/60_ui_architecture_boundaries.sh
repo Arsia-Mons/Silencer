@@ -224,7 +224,7 @@ fail_if_match \
   "$REPO_ROOT/clients/silencer/src/client/ui/screens/options/options_display_screen.h"
 
 fail_if_match \
-  '\b(presetClicked|saveClicked|cancelClicked)\b' \
+  '\b(presetClicked|saveClicked|cancelClicked|operatorClickedRow)\b' \
   "$REPO_ROOT/clients/silencer/src/client/ui/screens/options/options_controls_screen.cpp" \
   "$REPO_ROOT/clients/silencer/src/client/ui/screens/options/options_controls_screen.h"
 
