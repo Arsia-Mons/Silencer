@@ -214,6 +214,13 @@ fail_if_match \
   "$REPO_ROOT/clients/silencer/src/client/ui/screens/main_menu/main_menu_screen.h"
 
 fail_if_match \
+  '\bokClicked\b' \
+  "$REPO_ROOT/clients/silencer/src/client/ui/modals/message_modal.cpp" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/modals/message_modal.h" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/modals/password_modal.cpp" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/modals/password_modal.h"
+
+fail_if_match \
   '\b(goBackClicked|controlsClicked|displayClicked|audioClicked)\b' \
   "$REPO_ROOT/clients/silencer/src/client/ui/screens/options/options_screen.cpp" \
   "$REPO_ROOT/clients/silencer/src/client/ui/screens/options/options_screen.h"

@@ -32,7 +32,8 @@ private:
 
 	std::string message;
 	bool hasOk;
-	bool okClicked = false;
+	bool closeQueued = false;
+	std::function<void()> close;
 	std::function<void()> onClose;
 };
 

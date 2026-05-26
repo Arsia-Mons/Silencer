@@ -1,5 +1,6 @@
 #include "password_modal.h"
 
+#include "client/ui/ClientUi.h"
 #include "screen_context.h"
 #include "surface.h"
 
@@ -55,6 +56,23 @@ void RegisterWidgets(PasswordModal * modal,
 	input.isPassword = true;
 	interactions.RegisterInteractable(input);
 }
+
+std::function<void()> UseQueuedSubmit(ScreenContext & ctx,
+                                      char * password,
+                                      std::function<void(const char *)> * onSubmit)
+{
+	auto queueWrite = silencer::client_ui::UseUiWriteQueue();
+	if(!queueWrite) return {};
+	return [queueWrite, &ctx, password, onSubmit]() {
+		std::string captured = password ? password : "";
+		std::function<void(const char *)> cb;
+		if(onSubmit) cb = std::move(*onSubmit);
+		queueWrite([&ctx, captured, cb]() mutable {
+			ctx.PopScreen();
+			if(cb) cb(captured.c_str());
+		});
+	};
+}
 } // namespace password_modal_detail
 
 PasswordModal::PasswordModal(std::function<void(const char *)> onSubmit_)
@@ -65,19 +83,15 @@ PasswordModal::PasswordModal(std::function<void(const char *)> onSubmit_)
 void PasswordModal::Build(ScreenContext & ctx)
 {
 	(void)ctx;
-	okClicked = false;
+	submitQueued = false;
+	submit = {};
 	focusPasswordRequested = true;
 	password[0] = '\0';
 }
 
 void PasswordModal::Tick(ScreenContext & ctx)
 {
-	if(!okClicked) return;
-	okClicked = false;
-	std::string captured = password;
-	auto cb = std::move(onSubmit);
-	ctx.PopScreen();
-	if(cb) cb(captured.c_str());
+	(void)ctx;
 }
 
 void PasswordModal::BuildUi(ScreenContext & ctx, Surface & dst, float frametime, silencer::ui::UiInteractionRegistry& interactions)
@@ -89,6 +103,7 @@ void PasswordModal::BuildUi(ScreenContext & ctx, Surface & dst, float frametime,
 	focusPasswordRequested = false;
 	bool focused = interactions.IsTextInputFocused(password_modal_detail::kPasswordUid);
 	bool blink = ctx.UiBlinkVisible();
+	submit = password_modal_detail::UseQueuedSubmit(ctx, password, &onSubmit);
 
 	CLAY({ .id = CLAY_ID("PasswordModalRoot"),
 	       .layout = {
@@ -132,6 +147,7 @@ void PasswordModal::BuildUi(ScreenContext & ctx, Surface & dst, float frametime,
 void PasswordModal::Destroy(ScreenContext & ctx)
 {
 	ctx.ClearUiFocus();
+	submit = {};
 }
 
 bool PasswordModal::HandleUiIntent(ScreenContext & ctx, const silencer::ui::UiAction & action)
@@ -144,11 +160,17 @@ bool PasswordModal::HandleUiIntent(ScreenContext & ctx, const silencer::ui::UiAc
 	}
 	if(action.kind == silencer::ui::UiActionKind::SubmitText && action.id == password_modal_detail::kActionPassword){
 		password_modal_detail::CopyUiText(password, static_cast<int>(sizeof(password)), action.value);
-		okClicked = true;
+		if(submit && !submitQueued){
+			submitQueued = true;
+			submit();
+		}
 		return true;
 	}
 	if(action.kind == silencer::ui::UiActionKind::Activate && action.id == password_modal_detail::kActionOk){
-		okClicked = true;
+		if(submit && !submitQueued){
+			submitQueued = true;
+			submit();
+		}
 		return true;
 	}
 	return false;

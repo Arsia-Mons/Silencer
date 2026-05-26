@@ -1,5 +1,6 @@
 #include "message_modal.h"
 
+#include "client/ui/ClientUi.h"
 #include "screen_context.h"
 #include "surface.h"
 
@@ -31,6 +32,21 @@ Clay_String FromStd(const std::string & s)
 {
 	return Clay_String{ false, static_cast<int32_t>(s.size()), s.c_str() };
 }
+
+std::function<void()> UseQueuedClose(ScreenContext & ctx,
+                                     std::function<void()> * onClose)
+{
+	auto queueWrite = silencer::client_ui::UseUiWriteQueue();
+	if(!queueWrite) return {};
+	return [queueWrite, &ctx, onClose]() {
+		std::function<void()> cb;
+		if(onClose) cb = std::move(*onClose);
+		queueWrite([&ctx, cb]() mutable {
+			ctx.PopScreen();
+			if(cb) cb();
+		});
+	};
+}
 } // namespace message_modal_detail
 
 MessageModal::MessageModal(std::string message_, std::function<void()> onClose_)
@@ -51,16 +67,13 @@ std::unique_ptr<MessageModal> MessageModal::Progress(std::string message)
 void MessageModal::Build(ScreenContext & ctx)
 {
 	(void)ctx;
-	okClicked = false;
+	closeQueued = false;
+	close = {};
 }
 
 void MessageModal::Tick(ScreenContext & ctx)
 {
-	if(!hasOk || !okClicked) return;
-	okClicked = false;
-	auto cb = std::move(onClose);
-	ctx.PopScreen();
-	if(cb) cb();
+	(void)ctx;
 }
 
 void MessageModal::BuildUi(ScreenContext & ctx, Surface & dst, float frametime, silencer::ui::UiInteractionRegistry& interactions)
@@ -70,6 +83,8 @@ void MessageModal::BuildUi(ScreenContext & ctx, Surface & dst, float frametime, 
 	using namespace silencer::clay_bridge;
 
 
+
+	close = message_modal_detail::UseQueuedClose(ctx, &onClose);
 
 	CLAY({ .id = CLAY_ID("MessageModalRoot"),
 	       .layout = {
@@ -103,6 +118,7 @@ void MessageModal::BuildUi(ScreenContext & ctx, Surface & dst, float frametime, 
 void MessageModal::Destroy(ScreenContext & ctx)
 {
 	(void)ctx;
+	close = {};
 }
 
 bool MessageModal::HandleUiIntent(ScreenContext & ctx, const silencer::ui::UiAction & action)
@@ -111,7 +127,10 @@ bool MessageModal::HandleUiIntent(ScreenContext & ctx, const silencer::ui::UiAct
 	if(!hasOk) return false;
 	if(action.kind == silencer::ui::UiActionKind::Cancel ||
 	   (action.kind == silencer::ui::UiActionKind::Activate && action.id == message_modal_detail::kActionOk)){
-		okClicked = true;
+		if(close && !closeQueued){
+			closeQueued = true;
+			close();
+		}
 		return true;
 	}
 	return false;
