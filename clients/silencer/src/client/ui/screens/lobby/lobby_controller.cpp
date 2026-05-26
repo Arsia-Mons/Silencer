@@ -70,7 +70,7 @@ void LobbyScreen::Tick(ScreenContext & ctx)
 	}
 	if(gameTechActive){
 		silencer::client_ui::lobby::GameTechPanelTick(
-			gameTechState, ctx.world, ctx, *this);
+			gameTechState, ctx);
 	}
 
 	// Pre-CONNECTED surfaces (gameselect / gamecreate) — join finalisation,
@@ -152,30 +152,14 @@ bool LobbyScreen::HandleUiIntent(ScreenContext & ctx, const silencer::ui::UiActi
 		return silencer::client_ui::lobby::GameJoinPanelHandleUiIntent(gameJoinState, action);
 	}
 	if(gameTechActive){
-		return silencer::client_ui::lobby::GameTechPanelHandleUiIntent(gameTechState, action);
+		if(silencer::client_ui::lobby::GameTechPanelHandleUiIntent(gameTechState, action)){
+			if(gameTechState.backClicked){
+				gameTechState.backClicked = false;
+				ShowGameJoin(ctx);
+			}
+			return true;
+		}
+		return false;
 	}
 	return silencer::client_ui::lobby::GameSelectPanelHandleUiIntent(gameSelectState, action);
-}
-
-// Friend-of-World helpers for the GameTech panel. Kept alongside the
-// controller (Tick / HandleUiIntent) since the panel tick calls them.
-
-Uint8 LobbyScreen::TechPanelLocalPeerId(World & world) const
-{
-	return world.peers.localpeerid;
-}
-
-Peer * LobbyScreen::TechPanelPeer(World & world, Uint8 peerid) const
-{
-	return world.peers.peerlist[peerid];
-}
-
-void LobbyScreen::TechPanelRequestPeerList(World & world)
-{
-	world.RequestPeerList();
-}
-
-void LobbyScreen::TechPanelSetTech(World & world, Uint32 techchoices)
-{
-	world.SetTech(techchoices);
 }

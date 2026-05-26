@@ -211,9 +211,6 @@ void BuildRightUpperContents(LobbyMainAreaPanels & panels,
 		BuildGameTechUpperTree(
 			panels.gameTech,
 			static_cast<Uint16>(std::max(0, layout.rightUpperW)),
-			world,
-			resources,
-			owner,
 			interactions);
 	}else{
 		BuildGameSelectUpperTree(
@@ -242,7 +239,7 @@ void BuildRightTallContents(LobbyMainAreaPanels & panels,
 	}else if(panels.gameJoinActive){
 		BuildGameJoinTallTree(panels.gameJoin, resources, interactions);
 	}else if(panels.gameTechActive){
-		BuildGameTechTallTree(panels.gameTech, world, resources, owner, interactions);
+		BuildGameTechTallTree(panels.gameTech, interactions);
 	}else{
 		BuildGameSelectTallTree(
 			panels.gameSelect,

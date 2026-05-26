@@ -731,6 +731,145 @@ void ScreenContext::BeginLobbyTechSelection() {
 	world.peers.RequestPeerList();
 }
 
+ScreenContext::LobbyTechSnapshot ScreenContext::CurrentLobbyTechSnapshot() {
+	LobbyTechSnapshot snapshot;
+	const Uint8 localId = world.GetLocalPeerId();
+	Peer * localPeer = world.GetPeer(localId);
+	Team * team = world.GetPeerTeam(localId);
+
+	int localTechSlotsLeft = 0;
+	if(localPeer && team){
+		User * user = world.lobby.GetUserInfo(localPeer->accountid);
+		if(user){
+			localTechSlotsLeft =
+				user->agency[team->agency].techslots - world.TechSlotsUsed(*localPeer);
+			snapshot.slotsLeft =
+				"Tech slots left: " + std::to_string(localTechSlotsLeft);
+		}
+	}else if(!localPeer && world.tickcount % 12 == 0){
+		world.peers.RequestPeerList();
+	}
+
+	if(!team) return snapshot;
+
+	int peerIndex = 0;
+	for(int i = 0; i < 4 && peerIndex < 3; i++){
+		if(team->peers[i] == localId) continue;
+		if(i >= team->numpeers){ peerIndex++; continue; }
+		Peer * peer = world.GetPeer(team->peers[i]);
+		User * user = peer ? world.lobby.GetUserInfo(peer->accountid) : nullptr;
+		snapshot.peerNames[peerIndex] =
+			user ? std::string(user->DisplayName()) : std::string();
+		peerIndex++;
+	}
+
+	struct ColAssign { int peerSlot; bool draw; bool isLocal; };
+	ColAssign cols[4] = { {-1,false,false}, {-1,false,false},
+	                       {-1,false,false}, {-1,false,false} };
+	peerIndex = 0;
+	for(int i = 0; i < 4; i++){
+		const bool isLocal = (team->peers[i] == localId);
+		const bool draw = (i < team->numpeers);
+		const int col = isLocal ? 3 : peerIndex;
+		if(!isLocal) peerIndex++;
+		if(col >= 0 && col < 4){
+			cols[col].peerSlot = i;
+			cols[col].draw = draw;
+			cols[col].isLocal = isLocal;
+		}
+	}
+
+	const ColAssign & localColumn = cols[3];
+	for(size_t itemIndex = 0; itemIndex < world.buyableitems.size(); itemIndex++){
+		BuyableItem * item = world.buyableitems[itemIndex];
+		if(!item || !item->techslots) continue;
+		if(item->agencyspecific != -1 && item->agencyspecific != team->agency){
+			continue;
+		}
+
+		LobbyTechGridRow row;
+		row.itemIndex = static_cast<int>(itemIndex);
+		if(localColumn.draw){
+			row.label = item->name;
+			row.label += " (";
+			row.label += std::to_string(item->techslots);
+			row.label += ")";
+		}
+
+		for(int col = 0; col < 4; col++){
+			if(!cols[col].draw) continue;
+			Peer * peer = world.GetPeer(team->peers[cols[col].peerSlot]);
+			const bool selected = peer && (peer->techchoices & item->techchoice);
+			bool interactable = false;
+			if(cols[col].isLocal){
+				interactable =
+					(item->techslots <= localTechSlotsLeft) || selected;
+			}
+			const Uint8 brightness = cols[col].isLocal && interactable ? 128 : 64;
+			row.cells[col].draw = true;
+			row.cells[col].selected = selected;
+			row.cells[col].brightness = brightness;
+			if(cols[col].isLocal) row.labelBrightness = brightness;
+		}
+
+		snapshot.rows.push_back(std::move(row));
+	}
+
+	return snapshot;
+}
+
+ScreenContext::LobbyTechItemDetails
+ScreenContext::LobbyTechItemDetailsForIndex(int itemIndex) const {
+	LobbyTechItemDetails details;
+	if(itemIndex < 0 || itemIndex >= static_cast<int>(world.buyableitems.size())){
+		return details;
+	}
+	BuyableItem * item = world.buyableitems[itemIndex];
+	if(!item) return details;
+
+	details.found = true;
+	details.title = "-";
+	details.title += item->name;
+	details.title += "-";
+
+	char desc[1024];
+	std::strncpy(desc, item->description, sizeof(desc));
+	desc[sizeof(desc) - 1] = '\0';
+	int lineNo = 0;
+	char * line = std::strtok(desc, "\n");
+	while(line && lineNo < static_cast<int>(details.descriptionLines.size())){
+		details.descriptionLines[lineNo++] = line;
+		line = std::strtok(nullptr, "\n");
+	}
+	return details;
+}
+
+void ScreenContext::ToggleLobbyTechChoice(int itemIndex) {
+	const Uint8 localId = world.GetLocalPeerId();
+	Peer * localPeer = world.GetPeer(localId);
+	Team * team = world.GetPeerTeam(localId);
+	if(!localPeer || !team || itemIndex < 0
+	   || itemIndex >= static_cast<int>(world.buyableitems.size())){
+		return;
+	}
+
+	BuyableItem * item = world.buyableitems[itemIndex];
+	if(!item) return;
+	User * user = world.lobby.GetUserInfo(localPeer->accountid);
+	if(!user) return;
+
+	const int techSlotsLeft =
+		user->agency[team->agency].techslots - world.TechSlotsUsed(*localPeer);
+	const bool selected = (localPeer->techchoices & item->techchoice) != 0;
+	const bool interactable = (item->techslots <= techSlotsLeft) || selected;
+	if(!interactable) return;
+
+	const Uint32 newChoices = localPeer->techchoices ^ item->techchoice;
+	world.SetTech(newChoices);
+	Config::GetInstance().defaulttechchoices[team->agency] = newChoices;
+	Config::GetInstance().Save();
+}
+
 void ScreenContext::BeginCreateGameMapUpload(const std::string & gameName,
                                              const std::string & mapName,
                                              const std::string & password,

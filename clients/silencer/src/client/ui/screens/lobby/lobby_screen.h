@@ -41,12 +41,6 @@ public:
 	void ShowGameJoin(ScreenContext & ctx);
 	void ShowGameTech(ScreenContext & ctx);
 
-	// Friend-of-World helpers used by the GameTech panel.
-	Uint8 TechPanelLocalPeerId(class World & world) const;
-	class Peer * TechPanelPeer(class World & world, Uint8 peerid) const;
-	void TechPanelRequestPeerList(class World & world);
-	void TechPanelSetTech(class World & world, Uint32 techchoices);
-
 private:
 	// Per-frame state for the chrome tree. Strings live on the screen so the
 	// layout pass can hold pointers that remain valid until the frame ends.

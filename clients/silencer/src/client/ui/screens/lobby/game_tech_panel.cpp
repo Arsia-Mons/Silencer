@@ -6,23 +6,16 @@
 #include "primitives/text.h"
 #include "primitives/button.h"
 
-#include "lobby_screen.h"
 #include "screen_context.h"
 #include "tech_selected_panel.h"
 #include "tech_tree_grid.h"
-#include "world.h"
-#include "lobby.h"
-#include "team.h"
-#include "peer.h"
-#include "user.h"
-#include "buyableitem.h"
-#include "config.h"
 
 #include <algorithm>
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
 #include <string>
+#include <utility>
 
 using silencer::ui::primitives::Text;
 using silencer::ui::primitives::TextEffect;
@@ -87,6 +80,26 @@ int SuffixInt(const Text & value, const char * prefix) {
 	return std::atoi(value.c_str() + std::strlen(prefix));
 }
 
+void CopySnapshot(GameTechPanelState & state,
+                  const ScreenContext::LobbyTechSnapshot & snapshot) {
+	state.slotsLeftStr = snapshot.slotsLeft;
+	state.peerNameStrs = snapshot.peerNames;
+	state.rows.clear();
+	state.rows.reserve(snapshot.rows.size());
+	for(const ScreenContext::LobbyTechGridRow & source : snapshot.rows){
+		GameTechGridRow row;
+		row.itemIndex = source.itemIndex;
+		row.label = source.label;
+		row.labelBrightness = source.labelBrightness;
+		for(size_t i = 0; i < row.cells.size(); ++i){
+			row.cells[i].draw = source.cells[i].draw;
+			row.cells[i].selected = source.cells[i].selected;
+			row.cells[i].brightness = source.cells[i].brightness;
+		}
+		state.rows.push_back(std::move(row));
+	}
+}
+
 }  // namespace game_tech_panel_detail
 
 void GameTechPanelInit(GameTechPanelState & state) {
@@ -94,86 +107,29 @@ void GameTechPanelInit(GameTechPanelState & state) {
 }
 
 void GameTechPanelTick(GameTechPanelState & state,
-                       World & world,
-                       ScreenContext & ctx,
-                       LobbyScreen & owner) {
-	const Uint8 localid = owner.TechPanelLocalPeerId(world);
-	Peer * localpeer = owner.TechPanelPeer(world, localid);
-	Team * team = world.GetPeerTeam(localid);
-
-	int techslotsleft = 0;
-	if(localpeer && team){
-		User * user = world.lobby.GetUserInfo(localpeer->accountid);
-		if(user){
-			techslotsleft =
-				user->agency[team->agency].techslots - world.TechSlotsUsed(*localpeer);
-			state.slotsLeftStr = "Tech slots left: " + std::to_string(techslotsleft);
-		}else{
-			state.slotsLeftStr.clear();
-		}
-	}else{
-		state.slotsLeftStr.clear();
-		if(!localpeer && world.tickcount % 12 == 0){
-			owner.TechPanelRequestPeerList(world);
-		}
+                       ScreenContext & ctx) {
+	if(state.toggleClickedItemIndex >= 0){
+		const int idx = state.toggleClickedItemIndex;
+		state.toggleClickedItemIndex = -1;
+		ctx.ToggleLobbyTechChoice(idx);
 	}
 
-	for(int i = 0; i < 3; i++) state.peerNameStrs[i].clear();
-	if(team){
-		int peerindex = 0;
-		for(int i = 0; i < 4 && peerindex < 3; i++){
-			if(team->peers[i] == localid) continue;
-			if(i >= team->numpeers){ peerindex++; continue; }
-			Peer * peer = owner.TechPanelPeer(world, team->peers[i]);
-			User * user = peer ? world.lobby.GetUserInfo(peer->accountid) : nullptr;
-			state.peerNameStrs[peerindex] = user ? std::string(user->DisplayName()) : std::string();
-			peerindex++;
-		}
-	}
+	game_tech_panel_detail::CopySnapshot(state, ctx.CurrentLobbyTechSnapshot());
 
 	if(state.descClickedItemIndex >= 0){
 		const int idx = state.descClickedItemIndex;
 		state.descClickedItemIndex = -1;
-		if(idx >= 0 && idx < static_cast<int>(world.buyableitems.size())){
-			BuyableItem * item = world.buyableitems[idx];
-			state.techNameStr  = "-";
-			state.techNameStr += item->name;
-			state.techNameStr += "-";
-			char desc[1024];
-			std::strncpy(desc, item->description, sizeof(desc));
-			desc[sizeof(desc) - 1] = '\0';
-			int lineNo = 0;
-			char * line = std::strtok(desc, "\n");
-			while(line && lineNo < 8){
-				state.techDescLines[lineNo++] = line;
-				line = std::strtok(nullptr, "\n");
-			}
-			for(int j = lineNo; j < 8; j++) state.techDescLines[j].clear();
+		const ScreenContext::LobbyTechItemDetails details =
+			ctx.LobbyTechItemDetailsForIndex(idx);
+		if(details.found){
+			state.techNameStr = details.title;
+			state.techDescLines = details.descriptionLines;
+		}else{
+			state.techNameStr.clear();
+			for(std::string & line : state.techDescLines) line.clear();
 		}
 	}
 
-	if(state.toggleClickedItemIndex >= 0){
-		const int idx = state.toggleClickedItemIndex;
-		state.toggleClickedItemIndex = -1;
-		if(localpeer && team && idx >= 0
-		   && idx < static_cast<int>(world.buyableitems.size())){
-			BuyableItem * item = world.buyableitems[idx];
-			const bool interactable = (item->techslots <= techslotsleft)
-			                       || ((localpeer->techchoices & item->techchoice) != 0);
-			if(interactable){
-				const Uint32 newChoices = localpeer->techchoices ^ item->techchoice;
-				owner.TechPanelSetTech(world, newChoices);
-				Config::GetInstance().defaulttechchoices[team->agency] = newChoices;
-				Config::GetInstance().Save();
-			}
-		}
-	}
-
-	if(state.backClicked){
-		state.backClicked = false;
-		owner.ShowGameJoin(ctx);
-		return;
-	}
 }
 
 bool GameTechPanelHandleUiIntent(GameTechPanelState & state,
@@ -198,14 +154,7 @@ bool GameTechPanelHandleUiIntent(GameTechPanelState & state,
 
 void BuildGameTechUpperTree(GameTechPanelState & state,
                             Uint16 panelWidth,
-                            World & world,
-                            Resources & resources,
-                            LobbyScreen & owner,
                             silencer::ui::UiInteractionRegistry& interactions) {
-	(void)world;
-	(void)resources;
-	(void)owner;
-
 	// Back To Teams button.
 	CLAY({ .id = CLAY_ID("GTechBackWrap"),
 	       .layout = { .padding = { game_tech_panel_detail::kUpperBackPadLeft, 0,
@@ -217,7 +166,7 @@ void BuildGameTechUpperTree(GameTechPanelState & state,
 		                             /*interactions*/ &interactions });
 	}
 
-	// Peer name labels — right-aligned column. ALIGN_X_RIGHT inside a
+	// Participant name labels — right-aligned column. ALIGN_X_RIGHT inside a
 	// grow-width wrapper aligns each name to the wrapper's right edge.
 	CLAY({ .id = CLAY_ID("GTechPeerNames"),
 	       .layout = {
@@ -245,12 +194,7 @@ void BuildGameTechUpperTree(GameTechPanelState & state,
 }
 
 void BuildGameTechTallTree(GameTechPanelState & state,
-                           World & world,
-                           Resources & resources,
-                           LobbyScreen & owner,
                            silencer::ui::UiInteractionRegistry& interactions) {
-	(void)resources;
-
 	// "Tech slots left: N" — bank 133/w6/eff=129/brightness=144/colorRamp.
 	CLAY({ .id = CLAY_ID("GTechSlotsWrap"),
 	       .layout = { .padding = { game_tech_panel_detail::kTallSlotsPadLeft, 0,
@@ -263,7 +207,7 @@ void BuildGameTechTallTree(GameTechPanelState & state,
 		}
 	}
 
-	BuildTechTreeGrid(world, owner, interactions);
+	BuildTechTreeGrid(state, interactions);
 	BuildTechSelectedPanel(state);
 }
 

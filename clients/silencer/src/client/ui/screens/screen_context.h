@@ -4,6 +4,7 @@
 #include <SDL3/SDL_stdinc.h>
 #include <SDL3/SDL_gamepad.h>
 #include <SDL3/SDL_scancode.h>
+#include <array>
 #include <cstdint>
 #include <functional>
 #include <memory>
@@ -149,6 +150,27 @@ public:
 		std::string name;
 		std::string level;
 	};
+	struct LobbyTechGridCell {
+		bool draw = false;
+		bool selected = false;
+		Uint8 brightness = 64;
+	};
+	struct LobbyTechGridRow {
+		int itemIndex = -1;
+		std::array<LobbyTechGridCell, 4> cells{};
+		std::string label;
+		Uint8 labelBrightness = 64;
+	};
+	struct LobbyTechSnapshot {
+		std::string slotsLeft;
+		std::array<std::string, 3> peerNames{};
+		std::vector<LobbyTechGridRow> rows;
+	};
+	struct LobbyTechItemDetails {
+		bool found = false;
+		std::string title;
+		std::array<std::string, 8> descriptionLines{};
+	};
 	struct UiSpriteFrameMetrics {
 		int offsetX = 0;
 		int offsetY = 0;
@@ -255,6 +277,9 @@ public:
 	void SendLobbyJoinReady();
 	void ChangeLobbyJoinTeam();
 	void BeginLobbyTechSelection();
+	LobbyTechSnapshot CurrentLobbyTechSnapshot();
+	LobbyTechItemDetails LobbyTechItemDetailsForIndex(int itemIndex) const;
+	void ToggleLobbyTechChoice(int itemIndex);
 	void BeginCreateGameMapUpload(const std::string & gameName,
 	                              const std::string & mapName,
 	                              const std::string & password,

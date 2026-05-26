@@ -301,6 +301,18 @@ fail_if_match \
   --glob '!**/screen_context.cpp'
 
 fail_if_match \
+  '\b(World|Peer|User|Config|LobbyGame)\b|\bTeam[[:space:]]*([*&]|::)|\bTeam[[:space:]]+[A-Za-z_]|\bTeam[[:space:]]*$|\bLobby[[:space:]]*([*&]|::)|\bLobby[[:space:]]+[A-Za-z_]|\bLobby[[:space:]]*$|([.]|->)[[:space:]]*(world|lobby)\b|world[[:space:]]*[.]|#[[:space:]]*include[[:space:]]*[<"]([^>"]*/)?(world|lobby|lobbygame|peer|team|user|config)[.]h[>"]|Config::GetInstance[[:space:]]*[(]|\bGetPeerTeam\b|\bGetPeer[[:space:]]*[(]|\bTechPanel(LocalPeerId|Peer|RequestPeerList|SetTech)\b' \
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens/lobby/game_tech_panel.cpp" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens/lobby/game_tech_panel.h" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens/lobby/tech_tree_grid.cpp" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens/lobby/tech_tree_grid.h" \
+  --glob '!**/screen_context.cpp'
+
+fail_if_match \
+  '\bTechPanel(LocalPeerId|Peer|RequestPeerList|SetTech)\b' \
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens/lobby/lobby_screen.h"
+
+fail_if_match \
   '\bLobbyScreen\b|#[[:space:]]*include[[:space:]]*"lobby_screen[.]h"' \
   "$REPO_ROOT/clients/silencer/src/client/ui/screens/screen_context.cpp" \
   "$REPO_ROOT/clients/silencer/src/client/ui/screens/screen_context.h"

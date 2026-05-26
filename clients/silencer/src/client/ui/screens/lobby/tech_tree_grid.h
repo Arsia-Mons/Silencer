@@ -3,10 +3,7 @@
 
 // 4-column tech-choice grid for the lobby GameTechPanel. Three remote-peer
 // columns + one local column with tech-name labels + per-row description
-// hit-target widget registration.
-
-class World;
-class LobbyScreen;
+// hit-target widget registration. Domain state is supplied by GameTechPanelState.
 
 namespace silencer::ui {
 class UiInteractionRegistry;
@@ -14,8 +11,9 @@ class UiInteractionRegistry;
 
 namespace silencer::client_ui::lobby {
 
-void BuildTechTreeGrid(World & world,
-                       LobbyScreen & owner,
+struct GameTechPanelState;
+
+void BuildTechTreeGrid(const GameTechPanelState & state,
                        silencer::ui::UiInteractionRegistry& interactions);
 
 }  // namespace silencer::client_ui::lobby
