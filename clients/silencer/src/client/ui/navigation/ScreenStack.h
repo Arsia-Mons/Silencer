@@ -8,7 +8,6 @@
 
 class Screen;
 class ScreenContext;
-class Surface;
 
 namespace silencer {
 namespace ui {
@@ -39,11 +38,8 @@ public:
 	bool PopEntry(UiScreenEntryId entryId, ScreenContext& ctx);
 
 	void TickVisible(ScreenContext& ctx);
-	void BuildVisible(ScreenContext& ctx,
-	                  Surface& dst,
-	                  float frametime,
-	                  silencer::ui::UiInteractionRegistry& interactions,
-	                  const BuildVisibleScreen& buildScreen = {});
+	void BuildVisible(silencer::ui::UiInteractionRegistry& interactions,
+	                  const BuildVisibleScreen& buildScreen);
 
 #ifdef SILENCER_TEST_BUILD
 	void PushBuiltForTest(std::unique_ptr<Screen> screen);

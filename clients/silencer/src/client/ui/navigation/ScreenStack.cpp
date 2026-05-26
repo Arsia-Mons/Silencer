@@ -76,12 +76,9 @@ void ScreenStack::TickVisible(ScreenContext& ctx) {
 	}
 }
 
-void ScreenStack::BuildVisible(ScreenContext& ctx,
-                               Surface& dst,
-                               float frametime,
-                               silencer::ui::UiInteractionRegistry& interactions,
+void ScreenStack::BuildVisible(silencer::ui::UiInteractionRegistry& interactions,
                                const BuildVisibleScreen& buildScreen) {
-	if(screens_.empty()) return;
+	if(!buildScreen || screens_.empty()) return;
 	const std::size_t start = VisibleStart();
 	int visibleIndex = 0;
 	for(std::size_t i = start; i < screens_.size(); ++i) {
@@ -89,11 +86,7 @@ void ScreenStack::BuildVisible(ScreenContext& ctx,
 		if(i > start && screen.IsOverlay()) {
 			interactions.BeginFrame();
 		}
-		if(buildScreen){
-			buildScreen(screens_[i].entryId, screen, screen.IsOverlay(), visibleIndex);
-		}else{
-			screen.BuildUi(ctx, dst, frametime, interactions);
-		}
+		buildScreen(screens_[i].entryId, screen, screen.IsOverlay(), visibleIndex);
 		++visibleIndex;
 	}
 }

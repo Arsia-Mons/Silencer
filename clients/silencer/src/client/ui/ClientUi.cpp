@@ -323,9 +323,6 @@ void ClientUi::TickVisibleScreens(ScreenContext& ctx) {
 
 void ClientUi::BuildVisibleScreens(ScreenContext& ctx, Surface& dst, float frametime) {
 	screens_.BuildVisible(
-		ctx,
-		dst,
-		frametime,
 		interactions_,
 		[&](UiScreenEntryId entryId, Screen& screen, bool overlay, int visibleIndex) {
 			BuildVisibleScreenFrame(entryId, overlay, visibleIndex, [&] {
