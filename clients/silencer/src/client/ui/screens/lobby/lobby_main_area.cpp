@@ -13,7 +13,6 @@
 #include "lobby_screen.h"
 
 #include "screen_context.h"
-#include "renderdevice.h"
 #include "world.h"
 
 #include <algorithm>
@@ -85,66 +84,63 @@ struct LobbySteppedPaneLayout {
 	int chatH = kLegacyBodyH - 121 - 10;
 };
 
-void AddBorderBlurRect(RenderDevice * renderdevice, SDL_Rect rect) {
-	if(!renderdevice || rect.w <= 0 || rect.h <= 0) return;
-	renderdevice->AddLobbyPanelBorderBlurRect(rect);
-}
+	void AddBorderBlurRect(ScreenContext & ctx, SDL_Rect rect) {
+		ctx.AddLobbyPanelBorderBlurRect(rect);
+	}
 
-void AddPanelBorderBlur(RenderDevice * renderdevice,
-                        int x,
-                        int y,
-                        int w,
-                        int h,
-                        Uint8 sides) {
-	if(!renderdevice || w <= 0 || h <= 0) return;
-	if(sides & BoxSides::Top){
-		AddBorderBlurRect(renderdevice, SDL_Rect{ x, y, w, 1 });
+	void AddPanelBorderBlur(ScreenContext & ctx,
+	                        int x,
+	                        int y,
+	                        int w,
+	                        int h,
+	                        Uint8 sides) {
+		if(w <= 0 || h <= 0) return;
+		if(sides & BoxSides::Top){
+			AddBorderBlurRect(ctx, SDL_Rect{ x, y, w, 1 });
+		}
+		if(sides & BoxSides::Bottom){
+			AddBorderBlurRect(ctx, SDL_Rect{ x, y + h - 1, w, 1 });
+		}
+		if(sides & BoxSides::Left){
+			AddBorderBlurRect(ctx, SDL_Rect{ x, y, 1, h });
+		}
+		if(sides & BoxSides::Right){
+			AddBorderBlurRect(ctx, SDL_Rect{ x + w - 1, y, 1, h });
+		}
 	}
-	if(sides & BoxSides::Bottom){
-		AddBorderBlurRect(renderdevice, SDL_Rect{ x, y + h - 1, w, 1 });
-	}
-	if(sides & BoxSides::Left){
-		AddBorderBlurRect(renderdevice, SDL_Rect{ x, y, 1, h });
-	}
-	if(sides & BoxSides::Right){
-		AddBorderBlurRect(renderdevice, SDL_Rect{ x + w - 1, y, 1, h });
-	}
-}
 
 void QueueLobbyPanelBorderBlurRects(ScreenContext & ctx,
-                                    int bodyX,
-                                    int bodyY,
-                                    const LobbySteppedPaneLayout & layout) {
-	RenderDevice * renderdevice = ctx.renderdevice;
-	if(!renderdevice) return;
-	const int topY = bodyY;
+	                                    int bodyX,
+	                                    int bodyY,
+	                                    const LobbySteppedPaneLayout & layout) {
+		const int topY = bodyY;
 	const int lowerY = bodyY + layout.upperH + layout.regionGap;
 	const int rightX = bodyX + layout.topRowW;
 	const int characterX = bodyX;
 	const int rightUpperX = bodyX + layout.characterW + layout.regionGap;
 	const int seamX = bodyX + layout.topRowW - layout.regionGap;
 
-	AddPanelBorderBlur(renderdevice,
-	                   characterX, topY,
+		AddPanelBorderBlur(ctx,
+		                   characterX, topY,
 	                   layout.characterW, layout.upperH,
 	                   BoxSides::All);
-	AddPanelBorderBlur(renderdevice,
+		AddPanelBorderBlur(ctx,
 	                   rightUpperX, topY,
 	                   layout.rightUpperW, layout.upperH,
 	                   static_cast<Uint8>(BoxSides::Top | BoxSides::Bottom | BoxSides::Left));
-	AddPanelBorderBlur(renderdevice,
+		AddPanelBorderBlur(ctx,
 	                   seamX, bodyY + layout.upperH,
 	                   layout.regionGap, layout.regionGap,
 	                   BoxSides::Right);
-	AddPanelBorderBlur(renderdevice,
+		AddPanelBorderBlur(ctx,
 	                   bodyX, lowerY,
 	                   layout.chatW, layout.chatH,
 	                   BoxSides::All);
-	AddPanelBorderBlur(renderdevice,
+		AddPanelBorderBlur(ctx,
 	                   seamX, lowerY,
 	                   layout.regionGap, layout.chatH,
 	                   BoxSides::Right);
-	AddPanelBorderBlur(renderdevice,
+		AddPanelBorderBlur(ctx,
 	                   rightX, bodyY,
 	                   layout.rightTallW, layout.rightTallH,
 	                   static_cast<Uint8>(BoxSides::Top | BoxSides::Bottom | BoxSides::Right));

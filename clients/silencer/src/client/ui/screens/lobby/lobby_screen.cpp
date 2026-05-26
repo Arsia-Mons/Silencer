@@ -5,7 +5,6 @@
 #include "lobby_main_area.h"
 
 #include "screen_context.h"
-#include "renderdevice.h"
 #include "world.h"
 #include "surface.h"
 
@@ -40,13 +39,13 @@ int ScaleLegacyPx(int base,
 	return ClampInt(scaled, minValue, maxValue);
 }
 
-void AddPanelBorderBlur(RenderDevice * renderdevice, SDL_Rect rect) {
-	if(!renderdevice || rect.w <= 0 || rect.h <= 0) return;
-	renderdevice->AddLobbyPanelBorderBlurRect({ rect.x, rect.y, rect.w, 1 });
-	renderdevice->AddLobbyPanelBorderBlurRect({ rect.x, rect.y + rect.h - 1, rect.w, 1 });
-	renderdevice->AddLobbyPanelBorderBlurRect({ rect.x, rect.y, 1, rect.h });
-	renderdevice->AddLobbyPanelBorderBlurRect({ rect.x + rect.w - 1, rect.y, 1, rect.h });
-}
+	void AddPanelBorderBlur(ScreenContext & ctx, SDL_Rect rect) {
+		if(rect.w <= 0 || rect.h <= 0) return;
+		ctx.AddLobbyPanelBorderBlurRect({ rect.x, rect.y, rect.w, 1 });
+		ctx.AddLobbyPanelBorderBlurRect({ rect.x, rect.y + rect.h - 1, rect.w, 1 });
+		ctx.AddLobbyPanelBorderBlurRect({ rect.x, rect.y, 1, rect.h });
+		ctx.AddLobbyPanelBorderBlurRect({ rect.x + rect.w - 1, rect.y, 1, rect.h });
+	}
 
 }  // namespace lobby_screen_detail
 
@@ -132,15 +131,10 @@ void LobbyScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime, s
 	const int bodyX = rootPadX;
 	const int bodyY = rootPadTop + (int)titleBarH + regionGap;
 
-	if(ctx.renderdevice){
-		ctx.renderdevice->BeginLobbyPanelBorderBlur(
-			layoutWidth,
-			layoutHeight,
-			input.uiScale);
+		ctx.BeginLobbyPanelBorderBlur(layoutWidth, layoutHeight, input.uiScale);
 		lobby_screen_detail::AddPanelBorderBlur(
-			ctx.renderdevice,
+			ctx,
 			SDL_Rect{ rootPadX, rootPadTop, bodyW, (int)titleBarH });
-	}
 
 	CLAY({ .id = CLAY_ID("LobbyRoot"),
 	       .layout = {

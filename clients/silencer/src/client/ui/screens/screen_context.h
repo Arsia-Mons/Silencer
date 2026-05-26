@@ -3,6 +3,7 @@
 
 #include <SDL3/SDL_stdinc.h>
 #include <SDL3/SDL_gamepad.h>
+#include <SDL3/SDL_rect.h>
 #include <functional>
 #include <memory>
 
@@ -30,6 +31,8 @@ class ScreenContext
 {
 	Game & game;
 	Renderer & renderer;
+	SDL_Window * & window;
+	RenderDevice * & renderdevice;
 
 public:
 	ScreenContext(Game & game,
@@ -38,10 +41,10 @@ public:
 	              Lobby & lobby,
 	              KeyMap & keymap,
 	              Updater & updater,
-	              AmbienceMixer & ambienceMixer,
-	              MapDownloader & mapDownloader,
-	              SDL_Window * & window,
-	RenderDevice * & renderdevice);
+		              AmbienceMixer & ambienceMixer,
+		              MapDownloader & mapDownloader,
+		              SDL_Window * & window,
+		              RenderDevice * & renderdevice);
 
 	World &    world;
 	Lobby &    lobby;
@@ -49,11 +52,6 @@ public:
 	Updater &  updater;
 	AmbienceMixer & ambienceMixer;
 	MapDownloader & mapDownloader;
-	// Live refs to Game's SDL window + render device. Pointers because both
-	// are nullable in headless / dedicated-server mode and are assigned
-	// after ScreenContext is constructed (during SetupRenderDevice).
-	SDL_Window * & window;
-	RenderDevice * & renderdevice;
 
 	// State-machine + client UI navigation actions.
 	void GoToState(Uint8 newState);
@@ -83,6 +81,10 @@ public:
 	void ResetPresentation(int paletteIdx);
 	void ResetMenuPresentation(int paletteIdx);
 	bool UiBlinkVisible() const;
+	void SetWindowFullscreen(bool fullscreen);
+	void SetScaleFilter(bool enabled);
+	void BeginLobbyPanelBorderBlur(int width, int height, float uiScale);
+	void AddLobbyPanelBorderBlurRect(SDL_Rect rect);
 
 	// Clay frame ownership lives in Game/ClientUi. Screens declare UI through
 	// Screen::BuildUi only; they must not begin/end or render Clay directly.

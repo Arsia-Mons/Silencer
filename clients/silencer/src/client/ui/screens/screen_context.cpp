@@ -9,6 +9,9 @@
 #include "runtime/UiInteractionRegistry.h"
 #include "lobby.h"
 #include "lobbygame.h"
+#include "renderdevice.h"
+
+#include <SDL3/SDL_video.h>
 
 #include <cassert>
 
@@ -22,16 +25,16 @@ ScreenContext::ScreenContext(Game & game_,
                              MapDownloader & mapDownloader_,
                              SDL_Window * & window_,
                              RenderDevice * & renderdevice_)
-	    : game(game_),
-	      renderer(renderer_),
-	      world(world_),
+    : game(game_),
+      renderer(renderer_),
+      window(window_),
+      renderdevice(renderdevice_),
+      world(world_),
       lobby(lobby_),
       keymap(keymap_),
       updater(updater_),
       ambienceMixer(ambienceMixer_),
-      mapDownloader(mapDownloader_),
-      window(window_),
-      renderdevice(renderdevice_)
+      mapDownloader(mapDownloader_)
 {
 }
 
@@ -85,4 +88,21 @@ void ScreenContext::ResetMenuPresentation(int paletteIdx) {
 
 bool ScreenContext::UiBlinkVisible() const {
 	return (renderer.GetHudAnimationPhase() % 32) < 16;
+}
+
+void ScreenContext::SetWindowFullscreen(bool fullscreen) {
+	if(window) SDL_SetWindowFullscreen(window, fullscreen);
+}
+
+void ScreenContext::SetScaleFilter(bool enabled) {
+	if(renderdevice) renderdevice->SetScaleFilter(enabled);
+}
+
+void ScreenContext::BeginLobbyPanelBorderBlur(int width, int height, float uiScale) {
+	if(renderdevice) renderdevice->BeginLobbyPanelBorderBlur(width, height, uiScale);
+}
+
+void ScreenContext::AddLobbyPanelBorderBlurRect(SDL_Rect rect) {
+	if(!renderdevice || rect.w <= 0 || rect.h <= 0) return;
+	renderdevice->AddLobbyPanelBorderBlurRect(rect);
 }

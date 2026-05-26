@@ -4,7 +4,6 @@
 #include "game_state.h"
 #include "surface.h"
 #include "config.h"
-#include "renderdevice.h"
 
 #include "components/boolean_setting_row.h"
 #include "clay/clay.h"
@@ -14,7 +13,6 @@
 #include "primitives/text.h"
 
 #include <SDL3/SDL.h>
-#include <SDL3/SDL_video.h>
 
 namespace options_display_screen_detail
 {
@@ -48,18 +46,18 @@ void OptionsDisplayScreen::Build(ScreenContext & ctx)
 
 void OptionsDisplayScreen::Tick(ScreenContext & ctx)
 {
-	if(fullscreenClicked){
-		fullscreenClicked = false;
-		Config & cfg = Config::GetInstance();
-		cfg.fullscreen = !cfg.fullscreen;
-		if(ctx.window) SDL_SetWindowFullscreen(ctx.window, cfg.fullscreen);
-	}
+		if(fullscreenClicked){
+			fullscreenClicked = false;
+			Config & cfg = Config::GetInstance();
+			cfg.fullscreen = !cfg.fullscreen;
+			ctx.SetWindowFullscreen(cfg.fullscreen);
+		}
 	if(smoothScalingClicked){
-		smoothScalingClicked = false;
-		Config & cfg = Config::GetInstance();
-		cfg.scalefilter = !cfg.scalefilter;
-		if(ctx.renderdevice) ctx.renderdevice->SetScaleFilter(cfg.scalefilter);
-	}
+			smoothScalingClicked = false;
+			Config & cfg = Config::GetInstance();
+			cfg.scalefilter = !cfg.scalefilter;
+			ctx.SetScaleFilter(cfg.scalefilter);
+		}
 	if(saveClicked){
 		saveClicked = false;
 		Config::GetInstance().Save();
@@ -68,12 +66,12 @@ void OptionsDisplayScreen::Tick(ScreenContext & ctx)
 	}
 	if(cancelClicked){
 		cancelClicked = false;
-		Config & cfg = Config::GetInstance();
-		cfg.Load();
-		if(ctx.renderdevice) ctx.renderdevice->SetScaleFilter(cfg.scalefilter);
-		if(ctx.window) SDL_SetWindowFullscreen(ctx.window, cfg.fullscreen);
-		ctx.GoToState(GameState::OPTIONS);
-	}
+			Config & cfg = Config::GetInstance();
+			cfg.Load();
+			ctx.SetScaleFilter(cfg.scalefilter);
+			ctx.SetWindowFullscreen(cfg.fullscreen);
+			ctx.GoToState(GameState::OPTIONS);
+		}
 }
 
 void OptionsDisplayScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime, silencer::ui::UiInteractionRegistry& interactions)
