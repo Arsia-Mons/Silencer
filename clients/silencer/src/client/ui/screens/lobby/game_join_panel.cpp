@@ -81,7 +81,7 @@ void GameJoinPanelInit(GameJoinPanelState & state) {
 void GameJoinPanelTick(GameJoinPanelState & state,
                        ScreenContext & ctx,
                        LobbyScreen & owner) {
-	state.readyLabel = ctx.LobbyJoinReadyBlocked(owner) ? "Waiting..." : "Ready";
+	state.readyLabel = ctx.LobbyJoinReadyBlocked() ? "Waiting..." : "Ready";
 
 	state.rosterRows.clear();
 	for(const ScreenContext::LobbyJoinRosterRow & sourceRow : ctx.LobbyJoinRosterRows()){
@@ -103,11 +103,11 @@ void GameJoinPanelTick(GameJoinPanelState & state,
 	}
 	if(state.readyClicked){
 		state.readyClicked = false;
-		ctx.SendLobbyJoinReady(owner);
+		ctx.SendLobbyJoinReady();
 	}
 	if(state.teamClicked){
 		state.teamClicked = false;
-		ctx.ChangeLobbyJoinTeam(owner);
+		ctx.ChangeLobbyJoinTeam();
 	}
 }
 

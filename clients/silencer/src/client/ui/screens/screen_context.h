@@ -23,7 +23,6 @@ class MapDownloader;
 class RenderDevice;
 class Surface;
 class LobbyGame;
-class LobbyScreen;
 struct SDL_Window;
 enum class Action : uint8_t;
 
@@ -248,10 +247,10 @@ public:
 	std::vector<LobbyPresenceRow> LobbyPresenceRows() const;
 	std::vector<LobbyChatMessage> DrainLobbyChatMessages();
 	void SendLobbyChat(const char * message);
-	bool LobbyJoinReadyBlocked(LobbyScreen & owner) const;
+	bool LobbyJoinReadyBlocked();
 	std::vector<LobbyJoinRosterRow> LobbyJoinRosterRows() const;
-	void SendLobbyJoinReady(LobbyScreen & owner);
-	void ChangeLobbyJoinTeam(LobbyScreen & owner);
+	void SendLobbyJoinReady();
+	void ChangeLobbyJoinTeam();
 	void BeginLobbyTechSelection();
 	void BeginCreateGameMapUpload(const std::string & gameName,
 	                              const std::string & mapName,

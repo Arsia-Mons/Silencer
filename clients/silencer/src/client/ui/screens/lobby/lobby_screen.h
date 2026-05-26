@@ -47,12 +47,6 @@ public:
 	// host-side gameinfo seeding. Called from GameCreatePanelTick.
 	void SeedHostGameInfo(class World & world, class LobbyGame & lg);
 
-	// Friend-of-World helpers used by ScreenContext handoffs for the
-	// GameJoin panel.
-	bool JoinPanelReadyBlocked(class World & world) const;
-	void JoinPanelSendReady(class World & world);
-	void JoinPanelChangeTeam(class World & world);
-
 	// Friend-of-World helpers used by the GameTech panel.
 	Uint8 TechPanelLocalPeerId(class World & world) const;
 	class Peer * TechPanelPeer(class World & world, Uint8 peerid) const;

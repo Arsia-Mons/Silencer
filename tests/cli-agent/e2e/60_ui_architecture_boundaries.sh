@@ -295,6 +295,11 @@ fail_if_match \
   --glob '!**/screen_context.cpp'
 
 fail_if_match \
+  '\bLobbyScreen\b|#[[:space:]]*include[[:space:]]*"lobby_screen[.]h"' \
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens/screen_context.cpp" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens/screen_context.h"
+
+fail_if_match \
   '#include[[:space:]]*"updater(stage2)?[.]h"' \
   "$REPO_ROOT/clients/silencer/src/client/ui/screens" \
   "$REPO_ROOT/clients/silencer/src/client/ui/modals" \

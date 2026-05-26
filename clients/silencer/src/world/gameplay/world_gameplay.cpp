@@ -180,6 +180,20 @@ void World::ChangeTeam(void){
 	SendPacket(GetAuthorityPeer(), msg, sizeof(msg));
 }
 
+bool World::IsLocalHostWaitingForMapDownloads(void){
+	if(gameplaystate != World::INLOBBY) return false;
+	Peer * localpeer = peers.peerlist[peers.localpeerid];
+	return localpeer && localpeer->ishost && !AllPeersDownloadedMap();
+}
+
+void World::SendReadyIfAllowed(void){
+	Peer * localpeer = peers.peerlist[peers.localpeerid];
+	bool ishost = localpeer && localpeer->ishost;
+	if(!ishost || AllPeersDownloadedMap()){
+		SendReady();
+	}
+}
+
 void World::SetAgency(Uint8 agency){
 	char msg[2];
 	msg[0] = MSG_SETAGENCY;
@@ -395,4 +409,3 @@ bool World::SecurityIDCanSpawn(Uint8 securityid){
 	}
 	return false;
 }
-

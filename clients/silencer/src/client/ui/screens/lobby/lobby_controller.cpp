@@ -6,7 +6,6 @@
 #include "lobbygame.h"
 #include "serializer.h"
 #include "message_modal.h"
-#include "peer.h"
 
 #include <cstring>
 #include <memory>
@@ -170,27 +169,6 @@ void LobbyScreen::SeedHostGameInfo(World & world, LobbyGame & lg)
 	Serializer data;
 	lg.Serialize(Serializer::WRITE, data);
 	world.gameinfo.Serialize(Serializer::READ, data);
-}
-
-bool LobbyScreen::JoinPanelReadyBlocked(World & world) const
-{
-	if(world.gameplaystate != World::INLOBBY) return false;
-	Peer * localpeer = world.peers.peerlist[world.peers.localpeerid];
-	return localpeer && localpeer->ishost && !world.AllPeersDownloadedMap();
-}
-
-void LobbyScreen::JoinPanelSendReady(World & world)
-{
-	Peer * localpeer = world.peers.peerlist[world.peers.localpeerid];
-	bool ishost = localpeer && localpeer->ishost;
-	if(!ishost || world.AllPeersDownloadedMap()){
-		world.SendReady();
-	}
-}
-
-void LobbyScreen::JoinPanelChangeTeam(World & world)
-{
-	world.ChangeTeam();
 }
 
 Uint8 LobbyScreen::TechPanelLocalPeerId(World & world) const

@@ -7,7 +7,6 @@
 #include "game_state.h"
 #include "gasloader.h"
 #include "keybinds.h"
-#include "lobby_screen.h"
 #include "map_downloader.h"
 #include "renderer.h"
 #include "screen.h"
@@ -653,8 +652,8 @@ void ScreenContext::SendLobbyChat(const char * message) {
 	world.lobby.SendChat(world.lobby.channel, message);
 }
 
-bool ScreenContext::LobbyJoinReadyBlocked(LobbyScreen & owner) const {
-	return owner.JoinPanelReadyBlocked(world);
+bool ScreenContext::LobbyJoinReadyBlocked() {
+	return world.IsLocalHostWaitingForMapDownloads();
 }
 
 std::vector<ScreenContext::LobbyJoinRosterRow>
@@ -689,12 +688,12 @@ ScreenContext::LobbyJoinRosterRows() const {
 	return rows;
 }
 
-void ScreenContext::SendLobbyJoinReady(LobbyScreen & owner) {
-	owner.JoinPanelSendReady(world);
+void ScreenContext::SendLobbyJoinReady() {
+	world.SendReadyIfAllowed();
 }
 
-void ScreenContext::ChangeLobbyJoinTeam(LobbyScreen & owner) {
-	owner.JoinPanelChangeTeam(world);
+void ScreenContext::ChangeLobbyJoinTeam() {
+	world.ChangeTeam();
 }
 
 void ScreenContext::BeginLobbyTechSelection() {

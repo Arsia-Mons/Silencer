@@ -146,6 +146,8 @@ class World {
     Uint16 GetWinningTeamId() const                      { return winningteamid; }
     void   Illuminate();
     void   ChangeTeam();
+    bool   IsLocalHostWaitingForMapDownloads();
+    void   SendReadyIfAllowed();
     void   SetAgency(Uint8 agency);
     void   KillByGovt(Peer & peer);
     void   Explode(Object & object, Uint8 suitcolor, float hitx);
