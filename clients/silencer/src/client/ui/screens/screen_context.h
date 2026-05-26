@@ -127,6 +127,8 @@ public:
 	Uint32 WorldTickCount() const;
 	bool LobbyMusicFadedIn() const;
 	std::string LobbyGameChannelName(LobbyGame & lobbyGame);
+	bool IsServerMapLabel(const std::string & mapLabel) const;
+	std::string FindMapPath(const char * mapName);
 	void PresentUpdate(const std::string & url, const uint8_t sha256[32]);
 	UpdateState CurrentUpdateState();
 	float UpdateProgress();

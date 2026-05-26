@@ -218,6 +218,11 @@ fail_if_match \
   --glob '!**/screen_context.cpp'
 
 fail_if_match \
+  'ctx[[:space:]]*[.][[:space:]]*mapDownloader|#[[:space:]]*include[[:space:]]*[<"]([^>"]*/)?map_downloader[.]h[>"]' \
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens/lobby/game_create_panel_map_form.cpp" \
+  --glob '!**/screen_context.cpp'
+
+fail_if_match \
   '#include[[:space:]]*"updater(stage2)?[.]h"' \
   "$REPO_ROOT/clients/silencer/src/client/ui/screens" \
   "$REPO_ROOT/clients/silencer/src/client/ui/modals" \

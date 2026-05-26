@@ -294,6 +294,14 @@ std::string ScreenContext::LobbyGameChannelName(LobbyGame & lobbyGame) {
 	return name;
 }
 
+bool ScreenContext::IsServerMapLabel(const std::string & mapLabel) const {
+	return mapDownloader.servermaps.count(mapLabel) > 0;
+}
+
+std::string ScreenContext::FindMapPath(const char * mapName) {
+	return mapDownloader.FindMap(mapName);
+}
+
 void ScreenContext::PresentUpdate(const std::string & url, const uint8_t sha256[32]) {
 	updater.PresentUpdate(url, sha256);
 }

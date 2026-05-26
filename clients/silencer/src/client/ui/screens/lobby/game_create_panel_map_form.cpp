@@ -1,7 +1,6 @@
 #include "game_create_panel.h"
 
 #include "screen_context.h"
-#include "map_downloader.h"
 #include "map.h"
 #include "text_wrap.h"
 
@@ -102,7 +101,7 @@ void LoadHoverPreview(GameCreatePanelState & state,
 	}
 
 	const std::string & mapLabel = state.maps[hoveredIndex];
-	if(ctx.mapDownloader.servermaps.count(mapLabel) > 0){
+	if(ctx.IsServerMapLabel(mapLabel)){
 		ResetHoverPreview(state);
 		return;
 	}
@@ -113,7 +112,7 @@ void LoadHoverPreview(GameCreatePanelState & state,
 
 	ResetHoverPreview(state);
 
-	const std::string filename = ctx.mapDownloader.FindMap(mapLabel.c_str());
+	const std::string filename = ctx.FindMapPath(mapLabel.c_str());
 	if(filename.empty()) return;
 
 	SDL_IOStream * file = SDL_IOFromFile(filename.c_str(), "rb");
