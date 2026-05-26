@@ -62,7 +62,7 @@ void LobbyScreen::Build(ScreenContext & ctx)
 	mapName.clear();
 	goBackClicked = false;
 
-	silencer::client_ui::lobby::CharacterPanelInit(characterState);
+	silencer::client_ui::lobby::CharacterPanelInit(characterState, ctx);
 	silencer::client_ui::lobby::ChatPanelInit(chatState);
 	silencer::client_ui::lobby::GameSelectPanelInit(gameSelectState);
 	silencer::client_ui::lobby::GameJoinPanelInit(gameJoinState);

@@ -550,6 +550,43 @@ ScreenContext::CurrentLobbyAgencyLevel() const {
 	return result;
 }
 
+Uint8 ScreenContext::DefaultLobbyAgency() const {
+	return Config::GetInstance().defaultagency;
+}
+
+Uint8 ScreenContext::SelectedLobbyAgency() const {
+	return world.lobby.GetSelectedAgencyOrDefault(DefaultLobbyAgency());
+}
+
+void ScreenContext::SetLobbyAgency(Uint8 agency) {
+	world.SetAgency(agency);
+}
+
+ScreenContext::LobbyCharacterStats
+ScreenContext::LobbyCharacterStatsForAgency(Uint8 agency) const {
+	LobbyCharacterStats result;
+	const Lobby::Character * character = world.lobby.GetSelectedCharacter();
+	result.name = character ? character->name : "No Agent";
+
+	User * user = world.lobby.GetUserInfo(world.lobby.accountid);
+	if(!user || user->retrieving) return result;
+
+	const auto & stats = user->agency[agency];
+	result.statsAvailable = true;
+	result.maxLevel = stats.level >= User::maxlevel;
+	result.wins = stats.wins;
+	result.losses = stats.losses;
+	result.xpToNextLevel = stats.xptonextlevel;
+	result.level = stats.level;
+	result.endurance = stats.endurance;
+	result.shield = stats.shield;
+	result.jetpack = stats.jetpack;
+	result.techslots = stats.techslots;
+	result.hacking = stats.hacking;
+	result.contacts = stats.contacts;
+	return result;
+}
+
 void ScreenContext::BeginLobbyTechSelection() {
 	world.choosingtech = true;
 	world.peers.RequestPeerList();

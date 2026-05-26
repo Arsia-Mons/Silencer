@@ -7,11 +7,7 @@
 #include "primitives/box.h"
 #include "primitives/text.h"
 
-#include "config.h"
-#include "lobby.h"
-#include "resources.h"
-#include "user.h"
-#include "world.h"
+#include "screen_context.h"
 
 #include <algorithm>
 #include <cstring>
@@ -276,29 +272,29 @@ namespace silencer::client_ui::lobby {
         }
     } // namespace character_panel_detail
 
-    void CharacterPanelInit(CharacterPanelState &state) {
-        state.selectedAgency = Config::GetInstance().defaultagency;
+    void CharacterPanelInit(CharacterPanelState &state, ScreenContext &ctx) {
+        state.selectedAgency = ctx.DefaultLobbyAgency();
         state.lastReconciled = -1; // forces first-frame reconcile pass
         state.newCharacterRequested = false;
     }
 
-    void CharacterPanelTick(CharacterPanelState &state, World &world) {
-        state.selectedAgency = world.lobby.GetSelectedAgencyOrDefault(Config::GetInstance().defaultagency);
-        state.agentSelectionLocked = world.IsConnected();
+    void CharacterPanelTick(CharacterPanelState &state, ScreenContext &ctx) {
+        state.selectedAgency = ctx.SelectedLobbyAgency();
+        state.agentSelectionLocked = ctx.LobbyNetworkConnected();
         if (static_cast<int>(state.selectedAgency) != state.lastReconciled) {
             state.lastReconciled = state.selectedAgency;
-            if (world.IsConnected()) {
-                world.SetAgency(state.selectedAgency);
+            if (ctx.LobbyNetworkConnected()) {
+                ctx.SetLobbyAgency(state.selectedAgency);
             }
         }
     }
 
     bool CharacterPanelHandleUiIntent(CharacterPanelState &state,
-                                      World &world,
+                                      ScreenContext &ctx,
                                       const silencer::ui::UiAction &action) {
         if (action.kind != silencer::ui::UiActionKind::Activate) return false;
         if (action.id == character_panel_detail::kActionAgents) {
-            if (world.IsConnected()) return true;
+            if (ctx.LobbyNetworkConnected()) return true;
             state.newCharacterRequested = true;
             return true;
         }
@@ -307,14 +303,14 @@ namespace silencer::client_ui::lobby {
 
     void BuildCharacterPanelTree(CharacterPanelState &state,
                                  Uint16 panelWidth,
-                                 World &world,
-                                 Resources &resources,
+                                 ScreenContext &ctx,
                                  silencer::ui::UiInteractionRegistry &interactions) {
         // Refresh display strings each frame. Clay rebuilds this compact panel
         // from scratch, so the buffers only need to remain stable through the
         // current layout pass.
         const Uint8 a = state.selectedAgency;
-        const Lobby::Character *ch = world.lobby.GetSelectedCharacter();
+        const ScreenContext::LobbyCharacterStats characterStats =
+            ctx.LobbyCharacterStatsForAgency(a);
         const int innerWidth = std::max(1,
                                         static_cast<int>(panelWidth) -
                                         2 * static_cast<int>(character_panel_detail::kPanelPad));
@@ -327,29 +323,28 @@ namespace silencer::client_ui::lobby {
                                               character_panel_detail::kEmblemGap));
         character_panel_detail::g_stats.name =
                 character_panel_detail::FitMiddleEllipsis(
-                    ch ? std::string(ch->name) : std::string("No Agent"),
+                    characterStats.name,
                     TextSize::Heading,
                     detailsWidth);
 
-        User *user = world.lobby.GetUserInfo(world.lobby.accountid);
-        if (user && !user->retrieving) {
-            const auto &stats = user->agency[a];
-            character_panel_detail::g_stats.level = "LV " + std::to_string(stats.level);
-            character_panel_detail::g_stats.wins = std::to_string(stats.wins);
-            character_panel_detail::g_stats.losses = std::to_string(stats.losses);
-            if (stats.level >= User::maxlevel) {
+        if (characterStats.statsAvailable) {
+            character_panel_detail::g_stats.level = "LV " + std::to_string(characterStats.level);
+            character_panel_detail::g_stats.wins = std::to_string(characterStats.wins);
+            character_panel_detail::g_stats.losses = std::to_string(characterStats.losses);
+            if (characterStats.maxLevel) {
                 character_panel_detail::g_stats.xp = "MAX";
             } else {
-                const int nextLevelXp = 100 * (static_cast<int>(stats.level) + 1);
+                const int nextLevelXp = 100 * (static_cast<int>(characterStats.level) + 1);
                 character_panel_detail::g_stats.xp =
-                        std::to_string(stats.xptonextlevel) + "/" + std::to_string(nextLevelXp);
+                        std::to_string(characterStats.xpToNextLevel) + "/" +
+                        std::to_string(nextLevelXp);
             }
-            character_panel_detail::g_stats.endurance = std::to_string(stats.endurance);
-            character_panel_detail::g_stats.shield = std::to_string(stats.shield);
-            character_panel_detail::g_stats.jetpack = std::to_string(stats.jetpack);
-            character_panel_detail::g_stats.techslots = std::to_string(stats.techslots);
-            character_panel_detail::g_stats.hacking = std::to_string(stats.hacking);
-            character_panel_detail::g_stats.contacts = std::to_string(stats.contacts);
+            character_panel_detail::g_stats.endurance = std::to_string(characterStats.endurance);
+            character_panel_detail::g_stats.shield = std::to_string(characterStats.shield);
+            character_panel_detail::g_stats.jetpack = std::to_string(characterStats.jetpack);
+            character_panel_detail::g_stats.techslots = std::to_string(characterStats.techslots);
+            character_panel_detail::g_stats.hacking = std::to_string(characterStats.hacking);
+            character_panel_detail::g_stats.contacts = std::to_string(characterStats.contacts);
         } else {
             character_panel_detail::g_stats.level = "LV 0";
             character_panel_detail::g_stats.wins = "0";

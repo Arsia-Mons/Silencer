@@ -51,7 +51,7 @@ void LobbyScreen::Tick(ScreenContext & ctx)
 		if(ctx.GoBack()) return;
 	}
 
-	silencer::client_ui::lobby::CharacterPanelTick(characterState, ctx.world);
+	silencer::client_ui::lobby::CharacterPanelTick(characterState, ctx);
 	if(characterState.newCharacterRequested){
 		characterState.newCharacterRequested = false;
 		ctx.GoToState(GameState::CREATECHARACTER);
@@ -142,7 +142,7 @@ bool LobbyScreen::HandleUiIntent(ScreenContext & ctx, const silencer::ui::UiActi
 		goBackClicked = true;
 		return true;
 	}
-	if(silencer::client_ui::lobby::CharacterPanelHandleUiIntent(characterState, ctx.world, action)){
+	if(silencer::client_ui::lobby::CharacterPanelHandleUiIntent(characterState, ctx, action)){
 		return true;
 	}
 	if(silencer::client_ui::lobby::ChatPanelHandleUiIntent(chatState, ctx.world, action)){
