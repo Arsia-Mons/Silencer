@@ -3,12 +3,11 @@
 
 #include <SDL3/SDL_stdinc.h>
 #include <SDL3/SDL_gamepad.h>
+#include <SDL3/SDL_scancode.h>
 #include <cstdint>
 #include <functional>
 #include <memory>
 #include <string>
-
-#include "keybinds.h"
 
 class World;
 class Renderer;
@@ -24,6 +23,11 @@ class RenderDevice;
 class Surface;
 class LobbyGame;
 struct SDL_Window;
+enum class Action : uint8_t;
+
+namespace silencer::ui {
+struct UiBindingInput;
+}
 
 // Bag of refs that screens use to reach transitional global subsystems
 // (World, Lobby, AmbienceMixer, MapDownloader) plus narrow handoffs for Game,
@@ -103,7 +107,7 @@ public:
 	                           SDL_Scancode key2,
 	                           bool and_);
 	std::string KeyBindingSlotLabel(Action action, int slot) const;
-	void SetCapturedBinding(Action action, int slot, const BindingKey & binding);
+	bool SetCapturedBinding(Action action, int slot, const silencer::ui::UiBindingInput & input);
 
 	// Switch the renderer's active palette and clear the framebuffer. Called
 	// from Screen::Build by every menu surface that owns its presentation.

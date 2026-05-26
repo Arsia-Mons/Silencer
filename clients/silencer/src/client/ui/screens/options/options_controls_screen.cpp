@@ -110,9 +110,9 @@ void OptionsControlsScreen::Tick(ScreenContext & ctx) {
 	}
 	if(operatorClickedRow >= 0 && operatorClickedRow < (int)Action::Count){
 		Action a = ACTION_TABLE[operatorClickedRow].action;
-		LegacyBindingView v = ViewLegacy(ctx, a);
+		ScreenContext::LegacyKeyBindingSlots v = ctx.LegacyKeyBinding(a);
 		v.and_ = !v.and_;
-		WriteLegacy(ctx, a, v.key1, v.key2, v.and_);
+		ctx.WriteLegacyKeyBinding(a, v.key1, v.key2, v.and_);
 		operatorClickedRow = -1;
 	}
 	if(rebindRow >= 0){
@@ -264,11 +264,11 @@ void OptionsControlsScreen::BuildUi(ScreenContext & ctx, Surface & dst, float fr
 		int row = scrollPosition + i;
 		if(row >= (int)Action::Count) break;
 		Action action = ACTION_TABLE[row].action;
-		LegacyBindingView v = ViewLegacy(ctx, action);
+		ScreenContext::LegacyKeyBindingSlots v = ctx.LegacyKeyBinding(action);
 		KeybindRowView & out = keybindListView_.rows[i];
 		out.actionLabel = std::string(GetActionInfo(action).label) + ":";
-		out.primaryLabel = GetBindingLabel(ctx, action, 0);
-		out.secondaryLabel = GetBindingLabel(ctx, action, 1);
+		out.primaryLabel = ctx.KeyBindingSlotLabel(action, 0);
+		out.secondaryLabel = ctx.KeyBindingSlotLabel(action, 1);
 		out.operatorLabel = v.and_ ? "AND" : "OR";
 		out.rebindingPrimary = (rebindRow == row && rebindSlot == 0);
 		out.rebindingSecondary = (rebindRow == row && rebindSlot == 1);

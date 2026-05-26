@@ -2,6 +2,7 @@
 
 #include "config.h"
 #include "game.h"
+#include "keybinds.h"
 #include "renderer.h"
 #include "screen.h"
 #include "modal.h"
@@ -11,6 +12,7 @@
 #include "lobby.h"
 #include "lobbygame.h"
 #include "renderdevice.h"
+#include "runtime/UiActionQueue.h"
 #include "updater.h"
 #include "updaterstage2.h"
 
@@ -205,7 +207,20 @@ std::string ScreenContext::KeyBindingSlotLabel(Action action, int slot) const {
 	return KeyMap::GetKeyName(SDL_SCANCODE_UNKNOWN);
 }
 
-void ScreenContext::SetCapturedBinding(Action action, int slot, const BindingKey & bindingKey) {
+bool ScreenContext::SetCapturedBinding(Action action, int slot, const silencer::ui::UiBindingInput & input) {
+	BindingKey bindingKey{};
+	if(input.kind == silencer::ui::UiBindingInputKind::GamepadButtonDown){
+		bindingKey.device = BindingDevice::GamepadButton;
+		bindingKey.code = input.code;
+		bindingKey.axisDir = 0;
+	}else if(input.kind == silencer::ui::UiBindingInputKind::GamepadAxisMoved){
+		bindingKey.device = BindingDevice::GamepadAxis;
+		bindingKey.code = input.code;
+		bindingKey.axisDir = static_cast<int8_t>(input.axisDir < 0 ? -1 : 1);
+	}else{
+		return false;
+	}
+
 	ForkActiveProfileIfBuiltin(keymap);
 	auto & ab = keymap.Get(action);
 	Binding binding;
@@ -218,6 +233,7 @@ void ScreenContext::SetCapturedBinding(Action action, int slot, const BindingKey
 		if(ab.bindings.size() < 2) ab.bindings.push_back(binding);
 		else ab.bindings[1] = binding;
 	}
+	return true;
 }
 
 void ScreenContext::ResetPresentation(int paletteIdx) {
