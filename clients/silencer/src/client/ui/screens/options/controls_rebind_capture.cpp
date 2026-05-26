@@ -7,35 +7,32 @@
 
 namespace silencer::client_ui::options {
 
-void FinishKeyboardRebind(ScreenContext & ctx,
-                          int & rebindRow, int & rebindSlot,
-                          SDL_Scancode sym) {
-	if(rebindRow < 0 || rebindRow >= (int)Action::Count) return;
+bool ApplyKeyboardRebind(ScreenContext & ctx,
+                         int row, int slot,
+                         SDL_Scancode sym) {
+	if(row < 0 || row >= (int)Action::Count) return false;
 #ifndef OUYA
 	if(sym == SDL_SCANCODE_ESCAPE) sym = SDL_SCANCODE_UNKNOWN;
 #endif
-	Action a = ACTION_TABLE[rebindRow].action;
+	Action a = ACTION_TABLE[row].action;
 	ScreenContext::LegacyKeyBindingSlots v = ctx.LegacyKeyBinding(a);
-	if(rebindSlot == 0) v.key1 = sym; else v.key2 = sym;
+	if(slot == 0) v.key1 = sym; else v.key2 = sym;
 	ctx.WriteLegacyKeyBinding(a, v.key1, v.key2, v.and_);
-	rebindRow = -1;
-	rebindSlot = -1;
+	return true;
 }
 
-void FinishBindingRebind(ScreenContext & ctx,
-                         int & rebindRow, int & rebindSlot,
-                         const silencer::ui::UiBindingInput & input) {
-	if(rebindRow < 0 || rebindRow >= (int)Action::Count) return;
+bool ApplyBindingRebind(ScreenContext & ctx,
+                        int row, int slot,
+                        const silencer::ui::UiBindingInput & input) {
+	if(row < 0 || row >= (int)Action::Count) return false;
 
 	if(input.kind == silencer::ui::UiBindingInputKind::KeyboardKeyDown){
-		FinishKeyboardRebind(ctx, rebindRow, rebindSlot,
-		                     static_cast<SDL_Scancode>(input.code));
-		return;
+		return ApplyKeyboardRebind(ctx, row, slot,
+		                           static_cast<SDL_Scancode>(input.code));
 	}
 
-	if(!ctx.SetCapturedBinding(ACTION_TABLE[rebindRow].action, rebindSlot, input)) return;
-	rebindRow = -1;
-	rebindSlot = -1;
+	if(!ctx.SetCapturedBinding(ACTION_TABLE[row].action, slot, input)) return false;
+	return true;
 }
 
 }  // namespace silencer::client_ui::options

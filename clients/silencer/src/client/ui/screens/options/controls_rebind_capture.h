@@ -13,14 +13,14 @@ class ScreenContext;
 
 namespace silencer::client_ui::options {
 
-// Capture sinks. Both consume the row/slot in-flight and reset the caller's
-// rebind state to (-1, -1) on success.
-void FinishKeyboardRebind(ScreenContext & ctx,
-                          int & rebindRow, int & rebindSlot,
-                          SDL_Scancode sym);
-void FinishBindingRebind(ScreenContext & ctx,
-                         int & rebindRow, int & rebindSlot,
-                         const silencer::ui::UiBindingInput & input);
+// Capture sinks. The caller owns in-flight row/slot state and decides when to
+// clear it; these helpers only apply a validated row/slot to ScreenContext.
+bool ApplyKeyboardRebind(ScreenContext & ctx,
+                         int row, int slot,
+                         SDL_Scancode sym);
+bool ApplyBindingRebind(ScreenContext & ctx,
+                        int row, int slot,
+                        const silencer::ui::UiBindingInput & input);
 
 }  // namespace silencer::client_ui::options
 

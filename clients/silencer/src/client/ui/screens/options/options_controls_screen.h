@@ -25,6 +25,9 @@ private:
 	// The screen owns only the in-flight row/slot state. Binding labels and
 	// writes are requested through ScreenContext.
 	void BeginRebindFromVisibleRow(int row, int slot);
+	void ClearRebind();
+	bool QueueKeyboardRebind(int row, int slot, SDL_Scancode sym);
+	bool QueueBindingRebind(int row, int slot, const silencer::ui::UiBindingInput & input);
 	void InvokeOperatorForVisibleRow(int row);
 	int MaxScroll() const;
 
@@ -35,6 +38,8 @@ private:
 	std::function<void()> cyclePreset;
 	std::function<void()> save;
 	std::function<void()> cancel;
+	std::function<void(int, int, SDL_Scancode)> applyKeyboardRebind;
+	std::function<void(int, int, silencer::ui::UiBindingInput)> applyBindingRebind;
 	int scrollDelta = 0;
 	std::vector<std::function<void()>> toggleOperatorActions_;
 	int visibleRowCapacity_ = silencer::client_ui::options::kKeybindListMinVisibleRows;

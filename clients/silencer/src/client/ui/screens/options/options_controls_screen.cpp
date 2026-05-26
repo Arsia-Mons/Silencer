@@ -81,6 +81,22 @@ void Invoke(const std::function<void()> & action)
 	if(action) action();
 }
 
+bool ValidRebindRow(int row)
+{
+	return row >= 0 && row < static_cast<int>(Action::Count);
+}
+
+bool SupportedBindingInput(const silencer::ui::UiBindingInput & input)
+{
+	switch(input.kind){
+		case silencer::ui::UiBindingInputKind::KeyboardKeyDown:
+		case silencer::ui::UiBindingInputKind::GamepadButtonDown:
+		case silencer::ui::UiBindingInputKind::GamepadAxisMoved:
+			return true;
+	}
+	return false;
+}
+
 }  // namespace options_controls_screen_detail
 
 int OptionsControlsScreen::MaxScroll() const {
@@ -91,11 +107,12 @@ int OptionsControlsScreen::MaxScroll() const {
 void OptionsControlsScreen::Build(ScreenContext & ctx) {
 	ctx.ResetMenuPresentation(1);
 	scrollPosition = 0;
-	rebindRow = -1;
-	rebindSlot = -1;
+	ClearRebind();
 	cyclePreset = {};
 	save = {};
 	cancel = {};
+	applyKeyboardRebind = {};
+	applyBindingRebind = {};
 	scrollDelta = 0;
 	toggleOperatorActions_.clear();
 }
@@ -105,6 +122,28 @@ void OptionsControlsScreen::BeginRebindFromVisibleRow(int row, int slot) {
 	if(absolute < 0 || absolute >= (int)Action::Count) return;
 	rebindRow = absolute;
 	rebindSlot = slot;
+}
+
+void OptionsControlsScreen::ClearRebind() {
+	rebindRow = -1;
+	rebindSlot = -1;
+	optionscontrolstick = 0;
+}
+
+bool OptionsControlsScreen::QueueKeyboardRebind(int row, int slot, SDL_Scancode sym) {
+	if(!options_controls_screen_detail::ValidRebindRow(row) || !applyKeyboardRebind) return false;
+	applyKeyboardRebind(row, slot, sym);
+	return true;
+}
+
+bool OptionsControlsScreen::QueueBindingRebind(int row, int slot, const silencer::ui::UiBindingInput & input) {
+	if(!options_controls_screen_detail::ValidRebindRow(row) ||
+	   !options_controls_screen_detail::SupportedBindingInput(input) ||
+	   !applyBindingRebind) {
+		return false;
+	}
+	applyBindingRebind(row, slot, input);
+	return true;
 }
 
 void OptionsControlsScreen::InvokeOperatorForVisibleRow(int row) {
@@ -126,7 +165,9 @@ void OptionsControlsScreen::Tick(ScreenContext & ctx) {
 		}
 		if(rebindRow >= 0 &&
 		   tickCount - optionscontrolstick > options_controls_screen_detail::REBIND_TIMEOUT_TICKS){
-			FinishKeyboardRebind(ctx, rebindRow, rebindSlot, SDL_SCANCODE_UNKNOWN);
+			if(QueueKeyboardRebind(rebindRow, rebindSlot, SDL_SCANCODE_UNKNOWN)){
+				ClearRebind();
+			}
 		}
 	}else{
 		optionscontrolstick = 0;
@@ -134,11 +175,16 @@ void OptionsControlsScreen::Tick(ScreenContext & ctx) {
 }
 
 bool OptionsControlsScreen::HandleUiIntent(ScreenContext & ctx, const silencer::ui::UiAction & action) {
+	(void)ctx;
 	using namespace silencer::client_ui::options;
 
 	if(action.kind == silencer::ui::UiActionKind::CaptureBinding){
 		if(rebindRow < 0) return false;
-		FinishBindingRebind(ctx, rebindRow, rebindSlot, action.binding);
+		const int row = rebindRow;
+		const int slot = rebindSlot;
+		if(QueueBindingRebind(row, slot, action.binding)){
+			ClearRebind();
+		}
 		return true;
 	}
 	if(action.kind == silencer::ui::UiActionKind::Cancel){
@@ -202,6 +248,21 @@ void OptionsControlsScreen::BuildUi(ScreenContext & ctx, Surface & dst, float fr
 		Config::GetInstance().Load();
 		ctx.GoToState(GameState::OPTIONS);
 	});
+	auto queueWrite = silencer::client_ui::UseUiWriteQueue();
+	applyKeyboardRebind = {};
+	applyBindingRebind = {};
+	if(queueWrite){
+		applyKeyboardRebind = [queueWrite, &ctx](int row, int slot, SDL_Scancode sym) {
+			queueWrite([&ctx, row, slot, sym]() {
+				ApplyKeyboardRebind(ctx, row, slot, sym);
+			});
+		};
+		applyBindingRebind = [queueWrite, &ctx](int row, int slot, silencer::ui::UiBindingInput input) {
+			queueWrite([&ctx, row, slot, input]() {
+				ApplyBindingRebind(ctx, row, slot, input);
+			});
+		};
+	}
 
 	const silencer::ui::UiInputState & input =
 		silencer::game_ui::RequireGameUiFrame().input;
@@ -323,5 +384,7 @@ void OptionsControlsScreen::Destroy(ScreenContext & ctx) {
 	cyclePreset = {};
 	save = {};
 	cancel = {};
+	applyKeyboardRebind = {};
+	applyBindingRebind = {};
 	toggleOperatorActions_.clear();
 }

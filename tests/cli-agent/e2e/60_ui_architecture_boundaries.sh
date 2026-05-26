@@ -229,6 +229,10 @@ fail_if_match \
   "$REPO_ROOT/clients/silencer/src/client/ui/screens/options/options_controls_screen.h"
 
 fail_if_match \
+  '\b(FinishKeyboardRebind|FinishBindingRebind)\b' \
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens/options"
+
+fail_if_match \
   'ctx[.]world|#include[[:space:]]*[<"]([^>"]*/)?(world|resources)[.]h[>"]' \
   "$REPO_ROOT/clients/silencer/src/client/ui/screens/main_menu" \
   --glob '!**/screen_context.cpp'
