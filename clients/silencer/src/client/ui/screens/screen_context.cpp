@@ -4,6 +4,7 @@
 #include "audio.h"
 #include "config.h"
 #include "game.h"
+#include "game_state.h"
 #include "gasloader.h"
 #include "keybinds.h"
 #include "map_downloader.h"
@@ -89,6 +90,24 @@ void ScreenContext::RequestQuit() { game.quitRequested = true; }
 void ScreenContext::LeaveJoinedGame() { game.LeaveJoinedGame(); }
 bool ScreenContext::IsJoiningGame() const { return game.joininggame; }
 void ScreenContext::SetJoiningGame(bool joining) { game.joininggame = joining; }
+ScreenContext::JoiningGameResult ScreenContext::ConsumeJoiningGameResult() {
+	if(!game.joininggame) return JoiningGameResult::Pending;
+	if(world.IsConnected()){
+		game.joininggame = false;
+		return JoiningGameResult::Connected;
+	}
+	if(world.IsIdle()){
+		game.joininggame = false;
+		return JoiningGameResult::Failed;
+	}
+	return JoiningGameResult::Pending;
+}
+bool ScreenContext::HandleLobbyDisconnect() {
+	if(world.lobby.state != Lobby::DISCONNECTED) return false;
+	world.Disconnect();
+	game.GoToState(GameState::LOBBYCONNECT);
+	return true;
+}
 bool ScreenContext::IsCreateGamePending() const { return game.creategameclicked; }
 void ScreenContext::SetCreateGamePending(bool pending) { game.creategameclicked = pending; }
 void ScreenContext::StartCreateGameRequest() {
@@ -407,6 +426,11 @@ bool ScreenContext::CreateGameMapUploadIdle() const {
 	return mapDownloader.mapUploadState.load(std::memory_order_relaxed) == 0;
 }
 
+bool ScreenContext::ShouldDismissCreateGameProgress() const {
+	return world.lobby.creategamestatus != 100 && CreateGameMapUploadIdle() &&
+	       (world.IsConnected() || world.IsIdle());
+}
+
 void ScreenContext::BeginCreateGameMapUpload(const std::string & gameName,
                                              const std::string & mapName,
                                              const std::string & password,
@@ -461,6 +485,14 @@ void ScreenContext::ResetJoinMapDownload() {
 
 void ScreenContext::PumpMapDownload() {
 	mapDownloader.ProcessMapDownload();
+}
+
+bool ScreenContext::LobbyNetworkConnected() const {
+	return world.IsConnected();
+}
+
+bool ScreenContext::JoinedGameDisconnected() const {
+	return !world.IsConnected();
 }
 
 void ScreenContext::PresentUpdate(const std::string & url, const uint8_t sha256[32]) {

@@ -66,6 +66,11 @@ public:
 		Created,
 		Failed
 	};
+	enum class JoiningGameResult {
+		Pending,
+		Connected,
+		Failed
+	};
 	struct LegacyKeyBindingSlots {
 		SDL_Scancode key1 = SDL_SCANCODE_UNKNOWN;
 		SDL_Scancode key2 = SDL_SCANCODE_UNKNOWN;
@@ -105,6 +110,8 @@ public:
 	void LeaveJoinedGame();
 	bool IsJoiningGame() const;
 	void SetJoiningGame(bool joining);
+	JoiningGameResult ConsumeJoiningGameResult();
+	bool HandleLobbyDisconnect();
 	bool IsCreateGamePending() const;
 	void SetCreateGamePending(bool pending);
 	void StartCreateGameRequest();
@@ -152,6 +159,7 @@ public:
 	CreateGameMapUploadResult ConsumeCreateGameMapUploadResult();
 	std::string CreateGameProgressText() const;
 	bool CreateGameMapUploadIdle() const;
+	bool ShouldDismissCreateGameProgress() const;
 	void BeginCreateGameMapUpload(const std::string & gameName,
 	                              const std::string & mapName,
 	                              const std::string & password,
@@ -163,6 +171,8 @@ public:
 	bool spectatable);
 	void ResetJoinMapDownload();
 	void PumpMapDownload();
+	bool LobbyNetworkConnected() const;
+	bool JoinedGameDisconnected() const;
 	void PresentUpdate(const std::string & url, const uint8_t sha256[32]);
 	UpdateState CurrentUpdateState();
 	float UpdateProgress();

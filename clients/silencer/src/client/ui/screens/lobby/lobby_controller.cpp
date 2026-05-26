@@ -3,7 +3,6 @@
 #include "screen_context.h"
 #include "game_state.h"
 #include "world.h"
-#include "lobby.h"
 #include "lobbygame.h"
 #include "serializer.h"
 #include "config.h"
@@ -41,14 +40,10 @@ void DismissProgressModal(ScreenContext & ctx)
 
 void LobbyScreen::Tick(ScreenContext & ctx)
 {
-	World & world = ctx.world;
-
 	// Lobby disconnect → bounce back to the connect screen.
-	if(world.lobby.state == Lobby::DISCONNECTED){
-		world.Disconnect();
-		ctx.GoToState(GameState::LOBBYCONNECT);
-		return;
-	}
+	if(ctx.HandleLobbyDisconnect()) return;
+
+	World & world = ctx.world;
 
 	// Chrome Go Back — flag was set by a typed button intent on the previous
 	// frame. Consume it before pumping anything else.
@@ -86,26 +81,21 @@ void LobbyScreen::Tick(ScreenContext & ctx)
 	// progress-modal spinner update, auto-dismiss, CONNECTED→GameJoin
 	// transition.
 	if(!gameJoinActive && !gameTechActive){
-		if(ctx.IsJoiningGame()){
-			if(world.network.state == World::CONNECTED){
-				ctx.SetJoiningGame(false);
-			}
-			if(world.network.state == World::IDLE){
-				ctx.SetJoiningGame(false);
-				lobby_controller_detail::DismissProgressModal(ctx);
-				ctx.ShowMessage("Unable to join game");
-			}
+		ScreenContext::JoiningGameResult joiningGameResult =
+			ctx.ConsumeJoiningGameResult();
+		if(joiningGameResult == ScreenContext::JoiningGameResult::Failed){
+			lobby_controller_detail::DismissProgressModal(ctx);
+			ctx.ShowMessage("Unable to join game");
 		}
 		if(MessageModal * progress = lobby_controller_detail::TopAsProgressModal(ctx)){
 			progress->SetText(ctx, ctx.CreateGameProgressText());
 		}
-		if(lobby_controller_detail::TopAsProgressModal(ctx) && world.lobby.creategamestatus != 100 &&
-		   ctx.CreateGameMapUploadIdle() &&
-		   (world.network.state == World::CONNECTED || world.network.state == World::IDLE)){
+		if(lobby_controller_detail::TopAsProgressModal(ctx) &&
+		   ctx.ShouldDismissCreateGameProgress()){
 			ctx.PopScreen();
 			ctx.SetCreateGamePending(false);
 		}
-		if(world.network.state == World::CONNECTED){
+		if(ctx.LobbyNetworkConnected()){
 			Peer * peer = world.peers.peerlist[world.peers.localpeerid];
 			if(peer){
 				ctx.ResetJoinMapDownload();
@@ -128,7 +118,7 @@ void LobbyScreen::Tick(ScreenContext & ctx)
 	// Disconnect-from-game modal — fires on the joined-game surface
 	// (gameJoinActive || gameTechActive) when the world drops out of
 	// CONNECTED.
-	if(world.network.state != World::CONNECTED && !lobby_controller_detail::TopIsModal(ctx)){
+	if(ctx.JoinedGameDisconnected() && !lobby_controller_detail::TopIsModal(ctx)){
 		if(gameJoinActive || gameTechActive){
 			ctx.ShowMessage("Disconnected from game", [&ctx]() { ctx.GoBack(); });
 		}
