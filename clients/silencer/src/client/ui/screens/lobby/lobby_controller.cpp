@@ -1,7 +1,6 @@
 #include "lobby_screen.h"
 
 #include "screen_context.h"
-#include "game.h"
 #include "game_state.h"
 #include "world.h"
 #include "lobby.h"
@@ -45,7 +44,6 @@ void DismissProgressModal(ScreenContext & ctx)
 void LobbyScreen::Tick(ScreenContext & ctx)
 {
 	World & world = ctx.world;
-	Game & game = ctx.game;
 
 	// Lobby disconnect → bounce back to the connect screen.
 	if(world.lobby.state == Lobby::DISCONNECTED){
@@ -58,7 +56,7 @@ void LobbyScreen::Tick(ScreenContext & ctx)
 	// frame. Consume it before pumping anything else.
 	if(goBackClicked){
 		goBackClicked = false;
-		if(game.GoBack()) return;
+		if(ctx.GoBack()) return;
 	}
 
 	silencer::client_ui::lobby::CharacterPanelTick(characterState, ctx.world);
@@ -92,12 +90,12 @@ void LobbyScreen::Tick(ScreenContext & ctx)
 	// progress-modal spinner update, auto-dismiss, CONNECTED→GameJoin
 	// transition.
 	if(!gameJoinActive && !gameTechActive){
-		if(game.joininggame){
+		if(ctx.IsJoiningGame()){
 			if(world.network.state == World::CONNECTED){
-				game.joininggame = false;
+				ctx.SetJoiningGame(false);
 			}
 			if(world.network.state == World::IDLE){
-				game.joininggame = false;
+				ctx.SetJoiningGame(false);
 				lobby_controller_detail::DismissProgressModal(ctx);
 				ctx.ShowMessage("Unable to join game");
 			}
@@ -114,7 +112,7 @@ void LobbyScreen::Tick(ScreenContext & ctx)
 		   mapDownloader.mapUploadState.load(std::memory_order_relaxed) == 0 &&
 		   (world.network.state == World::CONNECTED || world.network.state == World::IDLE)){
 			ctx.PopScreen();
-			game.creategameclicked = false;
+			ctx.SetCreateGamePending(false);
 		}
 		if(world.network.state == World::CONNECTED){
 			Peer * peer = world.peers.peerlist[world.peers.localpeerid];
@@ -126,7 +124,7 @@ void LobbyScreen::Tick(ScreenContext & ctx)
 				const Uint8 agency = world.lobby.GetSelectedAgencyOrDefault(Config::GetInstance().defaultagency);
 				world.SetTech(Config::GetInstance().defaulttechchoices[agency]);
 				ShowGameJoin(ctx);
-				LobbyGame * lobbygame = world.lobby.GetGameById(game.currentlobbygameid);
+				LobbyGame * lobbygame = ctx.CurrentLobbyGame();
 				if(lobbygame){
 					char temp[256];
 					ctx.ambienceMixer.GetGameChannelName(*lobbygame, temp);
@@ -145,8 +143,7 @@ void LobbyScreen::Tick(ScreenContext & ctx)
 	// CONNECTED.
 	if(world.network.state != World::CONNECTED && !lobby_controller_detail::TopIsModal(ctx)){
 		if(gameJoinActive || gameTechActive){
-			Game * gamePtr = &game;
-			ctx.ShowMessage("Disconnected from game", [gamePtr]() { gamePtr->GoBack(); });
+			ctx.ShowMessage("Disconnected from game", [&ctx]() { ctx.GoBack(); });
 		}
 	}
 }

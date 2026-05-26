@@ -112,6 +112,10 @@ fail_if_match \
   --glob '!**/screen_context.cpp'
 
 fail_if_match \
+  'ctx[.]game' \
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens/lobby"
+
+fail_if_match \
   'nlohmann::json[[:space:]]+(Game::)?GetWorldSummary|nlohmann::json[[:space:]]+(InGameUiController::)?ConfigureForControl' \
   "$REPO_ROOT/clients/silencer/src" \
   --glob '!third_party/**'

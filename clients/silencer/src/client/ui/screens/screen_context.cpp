@@ -7,6 +7,7 @@
 #include "message_modal.h"
 #include "surface.h"
 #include "runtime/UiInteractionRegistry.h"
+#include "lobby.h"
 
 #include <cassert>
 
@@ -34,9 +35,17 @@ ScreenContext::ScreenContext(Game & game_,
 }
 
 void ScreenContext::GoToState(Uint8 newState) { game.GoToState(newState); }
-void ScreenContext::GoBack() { game.GoBack(); }
+bool ScreenContext::GoBack() { return game.GoBack(); }
 void ScreenContext::RequestQuit() { game.quitRequested = true; }
 void ScreenContext::LeaveJoinedGame() { game.LeaveJoinedGame(); }
+bool ScreenContext::IsJoiningGame() const { return game.joininggame; }
+void ScreenContext::SetJoiningGame(bool joining) { game.joininggame = joining; }
+bool ScreenContext::IsCreateGamePending() const { return game.creategameclicked; }
+void ScreenContext::SetCreateGamePending(bool pending) { game.creategameclicked = pending; }
+void ScreenContext::SetCurrentLobbyGameId(Uint32 gameId) { game.currentlobbygameid = gameId; }
+LobbyGame * ScreenContext::CurrentLobbyGame() const { return world.lobby.GetGameById(game.currentlobbygameid); }
+void ScreenContext::JoinGame(LobbyGame & lobbyGame, char * password) { game.JoinGame(lobbyGame, password); }
+void ScreenContext::SpectateGame(LobbyGame & lobbyGame, char * password) { game.SpectateGame(lobbyGame, password); }
 bool ScreenContext::PushScreen(std::unique_ptr<Screen> s) { return game.PushScreen(std::move(s)); }
 bool ScreenContext::PopScreen() { return game.PopScreen(); }
 bool ScreenContext::ReplaceScreen(std::unique_ptr<Screen> s) { return game.ReplaceScreen(std::move(s)); }

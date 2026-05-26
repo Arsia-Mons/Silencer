@@ -2,7 +2,6 @@
 
 #include "lobby_screen.h"
 #include "screen_context.h"
-#include "game.h"
 #include "world.h"
 #include "lobby.h"
 #include "lobbygame.h"
@@ -84,7 +83,7 @@ void GameCreatePanelInit(GameCreatePanelState & state, ScreenContext & ctx) {
 	state.name[sizeof(state.name) - 1] = '\0';
 	game_create_panel_detail::BuildMapList(state, ctx);
 	ctx.mapDownloader.selectedmap = -1;
-	ctx.game.creategameclicked = false;
+	ctx.SetCreateGamePending(false);
 }
 
 void GameCreatePanelTick(GameCreatePanelState & state,
@@ -92,7 +91,6 @@ void GameCreatePanelTick(GameCreatePanelState & state,
                          ScreenContext & ctx,
                          LobbyScreen & owner) {
 	MapDownloader & mapDownloader = ctx.mapDownloader;
-	Game & game = ctx.game;
 
 	if(state.mapRowClickedIndex >= 0){
 		state.mapSelectedIndex = state.mapRowClickedIndex;
@@ -127,25 +125,25 @@ void GameCreatePanelTick(GameCreatePanelState & state,
 			mapDownloader.pendingCreate.spectatable);
 	}else if(us == 3){
 		mapDownloader.mapUploadState.store(0, std::memory_order_relaxed);
-		game.creategameclicked = false;
+		ctx.SetCreateGamePending(false);
 		Screen * top = ctx.TopScreen();
 		MessageModal * m = dynamic_cast<MessageModal *>(top);
 		if(m && m->IsProgress()) ctx.PopScreen();
 		ctx.ShowMessage("Could not upload map");
 	}
-	if(world.lobby.creategamestatus == 1 && game.creategameclicked){
+	if(world.lobby.creategamestatus == 1 && ctx.IsCreateGamePending()){
 		world.lobby.creategamestatus = 0;
-		game.creategameclicked = false;
+		ctx.SetCreateGamePending(false);
 		LobbyGame * lobbygame = world.lobby.GetGameById(world.lobby.createdgameid);
 		if(lobbygame){
 			owner.SeedHostGameInfo(world, *lobbygame);
-			game.JoinGame(*lobbygame, lobbygame->password);
+			ctx.JoinGame(*lobbygame, lobbygame->password);
 			mapDownloader.LoadMapData(mapDownloader.FindMap(lobbygame->mapname, &lobbygame->maphash).c_str());
-			game.currentlobbygameid = lobbygame->id;
+			ctx.SetCurrentLobbyGameId(lobbygame->id);
 		}
-	}else if(world.lobby.creategamestatus != 100 && world.lobby.creategamestatus != 0 && game.creategameclicked){
+	}else if(world.lobby.creategamestatus != 100 && world.lobby.creategamestatus != 0 && ctx.IsCreateGamePending()){
 		world.lobby.creategamestatus = 0;
-		game.creategameclicked = false;
+		ctx.SetCreateGamePending(false);
 		Screen * top = ctx.TopScreen();
 		MessageModal * m = dynamic_cast<MessageModal *>(top);
 		if(m && m->IsProgress()) ctx.PopScreen();
@@ -154,7 +152,7 @@ void GameCreatePanelTick(GameCreatePanelState & state,
 
 	if(!state.createClicked) return;
 	state.createClicked = false;
-	if(game.creategameclicked) return;
+	if(ctx.IsCreateGamePending()) return;
 
 	if(strlen(state.name) == 0){ ctx.ShowMessage("No game name"); return; }
 	if(state.mapSelectedIndex < 0 || state.mapSelectedIndex >= (int)state.maps.size()){
@@ -207,7 +205,7 @@ void GameCreatePanelTick(GameCreatePanelState & state,
 		});
 	}
 	world.lobby.creategamestatus = 0;
-	game.creategameclicked = true;
+	ctx.SetCreateGamePending(true);
 	std::strncpy(Config::GetInstance().defaultgamename, state.name, sizeof(Config::GetInstance().defaultgamename) - 1);
 	Config::GetInstance().defaultgamename[sizeof(Config::GetInstance().defaultgamename) - 1] = '\0';
 	Config::GetInstance().Save();

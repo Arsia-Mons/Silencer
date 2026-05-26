@@ -17,6 +17,7 @@ class AmbienceMixer;
 class MapDownloader;
 class RenderDevice;
 class Surface;
+class LobbyGame;
 struct SDL_Window;
 
 // Bag of refs that screens use to reach the global subsystems (World,
@@ -53,13 +54,21 @@ public:
 	SDL_Window * & window;
 	RenderDevice * & renderdevice;
 
-		// State-machine + client UI navigation actions.
+	// State-machine + client UI navigation actions.
 	void GoToState(Uint8 newState);
-	void GoBack();
+	bool GoBack();
 	void RequestQuit();
 	// Session-side cleanup when a screen leaves a joined game (handled by
 	// Game/World, never by a screen reaching into the world directly).
 	void LeaveJoinedGame();
+	bool IsJoiningGame() const;
+	void SetJoiningGame(bool joining);
+	bool IsCreateGamePending() const;
+	void SetCreateGamePending(bool pending);
+	void SetCurrentLobbyGameId(Uint32 gameId);
+	LobbyGame * CurrentLobbyGame() const;
+	void JoinGame(LobbyGame & lobbyGame, char * password = nullptr);
+	void SpectateGame(LobbyGame & lobbyGame, char * password = nullptr);
 	bool PushScreen(std::unique_ptr<Screen> s);
 	bool PopScreen();
 	bool ReplaceScreen(std::unique_ptr<Screen> s);
