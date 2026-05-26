@@ -65,6 +65,8 @@ public:
 	void PushBuiltScreenForTest(std::unique_ptr<Screen> screen);
 	void BuildVisibleScreenProvidersForTest(
 		const std::function<void(UiScreenEntryId entryId, Screen& screen)>& buildScreen);
+	void BuildVisibleScreenFramesForTest(
+		const std::function<void(UiScreenEntryId entryId, Screen& screen, bool overlay)>& buildScreen);
 	void DrainWritesForTest();
 #endif
 
@@ -86,6 +88,10 @@ private:
 	bool QueueWrite(QueuedWrite write);
 	void ClearWrites();
 	void WithScreenProvider(UiScreenEntryId entryId, const std::function<void()>& build);
+	void BuildVisibleScreenFrame(UiScreenEntryId entryId,
+	                             bool overlay,
+	                             int visibleIndex,
+	                             const std::function<void()>& build);
 
 	silencer::ui::UiFrameContext frameCtx_;
 	silencer::ui::ClayService& clay_;

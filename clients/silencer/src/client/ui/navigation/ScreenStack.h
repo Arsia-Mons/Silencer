@@ -18,7 +18,7 @@ namespace client_ui {
 
 using UiScreenEntryId = uint32_t;
 using BuildVisibleScreen =
-	std::function<void(UiScreenEntryId entryId, Screen& screen, bool overlay)>;
+	std::function<void(UiScreenEntryId entryId, Screen& screen, bool overlay, int visibleIndex)>;
 
 class ScreenStack {
 public:

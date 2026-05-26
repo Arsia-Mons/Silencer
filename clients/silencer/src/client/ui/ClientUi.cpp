@@ -12,6 +12,7 @@
 #include "world.h"
 #endif
 
+#include <cstdint>
 #include <utility>
 
 namespace silencer {
@@ -271,6 +272,43 @@ void ClientUi::WithScreenProvider(UiScreenEntryId entryId,
 	REACT_PROVIDER_EXIT();
 }
 
+void ClientUi::BuildVisibleScreenFrame(UiScreenEntryId entryId,
+                                       bool overlay,
+                                       int visibleIndex,
+                                       const std::function<void()>& build) {
+	if(!build) return;
+	if(!overlay){
+		CLAY({
+			.id = CLAY_IDI("ClientUiScreenFrame", entryId),
+			.layout = {
+				.sizing = { CLAY_SIZING_GROW(0), CLAY_SIZING_GROW(0) },
+				.layoutDirection = CLAY_TOP_TO_BOTTOM,
+			},
+		}) {
+			build();
+		}
+		return;
+	}
+
+	const int16_t zIndex = static_cast<int16_t>(100 + visibleIndex);
+	CLAY({
+		.id = CLAY_IDI("ClientUiOverlayScreenFrame", entryId),
+		.layout = {
+			.sizing = { CLAY_SIZING_GROW(0), CLAY_SIZING_GROW(0) },
+			.layoutDirection = CLAY_TOP_TO_BOTTOM,
+			.childAlignment = { CLAY_ALIGN_X_CENTER, CLAY_ALIGN_Y_CENTER },
+		},
+		.backgroundColor = { 0, 0, 0, 160 },
+		.floating = {
+			.zIndex = zIndex,
+			.pointerCaptureMode = CLAY_POINTER_CAPTURE_MODE_CAPTURE,
+			.attachTo = CLAY_ATTACH_TO_ROOT,
+		},
+	}) {
+		build();
+	}
+}
+
 void ClientUi::RequestClearScreens() {
 	screens_.RequestClear();
 }
@@ -289,9 +327,11 @@ void ClientUi::BuildVisibleScreens(ScreenContext& ctx, Surface& dst, float frame
 		dst,
 		frametime,
 		interactions_,
-		[&](UiScreenEntryId entryId, Screen& screen, bool) {
-			WithScreenProvider(entryId, [&] {
-				screen.BuildUi(ctx, dst, frametime, interactions_);
+		[&](UiScreenEntryId entryId, Screen& screen, bool overlay, int visibleIndex) {
+			BuildVisibleScreenFrame(entryId, overlay, visibleIndex, [&] {
+				WithScreenProvider(entryId, [&] {
+					screen.BuildUi(ctx, dst, frametime, interactions_);
+				});
 			});
 		});
 }
@@ -304,9 +344,21 @@ void ClientUi::PushBuiltScreenForTest(std::unique_ptr<Screen> screen) {
 void ClientUi::BuildVisibleScreenProvidersForTest(
 	const std::function<void(UiScreenEntryId entryId, Screen& screen)>& buildScreen) {
 	screens_.BuildVisibleForTest(
-		[&](UiScreenEntryId entryId, Screen& screen, bool) {
+		[&](UiScreenEntryId entryId, Screen& screen, bool, int) {
 			WithScreenProvider(entryId, [&] {
 				if(buildScreen) buildScreen(entryId, screen);
+			});
+		});
+}
+
+void ClientUi::BuildVisibleScreenFramesForTest(
+	const std::function<void(UiScreenEntryId entryId, Screen& screen, bool overlay)>& buildScreen) {
+	screens_.BuildVisibleForTest(
+		[&](UiScreenEntryId entryId, Screen& screen, bool overlay, int visibleIndex) {
+			BuildVisibleScreenFrame(entryId, overlay, visibleIndex, [&] {
+				WithScreenProvider(entryId, [&] {
+					if(buildScreen) buildScreen(entryId, screen, overlay);
+				});
 			});
 		});
 }

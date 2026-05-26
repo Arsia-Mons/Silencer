@@ -83,16 +83,18 @@ void ScreenStack::BuildVisible(ScreenContext& ctx,
                                const BuildVisibleScreen& buildScreen) {
 	if(screens_.empty()) return;
 	const std::size_t start = VisibleStart();
+	int visibleIndex = 0;
 	for(std::size_t i = start; i < screens_.size(); ++i) {
 		Screen& screen = *screens_[i].screen;
 		if(i > start && screen.IsOverlay()) {
 			interactions.BeginFrame();
 		}
 		if(buildScreen){
-			buildScreen(screens_[i].entryId, screen, screen.IsOverlay());
+			buildScreen(screens_[i].entryId, screen, screen.IsOverlay(), visibleIndex);
 		}else{
 			screen.BuildUi(ctx, dst, frametime, interactions);
 		}
+		++visibleIndex;
 	}
 }
 
@@ -120,9 +122,11 @@ bool ScreenStack::PopEntryForTest(UiScreenEntryId entryId) {
 void ScreenStack::BuildVisibleForTest(const BuildVisibleScreen& buildScreen) {
 	if(!buildScreen || screens_.empty()) return;
 	const std::size_t start = VisibleStart();
+	int visibleIndex = 0;
 	for(std::size_t i = start; i < screens_.size(); ++i) {
 		Screen& screen = *screens_[i].screen;
-		buildScreen(screens_[i].entryId, screen, screen.IsOverlay());
+		buildScreen(screens_[i].entryId, screen, screen.IsOverlay(), visibleIndex);
+		++visibleIndex;
 	}
 }
 #endif

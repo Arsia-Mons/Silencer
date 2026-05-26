@@ -1,6 +1,7 @@
 #include "doctest.h"
 
 #include "client/ui/ClientUi.h"
+#include "client/ui/screens/screen.h"
 #include "ui/focus/UiFocus.h"
 #include "ui/primitives/focusable.h"
 #include "ui/runtime/ClayService.h"
@@ -9,6 +10,7 @@
 
 #include <cstdlib>
 #include <cstring>
+#include <memory>
 
 namespace {
 
@@ -142,6 +144,20 @@ public:
 	}
 	void BeginLayout() override { Clay_BeginLayout(); }
 	Clay_RenderCommandArray EndLayout() override { return Clay_EndLayout(); }
+};
+
+class FrameProbeScreen final : public Screen {
+public:
+	explicit FrameProbeScreen(bool overlay)
+		: overlay_(overlay) {}
+
+	void Build(ScreenContext&) override {}
+	void Tick(ScreenContext&) override {}
+	void Destroy(ScreenContext&) override {}
+	bool IsOverlay() const override { return overlay_; }
+
+private:
+	bool overlay_ = false;
 };
 
 }  // namespace
@@ -431,6 +447,64 @@ TEST_CASE("ClientUi owns the UiFocus frame lifecycle") {
 		second));
 	CHECK(silencer::ui::ui_focus_source_for_scope(scope) ==
 	      silencer::ui::UiFocusSource::Gamepad);
+}
+
+TEST_CASE("ClientUi wraps overlay screens in root-attached frame geometry") {
+	RealClayBackend backend;
+	silencer::ui::ClayService clay(backend);
+	silencer::client_ui::ClientUi clientUi(clay);
+	int baseBuilds = 0;
+	int overlayBuilds = 0;
+	silencer::client_ui::UiScreenEntryId baseEntry = 0;
+	silencer::client_ui::UiScreenEntryId overlayEntry = 0;
+
+	auto base = std::make_unique<FrameProbeScreen>(false);
+	Screen * baseScreen = base.get();
+	auto overlay = std::make_unique<FrameProbeScreen>(true);
+	Screen * overlayScreen = overlay.get();
+	clientUi.PushBuiltScreenForTest(std::move(base));
+	clientUi.PushBuiltScreenForTest(std::move(overlay));
+
+	silencer::ui::UiInputState input;
+	input.width = 640;
+	input.height = 480;
+	clientUi.BeginFrame(input);
+	clientUi.BuildVisibleScreenFramesForTest(
+		[&](silencer::client_ui::UiScreenEntryId entryId,
+		    Screen& screen,
+		    bool overlayFlag) {
+			if(&screen == baseScreen){
+				CHECK_FALSE(overlayFlag);
+				baseEntry = entryId;
+				baseBuilds++;
+			}else if(&screen == overlayScreen){
+				CHECK(overlayFlag);
+				overlayEntry = entryId;
+				overlayBuilds++;
+			}else{
+				FAIL("unexpected visible screen");
+			}
+		});
+	clientUi.EndFrame();
+
+	REQUIRE(baseEntry != 0);
+	REQUIRE(overlayEntry != 0);
+	Clay_ElementData baseFrame =
+		Clay_GetElementData(CLAY_IDI("ClientUiScreenFrame", baseEntry));
+	Clay_ElementData overlayFrame =
+		Clay_GetElementData(CLAY_IDI("ClientUiOverlayScreenFrame", overlayEntry));
+	REQUIRE(baseFrame.found);
+	REQUIRE(overlayFrame.found);
+	CHECK(baseFrame.boundingBox.x == 0.0f);
+	CHECK(baseFrame.boundingBox.y == 0.0f);
+	CHECK(baseFrame.boundingBox.width == 640.0f);
+	CHECK(baseFrame.boundingBox.height == 480.0f);
+	CHECK(overlayFrame.boundingBox.x == 0.0f);
+	CHECK(overlayFrame.boundingBox.y == 0.0f);
+	CHECK(overlayFrame.boundingBox.width == 640.0f);
+	CHECK(overlayFrame.boundingBox.height == 480.0f);
+	CHECK(baseBuilds == 1);
+	CHECK(overlayBuilds == 1);
 }
 
 TEST_CASE("ClientUi focus sees current frame pointer state before layout") {
