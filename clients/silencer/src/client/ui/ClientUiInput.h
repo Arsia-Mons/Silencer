@@ -13,7 +13,9 @@ class ClientUiInput {
 public:
 	void AddWheelDelta(float x, float y);
 	void QueueTextInput(char ascii);
-	void QueueNavAction(silencer::ui::UiNavAction action);
+	void QueueNavAction(
+		silencer::ui::UiNavAction action,
+		silencer::ui::UiFocusSource source = silencer::ui::UiFocusSource::Keyboard);
 	void QueueBindingKeyDown(int keyCode);
 	void QueueControlAction(silencer::ui::UiAction action);
 	void QueueControlPointerPress(int x, int y);
@@ -53,6 +55,7 @@ private:
 	                            int surfaceH,
 	                            float& surfaceX,
 	                            float& surfaceY);
+	void SetInputSource(silencer::ui::UiFocusSource source);
 	void QueueBindingInput(silencer::ui::UiBindingInput input);
 
 	float wheelX_ = 0.0f;
@@ -61,6 +64,7 @@ private:
 	std::vector<silencer::ui::UiNavAction> navActions_;
 	std::vector<silencer::ui::UiBindingInput> bindingInputs_;
 	std::vector<silencer::ui::UiControlCommand> controlCommands_;
+	silencer::ui::UiFocusSource source_ = silencer::ui::UiFocusSource::None;
 
 	bool havePointerPosition_ = false;
 	bool controlPointerActive_ = false;

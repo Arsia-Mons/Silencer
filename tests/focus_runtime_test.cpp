@@ -410,6 +410,8 @@ TEST_CASE("ClientUi owns the UiFocus frame lifecycle") {
 		first));
 
 	input.navActions.push_back(silencer::ui::UiNavAction::Down);
+	input.source = silencer::ui::UiFocusSource::Gamepad;
+	input.pointer.down = true;
 	clientUi.BeginFrame(input);
 	CLAY({
 		.id = TestId("ClientUiFocusStack"),
@@ -427,6 +429,8 @@ TEST_CASE("ClientUi owns the UiFocus frame lifecycle") {
 	CHECK(SameId(
 		silencer::ui::ui_focus_focused_id_for_scope(scope),
 		second));
+	CHECK(silencer::ui::ui_focus_source_for_scope(scope) ==
+	      silencer::ui::UiFocusSource::Gamepad);
 }
 
 TEST_CASE("ClientUi focus sees current frame pointer state before layout") {

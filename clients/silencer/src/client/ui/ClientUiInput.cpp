@@ -28,11 +28,16 @@ void ClientUiInput::AddWheelDelta(float x, float y) {
 }
 
 void ClientUiInput::QueueTextInput(char ascii) {
-	if(ascii >= 0x20 && ascii <= 0x7E) textInput_.push_back(ascii);
+	if(ascii >= 0x20 && ascii <= 0x7E){
+		textInput_.push_back(ascii);
+		SetInputSource(silencer::ui::UiFocusSource::Keyboard);
+	}
 }
 
-void ClientUiInput::QueueNavAction(silencer::ui::UiNavAction action) {
+void ClientUiInput::QueueNavAction(silencer::ui::UiNavAction action,
+                                   silencer::ui::UiFocusSource source) {
 	navActions_.push_back(action);
+	SetInputSource(source);
 }
 
 void ClientUiInput::QueueBindingInput(silencer::ui::UiBindingInput input) {
@@ -45,6 +50,7 @@ void ClientUiInput::QueueBindingKeyDown(int keyCode) {
 	input.code = keyCode;
 	input.axisDir = 0;
 	QueueBindingInput(input);
+	SetInputSource(silencer::ui::UiFocusSource::Keyboard);
 }
 
 void ClientUiInput::QueueControlAction(silencer::ui::UiAction action) {
@@ -64,6 +70,7 @@ void ClientUiInput::QueueControlPointerPress(int x, int y) {
 	command.x = x;
 	command.y = y;
 	controlCommands_.push_back(command);
+	SetInputSource(silencer::ui::UiFocusSource::Mouse);
 }
 
 void ClientUiInput::QueueControlPointerHover(int x, int y) {
@@ -76,6 +83,7 @@ void ClientUiInput::QueueControlPointerHover(int x, int y) {
 	command.x = x;
 	command.y = y;
 	controlCommands_.push_back(command);
+	SetInputSource(silencer::ui::UiFocusSource::Mouse);
 }
 
 void ClientUiInput::QueuePointerWindowEvent(float windowX,
@@ -103,10 +111,12 @@ void ClientUiInput::QueuePointerSurfaceEvent(float surfaceX,
 	if(pressed){
 		pointerPressed_ = true;
 		pointerDown_ = true;
+		SetInputSource(silencer::ui::UiFocusSource::Mouse);
 	}
 	if(released){
 		pointerReleased_ = true;
 		pointerDown_ = false;
+		SetInputSource(silencer::ui::UiFocusSource::Mouse);
 	}
 }
 
@@ -129,6 +139,11 @@ void ClientUiInput::SetPolledSurfacePointer(float surfaceX, float surfaceY, bool
 	pointerY_ = surfaceY;
 	havePointerPosition_ = true;
 	pointerDown_ = down;
+}
+
+void ClientUiInput::SetInputSource(silencer::ui::UiFocusSource source) {
+	if(source == silencer::ui::UiFocusSource::None) return;
+	source_ = source;
 }
 
 void ClientUiInput::CaptureGamepadBindingEdges(uint32_t buttons,
@@ -155,6 +170,7 @@ void ClientUiInput::CaptureGamepadBindingEdges(uint32_t buttons,
 			input.code = b;
 			input.axisDir = 0;
 			QueueBindingInput(input);
+			SetInputSource(silencer::ui::UiFocusSource::Gamepad);
 		}
 	}
 
@@ -172,6 +188,7 @@ void ClientUiInput::CaptureGamepadBindingEdges(uint32_t buttons,
 			input.code = axis;
 			input.axisDir = (now > 0) ? 1 : -1;
 			QueueBindingInput(input);
+			SetInputSource(silencer::ui::UiFocusSource::Gamepad);
 		}
 		gamepadBindingAxes_[axis] = now;
 	}
@@ -192,6 +209,12 @@ silencer::ui::UiInputState ClientUiInput::BuildFrame(int width,
 	input.pointer.down = pointerDown_ || pointerPressed_;
 	input.pointer.pressed = pointerPressed_ || (input.pointer.down && !pointerWasDown_);
 	input.pointer.released = pointerReleased_ || (!input.pointer.down && pointerWasDown_);
+	input.source = source_;
+	if(input.source == silencer::ui::UiFocusSource::None){
+		input.source = (input.pointer.pressed || input.pointer.released)
+			? silencer::ui::UiFocusSource::Mouse
+			: silencer::ui::UiFocusSource::Keyboard;
+	}
 	input.pointer.wheelX = wheelX_;
 	input.pointer.wheelY = wheelY_;
 	input.textInput = textInput_;
@@ -211,6 +234,7 @@ void ClientUiInput::EndFrame() {
 	navActions_.clear();
 	bindingInputs_.clear();
 	controlCommands_.clear();
+	source_ = silencer::ui::UiFocusSource::None;
 	pointerPressed_ = false;
 	pointerReleased_ = false;
 }

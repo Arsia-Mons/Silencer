@@ -70,12 +70,12 @@ bool ActionTargetsAudibleInteractable(const silencer::ui::UiInteractionRegistry&
 silencer::ui::UiFocusInputFrame FocusInputFrom(
 	const silencer::ui::UiInputState& input) {
 	silencer::ui::UiFocusInputFrame out;
+	out.source = input.source == silencer::ui::UiFocusSource::None
+		? silencer::ui::UiFocusSource::Keyboard
+		: input.source;
 	out.pointerPressed = input.pointer.pressed;
 	out.pointerDown = input.pointer.down;
 	out.pointerReleased = input.pointer.released;
-	if(input.pointer.pressed || input.pointer.released || input.pointer.down){
-		out.source = silencer::ui::UiFocusSource::Mouse;
-	}
 	for(silencer::ui::UiNavAction action : input.navActions){
 		switch(action){
 			case silencer::ui::UiNavAction::Up:

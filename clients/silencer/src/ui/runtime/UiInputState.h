@@ -3,6 +3,7 @@
 #include <string>
 #include <vector>
 
+#include "ui/focus/UiFocus.h"
 #include "runtime/UiActionQueue.h"
 
 namespace silencer {
@@ -43,6 +44,7 @@ struct UiInputState {
 	float deltaTimeSeconds = 0.0f;
 	float animationDeltaSeconds = 1.0f / 24.0f;
 	float animationStepSeconds = 1.0f / 24.0f;
+	UiFocusSource source = UiFocusSource::Keyboard;
 	UiPointerState pointer;
 	std::string textInput;
 	std::vector<UiNavAction> navActions;

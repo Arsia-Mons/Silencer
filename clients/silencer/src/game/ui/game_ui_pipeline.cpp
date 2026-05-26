@@ -233,7 +233,7 @@ auto queue = [&](silencer::ui::UiNavAction action){
 for(auto existing : queued){
 if(existing == action) return;
 }
-clientUiInput.QueueNavAction(action);
+clientUiInput.QueueNavAction(action, silencer::ui::UiFocusSource::Keyboard);
 queued.push_back(action);
 };
 

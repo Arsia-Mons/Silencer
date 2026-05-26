@@ -83,10 +83,10 @@ return;
 if(!dir.held){
 dir.held = true;
 dir.nextfire = now + GAMEPAD_NAV_DELAY_MS;
-game.UiInput().QueueNavAction(navAction);
+game.UiInput().QueueNavAction(navAction, silencer::ui::UiFocusSource::Gamepad);
 }else if(now >= dir.nextfire){
 dir.nextfire = now + GAMEPAD_NAV_REPEAT_MS;
-game.UiInput().QueueNavAction(navAction);
+game.UiInput().QueueNavAction(navAction, silencer::ui::UiFocusSource::Gamepad);
 }
 };
 
@@ -99,7 +99,9 @@ tick(gamepadNavRight, Action::UiRight, silencer::ui::UiNavAction::Right);
 bool confirmNow = keymap.IsPressed(Action::UiConfirm, keystate, gamepadstate);
 static bool confirmPrev = false;
 if(confirmNow && !confirmPrev){
-game.UiInput().QueueNavAction(silencer::ui::UiNavAction::Confirm);
+game.UiInput().QueueNavAction(
+silencer::ui::UiNavAction::Confirm,
+silencer::ui::UiFocusSource::Gamepad);
 }
 confirmPrev = confirmNow;
 }
@@ -108,7 +110,9 @@ confirmPrev = confirmNow;
 bool cancelNow = keymap.IsPressed(Action::UiCancel, keystate, gamepadstate);
 static bool cancelPrev = false;
 if(cancelNow && !cancelPrev){
-game.UiInput().QueueNavAction(silencer::ui::UiNavAction::Cancel);
+game.UiInput().QueueNavAction(
+silencer::ui::UiNavAction::Cancel,
+silencer::ui::UiFocusSource::Gamepad);
 }
 cancelPrev = cancelNow;
 }

@@ -17,6 +17,9 @@ This is mid-migration toward good flexbox layout, Clay lifecycle, and shadcn-sty
 - `ClientUi` owns the `UiFocusRuntime` frame lifecycle. Components may declare
   focus scopes and focusables, but they must not call `ui_focus_begin_frame`,
   `ui_focus_end_layout`, `ui_focus_set_current`, or `ui_focus_init` directly.
+- `UiInputState::source` is set by input adapters for real keyboard, gamepad,
+  and pointer edge sources. Focus code should not treat a held pointer as a
+  new mouse-source frame when keyboard/gamepad navigation also arrives.
 - Screen-local navigation and state writes should go through ClientUi's
   screen provider hooks (`UseScreenNavigator`, `UseUiWriteQueue`) so mutations
   drain after layout/render instead of during declaration.

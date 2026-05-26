@@ -556,6 +556,7 @@ TEST_CASE("ClientUiInput normalizes pointer and drains frame-local inputs") {
 
 	auto frame = input.BuildFrame(640, 480, 1, 0.0f);
 	CHECK(frame.uiScale == 1);
+	CHECK(frame.source == silencer::ui::UiFocusSource::Keyboard);
 	CHECK(frame.pointer.x == 160.0f);
 	CHECK(frame.pointer.y == 120.0f);
 	CHECK(frame.pointer.down);
@@ -570,15 +571,30 @@ TEST_CASE("ClientUiInput normalizes pointer and drains frame-local inputs") {
 	CHECK(frame.controlCommands[0].action.id == "main_menu.connect");
 
 	input.EndFrame();
+	input.QueueNavAction(silencer::ui::UiNavAction::Down,
+	                     silencer::ui::UiFocusSource::Gamepad);
+	frame = input.BuildFrame(640, 480, 2, 1.0f / 60.0f);
+	CHECK(frame.source == silencer::ui::UiFocusSource::Gamepad);
+	REQUIRE(frame.navActions.size() == 1);
+	CHECK(frame.navActions[0] == silencer::ui::UiNavAction::Down);
+
+	input.EndFrame();
 	frame = input.BuildFrame(640, 480, 2, 1.0f / 60.0f);
 	CHECK(frame.uiScale == 2);
 	CHECK(frame.pointer.down);
 	CHECK(!frame.pointer.pressed);
+	CHECK(frame.source == silencer::ui::UiFocusSource::Keyboard);
 	CHECK(frame.pointer.wheelY == 0.0f);
 	CHECK(frame.textInput.empty());
 	CHECK(frame.navActions.empty());
 	CHECK(frame.bindingInputs.empty());
 	CHECK(frame.controlCommands.empty());
+
+	silencer::client_ui::ClientUiInput pointerOnly;
+	pointerOnly.QueuePointerSurfaceEvent(10.0f, 20.0f, true, false);
+	frame = pointerOnly.BuildFrame(640, 480, 1, 1.0f / 60.0f);
+	CHECK(frame.source == silencer::ui::UiFocusSource::Mouse);
+	CHECK(frame.pointer.pressed);
 }
 
 TEST_CASE("UiInputRouter routes control commands and binding capture through typed actions") {

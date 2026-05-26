@@ -16,6 +16,9 @@ This UI is actively migrating toward good flexbox layout, Clay lifecycle, and sh
 - `ClientUi` also brackets the retained focus runtime for that frame. Screens
   may declare focus scopes/focusables while building UI; lifecycle calls remain
   in `ClientUi`, not individual screens or primitives.
+- Input adapters must set `UiInputState::source` for keyboard, gamepad, and
+  pointer edge producers. Do not infer source from held pointer state inside
+  `ClientUi`; a held pointer must not relabel keyboard/gamepad navigation.
 - `ClientUi` provides the current screen entry through React context while
   visible screens build. New component-style screen code should use
   `UseScreenNavigator()` and `UseUiWriteQueue()` for post-layout pushes, pops,
