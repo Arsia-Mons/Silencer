@@ -68,6 +68,13 @@ public:
 #endif
 
 private:
+	struct LifecycleScope {
+		explicit LifecycleScope(ScreenStack& stack);
+		~LifecycleScope();
+
+		ScreenStack& stack;
+	};
+
 	struct Entry {
 		std::unique_ptr<Screen> screen;
 	};
@@ -84,6 +91,7 @@ private:
 	                          void * userData,
 	                          LifecycleCallback build,
 	                          LifecycleCallback destroy);
+	bool LifecycleActive() const { return lifecycleDepth_ > 0; }
 	int VisibleStart() const;
 
 	std::array<Entry, CLIENT_UI_MAX_SCREENS> screens_;
@@ -91,6 +99,7 @@ private:
 	int count_ = 0;
 	int visibleScreenCount_ = 0;
 	int overflowCount_ = 0;
+	int lifecycleDepth_ = 0;
 	UiScreenEntryId nextEntryId_ = 1;
 	bool clearRequested_ = false;
 };

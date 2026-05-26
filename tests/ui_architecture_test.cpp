@@ -111,7 +111,27 @@ struct ReplacementLifecycleProbe {
 	Screen * observedTop = nullptr;
 	silencer::client_ui::UiScreenEntryId observedBuiltEntryId = 0;
 	int buildCount = 0;
+	bool attemptBuildMutations = false;
+	bool buildPopResult = true;
+	bool buildPushResult = true;
+	bool buildReplaceResult = true;
+	bool attemptDestroyMutations = false;
+	bool destroyPopResult = true;
+	bool destroyPushResult = true;
+	bool destroyReplaceResult = true;
+	int destroyCount = 0;
 };
+
+void AttemptLifecycleMutations(silencer::client_ui::ScreenStack * stack,
+                               bool& popResult,
+                               bool& pushResult,
+                               bool& replaceResult) {
+	if(!stack) return;
+	popResult = stack->PopForTest();
+	pushResult = stack->PushBuiltForTest(std::make_unique<HookProbeScreen>(nullptr));
+	replaceResult = stack->ReplaceWithLifecycleForTest(
+		std::make_unique<HookProbeScreen>(nullptr), nullptr, nullptr, nullptr);
+}
 
 void ObserveLifecycleBuild(Screen& screen, ScreenContext *, void * userData) {
 	auto * probe = static_cast<ReplacementLifecycleProbe *>(userData);
@@ -119,6 +139,24 @@ void ObserveLifecycleBuild(Screen& screen, ScreenContext *, void * userData) {
 	probe->buildCount += 1;
 	probe->observedTop = probe->stack_ ? probe->stack_->Top() : nullptr;
 	probe->observedBuiltEntryId = screen.EntryId();
+	if(probe->attemptBuildMutations){
+		AttemptLifecycleMutations(probe->stack_,
+		                          probe->buildPopResult,
+		                          probe->buildPushResult,
+		                          probe->buildReplaceResult);
+	}
+}
+
+void ObserveLifecycleDestroy(Screen&, ScreenContext *, void * userData) {
+	auto * probe = static_cast<ReplacementLifecycleProbe *>(userData);
+	if(!probe) return;
+	probe->destroyCount += 1;
+	if(probe->attemptDestroyMutations){
+		AttemptLifecycleMutations(probe->stack_,
+		                          probe->destroyPopResult,
+		                          probe->destroyPushResult,
+		                          probe->destroyReplaceResult);
+	}
 }
 
 void ProbeScreenHooks(HookProbeStats& stats,
@@ -412,6 +450,25 @@ TEST_CASE("ScreenStack retains pushed screen before lifecycle build") {
 	CHECK(pushedScreen->EntryId() == probe.observedBuiltEntryId);
 }
 
+TEST_CASE("ScreenStack rejects reentrant stack mutations during lifecycle build") {
+	silencer::client_ui::ScreenStack stack;
+	ReplacementLifecycleProbe probe;
+	probe.stack_ = &stack;
+	probe.attemptBuildMutations = true;
+	auto pushed = std::make_unique<HookProbeScreen>(nullptr);
+	Screen * pushedScreen = pushed.get();
+
+	CHECK(stack.PushWithLifecycleForTest(std::move(pushed), ObserveLifecycleBuild, &probe));
+
+	CHECK(probe.buildCount == 1);
+	CHECK_FALSE(probe.buildPopResult);
+	CHECK_FALSE(probe.buildPushResult);
+	CHECK_FALSE(probe.buildReplaceResult);
+	CHECK(stack.Size() == 1);
+	CHECK(stack.Top() == pushedScreen);
+	CHECK(stack.TopEntryId() == pushedScreen->EntryId());
+}
+
 TEST_CASE("ScreenStack replacement lifecycle validates before mutation and retains replacement during build") {
 	silencer::client_ui::ScreenStack stack;
 	HookProbeStats firstStats;
@@ -438,6 +495,35 @@ TEST_CASE("ScreenStack replacement lifecycle validates before mutation and retai
 	CHECK(stack.Top() == replacementScreen);
 	CHECK(stack.TopEntryId() == probe.observedBuiltEntryId);
 	CHECK(replacementScreen->EntryId() == probe.observedBuiltEntryId);
+	CHECK(firstStats.destructorCount == 1);
+}
+
+TEST_CASE("ScreenStack rejects reentrant stack mutations during lifecycle destroy") {
+	silencer::client_ui::ScreenStack stack;
+	HookProbeStats firstStats;
+	auto base = std::make_unique<HookProbeScreen>(nullptr);
+	auto first = std::make_unique<HookProbeScreen>(&firstStats);
+	Screen * firstScreen = first.get();
+	ReplacementLifecycleProbe probe;
+	probe.stack_ = &stack;
+	probe.attemptDestroyMutations = true;
+	auto replacement = std::make_unique<HookProbeScreen>(nullptr);
+	Screen * replacementScreen = replacement.get();
+
+	CHECK(stack.PushBuiltForTest(std::move(base)));
+	CHECK(stack.PushBuiltForTest(std::move(first)));
+	CHECK(stack.Top() == firstScreen);
+
+	CHECK(stack.ReplaceWithLifecycleForTest(
+		std::move(replacement), ObserveLifecycleBuild, ObserveLifecycleDestroy, &probe));
+
+	CHECK(probe.destroyCount == 1);
+	CHECK_FALSE(probe.destroyPopResult);
+	CHECK_FALSE(probe.destroyPushResult);
+	CHECK_FALSE(probe.destroyReplaceResult);
+	CHECK(probe.buildCount == 1);
+	CHECK(stack.Size() == 2);
+	CHECK(stack.Top() == replacementScreen);
 	CHECK(firstStats.destructorCount == 1);
 }
 

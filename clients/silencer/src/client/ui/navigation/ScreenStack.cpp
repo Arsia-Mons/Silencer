@@ -21,6 +21,15 @@ void DestroyWithContext(Screen& screen, ScreenContext * ctx, void *) {
 
 ScreenStack::~ScreenStack() = default;
 
+ScreenStack::LifecycleScope::LifecycleScope(ScreenStack& stack_)
+	: stack(stack_) {
+	++stack.lifecycleDepth_;
+}
+
+ScreenStack::LifecycleScope::~LifecycleScope() {
+	--stack.lifecycleDepth_;
+}
+
 bool ScreenStack::Push(std::unique_ptr<Screen> screen, ScreenContext& ctx) {
 	return PushWithLifecycle(std::move(screen), &ctx, nullptr, BuildWithContext);
 }
@@ -41,6 +50,7 @@ bool ScreenStack::PushWithLifecycle(std::unique_ptr<Screen> screen,
                                     ScreenContext * ctx,
                                     void * userData,
                                     LifecycleCallback build) {
+	if(LifecycleActive()) return false;
 	if(!screen) return false;
 	if(count_ >= CLIENT_UI_MAX_SCREENS) {
 		++overflowCount_;
@@ -51,16 +61,23 @@ bool ScreenStack::PushWithLifecycle(std::unique_ptr<Screen> screen,
 	Screen * builtScreen = screen.get();
 	Entry& entry = screens_[count_++];
 	entry.screen = std::move(screen);
-	if(build) build(*builtScreen, ctx, userData);
+	if(build) {
+		LifecycleScope scope(*this);
+		build(*builtScreen, ctx, userData);
+	}
 	return true;
 }
 
 bool ScreenStack::PopWithLifecycle(ScreenContext * ctx,
                                    void * userData,
                                    LifecycleCallback destroy) {
+	if(LifecycleActive()) return false;
 	if(count_ <= 0) return false;
 	Entry& entry = screens_[count_ - 1];
-	if(entry.screen && destroy) destroy(*entry.screen, ctx, userData);
+	if(entry.screen && destroy) {
+		LifecycleScope scope(*this);
+		destroy(*entry.screen, ctx, userData);
+	}
 	if(entry.screen) entry.screen->SetEntryId(0);
 	entry.screen.reset();
 	--count_;
@@ -72,21 +89,29 @@ bool ScreenStack::ReplaceWithLifecycle(std::unique_ptr<Screen> screen,
                                        void * userData,
                                        LifecycleCallback build,
                                        LifecycleCallback destroy) {
+	if(LifecycleActive()) return false;
 	if(!screen) return false;
 	if(count_ <= 0) return PushWithLifecycle(std::move(screen), ctx, userData, build);
 	Entry& entry = screens_[count_ - 1];
-	if(entry.screen && destroy) destroy(*entry.screen, ctx, userData);
+	if(entry.screen && destroy) {
+		LifecycleScope scope(*this);
+		destroy(*entry.screen, ctx, userData);
+	}
 	if(entry.screen) entry.screen->SetEntryId(0);
 
 	const UiScreenEntryId entryId = nextEntryId_++;
 	screen->SetEntryId(entryId);
 	Screen * replacement = screen.get();
 	entry.screen = std::move(screen);
-	if(build) build(*replacement, ctx, userData);
+	if(build) {
+		LifecycleScope scope(*this);
+		build(*replacement, ctx, userData);
+	}
 	return true;
 }
 
 void ScreenStack::Clear(ScreenContext& ctx) {
+	if(LifecycleActive()) return;
 	while(count_ > 0) Pop(ctx);
 	visibleScreenCount_ = 0;
 }
@@ -97,6 +122,7 @@ void ScreenStack::RequestClear() {
 
 void ScreenStack::ClearIfRequested(ScreenContext& ctx) {
 	if(!clearRequested_) return;
+	if(LifecycleActive()) return;
 	Clear(ctx);
 	clearRequested_ = false;
 }
@@ -112,10 +138,14 @@ UiScreenEntryId ScreenStack::TopEntryId() const {
 }
 
 bool ScreenStack::PopEntry(UiScreenEntryId entryId, ScreenContext& ctx) {
+	if(LifecycleActive()) return false;
 	if(entryId == 0) return false;
 	for(int i = count_ - 1; i >= 0; --i){
 		if(!screens_[i].screen || screens_[i].screen->EntryId() != entryId) continue;
-		if(screens_[i].screen) screens_[i].screen->Destroy(ctx);
+		if(screens_[i].screen) {
+			LifecycleScope scope(*this);
+			screens_[i].screen->Destroy(ctx);
+		}
 		if(screens_[i].screen) screens_[i].screen->SetEntryId(0);
 		screens_[i].screen.reset();
 		for(int j = i; j + 1 < count_; ++j){
@@ -185,6 +215,7 @@ bool ScreenStack::ReplaceWithLifecycleForTest(std::unique_ptr<Screen> screen,
 }
 
 bool ScreenStack::PopEntryForTest(UiScreenEntryId entryId) {
+	if(LifecycleActive()) return false;
 	if(entryId == 0) return false;
 	for(int i = count_ - 1; i >= 0; --i){
 		if(!screens_[i].screen || screens_[i].screen->EntryId() != entryId) continue;
