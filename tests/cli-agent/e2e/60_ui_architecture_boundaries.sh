@@ -98,6 +98,11 @@ fail_if_match \
   --glob '!third_party/**'
 
 fail_if_match \
+  '#include[[:space:]]*[<"]((audio|gasloader|world)[.]h)[>"]|Audio::|GASLoader::|soundUIClick' \
+  "$REPO_ROOT/clients/silencer/src/client/ui/ClientUi.h" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/ClientUi.cpp"
+
+fail_if_match \
   'nlohmann::json[[:space:]]+(Game::)?GetWorldSummary|nlohmann::json[[:space:]]+(InGameUiController::)?ConfigureForControl' \
   "$REPO_ROOT/clients/silencer/src" \
   --glob '!third_party/**'

@@ -13,8 +13,10 @@
 #include "clay_ui_compositor.h"
 #include "ui/client_ui_write_drain.h"
 #include "ui/game_ui_frame_provider.h"
+#include "audio.h"
 #include <array>
 #include <algorithm>
+#include <string>
 
 namespace {
 
@@ -39,6 +41,15 @@ int scaledW = static_cast<int>(virtualW * scale + 0.5f);
 int scaledH = static_cast<int>(virtualH * scale + 0.5f);
 offsetX = scaledW < surfaceW ? (surfaceW - scaledW) / 2 : 0;
 offsetY = scaledH < surfaceH ? (surfaceH - scaledH) / 2 : 0;
+}
+
+static void PlayMenuButtonSound(World& world) {
+Audio& audio = Audio::GetInstance();
+if(!audio.enabled) return;
+const std::string& sound = GASLoader::Get().player.soundUIClick;
+auto it = world.resources.soundbank.find(sound);
+if(it == world.resources.soundbank.end() || !it->second) return;
+audio.PlayUI(it->second);
 }
 } // namespace
 
@@ -174,11 +185,14 @@ game.screenContext,
 [&] {
 silencer::clay_bridge::Render(game, &surface, cmds);
 if(game.state != GameState::FADEOUT){
-silencer::ui::UiActionList unhandledUiActions =
-clientUi.DispatchInput(game.screenContext, preparedUiInput);
+silencer::client_ui::UiDispatchResult dispatch =
+clientUi.DispatchInput(&game.screenContext, preparedUiInput);
+if(dispatch.feedbackRequested){
+PlayMenuButtonSound(game.world);
+}
 if(!clientUi.HasScreens() && game.world.map.loaded){
 inGameUiController.ApplyActions(
-game.world.peers.localpeerid, unhandledUiActions, clientUi.Interactions());
+game.world.peers.localpeerid, dispatch.unhandledActions, clientUi.Interactions());
 }
 bool nowFocused = clientUi.Interactions().HasTextInputFocus();
 if(nowFocused && !textInputFocused){

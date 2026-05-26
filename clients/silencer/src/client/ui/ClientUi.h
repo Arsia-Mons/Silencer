@@ -9,7 +9,6 @@
 #include <array>
 #include <functional>
 #include <memory>
-#include <string>
 
 class Screen;
 class ScreenContext;
@@ -30,6 +29,11 @@ struct ScreenNavigator {
 	std::function<void()> popTop = {};
 };
 
+struct UiDispatchResult {
+	silencer::ui::UiActionList unhandledActions;
+	bool feedbackRequested = false;
+};
+
 class ClientUi {
 public:
 	explicit ClientUi(silencer::ui::ClayService& clay);
@@ -37,7 +41,7 @@ public:
 
 	void BeginFrame(const silencer::ui::UiInputState& input);
 	Clay_RenderCommandArray EndFrame();
-	silencer::ui::UiActionList DispatchInput(ScreenContext& ctx, const silencer::ui::UiInputState& input);
+	UiDispatchResult DispatchInput(ScreenContext * ctx, const silencer::ui::UiInputState& input);
 	silencer::ui::UiActionList DrainActions();
 	const silencer::ui::UiInteractionRegistry& Interactions() const { return interactions_; }
 	silencer::ui::UiInteractionRegistry& Interactions() { return interactions_; }
@@ -103,7 +107,7 @@ private:
 	std::array<QueuedWrite, CLIENT_UI_MAX_WRITES> writes_;
 	int writeCount_ = 0;
 	int writeOverflowCount_ = 0;
-	std::string hoveredAudioInteractableId_;
+	silencer::ui::UiActionId hoveredFeedbackInteractableId_;
 };
 
 ScreenNavigator UseScreenNavigator();

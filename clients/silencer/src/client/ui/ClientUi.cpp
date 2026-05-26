@@ -6,12 +6,8 @@
 #include "runtime/UiInputRouter.h"
 #include "runtime/react.h"
 
-#ifndef SILENCER_TEST_BUILD
-#include "audio.h"
-#include "gasloader.h"
-#include "world.h"
-#endif
-
+#include <cstdio>
+#include <cstring>
 #include <cstdint>
 #include <utility>
 
@@ -27,11 +23,11 @@ struct ScreenProviderContext {
 
 static ReactContext g_screenContextValue = {};
 
-bool IsAudibleInteractable(const silencer::ui::UiInteractable& widget) {
+bool InteractableRequestsFeedback(const silencer::ui::UiInteractable& widget) {
 	if(widget.inactive) return false;
-	// Only buttons emit hover/activate audio. Legacy toggles (e.g. the
+	// Only buttons request hover/activate feedback. Legacy toggles (e.g. the
 	// lobby agency icons) were silent on both hover and click; treating
-	// them as audible was a migration regression.
+	// them as feedback targets was a migration regression.
 	return widget.kind == silencer::ui::UiInteractableKind::Button;
 }
 
@@ -40,32 +36,53 @@ bool PointIn(const silencer::ui::UiInteractable& widget, int x, int y) {
 	    && x < widget.x + widget.w && y < widget.y + widget.h;
 }
 
-std::string InteractableAudioId(const silencer::ui::UiInteractable& widget) {
-	if(!widget.id.empty()) return widget.id;
-	if(widget.uid >= 0) return std::to_string(widget.uid);
-	return widget.labelText;
+bool SameActionId(const silencer::ui::UiActionId& lhs,
+                  const silencer::ui::UiActionId& rhs) {
+	return lhs.size() == rhs.size() &&
+	       std::memcmp(lhs.data(), rhs.data(), lhs.size()) == 0;
 }
 
-const silencer::ui::UiInteractable * HitAudibleInteractable(
+void AssignInteractableFeedbackId(silencer::ui::UiActionId& id,
+                                  const silencer::ui::UiInteractable& widget) {
+	if(!widget.id.empty()){
+		id.Assign(widget.id.data(), widget.id.size());
+		return;
+	}
+	if(widget.uid >= 0){
+		char uidText[16] = {};
+		const int n = std::snprintf(uidText, sizeof(uidText), "%d", widget.uid);
+		if(n > 0){
+			const std::size_t len = n < static_cast<int>(sizeof(uidText))
+				? static_cast<std::size_t>(n)
+				: sizeof(uidText) - 1;
+			id.Assign(uidText, len);
+			return;
+		}
+	}
+	const char * label = silencer::ui::UiInteractableLabel(widget);
+	id.Assign(label);
+}
+
+const silencer::ui::UiInteractable * HitFeedbackInteractable(
 	const silencer::ui::UiInteractionRegistry& interactions,
 	const silencer::ui::UiInputState& input) {
 	const int x = static_cast<int>(input.pointer.x);
 	const int y = static_cast<int>(input.pointer.y);
 	const auto& widgets = interactions.Interactables();
 	for(auto it = widgets.rbegin(); it != widgets.rend(); ++it){
-		if(IsAudibleInteractable(*it) && PointIn(*it, x, y)) return &*it;
+		if(InteractableRequestsFeedback(*it) && PointIn(*it, x, y)) return &*it;
 	}
 	return nullptr;
 }
 
-bool ActionTargetsAudibleInteractable(const silencer::ui::UiInteractionRegistry& interactions,
-                                      const silencer::ui::UiAction& action) {
+bool ActionTargetsFeedbackInteractable(const silencer::ui::UiInteractionRegistry& interactions,
+                                       const silencer::ui::UiAction& action) {
 	if(action.kind != silencer::ui::UiActionKind::Activate &&
 	   action.kind != silencer::ui::UiActionKind::Navigate){
 		return false;
 	}
 	const auto * widget = interactions.FindInteractableById(action.id.data(), action.id.size());
-	return widget && IsAudibleInteractable(*widget);
+	return widget && InteractableRequestsFeedback(*widget);
 }
 
 silencer::ui::UiFocusInputFrame FocusInputFrom(
@@ -106,19 +123,6 @@ silencer::ui::UiFocusInputFrame FocusInputFrom(
 	return out;
 }
 
-void PlayMenuButtonSound(ScreenContext& ctx) {
-#ifdef SILENCER_TEST_BUILD
-	(void)ctx;
-#else
-	Audio& audio = Audio::GetInstance();
-	if(!audio.enabled) return;
-	const std::string& sound = GASLoader::Get().player.soundUIClick;
-	auto it = ctx.world.resources.soundbank.find(sound);
-	if(it == ctx.world.resources.soundbank.end() || !it->second) return;
-	audio.PlayUI(it->second);
-#endif
-}
-
 }  // namespace clientui_detail
 
 ClientUi::ClientUi(silencer::ui::ClayService& clay)
@@ -147,39 +151,43 @@ Clay_RenderCommandArray ClientUi::EndFrame() {
 	return commands;
 }
 
-silencer::ui::UiActionList ClientUi::DispatchInput(
-	ScreenContext& ctx,
+UiDispatchResult ClientUi::DispatchInput(
+	ScreenContext * ctx,
 	const silencer::ui::UiInputState& input) {
+	UiDispatchResult result;
 	Screen * top = screens_.Top();
 	silencer::ui::UiInputRouter router(interactions_);
 	silencer::ui::UiActionList actions = router.Route(input);
-	bool playedFeedback = false;
 	const silencer::ui::UiInteractable * hovered =
-		clientui_detail::HitAudibleInteractable(interactions_, input);
-	std::string hoveredId = hovered ? clientui_detail::InteractableAudioId(*hovered) : std::string();
-	if(!hoveredId.empty() && hoveredId != hoveredAudioInteractableId_){
-		clientui_detail::PlayMenuButtonSound(ctx);
-		playedFeedback = true;
+		clientui_detail::HitFeedbackInteractable(interactions_, input);
+	silencer::ui::UiActionId hoveredId;
+	if(hovered) clientui_detail::AssignInteractableFeedbackId(hoveredId, *hovered);
+	if(!hoveredId.empty() &&
+	   !clientui_detail::SameActionId(hoveredId, hoveredFeedbackInteractableId_)){
+		result.feedbackRequested = true;
 	}
-	hoveredAudioInteractableId_ = hoveredId;
+	hoveredFeedbackInteractableId_ = hoveredId;
 	for(const silencer::ui::UiAction& action : actions){
-		if(!playedFeedback && clientui_detail::ActionTargetsAudibleInteractable(interactions_, action)){
-			clientui_detail::PlayMenuButtonSound(ctx);
-			playedFeedback = true;
+		if(!result.feedbackRequested &&
+		   clientui_detail::ActionTargetsFeedbackInteractable(interactions_, action)){
+			result.feedbackRequested = true;
 		}
 	}
-	if(!top) return actions;
-	silencer::ui::UiActionList unhandled;
+	if(!top || !ctx){
+		result.unhandledActions = actions;
+		return result;
+	}
 	for(const silencer::ui::UiAction& action : actions){
-		if(top && top->HandleUiIntent(ctx, action)){
+		if(top && top->HandleUiIntent(*ctx, action)){
 			if(action.kind == silencer::ui::UiActionKind::CaptureBinding){
-				return silencer::ui::UiActionList();
+				result.unhandledActions.Clear();
+				return result;
 			}
 			continue;
 		}
-		unhandled.Push(action);
+		result.unhandledActions.Push(action);
 	}
-	return unhandled;
+	return result;
 }
 
 silencer::ui::UiActionList ClientUi::DrainActions() {

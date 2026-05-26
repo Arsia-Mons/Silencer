@@ -272,6 +272,83 @@ TEST_CASE("ClientUi owns the frame lifecycle without demo-screen metadata") {
 	CHECK(clientUi.DrainActions().empty());
 }
 
+TEST_CASE("ClientUi dispatch reports feedback without playing game audio") {
+	RecordingClayBackend backend;
+	silencer::ui::ClayService clay(backend);
+	silencer::client_ui::ClientUi clientUi(clay);
+	silencer::ui::UiInputState input;
+	input.width = 640;
+	input.height = 480;
+	input.pointer.x = 12.0f;
+	input.pointer.y = 22.0f;
+
+	clientUi.BeginFrame(input);
+	silencer::ui::UiInteractable button;
+	button.id = "main_menu.connect";
+	button.labelText = "Connect";
+	button.kind = silencer::ui::UiInteractableKind::Button;
+	button.x = 10;
+	button.y = 20;
+	button.w = 80;
+	button.h = 30;
+	REQUIRE(clientUi.Interactions().RegisterInteractable(button));
+	clientUi.EndFrame();
+
+	silencer::client_ui::UiDispatchResult first =
+		clientUi.DispatchInput(nullptr, input);
+	CHECK(first.feedbackRequested);
+	REQUIRE(first.unhandledActions.size() == 1);
+	CHECK(first.unhandledActions[0].kind == silencer::ui::UiActionKind::Navigate);
+	CHECK(first.unhandledActions[0].value == "hover");
+
+	silencer::client_ui::UiDispatchResult second =
+		clientUi.DispatchInput(nullptr, input);
+	CHECK_FALSE(second.feedbackRequested);
+	CHECK(second.unhandledActions.empty());
+
+	input.pointer.x = 200.0f;
+	input.pointer.y = 200.0f;
+	silencer::client_ui::UiDispatchResult away =
+		clientUi.DispatchInput(nullptr, input);
+	CHECK_FALSE(away.feedbackRequested);
+
+	input.pointer.x = 12.0f;
+	input.pointer.y = 22.0f;
+	silencer::client_ui::UiDispatchResult returned =
+		clientUi.DispatchInput(nullptr, input);
+	CHECK(returned.feedbackRequested);
+}
+
+TEST_CASE("ClientUi dispatch returns feedback requests for audible actions") {
+	RecordingClayBackend backend;
+	silencer::ui::ClayService clay(backend);
+	silencer::client_ui::ClientUi clientUi(clay);
+	silencer::ui::UiInputState input;
+	input.width = 640;
+	input.height = 480;
+
+	clientUi.BeginFrame(input);
+	silencer::ui::UiInteractable button;
+	button.id = "main_menu.connect";
+	button.labelText = "Connect";
+	button.kind = silencer::ui::UiInteractableKind::Button;
+	button.x = 10;
+	button.y = 20;
+	button.w = 80;
+	button.h = 30;
+	REQUIRE(clientUi.Interactions().RegisterInteractable(button));
+	REQUIRE(clientUi.Interactions().FocusInteractableById("main_menu.connect"));
+	clientUi.EndFrame();
+
+	input.navActions.Push(silencer::ui::UiNavAction::Confirm);
+	silencer::client_ui::UiDispatchResult result =
+		clientUi.DispatchInput(nullptr, input);
+	CHECK(result.feedbackRequested);
+	REQUIRE(result.unhandledActions.size() == 1);
+	CHECK(result.unhandledActions[0].kind == silencer::ui::UiActionKind::Activate);
+	CHECK(result.unhandledActions[0].id == "main_menu.connect");
+}
+
 TEST_CASE("ClientUi exposes empty provider hooks outside screen declaration") {
 	auto navigator = silencer::client_ui::UseScreenNavigator();
 	CHECK(navigator.currentEntryId == 0);
