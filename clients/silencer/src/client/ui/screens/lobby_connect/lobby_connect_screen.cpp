@@ -4,7 +4,6 @@
 #include "game_state.h"
 #include "surface.h"
 #include "lobby.h"
-#include "updater.h"
 #include "ambience_mixer.h"
 #include "config.h"
 #include "world.h"
@@ -214,8 +213,8 @@ void LobbyConnectScreen::Tick(ScreenContext & ctx)
 				}else{
 					if(world.lobby.updateavailable){
 						// Route into the auto-updater flow.
-						ctx.updater.PresentUpdate(world.lobby.updateurl,
-						                          world.lobby.updatesha256);
+						ctx.PresentUpdate(world.lobby.updateurl,
+						                  world.lobby.updatesha256);
 						world.lobby.Disconnect();
 						world.lobby.state = Lobby::IDLE;
 						world.lobby.UnlockMutex();

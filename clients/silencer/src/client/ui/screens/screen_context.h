@@ -3,8 +3,10 @@
 
 #include <SDL3/SDL_stdinc.h>
 #include <SDL3/SDL_gamepad.h>
+#include <cstdint>
 #include <functional>
 #include <memory>
+#include <string>
 
 class World;
 class Renderer;
@@ -22,18 +24,29 @@ class LobbyGame;
 struct SDL_Window;
 
 // Bag of refs that screens use to reach transitional global subsystems
-// (World, Lobby, Updater, KeyMap, AmbienceMixer, MapDownloader) plus narrow
-// handoffs for Game, renderer, window, render-device, and screen-stack actions.
+// (World, Lobby, KeyMap, AmbienceMixer, MapDownloader) plus narrow handoffs for
+// Game, updater, renderer, window, render-device, and screen-stack actions.
 // Per-screen behavior lives in the screen, not here; private backing services
 // must be exposed only through named ScreenContext methods.
 class ScreenContext
 {
 	Game & game;
 	Renderer & renderer;
+	Updater & updater;
 	SDL_Window * & window;
 	RenderDevice * & renderdevice;
 
 public:
+	enum class UpdateState {
+		Idle,
+		Prompting,
+		Downloading,
+		Verifying,
+		Staging,
+		Failed,
+		Done
+	};
+
 	ScreenContext(Game & game,
 	              World & world,
 	              Renderer & renderer,
@@ -48,7 +61,6 @@ public:
 	World &    world;
 	Lobby &    lobby;
 	KeyMap &   keymap;
-	Updater &  updater;
 	AmbienceMixer & ambienceMixer;
 	MapDownloader & mapDownloader;
 
@@ -80,6 +92,16 @@ public:
 	void ResetPresentation(int paletteIdx);
 	void ResetMenuPresentation(int paletteIdx);
 	bool UiBlinkVisible() const;
+	void PresentUpdate(const std::string & url, const uint8_t sha256[32]);
+	UpdateState CurrentUpdateState();
+	float UpdateProgress();
+	std::string UpdateErrorMessage();
+	int UpdateRetryCount();
+	void ConsentUpdate();
+	void CancelUpdate();
+	void RetryUpdate();
+	void OpenUpdateDownloadPage();
+	bool LaunchStagedUpdate();
 	void SetWindowFullscreen(bool fullscreen);
 	void SetScaleFilter(bool enabled);
 	void BeginLobbyPanelBorderBlur(int width, int height, float uiScale);

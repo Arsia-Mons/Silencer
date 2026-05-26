@@ -3,8 +3,6 @@
 #include "screen_context.h"
 #include "game_state.h"
 #include "surface.h"
-#include "updater.h"
-#include "updaterstage2.h"
 
 #include "clay/clay.h"
 #include "clay_ui_compositor.h"
@@ -15,7 +13,6 @@
 #include <SDL3/SDL.h>
 
 #include <cstdio>
-#include <cstdlib>
 #include <string>
 
 namespace update_screen_detail
@@ -27,6 +24,7 @@ using silencer::ui::primitives::ButtonSize;
 using silencer::ui::primitives::ButtonVariant;
 using silencer::ui::primitives::Text;
 using silencer::ui::primitives::TextSize;
+using UpdateState = ScreenContext::UpdateState;
 
 constexpr uint16_t kDialogW = 352;
 constexpr uint16_t kDialogH = 178;
@@ -45,22 +43,22 @@ Clay_String FromStd(const std::string & s)
 
 std::string StatusText(ScreenContext & ctx)
 {
-	switch(ctx.updater.GetState()){
-		case Updater::PROMPTING:
+	switch(ctx.CurrentUpdateState()){
+		case UpdateState::Prompting:
 			return "An update is required to play online.";
-		case Updater::DOWNLOADING:{
+		case UpdateState::Downloading:{
 			char buf[32];
-			snprintf(buf, sizeof(buf), "%d%%", int(ctx.updater.GetProgress() * 100));
+			snprintf(buf, sizeof(buf), "%d%%", int(ctx.UpdateProgress() * 100));
 			return buf;
 		}
-		case Updater::VERIFYING:
+		case UpdateState::Verifying:
 			return "Verifying...";
-		case Updater::STAGING:
+		case UpdateState::Staging:
 			return "Restarting...";
-		case Updater::FAILED:
-			return ctx.updater.GetErrorMessage();
-		case Updater::IDLE:
-		case Updater::DONE:
+		case UpdateState::Failed:
+			return ctx.UpdateErrorMessage();
+		case UpdateState::Idle:
+		case UpdateState::Done:
 		default:
 			return "";
 	}
@@ -68,8 +66,8 @@ std::string StatusText(ScreenContext & ctx)
 
 std::string ProgressText(ScreenContext & ctx)
 {
-	if(ctx.updater.GetState() != Updater::DOWNLOADING) return "";
-	int width = int(ctx.updater.GetProgress() * 20.0f);
+	if(ctx.CurrentUpdateState() != UpdateState::Downloading) return "";
+	int width = int(ctx.UpdateProgress() * 20.0f);
 	std::string bar = "[";
 	for(int i = 0; i < 20; i++) bar += (i < width) ? "=" : " ";
 	bar += "]";
@@ -88,55 +86,36 @@ void UpdateScreen::Build(ScreenContext & ctx)
 
 void UpdateScreen::Tick(ScreenContext & ctx)
 {
-	Updater::State ustate = ctx.updater.GetState();
+	using update_screen_detail::UpdateState;
+	UpdateState ustate = ctx.CurrentUpdateState();
 	if(updateClicked){
 		updateClicked = false;
-		if(ustate == Updater::PROMPTING) ctx.updater.Consent();
+		if(ustate == UpdateState::Prompting) ctx.ConsentUpdate();
 	}
 	if(cancelClicked){
 		cancelClicked = false;
-		if(ustate == Updater::PROMPTING || ustate == Updater::DOWNLOADING || ustate == Updater::FAILED){
-			if(ustate == Updater::DOWNLOADING) ctx.updater.Cancel();
+		if(ustate == UpdateState::Prompting || ustate == UpdateState::Downloading || ustate == UpdateState::Failed){
+			if(ustate == UpdateState::Downloading) ctx.CancelUpdate();
 			ctx.GoToState(GameState::MAINMENU);
 			return;
 		}
 	}
 	if(retryClicked){
 		retryClicked = false;
-		if(ustate == Updater::FAILED && ctx.updater.GetRetryCount() < 3){
-			ctx.updater.Retry();
+		if(ustate == UpdateState::Failed && ctx.UpdateRetryCount() < 3){
+			ctx.RetryUpdate();
 		}
 	}
 	if(downloadClicked){
 		downloadClicked = false;
-		if(ustate == Updater::FAILED && ctx.updater.GetRetryCount() >= 3){
-			std::string url = ctx.updater.GetDownloadURL();
-#ifdef _WIN32
-			std::string cmd = "start \"\" \"" + url + "\"";
-#elif defined(__APPLE__)
-			std::string cmd = "open '" + url + "'";
-#else
-			std::string cmd = "xdg-open '" + url + "' &";
-#endif
-			system(cmd.c_str());
+		if(ustate == UpdateState::Failed && ctx.UpdateRetryCount() >= 3){
+			ctx.OpenUpdateDownloadPage();
 			ctx.GoToState(GameState::MAINMENU);
 			return;
 		}
 	}
-	if(ctx.updater.GetState() == Updater::STAGING){
-		std::string zippath =
-#ifdef _WIN32
-			std::string(getenv("TEMP") ? getenv("TEMP") : ".") + "\\silencer-update.zip";
-#else
-			"/tmp/silencer-update.zip";
-#endif
-		fprintf(stderr, "[updater] UpdateScreen invoking UpdaterStage2::Launch with zip=%s\n",
-		        zippath.c_str());
-		if(UpdaterStage2::Launch(zippath)){
-			ctx.updater.MarkStage2Spawned();
-			return;
-		}
-		fprintf(stderr, "[updater] UpdaterStage2::Launch failed; returning to main menu\n");
+	if(ctx.CurrentUpdateState() == UpdateState::Staging){
+		if(ctx.LaunchStagedUpdate()) return;
 		ctx.GoToState(GameState::MAINMENU);
 	}
 }
@@ -145,13 +124,14 @@ void UpdateScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime, 
 {
 	(void)frametime;
 	(void)dst;
+	using update_screen_detail::UpdateState;
 	using namespace silencer::clay_bridge;
 
 
 
 	std::string status = update_screen_detail::StatusText(ctx);
 	std::string progress = update_screen_detail::ProgressText(ctx);
-	Updater::State ustate = ctx.updater.GetState();
+	UpdateState ustate = ctx.CurrentUpdateState();
 
 	CLAY({ .id = CLAY_ID("UpdateRoot"),
 	       .layout = {
@@ -182,23 +162,23 @@ void UpdateScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime, 
 			           .childGap = update_screen_detail::kButtonGap,
 			           .layoutDirection = CLAY_LEFT_TO_RIGHT,
 			       } }) {
-				if(ustate == Updater::PROMPTING){
+				if(ustate == UpdateState::Prompting){
 					update_screen_detail::Button(CLAY_STRING("UpdateConsentButton"), CLAY_STRING("Update"),
 					           update_screen_detail::ButtonOpts{ .variant = update_screen_detail::ButtonVariant::Chrome,
 					                                             .size = update_screen_detail::ButtonSize::Compact },
 					           update_screen_detail::ButtonHandle{ nullptr, update_screen_detail::kActionUpdate, &interactions });
-				}else if(ustate == Updater::FAILED && ctx.updater.GetRetryCount() < 3){
+				}else if(ustate == UpdateState::Failed && ctx.UpdateRetryCount() < 3){
 					update_screen_detail::Button(CLAY_STRING("UpdateRetryButton"), CLAY_STRING("Retry"),
 					           update_screen_detail::ButtonOpts{ .variant = update_screen_detail::ButtonVariant::Chrome,
 					                                             .size = update_screen_detail::ButtonSize::Compact },
 					           update_screen_detail::ButtonHandle{ nullptr, update_screen_detail::kActionRetry, &interactions });
-				}else if(ustate == Updater::FAILED){
+				}else if(ustate == UpdateState::Failed){
 					update_screen_detail::Button(CLAY_STRING("UpdateDownloadButton"), CLAY_STRING("Download"),
 					           update_screen_detail::ButtonOpts{ .variant = update_screen_detail::ButtonVariant::Chrome,
 					                                             .size = update_screen_detail::ButtonSize::Compact },
 					           update_screen_detail::ButtonHandle{ nullptr, update_screen_detail::kActionDownload, &interactions });
 				}
-				if(ustate == Updater::PROMPTING || ustate == Updater::DOWNLOADING || ustate == Updater::FAILED){
+				if(ustate == UpdateState::Prompting || ustate == UpdateState::Downloading || ustate == UpdateState::Failed){
 					update_screen_detail::Button(CLAY_STRING("UpdateCancelButton"), CLAY_STRING("Cancel"),
 					           update_screen_detail::ButtonOpts{ .variant = update_screen_detail::ButtonVariant::Chrome,
 					                                             .size = update_screen_detail::ButtonSize::Compact },

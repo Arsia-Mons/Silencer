@@ -10,10 +10,39 @@
 #include "lobby.h"
 #include "lobbygame.h"
 #include "renderdevice.h"
+#include "updater.h"
+#include "updaterstage2.h"
 
 #include <SDL3/SDL_video.h>
 
 #include <cassert>
+#include <cstdio>
+#include <cstdlib>
+#include <string>
+
+namespace
+{
+ScreenContext::UpdateState ToScreenUpdateState(Updater::State state)
+{
+	switch(state){
+		case Updater::IDLE:
+			return ScreenContext::UpdateState::Idle;
+		case Updater::PROMPTING:
+			return ScreenContext::UpdateState::Prompting;
+		case Updater::DOWNLOADING:
+			return ScreenContext::UpdateState::Downloading;
+		case Updater::VERIFYING:
+			return ScreenContext::UpdateState::Verifying;
+		case Updater::STAGING:
+			return ScreenContext::UpdateState::Staging;
+		case Updater::FAILED:
+			return ScreenContext::UpdateState::Failed;
+		case Updater::DONE:
+		default:
+			return ScreenContext::UpdateState::Done;
+	}
+}
+} // namespace
 
 ScreenContext::ScreenContext(Game & game_,
                              World & world_,
@@ -27,12 +56,12 @@ ScreenContext::ScreenContext(Game & game_,
                              RenderDevice * & renderdevice_)
     : game(game_),
       renderer(renderer_),
+      updater(updater_),
       window(window_),
       renderdevice(renderdevice_),
       world(world_),
       lobby(lobby_),
       keymap(keymap_),
-      updater(updater_),
       ambienceMixer(ambienceMixer_),
       mapDownloader(mapDownloader_)
 {
@@ -88,6 +117,67 @@ void ScreenContext::ResetMenuPresentation(int paletteIdx) {
 
 bool ScreenContext::UiBlinkVisible() const {
 	return (renderer.GetHudAnimationPhase() % 32) < 16;
+}
+
+void ScreenContext::PresentUpdate(const std::string & url, const uint8_t sha256[32]) {
+	updater.PresentUpdate(url, sha256);
+}
+
+ScreenContext::UpdateState ScreenContext::CurrentUpdateState() {
+	return ToScreenUpdateState(updater.GetState());
+}
+
+float ScreenContext::UpdateProgress() {
+	return updater.GetProgress();
+}
+
+std::string ScreenContext::UpdateErrorMessage() {
+	return updater.GetErrorMessage();
+}
+
+int ScreenContext::UpdateRetryCount() {
+	return updater.GetRetryCount();
+}
+
+void ScreenContext::ConsentUpdate() {
+	updater.Consent();
+}
+
+void ScreenContext::CancelUpdate() {
+	updater.Cancel();
+}
+
+void ScreenContext::RetryUpdate() {
+	updater.Retry();
+}
+
+void ScreenContext::OpenUpdateDownloadPage() {
+	std::string url = updater.GetDownloadURL();
+#ifdef _WIN32
+	std::string cmd = "start \"\" \"" + url + "\"";
+#elif defined(__APPLE__)
+	std::string cmd = "open '" + url + "'";
+#else
+	std::string cmd = "xdg-open '" + url + "' &";
+#endif
+	system(cmd.c_str());
+}
+
+bool ScreenContext::LaunchStagedUpdate() {
+	std::string zippath =
+#ifdef _WIN32
+		std::string(getenv("TEMP") ? getenv("TEMP") : ".") + "\\silencer-update.zip";
+#else
+		"/tmp/silencer-update.zip";
+#endif
+	fprintf(stderr, "[updater] UpdateScreen invoking UpdaterStage2::Launch with zip=%s\n",
+	        zippath.c_str());
+	if(UpdaterStage2::Launch(zippath)){
+		updater.MarkStage2Spawned();
+		return true;
+	}
+	fprintf(stderr, "[updater] UpdaterStage2::Launch failed; returning to main menu\n");
+	return false;
 }
 
 void ScreenContext::SetWindowFullscreen(bool fullscreen) {

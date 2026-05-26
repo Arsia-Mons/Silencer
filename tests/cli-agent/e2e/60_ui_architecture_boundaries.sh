@@ -148,13 +148,26 @@ if awk '
   in_screen_context && /^};/ { in_screen_context = 0 }
   in_screen_context && seen_public && /^[[:space:]]*Game[[:space:]]*&[[:space:]]*game[[:space:]]*;/ { found = 1 }
   in_screen_context && seen_public && /^[[:space:]]*Renderer[[:space:]]*&[[:space:]]*renderer[[:space:]]*;/ { found = 1 }
+  in_screen_context && seen_public && /^[[:space:]]*Updater[[:space:]]*&[[:space:]]*updater[[:space:]]*;/ { found = 1 }
   in_screen_context && seen_public && /^[[:space:]]*SDL_Window[[:space:]]*\*[[:space:]]*&[[:space:]]*window[[:space:]]*;/ { found = 1 }
   in_screen_context && seen_public && /^[[:space:]]*RenderDevice[[:space:]]*\*[[:space:]]*&[[:space:]]*renderdevice[[:space:]]*;/ { found = 1 }
   END { exit(found ? 0 : 1) }
 ' "$screen_context_header"; then
-  echo "ScreenContext backing Game/Renderer/window/render-device refs must stay private" >&2
+  echo "ScreenContext backing Game/Renderer/Updater/window/render-device refs must stay private" >&2
   exit 1
 fi
+
+fail_if_match \
+  'ctx[.]updater' \
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/modals" \
+  --glob '!**/screen_context.cpp'
+
+fail_if_match \
+  '#include[[:space:]]*"updater(stage2)?[.]h"' \
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/modals" \
+  --glob '!**/screen_context.cpp'
 
 fail_if_match \
   '#include[[:space:]]*"renderdevice[.]h"' \
