@@ -51,7 +51,7 @@ fail_if_match \
   --glob '!clients/silencer/src/ui/runtime/ClayService.cpp'
 
 fail_if_match \
-  "\\breact_(enter|leave|provider_push|provider_pop)[[:space:]]*\\(" \
+  "\\breact_(enter|leave|next_child_index|make_instance_id|provider_push|provider_pop)[[:space:]]*\\(" \
   "$REPO_ROOT/clients/silencer/src" \
   --glob '!third_party/**' \
   --glob '!clients/silencer/src/ui/runtime/react.h' \

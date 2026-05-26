@@ -76,6 +76,9 @@ struct ReactRuntimeState {
 	int32_t effect_queue_count;
 	RenderFrame render_stack[kMaxRenderDepth];
 	int32_t render_stack_count;
+	int32_t render_overflow_depth;
+	Fiber* render_overflow_saved_current;
+	int32_t render_overflow_saved_hook_index;
 
 	Fiber* current;
 	int32_t hook_index;
@@ -242,14 +245,22 @@ void react_shutdown(void) {
 	}
 	G.effect_queue_count = 0;
 	G.render_stack_count = 0;
+	G.render_overflow_depth = 0;
+	G.render_overflow_saved_current = nullptr;
+	G.render_overflow_saved_hook_index = 0;
 	G.current = nullptr;
 	G.hook_index = 0;
 	G.root_child_index = 0;
 }
 
 void react_enter(uint32_t fiber_id) {
-	if(G.render_stack_count >= kMaxRenderDepth){
-		report_error("react: render stack overflow (max=%d)\n", kMaxRenderDepth);
+	if(G.render_overflow_depth > 0 || G.render_stack_count >= kMaxRenderDepth){
+		if(G.render_overflow_depth == 0){
+			report_error("react: render stack overflow (max=%d)\n", kMaxRenderDepth);
+			G.render_overflow_saved_current = G.current;
+			G.render_overflow_saved_hook_index = G.hook_index;
+		}
+		G.render_overflow_depth++;
 		G.current = nullptr;
 		G.hook_index = 0;
 		return;
@@ -292,6 +303,17 @@ Clay_ElementId react_make_instance_id(Clay_String name,
 }
 
 void react_leave(void) {
+	if(G.render_overflow_depth > 0){
+		G.render_overflow_depth--;
+		if(G.render_overflow_depth == 0){
+			G.current = G.render_overflow_saved_current;
+			G.hook_index = G.render_overflow_saved_hook_index;
+			G.render_overflow_saved_current = nullptr;
+			G.render_overflow_saved_hook_index = 0;
+		}
+		return;
+	}
+
 	if(G.render_stack_count <= 0){
 		report_error("react: leave without matching enter\n");
 		G.current = nullptr;
@@ -407,6 +429,9 @@ void react_begin_frame(void) {
 	G.frame++;
 	G.effect_queue_count = 0;
 	G.render_stack_count = 0;
+	G.render_overflow_depth = 0;
+	G.render_overflow_saved_current = nullptr;
+	G.render_overflow_saved_hook_index = 0;
 	G.current = nullptr;
 	G.hook_index = 0;
 	G.root_child_index = 0;

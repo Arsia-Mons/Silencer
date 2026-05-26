@@ -144,6 +144,19 @@ void ProviderOverflowProbe(int depth) {
 	}
 }
 
+int gRenderStackAfterChildValue = 0;
+
+void RenderStackOverflowProbe(int depth) {
+	REACT_COMPONENT_BEGIN_KEY("RenderStackOverflowProbe", depth) {
+		(void)use_state_int(depth);
+		if(depth < 128) RenderStackOverflowProbe(depth + 1);
+		if(depth == 127){
+			int* value = use_state_int(777);
+			gRenderStackAfterChildValue = *value;
+		}
+	} REACT_COMPONENT_END();
+}
+
 bool gUseRefForKindProbe = false;
 bool gExtraHookForCountProbe = false;
 
@@ -290,6 +303,16 @@ TEST_CASE("React provider overflow preserves context restoration") {
 	CHECK(gOverflowContext.current == &gOverflowRootValue);
 	CHECK(gOverflowContext.depth == 0);
 	CHECK(gOverflowContext.overflowDepth == 0);
+}
+
+TEST_CASE("React render stack overflow preserves parent component stack") {
+	EnsureClay();
+	react_init(g_clay);
+	gRenderStackAfterChildValue = 0;
+
+	RunReactFrame([] { RenderStackOverflowProbe(0); });
+	CHECK(react_error_count() == 1);
+	CHECK(gRenderStackAfterChildValue == 777);
 }
 
 TEST_CASE("React runtime diagnoses hook kind and count drift") {
