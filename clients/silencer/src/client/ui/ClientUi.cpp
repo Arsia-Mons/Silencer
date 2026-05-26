@@ -85,11 +85,11 @@ bool ActionTargetsFeedbackInteractable(const silencer::ui::UiInteractionRegistry
 	return widget && InteractableRequestsFeedback(*widget);
 }
 
-void WithScreenFocusScope(silencer::client_ui::UiScreenEntryId entryId,
+void WithScreenFocusScope(int visibleIndex,
                           bool modal,
                           const std::function<void()>& build) {
 	silencer::ui::ui_focus_push_scope({
-		CLAY_IDI("ClientUiScreenFocusScope", entryId),
+		CLAY_IDI("ClientUiScreenFocusScope", visibleIndex),
 		modal,
 		true,
 	});
@@ -403,7 +403,7 @@ void ClientUi::BuildVisibleScreenFrame(UiScreenEntryId entryId,
 				.layoutDirection = CLAY_TOP_TO_BOTTOM,
 			},
 		}) {
-			clientui_detail::WithScreenFocusScope(entryId, false, build);
+			clientui_detail::WithScreenFocusScope(visibleIndex, false, build);
 		}
 		return;
 	}
@@ -423,7 +423,7 @@ void ClientUi::BuildVisibleScreenFrame(UiScreenEntryId entryId,
 			.attachTo = CLAY_ATTACH_TO_ROOT,
 		},
 	}) {
-		clientui_detail::WithScreenFocusScope(entryId, true, build);
+		clientui_detail::WithScreenFocusScope(visibleIndex, true, build);
 	}
 }
 

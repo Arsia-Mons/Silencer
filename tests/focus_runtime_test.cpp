@@ -615,7 +615,7 @@ TEST_CASE("ClientUi overlay focus is isolated from the covered screen") {
 
 	REQUIRE(overlayEntry != 0);
 	CHECK(SameId(silencer::ui::ui_focus_focused_id_for_scope(
-		             CLAY_IDI("ClientUiScreenFocusScope", overlayEntry)),
+		             CLAY_IDI("ClientUiScreenFocusScope", 1)),
 	             overlayButton));
 	CHECK(clientUi.Interactions().FindById("base.activate") == nullptr);
 	const auto * overlayElement = clientUi.Interactions().FindById("overlay.activate");
@@ -633,6 +633,38 @@ TEST_CASE("ClientUi overlay focus is isolated from the covered screen") {
 	REQUIRE(result.unhandledActions.size() == 1);
 	CHECK(result.unhandledActions[0].kind == silencer::ui::UiActionKind::Activate);
 	CHECK(result.unhandledActions[0].id == "overlay.activate");
+}
+
+TEST_CASE("ClientUi screen focus scopes stay bounded across entry churn") {
+	RealClayBackend backend;
+	silencer::ui::ClayService clay(backend);
+	silencer::client_ui::ClientUi clientUi(clay);
+
+	Clay_ElementId button = TestId("ChurnVisibleButton");
+	for(int i = 0; i < 20; ++i){
+		auto screen = std::make_unique<FrameProbeScreen>(false);
+		Screen * current = screen.get();
+		REQUIRE(clientUi.PushBuiltScreenForTest(std::move(screen)));
+
+		silencer::ui::UiInputState input;
+		input.width = 640;
+		input.height = 480;
+		clientUi.BeginFrame(input);
+		clientUi.BuildVisibleScreenFramesForTest(
+			[&](silencer::client_ui::UiScreenEntryId, Screen& screen, bool) {
+				if(&screen == current){
+					RuntimeButton(clientUi.Interactions(), button, "churn.visible");
+				}
+			});
+		clientUi.EndFrame();
+		(void)clientUi.DispatchInput(nullptr, input);
+
+		CHECK(clientUi.FocusRuntime().errorCount == 0);
+		CHECK(clientUi.FocusRuntime().scopeCount <= 2);
+		CHECK(SameId(silencer::ui::ui_focus_focused_id_for_scope(
+			             CLAY_IDI("ClientUiScreenFocusScope", 0)),
+		             button));
+	}
 }
 
 TEST_CASE("ClientUi focus sees current frame pointer state before layout") {
