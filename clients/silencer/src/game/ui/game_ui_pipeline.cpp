@@ -111,11 +111,7 @@ return commands;
 }
 
 void GameUiPipeline::BuildVisibleClientUi(Surface& surface, float frametime) {
-silencer::game_ui::GameUiFrame frame;
-frame.input = preparedUiInput;
-frame.surfaceWidth = surface.w;
-frame.surfaceHeight = surface.h;
-silencer::game_ui::WithGameUiFrameProvider(frame, [&] {
+silencer::game_ui::WithPreparedGameUiFrame(preparedUiInput, surface.w, surface.h, [&] {
 clientUi.BuildVisibleScreens(game.screenContext, surface, frametime);
 if(game.world.map.loaded){
 silencer::client_ui::HudView hudView =

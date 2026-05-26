@@ -336,17 +336,15 @@ TEST_CASE("GameUiFrame provider exposes frame data during screen declaration") {
 	Screen * screenPtr = screen.get();
 	clientUi.PushBuiltScreenForTest(std::move(screen));
 
-	silencer::game_ui::GameUiFrame frame;
-	frame.input.width = 320;
-	frame.input.height = 200;
-	frame.input.uiScale = 2.0f;
-	frame.input.pointer.x = 14.0f;
-	frame.input.pointer.y = 27.0f;
-	frame.surfaceWidth = 640;
-	frame.surfaceHeight = 400;
+	silencer::ui::UiInputState input;
+	input.width = 320;
+	input.height = 200;
+	input.uiScale = 2.0f;
+	input.pointer.x = 14.0f;
+	input.pointer.y = 27.0f;
 
 	CHECK(silencer::game_ui::UseGameUiFrame() == nullptr);
-	silencer::game_ui::WithGameUiFrameProvider(frame, [&] {
+	silencer::game_ui::WithPreparedGameUiFrame(input, 640, 400, [&] {
 		clientUi.BuildVisibleScreenProvidersForTest(
 			[&](silencer::client_ui::UiScreenEntryId, Screen& screen) {
 				REQUIRE(&screen == screenPtr);
@@ -358,6 +356,10 @@ TEST_CASE("GameUiFrame provider exposes frame data during screen declaration") {
 				CHECK(current->input.uiScale == 2.0f);
 				CHECK(current->input.pointer.x == 14.0f);
 				CHECK(current->input.pointer.y == 27.0f);
+				CHECK(current->layout.width == 320.0f);
+				CHECK(current->layout.height == 200.0f);
+				CHECK(current->pointer.x == 14.0f);
+				CHECK(current->pointer.y == 27.0f);
 				CHECK(current->surfaceWidth == 640);
 				CHECK(current->surfaceHeight == 400);
 			});
