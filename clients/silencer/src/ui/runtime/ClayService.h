@@ -30,6 +30,10 @@ public:
 	~ClayService();
 
 	void BeginFrame(const UiInputState& input, UiInteractionRegistry& interactions);
+	void PrepareFrame(const UiInputState& input, UiInteractionRegistry& interactions);
+	void BeginPreparedLayout();
+	Clay_RenderCommandArray EndPreparedLayout();
+	void EndPreparedFrame();
 	Clay_RenderCommandArray EndFrame();
 	const ClayFrameState& Frame() const { return frame_; }
 

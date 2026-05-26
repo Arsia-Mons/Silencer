@@ -313,6 +313,72 @@ TEST_CASE("UiFocus pointer release confirms only the original hovered target") {
 	CHECK(confirmCount == 1);
 }
 
+TEST_CASE("UiFocus failed scope pushes unwind without corrupting parent scope") {
+	silencer::ui::UiFocusRuntime focus;
+	silencer::ui::ui_focus_init(&focus, {
+		.maxFocusScopes = 1,
+		.maxFocusablesPerScope = 8,
+	});
+
+	Clay_ElementId parent = TestId("OverflowParentScope");
+	Clay_ElementId overflow = TestId("OverflowNoopScope");
+	Clay_ElementId parentFirst = TestId("OverflowParentFirst");
+	Clay_ElementId parentSecond = TestId("OverflowParentSecond");
+	Clay_ElementId leakedItem = TestId("OverflowLeakedItem");
+
+	RunFocusFrame(focus, {}, [&] {
+		silencer::ui::ui_focus_push_scope({parent});
+		FocusBox(parentFirst);
+		silencer::ui::ui_focus_push_scope({overflow});
+		FocusBox(leakedItem);
+		silencer::ui::ui_focus_pop_scope();
+		FocusBox(parentSecond);
+		silencer::ui::ui_focus_pop_scope();
+	});
+
+	CHECK(silencer::ui::ui_focus_error_count() == 1);
+	CHECK(SameId(silencer::ui::ui_focus_focused_id_for_scope(parent), parentFirst));
+
+	silencer::ui::UiFocusInputFrame down;
+	down.navDown = true;
+	RunFocusFrame(focus, down, [&] {
+		silencer::ui::ui_focus_push_scope({parent});
+		FocusBox(parentFirst);
+		FocusBox(parentSecond);
+		silencer::ui::ui_focus_pop_scope();
+	});
+	CHECK(SameId(silencer::ui::ui_focus_focused_id_for_scope(parent), parentSecond));
+}
+
+TEST_CASE("UiFocus unique-scope creation overflow does not leak declarations") {
+	silencer::ui::UiFocusRuntime focus;
+	silencer::ui::ui_focus_init(&focus, {
+		.maxFocusScopes = 1,
+		.maxFocusablesPerScope = 8,
+	});
+
+	Clay_ElementId firstScope = TestId("CreationOverflowFirstScope");
+	Clay_ElementId secondScope = TestId("CreationOverflowSecondScope");
+	Clay_ElementId firstItem = TestId("CreationOverflowFirstItem");
+	Clay_ElementId leakedItem = TestId("CreationOverflowLeakedItem");
+
+	RunFocusFrame(focus, {}, [&] {
+		silencer::ui::ui_focus_push_scope({firstScope});
+		FocusBox(firstItem);
+		silencer::ui::ui_focus_pop_scope();
+	});
+	CHECK(SameId(silencer::ui::ui_focus_focused_id_for_scope(firstScope), firstItem));
+
+	RunFocusFrame(focus, {}, [&] {
+		silencer::ui::ui_focus_push_scope({secondScope});
+		FocusBox(leakedItem);
+		silencer::ui::ui_focus_pop_scope();
+	});
+	CHECK(silencer::ui::ui_focus_error_count() == 1);
+	CHECK(silencer::ui::ui_focus_focused_id_for_scope(secondScope).id == 0);
+	CHECK(SameId(silencer::ui::ui_focus_focused_id_for_scope(firstScope), firstItem));
+}
+
 TEST_CASE("ClientUi owns the UiFocus frame lifecycle") {
 	RealClayBackend backend;
 	silencer::ui::ClayService clay(backend);
@@ -361,4 +427,60 @@ TEST_CASE("ClientUi owns the UiFocus frame lifecycle") {
 	CHECK(SameId(
 		silencer::ui::ui_focus_focused_id_for_scope(scope),
 		second));
+}
+
+TEST_CASE("ClientUi focus sees current frame pointer state before layout") {
+	RealClayBackend backend;
+	silencer::ui::ClayService clay(backend);
+	silencer::client_ui::ClientUi clientUi(clay);
+
+	silencer::ui::UiInputState input;
+	input.width = 640;
+	input.height = 480;
+	Clay_ElementId scope = TestId("ClientUiPointerScope");
+	Clay_ElementId first = TestId("ClientUiPointerFirst");
+	Clay_ElementId second = TestId("ClientUiPointerSecond");
+	int confirmCount = 0;
+
+	auto build = [&] {
+		CLAY({
+			.id = TestId("ClientUiPointerStack"),
+			.layout = {
+				.layoutDirection = CLAY_TOP_TO_BOTTOM,
+				.childGap = 8,
+			},
+		}) {
+			silencer::ui::ui_focus_push_scope({scope});
+			FocusBox(first, false, {}, [&] { confirmCount++; });
+			FocusBox(second, false, {}, [&] { confirmCount++; });
+			silencer::ui::ui_focus_pop_scope();
+		}
+	};
+
+	clientUi.BeginFrame(input);
+	build();
+	clientUi.EndFrame();
+	Clay_ElementData firstData = Clay_GetElementData(first);
+	Clay_ElementData secondData = Clay_GetElementData(second);
+	REQUIRE(firstData.found);
+	REQUIRE(secondData.found);
+
+	input.pointer.x = secondData.boundingBox.x + secondData.boundingBox.width * 0.5f;
+	input.pointer.y = secondData.boundingBox.y + secondData.boundingBox.height * 0.5f;
+	input.pointer.down = true;
+	input.pointer.pressed = true;
+	clientUi.BeginFrame(input);
+	build();
+	clientUi.EndFrame();
+	CHECK(SameId(silencer::ui::ui_focus_focused_id_for_scope(scope), second));
+	CHECK(confirmCount == 0);
+
+	input.pointer.pressed = false;
+	input.pointer.down = false;
+	input.pointer.released = true;
+	clientUi.BeginFrame(input);
+	build();
+	clientUi.EndFrame();
+	CHECK(SameId(silencer::ui::ui_focus_focused_id_for_scope(scope), second));
+	CHECK(confirmCount == 1);
 }

@@ -123,15 +123,17 @@ void ClientUi::BeginFrame(const silencer::ui::UiInputState& input) {
 	frameCtx_.BeginFrame(input.animationDeltaSeconds, input.animationStepSeconds);
 	silencer::client_ui::HudPayloadBeginFrame();
 	focusInput_ = clientui_detail::FocusInputFrom(input);
+	clay_.PrepareFrame(input, interactions_);
 	silencer::ui::ui_focus_set_current(&focus_);
 	silencer::ui::ui_focus_begin_frame(focusInput_);
-	clay_.BeginFrame(input, interactions_);
+	clay_.BeginPreparedLayout();
 }
 
 Clay_RenderCommandArray ClientUi::EndFrame() {
-	Clay_RenderCommandArray commands = clay_.EndFrame();
+	Clay_RenderCommandArray commands = clay_.EndPreparedLayout();
 	silencer::ui::ui_focus_set_current(&focus_);
 	silencer::ui::ui_focus_end_layout(focusInput_);
+	clay_.EndPreparedFrame();
 	return commands;
 }
 

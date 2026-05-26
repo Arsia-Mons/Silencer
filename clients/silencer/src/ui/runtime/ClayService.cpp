@@ -12,6 +12,12 @@ ClayService::~ClayService() {
 }
 
 void ClayService::BeginFrame(const UiInputState& input, UiInteractionRegistry& interactions) {
+	PrepareFrame(input, interactions);
+	BeginPreparedLayout();
+}
+
+void ClayService::PrepareFrame(const UiInputState& input,
+                               UiInteractionRegistry& interactions) {
 	frame_.input = input;
 	frame_.interactions = &interactions;
 	interactions.BeginFrame();
@@ -25,19 +31,32 @@ void ClayService::BeginFrame(const UiInputState& input, UiInteractionRegistry& i
 		react_init(Clay_GetCurrentContext());
 		reactInitialized_ = true;
 	}
+}
+
+void ClayService::BeginPreparedLayout() {
 	react_begin_frame();
 	backend_.BeginLayout();
 	inFrame_ = true;
 }
 
-Clay_RenderCommandArray ClayService::EndFrame() {
+Clay_RenderCommandArray ClayService::EndPreparedLayout() {
 	if(!inFrame_) return Clay_RenderCommandArray{};
 	inFrame_ = false;
 	Clay_RenderCommandArray commands = backend_.EndLayout();
-	react_end_frame();
 	if(frame_.interactions){
 		frame_.interactions->ResolveClayBoundsFromClay();
 	}
+	return commands;
+}
+
+void ClayService::EndPreparedFrame() {
+	if(!reactInitialized_) return;
+	react_end_frame();
+}
+
+Clay_RenderCommandArray ClayService::EndFrame() {
+	Clay_RenderCommandArray commands = EndPreparedLayout();
+	EndPreparedFrame();
 	return commands;
 }
 

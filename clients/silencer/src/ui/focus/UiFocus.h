@@ -149,6 +149,7 @@ struct UiFocusRuntime {
 
 	int scopeStack[UI_FOCUS_MAX_SCOPES] = {};
 	int scopeStackCount = 0;
+	int scopeNoopPushDepth = 0;
 
 	uint32_t frame = 0;
 	uint32_t nextDeclarationOrder = 0;

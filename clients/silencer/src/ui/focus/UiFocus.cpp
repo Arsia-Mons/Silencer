@@ -83,6 +83,7 @@ UiFocusScope * ScopeForDeclaration(UiFocusRuntime * runtime,
 
 UiFocusScope * ActiveScopeForDeclaration(UiFocusRuntime * runtime) {
 	if(!runtime || runtime->scopeStackCount <= 0) return nullptr;
+	if(runtime->scopeNoopPushDepth > 0) return nullptr;
 	int index = runtime->scopeStack[runtime->scopeStackCount - 1];
 	if(index < 0 || index >= runtime->scopeCount) return nullptr;
 	return &runtime->scopes[index];
@@ -397,6 +398,7 @@ void ui_focus_begin_frame(const UiFocusInputFrame& input) {
 
 	runtime->frame++;
 	runtime->scopeStackCount = 0;
+	runtime->scopeNoopPushDepth = 0;
 	runtime->nextDeclarationOrder = 0;
 	runtime->pendingFocusCallbackId = {};
 	runtime->pendingPointerConfirmId = {};
@@ -441,21 +443,36 @@ void ui_focus_begin_frame(const UiFocusInputFrame& input) {
 void ui_focus_push_scope(const UiFocusScopeDesc& desc) {
 	UiFocusRuntime * runtime = g_current;
 	if(!runtime) return;
+	if(runtime->scopeNoopPushDepth > 0){
+		runtime->scopeNoopPushDepth++;
+		return;
+	}
 	if(runtime->scopeStackCount >= runtime->limits.maxFocusScopes){
 		ReportError(runtime, "scope stack overflow");
+		runtime->scopeNoopPushDepth++;
 		return;
 	}
 
 	UiFocusScope * scope = ScopeForDeclaration(runtime, desc);
-	if(!scope) return;
+	if(!scope){
+		runtime->scopeNoopPushDepth++;
+		return;
+	}
 	int index = FindScopeIndex(runtime, scope->id);
-	if(index < 0) return;
+	if(index < 0){
+		runtime->scopeNoopPushDepth++;
+		return;
+	}
 	runtime->scopeStack[runtime->scopeStackCount++] = index;
 }
 
 void ui_focus_pop_scope() {
 	UiFocusRuntime * runtime = g_current;
 	if(!runtime) return;
+	if(runtime->scopeNoopPushDepth > 0){
+		runtime->scopeNoopPushDepth--;
+		return;
+	}
 	if(runtime->scopeStackCount <= 0){
 		ReportError(runtime, "scope pop without matching push");
 		return;
