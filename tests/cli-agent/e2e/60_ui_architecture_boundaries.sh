@@ -207,7 +207,7 @@ fail_if_match \
   --glob '!**/screen_context.cpp'
 
 fail_if_match \
-  'ctx[.]world[.]lobby[.]GetGameById' \
+  'ctx[[:space:]]*[.][[:space:]]*(world[[:space:]]*[.][[:space:]]*lobby|lobby)[[:space:]]*[.][[:space:]]*GetGameById' \
   "$REPO_ROOT/clients/silencer/src/client/ui/screens" \
   "$REPO_ROOT/clients/silencer/src/client/ui/modals" \
   --glob '!**/screen_context.cpp'
