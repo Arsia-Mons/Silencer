@@ -31,17 +31,16 @@ bool StartsWith(const Text & value, const char * prefix) {
 	return value.size() >= n && value.compare(0, n, prefix) == 0;
 }
 
-void RebuildRows(GameSelectPanelState & state, World & world) {
+void RebuildRows(GameSelectPanelState & state, ScreenContext & ctx) {
 	Uint32 prevSelectedId = 0;
 	if(state.selectedIndex >= 0 && state.selectedIndex < (int)state.rows.size()){
 		prevSelectedId = state.rows[state.selectedIndex].gameid;
 	}
 	state.rows.clear();
-	for(LobbyGame * lg : world.lobby.games){
-		if(!lg) continue;
+	for(const ScreenContext::LobbyGameListRow & lobbyGame : ctx.LobbyGameListRows()){
 		GameSelectPanelState::Row r;
-		r.name   = lg->name;
-		r.gameid = lg->id;
+		r.name   = lobbyGame.name;
+		r.gameid = lobbyGame.gameId;
 		state.rows.push_back(std::move(r));
 	}
 	state.selectedIndex = -1;
@@ -208,9 +207,8 @@ void GameSelectPanelTick(GameSelectPanelState & state,
                          World & world,
                          ScreenContext & ctx,
                          LobbyScreen & owner) {
-	if(!world.lobby.gamesprocessed){
-		game_select_panel_detail::RebuildRows(state, world);
-		world.lobby.gamesprocessed = true;
+	if(ctx.ConsumeLobbyGameListRefresh()){
+		game_select_panel_detail::RebuildRows(state, ctx);
 	}
 
 	if(state.rowClickedIndex >= 0){

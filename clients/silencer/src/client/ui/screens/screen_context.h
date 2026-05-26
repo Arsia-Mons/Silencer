@@ -80,6 +80,10 @@ public:
 		CreateLobbyGameResultKind kind = CreateLobbyGameResultKind::Pending;
 		LobbyGame * lobbyGame = nullptr;
 	};
+	struct LobbyGameListRow {
+		Uint32 gameId = 0;
+		std::string name;
+	};
 	struct UiSpriteFrameMetrics {
 		int offsetX = 0;
 		int offsetY = 0;
@@ -163,6 +167,8 @@ public:
 	bool BeginConnectedLobbyGame();
 	std::string JoinCurrentLobbyGameChannel();
 	void RequestLobbyGameListRefresh();
+	bool ConsumeLobbyGameListRefresh();
+	std::vector<LobbyGameListRow> LobbyGameListRows() const;
 	void BeginLobbyTechSelection();
 	void BeginCreateGameMapUpload(const std::string & gameName,
 	                              const std::string & mapName,

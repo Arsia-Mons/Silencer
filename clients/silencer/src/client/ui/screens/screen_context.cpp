@@ -452,6 +452,26 @@ void ScreenContext::RequestLobbyGameListRefresh() {
 	world.lobby.gamesprocessed = false;
 }
 
+bool ScreenContext::ConsumeLobbyGameListRefresh() {
+	if(world.lobby.gamesprocessed) return false;
+	world.lobby.gamesprocessed = true;
+	return true;
+}
+
+std::vector<ScreenContext::LobbyGameListRow>
+ScreenContext::LobbyGameListRows() const {
+	std::vector<LobbyGameListRow> rows;
+	rows.reserve(world.lobby.games.size());
+	for(LobbyGame * lobbyGame : world.lobby.games){
+		if(!lobbyGame) continue;
+		LobbyGameListRow row;
+		row.gameId = lobbyGame->id;
+		row.name = lobbyGame->name;
+		rows.push_back(std::move(row));
+	}
+	return rows;
+}
+
 void ScreenContext::BeginLobbyTechSelection() {
 	world.choosingtech = true;
 	world.peers.RequestPeerList();
