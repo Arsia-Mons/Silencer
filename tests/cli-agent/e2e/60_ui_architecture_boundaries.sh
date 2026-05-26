@@ -55,6 +55,10 @@ fail_if_match \
   "$REPO_ROOT/clients/silencer/src/ui/runtime/UiActionQueue.h"
 
 fail_if_match \
+  "UiBoundedText\\(const std::string|operator=[[:space:]]*\\(const std::string" \
+  "$REPO_ROOT/clients/silencer/src/ui/runtime/UiActionQueue.h"
+
+fail_if_match \
   "\\breact_(init|begin_frame|end_frame|shutdown)[[:space:]]*\\(" \
   "$REPO_ROOT/clients/silencer/src" \
   --glob '!third_party/**' \

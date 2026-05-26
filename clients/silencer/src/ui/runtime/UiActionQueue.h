@@ -44,15 +44,9 @@ public:
 
 	UiBoundedText() = default;
 	UiBoundedText(const char * text) { Assign(text); }
-	UiBoundedText(const std::string& text) { Assign(text.data(), text.size()); }
 
 	UiBoundedText& operator=(const char * text) {
 		Assign(text);
-		return *this;
-	}
-
-	UiBoundedText& operator=(const std::string& text) {
-		Assign(text.data(), text.size());
 		return *this;
 	}
 

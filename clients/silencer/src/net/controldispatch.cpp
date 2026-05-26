@@ -232,12 +232,13 @@ static void QueueInteractableAction(Game& game,
                                     int amount = 0){
 	silencer::ui::UiAction action;
 	action.kind = kind;
-	action.id = !widget.id.empty()
-		? widget.id
-		: (silencer::ui::UiInteractableLabel(widget)
-			? std::string(silencer::ui::UiInteractableLabel(widget))
-			: std::string());
-	action.value = value;
+	if(!widget.id.empty()){
+		action.id.Assign(widget.id.data(), widget.id.size());
+	}else{
+		const char * label = silencer::ui::UiInteractableLabel(widget);
+		if(label) action.id.Assign(label);
+	}
+	action.value.Assign(value.data(), value.size());
 	action.index = widget.index;
 	action.amount = amount;
 	game.UiInput().QueueControlAction(std::move(action));
@@ -815,7 +816,7 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 		if(element && element->value == "scroll"){
 			silencer::ui::UiAction action;
 			action.kind = silencer::ui::UiActionKind::Scroll;
-			action.id = element->id;
+			action.id.Assign(element->id.data(), element->id.size());
 			action.value = "control";
 			action.amount = amount;
 			game.UiInput().QueueControlAction(std::move(action));

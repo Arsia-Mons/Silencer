@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cctype>
+#include <cstdio>
 #include <utility>
 
 namespace silencer {
@@ -37,6 +38,27 @@ std::string InteractableId(const UiInteractable& widget) {
 	if(widget.uid >= 0) return std::to_string(widget.uid);
 	const char * label = UiInteractableLabel(widget);
 	return label ? std::string(label) : std::string();
+}
+
+void AssignInteractableActionId(UiActionId& id, const UiInteractable& widget) {
+	if(!widget.id.empty()){
+		id.Assign(widget.id.data(), widget.id.size());
+		return;
+	}
+	if(widget.uid >= 0){
+		char uidText[16] = {};
+		const int n = std::snprintf(uidText, sizeof(uidText), "%d", widget.uid);
+		if(n > 0){
+			const std::size_t len =
+				n < static_cast<int>(sizeof(uidText))
+					? static_cast<std::size_t>(n)
+					: sizeof(uidText) - 1;
+			id.Assign(uidText, len);
+		}
+		return;
+	}
+	const char * label = UiInteractableLabel(widget);
+	if(label) id.Assign(label);
 }
 
 bool PointIn(const UiInteractable& widget, int x, int y) {
@@ -307,7 +329,7 @@ bool UiInteractionRegistry::QueueAction(UiActionKind kind,
                                        const char * value) {
 	UiAction action;
 	action.kind = kind;
-	action.id = registry_detail::InteractableId(widget);
+	registry_detail::AssignInteractableActionId(action.id, widget);
 	if(value) action.value = value;
 	else{
 		const char * label = UiInteractableLabel(widget);

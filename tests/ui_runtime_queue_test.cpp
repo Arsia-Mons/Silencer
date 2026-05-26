@@ -13,7 +13,8 @@ namespace {
 silencer::ui::UiAction MakeAction(int index) {
 	silencer::ui::UiAction action;
 	action.kind = silencer::ui::UiActionKind::Activate;
-	action.id = "action." + std::to_string(index);
+	const std::string id = "action." + std::to_string(index);
+	action.id.Assign(id.data(), id.size());
 	action.index = index;
 	return action;
 }
@@ -81,7 +82,7 @@ TEST_CASE("UiAction payload text uses bounded storage") {
 	CHECK(action.value.c_str()[silencer::ui::UI_ACTION_MAX_VALUE_CHARS] == '\0');
 
 	action.id = "main_menu.connect";
-	action.value = std::string("Connect");
+	action.value = "Connect";
 	CHECK(action.id == "main_menu.connect");
 	CHECK(action.value == "Connect");
 	CHECK(action.id.find("menu") == 5);
