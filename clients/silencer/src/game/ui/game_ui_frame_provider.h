@@ -23,6 +23,7 @@ void WithPreparedGameUiFrame(const silencer::ui::UiInputState& input,
                              int surfaceHeight,
                              const GameUiFrameBuild& build);
 const GameUiFrame * UseGameUiFrame();
+const GameUiFrame& RequireGameUiFrame();
 
 }  // namespace game_ui
 }  // namespace silencer

@@ -9,6 +9,7 @@
 
 #include "clay/clay.h"
 #include "clay_ui_compositor.h"
+#include "ui/game_ui_frame_provider.h"
 #include "runtime/UiInteractionRegistry.h"
 #include "primitives/box.h"
 #include "primitives/text.h"
@@ -175,9 +176,11 @@ int CountPreviewLines(const std::string & text) {
 
 void BuildHoverPreviewOverlay(GameCreatePanelState & state,
                               ScreenContext & ctx) {
+	(void)ctx;
 	if(!state.hoverPreviewVisible || state.hoverPreviewPixels.empty()) return;
 
-	const silencer::ui::UiInputState & input = ctx.game.CurrentUiInput();
+	const silencer::ui::UiInputState & input =
+		silencer::game_ui::RequireGameUiFrame().input;
 	const int lineHeight = silencer::ui::primitives::TextLineHeight(TextSize::BodySm);
 	const int descLines = CountPreviewLines(state.hoverPreviewDescription);
 	const int previewHeight = lineHeight + kPreviewGap + kPreviewH

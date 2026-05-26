@@ -2,6 +2,8 @@
 
 #include "runtime/react.h"
 
+#include <cassert>
+
 namespace silencer {
 namespace game_ui {
 
@@ -36,6 +38,12 @@ void WithPreparedGameUiFrame(const silencer::ui::UiInputState& input,
 
 const GameUiFrame * UseGameUiFrame() {
 	return static_cast<const GameUiFrame *>(use_context(&g_gameUiFrameContext));
+}
+
+const GameUiFrame& RequireGameUiFrame() {
+	const GameUiFrame * frame = UseGameUiFrame();
+	assert(frame && "GameUiFrame provider is required during UI declaration");
+	return *frame;
 }
 
 }  // namespace game_ui

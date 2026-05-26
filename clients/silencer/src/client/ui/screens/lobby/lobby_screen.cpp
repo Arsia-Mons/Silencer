@@ -13,6 +13,7 @@
 
 #include "clay/clay.h"
 #include "clay_ui_compositor.h"
+#include "ui/game_ui_frame_provider.h"
 
 #include <SDL3/SDL.h>
 
@@ -116,7 +117,8 @@ void LobbyScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime, s
 	(void)dst;
 	using namespace silencer::client_ui::lobby;
 
-	const silencer::ui::UiInputState & input = ctx.game.CurrentUiInput();
+	const silencer::ui::UiInputState & input =
+		silencer::game_ui::RequireGameUiFrame().input;
 	const int layoutWidth = std::max(1, input.width);
 	const int layoutHeight = std::max(1, input.height);
 	const int rootPadX = lobby_screen_detail::ScaleLegacyPx(

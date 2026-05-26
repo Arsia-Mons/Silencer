@@ -11,6 +11,7 @@
 
 #include "clay/clay.h"
 #include "clay_ui_compositor.h"
+#include "ui/game_ui_frame_provider.h"
 #include "runtime/UiInteractionRegistry.h"
 
 #include <SDL3/SDL.h>
@@ -203,7 +204,8 @@ void OptionsControlsScreen::BuildUi(ScreenContext & ctx, Surface & dst, float fr
 	using namespace silencer::clay_bridge;
 	using namespace silencer::client_ui::options;
 
-	const silencer::ui::UiInputState & input = ctx.game.CurrentUiInput();
+	const silencer::ui::UiInputState & input =
+		silencer::game_ui::RequireGameUiFrame().input;
 	const int layoutWidth = std::max(1, input.width);
 	const int layoutHeight = std::max(1, input.height);
 	const int framePadLeft = options_controls_screen_detail::ScaleLegacyPx(
