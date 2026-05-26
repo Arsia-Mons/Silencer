@@ -1,5 +1,6 @@
 #include "options_controls_screen.h"
 
+#include "client/ui/ClientUi.h"
 #include "controls_keybind_list.h"
 #include "controls_rebind_capture.h"
 
@@ -19,6 +20,7 @@
 #include <algorithm>
 #include <cstdlib>
 #include <cstring>
+#include <functional>
 #include <string>
 
 namespace options_controls_screen_detail {
@@ -65,6 +67,20 @@ int ScaleLegacyButtonTop(int top, int height, int current, int legacy) {
 	return std::max(0, (centerTwice * current - height * legacy + legacy) / (legacy * 2));
 }
 
+std::function<void()> UseQueuedAction(std::function<void()> write)
+{
+	auto queueWrite = silencer::client_ui::UseUiWriteQueue();
+	if(!queueWrite) return {};
+	return [queueWrite, write]() {
+		queueWrite(write);
+	};
+}
+
+void Invoke(const std::function<void()> & action)
+{
+	if(action) action();
+}
+
 }  // namespace options_controls_screen_detail
 
 int OptionsControlsScreen::MaxScroll() const {
@@ -77,9 +93,9 @@ void OptionsControlsScreen::Build(ScreenContext & ctx) {
 	scrollPosition = 0;
 	rebindRow = -1;
 	rebindSlot = -1;
-	presetClicked = false;
-	saveClicked = false;
-	cancelClicked = false;
+	cyclePreset = {};
+	save = {};
+	cancel = {};
 	scrollDelta = 0;
 	operatorClickedRow = -1;
 }
@@ -104,10 +120,6 @@ void OptionsControlsScreen::Tick(ScreenContext & ctx) {
 		scrollPosition = std::max(0, std::min(MaxScroll(), scrollPosition + scrollDelta));
 		scrollDelta = 0;
 	}
-	if(presetClicked){
-		presetClicked = false;
-		ctx.CycleKeybindPreset();
-	}
 	if(operatorClickedRow >= 0 && operatorClickedRow < (int)Action::Count){
 		Action a = ACTION_TABLE[operatorClickedRow].action;
 		ScreenContext::LegacyKeyBindingSlots v = ctx.LegacyKeyBinding(a);
@@ -127,19 +139,6 @@ void OptionsControlsScreen::Tick(ScreenContext & ctx) {
 	}else{
 		optionscontrolstick = 0;
 	}
-	if(saveClicked){
-		saveClicked = false;
-		ctx.SaveActiveKeybindProfileIfCustom();
-		Config::GetInstance().Save();
-		ctx.GoToState(GameState::OPTIONS);
-		return;
-	}
-	if(cancelClicked){
-		cancelClicked = false;
-		ctx.ReloadActiveKeymap();
-		Config::GetInstance().Load();
-		ctx.GoToState(GameState::OPTIONS);
-	}
 }
 
 bool OptionsControlsScreen::HandleUiIntent(ScreenContext & ctx, const silencer::ui::UiAction & action) {
@@ -151,7 +150,7 @@ bool OptionsControlsScreen::HandleUiIntent(ScreenContext & ctx, const silencer::
 		return true;
 	}
 	if(action.kind == silencer::ui::UiActionKind::Cancel){
-		cancelClicked = true;
+		options_controls_screen_detail::Invoke(cancel);
 		return true;
 	}
 	if(action.kind == silencer::ui::UiActionKind::Scroll){
@@ -163,15 +162,15 @@ bool OptionsControlsScreen::HandleUiIntent(ScreenContext & ctx, const silencer::
 	}
 	if(action.kind != silencer::ui::UiActionKind::Activate) return false;
 	if(action.id == options_controls_screen_detail::kActionPreset){
-		presetClicked = true;
+		options_controls_screen_detail::Invoke(cyclePreset);
 		return true;
 	}
 	if(action.id == options_controls_screen_detail::kActionSave){
-		saveClicked = true;
+		options_controls_screen_detail::Invoke(save);
 		return true;
 	}
 	if(action.id == options_controls_screen_detail::kActionCancel){
-		cancelClicked = true;
+		options_controls_screen_detail::Invoke(cancel);
 		return true;
 	}
 	int row = options_controls_screen_detail::SuffixInt(action.id, options_controls_screen_detail::kActionPrimaryPrefix);
@@ -197,6 +196,20 @@ void OptionsControlsScreen::BuildUi(ScreenContext & ctx, Surface & dst, float fr
 	(void)dst;
 	using namespace silencer::clay_bridge;
 	using namespace silencer::client_ui::options;
+
+	cyclePreset = options_controls_screen_detail::UseQueuedAction([&ctx]() {
+		ctx.CycleKeybindPreset();
+	});
+	save = options_controls_screen_detail::UseQueuedAction([&ctx]() {
+		ctx.SaveActiveKeybindProfileIfCustom();
+		Config::GetInstance().Save();
+		ctx.GoToState(GameState::OPTIONS);
+	});
+	cancel = options_controls_screen_detail::UseQueuedAction([&ctx]() {
+		ctx.ReloadActiveKeymap();
+		Config::GetInstance().Load();
+		ctx.GoToState(GameState::OPTIONS);
+	});
 
 	const silencer::ui::UiInputState & input =
 		silencer::game_ui::RequireGameUiFrame().input;
@@ -304,4 +317,7 @@ void OptionsControlsScreen::BuildUi(ScreenContext & ctx, Surface & dst, float fr
 
 void OptionsControlsScreen::Destroy(ScreenContext & ctx) {
 	(void)ctx;
+	cyclePreset = {};
+	save = {};
+	cancel = {};
 }

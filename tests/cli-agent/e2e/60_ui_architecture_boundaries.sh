@@ -224,6 +224,11 @@ fail_if_match \
   "$REPO_ROOT/clients/silencer/src/client/ui/screens/options/options_display_screen.h"
 
 fail_if_match \
+  '\b(presetClicked|saveClicked|cancelClicked)\b' \
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens/options/options_controls_screen.cpp" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens/options/options_controls_screen.h"
+
+fail_if_match \
   'ctx[.]world|#include[[:space:]]*[<"]([^>"]*/)?(world|resources)[.]h[>"]' \
   "$REPO_ROOT/clients/silencer/src/client/ui/screens/main_menu" \
   --glob '!**/screen_context.cpp'

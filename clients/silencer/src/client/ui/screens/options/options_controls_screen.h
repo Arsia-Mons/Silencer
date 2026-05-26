@@ -7,6 +7,7 @@
 #include <SDL3/SDL_scancode.h>
 #include <SDL3/SDL_gamepad.h>
 
+#include <functional>
 #include <string>
 
 class Overlay;
@@ -30,9 +31,9 @@ private:
 	int rebindRow = -1;
 	int rebindSlot = -1;
 	Uint32    optionscontrolstick = 0;
-	bool presetClicked = false;
-	bool saveClicked = false;
-	bool cancelClicked = false;
+	std::function<void()> cyclePreset;
+	std::function<void()> save;
+	std::function<void()> cancel;
 	int scrollDelta = 0;
 	int operatorClickedRow = -1;
 	int visibleRowCapacity_ = silencer::client_ui::options::kKeybindListMinVisibleRows;
