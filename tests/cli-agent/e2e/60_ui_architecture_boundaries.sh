@@ -271,7 +271,7 @@ fail_if_match \
   --glob '!**/screen_context.cpp'
 
 fail_if_match \
-  'world[[:space:]]*[.][[:space:]]*lobby[[:space:]]*[.][[:space:]]*(gamesprocessed|games)\b' \
+  'World[[:space:]]*&|world[[:space:]]*[.][[:space:]]*(lobby|IsIdle[[:space:]]*[(])|ctx[[:space:]]*[.][[:space:]]*(FindLobbyGame|JoinLobbyGame|SpectateLobbyGame)[[:space:]]*[(]|#[[:space:]]*include[[:space:]]*[<"]([^>"]*/)?(world|lobby|lobbygame|user|config)[.]h[>"]|Config::GetInstance[[:space:]]*[(]' \
   "$REPO_ROOT/clients/silencer/src/client/ui/screens/lobby/game_select_panel.cpp" \
   --glob '!**/screen_context.cpp'
 

@@ -22,6 +22,7 @@
 #include "runtime/UiActionQueue.h"
 #include "updater.h"
 #include "updaterstage2.h"
+#include "user.h"
 #include "world.h"
 
 #include <SDL3/SDL_video.h>
@@ -58,6 +59,15 @@ ScreenContext::UpdateState ToScreenUpdateState(Updater::State state)
 	}
 	assert(false && "Unhandled updater state");
 	std::abort();
+}
+
+char * CopyOptionalPassword(const char * password, char * buffer, size_t bufferSize)
+{
+	if(!password) return nullptr;
+	if(!buffer || bufferSize == 0) return nullptr;
+	std::strncpy(buffer, password, bufferSize - 1);
+	buffer[bufferSize - 1] = '\0';
+	return buffer;
 }
 } // namespace
 
@@ -141,6 +151,22 @@ void ScreenContext::JoinLobbyGame(LobbyGame & lobbyGame, char * password) {
 void ScreenContext::SpectateLobbyGame(LobbyGame & lobbyGame, char * password) {
 	game.currentlobbygameid = lobbyGame.id;
 	game.SpectateGame(lobbyGame, password);
+}
+bool ScreenContext::JoinLobbyGameById(Uint32 gameId, const char * password) {
+	LobbyGame * lobbyGame = FindLobbyGame(gameId);
+	if(!lobbyGame) return false;
+	char passwordBuffer[64];
+	JoinLobbyGame(*lobbyGame,
+	              CopyOptionalPassword(password, passwordBuffer, sizeof(passwordBuffer)));
+	return true;
+}
+bool ScreenContext::SpectateLobbyGameById(Uint32 gameId, const char * password) {
+	LobbyGame * lobbyGame = FindLobbyGame(gameId);
+	if(!lobbyGame) return false;
+	char passwordBuffer[64];
+	SpectateLobbyGame(*lobbyGame,
+	                  CopyOptionalPassword(password, passwordBuffer, sizeof(passwordBuffer)));
+	return true;
 }
 SDL_GamepadType ScreenContext::CurrentGamepadType() const {
 	SDL_Gamepad * pad = game.GetGamepad();
@@ -472,6 +498,58 @@ ScreenContext::LobbyGameListRows() const {
 	return rows;
 }
 
+ScreenContext::LobbyGameDetails
+ScreenContext::LobbyGameDetailsFor(Uint32 gameId) const {
+	LobbyGameDetails details;
+	LobbyGame * lobbyGame = world.lobby.GetGameById(gameId);
+	if(!lobbyGame) return details;
+
+	details.found = true;
+	details.gameId = lobbyGame->id;
+	details.name = lobbyGame->name;
+	details.mapName = lobbyGame->mapname;
+	User * creator = world.lobby.GetUserInfo(lobbyGame->accountid);
+	if(creator) details.creatorName = creator->name;
+	switch(lobbyGame->securitylevel){
+		case LobbyGame::SECLOW:
+			details.securityLevel = LobbyGameSecurityLevel::Low;
+			break;
+		case LobbyGame::SECMEDIUM:
+			details.securityLevel = LobbyGameSecurityLevel::Medium;
+			break;
+		case LobbyGame::SECHIGH:
+			details.securityLevel = LobbyGameSecurityLevel::High;
+			break;
+		default:
+			details.securityLevel = LobbyGameSecurityLevel::None;
+			break;
+	}
+	details.passwordProtected = std::strlen(lobbyGame->password) > 0;
+	details.passwordRequiredForLocalAccount =
+		details.passwordProtected && lobbyGame->accountid != world.lobby.accountid;
+	details.inGame = lobbyGame->state == 1;
+	details.canRejoin = lobbyGame->canrejoin;
+	details.spectatable = lobbyGame->spectatable;
+	details.minLevel = lobbyGame->minlevel;
+	details.maxLevel = lobbyGame->maxlevel;
+	details.players = lobbyGame->players;
+	details.maxPlayers = lobbyGame->maxplayers;
+	details.maxTeams = lobbyGame->maxteams;
+	return details;
+}
+
+ScreenContext::LocalLobbyAgencyLevel
+ScreenContext::CurrentLobbyAgencyLevel() const {
+	LocalLobbyAgencyLevel result;
+	User * user = world.lobby.GetUserInfo(world.lobby.accountid);
+	if(!user) return result;
+	const Uint8 agency =
+		world.lobby.GetSelectedAgencyOrDefault(Config::GetInstance().defaultagency);
+	result.found = true;
+	result.level = user->agency[agency].level;
+	return result;
+}
+
 void ScreenContext::BeginLobbyTechSelection() {
 	world.choosingtech = true;
 	world.peers.RequestPeerList();
@@ -531,6 +609,10 @@ void ScreenContext::ResetJoinMapDownload() {
 
 void ScreenContext::PumpMapDownload() {
 	mapDownloader.ProcessMapDownload();
+}
+
+bool ScreenContext::LobbyNetworkIdle() const {
+	return world.IsIdle();
 }
 
 bool ScreenContext::LobbyNetworkConnected() const {

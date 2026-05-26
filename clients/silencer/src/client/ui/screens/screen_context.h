@@ -71,6 +71,12 @@ public:
 		Connected,
 		Failed
 	};
+	enum class LobbyGameSecurityLevel {
+		None,
+		Low,
+		Medium,
+		High
+	};
 	struct LegacyKeyBindingSlots {
 		SDL_Scancode key1 = SDL_SCANCODE_UNKNOWN;
 		SDL_Scancode key2 = SDL_SCANCODE_UNKNOWN;
@@ -83,6 +89,28 @@ public:
 	struct LobbyGameListRow {
 		Uint32 gameId = 0;
 		std::string name;
+	};
+	struct LobbyGameDetails {
+		bool found = false;
+		Uint32 gameId = 0;
+		std::string name;
+		std::string mapName;
+		std::string creatorName;
+		LobbyGameSecurityLevel securityLevel = LobbyGameSecurityLevel::None;
+		bool passwordProtected = false;
+		bool passwordRequiredForLocalAccount = false;
+		bool inGame = false;
+		bool canRejoin = false;
+		bool spectatable = false;
+		Uint8 minLevel = 0;
+		Uint8 maxLevel = 0;
+		Uint8 players = 0;
+		Uint8 maxPlayers = 0;
+		Uint8 maxTeams = 0;
+	};
+	struct LocalLobbyAgencyLevel {
+		bool found = false;
+		Uint8 level = 0;
 	};
 	struct UiSpriteFrameMetrics {
 		int offsetX = 0;
@@ -124,6 +152,8 @@ public:
 	LobbyGame * CurrentLobbyGame() const;
 	void JoinLobbyGame(LobbyGame & lobbyGame, char * password = nullptr);
 	void SpectateLobbyGame(LobbyGame & lobbyGame, char * password = nullptr);
+	bool JoinLobbyGameById(Uint32 gameId, const char * password = nullptr);
+	bool SpectateLobbyGameById(Uint32 gameId, const char * password = nullptr);
 	SDL_GamepadType CurrentGamepadType() const;
 	bool PushScreen(std::unique_ptr<Screen> s);
 	bool PopScreen();
@@ -169,6 +199,8 @@ public:
 	void RequestLobbyGameListRefresh();
 	bool ConsumeLobbyGameListRefresh();
 	std::vector<LobbyGameListRow> LobbyGameListRows() const;
+	LobbyGameDetails LobbyGameDetailsFor(Uint32 gameId) const;
+	LocalLobbyAgencyLevel CurrentLobbyAgencyLevel() const;
 	void BeginLobbyTechSelection();
 	void BeginCreateGameMapUpload(const std::string & gameName,
 	                              const std::string & mapName,
@@ -181,6 +213,7 @@ public:
 	bool spectatable);
 	void ResetJoinMapDownload();
 	void PumpMapDownload();
+	bool LobbyNetworkIdle() const;
 	bool LobbyNetworkConnected() const;
 	bool JoinedGameDisconnected() const;
 	void PresentUpdate(const std::string & url, const uint8_t sha256[32]);

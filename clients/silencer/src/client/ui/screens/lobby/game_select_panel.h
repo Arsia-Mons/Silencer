@@ -14,7 +14,6 @@
 #include <string>
 #include <vector>
 
-class World;
 class Resources;
 class ScreenContext;
 class LobbyScreen;
@@ -73,7 +72,6 @@ void GameSelectPanelInit(GameSelectPanelState & state);
 //     password modal, JoinGame/SpectateGame) and the Create flow (calls
 //     owner.ShowGameCreate).
 void GameSelectPanelTick(GameSelectPanelState & state,
-                         World & world,
                          ScreenContext & ctx,
                          LobbyScreen & owner);
 bool GameSelectPanelHandleUiIntent(GameSelectPanelState & state,

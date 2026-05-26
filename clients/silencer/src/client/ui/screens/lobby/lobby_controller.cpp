@@ -61,7 +61,7 @@ void LobbyScreen::Tick(ScreenContext & ctx)
 
 	if(!gameCreateActive && !gameJoinActive && !gameTechActive){
 		silencer::client_ui::lobby::GameSelectPanelTick(
-			gameSelectState, ctx.world, ctx, *this);
+			gameSelectState, ctx, *this);
 	}
 	if(gameCreateActive){
 		silencer::client_ui::lobby::GameCreatePanelTick(

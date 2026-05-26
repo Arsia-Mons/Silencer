@@ -2,11 +2,6 @@
 
 #include "lobby_screen.h"
 #include "screen_context.h"
-#include "world.h"
-#include "lobby.h"
-#include "lobbygame.h"
-#include "config.h"
-#include "user.h"
 #include "password_modal.h"
 
 #include <cstring>
@@ -58,16 +53,17 @@ void RebuildRows(GameSelectPanelState & state, ScreenContext & ctx) {
 	if(state.scrollPos > maxScroll) state.scrollPos = static_cast<Uint16>(maxScroll);
 }
 
-LobbyGame * GetSelectedGame(GameSelectPanelState & state, World & world) {
+Uint32 GetSelectedGameId(const GameSelectPanelState & state) {
 	if(state.selectedIndex < 0 || state.selectedIndex >= (int)state.rows.size()){
-		return nullptr;
+		return 0;
 	}
-	return world.lobby.GetGameById(state.rows[state.selectedIndex].gameid);
+	return state.rows[state.selectedIndex].gameid;
 }
 
-void RecomputeInfoBlock(GameSelectPanelState & state, World & world) {
-	LobbyGame * lobbygame = GetSelectedGame(state, world);
-	if(!lobbygame){
+void RecomputeInfoBlock(GameSelectPanelState & state, ScreenContext & ctx) {
+	ScreenContext::LobbyGameDetails lobbyGame =
+		ctx.LobbyGameDetailsFor(GetSelectedGameId(state));
+	if(!lobbyGame.found){
 		state.infoName.clear();
 		state.infoMap.clear();
 		state.infoSecurity.clear();
@@ -77,18 +73,26 @@ void RecomputeInfoBlock(GameSelectPanelState & state, World & world) {
 		state.spectateVisible = false;
 		return;
 	}
-	state.infoName = lobbygame->name;
+	state.infoName = lobbyGame.name;
 
 	state.infoMap = "Map: ";
-	state.infoMap += lobbygame->mapname;
+	state.infoMap += lobbyGame.mapName;
 
-	const char * passwordlock = (strlen(lobbygame->password) > 0)
+	const char * passwordlock = lobbyGame.passwordProtected
 	                              ? "*PASSWORD LOCK*" : "";
 	std::string security = "No";
-	switch(lobbygame->securitylevel){
-		case LobbyGame::SECLOW:    security = "Low"; break;
-		case LobbyGame::SECMEDIUM: security = "Medium"; break;
-		case LobbyGame::SECHIGH:   security = "High"; break;
+	switch(lobbyGame.securityLevel){
+		case ScreenContext::LobbyGameSecurityLevel::Low:
+			security = "Low";
+			break;
+		case ScreenContext::LobbyGameSecurityLevel::Medium:
+			security = "Medium";
+			break;
+		case ScreenContext::LobbyGameSecurityLevel::High:
+			security = "High";
+			break;
+		case ScreenContext::LobbyGameSecurityLevel::None:
+			break;
 	}
 	state.infoSecurity = security + " Security";
 	while(state.infoSecurity.length() < 21){
@@ -96,91 +100,76 @@ void RecomputeInfoBlock(GameSelectPanelState & state, World & world) {
 	}
 	state.infoSecurity += passwordlock;
 
-	User * creator = world.lobby.GetUserInfo(lobbygame->accountid);
 	state.infoCreator = "Creator: ";
-	if(creator) state.infoCreator += creator->name;
+	state.infoCreator += lobbyGame.creatorName;
 
-	const bool ingame = lobbygame->state == 1;
-	if(!ingame){
+	if(!lobbyGame.inGame){
 		state.infoLimits =
-			"MinLv:" + std::to_string(lobbygame->minlevel)
-			+ " MaxLv:" + std::to_string(lobbygame->maxlevel)
-			+ " MaxPl:" + std::to_string(lobbygame->maxplayers)
-			+ " MaxTm:" + std::to_string(lobbygame->maxteams);
+			"MinLv:" + std::to_string(lobbyGame.minLevel)
+			+ " MaxLv:" + std::to_string(lobbyGame.maxLevel)
+			+ " MaxPl:" + std::to_string(lobbyGame.maxPlayers)
+			+ " MaxTm:" + std::to_string(lobbyGame.maxTeams);
 	}else{
 		state.infoLimits.clear();
 	}
 
 	state.joinVisible = false;
 	state.spectateVisible = false;
-	if(!ingame && lobbygame->players < lobbygame->maxplayers){
+	if(!lobbyGame.inGame && lobbyGame.players < lobbyGame.maxPlayers){
 		state.joinVisible = true;
-	}else if(ingame && lobbygame->canrejoin){
+	}else if(lobbyGame.inGame && lobbyGame.canRejoin){
 		state.joinVisible = true;
 	}
-	if(ingame && lobbygame->spectatable){
+	if(lobbyGame.inGame && lobbyGame.spectatable){
 		state.spectateVisible = true;
 	}
 }
 
-void HandleJoinClick(GameSelectPanelState & state, World & world, ScreenContext & ctx) {
-	LobbyGame * lobbygame = GetSelectedGame(state, world);
-	if(!lobbygame){
+void HandleJoinClick(GameSelectPanelState & state, ScreenContext & ctx) {
+	ScreenContext::LobbyGameDetails lobbyGame =
+		ctx.LobbyGameDetailsFor(GetSelectedGameId(state));
+	if(!lobbyGame.found){
 		ctx.ShowMessage("No game selected");
 		return;
 	}
-	if(!world.IsIdle()) return;
-	User * user = world.lobby.GetUserInfo(world.lobby.accountid);
-	bool canjoin = true;
-	if(user){
-		const Uint8 agency = world.lobby.GetSelectedAgencyOrDefault(Config::GetInstance().defaultagency);
-		if(lobbygame->minlevel > user->agency[agency].level){
-			canjoin = false;
+	if(!ctx.LobbyNetworkIdle()) return;
+	ScreenContext::LocalLobbyAgencyLevel agencyLevel = ctx.CurrentLobbyAgencyLevel();
+	if(agencyLevel.found){
+		if(lobbyGame.minLevel > agencyLevel.level){
 			ctx.ShowMessage("Your player level is too low");
-		}else if(lobbygame->maxlevel < user->agency[agency].level){
-			canjoin = false;
+			return;
+		}else if(lobbyGame.maxLevel < agencyLevel.level){
 			ctx.ShowMessage("Your player level is too high");
+			return;
 		}
 	}
-	if(!canjoin) return;
-	if(strlen(lobbygame->password) > 0 && lobbygame->accountid != world.lobby.accountid){
-		Uint32 gameId = lobbygame->id;
+	if(lobbyGame.passwordRequiredForLocalAccount){
+		Uint32 gameId = lobbyGame.gameId;
 		ctx.PushScreen(std::make_unique<PasswordModal>(
 			[&ctx, gameId](const char * password){
-				LobbyGame * lg = ctx.FindLobbyGame(gameId);
-				if(lg){
-					char buf[64];
-					std::strncpy(buf, password ? password : "", sizeof(buf) - 1);
-					buf[sizeof(buf) - 1] = '\0';
-					ctx.JoinLobbyGame(*lg, buf);
-				}
+				ctx.JoinLobbyGameById(gameId, password ? password : "");
 			}));
 	}else{
-		ctx.JoinLobbyGame(*lobbygame);
+		ctx.JoinLobbyGameById(lobbyGame.gameId);
 	}
 }
 
-void HandleSpectateClick(GameSelectPanelState & state, World & world, ScreenContext & ctx) {
-	LobbyGame * lobbygame = GetSelectedGame(state, world);
-	if(!lobbygame){
+void HandleSpectateClick(GameSelectPanelState & state, ScreenContext & ctx) {
+	ScreenContext::LobbyGameDetails lobbyGame =
+		ctx.LobbyGameDetailsFor(GetSelectedGameId(state));
+	if(!lobbyGame.found){
 		ctx.ShowMessage("No game selected");
 		return;
 	}
-	if(!world.IsIdle()) return;
-	if(strlen(lobbygame->password) > 0 && lobbygame->accountid != world.lobby.accountid){
-		Uint32 gameId = lobbygame->id;
+	if(!ctx.LobbyNetworkIdle()) return;
+	if(lobbyGame.passwordRequiredForLocalAccount){
+		Uint32 gameId = lobbyGame.gameId;
 		ctx.PushScreen(std::make_unique<PasswordModal>(
 			[&ctx, gameId](const char * password){
-				LobbyGame * lg = ctx.FindLobbyGame(gameId);
-				if(lg){
-					char buf[64];
-					std::strncpy(buf, password ? password : "", sizeof(buf) - 1);
-					buf[sizeof(buf) - 1] = '\0';
-					ctx.SpectateLobbyGame(*lg, buf);
-				}
+				ctx.SpectateLobbyGameById(gameId, password ? password : "");
 			}));
 	}else{
-		ctx.SpectateLobbyGame(*lobbygame);
+		ctx.SpectateLobbyGameById(lobbyGame.gameId);
 	}
 }
 
@@ -204,7 +193,6 @@ void GameSelectPanelInit(GameSelectPanelState & state) {
 }
 
 void GameSelectPanelTick(GameSelectPanelState & state,
-                         World & world,
                          ScreenContext & ctx,
                          LobbyScreen & owner) {
 	if(ctx.ConsumeLobbyGameListRefresh()){
@@ -216,7 +204,7 @@ void GameSelectPanelTick(GameSelectPanelState & state,
 		state.rowClickedIndex = -1;
 	}
 
-	game_select_panel_detail::RecomputeInfoBlock(state, world);
+	game_select_panel_detail::RecomputeInfoBlock(state, ctx);
 
 	if(state.createClicked){
 		state.createClicked = false;
@@ -225,11 +213,11 @@ void GameSelectPanelTick(GameSelectPanelState & state,
 	}
 	if(state.joinClicked){
 		state.joinClicked = false;
-		game_select_panel_detail::HandleJoinClick(state, world, ctx);
+		game_select_panel_detail::HandleJoinClick(state, ctx);
 	}
 	if(state.spectateClicked){
 		state.spectateClicked = false;
-		game_select_panel_detail::HandleSpectateClick(state, world, ctx);
+		game_select_panel_detail::HandleSpectateClick(state, ctx);
 	}
 }
 
