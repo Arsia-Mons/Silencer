@@ -160,6 +160,53 @@ TEST_CASE("UiInteractionRegistry bounds frame interactable registration") {
 	CHECK(registry.FindById("button.256") == nullptr);
 }
 
+TEST_CASE("UiInteractionRegistry matches fallback interactable identities") {
+	silencer::ui::UiInteractionRegistry registry;
+	registry.BeginFrame();
+
+	silencer::ui::UiInteractable uidWidget;
+	uidWidget.labelText = "Original";
+	uidWidget.kind = silencer::ui::UiInteractableKind::Button;
+	uidWidget.uid = 42;
+	uidWidget.x = 10;
+	uidWidget.y = 20;
+	uidWidget.w = 30;
+	uidWidget.h = 12;
+	CHECK(registry.RegisterInteractable(uidWidget));
+
+	silencer::ui::UiInteractable uidUpdate = uidWidget;
+	uidUpdate.labelText = "Updated";
+	uidUpdate.x = 40;
+	CHECK(registry.RegisterInteractable(uidUpdate));
+
+	auto interactables = registry.Interactables();
+	REQUIRE(interactables.size() == 1);
+	CHECK(interactables[0].id.empty());
+	CHECK(interactables[0].labelText == "Updated");
+	CHECK(registry.FindInteractableById("42") == &interactables[0]);
+
+	CHECK(registry.PressAt(41, 20));
+	silencer::ui::UiActionList actions = registry.DrainActions();
+	REQUIRE(actions.size() == 1);
+	CHECK(actions[0].id == "42");
+
+	registry.BeginFrame();
+	silencer::ui::UiInteractable labelWidget;
+	labelWidget.labelText = "Loose Label";
+	labelWidget.kind = silencer::ui::UiInteractableKind::Button;
+	labelWidget.x = 1;
+	labelWidget.y = 2;
+	labelWidget.w = 15;
+	labelWidget.h = 15;
+	CHECK(registry.RegisterInteractable(labelWidget));
+	CHECK(registry.FindInteractableById("Loose Label") != nullptr);
+
+	CHECK(registry.PressAt(2, 3));
+	actions = registry.DrainActions();
+	REQUIRE(actions.size() == 1);
+	CHECK(actions[0].id == "Loose Label");
+}
+
 TEST_CASE("UiInputState bounds frame-local input buffers") {
 	silencer::ui::UiInputState input;
 

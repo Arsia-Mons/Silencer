@@ -117,7 +117,8 @@ public:
 	const UiElementSnapshot* FindByLabel(const std::string& label) const;
 	const UiInteractable* FindInteractableByLabel(const char * label) const;
 	const UiInteractable* FindInteractableByUid(int uid) const;
-	const UiInteractable* FindInteractableById(const std::string& id) const;
+	const UiInteractable* FindInteractableById(const char * id) const;
+	const UiInteractable* FindInteractableById(const char * id, std::size_t len) const;
 
 	bool FocusTextInputAt(int x, int y);
 	bool FocusTextInputByUid(int uid);
@@ -173,7 +174,7 @@ private:
 	int interactableOverflowCount_ = 0;
 	int focusedUid_ = -1;
 	UiInteractableKind focusedKind_ = UiInteractableKind::Button;
-	std::string focusedLabel_;
+	UiActionId focusedLabel_;
 	FocusOrigin focusedOrigin_ = FocusOrigin::None;
 	float hoverSampleX_ = 0.0f;
 	float hoverSampleY_ = 0.0f;

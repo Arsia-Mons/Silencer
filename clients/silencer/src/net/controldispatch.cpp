@@ -521,7 +521,7 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 		nlohmann::json elements = nlohmann::json::array();
 		for(const auto & element : game.UiInteractions().Elements()){
 			if(!element.id.empty() &&
-			   game.UiInteractions().FindInteractableById(element.id)){
+			   game.UiInteractions().FindInteractableById(element.id.data(), element.id.size())){
 				continue;
 			}
 			nlohmann::json e;

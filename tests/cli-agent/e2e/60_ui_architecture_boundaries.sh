@@ -59,6 +59,11 @@ fail_if_match \
   "$REPO_ROOT/clients/silencer/src/ui/runtime/UiActionQueue.h"
 
 fail_if_match \
+  "std::string[[:space:]]+InteractableId|InteractableId\\(const UiInteractable|FindInteractableById\\(const std::string" \
+  "$REPO_ROOT/clients/silencer/src/ui/runtime/UiInteractionRegistry.h" \
+  "$REPO_ROOT/clients/silencer/src/ui/runtime/UiInteractionRegistry.cpp"
+
+fail_if_match \
   "\\breact_(init|begin_frame|end_frame|shutdown)[[:space:]]*\\(" \
   "$REPO_ROOT/clients/silencer/src" \
   --glob '!third_party/**' \

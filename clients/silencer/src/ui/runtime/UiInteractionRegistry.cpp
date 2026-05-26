@@ -6,12 +6,21 @@
 #include <cmath>
 #include <cctype>
 #include <cstdio>
+#include <cstring>
 #include <utility>
 
 namespace silencer {
 namespace ui {
 
 namespace registry_detail {
+
+struct InteractableIdentity {
+	const char * text = nullptr;
+	std::size_t len = 0;
+	char uidText[16] = {};
+
+	bool empty() const { return len == 0; }
+};
 
 bool EqualsIgnoreCase(const std::string& a, const std::string& b) {
 	if(a.size() != b.size()) return false;
@@ -33,32 +42,61 @@ bool LabelEquals(const char * a, const char * b) {
 	return *a == 0 && *b == 0;
 }
 
-std::string InteractableId(const UiInteractable& widget) {
-	if(!widget.id.empty()) return widget.id;
-	if(widget.uid >= 0) return std::to_string(widget.uid);
-	const char * label = UiInteractableLabel(widget);
-	return label ? std::string(label) : std::string();
+bool TextEquals(const char * lhs, std::size_t lhsLen, const char * rhs, std::size_t rhsLen) {
+	if(lhsLen != rhsLen) return false;
+	if(lhsLen == 0) return true;
+	if(!lhs || !rhs) return false;
+	return std::memcmp(lhs, rhs, lhsLen) == 0;
 }
 
-void AssignInteractableActionId(UiActionId& id, const UiInteractable& widget) {
+void FillInteractableIdentity(InteractableIdentity& identity, const UiInteractable& widget) {
+	identity = {};
 	if(!widget.id.empty()){
-		id.Assign(widget.id.data(), widget.id.size());
+		identity.text = widget.id.data();
+		identity.len = widget.id.size();
 		return;
 	}
 	if(widget.uid >= 0){
-		char uidText[16] = {};
-		const int n = std::snprintf(uidText, sizeof(uidText), "%d", widget.uid);
+		const int n = std::snprintf(identity.uidText, sizeof(identity.uidText), "%d", widget.uid);
 		if(n > 0){
-			const std::size_t len =
-				n < static_cast<int>(sizeof(uidText))
-					? static_cast<std::size_t>(n)
-					: sizeof(uidText) - 1;
-			id.Assign(uidText, len);
+			identity.text = identity.uidText;
+			identity.len = n < static_cast<int>(sizeof(identity.uidText))
+				? static_cast<std::size_t>(n)
+				: sizeof(identity.uidText) - 1;
 		}
 		return;
 	}
 	const char * label = UiInteractableLabel(widget);
-	if(label) id.Assign(label);
+	if(label){
+		identity.text = label;
+		identity.len = std::strlen(label);
+	}
+}
+
+bool InteractableMatchesText(const UiInteractable& widget, const char * text, std::size_t len) {
+	InteractableIdentity identity;
+	FillInteractableIdentity(identity, widget);
+	return TextEquals(identity.text, identity.len, text, len);
+}
+
+bool InteractableMatchesIdentity(const UiInteractable& widget,
+                                 const InteractableIdentity& identity) {
+	if(identity.empty()) return false;
+	return InteractableMatchesText(widget, identity.text, identity.len);
+}
+
+void AssignStringFromIdentity(std::string& out, const InteractableIdentity& identity) {
+	if(identity.text){
+		out.assign(identity.text, identity.len);
+	}else{
+		out.clear();
+	}
+}
+
+void AssignInteractableActionId(UiActionId& id, const UiInteractable& widget) {
+	InteractableIdentity identity;
+	FillInteractableIdentity(identity, widget);
+	id.Assign(identity.text, identity.len);
 }
 
 bool PointIn(const UiInteractable& widget, int x, int y) {
@@ -82,7 +120,9 @@ UiElementKind MetadataKind(UiInteractableKind kind) {
 
 UiElementSnapshot MetadataFromWidget(const UiInteractable& widget, bool focused) {
 	UiElementSnapshot metadata;
-	metadata.id = InteractableId(widget);
+	InteractableIdentity identity;
+	FillInteractableIdentity(identity, widget);
+	AssignStringFromIdentity(metadata.id, identity);
 	metadata.kind = MetadataKind(widget.kind);
 	const char * label = UiInteractableLabel(widget);
 	if(label) metadata.label = label;
@@ -189,12 +229,13 @@ bool UiInteractionRegistry::Register(UiElementSnapshot metadata) {
 }
 
 bool UiInteractionRegistry::RegisterInteractable(UiInteractable widget) {
-	const std::string incomingId = registry_detail::InteractableId(widget);
+	registry_detail::InteractableIdentity incomingId;
+	registry_detail::FillInteractableIdentity(incomingId, widget);
 	UiInteractable * existing = nullptr;
 	if(!incomingId.empty()){
 		for(int i = 0; i < interactableCount_; ++i){
 			UiInteractable& candidate = interactables_[i];
-			if(registry_detail::InteractableId(candidate) == incomingId){
+			if(registry_detail::InteractableMatchesIdentity(candidate, incomingId)){
 				existing = &candidate;
 				break;
 			}
@@ -229,7 +270,6 @@ bool UiInteractionRegistry::RegisterInteractable(UiInteractable widget) {
 			++interactableOverflowCount_;
 			return false;
 		}
-		if(widget.id.empty()) widget.id = incomingId;
 		interactables_[interactableCount_++] = std::move(widget);
 	}
 
@@ -286,16 +326,26 @@ const UiInteractable* UiInteractionRegistry::FindInteractableByUid(int uid) cons
 	return count == 1 ? hit : nullptr;
 }
 
-const UiInteractable* UiInteractionRegistry::FindInteractableById(const std::string& id) const {
+const UiInteractable* UiInteractionRegistry::FindInteractableById(const char * id) const {
+	return FindInteractableById(id, id ? std::strlen(id) : 0);
+}
+
+const UiInteractable* UiInteractionRegistry::FindInteractableById(const char * id,
+                                                                  std::size_t len) const {
 	for(int i = 0; i < interactableCount_; ++i){
-		if(registry_detail::InteractableId(interactables_[i]) == id) return &interactables_[i];
+		if(registry_detail::InteractableMatchesText(interactables_[i], id, len)) {
+			return &interactables_[i];
+		}
 	}
 	return nullptr;
 }
 
 bool UiInteractionRegistry::MatchesFocus(const UiInteractable& widget) const {
 	if(focusedUid_ >= 0 && widget.uid == focusedUid_) return true;
-	if(!focusedLabel_.empty() && registry_detail::InteractableId(widget) == focusedLabel_) return true;
+	if(!focusedLabel_.empty() &&
+	   registry_detail::InteractableMatchesText(widget, focusedLabel_.data(), focusedLabel_.size())){
+		return true;
+	}
 	const char * label = UiInteractableLabel(widget);
 	return focusedUid_ < 0 && !focusedLabel_.empty() && label
 	    && registry_detail::LabelEquals(label, focusedLabel_.c_str());
@@ -319,7 +369,7 @@ void UiInteractionRegistry::SetFocus(const UiInteractable& widget,
                                      FocusOrigin origin) {
 	focusedUid_ = widget.uid;
 	focusedKind_ = widget.kind;
-	focusedLabel_ = registry_detail::InteractableId(widget);
+	registry_detail::AssignInteractableActionId(focusedLabel_, widget);
 	focusedOrigin_ = origin;
 	RefreshElementState();
 }
@@ -366,7 +416,7 @@ bool UiInteractionRegistry::FocusTextInputByUid(int uid) {
 }
 
 bool UiInteractionRegistry::FocusInteractableById(const std::string& id) {
-	const UiInteractable * widget = FindInteractableById(id);
+	const UiInteractable * widget = FindInteractableById(id.data(), id.size());
 	if(!widget || !UiInteractableIsInteractive(*widget)) return false;
 	SetFocus(*widget, widget->kind == UiInteractableKind::TextInput
 	                  ? FocusOrigin::Text
