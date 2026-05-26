@@ -1,6 +1,7 @@
 #include "lobby_connect_screen.h"
 
 #include "client/ui/ClientUi.h"
+#include "hooks/use_lobby.h"
 #include "screen_context.h"
 #include "game_state.h"
 #include "surface.h"
@@ -88,18 +89,15 @@ std::function<void()> UseQueuedAction(std::function<void()> write)
 	};
 }
 
-std::function<void()> UseQueuedLobbyCredentials(ScreenContext & ctx,
+std::function<void()> UseQueuedLobbyCredentials(const silencer::client_ui::hooks::LobbyUi & lobby,
                                                 const char * username,
                                                 const char * password)
 {
-	auto queueWrite = silencer::client_ui::UseUiWriteQueue();
-	if(!queueWrite) return {};
-	return [queueWrite, &ctx, username, password]() {
+	if(!lobby.submitCredentials) return {};
+	return [submitCredentials = lobby.submitCredentials, username, password]() {
 		const std::string usernameValue = username ? username : "";
 		const std::string passwordValue = password ? password : "";
-		queueWrite([&ctx, usernameValue, passwordValue]() {
-			ctx.SubmitLobbyCredentials(usernameValue.c_str(), passwordValue.c_str());
-		});
+		submitCredentials(usernameValue, passwordValue);
 	};
 }
 
@@ -307,13 +305,16 @@ void LobbyConnectScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frame
 	(void)frametime;
 	using namespace silencer::clay_bridge;
 
+	silencer::client_ui::hooks::LobbyProvider(ctx, [&]() {
+	const silencer::client_ui::hooks::LobbyUi lobby =
+		silencer::client_ui::hooks::UseLobby();
 	int lineCount = lobby_connect_screen_detail::FillLogSlab(logLines);
 	Uint16 scroll = 0;
 	const int visibleLines = lobby_connect_screen_detail::kLogH / 11;
 	if(lineCount > visibleLines){
 		scroll = static_cast<Uint16>(lineCount - visibleLines);
 	}
-	bool inactive = ctx.world.lobby.state == Lobby::AUTHSENT;
+	bool inactive = lobby.authSent;
 	const bool requestUsernameInitialFocus = focusUsernameRequested;
 	focusUsernameRequested = false;
 	const bool usernameFocused =
@@ -321,7 +322,7 @@ void LobbyConnectScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frame
 	const bool passwordFocused =
 		interactions.IsTextInputFocused(lobby_connect_screen_detail::LBY_INPUT_PASSWORD);
 	const bool blink = ctx.UiBlinkVisible();
-	submitLogin = lobby_connect_screen_detail::UseQueuedLobbyCredentials(ctx, username, password);
+	submitLogin = lobby_connect_screen_detail::UseQueuedLobbyCredentials(lobby, username, password);
 	cancel = lobby_connect_screen_detail::UseQueuedAction([&ctx]() {
 		ctx.GoToState(GameState::MAINMENU);
 	});
@@ -495,6 +496,7 @@ void LobbyConnectScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frame
 	}
 
 	lobby_connect_screen_detail::RegisterWidgets(this, username, password, inactive, interactions);
+	});
 }
 
 void LobbyConnectScreen::Destroy(ScreenContext & ctx)

@@ -1,6 +1,5 @@
 #include "mission_summary_screen.h"
 
-#include "client/ui/ClientUi.h"
 #include "screen_context.h"
 #include "world.h"
 #include "user.h"
@@ -20,6 +19,7 @@
 #include <cstdio>
 #include <cstring>
 #include <functional>
+#include <memory>
 
 namespace mission_summary_screen_detail
 {
@@ -122,15 +122,6 @@ int SuffixInt(const Text & value, const char * prefix)
 {
 	if(!StartsWith(value, prefix)) return -1;
 	return std::atoi(value.c_str() + std::strlen(prefix));
-}
-
-std::function<void()> UseQueuedAction(std::function<void()> write)
-{
-	auto queueWrite = silencer::client_ui::UseUiWriteQueue();
-	if(!queueWrite) return {};
-	return [queueWrite, write]() {
-		queueWrite(write);
-	};
 }
 
 void Invoke(const std::function<void()> & action)
@@ -245,8 +236,9 @@ void MissionSummaryScreen::Build(ScreenContext & ctx)
 {
 	ctx.ResetMenuPresentation(1);
 	infoLoaded = false;
-	done = {};
-	for(auto & action : upgradeActions) action = {};
+	flushActions = {};
+	pendingActions = {};
+	actionFlushQueued = false;
 	scrollDelta = 0;
 	scrollPosition = 0;
 	Refresh(ctx);
@@ -276,6 +268,9 @@ void MissionSummaryScreen::BuildUi(ScreenContext & ctx, Surface & dst, float fra
 	(void)dst;
 	using namespace silencer::clay_bridge;
 
+	silencer::client_ui::hooks::LobbyProvider(ctx, [&]() {
+	const silencer::client_ui::hooks::LobbyUi lobby =
+		silencer::client_ui::hooks::UseLobby();
 	int lineCount = mission_summary_screen_detail::FillSummarySlab(summaryLines);
 	std::string xp = "+ " + std::to_string(experience) + " XP";
 	const int titleX = mission_summary_screen_detail::CenteredTextX(
@@ -286,14 +281,11 @@ void MissionSummaryScreen::BuildUi(ScreenContext & ctx, Surface & dst, float fra
 		mission_summary_screen_detail::kXpCenterX,
 		mission_summary_screen_detail::FromStd(xp),
 		mission_summary_screen_detail::TextSize::Prompt);
-	done = mission_summary_screen_detail::UseQueuedAction([&ctx]() {
-		ctx.CompleteMissionSummary();
-	});
-	for(int i = 0; i < 6; i++){
-		upgradeActions[i] = mission_summary_screen_detail::UseQueuedAction([&ctx, i]() {
-			ctx.UpgradeMissionSummaryStat(i);
-		});
-	}
+	actionFlushQueued = false;
+	pendingActions = std::make_shared<silencer::client_ui::hooks::LobbyMissionSummaryActions>();
+	flushActions = [flush = lobby.flushMissionSummaryActions, pendingActions = pendingActions]() {
+		if(flush) flush(pendingActions);
+	};
 
 	CLAY({ .id = CLAY_ID("MissionSummaryRoot"),
 	       .layout = {
@@ -391,13 +383,15 @@ void MissionSummaryScreen::BuildUi(ScreenContext & ctx, Surface & dst, float fra
 			}
 		}
 	}
+	});
 }
 
 void MissionSummaryScreen::Destroy(ScreenContext & ctx)
 {
 	(void)ctx;
-	done = {};
-	for(auto & action : upgradeActions) action = {};
+	flushActions = {};
+	pendingActions = {};
+	actionFlushQueued = false;
 }
 
 bool MissionSummaryScreen::HandleUiIntent(ScreenContext & ctx, const silencer::ui::UiAction & action)
@@ -405,7 +399,8 @@ bool MissionSummaryScreen::HandleUiIntent(ScreenContext & ctx, const silencer::u
 	(void)ctx;
 	if(action.kind == silencer::ui::UiActionKind::Cancel ||
 	   (action.kind == silencer::ui::UiActionKind::Activate && action.id == mission_summary_screen_detail::kActionDone)){
-		mission_summary_screen_detail::Invoke(done);
+		if(pendingActions) pendingActions->done = true;
+		QueueActionFlush();
 		return true;
 	}
 	if(action.kind == silencer::ui::UiActionKind::Scroll){
@@ -415,10 +410,18 @@ bool MissionSummaryScreen::HandleUiIntent(ScreenContext & ctx, const silencer::u
 	if(action.kind != silencer::ui::UiActionKind::Activate) return false;
 	int upgrade = mission_summary_screen_detail::SuffixInt(action.id, mission_summary_screen_detail::kActionUpgradePrefix);
 	if(upgrade >= 0 && upgrade < 6){
-		mission_summary_screen_detail::Invoke(upgradeActions[upgrade]);
+		if(pendingActions) pendingActions->upgradeIndex = upgrade;
+		QueueActionFlush();
 		return true;
 	}
 	return false;
+}
+
+void MissionSummaryScreen::QueueActionFlush()
+{
+	if(actionFlushQueued) return;
+	actionFlushQueued = true;
+	mission_summary_screen_detail::Invoke(flushActions);
 }
 
 void MissionSummaryScreen::Refresh(ScreenContext & ctx)

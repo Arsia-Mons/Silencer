@@ -236,6 +236,16 @@ fail_if_match \
   "$REPO_ROOT/clients/silencer/src/client/ui/screens/mission_summary/mission_summary_screen.h"
 
 fail_if_match \
+  '\b(SubmitLobbyCredentials|UpgradeMissionSummaryStat|CompleteMissionSummary)\b' \
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens/screen_context.cpp" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens/screen_context.h"
+
+fail_if_match \
+  '\b(SendCredentials|UpgradeStat)\b' \
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens/lobby_connect/lobby_connect_screen.cpp" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens/mission_summary/mission_summary_screen.cpp"
+
+fail_if_match \
   '\b(goBackClicked|controlsClicked|displayClicked|audioClicked)\b' \
   "$REPO_ROOT/clients/silencer/src/client/ui/screens/options/options_screen.cpp" \
   "$REPO_ROOT/clients/silencer/src/client/ui/screens/options/options_screen.h"

@@ -247,9 +247,6 @@ public:
 	Uint32 FrameCount() const;
 	Uint32 WorldTickCount() const;
 	bool LobbyMusicFadedIn() const;
-	void SubmitLobbyCredentials(const char * username, const char * password);
-	void UpgradeMissionSummaryStat(int upgradeIndex);
-	void CompleteMissionSummary();
 	std::string LobbyGameChannelName(LobbyGame & lobbyGame);
 	std::vector<std::string> CreateGameMapLabels();
 	void SelectCreateGameMap(int mapIndex);

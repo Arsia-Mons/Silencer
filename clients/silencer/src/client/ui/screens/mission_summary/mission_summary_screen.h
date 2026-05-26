@@ -2,9 +2,11 @@
 #define MISSION_SUMMARY_SCREEN_H
 
 #include "screen.h"
+#include "hooks/use_lobby.h"
 
 #include <array>
 #include <functional>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -26,10 +28,12 @@ public:
 private:
 	void Refresh(ScreenContext & ctx);
 	void AddSummaryLine(const char * name, Uint32 value, bool percentage = false);
+	void QueueActionFlush();
 
 	bool infoLoaded = false;
-	std::function<void()> done;
-	std::array<std::function<void()>, 6> upgradeActions = {};
+	std::function<void()> flushActions;
+	std::shared_ptr<silencer::client_ui::hooks::LobbyMissionSummaryActions> pendingActions;
+	bool actionFlushQueued = false;
 	int scrollDelta = 0;
 	int scrollPosition = 0;
 	bool upgradeBanner = false;
