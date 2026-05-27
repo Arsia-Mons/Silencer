@@ -7,7 +7,6 @@
 #include "primitives/text.h"
 #include "primitives/button.h"
 
-#include "screen_context.h"
 #include "tech_selected_panel.h"
 #include "tech_tree_grid.h"
 
@@ -16,7 +15,6 @@
 #include <cstdlib>
 #include <cstring>
 #include <string>
-#include <utility>
 
 using silencer::ui::primitives::Text;
 using silencer::ui::primitives::TextEffect;
@@ -81,44 +79,6 @@ int SuffixInt(const Text & value, const char * prefix) {
 	return std::atoi(value.c_str() + std::strlen(prefix));
 }
 
-void CopySnapshot(GameTechPanelState & state,
-                  const ScreenContext::LobbyTechSnapshot & snapshot) {
-	state.slotsLeftStr = snapshot.slotsLeft;
-	state.peerNameStrs = snapshot.peerNames;
-	state.rows.clear();
-	state.rows.reserve(snapshot.rows.size());
-	for(const ScreenContext::LobbyTechGridRow & source : snapshot.rows){
-		GameTechGridRow row;
-		row.itemIndex = source.itemIndex;
-		row.label = source.label;
-		row.labelBrightness = source.labelBrightness;
-		for(size_t i = 0; i < row.cells.size(); ++i){
-			row.cells[i].draw = source.cells[i].draw;
-			row.cells[i].selected = source.cells[i].selected;
-			row.cells[i].brightness = source.cells[i].brightness;
-		}
-		state.rows.push_back(std::move(row));
-	}
-}
-
-void ClearSelectedTechDetails(GameTechPanelState & state)
-{
-	state.techNameStr.clear();
-	for(std::string & line : state.techDescLines) line.clear();
-}
-
-void ApplySelectedTechDetails(
-	GameTechPanelState & state,
-	const silencer::client_ui::hooks::LobbyTechItemDetails & details)
-{
-	if(!details.found){
-		ClearSelectedTechDetails(state);
-		return;
-	}
-	state.techNameStr = details.title;
-	state.techDescLines = details.descriptionLines;
-}
-
 void QueueActionsFlush(GameTechPanelState & state)
 {
 	if(state.actionsQueued) return;
@@ -132,11 +92,6 @@ void QueueActionsFlush(GameTechPanelState & state)
 
 void GameTechPanelInit(GameTechPanelState & state) {
 	state = GameTechPanelState{};
-}
-
-void GameTechPanelTick(GameTechPanelState & state,
-                       ScreenContext & ctx) {
-	game_tech_panel_detail::CopySnapshot(state, ctx.CurrentLobbyTechSnapshot());
 }
 
 bool GameTechPanelHandleUiIntent(GameTechPanelState & state,
@@ -157,13 +112,7 @@ bool GameTechPanelHandleUiIntent(GameTechPanelState & state,
 	}
 	index = game_tech_panel_detail::SuffixInt(action.id, game_tech_panel_detail::kActionDescriptionPrefix);
 	if(index >= 0){
-		if(state.techItemDetailsForIndex){
-			game_tech_panel_detail::ApplySelectedTechDetails(
-				state,
-				state.techItemDetailsForIndex(index));
-		}else{
-			game_tech_panel_detail::ClearSelectedTechDetails(state);
-		}
+		state.selectedTechItemIndex = index;
 		return true;
 	}
 	return false;
@@ -172,8 +121,8 @@ bool GameTechPanelHandleUiIntent(GameTechPanelState & state,
 void BuildGameTechUpperTree(GameTechPanelState & state,
                             Uint16 panelWidth,
                             silencer::ui::UiInteractionRegistry& interactions) {
-	const silencer::client_ui::hooks::LobbyUi lobby =
-		silencer::client_ui::hooks::UseLobby();
+	const silencer::client_ui::hooks::LobbyTechSnapshot snapshot =
+		silencer::client_ui::hooks::UseLobbyGameTechSnapshot();
 	if(!state.pendingActions){
 		state.pendingActions =
 			std::make_shared<silencer::client_ui::hooks::LobbyGameTechActions>();
@@ -181,7 +130,6 @@ void BuildGameTechUpperTree(GameTechPanelState & state,
 	state.pendingActions->toggleIndex = -1;
 	state.pendingActions->backToTeams = false;
 	state.actionsQueued = false;
-	state.techItemDetailsForIndex = lobby.techItemDetailsForIndex;
 
 	// Back To Teams button.
 	CLAY({ .id = CLAY_ID("GTechBackWrap"),
@@ -212,8 +160,8 @@ void BuildGameTechUpperTree(GameTechPanelState & state,
 			wid.length = (int32_t)std::strlen(idBuf);
 			wid.chars  = idBuf;
 			CLAY({ .id = CLAY_SID(wid) }) {
-				if(!state.peerNameStrs[i].empty()){
-					Text(game_tech_panel_detail::FromStd(state.peerNameStrs[i]),
+				if(!snapshot.peerNames[i].empty()){
+					Text(game_tech_panel_detail::FromStd(snapshot.peerNames[i]),
 					     { .size = TextSize::Body });
 				}
 			}
@@ -223,20 +171,26 @@ void BuildGameTechUpperTree(GameTechPanelState & state,
 
 void BuildGameTechTallTree(GameTechPanelState & state,
                            silencer::ui::UiInteractionRegistry& interactions) {
+	const silencer::client_ui::hooks::LobbyTechSnapshot snapshot =
+		silencer::client_ui::hooks::UseLobbyGameTechSnapshot();
+	const silencer::client_ui::hooks::LobbyTechItemDetails details =
+		silencer::client_ui::hooks::UseLobbyTechItemDetails(
+			state.selectedTechItemIndex);
+
 	// "Tech slots left: N" — bank 133/w6/eff=129/brightness=144/colorRamp.
 	CLAY({ .id = CLAY_ID("GTechSlotsWrap"),
 	       .layout = { .padding = { game_tech_panel_detail::kTallSlotsPadLeft, 0,
 	                                game_tech_panel_detail::kTallSlotsPadTop, 0 } } }) {
-		if(!state.slotsLeftStr.empty()){
-			Text(game_tech_panel_detail::FromStd(state.slotsLeftStr),
+		if(!snapshot.slotsLeft.empty()){
+			Text(game_tech_panel_detail::FromStd(snapshot.slotsLeft),
 			     { .size = TextSize::Body,
 			       .effect = TextEffect::LegacyPalette(
 					   129, static_cast<Uint8>(128 + 16), true) });
 		}
 	}
 
-	BuildTechTreeGrid(state, interactions);
-	BuildTechSelectedPanel(state);
+	BuildTechTreeGrid(snapshot, interactions);
+	BuildTechSelectedPanel(details);
 }
 
 }  // namespace silencer::client_ui::lobby

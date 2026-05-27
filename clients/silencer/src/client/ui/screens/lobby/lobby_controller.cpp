@@ -56,8 +56,7 @@ void LobbyScreen::Tick(ScreenContext & ctx)
 			gameCreateState, ctx);
 	}
 	if(gameTechActive){
-		silencer::client_ui::lobby::GameTechPanelTick(
-			gameTechState, ctx);
+		silencer::client_ui::hooks::RequestLobbyGameTechPeerList(ctx);
 	}
 
 	// Pre-CONNECTED surfaces (gameselect / gamecreate) — join finalisation,

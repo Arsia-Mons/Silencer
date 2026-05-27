@@ -122,22 +122,6 @@ public:
 		Uint8 color = 0;
 		Uint8 brightness = 128;
 	};
-	struct LobbyTechGridCell {
-		bool draw = false;
-		bool selected = false;
-		Uint8 brightness = 64;
-	};
-	struct LobbyTechGridRow {
-		int itemIndex = -1;
-		std::array<LobbyTechGridCell, 4> cells{};
-		std::string label;
-		Uint8 labelBrightness = 64;
-	};
-	struct LobbyTechSnapshot {
-		std::string slotsLeft;
-		std::array<std::string, 3> peerNames{};
-		std::vector<LobbyTechGridRow> rows;
-	};
 	struct UiSpriteFrameMetrics {
 		int offsetX = 0;
 		int offsetY = 0;
@@ -235,7 +219,6 @@ public:
 	std::vector<LobbyPresenceRow> LobbyPresenceRows() const;
 	std::vector<LobbyChatMessage> DrainLobbyChatMessages();
 	void SendLobbyChat(const char * message);
-	LobbyTechSnapshot CurrentLobbyTechSnapshot();
 	void BeginCreateGameMapUpload(const std::string & gameName,
 	                              const std::string & mapName,
 	                              const std::string & password,

@@ -49,6 +49,25 @@ struct LobbyTechItemDetails {
 	std::array<std::string, 8> descriptionLines{};
 };
 
+struct LobbyTechGridCell {
+	bool draw = false;
+	bool selected = false;
+	uint8_t brightness = 64;
+};
+
+struct LobbyTechGridRow {
+	int itemIndex = -1;
+	std::array<LobbyTechGridCell, 4> cells{};
+	std::string label;
+	uint8_t labelBrightness = 64;
+};
+
+struct LobbyTechSnapshot {
+	std::string slotsLeft;
+	std::array<std::string, 3> peerNames{};
+	std::vector<LobbyTechGridRow> rows;
+};
+
 struct LobbyCharacterStats {
 	std::string name;
 	bool statsAvailable = false;
@@ -74,7 +93,6 @@ struct LobbyUi {
 	std::function<void(std::shared_ptr<LobbyGameJoinActions>,
 	                   std::function<bool()> gameJoinStillActive,
 	                   std::function<void()> showTech)> flushGameJoinActions = {};
-	std::function<LobbyTechItemDetails(int itemIndex)> techItemDetailsForIndex = {};
 	std::function<LobbyCharacterStats(uint8_t agency)> characterStatsForAgency = {};
 	std::function<void(std::shared_ptr<LobbyGameTechActions>,
 	                   std::function<bool()> gameTechStillActive,
@@ -89,7 +107,10 @@ void LobbyProvider(ScreenContext & ctx, const std::function<void()> & children);
 LobbyUi UseLobby();
 std::string UseLobbyGameJoinReadyLabel();
 std::vector<LobbyGameJoinRosterRow> UseLobbyGameJoinRosterRows();
+LobbyTechSnapshot UseLobbyGameTechSnapshot();
+LobbyTechItemDetails UseLobbyTechItemDetails(int itemIndex);
 void ReconcileLobbyCharacterAgency(ScreenContext & ctx, int & lastSyncedAgency);
 void FlushLobbyCharacterSelectionRequest(ScreenContext & ctx, bool & requested);
+void RequestLobbyGameTechPeerList(ScreenContext & ctx);
 
 } // namespace silencer::client_ui::hooks

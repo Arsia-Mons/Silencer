@@ -4,8 +4,6 @@
 #include "clay_ui_compositor.h"
 #include "primitives/text.h"
 
-#include "game_tech_panel.h"
-
 #include <cstdint>
 #include <string>
 
@@ -33,7 +31,7 @@ Clay_String FromStd(const std::string & s) {
 
 }  // namespace tech_selected_panel_detail
 
-void BuildTechSelectedPanel(const GameTechPanelState & state) {
+void BuildTechSelectedPanel(const hooks::LobbyTechItemDetails & details) {
 	// Centered tech-name heading. ALIGN_X_CENTER in a grow wrapper sized to
 	// the legacy 232-wide tall pane.
 	CLAY({ .id = CLAY_ID("GTechNameWrap"),
@@ -43,8 +41,8 @@ void BuildTechSelectedPanel(const GameTechPanelState & state) {
 	           .padding = { 0, 0, tech_selected_panel_detail::kTallTechNamePadTop, 0 },
 	           .childAlignment = { .x = CLAY_ALIGN_X_CENTER },
 	       } }) {
-		if(!state.techNameStr.empty()){
-			Text(tech_selected_panel_detail::FromStd(state.techNameStr),
+		if(details.found && !details.title.empty()){
+			Text(tech_selected_panel_detail::FromStd(details.title),
 			     { .size = TextSize::Heading });
 		}
 	}
@@ -64,8 +62,8 @@ void BuildTechSelectedPanel(const GameTechPanelState & state) {
 			           .sizing = { CLAY_SIZING_GROW(0),
 			                       CLAY_SIZING_FIXED(tech_selected_panel_detail::kDescLH) },
 			       } }) {
-				if(!state.techDescLines[i].empty()){
-					Text(tech_selected_panel_detail::FromStd(state.techDescLines[i]),
+				if(details.found && !details.descriptionLines[i].empty()){
+					Text(tech_selected_panel_detail::FromStd(details.descriptionLines[i]),
 					     { .size = TextSize::Body,
 					       .effect = TextEffect::LegacyPalette(
 							   129, static_cast<Uint8>(128 + 16), true) });

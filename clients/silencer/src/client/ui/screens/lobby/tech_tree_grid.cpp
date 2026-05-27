@@ -2,11 +2,10 @@
 
 #include "clay/clay.h"
 #include "clay_ui_compositor.h"
+#include "hooks/use_lobby.h"
 #include "runtime/UiInteractionRegistry.h"
 #include "primitives/text.h"
 #include "primitives/toggle.h"
-
-#include "game_tech_panel.h"
 
 #include <cstdint>
 #include <cstring>
@@ -56,7 +55,7 @@ Clay_String FromStd(const std::string & s) {
 
 }  // namespace tech_tree_grid_detail
 
-void BuildTechTreeGrid(const GameTechPanelState & state,
+void BuildTechTreeGrid(const silencer::client_ui::hooks::LobbyTechSnapshot & snapshot,
                        silencer::ui::UiInteractionRegistry& interactions) {
 	CLAY({ .id = CLAY_ID("GTechGridWrap"),
 	       .layout = {
@@ -84,11 +83,11 @@ void BuildTechTreeGrid(const GameTechPanelState & state,
 			           .layoutDirection = CLAY_TOP_TO_BOTTOM,
 			       } }) {
 				for(size_t rowSlot = 0;
-				    rowSlot < state.rows.size()
+				    rowSlot < snapshot.rows.size()
 				    && rowSlot < tech_tree_grid_detail::kMaxRows;
 				    ++rowSlot){
-					const GameTechGridRow & row = state.rows[rowSlot];
-					const GameTechGridCell & cell = row.cells[col];
+					const auto & row = snapshot.rows[rowSlot];
+					const auto & cell = row.cells[col];
 					if(!cell.draw) continue;
 
 					const Uint8 boxIdx = cell.selected
@@ -153,10 +152,10 @@ void BuildTechTreeGrid(const GameTechPanelState & state,
 		           .layoutDirection = CLAY_TOP_TO_BOTTOM,
 		       } }) {
 			for(size_t rowSlot = 0;
-			    rowSlot < state.rows.size()
+			    rowSlot < snapshot.rows.size()
 			    && rowSlot < tech_tree_grid_detail::kMaxRows;
 			    ++rowSlot){
-				const GameTechGridRow & row = state.rows[rowSlot];
+				const auto & row = snapshot.rows[rowSlot];
 				if(row.label.empty()) continue;
 
 				tech_tree_grid_detail::g_rowLabels[rowSlot] = row.label;

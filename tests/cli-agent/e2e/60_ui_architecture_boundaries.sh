@@ -169,6 +169,16 @@ fail_if_match \
   "$REPO_ROOT/clients/silencer/src/client/ui/screens/lobby/game_join_panel.cpp"
 
 fail_if_match \
+  '\b(CurrentLobbyTechSnapshot|LobbyTechSnapshot|LobbyTechGridCell|LobbyTechGridRow)\b' \
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens/screen_context.h" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens/screen_context.cpp"
+
+fail_if_match \
+  '\bScreenContext\b|\bGameTechPanelTick\b|\btechItemDetailsForIndex\b' \
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens/lobby/game_tech_panel.h" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens/lobby/game_tech_panel.cpp"
+
+fail_if_match \
   '#include[[:space:]]*"game[.]h"' \
   "$REPO_ROOT/clients/silencer/src/client/ui/screens" \
   "$REPO_ROOT/clients/silencer/src/client/ui/modals" \

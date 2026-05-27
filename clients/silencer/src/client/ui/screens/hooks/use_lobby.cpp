@@ -154,6 +154,94 @@ LobbyTechItemDetails TechItemDetailsForIndex(World * world, int itemIndex)
 	return details;
 }
 
+LobbyTechSnapshot GameTechSnapshot(World * world, Lobby * lobby)
+{
+	LobbyTechSnapshot snapshot;
+	if(!world || !lobby) return snapshot;
+
+	const uint8_t localId = world->GetLocalPeerId();
+	Peer * localPeer = world->GetPeer(localId);
+	Team * team = world->GetPeerTeam(localId);
+
+	int localTechSlotsLeft = 0;
+	if(localPeer && team){
+		User * user = lobby->GetUserInfo(localPeer->accountid);
+		if(user){
+			localTechSlotsLeft =
+				user->agency[team->agency].techslots - world->TechSlotsUsed(*localPeer);
+			snapshot.slotsLeft =
+				"Tech slots left: " + std::to_string(localTechSlotsLeft);
+		}
+	}
+
+	if(!team) return snapshot;
+
+	int peerIndex = 0;
+	for(int i = 0; i < 4 && peerIndex < 3; i++){
+		if(team->peers[i] == localId) continue;
+		if(i >= team->numpeers){ peerIndex++; continue; }
+		Peer * peer = world->GetPeer(team->peers[i]);
+		User * user = peer ? lobby->GetUserInfo(peer->accountid) : nullptr;
+		snapshot.peerNames[peerIndex] =
+			user ? std::string(user->DisplayName()) : std::string();
+		peerIndex++;
+	}
+
+	struct ColAssign { int peerSlot; bool draw; bool isLocal; };
+	ColAssign cols[4] = { {-1,false,false}, {-1,false,false},
+	                       {-1,false,false}, {-1,false,false} };
+	peerIndex = 0;
+	for(int i = 0; i < 4; i++){
+		const bool isLocal = (team->peers[i] == localId);
+		const bool draw = (i < team->numpeers);
+		const int col = isLocal ? 3 : peerIndex;
+		if(!isLocal) peerIndex++;
+		if(col >= 0 && col < 4){
+			cols[col].peerSlot = i;
+			cols[col].draw = draw;
+			cols[col].isLocal = isLocal;
+		}
+	}
+
+	const ColAssign & localColumn = cols[3];
+	for(size_t itemIndex = 0; itemIndex < world->buyableitems.size(); itemIndex++){
+		BuyableItem * item = world->buyableitems[itemIndex];
+		if(!item || !item->techslots) continue;
+		if(item->agencyspecific != -1 && item->agencyspecific != team->agency){
+			continue;
+		}
+
+		LobbyTechGridRow row;
+		row.itemIndex = static_cast<int>(itemIndex);
+		if(localColumn.draw){
+			row.label = item->name;
+			row.label += " (";
+			row.label += std::to_string(item->techslots);
+			row.label += ")";
+		}
+
+		for(int col = 0; col < 4; col++){
+			if(!cols[col].draw) continue;
+			Peer * peer = world->GetPeer(team->peers[cols[col].peerSlot]);
+			const bool selected = peer && (peer->techchoices & item->techchoice);
+			bool interactable = false;
+			if(cols[col].isLocal){
+				interactable =
+					(item->techslots <= localTechSlotsLeft) || selected;
+			}
+			const uint8_t brightness = cols[col].isLocal && interactable ? 128 : 64;
+			row.cells[col].draw = true;
+			row.cells[col].selected = selected;
+			row.cells[col].brightness = brightness;
+			if(cols[col].isLocal) row.labelBrightness = brightness;
+		}
+
+		snapshot.rows.push_back(std::move(row));
+	}
+
+	return snapshot;
+}
+
 LobbyCharacterStats CharacterStatsForAgency(Lobby * lobby, uint8_t agency)
 {
 	LobbyCharacterStats result;
@@ -437,6 +525,19 @@ std::vector<LobbyGameJoinRosterRow> UseLobbyGameJoinRosterRows()
 	return rows;
 }
 
+LobbyTechSnapshot UseLobbyGameTechSnapshot()
+{
+	LobbyContext * context = CurrentLobbyContext();
+	return GameTechSnapshot(context ? context->world : nullptr,
+	                        context ? context->lobby : nullptr);
+}
+
+LobbyTechItemDetails UseLobbyTechItemDetails(int itemIndex)
+{
+	LobbyContext * context = CurrentLobbyContext();
+	return TechItemDetailsForIndex(context ? context->world : nullptr, itemIndex);
+}
+
 void ReconcileLobbyCharacterAgency(ScreenContext & ctx, int & lastSyncedAgency)
 {
 	if(!AgentSelectionLocked(&ctx.world)){
@@ -455,6 +556,13 @@ void FlushLobbyCharacterSelectionRequest(ScreenContext & ctx, bool & requested)
 	if(!requested) return;
 	requested = false;
 	OpenCharacterSelection(&ctx, &ctx.world);
+}
+
+void RequestLobbyGameTechPeerList(ScreenContext & ctx)
+{
+	if(ctx.world.GetPeer(ctx.world.GetLocalPeerId())) return;
+	if(ctx.world.tickcount % 12 != 0) return;
+	ctx.world.peers.RequestPeerList();
 }
 
 LobbyUi UseLobby()
@@ -500,9 +608,6 @@ LobbyUi UseLobby()
 				FlushGameJoinActions(world, actions, gameJoinStillActive, showTech);
 			});
 		};
-	result.techItemDetailsForIndex = [world](int itemIndex) {
-		return TechItemDetailsForIndex(world, itemIndex);
-	};
 	result.characterStatsForAgency = [lobby](uint8_t agency) {
 		return CharacterStatsForAgency(lobby, agency);
 	};
