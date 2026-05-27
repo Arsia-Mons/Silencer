@@ -1,5 +1,6 @@
 #include "lobby_screen.h"
 
+#include "hooks/use_lobby.h"
 #include "screen_context.h"
 #include "message_modal.h"
 
@@ -36,6 +37,13 @@ void LobbyScreen::Tick(ScreenContext & ctx)
 {
 	// Lobby disconnect → bounce back to the connect screen.
 	if(ctx.HandleLobbyDisconnect()) return;
+
+	silencer::client_ui::hooks::ReconcileLobbyCharacterAgency(
+		ctx,
+		lastSyncedCharacterAgency);
+	silencer::client_ui::hooks::FlushLobbyCharacterSelectionRequest(
+		ctx,
+		characterState.openCharacterSelectionRequested);
 
 	silencer::client_ui::lobby::ChatPanelTick(chatState, ctx);
 

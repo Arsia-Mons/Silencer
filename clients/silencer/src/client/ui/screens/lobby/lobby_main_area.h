@@ -14,7 +14,6 @@ class UiInteractionRegistry;
 
 namespace silencer::client_ui::lobby {
 
-struct CharacterPanelState;
 struct ChatPanelState;
 struct GameSelectPanelState;
 struct GameCreatePanelState;
@@ -22,7 +21,6 @@ struct GameJoinPanelState;
 struct GameTechPanelState;
 
 struct LobbyMainAreaPanels {
-	CharacterPanelState & character;
 	ChatPanelState & chat;
 	GameSelectPanelState & gameSelect;
 	GameCreatePanelState & gameCreate;

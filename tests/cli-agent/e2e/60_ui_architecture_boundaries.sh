@@ -154,6 +154,11 @@ fail_if_match \
   "$REPO_ROOT/clients/silencer/src/client/ui/screens/lobby/character_panel.cpp"
 
 fail_if_match \
+  '\bstd::function\b|\b(syncSelectedAgency|openCharacterSelection|lastReconciled)\b' \
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens/lobby/character_panel.h" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens/lobby/character_panel.cpp"
+
+fail_if_match \
   '#include[[:space:]]*"game[.]h"' \
   "$REPO_ROOT/clients/silencer/src/client/ui/screens" \
   "$REPO_ROOT/clients/silencer/src/client/ui/modals" \

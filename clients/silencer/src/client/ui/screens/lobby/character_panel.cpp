@@ -273,44 +273,27 @@ namespace silencer::client_ui::lobby {
     } // namespace character_panel_detail
 
     void CharacterPanelInit(CharacterPanelState &state) {
-        state.selectedAgency = 0;
-        state.lastReconciled = -1; // forces first-frame reconcile pass
-        state.agentSelectionLocked = false;
-        state.syncSelectedAgency = {};
-        state.openCharacterSelection = {};
+        state.openCharacterSelectionRequested = false;
     }
 
     bool CharacterPanelHandleUiIntent(CharacterPanelState &state,
                                       const silencer::ui::UiAction &action) {
         if (action.kind != silencer::ui::UiActionKind::Activate) return false;
         if (action.id == character_panel_detail::kActionAgents) {
-            if (!state.agentSelectionLocked && state.openCharacterSelection) {
-                state.openCharacterSelection();
-            }
+            state.openCharacterSelectionRequested = true;
             return true;
         }
         return false;
     }
 
-    void BuildCharacterPanelTree(CharacterPanelState &state,
-                                 Uint16 panelWidth,
+    void BuildCharacterPanelTree(Uint16 panelWidth,
                                  silencer::ui::UiInteractionRegistry &interactions) {
         // Refresh display strings each frame. Clay rebuilds this compact panel
         // from scratch, so the buffers only need to remain stable through the
         // current layout pass.
         const hooks::LobbyUi lobby = hooks::UseLobby();
-        state.selectedAgency = lobby.selectedAgency;
-        state.agentSelectionLocked = lobby.agentSelectionLocked;
-        state.syncSelectedAgency = lobby.syncSelectedAgency;
-        state.openCharacterSelection = lobby.openCharacterSelection;
-        if (static_cast<int>(state.selectedAgency) != state.lastReconciled) {
-            state.lastReconciled = state.selectedAgency;
-            if (state.agentSelectionLocked && state.syncSelectedAgency) {
-                state.syncSelectedAgency(state.selectedAgency);
-            }
-        }
-
-        const Uint8 a = state.selectedAgency;
+        const Uint8 a = lobby.selectedAgency;
+        const bool agentSelectionLocked = lobby.agentSelectionLocked;
         const hooks::LobbyCharacterStats characterStats =
             lobby.characterStatsForAgency
                 ? lobby.characterStatsForAgency(static_cast<uint8_t>(a))
@@ -493,7 +476,7 @@ namespace silencer::client_ui::lobby {
                                    ButtonOpts{
                                        .variant = ButtonVariant::Chrome,
                                        .size = ButtonSize::Auto,
-                                       .disabled = state.agentSelectionLocked,
+                                       .disabled = agentSelectionLocked,
                                        .minWidth = character_panel_detail::kActionButtonMinWidth,
                                        .paddingX = character_panel_detail::kActionButtonPaddingX
                                    },

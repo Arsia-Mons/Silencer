@@ -53,9 +53,10 @@ private:
 	std::function<void()> goBack;
 	bool goBackQueued = false;
 
-		// CharacterPanel state — agency selection and navigation handoffs are
-		// supplied by UseLobby during declaration.
-		silencer::client_ui::lobby::CharacterPanelState characterState;
+	// CharacterPanel state — declaration reads live lobby data through UseLobby;
+	// pending intent + agency sync are flushed from the lobby lifecycle.
+	silencer::client_ui::lobby::CharacterPanelState characterState;
+	int lastSyncedCharacterAgency = -1;
 
 	// ChatPanel state — chat scrollback + presence list + input buffer +
 	// cached channel name.

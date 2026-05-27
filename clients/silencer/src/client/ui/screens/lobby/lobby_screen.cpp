@@ -74,6 +74,7 @@ void LobbyScreen::Build(ScreenContext & ctx)
 	mapName.clear();
 	goBack = {};
 	goBackQueued = false;
+	lastSyncedCharacterAgency = -1;
 
 	silencer::client_ui::lobby::CharacterPanelInit(characterState);
 	silencer::client_ui::lobby::ChatPanelInit(chatState);
@@ -213,7 +214,6 @@ void LobbyScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime, s
 			BuildLobbyTitleBar(version, mapName, layoutWidth, interactions);
 
 			LobbyMainAreaPanels panels{
-				characterState,
 				chatState,
 				gameSelectState,
 				gameCreateState,

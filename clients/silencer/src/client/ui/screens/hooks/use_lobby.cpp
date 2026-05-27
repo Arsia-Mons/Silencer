@@ -388,6 +388,26 @@ void LobbyProvider(ScreenContext & ctx, const std::function<void()> & children)
 	REACT_PROVIDER_EXIT();
 }
 
+void ReconcileLobbyCharacterAgency(ScreenContext & ctx, int & lastSyncedAgency)
+{
+	if(!AgentSelectionLocked(&ctx.world)){
+		lastSyncedAgency = -1;
+		return;
+	}
+
+	const uint8_t selectedAgency = SelectedAgencyOrDefault(&ctx.lobby);
+	if(static_cast<int>(selectedAgency) == lastSyncedAgency) return;
+	lastSyncedAgency = selectedAgency;
+	SyncSelectedAgency(&ctx.world, selectedAgency);
+}
+
+void FlushLobbyCharacterSelectionRequest(ScreenContext & ctx, bool & requested)
+{
+	if(!requested) return;
+	requested = false;
+	OpenCharacterSelection(&ctx, &ctx.world);
+}
+
 LobbyUi UseLobby()
 {
 	auto * context = static_cast<LobbyContext *>(use_context(&g_lobbyContextValue));
@@ -436,18 +456,6 @@ LobbyUi UseLobby()
 	};
 	result.characterStatsForAgency = [lobby](uint8_t agency) {
 		return CharacterStatsForAgency(lobby, agency);
-	};
-	result.syncSelectedAgency = [queueWrite, world](uint8_t agency) {
-		if(!queueWrite || !world) return;
-		queueWrite([world, agency]() {
-			SyncSelectedAgency(world, agency);
-		});
-	};
-	result.openCharacterSelection = [queueWrite, screen, world]() {
-		if(!queueWrite || !screen) return;
-		queueWrite([screen, world]() {
-			OpenCharacterSelection(screen, world);
-		});
 	};
 	result.flushGameTechActions =
 		[queueWrite, world](std::shared_ptr<LobbyGameTechActions> actions,

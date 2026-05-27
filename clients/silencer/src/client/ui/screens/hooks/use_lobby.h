@@ -65,8 +65,6 @@ struct LobbyUi {
 	                   std::function<void()> showTech)> flushGameJoinActions = {};
 	std::function<LobbyTechItemDetails(int itemIndex)> techItemDetailsForIndex = {};
 	std::function<LobbyCharacterStats(uint8_t agency)> characterStatsForAgency = {};
-	std::function<void(uint8_t agency)> syncSelectedAgency = {};
-	std::function<void()> openCharacterSelection = {};
 	std::function<void(std::shared_ptr<LobbyGameTechActions>,
 	                   std::function<bool()> gameTechStillActive,
 	                   std::function<void()> showTeams)> flushGameTechActions = {};
@@ -78,5 +76,7 @@ struct LobbyUi {
 
 void LobbyProvider(ScreenContext & ctx, const std::function<void()> & children);
 LobbyUi UseLobby();
+void ReconcileLobbyCharacterAgency(ScreenContext & ctx, int & lastSyncedAgency);
+void FlushLobbyCharacterSelectionRequest(ScreenContext & ctx, bool & requested);
 
 } // namespace silencer::client_ui::hooks
