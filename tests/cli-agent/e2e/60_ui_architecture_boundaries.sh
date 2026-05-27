@@ -399,6 +399,22 @@ fail_if_match \
   --glob '!**/screen_context.cpp'
 
 fail_if_match \
+  '\bScreenContext\b|#[[:space:]]*include[[:space:]]*"screen_context[.]h"|ctx[[:space:]]*[.][[:space:]]*(IsServerMapLabel|FindMapPath|PlayUiClickSound)[[:space:]]*[(]' \
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens/lobby/game_create_panel_map_form.cpp" \
+  --glob '!**/screen_context.cpp'
+
+if awk '
+  /BuildGameCreate(TallTree|PreviewOverlay)[[:space:]]*\(/ { in_signature = 1 }
+  in_signature && /ScreenContext[[:space:]]*[*&]/ { found = 1 }
+  in_signature && /[;)][[:space:]]*$/ { in_signature = 0 }
+  END { exit(found ? 0 : 1) }
+' "$REPO_ROOT/clients/silencer/src/client/ui/screens/lobby/game_create_panel.h" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens/lobby/game_create_panel_map_form.cpp"; then
+  echo "GameCreate map declaration must use lobby hooks, not ScreenContext tree props" >&2
+  exit 1
+fi
+
+fail_if_match \
   'mapDownloader[[:space:]]*[.][[:space:]]*(servermaps[[:space:]]*[.][[:space:]]*count|FindMap[[:space:]]*[(]|LoadMapData[[:space:]]*[(])' \
   "$REPO_ROOT/clients/silencer/src/client/ui/screens/lobby/game_create_panel.cpp" \
   --glob '!**/screen_context.cpp'

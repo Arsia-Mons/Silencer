@@ -247,7 +247,6 @@ void LobbyScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime, s
 					if(gameCreateActive){
 						BuildGameCreateTallTree(
 							gameCreateState,
-							ctx,
 							static_cast<Uint16>(std::max(0, width)),
 							static_cast<Uint16>(std::max(0, height)),
 							ctx.world.resources,
@@ -266,7 +265,7 @@ void LobbyScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime, s
 					}
 				});
 			if(gameCreateActive){
-				BuildGameCreatePreviewOverlay(gameCreateState, ctx);
+				BuildGameCreatePreviewOverlay(gameCreateState);
 			}
 		}
 	});

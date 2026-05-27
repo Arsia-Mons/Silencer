@@ -441,6 +441,30 @@ LobbyTechItemDetails UseLobbyTechItemDetails(int itemIndex)
 	return TechItemDetailsForIndex(context ? context->world : nullptr, itemIndex);
 }
 
+LobbyCreateMapInfo UseLobbyCreateMapInfo(const std::string & mapLabel)
+{
+	LobbyContext * context = CurrentLobbyContext();
+	ScreenContext * screen = context ? context->screen : nullptr;
+	LobbyCreateMapInfo info;
+	if(!screen) return info;
+	info.serverMap = screen->IsServerMapLabel(mapLabel);
+	if(!info.serverMap){
+		info.localPath = screen->FindMapPath(mapLabel.c_str());
+	}
+	return info;
+}
+
+void QueueLobbyUiClickSound()
+{
+	LobbyContext * context = CurrentLobbyContext();
+	ScreenContext * screen = context ? context->screen : nullptr;
+	QueueUiWrite queueWrite = UseUiWriteQueue();
+	if(!screen || !queueWrite) return;
+	queueWrite([screen]() {
+		screen->PlayUiClickSound();
+	});
+}
+
 void ReconcileLobbyCharacterAgency(ScreenContext & ctx, int & lastSyncedAgency)
 {
 	if(!AgentSelectionLocked(&ctx.world)){

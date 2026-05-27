@@ -61,6 +61,11 @@ struct LobbyCharacterStats {
 	uint8_t contacts = 0;
 };
 
+struct LobbyCreateMapInfo {
+	bool serverMap = false;
+	std::string localPath;
+};
+
 struct LobbyUi {
 	bool authSent = false;
 	uint8_t selectedAgency = 0;
@@ -83,6 +88,8 @@ std::string UseLobbyGameJoinReadyLabel();
 std::vector<LobbyGameJoinRosterRow> UseLobbyGameJoinRosterRows();
 LobbyTechSnapshot UseLobbyGameTechSnapshot();
 LobbyTechItemDetails UseLobbyTechItemDetails(int itemIndex);
+LobbyCreateMapInfo UseLobbyCreateMapInfo(const std::string & mapLabel);
+void QueueLobbyUiClickSound();
 void ReconcileLobbyCharacterAgency(ScreenContext & ctx, int & lastSyncedAgency);
 void FlushLobbyCharacterSelectionRequest(ScreenContext & ctx, bool & requested);
 void RequestLobbyGameTechPeerList(ScreenContext & ctx);

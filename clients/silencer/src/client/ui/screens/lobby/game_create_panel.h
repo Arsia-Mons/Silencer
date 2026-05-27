@@ -7,8 +7,9 @@
 // Button::Chrome (Create).
 //
 // Domain decisions live in the screen-side GameCreatePanelTick. Create
-// defaults, security-level, and async create/join handoffs come through
-// ScreenContext; primitives stay screen-agnostic.
+// defaults, security-level, and async create/join handoffs are owned by the
+// screen lifecycle; declaration-time map preview reads go through UseLobby so
+// child trees do not receive ScreenContext.
 
 #include "shared.h"
 #include "clay_ui_payloads.h"
@@ -108,14 +109,12 @@ void BuildGameCreateUpperTree(GameCreatePanelState & state,
 // BeginFrame requirements: TextBeginFrame, ButtonBeginFrame,
 // ScrollListBeginFrame, TextInputBeginFrame.
 void BuildGameCreateTallTree(GameCreatePanelState & state,
-                             ScreenContext & ctx,
                              Uint16 panelWidth,
                              Uint16 panelHeight,
                              Resources & resources,
                              silencer::ui::UiInteractionRegistry& interactions);
 
-void BuildGameCreatePreviewOverlay(GameCreatePanelState & state,
-                                   ScreenContext & ctx);
+void BuildGameCreatePreviewOverlay(GameCreatePanelState & state);
 
 }  // namespace silencer::client_ui::lobby
 

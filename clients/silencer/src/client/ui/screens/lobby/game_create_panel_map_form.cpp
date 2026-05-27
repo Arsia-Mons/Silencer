@@ -1,6 +1,6 @@
 #include "game_create_panel.h"
 
-#include "screen_context.h"
+#include "hooks/use_lobby.h"
 #include "map.h"
 #include "text_wrap.h"
 
@@ -93,7 +93,6 @@ void HideHoverPreview(GameCreatePanelState & state) {
 }
 
 void LoadHoverPreview(GameCreatePanelState & state,
-                      ScreenContext & ctx,
                       int hoveredIndex) {
 	if(hoveredIndex < 0 || hoveredIndex >= static_cast<int>(state.maps.size())){
 		ResetHoverPreview(state);
@@ -101,18 +100,21 @@ void LoadHoverPreview(GameCreatePanelState & state,
 	}
 
 	const std::string & mapLabel = state.maps[hoveredIndex];
-	if(ctx.IsServerMapLabel(mapLabel)){
-		ResetHoverPreview(state);
-		return;
-	}
 	if(state.hoverPreviewMapIndex == hoveredIndex && !state.hoverPreviewPixels.empty()){
 		state.hoverPreviewVisible = true;
 		return;
 	}
 
+	const silencer::client_ui::hooks::LobbyCreateMapInfo mapInfo =
+		silencer::client_ui::hooks::UseLobbyCreateMapInfo(mapLabel);
+	if(mapInfo.serverMap){
+		ResetHoverPreview(state);
+		return;
+	}
+
 	ResetHoverPreview(state);
 
-	const std::string filename = ctx.FindMapPath(mapLabel.c_str());
+	const std::string & filename = mapInfo.localPath;
 	if(filename.empty()) return;
 
 	SDL_IOStream * file = SDL_IOFromFile(filename.c_str(), "rb");
@@ -153,13 +155,12 @@ void LoadHoverPreview(GameCreatePanelState & state,
 }
 
 void UpdateHoverPreview(GameCreatePanelState & state,
-                        ScreenContext & ctx,
                         int hoveredIndex) {
 	if(hoveredIndex < 0){
 		HideHoverPreview(state);
 		return;
 	}
-	LoadHoverPreview(state, ctx, hoveredIndex);
+	LoadHoverPreview(state, hoveredIndex);
 }
 
 int CountPreviewLines(const std::string & text) {
@@ -171,9 +172,7 @@ int CountPreviewLines(const std::string & text) {
 	return lines;
 }
 
-void BuildHoverPreviewOverlay(GameCreatePanelState & state,
-                              ScreenContext & ctx) {
-	(void)ctx;
+void BuildHoverPreviewOverlay(GameCreatePanelState & state) {
 	if(!state.hoverPreviewVisible || state.hoverPreviewPixels.empty()) return;
 
 	const silencer::ui::UiInputState & input =
@@ -271,7 +270,6 @@ GameCreateTallLayout ResolveTallLayout(Uint16 panelWidth,
 }
 
 void BuildMapList(GameCreatePanelState & state,
-                  ScreenContext & ctx,
                   const GameCreateTallLayout & layout,
                   silencer::ui::UiInteractionRegistry& interactions) {
 	const int slotCount = std::min((int)state.maps.size(), kMaxMapRows);
@@ -306,10 +304,10 @@ void BuildMapList(GameCreatePanelState & state,
 		           ScrollListHandle{ nullptr, kActionMapPrefix, &interactions, &hoveredIndex });
 	}
 	if(hoveredIndex >= 0 && hoveredIndex != state.lastHoveredMapIndex){
-		ctx.PlayUiClickSound();
+		silencer::client_ui::hooks::QueueLobbyUiClickSound();
 	}
 	state.lastHoveredMapIndex = hoveredIndex;
-	UpdateHoverPreview(state, ctx, hoveredIndex);
+	UpdateHoverPreview(state, hoveredIndex);
 }
 
 void BuildNameAndPassword(GameCreatePanelState & state,
@@ -371,7 +369,6 @@ void BuildNameAndPassword(GameCreatePanelState & state,
 }  // namespace game_create_panel_map_form_detail
 
 void BuildGameCreateTallTree(GameCreatePanelState & state,
-                             ScreenContext & ctx,
                              Uint16 panelWidth,
                              Uint16 panelHeight,
                              Resources & resources,
@@ -392,14 +389,13 @@ void BuildGameCreateTallTree(GameCreatePanelState & state,
 			     { .size = TextSize::Heading });
 		}
 
-		game_create_panel_map_form_detail::BuildMapList(state, ctx, layout, interactions);
+		game_create_panel_map_form_detail::BuildMapList(state, layout, interactions);
 		game_create_panel_map_form_detail::BuildNameAndPassword(state, layout, interactions);
 	}
 }
 
-void BuildGameCreatePreviewOverlay(GameCreatePanelState & state,
-                                   ScreenContext & ctx) {
-	game_create_panel_map_form_detail::BuildHoverPreviewOverlay(state, ctx);
+void BuildGameCreatePreviewOverlay(GameCreatePanelState & state) {
+	game_create_panel_map_form_detail::BuildHoverPreviewOverlay(state);
 }
 
 }  // namespace silencer::client_ui::lobby
