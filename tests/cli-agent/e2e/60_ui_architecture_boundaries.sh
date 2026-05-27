@@ -403,6 +403,12 @@ fail_if_match \
   "$REPO_ROOT/clients/silencer/src/client/ui/screens/lobby/game_create_panel_map_form.cpp" \
   --glob '!**/screen_context.cpp'
 
+fail_if_match \
+  '\bQueueLobbyUiClickSound\b|\bPlayUiClickSound[[:space:]]*[(]' \
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens/hooks/use_lobby.h" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens/hooks/use_lobby.cpp" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens/lobby/game_create_panel_map_form.cpp"
+
 if awk '
   /BuildGameCreate(TallTree|PreviewOverlay)[[:space:]]*\(/ { in_signature = 1 }
   in_signature && /ScreenContext[[:space:]]*[*&]/ { found = 1 }

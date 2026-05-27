@@ -50,6 +50,7 @@ struct ScrollListHandle {
 	int * hoveredIndexOut = nullptr;  // Optional. Hovered absolute row index.
 	bool requestSelectedInitialFocus = false;
 	bool requestSelectedFocus = false;
+	bool requestFeedback = false;     // Rows opt into client-layer UI feedback.
 };
 
 // Resets the per-frame click-adapter + payload arenas. Call once before

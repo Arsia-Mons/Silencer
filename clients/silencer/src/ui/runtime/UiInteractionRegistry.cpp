@@ -225,6 +225,7 @@ bool UiInteractionRegistry::RegisterInteractable(UiInteractable widget) {
 		existing->cancelOnEscape = widget.cancelOnEscape;
 		existing->requestInitialFocus = widget.requestInitialFocus;
 		existing->requestFocus = widget.requestFocus;
+		existing->requestFeedback = widget.requestFeedback;
 	}else{
 		if(interactableCount_ >= UI_INTERACTION_MAX_INTERACTABLES) {
 			++interactableOverflowCount_;

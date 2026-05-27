@@ -297,16 +297,17 @@ void BuildMapList(GameCreatePanelState & state,
 	                          kListBorderPad, kListBorderPad },
 	         },
 	     })) {
+		ScrollListHandle handle = {};
+		handle.actionId = kActionMapPrefix;
+		handle.interactions = &interactions;
+		handle.hoveredIndexOut = &hoveredIndex;
+		handle.requestFeedback = true;
 		ScrollList(CLAY_STRING("GCrtMapList"),
 		           g_mapSlab, slotCount,
 		           state.mapSelectedIndex, state.mapScrollPos,
 		           listOpts,
-		           ScrollListHandle{ nullptr, kActionMapPrefix, &interactions, &hoveredIndex });
+		           handle);
 	}
-	if(hoveredIndex >= 0 && hoveredIndex != state.lastHoveredMapIndex){
-		silencer::client_ui::hooks::QueueLobbyUiClickSound();
-	}
-	state.lastHoveredMapIndex = hoveredIndex;
 	UpdateHoverPreview(state, hoveredIndex);
 }
 

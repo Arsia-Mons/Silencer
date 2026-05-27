@@ -73,6 +73,7 @@ struct UiInteractable {
 	bool cancelOnEscape = false;
 	bool requestInitialFocus = false;
 	bool requestFocus = false;
+	bool requestFeedback = false;
 };
 
 template <typename T>

@@ -89,7 +89,6 @@ std::vector<LobbyGameJoinRosterRow> UseLobbyGameJoinRosterRows();
 LobbyTechSnapshot UseLobbyGameTechSnapshot();
 LobbyTechItemDetails UseLobbyTechItemDetails(int itemIndex);
 LobbyCreateMapInfo UseLobbyCreateMapInfo(const std::string & mapLabel);
-void QueueLobbyUiClickSound();
 void ReconcileLobbyCharacterAgency(ScreenContext & ctx, int & lastSyncedAgency);
 void FlushLobbyCharacterSelectionRequest(ScreenContext & ctx, bool & requested);
 void RequestLobbyGameTechPeerList(ScreenContext & ctx);

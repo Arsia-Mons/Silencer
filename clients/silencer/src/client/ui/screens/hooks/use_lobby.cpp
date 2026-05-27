@@ -454,17 +454,6 @@ LobbyCreateMapInfo UseLobbyCreateMapInfo(const std::string & mapLabel)
 	return info;
 }
 
-void QueueLobbyUiClickSound()
-{
-	LobbyContext * context = CurrentLobbyContext();
-	ScreenContext * screen = context ? context->screen : nullptr;
-	QueueUiWrite queueWrite = UseUiWriteQueue();
-	if(!screen || !queueWrite) return;
-	queueWrite([screen]() {
-		screen->PlayUiClickSound();
-	});
-}
-
 void ReconcileLobbyCharacterAgency(ScreenContext & ctx, int & lastSyncedAgency)
 {
 	if(!AgentSelectionLocked(&ctx.world)){

@@ -28,6 +28,7 @@ static ReactContext g_screenContextValue = {};
 
 bool InteractableRequestsFeedback(const silencer::ui::UiInteractable& widget) {
 	if(widget.inactive) return false;
+	if(widget.requestFeedback) return true;
 	// Only buttons request hover/activate feedback. Legacy toggles (e.g. the
 	// lobby agency icons) were silent on both hover and click; treating
 	// them as feedback targets was a migration regression.
@@ -81,10 +82,14 @@ const silencer::ui::UiInteractable * HitFeedbackInteractable(
 bool ActionTargetsFeedbackInteractable(const silencer::ui::UiInteractionRegistry& interactions,
                                        const silencer::ui::UiAction& action) {
 	if(action.kind != silencer::ui::UiActionKind::Activate &&
-	   action.kind != silencer::ui::UiActionKind::Navigate){
+	   action.kind != silencer::ui::UiActionKind::Navigate &&
+	   action.kind != silencer::ui::UiActionKind::Select){
 		return false;
 	}
 	const auto * widget = interactions.FindInteractableById(action.id.data(), action.id.size());
+	if(action.kind == silencer::ui::UiActionKind::Select){
+		return widget && widget->requestFeedback && !widget->inactive;
+	}
 	return widget && InteractableRequestsFeedback(*widget);
 }
 

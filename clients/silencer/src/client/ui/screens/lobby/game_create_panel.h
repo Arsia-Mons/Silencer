@@ -65,7 +65,6 @@ struct GameCreatePanelState {
 	Uint8  optionsVisibleRows = 0;
 
 	// Hover-preview cache for local map rows in the Create flow.
-	int  lastHoveredMapIndex = -1;  // tracks hover changes to trigger sound once per row
 	bool hoverPreviewVisible = false;
 	int  hoverPreviewMapIndex = -1;
 	std::string hoverPreviewName;

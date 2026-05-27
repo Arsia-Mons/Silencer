@@ -71,6 +71,7 @@ void RegisterRowWidget(Clay_String id,
 	widget.hasClayId = true;
 	widget.requestInitialFocus = selected && handle.requestSelectedInitialFocus;
 	widget.requestFocus = selected && handle.requestSelectedFocus;
+	widget.requestFeedback = handle.requestFeedback;
 	handle.interactions->RegisterInteractable(widget);
 }
 

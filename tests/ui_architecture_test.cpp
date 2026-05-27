@@ -372,6 +372,61 @@ TEST_CASE("ClientUi dispatch returns feedback requests for audible actions") {
 	CHECK(result.unhandledActions[0].id == "main_menu.connect");
 }
 
+TEST_CASE("ClientUi dispatch honors explicit interactable feedback requests") {
+	RecordingClayBackend backend;
+	silencer::ui::ClayService clay(backend);
+	silencer::client_ui::ClientUi clientUi(clay);
+	silencer::ui::UiInputState input;
+	input.width = 640;
+	input.height = 480;
+	input.pointer.x = 12.0f;
+	input.pointer.y = 22.0f;
+	input.pointer.moved = true;
+
+	clientUi.BeginFrame(input);
+	silencer::ui::UiInteractable row;
+	row.id = "lobby.game_create.map.2";
+	row.labelText = "ctf_compound";
+	row.kind = silencer::ui::UiInteractableKind::ListRow;
+	row.x = 10;
+	row.y = 20;
+	row.w = 120;
+	row.h = 14;
+	row.index = 2;
+	row.requestFeedback = true;
+	REQUIRE(clientUi.Interactions().RegisterInteractable(row));
+	clientUi.EndFrame();
+
+	silencer::client_ui::UiDispatchResult hover =
+		clientUi.DispatchInput(nullptr, input);
+	CHECK(hover.feedbackRequested);
+	REQUIRE(hover.unhandledActions.size() == 1);
+	CHECK(hover.unhandledActions[0].kind == silencer::ui::UiActionKind::Navigate);
+	CHECK(hover.unhandledActions[0].id == "lobby.game_create.map.2");
+
+	RecordingClayBackend actionBackend;
+	silencer::ui::ClayService actionClay(actionBackend);
+	silencer::client_ui::ClientUi actionClientUi(actionClay);
+	silencer::ui::UiInputState actionInput;
+	actionInput.width = 640;
+	actionInput.height = 480;
+
+	actionClientUi.BeginFrame(actionInput);
+	REQUIRE(actionClientUi.Interactions().RegisterInteractable(row));
+	silencer::ui::UiAction select;
+	select.kind = silencer::ui::UiActionKind::Select;
+	select.id = "lobby.game_create.map.2";
+	REQUIRE(actionClientUi.Interactions().QueueAction(select));
+	actionClientUi.EndFrame();
+
+	silencer::client_ui::UiDispatchResult selected =
+		actionClientUi.DispatchInput(nullptr, actionInput);
+	CHECK(selected.feedbackRequested);
+	REQUIRE(selected.unhandledActions.size() == 1);
+	CHECK(selected.unhandledActions[0].kind == silencer::ui::UiActionKind::Select);
+	CHECK(selected.unhandledActions[0].id == "lobby.game_create.map.2");
+}
+
 TEST_CASE("ClientUi exposes empty provider hooks outside screen declaration") {
 	auto navigator = silencer::client_ui::UseScreenNavigator();
 	CHECK(navigator.currentEntryId == 0);
