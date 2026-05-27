@@ -304,8 +304,8 @@ bool Game::Tick(void){
 		}
 		if(world.gameplaystate == World::INLOBBY){
 			gameSession.MapDownloaderRef().ProcessMapDownload();
-			// Ready-button text refresh ("Waiting..." vs "Ready") happens
-			// in GameJoinPanelTick — runs each frame from LobbyScreen::Tick.
+			// Ready-button text refresh ("Waiting..." vs "Ready") is read
+			// through the lobby UI hook during the lobby UI declaration.
 		}
 		/*Peer * localpeer = world.peers.peerlist[world.peers.localpeerid];
 		if(localpeer){

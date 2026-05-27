@@ -5,6 +5,7 @@
 #include <functional>
 #include <memory>
 #include <string>
+#include <vector>
 
 class ScreenContext;
 
@@ -19,6 +20,16 @@ struct LobbyGameJoinActions {
 	bool ready = false;
 	bool changeTeam = false;
 	bool chooseTech = false;
+};
+
+struct LobbyGameJoinRosterRow {
+	bool ready = false;
+	uint8_t agency = 0;
+	uint8_t teamNumber = 0;
+	uint8_t peerSlot = 0;
+	bool drawEmblem = false;
+	std::string name;
+	std::string level;
 };
 
 struct LobbyGameTechActions {
@@ -76,6 +87,8 @@ struct LobbyUi {
 
 void LobbyProvider(ScreenContext & ctx, const std::function<void()> & children);
 LobbyUi UseLobby();
+std::string UseLobbyGameJoinReadyLabel();
+std::vector<LobbyGameJoinRosterRow> UseLobbyGameJoinRosterRows();
 void ReconcileLobbyCharacterAgency(ScreenContext & ctx, int & lastSyncedAgency);
 void FlushLobbyCharacterSelectionRequest(ScreenContext & ctx, bool & requested);
 

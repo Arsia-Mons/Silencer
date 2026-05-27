@@ -207,6 +207,11 @@ bool AgentSelectionLocked(World * world)
 	return world && world->IsConnected();
 }
 
+LobbyContext * CurrentLobbyContext()
+{
+	return static_cast<LobbyContext *>(use_context(&g_lobbyContextValue));
+}
+
 void SyncSelectedAgency(World * world, uint8_t agency)
 {
 	if(!AgentSelectionLocked(world)) return;
@@ -388,6 +393,50 @@ void LobbyProvider(ScreenContext & ctx, const std::function<void()> & children)
 	REACT_PROVIDER_EXIT();
 }
 
+std::string UseLobbyGameJoinReadyLabel()
+{
+	LobbyContext * context = CurrentLobbyContext();
+	World * world = context ? context->world : nullptr;
+	return world && world->IsLocalHostWaitingForMapDownloads()
+		? "Waiting..."
+		: "Ready";
+}
+
+std::vector<LobbyGameJoinRosterRow> UseLobbyGameJoinRosterRows()
+{
+	LobbyContext * context = CurrentLobbyContext();
+	World * world = context ? context->world : nullptr;
+	Lobby * lobby = context ? context->lobby : nullptr;
+	std::vector<LobbyGameJoinRosterRow> rows;
+	if(!world || !lobby || !world->IsConnected()) return rows;
+
+	const std::vector<Uint16> & teamIds = world->GetObjectsByType(ObjectTypes::TEAM);
+	for(Uint16 teamId : teamIds){
+		Team * team = static_cast<Team *>(world->GetObjectFromId(teamId));
+		if(!team || team->numpeers == 0) continue;
+		bool drewEmblem = false;
+		for(int i = 0; i < team->numpeers; ++i){
+			Peer * peer = world->GetPeer(team->peers[i]);
+			if(!peer || peer->observer || peer->disconnected) continue;
+			User * user = lobby->GetUserInfo(peer->accountid);
+			if(!user || user->retrieving || !user->DisplayName()[0]) continue;
+
+			LobbyGameJoinRosterRow row;
+			row.ready = peer->isready;
+			row.agency = team->agency;
+			row.teamNumber = team->number;
+			row.peerSlot = static_cast<uint8_t>(i);
+			row.drawEmblem = !drewEmblem;
+			row.name = peer->isbot ? std::string(user->DisplayName()) + " [BOT]"
+			                       : std::string(user->DisplayName());
+			row.level = "L:" + std::to_string(user->agency[team->agency].level);
+			rows.push_back(std::move(row));
+			drewEmblem = true;
+		}
+	}
+	return rows;
+}
+
 void ReconcileLobbyCharacterAgency(ScreenContext & ctx, int & lastSyncedAgency)
 {
 	if(!AgentSelectionLocked(&ctx.world)){
@@ -410,7 +459,7 @@ void FlushLobbyCharacterSelectionRequest(ScreenContext & ctx, bool & requested)
 
 LobbyUi UseLobby()
 {
-	auto * context = static_cast<LobbyContext *>(use_context(&g_lobbyContextValue));
+	auto * context = CurrentLobbyContext();
 	QueueUiWrite queueWrite = UseUiWriteQueue();
 	ScreenContext * screen = context ? context->screen : nullptr;
 	Lobby * lobby = context ? context->lobby : nullptr;

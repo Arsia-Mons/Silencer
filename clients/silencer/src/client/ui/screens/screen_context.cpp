@@ -637,42 +637,6 @@ void ScreenContext::SendLobbyChat(const char * message) {
 	world.lobby.SendChat(world.lobby.channel, message);
 }
 
-bool ScreenContext::LobbyJoinReadyBlocked() {
-	return world.IsLocalHostWaitingForMapDownloads();
-}
-
-std::vector<ScreenContext::LobbyJoinRosterRow>
-ScreenContext::LobbyJoinRosterRows() const {
-	std::vector<LobbyJoinRosterRow> rows;
-	if(!world.IsConnected()) return rows;
-
-	const std::vector<Uint16> & teamIds = world.GetObjectsByType(ObjectTypes::TEAM);
-	for(Uint16 teamId : teamIds){
-		Team * team = static_cast<Team *>(world.GetObjectFromId(teamId));
-		if(!team || team->numpeers == 0) continue;
-		bool drewEmblem = false;
-		for(int i = 0; i < team->numpeers; ++i){
-			Peer * peer = world.GetPeer(team->peers[i]);
-			if(!peer || peer->observer || peer->disconnected) continue;
-			User * user = world.lobby.GetUserInfo(peer->accountid);
-			if(!user || user->retrieving || !user->DisplayName()[0]) continue;
-
-			LobbyJoinRosterRow row;
-			row.ready = peer->isready;
-			row.agency = team->agency;
-			row.teamNumber = team->number;
-			row.peerSlot = static_cast<Uint8>(i);
-			row.drawEmblem = !drewEmblem;
-			row.name = peer->isbot ? std::string(user->DisplayName()) + " [BOT]"
-			                       : std::string(user->DisplayName());
-			row.level = "L:" + std::to_string(user->agency[team->agency].level);
-			rows.push_back(std::move(row));
-			drewEmblem = true;
-		}
-	}
-	return rows;
-}
-
 ScreenContext::LobbyTechSnapshot ScreenContext::CurrentLobbyTechSnapshot() {
 	LobbyTechSnapshot snapshot;
 	const Uint8 localId = world.GetLocalPeerId();

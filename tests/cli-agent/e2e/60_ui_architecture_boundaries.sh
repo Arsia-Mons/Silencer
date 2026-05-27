@@ -159,6 +159,16 @@ fail_if_match \
   "$REPO_ROOT/clients/silencer/src/client/ui/screens/lobby/character_panel.cpp"
 
 fail_if_match \
+  '\b(LobbyJoinReadyBlocked|LobbyJoinRosterRows|LobbyJoinRosterRow)\b' \
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens/screen_context.h" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens/screen_context.cpp"
+
+fail_if_match \
+  '\bScreenContext\b|\bGameJoinPanelTick\b' \
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens/lobby/game_join_panel.h" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens/lobby/game_join_panel.cpp"
+
+fail_if_match \
   '#include[[:space:]]*"game[.]h"' \
   "$REPO_ROOT/clients/silencer/src/client/ui/screens" \
   "$REPO_ROOT/clients/silencer/src/client/ui/modals" \

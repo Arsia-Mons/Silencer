@@ -9,10 +9,11 @@
 #include "runtime/UiInteractionRegistry.h"
 
 #include "resources.h"
-#include "screen_context.h"
 
 #include <algorithm>
+#include <string>
 #include <utility>
+#include <vector>
 
 using silencer::ui::primitives::Button;
 using silencer::ui::primitives::ButtonHandle;
@@ -87,24 +88,6 @@ void GameJoinPanelInit(GameJoinPanelState & state) {
 	state = GameJoinPanelState{};
 }
 
-void GameJoinPanelTick(GameJoinPanelState & state,
-                       ScreenContext & ctx) {
-	state.readyLabel = ctx.LobbyJoinReadyBlocked() ? "Waiting..." : "Ready";
-
-	state.rosterRows.clear();
-	for(const ScreenContext::LobbyJoinRosterRow & sourceRow : ctx.LobbyJoinRosterRows()){
-		GameJoinRosterRow row;
-		row.ready = sourceRow.ready;
-		row.agency = sourceRow.agency;
-		row.teamNumber = sourceRow.teamNumber;
-		row.peerSlot = sourceRow.peerSlot;
-		row.drawEmblem = sourceRow.drawEmblem;
-		row.name = sourceRow.name;
-		row.level = sourceRow.level;
-		state.rosterRows.push_back(std::move(row));
-	}
-}
-
 bool GameJoinPanelHandleUiIntent(GameJoinPanelState & state,
                                  const silencer::ui::UiAction & action) {
 	if(action.kind != silencer::ui::UiActionKind::Activate) return false;
@@ -166,10 +149,12 @@ void BuildGameJoinUpperTree(GameJoinPanelState & state,
 		                             /*interactions*/ &interactions });
 	}
 
-	// Ready / Waiting... (bottom button). Label flips per Tick.
+	// Ready / Waiting... (bottom button). Label is a live lobby hook read.
+	const std::string readyLabel =
+		silencer::client_ui::hooks::UseLobbyGameJoinReadyLabel();
 	CLAY({ .id = CLAY_ID("GJoinBtnReadyWrap"),
 	       .layout = { .padding = { game_join_panel_detail::kBtnPadLeft, 0, game_join_panel_detail::kBtnReadyPadTop, 0 } } }) {
-		Button(CLAY_STRING("GameJoinReadyButton"), game_join_panel_detail::FromStd(state.readyLabel),
+		Button(CLAY_STRING("GameJoinReadyButton"), game_join_panel_detail::FromStd(readyLabel),
 		           buttonOpts,
 		           ButtonHandle{ /*hoveredOut*/ nullptr,
 		                             /*actionId*/   game_join_panel_detail::kActionReady,
@@ -180,9 +165,12 @@ void BuildGameJoinUpperTree(GameJoinPanelState & state,
 void BuildGameJoinTallTree(GameJoinPanelState & state,
                            Resources & resources,
                            silencer::ui::UiInteractionRegistry& interactions) {
+	(void)state;
 	(void)interactions;
 
-	if(state.rosterRows.empty()) return;
+	const std::vector<silencer::client_ui::hooks::LobbyGameJoinRosterRow> rosterRows =
+		silencer::client_ui::hooks::UseLobbyGameJoinRosterRows();
+	if(rosterRows.empty()) return;
 
 	CLAY({ .id = CLAY_ID("GameJoinRoster"),
 	       .layout = {
@@ -190,8 +178,8 @@ void BuildGameJoinTallTree(GameJoinPanelState & state,
 	           .padding = { game_join_panel_detail::kRosterPadLeft, 0,
 	                        game_join_panel_detail::kRosterPadTop, 0 },
 	       } }) {
-		for(size_t i = 0; i < state.rosterRows.size(); ++i){
-			const GameJoinRosterRow & row = state.rosterRows[i];
+		for(size_t i = 0; i < rosterRows.size(); ++i){
+			const silencer::client_ui::hooks::LobbyGameJoinRosterRow & row = rosterRows[i];
 			const int rowYOffset = row.teamNumber * game_join_panel_detail::kRosterTeamStepY
 			                     + row.peerSlot * game_join_panel_detail::kRosterPeerStepY;
 

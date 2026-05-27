@@ -122,15 +122,6 @@ public:
 		Uint8 color = 0;
 		Uint8 brightness = 128;
 	};
-	struct LobbyJoinRosterRow {
-		bool ready = false;
-		Uint8 agency = 0;
-		Uint8 teamNumber = 0;
-		Uint8 peerSlot = 0;
-		bool drawEmblem = false;
-		std::string name;
-		std::string level;
-	};
 	struct LobbyTechGridCell {
 		bool draw = false;
 		bool selected = false;
@@ -244,8 +235,6 @@ public:
 	std::vector<LobbyPresenceRow> LobbyPresenceRows() const;
 	std::vector<LobbyChatMessage> DrainLobbyChatMessages();
 	void SendLobbyChat(const char * message);
-	bool LobbyJoinReadyBlocked();
-	std::vector<LobbyJoinRosterRow> LobbyJoinRosterRows() const;
 	LobbyTechSnapshot CurrentLobbyTechSnapshot();
 	void BeginCreateGameMapUpload(const std::string & gameName,
 	                              const std::string & mapName,
