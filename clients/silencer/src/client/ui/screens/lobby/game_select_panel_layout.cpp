@@ -241,19 +241,12 @@ void BuildGameSelectActionButtons(const GameSelectPanelState & state,
 
 void BuildGameSelectUpperTree(GameSelectPanelState & state,
                               Uint16 panelWidth,
-                              Resources & resources,
-                              silencer::ui::UiInteractionRegistry& interactions) {
-	(void)resources;
-	if(!state.pendingActions){
-		state.pendingActions =
-			std::make_shared<silencer::client_ui::hooks::LobbyGameSelectActions>();
-	}
-	state.pendingActions->create = false;
-	state.pendingActions->join = false;
-	state.pendingActions->spectate = false;
-	state.actionsQueued = false;
+	                              Resources & resources,
+	                              silencer::ui::UiInteractionRegistry& interactions) {
+		(void)state;
+		(void)resources;
 
-	// Create Game button — single flex child of the Upper box.
+		// Create Game button — single flex child of the Upper box.
 	CLAY({ .id = CLAY_ID("GSelBtnCreateWrap"),
 	       .layout = { .padding = { game_select_panel_layout_detail::kUpperBtnPadLeft, 0,
 	                                game_select_panel_layout_detail::kUpperBtnPadTop,  0 } } }) {

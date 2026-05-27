@@ -79,57 +79,36 @@ int SuffixInt(const Text & value, const char * prefix) {
 	return std::atoi(value.c_str() + std::strlen(prefix));
 }
 
-void QueueActionsFlush(GameTechPanelState & state)
-{
-	if(state.actionsQueued) return;
-	state.actionsQueued = true;
-	if(state.flushActions && state.pendingActions){
-		state.flushActions(state.pendingActions);
-	}
-}
-
 }  // namespace game_tech_panel_detail
 
 void GameTechPanelInit(GameTechPanelState & state) {
 	state = GameTechPanelState{};
 }
 
-bool GameTechPanelHandleUiIntent(GameTechPanelState & state,
-                                 const silencer::ui::UiAction & action) {
-	if(action.kind != silencer::ui::UiActionKind::Activate) return false;
+GameTechPanelIntent GameTechPanelHandleUiIntent(GameTechPanelState & state,
+                                                const silencer::ui::UiAction & action) {
+	if(action.kind != silencer::ui::UiActionKind::Activate) return {};
 	if(action.id == game_tech_panel_detail::kActionBack){
-		if(!state.pendingActions) return true;
-		state.pendingActions->backToTeams = true;
-		game_tech_panel_detail::QueueActionsFlush(state);
-		return true;
+		return { GameTechPanelIntent::Kind::BackToTeams, -1 };
 	}
 	int index = game_tech_panel_detail::SuffixInt(action.id, game_tech_panel_detail::kActionTogglePrefix);
 	if(index >= 0){
-		if(!state.pendingActions) return true;
-		state.pendingActions->toggleIndex = index;
-		game_tech_panel_detail::QueueActionsFlush(state);
-		return true;
+		return { GameTechPanelIntent::Kind::ToggleTech, index };
 	}
 	index = game_tech_panel_detail::SuffixInt(action.id, game_tech_panel_detail::kActionDescriptionPrefix);
 	if(index >= 0){
 		state.selectedTechItemIndex = index;
-		return true;
+		return { GameTechPanelIntent::Kind::Handled, index };
 	}
-	return false;
+	return {};
 }
 
 void BuildGameTechUpperTree(GameTechPanelState & state,
                             Uint16 panelWidth,
                             silencer::ui::UiInteractionRegistry& interactions) {
+	(void)state;
 	const silencer::client_ui::hooks::LobbyTechSnapshot snapshot =
 		silencer::client_ui::hooks::UseLobbyGameTechSnapshot();
-	if(!state.pendingActions){
-		state.pendingActions =
-			std::make_shared<silencer::client_ui::hooks::LobbyGameTechActions>();
-	}
-	state.pendingActions->toggleIndex = -1;
-	state.pendingActions->backToTeams = false;
-	state.actionsQueued = false;
 
 	// Back To Teams button.
 	CLAY({ .id = CLAY_ID("GTechBackWrap"),

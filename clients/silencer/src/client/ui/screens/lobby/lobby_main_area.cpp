@@ -4,13 +4,6 @@
 #include "clay_ui_compositor.h"
 #include "primitives/box.h"
 
-#include "character_panel.h"
-#include "chat_panel.h"
-#include "game_select_panel.h"
-#include "game_create_panel.h"
-#include "game_join_panel.h"
-#include "game_tech_panel.h"
-
 #include "screen_context.h"
 
 #include <algorithm>
@@ -185,69 +178,16 @@ LobbySteppedPaneLayout ResolveSteppedPaneLayout(int bodyW,
 	return out;
 }
 
-void BuildRightUpperContents(LobbyMainAreaPanels & panels,
-                             Resources & resources,
-                             const LobbySteppedPaneLayout & layout,
-                             silencer::ui::UiInteractionRegistry& interactions) {
-	if(panels.gameCreateActive){
-		BuildGameCreateUpperTree(
-			panels.gameCreate,
-			static_cast<Uint16>(std::max(0, layout.rightUpperW)),
-			static_cast<Uint16>(std::max(0, layout.upperH)),
-			resources,
-			interactions);
-	}else if(panels.gameJoinActive){
-		BuildGameJoinUpperTree(
-			panels.gameJoin,
-			static_cast<Uint16>(std::max(0, layout.rightUpperW)),
-			resources,
-			interactions);
-	}else if(panels.gameTechActive){
-		BuildGameTechUpperTree(
-			panels.gameTech,
-			static_cast<Uint16>(std::max(0, layout.rightUpperW)),
-			interactions);
-	}else{
-		BuildGameSelectUpperTree(
-			panels.gameSelect,
-			static_cast<Uint16>(std::max(0, layout.rightUpperW)),
-			resources,
-			interactions);
-	}
+void InvokeChild(const LobbyMainAreaChild & child, int width, int height)
+{
+	if(child) child(std::max(0, width), std::max(0, height));
 }
 
-void BuildRightTallContents(LobbyMainAreaPanels & panels,
-                            ScreenContext & ctx,
-                            Resources & resources,
-                            const LobbySteppedPaneLayout & layout,
-                            silencer::ui::UiInteractionRegistry& interactions) {
-	if(panels.gameCreateActive){
-		BuildGameCreateTallTree(
-			panels.gameCreate,
-			ctx,
-			static_cast<Uint16>(std::max(0, layout.rightTallW)),
-			static_cast<Uint16>(std::max(0, layout.rightTallH)),
-			resources,
-			interactions);
-	}else if(panels.gameJoinActive){
-		BuildGameJoinTallTree(panels.gameJoin, resources, interactions);
-	}else if(panels.gameTechActive){
-		BuildGameTechTallTree(panels.gameTech, interactions);
-	}else{
-		BuildGameSelectTallTree(
-			panels.gameSelect,
-			static_cast<Uint16>(std::max(0, layout.rightTallW)),
-			static_cast<Uint16>(std::max(0, layout.rightTallH)),
-			resources,
-			interactions);
-	}
-}
-
-void BuildLobbySteppedPane(LobbyMainAreaPanels & panels,
-                           ScreenContext & ctx,
-                           Resources & resources,
-                           const LobbySteppedPaneLayout & layout,
-                           silencer::ui::UiInteractionRegistry& interactions) {
+void BuildLobbySteppedPane(const LobbySteppedPaneLayout & layout,
+                           const LobbyMainAreaChild & buildCharacter,
+                           const LobbyMainAreaChild & buildChat,
+                           const LobbyMainAreaChild & buildRightUpper,
+                           const LobbyMainAreaChild & buildRightTall) {
 	CLAY({ .id = CLAY_ID("LobbyBody"),
 	       .layout = {
 	           .sizing = { CLAY_SIZING_GROW(0),
@@ -279,9 +219,7 @@ void BuildLobbySteppedPane(LobbyMainAreaPanels & panels,
 				         },
 				         .clip = { .horizontal = true, .vertical = true },
 				     })) {
-					BuildCharacterPanelTree(
-						static_cast<Uint16>(std::max(0, layout.characterW)),
-						interactions);
+					InvokeChild(buildCharacter, layout.characterW, layout.upperH);
 				}
 
 				CLAY(Box(OpenRightChrome(), {
@@ -293,32 +231,32 @@ void BuildLobbySteppedPane(LobbyMainAreaPanels & panels,
 				         },
 				         .clip = { .horizontal = true, .vertical = true },
 				     })) {
-					BuildRightUpperContents(panels, resources, layout, interactions);
+					InvokeChild(buildRightUpper, layout.rightUpperW, layout.upperH);
 				}
 			}
 
-				CLAY({ .id = CLAY_ID("LobbyElbowGapRow"),
+			CLAY({ .id = CLAY_ID("LobbyElbowGapRow"),
+			       .layout = {
+			           .sizing = { CLAY_SIZING_GROW(0),
+			                       CLAY_SIZING_FIXED((float)layout.regionGap) },
+			           .layoutDirection = CLAY_LEFT_TO_RIGHT,
+			       },
+			    }) {
+				CLAY({ .id = CLAY_ID("LobbyElbowGapFill"),
 				       .layout = {
 				           .sizing = { CLAY_SIZING_GROW(0),
-				                       CLAY_SIZING_FIXED((float)layout.regionGap) },
-				           .layoutDirection = CLAY_LEFT_TO_RIGHT,
+				                       CLAY_SIZING_GROW(0) },
 				       },
 				    }) {
-					CLAY({ .id = CLAY_ID("LobbyElbowGapFill"),
-					       .layout = {
-					           .sizing = { CLAY_SIZING_GROW(0),
-					                       CLAY_SIZING_GROW(0) },
-					       },
-					    }) {
-					}
-					CLAY(Box(RightEdgeChrome(), {
-					         .id = CLAY_ID("LobbyElbowGapSeam"),
-					         .layout = {
-					             .sizing = { CLAY_SIZING_FIXED((float)layout.regionGap),
-					                         CLAY_SIZING_GROW(0) },
-					         },
-					     })) {}
 				}
+				CLAY(Box(RightEdgeChrome(), {
+				         .id = CLAY_ID("LobbyElbowGapSeam"),
+				         .layout = {
+				             .sizing = { CLAY_SIZING_FIXED((float)layout.regionGap),
+				                         CLAY_SIZING_GROW(0) },
+				         },
+				     })) {}
+			}
 
 			CLAY({ .id = CLAY_ID("LobbyLowerRow"),
 			       .layout = {
@@ -336,10 +274,7 @@ void BuildLobbySteppedPane(LobbyMainAreaPanels & panels,
 				         },
 				         .clip = { .horizontal = true, .vertical = true },
 				     })) {
-					BuildChatPanelTree(panels.chat,
-					                   static_cast<Uint16>(std::max(0, layout.chatW)),
-					                   static_cast<Uint16>(std::max(0, layout.chatH)),
-					                   interactions);
+					InvokeChild(buildChat, layout.chatW, layout.chatH);
 				}
 				CLAY(Box(RightEdgeChrome(), {
 				         .id = CLAY_ID("LobbyChatTallSeam"),
@@ -348,43 +283,44 @@ void BuildLobbySteppedPane(LobbyMainAreaPanels & panels,
 				                         CLAY_SIZING_GROW(0) },
 				         },
 				     })) {}
-				}
 			}
+		}
 
-			CLAY(Box(OpenLeftChrome(), {
-			         .id = CLAY_ID("LobbyRightTallBox"),
-			         .layout = {
-			             .sizing = { CLAY_SIZING_FIXED((float)layout.rightTallW),
-			                         CLAY_SIZING_GROW(0) },
-			             .layoutDirection = CLAY_TOP_TO_BOTTOM,
-			         },
-			         .clip = { .horizontal = true, .vertical = true },
-			     })) {
-			BuildRightTallContents(panels, ctx, resources, layout, interactions);
+		CLAY(Box(OpenLeftChrome(), {
+		         .id = CLAY_ID("LobbyRightTallBox"),
+		         .layout = {
+		             .sizing = { CLAY_SIZING_FIXED((float)layout.rightTallW),
+		                         CLAY_SIZING_GROW(0) },
+		             .layoutDirection = CLAY_TOP_TO_BOTTOM,
+		         },
+		         .clip = { .horizontal = true, .vertical = true },
+		     })) {
+			InvokeChild(buildRightTall, layout.rightTallW, layout.rightTallH);
 		}
 	}
 }
 
 }  // namespace lobby_main_area_detail
 
-void BuildLobbyMainArea(LobbyMainAreaPanels & panels,
-                        ScreenContext & ctx,
-                        Resources & resources,
+void BuildLobbyMainArea(ScreenContext & ctx,
                         int bodyX,
                         int bodyY,
                         int bodyW,
                         int bodyH,
                         int regionGap,
-                        silencer::ui::UiInteractionRegistry& interactions) {
+                        const LobbyMainAreaChild & buildCharacter,
+                        const LobbyMainAreaChild & buildChat,
+                        const LobbyMainAreaChild & buildRightUpper,
+                        const LobbyMainAreaChild & buildRightTall) {
 	const lobby_main_area_detail::LobbySteppedPaneLayout layout =
 		lobby_main_area_detail::ResolveSteppedPaneLayout(bodyW, bodyH, regionGap);
 	lobby_main_area_detail::QueueLobbyPanelBorderBlurRects(ctx, bodyX, bodyY, layout);
 	lobby_main_area_detail::BuildLobbySteppedPane(
-		panels,
-		ctx,
-		resources,
 		layout,
-		interactions);
+		buildCharacter,
+		buildChat,
+		buildRightUpper,
+		buildRightTall);
 }
 
 }  // namespace silencer::client_ui::lobby

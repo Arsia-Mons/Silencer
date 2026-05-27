@@ -142,10 +142,59 @@ bool LobbyScreen::HandleUiIntent(ScreenContext & ctx, const silencer::ui::UiActi
 		return silencer::client_ui::lobby::GameCreatePanelHandleUiIntent(gameCreateState, action);
 	}
 	if(gameJoinActive){
-		return silencer::client_ui::lobby::GameJoinPanelHandleUiIntent(gameJoinState, action);
+		const auto intent =
+			silencer::client_ui::lobby::GameJoinPanelHandleUiIntent(action);
+		switch(intent){
+			case silencer::client_ui::lobby::GameJoinPanelIntent::ChooseTech:
+				if(!goBackQueued){
+					if(beginGameTechSelection) beginGameTechSelection();
+					if(showGameTechQueued) showGameTechQueued();
+				}
+				return true;
+			case silencer::client_ui::lobby::GameJoinPanelIntent::ChangeTeam:
+				if(!goBackQueued && changeGameJoinTeam) changeGameJoinTeam();
+				return true;
+			case silencer::client_ui::lobby::GameJoinPanelIntent::Ready:
+				if(!goBackQueued && sendGameJoinReady) sendGameJoinReady();
+				return true;
+			case silencer::client_ui::lobby::GameJoinPanelIntent::None:
+				return false;
+		}
 	}
 	if(gameTechActive){
-		return silencer::client_ui::lobby::GameTechPanelHandleUiIntent(gameTechState, action);
+		const auto intent =
+			silencer::client_ui::lobby::GameTechPanelHandleUiIntent(gameTechState, action);
+		switch(intent.kind){
+			case silencer::client_ui::lobby::GameTechPanelIntent::Kind::BackToTeams:
+				if(!goBackQueued && showGameJoinQueued) showGameJoinQueued();
+				return true;
+			case silencer::client_ui::lobby::GameTechPanelIntent::Kind::ToggleTech:
+				if(!goBackQueued && toggleGameTechChoice){
+					toggleGameTechChoice(intent.itemIndex);
+				}
+				return true;
+			case silencer::client_ui::lobby::GameTechPanelIntent::Kind::Handled:
+				return true;
+			case silencer::client_ui::lobby::GameTechPanelIntent::Kind::None:
+				return false;
+		}
 	}
-	return silencer::client_ui::lobby::GameSelectPanelHandleUiIntent(gameSelectState, action);
+	const auto intent =
+		silencer::client_ui::lobby::GameSelectPanelHandleUiIntent(gameSelectState, action);
+	switch(intent){
+		case silencer::client_ui::lobby::GameSelectPanelIntent::Create:
+			if(!goBackQueued && showGameCreateQueued) showGameCreateQueued();
+			return true;
+		case silencer::client_ui::lobby::GameSelectPanelIntent::Join:
+			if(!goBackQueued && joinLobbyGame) joinLobbyGame(SelectedLobbyGameId());
+			return true;
+		case silencer::client_ui::lobby::GameSelectPanelIntent::Spectate:
+			if(!goBackQueued && spectateLobbyGame) spectateLobbyGame(SelectedLobbyGameId());
+			return true;
+		case silencer::client_ui::lobby::GameSelectPanelIntent::Handled:
+			return true;
+		case silencer::client_ui::lobby::GameSelectPanelIntent::None:
+			return false;
+	}
+	return false;
 }

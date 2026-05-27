@@ -5,43 +5,26 @@
 // (upper shelf + tall column) that swaps between GameSelect / GameCreate /
 // GameJoin / GameTech. Composes into LobbyRoot beneath the title bar.
 
-class ScreenContext;
-class Resources;
+#include <functional>
 
-namespace silencer::ui {
-class UiInteractionRegistry;
-}
+class ScreenContext;
 
 namespace silencer::client_ui::lobby {
 
-struct ChatPanelState;
-struct GameSelectPanelState;
-struct GameCreatePanelState;
-struct GameJoinPanelState;
-struct GameTechPanelState;
-
-struct LobbyMainAreaPanels {
-	ChatPanelState & chat;
-	GameSelectPanelState & gameSelect;
-	GameCreatePanelState & gameCreate;
-	GameJoinPanelState & gameJoin;
-	GameTechPanelState & gameTech;
-	bool gameCreateActive;
-	bool gameJoinActive;
-	bool gameTechActive;
-};
+using LobbyMainAreaChild = std::function<void(int width, int height)>;
 
 // Emits the LobbyBody subtree (character + chat + stepped right pane) into
 // the current Clay frame.
-void BuildLobbyMainArea(LobbyMainAreaPanels & panels,
-                        ScreenContext & ctx,
-                        Resources & resources,
+void BuildLobbyMainArea(ScreenContext & ctx,
                         int bodyX,
                         int bodyY,
                         int bodyW,
                         int bodyH,
                         int regionGap,
-                        silencer::ui::UiInteractionRegistry& interactions);
+                        const LobbyMainAreaChild & buildCharacter,
+                        const LobbyMainAreaChild & buildChat,
+                        const LobbyMainAreaChild & buildRightUpper,
+                        const LobbyMainAreaChild & buildRightTall);
 
 }  // namespace silencer::client_ui::lobby
 

@@ -3,24 +3,12 @@
 #include <array>
 #include <cstdint>
 #include <functional>
-#include <memory>
 #include <string>
 #include <vector>
 
 class ScreenContext;
 
 namespace silencer::client_ui::hooks {
-
-struct LobbyMissionSummaryActions {
-	int upgradeIndex = -1;
-	bool done = false;
-};
-
-struct LobbyGameJoinActions {
-	bool ready = false;
-	bool changeTeam = false;
-	bool chooseTech = false;
-};
 
 struct LobbyGameJoinRosterRow {
 	bool ready = false;
@@ -30,17 +18,6 @@ struct LobbyGameJoinRosterRow {
 	bool drawEmblem = false;
 	std::string name;
 	std::string level;
-};
-
-struct LobbyGameTechActions {
-	int toggleIndex = -1;
-	bool backToTeams = false;
-};
-
-struct LobbyGameSelectActions {
-	bool create = false;
-	bool join = false;
-	bool spectate = false;
 };
 
 struct LobbyTechItemDetails {
@@ -89,18 +66,15 @@ struct LobbyUi {
 	uint8_t selectedAgency = 0;
 	bool agentSelectionLocked = false;
 	std::function<void(std::string username, std::string password)> submitCredentials = {};
-	std::function<void(std::shared_ptr<LobbyMissionSummaryActions>)> flushMissionSummaryActions = {};
-	std::function<void(std::shared_ptr<LobbyGameJoinActions>,
-	                   std::function<bool()> gameJoinStillActive,
-	                   std::function<void()> showTech)> flushGameJoinActions = {};
+	std::function<void(int upgradeIndex)> upgradeMissionSummaryStat = {};
+	std::function<void()> completeMissionSummary = {};
+	std::function<void()> sendGameJoinReady = {};
+	std::function<void()> changeGameJoinTeam = {};
+	std::function<void()> beginGameTechSelection = {};
 	std::function<LobbyCharacterStats(uint8_t agency)> characterStatsForAgency = {};
-	std::function<void(std::shared_ptr<LobbyGameTechActions>,
-	                   std::function<bool()> gameTechStillActive,
-	                   std::function<void()> showTeams)> flushGameTechActions = {};
-	std::function<void(std::shared_ptr<LobbyGameSelectActions>,
-	                   std::function<bool()> gameSelectStillActive,
-	                   std::function<uint32_t()> selectedGameId,
-	                   std::function<void()> showCreate)> flushGameSelectActions = {};
+	std::function<void(int itemIndex)> toggleGameTechChoice = {};
+	std::function<void(uint32_t gameId)> joinLobbyGame = {};
+	std::function<void(uint32_t gameId)> spectateLobbyGame = {};
 };
 
 void LobbyProvider(ScreenContext & ctx, const std::function<void()> & children);

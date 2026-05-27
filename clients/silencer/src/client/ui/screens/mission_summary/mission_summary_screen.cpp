@@ -19,7 +19,6 @@
 #include <cstdio>
 #include <cstring>
 #include <functional>
-#include <memory>
 
 namespace mission_summary_screen_detail
 {
@@ -124,12 +123,7 @@ int SuffixInt(const Text & value, const char * prefix)
 	return std::atoi(value.c_str() + std::strlen(prefix));
 }
 
-void Invoke(const std::function<void()> & action)
-{
-	if(action) action();
-}
-
-int FillSummarySlab(const std::vector<std::string> & lines)
+	int FillSummarySlab(const std::vector<std::string> & lines)
 {
 	int count = static_cast<int>(lines.size());
 	if(count > kMaxSummaryLines) count = kMaxSummaryLines;
@@ -236,9 +230,8 @@ void MissionSummaryScreen::Build(ScreenContext & ctx)
 {
 	ctx.ResetMenuPresentation(1);
 	infoLoaded = false;
-	flushActions = {};
-	pendingActions = {};
-	actionFlushQueued = false;
+	upgradeStat = {};
+	completeSummary = {};
 	scrollDelta = 0;
 	scrollPosition = 0;
 	Refresh(ctx);
@@ -272,7 +265,7 @@ void MissionSummaryScreen::BuildUi(ScreenContext & ctx, Surface & dst, float fra
 	const silencer::client_ui::hooks::LobbyUi lobby =
 		silencer::client_ui::hooks::UseLobby();
 	int lineCount = mission_summary_screen_detail::FillSummarySlab(summaryLines);
-	std::string xp = "+ " + std::to_string(experience) + " XP";
+		std::string xp = "+ " + std::to_string(experience) + " XP";
 	const int titleX = mission_summary_screen_detail::CenteredTextX(
 		mission_summary_screen_detail::kTitleCenterX,
 		CLAY_STRING("Mission Summary"),
@@ -281,11 +274,8 @@ void MissionSummaryScreen::BuildUi(ScreenContext & ctx, Surface & dst, float fra
 		mission_summary_screen_detail::kXpCenterX,
 		mission_summary_screen_detail::FromStd(xp),
 		mission_summary_screen_detail::TextSize::Prompt);
-	actionFlushQueued = false;
-	pendingActions = std::make_shared<silencer::client_ui::hooks::LobbyMissionSummaryActions>();
-	flushActions = [flush = lobby.flushMissionSummaryActions, pendingActions = pendingActions]() {
-		if(flush) flush(pendingActions);
-	};
+		upgradeStat = lobby.upgradeMissionSummaryStat;
+		completeSummary = lobby.completeMissionSummary;
 
 	CLAY({ .id = CLAY_ID("MissionSummaryRoot"),
 	       .layout = {
@@ -389,9 +379,8 @@ void MissionSummaryScreen::BuildUi(ScreenContext & ctx, Surface & dst, float fra
 void MissionSummaryScreen::Destroy(ScreenContext & ctx)
 {
 	(void)ctx;
-	flushActions = {};
-	pendingActions = {};
-	actionFlushQueued = false;
+	upgradeStat = {};
+	completeSummary = {};
 }
 
 bool MissionSummaryScreen::HandleUiIntent(ScreenContext & ctx, const silencer::ui::UiAction & action)
@@ -399,8 +388,7 @@ bool MissionSummaryScreen::HandleUiIntent(ScreenContext & ctx, const silencer::u
 	(void)ctx;
 	if(action.kind == silencer::ui::UiActionKind::Cancel ||
 	   (action.kind == silencer::ui::UiActionKind::Activate && action.id == mission_summary_screen_detail::kActionDone)){
-		if(pendingActions) pendingActions->done = true;
-		QueueActionFlush();
+		if(completeSummary) completeSummary();
 		return true;
 	}
 	if(action.kind == silencer::ui::UiActionKind::Scroll){
@@ -410,18 +398,10 @@ bool MissionSummaryScreen::HandleUiIntent(ScreenContext & ctx, const silencer::u
 	if(action.kind != silencer::ui::UiActionKind::Activate) return false;
 	int upgrade = mission_summary_screen_detail::SuffixInt(action.id, mission_summary_screen_detail::kActionUpgradePrefix);
 	if(upgrade >= 0 && upgrade < 6){
-		if(pendingActions) pendingActions->upgradeIndex = upgrade;
-		QueueActionFlush();
+		if(upgradeStat) upgradeStat(upgrade);
 		return true;
 	}
 	return false;
-}
-
-void MissionSummaryScreen::QueueActionFlush()
-{
-	if(actionFlushQueued) return;
-	actionFlushQueued = true;
-	mission_summary_screen_detail::Invoke(flushActions);
 }
 
 void MissionSummaryScreen::Refresh(ScreenContext & ctx)

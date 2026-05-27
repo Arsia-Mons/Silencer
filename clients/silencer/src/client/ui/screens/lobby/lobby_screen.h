@@ -8,6 +8,7 @@
 #include "game_create_panel.h"
 #include "game_join_panel.h"
 #include "game_tech_panel.h"
+#include <cstdint>
 #include <functional>
 #include <string>
 
@@ -44,6 +45,7 @@ public:
 
 private:
 	void QueueGoBack();
+	uint32_t SelectedLobbyGameId() const;
 
 	// Per-frame state for the chrome tree. Strings live on the screen so the
 	// layout pass can hold pointers that remain valid until the frame ends.
@@ -51,6 +53,15 @@ private:
 	std::string version;
 	std::string mapName;
 	std::function<void()> goBack;
+	std::function<void()> showGameCreateQueued;
+	std::function<void()> showGameJoinQueued;
+	std::function<void()> showGameTechQueued;
+	std::function<void()> sendGameJoinReady;
+	std::function<void()> changeGameJoinTeam;
+	std::function<void()> beginGameTechSelection;
+	std::function<void(int)> toggleGameTechChoice;
+	std::function<void(uint32_t)> joinLobbyGame;
+	std::function<void(uint32_t)> spectateLobbyGame;
 	bool goBackQueued = false;
 
 	// CharacterPanel state — declaration reads live lobby data through UseLobby;

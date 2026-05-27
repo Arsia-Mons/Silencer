@@ -73,6 +73,15 @@ void LobbyScreen::Build(ScreenContext & ctx)
 	version += world.GetVersion();
 	mapName.clear();
 	goBack = {};
+	showGameCreateQueued = {};
+	showGameJoinQueued = {};
+	showGameTechQueued = {};
+	sendGameJoinReady = {};
+	changeGameJoinTeam = {};
+	beginGameTechSelection = {};
+	toggleGameTechChoice = {};
+	joinLobbyGame = {};
+	spectateLobbyGame = {};
 	goBackQueued = false;
 	lastSyncedCharacterAgency = -1;
 
@@ -150,46 +159,21 @@ void LobbyScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime, s
 		goBack = lobby_screen_detail::UseQueuedAction([&ctx]() {
 			ctx.GoBack();
 		});
-		gameJoinState.flushActions =
-			[lobby, this, &ctx](
-				std::shared_ptr<silencer::client_ui::hooks::LobbyGameJoinActions> actions) {
-				if(!lobby.flushGameJoinActions || !actions) return;
-				lobby.flushGameJoinActions(
-					actions,
-					[this]() { return gameJoinActive && !goBackQueued; },
-					[this, &ctx]() { ShowGameTech(ctx); });
-		};
-		gameTechState.flushActions =
-			[lobby, this, &ctx](
-				std::shared_ptr<silencer::client_ui::hooks::LobbyGameTechActions> actions) {
-				if(!lobby.flushGameTechActions || !actions) return;
-				lobby.flushGameTechActions(
-					actions,
-					[this]() { return gameTechActive && !goBackQueued; },
-					[this, &ctx]() { ShowGameJoin(ctx); });
-		};
-		gameSelectState.flushActions =
-			[lobby, this, &ctx](
-				std::shared_ptr<silencer::client_ui::hooks::LobbyGameSelectActions> actions) {
-				if(!lobby.flushGameSelectActions || !actions) return;
-				lobby.flushGameSelectActions(
-					actions,
-					[this]() {
-						return !gameCreateActive
-						    && !gameJoinActive
-						    && !gameTechActive
-						    && !goBackQueued;
-					},
-					[this]() -> uint32_t {
-						if(gameSelectState.selectedIndex < 0
-						   || gameSelectState.selectedIndex >=
-						      static_cast<int>(gameSelectState.rows.size())){
-							return 0;
-						}
-						return gameSelectState.rows[gameSelectState.selectedIndex].gameid;
-					},
-					[this, &ctx]() { ShowGameCreate(ctx); });
-		};
+		showGameCreateQueued = lobby_screen_detail::UseQueuedAction([this, &ctx]() {
+			ShowGameCreate(ctx);
+		});
+		showGameJoinQueued = lobby_screen_detail::UseQueuedAction([this, &ctx]() {
+			ShowGameJoin(ctx);
+		});
+		showGameTechQueued = lobby_screen_detail::UseQueuedAction([this, &ctx]() {
+			ShowGameTech(ctx);
+		});
+		sendGameJoinReady = lobby.sendGameJoinReady;
+		changeGameJoinTeam = lobby.changeGameJoinTeam;
+		beginGameTechSelection = lobby.beginGameTechSelection;
+		toggleGameTechChoice = lobby.toggleGameTechChoice;
+		joinLobbyGame = lobby.joinLobbyGame;
+		spectateLobbyGame = lobby.spectateLobbyGame;
 
 		ctx.BeginLobbyPanelBorderBlur(layoutWidth, layoutHeight, input.uiScale);
 		lobby_screen_detail::AddPanelBorderBlur(
@@ -213,26 +197,74 @@ void LobbyScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime, s
 		       .image = { .imageData = silencer::clay_bridge::PackImageStretch(7, 1) } }) {
 			BuildLobbyTitleBar(version, mapName, layoutWidth, interactions);
 
-			LobbyMainAreaPanels panels{
-				chatState,
-				gameSelectState,
-				gameCreateState,
-				gameJoinState,
-				gameTechState,
-				gameCreateActive,
-				gameJoinActive,
-				gameTechActive,
-			};
 			BuildLobbyMainArea(
-				panels,
 				ctx,
-				ctx.world.resources,
 				bodyX,
 				bodyY,
 				bodyW,
 				bodyH,
 				regionGap,
-				interactions);
+				[&](int width, int) {
+					BuildCharacterPanelTree(
+						static_cast<Uint16>(std::max(0, width)),
+						interactions);
+				},
+				[&](int width, int height) {
+					BuildChatPanelTree(
+						chatState,
+						static_cast<Uint16>(std::max(0, width)),
+						static_cast<Uint16>(std::max(0, height)),
+						interactions);
+				},
+				[&](int width, int height) {
+					if(gameCreateActive){
+						BuildGameCreateUpperTree(
+							gameCreateState,
+							static_cast<Uint16>(std::max(0, width)),
+							static_cast<Uint16>(std::max(0, height)),
+							ctx.world.resources,
+							interactions);
+					}else if(gameJoinActive){
+						BuildGameJoinUpperTree(
+							gameJoinState,
+							static_cast<Uint16>(std::max(0, width)),
+							ctx.world.resources,
+							interactions);
+					}else if(gameTechActive){
+						BuildGameTechUpperTree(
+							gameTechState,
+							static_cast<Uint16>(std::max(0, width)),
+							interactions);
+					}else{
+						BuildGameSelectUpperTree(
+							gameSelectState,
+							static_cast<Uint16>(std::max(0, width)),
+							ctx.world.resources,
+							interactions);
+					}
+				},
+				[&](int width, int height) {
+					if(gameCreateActive){
+						BuildGameCreateTallTree(
+							gameCreateState,
+							ctx,
+							static_cast<Uint16>(std::max(0, width)),
+							static_cast<Uint16>(std::max(0, height)),
+							ctx.world.resources,
+							interactions);
+					}else if(gameJoinActive){
+						BuildGameJoinTallTree(gameJoinState, ctx.world.resources, interactions);
+					}else if(gameTechActive){
+						BuildGameTechTallTree(gameTechState, interactions);
+					}else{
+						BuildGameSelectTallTree(
+							gameSelectState,
+							static_cast<Uint16>(std::max(0, width)),
+							static_cast<Uint16>(std::max(0, height)),
+							ctx.world.resources,
+							interactions);
+					}
+				});
 			if(gameCreateActive){
 				BuildGameCreatePreviewOverlay(gameCreateState, ctx);
 			}
@@ -244,10 +276,28 @@ void LobbyScreen::Destroy(ScreenContext & ctx)
 {
 	(void)ctx;
 	goBack = {};
+	showGameCreateQueued = {};
+	showGameJoinQueued = {};
+	showGameTechQueued = {};
+	sendGameJoinReady = {};
+	changeGameJoinTeam = {};
+	beginGameTechSelection = {};
+	toggleGameTechChoice = {};
+	joinLobbyGame = {};
+	spectateLobbyGame = {};
 	goBackQueued = false;
 }
 
 void LobbyScreen::SetMapNameOverlay(const char * name)
 {
 	mapName = name ? std::string(name).substr(0, 25) : std::string();
+}
+
+uint32_t LobbyScreen::SelectedLobbyGameId() const
+{
+	if(gameSelectState.selectedIndex < 0 ||
+	   gameSelectState.selectedIndex >= static_cast<int>(gameSelectState.rows.size())){
+		return 0;
+	}
+	return gameSelectState.rows[gameSelectState.selectedIndex].gameid;
 }

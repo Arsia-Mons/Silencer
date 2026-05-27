@@ -13,31 +13,31 @@
 #include "shared.h"
 #include "runtime/UiActionQueue.h"
 
-#include <functional>
-#include <memory>
-
 namespace silencer::ui {
 class UiInteractionRegistry;
 }
 
-namespace silencer::client_ui::hooks {
-struct LobbyGameTechActions;
-}
-
 namespace silencer::client_ui::lobby {
 
+struct GameTechPanelIntent {
+	enum class Kind {
+		None,
+		BackToTeams,
+		ToggleTech,
+		Handled,
+	};
+	Kind kind = Kind::None;
+	int itemIndex = -1;
+};
+
 struct GameTechPanelState {
-	std::shared_ptr<silencer::client_ui::hooks::LobbyGameTechActions> pendingActions = {};
-	std::function<void(std::shared_ptr<silencer::client_ui::hooks::LobbyGameTechActions>)>
-		flushActions = {};
-	bool actionsQueued = false;
 	int selectedTechItemIndex = -1;
 };
 
 void GameTechPanelInit(GameTechPanelState & state);
 
-bool GameTechPanelHandleUiIntent(GameTechPanelState & state,
-                                 const silencer::ui::UiAction & action);
+GameTechPanelIntent GameTechPanelHandleUiIntent(GameTechPanelState & state,
+	                                            const silencer::ui::UiAction & action);
 
 // Emits the upper stepped-pane subtree ("Back To Teams" button + 3
 // right-aligned peer-name labels). Called inside the LobbyRightUpperBox CLAY

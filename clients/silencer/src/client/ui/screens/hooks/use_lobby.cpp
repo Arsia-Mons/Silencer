@@ -14,7 +14,6 @@
 
 #include <cstdint>
 #include <cstring>
-#include <memory>
 #include <utility>
 
 namespace silencer::client_ui::hooks {
@@ -93,39 +92,6 @@ void BeginTechSelection(World * world)
 	if(!world) return;
 	world->choosingtech = true;
 	world->peers.RequestPeerList();
-}
-
-void ClearGameJoinActions(LobbyGameJoinActions & actions)
-{
-	actions.ready = false;
-	actions.changeTeam = false;
-	actions.chooseTech = false;
-}
-
-void FlushGameJoinActions(World * world,
-                          const std::shared_ptr<LobbyGameJoinActions> & actions,
-                          const std::function<bool()> & gameJoinStillActive,
-                          const std::function<void()> & showTech)
-{
-	if(!actions) return;
-	if(gameJoinStillActive && !gameJoinStillActive()){
-		ClearGameJoinActions(*actions);
-		return;
-	}
-
-	if(actions->chooseTech){
-		BeginTechSelection(world);
-		if(showTech) showTech();
-		ClearGameJoinActions(*actions);
-		return;
-	}
-	if(actions->ready){
-		SendJoinReady(world);
-	}
-	if(actions->changeTeam){
-		ChangeJoinTeam(world);
-	}
-	ClearGameJoinActions(*actions);
 }
 
 LobbyTechItemDetails TechItemDetailsForIndex(World * world, int itemIndex)
@@ -340,40 +306,6 @@ void ToggleTechChoice(World * world, int itemIndex)
 	Config::GetInstance().Save();
 }
 
-void ClearGameTechActions(LobbyGameTechActions & actions)
-{
-	actions.toggleIndex = -1;
-	actions.backToTeams = false;
-}
-
-void FlushGameTechActions(World * world,
-                          const std::shared_ptr<LobbyGameTechActions> & actions,
-                          const std::function<bool()> & gameTechStillActive,
-                          const std::function<void()> & showTeams)
-{
-	if(!actions) return;
-	if(gameTechStillActive && !gameTechStillActive()){
-		ClearGameTechActions(*actions);
-		return;
-	}
-	if(actions->backToTeams){
-		if(showTeams) showTeams();
-		ClearGameTechActions(*actions);
-		return;
-	}
-	if(actions->toggleIndex >= 0){
-		ToggleTechChoice(world, actions->toggleIndex);
-	}
-	ClearGameTechActions(*actions);
-}
-
-void ClearGameSelectActions(LobbyGameSelectActions & actions)
-{
-	actions.create = false;
-	actions.join = false;
-	actions.spectate = false;
-}
-
 void JoinLobbyGame(ScreenContext * screen, uint32_t gameId, const char * password)
 {
 	if(!screen || gameId == 0) return;
@@ -434,35 +366,6 @@ void HandleSpectateGameSelectAction(ScreenContext * screen, uint32_t gameId)
 	}else{
 		SpectateLobbyGame(screen, lobbyGame.gameId, nullptr);
 	}
-}
-
-void FlushGameSelectActions(ScreenContext * screen,
-                            Lobby * lobby,
-                            const std::shared_ptr<LobbyGameSelectActions> & actions,
-                            const std::function<bool()> & gameSelectStillActive,
-                            const std::function<uint32_t()> & selectedGameId,
-                            const std::function<void()> & showCreate)
-{
-	if(!actions) return;
-	if(gameSelectStillActive && !gameSelectStillActive()){
-		ClearGameSelectActions(*actions);
-		return;
-	}
-
-	if(actions->create){
-		if(showCreate) showCreate();
-		ClearGameSelectActions(*actions);
-		return;
-	}
-
-	const uint32_t gameId = selectedGameId ? selectedGameId() : 0;
-	if(actions->join){
-		HandleJoinGameSelectAction(screen, lobby, gameId);
-	}
-	if(actions->spectate){
-		HandleSpectateGameSelectAction(screen, gameId);
-	}
-	ClearGameSelectActions(*actions);
 }
 
 } // namespace
@@ -584,64 +487,63 @@ LobbyUi UseLobby()
 				SubmitCredentials(lobby, username, password);
 			});
 		};
-	result.flushMissionSummaryActions =
-		[queueWrite, screen, lobby, world](std::shared_ptr<LobbyMissionSummaryActions> actions) {
-			if(!queueWrite || !actions) return;
-			queueWrite([screen, lobby, world, actions]() {
-				if(actions->upgradeIndex >= 0){
-					UpgradeMissionSummaryStat(lobby, world, actions->upgradeIndex);
-				}
-				if(actions->done){
-					CompleteMissionSummary(screen, lobby);
-				}
+	result.upgradeMissionSummaryStat =
+		[queueWrite, lobby, world](int upgradeIndex) {
+			if(!queueWrite) return;
+			queueWrite([lobby, world, upgradeIndex]() {
+				UpgradeMissionSummaryStat(lobby, world, upgradeIndex);
 			});
 		};
-	result.flushGameJoinActions =
-		[queueWrite, world](std::shared_ptr<LobbyGameJoinActions> actions,
-		                    std::function<bool()> gameJoinStillActive,
-		                    std::function<void()> showTech) {
-			if(!queueWrite || !actions) return;
-			queueWrite([world,
-			            actions,
-			            gameJoinStillActive = std::move(gameJoinStillActive),
-			            showTech = std::move(showTech)]() {
-				FlushGameJoinActions(world, actions, gameJoinStillActive, showTech);
+	result.completeMissionSummary =
+		[queueWrite, screen, lobby]() {
+			if(!queueWrite) return;
+			queueWrite([screen, lobby]() {
+				CompleteMissionSummary(screen, lobby);
+			});
+		};
+	result.sendGameJoinReady =
+		[queueWrite, world]() {
+			if(!queueWrite) return;
+			queueWrite([world]() {
+				SendJoinReady(world);
+			});
+		};
+	result.changeGameJoinTeam =
+		[queueWrite, world]() {
+			if(!queueWrite) return;
+			queueWrite([world]() {
+				ChangeJoinTeam(world);
+			});
+		};
+	result.beginGameTechSelection =
+		[queueWrite, world]() {
+			if(!queueWrite) return;
+			queueWrite([world]() {
+				BeginTechSelection(world);
 			});
 		};
 	result.characterStatsForAgency = [lobby](uint8_t agency) {
 		return CharacterStatsForAgency(lobby, agency);
 	};
-	result.flushGameTechActions =
-		[queueWrite, world](std::shared_ptr<LobbyGameTechActions> actions,
-		                    std::function<bool()> gameTechStillActive,
-		                    std::function<void()> showTeams) {
-			if(!queueWrite || !actions) return;
-			queueWrite([world,
-			            actions,
-			            gameTechStillActive = std::move(gameTechStillActive),
-			            showTeams = std::move(showTeams)]() {
-				FlushGameTechActions(world, actions, gameTechStillActive, showTeams);
+	result.toggleGameTechChoice =
+		[queueWrite, world](int itemIndex) {
+			if(!queueWrite) return;
+			queueWrite([world, itemIndex]() {
+				ToggleTechChoice(world, itemIndex);
 			});
 		};
-	result.flushGameSelectActions =
-		[queueWrite, screen, lobby](std::shared_ptr<LobbyGameSelectActions> actions,
-		                            std::function<bool()> gameSelectStillActive,
-		                            std::function<uint32_t()> selectedGameId,
-		                            std::function<void()> showCreate) {
-			if(!queueWrite || !actions) return;
-			queueWrite([screen,
-			            lobby,
-			            actions,
-			            gameSelectStillActive = std::move(gameSelectStillActive),
-			            selectedGameId = std::move(selectedGameId),
-			            showCreate = std::move(showCreate)]() {
-				FlushGameSelectActions(
-					screen,
-					lobby,
-					actions,
-					gameSelectStillActive,
-					selectedGameId,
-					showCreate);
+	result.joinLobbyGame =
+		[queueWrite, screen, lobby](uint32_t gameId) {
+			if(!queueWrite) return;
+			queueWrite([screen, lobby, gameId]() {
+				HandleJoinGameSelectAction(screen, lobby, gameId);
+			});
+		};
+	result.spectateLobbyGame =
+		[queueWrite, screen](uint32_t gameId) {
+			if(!queueWrite) return;
+			queueWrite([screen, gameId]() {
+				HandleSpectateGameSelectAction(screen, gameId);
 			});
 		};
 	return result;

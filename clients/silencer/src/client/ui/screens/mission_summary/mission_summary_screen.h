@@ -6,7 +6,6 @@
 
 #include <array>
 #include <functional>
-#include <memory>
 #include <string>
 #include <vector>
 
@@ -28,12 +27,10 @@ public:
 private:
 	void Refresh(ScreenContext & ctx);
 	void AddSummaryLine(const char * name, Uint32 value, bool percentage = false);
-	void QueueActionFlush();
 
 	bool infoLoaded = false;
-	std::function<void()> flushActions;
-	std::shared_ptr<silencer::client_ui::hooks::LobbyMissionSummaryActions> pendingActions;
-	bool actionFlushQueued = false;
+	std::function<void(int)> upgradeStat;
+	std::function<void()> completeSummary;
 	int scrollDelta = 0;
 	int scrollPosition = 0;
 	bool upgradeBanner = false;

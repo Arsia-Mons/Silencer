@@ -7,14 +7,11 @@
 // "Waiting..." while the host is still waiting for peers to finish
 // downloading the map.
 //
-// Domain reads and writes come through lobby hooks/providers. Button callbacks
-// are captured during BuildUi and drained after Clay declaration.
+// Domain reads come through lobby hooks/providers. Button activation returns a
+// typed intent to the screen root, which queues writes after Clay declaration.
 
 #include "shared.h"
 #include "runtime/UiActionQueue.h"
-
-#include <functional>
-#include <memory>
 
 class Resources;
 
@@ -22,23 +19,20 @@ namespace silencer::ui {
 class UiInteractionRegistry;
 }
 
-namespace silencer::client_ui::hooks {
-struct LobbyGameJoinActions;
-}
-
 namespace silencer::client_ui::lobby {
 
-struct GameJoinPanelState {
-	std::shared_ptr<silencer::client_ui::hooks::LobbyGameJoinActions> pendingActions = {};
-	std::function<void(std::shared_ptr<silencer::client_ui::hooks::LobbyGameJoinActions>)>
-		flushActions = {};
-	bool actionsQueued = false;
+enum class GameJoinPanelIntent {
+	None,
+	ChooseTech,
+	ChangeTeam,
+	Ready,
 };
+
+struct GameJoinPanelState {};
 
 void GameJoinPanelInit(GameJoinPanelState & state);
 
-bool GameJoinPanelHandleUiIntent(GameJoinPanelState & state,
-                                 const silencer::ui::UiAction & action);
+GameJoinPanelIntent GameJoinPanelHandleUiIntent(const silencer::ui::UiAction & action);
 
 // Emits the upper stepped-pane subtree (Choose Tech / Change Team / Ready
 // buttons, stacked vertically). Must be called inside the LobbyRightUpperBox

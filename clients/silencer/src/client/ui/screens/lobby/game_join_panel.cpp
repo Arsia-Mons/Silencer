@@ -73,58 +73,35 @@ ButtonOpts FullWidthUpperButtonOpts(Uint16 panelWidth) {
 	};
 }
 
-void QueueActionsFlush(GameJoinPanelState & state)
-{
-	if(state.actionsQueued) return;
-	state.actionsQueued = true;
-	if(state.flushActions && state.pendingActions){
-		state.flushActions(state.pendingActions);
-	}
-}
-
 }  // namespace game_join_panel_detail
 
 void GameJoinPanelInit(GameJoinPanelState & state) {
-	state = GameJoinPanelState{};
+	(void)state;
 }
 
-bool GameJoinPanelHandleUiIntent(GameJoinPanelState & state,
-                                 const silencer::ui::UiAction & action) {
-	if(action.kind != silencer::ui::UiActionKind::Activate) return false;
+GameJoinPanelIntent GameJoinPanelHandleUiIntent(
+	const silencer::ui::UiAction & action) {
+	if(action.kind != silencer::ui::UiActionKind::Activate){
+		return GameJoinPanelIntent::None;
+	}
 	if(action.id == game_join_panel_detail::kActionTech){
-		if(!state.pendingActions) return true;
-		state.pendingActions->chooseTech = true;
-		game_join_panel_detail::QueueActionsFlush(state);
-		return true;
+		return GameJoinPanelIntent::ChooseTech;
 	}
 	if(action.id == game_join_panel_detail::kActionTeam){
-		if(!state.pendingActions) return true;
-		state.pendingActions->changeTeam = true;
-		game_join_panel_detail::QueueActionsFlush(state);
-		return true;
+		return GameJoinPanelIntent::ChangeTeam;
 	}
 	if(action.id == game_join_panel_detail::kActionReady){
-		if(!state.pendingActions) return true;
-		state.pendingActions->ready = true;
-		game_join_panel_detail::QueueActionsFlush(state);
-		return true;
+		return GameJoinPanelIntent::Ready;
 	}
-	return false;
+	return GameJoinPanelIntent::None;
 }
 
 void BuildGameJoinUpperTree(GameJoinPanelState & state,
                             Uint16 panelWidth,
                             Resources & resources,
                             silencer::ui::UiInteractionRegistry& interactions) {
+	(void)state;
 	(void)resources;
-	if(!state.pendingActions){
-		state.pendingActions =
-			std::make_shared<silencer::client_ui::hooks::LobbyGameJoinActions>();
-	}
-	state.pendingActions->ready = false;
-	state.pendingActions->changeTeam = false;
-	state.pendingActions->chooseTech = false;
-	state.actionsQueued = false;
 
 	const ButtonOpts buttonOpts =
 		game_join_panel_detail::FullWidthUpperButtonOpts(panelWidth);

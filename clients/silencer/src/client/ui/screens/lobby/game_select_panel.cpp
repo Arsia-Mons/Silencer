@@ -58,15 +58,6 @@ Uint32 GetSelectedGameId(const GameSelectPanelState & state) {
 	return state.rows[state.selectedIndex].gameid;
 }
 
-void QueueActionsFlush(GameSelectPanelState & state)
-{
-	if(state.actionsQueued) return;
-	state.actionsQueued = true;
-	if(state.flushActions && state.pendingActions){
-		state.flushActions(state.pendingActions);
-	}
-}
-
 void RecomputeInfoBlock(GameSelectPanelState & state, ScreenContext & ctx) {
 	ScreenContext::LobbyGameDetails lobbyGame =
 		ctx.LobbyGameDetailsFor(GetSelectedGameId(state));
@@ -136,17 +127,14 @@ void RecomputeInfoBlock(GameSelectPanelState & state, ScreenContext & ctx) {
 
 void GameSelectPanelInit(GameSelectPanelState & state) {
 	state.rows.clear();
-	state.selectedIndex   = -1;
-	state.scrollPos       = 0;
-	state.pendingActions  = {};
-	state.flushActions    = {};
-	state.actionsQueued   = false;
+	state.selectedIndex = -1;
+	state.scrollPos = 0;
 	state.infoName.clear();
 	state.infoMap.clear();
 	state.infoSecurity.clear();
 	state.infoCreator.clear();
 	state.infoLimits.clear();
-	state.joinVisible     = false;
+	state.joinVisible = false;
 	state.spectateVisible = false;
 }
 
@@ -159,34 +147,26 @@ void GameSelectPanelTick(GameSelectPanelState & state,
 	game_select_panel_detail::RecomputeInfoBlock(state, ctx);
 }
 
-bool GameSelectPanelHandleUiIntent(GameSelectPanelState & state,
-                                   const silencer::ui::UiAction & action) {
+GameSelectPanelIntent GameSelectPanelHandleUiIntent(
+	GameSelectPanelState & state,
+	const silencer::ui::UiAction & action) {
 	if(action.kind == silencer::ui::UiActionKind::Activate){
 		if(action.id == game_select_panel_detail::kActionCreate){
-			if(!state.pendingActions) return true;
-			state.pendingActions->create = true;
-			game_select_panel_detail::QueueActionsFlush(state);
-			return true;
+			return GameSelectPanelIntent::Create;
 		}
 		if(action.id == game_select_panel_detail::kActionJoin){
-			if(!state.pendingActions) return true;
-			state.pendingActions->join = true;
-			game_select_panel_detail::QueueActionsFlush(state);
-			return true;
+			return GameSelectPanelIntent::Join;
 		}
 		if(action.id == game_select_panel_detail::kActionSpectate){
-			if(!state.pendingActions) return true;
-			state.pendingActions->spectate = true;
-			game_select_panel_detail::QueueActionsFlush(state);
-			return true;
+			return GameSelectPanelIntent::Spectate;
 		}
 	}
 	if(action.kind == silencer::ui::UiActionKind::Select &&
 	   game_select_panel_detail::StartsWith(action.id, game_select_panel_detail::kActionRowPrefix)){
 		state.selectedIndex = action.index;
-		return true;
+		return GameSelectPanelIntent::Handled;
 	}
-	return false;
+	return GameSelectPanelIntent::None;
 }
 
 }  // namespace silencer::client_ui::lobby

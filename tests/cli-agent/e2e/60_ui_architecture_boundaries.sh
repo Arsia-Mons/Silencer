@@ -179,6 +179,19 @@ fail_if_match \
   "$REPO_ROOT/clients/silencer/src/client/ui/screens/lobby/game_tech_panel.cpp"
 
 fail_if_match \
+  '\bLobbyMainAreaPanels\b' \
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens/lobby/lobby_main_area.h" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens/lobby/lobby_main_area.cpp" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens/lobby/lobby_screen.cpp"
+
+fail_if_match \
+  '\bLobby(MissionSummary|GameJoin|GameTech|GameSelect)Actions\b|\b(pendingActions|flushActions|actionsQueued|actionFlushQueued)\b' \
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens/hooks/use_lobby.h" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens/hooks/use_lobby.cpp" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens/lobby" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens/mission_summary"
+
+fail_if_match \
   '#include[[:space:]]*"game[.]h"' \
   "$REPO_ROOT/clients/silencer/src/client/ui/screens" \
   "$REPO_ROOT/clients/silencer/src/client/ui/modals" \
