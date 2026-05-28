@@ -28,6 +28,20 @@ export async function apiFetch(path: string, opts: RequestInit = {}, tokenOverri
       ...(opts.headers as Record<string, string> | undefined),
     },
   });
+  if (res.status === 401 && typeof window !== 'undefined') {
+    // Session expired or revoked — clear stored credentials and redirect to login
+    const isPlayerReq = tokenOverride !== undefined ? tokenOverride === getPlayerToken() : false;
+    if (isPlayerReq) {
+      localStorage.removeItem('zs_player_token');
+      localStorage.removeItem('zs_player');
+      window.location.href = '/login?mode=player';
+    } else {
+      localStorage.removeItem('zs_token');
+      localStorage.removeItem('zs_user');
+      window.location.href = '/login';
+    }
+    throw new Error('Session expired');
+  }
   if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
   return res.json();
 }
