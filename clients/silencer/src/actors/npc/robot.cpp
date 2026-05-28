@@ -309,8 +309,10 @@ void Robot::Tick(World & world){
 				if(it != world.resources.actordefs.end()){
 					const AnimSequence* seq = it->second.GetSequence("WALKING");
 					std::string ev; int evVol;
-					if(seq && seq->GetFrameSoundByIndex(state_i % 20, ev, evVol))
+					if(seq && seq->GetFrameSoundByIndex(state_i % 20, ev, evVol)){
+						StopAmbience();
 						FireFrameEvent(ev, &it->second, currentplatformid, *this, world, 48);
+					}
 				}
 			}
 			res_bank = 45;

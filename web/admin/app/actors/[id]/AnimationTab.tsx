@@ -241,8 +241,12 @@ function PreviewCanvas({ sequence, scale, speed }: { sequence: AnimSequence | nu
 // Semantic frame event tags understood by FireFrameEvent in C++.
 // footstep:L/R → resolved via physics material + per-actor override at runtime.
 const FRAME_EVENT_TAGS = [
-  { tag: 'footstep:L', label: 'Footstep Left  (material-aware)' },
-  { tag: 'footstep:R', label: 'Footstep Right (material-aware)' },
+  { tag: 'footstep:L',        label: 'Footstep Left        (walk, material-aware)' },
+  { tag: 'footstep:R',        label: 'Footstep Right       (walk, material-aware)' },
+  { tag: 'footstep:crouch:L', label: 'Footstep Crouch Left (material-aware)'       },
+  { tag: 'footstep:crouch:R', label: 'Footstep Crouch Right (material-aware)'      },
+  { tag: 'footstep:stair:L',  label: 'Footstep Stair Left  (material-aware)'       },
+  { tag: 'footstep:stair:R',  label: 'Footstep Stair Right (material-aware)'       },
 ];
 
 /** Inline frame event picker — supports semantic tags, cues, and legacy WAVs. */

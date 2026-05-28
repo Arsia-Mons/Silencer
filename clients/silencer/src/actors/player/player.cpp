@@ -35,12 +35,15 @@
 
 // Apply a data-driven animation sequence to res_bank/res_index.
 // Returns true if the sequence was found and applied; false → caller keeps its hardcoded fallback.
+// When actor/platformId are provided, also fires any frame event tag via FireFrameEvent.
 static bool ApplyActorSeq(World & world,
                            const char * actor_id,
                            const char * seq_name,
                            int state_i,
                            Uint8 & res_bank,
-                           Uint8 & res_index) {
+                           Uint8 & res_index,
+                           Object * actor = nullptr,
+                           Uint16 platformId = 0) {
 	auto it = world.resources.actordefs.find(actor_id);
 	if (it == world.resources.actordefs.end()) return false;
 	auto sit = it->second.sequences.find(seq_name);
@@ -49,6 +52,11 @@ static bool ApplyActorSeq(World & world,
 	if (!fd) return false;
 	res_bank  = fd->bank;
 	res_index = fd->index;
+	if (actor && !fd->sound.empty()) {
+		std::string ev; int evVol;
+		if (sit->second.GetFrameSound(state_i, ev, evVol))
+			FireFrameEvent(ev, &it->second, platformId, *actor, world);
+	}
 	return true;
 }
 
@@ -1472,10 +1480,10 @@ void Player::Tick(World & world){
 					state_i = 25 - 1;
 				}
 				if(res_index == 5){
-					FireFrameEvent("footstep:L", _pActorDef, currentplatformid, *this, world);
+					FireFrameEvent("footstep:stair:L", _pActorDef, currentplatformid, *this, world);
 				}
 				if(res_index == 15){
-					FireFrameEvent("footstep:R", _pActorDef, currentplatformid, *this, world);
+					FireFrameEvent("footstep:stair:R", _pActorDef, currentplatformid, *this, world);
 				}
 			}
 			//printf("bank: %d  index: %d\n", res_bank, res_index);
@@ -1650,7 +1658,7 @@ void Player::Tick(World & world){
 				}
 			}
 			xv = 0;
-			if(!ApplyActorSeq(world, "player", "CROUCHED", state_i, res_bank, res_index)){
+			if(!ApplyActorSeq(world, "player", "CROUCHED", state_i, res_bank, res_index, this, currentplatformid)){
 				res_bank  = 18;
 				res_index = state_i / 3;
 			}

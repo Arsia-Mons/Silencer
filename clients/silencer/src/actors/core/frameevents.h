@@ -11,17 +11,21 @@ class World;
 // The `event` field on a FrameDef is a semantic tag describing what just
 // happened at this frame. The actual sound is resolved from context:
 //
-//   "footstep:L"   → left-foot step; looks up physics material footstepL
-//                    (or actorDef.footstepL override if set)
-//   "footstep:R"   → right-foot step; same for footstepR
-//   "cue:some_id"  → plays the named cue directly (no material lookup)
-//   anything else  → passed to ResolveSound (bare cue name or legacy WAV)
+//   "footstep:L"        → left-foot step; uses physics material footstepL
+//                          (or actor per-material override if set)
+//   "footstep:R"        → right-foot step; same for footstepR
+//   "footstep:crouch:L" → crouched left step; uses footstepCrouchL
+//   "footstep:crouch:R" → crouched right step; uses footstepCrouchR
+//   "footstep:stair:L"  → stair left step; uses footstepStairL
+//   "footstep:stair:R"  → stair right step; uses footstepStairR
+//   "cue:some_id"       → plays the named cue directly (no material lookup)
+//   anything else       → passed to ResolveSound (bare cue name or legacy WAV)
 //
-// adef     — nullable; checked for per-actor footstep overrides
+// adef       — nullable; checked for per-material footstep overrides
 // platformId — currentplatformid of the calling actor (0 = default material)
-// actor    — source Object, used for positional EmitSound
-// world    — for platform and resource lookups
-// baseVol  — SDL volume scalar (0–128); scaled by cue volume node output
+// actor      — source Object, used for positional EmitSound
+// world      — for platform and resource lookups
+// baseVol    — SDL volume scalar (0–128); scaled by cue volume node output
 // ---------------------------------------------------------------------------
 void FireFrameEvent(const std::string& event,
                     const ActorDef*    adef,
