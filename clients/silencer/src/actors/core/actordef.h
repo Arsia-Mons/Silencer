@@ -46,8 +46,19 @@ struct AnimSequence {
 	bool GetFrameSoundByIndex(int frameIdx, std::string& outFile, int& outVolume) const;
 };
 
+// Per-material footstep override for an actor.
+// Key = physics material name (e.g. "Concrete", "MetalSolid").
+// Overrides the material's own footstepL/R when the actor walks on that surface.
+struct ActorFootstepOverride {
+	std::string walkL;
+	std::string walkR;
+};
+
 struct ActorDef {
 	std::string id;
+
+	// Per-material footstep sound overrides. Empty map = always use physics material defaults.
+	std::unordered_map<std::string, ActorFootstepOverride> footstepOverrides;
 
 	// sequences keyed by player-state name (e.g. "CROUCHING").
 	// Only states whose animation can be fully driven from state_i live here;

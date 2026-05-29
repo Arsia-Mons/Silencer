@@ -114,6 +114,16 @@ static bool ParseActorDef(const std::string& path, ActorDef& out) {
 		json j;
 		f >> j;
 		out.id = j.at("id").get<std::string>();
+		if (j.contains("footsteps")) {
+			const auto& fs = j["footsteps"];
+			out.footstepOverrides.clear();
+			for (auto& [matName, ov] : fs.items()) {
+				ActorFootstepOverride o;
+				o.walkL = ov.value("walkL", std::string{});
+				o.walkR = ov.value("walkR", std::string{});
+				out.footstepOverrides[matName] = std::move(o);
+			}
+		}
 		if (j.contains("sequences")) {
 			for (auto it = j["sequences"].begin(); it != j["sequences"].end(); ++it) {
 				out.sequences[it.key()] = ParseSequence(it.value());
@@ -246,6 +256,16 @@ int FetchActorDefs(const char* apiBase,
 			json j = json::parse(body);
 			ActorDef def;
 			def.id = id;
+			if (j.contains("footsteps")) {
+				const auto& fs = j["footsteps"];
+				def.footstepOverrides.clear();
+				for (auto& [matName, ov] : fs.items()) {
+					ActorFootstepOverride o;
+					o.walkL = ov.value("walkL", std::string{});
+					o.walkR = ov.value("walkR", std::string{});
+					def.footstepOverrides[matName] = std::move(o);
+				}
+			}
 			if (j.contains("sequences")) {
 				for (auto it = j["sequences"].begin(); it != j["sequences"].end(); ++it) {
 					def.sequences[it.key()] = ParseSequence(it.value());

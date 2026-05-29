@@ -30,8 +30,9 @@ ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 ENV NEXT_PUBLIC_WS_URL=$NEXT_PUBLIC_WS_URL
 ENV NEXT_PUBLIC_MAP_API_URL=$NEXT_PUBLIC_MAP_API_URL
 COPY --from=deps /app /app
-COPY shared/gas-validation ./shared/gas-validation
-COPY web/admin             ./web/admin
+COPY shared/gas-validation             ./shared/gas-validation
+COPY shared/assets/gas/physics_materials ./shared/assets/gas/physics_materials
+COPY web/admin                         ./web/admin
 WORKDIR /app/web/admin
 ENV NEXT_TELEMETRY_DISABLED=1
 RUN bun run build

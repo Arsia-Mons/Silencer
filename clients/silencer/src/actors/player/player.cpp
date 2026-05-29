@@ -1,6 +1,7 @@
 #include "player.h"
 #include "resources.h"
 #include "objecttypes.h"
+#include "frameevents.h"
 #include "plume.h"
 #include "civilian.h"
 #include "EventBus.h"
@@ -34,12 +35,15 @@
 
 // Apply a data-driven animation sequence to res_bank/res_index.
 // Returns true if the sequence was found and applied; false → caller keeps its hardcoded fallback.
+// When actor/platformId are provided, also fires any frame event tag via FireFrameEvent.
 static bool ApplyActorSeq(World & world,
                            const char * actor_id,
                            const char * seq_name,
                            int state_i,
                            Uint8 & res_bank,
-                           Uint8 & res_index) {
+                           Uint8 & res_index,
+                           Object * actor = nullptr,
+                           Uint16 platformId = 0) {
 	auto it = world.resources.actordefs.find(actor_id);
 	if (it == world.resources.actordefs.end()) return false;
 	auto sit = it->second.sequences.find(seq_name);
@@ -48,6 +52,11 @@ static bool ApplyActorSeq(World & world,
 	if (!fd) return false;
 	res_bank  = fd->bank;
 	res_index = fd->index;
+	if (actor && !fd->sound.empty()) {
+		std::string ev; int evVol;
+		if (sit->second.GetFrameSound(state_i, ev, evVol))
+			FireFrameEvent(ev, &it->second, platformId, *actor, world);
+	}
 	return true;
 }
 
@@ -1336,6 +1345,10 @@ void Player::Tick(World & world){
 					}
 				}
 			}
+			Platform* _cp = currentplatformid ? world.map.platformids[currentplatformid] : nullptr;
+			const auto& _mat = GASLoader::Get().GetPhysicsMaterialDef(_cp ? static_cast<uint8_t>(_cp->physicsMaterial) : 0);
+			const ActorDef* _pActorDef = nullptr;
+			{ auto _ait = world.resources.actordefs.find("player"); if (_ait != world.resources.actordefs.end()) _pActorDef = &_ait->second; }
 			if(input.keymoveleft || (ladder && x > center)){
 				xv -= GASLoader::Get().player.walkAcceleration;
 				if(xv > 0){
@@ -1360,7 +1373,8 @@ void Player::Tick(World & world){
 				}
 				mirrored = false;
 			}else{
-				xv *= 0.5;
+				float decelFactor = std::max(0.05f, 1.0f - 0.5f * _mat.friction);
+				xv = static_cast<int>(xv * decelFactor);
 				if(IsDisguised()){
 					if(state_i < 25){
 						state_i = 25;
@@ -1376,7 +1390,7 @@ void Player::Tick(World & world){
 					}
 				}
 			}
-			int xvmax = GASLoader::Get().player.runSpeed;
+			int xvmax = static_cast<int>(GASLoader::Get().player.runSpeed * _mat.speedMult);
 			if(IsDisguised()){
 				xvmax = GASLoader::Get().player.runSpeedDisguised;
 			}
@@ -1417,7 +1431,7 @@ void Player::Tick(World & world){
 					res_bank = 66;
 					res_index = state_i;
 					if(res_index == 3){
-						{ auto _r = ResolveSound(GASLoader::Get().player.soundFootstepCrouchL, world.resources); if(_r.chunk) EmitSound(world, _r.chunk, static_cast<int>(64 * _r.volume)); };
+						FireFrameEvent("footstep:L", _pActorDef, currentplatformid, *this, world);
 					}
 				}
 			}
@@ -1430,18 +1444,21 @@ void Player::Tick(World & world){
 				if(IsDisguised()){
 					res_bank = 123;
 				}
-				if(res_index == 4){
-					{ auto _r = ResolveSound(GASLoader::Get().player.soundFootstepCrouchL, world.resources); if(_r.chunk) EmitSound(world, _r.chunk, static_cast<int>(64 * _r.volume)); };
-				}
-				if(res_index == 11){
-					{ auto _r = ResolveSound(GASLoader::Get().player.soundFootstepCrouchR, world.resources); if(_r.chunk) EmitSound(world, _r.chunk, static_cast<int>(64 * _r.volume)); };
+				{
+					auto _ait = world.resources.actordefs.find("player");
+					if(_ait != world.resources.actordefs.end()){
+						const AnimSequence* seq = _ait->second.GetSequence("RUNNING");
+						std::string ev; int evVol;
+						if(seq && seq->GetFrameSoundByIndex(res_index, ev, evVol))
+							FireFrameEvent(ev, &_ait->second, currentplatformid, *this, world);
+					}
 				}
 			}
 			if(state_i >= 21 && state_i < 25){
 				res_bank = 67;
 				res_index = state_i - 21;
 				if(res_index == 3){
-					{ auto _r = ResolveSound(GASLoader::Get().player.soundFootstepCrouchL, world.resources); if(_r.chunk) EmitSound(world, _r.chunk, static_cast<int>(64 * _r.volume)); };
+					FireFrameEvent("footstep:L", _pActorDef, currentplatformid, *this, world);
 				}
 				if(input.keymoveleft || input.keymoveright){
 					state_i = -1;
@@ -1463,10 +1480,10 @@ void Player::Tick(World & world){
 					state_i = 25 - 1;
 				}
 				if(res_index == 5){
-					{ auto _r = ResolveSound(GASLoader::Get().player.soundFootstepStairL, world.resources); if(_r.chunk) EmitSound(world, _r.chunk, static_cast<int>(48 * _r.volume)); };
+					FireFrameEvent("footstep:stair:L", _pActorDef, currentplatformid, *this, world);
 				}
 				if(res_index == 15){
-					{ auto _r = ResolveSound(GASLoader::Get().player.soundFootstepStairR, world.resources); if(_r.chunk) EmitSound(world, _r.chunk, static_cast<int>(48 * _r.volume)); };
+					FireFrameEvent("footstep:stair:R", _pActorDef, currentplatformid, *this, world);
 				}
 			}
 			//printf("bank: %d  index: %d\n", res_bank, res_index);
@@ -1641,7 +1658,7 @@ void Player::Tick(World & world){
 				}
 			}
 			xv = 0;
-			if(!ApplyActorSeq(world, "player", "CROUCHED", state_i, res_bank, res_index)){
+			if(!ApplyActorSeq(world, "player", "CROUCHED", state_i, res_bank, res_index, this, currentplatformid)){
 				res_bank  = 18;
 				res_index = state_i / 3;
 			}
@@ -2994,7 +3011,7 @@ bool Player::CheckForGround(World & world, Platform & platform){
 	justjumpedfromladder = false;
 	int yt = platform.XtoY(x);
 	if(y <= yt || ((platform.type == Platform::STAIRSUP || platform.type == Platform::STAIRSDOWN) && y <= yt + 1)){
-		{ auto _r = ResolveSound(GASLoader::Get().player.soundFootstepCrouchR, world.resources); if(_r.chunk) EmitSound(world, _r.chunk, static_cast<int>(32 * _r.volume)); };
+		{ auto _ait = world.resources.actordefs.find("player"); const ActorDef* _pAd = (_ait != world.resources.actordefs.end()) ? &_ait->second : nullptr; FireFrameEvent("footstep:R", _pAd, platform.id, *this, world, 32); }
 		auto _land = ResolveSound(GASLoader::Get().player.soundLandCrouch, world.resources);
 		if(_land.chunk) EmitSound(world, _land.chunk, static_cast<int>(96 * _land.volume));
 		yv = 0;

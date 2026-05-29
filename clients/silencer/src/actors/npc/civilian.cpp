@@ -7,6 +7,7 @@
 #include "plasmaprojectile.h"
 #include "gasloader.h"
 #include "audio/soundcue.h"
+#include "frameevents.h"
 
 Civilian::Civilian() : Object(ObjectTypes::CIVILIAN){
 	requiresauthority = true;
@@ -165,14 +166,14 @@ void Civilian::Tick(World & world){
 			}
 			res_bank = 122;
 			res_index = state_i;
-			// play per-frame sounds defined in actordefs/civilian.json
+			// play per-frame events defined in actordefs/civilian.json
 			{
 				auto it = world.resources.actordefs.find("civilian");
 				if(it != world.resources.actordefs.end()){
 					auto* seq = it->second.GetSequence("WALKING");
-					std::string snd; int vol;
-					if(seq && seq->GetFrameSoundByIndex(state_i, snd, vol)){
-						EmitSound(world, world.resources.soundbank[snd], vol);
+					std::string ev; int evVol;
+					if(seq && seq->GetFrameSoundByIndex(state_i, ev, evVol)){
+						FireFrameEvent(ev, &it->second, currentplatformid, *this, world);
 					}
 				}
 			}
@@ -226,14 +227,14 @@ void Civilian::Tick(World & world){
 			{ const EnemyDef* _gd = GASLoader::Get().GetEnemyDef("civilian"); int _bonus = btctx_.bb<int>("bt_run_speed_bonus", _gd ? _gd->runSpeedBonus : 5); xv = (mirrored ? -1 : 1) * (_bonus + speed); }
 			res_bank = 123;
 			res_index = state_i % 15;
-			// play per-frame sounds defined in actordefs/civilian.json
+			// play per-frame events defined in actordefs/civilian.json
 			{
 				auto it = world.resources.actordefs.find("civilian");
 				if(it != world.resources.actordefs.end()){
 					auto* seq = it->second.GetSequence("RUNNING");
-					std::string snd; int vol;
-					if(seq && seq->GetFrameSoundByIndex(state_i % 15, snd, vol)){
-						EmitSound(world, world.resources.soundbank[snd], vol);
+					std::string ev; int evVol;
+					if(seq && seq->GetFrameSoundByIndex(state_i % 15, ev, evVol)){
+						FireFrameEvent(ev, &it->second, currentplatformid, *this, world);
 					}
 				}
 			}

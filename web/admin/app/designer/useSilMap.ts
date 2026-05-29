@@ -8,6 +8,20 @@ import { bakeMapLightMasks } from './lightBaker';
 const CELL_SIZE = 36; // bytes per map cell
 const MAX_HISTORY = 50;
 
+export const PHYSICS_MATERIAL_NAMES: string[] = [
+  'Concrete', 'Asphalt', 'MetalSolid', 'MetalGrate', 'Glass', 'Tile', 'Carpet', 'Linoleum',
+  'GrassDry', 'GrassLush', 'Dirt', 'Mud', 'Sand', 'Gravel', 'Rock',
+  'WaterShallow', 'WaterDeep', 'SnowPowder', 'SnowCrust', 'Ice', 'Puddle',
+  'WoodSolid', 'WoodCreaky', 'Marble', 'Brick',
+  'FleshOrganic', 'EnergyForcefield', 'MagmaAsh',
+];
+
+function physicsMaterialToIndex(name: string | undefined): number {
+  if (!name) return 0;
+  const idx = PHYSICS_MATERIAL_NAMES.indexOf(name);
+  return idx < 0 ? 0 : idx;
+}
+
 interface ParsedHeader {
   header: MapHeader;
   width: number;
@@ -357,6 +371,7 @@ export interface UseSilMapReturn {
   addPlatform: (platform: MapPlatform) => void;
   removePlatform: (idx: number) => void;
   updatePlatform: (idx: number, x1: number, y1: number, x2: number, y2: number) => void;
+  updatePlatformMaterial: (idx: number, material: string) => void;
   addActor: (actor: MapActor) => void;
   removeActor: (idx: number) => void;
   updateActor: (idx: number, patch: Partial<MapActor>) => void;
@@ -503,7 +518,17 @@ export function useSilMap(): UseSilMapReturn {
       }
 
       // Parse trigger nodes + objectives sections
-      const { triggers, objectives, zones } = parseTriggers(levelDV, levelRaw, off5);
+      const { triggers, objectives, zones, offset: off6 } = parseTriggers(levelDV, levelRaw, off5);
+
+      // Platform physics materials — optional trailing section (one uint8 per platform)
+      if (off6 + 8 <= levelDV.byteLength) {
+        const numMats = levelDV.getUint32(off6, true);
+        let matOff = off6 + 8;
+        for (let m = 0; m < numMats && m < platforms.length && matOff < levelDV.byteLength; m++, matOff++) {
+          const matIdx = levelDV.getUint8(matOff);
+          platforms[m].physicsMaterial = PHYSICS_MATERIAL_NAMES[matIdx] ?? 'Concrete';
+        }
+      }
 
       historyRef.current = [];
       futureRef.current = [];
@@ -539,10 +564,11 @@ export function useSilMap(): UseSilMapReturn {
       sum + 14 + n.conditions.length * COND_BYTES + n.actions.length * ACTION_BYTES, 0);
     const objectivesSectionSize = 8 + objectives.length * 132;
     const zonesSectionSize = 8 + zones.length * 12;
+    const physMatsSectionSize = 8 + platforms.length; // one uint8 per platform
     const levelBuf = new ArrayBuffer(
       tileSectionSize + actorsSectionSize + platformsSectionSize +
       shadowZonesSectionSize + lightMasksSectionSize + navLinksSectionSize +
-      triggerNodesSectionSize + objectivesSectionSize + zonesSectionSize,
+      triggerNodesSectionSize + objectivesSectionSize + zonesSectionSize + physMatsSectionSize,
     );
     const ldv = new DataView(levelBuf);
     for (let i = 0; i < numCells; i++) {
@@ -628,6 +654,13 @@ export function useSilMap(): UseSilMapReturn {
 
     // Trigger nodes + objectives sections
     off = writeTriggerSections(ldv, new Uint8Array(levelBuf), off, triggers, objectives, zones);
+
+    // Platform physics materials section — one uint8 per platform
+    ldv.setUint32(off, platforms.length, true); off += 4;
+    ldv.setUint32(off, 0, true); off += 4;
+    for (const p of platforms) {
+      ldv.setUint8(off, physicsMaterialToIndex(p.physicsMaterial)); off += 1;
+    }
 
     const levelCompressed = pako.deflate(new Uint8Array(levelBuf));
     const descBytes = new TextEncoder().encode(header.description);
@@ -832,6 +865,15 @@ export function useSilMap(): UseSilMapReturn {
     });
   }, [pushHistory]);
 
+  const updatePlatformMaterial = useCallback((idx: number, material: string) => {
+    setMapData(prev => {
+      if (!prev) return prev;
+      pushHistory(prev);
+      const platforms = prev.platforms.map((p, i) => i === idx ? { ...p, physicsMaterial: material } : p);
+      return { ...prev, platforms };
+    });
+  }, [pushHistory]);
+
   const addShadowZone = useCallback((zone: MapShadowZone) => {
     setMapData(prev => {
       if (!prev) return prev;
@@ -980,10 +1022,11 @@ export function useSilMap(): UseSilMapReturn {
       sum + 14 + n.conditions.length * COND_BYTES + n.actions.length * ACTION_BYTES, 0);
     const objectivesSectionSize = 8 + objectives.length * 132;
     const zonesSectionSize = 8 + zones.length * 12;
+    const physMatsSectionSize = 8 + platforms.length;
     const levelBuf = new ArrayBuffer(
       tileSectionSize + actorsSectionSize + platformsSectionSize +
       shadowZonesSectionSize + lightMasksSectionSize + navLinksSectionSize +
-      triggerNodesSectionSize + objectivesSectionSize + zonesSectionSize,
+      triggerNodesSectionSize + objectivesSectionSize + zonesSectionSize + physMatsSectionSize,
     );
     const ldv = new DataView(levelBuf);
 
@@ -1070,6 +1113,13 @@ export function useSilMap(): UseSilMapReturn {
     // Trigger nodes + objectives sections
     off = writeTriggerSections(ldv, new Uint8Array(levelBuf), off, triggers, objectives, zones);
 
+    // Platform physics materials section — one uint8 per platform
+    ldv.setUint32(off, platforms.length, true); off += 4;
+    ldv.setUint32(off, 0, true); off += 4;
+    for (const p of platforms) {
+      ldv.setUint8(off, physicsMaterialToIndex(p.physicsMaterial)); off += 1;
+    }
+
     const levelCompressed = pako.deflate(new Uint8Array(levelBuf));
     const descBytes = new TextEncoder().encode(header.description);
     const descBuf = new Uint8Array(128);
@@ -1125,7 +1175,7 @@ export function useSilMap(): UseSilMapReturn {
   return {
     map: mapData, openMap, saveMap, publishMap, createMap,
     updateTile, patchTile, applyTileBatch, applyAllLayersBatch, beginPaint, commitPaint,
-    addPlatform, removePlatform, updatePlatform,
+    addPlatform, removePlatform, updatePlatform, updatePlatformMaterial,
     addActor, removeActor, updateActor, moveActor,
     addShadowZone, removeShadowZone,
     addNavLink, removeNavLink, updateNavLink,

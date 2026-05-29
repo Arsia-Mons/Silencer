@@ -1,0 +1,11 @@
+{
+  "id": "Dirt",
+  "friction": 1.3,
+  "speedMult": 0.9,
+  "footstepL": "footstep_concrete",
+  "footstepR": "footstep_concrete",
+  "footstepStairL": "footstep_concrete",
+  "footstepStairR": "footstep_concrete",
+  "footstepCrouchL": "footstep_concrete",
+  "footstepCrouchR": "footstep_concrete"
+}

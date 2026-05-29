@@ -238,7 +238,18 @@ function PreviewCanvas({ sequence, scale, speed }: { sequence: AnimSequence | nu
   );
 }
 
-/** Inline sound picker — shows current value; click to open a searchable dropdown. */
+// Semantic frame event tags understood by FireFrameEvent in C++.
+// footstep:L/R → resolved via physics material + per-actor override at runtime.
+const FRAME_EVENT_TAGS = [
+  { tag: 'footstep:L',        label: 'Footstep Left        (walk, material-aware)' },
+  { tag: 'footstep:R',        label: 'Footstep Right       (walk, material-aware)' },
+  { tag: 'footstep:crouch:L', label: 'Footstep Crouch Left (material-aware)'       },
+  { tag: 'footstep:crouch:R', label: 'Footstep Crouch Right (material-aware)'      },
+  { tag: 'footstep:stair:L',  label: 'Footstep Stair Left  (material-aware)'       },
+  { tag: 'footstep:stair:R',  label: 'Footstep Stair Right (material-aware)'       },
+];
+
+/** Inline frame event picker — supports semantic tags, cues, and legacy WAVs. */
 function SoundPicker({ value, volume, sounds, onChange }: {
   value: string | undefined;
   volume: number | undefined;
@@ -248,13 +259,18 @@ function SoundPicker({ value, volume, sounds, onChange }: {
   const [open, setOpen] = useState(false);
   const [filter, setFilter] = useState('');
   const ref = useRef<HTMLDivElement>(null);
+  const lf = filter.toLowerCase();
+  const filteredTags = useMemo(
+    () => FRAME_EVENT_TAGS.filter(t => t.tag.includes(lf) || t.label.toLowerCase().includes(lf)),
+    [lf]
+  );
   const filteredWavs = useMemo(
-    () => sounds.wavs.filter(s => s.toLowerCase().includes(filter.toLowerCase())),
-    [sounds.wavs, filter]
+    () => sounds.wavs.filter(s => s.toLowerCase().includes(lf)),
+    [sounds.wavs, lf]
   );
   const filteredCues = useMemo(
-    () => sounds.cues.filter(s => s.toLowerCase().includes(filter.toLowerCase())),
-    [sounds.cues, filter]
+    () => sounds.cues.filter(s => s.toLowerCase().includes(lf)),
+    [sounds.cues, lf]
   );
   useEffect(() => {
     if (!open) return;
@@ -264,6 +280,10 @@ function SoundPicker({ value, volume, sounds, onChange }: {
     document.addEventListener('mousedown', onDown);
     return () => document.removeEventListener('mousedown', onDown);
   }, [open]);
+
+  const isTag  = (v: string) => FRAME_EVENT_TAGS.some(t => t.tag === v);
+  const isCue  = (v: string) => !isTag(v) && sounds.cues.includes(v);
+
   return (
     <div className="relative flex items-center gap-1" ref={ref}>
       <button
@@ -273,10 +293,10 @@ function SoundPicker({ value, volume, sounds, onChange }: {
         title={value}
       >
         {value
-          ? <span className={value.startsWith('cue:') ? 'text-game-primary' : ''}>{value}</span>
+          ? <span className={isTag(value) ? 'text-yellow-400' : isCue(value) ? 'text-game-primary' : ''}>{value}</span>
           : <span className="text-game-textDim">— none —</span>}
       </button>
-      {value && (
+      {value && !isTag(value) && (
         <button
           type="button"
           title="Preview sound"
@@ -285,7 +305,7 @@ function SoundPicker({ value, volume, sounds, onChange }: {
         >▶</button>
       )}
       {open && (
-        <div className="absolute z-50 top-full left-0 mt-0.5 w-48 bg-[#050a05] border border-game-border shadow-lg flex flex-col">
+        <div className="absolute z-50 top-full left-0 mt-0.5 w-56 bg-[#050a05] border border-game-border shadow-lg flex flex-col">
           <input
             autoFocus
             type="text"
@@ -294,12 +314,26 @@ function SoundPicker({ value, volume, sounds, onChange }: {
             value={filter}
             onChange={e => setFilter(e.target.value)}
           />
-          <div className="overflow-y-auto max-h-56">
+          <div className="overflow-y-auto max-h-64">
             <button
               type="button"
               className="w-full text-left px-2 py-1 text-xs text-game-textDim hover:bg-game-border/30"
               onClick={() => { onChange(undefined); setOpen(false); }}
             >— none —</button>
+
+            {filteredTags.length > 0 && <>
+              <div className="px-2 py-0.5 text-[10px] text-yellow-400 font-mono border-b border-game-border/50 tracking-widest">EVENTS</div>
+              {filteredTags.map(t => (
+                <button
+                  key={t.tag}
+                  type="button"
+                  className={`w-full text-left px-2 py-1 text-xs font-mono hover:bg-game-border/30 ${t.tag === value ? 'text-yellow-400' : 'text-yellow-400/70'}`}
+                  onClick={() => { onChange(t.tag); setOpen(false); }}
+                  title={t.label}
+                >{t.tag}</button>
+              ))}
+            </>}
+
             {filteredCues.length > 0 && <>
               <div className="px-2 py-0.5 text-[10px] text-game-primary font-mono border-b border-game-border/50 tracking-widest">CUES</div>
               {filteredCues.map(s => (
@@ -317,23 +351,26 @@ function SoundPicker({ value, volume, sounds, onChange }: {
                   >▶</button>
                 </div>
               ))}
-              {filteredWavs.length > 0 && <div className="px-2 py-0.5 text-[10px] text-game-textDim font-mono border-b border-game-border/50 tracking-widest">SOUNDS</div>}
             </>}
-            {filteredWavs.map(s => (
-              <div key={s} className="flex items-center">
-                <button
-                  type="button"
-                  className={`flex-1 text-left px-2 py-1 text-xs font-mono hover:bg-game-border/30 ${s === value ? 'text-game-primary' : ''}`}
-                  onClick={() => { onChange(s); setOpen(false); }}
-                >{s}</button>
-                <button
-                  type="button"
-                  title="Preview"
-                  className="px-2 text-game-textDim hover:text-game-primary text-xs"
-                  onClick={() => playSlot(s, volume ?? 128)}
-                >▶</button>
-              </div>
-            ))}
+
+            {filteredWavs.length > 0 && <>
+              {(filteredCues.length > 0 || filteredTags.length > 0) && <div className="px-2 py-0.5 text-[10px] text-game-textDim font-mono border-b border-game-border/50 tracking-widest">SOUNDS</div>}
+              {filteredWavs.map(s => (
+                <div key={s} className="flex items-center">
+                  <button
+                    type="button"
+                    className={`flex-1 text-left px-2 py-1 text-xs font-mono hover:bg-game-border/30 ${s === value ? 'text-game-primary' : ''}`}
+                    onClick={() => { onChange(s); setOpen(false); }}
+                  >{s}</button>
+                  <button
+                    type="button"
+                    title="Preview"
+                    className="px-2 text-game-textDim hover:text-game-primary text-xs"
+                    onClick={() => playSlot(s, volume ?? 128)}
+                  >▶</button>
+                </div>
+              ))}
+            </>}
           </div>
         </div>
       )}

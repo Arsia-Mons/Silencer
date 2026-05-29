@@ -191,7 +191,7 @@
             14,
             0
           ],
-          "sound": "stostep1.wav",
+          "sound": "footstep:L",
           "soundVolume": 64
         },
         {
@@ -303,7 +303,7 @@
             14,
             0
           ],
-          "sound": "stostepr.wav",
+          "sound": "footstep:R",
           "soundVolume": 64
         },
         {
@@ -431,7 +431,7 @@
             18,
             0
           ],
-          "sound": "futstonl.wav",
+          "sound": "footstep:L",
           "soundVolume": 64
         },
         {
@@ -521,7 +521,7 @@
             18,
             0
           ],
-          "sound": "futstonr.wav",
+          "sound": "footstep:R",
           "soundVolume": 64
         }
       ]

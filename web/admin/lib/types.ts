@@ -170,6 +170,7 @@ export interface MapPlatform {
   type1: number;
   type2: number;
   typeName: string;
+  physicsMaterial?: string;
 }
 
 export interface MapLayers {

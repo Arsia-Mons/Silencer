@@ -5,6 +5,42 @@
 #include <memory>
 #include "platformset.h"
 
+enum class PhysicsMaterial : uint8_t {
+    // Modern & Urban
+    Concrete        =  0,
+    Asphalt         =  1,
+    MetalSolid      =  2,
+    MetalGrate      =  3,
+    Glass           =  4,
+    Tile            =  5,
+    Carpet          =  6,
+    Linoleum        =  7,
+    // Natural & Outdoor
+    GrassDry        =  8,
+    GrassLush       =  9,
+    Dirt            = 10,
+    Mud             = 11,
+    Sand            = 12,
+    Gravel          = 13,
+    Rock            = 14,
+    // Water & Weather
+    WaterShallow    = 15,
+    WaterDeep       = 16,
+    SnowPowder      = 17,
+    SnowCrust       = 18,
+    Ice             = 19,
+    Puddle          = 20,
+    // Historic & Indoor Traditional
+    WoodSolid       = 21,
+    WoodCreaky      = 22,
+    Marble          = 23,
+    Brick           = 24,
+    // Sci-Fi & Fantasy
+    FleshOrganic    = 25,
+    EnergyForcefield = 26,
+    MagmaAsh        = 27,
+};
+
 class Platform
 {
 public:
@@ -24,6 +60,7 @@ public:
     Uint8 type;
     int x1, x2, y1, y2;
 	Uint16 id;
+	PhysicsMaterial physicsMaterial = PhysicsMaterial::Concrete;
 	Platform * adjacentl;
 	Platform * adjacentr;
 	class PlatformSet * set;

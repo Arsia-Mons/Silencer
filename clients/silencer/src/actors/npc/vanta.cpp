@@ -6,6 +6,7 @@
 #include "world.h"
 #include "hittable.h"
 #include "bipedal.h"
+#include "frameevents.h"
 
 static constexpr int VANTA_BANK    = 234;
 static constexpr int VANTA_FRAMES  = 25;
@@ -337,9 +338,9 @@ void Vanta::Tick(World & world){
 				auto it = world.resources.actordefs.find("vanta");
 				if(it != world.resources.actordefs.end()){
 					const AnimSequence* seq = it->second.GetSequence("WALKING");
-					std::string snd; int vol;
-					if(seq && seq->GetFrameSoundByIndex(res_index, snd, vol))
-						EmitSound(world, world.resources.soundbank[snd], vol);
+					std::string ev; int evVol;
+					if(seq && seq->GetFrameSoundByIndex(res_index, ev, evVol))
+						FireFrameEvent(ev, &it->second, currentplatformid, *this, world);
 				}
 			}
 			break;

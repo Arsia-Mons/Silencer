@@ -45,8 +45,19 @@ export function useSocket(events: Record<string, (...args: unknown[]) => void>):
     const s = getSocket();
     const onConnect    = () => { setConnected(true); s.emit('getSnapshot'); };
     const onDisconnect = () => setConnected(false);
+    const onConnectError = (err: Error) => {
+      if (err.message === 'Invalid token' || err.message === 'No token') {
+        s.disconnect();
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem('zs_token');
+          localStorage.removeItem('zs_user');
+          window.location.href = '/login';
+        }
+      }
+    };
     s.on('connect', onConnect);
     s.on('disconnect', onDisconnect);
+    s.on('connect_error', onConnectError);
 
     // Already connected — request snapshot immediately
     if (s.connected) {
@@ -59,6 +70,7 @@ export function useSocket(events: Record<string, (...args: unknown[]) => void>):
     return () => {
       s.off('connect', onConnect);
       s.off('disconnect', onDisconnect);
+      s.off('connect_error', onConnectError);
       handlers.forEach(([ev, fn]) => s.off(ev, fn as (...args: unknown[]) => void));
     };
   }, []);

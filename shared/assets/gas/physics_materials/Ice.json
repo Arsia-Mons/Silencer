@@ -1,0 +1,11 @@
+{
+  "id": "Ice",
+  "friction": 0.1,
+  "speedMult": 1.1,
+  "footstepL": "footstep_concrete",
+  "footstepR": "footstep_concrete",
+  "footstepCrouchL": "footstep_concrete",
+  "footstepCrouchR": "footstep_concrete",
+  "footstepStairL": "footstep_concrete",
+  "footstepStairR": "footstep_concrete"
+}

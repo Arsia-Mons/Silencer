@@ -1,0 +1,11 @@
+{
+  "id": "Tile",
+  "friction": 0.9,
+  "speedMult": 1.0,
+  "footstepL": "footstep_concrete",
+  "footstepR": "footstep_concrete",
+  "footstepCrouchL": "footstep_concrete",
+  "footstepCrouchR": "footstep_concrete",
+  "footstepStairL": "footstep_concrete",
+  "footstepStairR": "footstep_concrete"
+}

@@ -1,7 +1,9 @@
 #include "gasloader.h"
 #include "nlohmann/json.hpp"
+#include <filesystem>
 #include <fstream>
 #include <cstdio>
+namespace fs = std::filesystem;
 
 using json = nlohmann::json;
 
@@ -727,6 +729,57 @@ static void LoadGameModes(const std::string& dir, std::vector<GameModeConfig>& o
 
 // ---------------------------------------------------------------------------
 
+static void LoadPhysicsMaterials(const std::string& dir,
+                                 std::unordered_map<uint8_t, PhysicsMaterialDef>& out,
+                                 std::vector<GASLoadError>& errors) {
+    // Map string id → enum value (must stay in sync with PhysicsMaterial in platform.h)
+    static const std::unordered_map<std::string, uint8_t> nameToId = {
+        {"Concrete",         0}, {"Asphalt",          1}, {"MetalSolid",      2},
+        {"MetalGrate",       3}, {"Glass",             4}, {"Tile",            5},
+        {"Carpet",           6}, {"Linoleum",          7}, {"GrassDry",        8},
+        {"GrassLush",        9}, {"Dirt",             10}, {"Mud",            11},
+        {"Sand",            12}, {"Gravel",           13}, {"Rock",           14},
+        {"WaterShallow",    15}, {"WaterDeep",        16}, {"SnowPowder",     17},
+        {"SnowCrust",       18}, {"Ice",              19}, {"Puddle",         20},
+        {"WoodSolid",       21}, {"WoodCreaky",       22}, {"Marble",         23},
+        {"Brick",           24}, {"FleshOrganic",     25}, {"EnergyForcefield",26},
+        {"MagmaAsh",        27},
+    };
+    const std::string matDir = dir + "/physics_materials";
+    out.clear();
+    std::error_code ec;
+    for (const auto& entry : fs::directory_iterator(matDir, ec)) {
+        if (entry.path().extension() != ".json") continue;
+        const std::string file = entry.path().filename().string();
+        json m;
+        if (!OpenJson(entry.path().string(), m, errors)) continue;
+        try {
+            std::string id = m.value("id", std::string{});
+            auto it = nameToId.find(id);
+            if (it == nameToId.end()) {
+                errors.push_back({file, "/id", "FIELD_ERROR", "unknown material id: " + id});
+                continue;
+            }
+            PhysicsMaterialDef def;
+            def.name        = id;
+            def.friction        = m.value("friction",       1.0f);
+            def.speedMult       = m.value("speedMult",      1.0f);
+            def.footstepL       = m.value("footstepL",       std::string{});
+            def.footstepR       = m.value("footstepR",       std::string{});
+            def.footstepCrouchL = m.value("footstepCrouchL", def.footstepL);
+            def.footstepCrouchR = m.value("footstepCrouchR", def.footstepR);
+            def.footstepStairL  = m.value("footstepStairL",  def.footstepL);
+            def.footstepStairR  = m.value("footstepStairR",  def.footstepR);
+            out[it->second] = std::move(def);
+        } catch (const std::exception& e) {
+            errors.push_back({file, "", "FIELD_ERROR", e.what()});
+        }
+    }
+    if (ec) errors.push_back({"physics_materials/", "", "FIELD_ERROR", "cannot open directory: " + ec.message()});
+}
+
+// ---------------------------------------------------------------------------
+
 bool GASLoader::Load(const std::string& gasDir) {
     lastLoadErrors.clear();
     LoadGameEngine(gasDir, gameengine);
@@ -742,11 +795,12 @@ bool GASLoader::Load(const std::string& gasDir) {
     LoadEffects(gasDir, effects, lastLoadErrors);
     LoadLights(gasDir, lights, lastLoadErrors);
     LoadGameModes(gasDir, gameModes, lastLoadErrors);
+    LoadPhysicsMaterials(gasDir, physicsMaterials, lastLoadErrors);
     loaded = true;
-    fprintf(stderr, "[gas] loaded: %zu agencies, %zu weapons, %zu items, %zu enemies, %zu abilities, %zu gameObjects, %zu terminals, %zu effects, %zu lights, %zu gameModes (%zu errors)\n",
+    fprintf(stderr, "[gas] loaded: %zu agencies, %zu weapons, %zu items, %zu enemies, %zu abilities, %zu gameObjects, %zu terminals, %zu effects, %zu lights, %zu gameModes, %zu physicsMaterials (%zu errors)\n",
             agencies.size(), weapons.size(), items.size(),
             enemies.size(), abilities.size(), gameObjects.size(), terminals.size(),
-            effects.size(), lights.size(), gameModes.size(), lastLoadErrors.size());
+            effects.size(), lights.size(), gameModes.size(), physicsMaterials.size(), lastLoadErrors.size());
     return lastLoadErrors.empty();
 }
 
@@ -766,6 +820,7 @@ void GASLoader::Reload(const std::string& gasDir) {
     effects.clear();
     lights.clear();
     gameModes.clear();
+    physicsMaterials.clear();
     loaded = false;
     Load(gasDir);
 }

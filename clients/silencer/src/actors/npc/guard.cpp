@@ -9,6 +9,7 @@
 #include "pickup.h"
 #include "gasloader.h"
 #include "audio/soundcue.h"
+#include "frameevents.h"
 #include "npc_math.h"
 #include <math.h>
 
@@ -886,14 +887,18 @@ void Guard::Tick(World & world){
 			res_index = state_i % 19;
 			xv = mirrored ? -speed : speed;
 			FollowGround(*this, world, xv);
-			// play per-frame sounds defined in actordefs/guard.json
-			{
-				auto it = world.resources.actordefs.find(ActorDefName(weapon));
-				if(it != world.resources.actordefs.end()){
-					auto* seq = it->second.GetSequence("WALKING");
-					std::string snd; int vol;
-					if(seq && seq->GetFrameSoundByIndex(state_i % 19, snd, vol)){
-						EmitSound(world, world.resources.soundbank[snd], vol);
+			// Footstep: frame event tag drives timing; FireFrameEvent resolves material/actor cue.
+			// Cooldown prevents double-fire from state resets and Uint8 state_i overflow (256 % 19 != 0).
+			if (walkStepCooldown_ > 0) {
+				--walkStepCooldown_;
+			} else {
+				auto adit = world.resources.actordefs.find(ActorDefName(weapon));
+				if (adit != world.resources.actordefs.end()) {
+					auto* seq = adit->second.GetSequence("WALKING");
+					std::string ev; int evVol;
+					if (seq && seq->GetFrameSoundByIndex(state_i % 19, ev, evVol)) {
+						FireFrameEvent(ev, &adit->second, currentplatformid, *this, world, 64);
+						walkStepCooldown_ = 10;
 					}
 				}
 			}
