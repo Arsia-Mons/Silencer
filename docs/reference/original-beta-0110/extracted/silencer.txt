@@ -1,0 +1,492 @@
+			    - Silencer -
+			A Mind Control Game 
+
+OPEN BETA Build 110
+May 21, 2000
+See README.TXT for additional info
+
+=================
+TABLE OF CONTENTS
+=================
+
+I.	BACKGROUND
+II.	KEYS
+III.	PLAYING THE GAME
+IV.	AGENCIES
+V.	WEAPONS
+VI.	INVENTORY
+VII.	CHAT COMMANDS
+VIII.	KNOWN ISSUES 
+
+
+=============
+I. BACKGROUND
+=============
+
+Silencer is a multiplayer action strategy game that offers both solo and team
+play. As a Silencer you work for one of five information hungry agencies on a
+future Mars colony. Information piracy is the name of the game as you hack
+your way through terminals and routers to uncover government secrets. Be
+careful though because government security officers will try to stop you and
+other Silencers will want to take the data pack off your corpse. Collect three
+top secrets from the government and get beamed away from the colony just as
+the government "cleanses" it.
+
+
+========
+II. KEYS
+========
+
+You can redefine the keys in the "Options" menu.  Below is a description of
+the default keys for the game.
+
+Key		Alt			Function
+---		---			--------
+Numpad 8	Joy up			Climb ladder, Aim up while shooting
+Numpad 2	Joy down		Climb down ladder, Duck
+Numpad 4	Joy left		Run left
+Numpad 6	Joy right		Run right
+
+Numpad 7	Joy up/left		Aim up/left
+Numpad 9	Joy up/right		Aim up/right
+Numpad 1	Joy down/left		Aim down/left
+Numpad 3	Joy down/right		Aim down/right
+
+Numpad 8	Joy up			Jump
+Numpad 5	Joy Button 6		Disguise as civilian
+
+Right SHIFT	None			Use jetpack (hold)
+
+Right CTRL	Joy Button 1		Fire weapon (hold for continuous fire)
+Space		Joy Button 3		Activate / Hack / Enter door (toggle)
+Enter		Enter			Use inventory (toggle)
+Right ALT	Joy Button 5		Nothing at this time
+/		None			Look ahead (hold)
+TAB		None			Chat 
+Numpad 0	Joy Button 7		Next weapon (toggle)
+]		Joy Button 8		Next inventory item (toggle)
+<		None			Previous camera/detonator
+>		None			Next camera/detonator
+M		None			Detonate camera/detonator
+J		Joy Button 11		Signal thumbs-up
+K		Joy Button 12		Signal "Follow me"
+L		Joy Button 13		Point emphatically
+;		Joy Button 14		Signal "Halt" / Wave
+
+
+=====================
+III. PLAYING THE GAME
+=====================
+
+The best way to learn the game is to first play the Tutorials then jump online.
+However, here's a brief synopsis for the truly eager.
+
+If you are the team leader or playing alone you will start with a base door
+builder in your inventory (upper right). Silencer bases exist in another
+dimension; these special doors enable access to them. The first thing you'll
+want to do is find a good place for your base door. It will remain invisible
+to enemy agents until they see it used (either someone entering or exiting
+the door). Once a base has been discovered by enemy agents they can enter
+freely and take down systems if they have viruses or bombs. You in turn can
+activate base defenses to discourage would-be saboteurs.  If you selected the
+right technology before starting the game you can buy a new base door builder
+and effectively rehide it.
+
+So now you've built your base door. On the left side of the screen you'll
+notice that there is a list of items.  Terminals and routers in the playfield
+will come online gradually.  They show up as white blips on the radar map and
+as green devices in the playfield.  As you hack terminals (big) and routers 
+(small) the items in this list will turn green. When all of them are green
+you will know the terminal that will be receiving a government secret. It
+takes about 65 seconds for the secret to show up so you have time to prepare
+to meet the opposition. After about 20 seconds your enemies will know of the
+location too since all the agencies eventually know what the others are doing.
+Only you team has the access code to steal the secret so only your team
+members can get it from the terminal. Once it's in your possession though it
+becomes free game. When you die the data pack containing the secret falls to
+the ground and anyone can pick it up.
+
+Disguising is very important in the game. Your suit has the ability to
+project the image of a civilian. As a civilian government security forces will
+ignore you. However, you will not be able to perform any non-civilian feats
+while disguised and using a weapon or offensive inventory item will drop your
+disguise. While disguised you will automatically walk like a civilian. You
+can run like one by holding the Left or Right key and you can stop by holding
+the Duck key.
+
+
+============
+IV. AGENCIES
+============
+
+Noxis
+-----
+The Noxis corporation terraformed the majority of the initial habitable
+sectors of Mars, and continues to do so.  It is also responsible for producing
+and selling 70 percent of the breathable oxygen. Since they are widely known
+to the populace and government, they have taken steps to bolster their agent's
+health so they are better able to avoid detection. Training in bio-sporria
+rich environments, and possessing suits with advanced oxygen processors and
+filters, has given these agents improved physical abilities such as higher
+jumps, more stamina, and enhanced durability.
+
+- Jump +5
+- Endurance +3
+
+
+Lazarus
+-------
+Like the mythical phoenix, the loose organization known as Lazarus has been
+resurfacing every hundred years and causing chaos in the larger urban areas of
+Mars. Whether it's belief in some higher power, an understanding of mystical
+truths, or something else entirely, no one outside of the group is sure of
+their motives. Numerous witnesses of Lazarus attacks claim to have seen
+supposedly fatally wounded agents dust themselves off and continue their
+efforts, virtually undamaged.
+
+- Laz Tract Technology
+- Resurrection (% chance of respawning at location of death)
+
+
+Caliber
+-------
+Looking more like weekend fact-finders or trivia buffs than technological
+spelunkers, members of Caliber seem to be concerned with obtaining a broad
+range of general information. So while harvesting data may be only a hobby for
+their predominantly upper-class agents, even the simplest router checks give
+them what they want. For some reason, Caliber pays its members extremely well
+for even the most common files.
+
+- Security Badge Technology
+- Contacts +3
+
+
+Static
+------
+The Guv first realized that there was a brain-drain about four years ago.
+Silently, the youngest talented computer specialists and high level
+programmers were disappearing and leaving the Guv without the technical
+support it required. They ended up creating Static as a technologically savvy
+anti-government agency, but many members are more interested in reinforcing
+their reputation as turbulently wild hackers with the best skills and
+techniques.
+
+- Virus Technology
+- Periodic blips of enemy agents
+- Hacking +3
+
+
+Black Rose
+----------
+More like a dark force than a loose collection of humans, little is known of
+Black Rose. Something vibrant was taken from these people, and left in its
+place was a new form of sustenance. Its members seem to be misanthropic and
+have a penchant for using illegal compounds such as Hollowhead injections to
+cause extreme pain and internal withering in their victims. Shunned by even
+the most avaristic mercenaries, these agents work alone and yet still prosper
+due to some combination of ego and superlative talent.
+
+- Poison Technology
+- Poison Flare Technology
+- Stealth
+- Shield +2
+
+
+==========
+V. WEAPONS
+==========
+
+Blaster
+-------
+The Blaster is the main stay of all Silencers.  It derives an unlimited supply
+of ammo from the Silencer's suit.  Relatively ineffective against shield
+opponents the Blaster does significant damage to flesh once the shield is
+gone.
+
+Laser
+-----
+Immediately after shield technology was capable of dampening weapon effects,
+the Frost-Light laser was released. Two hits should remove any standard
+shield, but no damage is done to an unshielded target.
+
+Rockets
+-------
+Long range, high yield mini-warheads will devestate an unshielded opponent.
+The last best thing. A couple well timed rockets will send any Silencer back
+to the Reconstructor in his base.
+
+Flamer
+------
+No shield has been made that the Crucible flamer cannot ignore. It has a
+rather limited but is very deadly within that range.
+
+
+==============
+VI. Inventory
+==============
+
+Health Pack (Noxis)
+-------------------
+A small portable boost for Noxis agents in the field. Restores lost health,
+but must be manually applied.
+
+Laz Tract (Lazarus)
+-------------------
+The definitive and unquestionable truth about Mars' oddest and most powerful
+religious organization. Helpful in converting disbelieving citizens to your
+cause.
+
+Security Badge (Caliber)
+------------------------
+Unlimited security access. Government agents will ignore you in the field.
+
+Virus (Static)
+--------------
+A portable virus whipped up by the snotty underage hackers of Static. Gives
+you immediate control over cannons and robots in the field. May harm enemy
+in-base weapon stations.
+
+Poison (Black Rose)
+-------------------
+Hollowhead poisons are pernicious bio-rad toxins, administered via injection.
+Causes the victim to lose health until cured, multiple doses recommended.
+
+Poison Flare (Black Rose)
+-------------------------
+A more devious strain of the Orion Flare, the Poison Flare incapacitates its
+victims in seconds and leaves them poisoned as well. Environmentally
+disastrous, but highly lethal.
+
+Plasma Bomb
+-----------
+An indescriminate terrorist device capable of killing even a perfectly
+healthy opponent. A core explosion with multiple shrapnel tendrils, extremely
+lethal.
+
+Shaped Bomb
+-----------
+Like the plasma bomb but is engineered to direct its blast upwards.
+
+EMP Bomb
+--------
+Sends an EMP pulse throughout the area dropping all shields.
+
+Nuetron Bomb
+------------
+Kills every living thing on the level.  The only defense against it is to be
+inside a base.
+
+Detonator
+---------
+A remote detonation device. Deploy in strategic locations and hit FIRE to
+detonate.  Comes equipped with a remote camera.
+
+Laser Cannon
+------------
+A stationary laser turret with excellent offensive and defensive capabilities.
+This mechanical friend in the field can do your work for you.
+
+Flare
+-----
+The Orion Flare is a stationary mini-torch looks like a bomb in flight but
+has a more lingering effect. Useful for blocking off tight areas or herding
+enemies.
+
+Camera
+------
+A remote viewing device that allows you to monitor important location on the
+map.
+
+Base Door Builder
+-----------------
+When secrecy is a way of life. The ability to relocate the warp door to your
+base.
+
+Base Defense
+------------
+Internal security systems to deter would-be ambushers. In-base laser turrets.
+Multiple purchases increase turret structure durability.
+
+Insider Info
+------------
+Not to be confused with "Inside Contacts" this establishes a rather expensive
+link with moles inside the government.  You can purchase from them additional
+information to more quickly discover the location of the next secret.
+
+Credit Transfer
+---------------
+Allows you to share credits with your teammates if they find themselves a
+little low on cash.
+
+
+==================
+VII. CHAT COMMANDS
+==================
+
+Whisper (main lobby only)
+-------
+	Once in whisper mode you continue to whisper to the player until you 
+	issue a null whisper command (don't include the username or message)
+
+	/w [username] [message]
+	/whisper [username] [message]
+	
+Ignore (main lobby only)
+------
+	Ignores messages from the specified user
+
+	/i [username]
+	/ignore [username]
+
+Listen (main lobby only)
+------
+	Resume listening to a previously ignored user
+
+	/l [username]
+	/listen [username]
+
+Notification (main lobby only)
+------------
+	Toggles the "Entered / Left" system messages
+
+	/notify
+
+User List (main lobby only)
+---------
+	Displays sorted list of users in lobby
+	
+	/list
+
+Emote (both lobbies)
+-----
+	Puts message into *[yourname] [message]* format
+
+	/me [message]
+	/emote [message]
+
+Agent Stats (game lobby only)
+-----------
+	Displays an agent's stats in the chat window
+
+	/stats [agentname]
+
+
+==================
+VIII. KNOWN ISSUES 
+==================
+
+What's new in 0110
+------------------
+- Lobby chat commands.  Refer to CHAT COMMANDS section above for usage
+- Fixed "Change Agent" bug
+- Fixed Run/Hack bug
+- Fixed secret beaming problems.  Only one secret per team allowed on map now.
+- Fixed memory leak on server
+- Fixed sockets error on server
+- Disabled character verification on server (temporarily)
+- Character wipe
+- Learned to windsurf
+
+What's new in 0109
+------------------
+- Fixed "multiple personality" bug when you get kicked from a game
+- Fixed close game bug
+- Possible fix of the "can't recover secret" bug
+- Added agent selection to the main lobby
+- Other minor fixes
+
+Fixed in 0108
+------------------
+- 3 new levels
+- Fixed potential source of checksum problems in the server
+- Fixed memory leak in the server
+- Fixed possible cause of "List Pop() Empty" error in client
+- Players who willfully drop from a game they are losing "Forfeit" the game
+- 2 teams are required before a game can be started
+- In game chat has been improved (though not any more responsive)
+- ONLY bombs and virii can be used to destory tech stations in bases (no more campers with blasters)
+- Flamer ammo has been adjusted so it is a more reasonable weapon choice
+- Players can create multiple characters with the same name so long as they are with different agencies.
+- A player being shot at while hacking doesn't stand up or slide any more.  (Note: shooting a player never stopped their hacking only pushed them out of the way.  This is an aesthetic fix).
+- Fixed "Magistrate Killer Unknown" error
+- EMP bomb no lnger drops the thrower's shield (it will drop your teammates' though)
+- Included a players guide, SilencerGuide.doc, compiled by Noel Wade
+
+
+Fixed in 0107
+-------------
+- Fixed a bug in the client net code that resulted in discarded packets from server
+- Tweaked the resynch settings a little
+- Fixed fatal bug in server
+
+
+Fixed in 0106
+-------------
+- Level THET06E is included
+- New server architecture
+- Each player's latency only affects that player
+- Client will attempt to resynch with server after latency spike
+- Server not responding does not abort game
+- The end of game crash has been fixed
+
+
+Fixed in 0105
+-------------
+- Level PIT16D is included
+- Clicking READY leaves you in lobby so you can chat with people.
+- Clicking START removes game from list almost immediately to prevent last minute joiners
+- Players with bad latency are dropped from games by server
+- The checksum bug has been fixed (at least the one that was found)
+- If a player does generate a checksum only he is dropped (in theory)
+- In game chat is much more responsive
+- You can exit the game even under horrible net conditions
+- Server can better handle net traffic and error conditions
+- Client better handles error conditions
+- The end of game crash has been addressed
+- Fixed some of the level bugs
+- Made access to lower level of base more apparent
+- Fixed team change bug for black rose
+- Players who join after someone is ready will now know that person is ready
+- Bug that allowed joiners to kick/ban other players in lobby
+- Teammates receive "Secret Location Determined" message
+- Added "Close Game" button to game lobby to prevent unwanted guests
+- Added language filter (will be user set-able in later version)
+
+
+Fixed in 0104
+-------------
+- Silencer should behave properly if it loses focus during a net game
+- Meta and Game lobbies work correctly now
+- In-Game chat works (use the TAB key to toggle between team/all)
+- Could not run tutorials after entering a net lobby
+- SHIFT + [ bombed back to Windows
+- Leaving game while waiting for other players didn't notify server
+- Removed the "push" effect when trying to shoot next to someone
+
+
+The following is a list of major known bugs and issues.  We are addressing
+them.
+
+- When "Resynching With Server" is displayed and ESC is pressed the exit
+  message does not appear but hitting ENTER will still exit game
+- "List Pop() empty" error.  Happens after too many consecutive games.
+- 2D capable Voodoo cards display bad palette
+- Mouse not available in all menus
+- Mouse doesn't display properly on some video cards (ATI) (try using default mouse cursor if you're not)
+- Various messages cause display problems in the lobby/setup screens
+- More than 4 teams makes it impossible to see all of secret progress
+- Jet-pack can be "sticky" on odd surface collisions
+- "Could not send AUTH1request" means couldn't connect to routing server
+
+There are others but these are the major ones.  Please refer to the Silencer
+web page for a more detailed list or to report any bugs / problems you've
+encountered.
+
+A new BETA version will be available at the following address when a number
+of the above issues are resolved.
+
+http://www.won.net/channels/action/silencer/downloads.html
+
+
+Mark Roberts
+Mind Control Software

@@ -1,0 +1,3656 @@
+!This program cannot be run in DOS mode.
+[Rich
+.text
+`.rdata
+@.data
+.rsrc
+FGMu
+FOMu
+FGMu
+FOMu
+FGMu
+FOMu
+FGMu
+FOMu
+FGMu
+FOMu
+Ph`AJ
+hhAJ
+PhhAJ
+hP9@
+;Ms
+;Us
+Q;U
+B;E
+Q;U
+B;E
+;Us
+Q;U
+B;E
+B;E
+H;M
+Q;U
+B;E
+;Es
+M;H
+Q;Us
+B;Es
+Q;U
+B;E
+Q;U
+B;E
+HSVW
+PSVW
+M;M
+9U}
+9U|
+;Et
+jnhlAJ
+M;H
+M;H
+;Eu
+;Et
+;Mt
+E ;E
+VQPR
+MQj
+uYj 
+uYj 
+h$BJ
+Qh$BJ
+h0BJ
+Qh0BJ
+;Mu
+EPf
+EPf
+EPf
+URf
+EPf
+URf
+EPf
+|SVW
+;Es
+M;H
+Q;Us
+B;Es
+;Es
+B;E
+H;M
+B;E
+H;M
+;Us
+Q;U
+B;E
+Q;U
+B;E
+Q;U
+B;E
+Q;U
+B;E
+h',A
+hf,A
+A\vT2
+M3M
+M3M
+p $j
+hQZ^&j
+hD")
+Y[ej
+H;M
+Q;U
+B;E
+H;M
+Q;U
+B;E
+h( K
+hxDJ
+h(EJ
+h@EJ
+hXEJ
+htEJ
+h,FJ
+h@FJ
+hTFJ
+hlFJ
+h0GJ
+hHGJ
+h`GJ
+hxGJ
+h(HJ
+h8HJ
+hHHJ
+hXHJ
+hhHJ
+htHJ
+hIJ
+h IJ
+h4IJ
+hLIJ
+h\IJ
+hlIJ
+h$JJ
+hHJJ
+h`JJ
+htJJ
+h KJ
+h4KJ
+hDKJ
+hXKJ
+hhKJ
+h$LJ
+h8LJ
+hHLJ
+h`LJ
+hpLJ
+h|LJ
+h8MJ
+hPMJ
+hdMJ
+h NJ
+h<NJ
+hPNJ
+hhNJ
+=, K
+=0 K
+=4 K
+=8 K
+=< K
+=@ K
+=D K
+=H K
+=L K
+=P K
+=T K
+=X K
+=\ K
+=` K
+=d K
+=h K
+=l K
+=p K
+=t K
+=x K
+=| K
+=!K
+= !K
+=$!K
+=(!K
+=,!K
+=0!K
+=4!K
+=8!K
+=<!K
+=@!K
+=D!K
+=H!K
+=L!K
+=P!K
+=T!K
+=X!K
+=\!K
+=`!K
+=d!K
+=h!K
+=l!K
+=p!K
+=t!K
+=x!K
+=|!K
+="K
+="K
+=, K
+=0 K
+=4 K
+=8 K
+=< K
+=@ K
+=D K
+=H K
+=L K
+=P K
+=T K
+=X K
+=\ K
+=` K
+=d K
+=h K
+=l K
+=p K
+=t K
+=x K
+=| K
+=!K
+= !K
+=$!K
+=(!K
+=,!K
+=0!K
+=4!K
+=8!K
+=<!K
+=@!K
+=D!K
+=H!K
+=L!K
+=P!K
+=T!K
+=X!K
+=\!K
+=`!K
+=d!K
+=h!K
+=l!K
+=p!K
+=t!K
+=x!K
+=|!K
+MQh
+ h OJ
+u:hx
+tAhx
+uDhx
+h<OJ
+EPj%
+URj
+EPj
+MQj
+HFQf
+BFPf
+BFPf
+RhdOJ
+RhhOJ
+;Mt
+PhlOJ
+;Ut
+;Eu
+;Et
+h<PJ
++MQ
+hdPJ
+9M|
+h0QJ
+hLQJ
+hpQJ
+Ph&K
+hLRJ
+h,&K
+hPRJ
+hL&K
+hTRJ
+hl&K
+hXRJ
+h\RJ
+h`RJ
+hdRJ
+2|\j
+G|ej
+Pj@j
+|7hSJ
+uKh SJ
+Kh$SJ
+|th(SJ
+u~h,SJ
+u<h0SJ
+Qh4SJ
+Nh8SJ
+|Lh<SJ
+u<h@SJ
+[hDSJ
+[hHSJ
+|ahLSJ
+}@hPSJ
+KhTSJ
+9hXSJ
+|Fh\SJ
+|Oh`SJ
+tlhdSJ
+WhhSJ
+|OhlSJ
+hpSJ
+~DhtSJ
+hxSJ
+|'j9j
+~"h|SJ
+|Qj<j
+|dhTJ
+|:j,j
+h TJ
+h$TJ
+h,TJ
+h8TJ
+hDTJ
+hTTJ
+h\TJ
+hlTJ
+h|TJ
+h UJ
+uTh,UJ
+uuh0UJ
+h4UJ
+h8UJ
+|@h<UJ
+^h@UJ
+[hDUJ
+hhHUJ
+hLUJ
+hPUJ
+hTUJ
+'hXUJ
+mh\UJ
+|Ah`UJ
+~3j$j
+t7hdUJ
+hhUJ
+u)hlUJ
+hpUJ
+htUJ
+t*j5j
+uOhxUJ
+9h|UJ
+h`#K
+h,VJ
+h4VJ
+h8VJ
+Rh@VJ
+hhVJ
+h`#K
+;B@}
+,;Eu
+;Bl}
+D;Eu
+=D]J
+=D]J
+h WJ
+=XWJ
+h,WJ
+URh|5K
+h|5K
+Ph|5K
+h|5K
+;M|
+hYJ
+Qh0YJ
+PhTYJ
+PhxYJ
+hL=K
+hL=K
+hL=K
+hL=K
+Rh|5K
+h|5K
+hDZJ
+hHZJ
+hTZJ
+Rh\ZJ
+ZhtZJ
+hxZJ
+Rh|5K
+h|5K
+u}h|5K
+=,lK
+h|5K
+h[J
+=,lK
+hhpK
+=XWJ
+Rh|5K
+h|5K
+h|5K
+h4[J
+h8[J
+PhD[J
+=XWJ
+h`[J
+h0lK
+hd[J
+;E}
+;H~
+P;Q}
+P;Q~
+;Ht
+A;B
+A;B
+J;H
+J+H
+A;B
+;B~v
+A;B~h
++BP
+A+B
++BP
+A+B
+hh[J
+hp[J
+ht[J
+h|[J
+v\hL
+h\J
+h \J
+M;M
+hD\J
+hh\J
+hx\J
+Rjj
+HDQj
+hX]J
+h\]J
+Rj4j
+hl]J
+h|]J
+Pj4j
+B(Ph
+B(Ph
+h$^J
+h<^J
+h`^J
+Rjxj
+Ph$_J
+RhD_J
+h`_J
+Phd_J
+Phl_J
+Qhx_J
+h8`J
+h\`J
+hPaJ
+htaJ
+QhbJ
+h8bJ
+hPbJ
+hlbJ
+h(cJ
+h@cJ
+hXcJ
+hxcJ
+h0dJ
+hDdJ
+h\dJ
+hxdJ
+h0eJ
+h<eJ
+hLeJ
+h\eJ
+hpeJ
+h4fJ
+hHfJ
+h`fJ
+hpfJ
+h|fJ
+h0gJ
+hDgJ
+hXgJ
+hpgJ
+h(hJ
+h8hJ
+hLhJ
+h`hJ
+hphJ
+h(iJ
+h@iJ
+h`iJ
+h,jJ
+hDjJ
+ph\jJ
+]htjJ
+
+
+
+
+
+
+
+
+
+1111
+1111
+111111111
+111111111
+111111111
+111111111
+111111111
+1111111111111111111
+111111111
+1111111111111111
+1111111111111111111
+ !"#$%&'()*+,111111111111111111111111111-1111111111111111111.1111111111111111111/11111111111111111110U
+VWj|j
+Ph|kJ
+h@lJ
+hdlJ
+EPj
+Ph$mJ
+PhDmJ
+PhhmJ
+Ph0nJ
+PhLnJ
+hlnJ
+Ph<oJ
+PhhoJ
+Ph(pJ
+PhHpJ
+hppJ
+PhqJ
+Ph4qJ
+hdqJ
+hlqJ
+htqJ
+B,Pj
+J$;H(}T
+h|qJ
+QhXtJ
+Rh`tJ
+PhdtJ
+RhhtJ
+PhltJ
+RhptJ
+PhttJ
+Rh|tJ
+Jd;Hdt
+tVjpj
+MQh
+1jj
+vMhL
+MQh
+h$uJ
+,h(uJ
+h,uJ
+h0uJ
+h4uJ
+PhDuJ
+hpuJ
+=@uJ
+hHvJ
+h<wJ
+t%hx
+h`wJ
+B09E
+U;Q
+}"hx
+U+U
+Ph0xJ
+h<xJ
+A4+B8
+QhpxJ
+h yJ
+EPh(yJ
+hDyJ
+URj
+hHyJ
+Rh\yJ
+hhyJ
+hlyJ
+Ph|yJ
+=$yJ
+h$yJ
+hzJ
+=$yJ
+B Pj
+-------------------------------
+ !"#$%&'()*+,
+=hnJ
+9U|
+Pj$h|
+Q Rj
+H$;M
+B$9E
+B$;E
+MQh
+EPh
+u1h0
+ j j
+B Pj
+EPj
+EPjR
+MQjU
+tjq
+;Mu
+9Eu
+;Eu
+t}jj
+B Pj
+B&f-
+;Eu
+;Hu
+ff&@
+Q<9U
+TA>;Uu
+DJFf
+LPFf
+LN@f
+LNHf
+B<f-
+QP;U
+Q Rj
+=D]J
+H;M
+Hy;M
+B=Ph
+BLPh
+BFPh
+BDPh
+BBPh
+HQh
+3Ph@
+3Qh\
+j9jx
+hP]J
+Hu%j
+B$9E
+EPj
+Q$Rj)
+B$PjL
+H$Qj
+Q$RjY
+Atb3
+RjUj
+PjUj
+QjUj
+RjUj
+PjUj
+QjUj
+RjUj
+QjUj
+BDPj
+MQj
+B&;E
+P9U
+URj
+B&;E
+h0lK
+hP]J
+}Kj
+B$9E
+B$9E
+B$;E
+Q$;U
+H<9M
+QRh
+Qj*j
+Hy;M
+EPh
+QjKj
+hP]J
+QjKj
+DJdf
+LPdf
+;Mu
+PjPh
+H=Qj
+Q*Rj
+QLRj
+BDPj
+RjKj
+M+H
+E+B
+EPhT
+PjKj
+jXh"
+A9E
+=hnJ
+=hnJ
+PjKj
+Oj!j
+4j"j
+jZh-
+A9E
+P9U
+;Bl}F
+Pjj
+J9M
+QjOj
+P9U
+PjKj
+Q=Rj
+QLRj
+;H}
+Q Rj
+H(Qjj
+B,Pj
+Q0Rj
+H4Qj
+B8Pj
+Q<Rj
+H@Qj
+BPj
+B\Pj
+QdRj
+HhQj
+BlPj
+QDRj
+HHQj
+BLPj
+QTRj
+JLh,
+Q=9U
+EPj
+;E~03
+;M~03
+;E~03
+jjh
+=D]J
+=D]J
+=D]J
+=D]J
+=D]J
+=D]J
+=D]J
+=D]J
+=D]J
+=D]J
+U Rh
+M&Qh
+U;Rh
+EdPh
+=D]J
+=D]J
+=D]J
+=D]J
+=D]J
+=D]J
+VWj
+=D]J
+=D]J
+=D]J
+EPjqj
+B2f-
+@ff
+fff?
+333?
+j0h(
+P+Q
+EPh
+;Ms
+@N;Eu
+B`f+E
+8Qu+
+B$;E
+J;H
+t%hL
+QjNj
+jj
+jj
+jj
+PjNj
+ jNj
+Rh{
+J,+H$
+J0+H(
+B,+E
+H0+M
+u(h`
+M Qj
+t*hL
+jOj
+jOj
+jOj
+jOj
+jOj
+tPhP
+;Ut
+URh
+H$9Mt
+Q$9Uu
+Ef-
+Ef-
+HQj
+HQj
+BPj
+BPj
+HQj
+A+B
+P+Q
+P+Q
++QR
++BP
+BPh
+QRjr
+HQjr
+M Qj
+t-hx
+t-hx
+t%hx
+Pj1j
+Pj1j
+E Pf
+U Rf
+E(Pf
++F$+
++N(+
+QXRj
+U;Q
+U+Q$
+M;M
+U;U
+h$>l
+hP]J
+u.h\]
+Q$Rh
+Hy9M
+jj
+H0Qh
+j j
+B);E
+Qy;U
+t(h4
+j9jx
+;H8t
+=XWJ
+=D]J
+j&jd
+=D]J
+Q=Rh<
+HLQhH
+BFPhX
+QDRhh
+HBQhx
+MQh
+;U~
+Q$;U
+;Uu
+Q$;U
+MQj
+H$;M
+P9U
+H.Qj
+HQj
+B;E
+Q+U
+Q;U
+H+M
+P9U
+J\;H\t
+JX;HX}
+PX;Q
+;Eu
+MQh
+QRj
+PjKj
+MQh
+vuD3
+H8Qj
+Qjj
+QBRj
+A:f3
+A+B
+P+Q
+;H|
+;B~"
+EPj
+URhL
+;H}
+u@hx
+}5hx
+Bhx
+J hx
++EP
++MQ
+9E}
+QRj
+EPh
+URh
+A;B
+A;B
+U+Q(
+E;E
+M;M
+;Bu
+M;H
+Pj2j
+BH;E
+U;U
+M;M
+=XWJ
+Rh|5K
+h|5K
+h|5K
+URhP
+EPh\
+=D]J
+Ph0*l
+hZ"l
+Ph..l
+PhH&l
+RhH&l
+h`"l
+PhH&l
+Qh`"l
+hX"l
+h0*l
+h\"l
+j33
+URh
+Rh$>l
+Rh$>l
+Rh$>l
+PhT<l
+}&jd
+uuj3h
+u>j3h
+h$>l
+y0u
+B0u
+DJ^f-
+H$;M
+y(Pj
+6u1j
+Q$;U
+D$DVW
+D$QRP
+T$<VW
+L$h
+|$08
+_^][
+G  7H
+W(9W$u
+G$@7H
+\$ ;
+D$(;
+_^][
+_^][
+_^][
+_^][
+SUVW
+@0WVP
+_^][
+_^][
+t_9H tZ9H$tU
+9_|t93
+_^][
+_^][
+n u{
+_^][
+u ;l$
+_^][
+_^][
+F|UV
+_^][
+_^][
+_^][
+_^][
+_^][
+V(PR
+N(PQ
+V(QR
+_^][
+_^][
+_^][
+B<Wf
+WPRV
+WRPV
+_^][
+_^][
+_^]3
+_^][
+L$SU
+l$VW
+_^][
+U0SQR
+QSUV
+f+Fh
+Nlw^
+~@B3
+VdS+
+_^][Y
+_^][Y
+_^]3
+QSUV
+nXtX
+Fdf+F\
+VlH3
+NlBI
+FlAH
+_^][Y
+_^][Y
+_^]3
+N(PQ
+D$VW3
+t$;
+F  7H
+~(9~$u
+F$@7H
+z}
+_^][
+_^][
+_^][
+_^][
+_^][
+_^][
+_^][
+_^][
+_^][
+;G0t
+_^][
+_^][
+_^][
+_^][
+_^][
+t$W
+t$W
+|$ WUSV
+@APQV
+_^][
+D$$f
+T$ RV
+_^][
+L$SU
+D$$SUV
+L$03
+\$ f
+t$$+
+D$0tc
+D$0H
+_^][
+D$S3
+_^][Y
+HPQV
+_^][
+T$ }
+_^][
+t$W
+L$ f
+\$ ;
+t$WV
+D$PV
+L$QV
+D$PV
+l$ VW
+T$ v
+utABf
+D$(H
+D$ ;
+_^][
+D$V
+G(RP
+G0_^
+W(VR
+G(Sj
+W(QR
+D$8S
+\$8U
+C0V;
+L$Ds
+D$ R
+L$(P
+T$0Q
+D$8RP
+L$,R
+T$4PQR
+ s,3
+T$D;
+T$Ds
+L$HPQS
+T$Ds
+T$Ds
+D$4s
+{AH
+T$DQR
+T$$Q
+L$<R
+T$ P
+L$DRPS
+L$Ds
+L$LQP
+_^][
+_^][
+_^][
+D$HQ
+_^][
+_^][
+T$LRQS
+_^][
+_^][
+_^][
+_^][
+T$LRP
+_^][
+L$LQP
+_^][
+_^][
+_^][
+_^][
+T$HPRS
+_^][
+K4PVS
+_^][
+_^][
+_^][
+L$H+
+_^][
+t$W
+|$j
+UWVS
+t$f
+t$ O
+L$0u
+8t}%
+8tz%
+8ts%
+8tl%
+8te%
+tf;,
+cf;,
+D$0
+Rf;,
+Af;,
+0f;,
+|$$f;,8
+F+t$;t$(w
+4[^_]
+GVMat32 optimised assembly code written 1996-98 by Gilles Vollant
+UWVS
+|$ +
+$[^_]
+asm686 with masm, code optimised assembly code from Brian Raiter, written 1998
+\$ UV
+SVR3
+L$0s
+L$,A;
+L$,r
+D$(#
+L$,H
+L$,A;
+L$,r
+L$(#
+L$,A;
+L$,r
+D$(#
+L$,H
+L$,A;
+L$,r
+L$(#
+T$0RSV
+D$ s
+D$ ;
+AH;N,
+T$0RSV
+D$ s
+D$ ;
+T$0RSV
+_^][
+_^][
+T$0RSV
+_^][
+T$0RSV
+_^][
+V4PSV
+L$,P
+_^][
+_^][
+_^][
+|$ j
+L$ RUPj
+W(SR
+]^_[Y
+W(SR
+]^_[Y
+9t$Du
+*_^][
+T$,v
+D+3x%A
+LD+
+t$@y
+_^][
+L$,;
+L$8v
+D$1+
+D$$+
+;D$<s
+;D$<r
+T$$O#
+L$,@
+t$@3
+_^][
+_^][
+QSUVW
+|$8j
+_^][Y
+L$4R
+T$,PQhP
+L$8R
+T$(P
+D$0QhH
+G(SP
+_^][Y
+O(SQ
+_^][Y
+O(SQ
+_^][Y
+O(SQ
+_^][Y
+W(SR
+_^][Y
+W(SR
+_^][Y
+\$UV
+K<UWQ
+K<UVQ
+L$(SU
+t$0#
+t$4#
+EFOu
+EFKu
+\$8+
+_^][
+\$8+
+_^][
+\$8+
+k4^]
+hP%J
+QQSV
+_^[d
+_^[d
+hP%J
+hx&J
+hx&J
+t$W
+SSSh
+th8
+^tj
+QQV3
+QQV3
+QQV3
+QQV3
+~'9u}
+uVPS
+~'9u}
+uVSP
+9~8u
+NDWj
+t%Ht
+HHuS
+NDPj
+N8WP
+t2Ht
+t$j
+QQV3
+QQV3
+QQV3
+QQV3
+~39E}
+AABB
+)EP
+~39E}
+AABB
+)EP
+9^8u
+NDSj
+t/Ht HH
+NDPj
+N8WP
+t2Ht
+8]t
+QQSV
+_^[d
+hX*J
+_^[d
+t&9X
+u9x
+9xu
+_^[d
+;Hs
+u!8T$
+;Hs
+VWh
+YYPV
+_^[d
+_^[]
+_^[]
+9Mt
+ES3
+^s:R
+QSVW
+QQSVWd
+4SVW
+X_^[]
+;Gw
+SVWUj
+]_^[
+t.;t$$t(
+_^[
+R9Q
+kY[
+SUVW
+_^][
+QSUVW
+t$$S
+_^][Y
+<v(j1
+L$u
+uRFGHt
+SVW
+QQSVW
+8csm
+SVW3
+h@AJ
+h,AJ
+h(AJ
+^hLAJ
+hDAJ
+YYhXAJ
+hPAJ
+;t$s
+L$W
+tzVS
+GIt%
+t/Ku
+^_[3
+SVWu
+^}%95
+t&:a
+PPPPPPPP
+PPPPPPPP
+QSVW
+t$W
+u+Vj
+t$%
+YtGhD
+Yt3h<
+Yt"h4
+YtNV
+vBWSSSj
+</uQ
+</uF
+t&@8
+QSVW
+t7)E
+^[_3
+D$%
+WVh?
+YHYtLHt9
+HWt!
+EV%
+YY_^
+MSVWt
+_^[]
+_^[]
+<$tPf
+<$tPf
+<$t6f
+D$tQf
+MVt*
+^_[]
+XSVW
+D$d
+l$P
+Yu!j
+F@t
+t$3
+~&WP
+SVW3
+F;5@
+EVP
+EVP
+YY^]
+wDVSU
+_^][
+8csm
+u,9x
+X_^]
+uV9~
+YY_^[
+VWt!
+sO;>|C;~
+u Vj
+SVW
+8csm
+u SW
+_^[]
+?csm
+8csm
+SVW
+YYPW
+QQSVW
+QQSVW
+QQSVW
+Fu"
+_WPS
+E9}_t
+HHtpHHtl
+RPWV
+NNtS
+t-NuT
+HHtYHHtF
+[_^]
+VWuBh
+tPhh
+L$W
+GIt#
+8csm
+VC20XC00U
+SVWU
+tEVU
+t3x<
+]_^[
+j?I_
+ulSj
+uY;]
+pD#U
+j #M
+j?^;
+])u
+X_^[
+j?Y;M
+YYj0[
+<]t_G<-uA
+]t6G:
+YY9u
+uuU
+uu>
+>%uM
+eYt,F
+EYY
+EYY
+SVt'
+80t<
+E^[]
+VWt*
+Sj0W
+8-PS
+_^[]
+t$V
+VWj\S
+uKj:S
+Yu;S
+Ytwh
+Yt'j
+uFWWj
+"WWSh
+9} u
+E WW
+tMWWS
+t@9}
+VSh 
+X_[^
+ tj
+E9}
++M;M
++E;E
+QQSV
+btHHt.
+SUV3
+_^][
+SUVW
+_^][
+SVWu
+MtP
+9Mu
+9Mu
+EPW
+YY_[]
+);}u
+u49U
+u#9U
+9Eu19U
+e9Mue9U
+EQQ
+EQQ
+EYY]
+EQQ
+E QQ
+E YY
+t%It
+_^[]
+;D$v
+D$3
+;T$w
+VWss
+SVW
+<"u%
+F<"t
+t9UW
+?=t"U
+QQS3
+PSSW
+8"uD
+8"uF@
+8"u,
+@@f9
+@@f9
+SS@SSPVSS
+t#SSUP
+t$$VSS
+_^][YY
+DSUVWh
+_^][
+^95@
+F;5@
+u";U
+Fu%
+ tj
+WPQf
+E9}_t
+~*9E
+SVWj 
+ESVW
+t!CS
+ESVWj 
+G@P
+Y+O
+1_^[
+PPPP
+PPPj
+PPPP
+@PWV
+_^[]
+USVWf
+9Et
+9UtA
+SVW3
+^VWP
+YuS
+8=u)
+t#PV
+_^[]
+t$j@
+MS3
+t-Ht!Ht
+5t.;
+90tr
+0B=p
+tHt
+Wj@Y3
+t7SW
+    
+@AA;
+QSUVW3
+<f9-6
+PUj?
+PUj?
+>:uNFV
+>:u#FV
+_^][Y
+SVW3
+Qf9=
+WQPWS
+,f9=4
+WWWj
+WWSj
+WWWj
+u!;E
+D$%
+D$%
+D$%
+D$%
+D$.%
+D$ %
+D$.%
+D$ %
+t+Ht$Ht
+Hunj
+Y_^[
+3E%
+WVh?
+Yu]QQ
+$j%j
+$j%j
+WVh?
+$j&j
+$j&j
+$j&j
+YHYt
+HtHt
+t$3
+\SVW
++ttHHtd
+VPPP
+u.h0
+@}>j
+<8=u
+WVh?
+YunQQ
+WQQ
+WQQ
+`9Mtc}
+9MtAVW
+9Mu
+9t$u
+QSUV
+WWWWj
+t/WWUPj
+_^][Y
+0SVW
+_u@W
+PWPSS
+PWPSS
+9] u
+tySS
+t-VW
+QQSVW3
+tUj=
+t@9u
+uT9}t
+8<=t
+^][_
+WONswapSDK-SimpleSample
+@333333
+H@ff&@
+ Dff
+ff&?
+,@333?
+ deflate 1.1.3 Copyright 1995-1998 Jean-loup Gailly 
+
+
+ inflate 1.1.3 Copyright 1995-1998 Mark Adler 
+nX~p
+6e-{
+kc}
+pB3A
+DEST
+B^AER
+B^pzZ
+B^@V
+B^pj
+lIr`
+B^`h
+DEST
+DEST
+DEST
+DEST
+DEST
+DEST
+DEST
+DEST
+DEST
+DEST
+DEST
+DEST
+DEST
+DEST
+DEST
+DEST
+DEST
+DEST
+DEST
+DEST
+DEST
+DEST
+DEST
+DEST
+DEST
+DEST
+DEST
+DEST
+DEST
+irq`
+4Tfm
+k/$I8
+k/$I8
+4Tfm
+/k@Z>
+A)@u
+U5Pz
+n`\f
+3V k
+]u`@j
+3V`'
+`~G<
+sGS
+string too long
+invalid string position
+ios::eofbit set
+ios::failbit set
+ios::badbit set
+invalid ios::iword/pword index
+bad allocation
+Microsoft Visual C++ Runtime Library
+(Press Retry to debug the application - JIT must be enabled)
+For information on how your program can cause an assertion
+failure, see the Visual C++ documentation on asserts
+Expression: 
+Line: 
+File: 
+<program name unknown>
+Program: 
+Assertion failed!
+Unknown exception
+.com
+.bat
+.cmd
+.exe
+ (8PX
+700WP
+`h````
+ppxxxx
+(null)
+GetLastActivePopup
+GetActiveWindow
+MessageBoxA
+user32.dll
+GAIsProcessorFeaturePresent
+KERNEL32
+e+000
+frexp
+fmod
+_hypot
+_cabs
+ldexp
+modf
+fabs
+floor
+ceil
+sqrt
+atan2
+atan
+acos
+asin
+tanh
+cosh
+sinh
+log10
+runtime error 
+TLOSS error
+SING error
+DOMAIN error
+R6028
+- unable to initialize heap
+R6027
+- not enough space for lowio initialization
+R6026
+- not enough space for stdio initialization
+R6025
+- pure virtual function call
+R6024
+- not enough space for _onexit/atexit table
+R6019
+- unable to open console device
+R6018
+- unexpected heap error
+R6017
+- unexpected multithread lock error
+R6016
+- not enough space for thread data
+abnormal program termination
+R6009
+- not enough space for environment
+R6008
+- not enough space for arguments
+R6002
+- floating point not loaded
+Runtime Error!
+Program: 
+SunMonTueWedThuFriSat
+JanFebMarAprMayJunJulAugSepOctNovDec
+1#QNAN
+1#INF
+1#IND
+1#SNAN
+VerQueryValueA
+GetFileVersionInfoA
+GetFileVersionInfoSizeA
+VERSION.dll
+WONAuthGetNicknameA
+WONAuthLoginA
+WONAuthLoginNewAccountA
+WONIPAddressSetFromString
+WONAuthLoadVerifierKeyFromFileA
+WONAuthGetPrivateKey
+WONAuthGetCertificate
+WONAuthCloseHandle
+WONProfileSet
+WONProfileCreate
+WONDLL.dll
+WSOCK32.dll
+DirectDrawCreate
+DDRAW.dll
+DirectInputCreateA
+DINPUT.dll
+_AIL_set_sample_loop_block@12
+_AIL_set_sample_loop_count@8
+_AIL_set_sample_playback_rate@8
+_AIL_set_sample_volume@8
+_AIL_set_sample_pan@8
+_AIL_start_sample@4
+_AIL_set_sample_adpcm_block_size@8
+_AIL_set_sample_address@12
+_AIL_set_sample_type@12
+_AIL_init_sample@4
+_AIL_sample_status@4
+_AIL_end_sample@4
+_AIL_active_sample_count@4
+_AIL_start_stream@4
+_AIL_set_stream_loop_count@8
+_AIL_set_stream_volume@8
+_AIL_open_stream@12
+_AIL_close_stream@4
+_AIL_set_preference@8
+_AIL_waveOutOpen@16
+_AIL_startup@0
+_AIL_shutdown@0
+_AIL_digital_handle_release@4
+_AIL_digital_handle_reacquire@4
+_AIL_allocate_sample_handle@4
+_AIL_WAV_info@8
+_AIL_mem_free_lock@4
+_AIL_compress_ADPCM@12
+_AIL_decompress_ADPCM@12
+_AIL_set_digital_master_volume@8
+_AIL_digital_master_volume@4
+mss32.dll
+timeGetTime
+WINMM.dll
+GetSystemTimeAsFileTime
+GetTickCount
+GetDiskFreeSpaceA
+InterlockedIncrement
+GetModuleFileNameA
+WinExec
+CloseHandle
+CreateFileA
+LoadLibraryA
+GetProcAddress
+FreeLibrary
+lstrcpyA
+lstrlenA
+lstrcmpiA
+FileTimeToSystemTime
+FileTimeToLocalFileTime
+FindClose
+FindNextFileA
+FindFirstFileA
+lstrcpynA
+CreateDirectoryA
+CopyFileA
+GetFileSize
+SetFilePointer
+ReadFile
+WriteFile
+GlobalAlloc
+GlobalFree
+GetSystemInfo
+FormatMessageA
+GetLastError
+DeleteFileA
+lstrcmpA
+KERNEL32.dll
+wsprintfA
+MessageBoxA
+GetFocus
+wvsprintfA
+DispatchMessageA
+TranslateMessage
+PeekMessageA
+PostMessageA
+DestroyAcceleratorTable
+DefWindowProcA
+PostQuitMessage
+EnableWindow
+SetFocus
+UpdateWindow
+ShowWindow
+CreateWindowExA
+GetSystemMetrics
+RegisterClassA
+LoadCursorA
+LoadIconA
+ShowCursor
+USER32.dll
+GetStockObject
+GDI32.dll
+RegCloseKey
+RegQueryValueExA
+RegOpenKeyExA
+ADVAPI32.dll
+ShellExecuteA
+SHELL32.dll
+MultiByteToWideChar
+RtlUnwind
+RaiseException
+HeapFree
+HeapAlloc
+ExitProcess
+TerminateProcess
+GetCurrentProcess
+GetDriveTypeA
+GetTimeZoneInformation
+GetSystemTime
+GetLocalTime
+GetModuleHandleA
+GetStartupInfoA
+GetCommandLineA
+GetVersion
+HeapReAlloc
+HeapSize
+SetConsoleCtrlHandler
+SetUnhandledExceptionFilter
+HeapDestroy
+HeapCreate
+VirtualFree
+VirtualAlloc
+IsBadWritePtr
+WideCharToMultiByte
+LCMapStringA
+LCMapStringW
+GetFullPathNameA
+GetCurrentDirectoryA
+SetCurrentDirectoryA
+UnhandledExceptionFilter
+FreeEnvironmentStringsA
+FreeEnvironmentStringsW
+GetEnvironmentStrings
+GetEnvironmentStringsW
+SetHandleCount
+GetStdHandle
+GetFileType
+FlushFileBuffers
+IsBadReadPtr
+IsBadCodePtr
+GetStringTypeA
+GetStringTypeW
+GetFileAttributesA
+GetExitCodeProcess
+WaitForSingleObject
+CreateProcessA
+SetStdHandle
+GetCPInfo
+GetACP
+GetOEMCP
+SetEndOfFile
+CompareStringA
+CompareStringW
+SetEnvironmentVariableA
+%03d
+R:\crypto\BigNum.cpp
+Result must not be either Parameter (a or b)
+Result must not be either Parameter (a or b)
+Result must not be the same object as m
+div: Divide by zero
+modMulRecip
+inverseModN
+.?AVexception@@
+.?AVArithmeticException@WONCryptMini@@
+%d.%d.%d.%d
+0.0.0.0
+%d.%d.%d.%d
+%d.%d.%d.%d
+Software\Sierra OnLine\Setup\WONswap
+Directory
+\WONfftp.DLL
+SOFTWARE\WON\WONswap\Downloader\Settings
+Language
+Software\Sierra OnLine\Setup
+Software\Sierra OnLine\Setup\SUTIL
+Directory
+%s\%s
+sigspat.exe
+%s -i\%s
+WONswap Error
+WONswap Error
+No Errors.
+Unable to locate WONfftp.DLL.
+Old version of WONfftp.DLL.
+Unable to locate Patch Utility.
+Unable to start Patch Utility.
+Unknown Error.
+Unknown Language.
+FFTP_NewMetaData
+FFTP_NewMetaDataRaw
+FFTP_NewCopyMetaData
+FFTP_CopyMetaDataRaw
+FFTP_CopyMetaData
+FFTP_MetaDataAddRef
+FFTP_ReleaseMetaData
+FFTP_GetRawMetaDataSize
+FFTP_GetRawMetaDataCopy
+FFTP_GetMetaDataValue
+FFTP_GetMetaDataValueCopy
+FFTP_GetMetaDataCount
+FFTP_GetNthMetaDataValue
+FFTP_GetNthMetaDataValueCopy
+FFTP_SetMetaDataValue
+FFTP_DeleteMetaDataValue
+FFTP_GetMetaDataValueSize
+FFTP_GetRawMetaData
+FFTP_NewMetaList
+FFTP_NewMetaListRaw
+FFTP_NewCopyMetaList
+FFTP_CopyMetaList
+FFTP_CopyMetaListRaw
+FFTP_MetaListAddRef
+FFTP_ReleaseMetaList
+FFTP_GetRawMetaListSize
+FFTP_GetRawMetaList
+FFTP_GetRawMetaListCopy
+FFTP_AddToMetaList
+FFTP_SetMetaInList
+FFTP_RemoveFromMetaList
+FFTP_Get1MetaFromList
+FFTP_GetNumMetaInList
+FFTP_SaveUserSettings
+FFTP_LoadUserSettings
+FO_CreateFftpObject
+FO_CreateFftpObjectWithID
+FO_CreateFftpObjectWithIDAndHost
+FO_DeleteFftpObject
+FO_GetHost
+FO_SetHost
+FO_GetProdID
+FO_SetProdID
+FO_GetLanguage
+FO_SetLanguage
+FO_GetUser
+FO_SetUser
+FO_GetPassword
+FO_SetPassword
+FO_GetCompressFiles
+FO_SetCompressFiles
+FO_GetMaxTransferWait
+FO_SetMaxTransferWait
+FO_SetDialogParent
+FO_GetDialogParent
+FO_LoadUserSettings
+FO_GenerateTempFileName
+FO_FileExists
+FO_GetFileSize
+FO_EnableWaitCursorChanges
+FO_BeginWait
+FO_EndWait
+RegisterWONswapDependency
+UnregisterWONswapDependency
+FO_DownloaderRegisterFileDataType
+FO_DownloaderUnregisterFileDataType
+FO_DownloaderGetFileDataTypeInfo
+FO_UpdateMetaFileSize
+FO_TranslateError
+FO_SetMinTransferDlgDisplayTime
+FO_GetMinTransferDlgDisplayTime
+FO_SetValidationInfo
+FO_ValidateUser
+FO_ChangeUserPassword
+FO_ChangePassword
+FO_AddValidationInfo
+FO_CreateMetaData
+FO_FreeMetaData
+FO_CreateMetaList
+FO_FreeMetaList
+FO_AddProductByMetaData
+FO_AddProductByDesc
+FO_RemoveProduct
+FO_GetProduct
+FO_UpdateProduct
+FO_GetProductList
+FO_UploadNewFileNCB
+FO_UploadNewFile
+FO_UploadNewFileViaAbort
+FO_GetMetaDataNCB
+FO_GetMetaData
+FO_GetMetaDataViaAbort
+FO_GetFileNCB
+FO_GetFile
+FO_GetMetaDataAndFileNCB
+FO_GetMetaDataAndFile
+FO_UpdateMetaDataNCB
+FO_UpdateMetaData
+FO_UpdateFileNCB
+FO_UpdateFile
+FO_UpdateFileAndMetaDataNCB
+FO_UpdateFileAndMetaData
+FO_DeleteMetaDataNCB
+FO_DeleteMetaData
+FO_AddMetaDataAndFileToList
+FO_UploadMetaListNCB
+FO_UploadMetaList
+FO_DownloadMetaListNCB
+FO_DownloadMetaList
+FO_ReloadSettingsNCB
+FO_SetAuthSettings
+FO_SearchNCB
+FO_Search
+FO_GetLatestReceiverVersion
+FO_GetLatestVersion
+FO_EnableAuthentication
+StartNetGravityAdProcessing
+StopNetGravityAdProcessing
+Desc
+<Unexpected ID>
+Undefined entity in put actor : %i, %i
+(%s) entid,type:%i,%i  x,y,lev: %i,%i %i  mode=%i
+No free actors in put_actor
+Need a viewer to run find_monitor_guy
+Find nth actor takes only counting numbers : %i
+Copying %i actors
+Loading %i actors
+Actors to save %i, Save actor size %i
+Actors to save %i, Save actor size %i
+NULL actor pointer in find_actor_dist
+NULL actor pointer in find_actor_dist
+NULL actor pointer in find_actor_collide
+NULL actor pointer in find_actor_tier_collide
+NULL actor pointer in find_actor_overlap
+Entity %s : Tier bounded actors must have a floor to run move_actor
+NULL actor in warp_actor
+NULL actor in set_box_from_actor
+NULL actor in set_box_from_actor_max
+No jig found in set_box_from_actor_max
+No sprites found in set_box_from_actor_max
+No free stencils in add_stencil
+Noxis
+Lazarus
+Caliber
+Static
+Black Rose
+Value %i is out of range for get_mission_var
+us. 
+Doc:: 
+Bunky:: 
+Sleepy:: 
+RoperTwin:: 
+Eco:: 
+Marchepane:: 
+Step-Water:: 
+Thedipdoo:: 
+Patrolman-Ape:: 
+Human:: 
+Asterix:: 
+Geriatrix:: 
+Getafix:: 
+Cacophonix:: 
+Obelix:: 
+Stig:: 
+Aage:: 
+Lars:: 
+Lynch:: 
+Coop:: 
+Agency id out of range in get_agency : %i
+agency.i
+Tech
+Missing separator in AGENCY.ASC : %s
+Exceeded max agency technologies
+Advant
+Missing separator in AGENCY.ASC : %s
+Exceeded max agency advantages
+script.i
+debug.txt
+ACTOR %s, %i: %i, %i
+total: %i
+Silencer Message
+Silencer Error
+!   receive
+update.exe
+update.exe
+open
+MCWinClass
+Silencer
+Designer
+get_token received more than 40 characters in string
+Missing token in get_token_value
+Bad value in get_token_value : %s
+Can't convert token to value : %s
+Cannot find token_string in : %s
+String too long in convert_to_dos_text
+String too long in convert_to_dos_text
+String too long in convert_to_dos_text
+String too long in convert_to_dos_text
+globals.i
+Invalid global index %i
+info.txt
+----------------------------------
+       --- Info File ---          
+----------------------------------
+info.txt
+info.txt
+Text history buffer...
+track.txt
+Text history buffer...%i
+whisper
+ignore
+listen
+stats
+list
+users
+notify
+emote
+*%s %s*
+%s<B%i>^
+Weapon_id out of range in get_weapon : %i
+weapon.i
+NULL actor in get_responsible_actor
+Only players can fire the flamer
+a shaped bomb
+an emp bomb
+an empx bomb
+a neutron bomb
+an exploding robot
+an exploding cannon
+robot electrocution
+flamer
+unknown attack
+Can't select weapon for non-player
+Only players can run flamer_handling
+0110
+silencer.cfg
+silencer.cfg
+silencer.cfg
+FPS %i
+(Sync %i)
+(Info file)
+Logic MSec
+%.3f
+<V5>
+Graph MSec
+%.3f
+<V5>
+Video MSec
+%.3f
+<V5>
+Total MSec
+%.3f
+<V10>
+(Debug MSec)
+%.3f
+World object size :
+Actor alloc :
+%i x %i = %i bytes
+List node alloc :
+%i x %i = %i bytes
+Sound instance alloc :
+%i x %i = %i bytes
+Stencil alloc :
+%i x %i = %i bytes
+Misc alloc :
+Actor usage :
+%i / %i
+List node usage :
+%i / %i
+Sound instance usage :
+%i / %i
+Stencil usage :
+%i / %i
+%i:%.2i
+Common heap
+Area heap
+Sound heap
+TICKS = %i,  SECONDS = %.2f,  IMPULSES = %i
+FRAMES PER SEC = %.2f,  SECONDS PER IMPULSE = %.4f
+<V4>%s
+Can't execute get_mca_offset without an mca_header
+Invalid pointer in get_mca_offset
+Can't execute get_mca_pointer without an mca_header
+Invalid offset in get_mca_pointer: %i
+Can't execute get_mca_sprite_bank without an mca_header
+Invalid bank in get_mca_sprite_bank %i
+Can't execute get_mca_tile_bank without an mca_header
+Invalid bank in get_mca_tile_bank
+Workspace heap
+SB %i used in STAR
+TB %i used in STAR
+%s.MCA
+MCA is not current with sprite bank %i
+MCA is not current with tile bank %i
+<N>%s
+DDERR_ALREADYINITIALIZED
+DDERR_BLTFASTCANTCLIP
+DDERR_CANNOTATTACHSURFACE
+DDERR_CANNOTDETACHSURFACE
+DDERR_CANTCREATEDC
+DDERR_CANTDUPLICATE
+DDERR_CANTLOCKSURFACE
+DDERR_CANTPAGELOCK
+DDERR_CANTPAGEUNLOCK
+DDERR_CLIPPERISUSINGHWND
+DDERR_COLORKEYNOTSET
+DDERR_CURRENTLYNOTAVAIL
+DDERR_DCALREADYCREATED
+DDERR_DIRECTDRAWALREADYCREATED
+DDERR_EXCEPTION
+DDERR_EXCLUSIVEMODEALREADYSET
+DDERR_GENERIC
+DDERR_HEIGHTALIGN
+DDERR_HWNDALREADYSET
+DDERR_HWNDSUBCLASSED
+DDERR_IMPLICITLYCREATED
+DDERR_INCOMPATIBLEPRIMARY
+DDERR_INVALIDCAPS
+DDERR_INVALIDCLIPLIST
+DDERR_INVALIDDIRECTDRAWGUID
+DDERR_INVALIDMODE
+DDERR_INVALIDOBJECT
+DDERR_INVALIDPARAMS
+DDERR_INVALIDPIXELFORMAT
+DDERR_INVALIDPOSITION
+DDERR_INVALIDRECT
+DDERR_INVALIDSURFACETYPE
+DDERR_LOCKEDSURFACES
+DDERR_NO3D
+DDERR_NOALPHAHW
+DDERR_NOBLTHW
+DDERR_NOCLIPLIST
+DDERR_NOCLIPPERATTACHED
+DDERR_NOCOLORCONVHW
+DDERR_NOCOLORKEY
+DDERR_NOCOLORKEYHW
+DDERR_NOCOOPERATIVELEVELSET
+DDERR_NODC
+DDERR_NODDROPSHW
+DDERR_NODIRECTDRAWHW
+DDERR_NODIRECTDRAWSUPPORT
+DDERR_NOEMULATION
+DDERR_NOEXCLUSIVEMODE
+DDERR_NOFLIPHW
+DDERR_NOGDI
+DDERR_NOHWND
+DDERR_NOMIPMAPHW
+DDERR_NOMIRRORHW
+DDERR_NOOVERLAYDEST
+DDERR_NOOVERLAYHW
+DDERR_NOPALETTEATTACHED
+DDERR_NOPALETTEHW
+DDERR_NORASTEROPHW
+DDERR_NOROTATIONHW
+DDERR_NOSTRETCHHW
+DDERR_NOT4BITCOLOR
+DDERR_NOT4BITCOLORINDEX
+DDERR_NOT8BITCOLOR
+DDERR_NOTAOVERLAYSURFACE
+DDERR_NOTEXTUREHW
+DDERR_NOTFLIPPABLE
+DDERR_NOTFOUND
+DDERR_NOTINITIALIZED
+DDERR_NOTLOCKED
+DDERR_NOTPAGELOCKED
+DDERR_NOTPALETTIZED
+DDERR_NOVSYNCHW
+DDERR_NOZBUFFERHW
+DDERR_NOZOVERLAYHW
+DDERR_OUTOFCAPS
+DDERR_OUTOFMEMORY
+DDERR_OUTOFVIDEOMEMORY
+DDERR_OVERLAYCANTCLIP
+DDERR_OVERLAYCOLORKEYONLYONEACTIVE
+DDERR_OVERLAYNOTVISIBLE
+DDERR_PALETTEBUSY
+DDERR_PRIMARYSURFACEALREADYEXISTS
+DDERR_REGIONTOOSMALL
+DDERR_SURFACEALREADYATTACHED
+DDERR_SURFACEALREADYDEPENDENT
+DDERR_SURFACEBUSY
+DDERR_SURFACEISOBSCURED
+DDERR_SURFACELOST
+DDERR_SURFACENOTATTACHED
+DDERR_TOOBIGHEIGHT
+DDERR_TOOBIGSIZE
+DDERR_TOOBIGWIDTH
+DDERR_UNSUPPORTED
+DDERR_UNSUPPORTEDFORMAT
+DDERR_UNSUPPORTEDMASK
+DDERR_UNSUPPORTEDMODE
+DDERR_VERTICALBLANKINPROGRESS
+DDERR_WASSTILLDRAWING
+DDERR_WRONGMODE
+DDERR_XALIGN
+DPERR_UNKNOWN
+Error in Lock surface: %s
+Error in surface Unlock : %s
+Can't initialize DirectDraw surfaces.  Make sure you have exited all other DirectDraw applications.
+Error %s in CreateSurface for %s
+Can't release inactive surface
+Cannot lock surface (already locked) : %s
+Cannot lock inactive surface : %s
+Cannot unlock surface (already unlocked) : %s
+Cannot blit from inactive surface
+Cannot blit to inactive surface
+Error in BltFast from %s to %s: %s
+Error in Blt for clear_surface: %s
+Error in Flip Surface : %s
+Error in SetEntries : %s
+Error in DirectDrawCreate : %s
+Error in QueryInterface : %s
+Error in SetCooperativeLevel : %s
+Error in SetDisplayMode : %s
+Primary Surface
+Error in CreateSurface for PrimarySurface : %s
+Back Surface
+Error in GetAttachedSurface : %s
+Error in CreatePalette : %s
+Error in GetCaps : %s
+Error in GetFlipStatus : %s
+Error in GetBltStatus : %s
+Silencer Requires DirectX 7.0
+DIERR_BETADIRECTINPUTVERSION
+DIERR_INPUTLOST
+DIERR_INVALIDPARAM
+DIERR_NOTACQUIRED
+DIERR_NOTINITIALIZED
+DIERR_OLDDIRECTINPUTVERSION
+DIERR_OUTOFMEMORY
+DIERR_UNKNOWN
+DirectInput Error %s
+in file %s at line %d
+Error %s in SetProperty for keyboard
+SetProperty(RANGE, X-Axis) failed.
+SetProperty(RANGE, Y-Axis) failed.
+SetProperty(DEADZONE, X-Axis) failed.
+SetProperty(DEADZONE, Y-Axis) failed.
+Error %s in DirectInputCreate
+Error %s in CreateDevice for keyboard
+No keyboard is attached
+Error %s in enumerating joystick devices
+Error %s in SetDataFormat for joystick
+Error %s in SetCooperativeLevel for keyboard
+Error %s in SetDataFormat for joystick
+Error %s in SetCooperativeLevel for joystick
+DLwin
+DRwin
+DApps
+entity.bin
+ENTITY.BIN is out of date
+LEVEL
+LEVEL
+0%i:
+-0%i
+LEVEL
+%s\*.%s
+<N>SIL
+<N>LEV
+<N>LCA
+(%s)
+%s<B%i>^
+could not go up a level %s %s
+could not go down a level %s %s
+<N>%s\*.%s
+Invalid cache_id in get_sprite_cache : %i
+Default cache
+Medium cache
+Tile cache
+Quarter cache
+Sixteenth cache
+Shard cache
+Undefined sprite cache : %i
+Defined caches require more than max number of surfaces
+Invalid cache_id in find_free_cache_surface
+Not enough fsprites defined in allocate_fsprite_surface
+Fsprite Surface
+Not enough video memory to allocate fsprite surfaces
+Cache surfaces allocated at cache delta %i
+Unable to allocate cache surfaces
+Can't write to screen until locked
+Can't read from screen until locked
+Exceeded max_graph_instances in new_graph_instance
+Fsprite not already cached in draw_graph_list
+Call to restore surfaces
+%s is already initialized
+Out of memory : Attempting to allocate %s, size %i
+%s : %i
+Heap must be initialized before space is requested
+Out of space in %s (size %i, used %i, requested %i)
+Heap must be initialized before it can be reset
+Common heap : %i of %i
+Area heap : %i of %i
+Sound heap : %i of %i
+HTTP MESSAGE: %i - %i - %i
+GET /%s HTTP/1.1
+Host: %s
+modified.txt
+If-Range: %s
+Range: bytes=%i-
+HTTP Message:
+END OF LINE: 
+Content-Length: %d
+Last-Modified: 
+Last-Modified: 
+modified.txt
+SCIA
+SFPS
+SSYNC
+SKILL
+SDIE
+SSHADOW
+SMONITOR
+SMACRO
+SBASE
+SBOMB
+SFLARE
+SPFLARE
+SCANNON
+SVIRUS
+SDETON
+SPOISON
+STRACT
+SBADGE
+SSHAPED
+SEMP
+SNEUTRON
+SGUNS
+SCAMERA
+SRISE
+SSHIELD
+SSPEED1
+SSPEED2
+SSPEED3
+SSPEED4
+SSPEED5
+SPOWER
+SRICH
+SEMPTY
+SEFFECT
+SLUMIN
+SAMBIENT
+SWORD
+SSCHED
+STRANS
+SDETAIL
+SRAIN
+SSNOW
+STECH
+SBAD
+SBREAK
+SINFO
+SINTERF
+SRADAR
+SACTOR
+STILE
+SPARALL
+STIER
+SSIMM
+SSECRET
+SSTAGE
+SWIN
+SLOSE
+SQUANTUM
+SSCOPE
+STWEAK
+SAGENCY
+SROOM
+SAWARE
+SCHEAT
+SUPS
+SMAGIS
+STIERS
+Player requests bad statement
+AGENCY MESSAGE
+If this were a real message, it would be useful
+Invalid input_id in get_input : %i
+input.i
+Invalid key handle in load_inputs : %i
+Input %i is not a key input, so it has no scan code
+%s %i
+%s : %i
+Invalid jig in call_jig
+NULL actor in call_jig
+jig.bin
+Invalid firing mode in find_firing_jig : %i
+Attempt to find firing_jig for actor who is not firing
+Unknown firing mode in find_firing_jig
+Level id out of range in get_level : %i
+Area id out of range in get_area : %i
+Null actor passed into transit level
+area.bin
+Area %i is not defined
+Loading Area %s
+%s\%s
+could not load_level in load_area and load_area returns void
+blank.sil
+blank.sil
+xbase15a.sil
+Can't abbreviate player name further
+Infinite loop in creating team icon name
+Not enough start players in area for a %i player game
+PLAYER %i INITIALIZED
+.sil
+saved level 0 must be .sil: %s, %i
+saving to: (%s)
+SAVE: %s
+COMPRESSED RADAR MAP = %i
+COMPRESSED LEVEL = %i
+LOAD_LEVEL_HEADER can't open file: (%s)
+Cannot play this SIL type in Silencer
+HEADER version %i not supported for %i
+can't load level %i
+can't open file: (%s)
+Version %i files can't be loaded in version %i
+loading level (%s) with mca: (%s)
+Level Dimensions : %i, %i
+OLD LEVEL bad level dimensions (must be 10<wh<256): %i,%i
+HEADER version %i not supported for %i
+LEVEL SIZE %i, %i
+reading RADAR data %i
+reading LEVEL data %i
+Version %i files can't be loaded in version %i, %i
+can't open file: (%s)
+HEADER version %i not supported for %i
+reading RADAR data %i
+Only players have level requests
+Only players can make level requests
+No levels to enter
+Attempt to enter inactive level : %i
+No trans_act in handle_level_requests
+Entering level %i
+pre_compression size = %i
+DONE uncompressing level %i
+%s\%s
+%s\%s
+size of (%s) is %i
+0 file size: (%s)
+compress length = %i
+uncompress length = %i %i %i
+saving level %s
+All filters must return a value
+TRANS.BIN
+List empty in pop()
+Requested node %i in a list of %i nodes
+Actor is not a player in current_invent_ready
+CREATING FUTURE
+1FCCS pi->impulse: %i, imp: %i, (%i) (%i)
+2FCCS imp: %i, (%i) (%i)
+DONE CREATING FUTURE
+Infinite loop in max_path_platform
+!!!!!explosion aborted due to low actor count
+No destination in npc_seek_tier
+Infinite loop in platform equivalency
+No actor_dest in npc_seek_actor
+Actor %s has no actor to chase
+Null tier passed to evaluate_path
+Entity %s : Cannot execute find_actor_location without a cur_floor
+NULL result in find_actor_location
+Invalid player pointer in reset player
+Entity %s : Cannot execute physics without a cur_floor
+<C9>%s: %s
+PLAYER %i ALREADY GONE
+Just Kill Me
+And you are?
+Ignored
+Still Ignored
+Misunderstood
+Noticed
+Respected
+Very Favorable
+Well Respected
+Feared
+God-like
+<N>BACK
+FORFEITS:
+<N>Change Agent
+<N>%s
+<N>%s<B%i>^
+Host:
+Level:
+Security:
+Max Players:
+Max Lvl:
+Max Teams:
+Min Lvl:
+GAME %s FROM %i IS CLOSED
+Return to Main Menu?
+Beta Version %s
+Invalid name
+That word is not allowed
+No data port found for secret
+can't interract with neutron depositor!
+bad case in power_up: %i
+SIL_01.DEM
+Guv Net
+Protocol
+Cypher Lock 1
+Cypher Lock 2
+Cypher Lock 3
+Header
+Schedule
+Location
+PARSING COMMAND LINE %i
+level\%s
+junk.txt
+LEVEL
+LEVEL\DOWNLOAD
+Init Engine completed
+Init DirectInput completed
+Init DirectDraw completed
+Init Sound completed
+Allocate Surfaces completed
+SILENCER VERSION %s
+http://won.net
+SAVES
+SAVES
+Exiting Silencer
+Unknown option
+%s : %i
+<C6>%s : 
+<C6>(TEAM): 
+<C6>(%s): 
+<I0>*
+<I1>*
+<N>%s
+<N>%s
+ III
+%s : %s
+SIL MISSION
+Play to WIN!
+LEVEL_TEST
+LEVEL_TEST
+READY TO TEST LEVEL
+------------- IMPULSE %i ----------------
+CCS pid: %i, imp: %i, (%i) (%i)
+PLAYING CATCH-UP csi %i, li %i
+LCCS pid: %i, imp: %i, (%i) (%i)
+Resynching with server
+RUNNING LOGIC ONLY
+Downloading Level...
+Begin Main Event Loop - %i
+Illegal training mission in mission handling
+---NET completed lobby
+Mission must be selected in game
+initialize: ERROR no winsock.dll
+FD_WRITE with error %i
+ERROR %i in FD_WRITE
+FD_READ with error %i
+FD_CONNECT with error %i
+FD_CLOSE with error %i
+FD_CONNECT connection reset by peer - reconnecting
+SOCKET_open: ERROR connecting %i, %i
+BAD event IN process_message()
+MCSOCKET for %s:%i
+initialize: ERROR no winsock.dll
+ERROR - initialize - host NULL %i
+SOCKET_open: ERROR connecting %i, %i
+COULD NOT CONNECT SOCKET
+SOCKET CONNECTED
+TRYING TO OPEN A NON-'INVALID_SOCKET'
+open_socket: INVALID_SOCKET
+open_socket: ERROR binding socket
+SOCKET_open: ERROR WSAAsyncSelect %i, %i
+SOCKET_send_data: ERROR %i
+s is an INVALID SOCKET
+SOCKET_send_now: data size %i sent
+SOCKET_send_now: ERROR %i
+MCSOCKET TIMEOUT waiting for reply
+<N><C8>GAME DESIGN
+<V5><C9>Mind Control Software
+<C8>PRODUCER
+<V5><C9>Andrew Leker
+<C8>DESIGN COORDINATOR
+<V5><C9>William G. Dunn
+<C8>LEAD PROGRAMMER
+<V5><C9>Jonathan Stone
+<C8>NET & APPLICATIONS PROGRAMMING
+<V5><C9>Mark Roberts
+<C9>Andrew Leker
+<C8>WON.NET CLIENT PROGRAMMING
+<V5><C9>Mark Roberts
+<C8>REMOTE SERVER PROGRAMMING
+<V5><C9>Mark Roberts
+<C8>3D ART
+<V5><C9>Tynan Wales
+<C9>James Graham
+<C8>TILE ART
+<V5><C9>Gene Hirsh
+<C8>LEVEL DESIGN
+<V5><C9>Andrew Leker
+<C9>Darren Koepp
+<C9>Mark Roberts
+<C9>William G. Dunn
+<C9>Jeff Moser
+<C9>Damon Berry
+<C8>SOUND
+<V5><C9>Jonathan Hoffberg
+<C9>Jonathan Stone
+<C9>Mark Roberts
+<C9>Adam Levinson
+<C8>MUSIC
+<V5><C9>Jonathan Stone
+<C8>AGENCY SCRIPTING
+<V5><C9>Peter Kelly
+<C8>PLAYER'S GUIDE
+<V5><C9>Noel Wade
+<C8>SPECIAL THANKS TO
+<V5><C9>Jeff Moser
+<C9>Fred Ford
+<C9>Paul Reiche
+<C9>Ken Ford
+<C9>Phil Smith
+<C9>Miles Teves
+<C9>Andre Vrignaud
+<C9>Scott Cuthbertson
+<C9>Dale Crowley
+<C9>Yon Hardisty
+<C9>Kim Tulsky
+<C9>Mitch Soule
+<C9>Kevin Stein
+<C9>Huck Akin
+<C9>Mike Sellers
+<C9>Mark Wallace
+<C9>Katrina, Samantha, & Jason
+<C9>Ann
+<C9>The Thursday Night Game Crew
+<C9>All the Beta Testers
+<C8>TECHNOLOGIES AND TOOLS
+<C9>Microsoft DirectX 6.1
+<C9>Miles Sound System 5.0 from Rad Game Tools
+<C9>Won.net Technologies
+<C9>Visual C++ 6.0
+<C9>XY-Write 3.51
+<C9>BSD Sockets v1.1
+<C8>WON.NET CREDITS
+<C8>PRODUCER
+<C9>Mark Silverstein
+<C8>TECHNOLOGY
+<C9>Stuart Seelye
+<C8>ASSOCIATE PRODUCER
+<C9>Ross Perez
+<C8>ENGINEERING SUPPORT
+<C9>Erik De Bonte
+<C9>Colen Garoutte-Carson
+<C9>Len Skiena
+<C8>SIERRA STUDIOS CREDITS
+<C8>QA MANAGER
+<C9>Gary Stevens
+<C8>QA SUPERVISOR
+<C9>Ken Eaton
+<C8>LEAD TESTER
+<C9>Marc Nagel
+<C8>TESTERS
+<C9>James Evans
+<C9>Niko Simonson
+<C9>Byron Hummel
+LEVEL
+LEVEL
+LEVEL\SRCFILES
+LEVEL\BASE
+LEVEL\SRCFILES
+Silencer Levels
+Old Silencer Levels
+Source Levels
+Base Levels
+Level Capture Arrays
+Blue Team
+Red Team
+Green Team
+Black Team
+Copyright 1999 (C), Mind Control Software
+Beta Version -- 
+<F1>%s
+<V1>
+%s %i
+<F0>
+%s : %i
+%s : %i
+%s : %i
+%s : %i
+%s : %i
+<F1>
+<F0><V1>
+<C5>(%s)
+<N>%s
+<N>%s
+<N>WON.net
+<N>Silencer Web Site
+<N>Players Pages
+<N>Wonswap
+<N>%s
+ERROR: %s
+LEN: %i %s
+<N>%s
+<N>%s<B%i>^
+<N>%s
+WARNING: %s
+<N>%s
+http://won.net
+http://www.won.net/channels/action/silencer/
+http://players.won.net
+http://wonswap.won.net
+notes.txt
+<N>OPTIONS
+Invalid global_id in controller input
+%s '%s'?
+<F0><V1>
+%s %s
+%s%s%s
+%s%s
+%s%s
+%s%s%s
+%s%s
+Too many entries : %i
+<N><C1>%s
+<L><C2><V2>
+*<H1> 
+%s\*.%s
+(%s)
+%s : %s
+%s %i
+%s : %i
+%s : %i
+%i%%
+message text bank out of range: %i,%i
+message text index out of range for bank %i (%i)
+message.bin
+message.bin
+message.bin
+file open failed: %s
+read, size = %i,%i
+error between messages.bin and Num_message_text: %i,%i
+Mission id out of range in get_mission : %i
+mission.i
+Mission text requires a mission entry
+mission name: (%s)
+SIL MISSION
+Play to WIN!
+LEVEL
+%s\%s
+LEVEL\DOWNLOAD
+%s\%s
+LEVEL DOESN'T EXIST
+LEVEL CHECKSUM don't match %i, %i
+LEVEL CHECKSUM don't match %i, %i
+%s\%s
+mission name: (%s)
+SIL MISSION
+Play to WIN!
+could not get a game_id from game server
+agency04.sil
+AIL not active in SOUND_set_pitch
+AIL not active in SOUND_set_volume
+AIL not active in SOUND_set_pan
+AIL not active in SOUND_play_sample
+Sample inset not dword aligned in SOUND_play_sample : %i
+Sample handle not free in SOUND_play_sample
+AIL not active in SOUND_sample_playing
+AIL not active in SOUND_stop_sample
+AIL not active in SOUND_active_sample_count
+AIL not active in SOUND_start_stream
+Error in AIL_waveOutOpen
+AIL driver already active in SOUND_init_wave_driver
+WAVE_init_driver failed in SOUND_init_wave_driver
+NULL returned in SOUND_allocate_sample_handle
+Invalid wav image in SOUND_wav_info
+Invalid wav image in SOUND_adpcm_compress
+Can't compress wav image in SOUND_adpcm_compress
+Invalid wav image in SOUND_adpcm_decompress
+Can't decompress wav image in SOUND_adpcm_decompress
+MSG_ack
+MSG_failure
+MSG_query
+MSG_query_reply
+MSG_create
+MSG_create_reply
+MSG_ping
+MSG_pong
+MSG_keep_alive
+MSG_chat
+MSG_exit
+MSG_first_contact
+MSG_join
+MSG_join_reply
+MSG_kick
+MSG_game_status
+MSG_flags
+MSG_req_level
+MSG_level
+MSG_req_team_change
+MSG_team_change
+MSG_lock_team
+MSG_tech_change
+MSG_fragment_header
+MSG_ready
+MSG_synch
+MSG_close_game
+MSG_begin_game
+MSG_checksum
+MSG_player_bundle
+MSG_server_packet
+MSG_req_server_packet
+MSG_end_gameMSG_req_synchronization
+zero sized objects cannot be put on reception:
+pid=%i, ui=%i, msg=%i, imp=%i
+Clearing net arrays
+NET_SEND %i to %s:%i
+!net initialize failed
+OUT OF MEMORY ON reception_list.initialize()
+OUT OF MEMORY ON send_queue.initialize()
+OUT OF MEMORY ON player_input_list.initialize()
+NET has been opened
+NET terminate
+sending checksum %i for %i on %i
+sending level req
+SEND ACK FOR %i
+RECV ACK FOR %i
+ERROR - Net raw data NULL
+ERROR - received msg from %s:%i
+HAVE RECEPTION FOR %i, %i
+NET_JOIN:
+CREATOR calling NET_JOIN
+NET missing unique: %i for %i
+PART: %i DONE: %i SIZE: %i TS: %i
+PART: %i FINAL: %i PACKET DONE
+act on net data assumes msg is not a ack
+RSP pi: %i , esi: %i
+FAILURE %i
+<C9>%s: %s
+---> NET first contact reply!
+RECEIVED MSG_first_contact
+---> NET create reply!
+RECEIVED MSG_create_reply at state %i
+ERROR - received MSG_create_reply at state %i
+---> NET join reply!
+MSG_join - local_player_id = %i
+ERROR - received MSG_join_reply at state %i
+---> NET game status
+player %s on %i at %i
+Update game received: %i
+---> NET reg level
+---> NET level
+LEVEL\DOWNLOAD
+PFH should not be on reception list
+---> NET tech update
+---> NET team change
+---> NET synch
+---> NET ready
+-->%s is READY to PLAY
+SYSTEM
+---> NET begin game
+BEGIN GAME
+---> NET kick!
+---> NET exit!
+%s has left the game
+PLAYER %i EXITED
+REMOVING PLAYER %i
+ERR_ok
+ERR_wrong_session
+ERR_no_player_record
+ERR_server_full
+ERR_game_full
+ERR_no_teams
+ERR_kicked
+ERR_banned
+ERR_invalid_character
+ERR_bad_checksums
+ERR_failed_level_requirement
+ERR_bad_password
+ERR_lost_communications
+ERR_missing_keep_alive
+ERR_bad_packet_format
+ERR_already_processed_create
+ERR_no_free_games
+ERR_activation_failed
+ERR_invalid_tech
+ERR_server_disconnected
+ERR_old_version
+ERR_server_not_responding
+GAME_PROFILE:
+game_id: %i
+security_level: %i
+password: %i
+max_players: %i
+max_teams: %i
+magistrate: %i
+fatigue: %i
+min_level: %i
+max_level: %i
+level_checksum: %i
+server_address: %i:%i
+random_seed: %i
+level_name: %s
+game_name: %s
+host_name: %s
+------------------------
+---------ACTORS---------
+------------------------
+%s : player_id %i, lx %i, ly %i
+NET joining
+Enter Password
+Attempting to join game
+GAME SUCCESSFULLY POSTED
+Could not create game
+Getting game id
+Contacting game service
+Synching Players...
+Error synchronizing game state
+Players Synched
+BITS %i ON %i
+player_input_list CANNOT BE NULL!
+SEND DATA TO SERVER: %i %i
+SIZE OF PLAYER BUNDLE %i
+Server not responding!
+Player checksums don't match!
+REQUESTING server packet: %i,%i
+Palette handle out of range in get_palette : %i
+palette.bin
+Not enough memory for screen_buffer
+Not enough memory for rle_buffer
+%s%.5i.pcx
+!!!!!!!too few particles: %i
+No free particles in put_particle
+_##w''
+w;#Not enough memory for pcx_file_buffer
+File %s is too large for file buffer
+File %s is not a complete PCX file
+File %s is not a PCX file
+File %s dimensions are %i by %i
+Invalid PCX data in file %s
+Empty buffer in find_pcx_box
+Buffer must be dword granular to dword run-length encode
+Unknown mode in file_open : %s
+Can't open file '%s' for %s:
+Can't close file:
+File tell not yet converted to Win95
+Invalid origin in file_seek : %i
+SetFilePointer returns error value in file_seek
+NULL returned in GlobalAlloc : %i
+GlobalFree cannot free given ptr
+Must execute determine_system_info before make_region_present
+Data ptr not page aligned in make_region_present
+Byte count not page aligned in make_region_present
+No reconstructor for resurrecting player
+No start player for resurrecting player
+<N>%s
+<B%i>^
+Female
+Male
+<N>%s
+Return to lobby?
+Server Name
+<N>Active/Max
+<N>%i/%i
+<N>Select
+<N>Refresh
+<N>Select Game Server
+Server full.  Select another.
+Could not create game. Select another server.
+NET_create_game() failed on status %i
+<N>PASSWORD
+<N>%s
+<N>%s<B%i>^
+<N>POST CONFLICT
+%s\%s
+%s\%s
+map loaded for %s
+<N>%i
+MAX PLAYERS
+<N>%i
+MAX TEAMS
+<N>%s
+SECURITY LEVEL
+<N>YES
+<N>NO
+MAGISTRATE
+<N>YES
+<N>NO
+FATIGUE
+<N>%i
+MIN PLAYER LEVEL
+<N>%i
+MAX PLAYER LEVEL
+<N>Select Level
+<N>%s
+Return to lobby?
+---SOCKET begin
+no winsock.dll
+invalid socket
+socket error
+error with wsaasyncselect
+SOCKET closed
+SOCKET send error: (%s) %i
+SOCKET receive error: %i
+SOCKET input data: (%s) %i
+Invalid sound_id in get_sound_header : %i
+Attempt to get sound properties for undefined sample : %i
+sound.bin
+SOUND.BIN is not current with executable
+Channel %i not free in play_sound
+Attempt to play undefined sample : %i
+Invalid channel in get_sound_channel : %i
+Sample out of range in create_sound_instance : %i
+No free sound instances in add_sound_instance
+SOUND
+Filter not handled in apply_sprite_filter
+Invalid bank_id in get_sprite_bank : %i
+Index out of range in get_dsprite : %i
+Invalid bank length in load_sprite_bank
+BIN_SPR
+SPR_%03i.BIN
+Exceeded MAX_SPRITES in load_sprite_bank
+Invalid sprite in get_sub_sprite_properties : %i/%i
+Instance not cached in blit_graph_instance
+.\BIN_SPR.DAT
+<B%i>^
+%s<B%i>^
+%s<B%i>^
+%i%%
+Get latest open beta from WON.NET
+http://www.won.net/channels/action/silencer/downloads.html
+.mcp
+silencer.update.won.net
+Can't Connect to WON
+Invalid task_id in get_task
+Invalid team_id in get_team : %i
+Not enough base levels for all teams
+Can't assign a team to player %i
+<N>%s
+<N>%s: %i
+<N>Close Game
+<N>Game Closed
+<N>%s
+<N>%s (%i)
+BANNING AN INVALID PLAYER
+<N>Kick this player?
+<N>Ban this player from this session?
+<N>%s
+nt %i - nr %i
+<N>You've been kicked from this game
+<N>You've been banned from this game
+Return to Lobby?
+CLOSING GAME
+COULD NOT CLOSE GAME %i %i
+---------------------------------
+AGENT: %s
+OF: %s
+LEVEL: %i
+CREDITS: %i
+MISSIONS: %i
+VICTORIES: %i
+FORFEITS: %i
+REPUTE: %s
+---------------------------------
+SYSTEM
+Ivalid Command Format
+%s: %s
+whisper NA in Game lobby
+list NA in Game lobby
+ignore NA in Game lobby
+listen NA in Game lobby
+notify NA in Game lobby
+Unknown chat command in send_won_chat
+range < 1 in cycle: %i
+Tech id out of range in get_tech : %i
+tech.i
+%s %i
+.\PLAYERS.DAT
+.\PLAYERS.DAT
+LOAD player %i,%i team=%i   name=(%s)
+%s %s
+%s INVALID
+%s (%s)
+%s (%s)
+%s: %i
+INVALID buddy on team: %i
+Actor has no linked constructor in display_constructor
+<N>%s A
+<N>%s B
+<N>%s C
+Actor has no linked constructor in constructor_mode_handling
+Invalid font_id in get_font : %i
+Invalid command in get_token_command
+No command found in get_token_command
+Null command in get_token_command
+Null string in find_nth_line
+Can't find nth line in text : %i
+Undefined font : %i
+Infinite loop in blast_string
+Line too long in blast_string : %s
+Display user : %s
+Error user : %s
+Error user : %s
+Display loading info : %s
+<N><C1>%s
+<L><V9><C2>%s*
+<V9>%s*
+That word is not allowed
+LEVEL
+BASE
+SRCFILES
+Invalid level type in create_directory
+LEVEL
+BASE
+SRCFILES
+Invalid level type in display_directory
+<N><C1>%s
+<L><C2><V2>
+%i x %i %s (V%i %s)
+%i x %i %s, %i %s
+*<H1> 
+%s %i
+<N>Actor Info
+<L><V2>
+%s : %s
+<V6>
+ *<H1> 
+%s : %s
+<V7>
+ *<H1> 
+X-%s : %i
+ *<H1> 
+Y-%s : %i
+ *<H1> 
+%s : %s
+ *<H1> 
+%s : %i
+<V7>
+ *<H1> 
+%s ID : %s
+ *<H1> 
+%s : %s
+Bad case in query user actor
+%s %i
+<N><C1>%s
+<L><C2>
+*<H1> 
+%s : %s
+*<H1> 
+%s : %s
+*<H1> 
+%s ID : %s
+Bad case in query user search actor
+<N><C1>%s
+<V2><L><C2>
+%s : %s
+ *<H1> 
+X0 : %i
+ *<H1> 
+Y0 : %i
+ *<H1> 
+X1 : %i
+ *<H1> 
+Y1 : %i
+Bad case in query user tier
+<N><C1>%s
+<V2><L><C2>
+Lumin
+*<H6>
+ <H4>
+Invalid sprite in screen_sprite
+Null string in number_of_lines
+<I%i>
+<B%i>
+<I%i>
+Message exceeds MAX_MESSAGE_SIZE in send_text_message
+Undefined text message type : %i
+Message exceeds MAX_MESSAGE_SIZE in send_text_message
+Message exceeds MAX_MESSAGE_SIZE in send_debug_message
+(%i) %s
+Debug message : %s
+cunt
+bitch
+fuck
+shit
+asshole
+Invalid level in get_tier_type_list
+Invalid type in get_tier_type_list
+Exceeded MAX_TIERS in put_tier
+NULL actor in find_tier_floor
+UNPACKING %i tiers of size %i
+Level %i in area %s has no platforms (can't be run in game)
+Unpacking %i tiers
+Level %i in area %s has no platforms (can't be run in game)
+Loading %i tiers
+Tiers to save %i, Save tier size %i
+PACKING %i tiers of size %i
+Tiers to save %i, Save tier size %i
+Unknown type in draw tiers : %i
+NULL actor in find_tier_ledge
+NULL tier in get_tier_type_index
+Invalid bank_id in get_tile_bank : %i
+Exceeded level bounds in get_tile_loc : tx %i, ty %i (level %i, %i)
+Invalid bank length in load_sprite_bank
+BIN_TIL
+TIL_%03i.BIN
+Exceeded MAX_TILES in load_tiles: %i,%i
+Plane %i is not a tile plane
+.\BIN_TIL.DAT
+Invalid bank length in load_tile_bank
+BIN_TIL
+TIL_%03i.BIN
+Exceeded MAX_TILES in load_tiles: %i,%i
+Line segment has undefined slope in find_slope
+Line segment has undefined slope in find_y_intercept
+Unknown direction in dir_to_angle
+MODULO: %i,%i,%i      b_mod=%i  cusp=%i cm1=%i cm2=%i diff=%i res=%i
+SilencerValidVersions
+TitanRoutingServer
+TitanFactoryServer
+AuthServer
+GameServer
+SilencerValidVersions
+silencer.west.won.net
+silencer.east.won.net
+silencer.central.won.net
+won_debug.txt
+won_debug.txt
+DS - GetDirContents - PACKET LENGTH %i
+DS - GetDirectory - PACKET LENGTH %i
+DS - received message type %i
+ID: %s
+NAME: %s
+DNAME: %s
+STATUS %i -- NUM_ENTITIES: %i
+%s:%i
+%s:%i
+%s:%i
+%s:%i
+UNKNOWN SERVER TYPE: %s
+%i/%i NAME: %i - %s
+ADDR: %i - %s
+%i/%i TYPE Directory
+%i/%i UNKNOWN TYPE
+UNKNOWN WON MESSAGE %i
+kver.pub
+NO FILE FOUND
+%s:%i
+Silencer
+Silencer
+Login successful.  Nickname: %s
+Authentication Error: (%i)
+RS - received message type %i
+STATUS: %i
+*** RoutingRegisterClientReply ***
+Status: %i
+hn_length: %i
+hostname: %s
+hc_length: %i
+host_comment: %s
+ClientID: %i
+*** RoutingGetClientListReply ***
+Size: %i
+Status: %i
+num_clients: %i
+num_optional_fields: %i
+type[%i]: %i
+size[%i]: %i
+client_id: %i
+cn_length: %i
+client_name: %s
+UNPACKED PRIVATE MESSAGE TO %i
+BAD GAME PROFILE FROM ROUTING SERVER %i
+BAD GAME_PROFILE VERSION
+BAD GAME PROFILE FROM ROUTING SERVER %i
+BAD GAME_PROFILE VERSION
+*** ClientChange *** NOT SUPPORTED
+*** ClientChangeEx ***
+client_id: %i
+cn_length: %i
+client_name: %s
+*** GroupChangeEx *** NOT SUPPORTED
+*** GroupChange ***
+GroupChange ADD %i, reason %i
+GroupChange REMOVE %i, reason %i
+**** NEW MESSAGE TYPE ****
+RECEIVING ON DISCONNECTED RS SOCKET
+RS - Auth1Request -  PACKET LENGTH %i
+RS - Certificate %i
+WON_ReceiveAuth1Challenge1
+ML %i
+ML %i, ST %i, MT %i
+Auth1Complete ERROR: %s
+Auth1Challenge1 FAILED TO DECRYPT
+Auth1Challenge2 FAILED TO ENCRYPT
+RS - Auth1Challenge2 -  PACKET LENGTH %i
+WON_ReceiveAuth1Comlete
+ML %i
+ML %i, ST %i, MT %i
+Auth1Complete FAILED TO DECRYPT
+Auth1Complete ERROR: %s
+Could not send Auth1Request
+Could not receive Auth1Challenge1
+Could not send Auth1Challenge2
+Could not receive Auth1Complete
+RS - RegisterClient - PACKET LENGTH %i
+RS - DisconnectClient - PACKET LENGTH %i
+RS - ReconnectClient - PACKET LENGTH %i
+RS - GetClientList - PACKET LENGTH %i
+PRIVATE CHAT TO %i
+RS - SendChat - PACKET LENGTH %i
+RS - GetClientInfo - PACKET LENGTH %i
+RS - RenewDataObject - PACKET LENGTH %i
+RS - CreateDataObject - PACKET LENGTH %i
+RS - ReadDataObject - PACKET LENGTH %i
+RS - SubscribeDataObject - PACKET LENGTH %i
+RS - DeleteDataObject - PACKET LENGTH %i
+Routing Server at (%s:%i)
+SOCKET ERROR on Client Registration
+RS - ClientRegistration failed %i
+User already connected
+General Failure connecting to lobby
+RS - ClientRegistration succeeded %i
+WON initialized
+WONAuthCloseHandle
+shutting down DS
+MCS_WONRS not CONNECTED!!!
+shutting down RS
+WON shutdown
+--> %s
+SYSTEM
+%s (whispers): %s
+Whispering to: %s
+Ignoring: %s
+SYSTEM
+Listening to: %s
+SYSTEM
+SYSTEM
+Ivalid Command Format
+%s: %s
+%s (whispers): %s
+SYSTEM
+Whispering Off
+SYSTEM
+Join/Exit Nofication Enabled
+SYSTEM
+Join/Exit Nofication Disabled
+Stats NA in WON lobby
+Unknown chat command in send_won_chat
+REMOVING %s
+--> %s left the lobby
+SYSTEM
+STATUS %i -- NUM_ENTITIES: %i
+TYPE Service
+%s:%i
+%i/%i NAME: %i - %s
+ADDR: %i - %s
+%i/%i TYPE Directory
+%i/%i UNKNOWN TYPE
+STATUS %i -- NUM_ENTITIES: %i
+TYPE Service
+%s:%i
+%s:%i
+%s:%i
+UNKNOWN SERVER TYPE: %s
+%i/%i NAME: %i - %s
+ADDR: %i - %s
+%i/%i TYPE Directory
+%i/%i UNKNOWN TYPE
+CHECKING FOR VALID VERSION
+VALID VERSION REQUEST SENT
+TIMEOUT WAITING FOR version REPLY
+VALID VERSION REPLY RECEIVED
+VALID VERSION COMPARING
+VALID VERSION local: %s, web: %s
+/TitanServers/Auth
+DS - GetDirectory - PACKET LENGTH %i
+TIMEOUT WAITING FOR auth_list REPLY
+/Silencer
+DS - GetDirectory - PACKET LENGTH %i
+TIMEOUT WAITING FOR routing_list REPLY
+/Silencer/GameServers
+DS - get_game_servers - PACKET LENGTH %i
+STARTING WONSWAP
+couldn't connect to wonswap
+testing
+WONSWAP: %s
+couldn't disconnect from wonswap
+EXITING WONSWAP
+--> %s has entered the lobby
+SYSTEM
+%s: %s
+too many teams %i
+can't find location to place magistrate
+imp=%i
+%i (%s) %i,%i  %i  %i,%i
+WCI %i is %i (a %i, s %i, r %i, l %i)
+Exceeded MAX_SECRETS in find_free_secret
+No secret in clear_secret
+Source actor has no secret in transfer_secret
+1.1.3
+need dictionary
+incorrect data check
+incorrect header check
+invalid window size
+unknown compression method
+incompatible version
+buffer error
+insufficient memory
+data error
+stream error
+file error
+stream end
+invalid bit length repeat
+too many length or distance symbols
+invalid stored block lengths
+invalid block type
+invalid distance code
+invalid literal/length code
+incomplete dynamic bit lengths tree
+oversubscribed dynamic bit lengths tree
+incomplete literal/length tree
+oversubscribed literal/length tree
+empty distance tree with lengths
+incomplete distance tree
+oversubscribed distance tree
+.?AVlogic_error@std@@
+.?AVlength_error@std@@
+.?AVout_of_range@std@@
+.?AVios_base@std@@
+.?AV?$basic_ios@DU?$char_traits@D@std@@@std@@
+.?AV?$basic_istream@DU?$char_traits@D@std@@@std@@
+.?AV?$basic_ostream@DU?$char_traits@D@std@@@std@@
+.?AV?$basic_streambuf@DU?$char_traits@D@std@@@std@@
+.?AV?$basic_filebuf@DU?$char_traits@D@std@@@std@@
+.?AV?$basic_ios@GU?$char_traits@G@std@@@std@@
+.?AV?$basic_istream@GU?$char_traits@G@std@@@std@@
+.?AV?$basic_ostream@GU?$char_traits@G@std@@@std@@
+.?AV?$basic_filebuf@GU?$char_traits@G@std@@@std@@
+.?AV?$basic_streambuf@GU?$char_traits@G@std@@@std@@
+.?AVruntime_error@std@@
+.?AVfailure@ios_base@std@@
+.?AVfacet@locale@std@@
+.?AV_Locimp@locale@std@@
+.?AVbad_alloc@std@@
+Assertion failed: %s, file %s, line %d
+.?AVtype_info@@
+?pow
+atan
+sqrt
+kU'9
+HMXB
+?Zd;
+?/L[
+S;uD
+z?aUY
+D?$?
+U>c{
+zc%C1
+.:3q
+-64OS
+NKeb
+wwwwwwwwwww
+wwwwww
+wwww
+wwwww
+wwwwww
+wwww
+wwww
+wwwwp
+wwwww
+wwwwp
+wwwww
+wwwp
+wwwx
+wwwx
+wwwp
+wwww
+wwwwwwwww
+NB10
+R:\Obj_win\Silencer.pdb
