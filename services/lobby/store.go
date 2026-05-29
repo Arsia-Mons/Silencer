@@ -195,6 +195,28 @@ func (s *Store) ByAccountID(id uint32) *User {
 	return nil
 }
 
+// CreateUser registers a brand-new account. Returns an error if the name is
+// already taken. Unlike Login, it never auto-creates on login.
+func (s *Store) CreateUser(name string, sha1sum []byte) (*User, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	key := strings.ToLower(name)
+	if _, exists := s.ByName[key]; exists {
+		return nil, errors.New("name taken")
+	}
+	hash := hex.EncodeToString(sha1sum)
+	u := &User{
+		AccountID: s.NextID,
+		Name:      name,
+		PassHash:  hash,
+	}
+	s.ByName[key] = u
+	s.NextID++
+	_ = s.save()
+	s.mongo.SyncPlayer(u)
+	return cloneUser(u), nil
+}
+
 // CreateCharacter adds a new character to the account and selects it.
 // Returns the updated User and true on success; false if name is blank, too
 // long, invalid, or the fixed-size lobby character-list frame is full.

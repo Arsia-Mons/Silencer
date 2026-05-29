@@ -97,6 +97,8 @@ func StartPlayerAuthServer(addr string, store *Store, hub *Hub) {
 		writeJSON(w, map[string]any{"ok": found})
 	})
 
+	RegisterWONRoutes(mux, store)
+
 	srv := &http.Server{
 		Addr:         addr,
 		Handler:      mux,
