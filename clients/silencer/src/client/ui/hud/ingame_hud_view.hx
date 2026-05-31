@@ -12,14 +12,22 @@ class Resources;
 namespace silencer::client_ui {
 
 struct InGameHudContextValue {
-	const HudView * view = nullptr;
-	const Resources * resources = nullptr;
-	std::function<void(const std::string&)> on_chat_text_change = {};
-	std::function<void(const std::string&)> on_chat_submit = {};
-	std::function<void()> on_chat_channel_toggle = {};
-	std::function<void(int)> on_buy_tech_focus = {};
-	std::function<void(int)> on_buy_tech_activate = {};
-	Uint8 animationPhase = 0;
+	struct State {
+		const HudView * view = nullptr;
+		const Resources * resources = nullptr;
+		Uint8 animationPhase = 0;
+	};
+
+	struct Actions {
+		std::function<void(const std::string&)> set_chat_text = {};
+		std::function<void(const std::string&)> submit_chat_text = {};
+		std::function<void()> toggle_chat_channel = {};
+		std::function<void(int)> focus_buy_tech = {};
+		std::function<void(int)> activate_buy_tech = {};
+	};
+
+	State state = {};
+	Actions actions = {};
 };
 
 extern ::ReactContext InGameHudContext;

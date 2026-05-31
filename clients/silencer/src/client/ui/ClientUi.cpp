@@ -533,37 +533,41 @@ void ClientUi::BuildRetainedUi(ScreenContext& ctx,
 
 	if(view && resources && view->mapLoaded){
 		const InGameHudContextValue context{
-			.view = view,
-			.resources = resources,
-			.on_chat_text_change = [this](const std::string& value) {
-				clientui_detail::QueueAction(
-					interactions_, silencer::ui::UiActionKind::SetText, "ingame.chat", value);
+			.state = {
+				.view = view,
+				.resources = resources,
+				.animationPhase = animationPhase,
 			},
-			.on_chat_submit = [this](const std::string& value) {
-				clientui_detail::QueueAction(
-					interactions_, silencer::ui::UiActionKind::SubmitText, "ingame.chat", value);
+			.actions = {
+				.set_chat_text = [this](const std::string& value) {
+					clientui_detail::QueueAction(
+						interactions_, silencer::ui::UiActionKind::SetText, "ingame.chat", value);
+				},
+				.submit_chat_text = [this](const std::string& value) {
+					clientui_detail::QueueAction(
+						interactions_, silencer::ui::UiActionKind::SubmitText, "ingame.chat", value);
+				},
+				.toggle_chat_channel = [this]() {
+					clientui_detail::QueueAction(
+						interactions_, silencer::ui::UiActionKind::Activate, "ingame.chat.channel");
+				},
+				.focus_buy_tech = [this](int index) {
+					clientui_detail::QueueAction(
+						interactions_,
+						silencer::ui::UiActionKind::Navigate,
+						clientui_detail::BuyTechActionId(index).c_str(),
+						"focus",
+						index);
+				},
+				.activate_buy_tech = [this](int index) {
+					clientui_detail::QueueAction(
+						interactions_,
+						silencer::ui::UiActionKind::Select,
+						clientui_detail::BuyTechActionId(index).c_str(),
+						"activate",
+						index);
+				},
 			},
-			.on_chat_channel_toggle = [this]() {
-				clientui_detail::QueueAction(
-					interactions_, silencer::ui::UiActionKind::Activate, "ingame.chat.channel");
-			},
-			.on_buy_tech_focus = [this](int index) {
-				clientui_detail::QueueAction(
-					interactions_,
-					silencer::ui::UiActionKind::Navigate,
-					clientui_detail::BuyTechActionId(index).c_str(),
-					"focus",
-					index);
-			},
-			.on_buy_tech_activate = [this](int index) {
-				clientui_detail::QueueAction(
-					interactions_,
-					silencer::ui::UiActionKind::Select,
-					clientui_detail::BuyTechActionId(index).c_str(),
-					"activate",
-					index);
-			},
-			.animationPhase = animationPhase,
 		};
 		const auto * stored = ::ui::copy_value(context);
 		if(!stored){
