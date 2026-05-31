@@ -1,5 +1,7 @@
 #include "client/ui/screens/main_menu/main_menu_view.h"
 
+#include "client/ui/navigation/NavigationProvider.h"
+#include "game_state.h"
 #include "ui/components/box.h"
 #include "ui/components/button.h"
 #include "ui/components/text.h"
@@ -92,9 +94,25 @@ namespace {
 	});
 }
 
+std::function<void(const ::ui::ActivationEvent&)> go_to_state_callback(
+	Navigation navigation,
+	Uint8 state) {
+	return [navigation, state](const ::ui::ActivationEvent&) {
+		if(navigation.goToState) navigation.goToState(state);
+	};
+}
+
+std::function<void(const ::ui::ActivationEvent&)> request_quit_callback(
+	Navigation navigation) {
+	return [navigation](const ::ui::ActivationEvent&) {
+		if(navigation.requestQuit) navigation.requestQuit();
+	};
+}
+
 }  // namespace
 
 ::ui::UiElement MainMenuView(const MainMenuViewProps& props) {
+	Navigation navigation = UseNavigation();
 	return <Box key={props.key} layout={root_layout()} style={root_style()}>
 		<Box key="title-stack" layout={title_stack_layout()}>
 			<Text key="title" value="Silencer" layout={title_layout()} style={title_style()} />
@@ -106,28 +124,28 @@ namespace {
 			  id="main_menu.tutorial"
 			  label="Tutorial"
 			  autofocus={true}
-			  onActivate={props.on_tutorial}
+			  onActivate={go_to_state_callback(navigation, GameState::SINGLEPLAYERGAME)}
 			  layout={button_layout(true)}
 			/>
 			<Button
 			  key="lobby"
 			  id="main_menu.lobby"
 			  label="Connect To Lobby"
-			  onActivate={props.on_lobby}
+			  onActivate={go_to_state_callback(navigation, GameState::LOBBYCONNECT)}
 			  layout={button_layout()}
 			/>
 			<Button
 			  key="options"
 			  id="main_menu.options"
 			  label="Options"
-			  onActivate={props.on_options}
+			  onActivate={go_to_state_callback(navigation, GameState::OPTIONS)}
 			  layout={button_layout()}
 			/>
 			<Button
 			  key="exit"
 			  id="main_menu.exit"
 			  label="Exit"
-			  onActivate={props.on_exit}
+			  onActivate={request_quit_callback(navigation)}
 			  layout={button_layout()}
 			/>
 		</Box>

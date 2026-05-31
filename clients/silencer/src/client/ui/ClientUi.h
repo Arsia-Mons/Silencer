@@ -12,6 +12,7 @@
 #include <SDL3/SDL_stdinc.h>
 
 #include <array>
+#include <functional>
 #include <memory>
 #include <string>
 #include <vector>
@@ -26,6 +27,7 @@ namespace silencer {
 namespace client_ui {
 
 struct HudView;
+using DeferredUiMutation = std::function<void(ScreenContext&)>;
 
 class ClientUi {
 public:
@@ -45,6 +47,8 @@ public:
 	void PushScreen(std::unique_ptr<Screen> screen, ScreenContext& ctx);
 	void PopScreen(ScreenContext& ctx);
 	void ReplaceScreen(std::unique_ptr<Screen> screen, ScreenContext& ctx);
+	bool QueueDeferredMutation(DeferredUiMutation mutation);
+	void DrainDeferredMutations(ScreenContext& ctx);
 	void RequestClearScreens();
 	void ClearScreensIfRequested(ScreenContext& ctx);
 	void TickVisibleScreens(ScreenContext& ctx);
@@ -63,6 +67,7 @@ private:
 	::ui::InteractionSnapshot retainedInteractionSnapshot_;
 	::ui::InputFrame retainedInput_;
 	::ui::LayoutViewport retainedViewport_;
+	std::vector<DeferredUiMutation> deferredMutations_;
 	bool retainedFrameOpen_ = false;
 
 	void RefreshRetainedInteractions();

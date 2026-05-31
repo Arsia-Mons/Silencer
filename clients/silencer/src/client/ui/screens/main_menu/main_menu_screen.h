@@ -15,10 +15,6 @@ public:
 	bool HandleUiIntent(ScreenContext & ctx, const silencer::ui::UiAction & action) override;
 
 private:
-	bool tutorialClicked = false;
-	bool lobbyClicked = false;
-	bool optionsClicked = false;
-	bool exitClicked = false;
 	std::string versionText_;
 };
 

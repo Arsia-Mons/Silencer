@@ -2,6 +2,7 @@
 
 #include "client/ui/hud/ingame_hud_view.h"
 #include "client/ui/hud/hud_retained_payloads.h"
+#include "client/ui/navigation/NavigationProvider.h"
 #include "client/ui/views/HudView.h"
 #include "screen.h"
 #include "screen_context.h"
@@ -254,6 +255,10 @@ std::string BuyTechActionId(int index) {
 	return "ingame.buytech.row." + std::to_string(index);
 }
 
+const char * ScreenProviderKey(UiScreenEntryId entryId) {
+	return ::ui::copy_string(("screen-provider-" + std::to_string(entryId)).c_str());
+}
+
 ::ui::InputFrame ToRetainedInput(const silencer::ui::UiInputState& input) {
 	::ui::InputFrame out{};
 	out.pointer_pressed = input.pointer.pressed;
@@ -475,6 +480,21 @@ void ClientUi::ReplaceScreen(std::unique_ptr<Screen> screen, ScreenContext& ctx)
 	screens_.Replace(std::move(screen));
 }
 
+bool ClientUi::QueueDeferredMutation(DeferredUiMutation mutation) {
+	if(!mutation) return false;
+	deferredMutations_.push_back(std::move(mutation));
+	return true;
+}
+
+void ClientUi::DrainDeferredMutations(ScreenContext& ctx) {
+	if(deferredMutations_.empty()) return;
+	std::vector<DeferredUiMutation> mutations;
+	mutations.swap(deferredMutations_);
+	for(DeferredUiMutation& mutation : mutations){
+		if(mutation) mutation(ctx);
+	}
+}
+
 void ClientUi::RequestClearScreens() {
 	screens_.RequestClear();
 }
@@ -567,7 +587,15 @@ void ClientUi::BuildRetainedUi(ScreenContext& ctx,
 			retainedCommands_.reset();
 			return;
 		}
-		roots[rootCount++] = root;
+		NavigationProviderValue navigation{
+			.clientUi = this,
+			.currentEntryId = visible[i]->EntryId(),
+			.isTop = i == visible.count - 1,
+		};
+		roots[rootCount++] = NavigationProvider(
+			navigation,
+			::ui::children({ root }),
+			clientui_detail::ScreenProviderKey(visible[i]->EntryId()));
 	}
 	::ui::UiElement root = retainedElementFrame_.fragment(
 		retainedElementFrame_.children(roots.data(), rootCount));

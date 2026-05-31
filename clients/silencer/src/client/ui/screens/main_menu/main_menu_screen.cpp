@@ -20,35 +20,11 @@ void MainMenuScreen::Build(ScreenContext & ctx)
 {
 	ctx.ResetPresentation(1);
 	ctx.renderer.camera.SetPosition(320, 240);
-
-	tutorialClicked = false;
-	lobbyClicked = false;
-	optionsClicked = false;
-	exitClicked = false;
 }
 
 void MainMenuScreen::Tick(ScreenContext & ctx)
 {
-	if(tutorialClicked){
-		tutorialClicked = false;
-		ctx.GoToState(GameState::SINGLEPLAYERGAME);
-		return;
-	}
-	if(lobbyClicked){
-		lobbyClicked = false;
-		ctx.GoToState(GameState::LOBBYCONNECT);
-		return;
-	}
-	if(optionsClicked){
-		optionsClicked = false;
-		ctx.GoToState(GameState::OPTIONS);
-		return;
-	}
-	if(exitClicked){
-		exitClicked = false;
-		ctx.RequestQuit();
-		return;
-	}
+	(void)ctx;
 }
 
 bool MainMenuScreen::BuildElement(ScreenContext & ctx, ::ui::UiElement * out)
@@ -57,23 +33,13 @@ bool MainMenuScreen::BuildElement(ScreenContext & ctx, ::ui::UiElement * out)
 	versionText_ = "Silencer v";
 	versionText_ += ctx.world.GetVersion();
 
-	*out = silencer::client_ui::MainMenuView(
+	*out = ::ui::component(
+		"MainMenuView",
 		silencer::client_ui::MainMenuViewProps{
 			.key = "main-menu",
 			.version = versionText_.c_str(),
-			.on_tutorial = [this](const ::ui::ActivationEvent&) {
-				tutorialClicked = true;
-			},
-			.on_lobby = [this](const ::ui::ActivationEvent&) {
-				lobbyClicked = true;
-			},
-			.on_options = [this](const ::ui::ActivationEvent&) {
-				optionsClicked = true;
-			},
-			.on_exit = [this](const ::ui::ActivationEvent&) {
-				exitClicked = true;
-			},
-		});
+		},
+		silencer::client_ui::MainMenuView);
 	return true;
 }
 
@@ -90,19 +56,19 @@ bool MainMenuScreen::HandleUiIntent(ScreenContext & ctx, const silencer::ui::UiA
 	}
 	if(action.kind != silencer::ui::UiActionKind::Activate) return false;
 	if(action.id == main_menu_screen_detail::kActionTutorial){
-		tutorialClicked = true;
+		ctx.GoToState(GameState::SINGLEPLAYERGAME);
 		return true;
 	}
 	if(action.id == main_menu_screen_detail::kActionLobby){
-		lobbyClicked = true;
+		ctx.GoToState(GameState::LOBBYCONNECT);
 		return true;
 	}
 	if(action.id == main_menu_screen_detail::kActionOptions){
-		optionsClicked = true;
+		ctx.GoToState(GameState::OPTIONS);
 		return true;
 	}
 	if(action.id == main_menu_screen_detail::kActionExit){
-		exitClicked = true;
+		ctx.RequestQuit();
 		return true;
 	}
 	return false;

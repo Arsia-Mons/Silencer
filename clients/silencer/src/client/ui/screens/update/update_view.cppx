@@ -149,6 +149,42 @@ std::function<void(const ::ui::ActivationEvent&)> primary_callback(const UpdateV
 	}
 }
 
+struct PrimaryActionButtonProps {
+	const char * key = nullptr;
+	const UpdateViewProps * view = nullptr;
+};
+
+::ui::UiElement PrimaryActionButton(const PrimaryActionButtonProps& props) {
+	const UpdateViewProps& view = *props.view;
+	return <Button
+	  key={props.key}
+	  id={primary_id(view.primary_action)}
+	  label={primary_label(view.primary_action)}
+	  disabled={!has_primary_action(view)}
+	  autofocus={has_primary_action(view)}
+	  onActivate={primary_callback(view)}
+	  layout={button_layout(has_primary_action(view))}
+	/>
+}
+
+struct CancelButtonProps {
+	const char * key = nullptr;
+	const UpdateViewProps * view = nullptr;
+};
+
+::ui::UiElement CancelButton(const CancelButtonProps& props) {
+	const UpdateViewProps& view = *props.view;
+	return <Button
+	  key={props.key}
+	  id="update.cancel"
+	  label="Cancel"
+	  disabled={!view.show_cancel}
+	  autofocus={!has_primary_action(view) && view.show_cancel}
+	  onActivate={view.on_cancel}
+	  layout={button_layout(view.show_cancel)}
+	/>
+}
+
 }  // namespace
 
 ::ui::UiElement UpdateView(const UpdateViewProps& props) {
@@ -163,24 +199,8 @@ std::function<void(const ::ui::ActivationEvent&)> primary_callback(const UpdateV
 			  style={progress_style()}
 			/>
 			<Box key="actions" layout={actions_layout()}>
-				<Button
-				  key="primary"
-				  id={primary_id(props.primary_action)}
-				  label={primary_label(props.primary_action)}
-				  disabled={!has_primary_action(props)}
-				  autofocus={has_primary_action(props)}
-				  onActivate={primary_callback(props)}
-				  layout={button_layout(has_primary_action(props))}
-				/>
-				<Button
-				  key="cancel"
-				  id="update.cancel"
-				  label="Cancel"
-				  disabled={!props.show_cancel}
-				  autofocus={!has_primary_action(props) && props.show_cancel}
-				  onActivate={props.on_cancel}
-				  layout={button_layout(props.show_cancel)}
-				/>
+				<PrimaryActionButton key="primary" view={&props} />
+				<CancelButton key="cancel" view={&props} />
 			</Box>
 		</Dialog>
 	</Box>

@@ -226,6 +226,7 @@ SDL_StartTextInput(game.gameRenderer.GetWindow());
 SDL_StopTextInput(game.gameRenderer.GetWindow());
 }
 textInputFocused = nowFocused;
+clientUi.DrainDeferredMutations(game.screenContext);
 }
 }
 
