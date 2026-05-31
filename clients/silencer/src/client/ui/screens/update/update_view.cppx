@@ -1,5 +1,7 @@
 #include "client/ui/screens/update/update_view.h"
 
+#include "client/ui/navigation/NavigationProvider.h"
+#include "game_state.h"
 #include "ui/components/box.h"
 #include "ui/components/button.h"
 #include "ui/components/dialog.h"
@@ -127,63 +129,113 @@ const char * primary_label(UpdatePrimaryAction action) {
 	}
 }
 
-bool has_progress(const UpdateViewProps& props) {
-	return props.progress && props.progress[0] != '\0';
+bool has_progress(const UpdateState& state) {
+	return state.progress && state.progress[0] != '\0';
 }
 
-bool has_primary_action(const UpdateViewProps& props) {
-	return props.primary_action != UpdatePrimaryAction::None;
+bool has_primary_action(const UpdateState& state) {
+	return state.primary_action != UpdatePrimaryAction::None;
 }
 
-std::function<void(const ::ui::ActivationEvent&)> primary_callback(const UpdateViewProps& props) {
-	switch(props.primary_action){
+std::function<void(const ::ui::ActivationEvent&)> primary_callback(
+	const UpdateContextValue& update,
+	Navigation navigation) {
+	switch(update.state.primary_action){
 		case UpdatePrimaryAction::Update:
-			return props.on_update;
+			return [actions = update.actions](const ::ui::ActivationEvent&) {
+				if(actions.start_update) actions.start_update();
+			};
 		case UpdatePrimaryAction::Retry:
-			return props.on_retry;
+			return [actions = update.actions](const ::ui::ActivationEvent&) {
+				if(actions.retry) actions.retry();
+			};
 		case UpdatePrimaryAction::Download:
-			return props.on_download;
+			return [actions = update.actions, navigation](const ::ui::ActivationEvent&) {
+				const bool opened = actions.download ? actions.download() : false;
+				if(opened && navigation.goToState) navigation.goToState(GameState::MAINMENU);
+			};
 		case UpdatePrimaryAction::None:
 		default:
 			return {};
 	}
 }
 
-}  // namespace
+std::function<void(const ::ui::ActivationEvent&)> cancel_callback(
+	const UpdateActions& actions,
+	Navigation navigation) {
+	return [actions, navigation](const ::ui::ActivationEvent&) {
+		const bool cancelled = actions.cancel ? actions.cancel() : false;
+		if(cancelled && navigation.goToState) navigation.goToState(GameState::MAINMENU);
+	};
+}
 
-::ui::UiElement UpdateView(const UpdateViewProps& props) {
+struct UpdateFrameProps {
+	const char * key = nullptr;
+};
+
+::ui::UiElement UpdateFrame(const UpdateFrameProps& props) {
+	const UpdateContextValue& update = UseUpdate();
+	Navigation navigation = UseNavigation();
+	const UpdateState& state = update.state;
 	return <Box key={props.key} layout={root_layout()}>
 		<Dialog key="dialog" modal={true} layout={dialog_layout()}>
-			<Text key="status" value={props.status} layout={status_layout()} style={status_style()} />
+			<Text key="status" value={state.status} layout={status_layout()} style={status_style()} />
 			<Text
 			  key="progress"
-			  value={props.progress}
-			  disabled={!has_progress(props)}
-			  layout={progress_layout(has_progress(props))}
+			  value={state.progress}
+			  disabled={!has_progress(state)}
+			  layout={progress_layout(has_progress(state))}
 			  style={progress_style()}
 			/>
 			<Box key="actions" layout={actions_layout()}>
 				<Button
 				  key="primary"
-				  id={primary_id(props.primary_action)}
-				  label={primary_label(props.primary_action)}
-				  disabled={!has_primary_action(props)}
-				  autofocus={has_primary_action(props)}
-				  onActivate={primary_callback(props)}
-				  layout={button_layout(has_primary_action(props))}
+				  id={primary_id(state.primary_action)}
+				  label={primary_label(state.primary_action)}
+				  disabled={!has_primary_action(state)}
+				  autofocus={has_primary_action(state)}
+				  onActivate={primary_callback(update, navigation)}
+				  layout={button_layout(has_primary_action(state))}
 				/>
 				<Button
 				  key="cancel"
 				  id="update.cancel"
 				  label="Cancel"
-				  disabled={!props.show_cancel}
-				  autofocus={!has_primary_action(props) && props.show_cancel}
-				  onActivate={props.on_cancel}
-				  layout={button_layout(props.show_cancel)}
+				  disabled={!state.show_cancel}
+				  autofocus={!has_primary_action(state) && state.show_cancel}
+				  onActivate={cancel_callback(update.actions, navigation)}
+				  layout={button_layout(state.show_cancel)}
 				/>
 			</Box>
 		</Dialog>
 	</Box>
+}
+
+}  // namespace
+
+::ReactContext UpdateContext = {};
+
+namespace {
+const UpdateContextValue kEmptyUpdate = {};
+}
+
+const UpdateContextValue& UseUpdate() {
+	const auto * value = static_cast<const UpdateContextValue *>(
+		::use_context(&UpdateContext));
+	return value ? *value : kEmptyUpdate;
+}
+
+::ui::UiElement UpdateView(const UpdateViewProps& props) {
+	return ::ui::provider(
+		"UpdateProvider",
+		&UpdateContext,
+		const_cast<UpdateContextValue *>(props.value),
+		children({
+			::ui::component("UpdateFrame",
+			                UpdateFrameProps{ .key = "frame" },
+			                UpdateFrame),
+		}),
+		props.key);
 }
 
 }  // namespace silencer::client_ui

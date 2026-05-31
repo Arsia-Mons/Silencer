@@ -67,54 +67,55 @@ bool ShowCancel(ScreenContext & ctx)
 	return ustate == Updater::PROMPTING || ustate == Updater::DOWNLOADING ||
 	       ustate == Updater::FAILED;
 }
+
+void StartUpdate(Updater & updater)
+{
+	if(updater.GetState() == Updater::PROMPTING) updater.Consent();
+}
+
+bool CancelUpdate(Updater & updater)
+{
+	Updater::State ustate = updater.GetState();
+	if(ustate != Updater::PROMPTING && ustate != Updater::DOWNLOADING &&
+	   ustate != Updater::FAILED){
+		return false;
+	}
+	if(ustate == Updater::DOWNLOADING) updater.Cancel();
+	return true;
+}
+
+void RetryUpdate(Updater & updater)
+{
+	if(updater.GetState() == Updater::FAILED && updater.GetRetryCount() < 3){
+		updater.Retry();
+	}
+}
+
+bool OpenDownload(Updater & updater)
+{
+	if(updater.GetState() != Updater::FAILED || updater.GetRetryCount() < 3){
+		return false;
+	}
+	std::string url = updater.GetDownloadURL();
+#ifdef _WIN32
+	std::string cmd = "start \"\" \"" + url + "\"";
+#elif defined(__APPLE__)
+	std::string cmd = "open '" + url + "'";
+#else
+	std::string cmd = "xdg-open '" + url + "' &";
+#endif
+	system(cmd.c_str());
+	return true;
+}
 } // namespace update_screen_detail
 
 void UpdateScreen::Build(ScreenContext & ctx)
 {
 	ctx.ResetPresentation(2);
-	updateClicked = false;
-	cancelClicked = false;
-	retryClicked = false;
-	downloadClicked = false;
 }
 
 void UpdateScreen::Tick(ScreenContext & ctx)
 {
-	Updater::State ustate = ctx.updater.GetState();
-	if(updateClicked){
-		updateClicked = false;
-		if(ustate == Updater::PROMPTING) ctx.updater.Consent();
-	}
-	if(cancelClicked){
-		cancelClicked = false;
-		if(ustate == Updater::PROMPTING || ustate == Updater::DOWNLOADING || ustate == Updater::FAILED){
-			if(ustate == Updater::DOWNLOADING) ctx.updater.Cancel();
-			ctx.GoToState(GameState::MAINMENU);
-			return;
-		}
-	}
-	if(retryClicked){
-		retryClicked = false;
-		if(ustate == Updater::FAILED && ctx.updater.GetRetryCount() < 3){
-			ctx.updater.Retry();
-		}
-	}
-	if(downloadClicked){
-		downloadClicked = false;
-		if(ustate == Updater::FAILED && ctx.updater.GetRetryCount() >= 3){
-			std::string url = ctx.updater.GetDownloadURL();
-#ifdef _WIN32
-			std::string cmd = "start \"\" \"" + url + "\"";
-#elif defined(__APPLE__)
-			std::string cmd = "open '" + url + "'";
-#else
-			std::string cmd = "xdg-open '" + url + "' &";
-#endif
-			system(cmd.c_str());
-			ctx.GoToState(GameState::MAINMENU);
-			return;
-		}
-	}
 	if(ctx.updater.GetState() == Updater::STAGING){
 		std::string zippath =
 #ifdef _WIN32
@@ -138,26 +139,37 @@ bool UpdateScreen::BuildElement(ScreenContext & ctx, ::ui::UiElement * out)
 	if(!out) return false;
 	statusText_ = update_screen_detail::StatusText(ctx);
 	progressText_ = update_screen_detail::ProgressText(ctx);
-	*out = silencer::client_ui::UpdateView(
-		silencer::client_ui::UpdateViewProps{
-			.key = "update",
+	const silencer::client_ui::UpdateContextValue context{
+		.state = silencer::client_ui::UpdateState{
 			.status = statusText_.c_str(),
 			.progress = progressText_.c_str(),
 			.primary_action = update_screen_detail::PrimaryAction(ctx),
 			.show_cancel = update_screen_detail::ShowCancel(ctx),
-			.on_update = [this](const ::ui::ActivationEvent&) {
-				updateClicked = true;
+		},
+		.actions = silencer::client_ui::UpdateActions{
+			.start_update = [updater = &ctx.updater]() {
+				update_screen_detail::StartUpdate(*updater);
 			},
-			.on_retry = [this](const ::ui::ActivationEvent&) {
-				retryClicked = true;
+			.retry = [updater = &ctx.updater]() {
+				update_screen_detail::RetryUpdate(*updater);
 			},
-			.on_download = [this](const ::ui::ActivationEvent&) {
-				downloadClicked = true;
+			.download = [updater = &ctx.updater]() {
+				return update_screen_detail::OpenDownload(*updater);
 			},
-			.on_cancel = [this](const ::ui::ActivationEvent&) {
-				cancelClicked = true;
+			.cancel = [updater = &ctx.updater]() {
+				return update_screen_detail::CancelUpdate(*updater);
 			},
-		});
+		},
+	};
+	const auto * stored = ::ui::copy_value(context);
+	if(!stored) return false;
+	*out = ::ui::component(
+		"UpdateView",
+		silencer::client_ui::UpdateViewProps{
+			.key = "update",
+			.value = stored,
+		},
+		silencer::client_ui::UpdateView);
 	return true;
 }
 
@@ -168,26 +180,31 @@ void UpdateScreen::Destroy(ScreenContext & ctx)
 
 bool UpdateScreen::HandleUiIntent(ScreenContext & ctx, const silencer::ui::UiAction & action)
 {
-	(void)ctx;
 	if(action.kind == silencer::ui::UiActionKind::Cancel){
-		cancelClicked = true;
+		if(update_screen_detail::CancelUpdate(ctx.updater)){
+			ctx.GoToState(GameState::MAINMENU);
+		}
 		return true;
 	}
 	if(action.kind != silencer::ui::UiActionKind::Activate) return false;
 	if(action.id == update_screen_detail::kActionUpdate){
-		updateClicked = true;
+		update_screen_detail::StartUpdate(ctx.updater);
 		return true;
 	}
 	if(action.id == update_screen_detail::kActionCancel){
-		cancelClicked = true;
+		if(update_screen_detail::CancelUpdate(ctx.updater)){
+			ctx.GoToState(GameState::MAINMENU);
+		}
 		return true;
 	}
 	if(action.id == update_screen_detail::kActionRetry){
-		retryClicked = true;
+		update_screen_detail::RetryUpdate(ctx.updater);
 		return true;
 	}
 	if(action.id == update_screen_detail::kActionDownload){
-		downloadClicked = true;
+		if(update_screen_detail::OpenDownload(ctx.updater)){
+			ctx.GoToState(GameState::MAINMENU);
+		}
 		return true;
 	}
 	return false;

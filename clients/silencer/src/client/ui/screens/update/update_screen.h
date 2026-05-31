@@ -15,10 +15,6 @@ public:
 	bool HandleUiIntent(ScreenContext & ctx, const silencer::ui::UiAction & action) override;
 
 private:
-	bool updateClicked = false;
-	bool cancelClicked = false;
-	bool retryClicked = false;
-	bool downloadClicked = false;
 	std::string statusText_;
 	std::string progressText_;
 };
