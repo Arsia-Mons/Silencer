@@ -17,8 +17,6 @@
 #include "options_screen.h"
 #include "player.h"
 #include "update_screen.h"
-#include "client/ui/hud/InGameHud.h"
-#include "client/ui/hud/InGameOverlays.h"
 #include "client/ui/views/HudView.h"
 #include "clay_ui_compositor.h"
 #ifdef SILENCER_HAVE_LOBBY_UI
@@ -156,6 +154,7 @@ return uiClayBackend.Commands();
 }
 
 void GameUiPipeline::BuildVisibleClientUi(Surface& surface, float frametime) {
+(void)surface;
 (void)frametime;
 silencer::client_ui::HudView hudView;
 const bool hasHud = game.world.map.loaded;
@@ -167,17 +166,6 @@ game.screenContext,
 hasHud ? &hudView : nullptr,
 hasHud ? &game.world.resources : nullptr,
 game.renderer.GetHudAnimationPhase());
-if(game.world.map.loaded){
-silencer::client_ui::BuildInGameHudUi(
-game.renderer,
-game.world.resources,
-hudView,
-&surface,
-clientUi.Interactions(),
-false);
-silencer::client_ui::BuildInGameOverlaysUi(
-game.renderer, game.world.resources, hudView, &surface, false);
-}
 }
 
 void GameUiPipeline::DrawInGameWorldInsets(Surface& surface, float frametime) {

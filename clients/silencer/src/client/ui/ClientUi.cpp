@@ -1,6 +1,5 @@
 #include "client/ui/ClientUi.h"
 
-#include "client/ui/hud/HudPayloadArena.h"
 #include "client/ui/hud/ingame_hud_view.h"
 #include "client/ui/hud/hud_retained_payloads.h"
 #include "client/ui/views/HudView.h"
@@ -147,7 +146,6 @@ ClientUi::~ClientUi() = default;
 
 void ClientUi::BeginFrame(const silencer::ui::UiInputState& input) {
 	frameCtx_.BeginFrame(input.animationDeltaSeconds, input.animationStepSeconds);
-	silencer::client_ui::HudPayloadBeginFrame();
 	silencer::client_ui::HudRetainedPayloadBeginFrame();
 	clay_.BeginFrame(input, interactions_);
 	retainedElementFrame_.reset();
