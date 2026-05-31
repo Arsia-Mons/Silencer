@@ -27,6 +27,11 @@ void DrawInGameWorldInsets(Surface & surface, float frametime);
 void RenderClientUiFrame(Surface & surface, float frametime);
 void ResetUiFrameDeltas();
 bool HasInputTarget();
+void RequestClearScreens();
+void ClearScreensIfRequested();
+void TickVisibleScreens();
+void ShowStateScreen(Uint8 state);
+bool HandleBack();
 void Push(std::unique_ptr<Screen> s);
 void Pop();
 void Replace(std::unique_ptr<Screen> s);
@@ -34,8 +39,6 @@ Screen * Top() const;
 void QueueKeyboardInputForScancode(int scancode, const Uint8 * keystate,
 const KeyMap & keymap, const GamepadState & gamepadstate);
 
-silencer::client_ui::ClientUi & ClientUiRef() { return clientUi; }
-const silencer::client_ui::ClientUi & ClientUiRef() const { return clientUi; }
 silencer::client_ui::ClientUiInput & UiInput() { return clientUiInput; }
 const silencer::client_ui::ClientUiInput & UiInput() const { return clientUiInput; }
 const silencer::ui::UiInputState & CurrentUiInput() const { return preparedUiInput; }

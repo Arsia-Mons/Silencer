@@ -3,14 +3,26 @@
 #include "client/ui/screens/screen.h"
 #include "game.h"
 #include "camera.h"
+#include "character_create_screen.h"
 #include "detonator.h"
 #include "gasloader.h"
+#include "lobby_connect_screen.h"
+#include "main_menu_screen.h"
+#include "mission_summary_screen.h"
 #include "objecttypes.h"
+#include "options_audio_screen.h"
+#include "options_controls_screen.h"
+#include "options_display_screen.h"
+#include "options_screen.h"
 #include "player.h"
 #include "client/ui/hud/InGameHud.h"
 #include "client/ui/hud/InGameOverlays.h"
 #include "client/ui/views/HudView.h"
 #include "clay_ui_compositor.h"
+#include "update_screen.h"
+#ifdef SILENCER_HAVE_LOBBY_UI
+#include "lobby_screen.h"
+#endif
 #include <algorithm>
 #include <vector>
 
@@ -200,6 +212,62 @@ GameUiPipeline::GameUiPipeline(Game & g)
 bool GameUiPipeline::HasInputTarget() {
 if(Top()) return true;
 return inGameUiController.HasInputTarget(game.world.peers.localpeerid);
+}
+
+void GameUiPipeline::RequestClearScreens() {
+clientUi.RequestClearScreens();
+}
+
+void GameUiPipeline::ClearScreensIfRequested() {
+clientUi.ClearScreensIfRequested(game.screenContext);
+}
+
+void GameUiPipeline::TickVisibleScreens() {
+clientUi.TickVisibleScreens(game.screenContext);
+}
+
+void GameUiPipeline::ShowStateScreen(Uint8 uiState) {
+switch(uiState){
+case GameState::MAINMENU:
+	Push(std::make_unique<MainMenuScreen>());
+	break;
+case GameState::LOBBYCONNECT:
+	Push(std::make_unique<LobbyConnectScreen>());
+	break;
+case GameState::LOBBY:
+#ifdef SILENCER_HAVE_LOBBY_UI
+	Push(std::make_unique<LobbyScreen>());
+#endif
+	break;
+case GameState::CREATECHARACTER:
+	Push(std::make_unique<CharacterCreateScreen>());
+	break;
+case GameState::UPDATING:
+	Push(std::make_unique<UpdateScreen>());
+	break;
+case GameState::MISSIONSUMMARY:
+	Push(std::make_unique<MissionSummaryScreen>());
+	break;
+case GameState::OPTIONS:
+	Push(std::make_unique<OptionsScreen>());
+	break;
+case GameState::OPTIONSCONTROLS:
+	Push(std::make_unique<OptionsControlsScreen>());
+	break;
+case GameState::OPTIONSDISPLAY:
+	Push(std::make_unique<OptionsDisplayScreen>());
+	break;
+case GameState::OPTIONSAUDIO:
+	Push(std::make_unique<OptionsAudioScreen>());
+	break;
+default:
+	break;
+}
+}
+
+bool GameUiPipeline::HandleBack() {
+Screen * top = Top();
+return top && top->HandleBack(game.screenContext);
 }
 
 void GameUiPipeline::Push(std::unique_ptr<Screen> s){

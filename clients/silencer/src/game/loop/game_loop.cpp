@@ -4,18 +4,6 @@
 #include "objecttypes.h"
 #include "player.h"
 #include "state.h"
-#include "character_create_screen.h"
-#include "lobby_connect_screen.h"
-#include "main_menu_screen.h"
-#include "mission_summary_screen.h"
-#include "options_audio_screen.h"
-#include "options_controls_screen.h"
-#include "options_display_screen.h"
-#include "options_screen.h"
-#include "update_screen.h"
-#ifdef SILENCER_HAVE_LOBBY_UI
-#include "lobby_screen.h"
-#endif
 #include <stdio.h>
 #include <cstring>
 #include <vector>
@@ -265,9 +253,9 @@ bool Game::Loop(void){
 }
 
 bool Game::Tick(void){
-	gameUiPipeline.ClientUiRef().ClearScreensIfRequested(screenContext);
+	gameUiPipeline.ClearScreensIfRequested();
 	if(state != FADEOUT){
-		gameUiPipeline.ClientUiRef().TickVisibleScreens(screenContext);
+		gameUiPipeline.TickVisibleScreens();
 	}
 	gameUiPipeline.InGameUi().UpdateOverlayState(world.peers.localpeerid);
 	if(!world.dedicatedserver.active){
@@ -379,7 +367,7 @@ bool Game::Tick(void){
 				gameSession.UnloadGame();
 				world.GetAuthorityPeer()->controlledlist.clear();
 				world.DestroyAllObjects();
-				PushScreen(std::make_unique<MainMenuScreen>());
+				gameUiPipeline.ShowStateScreen(state);
 				stateisnew = false;
 			}else{
 				if(gameSession.AmbienceMixerRef().FadedIn()){
@@ -395,7 +383,7 @@ bool Game::Tick(void){
 				world.DestroyAllObjects();
 				world.lobby.ClearGames();
 				world.lobby.state = Lobby::WAITING;
-				PushScreen(std::make_unique<LobbyConnectScreen>());
+				gameUiPipeline.ShowStateScreen(state);
 				stateisnew = false;
 			}else{
 				if(gameSession.AmbienceMixerRef().FadedIn()){
@@ -411,9 +399,7 @@ bool Game::Tick(void){
 				world.Disconnect();
 				world.choosingtech = false;
 				world.lobby.channelchanged = true;
-#ifdef SILENCER_HAVE_LOBBY_UI
-				PushScreen(std::make_unique<LobbyScreen>());
-#endif
+				gameUiPipeline.ShowStateScreen(state);
 				stateisnew = false;
 			}else{
 				if(gameSession.AmbienceMixerRef().FadedIn()){
@@ -428,7 +414,7 @@ bool Game::Tick(void){
 			if(stateisnew){
 				world.GetAuthorityPeer()->controlledlist.clear();
 				world.DestroyAllObjects();
-				PushScreen(std::make_unique<CharacterCreateScreen>());
+				gameUiPipeline.ShowStateScreen(state);
 				stateisnew = false;
 			}else{
 				if(gameSession.AmbienceMixerRef().FadedIn()){
@@ -440,7 +426,7 @@ bool Game::Tick(void){
 			if(stateisnew){
 				world.GetAuthorityPeer()->controlledlist.clear();
 				world.DestroyAllObjects();
-				PushScreen(std::make_unique<UpdateScreen>());
+				gameUiPipeline.ShowStateScreen(state);
 				stateisnew = false;
 			}else{
 				if(gameSession.AmbienceMixerRef().FadedIn()){
@@ -453,7 +439,7 @@ bool Game::Tick(void){
 			if(stateisnew){
 				gameSession.UnloadGame();
 				world.Disconnect();
-				PushScreen(std::make_unique<MissionSummaryScreen>());
+				gameUiPipeline.ShowStateScreen(state);
 				stateisnew = false;
 			}else{
 				if(gameSession.AmbienceMixerRef().FadedIn()){
@@ -465,28 +451,28 @@ bool Game::Tick(void){
 		case OPTIONS:{
 			if(stateisnew){
 				world.DestroyAllObjects();
-				PushScreen(std::make_unique<OptionsScreen>());
+				gameUiPipeline.ShowStateScreen(state);
 				stateisnew = false;
 			}
 		}break;
 		case OPTIONSCONTROLS:{
 			if(stateisnew){
 				world.DestroyAllObjects();
-				PushScreen(std::make_unique<OptionsControlsScreen>());
+				gameUiPipeline.ShowStateScreen(state);
 				stateisnew = false;
 			}
 		}break;
 		case OPTIONSDISPLAY:{
 			if(stateisnew){
 				world.DestroyAllObjects();
-				PushScreen(std::make_unique<OptionsDisplayScreen>());
+				gameUiPipeline.ShowStateScreen(state);
 				stateisnew = false;
 			}
 		}break;
 		case OPTIONSAUDIO:{
 			if(stateisnew){
 				world.DestroyAllObjects();
-				PushScreen(std::make_unique<OptionsAudioScreen>());
+				gameUiPipeline.ShowStateScreen(state);
 				stateisnew = false;
 			}
 		}break;
@@ -518,8 +504,7 @@ void Game::GoToState(Uint8 newstate){
 }
 
 bool Game::GoBack(void){
-	Screen * top = GetTopScreen();
-	if(top && top->HandleBack(screenContext)) return true;
+	if(gameUiPipeline.HandleBack()) return true;
 	GoToState(MAINMENU);
 	return false;
 }
