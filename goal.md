@@ -33,12 +33,25 @@ Track all task context, decisions, and progress in Linear. Do not grow this file
   All slices land here; squash-merge at the end. Linear children are the task units —
   no per-slice PRs.
 
-## How to work
+## Autonomous loop protocol
 
-1. Read the Linear architecture doc, then pick the next **unblocked** issue (start at **SIL-6**).
-2. Keep exactly one high-coupling ownership slice (SIL-13/14/15) in progress at a time.
-3. Move the Linear issue through states; comment at boundaries (context, decisions, verification).
-4. No backwards-compat shims. Rename stale `zSILENCER`/`SDL2` when you touch a line. Combat overengineering.
+You are a long-running implementation agent. Each iteration:
+
+1. Read the Linear architecture doc (once per session is fine), then pick the next
+   **unblocked** Linear issue (lowest SIL-number whose blocked-by deps are all Done).
+   Foundation order that needs no open decisions: **SIL-7 → SIL-8 → SIL-9 → SIL-10**.
+2. Set it **In Progress** (keep exactly one high-coupling ownership slice — SIL-13/14/15 —
+   in progress at a time). Comment your starting context + files.
+3. Implement the slice against the contract in the Linear doc. `/Users/hv/repos/ui` wins on
+   any disagreement. No backwards-compat shims. Rename stale `zSILENCER`/`SDL2` when you
+   touch a line. Combat overengineering.
+4. **Verify** before claiming done: `clients/silencer/build.sh` + the issue's checks +
+   `tests/cli-agent/e2e/60_ui_architecture_boundaries.sh`. Paste evidence into the issue.
+5. Commit to branch `hv/cppx-migration-cc` (push to PR #267), set the issue **Done**, repeat.
+
+**Stop and ask the user** when blocked by a decision you can't make — notably **SIL-6**'s
+open decisions: the **UI font asset (TTF face) is the user's to provide**, and the in-game
+HUD scope + generated-cppx commit policy want a human call. Don't spin; surface it.
 
 ## Verify (per slice)
 
