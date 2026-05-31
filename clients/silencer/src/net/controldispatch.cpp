@@ -566,7 +566,7 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 	if(cmd.op == "show_password_modal"){
 		g_controlPasswordModalValue.clear();
 		g_controlPasswordModalSubmitted = false;
-		game.PushScreen(std::make_unique<PasswordModal>([](const char * password) {
+		game.GetScreenContext().ShowModal(std::make_unique<PasswordModal>([](const char * password) {
 			g_controlPasswordModalValue = password ? password : "";
 			g_controlPasswordModalSubmitted = true;
 		}));

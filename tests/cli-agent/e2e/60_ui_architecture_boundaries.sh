@@ -128,6 +128,11 @@ fail_if_match \
   --glob '!third_party/**'
 
 fail_if_match \
+  "\\b(PushScreen|PopScreen|ReplaceScreen)[[:space:]]*\\(" \
+  "$REPO_ROOT/clients/silencer/src/game/game.cpp" \
+  "$REPO_ROOT/clients/silencer/src/game/game.h"
+
+fail_if_match \
   '#include "(character_create_screen|lobby_connect_screen|main_menu_screen|mission_summary_screen|options_audio_screen|options_controls_screen|options_display_screen|options_screen|update_screen|lobby_screen)[.]h"|PushScreen[[:space:]]*[(][[:space:]]*std::make_unique<' \
   "$REPO_ROOT/clients/silencer/src/game/loop/game_loop.cpp"
 
