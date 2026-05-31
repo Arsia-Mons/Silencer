@@ -387,7 +387,7 @@ void Game::GoToState(Uint8 newstate){
 	gameRenderer.RestartPaletteFade();
 	stateisnew = true;
 	nextstateprocessed = false;
-	// Keep the outgoing Clay screen mounted until TickFadeOut reaches black.
+	// Keep the outgoing UI screen mounted until TickFadeOut reaches black.
 	// Legacy retained its world UI objects across FADEOUT, so there were still
 	// pixels for the palette fade to dim before the next state rebuilt UI.
 }

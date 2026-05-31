@@ -203,15 +203,15 @@ field reference, the two sound-helper variants, and NPC-wiring steps:
   `game.cpp` is the dispatcher; `events.cpp` handles SDL input,
   `ingame.cpp` holds in-game lifecycle, `headless.cpp` glues the
   control queue, and each gameplay-state Tick body lives in
-  `tick/tick_<state>.cpp`. `Game::RenderClientUiFrame` starts the one
-  production Clay frame; `ClientUi` owns visible UI navigation.
+  `tick/tick_<state>.cpp`. `GameUiPipeline::RenderClientUiFrame` starts the
+  retained UI frame; `ClientUi` owns visible UI navigation.
 - Simulation loop, socket, peer list, replay: `src/world.cpp`.
 - Rendering: `src/render/renderer.cpp`, `src/render/surface.cpp`,
   `src/render/sprite.cpp`, `src/render/palette.cpp`. Renderer is not a UI
-  owner; it supplies world/pixel drawing primitives used by the Clay compositor.
+  owner; it supplies world/pixel drawing primitives used by retained UI renderers.
 - Audio (skipped in `-s`): `src/audio.cpp`.
-- Generic Clay runtime/primitives: `src/ui/runtime`, `src/ui/primitives`,
-  `src/ui/design`.
+- Generic retained runtime/components: `src/ui/runtime`, `src/ui/components`,
+  `src/ui/style`.
 - Silencer-specific UI surfaces: `src/client/ui/screens`,
   `src/client/ui/modals`, `src/client/ui/hud`, and
   `src/client/ui/navigation`.

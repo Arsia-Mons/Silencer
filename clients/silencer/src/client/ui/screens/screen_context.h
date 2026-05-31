@@ -67,9 +67,9 @@ public:
 	// from Screen::Build by every menu surface that owns its presentation.
 	void ResetPresentation(int paletteIdx);
 
-	// Clay frame ownership lives in Game/ClientUi. Screens return retained
+	// Retained frame ownership lives in Game/ClientUi. Screens return retained
 	// roots through Screen::BuildElement; they must not begin/end or render
-	// Clay directly.
+	// UI frames directly.
 };
 
 #endif
