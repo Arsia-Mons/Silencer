@@ -37,6 +37,13 @@ RUNTIME_FILES = [
     "src/ui/runtime/element.cpp",
     "src/ui/runtime/tree.h",
     "src/ui/runtime/tree.cpp",
+    # SIL-10 Yoga flex layout adapter. yoga_flex_layout.cpp includes
+    # <yoga/Yoga.h> (not SDL) — Yoga is an allowed layout backend; the guard
+    # only bans SDL/SDL_ttf.
+    "src/ui/runtime/flex_layout.h",
+    "src/ui/runtime/flex_layout.cpp",
+    "src/ui/runtime/yoga_flex_layout.h",
+    "src/ui/runtime/yoga_flex_layout.cpp",
 ]
 
 SDL_INCLUDE_RE = re.compile(r'#\s*include\s*[<"]\s*(SDL3?/|SDL[._]|SDL_ttf)', re.IGNORECASE)

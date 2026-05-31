@@ -272,6 +272,52 @@ add_test(NAME cppx_runtime_sdl_free
 	COMMAND ${Python3_EXECUTABLE}
 		"${CMAKE_CURRENT_SOURCE_DIR}/tools/cppx_runtime_guard.py")
 
+# --- Yoga flex layout (SIL-10) -------------------------------------------
+# Yoga v3.2.1, the layout backend behind the retained runtime. flex_layout.*
+# is a Yoga-free adapter (FlexLayoutAdapter seam over UiTree); only
+# yoga_flex_layout.cpp touches <yoga/Yoga.h>. Both compile into the client via
+# the source glob (unity-excluded under src/ui/runtime) — dead until the
+# pipeline drives compute_flex_layout (SIL-13), but matches the end state, so
+# the client links yogacore now.
+include(FetchContent)
+FetchContent_Declare(
+	yoga
+	GIT_REPOSITORY https://github.com/facebook/yoga.git
+	GIT_TAG v3.2.1
+	GIT_SHALLOW TRUE
+	SOURCE_SUBDIR yoga
+)
+FetchContent_MakeAvailable(yoga)
+target_link_libraries(${SILENCER_TARGET} yogacore)
+
+# Retained tree-reconciliation contract (injected layout backend, no Yoga).
+add_executable(retained_ui_runtime_tests
+	tests/retained_ui_runtime_tests.cpp
+	src/ui/runtime/tree.cpp
+	src/ui/style/text_measure.cpp
+	src/ui/runtime/flex_layout.cpp)
+target_compile_features(retained_ui_runtime_tests PRIVATE cxx_std_20)
+target_include_directories(retained_ui_runtime_tests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src")
+if(MSVC)
+	target_compile_definitions(retained_ui_runtime_tests PRIVATE NOMINMAX)
+endif()
+add_test(NAME retained_ui_runtime_tests COMMAND retained_ui_runtime_tests)
+
+# Real Yoga layout: resolves absolute bounds for a nested flex tree.
+add_executable(retained_ui_yoga_tests
+	tests/retained_ui_yoga_tests.cpp
+	src/ui/runtime/tree.cpp
+	src/ui/style/text_measure.cpp
+	src/ui/runtime/flex_layout.cpp
+	src/ui/runtime/yoga_flex_layout.cpp)
+target_compile_features(retained_ui_yoga_tests PRIVATE cxx_std_20)
+target_include_directories(retained_ui_yoga_tests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src")
+target_link_libraries(retained_ui_yoga_tests PRIVATE yogacore)
+if(MSVC)
+	target_compile_definitions(retained_ui_yoga_tests PRIVATE NOMINMAX)
+endif()
+add_test(NAME retained_ui_yoga_tests COMMAND retained_ui_yoga_tests)
+
 # /Z7 embeds debug info into .obj files instead of routing it through MSVC's
 # mspdbsrv.exe — which has a habit of failing with C1090 PDB errors on some
 # Windows installs. /Zi (the default) is faster but unreliable; /Z7 is rock
