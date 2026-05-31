@@ -63,8 +63,6 @@ struct LobbyContextValue {
 	Actions actions = {};
 };
 
-extern ::ReactContext LobbyContext;
-
 const LobbyContextValue& UseLobby();
 
 struct LobbyScreenViewProps {

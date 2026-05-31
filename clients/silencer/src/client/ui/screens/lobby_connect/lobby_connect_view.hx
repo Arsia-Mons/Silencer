@@ -30,8 +30,6 @@ struct LobbyConnectContextValue {
 	LobbyConnectActions actions = {};
 };
 
-extern ::ReactContext LobbyConnectContext;
-
 const LobbyConnectContextValue& UseLobbyConnect();
 
 struct LobbyConnectViewProps {

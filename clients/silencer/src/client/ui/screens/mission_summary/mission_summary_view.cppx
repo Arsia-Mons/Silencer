@@ -541,9 +541,8 @@ struct MissionSummaryFrameProps {
 
 }  // namespace
 
-::ReactContext MissionSummaryContext = {};
-
 namespace {
+::ReactContext MissionSummaryContext = {};
 const MissionSummaryContextValue kEmptyMissionSummary = {};
 }
 

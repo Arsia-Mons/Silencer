@@ -25,8 +25,6 @@ struct OptionsControlsContextValue {
 	std::function<void()> cancel = {};
 };
 
-extern ::ReactContext OptionsControlsContext;
-
 const OptionsControlsContextValue& UseOptionsControls();
 
 struct OptionsControlsViewProps {

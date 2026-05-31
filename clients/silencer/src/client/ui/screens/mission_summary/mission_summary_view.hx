@@ -34,8 +34,6 @@ struct MissionSummaryContextValue {
 	MissionSummaryActions actions = {};
 };
 
-extern ::ReactContext MissionSummaryContext;
-
 const MissionSummaryContextValue& UseMissionSummary();
 
 struct MissionSummaryViewProps {

@@ -243,9 +243,8 @@ struct LobbyConnectFrameProps {
 
 }  // namespace
 
-::ReactContext LobbyConnectContext = {};
-
 namespace {
+::ReactContext LobbyConnectContext = {};
 const LobbyConnectContextValue kEmptyLobbyConnect = {};
 }
 

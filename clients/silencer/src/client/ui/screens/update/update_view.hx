@@ -33,8 +33,6 @@ struct UpdateContextValue {
 	UpdateActions actions = {};
 };
 
-extern ::ReactContext UpdateContext;
-
 const UpdateContextValue& UseUpdate();
 
 struct UpdateViewProps {

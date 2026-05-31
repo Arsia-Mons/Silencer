@@ -16,8 +16,6 @@ struct OptionsDisplayContextValue {
 	std::function<void()> cancel = {};
 };
 
-extern ::ReactContext OptionsDisplayContext;
-
 const OptionsDisplayContextValue& UseOptionsDisplay();
 
 struct OptionsDisplayViewProps {

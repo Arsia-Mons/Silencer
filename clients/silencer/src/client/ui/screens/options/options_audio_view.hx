@@ -14,8 +14,6 @@ struct OptionsAudioContextValue {
 	std::function<void()> cancel = {};
 };
 
-extern ::ReactContext OptionsAudioContext;
-
 const OptionsAudioContextValue& UseOptionsAudio();
 
 struct OptionsAudioViewProps {

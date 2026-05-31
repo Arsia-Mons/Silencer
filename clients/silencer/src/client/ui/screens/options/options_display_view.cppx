@@ -182,9 +182,8 @@ struct OptionsDisplayFrameProps {
 
 }  // namespace
 
-::ReactContext OptionsDisplayContext = {};
-
 namespace {
+::ReactContext OptionsDisplayContext = {};
 const OptionsDisplayContextValue kEmptyOptionsDisplay = {};
 }
 

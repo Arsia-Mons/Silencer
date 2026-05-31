@@ -102,6 +102,11 @@ fail_if_match \
   "$REPO_ROOT/clients/silencer/src/client/ui/screens/character_create"
 
 fail_if_match \
+  "extern ::ReactContext" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens" \
+  --glob '*.hx'
+
+fail_if_match \
   "clay_bridge::(EnsureInitialized|Render)[[:space:]]*\\(" \
   "$REPO_ROOT/clients/silencer/src/client/ui/screens" \
   "$REPO_ROOT/clients/silencer/src/client/ui/modals" \

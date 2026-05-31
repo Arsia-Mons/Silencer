@@ -159,9 +159,8 @@ struct OptionsAudioFrameProps {
 
 }  // namespace
 
-::ReactContext OptionsAudioContext = {};
-
 namespace {
+::ReactContext OptionsAudioContext = {};
 const OptionsAudioContextValue kEmptyOptionsAudio = {};
 }
 

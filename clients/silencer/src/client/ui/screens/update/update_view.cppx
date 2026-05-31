@@ -214,9 +214,8 @@ struct UpdateFrameProps {
 
 }  // namespace
 
-::ReactContext UpdateContext = {};
-
 namespace {
+::ReactContext UpdateContext = {};
 const UpdateContextValue kEmptyUpdate = {};
 }
 

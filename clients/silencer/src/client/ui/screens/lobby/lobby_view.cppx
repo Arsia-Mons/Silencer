@@ -29,10 +29,9 @@ using ::ui::components::InputProps;
 using ::ui::components::Text;
 using ::ui::components::TextProps;
 
-::ReactContext LobbyContext = {};
-
 namespace {
 
+::ReactContext LobbyContext = {};
 constexpr int kVisibleChatLines = 8;
 constexpr int kVisiblePresenceLines = 7;
 const LobbyContextValue kEmptyContext = {};

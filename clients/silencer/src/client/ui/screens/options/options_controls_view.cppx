@@ -17,10 +17,9 @@ using ::ui::components::ButtonProps;
 using ::ui::components::Text;
 using ::ui::components::TextProps;
 
-::ReactContext OptionsControlsContext = {};
-
 namespace {
 
+::ReactContext OptionsControlsContext = {};
 const OptionsControlsContextValue kEmptyContext = {};
 
 constexpr int kContentW = 486;
