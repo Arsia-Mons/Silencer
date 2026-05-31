@@ -52,3 +52,7 @@ return gameUiPipeline.Top();
 bool Game::HasUiInputTarget() {
 return gameUiPipeline.HasInputTarget();
 }
+
+bool Game::HasVisibleUiScreen() const {
+return gameUiPipeline.HasScreen();
+}

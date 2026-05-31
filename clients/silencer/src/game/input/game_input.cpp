@@ -4,7 +4,6 @@
 #include "audio.h"
 #include "config.h"
 #include "player.h"
-#include "screen.h"
 #include <cstring>
 #include <vector>
 
@@ -67,10 +66,7 @@ SDL_RumbleGamepad(gamepad, 18000, 0, 120);
 
 void GameInput::TickGamepadMenuNav(){
 if(!gamepadstate.connected) return;
-Player * localplayer = game.world.GetPeerPlayer(game.world.peers.localpeerid);
-bool inGameUi = localplayer && (localplayer->chatActive || localplayer->isbuying || localplayer->techstationactive);
-Screen * top = game.GetTopScreen();
-if(!top && !inGameUi) return;
+if(!game.HasUiInputTarget()) return;
 
 Uint32 now = SDL_GetTicks();
 auto tick = [&](GamepadNavDir& dir, Action action, silencer::ui::UiNavAction navAction){

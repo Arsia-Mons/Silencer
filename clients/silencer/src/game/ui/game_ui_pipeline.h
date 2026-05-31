@@ -26,6 +26,7 @@ void BuildVisibleClientUi(Surface & surface, float frametime);
 void DrawInGameWorldInsets(Surface & surface, float frametime);
 void RenderClientUiFrame(Surface & surface, float frametime);
 void ResetUiFrameDeltas();
+bool HasScreen() const;
 bool HasInputTarget();
 void RequestClearScreens();
 void ClearScreensIfRequested();

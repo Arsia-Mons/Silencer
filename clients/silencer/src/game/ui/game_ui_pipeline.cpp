@@ -209,6 +209,10 @@ GameUiPipeline::GameUiPipeline(Game & g)
   lastUiAnimationMs(0), textInputFocused(false) {
 }
 
+bool GameUiPipeline::HasScreen() const {
+return clientUi.HasScreens();
+}
+
 bool GameUiPipeline::HasInputTarget() {
 if(Top()) return true;
 return inGameUiController.HasInputTarget(game.world.peers.localpeerid);

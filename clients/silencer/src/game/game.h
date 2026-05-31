@@ -81,6 +81,7 @@ void PopScreen();
 void ReplaceScreen(std::unique_ptr<Screen> s);
 Screen * GetTopScreen() const;
 bool HasUiInputTarget();
+bool HasVisibleUiScreen() const;
 
 KeyMap & GetKeyMap() { return gameInput.GetKeyMap(); }
 const KeyMap & GetKeyMap() const { return gameInput.GetKeyMap(); }
