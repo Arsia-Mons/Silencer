@@ -24,6 +24,8 @@ class Surface;
 namespace silencer {
 namespace client_ui {
 
+struct HudView;
+
 class ClientUi {
 public:
 	explicit ClientUi(silencer::ui::ClayService& clay);
@@ -45,6 +47,7 @@ public:
 	void ClearScreensIfRequested(ScreenContext& ctx);
 	void TickVisibleScreens(ScreenContext& ctx);
 	void BuildVisibleScreens(ScreenContext& ctx);
+	void BuildRetainedInGameHud(const HudView& view);
 	void RenderRetainedScreens(Renderer& renderer, Surface& dst);
 
 private:

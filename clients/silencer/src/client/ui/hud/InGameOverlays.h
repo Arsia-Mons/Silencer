@@ -12,7 +12,8 @@ struct HudView;
 void BuildInGameOverlaysUi(Renderer& renderer,
                            const Resources& resources,
                            const HudView& view,
-                           Surface* surface);
+                           Surface* surface,
+                           bool drawTopMessage);
 
 }  // namespace client_ui
 }  // namespace silencer

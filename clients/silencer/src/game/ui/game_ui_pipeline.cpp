@@ -161,9 +161,14 @@ clientUi.BuildVisibleScreens(game.screenContext);
 if(game.world.map.loaded){
 silencer::client_ui::HudView hudView =
 silencer::client_ui::BuildHudView(game.world);
+const bool retainedInGameHud = !clientUi.HasScreens();
+if(retainedInGameHud){
+clientUi.BuildRetainedInGameHud(hudView);
+}
 silencer::client_ui::BuildInGameHudUi(
 game.renderer, game.world.resources, hudView, &surface, clientUi.Interactions());
-silencer::client_ui::BuildInGameOverlaysUi(game.renderer, game.world.resources, hudView, &surface);
+silencer::client_ui::BuildInGameOverlaysUi(
+game.renderer, game.world.resources, hudView, &surface, !retainedInGameHud);
 }
 }
 

@@ -229,10 +229,12 @@ void DrawQuitPrompt(const HudView& /*view*/, Surface* surface) {
 }  // namespace ingameoverlays_detail
 
 void BuildInGameOverlaysUi(Renderer& /*renderer*/, const Resources& /*resources*/,
-                           const HudView& view, Surface* surface) {
+                           const HudView& view, Surface* surface, bool drawTopMessage) {
 	if(!view.mapLoaded) return;
 	ingameoverlays_detail::DrawStatus(view, surface);
-	ingameoverlays_detail::DrawTopMessage(view, surface);
+	if(drawTopMessage){
+		ingameoverlays_detail::DrawTopMessage(view, surface);
+	}
 	ingameoverlays_detail::DrawMessage(view, surface);
 	if(view.showPlayerList){
 		BuildPlayerListOverlay(view, surface);

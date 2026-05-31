@@ -1,6 +1,8 @@
 #include "client/ui/ClientUi.h"
 
 #include "client/ui/hud/HudPayloadArena.h"
+#include "client/ui/hud/ingame_hud_view.h"
+#include "client/ui/views/HudView.h"
 #include "screen.h"
 #include "screen_context.h"
 #include "retained_surface_renderer.h"
@@ -306,6 +308,37 @@ bool ClientUi::BuildRetainedScreens(ScreenContext& ctx) {
 
 void ClientUi::BuildVisibleScreens(ScreenContext& ctx) {
 	(void)BuildRetainedScreens(ctx);
+}
+
+void ClientUi::BuildRetainedInGameHud(const HudView& view) {
+	retainedElementFrame_.reset();
+	if(!view.mapLoaded){
+		retainedCommands_.reset();
+		return;
+	}
+	::ui::UiElementFrameScope scope(retainedElementFrame_);
+	const InGameHudContextValue context{ .view = &view };
+	const auto * stored = ::ui::copy_value(context);
+	if(!stored){
+		retainedCommands_.reset();
+		return;
+	}
+	::ui::UiElement root = InGameHudView(InGameHudViewProps{
+		.key = "in-game-hud",
+		.value = stored,
+	});
+	::ui::UiElement provider = ::ui::provider(
+		"InteractionProvider",
+		&::ui::InteractionContext,
+		&retainedInteractionSnapshot_,
+		::ui::children({ root }));
+	::ui::ReconcileResult result =
+		::ui::commit_retained_elements(retainedTree_, retainedElementFrame_, provider);
+	if(!result.ok){
+		retainedCommands_.reset();
+		::react_report_error("client/ui: failed to commit retained in-game HUD (errors=%d)\n",
+		                     result.error_count);
+	}
 }
 
 void ClientUi::RenderRetainedScreens(Renderer& renderer, Surface& dst) {

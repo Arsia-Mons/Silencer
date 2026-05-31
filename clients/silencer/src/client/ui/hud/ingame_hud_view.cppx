@@ -1,0 +1,115 @@
+#include "client/ui/hud/ingame_hud_view.h"
+
+#include "ui/components/box.h"
+#include "ui/components/text.h"
+#include "ui/runtime/react.h"
+
+#include <algorithm>
+#include <string>
+
+namespace silencer::client_ui {
+
+using ::ui::children;
+using ::ui::components::Box;
+using ::ui::components::BoxProps;
+using ::ui::components::Text;
+using ::ui::components::TextProps;
+
+::ReactContext InGameHudContext = {};
+
+namespace {
+
+const InGameHudContextValue kEmptyContext = {};
+constexpr int kTopMessageMaxLength = 35;
+
+std::string visible_top_message(const InGameTopMessageView& message) {
+	if(!message.topmessage_i || message.text.empty()) return std::string();
+	int start = 0;
+	if(message.topmessage_i / 2 > 24){
+		start = (message.topmessage_i / 2) - 24;
+		if(start > static_cast<int>(message.text.size())){
+			start = static_cast<int>(message.text.size());
+		}
+	}
+	const int length = std::min(kTopMessageMaxLength,
+	                            static_cast<int>(message.text.size()) - start);
+	return length > 0
+		? message.text.substr(static_cast<size_t>(start), static_cast<size_t>(length))
+		: std::string();
+}
+
+::ui::LayoutStyle root_layout() {
+	return ::ui::LayoutStyle{
+		.position = ::ui::PositionType::Absolute,
+		.width = ::ui::Length::percent(100.0f),
+		.height = ::ui::Length::percent(100.0f),
+	};
+}
+
+::ui::EdgeSizes top_message_inset() {
+	::ui::EdgeSizes inset;
+	inset.left = ::ui::StyleValue::points(200.0f);
+	inset.top = ::ui::StyleValue::points(10.0f);
+	return inset;
+}
+
+::ui::LayoutStyle top_message_layout() {
+	return ::ui::LayoutStyle{
+		.position = ::ui::PositionType::Absolute,
+		.width = ::ui::Length::points(245.0f),
+		.height = ::ui::Length::points(12.0f),
+		.position_inset = top_message_inset(),
+	};
+}
+
+::ui::StyleStatePatch top_message_style() {
+	return ::ui::patch().text(::ui::TextVisual{
+		.color = {226, 234, 242, 255},
+		.font_id = 133,
+		.font_size = 7,
+	});
+}
+
+struct TopMessageProps {
+	const char * key = nullptr;
+};
+
+::ui::UiElement TopMessage(const TopMessageProps& props) {
+	const InGameHudContextValue& hud = UseInGameHud();
+	if(!hud.view) return ::ui::empty();
+	std::string text = visible_top_message(hud.view->topMessage);
+	if(text.empty()) return ::ui::empty();
+	return <Text
+	  key={props.key}
+	  value={text.c_str()}
+	  layout={top_message_layout()}
+	  style={top_message_style()}
+	/>
+}
+
+::ui::UiElement InGameHudFrame(const BoxProps& props) {
+	return <Box key={props.key} layout={root_layout()}>
+		<TopMessage key="top-message" />
+	</Box>
+}
+
+}  // namespace
+
+const InGameHudContextValue& UseInGameHud() {
+	const auto * value = static_cast<const InGameHudContextValue *>(
+		::use_context(&InGameHudContext));
+	return value ? *value : kEmptyContext;
+}
+
+::ui::UiElement InGameHudView(const InGameHudViewProps& props) {
+	return ::ui::provider(
+		"InGameHudProvider",
+		&InGameHudContext,
+		const_cast<InGameHudContextValue *>(props.value),
+		children({
+			::ui::component("InGameHudFrame", BoxProps{ .key = "frame" }, InGameHudFrame),
+		}),
+		props.key);
+}
+
+}  // namespace silencer::client_ui
