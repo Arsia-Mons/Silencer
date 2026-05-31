@@ -4,6 +4,34 @@ All notable changes to Silencer are documented here.
 
 ## [Unreleased]
 
+## [v00058] — 2026-05-31
+
+### Game client
+
+#### Lobby connect and UI (#264)
+
+- The lobby connect primary action now reads `Login/Create`, with auto-width chrome buttons and a patched legacy backdrop so the wider label no longer clips or overlaps `Cancel`.
+
+#### Physics materials and footsteps (#229)
+
+- Added data-driven physics materials for platforms, including friction/speed multipliers and material-driven footstep cue resolution.
+- Player and NPC footsteps now use frame-event tags with per-material actor overrides, and map data can persist platform material assignments.
+
+### Admin web and API
+
+- Added the Physics Materials editor and API route for editing per-material movement and sound cue data (#229).
+- Actor footstep override controls now use searchable cue pickers, and expired admin sessions redirect back to login instead of leaving pages in a broken offline state (#229).
+- Admin API can drive a Discord live-stats presence from live player/game counts when `DISCORD_TOKEN` is configured (#262).
+
+### Lobby and compatibility
+
+- Added the WON.net replacement DLL client plus lobby compatibility endpoints for legacy login, account creation, and profile requests (#260).
+- Fixed the WON DLL Windows socket include path so its x86 Windows build uses the expected Winsock declarations.
+
+### Docs
+
+- Added extracted original beta reference files and game-reference docs for the WON compatibility work (#260).
+
 ## [v00057] — 2026-05-25
 
 ### Game client

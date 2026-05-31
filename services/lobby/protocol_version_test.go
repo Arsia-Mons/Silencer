@@ -9,7 +9,7 @@ import (
 	"testing"
 )
 
-const currentProtocolVersion = "00057"
+const currentProtocolVersion = "00058"
 const currentWireFingerprint = "c16c0106632b187bff8887ecf00fdef413aa9a46434b90a7caaf8d96d8da80eb"
 
 var wireFingerprintPaths = []string{
