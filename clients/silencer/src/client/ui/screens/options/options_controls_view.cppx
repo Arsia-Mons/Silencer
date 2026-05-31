@@ -343,9 +343,57 @@ struct OptionsControlsFrameProps {
 	const char * key = nullptr;
 };
 
-::ui::UiElement OptionsControlsFrame(const OptionsControlsFrameProps& props) {
+struct PresetButtonProps {
+	const char * key = nullptr;
+};
+
+::ui::UiElement PresetButton(const PresetButtonProps& props) {
+	const OptionsControlsContextValue& controls = UseOptionsControls();
+	return <Button
+	  key={props.key}
+	  id="options_controls.preset"
+	  label={preset_text(controls.keybinds)}
+	  accessibility={::ui::components::AccessibilityProps{.label = "Preset"}}
+	  autofocus={true}
+	  onActivate={action_callback(controls.cycle_preset)}
+	  layout={preset_button_layout(h_scale(controls.keybinds))}
+	/>
+}
+
+struct ControlsSaveButtonProps {
+	const char * key = nullptr;
+};
+
+::ui::UiElement ControlsSaveButton(const ControlsSaveButtonProps& props) {
 	const OptionsControlsContextValue& controls = UseOptionsControls();
 	Navigation navigation = UseNavigation();
+	return <Button
+	  key={props.key}
+	  id="options_controls.save"
+	  label="Save"
+	  onActivate={navigation_action_callback(controls.save, navigation, GameState::OPTIONS)}
+	  layout={footer_button_layout()}
+	/>
+}
+
+struct ControlsCancelButtonProps {
+	const char * key = nullptr;
+};
+
+::ui::UiElement ControlsCancelButton(const ControlsCancelButtonProps& props) {
+	const OptionsControlsContextValue& controls = UseOptionsControls();
+	Navigation navigation = UseNavigation();
+	return <Button
+	  key={props.key}
+	  id="options_controls.cancel"
+	  label="Cancel"
+	  onActivate={navigation_action_callback(controls.cancel, navigation, GameState::OPTIONS)}
+	  layout={footer_button_layout()}
+	/>
+}
+
+::ui::UiElement OptionsControlsFrame(const OptionsControlsFrameProps& props) {
+	const OptionsControlsContextValue& controls = UseOptionsControls();
 	return <Box key={props.key} layout={root_layout(controls)} style={root_style()}>
 		<Box key="panel" layout={panel_layout(controls)} style={panel_style()}>
 			<Text
@@ -362,15 +410,7 @@ struct OptionsControlsFrameProps {
 					  layout={label_layout(h_scale(controls.keybinds))}
 					  style={heading_style()}
 					/>
-					<Button
-					  key="preset"
-					  id="options_controls.preset"
-					  label={preset_text(controls.keybinds)}
-					  accessibility={::ui::components::AccessibilityProps{.label = "Preset"}}
-					  autofocus={true}
-					  onActivate={action_callback(controls.cycle_preset)}
-					  layout={preset_button_layout(h_scale(controls.keybinds))}
-					/>
+					<PresetButton key="preset" />
 				</Box>
 				<Box
 				  key="rows"
@@ -411,20 +451,8 @@ struct OptionsControlsFrameProps {
 				</Box>
 				<Box key="spacer" layout={spacer_layout()} />
 				<Box key="actions" layout={actions_layout(controls.keybinds)}>
-					<Button
-					  key="save"
-					  id="options_controls.save"
-					  label="Save"
-					  onActivate={navigation_action_callback(controls.save, navigation, GameState::OPTIONS)}
-					  layout={footer_button_layout()}
-					/>
-					<Button
-					  key="cancel"
-					  id="options_controls.cancel"
-					  label="Cancel"
-					  onActivate={navigation_action_callback(controls.cancel, navigation, GameState::OPTIONS)}
-					  layout={footer_button_layout()}
-					/>
+					<ControlsSaveButton key="save" />
+					<ControlsCancelButton key="cancel" />
 				</Box>
 			</Box>
 		</Box>
