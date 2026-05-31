@@ -1,19 +1,26 @@
 # clients/silencer/src/client/ui - Client UI
 
-This subtree owns Silencer's app-side UI composition: screen/modal navigation, HUD/overlay declaration, screen-local components, and the bridge from semantic UI actions back into game state.
+This subtree owns Silencer's app-side UI composition: screen/modal navigation,
+HUD/overlay declaration, screen-local components, and the bridge from semantic
+UI actions back into game state.
 
 Clay is a frame layout and render-command generator. It is not the application state owner, event loop, renderer, widget toolkit, or navigation stack.
 
-This UI is actively migrating toward good flexbox layout, Clay lifecycle, and shadcn-style primitive API first principles. If you touch stale code that conflicts with those principles, update it in the same change instead of preserving the old pattern.
+This UI is actively migrating toward retained cppx roots, hooks/providers, good
+flexbox layout, Clay lifecycle, and shadcn-style primitive API first principles.
+If you touch stale code that conflicts with those principles, update it in the
+same change instead of preserving the old pattern.
 
 ## Ownership
 
-- `ClientUi` owns one visible UI frame. `Game::RenderClientUiFrame` prepares input, begins one `ClientUi`/`ClayService` frame, asks visible layers to declare UI, ends the frame, renders commands, then dispatches typed UI actions.
-- Screens, modals, HUD, and overlays only declare UI into the current frame. They must not call `Clay_BeginLayout`, `Clay_EndLayout`, `Clay_SetPointerState`, `clay_bridge::EnsureInitialized`, or `clay_bridge::Render`.
+- `ClientUi` owns one visible UI frame. `Game::RenderClientUiFrame` prepares input, begins one `ClientUi`/`ClayService` frame, asks visible screens and modals for retained roots, asks HUD/overlays to declare legacy bridge UI, ends the frame, renders commands, then dispatches typed UI actions.
+- Screens and modals return retained cppx roots from `BuildElement`. HUD and overlays may still declare legacy bridge UI during migration. They must not call `Clay_BeginLayout`, `Clay_EndLayout`, `Clay_SetPointerState`, `clay_bridge::EnsureInitialized`, or `clay_bridge::Render`.
 - Clay owns layout, wrapping, clipping, hover state, scroll containers, and final bounds. `UiInteractionRegistry` owns semantic metadata, focus, text editing, pointer hit testing, keyboard/gamepad navigation, automation, and typed actions.
 - Prefer flexbox-style Clay layout: sizing, grow/fit, padding, gaps, alignment, and stable containers. Treat absolute coordinates and sprite-offset nudges as legacy escape hatches to remove when practical.
 - The compositor/render layer owns sprite banks, palette effects, text drawing, clipping, and custom-payload dispatch. UI screens and ordinary primitives do not call SDL, `Renderer`, or `Surface` APIs directly.
 - Screen-specific components stay under the owning screen directory. Promote a component only after there is real reuse.
+- Keep screen/component APIs React-style: props, children, hooks, and providers.
+  Do not add a separate view/action mediation layer.
 
 ## Primitive API
 
