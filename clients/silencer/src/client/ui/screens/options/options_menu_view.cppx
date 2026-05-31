@@ -1,5 +1,7 @@
 #include "client/ui/screens/options/options_menu_view.h"
 
+#include "client/ui/navigation/NavigationProvider.h"
+#include "game_state.h"
 #include "ui/components/box.h"
 #include "ui/components/button.h"
 #include "ui/components/text.h"
@@ -62,9 +64,18 @@ namespace {
 	});
 }
 
+std::function<void(const ::ui::ActivationEvent&)> go_to_state_callback(
+	Navigation navigation,
+	Uint8 state) {
+	return [navigation, state](const ::ui::ActivationEvent&) {
+		if(navigation.goToState) navigation.goToState(state);
+	};
+}
+
 }  // namespace
 
 ::ui::UiElement OptionsMenuView(const OptionsMenuViewProps& props) {
+	Navigation navigation = UseNavigation();
 	return <Box key={props.key} layout={root_layout()}>
 		<Box key="column" layout={column_layout()}>
 			<Text key="title" value="Options" layout={title_layout()} style={title_style()} />
@@ -73,28 +84,28 @@ namespace {
 			  id="options.controls"
 			  label="Controls"
 			  autofocus={true}
-			  onActivate={props.on_controls}
+			  onActivate={go_to_state_callback(navigation, GameState::OPTIONSCONTROLS)}
 			  layout={button_layout(true)}
 			/>
 			<Button
 			  key="display"
 			  id="options.display"
 			  label="Display"
-			  onActivate={props.on_display}
+			  onActivate={go_to_state_callback(navigation, GameState::OPTIONSDISPLAY)}
 			  layout={button_layout()}
 			/>
 			<Button
 			  key="audio"
 			  id="options.audio"
 			  label="Audio"
-			  onActivate={props.on_audio}
+			  onActivate={go_to_state_callback(navigation, GameState::OPTIONSAUDIO)}
 			  layout={button_layout()}
 			/>
 			<Button
 			  key="back"
 			  id="options.back"
 			  label="Go Back"
-			  onActivate={props.on_back}
+			  onActivate={go_to_state_callback(navigation, GameState::MAINMENU)}
 			  layout={button_layout()}
 			/>
 		</Box>

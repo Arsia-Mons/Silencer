@@ -12,8 +12,8 @@ wait_alive "$PORT"
 cli --port "$PORT" wait_for_state --state MAINMENU --timeout-ms 15000 >/dev/null
 
 # The control key op's directional names mirror the gamepad UI navigation
-# mapping in Game::TickGamepadMenuNavigation.
-cli --port "$PORT" key --key down >/dev/null
+# mapping in Game::TickGamepadMenuNavigation. MainMenuView autofocuses
+# Tutorial, so two downward moves land on Options.
 cli --port "$PORT" key --key down >/dev/null
 cli --port "$PORT" key --key down >/dev/null
 cli --port "$PORT" key --key enter >/dev/null
