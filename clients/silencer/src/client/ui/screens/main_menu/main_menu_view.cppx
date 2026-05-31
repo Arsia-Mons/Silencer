@@ -109,45 +109,70 @@ std::function<void(const ::ui::ActivationEvent&)> request_quit_callback(
 	};
 }
 
+struct MenuNavigationButtonProps {
+	const char * key = nullptr;
+	const char * id = "";
+	const char * label = "";
+	Uint8 destination = 0;
+	bool autofocus = false;
+};
+
+::ui::UiElement MenuNavigationButton(const MenuNavigationButtonProps& props) {
+	Navigation navigation = UseNavigation();
+	return <Button
+	  key={props.key}
+	  id={props.id}
+	  label={props.label}
+	  autofocus={props.autofocus}
+	  onActivate={go_to_state_callback(navigation, props.destination)}
+	  layout={button_layout(props.autofocus)}
+	/>
+}
+
+struct ExitButtonProps {
+	const char * key = nullptr;
+};
+
+::ui::UiElement ExitButton(const ExitButtonProps& props) {
+	Navigation navigation = UseNavigation();
+	return <Button
+	  key={props.key}
+	  id="main_menu.exit"
+	  label="Exit"
+	  onActivate={request_quit_callback(navigation)}
+	  layout={button_layout()}
+	/>
+}
+
 }  // namespace
 
 ::ui::UiElement MainMenuView(const MainMenuViewProps& props) {
-	Navigation navigation = UseNavigation();
 	return <Box key={props.key} layout={root_layout()} style={root_style()}>
 		<Box key="title-stack" layout={title_stack_layout()}>
 			<Text key="title" value="Silencer" layout={title_layout()} style={title_style()} />
 			<Text key="version" value={props.version} layout={subtitle_layout()} style={subtitle_style()} />
 		</Box>
 		<Box key="button-stack" layout={button_stack_layout()}>
-			<Button
+			<MenuNavigationButton
 			  key="tutorial"
 			  id="main_menu.tutorial"
 			  label="Tutorial"
+			  destination={GameState::SINGLEPLAYERGAME}
 			  autofocus={true}
-			  onActivate={go_to_state_callback(navigation, GameState::SINGLEPLAYERGAME)}
-			  layout={button_layout(true)}
 			/>
-			<Button
+			<MenuNavigationButton
 			  key="lobby"
 			  id="main_menu.lobby"
 			  label="Connect To Lobby"
-			  onActivate={go_to_state_callback(navigation, GameState::LOBBYCONNECT)}
-			  layout={button_layout()}
+			  destination={GameState::LOBBYCONNECT}
 			/>
-			<Button
+			<MenuNavigationButton
 			  key="options"
 			  id="main_menu.options"
 			  label="Options"
-			  onActivate={go_to_state_callback(navigation, GameState::OPTIONS)}
-			  layout={button_layout()}
+			  destination={GameState::OPTIONS}
 			/>
-			<Button
-			  key="exit"
-			  id="main_menu.exit"
-			  label="Exit"
-			  onActivate={request_quit_callback(navigation)}
-			  layout={button_layout()}
-			/>
+			<ExitButton key="exit" />
 		</Box>
 	</Box>
 }

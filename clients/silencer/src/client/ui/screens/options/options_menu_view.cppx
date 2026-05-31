@@ -72,41 +72,56 @@ std::function<void(const ::ui::ActivationEvent&)> go_to_state_callback(
 	};
 }
 
+struct OptionsNavigationButtonProps {
+	const char * key = nullptr;
+	const char * id = "";
+	const char * label = "";
+	Uint8 destination = 0;
+	bool autofocus = false;
+};
+
+::ui::UiElement OptionsNavigationButton(const OptionsNavigationButtonProps& props) {
+	Navigation navigation = UseNavigation();
+	return <Button
+	  key={props.key}
+	  id={props.id}
+	  label={props.label}
+	  autofocus={props.autofocus}
+	  onActivate={go_to_state_callback(navigation, props.destination)}
+	  layout={button_layout(props.autofocus)}
+	/>
+}
+
 }  // namespace
 
 ::ui::UiElement OptionsMenuView(const OptionsMenuViewProps& props) {
-	Navigation navigation = UseNavigation();
 	return <Box key={props.key} layout={root_layout()}>
 		<Box key="column" layout={column_layout()}>
 			<Text key="title" value="Options" layout={title_layout()} style={title_style()} />
-			<Button
+			<OptionsNavigationButton
 			  key="controls"
 			  id="options.controls"
 			  label="Controls"
+			  destination={GameState::OPTIONSCONTROLS}
 			  autofocus={true}
-			  onActivate={go_to_state_callback(navigation, GameState::OPTIONSCONTROLS)}
-			  layout={button_layout(true)}
 			/>
-			<Button
+			<OptionsNavigationButton
 			  key="display"
 			  id="options.display"
 			  label="Display"
-			  onActivate={go_to_state_callback(navigation, GameState::OPTIONSDISPLAY)}
-			  layout={button_layout()}
+			  destination={GameState::OPTIONSDISPLAY}
 			/>
-			<Button
+			<OptionsNavigationButton
 			  key="audio"
 			  id="options.audio"
 			  label="Audio"
-			  onActivate={go_to_state_callback(navigation, GameState::OPTIONSAUDIO)}
-			  layout={button_layout()}
+			  destination={GameState::OPTIONSAUDIO}
 			/>
-			<Button
+			<OptionsNavigationButton
 			  key="back"
 			  id="options.back"
 			  label="Go Back"
-			  onActivate={go_to_state_callback(navigation, GameState::MAINMENU)}
-			  layout={button_layout()}
+			  destination={GameState::MAINMENU}
 			/>
 		</Box>
 	</Box>
