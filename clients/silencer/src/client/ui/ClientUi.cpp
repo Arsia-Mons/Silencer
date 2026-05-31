@@ -240,10 +240,6 @@ std::vector<silencer::ui::UiAction> ClientUi::DispatchInput(
 	return unhandled;
 }
 
-std::vector<silencer::ui::UiAction> ClientUi::DrainActions() {
-	return interactions_.DrainActions();
-}
-
 bool ClientUi::HasTextInputFocus() const {
 	if(interactions_.HasTextInputFocus()) return true;
 	const ::ui::NodeId focused = ::ui::focus_focused_id(retainedFocus_);

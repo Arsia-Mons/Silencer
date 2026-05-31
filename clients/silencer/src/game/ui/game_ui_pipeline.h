@@ -17,10 +17,6 @@ class GameUiPipeline
 public:
 explicit GameUiPipeline(Game & game);
 
-void PrepareClientUiFrame(Surface & surface);
-void BeginPreparedClientUiFrame();
-void EndClientUiFrame();
-void BuildVisibleClientUi(Surface & surface, float frametime);
 void DrawInGameWorldInsets(Surface & surface, float frametime);
 void RenderClientUiFrame(Surface & surface, float frametime);
 void ResetUiFrameDeltas();
@@ -53,6 +49,10 @@ Uint64 lastUiAnimationMs;
 bool textInputFocused;
 
 bool ShowScreenForState(Uint8 state);
+void PrepareClientUiFrame(Surface & surface);
+void BeginPreparedClientUiFrame();
+void EndClientUiFrame();
+void BuildVisibleClientUi();
 void EnterScreenState(Uint8 state);
 void PlayMenuMusicIfReady();
 };

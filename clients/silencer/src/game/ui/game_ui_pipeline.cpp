@@ -150,9 +150,7 @@ clientUi.EndFrame();
 hasPreparedUiInput = false;
 }
 
-void GameUiPipeline::BuildVisibleClientUi(Surface& surface, float frametime) {
-(void)surface;
-(void)frametime;
+void GameUiPipeline::BuildVisibleClientUi() {
 silencer::client_ui::HudView hudView;
 const bool hasHud = game.world.map.loaded;
 if(game.world.map.loaded){
@@ -208,7 +206,7 @@ return;
 
 PrepareClientUiFrame(surface);
 BeginPreparedClientUiFrame();
-BuildVisibleClientUi(surface, frametime);
+BuildVisibleClientUi();
 EndClientUiFrame();
 clientUi.RenderRetainedScreens(game.renderer, game.world.resources, surface);
 if(game.state != GameState::FADEOUT){

@@ -35,7 +35,6 @@ public:
 	void BeginFrame(const silencer::ui::UiInputState& input);
 	void EndFrame();
 	std::vector<silencer::ui::UiAction> DispatchInput(ScreenContext& ctx, const silencer::ui::UiInputState& input);
-	std::vector<silencer::ui::UiAction> DrainActions();
 	const silencer::ui::UiInteractionRegistry& Interactions() const { return interactions_; }
 	silencer::ui::UiInteractionRegistry& Interactions() { return interactions_; }
 	bool HasTextInputFocus() const;
