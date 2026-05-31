@@ -145,6 +145,37 @@ the same pattern; new keys that affect a UI screen should go through
 Run `tests/cli-agent/e2e/60_ui_architecture_boundaries.sh` after UI ownership
 changes; it guards this boundary.
 
+### cppx tooling
+
+The cppx migration uses the formatter/transpiler vendored from the
+authoritative `/Users/hv/repos/ui` checkout:
+
+```bash
+python3 clients/silencer/tools/cppx_format.py --in-place <files.cppx-or-hx>
+python3 clients/silencer/tools/cppx_transpile.py <file.cppx-or-hx>
+python3 tests/cppx_transpiler_tests.py \
+  --tool clients/silencer/tools/cppx_transpile.py \
+  --fixtures tests/fixtures/cppx
+```
+
+Add authored `.cppx`/`.hx` inputs to `SILENCER_CPPX_SOURCES` in
+`clients/silencer/CMakeLists.txt`. Generated C++ is written under the CMake
+build tree at `generated/cppx/`; do not commit generated outputs.
+
+The SDL-free retained runtime/style substrate from `/Users/hv/repos/ui` lives
+under `src/ui/runtime`, `src/ui/style`, plus `src/ui/input.h` and
+`src/ui/span.h` in the `::ui` namespace. Silencer's existing Clay runtime stays
+under `silencer::ui` while the migration is incomplete. The Yoga flex adapter
+uses Yoga v3.2.1 through CMake `FetchContent`, matching the
+authoritative cppx repo.
+The cppx app-shell target layer lives under `src/client/ui/app_shell`,
+`src/client/ui/providers`, and `src/client/ui/hooks` in `client::ui`; production
+screens still use the legacy `silencer::client_ui` stack until each screen is
+ported.
+During the migration, `hooks/`, `providers/`, and `components/` directories
+must remain under `src/client/ui/**` or `src/ui/**`; the architecture boundary
+script enforces this.
+
 ## Object hierarchy
 
 `Object` is mixin multiple inheritance of five bases — `Sprite`,

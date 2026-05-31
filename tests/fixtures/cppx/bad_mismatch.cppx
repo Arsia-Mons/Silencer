@@ -1,0 +1,5 @@
+void Broken() {
+  <Panel>
+    <Panel.Header>
+  </Panel.Body>
+}

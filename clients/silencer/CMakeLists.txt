@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.16)
+cmake_minimum_required(VERSION 3.23)
 
 project(Silencer)
 
@@ -11,17 +11,38 @@ set(NLOHMANN_JSON_INCLUDE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/third_party")
 set(SILENCER_TARGET silencer)
 
 include(GNUInstallDirs)
+include(FetchContent)
 
 list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 
 # Shared monorepo dirs sit two levels up from clients/silencer/.
-set(SILENCER_SHARED_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../shared")
+get_filename_component(SILENCER_REPO_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../.." ABSOLUTE)
+set(SILENCER_SHARED_DIR "${SILENCER_REPO_ROOT}/shared")
+
+find_package(Python3 REQUIRED COMPONENTS Interpreter)
+include(cppx_transpile)
+
+FetchContent_Declare(
+	yoga
+	GIT_REPOSITORY https://github.com/facebook/yoga.git
+	GIT_TAG v3.2.1
+	GIT_SHALLOW TRUE
+	SOURCE_SUBDIR yoga
+)
+FetchContent_MakeAvailable(yoga)
 
 if(APPLE)
 	file(GLOB_RECURSE sources src/*.cpp src/*.h src/*.mm)
 else()
 	file(GLOB_RECURSE sources src/*.cpp src/*.h)
 endif()
+
+# Authored cppx UI sources live in-tree and generate ordinary C++ into the
+# build directory. Add new .cppx/.hx inputs here; never commit generated output.
+set(SILENCER_CPPX_SOURCES
+)
+cppx_transpile(SILENCER_CPPX_GENERATED ${SILENCER_CPPX_SOURCES})
+list(APPEND sources ${SILENCER_CPPX_GENERATED})
 
 # Extra files that get bundled into the .app on macOS (icon + shared/assets/).
 set(bundle_extras "")
@@ -86,6 +107,7 @@ else()
 endif()
 
 target_compile_features(${SILENCER_TARGET} PUBLIC cxx_std_20)
+target_link_libraries(${SILENCER_TARGET} yogacore)
 
 if(WIN32)
 	# Strip <winsock.h> (and other legacy subsystems) out of <windows.h>.
@@ -158,6 +180,7 @@ target_include_directories(${SILENCER_TARGET} PRIVATE
 # Expose src/ and every first-level subdomain so that bare-name includes
 # (#include "lobby.h") continue to resolve after the src/ reorganisation.
 target_include_directories(${SILENCER_TARGET} PRIVATE
+    "${CMAKE_CURRENT_BINARY_DIR}/generated/cppx/src"
     "${CMAKE_CURRENT_SOURCE_DIR}/src"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/platform"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/render"
@@ -327,6 +350,16 @@ option(SILENCER_BUILD_TESTS "Build unit tests" OFF)
 if(SILENCER_BUILD_TESTS)
 	enable_testing()
 	add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../../tests ${CMAKE_BINARY_DIR}/tests)
+	add_test(
+		NAME cppx_transpiler_tests
+		COMMAND ${Python3_EXECUTABLE}
+			${SILENCER_REPO_ROOT}/tests/cppx_transpiler_tests.py
+			--tool ${CMAKE_CURRENT_SOURCE_DIR}/tools/cppx_transpile.py
+			--fixtures tests/fixtures/cppx
+	)
+	set_tests_properties(cppx_transpiler_tests PROPERTIES
+		WORKING_DIRECTORY ${SILENCER_REPO_ROOT}
+	)
 endif()
 
 include(CPack)

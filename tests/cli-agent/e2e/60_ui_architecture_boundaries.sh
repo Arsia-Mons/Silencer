@@ -21,6 +21,24 @@ fail_if_path_exists() {
   fi
 }
 
+fail_if_ui_taxonomy_dirs_escape_roots() {
+  local bad_paths
+  bad_paths="$(
+    find "$REPO_ROOT/clients/silencer/src" -type d \
+      \( -name hooks -o -name providers -o -name components \) \
+      -not -path "$REPO_ROOT/clients/silencer/src/client/ui/*" \
+      -not -path "$REPO_ROOT/clients/silencer/src/ui/*" \
+      -print
+  )"
+  if [ -n "$bad_paths" ]; then
+    echo "$bad_paths" >&2
+    echo "hooks/providers/components directories must live under client/ui or ui" >&2
+    exit 1
+  fi
+}
+
+fail_if_ui_taxonomy_dirs_escape_roots
+
 fail_if_path_exists "clients/silencer/src/ui/components"
 fail_if_path_exists "clients/silencer/src/ui/modals"
 fail_if_path_exists "clients/silencer/src/ui/panels"
@@ -30,7 +48,7 @@ fail_if_path_exists "clients/silencer/src/ui/runtime/clay_inspector.h"
 fail_if_path_exists "clients/silencer/src/ui/runtime/clay_inspector.cpp"
 
 fail_if_match \
-  "\\b(currentinterface|ProcessInGameInterfaces|Interface \\*|new Interface|ui/components|ui/modals|ui/panels|ui/screens)\\b" \
+  "\\b(currentinterface|ProcessInGameInterfaces|Interface \\*|new Interface)\\b|(^|[^[:alnum:]_/])ui/(components|modals|panels|screens)\\b" \
   "$REPO_ROOT/clients/silencer/src" \
   --glob '!third_party/**'
 
