@@ -129,6 +129,7 @@ if(SILENCER_UNITY_BUILD)
 	file(GLOB _clay_unsafe_sources
 		src/ui/primitives/*.cpp
 		src/ui/runtime/*.cpp
+		src/ui/style/*.cpp
 		src/render/clay_ui_tests/*.cpp
 		src/client/ui/screens/character_create/*.cpp
 		src/client/ui/screens/lobby/*.cpp)
@@ -244,6 +245,32 @@ endforeach()
 add_test(NAME cppx_format_check
 	COMMAND ${Python3_EXECUTABLE}
 		"${CMAKE_CURRENT_SOURCE_DIR}/tools/cppx_format.py" --check ${_cppx_format_files})
+
+# --- cppx retained runtime (SIL-9) ---------------------------------------
+# The golden react+element+tree trio (+ SDL-free contract deps input.h,
+# style/visual_style.h, style/text_measure.*) is vendored under src/ui/ and
+# compiles into the client via the source glob. It is dead until the pipeline
+# wires it (SIL-13+), but proves the vendor integrates build-clean here.
+#
+# react_runtime_tests: the golden hook-runtime unit test (a trivial component
+# renders, hooks keep per-instance state across reorders). Built always so a
+# normal build.sh produces it; run via `ctest -R react_runtime_tests`.
+add_executable(react_runtime_tests
+	tests/react_runtime_tests.cpp
+	src/ui/runtime/react.cpp)
+target_compile_features(react_runtime_tests PRIVATE cxx_std_20)
+target_include_directories(react_runtime_tests PRIVATE
+	"${CMAKE_CURRENT_SOURCE_DIR}/src")
+if(MSVC)
+	target_compile_definitions(react_runtime_tests PRIVATE NOMINMAX)
+endif()
+add_test(NAME react_runtime_tests COMMAND react_runtime_tests)
+
+# SDL-free guard on the vendored runtime (scoped allowlist while the legacy
+# Clay runtime still lives under src/ui/; SIL-23 broadens it post-Clay).
+add_test(NAME cppx_runtime_sdl_free
+	COMMAND ${Python3_EXECUTABLE}
+		"${CMAKE_CURRENT_SOURCE_DIR}/tools/cppx_runtime_guard.py")
 
 # /Z7 embeds debug info into .obj files instead of routing it through MSVC's
 # mspdbsrv.exe — which has a habit of failing with C1090 PDB errors on some
