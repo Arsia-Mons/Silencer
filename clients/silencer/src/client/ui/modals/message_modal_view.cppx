@@ -1,0 +1,93 @@
+#include "client/ui/modals/message_modal_view.h"
+
+#include "ui/components/box.h"
+#include "ui/components/button.h"
+#include "ui/components/dialog.h"
+#include "ui/components/text.h"
+
+namespace silencer::client_ui {
+
+using ::ui::children;
+using ::ui::components::Box;
+using ::ui::components::BoxProps;
+using ::ui::components::Button;
+using ::ui::components::ButtonProps;
+using ::ui::components::Dialog;
+using ::ui::components::DialogProps;
+using ::ui::components::Text;
+using ::ui::components::TextProps;
+
+namespace {
+
+::ui::LayoutStyle root_layout() {
+	return ::ui::LayoutStyle{
+		.direction = ::ui::FlexDirection::Column,
+		.align_items = ::ui::AlignItems::Center,
+		.justify_content = ::ui::JustifyContent::Center,
+		.width = ::ui::Length::percent(100.0f),
+		.height = ::ui::Length::percent(100.0f),
+	};
+}
+
+::ui::LayoutStyle dialog_layout() {
+	return ::ui::LayoutStyle{
+		.direction = ::ui::FlexDirection::Column,
+		.align_items = ::ui::AlignItems::Center,
+		.justify_content = ::ui::JustifyContent::Center,
+		.width = ::ui::Length::points(352.0f),
+		.height = ::ui::Length::points(178.0f),
+		.padding = {34.0f, 34.0f, 44.0f, 44.0f},
+		.gap = 18.0f,
+	};
+}
+
+::ui::LayoutStyle message_layout() {
+	return ::ui::LayoutStyle{
+		.width = ::ui::Length::points(284.0f),
+		.height = ::ui::Length::points(54.0f),
+	};
+}
+
+::ui::LayoutStyle ok_button_layout(bool visible) {
+	if(!visible){
+		return ::ui::LayoutStyle{ .display = ::ui::Display::None };
+	}
+	return ::ui::LayoutStyle{
+		.align_items = ::ui::AlignItems::Center,
+		.justify_content = ::ui::JustifyContent::Center,
+		.width = ::ui::Length::points(96.0f),
+		.height = ::ui::Length::points(30.0f),
+		.padding = {14.0f, 14.0f, 6.0f, 6.0f},
+	};
+}
+
+::ui::StyleStatePatch message_style() {
+	return ::ui::patch().text(::ui::TextVisual{
+		.color = {226, 234, 242, 255},
+		.font_id = 133,
+		.font_size = 12,
+		.align = ::ui::TextAlign::Center,
+		.wrap = ::ui::TextWrap::Words,
+	});
+}
+
+}  // namespace
+
+::ui::UiElement MessageModalView(const MessageModalViewProps& props) {
+	return <Box key={props.key} layout={root_layout()}>
+		<Dialog key="dialog" modal={true} layout={dialog_layout()}>
+			<Text key="message" value={props.message} layout={message_layout()} style={message_style()} />
+			<Button
+			  key="ok"
+			  id="message_modal.ok"
+			  label="OK"
+			  disabled={!props.show_ok}
+			  autofocus={props.show_ok}
+			  onActivate={props.on_ok}
+			  layout={ok_button_layout(props.show_ok)}
+			/>
+		</Dialog>
+	</Box>
+}
+
+}  // namespace silencer::client_ui

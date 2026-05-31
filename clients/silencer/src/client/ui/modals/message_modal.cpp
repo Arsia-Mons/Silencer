@@ -1,38 +1,11 @@
 #include "message_modal.h"
 
+#include "client/ui/modals/message_modal_view.h"
 #include "screen_context.h"
-#include "game.h"
-#include "renderer.h"
-#include "surface.h"
-
-#include "clay/clay.h"
-#include "clay_ui_compositor.h"
-#include "runtime/UiInteractionRegistry.h"
-#include "primitives/button.h"
-#include "primitives/text.h"
-
-#include <SDL3/SDL.h>
 
 namespace message_modal_detail
 {
-using silencer::ui::primitives::Button;
-using silencer::ui::primitives::ButtonHandle;
-using silencer::ui::primitives::ButtonOpts;
-using silencer::ui::primitives::ButtonSize;
-using silencer::ui::primitives::ButtonVariant;
-using silencer::ui::primitives::Text;
-using silencer::ui::primitives::TextSize;
-
-constexpr uint16_t kDialogW = 352;
-constexpr uint16_t kDialogH = 178;
-constexpr uint16_t kDialogPadX = 34;
-constexpr uint16_t kDialogPadY = 44;
 constexpr const char * kActionOk = "message_modal.ok";
-
-Clay_String FromStd(const std::string & s)
-{
-	return Clay_String{ false, static_cast<int32_t>(s.size()), s.c_str() };
-}
 } // namespace message_modal_detail
 
 MessageModal::MessageModal(std::string message_, std::function<void()> onClose_)
@@ -65,41 +38,20 @@ void MessageModal::Tick(ScreenContext & ctx)
 	if(cb) cb();
 }
 
-void MessageModal::BuildUi(ScreenContext & ctx, Surface & dst, float frametime, silencer::ui::UiInteractionRegistry& interactions)
+bool MessageModal::BuildElement(ScreenContext & ctx, ::ui::UiElement * out)
 {
-	(void)frametime;
-	(void)dst;
-	using namespace silencer::clay_bridge;
-
-
-
-	CLAY({ .id = CLAY_ID("MessageModalRoot"),
-	       .layout = {
-	           .sizing = { CLAY_SIZING_GROW(0),
-	                       CLAY_SIZING_GROW(0) },
-	           .childAlignment = { CLAY_ALIGN_X_CENTER, CLAY_ALIGN_Y_CENTER },
-	       } }) {
-		CLAY({ .id = CLAY_ID("MessageModalDialog"),
-		       .layout = {
-		           .sizing = { CLAY_SIZING_FIXED(message_modal_detail::kDialogW),
-		                       CLAY_SIZING_FIXED(message_modal_detail::kDialogH) },
-		           .padding = { message_modal_detail::kDialogPadX, message_modal_detail::kDialogPadX,
-		                        message_modal_detail::kDialogPadY, message_modal_detail::kDialogPadY },
-		           .childGap = 18,
-		           .childAlignment = { CLAY_ALIGN_X_CENTER, CLAY_ALIGN_Y_CENTER },
-		           .layoutDirection = CLAY_TOP_TO_BOTTOM,
-		       },
-		       .image = { .imageData = PackImage(40, 4) } }) {
-			message_modal_detail::Text(message_modal_detail::FromStd(message),
-			                           { .size = message_modal_detail::TextSize::Heading });
-			if(hasOk){
-				message_modal_detail::Button(CLAY_STRING("MessageModalOkButton"), CLAY_STRING("OK"),
-				           message_modal_detail::ButtonOpts{ .variant = message_modal_detail::ButtonVariant::Chrome,
-				                                             .size = message_modal_detail::ButtonSize::Compact },
-				           message_modal_detail::ButtonHandle{ nullptr, message_modal_detail::kActionOk, &interactions });
-			}
-		}
-	}
+	(void)ctx;
+	if(!out) return false;
+	*out = silencer::client_ui::MessageModalView(
+		silencer::client_ui::MessageModalViewProps{
+			.key = "message-modal",
+			.message = message.c_str(),
+			.show_ok = hasOk,
+			.on_ok = [this](const ::ui::ActivationEvent&) {
+				okClicked = true;
+			},
+		});
+	return true;
 }
 
 void MessageModal::Destroy(ScreenContext & ctx)

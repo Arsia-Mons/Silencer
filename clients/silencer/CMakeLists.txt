@@ -43,6 +43,8 @@ cppx_transpile(SILENCER_UI_COMPONENT_GENERATED
 	src/ui/components/input.hx
 	src/ui/components/text.cppx
 	src/ui/components/text.hx
+	src/client/ui/modals/message_modal_view.cppx
+	src/client/ui/modals/message_modal_view.hx
 	src/client/ui/screens/main_menu/main_menu_view.cppx
 	src/client/ui/screens/main_menu/main_menu_view.hx
 	src/client/ui/screens/options/options_audio_view.cppx
