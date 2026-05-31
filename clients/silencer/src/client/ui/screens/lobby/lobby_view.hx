@@ -31,6 +31,8 @@ struct LobbyContextValue {
 
 	struct Actions {
 		std::function<void()> go_back = {};
+		std::function<void()> change_agent = {};
+		std::function<void(const std::string&)> set_chat_text = {};
 		std::function<void()> send_chat = {};
 	};
 

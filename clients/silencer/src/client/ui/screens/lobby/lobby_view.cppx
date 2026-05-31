@@ -473,7 +473,7 @@ struct CharacterPanelProps {
 		  id="lobby.character.agents"
 		  label={locked ? "Agent Locked" : "Change Agent"}
 		  disabled={locked}
-		  onActivate={set_flag(&state->newCharacterRequested)}
+		  onActivate={action_callback(lobby.actions.change_agent)}
 		  layout={row_button_layout(26.0f)}
 		/>
 	</Box>
@@ -552,7 +552,7 @@ struct ChatPanelProps {
 			  id="lobby.chat.input"
 			  value={state->inputBuffer}
 			  accessibility={::ui::components::AccessibilityProps{.role = ::ui::SemanticRole::TextBox, .label = "Chat message"}}
-			  onChange={copy_to(state->inputBuffer, static_cast<int>(sizeof(state->inputBuffer)))}
+			  onChange={lobby.actions.set_chat_text}
 			  onKey={action_on_enter(lobby.actions.send_chat)}
 			  layout={input_grow_layout()}
 			/>

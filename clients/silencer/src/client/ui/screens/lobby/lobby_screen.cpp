@@ -103,6 +103,12 @@ bool LobbyScreen::BuildElement(ScreenContext & ctx, ::ui::UiElement * out)
 			.go_back = [this]() {
 				goBackClicked = true;
 			},
+			.change_agent = [this]() {
+				characterState.newCharacterRequested = true;
+			},
+			.set_chat_text = [this](const std::string& value) {
+				silencer::client_ui::lobby::ChatPanelSetInput(chatState, value);
+			},
 			.send_chat = [this]() {
 				chatSendClicked = true;
 			},

@@ -85,6 +85,7 @@ void ChatPanelTick(ChatPanelState & state, World & world);
 bool ChatPanelHandleUiIntent(ChatPanelState & state,
                              World & world,
                              const silencer::ui::UiAction & action);
+void ChatPanelSetInput(ChatPanelState & state, const std::string & value);
 ChatPanelLayoutMetrics ResolveChatPanelLayout(Uint16 panelWidth,
                                               Uint16 panelHeight);
 void ChatPanelSyncLayout(ChatPanelState & state,
