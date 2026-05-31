@@ -4,18 +4,21 @@
 #include "ui/components/common.h"
 #include "ui/runtime/react.h"
 
-class Resources;
+#include <functional>
+#include <string>
 
-namespace silencer::ui {
-class UiInteractionRegistry;
-}
+class Resources;
 
 namespace silencer::client_ui {
 
 struct InGameHudContextValue {
 	const HudView * view = nullptr;
 	const Resources * resources = nullptr;
-	silencer::ui::UiInteractionRegistry * interactions = nullptr;
+	std::function<void(const std::string&)> on_chat_text_change = {};
+	std::function<void(const std::string&)> on_chat_submit = {};
+	std::function<void()> on_chat_channel_toggle = {};
+	std::function<void(int)> on_buy_tech_focus = {};
+	std::function<void(int)> on_buy_tech_activate = {};
 	Uint8 animationPhase = 0;
 };
 

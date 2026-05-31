@@ -78,6 +78,24 @@ void PlayMenuButtonSound(ScreenContext& ctx) {
 #endif
 }
 
+void QueueAction(silencer::ui::UiInteractionRegistry& interactions,
+                 silencer::ui::UiActionKind kind,
+                 const char * id,
+                 const std::string& value = std::string(),
+                 int index = -1) {
+	if(!id) return;
+	silencer::ui::UiAction action;
+	action.kind = kind;
+	action.id = id;
+	action.value = value;
+	action.index = index;
+	interactions.QueueAction(std::move(action));
+}
+
+std::string BuyTechActionId(int index) {
+	return "ingame.buytech.row." + std::to_string(index);
+}
+
 ::ui::InputFrame ToRetainedInput(const silencer::ui::UiInputState& input) {
 	::ui::InputFrame out{};
 	out.pointer_pressed = input.pointer.pressed;
@@ -288,7 +306,34 @@ void ClientUi::BuildRetainedUi(ScreenContext& ctx,
 		const InGameHudContextValue context{
 			.view = view,
 			.resources = resources,
-			.interactions = &interactions_,
+			.on_chat_text_change = [this](const std::string& value) {
+				clientui_detail::QueueAction(
+					interactions_, silencer::ui::UiActionKind::SetText, "ingame.chat", value);
+			},
+			.on_chat_submit = [this](const std::string& value) {
+				clientui_detail::QueueAction(
+					interactions_, silencer::ui::UiActionKind::SubmitText, "ingame.chat", value);
+			},
+			.on_chat_channel_toggle = [this]() {
+				clientui_detail::QueueAction(
+					interactions_, silencer::ui::UiActionKind::Activate, "ingame.chat.channel");
+			},
+			.on_buy_tech_focus = [this](int index) {
+				clientui_detail::QueueAction(
+					interactions_,
+					silencer::ui::UiActionKind::Navigate,
+					clientui_detail::BuyTechActionId(index).c_str(),
+					"focus",
+					index);
+			},
+			.on_buy_tech_activate = [this](int index) {
+				clientui_detail::QueueAction(
+					interactions_,
+					silencer::ui::UiActionKind::Select,
+					clientui_detail::BuyTechActionId(index).c_str(),
+					"activate",
+					index);
+			},
 			.animationPhase = animationPhase,
 		};
 		const auto * stored = ::ui::copy_value(context);

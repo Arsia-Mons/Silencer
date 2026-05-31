@@ -6,7 +6,6 @@
 #include "ui/components/box.h"
 #include "ui/components/input.h"
 #include "ui/components/text.h"
-#include "ui/runtime/UiInteractionRegistry.h"
 #include "ui/runtime/react.h"
 
 #include <algorithm>
@@ -44,7 +43,6 @@ constexpr int kChatRightCapX = 36;
 constexpr int kChatTextAdvance = 6;
 constexpr int kChatLineHeight = 11;
 constexpr const char * kChatInputActionId = "ingame.chat";
-constexpr const char * kChatChannelActionId = "ingame.chat.channel";
 constexpr Uint8 kHudPlayerStateHacking = 15;
 constexpr Uint8 kHudPlayerStateDying = 20;
 constexpr Uint8 kHudPlayerStateDead = 21;
@@ -1254,36 +1252,17 @@ std::string chat_history_line_text(const HudView& view, int slot) {
 	return std::string();
 }
 
-void queue_chat_action(silencer::ui::UiInteractionRegistry * interactions,
-                       silencer::ui::UiActionKind kind,
-                       const char * id,
-                       const std::string& value) {
-	if(!interactions || !id) return;
-	silencer::ui::UiAction action;
-	action.kind = kind;
-	action.id = id;
-	action.value = value;
-	interactions->QueueAction(action);
-}
-
-std::function<void(const std::string&)>
-change_chat_text(silencer::ui::UiInteractionRegistry * interactions) {
-	return [interactions](const std::string& value) {
-		queue_chat_action(interactions, silencer::ui::UiActionKind::SetText, kChatInputActionId, value);
+std::function<void(const ::ui::ActivationEvent&)>
+submit_chat_text(std::function<void(const std::string&)> submit, std::string value) {
+	return [submit, value](const ::ui::ActivationEvent&) {
+		if(submit) submit(value);
 	};
 }
 
 std::function<void(const ::ui::ActivationEvent&)>
-submit_chat_text(silencer::ui::UiInteractionRegistry * interactions, std::string value) {
-	return [interactions, value](const ::ui::ActivationEvent&) {
-		queue_chat_action(interactions, silencer::ui::UiActionKind::SubmitText, kChatInputActionId, value);
-	};
-}
-
-std::function<void(const ::ui::ActivationEvent&)>
-toggle_chat_channel(silencer::ui::UiInteractionRegistry * interactions) {
-	return [interactions](const ::ui::ActivationEvent&) {
-		queue_chat_action(interactions, silencer::ui::UiActionKind::Activate, kChatChannelActionId, std::string());
+toggle_chat_channel(std::function<void()> toggle) {
+	return [toggle](const ::ui::ActivationEvent&) {
+		if(toggle) toggle();
 	};
 }
 
@@ -1414,7 +1393,7 @@ struct ChatInputLineProps {
 		  key={player.chatWithTeam ? "channel-hit-team" : "channel-hit-all"}
 		  focusable={true}
 		  accessibility={::ui::components::AccessibilityProps{.role = ::ui::SemanticRole::Button, .label = player.chatWithTeam ? "Team chat" : "All chat"}}
-		  onActivate={toggle_chat_channel(hud.interactions)}
+		  onActivate={toggle_chat_channel(hud.on_chat_channel_toggle)}
 		  layout={text_layout(kChatX + kChatTextX, inputY, prefixW, kChatLineHeight)}
 		/>
 		<Text
@@ -1429,8 +1408,8 @@ struct ChatInputLineProps {
 		  value={player.chatText.c_str()}
 		  autofocus={true}
 		  accessibility={::ui::components::AccessibilityProps{.role = ::ui::SemanticRole::TextBox, .label = "In-game chat"}}
-		  onChange={change_chat_text(hud.interactions)}
-		  onActivate={submit_chat_text(hud.interactions, player.chatText)}
+		  onChange={hud.on_chat_text_change}
+		  onActivate={submit_chat_text(hud.on_chat_submit, player.chatText)}
 		  layout={chat_input_layout(inputX, inputY, (kChatInputVisibleChars * kChatTextAdvance) + 16)}
 		  style={chat_input_style()}
 		/>
@@ -1464,30 +1443,17 @@ std::string buy_tech_action_id(int index) {
 	return "ingame.buytech.row." + std::to_string(index);
 }
 
-void queue_buy_tech_action(silencer::ui::UiInteractionRegistry * interactions,
-                           silencer::ui::UiActionKind kind,
-                           int index,
-                           const char * value) {
-	if(!interactions) return;
-	silencer::ui::UiAction action;
-	action.kind = kind;
-	action.id = buy_tech_action_id(index);
-	action.index = index;
-	if(value) action.value = value;
-	interactions->QueueAction(action);
-}
-
 std::function<void(const ::ui::FocusEvent&)>
-focus_buy_tech_row(silencer::ui::UiInteractionRegistry * interactions, int index) {
-	return [interactions, index](const ::ui::FocusEvent&) {
-		queue_buy_tech_action(interactions, silencer::ui::UiActionKind::Navigate, index, "focus");
+focus_buy_tech_row(std::function<void(int)> focus, int index) {
+	return [focus, index](const ::ui::FocusEvent&) {
+		if(focus) focus(index);
 	};
 }
 
 std::function<void(const ::ui::ActivationEvent&)>
-activate_buy_tech_row(silencer::ui::UiInteractionRegistry * interactions, int index) {
-	return [interactions, index](const ::ui::ActivationEvent&) {
-		queue_buy_tech_action(interactions, silencer::ui::UiActionKind::Select, index, "activate");
+activate_buy_tech_row(std::function<void(int)> activate, int index) {
+	return [activate, index](const ::ui::ActivationEvent&) {
+		if(activate) activate(index);
 	};
 }
 
@@ -1540,8 +1506,8 @@ struct BuyTechRowProps {
 		  focusable={true}
 		  autofocus={row->selected}
 		  accessibility={::ui::components::AccessibilityProps{.role = ::ui::SemanticRole::Button, .label = row->name.c_str()}}
-		  onFocus={focus_buy_tech_row(hud.interactions, row->index)}
-		  onActivate={activate_buy_tech_row(hud.interactions, row->index)}
+		  onFocus={focus_buy_tech_row(hud.on_buy_tech_focus, row->index)}
+		  onActivate={activate_buy_tech_row(hud.on_buy_tech_activate, row->index)}
 		  layout={text_layout(highlightX, highlightY, highlightW, highlightH)}
 		/>
 		<HudSprite
