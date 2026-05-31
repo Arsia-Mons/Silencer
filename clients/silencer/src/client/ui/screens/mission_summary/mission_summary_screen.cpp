@@ -43,6 +43,24 @@ int SuffixInt(const std::string & value, const char * prefix)
 	return std::atoi(value.c_str() + std::strlen(prefix));
 }
 
+void UpgradeStat(World & world, int index)
+{
+	User * user = world.lobby.GetUserInfo(world.lobby.accountid);
+	if(user && index >= 0 && index < 6){
+		world.lobby.UpgradeStat(user->selectedcharid, user->statsagency,
+		                        kUpgradeStatIds[index]);
+	}
+}
+
+silencer::client_ui::MissionSummaryDestination FinishMissionSummary(World & world)
+{
+	if(world.lobby.state == Lobby::AUTHENTICATED){
+		world.lobby.JoinChannel(world.lobby.lastchannel);
+		return silencer::client_ui::MissionSummaryDestination::Lobby;
+	}
+	return silencer::client_ui::MissionSummaryDestination::MainMenu;
+}
+
 } // namespace mission_summary_screen_detail
 
 void MissionSummaryScreen::Build(ScreenContext & ctx)
@@ -50,8 +68,6 @@ void MissionSummaryScreen::Build(ScreenContext & ctx)
 	ctx.ResetPresentation(1);
 	ctx.renderer.camera.SetPosition(320, 240);
 	infoLoaded = false;
-	doneClicked = false;
-	upgradeClicked = -1;
 	scrollDelta = 0;
 	scrollPosition = 0;
 	Refresh(ctx);
@@ -73,29 +89,10 @@ void MissionSummaryScreen::Tick(ScreenContext & ctx)
 			world.lobby.statupgraded = false;
 		}
 	}
-	if(upgradeClicked >= 0){
-		int idx = upgradeClicked;
-		upgradeClicked = -1;
-		User * user = world.lobby.GetUserInfo(world.lobby.accountid);
-		if(user && idx >= 0 && idx < 6){
-			world.lobby.UpgradeStat(user->selectedcharid, user->statsagency,
-			                        mission_summary_screen_detail::kUpgradeStatIds[idx]);
-		}
-	}
-	if(doneClicked){
-		doneClicked = false;
-		if(world.lobby.state == Lobby::AUTHENTICATED){
-			ctx.GoToState(GameState::LOBBY);
-			world.lobby.JoinChannel(world.lobby.lastchannel);
-		}else{
-			ctx.GoToState(GameState::MAINMENU);
-		}
-	}
 }
 
 bool MissionSummaryScreen::BuildElement(ScreenContext & ctx, ::ui::UiElement * out)
 {
-	(void)ctx;
 	if(!out) return false;
 
 	std::array<const char *, silencer::client_ui::kMissionSummaryVisibleLines> lines = {};
@@ -110,27 +107,32 @@ bool MissionSummaryScreen::BuildElement(ScreenContext & ctx, ::ui::UiElement * o
 
 	xpText = "+ " + std::to_string(experience) + " XP";
 
-	std::array<std::function<void(const ::ui::ActivationEvent&)>,
-	           silencer::client_ui::kMissionSummaryUpgradeCount> onUpgrade = {};
-	for(int i = 0; i < silencer::client_ui::kMissionSummaryUpgradeCount; i++){
-		onUpgrade[i] = [this, i](const ::ui::ActivationEvent&) {
-			upgradeClicked = i;
-		};
-	}
-
-	*out = silencer::client_ui::MissionSummaryView(
-		silencer::client_ui::MissionSummaryViewProps{
-			.key = "mission-summary",
+	const silencer::client_ui::MissionSummaryContextValue context{
+		.state = silencer::client_ui::MissionSummaryState{
 			.xp = xpText.c_str(),
 			.upgrade_banner = upgradeBanner,
 			.summary_lines = lines,
 			.levels = levels,
 			.upgrades_available = upgradesAvailable,
-			.on_upgrade = onUpgrade,
-			.on_done = [this](const ::ui::ActivationEvent&) {
-				doneClicked = true;
+		},
+		.actions = silencer::client_ui::MissionSummaryActions{
+			.upgrade = [world = &ctx.world](int index) {
+				mission_summary_screen_detail::UpgradeStat(*world, index);
 			},
-		});
+			.done = [world = &ctx.world]() {
+				return mission_summary_screen_detail::FinishMissionSummary(*world);
+			},
+		},
+	};
+	const auto * stored = ::ui::copy_value(context);
+	if(!stored) return false;
+	*out = ::ui::component(
+		"MissionSummaryView",
+		silencer::client_ui::MissionSummaryViewProps{
+			.key = "mission-summary",
+			.value = stored,
+		},
+		silencer::client_ui::MissionSummaryView);
 	return true;
 }
 
@@ -141,10 +143,13 @@ void MissionSummaryScreen::Destroy(ScreenContext & ctx)
 
 bool MissionSummaryScreen::HandleUiIntent(ScreenContext & ctx, const silencer::ui::UiAction & action)
 {
-	(void)ctx;
 	if(action.kind == silencer::ui::UiActionKind::Cancel ||
 	   (action.kind == silencer::ui::UiActionKind::Activate && action.id == mission_summary_screen_detail::kActionDone)){
-		doneClicked = true;
+		silencer::client_ui::MissionSummaryDestination destination =
+			mission_summary_screen_detail::FinishMissionSummary(ctx.world);
+		ctx.GoToState(destination == silencer::client_ui::MissionSummaryDestination::Lobby
+		              ? GameState::LOBBY
+		              : GameState::MAINMENU);
 		return true;
 	}
 	if(action.kind == silencer::ui::UiActionKind::Scroll){
@@ -154,7 +159,7 @@ bool MissionSummaryScreen::HandleUiIntent(ScreenContext & ctx, const silencer::u
 	if(action.kind != silencer::ui::UiActionKind::Activate) return false;
 	int upgrade = mission_summary_screen_detail::SuffixInt(action.id, mission_summary_screen_detail::kActionUpgradePrefix);
 	if(upgrade >= 0 && upgrade < 6){
-		upgradeClicked = upgrade;
+		mission_summary_screen_detail::UpgradeStat(ctx.world, upgrade);
 		return true;
 	}
 	return false;

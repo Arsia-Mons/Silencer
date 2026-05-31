@@ -29,8 +29,6 @@ private:
 	void AddSummaryLine(const char * name, Uint32 value, bool percentage = false);
 
 	bool infoLoaded = false;
-	bool doneClicked = false;
-	int upgradeClicked = -1;
 	int scrollDelta = 0;
 	int scrollPosition = 0;
 	bool upgradeBanner = false;

@@ -1,9 +1,10 @@
 #include "client/ui/screens/mission_summary/mission_summary_view.h"
 
+#include "client/ui/navigation/NavigationProvider.h"
+#include "game_state.h"
 #include "ui/components/box.h"
 #include "ui/components/button.h"
 #include "ui/components/text.h"
-#include "ui/runtime/react.h"
 
 namespace silencer::client_ui {
 
@@ -238,8 +239,16 @@ struct UpgradeRowProps {
 	int index = 0;
 	int level = 0;
 	bool available = false;
-	std::function<void(const ::ui::ActivationEvent&)> on_upgrade = {};
+	std::function<void(int)> upgrade = {};
 };
+
+std::function<void(const ::ui::ActivationEvent&)> upgrade_callback(
+	std::function<void(int)> upgrade,
+	int index) {
+	return [upgrade, index](const ::ui::ActivationEvent&) {
+		if(upgrade) upgrade(index);
+	};
+}
 
 ::ui::UiElement UpgradeRow(const UpgradeRowProps& props) {
 	return <Box key={props.key ? props.key : upgrade_key(props.index)} layout={upgrade_row_layout()}>
@@ -262,15 +271,41 @@ struct UpgradeRowProps {
 		  id={upgrade_id(props.index)}
 		  label={kUpgradeLabels[props.index]}
 		  disabled={!props.available}
-		  onActivate={props.on_upgrade}
+		  onActivate={upgrade_callback(props.upgrade, props.index)}
 		  layout={upgrade_button_layout(props.available)}
 		/>
 	</Box>
 }
 
-}  // namespace
+Uint8 destination_state(MissionSummaryDestination destination) {
+	switch(destination){
+		case MissionSummaryDestination::Lobby:
+			return GameState::LOBBY;
+		case MissionSummaryDestination::MainMenu:
+		default:
+			return GameState::MAINMENU;
+	}
+}
 
-::ui::UiElement MissionSummaryView(const MissionSummaryViewProps& props) {
+std::function<void(const ::ui::ActivationEvent&)> done_callback(
+	const MissionSummaryActions& actions,
+	Navigation navigation) {
+	return [actions, navigation](const ::ui::ActivationEvent&) {
+		MissionSummaryDestination destination = MissionSummaryDestination::MainMenu;
+		if(actions.done) destination = actions.done();
+		if(navigation.goToState) navigation.goToState(destination_state(destination));
+	};
+}
+
+struct MissionSummaryFrameProps {
+	const char * key = nullptr;
+};
+
+::ui::UiElement MissionSummaryFrame(const MissionSummaryFrameProps& props) {
+	const MissionSummaryContextValue& summary = UseMissionSummary();
+	Navigation navigation = UseNavigation();
+	const MissionSummaryState& state = summary.state;
+	const MissionSummaryActions& actions = summary.actions;
 	return <Box key={props.key} layout={root_layout()} style={root_style()}>
 		<Box key="panel" layout={panel_layout()} style={panel_style()}>
 			<Box key="summary-column" layout={summary_column_layout()}>
@@ -278,230 +313,257 @@ struct UpgradeRowProps {
 				<Box key="summary-lines" layout={summary_list_layout()}>
 					<Text
 					  key="line-00"
-					  value={props.summary_lines[0]}
+					  value={state.summary_lines[0]}
 					  layout={summary_line_layout()}
 					  style={body_style()}
 					/>
 					<Text
 					  key="line-01"
-					  value={props.summary_lines[1]}
+					  value={state.summary_lines[1]}
 					  layout={summary_line_layout()}
 					  style={body_style()}
 					/>
 					<Text
 					  key="line-02"
-					  value={props.summary_lines[2]}
+					  value={state.summary_lines[2]}
 					  layout={summary_line_layout()}
 					  style={body_style()}
 					/>
 					<Text
 					  key="line-03"
-					  value={props.summary_lines[3]}
+					  value={state.summary_lines[3]}
 					  layout={summary_line_layout()}
 					  style={body_style()}
 					/>
 					<Text
 					  key="line-04"
-					  value={props.summary_lines[4]}
+					  value={state.summary_lines[4]}
 					  layout={summary_line_layout()}
 					  style={body_style()}
 					/>
 					<Text
 					  key="line-05"
-					  value={props.summary_lines[5]}
+					  value={state.summary_lines[5]}
 					  layout={summary_line_layout()}
 					  style={body_style()}
 					/>
 					<Text
 					  key="line-06"
-					  value={props.summary_lines[6]}
+					  value={state.summary_lines[6]}
 					  layout={summary_line_layout()}
 					  style={body_style()}
 					/>
 					<Text
 					  key="line-07"
-					  value={props.summary_lines[7]}
+					  value={state.summary_lines[7]}
 					  layout={summary_line_layout()}
 					  style={body_style()}
 					/>
 					<Text
 					  key="line-08"
-					  value={props.summary_lines[8]}
+					  value={state.summary_lines[8]}
 					  layout={summary_line_layout()}
 					  style={body_style()}
 					/>
 					<Text
 					  key="line-09"
-					  value={props.summary_lines[9]}
+					  value={state.summary_lines[9]}
 					  layout={summary_line_layout()}
 					  style={body_style()}
 					/>
 					<Text
 					  key="line-10"
-					  value={props.summary_lines[10]}
+					  value={state.summary_lines[10]}
 					  layout={summary_line_layout()}
 					  style={body_style()}
 					/>
 					<Text
 					  key="line-11"
-					  value={props.summary_lines[11]}
+					  value={state.summary_lines[11]}
 					  layout={summary_line_layout()}
 					  style={body_style()}
 					/>
 					<Text
 					  key="line-12"
-					  value={props.summary_lines[12]}
+					  value={state.summary_lines[12]}
 					  layout={summary_line_layout()}
 					  style={body_style()}
 					/>
 					<Text
 					  key="line-13"
-					  value={props.summary_lines[13]}
+					  value={state.summary_lines[13]}
 					  layout={summary_line_layout()}
 					  style={body_style()}
 					/>
 					<Text
 					  key="line-14"
-					  value={props.summary_lines[14]}
+					  value={state.summary_lines[14]}
 					  layout={summary_line_layout()}
 					  style={body_style()}
 					/>
 					<Text
 					  key="line-15"
-					  value={props.summary_lines[15]}
+					  value={state.summary_lines[15]}
 					  layout={summary_line_layout()}
 					  style={body_style()}
 					/>
 					<Text
 					  key="line-16"
-					  value={props.summary_lines[16]}
+					  value={state.summary_lines[16]}
 					  layout={summary_line_layout()}
 					  style={body_style()}
 					/>
 					<Text
 					  key="line-17"
-					  value={props.summary_lines[17]}
+					  value={state.summary_lines[17]}
 					  layout={summary_line_layout()}
 					  style={body_style()}
 					/>
 					<Text
 					  key="line-18"
-					  value={props.summary_lines[18]}
+					  value={state.summary_lines[18]}
 					  layout={summary_line_layout()}
 					  style={body_style()}
 					/>
 					<Text
 					  key="line-19"
-					  value={props.summary_lines[19]}
+					  value={state.summary_lines[19]}
 					  layout={summary_line_layout()}
 					  style={body_style()}
 					/>
 					<Text
 					  key="line-20"
-					  value={props.summary_lines[20]}
+					  value={state.summary_lines[20]}
 					  layout={summary_line_layout()}
 					  style={body_style()}
 					/>
 					<Text
 					  key="line-21"
-					  value={props.summary_lines[21]}
+					  value={state.summary_lines[21]}
 					  layout={summary_line_layout()}
 					  style={body_style()}
 					/>
 					<Text
 					  key="line-22"
-					  value={props.summary_lines[22]}
+					  value={state.summary_lines[22]}
 					  layout={summary_line_layout()}
 					  style={body_style()}
 					/>
 					<Text
 					  key="line-23"
-					  value={props.summary_lines[23]}
+					  value={state.summary_lines[23]}
 					  layout={summary_line_layout()}
 					  style={body_style()}
 					/>
 					<Text
 					  key="line-24"
-					  value={props.summary_lines[24]}
+					  value={state.summary_lines[24]}
 					  layout={summary_line_layout()}
 					  style={body_style()}
 					/>
 					<Text
 					  key="line-25"
-					  value={props.summary_lines[25]}
+					  value={state.summary_lines[25]}
 					  layout={summary_line_layout()}
 					  style={body_style()}
 					/>
 					<Text
 					  key="line-26"
-					  value={props.summary_lines[26]}
+					  value={state.summary_lines[26]}
 					  layout={summary_line_layout()}
 					  style={body_style()}
 					/>
 				</Box>
 			</Box>
 			<Box key="upgrade-column" layout={upgrade_column_layout()}>
-				<Text key="xp" value={props.xp} layout={xp_layout()} style={prompt_style()} />
+				<Text key="xp" value={state.xp} layout={xp_layout()} style={prompt_style()} />
 				<Text
 				  key="banner"
 				  value="*NEW UPGRADE AVAILABLE*"
-				  disabled={!props.upgrade_banner}
-				  layout={banner_layout(props.upgrade_banner)}
+				  disabled={!state.upgrade_banner}
+				  layout={banner_layout(state.upgrade_banner)}
 				  style={banner_style()}
 				/>
 				<UpgradeRow
 				  key="upgrade-row-0"
 				  index={0}
-				  level={props.levels[0]}
-				  available={props.upgrades_available[0]}
-				  onUpgrade={props.on_upgrade[0]}
+				  level={state.levels[0]}
+				  available={state.upgrades_available[0]}
+				  upgrade={actions.upgrade}
 				/>
 				<UpgradeRow
 				  key="upgrade-row-1"
 				  index={1}
-				  level={props.levels[1]}
-				  available={props.upgrades_available[1]}
-				  onUpgrade={props.on_upgrade[1]}
+				  level={state.levels[1]}
+				  available={state.upgrades_available[1]}
+				  upgrade={actions.upgrade}
 				/>
 				<UpgradeRow
 				  key="upgrade-row-2"
 				  index={2}
-				  level={props.levels[2]}
-				  available={props.upgrades_available[2]}
-				  onUpgrade={props.on_upgrade[2]}
+				  level={state.levels[2]}
+				  available={state.upgrades_available[2]}
+				  upgrade={actions.upgrade}
 				/>
 				<UpgradeRow
 				  key="upgrade-row-3"
 				  index={3}
-				  level={props.levels[3]}
-				  available={props.upgrades_available[3]}
-				  onUpgrade={props.on_upgrade[3]}
+				  level={state.levels[3]}
+				  available={state.upgrades_available[3]}
+				  upgrade={actions.upgrade}
 				/>
 				<UpgradeRow
 				  key="upgrade-row-4"
 				  index={4}
-				  level={props.levels[4]}
-				  available={props.upgrades_available[4]}
-				  onUpgrade={props.on_upgrade[4]}
+				  level={state.levels[4]}
+				  available={state.upgrades_available[4]}
+				  upgrade={actions.upgrade}
 				/>
 				<UpgradeRow
 				  key="upgrade-row-5"
 				  index={5}
-				  level={props.levels[5]}
-				  available={props.upgrades_available[5]}
-				  onUpgrade={props.on_upgrade[5]}
+				  level={state.levels[5]}
+				  available={state.upgrades_available[5]}
+				  upgrade={actions.upgrade}
 				/>
 				<Button
 				  key="done"
 				  id="mission_summary.done"
 				  label="Done"
 				  autofocus={true}
-				  onActivate={props.on_done}
+				  onActivate={done_callback(actions, navigation)}
 				  layout={done_button_layout()}
 				/>
 			</Box>
 		</Box>
 	</Box>
+}
+
+}  // namespace
+
+::ReactContext MissionSummaryContext = {};
+
+namespace {
+const MissionSummaryContextValue kEmptyMissionSummary = {};
+}
+
+const MissionSummaryContextValue& UseMissionSummary() {
+	const auto * value = static_cast<const MissionSummaryContextValue *>(
+		::use_context(&MissionSummaryContext));
+	return value ? *value : kEmptyMissionSummary;
+}
+
+::ui::UiElement MissionSummaryView(const MissionSummaryViewProps& props) {
+	return ::ui::provider(
+		"MissionSummaryProvider",
+		&MissionSummaryContext,
+		const_cast<MissionSummaryContextValue *>(props.value),
+		children({
+			::ui::component("MissionSummaryFrame",
+			                MissionSummaryFrameProps{ .key = "frame" },
+			                MissionSummaryFrame),
+		}),
+		props.key);
 }
 
 }  // namespace silencer::client_ui
