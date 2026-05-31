@@ -39,16 +39,15 @@ instead of reviving the old flat layout.
 `ClientUi` is the only production owner of visible UI composition and
 screen/modal navigation. `Game::RenderClientUiFrame` collects the
 `UiInputState`, begins one `ClientUi`/`ClayService` frame, asks active screens,
-modals, HUD, and overlays to declare UI, ends the frame once, renders one
+modals, HUD, and overlays for retained roots, ends the frame once, renders one
 command stream through the Clay compositor, then dispatches typed UI actions.
-Navigation mechanics
-live in `src/client/ui/navigation/ScreenStack`; `Game` may request transitions
-but must not store or traverse the stack itself.
+Navigation mechanics live in `src/client/ui/navigation/ScreenStack`; `Game`
+may request transitions but must not store or traverse the stack itself.
 
 Rules:
 
-- Screens and modals implement `Screen::BuildUi`; they only declare UI into the
-  current frame. They must not call `Clay_BeginLayout`, `Clay_EndLayout`,
+- Screens and modals implement `Screen::BuildElement`; they return a retained
+  cppx component root. They must not call `Clay_BeginLayout`, `Clay_EndLayout`,
   `Clay_SetPointerState`, `clay_bridge::EnsureInitialized`, or
   `clay_bridge::Render`.
 - HUD and overlays live under `src/client/ui/hud` and follow the same rule:
@@ -59,11 +58,16 @@ Rules:
 - Primitive frame arenas reset once in `ClientUi::BeginFrame`. A primitive's
   per-frame begin-frame reset must not be called inside a screen, modal, HUD
   block, or overlay block.
-- Modal overlays clear interaction metadata before their own `BuildUi`, so the
-  top modal owns keyboard/CLI focus while lower visual layers can still render.
+- Modal overlays clear interaction metadata before their own `BuildElement`, so
+  the top modal owns keyboard/CLI focus while lower visual layers can still
+  render.
 - Keep `ScreenStack` as the real single-stack owner for screens and modal
   overlays. Add a separate modal stack only if real modal semantics are being
   extracted, not as a placeholder.
+- Keep UI architecture React-style: screen lifecycle code, retained components,
+  providers, and hooks. Do not add a separate view/action mediation layer; data
+  needed by a component should be read through a focused hook/provider when that
+  is practical.
 
 ### UI primitive API contract
 
@@ -137,10 +141,9 @@ UI navigation. They are read directly in `events.cpp` `OnScancodeDown`/
 `OnScancodeUp` and mutate `World` via its public setters
 (`SetShowingPlayerList`, `SetShowingTeamColors`, etc.). They intentionally
 bypass the `UiInputState` → `UiAction` path: routing them through a typed-
-action layer would require a controller bridging UI input and world state
-for no real benefit. New keys that toggle world/gameplay state should follow
-the same pattern; new keys that affect a UI screen should go through
-`navActions`.
+action layer would add an unnecessary UI-to-world indirection. New keys that
+toggle world/gameplay state should follow the same pattern; new keys that
+affect a UI screen should go through `navActions`.
 
 Run `tests/cli-agent/e2e/60_ui_architecture_boundaries.sh` after UI ownership
 changes; it guards this boundary.

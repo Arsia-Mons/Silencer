@@ -38,9 +38,9 @@ struct InGameUiControlResult {
 	int techSelectedIndex = 0;
 };
 
-class InGameUiController {
+class InGameUi {
 public:
-	explicit InGameUiController(World& world);
+	explicit InGameUi(World& world);
 
 	bool HasInputTarget(int localPeerId);
 	void UpdateOverlayState(int localPeerId);

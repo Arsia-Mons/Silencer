@@ -1,9 +1,8 @@
 #ifndef SILENCER_CLIENT_UI_LOBBY_CHAT_PANEL_H
 #define SILENCER_CLIENT_UI_LOBBY_CHAT_PANEL_H
 
-// Screen-side lobby ChatPanel. Composes the ScrollTextBox (chat scrollback +
-// presence list) and TextInput primitives plus a small set of background
-// sprites + the channel-name header.
+// Screen-side lobby ChatPanel state. The cppx lobby view reads these cached
+// lines and the screen lifecycle owns the lobby chat mutations.
 //
 // Domain glue lives HERE: draining `world.lobby.chatmessages`, watching
 // `presencechanged` / `channelchanged`, and routing the input field's Enter
@@ -16,11 +15,6 @@
 #include <vector>
 
 class World;
-class Resources;
-
-namespace silencer::ui {
-class UiInteractionRegistry;
-}
 
 namespace silencer::client_ui::lobby {
 
@@ -96,15 +90,6 @@ ChatPanelLayoutMetrics ResolveChatPanelLayout(Uint16 panelWidth,
 void ChatPanelSyncLayout(ChatPanelState & state,
                          Uint16 panelWidth,
                          Uint16 panelHeight);
-
-// Emits the panel subtree. Must be called inside an open Clay layout pass
-// AFTER TextBeginFrame() + ScrollTextBoxBeginFrame() + TextInputBeginFrame().
-void BuildChatPanelTree(ChatPanelState & state,
-                        World & world,
-                        Resources & resources,
-                        Uint16 panelWidth,
-                        Uint16 panelHeight,
-                        silencer::ui::UiInteractionRegistry& interactions);
 
 }  // namespace silencer::client_ui::lobby
 

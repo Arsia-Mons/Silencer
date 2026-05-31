@@ -54,7 +54,7 @@ const silencer::client_ui::ClientUiInput & UiInput() const { return gameUiPipeli
 const silencer::ui::UiInputState & CurrentUiInput() const { return gameUiPipeline.CurrentUiInput(); }
 silencer::ui::UiInteractionRegistry & UiInteractions() { return gameUiPipeline.UiInteractions(); }
 const silencer::ui::UiInteractionRegistry & UiInteractions() const { return gameUiPipeline.UiInteractions(); }
-silencer::client_ui::InGameUiController & InGameUi() { return gameUiPipeline.InGameUi(); }
+silencer::client_ui::InGameUi & InGameUi() { return gameUiPipeline.InGameUi(); }
 bool ResizeRenderSurface(int width, int height);
 bool ResizeRenderSurfacePixels(int width, int height);
 bool SyncRenderSurfaceToWindowPixels();

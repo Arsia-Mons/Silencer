@@ -4,7 +4,7 @@
 #include "client/ui/ClayBridgeFrameBackend.h"
 #include "client/ui/ClientUi.h"
 #include "client/ui/ClientUiInput.h"
-#include "client/ui/ingame/InGameUiController.h"
+#include "client/ui/ingame/InGameUi.h"
 #include "clay/clay.h"
 #include "keybinds.h"
 #include "surface.h"
@@ -42,7 +42,7 @@ const silencer::client_ui::ClientUiInput & UiInput() const { return clientUiInpu
 const silencer::ui::UiInputState & CurrentUiInput() const { return preparedUiInput; }
 silencer::ui::UiInteractionRegistry & UiInteractions() { return clientUi.Interactions(); }
 const silencer::ui::UiInteractionRegistry & UiInteractions() const { return clientUi.Interactions(); }
-silencer::client_ui::InGameUiController & InGameUi() { return inGameUiController; }
+silencer::client_ui::InGameUi & InGameUi() { return inGameUi; }
 
 private:
 Game & game;
@@ -50,7 +50,7 @@ silencer::client_ui::ClayBridgeFrameBackend uiClayBackend;
 silencer::ui::ClayService uiClayService;
 silencer::client_ui::ClientUi clientUi;
 silencer::client_ui::ClientUiInput clientUiInput;
-silencer::client_ui::InGameUiController inGameUiController;
+silencer::client_ui::InGameUi inGameUi;
 silencer::ui::UiInputState preparedUiInput;
 bool hasPreparedUiInput;
 Uint64 lastUiAnimationMs;

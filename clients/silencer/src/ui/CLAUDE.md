@@ -10,9 +10,9 @@ authoritative cppx repo. Treat `.cppx` and `.hx` as source files and generated
 files under `build/generated/cppx/` as disposable build output.
 
 Clay is still the production compositor for HUD and legacy bridge primitives
-during the migration. The retained cppx runtime is the target UI model. This
-layer does not own screen navigation, game state, SDL events, audio playback, or
-final renderer submission.
+during the migration. The retained cppx runtime is the target UI architecture.
+This layer does not own screen navigation, game state, SDL events, audio
+playback, or final renderer submission.
 
 This is mid-migration toward good flexbox layout, Clay lifecycle, and shadcn-style primitive API first principles. If you touch stale code that conflicts with those principles, update it in the same change.
 
@@ -28,6 +28,8 @@ This is mid-migration toward good flexbox layout, Clay lifecycle, and shadcn-sty
 - Public cppx component contracts are props and children. Do not expose
   `UiElementFrame`, retained builders, context bags, or renderer plumbing in
   authored component APIs.
+- Keep shared runtime APIs React-style: components, hooks, providers, and
+  narrow services only. Do not add a separate view/action mediation layer.
 
 ## Primitive API
 

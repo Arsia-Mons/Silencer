@@ -10,12 +10,9 @@
 #include "game_tech_panel.h"
 #include <string>
 
-class Surface;
-
-// Top-level lobby surface. The chrome (background image, "Silencer" title,
-// version string, map-name overlay, "Go Back" button), the four right-side
-// panels, and the always-on character + chat panels are emitted by per-screen
-// state structs; no retained world UI objects are created for the lobby UI.
+// Top-level lobby surface. The retained cppx view owns the component tree and
+// reads lobby state through UseLobby(); this screen owns the lobby lifecycle
+// mutations that touch World/Game.
 class LobbyScreen : public Screen
 {
 public:
@@ -63,9 +60,9 @@ public:
 	void TechPanelSetTech(class World & world, Uint32 techchoices);
 
 private:
-	// Per-frame state for the chrome tree. Strings live on the screen so the
-	// layout pass can hold pointers that remain valid until the frame ends.
-	// Version is cached once at Build; mapName is updated by SetMapNameOverlay.
+	// Strings live on the screen so retained component props remain valid until
+	// the frame ends. Version is cached once at Build; mapName is updated by
+	// SetMapNameOverlay.
 	std::string version;
 	std::string mapName;
 	bool goBackClicked = false;
@@ -84,10 +81,9 @@ private:
 	// when another right-side panel is active.
 	silencer::client_ui::lobby::GameSelectPanelState gameSelectState;
 
-	// GameCreate state + active flag. When `gameCreateActive` is true the
-	// create panel owns the right column (suppresses the games-list tree)
-	// and the screen's Tick pumps the deferred CreateGame state
-	// machine.
+	// GameCreate state + active flag. When `gameCreateActive` is true, the
+	// create panel owns the right column and Tick pumps the deferred CreateGame
+	// workflow.
 	silencer::client_ui::lobby::GameCreatePanelState gameCreateState;
 	bool gameCreateActive = false;
 

@@ -16,14 +16,12 @@ class Game;
 class AmbienceMixer;
 class MapDownloader;
 class RenderDevice;
-class Surface;
 struct SDL_Window;
 
-// Bag of refs that screens use to reach the global subsystems (World,
-// Renderer, Lobby, Updater, KeyMap, AmbienceMixer, the SDL window /
-// RenderDevice) plus the state-machine / screen-stack actions that touch
-// Game itself. Per-screen behavior lives in the screen, not here — when a
-// screen needs Game state directly, reach through the `game` ref.
+// Screen lifecycle context. It exposes the global services and navigation
+// actions that a top-level screen needs outside the retained component tree.
+// Component data should move through focused props/hooks/providers instead of
+// growing this type into a UI state container.
 class ScreenContext
 {
 public:
@@ -69,8 +67,9 @@ public:
 	// from Screen::Build by every menu surface that owns its presentation.
 	void ResetPresentation(int paletteIdx);
 
-	// Clay frame ownership lives in Game/ClientUi. Screens declare UI through
-	// Screen::BuildUi only; they must not begin/end or render Clay directly.
+	// Clay frame ownership lives in Game/ClientUi. Screens return retained
+	// roots through Screen::BuildElement; they must not begin/end or render
+	// Clay directly.
 };
 
 #endif

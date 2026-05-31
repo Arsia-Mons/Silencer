@@ -1,12 +1,10 @@
 #ifndef SILENCER_CLIENT_UI_LOBBY_GAME_SELECT_PANEL_H
 #define SILENCER_CLIENT_UI_LOBBY_GAME_SELECT_PANEL_H
 
-// Screen-side lobby GameSelectPanel: the always-on right-side games list
-// surface (active when no Create/Join/Tech panel is up). Composes ScrollList
-// + Text + Button primitives and owns the per-frame info-block
-// strings + the Join/Spectate/Create button click flags. Domain glue
+// Screen-side lobby GameSelectPanel: owns the per-frame games snapshot, selected
+// game info strings, and the Join/Spectate/Create click flags. Domain glue
 // (JoinGame / SpectateGame / level checks / password modal / ShowGameCreate)
-// lives here in the screen; primitives stay screen-agnostic.
+// lives here in the screen; the cppx view owns retained composition.
 
 #include "shared.h"
 #include "runtime/UiActionQueue.h"
@@ -15,13 +13,8 @@
 #include <vector>
 
 class World;
-class Resources;
 class ScreenContext;
 class LobbyScreen;
-
-namespace silencer::ui {
-class UiInteractionRegistry;
-}
 
 namespace silencer::client_ui::lobby {
 
@@ -79,26 +72,6 @@ void GameSelectPanelTick(GameSelectPanelState & state,
                          LobbyScreen & owner);
 bool GameSelectPanelHandleUiIntent(GameSelectPanelState & state,
                                    const silencer::ui::UiAction & action);
-
-// Emits the upper stepped-pane subtree (Create Game button). Must be called
-// inside the LobbyRightUpperBox CLAY block; emits flex children only (no
-// floating).
-// BeginFrame requirements: ButtonBeginFrame.
-void BuildGameSelectUpperTree(GameSelectPanelState & state,
-                              Uint16 panelWidth,
-                              Resources & resources,
-                              silencer::ui::UiInteractionRegistry& interactions);
-
-// Emits the tall stepped-pane subtree ("Active Games" header + games list +
-// info-block + Spectate/Join buttons). Must be called inside the
-// LobbyRightTallBox CLAY block; emits flex children only.
-// BeginFrame requirements: TextBeginFrame, ButtonBeginFrame,
-// ScrollListBeginFrame.
-void BuildGameSelectTallTree(GameSelectPanelState & state,
-                             Uint16 panelWidth,
-                             Uint16 panelHeight,
-                             Resources & resources,
-                             silencer::ui::UiInteractionRegistry& interactions);
 
 }  // namespace silencer::client_ui::lobby
 

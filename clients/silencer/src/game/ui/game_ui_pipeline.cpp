@@ -218,7 +218,7 @@ if(game.state != GameState::FADEOUT){
 std::vector<silencer::ui::UiAction> unhandledUiActions =
 clientUi.DispatchInput(game.screenContext, preparedUiInput);
 if(!clientUi.HasScreens() && game.world.map.loaded){
-inGameUiController.ApplyActions(
+inGameUi.ApplyActions(
 game.world.peers.localpeerid, unhandledUiActions, clientUi.Interactions());
 }
 bool nowFocused = clientUi.Interactions().HasTextInputFocus();
@@ -242,13 +242,13 @@ preparedUiInput.controlCommands.clear();
 }
 GameUiPipeline::GameUiPipeline(Game & g)
 : game(g), uiClayService(uiClayBackend), clientUi(uiClayService),
-  inGameUiController(g.world), hasPreparedUiInput(false),
+  inGameUi(g.world), hasPreparedUiInput(false),
   lastUiAnimationMs(0), textInputFocused(false) {
 }
 
 bool GameUiPipeline::HasInputTarget() {
 if(Top()) return true;
-return inGameUiController.HasInputTarget(game.world.peers.localpeerid);
+return inGameUi.HasInputTarget(game.world.peers.localpeerid);
 }
 
 bool GameUiPipeline::TickScreenState(Uint8 state, bool entering) {

@@ -1,30 +1,19 @@
 #ifndef SILENCER_CLIENT_UI_LOBBY_GAME_CREATE_PANEL_H
 #define SILENCER_CLIENT_UI_LOBBY_GAME_CREATE_PANEL_H
 
-// Screen-side lobby GameCreatePanel: the game-options form on the right pane.
-// Composes Panel + LabelValueRow + TextInput + Button::Inline
-// (security/spectatable cyclers) + ScrollList (map list) +
-// Button::Chrome (Create).
-//
-// Domain glue (CreateGame kickoff, Config persistence, async map upload)
-// lives in the screen-side GameCreatePanelTick. Primitives stay screen-
-// agnostic.
+// Screen-side lobby GameCreatePanel state and domain glue. The cppx lobby view
+// owns retained composition; this file owns CreateGame kickoff, Config
+// persistence, and async map upload.
 
 #include "shared.h"
-#include "clay_ui_payloads.h"
 #include "runtime/UiActionQueue.h"
 
 #include <string>
 #include <vector>
 
 class World;
-class Resources;
 class ScreenContext;
 class LobbyScreen;
-
-namespace silencer::ui {
-class UiInteractionRegistry;
-}
 
 namespace silencer::client_ui::lobby {
 
@@ -65,15 +54,6 @@ struct GameCreatePanelState {
 	Uint16 optionsMaxScroll = 0;
 	Uint8  optionsVisibleRows = 0;
 
-	// Hover-preview cache for local map rows in the Create flow.
-	int  lastHoveredMapIndex = -1;  // tracks hover changes to trigger sound once per row
-	bool hoverPreviewVisible = false;
-	int  hoverPreviewMapIndex = -1;
-	std::string hoverPreviewName;
-	std::string hoverPreviewDescription;
-	std::vector<Uint8> hoverPreviewPixels;
-	silencer::clay_bridge::SurfacePayload hoverPreviewSurface{};
-	silencer::clay_bridge::ClayCustomData hoverPreviewCustomData{};
 };
 
 // Hydrate state from Config (defaultgamename, lastspectatable) and rebuild
@@ -93,33 +73,6 @@ void GameCreatePanelTick(GameCreatePanelState & state,
                          LobbyScreen & owner);
 bool GameCreatePanelHandleUiIntent(GameCreatePanelState & state,
                                    const silencer::ui::UiAction & action);
-
-// Emits the upper stepped-pane subtree ("Game Options" heading + 6-row form:
-// security cycler, min/max level, max players, max teams, spectatable).
-// Called inside the LobbyRightUpperBox CLAY block; flex children only (no
-// floating).
-// BeginFrame requirements: TextBeginFrame, ButtonBeginFrame,
-// TextInputBeginFrame.
-void BuildGameCreateUpperTree(GameCreatePanelState & state,
-                              Uint16 panelWidth,
-                              Uint16 panelHeight,
-                              Resources & resources,
-                              silencer::ui::UiInteractionRegistry& interactions);
-
-// Emits the tall stepped-pane subtree ("Select Map" heading + map list +
-// game-name + password inputs + Create button). Called inside the
-// LobbyRightTallBox CLAY block; flex children only.
-// BeginFrame requirements: TextBeginFrame, ButtonBeginFrame,
-// ScrollListBeginFrame, TextInputBeginFrame.
-void BuildGameCreateTallTree(GameCreatePanelState & state,
-                             ScreenContext & ctx,
-                             Uint16 panelWidth,
-                             Uint16 panelHeight,
-                             Resources & resources,
-                             silencer::ui::UiInteractionRegistry& interactions);
-
-void BuildGameCreatePreviewOverlay(GameCreatePanelState & state,
-                                   ScreenContext & ctx);
 
 }  // namespace silencer::client_ui::lobby
 

@@ -17,7 +17,7 @@
 #include <memory>
 #include <string>
 
-namespace lobby_controller_detail {
+namespace lobby_screen_detail {
 
 constexpr const char * kActionGoBack = "lobby.go_back";
 
@@ -40,7 +40,7 @@ void DismissProgressModal(ScreenContext & ctx)
 	if(TopAsProgressModal(ctx)) ctx.PopScreen();
 }
 
-}  // namespace lobby_controller_detail
+}  // namespace lobby_screen_detail
 
 void LobbyScreen::Tick(ScreenContext & ctx)
 {
@@ -54,8 +54,8 @@ void LobbyScreen::Tick(ScreenContext & ctx)
 		return;
 	}
 
-	// Chrome Go Back — flag was set by a typed button intent on the previous
-	// frame. Consume it before pumping anything else.
+	// Go Back was set by a typed button intent on the previous frame. Consume
+	// it before pumping anything else.
 	if(goBackClicked){
 		goBackClicked = false;
 		if(game.GoBack()) return;
@@ -95,7 +95,7 @@ void LobbyScreen::Tick(ScreenContext & ctx)
 
 	MapDownloader & mapDownloader = ctx.mapDownloader;
 
-	// Pre-CONNECTED surfaces (gameselect / gamecreate) — join finalisation,
+	// Pre-CONNECTED states (game select / game create) — join finalisation,
 	// progress-modal spinner update, auto-dismiss, CONNECTED→GameJoin
 	// transition.
 	if(!gameJoinActive && !gameTechActive){
@@ -105,11 +105,11 @@ void LobbyScreen::Tick(ScreenContext & ctx)
 			}
 			if(world.network.state == World::IDLE){
 				game.joininggame = false;
-				lobby_controller_detail::DismissProgressModal(ctx);
+				lobby_screen_detail::DismissProgressModal(ctx);
 				ctx.ShowMessage("Unable to join game");
 			}
 		}
-		if(MessageModal * progress = lobby_controller_detail::TopAsProgressModal(ctx)){
+		if(MessageModal * progress = lobby_screen_detail::TopAsProgressModal(ctx)){
 			std::string text = (mapDownloader.mapUploadState.load(std::memory_order_relaxed) == 1)
 				? "Uploading map" : "Creating game";
 			int dots = (world.tickcount / 4) % 6;
@@ -117,7 +117,7 @@ void LobbyScreen::Tick(ScreenContext & ctx)
 			for(int i = 0; i < dots; i++) text += ".";
 			progress->SetText(ctx, text);
 		}
-		if(lobby_controller_detail::TopAsProgressModal(ctx) && world.lobby.creategamestatus != 100 &&
+		if(lobby_screen_detail::TopAsProgressModal(ctx) && world.lobby.creategamestatus != 100 &&
 		   mapDownloader.mapUploadState.load(std::memory_order_relaxed) == 0 &&
 		   (world.network.state == World::CONNECTED || world.network.state == World::IDLE)){
 			ctx.PopScreen();
@@ -150,7 +150,7 @@ void LobbyScreen::Tick(ScreenContext & ctx)
 	// Disconnect-from-game modal — fires on the joined-game surface
 	// (gameJoinActive || gameTechActive) when the world drops out of
 	// CONNECTED.
-	if(world.network.state != World::CONNECTED && !lobby_controller_detail::TopIsModal(ctx)){
+	if(world.network.state != World::CONNECTED && !lobby_screen_detail::TopIsModal(ctx)){
 		if(gameJoinActive || gameTechActive){
 			Game * gamePtr = &game;
 			ctx.ShowMessage("Disconnected from game", [gamePtr]() { gamePtr->GoBack(); });
@@ -182,7 +182,7 @@ bool LobbyScreen::HandleUiIntent(ScreenContext & ctx, const silencer::ui::UiActi
 		return true;
 	}
 	if(action.kind == silencer::ui::UiActionKind::Activate &&
-	   action.id == lobby_controller_detail::kActionGoBack){
+	   action.id == lobby_screen_detail::kActionGoBack){
 		goBackClicked = true;
 		return true;
 	}
@@ -206,8 +206,7 @@ bool LobbyScreen::HandleUiIntent(ScreenContext & ctx, const silencer::ui::UiActi
 
 // Friend-of-World helpers — these are member methods because the lobby
 // panels reach into World private state through the LobbyScreen friend
-// grant. Kept alongside the controller (Tick / HandleUiIntent) since the
-// panel ticks call them.
+// grant. Kept with the screen lifecycle helpers because the panel ticks call them.
 
 void LobbyScreen::SeedHostGameInfo(World & world, LobbyGame & lg)
 {

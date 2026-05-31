@@ -7,6 +7,7 @@
 #include "world.h"
 #include "renderer.h"
 
+#include <algorithm>
 #include <cstring>
 #include <string>
 
@@ -73,6 +74,17 @@ void LobbyScreen::ShowGameTech(ScreenContext & ctx)
 bool LobbyScreen::BuildElement(ScreenContext & ctx, ::ui::UiElement * out)
 {
 	if(!out) return false;
+	const silencer::ui::UiInputState & input = ctx.game.CurrentUiInput();
+	const int layoutWidth = std::max(1, input.width);
+	const int layoutHeight = std::max(1, input.height);
+	const int bodyWidth = std::max(1, layoutWidth - 20);
+	const int bodyHeight = std::max(1, layoutHeight - 80);
+	const int chatWidth = std::max(220, bodyWidth - 244 - 10);
+	const int chatHeight = std::max(120, bodyHeight - 126 - 10);
+	silencer::client_ui::lobby::ChatPanelSyncLayout(
+		chatState,
+		static_cast<Uint16>(std::min(chatWidth, 1024)),
+		static_cast<Uint16>(std::min(chatHeight, 768)));
 	silencer::client_ui::lobby::LobbyContextValue context{
 		.version = version.c_str(),
 		.map_name = mapName.c_str(),

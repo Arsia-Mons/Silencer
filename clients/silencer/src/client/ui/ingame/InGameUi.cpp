@@ -1,4 +1,4 @@
-#include "client/ui/ingame/InGameUiController.h"
+#include "client/ui/ingame/InGameUi.h"
 
 #include "audio.h"
 #include "basedoor.h"
@@ -15,7 +15,7 @@
 namespace silencer {
 namespace client_ui {
 
-namespace ingameuicontroller_detail {
+namespace ingameui_detail {
 
 bool StartsWith(const std::string& value, const char * prefix) {
 	return value.compare(0, std::strlen(prefix), prefix) == 0;
@@ -74,16 +74,16 @@ void ActivateBuyTechSelection(Player& player, World& world) {
 	}
 }
 
-}  // namespace ingameuicontroller_detail
+}  // namespace ingameui_detail
 
-InGameUiController::InGameUiController(World& world) : world_(world) {}
+InGameUi::InGameUi(World& world) : world_(world) {}
 
-bool InGameUiController::HasInputTarget(int localPeerId) {
+bool InGameUi::HasInputTarget(int localPeerId) {
 	Player * player = world_.GetPeerPlayer(localPeerId);
 	return player && (player->chatActive || player->isbuying || player->techstationactive);
 }
 
-void InGameUiController::UpdateOverlayState(int localPeerId) {
+void InGameUi::UpdateOverlayState(int localPeerId) {
 	Player * localplayer = world_.GetPeerPlayer(localPeerId);
 	if(!localplayer) return;
 	if(localplayer->isbuying || localplayer->techstationactive){
@@ -108,7 +108,7 @@ void InGameUiController::UpdateOverlayState(int localPeerId) {
 	}
 }
 
-bool InGameUiController::ApplyActions(
+bool InGameUi::ApplyActions(
 	int localPeerId,
 	const std::vector<silencer::ui::UiAction>& actions,
 	silencer::ui::UiInteractionRegistry& interactions) {
@@ -154,14 +154,14 @@ bool InGameUiController::ApplyActions(
 		}
 
 		if((localplayer->isbuying || localplayer->techstationactive) &&
-		   ingameuicontroller_detail::StartsWith(action.id, "ingame.buytech.row.")){
+		   ingameui_detail::StartsWith(action.id, "ingame.buytech.row.")){
 			handled = true;
 			if(action.index >= 0){
-				ingameuicontroller_detail::SelectBuyTechRow(*localplayer, world_, action.index);
+				ingameui_detail::SelectBuyTechRow(*localplayer, world_, action.index);
 			}
 			if(action.kind == silencer::ui::UiActionKind::Select &&
 			   action.value != "focus_next" && action.value != "focus_previous"){
-				ingameuicontroller_detail::ActivateBuyTechSelection(*localplayer, world_);
+				ingameui_detail::ActivateBuyTechSelection(*localplayer, world_);
 			}
 			continue;
 		}
@@ -176,7 +176,7 @@ bool InGameUiController::ApplyActions(
 	return handled;
 }
 
-InGameUiControlResult InGameUiController::ConfigureForControl(InGameUiControlMode mode) {
+InGameUiControlResult InGameUi::ConfigureForControl(InGameUiControlMode mode) {
 	InGameUiControlResult result;
 	result.mode = mode;
 

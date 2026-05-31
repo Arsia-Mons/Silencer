@@ -45,7 +45,7 @@ fail_if_match \
   --glob '!third_party/**'
 
 fail_if_match \
-  'nlohmann::json[[:space:]]+(Game::)?GetWorldSummary|nlohmann::json[[:space:]]+(InGameUiController::)?ConfigureForControl' \
+  'nlohmann::json[[:space:]]+(Game::)?GetWorldSummary|nlohmann::json[[:space:]]+(InGameUi::)?ConfigureForControl' \
   "$REPO_ROOT/clients/silencer/src" \
   --glob '!third_party/**'
 
@@ -78,6 +78,13 @@ fail_if_match \
 fail_if_match \
   "\\bBuildUi[[:space:]]*\\(" \
   "$REPO_ROOT/clients/silencer/src/client/ui"
+
+fail_if_match \
+  "\\b[A-Za-z0-9_]*Controller\\b|\\bcontroller\\b" \
+  "$REPO_ROOT/clients/silencer/src/client/ui" \
+  "$REPO_ROOT/clients/silencer/src/game/ui" \
+  "$REPO_ROOT/clients/silencer/CLAUDE.md" \
+  "$REPO_ROOT/clients/silencer/src/ui/CLAUDE.md"
 
 fail_if_match \
   "clay_bridge::(EnsureInitialized|Render)[[:space:]]*\\(" \
