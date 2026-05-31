@@ -1,0 +1,507 @@
+#include "client/ui/screens/mission_summary/mission_summary_view.h"
+
+#include "ui/components/box.h"
+#include "ui/components/button.h"
+#include "ui/components/text.h"
+#include "ui/runtime/react.h"
+
+namespace silencer::client_ui {
+
+using ::ui::children;
+using ::ui::components::Box;
+using ::ui::components::BoxProps;
+using ::ui::components::Button;
+using ::ui::components::ButtonProps;
+using ::ui::components::Text;
+using ::ui::components::TextProps;
+
+namespace {
+
+const char * kUpgradeLabels[kMissionSummaryUpgradeCount] = {
+	"+1 Endurance",
+	"+1 Shield",
+	"+1 Jetpack",
+	"+1 Tech Slot",
+	"+1 Hacking",
+	"+1 Contacts",
+};
+
+const char * kLevelLabels[kMissionSummaryUpgradeCount] = {
+	"Current Endurance Level:",
+	"Current Shield Level:",
+	"Current Jetpack Level:",
+	"Current Tech Slot Level:",
+	"Current Hacking Level:",
+	"Current Contacts Level:",
+};
+
+::ui::LayoutStyle root_layout() {
+	return ::ui::LayoutStyle{
+		.direction = ::ui::FlexDirection::Column,
+		.align_items = ::ui::AlignItems::Center,
+		.justify_content = ::ui::JustifyContent::Center,
+		.width = ::ui::Length::percent(100.0f),
+		.height = ::ui::Length::percent(100.0f),
+	};
+}
+
+::ui::StyleStatePatch root_style() {
+	return ::ui::patch().background(::ui::Color{14, 18, 25, 255});
+}
+
+::ui::LayoutStyle panel_layout() {
+	return ::ui::LayoutStyle{
+		.direction = ::ui::FlexDirection::Row,
+		.align_items = ::ui::AlignItems::Start,
+		.width = ::ui::Length::points(628.0f),
+		.height = ::ui::Length::points(441.0f),
+		.padding = {48.0f, 48.0f, 26.0f, 26.0f},
+		.gap = 44.0f,
+	};
+}
+
+::ui::StyleStatePatch panel_style() {
+	return ::ui::patch()
+		.background(::ui::Color{31, 36, 44, 248})
+		.border(::ui::Border{
+			.width = {1.0f, 1.0f, 1.0f, 1.0f},
+			.color = {
+				{74, 86, 102, 255},
+				{74, 86, 102, 255},
+				{74, 86, 102, 255},
+				{74, 86, 102, 255},
+			},
+		});
+}
+
+::ui::LayoutStyle summary_column_layout() {
+	return ::ui::LayoutStyle{
+		.direction = ::ui::FlexDirection::Column,
+		.align_items = ::ui::AlignItems::Center,
+		.width = ::ui::Length::points(220.0f),
+		.gap = 10.0f,
+	};
+}
+
+::ui::LayoutStyle upgrade_column_layout() {
+	return ::ui::LayoutStyle{
+		.direction = ::ui::FlexDirection::Column,
+		.align_items = ::ui::AlignItems::Center,
+		.width = ::ui::Length::points(260.0f),
+		.gap = 10.0f,
+	};
+}
+
+::ui::LayoutStyle title_layout() {
+	return ::ui::LayoutStyle{
+		.width = ::ui::Length::points(220.0f),
+		.height = ::ui::Length::points(24.0f),
+	};
+}
+
+::ui::LayoutStyle xp_layout() {
+	return ::ui::LayoutStyle{
+		.width = ::ui::Length::points(220.0f),
+		.height = ::ui::Length::points(28.0f),
+	};
+}
+
+::ui::LayoutStyle banner_layout(bool visible) {
+	if(!visible){
+		return ::ui::LayoutStyle{ .display = ::ui::Display::None };
+	}
+	return ::ui::LayoutStyle{
+		.width = ::ui::Length::points(220.0f),
+		.height = ::ui::Length::points(16.0f),
+	};
+}
+
+::ui::LayoutStyle summary_list_layout() {
+	return ::ui::LayoutStyle{
+		.direction = ::ui::FlexDirection::Column,
+		.align_items = ::ui::AlignItems::Start,
+		.width = ::ui::Length::points(220.0f),
+		.height = ::ui::Length::points(308.0f),
+		.gap = 0.0f,
+	};
+}
+
+::ui::LayoutStyle summary_line_layout() {
+	return ::ui::LayoutStyle{
+		.width = ::ui::Length::points(220.0f),
+		.height = ::ui::Length::points(11.0f),
+	};
+}
+
+::ui::LayoutStyle upgrade_row_layout() {
+	return ::ui::LayoutStyle{
+		.direction = ::ui::FlexDirection::Column,
+		.align_items = ::ui::AlignItems::Center,
+		.width = ::ui::Length::points(240.0f),
+		.gap = 5.0f,
+	};
+}
+
+::ui::LayoutStyle level_row_layout() {
+	return ::ui::LayoutStyle{
+		.direction = ::ui::FlexDirection::Row,
+		.align_items = ::ui::AlignItems::Center,
+		.justify_content = ::ui::JustifyContent::SpaceBetween,
+		.width = ::ui::Length::points(240.0f),
+		.height = ::ui::Length::points(14.0f),
+	};
+}
+
+::ui::LayoutStyle level_label_layout() {
+	return ::ui::LayoutStyle{
+		.width = ::ui::Length::points(188.0f),
+		.height = ::ui::Length::points(14.0f),
+	};
+}
+
+::ui::LayoutStyle level_value_layout() {
+	return ::ui::LayoutStyle{
+		.width = ::ui::Length::points(28.0f),
+		.height = ::ui::Length::points(14.0f),
+	};
+}
+
+::ui::LayoutStyle upgrade_button_layout(bool visible) {
+	if(!visible){
+		return ::ui::LayoutStyle{ .display = ::ui::Display::None };
+	}
+	return ::ui::LayoutStyle{
+		.align_items = ::ui::AlignItems::Center,
+		.justify_content = ::ui::JustifyContent::Center,
+		.width = ::ui::Length::points(196.0f),
+		.height = ::ui::Length::points(33.0f),
+		.padding = {24.0f, 24.0f, 7.0f, 7.0f},
+	};
+}
+
+::ui::LayoutStyle done_button_layout() {
+	return ::ui::LayoutStyle{
+		.align_items = ::ui::AlignItems::Center,
+		.justify_content = ::ui::JustifyContent::Center,
+		.width = ::ui::Length::points(196.0f),
+		.height = ::ui::Length::points(33.0f),
+		.padding = {24.0f, 24.0f, 7.0f, 7.0f},
+	};
+}
+
+::ui::StyleStatePatch title_style() {
+	return ::ui::patch().text(::ui::TextVisual{
+		.color = {236, 241, 247, 255},
+		.font_id = 135,
+		.font_size = 12,
+		.align = ::ui::TextAlign::Center,
+	});
+}
+
+::ui::StyleStatePatch prompt_style() {
+	return ::ui::patch().text(::ui::TextVisual{
+		.color = {198, 218, 240, 255},
+		.font_id = 136,
+		.font_size = 16,
+		.align = ::ui::TextAlign::Center,
+	});
+}
+
+::ui::StyleStatePatch body_style(::ui::TextAlign align = ::ui::TextAlign::Left) {
+	return ::ui::patch().text(::ui::TextVisual{
+		.color = {226, 234, 242, 255},
+		.font_id = 133,
+		.font_size = 6,
+		.align = align,
+	});
+}
+
+::ui::StyleStatePatch banner_style() {
+	return ::ui::patch().text(::ui::TextVisual{
+		.color = {238, 210, 98, 255},
+		.font_id = 133,
+		.font_size = 6,
+		.align = ::ui::TextAlign::Center,
+	});
+}
+
+const char * upgrade_key(int index) {
+	return ::ui::copy_string(use_text_storage("upgrade-%d", index));
+}
+
+const char * upgrade_id(int index) {
+	return ::ui::copy_string(use_text_storage("mission_summary.upgrade.%d", index));
+}
+
+struct UpgradeRowProps {
+	const char * key = nullptr;
+	int index = 0;
+	int level = 0;
+	bool available = false;
+	std::function<void(const ::ui::ActivationEvent&)> on_upgrade = {};
+};
+
+::ui::UiElement UpgradeRow(const UpgradeRowProps& props) {
+	return <Box key={props.key ? props.key : upgrade_key(props.index)} layout={upgrade_row_layout()}>
+		<Box key="level" layout={level_row_layout()}>
+			<Text
+			  key="label"
+			  value={kLevelLabels[props.index]}
+			  layout={level_label_layout()}
+			  style={body_style()}
+			/>
+			<Text
+			  key="value"
+			  value={::ui::copy_string(use_text_storage("%d", props.level))}
+			  layout={level_value_layout()}
+			  style={body_style(::ui::TextAlign::Right)}
+			/>
+		</Box>
+		<Button
+		  key="button"
+		  id={upgrade_id(props.index)}
+		  label={kUpgradeLabels[props.index]}
+		  disabled={!props.available}
+		  onActivate={props.on_upgrade}
+		  layout={upgrade_button_layout(props.available)}
+		/>
+	</Box>
+}
+
+}  // namespace
+
+::ui::UiElement MissionSummaryView(const MissionSummaryViewProps& props) {
+	return <Box key={props.key} layout={root_layout()} style={root_style()}>
+		<Box key="panel" layout={panel_layout()} style={panel_style()}>
+			<Box key="summary-column" layout={summary_column_layout()}>
+				<Text key="title" value="Mission Summary" layout={title_layout()} style={title_style()} />
+				<Box key="summary-lines" layout={summary_list_layout()}>
+					<Text
+					  key="line-00"
+					  value={props.summary_lines[0]}
+					  layout={summary_line_layout()}
+					  style={body_style()}
+					/>
+					<Text
+					  key="line-01"
+					  value={props.summary_lines[1]}
+					  layout={summary_line_layout()}
+					  style={body_style()}
+					/>
+					<Text
+					  key="line-02"
+					  value={props.summary_lines[2]}
+					  layout={summary_line_layout()}
+					  style={body_style()}
+					/>
+					<Text
+					  key="line-03"
+					  value={props.summary_lines[3]}
+					  layout={summary_line_layout()}
+					  style={body_style()}
+					/>
+					<Text
+					  key="line-04"
+					  value={props.summary_lines[4]}
+					  layout={summary_line_layout()}
+					  style={body_style()}
+					/>
+					<Text
+					  key="line-05"
+					  value={props.summary_lines[5]}
+					  layout={summary_line_layout()}
+					  style={body_style()}
+					/>
+					<Text
+					  key="line-06"
+					  value={props.summary_lines[6]}
+					  layout={summary_line_layout()}
+					  style={body_style()}
+					/>
+					<Text
+					  key="line-07"
+					  value={props.summary_lines[7]}
+					  layout={summary_line_layout()}
+					  style={body_style()}
+					/>
+					<Text
+					  key="line-08"
+					  value={props.summary_lines[8]}
+					  layout={summary_line_layout()}
+					  style={body_style()}
+					/>
+					<Text
+					  key="line-09"
+					  value={props.summary_lines[9]}
+					  layout={summary_line_layout()}
+					  style={body_style()}
+					/>
+					<Text
+					  key="line-10"
+					  value={props.summary_lines[10]}
+					  layout={summary_line_layout()}
+					  style={body_style()}
+					/>
+					<Text
+					  key="line-11"
+					  value={props.summary_lines[11]}
+					  layout={summary_line_layout()}
+					  style={body_style()}
+					/>
+					<Text
+					  key="line-12"
+					  value={props.summary_lines[12]}
+					  layout={summary_line_layout()}
+					  style={body_style()}
+					/>
+					<Text
+					  key="line-13"
+					  value={props.summary_lines[13]}
+					  layout={summary_line_layout()}
+					  style={body_style()}
+					/>
+					<Text
+					  key="line-14"
+					  value={props.summary_lines[14]}
+					  layout={summary_line_layout()}
+					  style={body_style()}
+					/>
+					<Text
+					  key="line-15"
+					  value={props.summary_lines[15]}
+					  layout={summary_line_layout()}
+					  style={body_style()}
+					/>
+					<Text
+					  key="line-16"
+					  value={props.summary_lines[16]}
+					  layout={summary_line_layout()}
+					  style={body_style()}
+					/>
+					<Text
+					  key="line-17"
+					  value={props.summary_lines[17]}
+					  layout={summary_line_layout()}
+					  style={body_style()}
+					/>
+					<Text
+					  key="line-18"
+					  value={props.summary_lines[18]}
+					  layout={summary_line_layout()}
+					  style={body_style()}
+					/>
+					<Text
+					  key="line-19"
+					  value={props.summary_lines[19]}
+					  layout={summary_line_layout()}
+					  style={body_style()}
+					/>
+					<Text
+					  key="line-20"
+					  value={props.summary_lines[20]}
+					  layout={summary_line_layout()}
+					  style={body_style()}
+					/>
+					<Text
+					  key="line-21"
+					  value={props.summary_lines[21]}
+					  layout={summary_line_layout()}
+					  style={body_style()}
+					/>
+					<Text
+					  key="line-22"
+					  value={props.summary_lines[22]}
+					  layout={summary_line_layout()}
+					  style={body_style()}
+					/>
+					<Text
+					  key="line-23"
+					  value={props.summary_lines[23]}
+					  layout={summary_line_layout()}
+					  style={body_style()}
+					/>
+					<Text
+					  key="line-24"
+					  value={props.summary_lines[24]}
+					  layout={summary_line_layout()}
+					  style={body_style()}
+					/>
+					<Text
+					  key="line-25"
+					  value={props.summary_lines[25]}
+					  layout={summary_line_layout()}
+					  style={body_style()}
+					/>
+					<Text
+					  key="line-26"
+					  value={props.summary_lines[26]}
+					  layout={summary_line_layout()}
+					  style={body_style()}
+					/>
+				</Box>
+			</Box>
+			<Box key="upgrade-column" layout={upgrade_column_layout()}>
+				<Text key="xp" value={props.xp} layout={xp_layout()} style={prompt_style()} />
+				<Text
+				  key="banner"
+				  value="*NEW UPGRADE AVAILABLE*"
+				  disabled={!props.upgrade_banner}
+				  layout={banner_layout(props.upgrade_banner)}
+				  style={banner_style()}
+				/>
+				<UpgradeRow
+				  key="upgrade-row-0"
+				  index={0}
+				  level={props.levels[0]}
+				  available={props.upgrades_available[0]}
+				  onUpgrade={props.on_upgrade[0]}
+				/>
+				<UpgradeRow
+				  key="upgrade-row-1"
+				  index={1}
+				  level={props.levels[1]}
+				  available={props.upgrades_available[1]}
+				  onUpgrade={props.on_upgrade[1]}
+				/>
+				<UpgradeRow
+				  key="upgrade-row-2"
+				  index={2}
+				  level={props.levels[2]}
+				  available={props.upgrades_available[2]}
+				  onUpgrade={props.on_upgrade[2]}
+				/>
+				<UpgradeRow
+				  key="upgrade-row-3"
+				  index={3}
+				  level={props.levels[3]}
+				  available={props.upgrades_available[3]}
+				  onUpgrade={props.on_upgrade[3]}
+				/>
+				<UpgradeRow
+				  key="upgrade-row-4"
+				  index={4}
+				  level={props.levels[4]}
+				  available={props.upgrades_available[4]}
+				  onUpgrade={props.on_upgrade[4]}
+				/>
+				<UpgradeRow
+				  key="upgrade-row-5"
+				  index={5}
+				  level={props.levels[5]}
+				  available={props.upgrades_available[5]}
+				  onUpgrade={props.on_upgrade[5]}
+				/>
+				<Button
+				  key="done"
+				  id="mission_summary.done"
+				  label="Done"
+				  autofocus={true}
+				  onActivate={props.on_done}
+				  layout={done_button_layout()}
+				/>
+			</Box>
+		</Box>
+	</Box>
+}
+
+}  // namespace silencer::client_ui

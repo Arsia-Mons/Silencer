@@ -18,11 +18,13 @@ class MissionSummaryScreen : public Screen
 public:
 	void Build(ScreenContext & ctx) override;
 	void Tick(ScreenContext & ctx) override;
-	void BuildUi(ScreenContext & ctx, Surface & dst, float frametime, silencer::ui::UiInteractionRegistry& interactions) override;
+	bool BuildElement(ScreenContext & ctx, ::ui::UiElement * out) override;
 	void Destroy(ScreenContext & ctx) override;
 	bool HandleUiIntent(ScreenContext & ctx, const silencer::ui::UiAction & action) override;
 
 private:
+	static constexpr int kVisibleSummaryLineCount = 27;
+
 	void Refresh(ScreenContext & ctx);
 	void AddSummaryLine(const char * name, Uint32 value, bool percentage = false);
 
@@ -33,6 +35,8 @@ private:
 	int scrollPosition = 0;
 	bool upgradeBanner = false;
 	int experience = 0;
+	std::string xpText;
+	std::array<std::string, kVisibleSummaryLineCount> visibleSummaryLines = {};
 	std::vector<std::string> summaryLines;
 	std::array<int, 6> levels = {};
 	std::array<bool, 6> upgradesAvailable = {};
