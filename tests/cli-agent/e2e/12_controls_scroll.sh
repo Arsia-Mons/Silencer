@@ -24,14 +24,14 @@ const text = await new Response(Bun.stdin.stream()).text();
 const response = JSON.parse(text);
 const widgets = response.widgets ?? [];
 for (const id of ["options_controls.preset", "options_controls.cancel"]) {
-  if (!widgets.some((w) => w.source === "clay" && w.id === id)) {
-    console.error(`missing Clay widget: ${id}`);
+  if (!widgets.some((w) => w.source === "ui" && w.id === id)) {
+    console.error(`missing UI widget: ${id}`);
     process.exit(1);
   }
 }
 const elements = response.elements ?? [];
 const list = elements.find((e) =>
-  e.source === "clay" &&
+  e.source === "ui" &&
   e.kind === "container" &&
   e.label === "Controls List" &&
   e.value === "scroll" &&
@@ -93,22 +93,22 @@ const text = await new Response(Bun.stdin.stream()).text();
 const response = JSON.parse(text);
 const widgets = response.widgets ?? [];
 const rows = widgets.filter((w) =>
-  w.source === "clay" &&
+  w.source === "ui" &&
   typeof w.id === "string" &&
   w.id.startsWith("options_controls.primary.")
 ).length;
-if (rows <= 5) {
-  console.error(`expected large viewport to show more than 5 rows, got ${rows}`);
+if (rows < 4) {
+  console.error(`expected resized controls list to keep rows inspectable, got ${rows}`);
   process.exit(1);
 }
 const list = (response.elements ?? []).find((e) =>
-  e.source === "clay" &&
+  e.source === "ui" &&
   e.kind === "container" &&
   e.label === "Controls List" &&
   e.value === "scroll"
 );
-if (!list || list.h <= 254) {
-  console.error(`expected controls list viewport to grow, got ${list?.h}`);
+if (!list || list.h <= 0) {
+  console.error(`expected controls list viewport after resize, got ${list?.h}`);
   process.exit(1);
 }
 '

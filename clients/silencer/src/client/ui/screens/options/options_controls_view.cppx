@@ -347,12 +347,18 @@ struct OptionsControlsFrameProps {
 					  key="preset"
 					  id="options_controls.preset"
 					  label={preset_text(controls.keybinds)}
+					  accessibility={::ui::components::AccessibilityProps{.label = "Preset"}}
 					  autofocus={true}
 					  onActivate={controls.on_preset}
 					  layout={preset_button_layout(h_scale(controls.keybinds))}
 					/>
 				</Box>
-				<Box key="rows" id="options_controls.list" layout={rows_layout()}>
+				<Box
+				  key="rows"
+				  id="options_controls.list"
+				  accessibility={::ui::components::AccessibilityProps{.label = "Controls List", .description = "scroll"}}
+				  layout={rows_layout()}
+				>
 					<KeybindRow key="row-00" index={0} />
 					<KeybindRow key="row-01" index={1} />
 					<KeybindRow key="row-02" index={2} />

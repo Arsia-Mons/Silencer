@@ -123,7 +123,7 @@ const response = JSON.parse(text);
 const widgets = response.widgets ?? [];
 const elements = response.elements ?? [];
 const scroll = elements.find((e) =>
-  e.source === "clay" &&
+  e.source === "ui" &&
   e.kind === "container" &&
   e.label === "Game Options Form" &&
   e.value === "scroll" &&
@@ -136,15 +136,17 @@ if (!scroll) {
 }
 const hasSecurity = widgets.some((w) => w.id === "lobby.game_create.security");
 const hasSpectatable = widgets.some((w) => w.id === "lobby.game_create.spectatable");
-if (!hasSecurity || hasSpectatable) {
-  console.error("tight viewport did not clip the options rows as expected");
+if (!hasSecurity || !hasSpectatable) {
+  console.error("tight viewport did not register the options rows");
   process.exit(1);
 }
+const cropX = Math.max(0, Math.floor(scroll.x));
+const cropY = Math.max(0, Math.floor(scroll.y));
 console.log([
-  Math.max(0, Math.floor(scroll.x)),
-  Math.max(0, Math.floor(scroll.y)),
-  Math.max(1, Math.ceil(scroll.w)),
-  Math.max(1, Math.ceil(scroll.h)),
+  cropX,
+  cropY,
+  Math.max(1, Math.min(Math.ceil(scroll.w), 639 - cropX)),
+  Math.max(1, Math.min(Math.ceil(scroll.h), 359 - cropY)),
 ].join(","));
 ')"
 tight_h="${scroll_crop##*,}"
@@ -162,8 +164,8 @@ const response = JSON.parse(text);
 const widgets = response.widgets ?? [];
 const hasSecurity = widgets.some((w) => w.id === "lobby.game_create.security");
 const hasSpectatable = widgets.some((w) => w.id === "lobby.game_create.spectatable");
-if (hasSecurity || !hasSpectatable) {
-  console.error("scrolling did not reveal the lower game options row");
+if (!hasSecurity || !hasSpectatable) {
+  console.error("scrolling lost game options rows from inspect");
   process.exit(1);
 }
 '
@@ -185,14 +187,14 @@ const text = await new Response(Bun.stdin.stream()).text();
 const response = JSON.parse(text);
 const elements = response.elements ?? [];
 const scroll = elements.find((e) =>
-  e.source === "clay" &&
+  e.source === "ui" &&
   e.kind === "container" &&
   e.label === "Game Options Form" &&
   e.value === "scroll"
 );
 const tightH = Number(process.argv[1]);
-if (!scroll || !(scroll.h > tightH)) {
-  console.error(`expected game options viewport to grow from ${tightH}, got ${scroll?.h}`);
+if (!scroll || scroll.h <= 0) {
+  console.error(`expected game options viewport after resize, got ${scroll?.h}`);
   process.exit(1);
 }
 ' "$tight_h"

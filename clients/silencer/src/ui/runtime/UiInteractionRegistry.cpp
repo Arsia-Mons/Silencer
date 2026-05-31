@@ -39,6 +39,15 @@ std::string InteractableId(const UiInteractable& widget) {
 	return label ? std::string(label) : std::string();
 }
 
+std::string InteractableIdentity(const UiInteractable& widget) {
+	std::string identity = InteractableId(widget);
+	if(widget.index >= 0){
+		identity += "#";
+		identity += std::to_string(widget.index);
+	}
+	return identity;
+}
+
 bool PointIn(const UiInteractable& widget, int x, int y) {
 	return x >= widget.x && y >= widget.y
 	    && x < widget.x + widget.w && y < widget.y + widget.h;
@@ -154,10 +163,11 @@ void UiInteractionRegistry::Register(UiElementSnapshot metadata) {
 
 void UiInteractionRegistry::RegisterInteractable(UiInteractable widget) {
 	const std::string incomingId = registry_detail::InteractableId(widget);
+	const std::string incomingIdentity = registry_detail::InteractableIdentity(widget);
 	UiInteractable * existing = nullptr;
-	if(!incomingId.empty()){
+	if(!incomingIdentity.empty()){
 		for(auto& candidate : interactables_){
-			if(registry_detail::InteractableId(candidate) == incomingId){
+			if(registry_detail::InteractableIdentity(candidate) == incomingIdentity){
 				existing = &candidate;
 				break;
 			}
@@ -247,7 +257,7 @@ const UiInteractable* UiInteractionRegistry::FindInteractableById(const std::str
 
 bool UiInteractionRegistry::MatchesFocus(const UiInteractable& widget) const {
 	if(focusedUid_ >= 0 && widget.uid == focusedUid_) return true;
-	if(!focusedLabel_.empty() && registry_detail::InteractableId(widget) == focusedLabel_) return true;
+	if(!focusedLabel_.empty() && registry_detail::InteractableIdentity(widget) == focusedLabel_) return true;
 	const char * label = UiInteractableLabel(widget);
 	return focusedUid_ < 0 && !focusedLabel_.empty() && label
 	    && registry_detail::LabelEquals(label, focusedLabel_.c_str());
@@ -271,7 +281,7 @@ void UiInteractionRegistry::SetFocus(const UiInteractable& widget,
                                      FocusOrigin origin) {
 	focusedUid_ = widget.uid;
 	focusedKind_ = widget.kind;
-	focusedLabel_ = registry_detail::InteractableId(widget);
+	focusedLabel_ = registry_detail::InteractableIdentity(widget);
 	focusedOrigin_ = origin;
 	RefreshElementState();
 }
@@ -322,6 +332,10 @@ bool UiInteractionRegistry::FocusInteractableById(const std::string& id) {
 	                  ? FocusOrigin::Text
 	                  : FocusOrigin::Navigation);
 	return true;
+}
+
+bool UiInteractionRegistry::IsFocused(const UiInteractable& interactable) const {
+	return MatchesFocus(interactable);
 }
 
 bool UiInteractionRegistry::IsTextInputFocused(int uid) const {

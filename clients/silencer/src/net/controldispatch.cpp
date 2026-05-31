@@ -361,7 +361,7 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 			const auto * el = cw.id.empty()
 				? nullptr
 				: game.UiInteractions().FindById(cw.id);
-			w["focused"] = el ? el->focused : false;
+			w["focused"] = game.UiInteractions().IsFocused(cw) || (el ? el->focused : false);
 			w["enabled"] = !cw.inactive;
 			w["x"] = cw.x; w["y"] = cw.y;
 			w["w"] = cw.w; w["h"] = cw.h;
@@ -877,9 +877,27 @@ void TickWaits(Game& game){
 		} else if(w.cmd.op == "wait_for_state"){
 			if(w.wait_state == Game::StateName(game.GetState()) &&
 			   (!StateNeedsScreen(w.wait_state) || game.GetTopScreen())){
+				if(StateNeedsScreen(w.wait_state)){
+					// State changes replace screens before the retained tree is
+					// rendered. Defer the reply until the new screen has produced
+					// an interaction snapshot for the next command.
+					if(!game.IsScreenStateSettled()){
+						w.frames_left = -1;
+						++it; continue;
+					}
+					if(w.frames_left < 0){
+						w.frames_left = 1;
+						++it; continue;
+					}
+					if(w.frames_left > 0){
+						--w.frames_left;
+						++it; continue;
+					}
+				}
 				w.cmd.reply->set_value(OkResult(w.cmd.id, nlohmann::json::object()));
 				it = v.erase(it); continue;
 			}
+			w.frames_left = -1;
 			if(now >= w.deadline_ms){
 				w.cmd.reply->set_value(Err(w.cmd.id, "TIMEOUT",
 					"state did not become " + w.wait_state));

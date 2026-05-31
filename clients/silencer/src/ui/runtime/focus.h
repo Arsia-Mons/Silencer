@@ -73,6 +73,7 @@ struct FocusRuntime {
   NodeId pointer_press_origin = 0;
   NodeId confirmed_id = 0;
   FocusSource source = FocusSource::None;
+  bool pointer_cleared_focus = false;
   int error_count = 0;
 };
 

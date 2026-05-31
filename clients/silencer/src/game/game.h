@@ -42,6 +42,7 @@ friend class GameSession;
 int GetFrameCount() const { return frames; }
 static const char * StateName(Uint8 s);
 Uint8 GetState() const { return state; }
+bool IsScreenStateSettled() const { return state != GameState::FADEOUT && !stateisnew && nextstateprocessed; }
 World & GetWorld() { return world; }
 ScreenContext & GetScreenContext() { return screenContext; }
 WorldSummary GetWorldSummary();

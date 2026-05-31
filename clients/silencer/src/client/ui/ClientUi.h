@@ -64,6 +64,8 @@ private:
 	::ui::InputFrame retainedInput_;
 	::ui::LayoutViewport retainedViewport_;
 	bool retainedFrameOpen_ = false;
+
+	void RefreshRetainedInteractions();
 };
 
 }  // namespace client_ui

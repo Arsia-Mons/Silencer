@@ -305,6 +305,7 @@ struct NodeInteraction {
   bool focusable = false;
   bool disabled = false;
   bool checked = false;
+  bool selected = false;
   bool modal = false;
   bool initial_focus = false;
 };

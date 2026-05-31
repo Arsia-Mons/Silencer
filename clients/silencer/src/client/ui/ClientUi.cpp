@@ -11,6 +11,11 @@
 #include "ui/runtime/react.h"
 #include "ui/runtime/yoga_flex_layout.h"
 
+#include <algorithm>
+#include <cmath>
+#include <cstring>
+#include <string>
+
 #ifndef SILENCER_TEST_BUILD
 #include "audio.h"
 #include "gasloader.h"
@@ -65,6 +70,159 @@ bool ActionTargetsAudibleInteractable(const silencer::ui::UiInteractionRegistry&
 	return widget && IsAudibleInteractable(*widget);
 }
 
+bool HasText(const char * value) {
+	return value && value[0] != '\0';
+}
+
+bool IsHiddenNode(const ::ui::NodeSnapshot& node) {
+	return node.visual.hidden ||
+	       node.style.display == ::ui::Display::None ||
+	       node.layout.width <= 0.0f ||
+	       node.layout.height <= 0.0f;
+}
+
+silencer::ui::UiElementKind ElementKindForNode(const ::ui::NodeSnapshot& node) {
+	switch(node.role){
+		case ::ui::NodeRole::Button:
+			return silencer::ui::UiElementKind::Button;
+		case ::ui::NodeRole::Text:
+			return silencer::ui::UiElementKind::Text;
+		case ::ui::NodeRole::Input:
+			return silencer::ui::UiElementKind::TextField;
+		case ::ui::NodeRole::Checkbox:
+			return silencer::ui::UiElementKind::Button;
+		case ::ui::NodeRole::Dialog:
+		case ::ui::NodeRole::Box:
+		case ::ui::NodeRole::Generic:
+			break;
+	}
+	switch(node.semantic_role){
+		case ::ui::SemanticRole::Button:
+		case ::ui::SemanticRole::Checkbox:
+			return silencer::ui::UiElementKind::Button;
+		case ::ui::SemanticRole::TextBox:
+			return silencer::ui::UiElementKind::TextField;
+		case ::ui::SemanticRole::Tab:
+			return silencer::ui::UiElementKind::Tab;
+		case ::ui::SemanticRole::Dialog:
+		case ::ui::SemanticRole::Auto:
+			break;
+	}
+	return silencer::ui::UiElementKind::Container;
+}
+
+bool IsTextInputNode(const ::ui::NodeSnapshot& node) {
+	return node.role == ::ui::NodeRole::Input ||
+	       node.semantic_role == ::ui::SemanticRole::TextBox;
+}
+
+bool IsListRowNode(const ::ui::NodeSnapshot& node) {
+	if(!HasText(node.control_id)) return false;
+	return std::strcmp(node.control_id, "lobby.game_select.row") == 0 ||
+	       std::strcmp(node.control_id, "lobby.game_create.map") == 0 ||
+	       std::strcmp(node.control_id, "lobby.game_tech.toggle") == 0;
+}
+
+silencer::ui::UiInteractableKind InteractableKindForNode(const ::ui::NodeSnapshot& node) {
+	if(IsTextInputNode(node)) return silencer::ui::UiInteractableKind::TextInput;
+	if(node.role == ::ui::NodeRole::Checkbox ||
+	   node.semantic_role == ::ui::SemanticRole::Checkbox){
+		return silencer::ui::UiInteractableKind::Toggle;
+	}
+	if(IsListRowNode(node)) return silencer::ui::UiInteractableKind::ListRow;
+	return silencer::ui::UiInteractableKind::Button;
+}
+
+std::string LabelForNode(const ::ui::NodeSnapshot& node) {
+	if(HasText(node.accessibility_label)) return node.accessibility_label;
+	if(HasText(node.value)) return node.value;
+	if(HasText(node.control_id)) return node.control_id;
+	return std::string();
+}
+
+silencer::ui::UiRect BoundsForNode(const ::ui::NodeSnapshot& node) {
+	return silencer::ui::UiRect{
+		node.layout.x,
+		node.layout.y,
+		node.layout.width,
+		node.layout.height,
+	};
+}
+
+void FindLastModalNode(const ::ui::UiTree& tree, ::ui::NodeId id, ::ui::NodeId& out) {
+	::ui::NodeSnapshot node{};
+	if(!tree.snapshot(id, &node)) return;
+	if(!IsHiddenNode(node) && node.interaction.modal) out = id;
+	for(int i = 0; i < tree.child_count(id); ++i){
+		FindLastModalNode(tree, tree.child_at(id, i), out);
+	}
+}
+
+void RegisterRetainedNode(const ::ui::UiTree& tree,
+                          ::ui::NodeId id,
+                          silencer::ui::UiInteractionRegistry& interactions,
+                          int& nextUid,
+                          ::ui::NodeId focusedNode) {
+	::ui::NodeSnapshot node{};
+	if(!tree.snapshot(id, &node)) return;
+	if(IsHiddenNode(node)) return;
+
+	const std::string label = LabelForNode(node);
+	const bool hasId = HasText(node.control_id);
+	const bool hasLabel = !label.empty();
+	const bool hasValue = HasText(node.value);
+	if(hasId || hasLabel || hasValue){
+		silencer::ui::UiElementSnapshot element;
+		if(hasId) element.id = node.control_id;
+		element.kind = ElementKindForNode(node);
+		element.label = label;
+		if(IsTextInputNode(node)){
+			element.value = node.password
+				? std::string(std::strlen(node.value), '*')
+				: std::string(node.value ? node.value : "");
+		}else if(HasText(node.accessibility_description)){
+			element.value = node.accessibility_description;
+		}else if(hasValue){
+			element.value = node.value;
+		}
+		element.bounds = BoundsForNode(node);
+		element.enabled = !node.interaction.disabled;
+		element.focused = node.id == focusedNode;
+		element.selected = node.interaction.selected || node.interaction.checked;
+		interactions.Register(std::move(element));
+	}
+
+	if(node.interaction.focusable &&
+	   (node.role == ::ui::NodeRole::Button ||
+	    node.role == ::ui::NodeRole::Input ||
+	    node.role == ::ui::NodeRole::Checkbox ||
+	    node.semantic_role == ::ui::SemanticRole::Button ||
+	    node.semantic_role == ::ui::SemanticRole::TextBox ||
+	    node.semantic_role == ::ui::SemanticRole::Checkbox)){
+		silencer::ui::UiInteractable widget;
+		widget.id = hasId ? node.control_id : std::string();
+		widget.labelText = label;
+		widget.kind = InteractableKindForNode(node);
+		widget.uid = nextUid++;
+		widget.x = static_cast<int>(std::floor(node.layout.x));
+		widget.y = static_cast<int>(std::floor(node.layout.y));
+		widget.w = static_cast<int>(std::ceil(node.layout.width));
+		widget.h = static_cast<int>(std::ceil(node.layout.height));
+		widget.index = widget.kind == silencer::ui::UiInteractableKind::ListRow
+			? node.control_offset
+			: -1;
+		widget.selected = node.interaction.selected || node.interaction.checked;
+		widget.value = node.value ? node.value : "";
+		widget.isPassword = node.password;
+		widget.inactive = node.interaction.disabled;
+		interactions.RegisterInteractable(std::move(widget));
+	}
+
+	for(int i = 0; i < tree.child_count(id); ++i){
+		RegisterRetainedNode(tree, tree.child_at(id, i), interactions, nextUid, focusedNode);
+	}
+}
+
 void PlayMenuButtonSound(ScreenContext& ctx) {
 #ifdef SILENCER_TEST_BUILD
 	(void)ctx;
@@ -104,7 +262,15 @@ std::string BuyTechActionId(int index) {
 	out.pointer_valid = input.HasWindow();
 	out.pointer_x = input.pointer.x;
 	out.pointer_y = input.pointer.y;
-	out.source = (input.pointer.pressed || input.pointer.down || input.pointer.released)
+	bool controlPointer = false;
+	for(const silencer::ui::UiControlCommand& command : input.controlCommands){
+		if(command.kind == silencer::ui::UiControlCommandKind::PointerPress ||
+		   command.kind == silencer::ui::UiControlCommandKind::PointerHover){
+			controlPointer = true;
+			break;
+		}
+	}
+	out.source = (controlPointer || input.pointer.pressed || input.pointer.down || input.pointer.released)
 		? ::ui::FocusSource::Mouse
 		: ::ui::FocusSource::Keyboard;
 	for(silencer::ui::UiNavAction action : input.navActions){
@@ -156,6 +322,7 @@ std::string BuyTechActionId(int index) {
 
 ClientUi::ClientUi()
 	: retainedLayout_(::ui::make_yoga_flex_layout_adapter()) {
+	::react_init_runtime();
 	::ui::focus_init(&retainedFocus_);
 }
 
@@ -212,6 +379,7 @@ void ClientUi::EndFrame() {
 				.pressed_fiber = fiberOf(::ui::focus_pressed_id(retainedFocus_)),
 				.source = ::ui::focus_source(retainedFocus_),
 			};
+			RefreshRetainedInteractions();
 			if(!::ui::build_draw_command_list(retainedTree_, &retainedCommands_, active)){
 				retainedCommands_.reset();
 			}
@@ -221,6 +389,20 @@ void ClientUi::EndFrame() {
 		::react_end_frame();
 		retainedFrameOpen_ = false;
 	}
+}
+
+void ClientUi::RefreshRetainedInteractions() {
+	if(!retainedTree_.contains(retainedTree_.root_id())) return;
+	::ui::NodeId root = retainedTree_.root_id();
+	::ui::NodeId modal = 0;
+	clientui_detail::FindLastModalNode(retainedTree_, root, modal);
+	int nextUid = 1;
+	clientui_detail::RegisterRetainedNode(
+		retainedTree_,
+		modal != 0 ? modal : root,
+		interactions_,
+		nextUid,
+		::ui::focus_focused_id(retainedFocus_));
 }
 
 std::vector<silencer::ui::UiAction> ClientUi::DispatchInput(
@@ -308,7 +490,14 @@ void ClientUi::ClearScreensIfRequested(ScreenContext& ctx) {
 void ClientUi::TickVisibleScreens(ScreenContext& ctx) {
 	::ui::Span<Screen *> visible = screens_.VisibleScreens();
 	for(int i = 0; i < visible.count; ++i) {
-		visible[i]->Tick(ctx);
+		Screen * screen = visible[i];
+		if(!screen) continue;
+		const int stackSize = screens_.Size();
+		const UiScreenEntryId entryId = screen->EntryId();
+		screen->Tick(ctx);
+		if(screens_.Size() != stackSize || !screens_.ContainsEntry(entryId)){
+			break;
+		}
 	}
 }
 

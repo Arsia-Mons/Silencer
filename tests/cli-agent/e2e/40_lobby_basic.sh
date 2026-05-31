@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Drives the migrated lobby through gameselect → gamecreate using only
 # `cli click --label` and `cli set_text --label`, ending with a Create.
-# Exercises P18 (CLI inspect compatibility for Clay tree): the Clay panels
+# Exercises P18 (CLI inspect compatibility for UI tree): the UI panels
 # register their interactive widgets in UiInteractionRegistry, and controldispatch
 # routes click / set_text through that registry when the active iface has
 # no matching object.
@@ -108,30 +108,30 @@ cli --port "$CTRL_PORT" click --label "Connect To Lobby" >/dev/null
 cli --port "$CTRL_PORT" wait_for_state --state LOBBYCONNECT --timeout-ms 5000
 wait_for_widget "Login/Create"
 
-cli --port "$CTRL_PORT" set_text --uid 1 --text "claybob" >/dev/null
+cli --port "$CTRL_PORT" set_text --uid 1 --text "UIbob" >/dev/null
 cli --port "$CTRL_PORT" set_text --uid 2 --text "secret" >/dev/null
 wait_for_lobby_state AUTHENTICATING
 cli --port "$CTRL_PORT" click --label "Login/Create" >/dev/null
-create_initial_character "ClayBob"
+create_initial_character "UIBob"
 wait_for_widget "Create Game"
 
-# Drive a few frames so the Clay panels run their first Build pass and
+# Drive a few frames so the UI panels run their first Build pass and
 # register widgets into the inspector.
 cli --port "$CTRL_PORT" step --frames 5 >/dev/null
 
-# inspect should now list Clay widgets including "Create Game".
+# inspect should now list UI widgets including "Create Game".
 got=$(cli --port "$CTRL_PORT" inspect | bun -e \
   'const t=await new Response(Bun.stdin.stream()).text();
    const r=JSON.parse(t);
-   const has=(lbl)=>r.widgets.some((w)=>w.label===lbl && w.source==="clay");
+   const has=(lbl)=>r.widgets.some((w)=>w.label===lbl && w.source==="ui");
    console.log(has("Create Game") ? "ok" : "missing");')
 if [ "$got" != "ok" ]; then
-  echo "inspect did not surface Clay 'Create Game' widget" >&2
+  echo "inspect did not surface UI 'Create Game' widget" >&2
   cli --port "$CTRL_PORT" inspect >&2 || true
   exit 1
 fi
 
-# Step from gameselect → gamecreate via the Clay registry path.
+# Step from gameselect → gamecreate via the UI registry path.
 cli --port "$CTRL_PORT" click --label "Create Game" >/dev/null
 cli --port "$CTRL_PORT" step --frames 5 >/dev/null
 
@@ -139,16 +139,16 @@ cli --port "$CTRL_PORT" step --frames 5 >/dev/null
 got=$(cli --port "$CTRL_PORT" inspect | bun -e \
   'const t=await new Response(Bun.stdin.stream()).text();
    const r=JSON.parse(t);
-   const has=(lbl)=>r.widgets.some((w)=>w.label===lbl && w.source==="clay");
+   const has=(lbl)=>r.widgets.some((w)=>w.label===lbl && w.source==="ui");
    console.log(has("Create") && has("Game name") ? "ok" : "missing");')
 if [ "$got" != "ok" ]; then
-  echo "inspect did not surface gamecreate Clay widgets" >&2
+  echo "inspect did not surface gamecreate UI widgets" >&2
   cli --port "$CTRL_PORT" inspect >&2 || true
   exit 1
 fi
 
-# Set the game name via Clay set_text.
-cli --port "$CTRL_PORT" set_text --label "Game name" --text "ClayTest" >/dev/null
+# Set the game name via UI set_text.
+cli --port "$CTRL_PORT" set_text --label "Game name" --text "UITest" >/dev/null
 
 # Creating without a selected map should show a modal. While it is up,
 # inspect/click routes must be modal-scoped, not leak through to the
@@ -158,7 +158,7 @@ cli --port "$CTRL_PORT" step --frames 5 >/dev/null
 modal_scope=$(cli --port "$CTRL_PORT" inspect | bun -e \
   'const t=await new Response(Bun.stdin.stream()).text();
    const r=JSON.parse(t);
-   const hasOk=r.widgets.some((w)=>w.label==="OK" && w.source==="clay");
+   const hasOk=r.widgets.some((w)=>w.label==="OK" && w.source==="ui");
    const leaks=r.widgets.some((w)=>w.label==="Create" || w.label==="Game name");
    console.log(hasOk && !leaks ? "ok" : "bad");')
 if [ "$modal_scope" != "ok" ]; then
@@ -169,14 +169,14 @@ fi
 cli --port "$CTRL_PORT" click --label OK >/dev/null
 cli --port "$CTRL_PORT" step --frames 5 >/dev/null
 
-# Select the first list row through the Clay-aware select control op.
+# Select the first list row through the UI-aware select control op.
 first_map=$(cli --port "$CTRL_PORT" inspect | bun -e \
   'const t=await new Response(Bun.stdin.stream()).text();
    const r=JSON.parse(t);
-   const row=r.widgets.find((w)=>w.kind==="listrow" && w.source==="clay" && w.row_index===0);
+   const row=r.widgets.find((w)=>w.kind==="listrow" && w.source==="ui" && w.row_index===0);
    console.log(row && row.label ? row.label : "");')
 if [ -z "$first_map" ]; then
-  echo "no Clay listrow with row_index=0 in inspect" >&2
+  echo "no UI listrow with row_index=0 in inspect" >&2
   exit 1
 fi
 cli --port "$CTRL_PORT" select --index 0 >/dev/null
@@ -186,20 +186,20 @@ cli --port "$CTRL_PORT" step --frames 5 >/dev/null
 sel=$(cli --port "$CTRL_PORT" inspect | bun -e \
   'const t=await new Response(Bun.stdin.stream()).text();
    const r=JSON.parse(t);
-   const row=r.widgets.find((w)=>w.kind==="listrow" && w.source==="clay" && w.row_index===0);
+   const row=r.widgets.find((w)=>w.kind==="listrow" && w.source==="ui" && w.row_index===0);
    console.log(row && row.selected ? "yes" : "no");')
 if [ "$sel" != "yes" ]; then
   echo "map row click did not mark the row selected" >&2
   exit 1
 fi
 
-# Verify the text input now reads "ClayTest".
+# Verify the text input now reads "UITest".
 name=$(cli --port "$CTRL_PORT" inspect | bun -e \
   'const t=await new Response(Bun.stdin.stream()).text();
    const r=JSON.parse(t);
-   const w=r.widgets.find((w)=>w.kind==="textinput" && w.label==="Game name" && w.source==="clay");
+   const w=r.widgets.find((w)=>w.kind==="textinput" && w.label==="Game name" && w.source==="ui");
    console.log(w ? (w.text || "") : "");')
-if [ "$name" != "ClayTest" ]; then
+if [ "$name" != "UITest" ]; then
   echo "set_text on Game name did not stick (got: '$name')" >&2
   exit 1
 fi
@@ -211,7 +211,7 @@ cli --port "$CTRL_PORT" click --label "Create" >/dev/null
 
 # Wait a few frames for either the progress modal to push (success path) or
 # an immediate error modal ("No map selected", "Could not create game"). The
-# Clay panel teardown only happens AFTER the Create flow completes, so for
+# UI panel teardown only happens AFTER the Create flow completes, so for
 # this test we just want to confirm Create dispatched without hitting the
 # WIDGET_NOT_FOUND path.
 cli --port "$CTRL_PORT" step --frames 30 >/dev/null
@@ -219,7 +219,7 @@ for i in $(seq 1 100); do
   if cli --port "$CTRL_PORT" inspect | bun -e '
     const t = await new Response(Bun.stdin.stream()).text();
     const r = JSON.parse(t);
-    const agents = (r.widgets ?? []).find((w) => w.label === "Agents" && w.kind === "button");
+    const agents = (r.widgets ?? []).find((w) => w.id === "lobby.character.agents" && w.kind === "button");
     process.exit(agents && agents.enabled === false ? 0 : 1);
   ' >/dev/null 2>&1; then
     echo "PASS 40_lobby_basic"

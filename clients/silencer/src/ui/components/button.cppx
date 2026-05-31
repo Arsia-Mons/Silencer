@@ -14,6 +14,10 @@ namespace {
 } // namespace
 
 ::ui::UiElement Button(const ButtonProps &props) {
+  ::ui::NodeInteraction interaction =
+      detail::interaction_from_props(props, true);
+  interaction.selected = props.selected;
+
   // Resolve dense paint from theme + this component's live interaction; commit
   // as .visual. The renderer consumes it once P3 flips the builder.
   const ::ui::VisualStyle visual =
@@ -27,7 +31,7 @@ namespace {
     style={detail::control_layout_style(props.layout)}
     visual={visual}
     text={::ui::HostTextProps{.value = props.label}}
-    interaction={detail::interaction_from_props(props, true)}
+    interaction={interaction}
     accessibility={detail::accessibility_from_props(props, ::ui::SemanticRole::Button)}
     callbacks={button_callbacks(props)}
   >

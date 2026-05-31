@@ -59,6 +59,9 @@ void ClientUiInput::QueueControlPointerPress(int x, int y) {
 	pointerY_ = static_cast<float>(y);
 	havePointerPosition_ = true;
 	controlPointerActive_ = true;
+	pointerPressed_ = true;
+	pointerReleased_ = true;
+	pointerDown_ = false;
 	silencer::ui::UiControlCommand command;
 	command.kind = silencer::ui::UiControlCommandKind::PointerPress;
 	command.x = x;

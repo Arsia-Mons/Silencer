@@ -18,11 +18,11 @@ cli --port "$PORT" inspect | bun -e '
 const text = await new Response(Bun.stdin.stream()).text();
 const response = JSON.parse(text);
 const widgets = response.widgets ?? [];
-const password = widgets.find((w) => w.source === "clay" && w.label === "Password");
-const ok = widgets.find((w) => w.source === "clay" && w.label === "OK");
+const password = widgets.find((w) => w.source === "ui" && w.label === "Password");
+const ok = widgets.find((w) => w.source === "ui" && w.label === "OK");
 const leaked = widgets.some((w) => ["Tutorial", "Options", "Exit"].includes(w.label));
 if (!password || password.kind !== "textinput" || !password.password || !ok || leaked) {
-  console.error("password modal did not expose only modal-scoped Clay widgets");
+  console.error("password modal did not expose only modal-scoped UI widgets");
   process.exit(1);
 }
 '

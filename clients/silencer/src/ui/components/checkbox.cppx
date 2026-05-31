@@ -31,6 +31,7 @@ namespace {
   ::ui::NodeInteraction interaction =
       detail::interaction_from_props(props, true);
   interaction.checked = props.checked;
+  interaction.selected = props.checked;
 
   // Box body + inner mark each resolve from their theme role (dual-path; the
   // renderer consumes .visual once P3 flips the builder).

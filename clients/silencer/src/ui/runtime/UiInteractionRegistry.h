@@ -81,6 +81,7 @@ public:
 	bool FocusTextInputAt(int x, int y);
 	bool FocusTextInputByUid(int uid);
 	bool FocusInteractableById(const std::string& id);
+	bool IsFocused(const UiInteractable& interactable) const;
 	bool IsTextInputFocused(int uid) const;
 	bool HasFocus() const;
 	bool HasTextInputFocus() const;

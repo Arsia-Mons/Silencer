@@ -254,13 +254,15 @@ struct AgentRowProps {
 
 ::ui::UiElement AgentRow(const AgentRowProps& props) {
 	const CharacterCreateContextValue& state = UseCharacterCreate();
-	if(is_agency_step(state)) return ::ui::empty();
 	const int index = state.agent_scroll + props.slot;
+	const char * id = agent_id(index);
+	if(is_agency_step(state)) return ::ui::empty();
 	if(!agent_row_visible(state, index)) return ::ui::empty();
 	return <Button
 	  key={props.key}
-	  id={agent_id(index)}
+	  id={id}
 	  label={agent_label(state, index)}
+	  selected={index == state.selected_agent_index}
 	  disabled={is_alias_step(state)}
 	  onFocus={focus_index(state.on_agent_focus, index)}
 	  onActivate={activate_index(state.on_agent_activate, index)}
@@ -275,12 +277,14 @@ struct AgencyRowProps {
 
 ::ui::UiElement AgencyRow(const AgencyRowProps& props) {
 	const CharacterCreateContextValue& state = UseCharacterCreate();
+	const char * id = agency_id(props.index);
 	if(!is_agency_step(state)) return ::ui::empty();
 	const AgencyView& agency = agency_at(props.index);
 	return <Button
 	  key={props.key}
-	  id={agency_id(props.index)}
+	  id={id}
 	  label={agency.name}
+	  selected={props.index == state.selected_agency_index}
 	  disabled={state.waiting}
 	  onFocus={focus_index(state.on_agency_focus, props.index)}
 	  onActivate={activate_index(state.on_agency_activate, props.index)}
@@ -430,6 +434,8 @@ struct AliasModalProps {
 		  value={state.alias}
 		  disabled={!alias_step || state.waiting}
 		  autofocus={alias_step}
+		  accessibility={::ui::components::AccessibilityProps{.role = ::ui::SemanticRole::TextBox, .label = "Alias"}}
+		  onActivate={state.on_alias_submit}
 		  onChange={state.on_alias_change}
 		  layout={alias_input_layout()}
 		/>

@@ -171,6 +171,7 @@ namespace {
 					  value={props.username}
 					  disabled={props.inactive}
 					  autofocus={true}
+					  accessibility={::ui::components::AccessibilityProps{.role = ::ui::SemanticRole::TextBox, .label = "Username"}}
 					  onChange={props.on_username_change}
 					  layout={input_layout()}
 					/>
@@ -183,6 +184,7 @@ namespace {
 					  value={props.password}
 					  password={true}
 					  disabled={props.inactive}
+					  accessibility={::ui::components::AccessibilityProps{.role = ::ui::SemanticRole::TextBox, .label = "Password"}}
 					  onChange={props.on_password_change}
 					  layout={input_layout()}
 					/>

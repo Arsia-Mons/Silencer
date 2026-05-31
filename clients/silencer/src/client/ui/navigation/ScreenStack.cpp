@@ -9,6 +9,13 @@ namespace client_ui {
 
 ScreenStack::~ScreenStack() = default;
 
+bool ScreenStack::ContainsEntry(UiScreenEntryId entryId) const {
+	for(int i = 0; i < count_; ++i){
+		if(screens_[i] && screens_[i]->EntryId() == entryId) return true;
+	}
+	return false;
+}
+
 bool ScreenStack::Push(std::unique_ptr<Screen> screen) {
 	if(!screen || count_ >= CLIENT_UI_MAX_SCREENS) return false;
 	screen->SetEntryId(nextEntryId_++);

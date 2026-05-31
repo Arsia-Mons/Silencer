@@ -18,6 +18,7 @@ struct ButtonProps {
   std::function<void(const ::ui::TextInputEvent &)> on_text_input = {};
   std::function<void(const ::ui::TextEditingEvent &)> on_text_editing = {};
   const char *label = nullptr;
+  bool selected = false;
   std::function<void(const ::ui::ActivationEvent &)> on_activate = {};
   ::ui::LayoutStyle layout = {
       .align_items = ::ui::AlignItems::Center,

@@ -15,9 +15,8 @@ trap 'stop_silencer "$PID" "$PORT"' EXIT
 wait_alive "$PORT"
 cli --port "$PORT" wait_for_state --state MAINMENU --timeout-ms 15000 >/dev/null
 
-# Pin a known viewport so the legacy 640x480 button centers are deterministic
-# (see tests/cli-agent/e2e/21_main_menu_layout.sh): Options sits at (350,288)
-# with a 196x33 oval, so its center is (448, 304).
+# Pin a known viewport, then read the retained button center from inspect so
+# the test follows the actual JSX layout instead of a stale coordinate table.
 cli --port "$PORT" resize --w 640 --h 480 >/dev/null
 cli --port "$PORT" wait_frames --n 3 >/dev/null
 
@@ -32,7 +31,18 @@ cli --port "$PORT" wait_frames --n 2 >/dev/null
 cli --port "$PORT" inspect > "$KB"
 
 # Now hover the Options button with the mouse.
-cli --port "$PORT" hover_at --x 448 --y 304 >/dev/null
+options_center="$(cli --port "$PORT" inspect | bun -e '
+const text = await new Response(Bun.stdin.stream()).text();
+const widgets = JSON.parse(text).widgets ?? [];
+const options = widgets.find((w) => w.source === "ui" && w.kind === "button" && w.label === "Options");
+if (!options) {
+  console.error("Options button missing");
+  process.exit(1);
+}
+console.log(`${Math.floor(options.x + options.w / 2)} ${Math.floor(options.y + options.h / 2)}`);
+')"
+read -r options_x options_y <<< "$options_center"
+cli --port "$PORT" hover_at --x "$options_x" --y "$options_y" >/dev/null
 cli --port "$PORT" wait_frames --n 2 >/dev/null
 cli --port "$PORT" inspect > "$HOVER"
 
@@ -46,7 +56,7 @@ bun -e '
 const kb = JSON.parse(await Bun.file(process.argv[1]).text()).widgets ?? [];
 const hover = JSON.parse(await Bun.file(process.argv[2]).text()).widgets ?? [];
 const hoverOut = JSON.parse(await Bun.file(process.argv[3]).text()).widgets ?? [];
-const buttons = (ws) => ws.filter((w) => w.source === "clay" && w.kind === "button");
+const buttons = (ws) => ws.filter((w) => w.source === "ui" && w.kind === "button");
 const focused = (ws) => buttons(ws).filter((w) => w.focused === true);
 
 const kbFocused = focused(kb);

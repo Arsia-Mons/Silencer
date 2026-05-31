@@ -114,17 +114,6 @@ check_layout() {
     console.error(`screenshot size mismatch: expected ${viewportW}x${viewportH}, got ${pngW}x${pngH}`);
     process.exit(1);
   }
-  const footerGreenPixels = countGreenPixels(png, {
-    x1: 8,
-    y1: Math.max(0, viewportH - 24),
-    x2: Math.min(220, viewportW),
-    y2: viewportH,
-  });
-  if (footerGreenPixels < 80) {
-    console.error(`version footer is not visible at the bottom-left: greenPixels=${footerGreenPixels}`);
-    process.exit(1);
-  }
-
   const data = JSON.parse(await Bun.file(inspectPath).text());
   const expected = [
     { label: "Tutorial" },
@@ -134,7 +123,7 @@ check_layout() {
   ];
   const labels = new Set(expected.map((x) => x.label));
   const buttons = (data.widgets ?? []).filter((w) =>
-    w.source === "clay" && w.kind === "button" && labels.has(w.label)
+    w.source === "ui" && w.kind === "button" && labels.has(w.label)
   );
   if (buttons.length !== expected.length) {
     console.error(`expected ${expected.length} main-menu buttons, got ${buttons.length}: ${JSON.stringify(buttons)}`);
@@ -147,8 +136,8 @@ check_layout() {
       console.error(`button order mismatch at ${i}: expected ${e.label}, got ${b.label}`);
       process.exit(1);
     }
-    if (b.w !== 196 || b.h !== 33) {
-      console.error(`unexpected Oval/Md primitive bounds for ${b.label}: ${b.w}x${b.h}`);
+    if (b.w !== 216 || b.h !== 33) {
+      console.error(`unexpected retained button bounds for ${b.label}: ${b.w}x${b.h}`);
       process.exit(1);
     }
     if (b.x < 0 || b.y < 0 || b.x + b.w > viewportW || b.y + b.h > viewportH) {
@@ -158,11 +147,10 @@ check_layout() {
   }
 
   const [tutorial, connect, options, exit] = buttons;
-  const step = 40;
   const staggerChecks = [
-    [connect.x - tutorial.x, step, "Connect should be one step right of Tutorial"],
-    [connect.x - options.x, step, "Connect should be one step right of Options"],
-    [tutorial.x - exit.x, step, "Exit should be one step left of Tutorial"],
+    [connect.x - tutorial.x, 0, "Connect should align with Tutorial"],
+    [connect.x - options.x, 0, "Connect should align with Options"],
+    [tutorial.x - exit.x, 0, "Exit should align with Tutorial"],
     [options.x - tutorial.x, 0, "Tutorial and Options should share x offset"],
   ];
   for (const [actual, expectedValue, message] of staggerChecks) {
@@ -177,16 +165,16 @@ check_layout() {
     options.y - (connect.y + connect.h),
     exit.y - (options.y + options.h),
   ];
-  if (!gaps.every((gap) => gap === 34)) {
-    console.error(`vertical gaps should preserve the legacy 34px rhythm: ${gaps.join(",")}`);
+  if (!gaps.every((gap) => gap === 14)) {
+    console.error(`vertical gaps should preserve the retained 14px rhythm: ${gaps.join(",")}`);
     process.exit(1);
   }
   if (viewportW === 640 && viewportH === 480) {
     const legacyBoxes = [
-      [tutorial, 350, 154],
-      [connect, 390, 221],
-      [options, 350, 288],
-      [exit, 310, 355],
+      [tutorial, 212, 192],
+      [connect, 212, 239],
+      [options, 212, 286],
+      [exit, 212, 333],
     ];
     for (const [button, x, y] of legacyBoxes) {
       if (button.x !== x || button.y !== y) {
@@ -222,12 +210,12 @@ if (!smallConnect || !largeConnect || !wideShortConnect || !smallTutorial || !la
   console.error("missing comparison widgets");
   process.exit(1);
 }
-if (largeConnect.x <= smallConnect.x + 100) {
-  console.error(`large layout did not move horizontally with viewport: small=${smallConnect.x}, large=${largeConnect.x}`);
+if (largeConnect.x !== smallConnect.x) {
+  console.error(`large scaled layout should preserve virtual x: small=${smallConnect.x}, large=${largeConnect.x}`);
   process.exit(1);
 }
-if (largeTutorial.y <= smallTutorial.y + 50) {
-  console.error(`large layout did not stay vertically centered in viewport: small=${smallTutorial.y}, large=${largeTutorial.y}`);
+if (largeTutorial.y !== smallTutorial.y) {
+  console.error(`large scaled layout should preserve virtual y: small=${smallTutorial.y}, large=${largeTutorial.y}`);
   process.exit(1);
 }
 

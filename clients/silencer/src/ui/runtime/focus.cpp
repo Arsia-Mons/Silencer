@@ -170,6 +170,8 @@ bool set_focus(FocusRuntime &runtime, NodeId id, FocusSource source) {
   runtime.focused_id = id;
   runtime.focus_changed_id = id;
   runtime.source = source;
+  if (id != 0)
+    runtime.pointer_cleared_focus = false;
   return true;
 }
 
@@ -304,6 +306,9 @@ bool focus_update(FocusRuntime *runtime, const UiTree &tree,
   if (!collect_focusables(tree, *runtime, active_scope, &order))
     return false;
 
+  bool has_focus_request =
+      input.nav_up || input.nav_down || input.nav_left || input.nav_right ||
+      input.confirm_pressed || input.pointer_pressed;
   bool restore_parent_focus =
       previous_scope != 0 && !same_id(previous_scope, active_scope) &&
       runtime->previous_focus_before_modal != 0 &&
@@ -313,9 +318,11 @@ bool focus_update(FocusRuntime *runtime, const UiTree &tree,
               FocusSource::Programmatic);
     runtime->previous_focus_before_modal = 0;
   } else if (!contains_enabled(*runtime, runtime->focused_id)) {
-    NodeId next = first_enabled(*runtime);
-    set_focus(*runtime, next,
-              next != 0 ? FocusSource::Programmatic : FocusSource::None);
+    if (!runtime->pointer_cleared_focus || has_focus_request) {
+      NodeId next = first_enabled(*runtime);
+      set_focus(*runtime, next,
+                next != 0 ? FocusSource::Programmatic : FocusSource::None);
+    }
   }
 
   FocusDirection dir = FocusDirection::Down;
@@ -327,8 +334,20 @@ bool focus_update(FocusRuntime *runtime, const UiTree &tree,
     }
   }
 
+  NodeId hovered = hovered_enabled(*runtime, input);
+
+  if (input.pointer_valid && input.source == FocusSource::Mouse &&
+      !input.pointer_pressed && !input.pointer_down && !input.pointer_released) {
+    if (hovered != 0) {
+      set_focus(*runtime, hovered, pointer_source(input));
+    } else if (runtime->source == FocusSource::Mouse ||
+               runtime->source == FocusSource::Touch) {
+      set_focus(*runtime, 0, FocusSource::None);
+      runtime->pointer_cleared_focus = true;
+    }
+  }
+
   if (input.pointer_pressed) {
-    NodeId hovered = hovered_enabled(*runtime, input);
     runtime->pointer_press_origin = hovered;
     if (hovered != 0) {
       set_focus(*runtime, hovered, pointer_source(input));
@@ -336,7 +355,6 @@ bool focus_update(FocusRuntime *runtime, const UiTree &tree,
   }
 
   if (input.pointer_released) {
-    NodeId hovered = hovered_enabled(*runtime, input);
     if (same_id(runtime->pointer_press_origin, hovered)) {
       runtime->confirmed_id = hovered;
     }
@@ -350,7 +368,7 @@ bool focus_update(FocusRuntime *runtime, const UiTree &tree,
     runtime->confirmed_id = runtime->focused_id;
   }
 
-  runtime->hovered_id = hovered_enabled(*runtime, input);
+  runtime->hovered_id = hovered;
 
   return runtime->error_count == 0;
 }

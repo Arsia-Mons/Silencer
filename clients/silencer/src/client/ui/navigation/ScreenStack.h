@@ -17,6 +17,7 @@ public:
 
 	bool Empty() const { return count_ <= 0; }
 	int Size() const { return count_; }
+	bool ContainsEntry(UiScreenEntryId entryId) const;
 
 	bool Push(std::unique_ptr<Screen> screen);
 	bool Pop();

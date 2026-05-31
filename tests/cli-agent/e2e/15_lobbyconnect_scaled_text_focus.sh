@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Regression: at uiScale > 1, LOBBYCONNECT text-input hit bounds must be
-# resolved from Clay's virtual layout, not stale native/window rectangles.
+# resolved from the retained UI virtual layout, not stale native/window rectangles.
 set -euo pipefail
 . "$(dirname "$0")/lib.sh"
 

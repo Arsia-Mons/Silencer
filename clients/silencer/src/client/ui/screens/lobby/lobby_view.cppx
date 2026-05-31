@@ -544,6 +544,7 @@ struct ChatPanelProps {
 			  key="input"
 			  id="lobby.chat.input"
 			  value={state->inputBuffer}
+			  accessibility={::ui::components::AccessibilityProps{.role = ::ui::SemanticRole::TextBox, .label = "Chat message"}}
 			  onChange={copy_to(state->inputBuffer, static_cast<int>(sizeof(state->inputBuffer)))}
 			  onKey={submit_on_enter(lobby.chat_send_clicked)}
 			  layout={input_grow_layout()}
@@ -577,6 +578,7 @@ struct GameRowProps {
 	  id="lobby.game_select.row"
 	  idOffset={index}
 	  label={state->rows[static_cast<size_t>(index)].name.c_str()}
+	  selected={selected}
 	  onActivate={set_index(&state->rowClickedIndex, index)}
 	  layout={row_button_layout(24.0f)}
 	  style={row_style(selected)}
@@ -686,6 +688,7 @@ struct MapRowProps {
 	  id="lobby.game_create.map"
 	  idOffset={index}
 	  label={state->maps[static_cast<size_t>(index)].c_str()}
+	  selected={index == state->mapSelectedIndex}
 	  onActivate={set_index(&state->mapRowClickedIndex, index)}
 	  layout={row_button_layout(23.0f)}
 	  style={row_style(index == state->mapSelectedIndex)}
@@ -754,11 +757,18 @@ struct GameCreateTallProps {
 		<MapRow key="map-4" slot={4} />
 		<MapRow key="map-5" slot={5} />
 		<MapRow key="map-6" slot={6} />
-		<Box key="fields" layout={create_options_layout()} style={inner_panel_style()}>
+		<Box
+		  key="fields"
+		  id={kGameCreateOptionsScrollId}
+		  accessibility={::ui::components::AccessibilityProps{.label = kGameCreateOptionsScrollLabel, .description = "scroll"}}
+		  layout={create_options_layout()}
+		  style={inner_panel_style()}
+		>
 			<Input
 			  key="name"
 			  id="lobby.game_create.name"
 			  value={state->name}
+			  accessibility={::ui::components::AccessibilityProps{.role = ::ui::SemanticRole::TextBox, .label = "Game name"}}
 			  onChange={copy_to(state->name, static_cast<int>(sizeof(state->name)))}
 			  layout={row_button_layout(26.0f)}
 			/>
@@ -767,6 +777,7 @@ struct GameCreateTallProps {
 			  id="lobby.game_create.password"
 			  value={state->password}
 			  password={true}
+			  accessibility={::ui::components::AccessibilityProps{.role = ::ui::SemanticRole::TextBox, .label = "Game password"}}
 			  onChange={copy_to(state->password, static_cast<int>(sizeof(state->password)))}
 			  layout={row_button_layout(26.0f)}
 			/>
@@ -774,6 +785,7 @@ struct GameCreateTallProps {
 			  key="min-level"
 			  id="lobby.game_create.min_level"
 			  value={state->minLevel}
+			  accessibility={::ui::components::AccessibilityProps{.role = ::ui::SemanticRole::TextBox, .label = "Min level"}}
 			  onChange={copy_to(state->minLevel, static_cast<int>(sizeof(state->minLevel)))}
 			  layout={row_button_layout(24.0f)}
 			/>
@@ -781,6 +793,7 @@ struct GameCreateTallProps {
 			  key="max-level"
 			  id="lobby.game_create.max_level"
 			  value={state->maxLevel}
+			  accessibility={::ui::components::AccessibilityProps{.role = ::ui::SemanticRole::TextBox, .label = "Max level"}}
 			  onChange={copy_to(state->maxLevel, static_cast<int>(sizeof(state->maxLevel)))}
 			  layout={row_button_layout(24.0f)}
 			/>
@@ -788,6 +801,7 @@ struct GameCreateTallProps {
 			  key="max-players"
 			  id="lobby.game_create.max_players"
 			  value={state->maxPlayers}
+			  accessibility={::ui::components::AccessibilityProps{.role = ::ui::SemanticRole::TextBox, .label = "Max players"}}
 			  onChange={copy_to(state->maxPlayers, static_cast<int>(sizeof(state->maxPlayers)))}
 			  layout={row_button_layout(24.0f)}
 			/>
@@ -795,6 +809,7 @@ struct GameCreateTallProps {
 			  key="max-teams"
 			  id="lobby.game_create.max_teams"
 			  value={state->maxTeams}
+			  accessibility={::ui::components::AccessibilityProps{.role = ::ui::SemanticRole::TextBox, .label = "Max teams"}}
 			  onChange={copy_to(state->maxTeams, static_cast<int>(sizeof(state->maxTeams)))}
 			  layout={row_button_layout(24.0f)}
 			/>
@@ -901,6 +916,7 @@ struct TechRowProps {
 	  id="lobby.game_tech.toggle"
 	  idOffset={props.slot}
 	  label={row.label.c_str()}
+	  selected={row.selected}
 	  onFocus={focus_index(&state->descClickedItemIndex, props.slot)}
 	  onActivate={set_index(&state->toggleClickedItemIndex, props.slot)}
 	  layout={row_button_layout(23.0f)}
