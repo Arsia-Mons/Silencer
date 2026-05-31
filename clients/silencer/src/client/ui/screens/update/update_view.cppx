@@ -173,47 +173,11 @@ struct UpdateFrameProps {
 	const char * key = nullptr;
 };
 
-struct PrimaryActionButtonProps {
-	const char * key = nullptr;
-};
-
-::ui::UiElement PrimaryActionButton(const PrimaryActionButtonProps& props) {
-	const UpdateContextValue& update = UseUpdate();
-	Navigation navigation = UseNavigation();
-	const UpdateState& state = update.state;
-	return <Button
-	  key={props.key}
-	  id={primary_id(state.primary_action)}
-	  label={primary_label(state.primary_action)}
-	  disabled={!has_primary_action(state)}
-	  autofocus={has_primary_action(state)}
-	  onActivate={primary_callback(update, navigation)}
-	  layout={button_layout(has_primary_action(state))}
-	/>
-}
-
-struct CancelButtonProps {
-	const char * key = nullptr;
-};
-
-::ui::UiElement CancelButton(const CancelButtonProps& props) {
-	const UpdateContextValue& update = UseUpdate();
-	Navigation navigation = UseNavigation();
-	const UpdateState& state = update.state;
-	return <Button
-	  key={props.key}
-	  id="update.cancel"
-	  label="Cancel"
-	  disabled={!state.show_cancel}
-	  autofocus={!has_primary_action(state) && state.show_cancel}
-	  onActivate={cancel_callback(update.actions, navigation)}
-	  layout={button_layout(state.show_cancel)}
-	/>
-}
-
 ::ui::UiElement UpdateFrame(const UpdateFrameProps& props) {
 	const UpdateContextValue& update = UseUpdate();
+	Navigation navigation = UseNavigation();
 	const UpdateState& state = update.state;
+	const bool primary_visible = has_primary_action(state);
 	return <Box key={props.key} layout={root_layout()}>
 		<Dialog key="dialog" modal={true} layout={dialog_layout()}>
 			<Text key="status" value={state.status} layout={status_layout()} style={status_style()} />
@@ -225,8 +189,24 @@ struct CancelButtonProps {
 			  style={progress_style()}
 			/>
 			<Box key="actions" layout={actions_layout()}>
-				<PrimaryActionButton key="primary" />
-				<CancelButton key="cancel" />
+				<Button
+				  key="primary"
+				  id={primary_id(state.primary_action)}
+				  label={primary_label(state.primary_action)}
+				  disabled={!primary_visible}
+				  autofocus={primary_visible}
+				  onActivate={primary_callback(update, navigation)}
+				  layout={button_layout(primary_visible)}
+				/>
+				<Button
+				  key="cancel"
+				  id="update.cancel"
+				  label="Cancel"
+				  disabled={!state.show_cancel}
+				  autofocus={!primary_visible && state.show_cancel}
+				  onActivate={cancel_callback(update.actions, navigation)}
+				  layout={button_layout(state.show_cancel)}
+				/>
 			</Box>
 		</Dialog>
 	</Box>
