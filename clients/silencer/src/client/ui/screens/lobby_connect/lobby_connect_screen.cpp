@@ -12,6 +12,7 @@
 #include "world.h"
 
 #include "clay/clay.h"
+#include "clay_ui_payloads.h"
 #include "clay_ui_compositor.h"
 #include "runtime/UiInteractionRegistry.h"
 #include "primitives/text.h"
@@ -60,12 +61,14 @@ constexpr uint16_t kFormRowGap = 6;
 constexpr uint16_t kLabelW = 86;
 constexpr uint16_t kInputW = 183;
 constexpr uint16_t kInputInsetX = 7;
-constexpr uint16_t kLoginButtonW = 116;
-constexpr uint16_t kCancelButtonW = 68;
 constexpr uint16_t kButtonGap = 0;
-constexpr uint16_t kButtonRowX = (kPanelW - kLoginButtonW - kButtonGap - kCancelButtonW) / 2;
-constexpr uint16_t kButtonRowY = 246;
 constexpr uint16_t kButtonH = 21;
+constexpr uint16_t kButtonPatchX = 84;
+constexpr uint16_t kButtonPatchY = 246;
+constexpr uint16_t kButtonPatchW = 116;
+constexpr uint16_t kButtonPatchH = 24;
+constexpr uint16_t kButtonRowY = 249;
+constexpr uint16_t kButtonRowOffsetY = kButtonRowY - kButtonPatchY;
 constexpr int kButtonPaddingX = 10;
 constexpr int kMaxLogLines = 128;
 constexpr const char * kActionUsername = "lobby_connect.username";
@@ -73,6 +76,10 @@ constexpr const char * kActionPassword = "lobby_connect.password";
 constexpr const char * kActionLogin = "lobby_connect.login";
 constexpr const char * kActionCancel = "lobby_connect.cancel";
 ScrollTextBoxLine g_logSlab[kMaxLogLines];
+Uint8 g_buttonPatchPixels[kButtonPatchW * kButtonPatchH];
+silencer::clay_bridge::SurfacePayload g_buttonPatchPayload{};
+silencer::clay_bridge::ClayCustomData g_buttonPatchCustomData{};
+bool g_buttonPatchInitialized = false;
 
 Clay_String FromCStr(const char * s)
 {
@@ -141,6 +148,28 @@ int FillLogSlab(const std::vector<std::string> & lines)
 		count++;
 	}
 	return count;
+}
+
+void EnsureButtonPatch()
+{
+	if(g_buttonPatchInitialized) return;
+	// The original 52px login/cancel wells are baked into the panel sprite.
+	// Replace only that strip with the panel's stippled fill before drawing
+	// the measured-width buttons on top.
+	for(uint16_t y = 0; y < kButtonPatchH; ++y){
+		for(uint16_t x = 0; x < kButtonPatchW; ++x){
+			const uint16_t panelX = kButtonPatchX + x;
+			const uint16_t panelY = kButtonPatchY + y;
+			g_buttonPatchPixels[(y * kButtonPatchW) + x] =
+				((panelY & 1) == 0 || (panelX & 1) == 0) ? 210 : 146;
+		}
+	}
+	g_buttonPatchPayload.pixels = g_buttonPatchPixels;
+	g_buttonPatchPayload.width = kButtonPatchW;
+	g_buttonPatchPayload.height = kButtonPatchH;
+	g_buttonPatchCustomData.kind = silencer::clay_bridge::CustomKind::Surface;
+	g_buttonPatchCustomData.payload = &g_buttonPatchPayload;
+	g_buttonPatchInitialized = true;
 }
 } // namespace lobby_connect_screen_detail
 
@@ -305,6 +334,7 @@ void LobbyConnectScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frame
 		scroll = static_cast<Uint16>(lineCount - visibleLines);
 	}
 	bool inactive = ctx.world.lobby.state == Lobby::AUTHSENT;
+	lobby_connect_screen_detail::EnsureButtonPatch();
 	const bool usernameFocused =
 		interactions.IsTextInputFocused(lobby_connect_screen_detail::LBY_INPUT_USERNAME);
 	const bool passwordFocused =
@@ -450,36 +480,52 @@ void LobbyConnectScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frame
 			       .layout = {
 			           .sizing = {
 			               CLAY_SIZING_GROW(0),
-			               CLAY_SIZING_FIXED(lobby_connect_screen_detail::kButtonRowY -
+			               CLAY_SIZING_FIXED(lobby_connect_screen_detail::kButtonPatchY -
 			                                  lobby_connect_screen_detail::kFormRowY -
 			                                  (lobby_connect_screen_detail::kFormRowH * 2) -
 			                                  lobby_connect_screen_detail::kFormRowGap) },
 			       } }) {
 			}
 
-			CLAY({ .id = CLAY_ID("LobbyConnectButtons"),
+			CLAY({ .id = CLAY_ID("LobbyConnectButtonArea"),
 			       .layout = {
 			           .sizing = { CLAY_SIZING_GROW(0),
-			                       CLAY_SIZING_FIXED(lobby_connect_screen_detail::kButtonH) },
-			           .padding = { lobby_connect_screen_detail::kButtonRowX, 0, 0, 0 },
-			           .childGap = lobby_connect_screen_detail::kButtonGap,
-			           .childAlignment = { CLAY_ALIGN_X_LEFT, CLAY_ALIGN_Y_CENTER },
+			                       CLAY_SIZING_FIXED(lobby_connect_screen_detail::kButtonPatchH) },
+			           .padding = { lobby_connect_screen_detail::kButtonPatchX, 0, 0, 0 },
 			           .layoutDirection = CLAY_LEFT_TO_RIGHT,
 			       } }) {
-				lobby_connect_screen_detail::Button(CLAY_STRING("LobbyConnectLoginButton"), CLAY_STRING("Login/Create"),
-					lobby_connect_screen_detail::ButtonOpts{ .variant = lobby_connect_screen_detail::ButtonVariant::Chrome,
-					                                         .size = lobby_connect_screen_detail::ButtonSize::Auto,
-					                                         .minWidth = lobby_connect_screen_detail::kLoginButtonW,
-					                                         .maxWidth = lobby_connect_screen_detail::kLoginButtonW,
-					                                         .paddingX = lobby_connect_screen_detail::kButtonPaddingX },
-					lobby_connect_screen_detail::ButtonHandle{ nullptr, lobby_connect_screen_detail::kActionLogin, &interactions });
-				lobby_connect_screen_detail::Button(CLAY_STRING("LobbyConnectCancelButton"), CLAY_STRING("Cancel"),
-					lobby_connect_screen_detail::ButtonOpts{ .variant = lobby_connect_screen_detail::ButtonVariant::Chrome,
-					                                         .size = lobby_connect_screen_detail::ButtonSize::Auto,
-					                                         .minWidth = lobby_connect_screen_detail::kCancelButtonW,
-					                                         .maxWidth = lobby_connect_screen_detail::kCancelButtonW,
-					                                         .paddingX = lobby_connect_screen_detail::kButtonPaddingX },
-					lobby_connect_screen_detail::ButtonHandle{ nullptr, lobby_connect_screen_detail::kActionCancel, &interactions });
+				CLAY({ .id = CLAY_ID("LobbyConnectButtonPatch"),
+				       .layout = {
+				           .sizing = { CLAY_SIZING_FIXED(lobby_connect_screen_detail::kButtonPatchW),
+				                       CLAY_SIZING_FIXED(lobby_connect_screen_detail::kButtonPatchH) },
+				       },
+				       .custom = { .customData = &lobby_connect_screen_detail::g_buttonPatchCustomData } }) {}
+				CLAY({ .id = CLAY_ID("LobbyConnectButtons"),
+				       .layout = {
+				           .sizing = { CLAY_SIZING_GROW(0),
+				                       CLAY_SIZING_FIXED(lobby_connect_screen_detail::kButtonH) },
+				           .childGap = lobby_connect_screen_detail::kButtonGap,
+				           .childAlignment = { CLAY_ALIGN_X_CENTER, CLAY_ALIGN_Y_CENTER },
+				           .layoutDirection = CLAY_LEFT_TO_RIGHT,
+				       },
+				       .floating = {
+				           .offset = { 0.0f, static_cast<float>(lobby_connect_screen_detail::kButtonRowOffsetY) },
+				           .zIndex = 1,
+				           .attachPoints = { .element = CLAY_ATTACH_POINT_LEFT_TOP,
+				                             .parent = CLAY_ATTACH_POINT_LEFT_TOP },
+				           .attachTo = CLAY_ATTACH_TO_PARENT,
+				       } }) {
+					lobby_connect_screen_detail::Button(CLAY_STRING("LobbyConnectLoginButton"), CLAY_STRING("Login/Create"),
+						lobby_connect_screen_detail::ButtonOpts{ .variant = lobby_connect_screen_detail::ButtonVariant::Chrome,
+						                                         .size = lobby_connect_screen_detail::ButtonSize::Auto,
+						                                         .paddingX = lobby_connect_screen_detail::kButtonPaddingX },
+						lobby_connect_screen_detail::ButtonHandle{ nullptr, lobby_connect_screen_detail::kActionLogin, &interactions });
+					lobby_connect_screen_detail::Button(CLAY_STRING("LobbyConnectCancelButton"), CLAY_STRING("Cancel"),
+						lobby_connect_screen_detail::ButtonOpts{ .variant = lobby_connect_screen_detail::ButtonVariant::Chrome,
+						                                         .size = lobby_connect_screen_detail::ButtonSize::Auto,
+						                                         .paddingX = lobby_connect_screen_detail::kButtonPaddingX },
+						lobby_connect_screen_detail::ButtonHandle{ nullptr, lobby_connect_screen_detail::kActionCancel, &interactions });
+				}
 			}
 		}
 	}
