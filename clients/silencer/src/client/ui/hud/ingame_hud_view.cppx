@@ -38,6 +38,22 @@ std::string visible_top_message(const InGameTopMessageView& message) {
 		: std::string();
 }
 
+::ui::Color hud_text_color(Uint8 paletteColor) {
+	switch(paletteColor){
+		case 128: return {198, 213, 232, 255};
+		case 153: return {238, 118, 118, 255};
+		case 192: return {135, 219, 174, 255};
+		case 202: return {243, 216, 133, 255};
+		case 208: return {226, 234, 242, 255};
+		case 224: return {250, 245, 190, 255};
+		default:  return {226, 234, 242, 255};
+	}
+}
+
+::ui::Color shadow_color() {
+	return {24, 28, 36, 220};
+}
+
 ::ui::LayoutStyle root_layout() {
 	return ::ui::LayoutStyle{
 		.position = ::ui::PositionType::Absolute,
@@ -53,6 +69,22 @@ std::string visible_top_message(const InGameTopMessageView& message) {
 	return inset;
 }
 
+::ui::EdgeSizes absolute_inset(int x, int y) {
+	::ui::EdgeSizes inset;
+	inset.left = ::ui::StyleValue::points(static_cast<float>(x));
+	inset.top = ::ui::StyleValue::points(static_cast<float>(y));
+	return inset;
+}
+
+::ui::LayoutStyle text_layout(int x, int y, int w, int h) {
+	return ::ui::LayoutStyle{
+		.position = ::ui::PositionType::Absolute,
+		.width = ::ui::Length::points(static_cast<float>(w)),
+		.height = ::ui::Length::points(static_cast<float>(h)),
+		.position_inset = absolute_inset(x, y),
+	};
+}
+
 ::ui::LayoutStyle top_message_layout() {
 	return ::ui::LayoutStyle{
 		.position = ::ui::PositionType::Absolute,
@@ -62,11 +94,11 @@ std::string visible_top_message(const InGameTopMessageView& message) {
 	};
 }
 
-::ui::StyleStatePatch top_message_style() {
+::ui::StyleStatePatch text_style(::ui::Color color, uint16_t font_id, uint16_t font_size) {
 	return ::ui::patch().text(::ui::TextVisual{
-		.color = {226, 234, 242, 255},
-		.font_id = 133,
-		.font_size = 7,
+		.color = color,
+		.font_id = font_id,
+		.font_size = font_size,
 	});
 }
 
@@ -83,13 +115,83 @@ struct TopMessageProps {
 	  key={props.key}
 	  value={text.c_str()}
 	  layout={top_message_layout()}
-	  style={top_message_style()}
+	  style={text_style(hud_text_color(208), 133, 7)}
+	/>
+}
+
+struct StatusLineProps {
+	const char * key = nullptr;
+	int slot = 0;
+	bool shadow = false;
+};
+
+::ui::UiElement StatusLine(const StatusLineProps& props) {
+	const InGameHudContextValue& hud = UseInGameHud();
+	if(!hud.view) return ::ui::empty();
+	if(props.slot < 0 || props.slot >= static_cast<int>(hud.view->statusMessages.size())){
+		return ::ui::empty();
+	}
+	const InGameStatusLineView& line = hud.view->statusMessages[static_cast<size_t>(props.slot)];
+	const int width = static_cast<int>(line.text.size()) * 7;
+	const int x = (640 - width) / 2;
+	const int y = 370 - (props.slot * 10);
+	return <Text
+	  key={props.key}
+	  value={line.text.c_str()}
+	  layout={text_layout(x + (props.shadow ? 1 : 0), y + (props.shadow ? 1 : 0), width, 11)}
+	  style={text_style(props.shadow ? shadow_color() : hud_text_color(line.color), 133, 7)}
+	/>
+}
+
+struct StatusMessagesProps {
+	const char * key = nullptr;
+};
+
+::ui::UiElement StatusMessages(const StatusMessagesProps& props) {
+	return <Box key={props.key} layout={root_layout()}>
+		<StatusLine key="status-0-shadow" slot={0} shadow={true} />
+		<StatusLine key="status-0-text" slot={0} shadow={false} />
+		<StatusLine key="status-1-shadow" slot={1} shadow={true} />
+		<StatusLine key="status-1-text" slot={1} shadow={false} />
+		<StatusLine key="status-2-shadow" slot={2} shadow={true} />
+		<StatusLine key="status-2-text" slot={2} shadow={false} />
+		<StatusLine key="status-3-shadow" slot={3} shadow={true} />
+		<StatusLine key="status-3-text" slot={3} shadow={false} />
+	</Box>
+}
+
+std::string quit_prompt_text() {
+#ifdef OUYA
+	return "Hit O To QUIT";
+#else
+	return "Hit Enter To Quit";
+#endif
+}
+
+struct QuitPromptProps {
+	const char * key = nullptr;
+};
+
+::ui::UiElement QuitPrompt(const QuitPromptProps& props) {
+	const InGameHudContextValue& hud = UseInGameHud();
+	if(!hud.view || (hud.view->quitState != 1 && hud.view->quitState != 2)){
+		return ::ui::empty();
+	}
+	const std::string text = quit_prompt_text();
+	const int width = static_cast<int>(text.size()) * 16;
+	return <Text
+	  key={props.key}
+	  value={text.c_str()}
+	  layout={text_layout((640 - width) / 2, 200, width, 23)}
+	  style={text_style(hud_text_color(202), 136, 16)}
 	/>
 }
 
 ::ui::UiElement InGameHudFrame(const BoxProps& props) {
 	return <Box key={props.key} layout={root_layout()}>
+		<StatusMessages key="status" />
 		<TopMessage key="top-message" />
+		<QuitPrompt key="quit-prompt" />
 	</Box>
 }
 

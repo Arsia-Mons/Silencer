@@ -13,7 +13,7 @@ void BuildInGameOverlaysUi(Renderer& renderer,
                            const Resources& resources,
                            const HudView& view,
                            Surface* surface,
-                           bool drawTopMessage);
+                           bool drawLegacyTextOverlays);
 
 }  // namespace client_ui
 }  // namespace silencer

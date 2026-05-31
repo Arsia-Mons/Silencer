@@ -229,17 +229,17 @@ void DrawQuitPrompt(const HudView& /*view*/, Surface* surface) {
 }  // namespace ingameoverlays_detail
 
 void BuildInGameOverlaysUi(Renderer& /*renderer*/, const Resources& /*resources*/,
-                           const HudView& view, Surface* surface, bool drawTopMessage) {
+                           const HudView& view, Surface* surface, bool drawLegacyTextOverlays) {
 	if(!view.mapLoaded) return;
-	ingameoverlays_detail::DrawStatus(view, surface);
-	if(drawTopMessage){
+	if(drawLegacyTextOverlays){
+		ingameoverlays_detail::DrawStatus(view, surface);
 		ingameoverlays_detail::DrawTopMessage(view, surface);
 	}
 	ingameoverlays_detail::DrawMessage(view, surface);
 	if(view.showPlayerList){
 		BuildPlayerListOverlay(view, surface);
 	}
-	if(view.quitState == 1 || view.quitState == 2){
+	if(drawLegacyTextOverlays && (view.quitState == 1 || view.quitState == 2)){
 		ingameoverlays_detail::DrawQuitPrompt(view, surface);
 	}
 }
