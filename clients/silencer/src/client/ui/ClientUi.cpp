@@ -322,6 +322,7 @@ void ClientUi::BuildRetainedInGameHud(const HudView& view, const Resources& reso
 	const InGameHudContextValue context{
 		.view = &view,
 		.resources = &resources,
+		.interactions = &interactions_,
 		.animationPhase = animationPhase,
 	};
 	const auto * stored = ::ui::copy_value(context);

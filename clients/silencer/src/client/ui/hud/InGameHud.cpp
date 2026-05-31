@@ -65,7 +65,7 @@ void BuildInGameHudUi(Renderer& renderer, const Resources& resources,
 	if(player.tracetime > 0) tracetime = player.tracetime;
 	if(drawLegacyRetainedHudParts && tracetime > 0) BuildHudTraceTime(surface, tracetime);
 
-	if(view.buyTech.visible){
+	if(drawLegacyRetainedHudParts && view.buyTech.visible){
 		BuildBuyTechOverlay(view.buyTech, resources, surface, interactions);
 	}
 
