@@ -38,9 +38,9 @@ instead of reviving the old flat layout.
 
 `ClientUi` is the only production owner of visible UI composition and
 screen/modal navigation. `Game::RenderClientUiFrame` collects the
-`UiInputState`, begins one `ClientUi`/`ClayService` frame, asks active screens,
-modals, HUD, and overlays for retained roots, ends the frame once, renders one
-command stream through the Clay compositor, then dispatches typed UI actions.
+`UiInputState`, begins one `ClientUi` frame, asks active screens, modals, HUD,
+and overlays for retained roots, ends the frame once, renders retained
+commands, then dispatches typed UI actions.
 Navigation mechanics live in `src/client/ui/navigation/ScreenStack`; `Game`
 may request transitions but must not store or traverse the stack itself.
 
@@ -55,9 +55,8 @@ Rules:
   `Renderer`.
 - `Renderer` owns world/pixel drawing primitives only. It must not own Clay
   layout or UI screen/HUD composition.
-- Primitive frame arenas reset once in `ClientUi::BeginFrame`. A primitive's
-  per-frame begin-frame reset must not be called inside a screen, modal, HUD
-  block, or overlay block.
+- Retained per-frame arenas reset once in `ClientUi::BeginFrame`. Per-frame
+  resets must not be called inside a screen, modal, HUD block, or overlay block.
 - Modal overlays clear interaction metadata before their own `BuildElement`, so
   the top modal owns keyboard/CLI focus while lower visual layers can still
   render.

@@ -1,11 +1,9 @@
 #ifndef GAME_UI_PIPELINE_H
 #define GAME_UI_PIPELINE_H
 
-#include "client/ui/ClayBridgeFrameBackend.h"
 #include "client/ui/ClientUi.h"
 #include "client/ui/ClientUiInput.h"
 #include "client/ui/ingame/InGameUi.h"
-#include "clay/clay.h"
 #include "keybinds.h"
 #include "surface.h"
 #include "ui/runtime/UiInputState.h"
@@ -21,7 +19,7 @@ explicit GameUiPipeline(Game & game);
 
 void PrepareClientUiFrame(Surface & surface);
 void BeginPreparedClientUiFrame();
-Clay_RenderCommandArray EndClientUiFrame();
+void EndClientUiFrame();
 void BuildVisibleClientUi(Surface & surface, float frametime);
 void DrawInGameWorldInsets(Surface & surface, float frametime);
 void RenderClientUiFrame(Surface & surface, float frametime);
@@ -46,8 +44,6 @@ silencer::client_ui::InGameUi & InGameUi() { return inGameUi; }
 
 private:
 Game & game;
-silencer::client_ui::ClayBridgeFrameBackend uiClayBackend;
-silencer::ui::ClayService uiClayService;
 silencer::client_ui::ClientUi clientUi;
 silencer::client_ui::ClientUiInput clientUiInput;
 silencer::client_ui::InGameUi inGameUi;

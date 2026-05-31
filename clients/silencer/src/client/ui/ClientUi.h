@@ -1,6 +1,5 @@
 #pragma once
 
-#include "ui/runtime/ClayService.h"
 #include "ui/runtime/draw_command.h"
 #include "ui/runtime/element.h"
 #include "ui/runtime/flex_layout.h"
@@ -8,7 +7,6 @@
 #include "ui/runtime/interaction_hooks.h"
 #include "ui/runtime/tree.h"
 #include "ui/runtime/UiInteractionRegistry.h"
-#include "ui/runtime/UiFrameContext.h"
 #include "client/ui/navigation/ScreenStack.h"
 
 #include <SDL3/SDL_stdinc.h>
@@ -31,11 +29,11 @@ struct HudView;
 
 class ClientUi {
 public:
-	explicit ClientUi(silencer::ui::ClayService& clay);
+	ClientUi();
 	~ClientUi();
 
 	void BeginFrame(const silencer::ui::UiInputState& input);
-	std::vector<silencer::ui::UiRenderCommand> EndFrame();
+	void EndFrame();
 	std::vector<silencer::ui::UiAction> DispatchInput(ScreenContext& ctx, const silencer::ui::UiInputState& input);
 	std::vector<silencer::ui::UiAction> DrainActions();
 	const silencer::ui::UiInteractionRegistry& Interactions() const { return interactions_; }
@@ -54,8 +52,6 @@ public:
 	void RenderRetainedScreens(Renderer& renderer, const Resources& resources, Surface& dst);
 
 private:
-	silencer::ui::UiFrameContext frameCtx_;
-	silencer::ui::ClayService& clay_;
 	silencer::ui::UiInteractionRegistry interactions_;
 	ScreenStack screens_;
 	std::string hoveredAudioInteractableId_;

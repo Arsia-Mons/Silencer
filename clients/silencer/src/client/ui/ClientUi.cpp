@@ -136,18 +136,16 @@ void PlayMenuButtonSound(ScreenContext& ctx) {
 
 }  // namespace clientui_detail
 
-ClientUi::ClientUi(silencer::ui::ClayService& clay)
-	: clay_(clay),
-	  retainedLayout_(::ui::make_yoga_flex_layout_adapter()) {
+ClientUi::ClientUi()
+	: retainedLayout_(::ui::make_yoga_flex_layout_adapter()) {
 	::ui::focus_init(&retainedFocus_);
 }
 
 ClientUi::~ClientUi() = default;
 
 void ClientUi::BeginFrame(const silencer::ui::UiInputState& input) {
-	frameCtx_.BeginFrame(input.animationDeltaSeconds, input.animationStepSeconds);
 	silencer::client_ui::HudRetainedPayloadBeginFrame();
-	clay_.BeginFrame(input, interactions_);
+	interactions_.BeginFrame();
 	retainedElementFrame_.reset();
 	retainedCommands_.reset();
 	retainedInput_ = clientui_detail::ToRetainedInput(input);
@@ -160,7 +158,7 @@ void ClientUi::BeginFrame(const silencer::ui::UiInputState& input) {
 	retainedFrameOpen_ = true;
 }
 
-std::vector<silencer::ui::UiRenderCommand> ClientUi::EndFrame() {
+void ClientUi::EndFrame() {
 	if(retainedFrameOpen_){
 		bool treeEnded = retainedTree_.end_frame();
 		if(treeEnded &&
@@ -205,7 +203,6 @@ std::vector<silencer::ui::UiRenderCommand> ClientUi::EndFrame() {
 		::react_end_frame();
 		retainedFrameOpen_ = false;
 	}
-	return clay_.EndFrame();
 }
 
 std::vector<silencer::ui::UiAction> ClientUi::DispatchInput(

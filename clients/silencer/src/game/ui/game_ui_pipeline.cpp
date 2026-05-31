@@ -18,7 +18,6 @@
 #include "player.h"
 #include "update_screen.h"
 #include "client/ui/views/HudView.h"
-#include "clay_ui_compositor.h"
 #ifdef SILENCER_HAVE_LOBBY_UI
 #include "lobby_screen.h"
 #endif
@@ -143,14 +142,12 @@ void GameUiPipeline::BeginPreparedClientUiFrame() {
 if(!hasPreparedUiInput) {
 PrepareClientUiFrame(game.GetScreenBuffer());
 }
-silencer::clay_bridge::SetTextMeasureResources(&game.world.resources);
 clientUi.BeginFrame(preparedUiInput);
 }
 
-Clay_RenderCommandArray GameUiPipeline::EndClientUiFrame() {
+void GameUiPipeline::EndClientUiFrame() {
 clientUi.EndFrame();
 hasPreparedUiInput = false;
-return uiClayBackend.Commands();
 }
 
 void GameUiPipeline::BuildVisibleClientUi(Surface& surface, float frametime) {
@@ -212,8 +209,7 @@ return;
 PrepareClientUiFrame(surface);
 BeginPreparedClientUiFrame();
 BuildVisibleClientUi(surface, frametime);
-Clay_RenderCommandArray cmds = EndClientUiFrame();
-silencer::clay_bridge::Render(game, &surface, cmds);
+EndClientUiFrame();
 clientUi.RenderRetainedScreens(game.renderer, game.world.resources, surface);
 if(game.state != GameState::FADEOUT){
 std::vector<silencer::ui::UiAction> unhandledUiActions =
@@ -242,8 +238,7 @@ preparedUiInput.bindingInputs.clear();
 preparedUiInput.controlCommands.clear();
 }
 GameUiPipeline::GameUiPipeline(Game & g)
-: game(g), uiClayService(uiClayBackend), clientUi(uiClayService),
-  inGameUi(g.world), hasPreparedUiInput(false),
+: game(g), clientUi(), inGameUi(g.world), hasPreparedUiInput(false),
   lastUiAnimationMs(0), textInputFocused(false) {
 }
 

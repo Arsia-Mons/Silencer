@@ -719,7 +719,7 @@ void EnsureInitialized(int width, int height) {
 			g_lastH = height;
 		}
 	}
-	// Input is now owned by ClientUi/ClayService. Initialization must not reset
+	// Input is now owned by ClientUi. Initialization must not reset
 	// pointer or scroll state; Clay needs continuity across frames to report
 	// pressed, held, released, and wheel behavior correctly.
 }
