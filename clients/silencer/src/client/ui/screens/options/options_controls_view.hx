@@ -18,11 +18,11 @@ struct OptionsControlsContextValue {
 	int frame_pad_bottom = 0;
 	int panel_pad_x = 48;
 	int panel_pad_bottom = 20;
-	std::function<void(const ::ui::ActivationEvent&)> on_preset = {};
+	std::function<void()> cycle_preset = {};
 	std::function<void(int row, int slot)> on_rebind = {};
-	std::function<void(int row)> on_operator = {};
-	std::function<void(const ::ui::ActivationEvent&)> on_save = {};
-	std::function<void(const ::ui::ActivationEvent&)> on_cancel = {};
+	std::function<void(int row)> toggle_operator = {};
+	std::function<void()> save = {};
+	std::function<void()> cancel = {};
 };
 
 extern ::ReactContext OptionsControlsContext;

@@ -1,5 +1,7 @@
 #include "client/ui/screens/options/options_controls_view.h"
 
+#include "client/ui/navigation/NavigationProvider.h"
+#include "game_state.h"
 #include "ui/components/box.h"
 #include "ui/components/button.h"
 #include "ui/components/text.h"
@@ -87,6 +89,23 @@ std::function<void(const ::ui::ActivationEvent&)> operator_callback(
 	int row) {
 	return [handler, row](const ::ui::ActivationEvent&) {
 		if(handler) handler(row);
+	};
+}
+
+std::function<void(const ::ui::ActivationEvent&)> action_callback(
+	std::function<void()> action) {
+	return [action](const ::ui::ActivationEvent&) {
+		if(action) action();
+	};
+}
+
+std::function<void(const ::ui::ActivationEvent&)> navigation_action_callback(
+	std::function<void()> action,
+	Navigation navigation,
+	Uint8 destination) {
+	return [action, navigation, destination](const ::ui::ActivationEvent&) {
+		if(action) action();
+		if(navigation.goToState) navigation.goToState(destination);
 	};
 }
 
@@ -308,7 +327,7 @@ struct KeybindRowProps {
 		  key="operator"
 		  id={operator_id(props.index)}
 		  label={row->operatorLabel.c_str()}
-		  onActivate={operator_callback(controls.on_operator, props.index)}
+		  onActivate={operator_callback(controls.toggle_operator, props.index)}
 		  layout={operator_button_layout(scale)}
 		/>
 		<Button
@@ -327,6 +346,7 @@ struct OptionsControlsFrameProps {
 
 ::ui::UiElement OptionsControlsFrame(const OptionsControlsFrameProps& props) {
 	const OptionsControlsContextValue& controls = UseOptionsControls();
+	Navigation navigation = UseNavigation();
 	return <Box key={props.key} layout={root_layout(controls)} style={root_style()}>
 		<Box key="panel" layout={panel_layout(controls)} style={panel_style()}>
 			<Text
@@ -349,7 +369,7 @@ struct OptionsControlsFrameProps {
 					  label={preset_text(controls.keybinds)}
 					  accessibility={::ui::components::AccessibilityProps{.label = "Preset"}}
 					  autofocus={true}
-					  onActivate={controls.on_preset}
+					  onActivate={action_callback(controls.cycle_preset)}
 					  layout={preset_button_layout(h_scale(controls.keybinds))}
 					/>
 				</Box>
@@ -396,14 +416,14 @@ struct OptionsControlsFrameProps {
 					  key="save"
 					  id="options_controls.save"
 					  label="Save"
-					  onActivate={controls.on_save}
+					  onActivate={navigation_action_callback(controls.save, navigation, GameState::OPTIONS)}
 					  layout={footer_button_layout()}
 					/>
 					<Button
 					  key="cancel"
 					  id="options_controls.cancel"
 					  label="Cancel"
-					  onActivate={controls.on_cancel}
+					  onActivate={navigation_action_callback(controls.cancel, navigation, GameState::OPTIONS)}
 					  layout={footer_button_layout()}
 					/>
 				</Box>

@@ -77,11 +77,7 @@ void OptionsControlsScreen::Build(ScreenContext & ctx) {
 	scrollPosition = 0;
 	rebindRow = -1;
 	rebindSlot = -1;
-	presetClicked = false;
-	saveClicked = false;
-	cancelClicked = false;
 	scrollDelta = 0;
-	operatorClickedRow = -1;
 }
 
 void OptionsControlsScreen::BeginRebindFromVisibleRow(int row, int slot) {
@@ -91,10 +87,37 @@ void OptionsControlsScreen::BeginRebindFromVisibleRow(int row, int slot) {
 	rebindSlot = slot;
 }
 
-void OptionsControlsScreen::ToggleOperatorFromVisibleRow(int row) {
+void OptionsControlsScreen::CyclePreset(ScreenContext & ctx) {
+	CycleKeybindPreset(ctx.keymap);
+}
+
+void OptionsControlsScreen::ToggleOperatorFromVisibleRow(ScreenContext & ctx, int row) {
+	using namespace silencer::client_ui::options;
+
 	int absolute = scrollPosition + row;
 	if(absolute < 0 || absolute >= (int)Action::Count) return;
-	operatorClickedRow = absolute;
+	Action a = ACTION_TABLE[absolute].action;
+	LegacyBindingView v = ViewLegacy(ctx.keymap, a);
+	v.and_ = !v.and_;
+	ForkActiveProfileIfBuiltin(ctx.keymap);
+	WriteLegacy(ctx.keymap, a, v.key1, v.key2, v.and_);
+}
+
+void OptionsControlsScreen::SaveControls(ScreenContext & ctx) {
+	using namespace silencer::client_ui::options;
+
+	const std::string active = Config::GetInstance().active_keybind_profile;
+	if(!options_controls_screen_detail::IsBuiltinKeybindProfile(active)){
+		ctx.keymap.SaveFile(WritableProfilePath(active));
+	}
+	Config::GetInstance().Save();
+}
+
+void OptionsControlsScreen::CancelControls(ScreenContext & ctx) {
+	using namespace silencer::client_ui::options;
+
+	LoadActiveKeymap(ctx.keymap);
+	Config::GetInstance().Load();
 }
 
 void OptionsControlsScreen::Tick(ScreenContext & ctx) {
@@ -103,18 +126,6 @@ void OptionsControlsScreen::Tick(ScreenContext & ctx) {
 	if(scrollDelta != 0){
 		scrollPosition = std::max(0, std::min(MaxScroll(), scrollPosition + scrollDelta));
 		scrollDelta = 0;
-	}
-	if(presetClicked){
-		presetClicked = false;
-		CycleKeybindPreset(ctx.keymap);
-	}
-	if(operatorClickedRow >= 0 && operatorClickedRow < (int)Action::Count){
-		Action a = ACTION_TABLE[operatorClickedRow].action;
-		LegacyBindingView v = ViewLegacy(ctx.keymap, a);
-		v.and_ = !v.and_;
-		ForkActiveProfileIfBuiltin(ctx.keymap);
-		WriteLegacy(ctx.keymap, a, v.key1, v.key2, v.and_);
-		operatorClickedRow = -1;
 	}
 	if(rebindRow >= 0){
 		if(optionscontrolstick == 0){
@@ -127,22 +138,6 @@ void OptionsControlsScreen::Tick(ScreenContext & ctx) {
 	}else{
 		optionscontrolstick = 0;
 	}
-	if(saveClicked){
-		saveClicked = false;
-		const std::string active = Config::GetInstance().active_keybind_profile;
-		if(!options_controls_screen_detail::IsBuiltinKeybindProfile(active)){
-			ctx.keymap.SaveFile(WritableProfilePath(active));
-		}
-		Config::GetInstance().Save();
-		ctx.GoToState(GameState::OPTIONS);
-		return;
-	}
-	if(cancelClicked){
-		cancelClicked = false;
-		LoadActiveKeymap(ctx.keymap);
-		Config::GetInstance().Load();
-		ctx.GoToState(GameState::OPTIONS);
-	}
 }
 
 bool OptionsControlsScreen::HandleUiIntent(ScreenContext & ctx, const silencer::ui::UiAction & action) {
@@ -154,7 +149,8 @@ bool OptionsControlsScreen::HandleUiIntent(ScreenContext & ctx, const silencer::
 		return true;
 	}
 	if(action.kind == silencer::ui::UiActionKind::Cancel){
-		cancelClicked = true;
+		CancelControls(ctx);
+		ctx.GoToState(GameState::OPTIONS);
 		return true;
 	}
 	if(action.kind == silencer::ui::UiActionKind::Scroll){
@@ -166,15 +162,17 @@ bool OptionsControlsScreen::HandleUiIntent(ScreenContext & ctx, const silencer::
 	}
 	if(action.kind != silencer::ui::UiActionKind::Activate) return false;
 	if(action.id == options_controls_screen_detail::kActionPreset){
-		presetClicked = true;
+		CyclePreset(ctx);
 		return true;
 	}
 	if(action.id == options_controls_screen_detail::kActionSave){
-		saveClicked = true;
+		SaveControls(ctx);
+		ctx.GoToState(GameState::OPTIONS);
 		return true;
 	}
 	if(action.id == options_controls_screen_detail::kActionCancel){
-		cancelClicked = true;
+		CancelControls(ctx);
+		ctx.GoToState(GameState::OPTIONS);
 		return true;
 	}
 	int row = options_controls_screen_detail::SuffixInt(action.id, options_controls_screen_detail::kActionPrimaryPrefix);
@@ -189,7 +187,7 @@ bool OptionsControlsScreen::HandleUiIntent(ScreenContext & ctx, const silencer::
 	}
 	row = options_controls_screen_detail::SuffixInt(action.id, options_controls_screen_detail::kActionOperatorPrefix);
 	if(row >= 0){
-		ToggleOperatorFromVisibleRow(row);
+		ToggleOperatorFromVisibleRow(ctx, row);
 		return true;
 	}
 	return false;
@@ -286,20 +284,20 @@ bool OptionsControlsScreen::BuildElement(ScreenContext & ctx, ::ui::UiElement * 
 		.frame_pad_bottom = framePadBottom,
 		.panel_pad_x = panelPadX,
 		.panel_pad_bottom = panelPadBottom,
-		.on_preset = [this](const ::ui::ActivationEvent&) {
-			presetClicked = true;
+		.cycle_preset = [this, screenContext = &ctx]() {
+			CyclePreset(*screenContext);
 		},
 		.on_rebind = [this](int row, int slot) {
 			BeginRebindFromVisibleRow(row, slot);
 		},
-		.on_operator = [this](int row) {
-			ToggleOperatorFromVisibleRow(row);
+		.toggle_operator = [this, screenContext = &ctx](int row) {
+			ToggleOperatorFromVisibleRow(*screenContext, row);
 		},
-		.on_save = [this](const ::ui::ActivationEvent&) {
-			saveClicked = true;
+		.save = [this, screenContext = &ctx]() {
+			SaveControls(*screenContext);
 		},
-		.on_cancel = [this](const ::ui::ActivationEvent&) {
-			cancelClicked = true;
+		.cancel = [this, screenContext = &ctx]() {
+			CancelControls(*screenContext);
 		},
 	};
 	const auto * stored = ::ui::copy_value(context);

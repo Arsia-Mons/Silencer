@@ -24,18 +24,17 @@ private:
 	// Two-slot rebind state machine + label resolution lives in
 	// controls_rebind_capture.{h,cpp}; these stay as the per-frame state.
 	void BeginRebindFromVisibleRow(int row, int slot);
-	void ToggleOperatorFromVisibleRow(int row);
+	void CyclePreset(ScreenContext & ctx);
+	void ToggleOperatorFromVisibleRow(ScreenContext & ctx, int row);
+	void SaveControls(ScreenContext & ctx);
+	void CancelControls(ScreenContext & ctx);
 	int MaxScroll() const;
 
 	int scrollPosition = 0;
 	int rebindRow = -1;
 	int rebindSlot = -1;
 	Uint32    optionscontrolstick = 0;
-	bool presetClicked = false;
-	bool saveClicked = false;
-	bool cancelClicked = false;
 	int scrollDelta = 0;
-	int operatorClickedRow = -1;
 	int visibleRowCapacity_ = silencer::client_ui::options::kKeybindListMinVisibleRows;
 	silencer::client_ui::options::KeybindListView keybindListView_;
 };
