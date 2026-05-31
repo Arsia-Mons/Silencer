@@ -63,7 +63,7 @@ bool PasswordModal::BuildElement(ScreenContext & ctx, ::ui::UiElement * out)
 
 void PasswordModal::Destroy(ScreenContext & ctx)
 {
-	ctx.game.UiInteractions().ClearFocus();
+	ctx.game.ClearUiFocus();
 }
 
 bool PasswordModal::HandleUiIntent(ScreenContext & ctx, const silencer::ui::UiAction & action)

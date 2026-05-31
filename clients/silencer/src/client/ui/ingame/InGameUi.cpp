@@ -7,7 +7,6 @@
 #include "objecttypes.h"
 #include "player.h"
 #include "team.h"
-#include "runtime/UiInteractionRegistry.h"
 #include "world.h"
 
 #include <cstring>
@@ -108,27 +107,26 @@ void InGameUi::UpdateOverlayState(int localPeerId) {
 	}
 }
 
-bool InGameUi::ApplyActions(
+InGameUiActionResult InGameUi::ApplyActions(
 	int localPeerId,
-	const std::vector<silencer::ui::UiAction>& actions,
-	silencer::ui::UiInteractionRegistry& interactions) {
+	const std::vector<silencer::ui::UiAction>& actions) {
 	Player * localplayer = world_.GetPeerPlayer(localPeerId);
-	if(!localplayer) return false;
+	if(!localplayer) return {};
 
-	bool handled = false;
+	InGameUiActionResult result;
 	for(const silencer::ui::UiAction& action : actions){
 		if(localplayer->chatActive &&
 		   action.kind == silencer::ui::UiActionKind::Cancel &&
 		   action.id == "ui.cancel"){
 			localplayer->chatText[0] = '\0';
 			localplayer->chatActive = false;
-			handled = true;
+			result.handled = true;
 			continue;
 		}
 
 		if(localplayer->chatActive &&
 		   (action.id == "ingame.chat" || action.id == "ingame.chat.channel")){
-			handled = true;
+			result.handled = true;
 			if(action.kind == silencer::ui::UiActionKind::SetText &&
 			   action.id == "ingame.chat"){
 				int n = static_cast<int>(action.value.size());
@@ -156,7 +154,7 @@ bool InGameUi::ApplyActions(
 			         action.kind == silencer::ui::UiActionKind::Activate){
 				if(action.id == "ingame.chat.channel"){
 					localplayer->chatwithteam = !localplayer->chatwithteam;
-					interactions.FocusInteractableById("ingame.chat");
+					result.focusChatInput = true;
 				}
 			}
 			continue;
@@ -164,7 +162,7 @@ bool InGameUi::ApplyActions(
 
 		if((localplayer->isbuying || localplayer->techstationactive) &&
 		   ingameui_detail::StartsWith(action.id, "ingame.buytech.row.")){
-			handled = true;
+			result.handled = true;
 			if(action.index >= 0){
 				ingameui_detail::SelectBuyTechRow(*localplayer, world_, action.index);
 			}
@@ -179,10 +177,10 @@ bool InGameUi::ApplyActions(
 		   action.kind == silencer::ui::UiActionKind::Cancel){
 			localplayer->isbuying = false;
 			localplayer->techstationactive = false;
-			handled = true;
+			result.handled = true;
 		}
 	}
-	return handled;
+	return result;
 }
 
 InGameUiControlResult InGameUi::ConfigureForControl(InGameUiControlMode mode) {

@@ -52,8 +52,8 @@ Renderer & GetRenderer() { return renderer; }
 silencer::client_ui::ClientUiInput & UiInput() { return gameUiPipeline.UiInput(); }
 const silencer::client_ui::ClientUiInput & UiInput() const { return gameUiPipeline.UiInput(); }
 const silencer::ui::UiInputState & CurrentUiInput() const { return gameUiPipeline.CurrentUiInput(); }
-silencer::ui::UiInteractionRegistry & UiInteractions() { return gameUiPipeline.UiInteractions(); }
 const silencer::ui::UiInteractionRegistry & UiInteractions() const { return gameUiPipeline.UiInteractions(); }
+void ClearUiFocus() { gameUiPipeline.ClearUiFocus(); }
 silencer::client_ui::InGameUi & InGameUi() { return gameUiPipeline.InGameUi(); }
 bool ResizeRenderSurface(int width, int height);
 bool ResizeRenderSurfacePixels(int width, int height);

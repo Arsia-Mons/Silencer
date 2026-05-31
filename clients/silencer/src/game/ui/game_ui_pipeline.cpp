@@ -213,8 +213,11 @@ if(game.state != GameState::FADEOUT){
 std::vector<silencer::ui::UiAction> unhandledUiActions =
 clientUi.DispatchInput(game.screenContext, preparedUiInput);
 if(!clientUi.HasScreens() && game.world.map.loaded){
-inGameUi.ApplyActions(
-game.world.peers.localpeerid, unhandledUiActions, clientUi.Interactions());
+silencer::client_ui::InGameUiActionResult result =
+inGameUi.ApplyActions(game.world.peers.localpeerid, unhandledUiActions);
+if(result.focusChatInput){
+clientUi.FocusInteractableById("ingame.chat");
+}
 }
 bool nowFocused = clientUi.HasTextInputFocus();
 if(nowFocused && !textInputFocused){

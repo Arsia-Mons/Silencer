@@ -8,9 +8,6 @@
 class World;
 
 namespace silencer {
-namespace ui {
-class UiInteractionRegistry;
-}
 namespace client_ui {
 
 enum class InGameUiControlMode {
@@ -38,15 +35,19 @@ struct InGameUiControlResult {
 	int techSelectedIndex = 0;
 };
 
+struct InGameUiActionResult {
+	bool handled = false;
+	bool focusChatInput = false;
+};
+
 class InGameUi {
 public:
 	explicit InGameUi(World& world);
 
 	bool HasInputTarget(int localPeerId);
 	void UpdateOverlayState(int localPeerId);
-	bool ApplyActions(int localPeerId,
-	                  const std::vector<silencer::ui::UiAction>& actions,
-	                  silencer::ui::UiInteractionRegistry& interactions);
+	InGameUiActionResult ApplyActions(int localPeerId,
+	                                  const std::vector<silencer::ui::UiAction>& actions);
 	InGameUiControlResult ConfigureForControl(InGameUiControlMode mode);
 
 private:
