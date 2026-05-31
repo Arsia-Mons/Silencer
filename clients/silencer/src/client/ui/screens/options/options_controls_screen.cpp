@@ -287,7 +287,7 @@ bool OptionsControlsScreen::BuildElement(ScreenContext & ctx, ::ui::UiElement * 
 		.cycle_preset = [this, screenContext = &ctx]() {
 			CyclePreset(*screenContext);
 		},
-		.on_rebind = [this](int row, int slot) {
+		.begin_rebind = [this](int row, int slot) {
 			BeginRebindFromVisibleRow(row, slot);
 		},
 		.toggle_operator = [this, screenContext = &ctx](int row) {

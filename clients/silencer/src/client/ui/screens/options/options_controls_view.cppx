@@ -320,7 +320,7 @@ struct KeybindRowProps {
 		  key="primary"
 		  id={primary_id(props.index)}
 		  label={row->rebindingPrimary ? "-" : row->primaryLabel.c_str()}
-		  onActivate={rebind_callback(controls.on_rebind, props.index, 0)}
+		  onActivate={rebind_callback(controls.begin_rebind, props.index, 0)}
 		  layout={action_button_layout(scale)}
 		/>
 		<Button
@@ -334,7 +334,7 @@ struct KeybindRowProps {
 		  key="secondary"
 		  id={secondary_id(props.index)}
 		  label={row->rebindingSecondary ? "-" : row->secondaryLabel.c_str()}
-		  onActivate={rebind_callback(controls.on_rebind, props.index, 1)}
+		  onActivate={rebind_callback(controls.begin_rebind, props.index, 1)}
 		  layout={action_button_layout(scale)}
 		/>
 	</Box>

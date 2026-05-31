@@ -19,7 +19,7 @@ struct OptionsControlsContextValue {
 	int panel_pad_x = 48;
 	int panel_pad_bottom = 20;
 	std::function<void()> cycle_preset = {};
-	std::function<void(int row, int slot)> on_rebind = {};
+	std::function<void(int row, int slot)> begin_rebind = {};
 	std::function<void(int row)> toggle_operator = {};
 	std::function<void()> save = {};
 	std::function<void()> cancel = {};
