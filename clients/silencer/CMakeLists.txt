@@ -368,6 +368,18 @@ if(MSVC)
 endif()
 add_test(NAME ui_text_measure_tests COMMAND ui_text_measure_tests)
 
+# Sprite->RGBA bake: indexed Surface + palette -> premultiplied RGBA8.
+add_executable(sprite_bake_tests
+	tests/sprite_bake_tests.cpp
+	src/render/cppx_ui/sprite_bake.cpp)
+target_compile_features(sprite_bake_tests PRIVATE cxx_std_20)
+target_include_directories(sprite_bake_tests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src")
+target_link_libraries(sprite_bake_tests PRIVATE SDL3::SDL3)
+if(MSVC)
+	target_compile_definitions(sprite_bake_tests PRIVATE NOMINMAX)
+endif()
+add_test(NAME sprite_bake_tests COMMAND sprite_bake_tests)
+
 # /Z7 embeds debug info into .obj files instead of routing it through MSVC's
 # mspdbsrv.exe — which has a habit of failing with C1090 PDB errors on some
 # Windows installs. /Zi (the default) is faster but unreliable; /Z7 is rock
