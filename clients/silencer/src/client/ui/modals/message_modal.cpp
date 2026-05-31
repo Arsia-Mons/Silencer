@@ -26,31 +26,36 @@ std::unique_ptr<MessageModal> MessageModal::Progress(std::string message)
 void MessageModal::Build(ScreenContext & ctx)
 {
 	(void)ctx;
-	okClicked = false;
 }
 
 void MessageModal::Tick(ScreenContext & ctx)
 {
-	if(!hasOk || !okClicked) return;
-	okClicked = false;
-	auto cb = std::move(onClose);
-	ctx.PopScreen();
-	if(cb) cb();
+	(void)ctx;
 }
 
 bool MessageModal::BuildElement(ScreenContext & ctx, ::ui::UiElement * out)
 {
-	(void)ctx;
 	if(!out) return false;
-	*out = silencer::client_ui::MessageModalView(
-		silencer::client_ui::MessageModalViewProps{
-			.key = "message-modal",
+	const silencer::client_ui::MessageModalContextValue context{
+		.state = silencer::client_ui::MessageModalState{
 			.message = message.c_str(),
 			.show_ok = hasOk,
-			.on_ok = [this](const ::ui::ActivationEvent&) {
-				okClicked = true;
+		},
+		.actions = silencer::client_ui::MessageModalActions{
+			.close = [this, screenContext = &ctx]() {
+				Close(*screenContext);
 			},
-		});
+		},
+	};
+	const auto * stored = ::ui::copy_value(context);
+	if(!stored) return false;
+	*out = ::ui::component(
+		"MessageModalView",
+		silencer::client_ui::MessageModalViewProps{
+			.key = "message-modal",
+			.value = stored,
+		},
+		silencer::client_ui::MessageModalView);
 	return true;
 }
 
@@ -61,11 +66,10 @@ void MessageModal::Destroy(ScreenContext & ctx)
 
 bool MessageModal::HandleUiIntent(ScreenContext & ctx, const silencer::ui::UiAction & action)
 {
-	(void)ctx;
 	if(!hasOk) return false;
 	if(action.kind == silencer::ui::UiActionKind::Cancel ||
 	   (action.kind == silencer::ui::UiActionKind::Activate && action.id == message_modal_detail::kActionOk)){
-		okClicked = true;
+		Close(ctx);
 		return true;
 	}
 	return false;
@@ -75,4 +79,12 @@ void MessageModal::SetText(ScreenContext & ctx, const std::string & text)
 {
 	(void)ctx;
 	message = text;
+}
+
+void MessageModal::Close(ScreenContext & ctx)
+{
+	if(!hasOk) return;
+	auto cb = std::move(onClose);
+	ctx.PopScreen();
+	if(cb) cb();
 }

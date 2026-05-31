@@ -20,8 +20,9 @@ public:
 	bool HandleUiIntent(ScreenContext & ctx, const silencer::ui::UiAction & action) override;
 
 private:
+	void Submit(ScreenContext & ctx);
+
 	std::function<void(const char *)> onSubmit;
-	bool okClicked = false;
 	char password[21] = {};
 };
 

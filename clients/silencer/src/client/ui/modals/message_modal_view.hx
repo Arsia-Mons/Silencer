@@ -1,16 +1,33 @@
 #pragma once
 
 #include "ui/components/common.h"
+#include "ui/runtime/react.h"
 
 #include <functional>
 
 namespace silencer::client_ui {
 
-struct MessageModalViewProps {
-	const char * key = nullptr;
+struct MessageModalState {
 	const char * message = "";
 	bool show_ok = true;
-	std::function<void(const ::ui::ActivationEvent&)> on_ok = {};
+};
+
+struct MessageModalActions {
+	std::function<void()> close = {};
+};
+
+struct MessageModalContextValue {
+	MessageModalState state = {};
+	MessageModalActions actions = {};
+};
+
+extern ::ReactContext MessageModalContext;
+
+const MessageModalContextValue& UseMessageModal();
+
+struct MessageModalViewProps {
+	const char * key = nullptr;
+	const MessageModalContextValue * value = nullptr;
 };
 
 ::ui::UiElement MessageModalView(const MessageModalViewProps& props);

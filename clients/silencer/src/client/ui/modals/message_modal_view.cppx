@@ -71,23 +71,62 @@ namespace {
 	});
 }
 
-}  // namespace
+std::function<void(const ::ui::ActivationEvent&)> close_callback(
+	const MessageModalActions& actions) {
+	return [actions](const ::ui::ActivationEvent&) {
+		if(actions.close) actions.close();
+	};
+}
 
-::ui::UiElement MessageModalView(const MessageModalViewProps& props) {
+struct MessageModalFrameProps {
+	const char * key = nullptr;
+};
+
+::ui::UiElement MessageModalFrame(const MessageModalFrameProps& props) {
+	const MessageModalContextValue& modal = UseMessageModal();
+	const MessageModalState& state = modal.state;
+	const MessageModalActions& actions = modal.actions;
 	return <Box key={props.key} layout={root_layout()}>
 		<Dialog key="dialog" modal={true} layout={dialog_layout()}>
-			<Text key="message" value={props.message} layout={message_layout()} style={message_style()} />
+			<Text key="message" value={state.message} layout={message_layout()} style={message_style()} />
 			<Button
 			  key="ok"
 			  id="message_modal.ok"
 			  label="OK"
-			  disabled={!props.show_ok}
-			  autofocus={props.show_ok}
-			  onActivate={props.on_ok}
-			  layout={ok_button_layout(props.show_ok)}
+			  disabled={!state.show_ok}
+			  autofocus={state.show_ok}
+			  onActivate={close_callback(actions)}
+			  layout={ok_button_layout(state.show_ok)}
 			/>
 		</Dialog>
 	</Box>
+}
+
+}  // namespace
+
+::ReactContext MessageModalContext = {};
+
+namespace {
+const MessageModalContextValue kEmptyMessageModal = {};
+}
+
+const MessageModalContextValue& UseMessageModal() {
+	const auto * value = static_cast<const MessageModalContextValue *>(
+		::use_context(&MessageModalContext));
+	return value ? *value : kEmptyMessageModal;
+}
+
+::ui::UiElement MessageModalView(const MessageModalViewProps& props) {
+	return ::ui::provider(
+		"MessageModalProvider",
+		&MessageModalContext,
+		const_cast<MessageModalContextValue *>(props.value),
+		children({
+			::ui::component("MessageModalFrame",
+			                MessageModalFrameProps{ .key = "frame" },
+			                MessageModalFrame),
+		}),
+		props.key);
 }
 
 }  // namespace silencer::client_ui

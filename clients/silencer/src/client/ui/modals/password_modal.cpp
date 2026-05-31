@@ -29,35 +29,39 @@ PasswordModal::PasswordModal(std::function<void(const char *)> onSubmit_)
 void PasswordModal::Build(ScreenContext & ctx)
 {
 	(void)ctx;
-	okClicked = false;
 	password[0] = '\0';
 }
 
 void PasswordModal::Tick(ScreenContext & ctx)
 {
-	if(!okClicked) return;
-	okClicked = false;
-	std::string captured = password;
-	auto cb = std::move(onSubmit);
-	ctx.PopScreen();
-	if(cb) cb(captured.c_str());
+	(void)ctx;
 }
 
 bool PasswordModal::BuildElement(ScreenContext & ctx, ::ui::UiElement * out)
 {
-	(void)ctx;
 	if(!out) return false;
-	*out = silencer::client_ui::PasswordModalView(
-		silencer::client_ui::PasswordModalViewProps{
-			.key = "password-modal",
+	const silencer::client_ui::PasswordModalContextValue context{
+		.state = silencer::client_ui::PasswordModalState{
 			.password = password,
-			.on_password_change = [this](const std::string& value) {
+		},
+		.actions = silencer::client_ui::PasswordModalActions{
+			.set_password = [this](const std::string& value) {
 				password_modal_detail::CopyUiText(password, static_cast<int>(sizeof(password)), value);
 			},
-			.on_submit = [this](const ::ui::ActivationEvent&) {
-				okClicked = true;
+			.submit = [this, screenContext = &ctx]() {
+				Submit(*screenContext);
 			},
-		});
+		},
+	};
+	const auto * stored = ::ui::copy_value(context);
+	if(!stored) return false;
+	*out = ::ui::component(
+		"PasswordModalView",
+		silencer::client_ui::PasswordModalViewProps{
+			.key = "password-modal",
+			.value = stored,
+		},
+		silencer::client_ui::PasswordModalView);
 	return true;
 }
 
@@ -76,12 +80,20 @@ bool PasswordModal::HandleUiIntent(ScreenContext & ctx, const silencer::ui::UiAc
 	}
 	if(action.kind == silencer::ui::UiActionKind::SubmitText && action.id == password_modal_detail::kActionPassword){
 		password_modal_detail::CopyUiText(password, static_cast<int>(sizeof(password)), action.value);
-		okClicked = true;
+		Submit(ctx);
 		return true;
 	}
 	if(action.kind == silencer::ui::UiActionKind::Activate && action.id == password_modal_detail::kActionOk){
-		okClicked = true;
+		Submit(ctx);
 		return true;
 	}
 	return false;
+}
+
+void PasswordModal::Submit(ScreenContext & ctx)
+{
+	std::string captured = password;
+	auto cb = std::move(onSubmit);
+	ctx.PopScreen();
+	if(cb) cb(captured.c_str());
 }

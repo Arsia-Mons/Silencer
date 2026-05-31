@@ -29,10 +29,10 @@ public:
 
 private:
 	MessageModal(std::string message, bool ok, std::function<void()> onClose);
+	void Close(ScreenContext & ctx);
 
 	std::string message;
 	bool hasOk;
-	bool okClicked = false;
 	std::function<void()> onClose;
 };
 

@@ -1,17 +1,34 @@
 #pragma once
 
 #include "ui/components/common.h"
+#include "ui/runtime/react.h"
 
 #include <functional>
 #include <string>
 
 namespace silencer::client_ui {
 
+struct PasswordModalState {
+	const char * password = "";
+};
+
+struct PasswordModalActions {
+	std::function<void(const std::string&)> set_password = {};
+	std::function<void()> submit = {};
+};
+
+struct PasswordModalContextValue {
+	PasswordModalState state = {};
+	PasswordModalActions actions = {};
+};
+
+extern ::ReactContext PasswordModalContext;
+
+const PasswordModalContextValue& UsePasswordModal();
+
 struct PasswordModalViewProps {
 	const char * key = nullptr;
-	const char * password = "";
-	std::function<void(const std::string&)> on_password_change = {};
-	std::function<void(const ::ui::ActivationEvent&)> on_submit = {};
+	const PasswordModalContextValue * value = nullptr;
 };
 
 ::ui::UiElement PasswordModalView(const PasswordModalViewProps& props);
