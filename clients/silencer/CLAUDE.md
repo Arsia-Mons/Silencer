@@ -34,6 +34,13 @@ Source under `src/` is organized by concern (`game/`, `render/`,
 `client/ui/`, `ui/`, etc.); keep new files in the owning concern
 instead of reviving the old flat layout.
 
+UI is authored in `.cppx`/`.hx` and transpiled to C++ at build time, so
+**configure requires `Python3`** (`find_package(Python3 ... REQUIRED)`).
+Generated `.cpp`/`.h` go to `<build>/generated/cppx/` — gitignored,
+never committed, regenerated each build. See
+[`../../docs/silencer-client-build.md`](../../docs/silencer-client-build.md)
+(*cppx UI pipeline*).
+
 ## Client UI dogma
 
 `ClientUi` is the only production owner of visible UI composition and

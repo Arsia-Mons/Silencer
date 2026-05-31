@@ -203,6 +203,48 @@ target_include_directories(${SILENCER_TARGET} PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}/src/events"
 )
 
+# --- cppx authoring pipeline (SIL-7) -------------------------------------
+# `.cppx`/`.hx` view sources transpile to ordinary C++ at build time through
+# the vendored Python tooling. Generated `.cpp`/`.h` land under
+# <build>/generated/cppx/ (gitignored, never committed) and regenerate every
+# build; Python3 is a documented build dependency. The authored-source list
+# below is the single source of truth — both the transpile step and the
+# format gate consume it.
+find_package(Python3 COMPONENTS Interpreter REQUIRED)
+include(cppx_transpile)
+
+set(SILENCER_CPPX_SOURCES
+	src/ui/cppx_smoke.cppx
+	src/ui/cppx_smoke.hx
+)
+cppx_transpile(SILENCER_CPPX_GENERATED ${SILENCER_CPPX_SOURCES})
+target_sources(${SILENCER_TARGET} PRIVATE ${SILENCER_CPPX_GENERATED})
+
+# Expose the generated root + each generated output's directory so authored
+# `.cppx`/`.hx` resolve their generated `.h` siblings by name. Generated TUs
+# use named namespaces (no anon-namespace / global `using` vocabulary), so
+# they are unity-safe — unlike the legacy Clay `_clay_unsafe_sources`.
+# Re-audit when adding generated TUs.
+set(SILENCER_CPPX_INCLUDE_DIRS "${CMAKE_CURRENT_BINARY_DIR}/generated/cppx")
+foreach(_gen ${SILENCER_CPPX_GENERATED})
+	get_filename_component(_gen_dir "${_gen}" DIRECTORY)
+	list(APPEND SILENCER_CPPX_INCLUDE_DIRS "${_gen_dir}")
+endforeach()
+list(REMOVE_DUPLICATES SILENCER_CPPX_INCLUDE_DIRS)
+target_include_directories(${SILENCER_TARGET} PRIVATE ${SILENCER_CPPX_INCLUDE_DIRS})
+
+# Format gate on the authored sources (CI: `ctest -R cppx_format_check`).
+# Always registered so it does not depend on the full SILENCER_BUILD_TESTS
+# tree. There is no drift gate: nothing generated lives in source.
+enable_testing()
+set(_cppx_format_files "")
+foreach(_src ${SILENCER_CPPX_SOURCES})
+	list(APPEND _cppx_format_files "${CMAKE_CURRENT_SOURCE_DIR}/${_src}")
+endforeach()
+add_test(NAME cppx_format_check
+	COMMAND ${Python3_EXECUTABLE}
+		"${CMAKE_CURRENT_SOURCE_DIR}/tools/cppx_format.py" --check ${_cppx_format_files})
+
 # /Z7 embeds debug info into .obj files instead of routing it through MSVC's
 # mspdbsrv.exe — which has a habit of failing with C1090 PDB errors on some
 # Windows installs. /Zi (the default) is faster but unreliable; /Z7 is rock
