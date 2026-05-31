@@ -137,6 +137,17 @@ fail_if_match \
   "$REPO_ROOT/clients/silencer/src/game/loop/game_loop.cpp"
 
 fail_if_match \
+  '#include "(character_create_screen|lobby_connect_screen|main_menu_screen|mission_summary_screen|options_audio_screen|options_controls_screen|options_display_screen|options_screen|update_screen|lobby_screen|message_modal)[.]h"|std::make_unique<(MainMenuScreen|LobbyConnectScreen|LobbyScreen|CharacterCreateScreen|UpdateScreen|MissionSummaryScreen|OptionsScreen|OptionsControlsScreen|OptionsDisplayScreen|OptionsAudioScreen)|dynamic_cast<(LobbyScreen|MessageModal)' \
+  "$REPO_ROOT/clients/silencer/src/game/ui/game_ui_pipeline.cpp"
+
+fail_if_match \
+  "TopProgressModal|TopScreenIsOverlay|TopIsOverlay|HasTopLobbyScreen|ShowLobbyPanel" \
+  "$REPO_ROOT/clients/silencer/src/game/game.cpp" \
+  "$REPO_ROOT/clients/silencer/src/game/game.h" \
+  "$REPO_ROOT/clients/silencer/src/game/ui/game_ui_pipeline.cpp" \
+  "$REPO_ROOT/clients/silencer/src/game/ui/game_ui_pipeline.h"
+
+fail_if_match \
   "Handle(TextInput|KeyPress|ScancodeDown|MousePress|MouseMove)|DispatchKeyPress|DispatchPreparedUiNavActions|UiNavActionToAscii|DispatchChatKey|HandleInGameMenuKey" \
   "$REPO_ROOT/clients/silencer/src" \
   --glob '!third_party/**'
