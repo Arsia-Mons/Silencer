@@ -80,6 +80,13 @@ fail_if_match \
   "$REPO_ROOT/clients/silencer/src/client/ui"
 
 fail_if_match \
+  "CLAY|Clay_|clay_bridge|#include[[:space:]]*[<\"](clay|primitives)/" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/modals" \
+  --glob '!*.cppx' \
+  --glob '!*.hx'
+
+fail_if_match \
   "\\b[A-Za-z0-9_]*Controller\\b|\\bcontroller\\b" \
   "$REPO_ROOT/clients/silencer/src/client/ui" \
   "$REPO_ROOT/clients/silencer/src/game/ui" \

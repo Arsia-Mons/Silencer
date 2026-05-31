@@ -19,8 +19,6 @@ void OptionsScreen::Build(ScreenContext & ctx)
 	ctx.ResetPresentation(1);
 	ctx.renderer.camera.SetPosition(320, 240);
 
-	// Clay owns all visible options-menu structure and hit targets.
-
 	goBackClicked = false;
 	controlsClicked = false;
 	displayClicked = false;
