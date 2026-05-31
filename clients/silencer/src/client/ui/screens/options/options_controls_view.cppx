@@ -1,0 +1,584 @@
+#include "client/ui/screens/options/options_controls_view.h"
+
+#include "ui/components/box.h"
+#include "ui/components/button.h"
+#include "ui/components/text.h"
+#include "ui/runtime/react.h"
+
+namespace silencer::client_ui {
+
+using ::ui::children;
+using ::ui::components::Box;
+using ::ui::components::BoxProps;
+using ::ui::components::Button;
+using ::ui::components::ButtonProps;
+using ::ui::components::Text;
+using ::ui::components::TextProps;
+
+namespace {
+
+constexpr int kContentW = 486;
+constexpr int kActionNameW = 180;
+constexpr int kOperatorW = 45;
+constexpr int kActionSlotW = 100;
+constexpr int kPresetButtonW = 240;
+constexpr int kPanelMinW = 560;
+constexpr int kPanelMinH = 420;
+constexpr int kPresetRowH = 43;
+constexpr int kRowH = 43;
+constexpr int kRowGap = 10;
+constexpr int kColumnGap = 12;
+constexpr int kPresetGap = 12;
+constexpr int kSectionGap = 8;
+constexpr int kActionTopGap = 16;
+constexpr int kActionRowH = 33;
+
+int scaled(float h_scale, int value) {
+	int result = static_cast<int>(static_cast<float>(value) * h_scale + 0.5f);
+	return result < 1 ? 1 : result;
+}
+
+float h_scale(const options::KeybindListView * view) {
+	return view ? view->hScale : 1.0f;
+}
+
+const options::KeybindRowView * row_at(const options::KeybindListView * view, int index) {
+	if(!view) return nullptr;
+	if(index < 0 || index >= view->visibleRowCount) return nullptr;
+	if(index >= static_cast<int>(view->rows.size())) return nullptr;
+	return &view->rows[index];
+}
+
+const char * preset_text(const options::KeybindListView * view) {
+	return view ? view->presetText.c_str() : "";
+}
+
+float title_offset_y(const options::KeybindListView * view) {
+	return view ? view->titleOffsetY : 8.0f;
+}
+
+const char * primary_id(int row) {
+	return ::ui::copy_string(use_text_storage("options_controls.primary.%d", row));
+}
+
+const char * secondary_id(int row) {
+	return ::ui::copy_string(use_text_storage("options_controls.secondary.%d", row));
+}
+
+const char * operator_id(int row) {
+	return ::ui::copy_string(use_text_storage("options_controls.operator.%d", row));
+}
+
+std::function<void(const ::ui::ActivationEvent&)> rebind_callback(
+	std::function<void(int row, int slot)> handler,
+	int row,
+	int slot) {
+	return [handler, row, slot](const ::ui::ActivationEvent&) {
+		if(handler) handler(row, slot);
+	};
+}
+
+std::function<void(const ::ui::ActivationEvent&)> operator_callback(
+	std::function<void(int row)> handler,
+	int row) {
+	return [handler, row](const ::ui::ActivationEvent&) {
+		if(handler) handler(row);
+	};
+}
+
+::ui::LayoutStyle root_layout(const OptionsControlsViewProps& props) {
+	return ::ui::LayoutStyle{
+		.direction = ::ui::FlexDirection::Column,
+		.align_items = ::ui::AlignItems::Center,
+		.justify_content = ::ui::JustifyContent::Center,
+		.width = ::ui::Length::percent(100.0f),
+		.height = ::ui::Length::percent(100.0f),
+		.padding = {
+			static_cast<float>(props.frame_pad_left),
+			static_cast<float>(props.frame_pad_right),
+			static_cast<float>(props.frame_pad_top),
+			static_cast<float>(props.frame_pad_bottom),
+		},
+	};
+}
+
+::ui::StyleStatePatch root_style() {
+	return ::ui::patch().background(::ui::Color{14, 18, 25, 255});
+}
+
+::ui::LayoutStyle panel_layout(const OptionsControlsViewProps& props) {
+	return ::ui::LayoutStyle{
+		.direction = ::ui::FlexDirection::Column,
+		.align_items = ::ui::AlignItems::Center,
+		.width = ::ui::Length::percent(100.0f),
+		.height = ::ui::Length::percent(100.0f),
+		.min_width = ::ui::Length::points(static_cast<float>(kPanelMinW)),
+		.min_height = ::ui::Length::points(static_cast<float>(kPanelMinH)),
+		.padding = {
+			static_cast<float>(props.panel_pad_x),
+			static_cast<float>(props.panel_pad_x),
+			70.0f,
+			static_cast<float>(props.panel_pad_bottom),
+		},
+	};
+}
+
+::ui::StyleStatePatch panel_style() {
+	return ::ui::patch()
+		.background(::ui::Color{31, 36, 44, 248})
+		.border(::ui::Border{
+			.width = {1.0f, 1.0f, 1.0f, 1.0f},
+			.color = {
+				{74, 86, 102, 255},
+				{74, 86, 102, 255},
+				{74, 86, 102, 255},
+				{74, 86, 102, 255},
+			},
+		});
+}
+
+::ui::EdgeSizes title_position(float y) {
+	::ui::EdgeSizes inset;
+	inset.left = ::ui::StyleValue::percent(0.0f);
+	inset.right = ::ui::StyleValue::percent(0.0f);
+	inset.top = ::ui::StyleValue::points(y);
+	return inset;
+}
+
+::ui::LayoutStyle title_layout(const options::KeybindListView * view) {
+	return ::ui::LayoutStyle{
+		.position = ::ui::PositionType::Absolute,
+		.width = ::ui::Length::points(static_cast<float>(scaled(h_scale(view), kContentW))),
+		.height = ::ui::Length::points(24.0f),
+		.position_inset = title_position(title_offset_y(view)),
+	};
+}
+
+::ui::LayoutStyle content_layout(const options::KeybindListView * view) {
+	return ::ui::LayoutStyle{
+		.direction = ::ui::FlexDirection::Column,
+		.align_items = ::ui::AlignItems::Center,
+		.width = ::ui::Length::points(static_cast<float>(scaled(h_scale(view), kContentW))),
+		.height = ::ui::Length::grow(1.0f),
+		.gap = static_cast<float>(kSectionGap),
+	};
+}
+
+::ui::LayoutStyle preset_row_layout(const options::KeybindListView * view) {
+	return ::ui::LayoutStyle{
+		.direction = ::ui::FlexDirection::Row,
+		.align_items = ::ui::AlignItems::Center,
+		.width = ::ui::Length::percent(100.0f),
+		.height = ::ui::Length::points(static_cast<float>(kPresetRowH)),
+		.gap = static_cast<float>(scaled(h_scale(view), kPresetGap)),
+	};
+}
+
+::ui::LayoutStyle rows_layout() {
+	return ::ui::LayoutStyle{
+		.direction = ::ui::FlexDirection::Column,
+		.width = ::ui::Length::percent(100.0f),
+		.height = ::ui::Length::grow(1.0f),
+		.gap = static_cast<float>(kRowGap),
+		.overflow = ::ui::Overflow::Hidden,
+	};
+}
+
+::ui::LayoutStyle row_layout(float h_scale) {
+	(void)h_scale;
+	return ::ui::LayoutStyle{
+		.direction = ::ui::FlexDirection::Row,
+		.align_items = ::ui::AlignItems::Center,
+		.width = ::ui::Length::percent(100.0f),
+		.height = ::ui::Length::points(static_cast<float>(kRowH)),
+		.gap = static_cast<float>(scaled(h_scale, kColumnGap)),
+	};
+}
+
+::ui::LayoutStyle label_layout(float h_scale) {
+	return ::ui::LayoutStyle{
+		.width = ::ui::Length::points(static_cast<float>(scaled(h_scale, kActionNameW))),
+		.height = ::ui::Length::points(18.0f),
+	};
+}
+
+::ui::LayoutStyle preset_button_layout(float h_scale) {
+	return ::ui::LayoutStyle{
+		.align_items = ::ui::AlignItems::Center,
+		.justify_content = ::ui::JustifyContent::Center,
+		.width = ::ui::Length::points(static_cast<float>(scaled(h_scale, kPresetButtonW))),
+		.height = ::ui::Length::points(33.0f),
+		.padding = {24.0f, 24.0f, 7.0f, 7.0f},
+	};
+}
+
+::ui::LayoutStyle action_button_layout(float h_scale) {
+	return ::ui::LayoutStyle{
+		.align_items = ::ui::AlignItems::Center,
+		.justify_content = ::ui::JustifyContent::Center,
+		.width = ::ui::Length::points(static_cast<float>(scaled(h_scale, kActionSlotW))),
+		.height = ::ui::Length::points(28.0f),
+		.padding = {14.0f, 14.0f, 5.0f, 5.0f},
+	};
+}
+
+::ui::LayoutStyle operator_button_layout(float h_scale) {
+	return ::ui::LayoutStyle{
+		.align_items = ::ui::AlignItems::Center,
+		.justify_content = ::ui::JustifyContent::Center,
+		.width = ::ui::Length::points(static_cast<float>(scaled(h_scale, kOperatorW))),
+		.height = ::ui::Length::points(28.0f),
+		.padding = {8.0f, 8.0f, 4.0f, 4.0f},
+	};
+}
+
+::ui::LayoutStyle spacer_layout() {
+	return ::ui::LayoutStyle{
+		.width = ::ui::Length::percent(100.0f),
+		.height = ::ui::Length::points(static_cast<float>(kActionTopGap)),
+	};
+}
+
+::ui::LayoutStyle actions_layout(const options::KeybindListView * view) {
+	return ::ui::LayoutStyle{
+		.direction = ::ui::FlexDirection::Row,
+		.align_items = ::ui::AlignItems::Center,
+		.justify_content = ::ui::JustifyContent::Center,
+		.height = ::ui::Length::points(static_cast<float>(kActionRowH)),
+		.gap = static_cast<float>(scaled(h_scale(view), kColumnGap)),
+	};
+}
+
+::ui::LayoutStyle footer_button_layout() {
+	return ::ui::LayoutStyle{
+		.align_items = ::ui::AlignItems::Center,
+		.justify_content = ::ui::JustifyContent::Center,
+		.width = ::ui::Length::points(196.0f),
+		.height = ::ui::Length::points(33.0f),
+		.padding = {24.0f, 24.0f, 7.0f, 7.0f},
+	};
+}
+
+::ui::StyleStatePatch title_style() {
+	return ::ui::patch().text(::ui::TextVisual{
+		.color = {236, 241, 247, 255},
+		.font_id = 135,
+		.font_size = 12,
+		.align = ::ui::TextAlign::Center,
+	});
+}
+
+::ui::StyleStatePatch heading_style() {
+	return ::ui::patch().text(::ui::TextVisual{
+		.color = {226, 234, 242, 255},
+		.font_id = 133,
+		.font_size = 8,
+	});
+}
+
+struct KeybindRowProps {
+	const char * key = nullptr;
+	const options::KeybindListView * view = nullptr;
+	int index = 0;
+	std::function<void(int row, int slot)> on_rebind = {};
+	std::function<void(int row)> on_operator = {};
+};
+
+::ui::UiElement KeybindRow(const KeybindRowProps& props) {
+	const options::KeybindRowView * row = row_at(props.view, props.index);
+	if(!row) return ::ui::empty();
+	const float scale = h_scale(props.view);
+	return <Box key={props.key} layout={row_layout(scale)}>
+		<Text
+		  key="action"
+		  value={row->actionLabel.c_str()}
+		  layout={label_layout(scale)}
+		  style={heading_style()}
+		/>
+		<Button
+		  key="primary"
+		  id={primary_id(props.index)}
+		  label={row->rebindingPrimary ? "-" : row->primaryLabel.c_str()}
+		  onActivate={rebind_callback(props.on_rebind, props.index, 0)}
+		  layout={action_button_layout(scale)}
+		/>
+		<Button
+		  key="operator"
+		  id={operator_id(props.index)}
+		  label={row->operatorLabel.c_str()}
+		  onActivate={operator_callback(props.on_operator, props.index)}
+		  layout={operator_button_layout(scale)}
+		/>
+		<Button
+		  key="secondary"
+		  id={secondary_id(props.index)}
+		  label={row->rebindingSecondary ? "-" : row->secondaryLabel.c_str()}
+		  onActivate={rebind_callback(props.on_rebind, props.index, 1)}
+		  layout={action_button_layout(scale)}
+		/>
+	</Box>
+}
+
+}  // namespace
+
+::ui::UiElement OptionsControlsView(const OptionsControlsViewProps& props) {
+	return <Box key={props.key} layout={root_layout(props)} style={root_style()}>
+		<Box key="panel" layout={panel_layout(props)} style={panel_style()}>
+			<Text
+			  key="title"
+			  value="Configure Controls"
+			  layout={title_layout(props.keybinds)}
+			  style={title_style()}
+			/>
+			<Box key="content" layout={content_layout(props.keybinds)}>
+				<Box key="preset-row" layout={preset_row_layout(props.keybinds)}>
+					<Text
+					  key="preset-label"
+					  value="Preset:"
+					  layout={label_layout(h_scale(props.keybinds))}
+					  style={heading_style()}
+					/>
+					<Button
+					  key="preset"
+					  id="options_controls.preset"
+					  label={preset_text(props.keybinds)}
+					  autofocus={true}
+					  onActivate={props.on_preset}
+					  layout={preset_button_layout(h_scale(props.keybinds))}
+					/>
+				</Box>
+				<Box key="rows" id="options_controls.list" layout={rows_layout()}>
+					<KeybindRow
+					  key="row-00"
+					  view={props.keybinds}
+					  index={0}
+					  onRebind={props.on_rebind}
+					  onOperator={props.on_operator}
+					/>
+					<KeybindRow
+					  key="row-01"
+					  view={props.keybinds}
+					  index={1}
+					  onRebind={props.on_rebind}
+					  onOperator={props.on_operator}
+					/>
+					<KeybindRow
+					  key="row-02"
+					  view={props.keybinds}
+					  index={2}
+					  onRebind={props.on_rebind}
+					  onOperator={props.on_operator}
+					/>
+					<KeybindRow
+					  key="row-03"
+					  view={props.keybinds}
+					  index={3}
+					  onRebind={props.on_rebind}
+					  onOperator={props.on_operator}
+					/>
+					<KeybindRow
+					  key="row-04"
+					  view={props.keybinds}
+					  index={4}
+					  onRebind={props.on_rebind}
+					  onOperator={props.on_operator}
+					/>
+					<KeybindRow
+					  key="row-05"
+					  view={props.keybinds}
+					  index={5}
+					  onRebind={props.on_rebind}
+					  onOperator={props.on_operator}
+					/>
+					<KeybindRow
+					  key="row-06"
+					  view={props.keybinds}
+					  index={6}
+					  onRebind={props.on_rebind}
+					  onOperator={props.on_operator}
+					/>
+					<KeybindRow
+					  key="row-07"
+					  view={props.keybinds}
+					  index={7}
+					  onRebind={props.on_rebind}
+					  onOperator={props.on_operator}
+					/>
+					<KeybindRow
+					  key="row-08"
+					  view={props.keybinds}
+					  index={8}
+					  onRebind={props.on_rebind}
+					  onOperator={props.on_operator}
+					/>
+					<KeybindRow
+					  key="row-09"
+					  view={props.keybinds}
+					  index={9}
+					  onRebind={props.on_rebind}
+					  onOperator={props.on_operator}
+					/>
+					<KeybindRow
+					  key="row-10"
+					  view={props.keybinds}
+					  index={10}
+					  onRebind={props.on_rebind}
+					  onOperator={props.on_operator}
+					/>
+					<KeybindRow
+					  key="row-11"
+					  view={props.keybinds}
+					  index={11}
+					  onRebind={props.on_rebind}
+					  onOperator={props.on_operator}
+					/>
+					<KeybindRow
+					  key="row-12"
+					  view={props.keybinds}
+					  index={12}
+					  onRebind={props.on_rebind}
+					  onOperator={props.on_operator}
+					/>
+					<KeybindRow
+					  key="row-13"
+					  view={props.keybinds}
+					  index={13}
+					  onRebind={props.on_rebind}
+					  onOperator={props.on_operator}
+					/>
+					<KeybindRow
+					  key="row-14"
+					  view={props.keybinds}
+					  index={14}
+					  onRebind={props.on_rebind}
+					  onOperator={props.on_operator}
+					/>
+					<KeybindRow
+					  key="row-15"
+					  view={props.keybinds}
+					  index={15}
+					  onRebind={props.on_rebind}
+					  onOperator={props.on_operator}
+					/>
+					<KeybindRow
+					  key="row-16"
+					  view={props.keybinds}
+					  index={16}
+					  onRebind={props.on_rebind}
+					  onOperator={props.on_operator}
+					/>
+					<KeybindRow
+					  key="row-17"
+					  view={props.keybinds}
+					  index={17}
+					  onRebind={props.on_rebind}
+					  onOperator={props.on_operator}
+					/>
+					<KeybindRow
+					  key="row-18"
+					  view={props.keybinds}
+					  index={18}
+					  onRebind={props.on_rebind}
+					  onOperator={props.on_operator}
+					/>
+					<KeybindRow
+					  key="row-19"
+					  view={props.keybinds}
+					  index={19}
+					  onRebind={props.on_rebind}
+					  onOperator={props.on_operator}
+					/>
+					<KeybindRow
+					  key="row-20"
+					  view={props.keybinds}
+					  index={20}
+					  onRebind={props.on_rebind}
+					  onOperator={props.on_operator}
+					/>
+					<KeybindRow
+					  key="row-21"
+					  view={props.keybinds}
+					  index={21}
+					  onRebind={props.on_rebind}
+					  onOperator={props.on_operator}
+					/>
+					<KeybindRow
+					  key="row-22"
+					  view={props.keybinds}
+					  index={22}
+					  onRebind={props.on_rebind}
+					  onOperator={props.on_operator}
+					/>
+					<KeybindRow
+					  key="row-23"
+					  view={props.keybinds}
+					  index={23}
+					  onRebind={props.on_rebind}
+					  onOperator={props.on_operator}
+					/>
+					<KeybindRow
+					  key="row-24"
+					  view={props.keybinds}
+					  index={24}
+					  onRebind={props.on_rebind}
+					  onOperator={props.on_operator}
+					/>
+					<KeybindRow
+					  key="row-25"
+					  view={props.keybinds}
+					  index={25}
+					  onRebind={props.on_rebind}
+					  onOperator={props.on_operator}
+					/>
+					<KeybindRow
+					  key="row-26"
+					  view={props.keybinds}
+					  index={26}
+					  onRebind={props.on_rebind}
+					  onOperator={props.on_operator}
+					/>
+					<KeybindRow
+					  key="row-27"
+					  view={props.keybinds}
+					  index={27}
+					  onRebind={props.on_rebind}
+					  onOperator={props.on_operator}
+					/>
+					<KeybindRow
+					  key="row-28"
+					  view={props.keybinds}
+					  index={28}
+					  onRebind={props.on_rebind}
+					  onOperator={props.on_operator}
+					/>
+					<KeybindRow
+					  key="row-29"
+					  view={props.keybinds}
+					  index={29}
+					  onRebind={props.on_rebind}
+					  onOperator={props.on_operator}
+					/>
+				</Box>
+				<Box key="spacer" layout={spacer_layout()} />
+				<Box key="actions" layout={actions_layout(props.keybinds)}>
+					<Button
+					  key="save"
+					  id="options_controls.save"
+					  label="Save"
+					  onActivate={props.on_save}
+					  layout={footer_button_layout()}
+					/>
+					<Button
+					  key="cancel"
+					  id="options_controls.cancel"
+					  label="Cancel"
+					  onActivate={props.on_cancel}
+					  layout={footer_button_layout()}
+					/>
+				</Box>
+			</Box>
+		</Box>
+	</Box>
+}
+
+}  // namespace silencer::client_ui

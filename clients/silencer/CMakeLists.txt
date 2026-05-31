@@ -51,6 +51,8 @@ cppx_transpile(SILENCER_UI_COMPONENT_GENERATED
 	src/client/ui/screens/mission_summary/mission_summary_view.hx
 	src/client/ui/screens/main_menu/main_menu_view.cppx
 	src/client/ui/screens/main_menu/main_menu_view.hx
+	src/client/ui/screens/options/options_controls_view.cppx
+	src/client/ui/screens/options/options_controls_view.hx
 	src/client/ui/screens/options/options_audio_view.cppx
 	src/client/ui/screens/options/options_audio_view.hx
 	src/client/ui/screens/options/options_display_view.cppx

@@ -2,16 +2,12 @@
 
 #include "controls_keybind_list.h"
 #include "controls_rebind_capture.h"
+#include "client/ui/screens/options/options_controls_view.h"
 
 #include "screen_context.h"
 #include "game.h"
 #include "game_state.h"
 #include "config.h"
-#include "surface.h"
-
-#include "clay/clay.h"
-#include "clay_ui_compositor.h"
-#include "runtime/UiInteractionRegistry.h"
 
 #include <SDL3/SDL.h>
 
@@ -32,7 +28,6 @@ constexpr int kFrameMarginBottom = 20;
 constexpr int kTitleTextY = 14;
 constexpr int kActionRowH = 33;
 constexpr int kActionTopY = 405;
-constexpr uint16_t kPanelMinW = 560;
 constexpr uint16_t kPanelMinH = 420;
 constexpr uint16_t kPanelPadX = 48;
 constexpr uint16_t kPanelPadTop = 70;
@@ -42,6 +37,9 @@ constexpr const char * kActionCancel = "options_controls.cancel";
 constexpr const char * kActionPrimaryPrefix = "options_controls.primary.";
 constexpr const char * kActionSecondaryPrefix = "options_controls.secondary.";
 constexpr const char * kActionOperatorPrefix = "options_controls.operator.";
+
+static_assert(static_cast<int>(Action::Count) == silencer::client_ui::kOptionsControlsMaxRows,
+              "OptionsControlsView must expose one JSX row per keybind action");
 
 bool IsBuiltinKeybindProfile(const std::string & name) {
 	return name == "default" || name == "wasd" || name == "gamepad";
@@ -197,11 +195,9 @@ bool OptionsControlsScreen::HandleUiIntent(ScreenContext & ctx, const silencer::
 	return false;
 }
 
-void OptionsControlsScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime, silencer::ui::UiInteractionRegistry& interactions) {
-	(void)frametime;
-	(void)dst;
-	using namespace silencer::clay_bridge;
+bool OptionsControlsScreen::BuildElement(ScreenContext & ctx, ::ui::UiElement * out) {
 	using namespace silencer::client_ui::options;
+	if(!out) return false;
 
 	const silencer::ui::UiInputState & input = ctx.game.CurrentUiInput();
 	const int layoutWidth = std::max(1, input.width);
@@ -282,30 +278,33 @@ void OptionsControlsScreen::BuildUi(ScreenContext & ctx, Surface & dst, float fr
 		keybindListView_.visibleRowCount = i + 1;
 	}
 
-	CLAY({ .id = CLAY_ID("OptionsControlsRoot"),
-	       .layout = {
-	           .sizing = { CLAY_SIZING_GROW(0),
-	                       CLAY_SIZING_GROW(0) },
-	           .padding = { static_cast<uint16_t>(framePadLeft),
-	                        static_cast<uint16_t>(framePadRight),
-	                        static_cast<uint16_t>(framePadTop),
-	                        static_cast<uint16_t>(framePadBottom) },
-	           .childAlignment = { CLAY_ALIGN_X_CENTER, CLAY_ALIGN_Y_CENTER },
-	       },
-	       .image = { .imageData = PackImageStretch(6, 0) } }) {
-		CLAY({ .id = CLAY_ID("OptionsControlsPanel"),
-		       .layout = {
-		           .sizing = { CLAY_SIZING_GROW(0),
-		                       CLAY_SIZING_GROW(options_controls_screen_detail::kPanelMinH) },
-		           .padding = { static_cast<uint16_t>(panelPadX), static_cast<uint16_t>(panelPadX),
-		                        options_controls_screen_detail::kPanelPadTop, static_cast<uint16_t>(panelPadBottom) },
-		           .childAlignment = { CLAY_ALIGN_X_CENTER, CLAY_ALIGN_Y_TOP },
-		           .layoutDirection = CLAY_TOP_TO_BOTTOM,
-		       },
-		       .image = { .imageData = PackImageStretch(7, 7) } }) {
-			BuildKeybindListBody(keybindListView_, interactions);
-		}
-	}
+	*out = silencer::client_ui::OptionsControlsView(
+		silencer::client_ui::OptionsControlsViewProps{
+			.key = "options-controls",
+			.keybinds = &keybindListView_,
+			.frame_pad_left = framePadLeft,
+			.frame_pad_right = framePadRight,
+			.frame_pad_top = framePadTop,
+			.frame_pad_bottom = framePadBottom,
+			.panel_pad_x = panelPadX,
+			.panel_pad_bottom = panelPadBottom,
+			.on_preset = [this](const ::ui::ActivationEvent&) {
+				presetClicked = true;
+			},
+			.on_rebind = [this](int row, int slot) {
+				BeginRebindFromVisibleRow(row, slot);
+			},
+			.on_operator = [this](int row) {
+				ToggleOperatorFromVisibleRow(row);
+			},
+			.on_save = [this](const ::ui::ActivationEvent&) {
+				saveClicked = true;
+			},
+			.on_cancel = [this](const ::ui::ActivationEvent&) {
+				cancelClicked = true;
+			},
+		});
+	return true;
 }
 
 void OptionsControlsScreen::Destroy(ScreenContext & ctx) {
