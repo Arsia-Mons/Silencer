@@ -283,21 +283,44 @@ void ClientUi::TickVisibleScreens(ScreenContext& ctx) {
 	screens_.TickVisible(ctx);
 }
 
-bool ClientUi::BuildRetainedScreens(ScreenContext& ctx) {
+void ClientUi::BuildRetainedUi(ScreenContext& ctx,
+                               const HudView * view,
+                               const Resources * resources,
+                               Uint8 animationPhase) {
 	retainedElementFrame_.reset();
 	::ui::UiElementFrameScope scope(retainedElementFrame_);
 	::ui::Span<Screen *> visible = screens_.VisibleScreens();
-	if(visible.count <= 0){
-		retainedCommands_.reset();
-		return true;
-	}
-	std::array<::ui::UiElement, CLIENT_UI_MAX_SCREENS> roots = {};
+	std::array<::ui::UiElement, CLIENT_UI_MAX_SCREENS + 1> roots = {};
 	int rootCount = 0;
+
+	if(view && resources && view->mapLoaded){
+		const InGameHudContextValue context{
+			.view = view,
+			.resources = resources,
+			.interactions = &interactions_,
+			.animationPhase = animationPhase,
+		};
+		const auto * stored = ::ui::copy_value(context);
+		if(!stored){
+			retainedCommands_.reset();
+			return;
+		}
+		roots[rootCount++] = InGameHudView(InGameHudViewProps{
+			.key = "in-game-hud",
+			.value = stored,
+		});
+	}
+
+	if(visible.count <= 0 && rootCount <= 0){
+		retainedCommands_.reset();
+		return;
+	}
 	for(int i = 0; i < visible.count; ++i){
 		::ui::UiElement root{};
 		if(!visible[i]->BuildElement(ctx, &root)){
 			::react_report_error("client/ui: screen did not return retained UI\n");
-			return false;
+			retainedCommands_.reset();
+			return;
 		}
 		roots[rootCount++] = root;
 	}
@@ -311,50 +334,10 @@ bool ClientUi::BuildRetainedScreens(ScreenContext& ctx) {
 	::ui::ReconcileResult result =
 		::ui::commit_retained_elements(retainedTree_, retainedElementFrame_, provider);
 	if(!result.ok){
-		::react_report_error("client/ui: failed to commit retained screen (errors=%d)\n",
+		::react_report_error("client/ui: failed to commit retained UI (errors=%d)\n",
 		                     result.error_count);
-		return false;
-	}
-	return true;
-}
-
-void ClientUi::BuildVisibleScreens(ScreenContext& ctx) {
-	(void)BuildRetainedScreens(ctx);
-}
-
-void ClientUi::BuildRetainedInGameHud(const HudView& view, const Resources& resources, Uint8 animationPhase) {
-	retainedElementFrame_.reset();
-	if(!view.mapLoaded){
 		retainedCommands_.reset();
 		return;
-	}
-	::ui::UiElementFrameScope scope(retainedElementFrame_);
-	const InGameHudContextValue context{
-		.view = &view,
-		.resources = &resources,
-		.interactions = &interactions_,
-		.animationPhase = animationPhase,
-	};
-	const auto * stored = ::ui::copy_value(context);
-	if(!stored){
-		retainedCommands_.reset();
-		return;
-	}
-	::ui::UiElement root = InGameHudView(InGameHudViewProps{
-		.key = "in-game-hud",
-		.value = stored,
-	});
-	::ui::UiElement provider = ::ui::provider(
-		"InteractionProvider",
-		&::ui::InteractionContext,
-		&retainedInteractionSnapshot_,
-		::ui::children({ root }));
-	::ui::ReconcileResult result =
-		::ui::commit_retained_elements(retainedTree_, retainedElementFrame_, provider);
-	if(!result.ok){
-		retainedCommands_.reset();
-		::react_report_error("client/ui: failed to commit retained in-game HUD (errors=%d)\n",
-		                     result.error_count);
 	}
 }
 

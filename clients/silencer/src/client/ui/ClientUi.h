@@ -50,13 +50,10 @@ public:
 	void RequestClearScreens();
 	void ClearScreensIfRequested(ScreenContext& ctx);
 	void TickVisibleScreens(ScreenContext& ctx);
-	void BuildVisibleScreens(ScreenContext& ctx);
-	void BuildRetainedInGameHud(const HudView& view, const Resources& resources, Uint8 animationPhase);
+	void BuildRetainedUi(ScreenContext& ctx, const HudView * view, const Resources * resources, Uint8 animationPhase);
 	void RenderRetainedScreens(Renderer& renderer, const Resources& resources, Surface& dst);
 
 private:
-	bool BuildRetainedScreens(ScreenContext& ctx);
-
 	silencer::ui::UiFrameContext frameCtx_;
 	silencer::ui::ClayService& clay_;
 	silencer::ui::UiInteractionRegistry interactions_;

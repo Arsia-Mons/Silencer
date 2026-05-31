@@ -157,24 +157,26 @@ return uiClayBackend.Commands();
 
 void GameUiPipeline::BuildVisibleClientUi(Surface& surface, float frametime) {
 (void)frametime;
-clientUi.BuildVisibleScreens(game.screenContext);
+silencer::client_ui::HudView hudView;
+const bool hasHud = game.world.map.loaded;
 if(game.world.map.loaded){
-silencer::client_ui::HudView hudView =
-silencer::client_ui::BuildHudView(game.world);
-const bool retainedInGameHud = !clientUi.HasScreens();
-if(retainedInGameHud){
-clientUi.BuildRetainedInGameHud(
-hudView, game.world.resources, game.renderer.GetHudAnimationPhase());
+hudView = silencer::client_ui::BuildHudView(game.world);
 }
+clientUi.BuildRetainedUi(
+game.screenContext,
+hasHud ? &hudView : nullptr,
+hasHud ? &game.world.resources : nullptr,
+game.renderer.GetHudAnimationPhase());
+if(game.world.map.loaded){
 silencer::client_ui::BuildInGameHudUi(
 game.renderer,
 game.world.resources,
 hudView,
 &surface,
 clientUi.Interactions(),
-!retainedInGameHud);
+false);
 silencer::client_ui::BuildInGameOverlaysUi(
-game.renderer, game.world.resources, hudView, &surface, !retainedInGameHud);
+game.renderer, game.world.resources, hudView, &surface, false);
 }
 }
 
