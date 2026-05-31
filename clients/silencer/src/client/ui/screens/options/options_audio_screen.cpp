@@ -21,38 +21,36 @@ void ApplyMusicSetting(bool on)
 		Audio::GetInstance().PauseMusic();
 	}
 }
+
+void ToggleMusicSetting()
+{
+	Config & cfg = Config::GetInstance();
+	cfg.music = !cfg.music;
+	ApplyMusicSetting(cfg.music);
+}
+
+void SaveAudioSettings()
+{
+	Config::GetInstance().Save();
+}
+
+void CancelAudioSettings()
+{
+	Config & cfg = Config::GetInstance();
+	cfg.Load();
+	ApplyMusicSetting(cfg.music);
+}
 } // namespace options_audio_screen_detail
 
 void OptionsAudioScreen::Build(ScreenContext & ctx)
 {
 	ctx.ResetPresentation(1);
 	ctx.renderer.camera.SetPosition(320, 240);
-	musicClicked = false;
-	saveClicked = false;
-	cancelClicked = false;
 }
 
 void OptionsAudioScreen::Tick(ScreenContext & ctx)
 {
-	if(musicClicked){
-		musicClicked = false;
-		Config & cfg = Config::GetInstance();
-		cfg.music = !cfg.music;
-		options_audio_screen_detail::ApplyMusicSetting(cfg.music);
-	}
-	if(saveClicked){
-		saveClicked = false;
-		Config::GetInstance().Save();
-		ctx.GoToState(GameState::OPTIONS);
-		return;
-	}
-	if(cancelClicked){
-		cancelClicked = false;
-		Config & cfg = Config::GetInstance();
-		cfg.Load();
-		options_audio_screen_detail::ApplyMusicSetting(cfg.music);
-		ctx.GoToState(GameState::OPTIONS);
-	}
+	(void)ctx;
 }
 
 bool OptionsAudioScreen::BuildElement(ScreenContext & ctx, ::ui::UiElement * out)
@@ -61,20 +59,27 @@ bool OptionsAudioScreen::BuildElement(ScreenContext & ctx, ::ui::UiElement * out
 	if(!out) return false;
 
 	Config & cfg = Config::GetInstance();
-	*out = silencer::client_ui::OptionsAudioView(
+	const silencer::client_ui::OptionsAudioContextValue context{
+		.music = cfg.music,
+		.toggle_music = []() {
+			options_audio_screen_detail::ToggleMusicSetting();
+		},
+		.save = []() {
+			options_audio_screen_detail::SaveAudioSettings();
+		},
+		.cancel = []() {
+			options_audio_screen_detail::CancelAudioSettings();
+		},
+	};
+	const auto * stored = ::ui::copy_value(context);
+	if(!stored) return false;
+	*out = ::ui::component(
+		"OptionsAudioView",
 		silencer::client_ui::OptionsAudioViewProps{
 			.key = "options-audio",
-			.music = cfg.music,
-			.on_music = [this](bool) {
-				musicClicked = true;
-			},
-			.on_save = [this](const ::ui::ActivationEvent&) {
-				saveClicked = true;
-			},
-			.on_cancel = [this](const ::ui::ActivationEvent&) {
-				cancelClicked = true;
-			},
-		});
+			.value = stored,
+		},
+		silencer::client_ui::OptionsAudioView);
 	return true;
 }
 
@@ -85,22 +90,24 @@ void OptionsAudioScreen::Destroy(ScreenContext & ctx)
 
 bool OptionsAudioScreen::HandleUiIntent(ScreenContext & ctx, const silencer::ui::UiAction & action)
 {
-	(void)ctx;
 	if(action.kind == silencer::ui::UiActionKind::Cancel){
-		cancelClicked = true;
+		options_audio_screen_detail::CancelAudioSettings();
+		ctx.GoToState(GameState::OPTIONS);
 		return true;
 	}
 	if(action.kind != silencer::ui::UiActionKind::Activate) return false;
 	if(action.id == options_audio_screen_detail::kActionMusic){
-		musicClicked = true;
+		options_audio_screen_detail::ToggleMusicSetting();
 		return true;
 	}
 	if(action.id == options_audio_screen_detail::kActionSave){
-		saveClicked = true;
+		options_audio_screen_detail::SaveAudioSettings();
+		ctx.GoToState(GameState::OPTIONS);
 		return true;
 	}
 	if(action.id == options_audio_screen_detail::kActionCancel){
-		cancelClicked = true;
+		options_audio_screen_detail::CancelAudioSettings();
+		ctx.GoToState(GameState::OPTIONS);
 		return true;
 	}
 	return false;

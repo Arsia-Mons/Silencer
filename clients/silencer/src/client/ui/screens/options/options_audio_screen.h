@@ -11,11 +11,6 @@ public:
 	bool BuildElement(ScreenContext & ctx, ::ui::UiElement * out) override;
 	void Destroy(ScreenContext & ctx) override;
 	bool HandleUiIntent(ScreenContext & ctx, const silencer::ui::UiAction & action) override;
-
-private:
-	bool musicClicked = false;
-	bool saveClicked = false;
-	bool cancelClicked = false;
 };
 
 #endif

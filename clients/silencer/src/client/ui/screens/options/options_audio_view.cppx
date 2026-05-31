@@ -1,5 +1,7 @@
 #include "client/ui/screens/options/options_audio_view.h"
 
+#include "client/ui/navigation/NavigationProvider.h"
+#include "game_state.h"
 #include "ui/components/box.h"
 #include "ui/components/button.h"
 #include "ui/components/checkbox.h"
@@ -92,9 +94,37 @@ namespace {
 	});
 }
 
-}  // namespace
+std::function<void(bool)> toggle_music_callback(const OptionsAudioContextValue& audio) {
+	return [audio](bool) {
+		if(audio.toggle_music) audio.toggle_music();
+	};
+}
 
-::ui::UiElement OptionsAudioView(const OptionsAudioViewProps& props) {
+std::function<void(const ::ui::ActivationEvent&)> save_callback(
+	const OptionsAudioContextValue& audio,
+	Navigation navigation) {
+	return [audio, navigation](const ::ui::ActivationEvent&) {
+		if(audio.save) audio.save();
+		if(navigation.goToState) navigation.goToState(GameState::OPTIONS);
+	};
+}
+
+std::function<void(const ::ui::ActivationEvent&)> cancel_callback(
+	const OptionsAudioContextValue& audio,
+	Navigation navigation) {
+	return [audio, navigation](const ::ui::ActivationEvent&) {
+		if(audio.cancel) audio.cancel();
+		if(navigation.goToState) navigation.goToState(GameState::OPTIONS);
+	};
+}
+
+struct OptionsAudioFrameProps {
+	const char * key = nullptr;
+};
+
+::ui::UiElement OptionsAudioFrame(const OptionsAudioFrameProps& props) {
+	const OptionsAudioContextValue& audio = UseOptionsAudio();
+	Navigation navigation = UseNavigation();
 	return <Box key={props.key} layout={root_layout()} style={root_style()}>
 		<Box key="panel" layout={panel_layout()}>
 			<Text key="title" value="Audio Options" layout={title_layout()} style={title_style()} />
@@ -102,9 +132,9 @@ namespace {
 			  key="music"
 			  id="options_audio.music"
 			  label="Music"
-			  checked={props.music}
+			  checked={audio.music}
 			  autofocus={true}
-			  onChange={props.on_music}
+			  onChange={toggle_music_callback(audio)}
 			  layout={setting_layout()}
 			/>
 			<Box key="actions" layout={actions_layout()}>
@@ -112,19 +142,46 @@ namespace {
 				  key="save"
 				  id="options_audio.save"
 				  label="Save"
-				  onActivate={props.on_save}
+				  onActivate={save_callback(audio, navigation)}
 				  layout={action_button_layout()}
 				/>
 				<Button
 				  key="cancel"
 				  id="options_audio.cancel"
 				  label="Cancel"
-				  onActivate={props.on_cancel}
+				  onActivate={cancel_callback(audio, navigation)}
 				  layout={action_button_layout()}
 				/>
 			</Box>
 		</Box>
 	</Box>
+}
+
+}  // namespace
+
+::ReactContext OptionsAudioContext = {};
+
+namespace {
+const OptionsAudioContextValue kEmptyOptionsAudio = {};
+}
+
+const OptionsAudioContextValue& UseOptionsAudio() {
+	const auto * value = static_cast<const OptionsAudioContextValue *>(
+		::use_context(&OptionsAudioContext));
+	return value ? *value : kEmptyOptionsAudio;
+}
+
+::ui::UiElement OptionsAudioView(const OptionsAudioViewProps& props) {
+	return ::ui::provider(
+		"OptionsAudioProvider",
+		&OptionsAudioContext,
+		const_cast<OptionsAudioContextValue *>(props.value),
+		children({
+			::ui::component("OptionsAudioFrame",
+			                OptionsAudioFrameProps{ .key = "frame" },
+			                OptionsAudioFrame),
+		}),
+		props.key);
 }
 
 }  // namespace silencer::client_ui
