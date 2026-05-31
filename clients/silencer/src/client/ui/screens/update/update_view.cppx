@@ -1,0 +1,189 @@
+#include "client/ui/screens/update/update_view.h"
+
+#include "ui/components/box.h"
+#include "ui/components/button.h"
+#include "ui/components/dialog.h"
+#include "ui/components/text.h"
+
+namespace silencer::client_ui {
+
+using ::ui::children;
+using ::ui::components::Box;
+using ::ui::components::BoxProps;
+using ::ui::components::Button;
+using ::ui::components::ButtonProps;
+using ::ui::components::Dialog;
+using ::ui::components::DialogProps;
+using ::ui::components::Text;
+using ::ui::components::TextProps;
+
+namespace {
+
+::ui::LayoutStyle root_layout() {
+	return ::ui::LayoutStyle{
+		.direction = ::ui::FlexDirection::Column,
+		.align_items = ::ui::AlignItems::Center,
+		.justify_content = ::ui::JustifyContent::Center,
+		.width = ::ui::Length::percent(100.0f),
+		.height = ::ui::Length::percent(100.0f),
+	};
+}
+
+::ui::LayoutStyle dialog_layout() {
+	return ::ui::LayoutStyle{
+		.direction = ::ui::FlexDirection::Column,
+		.align_items = ::ui::AlignItems::Center,
+		.justify_content = ::ui::JustifyContent::Center,
+		.width = ::ui::Length::points(352.0f),
+		.height = ::ui::Length::points(178.0f),
+		.padding = {34.0f, 34.0f, 42.0f, 42.0f},
+		.gap = 12.0f,
+	};
+}
+
+::ui::LayoutStyle status_layout() {
+	return ::ui::LayoutStyle{
+		.width = ::ui::Length::points(284.0f),
+		.height = ::ui::Length::points(42.0f),
+	};
+}
+
+::ui::LayoutStyle progress_layout(bool visible) {
+	if(!visible){
+		return ::ui::LayoutStyle{ .display = ::ui::Display::None };
+	}
+	return ::ui::LayoutStyle{
+		.width = ::ui::Length::points(284.0f),
+		.height = ::ui::Length::points(18.0f),
+	};
+}
+
+::ui::LayoutStyle actions_layout() {
+	return ::ui::LayoutStyle{
+		.direction = ::ui::FlexDirection::Row,
+		.align_items = ::ui::AlignItems::Center,
+		.justify_content = ::ui::JustifyContent::Center,
+		.gap = 6.0f,
+	};
+}
+
+::ui::LayoutStyle button_layout(bool visible) {
+	if(!visible){
+		return ::ui::LayoutStyle{ .display = ::ui::Display::None };
+	}
+	return ::ui::LayoutStyle{
+		.align_items = ::ui::AlignItems::Center,
+		.justify_content = ::ui::JustifyContent::Center,
+		.width = ::ui::Length::points(96.0f),
+		.height = ::ui::Length::points(30.0f),
+		.padding = {14.0f, 14.0f, 6.0f, 6.0f},
+	};
+}
+
+::ui::StyleStatePatch status_style() {
+	return ::ui::patch().text(::ui::TextVisual{
+		.color = {226, 234, 242, 255},
+		.font_id = 133,
+		.font_size = 12,
+		.align = ::ui::TextAlign::Center,
+		.wrap = ::ui::TextWrap::Words,
+	});
+}
+
+::ui::StyleStatePatch progress_style() {
+	return ::ui::patch().text(::ui::TextVisual{
+		.color = {178, 210, 242, 255},
+		.font_id = 133,
+		.font_size = 10,
+		.align = ::ui::TextAlign::Center,
+	});
+}
+
+const char * primary_id(UpdatePrimaryAction action) {
+	switch(action){
+		case UpdatePrimaryAction::Update:
+			return "update.update";
+		case UpdatePrimaryAction::Retry:
+			return "update.retry";
+		case UpdatePrimaryAction::Download:
+			return "update.download";
+		case UpdatePrimaryAction::None:
+		default:
+			return nullptr;
+	}
+}
+
+const char * primary_label(UpdatePrimaryAction action) {
+	switch(action){
+		case UpdatePrimaryAction::Update:
+			return "Update";
+		case UpdatePrimaryAction::Retry:
+			return "Retry";
+		case UpdatePrimaryAction::Download:
+			return "Download";
+		case UpdatePrimaryAction::None:
+		default:
+			return nullptr;
+	}
+}
+
+bool has_progress(const UpdateViewProps& props) {
+	return props.progress && props.progress[0] != '\0';
+}
+
+bool has_primary_action(const UpdateViewProps& props) {
+	return props.primary_action != UpdatePrimaryAction::None;
+}
+
+std::function<void(const ::ui::ActivationEvent&)> primary_callback(const UpdateViewProps& props) {
+	switch(props.primary_action){
+		case UpdatePrimaryAction::Update:
+			return props.on_update;
+		case UpdatePrimaryAction::Retry:
+			return props.on_retry;
+		case UpdatePrimaryAction::Download:
+			return props.on_download;
+		case UpdatePrimaryAction::None:
+		default:
+			return {};
+	}
+}
+
+}  // namespace
+
+::ui::UiElement UpdateView(const UpdateViewProps& props) {
+	return <Box key={props.key} layout={root_layout()}>
+		<Dialog key="dialog" modal={true} layout={dialog_layout()}>
+			<Text key="status" value={props.status} layout={status_layout()} style={status_style()} />
+			<Text
+			  key="progress"
+			  value={props.progress}
+			  disabled={!has_progress(props)}
+			  layout={progress_layout(has_progress(props))}
+			  style={progress_style()}
+			/>
+			<Box key="actions" layout={actions_layout()}>
+				<Button
+				  key="primary"
+				  id={primary_id(props.primary_action)}
+				  label={primary_label(props.primary_action)}
+				  disabled={!has_primary_action(props)}
+				  autofocus={has_primary_action(props)}
+				  onActivate={primary_callback(props)}
+				  layout={button_layout(has_primary_action(props))}
+				/>
+				<Button
+				  key="cancel"
+				  id="update.cancel"
+				  label="Cancel"
+				  disabled={!props.show_cancel}
+				  autofocus={!has_primary_action(props) && props.show_cancel}
+				  onActivate={props.on_cancel}
+				  layout={button_layout(props.show_cancel)}
+				/>
+			</Box>
+		</Dialog>
+	</Box>
+}
+
+}  // namespace silencer::client_ui

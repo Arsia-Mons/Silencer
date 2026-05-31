@@ -1,20 +1,10 @@
 #include "update_screen.h"
 
+#include "client/ui/screens/update/update_view.h"
 #include "screen_context.h"
 #include "game_state.h"
-#include "game.h"
-#include "renderer.h"
-#include "surface.h"
 #include "updater.h"
 #include "updaterstage2.h"
-
-#include "clay/clay.h"
-#include "clay_ui_compositor.h"
-#include "runtime/UiInteractionRegistry.h"
-#include "primitives/button.h"
-#include "primitives/text.h"
-
-#include <SDL3/SDL.h>
 
 #include <cstdio>
 #include <cstdlib>
@@ -22,28 +12,10 @@
 
 namespace update_screen_detail
 {
-using silencer::ui::primitives::Button;
-using silencer::ui::primitives::ButtonHandle;
-using silencer::ui::primitives::ButtonOpts;
-using silencer::ui::primitives::ButtonSize;
-using silencer::ui::primitives::ButtonVariant;
-using silencer::ui::primitives::Text;
-using silencer::ui::primitives::TextSize;
-
-constexpr uint16_t kDialogW = 352;
-constexpr uint16_t kDialogH = 178;
-constexpr uint16_t kDialogPadX = 34;
-constexpr uint16_t kDialogPadY = 42;
-constexpr uint16_t kButtonGap = 6;
 constexpr const char * kActionUpdate = "update.update";
 constexpr const char * kActionCancel = "update.cancel";
 constexpr const char * kActionRetry = "update.retry";
 constexpr const char * kActionDownload = "update.download";
-
-Clay_String FromStd(const std::string & s)
-{
-	return Clay_String{ false, static_cast<int32_t>(s.size()), s.c_str() };
-}
 
 std::string StatusText(ScreenContext & ctx)
 {
@@ -76,6 +48,24 @@ std::string ProgressText(ScreenContext & ctx)
 	for(int i = 0; i < 20; i++) bar += (i < width) ? "=" : " ";
 	bar += "]";
 	return bar;
+}
+
+silencer::client_ui::UpdatePrimaryAction PrimaryAction(ScreenContext & ctx)
+{
+	Updater::State ustate = ctx.updater.GetState();
+	if(ustate == Updater::PROMPTING) return silencer::client_ui::UpdatePrimaryAction::Update;
+	if(ustate == Updater::FAILED && ctx.updater.GetRetryCount() < 3){
+		return silencer::client_ui::UpdatePrimaryAction::Retry;
+	}
+	if(ustate == Updater::FAILED) return silencer::client_ui::UpdatePrimaryAction::Download;
+	return silencer::client_ui::UpdatePrimaryAction::None;
+}
+
+bool ShowCancel(ScreenContext & ctx)
+{
+	Updater::State ustate = ctx.updater.GetState();
+	return ustate == Updater::PROMPTING || ustate == Updater::DOWNLOADING ||
+	       ustate == Updater::FAILED;
 }
 } // namespace update_screen_detail
 
@@ -143,72 +133,32 @@ void UpdateScreen::Tick(ScreenContext & ctx)
 	}
 }
 
-void UpdateScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime, silencer::ui::UiInteractionRegistry& interactions)
+bool UpdateScreen::BuildElement(ScreenContext & ctx, ::ui::UiElement * out)
 {
-	(void)frametime;
-	(void)dst;
-	using namespace silencer::clay_bridge;
-
-
-
-	std::string status = update_screen_detail::StatusText(ctx);
-	std::string progress = update_screen_detail::ProgressText(ctx);
-	Updater::State ustate = ctx.updater.GetState();
-
-	CLAY({ .id = CLAY_ID("UpdateRoot"),
-	       .layout = {
-	           .sizing = { CLAY_SIZING_GROW(0),
-	                       CLAY_SIZING_GROW(0) },
-	           .childAlignment = { CLAY_ALIGN_X_CENTER, CLAY_ALIGN_Y_CENTER },
-	       } }) {
-		CLAY({ .id = CLAY_ID("UpdateDialog"),
-		       .layout = {
-		           .sizing = { CLAY_SIZING_FIXED(update_screen_detail::kDialogW),
-		                       CLAY_SIZING_FIXED(update_screen_detail::kDialogH) },
-		           .padding = { update_screen_detail::kDialogPadX, update_screen_detail::kDialogPadX,
-		                        update_screen_detail::kDialogPadY, update_screen_detail::kDialogPadY },
-		           .childGap = 12,
-		           .childAlignment = { CLAY_ALIGN_X_CENTER, CLAY_ALIGN_Y_CENTER },
-		           .layoutDirection = CLAY_TOP_TO_BOTTOM,
-		       },
-		       .image = { .imageData = PackImage(40, 4) } }) {
-			update_screen_detail::Text(update_screen_detail::FromStd(status),
-			                           { .size = update_screen_detail::TextSize::Heading });
-			if(!progress.empty()){
-				update_screen_detail::Text(update_screen_detail::FromStd(progress),
-				                           { .size = update_screen_detail::TextSize::Heading });
-			}
-			CLAY({ .id = CLAY_ID("UpdateActions"),
-			       .layout = {
-			           .sizing = { CLAY_SIZING_FIT(0), CLAY_SIZING_FIT(0) },
-			           .childGap = update_screen_detail::kButtonGap,
-			           .layoutDirection = CLAY_LEFT_TO_RIGHT,
-			       } }) {
-				if(ustate == Updater::PROMPTING){
-					update_screen_detail::Button(CLAY_STRING("UpdateConsentButton"), CLAY_STRING("Update"),
-					           update_screen_detail::ButtonOpts{ .variant = update_screen_detail::ButtonVariant::Chrome,
-					                                             .size = update_screen_detail::ButtonSize::Compact },
-					           update_screen_detail::ButtonHandle{ nullptr, update_screen_detail::kActionUpdate, &interactions });
-				}else if(ustate == Updater::FAILED && ctx.updater.GetRetryCount() < 3){
-					update_screen_detail::Button(CLAY_STRING("UpdateRetryButton"), CLAY_STRING("Retry"),
-					           update_screen_detail::ButtonOpts{ .variant = update_screen_detail::ButtonVariant::Chrome,
-					                                             .size = update_screen_detail::ButtonSize::Compact },
-					           update_screen_detail::ButtonHandle{ nullptr, update_screen_detail::kActionRetry, &interactions });
-				}else if(ustate == Updater::FAILED){
-					update_screen_detail::Button(CLAY_STRING("UpdateDownloadButton"), CLAY_STRING("Download"),
-					           update_screen_detail::ButtonOpts{ .variant = update_screen_detail::ButtonVariant::Chrome,
-					                                             .size = update_screen_detail::ButtonSize::Compact },
-					           update_screen_detail::ButtonHandle{ nullptr, update_screen_detail::kActionDownload, &interactions });
-				}
-				if(ustate == Updater::PROMPTING || ustate == Updater::DOWNLOADING || ustate == Updater::FAILED){
-					update_screen_detail::Button(CLAY_STRING("UpdateCancelButton"), CLAY_STRING("Cancel"),
-					           update_screen_detail::ButtonOpts{ .variant = update_screen_detail::ButtonVariant::Chrome,
-					                                             .size = update_screen_detail::ButtonSize::Compact },
-					           update_screen_detail::ButtonHandle{ nullptr, update_screen_detail::kActionCancel, &interactions });
-				}
-			}
-		}
-	}
+	if(!out) return false;
+	statusText_ = update_screen_detail::StatusText(ctx);
+	progressText_ = update_screen_detail::ProgressText(ctx);
+	*out = silencer::client_ui::UpdateView(
+		silencer::client_ui::UpdateViewProps{
+			.key = "update",
+			.status = statusText_.c_str(),
+			.progress = progressText_.c_str(),
+			.primary_action = update_screen_detail::PrimaryAction(ctx),
+			.show_cancel = update_screen_detail::ShowCancel(ctx),
+			.on_update = [this](const ::ui::ActivationEvent&) {
+				updateClicked = true;
+			},
+			.on_retry = [this](const ::ui::ActivationEvent&) {
+				retryClicked = true;
+			},
+			.on_download = [this](const ::ui::ActivationEvent&) {
+				downloadClicked = true;
+			},
+			.on_cancel = [this](const ::ui::ActivationEvent&) {
+				cancelClicked = true;
+			},
+		});
+	return true;
 }
 
 void UpdateScreen::Destroy(ScreenContext & ctx)

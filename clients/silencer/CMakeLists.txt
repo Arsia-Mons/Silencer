@@ -51,6 +51,8 @@ cppx_transpile(SILENCER_UI_COMPONENT_GENERATED
 	src/client/ui/screens/options/options_display_view.hx
 	src/client/ui/screens/options/options_menu_view.cppx
 	src/client/ui/screens/options/options_menu_view.hx
+	src/client/ui/screens/update/update_view.cppx
+	src/client/ui/screens/update/update_view.hx
 )
 add_custom_target(silencer_cppx_generated_components
 	DEPENDS ${SILENCER_UI_COMPONENT_GENERATED})
