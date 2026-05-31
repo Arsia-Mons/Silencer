@@ -95,8 +95,8 @@ void GameTechPanelTick(GameTechPanelState & state,
                        World & world,
                        ScreenContext & ctx,
                        LobbyScreen & owner) {
-	const Uint8 localid = owner.TechPanelLocalPeerId(world);
-	Peer * localpeer = owner.TechPanelPeer(world, localid);
+	const Uint8 localid = world.GetLocalPeerId();
+	Peer * localpeer = world.GetPeer(localid);
 	Team * team = world.GetPeerTeam(localid);
 
 	int techslotsleft = 0;
@@ -112,7 +112,7 @@ void GameTechPanelTick(GameTechPanelState & state,
 	}else{
 		state.slotsLeftStr.clear();
 		if(!localpeer && world.tickcount % 12 == 0){
-			owner.TechPanelRequestPeerList(world);
+			world.RequestPeerList();
 		}
 	}
 
@@ -122,7 +122,7 @@ void GameTechPanelTick(GameTechPanelState & state,
 		for(int i = 0; i < 4 && peerindex < 3; i++){
 			if(team->peers[i] == localid) continue;
 			if(i >= team->numpeers){ peerindex++; continue; }
-			Peer * peer = owner.TechPanelPeer(world, team->peers[i]);
+			Peer * peer = world.GetPeer(team->peers[i]);
 			User * user = peer ? world.lobby.GetUserInfo(peer->accountid) : nullptr;
 			state.peerNameStrs[peerindex] = user ? std::string(user->DisplayName()) : std::string();
 			peerindex++;
@@ -160,7 +160,7 @@ void GameTechPanelTick(GameTechPanelState & state,
 			                       || ((localpeer->techchoices & item->techchoice) != 0);
 			if(interactable){
 				const Uint32 newChoices = localpeer->techchoices ^ item->techchoice;
-				owner.TechPanelSetTech(world, newChoices);
+				world.SetTech(newChoices);
 				Config::GetInstance().defaulttechchoices[team->agency] = newChoices;
 				Config::GetInstance().Save();
 			}

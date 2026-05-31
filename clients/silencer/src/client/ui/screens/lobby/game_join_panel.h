@@ -45,7 +45,7 @@ struct GameJoinPanelState {
 	bool techClicked  = false;
 
 	// Cached Ready-button label — recomputed each Tick from
-	// world.gameplaystate / localpeer.ishost / AllPeersDownloadedMap.
+	// world.IsInLobby() / localpeer.ishost / world.AllPeersDownloadedMap().
 	// Pointer-stable across Build calls because it's std::string-owned
 	// on the screen.
 	std::string readyLabel = "Ready";
@@ -57,8 +57,8 @@ struct GameJoinPanelState {
 
 void GameJoinPanelInit(GameJoinPanelState & state);
 
-// Per-frame pump. Recomputes the Ready-button label (legacy
-// `if(world.gameplaystate == INLOBBY) ...` block) and consumes the click
+// Per-frame pump. Recomputes the Ready-button label (the
+// `if(world.IsInLobby()) ...` block) and consumes the click
 // flags — SendReady on Ready, ChangeTeam on Change Team, owner.ShowGameTech
 // on Choose Tech.
 void GameJoinPanelTick(GameJoinPanelState & state,

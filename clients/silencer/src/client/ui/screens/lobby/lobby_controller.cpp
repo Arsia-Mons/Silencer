@@ -6,7 +6,6 @@
 #include "world.h"
 #include "lobby.h"
 #include "lobbygame.h"
-#include "serializer.h"
 #include "config.h"
 #include "ambience_mixer.h"
 #include "map_downloader.h"
@@ -93,10 +92,10 @@ void LobbyScreen::Tick(ScreenContext & ctx)
 	// transition.
 	if(!gameJoinActive && !gameTechActive){
 		if(game.joininggame){
-			if(world.network.state == World::CONNECTED){
+			if(world.IsConnected()){
 				game.joininggame = false;
 			}
-			if(world.network.state == World::IDLE){
+			if(world.IsIdle()){
 				game.joininggame = false;
 				lobby_controller_detail::DismissProgressModal(ctx);
 				ctx.ShowMessage("Unable to join game");
@@ -112,11 +111,11 @@ void LobbyScreen::Tick(ScreenContext & ctx)
 		}
 		if(lobby_controller_detail::TopAsProgressModal(ctx) && world.lobby.creategamestatus != 100 &&
 		   mapDownloader.mapUploadState.load(std::memory_order_relaxed) == 0 &&
-		   (world.network.state == World::CONNECTED || world.network.state == World::IDLE)){
+		   (world.IsConnected() || world.IsIdle())){
 			ctx.PopScreen();
 			game.creategameclicked = false;
 		}
-		if(world.network.state == World::CONNECTED){
+		if(world.IsConnected()){
 			Peer * peer = world.peers.peerlist[world.peers.localpeerid];
 			if(peer){
 				mapDownloader.mapexistchecked = false;
@@ -143,7 +142,7 @@ void LobbyScreen::Tick(ScreenContext & ctx)
 	// Disconnect-from-game modal — fires on the joined-game surface
 	// (gameJoinActive || gameTechActive) when the world drops out of
 	// CONNECTED.
-	if(world.network.state != World::CONNECTED && !lobby_controller_detail::TopIsModal(ctx)){
+	if(!world.IsConnected() && !lobby_controller_detail::TopIsModal(ctx)){
 		if(gameJoinActive || gameTechActive){
 			Game * gamePtr = &game;
 			ctx.ShowMessage("Disconnected from game", [gamePtr]() { gamePtr->GoBack(); });
@@ -195,61 +194,4 @@ bool LobbyScreen::HandleUiIntent(ScreenContext & ctx, const silencer::ui::UiActi
 		return silencer::client_ui::lobby::GameTechPanelHandleUiIntent(gameTechState, action);
 	}
 	return silencer::client_ui::lobby::GameSelectPanelHandleUiIntent(gameSelectState, action);
-}
-
-// Friend-of-World helpers — these are member methods because the lobby
-// panels reach into World private state through the LobbyScreen friend
-// grant. Kept alongside the controller (Tick / HandleUiIntent) since the
-// panel ticks call them.
-
-void LobbyScreen::SeedHostGameInfo(World & world, LobbyGame & lg)
-{
-	Serializer data;
-	lg.Serialize(Serializer::WRITE, data);
-	world.gameinfo.Serialize(Serializer::READ, data);
-}
-
-bool LobbyScreen::JoinPanelInLobby(World & world) const
-{
-	return world.gameplaystate == World::INLOBBY;
-}
-
-bool LobbyScreen::JoinPanelReadyBlocked(World & world) const
-{
-	Peer * localpeer = world.peers.peerlist[world.peers.localpeerid];
-	return localpeer && localpeer->ishost && !world.AllPeersDownloadedMap();
-}
-
-void LobbyScreen::JoinPanelSendReady(World & world)
-{
-	Peer * localpeer = world.peers.peerlist[world.peers.localpeerid];
-	bool ishost = localpeer && localpeer->ishost;
-	if(!ishost || world.AllPeersDownloadedMap()){
-		world.SendReady();
-	}
-}
-
-void LobbyScreen::JoinPanelChangeTeam(World & world)
-{
-	world.ChangeTeam();
-}
-
-Uint8 LobbyScreen::TechPanelLocalPeerId(World & world) const
-{
-	return world.peers.localpeerid;
-}
-
-Peer * LobbyScreen::TechPanelPeer(World & world, Uint8 peerid) const
-{
-	return world.peers.peerlist[peerid];
-}
-
-void LobbyScreen::TechPanelRequestPeerList(World & world)
-{
-	world.RequestPeerList();
-}
-
-void LobbyScreen::TechPanelSetTech(World & world, Uint32 techchoices)
-{
-	world.SetTech(techchoices);
 }

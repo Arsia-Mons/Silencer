@@ -64,7 +64,8 @@ Clay_String FromStd(const std::string & s) {
 void BuildTechTreeGrid(World & world,
                        LobbyScreen & owner,
                        silencer::ui::UiInteractionRegistry& interactions) {
-	const Uint8 localid = owner.TechPanelLocalPeerId(world);
+	(void)owner;  // uniform panel signature; grid reads world directly
+	const Uint8 localid = world.GetLocalPeerId();
 	Team * team = world.GetPeerTeam(localid);
 
 	CLAY({ .id = CLAY_ID("GTechGridWrap"),
@@ -117,7 +118,7 @@ void BuildTechTreeGrid(World & world,
 				       } }) {
 					if(!cols[col].draw) continue;
 					const ColAssign & ca = cols[col];
-					Peer * peer = owner.TechPanelPeer(world, team->peers[ca.peerSlot]);
+					Peer * peer = world.GetPeer(team->peers[ca.peerSlot]);
 
 					int techslotsleft = 0;
 					if(ca.isLocal && peer){
@@ -198,7 +199,7 @@ void BuildTechTreeGrid(World & world,
 				const int localColSlot = 3;
 				const ColAssign & lc = cols[localColSlot];
 				if(lc.draw){
-					Peer * peer = owner.TechPanelPeer(world, team->peers[lc.peerSlot]);
+					Peer * peer = world.GetPeer(team->peers[lc.peerSlot]);
 					int techslotsleft = 0;
 					if(peer){
 						User * user = world.lobby.GetUserInfo(peer->accountid);

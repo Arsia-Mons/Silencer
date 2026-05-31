@@ -50,5 +50,5 @@ void ScreenContext::ShowMessage(const char * msg, std::function<void()> onClose)
 void ScreenContext::ResetPresentation(int paletteIdx) {
 	renderer.palette.SetPalette(paletteIdx);
 	game.GetScreenBuffer().Clear(0);
-	game.gameRenderer.SetColors(renderer.palette.GetColors());
+	game.SetRenderPaletteColors(renderer.palette.GetColors());
 }

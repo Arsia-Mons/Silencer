@@ -89,6 +89,7 @@ void GameCreatePanelTick(GameCreatePanelState & state,
                          World & world,
                          ScreenContext & ctx,
                          LobbyScreen & owner) {
+	(void)owner;  // uniform panel signature; create flow drives world directly
 	MapDownloader & mapDownloader = ctx.mapDownloader;
 	Game & game = ctx.game;
 
@@ -136,7 +137,7 @@ void GameCreatePanelTick(GameCreatePanelState & state,
 		game.creategameclicked = false;
 		LobbyGame * lobbygame = world.lobby.GetGameById(world.lobby.createdgameid);
 		if(lobbygame){
-			owner.SeedHostGameInfo(world, *lobbygame);
+			world.SeedGameInfo(*lobbygame);
 			game.JoinGame(*lobbygame, lobbygame->password);
 			mapDownloader.LoadMapData(mapDownloader.FindMap(lobbygame->mapname, &lobbygame->maphash).c_str());
 			game.currentlobbygameid = lobbygame->id;

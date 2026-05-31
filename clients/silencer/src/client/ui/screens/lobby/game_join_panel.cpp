@@ -85,8 +85,11 @@ void GameJoinPanelTick(GameJoinPanelState & state,
                        World & world,
                        ScreenContext & ctx,
                        LobbyScreen & owner) {
-	if(owner.JoinPanelInLobby(world)){
-		state.readyLabel = owner.JoinPanelReadyBlocked(world) ? "Waiting..." : "Ready";
+	Peer * localpeer = world.GetPeer(world.GetLocalPeerId());
+	bool isHost = localpeer && localpeer->ishost;
+	if(world.IsInLobby()){
+		bool readyBlocked = isHost && !world.AllPeersDownloadedMap();
+		state.readyLabel = readyBlocked ? "Waiting..." : "Ready";
 	}else{
 		state.readyLabel = "Ready";
 	}
@@ -126,11 +129,11 @@ void GameJoinPanelTick(GameJoinPanelState & state,
 	}
 	if(state.readyClicked){
 		state.readyClicked = false;
-		owner.JoinPanelSendReady(world);
+		if(!isHost || world.AllPeersDownloadedMap()) world.SendReady();
 	}
 	if(state.teamClicked){
 		state.teamClicked = false;
-		owner.JoinPanelChangeTeam(world);
+		world.ChangeTeam();
 	}
 }
 

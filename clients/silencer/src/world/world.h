@@ -160,6 +160,15 @@ class World {
     void   StoreMapChunk(unsigned char * data, Uint32 offset, Uint32 size);
     bool   SecurityIDCanSpawn(Uint8 securityid);
 
+    // Lobby / pre-match commands (local-player -> authority). Promoted from
+    // private in SIL-8 to join the public ChangeTeam/SetTech family; the
+    // authority-side receive handlers (peerid overloads) stay private.
+    void   SendReady()                                   { replication.SendReady(); }
+    void   RequestPeerList()                             { peers.RequestPeerList(); }
+    bool   AllPeersDownloadedMap()                       { return replication.AllPeersDownloadedMap(); }
+    bool   IsInLobby() const                             { return gameplaystate == INLOBBY; }
+    void   SeedGameInfo(LobbyGame & lg);
+
     // World state (public members)
     Input  localinput;
     Map    map;
@@ -190,7 +199,7 @@ class World {
     // Friends
     friend class Renderer;        friend class Game;
     friend class GameRenderer;    friend class GameInput;
-    friend class GameUiPipeline;  friend class GameSession;
+    friend class GameSession;
     friend class WorldMessaging;  friend class WorldObjectRegistry;
     friend class WorldNetwork;    friend class WorldPeerRegistry;
     friend class WorldReplication;
@@ -204,7 +213,7 @@ class World {
     friend class Grenade;         friend class BaseDoor;
     friend class Terminal;        friend class PlayerAI;
     friend class Replay;          friend class Audio;
-    friend class TriggerGraph;    friend class LobbyScreen;
+    friend class TriggerGraph;
 
     protected:
     void   SaveSnapshot(Serializer & data, Uint8 peerid)                                    { replication.SaveSnapshot(data, peerid); }
@@ -229,13 +238,10 @@ class World {
     void LoadMapData(const char * filename);
     void SendGameInfo(Uint8 peerid)                      { replication.SendGameInfo(peerid); }
     void SendGameInfoLoaded()                            { replication.SendGameInfoLoaded(); }
-    void SendReady()                                     { replication.SendReady(); }
     bool AllPeersReady(Uint8 except)                     { return replication.AllPeersReady(except); }
     bool AllPeersLoadedGameInfo()                        { return replication.AllPeersLoadedGameInfo(); }
-    bool AllPeersDownloadedMap()                         { return replication.AllPeersDownloadedMap(); }
     char * CreateStatusString(const char * status, Uint8 color = 0, Uint8 duration = 100)   { return messaging.CreateStatusString(status, color, duration); }
     void   PushStatusString(char * statusstring)         { messaging.PushStatusString(statusstring); }
-    void   RequestPeerList()                             { peers.RequestPeerList(); }
     void   SendSnapshots()                               { replication.SendSnapshots(); }
     void   SendPeerList(Uint8 peerid = 0)                { peers.SendPeerList(peerid); }
     void   ReadPeerList(Serializer & data)               { peers.ReadPeerList(data); }

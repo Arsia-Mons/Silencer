@@ -33,7 +33,6 @@ bool HandleSDLEvents();
 void LoadProgressCallback(int progress, int totalprogressitems);
 
 friend class Audio;
-friend class ScreenContext;
 friend class GameRenderer;
 friend class GameInput;
 friend class GameUiPipeline;
@@ -60,6 +59,12 @@ bool ResizeRenderSurfacePixels(int width, int height);
 bool SyncRenderSurfaceToWindowPixels();
 bool IsLiveMultiplayer() const;
 bool GoBack();
+// State transition entry point. Public so ScreenContext / screens can drive
+// navigation without a friend grant (SIL-8); ~21 internal callers unchanged.
+void GoToState(Uint8 newstate);
+// Push the active palette colors into the render backend. Hides the private
+// gameRenderer behind a public command, closing ScreenContext::ResetPresentation.
+void SetRenderPaletteColors(SDL_Color * colors) { gameRenderer.SetColors(colors); }
 struct PendingWait {
 ControlCommand cmd;
 Uint64 deadline_ms = 0;
@@ -101,7 +106,6 @@ void TickJoinGame();
 void TickTestGame();
 void TickReplayGame();
 void Present();
-void GoToState(Uint8 newstate);
 void DrainControlQueue();
 void PostFrameReplies();
 

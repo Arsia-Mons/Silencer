@@ -41,27 +41,6 @@ public:
 	void ShowGameJoin(ScreenContext & ctx);
 	void ShowGameTech(ScreenContext & ctx);
 
-	// Friend-of-World helper: seeds `world.gameinfo` from the lobby record
-	// of the newly created game so the host's SendGameInfo path can push
-	// it to the dedicated server. Mirrors the legacy LobbyScreen::Tick
-	// host-side gameinfo seeding. Called from GameCreatePanelTick.
-	void SeedHostGameInfo(class World & world, class LobbyGame & lg);
-
-	// Friend-of-World helpers used by the GameJoin panel. The free
-	// function in game_join_panel.cpp cannot reach World's private
-	// peerlist/localpeerid/AllPeersDownloadedMap/SendReady/ChangeTeam, so
-	// the panel routes those calls through these member methods.
-	bool JoinPanelInLobby(class World & world) const;
-	bool JoinPanelReadyBlocked(class World & world) const;
-	void JoinPanelSendReady(class World & world);
-	void JoinPanelChangeTeam(class World & world);
-
-	// Friend-of-World helpers used by the GameTech panel.
-	Uint8 TechPanelLocalPeerId(class World & world) const;
-	class Peer * TechPanelPeer(class World & world, Uint8 peerid) const;
-	void TechPanelRequestPeerList(class World & world);
-	void TechPanelSetTech(class World & world, Uint32 techchoices);
-
 private:
 	// Per-frame state for the chrome tree. Strings live on the screen so the
 	// layout pass can hold pointers that remain valid until the frame ends.
