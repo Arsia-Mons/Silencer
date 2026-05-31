@@ -61,6 +61,17 @@ unit + env file + Mongo/LavinMQ co-location are described in
   `socket.handshake.auth.token`. `liveState` +
   `onlinePlayers` / `activeGames` `Map`s are the in-memory
   snapshot fanned via `snapshot` / per-event broadcasts.
+  `setLiveStateListener(fn)` registers one observer, called
+  with `(players, games)` on the count-changing events — the
+  Discord presence updater hooks in here.
+- `src/discord/presence.js` — Discord **live-stats bot**: shows
+  "Watching N players · M games" as the bot's presence line.
+  Raw gateway WebSocket (Bun native), **no discord.js** — presence
+  is a gateway-only op, so it adds zero deps. Driven entirely by
+  `ws/index.js`'s existing live counts (no extra consumer/poll).
+  Needs `DISCORD_TOKEN`; empty = presence disabled (counts logged
+  on change, nothing connects). Presence sends are throttled to
+  one per 5 s (Discord allows ~5 / 20 s).
 - `src/amqp/consumer.js` — single durable topic queue
   `admin-dashboard` bound to `silencer.events` with `#`.
   Each message: `persistEvent` (Mongo write) **then**

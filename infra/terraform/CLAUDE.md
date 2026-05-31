@@ -156,6 +156,7 @@ teammates with IAM read access pull from the same source.
 | `/silencer/admin/jwt_secret`                   | SecureString | admin-api                                    | **Runtime fetch (IAM role)**    |
 | `/silencer/admin/cloudflare_tunnel_token`      | SecureString | `cloudflared service install` (one-shot)     | TF data → user_data             |
 | `/silencer/admin/github_backup_token`          | SecureString | admin-api (optional; empty = backups off)    | **Runtime fetch (IAM role)**    |
+| `/silencer/admin/discord_token`                | SecureString | admin-api (optional; empty = presence off)   | **Runtime fetch (IAM role)**    |
 
 **Two mechanisms because of two different needs**:
 *TF data* values get baked into resources at apply time and end up in

@@ -3,6 +3,9 @@ export const MONGO_URL = process.env.MONGO_URL || 'mongodb://localhost:28017/sil
 export const AMQP_URL = process.env.AMQP_URL || 'amqp://silencer:silencer@localhost:25672/';
 export const JWT_SECRET = process.env.JWT_SECRET || 'changeme-in-production';
 export const JWT_EXPIRES_IN = '8h';
+// Discord bot token for the live-stats presence line. Empty = presence
+// disabled (counts are logged on change but nothing connects to Discord).
+export const DISCORD_TOKEN = process.env.DISCORD_TOKEN || '';
 export const LOBBY_PLAYER_AUTH_URL = process.env.LOBBY_PLAYER_AUTH_URL || 'http://localhost:15171';
 export const LOBBY_MAP_API_URL = process.env.LOBBY_MAP_API_URL || 'http://localhost:15172';
 // Path to shared/assets directory (game binary assets).  Set via ASSETS_DIR env var in production.
