@@ -94,6 +94,10 @@ fail_if_match \
   "$REPO_ROOT/clients/silencer/src/ui/CLAUDE.md"
 
 fail_if_match \
+  "set_flag\\(|set_index\\(|focus_index\\(|copy_to\\(|copy_ui_text\\(|&state->" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens/lobby/lobby_view.cppx"
+
+fail_if_match \
   "clay_bridge::(EnsureInitialized|Render)[[:space:]]*\\(" \
   "$REPO_ROOT/clients/silencer/src/client/ui/screens" \
   "$REPO_ROOT/clients/silencer/src/client/ui/modals" \
