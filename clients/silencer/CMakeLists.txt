@@ -394,6 +394,25 @@ if(MSVC)
 endif()
 add_test(NAME texture_registry_tests COMMAND texture_registry_tests)
 
+# DrawCommand IR -> pixels executor, verified by headless pixel readback.
+add_executable(draw_executor_tests
+	tests/draw_executor_tests.cpp
+	src/render/cppx_ui/draw_executor.cpp
+	src/render/cppx_ui/sdf_raster.cpp
+	src/render/cppx_ui/font_registry.cpp
+	src/render/cppx_ui/texture_registry.cpp
+	src/ui/runtime/draw_command.cpp
+	src/ui/runtime/geometry.cpp)
+target_compile_features(draw_executor_tests PRIVATE cxx_std_20)
+target_include_directories(draw_executor_tests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src")
+target_link_libraries(draw_executor_tests PRIVATE SDL3::SDL3 SDL3_ttf::SDL3_ttf)
+target_compile_definitions(draw_executor_tests PRIVATE
+	SILENCER_TEST_FONT_DIR="${SILENCER_SHARED_DIR}/fonts")
+if(MSVC)
+	target_compile_definitions(draw_executor_tests PRIVATE NOMINMAX)
+endif()
+add_test(NAME draw_executor_tests COMMAND draw_executor_tests)
+
 # /Z7 embeds debug info into .obj files instead of routing it through MSVC's
 # mspdbsrv.exe — which has a habit of failing with C1090 PDB errors on some
 # Windows installs. /Zi (the default) is faster but unreliable; /Z7 is rock
