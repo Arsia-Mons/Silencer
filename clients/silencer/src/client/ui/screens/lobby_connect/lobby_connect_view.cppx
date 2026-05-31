@@ -1,0 +1,213 @@
+#include "client/ui/screens/lobby_connect/lobby_connect_view.h"
+
+#include "ui/components/box.h"
+#include "ui/components/button.h"
+#include "ui/components/input.h"
+#include "ui/components/text.h"
+
+namespace silencer::client_ui {
+
+using ::ui::children;
+using ::ui::components::Box;
+using ::ui::components::BoxProps;
+using ::ui::components::Button;
+using ::ui::components::ButtonProps;
+using ::ui::components::Input;
+using ::ui::components::InputProps;
+using ::ui::components::Text;
+using ::ui::components::TextProps;
+
+namespace {
+
+::ui::LayoutStyle root_layout() {
+	return ::ui::LayoutStyle{
+		.direction = ::ui::FlexDirection::Column,
+		.align_items = ::ui::AlignItems::Center,
+		.justify_content = ::ui::JustifyContent::Center,
+		.width = ::ui::Length::percent(100.0f),
+		.height = ::ui::Length::percent(100.0f),
+	};
+}
+
+::ui::LayoutStyle panel_layout() {
+	return ::ui::LayoutStyle{
+		.direction = ::ui::FlexDirection::Column,
+		.align_items = ::ui::AlignItems::Stretch,
+		.width = ::ui::Length::points(284.0f),
+		.height = ::ui::Length::points(277.0f),
+		.padding = {12.0f, 12.0f, 8.0f, 8.0f},
+		.gap = 7.0f,
+	};
+}
+
+::ui::StyleStatePatch panel_style() {
+	return ::ui::patch()
+		.background(::ui::Color{31, 36, 44, 248})
+		.border(::ui::Border{
+			.width = {1.0f, 1.0f, 1.0f, 1.0f},
+			.color = {
+				{74, 86, 102, 255},
+				{74, 86, 102, 255},
+				{74, 86, 102, 255},
+				{74, 86, 102, 255},
+			},
+		});
+}
+
+::ui::LayoutStyle log_layout() {
+	return ::ui::LayoutStyle{
+		.direction = ::ui::FlexDirection::Column,
+		.align_items = ::ui::AlignItems::Start,
+		.width = ::ui::Length::points(250.0f),
+		.height = ::ui::Length::points(170.0f),
+		.gap = 0.0f,
+	};
+}
+
+::ui::LayoutStyle log_line_layout() {
+	return ::ui::LayoutStyle{
+		.width = ::ui::Length::points(250.0f),
+		.height = ::ui::Length::points(11.0f),
+	};
+}
+
+::ui::LayoutStyle form_layout() {
+	return ::ui::LayoutStyle{
+		.direction = ::ui::FlexDirection::Column,
+		.gap = 6.0f,
+	};
+}
+
+::ui::LayoutStyle form_row_layout() {
+	return ::ui::LayoutStyle{
+		.direction = ::ui::FlexDirection::Row,
+		.align_items = ::ui::AlignItems::Center,
+		.height = ::ui::Length::points(21.0f),
+	};
+}
+
+::ui::LayoutStyle label_layout() {
+	return ::ui::LayoutStyle{
+		.width = ::ui::Length::points(86.0f),
+		.height = ::ui::Length::points(21.0f),
+	};
+}
+
+::ui::LayoutStyle input_layout() {
+	return ::ui::LayoutStyle{
+		.align_items = ::ui::AlignItems::Stretch,
+		.justify_content = ::ui::JustifyContent::Center,
+		.width = ::ui::Length::points(183.0f),
+		.height = ::ui::Length::points(21.0f),
+		.padding = {7.0f, 7.0f, 3.0f, 3.0f},
+	};
+}
+
+::ui::LayoutStyle actions_layout() {
+	return ::ui::LayoutStyle{
+		.direction = ::ui::FlexDirection::Row,
+		.align_items = ::ui::AlignItems::Center,
+		.justify_content = ::ui::JustifyContent::Center,
+		.height = ::ui::Length::points(33.0f),
+		.gap = 0.0f,
+	};
+}
+
+::ui::LayoutStyle button_layout() {
+	return ::ui::LayoutStyle{
+		.align_items = ::ui::AlignItems::Center,
+		.justify_content = ::ui::JustifyContent::Center,
+		.width = ::ui::Length::points(112.0f),
+		.height = ::ui::Length::points(28.0f),
+		.padding = {10.0f, 10.0f, 5.0f, 5.0f},
+	};
+}
+
+::ui::StyleStatePatch label_style() {
+	return ::ui::patch().text(::ui::TextVisual{
+		.color = {226, 234, 242, 255},
+		.font_id = 133,
+		.font_size = 8,
+		.align = ::ui::TextAlign::Center,
+	});
+}
+
+::ui::StyleStatePatch log_style() {
+	return ::ui::patch().text(::ui::TextVisual{
+		.color = {226, 234, 242, 255},
+		.font_id = 133,
+		.font_size = 6,
+	});
+}
+
+}  // namespace
+
+::ui::UiElement LobbyConnectView(const LobbyConnectViewProps& props) {
+	return <Box key={props.key} layout={root_layout()}>
+		<Box key="panel" layout={panel_layout()} style={panel_style()}>
+			<Box key="log" layout={log_layout()}>
+				<Text key="log-00" value={props.log_lines[0]} layout={log_line_layout()} style={log_style()} />
+				<Text key="log-01" value={props.log_lines[1]} layout={log_line_layout()} style={log_style()} />
+				<Text key="log-02" value={props.log_lines[2]} layout={log_line_layout()} style={log_style()} />
+				<Text key="log-03" value={props.log_lines[3]} layout={log_line_layout()} style={log_style()} />
+				<Text key="log-04" value={props.log_lines[4]} layout={log_line_layout()} style={log_style()} />
+				<Text key="log-05" value={props.log_lines[5]} layout={log_line_layout()} style={log_style()} />
+				<Text key="log-06" value={props.log_lines[6]} layout={log_line_layout()} style={log_style()} />
+				<Text key="log-07" value={props.log_lines[7]} layout={log_line_layout()} style={log_style()} />
+				<Text key="log-08" value={props.log_lines[8]} layout={log_line_layout()} style={log_style()} />
+				<Text key="log-09" value={props.log_lines[9]} layout={log_line_layout()} style={log_style()} />
+				<Text key="log-10" value={props.log_lines[10]} layout={log_line_layout()} style={log_style()} />
+				<Text key="log-11" value={props.log_lines[11]} layout={log_line_layout()} style={log_style()} />
+				<Text key="log-12" value={props.log_lines[12]} layout={log_line_layout()} style={log_style()} />
+				<Text key="log-13" value={props.log_lines[13]} layout={log_line_layout()} style={log_style()} />
+				<Text key="log-14" value={props.log_lines[14]} layout={log_line_layout()} style={log_style()} />
+			</Box>
+			<Box key="form" layout={form_layout()}>
+				<Box key="username-row" layout={form_row_layout()}>
+					<Text key="username-label" value="Username" layout={label_layout()} style={label_style()} />
+					<Input
+					  key="username"
+					  id="lobby_connect.username"
+					  value={props.username}
+					  disabled={props.inactive}
+					  autofocus={true}
+					  onChange={props.on_username_change}
+					  onActivate={props.on_login}
+					  layout={input_layout()}
+					/>
+				</Box>
+				<Box key="password-row" layout={form_row_layout()}>
+					<Text key="password-label" value="Password" layout={label_layout()} style={label_style()} />
+					<Input
+					  key="password"
+					  id="lobby_connect.password"
+					  value={props.password}
+					  password={true}
+					  disabled={props.inactive}
+					  onChange={props.on_password_change}
+					  onActivate={props.on_login}
+					  layout={input_layout()}
+					/>
+				</Box>
+			</Box>
+			<Box key="actions" layout={actions_layout()}>
+				<Button
+				  key="login"
+				  id="lobby_connect.login"
+				  label="Login/Create"
+				  onActivate={props.on_login}
+				  layout={button_layout()}
+				/>
+				<Button
+				  key="cancel"
+				  id="lobby_connect.cancel"
+				  label="Cancel"
+				  onActivate={props.on_cancel}
+				  layout={button_layout()}
+				/>
+			</Box>
+		</Box>
+	</Box>
+}
+
+}  // namespace silencer::client_ui
