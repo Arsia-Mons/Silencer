@@ -1,19 +1,28 @@
 #pragma once
 
 #include "ui/components/common.h"
+#include "ui/runtime/react.h"
 
 #include <functional>
 
 namespace silencer::client_ui {
 
-struct OptionsDisplayViewProps {
-	const char * key = nullptr;
+struct OptionsDisplayContextValue {
 	bool fullscreen = false;
 	bool smooth_scaling = false;
-	std::function<void(bool)> on_fullscreen = {};
-	std::function<void(bool)> on_smooth_scaling = {};
-	std::function<void(const ::ui::ActivationEvent&)> on_save = {};
-	std::function<void(const ::ui::ActivationEvent&)> on_cancel = {};
+	std::function<void()> toggle_fullscreen = {};
+	std::function<void()> toggle_smooth_scaling = {};
+	std::function<void()> save = {};
+	std::function<void()> cancel = {};
+};
+
+extern ::ReactContext OptionsDisplayContext;
+
+const OptionsDisplayContextValue& UseOptionsDisplay();
+
+struct OptionsDisplayViewProps {
+	const char * key = nullptr;
+	const OptionsDisplayContextValue * value = nullptr;
 };
 
 ::ui::UiElement OptionsDisplayView(const OptionsDisplayViewProps& props);

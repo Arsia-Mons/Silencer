@@ -1,5 +1,7 @@
 #include "client/ui/screens/options/options_display_view.h"
 
+#include "client/ui/navigation/NavigationProvider.h"
+#include "game_state.h"
 #include "ui/components/box.h"
 #include "ui/components/button.h"
 #include "ui/components/checkbox.h"
@@ -99,9 +101,43 @@ namespace {
 	});
 }
 
-}  // namespace
+std::function<void(bool)> toggle_fullscreen_callback(const OptionsDisplayContextValue& display) {
+	return [display](bool) {
+		if(display.toggle_fullscreen) display.toggle_fullscreen();
+	};
+}
 
-::ui::UiElement OptionsDisplayView(const OptionsDisplayViewProps& props) {
+std::function<void(bool)> toggle_smooth_scaling_callback(const OptionsDisplayContextValue& display) {
+	return [display](bool) {
+		if(display.toggle_smooth_scaling) display.toggle_smooth_scaling();
+	};
+}
+
+std::function<void(const ::ui::ActivationEvent&)> save_callback(
+	const OptionsDisplayContextValue& display,
+	Navigation navigation) {
+	return [display, navigation](const ::ui::ActivationEvent&) {
+		if(display.save) display.save();
+		if(navigation.goToState) navigation.goToState(GameState::OPTIONS);
+	};
+}
+
+std::function<void(const ::ui::ActivationEvent&)> cancel_callback(
+	const OptionsDisplayContextValue& display,
+	Navigation navigation) {
+	return [display, navigation](const ::ui::ActivationEvent&) {
+		if(display.cancel) display.cancel();
+		if(navigation.goToState) navigation.goToState(GameState::OPTIONS);
+	};
+}
+
+struct OptionsDisplayFrameProps {
+	const char * key = nullptr;
+};
+
+::ui::UiElement OptionsDisplayFrame(const OptionsDisplayFrameProps& props) {
+	const OptionsDisplayContextValue& display = UseOptionsDisplay();
+	Navigation navigation = UseNavigation();
 	return <Box key={props.key} layout={root_layout()} style={root_style()}>
 		<Box key="panel" layout={panel_layout()}>
 			<Text key="title" value="Display Options" layout={title_layout()} style={title_style()} />
@@ -110,17 +146,17 @@ namespace {
 				  key="fullscreen"
 				  id="options_display.fullscreen"
 				  label="Fullscreen"
-				  checked={props.fullscreen}
+				  checked={display.fullscreen}
 				  autofocus={true}
-				  onChange={props.on_fullscreen}
+				  onChange={toggle_fullscreen_callback(display)}
 				  layout={setting_layout()}
 				/>
 				<Checkbox
 				  key="smooth-scaling"
 				  id="options_display.smooth_scaling"
 				  label="Smooth Scaling"
-				  checked={props.smooth_scaling}
-				  onChange={props.on_smooth_scaling}
+				  checked={display.smooth_scaling}
+				  onChange={toggle_smooth_scaling_callback(display)}
 				  layout={setting_layout()}
 				/>
 			</Box>
@@ -129,19 +165,46 @@ namespace {
 				  key="save"
 				  id="options_display.save"
 				  label="Save"
-				  onActivate={props.on_save}
+				  onActivate={save_callback(display, navigation)}
 				  layout={action_button_layout()}
 				/>
 				<Button
 				  key="cancel"
 				  id="options_display.cancel"
 				  label="Cancel"
-				  onActivate={props.on_cancel}
+				  onActivate={cancel_callback(display, navigation)}
 				  layout={action_button_layout()}
 				/>
 			</Box>
 		</Box>
 	</Box>
+}
+
+}  // namespace
+
+::ReactContext OptionsDisplayContext = {};
+
+namespace {
+const OptionsDisplayContextValue kEmptyOptionsDisplay = {};
+}
+
+const OptionsDisplayContextValue& UseOptionsDisplay() {
+	const auto * value = static_cast<const OptionsDisplayContextValue *>(
+		::use_context(&OptionsDisplayContext));
+	return value ? *value : kEmptyOptionsDisplay;
+}
+
+::ui::UiElement OptionsDisplayView(const OptionsDisplayViewProps& props) {
+	return ::ui::provider(
+		"OptionsDisplayProvider",
+		&OptionsDisplayContext,
+		const_cast<OptionsDisplayContextValue *>(props.value),
+		children({
+			::ui::component("OptionsDisplayFrame",
+			                OptionsDisplayFrameProps{ .key = "frame" },
+			                OptionsDisplayFrame),
+		}),
+		props.key);
 }
 
 }  // namespace silencer::client_ui
