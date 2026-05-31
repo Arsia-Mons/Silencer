@@ -24,7 +24,7 @@ public:
 
 	void Build(ScreenContext & ctx) override;
 	void Tick(ScreenContext & ctx) override;
-	void BuildUi(ScreenContext & ctx, Surface & dst, float frametime, silencer::ui::UiInteractionRegistry& interactions) override;
+	bool BuildElement(ScreenContext & ctx, ::ui::UiElement * out) override;
 	void Destroy(ScreenContext & ctx) override;
 	bool HandleBack(ScreenContext & ctx) override;
 	bool HandleUiIntent(ScreenContext & ctx, const silencer::ui::UiAction & action) override;
@@ -69,6 +69,7 @@ private:
 	std::string version;
 	std::string mapName;
 	bool goBackClicked = false;
+	bool chatSendClicked = false;
 
 	// CharacterPanel state — agency selection persisted via Config +
 	// World::SetAgency on change.

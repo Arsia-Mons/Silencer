@@ -1,0 +1,1080 @@
+#include "client/ui/screens/lobby/lobby_view.h"
+
+#include "client/ui/screens/lobby/character_panel.h"
+#include "client/ui/screens/lobby/chat_panel.h"
+#include "client/ui/screens/lobby/game_create_panel.h"
+#include "client/ui/screens/lobby/game_join_panel.h"
+#include "client/ui/screens/lobby/game_select_panel.h"
+#include "client/ui/screens/lobby/game_tech_panel.h"
+#include "lobby.h"
+#include "lobbygame.h"
+#include "peer.h"
+#include "team.h"
+#include "user.h"
+#include "world.h"
+#include "stations/buyableitem.h"
+
+#include "ui/components/box.h"
+#include "ui/components/button.h"
+#include "ui/components/input.h"
+#include "ui/components/text.h"
+#include "ui/runtime/react.h"
+
+#include <algorithm>
+#include <cstring>
+#include <string>
+
+namespace silencer::client_ui::lobby {
+
+using ::ui::children;
+using ::ui::components::Box;
+using ::ui::components::BoxProps;
+using ::ui::components::Button;
+using ::ui::components::ButtonProps;
+using ::ui::components::Input;
+using ::ui::components::InputProps;
+using ::ui::components::Text;
+using ::ui::components::TextProps;
+
+::ReactContext LobbyContext = {};
+
+namespace {
+
+constexpr int kVisibleChatLines = 8;
+constexpr int kVisiblePresenceLines = 7;
+const LobbyContextValue kEmptyContext = {};
+
+const char * kAgencyNames[] = {
+	"Noxis",
+	"Lazarus",
+	"Caliber",
+	"Static",
+	"Black Rose",
+};
+
+const char * safe_text(const char * value) {
+	return value ? value : "";
+}
+
+const char * agency_name(int agency) {
+	if(agency < 0 || agency >= static_cast<int>(sizeof(kAgencyNames) / sizeof(kAgencyNames[0]))){
+		return "Unknown";
+	}
+	return kAgencyNames[agency];
+}
+
+void copy_ui_text(char * dst, int dst_len, const std::string& value) {
+	if(!dst || dst_len <= 0) return;
+	int n = static_cast<int>(value.size());
+	if(n > dst_len - 1) n = dst_len - 1;
+	std::memcpy(dst, value.data(), static_cast<size_t>(n));
+	dst[n] = '\0';
+}
+
+std::function<void(const std::string&)> copy_to(char * dst, int dst_len) {
+	return [dst, dst_len](const std::string& value) {
+		copy_ui_text(dst, dst_len, value);
+	};
+}
+
+std::function<void(const ::ui::ActivationEvent&)> set_flag(bool * flag) {
+	return [flag](const ::ui::ActivationEvent&) {
+		if(flag) *flag = true;
+	};
+}
+
+std::function<void(const ::ui::ActivationEvent&)> set_index(int * target, int value) {
+	return [target, value](const ::ui::ActivationEvent&) {
+		if(target) *target = value;
+	};
+}
+
+std::function<void(const ::ui::ActivationEvent&)> scroll_rows(Uint16 * position,
+                                                               int total,
+                                                               int visible,
+                                                               int delta) {
+	return [position, total, visible, delta](const ::ui::ActivationEvent&) {
+		if(!position) return;
+		int max_scroll = total - visible;
+		if(max_scroll < 0) max_scroll = 0;
+		int next = static_cast<int>(*position) + delta;
+		if(next < 0) next = 0;
+		if(next > max_scroll) next = max_scroll;
+		*position = static_cast<Uint16>(next);
+	};
+}
+
+std::function<void(const ::ui::FocusEvent&)> focus_index(int * target, int value) {
+	return [target, value](const ::ui::FocusEvent&) {
+		if(target) *target = value;
+	};
+}
+
+std::function<void(const ::ui::KeyEvent&)> submit_on_enter(bool * flag) {
+	return [flag](const ::ui::KeyEvent& event) {
+		if(event.key == ::ui::UiKey::Enter && flag) *flag = true;
+	};
+}
+
+::ui::Border panel_border(::ui::Color color) {
+	return ::ui::Border{
+		.width = {1.0f, 1.0f, 1.0f, 1.0f},
+		.color = {color, color, color, color},
+	};
+}
+
+::ui::StyleStatePatch root_style() {
+	return ::ui::patch().background(::ui::Color{9, 13, 18, 255});
+}
+
+::ui::StyleStatePatch panel_style() {
+	return ::ui::patch()
+		.background(::ui::Color{25, 31, 38, 245})
+		.border(panel_border(::ui::Color{78, 92, 108, 255}));
+}
+
+::ui::StyleStatePatch inner_panel_style() {
+	return ::ui::patch()
+		.background(::ui::Color{16, 21, 27, 232})
+		.border(panel_border(::ui::Color{52, 63, 76, 255}));
+}
+
+::ui::StyleStatePatch row_style(bool selected) {
+	if(!selected) return {};
+	return ::ui::patch()
+		.background(::ui::Color{64, 82, 92, 255})
+		.border(panel_border(::ui::Color{178, 198, 142, 255}));
+}
+
+::ui::StyleStatePatch text_style(::ui::Color color,
+                                 ::ui::TextAlign align = ::ui::TextAlign::Left,
+                                 ::ui::TextWrap wrap = ::ui::TextWrap::None,
+                                 int font_size = 7) {
+	return ::ui::patch().text(::ui::TextVisual{
+		.color = color,
+		.font_id = 133,
+		.font_size = static_cast<uint16_t>(font_size),
+		.align = align,
+		.wrap = wrap,
+	});
+}
+
+::ui::StyleStatePatch heading_style() {
+	return text_style(::ui::Color{236, 214, 116, 255}, ::ui::TextAlign::Left, ::ui::TextWrap::None, 8);
+}
+
+::ui::StyleStatePatch muted_style() {
+	return text_style(::ui::Color{156, 169, 181, 255});
+}
+
+::ui::LayoutStyle root_layout() {
+	return ::ui::LayoutStyle{
+		.direction = ::ui::FlexDirection::Column,
+		.width = ::ui::Length::percent(100.0f),
+		.height = ::ui::Length::percent(100.0f),
+		.padding = {10.0f, 10.0f, 24.0f, 24.0f},
+		.gap = 10.0f,
+	};
+}
+
+::ui::LayoutStyle title_bar_layout() {
+	return ::ui::LayoutStyle{
+		.direction = ::ui::FlexDirection::Row,
+		.align_items = ::ui::AlignItems::Center,
+		.width = ::ui::Length::percent(100.0f),
+		.height = ::ui::Length::points(46.0f),
+		.padding = {14.0f, 14.0f, 8.0f, 8.0f},
+		.gap = 12.0f,
+	};
+}
+
+::ui::LayoutStyle title_layout() {
+	return ::ui::LayoutStyle{
+		.width = ::ui::Length::points(190.0f),
+		.height = ::ui::Length::points(26.0f),
+	};
+}
+
+::ui::LayoutStyle title_meta_layout() {
+	return ::ui::LayoutStyle{
+		.width = ::ui::Length::grow(1.0f),
+		.height = ::ui::Length::points(20.0f),
+	};
+}
+
+::ui::LayoutStyle body_layout() {
+	return ::ui::LayoutStyle{
+		.direction = ::ui::FlexDirection::Row,
+		.width = ::ui::Length::percent(100.0f),
+		.height = ::ui::Length::grow(1.0f),
+		.gap = 10.0f,
+	};
+}
+
+::ui::LayoutStyle left_stack_layout() {
+	return ::ui::LayoutStyle{
+		.direction = ::ui::FlexDirection::Column,
+		.width = ::ui::Length::grow(1.0f),
+		.height = ::ui::Length::percent(100.0f),
+		.gap = 10.0f,
+	};
+}
+
+::ui::LayoutStyle upper_row_layout() {
+	return ::ui::LayoutStyle{
+		.direction = ::ui::FlexDirection::Row,
+		.width = ::ui::Length::percent(100.0f),
+		.height = ::ui::Length::points(126.0f),
+		.gap = 10.0f,
+	};
+}
+
+::ui::LayoutStyle character_panel_layout() {
+	return ::ui::LayoutStyle{
+		.direction = ::ui::FlexDirection::Column,
+		.width = ::ui::Length::points(220.0f),
+		.height = ::ui::Length::percent(100.0f),
+		.padding = {10.0f, 10.0f, 8.0f, 8.0f},
+		.gap = 5.0f,
+		.overflow = ::ui::Overflow::Hidden,
+	};
+}
+
+::ui::LayoutStyle upper_panel_layout() {
+	return ::ui::LayoutStyle{
+		.direction = ::ui::FlexDirection::Column,
+		.width = ::ui::Length::grow(1.0f),
+		.height = ::ui::Length::percent(100.0f),
+		.padding = {10.0f, 10.0f, 8.0f, 8.0f},
+		.gap = 6.0f,
+		.overflow = ::ui::Overflow::Hidden,
+	};
+}
+
+::ui::LayoutStyle chat_panel_layout() {
+	return ::ui::LayoutStyle{
+		.direction = ::ui::FlexDirection::Column,
+		.width = ::ui::Length::percent(100.0f),
+		.height = ::ui::Length::grow(1.0f),
+		.padding = {10.0f, 10.0f, 8.0f, 8.0f},
+		.gap = 7.0f,
+		.overflow = ::ui::Overflow::Hidden,
+	};
+}
+
+::ui::LayoutStyle chat_body_layout() {
+	return ::ui::LayoutStyle{
+		.direction = ::ui::FlexDirection::Row,
+		.width = ::ui::Length::percent(100.0f),
+		.height = ::ui::Length::grow(1.0f),
+		.gap = 8.0f,
+	};
+}
+
+::ui::LayoutStyle chat_log_layout() {
+	return ::ui::LayoutStyle{
+		.direction = ::ui::FlexDirection::Column,
+		.width = ::ui::Length::grow(1.0f),
+		.height = ::ui::Length::percent(100.0f),
+		.gap = 3.0f,
+		.overflow = ::ui::Overflow::Hidden,
+	};
+}
+
+::ui::LayoutStyle presence_layout() {
+	return ::ui::LayoutStyle{
+		.direction = ::ui::FlexDirection::Column,
+		.width = ::ui::Length::points(148.0f),
+		.height = ::ui::Length::percent(100.0f),
+		.gap = 3.0f,
+		.overflow = ::ui::Overflow::Hidden,
+	};
+}
+
+::ui::LayoutStyle input_row_layout() {
+	return ::ui::LayoutStyle{
+		.direction = ::ui::FlexDirection::Row,
+		.width = ::ui::Length::percent(100.0f),
+		.height = ::ui::Length::points(30.0f),
+		.gap = 7.0f,
+	};
+}
+
+::ui::LayoutStyle compact_actions_layout() {
+	return ::ui::LayoutStyle{
+		.direction = ::ui::FlexDirection::Row,
+		.width = ::ui::Length::percent(100.0f),
+		.height = ::ui::Length::points(26.0f),
+		.gap = 6.0f,
+	};
+}
+
+::ui::LayoutStyle input_grow_layout() {
+	return ::ui::LayoutStyle{
+		.width = ::ui::Length::grow(1.0f),
+		.height = ::ui::Length::points(28.0f),
+		.padding = {8.0f, 8.0f, 5.0f, 5.0f},
+	};
+}
+
+::ui::LayoutStyle side_panel_layout() {
+	return ::ui::LayoutStyle{
+		.direction = ::ui::FlexDirection::Column,
+		.width = ::ui::Length::points(244.0f),
+		.height = ::ui::Length::percent(100.0f),
+		.padding = {10.0f, 10.0f, 8.0f, 8.0f},
+		.gap = 7.0f,
+		.overflow = ::ui::Overflow::Hidden,
+	};
+}
+
+::ui::LayoutStyle row_button_layout(float height = 24.0f) {
+	return ::ui::LayoutStyle{
+		.align_items = ::ui::AlignItems::Center,
+		.justify_content = ::ui::JustifyContent::Center,
+		.width = ::ui::Length::percent(100.0f),
+		.height = ::ui::Length::points(height),
+		.padding = {8.0f, 8.0f, 4.0f, 4.0f},
+	};
+}
+
+::ui::LayoutStyle small_button_layout(float width = 82.0f) {
+	return ::ui::LayoutStyle{
+		.align_items = ::ui::AlignItems::Center,
+		.justify_content = ::ui::JustifyContent::Center,
+		.width = ::ui::Length::points(width),
+		.height = ::ui::Length::points(28.0f),
+		.padding = {8.0f, 8.0f, 5.0f, 5.0f},
+	};
+}
+
+::ui::LayoutStyle compact_button_layout() {
+	return ::ui::LayoutStyle{
+		.align_items = ::ui::AlignItems::Center,
+		.justify_content = ::ui::JustifyContent::Center,
+		.width = ::ui::Length::grow(1.0f),
+		.height = ::ui::Length::points(24.0f),
+		.padding = {8.0f, 8.0f, 4.0f, 4.0f},
+	};
+}
+
+::ui::LayoutStyle text_line_layout(float height = 16.0f) {
+	return ::ui::LayoutStyle{
+		.width = ::ui::Length::percent(100.0f),
+		.height = ::ui::Length::points(height),
+	};
+}
+
+::ui::LayoutStyle paragraph_layout(float height = 42.0f) {
+	return ::ui::LayoutStyle{
+		.width = ::ui::Length::percent(100.0f),
+		.height = ::ui::Length::points(height),
+	};
+}
+
+::ui::LayoutStyle create_options_layout() {
+	return ::ui::LayoutStyle{
+		.direction = ::ui::FlexDirection::Column,
+		.width = ::ui::Length::percent(100.0f),
+		.height = ::ui::Length::grow(1.0f),
+		.gap = 6.0f,
+		.overflow = ::ui::Overflow::Hidden,
+	};
+}
+
+const char * security_label(Uint8 index) {
+	switch(index){
+		case LobbyGame::SECLOW: return "Security: Low";
+		case LobbyGame::SECMEDIUM: return "Security: Medium";
+		case LobbyGame::SECHIGH: return "Security: High";
+		default: return "Security: Off";
+	}
+}
+
+struct SectionHeadingProps {
+	const char * key = nullptr;
+	const char * value = nullptr;
+};
+
+::ui::UiElement SectionHeading(const SectionHeadingProps& props) {
+	return <Text
+	  key={props.key}
+	  value={props.value}
+	  layout={text_line_layout(18.0f)}
+	  style={heading_style()}
+	/>
+}
+
+struct FieldTextProps {
+	const char * key = nullptr;
+	const char * value = nullptr;
+	::ui::LayoutStyle layout = {};
+	::ui::StyleStatePatch style = {};
+};
+
+::ui::UiElement FieldText(const FieldTextProps& props) {
+	return <Text
+	  key={props.key}
+	  value={safe_text(props.value)}
+	  layout={props.layout.width.kind == ::ui::LengthKind::Undefined ? text_line_layout() : props.layout}
+	  style={props.style.base.text.set ? props.style : muted_style()}
+	/>
+}
+
+struct TitleBarProps {
+	const char * key = nullptr;
+};
+
+::ui::UiElement TitleBar(const TitleBarProps& props) {
+	(void)props;
+	const LobbyContextValue& lobby = UseLobby();
+	const char * meta = lobby.map_name && lobby.map_name[0] != '\0'
+		? use_text_storage("%s    %s", lobby.version, lobby.map_name)
+		: safe_text(lobby.version);
+	return <Box key="title-bar" layout={title_bar_layout()} style={panel_style()}>
+		<Text
+		  key="title"
+		  value="Silencer"
+		  layout={title_layout()}
+		  style={text_style(::ui::Color{238, 242, 246, 255}, ::ui::TextAlign::Left, ::ui::TextWrap::None, 16)}
+		/>
+		<Text key="meta" value={meta} layout={title_meta_layout()} style={muted_style()} />
+		<Button
+		  key="back"
+		  id="lobby.go_back"
+		  label="Go Back"
+		  onActivate={set_flag(lobby.go_back_clicked)}
+		  layout={small_button_layout(94.0f)}
+		/>
+	</Box>
+}
+
+struct CharacterPanelProps {
+	const char * key = nullptr;
+};
+
+::ui::UiElement CharacterPanel(const CharacterPanelProps& props) {
+	(void)props;
+	const LobbyContextValue& lobby = UseLobby();
+	World * world = lobby.world;
+	CharacterPanelState * state = lobby.character;
+	if(!world || !state) return ::ui::empty();
+	const Lobby::Character * ch = world->lobby.GetSelectedCharacter();
+	const char * agent_name = ch ? ch->name : world->lobby.GetLocalUsername();
+	if(!agent_name || agent_name[0] == '\0') agent_name = "Agent";
+	const int agency = ch ? ch->agencyIdx : state->selectedAgency;
+	const bool locked = state->agentSelectionLocked || world->IsConnected();
+	return <Box key="character" layout={character_panel_layout()} style={panel_style()}>
+		<SectionHeading key="heading" value="AGENT" />
+		<FieldText key="name" value={agent_name} />
+		<FieldText key="agency" value={agency_name(agency)} />
+		<FieldText
+		  key="level"
+		  value={ch ? use_text_storage("Level %u XP %u", ch->stats.level, ch->stats.xp) : "No character selected"}
+		/>
+		<FieldText
+		  key="record"
+		  value={ch ? use_text_storage("Wins %u Losses %u", ch->stats.wins, ch->stats.losses) : ""}
+		/>
+		<FieldText
+		  key="stats-a"
+		  value={ch ? use_text_storage("End %u Shield %u Jet %u", ch->stats.endurance, ch->stats.shield, ch->stats.jetpack) : ""}
+		/>
+		<FieldText
+		  key="stats-b"
+		  value={ch ? use_text_storage("Tech %u Hack %u Contacts %u", ch->stats.techslots, ch->stats.hacking, ch->stats.contacts) : ""}
+		/>
+		<Button
+		  key="agents"
+		  id="lobby.character.agents"
+		  label={locked ? "Agent Locked" : "Change Agent"}
+		  disabled={locked}
+		  onActivate={set_flag(&state->newCharacterRequested)}
+		  layout={row_button_layout(26.0f)}
+		/>
+	</Box>
+}
+
+struct ChatLineRowProps {
+	const char * key = nullptr;
+	int slot = 0;
+	bool presence = false;
+};
+
+::ui::UiElement ChatLineRow(const ChatLineRowProps& props) {
+	const LobbyContextValue& lobby = UseLobby();
+	ChatPanelState * state = lobby.chat;
+	if(!state) return ::ui::empty();
+	if(props.presence){
+		int start = static_cast<int>(state->presenceLines.size()) - kVisiblePresenceLines;
+		if(start < 0) start = 0;
+		int index = start + props.slot;
+		if(index < 0 || index >= static_cast<int>(state->presenceLines.size())) return ::ui::empty();
+		return <Text
+		  key={props.key}
+		  value={state->presenceLines[static_cast<size_t>(index)].text.c_str()}
+		  layout={text_line_layout(15.0f)}
+		  style={muted_style()}
+		/>
+	}
+	int start = static_cast<int>(state->chatLines.size()) - kVisibleChatLines;
+	if(start < 0) start = 0;
+	int index = start + props.slot;
+	if(index < 0 || index >= static_cast<int>(state->chatLines.size())) return ::ui::empty();
+	return <Text
+	  key={props.key}
+	  value={state->chatLines[static_cast<size_t>(index)].text.c_str()}
+	  layout={text_line_layout(15.0f)}
+	  style={text_style(::ui::Color{222, 231, 238, 255})}
+	/>
+}
+
+struct ChatPanelProps {
+	const char * key = nullptr;
+};
+
+::ui::UiElement ChatPanel(const ChatPanelProps& props) {
+	(void)props;
+	const LobbyContextValue& lobby = UseLobby();
+	ChatPanelState * state = lobby.chat;
+	if(!state) return ::ui::empty();
+	const char * channel = state->channel.empty() ? "Lobby" : state->channel.c_str();
+	return <Box key="chat" layout={chat_panel_layout()} style={panel_style()}>
+		<SectionHeading key="heading" value={channel} />
+		<Box key="body" layout={chat_body_layout()}>
+			<Box key="log" layout={chat_log_layout()} style={inner_panel_style()}>
+				<ChatLineRow key="chat-0" slot={0} />
+				<ChatLineRow key="chat-1" slot={1} />
+				<ChatLineRow key="chat-2" slot={2} />
+				<ChatLineRow key="chat-3" slot={3} />
+				<ChatLineRow key="chat-4" slot={4} />
+				<ChatLineRow key="chat-5" slot={5} />
+				<ChatLineRow key="chat-6" slot={6} />
+				<ChatLineRow key="chat-7" slot={7} />
+			</Box>
+			<Box key="presence" layout={presence_layout()} style={inner_panel_style()}>
+				<ChatLineRow key="presence-0" slot={0} presence={true} />
+				<ChatLineRow key="presence-1" slot={1} presence={true} />
+				<ChatLineRow key="presence-2" slot={2} presence={true} />
+				<ChatLineRow key="presence-3" slot={3} presence={true} />
+				<ChatLineRow key="presence-4" slot={4} presence={true} />
+				<ChatLineRow key="presence-5" slot={5} presence={true} />
+				<ChatLineRow key="presence-6" slot={6} presence={true} />
+			</Box>
+		</Box>
+		<Box key="input-row" layout={input_row_layout()}>
+			<Input
+			  key="input"
+			  id="lobby.chat.input"
+			  value={state->inputBuffer}
+			  onChange={copy_to(state->inputBuffer, static_cast<int>(sizeof(state->inputBuffer)))}
+			  onKey={submit_on_enter(lobby.chat_send_clicked)}
+			  layout={input_grow_layout()}
+			/>
+			<Button
+			  key="send"
+			  id="lobby.chat.send"
+			  label="Send"
+			  onActivate={set_flag(lobby.chat_send_clicked)}
+			  layout={small_button_layout(72.0f)}
+			/>
+		</Box>
+	</Box>
+}
+
+struct GameRowProps {
+	const char * key = nullptr;
+	int slot = 0;
+};
+
+::ui::UiElement GameRow(const GameRowProps& props) {
+	const LobbyContextValue& lobby = UseLobby();
+	GameSelectPanelState * state = lobby.game_select;
+	if(!state) return ::ui::empty();
+	int start = state->scrollPos;
+	int index = start + props.slot;
+	if(index < 0 || index >= static_cast<int>(state->rows.size())) return ::ui::empty();
+	bool selected = index == state->selectedIndex;
+	return <Button
+	  key={props.key}
+	  id="lobby.game_select.row"
+	  idOffset={index}
+	  label={state->rows[static_cast<size_t>(index)].name.c_str()}
+	  onActivate={set_index(&state->rowClickedIndex, index)}
+	  layout={row_button_layout(24.0f)}
+	  style={row_style(selected)}
+	/>
+}
+
+struct GameSelectUpperProps {
+	const char * key = nullptr;
+};
+
+::ui::UiElement GameSelectUpper(const GameSelectUpperProps& props) {
+	(void)props;
+	const LobbyContextValue& lobby = UseLobby();
+	GameSelectPanelState * state = lobby.game_select;
+	if(!state) return ::ui::empty();
+	return <Box key="select-upper" layout={upper_panel_layout()} style={panel_style()}>
+		<SectionHeading key="heading" value="GAME SELECT" />
+		<Button
+		  key="create"
+		  id="lobby.game_select.create"
+		  label="Create Game"
+		  onActivate={set_flag(&state->createClicked)}
+		  layout={row_button_layout(30.0f)}
+		/>
+		<FieldText
+		  key="count"
+		  value={use_text_storage("%d active games", static_cast<int>(state->rows.size()))}
+		/>
+	</Box>
+}
+
+struct GameSelectTallProps {
+	const char * key = nullptr;
+};
+
+::ui::UiElement GameSelectTall(const GameSelectTallProps& props) {
+	(void)props;
+	const LobbyContextValue& lobby = UseLobby();
+	GameSelectPanelState * state = lobby.game_select;
+	if(!state) return ::ui::empty();
+	return <Box key="select-tall" layout={side_panel_layout()} style={panel_style()}>
+		<SectionHeading key="heading" value="ACTIVE GAMES" />
+		<Box key="game-scroll" layout={compact_actions_layout()}>
+			<Button
+			  key="prev"
+			  id="lobby.game_select.prev"
+			  label="Prev"
+			  onActivate={scroll_rows(&state->scrollPos, static_cast<int>(state->rows.size()), 8, -8)}
+			  layout={compact_button_layout()}
+			/>
+			<Button
+			  key="next"
+			  id="lobby.game_select.next"
+			  label="Next"
+			  onActivate={scroll_rows(&state->scrollPos, static_cast<int>(state->rows.size()), 8, 8)}
+			  layout={compact_button_layout()}
+			/>
+		</Box>
+		<GameRow key="game-0" slot={0} />
+		<GameRow key="game-1" slot={1} />
+		<GameRow key="game-2" slot={2} />
+		<GameRow key="game-3" slot={3} />
+		<GameRow key="game-4" slot={4} />
+		<GameRow key="game-5" slot={5} />
+		<GameRow key="game-6" slot={6} />
+		<GameRow key="game-7" slot={7} />
+		<Box key="info" layout={create_options_layout()} style={inner_panel_style()}>
+			<FieldText key="name" value={state->infoName.c_str()} />
+			<FieldText key="map" value={state->infoMap.c_str()} />
+			<FieldText key="security" value={state->infoSecurity.c_str()} />
+			<FieldText key="creator" value={state->infoCreator.c_str()} />
+			<FieldText key="limits" value={state->infoLimits.c_str()} />
+		</Box>
+		<Button
+		  key="spectate"
+		  id="lobby.game_select.spectate"
+		  label="Spectate"
+		  disabled={!state->spectateVisible}
+		  onActivate={set_flag(&state->spectateClicked)}
+		  layout={row_button_layout(27.0f)}
+		/>
+		<Button
+		  key="join"
+		  id="lobby.game_select.join"
+		  label="Join"
+		  disabled={!state->joinVisible}
+		  onActivate={set_flag(&state->joinClicked)}
+		  layout={row_button_layout(27.0f)}
+		/>
+	</Box>
+}
+
+struct MapRowProps {
+	const char * key = nullptr;
+	int slot = 0;
+};
+
+::ui::UiElement MapRow(const MapRowProps& props) {
+	const LobbyContextValue& lobby = UseLobby();
+	GameCreatePanelState * state = lobby.game_create;
+	if(!state) return ::ui::empty();
+	int start = state->mapScrollPos;
+	int index = start + props.slot;
+	if(index < 0 || index >= static_cast<int>(state->maps.size())) return ::ui::empty();
+	return <Button
+	  key={props.key}
+	  id="lobby.game_create.map"
+	  idOffset={index}
+	  label={state->maps[static_cast<size_t>(index)].c_str()}
+	  onActivate={set_index(&state->mapRowClickedIndex, index)}
+	  layout={row_button_layout(23.0f)}
+	  style={row_style(index == state->mapSelectedIndex)}
+	/>
+}
+
+struct GameCreateUpperProps {
+	const char * key = nullptr;
+};
+
+::ui::UiElement GameCreateUpper(const GameCreateUpperProps& props) {
+	(void)props;
+	const LobbyContextValue& lobby = UseLobby();
+	GameCreatePanelState * state = lobby.game_create;
+	if(!state) return ::ui::empty();
+	return <Box key="create-upper" layout={upper_panel_layout()} style={panel_style()}>
+		<SectionHeading key="heading" value="GAME OPTIONS" />
+		<Button
+		  key="security"
+		  id="lobby.game_create.security"
+		  label={security_label(state->securityIndex)}
+		  onActivate={set_flag(&state->securityClicked)}
+		  layout={row_button_layout(25.0f)}
+		/>
+		<Button
+		  key="spectatable"
+		  id="lobby.game_create.spectatable"
+		  label={state->spectatable ? "Spectatable: Yes" : "Spectatable: No"}
+		  onActivate={set_flag(&state->spectatableClicked)}
+		  layout={row_button_layout(25.0f)}
+		/>
+	</Box>
+}
+
+struct GameCreateTallProps {
+	const char * key = nullptr;
+};
+
+::ui::UiElement GameCreateTall(const GameCreateTallProps& props) {
+	(void)props;
+	const LobbyContextValue& lobby = UseLobby();
+	GameCreatePanelState * state = lobby.game_create;
+	if(!state) return ::ui::empty();
+	return <Box key="create-tall" layout={side_panel_layout()} style={panel_style()}>
+		<SectionHeading key="heading" value="SELECT MAP" />
+		<Box key="map-scroll" layout={compact_actions_layout()}>
+			<Button
+			  key="prev"
+			  id="lobby.game_create.map.prev"
+			  label="Prev"
+			  onActivate={scroll_rows(&state->mapScrollPos, static_cast<int>(state->maps.size()), 7, -7)}
+			  layout={compact_button_layout()}
+			/>
+			<Button
+			  key="next"
+			  id="lobby.game_create.map.next"
+			  label="Next"
+			  onActivate={scroll_rows(&state->mapScrollPos, static_cast<int>(state->maps.size()), 7, 7)}
+			  layout={compact_button_layout()}
+			/>
+		</Box>
+		<MapRow key="map-0" slot={0} />
+		<MapRow key="map-1" slot={1} />
+		<MapRow key="map-2" slot={2} />
+		<MapRow key="map-3" slot={3} />
+		<MapRow key="map-4" slot={4} />
+		<MapRow key="map-5" slot={5} />
+		<MapRow key="map-6" slot={6} />
+		<Box key="fields" layout={create_options_layout()} style={inner_panel_style()}>
+			<Input
+			  key="name"
+			  id="lobby.game_create.name"
+			  value={state->name}
+			  onChange={copy_to(state->name, static_cast<int>(sizeof(state->name)))}
+			  layout={row_button_layout(26.0f)}
+			/>
+			<Input
+			  key="password"
+			  id="lobby.game_create.password"
+			  value={state->password}
+			  password={true}
+			  onChange={copy_to(state->password, static_cast<int>(sizeof(state->password)))}
+			  layout={row_button_layout(26.0f)}
+			/>
+			<Input
+			  key="min-level"
+			  id="lobby.game_create.min_level"
+			  value={state->minLevel}
+			  onChange={copy_to(state->minLevel, static_cast<int>(sizeof(state->minLevel)))}
+			  layout={row_button_layout(24.0f)}
+			/>
+			<Input
+			  key="max-level"
+			  id="lobby.game_create.max_level"
+			  value={state->maxLevel}
+			  onChange={copy_to(state->maxLevel, static_cast<int>(sizeof(state->maxLevel)))}
+			  layout={row_button_layout(24.0f)}
+			/>
+			<Input
+			  key="max-players"
+			  id="lobby.game_create.max_players"
+			  value={state->maxPlayers}
+			  onChange={copy_to(state->maxPlayers, static_cast<int>(sizeof(state->maxPlayers)))}
+			  layout={row_button_layout(24.0f)}
+			/>
+			<Input
+			  key="max-teams"
+			  id="lobby.game_create.max_teams"
+			  value={state->maxTeams}
+			  onChange={copy_to(state->maxTeams, static_cast<int>(sizeof(state->maxTeams)))}
+			  layout={row_button_layout(24.0f)}
+			/>
+		</Box>
+		<Button
+		  key="create"
+		  id="lobby.game_create.create"
+		  label="Create"
+		  onActivate={set_flag(&state->createClicked)}
+		  layout={row_button_layout(28.0f)}
+		/>
+	</Box>
+}
+
+struct GameJoinUpperProps {
+	const char * key = nullptr;
+};
+
+::ui::UiElement GameJoinUpper(const GameJoinUpperProps& props) {
+	(void)props;
+	const LobbyContextValue& lobby = UseLobby();
+	GameJoinPanelState * state = lobby.game_join;
+	if(!state) return ::ui::empty();
+	return <Box key="join-upper" layout={upper_panel_layout()} style={panel_style()}>
+		<SectionHeading key="heading" value="TEAM" />
+		<Button
+		  key="tech"
+		  id="lobby.game_join.choose_tech"
+		  label="Choose Tech"
+		  onActivate={set_flag(&state->techClicked)}
+		  layout={row_button_layout(27.0f)}
+		/>
+		<Button
+		  key="team"
+		  id="lobby.game_join.change_team"
+		  label="Change Team"
+		  onActivate={set_flag(&state->teamClicked)}
+		  layout={row_button_layout(27.0f)}
+		/>
+		<Button
+		  key="ready"
+		  id="lobby.game_join.ready"
+		  label={state->readyLabel.c_str()}
+		  onActivate={set_flag(&state->readyClicked)}
+		  layout={row_button_layout(27.0f)}
+		/>
+	</Box>
+}
+
+struct RosterRowProps {
+	const char * key = nullptr;
+	int slot = 0;
+};
+
+::ui::UiElement RosterRow(const RosterRowProps& props) {
+	const LobbyContextValue& lobby = UseLobby();
+	GameJoinPanelState * state = lobby.game_join;
+	if(!state) return ::ui::empty();
+	if(props.slot < 0 || props.slot >= static_cast<int>(state->rosterRows.size())) return ::ui::empty();
+	const GameJoinRosterRow& row = state->rosterRows[static_cast<size_t>(props.slot)];
+	return <Text
+	  key={props.key}
+	  value={use_text_storage("%s T%u %s %s", row.ready ? "Ready" : "Wait", row.teamNumber, agency_name(row.agency), row.name.c_str())}
+	  layout={text_line_layout(17.0f)}
+	  style={text_style(::ui::Color{226, 234, 242, 255})}
+	/>
+}
+
+struct GameJoinTallProps {
+	const char * key = nullptr;
+};
+
+::ui::UiElement GameJoinTall(const GameJoinTallProps& props) {
+	(void)props;
+	return <Box key="join-tall" layout={side_panel_layout()} style={panel_style()}>
+		<SectionHeading key="heading" value="ROSTER" />
+		<RosterRow key="roster-0" slot={0} />
+		<RosterRow key="roster-1" slot={1} />
+		<RosterRow key="roster-2" slot={2} />
+		<RosterRow key="roster-3" slot={3} />
+		<RosterRow key="roster-4" slot={4} />
+		<RosterRow key="roster-5" slot={5} />
+		<RosterRow key="roster-6" slot={6} />
+		<RosterRow key="roster-7" slot={7} />
+		<RosterRow key="roster-8" slot={8} />
+		<RosterRow key="roster-9" slot={9} />
+	</Box>
+}
+
+struct TechRowProps {
+	const char * key = nullptr;
+	int slot = 0;
+};
+
+::ui::UiElement TechRow(const TechRowProps& props) {
+	const LobbyContextValue& lobby = UseLobby();
+	World * world = lobby.world;
+	GameTechPanelState * state = lobby.game_tech;
+	if(!world || !state) return ::ui::empty();
+	if(props.slot < 0 || props.slot >= static_cast<int>(world->buyableitems.size())) return ::ui::empty();
+	BuyableItem * item = world->buyableitems[static_cast<size_t>(props.slot)];
+	if(!item) return ::ui::empty();
+	Peer * local = world->GetPeer(world->GetLocalPeerId());
+	bool selected = local && ((local->techchoices & item->techchoice) != 0);
+	return <Button
+	  key={props.key}
+	  id="lobby.game_tech.toggle"
+	  idOffset={props.slot}
+	  label={use_text_storage("%s (%u)", item->name, item->techslots)}
+	  onFocus={focus_index(&state->descClickedItemIndex, props.slot)}
+	  onActivate={set_index(&state->toggleClickedItemIndex, props.slot)}
+	  layout={row_button_layout(23.0f)}
+	  style={row_style(selected)}
+	/>
+}
+
+struct GameTechUpperProps {
+	const char * key = nullptr;
+};
+
+::ui::UiElement GameTechUpper(const GameTechUpperProps& props) {
+	(void)props;
+	const LobbyContextValue& lobby = UseLobby();
+	GameTechPanelState * state = lobby.game_tech;
+	if(!state) return ::ui::empty();
+	return <Box key="tech-upper" layout={upper_panel_layout()} style={panel_style()}>
+		<SectionHeading key="heading" value="TECH" />
+		<Button
+		  key="back"
+		  id="lobby.game_tech.back"
+		  label="Back To Teams"
+		  onActivate={set_flag(&state->backClicked)}
+		  layout={row_button_layout(28.0f)}
+		/>
+		<FieldText key="peer-0" value={state->peerNameStrs[0].c_str()} />
+		<FieldText key="peer-1" value={state->peerNameStrs[1].c_str()} />
+		<FieldText key="peer-2" value={state->peerNameStrs[2].c_str()} />
+	</Box>
+}
+
+struct GameTechTallProps {
+	const char * key = nullptr;
+};
+
+::ui::UiElement GameTechTall(const GameTechTallProps& props) {
+	(void)props;
+	const LobbyContextValue& lobby = UseLobby();
+	GameTechPanelState * state = lobby.game_tech;
+	if(!state) return ::ui::empty();
+	return <Box key="tech-tall" layout={side_panel_layout()} style={panel_style()}>
+		<SectionHeading key="heading" value={state->slotsLeftStr.c_str()} />
+		<TechRow key="tech-0" slot={0} />
+		<TechRow key="tech-1" slot={1} />
+		<TechRow key="tech-2" slot={2} />
+		<TechRow key="tech-3" slot={3} />
+		<TechRow key="tech-4" slot={4} />
+		<TechRow key="tech-5" slot={5} />
+		<TechRow key="tech-6" slot={6} />
+		<TechRow key="tech-7" slot={7} />
+		<TechRow key="tech-8" slot={8} />
+		<TechRow key="tech-9" slot={9} />
+		<Box key="desc" layout={create_options_layout()} style={inner_panel_style()}>
+			<FieldText key="tech-name" value={state->techNameStr.c_str()} style={heading_style()} />
+			<FieldText key="desc-0" value={state->techDescLines[0].c_str()} />
+			<FieldText key="desc-1" value={state->techDescLines[1].c_str()} />
+			<FieldText key="desc-2" value={state->techDescLines[2].c_str()} />
+			<FieldText key="desc-3" value={state->techDescLines[3].c_str()} />
+			<FieldText key="desc-4" value={state->techDescLines[4].c_str()} />
+			<FieldText key="desc-5" value={state->techDescLines[5].c_str()} />
+		</Box>
+	</Box>
+}
+
+struct RightUpperPanelProps {
+	const char * key = nullptr;
+};
+
+::ui::UiElement RightUpperPanel(const RightUpperPanelProps& props) {
+	(void)props;
+	const LobbyContextValue& lobby = UseLobby();
+	if(lobby.game_create_active){
+		return <GameCreateUpper key="create-upper-root" />
+	}
+	if(lobby.game_join_active){
+		return <GameJoinUpper key="join-upper-root" />
+	}
+	if(lobby.game_tech_active){
+		return <GameTechUpper key="tech-upper-root" />
+	}
+	return <GameSelectUpper key="select-upper-root" />
+}
+
+struct RightTallPanelProps {
+	const char * key = nullptr;
+};
+
+::ui::UiElement RightTallPanel(const RightTallPanelProps& props) {
+	(void)props;
+	const LobbyContextValue& lobby = UseLobby();
+	if(lobby.game_create_active){
+		return <GameCreateTall key="create-tall-root" />
+	}
+	if(lobby.game_join_active){
+		return <GameJoinTall key="join-tall-root" />
+	}
+	if(lobby.game_tech_active){
+		return <GameTechTall key="tech-tall-root" />
+	}
+	return <GameSelectTall key="select-tall-root" />
+}
+
+struct LobbyBodyProps {
+	const char * key = nullptr;
+};
+
+::ui::UiElement LobbyBody(const LobbyBodyProps& props) {
+	(void)props;
+	return <Box key="body" layout={body_layout()}>
+		<Box key="left" layout={left_stack_layout()}>
+			<Box key="upper-row" layout={upper_row_layout()}>
+				<CharacterPanel key="character" />
+				<RightUpperPanel key="right-upper" />
+			</Box>
+			<ChatPanel key="chat" />
+		</Box>
+		<RightTallPanel key="right-tall" />
+	</Box>
+}
+
+struct LobbyViewProps {
+	const char * key = nullptr;
+};
+
+::ui::UiElement LobbyView(const LobbyViewProps& props) {
+	(void)props;
+	return <Box key="root" layout={root_layout()} style={root_style()}>
+		<TitleBar key="title" />
+		<LobbyBody key="body" />
+	</Box>
+}
+
+}  // namespace
+
+const LobbyContextValue& UseLobby() {
+	const auto * value = static_cast<const LobbyContextValue *>(::use_context(&LobbyContext));
+	return value ? *value : kEmptyContext;
+}
+
+::ui::UiElement LobbyScreenView(const LobbyScreenViewProps& props) {
+	return ::ui::provider(
+		"LobbyProvider",
+		&LobbyContext,
+		const_cast<LobbyContextValue *>(props.value),
+		children({
+			::ui::component("LobbyView", LobbyViewProps{ .key = "view" }, LobbyView),
+		}),
+		props.key);
+}
+
+}  // namespace silencer::client_ui::lobby

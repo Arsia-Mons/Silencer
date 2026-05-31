@@ -68,6 +68,13 @@ void LobbyScreen::Tick(ScreenContext & ctx)
 		return;
 	}
 	silencer::client_ui::lobby::ChatPanelTick(chatState, ctx.world);
+	if(chatSendClicked){
+		chatSendClicked = false;
+		if(std::strlen(chatState.inputBuffer) > 0){
+			world.lobby.SendChat(world.lobby.channel, chatState.inputBuffer);
+			chatState.inputBuffer[0] = '\0';
+		}
+	}
 
 	if(!gameCreateActive && !gameJoinActive && !gameTechActive){
 		silencer::client_ui::lobby::GameSelectPanelTick(
