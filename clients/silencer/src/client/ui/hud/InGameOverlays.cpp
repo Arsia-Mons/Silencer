@@ -235,7 +235,9 @@ void BuildInGameOverlaysUi(Renderer& /*renderer*/, const Resources& /*resources*
 		ingameoverlays_detail::DrawStatus(view, surface);
 		ingameoverlays_detail::DrawTopMessage(view, surface);
 	}
-	ingameoverlays_detail::DrawMessage(view, surface);
+	if(drawLegacyTextOverlays){
+		ingameoverlays_detail::DrawMessage(view, surface);
+	}
 	if(drawLegacyTextOverlays && view.showPlayerList){
 		BuildPlayerListOverlay(view, surface);
 	}
