@@ -4,10 +4,13 @@
 #include "ui/components/common.h"
 #include "ui/runtime/react.h"
 
+class Resources;
+
 namespace silencer::client_ui {
 
 struct InGameHudContextValue {
 	const HudView * view = nullptr;
+	const Resources * resources = nullptr;
 };
 
 extern ::ReactContext InGameHudContext;

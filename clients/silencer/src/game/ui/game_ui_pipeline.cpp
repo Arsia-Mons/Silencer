@@ -163,10 +163,15 @@ silencer::client_ui::HudView hudView =
 silencer::client_ui::BuildHudView(game.world);
 const bool retainedInGameHud = !clientUi.HasScreens();
 if(retainedInGameHud){
-clientUi.BuildRetainedInGameHud(hudView);
+clientUi.BuildRetainedInGameHud(hudView, game.world.resources);
 }
 silencer::client_ui::BuildInGameHudUi(
-game.renderer, game.world.resources, hudView, &surface, clientUi.Interactions());
+game.renderer,
+game.world.resources,
+hudView,
+&surface,
+clientUi.Interactions(),
+!retainedInGameHud);
 silencer::client_ui::BuildInGameOverlaysUi(
 game.renderer, game.world.resources, hudView, &surface, !retainedInGameHud);
 }
@@ -218,7 +223,7 @@ BeginPreparedClientUiFrame();
 BuildVisibleClientUi(surface, frametime);
 Clay_RenderCommandArray cmds = EndClientUiFrame();
 silencer::clay_bridge::Render(game, &surface, cmds);
-clientUi.RenderRetainedScreens(game.renderer, surface);
+clientUi.RenderRetainedScreens(game.renderer, game.world.resources, surface);
 if(game.state != GameState::FADEOUT){
 std::vector<silencer::ui::UiAction> unhandledUiActions =
 clientUi.DispatchInput(game.screenContext, preparedUiInput);

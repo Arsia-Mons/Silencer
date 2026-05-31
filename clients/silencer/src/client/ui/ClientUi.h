@@ -17,6 +17,7 @@
 #include <vector>
 
 class Renderer;
+class Resources;
 class Screen;
 class ScreenContext;
 class Surface;
@@ -47,8 +48,8 @@ public:
 	void ClearScreensIfRequested(ScreenContext& ctx);
 	void TickVisibleScreens(ScreenContext& ctx);
 	void BuildVisibleScreens(ScreenContext& ctx);
-	void BuildRetainedInGameHud(const HudView& view);
-	void RenderRetainedScreens(Renderer& renderer, Surface& dst);
+	void BuildRetainedInGameHud(const HudView& view, const Resources& resources);
+	void RenderRetainedScreens(Renderer& renderer, const Resources& resources, Surface& dst);
 
 private:
 	bool BuildRetainedScreens(ScreenContext& ctx);

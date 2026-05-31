@@ -1,6 +1,8 @@
 #include "retained_surface_renderer.h"
 
+#include "resources.h"
 #include "renderer.h"
+#include "render/clay_ui_payloads.h"
 #include "surface.h"
 
 #include <algorithm>
@@ -119,9 +121,35 @@ void DrawText(Renderer& renderer, Surface& dst, const ::ui::DrawCommandList& lis
 	                  false);
 }
 
+Surface * ResolveSprite(const Resources& resources, uint32_t textureId) {
+	const uint32_t flags = static_cast<uint32_t>(
+		silencer::clay_bridge::kImageContainBit |
+		silencer::clay_bridge::kImageStretchBit);
+	const uint32_t raw = textureId & ~flags;
+	const Uint8 bank = static_cast<Uint8>((raw >> 16) & 0xFFu);
+	const Uint16 index = static_cast<Uint16>(raw & 0xFFFFu);
+	if(bank >= resources.spritebank.size()) return nullptr;
+	if(index >= resources.spritebank[bank].size()) return nullptr;
+	return resources.spritebank[bank][index].get();
+}
+
+void DrawImage(const Resources& resources, Surface& dst, const ::ui::DrawCommand& command) {
+	if(command.payload.image.texture_id == 0) return;
+	Surface * src = ResolveSprite(resources, command.payload.image.texture_id);
+	if(!src) return;
+	Renderer::Rect dstrect{
+		src->w,
+		src->h,
+		static_cast<int>(std::floor(command.rect.x)),
+		static_cast<int>(std::floor(command.rect.y)),
+	};
+	Renderer::BlitSurface(src, nullptr, &dst, &dstrect);
+}
+
 }  // namespace
 
 void RenderRetainedDrawCommands(Renderer& renderer,
+                                const Resources& resources,
                                 Surface& dst,
                                 const ::ui::DrawCommandList& commands) {
 	for(int i = 0; i < commands.count; ++i){
@@ -141,6 +169,9 @@ void RenderRetainedDrawCommands(Renderer& renderer,
 				break;
 			case ::ui::DrawCommandKind::Text:
 				DrawText(renderer, dst, commands, command);
+				break;
+			case ::ui::DrawCommandKind::Image:
+				DrawImage(resources, dst, command);
 				break;
 			default:
 				break;

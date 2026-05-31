@@ -19,17 +19,18 @@ namespace client_ui {
 // overlay, chat overlay, system-camera frame) and lives in its own TU.
 void BuildInGameHudUi(Renderer& renderer, const Resources& resources,
                       const HudView& view, Surface* surface,
-                      silencer::ui::UiInteractionRegistry& interactions) {
+                      silencer::ui::UiInteractionRegistry& interactions,
+                      bool drawLegacySystemCameraFrames) {
 	if(!view.mapLoaded) return;
 	if(!view.localPlayer.valid) return;
 
 	const PlayerHudView& player = view.viewedPlayer;
 	Uint8 phase = renderer.GetHudAnimationPhase();
 
-	if(view.systemCamera[0].active){
+	if(drawLegacySystemCameraFrames && view.systemCamera[0].active){
 		BuildHudSystemCameraFrame(surface, resources, 95, 2, 92, 381);
 	}
-	if(view.systemCamera[1].active){
+	if(drawLegacySystemCameraFrames && view.systemCamera[1].active){
 		BuildHudSystemCameraFrame(surface, resources, 95, 11, 92, 318);
 	}
 

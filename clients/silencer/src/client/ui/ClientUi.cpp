@@ -310,14 +310,14 @@ void ClientUi::BuildVisibleScreens(ScreenContext& ctx) {
 	(void)BuildRetainedScreens(ctx);
 }
 
-void ClientUi::BuildRetainedInGameHud(const HudView& view) {
+void ClientUi::BuildRetainedInGameHud(const HudView& view, const Resources& resources) {
 	retainedElementFrame_.reset();
 	if(!view.mapLoaded){
 		retainedCommands_.reset();
 		return;
 	}
 	::ui::UiElementFrameScope scope(retainedElementFrame_);
-	const InGameHudContextValue context{ .view = &view };
+	const InGameHudContextValue context{ .view = &view, .resources = &resources };
 	const auto * stored = ::ui::copy_value(context);
 	if(!stored){
 		retainedCommands_.reset();
@@ -341,8 +341,8 @@ void ClientUi::BuildRetainedInGameHud(const HudView& view) {
 	}
 }
 
-void ClientUi::RenderRetainedScreens(Renderer& renderer, Surface& dst) {
-	silencer::client_ui::RenderRetainedDrawCommands(renderer, dst, retainedCommands_);
+void ClientUi::RenderRetainedScreens(Renderer& renderer, const Resources& resources, Surface& dst) {
+	silencer::client_ui::RenderRetainedDrawCommands(renderer, resources, dst, retainedCommands_);
 }
 
 }  // namespace client_ui

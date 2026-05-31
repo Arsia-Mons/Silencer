@@ -1,10 +1,13 @@
 #include "client/ui/hud/ingame_hud_view.h"
 
+#include "resources.h"
+#include "surface.h"
 #include "ui/components/box.h"
 #include "ui/components/text.h"
 #include "ui/runtime/react.h"
 
 #include <algorithm>
+#include <cstdint>
 #include <string>
 
 namespace silencer::client_ui {
@@ -21,6 +24,35 @@ namespace {
 
 const InGameHudContextValue kEmptyContext = {};
 constexpr int kTopMessageMaxLength = 35;
+uint32_t retained_sprite_texture_id(Uint8 bank, Uint16 index) {
+	return (static_cast<uint32_t>(bank) << 16) | static_cast<uint32_t>(index);
+}
+
+int sprite_width(const Resources& resources, Uint8 bank, Uint16 index) {
+	if(bank >= resources.spritebank.size()) return 0;
+	if(index >= resources.spritebank[bank].size()) return 0;
+	Surface * sprite = resources.spritebank[bank][index].get();
+	return sprite ? sprite->w : 0;
+}
+
+int sprite_height(const Resources& resources, Uint8 bank, Uint16 index) {
+	if(bank >= resources.spritebank.size()) return 0;
+	if(index >= resources.spritebank[bank].size()) return 0;
+	Surface * sprite = resources.spritebank[bank][index].get();
+	return sprite ? sprite->h : 0;
+}
+
+int sprite_offset_x(const Resources& resources, Uint8 bank, Uint16 index) {
+	if(bank >= resources.spriteoffsetx.size()) return 0;
+	if(index >= resources.spriteoffsetx[bank].size()) return 0;
+	return resources.spriteoffsetx[bank][index];
+}
+
+int sprite_offset_y(const Resources& resources, Uint8 bank, Uint16 index) {
+	if(bank >= resources.spriteoffsety.size()) return 0;
+	if(index >= resources.spriteoffsety[bank].size()) return 0;
+	return resources.spriteoffsety[bank][index];
+}
 
 std::string visible_top_message(const InGameTopMessageView& message) {
 	if(!message.topmessage_i || message.text.empty()) return std::string();
@@ -100,6 +132,62 @@ std::string visible_top_message(const InGameTopMessageView& message) {
 		.font_id = font_id,
 		.font_size = font_size,
 	});
+}
+
+::ui::StyleStatePatch sprite_style(Uint8 bank, Uint16 index) {
+	return ::ui::patch().image(::ui::BackgroundImage{
+		.texture_id = retained_sprite_texture_id(bank, index),
+		.tint = {255, 255, 255, 255},
+	});
+}
+
+struct HudSpriteProps {
+	const char * key = nullptr;
+	Uint8 bank = 0;
+	Uint16 index = 0;
+	int x = 0;
+	int y = 0;
+	int w = 0;
+	int h = 0;
+};
+
+::ui::UiElement HudSprite(const HudSpriteProps& props) {
+	if(props.w <= 0 || props.h <= 0) return ::ui::empty();
+	return <Box
+	  key={props.key}
+	  layout={text_layout(props.x, props.y, props.w, props.h)}
+	  style={sprite_style(props.bank, props.index)}
+	/>
+}
+
+struct SystemCameraFrameProps {
+	const char * key = nullptr;
+	int slot = 0;
+};
+
+::ui::UiElement SystemCameraFrame(const SystemCameraFrameProps& props) {
+	const InGameHudContextValue& hud = UseInGameHud();
+	if(!hud.view || !hud.resources) return ::ui::empty();
+	if(props.slot < 0 || props.slot >= 2) return ::ui::empty();
+	if(!hud.view->systemCamera[props.slot].active) return ::ui::empty();
+
+	const Uint8 bank = 95;
+	const Uint16 index = props.slot == 0 ? 2 : 11;
+	const Uint8 offsetBank = 92;
+	const int logicalY = props.slot == 0 ? 381 : 318;
+	const Resources& resources = *hud.resources;
+	const int w = sprite_width(resources, bank, index);
+	const int h = sprite_height(resources, bank, index);
+	if(w <= 0 || h <= 0) return ::ui::empty();
+	return <HudSprite
+	  key={props.key}
+	  bank={bank}
+	  index={index}
+	  x={-sprite_offset_x(resources, bank, index)}
+	  y={-sprite_offset_y(resources, offsetBank, index) + logicalY}
+	  w={w}
+	  h={h}
+	/>
 }
 
 struct TopMessageProps {
@@ -189,6 +277,8 @@ struct QuitPromptProps {
 
 ::ui::UiElement InGameHudFrame(const BoxProps& props) {
 	return <Box key={props.key} layout={root_layout()}>
+		<SystemCameraFrame key="system-camera-0" slot={0} />
+		<SystemCameraFrame key="system-camera-1" slot={1} />
 		<StatusMessages key="status" />
 		<TopMessage key="top-message" />
 		<QuitPrompt key="quit-prompt" />
