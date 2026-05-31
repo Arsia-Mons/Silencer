@@ -269,15 +269,28 @@ bool ClientUi::HasTextInputFocus() const {
 }
 
 void ClientUi::PushScreen(std::unique_ptr<Screen> screen, ScreenContext& ctx) {
-	screens_.Push(std::move(screen), ctx);
+	if(!screen || screens_.Size() >= CLIENT_UI_MAX_SCREENS) return;
+	screen->Build(ctx);
+	screens_.Push(std::move(screen));
 }
 
 void ClientUi::PopScreen(ScreenContext& ctx) {
-	screens_.Pop(ctx);
+	Screen * top = screens_.Top();
+	if(!top) return;
+	top->Destroy(ctx);
+	screens_.Pop();
 }
 
 void ClientUi::ReplaceScreen(std::unique_ptr<Screen> screen, ScreenContext& ctx) {
-	screens_.Replace(std::move(screen), ctx);
+	if(!screen) return;
+	Screen * top = screens_.Top();
+	if(!top){
+		PushScreen(std::move(screen), ctx);
+		return;
+	}
+	top->Destroy(ctx);
+	screen->Build(ctx);
+	screens_.Replace(std::move(screen));
 }
 
 void ClientUi::RequestClearScreens() {
@@ -285,11 +298,18 @@ void ClientUi::RequestClearScreens() {
 }
 
 void ClientUi::ClearScreensIfRequested(ScreenContext& ctx) {
-	screens_.ClearIfRequested(ctx);
+	if(!screens_.ConsumeClearRequest()) return;
+	while(Screen * top = screens_.Top()){
+		top->Destroy(ctx);
+		screens_.Pop();
+	}
 }
 
 void ClientUi::TickVisibleScreens(ScreenContext& ctx) {
-	screens_.TickVisible(ctx);
+	::ui::Span<Screen *> visible = screens_.VisibleScreens();
+	for(int i = 0; i < visible.count; ++i) {
+		visible[i]->Tick(ctx);
+	}
 }
 
 void ClientUi::BuildRetainedUi(ScreenContext& ctx,

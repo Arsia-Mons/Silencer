@@ -9,25 +9,22 @@ namespace client_ui {
 
 ScreenStack::~ScreenStack() = default;
 
-bool ScreenStack::Push(std::unique_ptr<Screen> screen, ScreenContext& ctx) {
+bool ScreenStack::Push(std::unique_ptr<Screen> screen) {
 	if(!screen || count_ >= CLIENT_UI_MAX_SCREENS) return false;
 	screen->SetEntryId(nextEntryId_++);
-	screen->Build(ctx);
 	screens_[count_++] = std::move(screen);
 	return true;
 }
 
-bool ScreenStack::Pop(ScreenContext& ctx) {
+bool ScreenStack::Pop() {
 	if(count_ <= 0) return false;
-	screens_[count_ - 1]->Destroy(ctx);
 	screens_[--count_].reset();
 	return true;
 }
 
-bool ScreenStack::PopEntry(UiScreenEntryId entryId, ScreenContext& ctx) {
+bool ScreenStack::PopEntry(UiScreenEntryId entryId) {
 	for(int i = count_ - 1; i >= 0; --i){
 		if(screens_[i] && screens_[i]->EntryId() == entryId){
-			screens_[i]->Destroy(ctx);
 			for(int j = i; j + 1 < count_; ++j){
 				screens_[j] = std::move(screens_[j + 1]);
 			}
@@ -38,34 +35,31 @@ bool ScreenStack::PopEntry(UiScreenEntryId entryId, ScreenContext& ctx) {
 	return false;
 }
 
-bool ScreenStack::Replace(std::unique_ptr<Screen> screen, ScreenContext& ctx) {
+bool ScreenStack::Replace(std::unique_ptr<Screen> screen) {
 	if(!screen) return false;
-	if(count_ <= 0) return Push(std::move(screen), ctx);
-	screens_[count_ - 1]->Destroy(ctx);
+	if(count_ <= 0) return Push(std::move(screen));
 	screen->SetEntryId(nextEntryId_++);
-	screen->Build(ctx);
 	screens_[count_ - 1] = std::move(screen);
 	return true;
 }
 
-bool ScreenStack::ResetTo(std::unique_ptr<Screen> screen, ScreenContext& ctx) {
+bool ScreenStack::ResetTo(std::unique_ptr<Screen> screen) {
 	if(!screen) return false;
-	Clear(ctx);
-	return Push(std::move(screen), ctx);
-}
-
-void ScreenStack::Clear(ScreenContext& ctx) {
-	while(count_ > 0) Pop(ctx);
+	for(int i = 0; i < count_; ++i){
+		screens_[i].reset();
+	}
+	count_ = 0;
+	return Push(std::move(screen));
 }
 
 void ScreenStack::RequestClear() {
 	clearRequested_ = true;
 }
 
-void ScreenStack::ClearIfRequested(ScreenContext& ctx) {
-	if(!clearRequested_) return;
-	Clear(ctx);
+bool ScreenStack::ConsumeClearRequest() {
+	if(!clearRequested_) return false;
 	clearRequested_ = false;
+	return true;
 }
 
 Screen * ScreenStack::Top() const {
@@ -89,13 +83,6 @@ Screen * ScreenStack::At(int index) const {
 		visible_[visibleCount++] = screens_[i].get();
 	}
 	return { visible_.data(), visibleCount };
-}
-
-void ScreenStack::TickVisible(ScreenContext& ctx) {
-	::ui::Span<Screen *> visible = VisibleScreens();
-	for(int i = 0; i < visible.count; ++i) {
-		visible[i]->Tick(ctx);
-	}
 }
 
 }  // namespace client_ui

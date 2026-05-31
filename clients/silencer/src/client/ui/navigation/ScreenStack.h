@@ -6,8 +6,6 @@
 #include <array>
 #include <memory>
 
-class ScreenContext;
-
 namespace silencer {
 namespace client_ui {
 
@@ -20,20 +18,17 @@ public:
 	bool Empty() const { return count_ <= 0; }
 	int Size() const { return count_; }
 
-	bool Push(std::unique_ptr<Screen> screen, ScreenContext& ctx);
-	bool Pop(ScreenContext& ctx);
-	bool PopEntry(UiScreenEntryId entryId, ScreenContext& ctx);
-	bool Replace(std::unique_ptr<Screen> screen, ScreenContext& ctx);
-	bool ResetTo(std::unique_ptr<Screen> screen, ScreenContext& ctx);
-	void Clear(ScreenContext& ctx);
+	bool Push(std::unique_ptr<Screen> screen);
+	bool Pop();
+	bool PopEntry(UiScreenEntryId entryId);
+	bool Replace(std::unique_ptr<Screen> screen);
+	bool ResetTo(std::unique_ptr<Screen> screen);
 	void RequestClear();
-	void ClearIfRequested(ScreenContext& ctx);
+	bool ConsumeClearRequest();
 
 	Screen * At(int index) const;
 	Screen * Top() const;
 	::ui::Span<Screen *> VisibleScreens();
-
-	void TickVisible(ScreenContext& ctx);
 
 private:
 	std::array<std::unique_ptr<Screen>, CLIENT_UI_MAX_SCREENS> screens_ = {};
