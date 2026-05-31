@@ -115,6 +115,7 @@ private:
         .accessibility_label = props.accessibility.label,
         .accessibility_description = props.accessibility.description,
         .value = props.text.value,
+        .password = props.text.password,
         .interaction = props.interaction,
         .text_edit = props.text_edit,
         .on_focus = props.callbacks.on_focus,

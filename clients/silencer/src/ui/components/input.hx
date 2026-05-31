@@ -21,6 +21,7 @@ struct InputProps {
   std::function<void(const ::ui::TextInputEvent &)> on_text_input = {};
   std::function<void(const ::ui::TextEditingEvent &)> on_text_editing = {};
   const char *value = "";
+  bool password = false;
   std::function<void(const std::string &)> on_change = {};
   ::ui::LayoutStyle layout = {
       .align_items = ::ui::AlignItems::Stretch,

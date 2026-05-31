@@ -359,6 +359,7 @@ struct NodeMetadata {
   const char *accessibility_label = "";
   const char *accessibility_description = "";
   const char *value = "";
+  bool password = false;
   NodeInteraction interaction = {};
   TextEditMetadata text_edit = {};
   std::function<void(const FocusEvent &)> on_focus = {};
@@ -385,6 +386,7 @@ struct NodeSnapshot {
   const char *accessibility_label = "";
   const char *accessibility_description = "";
   const char *value = "";
+  bool password = false;
   NodeRole role = NodeRole::Generic;
   SemanticRole semantic_role = SemanticRole::Auto;
   NodeInteraction interaction = {};
@@ -477,6 +479,7 @@ private:
     char accessibility_label[UI_RETAINED_VALUE_CAP] = {};
     char accessibility_description[UI_RETAINED_VALUE_CAP] = {};
     char value[UI_RETAINED_VALUE_CAP] = {};
+    bool password = false;
     char composition[UI_RETAINED_VALUE_CAP] = {};
     std::array<NodeId, UI_RETAINED_MAX_CHILDREN> children = {};
     NodeRole role = NodeRole::Generic;

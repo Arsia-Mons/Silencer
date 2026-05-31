@@ -411,8 +411,17 @@ bool append_input_contents(DrawCommandList &list, const NodeSnapshot &node,
   text_rect.width = node.layout.width - kInsetX * 2.0f;
   text_rect.height = kTextHeight;
 
+  char password_value[UI_RETAINED_VALUE_CAP] = {};
   const char *value = node.value ? node.value : "";
   int length = text_length(value);
+  const char *draw_value = value;
+  if (node.password) {
+    int masked_len = clamp_int(length, 0, UI_RETAINED_VALUE_CAP - 1);
+    memset(password_value, '*', static_cast<size_t>(masked_len));
+    password_value[masked_len] = '\0';
+    draw_value = password_value;
+    length = masked_len;
+  }
   uint16_t font_size = node.visual.text.font_size > 0 ? node.visual.text.font_size
                                                       : static_cast<uint16_t>(15);
   // Inputs are single-line; reuse the node's resolved text line height if any.
@@ -429,7 +438,7 @@ bool append_input_contents(DrawCommandList &list, const NodeSnapshot &node,
 
   // Measured pen x for the prefix [0, idx) of the value.
   auto advance_to = [&](int idx) -> float {
-    return measured_advance(value, static_cast<uint32_t>(idx), font_id,
+    return measured_advance(draw_value, static_cast<uint32_t>(idx), font_id,
                             font_size, line_height);
   };
 
@@ -450,7 +459,7 @@ bool append_input_contents(DrawCommandList &list, const NodeSnapshot &node,
           ? node.visual.text.color
           : ((node.interaction.disabled || inherited_disabled) ? kTextDisabledFill
                                                                : kTextFill);
-  if (!push_text_command(list, node.id, text_rect, value, text_color, font_size,
+  if (!push_text_command(list, node.id, text_rect, draw_value, text_color, font_size,
                          TextAlign::Left))
     return false;
 
