@@ -1,26 +1,15 @@
 #include "ui/game_ui_pipeline.h"
 
 #include "client/ui/screens/screen.h"
-#include "character_create_screen.h"
+#include "client/ui/screens/screen_routes.h"
 #include "game.h"
 #include "camera.h"
 #include "detonator.h"
 #include "gasloader.h"
 #include "game_state.h"
-#include "lobby_connect_screen.h"
-#include "main_menu_screen.h"
-#include "mission_summary_screen.h"
 #include "objecttypes.h"
-#include "options_audio_screen.h"
-#include "options_controls_screen.h"
-#include "options_display_screen.h"
-#include "options_screen.h"
 #include "player.h"
-#include "update_screen.h"
 #include "client/ui/views/HudView.h"
-#ifdef SILENCER_HAVE_LOBBY_UI
-#include "lobby_screen.h"
-#endif
 #include <algorithm>
 #include <vector>
 
@@ -49,39 +38,6 @@ offsetX = scaledW < surfaceW ? (surfaceW - scaledW) / 2 : 0;
 offsetY = scaledH < surfaceH ? (surfaceH - scaledH) / 2 : 0;
 }
 
-static bool IsScreenState(Uint8 state) {
-using namespace GameState;
-switch(state){
-case MAINMENU:
-case LOBBYCONNECT:
-case LOBBY:
-case CREATECHARACTER:
-case UPDATING:
-case MISSIONSUMMARY:
-case OPTIONS:
-case OPTIONSCONTROLS:
-case OPTIONSDISPLAY:
-case OPTIONSAUDIO:
-return true;
-default:
-return false;
-}
-}
-
-static bool ScreenStatePlaysMenuMusic(Uint8 state) {
-using namespace GameState;
-switch(state){
-case MAINMENU:
-case LOBBYCONNECT:
-case LOBBY:
-case CREATECHARACTER:
-case UPDATING:
-case MISSIONSUMMARY:
-return true;
-default:
-return false;
-}
-}
 } // namespace
 
 void GameUiPipeline::PrepareClientUiFrame(Surface& surface) {
@@ -250,10 +206,10 @@ return inGameUi.HasInputTarget(game.world.peers.localpeerid);
 }
 
 bool GameUiPipeline::TickScreenState(Uint8 state, bool entering) {
-if(!IsScreenState(state)) return false;
+if(!silencer::client_ui::IsScreenState(state)) return false;
 if(entering){
 EnterScreenState(state);
-}else if(ScreenStatePlaysMenuMusic(state)){
+}else if(silencer::client_ui::ScreenStatePlaysMenuMusic(state)){
 PlayMenuMusicIfReady();
 }
 return true;
@@ -312,45 +268,10 @@ game.gameSession.AmbienceMixerRef().PlayMusic(game.world.resources.menumusic);
 }
 
 bool GameUiPipeline::ShowScreenForState(Uint8 state) {
-using namespace GameState;
-switch(state){
-case MAINMENU:
-Push(std::make_unique<MainMenuScreen>());
+std::unique_ptr<Screen> screen = silencer::client_ui::CreateScreenForState(state);
+if(!screen) return false;
+Push(std::move(screen));
 return true;
-case LOBBYCONNECT:
-Push(std::make_unique<LobbyConnectScreen>());
-return true;
-case LOBBY:
-#ifdef SILENCER_HAVE_LOBBY_UI
-Push(std::make_unique<LobbyScreen>());
-return true;
-#else
-return false;
-#endif
-case CREATECHARACTER:
-Push(std::make_unique<CharacterCreateScreen>());
-return true;
-case UPDATING:
-Push(std::make_unique<UpdateScreen>());
-return true;
-case MISSIONSUMMARY:
-Push(std::make_unique<MissionSummaryScreen>());
-return true;
-case OPTIONS:
-Push(std::make_unique<OptionsScreen>());
-return true;
-case OPTIONSCONTROLS:
-Push(std::make_unique<OptionsControlsScreen>());
-return true;
-case OPTIONSDISPLAY:
-Push(std::make_unique<OptionsDisplayScreen>());
-return true;
-case OPTIONSAUDIO:
-Push(std::make_unique<OptionsAudioScreen>());
-return true;
-default:
-return false;
-}
 }
 
 void GameUiPipeline::Push(std::unique_ptr<Screen> s){

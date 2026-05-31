@@ -142,6 +142,12 @@ fail_if_match \
   "$REPO_ROOT/clients/silencer/src/game/game.h"
 
 fail_if_match \
+  'main_menu_screen|lobby_connect_screen|character_create_screen|mission_summary_screen|options_(screen|audio_screen|controls_screen|display_screen)|update_screen|lobby_screen|std::make_unique<.*Screen' \
+  "$REPO_ROOT/clients/silencer/src/game/ui" \
+  "$REPO_ROOT/clients/silencer/src/game/game.cpp" \
+  "$REPO_ROOT/clients/silencer/src/game/game.h"
+
+fail_if_match \
   "Handle(TextInput|KeyPress|ScancodeDown|MousePress|MouseMove)|DispatchKeyPress|DispatchPreparedUiNavActions|UiNavActionToAscii|DispatchChatKey|HandleInGameMenuKey" \
   "$REPO_ROOT/clients/silencer/src" \
   --glob '!third_party/**'
