@@ -130,6 +130,7 @@ if(SILENCER_UNITY_BUILD)
 		src/ui/primitives/*.cpp
 		src/ui/runtime/*.cpp
 		src/ui/style/*.cpp
+		src/render/cppx_ui/*.cpp
 		src/render/clay_ui_tests/*.cpp
 		src/client/ui/screens/character_create/*.cpp
 		src/client/ui/screens/lobby/*.cpp)
@@ -350,6 +351,23 @@ target_compile_definitions(ttf_font_smoke_tests PRIVATE
 	SILENCER_TEST_FONT_DIR="${SILENCER_SHARED_DIR}/fonts")
 add_test(NAME ttf_font_smoke_tests COMMAND ttf_font_smoke_tests)
 
+# Multi-face text-measure seam: FontRegistry + install_text_measurer wired into
+# the SDL-free ui/ measurer, exercised through ui::text_measurer().
+add_executable(ui_text_measure_tests
+	tests/ui_text_measure_tests.cpp
+	src/render/cppx_ui/font_registry.cpp
+	src/render/cppx_ui/text_measure.cpp
+	src/ui/style/text_measure.cpp)
+target_compile_features(ui_text_measure_tests PRIVATE cxx_std_20)
+target_include_directories(ui_text_measure_tests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src")
+target_link_libraries(ui_text_measure_tests PRIVATE SDL3::SDL3 SDL3_ttf::SDL3_ttf)
+target_compile_definitions(ui_text_measure_tests PRIVATE
+	SILENCER_TEST_FONT_DIR="${SILENCER_SHARED_DIR}/fonts")
+if(MSVC)
+	target_compile_definitions(ui_text_measure_tests PRIVATE NOMINMAX)
+endif()
+add_test(NAME ui_text_measure_tests COMMAND ui_text_measure_tests)
+
 # /Z7 embeds debug info into .obj files instead of routing it through MSVC's
 # mspdbsrv.exe — which has a habit of failing with C1090 PDB errors on some
 # Windows installs. /Zi (the default) is faster but unreliable; /Z7 is rock
@@ -429,16 +447,16 @@ endif()
 if(APPLE)
 	find_library(COCOA_FRAMEWORK Cocoa)
 	target_link_libraries(${SILENCER_TARGET}
-		SDL3::SDL3 SDL3_mixer::SDL3_mixer ${ZLIB_LIBRARY}
+		SDL3::SDL3 SDL3_mixer::SDL3_mixer SDL3_ttf::SDL3_ttf ${ZLIB_LIBRARY}
 		CURL::libcurl
 		${COCOA_FRAMEWORK})
 elseif(WIN32)
 	target_link_libraries(${SILENCER_TARGET}
-		SDL3::SDL3 SDL3_mixer::SDL3_mixer ${ZLIB_LIBRARY}
+		SDL3::SDL3 SDL3_mixer::SDL3_mixer SDL3_ttf::SDL3_ttf ${ZLIB_LIBRARY}
 		CURL::libcurl ws2_32)
 else()
 	target_link_libraries(${SILENCER_TARGET}
-		SDL3::SDL3 SDL3_mixer::SDL3_mixer ${ZLIB_LIBRARY}
+		SDL3::SDL3 SDL3_mixer::SDL3_mixer SDL3_ttf::SDL3_ttf ${ZLIB_LIBRARY}
 		CURL::libcurl)
 endif()
 
