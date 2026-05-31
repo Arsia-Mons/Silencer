@@ -49,6 +49,9 @@ void GameTechPanelTick(GameTechPanelState & state,
                        LobbyScreen & owner);
 bool GameTechPanelHandleUiIntent(GameTechPanelState & state,
                                  const silencer::ui::UiAction & action);
+void GameTechPanelRequestBack(GameTechPanelState & state);
+void GameTechPanelPreviewItem(GameTechPanelState & state, int index);
+void GameTechPanelToggleItem(GameTechPanelState & state, int index);
 
 }  // namespace silencer::client_ui::lobby
 

@@ -56,12 +56,6 @@ const char * agency_name(int agency) {
 	return kAgencyNames[agency];
 }
 
-std::function<void(const ::ui::ActivationEvent&)> set_flag(bool * flag) {
-	return [flag](const ::ui::ActivationEvent&) {
-		if(flag) *flag = true;
-	};
-}
-
 std::function<void(const ::ui::ActivationEvent&)> action_callback(
 	std::function<void()> action) {
 	return [action](const ::ui::ActivationEvent&) {
@@ -77,15 +71,11 @@ std::function<void(const ::ui::ActivationEvent&)> index_action_callback(
 	};
 }
 
-std::function<void(const ::ui::ActivationEvent&)> set_index(int * target, int value) {
-	return [target, value](const ::ui::ActivationEvent&) {
-		if(target) *target = value;
-	};
-}
-
-std::function<void(const ::ui::FocusEvent&)> focus_index(int * target, int value) {
-	return [target, value](const ::ui::FocusEvent&) {
-		if(target) *target = value;
+std::function<void(const ::ui::FocusEvent&)> index_focus_callback(
+	std::function<void(int)> action,
+	int index) {
+	return [action, index](const ::ui::FocusEvent&) {
+		if(action) action(index);
 	};
 }
 
@@ -824,21 +814,21 @@ struct GameJoinUpperProps {
 		  key="tech"
 		  id="lobby.game_join.choose_tech"
 		  label="Choose Tech"
-		  onActivate={set_flag(&state->techClicked)}
+		  onActivate={action_callback(lobby.actions.choose_tech)}
 		  layout={row_button_layout(27.0f)}
 		/>
 		<Button
 		  key="team"
 		  id="lobby.game_join.change_team"
 		  label="Change Team"
-		  onActivate={set_flag(&state->teamClicked)}
+		  onActivate={action_callback(lobby.actions.change_team)}
 		  layout={row_button_layout(27.0f)}
 		/>
 		<Button
 		  key="ready"
 		  id="lobby.game_join.ready"
 		  label={state->readyLabel.c_str()}
-		  onActivate={set_flag(&state->readyClicked)}
+		  onActivate={action_callback(lobby.actions.ready_game)}
 		  layout={row_button_layout(27.0f)}
 		/>
 	</Box>
@@ -902,8 +892,8 @@ struct TechRowProps {
 	  idOffset={props.slot}
 	  label={row.label.c_str()}
 	  selected={row.selected}
-	  onFocus={focus_index(&state->descClickedItemIndex, props.slot)}
-	  onActivate={set_index(&state->toggleClickedItemIndex, props.slot)}
+	  onFocus={index_focus_callback(lobby.actions.preview_tech, props.slot)}
+	  onActivate={index_action_callback(lobby.actions.toggle_tech, props.slot)}
 	  layout={row_button_layout(23.0f)}
 	  style={row_style(row.selected)}
 	/>
@@ -924,7 +914,7 @@ struct GameTechUpperProps {
 		  key="back"
 		  id="lobby.game_tech.back"
 		  label="Back To Teams"
-		  onActivate={set_flag(&state->backClicked)}
+		  onActivate={action_callback(lobby.actions.back_to_team)}
 		  layout={row_button_layout(28.0f)}
 		/>
 		<FieldText key="peer-0" value={state->peerNameStrs[0].c_str()} />

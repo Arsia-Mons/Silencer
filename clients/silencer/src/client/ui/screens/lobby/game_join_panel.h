@@ -57,6 +57,9 @@ void GameJoinPanelTick(GameJoinPanelState & state,
                        LobbyScreen & owner);
 bool GameJoinPanelHandleUiIntent(GameJoinPanelState & state,
                                  const silencer::ui::UiAction & action);
+void GameJoinPanelRequestTech(GameJoinPanelState & state);
+void GameJoinPanelRequestTeam(GameJoinPanelState & state);
+void GameJoinPanelRequestReady(GameJoinPanelState & state);
 
 }  // namespace silencer::client_ui::lobby
 

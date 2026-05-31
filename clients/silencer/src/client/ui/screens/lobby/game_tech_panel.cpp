@@ -142,20 +142,32 @@ bool GameTechPanelHandleUiIntent(GameTechPanelState & state,
                                  const silencer::ui::UiAction & action) {
 	if(action.kind != silencer::ui::UiActionKind::Activate) return false;
 	if(action.id == game_tech_panel_detail::kActionBack){
-		state.backClicked = true;
+		GameTechPanelRequestBack(state);
 		return true;
 	}
 	int index = game_tech_panel_detail::SuffixInt(action.id, game_tech_panel_detail::kActionTogglePrefix);
 	if(index >= 0){
-		state.toggleClickedItemIndex = index;
+		GameTechPanelToggleItem(state, index);
 		return true;
 	}
 	index = game_tech_panel_detail::SuffixInt(action.id, game_tech_panel_detail::kActionDescriptionPrefix);
 	if(index >= 0){
-		state.descClickedItemIndex = index;
+		GameTechPanelPreviewItem(state, index);
 		return true;
 	}
 	return false;
+}
+
+void GameTechPanelRequestBack(GameTechPanelState & state) {
+	state.backClicked = true;
+}
+
+void GameTechPanelPreviewItem(GameTechPanelState & state, int index) {
+	state.descClickedItemIndex = index;
+}
+
+void GameTechPanelToggleItem(GameTechPanelState & state, int index) {
+	state.toggleClickedItemIndex = index;
 }
 
 }  // namespace silencer::client_ui::lobby

@@ -78,18 +78,30 @@ bool GameJoinPanelHandleUiIntent(GameJoinPanelState & state,
                                  const silencer::ui::UiAction & action) {
 	if(action.kind != silencer::ui::UiActionKind::Activate) return false;
 	if(action.id == game_join_panel_detail::kActionTech){
-		state.techClicked = true;
+		GameJoinPanelRequestTech(state);
 		return true;
 	}
 	if(action.id == game_join_panel_detail::kActionTeam){
-		state.teamClicked = true;
+		GameJoinPanelRequestTeam(state);
 		return true;
 	}
 	if(action.id == game_join_panel_detail::kActionReady){
-		state.readyClicked = true;
+		GameJoinPanelRequestReady(state);
 		return true;
 	}
 	return false;
+}
+
+void GameJoinPanelRequestTech(GameJoinPanelState & state) {
+	state.techClicked = true;
+}
+
+void GameJoinPanelRequestTeam(GameJoinPanelState & state) {
+	state.teamClicked = true;
+}
+
+void GameJoinPanelRequestReady(GameJoinPanelState & state) {
+	state.readyClicked = true;
 }
 
 }  // namespace silencer::client_ui::lobby

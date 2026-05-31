@@ -160,6 +160,24 @@ bool LobbyScreen::BuildElement(ScreenContext & ctx, ::ui::UiElement * out)
 			.set_create_max_teams = [this](const std::string& value) {
 				silencer::client_ui::lobby::GameCreatePanelSetMaxTeams(gameCreateState, value);
 			},
+			.choose_tech = [this]() {
+				silencer::client_ui::lobby::GameJoinPanelRequestTech(gameJoinState);
+			},
+			.change_team = [this]() {
+				silencer::client_ui::lobby::GameJoinPanelRequestTeam(gameJoinState);
+			},
+			.ready_game = [this]() {
+				silencer::client_ui::lobby::GameJoinPanelRequestReady(gameJoinState);
+			},
+			.back_to_team = [this]() {
+				silencer::client_ui::lobby::GameTechPanelRequestBack(gameTechState);
+			},
+			.preview_tech = [this](int index) {
+				silencer::client_ui::lobby::GameTechPanelPreviewItem(gameTechState, index);
+			},
+			.toggle_tech = [this](int index) {
+				silencer::client_ui::lobby::GameTechPanelToggleItem(gameTechState, index);
+			},
 		},
 	};
 	*out = silencer::client_ui::lobby::LobbyScreenView(

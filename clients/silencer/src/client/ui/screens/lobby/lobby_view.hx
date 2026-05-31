@@ -51,6 +51,12 @@ struct LobbyContextValue {
 		std::function<void(const std::string&)> set_create_max_level = {};
 		std::function<void(const std::string&)> set_create_max_players = {};
 		std::function<void(const std::string&)> set_create_max_teams = {};
+		std::function<void()> choose_tech = {};
+		std::function<void()> change_team = {};
+		std::function<void()> ready_game = {};
+		std::function<void()> back_to_team = {};
+		std::function<void(int)> preview_tech = {};
+		std::function<void(int)> toggle_tech = {};
 	};
 
 	State state = {};
