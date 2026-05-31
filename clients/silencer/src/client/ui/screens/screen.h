@@ -9,7 +9,6 @@
 #include <cstdint>
 
 class ScreenContext;
-class Surface;
 
 namespace silencer {
 namespace client_ui {
@@ -19,9 +18,6 @@ enum class ScreenKind {
 	Normal,
 	Overlay,
 };
-}
-namespace ui {
-class UiInteractionRegistry;
 }
 }
 
@@ -45,19 +41,9 @@ public:
 	// Called once per frame while the screen is on top of the UI stack.
 	virtual void Tick(ScreenContext & ctx) = 0;
 
-	// Declare this screen's UI into the current ClientUi frame. Screens do not
-	// begin/end Clay, render Clay commands, or reset primitive arenas; ClientUi
-	// owns the frame lifecycle for every visible UI surface.
-	virtual void BuildUi(ScreenContext & ctx,
-	                     Surface & dst,
-	                     float frametime,
-	                     silencer::ui::UiInteractionRegistry& interactions)
-	{ (void)ctx; (void)dst; (void)frametime; (void)interactions; }
-
 	// Retained cppx entry point. ClientUi owns the UiElementFrame/reconciler
 	// boundary; screens only return a component root built from props/children.
-	virtual bool BuildElement(ScreenContext & ctx, ::ui::UiElement * out)
-	{ (void)ctx; (void)out; return false; }
+	virtual bool BuildElement(ScreenContext & ctx, ::ui::UiElement * out) = 0;
 
 	// Tear down screen-owned UI state. Called on pop/replace.
 	virtual void Destroy(ScreenContext & ctx) = 0;

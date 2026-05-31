@@ -1,6 +1,5 @@
 #include "client/ui/navigation/ScreenStack.h"
 
-#include "runtime/UiInteractionRegistry.h"
 #include "screen.h"
 
 #include <utility>
@@ -96,19 +95,6 @@ void ScreenStack::TickVisible(ScreenContext& ctx) {
 	::ui::Span<Screen *> visible = VisibleScreens();
 	for(int i = 0; i < visible.count; ++i) {
 		visible[i]->Tick(ctx);
-	}
-}
-
-void ScreenStack::BuildVisible(ScreenContext& ctx,
-                               Surface& dst,
-                               float frametime,
-                               silencer::ui::UiInteractionRegistry& interactions) {
-	::ui::Span<Screen *> visible = VisibleScreens();
-	for(int i = 0; i < visible.count; ++i) {
-		if(i > 0 && visible[i]->Kind() == ScreenKind::Overlay) {
-			interactions.BeginFrame();
-		}
-		visible[i]->BuildUi(ctx, dst, frametime, interactions);
 	}
 }
 

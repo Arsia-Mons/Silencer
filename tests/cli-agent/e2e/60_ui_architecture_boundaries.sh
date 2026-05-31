@@ -76,6 +76,10 @@ fail_if_match \
   "$REPO_ROOT/clients/silencer/src/client/ui/hud"
 
 fail_if_match \
+  "\\bBuildUi[[:space:]]*\\(" \
+  "$REPO_ROOT/clients/silencer/src/client/ui"
+
+fail_if_match \
   "clay_bridge::(EnsureInitialized|Render)[[:space:]]*\\(" \
   "$REPO_ROOT/clients/silencer/src/client/ui/screens" \
   "$REPO_ROOT/clients/silencer/src/client/ui/modals" \

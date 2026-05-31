@@ -7,12 +7,8 @@
 #include <memory>
 
 class ScreenContext;
-class Surface;
 
 namespace silencer {
-namespace ui {
-class UiInteractionRegistry;
-}
 namespace client_ui {
 
 constexpr int CLIENT_UI_MAX_SCREENS = 32;
@@ -38,10 +34,6 @@ public:
 	::ui::Span<Screen *> VisibleScreens();
 
 	void TickVisible(ScreenContext& ctx);
-	void BuildVisible(ScreenContext& ctx,
-	                  Surface& dst,
-	                  float frametime,
-	                  silencer::ui::UiInteractionRegistry& interactions);
 
 private:
 	std::array<std::unique_ptr<Screen>, CLIENT_UI_MAX_SCREENS> screens_ = {};

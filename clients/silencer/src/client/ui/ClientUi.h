@@ -44,11 +44,11 @@ public:
 	void RequestClearScreens();
 	void ClearScreensIfRequested(ScreenContext& ctx);
 	void TickVisibleScreens(ScreenContext& ctx);
-	void BuildVisibleScreens(ScreenContext& ctx, Surface& dst, float frametime);
+	void BuildVisibleScreens(ScreenContext& ctx);
 	void RenderRetainedScreens(Renderer& renderer, Surface& dst);
 
 private:
-	bool BuildRetainedScreen(Screen& screen, ScreenContext& ctx);
+	bool BuildRetainedScreens(ScreenContext& ctx);
 
 	silencer::ui::UiFrameContext frameCtx_;
 	silencer::ui::ClayService& clay_;

@@ -151,6 +151,7 @@ public:
 
   UiChildren children(std::initializer_list<UiElement> items);
   UiChildren children(std::initializer_list<UiChild> items);
+  UiChildren children(const UiElement *items, int count);
   UiElement empty();
   UiElement fragment(UiChildren children);
   UiElement host(HostKind kind, const HostProps &props);

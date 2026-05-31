@@ -9,10 +9,10 @@ game-agnostic.
 authoritative cppx repo. Treat `.cppx` and `.hx` as source files and generated
 files under `build/generated/cppx/` as disposable build output.
 
-Clay is still the production compositor for legacy screens during the migration.
-The retained cppx runtime is the target UI model. This layer does not own screen
-navigation, game state, SDL events, audio playback, or final renderer
-submission.
+Clay is still the production compositor for HUD and legacy bridge primitives
+during the migration. The retained cppx runtime is the target UI model. This
+layer does not own screen navigation, game state, SDL events, audio playback, or
+final renderer submission.
 
 This is mid-migration toward good flexbox layout, Clay lifecycle, and shadcn-style primitive API first principles. If you touch stale code that conflicts with those principles, update it in the same change.
 

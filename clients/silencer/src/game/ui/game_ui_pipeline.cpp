@@ -156,7 +156,8 @@ return uiClayBackend.Commands();
 }
 
 void GameUiPipeline::BuildVisibleClientUi(Surface& surface, float frametime) {
-clientUi.BuildVisibleScreens(game.screenContext, surface, frametime);
+(void)frametime;
+clientUi.BuildVisibleScreens(game.screenContext);
 if(game.world.map.loaded){
 silencer::client_ui::HudView hudView =
 silencer::client_ui::BuildHudView(game.world);

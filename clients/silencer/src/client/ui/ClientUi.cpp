@@ -269,13 +269,26 @@ void ClientUi::TickVisibleScreens(ScreenContext& ctx) {
 	screens_.TickVisible(ctx);
 }
 
-bool ClientUi::BuildRetainedScreen(Screen& screen, ScreenContext& ctx) {
+bool ClientUi::BuildRetainedScreens(ScreenContext& ctx) {
 	retainedElementFrame_.reset();
 	::ui::UiElementFrameScope scope(retainedElementFrame_);
-	::ui::UiElement root{};
-	if(!screen.BuildElement(ctx, &root)){
-		return false;
+	::ui::Span<Screen *> visible = screens_.VisibleScreens();
+	if(visible.count <= 0){
+		retainedCommands_.reset();
+		return true;
 	}
+	std::array<::ui::UiElement, CLIENT_UI_MAX_SCREENS> roots = {};
+	int rootCount = 0;
+	for(int i = 0; i < visible.count; ++i){
+		::ui::UiElement root{};
+		if(!visible[i]->BuildElement(ctx, &root)){
+			::react_report_error("client/ui: screen did not return retained UI\n");
+			return false;
+		}
+		roots[rootCount++] = root;
+	}
+	::ui::UiElement root = retainedElementFrame_.fragment(
+		retainedElementFrame_.children(roots.data(), rootCount));
 	::ui::UiElement provider = ::ui::provider(
 		"InteractionProvider",
 		&::ui::InteractionContext,
@@ -291,17 +304,8 @@ bool ClientUi::BuildRetainedScreen(Screen& screen, ScreenContext& ctx) {
 	return true;
 }
 
-void ClientUi::BuildVisibleScreens(ScreenContext& ctx, Surface& dst, float frametime) {
-	::ui::Span<Screen *> visible = screens_.VisibleScreens();
-	for(int i = 0; i < visible.count; ++i){
-		if(i > 0 && visible[i]->Kind() == ScreenKind::Overlay){
-			interactions_.BeginFrame();
-		}
-		if(BuildRetainedScreen(*visible[i], ctx)){
-			continue;
-		}
-		visible[i]->BuildUi(ctx, dst, frametime, interactions_);
-	}
+void ClientUi::BuildVisibleScreens(ScreenContext& ctx) {
+	(void)BuildRetainedScreens(ctx);
 }
 
 void ClientUi::RenderRetainedScreens(Renderer& renderer, Surface& dst) {
