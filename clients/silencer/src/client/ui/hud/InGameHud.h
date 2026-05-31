@@ -17,7 +17,7 @@ void BuildInGameHudUi(Renderer& renderer,
                       const HudView& view,
                       Surface* surface,
                       silencer::ui::UiInteractionRegistry& interactions,
-                      bool drawLegacySystemCameraFrames);
+                      bool drawLegacyRetainedHudParts);
 
 }  // namespace client_ui
 }  // namespace silencer

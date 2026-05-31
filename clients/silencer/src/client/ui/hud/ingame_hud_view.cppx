@@ -74,12 +74,45 @@ std::string visible_top_message(const InGameTopMessageView& message) {
 	switch(paletteColor){
 		case 128: return {198, 213, 232, 255};
 		case 153: return {238, 118, 118, 255};
+		case 161: return {118, 230, 158, 255};
 		case 192: return {135, 219, 174, 255};
 		case 202: return {243, 216, 133, 255};
 		case 208: return {226, 234, 242, 255};
 		case 224: return {250, 245, 190, 255};
 		default:  return {226, 234, 242, 255};
 	}
+}
+
+std::string two_digit_text(int value) {
+	return std::string(value < 10 ? " " : "") + std::to_string(value);
+}
+
+Uint8 current_ammo(const PlayerHudView& player) {
+	switch(player.currentWeapon){
+		case 0: return 99;
+		case 1: return player.laserAmmo;
+		case 2: return player.rocketAmmo;
+		case 3: return player.flamerAmmo;
+		default: return 0;
+	}
+}
+
+const TeamHudView * find_team(const HudView& view, Uint16 id) {
+	for(const TeamHudView& team : view.teams){
+		if(team.id == id) return &team;
+	}
+	return nullptr;
+}
+
+Uint8 trace_time(const HudView& view) {
+	const PlayerHudView& player = view.viewedPlayer;
+	Uint8 value = 0;
+	const TeamHudView * team = find_team(view, player.teamId);
+	if(team && team->beamingTerminalId && team->beamingTerminalTraceTime > 0){
+		value = team->beamingTerminalTraceTime;
+	}
+	if(player.tracetime > 0) value = player.tracetime;
+	return value;
 }
 
 ::ui::Color shadow_color() {
@@ -126,11 +159,15 @@ std::string visible_top_message(const InGameTopMessageView& message) {
 	};
 }
 
-::ui::StyleStatePatch text_style(::ui::Color color, uint16_t font_id, uint16_t font_size) {
+::ui::StyleStatePatch text_style(::ui::Color color,
+                                 uint16_t font_id,
+                                 uint16_t font_size,
+                                 ::ui::TextAlign align = ::ui::TextAlign::Left) {
 	return ::ui::patch().text(::ui::TextVisual{
 		.color = color,
 		.font_id = font_id,
 		.font_size = font_size,
+		.align = align,
 	});
 }
 
@@ -275,10 +312,135 @@ struct QuitPromptProps {
 	/>
 }
 
+struct HudReadoutsProps {
+	const char * key = nullptr;
+};
+
+::ui::UiElement HudReadouts(const HudReadoutsProps& props) {
+	const InGameHudContextValue& hud = UseInGameHud();
+	if(!hud.view || !hud.view->viewedPlayer.valid) return ::ui::empty();
+	const PlayerHudView& player = hud.view->viewedPlayer;
+	const std::string currentAmmo = two_digit_text(current_ammo(player));
+	const std::string blasterAmmo = "99";
+	const std::string laserAmmo = player.laserAmmo > 0 ? two_digit_text(player.laserAmmo) : std::string();
+	const std::string rocketAmmo = player.rocketAmmo > 0 ? two_digit_text(player.rocketAmmo) : std::string();
+	const std::string flamerAmmo = player.flamerAmmo > 0 ? two_digit_text(player.flamerAmmo) : std::string();
+	const std::string credits = std::to_string(player.credits);
+	const std::string health = std::to_string(player.health);
+	const std::string shield = std::to_string(player.shield);
+	const std::string inventory0 = player.inventoryItemsNum[0] > 1
+		? std::to_string(player.inventoryItemsNum[0])
+		: std::string();
+	const std::string inventory1 = player.inventoryItemsNum[1] > 1
+		? std::to_string(player.inventoryItemsNum[1])
+		: std::string();
+	const std::string inventory2 = player.inventoryItemsNum[2] > 1
+		? std::to_string(player.inventoryItemsNum[2])
+		: std::string();
+	const std::string inventory3 = player.inventoryItemsNum[3] > 1
+		? std::to_string(player.inventoryItemsNum[3])
+		: std::string();
+
+	return <Box key={props.key} layout={root_layout()}>
+		<Text
+		  key="current-ammo"
+		  value={::ui::copy_string(currentAmmo.c_str())}
+		  layout={text_layout(117, 457, 40, 18)}
+		  style={text_style(hud_text_color(208), 135, 12)}
+		/>
+		<Text
+		  key="blaster-ammo"
+		  value={::ui::copy_string(blasterAmmo.c_str())}
+		  layout={text_layout(0, 414, 20, 8)}
+		  style={text_style(hud_text_color(208), 132, 4, ::ui::TextAlign::Center)}
+		/>
+		<Text
+		  key="laser-ammo"
+		  value={::ui::copy_string(laserAmmo.c_str())}
+		  layout={text_layout(0, 428, 20, 8)}
+		  style={text_style(hud_text_color(208), 132, 4, ::ui::TextAlign::Center)}
+		/>
+		<Text
+		  key="rocket-ammo"
+		  value={::ui::copy_string(rocketAmmo.c_str())}
+		  layout={text_layout(0, 442, 20, 8)}
+		  style={text_style(hud_text_color(208), 132, 4, ::ui::TextAlign::Center)}
+		/>
+		<Text
+		  key="flamer-ammo"
+		  value={::ui::copy_string(flamerAmmo.c_str())}
+		  layout={text_layout(0, 456, 20, 8)}
+		  style={text_style(hud_text_color(208), 132, 4, ::ui::TextAlign::Center)}
+		/>
+		<Text
+		  key="credits"
+		  value={::ui::copy_string(credits.c_str())}
+		  layout={text_layout(572, 456, 60, 18)}
+		  style={text_style(hud_text_color(202), 135, 12)}
+		/>
+		<Text
+		  key="health"
+		  value={::ui::copy_string(health.c_str())}
+		  layout={text_layout(145, 463, 26, 8)}
+		  style={text_style(hud_text_color(161), 132, 4, ::ui::TextAlign::Center)}
+		/>
+		<Text
+		  key="shield"
+		  value={::ui::copy_string(shield.c_str())}
+		  layout={text_layout(468, 463, 26, 8)}
+		  style={text_style(hud_text_color(202), 132, 4, ::ui::TextAlign::Center)}
+		/>
+		<Text
+		  key="inventory-count-0"
+		  value={::ui::copy_string(inventory0.c_str())}
+		  layout={text_layout(632, 33, 32, 10)}
+		  style={text_style(hud_text_color(208), 132, 6)}
+		/>
+		<Text
+		  key="inventory-count-1"
+		  value={::ui::copy_string(inventory1.c_str())}
+		  layout={text_layout(604, 33, 32, 10)}
+		  style={text_style(hud_text_color(208), 132, 6)}
+		/>
+		<Text
+		  key="inventory-count-2"
+		  value={::ui::copy_string(inventory2.c_str())}
+		  layout={text_layout(576, 31, 32, 10)}
+		  style={text_style(hud_text_color(208), 132, 6)}
+		/>
+		<Text
+		  key="inventory-count-3"
+		  value={::ui::copy_string(inventory3.c_str())}
+		  layout={text_layout(548, 27, 32, 10)}
+		  style={text_style(hud_text_color(208), 132, 6)}
+		/>
+	</Box>
+}
+
+struct TraceTimeProps {
+	const char * key = nullptr;
+};
+
+::ui::UiElement TraceTime(const TraceTimeProps& props) {
+	const InGameHudContextValue& hud = UseInGameHud();
+	if(!hud.view) return ::ui::empty();
+	const Uint8 value = trace_time(*hud.view);
+	if(value == 0) return ::ui::empty();
+	const std::string text = "Government Trace Time: " + std::to_string(value);
+	return <Text
+	  key={props.key}
+	  value={::ui::copy_string(text.c_str())}
+	  layout={text_layout(20, 350, 180, 12)}
+	  style={text_style(hud_text_color(208), 133, 6)}
+	/>
+}
+
 ::ui::UiElement InGameHudFrame(const BoxProps& props) {
 	return <Box key={props.key} layout={root_layout()}>
 		<SystemCameraFrame key="system-camera-0" slot={0} />
 		<SystemCameraFrame key="system-camera-1" slot={1} />
+		<HudReadouts key="readouts" />
+		<TraceTime key="trace-time" />
 		<StatusMessages key="status" />
 		<TopMessage key="top-message" />
 		<QuitPrompt key="quit-prompt" />

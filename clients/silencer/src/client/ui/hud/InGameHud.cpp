@@ -20,24 +20,26 @@ namespace client_ui {
 void BuildInGameHudUi(Renderer& renderer, const Resources& resources,
                       const HudView& view, Surface* surface,
                       silencer::ui::UiInteractionRegistry& interactions,
-                      bool drawLegacySystemCameraFrames) {
+                      bool drawLegacyRetainedHudParts) {
 	if(!view.mapLoaded) return;
 	if(!view.localPlayer.valid) return;
 
 	const PlayerHudView& player = view.viewedPlayer;
 	Uint8 phase = renderer.GetHudAnimationPhase();
 
-	if(drawLegacySystemCameraFrames && view.systemCamera[0].active){
+	if(drawLegacyRetainedHudParts && view.systemCamera[0].active){
 		BuildHudSystemCameraFrame(surface, resources, 95, 2, 92, 381);
 	}
-	if(drawLegacySystemCameraFrames && view.systemCamera[1].active){
+	if(drawLegacyRetainedHudParts && view.systemCamera[1].active){
 		BuildHudSystemCameraFrame(surface, resources, 95, 11, 92, 318);
 	}
 
 	if(!player.valid) return;
 
 	Uint8 currentammo = BuildHudStatusSprites(player, surface, resources, renderer, phase);
-	BuildHudReadouts(player, surface, currentammo);
+	if(drawLegacyRetainedHudParts){
+		BuildHudReadouts(player, surface, currentammo);
+	}
 
 	int teamCount = BuildHudTeams(view, surface, resources, phase);
 	const TeamHudView* team = FindTeamById(view, player.teamId);
@@ -56,7 +58,7 @@ void BuildInGameHudUi(Renderer& renderer, const Resources& resources,
 		tracetime = team->beamingTerminalTraceTime;
 	}
 	if(player.tracetime > 0) tracetime = player.tracetime;
-	if(tracetime > 0) BuildHudTraceTime(surface, tracetime);
+	if(drawLegacyRetainedHudParts && tracetime > 0) BuildHudTraceTime(surface, tracetime);
 
 	if(view.buyTech.visible){
 		BuildBuyTechOverlay(view.buyTech, resources, surface, interactions);
