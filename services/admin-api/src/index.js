@@ -1,10 +1,11 @@
 import http from 'http';
 import express from 'express';
 import cors from 'cors';
-import { PORT } from './config.js';
+import { PORT, DISCORD_TOKEN } from './config.js';
 import { connectDB } from './db/connection.js';
-import { initWS } from './ws/index.js';
+import { initWS, setLiveStateListener, getLiveState } from './ws/index.js';
 import { startConsumer } from './amqp/consumer.js';
+import { DiscordPresence } from './discord/presence.js';
 import authRoutes    from './routes/auth.js';
 import playerRoutes  from './routes/players.js';
 import sessionRoutes from './routes/sessions.js';
@@ -64,6 +65,15 @@ async function start() {
   await seed();
   startBackupScheduler();
   initWS(server);
+
+  // Discord live-stats presence: reuse the AMQP-fed live counts (no extra
+  // consumer/process) and push them to the bot's presence line on change.
+  const presence = new DiscordPresence(DISCORD_TOKEN);
+  setLiveStateListener((players, games) => presence.update(players, games));
+  presence.start();
+  const live = getLiveState();
+  presence.update(live.onlinePlayers, live.activeGames);
+
   await startConsumer();
   server.listen(PORT, () => console.log(`[api] Silencer admin API on :${PORT}`));
 }

@@ -66,6 +66,8 @@ write_files:
       JWT=$(get /silencer/admin/jwt_secret)
       GITHUB_TOKEN=$(get /silencer/admin/github_backup_token)
       GHCR_TOKEN=$(get /silencer/admin/ghcr_pull_token)
+      # Optional: empty (or unseeded) → Discord presence disabled.
+      DISCORD_TOKEN=$(get /silencer/admin/discord_token 2>/dev/null || echo "")
       umask 077
       mkdir -p /etc/silencer
       cat > /etc/silencer/admin-api.env <<EOF
@@ -81,6 +83,7 @@ write_files:
       GITHUB_TOKEN=$GITHUB_TOKEN
       GITHUB_BACKUP_REPO=${github_backup_repo}
       ASSETS_DIR=/assets
+      DISCORD_TOKEN=$DISCORD_TOKEN
       EOF
       chmod 0600 /etc/silencer/admin-api.env
       # docker login to ghcr.io so the silencer-admin-{api,web} units can

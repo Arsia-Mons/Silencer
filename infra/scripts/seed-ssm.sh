@@ -169,6 +169,16 @@ if ! aws ssm get-parameter --region "$REGION" \
   put_param /silencer/admin/github_backup_token SecureString "${token:-}"
 fi
 
+# Optional. Bot token for the admin-api Discord live-stats presence line.
+# Empty = presence disabled (admin-api still runs). Seed an empty string if
+# the operator declines so the IAM role can read it without a 404 at fetch.
+if ! aws ssm get-parameter --region "$REGION" \
+       --name /silencer/admin/discord_token >/dev/null 2>&1; then
+  printf '  Discord bot token (Developer Portal > Bot > Reset Token) — leave blank to disable: ' >&2
+  IFS= read -r dtoken
+  put_param /silencer/admin/discord_token SecureString "${dtoken:-}"
+fi
+
 echo
 echo "Done. Verify with:"
 echo "  aws ssm get-parameters-by-path --region $REGION --path /silencer --recursive --query 'Parameters[].Name'"

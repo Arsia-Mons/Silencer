@@ -6,6 +6,11 @@ let liveState = { onlinePlayers: 0, activeGames: 0, rabbitmqConnected: false };
 const onlinePlayers = new Map(); // accountId → { name, gameId, gameStatus }
 const activeGames    = new Map(); // gameId   → { name, mapName, hostname, port, state }
 
+// Optional observer notified whenever the player/game counts change — the
+// Discord presence updater hooks in here so it needs no consumer of its own.
+let liveStateListener = null;
+export function setLiveStateListener(fn) { liveStateListener = fn; }
+
 export function initWS(httpServer) {
   io = new Server(httpServer, {
     cors: { origin: '*', methods: ['GET', 'POST'] },
@@ -92,6 +97,17 @@ export function handleLobbyEvent(type, data) {
       liveState.activeGames = activeGames.size;
       broadcast('game.ended', data);
       break;
+  }
+
+  // Notify the presence updater on the events that move the counts.
+  if (
+    liveStateListener &&
+    (type === 'player.login' ||
+      type === 'player.logout' ||
+      type === 'game.created' ||
+      type === 'game.ended')
+  ) {
+    liveStateListener(liveState.onlinePlayers, liveState.activeGames);
   }
 }
 
