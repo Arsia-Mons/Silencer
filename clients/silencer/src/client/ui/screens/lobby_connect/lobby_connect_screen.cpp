@@ -60,10 +60,13 @@ constexpr uint16_t kFormRowGap = 6;
 constexpr uint16_t kLabelW = 86;
 constexpr uint16_t kInputW = 183;
 constexpr uint16_t kInputInsetX = 7;
-constexpr uint16_t kButtonRowX = 86;
+constexpr uint16_t kLoginButtonW = 116;
+constexpr uint16_t kCancelButtonW = 68;
+constexpr uint16_t kButtonGap = 0;
+constexpr uint16_t kButtonRowX = (kPanelW - kLoginButtonW - kButtonGap - kCancelButtonW) / 2;
 constexpr uint16_t kButtonRowY = 246;
-constexpr uint16_t kButtonGap = 5;
 constexpr uint16_t kButtonH = 21;
+constexpr int kButtonPaddingX = 10;
 constexpr int kMaxLogLines = 128;
 constexpr const char * kActionUsername = "lobby_connect.username";
 constexpr const char * kActionPassword = "lobby_connect.password";
@@ -463,13 +466,19 @@ void LobbyConnectScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frame
 			           .childAlignment = { CLAY_ALIGN_X_LEFT, CLAY_ALIGN_Y_CENTER },
 			           .layoutDirection = CLAY_LEFT_TO_RIGHT,
 			       } }) {
-				lobby_connect_screen_detail::Button(CLAY_STRING("LobbyConnectLoginButton"), CLAY_STRING("Login"),
-					lobby_connect_screen_detail::ButtonOpts{ .variant = lobby_connect_screen_detail::ButtonVariant::Text,
-					                                         .size = lobby_connect_screen_detail::ButtonSize::Compact },
+				lobby_connect_screen_detail::Button(CLAY_STRING("LobbyConnectLoginButton"), CLAY_STRING("Login/Create"),
+					lobby_connect_screen_detail::ButtonOpts{ .variant = lobby_connect_screen_detail::ButtonVariant::Chrome,
+					                                         .size = lobby_connect_screen_detail::ButtonSize::Auto,
+					                                         .minWidth = lobby_connect_screen_detail::kLoginButtonW,
+					                                         .maxWidth = lobby_connect_screen_detail::kLoginButtonW,
+					                                         .paddingX = lobby_connect_screen_detail::kButtonPaddingX },
 					lobby_connect_screen_detail::ButtonHandle{ nullptr, lobby_connect_screen_detail::kActionLogin, &interactions });
 				lobby_connect_screen_detail::Button(CLAY_STRING("LobbyConnectCancelButton"), CLAY_STRING("Cancel"),
-					lobby_connect_screen_detail::ButtonOpts{ .variant = lobby_connect_screen_detail::ButtonVariant::Text,
-					                                         .size = lobby_connect_screen_detail::ButtonSize::Compact },
+					lobby_connect_screen_detail::ButtonOpts{ .variant = lobby_connect_screen_detail::ButtonVariant::Chrome,
+					                                         .size = lobby_connect_screen_detail::ButtonSize::Auto,
+					                                         .minWidth = lobby_connect_screen_detail::kCancelButtonW,
+					                                         .maxWidth = lobby_connect_screen_detail::kCancelButtonW,
+					                                         .paddingX = lobby_connect_screen_detail::kButtonPaddingX },
 					lobby_connect_screen_detail::ButtonHandle{ nullptr, lobby_connect_screen_detail::kActionCancel, &interactions });
 			}
 		}

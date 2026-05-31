@@ -99,7 +99,7 @@ cli --port "$CTRL_PORT" wait_for_state --state MAINMENU --timeout-ms 15000
 wait_for_widget "Connect To Lobby"
 cli --port "$CTRL_PORT" click --label "Connect To Lobby" >/dev/null
 cli --port "$CTRL_PORT" wait_for_state --state LOBBYCONNECT --timeout-ms 5000
-wait_for_widget "Login"
+wait_for_widget "Login/Create"
 
 # Type the credentials through the same key path real text input uses
 # (auto-creates the account on first login).
@@ -111,7 +111,7 @@ for ch in s e c r e t; do
   cli --port "$CTRL_PORT" key --key "$ch" >/dev/null
 done
 
-# The Login button only dispatches credentials when the lobby state machine
+# The Login/Create button only dispatches credentials when the lobby state machine
 # has advanced through Connect → version-check → AUTHENTICATING; a click
 # before that is silently consumed. The `state` op exposes lobby_state for
 # exactly this kind of synchronization.
@@ -128,7 +128,7 @@ wait_for_lobby_state() {
 }
 wait_for_lobby_state AUTHENTICATING
 
-cli --port "$CTRL_PORT" click --label "Login" >/dev/null
+cli --port "$CTRL_PORT" click --label "Login/Create" >/dev/null
 
 # Auth + lobby state pump can take a couple of seconds in CI. Fresh
 # accounts now land in character creation before the lobby.

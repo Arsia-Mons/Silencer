@@ -95,12 +95,12 @@ cli --port "$CTRL_PORT" wait_for_state --state MAINMENU --timeout-ms 15000 >/dev
 wait_for_widget "Connect To Lobby"
 cli --port "$CTRL_PORT" click --label "Connect To Lobby" >/dev/null
 cli --port "$CTRL_PORT" wait_for_state --state LOBBYCONNECT --timeout-ms 5000 >/dev/null
-wait_for_widget "Login"
+wait_for_widget "Login/Create"
 for ch in a l i c e; do cli --port "$CTRL_PORT" key --key "$ch" >/dev/null; done
 cli --port "$CTRL_PORT" key --key tab >/dev/null
 for ch in s e c r e t; do cli --port "$CTRL_PORT" key --key "$ch" >/dev/null; done
 wait_for_lobby_state AUTHENTICATING
-cli --port "$CTRL_PORT" click --label "Login" >/dev/null
+cli --port "$CTRL_PORT" click --label "Login/Create" >/dev/null
 
 # Walk the create flow up to the SELECT AGENCY stage (5 oval agency rows).
 cli --port "$CTRL_PORT" wait_for_state --state CREATECHARACTER --timeout-ms 15000 >/dev/null
