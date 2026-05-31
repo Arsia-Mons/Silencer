@@ -342,6 +342,14 @@ if(MSVC)
 endif()
 add_test(NAME ui_draw_command_tests COMMAND ui_draw_command_tests)
 
+# SIL-11 font path: SDL_ttf + the four silencer .otf faces load + measure.
+# Foundation for the golden FontRegistry + install_text_measurer (next).
+add_executable(ttf_font_smoke_tests tests/ttf_font_smoke_tests.cpp)
+target_link_libraries(ttf_font_smoke_tests PRIVATE SDL3::SDL3 SDL3_ttf::SDL3_ttf)
+target_compile_definitions(ttf_font_smoke_tests PRIVATE
+	SILENCER_TEST_FONT_DIR="${SILENCER_SHARED_DIR}/fonts")
+add_test(NAME ttf_font_smoke_tests COMMAND ttf_font_smoke_tests)
+
 # /Z7 embeds debug info into .obj files instead of routing it through MSVC's
 # mspdbsrv.exe — which has a habit of failing with C1090 PDB errors on some
 # Windows installs. /Zi (the default) is faster but unreliable; /Z7 is rock
@@ -374,6 +382,7 @@ target_compile_definitions(${SILENCER_TARGET} PRIVATE
 find_package(ZLIB REQUIRED)
 find_package(SDL3 REQUIRED)
 find_package(SDL3_mixer REQUIRED)
+find_package(SDL3_ttf REQUIRED CONFIG)  # SIL-11: golden TTF FontRegistry / UI text
 find_package(CURL REQUIRED)
 
 # Minizip: prefer vcpkg's CMake CONFIG packages (Windows CI), then fall back
