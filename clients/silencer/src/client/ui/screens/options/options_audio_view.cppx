@@ -122,36 +122,63 @@ struct OptionsAudioFrameProps {
 	const char * key = nullptr;
 };
 
-::ui::UiElement OptionsAudioFrame(const OptionsAudioFrameProps& props) {
+struct MusicToggleProps {
+	const char * key = nullptr;
+};
+
+::ui::UiElement MusicToggle(const MusicToggleProps& props) {
+	const OptionsAudioContextValue& audio = UseOptionsAudio();
+	return <Checkbox
+	  key={props.key}
+	  id="options_audio.music"
+	  label="Music"
+	  checked={audio.music}
+	  autofocus={true}
+	  onChange={toggle_music_callback(audio)}
+	  layout={setting_layout()}
+	/>
+}
+
+struct AudioSaveButtonProps {
+	const char * key = nullptr;
+};
+
+::ui::UiElement AudioSaveButton(const AudioSaveButtonProps& props) {
 	const OptionsAudioContextValue& audio = UseOptionsAudio();
 	Navigation navigation = UseNavigation();
+	return <Button
+	  key={props.key}
+	  id="options_audio.save"
+	  label="Save"
+	  onActivate={save_callback(audio, navigation)}
+	  layout={action_button_layout()}
+	/>
+}
+
+struct AudioCancelButtonProps {
+	const char * key = nullptr;
+};
+
+::ui::UiElement AudioCancelButton(const AudioCancelButtonProps& props) {
+	const OptionsAudioContextValue& audio = UseOptionsAudio();
+	Navigation navigation = UseNavigation();
+	return <Button
+	  key={props.key}
+	  id="options_audio.cancel"
+	  label="Cancel"
+	  onActivate={cancel_callback(audio, navigation)}
+	  layout={action_button_layout()}
+	/>
+}
+
+::ui::UiElement OptionsAudioFrame(const OptionsAudioFrameProps& props) {
 	return <Box key={props.key} layout={root_layout()} style={root_style()}>
 		<Box key="panel" layout={panel_layout()}>
 			<Text key="title" value="Audio Options" layout={title_layout()} style={title_style()} />
-			<Checkbox
-			  key="music"
-			  id="options_audio.music"
-			  label="Music"
-			  checked={audio.music}
-			  autofocus={true}
-			  onChange={toggle_music_callback(audio)}
-			  layout={setting_layout()}
-			/>
+			<MusicToggle key="music" />
 			<Box key="actions" layout={actions_layout()}>
-				<Button
-				  key="save"
-				  id="options_audio.save"
-				  label="Save"
-				  onActivate={save_callback(audio, navigation)}
-				  layout={action_button_layout()}
-				/>
-				<Button
-				  key="cancel"
-				  id="options_audio.cancel"
-				  label="Cancel"
-				  onActivate={cancel_callback(audio, navigation)}
-				  layout={action_button_layout()}
-				/>
+				<AudioSaveButton key="save" />
+				<AudioCancelButton key="cancel" />
 			</Box>
 		</Box>
 	</Box>

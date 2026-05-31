@@ -135,46 +135,82 @@ struct OptionsDisplayFrameProps {
 	const char * key = nullptr;
 };
 
-::ui::UiElement OptionsDisplayFrame(const OptionsDisplayFrameProps& props) {
+struct FullscreenToggleProps {
+	const char * key = nullptr;
+};
+
+::ui::UiElement FullscreenToggle(const FullscreenToggleProps& props) {
+	const OptionsDisplayContextValue& display = UseOptionsDisplay();
+	return <Checkbox
+	  key={props.key}
+	  id="options_display.fullscreen"
+	  label="Fullscreen"
+	  checked={display.fullscreen}
+	  autofocus={true}
+	  onChange={toggle_fullscreen_callback(display)}
+	  layout={setting_layout()}
+	/>
+}
+
+struct SmoothScalingToggleProps {
+	const char * key = nullptr;
+};
+
+::ui::UiElement SmoothScalingToggle(const SmoothScalingToggleProps& props) {
+	const OptionsDisplayContextValue& display = UseOptionsDisplay();
+	return <Checkbox
+	  key={props.key}
+	  id="options_display.smooth_scaling"
+	  label="Smooth Scaling"
+	  checked={display.smooth_scaling}
+	  onChange={toggle_smooth_scaling_callback(display)}
+	  layout={setting_layout()}
+	/>
+}
+
+struct DisplaySaveButtonProps {
+	const char * key = nullptr;
+};
+
+::ui::UiElement DisplaySaveButton(const DisplaySaveButtonProps& props) {
 	const OptionsDisplayContextValue& display = UseOptionsDisplay();
 	Navigation navigation = UseNavigation();
+	return <Button
+	  key={props.key}
+	  id="options_display.save"
+	  label="Save"
+	  onActivate={save_callback(display, navigation)}
+	  layout={action_button_layout()}
+	/>
+}
+
+struct DisplayCancelButtonProps {
+	const char * key = nullptr;
+};
+
+::ui::UiElement DisplayCancelButton(const DisplayCancelButtonProps& props) {
+	const OptionsDisplayContextValue& display = UseOptionsDisplay();
+	Navigation navigation = UseNavigation();
+	return <Button
+	  key={props.key}
+	  id="options_display.cancel"
+	  label="Cancel"
+	  onActivate={cancel_callback(display, navigation)}
+	  layout={action_button_layout()}
+	/>
+}
+
+::ui::UiElement OptionsDisplayFrame(const OptionsDisplayFrameProps& props) {
 	return <Box key={props.key} layout={root_layout()} style={root_style()}>
 		<Box key="panel" layout={panel_layout()}>
 			<Text key="title" value="Display Options" layout={title_layout()} style={title_style()} />
 			<Box key="rows" layout={rows_layout()}>
-				<Checkbox
-				  key="fullscreen"
-				  id="options_display.fullscreen"
-				  label="Fullscreen"
-				  checked={display.fullscreen}
-				  autofocus={true}
-				  onChange={toggle_fullscreen_callback(display)}
-				  layout={setting_layout()}
-				/>
-				<Checkbox
-				  key="smooth-scaling"
-				  id="options_display.smooth_scaling"
-				  label="Smooth Scaling"
-				  checked={display.smooth_scaling}
-				  onChange={toggle_smooth_scaling_callback(display)}
-				  layout={setting_layout()}
-				/>
+				<FullscreenToggle key="fullscreen" />
+				<SmoothScalingToggle key="smooth-scaling" />
 			</Box>
 			<Box key="actions" layout={actions_layout()}>
-				<Button
-				  key="save"
-				  id="options_display.save"
-				  label="Save"
-				  onActivate={save_callback(display, navigation)}
-				  layout={action_button_layout()}
-				/>
-				<Button
-				  key="cancel"
-				  id="options_display.cancel"
-				  label="Cancel"
-				  onActivate={cancel_callback(display, navigation)}
-				  layout={action_button_layout()}
-				/>
+				<DisplaySaveButton key="save" />
+				<DisplayCancelButton key="cancel" />
 			</Box>
 		</Box>
 	</Box>
