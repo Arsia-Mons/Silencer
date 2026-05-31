@@ -229,7 +229,7 @@ InGameUiControlResult InGameUi::ConfigureForControl(InGameUiControlMode mode) {
 	if(mode == InGameUiControlMode::Chat || mode == InGameUiControlMode::All){
 		player->chatActive = true;
 		player->chatwithteam = false;
-		std::strncpy(player->chatText, "clay chat smoke", sizeof(player->chatText) - 1);
+		std::strncpy(player->chatText, "ui chat smoke", sizeof(player->chatText) - 1);
 		player->chatText[sizeof(player->chatText) - 1] = '\0';
 		world_.messaging.showchat_i = GASLoader::Get().gameengine.chatDisplayTicks;
 	}

@@ -1,6 +1,5 @@
 #pragma once
 
-#include "clay/clay.h"
 #include "runtime/UiActionQueue.h"
 #include "runtime/UiInputState.h"
 
@@ -41,8 +40,6 @@ struct UiElementSnapshot {
 	std::string label;
 	std::string value;
 	UiRect bounds;
-	Clay_ElementId clayId{};
-	bool hasClayId = false;
 	bool enabled = true;
 	bool focused = false;
 	bool selected = false;
@@ -54,8 +51,6 @@ struct UiInteractable {
 	UiInteractableKind kind = UiInteractableKind::Button;
 	int uid = -1;
 	int x = 0, y = 0, w = 0, h = 0;
-	Clay_ElementId clayId{};
-	bool hasClayId = false;
 	int index = -1;
 	bool selected = false;
 	std::string value;
@@ -106,7 +101,6 @@ public:
 	bool ActivateFocused();
 	void QueueAction(UiAction action);
 	std::vector<UiAction> DrainActions();
-	void ResolveClayBoundsFromClay();
 
 private:
 	enum class FocusOrigin {

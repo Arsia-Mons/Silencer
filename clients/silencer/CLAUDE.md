@@ -47,13 +47,11 @@ may request transitions but must not store or traverse the stack itself.
 Rules:
 
 - Screens and modals implement `Screen::BuildElement`; they return a retained
-  cppx component root. They must not call `Clay_BeginLayout`, `Clay_EndLayout`,
-  `Clay_SetPointerState`, `clay_bridge::EnsureInitialized`, or
-  `clay_bridge::Render`.
+  cppx component root. They must not depend on legacy immediate-mode UI APIs.
 - HUD and overlays live under `src/client/ui/hud` and follow the same rule:
-  build UI into the current `ClientUi` frame. Do not add `Draw*Clay` methods to
+  build UI into the current `ClientUi` frame. Do not add UI draw methods to
   `Renderer`.
-- `Renderer` owns world/pixel drawing primitives only. It must not own Clay
+- `Renderer` owns world/pixel drawing primitives only. It must not own retained
   layout or UI screen/HUD composition.
 - Retained per-frame arenas reset once in `ClientUi::BeginFrame`. Per-frame
   resets must not be called inside a screen, modal, HUD block, or overlay block.
@@ -70,7 +68,7 @@ Rules:
 
 ### UI primitive API contract
 
-These rules port shadcn's surfaced best practices onto Clay: a default style
+These rules port shadcn's surfaced best practices onto cppx: a default style
 plus named `variant`s that encode the design system's identity, `size` for
 scale/fit, composition over per-call configuration. Treat shadcn as the north
 star for *why* an API shape is good — matching shadcn's exact API is
@@ -81,9 +79,8 @@ explicitly a non-goal.
   Callers pass `{variant, size}` — never a palette index, sprite bank, or a
   `B196x33`-style sprite code. Sprite-bank terms are private implementation
   detail and must not appear in any public signature, enum, or doc comment.
-- Responsive/auto sizing is a `size` value backed by the nine-slice
-  custom-payload compositor path (`CustomKind::*`), never a new per-consumer
-  preset.
+- Responsive/auto sizing is a `size` value backed by the retained renderer's
+  nine-slice path, never a new per-consumer preset.
 - Public primitive names are plain nouns: `Button`, `Text`, `TextInput`,
   `Checkbox`, `Toggle`, `Panel`. Runtime/service types that name a subsystem
   keep their `Ui` prefix (`UiInteractionRegistry`, `UiInputState`,
@@ -91,10 +88,9 @@ explicitly a non-goal.
 - One primitive owns one visual/interaction concern. Checkbox/toggle state
   belongs to `Checkbox`/`Toggle`, not a `Button` mode — don't overload a
   primitive with a second widget's behavior.
-- Every declared element needs an explicit, stable Clay ID. A visible label
-  must never double as its ID. Dynamic label text must be copied into the
-  per-frame primitive arena before Clay renders it; Clay does not own the
-  string's lifetime.
+- Every declared element needs an explicit, stable UI ID. A visible label
+  must never double as its ID. Dynamic label text must be copied into retained
+  frame storage or owned by the screen/provider state for the frame.
 - When an all-params primitive grows callsites that all pass the same values,
   add a named variant — not another required param. The rule is "no hidden
   lobby coupling," not "no defaults ever."

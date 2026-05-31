@@ -3,7 +3,6 @@
 #include "client/ui/hud/hud_retained_payloads.h"
 #include "resources.h"
 #include "renderer.h"
-#include "render/clay_ui_payloads.h"
 #include "surface.h"
 
 #include <algorithm>
@@ -13,6 +12,9 @@
 namespace silencer {
 namespace client_ui {
 namespace {
+
+constexpr uint32_t kRetainedImageContainBit = 1u << 24;
+constexpr uint32_t kRetainedImageStretchBit = 1u << 25;
 
 SDL_Color Unpremultiply(::ui::Color color) {
 	if(color.a == 0) return SDL_Color{0, 0, 0, 0};
@@ -123,9 +125,7 @@ void DrawText(Renderer& renderer, Surface& dst, const ::ui::DrawCommandList& lis
 }
 
 Surface * ResolveSprite(const Resources& resources, uint32_t textureId) {
-	const uint32_t flags = static_cast<uint32_t>(
-		silencer::clay_bridge::kImageContainBit |
-		silencer::clay_bridge::kImageStretchBit);
+	const uint32_t flags = kRetainedImageContainBit | kRetainedImageStretchBit;
 	const uint32_t raw = textureId & ~flags;
 	const Uint8 bank = static_cast<Uint8>((raw >> 16) & 0xFFu);
 	const Uint16 index = static_cast<Uint16>(raw & 0xFFFFu);

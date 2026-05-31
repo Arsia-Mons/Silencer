@@ -13,8 +13,7 @@
 class Renderer
 {
 public:
-	// Public so external dispatchers (e.g. the Clay-to-Surface bridge in
-	// src/ui/runtime/) can call BlitSurface / ClipRect without a friend
+	// Public so retained UI renderers can call BlitSurface / ClipRect without a friend
 	// declaration. Just a 4-int box; nothing to encapsulate.
 	struct Rect { int w, h, x, y; };
 

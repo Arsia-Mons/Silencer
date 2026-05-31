@@ -165,10 +165,6 @@ void UiInteractionRegistry::RegisterInteractable(UiInteractable widget) {
 	}
 
 	if(existing){
-		if(widget.hasClayId){
-			existing->clayId = widget.clayId;
-			existing->hasClayId = true;
-		}
 		if(registry_detail::HasBounds(widget)){
 			existing->x = widget.x;
 			existing->y = widget.y;
@@ -567,30 +563,6 @@ void UiInteractionRegistry::QueueAction(UiAction action) {
 
 std::vector<UiAction> UiInteractionRegistry::DrainActions() {
 	return actions_.Drain();
-}
-
-void UiInteractionRegistry::ResolveClayBoundsFromClay() {
-	for(auto& element : registeredElements_){
-		if(!element.hasClayId) continue;
-		Clay_ElementData data = Clay_GetElementData(element.clayId);
-		if(!data.found) continue;
-		element.bounds = UiRect{
-			data.boundingBox.x,
-			data.boundingBox.y,
-			data.boundingBox.width,
-			data.boundingBox.height,
-		};
-	}
-	for(auto& widget : interactables_){
-		if(!widget.hasClayId) continue;
-		Clay_ElementData data = Clay_GetElementData(widget.clayId);
-		if(!data.found) continue;
-		widget.x = static_cast<int>(data.boundingBox.x);
-		widget.y = static_cast<int>(data.boundingBox.y);
-		widget.w = static_cast<int>(data.boundingBox.width);
-		widget.h = static_cast<int>(data.boundingBox.height);
-	}
-	RefreshElementState();
 }
 
 void UiInteractionRegistry::RefreshElementState() {

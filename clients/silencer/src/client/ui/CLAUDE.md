@@ -12,7 +12,7 @@ same change instead of preserving the old pattern.
 ## Ownership
 
 - `ClientUi` owns one visible UI frame. `Game::RenderClientUiFrame` prepares input, begins one `ClientUi` frame, asks visible screens, modals, HUD, and overlays for retained roots, ends the frame, renders retained commands, then dispatches typed UI actions.
-- Screens, modals, HUD, and overlays return retained cppx roots from `BuildElement` or provider-backed components. They must not call `Clay_BeginLayout`, `Clay_EndLayout`, `Clay_SetPointerState`, `clay_bridge::EnsureInitialized`, or `clay_bridge::Render`.
+- Screens, modals, HUD, and overlays return retained cppx roots from `BuildElement` or provider-backed components. They must not depend on legacy immediate-mode UI APIs.
 - The retained tree owns layout, focus, hover, and final bounds. `UiInteractionRegistry` owns semantic metadata, text editing, keyboard/gamepad navigation, automation, and typed actions.
 - Prefer flexbox-style retained layout: sizing, grow/fit, padding, gaps, alignment, and stable containers. Treat absolute coordinates and sprite-offset nudges as legacy escape hatches to remove when practical.
 - The compositor/render layer owns sprite banks, palette effects, text drawing, clipping, and custom-payload dispatch. UI screens and ordinary primitives do not call SDL, `Renderer`, or `Surface` APIs directly.
@@ -24,7 +24,7 @@ same change instead of preserving the old pattern.
 
 - Target public primitives are plain nouns: `Button`, `TextInput`, `Toggle`, `Panel`. Runtime/service types keep the `Ui` prefix: `UiInteractionRegistry`, `UiInputState`, `UiInputRouter`.
 - Public primitive API follows shadcn's core shape, not its exact implementation: `variant + size`, composition, and named defaults. `variant` names the visual treatment; `size` names scale or fit behavior.
-- Existing bridge primitives may still expose bank/palette details. Do not spread that into new or cleaned-up primitive signatures, enums, or comments.
+- Existing sprite-backed render helpers may still expose bank/palette details. Do not spread that into new or cleaned-up primitive signatures, enums, or comments.
 - If many call sites pass the same option values, grow a named variant or size. Do not let padding, min/max width, wrap, or effect-color escape hatches become the normal API.
 - One primitive owns one concern. Checkbox/toggle state belongs to checkbox/toggle primitives, not a `Button` mode.
 - Every interactive, animated, scrollable, custom-rendered, tested, or automation-visible element needs an explicit stable ID. A visible label must never double as the element ID.
@@ -39,5 +39,5 @@ same change instead of preserving the old pattern.
 ## Verification
 
 - Build through `clients/silencer/build.ps1` or `clients/silencer/build.sh`; do not run raw CMake/Ninja commands.
-- For primitive/API work, run the relevant `clay_*_check` control-socket ops through `clients/cli/index.ts`. Add `tests/cli-agent/e2e/60_ui_architecture_boundaries.sh` when ownership boundaries change.
+- For primitive/API work, run `python3 clients/silencer/tools/check-cppx.py`. Add `tests/cli-agent/e2e/60_ui_architecture_boundaries.sh` when ownership boundaries change.
 - If visual or interaction behavior is in question, verify the real runtime through the client/control socket/screenshots, not compile success alone.

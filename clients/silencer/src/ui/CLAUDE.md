@@ -8,9 +8,8 @@ shared primitives. It must stay screen-agnostic and game-agnostic.
 authoritative cppx repo. Treat `.cppx` and `.hx` as source files and generated
 files under `build/generated/cppx/` as disposable build output.
 
-The retained cppx runtime is the target UI architecture. Legacy Clay
-primitives and compositor tests may remain during migration, but production
-client UI should be authored as components, hooks, and providers. This layer
+The retained cppx runtime is the target UI architecture. Production client UI
+must be authored as components, hooks, and providers. This layer
 does not own screen navigation, game state, SDL events, audio playback, or
 final renderer submission.
 
@@ -32,20 +31,14 @@ This is mid-migration toward good flexbox layout and shadcn-style primitive API 
 ## Primitive API
 
 - Target public primitives are plain nouns: `Button`, `TextInput`, `Toggle`, `Panel`, `Text`. Runtime/service types keep the `Ui` prefix: `UiInteractionRegistry`, `UiInputState`, `UiInputRouter`.
-- Text consumers use the `Text` primitive plus semantic `TextSize` metrics. Keep sprite-bank and Clay font fields behind the text primitive/compositor boundary.
+- Text consumers use the `Text` primitive plus semantic text metrics. Keep sprite-bank and font details behind the text primitive/render boundary.
 - Primitive APIs follow shadcn's core shape, not its exact implementation: `variant + size`, composition, and named defaults. Repeated call-site option bundles should become named variants or sizes.
 - New or cleaned-up primitive APIs must not expose palette indices, sprite banks, legacy `B196x33`-style codes, or one-consumer presets in public signatures, enums, or docs.
 - One primitive owns one concern. Checkbox/toggle state belongs to checkbox/toggle primitives, not a `Button` mode.
-
-## Legacy Clay Discipline
-
-- Prefer flexbox-style Clay layout: sizing, grow/fit, padding, gaps, alignment, clipping, and stable containers. Absolute coordinates, sprite-offset nudges, and hand-measured widths are legacy escape hatches to remove when practical.
-- Every interactive, animated, scrollable, custom-rendered, tested, or automation-visible element needs an explicit stable Clay ID. A visible label must never double as the element ID.
-- Dynamic strings and custom payloads must live until after Clay render command consumption. Legacy primitive tests reset their own per-frame arenas.
 
 ## Verification
 
 - Build through `clients/silencer/build.ps1` or `clients/silencer/build.sh`; do not run raw CMake/Ninja commands.
 - Run `cmake --build clients/silencer/build --target silencer_cppx_check` after
   editing `.cppx` or `.hx`.
-- For primitive/API work, run the relevant `clay_*_check` control-socket ops through `clients/cli/index.ts`; add runtime screenshot or control-socket verification when visual/interaction behavior is at risk.
+- For primitive/API work, add runtime screenshot or control-socket verification when visual/interaction behavior is at risk.

@@ -6,7 +6,6 @@
 #include "gasloader.h"
 #include "os.h"
 #include "shared.h"
-#include "clay_ui_tests/clay_ui_checks.h"
 #include "runtime/UiInteractionRegistry.h"
 #include "screen.h"
 #include "password_modal.h"
@@ -326,128 +325,6 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 		cmd.reply->set_value(OkResult(cmd.id, r));
 		return;
 	}
-	if(cmd.op == "clay_button_check"){
-		silencer::clay_bridge::ButtonCheckResult res{};
-		bool ok = silencer::clay_bridge::RunButtonCheck(game, res);
-		if(!ok){
-			cmd.reply->set_value(Err(cmd.id, "INTERNAL",
-				"button check failed"));
-			return;
-		}
-		nlohmann::json r;
-		r["clicks_fired_on_press"] = res.clicksFiredOnPress;
-		r["clicks_fired_when_held"] = res.clicksFiredWhenHeld;
-		r["chrome_brightness_hover"] = res.chromeBrightnessHover;
-		r["chrome_brightness_idle"] = res.chromeBrightnessIdle;
-		r["chrome_sprite_index_hover"] = res.chromeSpriteIndexHover;
-		r["oval_hover_sprite_indices"] = nlohmann::json::array();
-		r["oval_hover_brightness"] = nlohmann::json::array();
-		r["oval_unhover_sprite_indices"] = nlohmann::json::array();
-		r["oval_unhover_brightness"] = nlohmann::json::array();
-		for(int i = 0; i < 5; ++i){
-			r["oval_hover_sprite_indices"].push_back(res.ovalHoverSpriteIndices[i]);
-			r["oval_hover_brightness"].push_back(res.ovalHoverBrightness[i]);
-			r["oval_unhover_sprite_indices"].push_back(res.ovalUnhoverSpriteIndices[i]);
-			r["oval_unhover_brightness"].push_back(res.ovalUnhoverBrightness[i]);
-		}
-		r["oval_focus_sprite_index"] = res.ovalFocusSpriteIndex;
-		r["oval_focus_brightness"] = res.ovalFocusBrightness;
-		r["oval_wall_clock_partial_sprite_index"] = res.ovalWallClockPartialSpriteIndex;
-		r["oval_wall_clock_partial_brightness"] = res.ovalWallClockPartialBrightness;
-		r["oval_wall_clock_next_sprite_index"] = res.ovalWallClockNextSpriteIndex;
-		r["oval_wall_clock_next_brightness"] = res.ovalWallClockNextBrightness;
-		r["legacy_selected_suppressed_sprite_index"] =
-			res.legacySelectedSuppressedSpriteIndex;
-		r["legacy_selected_suppressed_brightness"] =
-			res.legacySelectedSuppressedBrightness;
-		r["legacy_selected_suppressed_metadata"] =
-			res.legacySelectedSuppressedMetadata;
-		r["compact_width"] = res.compactWidth;
-		r["compact_height"] = res.compactHeight;
-		r["chrome_auto_width"] = res.chromeAutoWidth;
-		r["chrome_auto_height"] = res.chromeAutoHeight;
-		r["text_compact_width"] = res.textCompactWidth;
-		r["text_compact_height"] = res.textCompactHeight;
-		r["text_compact_text_x_offset"] = res.textCompactTextXOffset;
-		r["text_compact_text_width"] = res.textCompactTextWidth;
-		r["text_compact_text_y_offset"] = res.textCompactTextYOffset;
-		r["auto_short_width"] = res.autoShortWidth;
-		r["auto_long_width"] = res.autoLongWidth;
-		r["auto_multiline_height"] = res.autoMultilineHeight;
-		cmd.reply->set_value(OkResult(cmd.id, r));
-		return;
-	}
-	if(cmd.op == "clay_toggle_check"){
-		silencer::clay_bridge::ToggleCheckResult res{};
-		bool ok = silencer::clay_bridge::RunToggleCheck(game, res);
-		if(!ok){
-			cmd.reply->set_value(Err(cmd.id, "INTERNAL",
-				"toggle check failed"));
-			return;
-		}
-		nlohmann::json r;
-		r["clicks_toggle_0"] = res.clicksToggle0;
-		r["clicks_toggle_1"] = res.clicksToggle1;
-		r["clicks_toggle_2"] = res.clicksToggle2;
-		r["selected_brightness"] = res.selectedBrightness;
-		r["unselected_brightness"] = res.unselectedBrightness;
-		cmd.reply->set_value(OkResult(cmd.id, r));
-		return;
-	}
-	if(cmd.op == "clay_scroll_list_check"){
-		silencer::clay_bridge::ScrollListCheckResult res{};
-		bool ok = silencer::clay_bridge::RunScrollListCheck(game, res);
-		if(!ok){
-			cmd.reply->set_value(Err(cmd.id, "INTERNAL",
-				"scroll_list check failed"));
-			return;
-		}
-		nlohmann::json r;
-		r["select_actions"] = res.selectActions;
-		r["last_selected_index"] = res.lastSelectedIndex;
-		r["no_overflow_scrollbar_count"] = res.noOverflowScrollbarCount;
-		r["overflow_scrollbar_count"] = res.overflowScrollbarCount;
-		r["overflow_scrollbar_bbox_x"] = res.overflowScrollbarBboxX;
-		r["overflow_scrollbar_bbox_y"] = res.overflowScrollbarBboxY;
-		r["overflow_scrollbar_bbox_w"] = res.overflowScrollbarBboxW;
-		r["overflow_scrollbar_bbox_h"] = res.overflowScrollbarBboxH;
-		cmd.reply->set_value(OkResult(cmd.id, r));
-		return;
-	}
-	if(cmd.op == "clay_scroll_text_box_check"){
-		silencer::clay_bridge::ScrollTextBoxCheckResult res{};
-		bool ok = silencer::clay_bridge::RunScrollTextBoxCheck(game, res);
-		if(!ok){
-			cmd.reply->set_value(Err(cmd.id, "INTERNAL",
-				"scroll_text_box check failed"));
-			return;
-		}
-		nlohmann::json r;
-		r["at_bottom_prev_pos"] = res.atBottom_prevPos;
-		r["not_at_bottom_prev_pos"] = res.notAtBottom_prevPos;
-		r["at_bottom_overflow_prev_pos"] = res.atBottomOverflow_prevPos;
-		cmd.reply->set_value(OkResult(cmd.id, r));
-		return;
-	}
-	if(cmd.op == "clay_text_input_check"){
-		silencer::clay_bridge::TextInputCheckResult res{};
-		bool ok = silencer::clay_bridge::RunTextInputCheck(game, res);
-		if(!ok){
-			cmd.reply->set_value(Err(cmd.id, "INTERNAL",
-				"text_input check failed"));
-			return;
-		}
-		nlohmann::json r;
-		r["submit_actions_for_enter"] = res.submitActionsForEnter;
-		r["submit_actions_for_text"] = res.submitActionsForText;
-		r["password_mask_applied_len"] = res.passwordMaskAppliedLen;
-		r["overflow_tail_applied_len"] = res.overflowTailAppliedLen;
-		r["overflow_tail_matches"] = res.overflowTailMatches;
-		r["body14_top_margin"] = res.body14TopMargin;
-		r["body14_bottom_margin"] = res.body14BottomMargin;
-		cmd.reply->set_value(OkResult(cmd.id, r));
-		return;
-	}
 	if(cmd.op == "state"){
 		nlohmann::json r;
 		r["state"] = Game::StateName(game.GetState());
@@ -479,7 +356,7 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 		nlohmann::json widgets = nlohmann::json::array();
 		for(const auto & cw : game.UiInteractions().Interactables()){
 			nlohmann::json w;
-			w["source"] = "clay";
+			w["source"] = "ui";
 			if(!cw.id.empty()) w["id"] = cw.id;
 			const auto * el = cw.id.empty()
 				? nullptr
@@ -524,7 +401,7 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 				continue;
 			}
 			nlohmann::json e;
-			e["source"] = "clay";
+			e["source"] = "ui";
 			if(!element.id.empty()) e["id"] = element.id;
 			if(!element.label.empty()) e["label"] = element.label;
 			if(!element.value.empty()) e["value"] = element.value;
@@ -549,7 +426,7 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 			elements.push_back(std::move(e));
 		}
 		if(widgets.empty() && elements.empty()){
-			cmd.reply->set_value(Err(cmd.id, "WRONG_STATE", "no clay widgets"));
+			cmd.reply->set_value(Err(cmd.id, "WRONG_STATE", "no UI widgets"));
 			return;
 		}
 		nlohmann::json r;
@@ -628,7 +505,7 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 				QueueInteractableAction(game, *cw, silencer::ui::UiActionKind::Activate,
 				                  label ? label : "");
 				nlohmann::json r;
-				r["source"] = "clay";
+				r["source"] = "ui";
 				cmd.reply->set_value(OkResult(cmd.id, r));
 				return;
 			}
@@ -637,13 +514,13 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 				QueueInteractableAction(game, *cw, silencer::ui::UiActionKind::Select,
 				                  label ? label : "");
 				nlohmann::json r;
-				r["source"] = "clay";
+				r["source"] = "ui";
 				r["row_index"] = cw->index;
 				cmd.reply->set_value(OkResult(cmd.id, r));
 				return;
 			}
 			cmd.reply->set_value(Err(cmd.id, "WRONG_TYPE",
-				"clay widget \"" + target + "\" is not clickable"));
+				"UI widget \"" + target + "\" is not clickable"));
 			return;
 		}
 		cmd.reply->set_value(Err(cmd.id, "WIDGET_NOT_FOUND",
@@ -659,12 +536,12 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 		int y = cmd.args["y"].get<int>();
 		if(!FindInteractableAt(game.UiInteractions(), x, y)){
 			cmd.reply->set_value(Err(cmd.id, "WIDGET_NOT_FOUND",
-				"no clickable clay widget at point"));
+				"no clickable UI widget at point"));
 			return;
 		}
 		game.UiInput().QueueControlPointerPress(x, y);
 		nlohmann::json r;
-		r["source"] = "clay";
+		r["source"] = "ui";
 		r["x"] = x;
 		r["y"] = y;
 		cmd.reply->set_value(OkResult(cmd.id, r));
@@ -672,7 +549,7 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 	}
 	if(cmd.op == "hover_at"){
 		// Move the UI pointer without pressing. Control-socket callers use the
-		// same virtual Clay coordinates that inspect/click_at expose.
+		// same virtual UI coordinates that inspect/click_at expose.
 		if(!cmd.args.contains("x") || !cmd.args.contains("y")){
 			cmd.reply->set_value(Err(cmd.id, "BAD_REQUEST", "hover_at needs x and y"));
 			return;
@@ -683,7 +560,7 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 		if(y < 0) y = 0;
 		game.UiInput().QueueControlPointerHover(x, y);
 		nlohmann::json r;
-		r["source"] = "clay";
+		r["source"] = "ui";
 		r["x"] = x;
 		r["y"] = y;
 		cmd.reply->set_value(OkResult(cmd.id, r));
@@ -722,12 +599,12 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 				QueueInteractableAction(game, *cw, silencer::ui::UiActionKind::SetText,
 				                  text.substr(0, static_cast<size_t>(n)));
 				nlohmann::json r;
-				r["source"] = "clay";
+				r["source"] = "ui";
 				cmd.reply->set_value(OkResult(cmd.id, r));
 				return;
 			}
 			cmd.reply->set_value(Err(cmd.id, "WRONG_TYPE",
-				"clay widget is not a textinput"));
+				"UI widget is not a textinput"));
 			return;
 		}
 		if(cmd.args.contains("label")){
@@ -742,7 +619,7 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 		if(cmd.args.contains("uid")){
 			int uid = cmd.args["uid"].get<int>();
 			cmd.reply->set_value(Err(cmd.id, "WIDGET_NOT_FOUND",
-				"no clay widget with uid " + std::to_string(uid)));
+				"no UI widget with uid " + std::to_string(uid)));
 			return;
 		}
 		cmd.reply->set_value(Err(cmd.id, "BAD_REQUEST",
@@ -789,14 +666,14 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 		if(count != 1 || !hit){
 			cmd.reply->set_value(Err(cmd.id,
 				count > 1 ? "AMBIGUOUS_TARGET" : "WIDGET_NOT_FOUND",
-				"no unique clay list row matches select target"));
+				"no unique UI list row matches select target"));
 			return;
 		}
 		const char * hitLabel = silencer::ui::UiInteractableLabel(*hit);
 		QueueInteractableAction(game, *hit, silencer::ui::UiActionKind::Select,
 		                  hitLabel ? hitLabel : "");
 		nlohmann::json r;
-		r["source"] = "clay";
+		r["source"] = "ui";
 		r["row_index"] = hit->index;
 		if(hitLabel) r["label"] = hitLabel;
 		cmd.reply->set_value(OkResult(cmd.id, r));
@@ -807,7 +684,7 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 		int amount = cmd.args.value("amount", 1);
 		if(label.empty()){
 			cmd.reply->set_value(Err(cmd.id, "BAD_REQUEST",
-				"scroll needs --label for a Clay scroll control"));
+				"scroll needs --label for a UI scroll control"));
 			return;
 		}
 		if(amount < 1) amount = 1;
@@ -820,7 +697,7 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 			action.amount = amount;
 			game.UiInput().QueueControlAction(std::move(action));
 			nlohmann::json r;
-			r["source"] = "clay";
+			r["source"] = "ui";
 			r["target"] = "element";
 			r["label"] = label;
 			r["amount"] = amount;
@@ -834,7 +711,7 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 		}
 		if(cw->kind != silencer::ui::UiInteractableKind::Button){
 			cmd.reply->set_value(Err(cmd.id, "WRONG_TYPE",
-				"scroll target is not a Clay scroll button"));
+				"scroll target is not a UI scroll button"));
 			return;
 		}
 		const char * actionValue = silencer::ui::UiInteractableLabel(*cw);
@@ -843,7 +720,7 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 			                  actionValue ? actionValue : "");
 		}
 		nlohmann::json r;
-		r["source"] = "clay";
+		r["source"] = "ui";
 		r["label"] = label;
 		r["amount"] = amount;
 		cmd.reply->set_value(OkResult(cmd.id, r));

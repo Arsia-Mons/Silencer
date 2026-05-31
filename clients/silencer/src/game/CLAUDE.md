@@ -18,7 +18,7 @@ internals — use `World` and its subsystems for that.
 | `actor/` | `Team` actor helpers, stats |
 | `input/` | `GameInput` — raw SDL event → keybind action mapping |
 | `render/` | `GameRenderer` — SDL3 GPU backend, surface resize, vsync, `kLegacyRenderWidth/Height` |
-| `ui/` | `GameUiPipeline` — Clay UI frame lifecycle, client UI dispatch, `SDL_StartTextInput` gating |
+| `ui/` | `GameUiPipeline` — retained client UI frame lifecycle, client UI dispatch, `SDL_StartTextInput` gating |
 | `replay/` | Replay recorder/playback |
 
 ## Key boundaries
@@ -27,8 +27,7 @@ internals — use `World` and its subsystems for that.
   and `world.DoNetwork()` but does not reach into world subsystems directly.
 - `GameSession` is the only place that calls `world.map.Load*` and
   `world.UnloadGame()`.
-- `GameUiPipeline` owns `SDL_StartTextInput` / `SDL_StopTextInput` — call
-  `clientUi.Interactions().HasTextInputFocus()` to gate them; never call
+- `GameUiPipeline` owns `SDL_StartTextInput` / `SDL_StopTextInput`; never call
   SDL text input functions elsewhere.
 - `GameRenderer` owns `kLegacyRenderWidth` / `kLegacyRenderHeight` (640/480)
   as `inline constexpr` in `render/game_renderer.h`. Import from there;

@@ -251,7 +251,7 @@ void Renderer::Draw(Surface * surface, float frametime){
 	//}
 
 	// UI composition is owned by Game/ClientUi after the world frame is drawn.
-	// Renderer must not begin Clay frames or own HUD layout.
+	// Renderer must not begin UI frames or own HUD layout.
 }
 
 void Renderer::Tick(void){

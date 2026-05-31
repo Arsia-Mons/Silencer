@@ -176,25 +176,14 @@ if(SILENCER_UNITY_BUILD)
 		file(GLOB_RECURSE _mm_sources src/*.mm)
 		set_source_files_properties(${_mm_sources} PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON)
 	endif()
-	# The Clay primitives and the lobby panels each use an anonymous
-	# namespace with a shared vocabulary (`g_payloads`, `g_customData`,
-	# `kPayloadCapacity`, `AllocCustomData`, `FromStd`, `kScrollbarBank`,
-	# `OnCreateClicked`, …). Anonymous namespaces re-open in the same
-	# translation unit, so concatenating two of these into one jumbo TU
-	# produces redefinition errors on every shared symbol — and the
-	# panel files also bring `TextInput` / `Box` / etc. into the global
-	# namespace via `using`, which trips sibling screen TUs in the same
-	# batch (e.g. lobby_connect_screen.cpp's `TextInput * passwordinput`
-	# becomes ambiguous). Until the per-file arenas + `using` decls are
-	# refactored into uniquely-scoped storage, build these as individual
-	# TUs.
-	file(GLOB _clay_unsafe_sources
-		src/ui/primitives/*.cpp
-		src/ui/runtime/*.cpp
-		src/render/clay_ui_tests/*.cpp
+	# Some screen panels use anonymous namespaces with shared helper names and
+	# global `using` declarations. Anonymous namespaces re-open inside one jumbo
+	# TU, so keep those panels as individual translation units until the helpers
+	# are uniquely scoped.
+	file(GLOB _ui_unity_unsafe_sources
 		src/client/ui/screens/character_create/*.cpp
 		src/client/ui/screens/lobby/*.cpp)
-	set_source_files_properties(${_clay_unsafe_sources} PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON)
+	set_source_files_properties(${_ui_unity_unsafe_sources} PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON)
 endif()
 
 # Compile HLSL → DXIL bytecode headers for the SDL3 GPU backend. macOS keeps
