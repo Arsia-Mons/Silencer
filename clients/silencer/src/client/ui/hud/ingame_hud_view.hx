@@ -30,8 +30,6 @@ struct InGameHudContextValue {
 	Actions actions = {};
 };
 
-extern ::ReactContext InGameHudContext;
-
 const InGameHudContextValue& UseInGameHud();
 
 struct InGameHudViewProps {

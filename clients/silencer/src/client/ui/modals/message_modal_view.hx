@@ -21,8 +21,6 @@ struct MessageModalContextValue {
 	MessageModalActions actions = {};
 };
 
-extern ::ReactContext MessageModalContext;
-
 const MessageModalContextValue& UseMessageModal();
 
 struct MessageModalViewProps {

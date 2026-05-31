@@ -104,9 +104,8 @@ struct MessageModalFrameProps {
 
 }  // namespace
 
-::ReactContext MessageModalContext = {};
-
 namespace {
+::ReactContext MessageModalContext = {};
 const MessageModalContextValue kEmptyMessageModal = {};
 }
 

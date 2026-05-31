@@ -23,10 +23,9 @@ using ::ui::components::InputProps;
 using ::ui::components::Text;
 using ::ui::components::TextProps;
 
-::ReactContext InGameHudContext = {};
-
 namespace {
 
+::ReactContext InGameHudContext = {};
 const InGameHudContextValue kEmptyContext = {};
 constexpr int kTopMessageMaxLength = 35;
 constexpr int kChatX = 400;

@@ -103,7 +103,7 @@ fail_if_match \
 
 fail_if_match \
   "extern ::ReactContext" \
-  "$REPO_ROOT/clients/silencer/src/client/ui/screens" \
+  "$REPO_ROOT/clients/silencer/src/client/ui" \
   --glob '*.hx'
 
 fail_if_match \

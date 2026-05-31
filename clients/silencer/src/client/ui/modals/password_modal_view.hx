@@ -22,8 +22,6 @@ struct PasswordModalContextValue {
 	PasswordModalActions actions = {};
 };
 
-extern ::ReactContext PasswordModalContext;
-
 const PasswordModalContextValue& UsePasswordModal();
 
 struct PasswordModalViewProps {
