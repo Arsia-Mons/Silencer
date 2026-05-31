@@ -3,6 +3,8 @@
 #include "ui/components/common.h"
 #include "ui/runtime/react.h"
 
+#include <functional>
+
 namespace silencer::client_ui::lobby {
 
 struct CharacterPanelState;
@@ -13,19 +15,27 @@ struct GameJoinPanelState;
 struct GameTechPanelState;
 
 struct LobbyContextValue {
-	const char * version = "";
-	const char * map_name = "";
-	CharacterPanelState * character = nullptr;
-	ChatPanelState * chat = nullptr;
-	GameSelectPanelState * game_select = nullptr;
-	GameCreatePanelState * game_create = nullptr;
-	GameJoinPanelState * game_join = nullptr;
-	GameTechPanelState * game_tech = nullptr;
-	bool game_create_active = false;
-	bool game_join_active = false;
-	bool game_tech_active = false;
-	bool * go_back_clicked = nullptr;
-	bool * chat_send_clicked = nullptr;
+	struct State {
+		const char * version = "";
+		const char * map_name = "";
+		CharacterPanelState * character = nullptr;
+		ChatPanelState * chat = nullptr;
+		GameSelectPanelState * game_select = nullptr;
+		GameCreatePanelState * game_create = nullptr;
+		GameJoinPanelState * game_join = nullptr;
+		GameTechPanelState * game_tech = nullptr;
+		bool game_create_active = false;
+		bool game_join_active = false;
+		bool game_tech_active = false;
+	};
+
+	struct Actions {
+		std::function<void()> go_back = {};
+		std::function<void()> send_chat = {};
+	};
+
+	State state = {};
+	Actions actions = {};
 };
 
 extern ::ReactContext LobbyContext;

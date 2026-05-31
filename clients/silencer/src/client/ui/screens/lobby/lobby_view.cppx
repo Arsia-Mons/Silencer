@@ -77,6 +77,13 @@ std::function<void(const ::ui::ActivationEvent&)> set_flag(bool * flag) {
 	};
 }
 
+std::function<void(const ::ui::ActivationEvent&)> action_callback(
+	std::function<void()> action) {
+	return [action](const ::ui::ActivationEvent&) {
+		if(action) action();
+	};
+}
+
 std::function<void(const ::ui::ActivationEvent&)> set_index(int * target, int value) {
 	return [target, value](const ::ui::ActivationEvent&) {
 		if(target) *target = value;
@@ -104,9 +111,9 @@ std::function<void(const ::ui::FocusEvent&)> focus_index(int * target, int value
 	};
 }
 
-std::function<void(const ::ui::KeyEvent&)> submit_on_enter(bool * flag) {
-	return [flag](const ::ui::KeyEvent& event) {
-		if(event.key == ::ui::UiKey::Enter && flag) *flag = true;
+std::function<void(const ::ui::KeyEvent&)> action_on_enter(std::function<void()> action) {
+	return [action](const ::ui::KeyEvent& event) {
+		if(event.key == ::ui::UiKey::Enter && action) action();
 	};
 }
 
@@ -422,9 +429,9 @@ struct TitleBarProps {
 ::ui::UiElement TitleBar(const TitleBarProps& props) {
 	(void)props;
 	const LobbyContextValue& lobby = UseLobby();
-	const char * meta = lobby.map_name && lobby.map_name[0] != '\0'
-		? use_text_storage("%s    %s", lobby.version, lobby.map_name)
-		: safe_text(lobby.version);
+	const char * meta = lobby.state.map_name && lobby.state.map_name[0] != '\0'
+		? use_text_storage("%s    %s", lobby.state.version, lobby.state.map_name)
+		: safe_text(lobby.state.version);
 	return <Box key="title-bar" layout={title_bar_layout()} style={panel_style()}>
 		<Text
 		  key="title"
@@ -437,7 +444,7 @@ struct TitleBarProps {
 		  key="back"
 		  id="lobby.go_back"
 		  label="Go Back"
-		  onActivate={set_flag(lobby.go_back_clicked)}
+		  onActivate={action_callback(lobby.actions.go_back)}
 		  layout={small_button_layout(94.0f)}
 		/>
 	</Box>
@@ -450,7 +457,7 @@ struct CharacterPanelProps {
 ::ui::UiElement CharacterPanel(const CharacterPanelProps& props) {
 	(void)props;
 	const LobbyContextValue& lobby = UseLobby();
-	CharacterPanelState * state = lobby.character;
+	CharacterPanelState * state = lobby.state.character;
 	if(!state) return ::ui::empty();
 	const bool locked = state->agentSelectionLocked;
 	return <Box key="character" layout={character_panel_layout()} style={panel_style()}>
@@ -480,7 +487,7 @@ struct ChatLineRowProps {
 
 ::ui::UiElement ChatLineRow(const ChatLineRowProps& props) {
 	const LobbyContextValue& lobby = UseLobby();
-	ChatPanelState * state = lobby.chat;
+	ChatPanelState * state = lobby.state.chat;
 	if(!state) return ::ui::empty();
 	if(props.presence){
 		int start = static_cast<int>(state->presenceLines.size()) - kVisiblePresenceLines;
@@ -513,7 +520,7 @@ struct ChatPanelProps {
 ::ui::UiElement ChatPanel(const ChatPanelProps& props) {
 	(void)props;
 	const LobbyContextValue& lobby = UseLobby();
-	ChatPanelState * state = lobby.chat;
+	ChatPanelState * state = lobby.state.chat;
 	if(!state) return ::ui::empty();
 	const char * channel = state->channel.empty() ? "Lobby" : state->channel.c_str();
 	return <Box key="chat" layout={chat_panel_layout()} style={panel_style()}>
@@ -546,14 +553,14 @@ struct ChatPanelProps {
 			  value={state->inputBuffer}
 			  accessibility={::ui::components::AccessibilityProps{.role = ::ui::SemanticRole::TextBox, .label = "Chat message"}}
 			  onChange={copy_to(state->inputBuffer, static_cast<int>(sizeof(state->inputBuffer)))}
-			  onKey={submit_on_enter(lobby.chat_send_clicked)}
+			  onKey={action_on_enter(lobby.actions.send_chat)}
 			  layout={input_grow_layout()}
 			/>
 			<Button
 			  key="send"
 			  id="lobby.chat.send"
 			  label="Send"
-			  onActivate={set_flag(lobby.chat_send_clicked)}
+			  onActivate={action_callback(lobby.actions.send_chat)}
 			  layout={small_button_layout(72.0f)}
 			/>
 		</Box>
@@ -567,7 +574,7 @@ struct GameRowProps {
 
 ::ui::UiElement GameRow(const GameRowProps& props) {
 	const LobbyContextValue& lobby = UseLobby();
-	GameSelectPanelState * state = lobby.game_select;
+	GameSelectPanelState * state = lobby.state.game_select;
 	if(!state) return ::ui::empty();
 	int start = state->scrollPos;
 	int index = start + props.slot;
@@ -592,7 +599,7 @@ struct GameSelectUpperProps {
 ::ui::UiElement GameSelectUpper(const GameSelectUpperProps& props) {
 	(void)props;
 	const LobbyContextValue& lobby = UseLobby();
-	GameSelectPanelState * state = lobby.game_select;
+	GameSelectPanelState * state = lobby.state.game_select;
 	if(!state) return ::ui::empty();
 	return <Box key="select-upper" layout={upper_panel_layout()} style={panel_style()}>
 		<SectionHeading key="heading" value="GAME SELECT" />
@@ -617,7 +624,7 @@ struct GameSelectTallProps {
 ::ui::UiElement GameSelectTall(const GameSelectTallProps& props) {
 	(void)props;
 	const LobbyContextValue& lobby = UseLobby();
-	GameSelectPanelState * state = lobby.game_select;
+	GameSelectPanelState * state = lobby.state.game_select;
 	if(!state) return ::ui::empty();
 	return <Box key="select-tall" layout={side_panel_layout()} style={panel_style()}>
 		<SectionHeading key="heading" value="ACTIVE GAMES" />
@@ -678,7 +685,7 @@ struct MapRowProps {
 
 ::ui::UiElement MapRow(const MapRowProps& props) {
 	const LobbyContextValue& lobby = UseLobby();
-	GameCreatePanelState * state = lobby.game_create;
+	GameCreatePanelState * state = lobby.state.game_create;
 	if(!state) return ::ui::empty();
 	int start = state->mapScrollPos;
 	int index = start + props.slot;
@@ -702,7 +709,7 @@ struct GameCreateUpperProps {
 ::ui::UiElement GameCreateUpper(const GameCreateUpperProps& props) {
 	(void)props;
 	const LobbyContextValue& lobby = UseLobby();
-	GameCreatePanelState * state = lobby.game_create;
+	GameCreatePanelState * state = lobby.state.game_create;
 	if(!state) return ::ui::empty();
 	return <Box key="create-upper" layout={upper_panel_layout()} style={panel_style()}>
 		<SectionHeading key="heading" value="GAME OPTIONS" />
@@ -730,7 +737,7 @@ struct GameCreateTallProps {
 ::ui::UiElement GameCreateTall(const GameCreateTallProps& props) {
 	(void)props;
 	const LobbyContextValue& lobby = UseLobby();
-	GameCreatePanelState * state = lobby.game_create;
+	GameCreatePanelState * state = lobby.state.game_create;
 	if(!state) return ::ui::empty();
 	return <Box key="create-tall" layout={side_panel_layout()} style={panel_style()}>
 		<SectionHeading key="heading" value="SELECT MAP" />
@@ -831,7 +838,7 @@ struct GameJoinUpperProps {
 ::ui::UiElement GameJoinUpper(const GameJoinUpperProps& props) {
 	(void)props;
 	const LobbyContextValue& lobby = UseLobby();
-	GameJoinPanelState * state = lobby.game_join;
+	GameJoinPanelState * state = lobby.state.game_join;
 	if(!state) return ::ui::empty();
 	return <Box key="join-upper" layout={upper_panel_layout()} style={panel_style()}>
 		<SectionHeading key="heading" value="TEAM" />
@@ -866,7 +873,7 @@ struct RosterRowProps {
 
 ::ui::UiElement RosterRow(const RosterRowProps& props) {
 	const LobbyContextValue& lobby = UseLobby();
-	GameJoinPanelState * state = lobby.game_join;
+	GameJoinPanelState * state = lobby.state.game_join;
 	if(!state) return ::ui::empty();
 	if(props.slot < 0 || props.slot >= static_cast<int>(state->rosterRows.size())) return ::ui::empty();
 	const GameJoinRosterRow& row = state->rosterRows[static_cast<size_t>(props.slot)];
@@ -906,7 +913,7 @@ struct TechRowProps {
 
 ::ui::UiElement TechRow(const TechRowProps& props) {
 	const LobbyContextValue& lobby = UseLobby();
-	GameTechPanelState * state = lobby.game_tech;
+	GameTechPanelState * state = lobby.state.game_tech;
 	if(!state) return ::ui::empty();
 	if(props.slot < 0 || props.slot >= static_cast<int>(state->techRows.size())) return ::ui::empty();
 	const GameTechRow& row = state->techRows[static_cast<size_t>(props.slot)];
@@ -931,7 +938,7 @@ struct GameTechUpperProps {
 ::ui::UiElement GameTechUpper(const GameTechUpperProps& props) {
 	(void)props;
 	const LobbyContextValue& lobby = UseLobby();
-	GameTechPanelState * state = lobby.game_tech;
+	GameTechPanelState * state = lobby.state.game_tech;
 	if(!state) return ::ui::empty();
 	return <Box key="tech-upper" layout={upper_panel_layout()} style={panel_style()}>
 		<SectionHeading key="heading" value="TECH" />
@@ -955,7 +962,7 @@ struct GameTechTallProps {
 ::ui::UiElement GameTechTall(const GameTechTallProps& props) {
 	(void)props;
 	const LobbyContextValue& lobby = UseLobby();
-	GameTechPanelState * state = lobby.game_tech;
+	GameTechPanelState * state = lobby.state.game_tech;
 	if(!state) return ::ui::empty();
 	return <Box key="tech-tall" layout={side_panel_layout()} style={panel_style()}>
 		<SectionHeading key="heading" value={state->slotsLeftStr.c_str()} />
@@ -988,13 +995,13 @@ struct RightUpperPanelProps {
 ::ui::UiElement RightUpperPanel(const RightUpperPanelProps& props) {
 	(void)props;
 	const LobbyContextValue& lobby = UseLobby();
-	if(lobby.game_create_active){
+	if(lobby.state.game_create_active){
 		return <GameCreateUpper key="create-upper-root" />
 	}
-	if(lobby.game_join_active){
+	if(lobby.state.game_join_active){
 		return <GameJoinUpper key="join-upper-root" />
 	}
-	if(lobby.game_tech_active){
+	if(lobby.state.game_tech_active){
 		return <GameTechUpper key="tech-upper-root" />
 	}
 	return <GameSelectUpper key="select-upper-root" />
@@ -1007,13 +1014,13 @@ struct RightTallPanelProps {
 ::ui::UiElement RightTallPanel(const RightTallPanelProps& props) {
 	(void)props;
 	const LobbyContextValue& lobby = UseLobby();
-	if(lobby.game_create_active){
+	if(lobby.state.game_create_active){
 		return <GameCreateTall key="create-tall-root" />
 	}
-	if(lobby.game_join_active){
+	if(lobby.state.game_join_active){
 		return <GameJoinTall key="join-tall-root" />
 	}
-	if(lobby.game_tech_active){
+	if(lobby.state.game_tech_active){
 		return <GameTechTall key="tech-tall-root" />
 	}
 	return <GameSelectTall key="select-tall-root" />

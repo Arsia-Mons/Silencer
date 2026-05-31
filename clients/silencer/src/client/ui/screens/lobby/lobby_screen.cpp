@@ -86,19 +86,27 @@ bool LobbyScreen::BuildElement(ScreenContext & ctx, ::ui::UiElement * out)
 		static_cast<Uint16>(std::min(chatWidth, 1024)),
 		static_cast<Uint16>(std::min(chatHeight, 768)));
 	silencer::client_ui::lobby::LobbyContextValue context{
-		.version = version.c_str(),
-		.map_name = mapName.c_str(),
-		.character = &characterState,
-		.chat = &chatState,
-		.game_select = &gameSelectState,
-		.game_create = &gameCreateState,
-		.game_join = &gameJoinState,
-		.game_tech = &gameTechState,
-		.game_create_active = gameCreateActive,
-		.game_join_active = gameJoinActive,
-		.game_tech_active = gameTechActive,
-		.go_back_clicked = &goBackClicked,
-		.chat_send_clicked = &chatSendClicked,
+		.state = {
+			.version = version.c_str(),
+			.map_name = mapName.c_str(),
+			.character = &characterState,
+			.chat = &chatState,
+			.game_select = &gameSelectState,
+			.game_create = &gameCreateState,
+			.game_join = &gameJoinState,
+			.game_tech = &gameTechState,
+			.game_create_active = gameCreateActive,
+			.game_join_active = gameJoinActive,
+			.game_tech_active = gameTechActive,
+		},
+		.actions = {
+			.go_back = [this]() {
+				goBackClicked = true;
+			},
+			.send_chat = [this]() {
+				chatSendClicked = true;
+			},
+		},
 	};
 	*out = silencer::client_ui::lobby::LobbyScreenView(
 		silencer::client_ui::lobby::LobbyScreenViewProps{
