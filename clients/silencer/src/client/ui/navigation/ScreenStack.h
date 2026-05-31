@@ -1,10 +1,11 @@
 #pragma once
 
-#include <cstddef>
-#include <memory>
-#include <vector>
+#include "screen.h"
+#include "ui/span.h"
 
-class Screen;
+#include <array>
+#include <memory>
+
 class ScreenContext;
 class Surface;
 
@@ -14,21 +15,27 @@ class UiInteractionRegistry;
 }
 namespace client_ui {
 
+constexpr int CLIENT_UI_MAX_SCREENS = 32;
+
 class ScreenStack {
 public:
 	~ScreenStack();
 
-	bool Empty() const { return screens_.empty(); }
-	std::size_t Size() const { return screens_.size(); }
+	bool Empty() const { return count_ <= 0; }
+	int Size() const { return count_; }
 
-	void Push(std::unique_ptr<Screen> screen, ScreenContext& ctx);
-	void Pop(ScreenContext& ctx);
-	void Replace(std::unique_ptr<Screen> screen, ScreenContext& ctx);
+	bool Push(std::unique_ptr<Screen> screen, ScreenContext& ctx);
+	bool Pop(ScreenContext& ctx);
+	bool PopEntry(UiScreenEntryId entryId, ScreenContext& ctx);
+	bool Replace(std::unique_ptr<Screen> screen, ScreenContext& ctx);
+	bool ResetTo(std::unique_ptr<Screen> screen, ScreenContext& ctx);
 	void Clear(ScreenContext& ctx);
 	void RequestClear();
 	void ClearIfRequested(ScreenContext& ctx);
 
+	Screen * At(int index) const;
 	Screen * Top() const;
+	::ui::Span<Screen *> VisibleScreens();
 
 	void TickVisible(ScreenContext& ctx);
 	void BuildVisible(ScreenContext& ctx,
@@ -37,9 +44,10 @@ public:
 	                  silencer::ui::UiInteractionRegistry& interactions);
 
 private:
-	std::size_t VisibleStart() const;
-
-	std::vector<std::unique_ptr<Screen>> screens_;
+	std::array<std::unique_ptr<Screen>, CLIENT_UI_MAX_SCREENS> screens_ = {};
+	std::array<Screen *, CLIENT_UI_MAX_SCREENS> visible_ = {};
+	int count_ = 0;
+	UiScreenEntryId nextEntryId_ = 1;
 	bool clearRequested_ = false;
 };
 

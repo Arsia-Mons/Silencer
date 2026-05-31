@@ -1,14 +1,22 @@
 #pragma once
 
 #include "ui/runtime/ClayService.h"
+#include "ui/runtime/draw_command.h"
+#include "ui/runtime/element.h"
+#include "ui/runtime/flex_layout.h"
+#include "ui/runtime/focus.h"
+#include "ui/runtime/interaction_hooks.h"
+#include "ui/runtime/tree.h"
 #include "ui/runtime/UiInteractionRegistry.h"
 #include "ui/runtime/UiFrameContext.h"
 #include "client/ui/navigation/ScreenStack.h"
 
+#include <array>
 #include <memory>
 #include <string>
 #include <vector>
 
+class Renderer;
 class Screen;
 class ScreenContext;
 class Surface;
@@ -37,13 +45,25 @@ public:
 	void ClearScreensIfRequested(ScreenContext& ctx);
 	void TickVisibleScreens(ScreenContext& ctx);
 	void BuildVisibleScreens(ScreenContext& ctx, Surface& dst, float frametime);
+	void RenderRetainedScreens(Renderer& renderer, Surface& dst);
 
 private:
+	bool BuildRetainedScreen(Screen& screen, ScreenContext& ctx);
+
 	silencer::ui::UiFrameContext frameCtx_;
 	silencer::ui::ClayService& clay_;
 	silencer::ui::UiInteractionRegistry interactions_;
 	ScreenStack screens_;
 	std::string hoveredAudioInteractableId_;
+	::ui::UiElementFrame retainedElementFrame_;
+	::ui::UiTree retainedTree_;
+	::ui::FocusRuntime retainedFocus_;
+	::ui::DrawCommandList retainedCommands_;
+	::ui::FlexLayoutAdapter retainedLayout_;
+	::ui::InteractionSnapshot retainedInteractionSnapshot_;
+	::ui::InputFrame retainedInput_;
+	::ui::LayoutViewport retainedViewport_;
+	bool retainedFrameOpen_ = false;
 };
 
 }  // namespace client_ui

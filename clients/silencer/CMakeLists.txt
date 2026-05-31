@@ -14,8 +14,50 @@ include(GNUInstallDirs)
 
 list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 
+include(FetchContent)
+find_package(Python3 COMPONENTS Interpreter REQUIRED)
+include(cmake/cppx_transpile.cmake)
+
+FetchContent_Declare(
+	yoga
+	GIT_REPOSITORY https://github.com/facebook/yoga.git
+	GIT_TAG v3.2.1
+	GIT_SHALLOW TRUE
+	SOURCE_SUBDIR yoga
+)
+FetchContent_MakeAvailable(yoga)
+
 # Shared monorepo dirs sit two levels up from clients/silencer/.
 set(SILENCER_SHARED_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../shared")
+
+cppx_transpile(SILENCER_UI_COMPONENT_GENERATED
+	src/ui/components/box.cppx
+	src/ui/components/box.hx
+	src/ui/components/button.cppx
+	src/ui/components/button.hx
+	src/ui/components/checkbox.cppx
+	src/ui/components/checkbox.hx
+	src/ui/components/dialog.cppx
+	src/ui/components/dialog.hx
+	src/ui/components/input.cppx
+	src/ui/components/input.hx
+	src/ui/components/text.cppx
+	src/ui/components/text.hx
+	src/client/ui/screens/main_menu/main_menu_view.cppx
+	src/client/ui/screens/main_menu/main_menu_view.hx
+	src/client/ui/screens/options/options_audio_view.cppx
+	src/client/ui/screens/options/options_audio_view.hx
+	src/client/ui/screens/options/options_display_view.cppx
+	src/client/ui/screens/options/options_display_view.hx
+	src/client/ui/screens/options/options_menu_view.cppx
+	src/client/ui/screens/options/options_menu_view.hx
+)
+add_custom_target(silencer_cppx_generated_components
+	DEPENDS ${SILENCER_UI_COMPONENT_GENERATED})
+
+set(SILENCER_CPPX_GENERATED_INCLUDE_DIRS
+	"${CMAKE_CURRENT_BINARY_DIR}/generated/cppx/src"
+)
 
 if(APPLE)
 	file(GLOB_RECURSE sources src/*.cpp src/*.h src/*.mm)
@@ -86,6 +128,8 @@ else()
 endif()
 
 target_compile_features(${SILENCER_TARGET} PUBLIC cxx_std_20)
+target_sources(${SILENCER_TARGET} PRIVATE ${SILENCER_UI_COMPONENT_GENERATED})
+add_dependencies(${SILENCER_TARGET} silencer_cppx_generated_components)
 
 if(WIN32)
 	# Strip <winsock.h> (and other legacy subsystems) out of <windows.h>.
@@ -152,6 +196,7 @@ silencer_finalize_shaders(
 )
 add_dependencies(${SILENCER_TARGET} silencer_shaders)
 target_include_directories(${SILENCER_TARGET} PRIVATE
+    ${SILENCER_CPPX_GENERATED_INCLUDE_DIRS}
     "${CMAKE_CURRENT_SOURCE_DIR}/shaders/generated")
 target_include_directories(${SILENCER_TARGET} PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}/third_party")
@@ -294,7 +339,13 @@ else()
 		CURL::libcurl)
 endif()
 
-target_link_libraries(${SILENCER_TARGET} minizip_dep)
+target_link_libraries(${SILENCER_TARGET} minizip_dep yogacore)
+
+add_custom_target(silencer_cppx_check
+	COMMAND ${Python3_EXECUTABLE}
+		${CMAKE_CURRENT_SOURCE_DIR}/tools/check-cppx.py
+	WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+	COMMENT "Checking cppx formatting and transpilation")
 
 # Dev-build asset staging (Windows/Linux): copy shared/assets/ next to the
 # binary so the runtime fallback (`GetResDir() + "<subdir>/..."` in

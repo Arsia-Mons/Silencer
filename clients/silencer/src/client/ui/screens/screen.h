@@ -4,11 +4,22 @@
 #include <SDL3/SDL_stdinc.h>
 #include "runtime/UiActionQueue.h"
 #include "runtime/UiInputState.h"
+#include "ui/runtime/element.h"
+
+#include <cstdint>
 
 class ScreenContext;
 class Surface;
 
 namespace silencer {
+namespace client_ui {
+using UiScreenEntryId = std::uint32_t;
+
+enum class ScreenKind {
+	Normal,
+	Overlay,
+};
+}
 namespace ui {
 class UiInteractionRegistry;
 }
@@ -20,6 +31,13 @@ class Screen
 {
 public:
 	virtual ~Screen() = default;
+
+	silencer::client_ui::UiScreenEntryId EntryId() const { return entryId_; }
+	void SetEntryId(silencer::client_ui::UiScreenEntryId id) { entryId_ = id; }
+	silencer::client_ui::ScreenKind Kind() const {
+		return IsOverlay() ? silencer::client_ui::ScreenKind::Overlay
+		                   : silencer::client_ui::ScreenKind::Normal;
+	}
 
 	// Initialize screen-owned UI state. Called once on push.
 	virtual void Build(ScreenContext & ctx) = 0;
@@ -35,6 +53,11 @@ public:
 	                     float frametime,
 	                     silencer::ui::UiInteractionRegistry& interactions)
 	{ (void)ctx; (void)dst; (void)frametime; (void)interactions; }
+
+	// Retained cppx entry point. ClientUi owns the UiElementFrame/reconciler
+	// boundary; screens only return a component root built from props/children.
+	virtual bool BuildElement(ScreenContext & ctx, ::ui::UiElement * out)
+	{ (void)ctx; (void)out; return false; }
 
 	// Tear down screen-owned UI state. Called on pop/replace.
 	virtual void Destroy(ScreenContext & ctx) = 0;
@@ -59,6 +82,9 @@ public:
 
 	// Modals draw the screen below them; non-modal Screens hide what's beneath.
 	virtual bool IsOverlay() const { return false; }
+
+private:
+	silencer::client_ui::UiScreenEntryId entryId_ = 0;
 };
 
 #endif

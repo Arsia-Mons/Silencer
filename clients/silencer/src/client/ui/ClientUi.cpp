@@ -3,7 +3,11 @@
 #include "client/ui/hud/HudPayloadArena.h"
 #include "screen.h"
 #include "screen_context.h"
+#include "retained_surface_renderer.h"
 #include "runtime/UiInputRouter.h"
+#include "ui/runtime/draw_command_builder.h"
+#include "ui/runtime/react.h"
+#include "ui/runtime/yoga_flex_layout.h"
 
 #ifndef SILENCER_TEST_BUILD
 #include "audio.h"
@@ -72,10 +76,69 @@ void PlayMenuButtonSound(ScreenContext& ctx) {
 #endif
 }
 
+::ui::InputFrame ToRetainedInput(const silencer::ui::UiInputState& input) {
+	::ui::InputFrame out{};
+	out.pointer_pressed = input.pointer.pressed;
+	out.pointer_down = input.pointer.down;
+	out.pointer_released = input.pointer.released;
+	out.pointer_valid = input.HasWindow();
+	out.pointer_x = input.pointer.x;
+	out.pointer_y = input.pointer.y;
+	out.source = (input.pointer.pressed || input.pointer.down || input.pointer.released)
+		? ::ui::FocusSource::Mouse
+		: ::ui::FocusSource::Keyboard;
+	for(silencer::ui::UiNavAction action : input.navActions){
+		switch(action){
+			case silencer::ui::UiNavAction::FocusNext:
+			case silencer::ui::UiNavAction::Down:
+			case silencer::ui::UiNavAction::NextSection:
+				out.nav_down = true;
+				break;
+			case silencer::ui::UiNavAction::FocusPrevious:
+			case silencer::ui::UiNavAction::Up:
+			case silencer::ui::UiNavAction::PreviousSection:
+				out.nav_up = true;
+				break;
+			case silencer::ui::UiNavAction::Left:
+				out.nav_left = true;
+				break;
+			case silencer::ui::UiNavAction::Right:
+				out.nav_right = true;
+				break;
+			case silencer::ui::UiNavAction::Confirm:
+				out.confirm_pressed = true;
+				break;
+			case silencer::ui::UiNavAction::Backspace:
+				if(out.key_event_count < ::ui::UI_INPUT_MAX_KEY_EVENTS){
+					out.key_events[out.key_event_count++] = {
+						.key = ::ui::UiKey::Backspace,
+						.modifiers = ::ui::UI_KEY_MOD_NONE,
+						.repeat = false,
+					};
+				}
+				break;
+			case silencer::ui::UiNavAction::Cancel:
+				break;
+		}
+	}
+	if(!input.textInput.empty()){
+		::ui::UiInputFrame textFrame{};
+		::ui::ui_input_push_text(textFrame, input.textInput.c_str());
+		out.text_event_count = textFrame.text_event_count;
+		for(int i = 0; i < out.text_event_count; ++i){
+			out.text_events[i] = textFrame.text_events[i];
+		}
+	}
+	return out;
+}
+
 }  // namespace clientui_detail
 
 ClientUi::ClientUi(silencer::ui::ClayService& clay)
-	: clay_(clay) {}
+	: clay_(clay),
+	  retainedLayout_(::ui::make_yoga_flex_layout_adapter()) {
+	::ui::focus_init(&retainedFocus_);
+}
 
 ClientUi::~ClientUi() = default;
 
@@ -83,9 +146,63 @@ void ClientUi::BeginFrame(const silencer::ui::UiInputState& input) {
 	frameCtx_.BeginFrame(input.animationDeltaSeconds, input.animationStepSeconds);
 	silencer::client_ui::HudPayloadBeginFrame();
 	clay_.BeginFrame(input, interactions_);
+	retainedElementFrame_.reset();
+	retainedCommands_.reset();
+	retainedInput_ = clientui_detail::ToRetainedInput(input);
+	retainedViewport_ = {
+		static_cast<float>(input.width > 0 ? input.width : 1),
+		static_cast<float>(input.height > 0 ? input.height : 1),
+	};
+	::react_begin_frame();
+	retainedTree_.begin_frame(retainedViewport_.width, retainedViewport_.height);
+	retainedFrameOpen_ = true;
 }
 
 std::vector<silencer::ui::UiRenderCommand> ClientUi::EndFrame() {
+	if(retainedFrameOpen_){
+		bool treeEnded = retainedTree_.end_frame();
+		if(treeEnded &&
+		   ::ui::compute_flex_layout(retainedLayout_, retainedTree_, retainedViewport_) &&
+		   ::ui::focus_update(&retainedFocus_, retainedTree_, retainedInput_)){
+			::ui::NodeId blurred = ::ui::focus_blurred_id(retainedFocus_);
+			if(blurred != 0) retainedTree_.invoke_blur(blurred);
+			::ui::NodeId focused = ::ui::focus_changed_id(retainedFocus_);
+			if(focused != 0) retainedTree_.invoke_focus(focused);
+			::ui::NodeId confirmed = ::ui::focus_confirmed_id(retainedFocus_);
+			if(confirmed != 0) retainedTree_.invoke_activate(confirmed);
+
+			::ui::NodeId active = ::ui::focus_focused_id(retainedFocus_);
+			for(int i = 0; i < retainedInput_.key_event_count; ++i){
+				retainedTree_.invoke_key(active, retainedInput_.key_events[i]);
+			}
+			for(int i = 0; i < retainedInput_.text_event_count; ++i){
+				retainedTree_.invoke_text_input(active, retainedInput_.text_events[i]);
+			}
+			for(int i = 0; i < retainedInput_.editing_event_count; ++i){
+				retainedTree_.invoke_text_editing(active, retainedInput_.editing_events[i]);
+			}
+
+			auto fiberOf = [&](::ui::NodeId id) -> ::ReactFiberId {
+				::ui::NodeSnapshot snapshot{};
+				return id != 0 && retainedTree_.snapshot(id, &snapshot)
+					? snapshot.fiber_id
+					: 0;
+			};
+			retainedInteractionSnapshot_ = {
+				.focused_fiber = fiberOf(::ui::focus_focused_id(retainedFocus_)),
+				.hovered_fiber = fiberOf(::ui::focus_hovered_id(retainedFocus_)),
+				.pressed_fiber = fiberOf(::ui::focus_pressed_id(retainedFocus_)),
+				.source = ::ui::focus_source(retainedFocus_),
+			};
+			if(!::ui::build_draw_command_list(retainedTree_, &retainedCommands_, active)){
+				retainedCommands_.reset();
+			}
+		}else{
+			retainedCommands_.reset();
+		}
+		::react_end_frame();
+		retainedFrameOpen_ = false;
+	}
 	return clay_.EndFrame();
 }
 
@@ -152,8 +269,43 @@ void ClientUi::TickVisibleScreens(ScreenContext& ctx) {
 	screens_.TickVisible(ctx);
 }
 
+bool ClientUi::BuildRetainedScreen(Screen& screen, ScreenContext& ctx) {
+	retainedElementFrame_.reset();
+	::ui::UiElementFrameScope scope(retainedElementFrame_);
+	::ui::UiElement root{};
+	if(!screen.BuildElement(ctx, &root)){
+		return false;
+	}
+	::ui::UiElement provider = ::ui::provider(
+		"InteractionProvider",
+		&::ui::InteractionContext,
+		&retainedInteractionSnapshot_,
+		::ui::children({ root }));
+	::ui::ReconcileResult result =
+		::ui::commit_retained_elements(retainedTree_, retainedElementFrame_, provider);
+	if(!result.ok){
+		::react_report_error("client/ui: failed to commit retained screen (errors=%d)\n",
+		                     result.error_count);
+		return false;
+	}
+	return true;
+}
+
 void ClientUi::BuildVisibleScreens(ScreenContext& ctx, Surface& dst, float frametime) {
-	screens_.BuildVisible(ctx, dst, frametime, interactions_);
+	::ui::Span<Screen *> visible = screens_.VisibleScreens();
+	for(int i = 0; i < visible.count; ++i){
+		if(i > 0 && visible[i]->Kind() == ScreenKind::Overlay){
+			interactions_.BeginFrame();
+		}
+		if(BuildRetainedScreen(*visible[i], ctx)){
+			continue;
+		}
+		visible[i]->BuildUi(ctx, dst, frametime, interactions_);
+	}
+}
+
+void ClientUi::RenderRetainedScreens(Renderer& renderer, Surface& dst) {
+	silencer::client_ui::RenderRetainedDrawCommands(renderer, dst, retainedCommands_);
 }
 
 }  // namespace client_ui

@@ -14,11 +14,7 @@ namespace silencer::ui::primitives {
 
 namespace {
 
-constexpr int kSpritePayloadCapacity = 512;
-silencer::clay_bridge::ButtonSpritePayload g_spritePayloads[kSpritePayloadCapacity];
-int g_spritePayloadCount = 0;
-
-constexpr int kNineSlicePayloadCapacity = 128;
+constexpr int kNineSlicePayloadCapacity = 512;
 silencer::clay_bridge::ButtonNineSlicePayload g_nineSlicePayloads[kNineSlicePayloadCapacity];
 int g_nineSlicePayloadCount = 0;
 
@@ -61,7 +57,6 @@ struct ButtonLines {
 
 struct ResolvedButton {
 	bool hasSprite = false;
-	bool nineSlice = false;
 	Uint8 spriteBank = 0;
 	Uint16 spriteIndex = 0;
 	int fixedWidth = 0;
@@ -118,6 +113,8 @@ ResolvedButton ResolveButton(const ButtonOpts& opts) {
 			out.fixedHeight = 33;
 			out.textSize = TextSize::Title;
 			out.yOffset = 8;
+			out.topCap = 8;
+			out.bottomCap = 8;
 			switch(opts.size){
 				case ButtonSize::Sm:
 				case ButtonSize::Compact:
@@ -133,7 +130,6 @@ ResolvedButton ResolveButton(const ButtonOpts& opts) {
 					out.fixedWidth = 0;
 					out.fixedHeight = 0;
 					out.minHeight = 33;
-					out.nineSlice = true;
 					out.defaultPaddingX = 24;
 					out.defaultPaddingY = 7;
 					out.centerContentY = true;
@@ -151,13 +147,12 @@ ResolvedButton ResolveButton(const ButtonOpts& opts) {
 			out.fixedHeight = 21;
 			out.textSize = TextSize::Heading;
 			out.yOffset = 4;
+			out.leftCap = 12;
+			out.rightCap = 12;
+			out.topCap = 4;
+			out.bottomCap = 4;
 			if(opts.size == ButtonSize::Auto){
 				out.fixedWidth = 0;
-				out.nineSlice = true;
-				out.leftCap = 12;
-				out.rightCap = 12;
-				out.topCap = 4;
-				out.bottomCap = 4;
 			}
 			break;
 		case ButtonVariant::LegacyRow:
@@ -169,6 +164,8 @@ ResolvedButton ResolveButton(const ButtonOpts& opts) {
 			out.textSize = TextSize::Heading;
 			out.yOffset = 6;
 			out.measureTextInk = true;
+			out.topCap = 8;
+			out.bottomCap = 8;
 			break;
 		case ButtonVariant::Text:
 			out.textSize = TextSize::BodySm;
@@ -369,16 +366,6 @@ ButtonLines BuildLines(Clay_String label, bool wrapText, int maxTextWidth, int c
 	return out;
 }
 
-silencer::clay_bridge::ButtonSpritePayload *
-AllocSpritePayload(Uint8 bank, Uint16 index, Uint8 brightness) {
-	if(g_spritePayloadCount >= kSpritePayloadCapacity) return nullptr;
-	auto * p = &g_spritePayloads[g_spritePayloadCount++];
-	p->bank = bank;
-	p->index = index;
-	p->brightness = brightness;
-	return p;
-}
-
 silencer::clay_bridge::ButtonNineSlicePayload *
 AllocNineSlicePayload(Uint8 bank,
                       Uint16 index,
@@ -462,7 +449,6 @@ void EmitButtonText(const ButtonLines& lines,
 }  // namespace
 
 void ButtonBeginFrame(float animationDeltaSeconds, float animationStepSeconds) {
-	g_spritePayloadCount = 0;
 	g_nineSlicePayloadCount = 0;
 	g_customDataCount = 0;
 	g_stringArenaOffset = 0;
@@ -505,31 +491,27 @@ void Button(Clay_String id,
 		: CLAY_ALIGN_X_CENTER;
 
 	if(resolved.hasSprite){
-		void * payload = resolved.nineSlice
-			? static_cast<void *>(AllocNineSlicePayload(resolved.spriteBank,
-			                                           resolved.spriteIndex,
-			                                           128,
-			                                           resolved.leftCap,
-			                                           resolved.rightCap,
-			                                           resolved.topCap,
-			                                           resolved.bottomCap))
-			: static_cast<void *>(AllocSpritePayload(resolved.spriteBank, resolved.spriteIndex, 128));
-		auto * ccd = AllocCustomData(
-			resolved.nineSlice ? silencer::clay_bridge::CustomKind::ButtonNineSlice
-			                   : silencer::clay_bridge::CustomKind::ButtonSprite,
-			payload);
+		auto * payload = AllocNineSlicePayload(resolved.spriteBank,
+		                                       resolved.spriteIndex,
+		                                       128,
+		                                       resolved.leftCap,
+		                                       resolved.rightCap,
+		                                       resolved.topCap,
+		                                       resolved.bottomCap);
+		auto * ccd = AllocCustomData(silencer::clay_bridge::CustomKind::ButtonNineSlice,
+		                             payload);
 		CLAY({ .id = clayId,
 		       .layout = {
 		           .sizing = { CLAY_SIZING_FIXED(boxW), CLAY_SIZING_FIXED(boxH) },
 		           .padding = { static_cast<uint16_t>(paddingX),
 		                        static_cast<uint16_t>(paddingX),
-		                        static_cast<uint16_t>(resolved.nineSlice && resolved.centerContentY
+		                        static_cast<uint16_t>(resolved.centerContentY
 		                                               ? paddingY
 		                                               : resolved.yOffset),
 		                        static_cast<uint16_t>(paddingY) },
 		           .childGap = 0,
 		           .childAlignment = { alignX,
-		                               resolved.nineSlice && resolved.centerContentY
+		                               resolved.centerContentY
 		                                                  ? CLAY_ALIGN_Y_CENTER
 		                                                  : CLAY_ALIGN_Y_TOP },
 		           .layoutDirection = CLAY_TOP_TO_BOTTOM,
@@ -543,18 +525,9 @@ void Button(Clay_String id,
 				clayId.id,
 				!opts.disabled && (hovered || focused || selectedVisual));
 			Uint16 spriteIndex = SpriteIndexForFrame(resolved, opts, visual.phase);
-			if(resolved.nineSlice){
-				auto * p = reinterpret_cast<silencer::clay_bridge::ButtonNineSlicePayload *>(payload);
-				if(p){
-					p->index = spriteIndex;
-					p->brightness = visual.brightness;
-				}
-			}else{
-				auto * p = reinterpret_cast<silencer::clay_bridge::ButtonSpritePayload *>(payload);
-				if(p){
-					p->index = spriteIndex;
-					p->brightness = visual.brightness;
-				}
+			if(payload){
+				payload->index = spriteIndex;
+				payload->brightness = visual.brightness;
 			}
 			if(handle.hoveredOut) *handle.hoveredOut = hovered;
 			EmitButtonText(lines, resolved, opts.textEffect, visual.brightness);

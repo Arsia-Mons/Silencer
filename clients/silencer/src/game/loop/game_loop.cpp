@@ -4,18 +4,6 @@
 #include "objecttypes.h"
 #include "player.h"
 #include "state.h"
-#include "character_create_screen.h"
-#include "lobby_connect_screen.h"
-#include "main_menu_screen.h"
-#include "mission_summary_screen.h"
-#include "options_audio_screen.h"
-#include "options_controls_screen.h"
-#include "options_display_screen.h"
-#include "options_screen.h"
-#include "update_screen.h"
-#ifdef SILENCER_HAVE_LOBBY_UI
-#include "lobby_screen.h"
-#endif
 #include <stdio.h>
 #include <cstring>
 #include <vector>
@@ -369,131 +357,18 @@ bool Game::Tick(void){
 		}
 	}
 	
-	switch(state){
-		case FADEOUT: TickFadeOut(); break;
-		case MAINMENU:{
-			if(stateisnew){
-				world.Disconnect();
-				world.gameplaystate = World::NONE;
-				world.lobby.Disconnect();
-				gameSession.UnloadGame();
-				world.GetAuthorityPeer()->controlledlist.clear();
-				world.DestroyAllObjects();
-				PushScreen(std::make_unique<MainMenuScreen>());
-				stateisnew = false;
-			}else{
-				if(gameSession.AmbienceMixerRef().FadedIn()){
-					gameSession.AmbienceMixerRef().PlayMusic(world.resources.menumusic);
-				}
-				// Button-click handling lives in MainMenuScreen::Tick, dispatched
-				// by ClientUi's navigation stack at the top of Game::Tick.
-			}
-		}break;
-		case LOBBYCONNECT:{
-			if(stateisnew){
-				world.GetAuthorityPeer()->controlledlist.clear();
-				world.DestroyAllObjects();
-				world.lobby.ClearGames();
-				world.lobby.state = Lobby::WAITING;
-				PushScreen(std::make_unique<LobbyConnectScreen>());
-				stateisnew = false;
-			}else{
-				if(gameSession.AmbienceMixerRef().FadedIn()){
-					gameSession.AmbienceMixerRef().PlayMusic(world.resources.menumusic);
-				}
-			}
-		}break;
-		case LOBBY:{
-			if(stateisnew){
-				world.lobby.ForgetAllUserInfo();
-				world.gameplaystate = World::INLOBBY;
-				gameSession.UnloadGame();
-				world.Disconnect();
-				world.choosingtech = false;
-				world.lobby.channelchanged = true;
-#ifdef SILENCER_HAVE_LOBBY_UI
-				PushScreen(std::make_unique<LobbyScreen>());
-#endif
-				stateisnew = false;
-			}else{
-				if(gameSession.AmbienceMixerRef().FadedIn()){
-					gameSession.AmbienceMixerRef().PlayMusic(world.resources.menumusic);
-				}
-				// Lobby pump (state-machine + deferred-create) lives in
-				// LobbyScreen::Tick, dispatched by ClientUi's navigation stack
-				// at the top of Game::Tick.
-			}
-		}break;
-		case CREATECHARACTER:{
-			if(stateisnew){
-				world.GetAuthorityPeer()->controlledlist.clear();
-				world.DestroyAllObjects();
-				PushScreen(std::make_unique<CharacterCreateScreen>());
-				stateisnew = false;
-			}else{
-				if(gameSession.AmbienceMixerRef().FadedIn()){
-					gameSession.AmbienceMixerRef().PlayMusic(world.resources.menumusic);
-				}
-			}
-		}break;
-		case UPDATING:{
-			if(stateisnew){
-				world.GetAuthorityPeer()->controlledlist.clear();
-				world.DestroyAllObjects();
-				PushScreen(std::make_unique<UpdateScreen>());
-				stateisnew = false;
-			}else{
-				if(gameSession.AmbienceMixerRef().FadedIn()){
-					gameSession.AmbienceMixerRef().PlayMusic(world.resources.menumusic);
-				}
-			}
-		}break;
-		case INGAME: TickInGame(); break;
-		case MISSIONSUMMARY:{
-			if(stateisnew){
-				gameSession.UnloadGame();
-				world.Disconnect();
-				PushScreen(std::make_unique<MissionSummaryScreen>());
-				stateisnew = false;
-			}else{
-				if(gameSession.AmbienceMixerRef().FadedIn()){
-					gameSession.AmbienceMixerRef().PlayMusic(world.resources.menumusic);
-				}
-			}
-		}break;
-		case SINGLEPLAYERGAME: TickSinglePlayerGame(); break;
-		case OPTIONS:{
-			if(stateisnew){
-				world.DestroyAllObjects();
-				PushScreen(std::make_unique<OptionsScreen>());
-				stateisnew = false;
-			}
-		}break;
-		case OPTIONSCONTROLS:{
-			if(stateisnew){
-				world.DestroyAllObjects();
-				PushScreen(std::make_unique<OptionsControlsScreen>());
-				stateisnew = false;
-			}
-		}break;
-		case OPTIONSDISPLAY:{
-			if(stateisnew){
-				world.DestroyAllObjects();
-				PushScreen(std::make_unique<OptionsDisplayScreen>());
-				stateisnew = false;
-			}
-		}break;
-		case OPTIONSAUDIO:{
-			if(stateisnew){
-				world.DestroyAllObjects();
-				PushScreen(std::make_unique<OptionsAudioScreen>());
-				stateisnew = false;
-			}
-		}break;
-		case HOSTGAME: TickHostGame(); break;
-		case JOINGAME: TickJoinGame(); break;
-		case TESTGAME: TickTestGame(); break;
-		case REPLAYGAME: TickReplayGame(); break;
+	if(gameUiPipeline.TickScreenState(state, stateisnew)){
+		stateisnew = false;
+	}else{
+		switch(state){
+			case FADEOUT: TickFadeOut(); break;
+			case INGAME: TickInGame(); break;
+			case SINGLEPLAYERGAME: TickSinglePlayerGame(); break;
+			case HOSTGAME: TickHostGame(); break;
+			case JOINGAME: TickJoinGame(); break;
+			case TESTGAME: TickTestGame(); break;
+			case REPLAYGAME: TickReplayGame(); break;
+		}
 	}
 	if(gameRenderer.FadePhaseRef() < 16 && state != FADEOUT){
 		gameRenderer.ApplyPaletteFade(false);

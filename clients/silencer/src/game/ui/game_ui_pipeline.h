@@ -27,6 +27,7 @@ void DrawInGameWorldInsets(Surface & surface, float frametime);
 void RenderClientUiFrame(Surface & surface, float frametime);
 void ResetUiFrameDeltas();
 bool HasInputTarget();
+bool TickScreenState(Uint8 state, bool entering);
 void Push(std::unique_ptr<Screen> s);
 void Pop();
 void Replace(std::unique_ptr<Screen> s);
@@ -54,6 +55,10 @@ silencer::ui::UiInputState preparedUiInput;
 bool hasPreparedUiInput;
 Uint64 lastUiAnimationMs;
 bool textInputFocused;
+
+bool ShowScreenForState(Uint8 state);
+void EnterScreenState(Uint8 state);
+void PlayMenuMusicIfReady();
 };
 
 #endif

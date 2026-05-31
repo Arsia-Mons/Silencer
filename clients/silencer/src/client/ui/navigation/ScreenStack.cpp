@@ -10,25 +10,53 @@ namespace client_ui {
 
 ScreenStack::~ScreenStack() = default;
 
-void ScreenStack::Push(std::unique_ptr<Screen> screen, ScreenContext& ctx) {
-	if(!screen) return;
+bool ScreenStack::Push(std::unique_ptr<Screen> screen, ScreenContext& ctx) {
+	if(!screen || count_ >= CLIENT_UI_MAX_SCREENS) return false;
+	screen->SetEntryId(nextEntryId_++);
 	screen->Build(ctx);
-	screens_.push_back(std::move(screen));
+	screens_[count_++] = std::move(screen);
+	return true;
 }
 
-void ScreenStack::Pop(ScreenContext& ctx) {
-	if(screens_.empty()) return;
-	screens_.back()->Destroy(ctx);
-	screens_.pop_back();
+bool ScreenStack::Pop(ScreenContext& ctx) {
+	if(count_ <= 0) return false;
+	screens_[count_ - 1]->Destroy(ctx);
+	screens_[--count_].reset();
+	return true;
 }
 
-void ScreenStack::Replace(std::unique_ptr<Screen> screen, ScreenContext& ctx) {
-	Pop(ctx);
-	Push(std::move(screen), ctx);
+bool ScreenStack::PopEntry(UiScreenEntryId entryId, ScreenContext& ctx) {
+	for(int i = count_ - 1; i >= 0; --i){
+		if(screens_[i] && screens_[i]->EntryId() == entryId){
+			screens_[i]->Destroy(ctx);
+			for(int j = i; j + 1 < count_; ++j){
+				screens_[j] = std::move(screens_[j + 1]);
+			}
+			screens_[--count_].reset();
+			return true;
+		}
+	}
+	return false;
+}
+
+bool ScreenStack::Replace(std::unique_ptr<Screen> screen, ScreenContext& ctx) {
+	if(!screen) return false;
+	if(count_ <= 0) return Push(std::move(screen), ctx);
+	screens_[count_ - 1]->Destroy(ctx);
+	screen->SetEntryId(nextEntryId_++);
+	screen->Build(ctx);
+	screens_[count_ - 1] = std::move(screen);
+	return true;
+}
+
+bool ScreenStack::ResetTo(std::unique_ptr<Screen> screen, ScreenContext& ctx) {
+	if(!screen) return false;
+	Clear(ctx);
+	return Push(std::move(screen), ctx);
 }
 
 void ScreenStack::Clear(ScreenContext& ctx) {
-	while(!screens_.empty()) Pop(ctx);
+	while(count_ > 0) Pop(ctx);
 }
 
 void ScreenStack::RequestClear() {
@@ -42,21 +70,32 @@ void ScreenStack::ClearIfRequested(ScreenContext& ctx) {
 }
 
 Screen * ScreenStack::Top() const {
-	return screens_.empty() ? nullptr : screens_.back().get();
+	return count_ > 0 ? screens_[count_ - 1].get() : nullptr;
 }
 
-std::size_t ScreenStack::VisibleStart() const {
-	if(screens_.empty()) return 0;
-	std::size_t start = screens_.size() - 1;
-	while(start > 0 && screens_[start]->IsOverlay()) --start;
-	return start;
+Screen * ScreenStack::At(int index) const {
+	if(index < 0 || index >= count_) return nullptr;
+	return screens_[index].get();
+}
+
+::ui::Span<Screen *> ScreenStack::VisibleScreens() {
+	int start = count_;
+	for(int i = count_ - 1; i >= 0; --i){
+		start = i;
+		if(screens_[i]->Kind() == ScreenKind::Normal) break;
+	}
+
+	int visibleCount = 0;
+	for(int i = start; i < count_; ++i){
+		visible_[visibleCount++] = screens_[i].get();
+	}
+	return { visible_.data(), visibleCount };
 }
 
 void ScreenStack::TickVisible(ScreenContext& ctx) {
-	if(screens_.empty()) return;
-	const std::size_t start = VisibleStart();
-	for(std::size_t i = start; i < screens_.size(); ++i) {
-		screens_[i]->Tick(ctx);
+	::ui::Span<Screen *> visible = VisibleScreens();
+	for(int i = 0; i < visible.count; ++i) {
+		visible[i]->Tick(ctx);
 	}
 }
 
@@ -64,13 +103,12 @@ void ScreenStack::BuildVisible(ScreenContext& ctx,
                                Surface& dst,
                                float frametime,
                                silencer::ui::UiInteractionRegistry& interactions) {
-	if(screens_.empty()) return;
-	const std::size_t start = VisibleStart();
-	for(std::size_t i = start; i < screens_.size(); ++i) {
-		if(i > start && screens_[i]->IsOverlay()) {
+	::ui::Span<Screen *> visible = VisibleScreens();
+	for(int i = 0; i < visible.count; ++i) {
+		if(i > 0 && visible[i]->Kind() == ScreenKind::Overlay) {
 			interactions.BeginFrame();
 		}
-		screens_[i]->BuildUi(ctx, dst, frametime, interactions);
+		visible[i]->BuildUi(ctx, dst, frametime, interactions);
 	}
 }
 
