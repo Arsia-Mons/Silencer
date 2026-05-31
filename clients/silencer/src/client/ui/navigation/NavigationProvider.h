@@ -6,6 +6,7 @@
 #include <SDL3/SDL_stdinc.h>
 
 #include <functional>
+#include <memory>
 
 class ScreenContext;
 
@@ -23,6 +24,11 @@ struct NavigationProviderValue {
 struct Navigation {
 	UiScreenEntryId currentEntryId = 0;
 	bool isTop = false;
+	std::function<void(std::unique_ptr<Screen>)> push = {};
+	std::function<void(std::unique_ptr<Screen>)> replace = {};
+	std::function<void(std::unique_ptr<Screen>)> resetTo = {};
+	std::function<void()> popCurrent = {};
+	std::function<void()> popTop = {};
 	std::function<void(Uint8)> goToState = {};
 	std::function<void()> goBack = {};
 	std::function<void()> requestQuit = {};

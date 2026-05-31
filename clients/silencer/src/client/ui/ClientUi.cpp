@@ -468,6 +468,18 @@ void ClientUi::PopScreen(ScreenContext& ctx) {
 	screens_.Pop();
 }
 
+void ClientUi::PopScreenEntry(UiScreenEntryId entryId, ScreenContext& ctx) {
+	if(entryId == 0) return;
+	for(int i = screens_.Size() - 1; i >= 0; --i){
+		Screen * screen = screens_.At(i);
+		if(screen && screen->EntryId() == entryId){
+			screen->Destroy(ctx);
+			screens_.PopEntry(entryId);
+			return;
+		}
+	}
+}
+
 void ClientUi::ReplaceScreen(std::unique_ptr<Screen> screen, ScreenContext& ctx) {
 	if(!screen) return;
 	Screen * top = screens_.Top();
@@ -480,18 +492,96 @@ void ClientUi::ReplaceScreen(std::unique_ptr<Screen> screen, ScreenContext& ctx)
 	screens_.Replace(std::move(screen));
 }
 
+void ClientUi::ResetToScreen(std::unique_ptr<Screen> screen, ScreenContext& ctx) {
+	if(!screen) return;
+	while(Screen * top = screens_.Top()){
+		top->Destroy(ctx);
+		screens_.Pop();
+	}
+	PushScreen(std::move(screen), ctx);
+}
+
 bool ClientUi::QueueDeferredMutation(DeferredUiMutation mutation) {
 	if(!mutation) return false;
-	deferredMutations_.push_back(std::move(mutation));
+	QueuedUiMutation queued;
+	queued.kind = QueuedUiMutation::Kind::Custom;
+	queued.custom = std::move(mutation);
+	deferredMutations_.push_back(std::move(queued));
+	return true;
+}
+
+bool ClientUi::QueuePushScreen(std::unique_ptr<Screen> screen) {
+	if(!screen) return false;
+	QueuedUiMutation queued;
+	queued.kind = QueuedUiMutation::Kind::Push;
+	queued.screen = std::move(screen);
+	deferredMutations_.push_back(std::move(queued));
+	return true;
+}
+
+bool ClientUi::QueuePopCurrent(UiScreenEntryId entryId) {
+	if(entryId == 0) return false;
+	QueuedUiMutation queued;
+	queued.kind = QueuedUiMutation::Kind::PopCurrent;
+	queued.entryId = entryId;
+	deferredMutations_.push_back(std::move(queued));
+	return true;
+}
+
+bool ClientUi::QueuePopTop() {
+	QueuedUiMutation queued;
+	queued.kind = QueuedUiMutation::Kind::PopTop;
+	deferredMutations_.push_back(std::move(queued));
+	return true;
+}
+
+bool ClientUi::QueueReplaceScreen(std::unique_ptr<Screen> screen) {
+	if(!screen) return false;
+	QueuedUiMutation queued;
+	queued.kind = QueuedUiMutation::Kind::Replace;
+	queued.screen = std::move(screen);
+	deferredMutations_.push_back(std::move(queued));
+	return true;
+}
+
+bool ClientUi::QueueResetToScreen(std::unique_ptr<Screen> screen) {
+	if(!screen) return false;
+	QueuedUiMutation queued;
+	queued.kind = QueuedUiMutation::Kind::ResetTo;
+	queued.screen = std::move(screen);
+	deferredMutations_.push_back(std::move(queued));
 	return true;
 }
 
 void ClientUi::DrainDeferredMutations(ScreenContext& ctx) {
 	if(deferredMutations_.empty()) return;
-	std::vector<DeferredUiMutation> mutations;
+	std::vector<QueuedUiMutation> mutations;
 	mutations.swap(deferredMutations_);
-	for(DeferredUiMutation& mutation : mutations){
-		if(mutation) mutation(ctx);
+	for(QueuedUiMutation& mutation : mutations){
+		ApplyQueuedMutation(mutation, ctx);
+	}
+}
+
+void ClientUi::ApplyQueuedMutation(QueuedUiMutation& mutation, ScreenContext& ctx) {
+	switch(mutation.kind){
+	case QueuedUiMutation::Kind::Custom:
+		if(mutation.custom) mutation.custom(ctx);
+		break;
+	case QueuedUiMutation::Kind::Push:
+		PushScreen(std::move(mutation.screen), ctx);
+		break;
+	case QueuedUiMutation::Kind::PopCurrent:
+		PopScreenEntry(mutation.entryId, ctx);
+		break;
+	case QueuedUiMutation::Kind::PopTop:
+		PopScreen(ctx);
+		break;
+	case QueuedUiMutation::Kind::Replace:
+		ReplaceScreen(std::move(mutation.screen), ctx);
+		break;
+	case QueuedUiMutation::Kind::ResetTo:
+		ResetToScreen(std::move(mutation.screen), ctx);
+		break;
 	}
 }
 

@@ -4,6 +4,8 @@
 #include "screen_context.h"
 #include "ui/runtime/react.h"
 
+#include <utility>
+
 namespace silencer {
 namespace client_ui {
 
@@ -42,9 +44,25 @@ Navigation UseNavigation() {
 	NavigationProviderValue * value = use_navigation_provider_value("UseNavigation");
 	if(!value) return {};
 	ClientUi * clientUi = value->clientUi;
+	UiScreenEntryId entryId = value->currentEntryId;
 	return Navigation{
-		.currentEntryId = value->currentEntryId,
+		.currentEntryId = entryId,
 		.isTop = value->isTop,
+		.push = [clientUi](std::unique_ptr<Screen> screen) {
+			clientUi->QueuePushScreen(std::move(screen));
+		},
+		.replace = [clientUi](std::unique_ptr<Screen> screen) {
+			clientUi->QueueReplaceScreen(std::move(screen));
+		},
+		.resetTo = [clientUi](std::unique_ptr<Screen> screen) {
+			clientUi->QueueResetToScreen(std::move(screen));
+		},
+		.popCurrent = [clientUi, entryId]() {
+			clientUi->QueuePopCurrent(entryId);
+		},
+		.popTop = [clientUi]() {
+			clientUi->QueuePopTop();
+		},
 		.goToState = [clientUi](Uint8 state) {
 			clientUi->QueueDeferredMutation([state](ScreenContext& ctx) {
 				ctx.GoToState(state);

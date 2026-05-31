@@ -46,8 +46,15 @@ public:
 	Screen * TopScreen() const { return screens_.Top(); }
 	void PushScreen(std::unique_ptr<Screen> screen, ScreenContext& ctx);
 	void PopScreen(ScreenContext& ctx);
+	void PopScreenEntry(UiScreenEntryId entryId, ScreenContext& ctx);
 	void ReplaceScreen(std::unique_ptr<Screen> screen, ScreenContext& ctx);
+	void ResetToScreen(std::unique_ptr<Screen> screen, ScreenContext& ctx);
 	bool QueueDeferredMutation(DeferredUiMutation mutation);
+	bool QueuePushScreen(std::unique_ptr<Screen> screen);
+	bool QueuePopCurrent(UiScreenEntryId entryId);
+	bool QueuePopTop();
+	bool QueueReplaceScreen(std::unique_ptr<Screen> screen);
+	bool QueueResetToScreen(std::unique_ptr<Screen> screen);
 	void DrainDeferredMutations(ScreenContext& ctx);
 	void RequestClearScreens();
 	void ClearScreensIfRequested(ScreenContext& ctx);
@@ -67,9 +74,33 @@ private:
 	::ui::InteractionSnapshot retainedInteractionSnapshot_;
 	::ui::InputFrame retainedInput_;
 	::ui::LayoutViewport retainedViewport_;
-	std::vector<DeferredUiMutation> deferredMutations_;
 	bool retainedFrameOpen_ = false;
 
+	struct QueuedUiMutation {
+		enum class Kind {
+			Custom,
+			Push,
+			PopCurrent,
+			PopTop,
+			Replace,
+			ResetTo,
+		};
+
+		Kind kind = Kind::Custom;
+		UiScreenEntryId entryId = 0;
+		std::unique_ptr<Screen> screen = nullptr;
+		DeferredUiMutation custom = {};
+
+		QueuedUiMutation() = default;
+		QueuedUiMutation(QueuedUiMutation&&) = default;
+		QueuedUiMutation& operator=(QueuedUiMutation&&) = default;
+		QueuedUiMutation(const QueuedUiMutation&) = delete;
+		QueuedUiMutation& operator=(const QueuedUiMutation&) = delete;
+	};
+
+	std::vector<QueuedUiMutation> deferredMutations_;
+
+	void ApplyQueuedMutation(QueuedUiMutation& mutation, ScreenContext& ctx);
 	void RefreshRetainedInteractions();
 };
 
