@@ -29,14 +29,23 @@ void CopyUiText(char * dst, int dstLen, const std::string & value)
 	std::memcpy(dst, value.data(), n);
 	dst[n] = '\0';
 }
+
+void SubmitCredentials(World & world, const char * username, const char * password)
+{
+	world.lobby.LockMutex();
+	if(world.lobby.state == Lobby::AUTHENTICATING){
+		world.lobby.SetLocalUsername(username);
+		world.lobby.SendCredentials(username, password);
+		world.lobby.state = Lobby::AUTHSENT;
+	}
+	world.lobby.UnlockMutex();
+}
 } // namespace lobby_connect_screen_detail
 
 void LobbyConnectScreen::Build(ScreenContext & ctx)
 {
 	ctx.ResetPresentation(2);
 	motdprinted = false;
-	loginClicked = false;
-	cancelClicked = false;
 	logLines.clear();
 	username[0] = '\0';
 	password[0] = '\0';
@@ -160,20 +169,7 @@ void LobbyConnectScreen::Tick(ScreenContext & ctx)
 		}
 		motdprinted = true;
 	}
-	if(loginClicked){
-		loginClicked = false;
-		if(world.lobby.state == Lobby::AUTHENTICATING){
-			world.lobby.SetLocalUsername(username);
-			world.lobby.SendCredentials(username, password);
-			world.lobby.state = Lobby::AUTHSENT;
-		}
-	}
 	world.lobby.UnlockMutex();
-
-	if(cancelClicked){
-		cancelClicked = false;
-		ctx.GoToState(GameState::MAINMENU);
-	}
 }
 
 bool LobbyConnectScreen::BuildElement(ScreenContext & ctx, ::ui::UiElement * out)
@@ -189,28 +185,37 @@ bool LobbyConnectScreen::BuildElement(ScreenContext & ctx, ::ui::UiElement * out
 	}
 
 	const bool inactive = ctx.world.lobby.state == Lobby::AUTHSENT;
-	*out = silencer::client_ui::LobbyConnectView(
-		silencer::client_ui::LobbyConnectViewProps{
-			.key = "lobby-connect",
+	const silencer::client_ui::LobbyConnectContextValue context{
+		.state = silencer::client_ui::LobbyConnectState{
 			.log_lines = lines,
 			.username = username,
 			.password = password,
 			.inactive = inactive,
-			.on_username_change = [this](const std::string& value) {
+		},
+		.actions = silencer::client_ui::LobbyConnectActions{
+			.set_username = [this](const std::string& value) {
 				lobby_connect_screen_detail::CopyUiText(
 					username, static_cast<int>(sizeof(username)), value);
 			},
-			.on_password_change = [this](const std::string& value) {
+			.set_password = [this](const std::string& value) {
 				lobby_connect_screen_detail::CopyUiText(
 					password, static_cast<int>(sizeof(password)), value);
 			},
-			.on_login = [this](const ::ui::ActivationEvent&) {
-				loginClicked = true;
+			.submit = [this, world = &ctx.world]() {
+				lobby_connect_screen_detail::SubmitCredentials(*world, username, password);
 			},
-			.on_cancel = [this](const ::ui::ActivationEvent&) {
-				cancelClicked = true;
-			},
-		});
+			.cancel = []() {},
+		},
+	};
+	const auto * stored = ::ui::copy_value(context);
+	if(!stored) return false;
+	*out = ::ui::component(
+		"LobbyConnectView",
+		silencer::client_ui::LobbyConnectViewProps{
+			.key = "lobby-connect",
+			.value = stored,
+		},
+		silencer::client_ui::LobbyConnectView);
 	return true;
 }
 
@@ -240,16 +245,16 @@ bool LobbyConnectScreen::HandleUiIntent(ScreenContext & ctx, const silencer::ui:
 		}else{
 			lobby_connect_screen_detail::CopyUiText(password, static_cast<int>(sizeof(password)), action.value);
 		}
-		loginClicked = true;
+		lobby_connect_screen_detail::SubmitCredentials(ctx.world, username, password);
 		return true;
 	}
 	if(action.kind == silencer::ui::UiActionKind::Activate && action.id == lobby_connect_screen_detail::kActionLogin){
-		loginClicked = true;
+		lobby_connect_screen_detail::SubmitCredentials(ctx.world, username, password);
 		return true;
 	}
 	if((action.kind == silencer::ui::UiActionKind::Activate && action.id == lobby_connect_screen_detail::kActionCancel) ||
 	   action.kind == silencer::ui::UiActionKind::Cancel){
-		cancelClicked = true;
+		ctx.GoToState(GameState::MAINMENU);
 		return true;
 	}
 	return false;

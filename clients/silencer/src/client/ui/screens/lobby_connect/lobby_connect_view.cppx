@@ -1,5 +1,7 @@
 #include "client/ui/screens/lobby_connect/lobby_connect_view.h"
 
+#include "client/ui/navigation/NavigationProvider.h"
+#include "game_state.h"
 #include "ui/components/box.h"
 #include "ui/components/button.h"
 #include "ui/components/input.h"
@@ -140,27 +142,56 @@ namespace {
 	});
 }
 
-}  // namespace
+std::function<void(const std::string&)> text_callback(
+	std::function<void(const std::string&)> action) {
+	return [action](const std::string& value) {
+		if(action) action(value);
+	};
+}
 
-::ui::UiElement LobbyConnectView(const LobbyConnectViewProps& props) {
+std::function<void(const ::ui::ActivationEvent&)> submit_callback(
+	const LobbyConnectActions& actions) {
+	return [actions](const ::ui::ActivationEvent&) {
+		if(actions.submit) actions.submit();
+	};
+}
+
+std::function<void(const ::ui::ActivationEvent&)> cancel_callback(
+	const LobbyConnectActions& actions,
+	Navigation navigation) {
+	return [actions, navigation](const ::ui::ActivationEvent&) {
+		if(actions.cancel) actions.cancel();
+		if(navigation.goToState) navigation.goToState(GameState::MAINMENU);
+	};
+}
+
+struct LobbyConnectFrameProps {
+	const char * key = nullptr;
+};
+
+::ui::UiElement LobbyConnectFrame(const LobbyConnectFrameProps& props) {
+	const LobbyConnectContextValue& lobby = UseLobbyConnect();
+	Navigation navigation = UseNavigation();
+	const LobbyConnectState& state = lobby.state;
+	const LobbyConnectActions& actions = lobby.actions;
 	return <Box key={props.key} layout={root_layout()}>
 		<Box key="panel" layout={panel_layout()} style={panel_style()}>
 			<Box key="log" layout={log_layout()}>
-				<Text key="log-00" value={props.log_lines[0]} layout={log_line_layout()} style={log_style()} />
-				<Text key="log-01" value={props.log_lines[1]} layout={log_line_layout()} style={log_style()} />
-				<Text key="log-02" value={props.log_lines[2]} layout={log_line_layout()} style={log_style()} />
-				<Text key="log-03" value={props.log_lines[3]} layout={log_line_layout()} style={log_style()} />
-				<Text key="log-04" value={props.log_lines[4]} layout={log_line_layout()} style={log_style()} />
-				<Text key="log-05" value={props.log_lines[5]} layout={log_line_layout()} style={log_style()} />
-				<Text key="log-06" value={props.log_lines[6]} layout={log_line_layout()} style={log_style()} />
-				<Text key="log-07" value={props.log_lines[7]} layout={log_line_layout()} style={log_style()} />
-				<Text key="log-08" value={props.log_lines[8]} layout={log_line_layout()} style={log_style()} />
-				<Text key="log-09" value={props.log_lines[9]} layout={log_line_layout()} style={log_style()} />
-				<Text key="log-10" value={props.log_lines[10]} layout={log_line_layout()} style={log_style()} />
-				<Text key="log-11" value={props.log_lines[11]} layout={log_line_layout()} style={log_style()} />
-				<Text key="log-12" value={props.log_lines[12]} layout={log_line_layout()} style={log_style()} />
-				<Text key="log-13" value={props.log_lines[13]} layout={log_line_layout()} style={log_style()} />
-				<Text key="log-14" value={props.log_lines[14]} layout={log_line_layout()} style={log_style()} />
+				<Text key="log-00" value={state.log_lines[0]} layout={log_line_layout()} style={log_style()} />
+				<Text key="log-01" value={state.log_lines[1]} layout={log_line_layout()} style={log_style()} />
+				<Text key="log-02" value={state.log_lines[2]} layout={log_line_layout()} style={log_style()} />
+				<Text key="log-03" value={state.log_lines[3]} layout={log_line_layout()} style={log_style()} />
+				<Text key="log-04" value={state.log_lines[4]} layout={log_line_layout()} style={log_style()} />
+				<Text key="log-05" value={state.log_lines[5]} layout={log_line_layout()} style={log_style()} />
+				<Text key="log-06" value={state.log_lines[6]} layout={log_line_layout()} style={log_style()} />
+				<Text key="log-07" value={state.log_lines[7]} layout={log_line_layout()} style={log_style()} />
+				<Text key="log-08" value={state.log_lines[8]} layout={log_line_layout()} style={log_style()} />
+				<Text key="log-09" value={state.log_lines[9]} layout={log_line_layout()} style={log_style()} />
+				<Text key="log-10" value={state.log_lines[10]} layout={log_line_layout()} style={log_style()} />
+				<Text key="log-11" value={state.log_lines[11]} layout={log_line_layout()} style={log_style()} />
+				<Text key="log-12" value={state.log_lines[12]} layout={log_line_layout()} style={log_style()} />
+				<Text key="log-13" value={state.log_lines[13]} layout={log_line_layout()} style={log_style()} />
+				<Text key="log-14" value={state.log_lines[14]} layout={log_line_layout()} style={log_style()} />
 			</Box>
 			<Box key="form" layout={form_layout()}>
 				<Box key="username-row" layout={form_row_layout()}>
@@ -168,11 +199,11 @@ namespace {
 					<Input
 					  key="username"
 					  id="lobby_connect.username"
-					  value={props.username}
-					  disabled={props.inactive}
+					  value={state.username}
+					  disabled={state.inactive}
 					  autofocus={true}
 					  accessibility={::ui::components::AccessibilityProps{.role = ::ui::SemanticRole::TextBox, .label = "Username"}}
-					  onChange={props.on_username_change}
+					  onChange={text_callback(actions.set_username)}
 					  layout={input_layout()}
 					/>
 				</Box>
@@ -181,11 +212,11 @@ namespace {
 					<Input
 					  key="password"
 					  id="lobby_connect.password"
-					  value={props.password}
+					  value={state.password}
 					  password={true}
-					  disabled={props.inactive}
+					  disabled={state.inactive}
 					  accessibility={::ui::components::AccessibilityProps{.role = ::ui::SemanticRole::TextBox, .label = "Password"}}
-					  onChange={props.on_password_change}
+					  onChange={text_callback(actions.set_password)}
 					  layout={input_layout()}
 					/>
 				</Box>
@@ -195,19 +226,46 @@ namespace {
 				  key="login"
 				  id="lobby_connect.login"
 				  label="Login/Create"
-				  onActivate={props.on_login}
+				  onActivate={submit_callback(actions)}
 				  layout={button_layout()}
 				/>
 				<Button
 				  key="cancel"
 				  id="lobby_connect.cancel"
 				  label="Cancel"
-				  onActivate={props.on_cancel}
+				  onActivate={cancel_callback(actions, navigation)}
 				  layout={button_layout()}
 				/>
 			</Box>
 		</Box>
 	</Box>
+}
+
+}  // namespace
+
+::ReactContext LobbyConnectContext = {};
+
+namespace {
+const LobbyConnectContextValue kEmptyLobbyConnect = {};
+}
+
+const LobbyConnectContextValue& UseLobbyConnect() {
+	const auto * value = static_cast<const LobbyConnectContextValue *>(
+		::use_context(&LobbyConnectContext));
+	return value ? *value : kEmptyLobbyConnect;
+}
+
+::ui::UiElement LobbyConnectView(const LobbyConnectViewProps& props) {
+	return ::ui::provider(
+		"LobbyConnectProvider",
+		&LobbyConnectContext,
+		const_cast<LobbyConnectContextValue *>(props.value),
+		children({
+			::ui::component("LobbyConnectFrame",
+			                LobbyConnectFrameProps{ .key = "frame" },
+			                LobbyConnectFrame),
+		}),
+		props.key);
 }
 
 }  // namespace silencer::client_ui
