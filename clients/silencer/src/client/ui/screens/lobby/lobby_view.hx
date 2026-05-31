@@ -3,8 +3,6 @@
 #include "ui/components/common.h"
 #include "ui/runtime/react.h"
 
-class World;
-
 namespace silencer::client_ui::lobby {
 
 struct CharacterPanelState;
@@ -17,7 +15,6 @@ struct GameTechPanelState;
 struct LobbyContextValue {
 	const char * version = "";
 	const char * map_name = "";
-	World * world = nullptr;
 	CharacterPanelState * character = nullptr;
 	ChatPanelState * chat = nullptr;
 	GameSelectPanelState * game_select = nullptr;

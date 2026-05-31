@@ -88,7 +88,6 @@ bool LobbyScreen::BuildElement(ScreenContext & ctx, ::ui::UiElement * out)
 	silencer::client_ui::lobby::LobbyContextValue context{
 		.version = version.c_str(),
 		.map_name = mapName.c_str(),
-		.world = &ctx.world,
 		.character = &characterState,
 		.chat = &chatState,
 		.game_select = &gameSelectState,

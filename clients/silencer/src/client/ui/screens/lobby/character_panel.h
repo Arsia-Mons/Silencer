@@ -8,6 +8,8 @@
 #include "shared.h"
 #include "runtime/UiActionQueue.h"
 
+#include <string>
+
 class World;
 
 namespace silencer::client_ui::lobby {
@@ -22,6 +24,15 @@ struct CharacterPanelState {
 	int lastReconciled = -1;
 	bool newCharacterRequested = false;
 	bool agentSelectionLocked = false;
+
+	// Cached character snapshot for UseLobby() consumers. Rebuilt from
+	// World/Lobby during CharacterPanelTick so components do not receive a
+	// raw World pointer.
+	std::string agentName = "Agent";
+	std::string levelText = "No character selected";
+	std::string recordText;
+	std::string statsLineA;
+	std::string statsLineB;
 };
 
 // Initialise state from Config (defaultagency).

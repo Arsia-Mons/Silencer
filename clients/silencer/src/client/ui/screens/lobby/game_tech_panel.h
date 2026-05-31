@@ -10,12 +10,19 @@
 
 #include <array>
 #include <string>
+#include <vector>
 
 class World;
 class ScreenContext;
 class LobbyScreen;
 
 namespace silencer::client_ui::lobby {
+
+struct GameTechRow {
+	bool visible = false;
+	bool selected = false;
+	std::string label;
+};
 
 struct GameTechPanelState {
 	// Per-frame click flags. Set by typed widget intents; consumed by Tick.
@@ -29,6 +36,7 @@ struct GameTechPanelState {
 	std::string techNameStr;                        // uid 60 — "-ItemName-"
 	std::array<std::string, 8> techDescLines{};     // uid 61..68
 	std::array<std::string, 3> peerNameStrs{};      // uid 80..82 (non-local peers)
+	std::vector<GameTechRow> techRows;
 };
 
 void GameTechPanelInit(GameTechPanelState & state);

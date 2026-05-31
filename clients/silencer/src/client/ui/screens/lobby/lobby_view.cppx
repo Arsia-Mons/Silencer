@@ -6,13 +6,7 @@
 #include "client/ui/screens/lobby/game_join_panel.h"
 #include "client/ui/screens/lobby/game_select_panel.h"
 #include "client/ui/screens/lobby/game_tech_panel.h"
-#include "lobby.h"
 #include "lobbygame.h"
-#include "peer.h"
-#include "team.h"
-#include "user.h"
-#include "world.h"
-#include "stations/buyableitem.h"
 
 #include "ui/components/box.h"
 #include "ui/components/button.h"
@@ -456,34 +450,17 @@ struct CharacterPanelProps {
 ::ui::UiElement CharacterPanel(const CharacterPanelProps& props) {
 	(void)props;
 	const LobbyContextValue& lobby = UseLobby();
-	World * world = lobby.world;
 	CharacterPanelState * state = lobby.character;
-	if(!world || !state) return ::ui::empty();
-	const Lobby::Character * ch = world->lobby.GetSelectedCharacter();
-	const char * agent_name = ch ? ch->name : world->lobby.GetLocalUsername();
-	if(!agent_name || agent_name[0] == '\0') agent_name = "Agent";
-	const int agency = ch ? ch->agencyIdx : state->selectedAgency;
-	const bool locked = state->agentSelectionLocked || world->IsConnected();
+	if(!state) return ::ui::empty();
+	const bool locked = state->agentSelectionLocked;
 	return <Box key="character" layout={character_panel_layout()} style={panel_style()}>
 		<SectionHeading key="heading" value="AGENT" />
-		<FieldText key="name" value={agent_name} />
-		<FieldText key="agency" value={agency_name(agency)} />
-		<FieldText
-		  key="level"
-		  value={ch ? use_text_storage("Level %u XP %u", ch->stats.level, ch->stats.xp) : "No character selected"}
-		/>
-		<FieldText
-		  key="record"
-		  value={ch ? use_text_storage("Wins %u Losses %u", ch->stats.wins, ch->stats.losses) : ""}
-		/>
-		<FieldText
-		  key="stats-a"
-		  value={ch ? use_text_storage("End %u Shield %u Jet %u", ch->stats.endurance, ch->stats.shield, ch->stats.jetpack) : ""}
-		/>
-		<FieldText
-		  key="stats-b"
-		  value={ch ? use_text_storage("Tech %u Hack %u Contacts %u", ch->stats.techslots, ch->stats.hacking, ch->stats.contacts) : ""}
-		/>
+		<FieldText key="name" value={state->agentName.c_str()} />
+		<FieldText key="agency" value={agency_name(state->selectedAgency)} />
+		<FieldText key="level" value={state->levelText.c_str()} />
+		<FieldText key="record" value={state->recordText.c_str()} />
+		<FieldText key="stats-a" value={state->statsLineA.c_str()} />
+		<FieldText key="stats-b" value={state->statsLineB.c_str()} />
 		<Button
 		  key="agents"
 		  id="lobby.character.agents"
@@ -914,23 +891,20 @@ struct TechRowProps {
 
 ::ui::UiElement TechRow(const TechRowProps& props) {
 	const LobbyContextValue& lobby = UseLobby();
-	World * world = lobby.world;
 	GameTechPanelState * state = lobby.game_tech;
-	if(!world || !state) return ::ui::empty();
-	if(props.slot < 0 || props.slot >= static_cast<int>(world->buyableitems.size())) return ::ui::empty();
-	BuyableItem * item = world->buyableitems[static_cast<size_t>(props.slot)];
-	if(!item) return ::ui::empty();
-	Peer * local = world->GetPeer(world->GetLocalPeerId());
-	bool selected = local && ((local->techchoices & item->techchoice) != 0);
+	if(!state) return ::ui::empty();
+	if(props.slot < 0 || props.slot >= static_cast<int>(state->techRows.size())) return ::ui::empty();
+	const GameTechRow& row = state->techRows[static_cast<size_t>(props.slot)];
+	if(!row.visible) return ::ui::empty();
 	return <Button
 	  key={props.key}
 	  id="lobby.game_tech.toggle"
 	  idOffset={props.slot}
-	  label={use_text_storage("%s (%u)", item->name, item->techslots)}
+	  label={row.label.c_str()}
 	  onFocus={focus_index(&state->descClickedItemIndex, props.slot)}
 	  onActivate={set_index(&state->toggleClickedItemIndex, props.slot)}
 	  layout={row_button_layout(23.0f)}
-	  style={row_style(selected)}
+	  style={row_style(row.selected)}
 	/>
 }
 

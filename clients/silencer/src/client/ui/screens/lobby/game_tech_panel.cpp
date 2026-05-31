@@ -78,6 +78,21 @@ void GameTechPanelTick(GameTechPanelState & state,
 		}
 	}
 
+	state.techRows.resize(world.buyableitems.size());
+	for(size_t i = 0; i < world.buyableitems.size(); ++i){
+		GameTechRow & row = state.techRows[i];
+		BuyableItem * item = world.buyableitems[i];
+		row.visible = item != nullptr;
+		row.selected = item && localpeer && ((localpeer->techchoices & item->techchoice) != 0);
+		row.label.clear();
+		if(item){
+			row.label = item->name;
+			row.label += " (";
+			row.label += std::to_string(item->techslots);
+			row.label += ")";
+		}
+	}
+
 	if(state.descClickedItemIndex >= 0){
 		const int idx = state.descClickedItemIndex;
 		state.descClickedItemIndex = -1;
