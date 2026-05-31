@@ -49,9 +49,12 @@ You are a long-running implementation agent. Each iteration:
    `tests/cli-agent/e2e/60_ui_architecture_boundaries.sh`. Paste evidence into the issue.
 5. Commit to branch `hv/cppx-migration-cc` (push to PR #267), set the issue **Done**, repeat.
 
-**Stop and ask the user** when blocked by a decision you can't make — notably **SIL-6**'s
-open decisions: the **UI font asset (TTF face) is the user's to provide**, and the in-game
-HUD scope + generated-cppx commit policy want a human call. Don't spin; surface it.
+**All migration decisions are pre-resolved** — see SIL-6's decisions register (source of
+truth for the loop) and the architecture doc. Proceed without stopping for them: UI fonts
+are `shared/fonts/silencer-{ui,ui-large,title,tiny}.otf` (generated from the legacy banks →
+exact identity, loaded via SDL_ttf); HUD is in scope using the `tiny` face; residuals are
+locked. Stop and ask only on a genuinely novel blocker not covered there (e.g. an
+unforeseen upstream/SDL constraint). Don't spin.
 
 ## Verify (per slice)
 
