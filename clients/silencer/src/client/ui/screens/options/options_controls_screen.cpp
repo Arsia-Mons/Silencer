@@ -278,31 +278,36 @@ bool OptionsControlsScreen::BuildElement(ScreenContext & ctx, ::ui::UiElement * 
 		keybindListView_.visibleRowCount = i + 1;
 	}
 
+	const silencer::client_ui::OptionsControlsContextValue context{
+		.keybinds = &keybindListView_,
+		.frame_pad_left = framePadLeft,
+		.frame_pad_right = framePadRight,
+		.frame_pad_top = framePadTop,
+		.frame_pad_bottom = framePadBottom,
+		.panel_pad_x = panelPadX,
+		.panel_pad_bottom = panelPadBottom,
+		.on_preset = [this](const ::ui::ActivationEvent&) {
+			presetClicked = true;
+		},
+		.on_rebind = [this](int row, int slot) {
+			BeginRebindFromVisibleRow(row, slot);
+		},
+		.on_operator = [this](int row) {
+			ToggleOperatorFromVisibleRow(row);
+		},
+		.on_save = [this](const ::ui::ActivationEvent&) {
+			saveClicked = true;
+		},
+		.on_cancel = [this](const ::ui::ActivationEvent&) {
+			cancelClicked = true;
+		},
+	};
+	const auto * stored = ::ui::copy_value(context);
+	if(!stored) return false;
 	*out = silencer::client_ui::OptionsControlsView(
 		silencer::client_ui::OptionsControlsViewProps{
 			.key = "options-controls",
-			.keybinds = &keybindListView_,
-			.frame_pad_left = framePadLeft,
-			.frame_pad_right = framePadRight,
-			.frame_pad_top = framePadTop,
-			.frame_pad_bottom = framePadBottom,
-			.panel_pad_x = panelPadX,
-			.panel_pad_bottom = panelPadBottom,
-			.on_preset = [this](const ::ui::ActivationEvent&) {
-				presetClicked = true;
-			},
-			.on_rebind = [this](int row, int slot) {
-				BeginRebindFromVisibleRow(row, slot);
-			},
-			.on_operator = [this](int row) {
-				ToggleOperatorFromVisibleRow(row);
-			},
-			.on_save = [this](const ::ui::ActivationEvent&) {
-				saveClicked = true;
-			},
-			.on_cancel = [this](const ::ui::ActivationEvent&) {
-				cancelClicked = true;
-			},
+			.value = stored,
 		});
 	return true;
 }

@@ -2,6 +2,7 @@
 
 #include "client/ui/screens/options/controls_keybind_list.h"
 #include "ui/components/common.h"
+#include "ui/runtime/react.h"
 
 #include <functional>
 
@@ -9,8 +10,7 @@ namespace silencer::client_ui {
 
 constexpr int kOptionsControlsMaxRows = 30;
 
-struct OptionsControlsViewProps {
-	const char * key = nullptr;
+struct OptionsControlsContextValue {
 	const options::KeybindListView * keybinds = nullptr;
 	int frame_pad_left = 0;
 	int frame_pad_right = 0;
@@ -23,6 +23,15 @@ struct OptionsControlsViewProps {
 	std::function<void(int row)> on_operator = {};
 	std::function<void(const ::ui::ActivationEvent&)> on_save = {};
 	std::function<void(const ::ui::ActivationEvent&)> on_cancel = {};
+};
+
+extern ::ReactContext OptionsControlsContext;
+
+const OptionsControlsContextValue& UseOptionsControls();
+
+struct OptionsControlsViewProps {
+	const char * key = nullptr;
+	const OptionsControlsContextValue * value = nullptr;
 };
 
 ::ui::UiElement OptionsControlsView(const OptionsControlsViewProps& props);
