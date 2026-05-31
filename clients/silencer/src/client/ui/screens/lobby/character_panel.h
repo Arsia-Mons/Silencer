@@ -1,24 +1,14 @@
 #ifndef SILENCER_CLIENT_UI_LOBBY_CHARACTER_PANEL_H
 #define SILENCER_CLIENT_UI_LOBBY_CHARACTER_PANEL_H
 
-// Screen-side lobby CharacterPanel. Composes Text, sprite chrome, and Button
-// primitives into the compact lobby identity panel: fitted agent name,
-// selected agency emblem, core record stats, and navigation to the
-// character selection/create screen.
-//
-// Domain glue (Config::Save, World::SetAgency, agency-change detection)
-// lives HERE in the screen — not in the primitives. The primitives stay
-// screen-agnostic.
+// Screen-side lobby CharacterPanel state and domain glue. The cppx lobby view
+// owns retained composition; this file owns agency-change reconciliation and
+// navigation to the character selection/create screen.
 
 #include "shared.h"
 #include "runtime/UiActionQueue.h"
 
 class World;
-class Resources;
-
-namespace silencer::ui {
-class UiInteractionRegistry;
-}
 
 namespace silencer::client_ui::lobby {
 
@@ -43,14 +33,6 @@ void CharacterPanelTick(CharacterPanelState & state, World & world);
 bool CharacterPanelHandleUiIntent(CharacterPanelState & state,
                                   World & world,
                                   const silencer::ui::UiAction & action);
-
-// Emit the panel subtree. Must be called inside an open Clay layout pass,
-// after the UI frame payload arenas have been reset.
-void BuildCharacterPanelTree(CharacterPanelState & state,
-                             Uint16 panelWidth,
-                             World & world,
-                             Resources & resources,
-                             silencer::ui::UiInteractionRegistry& interactions);
 
 }  // namespace silencer::client_ui::lobby
 
