@@ -318,6 +318,30 @@ if(MSVC)
 endif()
 add_test(NAME retained_ui_yoga_tests COMMAND retained_ui_yoga_tests)
 
+# --- SDL-free draw model (SIL-11 foundation) -----------------------------
+# RGBA DrawCommand IR + tessellation math. draw_command_builder.cpp compiles
+# into the client via the source glob; the renderer-side SDL executor/
+# registries are a separate bridge layer (later in SIL-11).
+add_executable(ui_geometry_tests
+	tests/ui_geometry_tests.cpp
+	src/ui/runtime/geometry.cpp)
+target_compile_features(ui_geometry_tests PRIVATE cxx_std_20)
+target_include_directories(ui_geometry_tests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src")
+if(MSVC)
+	target_compile_definitions(ui_geometry_tests PRIVATE NOMINMAX)
+endif()
+add_test(NAME ui_geometry_tests COMMAND ui_geometry_tests)
+
+add_executable(ui_draw_command_tests
+	tests/ui_draw_command_tests.cpp
+	src/ui/runtime/draw_command.cpp)
+target_compile_features(ui_draw_command_tests PRIVATE cxx_std_20)
+target_include_directories(ui_draw_command_tests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src")
+if(MSVC)
+	target_compile_definitions(ui_draw_command_tests PRIVATE NOMINMAX)
+endif()
+add_test(NAME ui_draw_command_tests COMMAND ui_draw_command_tests)
+
 # /Z7 embeds debug info into .obj files instead of routing it through MSVC's
 # mspdbsrv.exe — which has a habit of failing with C1090 PDB errors on some
 # Windows installs. /Zi (the default) is faster but unreliable; /Z7 is rock

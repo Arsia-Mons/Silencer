@@ -44,6 +44,14 @@ RUNTIME_FILES = [
     "src/ui/runtime/flex_layout.cpp",
     "src/ui/runtime/yoga_flex_layout.h",
     "src/ui/runtime/yoga_flex_layout.cpp",
+    # SIL-11 SDL-free draw model (RGBA IR + tessellation). The renderer-side
+    # SDL executor/registries are a separate bridge layer (not listed here).
+    "src/ui/runtime/draw_command.h",
+    "src/ui/runtime/draw_command.cpp",
+    "src/ui/runtime/draw_command_builder.h",
+    "src/ui/runtime/draw_command_builder.cpp",
+    "src/ui/runtime/geometry.h",
+    "src/ui/runtime/geometry.cpp",
 ]
 
 SDL_INCLUDE_RE = re.compile(r'#\s*include\s*[<"]\s*(SDL3?/|SDL[._]|SDL_ttf)', re.IGNORECASE)
