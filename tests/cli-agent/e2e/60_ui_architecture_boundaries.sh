@@ -98,6 +98,10 @@ fail_if_match \
   "$REPO_ROOT/clients/silencer/src/client/ui/screens/lobby/lobby_view.cppx"
 
 fail_if_match \
+  "focus_index\\(|[.]focus_agent|[.]focus_agency|extern ::ReactContext CharacterCreateContext" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens/character_create"
+
+fail_if_match \
   "clay_bridge::(EnsureInitialized|Render)[[:space:]]*\\(" \
   "$REPO_ROOT/clients/silencer/src/client/ui/screens" \
   "$REPO_ROOT/clients/silencer/src/client/ui/modals" \

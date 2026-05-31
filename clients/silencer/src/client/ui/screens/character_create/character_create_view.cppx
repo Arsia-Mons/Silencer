@@ -18,10 +18,9 @@ using ::ui::components::InputProps;
 using ::ui::components::Text;
 using ::ui::components::TextProps;
 
-::ReactContext CharacterCreateContext = {};
-
 namespace {
 
+::ReactContext CharacterCreateContext = {};
 const CharacterCreateContextValue kEmptyContext = {};
 
 struct AgencyView {
@@ -43,20 +42,20 @@ const AgencyView& agency_at(int index) {
 	return kAgencies[index];
 }
 
-bool is_alias_step(const CharacterCreateContextValue& state) {
+bool is_alias_step(const CharacterCreateContextValue::State& state) {
 	return state.step == CharacterCreateViewStep::EnterAlias;
 }
 
-bool is_agency_step(const CharacterCreateContextValue& state) {
+bool is_agency_step(const CharacterCreateContextValue::State& state) {
 	return state.step == CharacterCreateViewStep::SelectAgency;
 }
 
-const char * agent_label(const CharacterCreateContextValue& state, int index) {
+const char * agent_label(const CharacterCreateContextValue::State& state, int index) {
 	if(!state.agent_rows || index < 0 || index >= static_cast<int>(state.agent_rows->size())) return "";
 	return (*state.agent_rows)[static_cast<size_t>(index)].c_str();
 }
 
-bool agent_row_visible(const CharacterCreateContextValue& state, int index) {
+bool agent_row_visible(const CharacterCreateContextValue::State& state, int index) {
 	return state.agent_rows && index >= 0 && index < static_cast<int>(state.agent_rows->size());
 }
 
@@ -80,7 +79,7 @@ std::function<void(const ::ui::ActivationEvent&)> activate_index(
 	};
 }
 
-std::function<void(const ::ui::FocusEvent&)> focus_index(
+std::function<void(const ::ui::FocusEvent&)> preview_index(
 	std::function<void(int index)> handler,
 	int index) {
 	return [handler, index](const ::ui::FocusEvent&) {
@@ -260,7 +259,8 @@ struct AgentRowProps {
 };
 
 ::ui::UiElement AgentRow(const AgentRowProps& props) {
-	const CharacterCreateContextValue& state = UseCharacterCreate();
+	const CharacterCreateContextValue& character = UseCharacterCreate();
+	const CharacterCreateContextValue::State& state = character.state;
 	const int index = state.agent_scroll + props.slot;
 	const char * id = agent_id(index);
 	if(is_agency_step(state)) return ::ui::empty();
@@ -271,8 +271,8 @@ struct AgentRowProps {
 	  label={agent_label(state, index)}
 	  selected={index == state.selected_agent_index}
 	  disabled={is_alias_step(state)}
-	  onFocus={focus_index(state.focus_agent, index)}
-	  onActivate={activate_index(state.activate_agent, index)}
+	  onFocus={preview_index(character.actions.preview_agent, index)}
+	  onActivate={activate_index(character.actions.activate_agent, index)}
 	  layout={row_button_layout()}
 	/>
 }
@@ -283,7 +283,8 @@ struct AgencyRowProps {
 };
 
 ::ui::UiElement AgencyRow(const AgencyRowProps& props) {
-	const CharacterCreateContextValue& state = UseCharacterCreate();
+	const CharacterCreateContextValue& character = UseCharacterCreate();
+	const CharacterCreateContextValue::State& state = character.state;
 	const char * id = agency_id(props.index);
 	if(!is_agency_step(state)) return ::ui::empty();
 	const AgencyView& agency = agency_at(props.index);
@@ -293,8 +294,8 @@ struct AgencyRowProps {
 	  label={agency.name}
 	  selected={props.index == state.selected_agency_index}
 	  disabled={state.waiting}
-	  onFocus={focus_index(state.focus_agency, props.index)}
-	  onActivate={activate_index(state.activate_agency, props.index)}
+	  onFocus={preview_index(character.actions.preview_agency, props.index)}
+	  onActivate={activate_index(character.actions.activate_agency, props.index)}
 	  layout={row_button_layout()}
 	/>
 }
@@ -305,7 +306,7 @@ struct AgentOrAgencyColumnProps {
 
 ::ui::UiElement AgentOrAgencyColumn(const AgentOrAgencyColumnProps& props) {
 	(void)props;
-	const CharacterCreateContextValue& state = UseCharacterCreate();
+	const CharacterCreateContextValue::State& state = UseCharacterCreate().state;
 	return <Box key="left" layout={column_layout(236.0f)}>
 		<Text
 		  key="title"
@@ -337,7 +338,8 @@ struct DetailPanelProps {
 
 ::ui::UiElement DetailPanel(const DetailPanelProps& props) {
 	(void)props;
-	const CharacterCreateContextValue& state = UseCharacterCreate();
+	const CharacterCreateContextValue& character = UseCharacterCreate();
+	const CharacterCreateContextValue::State& state = character.state;
 	const int agency_detail_index = is_agency_step(state)
 		? (state.preview_agency_index >= 0 ? state.preview_agency_index : state.selected_agency_index)
 		: state.detail_agency_index;
@@ -400,7 +402,7 @@ struct DetailPanelProps {
 		  id={rename_id(state.detail_agent_index)}
 		  label="Rename Once"
 		  disabled={!state.detail_rename_available || is_agency_step(state) || is_alias_step(state)}
-		  onActivate={activate_index(state.rename_agent, state.detail_agent_index)}
+		  onActivate={activate_index(character.actions.rename_agent, state.detail_agent_index)}
 		  layout={rename_button_layout()}
 		/>
 		<Text
@@ -426,7 +428,8 @@ struct AliasModalProps {
 
 ::ui::UiElement AliasModal(const AliasModalProps& props) {
 	(void)props;
-	const CharacterCreateContextValue& state = UseCharacterCreate();
+	const CharacterCreateContextValue& character = UseCharacterCreate();
+	const CharacterCreateContextValue::State& state = character.state;
 	const bool alias_step = is_alias_step(state);
 	return <Box key="alias-modal" layout={alias_modal_layout(alias_step)} style={panel_style()}>
 		<Text
@@ -442,8 +445,8 @@ struct AliasModalProps {
 		  disabled={!alias_step || state.waiting}
 		  autofocus={alias_step}
 		  accessibility={::ui::components::AccessibilityProps{.role = ::ui::SemanticRole::TextBox, .label = "Alias"}}
-		  onActivate={action_callback(state.submit_alias)}
-		  onChange={state.set_alias}
+		  onActivate={action_callback(character.actions.submit_alias)}
+		  onChange={character.actions.set_alias}
 		  layout={alias_input_layout()}
 		/>
 		<Button
@@ -451,7 +454,7 @@ struct AliasModalProps {
 		  id="character_create.alias.submit"
 		  label={state.alias_renaming ? "Rename" : "Continue"}
 		  disabled={!alias_step || state.waiting}
-		  onActivate={action_callback(state.submit_alias)}
+		  onActivate={action_callback(character.actions.submit_alias)}
 		  layout={rename_button_layout()}
 		/>
 	</Box>

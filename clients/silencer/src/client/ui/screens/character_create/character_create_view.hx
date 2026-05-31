@@ -21,30 +21,36 @@ enum class CharacterCreateViewStep {
 };
 
 struct CharacterCreateContextValue {
-	CharacterCreateViewStep step = CharacterCreateViewStep::SelectAgent;
-	const std::vector<std::string> * agent_rows = nullptr;
-	int agent_scroll = 0;
-	int selected_agent_index = 0;
-	int preview_agent_index = -1;
-	int detail_agent_index = -1;
-	int detail_agency_index = 0;
-	bool detail_rename_available = false;
-	std::array<const char *, kCharacterCreateStatLineCount> detail_stats = {};
-	const char * alias = "";
-	bool alias_renaming = false;
-	bool waiting = false;
-	int selected_agency_index = 0;
-	int preview_agency_index = -1;
-	std::function<void(int index)> focus_agent = {};
-	std::function<void(int index)> activate_agent = {};
-	std::function<void(int index)> rename_agent = {};
-	std::function<void(const std::string&)> set_alias = {};
-	std::function<void()> submit_alias = {};
-	std::function<void(int index)> focus_agency = {};
-	std::function<void(int index)> activate_agency = {};
-};
+	struct State {
+		CharacterCreateViewStep step = CharacterCreateViewStep::SelectAgent;
+		const std::vector<std::string> * agent_rows = nullptr;
+		int agent_scroll = 0;
+		int selected_agent_index = 0;
+		int preview_agent_index = -1;
+		int detail_agent_index = -1;
+		int detail_agency_index = 0;
+		bool detail_rename_available = false;
+		std::array<const char *, kCharacterCreateStatLineCount> detail_stats = {};
+		const char * alias = "";
+		bool alias_renaming = false;
+		bool waiting = false;
+		int selected_agency_index = 0;
+		int preview_agency_index = -1;
+	};
 
-extern ::ReactContext CharacterCreateContext;
+	struct Actions {
+		std::function<void(int index)> preview_agent = {};
+		std::function<void(int index)> activate_agent = {};
+		std::function<void(int index)> rename_agent = {};
+		std::function<void(const std::string&)> set_alias = {};
+		std::function<void()> submit_alias = {};
+		std::function<void(int index)> preview_agency = {};
+		std::function<void(int index)> activate_agency = {};
+	};
+
+	State state = {};
+	Actions actions = {};
+};
 
 const CharacterCreateContextValue& UseCharacterCreate();
 
