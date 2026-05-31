@@ -85,10 +85,6 @@ void CharacterCreateScreen::Build(ScreenContext & ctx)
 	waitingForCreate = false;
 	waitingForRename = false;
 	renameCharacterId = 0;
-	activatedAgentIndex = -1;
-	renameClickedIndex = -1;
-	aliasSubmitted = false;
-	agencyClickedIndex = -1;
 	alias[0] = '\0';
 	RebuildAgentRows(ctx);
 }
@@ -139,37 +135,6 @@ void CharacterCreateScreen::Tick(ScreenContext & ctx)
 		if(received){
 			waitingForRename = false;
 			ctx.ShowMessage("Could not rename character");
-		}
-	}
-	if(activatedAgentIndex >= 0){
-		const int index = activatedAgentIndex;
-		activatedAgentIndex = -1;
-		selectedAgentIndex = index;
-		previewAgentIndex = index;
-		SelectCurrentAgent(ctx);
-	}
-	if(renameClickedIndex >= 0){
-		const int index = renameClickedIndex;
-		renameClickedIndex = -1;
-		StartRenameAgent(ctx, index);
-	}
-	if(aliasSubmitted){
-		aliasSubmitted = false;
-		if(IsRenaming()){
-			RenameCurrentAgent(ctx);
-		}else{
-			AdvanceAliasStep(ctx);
-		}
-	}
-	if(agencyClickedIndex >= 0){
-		const int index = agencyClickedIndex;
-		agencyClickedIndex = -1;
-		if(!waitingForCreate){
-			selectedAgency = AgencyForIndex(index);
-			previewAgencyIndex = index;
-			if(alias[0] != '\0'){
-				CreateCurrentAgent(ctx);
-			}
 		}
 	}
 }
@@ -235,26 +200,26 @@ bool CharacterCreateScreen::BuildElement(ScreenContext & ctx, ::ui::UiElement * 
 		.waiting = waitingForCreate || waitingForRename,
 		.selected_agency_index = AgencyIndex(selectedAgency),
 		.preview_agency_index = previewAgencyIndex,
-		.on_agent_focus = [this](int index) {
+		.focus_agent = [this](int index) {
 			previewAgentIndex = index;
 		},
-		.on_agent_activate = [this](int index) {
-			activatedAgentIndex = index;
+		.activate_agent = [this, screenContext = &ctx](int index) {
+			ActivateAgent(*screenContext, index);
 		},
-		.on_rename = [this](int index) {
-			renameClickedIndex = index;
+		.rename_agent = [this, screenContext = &ctx](int index) {
+			StartRenameAgent(*screenContext, index);
 		},
-		.on_alias_change = [this](const std::string& value) {
+		.set_alias = [this](const std::string& value) {
 			CopyAlias(value);
 		},
-		.on_alias_submit = [this](const ::ui::ActivationEvent&) {
-			aliasSubmitted = true;
+		.submit_alias = [this, screenContext = &ctx]() {
+			SubmitAlias(*screenContext);
 		},
-		.on_agency_focus = [this](int index) {
+		.focus_agency = [this](int index) {
 			previewAgencyIndex = index;
 		},
-		.on_agency_activate = [this](int index) {
-			agencyClickedIndex = index;
+		.activate_agency = [this, screenContext = &ctx](int index) {
+			ActivateAgency(*screenContext, index);
 		},
 	};
 	const auto * stored = ::ui::copy_value(context);
@@ -418,6 +383,13 @@ void CharacterCreateScreen::SelectCurrentAgent(ScreenContext & ctx)
 	}
 }
 
+void CharacterCreateScreen::ActivateAgent(ScreenContext & ctx, int agentIndex)
+{
+	selectedAgentIndex = agentIndex;
+	previewAgentIndex = agentIndex;
+	SelectCurrentAgent(ctx);
+}
+
 void CharacterCreateScreen::CreateCurrentAgent(ScreenContext & ctx)
 {
 	if(waitingForCreate){
@@ -434,6 +406,18 @@ void CharacterCreateScreen::CreateCurrentAgent(ScreenContext & ctx)
 	ctx.lobby.CreateCharacter(alias, selectedAgency);
 	ctx.lobby.UnlockMutex();
 	waitingForCreate = true;
+}
+
+void CharacterCreateScreen::ActivateAgency(ScreenContext & ctx, int agencyIndex)
+{
+	if(waitingForCreate){
+		return;
+	}
+	selectedAgency = AgencyForIndex(agencyIndex);
+	previewAgencyIndex = agencyIndex;
+	if(alias[0] != '\0'){
+		CreateCurrentAgent(ctx);
+	}
 }
 
 void CharacterCreateScreen::StartRenameAgent(ScreenContext & ctx, int agentIndex)
@@ -479,6 +463,15 @@ void CharacterCreateScreen::RenameCurrentAgent(ScreenContext & ctx)
 	ctx.lobby.RenameCharacter(renameCharacterId, alias);
 	ctx.lobby.UnlockMutex();
 	waitingForRename = true;
+}
+
+void CharacterCreateScreen::SubmitAlias(ScreenContext & ctx)
+{
+	if(IsRenaming()){
+		RenameCurrentAgent(ctx);
+	}else{
+		AdvanceAliasStep(ctx);
+	}
 }
 
 void CharacterCreateScreen::RebuildAgentRows(ScreenContext & ctx)

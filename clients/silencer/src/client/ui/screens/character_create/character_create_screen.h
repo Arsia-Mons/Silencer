@@ -26,9 +26,12 @@ private:
 	};
 
 	void SelectCurrentAgent(ScreenContext & ctx);
+	void ActivateAgent(ScreenContext & ctx, int agentIndex);
 	void CreateCurrentAgent(ScreenContext & ctx);
+	void ActivateAgency(ScreenContext & ctx, int agencyIndex);
 	void StartRenameAgent(ScreenContext & ctx, int agentIndex);
 	void RenameCurrentAgent(ScreenContext & ctx);
+	void SubmitAlias(ScreenContext & ctx);
 	void RebuildAgentRows(ScreenContext & ctx);
 	void CopyAlias(const std::string& value);
 	void AdvanceAliasStep(ScreenContext & ctx);
@@ -45,10 +48,6 @@ private:
 	bool waitingForCreate = false;
 	bool waitingForRename = false;
 	Uint32 renameCharacterId = 0;
-	int activatedAgentIndex = -1;
-	int renameClickedIndex = -1;
-	bool aliasSubmitted = false;
-	int agencyClickedIndex = -1;
 	char alias[17] = {};
 	std::vector<std::string> agentRows;
 	std::array<std::string, 4> detailStats = {};

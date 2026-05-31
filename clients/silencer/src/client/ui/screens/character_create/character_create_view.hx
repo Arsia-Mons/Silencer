@@ -35,13 +35,13 @@ struct CharacterCreateContextValue {
 	bool waiting = false;
 	int selected_agency_index = 0;
 	int preview_agency_index = -1;
-	std::function<void(int index)> on_agent_focus = {};
-	std::function<void(int index)> on_agent_activate = {};
-	std::function<void(int index)> on_rename = {};
-	std::function<void(const std::string&)> on_alias_change = {};
-	std::function<void(const ::ui::ActivationEvent&)> on_alias_submit = {};
-	std::function<void(int index)> on_agency_focus = {};
-	std::function<void(int index)> on_agency_activate = {};
+	std::function<void(int index)> focus_agent = {};
+	std::function<void(int index)> activate_agent = {};
+	std::function<void(int index)> rename_agent = {};
+	std::function<void(const std::string&)> set_alias = {};
+	std::function<void()> submit_alias = {};
+	std::function<void(int index)> focus_agency = {};
+	std::function<void(int index)> activate_agency = {};
 };
 
 extern ::ReactContext CharacterCreateContext;

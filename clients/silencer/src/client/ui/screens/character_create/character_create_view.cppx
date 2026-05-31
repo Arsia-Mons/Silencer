@@ -88,6 +88,13 @@ std::function<void(const ::ui::FocusEvent&)> focus_index(
 	};
 }
 
+std::function<void(const ::ui::ActivationEvent&)> action_callback(
+	std::function<void()> action) {
+	return [action](const ::ui::ActivationEvent&) {
+		if(action) action();
+	};
+}
+
 ::ui::LayoutStyle root_layout() {
 	return ::ui::LayoutStyle{
 		.direction = ::ui::FlexDirection::Column,
@@ -264,8 +271,8 @@ struct AgentRowProps {
 	  label={agent_label(state, index)}
 	  selected={index == state.selected_agent_index}
 	  disabled={is_alias_step(state)}
-	  onFocus={focus_index(state.on_agent_focus, index)}
-	  onActivate={activate_index(state.on_agent_activate, index)}
+	  onFocus={focus_index(state.focus_agent, index)}
+	  onActivate={activate_index(state.activate_agent, index)}
 	  layout={row_button_layout()}
 	/>
 }
@@ -286,8 +293,8 @@ struct AgencyRowProps {
 	  label={agency.name}
 	  selected={props.index == state.selected_agency_index}
 	  disabled={state.waiting}
-	  onFocus={focus_index(state.on_agency_focus, props.index)}
-	  onActivate={activate_index(state.on_agency_activate, props.index)}
+	  onFocus={focus_index(state.focus_agency, props.index)}
+	  onActivate={activate_index(state.activate_agency, props.index)}
 	  layout={row_button_layout()}
 	/>
 }
@@ -393,7 +400,7 @@ struct DetailPanelProps {
 		  id={rename_id(state.detail_agent_index)}
 		  label="Rename Once"
 		  disabled={!state.detail_rename_available || is_agency_step(state) || is_alias_step(state)}
-		  onActivate={activate_index(state.on_rename, state.detail_agent_index)}
+		  onActivate={activate_index(state.rename_agent, state.detail_agent_index)}
 		  layout={rename_button_layout()}
 		/>
 		<Text
@@ -435,8 +442,8 @@ struct AliasModalProps {
 		  disabled={!alias_step || state.waiting}
 		  autofocus={alias_step}
 		  accessibility={::ui::components::AccessibilityProps{.role = ::ui::SemanticRole::TextBox, .label = "Alias"}}
-		  onActivate={state.on_alias_submit}
-		  onChange={state.on_alias_change}
+		  onActivate={action_callback(state.submit_alias)}
+		  onChange={state.set_alias}
 		  layout={alias_input_layout()}
 		/>
 		<Button
@@ -444,7 +451,7 @@ struct AliasModalProps {
 		  id="character_create.alias.submit"
 		  label={state.alias_renaming ? "Rename" : "Continue"}
 		  disabled={!alias_step || state.waiting}
-		  onActivate={state.on_alias_submit}
+		  onActivate={action_callback(state.submit_alias)}
 		  layout={rename_button_layout()}
 		/>
 	</Box>
