@@ -19,6 +19,7 @@ namespace silencer::client_ui::lobby {
 
 constexpr const char * kGameCreateOptionsScrollId = "lobby.game_create.options";
 constexpr const char * kGameCreateOptionsScrollLabel = "Game Options Form";
+constexpr int kGameCreateVisibleMapRows = 7;
 
 struct GameCreatePanelState {
 	// Form fields — buffers sized to match the legacy TextInput maxchars.
@@ -73,6 +74,17 @@ void GameCreatePanelTick(GameCreatePanelState & state,
                          LobbyScreen & owner);
 bool GameCreatePanelHandleUiIntent(GameCreatePanelState & state,
                                    const silencer::ui::UiAction & action);
+void GameCreatePanelSelectMap(GameCreatePanelState & state, int index);
+void GameCreatePanelScrollMaps(GameCreatePanelState & state, int delta);
+void GameCreatePanelCycleSecurity(GameCreatePanelState & state);
+void GameCreatePanelToggleSpectatable(GameCreatePanelState & state);
+void GameCreatePanelRequestCreate(GameCreatePanelState & state);
+void GameCreatePanelSetName(GameCreatePanelState & state, const std::string & value);
+void GameCreatePanelSetPassword(GameCreatePanelState & state, const std::string & value);
+void GameCreatePanelSetMinLevel(GameCreatePanelState & state, const std::string & value);
+void GameCreatePanelSetMaxLevel(GameCreatePanelState & state, const std::string & value);
+void GameCreatePanelSetMaxPlayers(GameCreatePanelState & state, const std::string & value);
+void GameCreatePanelSetMaxTeams(GameCreatePanelState & state, const std::string & value);
 
 }  // namespace silencer::client_ui::lobby
 

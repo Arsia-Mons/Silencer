@@ -4,6 +4,7 @@
 #include "ui/runtime/react.h"
 
 #include <functional>
+#include <string>
 
 namespace silencer::client_ui::lobby {
 
@@ -39,6 +40,17 @@ struct LobbyContextValue {
 		std::function<void()> create_game = {};
 		std::function<void()> join_game = {};
 		std::function<void()> spectate_game = {};
+		std::function<void(int)> select_create_map = {};
+		std::function<void(int)> scroll_create_maps = {};
+		std::function<void()> cycle_create_security = {};
+		std::function<void()> toggle_create_spectatable = {};
+		std::function<void()> submit_create_game = {};
+		std::function<void(const std::string&)> set_create_name = {};
+		std::function<void(const std::string&)> set_create_password = {};
+		std::function<void(const std::string&)> set_create_min_level = {};
+		std::function<void(const std::string&)> set_create_max_level = {};
+		std::function<void(const std::string&)> set_create_max_players = {};
+		std::function<void(const std::string&)> set_create_max_teams = {};
 	};
 
 	State state = {};

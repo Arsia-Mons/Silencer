@@ -223,51 +223,100 @@ bool GameCreatePanelHandleUiIntent(GameCreatePanelState & state,
 	}
 	if(action.kind == silencer::ui::UiActionKind::SetText){
 		if(action.id == game_create_panel_detail::kActionMinLevel){
-			game_create_panel_detail::CopyUiText(state.minLevel, static_cast<int>(sizeof(state.minLevel)), action.value);
+			GameCreatePanelSetMinLevel(state, action.value);
 			return true;
 		}
 		if(action.id == game_create_panel_detail::kActionMaxLevel){
-			game_create_panel_detail::CopyUiText(state.maxLevel, static_cast<int>(sizeof(state.maxLevel)), action.value);
+			GameCreatePanelSetMaxLevel(state, action.value);
 			return true;
 		}
 		if(action.id == game_create_panel_detail::kActionMaxPlayers){
-			game_create_panel_detail::CopyUiText(state.maxPlayers, static_cast<int>(sizeof(state.maxPlayers)), action.value);
+			GameCreatePanelSetMaxPlayers(state, action.value);
 			return true;
 		}
 		if(action.id == game_create_panel_detail::kActionMaxTeams){
-			game_create_panel_detail::CopyUiText(state.maxTeams, static_cast<int>(sizeof(state.maxTeams)), action.value);
+			GameCreatePanelSetMaxTeams(state, action.value);
 			return true;
 		}
 		if(action.id == game_create_panel_detail::kActionName){
-			game_create_panel_detail::CopyUiText(state.name, static_cast<int>(sizeof(state.name)), action.value);
+			GameCreatePanelSetName(state, action.value);
 			return true;
 		}
 		if(action.id == game_create_panel_detail::kActionPassword){
-			game_create_panel_detail::CopyUiText(state.password, static_cast<int>(sizeof(state.password)), action.value);
+			GameCreatePanelSetPassword(state, action.value);
 			return true;
 		}
 		return false;
 	}
 	if(action.kind == silencer::ui::UiActionKind::Activate){
 		if(action.id == game_create_panel_detail::kActionSecurity){
-			state.securityClicked = true;
+			GameCreatePanelCycleSecurity(state);
 			return true;
 		}
 		if(action.id == game_create_panel_detail::kActionSpectatable){
-			state.spectatableClicked = true;
+			GameCreatePanelToggleSpectatable(state);
 			return true;
 		}
 		if(action.id == game_create_panel_detail::kActionCreate){
-			state.createClicked = true;
+			GameCreatePanelRequestCreate(state);
 			return true;
 		}
 	}
 	if(action.kind == silencer::ui::UiActionKind::Select &&
 	   game_create_panel_detail::StartsWith(action.id, game_create_panel_detail::kActionMapPrefix)){
-		state.mapRowClickedIndex = action.index;
+		GameCreatePanelSelectMap(state, action.index);
 		return true;
 	}
 	return false;
+}
+
+void GameCreatePanelSelectMap(GameCreatePanelState & state, int index) {
+	state.mapRowClickedIndex = index;
+}
+
+void GameCreatePanelScrollMaps(GameCreatePanelState & state, int delta) {
+	int maxScroll = static_cast<int>(state.maps.size()) - kGameCreateVisibleMapRows;
+	if(maxScroll < 0) maxScroll = 0;
+	int next = static_cast<int>(state.mapScrollPos) + delta;
+	if(next < 0) next = 0;
+	if(next > maxScroll) next = maxScroll;
+	state.mapScrollPos = static_cast<Uint16>(next);
+}
+
+void GameCreatePanelCycleSecurity(GameCreatePanelState & state) {
+	state.securityClicked = true;
+}
+
+void GameCreatePanelToggleSpectatable(GameCreatePanelState & state) {
+	state.spectatableClicked = true;
+}
+
+void GameCreatePanelRequestCreate(GameCreatePanelState & state) {
+	state.createClicked = true;
+}
+
+void GameCreatePanelSetName(GameCreatePanelState & state, const std::string & value) {
+	game_create_panel_detail::CopyUiText(state.name, static_cast<int>(sizeof(state.name)), value);
+}
+
+void GameCreatePanelSetPassword(GameCreatePanelState & state, const std::string & value) {
+	game_create_panel_detail::CopyUiText(state.password, static_cast<int>(sizeof(state.password)), value);
+}
+
+void GameCreatePanelSetMinLevel(GameCreatePanelState & state, const std::string & value) {
+	game_create_panel_detail::CopyUiText(state.minLevel, static_cast<int>(sizeof(state.minLevel)), value);
+}
+
+void GameCreatePanelSetMaxLevel(GameCreatePanelState & state, const std::string & value) {
+	game_create_panel_detail::CopyUiText(state.maxLevel, static_cast<int>(sizeof(state.maxLevel)), value);
+}
+
+void GameCreatePanelSetMaxPlayers(GameCreatePanelState & state, const std::string & value) {
+	game_create_panel_detail::CopyUiText(state.maxPlayers, static_cast<int>(sizeof(state.maxPlayers)), value);
+}
+
+void GameCreatePanelSetMaxTeams(GameCreatePanelState & state, const std::string & value) {
+	game_create_panel_detail::CopyUiText(state.maxTeams, static_cast<int>(sizeof(state.maxTeams)), value);
 }
 
 }  // namespace silencer::client_ui::lobby

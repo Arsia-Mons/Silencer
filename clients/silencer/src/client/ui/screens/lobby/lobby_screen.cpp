@@ -127,6 +127,39 @@ bool LobbyScreen::BuildElement(ScreenContext & ctx, ::ui::UiElement * out)
 			.spectate_game = [this]() {
 				silencer::client_ui::lobby::GameSelectPanelRequestSpectate(gameSelectState);
 			},
+			.select_create_map = [this](int index) {
+				silencer::client_ui::lobby::GameCreatePanelSelectMap(gameCreateState, index);
+			},
+			.scroll_create_maps = [this](int delta) {
+				silencer::client_ui::lobby::GameCreatePanelScrollMaps(gameCreateState, delta);
+			},
+			.cycle_create_security = [this]() {
+				silencer::client_ui::lobby::GameCreatePanelCycleSecurity(gameCreateState);
+			},
+			.toggle_create_spectatable = [this]() {
+				silencer::client_ui::lobby::GameCreatePanelToggleSpectatable(gameCreateState);
+			},
+			.submit_create_game = [this]() {
+				silencer::client_ui::lobby::GameCreatePanelRequestCreate(gameCreateState);
+			},
+			.set_create_name = [this](const std::string& value) {
+				silencer::client_ui::lobby::GameCreatePanelSetName(gameCreateState, value);
+			},
+			.set_create_password = [this](const std::string& value) {
+				silencer::client_ui::lobby::GameCreatePanelSetPassword(gameCreateState, value);
+			},
+			.set_create_min_level = [this](const std::string& value) {
+				silencer::client_ui::lobby::GameCreatePanelSetMinLevel(gameCreateState, value);
+			},
+			.set_create_max_level = [this](const std::string& value) {
+				silencer::client_ui::lobby::GameCreatePanelSetMaxLevel(gameCreateState, value);
+			},
+			.set_create_max_players = [this](const std::string& value) {
+				silencer::client_ui::lobby::GameCreatePanelSetMaxPlayers(gameCreateState, value);
+			},
+			.set_create_max_teams = [this](const std::string& value) {
+				silencer::client_ui::lobby::GameCreatePanelSetMaxTeams(gameCreateState, value);
+			},
 		},
 	};
 	*out = silencer::client_ui::lobby::LobbyScreenView(
