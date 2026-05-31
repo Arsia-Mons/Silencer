@@ -84,6 +84,14 @@ std::function<void(const ::ui::ActivationEvent&)> action_callback(
 	};
 }
 
+std::function<void(const ::ui::ActivationEvent&)> index_action_callback(
+	std::function<void(int)> action,
+	int index) {
+	return [action, index](const ::ui::ActivationEvent&) {
+		if(action) action(index);
+	};
+}
+
 std::function<void(const ::ui::ActivationEvent&)> set_index(int * target, int value) {
 	return [target, value](const ::ui::ActivationEvent&) {
 		if(target) *target = value;
@@ -586,7 +594,7 @@ struct GameRowProps {
 	  idOffset={index}
 	  label={state->rows[static_cast<size_t>(index)].name.c_str()}
 	  selected={selected}
-	  onActivate={set_index(&state->rowClickedIndex, index)}
+	  onActivate={index_action_callback(lobby.actions.select_game, index)}
 	  layout={row_button_layout(24.0f)}
 	  style={row_style(selected)}
 	/>
@@ -607,7 +615,7 @@ struct GameSelectUpperProps {
 		  key="create"
 		  id="lobby.game_select.create"
 		  label="Create Game"
-		  onActivate={set_flag(&state->createClicked)}
+		  onActivate={action_callback(lobby.actions.create_game)}
 		  layout={row_button_layout(30.0f)}
 		/>
 		<FieldText
@@ -633,14 +641,14 @@ struct GameSelectTallProps {
 			  key="prev"
 			  id="lobby.game_select.prev"
 			  label="Prev"
-			  onActivate={scroll_rows(&state->scrollPos, static_cast<int>(state->rows.size()), 8, -8)}
+			  onActivate={index_action_callback(lobby.actions.scroll_games, -kGameSelectVisibleRows)}
 			  layout={compact_button_layout()}
 			/>
 			<Button
 			  key="next"
 			  id="lobby.game_select.next"
 			  label="Next"
-			  onActivate={scroll_rows(&state->scrollPos, static_cast<int>(state->rows.size()), 8, 8)}
+			  onActivate={index_action_callback(lobby.actions.scroll_games, kGameSelectVisibleRows)}
 			  layout={compact_button_layout()}
 			/>
 		</Box>
@@ -664,7 +672,7 @@ struct GameSelectTallProps {
 		  id="lobby.game_select.spectate"
 		  label="Spectate"
 		  disabled={!state->spectateVisible}
-		  onActivate={set_flag(&state->spectateClicked)}
+		  onActivate={action_callback(lobby.actions.spectate_game)}
 		  layout={row_button_layout(27.0f)}
 		/>
 		<Button
@@ -672,7 +680,7 @@ struct GameSelectTallProps {
 		  id="lobby.game_select.join"
 		  label="Join"
 		  disabled={!state->joinVisible}
-		  onActivate={set_flag(&state->joinClicked)}
+		  onActivate={action_callback(lobby.actions.join_game)}
 		  layout={row_button_layout(27.0f)}
 		/>
 	</Box>

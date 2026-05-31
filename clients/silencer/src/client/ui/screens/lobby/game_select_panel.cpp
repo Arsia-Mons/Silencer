@@ -241,24 +241,49 @@ bool GameSelectPanelHandleUiIntent(GameSelectPanelState & state,
                                    const silencer::ui::UiAction & action) {
 	if(action.kind == silencer::ui::UiActionKind::Activate){
 		if(action.id == game_select_panel_detail::kActionCreate){
-			state.createClicked = true;
+			GameSelectPanelRequestCreate(state);
 			return true;
 		}
 		if(action.id == game_select_panel_detail::kActionJoin){
-			state.joinClicked = true;
+			GameSelectPanelRequestJoin(state);
 			return true;
 		}
 		if(action.id == game_select_panel_detail::kActionSpectate){
-			state.spectateClicked = true;
+			GameSelectPanelRequestSpectate(state);
 			return true;
 		}
 	}
 	if(action.kind == silencer::ui::UiActionKind::Select &&
 	   game_select_panel_detail::StartsWith(action.id, game_select_panel_detail::kActionRowPrefix)){
-		state.rowClickedIndex = action.index;
+		GameSelectPanelSelectRow(state, action.index);
 		return true;
 	}
 	return false;
+}
+
+void GameSelectPanelSelectRow(GameSelectPanelState & state, int index) {
+	state.rowClickedIndex = index;
+}
+
+void GameSelectPanelScrollRows(GameSelectPanelState & state, int delta) {
+	int maxScroll = static_cast<int>(state.rows.size()) - kGameSelectVisibleRows;
+	if(maxScroll < 0) maxScroll = 0;
+	int next = static_cast<int>(state.scrollPos) + delta;
+	if(next < 0) next = 0;
+	if(next > maxScroll) next = maxScroll;
+	state.scrollPos = static_cast<Uint16>(next);
+}
+
+void GameSelectPanelRequestCreate(GameSelectPanelState & state) {
+	state.createClicked = true;
+}
+
+void GameSelectPanelRequestJoin(GameSelectPanelState & state) {
+	state.joinClicked = true;
+}
+
+void GameSelectPanelRequestSpectate(GameSelectPanelState & state) {
+	state.spectateClicked = true;
 }
 
 }  // namespace silencer::client_ui::lobby

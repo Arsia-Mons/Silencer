@@ -18,6 +18,8 @@ class LobbyScreen;
 
 namespace silencer::client_ui::lobby {
 
+constexpr int kGameSelectVisibleRows = 8;
+
 struct GameSelectPanelState {
 	// Snapshot of the games list. Rebuilt from world.lobby.games whenever
 	// world.lobby.gamesprocessed flips false. Held in screen-side storage
@@ -72,6 +74,11 @@ void GameSelectPanelTick(GameSelectPanelState & state,
                          LobbyScreen & owner);
 bool GameSelectPanelHandleUiIntent(GameSelectPanelState & state,
                                    const silencer::ui::UiAction & action);
+void GameSelectPanelSelectRow(GameSelectPanelState & state, int index);
+void GameSelectPanelScrollRows(GameSelectPanelState & state, int delta);
+void GameSelectPanelRequestCreate(GameSelectPanelState & state);
+void GameSelectPanelRequestJoin(GameSelectPanelState & state);
+void GameSelectPanelRequestSpectate(GameSelectPanelState & state);
 
 }  // namespace silencer::client_ui::lobby
 

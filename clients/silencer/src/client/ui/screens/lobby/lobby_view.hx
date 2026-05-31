@@ -34,6 +34,11 @@ struct LobbyContextValue {
 		std::function<void()> change_agent = {};
 		std::function<void(const std::string&)> set_chat_text = {};
 		std::function<void()> send_chat = {};
+		std::function<void(int)> select_game = {};
+		std::function<void(int)> scroll_games = {};
+		std::function<void()> create_game = {};
+		std::function<void()> join_game = {};
+		std::function<void()> spectate_game = {};
 	};
 
 	State state = {};

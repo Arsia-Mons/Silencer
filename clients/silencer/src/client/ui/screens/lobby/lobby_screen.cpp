@@ -112,6 +112,21 @@ bool LobbyScreen::BuildElement(ScreenContext & ctx, ::ui::UiElement * out)
 			.send_chat = [this]() {
 				chatSendClicked = true;
 			},
+			.select_game = [this](int index) {
+				silencer::client_ui::lobby::GameSelectPanelSelectRow(gameSelectState, index);
+			},
+			.scroll_games = [this](int delta) {
+				silencer::client_ui::lobby::GameSelectPanelScrollRows(gameSelectState, delta);
+			},
+			.create_game = [this]() {
+				silencer::client_ui::lobby::GameSelectPanelRequestCreate(gameSelectState);
+			},
+			.join_game = [this]() {
+				silencer::client_ui::lobby::GameSelectPanelRequestJoin(gameSelectState);
+			},
+			.spectate_game = [this]() {
+				silencer::client_ui::lobby::GameSelectPanelRequestSpectate(gameSelectState);
+			},
 		},
 	};
 	*out = silencer::client_ui::lobby::LobbyScreenView(
