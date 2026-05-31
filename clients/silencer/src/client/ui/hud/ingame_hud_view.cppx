@@ -9,6 +9,7 @@
 
 #include <algorithm>
 #include <cstdint>
+#include <cstring>
 #include <string>
 
 namespace silencer::client_ui {
@@ -919,6 +920,127 @@ struct HudSecretOverlayProps {
 	</Box>
 }
 
+bool player_list_has_peers(const HudView& view) {
+	for(const TeamHudView& team : view.teams){
+		if(!team.playerListPeers.empty()) return true;
+	}
+	return false;
+}
+
+::ui::LayoutStyle player_list_panel_layout(const HudView& view) {
+	return text_layout(50, 50, 540, 10 + (static_cast<int>(view.teams.size()) * 58));
+}
+
+::ui::StyleStatePatch player_list_panel_style() {
+	return ::ui::patch().background(::ui::Color{0, 0, 0, 128});
+}
+
+::ui::StyleStatePatch player_list_text_style() {
+	return ::ui::patch().text(::ui::TextVisual{
+		.color = {226, 234, 242, 255},
+		.font_id = 133,
+		.font_size = 6,
+	});
+}
+
+const TeamPeerView * player_list_peer_at(const TeamHudView& team, int slot) {
+	if(slot < 0 || slot >= static_cast<int>(team.playerListPeers.size())) return nullptr;
+	return &team.playerListPeers[static_cast<size_t>(slot)];
+}
+
+int player_list_team_row_y(int teamSlot) {
+	return 60 + (teamSlot * 58);
+}
+
+int player_list_peer_y_offset(const TeamHudView& team) {
+	int y = ((4 - static_cast<int>(team.playerListPeers.size())) * 12) / 2;
+	return y < 0 ? 0 : y;
+}
+
+const char * player_list_stats_text(const TeamPeerView& peer) {
+	return ::ui::copy_string(use_text_storage(
+		"L:%d    E:%d  S:%d  J:%d  H:%d  C:%d",
+		peer.agencyLevel,
+		peer.agencyEndurance,
+		peer.agencyShield,
+		peer.agencyJetpack,
+		peer.agencyHacking,
+		peer.agencyContacts));
+}
+
+struct PlayerListPeerRowProps {
+	const char * key = nullptr;
+	int team_slot = 0;
+	int peer_slot = 0;
+};
+
+::ui::UiElement PlayerListPeerRow(const PlayerListPeerRowProps& props) {
+	const InGameHudContextValue& hud = UseInGameHud();
+	if(!hud.view) return ::ui::empty();
+	const TeamHudView * team = team_at(*hud.view, props.team_slot);
+	if(!team) return ::ui::empty();
+	const TeamPeerView * peer = player_list_peer_at(*team, props.peer_slot);
+	if(!peer) return ::ui::empty();
+	const char * stats = player_list_stats_text(*peer);
+	const int statsW = (static_cast<int>(std::strlen(stats)) + 1) * 6;
+	const int rowY = player_list_team_row_y(props.team_slot)
+		+ player_list_peer_y_offset(*team)
+		+ (props.peer_slot * 12);
+	return <Box key={props.key} layout={root_layout()}>
+		<Text
+		  key="name"
+		  value={peer->displayName.c_str()}
+		  layout={text_layout(100, rowY, 420 - statsW, 12)}
+		  style={player_list_text_style()}
+		/>
+		<Text
+		  key="stats"
+		  value={stats}
+		  layout={text_layout(580 - statsW, rowY, statsW, 12)}
+		  style={player_list_text_style()}
+		/>
+	</Box>
+}
+
+struct PlayerListTeamRowProps {
+	const char * key = nullptr;
+	int slot = 0;
+};
+
+::ui::UiElement PlayerListTeamRow(const PlayerListTeamRowProps& props) {
+	const InGameHudContextValue& hud = UseInGameHud();
+	if(!hud.view) return ::ui::empty();
+	const TeamHudView * team = team_at(*hud.view, props.slot);
+	if(!team) return ::ui::empty();
+	const int emblemY = player_list_team_row_y(props.slot) + ((58 - team->emblemH) / 2);
+	return <Box key={props.key} layout={root_layout()}>
+		<HudTeamEmblem key="emblem" slot={props.slot} x={60} y={emblemY} />
+		<PlayerListPeerRow key="peer-0" teamSlot={props.slot} peerSlot={0} />
+		<PlayerListPeerRow key="peer-1" teamSlot={props.slot} peerSlot={1} />
+		<PlayerListPeerRow key="peer-2" teamSlot={props.slot} peerSlot={2} />
+		<PlayerListPeerRow key="peer-3" teamSlot={props.slot} peerSlot={3} />
+	</Box>
+}
+
+struct PlayerListOverlayProps {
+	const char * key = nullptr;
+};
+
+::ui::UiElement PlayerListOverlay(const PlayerListOverlayProps& props) {
+	const InGameHudContextValue& hud = UseInGameHud();
+	if(!hud.view || !hud.view->showPlayerList || hud.view->teams.empty()) return ::ui::empty();
+	if(!player_list_has_peers(*hud.view)) return ::ui::empty();
+	return <Box key={props.key} layout={root_layout()}>
+		<Box key="panel" layout={player_list_panel_layout(*hud.view)} style={player_list_panel_style()} />
+		<PlayerListTeamRow key="team-0" slot={0} />
+		<PlayerListTeamRow key="team-1" slot={1} />
+		<PlayerListTeamRow key="team-2" slot={2} />
+		<PlayerListTeamRow key="team-3" slot={3} />
+		<PlayerListTeamRow key="team-4" slot={4} />
+		<PlayerListTeamRow key="team-5" slot={5} />
+	</Box>
+}
+
 struct SystemCameraFrameProps {
 	const char * key = nullptr;
 	int slot = 0;
@@ -1169,6 +1291,7 @@ struct TraceTimeProps {
 		<StatusMessages key="status" />
 		<TopMessage key="top-message" />
 		<QuitPrompt key="quit-prompt" />
+		<PlayerListOverlay key="player-list" />
 	</Box>
 }
 
