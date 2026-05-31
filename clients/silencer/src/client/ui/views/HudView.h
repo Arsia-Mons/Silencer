@@ -32,6 +32,8 @@ struct PlayerHudView {
 	Uint8  flamerAmmo = 0;
 	Uint8  inventoryItems[4] = {0, 0, 0, 0};
 	Uint8  inventoryItemsNum[4] = {0, 0, 0, 0};
+	Uint8  inventorySpriteIndexes[4] = {0xFF, 0xFF, 0xFF, 0xFF};
+	char   inventoryLetters[4] = {'\0', '\0', '\0', '\0'};
 	Uint8  currentInventoryItem = 0;
 	Uint16 poisonedBy = 0;
 	Uint8  tracetime = 0;

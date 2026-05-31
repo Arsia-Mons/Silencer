@@ -36,7 +36,10 @@ void BuildInGameHudUi(Renderer& renderer, const Resources& resources,
 
 	if(!player.valid) return;
 
-	Uint8 currentammo = BuildHudStatusSprites(player, surface, resources, renderer, phase);
+	Uint8 currentammo = 0;
+	if(drawLegacyRetainedHudParts){
+		currentammo = BuildHudStatusSprites(player, surface, resources, renderer, phase);
+	}
 	if(drawLegacyRetainedHudParts){
 		BuildHudReadouts(player, surface, currentammo);
 	}

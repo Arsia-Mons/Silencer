@@ -1,5 +1,6 @@
 #include "retained_surface_renderer.h"
 
+#include "client/ui/hud/hud_retained_payloads.h"
 #include "resources.h"
 #include "renderer.h"
 #include "render/clay_ui_payloads.h"
@@ -133,8 +134,77 @@ Surface * ResolveSprite(const Resources& resources, uint32_t textureId) {
 	return resources.spritebank[bank][index].get();
 }
 
-void DrawImage(const Resources& resources, Surface& dst, const ::ui::DrawCommand& command) {
+void DrawRetainedHudSprite(Renderer& renderer,
+                           const Resources& resources,
+                           Surface& dst,
+                           const ::ui::DrawCommand& command,
+                           const silencer::client_ui::RetainedHudSpritePayload& payload) {
+	if(payload.bank >= resources.spritebank.size()) return;
+	if(payload.index >= resources.spritebank[payload.bank].size()) return;
+	Surface * src = resources.spritebank[payload.bank][payload.index].get();
+	if(!src) return;
+
+	Renderer::Rect srcrect{
+		payload.srcW > 0 ? payload.srcW : src->w,
+		payload.srcH > 0 ? payload.srcH : src->h,
+		payload.srcX,
+		payload.srcY,
+	};
+	if(srcrect.x < 0) srcrect.x = 0;
+	if(srcrect.y < 0) srcrect.y = 0;
+	if(srcrect.x + srcrect.w > src->w) srcrect.w = src->w - srcrect.x;
+	if(srcrect.y + srcrect.h > src->h) srcrect.h = src->h - srcrect.y;
+	if(srcrect.w <= 0 || srcrect.h <= 0) return;
+
+	Renderer::Rect dstrect{
+		srcrect.w,
+		srcrect.h,
+		static_cast<int>(std::floor(command.rect.x)) + payload.dstOffsetX,
+		static_cast<int>(std::floor(command.rect.y)) + payload.dstOffsetY,
+	};
+	int cx = dstrect.x;
+	int cy = dstrect.y;
+	int cw = dstrect.w;
+	int ch = dstrect.h;
+	if(!ClipRect(dst, cx, cy, cw, ch)) return;
+
+	const bool needsCopy =
+		payload.effectColor != 0 || payload.rampColor != 0 || payload.brightness != 128;
+	if(needsCopy){
+		Surface * copy = renderer.CreateSurfaceCopy(src);
+		if(payload.effectColor != 0){
+			renderer.EffectColor(copy, nullptr, payload.effectColor);
+		}
+		if(payload.rampColor != 0){
+			if(payload.rampPlus != 0){
+				renderer.EffectRampColorPlus(copy, nullptr, payload.rampColor, payload.rampPlus);
+			}else{
+				renderer.EffectRampColor(copy, nullptr, payload.rampColor);
+			}
+		}
+		if(payload.brightness != 128){
+			renderer.EffectBrightness(copy, nullptr, payload.brightness);
+		}
+		Renderer::BlitSurface(copy, &srcrect, &dst, &dstrect);
+		delete copy;
+	}else{
+		Renderer::BlitSurface(src, &srcrect, &dst, &dstrect);
+	}
+}
+
+void DrawImage(Renderer& renderer,
+               const Resources& resources,
+               Surface& dst,
+               const ::ui::DrawCommand& command) {
 	if(command.payload.image.texture_id == 0) return;
+	if(silencer::client_ui::IsRetainedHudPayloadTexture(command.payload.image.texture_id)){
+		const auto * payload =
+			silencer::client_ui::ResolveRetainedHudSpritePayload(command.payload.image.texture_id);
+		if(payload){
+			DrawRetainedHudSprite(renderer, resources, dst, command, *payload);
+		}
+		return;
+	}
 	Surface * src = ResolveSprite(resources, command.payload.image.texture_id);
 	if(!src) return;
 	Renderer::Rect dstrect{
@@ -171,7 +241,7 @@ void RenderRetainedDrawCommands(Renderer& renderer,
 				DrawText(renderer, dst, commands, command);
 				break;
 			case ::ui::DrawCommandKind::Image:
-				DrawImage(resources, dst, command);
+				DrawImage(renderer, resources, dst, command);
 				break;
 			default:
 				break;

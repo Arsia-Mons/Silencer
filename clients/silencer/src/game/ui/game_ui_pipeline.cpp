@@ -163,7 +163,8 @@ silencer::client_ui::HudView hudView =
 silencer::client_ui::BuildHudView(game.world);
 const bool retainedInGameHud = !clientUi.HasScreens();
 if(retainedInGameHud){
-clientUi.BuildRetainedInGameHud(hudView, game.world.resources);
+clientUi.BuildRetainedInGameHud(
+hudView, game.world.resources, game.renderer.GetHudAnimationPhase());
 }
 silencer::client_ui::BuildInGameHudUi(
 game.renderer,

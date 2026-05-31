@@ -24,6 +24,63 @@ namespace client_ui {
 
 namespace hudview_detail {
 
+Uint8 InventoryResourceIndex(Uint8 id) {
+	switch(id){
+		default:
+		case ::Player::INV_NONE:
+			return 0xFF;
+		case ::Player::INV_HEALTHPACK:
+			return 1;
+		case ::Player::INV_LAZARUSTRACT:
+			return 2;
+		case ::Player::INV_SECURITYPASS:
+			return 3;
+		case ::Player::INV_VIRUS:
+			return 14;
+		case ::Player::INV_POISON:
+			return 5;
+		case ::Player::INV_EMPBOMB:
+			return 6;
+		case ::Player::INV_SHAPEDBOMB:
+			return 7;
+		case ::Player::INV_PLASMABOMB:
+			return 8;
+		case ::Player::INV_NEUTRONBOMB:
+			return 9;
+		case ::Player::INV_PLASMADET:
+			return 12;
+		case ::Player::INV_FIXEDCANNON:
+			return 11;
+		case ::Player::INV_FLARE:
+			return 10;
+		case ::Player::INV_POISONFLARE:
+			return 13;
+		case ::Player::INV_CAMERA:
+			return 4;
+		case ::Player::INV_BASEDOOR:
+			return 0;
+	}
+}
+
+char InventoryLetter(Uint8 id) {
+	switch(id){
+		case ::Player::INV_PLASMABOMB:
+			return 'P';
+		case ::Player::INV_SHAPEDBOMB:
+			return 'S';
+		case ::Player::INV_NEUTRONBOMB:
+			return 'N';
+		case ::Player::INV_EMPBOMB:
+			return 'E';
+		case ::Player::INV_PLASMADET:
+			return 'D';
+		case ::Player::INV_FLARE:
+			return 'F';
+		default:
+			return '\0';
+	}
+}
+
 void PopulatePlayerFields(PlayerHudView& view, ::Player* player) {
 	view.valid = true;
 	view.health = player->health;
@@ -43,6 +100,8 @@ void PopulatePlayerFields(PlayerHudView& view, ::Player* player) {
 	for(int i = 0; i < 4; ++i){
 		view.inventoryItems[i] = player->inventoryitems[i];
 		view.inventoryItemsNum[i] = player->inventoryitemsnum[i];
+		view.inventorySpriteIndexes[i] = InventoryResourceIndex(player->inventoryitems[i]);
+		view.inventoryLetters[i] = InventoryLetter(player->inventoryitems[i]);
 	}
 	view.currentInventoryItem = player->currentinventoryitem;
 	view.poisonedBy = player->GetPoisonedBy();

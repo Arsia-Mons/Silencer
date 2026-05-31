@@ -11,6 +11,8 @@
 #include "ui/runtime/UiFrameContext.h"
 #include "client/ui/navigation/ScreenStack.h"
 
+#include <SDL3/SDL_stdinc.h>
+
 #include <array>
 #include <memory>
 #include <string>
@@ -48,7 +50,7 @@ public:
 	void ClearScreensIfRequested(ScreenContext& ctx);
 	void TickVisibleScreens(ScreenContext& ctx);
 	void BuildVisibleScreens(ScreenContext& ctx);
-	void BuildRetainedInGameHud(const HudView& view, const Resources& resources);
+	void BuildRetainedInGameHud(const HudView& view, const Resources& resources, Uint8 animationPhase);
 	void RenderRetainedScreens(Renderer& renderer, const Resources& resources, Surface& dst);
 
 private:

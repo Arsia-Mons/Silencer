@@ -2,6 +2,7 @@
 
 #include "client/ui/hud/HudPayloadArena.h"
 #include "client/ui/hud/ingame_hud_view.h"
+#include "client/ui/hud/hud_retained_payloads.h"
 #include "client/ui/views/HudView.h"
 #include "screen.h"
 #include "screen_context.h"
@@ -147,6 +148,7 @@ ClientUi::~ClientUi() = default;
 void ClientUi::BeginFrame(const silencer::ui::UiInputState& input) {
 	frameCtx_.BeginFrame(input.animationDeltaSeconds, input.animationStepSeconds);
 	silencer::client_ui::HudPayloadBeginFrame();
+	silencer::client_ui::HudRetainedPayloadBeginFrame();
 	clay_.BeginFrame(input, interactions_);
 	retainedElementFrame_.reset();
 	retainedCommands_.reset();
@@ -310,14 +312,18 @@ void ClientUi::BuildVisibleScreens(ScreenContext& ctx) {
 	(void)BuildRetainedScreens(ctx);
 }
 
-void ClientUi::BuildRetainedInGameHud(const HudView& view, const Resources& resources) {
+void ClientUi::BuildRetainedInGameHud(const HudView& view, const Resources& resources, Uint8 animationPhase) {
 	retainedElementFrame_.reset();
 	if(!view.mapLoaded){
 		retainedCommands_.reset();
 		return;
 	}
 	::ui::UiElementFrameScope scope(retainedElementFrame_);
-	const InGameHudContextValue context{ .view = &view, .resources = &resources };
+	const InGameHudContextValue context{
+		.view = &view,
+		.resources = &resources,
+		.animationPhase = animationPhase,
+	};
 	const auto * stored = ::ui::copy_value(context);
 	if(!stored){
 		retainedCommands_.reset();

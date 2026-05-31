@@ -1,5 +1,6 @@
 #include "client/ui/hud/ingame_hud_view.h"
 
+#include "client/ui/hud/hud_retained_payloads.h"
 #include "resources.h"
 #include "surface.h"
 #include "ui/components/box.h"
@@ -24,9 +25,6 @@ namespace {
 
 const InGameHudContextValue kEmptyContext = {};
 constexpr int kTopMessageMaxLength = 35;
-uint32_t retained_sprite_texture_id(Uint8 bank, Uint16 index) {
-	return (static_cast<uint32_t>(bank) << 16) | static_cast<uint32_t>(index);
-}
 
 int sprite_width(const Resources& resources, Uint8 bank, Uint16 index) {
 	if(bank >= resources.spritebank.size()) return 0;
@@ -52,6 +50,14 @@ int sprite_offset_y(const Resources& resources, Uint8 bank, Uint16 index) {
 	if(bank >= resources.spriteoffsety.size()) return 0;
 	if(index >= resources.spriteoffsety[bank].size()) return 0;
 	return resources.spriteoffsety[bank][index];
+}
+
+int sprite_x(const Resources& resources, Uint8 bank, Uint16 index, int logicalX = 0) {
+	return logicalX - sprite_offset_x(resources, bank, index);
+}
+
+int sprite_y(const Resources& resources, Uint8 bank, Uint16 index, int logicalY = 0) {
+	return logicalY - sprite_offset_y(resources, bank, index);
 }
 
 std::string visible_top_message(const InGameTopMessageView& message) {
@@ -171,9 +177,9 @@ Uint8 trace_time(const HudView& view) {
 	});
 }
 
-::ui::StyleStatePatch sprite_style(Uint8 bank, Uint16 index) {
+::ui::StyleStatePatch sprite_style(const RetainedHudSpritePayload& payload) {
 	return ::ui::patch().image(::ui::BackgroundImage{
-		.texture_id = retained_sprite_texture_id(bank, index),
+		.texture_id = RetainedHudSpriteTextureId(payload),
 		.tint = {255, 255, 255, 255},
 	});
 }
@@ -182,6 +188,14 @@ struct HudSpriteProps {
 	const char * key = nullptr;
 	Uint8 bank = 0;
 	Uint16 index = 0;
+	int src_x = 0;
+	int src_y = 0;
+	int src_w = 0;
+	int src_h = 0;
+	Uint8 effect_color = 0;
+	Uint8 brightness = 128;
+	Uint8 ramp_color = 0;
+	Uint8 ramp_plus = 0;
 	int x = 0;
 	int y = 0;
 	int w = 0;
@@ -189,12 +203,377 @@ struct HudSpriteProps {
 };
 
 ::ui::UiElement HudSprite(const HudSpriteProps& props) {
-	if(props.w <= 0 || props.h <= 0) return ::ui::empty();
+	const InGameHudContextValue& hud = UseInGameHud();
+	if(!hud.resources) return ::ui::empty();
+	const int width = props.w > 0
+		? props.w
+		: props.src_w > 0 ? props.src_w : sprite_width(*hud.resources, props.bank, props.index);
+	const int height = props.h > 0
+		? props.h
+		: props.src_h > 0 ? props.src_h : sprite_height(*hud.resources, props.bank, props.index);
+	if(width <= 0 || height <= 0) return ::ui::empty();
+	const RetainedHudSpritePayload payload{
+		.bank = props.bank,
+		.index = props.index,
+		.srcX = static_cast<Sint16>(props.src_x),
+		.srcY = static_cast<Sint16>(props.src_y),
+		.srcW = static_cast<Sint16>(props.src_w),
+		.srcH = static_cast<Sint16>(props.src_h),
+		.effectColor = props.effect_color,
+		.brightness = props.brightness,
+		.rampColor = props.ramp_color,
+		.rampPlus = props.ramp_plus,
+	};
 	return <Box
 	  key={props.key}
-	  layout={text_layout(props.x, props.y, props.w, props.h)}
-	  style={sprite_style(props.bank, props.index)}
+	  layout={text_layout(props.x, props.y, width, height)}
+	  style={sprite_style(payload)}
 	/>
+}
+
+struct HudFixedSpriteProps {
+	const char * key = nullptr;
+	Uint8 bank = 0;
+	Uint16 index = 0;
+	int logical_x = 0;
+	int logical_y = 0;
+	Uint8 brightness = 128;
+	Uint8 ramp_color = 0;
+	Uint8 ramp_plus = 0;
+};
+
+::ui::UiElement HudFixedSprite(const HudFixedSpriteProps& props) {
+	const InGameHudContextValue& hud = UseInGameHud();
+	if(!hud.resources) return ::ui::empty();
+	const Resources& resources = *hud.resources;
+	return <HudSprite
+	  key={props.key}
+	  bank={props.bank}
+	  index={props.index}
+	  x={sprite_x(resources, props.bank, props.index, props.logical_x)}
+	  y={sprite_y(resources, props.bank, props.index, props.logical_y)}
+	  brightness={props.brightness}
+	  rampColor={props.ramp_color}
+	  rampPlus={props.ramp_plus}
+	/>
+}
+
+int proportional_size(int value, int maxValue, int size) {
+	if(maxValue <= 0 || size <= 0) return 0;
+	return static_cast<int>((static_cast<float>(value) / maxValue) * size);
+}
+
+::ui::Color inventory_letter_color(Uint8 brightness) {
+	return brightness >= 128
+		? ::ui::Color{226, 234, 242, 255}
+		: ::ui::Color{78, 86, 98, 255};
+}
+
+struct FuelLowSpriteProps {
+	const char * key = nullptr;
+};
+
+::ui::UiElement FuelLowSprite(const FuelLowSpriteProps& props) {
+	const InGameHudContextValue& hud = UseInGameHud();
+	if(!hud.view || !hud.view->viewedPlayer.fuelLow) return ::ui::empty();
+	return <HudFixedSprite key={props.key} bank={95} index={8} />
+}
+
+struct FuelBarProps {
+	const char * key = nullptr;
+};
+
+::ui::UiElement FuelBar(const FuelBarProps& props) {
+	const InGameHudContextValue& hud = UseInGameHud();
+	if(!hud.view || !hud.resources) return ::ui::empty();
+	const PlayerHudView& player = hud.view->viewedPlayer;
+	const Resources& resources = *hud.resources;
+	const int w = proportional_size(player.fuel, player.maxFuel, sprite_width(resources, 95, 6));
+	const int h = sprite_height(resources, 95, 6);
+	if(w <= 0 || h <= 0) return ::ui::empty();
+	return <HudSprite
+	  key={props.key}
+	  bank={95}
+	  index={6}
+	  srcW={w}
+	  srcH={h}
+	  x={sprite_x(resources, 95, 6)}
+	  y={sprite_y(resources, 95, 6)}
+	  w={w}
+	  h={h}
+	/>
+}
+
+struct HealthBarProps {
+	const char * key = nullptr;
+};
+
+::ui::UiElement HealthBar(const HealthBarProps& props) {
+	const InGameHudContextValue& hud = UseInGameHud();
+	if(!hud.view || !hud.resources) return ::ui::empty();
+	const PlayerHudView& player = hud.view->viewedPlayer;
+	const Resources& resources = *hud.resources;
+	const int h = sprite_height(resources, 95, 0);
+	const int w = sprite_width(resources, 95, 0);
+	if(w <= 0 || h <= 0) return ::ui::empty();
+	const int yOffset = h - proportional_size(player.health, player.maxHealth, h);
+	const int barH = h - yOffset;
+	if(barH <= 0) return ::ui::empty();
+	return <HudSprite
+	  key={props.key}
+	  bank={95}
+	  index={0}
+	  srcY={yOffset}
+	  srcW={w}
+	  srcH={barH}
+	  x={sprite_x(resources, 95, 0)}
+	  y={sprite_y(resources, 95, 0) + yOffset}
+	  w={w}
+	  h={barH}
+	/>
+}
+
+struct ShieldBarProps {
+	const char * key = nullptr;
+};
+
+::ui::UiElement ShieldBar(const ShieldBarProps& props) {
+	const InGameHudContextValue& hud = UseInGameHud();
+	if(!hud.view || !hud.resources) return ::ui::empty();
+	const PlayerHudView& player = hud.view->viewedPlayer;
+	const Resources& resources = *hud.resources;
+	const int h = sprite_height(resources, 95, 1);
+	const int w = sprite_width(resources, 95, 1);
+	if(w <= 0 || h <= 0) return ::ui::empty();
+	int yOffset = h - proportional_size(player.shield, player.maxShield, h);
+	if(yOffset < 0) yOffset = 0;
+	const int barH = h - yOffset;
+	if(barH <= 0) return ::ui::empty();
+	Uint8 brightness = 128;
+	if(player.shield > player.maxShield){
+		const Uint8 time = 6;
+		brightness = 136;
+		if(hud.animationPhase % (time * 2) < time){
+			brightness += (hud.animationPhase % time) * 2;
+		}else{
+			brightness += (time - (hud.animationPhase % time)) * 2;
+		}
+	}
+	return <HudSprite
+	  key={props.key}
+	  bank={95}
+	  index={1}
+	  srcY={yOffset}
+	  srcW={w}
+	  srcH={barH}
+	  x={sprite_x(resources, 95, 1)}
+	  y={sprite_y(resources, 95, 1) + yOffset}
+	  w={w}
+	  h={barH}
+	  brightness={brightness}
+	/>
+}
+
+struct PoisonedSpriteProps {
+	const char * key = nullptr;
+};
+
+::ui::UiElement PoisonedSprite(const PoisonedSpriteProps& props) {
+	const InGameHudContextValue& hud = UseInGameHud();
+	if(!hud.view || !hud.view->viewedPlayer.poisonedBy) return ::ui::empty();
+	return <HudFixedSprite key={props.key} bank={97} index={5} logicalX={183} logicalY={453} />
+}
+
+struct FilesBarProps {
+	const char * key = nullptr;
+};
+
+::ui::UiElement FilesBar(const FilesBarProps& props) {
+	const InGameHudContextValue& hud = UseInGameHud();
+	if(!hud.view || !hud.resources) return ::ui::empty();
+	const PlayerHudView& player = hud.view->viewedPlayer;
+	const Resources& resources = *hud.resources;
+	const int w = proportional_size(player.files, player.maxFiles, sprite_width(resources, 95, 7));
+	const int h = sprite_height(resources, 95, 7);
+	if(w <= 0 || h <= 0) return ::ui::empty();
+	return <HudSprite
+	  key={props.key}
+	  bank={95}
+	  index={7}
+	  srcW={w}
+	  srcH={h}
+	  x={sprite_x(resources, 95, 7)}
+	  y={sprite_y(resources, 95, 7)}
+	  w={w}
+	  h={h}
+	/>
+}
+
+struct WeaponFaceProps {
+	const char * key = nullptr;
+};
+
+::ui::UiElement WeaponFace(const WeaponFaceProps& props) {
+	const InGameHudContextValue& hud = UseInGameHud();
+	if(!hud.view) return ::ui::empty();
+	Uint16 index = 1;
+	switch(hud.view->viewedPlayer.currentWeapon){
+		case 1: index = 2; break;
+		case 2: index = 3; break;
+		case 3: index = 4; break;
+		default: index = 1; break;
+	}
+	return <HudFixedSprite key={props.key} bank={96} index={index} />
+}
+
+struct WeaponGlowProps {
+	const char * key = nullptr;
+};
+
+::ui::UiElement WeaponGlow(const WeaponGlowProps& props) {
+	const InGameHudContextValue& hud = UseInGameHud();
+	if(!hud.view) return ::ui::empty();
+	Uint16 index = 5;
+	switch(hud.view->viewedPlayer.currentWeapon){
+		case 1: index = 6; break;
+		case 2: index = 7; break;
+		case 3: index = 8; break;
+		default: index = 5; break;
+	}
+	return <HudFixedSprite key={props.key} bank={96} index={index} />
+}
+
+struct WeaponSelectorProps {
+	const char * key = nullptr;
+};
+
+::ui::UiElement WeaponSelector(const WeaponSelectorProps& props) {
+	const InGameHudContextValue& hud = UseInGameHud();
+	if(!hud.view || !hud.resources) return ::ui::empty();
+	const Resources& resources = *hud.resources;
+	return <HudSprite
+	  key={props.key}
+	  bank={96}
+	  index={0}
+	  x={sprite_x(resources, 96, 0)}
+	  y={sprite_y(resources, 96, 0) + (hud.view->viewedPlayer.currentWeapon * 14)}
+	/>
+}
+
+struct HealthWarningSpriteProps {
+	const char * key = nullptr;
+};
+
+::ui::UiElement HealthWarningSprite(const HealthWarningSpriteProps& props) {
+	const InGameHudContextValue& hud = UseInGameHud();
+	if(!hud.view) return ::ui::empty();
+	const PlayerHudView& player = hud.view->viewedPlayer;
+	if(!player.health || player.maxHealth <= 0) return ::ui::empty();
+	if(static_cast<float>(player.health) / player.maxHealth > 0.5f) return ::ui::empty();
+	if(hud.animationPhase % 8 > 3) return ::ui::empty();
+	return <HudFixedSprite key={props.key} bank={95} index={3} />
+}
+
+struct ShieldWarningSpriteProps {
+	const char * key = nullptr;
+};
+
+::ui::UiElement ShieldWarningSprite(const ShieldWarningSpriteProps& props) {
+	const InGameHudContextValue& hud = UseInGameHud();
+	if(!hud.view) return ::ui::empty();
+	const PlayerHudView& player = hud.view->viewedPlayer;
+	if(!player.shield || player.maxShield <= 0) return ::ui::empty();
+	if(static_cast<float>(player.shield) / player.maxShield > 0.5f) return ::ui::empty();
+	if(hud.animationPhase % 8 > 3) return ::ui::empty();
+	return <HudFixedSprite key={props.key} bank={95} index={4} />
+}
+
+struct InventoryIconProps {
+	const char * key = nullptr;
+	int slot = 0;
+};
+
+::ui::UiElement InventoryIcon(const InventoryIconProps& props) {
+	const InGameHudContextValue& hud = UseInGameHud();
+	if(!hud.view || !hud.resources) return ::ui::empty();
+	if(props.slot < 0 || props.slot >= 4) return ::ui::empty();
+	const int xOffsets[] = {612, 584, 556, 528};
+	const int yOffsets[] = {13, 13, 11, 7};
+	const PlayerHudView& player = hud.view->viewedPlayer;
+	const Resources& resources = *hud.resources;
+	const Uint8 index = player.inventorySpriteIndexes[props.slot];
+	const int x = sprite_x(resources, 97, index, xOffsets[props.slot]);
+	const int y = sprite_y(resources, 97, index, yOffsets[props.slot]);
+	const int w = sprite_width(resources, 97, index);
+	const int h = sprite_height(resources, 97, index);
+	if(w <= 0 || h <= 0) return ::ui::empty();
+	const Uint8 brightness = player.currentInventoryItem == props.slot ? 128 : 32;
+	return <HudSprite
+	  key={props.key}
+	  bank={97}
+	  index={index}
+	  x={x}
+	  y={y}
+	  w={w}
+	  h={h}
+	  brightness={brightness}
+	/>
+}
+
+struct InventoryLetterProps {
+	const char * key = nullptr;
+	int slot = 0;
+};
+
+::ui::UiElement InventoryLetter(const InventoryLetterProps& props) {
+	const InGameHudContextValue& hud = UseInGameHud();
+	if(!hud.view) return ::ui::empty();
+	if(props.slot < 0 || props.slot >= 4) return ::ui::empty();
+	const int xOffsets[] = {612, 584, 556, 528};
+	const int yOffsets[] = {13, 13, 11, 7};
+	const PlayerHudView& player = hud.view->viewedPlayer;
+	const char letter = player.inventoryLetters[props.slot];
+	if(letter == '\0') return ::ui::empty();
+	const Uint8 brightness = player.currentInventoryItem == props.slot ? 128 : 32;
+	return <Text
+	  key={props.key}
+	  value={::ui::copy_string(use_text_storage("%c", letter))}
+	  layout={text_layout(xOffsets[props.slot] - 2, yOffsets[props.slot], 8, 8)}
+	  style={text_style(inventory_letter_color(brightness), 132, 4)}
+	/>
+}
+
+struct HudStatusSpritesProps {
+	const char * key = nullptr;
+};
+
+::ui::UiElement HudStatusSprites(const HudStatusSpritesProps& props) {
+	const InGameHudContextValue& hud = UseInGameHud();
+	if(!hud.view || !hud.view->viewedPlayer.valid) return ::ui::empty();
+	return <Box key={props.key} layout={root_layout()}>
+		<HudFixedSprite key="minimap-frame" bank={94} index={0} />
+		<FuelLowSprite key="fuel-low" />
+		<FuelBar key="fuel-bar" />
+		<HudFixedSprite key="fuel-mask" bank={95} index={5} />
+		<HealthBar key="health-bar" />
+		<ShieldBar key="shield-bar" />
+		<PoisonedSprite key="poisoned" />
+		<FilesBar key="files-bar" />
+		<WeaponFace key="weapon-face" />
+		<WeaponGlow key="weapon-glow" />
+		<WeaponSelector key="weapon-selector" />
+		<HealthWarningSprite key="health-warning" />
+		<ShieldWarningSprite key="shield-warning" />
+		<HudFixedSprite key="inventory-frame" bank={94} index={2} />
+		<InventoryIcon key="inventory-icon-0" slot={0} />
+		<InventoryIcon key="inventory-icon-1" slot={1} />
+		<InventoryIcon key="inventory-icon-2" slot={2} />
+		<InventoryIcon key="inventory-icon-3" slot={3} />
+		<InventoryLetter key="inventory-letter-0" slot={0} />
+		<InventoryLetter key="inventory-letter-1" slot={1} />
+		<InventoryLetter key="inventory-letter-2" slot={2} />
+		<InventoryLetter key="inventory-letter-3" slot={3} />
+	</Box>
 }
 
 struct SystemCameraFrameProps {
@@ -437,6 +816,7 @@ struct TraceTimeProps {
 
 ::ui::UiElement InGameHudFrame(const BoxProps& props) {
 	return <Box key={props.key} layout={root_layout()}>
+		<HudStatusSprites key="status-sprites" />
 		<SystemCameraFrame key="system-camera-0" slot={0} />
 		<SystemCameraFrame key="system-camera-1" slot={1} />
 		<HudReadouts key="readouts" />

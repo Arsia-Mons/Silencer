@@ -11,6 +11,7 @@ namespace silencer::client_ui {
 struct InGameHudContextValue {
 	const HudView * view = nullptr;
 	const Resources * resources = nullptr;
+	Uint8 animationPhase = 0;
 };
 
 extern ::ReactContext InGameHudContext;
