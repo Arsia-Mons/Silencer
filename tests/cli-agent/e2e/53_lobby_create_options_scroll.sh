@@ -104,11 +104,11 @@ cli --port "$CTRL_PORT" wait_for_state --state MAINMENU --timeout-ms 15000 >/dev
 wait_for_widget "Connect To Lobby"
 cli --port "$CTRL_PORT" click --label "Connect To Lobby" >/dev/null
 cli --port "$CTRL_PORT" wait_for_state --state LOBBYCONNECT --timeout-ms 5000 >/dev/null
-wait_for_widget "Login"
+wait_for_widget "Login/Create"
 cli --port "$CTRL_PORT" set_text --uid 1 --text "scrolltest" >/dev/null
 cli --port "$CTRL_PORT" set_text --uid 2 --text "secret" >/dev/null
 wait_for_lobby_state AUTHENTICATING
-cli --port "$CTRL_PORT" click --label "Login" >/dev/null
+cli --port "$CTRL_PORT" click --label "Login/Create" >/dev/null
 create_initial_character "Scrolltest"
 wait_for_widget "Create Game"
 cli --port "$CTRL_PORT" click --label "Create Game" >/dev/null

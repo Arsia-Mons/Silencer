@@ -66,6 +66,7 @@ struct ResolvedButton {
 	Uint16 spriteIndex = 0;
 	int fixedWidth = 0;
 	int fixedHeight = 0;
+	int minWidth = 0;
 	int minHeight = 0;
 	TextSize textSize = TextSize::BodySm;
 	TextMetrics textMetrics = ResolveTextMetrics(TextSize::BodySm);
@@ -175,8 +176,8 @@ ResolvedButton ResolveButton(const ButtonOpts& opts) {
 			out.defaultPaddingY = 0;
 			out.measureTextInk = true;
 			if(opts.size == ButtonSize::Compact){
-				out.fixedWidth = 52;
 				out.fixedHeight = 21;
+				out.minWidth = 52;
 				// B52x21 text-only buttons draw at y + 8 in the legacy
 				// renderer. Clay centers the measured 11px bank-133 line box,
 				// so bias the content area until the emitted text bbox lands
@@ -407,9 +408,10 @@ AllocCustomData(silencer::clay_bridge::CustomKind kind, void * payload) {
 	return c;
 }
 
-int ClampAutoWidth(int width, const ButtonOpts& opts) {
+int ClampAutoWidth(int width, const ButtonOpts& opts, int defaultMinWidth) {
 	if(opts.maxWidth > 0 && width > opts.maxWidth) width = opts.maxWidth;
-	if(opts.minWidth > 0 && width < opts.minWidth) width = opts.minWidth;
+	int minWidth = std::max(defaultMinWidth, opts.minWidth);
+	if(minWidth > 0 && width < minWidth) width = minWidth;
 	return width < 1 ? 1 : width;
 }
 
@@ -491,7 +493,7 @@ void Button(Clay_String id,
 	                                    : contentWidth + paddingX * 2;
 	int height = resolved.fixedHeight > 0 ? resolved.fixedHeight
 	                                      : contentHeight + paddingY * 2;
-	if(resolved.fixedWidth == 0) width = ClampAutoWidth(width, opts);
+	if(resolved.fixedWidth == 0) width = ClampAutoWidth(width, opts, resolved.minWidth);
 	if(resolved.minHeight > 0 && height < resolved.minHeight) height = resolved.minHeight;
 	if(height < 1) height = 1;
 

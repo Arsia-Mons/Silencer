@@ -388,49 +388,78 @@ bool RunButtonCheck(::Game & game, ButtonCheckResult & out) {
 	            out.chromeAutoWidth,
 	            out.chromeAutoHeight);
 
-	int textCompactTextRows = 0;
-	bool textCompactTextOffsetMatches = false;
-	::Clay_SetPointerState(::Clay_Vector2{-1.0f, -1.0f}, false);
-	::Clay_UpdateScrollContainers(false, ::Clay_Vector2{0, 0}, 0.0f);
-	interactions.BeginFrame();
-	silencer::ui::primitives::TextBeginFrame();
-	silencer::ui::primitives::ButtonBeginFrame();
-	::Clay_BeginLayout();
-	CLAY({ .id = CLAY_ID("ButtonTextCompactProbeRoot"),
-	       .layout = {
-	           .sizing = { CLAY_SIZING_FIXED(W), CLAY_SIZING_FIXED(H) },
-	           .padding = { 40, 0, 40, 0 },
-	       } }) {
-		Button(CLAY_STRING("test.button.text_compact"),
-		       CLAY_STRING("Login"),
-		       ButtonOpts{ .variant = ButtonVariant::Text,
-		                   .size = ButtonSize::Compact },
-		       ButtonHandle{ nullptr, "test.button.text_compact", &interactions });
-	}
-	::Clay_RenderCommandArray textCompactCmds = ::Clay_EndLayout();
-	interactions.ResolveClayBoundsFromClay();
-	const auto * textCompactWidget = FindButton(interactions, "test.button.text_compact");
-	if(textCompactWidget){
-		out.textCompactWidth = textCompactWidget->w;
-		out.textCompactHeight = textCompactWidget->h;
-		for(int i = 0; i < textCompactCmds.length; i++){
-			::Clay_RenderCommand * c = &textCompactCmds.internalArray[i];
-			if(c->commandType != CLAY_RENDER_COMMAND_TYPE_TEXT) continue;
-			textCompactTextRows++;
-			out.textCompactTextXOffset =
-				static_cast<int>(c->boundingBox.x) - textCompactWidget->x;
-			out.textCompactTextWidth = static_cast<int>(c->boundingBox.width);
-			out.textCompactTextYOffset =
-				static_cast<int>(c->boundingBox.y) - textCompactWidget->y;
+	auto probeTextCompactButton = [&](const char * id,
+	                                  Clay_String label,
+	                                  int& buttonW,
+	                                  int& buttonH,
+	                                  int& textXOffset,
+	                                  int& textWidth,
+	                                  int& textYOffset,
+	                                  bool& textOffsetMatches) {
+		int textRows = 0;
+		::Clay_SetPointerState(::Clay_Vector2{-1.0f, -1.0f}, false);
+		::Clay_UpdateScrollContainers(false, ::Clay_Vector2{0, 0}, 0.0f);
+		interactions.BeginFrame();
+		silencer::ui::primitives::TextBeginFrame();
+		silencer::ui::primitives::ButtonBeginFrame();
+		::Clay_BeginLayout();
+		CLAY({ .id = CLAY_ID("ButtonTextCompactProbeRoot"),
+		       .layout = {
+		           .sizing = { CLAY_SIZING_FIXED(W), CLAY_SIZING_FIXED(H) },
+		           .padding = { 40, 0, 40, 0 },
+		       } }) {
+			Button(Clay_String{ false, static_cast<int32_t>(std::strlen(id)), id },
+			       label,
+			       ButtonOpts{ .variant = ButtonVariant::Text,
+			                   .size = ButtonSize::Compact },
+			       ButtonHandle{ nullptr, id, &interactions });
 		}
-		const int textRightGap = textCompactWidget->w -
-		                         out.textCompactTextXOffset -
-		                         out.textCompactTextWidth;
-		textCompactTextOffsetMatches =
-			textCompactTextRows == 1 &&
-			std::abs(out.textCompactTextXOffset - textRightGap) <= 1 &&
-			out.textCompactTextYOffset == 8;
-	}
+		::Clay_RenderCommandArray cmds = ::Clay_EndLayout();
+		interactions.ResolveClayBoundsFromClay();
+		const auto * widget = FindButton(interactions, id);
+		if(widget){
+			buttonW = widget->w;
+			buttonH = widget->h;
+			for(int i = 0; i < cmds.length; i++){
+				::Clay_RenderCommand * c = &cmds.internalArray[i];
+				if(c->commandType != CLAY_RENDER_COMMAND_TYPE_TEXT) continue;
+				textRows++;
+				textXOffset = static_cast<int>(c->boundingBox.x) - widget->x;
+				textWidth = static_cast<int>(c->boundingBox.width);
+				textYOffset = static_cast<int>(c->boundingBox.y) - widget->y;
+			}
+			const int textRightGap = widget->w - textXOffset - textWidth;
+			textOffsetMatches =
+				textRows == 1 &&
+				std::abs(textXOffset - textRightGap) <= 1 &&
+				textYOffset == 8;
+		}
+	};
+
+	bool textCompactTextOffsetMatches = false;
+	probeTextCompactButton("test.button.text_compact",
+	                       CLAY_STRING("Login"),
+	                       out.textCompactWidth,
+	                       out.textCompactHeight,
+	                       out.textCompactTextXOffset,
+	                       out.textCompactTextWidth,
+	                       out.textCompactTextYOffset,
+	                       textCompactTextOffsetMatches);
+
+	int textCompactLongWidth = 0;
+	int textCompactLongHeight = 0;
+	int textCompactLongXOffset = 0;
+	int textCompactLongTextWidth = 0;
+	int textCompactLongYOffset = 0;
+	bool textCompactLongTextOffsetMatches = false;
+	probeTextCompactButton("test.button.text_compact_long",
+	                       CLAY_STRING("Login/Create"),
+	                       textCompactLongWidth,
+	                       textCompactLongHeight,
+	                       textCompactLongXOffset,
+	                       textCompactLongTextWidth,
+	                       textCompactLongYOffset,
+	                       textCompactLongTextOffsetMatches);
 
 	int ovalMdLongWidth = 0;
 	int ovalMdLongHeight = 0;
@@ -520,7 +549,10 @@ bool RunButtonCheck(::Game & game, ButtonCheckResult & out) {
 	}
 	if(out.textCompactWidth != 52 ||
 	   out.textCompactHeight != 21 ||
-	   !textCompactTextOffsetMatches){
+	   textCompactLongWidth != 84 ||
+	   textCompactLongHeight != 21 ||
+	   !textCompactTextOffsetMatches ||
+	   !textCompactLongTextOffsetMatches){
 		return false;
 	}
 	return true;
