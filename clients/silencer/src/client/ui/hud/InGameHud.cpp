@@ -69,7 +69,7 @@ void BuildInGameHudUi(Renderer& renderer, const Resources& resources,
 		BuildBuyTechOverlay(view.buyTech, resources, surface, interactions);
 	}
 
-	if(view.showChatTicks || player.chatActive){
+	if(drawLegacyRetainedHudParts && (view.showChatTicks || player.chatActive)){
 		BuildChatOverlay(view, resources, surface, interactions);
 	}
 }

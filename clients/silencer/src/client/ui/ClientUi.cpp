@@ -249,6 +249,16 @@ std::vector<silencer::ui::UiAction> ClientUi::DrainActions() {
 	return interactions_.DrainActions();
 }
 
+bool ClientUi::HasTextInputFocus() const {
+	if(interactions_.HasTextInputFocus()) return true;
+	const ::ui::NodeId focused = ::ui::focus_focused_id(retainedFocus_);
+	if(focused == 0) return false;
+	::ui::NodeSnapshot snapshot{};
+	if(!retainedTree_.snapshot(focused, &snapshot)) return false;
+	return snapshot.role == ::ui::NodeRole::Input ||
+	       snapshot.semantic_role == ::ui::SemanticRole::TextBox;
+}
+
 void ClientUi::PushScreen(std::unique_ptr<Screen> screen, ScreenContext& ctx) {
 	screens_.Push(std::move(screen), ctx);
 }

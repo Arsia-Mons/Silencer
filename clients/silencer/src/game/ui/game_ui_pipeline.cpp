@@ -232,7 +232,7 @@ if(!clientUi.HasScreens() && game.world.map.loaded){
 inGameUi.ApplyActions(
 game.world.peers.localpeerid, unhandledUiActions, clientUi.Interactions());
 }
-bool nowFocused = clientUi.Interactions().HasTextInputFocus();
+bool nowFocused = clientUi.HasTextInputFocus();
 if(nowFocused && !textInputFocused){
 SDL_StartTextInput(game.gameRenderer.GetWindow());
 }else if(!nowFocused && textInputFocused){

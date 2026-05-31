@@ -118,6 +118,15 @@ bool InGameUi::ApplyActions(
 	bool handled = false;
 	for(const silencer::ui::UiAction& action : actions){
 		if(localplayer->chatActive &&
+		   action.kind == silencer::ui::UiActionKind::Cancel &&
+		   action.id == "ui.cancel"){
+			localplayer->chatText[0] = '\0';
+			localplayer->chatActive = false;
+			handled = true;
+			continue;
+		}
+
+		if(localplayer->chatActive &&
 		   (action.id == "ingame.chat" || action.id == "ingame.chat.channel")){
 			handled = true;
 			if(action.kind == silencer::ui::UiActionKind::SetText &&

@@ -40,6 +40,7 @@ public:
 	std::vector<silencer::ui::UiAction> DrainActions();
 	const silencer::ui::UiInteractionRegistry& Interactions() const { return interactions_; }
 	silencer::ui::UiInteractionRegistry& Interactions() { return interactions_; }
+	bool HasTextInputFocus() const;
 
 	bool HasScreens() const { return !screens_.Empty(); }
 	Screen * TopScreen() const { return screens_.Top(); }

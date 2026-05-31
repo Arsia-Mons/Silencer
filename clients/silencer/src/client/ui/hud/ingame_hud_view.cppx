@@ -4,6 +4,7 @@
 #include "resources.h"
 #include "surface.h"
 #include "ui/components/box.h"
+#include "ui/components/input.h"
 #include "ui/components/text.h"
 #include "ui/runtime/UiInteractionRegistry.h"
 #include "ui/runtime/react.h"
@@ -18,6 +19,8 @@ namespace silencer::client_ui {
 using ::ui::children;
 using ::ui::components::Box;
 using ::ui::components::BoxProps;
+using ::ui::components::Input;
+using ::ui::components::InputProps;
 using ::ui::components::Text;
 using ::ui::components::TextProps;
 
@@ -27,6 +30,21 @@ namespace {
 
 const InGameHudContextValue kEmptyContext = {};
 constexpr int kTopMessageMaxLength = 35;
+constexpr int kChatX = 400;
+constexpr int kChatY = 280;
+constexpr int kChatW = 231;
+constexpr int kChatBackgroundInteriorH = 30;
+constexpr Uint8 kChatBackgroundBank = 188;
+constexpr int kChatTextX = 10;
+constexpr int kChatTextStartY = 10;
+constexpr int kChatLineStepY = 10;
+constexpr int kChatMaxHistoryChars = 36;
+constexpr int kChatInputVisibleChars = 28;
+constexpr int kChatRightCapX = 36;
+constexpr int kChatTextAdvance = 6;
+constexpr int kChatLineHeight = 11;
+constexpr const char * kChatInputActionId = "ingame.chat";
+constexpr const char * kChatChannelActionId = "ingame.chat.channel";
 constexpr Uint8 kHudPlayerStateHacking = 15;
 constexpr Uint8 kHudPlayerStateDying = 20;
 constexpr Uint8 kHudPlayerStateDead = 21;
@@ -161,6 +179,15 @@ Uint8 trace_time(const HudView& view) {
 	};
 }
 
+::ui::LayoutStyle chat_input_layout(int x, int y, int w) {
+	return ::ui::LayoutStyle{
+		.position = ::ui::PositionType::Absolute,
+		.width = ::ui::Length::points(static_cast<float>(w)),
+		.height = ::ui::Length::points(16.0f),
+		.position_inset = absolute_inset(x, y),
+	};
+}
+
 ::ui::LayoutStyle top_message_layout() {
 	return ::ui::LayoutStyle{
 		.position = ::ui::PositionType::Absolute,
@@ -180,6 +207,26 @@ Uint8 trace_time(const HudView& view) {
 		.font_size = font_size,
 		.align = align,
 	});
+}
+
+::ui::StyleStatePatch chat_input_style() {
+	::ui::StylePatch clear = ::ui::patch()
+		.background(::ui::Color{0, 0, 0, 0})
+		.border(::ui::Border{})
+		.outline(::ui::Outline{})
+		.text(::ui::TextVisual{
+			.color = hud_text_color(128),
+			.font_id = 133,
+			.font_size = 6,
+			.line_height = 11.0f,
+		});
+	::ui::StyleStatePatch state;
+	state.base = clear;
+	state.hover = clear;
+	state.focus_visible = clear;
+	state.pressed = clear;
+	state.active = clear;
+	return state;
 }
 
 ::ui::StyleStatePatch sprite_style(const RetainedHudSpritePayload& payload) {
@@ -1164,6 +1211,255 @@ struct MessageOverlayProps {
 	</Box>
 }
 
+int chat_middle_tile_x(const Resources& resources, bool interior, int slot, int& tileW) {
+	const Uint16 leftIndex = interior ? 6 : 0;
+	const Uint16 middleIndex = interior ? 7 : 1;
+	const Uint16 rightIndex = interior ? 8 : 2;
+	int xOffset = sprite_width(resources, kChatBackgroundBank, leftIndex);
+	const int rightLimit = kChatW - sprite_width(resources, kChatBackgroundBank, rightIndex);
+	for(int currentSlot = 0; xOffset < rightLimit; ++currentSlot){
+		tileW = kChatW - xOffset - kChatRightCapX;
+		const int maxTileW = sprite_width(resources, kChatBackgroundBank, middleIndex);
+		if(maxTileW <= 0) break;
+		if(tileW > maxTileW) tileW = maxTileW;
+		if(tileW <= 0) break;
+		if(currentSlot == slot) return xOffset;
+		xOffset += tileW;
+	}
+	tileW = 0;
+	return -1;
+}
+
+int chat_visible_line_count(const HudView& view) {
+	const PlayerHudView& player = view.viewedPlayer;
+	int count = 0;
+	for(int i = 0; i < static_cast<int>(view.chatLines.size()); ++i){
+		if(player.chatActive && i == 0 && view.chatLines.size() == 5) continue;
+		++count;
+	}
+	return count;
+}
+
+std::string chat_history_line_text(const HudView& view, int slot) {
+	const PlayerHudView& player = view.viewedPlayer;
+	int visibleSlot = 0;
+	for(int i = 0; i < static_cast<int>(view.chatLines.size()); ++i){
+		if(player.chatActive && i == 0 && view.chatLines.size() == 5) continue;
+		if(visibleSlot == slot){
+			return view.chatLines[static_cast<size_t>(i)]
+				.substr(0, static_cast<size_t>(kChatMaxHistoryChars));
+		}
+		++visibleSlot;
+	}
+	return std::string();
+}
+
+void queue_chat_action(silencer::ui::UiInteractionRegistry * interactions,
+                       silencer::ui::UiActionKind kind,
+                       const char * id,
+                       const std::string& value) {
+	if(!interactions || !id) return;
+	silencer::ui::UiAction action;
+	action.kind = kind;
+	action.id = id;
+	action.value = value;
+	interactions->QueueAction(action);
+}
+
+std::function<void(const std::string&)>
+change_chat_text(silencer::ui::UiInteractionRegistry * interactions) {
+	return [interactions](const std::string& value) {
+		queue_chat_action(interactions, silencer::ui::UiActionKind::SetText, kChatInputActionId, value);
+	};
+}
+
+std::function<void(const ::ui::ActivationEvent&)>
+submit_chat_text(silencer::ui::UiInteractionRegistry * interactions, std::string value) {
+	return [interactions, value](const ::ui::ActivationEvent&) {
+		queue_chat_action(interactions, silencer::ui::UiActionKind::SubmitText, kChatInputActionId, value);
+	};
+}
+
+std::function<void(const ::ui::ActivationEvent&)>
+toggle_chat_channel(silencer::ui::UiInteractionRegistry * interactions) {
+	return [interactions](const ::ui::ActivationEvent&) {
+		queue_chat_action(interactions, silencer::ui::UiActionKind::Activate, kChatChannelActionId, std::string());
+	};
+}
+
+struct ChatBackgroundSpriteProps {
+	const char * key = nullptr;
+	Uint16 index = 0;
+	int logical_x = 0;
+	int logical_y = 0;
+	int src_w = 0;
+	int src_h = 0;
+};
+
+::ui::UiElement ChatBackgroundSprite(const ChatBackgroundSpriteProps& props) {
+	const InGameHudContextValue& hud = UseInGameHud();
+	if(!hud.resources) return ::ui::empty();
+	const Resources& resources = *hud.resources;
+	const int w = props.src_w > 0
+		? props.src_w
+		: sprite_width(resources, kChatBackgroundBank, props.index);
+	const int h = props.src_h > 0
+		? props.src_h
+		: sprite_height(resources, kChatBackgroundBank, props.index);
+	if(w <= 0 || h <= 0) return ::ui::empty();
+	return <HudSprite
+	  key={props.key}
+	  bank={kChatBackgroundBank}
+	  index={props.index}
+	  srcW={w}
+	  srcH={h}
+	  x={kChatX + sprite_x(resources, kChatBackgroundBank, props.index, props.logical_x)}
+	  y={kChatY + sprite_y(resources, kChatBackgroundBank, props.index, props.logical_y)}
+	  w={w}
+	  h={h}
+	/>
+}
+
+struct ChatMiddleTileProps {
+	const char * key = nullptr;
+	bool interior = false;
+	int slot = 0;
+};
+
+::ui::UiElement ChatMiddleTile(const ChatMiddleTileProps& props) {
+	const InGameHudContextValue& hud = UseInGameHud();
+	if(!hud.resources) return ::ui::empty();
+	const Resources& resources = *hud.resources;
+	int tileW = 0;
+	const int logicalX = chat_middle_tile_x(resources, props.interior, props.slot, tileW);
+	if(logicalX < 0 || tileW <= 0) return ::ui::empty();
+	const Uint16 index = props.interior ? 7 : 1;
+	return <ChatBackgroundSprite
+	  key={props.key}
+	  index={index}
+	  logicalX={logicalX}
+	  logicalY={props.interior ? kChatBackgroundInteriorH : 0}
+	  srcW={tileW}
+	  srcH={sprite_height(resources, kChatBackgroundBank, index)}
+	/>
+}
+
+struct ChatBackgroundProps {
+	const char * key = nullptr;
+};
+
+::ui::UiElement ChatBackground(const ChatBackgroundProps& props) {
+	return <Box key={props.key} layout={root_layout()}>
+		<ChatBackgroundSprite key="top-left" index={0} logicalX={0} logicalY={0} />
+		<ChatMiddleTile key="top-mid-0" slot={0} />
+		<ChatMiddleTile key="top-mid-1" slot={1} />
+		<ChatMiddleTile key="top-mid-2" slot={2} />
+		<ChatMiddleTile key="top-mid-3" slot={3} />
+		<ChatMiddleTile key="top-mid-4" slot={4} />
+		<ChatBackgroundSprite key="top-right" index={2} logicalX={kChatW - kChatRightCapX} logicalY={0} />
+		<ChatBackgroundSprite
+		  key="body-left"
+		  index={6}
+		  logicalX={0}
+		  logicalY={kChatBackgroundInteriorH}
+		/>
+		<ChatMiddleTile key="body-mid-0" interior={true} slot={0} />
+		<ChatMiddleTile key="body-mid-1" interior={true} slot={1} />
+		<ChatMiddleTile key="body-mid-2" interior={true} slot={2} />
+		<ChatMiddleTile key="body-mid-3" interior={true} slot={3} />
+		<ChatMiddleTile key="body-mid-4" interior={true} slot={4} />
+		<ChatBackgroundSprite
+		  key="body-right"
+		  index={8}
+		  logicalX={kChatW - kChatRightCapX}
+		  logicalY={kChatBackgroundInteriorH}
+		/>
+	</Box>
+}
+
+struct ChatHistoryLineProps {
+	const char * key = nullptr;
+	int slot = 0;
+};
+
+::ui::UiElement ChatHistoryLine(const ChatHistoryLineProps& props) {
+	const InGameHudContextValue& hud = UseInGameHud();
+	if(!hud.view) return ::ui::empty();
+	std::string text = chat_history_line_text(*hud.view, props.slot);
+	if(text.empty()) return ::ui::empty();
+	return <Text
+	  key={props.key}
+	  value={::ui::copy_string(text.c_str())}
+	  layout={text_layout(kChatX + kChatTextX, kChatY + kChatTextStartY + (props.slot * kChatLineStepY), kChatMaxHistoryChars * kChatTextAdvance, kChatLineHeight)}
+	  style={text_style(hud_text_color(208), 133, 6)}
+	/>
+}
+
+struct ChatInputLineProps {
+	const char * key = nullptr;
+	int y = 0;
+};
+
+::ui::UiElement ChatInputLine(const ChatInputLineProps& props) {
+	const InGameHudContextValue& hud = UseInGameHud();
+	if(!hud.view) return ::ui::empty();
+	const PlayerHudView& player = hud.view->viewedPlayer;
+	if(!player.chatActive) return ::ui::empty();
+	const char * prefix = player.chatWithTeam ? "(TEAM):" : "(ALL):";
+	const int prefixW = static_cast<int>(std::strlen(prefix)) * kChatTextAdvance;
+	const int inputX = kChatX + kChatTextX + prefixW - 8;
+	const int inputY = kChatY + props.y;
+	return <Box key={props.key} layout={root_layout()}>
+		<Box
+		  key={player.chatWithTeam ? "channel-hit-team" : "channel-hit-all"}
+		  focusable={true}
+		  accessibility={::ui::components::AccessibilityProps{.role = ::ui::SemanticRole::Button, .label = player.chatWithTeam ? "Team chat" : "All chat"}}
+		  onActivate={toggle_chat_channel(hud.interactions)}
+		  layout={text_layout(kChatX + kChatTextX, inputY, prefixW, kChatLineHeight)}
+		/>
+		<Text
+		  key="prefix"
+		  value={prefix}
+		  layout={text_layout(kChatX + kChatTextX, inputY, prefixW, kChatLineHeight)}
+		  style={text_style(hud_text_color(208), 133, 6)}
+		/>
+		<Input
+		  key="input"
+		  id={kChatInputActionId}
+		  value={player.chatText.c_str()}
+		  autofocus={true}
+		  accessibility={::ui::components::AccessibilityProps{.role = ::ui::SemanticRole::TextBox, .label = "In-game chat"}}
+		  onChange={change_chat_text(hud.interactions)}
+		  onActivate={submit_chat_text(hud.interactions, player.chatText)}
+		  layout={chat_input_layout(inputX, inputY, (kChatInputVisibleChars * kChatTextAdvance) + 16)}
+		  style={chat_input_style()}
+		/>
+	</Box>
+}
+
+struct ChatOverlayProps {
+	const char * key = nullptr;
+};
+
+::ui::UiElement ChatOverlay(const ChatOverlayProps& props) {
+	const InGameHudContextValue& hud = UseInGameHud();
+	if(!hud.view) return ::ui::empty();
+	const PlayerHudView& player = hud.view->viewedPlayer;
+	if(!player.chatActive && hud.view->showChatTicks <= 0) return ::ui::empty();
+	const int lineCount = chat_visible_line_count(*hud.view);
+	if(lineCount <= 0 && !player.chatActive) return ::ui::empty();
+	const int inputY = kChatTextStartY + (lineCount * kChatLineStepY);
+	return <Box key={props.key} layout={root_layout()}>
+		<ChatBackground key="background" />
+		<ChatHistoryLine key="line-0" slot={0} />
+		<ChatHistoryLine key="line-1" slot={1} />
+		<ChatHistoryLine key="line-2" slot={2} />
+		<ChatHistoryLine key="line-3" slot={3} />
+		<ChatHistoryLine key="line-4" slot={4} />
+		<ChatInputLine key="input-line" y={inputY} />
+	</Box>
+}
+
 std::string buy_tech_action_id(int index) {
 	return "ingame.buytech.row." + std::to_string(index);
 }
@@ -1569,6 +1865,7 @@ struct TraceTimeProps {
 		<TopMessage key="top-message" />
 		<QuitPrompt key="quit-prompt" />
 		<BuyTechOverlay key="buy-tech" />
+		<ChatOverlay key="chat" />
 		<MessageOverlay key="message" />
 		<PlayerListOverlay key="player-list" />
 	</Box>
