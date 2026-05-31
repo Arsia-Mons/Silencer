@@ -380,6 +380,20 @@ if(MSVC)
 endif()
 add_test(NAME sprite_bake_tests COMMAND sprite_bake_tests)
 
+# texture_id -> SDL_Texture registry (upload_rgba premultiplies). Headless via
+# a software SDL_Renderer.
+add_executable(texture_registry_tests
+	tests/texture_registry_tests.cpp
+	src/render/cppx_ui/texture_registry.cpp
+	src/render/cppx_ui/sprite_bake.cpp)
+target_compile_features(texture_registry_tests PRIVATE cxx_std_20)
+target_include_directories(texture_registry_tests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src")
+target_link_libraries(texture_registry_tests PRIVATE SDL3::SDL3)
+if(MSVC)
+	target_compile_definitions(texture_registry_tests PRIVATE NOMINMAX)
+endif()
+add_test(NAME texture_registry_tests COMMAND texture_registry_tests)
+
 # /Z7 embeds debug info into .obj files instead of routing it through MSVC's
 # mspdbsrv.exe — which has a habit of failing with C1090 PDB errors on some
 # Windows installs. /Zi (the default) is faster but unreliable; /Z7 is rock
