@@ -22,12 +22,22 @@ struct RetainedHudSpritePayload {
 	Sint16 dstOffsetY = 0;
 };
 
+struct RetainedHudTeamEmblemPayload {
+	Uint8  bank = 0;
+	Uint16 index = 0;
+	Uint8  teamColor = 0;
+	Uint8  outlineColor = 0;
+	bool   scaled = false;
+};
+
 void HudRetainedPayloadBeginFrame();
 
 uint32_t RetainedHudSpriteTextureId(const RetainedHudSpritePayload& payload);
+uint32_t RetainedHudTeamEmblemTextureId(const RetainedHudTeamEmblemPayload& payload);
 
 bool IsRetainedHudPayloadTexture(uint32_t textureId);
 const RetainedHudSpritePayload * ResolveRetainedHudSpritePayload(uint32_t textureId);
+const RetainedHudTeamEmblemPayload * ResolveRetainedHudTeamEmblemPayload(uint32_t textureId);
 
 }  // namespace client_ui
 }  // namespace silencer

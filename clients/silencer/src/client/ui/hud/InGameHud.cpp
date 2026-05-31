@@ -44,19 +44,21 @@ void BuildInGameHudUi(Renderer& renderer, const Resources& resources,
 		BuildHudReadouts(player, surface, currentammo);
 	}
 
-	int teamCount = BuildHudTeams(view, surface, resources, phase);
-	const TeamHudView* team = FindTeamById(view, player.teamId);
-
-	if(team && team->baseDoorId){
-		int yoffset = 60;
-		if(teamCount >= 3) yoffset += (teamCount * 20) - 65;
-		BuildHudSecretSprites(view, surface, resources, *team, yoffset, phase);
-		if(!team->beamingTerminalId){
-			BuildHudSecretProgress(player, surface, yoffset, team->secretProgress, phase);
+	if(drawLegacyRetainedHudParts){
+		int teamCount = BuildHudTeams(view, surface, resources, phase);
+		const TeamHudView* team = FindTeamById(view, player.teamId);
+		if(team && team->baseDoorId){
+			int yoffset = 60;
+			if(teamCount >= 3) yoffset += (teamCount * 20) - 65;
+			BuildHudSecretSprites(view, surface, resources, *team, yoffset, phase);
+			if(!team->beamingTerminalId){
+				BuildHudSecretProgress(player, surface, yoffset, team->secretProgress, phase);
+			}
 		}
 	}
 
 	Uint8 tracetime = 0;
+	const TeamHudView* team = FindTeamById(view, player.teamId);
 	if(team && team->beamingTerminalId && team->beamingTerminalTraceTime > 0){
 		tracetime = team->beamingTerminalTraceTime;
 	}

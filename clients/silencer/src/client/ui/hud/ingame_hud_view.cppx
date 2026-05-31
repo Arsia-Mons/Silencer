@@ -25,6 +25,9 @@ namespace {
 
 const InGameHudContextValue kEmptyContext = {};
 constexpr int kTopMessageMaxLength = 35;
+constexpr Uint8 kHudPlayerStateHacking = 15;
+constexpr Uint8 kHudPlayerStateDying = 20;
+constexpr Uint8 kHudPlayerStateDead = 21;
 
 int sprite_width(const Resources& resources, Uint8 bank, Uint16 index) {
 	if(bank >= resources.spritebank.size()) return 0;
@@ -180,6 +183,13 @@ Uint8 trace_time(const HudView& view) {
 ::ui::StyleStatePatch sprite_style(const RetainedHudSpritePayload& payload) {
 	return ::ui::patch().image(::ui::BackgroundImage{
 		.texture_id = RetainedHudSpriteTextureId(payload),
+		.tint = {255, 255, 255, 255},
+	});
+}
+
+::ui::StyleStatePatch team_emblem_style(const RetainedHudTeamEmblemPayload& payload) {
+	return ::ui::patch().image(::ui::BackgroundImage{
+		.texture_id = RetainedHudTeamEmblemTextureId(payload),
 		.tint = {255, 255, 255, 255},
 	});
 }
@@ -576,6 +586,339 @@ struct HudStatusSpritesProps {
 	</Box>
 }
 
+const TeamHudView * team_at(const HudView& view, int slot) {
+	if(slot < 0 || slot >= static_cast<int>(view.teams.size())) return nullptr;
+	return &view.teams[static_cast<size_t>(slot)];
+}
+
+const TeamHudView * viewed_player_team(const HudView& view) {
+	return find_team(view, view.viewedPlayer.teamId);
+}
+
+int secret_y_offset(const HudView& view) {
+	int y = 60;
+	const int count = static_cast<int>(view.teams.size());
+	if(count >= 3) y += (count * 20) - 65;
+	return y;
+}
+
+int team_y_offset(int slot) {
+	return 5 + (slot * 20);
+}
+
+Uint8 hud_pulse_plus(Uint8 phase, Uint8 time, Uint8 shift) {
+	if((phase >> shift) % (time * 2) < time) return (phase >> shift) % time;
+	return time - ((phase >> shift) % time);
+}
+
+Uint8 secret_highlight_brightness(Uint8 phase) {
+	Uint8 brightness = 120;
+	if(phase % 32 < 16) brightness += phase % 16;
+	else brightness += 16 - (phase % 16);
+	return brightness;
+}
+
+int players_with_secret(const TeamHudView& team) {
+	int count = 0;
+	for(int i = 0; i < team.numPeers && i < 4; ++i){
+		if(team.peerSlots[i].hasSecret) count++;
+	}
+	return count;
+}
+
+::ui::Color secret_progress_color(const PlayerHudView& player,
+                                  int secretProgress,
+                                  Uint8 phase,
+                                  int line) {
+	Uint8 effectColor = 0;
+	Uint8 brightness = 136;
+	for(int i = 0; i <= line; ++i){
+		secretProgress -= 20;
+		const bool hackingTick =
+			player.state == kHudPlayerStateHacking && player.state_i == 16 && phase % 16 < 8;
+		if(secretProgress < (hackingTick ? -20 : 0)){
+			effectColor = 114;
+			brightness = 96;
+		}
+	}
+	if(effectColor == 114){
+		return brightness < 128
+			? ::ui::Color{62, 152, 104, 255}
+			: ::ui::Color{93, 218, 142, 255};
+	}
+	return brightness < 128
+		? ::ui::Color{168, 176, 186, 255}
+		: ::ui::Color{226, 234, 242, 255};
+}
+
+const char * secret_progress_label(int line) {
+	static const char * names[] = {
+		"Guv Net", "OS", "Protocol", "Cypher Lock 1", "Cypher Lock 2",
+		"Cypher Lock 3", "Header", "Schedule", "Location",
+	};
+	if(line < 0 || line >= 9) return "";
+	return names[line];
+}
+
+struct HudTeamEmblemProps {
+	const char * key = nullptr;
+	int slot = 0;
+	int x = 0;
+	int y = 0;
+};
+
+::ui::UiElement HudTeamEmblem(const HudTeamEmblemProps& props) {
+	const InGameHudContextValue& hud = UseInGameHud();
+	if(!hud.view) return ::ui::empty();
+	const TeamHudView * team = team_at(*hud.view, props.slot);
+	if(!team) return ::ui::empty();
+	const RetainedHudTeamEmblemPayload payload{
+		.bank = 181,
+		.index = team->agency,
+		.teamColor = team->color,
+		.outlineColor = 17,
+		.scaled = true,
+	};
+	return <Box
+	  key={props.key}
+	  layout={text_layout(props.x, props.y, team->emblemW, team->emblemH)}
+	  style={team_emblem_style(payload)}
+	/>
+}
+
+struct HudTeamChromeProps {
+	const char * key = nullptr;
+};
+
+::ui::UiElement HudTeamChrome(const HudTeamChromeProps& props) {
+	const InGameHudContextValue& hud = UseInGameHud();
+	if(!hud.view || hud.view->teams.empty()) return ::ui::empty();
+	if(hud.view->teams.size() == 1){
+		return <HudFixedSprite key={props.key} bank={94} index={1} />
+	}
+	return <Box key={props.key} layout={root_layout()}>
+		<HudFixedSprite
+		  key="team-strip-background"
+		  bank={103}
+		  index={0}
+		  logicalY={-133 + ((static_cast<int>(hud.view->teams.size()) - 1) * 20)}
+		/>
+		<HudFixedSprite key="team-strip-front" bank={103} index={1} />
+	</Box>
+}
+
+struct HudTeamPeerSpriteProps {
+	const char * key = nullptr;
+	int team_slot = 0;
+	int peer_slot = 0;
+};
+
+::ui::UiElement HudTeamPeerSprite(const HudTeamPeerSpriteProps& props) {
+	const InGameHudContextValue& hud = UseInGameHud();
+	if(!hud.view) return ::ui::empty();
+	const TeamHudView * team = team_at(*hud.view, props.team_slot);
+	if(!team) return ::ui::empty();
+	if(props.peer_slot < 0 || props.peer_slot >= team->numPeers || props.peer_slot >= 4){
+		return ::ui::empty();
+	}
+	const TeamHudView::PeerSlot& slot = team->peerSlots[props.peer_slot];
+	if(!slot.present) return ::ui::empty();
+	Uint8 index = slot.state == kHudPlayerStateDead || slot.state == kHudPlayerStateDying ? 8 : 4;
+	index += static_cast<Uint8>(props.peer_slot);
+	Uint8 rampColor = 0;
+	Uint8 rampPlus = 0;
+	if(slot.inBase || slot.hasSecret){
+		Uint8 time = 4;
+		Uint8 shift = 2;
+		rampColor = 210;
+		if(slot.hasSecret){
+			time = 8;
+			rampColor = 114;
+			shift = 0;
+		}
+		rampPlus = hud_pulse_plus(hud.animationPhase, time, shift);
+	}
+	return <HudFixedSprite
+	  key={props.key}
+	  bank={103}
+	  index={index}
+	  logicalX={25 + (17 * props.peer_slot)}
+	  logicalY={team_y_offset(props.team_slot)}
+	  rampColor={rampColor}
+	  rampPlus={rampPlus}
+	/>
+}
+
+struct HudTeamSecretSpriteProps {
+	const char * key = nullptr;
+	int team_slot = 0;
+	int secret_slot = 0;
+};
+
+::ui::UiElement HudTeamSecretSprite(const HudTeamSecretSpriteProps& props) {
+	const InGameHudContextValue& hud = UseInGameHud();
+	if(!hud.view) return ::ui::empty();
+	const TeamHudView * team = team_at(*hud.view, props.team_slot);
+	if(!team || props.secret_slot < 0 || props.secret_slot >= 3) return ::ui::empty();
+	Uint8 index = team->secrets > props.secret_slot ? 2 : 3;
+	Uint8 rampColor = 0;
+	const int secretPlayers = players_with_secret(*team);
+	if(index == 3 && secretPlayers > props.secret_slot - team->secrets &&
+	   hud.view->tickCount % 12 < 6){
+		index = 2;
+	}
+	if(team->beamingTerminalId && team->secrets == props.secret_slot && index == 3){
+		rampColor = 224;
+		index = 3;
+	}
+	return <HudFixedSprite
+	  key={props.key}
+	  bank={103}
+	  index={index}
+	  logicalX={-(9 * (3 - props.secret_slot)) + 11}
+	  logicalY={team_y_offset(props.team_slot)}
+	  rampColor={rampColor}
+	/>
+}
+
+struct HudTeamRowProps {
+	const char * key = nullptr;
+	int slot = 0;
+};
+
+::ui::UiElement HudTeamRow(const HudTeamRowProps& props) {
+	const InGameHudContextValue& hud = UseInGameHud();
+	if(!hud.view || !team_at(*hud.view, props.slot)) return ::ui::empty();
+	return <Box key={props.key} layout={root_layout()}>
+		<HudTeamPeerSprite key="peer-0" teamSlot={props.slot} peerSlot={0} />
+		<HudTeamPeerSprite key="peer-1" teamSlot={props.slot} peerSlot={1} />
+		<HudTeamPeerSprite key="peer-2" teamSlot={props.slot} peerSlot={2} />
+		<HudTeamPeerSprite key="peer-3" teamSlot={props.slot} peerSlot={3} />
+		<HudTeamSecretSprite key="secret-0" teamSlot={props.slot} secretSlot={0} />
+		<HudTeamSecretSprite key="secret-1" teamSlot={props.slot} secretSlot={1} />
+		<HudTeamSecretSprite key="secret-2" teamSlot={props.slot} secretSlot={2} />
+		<HudTeamEmblem key="emblem" slot={props.slot} x={5} y={team_y_offset(props.slot) + 1} />
+	</Box>
+}
+
+struct HudTeamsProps {
+	const char * key = nullptr;
+};
+
+::ui::UiElement HudTeams(const HudTeamsProps& props) {
+	const InGameHudContextValue& hud = UseInGameHud();
+	if(!hud.view || hud.view->teams.empty()) return ::ui::empty();
+	return <Box key={props.key} layout={root_layout()}>
+		<HudTeamChrome key="chrome" />
+		<HudTeamRow key="team-0" slot={0} />
+		<HudTeamRow key="team-1" slot={1} />
+		<HudTeamRow key="team-2" slot={2} />
+		<HudTeamRow key="team-3" slot={3} />
+		<HudTeamRow key="team-4" slot={4} />
+		<HudTeamRow key="team-5" slot={5} />
+	</Box>
+}
+
+struct HudSecretSpritesProps {
+	const char * key = nullptr;
+};
+
+struct HudSecretHighlightSpriteProps {
+	const char * key = nullptr;
+};
+
+::ui::UiElement HudSecretHighlightSprite(const HudSecretHighlightSpriteProps& props) {
+	const InGameHudContextValue& hud = UseInGameHud();
+	if(!hud.view || !hud.view->highlightSecrets) return ::ui::empty();
+	return <HudFixedSprite
+	  key={props.key}
+	  bank={86}
+	  index={2}
+	  logicalY={secret_y_offset(*hud.view)}
+	  brightness={secret_highlight_brightness(hud.animationPhase)}
+	/>
+}
+
+struct HudMinimapHighlightSpriteProps {
+	const char * key = nullptr;
+};
+
+::ui::UiElement HudMinimapHighlightSprite(const HudMinimapHighlightSpriteProps& props) {
+	const InGameHudContextValue& hud = UseInGameHud();
+	if(!hud.view || !hud.view->highlightMinimap) return ::ui::empty();
+	return <HudFixedSprite
+	  key={props.key}
+	  bank={86}
+	  index={1}
+	  brightness={secret_highlight_brightness(hud.animationPhase)}
+	/>
+}
+
+::ui::UiElement HudSecretSprites(const HudSecretSpritesProps& props) {
+	const InGameHudContextValue& hud = UseInGameHud();
+	if(!hud.view || !hud.resources) return ::ui::empty();
+	const TeamHudView * team = viewed_player_team(*hud.view);
+	if(!team || !team->baseDoorId) return ::ui::empty();
+	const int yOffset = secret_y_offset(*hud.view);
+	const Uint16 backgroundIndex = team->beamingTerminalId ? 1 : 0;
+	return <Box key={props.key} layout={root_layout()}>
+		<HudFixedSprite key="secret-background" bank={187} index={backgroundIndex} logicalY={yOffset} />
+		<HudSecretHighlightSprite key="secret-highlight" />
+		<HudMinimapHighlightSprite key="minimap-highlight" />
+	</Box>
+}
+
+struct SecretProgressLineProps {
+	const char * key = nullptr;
+	int line = 0;
+};
+
+::ui::UiElement SecretProgressLine(const SecretProgressLineProps& props) {
+	const InGameHudContextValue& hud = UseInGameHud();
+	if(!hud.view) return ::ui::empty();
+	const TeamHudView * team = viewed_player_team(*hud.view);
+	if(!team || !team->baseDoorId || team->beamingTerminalId) return ::ui::empty();
+	if(props.line < 0 || props.line >= 9) return ::ui::empty();
+	const PlayerHudView& player = hud.view->viewedPlayer;
+	return <Text
+	  key={props.key}
+	  value={secret_progress_label(props.line)}
+	  layout={text_layout(10, 54 + (props.line * 13) + secret_y_offset(*hud.view), 110, 12)}
+	  style={text_style(secret_progress_color(player, team->secretProgress, hud.animationPhase, props.line), 133, 6)}
+	/>
+}
+
+struct HudSecretProgressProps {
+	const char * key = nullptr;
+};
+
+::ui::UiElement HudSecretProgress(const HudSecretProgressProps& props) {
+	return <Box key={props.key} layout={root_layout()}>
+		<SecretProgressLine key="line-0" line={0} />
+		<SecretProgressLine key="line-1" line={1} />
+		<SecretProgressLine key="line-2" line={2} />
+		<SecretProgressLine key="line-3" line={3} />
+		<SecretProgressLine key="line-4" line={4} />
+		<SecretProgressLine key="line-5" line={5} />
+		<SecretProgressLine key="line-6" line={6} />
+		<SecretProgressLine key="line-7" line={7} />
+		<SecretProgressLine key="line-8" line={8} />
+	</Box>
+}
+
+struct HudSecretOverlayProps {
+	const char * key = nullptr;
+};
+
+::ui::UiElement HudSecretOverlay(const HudSecretOverlayProps& props) {
+	const InGameHudContextValue& hud = UseInGameHud();
+	if(!hud.view || !viewed_player_team(*hud.view)) return ::ui::empty();
+	return <Box key={props.key} layout={root_layout()}>
+		<HudSecretSprites key="sprites" />
+		<HudSecretProgress key="progress" />
+	</Box>
+}
+
 struct SystemCameraFrameProps {
 	const char * key = nullptr;
 	int slot = 0;
@@ -816,10 +1159,12 @@ struct TraceTimeProps {
 
 ::ui::UiElement InGameHudFrame(const BoxProps& props) {
 	return <Box key={props.key} layout={root_layout()}>
-		<HudStatusSprites key="status-sprites" />
 		<SystemCameraFrame key="system-camera-0" slot={0} />
 		<SystemCameraFrame key="system-camera-1" slot={1} />
+		<HudStatusSprites key="status-sprites" />
 		<HudReadouts key="readouts" />
+		<HudTeams key="teams" />
+		<HudSecretOverlay key="secrets" />
 		<TraceTime key="trace-time" />
 		<StatusMessages key="status" />
 		<TopMessage key="top-message" />

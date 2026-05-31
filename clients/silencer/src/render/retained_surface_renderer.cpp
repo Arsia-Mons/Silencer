@@ -134,6 +134,23 @@ Surface * ResolveSprite(const Resources& resources, uint32_t textureId) {
 	return resources.spritebank[bank][index].get();
 }
 
+void OutlineVisiblePixels(Renderer& renderer, Surface * source, Surface * target, Uint8 color) {
+	if(!source || !target) return;
+	const int sw = std::min(source->w, target->w);
+	const int sh = std::min(source->h, target->h);
+	for(int py = 0; py < sh; py++){
+		for(int px = 0; px < sw; px++){
+			if(renderer.GetPixel(source, px, py)) continue;
+			if((px > 0 && renderer.GetPixel(source, px - 1, py)) ||
+			   (px < sw - 1 && renderer.GetPixel(source, px + 1, py)) ||
+			   (py > 0 && renderer.GetPixel(source, px, py - 1)) ||
+			   (py < sh - 1 && renderer.GetPixel(source, px, py + 1))){
+				renderer.SetPixel(target, px, py, color);
+			}
+		}
+	}
+}
+
 void DrawRetainedHudSprite(Renderer& renderer,
                            const Resources& resources,
                            Surface& dst,
@@ -192,16 +209,54 @@ void DrawRetainedHudSprite(Renderer& renderer,
 	}
 }
 
+void DrawRetainedHudTeamEmblem(Renderer& renderer,
+                               const Resources& resources,
+                               Surface& dst,
+                               const ::ui::DrawCommand& command,
+                               const silencer::client_ui::RetainedHudTeamEmblemPayload& payload) {
+	if(payload.bank >= resources.spritebank.size()) return;
+	if(payload.index >= resources.spritebank[payload.bank].size()) return;
+	Surface * src = resources.spritebank[payload.bank][payload.index].get();
+	if(!src) return;
+	const int scale = payload.scaled ? 2 : 1;
+	Renderer::Rect dstrect{
+		src->w * scale,
+		src->h * scale,
+		static_cast<int>(std::floor(command.rect.x)),
+		static_cast<int>(std::floor(command.rect.y)),
+	};
+	int cx = dstrect.x;
+	int cy = dstrect.y;
+	int cw = dstrect.w;
+	int ch = dstrect.h;
+	if(!ClipRect(dst, cx, cy, cw, ch)) return;
+	Surface * copy = renderer.CreateSurfaceCopy(src);
+	renderer.EffectTeamColor(copy, nullptr, payload.teamColor, false, true);
+	OutlineVisiblePixels(renderer, src, copy, payload.outlineColor);
+	if(payload.scaled){
+		Renderer::DrawScaled(copy, nullptr, &dst, &dstrect);
+	}else{
+		Renderer::BlitSurface(copy, nullptr, &dst, &dstrect);
+	}
+	delete copy;
+}
+
 void DrawImage(Renderer& renderer,
                const Resources& resources,
                Surface& dst,
                const ::ui::DrawCommand& command) {
 	if(command.payload.image.texture_id == 0) return;
 	if(silencer::client_ui::IsRetainedHudPayloadTexture(command.payload.image.texture_id)){
-		const auto * payload =
+		const auto * sprite =
 			silencer::client_ui::ResolveRetainedHudSpritePayload(command.payload.image.texture_id);
-		if(payload){
-			DrawRetainedHudSprite(renderer, resources, dst, command, *payload);
+		if(sprite){
+			DrawRetainedHudSprite(renderer, resources, dst, command, *sprite);
+			return;
+		}
+		const auto * teamEmblem =
+			silencer::client_ui::ResolveRetainedHudTeamEmblemPayload(command.payload.image.texture_id);
+		if(teamEmblem){
+			DrawRetainedHudTeamEmblem(renderer, resources, dst, command, *teamEmblem);
 		}
 		return;
 	}
