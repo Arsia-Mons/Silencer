@@ -1,0 +1,476 @@
+#include "client/ui/screens/character_create/character_create_view.h"
+
+#include "ui/components/box.h"
+#include "ui/components/button.h"
+#include "ui/components/input.h"
+#include "ui/components/text.h"
+#include "ui/runtime/react.h"
+
+namespace silencer::client_ui {
+
+using ::ui::children;
+using ::ui::components::Box;
+using ::ui::components::BoxProps;
+using ::ui::components::Button;
+using ::ui::components::ButtonProps;
+using ::ui::components::Input;
+using ::ui::components::InputProps;
+using ::ui::components::Text;
+using ::ui::components::TextProps;
+
+::ReactContext CharacterCreateContext = {};
+
+namespace {
+
+const CharacterCreateContextValue kEmptyContext = {};
+
+struct AgencyView {
+	const char * name = "";
+	const char * advantages = "";
+	const char * description = "";
+};
+
+const AgencyView kAgencies[kCharacterCreateAgencyCount] = {
+	{"Noxis", "Endurance +3, Jump +5, Health Packs", "Resilient agents trained for hostile environments."},
+	{"Lazarus", "Resurrection Ability", "Agents who can return from otherwise fatal mistakes."},
+	{"Caliber", "Contacts +3, Security Passes", "Procurement specialists with unusually deep access."},
+	{"Static", "Satellite Ability, Hacking +3, Virus", "Technical operators with superior intrusion tools."},
+	{"Black Rose", "Stealth Ability, Shield +2, Poison Flare", "Solo agents focused on concealment and poison."},
+};
+
+const AgencyView& agency_at(int index) {
+	if(index < 0 || index >= kCharacterCreateAgencyCount) return kAgencies[0];
+	return kAgencies[index];
+}
+
+bool is_alias_step(const CharacterCreateContextValue& state) {
+	return state.step == CharacterCreateViewStep::EnterAlias;
+}
+
+bool is_agency_step(const CharacterCreateContextValue& state) {
+	return state.step == CharacterCreateViewStep::SelectAgency;
+}
+
+const char * agent_label(const CharacterCreateContextValue& state, int index) {
+	if(!state.agent_rows || index < 0 || index >= static_cast<int>(state.agent_rows->size())) return "";
+	return (*state.agent_rows)[static_cast<size_t>(index)].c_str();
+}
+
+bool agent_row_visible(const CharacterCreateContextValue& state, int index) {
+	return state.agent_rows && index >= 0 && index < static_cast<int>(state.agent_rows->size());
+}
+
+const char * agent_id(int index) {
+	return ::ui::copy_string(use_text_storage("character_create.agent.%d", index));
+}
+
+const char * rename_id(int index) {
+	return ::ui::copy_string(use_text_storage("character_create.rename.%d", index));
+}
+
+const char * agency_id(int index) {
+	return ::ui::copy_string(use_text_storage("character_create.agency.%d", index));
+}
+
+std::function<void(const ::ui::ActivationEvent&)> activate_index(
+	std::function<void(int index)> handler,
+	int index) {
+	return [handler, index](const ::ui::ActivationEvent&) {
+		if(handler) handler(index);
+	};
+}
+
+std::function<void(const ::ui::FocusEvent&)> focus_index(
+	std::function<void(int index)> handler,
+	int index) {
+	return [handler, index](const ::ui::FocusEvent&) {
+		if(handler) handler(index);
+	};
+}
+
+::ui::LayoutStyle root_layout() {
+	return ::ui::LayoutStyle{
+		.direction = ::ui::FlexDirection::Column,
+		.align_items = ::ui::AlignItems::Center,
+		.justify_content = ::ui::JustifyContent::Center,
+		.width = ::ui::Length::percent(100.0f),
+		.height = ::ui::Length::percent(100.0f),
+	};
+}
+
+::ui::StyleStatePatch root_style() {
+	return ::ui::patch().background(::ui::Color{14, 18, 25, 255});
+}
+
+::ui::LayoutStyle panel_layout() {
+	return ::ui::LayoutStyle{
+		.direction = ::ui::FlexDirection::Row,
+		.align_items = ::ui::AlignItems::Start,
+		.width = ::ui::Length::points(628.0f),
+		.height = ::ui::Length::points(441.0f),
+		.padding = {55.0f, 22.0f, 18.0f, 34.0f},
+		.gap = 78.0f,
+	};
+}
+
+::ui::StyleStatePatch panel_style() {
+	return ::ui::patch()
+		.background(::ui::Color{31, 36, 44, 248})
+		.border(::ui::Border{
+			.width = {1.0f, 1.0f, 1.0f, 1.0f},
+			.color = {
+				{74, 86, 102, 255},
+				{74, 86, 102, 255},
+				{74, 86, 102, 255},
+				{74, 86, 102, 255},
+			},
+		});
+}
+
+::ui::LayoutStyle column_layout(float width) {
+	return ::ui::LayoutStyle{
+		.direction = ::ui::FlexDirection::Column,
+		.align_items = ::ui::AlignItems::Center,
+		.width = ::ui::Length::points(width),
+		.gap = 5.0f,
+	};
+}
+
+::ui::LayoutStyle title_layout() {
+	return ::ui::LayoutStyle{
+		.width = ::ui::Length::points(236.0f),
+		.height = ::ui::Length::points(33.0f),
+	};
+}
+
+::ui::LayoutStyle rows_layout() {
+	return ::ui::LayoutStyle{
+		.direction = ::ui::FlexDirection::Column,
+		.width = ::ui::Length::points(236.0f),
+		.height = ::ui::Length::points(272.0f),
+		.gap = 5.0f,
+	};
+}
+
+::ui::LayoutStyle row_button_layout() {
+	return ::ui::LayoutStyle{
+		.align_items = ::ui::AlignItems::Center,
+		.justify_content = ::ui::JustifyContent::Center,
+		.width = ::ui::Length::points(236.0f),
+		.height = ::ui::Length::points(27.0f),
+		.padding = {18.0f, 18.0f, 5.0f, 5.0f},
+	};
+}
+
+::ui::LayoutStyle detail_layout() {
+	return ::ui::LayoutStyle{
+		.direction = ::ui::FlexDirection::Column,
+		.align_items = ::ui::AlignItems::Stretch,
+		.width = ::ui::Length::points(196.0f),
+		.padding = {22.0f, 0.0f, 42.0f, 0.0f},
+		.gap = 8.0f,
+	};
+}
+
+::ui::LayoutStyle detail_line_layout() {
+	return ::ui::LayoutStyle{
+		.width = ::ui::Length::points(174.0f),
+		.height = ::ui::Length::points(15.0f),
+	};
+}
+
+::ui::LayoutStyle detail_paragraph_layout() {
+	return ::ui::LayoutStyle{
+		.width = ::ui::Length::points(174.0f),
+		.height = ::ui::Length::points(64.0f),
+	};
+}
+
+::ui::LayoutStyle rename_button_layout() {
+	return ::ui::LayoutStyle{
+		.align_items = ::ui::AlignItems::Center,
+		.justify_content = ::ui::JustifyContent::Center,
+		.width = ::ui::Length::points(112.0f),
+		.height = ::ui::Length::points(27.0f),
+		.padding = {12.0f, 12.0f, 5.0f, 5.0f},
+	};
+}
+
+::ui::LayoutStyle alias_modal_layout(bool visible) {
+	if(!visible){
+		return ::ui::LayoutStyle{ .display = ::ui::Display::None };
+	}
+	return ::ui::LayoutStyle{
+		.position = ::ui::PositionType::Absolute,
+		.direction = ::ui::FlexDirection::Column,
+		.align_items = ::ui::AlignItems::Center,
+		.width = ::ui::Length::points(284.0f),
+		.height = ::ui::Length::points(108.0f),
+		.padding = {24.0f, 24.0f, 18.0f, 18.0f},
+		.gap = 16.0f,
+	};
+}
+
+::ui::LayoutStyle alias_input_layout() {
+	return ::ui::LayoutStyle{
+		.align_items = ::ui::AlignItems::Stretch,
+		.justify_content = ::ui::JustifyContent::Center,
+		.width = ::ui::Length::points(236.0f),
+		.height = ::ui::Length::points(27.0f),
+		.padding = {7.0f, 7.0f, 5.0f, 5.0f},
+	};
+}
+
+::ui::StyleStatePatch title_style() {
+	return ::ui::patch().text(::ui::TextVisual{
+		.color = {236, 241, 247, 255},
+		.font_id = 135,
+		.font_size = 12,
+		.align = ::ui::TextAlign::Center,
+	});
+}
+
+::ui::StyleStatePatch detail_heading_style() {
+	return ::ui::patch().text(::ui::TextVisual{
+		.color = {238, 210, 98, 255},
+		.font_id = 133,
+		.font_size = 8,
+	});
+}
+
+::ui::StyleStatePatch detail_style(::ui::TextWrap wrap = ::ui::TextWrap::None) {
+	return ::ui::patch().text(::ui::TextVisual{
+		.color = {226, 234, 242, 255},
+		.font_id = 133,
+		.font_size = 6,
+		.wrap = wrap,
+	});
+}
+
+struct AgentRowProps {
+	const char * key = nullptr;
+	int slot = 0;
+};
+
+::ui::UiElement AgentRow(const AgentRowProps& props) {
+	const CharacterCreateContextValue& state = UseCharacterCreate();
+	if(is_agency_step(state)) return ::ui::empty();
+	const int index = state.agent_scroll + props.slot;
+	if(!agent_row_visible(state, index)) return ::ui::empty();
+	return <Button
+	  key={props.key}
+	  id={agent_id(index)}
+	  label={agent_label(state, index)}
+	  disabled={is_alias_step(state)}
+	  onFocus={focus_index(state.on_agent_focus, index)}
+	  onActivate={activate_index(state.on_agent_activate, index)}
+	  layout={row_button_layout()}
+	/>
+}
+
+struct AgencyRowProps {
+	const char * key = nullptr;
+	int index = 0;
+};
+
+::ui::UiElement AgencyRow(const AgencyRowProps& props) {
+	const CharacterCreateContextValue& state = UseCharacterCreate();
+	if(!is_agency_step(state)) return ::ui::empty();
+	const AgencyView& agency = agency_at(props.index);
+	return <Button
+	  key={props.key}
+	  id={agency_id(props.index)}
+	  label={agency.name}
+	  disabled={state.waiting}
+	  onFocus={focus_index(state.on_agency_focus, props.index)}
+	  onActivate={activate_index(state.on_agency_activate, props.index)}
+	  layout={row_button_layout()}
+	/>
+}
+
+struct AgentOrAgencyColumnProps {
+	const char * key = nullptr;
+};
+
+::ui::UiElement AgentOrAgencyColumn(const AgentOrAgencyColumnProps& props) {
+	(void)props;
+	const CharacterCreateContextValue& state = UseCharacterCreate();
+	return <Box key="left" layout={column_layout(236.0f)}>
+		<Text
+		  key="title"
+		  value={is_agency_step(state) ? "SELECT AGENCY" : "SELECT AGENT"}
+		  layout={title_layout()}
+		  style={title_style()}
+		/>
+		<Box key="rows" layout={rows_layout()}>
+			<AgentRow key="agent-0" slot={0} />
+			<AgentRow key="agent-1" slot={1} />
+			<AgentRow key="agent-2" slot={2} />
+			<AgentRow key="agent-3" slot={3} />
+			<AgentRow key="agent-4" slot={4} />
+			<AgentRow key="agent-5" slot={5} />
+			<AgentRow key="agent-6" slot={6} />
+			<AgentRow key="agent-7" slot={7} />
+			<AgencyRow key="agency-0" index={0} />
+			<AgencyRow key="agency-1" index={1} />
+			<AgencyRow key="agency-2" index={2} />
+			<AgencyRow key="agency-3" index={3} />
+			<AgencyRow key="agency-4" index={4} />
+		</Box>
+	</Box>
+}
+
+struct DetailPanelProps {
+	const char * key = nullptr;
+};
+
+::ui::UiElement DetailPanel(const DetailPanelProps& props) {
+	(void)props;
+	const CharacterCreateContextValue& state = UseCharacterCreate();
+	const int agency_detail_index = is_agency_step(state)
+		? (state.preview_agency_index >= 0 ? state.preview_agency_index : state.selected_agency_index)
+		: state.detail_agency_index;
+	const AgencyView& detail_agency = agency_at(agency_detail_index);
+	return <Box key="detail" layout={detail_layout()}>
+		<Text
+		  key="agency-heading"
+		  value="Agency"
+		  layout={detail_line_layout()}
+		  style={detail_heading_style()}
+		/>
+		<Text
+		  key="agency"
+		  value={detail_agency.name}
+		  layout={detail_line_layout()}
+		  style={detail_style()}
+		/>
+		<Text
+		  key="advantages-heading"
+		  value="Advantages"
+		  layout={detail_line_layout()}
+		  style={detail_heading_style()}
+		/>
+		<Text
+		  key="advantages"
+		  value={detail_agency.advantages}
+		  layout={detail_paragraph_layout()}
+		  style={detail_style(::ui::TextWrap::Words)}
+		/>
+		<Text
+		  key="security"
+		  value={state.detail_stats[0]}
+		  disabled={is_agency_step(state) || state.detail_agent_index < 0}
+		  layout={detail_line_layout()}
+		  style={detail_style()}
+		/>
+		<Text
+		  key="stat-1"
+		  value={state.detail_stats[1]}
+		  disabled={is_agency_step(state) || state.detail_agent_index < 0}
+		  layout={detail_line_layout()}
+		  style={detail_style()}
+		/>
+		<Text
+		  key="stat-2"
+		  value={state.detail_stats[2]}
+		  disabled={is_agency_step(state) || state.detail_agent_index < 0}
+		  layout={detail_line_layout()}
+		  style={detail_style()}
+		/>
+		<Text
+		  key="stat-3"
+		  value={state.detail_stats[3]}
+		  disabled={is_agency_step(state) || state.detail_agent_index < 0}
+		  layout={detail_line_layout()}
+		  style={detail_style()}
+		/>
+		<Button
+		  key="rename"
+		  id={rename_id(state.detail_agent_index)}
+		  label="Rename Once"
+		  disabled={!state.detail_rename_available || is_agency_step(state) || is_alias_step(state)}
+		  onActivate={activate_index(state.on_rename, state.detail_agent_index)}
+		  layout={rename_button_layout()}
+		/>
+		<Text
+		  key="description-heading"
+		  value="Description"
+		  disabled={!is_agency_step(state)}
+		  layout={detail_line_layout()}
+		  style={detail_heading_style()}
+		/>
+		<Text
+		  key="description"
+		  value={detail_agency.description}
+		  disabled={!is_agency_step(state)}
+		  layout={detail_paragraph_layout()}
+		  style={detail_style(::ui::TextWrap::Words)}
+		/>
+	</Box>
+}
+
+struct AliasModalProps {
+	const char * key = nullptr;
+};
+
+::ui::UiElement AliasModal(const AliasModalProps& props) {
+	(void)props;
+	const CharacterCreateContextValue& state = UseCharacterCreate();
+	const bool alias_step = is_alias_step(state);
+	return <Box key="alias-modal" layout={alias_modal_layout(alias_step)} style={panel_style()}>
+		<Text
+		  key="alias-title"
+		  value={state.alias_renaming ? "ONE-TIME RENAME" : "SILENCER ALIAS"}
+		  layout={title_layout()}
+		  style={title_style()}
+		/>
+		<Input
+		  key="alias-input"
+		  id="character_create.alias"
+		  value={state.alias}
+		  disabled={!alias_step || state.waiting}
+		  autofocus={alias_step}
+		  onChange={state.on_alias_change}
+		  layout={alias_input_layout()}
+		/>
+		<Button
+		  key="alias-submit"
+		  id="character_create.alias.submit"
+		  label={state.alias_renaming ? "Rename" : "Continue"}
+		  disabled={!alias_step || state.waiting}
+		  onActivate={state.on_alias_submit}
+		  layout={rename_button_layout()}
+		/>
+	</Box>
+}
+
+::ui::UiElement CharacterCreateView(const BoxProps& props) {
+	return <Box key={props.key} layout={root_layout()} style={root_style()}>
+		<Box key="panel" layout={panel_layout()} style={panel_style()}>
+			<AgentOrAgencyColumn key="chooser" />
+			<DetailPanel key="detail" />
+			<AliasModal key="alias" />
+		</Box>
+	</Box>
+}
+
+}  // namespace
+
+const CharacterCreateContextValue& UseCharacterCreate() {
+	const auto * value = static_cast<const CharacterCreateContextValue *>(
+		::use_context(&CharacterCreateContext));
+	return value ? *value : kEmptyContext;
+}
+
+::ui::UiElement CharacterCreateScreenView(const CharacterCreateScreenViewProps& props) {
+	return ::ui::provider(
+		"CharacterCreateProvider",
+		&CharacterCreateContext,
+		const_cast<CharacterCreateContextValue *>(props.value),
+		children({
+			::ui::component("CharacterCreateView", BoxProps{ .key = "view" }, CharacterCreateView),
+		}),
+		props.key);
+}
+
+}  // namespace silencer::client_ui

@@ -172,7 +172,6 @@ namespace {
 					  disabled={props.inactive}
 					  autofocus={true}
 					  onChange={props.on_username_change}
-					  onActivate={props.on_login}
 					  layout={input_layout()}
 					/>
 				</Box>
@@ -185,7 +184,6 @@ namespace {
 					  password={true}
 					  disabled={props.inactive}
 					  onChange={props.on_password_change}
-					  onActivate={props.on_login}
 					  layout={input_layout()}
 					/>
 				</Box>

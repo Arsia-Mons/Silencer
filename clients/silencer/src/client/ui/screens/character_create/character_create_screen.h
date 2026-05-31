@@ -3,22 +3,17 @@
 
 #include "screen.h"
 #include "shared.h"
-#include "clay/clay.h"
 
+#include <array>
 #include <string>
 #include <vector>
-
-class Surface;
 
 class CharacterCreateScreen : public Screen
 {
 public:
 	void Build(ScreenContext & ctx) override;
 	void Tick(ScreenContext & ctx) override;
-	void BuildUi(ScreenContext & ctx,
-	             Surface & dst,
-	             float frametime,
-	             silencer::ui::UiInteractionRegistry& interactions) override;
+	bool BuildElement(ScreenContext & ctx, ::ui::UiElement * out) override;
 	void Destroy(ScreenContext & ctx) override;
 	bool HandleBack(ScreenContext & ctx) override;
 	bool HandleUiIntent(ScreenContext & ctx, const silencer::ui::UiAction & action) override;
@@ -30,11 +25,6 @@ private:
 		SelectAgency,
 	};
 
-	void BuildSelectAgent(ScreenContext & ctx,
-	                      silencer::ui::UiInteractionRegistry& interactions,
-	                      bool interactive = true);
-	void BuildEnterAlias(ScreenContext & ctx, silencer::ui::UiInteractionRegistry& interactions);
-	void BuildSelectAgency(ScreenContext & ctx, silencer::ui::UiInteractionRegistry& interactions);
 	void SelectCurrentAgent(ScreenContext & ctx);
 	void CreateCurrentAgent(ScreenContext & ctx);
 	void StartRenameAgent(ScreenContext & ctx, int agentIndex);
@@ -55,9 +45,13 @@ private:
 	bool waitingForCreate = false;
 	bool waitingForRename = false;
 	Uint32 renameCharacterId = 0;
-	bool focusAliasRequested = false;
+	int activatedAgentIndex = -1;
+	int renameClickedIndex = -1;
+	bool aliasSubmitted = false;
+	int agencyClickedIndex = -1;
 	char alias[17] = {};
 	std::vector<std::string> agentRows;
+	std::array<std::string, 4> detailStats = {};
 };
 
 #endif
