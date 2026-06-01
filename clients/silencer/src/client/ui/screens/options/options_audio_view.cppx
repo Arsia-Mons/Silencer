@@ -40,8 +40,8 @@ namespace {
 		.direction = ::ui::FlexDirection::Column,
 		.align_items = ::ui::AlignItems::Center,
 		.width = ::ui::Length::points(420.0f),
-		.gap = 22.0f,
 		.padding = {24.0f, 24.0f, 32.0f, 32.0f},
+		.gap = 22.0f,
 	};
 }
 

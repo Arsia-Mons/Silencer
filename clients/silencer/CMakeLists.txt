@@ -158,6 +158,14 @@ if(WIN32)
 	# but surfaces in unity batches. We use winsock2 only — no Shell/
 	# RPC/Crypto/DDE call sites in the codebase to break.
 	target_compile_definitions(${SILENCER_TARGET} PRIVATE WIN32_LEAN_AND_MEAN)
+	# WinMain declares World/Renderer/Game and other large subsystems as stack
+	# locals — a ~2 MB frame. macOS/Linux default to an 8 MB stack so it fits;
+	# Windows reserves only 1 MB by default, so the prologue stack probe
+	# (__chkstk) overflows the guard page the instant WinMain is entered. Reserve
+	# 8 MB to match the other platforms.
+	if(MSVC)
+		target_link_options(${SILENCER_TARGET} PRIVATE /STACK:8388608)
+	endif()
 endif()
 
 # Unity (jumbo) build: combines src/*.cpp into batched TUs to dramatically
@@ -184,6 +192,11 @@ if(SILENCER_UNITY_BUILD)
 		src/client/ui/screens/character_create/*.cpp
 		src/client/ui/screens/lobby/*.cpp)
 	set_source_files_properties(${_ui_unity_unsafe_sources} PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON)
+	# Generated cppx view TUs share anonymous-namespace helper names
+	# (root_layout/title_style/panel_layout/...) across files; a jumbo batch
+	# re-opens the anonymous namespace and collides on those bodies. Keep each
+	# generated TU separate until the helpers are uniquely scoped.
+	set_source_files_properties(${SILENCER_UI_COMPONENT_GENERATED} PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON)
 endif()
 
 # Compile HLSL → DXIL bytecode headers for the SDL3 GPU backend. macOS keeps

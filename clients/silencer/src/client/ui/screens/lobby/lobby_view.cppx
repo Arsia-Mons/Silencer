@@ -197,34 +197,34 @@ std::function<void(const ::ui::KeyEvent&)> action_on_enter(std::function<void()>
 
 ::ui::LayoutStyle character_panel_layout() {
 	return ::ui::LayoutStyle{
+		.overflow = ::ui::Overflow::Hidden,
 		.direction = ::ui::FlexDirection::Column,
 		.width = ::ui::Length::points(220.0f),
 		.height = ::ui::Length::percent(100.0f),
 		.padding = {10.0f, 10.0f, 8.0f, 8.0f},
 		.gap = 5.0f,
-		.overflow = ::ui::Overflow::Hidden,
 	};
 }
 
 ::ui::LayoutStyle upper_panel_layout() {
 	return ::ui::LayoutStyle{
+		.overflow = ::ui::Overflow::Hidden,
 		.direction = ::ui::FlexDirection::Column,
 		.width = ::ui::Length::grow(1.0f),
 		.height = ::ui::Length::percent(100.0f),
 		.padding = {10.0f, 10.0f, 8.0f, 8.0f},
 		.gap = 6.0f,
-		.overflow = ::ui::Overflow::Hidden,
 	};
 }
 
 ::ui::LayoutStyle chat_panel_layout() {
 	return ::ui::LayoutStyle{
+		.overflow = ::ui::Overflow::Hidden,
 		.direction = ::ui::FlexDirection::Column,
 		.width = ::ui::Length::percent(100.0f),
 		.height = ::ui::Length::grow(1.0f),
 		.padding = {10.0f, 10.0f, 8.0f, 8.0f},
 		.gap = 7.0f,
-		.overflow = ::ui::Overflow::Hidden,
 	};
 }
 
@@ -239,21 +239,21 @@ std::function<void(const ::ui::KeyEvent&)> action_on_enter(std::function<void()>
 
 ::ui::LayoutStyle chat_log_layout() {
 	return ::ui::LayoutStyle{
+		.overflow = ::ui::Overflow::Hidden,
 		.direction = ::ui::FlexDirection::Column,
 		.width = ::ui::Length::grow(1.0f),
 		.height = ::ui::Length::percent(100.0f),
 		.gap = 3.0f,
-		.overflow = ::ui::Overflow::Hidden,
 	};
 }
 
 ::ui::LayoutStyle presence_layout() {
 	return ::ui::LayoutStyle{
+		.overflow = ::ui::Overflow::Hidden,
 		.direction = ::ui::FlexDirection::Column,
 		.width = ::ui::Length::points(148.0f),
 		.height = ::ui::Length::percent(100.0f),
 		.gap = 3.0f,
-		.overflow = ::ui::Overflow::Hidden,
 	};
 }
 
@@ -285,12 +285,12 @@ std::function<void(const ::ui::KeyEvent&)> action_on_enter(std::function<void()>
 
 ::ui::LayoutStyle side_panel_layout() {
 	return ::ui::LayoutStyle{
+		.overflow = ::ui::Overflow::Hidden,
 		.direction = ::ui::FlexDirection::Column,
 		.width = ::ui::Length::points(244.0f),
 		.height = ::ui::Length::percent(100.0f),
 		.padding = {10.0f, 10.0f, 8.0f, 8.0f},
 		.gap = 7.0f,
-		.overflow = ::ui::Overflow::Hidden,
 	};
 }
 
@@ -340,20 +340,20 @@ std::function<void(const ::ui::KeyEvent&)> action_on_enter(std::function<void()>
 
 ::ui::LayoutStyle create_options_layout() {
 	return ::ui::LayoutStyle{
+		.overflow = ::ui::Overflow::Hidden,
 		.direction = ::ui::FlexDirection::Column,
 		.width = ::ui::Length::percent(100.0f),
 		.height = ::ui::Length::grow(1.0f),
 		.gap = 6.0f,
-		.overflow = ::ui::Overflow::Hidden,
 	};
 }
 
 ::ui::LayoutStyle game_create_options_viewport_layout() {
 	return ::ui::LayoutStyle{
+		.overflow = ::ui::Overflow::Hidden,
 		.direction = ::ui::FlexDirection::Column,
 		.width = ::ui::Length::percent(100.0f),
 		.height = ::ui::Length::grow(1.0f),
-		.overflow = ::ui::Overflow::Hidden,
 	};
 }
 
@@ -366,9 +366,9 @@ std::function<void(const ::ui::KeyEvent&)> action_on_enter(std::function<void()>
 ::ui::LayoutStyle game_create_options_content_layout(Uint16 scrollPosition) {
 	return ::ui::LayoutStyle{
 		.position = ::ui::PositionType::Relative,
-		.position_inset = game_create_options_content_position(scrollPosition),
 		.direction = ::ui::FlexDirection::Column,
 		.width = ::ui::Length::percent(100.0f),
+		.position_inset = game_create_options_content_position(scrollPosition),
 		.gap = 6.0f,
 	};
 }

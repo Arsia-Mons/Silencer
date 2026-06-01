@@ -193,11 +193,11 @@ std::function<void(const ::ui::ActivationEvent&)> navigation_action_callback(
 
 ::ui::LayoutStyle rows_layout() {
 	return ::ui::LayoutStyle{
+		.overflow = ::ui::Overflow::Hidden,
 		.direction = ::ui::FlexDirection::Column,
 		.width = ::ui::Length::percent(100.0f),
 		.height = ::ui::Length::grow(1.0f),
 		.gap = static_cast<float>(kRowGap),
-		.overflow = ::ui::Overflow::Hidden,
 	};
 }
 

@@ -25,8 +25,20 @@ from __future__ import annotations
 import argparse
 import difflib
 import pathlib
+import re
 import sys
 from dataclasses import dataclass
+
+# Props structs deliberately declare their members in the canonical JSX
+# attribute order (see ui/components/*.hx). MSVC enforces C++'s rule that
+# designated initializers appear in declaration order (C7560), while
+# Clang/GCC accept any order as an extension. To stay portable, emitted
+# designators are sorted into each Props struct's declaration order. Field
+# orders come from the component headers plus any struct defined in the file
+# being transpiled.
+SCRIPT_DIR = pathlib.Path(__file__).resolve().parent
+COMPONENTS_DIR = SCRIPT_DIR.parent / "src" / "ui" / "components"
+_IDENT_RE = re.compile(r"[A-Za-z_]\w*")
 
 
 class TranspileError(Exception):
@@ -50,6 +62,132 @@ class StackEntry:
     line: int
     column: int
     close_suffix: str
+
+
+def strip_comments(text: str) -> str:
+    """Remove // and /* */ comments, leaving string/char literals intact."""
+    out: list[str] = []
+    i = 0
+    n = len(text)
+    quote: str | None = None
+    while i < n:
+        ch = text[i]
+        if quote:
+            out.append(ch)
+            if ch == "\\" and i + 1 < n:
+                out.append(text[i + 1])
+                i += 2
+                continue
+            if ch == quote:
+                quote = None
+            i += 1
+            continue
+        if ch in ('"', "'"):
+            quote = ch
+            out.append(ch)
+            i += 1
+            continue
+        if ch == "/" and i + 1 < n and text[i + 1] == "/":
+            while i < n and text[i] != "\n":
+                i += 1
+            continue
+        if ch == "/" and i + 1 < n and text[i + 1] == "*":
+            i += 2
+            while i + 1 < n and not (text[i] == "*" and text[i + 1] == "/"):
+                i += 1
+            i += 2
+            continue
+        out.append(ch)
+        i += 1
+    return "".join(out)
+
+
+def field_name_from_member(stmt: str) -> str | None:
+    """Return the member name from a single struct member declaration."""
+    decl: list[str] = []
+    depth = 0
+    for ch in stmt:
+        if ch in "{([<":
+            depth += 1
+        elif ch in ")}]>":
+            depth -= 1
+        elif ch == "=" and depth == 0:
+            break
+        decl.append(ch)
+    idents = _IDENT_RE.findall("".join(decl))
+    return idents[-1] if idents else None
+
+
+def struct_member_order(body: str) -> list[str]:
+    """Member names, in order, from a struct body (no enclosing braces)."""
+    names: list[str] = []
+    depth = 0
+    stmt: list[str] = []
+    for ch in body:
+        if ch in "{([":
+            depth += 1
+            stmt.append(ch)
+        elif ch in ")}]":
+            depth -= 1
+            stmt.append(ch)
+        elif ch == ";" and depth == 0:
+            name = field_name_from_member("".join(stmt))
+            if name:
+                names.append(name)
+            stmt = []
+        else:
+            stmt.append(ch)
+    return names
+
+
+def parse_struct_field_orders(text: str) -> dict[str, list[str]]:
+    """Map each `struct Name { ... }` to its ordered member names."""
+    text = strip_comments(text)
+    orders: dict[str, list[str]] = {}
+    n = len(text)
+    pattern = re.compile(r"\bstruct\s+([A-Za-z_]\w*)")
+    pos = 0
+    while True:
+        match = pattern.search(text, pos)
+        if not match:
+            break
+        name = match.group(1)
+        i = match.end()
+        while i < n and text[i] not in "{;":
+            i += 1
+        if i >= n or text[i] == ";":  # forward declaration, no body
+            pos = i + 1
+            continue
+        depth = 0
+        body_start = i
+        while i < n:
+            if text[i] == "{":
+                depth += 1
+            elif text[i] == "}":
+                depth -= 1
+                if depth == 0:
+                    break
+            i += 1
+        orders[name] = struct_member_order(text[body_start + 1 : i])
+        pos = i + 1
+    return orders
+
+
+def load_component_field_orders() -> dict[str, list[str]]:
+    orders: dict[str, list[str]] = {}
+    if COMPONENTS_DIR.is_dir():
+        for header in sorted(COMPONENTS_DIR.glob("*.hx")):
+            try:
+                orders.update(parse_struct_field_orders(header.read_text()))
+            except OSError:
+                pass
+    return orders
+
+
+def order_for_props(
+    props_type: str, field_orders: dict[str, list[str]]
+) -> list[str] | None:
+    return field_orders.get(props_type.split("::")[-1])
 
 
 def cpp_string(value: str) -> str:
@@ -102,35 +240,51 @@ def prop_name(name: str) -> str:
     return "".join(out)
 
 
-def props_fields(attrs: list[Attr]) -> list[str]:
-    return [f".{prop_name(attr.name)} = {attr.value}" for attr in attrs]
+def props_fields(attrs: list[Attr], order: list[str] | None = None) -> list[str]:
+    fields = [(prop_name(attr.name), attr.value) for attr in attrs]
+    if order:
+        index = {name: pos for pos, name in enumerate(order)}
+        # Stable sort by declaration order; members the struct does not declare
+        # keep their original relative order at the end (a real compile error,
+        # surfaced rather than masked).
+        fields.sort(key=lambda field: index.get(field[0], len(order)))
+    return [f".{name} = {value}" for name, value in fields]
 
 
-def aggregate_init(type_name: str, attrs: list[Attr]) -> str:
-    parts = props_fields(attrs)
+def aggregate_init(
+    type_name: str, attrs: list[Attr], order: list[str] | None = None
+) -> str:
+    parts = props_fields(attrs, order)
     if not parts:
         return f"{type_name}{{}}"
     return f"{type_name}{{ " + ", ".join(parts) + " }"
 
 
-def aggregate_open_with_children(type_name: str, attrs: list[Attr]) -> str:
-    parts = props_fields(attrs)
+def aggregate_open_with_children(
+    type_name: str, attrs: list[Attr], order: list[str] | None = None
+) -> str:
+    parts = props_fields(attrs, order)
     parts.append(".children = children({")
     return f"{type_name}{{ " + ", ".join(parts)
 
 
-def open_element_expression(tag: str, attrs: list[Attr]) -> tuple[str, str]:
+def open_element_expression(
+    tag: str, attrs: list[Attr], field_orders: dict[str, list[str]]
+) -> tuple[str, str]:
     name = component_name(tag)
     if is_host_tag(tag):
+        props_type = name + "Props"
+        order = order_for_props(props_type, field_orders)
         return (
-            f"{name}({aggregate_init(name + 'Props', attrs)})",
-            f"{name}({aggregate_open_with_children(name + 'Props', attrs)}",
+            f"{name}({aggregate_init(props_type, attrs, order)})",
+            f"{name}({aggregate_open_with_children(props_type, attrs, order)}",
         )
     props_type = component_props_type(tag)
+    order = order_for_props(props_type, field_orders)
     display_name = component_display_name(tag)
     return (
-        f"::ui::component({cpp_string(display_name)}, {aggregate_init(props_type, attrs)}, {name})",
-        f"::ui::component({cpp_string(display_name)}, {aggregate_open_with_children(props_type, attrs)}",
+        f"::ui::component({cpp_string(display_name)}, {aggregate_init(props_type, attrs, order)}, {name})",
+        f"::ui::component({cpp_string(display_name)}, {aggregate_open_with_children(props_type, attrs, order)}",
     )
 
 
@@ -292,6 +446,7 @@ def transpile_jsx_line(
     path: pathlib.Path,
     line_no: int,
     stack: list[StackEntry],
+    field_orders: dict[str, list[str]],
     prefix: str = "",
 ) -> list[str]:
     out: list[str] = []
@@ -355,7 +510,7 @@ def transpile_jsx_line(
         else:
             tag, attrs, self_closing = parse_open_tag(body, path, line_no, column)
             out.append(line_directive(path, line_no))
-            closed, open_with_children = open_element_expression(tag, attrs)
+            closed, open_with_children = open_element_expression(tag, attrs, field_orders)
             if self_closing:
                 out.append(f"{base_indent}{take_prefix()}{closed}{expression_end()}")
             else:
@@ -407,6 +562,10 @@ def collect_jsx_source(
 
 
 def transpile_text(text: str, path: pathlib.Path) -> str:
+    field_orders = load_component_field_orders()
+    # Structs defined in this file (e.g. screen-local component Props) win over
+    # any same-named component header entry.
+    field_orders.update(parse_struct_field_orders(text))
     stack: list[StackEntry] = []
     out: list[str] = []
     lines = text.splitlines()
@@ -418,7 +577,7 @@ def transpile_text(text: str, path: pathlib.Path) -> str:
             if stack and line.strip():
                 indent = line[: len(line) - len(line.lstrip())]
                 generated = transpile_jsx_line(
-                    line.strip(), indent, path, line_no, stack
+                    line.strip(), indent, path, line_no, stack, field_orders
                 )
                 out.extend(generated)
                 index += 1
@@ -432,7 +591,9 @@ def transpile_text(text: str, path: pathlib.Path) -> str:
         if stripped.startswith("return <"):
             prefix = "return "
             stripped = stripped[len("return ") :]
-        generated = transpile_jsx_line(stripped, indent, path, line_no, stack, prefix)
+        generated = transpile_jsx_line(
+            stripped, indent, path, line_no, stack, field_orders, prefix
+        )
         out.extend(generated)
     if stack:
         entry = stack[-1]
