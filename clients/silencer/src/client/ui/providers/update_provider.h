@@ -1,13 +1,16 @@
 #pragma once
 
 class ScreenContext;
-class Updater;
+
+#include <memory>
 
 namespace silencer {
 namespace client_ui {
 
+struct UpdateProviderState;
+
 struct UpdateProviderValue {
-	Updater * updater = nullptr;
+	std::shared_ptr<UpdateProviderState> state;
 };
 
 UpdateProviderValue MakeUpdateProvider(ScreenContext& ctx);

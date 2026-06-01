@@ -1,13 +1,16 @@
 #pragma once
 
-class Game;
 class ScreenContext;
+
+#include <memory>
 
 namespace silencer {
 namespace client_ui {
 
+struct GameSessionProviderState;
+
 struct GameSessionProviderValue {
-	Game * game = nullptr;
+	std::shared_ptr<GameSessionProviderState> state;
 };
 
 GameSessionProviderValue MakeGameSessionProvider(ScreenContext& ctx);

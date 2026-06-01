@@ -131,6 +131,18 @@ fail_if_match \
   "$REPO_ROOT/clients/silencer/src/client/ui/providers/options_provider.h"
 
 fail_if_match \
+  "\\bGame\\b" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/providers/game_session_provider.h"
+
+fail_if_match \
+  "\\bWorld\\b" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/providers/mission_summary_provider.h"
+
+fail_if_match \
+  "\\bUpdater\\b" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/providers/update_provider.h"
+
+fail_if_match \
   "\\b(spriteBank|spriteIndex|bank|texture_id|nine_slice|palette)[[:space:]]*(=|;|,|\\)|\\})" \
   "$REPO_ROOT/clients/silencer/src/client/ui/components" \
   "$REPO_ROOT/clients/silencer/src/ui/components" \

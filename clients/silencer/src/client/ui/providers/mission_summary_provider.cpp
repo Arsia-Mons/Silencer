@@ -9,13 +9,19 @@
 #include <algorithm>
 #include <cstdio>
 #include <cstring>
+#include <memory>
 
 namespace silencer {
 namespace client_ui {
 
+struct MissionSummaryProviderState {
+	World * world = nullptr;
+};
+
 MissionSummaryProviderValue MakeMissionSummaryProvider(ScreenContext& ctx) {
 	MissionSummaryProviderValue value;
-	value.world = &ctx.world;
+	value.state = std::make_shared<MissionSummaryProviderState>();
+	value.state->world = &ctx.world;
 	return value;
 }
 
@@ -33,7 +39,7 @@ constexpr Lobby::StatID kUpgradeStatIds[6] = {
 };
 
 World * WorldFor(const MissionSummaryProviderValue& provider) {
-	return provider.world;
+	return provider.state ? provider.state->world : nullptr;
 }
 
 void AddSummaryLine(std::vector<std::string>& lines,

@@ -6,20 +6,26 @@
 
 #include <cstdio>
 #include <cstdlib>
+#include <memory>
 
 namespace silencer {
 namespace client_ui {
 
+struct UpdateProviderState {
+	Updater * updater = nullptr;
+};
+
 UpdateProviderValue MakeUpdateProvider(ScreenContext& ctx) {
 	UpdateProviderValue value;
-	value.updater = &ctx.updater;
+	value.state = std::make_shared<UpdateProviderState>();
+	value.state->updater = &ctx.updater;
 	return value;
 }
 
 namespace update_provider_detail {
 
 Updater * UpdaterFor(const UpdateProviderValue& provider) {
-	return provider.updater;
+	return provider.state ? provider.state->updater : nullptr;
 }
 
 UpdateStatus ConvertState(Updater::State state) {

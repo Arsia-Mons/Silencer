@@ -3,21 +3,36 @@
 #include "game.h"
 #include "screen_context.h"
 
+#include <memory>
+
 namespace silencer {
 namespace client_ui {
 
+struct GameSessionProviderState {
+	Game * game = nullptr;
+};
+
 GameSessionProviderValue MakeGameSessionProvider(ScreenContext& ctx) {
 	GameSessionProviderValue value;
-	value.game = &ctx.game;
+	value.state = std::make_shared<GameSessionProviderState>();
+	value.state->game = &ctx.game;
 	return value;
 }
+
+namespace game_session_provider_detail {
+
+Game * GameFor(const GameSessionProviderValue& provider) {
+	return provider.state ? provider.state->game : nullptr;
+}
+
+}  // namespace game_session_provider_detail
 
 TutorialSessionModel::TutorialSessionModel(const GameSessionProviderValue& provider)
 	: provider_(provider) {}
 
 void TutorialSessionModel::start() const {
-	if(provider_.game){
-		provider_.game->StartTutorial();
+	if(Game * game = game_session_provider_detail::GameFor(provider_)){
+		game->StartTutorial();
 	}
 }
 

@@ -1,13 +1,16 @@
 #pragma once
 
 class ScreenContext;
-class World;
+
+#include <memory>
 
 namespace silencer {
 namespace client_ui {
 
+struct MissionSummaryProviderState;
+
 struct MissionSummaryProviderValue {
-	World * world = nullptr;
+	std::shared_ptr<MissionSummaryProviderState> state;
 };
 
 MissionSummaryProviderValue MakeMissionSummaryProvider(ScreenContext& ctx);
