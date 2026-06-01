@@ -28,6 +28,12 @@ struct LobbySnapshot {
   bool characters_received = false;
   std::vector<std::string> character_names = {};
 
+  // --- lobby (LobbyScreen, read panels) — recent tails, newline-joined ---
+  std::string lobby_agent = {};    // selected agent name + compact summary
+  std::string lobby_chat = {};     // chat scrollback (drained on the tick)
+  std::string lobby_presence = {}; // who's online
+  std::string lobby_games = {};    // open games (browser)
+
   // --- progression (MissionSummary) ---
   bool progression_loaded = false;
   uint32_t experience = 0;
@@ -51,6 +57,8 @@ struct LobbyProviderValue {
   // existing one by roster index (routes to the lobby).
   std::function<void(const std::string &, int)> create_character = {};
   std::function<void(int)> select_character = {};
+  // Lobby: post a chat message to the current channel.
+  std::function<void(const std::string &)> send_chat = {};
 };
 
 // Publishes the lobby model to the component tree. Mounted in the global

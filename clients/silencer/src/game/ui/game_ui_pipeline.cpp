@@ -467,6 +467,15 @@ lb.UnlockMutex();
 if(selected) game.GoToState(GameState::LOBBY);
 });
 };
+lobby.send_chat = [this](const std::string & message){
+if(message.empty()) return;
+cppxHost->pipeline().client_ui().queue_deferred_mutation([this, message](){
+Lobby & lb = game.world.lobby;
+lb.LockMutex();
+lb.SendChat(lb.channel, message.c_str());
+lb.UnlockMutex();
+});
+};
 
 // Global FrameProvider chain (doc §5), outermost (Theme) → innermost (Lobby):
 // Theme ▸ Server ▸ App ▸ Session ▸ Settings ▸ KeyMap ▸ Updater ▸

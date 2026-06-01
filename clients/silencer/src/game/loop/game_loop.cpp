@@ -391,11 +391,24 @@ bool Game::Tick(void){
 				world.Disconnect();
 				world.choosingtech = false;
 				world.lobby.channelchanged = true;
+				lobbyChatLog.clear();
 				stateisnew = false;
 			}else{
 				if(gameSession.AmbienceMixerRef().FadedIn()){
 					gameSession.AmbienceMixerRef().PlayMusic(world.resources.menumusic);
 				}
+				// Drain the lobby chat queue into the scrollback the cppx
+				// ChatPanel reads (the queue would otherwise grow unboundedly).
+				// Each message is [text\0][color][brightness]; we keep the text.
+				world.lobby.LockMutex();
+				while(!world.lobby.chatmessages.empty()){
+					const std::vector<char> & msg = world.lobby.chatmessages.front();
+					lobbyChatLog.push_back(std::string(msg.data()));
+					world.lobby.chatmessages.pop_front();
+				}
+				world.lobby.UnlockMutex();
+				if(lobbyChatLog.size() > 256)
+					lobbyChatLog.erase(lobbyChatLog.begin(), lobbyChatLog.begin() + (lobbyChatLog.size() - 256));
 			}
 		}break;
 		case CREATECHARACTER:{

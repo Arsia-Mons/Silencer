@@ -93,6 +93,9 @@ void LeaveJoinedGame();
 // The LobbyConnect status log, accumulated by the connect flow on the tick.
 // Public so the cppx composition root can snapshot it without a friend grant.
 const std::vector<std::string> & LobbyConnectLog() const { return lobbyConnectFlow.Log(); }
+// The lobby chat scrollback, drained from the lobby message queue on the tick
+// (the queue would otherwise grow unboundedly). Snapshotted by the comp root.
+const std::vector<std::string> & LobbyChatLog() const { return lobbyChatLog; }
 
 private:
 bool Tick();
@@ -132,6 +135,9 @@ bool nextstateprocessed;
 // Roster size captured on entering CREATECHARACTER; when the roster grows past
 // it (a create round-tripped through the lobby), the tick routes to LOBBY.
 size_t charCreateCountOnEntry = 0;
+// Lobby chat scrollback, drained from world.lobby.chatmessages on the LOBBY
+// tick (cleared on entry). The cppx ChatPanel reads it via LobbyChatLog().
+std::vector<std::string> lobbyChatLog;
 Uint16 sharedstate;
 Uint8 singleplayermessage;
 bool updatetitle;

@@ -1,6 +1,8 @@
 #include "lobby_provider.h"
 
 #include "client/ui/hooks/use_characters.h"
+#include "client/ui/hooks/use_games.h"
+#include "client/ui/hooks/use_lobby_chat.h"
 #include "client/ui/hooks/use_lobby_session.h"
 #include "client/ui/hooks/use_progression.h"
 #include "ui/runtime/react.h"
@@ -71,9 +73,34 @@ Characters use_characters() {
   return {
       .roster = value->snapshot.character_names,
       .received = value->snapshot.characters_received,
+      .selected_summary = value->snapshot.lobby_agent,
       .create = value->create_character,
       .select = value->select_character,
   };
+}
+
+LobbyChat use_lobby_chat() {
+  LobbyProviderValue *value =
+      static_cast<LobbyProviderValue *>(use_context(&LobbyContext));
+  if (!value) {
+    react_report_error("client/ui: missing LobbyProvider\n");
+    return {};
+  }
+  return {
+      .scrollback = value->snapshot.lobby_chat,
+      .presence = value->snapshot.lobby_presence,
+      .send = value->send_chat,
+  };
+}
+
+Games use_games() {
+  LobbyProviderValue *value =
+      static_cast<LobbyProviderValue *>(use_context(&LobbyContext));
+  if (!value) {
+    react_report_error("client/ui: missing LobbyProvider\n");
+    return {};
+  }
+  return {.list = value->snapshot.lobby_games};
 }
 
 } // namespace client::ui

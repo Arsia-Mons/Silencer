@@ -1,0 +1,101 @@
+#include "client/ui/screens/lobby_screen.h"
+
+#include "client/ui/components/actions/actions.h"
+#include "client/ui/components/layout/layout.h"
+#include "client/ui/components/surfaces/surfaces.h"
+#include "client/ui/components/text/text.h"
+#include "client/ui/hooks/use_characters.h"
+#include "client/ui/hooks/use_games.h"
+#include "client/ui/hooks/use_lobby_chat.h"
+#include "client/ui/hooks/use_session.h"
+#include "ui/components/input.h"
+#include "ui/runtime/react.h"
+
+#include <functional>
+#include <string>
+
+namespace client::ui {
+namespace {
+
+using namespace silencer;
+using ::ui::children;
+using ::ui::components::Input;
+using ::ui::components::InputProps;
+
+struct LobbyScreenProps {
+  uint32_t unused = 0;
+};
+
+::ui::UiElement LobbyScreenView(const LobbyScreenProps &) {
+  Characters chars = use_characters();
+  LobbyChat chat = use_lobby_chat();
+  Games games = use_games();
+  Session session = use_session();
+  std::string *draft = use_state<std::string>(std::string());
+  if (!draft)
+    return ::ui::empty();
+
+  // Copy the dynamic panels into per-call-site scratch (children build after
+  // this returns, so a pointer into the transient hook models would dangle).
+  const char *agent = use_text_storage(
+      "%s", chars.selected_summary.empty() ? "Loading agent..."
+                                           : chars.selected_summary.c_str());
+  const char *scrollback = use_text_storage("%s", chat.scrollback.c_str());
+  const char *presence = use_text_storage("%s", chat.presence.c_str());
+  const char *game_list = use_text_storage("%s", games.list.c_str());
+
+  std::function<void(const std::string &)> set_draft =
+      [draft](const std::string &next) { *draft = next; };
+  std::function<void()> send = [send = chat.send, draft]() {
+    if (send && !draft->empty()) {
+      send(*draft);
+      draft->clear();
+    }
+  };
+  std::function<void(const ::ui::ActivationEvent &)> on_activate =
+      [send](const ::ui::ActivationEvent &) { send(); };
+
+  return <ScreenLayout key="root" variant={ScreenLayoutVariant::Game}>
+    <ScreenTitle key="title" variant={ScreenTitleVariant::Screen} value="Lobby" />
+    <ActionRow key="columns">
+      <Panel key="agent" variant={PanelVariant::Sunken}>
+        <ScreenTitle key="h" variant={ScreenTitleVariant::Dialog} value="Agent" />
+        <BodyText key="summary" variant={BodyTextVariant::Strong} value={agent} />
+        <AppButton
+          key="leave"
+          controlId="LeaveLobby"
+          label="Leave"
+          onPress={session.leave_to_menu}
+        />
+      </Panel>
+      <Panel key="chat" variant={PanelVariant::Sunken}>
+        <ScreenTitle key="h" variant={ScreenTitleVariant::Dialog} value="Chat" />
+        <BodyText key="log" variant={BodyTextVariant::Message} value={scrollback} />
+        <Input
+          key="draft"
+          id="ChatInput"
+          accessibility={{.label = "Chat"}}
+          value={draft->c_str()}
+          onChange={set_draft}
+          onActivate={on_activate}
+        />
+        <AppButton key="send" controlId="SendChat" label="Send" onPress={send} />
+      </Panel>
+      <Panel key="games" variant={PanelVariant::Sunken}>
+        <ScreenTitle key="hg" variant={ScreenTitleVariant::Dialog} value="Games" />
+        <BodyText key="list" variant={BodyTextVariant::Body} value={game_list} />
+        <ScreenTitle key="hp" variant={ScreenTitleVariant::Dialog} value="Online" />
+        <BodyText key="presence" variant={BodyTextVariant::Detail} value={presence} />
+      </Panel>
+    </ActionRow>
+  </ScreenLayout>
+}
+
+} // namespace
+
+::ui::UiElement LobbyScreen(const char *key) {
+  return ::ui::component("LobbyScreen", LobbyScreenProps{}, LobbyScreenView,
+                         key);
+}
+
+} // namespace client::ui

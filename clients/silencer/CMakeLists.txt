@@ -275,6 +275,10 @@ set(SILENCER_CPPX_SOURCES
 	# create → LOBBY (via the CREATECHARACTER tick reconcile).
 	src/client/ui/screens/character_create.cppx
 	src/client/ui/screens/character_create.hx
+	# LobbyScreen (SIL-21 2/n): the read cluster — agent + chat + presence +
+	# games panels (chat drained on the LOBBY tick; join/staging are 3/n).
+	src/client/ui/screens/lobby_screen.cppx
+	src/client/ui/screens/lobby_screen.hx
 )
 cppx_transpile(SILENCER_CPPX_GENERATED ${SILENCER_CPPX_SOURCES})
 target_sources(${SILENCER_TARGET} PRIVATE ${SILENCER_CPPX_GENERATED})

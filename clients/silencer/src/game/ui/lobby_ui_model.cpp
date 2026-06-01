@@ -63,6 +63,50 @@ void BuildProgression(client::ui::LobbySnapshot &snap, Lobby &lobby) {
   }
 }
 
+// Cap a joined display string to the screen's text-scratch buffer (keeps the
+// head — fine for name lists; the chat tail is capped separately).
+void CapHead(std::string &s, size_t cap = 180) {
+  if (s.size() > cap)
+    s.erase(cap);
+}
+
+// Build the lobby read panels (selected agent + presence + games). Lobby mutex
+// held by the caller. Chat is drained on the tick and joined separately.
+void BuildLobbyPanels(client::ui::LobbySnapshot &snap, Lobby &lobby) {
+  static const char *kAgency[5] = {"Noxis", "Lazarus", "Caliber", "Static",
+                                   "Black Rose"};
+  const Lobby::Character *ch = lobby.GetSelectedCharacter();
+  if (ch) {
+    char line[160];
+    User *user = lobby.GetUserInfo(lobby.accountid);
+    if (user && !user->retrieving && ch->agencyIdx < 5) {
+      const auto &ag = user->agency[ch->agencyIdx];
+      snprintf(line, sizeof(line), "%s\n%s  Level %u\n%u wins / %u losses",
+               ch->name, kAgency[ch->agencyIdx], (unsigned)ag.level,
+               (unsigned)ag.wins, (unsigned)ag.losses);
+    } else {
+      snprintf(line, sizeof(line), "%s", ch->name);
+    }
+    snap.lobby_agent = line;
+  }
+  for (auto &kv : lobby.presence) {
+    if (!snap.lobby_presence.empty())
+      snap.lobby_presence += "\n";
+    snap.lobby_presence += kv.second.name;
+  }
+  CapHead(snap.lobby_presence);
+  for (LobbyGame *g : lobby.games) {
+    if (!g)
+      continue;
+    if (!snap.lobby_games.empty())
+      snap.lobby_games += "\n";
+    snap.lobby_games += g->name;
+  }
+  CapHead(snap.lobby_games);
+  if (snap.lobby_games.empty())
+    snap.lobby_games = "No open games";
+}
+
 } // namespace
 
 client::ui::LobbySnapshot CaptureLobbySnapshot(Game &game,
@@ -72,7 +116,8 @@ client::ui::LobbySnapshot CaptureLobbySnapshot(Game &game,
   const bool connectPhase = (phase == P::Connecting);
   const bool postMatchPhase = (phase == P::PostMatch);
   const bool charCreatePhase = (phase == P::CharacterCreate);
-  if (!connectPhase && !postMatchPhase && !charCreatePhase)
+  const bool lobbyPhase = (phase == P::Lobby);
+  if (!connectPhase && !postMatchPhase && !charCreatePhase && !lobbyPhase)
     return snap;
 
   Lobby &lobby = game.GetWorld().lobby;
@@ -93,7 +138,24 @@ client::ui::LobbySnapshot CaptureLobbySnapshot(Game &game,
   }
   if (postMatchPhase)
     BuildProgression(snap, lobby);
+  if (lobbyPhase)
+    BuildLobbyPanels(snap, lobby);
   lobby.UnlockMutex();
+
+  // The lobby chat scrollback lives on the game-owned drain buffer (single
+  // thread), read outside the mutex; show the recent tail.
+  if (lobbyPhase) {
+    const std::vector<std::string> &chat = game.LobbyChatLog();
+    const int count = (int)chat.size();
+    const int start = std::max(0, count - kVisibleLogLines);
+    for (int i = start; i < count; ++i) {
+      if (!snap.lobby_chat.empty())
+        snap.lobby_chat += "\n";
+      snap.lobby_chat += chat[(size_t)i];
+    }
+    if (snap.lobby_chat.size() > kStatusLogCap)
+      snap.lobby_chat.erase(0, snap.lobby_chat.size() - kStatusLogCap);
+  }
 
   // The connect log lives on the game-owned flow (single-thread), not the lobby,
   // so it is read outside the mutex. Show the last lines, newline-joined.

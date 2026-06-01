@@ -145,4 +145,9 @@ done
 cli --port "$CTRL_PORT" click --label "Noxis" >/dev/null
 cli --port "$CTRL_PORT" wait_for_state --state LOBBY --timeout-ms 15000
 
+# The lobby renders the real read cluster (agent + chat + games panels), not the
+# old scaffold: its Send/Leave controls are present.
+wait_for_widget "Send"
+wait_for_widget "Leave"
+
 echo "PASS 30_lobby_login"

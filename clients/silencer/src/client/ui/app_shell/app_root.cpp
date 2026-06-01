@@ -3,6 +3,7 @@
 #include "client/ui/hooks/use_session.h"
 #include "client/ui/screens/character_create.h"
 #include "client/ui/screens/lobby_connect.h"
+#include "client/ui/screens/lobby_screen.h"
 #include "client/ui/screens/main_menu.h"
 #include "client/ui/screens/mission_summary.h"
 #include "client/ui/screens/update_screen.h"
@@ -64,7 +65,7 @@ bool AppRoot::build_element(::ui::UiElementFrame &, ::ui::UiElement *out) {
   case SessionPhase::CharacterCreate:
     return CharacterCreate("phase-character-create");
   case SessionPhase::Lobby:
-    return phase_scaffold({36, 72, 60, 255}, "phase-lobby");
+    return LobbyScreen("phase-lobby");
   case SessionPhase::Updating:
     return UpdateScreen("phase-updating");
   case SessionPhase::Loading:

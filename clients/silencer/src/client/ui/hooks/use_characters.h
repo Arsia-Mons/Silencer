@@ -17,6 +17,9 @@ namespace client::ui {
 struct Characters {
   std::vector<std::string> roster = {};
   bool received = false;
+  // The selected agent's name + a compact stat summary, for the lobby
+  // CharacterPanel (empty until the roster + user record arrive).
+  std::string selected_summary = {};
 
   std::function<void(const std::string &, int)> create = {}; // (alias, agency 0..4)
   std::function<void(int)> select = {};                       // existing, by roster index
