@@ -65,6 +65,12 @@ struct LobbyContextValue {
 
 const LobbyContextValue& UseLobby();
 
+struct LobbyFrameProps {
+	const char * key = nullptr;
+};
+
+::ui::UiElement LobbyFrame(const LobbyFrameProps& props);
+
 struct LobbyScreenViewProps {
 	const char * key = nullptr;
 	const LobbyContextValue * value = nullptr;

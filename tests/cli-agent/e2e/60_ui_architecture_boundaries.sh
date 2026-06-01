@@ -166,7 +166,8 @@ fail_if_match \
   "$REPO_ROOT/clients/silencer/src/client/ui/modals/password_modal_view.cppx" \
   "$REPO_ROOT/clients/silencer/src/client/ui/screens/lobby_connect/lobby_connect_view.cppx" \
   "$REPO_ROOT/clients/silencer/src/client/ui/screens/mission_summary/mission_summary_view.cppx" \
-  "$REPO_ROOT/clients/silencer/src/client/ui/screens/character_create/character_create_view.cppx"
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens/character_create/character_create_view.cppx" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens/lobby/lobby_view.cppx"
 
 fail_if_match \
   "Handle(TextInput|KeyPress|ScancodeDown|MousePress|MouseMove)|DispatchKeyPress|DispatchPreparedUiNavActions|UiNavActionToAscii|DispatchChatKey|HandleInGameMenuKey" \

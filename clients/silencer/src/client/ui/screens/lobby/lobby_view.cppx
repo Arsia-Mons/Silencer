@@ -31,10 +31,8 @@ using ::ui::components::TextProps;
 
 namespace {
 
-::ReactContext LobbyContext = {};
 constexpr int kVisibleChatLines = 8;
 constexpr int kVisiblePresenceLines = 7;
-const LobbyContextValue kEmptyContext = {};
 
 const char * kAgencyNames[] = {
 	"Noxis",
@@ -1011,34 +1009,14 @@ struct LobbyBodyProps {
 	</Box>
 }
 
-struct LobbyViewProps {
-	const char * key = nullptr;
-};
+}  // namespace
 
-::ui::UiElement LobbyView(const LobbyViewProps& props) {
+::ui::UiElement LobbyFrame(const LobbyFrameProps& props) {
 	(void)props;
 	return <Box key="root" layout={root_layout()} style={root_style()}>
 		<TitleBar key="title" />
 		<LobbyBody key="body" />
 	</Box>
-}
-
-}  // namespace
-
-const LobbyContextValue& UseLobby() {
-	const auto * value = static_cast<const LobbyContextValue *>(::use_context(&LobbyContext));
-	return value ? *value : kEmptyContext;
-}
-
-::ui::UiElement LobbyScreenView(const LobbyScreenViewProps& props) {
-	return ::ui::provider(
-		"LobbyProvider",
-		&LobbyContext,
-		const_cast<LobbyContextValue *>(props.value),
-		children({
-			::ui::component("LobbyView", LobbyViewProps{ .key = "view" }, LobbyView),
-		}),
-		props.key);
 }
 
 }  // namespace silencer::client_ui::lobby
