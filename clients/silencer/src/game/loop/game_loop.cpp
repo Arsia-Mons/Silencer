@@ -95,9 +95,6 @@ bool Game::Loop(void){
 					}
 				}
 				memcpy(gameInput.GetKeystate(), newkeystate, SDL_SCANCODE_COUNT * sizeof(Uint8));
-				for(int sc : pressedScancodes){
-					gameInput.QueueUiKeyboardInputForScancode(sc);
-				}
 			}
 			gameInput.UpdateInputState(world.localinput);
 			Input action;
@@ -146,10 +143,6 @@ bool Game::Loop(void){
 			}
 		} else {
 			gameInput.UpdateInputState(world.localinput);
-			UiInput().CaptureGamepadBindingEdges(
-				gameInput.GetGamepadState().buttons, gameInput.GetGamepadState().axes,
-				SDL_GAMEPAD_AXIS_COUNT, AXIS_DEADZONE);
-			gameInput.TickGamepadMenuNav();
 		}
 		world.SendInput();
 		if(!Tick()){
@@ -232,7 +225,6 @@ bool Game::Loop(void){
 		if(tui && gameRenderer.GetRenderDevice() && !gameRenderer.GetRenderDevice()->IsAlive()){
 			quitRequested = true;
 		}
-		gameUiPipeline.ResetUiFrameDeltas();
 		// SDL3GPUBackend's swapchain Present blocks on vsync (~16 ms) so the
 		// non-TUI loop self-throttles. TUIBackend writes to a TCP socket that
 		// never blocks the engine, so without an explicit cap the loop runs
@@ -253,11 +245,6 @@ bool Game::Loop(void){
 }
 
 bool Game::Tick(void){
-	gameUiPipeline.ClientUiRef().ClearScreensIfRequested(screenContext);
-	if(state != FADEOUT){
-		gameUiPipeline.ClientUiRef().TickVisibleScreens(screenContext);
-	}
-	gameUiPipeline.InGameUi().UpdateOverlayState(world.peers.localpeerid);
 	if(!world.dedicatedserver.active){
 		if(world.lobby.state == Lobby::AUTHENTICATED){
 			// 0 = main lobby, 1 = pregame (game-specific lobby, waiting for

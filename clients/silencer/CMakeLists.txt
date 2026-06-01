@@ -114,32 +114,20 @@ if(SILENCER_UNITY_BUILD)
 		file(GLOB_RECURSE _mm_sources src/*.mm)
 		set_source_files_properties(${_mm_sources} PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON)
 	endif()
-	# The Clay primitives and the lobby panels each use an anonymous
-	# namespace with a shared vocabulary (`g_payloads`, `g_customData`,
-	# `kPayloadCapacity`, `AllocCustomData`, `FromStd`, `kScrollbarBank`,
-	# `OnCreateClicked`, …). Anonymous namespaces re-open in the same
-	# translation unit, so concatenating two of these into one jumbo TU
-	# produces redefinition errors on every shared symbol — and the
-	# panel files also bring `TextInput` / `Box` / etc. into the global
-	# namespace via `using`, which trips sibling screen TUs in the same
-	# batch (e.g. lobby_connect_screen.cpp's `TextInput * passwordinput`
-	# becomes ambiguous). Until the per-file arenas + `using` decls are
-	# refactored into uniquely-scoped storage, build these as individual
-	# TUs.
-	file(GLOB _clay_unsafe_sources
-		src/ui/primitives/*.cpp
+	# The vendored retained cppx engine (ui/runtime, ui/style, render/cppx_ui)
+	# and the app-shell (client/ui: app_theme, app_shell, providers) use
+	# anonymous namespaces + file-local `using` decls that are not jumbo-safe —
+	# concatenating two into one TU collides on shared symbols. Build them as
+	# individual TUs (exclude from unity batches).
+	file(GLOB _unity_excluded_sources
 		src/ui/runtime/*.cpp
 		src/ui/style/*.cpp
 		src/render/cppx_ui/*.cpp
-		src/render/clay_ui_tests/*.cpp
-		src/client/ui/screens/character_create/*.cpp
-		src/client/ui/screens/lobby/*.cpp
-		# SIL-13 vendored cppx app-shell (client::ui) — unity-exclude like the
-		# rest of the vendored cppx engine.
+		src/client/ui/*.cpp
 		src/client/ui/app_shell/*.cpp
 		src/client/ui/app_shell/navigation/*.cpp
 		src/client/ui/providers/*.cpp)
-	set_source_files_properties(${_clay_unsafe_sources} PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON)
+	set_source_files_properties(${_unity_excluded_sources} PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON)
 endif()
 
 # Compile HLSL → DXIL bytecode headers for the SDL3 GPU backend. macOS keeps
@@ -188,15 +176,6 @@ target_include_directories(${SILENCER_TARGET} PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}/src/ui"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/ui/runtime"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/client/ui"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/client/ui/modals"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/client/ui/screens"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/client/ui/screens/main_menu"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/client/ui/screens/character_create"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/client/ui/screens/options"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/client/ui/screens/lobby_connect"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/client/ui/screens/update"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/client/ui/screens/lobby"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/client/ui/screens/mission_summary"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/net"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/game"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/game/modes"

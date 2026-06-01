@@ -70,17 +70,22 @@ if rg -n "SDL_EVENT_KEY_DOWN|SDL_EVENT_KEY_UP|SDL_KEYDOWN|SDL_KEYUP|SDL_PollEven
   exit 1
 fi
 
+# SIL-15/22: the legacy Clay UI layer is deleted. Lock the paths out…
+fail_if_path_exists "clients/silencer/third_party/clay"
+fail_if_path_exists "clients/silencer/src/render/clay_ui_compositor.cpp"
+fail_if_path_exists "clients/silencer/src/render/clay_ui_payloads.h"
+fail_if_path_exists "clients/silencer/src/render/clay_ui_tests"
+fail_if_path_exists "clients/silencer/src/ui/runtime/ClayService.h"
+fail_if_path_exists "clients/silencer/src/ui/primitives"
+fail_if_path_exists "clients/silencer/src/client/ui/ClientUi.h"
+fail_if_path_exists "clients/silencer/src/client/ui/screens/screen_context.h"
+fail_if_path_exists "clients/silencer/src/client/ui/modals"
+fail_if_path_exists "clients/silencer/src/client/ui/hud"
+# …and lock the Clay/ScreenContext vocabulary out of all source (incl. docs).
 fail_if_match \
-  "Clay_(BeginLayout|EndLayout|SetPointerState)[[:space:]]*\\(" \
-  "$REPO_ROOT/clients/silencer/src/client/ui/screens" \
-  "$REPO_ROOT/clients/silencer/src/client/ui/modals" \
-  "$REPO_ROOT/clients/silencer/src/client/ui/hud"
-
-fail_if_match \
-  "clay_bridge::(EnsureInitialized|Render)[[:space:]]*\\(" \
-  "$REPO_ROOT/clients/silencer/src/client/ui/screens" \
-  "$REPO_ROOT/clients/silencer/src/client/ui/modals" \
-  "$REPO_ROOT/clients/silencer/src/client/ui/hud"
+  "Clay_[A-Za-z]|ClayService|clay_bridge|clay_ui_compositor|CLAY[[:space:]]*\\(|\\bScreenContext\\b|UiInteractionRegistry" \
+  "$REPO_ROOT/clients/silencer/src" \
+  --glob '!third_party/**'
 
 fail_if_match \
   "Draw[A-Za-z0-9_]*Clay|BuildInGameHudUi|BuildInGameOverlaysUi|client/ui/hud|Clay_BeginLayout|Clay_EndLayout|Clay_SetPointerState|clay_bridge" \
@@ -90,7 +95,6 @@ fail_if_match \
 fail_if_match \
   "CLAY_TEXT|[.]font(Id|Size)|fontBank|fontWidth|BankText|bank_text|TextCellWidthFor|TextHeightForBank|MeasureBankText|Renderer::DrawText|\\bDrawText[[:space:]]*\\(" \
   "$REPO_ROOT/clients/silencer/src/client/ui" \
-  "$REPO_ROOT/clients/silencer/src/ui/primitives" \
   --glob '!**/text.cpp' \
   --glob '!**/text_internal.h'
 
@@ -117,13 +121,11 @@ fail_if_match \
 fail_if_match \
   "rawKeyDownCodes|CaptureRawKeyDown|BuildUiInputState|QueueUiTextInput|QueueUiNavAction|AddUiRawKeyDown|AddUiWheelDelta|QueueUiPointerWindowEvent|DispatchInGameUiActions|ConfigureInGameUiForControl" \
   "$REPO_ROOT/clients/silencer/src" \
-  "$REPO_ROOT/tests/ui_architecture_test.cpp" \
   --glob '!third_party/**'
 
 fail_if_match \
   "UiAutomation|ActiveUiInteractionRegistry|automation::" \
   "$REPO_ROOT/clients/silencer/src" \
-  "$REPO_ROOT/tests/ui_architecture_test.cpp" \
   --glob '!third_party/**'
 
 fail_if_match \
@@ -133,11 +135,8 @@ fail_if_match \
 fail_if_match \
   "\\bonClick\\b|\\bonClickRow\\b|\\bonEnter\\b|clickUser|enterUser|rowIndex|textBuffer|textBufferLen|DispatchAction|DispatchActions|DispatchUiActions|QueueClick|QueueRowSelect|QueueTextEnter|Notify[A-Za-z]*Clicked" \
   "$REPO_ROOT/clients/silencer/src/ui/runtime" \
-  "$REPO_ROOT/clients/silencer/src/ui/primitives" \
   "$REPO_ROOT/clients/silencer/src/client/ui" \
   "$REPO_ROOT/clients/silencer/src/net/controldispatch.cpp" \
-  "$REPO_ROOT/clients/silencer/src/render/clay_ui_tests" \
-  "$REPO_ROOT/tests/ui_architecture_test.cpp" \
   --glob '!third_party/**'
 
 echo "PASS 60_ui_architecture_boundaries"

@@ -1,6 +1,10 @@
 # All test sources aggregate into one binary: keeps link+run simple,
 # doctest handles discovery via its built-in main().
 # doctest v2.4.11 vendored verbatim from https://github.com/doctest/doctest
+# SIL-15/22: the legacy Clay UI unit tests (ui_architecture_test) + their Clay
+# source deps were removed with the Clay layer. The retained cppx engine is
+# covered by the CTest targets in clients/silencer/CMakeLists.txt
+# (client_ui_tests / ui_pipeline_tests / pipeline_host_tests / etc.).
 set(TEST_SRC
     smoke_test.cpp
     updater_sha256_test.cpp
@@ -8,24 +12,6 @@ set(TEST_SRC
     updater_zip_test.cpp
     updater_sm_test.cpp
     control_widget_test.cpp
-    ui_architecture_test.cpp
-    ${CMAKE_SOURCE_DIR}/src/ui/runtime/clay_init.cpp
-    ${CMAKE_SOURCE_DIR}/src/ui/runtime/ClayService.cpp
-    ${CMAKE_SOURCE_DIR}/src/ui/runtime/UiInteractionRegistry.cpp
-    ${CMAKE_SOURCE_DIR}/src/ui/runtime/UiFrameContext.cpp
-    ${CMAKE_SOURCE_DIR}/src/ui/runtime/UiInputRouter.cpp
-    ${CMAKE_SOURCE_DIR}/src/ui/runtime/UiTextPolicy.cpp
-    ${CMAKE_SOURCE_DIR}/src/ui/primitives/button.cpp
-    ${CMAKE_SOURCE_DIR}/src/ui/primitives/text.cpp
-    ${CMAKE_SOURCE_DIR}/src/ui/primitives/box.cpp
-    ${CMAKE_SOURCE_DIR}/src/ui/primitives/scroll_list.cpp
-    ${CMAKE_SOURCE_DIR}/src/ui/primitives/scroll_text_box.cpp
-    ${CMAKE_SOURCE_DIR}/src/ui/primitives/text_input.cpp
-    ${CMAKE_SOURCE_DIR}/src/ui/primitives/toggle.cpp
-    ${CMAKE_SOURCE_DIR}/src/client/ui/ClientUi.cpp
-    ${CMAKE_SOURCE_DIR}/src/client/ui/ClientUiInput.cpp
-    ${CMAKE_SOURCE_DIR}/src/client/ui/hud/HudPayloadArena.cpp
-    ${CMAKE_SOURCE_DIR}/src/client/ui/navigation/ScreenStack.cpp
     ${CMAKE_SOURCE_DIR}/src/updater/updatersha256.cpp
     ${CMAKE_SOURCE_DIR}/src/updater/updaterdownload.cpp
     ${CMAKE_SOURCE_DIR}/src/updater/updaterzip.cpp

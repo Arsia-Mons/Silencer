@@ -6,15 +6,7 @@
 #include "gasloader.h"
 #include "os.h"
 #include "shared.h"
-#include "clay_ui_tests/clay_ui_checks.h"
-#include "runtime/UiInteractionRegistry.h"
-#include "screen.h"
-#include "password_modal.h"
 #include <SDL3/SDL_keyboard.h>
-#ifdef SILENCER_HAVE_LOBBY_UI
-#include "lobby_screen.h"
-#endif
-#include "screen_context.h"
 #include <cstring>
 #include <cstdio>
 #include <fstream>
@@ -30,8 +22,13 @@
 namespace ControlDispatch {
 
 namespace {
-std::string g_controlPasswordModalValue;
-bool g_controlPasswordModalSubmitted = false;
+// UI-introspection/automation ops were bound to the deleted legacy
+// immediate-mode UI layer (its registry/screen-stack/screen-context bag). The
+// live UI is now the golden cppx path, which has no introspection surface yet.
+// These ops return a structured UNSUPPORTED error until cppx screens land
+// (SIL-18+).
+const char * const kUiUnsupportedMsg =
+	"UI introspection unavailable on cppx path (pending SIL-18+ screens)";
 }
 
 ControlCommand::Phase PhaseFor(const std::string& op) {
@@ -49,19 +46,6 @@ static ControlReply OkResult(int id, nlohmann::json r){
 	return rpl;
 }
 
-static bool StateNeedsScreen(const std::string& state){
-	return state == "MAINMENU" ||
-	       state == "LOBBYCONNECT" ||
-	       state == "LOBBY" ||
-	       state == "CREATECHARACTER" ||
-	       state == "UPDATING" ||
-	       state == "MISSIONSUMMARY" ||
-	       state == "OPTIONS" ||
-	       state == "OPTIONSCONTROLS" ||
-	       state == "OPTIONSDISPLAY" ||
-	       state == "OPTIONSAUDIO";
-}
-
 static ControlReply Err(int id, const char* code, const std::string& msg){
 	ControlReply rpl;
 	rpl.id = id;
@@ -69,79 +53,6 @@ static ControlReply Err(int id, const char* code, const std::string& msg){
 	rpl.code = code;
 	rpl.error = msg;
 	return rpl;
-}
-
-static const char * ModeName(silencer::client_ui::InGameUiControlMode mode){
-	using Mode = silencer::client_ui::InGameUiControlMode;
-	switch(mode){
-		case Mode::Clear: return "clear";
-		case Mode::Status: return "status";
-		case Mode::Chat: return "chat";
-		case Mode::Buy: return "buy";
-		case Mode::Tech: return "tech";
-		case Mode::PlayerList: return "playerlist";
-		case Mode::All: return "all";
-	}
-	return "status";
-}
-
-static bool ParseMode(
-	const std::string& value,
-	silencer::client_ui::InGameUiControlMode& mode){
-	using Mode = silencer::client_ui::InGameUiControlMode;
-	if(value == "clear"){
-		mode = Mode::Clear;
-		return true;
-	}
-	if(value == "status"){
-		mode = Mode::Status;
-		return true;
-	}
-	if(value == "chat"){
-		mode = Mode::Chat;
-		return true;
-	}
-	if(value == "buy"){
-		mode = Mode::Buy;
-		return true;
-	}
-	if(value == "tech"){
-		mode = Mode::Tech;
-		return true;
-	}
-	if(value == "playerlist"){
-		mode = Mode::PlayerList;
-		return true;
-	}
-	if(value == "all"){
-		mode = Mode::All;
-		return true;
-	}
-	return false;
-}
-
-static nlohmann::json InGameUiControlResultToJson(
-	const silencer::client_ui::InGameUiControlResult& result){
-	nlohmann::json r;
-	r["mode"] = ModeName(result.mode);
-	r["ok"] = result.available;
-	if(!result.available){
-		if(!result.error.empty()) r["error"] = result.error;
-		return r;
-	}
-	if(result.mode == silencer::client_ui::InGameUiControlMode::Clear){
-		return r;
-	}
-	r["chat_active"] = result.chatActive;
-	r["buy_active"] = result.buyActive;
-	r["tech_active"] = result.techActive;
-	r["show_chat_ticks"] = result.showChatTicks;
-	r["show_player_list"] = result.showPlayerList;
-	r["buy_item_count"] = result.buyItemCount;
-	r["tech_item_count"] = result.techItemCount;
-	r["buy_selected_index"] = result.buySelectedIndex;
-	r["tech_selected_index"] = result.techSelectedIndex;
-	return r;
 }
 
 static nlohmann::json WorldSummaryToJson(const WorldSummary& summary){
@@ -190,108 +101,6 @@ static nlohmann::json WorldSummaryToJson(const WorldSummary& summary){
 	return r;
 }
 
-static const silencer::ui::UiInteractable * FindInteractableTarget(
-	const silencer::ui::UiInteractionRegistry& interactions,
-	const std::string & target){
-	const silencer::ui::UiInteractable * hit = nullptr;
-	int count = 0;
-	for(const auto & candidate : interactions.Interactables()){
-		bool matches = candidate.id == target;
-		if(!matches) matches =
-			silencer::ui::UiInteractableMatchesLabel(candidate, target.c_str());
-		if(!matches && candidate.uid >= 0) matches = std::to_string(candidate.uid) == target;
-		if(matches){
-			hit = &candidate;
-			count++;
-		}
-	}
-	return count == 1 ? hit : nullptr;
-}
-
-static bool PointInInteractable(const silencer::ui::UiInteractable& widget, int x, int y){
-	return x >= widget.x && y >= widget.y
-	    && x < widget.x + widget.w && y < widget.y + widget.h;
-}
-
-static const silencer::ui::UiInteractable * FindInteractableAt(
-	const silencer::ui::UiInteractionRegistry& interactions,
-	int x,
-	int y){
-	const auto & widgets = interactions.Interactables();
-	for(auto it = widgets.rbegin(); it != widgets.rend(); ++it){
-		if(silencer::ui::UiInteractableIsInteractive(*it) &&
-		   PointInInteractable(*it, x, y)) return &*it;
-	}
-	return nullptr;
-}
-
-static void QueueInteractableAction(Game& game,
-                                    const silencer::ui::UiInteractable& widget,
-                                    silencer::ui::UiActionKind kind,
-                                    const std::string & value = std::string(),
-                                    int amount = 0){
-	silencer::ui::UiAction action;
-	action.kind = kind;
-	action.id = !widget.id.empty()
-		? widget.id
-		: (silencer::ui::UiInteractableLabel(widget)
-			? std::string(silencer::ui::UiInteractableLabel(widget))
-			: std::string());
-	action.value = value;
-	action.index = widget.index;
-	action.amount = amount;
-	game.UiInput().QueueControlAction(std::move(action));
-}
-
-static bool QueueControlKey(Game& game, int ascii){
-	switch(ascii){
-		case 1:
-			game.UiInput().QueueBindingKeyDown(SDL_SCANCODE_LEFT);
-			game.UiInput().QueueNavAction(silencer::ui::UiNavAction::Left);
-			return true;
-		case 2:
-			game.UiInput().QueueBindingKeyDown(SDL_SCANCODE_RIGHT);
-			game.UiInput().QueueNavAction(silencer::ui::UiNavAction::Right);
-			return true;
-		case 3:
-			game.UiInput().QueueBindingKeyDown(SDL_SCANCODE_UP);
-			game.UiInput().QueueNavAction(silencer::ui::UiNavAction::Up);
-			return true;
-		case 4:
-			game.UiInput().QueueBindingKeyDown(SDL_SCANCODE_DOWN);
-			game.UiInput().QueueNavAction(silencer::ui::UiNavAction::Down);
-			return true;
-		case '\t':
-			game.UiInput().QueueBindingKeyDown(SDL_SCANCODE_TAB);
-			game.UiInput().QueueNavAction(silencer::ui::UiNavAction::FocusNext);
-			return true;
-		case '\n':
-			game.UiInput().QueueBindingKeyDown(SDL_SCANCODE_RETURN);
-			game.UiInput().QueueNavAction(silencer::ui::UiNavAction::Confirm);
-			return true;
-		case 0x1B:
-			game.UiInput().QueueBindingKeyDown(SDL_SCANCODE_ESCAPE);
-			game.UiInput().QueueNavAction(silencer::ui::UiNavAction::Cancel);
-			return true;
-		case '\b':
-			game.UiInput().QueueBindingKeyDown(SDL_SCANCODE_BACKSPACE);
-			game.UiInput().QueueNavAction(silencer::ui::UiNavAction::Backspace);
-			return true;
-		default:
-			if(ascii >= 0x20 && ascii <= 0x7E){
-				SDL_Keymod mod = SDL_KMOD_NONE;
-				SDL_Scancode scancode =
-					SDL_GetScancodeFromKey(static_cast<SDL_Keycode>(ascii), &mod);
-				if(scancode != SDL_SCANCODE_UNKNOWN){
-					game.UiInput().QueueBindingKeyDown(scancode);
-				}
-				game.UiInput().QueueTextInput(static_cast<char>(ascii));
-				return true;
-			}
-			return false;
-	}
-}
-
 // Forward decl for the keybind sub-dispatcher implemented at the bottom of
 // this file. Lives in the same TU because it only ever reads/mutates Game's
 // KeyMap and Config; no other consumers.
@@ -326,126 +135,12 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 		cmd.reply->set_value(OkResult(cmd.id, r));
 		return;
 	}
-	if(cmd.op == "clay_button_check"){
-		silencer::clay_bridge::ButtonCheckResult res{};
-		bool ok = silencer::clay_bridge::RunButtonCheck(game, res);
-		if(!ok){
-			cmd.reply->set_value(Err(cmd.id, "INTERNAL",
-				"button check failed"));
-			return;
-		}
-		nlohmann::json r;
-		r["clicks_fired_on_press"] = res.clicksFiredOnPress;
-		r["clicks_fired_when_held"] = res.clicksFiredWhenHeld;
-		r["chrome_brightness_hover"] = res.chromeBrightnessHover;
-		r["chrome_brightness_idle"] = res.chromeBrightnessIdle;
-		r["chrome_sprite_index_hover"] = res.chromeSpriteIndexHover;
-		r["oval_hover_sprite_indices"] = nlohmann::json::array();
-		r["oval_hover_brightness"] = nlohmann::json::array();
-		r["oval_unhover_sprite_indices"] = nlohmann::json::array();
-		r["oval_unhover_brightness"] = nlohmann::json::array();
-		for(int i = 0; i < 5; ++i){
-			r["oval_hover_sprite_indices"].push_back(res.ovalHoverSpriteIndices[i]);
-			r["oval_hover_brightness"].push_back(res.ovalHoverBrightness[i]);
-			r["oval_unhover_sprite_indices"].push_back(res.ovalUnhoverSpriteIndices[i]);
-			r["oval_unhover_brightness"].push_back(res.ovalUnhoverBrightness[i]);
-		}
-		r["oval_focus_sprite_index"] = res.ovalFocusSpriteIndex;
-		r["oval_focus_brightness"] = res.ovalFocusBrightness;
-		r["oval_wall_clock_partial_sprite_index"] = res.ovalWallClockPartialSpriteIndex;
-		r["oval_wall_clock_partial_brightness"] = res.ovalWallClockPartialBrightness;
-		r["oval_wall_clock_next_sprite_index"] = res.ovalWallClockNextSpriteIndex;
-		r["oval_wall_clock_next_brightness"] = res.ovalWallClockNextBrightness;
-		r["legacy_selected_suppressed_sprite_index"] =
-			res.legacySelectedSuppressedSpriteIndex;
-		r["legacy_selected_suppressed_brightness"] =
-			res.legacySelectedSuppressedBrightness;
-		r["legacy_selected_suppressed_metadata"] =
-			res.legacySelectedSuppressedMetadata;
-		r["compact_width"] = res.compactWidth;
-		r["compact_height"] = res.compactHeight;
-		r["chrome_auto_width"] = res.chromeAutoWidth;
-		r["chrome_auto_height"] = res.chromeAutoHeight;
-		r["text_compact_width"] = res.textCompactWidth;
-		r["text_compact_height"] = res.textCompactHeight;
-		r["text_compact_text_x_offset"] = res.textCompactTextXOffset;
-		r["text_compact_text_width"] = res.textCompactTextWidth;
-		r["text_compact_text_y_offset"] = res.textCompactTextYOffset;
-		r["auto_short_width"] = res.autoShortWidth;
-		r["auto_long_width"] = res.autoLongWidth;
-		r["auto_multiline_height"] = res.autoMultilineHeight;
-		cmd.reply->set_value(OkResult(cmd.id, r));
-		return;
-	}
-	if(cmd.op == "clay_toggle_check"){
-		silencer::clay_bridge::ToggleCheckResult res{};
-		bool ok = silencer::clay_bridge::RunToggleCheck(game, res);
-		if(!ok){
-			cmd.reply->set_value(Err(cmd.id, "INTERNAL",
-				"toggle check failed"));
-			return;
-		}
-		nlohmann::json r;
-		r["clicks_toggle_0"] = res.clicksToggle0;
-		r["clicks_toggle_1"] = res.clicksToggle1;
-		r["clicks_toggle_2"] = res.clicksToggle2;
-		r["selected_brightness"] = res.selectedBrightness;
-		r["unselected_brightness"] = res.unselectedBrightness;
-		cmd.reply->set_value(OkResult(cmd.id, r));
-		return;
-	}
-	if(cmd.op == "clay_scroll_list_check"){
-		silencer::clay_bridge::ScrollListCheckResult res{};
-		bool ok = silencer::clay_bridge::RunScrollListCheck(game, res);
-		if(!ok){
-			cmd.reply->set_value(Err(cmd.id, "INTERNAL",
-				"scroll_list check failed"));
-			return;
-		}
-		nlohmann::json r;
-		r["select_actions"] = res.selectActions;
-		r["last_selected_index"] = res.lastSelectedIndex;
-		r["no_overflow_scrollbar_count"] = res.noOverflowScrollbarCount;
-		r["overflow_scrollbar_count"] = res.overflowScrollbarCount;
-		r["overflow_scrollbar_bbox_x"] = res.overflowScrollbarBboxX;
-		r["overflow_scrollbar_bbox_y"] = res.overflowScrollbarBboxY;
-		r["overflow_scrollbar_bbox_w"] = res.overflowScrollbarBboxW;
-		r["overflow_scrollbar_bbox_h"] = res.overflowScrollbarBboxH;
-		cmd.reply->set_value(OkResult(cmd.id, r));
-		return;
-	}
-	if(cmd.op == "clay_scroll_text_box_check"){
-		silencer::clay_bridge::ScrollTextBoxCheckResult res{};
-		bool ok = silencer::clay_bridge::RunScrollTextBoxCheck(game, res);
-		if(!ok){
-			cmd.reply->set_value(Err(cmd.id, "INTERNAL",
-				"scroll_text_box check failed"));
-			return;
-		}
-		nlohmann::json r;
-		r["at_bottom_prev_pos"] = res.atBottom_prevPos;
-		r["not_at_bottom_prev_pos"] = res.notAtBottom_prevPos;
-		r["at_bottom_overflow_prev_pos"] = res.atBottomOverflow_prevPos;
-		cmd.reply->set_value(OkResult(cmd.id, r));
-		return;
-	}
-	if(cmd.op == "clay_text_input_check"){
-		silencer::clay_bridge::TextInputCheckResult res{};
-		bool ok = silencer::clay_bridge::RunTextInputCheck(game, res);
-		if(!ok){
-			cmd.reply->set_value(Err(cmd.id, "INTERNAL",
-				"text_input check failed"));
-			return;
-		}
-		nlohmann::json r;
-		r["submit_actions_for_enter"] = res.submitActionsForEnter;
-		r["submit_actions_for_text"] = res.submitActionsForText;
-		r["password_mask_applied_len"] = res.passwordMaskAppliedLen;
-		r["overflow_tail_applied_len"] = res.overflowTailAppliedLen;
-		r["overflow_tail_matches"] = res.overflowTailMatches;
-		r["body14_top_margin"] = res.body14TopMargin;
-		r["body14_bottom_margin"] = res.body14BottomMargin;
-		cmd.reply->set_value(OkResult(cmd.id, r));
+	if(cmd.op == "clay_button_check" ||
+	   cmd.op == "clay_toggle_check" ||
+	   cmd.op == "clay_scroll_list_check" ||
+	   cmd.op == "clay_scroll_text_box_check" ||
+	   cmd.op == "clay_text_input_check"){
+		cmd.reply->set_value(Err(cmd.id, "UNSUPPORTED", kUiUnsupportedMsg));
 		return;
 	}
 	if(cmd.op == "state"){
@@ -453,9 +148,6 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 		r["state"] = Game::StateName(game.GetState());
 		r["frame"] = game.GetFrameCount();
 		r["paused"] = game.paused;
-		r["ui_width"] = game.CurrentUiInput().width;
-		r["ui_height"] = game.CurrentUiInput().height;
-		r["ui_scale"] = game.CurrentUiInput().uiScale;
 		// Expose the lobby connection sub-state so test scripts can wait for
 		// AUTHENTICATING before dispatching a Login/Create click — the LobbyConnect
 		// state machine progresses asynchronously through Connect/version
@@ -476,377 +168,28 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 		return;
 	}
 	if(cmd.op == "inspect"){
-		nlohmann::json widgets = nlohmann::json::array();
-		for(const auto & cw : game.UiInteractions().Interactables()){
-			nlohmann::json w;
-			w["source"] = "clay";
-			if(!cw.id.empty()) w["id"] = cw.id;
-			const auto * el = cw.id.empty()
-				? nullptr
-				: game.UiInteractions().FindById(cw.id);
-			w["focused"] = el ? el->focused : false;
-			w["enabled"] = !cw.inactive;
-			w["x"] = cw.x; w["y"] = cw.y;
-			w["w"] = cw.w; w["h"] = cw.h;
-			if(silencer::ui::UiInteractableLabel(cw))
-				w["label"] = silencer::ui::UiInteractableLabel(cw);
-			if(cw.uid >= 0) w["uid"] = cw.uid;
-			using K = silencer::ui::UiInteractableKind;
-			switch(cw.kind){
-				case K::Button:
-					w["kind"] = "button";
-					w["selected"] = cw.selected;
-					break;
-				case K::Toggle:
-					w["kind"] = "toggle";
-					w["selected"] = cw.selected;
-					break;
-				case K::TextInput:
-					w["kind"] = "textinput";
-					w["password"] = cw.isPassword;
-					w["text"] = cw.isPassword
-						? std::string(cw.value.size(), '*')
-						: cw.value;
-					w["maxchars"] = cw.maxLength;
-					break;
-				case K::ListRow:
-					w["kind"] = "listrow";
-					w["row_index"] = cw.index;
-					w["selected"] = cw.selected;
-					break;
-			}
-			widgets.push_back(std::move(w));
-		}
-		nlohmann::json elements = nlohmann::json::array();
-		for(const auto & element : game.UiInteractions().Elements()){
-			if(!element.id.empty() &&
-			   game.UiInteractions().FindInteractableById(element.id)){
-				continue;
-			}
-			nlohmann::json e;
-			e["source"] = "clay";
-			if(!element.id.empty()) e["id"] = element.id;
-			if(!element.label.empty()) e["label"] = element.label;
-			if(!element.value.empty()) e["value"] = element.value;
-			e["x"] = element.bounds.x;
-			e["y"] = element.bounds.y;
-			e["w"] = element.bounds.width;
-			e["h"] = element.bounds.height;
-			e["enabled"] = element.enabled;
-			e["focused"] = element.focused;
-			e["selected"] = element.selected;
-			using EK = silencer::ui::UiElementKind;
-			switch(element.kind){
-				case EK::Container: e["kind"] = "container"; break;
-				case EK::Button: e["kind"] = "button"; break;
-				case EK::Text: e["kind"] = "text"; break;
-				case EK::TextField: e["kind"] = "textfield"; break;
-				case EK::ListItem: e["kind"] = "listitem"; break;
-				case EK::Tab: e["kind"] = "tab"; break;
-				case EK::Slider: e["kind"] = "slider"; break;
-				case EK::Progress: e["kind"] = "progress"; break;
-			}
-			elements.push_back(std::move(e));
-		}
-		if(widgets.empty() && elements.empty()){
-			cmd.reply->set_value(Err(cmd.id, "WRONG_STATE", "no clay widgets"));
-			return;
-		}
-		nlohmann::json r;
-		r["widgets"] = widgets;
-		r["elements"] = elements;
-		r["interface_id"] = 0;
-		cmd.reply->set_value(OkResult(cmd.id, r));
+		cmd.reply->set_value(Err(cmd.id, "UNSUPPORTED", kUiUnsupportedMsg));
 		return;
 	}
 	if(cmd.op == "world_state"){
 		cmd.reply->set_value(OkResult(cmd.id, WorldSummaryToJson(game.GetWorldSummary())));
 		return;
 	}
-	if(cmd.op == "show_password_modal"){
-		g_controlPasswordModalValue.clear();
-		g_controlPasswordModalSubmitted = false;
-		game.PushScreen(std::make_unique<PasswordModal>([](const char * password) {
-			g_controlPasswordModalValue = password ? password : "";
-			g_controlPasswordModalSubmitted = true;
-		}));
-		cmd.reply->set_value(OkResult(cmd.id, nlohmann::json::object()));
-		return;
-	}
-	if(cmd.op == "password_modal_result"){
-		nlohmann::json r;
-		r["submitted"] = g_controlPasswordModalSubmitted;
-		r["value"] = g_controlPasswordModalValue;
-		cmd.reply->set_value(OkResult(cmd.id, r));
+	if(cmd.op == "show_password_modal" || cmd.op == "password_modal_result"){
+		cmd.reply->set_value(Err(cmd.id, "UNSUPPORTED", kUiUnsupportedMsg));
 		return;
 	}
 	if(cmd.op == "ingame_ui_mode"){
-		std::string mode = cmd.args.value("mode", std::string());
-		silencer::client_ui::InGameUiControlMode controlMode;
-		if(mode.empty() || !ParseMode(mode, controlMode)){
-			cmd.reply->set_value(Err(cmd.id, "BAD_REQUEST",
-				"ingame_ui_mode needs --mode clear|status|chat|buy|tech|playerlist|all"));
-			return;
-		}
-		silencer::client_ui::InGameUiControlResult result =
-			game.InGameUi().ConfigureForControl(controlMode);
-		if(!result.available){
-			cmd.reply->set_value(Err(cmd.id, "WRONG_STATE",
-				result.error.empty()
-					? std::string("in-game UI mode unavailable")
-					: result.error));
-			return;
-		}
-		using Mode = silencer::client_ui::InGameUiControlMode;
-		if((controlMode == Mode::Chat || controlMode == Mode::All) &&
-		   cmd.args.contains("chat_line")){
-			std::string chatLine = cmd.args.value("chat_line", std::string());
-			if(!chatLine.empty()){
-				auto& chatlines = game.GetWorld().messaging.chatlines;
-				chatlines.push_back(chatLine);
-				while((int)chatlines.size() > GASLoader::Get().gameengine.chatMaxLines){
-					chatlines.pop_front();
-				}
-			}
-		}
-		cmd.reply->set_value(OkResult(cmd.id, InGameUiControlResultToJson(result)));
+		cmd.reply->set_value(Err(cmd.id, "UNSUPPORTED", kUiUnsupportedMsg));
 		return;
 	}
-	if(cmd.op == "click"){
-		std::string target;
-		if(cmd.args.contains("label")) target = cmd.args["label"].get<std::string>();
-		else if(cmd.args.contains("id")) target = std::to_string(cmd.args["id"].get<int>());
-		if(target.empty()){
-			cmd.reply->set_value(Err(cmd.id, "BAD_REQUEST", "click needs label or id"));
-			return;
-		}
-		const auto * cw = FindInteractableTarget(game.UiInteractions(), target);
-		if(cw){
-			using K = silencer::ui::UiInteractableKind;
-			if(cw->kind == K::Button || cw->kind == K::Toggle){
-				const char * label = silencer::ui::UiInteractableLabel(*cw);
-				QueueInteractableAction(game, *cw, silencer::ui::UiActionKind::Activate,
-				                  label ? label : "");
-				nlohmann::json r;
-				r["source"] = "clay";
-				cmd.reply->set_value(OkResult(cmd.id, r));
-				return;
-			}
-			if(cw->kind == K::ListRow){
-				const char * label = silencer::ui::UiInteractableLabel(*cw);
-				QueueInteractableAction(game, *cw, silencer::ui::UiActionKind::Select,
-				                  label ? label : "");
-				nlohmann::json r;
-				r["source"] = "clay";
-				r["row_index"] = cw->index;
-				cmd.reply->set_value(OkResult(cmd.id, r));
-				return;
-			}
-			cmd.reply->set_value(Err(cmd.id, "WRONG_TYPE",
-				"clay widget \"" + target + "\" is not clickable"));
-			return;
-		}
-		cmd.reply->set_value(Err(cmd.id, "WIDGET_NOT_FOUND",
-			"no widget matches \"" + target + "\""));
-		return;
-	}
-	if(cmd.op == "click_at"){
-		if(!cmd.args.contains("x") || !cmd.args.contains("y")){
-			cmd.reply->set_value(Err(cmd.id, "BAD_REQUEST", "click_at needs x and y"));
-			return;
-		}
-		int x = cmd.args["x"].get<int>();
-		int y = cmd.args["y"].get<int>();
-		if(!FindInteractableAt(game.UiInteractions(), x, y)){
-			cmd.reply->set_value(Err(cmd.id, "WIDGET_NOT_FOUND",
-				"no clickable clay widget at point"));
-			return;
-		}
-		game.UiInput().QueueControlPointerPress(x, y);
-		nlohmann::json r;
-		r["source"] = "clay";
-		r["x"] = x;
-		r["y"] = y;
-		cmd.reply->set_value(OkResult(cmd.id, r));
-		return;
-	}
-	if(cmd.op == "hover_at"){
-		// Move the UI pointer without pressing. Control-socket callers use the
-		// same virtual Clay coordinates that inspect/click_at expose.
-		if(!cmd.args.contains("x") || !cmd.args.contains("y")){
-			cmd.reply->set_value(Err(cmd.id, "BAD_REQUEST", "hover_at needs x and y"));
-			return;
-		}
-		int x = cmd.args["x"].get<int>();
-		int y = cmd.args["y"].get<int>();
-		if(x < 0) x = 0;
-		if(y < 0) y = 0;
-		game.UiInput().QueueControlPointerHover(x, y);
-		nlohmann::json r;
-		r["source"] = "clay";
-		r["x"] = x;
-		r["y"] = y;
-		cmd.reply->set_value(OkResult(cmd.id, r));
-		return;
-	}
-	if(cmd.op == "set_text"){
-		std::string text = cmd.args.value("text", std::string());
-		const auto * cw = static_cast<const silencer::ui::UiInteractable *>(nullptr);
-		int count = 0;
-		if(cmd.args.contains("uid")){
-			int uid = cmd.args["uid"].get<int>();
-			for(const auto & candidate : game.UiInteractions().Interactables()){
-				if(candidate.uid == uid
-				   && candidate.kind == silencer::ui::UiInteractableKind::TextInput){
-					cw = &candidate;
-					count++;
-				}
-			}
-			if(count != 1) cw = nullptr;
-		}else if(cmd.args.contains("label")){
-			std::string label = cmd.args["label"].get<std::string>();
-			for(const auto & candidate : game.UiInteractions().Interactables()){
-				if(candidate.kind == silencer::ui::UiInteractableKind::TextInput
-				   && silencer::ui::UiInteractableMatchesLabel(candidate, label.c_str())){
-					cw = &candidate;
-					count++;
-				}
-			}
-			if(count != 1) cw = nullptr;
-		}
-		if(cw){
-			if(cw->kind == silencer::ui::UiInteractableKind::TextInput){
-				int cap = cw->maxLength;
-				int n = (int)text.size();
-				if(cap > 0 && n > cap) n = cap;
-				QueueInteractableAction(game, *cw, silencer::ui::UiActionKind::SetText,
-				                  text.substr(0, static_cast<size_t>(n)));
-				nlohmann::json r;
-				r["source"] = "clay";
-				cmd.reply->set_value(OkResult(cmd.id, r));
-				return;
-			}
-			cmd.reply->set_value(Err(cmd.id, "WRONG_TYPE",
-				"clay widget is not a textinput"));
-			return;
-		}
-		if(cmd.args.contains("label")){
-			std::string label = cmd.args["label"].get<std::string>();
-			if(count > 1){
-				cmd.reply->set_value(Err(cmd.id, "AMBIGUOUS_TARGET", label));
-				return;
-			}
-			cmd.reply->set_value(Err(cmd.id, "WIDGET_NOT_FOUND", label));
-			return;
-		}
-		if(cmd.args.contains("uid")){
-			int uid = cmd.args["uid"].get<int>();
-			cmd.reply->set_value(Err(cmd.id, "WIDGET_NOT_FOUND",
-				"no clay widget with uid " + std::to_string(uid)));
-			return;
-		}
-		cmd.reply->set_value(Err(cmd.id, "BAD_REQUEST",
-			"set_text needs label or uid"));
-		return;
-	}
-
-	if(cmd.op == "select"){
-		const auto & widgets = game.UiInteractions().Interactables();
-		const auto * hit = static_cast<const silencer::ui::UiInteractable *>(nullptr);
-		int count = 0;
-		if(cmd.args.contains("index")){
-			int index = cmd.args["index"].get<int>();
-			for(const auto & candidate : widgets){
-				if(candidate.kind == silencer::ui::UiInteractableKind::ListRow
-				   && candidate.index == index){
-					hit = &candidate;
-					count++;
-				}
-			}
-		}else if(cmd.args.contains("label")){
-			std::string label = cmd.args["label"].get<std::string>();
-			for(const auto & candidate : widgets){
-				if(candidate.kind == silencer::ui::UiInteractableKind::ListRow
-				   && silencer::ui::UiInteractableMatchesLabel(candidate, label.c_str())){
-					hit = &candidate;
-					count++;
-				}
-			}
-		}else if(cmd.args.contains("text")){
-			std::string text = cmd.args["text"].get<std::string>();
-			for(const auto & candidate : widgets){
-				if(candidate.kind == silencer::ui::UiInteractableKind::ListRow
-				   && silencer::ui::UiInteractableMatchesLabel(candidate, text.c_str())){
-					hit = &candidate;
-					count++;
-				}
-			}
-		}else{
-			cmd.reply->set_value(Err(cmd.id, "BAD_REQUEST",
-				"select needs --index, --label, or --text"));
-			return;
-		}
-		if(count != 1 || !hit){
-			cmd.reply->set_value(Err(cmd.id,
-				count > 1 ? "AMBIGUOUS_TARGET" : "WIDGET_NOT_FOUND",
-				"no unique clay list row matches select target"));
-			return;
-		}
-		const char * hitLabel = silencer::ui::UiInteractableLabel(*hit);
-		QueueInteractableAction(game, *hit, silencer::ui::UiActionKind::Select,
-		                  hitLabel ? hitLabel : "");
-		nlohmann::json r;
-		r["source"] = "clay";
-		r["row_index"] = hit->index;
-		if(hitLabel) r["label"] = hitLabel;
-		cmd.reply->set_value(OkResult(cmd.id, r));
-		return;
-	}
-	if(cmd.op == "scroll"){
-		std::string label = cmd.args.value("label", std::string());
-		int amount = cmd.args.value("amount", 1);
-		if(label.empty()){
-			cmd.reply->set_value(Err(cmd.id, "BAD_REQUEST",
-				"scroll needs --label for a Clay scroll control"));
-			return;
-		}
-		if(amount < 1) amount = 1;
-		const auto * element = game.UiInteractions().FindByLabel(label);
-		if(element && element->value == "scroll"){
-			silencer::ui::UiAction action;
-			action.kind = silencer::ui::UiActionKind::Scroll;
-			action.id = element->id;
-			action.value = "control";
-			action.amount = amount;
-			game.UiInput().QueueControlAction(std::move(action));
-			nlohmann::json r;
-			r["source"] = "clay";
-			r["target"] = "element";
-			r["label"] = label;
-			r["amount"] = amount;
-			cmd.reply->set_value(OkResult(cmd.id, r));
-			return;
-		}
-		const auto * cw = game.UiInteractions().FindInteractableByLabel(label.c_str());
-		if(!cw){
-			cmd.reply->set_value(Err(cmd.id, "WIDGET_NOT_FOUND", label));
-			return;
-		}
-		if(cw->kind != silencer::ui::UiInteractableKind::Button){
-			cmd.reply->set_value(Err(cmd.id, "WRONG_TYPE",
-				"scroll target is not a Clay scroll button"));
-			return;
-		}
-		const char * actionValue = silencer::ui::UiInteractableLabel(*cw);
-		for(int i = 0; i < amount; ++i){
-			QueueInteractableAction(game, *cw, silencer::ui::UiActionKind::Activate,
-			                  actionValue ? actionValue : "");
-		}
-		nlohmann::json r;
-		r["source"] = "clay";
-		r["label"] = label;
-		r["amount"] = amount;
-		cmd.reply->set_value(OkResult(cmd.id, r));
+	if(cmd.op == "click" ||
+	   cmd.op == "click_at" ||
+	   cmd.op == "hover_at" ||
+	   cmd.op == "set_text" ||
+	   cmd.op == "select" ||
+	   cmd.op == "scroll"){
+		cmd.reply->set_value(Err(cmd.id, "UNSUPPORTED", kUiUnsupportedMsg));
 		return;
 	}
 
@@ -885,62 +228,8 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 		HandleGas(game, cmd);
 		return;
 	}
-#ifdef SILENCER_HAVE_LOBBY_UI
-	if(cmd.op == "lobby_show_panel"){
-		// Drive the lobby's right-side panel swap from a CLI test. The lobby
-		// exposes these panels without world Interface objects, so
-		// `click --label "Create Game"` can't reach them. This
-		// op routes through `LobbyScreen::ShowGame*` directly.
-		Screen * top = game.GetTopScreen();
-		LobbyScreen * lobby = dynamic_cast<LobbyScreen *>(top);
-		if(!lobby){
-			cmd.reply->set_value(Err(cmd.id, "WRONG_STATE",
-				"top screen is not a LobbyScreen"));
-			return;
-		}
-		std::string which = cmd.args.value("panel", std::string());
-		ScreenContext & ctx = game.GetScreenContext();
-		if(which == "create")      lobby->ShowGameCreate(ctx);
-		else if(which == "select") lobby->ShowGameSelect(ctx);
-		else if(which == "join")   lobby->ShowGameJoin(ctx);
-		else if(which == "tech")   lobby->ShowGameTech(ctx);
-		else{
-			cmd.reply->set_value(Err(cmd.id, "BAD_REQUEST",
-				"lobby_show_panel needs --panel select|create|join|tech"));
-			return;
-		}
-		cmd.reply->set_value(OkResult(cmd.id, nlohmann::json::object()));
-		return;
-	}
-#endif
-	if(cmd.op == "key"){
-		// Edge-triggered key event for the active UI. The external CLI keeps
-		// its legacy ascii/name surface, but Game stores normalized text/nav
-		// input for ClientUi to dispatch after layout.
-		int ascii = -1;
-		if(cmd.args.contains("ascii") && cmd.args["ascii"].is_number()){
-			ascii = cmd.args["ascii"].get<int>();
-		}else if(cmd.args.contains("key") && cmd.args["key"].is_string()){
-			std::string k = cmd.args["key"].get<std::string>();
-			if(k == "left")           ascii = 1;
-			else if(k == "right")     ascii = 2;
-			else if(k == "up")        ascii = 3;
-			else if(k == "down")      ascii = 4;
-			else if(k == "tab")       ascii = '\t';
-			else if(k == "enter")     ascii = '\n';
-			else if(k == "escape")    ascii = 0x1B;
-			else if(k == "backspace") ascii = '\b';
-			else if(k.size() == 1)    ascii = (unsigned char)k[0];
-		}
-		if(ascii < 0){
-			cmd.reply->set_value(Err(cmd.id, "BAD_REQUEST", "key needs 'ascii' int or 'key' name/char"));
-			return;
-		}
-		if(game.HasUiInputTarget() && QueueControlKey(game, ascii)){
-			cmd.reply->set_value(OkResult(cmd.id, nlohmann::json::object()));
-			return;
-		}
-		cmd.reply->set_value(Err(cmd.id, "WRONG_STATE", "no normalized UI input target"));
+	if(cmd.op == "lobby_show_panel" || cmd.op == "key"){
+		cmd.reply->set_value(Err(cmd.id, "UNSUPPORTED", kUiUnsupportedMsg));
 		return;
 	}
 	cmd.reply->set_value(Err(cmd.id, "UNKNOWN_OP", "unknown op: " + cmd.op));
@@ -998,8 +287,7 @@ void TickWaits(Game& game){
 		} else if(w.cmd.op == "wait_ms"){
 			if(now >= w.deadline_ms) done = true;
 		} else if(w.cmd.op == "wait_for_state"){
-			if(w.wait_state == Game::StateName(game.GetState()) &&
-			   (!StateNeedsScreen(w.wait_state) || game.GetTopScreen())){
+			if(w.wait_state == Game::StateName(game.GetState())){
 				w.cmd.reply->set_value(OkResult(w.cmd.id, nlohmann::json::object()));
 				it = v.erase(it); continue;
 			}

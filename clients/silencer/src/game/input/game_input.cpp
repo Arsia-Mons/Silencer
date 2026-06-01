@@ -4,7 +4,6 @@
 #include "audio.h"
 #include "config.h"
 #include "player.h"
-#include "screen.h"
 #include <cstring>
 #include <vector>
 
@@ -62,55 +61,6 @@ SDL_RumbleGamepad(gamepad, 30000, 15000, 200);
 if(localPlayer->rumbleLand){
 localPlayer->rumbleLand = false;
 SDL_RumbleGamepad(gamepad, 18000, 0, 120);
-}
-}
-
-void GameInput::TickGamepadMenuNav(){
-if(!gamepadstate.connected) return;
-Player * localplayer = game.world.GetPeerPlayer(game.world.peers.localpeerid);
-bool inGameUi = localplayer && (localplayer->chatActive || localplayer->isbuying || localplayer->techstationactive);
-Screen * top = game.GetTopScreen();
-if(!top && !inGameUi) return;
-
-Uint32 now = SDL_GetTicks();
-auto tick = [&](GamepadNavDir& dir, Action action, silencer::ui::UiNavAction navAction){
-bool pressed = keymap.IsPressed(action, keystate, gamepadstate);
-if(!pressed){
-dir.held = false;
-dir.nextfire = 0;
-return;
-}
-if(!dir.held){
-dir.held = true;
-dir.nextfire = now + GAMEPAD_NAV_DELAY_MS;
-game.UiInput().QueueNavAction(navAction);
-}else if(now >= dir.nextfire){
-dir.nextfire = now + GAMEPAD_NAV_REPEAT_MS;
-game.UiInput().QueueNavAction(navAction);
-}
-};
-
-tick(gamepadNavUp, Action::UiUp, silencer::ui::UiNavAction::Up);
-tick(gamepadNavDown, Action::UiDown, silencer::ui::UiNavAction::Down);
-tick(gamepadNavLeft, Action::UiLeft, silencer::ui::UiNavAction::Left);
-tick(gamepadNavRight, Action::UiRight, silencer::ui::UiNavAction::Right);
-
-{
-bool confirmNow = keymap.IsPressed(Action::UiConfirm, keystate, gamepadstate);
-static bool confirmPrev = false;
-if(confirmNow && !confirmPrev){
-game.UiInput().QueueNavAction(silencer::ui::UiNavAction::Confirm);
-}
-confirmPrev = confirmNow;
-}
-
-{
-bool cancelNow = keymap.IsPressed(Action::UiCancel, keystate, gamepadstate);
-static bool cancelPrev = false;
-if(cancelNow && !cancelPrev){
-game.UiInput().QueueNavAction(silencer::ui::UiNavAction::Cancel);
-}
-cancelPrev = cancelNow;
 }
 }
 
@@ -308,10 +258,3 @@ game.world.SetShowingPlayerList(false);
 }
 }
 
-void GameInput::QueueUiKeyboardInputForScancode(int scancode){
-game.gameUiPipeline.QueueKeyboardInputForScancode(
-scancode,
-keystate,
-keymap,
-gamepadstate);
-}

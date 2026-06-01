@@ -34,50 +34,20 @@ case SDL_EVENT_WINDOW_MAXIMIZED:
 case SDL_EVENT_WINDOW_RESTORED:
 minimized = false;
 break;
-case SDL_EVENT_TEXT_INPUT: {
-char ascii = event.text.text[0] & 0x7F;
-UiInput().QueueTextInput(ascii);
-} break;
+// SIL-15: the legacy Clay UI-input collection (text/wheel/pointer-window
+// events feeding silencer::client_ui::ClientUiInput) is gone with the Clay
+// layer. The live cppx UI polls the pointer directly in
+// GameUiPipeline::RenderCppxClientUiFrame; nav/text routing for the
+// interactive cppx screens is wired with those screens (SIL-18+). Gameplay
+// shortcut keys + the keymap still flow through OnScancodeDown/Up below.
 case SDL_EVENT_KEY_DOWN:
 gameInput.OnScancodeDown(event.key.scancode);
 gameInput.GetKeystate()[event.key.scancode] = true;
-gameInput.QueueUiKeyboardInputForScancode(event.key.scancode);
 break;
 case SDL_EVENT_KEY_UP:
 gameInput.OnScancodeUp(event.key.scancode);
 gameInput.GetKeystate()[event.key.scancode] = false;
 break;
-case SDL_EVENT_MOUSE_WHEEL:
-UiInput().AddWheelDelta(event.wheel.x, event.wheel.y);
-break;
-case SDL_EVENT_MOUSE_BUTTON_DOWN:
-if(event.button.button == SDL_BUTTON_LEFT){
-int windowW = 0;
-int windowH = 0;
-SDL_GetWindowSize(gameRenderer.GetWindow(), &windowW, &windowH);
-UiInput().QueuePointerWindowEvent(
-event.button.x, event.button.y, windowW, windowH,
-GetScreenBuffer().w, GetScreenBuffer().h, true, false);
-}
-break;
-case SDL_EVENT_MOUSE_BUTTON_UP:
-if(event.button.button == SDL_BUTTON_LEFT){
-int windowW = 0;
-int windowH = 0;
-SDL_GetWindowSize(gameRenderer.GetWindow(), &windowW, &windowH);
-UiInput().QueuePointerWindowEvent(
-event.button.x, event.button.y, windowW, windowH,
-GetScreenBuffer().w, GetScreenBuffer().h, false, true);
-}
-break;
-case SDL_EVENT_MOUSE_MOTION: {
-int windowW = 0;
-int windowH = 0;
-SDL_GetWindowSize(gameRenderer.GetWindow(), &windowW, &windowH);
-UiInput().QueuePointerWindowEvent(
-event.motion.x, event.motion.y, windowW, windowH,
-GetScreenBuffer().w, GetScreenBuffer().h, false, false);
-} break;
 case SDL_EVENT_GAMEPAD_ADDED:
 if(!gameInput.GetGamepad()) gameInput.OpenFirstGamepad();
 break;

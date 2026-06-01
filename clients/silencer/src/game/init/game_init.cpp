@@ -30,10 +30,7 @@ Game::Game()
 	  gameUiPipeline(*this),
 	  gameSession(*this),
 	  currentlobbygameid(gameSession.CurrentLobbyGameIdRef()),
-	  joininggame(gameSession.JoiningGameRef()),
-	  screenContext(*this, world, renderer, world.lobby, gameInput.GetKeyMap(), updater,
-	                gameSession.AmbienceMixerRef(), gameSession.MapDownloaderRef(),
-	                gameRenderer.WindowRef(), gameRenderer.RenderDeviceRef()) {
+	  joininggame(gameSession.JoiningGameRef()) {
 	world.SetVersion(SILENCER_VERSION);
 	frames = 0;
 	fps = 0;

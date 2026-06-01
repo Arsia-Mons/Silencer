@@ -1,33 +1,55 @@
-# clients/silencer/src/ui - UI Runtime And Primitives
+# clients/silencer/src/ui - UI runtime + styling substrate
 
-This subtree owns the reusable UI substrate: design tokens, Clay frame runtime, interaction registry/router, text/layout helpers, and shared primitives. It must stay screen-agnostic and game-agnostic.
+This subtree is the golden retained cppx UI engine: a React-style hook
+runtime, Yoga flex layout, a focus/interaction model, and an RGBA
+draw-command IR, plus the styling substrate (theme, visual style, resolve).
+It must stay screen-agnostic and game-agnostic — it knows nothing about
+`Game`, `World`, SDL, audio, or the renderer's SDL handles.
 
-Clay is a flexbox-like frame layout and render-command generator. This layer wraps Clay with Silencer's design-system primitives; it does not own screen navigation, game state, SDL events, audio playback, or final renderer submission.
+## Layout
 
-This is mid-migration toward good flexbox layout, Clay lifecycle, and shadcn-style primitive API first principles. If you touch stale code that conflicts with those principles, update it in the same change.
+| Dir/file | What it owns |
+|---|---|
+| `runtime/react.{h,cpp}` | Hook runtime: fibers, `use_state`/`use_effect`/`use_ref`/`use_callback`, `PROVIDE`/`use_context`, per-frame begin/end. |
+| `runtime/element.h`, `tree.{h,cpp}` | `UiElement` descriptors + the retained node tree the reconciler commits. |
+| `runtime/flex_layout.*`, `yoga_flex_layout.*` | Yoga-backed flexbox layout adapter (sizing, grow/fit, padding, gaps, alignment). |
+| `runtime/focus.*`, `interaction_hooks.*` | Focus runtime + per-frame interaction reads (`use_focused`/`use_hovered`/`use_pressed`/`use_focus_visible`, one-frame lag by design). |
+| `runtime/geometry.*` | Points, sizes, rects. |
+| `runtime/draw_command.{h,cpp}`, `draw_command_builder.*` | The tagged-union, premultiplied-RGBA `DrawCommandList` IR + its pure transcriber. |
+| `style/visual_style.h` | `VisualStyle`: the dense resolved paint description the renderer reads (straight-alpha authoring). |
+| `style/style_patch.h` | Sparse `StylePatch` / `StyleStatePatch` overlays. |
+| `style/theme.h`, `default_theme.cpp` | `Theme`/`RoleStyle` + the neutral fallback theme (`use_theme()` via `ThemeContext`). |
+| `style/resolve.{h,cpp}` | `resolve()` — layers role + override patches + interaction state into one `VisualStyle` at authoring time. |
+| `style/text_measure.{h,cpp}`, `text_wrap.{h,cpp}` | SDL-free text measure/wrap seam (`set_text_measurer`); the renderer installs the real measurer. |
+| `input.h` | `UiInputFrame` — the per-frame nav/confirm/cancel/pointer + key/text/editing event channels. |
+| `design/Colors.h`, `Spacing.h` | LEGACY/transitional palette + spacing constants; being replaced by theme tokens. Do not build new APIs on these. |
 
 ## Boundaries
 
-- Do not include or depend on `Game`, `World`, `ScreenContext`, concrete screens, audio, SDL event loops, `Renderer`, or `Surface` from this layer. Use narrow runtime state, primitive options, and custom payload contracts instead.
-- `ClayService` owns production Clay frame lifecycle. Primitives declare Clay inside an existing frame; they do not begin/end layout, set pointer state, update scroll containers, or render command streams.
-- `UiInteractionRegistry` owns semantic metadata, focus, text editing, pointer hit testing, keyboard/gamepad navigation, automation, and typed action queuing. Clay still owns layout and final bounds.
-- Custom render payloads are the renderer bridge. Keep sprite-bank details inside payloads or existing bridge primitives; do not leak them into new public primitive APIs.
+- Do not include or depend on `Game`, `World`, concrete screens, audio, SDL,
+  `Renderer`, or `Surface` from this layer. The renderer reads the SDL-free
+  `DrawCommandList` IR; text measurement is injected via `set_text_measurer`.
+- The runtime owns layout, focus, hit testing, and IR emission. Components
+  compose hooks + elements; they do not run the frame lifecycle (that is the
+  app-shell's `UiPipeline`, `src/client/ui`).
+- Colors are authored straight-alpha and premultiplied once at the IR emit
+  boundary. The IR carries integer handles (text/font/texture ids), never
+  pointers, so it stays trivially copyable and relocatable.
 
-## Primitive API
+## Authoring discipline
 
-- Target public primitives are plain nouns: `Button`, `TextInput`, `Toggle`, `Panel`, `Text`. Runtime/service types keep the `Ui` prefix: `UiInteractionRegistry`, `UiInputState`, `UiInputRouter`, `UiFrameContext`.
-- Text consumers use the `Text` primitive plus semantic `TextSize` metrics. Keep sprite-bank and Clay font fields behind the text primitive/compositor boundary.
-- Primitive APIs follow shadcn's core shape, not its exact implementation: `variant + size`, composition, and named defaults. Repeated call-site option bundles should become named variants or sizes.
-- New or cleaned-up primitive APIs must not expose palette indices, sprite banks, legacy `B196x33`-style codes, or one-consumer presets in public signatures, enums, or docs.
-- One primitive owns one concern. Checkbox/toggle state belongs to checkbox/toggle primitives, not a `Button` mode.
-
-## Clay Discipline
-
-- Prefer flexbox-style Clay layout: sizing, grow/fit, padding, gaps, alignment, clipping, and stable containers. Absolute coordinates, sprite-offset nudges, and hand-measured widths are legacy escape hatches to remove when practical.
-- Every interactive, animated, scrollable, custom-rendered, tested, or automation-visible element needs an explicit stable Clay ID. A visible label must never double as the element ID.
-- Dynamic strings and custom payloads must live until after Clay render command consumption. Use per-frame primitive arenas; production resets them once from `UiFrameContext::BeginFrame`.
+- Theme is read with `use_theme()`; components resolve their own `VisualStyle`
+  via `resolve()` at authoring time and pass it down. The renderer never sees
+  the theme.
+- Reorderable same-type siblings need stable keys (`REACT_COMPONENT_BEGIN_KEY`)
+  so fiber identity — and the hook state keyed to it — survives reorders.
+- Dynamic per-frame text uses the per-call-site `use_text_storage`
+  scratch; do not hand the IR a pointer into a transient stack buffer.
 
 ## Verification
 
-- Build through `clients/silencer/build.ps1` or `clients/silencer/build.sh`; do not run raw CMake/Ninja commands.
-- For primitive/API work, run the relevant `clay_*_check` control-socket ops through `clients/cli/index.ts`; add runtime screenshot or control-socket verification when visual/interaction behavior is at risk.
+- Build through `clients/silencer/build.ps1` or `clients/silencer/build.sh`;
+  do not run raw CMake/Ninja commands.
+- Add runtime screenshot / control-socket verification (via
+  `clients/cli/index.ts`) when visual or interaction behavior is at risk;
+  compile success alone is not sufficient.

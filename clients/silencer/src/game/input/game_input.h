@@ -11,24 +11,14 @@ class Player;
 class GameInput
 {
 public:
-static constexpr Uint32 GAMEPAD_NAV_DELAY_MS  = 300;
-static constexpr Uint32 GAMEPAD_NAV_REPEAT_MS = 120;
-
-struct GamepadNavDir {
-bool   held = false;
-Uint32 nextfire = 0;
-};
-
 explicit GameInput(Game & game);
 
 void UpdateInputState(Input & input);
-void TickGamepadMenuNav();
 void TickRumble();
 void OpenFirstGamepad();
 void PollGamepadState();
 void OnScancodeDown(int scancode);
 void OnScancodeUp(int scancode);
-void QueueUiKeyboardInputForScancode(int scancode);
 const char * GetActionKeyDisplayName(Action a);
 
 KeyMap & GetKeyMap() { return keymap; }
@@ -48,10 +38,6 @@ KeyMap keymap;
 GamepadState gamepadstate;
 SDL_Gamepad * gamepad;
 std::string prevGamepadProfile;
-GamepadNavDir gamepadNavUp;
-GamepadNavDir gamepadNavDown;
-GamepadNavDir gamepadNavLeft;
-GamepadNavDir gamepadNavRight;
 };
 
 #endif
