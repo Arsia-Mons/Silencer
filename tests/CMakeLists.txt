@@ -37,15 +37,7 @@ target_include_directories(silencer_tests PRIVATE
     ${CMAKE_SOURCE_DIR}/src/ui/runtime
     ${CMAKE_SOURCE_DIR}/src/client
     ${CMAKE_SOURCE_DIR}/src/client/ui
-    ${CMAKE_SOURCE_DIR}/src/client/ui/modals
     ${CMAKE_SOURCE_DIR}/src/updater
-    ${CMAKE_SOURCE_DIR}/src/client/ui/screens
-    ${CMAKE_SOURCE_DIR}/src/client/ui/screens/main_menu
-    ${CMAKE_SOURCE_DIR}/src/client/ui/screens/options
-    ${CMAKE_SOURCE_DIR}/src/client/ui/screens/lobby_connect
-    ${CMAKE_SOURCE_DIR}/src/client/ui/screens/update
-    ${CMAKE_SOURCE_DIR}/src/client/ui/screens/lobby
-    ${CMAKE_SOURCE_DIR}/src/client/ui/screens/mission_summary
     ${CMAKE_SOURCE_DIR}/src/net
     ${CMAKE_SOURCE_DIR}/src/game
     ${CMAKE_SOURCE_DIR}/src/resources

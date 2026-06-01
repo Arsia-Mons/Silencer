@@ -78,7 +78,6 @@ bool Game::Loop(void){
 		if(tui){
 			Uint8 newkeystate[SDL_SCANCODE_COUNT];
 			if(inputserver.LatestScancodes(newkeystate)){
-				std::vector<int> pressedScancodes;
 				// Edge-detect: feed press/release transitions through the
 				// same handlers the SDL path uses, so the in-game ESC
 				// quitstate machine, F1 player-list, debug overlay etc.
@@ -89,7 +88,6 @@ bool Game::Loop(void){
 					if(was == now) continue;
 					if(now){
 						gameInput.OnScancodeDown(sc);
-						pressedScancodes.push_back(sc);
 					}else{
 						gameInput.OnScancodeUp(sc);
 					}
