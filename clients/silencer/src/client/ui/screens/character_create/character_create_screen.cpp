@@ -22,7 +22,6 @@ constexpr const char * kActionAgentPrefix = "character_create.agent";
 constexpr const char * kActionAgencyPrefix = "character_create.agency";
 constexpr const char * kActionRenamePrefix = "character_create.rename";
 constexpr const char * kActionCreate = "character_create.create";
-constexpr const char * kActionAlias = "character_create.alias";
 
 bool StartsWith(const std::string& value, const char * prefix)
 {
@@ -199,16 +198,6 @@ bool CharacterCreateScreen::HandleUiIntent(ScreenContext & ctx,
 			previewAgencyIndex = agencyIndex;
 			return true;
 		}
-	}
-	if(action.kind == silencer::ui::UiActionKind::SubmitText &&
-	   step == Step::EnterAlias && action.id == kActionAlias){
-		CopyAlias(action.value.c_str());
-		if(IsRenaming()){
-			RenameCurrentAgent(lobby, navigation);
-		}else{
-			AdvanceAliasStep();
-		}
-		return true;
 	}
 	if(action.kind != silencer::ui::UiActionKind::Activate){
 		return retainedFrame_.HandleUiIntent(action);

@@ -1,6 +1,7 @@
 #include "character_create_screen.h"
 
 #include "client/ui/hooks/use_lobby.h"
+#include "client/ui/hooks/use_navigation.h"
 #include "client/ui/screens/character_create/character_create_frame.h"
 #include "clay_ui_compositor.h"
 #include "game.h"
@@ -30,6 +31,8 @@ void CharacterCreateScreen::BuildUi(ScreenContext & ctx,
 	const silencer::client_ui::LobbyModel lobby =
 		silencer::client_ui::use_lobby(
 			silencer::client_ui::MakeLobbyProvider(ctx));
+	const silencer::client_ui::Navigation navigation =
+		silencer::client_ui::use_navigation();
 	RebuildAgentRows(lobby);
 	if(agentScrollDelta != 0){
 		int next = static_cast<int>(agentScroll) + agentScrollDelta;
@@ -64,6 +67,14 @@ void CharacterCreateScreen::BuildUi(ScreenContext & ctx,
 		.alias = alias,
 		.set_alias = [this](const char * value) {
 			CopyAlias(value);
+		},
+		.submit_alias = [this, lobby, navigation](const char * value) {
+			CopyAlias(value);
+			if(IsRenaming()){
+				RenameCurrentAgent(lobby, navigation);
+			}else{
+				AdvanceAliasStep();
+			}
 		},
 		.alias_renaming = IsRenaming(),
 		.waiting_for_create = waitingForCreate,

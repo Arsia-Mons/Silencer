@@ -300,6 +300,13 @@ alias_text_change_callback(std::function<void(const char *)> on_change) {
 	};
 }
 
+inline std::function<void(const ::ui::TextSubmitEvent&)>
+alias_text_submit_callback(std::function<void(const char *)> on_submit) {
+	return [on_submit](const ::ui::TextSubmitEvent& event) {
+		if(on_submit) on_submit(event.value);
+	};
+}
+
 	struct LabelTextProps {
 		const char * key = nullptr;
 		const char * value = nullptr;
@@ -794,6 +801,7 @@ alias_text_change_callback(std::function<void(const char *)> on_change) {
 		bool alias_renaming = false;
 		const char * alias = nullptr;
 		std::function<void(const char *)> set_alias = {};
+		std::function<void(const char *)> submit_alias = {};
 	};
 
 	::ui::UiElement AliasModal(const AliasModalProps& props) {
@@ -838,6 +846,7 @@ alias_text_change_callback(std::function<void(const char *)> on_change) {
 			  accessibility={{.label = "Alias"}}
 			  value={props.alias ? props.alias : ""}
 			  onTextChange={alias_text_change_callback(props.set_alias)}
+			  onTextSubmit={alias_text_submit_callback(props.submit_alias)}
 			  maxLength={16}
 			  layout={::ui::LayoutStyle{
 					.position = ::ui::PositionType::Absolute,
@@ -865,6 +874,7 @@ alias_text_change_callback(std::function<void(const char *)> on_change) {
 		int preview_agent = -1;
 		const char * alias = nullptr;
 		std::function<void(const char *)> set_alias = {};
+		std::function<void(const char *)> submit_alias = {};
 		bool alias_renaming = false;
 		bool waiting_for_create = false;
 		int selected_agency = 0;
@@ -928,6 +938,7 @@ alias_text_change_callback(std::function<void(const char *)> on_change) {
 			  aliasRenaming={props.alias_renaming}
 			  alias={props.alias}
 			  setAlias={props.set_alias}
+			  submitAlias={props.submit_alias}
 			/>
 		</Box>
 	}
@@ -990,6 +1001,7 @@ using character_create_frame_detail::BodyProps;
 					  previewAgent={props.preview_agent}
 					  alias={props.alias}
 					  setAlias={props.set_alias}
+					  submitAlias={props.submit_alias}
 					  aliasRenaming={props.alias_renaming}
 					  waitingForCreate={props.waiting_for_create}
 					  selectedAgency={props.selected_agency}

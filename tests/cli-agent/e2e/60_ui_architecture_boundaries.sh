@@ -495,6 +495,11 @@ fail_if_match \
   "$REPO_ROOT/clients/silencer/src/client/ui/screens/character_create/character_create_screen.h"
 
 fail_if_match \
+  "\\bUiActionKind::SubmitText\\b" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens/character_create/character_create_screen.cpp" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens/character_create/character_create_screen.h"
+
+fail_if_match \
   "\\b(loginClicked|cancelClicked)\\b" \
   "$REPO_ROOT/clients/silencer/src/client/ui/screens/lobby_connect/lobby_connect_screen.cpp" \
   "$REPO_ROOT/clients/silencer/src/client/ui/screens/lobby_connect/lobby_connect_screen.h"

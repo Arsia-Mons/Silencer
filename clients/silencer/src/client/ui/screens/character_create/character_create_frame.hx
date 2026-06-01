@@ -27,6 +27,7 @@ struct CharacterCreateFrameProps {
 	int preview_agent = -1;
 	const char * alias = nullptr;
 	std::function<void(const char *)> set_alias = {};
+	std::function<void(const char *)> submit_alias = {};
 	bool alias_renaming = false;
 	bool waiting_for_create = false;
 	int selected_agency = 0;
