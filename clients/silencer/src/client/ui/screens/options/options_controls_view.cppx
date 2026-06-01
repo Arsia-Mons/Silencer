@@ -19,9 +19,6 @@ using ::ui::components::TextProps;
 
 namespace {
 
-::ReactContext OptionsControlsContext = {};
-const OptionsControlsContextValue kEmptyContext = {};
-
 constexpr int kContentW = 486;
 constexpr int kActionNameW = 180;
 constexpr int kOperatorW = 45;
@@ -339,10 +336,6 @@ struct KeybindRowProps {
 	</Box>
 }
 
-struct OptionsControlsFrameProps {
-	const char * key = nullptr;
-};
-
 struct PresetButtonProps {
 	const char * key = nullptr;
 };
@@ -391,6 +384,8 @@ struct ControlsCancelButtonProps {
 	  layout={footer_button_layout()}
 	/>
 }
+
+}  // namespace
 
 ::ui::UiElement OptionsControlsFrame(const OptionsControlsFrameProps& props) {
 	const OptionsControlsContextValue& controls = UseOptionsControls();
@@ -457,27 +452,6 @@ struct ControlsCancelButtonProps {
 			</Box>
 		</Box>
 	</Box>
-}
-
-}  // namespace
-
-const OptionsControlsContextValue& UseOptionsControls() {
-	const auto * value = static_cast<const OptionsControlsContextValue *>(
-		::use_context(&OptionsControlsContext));
-	return value ? *value : kEmptyContext;
-}
-
-::ui::UiElement OptionsControlsView(const OptionsControlsViewProps& props) {
-	return ::ui::provider(
-		"OptionsControlsProvider",
-		&OptionsControlsContext,
-		const_cast<OptionsControlsContextValue *>(props.value),
-		children({
-			::ui::component("OptionsControlsFrame",
-			                OptionsControlsFrameProps{ .key = "view" },
-			                OptionsControlsFrame),
-		}),
-		props.key);
 }
 
 }  // namespace silencer::client_ui

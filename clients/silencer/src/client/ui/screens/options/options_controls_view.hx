@@ -27,6 +27,12 @@ struct OptionsControlsContextValue {
 
 const OptionsControlsContextValue& UseOptionsControls();
 
+struct OptionsControlsFrameProps {
+	const char * key = nullptr;
+};
+
+::ui::UiElement OptionsControlsFrame(const OptionsControlsFrameProps& props);
+
 struct OptionsControlsViewProps {
 	const char * key = nullptr;
 	const OptionsControlsContextValue * value = nullptr;

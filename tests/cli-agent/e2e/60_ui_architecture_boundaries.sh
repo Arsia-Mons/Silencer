@@ -160,7 +160,8 @@ fail_if_match \
   '::ui::component[[:space:]]*\(' \
   "$REPO_ROOT/clients/silencer/src/client/ui/screens/update/update_view.cppx" \
   "$REPO_ROOT/clients/silencer/src/client/ui/screens/options/options_audio_view.cppx" \
-  "$REPO_ROOT/clients/silencer/src/client/ui/screens/options/options_display_view.cppx"
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens/options/options_display_view.cppx" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens/options/options_controls_view.cppx"
 
 fail_if_match \
   "Handle(TextInput|KeyPress|ScancodeDown|MousePress|MouseMove)|DispatchKeyPress|DispatchPreparedUiNavActions|UiNavActionToAscii|DispatchChatKey|HandleInGameMenuKey" \
