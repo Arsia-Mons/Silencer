@@ -243,7 +243,7 @@ void LobbyScreen::Build(ScreenContext & ctx)
 
 	silencer::client_ui::LobbyModel lobby =
 		silencer::client_ui::use_lobby(
-			silencer::client_ui::MakeLobbyProvider(ctx, this));
+			silencer::client_ui::MakeLobbyProvider(ctx));
 	silencer::client_ui::lobby::CharacterPanelInit(characterState, lobby.character);
 	silencer::client_ui::lobby::ChatPanelInit(chatState);
 	silencer::client_ui::lobby::GameSelectPanelInit(gameSelectState);
@@ -311,7 +311,7 @@ void LobbyScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime, s
 		lobby_screen_detail::ResolveLobbyMainAreaLayout(bodyW, bodyH, regionGap);
 	silencer::client_ui::LobbyModel lobby =
 		silencer::client_ui::use_lobby(
-			silencer::client_ui::MakeLobbyProvider(ctx, this));
+			silencer::client_ui::MakeLobbyProvider(ctx));
 	const silencer::client_ui::AppModel app =
 		silencer::client_ui::use_app(
 			silencer::client_ui::MakeAppProvider(ctx));
@@ -687,7 +687,7 @@ void LobbyScreen::Tick(ScreenContext & ctx)
 {
 	silencer::client_ui::LobbyModel lobby =
 		silencer::client_ui::use_lobby(
-			silencer::client_ui::MakeLobbyProvider(ctx, this));
+			silencer::client_ui::MakeLobbyProvider(ctx));
 
 	if(lobby.session.disconnect_lobby_if_needed()){
 		silencer::client_ui::use_navigation()
@@ -759,7 +759,7 @@ bool LobbyScreen::HandleBack(ScreenContext & ctx)
 {
 	silencer::client_ui::LobbyModel lobby =
 		silencer::client_ui::use_lobby(
-			silencer::client_ui::MakeLobbyProvider(ctx, this));
+			silencer::client_ui::MakeLobbyProvider(ctx));
 	if(gameJoinActive || gameTechActive){
 		lobby.pregame.leave_joined_game();
 		lobby.browser.mark_games_dirty();
@@ -786,7 +786,7 @@ bool LobbyScreen::HandleUiIntent(ScreenContext & ctx, const silencer::ui::UiActi
 	if(chromeFrame_.HandleUiIntent(action)) return true;
 	silencer::client_ui::LobbyModel lobby =
 		silencer::client_ui::use_lobby(
-			silencer::client_ui::MakeLobbyProvider(ctx, this));
+			silencer::client_ui::MakeLobbyProvider(ctx));
 	if(silencer::client_ui::lobby::CharacterPanelHandleUiIntent(
 			characterState, lobby.character, action)){
 		return true;

@@ -32,14 +32,13 @@
 namespace silencer {
 namespace client_ui {
 
-LobbyProviderValue MakeLobbyProvider(ScreenContext& ctx, LobbyScreen * screen) {
+LobbyProviderValue MakeLobbyProvider(ScreenContext& ctx) {
 	LobbyProviderValue value;
 	value.world = &ctx.world;
 	value.game = &ctx.game;
 	value.ambience = &ctx.ambienceMixer;
 	value.map_downloader = &ctx.mapDownloader;
 	value.updater = &ctx.updater;
-	(void)screen;
 	return value;
 }
 

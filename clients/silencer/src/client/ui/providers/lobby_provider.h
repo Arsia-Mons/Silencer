@@ -2,7 +2,6 @@
 
 class AmbienceMixer;
 class Game;
-class LobbyScreen;
 class MapDownloader;
 class ScreenContext;
 class Updater;
@@ -19,7 +18,7 @@ struct LobbyProviderValue {
 	Updater * updater = nullptr;
 };
 
-LobbyProviderValue MakeLobbyProvider(ScreenContext& ctx, LobbyScreen * screen = nullptr);
+LobbyProviderValue MakeLobbyProvider(ScreenContext& ctx);
 
 }  // namespace client_ui
 }  // namespace silencer

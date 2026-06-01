@@ -402,6 +402,12 @@ fail_if_match \
   "$REPO_ROOT/clients/silencer/src/client/ui/screens/lobby/lobby_screen.h"
 
 fail_if_match \
+  "MakeLobbyProvider[[:space:]]*[(][^)]*,|LobbyScreen[[:space:]]*[*][[:space:]]*screen" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/providers/lobby_provider.h" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/providers/lobby_provider.cpp" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens/lobby/lobby_screen.cpp"
+
+fail_if_match \
   "ctx[.](world|mapDownloader|ambienceMixer)|\\b(World|Resources|MapDownloader|LobbyGame|Peer)[[:space:]*&]+|Config::|Lobby::|#include[[:space:]]*[<\"](world|resources|lobby|lobbygame|map_downloader|ambience_mixer|peer|config)[.]h[>\"]" \
   "$REPO_ROOT/clients/silencer/src/client/ui/screens/lobby/lobby_chrome_frame.cppx" \
   "$REPO_ROOT/clients/silencer/src/client/ui/screens/lobby/lobby_chrome_frame.hx"
