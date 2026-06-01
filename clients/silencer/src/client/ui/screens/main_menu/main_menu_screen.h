@@ -12,7 +12,7 @@ public:
 	void Tick(ScreenContext & ctx) override;
 	bool BuildElement(ScreenContext & ctx, ::ui::UiElement * out) override;
 	void Destroy(ScreenContext & ctx) override;
-	bool HandleUiIntent(ScreenContext & ctx, const silencer::ui::UiAction & action) override;
+	bool HandleBack(ScreenContext & ctx) override;
 
 private:
 	std::string versionText_;

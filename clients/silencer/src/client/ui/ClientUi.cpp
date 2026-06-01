@@ -71,6 +71,16 @@ bool ActionTargetsAudibleInteractable(const silencer::ui::UiInteractionRegistry&
 	return widget && IsAudibleInteractable(*widget);
 }
 
+bool InvokeRetainedActivation(const silencer::ui::UiInteractionRegistry& interactions,
+                              const ::ui::UiTree& tree,
+                              const silencer::ui::UiAction& action) {
+	if(action.kind != silencer::ui::UiActionKind::Activate) return false;
+	if(action.id.empty()) return false;
+	const auto * widget = interactions.FindInteractableById(action.id);
+	if(!widget || widget->retainedNodeId == 0) return false;
+	return tree.invoke_activate(widget->retainedNodeId);
+}
+
 bool HasText(const char * value) {
 	return value && value[0] != '\0';
 }
@@ -204,6 +214,7 @@ void RegisterRetainedNode(const ::ui::UiTree& tree,
 		widget.id = hasId ? node.control_id : std::string();
 		widget.labelText = label;
 		widget.kind = InteractableKindForNode(node);
+		widget.retainedNodeId = id;
 		widget.uid = nextUid++;
 		widget.x = static_cast<int>(std::floor(node.layout.x));
 		widget.y = static_cast<int>(std::floor(node.layout.y));
@@ -434,6 +445,9 @@ std::vector<silencer::ui::UiAction> ClientUi::DispatchInput(
 	if(!top) return actions;
 	std::vector<silencer::ui::UiAction> unhandled;
 	for(const silencer::ui::UiAction& action : actions){
+		if(clientui_detail::InvokeRetainedActivation(interactions_, retainedTree_, action)){
+			continue;
+		}
 		if(top && top->HandleUiIntent(ctx, action)){
 			if(action.kind == silencer::ui::UiActionKind::CaptureBinding){
 				return std::vector<silencer::ui::UiAction>();

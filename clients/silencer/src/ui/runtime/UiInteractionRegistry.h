@@ -2,6 +2,7 @@
 
 #include "runtime/UiActionQueue.h"
 #include "runtime/UiInputState.h"
+#include "ui/runtime/tree.h"
 
 #include <string>
 #include <vector>
@@ -49,6 +50,7 @@ struct UiInteractable {
 	std::string id;
 	std::string labelText;
 	UiInteractableKind kind = UiInteractableKind::Button;
+	::ui::NodeId retainedNodeId = 0;
 	int uid = -1;
 	int x = 0, y = 0, w = 0, h = 0;
 	int index = -1;

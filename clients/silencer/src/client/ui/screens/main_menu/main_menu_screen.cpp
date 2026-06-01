@@ -2,21 +2,12 @@
 
 #include "client/ui/screens/main_menu/main_menu_view.h"
 #include "screen_context.h"
-#include "game_state.h"
 #include "lobby.h"
 #include "peer.h"
 #include "renderer.h"
 #include "world.h"
 
 #include <string>
-
-namespace main_menu_screen_detail
-{
-constexpr const char * kActionTutorial = "main_menu.tutorial";
-constexpr const char * kActionLobby = "main_menu.lobby";
-constexpr const char * kActionOptions = "main_menu.options";
-constexpr const char * kActionExit = "main_menu.exit";
-} // namespace main_menu_screen_detail
 
 void MainMenuScreen::Build(ScreenContext & ctx)
 {
@@ -56,28 +47,8 @@ void MainMenuScreen::Destroy(ScreenContext & ctx)
 	(void)ctx;
 }
 
-bool MainMenuScreen::HandleUiIntent(ScreenContext & ctx, const silencer::ui::UiAction & action)
+bool MainMenuScreen::HandleBack(ScreenContext & ctx)
 {
-	if(action.kind == silencer::ui::UiActionKind::Cancel){
-		ctx.RequestQuit();
-		return true;
-	}
-	if(action.kind != silencer::ui::UiActionKind::Activate) return false;
-	if(action.id == main_menu_screen_detail::kActionTutorial){
-		ctx.GoToState(GameState::SINGLEPLAYERGAME);
-		return true;
-	}
-	if(action.id == main_menu_screen_detail::kActionLobby){
-		ctx.GoToState(GameState::LOBBYCONNECT);
-		return true;
-	}
-	if(action.id == main_menu_screen_detail::kActionOptions){
-		ctx.GoToState(GameState::OPTIONS);
-		return true;
-	}
-	if(action.id == main_menu_screen_detail::kActionExit){
-		ctx.RequestQuit();
-		return true;
-	}
-	return false;
+	ctx.RequestQuit();
+	return true;
 }

@@ -14,11 +14,6 @@
 
 namespace update_screen_detail
 {
-constexpr const char * kActionUpdate = "update.update";
-constexpr const char * kActionCancel = "update.cancel";
-constexpr const char * kActionRetry = "update.retry";
-constexpr const char * kActionDownload = "update.download";
-
 std::string StatusText(ScreenContext & ctx)
 {
 	switch(ctx.updater.GetState()){
@@ -182,34 +177,10 @@ void UpdateScreen::Destroy(ScreenContext & ctx)
 	(void)ctx;
 }
 
-bool UpdateScreen::HandleUiIntent(ScreenContext & ctx, const silencer::ui::UiAction & action)
+bool UpdateScreen::HandleBack(ScreenContext & ctx)
 {
-	if(action.kind == silencer::ui::UiActionKind::Cancel){
-		if(update_screen_detail::CancelUpdate(ctx.updater)){
-			ctx.GoToState(GameState::MAINMENU);
-		}
-		return true;
+	if(update_screen_detail::CancelUpdate(ctx.updater)){
+		ctx.GoToState(GameState::MAINMENU);
 	}
-	if(action.kind != silencer::ui::UiActionKind::Activate) return false;
-	if(action.id == update_screen_detail::kActionUpdate){
-		update_screen_detail::StartUpdate(ctx.updater);
-		return true;
-	}
-	if(action.id == update_screen_detail::kActionCancel){
-		if(update_screen_detail::CancelUpdate(ctx.updater)){
-			ctx.GoToState(GameState::MAINMENU);
-		}
-		return true;
-	}
-	if(action.id == update_screen_detail::kActionRetry){
-		update_screen_detail::RetryUpdate(ctx.updater);
-		return true;
-	}
-	if(action.id == update_screen_detail::kActionDownload){
-		if(update_screen_detail::OpenDownload(ctx.updater)){
-			ctx.GoToState(GameState::MAINMENU);
-		}
-		return true;
-	}
-	return false;
+	return true;
 }

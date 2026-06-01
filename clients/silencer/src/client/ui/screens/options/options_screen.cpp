@@ -6,15 +6,6 @@
 #include "renderer.h"
 #include "world.h"
 
-namespace options_screen_detail {
-
-constexpr const char * kActionControls = "options.controls";
-constexpr const char * kActionDisplay = "options.display";
-constexpr const char * kActionAudio = "options.audio";
-constexpr const char * kActionBack = "options.back";
-
-}  // namespace options_screen_detail
-
 void OptionsScreen::Build(ScreenContext & ctx)
 {
 	ctx.world.DestroyAllObjects();
@@ -45,28 +36,8 @@ void OptionsScreen::Destroy(ScreenContext & ctx)
 	(void)ctx;
 }
 
-bool OptionsScreen::HandleUiIntent(ScreenContext & ctx, const silencer::ui::UiAction & action)
+bool OptionsScreen::HandleBack(ScreenContext & ctx)
 {
-	if(action.kind == silencer::ui::UiActionKind::Cancel){
-		ctx.GoToState(GameState::MAINMENU);
-		return true;
-	}
-	if(action.kind != silencer::ui::UiActionKind::Activate) return false;
-	if(action.id == options_screen_detail::kActionControls){
-		ctx.GoToState(GameState::OPTIONSCONTROLS);
-		return true;
-	}
-	if(action.id == options_screen_detail::kActionDisplay){
-		ctx.GoToState(GameState::OPTIONSDISPLAY);
-		return true;
-	}
-	if(action.id == options_screen_detail::kActionAudio){
-		ctx.GoToState(GameState::OPTIONSAUDIO);
-		return true;
-	}
-	if(action.id == options_screen_detail::kActionBack){
-		ctx.GoToState(GameState::MAINMENU);
-		return true;
-	}
-	return false;
+	ctx.GoToState(GameState::MAINMENU);
+	return true;
 }
