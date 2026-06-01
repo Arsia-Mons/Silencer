@@ -322,8 +322,11 @@ void ClientUi::BuildVisibleScreens(ScreenContext& ctx, Surface& dst, float frame
 		BuildInGameHudUi(
 			ctx.renderer, ctx.world.resources, hudView, &dst, interactions_);
 		BuildInGameOverlaysUi(ctx.renderer, ctx.world.resources, hudView, &dst);
-		inGameOverlayFrameActive_ =
+		const bool showQuitPrompt =
 			hudView.quitState == 1 || hudView.quitState == 2;
+		const bool showTopMessage =
+			hudView.topMessage.topmessage_i > 0 && !hudView.topMessage.text.empty();
+		inGameOverlayFrameActive_ = showQuitPrompt || showTopMessage;
 		if(inGameOverlayFrameActive_){
 		#ifdef OUYA
 			const char * quitText = "Hit O To QUIT";
@@ -335,8 +338,11 @@ void ClientUi::BuildVisibleScreens(ScreenContext& ctx, Surface& dst, float frame
 				.key = "ingame-overlay",
 				.width = input.width,
 				.height = input.height,
-				.show_quit_prompt = true,
+				.show_quit_prompt = showQuitPrompt,
 				.quit_prompt_text = quitText,
+				.show_top_message = showTopMessage,
+				.top_message_text = hudView.topMessage.text.c_str(),
+				.top_message_progress = hudView.topMessage.topmessage_i,
 			};
 			inGameOverlayFrame_.Build([&]() {
 				                          return InGameOverlayFrame(props);

@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <cstdint>
 #include <cstring>
+#include <string>
 
 namespace silencer {
 namespace client_ui {
@@ -20,6 +21,16 @@ constexpr int kPromptFontBank = 136;
 constexpr int kPromptAdvance = 16;
 constexpr int kPromptLineHeight = 23;
 constexpr std::uint8_t kPromptPalette = 202;
+constexpr int kTopMessageX = 200;
+constexpr int kTopMessageY = 10;
+constexpr int kTopMessageWidth = 245;
+constexpr int kTopMessageHeight = 12;
+constexpr int kTopMessageMaxLength = 35;
+constexpr int kTopMessageScrollLead = 24;
+constexpr int kTopMessageFontBank = 133;
+constexpr int kTopMessageAdvance = 7;
+constexpr int kTopMessageLineHeight = 11;
+constexpr std::uint8_t kTopMessagePalette = 0;
 
 inline ::ui::LayoutStyle root_layout(int width, int height) {
 	return {
@@ -52,6 +63,27 @@ inline ::ui::StylePatch prompt_text_patch() {
 	});
 }
 
+inline ::ui::StylePatch top_message_text_patch() {
+	return ::ui::patch().text(::ui::TextVisual{
+		.color = {kTopMessagePalette, 0, 0, 255},
+		.font_id = kTopMessageFontBank,
+		.font_size = kTopMessageAdvance,
+		.line_height = static_cast<float>(kTopMessageLineHeight),
+	});
+}
+
+inline std::string top_message_slice(const char * text, int progress) {
+	const char * safe_text = text ? text : "";
+	const int length = static_cast<int>(std::strlen(safe_text));
+	int start = 0;
+	if(progress / 2 > kTopMessageScrollLead){
+		start = (progress / 2) - kTopMessageScrollLead;
+		if(start > length) start = length;
+	}
+	return std::string(safe_text + start,
+	                   static_cast<std::size_t>(std::min(kTopMessageMaxLength, length - start)));
+}
+
 struct QuitPromptProps {
 	const char * key = nullptr;
 	int surface_width = 0;
@@ -73,6 +105,26 @@ struct QuitPromptProps {
 	/>
 }
 
+struct TopMessageProps {
+	const char * key = nullptr;
+	bool show = false;
+	const char * text = nullptr;
+	int progress = 0;
+};
+
+::ui::UiElement TopMessage(const TopMessageProps& props) {
+	const char * text = props.text ? props.text : "";
+	if(!props.show || !*text || props.progress <= 0) return ::ui::empty();
+	std::string clipped = top_message_slice(text, props.progress);
+	return <Text
+	  key={props.key}
+	  id="InGameTopMessage"
+	  value={::ui::copy_string(clipped.c_str())}
+	  layout={absolute_layout(kTopMessageX, kTopMessageY, kTopMessageWidth, kTopMessageHeight)}
+	  style={top_message_text_patch()}
+	/>
+}
+
 }  // namespace ingame_overlay_frame_detail
 
 using ::ui::children;
@@ -90,6 +142,12 @@ using ::ui::components::BoxProps;
 		  surfaceWidth={props.width}
 		  show={props.show_quit_prompt}
 		  text={props.quit_prompt_text}
+		/>
+		<ingame_overlay_frame_detail.TopMessage
+		  key="top-message"
+		  show={props.show_top_message}
+		  text={props.top_message_text}
+		  progress={props.top_message_progress}
 		/>
 	</Box>
 }

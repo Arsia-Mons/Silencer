@@ -11,6 +11,9 @@ struct InGameOverlayFrameProps {
 	int height = 0;
 	bool show_quit_prompt = false;
 	const char * quit_prompt_text = nullptr;
+	bool show_top_message = false;
+	const char * top_message_text = nullptr;
+	int top_message_progress = 0;
 };
 
 ::ui::UiElement InGameOverlayFrame(const InGameOverlayFrameProps& props);

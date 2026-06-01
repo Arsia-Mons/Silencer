@@ -182,39 +182,12 @@ void DrawStatus(const HudView& view, Surface* surface) {
 	}
 }
 
-void DrawTopMessage(const HudView& view, Surface* surface) {
-	const InGameTopMessageView& msg = view.topMessage;
-	if(!msg.topmessage_i) return;
-	if(msg.text.empty()) return;
-
-	const char* text = msg.text.c_str();
-	int progress = msg.topmessage_i;
-	int slen = (int)msg.text.size();
-	int start = 0;
-	if(progress / 2 > 24){
-		start = (progress / 2) - 24;
-		if(start > slen) start = slen;
-	}
-	const int maxlength = 35;
-	char textmax[maxlength + 1];
-	std::memset(textmax, 0, sizeof(textmax));
-	std::strncpy(textmax, text + start, maxlength);
-	std::string topText(textmax);
-	CLAY({ .id = CLAY_ID("InGameTopMessageRoot"),
-	       .layout = { .sizing = { CLAY_SIZING_FIXED((float)surface->w), CLAY_SIZING_FIXED((float)surface->h) } } }) {
-		CLAY(FloatingTextElement("InGameTopMessage", 200, 10, 245, 12)) {
-			Text(ClayStringFromStd(topText), { .size = TextSize::BodySm });
-		}
-	}
-}
-
 }  // namespace ingameoverlays_detail
 
 void BuildInGameOverlaysUi(Renderer& /*renderer*/, const Resources& /*resources*/,
                            const HudView& view, Surface* surface) {
 	if(!view.mapLoaded) return;
 	ingameoverlays_detail::DrawStatus(view, surface);
-	ingameoverlays_detail::DrawTopMessage(view, surface);
 	ingameoverlays_detail::DrawMessage(view, surface);
 	if(view.showPlayerList){
 		BuildPlayerListOverlay(view, surface);

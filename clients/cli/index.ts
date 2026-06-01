@@ -18,7 +18,7 @@ function usage(): never {
       `       silencer-cli state\n` +
       `       silencer-cli inspect [--interface-id N]\n` +
       `       silencer-cli world_state\n` +
-      `       silencer-cli ingame_ui_mode --mode chat|buy|tech|playerlist|quit|all|clear|status [--chat-line TEXT]\n` +
+      `       silencer-cli ingame_ui_mode --mode chat|buy|tech|playerlist|quit|topmessage|all|clear|status [--chat-line TEXT]\n` +
       `       silencer-cli resize --w 1280 --h 720\n` +
       `       silencer-cli click --label "OPTIONS"\n` +
       `       silencer-cli click_at --x 320 --y 240\n` +
