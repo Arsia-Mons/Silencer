@@ -22,8 +22,6 @@ private:
 	void ClampScroll();
 
 	bool infoLoaded = false;
-	bool doneClicked = false;
-	int upgradeClicked = -1;
 	int scrollDelta = 0;
 	int scrollPosition = 0;
 	silencer::client_ui::MissionSummarySnapshot summary;

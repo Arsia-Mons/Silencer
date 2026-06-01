@@ -13,8 +13,6 @@
 
 #include <algorithm>
 #include <array>
-#include <cstring>
-#include <cstdlib>
 #include <memory>
 #include <string>
 #include <utility>
@@ -23,20 +21,6 @@ namespace mission_summary_screen_detail
 {
 constexpr uint16_t kSummaryH = 300;
 constexpr uint8_t kLineH = 11;
-constexpr const char * kActionDone = "mission_summary.done";
-constexpr const char * kActionUpgradePrefix = "mission_summary.upgrade.";
-
-bool StartsWith(const std::string & value, const char * prefix)
-{
-	const size_t n = std::strlen(prefix);
-	return value.size() >= n && value.compare(0, n, prefix) == 0;
-}
-
-int SuffixInt(const std::string & value, const char * prefix)
-{
-	if(!StartsWith(value, prefix)) return -1;
-	return std::atoi(value.c_str() + std::strlen(prefix));
-}
 
 void FillVisibleSummaryLines(
 	const silencer::client_ui::MissionSummarySnapshot& summary,
@@ -57,6 +41,19 @@ void FillVisibleSummaryLines(
 	}
 }
 
+void FinishMissionSummary(
+	silencer::client_ui::MissionSummaryModel mission,
+	silencer::client_ui::Navigation navigation)
+{
+	silencer::client_ui::MissionSummaryDestination destination =
+		mission.finish();
+	if(destination == silencer::client_ui::MissionSummaryDestination::Lobby){
+		navigation.reset_to(std::make_unique<LobbyScreen>());
+	}else{
+		navigation.reset_to(std::make_unique<MainMenuScreen>());
+	}
+}
+
 } // namespace mission_summary_screen_detail
 
 void MissionSummaryScreen::Build(ScreenContext & ctx)
@@ -64,8 +61,6 @@ void MissionSummaryScreen::Build(ScreenContext & ctx)
 	ctx.ResetPresentation(1);
 	ctx.renderer.camera.SetPosition(320, 240);
 	infoLoaded = false;
-	doneClicked = false;
-	upgradeClicked = -1;
 	scrollDelta = 0;
 	scrollPosition = 0;
 	summary = silencer::client_ui::use_mission_summary(
@@ -91,28 +86,10 @@ void MissionSummaryScreen::Tick(ScreenContext & ctx)
 			ClampScroll();
 		}
 	}
-	if(upgradeClicked >= 0){
-		int idx = upgradeClicked;
-		upgradeClicked = -1;
-		mission.upgrades.apply(idx);
-	}
-	if(doneClicked){
-		doneClicked = false;
-		silencer::client_ui::MissionSummaryDestination destination =
-			mission.finish();
-		if(destination == silencer::client_ui::MissionSummaryDestination::Lobby){
-			silencer::client_ui::use_navigation()
-				.reset_to(std::make_unique<LobbyScreen>());
-		}else{
-			silencer::client_ui::use_navigation()
-				.reset_to(std::make_unique<MainMenuScreen>());
-		}
-	}
 }
 
 void MissionSummaryScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime, silencer::ui::UiInteractionRegistry& interactions)
 {
-	(void)ctx;
 	(void)frametime;
 	const float uiScale = silencer::clay_bridge::UiScale();
 	const int virtualW = std::max(1, static_cast<int>(dst.w / uiScale));
@@ -128,6 +105,11 @@ void MissionSummaryScreen::BuildUi(ScreenContext & ctx, Surface & dst, float fra
 		linePtrs[i] = visibleLines[i].c_str();
 	}
 
+	silencer::client_ui::MissionSummaryModel mission =
+		silencer::client_ui::use_mission_summary(
+			silencer::client_ui::MakeMissionSummaryProvider(ctx));
+	silencer::client_ui::Navigation navigation =
+		silencer::client_ui::use_navigation();
 	silencer::client_ui::MissionSummaryFrameProps props{
 		.key = "mission-summary",
 		.summary_lines = linePtrs.data(),
@@ -136,6 +118,13 @@ void MissionSummaryScreen::BuildUi(ScreenContext & ctx, Surface & dst, float fra
 		.upgrade_banner = summary.upgrade_banner,
 		.levels = summary.levels,
 		.upgrades_available = summary.upgrades_available,
+		.apply_upgrade = [mission](int index) {
+			mission.upgrades.apply(index);
+		},
+		.finish = [mission, navigation]() {
+			mission_summary_screen_detail::FinishMissionSummary(
+				mission, navigation);
+		},
 	};
 	retainedFrame_.Build([&]() {
 		                     return silencer::client_ui::MissionSummaryFrame(props);
@@ -152,23 +141,19 @@ void MissionSummaryScreen::Destroy(ScreenContext & ctx)
 
 bool MissionSummaryScreen::HandleUiIntent(ScreenContext & ctx, const silencer::ui::UiAction & action)
 {
-	(void)ctx;
-	if(action.kind == silencer::ui::UiActionKind::Cancel ||
-	   (action.kind == silencer::ui::UiActionKind::Activate && action.id == mission_summary_screen_detail::kActionDone)){
-		doneClicked = true;
+	if(action.kind == silencer::ui::UiActionKind::Cancel){
+		silencer::client_ui::MissionSummaryModel mission =
+			silencer::client_ui::use_mission_summary(
+				silencer::client_ui::MakeMissionSummaryProvider(ctx));
+		mission_summary_screen_detail::FinishMissionSummary(
+			mission, silencer::client_ui::use_navigation());
 		return true;
 	}
 	if(action.kind == silencer::ui::UiActionKind::Scroll){
 		scrollDelta += action.amount;
 		return true;
 	}
-	if(action.kind != silencer::ui::UiActionKind::Activate) return false;
-	int upgrade = mission_summary_screen_detail::SuffixInt(action.id, mission_summary_screen_detail::kActionUpgradePrefix);
-	if(upgrade >= 0 && upgrade < 6){
-		upgradeClicked = upgrade;
-		return true;
-	}
-	return false;
+	return retainedFrame_.HandleUiIntent(action);
 }
 
 int MissionSummaryScreen::MaxScroll() const

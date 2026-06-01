@@ -3,6 +3,7 @@
 #include "ui/runtime/element.h"
 
 #include <array>
+#include <functional>
 
 namespace silencer {
 namespace client_ui {
@@ -18,6 +19,8 @@ struct MissionSummaryFrameProps {
 	bool upgrade_banner = false;
 	std::array<int, kMissionSummaryUpgradeCount> levels = {};
 	std::array<bool, kMissionSummaryUpgradeCount> upgrades_available = {};
+	std::function<void(int)> apply_upgrade = {};
+	std::function<void()> finish = {};
 };
 
 ::ui::UiElement MissionSummaryFrame(const MissionSummaryFrameProps& props);

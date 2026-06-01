@@ -442,6 +442,11 @@ fail_if_match \
   "$REPO_ROOT/clients/silencer/src/client/ui/screens/options/options_controls_screen.h"
 
 fail_if_match \
+  "\\b(doneClicked|upgradeClicked)\\b" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens/mission_summary/mission_summary_screen.cpp" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens/mission_summary/mission_summary_screen.h"
+
+fail_if_match \
   "\\bokClicked\\b" \
   "$REPO_ROOT/clients/silencer/src/client/ui/modals/message_modal.cpp" \
   "$REPO_ROOT/clients/silencer/src/client/ui/modals/message_modal.h" \

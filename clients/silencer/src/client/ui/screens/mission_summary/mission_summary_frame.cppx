@@ -203,6 +203,7 @@ const char * SummaryLine(const MissionSummaryFrameProps& props, int index) {
 		if(!props.frame || !props.frame->upgrades_available[props.index]){
 			return ::ui::empty();
 		}
+		std::function<void(int)> applyUpgrade = props.frame->apply_upgrade;
 		std::string actionId = std::string("mission_summary.upgrade.") +
 			std::to_string(props.index);
 		std::string textKey = std::string("upgrade-button-text-") +
@@ -216,6 +217,9 @@ const char * SummaryLine(const MissionSummaryFrameProps& props, int index) {
 			  controlId={actionId.c_str()}
 			  size={AppButtonSize::MainMenu}
 			  accessibilityLabel={kUpgradeLabels[props.index]}
+			  onPress={[applyUpgrade, index = props.index]() {
+					if(applyUpgrade) applyUpgrade(index);
+				}}
 			>
 				<ButtonLabel key={textKey.c_str()} label={kUpgradeLabels[props.index]} />
 			</AppButton>
@@ -382,6 +386,7 @@ using mission_summary_frame_detail::UpgradeRowProps;
 				  controlId="mission_summary.done"
 				  size={AppButtonSize::MainMenu}
 				  accessibilityLabel="Done"
+				  onPress={props.finish}
 				>
 						<ButtonLabel key="done-text" label="Done" />
 					</AppButton>
