@@ -4,6 +4,7 @@
 #include "client/ui/components/layout/layout.h"
 #include "client/ui/components/surfaces/surfaces.h"
 #include "client/ui/components/text/text.h"
+#include "client/ui/hooks/use_character_create.h"
 #include "client/ui/hooks/use_characters.h"
 #include "client/ui/hooks/use_lobby_session.h"
 #include "ui/components/input.h"
@@ -11,6 +12,7 @@
 
 #include <functional>
 #include <string>
+#include <vector>
 
 namespace client::ui {
 namespace {
@@ -20,24 +22,158 @@ using ::ui::children;
 using ::ui::components::Input;
 using ::ui::components::InputProps;
 
-// The five agencies, in `Team` enum / agency-index order (matches the index
-// CreateCharacter expects). Names mirror Team::GetAgencyName.
-struct AgencyRowProps {
-  const char *key = nullptr;
-  const char *control_id = nullptr;
-  const char *label = "";
-  bool enabled = false;
-  std::function<void()> on_create = {};
+// --- screen-local provider (doc §5/§6): the wizard cursor --------------------
+// Holds the staged-create UI state; setters mutate the use_state pointers
+// directly from event callbacks (the established Silencer screen idiom — the
+// callbacks fire in the focus/hit-test pass, after this frame's build).
+struct CharacterCreateContextValue {
+  int *step = nullptr;
+  std::string *alias = nullptr;
+  bool *submitting = nullptr;
 };
 
-::ui::UiElement AgencyRow(const AgencyRowProps &props) {
+ReactContext CharacterCreateContext = {};
+
+struct CharacterCreateProviderProps {
+  const char *key = nullptr;
+  ::ui::UiChildren children = {};
+};
+
+::ui::UiElement CharacterCreateProvider(const CharacterCreateProviderProps &props) {
+  int *step = use_state<int>(0);
+  std::string *alias = use_state<std::string>(std::string());
+  bool *submitting = use_state<bool>(false);
+  if (!step || !alias || !submitting)
+    return ::ui::empty();
+  CharacterCreateContextValue value{step, alias, submitting};
+  const CharacterCreateContextValue *stored = ::ui::copy_value(value);
+  if (!stored)
+    return ::ui::empty();
+  return ::ui::provider("CharacterCreateProvider", &CharacterCreateContext,
+                        const_cast<CharacterCreateContextValue *>(stored),
+                        props.children, props.key);
+}
+
+// The five agencies, in Team enum / agency-index order (matches CreateCharacter).
+const char *kAgencyNames[5] = {"Noxis", "Lazarus", "Caliber", "Static",
+                               "Black Rose"};
+const char *kAgencyControlIds[5] = {"AgencyNoxis", "AgencyLazarus",
+                                    "AgencyCaliber", "AgencyStatic",
+                                    "AgencyBlackRose"};
+
+// One agency row: a focusable selectable button. The default selection is the
+// first row; activating any row commits that agency and creates the agent.
+::ui::UiElement agency_row(int index, std::function<void(int)> on_pick) {
+  std::function<void()> on_press = [on_pick, index]() {
+    if (on_pick)
+      on_pick(index);
+  };
   return <AppButton
-    key={props.key}
-    controlId={props.control_id}
-    disabled={!props.enabled}
-    label={props.label}
-    onPress={props.on_create}
+    key={kAgencyControlIds[index]}
+    controlId={kAgencyControlIds[index]}
+    controlOffset={index}
+    selected={index == 0}
+    accessibilityLabel={kAgencyNames[index]}
+    label={kAgencyNames[index]}
+    onPress={on_press}
   />
+}
+
+// One roster row: select an existing agent. Out-of-range slots render nothing.
+::ui::UiElement roster_row(int index, const std::vector<std::string> &roster,
+                           std::function<void(int)> on_select) {
+  if (index < 0 || index >= (int)roster.size())
+    return ::ui::empty();
+  const char *label = ::ui::copy_string(roster[index].c_str());
+  const char *key = ::ui::copy_string(("agent" + std::to_string(index)).c_str());
+  std::function<void()> on_press = [on_select, index]() {
+    if (on_select)
+      on_select(index);
+  };
+  return <AppButton key={key} controlId="SelectAgent" controlOffset={index} label={label} onPress={on_press} />
+}
+
+struct CharacterCreateContentProps {
+  const char *key = nullptr;
+};
+
+::ui::UiElement CharacterCreateContent(const CharacterCreateContentProps &) {
+  CharacterWizard w = use_character_create();
+  Characters chars = use_characters();
+  LobbySession lobby = use_lobby_session();
+
+  std::function<void(int)> on_select = chars.select;
+  std::function<void(int)> on_pick = [create = chars.create, alias = w.alias,
+                                      submitting = w.submitting,
+                                      begin = w.begin_submit](int agency) {
+    if (submitting)
+      return;
+    if (begin)
+      begin();
+    if (create)
+      create(alias, agency);
+  };
+  std::function<void(const ::ui::ActivationEvent &)> on_alias_enter =
+      [confirm = w.confirm_alias](const ::ui::ActivationEvent &) {
+        if (confirm)
+          confirm();
+      };
+
+  // The wizard is a staged single-root view: roster → alias → agency. (Rendering
+  // the alias/agency as true modals layered over the roster needs overlay
+  // stack-entries, since the flex layout has no absolute/z stacking — a noted
+  // follow-up for the test-17 background-trap semantics.)
+  if (w.step == 1) {
+    return <ScreenLayout key="aliasmodal" variant={ScreenLayoutVariant::CenteredOverlay}>
+      <Panel key="panel" variant={PanelVariant::Hero}>
+        <ScreenTitle key="t" variant={ScreenTitleVariant::Dialog} value="New Agent" />
+        <ScreenSubtitle key="s" value="Step 2 of 3 — choose an alias" />
+        <Input
+          key="alias"
+          id="Alias"
+          autofocus={true}
+          accessibility={{.label = "Alias"}}
+          value={w.alias.c_str()}
+          onChange={w.set_alias}
+          onActivate={on_alias_enter}
+        />
+        <ActionRow key="actions">
+          <AppButton key="ok" controlId="AliasConfirm" variant={AppButtonVariant::Primary} disabled={w.alias.empty()} label="Continue" onPress={w.confirm_alias} />
+          <AppButton key="cancel" controlId="AliasCancel" label="Cancel" onPress={w.cancel} />
+        </ActionRow>
+      </Panel>
+    </ScreenLayout>
+  }
+
+  if (w.step == 2) {
+    return <ScreenLayout key="agencymodal" variant={ScreenLayoutVariant::CenteredOverlay}>
+      <Panel key="panel" variant={PanelVariant::Hero}>
+        <ScreenTitle key="t" variant={ScreenTitleVariant::Dialog} value="Choose Agency" />
+        <ScreenSubtitle key="s" value="Step 3 of 3 — pick an agency to deploy with" />
+        {agency_row(0, on_pick)}
+        {agency_row(1, on_pick)}
+        {agency_row(2, on_pick)}
+        {agency_row(3, on_pick)}
+        {agency_row(4, on_pick)}
+        <AppButton key="back" controlId="AgencyBack" label="Back" onPress={w.cancel} />
+      </Panel>
+    </ScreenLayout>
+  }
+
+  // step 0 — the roster + a "Create New Character" entry.
+  return <ScreenLayout key="roster" variant={ScreenLayoutVariant::Menu}>
+    <Panel key="panel" variant={PanelVariant::Hero}>
+      <ScreenTitle key="title" variant={ScreenTitleVariant::Hero} value="Select Agent" />
+      <ScreenSubtitle key="sub" value="Step 1 of 3 — choose an agent or create a new one" />
+      {roster_row(0, chars.roster, on_select)}
+      {roster_row(1, chars.roster, on_select)}
+      {roster_row(2, chars.roster, on_select)}
+      {roster_row(3, chars.roster, on_select)}
+      {roster_row(4, chars.roster, on_select)}
+      <AppButton key="new" controlId="CreateNewCharacter" variant={AppButtonVariant::Primary} label="Create New Character" onPress={w.open_alias} />
+      <AppButton key="leave" controlId="CharCreateCancel" label="Back" onPress={lobby.cancel} />
+    </Panel>
+  </ScreenLayout>
 }
 
 struct CharacterCreateProps {
@@ -45,76 +181,53 @@ struct CharacterCreateProps {
 };
 
 ::ui::UiElement CharacterCreateView(const CharacterCreateProps &) {
-  Characters chars = use_characters();
-  LobbySession lobby = use_lobby_session();
-  std::string *alias = use_state<std::string>(std::string());
-  if (!alias)
-    return ::ui::empty();
-
-  bool can_create = !alias->empty();
-  std::function<void(const std::string &)> set_alias =
-      [alias](const std::string &next) { *alias = next; };
-  std::function<void(const std::string &, int)> create = chars.create;
-  auto make_create = [create, alias](int agency) -> std::function<void()> {
-    return [create, alias, agency]() {
-      if (create && !alias->empty())
-        create(*alias, agency);
-    };
-  };
-
-  return <ScreenLayout key="root" variant={ScreenLayoutVariant::Menu}>
-    <Panel key="panel" variant={PanelVariant::Hero}>
-      <ScreenTitle key="title" variant={ScreenTitleVariant::Hero} value="Create Agent" />
-      <ScreenSubtitle key="subtitle" value="Choose an alias, then pick an agency" />
-      <Input
-        key="alias"
-        id="Alias"
-        autofocus={true}
-        accessibility={{.label = "Alias"}}
-        value={alias->c_str()}
-        onChange={set_alias}
-      />
-      <AgencyRow
-        key="noxis"
-        controlId="AgencyNoxis"
-        label="Noxis"
-        enabled={can_create}
-        onCreate={make_create(0)}
-      />
-      <AgencyRow
-        key="lazarus"
-        controlId="AgencyLazarus"
-        label="Lazarus"
-        enabled={can_create}
-        onCreate={make_create(1)}
-      />
-      <AgencyRow
-        key="caliber"
-        controlId="AgencyCaliber"
-        label="Caliber"
-        enabled={can_create}
-        onCreate={make_create(2)}
-      />
-      <AgencyRow
-        key="static"
-        controlId="AgencyStatic"
-        label="Static"
-        enabled={can_create}
-        onCreate={make_create(3)}
-      />
-      <AgencyRow
-        key="blackrose"
-        controlId="AgencyBlackRose"
-        label="Black Rose"
-        enabled={can_create}
-        onCreate={make_create(4)}
-      />
-      <AppButton key="cancel" controlId="Cancel" label="Cancel" onPress={lobby.cancel} />
-    </Panel>
-  </ScreenLayout>
+  return <CharacterCreateProvider key="provider">
+    <CharacterCreateContent key="content" />
+  </CharacterCreateProvider>
 }
 
 } // namespace
+
+CharacterWizard use_character_create() {
+  CharacterCreateContextValue *v = static_cast<CharacterCreateContextValue *>(
+      use_context(&CharacterCreateContext));
+  if (!v) {
+    react_report_error("client/ui: missing CharacterCreateProvider\n");
+    return {};
+  }
+  CharacterWizard w;
+  w.step = v->step ? *v->step : 0;
+  w.alias = v->alias ? *v->alias : std::string();
+  w.submitting = v->submitting ? *v->submitting : false;
+  int *step = v->step;
+  std::string *alias = v->alias;
+  bool *submitting = v->submitting;
+  w.set_alias = [alias](const std::string &s) {
+    if (alias)
+      *alias = s;
+  };
+  w.open_alias = [step]() {
+    if (step)
+      *step = 1;
+  };
+  w.confirm_alias = [step, alias]() {
+    if (step && alias && !alias->empty())
+      *step = 2;
+  };
+  w.cancel = [step, alias, submitting]() {
+    if (step)
+      *step = 0;
+    if (alias)
+      alias->clear();
+    if (submitting)
+      *submitting = false;
+  };
+  w.begin_submit = [submitting]() {
+    if (submitting)
+      *submitting = true;
+  };
+  return w;
+}
 
 ::ui::UiElement CharacterCreate(const char *key) {
   return ::ui::component("CharacterCreate", CharacterCreateProps{},
