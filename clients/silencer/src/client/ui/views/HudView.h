@@ -87,6 +87,34 @@ struct BuyTechOverlayView {
 	std::string                 footer;
 };
 
+struct ChatBackgroundSpriteView {
+	int    x = 0;
+	int    y = 0;
+	int    w = 0;
+	int    h = 0;
+	Uint8  bank = 0;
+	Uint16 index = 0;
+	int    sourceW = 0;
+	int    sourceH = 0;
+	bool   tile = false;
+};
+
+struct ChatOverlayView {
+	bool                              visible = false;
+	bool                              inputActive = false;
+	bool                              chatWithTeam = false;
+	bool                              caretVisible = false;
+	int                               panelX = 0;
+	int                               panelY = 0;
+	int                               panelW = 0;
+	int                               panelH = 0;
+	int                               inputCapacity = 0;
+	std::string                       inputPrefix;
+	std::string                       inputText;
+	std::vector<std::string>          lines;
+	std::vector<ChatBackgroundSpriteView> backgroundSprites;
+};
+
 // One team member, for the buy/tech "give to teammate" menu and player list.
 struct TeamPeerView {
 	Uint8       peerId = 0;
@@ -173,6 +201,7 @@ struct HudView {
 	// Chat overlay lines (history, not including the in-progress chat input).
 	std::vector<std::string> chatLines;
 	int                      showChatTicks = 0;
+	ChatOverlayView          chat;
 
 	// System camera insets (HUD draws frames around them; Game draws the
 	// world content via the renderer separately).

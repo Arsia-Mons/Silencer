@@ -68,6 +68,15 @@ constexpr int kBuyTechFooterY = 275;
 constexpr int kBuyTechTextBank = 134;
 constexpr int kBuyTechTextAdvance = 8;
 constexpr int kBuyTechTextLineHeight = 15;
+constexpr int kChatTextX = 10;
+constexpr int kChatTextStartY = 10;
+constexpr int kChatLineStepY = 10;
+constexpr int kChatMaxLines = 5;
+constexpr int kChatInputVisibleChars = 28;
+constexpr int kChatTextBank = 133;
+constexpr int kChatTextAdvance = 6;
+constexpr int kChatTextLineHeight = 11;
+constexpr int kChatInputUid = 9000;
 
 inline ::ui::LayoutStyle root_layout(int width, int height) {
 	return {
@@ -133,10 +142,16 @@ inline std::uint32_t texture_id(std::uint8_t bank, std::uint16_t index) {
 
 inline ::ui::StylePatch image_patch(std::uint8_t bank,
                                     std::uint16_t index,
-                                    std::uint8_t brightness = 128) {
+                                    std::uint8_t brightness = 128,
+                                    int source_width = 0,
+                                    int source_height = 0,
+                                    bool tile = false) {
 	return ::ui::patch().image(::ui::BackgroundImage{
 		.texture_id = texture_id(bank, index),
+		.source_w = static_cast<std::uint16_t>(std::max(0, source_width)),
+		.source_h = static_cast<std::uint16_t>(std::max(0, source_height)),
 		.brightness = brightness,
+		.tile = tile,
 	});
 }
 
@@ -165,6 +180,15 @@ inline ::ui::StylePatch buy_tech_text_patch(std::uint8_t brightness = 128) {
 
 inline std::string buy_tech_row_action_id(int index) {
 	return "ingame.buytech.row." + std::to_string(index);
+}
+
+inline ::ui::StylePatch chat_text_patch(std::uint8_t brightness = 136) {
+	return ::ui::patch().text(::ui::TextVisual{
+		.color = {0, brightness, 0, 255},
+		.font_id = kChatTextBank,
+		.font_size = kChatTextAdvance,
+		.line_height = static_cast<float>(kChatTextLineHeight),
+	});
 }
 
 struct MessageTextMetrics {
@@ -550,6 +574,172 @@ struct BuyTechOverlayProps {
 	</Box>
 }
 
+struct ChatBackgroundSpriteProps {
+	const char * key = nullptr;
+	const ChatOverlayView * chat = nullptr;
+	int index = 0;
+};
+
+::ui::UiElement ChatBackgroundSprite(const ChatBackgroundSpriteProps& props) {
+	if(!props.chat || props.index < 0 ||
+	   props.index >= static_cast<int>(props.chat->backgroundSprites.size())){
+		return ::ui::empty();
+	}
+	const ChatBackgroundSpriteView& sprite =
+		props.chat->backgroundSprites[props.index];
+	if(sprite.w <= 0 || sprite.h <= 0) return ::ui::empty();
+	return <Box
+	  key={props.key}
+	  id="InGameChatBackgroundSprite"
+	  idOffset={props.index}
+	  layout={absolute_layout(sprite.x, sprite.y, sprite.w, sprite.h)}
+	  style={image_patch(sprite.bank, sprite.index, 128, sprite.sourceW, sprite.sourceH, sprite.tile)}
+	/>
+}
+
+struct ChatLineProps {
+	const char * key = nullptr;
+	const ChatOverlayView * chat = nullptr;
+	int index = 0;
+};
+
+::ui::UiElement ChatLine(const ChatLineProps& props) {
+	if(!props.chat || props.index < 0 ||
+	   props.index >= static_cast<int>(props.chat->lines.size()) ||
+	   props.index >= kChatMaxLines){
+		return ::ui::empty();
+	}
+	const std::string& line = props.chat->lines[props.index];
+	if(line.empty()) return ::ui::empty();
+	return <Text
+	  key={props.key}
+	  id="InGameChatLine"
+	  idOffset={props.index}
+	  value={line.c_str()}
+	  layout={absolute_layout(kChatTextX, kChatTextStartY + (props.index * kChatLineStepY), static_cast<int>(line.size()) * kChatTextAdvance, kChatTextLineHeight)}
+	  style={chat_text_patch()}
+	/>
+}
+
+struct ChatCaretProps {
+	const char * key = nullptr;
+	bool show = false;
+	int x = 0;
+};
+
+::ui::UiElement ChatCaret(const ChatCaretProps& props) {
+	if(!props.show) return ::ui::empty();
+	return <Box
+	  key={props.key}
+	  id="InGameChatCaret"
+	  layout={absolute_layout(props.x, 0, 1, kChatTextLineHeight)}
+	  style={palette_fill_patch(140, 255)}
+	/>
+}
+
+struct ChatInputProps {
+	const char * key = nullptr;
+	const ChatOverlayView * chat = nullptr;
+};
+
+::ui::UiElement ChatInput(const ChatInputProps& props) {
+	if(!props.chat || !props.chat->inputActive) return ::ui::empty();
+	const int yoffset =
+		kChatTextStartY +
+		static_cast<int>(props.chat->lines.size()) * kChatLineStepY;
+	const int prefix_width =
+		static_cast<int>(props.chat->inputPrefix.size()) * kChatTextAdvance;
+	const int input_width = kChatInputVisibleChars * kChatTextAdvance;
+	const int caret_x =
+		std::min(std::max(0, input_width - 1),
+		         static_cast<int>(props.chat->inputText.size()) * kChatTextAdvance);
+	return <Box
+	  key={props.key}
+	  id="InGameChatInputRow"
+	  layout={absolute_layout(kChatTextX, yoffset, prefix_width + input_width, kChatTextLineHeight)}
+	>
+		<Text
+		  key="prefix"
+		  id="InGameChatInputPrefix"
+		  value={props.chat->inputPrefix.c_str()}
+		  layout={absolute_layout(0, 0, prefix_width, kChatTextLineHeight)}
+		  style={chat_text_patch()}
+		/>
+		<component_detail.Host
+		  kind={::ui::HostKind::Box}
+		  key="input"
+		  id="ingame.chat"
+		  idOffset={kChatInputUid}
+		  style={absolute_layout(prefix_width, 0, input_width, kChatTextLineHeight)}
+		  text={::ui::HostTextProps{.value = props.chat->inputText.c_str()}}
+		  interaction={::ui::NodeInteraction{.focusable = true}}
+		  accessibility={{.role = ::ui::SemanticRole::TextBox, .label = "In-game chat"}}
+		>
+			<Text
+			  key="value"
+			  id="InGameChatInputText"
+			  value={props.chat->inputText.c_str()}
+			  layout={absolute_layout(0, 0, input_width, kChatTextLineHeight)}
+			  style={chat_text_patch(128)}
+			/>
+			<ChatCaret key="caret" show={props.chat->caretVisible} x={caret_x} />
+		</component_detail.Host>
+	</Box>
+}
+
+struct ChatChannelTargetProps {
+	const char * key = nullptr;
+	const ChatOverlayView * chat = nullptr;
+};
+
+::ui::UiElement ChatChannelTarget(const ChatChannelTargetProps& props) {
+	if(!props.chat || !props.chat->inputActive) return ::ui::empty();
+	const char * label = props.chat->chatWithTeam ? "Team chat" : "All chat";
+	return <component_detail.Host
+	  kind={::ui::HostKind::Box}
+	  key={props.key}
+	  id="ingame.chat.channel"
+	  style={absolute_layout(0, 0, props.chat->panelW, props.chat->panelH)}
+	  interaction={::ui::NodeInteraction{
+			.focusable = true,
+			.checked = props.chat->chatWithTeam,
+		}}
+	  accessibility={{.role = ::ui::SemanticRole::Checkbox, .label = label}}
+	/>
+}
+
+struct ChatOverlayProps {
+	const char * key = nullptr;
+	bool show = false;
+	ChatOverlayView chat = {};
+};
+
+::ui::UiElement ChatOverlay(const ChatOverlayProps& props) {
+	if(!props.show || !props.chat.visible ||
+	   props.chat.panelW <= 0 || props.chat.panelH <= 0){
+		return ::ui::empty();
+	}
+	return <Box
+	  key={props.key}
+	  id="InGameChatPanel"
+	  layout={absolute_layout(props.chat.panelX, props.chat.panelY, props.chat.panelW, props.chat.panelH)}
+	>
+		<ChatChannelTarget key="channel" chat={&props.chat} />
+		<ChatBackgroundSprite key="background-0" chat={&props.chat} index={0} />
+		<ChatBackgroundSprite key="background-1" chat={&props.chat} index={1} />
+		<ChatBackgroundSprite key="background-2" chat={&props.chat} index={2} />
+		<ChatBackgroundSprite key="background-3" chat={&props.chat} index={3} />
+		<ChatBackgroundSprite key="background-4" chat={&props.chat} index={4} />
+		<ChatBackgroundSprite key="background-5" chat={&props.chat} index={5} />
+		<ChatLine key="line-0" chat={&props.chat} index={0} />
+		<ChatLine key="line-1" chat={&props.chat} index={1} />
+		<ChatLine key="line-2" chat={&props.chat} index={2} />
+		<ChatLine key="line-3" chat={&props.chat} index={3} />
+		<ChatLine key="line-4" chat={&props.chat} index={4} />
+		<ChatInput key="input" chat={&props.chat} />
+	</Box>
+}
+
 inline bool player_list_has_peers(const TeamHudView * teams, int count) {
 	if(!teams || count <= 0) return false;
 	for(int i = 0; i < count; ++i){
@@ -817,6 +1007,7 @@ using ::ui::components::BoxProps;
 		  surfaceWidth={props.width}
 		  surfaceHeight={props.height}
 		/>
+		<ingame_overlay_frame_detail.ChatOverlay key="chat" show={props.show_chat} chat={props.chat} />
 		<ingame_overlay_frame_detail.PlayerList
 		  key="player-list"
 		  show={props.show_player_list}

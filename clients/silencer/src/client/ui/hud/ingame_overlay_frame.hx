@@ -25,6 +25,8 @@ struct InGameOverlayFrameProps {
 	int team_count = 0;
 	bool show_buy_tech = false;
 	BuyTechOverlayView buy_tech = {};
+	bool show_chat = false;
+	ChatOverlayView chat = {};
 };
 
 ::ui::UiElement InGameOverlayFrame(const InGameOverlayFrameProps& props);

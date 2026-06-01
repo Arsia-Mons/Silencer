@@ -233,7 +233,12 @@ bool append_image(DrawCommandList &list, const NodeSnapshot &node) {
       .tint = premul(bi.tint),
       .nine_slice = bi.nine_slice,
       .corner_radius = node.visual.corner_radius,
+      .source_x = bi.source_x,
+      .source_y = bi.source_y,
+      .source_w = bi.source_w,
+      .source_h = bi.source_h,
       .brightness = bi.brightness,
+      .tile = bi.tile,
   };
   return list.push(command);
 }

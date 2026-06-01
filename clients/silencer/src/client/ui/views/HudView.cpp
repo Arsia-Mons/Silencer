@@ -13,6 +13,7 @@
 
 #include <SDL3/SDL_timer.h>
 
+#include <algorithm>
 #include <cstdio>
 #include <cstring>
 #include <list>
@@ -23,6 +24,17 @@ namespace silencer {
 namespace client_ui {
 
 namespace hudview_detail {
+
+constexpr int kChatX = 400;
+constexpr int kChatY = 280;
+constexpr int kChatW = 231;
+constexpr int kChatChromeH = 70;
+constexpr int kChatBackgroundInteriorH = 30;
+constexpr int kChatBackgroundBank = 188;
+constexpr int kChatTextStartY = 10;
+constexpr int kChatLineStepY = 10;
+constexpr int kChatMaxHistoryChars = 36;
+constexpr int kChatRightCapX = 36;
 
 int SpriteWidth(const ::Resources& res, Uint8 bank, Uint16 index) {
 	if(bank >= res.spritebank.size() || index >= res.spritebank[bank].size()){
@@ -68,6 +80,54 @@ int SpriteX(const ::Resources& res, Uint8 bank, Uint16 index, int logicalX = 0) 
 
 int SpriteY(const ::Resources& res, Uint8 bank, Uint16 index, int logicalY = 0) {
 	return logicalY + SpriteOffsetY(res, bank, index);
+}
+
+void AddChatBackgroundSprite(ChatOverlayView& chat,
+                             const ::Resources& resources,
+                             Uint16 spriteIndex,
+                             int logicalX,
+                             int logicalY,
+                             int targetW = 0,
+                             int targetH = 0,
+                             bool tile = false) {
+	const int spriteW = SpriteWidth(resources, kChatBackgroundBank, spriteIndex);
+	const int spriteH = SpriteHeight(resources, kChatBackgroundBank, spriteIndex);
+	if(spriteW <= 0 || spriteH <= 0) return;
+	if(targetW <= 0) targetW = spriteW;
+	if(targetH <= 0) targetH = spriteH;
+	if(targetW <= 0 || targetH <= 0) return;
+
+	ChatBackgroundSpriteView sprite;
+	sprite.x = SpriteX(resources, kChatBackgroundBank, spriteIndex, logicalX);
+	sprite.y = SpriteY(resources, kChatBackgroundBank, spriteIndex, logicalY);
+	sprite.w = targetW;
+	sprite.h = targetH;
+	sprite.bank = kChatBackgroundBank;
+	sprite.index = spriteIndex;
+	sprite.sourceW = spriteW;
+	sprite.sourceH = spriteH;
+	sprite.tile = tile;
+	chat.backgroundSprites.push_back(sprite);
+}
+
+void PopulateChatBackground(ChatOverlayView& chat, const ::Resources& resources) {
+	const int topLeftW = SpriteWidth(resources, kChatBackgroundBank, 0);
+	const int topMiddleW = std::max(0, kChatW - topLeftW - kChatRightCapX);
+	AddChatBackgroundSprite(chat, resources, 0, 0, 0);
+	AddChatBackgroundSprite(
+		chat, resources, 1, topLeftW, 0, topMiddleW,
+		SpriteHeight(resources, kChatBackgroundBank, 1), true);
+	AddChatBackgroundSprite(chat, resources, 2, kChatW - kChatRightCapX, 0);
+
+	const int bottomLeftW = SpriteWidth(resources, kChatBackgroundBank, 6);
+	const int bottomMiddleW = std::max(0, kChatW - bottomLeftW - kChatRightCapX);
+	AddChatBackgroundSprite(
+		chat, resources, 6, 0, kChatBackgroundInteriorH);
+	AddChatBackgroundSprite(
+		chat, resources, 7, bottomLeftW, kChatBackgroundInteriorH,
+		bottomMiddleW, SpriteHeight(resources, kChatBackgroundBank, 7), true);
+	AddChatBackgroundSprite(
+		chat, resources, 8, kChatW - kChatRightCapX, kChatBackgroundInteriorH);
 }
 
 void PopulatePlayerFields(PlayerHudView& view, ::Player* player) {
@@ -296,6 +356,37 @@ void PopulateBuyTech(HudView& out, ::World& world, ::Player* player) {
 	}
 }
 
+void PopulateChatOverlay(HudView& out, ::World& world, const PlayerHudView& player) {
+	if(!player.valid) return;
+	if(!player.chatActive && out.showChatTicks <= 0) return;
+
+	ChatOverlayView& chat = out.chat;
+	for(int i = 0; i < static_cast<int>(out.chatLines.size()); ++i){
+		if(player.chatActive && i == 0 && out.chatLines.size() == 5){
+			continue;
+		}
+		chat.lines.push_back(out.chatLines[i].substr(0, kChatMaxHistoryChars));
+	}
+	if(chat.lines.empty() && !player.chatActive) return;
+
+	chat.visible = true;
+	chat.inputActive = player.chatActive;
+	chat.chatWithTeam = player.chatWithTeam;
+	chat.panelX = kChatX;
+	chat.panelY = kChatY;
+	chat.panelW = kChatW;
+	const int contentLines =
+		static_cast<int>(chat.lines.size()) + (player.chatActive ? 1 : 0);
+	chat.panelH =
+		std::max(kChatChromeH,
+		         kChatTextStartY + contentLines * kChatLineStepY + 12);
+	chat.inputCapacity = player.chatTextCapacity;
+	chat.inputPrefix = player.chatWithTeam ? "(TEAM):" : "(ALL):";
+	chat.inputText = player.chatText;
+	chat.caretVisible = ((world.tickcount / 3) % 32) < 16;
+	PopulateChatBackground(chat, world.resources);
+}
+
 }  // namespace hudview_detail
 
 HudView BuildHudView(::World& world) {
@@ -366,6 +457,7 @@ HudView BuildHudView(::World& world) {
 
 	// Buy/Tech overlay derived from viewed player.
 	hudview_detail::PopulateBuyTech(view, world, viewedplayer);
+	hudview_detail::PopulateChatOverlay(view, world, view.viewedPlayer);
 
 	return view;
 }

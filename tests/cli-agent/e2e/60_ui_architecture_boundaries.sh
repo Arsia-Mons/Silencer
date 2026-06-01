@@ -188,6 +188,8 @@ fail_if_path_exists "clients/silencer/src/client/ui/hud/hud_player_list_overlay.
 fail_if_path_exists "clients/silencer/src/client/ui/hud/hud_player_list_overlay.h"
 fail_if_path_exists "clients/silencer/src/client/ui/hud/hud_buy_tech_overlay.cpp"
 fail_if_path_exists "clients/silencer/src/client/ui/hud/hud_buy_tech_overlay.h"
+fail_if_path_exists "clients/silencer/src/client/ui/hud/hud_chat_overlay.cpp"
+fail_if_path_exists "clients/silencer/src/client/ui/hud/hud_chat_overlay.h"
 
 fail_if_match \
   "Draw[A-Za-z0-9_]*Clay|BuildInGameHudUi|BuildInGameOverlaysUi|client/ui/hud|Clay_BeginLayout|Clay_EndLayout|Clay_SetPointerState|clay_bridge" \

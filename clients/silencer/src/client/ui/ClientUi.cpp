@@ -126,6 +126,25 @@ void FocusSelectedBuyTechRow(const HudView& view,
 	}
 }
 
+void UpdateChatTextInput(const HudView& view,
+                         silencer::ui::UiInteractionRegistry& interactions) {
+	if(!view.chat.visible || !view.chat.inputActive) return;
+	silencer::ui::UiInteractable input;
+	input.id = "ingame.chat";
+	input.labelText = "In-game chat";
+	input.kind = silencer::ui::UiInteractableKind::TextInput;
+	input.uid = 9000;
+	input.value = view.chat.inputText;
+	input.maxLength = view.chat.inputCapacity > 0
+		? view.chat.inputCapacity - 1
+		: 0;
+	input.cancelOnEscape = true;
+	interactions.RegisterInteractable(std::move(input));
+	if(!interactions.HasFocus()){
+		interactions.FocusInteractableById("ingame.chat");
+	}
+}
+
 void PlayMenuButtonSound(ScreenContext& ctx) {
 	use_app(MakeAppProvider(ctx)).audio.play_ui_click();
 }
@@ -329,8 +348,7 @@ void ClientUi::BuildVisibleScreens(ScreenContext& ctx, Surface& dst, float frame
 		MatchModel match = use_match(MatchProviderValue{&ctx.world},
 		                             ctx.world.peers.localpeerid);
 		HudView hudView = match.hud.snapshot();
-		BuildInGameHudUi(
-			ctx.renderer, ctx.world.resources, hudView, &dst, interactions_);
+		BuildInGameHudUi(ctx.renderer, ctx.world.resources, hudView, &dst);
 		const bool showQuitPrompt =
 			hudView.quitState == 1 || hudView.quitState == 2;
 		const bool showTopMessage =
@@ -342,9 +360,10 @@ void ClientUi::BuildVisibleScreens(ScreenContext& ctx, Surface& dst, float frame
 		const bool showBuyTech =
 			hudView.buyTech.visible && !hudView.buyTech.rows.empty() &&
 			hudView.buyTech.backgroundW > 0 && hudView.buyTech.backgroundH > 0;
+		const bool showChat = hudView.chat.visible;
 		inGameOverlayFrameActive_ =
 			showQuitPrompt || showTopMessage || showMessage ||
-			showStatusMessages || showPlayerList || showBuyTech;
+			showStatusMessages || showPlayerList || showBuyTech || showChat;
 		if(inGameOverlayFrameActive_){
 		#ifdef OUYA
 			const char * quitText = "Hit O To QUIT";
@@ -372,6 +391,8 @@ void ClientUi::BuildVisibleScreens(ScreenContext& ctx, Surface& dst, float frame
 				.team_count = static_cast<int>(hudView.teams.size()),
 				.show_buy_tech = showBuyTech,
 				.buy_tech = hudView.buyTech,
+				.show_chat = showChat,
+				.chat = hudView.chat,
 			};
 			inGameOverlayFrame_.Build([&]() {
 				                          return InGameOverlayFrame(props);
@@ -381,6 +402,9 @@ void ClientUi::BuildVisibleScreens(ScreenContext& ctx, Surface& dst, float frame
 			                          interactions_);
 			if(showBuyTech){
 				clientui_detail::FocusSelectedBuyTechRow(hudView, interactions_);
+			}
+			if(showChat){
+				clientui_detail::UpdateChatTextInput(hudView, interactions_);
 			}
 		}
 	}

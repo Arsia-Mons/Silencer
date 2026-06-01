@@ -109,25 +109,26 @@ void TileClipped(Surface * src,
 }
 
 void StretchClipped(Surface * src,
+                    Renderer::Rect srcRect,
                     Surface * dst,
                     int x,
                     int y,
                     int w,
                     int h) {
-	if(!src || !dst || w <= 0 || h <= 0) return;
+	if(!src || !dst || srcRect.w <= 0 || srcRect.h <= 0 || w <= 0 || h <= 0) return;
 	int cx = x;
 	int cy = y;
 	int cw = w;
 	int ch = h;
 	if(!ClipDrawRect(dst->w, dst->h, cx, cy, cw, ch)) return;
 	for(int py = cy; py < cy + ch; ++py){
-		int sy = ((py - y) * src->h) / h;
-		if(sy < 0) sy = 0;
-		if(sy >= src->h) sy = src->h - 1;
+		int sy = srcRect.y + ((py - y) * srcRect.h) / h;
+		if(sy < srcRect.y) sy = srcRect.y;
+		if(sy >= srcRect.y + srcRect.h) sy = srcRect.y + srcRect.h - 1;
 		for(int px = cx; px < cx + cw; ++px){
-			int sx = ((px - x) * src->w) / w;
-			if(sx < 0) sx = 0;
-			if(sx >= src->w) sx = src->w - 1;
+			int sx = srcRect.x + ((px - x) * srcRect.w) / w;
+			if(sx < srcRect.x) sx = srcRect.x;
+			if(sx >= srcRect.x + srcRect.w) sx = srcRect.x + srcRect.w - 1;
 			Uint8 col = Renderer::GetPixel(src, sx, sy);
 			if(col) Renderer::SetPixel(dst, px, py, col);
 		}
@@ -204,10 +205,23 @@ void DrawImage(Resources& resources,
 		if(work != src) delete work;
 		return;
 	}
-	if(w == work->w && h == work->h){
-		BlitClipped(work, Renderer::Rect{work->w, work->h, 0, 0}, dst, x, y);
+	const int srcX = std::min<int>(image.source_x, std::max(0, work->w - 1));
+	const int srcY = std::min<int>(image.source_y, std::max(0, work->h - 1));
+	const int maxSourceW = std::max(0, work->w - srcX);
+	const int maxSourceH = std::max(0, work->h - srcY);
+	const int sourceW = image.source_w > 0
+		? std::min<int>(image.source_w, maxSourceW)
+		: maxSourceW;
+	const int sourceH = image.source_h > 0
+		? std::min<int>(image.source_h, maxSourceH)
+		: maxSourceH;
+	Renderer::Rect srcRect{sourceW, sourceH, srcX, srcY};
+	if(image.tile){
+		TileClipped(work, srcRect, dst, x, y, w, h);
+	}else if(w == sourceW && h == sourceH){
+		BlitClipped(work, srcRect, dst, x, y);
 	}else{
-		StretchClipped(work, dst, x, y, w, h);
+		StretchClipped(work, srcRect, dst, x, y, w, h);
 	}
 	if(work != src) delete work;
 }

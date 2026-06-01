@@ -1,6 +1,5 @@
 #include "client/ui/hud/InGameHud.h"
 
-#include "client/ui/hud/hud_chat_overlay.h"
 #include "client/ui/hud/hud_readouts.h"
 #include "client/ui/hud/hud_secret_overlays.h"
 #include "client/ui/hud/hud_status_sprites.h"
@@ -14,11 +13,11 @@ namespace client_ui {
 
 // Top-level composition. Reads the per-frame HudView, picks a viewed player,
 // and orders the sub-builders. Each sub-builder owns a single concern (status
-// sprites, readouts, team strip, secret hack overlay, trace time, buy/tech
-// overlay, chat overlay, system-camera frame) and lives in its own TU.
+// sprites, readouts, team strip, secret hack overlay, trace time, system-camera
+// frame) and lives in its own TU. Retained in-game overlays are composed by
+// ClientUi after this legacy HUD pass.
 void BuildInGameHudUi(Renderer& renderer, const Resources& resources,
-                      const HudView& view, Surface* surface,
-                      silencer::ui::UiInteractionRegistry& interactions) {
+                      const HudView& view, Surface* surface) {
 	if(!view.mapLoaded) return;
 	if(!view.localPlayer.valid) return;
 
@@ -55,10 +54,6 @@ void BuildInGameHudUi(Renderer& renderer, const Resources& resources,
 	}
 	if(player.tracetime > 0) tracetime = player.tracetime;
 	if(tracetime > 0) BuildHudTraceTime(surface, tracetime);
-
-	if(view.showChatTicks || player.chatActive){
-		BuildChatOverlay(view, resources, surface, interactions);
-	}
 }
 
 }  // namespace client_ui
