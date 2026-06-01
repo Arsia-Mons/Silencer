@@ -29,6 +29,8 @@ Don't invoke for:
    - Main menu (640×480, 1280×720)
    - Options root, Options Controls, Options Display, Options Audio
    - Lobby connect screen (no live lobby needed — the connect-attempt UI itself is captured)
+   - Authenticated local-lobby flow: login, character create, alias modal, lobby browser, create-game, create-game message modal
+   - Password modal
    - In-game HUD (via Tutorial), at 640×480 and 1280×720
    - In-game overlays via `ingame_ui_mode --mode {chat,buy,tech,playerlist}` (note: tutorial mode may not surface buy/tech overlays because those need world stations — flag this in the report, don't claim success)
 
@@ -41,7 +43,9 @@ Don't invoke for:
 
 4. **Composite** side-by-side images with diff scores annotated, via ImageMagick (`magick`). Output to `/tmp/journeys-composite/`.
 
-5. **Categorize** each pair:
+5. **DM** the stitched comparison images to Henry on Discord by default. Set `SEND_DISCORD=0` for dry local runs.
+
+6. **Categorize** each pair:
    - ≤ 2% — visually identical, likely animation-phase noise only
    - 2-10% — minor layout drift; eyeball for real differences
    - 10-40% — fade-in timing mismatch OR genuine visual change; eyeball is mandatory
@@ -63,16 +67,20 @@ SKIP_BASELINE=1 bash shared/skills/visual-regression-journeys/run.sh
 
 # Skip current branch capture (re-use existing)
 SKIP_CURRENT=1 bash shared/skills/visual-regression-journeys/run.sh
+
+# Dry run without Discord delivery
+SEND_DISCORD=0 bash shared/skills/visual-regression-journeys/run.sh
 ```
 
-The driver does five things in order: build current → capture current → checkout baseline worktree + build → capture baseline → pixdiff + composites. Each step is its own script; they can be invoked independently for debugging.
+The driver does six things in order: build current with the client wrapper → capture current → checkout a clean baseline worktree + build with the client wrapper → capture baseline → pixdiff + composites → Discord DM delivery. Each step is its own script; they can be invoked independently for debugging.
 
 ## Pre-flight requirements
 
-- `cmake --build build --target silencer -j 8` must succeed on the current branch first. The driver does NOT rebuild for you — it errors if `build/Silencer.app/Contents/MacOS/Silencer` is stale.
+- `clients/silencer/build.sh` must be available. The driver builds current and baseline through this wrapper by default; set `BUILD_CURRENT=0` or `BUILD_BASELINE=0` only when reusing known-fresh binaries.
 - `tools/pixdiff/build/pixdiff` must exist. Build with `cmake -B tools/pixdiff/build -S tools/pixdiff && cmake --build tools/pixdiff/build` if missing.
 - `magick` (ImageMagick 7) on PATH. `brew install imagemagick` if missing.
 - `ripgrep` (`rg`) for `tests/cli-agent/e2e/60_ui_architecture_boundaries.sh` to actually do anything when invoked. `brew install ripgrep`.
+- Discord DM delivery uses `DISCORD_DM_SEND_SCRIPT`, `${CLAUDE_PLUGIN_ROOT}/skills/discord-dm/send.ts`, or `/Users/hv/repos/hv-skills/discord-dm/skills/discord-dm/send.ts`, in that order.
 
 ## What it catches (real examples)
 
@@ -83,12 +91,12 @@ The driver does five things in order: build current → capture current → chec
 ## What it does NOT catch
 
 - Behavior bugs that don't show on screen (state machine errors, network glitches, audio).
-- Surfaces it can't reach: chat-overlay-with-typed-text, buy menu against a station, tech-tree mid-purchase. Tutorial mode doesn't surface most station-bound overlays. For those, drive a real lobby (not yet automated in this skill).
+- Surfaces it can't reach: chat-overlay-with-typed-text, buy menu against a station, tech-tree mid-purchase. Tutorial mode doesn't surface most station-bound overlays; treat those captures as representative overlay states, not full station interaction proof.
 - Animation regressions — captures land on whatever frame is current; non-deterministic.
 
 ## Files
 
-- `run.sh` — the orchestrator. Read it; it documents the flow as comments.
+- `run.sh` — the orchestrator. Read it; it documents the flow as comments and sends Discord DM batches unless `SEND_DISCORD=0`.
 - `capture_current.sh` — captures the current branch into `$OUT_DIR`. Uses `tests/cli-agent/e2e/lib.sh` from the current worktree. Uses Clay-era labels ("OPTIONS", "CONTROLS").
 - `capture_baseline.sh` — captures the baseline ref. Sets `SILENCER_BIN` to the worktree's build output. Uses legacy-era labels ("Controls", "Display", "Audio"). Restarts the binary per screen because legacy UI flow is fragile to CLI back-navigation.
 - `build_composites.sh` — runs ImageMagick to produce side-by-side composites with diff scores. Uses `/System/Library/Fonts/Supplemental/Arial.ttf` to avoid ImageMagick's font fallback failure on macOS.

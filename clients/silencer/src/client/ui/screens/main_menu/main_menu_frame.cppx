@@ -5,6 +5,8 @@
 #include "ui/components/box.h"
 #include "ui/components/text.h"
 
+#include <cstdint>
+
 namespace silencer {
 namespace client_ui {
 
@@ -13,6 +15,26 @@ using ::ui::components::Box;
 using ::ui::components::BoxProps;
 using ::ui::components::Text;
 using ::ui::components::TextProps;
+
+namespace main_menu_frame_detail {
+
+inline std::uint32_t texture_id(std::uint8_t bank, std::uint16_t index) {
+	return (static_cast<std::uint32_t>(bank) << 16) |
+	       static_cast<std::uint32_t>(index);
+}
+
+inline ::ui::StylePatch image_patch(std::uint8_t bank, std::uint16_t index) {
+	return ::ui::patch().image(::ui::BackgroundImage{
+		.texture_id = texture_id(bank, index),
+		.tint = {255, 255, 255, 255},
+	});
+}
+
+inline ::ui::StylePatch logo_patch() {
+	return image_patch(208, 60);
+}
+
+}  // namespace main_menu_frame_detail
 
 ::ui::UiElement MainMenuFrame(const MainMenuFrameProps& props) {
 	const bool compact = props.viewport_width > 0 &&
@@ -87,15 +109,17 @@ using ::ui::components::TextProps;
 			.width = ::ui::Length::percent(100.0f),
 			.height = ::ui::Length::percent(100.0f),
 		}}
-	  style={tokens::fill_patch(tokens::kSurfaceMenu)}
+	  style={main_menu_frame_detail::image_patch(6, 0)}
 	>
 		<Box key="composition" layout={composition_layout}>
 			<Box key="logo-group" layout={logo_layout}>
-				<Text
-				  key="title"
-				  value="Silencer"
-				  layout={::ui::LayoutStyle{.height = ::ui::Length::points(24.0f)}}
-				  style={tokens::text_patch(tokens::kTextTitle, tokens::kFontTitleBank, tokens::kFontTitleAdvance)}
+				<Box
+				  key="logo"
+				  layout={::ui::LayoutStyle{
+						.width = ::ui::Length::points(292.0f),
+						.height = ::ui::Length::points(46.0f),
+					}}
+				  style={main_menu_frame_detail::logo_patch()}
 				/>
 			</Box>
 			<Box key="action-group" layout={action_group_layout}>
@@ -198,7 +222,7 @@ using ::ui::components::TextProps;
 				.position_inset = tokens::inset_left_bottom(10.0f, 6.0f),
 				.height = ::ui::Length::points(11.0f),
 			}}
-		  style={tokens::text_patch(::ui::Color{0, 0, 0, 255},
+		  style={tokens::text_patch(::ui::Color{0, 255, 64, 255},
 		                            tokens::kFontFooterBank,
 		                            tokens::kFontFooterAdvance)}
 		/>

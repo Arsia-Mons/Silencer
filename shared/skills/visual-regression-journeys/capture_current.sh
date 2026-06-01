@@ -27,6 +27,14 @@ snap() {
   echo "  captured $name"
 }
 
+snap_port() {
+  local port="$1"
+  local name="$2"
+  cli --port "$port" wait_ms --n 1500 >/dev/null
+  cli --port "$port" screenshot --out "$OUT_DIR/${name}.png" >/dev/null
+  echo "  captured $name"
+}
+
 resize() {
   cli --port "$PORT" resize --w "$1" --h "$2" >/dev/null
   cli --port "$PORT" wait_ms --n 1500 >/dev/null
@@ -35,6 +43,166 @@ resize() {
 go_back() {
   cli --port "$PORT" back >/dev/null
   cli --port "$PORT" wait_ms --n 1500 >/dev/null
+}
+
+wait_for_widget_port() {
+  local port="$1"
+  local label="$2"
+  for _ in $(seq 1 100); do
+    if cli --port "$port" inspect | LABEL="$label" bun -e '
+      const text = await new Response(Bun.stdin.stream()).text();
+      const response = JSON.parse(text);
+      const label = process.env.LABEL;
+      process.exit((response.widgets ?? []).some((w) => w.label === label) ? 0 : 1);
+    ' >/dev/null 2>&1; then
+      return 0
+    fi
+    sleep 0.05
+  done
+  echo "widget '$label' never appeared" >&2
+  cli --port "$port" inspect >&2 || true
+  return 1
+}
+
+wait_for_lobby_state_port() {
+  local port="$1"
+  local target="$2"
+  local state=""
+  for _ in $(seq 1 100); do
+    state="$(cli --port "$port" state | bun -e '
+      const text = await new Response(Bun.stdin.stream()).text();
+      console.log(JSON.parse(text).lobby_state || "");
+    ')"
+    if [ "$state" = "$target" ]; then
+      return 0
+    fi
+    sleep 0.1
+  done
+  echo "lobby_state never became $target (last=$state)" >&2
+  return 1
+}
+
+wait_character_create_port() {
+  local port="$1"
+  cli --port "$port" wait_for_ui --id-prefix character_create. --timeout-ms 15000 >/dev/null
+}
+
+wait_lobby_screen_port() {
+  local port="$1"
+  cli --port "$port" wait_for_ui --id lobby.go_back --timeout-ms 15000 >/dev/null
+}
+
+capture_live_lobby() {
+  local lobby_bin tmp lobby_log lobby_db silencer_home lobby_port player_auth_port map_api_port ctrl_port
+  lobby_bin="$(lobby_bin)"
+  tmp="$(mktemp -d)"
+  lobby_log="$tmp/lobby.log"
+  lobby_db="$tmp/lobby.json"
+  silencer_home="$tmp/home"
+  mkdir -p "$silencer_home/Library/Application Support/Silencer" "$tmp/maps"
+
+  lobby_port="$(pick_port)"
+  player_auth_port="$(pick_port)"
+  map_api_port="$(pick_port)"
+  ctrl_port="$(pick_port)"
+
+  cat > "$silencer_home/Library/Application Support/Silencer/config.cfg" <<EOF
+mapapiurl=http://127.0.0.1:$map_api_port
+EOF
+
+  local silencer_version
+  silencer_version="$(silencer_version)"
+
+  "$lobby_bin" \
+    -addr ":$lobby_port" \
+    -db "$lobby_db" \
+    -version "$silencer_version" \
+    -game-binary "$SILENCER_BIN" \
+    -maps-dir "$tmp/maps" \
+    -player-auth-addr ":$player_auth_port" \
+    -map-api-addr ":$map_api_port" \
+    >"$lobby_log" 2>&1 &
+  local lobby_pid=$!
+
+  cleanup_live_lobby() {
+    if [ -n "${silencer_pid:-}" ]; then
+      stop_silencer "$silencer_pid" "$ctrl_port" || true
+    fi
+    kill "$lobby_pid" 2>/dev/null || true
+    wait "$lobby_pid" 2>/dev/null || true
+    rm -rf "$tmp"
+  }
+  trap cleanup_live_lobby EXIT
+
+  for i in $(seq 1 60); do
+    if (echo > "/dev/tcp/127.0.0.1/$lobby_port") 2>/dev/null; then
+      break
+    fi
+    sleep 0.25
+    if [ "$i" = 60 ]; then
+      echo "lobby on :$lobby_port never came up" >&2
+      cat "$lobby_log" >&2
+      exit 1
+    fi
+  done
+
+  HOME="$silencer_home" "$SILENCER_BIN" \
+    --headless \
+    --control-port "$ctrl_port" \
+    --lobby-host 127.0.0.1 \
+    --lobby-port "$lobby_port" \
+    >"/tmp/silencer-e2e-$ctrl_port.log" 2>&1 &
+  local silencer_pid=$!
+  wait_alive "$ctrl_port"
+
+  cli --port "$ctrl_port" wait_for_ui --id main_menu.options --timeout-ms 15000 >/dev/null
+  cli --port "$ctrl_port" resize --w 640 --h 480 >/dev/null
+  wait_for_widget_port "$ctrl_port" "Connect To Lobby"
+  cli --port "$ctrl_port" click --label "Connect To Lobby" >/dev/null
+  cli --port "$ctrl_port" wait_for_ui --id lobby_connect.login --timeout-ms 5000 >/dev/null
+  wait_for_widget_port "$ctrl_port" "Login/Create"
+  snap_port "$ctrl_port" "30_lobby_login_640x480"
+
+  cli --port "$ctrl_port" set_text --uid 1 --text "visualcurrent" >/dev/null
+  cli --port "$ctrl_port" set_text --uid 2 --text "secret" >/dev/null
+  wait_for_lobby_state_port "$ctrl_port" AUTHENTICATING
+  cli --port "$ctrl_port" click --label "Login/Create" >/dev/null
+  wait_character_create_port "$ctrl_port"
+  wait_for_widget_port "$ctrl_port" "Create New Character"
+  snap_port "$ctrl_port" "31_character_create_640x480"
+
+  cli --port "$ctrl_port" click --label "Create New Character" >/dev/null
+  wait_for_widget_port "$ctrl_port" "Alias"
+  snap_port "$ctrl_port" "32_character_alias_modal_640x480"
+  cli --port "$ctrl_port" set_text --label "Alias" --text "VisualCurrent" >/dev/null
+  cli --port "$ctrl_port" key --key enter >/dev/null
+  wait_character_create_port "$ctrl_port"
+  wait_for_widget_port "$ctrl_port" "Noxis"
+  cli --port "$ctrl_port" click --label "Noxis" >/dev/null
+  wait_lobby_screen_port "$ctrl_port"
+  wait_for_widget_port "$ctrl_port" "Create Game"
+  cli --port "$ctrl_port" step --frames 5 >/dev/null
+  snap_port "$ctrl_port" "33_lobby_game_select_640x480"
+
+  cli --port "$ctrl_port" set_text --label "Chat" --text "visual lobby hello" >/dev/null || true
+  cli --port "$ctrl_port" click --label "Create Game" >/dev/null
+  cli --port "$ctrl_port" step --frames 5 >/dev/null
+  wait_for_widget_port "$ctrl_port" "Game name"
+  snap_port "$ctrl_port" "34_lobby_game_create_640x480"
+
+  cli --port "$ctrl_port" click --label "Create" >/dev/null
+  cli --port "$ctrl_port" step --frames 5 >/dev/null
+  wait_for_widget_port "$ctrl_port" OK
+  snap_port "$ctrl_port" "35_lobby_create_message_modal_640x480"
+  cli --port "$ctrl_port" click --label OK >/dev/null
+  cli --port "$ctrl_port" step --frames 5 >/dev/null
+
+  cli --port "$ctrl_port" resize --w 1280 --h 720 >/dev/null
+  cli --port "$ctrl_port" wait_frames --n 3 >/dev/null
+  snap_port "$ctrl_port" "36_lobby_game_create_1280x720"
+
+  cleanup_live_lobby
+  trap - EXIT
 }
 
 # --- Phase 1: menu surfaces at 640x480 ---
@@ -78,6 +246,12 @@ if cli --port "$PORT" click --label "Connect To Lobby" 2>/dev/null >/dev/null \
 else
   echo "  skipped lobby connect (no matching label)"
 fi
+
+cli --port "$PORT" show_password_modal >/dev/null
+cli --port "$PORT" wait_ms --n 500 >/dev/null
+snap "07_password_modal_640x480"
+cli --port "$PORT" click --label OK >/dev/null
+cli --port "$PORT" wait_for_ui --id main_menu.options --timeout-ms 5000 >/dev/null
 
 # --- Phase 2: 1280x720 reflow ---
 resize 1280 720
@@ -143,5 +317,11 @@ cli --port "$PORT" ingame_ui_mode --mode clear >/dev/null
 resize 1280 720
 cli --port "$PORT" wait_frames --n 3 >/dev/null
 snap "25_ingame_hud_1280x720"
+
+stop_silencer "$PID" "$PORT"
+trap - EXIT
+
+# --- Phase 4: authenticated lobby/menu flow against a local lobby ---
+capture_live_lobby
 
 echo "DONE: $(ls "$OUT_DIR" | wc -l | tr -d ' ') screenshots in $OUT_DIR"

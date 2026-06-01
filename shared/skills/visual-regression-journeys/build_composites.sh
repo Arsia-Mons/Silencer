@@ -19,7 +19,10 @@ set -uo pipefail
 : "${CURRENT_DIR:?must be set}"
 : "${OUT_DIR:?must be set}"
 PIXDIFF_BIN="${PIXDIFF_BIN:-tools/pixdiff/build/pixdiff}"
+BASELINE_LABEL="${BASELINE_LABEL:-baseline}"
+CURRENT_LABEL="${CURRENT_LABEL:-current}"
 mkdir -p "$OUT_DIR"
+shopt -s nullglob
 
 FONT="/System/Library/Fonts/Supplemental/Arial.ttf"
 [ -f "$FONT" ] || FONT="/System/Library/Fonts/Helvetica.ttc"
@@ -53,8 +56,8 @@ build_one() {
   local diff_pct
   diff_pct=$("$PIXDIFF_BIN" "$BASE_DIR/$name.png" "$CURRENT_DIR/$name.png" 2>/dev/null)
   magick \
-    \( "$BASE_DIR/$name.png" -gravity North -background black -splice 0x30 -font "$FONT" -fill white -pointsize 14 -annotate +0+8 "baseline" \) \
-    \( "$CURRENT_DIR/$name.png" -gravity North -background black -splice 0x30 -font "$FONT" -fill white -pointsize 14 -annotate +0+8 "current" \) \
+    \( "$BASE_DIR/$name.png" -gravity North -background black -splice 0x30 -font "$FONT" -fill white -pointsize 14 -annotate +0+8 "$BASELINE_LABEL" \) \
+    \( "$CURRENT_DIR/$name.png" -gravity North -background black -splice 0x30 -font "$FONT" -fill white -pointsize 14 -annotate +0+8 "$CURRENT_LABEL" \) \
     +append \
     -gravity North -background "#222222" -splice 0x40 \
     -font "$FONT" -fill white -pointsize 18 -annotate +0+10 "${label}   pixdiff: ${diff_pct}%" \
