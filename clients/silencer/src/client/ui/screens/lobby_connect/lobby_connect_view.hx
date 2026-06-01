@@ -32,6 +32,12 @@ struct LobbyConnectContextValue {
 
 const LobbyConnectContextValue& UseLobbyConnect();
 
+struct LobbyConnectFrameProps {
+	const char * key = nullptr;
+};
+
+::ui::UiElement LobbyConnectFrame(const LobbyConnectFrameProps& props);
+
 struct LobbyConnectViewProps {
 	const char * key = nullptr;
 	const LobbyConnectContextValue * value = nullptr;

@@ -165,10 +165,6 @@ std::function<void(const ::ui::ActivationEvent&)> cancel_callback(
 	};
 }
 
-struct LobbyConnectFrameProps {
-	const char * key = nullptr;
-};
-
 struct UsernameInputProps {
 	const char * key = nullptr;
 };
@@ -240,6 +236,8 @@ struct LobbyConnectCancelButtonProps {
 	/>
 }
 
+}  // namespace
+
 ::ui::UiElement LobbyConnectFrame(const LobbyConnectFrameProps& props) {
 	const LobbyConnectContextValue& lobby = UseLobbyConnect();
 	const LobbyConnectState& state = lobby.state;
@@ -278,32 +276,6 @@ struct LobbyConnectCancelButtonProps {
 			</Box>
 		</Box>
 	</Box>
-}
-
-}  // namespace
-
-namespace {
-::ReactContext LobbyConnectContext = {};
-const LobbyConnectContextValue kEmptyLobbyConnect = {};
-}
-
-const LobbyConnectContextValue& UseLobbyConnect() {
-	const auto * value = static_cast<const LobbyConnectContextValue *>(
-		::use_context(&LobbyConnectContext));
-	return value ? *value : kEmptyLobbyConnect;
-}
-
-::ui::UiElement LobbyConnectView(const LobbyConnectViewProps& props) {
-	return ::ui::provider(
-		"LobbyConnectProvider",
-		&LobbyConnectContext,
-		const_cast<LobbyConnectContextValue *>(props.value),
-		children({
-			::ui::component("LobbyConnectFrame",
-			                LobbyConnectFrameProps{ .key = "frame" },
-			                LobbyConnectFrame),
-		}),
-		props.key);
 }
 
 }  // namespace silencer::client_ui
