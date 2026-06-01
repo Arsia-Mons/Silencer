@@ -597,7 +597,7 @@ inline const char * copied_id(const char * prefix, int row) {
 		  layout={::ui::LayoutStyle{
 				.direction = ::ui::FlexDirection::Row,
 				.align_items = ::ui::AlignItems::Center,
-			.width = ::ui::Length::grow(1.0f),
+			.width = ::ui::Length::percent(100.0f),
 			.height = ::ui::Length::points(static_cast<float>(kPresetRowH)),
 			.gap = presetGap,
 		}}

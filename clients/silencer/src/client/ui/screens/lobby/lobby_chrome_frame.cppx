@@ -849,11 +849,8 @@ inline ::ui::VisualStyle game_create_inline_control_visual(bool selected) {
 inline ::ui::StyleStatePatch game_create_text_input_patch() {
 	return ::ui::patch()
 		.background(::ui::Color{0, 0, 0, 0})
-		.border(::ui::Border{
-			{1.0f, 1.0f, 1.0f, 1.0f},
-			{{216, 0, 0, 255}, {216, 0, 0, 255},
-			 {216, 0, 0, 255}, {216, 0, 0, 255}},
-		})
+		.border(::ui::Border{})
+		.outline(::ui::Outline{})
 		.text(::ui::TextVisual{
 			.color = {0, 0, 0, 255},
 			.font_id = 133,

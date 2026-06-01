@@ -53,7 +53,7 @@ struct MessageModalOkButtonProps {
 	return <AppButton
 	  key={props.key}
 	  controlId="message_modal.ok"
-	  size={AppButtonSize::Sm}
+	  size={AppButtonSize::Chrome}
 	  label="OK"
 	  onPress={props.ok}
 	/>

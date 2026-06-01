@@ -173,17 +173,14 @@ inline ::ui::VisualStyle row_visual(bool selectedVisual, bool disabled) {
 	if(disabled){
 		visual.background = {0, 0, 0, 0};
 	}
-	visual.border = ::ui::Border{
-		{1.0f, 1.0f, 1.0f, 1.0f},
-		{{216, 0, 0, 255},
-		 {216, 0, 0, 255},
-		 {216, 0, 0, 255},
-		 {216, 0, 0, 255}},
+	visual.image = {
+		.texture_id = texture_id(6, 2),
+		.tint = {255, 255, 255, 255},
 	};
 	visual.text = {
 		.color = tokens::kTextButton,
-		.font_id = tokens::kFontBodyBank,
-		.font_size = 7,
+		.font_id = 134,
+		.font_size = 8,
 		.align = ::ui::TextAlign::Center,
 	};
 	return visual;
@@ -378,7 +375,7 @@ indexed_callback(std::function<void(int)> callback, int index) {
 				.justify_content = ::ui::JustifyContent::Center,
 			.width = ::ui::Length::points(static_cast<float>(kLeftColumnW)),
 			.height = ::ui::Length::points(static_cast<float>(kRowH)),
-				.padding = {8.0f, 8.0f, 4.0f, 4.0f},
+				.padding = {8.0f, 8.0f, 6.0f, 2.0f},
 			}}
 		  visual={row_visual(props.selected_visual, !props.enabled)}
 		  text={::ui::HostTextProps{.value = props.label ? props.label : ""}}
@@ -393,8 +390,8 @@ indexed_callback(std::function<void(int)> callback, int index) {
 			<LabelText
 			  key="label"
 			  value={props.label}
-			  style={text_patch(tokens::kTextButton, tokens::kFontBodyBank, 7, ::ui::TextAlign::Center)}
-			  height={13.0f}
+			  style={text_patch(tokens::kTextButton, 134, 8, ::ui::TextAlign::Center)}
+			  height={15.0f}
 			/>
 		</detail.Host>
 	}
@@ -898,8 +895,8 @@ indexed_callback(std::function<void(int)> callback, int index) {
 			.width = ::ui::Length::points(static_cast<float>(kAliasModalW)),
 			.height = ::ui::Length::points(static_cast<float>(kAliasModalH)),
 			.position_inset = inset_left_top(
-				static_cast<float>((kStageW - kAliasModalW) / 2),
-				static_cast<float>(kAliasModalTop)),
+				static_cast<float>((kPanelMinW - kAliasModalW) / 2),
+				static_cast<float>(kAliasModalTop - kFrameMarginTop)),
 		}}
 		  style={image_patch(40, 2)}
 		>
@@ -1022,14 +1019,6 @@ indexed_callback(std::function<void(int)> callback, int index) {
 			  agencyIds={props.agency_ids}
 			  renameAgent={props.rename_agent}
 			/>
-			<AliasModal
-			  key="alias-modal"
-			  show={props.step == CharacterCreateFrameStep::EnterAlias}
-			  aliasRenaming={props.alias_renaming}
-			  alias={props.alias}
-			  setAlias={props.set_alias}
-			  submitAlias={props.submit_alias}
-			/>
 		</Box>
 	}
 
@@ -1038,6 +1027,8 @@ indexed_callback(std::function<void(int)> callback, int index) {
 using ::ui::children;
 using ::ui::components::Box;
 using ::ui::components::BoxProps;
+using character_create_frame_detail::AliasModal;
+using character_create_frame_detail::AliasModalProps;
 using character_create_frame_detail::Body;
 using character_create_frame_detail::BodyProps;
 
@@ -1102,6 +1093,14 @@ using character_create_frame_detail::BodyProps;
 					  focusAgency={props.focus_agency}
 					  activateAgency={props.activate_agency}
 					  agencyIds={props.agency_ids}
+					/>
+					<AliasModal
+					  key="alias-modal"
+					  show={props.step == CharacterCreateFrameStep::EnterAlias}
+					  aliasRenaming={props.alias_renaming}
+					  alias={props.alias}
+					  setAlias={props.set_alias}
+					  submitAlias={props.submit_alias}
 					/>
 				</Box>
 			</Box>

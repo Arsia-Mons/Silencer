@@ -37,7 +37,7 @@ character_create	title	31_character_create_640x480	300x55+45+35	300x55+45+35	sel
 character_create	create_row	31_character_create_640x480	270x55+50+95	270x55+50+95	create new character row
 character_create	scrollbar	31_character_create_640x480	50x310+285+105	50x310+285+105	character list scrollbar
 character_create	preview_panel	31_character_create_640x480	270x370+340+55	270x370+340+55	agent preview panel
-character_alias	dialog	32_character_alias_modal_640x480	330x130+155+180	330x130+215+205	alias modal dialog
+character_alias	dialog	32_character_alias_modal_640x480	330x130+155+180	330x130+155+180	alias modal dialog
 lobby_chrome	top_lights	33_lobby_game_select_640x480	640x55+0+0	640x55+0+0	lobby chrome top lights
 lobby_chrome	header	33_lobby_game_select_640x480	640x75+0+45	640x75+0+45	lobby title and back button
 lobby_chrome	user_card	33_lobby_game_select_640x480	230x120+0+70	230x120+0+70	player card and portrait

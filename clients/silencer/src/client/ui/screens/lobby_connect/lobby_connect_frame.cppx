@@ -343,7 +343,7 @@ using ::ui::components::TextProps;
 				<AppButton
 				  key="login"
 				  controlId="lobby_connect.login"
-				  size={AppButtonSize::Sm}
+				  size={AppButtonSize::FitContent}
 				  variant={AppButtonVariant::Secondary}
 				  label="Login/Create"
 				  onPress={props.login}
@@ -351,7 +351,7 @@ using ::ui::components::TextProps;
 				<AppButton
 				  key="cancel"
 				  controlId="lobby_connect.cancel"
-				  size={AppButtonSize::Sm}
+				  size={AppButtonSize::FitContent}
 				  variant={AppButtonVariant::Secondary}
 				  label="Cancel"
 				  onPress={props.cancel}

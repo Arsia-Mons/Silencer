@@ -17,6 +17,8 @@ enum class AppButtonSize {
 	Md,
 	Sm,
 	MainMenu,
+	Chrome,
+	FitContent,
 };
 
 struct AppButtonProps {

@@ -17,14 +17,6 @@ using ::ui::components::TextProps;
 
 namespace app_button_detail {
 
-inline float label_advance(AppButtonSize size) {
-	return size == AppButtonSize::MainMenu ? 11.0f : 8.0f;
-}
-
-inline float label_height(AppButtonSize size) {
-	return size == AppButtonSize::MainMenu ? 19.0f : 15.0f;
-}
-
 inline ::ui::LayoutStyle label_layout(const char * label, AppButtonSize size) {
 	const char * safe = label ? label : "";
 	const float width =
@@ -75,7 +67,7 @@ struct AppButtonLabelProps {
 	  accessibility={{.label = accessibility_label}}
 	  label={nullptr}
 	  onActivate={on_activate}
-	  layout={app_button_detail::layout(props.size)}
+	  layout={app_button_detail::layout(props.size, props.label)}
 	  style={app_button_detail::variant_patch(props.variant, props.size)}
 	>
 		{props.children}

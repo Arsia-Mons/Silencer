@@ -169,7 +169,7 @@ EOF
   wait_for_widget_port "$ctrl_port" "Login/Create"
   snap_port "$ctrl_port" "30_lobby_login_640x480"
 
-  cli --port "$ctrl_port" set_text --uid 1 --text "visualcurrent" >/dev/null
+  cli --port "$ctrl_port" set_text --uid 1 --text "visualbase" >/dev/null
   cli --port "$ctrl_port" set_text --uid 2 --text "secret" >/dev/null
   wait_for_lobby_state_port "$ctrl_port" AUTHENTICATING
   cli --port "$ctrl_port" click --label "Login/Create" >/dev/null
@@ -180,7 +180,7 @@ EOF
   cli --port "$ctrl_port" click --label "Create New Character" >/dev/null
   wait_for_widget_port "$ctrl_port" "Alias"
   snap_port "$ctrl_port" "32_character_alias_modal_640x480"
-  cli --port "$ctrl_port" set_text --label "Alias" --text "VisualCurrent" >/dev/null
+  cli --port "$ctrl_port" set_text --label "Alias" --text "VisualBase" >/dev/null
   cli --port "$ctrl_port" key --key enter >/dev/null
   wait_character_create_port "$ctrl_port"
   wait_for_widget_port "$ctrl_port" "Noxis"
@@ -190,7 +190,6 @@ EOF
   cli --port "$ctrl_port" step --frames 5 >/dev/null
   snap_port "$ctrl_port" "33_lobby_game_select_640x480"
 
-  cli --port "$ctrl_port" set_text --label "Chat" --text "visual lobby hello" >/dev/null || true
   cli --port "$ctrl_port" click --label "Create Game" >/dev/null
   cli --port "$ctrl_port" step --frames 5 >/dev/null
   wait_for_widget_port "$ctrl_port" "Game name"

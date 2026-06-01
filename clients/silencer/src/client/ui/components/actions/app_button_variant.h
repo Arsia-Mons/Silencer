@@ -10,7 +10,24 @@ namespace silencer {
 namespace client_ui {
 namespace app_button_detail {
 
-inline ::ui::LayoutStyle layout(AppButtonSize size) {
+inline float label_advance(AppButtonSize size) {
+	return size == AppButtonSize::MainMenu ? 11.0f : 8.0f;
+}
+
+inline float label_height(AppButtonSize size) {
+	return size == AppButtonSize::MainMenu ? 19.0f : 15.0f;
+}
+
+inline float fit_content_width(const char * label, AppButtonSize size) {
+	const char * safe = label ? label : "";
+	float width = 0.0f;
+	while(*safe++){
+		width += label_advance(size);
+	}
+	return width + 20.0f;
+}
+
+inline ::ui::LayoutStyle layout(AppButtonSize size, const char * label = nullptr) {
 	switch(size){
 	case AppButtonSize::MainMenu:
 		return {
@@ -19,6 +36,22 @@ inline ::ui::LayoutStyle layout(AppButtonSize size) {
 			.width = ::ui::Length::points(196.0f),
 			.height = ::ui::Length::points(33.0f),
 			.padding = {14.0f, 14.0f, 8.0f, 8.0f},
+		};
+	case AppButtonSize::FitContent:
+		return {
+			.align_items = ::ui::AlignItems::Center,
+			.justify_content = ::ui::JustifyContent::Center,
+			.width = ::ui::Length::points(fit_content_width(label, size)),
+			.height = ::ui::Length::points(21.0f),
+			.padding = {10.0f, 10.0f, 4.0f, 2.0f},
+		};
+	case AppButtonSize::Chrome:
+		return {
+			.align_items = ::ui::AlignItems::Center,
+			.justify_content = ::ui::JustifyContent::Center,
+			.width = ::ui::Length::points(156.0f),
+			.height = ::ui::Length::points(21.0f),
+			.padding = {10.0f, 10.0f, 4.0f, 2.0f},
 		};
 	case AppButtonSize::Sm:
 		return {
