@@ -19,8 +19,6 @@ namespace lobby_connect_screen_detail
 {
 constexpr const char * kActionUsername = "lobby_connect.username";
 constexpr const char * kActionPassword = "lobby_connect.password";
-constexpr const char * kActionLogin = "lobby_connect.login";
-constexpr const char * kActionCancel = "lobby_connect.cancel";
 
 void CopyUiText(char * dst, int dstLen, const std::string & value)
 {
@@ -229,9 +227,14 @@ void LobbyConnectScreen::Destroy(ScreenContext & ctx)
 	(void)ctx;
 }
 
+bool LobbyConnectScreen::HandleBack(ScreenContext & ctx)
+{
+	ctx.GoToState(GameState::MAINMENU);
+	return true;
+}
+
 bool LobbyConnectScreen::HandleUiIntent(ScreenContext & ctx, const silencer::ui::UiAction & action)
 {
-	(void)ctx;
 	if(action.kind == silencer::ui::UiActionKind::SetText){
 		if(action.id == lobby_connect_screen_detail::kActionUsername){
 			lobby_connect_screen_detail::CopyUiText(username, static_cast<int>(sizeof(username)), action.value);
@@ -253,15 +256,7 @@ bool LobbyConnectScreen::HandleUiIntent(ScreenContext & ctx, const silencer::ui:
 		lobby_connect_screen_detail::SubmitCredentials(ctx.world, username, password);
 		return true;
 	}
-	if(action.kind == silencer::ui::UiActionKind::Activate && action.id == lobby_connect_screen_detail::kActionLogin){
-		lobby_connect_screen_detail::SubmitCredentials(ctx.world, username, password);
-		return true;
-	}
-	if((action.kind == silencer::ui::UiActionKind::Activate && action.id == lobby_connect_screen_detail::kActionCancel) ||
-	   action.kind == silencer::ui::UiActionKind::Cancel){
-		ctx.GoToState(GameState::MAINMENU);
-		return true;
-	}
+	if(action.kind == silencer::ui::UiActionKind::Cancel) return HandleBack(ctx);
 	return false;
 }
 

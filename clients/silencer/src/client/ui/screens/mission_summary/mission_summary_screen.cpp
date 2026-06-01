@@ -19,8 +19,6 @@ namespace mission_summary_screen_detail
 constexpr uint16_t kSummaryW = 180;
 constexpr uint16_t kSummaryH = 300;
 constexpr uint8_t kLineH = 11;
-constexpr const char * kActionDone = "mission_summary.done";
-constexpr const char * kActionUpgradePrefix = "mission_summary.upgrade.";
 
 constexpr Lobby::StatID kUpgradeStatIds[6] = {
 	Lobby::STAT_ENDURANCE,
@@ -30,18 +28,6 @@ constexpr Lobby::StatID kUpgradeStatIds[6] = {
 	Lobby::STAT_HACKING,
 	Lobby::STAT_CONTACTS,
 };
-
-bool StartsWith(const std::string & value, const char * prefix)
-{
-	const size_t n = std::strlen(prefix);
-	return value.size() >= n && value.compare(0, n, prefix) == 0;
-}
-
-int SuffixInt(const std::string & value, const char * prefix)
-{
-	if(!StartsWith(value, prefix)) return -1;
-	return std::atoi(value.c_str() + std::strlen(prefix));
-}
 
 void UpgradeStat(World & world, int index)
 {
@@ -143,25 +129,21 @@ void MissionSummaryScreen::Destroy(ScreenContext & ctx)
 	(void)ctx;
 }
 
+bool MissionSummaryScreen::HandleBack(ScreenContext & ctx)
+{
+	silencer::client_ui::MissionSummaryDestination destination =
+		mission_summary_screen_detail::FinishMissionSummary(ctx.world);
+	ctx.GoToState(destination == silencer::client_ui::MissionSummaryDestination::Lobby
+	              ? GameState::LOBBY
+	              : GameState::MAINMENU);
+	return true;
+}
+
 bool MissionSummaryScreen::HandleUiIntent(ScreenContext & ctx, const silencer::ui::UiAction & action)
 {
-	if(action.kind == silencer::ui::UiActionKind::Cancel ||
-	   (action.kind == silencer::ui::UiActionKind::Activate && action.id == mission_summary_screen_detail::kActionDone)){
-		silencer::client_ui::MissionSummaryDestination destination =
-			mission_summary_screen_detail::FinishMissionSummary(ctx.world);
-		ctx.GoToState(destination == silencer::client_ui::MissionSummaryDestination::Lobby
-		              ? GameState::LOBBY
-		              : GameState::MAINMENU);
-		return true;
-	}
+	if(action.kind == silencer::ui::UiActionKind::Cancel) return HandleBack(ctx);
 	if(action.kind == silencer::ui::UiActionKind::Scroll){
 		scrollDelta += action.amount;
-		return true;
-	}
-	if(action.kind != silencer::ui::UiActionKind::Activate) return false;
-	int upgrade = mission_summary_screen_detail::SuffixInt(action.id, mission_summary_screen_detail::kActionUpgradePrefix);
-	if(upgrade >= 0 && upgrade < 6){
-		mission_summary_screen_detail::UpgradeStat(ctx.world, upgrade);
 		return true;
 	}
 	return false;
