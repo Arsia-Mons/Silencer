@@ -18,12 +18,13 @@ namespace password_modal_detail
 constexpr int kPasswordUid = 1;
 constexpr const char * kActionPassword = "password_modal.password";
 
-void CopyUiText(char * dst, int dstLen, const std::string & value)
+void CopyUiText(char * dst, int dstLen, const char * value)
 {
 	if(!dst || dstLen <= 0) return;
-	int n = static_cast<int>(value.size());
+	const char * src = value ? value : "";
+	int n = static_cast<int>(std::strlen(src));
 	if(n > dstLen - 1) n = dstLen - 1;
-	std::memcpy(dst, value.data(), n);
+	std::memcpy(dst, src, n);
 	dst[n] = '\0';
 }
 
@@ -89,6 +90,10 @@ void PasswordModal::BuildUi(ScreenContext & ctx, Surface & dst, float frametime,
 	silencer::client_ui::PasswordModalFrameProps props{
 		.key = "password-modal",
 		.password_display = passwordDisplay_.c_str(),
+		.set_password = [this](const char * value) {
+			password_modal_detail::CopyUiText(
+				password, static_cast<int>(sizeof(password)), value);
+		},
 		.submit = [this]() {
 			Submit();
 		},
@@ -110,13 +115,8 @@ void PasswordModal::Destroy(ScreenContext & ctx)
 bool PasswordModal::HandleUiIntent(ScreenContext & ctx, const silencer::ui::UiAction & action)
 {
 	(void)ctx;
-	if(action.kind == silencer::ui::UiActionKind::SetText &&
-	   action.id == password_modal_detail::kActionPassword){
-		password_modal_detail::CopyUiText(password, static_cast<int>(sizeof(password)), action.value);
-		return true;
-	}
 	if(action.kind == silencer::ui::UiActionKind::SubmitText && action.id == password_modal_detail::kActionPassword){
-		password_modal_detail::CopyUiText(password, static_cast<int>(sizeof(password)), action.value);
+		password_modal_detail::CopyUiText(password, static_cast<int>(sizeof(password)), action.value.c_str());
 		Submit();
 		return true;
 	}

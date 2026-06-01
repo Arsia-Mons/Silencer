@@ -10,6 +10,7 @@ namespace client_ui {
 struct PasswordModalFrameProps {
 	const char * key = nullptr;
 	const char * password_display = nullptr;
+	std::function<void(const char *)> set_password = {};
 	std::function<void()> submit = {};
 };
 

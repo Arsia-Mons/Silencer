@@ -440,6 +440,10 @@ fail_if_match \
   "$REPO_ROOT/clients/silencer/src/client/ui/screens/update/update_screen.h"
 
 fail_if_match \
+  "\\bUiActionKind::SetText\\b" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/modals/password_modal.cpp"
+
+fail_if_match \
   "ctx[.]world|\\bResources\\b|#include[[:space:]]*[<\"](world|resources)[.]h[>\"]" \
   "$REPO_ROOT/clients/silencer/src/client/ui/screens/main_menu/main_menu_screen.cpp"
 
