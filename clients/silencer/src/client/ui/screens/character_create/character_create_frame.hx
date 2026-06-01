@@ -28,10 +28,13 @@ struct CharacterCreateFrameProps {
 	const char * alias = nullptr;
 	std::function<void(const char *)> set_alias = {};
 	std::function<void(const char *)> submit_alias = {};
+	std::function<void(int)> activate_agent = {};
+	std::function<void(int)> rename_agent = {};
 	bool alias_renaming = false;
 	bool waiting_for_create = false;
 	int selected_agency = 0;
 	int preview_agency = -1;
+	std::function<void(int)> activate_agency = {};
 	std::uint8_t agency_ids[5] = {};
 };
 

@@ -20,8 +20,6 @@ namespace {
 constexpr int kMaxRows = 32;
 constexpr const char * kActionAgentPrefix = "character_create.agent";
 constexpr const char * kActionAgencyPrefix = "character_create.agency";
-constexpr const char * kActionRenamePrefix = "character_create.rename";
-constexpr const char * kActionCreate = "character_create.create";
 
 bool StartsWith(const std::string& value, const char * prefix)
 {
@@ -160,8 +158,6 @@ bool CharacterCreateScreen::HandleUiIntent(ScreenContext & ctx,
 	silencer::client_ui::LobbyModel lobby =
 		silencer::client_ui::use_lobby(
 			silencer::client_ui::MakeLobbyProvider(ctx));
-	silencer::client_ui::Navigation navigation =
-		silencer::client_ui::use_navigation();
 	if(action.kind == silencer::ui::UiActionKind::Cancel){
 		return HandleBack(ctx);
 	}
@@ -198,38 +194,6 @@ bool CharacterCreateScreen::HandleUiIntent(ScreenContext & ctx,
 			previewAgencyIndex = agencyIndex;
 			return true;
 		}
-	}
-	if(action.kind != silencer::ui::UiActionKind::Activate){
-		return retainedFrame_.HandleUiIntent(action);
-	}
-	int agentIndex = SuffixInt(action.id, kActionAgentPrefix);
-	if(step == Step::SelectAgent && agentIndex >= 0){
-		selectedAgentIndex = agentIndex;
-		previewAgentIndex = agentIndex;
-		SelectCurrentAgent(lobby, navigation);
-		return true;
-	}
-	int renameIndex = SuffixInt(action.id, kActionRenamePrefix);
-	if(step == Step::SelectAgent && renameIndex >= 0){
-		StartRenameAgent(lobby, renameIndex);
-		return true;
-	}
-	int agencyIndex = SuffixInt(action.id, kActionAgencyPrefix);
-	if(step == Step::SelectAgency && agencyIndex >= 0){
-		if(waitingForCreate) return true;
-		if(agencyIndex < 5){
-			selectedAgency = lobby.character.agency_for_index(agencyIndex);
-			previewAgencyIndex = agencyIndex;
-			if(alias[0] != '\0'){
-				CreateCurrentAgent(lobby, navigation);
-			}
-		}
-		return true;
-	}
-	if(step == Step::SelectAgency && action.id == kActionCreate){
-		if(waitingForCreate) return true;
-		CreateCurrentAgent(lobby, navigation);
-		return true;
 	}
 	return retainedFrame_.HandleUiIntent(action);
 }

@@ -307,6 +307,26 @@ alias_text_submit_callback(std::function<void(const char *)> on_submit) {
 	};
 }
 
+inline ::ui::HostCallbacks
+row_button_callbacks(std::function<void()> on_press) {
+	::ui::HostCallbacks callbacks{};
+	if(on_press){
+		callbacks.on_activate =
+			[on_press](const ::ui::ActivationEvent&) {
+				on_press();
+			};
+	}
+	return callbacks;
+}
+
+inline std::function<void()>
+indexed_press_callback(std::function<void(int)> on_press, int index) {
+	if(!on_press) return {};
+	return [on_press, index]() {
+		on_press(index);
+	};
+}
+
 	struct LabelTextProps {
 		const char * key = nullptr;
 		const char * value = nullptr;
@@ -333,9 +353,12 @@ alias_text_submit_callback(std::function<void(const char *)> on_submit) {
 		bool enabled = true;
 		bool selected = false;
 		bool selected_visual = false;
+		std::function<void()> on_press = {};
 	};
 
 	::ui::UiElement RowButton(const RowButtonProps& props) {
+		std::function<void()> onPress =
+			props.enabled ? props.on_press : std::function<void()>{};
 		return <detail.Host
 		  kind={::ui::HostKind::Button}
 		  key={props.key}
@@ -354,6 +377,7 @@ alias_text_submit_callback(std::function<void(const char *)> on_submit) {
 				.disabled = !props.enabled,
 				.checked = props.selected,
 			}}
+		  callbacks={row_button_callbacks(onPress)}
 		  accessibility={{.role = ::ui::SemanticRole::Button, .label = props.label ? props.label : ""}}
 		>
 			<LabelText
@@ -394,6 +418,7 @@ alias_text_submit_callback(std::function<void(const char *)> on_submit) {
 		int preview_agent = -1;
 		bool selecting_agent = false;
 		int visible_row = 0;
+		std::function<void(int)> activate_agent = {};
 	};
 
 	::ui::UiElement AgentRow(const AgentRowProps& props) {
@@ -413,6 +438,7 @@ alias_text_submit_callback(std::function<void(const char *)> on_submit) {
 		  enabled={props.selecting_agent}
 		  selected={selected}
 		  selectedVisual={selectedVisual}
+		  onPress={indexed_press_callback(props.activate_agent, source)}
 		/>
 	}
 
@@ -424,6 +450,7 @@ alias_text_submit_callback(std::function<void(const char *)> on_submit) {
 		int selected_agent = 0;
 		int preview_agent = -1;
 		bool selecting_agent = false;
+		std::function<void(int)> activate_agent = {};
 	};
 
 	::ui::UiElement AgentColumn(const AgentColumnProps& props) {
@@ -461,6 +488,7 @@ alias_text_submit_callback(std::function<void(const char *)> on_submit) {
 				  previewAgent={props.preview_agent}
 				  selectingAgent={props.selecting_agent}
 				  visibleRow={0}
+				  activateAgent={props.activate_agent}
 				/>
 				<AgentRow
 				  key="agent-row-1"
@@ -471,6 +499,7 @@ alias_text_submit_callback(std::function<void(const char *)> on_submit) {
 				  previewAgent={props.preview_agent}
 				  selectingAgent={props.selecting_agent}
 				  visibleRow={1}
+				  activateAgent={props.activate_agent}
 				/>
 				<AgentRow
 				  key="agent-row-2"
@@ -481,6 +510,7 @@ alias_text_submit_callback(std::function<void(const char *)> on_submit) {
 				  previewAgent={props.preview_agent}
 				  selectingAgent={props.selecting_agent}
 				  visibleRow={2}
+				  activateAgent={props.activate_agent}
 				/>
 				<AgentRow
 				  key="agent-row-3"
@@ -491,6 +521,7 @@ alias_text_submit_callback(std::function<void(const char *)> on_submit) {
 				  previewAgent={props.preview_agent}
 				  selectingAgent={props.selecting_agent}
 				  visibleRow={3}
+				  activateAgent={props.activate_agent}
 				/>
 				<AgentRow
 				  key="agent-row-4"
@@ -501,6 +532,7 @@ alias_text_submit_callback(std::function<void(const char *)> on_submit) {
 				  previewAgent={props.preview_agent}
 				  selectingAgent={props.selecting_agent}
 				  visibleRow={4}
+				  activateAgent={props.activate_agent}
 				/>
 				<AgentRow
 				  key="agent-row-5"
@@ -511,6 +543,7 @@ alias_text_submit_callback(std::function<void(const char *)> on_submit) {
 				  previewAgent={props.preview_agent}
 				  selectingAgent={props.selecting_agent}
 				  visibleRow={5}
+				  activateAgent={props.activate_agent}
 				/>
 				<AgentRow
 				  key="agent-row-6"
@@ -521,6 +554,7 @@ alias_text_submit_callback(std::function<void(const char *)> on_submit) {
 				  previewAgent={props.preview_agent}
 				  selectingAgent={props.selecting_agent}
 				  visibleRow={6}
+				  activateAgent={props.activate_agent}
 				/>
 				<AgentRow
 				  key="agent-row-7"
@@ -531,6 +565,7 @@ alias_text_submit_callback(std::function<void(const char *)> on_submit) {
 				  previewAgent={props.preview_agent}
 				  selectingAgent={props.selecting_agent}
 				  visibleRow={7}
+				  activateAgent={props.activate_agent}
 				/>
 			</Box>
 		</Box>
@@ -542,6 +577,7 @@ alias_text_submit_callback(std::function<void(const char *)> on_submit) {
 		int selected_agency = 0;
 		int preview_agency = -1;
 		bool waiting_for_create = false;
+		std::function<void(int)> activate_agency = {};
 	};
 
 	::ui::UiElement AgencyRow(const AgencyRowProps& props) {
@@ -554,6 +590,7 @@ alias_text_submit_callback(std::function<void(const char *)> on_submit) {
 		  enabled={!props.waiting_for_create}
 		  selected={selected}
 		  selectedVisual={selectedVisual}
+		  onPress={indexed_press_callback(props.activate_agency, props.agency)}
 		/>
 	}
 
@@ -562,6 +599,7 @@ alias_text_submit_callback(std::function<void(const char *)> on_submit) {
 		int selected_agency = 0;
 		int preview_agency = -1;
 		bool waiting_for_create = false;
+		std::function<void(int)> activate_agency = {};
 	};
 
 	::ui::UiElement AgencyColumn(const AgencyColumnProps& props) {
@@ -595,6 +633,7 @@ alias_text_submit_callback(std::function<void(const char *)> on_submit) {
 				  selectedAgency={props.selected_agency}
 				  previewAgency={props.preview_agency}
 				  waitingForCreate={props.waiting_for_create}
+				  activateAgency={props.activate_agency}
 				/>
 				<AgencyRow
 				  key="agency-row-1"
@@ -602,6 +641,7 @@ alias_text_submit_callback(std::function<void(const char *)> on_submit) {
 				  selectedAgency={props.selected_agency}
 				  previewAgency={props.preview_agency}
 				  waitingForCreate={props.waiting_for_create}
+				  activateAgency={props.activate_agency}
 				/>
 				<AgencyRow
 				  key="agency-row-2"
@@ -609,6 +649,7 @@ alias_text_submit_callback(std::function<void(const char *)> on_submit) {
 				  selectedAgency={props.selected_agency}
 				  previewAgency={props.preview_agency}
 				  waitingForCreate={props.waiting_for_create}
+				  activateAgency={props.activate_agency}
 				/>
 				<AgencyRow
 				  key="agency-row-3"
@@ -616,6 +657,7 @@ alias_text_submit_callback(std::function<void(const char *)> on_submit) {
 				  selectedAgency={props.selected_agency}
 				  previewAgency={props.preview_agency}
 				  waitingForCreate={props.waiting_for_create}
+				  activateAgency={props.activate_agency}
 				/>
 				<AgencyRow
 				  key="agency-row-4"
@@ -623,6 +665,7 @@ alias_text_submit_callback(std::function<void(const char *)> on_submit) {
 				  selectedAgency={props.selected_agency}
 				  previewAgency={props.preview_agency}
 				  waitingForCreate={props.waiting_for_create}
+				  activateAgency={props.activate_agency}
 				/>
 			</Box>
 		</Box>
@@ -663,6 +706,7 @@ alias_text_submit_callback(std::function<void(const char *)> on_submit) {
 		const char * key = nullptr;
 		bool available = false;
 		int detail_agent = 0;
+		std::function<void(int)> rename_agent = {};
 	};
 
 	::ui::UiElement RenameButton(const RenameButtonProps& props) {
@@ -674,6 +718,7 @@ alias_text_submit_callback(std::function<void(const char *)> on_submit) {
 		  enabled={true}
 		  selected={false}
 		  selectedVisual={false}
+		  onPress={indexed_press_callback(props.rename_agent, props.detail_agent)}
 		/>
 	}
 
@@ -683,6 +728,7 @@ alias_text_submit_callback(std::function<void(const char *)> on_submit) {
 		int selected_agent = 0;
 		int preview_agent = -1;
 		const std::uint8_t * agency_ids = nullptr;
+		std::function<void(int)> rename_agent = {};
 	};
 
 	::ui::UiElement AgentDetails(const AgentDetailsProps& props) {
@@ -747,7 +793,12 @@ alias_text_submit_callback(std::function<void(const char *)> on_submit) {
 			<DetailLine key="xp" value={xp.c_str()} />
 			<DetailLine key="next" value={next.c_str()} />
 			<DetailLine key="wins" value={wins.c_str()} />
-			<RenameButton key="rename" available={agent.rename_available} detailAgent={detailAgent} />
+			<RenameButton
+			  key="rename"
+			  available={agent.rename_available}
+			  detailAgent={detailAgent}
+			  renameAgent={props.rename_agent}
+			/>
 			<LabelText key="advantages" value="Advantages" style={detail_text_patch(8)} height={15.0f} />
 			<DetailLine key="advantage-0" value={def.advantages[0]} />
 			<DetailLine key="advantage-1" value={def.advantages[1]} />
@@ -875,10 +926,13 @@ alias_text_submit_callback(std::function<void(const char *)> on_submit) {
 		const char * alias = nullptr;
 		std::function<void(const char *)> set_alias = {};
 		std::function<void(const char *)> submit_alias = {};
+		std::function<void(int)> activate_agent = {};
+		std::function<void(int)> rename_agent = {};
 		bool alias_renaming = false;
 		bool waiting_for_create = false;
 		int selected_agency = 0;
 		int preview_agency = -1;
+		std::function<void(int)> activate_agency = {};
 		const std::uint8_t * agency_ids = nullptr;
 	};
 
@@ -903,6 +957,7 @@ alias_text_submit_callback(std::function<void(const char *)> on_submit) {
 				  selectedAgency={selectedAgency}
 				  previewAgency={props.preview_agency}
 				  waitingForCreate={props.waiting_for_create}
+				  activateAgency={props.activate_agency}
 				/>
 				<AgencyDetails key="agency-info" detailAgency={detailAgency} />
 			</Box>
@@ -924,6 +979,7 @@ alias_text_submit_callback(std::function<void(const char *)> on_submit) {
 			  selectedAgent={props.selected_agent}
 			  previewAgent={props.preview_agent}
 			  selectingAgent={props.step == CharacterCreateFrameStep::SelectAgent}
+			  activateAgent={props.activate_agent}
 			/>
 			<AgentDetails
 			  key="details"
@@ -931,6 +987,7 @@ alias_text_submit_callback(std::function<void(const char *)> on_submit) {
 			  selectedAgent={props.selected_agent}
 			  previewAgent={props.preview_agent}
 			  agencyIds={props.agency_ids}
+			  renameAgent={props.rename_agent}
 			/>
 			<AliasModal
 			  key="alias-modal"
@@ -1002,10 +1059,13 @@ using character_create_frame_detail::BodyProps;
 					  alias={props.alias}
 					  setAlias={props.set_alias}
 					  submitAlias={props.submit_alias}
+					  activateAgent={props.activate_agent}
+					  renameAgent={props.rename_agent}
 					  aliasRenaming={props.alias_renaming}
 					  waitingForCreate={props.waiting_for_create}
 					  selectedAgency={props.selected_agency}
 					  previewAgency={props.preview_agency}
+					  activateAgency={props.activate_agency}
 					  agencyIds={props.agency_ids}
 					/>
 				</Box>

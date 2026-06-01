@@ -76,10 +76,27 @@ void CharacterCreateScreen::BuildUi(ScreenContext & ctx,
 				AdvanceAliasStep();
 			}
 		},
+		.activate_agent = [this, lobby, navigation](int agentIndex) {
+			selectedAgentIndex = agentIndex;
+			previewAgentIndex = agentIndex;
+			SelectCurrentAgent(lobby, navigation);
+		},
+		.rename_agent = [this, lobby](int agentIndex) {
+			StartRenameAgent(lobby, agentIndex);
+		},
 		.alias_renaming = IsRenaming(),
 		.waiting_for_create = waitingForCreate,
 		.selected_agency = selectedAgency,
 		.preview_agency = previewAgencyIndex,
+		.activate_agency = [this, lobby, navigation](int agencyIndex) {
+			if(waitingForCreate) return;
+			if(agencyIndex < 0 || agencyIndex >= 5) return;
+			selectedAgency = lobby.character.agency_for_index(agencyIndex);
+			previewAgencyIndex = agencyIndex;
+			if(alias[0] != '\0'){
+				CreateCurrentAgent(lobby, navigation);
+			}
+		},
 		.agency_ids = {
 			character.agency_for_index(0),
 			character.agency_for_index(1),
