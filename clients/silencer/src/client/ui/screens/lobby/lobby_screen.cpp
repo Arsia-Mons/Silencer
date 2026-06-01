@@ -254,23 +254,22 @@ void LobbyScreen::Build(ScreenContext & ctx)
 	gameCreateActive = false;
 }
 
-void LobbyScreen::ShowGameSelect(ScreenContext & ctx)
+void LobbyScreen::ShowGameSelect()
 {
-	(void)ctx;
 	gameCreateActive = false;
 	gameJoinActive   = false;
 	gameTechActive   = false;
 }
 
-void LobbyScreen::ShowGameCreate(ScreenContext & ctx)
+void LobbyScreen::ShowGameCreate(const silencer::client_ui::LobbyModel & lobby)
 {
-	silencer::client_ui::lobby::GameCreatePanelInit(gameCreateState, ctx);
+	silencer::client_ui::lobby::GameCreatePanelInit(gameCreateState, lobby);
 	gameCreateActive = true;
 	gameJoinActive   = false;
 	gameTechActive   = false;
 }
 
-void LobbyScreen::ShowGameJoin(ScreenContext & ctx)
+void LobbyScreen::ShowGameJoin()
 {
 	silencer::client_ui::lobby::GameJoinPanelInit(gameJoinState);
 	gameJoinActive   = true;
@@ -278,9 +277,8 @@ void LobbyScreen::ShowGameJoin(ScreenContext & ctx)
 	gameTechActive   = false;
 }
 
-void LobbyScreen::ShowGameTech(ScreenContext & ctx)
+void LobbyScreen::ShowGameTech()
 {
-	(void)ctx;
 	silencer::client_ui::lobby::GameTechPanelInit(gameTechState);
 	gameTechActive   = true;
 	gameJoinActive   = false;
@@ -314,6 +312,9 @@ void LobbyScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime, s
 	silencer::client_ui::LobbyModel lobby =
 		silencer::client_ui::use_lobby(
 			silencer::client_ui::MakeLobbyProvider(ctx, this));
+	const silencer::client_ui::AppModel app =
+		silencer::client_ui::use_app(
+			silencer::client_ui::MakeAppProvider(ctx));
 	ChatPanelSyncLayout(
 		chatState,
 		static_cast<Uint16>(std::max(0, mainLayout.chatW)),
@@ -325,7 +326,8 @@ void LobbyScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime, s
 			static_cast<Uint16>(std::max(0, mainLayout.upperH)));
 		GameCreatePanelSyncTallLayout(
 			gameCreateState,
-			ctx,
+			input,
+			app.audio,
 			lobby,
 			static_cast<Uint16>(std::max(0, mainLayout.rightTallW)),
 			static_cast<Uint16>(std::max(0, mainLayout.rightTallH)),
@@ -432,9 +434,6 @@ void LobbyScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime, s
 	const uint16_t titleRowGap = static_cast<uint16_t>(
 		lobby_screen_detail::ClampInt((layoutWidth * 6) / 640, 4, 10));
 	const bool showMapName = !mapName.empty() && layoutWidth >= 700;
-	const silencer::client_ui::AppModel app =
-		silencer::client_ui::use_app(
-			silencer::client_ui::MakeAppProvider(ctx));
 	silencer::client_ui::Navigation navigation =
 		silencer::client_ui::use_navigation();
 
@@ -487,8 +486,8 @@ void LobbyScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime, s
 		.game_select_create_y = bodyY + lobby_screen_detail::kGameSelectCreatePadTop,
 		.game_select_create_width = createButtonW,
 		.game_select_create_height = lobby_screen_detail::kGameSelectCreateButtonH,
-		.game_select_create = [this, ctx = &ctx]() {
-			ShowGameCreate(*ctx);
+		.game_select_create = [this, lobby]() {
+			ShowGameCreate(lobby);
 		},
 		.show_game_select_spectate =
 			showGameSelectActions && gameSelectState.spectateVisible,
@@ -672,8 +671,7 @@ MessageModal * ProgressModal(silencer::client_ui::lobby::GameCreatePanelState & 
 	return state.progressModal;
 }
 
-void DismissProgressModal(silencer::client_ui::lobby::GameCreatePanelState & state,
-                          ScreenContext & ctx)
+void DismissProgressModal(silencer::client_ui::lobby::GameCreatePanelState & state)
 {
 	if(!state.progressModal) return;
 	silencer::client_ui::use_navigation().pop_top();
@@ -709,7 +707,7 @@ void LobbyScreen::Tick(ScreenContext & ctx)
 	}
 	if(gameCreateActive){
 		silencer::client_ui::lobby::GameCreatePanelTick(
-			gameCreateState, ctx, lobby);
+			gameCreateState, lobby);
 	}
 	if(gameJoinActive){
 		silencer::client_ui::lobby::GameJoinPanelTick(
@@ -733,13 +731,13 @@ void LobbyScreen::Tick(ScreenContext & ctx)
 		progress->SetText(ctx, session.progress_text);
 	}
 	if(session.dismiss_progress){
-		lobby_screen_flow_detail::DismissProgressModal(gameCreateState, ctx);
+		lobby_screen_flow_detail::DismissProgressModal(gameCreateState);
 	}
 	if(!session.message.empty()){
 		lobby.modal.show_message(session.message.c_str());
 	}
 	if(session.show_game_join){
-		ShowGameJoin(ctx);
+		ShowGameJoin();
 		SetMapNameOverlay(session.map_name.c_str());
 	}
 	if(session.disconnected_from_game && !disconnectMessageOpen){
@@ -763,12 +761,12 @@ bool LobbyScreen::HandleBack(ScreenContext & ctx)
 		lobby.pregame.leave_joined_game();
 		lobby.browser.mark_games_dirty();
 		SetMapNameOverlay("");
-		ShowGameSelect(ctx);
+		ShowGameSelect();
 		return true;
 	}
 	if(gameCreateActive){
 		lobby.browser.mark_games_dirty();
-		ShowGameSelect(ctx);
+		ShowGameSelect();
 		return true;
 	}
 	return false;

@@ -2,7 +2,6 @@
 
 #include "client/ui/hooks/use_lobby.h"
 #include "client/ui/hooks/use_navigation.h"
-#include "screen_context.h"
 #include "message_modal.h"
 
 #include <algorithm>
@@ -27,19 +26,15 @@ void CopyUiText(char * dst, int dstLen, const char * value)
 
 }  // namespace game_create_panel_detail
 
-static void DismissProgressModal(GameCreatePanelState & state,
-                                 ScreenContext & ctx) {
-	(void)ctx;
+static void DismissProgressModal(GameCreatePanelState & state) {
 	if(!state.progressModal) return;
 	silencer::client_ui::use_navigation().pop_top();
 	state.progressModal = nullptr;
 }
 
-void GameCreatePanelInit(GameCreatePanelState & state, ScreenContext & ctx) {
+void GameCreatePanelInit(GameCreatePanelState & state,
+                         const LobbyModel & lobby) {
 	state = GameCreatePanelState{};
-	silencer::client_ui::LobbyModel lobby =
-		silencer::client_ui::use_lobby(
-			silencer::client_ui::MakeLobbyProvider(ctx));
 	const LobbyCreateModel::Defaults defaults = lobby.create.defaults();
 	state.spectatable = defaults.spectatable;
 	std::strncpy(state.name, defaults.game_name.c_str(), sizeof(state.name) - 1);
@@ -130,11 +125,10 @@ void GameCreatePanelScrollOptions(GameCreatePanelState & state, int amount) {
 }
 
 void GameCreatePanelTick(GameCreatePanelState & state,
-                         ScreenContext & ctx,
                          LobbyModel & lobby) {
 	const LobbyCreateModel::PumpResult pump = lobby.create.pump();
 	if(pump.dismiss_progress){
-		DismissProgressModal(state, ctx);
+		DismissProgressModal(state);
 		if(!pump.message.empty()){
 			lobby.modal.show_message(pump.message.c_str());
 		}

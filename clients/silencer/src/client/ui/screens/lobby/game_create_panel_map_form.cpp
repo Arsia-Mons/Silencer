@@ -2,10 +2,9 @@
 
 #include "client/ui/hooks/use_app.h"
 #include "client/ui/hooks/use_lobby.h"
-#include "game.h"
-#include "screen_context.h"
 #include "map.h"
 #include "text_wrap.h"
+#include "ui/runtime/UiInputState.h"
 
 #include <algorithm>
 #include <cstdint>
@@ -195,7 +194,8 @@ GameCreateTallLayout ResolveGameCreateTallLayout(Uint16 panelWidth,
 }
 
 void GameCreatePanelSyncTallLayout(GameCreatePanelState & state,
-                                   ScreenContext & ctx,
+                                   const silencer::ui::UiInputState & input,
+                                   const AppAudioModel & audio,
                                    LobbyModel & lobby,
                                    Uint16 panelWidth,
                                    Uint16 panelHeight,
@@ -210,14 +210,11 @@ void GameCreatePanelSyncTallLayout(GameCreatePanelState & state,
 		state.mapScrollPos = static_cast<Uint16>(maxScroll);
 	}
 
-	const silencer::ui::UiInputState & input = ctx.game.CurrentUiInput();
 	const int hoveredIndex =
 		game_create_panel_map_form_detail::ResolveHoveredMapIndex(
 			state, layout, input, panelX, panelY);
 	if(hoveredIndex >= 0 && hoveredIndex != state.lastHoveredMapIndex){
-		silencer::client_ui::use_app(
-			silencer::client_ui::MakeAppProvider(ctx))
-			.audio.play_ui_click();
+		audio.play_ui_click();
 	}
 	state.lastHoveredMapIndex = hoveredIndex;
 	game_create_panel_map_form_detail::UpdateHoverPreview(

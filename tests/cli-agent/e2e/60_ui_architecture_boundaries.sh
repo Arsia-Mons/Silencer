@@ -406,6 +406,13 @@ fail_if_match \
   "$REPO_ROOT/clients/silencer/src/client/ui/screens/lobby/game_create_panel.h"
 
 fail_if_match \
+  "\\bScreenContext\\b|#include[[:space:]]*[<\"]screen_context[.]h[>\"]|\\bMakeLobbyProvider[[:space:]]*[(]" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens/lobby/game_create_panel.cpp" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens/lobby/game_create_panel.h" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens/lobby/game_create_panel_map_form.cpp" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens/lobby/game_create_panel_options.cpp"
+
+fail_if_match \
   "ctx[.](world|mapDownloader|lobby|ambienceMixer)|\\b(World|Resources|Lobby|LobbyGame|MapDownloader|Config)::|#include[[:space:]]*[<\"](world|resources|lobby|lobbygame|config|map_downloader|audio|gasloader)[.]h[>\"]|Audio::GetInstance|GASLoader" \
   "$REPO_ROOT/clients/silencer/src/client/ui/screens/lobby/game_create_panel_options.cpp" \
   "$REPO_ROOT/clients/silencer/src/client/ui/screens/lobby/game_create_panel_map_form.cpp"

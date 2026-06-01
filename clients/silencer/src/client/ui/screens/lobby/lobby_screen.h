@@ -34,11 +34,11 @@ public:
 	// Map-name overlay written by the join handoff and cleared by HandleBack.
 	void SetMapNameOverlay(const char * name);
 
-	// Right-side panel swaps used by the lobby provider.
-	void ShowGameSelect(ScreenContext & ctx);
-	void ShowGameCreate(ScreenContext & ctx);
-	void ShowGameJoin(ScreenContext & ctx);
-	void ShowGameTech(ScreenContext & ctx);
+	// Right-side panel swaps used by lobby UI callbacks and provider pumps.
+	void ShowGameSelect();
+	void ShowGameCreate(const silencer::client_ui::LobbyModel & lobby);
+	void ShowGameJoin();
+	void ShowGameTech();
 
 private:
 	// Per-frame state for the chrome tree. Strings live on the screen so the

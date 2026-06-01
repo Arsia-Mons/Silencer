@@ -13,7 +13,6 @@
 #include <string>
 #include <vector>
 
-class ScreenContext;
 class MessageModal;
 
 namespace silencer::ui {
@@ -21,6 +20,7 @@ struct UiInputState;
 }
 
 namespace silencer::client_ui {
+class AppAudioModel;
 class LobbyModel;
 }
 
@@ -114,16 +114,14 @@ enum class GameCreatePanelTextField {
 	Password,
 };
 
-// Hydrate state from LobbyCreateModel defaults and rebuild the map list from
-// the provider. Mirrors the legacy GameCreatePanel::Build's one-time setup.
-void GameCreatePanelInit(GameCreatePanelState & state, ScreenContext & ctx);
+// Hydrate state from LobbyCreateModel defaults and rebuild the map list.
+void GameCreatePanelInit(GameCreatePanelState & state,
+                         const LobbyModel & lobby);
 
 // Per-frame pump for the deferred CreateGame state machine (map upload ->
 // CreateGame -> CONNECTED -> ShowGameJoin handoff + progress-modal spinner
-// update + create-failure unwind). Mirrors the legacy LobbyScreen::Tick's
-// `if(gameCreate)` block.
+// update + create-failure unwind).
 void GameCreatePanelTick(GameCreatePanelState & state,
-                         ScreenContext & ctx,
                          LobbyModel & lobby);
 void GameCreatePanelCycleSecurity(GameCreatePanelState & state);
 void GameCreatePanelToggleSpectatable(GameCreatePanelState & state,
@@ -149,7 +147,8 @@ void GameCreatePanelSyncOptionsLayout(GameCreatePanelState & state,
 GameCreateTallLayout ResolveGameCreateTallLayout(Uint16 panelWidth,
                                                  Uint16 panelHeight);
 void GameCreatePanelSyncTallLayout(GameCreatePanelState & state,
-                                   ScreenContext & ctx,
+                                   const silencer::ui::UiInputState & input,
+                                   const AppAudioModel & audio,
                                    LobbyModel & lobby,
                                    Uint16 panelWidth,
                                    Uint16 panelHeight,
