@@ -122,6 +122,10 @@ fail_if_match \
   --glob '*.h'
 
 fail_if_match \
+  "\\b(class|struct)[[:space:]]+(World|Game|Lobby|Updater|Renderer|RenderDevice|ScreenContext|ScreenStack|Peer)\\b|\\b(World|Game|Lobby|Updater|Renderer|RenderDevice|ScreenContext|ScreenStack|Peer)[[:space:]*&]+[A-Za-z_]" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/hooks/use_lobby.h"
+
+fail_if_match \
   "\\b(spriteBank|spriteIndex|bank|texture_id|nine_slice|palette)[[:space:]]*(=|;|,|\\)|\\})" \
   "$REPO_ROOT/clients/silencer/src/client/ui/components" \
   "$REPO_ROOT/clients/silencer/src/ui/components" \

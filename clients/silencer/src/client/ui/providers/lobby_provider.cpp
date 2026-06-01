@@ -981,11 +981,6 @@ Uint8 LobbyPregameTechModel::local_peer_id() const {
 	return world ? world->peers.localpeerid : 0;
 }
 
-Peer * LobbyPregameTechModel::peer(Uint8 peer_id) const {
-	World * world = lobby_provider_detail::LobbyWorld(provider_);
-	return world ? world->peers.peerlist[peer_id] : nullptr;
-}
-
 void LobbyPregameTechModel::request_peer_list() const {
 	if(World * world = lobby_provider_detail::LobbyWorld(provider_)){
 		world->choosingtech = true;

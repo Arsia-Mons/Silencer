@@ -7,8 +7,6 @@
 #include <string>
 #include <vector>
 
-class Peer;
-
 namespace silencer {
 namespace client_ui {
 
@@ -283,7 +281,6 @@ public:
 	explicit LobbyPregameTechModel(const LobbyProviderValue& provider);
 
 	Uint8 local_peer_id() const;
-	Peer * peer(Uint8 peer_id) const;
 	void request_peer_list() const;
 	void set_choices(Uint32 choices) const;
 
