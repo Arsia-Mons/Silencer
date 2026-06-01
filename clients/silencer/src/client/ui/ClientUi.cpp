@@ -413,7 +413,7 @@ void ClientUi::RefreshRetainedInteractions() {
 std::vector<silencer::ui::UiAction> ClientUi::DispatchInput(
 	ScreenContext& ctx,
 	const silencer::ui::UiInputState& input) {
-	Screen * top = screens_.Top();
+	Screen * top = screens_.top();
 	silencer::ui::UiInputRouter router(interactions_);
 	std::vector<silencer::ui::UiAction> actions = router.Route(input);
 	bool playedFeedback = false;
@@ -456,25 +456,25 @@ bool ClientUi::HasTextInputFocus() const {
 }
 
 void ClientUi::PushScreen(std::unique_ptr<Screen> screen, ScreenContext& ctx) {
-	if(!screen || screens_.Size() >= CLIENT_UI_MAX_SCREENS) return;
+	if(!screen || screens_.count() >= CLIENT_UI_MAX_SCREENS) return;
 	screen->Build(ctx);
-	screens_.Push(std::move(screen));
+	screens_.push(std::move(screen));
 }
 
 void ClientUi::PopScreen(ScreenContext& ctx) {
-	Screen * top = screens_.Top();
+	Screen * top = screens_.top();
 	if(!top) return;
 	top->Destroy(ctx);
-	screens_.Pop();
+	screens_.pop_top();
 }
 
 void ClientUi::PopScreenEntry(UiScreenEntryId entryId, ScreenContext& ctx) {
 	if(entryId == 0) return;
-	for(int i = screens_.Size() - 1; i >= 0; --i){
-		Screen * screen = screens_.At(i);
+	for(int i = screens_.count() - 1; i >= 0; --i){
+		Screen * screen = screens_.at(i);
 		if(screen && screen->EntryId() == entryId){
 			screen->Destroy(ctx);
-			screens_.PopEntry(entryId);
+			screens_.pop_entry(entryId);
 			return;
 		}
 	}
@@ -482,21 +482,21 @@ void ClientUi::PopScreenEntry(UiScreenEntryId entryId, ScreenContext& ctx) {
 
 void ClientUi::ReplaceScreen(std::unique_ptr<Screen> screen, ScreenContext& ctx) {
 	if(!screen) return;
-	Screen * top = screens_.Top();
+	Screen * top = screens_.top();
 	if(!top){
 		PushScreen(std::move(screen), ctx);
 		return;
 	}
 	top->Destroy(ctx);
 	screen->Build(ctx);
-	screens_.Replace(std::move(screen));
+	screens_.replace_top(std::move(screen));
 }
 
 void ClientUi::ResetToScreen(std::unique_ptr<Screen> screen, ScreenContext& ctx) {
 	if(!screen) return;
-	while(Screen * top = screens_.Top()){
+	while(Screen * top = screens_.top()){
 		top->Destroy(ctx);
-		screens_.Pop();
+		screens_.pop_top();
 	}
 	PushScreen(std::move(screen), ctx);
 }
@@ -586,26 +586,26 @@ void ClientUi::ApplyQueuedMutation(QueuedUiMutation& mutation, ScreenContext& ct
 }
 
 void ClientUi::RequestClearScreens() {
-	screens_.RequestClear();
+	screens_.request_clear();
 }
 
 void ClientUi::ClearScreensIfRequested(ScreenContext& ctx) {
-	if(!screens_.ConsumeClearRequest()) return;
-	while(Screen * top = screens_.Top()){
+	if(!screens_.consume_clear_request()) return;
+	while(Screen * top = screens_.top()){
 		top->Destroy(ctx);
-		screens_.Pop();
+		screens_.pop_top();
 	}
 }
 
 void ClientUi::TickVisibleScreens(ScreenContext& ctx) {
-	::ui::Span<Screen *> visible = screens_.VisibleScreens();
+	::ui::Span<Screen *> visible = screens_.visible_screens();
 	for(int i = 0; i < visible.count; ++i) {
 		Screen * screen = visible[i];
 		if(!screen) continue;
-		const int stackSize = screens_.Size();
+		const int stackSize = screens_.count();
 		const UiScreenEntryId entryId = screen->EntryId();
 		screen->Tick(ctx);
-		if(screens_.Size() != stackSize || !screens_.ContainsEntry(entryId)){
+		if(screens_.count() != stackSize || !screens_.contains_entry(entryId)){
 			break;
 		}
 	}
@@ -617,7 +617,7 @@ void ClientUi::BuildRetainedUi(ScreenContext& ctx,
                                Uint8 animationPhase) {
 	retainedElementFrame_.reset();
 	::ui::UiElementFrameScope scope(retainedElementFrame_);
-	::ui::Span<Screen *> visible = screens_.VisibleScreens();
+	::ui::Span<Screen *> visible = screens_.visible_screens();
 	std::array<::ui::UiElement, CLIENT_UI_MAX_SCREENS + 1> roots = {};
 	int rootCount = 0;
 

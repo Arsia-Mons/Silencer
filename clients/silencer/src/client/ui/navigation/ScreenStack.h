@@ -15,21 +15,21 @@ class ScreenStack {
 public:
 	~ScreenStack();
 
-	bool Empty() const { return count_ <= 0; }
-	int Size() const { return count_; }
-	bool ContainsEntry(UiScreenEntryId entryId) const;
+	bool empty() const { return count_ <= 0; }
+	int count() const { return count_; }
+	bool contains_entry(UiScreenEntryId entryId) const;
 
-	bool Push(std::unique_ptr<Screen> screen);
-	bool Pop();
-	bool PopEntry(UiScreenEntryId entryId);
-	bool Replace(std::unique_ptr<Screen> screen);
-	bool ResetTo(std::unique_ptr<Screen> screen);
-	void RequestClear();
-	bool ConsumeClearRequest();
+	bool push(std::unique_ptr<Screen> screen);
+	bool pop_top();
+	bool pop_entry(UiScreenEntryId entryId);
+	bool replace_top(std::unique_ptr<Screen> screen);
+	bool reset_to(std::unique_ptr<Screen> screen);
+	void request_clear();
+	bool consume_clear_request();
 
-	Screen * At(int index) const;
-	Screen * Top() const;
-	::ui::Span<Screen *> VisibleScreens();
+	Screen * at(int index) const;
+	Screen * top() const;
+	::ui::Span<Screen *> visible_screens();
 
 private:
 	std::array<std::unique_ptr<Screen>, CLIENT_UI_MAX_SCREENS> screens_ = {};

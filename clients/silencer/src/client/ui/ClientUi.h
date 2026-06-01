@@ -42,8 +42,8 @@ public:
 	void ClearFocus() { interactions_.ClearFocus(); }
 	bool HasTextInputFocus() const;
 
-	bool HasScreens() const { return !screens_.Empty(); }
-	Screen * TopScreen() const { return screens_.Top(); }
+	bool HasScreens() const { return !screens_.empty(); }
+	Screen * TopScreen() const { return screens_.top(); }
 	void PushScreen(std::unique_ptr<Screen> screen, ScreenContext& ctx);
 	void PopScreen(ScreenContext& ctx);
 	void PopScreenEntry(UiScreenEntryId entryId, ScreenContext& ctx);
