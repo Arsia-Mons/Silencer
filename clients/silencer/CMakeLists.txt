@@ -405,6 +405,35 @@ if(MSVC)
 endif()
 add_test(NAME ui_pipeline_tests COMMAND ui_pipeline_tests)
 
+# --- Production render seam: PipelineHost (SIL-14) ------------------------
+# Drives the real client::ui::UiPipeline and executes its IR to pixels via the
+# SIL-11 UiSurface/execute_draw_commands path (the render-lambda -> UiSurface
+# bridge SIL-13 deferred). Headless software renderer; a stub fill-box screen
+# proves pipeline -> renderer end-to-end. pipeline_host.cpp compiles into the
+# client via the src/render/cppx_ui glob.
+add_executable(pipeline_host_tests
+	tests/pipeline_host_tests.cpp
+	src/render/cppx_ui/pipeline_host.cpp
+	src/render/cppx_ui/ui_surface.cpp
+	src/render/cppx_ui/draw_executor.cpp
+	src/render/cppx_ui/sdf_raster.cpp
+	src/render/cppx_ui/font_registry.cpp
+	src/render/cppx_ui/texture_registry.cpp
+	src/render/cppx_ui/text_measure.cpp
+	src/ui/runtime/geometry.cpp
+	src/client/ui/app_shell/ui_pipeline.cpp
+	${_cppx_app_shell_sources}
+	${_cppx_retained_sources})
+target_compile_features(pipeline_host_tests PRIVATE cxx_std_20)
+target_include_directories(pipeline_host_tests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src")
+target_link_libraries(pipeline_host_tests PRIVATE SDL3::SDL3 SDL3_ttf::SDL3_ttf yogacore)
+target_compile_definitions(pipeline_host_tests PRIVATE
+	SILENCER_TEST_FONT_DIR="${SILENCER_SHARED_DIR}/fonts")
+if(MSVC)
+	target_compile_definitions(pipeline_host_tests PRIVATE NOMINMAX)
+endif()
+add_test(NAME pipeline_host_tests COMMAND pipeline_host_tests)
+
 # --- SDL-free draw model (SIL-11 foundation) -----------------------------
 # RGBA DrawCommand IR + tessellation math. draw_command_builder.cpp compiles
 # into the client via the source glob; the renderer-side SDL executor/
