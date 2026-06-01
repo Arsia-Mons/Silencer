@@ -637,6 +637,10 @@ fail_if_match \
   "$REPO_ROOT/clients/silencer/src/client/ui/ClientUi.cpp"
 
 fail_if_match \
+  "DispatchMatchAction|DispatchMatchActions|FocusSelectedBuyTechRow" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/ClientUi.cpp"
+
+fail_if_match \
   "\\bsprite_(bounds|frame)[[:space:]]*\\(" \
   "$REPO_ROOT/clients/silencer/src/client/ui/hooks/use_app.h"
 

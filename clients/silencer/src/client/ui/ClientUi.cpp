@@ -3,6 +3,7 @@
 #include "client/ui/hooks/use_app.h"
 #include "client/ui/hooks/use_match.h"
 #include "client/ui/hud/ingame_overlay_frame.h"
+#include "client/ui/hud/ingame_overlay_interaction.h"
 #include "game.h"
 #include "lobby_screen.h"
 #include "main_menu_screen.h"
@@ -13,7 +14,6 @@
 #include "world.h"
 
 #include <utility>
-#include <cstring>
 
 namespace silencer {
 namespace client_ui {
@@ -59,70 +59,6 @@ bool ActionTargetsAudibleInteractable(const silencer::ui::UiInteractionRegistry&
 	}
 	const auto * widget = interactions.FindInteractableById(action.id);
 	return widget && IsAudibleInteractable(*widget);
-}
-
-bool StartsWith(const std::string& value, const char * prefix) {
-	return value.compare(0, std::strlen(prefix), prefix) == 0;
-}
-
-bool DispatchMatchAction(const MatchModel& match,
-                         const silencer::ui::UiAction& action,
-                         silencer::ui::UiInteractionRegistry& interactions) {
-	if(match.chat.active() &&
-	   (action.id == "ingame.chat" || action.id == "ingame.chat.channel")){
-		if(action.kind == silencer::ui::UiActionKind::SubmitText){
-			match.chat.submit(action.value);
-		}else if(action.kind == silencer::ui::UiActionKind::Cancel){
-			match.chat.cancel();
-		}else if((action.kind == silencer::ui::UiActionKind::Navigate ||
-		          action.kind == silencer::ui::UiActionKind::Activate) &&
-		         action.id == "ingame.chat.channel"){
-			match.chat.toggle_channel();
-			interactions.FocusInteractableById("ingame.chat");
-		}
-		return true;
-	}
-
-	if(match.station.active() && StartsWith(action.id, "ingame.buytech.row.")){
-		if(action.index >= 0){
-			match.station.select_row(action.index);
-		}
-		if(action.kind == silencer::ui::UiActionKind::Select &&
-		   action.value != "focus_next" && action.value != "focus_previous"){
-			match.station.activate_selected();
-		}
-		return true;
-	}
-
-	if(match.station.active() && action.kind == silencer::ui::UiActionKind::Cancel){
-		match.station.close();
-		return true;
-	}
-
-	return false;
-}
-
-void DispatchMatchActions(const MatchModel& match,
-                          const RetainedFrame * overlayFrame,
-                          const std::vector<silencer::ui::UiAction>& actions,
-                          silencer::ui::UiInteractionRegistry& interactions) {
-	for(const silencer::ui::UiAction& action : actions){
-		if(overlayFrame && overlayFrame->HandleUiIntent(action)){
-			continue;
-		}
-		(void)DispatchMatchAction(match, action, interactions);
-	}
-}
-
-void FocusSelectedBuyTechRow(const HudView& view,
-                             silencer::ui::UiInteractionRegistry& interactions) {
-	if(!view.buyTech.visible) return;
-	for(const BuyTechRowView& row : view.buyTech.rows){
-		if(!row.selected) continue;
-		interactions.FocusInteractableById(
-			"ingame.buytech.row." + std::to_string(row.index));
-		return;
-	}
 }
 
 void PlayMenuButtonSound(ScreenContext& ctx) {
@@ -187,7 +123,7 @@ std::vector<silencer::ui::UiAction> ClientUi::DispatchInput(
 	if(!top){
 		MatchModel match = use_match(MakeMatchProvider(ctx));
 		if(match.active()){
-			clientui_detail::DispatchMatchActions(
+			ApplyInGameOverlayIntents(
 				match,
 				inGameOverlayFrameActive_ ? &inGameOverlayFrame_ : nullptr,
 				actions,
@@ -471,7 +407,7 @@ void ClientUi::BuildVisibleScreens(ScreenContext& ctx, Surface& dst, float frame
 			                          input.height,
 			                          interactions_);
 			if(showBuyTech){
-				clientui_detail::FocusSelectedBuyTechRow(hudView, interactions_);
+				FocusSelectedInGameStationRow(hudView, interactions_);
 			}
 		}
 	}
