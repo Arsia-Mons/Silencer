@@ -553,6 +553,37 @@ inline ::ui::HostCallbacks game_select_row_callbacks(
 	return callbacks;
 }
 
+inline ::ui::HostCallbacks game_create_option_callbacks(
+	int row,
+	const std::function<void()>& on_cycle_security,
+	const std::function<void()>& on_toggle_spectatable) {
+	::ui::HostCallbacks callbacks;
+	if(row == 0 && on_cycle_security){
+		callbacks.on_activate =
+			[on_cycle_security](const ::ui::ActivationEvent&) {
+				on_cycle_security();
+			};
+	}else if(row == 5 && on_toggle_spectatable){
+		callbacks.on_activate =
+			[on_toggle_spectatable](const ::ui::ActivationEvent&) {
+				on_toggle_spectatable();
+			};
+	}
+	return callbacks;
+}
+
+inline ::ui::HostCallbacks game_create_map_row_callbacks(
+	const std::function<void(int)>& on_select,
+	int source) {
+	::ui::HostCallbacks callbacks;
+	if(on_select){
+		callbacks.on_activate = [on_select, source](const ::ui::ActivationEvent&) {
+			on_select(source);
+		};
+	}
+	return callbacks;
+}
+
 inline const char * copied_prefixed_id(const char * prefix, int value) {
 	std::string id = std::string(prefix) + std::to_string(value);
 	return ::ui::copy_string(id.c_str());
@@ -1872,6 +1903,8 @@ struct GameCreateOptionValueProps {
 	int row = 0;
 	int x = 0;
 	int width = 0;
+	std::function<void()> on_cycle_security = {};
+	std::function<void()> on_toggle_spectatable = {};
 };
 
 ::ui::UiElement GameCreateOptionValue(const GameCreateOptionValueProps& props) {
@@ -1905,6 +1938,7 @@ struct GameCreateOptionValueProps {
 	  visual={game_create_inline_control_visual(selected)}
 	  text={::ui::HostTextProps{.value = value}}
 	  interaction={::ui::NodeInteraction{.focusable = true, .checked = selected}}
+	  callbacks={game_create_option_callbacks(props.row, props.on_cycle_security, props.on_toggle_spectatable)}
 	  accessibility={{.role = props.row == 5 ? ::ui::SemanticRole::Checkbox : ::ui::SemanticRole::Button, .label = label}}
 	>
 		<Text
@@ -1926,6 +1960,8 @@ struct GameCreateOptionRowProps {
 	GameCreateOptionsLayout layout_metrics = {};
 	int row = 0;
 	int width = 0;
+	std::function<void()> on_cycle_security = {};
+	std::function<void()> on_toggle_spectatable = {};
 };
 
 ::ui::UiElement GameCreateOptionRow(const GameCreateOptionRowProps& props) {
@@ -1962,6 +1998,8 @@ struct GameCreateOptionRowProps {
 		  row={props.row}
 		  x={value_x}
 		  width={value_width}
+		  onCycleSecurity={props.on_cycle_security}
+		  onToggleSpectatable={props.on_toggle_spectatable}
 		/>
 	</Box>
 }
@@ -1972,6 +2010,8 @@ struct GameCreateOptionRowsProps {
 	GameCreateOptionsLayout layout_metrics = {};
 	int width = 0;
 	int height = 0;
+	std::function<void()> on_cycle_security = {};
+	std::function<void()> on_toggle_spectatable = {};
 };
 
 ::ui::UiElement GameCreateOptionRows(const GameCreateOptionRowsProps& props) {
@@ -1982,6 +2022,8 @@ struct GameCreateOptionRowsProps {
 		  layoutMetrics={props.layout_metrics}
 		  row={0}
 		  width={props.width}
+		  onCycleSecurity={props.on_cycle_security}
+		  onToggleSpectatable={props.on_toggle_spectatable}
 		/>
 		<GameCreateOptionRow
 		  key={kGameCreateOptionRowKeys[1]}
@@ -1989,6 +2031,8 @@ struct GameCreateOptionRowsProps {
 		  layoutMetrics={props.layout_metrics}
 		  row={1}
 		  width={props.width}
+		  onCycleSecurity={props.on_cycle_security}
+		  onToggleSpectatable={props.on_toggle_spectatable}
 		/>
 		<GameCreateOptionRow
 		  key={kGameCreateOptionRowKeys[2]}
@@ -1996,6 +2040,8 @@ struct GameCreateOptionRowsProps {
 		  layoutMetrics={props.layout_metrics}
 		  row={2}
 		  width={props.width}
+		  onCycleSecurity={props.on_cycle_security}
+		  onToggleSpectatable={props.on_toggle_spectatable}
 		/>
 		<GameCreateOptionRow
 		  key={kGameCreateOptionRowKeys[3]}
@@ -2003,6 +2049,8 @@ struct GameCreateOptionRowsProps {
 		  layoutMetrics={props.layout_metrics}
 		  row={3}
 		  width={props.width}
+		  onCycleSecurity={props.on_cycle_security}
+		  onToggleSpectatable={props.on_toggle_spectatable}
 		/>
 		<GameCreateOptionRow
 		  key={kGameCreateOptionRowKeys[4]}
@@ -2010,6 +2058,8 @@ struct GameCreateOptionRowsProps {
 		  layoutMetrics={props.layout_metrics}
 		  row={4}
 		  width={props.width}
+		  onCycleSecurity={props.on_cycle_security}
+		  onToggleSpectatable={props.on_toggle_spectatable}
 		/>
 		<GameCreateOptionRow
 		  key={kGameCreateOptionRowKeys[5]}
@@ -2017,6 +2067,8 @@ struct GameCreateOptionRowsProps {
 		  layoutMetrics={props.layout_metrics}
 		  row={5}
 		  width={props.width}
+		  onCycleSecurity={props.on_cycle_security}
+		  onToggleSpectatable={props.on_toggle_spectatable}
 		/>
 	</Box>
 }
@@ -2078,6 +2130,8 @@ struct GameCreateUpperPanelProps {
 	int y = 0;
 	int width = 0;
 	int height = 0;
+	std::function<void()> on_cycle_security = {};
+	std::function<void()> on_toggle_spectatable = {};
 };
 
 ::ui::UiElement GameCreateUpperPanel(const GameCreateUpperPanelProps& props) {
@@ -2163,6 +2217,8 @@ struct GameCreateUpperPanelProps {
 					  layoutMetrics={layout}
 					  width={form_width}
 					  height={layout.viewportHeight}
+					  onCycleSecurity={props.on_cycle_security}
+					  onToggleSpectatable={props.on_toggle_spectatable}
 					/>
 				</component_detail.Host>
 				<GameCreateOptionsScrollbar
@@ -2181,6 +2237,7 @@ struct GameCreateMapRowProps {
 	const GameCreatePanelState * state = nullptr;
 	GameCreateTallLayout layout = {};
 	int visible_row = 0;
+	std::function<void(int)> on_select = {};
 };
 
 ::ui::UiElement GameCreateMapRow(const GameCreateMapRowProps& props) {
@@ -2208,6 +2265,7 @@ struct GameCreateMapRowProps {
 			.focusable = true,
 			.checked = selected,
 		}}
+	  callbacks={game_create_map_row_callbacks(props.on_select, source)}
 	  accessibility={{.role = ::ui::SemanticRole::ListRow, .label = label}}
 	>
 		<Text
@@ -2227,6 +2285,7 @@ struct GameCreateMapRowsProps {
 	const char * key = nullptr;
 	const GameCreatePanelState * state = nullptr;
 	GameCreateTallLayout layout = {};
+	std::function<void(int)> on_select = {};
 };
 
 ::ui::UiElement GameCreateMapRows(const GameCreateMapRowsProps& props) {
@@ -2239,192 +2298,224 @@ struct GameCreateMapRowsProps {
 		  state={props.state}
 		  layout={props.layout}
 		  visibleRow={0}
+		  onSelect={props.on_select}
 		/>
 		<GameCreateMapRow
 		  key={kGameCreateMapRowKeys[1]}
 		  state={props.state}
 		  layout={props.layout}
 		  visibleRow={1}
+		  onSelect={props.on_select}
 		/>
 		<GameCreateMapRow
 		  key={kGameCreateMapRowKeys[2]}
 		  state={props.state}
 		  layout={props.layout}
 		  visibleRow={2}
+		  onSelect={props.on_select}
 		/>
 		<GameCreateMapRow
 		  key={kGameCreateMapRowKeys[3]}
 		  state={props.state}
 		  layout={props.layout}
 		  visibleRow={3}
+		  onSelect={props.on_select}
 		/>
 		<GameCreateMapRow
 		  key={kGameCreateMapRowKeys[4]}
 		  state={props.state}
 		  layout={props.layout}
 		  visibleRow={4}
+		  onSelect={props.on_select}
 		/>
 		<GameCreateMapRow
 		  key={kGameCreateMapRowKeys[5]}
 		  state={props.state}
 		  layout={props.layout}
 		  visibleRow={5}
+		  onSelect={props.on_select}
 		/>
 		<GameCreateMapRow
 		  key={kGameCreateMapRowKeys[6]}
 		  state={props.state}
 		  layout={props.layout}
 		  visibleRow={6}
+		  onSelect={props.on_select}
 		/>
 		<GameCreateMapRow
 		  key={kGameCreateMapRowKeys[7]}
 		  state={props.state}
 		  layout={props.layout}
 		  visibleRow={7}
+		  onSelect={props.on_select}
 		/>
 		<GameCreateMapRow
 		  key={kGameCreateMapRowKeys[8]}
 		  state={props.state}
 		  layout={props.layout}
 		  visibleRow={8}
+		  onSelect={props.on_select}
 		/>
 		<GameCreateMapRow
 		  key={kGameCreateMapRowKeys[9]}
 		  state={props.state}
 		  layout={props.layout}
 		  visibleRow={9}
+		  onSelect={props.on_select}
 		/>
 		<GameCreateMapRow
 		  key={kGameCreateMapRowKeys[10]}
 		  state={props.state}
 		  layout={props.layout}
 		  visibleRow={10}
+		  onSelect={props.on_select}
 		/>
 		<GameCreateMapRow
 		  key={kGameCreateMapRowKeys[11]}
 		  state={props.state}
 		  layout={props.layout}
 		  visibleRow={11}
+		  onSelect={props.on_select}
 		/>
 		<GameCreateMapRow
 		  key={kGameCreateMapRowKeys[12]}
 		  state={props.state}
 		  layout={props.layout}
 		  visibleRow={12}
+		  onSelect={props.on_select}
 		/>
 		<GameCreateMapRow
 		  key={kGameCreateMapRowKeys[13]}
 		  state={props.state}
 		  layout={props.layout}
 		  visibleRow={13}
+		  onSelect={props.on_select}
 		/>
 		<GameCreateMapRow
 		  key={kGameCreateMapRowKeys[14]}
 		  state={props.state}
 		  layout={props.layout}
 		  visibleRow={14}
+		  onSelect={props.on_select}
 		/>
 		<GameCreateMapRow
 		  key={kGameCreateMapRowKeys[15]}
 		  state={props.state}
 		  layout={props.layout}
 		  visibleRow={15}
+		  onSelect={props.on_select}
 		/>
 		<GameCreateMapRow
 		  key={kGameCreateMapRowKeys[16]}
 		  state={props.state}
 		  layout={props.layout}
 		  visibleRow={16}
+		  onSelect={props.on_select}
 		/>
 		<GameCreateMapRow
 		  key={kGameCreateMapRowKeys[17]}
 		  state={props.state}
 		  layout={props.layout}
 		  visibleRow={17}
+		  onSelect={props.on_select}
 		/>
 		<GameCreateMapRow
 		  key={kGameCreateMapRowKeys[18]}
 		  state={props.state}
 		  layout={props.layout}
 		  visibleRow={18}
+		  onSelect={props.on_select}
 		/>
 		<GameCreateMapRow
 		  key={kGameCreateMapRowKeys[19]}
 		  state={props.state}
 		  layout={props.layout}
 		  visibleRow={19}
+		  onSelect={props.on_select}
 		/>
 		<GameCreateMapRow
 		  key={kGameCreateMapRowKeys[20]}
 		  state={props.state}
 		  layout={props.layout}
 		  visibleRow={20}
+		  onSelect={props.on_select}
 		/>
 		<GameCreateMapRow
 		  key={kGameCreateMapRowKeys[21]}
 		  state={props.state}
 		  layout={props.layout}
 		  visibleRow={21}
+		  onSelect={props.on_select}
 		/>
 		<GameCreateMapRow
 		  key={kGameCreateMapRowKeys[22]}
 		  state={props.state}
 		  layout={props.layout}
 		  visibleRow={22}
+		  onSelect={props.on_select}
 		/>
 		<GameCreateMapRow
 		  key={kGameCreateMapRowKeys[23]}
 		  state={props.state}
 		  layout={props.layout}
 		  visibleRow={23}
+		  onSelect={props.on_select}
 		/>
 		<GameCreateMapRow
 		  key={kGameCreateMapRowKeys[24]}
 		  state={props.state}
 		  layout={props.layout}
 		  visibleRow={24}
+		  onSelect={props.on_select}
 		/>
 		<GameCreateMapRow
 		  key={kGameCreateMapRowKeys[25]}
 		  state={props.state}
 		  layout={props.layout}
 		  visibleRow={25}
+		  onSelect={props.on_select}
 		/>
 		<GameCreateMapRow
 		  key={kGameCreateMapRowKeys[26]}
 		  state={props.state}
 		  layout={props.layout}
 		  visibleRow={26}
+		  onSelect={props.on_select}
 		/>
 		<GameCreateMapRow
 		  key={kGameCreateMapRowKeys[27]}
 		  state={props.state}
 		  layout={props.layout}
 		  visibleRow={27}
+		  onSelect={props.on_select}
 		/>
 		<GameCreateMapRow
 		  key={kGameCreateMapRowKeys[28]}
 		  state={props.state}
 		  layout={props.layout}
 		  visibleRow={28}
+		  onSelect={props.on_select}
 		/>
 		<GameCreateMapRow
 		  key={kGameCreateMapRowKeys[29]}
 		  state={props.state}
 		  layout={props.layout}
 		  visibleRow={29}
+		  onSelect={props.on_select}
 		/>
 		<GameCreateMapRow
 		  key={kGameCreateMapRowKeys[30]}
 		  state={props.state}
 		  layout={props.layout}
 		  visibleRow={30}
+		  onSelect={props.on_select}
 		/>
 		<GameCreateMapRow
 		  key={kGameCreateMapRowKeys[31]}
 		  state={props.state}
 		  layout={props.layout}
 		  visibleRow={31}
+		  onSelect={props.on_select}
 		/>
 	</Box>
 }
@@ -2486,11 +2577,19 @@ struct GameCreateTallPanelProps {
 	int y = 0;
 	int width = 0;
 	int height = 0;
+	std::function<void(int)> on_select_map = {};
+	std::function<void()> on_create = {};
 };
 
 ::ui::UiElement GameCreateTallPanel(const GameCreateTallPanelProps& props) {
 	if(!props.show || !props.state || props.width <= 0 || props.height <= 0){
 		return ::ui::empty();
+	}
+	std::function<void(const ::ui::ActivationEvent&)> create_activate = {};
+	if(props.on_create){
+		create_activate = [on_create = props.on_create](const ::ui::ActivationEvent&) {
+			on_create();
+		};
 	}
 	const GameCreateTallLayout layout =
 		ResolveGameCreateTallLayout(
@@ -2536,7 +2635,12 @@ struct GameCreateTallPanelProps {
 		  key="list-viewport"
 		  layout={absolute_layout(list_x, list_y, layout.listWidth, layout.listHeight)}
 		>
-			<GameCreateMapRows key="rows" state={props.state} layout={layout} />
+			<GameCreateMapRows
+			  key="rows"
+			  state={props.state}
+			  layout={layout}
+			  onSelect={props.on_select_map}
+			/>
 			<GameCreateMapScrollbar key="scrollbar" state={props.state} layout={layout} />
 		</Box>
 		<Text
@@ -2582,6 +2686,7 @@ struct GameCreateTallPanelProps {
 		  id={kGameCreateCreateAction}
 		  label="Create"
 		  accessibility={{.label = "Create"}}
+		  onActivate={create_activate}
 		  layout={absolute_button_layout(kGameCreateTallPanelPad, create_y, std::max(1, static_cast<int>(layout.inputWidth)), kGameCreateTallButtonH)}
 		  style={chrome_button_patch()}
 		/>
@@ -4365,6 +4470,8 @@ using ::ui::components::TextProps;
 		  y={props.game_create_upper_y}
 		  width={props.game_create_upper_width}
 		  height={props.game_create_upper_height}
+		  onCycleSecurity={props.game_create_cycle_security}
+		  onToggleSpectatable={props.game_create_toggle_spectatable}
 		/>
 		<lobby_chrome_frame_detail.GameCreateTallPanel
 		  key="game-create-tall"
@@ -4374,6 +4481,8 @@ using ::ui::components::TextProps;
 		  y={props.game_create_tall_y}
 		  width={props.game_create_tall_width}
 		  height={props.game_create_tall_height}
+		  onSelectMap={props.game_create_select_map}
+		  onCreate={props.game_create_submit}
 		/>
 		<lobby_chrome_frame_detail.AbsoluteChromeButton
 		  key="game-join-choose-tech"

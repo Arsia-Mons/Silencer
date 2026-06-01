@@ -88,11 +88,15 @@ struct LobbyChromeFrameProps {
 	int game_create_upper_y = 0;
 	int game_create_upper_width = 0;
 	int game_create_upper_height = 0;
+	std::function<void()> game_create_cycle_security = {};
+	std::function<void()> game_create_toggle_spectatable = {};
 	bool show_game_create_tall = false;
 	int game_create_tall_x = 0;
 	int game_create_tall_y = 0;
 	int game_create_tall_width = 0;
 	int game_create_tall_height = 0;
+	std::function<void(int)> game_create_select_map = {};
+	std::function<void()> game_create_submit = {};
 	bool show_game_create_preview = false;
 	int game_create_preview_x = 0;
 	int game_create_preview_y = 0;

@@ -17,10 +17,6 @@ namespace silencer::client_ui::lobby {
 
 namespace game_create_panel_detail {
 
-constexpr const char * kActionSecurity = "lobby.game_create.security";
-constexpr const char * kActionSpectatable = "lobby.game_create.spectatable";
-constexpr const char * kActionCreate = "lobby.game_create.create";
-constexpr const char * kActionMapPrefix = "lobby.game_create.map";
 constexpr const char * kActionMinLevel = "lobby.game_create.min_level";
 constexpr const char * kActionMaxLevel = "lobby.game_create.max_level";
 constexpr const char * kActionMaxPlayers = "lobby.game_create.max_players";
@@ -28,11 +24,6 @@ constexpr const char * kActionMaxTeams = "lobby.game_create.max_teams";
 constexpr const char * kActionName = "lobby.game_create.name";
 constexpr const char * kActionPassword = "lobby.game_create.password";
 constexpr const char * kActionOptionsScroll = kGameCreateOptionsScrollId;
-
-bool StartsWith(const std::string & value, const char * prefix) {
-	const size_t n = std::strlen(prefix);
-	return value.size() >= n && value.compare(0, n, prefix) == 0;
-}
 
 void CopyUiText(char * dst, int dstLen, const std::string & value)
 {
@@ -66,6 +57,7 @@ void UpdateExistingTextInput(const char * label,
 
 static void DismissProgressModal(GameCreatePanelState & state,
                                  ScreenContext & ctx) {
+	(void)ctx;
 	if(!state.progressModal) return;
 	silencer::client_ui::use_navigation().pop_top();
 	state.progressModal = nullptr;
@@ -84,35 +76,26 @@ void GameCreatePanelInit(GameCreatePanelState & state, ScreenContext & ctx) {
 	lobby.create.reset();
 }
 
-void GameCreatePanelTick(GameCreatePanelState & state,
-                         ScreenContext & ctx,
-                         LobbyModel & lobby) {
-	if(state.mapRowClickedIndex >= 0){
-		state.mapSelectedIndex = state.mapRowClickedIndex;
-		lobby.create.select_map(state.mapRowClickedIndex);
-		state.mapRowClickedIndex = -1;
-	}
-	if(state.securityClicked){
-		state.securityClicked = false;
-		state.securityIndex = static_cast<Uint8>((state.securityIndex + 1) % 4);
-	}
-	if(state.spectatableClicked){
-		state.spectatableClicked = false;
-		state.spectatable = !state.spectatable;
-		lobby.create.set_spectatable(state.spectatable);
-	}
+void GameCreatePanelCycleSecurity(GameCreatePanelState & state) {
+	state.securityIndex = static_cast<Uint8>((state.securityIndex + 1) % 4);
+}
 
-	const LobbyCreateModel::PumpResult pump = lobby.create.pump();
-	if(pump.dismiss_progress){
-		DismissProgressModal(state, ctx);
-		if(!pump.message.empty()){
-			lobby.modal.show_message(pump.message.c_str());
-		}
-	}
+void GameCreatePanelToggleSpectatable(GameCreatePanelState & state,
+                                      const LobbyModel & lobby) {
+	state.spectatable = !state.spectatable;
+	lobby.create.set_spectatable(state.spectatable);
+}
 
-	if(!state.createClicked) return;
-	state.createClicked = false;
+void GameCreatePanelSelectMap(GameCreatePanelState & state,
+                              const LobbyModel & lobby,
+                              int index) {
+	if(index < 0 || index >= static_cast<int>(state.maps.size())) return;
+	state.mapSelectedIndex = index;
+	lobby.create.select_map(index);
+}
 
+void GameCreatePanelSubmit(GameCreatePanelState & state,
+                           const LobbyModel & lobby) {
 	LobbyCreateModel::Request request;
 	request.game_name = state.name;
 	request.password = state.password;
@@ -137,6 +120,18 @@ void GameCreatePanelTick(GameCreatePanelState & state,
 	std::unique_ptr<MessageModal> progress = MessageModal::Progress("Uploading map...");
 	state.progressModal = progress.get();
 	silencer::client_ui::use_navigation().push(std::move(progress));
+}
+
+void GameCreatePanelTick(GameCreatePanelState & state,
+                         ScreenContext & ctx,
+                         LobbyModel & lobby) {
+	const LobbyCreateModel::PumpResult pump = lobby.create.pump();
+	if(pump.dismiss_progress){
+		DismissProgressModal(state, ctx);
+		if(!pump.message.empty()){
+			lobby.modal.show_message(pump.message.c_str());
+		}
+	}
 }
 
 bool GameCreatePanelHandleUiIntent(GameCreatePanelState & state,
@@ -174,25 +169,6 @@ bool GameCreatePanelHandleUiIntent(GameCreatePanelState & state,
 			return true;
 		}
 		return false;
-	}
-	if(action.kind == silencer::ui::UiActionKind::Activate){
-		if(action.id == game_create_panel_detail::kActionSecurity){
-			state.securityClicked = true;
-			return true;
-		}
-		if(action.id == game_create_panel_detail::kActionSpectatable){
-			state.spectatableClicked = true;
-			return true;
-		}
-		if(action.id == game_create_panel_detail::kActionCreate){
-			state.createClicked = true;
-			return true;
-		}
-	}
-	if(action.kind == silencer::ui::UiActionKind::Select &&
-	   game_create_panel_detail::StartsWith(action.id, game_create_panel_detail::kActionMapPrefix)){
-		state.mapRowClickedIndex = action.index;
-		return true;
 	}
 	return false;
 }

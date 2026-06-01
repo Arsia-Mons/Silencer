@@ -457,6 +457,11 @@ fail_if_match \
   "$REPO_ROOT/clients/silencer/src/client/ui/screens/lobby/game_select_panel.h"
 
 fail_if_match \
+  "\\b(securityClicked|spectatableClicked|createClicked|mapRowClickedIndex)\\b" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens/lobby/game_create_panel.cpp" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens/lobby/game_create_panel.h"
+
+fail_if_match \
   "\\bgoBackClicked\\b" \
   "$REPO_ROOT/clients/silencer/src/client/ui/screens/lobby/lobby_screen.cpp" \
   "$REPO_ROOT/clients/silencer/src/client/ui/screens/lobby/lobby_screen.h"

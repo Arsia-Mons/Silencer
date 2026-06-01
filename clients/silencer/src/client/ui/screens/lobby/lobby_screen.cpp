@@ -526,11 +526,27 @@ void LobbyScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime, s
 		.game_create_upper_y = bodyY,
 		.game_create_upper_width = mainLayout.rightUpperW,
 		.game_create_upper_height = mainLayout.upperH,
+		.game_create_cycle_security = [this]() {
+			silencer::client_ui::lobby::GameCreatePanelCycleSecurity(
+				gameCreateState);
+		},
+		.game_create_toggle_spectatable = [this, lobby]() {
+			silencer::client_ui::lobby::GameCreatePanelToggleSpectatable(
+				gameCreateState, lobby);
+		},
 		.show_game_create_tall = showGameCreateTall,
 		.game_create_tall_x = rightTallX,
 		.game_create_tall_y = bodyY,
 		.game_create_tall_width = mainLayout.rightTallW,
 		.game_create_tall_height = mainLayout.rightTallH,
+		.game_create_select_map = [this, lobby](int index) {
+			silencer::client_ui::lobby::GameCreatePanelSelectMap(
+				gameCreateState, lobby, index);
+		},
+		.game_create_submit = [this, lobby]() {
+			silencer::client_ui::lobby::GameCreatePanelSubmit(
+				gameCreateState, lobby);
+		},
 		.show_game_create_preview = gameCreatePreviewLayout.visible,
 		.game_create_preview_x = gameCreatePreviewLayout.x,
 		.game_create_preview_y = gameCreatePreviewLayout.y,

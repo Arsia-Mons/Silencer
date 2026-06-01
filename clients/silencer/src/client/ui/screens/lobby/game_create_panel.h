@@ -51,13 +51,6 @@ struct GameCreatePanelState {
 	int    mapSelectedIndex = -1;
 	Uint16 mapScrollPos     = 0;
 
-	// Per-frame click flags. Set by typed widget intents; consumed once
-	// by GameCreatePanelTick on the next frame.
-	bool securityClicked    = false;
-	bool spectatableClicked = false;
-	bool createClicked      = false;
-	int  mapRowClickedIndex = -1;
-
 	// Upper "Game Options" viewport state. The panel owns the visible-row
 	// window and applies wheel/control-socket scroll in row units.
 	Uint16 optionsScrollPosition = 0;
@@ -118,17 +111,23 @@ struct GameCreatePreviewOverlayLayout {
 // the provider. Mirrors the legacy GameCreatePanel::Build's one-time setup.
 void GameCreatePanelInit(GameCreatePanelState & state, ScreenContext & ctx);
 
-// Per-frame pump. Consumes click flags (cycle security, toggle spectatable,
-// kick off Create). Also pumps the deferred CreateGame state machine
-// (map upload -> CreateGame -> CONNECTED -> ShowGameJoin handoff +
-// progress-modal spinner update + create-failure unwind). Mirrors the
-// legacy LobbyScreen::Tick's `if(gameCreate)` block + GameCreatePanel::Tick
-// button switch.
+// Per-frame pump for the deferred CreateGame state machine (map upload ->
+// CreateGame -> CONNECTED -> ShowGameJoin handoff + progress-modal spinner
+// update + create-failure unwind). Mirrors the legacy LobbyScreen::Tick's
+// `if(gameCreate)` block.
 void GameCreatePanelTick(GameCreatePanelState & state,
                          ScreenContext & ctx,
                          LobbyModel & lobby);
 bool GameCreatePanelHandleUiIntent(GameCreatePanelState & state,
                                    const silencer::ui::UiAction & action);
+void GameCreatePanelCycleSecurity(GameCreatePanelState & state);
+void GameCreatePanelToggleSpectatable(GameCreatePanelState & state,
+                                      const LobbyModel & lobby);
+void GameCreatePanelSelectMap(GameCreatePanelState & state,
+                              const LobbyModel & lobby,
+                              int index);
+void GameCreatePanelSubmit(GameCreatePanelState & state,
+                           const LobbyModel & lobby);
 
 GameCreateOptionsLayout ResolveGameCreateOptionsLayout(Uint16 panelWidth,
                                                        Uint16 panelHeight);
