@@ -442,6 +442,11 @@ fail_if_match \
   "$REPO_ROOT/clients/silencer/src/client/ui/screens/options/options_controls_screen.h"
 
 fail_if_match \
+  "frame=\\{&props\\}|props[.]frame\\b|\\b(UpdateFrameProps|OptionsControlsFrameProps)[[:space:]]*[*][[:space:]]*frame\\b" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens/update/update_frame.cppx" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens/options/options_controls_frame.cppx"
+
+fail_if_match \
   "\\b(doneClicked|upgradeClicked)\\b" \
   "$REPO_ROOT/clients/silencer/src/client/ui/screens/mission_summary/mission_summary_screen.cpp" \
   "$REPO_ROOT/clients/silencer/src/client/ui/screens/mission_summary/mission_summary_screen.h"

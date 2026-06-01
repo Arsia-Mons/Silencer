@@ -119,14 +119,14 @@ inline int scaled_metric(int value, float scale) {
 	return result < 1 ? 1 : result;
 }
 
-inline float horizontal_scale(const OptionsControlsFrameProps& props) {
-	return props.view ? props.view->hScale : 1.0f;
+inline float horizontal_scale(const options::KeybindListView * view) {
+	return view ? view->hScale : 1.0f;
 }
 
-inline int visible_rows(const OptionsControlsFrameProps& props) {
-	if(!props.view) return 0;
-	return std::min(props.view->visibleRowCount,
-	                static_cast<int>(props.view->rows.size()));
+inline int visible_rows(const options::KeybindListView * view) {
+	if(!view) return 0;
+	return std::min(view->visibleRowCount,
+	                static_cast<int>(view->rows.size()));
 }
 
 inline ::ui::LayoutStyle fill_column_layout() {
@@ -241,20 +241,20 @@ inline const char * copied_id(const char * prefix, int row) {
 
 	struct KeybindRowProps {
 		const char * key = nullptr;
-		const OptionsControlsFrameProps * frame = nullptr;
+		const options::KeybindListView * view = nullptr;
 		int visible_row = 0;
+		std::function<void(int, int)> begin_rebind = {};
+		std::function<void(int)> toggle_operator = {};
 	};
 
 	::ui::UiElement KeybindRow(const KeybindRowProps& props) {
-		if(!props.frame) return ::ui::empty();
-		const OptionsControlsFrameProps& frame = *props.frame;
-		const int rowCount = visible_rows(frame);
-		if(!frame.view || props.visible_row < 0 || props.visible_row >= rowCount ||
+		const int rowCount = visible_rows(props.view);
+		if(!props.view || props.visible_row < 0 || props.visible_row >= rowCount ||
 		   props.visible_row >= kControlRowSlots){
 			return ::ui::empty();
 		}
-		const options::KeybindRowView& row = frame.view->rows[props.visible_row];
-		const float scale = horizontal_scale(frame);
+		const options::KeybindRowView& row = props.view->rows[props.visible_row];
+		const float scale = horizontal_scale(props.view);
 		const float actionNameW =
 			static_cast<float>(scaled_metric(kActionNameW, scale));
 		const float operatorW =
@@ -265,8 +265,6 @@ inline const char * copied_id(const char * prefix, int row) {
 			row.rebindingPrimary ? "-" : row.primaryLabel.c_str();
 		const char * secondaryText =
 			row.rebindingSecondary ? "-" : row.secondaryLabel.c_str();
-		const auto beginRebind = frame.begin_rebind;
-		const auto toggleOperator = frame.toggle_operator;
 		const int visibleRow = props.visible_row;
 		return <Box key={props.key} layout={row_layout(columnGap)}>
 			<Text
@@ -284,7 +282,7 @@ inline const char * copied_id(const char * prefix, int row) {
 			  label={primaryText}
 			  width={kRowActionW}
 			  spriteIndex={28}
-			  onPress={[beginRebind, visibleRow]() {
+			  onPress={[beginRebind = props.begin_rebind, visibleRow]() {
 				if(beginRebind) beginRebind(visibleRow, 0);
 			}}
 			/>
@@ -293,7 +291,7 @@ inline const char * copied_id(const char * prefix, int row) {
 			  id={copied_id(kActionOperatorPrefix, props.visible_row)}
 			  label={row.operatorLabel.c_str()}
 			  minWidth={operatorW}
-			  onPress={[toggleOperator, visibleRow]() {
+			  onPress={[toggleOperator = props.toggle_operator, visibleRow]() {
 				if(toggleOperator) toggleOperator(visibleRow);
 			}}
 			/>
@@ -303,7 +301,7 @@ inline const char * copied_id(const char * prefix, int row) {
 			  label={secondaryText}
 			  width={kRowActionW}
 			  spriteIndex={28}
-			  onPress={[beginRebind, visibleRow]() {
+			  onPress={[beginRebind = props.begin_rebind, visibleRow]() {
 				if(beginRebind) beginRebind(visibleRow, 1);
 			}}
 			/>
@@ -312,7 +310,9 @@ inline const char * copied_id(const char * prefix, int row) {
 
 	struct KeybindRowsProps {
 		const char * key = nullptr;
-		const OptionsControlsFrameProps * frame = nullptr;
+		const options::KeybindListView * view = nullptr;
+		std::function<void(int, int)> begin_rebind = {};
+		std::function<void(int)> toggle_operator = {};
 	};
 
 	::ui::UiElement KeybindRows(const KeybindRowsProps& props) {
@@ -323,44 +323,226 @@ inline const char * copied_id(const char * prefix, int row) {
 				.width = ::ui::Length::grow(1.0f),
 				.height = ::ui::Length::grow(1.0f),
 				.gap = static_cast<float>(kRowGap),
-			}}
+		}}
 		>
-			<KeybindRow key={kRowKeys[0]} frame={props.frame} visibleRow={0} />
-			<KeybindRow key={kRowKeys[1]} frame={props.frame} visibleRow={1} />
-			<KeybindRow key={kRowKeys[2]} frame={props.frame} visibleRow={2} />
-			<KeybindRow key={kRowKeys[3]} frame={props.frame} visibleRow={3} />
-			<KeybindRow key={kRowKeys[4]} frame={props.frame} visibleRow={4} />
-			<KeybindRow key={kRowKeys[5]} frame={props.frame} visibleRow={5} />
-			<KeybindRow key={kRowKeys[6]} frame={props.frame} visibleRow={6} />
-			<KeybindRow key={kRowKeys[7]} frame={props.frame} visibleRow={7} />
-			<KeybindRow key={kRowKeys[8]} frame={props.frame} visibleRow={8} />
-			<KeybindRow key={kRowKeys[9]} frame={props.frame} visibleRow={9} />
-			<KeybindRow key={kRowKeys[10]} frame={props.frame} visibleRow={10} />
-			<KeybindRow key={kRowKeys[11]} frame={props.frame} visibleRow={11} />
-			<KeybindRow key={kRowKeys[12]} frame={props.frame} visibleRow={12} />
-			<KeybindRow key={kRowKeys[13]} frame={props.frame} visibleRow={13} />
-			<KeybindRow key={kRowKeys[14]} frame={props.frame} visibleRow={14} />
-			<KeybindRow key={kRowKeys[15]} frame={props.frame} visibleRow={15} />
-			<KeybindRow key={kRowKeys[16]} frame={props.frame} visibleRow={16} />
-			<KeybindRow key={kRowKeys[17]} frame={props.frame} visibleRow={17} />
-			<KeybindRow key={kRowKeys[18]} frame={props.frame} visibleRow={18} />
-			<KeybindRow key={kRowKeys[19]} frame={props.frame} visibleRow={19} />
-			<KeybindRow key={kRowKeys[20]} frame={props.frame} visibleRow={20} />
-			<KeybindRow key={kRowKeys[21]} frame={props.frame} visibleRow={21} />
-			<KeybindRow key={kRowKeys[22]} frame={props.frame} visibleRow={22} />
-			<KeybindRow key={kRowKeys[23]} frame={props.frame} visibleRow={23} />
-			<KeybindRow key={kRowKeys[24]} frame={props.frame} visibleRow={24} />
-			<KeybindRow key={kRowKeys[25]} frame={props.frame} visibleRow={25} />
-			<KeybindRow key={kRowKeys[26]} frame={props.frame} visibleRow={26} />
-			<KeybindRow key={kRowKeys[27]} frame={props.frame} visibleRow={27} />
-			<KeybindRow key={kRowKeys[28]} frame={props.frame} visibleRow={28} />
-			<KeybindRow key={kRowKeys[29]} frame={props.frame} visibleRow={29} />
+			<KeybindRow
+			  key={kRowKeys[0]}
+			  view={props.view}
+			  visibleRow={0}
+			  beginRebind={props.begin_rebind}
+			  toggleOperator={props.toggle_operator}
+			/>
+			<KeybindRow
+			  key={kRowKeys[1]}
+			  view={props.view}
+			  visibleRow={1}
+			  beginRebind={props.begin_rebind}
+			  toggleOperator={props.toggle_operator}
+			/>
+			<KeybindRow
+			  key={kRowKeys[2]}
+			  view={props.view}
+			  visibleRow={2}
+			  beginRebind={props.begin_rebind}
+			  toggleOperator={props.toggle_operator}
+			/>
+			<KeybindRow
+			  key={kRowKeys[3]}
+			  view={props.view}
+			  visibleRow={3}
+			  beginRebind={props.begin_rebind}
+			  toggleOperator={props.toggle_operator}
+			/>
+			<KeybindRow
+			  key={kRowKeys[4]}
+			  view={props.view}
+			  visibleRow={4}
+			  beginRebind={props.begin_rebind}
+			  toggleOperator={props.toggle_operator}
+			/>
+			<KeybindRow
+			  key={kRowKeys[5]}
+			  view={props.view}
+			  visibleRow={5}
+			  beginRebind={props.begin_rebind}
+			  toggleOperator={props.toggle_operator}
+			/>
+			<KeybindRow
+			  key={kRowKeys[6]}
+			  view={props.view}
+			  visibleRow={6}
+			  beginRebind={props.begin_rebind}
+			  toggleOperator={props.toggle_operator}
+			/>
+			<KeybindRow
+			  key={kRowKeys[7]}
+			  view={props.view}
+			  visibleRow={7}
+			  beginRebind={props.begin_rebind}
+			  toggleOperator={props.toggle_operator}
+			/>
+			<KeybindRow
+			  key={kRowKeys[8]}
+			  view={props.view}
+			  visibleRow={8}
+			  beginRebind={props.begin_rebind}
+			  toggleOperator={props.toggle_operator}
+			/>
+			<KeybindRow
+			  key={kRowKeys[9]}
+			  view={props.view}
+			  visibleRow={9}
+			  beginRebind={props.begin_rebind}
+			  toggleOperator={props.toggle_operator}
+			/>
+			<KeybindRow
+			  key={kRowKeys[10]}
+			  view={props.view}
+			  visibleRow={10}
+			  beginRebind={props.begin_rebind}
+			  toggleOperator={props.toggle_operator}
+			/>
+			<KeybindRow
+			  key={kRowKeys[11]}
+			  view={props.view}
+			  visibleRow={11}
+			  beginRebind={props.begin_rebind}
+			  toggleOperator={props.toggle_operator}
+			/>
+			<KeybindRow
+			  key={kRowKeys[12]}
+			  view={props.view}
+			  visibleRow={12}
+			  beginRebind={props.begin_rebind}
+			  toggleOperator={props.toggle_operator}
+			/>
+			<KeybindRow
+			  key={kRowKeys[13]}
+			  view={props.view}
+			  visibleRow={13}
+			  beginRebind={props.begin_rebind}
+			  toggleOperator={props.toggle_operator}
+			/>
+			<KeybindRow
+			  key={kRowKeys[14]}
+			  view={props.view}
+			  visibleRow={14}
+			  beginRebind={props.begin_rebind}
+			  toggleOperator={props.toggle_operator}
+			/>
+			<KeybindRow
+			  key={kRowKeys[15]}
+			  view={props.view}
+			  visibleRow={15}
+			  beginRebind={props.begin_rebind}
+			  toggleOperator={props.toggle_operator}
+			/>
+			<KeybindRow
+			  key={kRowKeys[16]}
+			  view={props.view}
+			  visibleRow={16}
+			  beginRebind={props.begin_rebind}
+			  toggleOperator={props.toggle_operator}
+			/>
+			<KeybindRow
+			  key={kRowKeys[17]}
+			  view={props.view}
+			  visibleRow={17}
+			  beginRebind={props.begin_rebind}
+			  toggleOperator={props.toggle_operator}
+			/>
+			<KeybindRow
+			  key={kRowKeys[18]}
+			  view={props.view}
+			  visibleRow={18}
+			  beginRebind={props.begin_rebind}
+			  toggleOperator={props.toggle_operator}
+			/>
+			<KeybindRow
+			  key={kRowKeys[19]}
+			  view={props.view}
+			  visibleRow={19}
+			  beginRebind={props.begin_rebind}
+			  toggleOperator={props.toggle_operator}
+			/>
+			<KeybindRow
+			  key={kRowKeys[20]}
+			  view={props.view}
+			  visibleRow={20}
+			  beginRebind={props.begin_rebind}
+			  toggleOperator={props.toggle_operator}
+			/>
+			<KeybindRow
+			  key={kRowKeys[21]}
+			  view={props.view}
+			  visibleRow={21}
+			  beginRebind={props.begin_rebind}
+			  toggleOperator={props.toggle_operator}
+			/>
+			<KeybindRow
+			  key={kRowKeys[22]}
+			  view={props.view}
+			  visibleRow={22}
+			  beginRebind={props.begin_rebind}
+			  toggleOperator={props.toggle_operator}
+			/>
+			<KeybindRow
+			  key={kRowKeys[23]}
+			  view={props.view}
+			  visibleRow={23}
+			  beginRebind={props.begin_rebind}
+			  toggleOperator={props.toggle_operator}
+			/>
+			<KeybindRow
+			  key={kRowKeys[24]}
+			  view={props.view}
+			  visibleRow={24}
+			  beginRebind={props.begin_rebind}
+			  toggleOperator={props.toggle_operator}
+			/>
+			<KeybindRow
+			  key={kRowKeys[25]}
+			  view={props.view}
+			  visibleRow={25}
+			  beginRebind={props.begin_rebind}
+			  toggleOperator={props.toggle_operator}
+			/>
+			<KeybindRow
+			  key={kRowKeys[26]}
+			  view={props.view}
+			  visibleRow={26}
+			  beginRebind={props.begin_rebind}
+			  toggleOperator={props.toggle_operator}
+			/>
+			<KeybindRow
+			  key={kRowKeys[27]}
+			  view={props.view}
+			  visibleRow={27}
+			  beginRebind={props.begin_rebind}
+			  toggleOperator={props.toggle_operator}
+			/>
+			<KeybindRow
+			  key={kRowKeys[28]}
+			  view={props.view}
+			  visibleRow={28}
+			  beginRebind={props.begin_rebind}
+			  toggleOperator={props.toggle_operator}
+			/>
+			<KeybindRow
+			  key={kRowKeys[29]}
+			  view={props.view}
+			  visibleRow={29}
+			  beginRebind={props.begin_rebind}
+			  toggleOperator={props.toggle_operator}
+			/>
 		</Box>
 	}
 
 	struct RowsViewportProps {
 		const char * key = nullptr;
-		const OptionsControlsFrameProps * frame = nullptr;
+		const options::KeybindListView * view = nullptr;
+		std::function<void(int, int)> begin_rebind = {};
+		std::function<void(int)> toggle_operator = {};
 	};
 
 	::ui::UiElement RowsViewport(const RowsViewportProps& props) {
@@ -378,26 +560,30 @@ inline const char * copied_id(const char * prefix, int row) {
 		  text={::ui::HostTextProps{.value = "scroll"}}
 		  accessibility={{.label = options::kKeybindListScrollLabel}}
 		>
-			<KeybindRows key="rows" frame={props.frame} />
+			<KeybindRows
+			  key="rows"
+			  view={props.view}
+			  beginRebind={props.begin_rebind}
+			  toggleOperator={props.toggle_operator}
+			/>
 		</detail.Host>
 	}
 
 	struct PresetRowProps {
 		const char * key = nullptr;
-		const OptionsControlsFrameProps * frame = nullptr;
+		const options::KeybindListView * view = nullptr;
+		std::function<void()> cycle_preset = {};
 	};
 
 	::ui::UiElement PresetRow(const PresetRowProps& props) {
-		if(!props.frame) return ::ui::empty();
-		const OptionsControlsFrameProps& frame = *props.frame;
-		const float scale = horizontal_scale(frame);
+		const float scale = horizontal_scale(props.view);
 		const float actionNameW =
 			static_cast<float>(scaled_metric(kActionNameW, scale));
 		const float presetGap =
 			static_cast<float>(scaled_metric(kPresetGap, scale));
 		const char * preset =
-			(frame.view && !frame.view->presetText.empty())
-				? frame.view->presetText.c_str()
+			(props.view && !props.view->presetText.empty())
+				? props.view->presetText.c_str()
 				: "";
 		return <Box
 		  key={props.key}
@@ -424,19 +610,20 @@ inline const char * copied_id(const char * prefix, int row) {
 			  label={preset}
 			  width={kPresetButtonW}
 			  spriteIndex={23}
-			  onPress={frame.cycle_preset}
+			  onPress={props.cycle_preset}
 			/>
 		</Box>
 	}
 
 	struct ActionRowProps {
 		const char * key = nullptr;
-		const OptionsControlsFrameProps * frame = nullptr;
+		const options::KeybindListView * view = nullptr;
+		std::function<void()> save = {};
+		std::function<void()> cancel = {};
 	};
 
 	::ui::UiElement ActionRow(const ActionRowProps& props) {
-		if(!props.frame) return ::ui::empty();
-		const float scale = horizontal_scale(*props.frame);
+		const float scale = horizontal_scale(props.view);
 		const float actionGap =
 			static_cast<float>(scaled_metric(kActionGap, scale));
 		return <Box
@@ -454,27 +641,30 @@ inline const char * copied_id(const char * prefix, int row) {
 		  controlId={kActionSave}
 		  size={AppButtonSize::MainMenu}
 		  label="Save"
-		  onPress={props.frame->save}
+		  onPress={props.save}
 		/>
 		<AppButton
 		  key="cancel"
 		  controlId={kActionCancel}
 		  size={AppButtonSize::MainMenu}
 		  label="Cancel"
-		  onPress={props.frame->cancel}
+		  onPress={props.cancel}
 		/>
 		</Box>
 	}
 
 	struct ContentProps {
 		const char * key = nullptr;
-		const OptionsControlsFrameProps * frame = nullptr;
+		const options::KeybindListView * view = nullptr;
+		std::function<void()> cycle_preset = {};
+		std::function<void(int, int)> begin_rebind = {};
+		std::function<void(int)> toggle_operator = {};
+		std::function<void()> save = {};
+		std::function<void()> cancel = {};
 	};
 
 	::ui::UiElement Content(const ContentProps& props) {
-		if(!props.frame) return ::ui::empty();
-		const OptionsControlsFrameProps& frame = *props.frame;
-		const float scale = horizontal_scale(frame);
+		const float scale = horizontal_scale(props.view);
 		const float contentW =
 			static_cast<float>(scaled_metric(kContentW, scale));
 		return <Box
@@ -487,8 +677,13 @@ inline const char * copied_id(const char * prefix, int row) {
 			.gap = static_cast<float>(kSectionGap),
 			}}
 		>
-			<PresetRow key="preset-row" frame={props.frame} />
-			<RowsViewport key="rows-viewport" frame={props.frame} />
+			<PresetRow key="preset-row" view={props.view} cyclePreset={props.cycle_preset} />
+			<RowsViewport
+			  key="rows-viewport"
+			  view={props.view}
+			  beginRebind={props.begin_rebind}
+			  toggleOperator={props.toggle_operator}
+			/>
 			<Box
 			  key="action-spacer"
 			  layout={::ui::LayoutStyle{
@@ -496,7 +691,7 @@ inline const char * copied_id(const char * prefix, int row) {
 					.height = ::ui::Length::points(static_cast<float>(kActionTopGap)),
 				}}
 			/>
-			<ActionRow key="actions" frame={props.frame} />
+			<ActionRow key="actions" view={props.view} save={props.save} cancel={props.cancel} />
 		</Box>
 	}
 
@@ -564,7 +759,15 @@ using options_controls_frame_detail::ContentProps;
 				  style={options_controls_frame_detail::text_patch(tokens::kFontTitleBank, 12, ::ui::TextAlign::Center)}
 				/>
 			</Box>
-				<Content key="content" frame={&props} />
+				<Content
+				  key="content"
+				  view={props.view}
+				  cyclePreset={props.cycle_preset}
+				  beginRebind={props.begin_rebind}
+				  toggleOperator={props.toggle_operator}
+				  save={props.save}
+				  cancel={props.cancel}
+				/>
 			</Box>
 		</Box>
 	}
