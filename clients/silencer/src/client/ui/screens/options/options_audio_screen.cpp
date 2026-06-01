@@ -10,10 +10,6 @@
 
 namespace options_audio_screen_detail
 {
-constexpr const char * kActionMusic = "options_audio.music";
-constexpr const char * kActionSave = "options_audio.save";
-constexpr const char * kActionCancel = "options_audio.cancel";
-
 void ApplyMusicSetting(bool on)
 {
 	if(on){
@@ -90,27 +86,9 @@ void OptionsAudioScreen::Destroy(ScreenContext & ctx)
 	(void)ctx;
 }
 
-bool OptionsAudioScreen::HandleUiIntent(ScreenContext & ctx, const silencer::ui::UiAction & action)
+bool OptionsAudioScreen::HandleBack(ScreenContext & ctx)
 {
-	if(action.kind == silencer::ui::UiActionKind::Cancel){
-		options_audio_screen_detail::CancelAudioSettings();
-		ctx.GoToState(GameState::OPTIONS);
-		return true;
-	}
-	if(action.kind != silencer::ui::UiActionKind::Activate) return false;
-	if(action.id == options_audio_screen_detail::kActionMusic){
-		options_audio_screen_detail::ToggleMusicSetting();
-		return true;
-	}
-	if(action.id == options_audio_screen_detail::kActionSave){
-		options_audio_screen_detail::SaveAudioSettings();
-		ctx.GoToState(GameState::OPTIONS);
-		return true;
-	}
-	if(action.id == options_audio_screen_detail::kActionCancel){
-		options_audio_screen_detail::CancelAudioSettings();
-		ctx.GoToState(GameState::OPTIONS);
-		return true;
-	}
-	return false;
+	options_audio_screen_detail::CancelAudioSettings();
+	ctx.GoToState(GameState::OPTIONS);
+	return true;
 }

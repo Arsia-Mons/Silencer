@@ -13,8 +13,6 @@
 #include <SDL3/SDL.h>
 
 #include <algorithm>
-#include <cstdlib>
-#include <cstring>
 #include <string>
 
 namespace options_controls_screen_detail {
@@ -32,28 +30,12 @@ constexpr int kActionTopY = 405;
 constexpr uint16_t kPanelMinH = 420;
 constexpr uint16_t kPanelPadX = 48;
 constexpr uint16_t kPanelPadTop = 70;
-constexpr const char * kActionPreset = "options_controls.preset";
-constexpr const char * kActionSave = "options_controls.save";
-constexpr const char * kActionCancel = "options_controls.cancel";
-constexpr const char * kActionPrimaryPrefix = "options_controls.primary.";
-constexpr const char * kActionSecondaryPrefix = "options_controls.secondary.";
-constexpr const char * kActionOperatorPrefix = "options_controls.operator.";
 
 static_assert(static_cast<int>(Action::Count) == silencer::client_ui::kOptionsControlsMaxRows,
               "OptionsControlsView must expose one JSX row per keybind action");
 
 bool IsBuiltinKeybindProfile(const std::string & name) {
 	return name == "default" || name == "wasd" || name == "gamepad";
-}
-
-bool StartsWith(const std::string & value, const char * prefix) {
-	const size_t n = std::strlen(prefix);
-	return value.size() >= n && value.compare(0, n, prefix) == 0;
-}
-
-int SuffixInt(const std::string & value, const char * prefix) {
-	if(!StartsWith(value, prefix)) return -1;
-	return std::atoi(value.c_str() + std::strlen(prefix));
 }
 
 int ScaleLegacyPx(int value, int current, int legacy) {
@@ -161,36 +143,6 @@ bool OptionsControlsScreen::HandleUiIntent(ScreenContext & ctx, const silencer::
 			return true;
 		}
 		return false;
-	}
-	if(action.kind != silencer::ui::UiActionKind::Activate) return false;
-	if(action.id == options_controls_screen_detail::kActionPreset){
-		CyclePreset(ctx);
-		return true;
-	}
-	if(action.id == options_controls_screen_detail::kActionSave){
-		SaveControls(ctx);
-		ctx.GoToState(GameState::OPTIONS);
-		return true;
-	}
-	if(action.id == options_controls_screen_detail::kActionCancel){
-		CancelControls(ctx);
-		ctx.GoToState(GameState::OPTIONS);
-		return true;
-	}
-	int row = options_controls_screen_detail::SuffixInt(action.id, options_controls_screen_detail::kActionPrimaryPrefix);
-	if(row >= 0){
-		BeginRebindFromVisibleRow(row, 0);
-		return true;
-	}
-	row = options_controls_screen_detail::SuffixInt(action.id, options_controls_screen_detail::kActionSecondaryPrefix);
-	if(row >= 0){
-		BeginRebindFromVisibleRow(row, 1);
-		return true;
-	}
-	row = options_controls_screen_detail::SuffixInt(action.id, options_controls_screen_detail::kActionOperatorPrefix);
-	if(row >= 0){
-		ToggleOperatorFromVisibleRow(ctx, row);
-		return true;
 	}
 	return false;
 }

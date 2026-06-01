@@ -12,11 +12,6 @@
 
 namespace options_display_screen_detail
 {
-constexpr const char * kActionFullscreen = "options_display.fullscreen";
-constexpr const char * kActionSmoothScaling = "options_display.smooth_scaling";
-constexpr const char * kActionSave = "options_display.save";
-constexpr const char * kActionCancel = "options_display.cancel";
-
 void ToggleFullscreen(SDL_Window * window)
 {
 	Config & cfg = Config::GetInstance();
@@ -95,31 +90,9 @@ void OptionsDisplayScreen::Destroy(ScreenContext & ctx)
 	(void)ctx;
 }
 
-bool OptionsDisplayScreen::HandleUiIntent(ScreenContext & ctx, const silencer::ui::UiAction & action)
+bool OptionsDisplayScreen::HandleBack(ScreenContext & ctx)
 {
-	if(action.kind == silencer::ui::UiActionKind::Cancel){
-		options_display_screen_detail::CancelDisplaySettings(ctx.window, ctx.renderdevice);
-		ctx.GoToState(GameState::OPTIONS);
-		return true;
-	}
-	if(action.kind != silencer::ui::UiActionKind::Activate) return false;
-	if(action.id == options_display_screen_detail::kActionFullscreen){
-		options_display_screen_detail::ToggleFullscreen(ctx.window);
-		return true;
-	}
-	if(action.id == options_display_screen_detail::kActionSmoothScaling){
-		options_display_screen_detail::ToggleSmoothScaling(ctx.renderdevice);
-		return true;
-	}
-	if(action.id == options_display_screen_detail::kActionSave){
-		options_display_screen_detail::SaveDisplaySettings();
-		ctx.GoToState(GameState::OPTIONS);
-		return true;
-	}
-	if(action.id == options_display_screen_detail::kActionCancel){
-		options_display_screen_detail::CancelDisplaySettings(ctx.window, ctx.renderdevice);
-		ctx.GoToState(GameState::OPTIONS);
-		return true;
-	}
-	return false;
+	options_display_screen_detail::CancelDisplaySettings(ctx.window, ctx.renderdevice);
+	ctx.GoToState(GameState::OPTIONS);
+	return true;
 }
