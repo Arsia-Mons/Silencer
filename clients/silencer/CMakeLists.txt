@@ -374,15 +374,20 @@ set(_cppx_retained_sources
 	src/ui/runtime/yoga_flex_layout.cpp
 	src/ui/runtime/draw_command.cpp
 	src/ui/runtime/draw_command_builder.cpp
-	src/ui/style/text_measure.cpp)
+	src/ui/style/text_measure.cpp
+	src/ui/style/default_theme.cpp
+	src/ui/style/resolve.cpp)
 set(_cppx_app_shell_sources
 	src/client/ui/app_shell/client_ui.cpp
 	src/client/ui/app_shell/app_root.cpp
 	src/client/ui/app_shell/navigation/screen_stack.cpp
+	src/client/ui/app_theme.cpp
 	src/client/ui/providers/app_provider.cpp
+	src/client/ui/providers/key_map_provider.cpp
 	src/client/ui/providers/navigation_provider.cpp
 	src/client/ui/providers/server_provider.cpp
 	src/client/ui/providers/session_provider.cpp
+	src/client/ui/providers/settings_provider.cpp
 	src/client/ui/providers/updater_provider.cpp)
 
 add_executable(client_ui_tests

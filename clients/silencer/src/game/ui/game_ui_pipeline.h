@@ -85,6 +85,19 @@ int cppxUiW = 0;
 int cppxUiH = 0;
 bool cppxReactInitialized = false;
 bool cppxAppRootPushed = false;
+
+// SIL-15 use_settings dirty tracking: snapshot of the four persisted prefs as
+// of the last commit/revert; live Config diverging from it => Settings.dirty.
+struct CommittedSettings {
+bool music = true;
+uint8_t musicvolume = 48;
+bool fullscreen = true;
+bool scalefilter = true;
+};
+CommittedSettings committedSettings_ = {};
+bool committedSettingsInit_ = false;
+// SIL-15 use_key_map dirty flag (the live KeyMap has no dirty bit).
+bool keymapDirty_ = false;
 };
 
 #endif

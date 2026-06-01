@@ -16,17 +16,49 @@
 // SIL-14 golden cppx render path.
 #include "render/cppx_ui/pipeline_host.h"
 #include "client/ui/app_shell/app_root.h"
+#include "client/ui/app_theme.h"
+#include "client/ui/hooks/use_key_map.h"
 #include "client/ui/hooks/use_session.h"
+#include "client/ui/hooks/use_settings.h"
 #include "client/ui/hooks/use_updater.h"
 #include "client/ui/providers/app_provider.h"
+#include "client/ui/providers/key_map_provider.h"
 #include "client/ui/providers/server_provider.h"
 #include "client/ui/providers/session_provider.h"
+#include "client/ui/providers/settings_provider.h"
 #include "client/ui/providers/updater_provider.h"
 #include "session_phase.h"
+#include "config.h"
+#include "audio.h"
+#include "renderdevice.h"
 #include "ui/runtime/react.h"
+#include <SDL3/SDL.h>
 #include <algorithm>
 #include <cstdlib>
 #include <vector>
+
+namespace {
+// SIL-15 use_key_map: convert UI chips back to an input Binding, enforcing the
+// chord cap (reject, never truncate). Returns false if the chord is empty or
+// over CHORD_CAP.
+bool ChipsToBinding(const std::vector<client::ui::KeyMapChip> &chips,
+                    Binding &out) {
+  if (chips.empty() || (int)chips.size() > CHORD_CAP)
+    return false;
+  for (const client::ui::KeyMapChip &c : chips) {
+    BindingKey bk;
+    bk.device = c.device;
+    bk.code = c.code;
+    bk.axisDir = c.axis_dir;
+    out.keys.push_back(bk);
+  }
+  return true;
+}
+
+bool KeybindProfileIsBuiltin(const std::string &name) {
+  return name == "default" || name == "wasd" || name == "gamepad";
+}
+} // namespace
 
 namespace {
 
@@ -285,10 +317,166 @@ updater.open_download_page = [this]{
 SDL_OpenURL(game.updater.GetDownloadURL().c_str());
 };
 
-// Global FrameProvider chain (doc §5), outermost (Server) → innermost
-// (Updater): Server ▸ App ▸ Session ▸ … ▸ Updater ▸ <screen>.
+// Settings model (doc §6): read the live Config + install live-apply preview
+// closures over the public subsystems (SIL-6 LOCKED: live-apply preview). dirty
+// = live Config diverges from the last-committed snapshot.
+client::ui::Settings settings = {};
+{
+Config & cfg = Config::GetInstance();
+if(!committedSettingsInit_){
+committedSettings_ = {cfg.music, cfg.musicvolume, cfg.fullscreen, cfg.scalefilter};
+committedSettingsInit_ = true;
+}
+settings.music = cfg.music;
+settings.music_volume = cfg.musicvolume;
+settings.fullscreen = cfg.fullscreen;
+settings.smooth_scaling = cfg.scalefilter;
+settings.dirty = (cfg.music != committedSettings_.music
+|| cfg.musicvolume != committedSettings_.musicvolume
+|| cfg.fullscreen != committedSettings_.fullscreen
+|| cfg.scalefilter != committedSettings_.scalefilter);
+settings.set_music = [this](bool on){
+Config::GetInstance().music = on;
+if(on) Audio::GetInstance().ResumeMusic(); else Audio::GetInstance().PauseMusic();
+};
+settings.set_music_volume = [this](uint8_t v){
+Config::GetInstance().musicvolume = v;
+Audio::GetInstance().SetMusicVolume(v);
+};
+settings.set_fullscreen = [this](bool on){
+Config::GetInstance().fullscreen = on;
+if(SDL_Window * w = game.gameRenderer.GetWindow()) SDL_SetWindowFullscreen(w, on);
+};
+settings.set_smooth_scaling = [this](bool on){
+Config::GetInstance().scalefilter = on;
+if(RenderDevice * d = game.gameRenderer.GetRenderDevice()) d->SetScaleFilter(on);
+};
+settings.commit = [this]{
+Config & c = Config::GetInstance();
+c.Save();
+committedSettings_ = {c.music, c.musicvolume, c.fullscreen, c.scalefilter};
+};
+settings.revert = [this]{
+Config & c = Config::GetInstance();
+c.Load();
+if(SDL_Window * w = game.gameRenderer.GetWindow()) SDL_SetWindowFullscreen(w, c.fullscreen);
+if(RenderDevice * d = game.gameRenderer.GetRenderDevice()) d->SetScaleFilter(c.scalefilter);
+Audio::GetInstance().SetMusicVolume(c.musicvolume);
+if(c.music) Audio::GetInstance().ResumeMusic(); else Audio::GetInstance().PauseMusic();
+committedSettings_ = {c.music, c.musicvolume, c.fullscreen, c.scalefilter};
+};
+}
+
+// KeyMap model (doc §6/§7b): rows-of-combos read view (labels rendered here,
+// since only the comp root has the gamepad type) + the six mutation intents.
+// Binding mutations fork-if-builtin + enforce caps, all drained after render.
+client::ui::KeyMap key_map = {};
+{
+const KeyMap & km = game.GetKeyMap();
+SDL_Gamepad * pad = game.GetGamepad();
+SDL_GamepadType padType = pad ? SDL_GetGamepadType(pad) : SDL_GAMEPAD_TYPE_UNKNOWN;
+key_map.actions.reserve((int)Action::Count);
+for(int i = 0; i < (int)Action::Count; ++i){
+Action a = ACTION_TABLE[i].action;
+client::ui::KeyMapAction outA;
+outA.action = a;
+outA.label = GetActionInfo(a).label;
+const ActionBindings & ab = km.Get(a);
+for(const Binding & b : ab.bindings){
+client::ui::KeyMapCombo combo;
+for(const BindingKey & bk : b.keys){
+client::ui::KeyMapChip chip;
+chip.device = bk.device;
+chip.code = bk.code;
+chip.axis_dir = bk.axisDir;
+if(bk.device == BindingDevice::Keyboard){
+chip.label = KeyMap::GetKeyName((SDL_Scancode)bk.code);
+}else{
+std::string s = Stringify(bk);
+auto colon = s.find(':');
+std::string raw = (colon != std::string::npos) ? s.substr(colon + 1) : s;
+chip.label = GamepadShortLabel(raw, padType);
+}
+combo.chips.push_back(std::move(chip));
+}
+outA.combos.push_back(std::move(combo));
+}
+key_map.actions.push_back(std::move(outA));
+}
+const std::string activeProfile = Config::GetInstance().active_keybind_profile;
+key_map.preset_label = !km.label.empty() ? km.label
+: (!km.name.empty() ? km.name : activeProfile);
+key_map.preset_is_builtin = KeybindProfileIsBuiltin(activeProfile);
+key_map.dirty = keymapDirty_;
+key_map.add_combo = [this](Action a, std::vector<client::ui::KeyMapChip> chips){
+cppxHost->pipeline().client_ui().queue_deferred_mutation([this, a, chips = std::move(chips)]() mutable {
+Binding b;
+if(!ChipsToBinding(chips, b)) return;
+ForkActiveProfileIfBuiltin(game.GetKeyMap());
+ActionBindings & ab = game.GetKeyMap().Get(a);
+if((int)ab.bindings.size() >= COMBO_CAP) return;
+ab.bindings.push_back(std::move(b));
+keymapDirty_ = true;
+});
+};
+key_map.replace_combo = [this](Action a, int idx, std::vector<client::ui::KeyMapChip> chips){
+cppxHost->pipeline().client_ui().queue_deferred_mutation([this, a, idx, chips = std::move(chips)]() mutable {
+Binding b;
+if(!ChipsToBinding(chips, b)) return;
+ForkActiveProfileIfBuiltin(game.GetKeyMap());
+ActionBindings & ab = game.GetKeyMap().Get(a);
+if(idx < 0 || idx >= (int)ab.bindings.size()) return;
+ab.bindings[idx] = std::move(b);
+keymapDirty_ = true;
+});
+};
+key_map.remove_combo = [this](Action a, int idx){
+cppxHost->pipeline().client_ui().queue_deferred_mutation([this, a, idx](){
+ForkActiveProfileIfBuiltin(game.GetKeyMap());
+ActionBindings & ab = game.GetKeyMap().Get(a);
+if(idx < 0 || idx >= (int)ab.bindings.size()) return;
+ab.bindings.erase(ab.bindings.begin() + idx);
+keymapDirty_ = true;
+});
+};
+key_map.clear_action = [this](Action a){
+cppxHost->pipeline().client_ui().queue_deferred_mutation([this, a](){
+ForkActiveProfileIfBuiltin(game.GetKeyMap());
+game.GetKeyMap().Get(a).bindings.clear();
+keymapDirty_ = true;
+});
+};
+key_map.cycle_preset = [this](){
+cppxHost->pipeline().client_ui().queue_deferred_mutation([this](){
+CycleKeybindPreset(game.GetKeyMap());
+keymapDirty_ = false;
+});
+};
+key_map.commit = [this](){
+cppxHost->pipeline().client_ui().queue_deferred_mutation([this](){
+const std::string active = Config::GetInstance().active_keybind_profile;
+if(!KeybindProfileIsBuiltin(active)) game.GetKeyMap().SaveFile(WritableProfilePath(active));
+Config::GetInstance().Save();
+keymapDirty_ = false;
+});
+};
+key_map.revert = [this](){
+cppxHost->pipeline().client_ui().queue_deferred_mutation([this](){
+LoadActiveKeymap(game.GetKeyMap());
+Config::GetInstance().Load();
+keymapDirty_ = false;
+});
+};
+}
+
+// Global FrameProvider chain (doc §5), outermost (Theme) → innermost
+// (Updater): Theme ▸ Server ▸ App ▸ Session ▸ Settings ▸ KeyMap ▸ Updater ▸ <screen>.
 ::ui::UiElement tree = client::ui::UpdaterProvider(
 client::ui::UpdaterProviderValue{updater}, ::ui::children({child}));
+tree = client::ui::KeyMapProvider(
+client::ui::KeyMapProviderValue{std::move(key_map)}, ::ui::children({tree}));
+tree = client::ui::SettingsProvider(
+client::ui::SettingsProviderValue{settings}, ::ui::children({tree}));
 tree = client::ui::SessionProvider(
 client::ui::SessionProviderValue{session}, ::ui::children({tree}));
 tree = client::ui::AppProvider(
@@ -297,6 +485,7 @@ client::ui::AppProviderValue{[this]{ game.quitRequested = true; }},
 tree = silencer::game_ui::ServerProvider(
 silencer::game_ui::ServerProviderValue{&game},
 ::ui::children({tree}));
+tree = client::ui::ThemeProvider(::ui::children({tree}));
 return tree;
 });
 cppxHost->pipeline().client_ui().push_screen(
