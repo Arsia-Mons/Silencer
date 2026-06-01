@@ -1,9 +1,14 @@
 #include "client/ui/screens/main_menu/main_menu_view.h"
 
-#include "client/ui/hooks/use_game_navigation.h"
+#include "client/ui/hooks/use_game_session.h"
+#include "client/ui/hooks/use_navigation.h"
+#include "client/ui/screens/lobby_connect/lobby_connect_screen.h"
+#include "client/ui/screens/options/options_screen.h"
 #include "ui/components/box.h"
 #include "ui/components/button.h"
 #include "ui/components/text.h"
+
+#include <memory>
 
 namespace silencer::client_ui {
 
@@ -93,85 +98,78 @@ namespace {
 	});
 }
 
-std::function<void(const ::ui::ActivationEvent&)> go_to_destination_callback(
-	GameNavigation navigation,
-	ScreenDestination destination) {
-	return [navigation, destination](const ::ui::ActivationEvent&) {
-		if(navigation.go_to) navigation.go_to(destination);
+std::function<void(const ::ui::ActivationEvent&)> start_tutorial_callback(
+	GameSessionActions session) {
+	return [session](const ::ui::ActivationEvent&) {
+		if(session.start_tutorial) session.start_tutorial();
+	};
+}
+
+std::function<void(const ::ui::ActivationEvent&)> open_lobby_connect_callback(
+	Navigation navigation) {
+	return [navigation](const ::ui::ActivationEvent&) {
+		if(navigation.reset_to){
+			navigation.reset_to(std::make_unique<LobbyConnectScreen>());
+		}
+	};
+}
+
+std::function<void(const ::ui::ActivationEvent&)> open_options_callback(
+	Navigation navigation) {
+	return [navigation](const ::ui::ActivationEvent&) {
+		if(navigation.push){
+			navigation.push(std::make_unique<OptionsScreen>());
+		}
 	};
 }
 
 std::function<void(const ::ui::ActivationEvent&)> request_quit_callback(
-	GameNavigation navigation) {
-	return [navigation](const ::ui::ActivationEvent&) {
-		if(navigation.request_quit) navigation.request_quit();
+	GameSessionActions session) {
+	return [session](const ::ui::ActivationEvent&) {
+		if(session.request_quit) session.request_quit();
 	};
-}
-
-struct MenuNavigationButtonProps {
-	const char * key = nullptr;
-	const char * id = "";
-	const char * label = "";
-	ScreenDestination destination = ScreenDestination::MainMenu;
-	bool autofocus = false;
-};
-
-::ui::UiElement MenuNavigationButton(const MenuNavigationButtonProps& props) {
-	GameNavigation navigation = use_game_navigation();
-	return <Button
-	  key={props.key}
-	  id={props.id}
-	  label={props.label}
-	  autofocus={props.autofocus}
-	  onActivate={go_to_destination_callback(navigation, props.destination)}
-	  layout={button_layout(props.autofocus)}
-	/>
-}
-
-struct ExitButtonProps {
-	const char * key = nullptr;
-};
-
-::ui::UiElement ExitButton(const ExitButtonProps& props) {
-	GameNavigation navigation = use_game_navigation();
-	return <Button
-	  key={props.key}
-	  id="main_menu.exit"
-	  label="Exit"
-	  onActivate={request_quit_callback(navigation)}
-	  layout={button_layout()}
-	/>
 }
 
 }  // namespace
 
 ::ui::UiElement MainMenuView(const MainMenuViewProps& props) {
+	Navigation navigation = use_navigation();
+	GameSessionActions session = use_game_session();
 	return <Box key={props.key} layout={root_layout()} style={root_style()}>
 		<Box key="title-stack" layout={title_stack_layout()}>
 			<Text key="title" value="Silencer" layout={title_layout()} style={title_style()} />
 			<Text key="version" value={props.version} layout={subtitle_layout()} style={subtitle_style()} />
 		</Box>
 		<Box key="button-stack" layout={button_stack_layout()}>
-			<MenuNavigationButton
+			<Button
 			  key="tutorial"
 			  id="main_menu.tutorial"
 			  label="Tutorial"
-			  destination={ScreenDestination::SinglePlayerGame}
 			  autofocus={true}
+			  onActivate={start_tutorial_callback(session)}
+			  layout={button_layout(true)}
 			/>
-			<MenuNavigationButton
+			<Button
 			  key="lobby"
 			  id="main_menu.lobby"
 			  label="Connect To Lobby"
-			  destination={ScreenDestination::LobbyConnect}
+			  onActivate={open_lobby_connect_callback(navigation)}
+			  layout={button_layout()}
 			/>
-			<MenuNavigationButton
+			<Button
 			  key="options"
 			  id="main_menu.options"
 			  label="Options"
-			  destination={ScreenDestination::Options}
+			  onActivate={open_options_callback(navigation)}
+			  layout={button_layout()}
 			/>
-			<ExitButton key="exit" />
+			<Button
+			  key="exit"
+			  id="main_menu.exit"
+			  label="Exit"
+			  onActivate={request_quit_callback(session)}
+			  layout={button_layout()}
+			/>
 		</Box>
 	</Box>
 }

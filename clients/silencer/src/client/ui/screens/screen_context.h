@@ -50,9 +50,8 @@ public:
 	SDL_Window * & window;
 	RenderDevice * & renderdevice;
 
-		// State-machine + client UI navigation actions.
-	void GoToState(Uint8 newState);
-	void GoBack();
+	// Gameplay/session capabilities that do not yet have a screen owner.
+	void StartTutorialGame();
 	void RequestQuit();
 	// Session-side cleanup handled by Game/World, never by screens reaching
 	// into GameSession directly.
@@ -61,6 +60,7 @@ public:
 	void PushScreen(std::unique_ptr<Screen> s);
 	void PopScreen();
 	void ReplaceScreen(std::unique_ptr<Screen> s);
+	void ResetToScreen(std::unique_ptr<Screen> s);
 	void ShowModal(std::unique_ptr<Modal> m);
 	void ShowMessage(const char * msg, std::function<void()> onClose = nullptr);
 

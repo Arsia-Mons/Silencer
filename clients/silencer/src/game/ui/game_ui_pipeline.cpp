@@ -234,6 +234,10 @@ void GameUiPipeline::Replace(std::unique_ptr<Screen> s){
 clientUi.ReplaceScreen(std::move(s), game.screenContext);
 }
 
+void GameUiPipeline::ResetTo(std::unique_ptr<Screen> s){
+clientUi.ResetToScreen(std::move(s), game.screenContext);
+}
+
 Screen * GameUiPipeline::Top() const {
 return clientUi.TopScreen();
 }

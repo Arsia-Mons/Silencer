@@ -1,10 +1,13 @@
 #include "client/ui/screens/update/update_view.h"
 
-#include "client/ui/hooks/use_game_navigation.h"
+#include "client/ui/hooks/use_navigation.h"
+#include "client/ui/screens/main_menu/main_menu_screen.h"
 #include "ui/components/box.h"
 #include "ui/components/button.h"
 #include "ui/components/dialog.h"
 #include "ui/components/text.h"
+
+#include <memory>
 
 namespace silencer::client_ui {
 
@@ -140,7 +143,7 @@ bool has_primary_action(const UpdateStatus& update) {
 
 ::ui::UiElement UpdateFrame(const UpdateFrameProps& props) {
 	const UpdateStatus& update = UseUpdateStatus();
-	GameNavigation navigation = use_game_navigation();
+	Navigation navigation = use_navigation();
 	const bool primary_visible = has_primary_action(update);
 	std::function<void(const ::ui::ActivationEvent&)> primary_activate = {};
 	switch(update.primary_action){
@@ -159,7 +162,9 @@ bool has_primary_action(const UpdateStatus& update) {
 			primary_activate = [download = update.download, navigation](
 				const ::ui::ActivationEvent&) {
 				const bool opened = download ? download() : false;
-				if(opened && navigation.go_to) navigation.go_to(ScreenDestination::MainMenu);
+				if(opened && navigation.reset_to){
+					navigation.reset_to(std::make_unique<MainMenuScreen>());
+				}
 			};
 			break;
 		case UpdatePrimaryAction::None:
@@ -169,7 +174,9 @@ bool has_primary_action(const UpdateStatus& update) {
 	std::function<void(const ::ui::ActivationEvent&)> cancel_activate =
 		[cancel = update.cancel, navigation](const ::ui::ActivationEvent&) {
 			const bool cancelled = cancel ? cancel() : false;
-			if(cancelled && navigation.go_to) navigation.go_to(ScreenDestination::MainMenu);
+			if(cancelled && navigation.reset_to){
+				navigation.reset_to(std::make_unique<MainMenuScreen>());
+			}
 		};
 	return <Box key={props.key} layout={root_layout()}>
 		<Dialog key="dialog" modal={true} layout={dialog_layout()}>

@@ -63,9 +63,9 @@ check_resize() {
   local options_x options_y
   read -r options_x options_y <<< "$options_center"
   cli --port "$PORT" click_at --x "$options_x" --y "$options_y" >/dev/null
-  cli --port "$PORT" wait_for_state --state OPTIONS --timeout-ms 5000 >/dev/null
+  wait_for_widget "Controls"
   cli --port "$PORT" back >/dev/null
-  cli --port "$PORT" wait_for_state --state MAINMENU --timeout-ms 5000 >/dev/null
+  wait_for_widget "Connect To Lobby"
 }
 
 check_resize 1280 720 "$OUT_DIR/main-1280x720.png"

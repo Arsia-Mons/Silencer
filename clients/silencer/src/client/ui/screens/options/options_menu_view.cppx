@@ -1,9 +1,14 @@
 #include "client/ui/screens/options/options_menu_view.h"
 
-#include "client/ui/hooks/use_game_navigation.h"
+#include "client/ui/hooks/use_navigation.h"
+#include "client/ui/screens/options/options_audio_screen.h"
+#include "client/ui/screens/options/options_controls_screen.h"
+#include "client/ui/screens/options/options_display_screen.h"
 #include "ui/components/box.h"
 #include "ui/components/button.h"
 #include "ui/components/text.h"
+
+#include <memory>
 
 namespace silencer::client_ui {
 
@@ -63,64 +68,75 @@ namespace {
 	});
 }
 
-std::function<void(const ::ui::ActivationEvent&)> go_to_destination_callback(
-	GameNavigation navigation,
-	ScreenDestination destination) {
-	return [navigation, destination](const ::ui::ActivationEvent&) {
-		if(navigation.go_to) navigation.go_to(destination);
+std::function<void(const ::ui::ActivationEvent&)> open_controls_callback(
+	Navigation navigation) {
+	return [navigation](const ::ui::ActivationEvent&) {
+		if(navigation.push){
+			navigation.push(std::make_unique<OptionsControlsScreen>());
+		}
 	};
 }
 
-struct OptionsNavigationButtonProps {
-	const char * key = nullptr;
-	const char * id = "";
-	const char * label = "";
-	ScreenDestination destination = ScreenDestination::MainMenu;
-	bool autofocus = false;
-};
+std::function<void(const ::ui::ActivationEvent&)> open_display_callback(
+	Navigation navigation) {
+	return [navigation](const ::ui::ActivationEvent&) {
+		if(navigation.push){
+			navigation.push(std::make_unique<OptionsDisplayScreen>());
+		}
+	};
+}
 
-::ui::UiElement OptionsNavigationButton(const OptionsNavigationButtonProps& props) {
-	GameNavigation navigation = use_game_navigation();
-	return <Button
-	  key={props.key}
-	  id={props.id}
-	  label={props.label}
-	  autofocus={props.autofocus}
-	  onActivate={go_to_destination_callback(navigation, props.destination)}
-	  layout={button_layout(props.autofocus)}
-	/>
+std::function<void(const ::ui::ActivationEvent&)> open_audio_callback(
+	Navigation navigation) {
+	return [navigation](const ::ui::ActivationEvent&) {
+		if(navigation.push){
+			navigation.push(std::make_unique<OptionsAudioScreen>());
+		}
+	};
+}
+
+std::function<void(const ::ui::ActivationEvent&)> back_callback(
+	Navigation navigation) {
+	return [navigation](const ::ui::ActivationEvent&) {
+		if(navigation.pop_current) navigation.pop_current();
+	};
 }
 
 }  // namespace
 
 ::ui::UiElement OptionsMenuView(const OptionsMenuViewProps& props) {
+	Navigation navigation = use_navigation();
 	return <Box key={props.key} layout={root_layout()}>
 		<Box key="column" layout={column_layout()}>
 			<Text key="title" value="Options" layout={title_layout()} style={title_style()} />
-			<OptionsNavigationButton
+			<Button
 			  key="controls"
 			  id="options.controls"
 			  label="Controls"
-			  destination={ScreenDestination::OptionsControls}
 			  autofocus={true}
+			  onActivate={open_controls_callback(navigation)}
+			  layout={button_layout(true)}
 			/>
-			<OptionsNavigationButton
+			<Button
 			  key="display"
 			  id="options.display"
 			  label="Display"
-			  destination={ScreenDestination::OptionsDisplay}
+			  onActivate={open_display_callback(navigation)}
+			  layout={button_layout()}
 			/>
-			<OptionsNavigationButton
+			<Button
 			  key="audio"
 			  id="options.audio"
 			  label="Audio"
-			  destination={ScreenDestination::OptionsAudio}
+			  onActivate={open_audio_callback(navigation)}
+			  layout={button_layout()}
 			/>
-			<OptionsNavigationButton
+			<Button
 			  key="back"
 			  id="options.back"
 			  label="Go Back"
-			  destination={ScreenDestination::MainMenu}
+			  onActivate={back_callback(navigation)}
+			  layout={button_layout()}
 			/>
 		</Box>
 	</Box>

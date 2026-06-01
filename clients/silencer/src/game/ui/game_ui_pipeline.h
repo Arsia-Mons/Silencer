@@ -25,6 +25,7 @@ bool TickScreenState(Uint8 state, bool entering);
 void Push(std::unique_ptr<Screen> s);
 void Pop();
 void Replace(std::unique_ptr<Screen> s);
+void ResetTo(std::unique_ptr<Screen> s);
 Screen * Top() const;
 void QueueKeyboardInputForScancode(int scancode, const Uint8 * keystate,
 const KeyMap & keymap, const GamepadState & gamepadstate);

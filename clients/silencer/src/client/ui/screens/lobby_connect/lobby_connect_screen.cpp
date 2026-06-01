@@ -1,8 +1,11 @@
 #include "lobby_connect_screen.h"
 
+#include "client/ui/screens/character_create/character_create_screen.h"
 #include "client/ui/screens/lobby_connect/lobby_connect_view.h"
+#include "client/ui/screens/lobby/lobby_screen.h"
+#include "client/ui/screens/main_menu/main_menu_screen.h"
+#include "client/ui/screens/update/update_screen.h"
 #include "screen_context.h"
-#include "game_state.h"
 #include "lobby.h"
 #include "updater.h"
 #include "ambience_mixer.h"
@@ -13,6 +16,7 @@
 #include <algorithm>
 #include <array>
 #include <cstring>
+#include <memory>
 #include <string>
 
 namespace lobby_connect_screen_detail
@@ -121,7 +125,7 @@ void LobbyConnectScreen::Tick(ScreenContext & ctx)
 						world.lobby.Disconnect();
 						world.lobby.state = Lobby::IDLE;
 						world.lobby.UnlockMutex();
-						ctx.GoToState(GameState::UPDATING);
+						ctx.ResetToScreen(std::make_unique<UpdateScreen>());
 						return;
 					}else{
 						AppendLog("Software is out of date");
@@ -152,7 +156,11 @@ void LobbyConnectScreen::Tick(ScreenContext & ctx)
 			{
 				const bool needsCharacter = world.lobby.characters.empty();
 				world.lobby.UnlockMutex();
-				ctx.GoToState(needsCharacter ? GameState::CREATECHARACTER : GameState::LOBBY);
+				if(needsCharacter){
+					ctx.ResetToScreen(std::make_unique<CharacterCreateScreen>());
+				}else{
+					ctx.ResetToScreen(std::make_unique<LobbyScreen>());
+				}
 				return;
 			}
 		case Lobby::CONNECTIONFAILED:
@@ -228,7 +236,7 @@ void LobbyConnectScreen::Destroy(ScreenContext & ctx)
 
 bool LobbyConnectScreen::HandleBack(ScreenContext & ctx)
 {
-	ctx.GoToState(GameState::MAINMENU);
+	ctx.ResetToScreen(std::make_unique<MainMenuScreen>());
 	return true;
 }
 

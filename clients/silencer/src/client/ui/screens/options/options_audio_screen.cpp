@@ -2,7 +2,6 @@
 
 #include "client/ui/screens/options/options_audio_view.h"
 #include "screen_context.h"
-#include "game_state.h"
 #include "renderer.h"
 #include "config.h"
 #include "audio.h"
@@ -89,6 +88,6 @@ void OptionsAudioScreen::Destroy(ScreenContext & ctx)
 bool OptionsAudioScreen::HandleBack(ScreenContext & ctx)
 {
 	options_audio_screen_detail::CancelAudioSettings();
-	ctx.GoToState(GameState::OPTIONS);
+	ctx.PopScreen();
 	return true;
 }

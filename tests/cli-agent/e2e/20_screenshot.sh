@@ -13,7 +13,7 @@ cli --port "$PORT" screenshot --out "$OUT_DIR/main.png"
 test -s "$OUT_DIR/main.png"
 
 cli --port "$PORT" click --label OPTIONS
-cli --port "$PORT" wait_for_state --state OPTIONS --timeout-ms 5000
+wait_for_widget "Controls"
 cli --port "$PORT" screenshot --out "$OUT_DIR/options.png"
 test -s "$OUT_DIR/options.png"
 

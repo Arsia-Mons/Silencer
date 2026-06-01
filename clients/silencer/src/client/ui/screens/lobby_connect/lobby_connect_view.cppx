@@ -1,10 +1,13 @@
 #include "client/ui/screens/lobby_connect/lobby_connect_view.h"
 
-#include "client/ui/hooks/use_game_navigation.h"
+#include "client/ui/hooks/use_navigation.h"
+#include "client/ui/screens/main_menu/main_menu_screen.h"
 #include "ui/components/box.h"
 #include "ui/components/button.h"
 #include "ui/components/input.h"
 #include "ui/components/text.h"
+
+#include <memory>
 
 namespace silencer::client_ui {
 
@@ -156,9 +159,11 @@ std::function<void(const ::ui::ActivationEvent&)> submit_callback(
 }
 
 std::function<void(const ::ui::ActivationEvent&)> cancel_callback(
-	GameNavigation navigation) {
+	Navigation navigation) {
 	return [navigation](const ::ui::ActivationEvent&) {
-		if(navigation.go_to) navigation.go_to(ScreenDestination::MainMenu);
+		if(navigation.reset_to){
+			navigation.reset_to(std::make_unique<MainMenuScreen>());
+		}
 	};
 }
 
@@ -218,7 +223,7 @@ struct LobbyConnectCancelButtonProps {
 };
 
 ::ui::UiElement LobbyConnectCancelButton(const LobbyConnectCancelButtonProps& props) {
-	GameNavigation navigation = use_game_navigation();
+	Navigation navigation = use_navigation();
 	return <Button
 	  key={props.key}
 	  id="lobby_connect.cancel"

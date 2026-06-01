@@ -16,9 +16,9 @@ cli --port "$PORT" wait_for_state --state MAINMENU --timeout-ms 15000 >/dev/null
 cli --port "$PORT" key --key tab >/dev/null
 cli --port "$PORT" key --key tab >/dev/null
 cli --port "$PORT" key --key enter >/dev/null
-cli --port "$PORT" wait_for_state --state OPTIONS --timeout-ms 5000 >/dev/null
+wait_for_widget "Controls"
 
 cli --port "$PORT" back >/dev/null
-cli --port "$PORT" wait_for_state --state MAINMENU --timeout-ms 5000 >/dev/null
+wait_for_widget "Connect To Lobby"
 
 echo "PASS 11_keyboard_navigation"

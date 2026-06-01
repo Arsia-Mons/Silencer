@@ -1,9 +1,13 @@
 #include "client/ui/screens/mission_summary/mission_summary_view.h"
 
-#include "client/ui/hooks/use_game_navigation.h"
+#include "client/ui/hooks/use_navigation.h"
+#include "client/ui/screens/lobby/lobby_screen.h"
+#include "client/ui/screens/main_menu/main_menu_screen.h"
 #include "ui/components/box.h"
 #include "ui/components/button.h"
 #include "ui/components/text.h"
+
+#include <memory>
 
 namespace silencer::client_ui {
 
@@ -276,23 +280,18 @@ std::function<void(const ::ui::ActivationEvent&)> upgrade_callback(
 	</Box>
 }
 
-ScreenDestination screen_destination(MissionSummaryDestination destination) {
-	switch(destination){
-		case MissionSummaryDestination::Lobby:
-			return ScreenDestination::Lobby;
-		case MissionSummaryDestination::MainMenu:
-		default:
-			return ScreenDestination::MainMenu;
-	}
-}
-
 std::function<void(const ::ui::ActivationEvent&)> done_callback(
 	std::function<MissionSummaryDestination()> done,
-	GameNavigation navigation) {
+	Navigation navigation) {
 	return [done, navigation](const ::ui::ActivationEvent&) {
 		MissionSummaryDestination destination = MissionSummaryDestination::MainMenu;
 		if(done) destination = done();
-		if(navigation.go_to) navigation.go_to(screen_destination(destination));
+		if(!navigation.reset_to) return;
+		if(destination == MissionSummaryDestination::Lobby){
+			navigation.reset_to(std::make_unique<LobbyScreen>());
+		}else{
+			navigation.reset_to(std::make_unique<MainMenuScreen>());
+		}
 	};
 }
 
@@ -300,7 +299,7 @@ std::function<void(const ::ui::ActivationEvent&)> done_callback(
 
 ::ui::UiElement MissionSummaryFrame(const MissionSummaryFrameProps& props) {
 	const MissionSummary& mission = UseMissionSummary();
-	GameNavigation navigation = use_game_navigation();
+	Navigation navigation = use_navigation();
 	return <Box key={props.key} layout={root_layout()} style={root_style()}>
 		<Box key="panel" layout={panel_layout()} style={panel_style()}>
 			<Box key="summary-column" layout={summary_column_layout()}>

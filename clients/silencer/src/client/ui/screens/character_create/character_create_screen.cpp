@@ -1,8 +1,9 @@
 #include "character_create_screen.h"
 
 #include "client/ui/screens/character_create/character_create_view.h"
+#include "client/ui/screens/lobby/lobby_screen.h"
+#include "client/ui/screens/lobby_connect/lobby_connect_screen.h"
 #include "screen_context.h"
-#include "game_state.h"
 #include "lobby.h"
 #include "peer.h"
 #include "renderer.h"
@@ -12,6 +13,7 @@
 #include <algorithm>
 #include <cstdlib>
 #include <cstring>
+#include <memory>
 #include <string>
 
 namespace {
@@ -100,7 +102,7 @@ void CharacterCreateScreen::Tick(ScreenContext & ctx)
 		ctx.lobby.UnlockMutex();
 		if(created){
 			waitingForCreate = false;
-			ctx.GoToState(GameState::LOBBY);
+			ctx.ResetToScreen(std::make_unique<LobbyScreen>());
 			return;
 		}
 		if(received){
@@ -259,10 +261,10 @@ bool CharacterCreateScreen::HandleBack(ScreenContext & ctx)
 		return true;
 	}
 	if(!ctx.lobby.characters.empty()){
-		ctx.GoToState(GameState::LOBBY);
+		ctx.ResetToScreen(std::make_unique<LobbyScreen>());
 	}else{
 		ctx.lobby.Disconnect();
-		ctx.GoToState(GameState::LOBBYCONNECT);
+		ctx.ResetToScreen(std::make_unique<LobbyConnectScreen>());
 	}
 	return true;
 }
@@ -349,7 +351,7 @@ void CharacterCreateScreen::SelectCurrentAgent(ScreenContext & ctx)
 	}
 	ctx.lobby.UnlockMutex();
 	if(charId != 0){
-		ctx.GoToState(GameState::LOBBY);
+		ctx.ResetToScreen(std::make_unique<LobbyScreen>());
 	}
 }
 

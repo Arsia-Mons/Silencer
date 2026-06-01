@@ -1,6 +1,7 @@
 #include "screen_context.h"
 
 #include "game.h"
+#include "game_state.h"
 #include "renderer.h"
 #include "screen.h"
 #include "modal.h"
@@ -32,14 +33,14 @@ ScreenContext::ScreenContext(Game & game_,
 {
 }
 
-void ScreenContext::GoToState(Uint8 newState) { game.GoToState(newState); }
-void ScreenContext::GoBack() { game.GoBack(); }
+void ScreenContext::StartTutorialGame() { game.GoToState(GameState::SINGLEPLAYERGAME); }
 void ScreenContext::RequestQuit() { game.quitRequested = true; }
 void ScreenContext::LeaveJoinedGame() { game.LeaveJoinedGame(); }
 void ScreenContext::UnloadGame() { game.gameSession.UnloadGame(); }
 void ScreenContext::PushScreen(std::unique_ptr<Screen> s) { game.PushScreen(std::move(s)); }
 void ScreenContext::PopScreen() { game.PopScreen(); }
 void ScreenContext::ReplaceScreen(std::unique_ptr<Screen> s) { game.ReplaceScreen(std::move(s)); }
+void ScreenContext::ResetToScreen(std::unique_ptr<Screen> s) { game.ResetToScreen(std::move(s)); }
 void ScreenContext::ShowModal(std::unique_ptr<Modal> m) {
 	game.PushScreen(std::unique_ptr<Screen>(static_cast<Screen *>(m.release())));
 }

@@ -1,8 +1,10 @@
 #include "lobby_screen.h"
 
+#include "client/ui/screens/character_create/character_create_screen.h"
+#include "client/ui/screens/lobby_connect/lobby_connect_screen.h"
+#include "client/ui/screens/main_menu/main_menu_screen.h"
 #include "screen_context.h"
 #include "game.h"
-#include "game_state.h"
 #include "world.h"
 #include "lobby.h"
 #include "lobbygame.h"
@@ -48,7 +50,7 @@ void LobbyScreen::Tick(ScreenContext & ctx)
 	// Lobby disconnect → bounce back to the connect screen.
 	if(world.lobby.state == Lobby::DISCONNECTED){
 		world.Disconnect();
-		ctx.GoToState(GameState::LOBBYCONNECT);
+		ctx.ResetToScreen(std::make_unique<LobbyConnectScreen>());
 		return;
 	}
 
@@ -56,13 +58,14 @@ void LobbyScreen::Tick(ScreenContext & ctx)
 	// it before pumping anything else.
 	if(goBackClicked){
 		goBackClicked = false;
-		if(game.GoBack()) return;
+		ctx.ResetToScreen(std::make_unique<MainMenuScreen>());
+		return;
 	}
 
 	silencer::client_ui::lobby::CharacterPanelTick(characterState, ctx.world);
 	if(characterState.newCharacterRequested){
 		characterState.newCharacterRequested = false;
-		ctx.GoToState(GameState::CREATECHARACTER);
+		ctx.PushScreen(std::make_unique<CharacterCreateScreen>());
 		return;
 	}
 	silencer::client_ui::lobby::ChatPanelTick(chatState, ctx.world);
@@ -151,7 +154,9 @@ void LobbyScreen::Tick(ScreenContext & ctx)
 	if(world.network.state != World::CONNECTED && !lobby_screen_detail::TopIsModal(ctx)){
 		if(gameJoinActive || gameTechActive){
 			Game * gamePtr = &game;
-			ctx.ShowMessage("Disconnected from game", [gamePtr]() { gamePtr->GoBack(); });
+			ctx.ShowMessage("Disconnected from game", [gamePtr]() {
+				gamePtr->ResetToScreen(std::make_unique<MainMenuScreen>());
+			});
 		}
 	}
 }

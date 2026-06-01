@@ -98,7 +98,6 @@ wait_for_widget() {
 cli --port "$CTRL_PORT" wait_for_state --state MAINMENU --timeout-ms 15000
 wait_for_widget "Connect To Lobby"
 cli --port "$CTRL_PORT" click --label "Connect To Lobby" >/dev/null
-cli --port "$CTRL_PORT" wait_for_state --state LOBBYCONNECT --timeout-ms 5000
 wait_for_widget "Login/Create"
 
 # Type the credentials through the same key path real text input uses
@@ -138,6 +137,6 @@ wait_for_widget "Create Game"
 # Go Back from the lobby returns to MAINMENU (FADEOUT is a brief
 # transient that wait_for_state will skip past).
 cli --port "$CTRL_PORT" back >/dev/null
-cli --port "$CTRL_PORT" wait_for_state --state MAINMENU --timeout-ms 10000
+wait_for_widget "Connect To Lobby"
 
 echo "PASS 30_lobby_login"

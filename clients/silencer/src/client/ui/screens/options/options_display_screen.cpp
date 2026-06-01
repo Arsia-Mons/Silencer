@@ -2,7 +2,6 @@
 
 #include "client/ui/screens/options/options_display_view.h"
 #include "screen_context.h"
-#include "game_state.h"
 #include "renderer.h"
 #include "config.h"
 #include "renderdevice.h"
@@ -93,6 +92,6 @@ void OptionsDisplayScreen::Destroy(ScreenContext & ctx)
 bool OptionsDisplayScreen::HandleBack(ScreenContext & ctx)
 {
 	options_display_screen_detail::CancelDisplaySettings(ctx.window, ctx.renderdevice);
-	ctx.GoToState(GameState::OPTIONS);
+	ctx.PopScreen();
 	return true;
 }

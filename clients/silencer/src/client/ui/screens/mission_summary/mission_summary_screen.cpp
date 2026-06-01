@@ -1,8 +1,9 @@
 #include "mission_summary_screen.h"
 
+#include "client/ui/screens/lobby/lobby_screen.h"
+#include "client/ui/screens/main_menu/main_menu_screen.h"
 #include "client/ui/screens/mission_summary/mission_summary_view.h"
 #include "screen_context.h"
-#include "game_state.h"
 #include "world.h"
 #include "lobby.h"
 #include "user.h"
@@ -13,6 +14,7 @@
 #include <cstdio>
 #include <cstring>
 #include <functional>
+#include <memory>
 
 namespace mission_summary_screen_detail
 {
@@ -129,9 +131,11 @@ bool MissionSummaryScreen::HandleBack(ScreenContext & ctx)
 {
 	silencer::client_ui::MissionSummaryDestination destination =
 		mission_summary_screen_detail::FinishMissionSummary(ctx.world);
-	ctx.GoToState(destination == silencer::client_ui::MissionSummaryDestination::Lobby
-	              ? GameState::LOBBY
-	              : GameState::MAINMENU);
+	if(destination == silencer::client_ui::MissionSummaryDestination::Lobby){
+		ctx.ResetToScreen(std::make_unique<LobbyScreen>());
+	}else{
+		ctx.ResetToScreen(std::make_unique<MainMenuScreen>());
+	}
 	return true;
 }
 

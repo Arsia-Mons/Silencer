@@ -23,6 +23,8 @@ namespace silencer::client_ui::lobby {
 
 namespace game_create_panel_detail {
 
+constexpr int kOptionRowCount = 6;
+constexpr int kVisibleOptionRows = 4;
 constexpr const char * kActionMapPrefix = "lobby.game_create.map";
 constexpr const char * kActionMinLevel = "lobby.game_create.min_level";
 constexpr const char * kActionMaxLevel = "lobby.game_create.max_level";
@@ -88,6 +90,17 @@ void GameCreatePanelTick(GameCreatePanelState & state,
                          LobbyScreen & owner) {
 	MapDownloader & mapDownloader = ctx.mapDownloader;
 	Game & game = ctx.game;
+
+	state.optionsVisibleRows = game_create_panel_detail::kVisibleOptionRows;
+	state.optionsMaxScroll = game_create_panel_detail::kOptionRowCount -
+	                         game_create_panel_detail::kVisibleOptionRows;
+	if(state.optionsScrollDelta != 0){
+		int next = static_cast<int>(state.optionsScrollPosition) + state.optionsScrollDelta;
+		if(next < 0) next = 0;
+		if(next > state.optionsMaxScroll) next = state.optionsMaxScroll;
+		state.optionsScrollPosition = static_cast<Uint16>(next);
+		state.optionsScrollDelta = 0;
+	}
 
 	if(state.mapRowClickedIndex >= 0){
 		state.mapSelectedIndex = state.mapRowClickedIndex;

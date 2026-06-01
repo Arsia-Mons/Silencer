@@ -6,7 +6,6 @@
 
 #include "screen_context.h"
 #include "game.h"
-#include "game_state.h"
 #include "config.h"
 #include "world.h"
 
@@ -134,7 +133,7 @@ bool OptionsControlsScreen::HandleUiIntent(ScreenContext & ctx, const silencer::
 	}
 	if(action.kind == silencer::ui::UiActionKind::Cancel){
 		CancelControls(ctx);
-		ctx.GoToState(GameState::OPTIONS);
+		ctx.PopScreen();
 		return true;
 	}
 	if(action.kind == silencer::ui::UiActionKind::Scroll){

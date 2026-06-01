@@ -14,9 +14,9 @@ OUT_DIR="$(mktemp -d)"
 
 cli --port "$PORT" wait_for_state --state MAINMENU --timeout-ms 15000 >/dev/null
 cli --port "$PORT" click --label OPTIONS >/dev/null
-cli --port "$PORT" wait_for_state --state OPTIONS --timeout-ms 5000 >/dev/null
+wait_for_widget "Controls"
 cli --port "$PORT" click --label CONTROLS >/dev/null
-cli --port "$PORT" wait_for_state --state OPTIONSCONTROLS --timeout-ms 5000 >/dev/null
+wait_for_widget "Preset"
 cli --port "$PORT" wait_frames --n 2 >/dev/null
 
 cli --port "$PORT" inspect | bun -e '
@@ -114,6 +114,6 @@ if (!list || list.h <= 0) {
 '
 
 cli --port "$PORT" click --label CANCEL >/dev/null
-cli --port "$PORT" wait_for_state --state OPTIONS --timeout-ms 5000 >/dev/null
+wait_for_widget "Controls"
 
 echo "PASS 12_controls_scroll ($OUT_DIR)"

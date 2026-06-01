@@ -1,8 +1,8 @@
 #include "update_screen.h"
 
+#include "client/ui/screens/main_menu/main_menu_screen.h"
 #include "client/ui/screens/update/update_view.h"
 #include "screen_context.h"
-#include "game_state.h"
 #include "peer.h"
 #include "updater.h"
 #include "updaterstage2.h"
@@ -10,6 +10,7 @@
 
 #include <cstdio>
 #include <cstdlib>
+#include <memory>
 #include <string>
 
 namespace update_screen_detail
@@ -129,7 +130,7 @@ void UpdateScreen::Tick(ScreenContext & ctx)
 			return;
 		}
 		fprintf(stderr, "[updater] UpdaterStage2::Launch failed; returning to main menu\n");
-		ctx.GoToState(GameState::MAINMENU);
+		ctx.ResetToScreen(std::make_unique<MainMenuScreen>());
 	}
 }
 
@@ -176,7 +177,7 @@ void UpdateScreen::Destroy(ScreenContext & ctx)
 bool UpdateScreen::HandleBack(ScreenContext & ctx)
 {
 	if(update_screen_detail::CancelUpdate(ctx.updater)){
-		ctx.GoToState(GameState::MAINMENU);
+		ctx.ResetToScreen(std::make_unique<MainMenuScreen>());
 	}
 	return true;
 }

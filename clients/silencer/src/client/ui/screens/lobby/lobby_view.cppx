@@ -348,6 +348,31 @@ std::function<void(const ::ui::KeyEvent&)> action_on_enter(std::function<void()>
 	};
 }
 
+::ui::LayoutStyle game_create_options_viewport_layout() {
+	return ::ui::LayoutStyle{
+		.direction = ::ui::FlexDirection::Column,
+		.width = ::ui::Length::percent(100.0f),
+		.height = ::ui::Length::grow(1.0f),
+		.overflow = ::ui::Overflow::Hidden,
+	};
+}
+
+::ui::EdgeSizes game_create_options_content_position(Uint16 scrollPosition) {
+	::ui::EdgeSizes inset;
+	inset.top = ::ui::StyleValue::points(-30.0f * static_cast<float>(scrollPosition));
+	return inset;
+}
+
+::ui::LayoutStyle game_create_options_content_layout(Uint16 scrollPosition) {
+	return ::ui::LayoutStyle{
+		.position = ::ui::PositionType::Relative,
+		.position_inset = game_create_options_content_position(scrollPosition),
+		.direction = ::ui::FlexDirection::Column,
+		.width = ::ui::Length::percent(100.0f),
+		.gap = 6.0f,
+	};
+}
+
 const char * security_label(Uint8 index) {
 	switch(index){
 		case LobbyGame::SECLOW: return "Security: Low";
@@ -734,58 +759,63 @@ struct GameCreateTallProps {
 		  key="fields"
 		  id={kGameCreateOptionsScrollId}
 		  accessibility={::ui::components::AccessibilityProps{.label = kGameCreateOptionsScrollLabel, .description = "scroll"}}
-		  layout={create_options_layout()}
+		  layout={game_create_options_viewport_layout()}
 		  style={inner_panel_style()}
 		>
-			<Input
-			  key="name"
-			  id="lobby.game_create.name"
-			  value={snapshot->name}
-			  accessibility={::ui::components::AccessibilityProps{.role = ::ui::SemanticRole::TextBox, .label = "Game name"}}
-			  onChange={gameCreate.set_name}
-			  layout={row_button_layout(26.0f)}
-			/>
-			<Input
-			  key="password"
-			  id="lobby.game_create.password"
-			  value={snapshot->password}
-			  password={true}
-			  accessibility={::ui::components::AccessibilityProps{.role = ::ui::SemanticRole::TextBox, .label = "Game password"}}
-			  onChange={gameCreate.set_password}
-			  layout={row_button_layout(26.0f)}
-			/>
-			<Input
-			  key="min-level"
-			  id="lobby.game_create.min_level"
-			  value={snapshot->minLevel}
-			  accessibility={::ui::components::AccessibilityProps{.role = ::ui::SemanticRole::TextBox, .label = "Min level"}}
-			  onChange={gameCreate.set_min_level}
-			  layout={row_button_layout(24.0f)}
-			/>
-			<Input
-			  key="max-level"
-			  id="lobby.game_create.max_level"
-			  value={snapshot->maxLevel}
-			  accessibility={::ui::components::AccessibilityProps{.role = ::ui::SemanticRole::TextBox, .label = "Max level"}}
-			  onChange={gameCreate.set_max_level}
-			  layout={row_button_layout(24.0f)}
-			/>
-			<Input
-			  key="max-players"
-			  id="lobby.game_create.max_players"
-			  value={snapshot->maxPlayers}
-			  accessibility={::ui::components::AccessibilityProps{.role = ::ui::SemanticRole::TextBox, .label = "Max players"}}
-			  onChange={gameCreate.set_max_players}
-			  layout={row_button_layout(24.0f)}
-			/>
-			<Input
-			  key="max-teams"
-			  id="lobby.game_create.max_teams"
-			  value={snapshot->maxTeams}
-			  accessibility={::ui::components::AccessibilityProps{.role = ::ui::SemanticRole::TextBox, .label = "Max teams"}}
-			  onChange={gameCreate.set_max_teams}
-			  layout={row_button_layout(24.0f)}
-			/>
+			<Box
+			  key="fields-content"
+			  layout={game_create_options_content_layout(snapshot->optionsScrollPosition)}
+			>
+				<Input
+				  key="name"
+				  id="lobby.game_create.name"
+				  value={snapshot->name}
+				  accessibility={::ui::components::AccessibilityProps{.role = ::ui::SemanticRole::TextBox, .label = "Game name"}}
+				  onChange={gameCreate.set_name}
+				  layout={row_button_layout(26.0f)}
+				/>
+				<Input
+				  key="password"
+				  id="lobby.game_create.password"
+				  value={snapshot->password}
+				  password={true}
+				  accessibility={::ui::components::AccessibilityProps{.role = ::ui::SemanticRole::TextBox, .label = "Game password"}}
+				  onChange={gameCreate.set_password}
+				  layout={row_button_layout(26.0f)}
+				/>
+				<Input
+				  key="min-level"
+				  id="lobby.game_create.min_level"
+				  value={snapshot->minLevel}
+				  accessibility={::ui::components::AccessibilityProps{.role = ::ui::SemanticRole::TextBox, .label = "Min level"}}
+				  onChange={gameCreate.set_min_level}
+				  layout={row_button_layout(24.0f)}
+				/>
+				<Input
+				  key="max-level"
+				  id="lobby.game_create.max_level"
+				  value={snapshot->maxLevel}
+				  accessibility={::ui::components::AccessibilityProps{.role = ::ui::SemanticRole::TextBox, .label = "Max level"}}
+				  onChange={gameCreate.set_max_level}
+				  layout={row_button_layout(24.0f)}
+				/>
+				<Input
+				  key="max-players"
+				  id="lobby.game_create.max_players"
+				  value={snapshot->maxPlayers}
+				  accessibility={::ui::components::AccessibilityProps{.role = ::ui::SemanticRole::TextBox, .label = "Max players"}}
+				  onChange={gameCreate.set_max_players}
+				  layout={row_button_layout(24.0f)}
+				/>
+				<Input
+				  key="max-teams"
+				  id="lobby.game_create.max_teams"
+				  value={snapshot->maxTeams}
+				  accessibility={::ui::components::AccessibilityProps{.role = ::ui::SemanticRole::TextBox, .label = "Max teams"}}
+				  onChange={gameCreate.set_max_teams}
+				  layout={row_button_layout(24.0f)}
+				/>
+			</Box>
 		</Box>
 		<Button
 		  key="create"

@@ -59,9 +59,9 @@ check_resize() {
   local x y
   read -r x y <<< "$click_target"
   cli --port "$PORT" click_at --x "$x" --y "$y" >/dev/null
-  cli --port "$PORT" wait_for_state --state OPTIONS --timeout-ms 5000 >/dev/null
+  wait_for_widget "Controls"
   cli --port "$PORT" back >/dev/null
-  cli --port "$PORT" wait_for_state --state MAINMENU --timeout-ms 5000 >/dev/null
+  wait_for_widget "Connect To Lobby"
 
   rm -f "$state_out" "$inspect_out"
 }

@@ -200,6 +200,16 @@ fail_if_match \
   "$REPO_ROOT/clients/silencer/src/client/ui/ClientUi.cpp"
 
 fail_if_match \
+  "\\b(use_game_navigation|GameNavigation|ScreenDestination)\\b" \
+  "$REPO_ROOT/clients/silencer/src/client/ui"
+
+fail_if_match \
+  "#include[[:space:]]+\"game_state[.]h\"|\\bGameState::|\\bGoToState[[:space:]]*\\(" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens" \
+  --glob '!screen_context.*' \
+  --glob '!screen_routes.*'
+
+fail_if_match \
   "\\bGameState::|\\bgo_to_state\\b" \
   "$REPO_ROOT/clients/silencer/src/client/ui/screens" \
   "$REPO_ROOT/clients/silencer/src/client/ui/modals" \

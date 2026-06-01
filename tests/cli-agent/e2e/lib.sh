@@ -121,6 +121,35 @@ wait_alive() {
   return 1
 }
 
+wait_for_widget_on_port() {
+  local port="$1" label="$2"
+  for i in $(seq 1 80); do
+    if cli --port "$port" inspect | LABEL="$label" bun -e '
+      const text = await new Response(Bun.stdin.stream()).text();
+      const label = process.env.LABEL;
+      const r = JSON.parse(text);
+      const widgets = r.widgets ?? [];
+      process.exit(widgets.some((w) => w.source === "ui" && w.label === label) ? 0 : 1);
+    ' >/dev/null 2>&1; then
+      return 0
+    fi
+    sleep 0.25
+  done
+  echo "timed out waiting for UI widget: $label" >&2
+  cli --port "$port" inspect >&2 || true
+  return 1
+}
+
+wait_for_widget() {
+  local label="$1"
+  local port="${CTRL_PORT:-${PORT:-}}"
+  if [ -z "$port" ]; then
+    echo "wait_for_widget requires PORT or CTRL_PORT" >&2
+    return 1
+  fi
+  wait_for_widget_on_port "$port" "$label"
+}
+
 stop_silencer() {
   local pid="$1" port="${2:-}"
   if [ -n "$port" ]; then
@@ -133,14 +162,12 @@ stop_silencer() {
 
 create_initial_character() {
   local alias="${1:-Agent}"
-  cli --port "$CTRL_PORT" wait_for_state --state CREATECHARACTER --timeout-ms 15000 >/dev/null
   wait_for_widget "Create New Character"
   cli --port "$CTRL_PORT" click --label "Create New Character" >/dev/null
   wait_for_widget "Alias"
   cli --port "$CTRL_PORT" set_text --label "Alias" --text "$alias" >/dev/null
   cli --port "$CTRL_PORT" key --key enter >/dev/null
-  cli --port "$CTRL_PORT" wait_for_state --state CREATECHARACTER --timeout-ms 15000 >/dev/null
   wait_for_widget "Noxis"
   cli --port "$CTRL_PORT" click --label "Noxis" >/dev/null
-  cli --port "$CTRL_PORT" wait_for_state --state LOBBY --timeout-ms 15000 >/dev/null
+  wait_for_widget "Create Game"
 }
