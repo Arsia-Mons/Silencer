@@ -50,6 +50,8 @@ void MainMenuScreen::BuildUi(ScreenContext & ctx, float frametime, const silence
 	silencer::client_ui::MainMenuFrameProps props{
 		.key = "main-menu",
 		.version = versionText_.c_str(),
+		.viewport_width = virtualW,
+		.viewport_height = virtualH,
 		.start_tutorial = [session]() { session.tutorial.start(); },
 		.open_lobby = [navigation]() {
 			navigation.reset_to(std::make_unique<LobbyConnectScreen>());

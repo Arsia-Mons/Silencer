@@ -15,6 +15,69 @@ using ::ui::components::Text;
 using ::ui::components::TextProps;
 
 ::ui::UiElement MainMenuFrame(const MainMenuFrameProps& props) {
+	const bool compact = props.viewport_width > 0 &&
+	                     props.viewport_width < 640;
+	const bool short_viewport = props.viewport_height > 0 &&
+	                            props.viewport_height < 480;
+	const bool compact_layout = compact || short_viewport;
+	::ui::LayoutStyle composition_layout{
+		.direction = ::ui::FlexDirection::Row,
+		.width = ::ui::Length::points(640.0f),
+		.height = ::ui::Length::points(480.0f),
+		.padding = {0.0f, 0.0f, 32.0f, 32.0f},
+	};
+	::ui::LayoutStyle logo_layout{
+		.align_items = ::ui::AlignItems::Center,
+		.justify_content = ::ui::JustifyContent::Center,
+		.width = ::ui::Length::points(350.0f),
+		.height = ::ui::Length::grow(1.0f),
+		.padding = {7.0f, 0.0f, 0.0f, 0.0f},
+	};
+	::ui::LayoutStyle action_group_layout{
+		.position = ::ui::PositionType::Relative,
+		.width = ::ui::Length::points(290.0f),
+		.height = ::ui::Length::grow(1.0f),
+	};
+	::ui::LayoutStyle actions_layout{
+		.position = ::ui::PositionType::Absolute,
+		.direction = ::ui::FlexDirection::Column,
+		.width = ::ui::Length::points(276.0f),
+		.height = ::ui::Length::points(234.0f),
+		.position_inset = tokens::inset_right_top(54.0f, 122.0f),
+		.gap = 34.0f,
+	};
+
+	if(compact_layout){
+		composition_layout = {
+			.direction = ::ui::FlexDirection::Column,
+			.align_items = ::ui::AlignItems::Center,
+			.justify_content = ::ui::JustifyContent::Center,
+			.width = ::ui::Length::percent(100.0f),
+			.height = ::ui::Length::percent(100.0f),
+			.padding = {16.0f, 16.0f, 24.0f, 24.0f},
+			.gap = 30.0f,
+		};
+		logo_layout = {
+			.align_items = ::ui::AlignItems::Center,
+			.justify_content = ::ui::JustifyContent::Center,
+			.width = ::ui::Length::percent(100.0f),
+			.height = ::ui::Length::points(80.0f),
+		};
+		action_group_layout = {
+			.position = ::ui::PositionType::Relative,
+			.align_items = ::ui::AlignItems::Center,
+			.width = ::ui::Length::points(276.0f),
+			.height = ::ui::Length::points(234.0f),
+		};
+		actions_layout = {
+			.position = ::ui::PositionType::Relative,
+			.direction = ::ui::FlexDirection::Column,
+			.width = ::ui::Length::points(276.0f),
+			.height = ::ui::Length::points(234.0f),
+			.gap = 34.0f,
+		};
+	}
+
 	return <Box
 	  key={props.key}
 	  layout={::ui::LayoutStyle{
@@ -26,25 +89,8 @@ using ::ui::components::TextProps;
 		}}
 	  style={tokens::fill_patch(tokens::kSurfaceMenu)}
 	>
-		<Box
-		  key="composition"
-		  layout={::ui::LayoutStyle{
-				.direction = ::ui::FlexDirection::Row,
-				.width = ::ui::Length::points(640.0f),
-				.height = ::ui::Length::points(480.0f),
-				.padding = {0.0f, 0.0f, 32.0f, 32.0f},
-			}}
-		>
-			<Box
-			  key="logo-group"
-			  layout={::ui::LayoutStyle{
-					.align_items = ::ui::AlignItems::Center,
-					.justify_content = ::ui::JustifyContent::Center,
-					.width = ::ui::Length::points(350.0f),
-					.height = ::ui::Length::grow(1.0f),
-					.padding = {7.0f, 0.0f, 0.0f, 0.0f},
-				}}
-			>
+		<Box key="composition" layout={composition_layout}>
+			<Box key="logo-group" layout={logo_layout}>
 				<Text
 				  key="title"
 				  value="Silencer"
@@ -52,25 +98,8 @@ using ::ui::components::TextProps;
 				  style={tokens::text_patch(tokens::kTextTitle, tokens::kFontTitleBank, tokens::kFontTitleAdvance)}
 				/>
 			</Box>
-			<Box
-			  key="action-group"
-			  layout={::ui::LayoutStyle{
-					.position = ::ui::PositionType::Relative,
-					.width = ::ui::Length::points(290.0f),
-					.height = ::ui::Length::grow(1.0f),
-				}}
-			>
-				<Box
-				  key="actions"
-				  layout={::ui::LayoutStyle{
-						.position = ::ui::PositionType::Absolute,
-						.direction = ::ui::FlexDirection::Column,
-						.width = ::ui::Length::points(276.0f),
-						.height = ::ui::Length::points(234.0f),
-						.position_inset = tokens::inset_right_top(54.0f, 122.0f),
-						.gap = 34.0f,
-					}}
-				>
+			<Box key="action-group" layout={action_group_layout}>
+				<Box key="actions" layout={actions_layout}>
 					<Box
 					  key="tutorial-row"
 					  layout={::ui::LayoutStyle{

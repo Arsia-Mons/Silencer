@@ -10,6 +10,8 @@ namespace client_ui {
 struct MainMenuFrameProps {
 	const char * key = nullptr;
 	const char * version = nullptr;
+	int viewport_width = 0;
+	int viewport_height = 0;
 	std::function<void()> start_tutorial = {};
 	std::function<void()> open_lobby = {};
 	std::function<void()> open_options = {};
