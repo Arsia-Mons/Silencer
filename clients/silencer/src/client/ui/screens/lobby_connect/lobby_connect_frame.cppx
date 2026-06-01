@@ -215,6 +215,7 @@ using ::ui::components::TextProps;
 				  size={AppButtonSize::Sm}
 				  variant={AppButtonVariant::Secondary}
 				  label="Login/Create"
+				  onPress={props.login}
 				/>
 				<AppButton
 				  key="cancel"
@@ -222,6 +223,7 @@ using ::ui::components::TextProps;
 				  size={AppButtonSize::Sm}
 				  variant={AppButtonVariant::Secondary}
 				  label="Cancel"
+				  onPress={props.cancel}
 				/>
 			</Box>
 		</Box>

@@ -33,8 +33,6 @@ enum LobbyConnectInput : Uint8 {
 constexpr int kVisibleLogLines = 15;
 constexpr const char * kActionUsername = "lobby_connect.username";
 constexpr const char * kActionPassword = "lobby_connect.password";
-constexpr const char * kActionLogin = "lobby_connect.login";
-constexpr const char * kActionCancel = "lobby_connect.cancel";
 
 void CopyUiText(char * dst, int dstLen, const std::string & value)
 {
@@ -86,8 +84,6 @@ void LobbyConnectScreen::Build(ScreenContext & ctx)
 	silencer::client_ui::use_lobby(
 		silencer::client_ui::MakeLobbyProvider(ctx)).connection.reset();
 	motdprinted = false;
-	loginClicked = false;
-	cancelClicked = false;
 	logLines.clear();
 	username[0] = '\0';
 	password[0] = '\0';
@@ -130,25 +126,17 @@ void LobbyConnectScreen::Tick(ScreenContext & ctx)
 			.reset_to(std::make_unique<LobbyScreen>());
 		return;
 	}
-
-	if(loginClicked){
-		loginClicked = false;
-		lobby.connection.submit_credentials(username, password);
-	}
-
-	if(cancelClicked){
-		cancelClicked = false;
-		lobby.connection.cancel();
-		silencer::client_ui::use_navigation()
-			.reset_to(std::make_unique<MainMenuScreen>());
-	}
 }
 
 void LobbyConnectScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime, silencer::ui::UiInteractionRegistry& interactions)
 {
 	(void)frametime;
-	bool inactive = silencer::client_ui::use_lobby(
-		silencer::client_ui::MakeLobbyProvider(ctx)).connection.credentials_pending();
+	silencer::client_ui::LobbyModel lobby =
+		silencer::client_ui::use_lobby(
+			silencer::client_ui::MakeLobbyProvider(ctx));
+	silencer::client_ui::Navigation navigation =
+		silencer::client_ui::use_navigation();
+	bool inactive = lobby.connection.credentials_pending();
 	lobby_connect_screen_detail::RegisterWidgets(this, username, password, inactive, interactions);
 	if(!inactive && !interactions.HasFocus()){
 		interactions.FocusTextInputByUid(lobby_connect_screen_detail::LBY_INPUT_USERNAME);
@@ -174,6 +162,13 @@ void LobbyConnectScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frame
 		.username_display = usernameDisplay.c_str(),
 		.password_display = passwordDisplay.c_str(),
 		.inactive = inactive,
+		.login = [this, lobby]() {
+			lobby.connection.submit_credentials(username, password);
+		},
+		.cancel = [lobby, navigation]() {
+			lobby.connection.cancel();
+			navigation.reset_to(std::make_unique<MainMenuScreen>());
+		},
 	};
 	retainedFrame_.Build([&]() {
 		                     return silencer::client_ui::LobbyConnectFrame(props);
@@ -191,7 +186,6 @@ void LobbyConnectScreen::Destroy(ScreenContext & ctx)
 
 bool LobbyConnectScreen::HandleUiIntent(ScreenContext & ctx, const silencer::ui::UiAction & action)
 {
-	(void)ctx;
 	if(action.kind == silencer::ui::UiActionKind::SetText){
 		if(action.id == lobby_connect_screen_detail::kActionUsername){
 			lobby_connect_screen_detail::CopyUiText(username, static_cast<int>(sizeof(username)), action.value);
@@ -210,19 +204,21 @@ bool LobbyConnectScreen::HandleUiIntent(ScreenContext & ctx, const silencer::ui:
 		}else{
 			lobby_connect_screen_detail::CopyUiText(password, static_cast<int>(sizeof(password)), action.value);
 		}
-		loginClicked = true;
+		silencer::client_ui::use_lobby(
+			silencer::client_ui::MakeLobbyProvider(ctx))
+			.connection.submit_credentials(username, password);
 		return true;
 	}
-	if(action.kind == silencer::ui::UiActionKind::Activate && action.id == lobby_connect_screen_detail::kActionLogin){
-		loginClicked = true;
+	if(action.kind == silencer::ui::UiActionKind::Cancel){
+		silencer::client_ui::LobbyModel lobby =
+			silencer::client_ui::use_lobby(
+				silencer::client_ui::MakeLobbyProvider(ctx));
+		lobby.connection.cancel();
+		silencer::client_ui::use_navigation()
+			.reset_to(std::make_unique<MainMenuScreen>());
 		return true;
 	}
-	if((action.kind == silencer::ui::UiActionKind::Activate && action.id == lobby_connect_screen_detail::kActionCancel) ||
-	   action.kind == silencer::ui::UiActionKind::Cancel){
-		cancelClicked = true;
-		return true;
-	}
-	return false;
+	return retainedFrame_.HandleUiIntent(action);
 }
 
 void LobbyConnectScreen::AppendLog(const char * text)

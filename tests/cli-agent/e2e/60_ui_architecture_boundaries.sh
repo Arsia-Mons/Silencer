@@ -447,6 +447,11 @@ fail_if_match \
   "$REPO_ROOT/clients/silencer/src/client/ui/screens/mission_summary/mission_summary_screen.h"
 
 fail_if_match \
+  "\\b(loginClicked|cancelClicked)\\b" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens/lobby_connect/lobby_connect_screen.cpp" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens/lobby_connect/lobby_connect_screen.h"
+
+fail_if_match \
   "\\bokClicked\\b" \
   "$REPO_ROOT/clients/silencer/src/client/ui/modals/message_modal.cpp" \
   "$REPO_ROOT/clients/silencer/src/client/ui/modals/message_modal.h" \
