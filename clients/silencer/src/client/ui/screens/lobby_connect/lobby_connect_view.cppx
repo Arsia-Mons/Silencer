@@ -169,11 +169,80 @@ struct LobbyConnectFrameProps {
 	const char * key = nullptr;
 };
 
-::ui::UiElement LobbyConnectFrame(const LobbyConnectFrameProps& props) {
+struct UsernameInputProps {
+	const char * key = nullptr;
+};
+
+::ui::UiElement UsernameInput(const UsernameInputProps& props) {
 	const LobbyConnectContextValue& lobby = UseLobbyConnect();
-	Navigation navigation = UseNavigation();
 	const LobbyConnectState& state = lobby.state;
 	const LobbyConnectActions& actions = lobby.actions;
+	return <Input
+	  key={props.key}
+	  id="lobby_connect.username"
+	  value={state.username}
+	  disabled={state.inactive}
+	  autofocus={true}
+	  accessibility={::ui::components::AccessibilityProps{.role = ::ui::SemanticRole::TextBox, .label = "Username"}}
+	  onChange={text_callback(actions.set_username)}
+	  layout={input_layout()}
+	/>
+}
+
+struct PasswordInputProps {
+	const char * key = nullptr;
+};
+
+::ui::UiElement PasswordInput(const PasswordInputProps& props) {
+	const LobbyConnectContextValue& lobby = UseLobbyConnect();
+	const LobbyConnectState& state = lobby.state;
+	const LobbyConnectActions& actions = lobby.actions;
+	return <Input
+	  key={props.key}
+	  id="lobby_connect.password"
+	  value={state.password}
+	  password={true}
+	  disabled={state.inactive}
+	  accessibility={::ui::components::AccessibilityProps{.role = ::ui::SemanticRole::TextBox, .label = "Password"}}
+	  onChange={text_callback(actions.set_password)}
+	  layout={input_layout()}
+	/>
+}
+
+struct LoginButtonProps {
+	const char * key = nullptr;
+};
+
+::ui::UiElement LoginButton(const LoginButtonProps& props) {
+	const LobbyConnectActions& actions = UseLobbyConnect().actions;
+	return <Button
+	  key={props.key}
+	  id="lobby_connect.login"
+	  label="Login/Create"
+	  onActivate={submit_callback(actions)}
+	  layout={button_layout()}
+	/>
+}
+
+struct LobbyConnectCancelButtonProps {
+	const char * key = nullptr;
+};
+
+::ui::UiElement LobbyConnectCancelButton(const LobbyConnectCancelButtonProps& props) {
+	const LobbyConnectActions& actions = UseLobbyConnect().actions;
+	Navigation navigation = UseNavigation();
+	return <Button
+	  key={props.key}
+	  id="lobby_connect.cancel"
+	  label="Cancel"
+	  onActivate={cancel_callback(actions, navigation)}
+	  layout={button_layout()}
+	/>
+}
+
+::ui::UiElement LobbyConnectFrame(const LobbyConnectFrameProps& props) {
+	const LobbyConnectContextValue& lobby = UseLobbyConnect();
+	const LobbyConnectState& state = lobby.state;
 	return <Box key={props.key} layout={root_layout()}>
 		<Box key="panel" layout={panel_layout()} style={panel_style()}>
 			<Box key="log" layout={log_layout()}>
@@ -196,46 +265,16 @@ struct LobbyConnectFrameProps {
 			<Box key="form" layout={form_layout()}>
 				<Box key="username-row" layout={form_row_layout()}>
 					<Text key="username-label" value="Username" layout={label_layout()} style={label_style()} />
-					<Input
-					  key="username"
-					  id="lobby_connect.username"
-					  value={state.username}
-					  disabled={state.inactive}
-					  autofocus={true}
-					  accessibility={::ui::components::AccessibilityProps{.role = ::ui::SemanticRole::TextBox, .label = "Username"}}
-					  onChange={text_callback(actions.set_username)}
-					  layout={input_layout()}
-					/>
+					<UsernameInput key="username" />
 				</Box>
 				<Box key="password-row" layout={form_row_layout()}>
 					<Text key="password-label" value="Password" layout={label_layout()} style={label_style()} />
-					<Input
-					  key="password"
-					  id="lobby_connect.password"
-					  value={state.password}
-					  password={true}
-					  disabled={state.inactive}
-					  accessibility={::ui::components::AccessibilityProps{.role = ::ui::SemanticRole::TextBox, .label = "Password"}}
-					  onChange={text_callback(actions.set_password)}
-					  layout={input_layout()}
-					/>
+					<PasswordInput key="password" />
 				</Box>
 			</Box>
 			<Box key="actions" layout={actions_layout()}>
-				<Button
-				  key="login"
-				  id="lobby_connect.login"
-				  label="Login/Create"
-				  onActivate={submit_callback(actions)}
-				  layout={button_layout()}
-				/>
-				<Button
-				  key="cancel"
-				  id="lobby_connect.cancel"
-				  label="Cancel"
-				  onActivate={cancel_callback(actions, navigation)}
-				  layout={button_layout()}
-				/>
+				<LoginButton key="login" />
+				<LobbyConnectCancelButton key="cancel" />
 			</Box>
 		</Box>
 	</Box>
