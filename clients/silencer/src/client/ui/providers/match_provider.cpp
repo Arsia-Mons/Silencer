@@ -220,6 +220,8 @@ MatchUiControlResult MatchControlSurfaceModel::configure(MatchUiControlMode mode
 		result.showPlayerList = world->IsShowingPlayerList();
 		result.quitState = world->quitstate;
 		result.topMessageProgress = world->messaging.topmessage_i;
+		result.statusMessageCount =
+			static_cast<int>(world->messaging.statusmessages.size());
 		result.buyItemCount = static_cast<int>(buyItems.size());
 		result.techItemCount = static_cast<int>(techItems.size());
 		result.buySelectedIndex = player->buyifacelastitem;
@@ -236,6 +238,10 @@ MatchUiControlResult MatchControlSurfaceModel::configure(MatchUiControlMode mode
 		world->quitstate = 0;
 		world->messaging.topmessage_i = 0;
 		world->messaging.topmessage[0] = '\0';
+		for(char * status : world->messaging.statusmessages){
+			delete[] status;
+		}
+		world->messaging.statusmessages.clear();
 	};
 
 	if(mode == MatchUiControlMode::Clear){
@@ -306,6 +312,9 @@ MatchUiControlResult MatchControlSurfaceModel::configure(MatchUiControlMode mode
 	}
 	if(mode == MatchUiControlMode::TopMessage || mode == MatchUiControlMode::All){
 		world->ShowTopMessage("        RETAINED TOP MESSAGE");
+	}
+	if(mode == MatchUiControlMode::StatusLine || mode == MatchUiControlMode::All){
+		world->ShowStatus("RETAINED STATUS MESSAGE", 153);
 	}
 
 	populate();

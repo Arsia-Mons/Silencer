@@ -31,6 +31,12 @@ constexpr int kTopMessageFontBank = 133;
 constexpr int kTopMessageAdvance = 7;
 constexpr int kTopMessageLineHeight = 11;
 constexpr std::uint8_t kTopMessagePalette = 0;
+constexpr int kStatusBaseY = 370;
+constexpr int kStatusLineStep = -10;
+constexpr int kStatusMaxLines = 4;
+constexpr int kStatusFontBank = 133;
+constexpr int kStatusAdvance = 7;
+constexpr int kStatusLineHeight = 11;
 
 inline ::ui::LayoutStyle root_layout(int width, int height) {
 	return {
@@ -69,6 +75,23 @@ inline ::ui::StylePatch top_message_text_patch() {
 		.font_id = kTopMessageFontBank,
 		.font_size = kTopMessageAdvance,
 		.line_height = static_cast<float>(kTopMessageLineHeight),
+	});
+}
+
+inline std::uint8_t status_brightness(std::uint8_t time, bool shadow) {
+	int brightness = 128;
+	if(time <= 16) brightness -= (16 - time) * 8;
+	if(shadow) brightness = std::max(8, brightness - 64);
+	return static_cast<std::uint8_t>(std::max(0, std::min(255, brightness)));
+}
+
+inline ::ui::StylePatch status_text_patch(std::uint8_t palette,
+                                          std::uint8_t brightness) {
+	return ::ui::patch().text(::ui::TextVisual{
+		.color = {palette, brightness, 0, 255},
+		.font_id = kStatusFontBank,
+		.font_size = kStatusAdvance,
+		.line_height = static_cast<float>(kStatusLineHeight),
 	});
 }
 
@@ -125,6 +148,37 @@ struct TopMessageProps {
 	/>
 }
 
+struct StatusLineProps {
+	const char * key = nullptr;
+	bool show = false;
+	const InGameStatusLineView * lines = nullptr;
+	int count = 0;
+	int index = 0;
+	int surface_width = 0;
+	bool shadow = false;
+};
+
+::ui::UiElement StatusLine(const StatusLineProps& props) {
+	if(!props.show || !props.lines || props.index < 0 ||
+	   props.index >= props.count || props.index >= kStatusMaxLines){
+		return ::ui::empty();
+	}
+	const InGameStatusLineView& line = props.lines[props.index];
+	if(line.text.empty()) return ::ui::empty();
+	const int width = static_cast<int>(line.text.size()) * kStatusAdvance;
+	const int x = std::max(0, (props.surface_width - width) / 2) +
+	              (props.shadow ? 1 : 0);
+	const int y = kStatusBaseY + (props.index * kStatusLineStep) +
+	              (props.shadow ? 1 : 0);
+	return <Text
+	  key={props.key}
+	  id="InGameStatusLine"
+	  value={::ui::copy_string(line.text.c_str())}
+	  layout={absolute_layout(x, y, width, kStatusLineHeight)}
+	  style={status_text_patch(line.color, status_brightness(line.time, props.shadow))}
+	/>
+}
+
 }  // namespace ingame_overlay_frame_detail
 
 using ::ui::children;
@@ -148,6 +202,78 @@ using ::ui::components::BoxProps;
 		  show={props.show_top_message}
 		  text={props.top_message_text}
 		  progress={props.top_message_progress}
+		/>
+		<ingame_overlay_frame_detail.StatusLine
+		  key="status-0-shadow"
+		  show={props.show_status_messages}
+		  lines={props.status_messages}
+		  count={props.status_message_count}
+		  index={0}
+		  surfaceWidth={props.width}
+		  shadow={true}
+		/>
+		<ingame_overlay_frame_detail.StatusLine
+		  key="status-0"
+		  show={props.show_status_messages}
+		  lines={props.status_messages}
+		  count={props.status_message_count}
+		  index={0}
+		  surfaceWidth={props.width}
+		  shadow={false}
+		/>
+		<ingame_overlay_frame_detail.StatusLine
+		  key="status-1-shadow"
+		  show={props.show_status_messages}
+		  lines={props.status_messages}
+		  count={props.status_message_count}
+		  index={1}
+		  surfaceWidth={props.width}
+		  shadow={true}
+		/>
+		<ingame_overlay_frame_detail.StatusLine
+		  key="status-1"
+		  show={props.show_status_messages}
+		  lines={props.status_messages}
+		  count={props.status_message_count}
+		  index={1}
+		  surfaceWidth={props.width}
+		  shadow={false}
+		/>
+		<ingame_overlay_frame_detail.StatusLine
+		  key="status-2-shadow"
+		  show={props.show_status_messages}
+		  lines={props.status_messages}
+		  count={props.status_message_count}
+		  index={2}
+		  surfaceWidth={props.width}
+		  shadow={true}
+		/>
+		<ingame_overlay_frame_detail.StatusLine
+		  key="status-2"
+		  show={props.show_status_messages}
+		  lines={props.status_messages}
+		  count={props.status_message_count}
+		  index={2}
+		  surfaceWidth={props.width}
+		  shadow={false}
+		/>
+		<ingame_overlay_frame_detail.StatusLine
+		  key="status-3-shadow"
+		  show={props.show_status_messages}
+		  lines={props.status_messages}
+		  count={props.status_message_count}
+		  index={3}
+		  surfaceWidth={props.width}
+		  shadow={true}
+		/>
+		<ingame_overlay_frame_detail.StatusLine
+		  key="status-3"
+		  show={props.show_status_messages}
+		  lines={props.status_messages}
+		  count={props.status_message_count}
+		  index={3}
+		  surfaceWidth={props.width}
+		  shadow={false}
 		/>
 	</Box>
 }

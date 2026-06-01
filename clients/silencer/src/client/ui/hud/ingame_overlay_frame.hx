@@ -1,5 +1,6 @@
 #pragma once
 
+#include "client/ui/views/HudView.h"
 #include "ui/runtime/element.h"
 
 namespace silencer {
@@ -14,6 +15,9 @@ struct InGameOverlayFrameProps {
 	bool show_top_message = false;
 	const char * top_message_text = nullptr;
 	int top_message_progress = 0;
+	bool show_status_messages = false;
+	const InGameStatusLineView * status_messages = nullptr;
+	int status_message_count = 0;
 };
 
 ::ui::UiElement InGameOverlayFrame(const InGameOverlayFrameProps& props);

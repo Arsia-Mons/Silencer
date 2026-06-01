@@ -144,50 +144,11 @@ void DrawMessage(const HudView& view, Surface* surface) {
 	}
 }
 
-void DrawStatus(const HudView& view, Surface* surface) {
-	struct StatusLine {
-		std::string text;
-		int x;
-		int y;
-		Uint8 color;
-		TextEffect effect;
-	};
-	std::vector<StatusLine> lines;
-	lines.reserve(view.statusMessages.size() * 2);
-	int liney = 0;
-	for(const InGameStatusLineView& src : view.statusMessages) {
-		Uint8 brightness = 128;
-		if(src.time <= 16) brightness -= (16 - src.time) * 8;
-		Uint8 brightness2 = (int(brightness) - 64) < 8 ? 8 : brightness - 64;
-		const int x = (surface->w - ((int)src.text.size() * TextAdvance(TextSize::BodySm))) / 2;
-		lines.push_back({src.text, x + 1, 370 + liney + 1, src.color,
-		                TextEffect::LegacyPalette(src.color, brightness2)});
-		lines.push_back({src.text, x, 370 + liney, src.color,
-		                TextEffect::LegacyPalette(src.color, brightness)});
-		liney -= 10;
-	}
-	if(lines.empty()) return;
-	CLAY({ .id = CLAY_ID("InGameStatusRoot"),
-	       .layout = { .sizing = { CLAY_SIZING_FIXED((float)surface->w), CLAY_SIZING_FIXED((float)surface->h) } } }) {
-		for(size_t i = 0; i < lines.size(); ++i) {
-			StatusLine& line = lines[i];
-			CLAY(FloatingTextElementI("InGameStatusLine", (uint32_t)i, line.x, line.y,
-			                          (int)line.text.size() * TextAdvance(TextSize::BodySm),
-			                          TextLineHeight(TextSize::BodySm))) {
-				Text(ClayStringFromStd(line.text),
-				     { .size = TextSize::BodySm,
-				       .effect = line.effect });
-			}
-		}
-	}
-}
-
 }  // namespace ingameoverlays_detail
 
 void BuildInGameOverlaysUi(Renderer& /*renderer*/, const Resources& /*resources*/,
                            const HudView& view, Surface* surface) {
 	if(!view.mapLoaded) return;
-	ingameoverlays_detail::DrawStatus(view, surface);
 	ingameoverlays_detail::DrawMessage(view, surface);
 	if(view.showPlayerList){
 		BuildPlayerListOverlay(view, surface);

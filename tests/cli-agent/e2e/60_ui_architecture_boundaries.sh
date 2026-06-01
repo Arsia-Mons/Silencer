@@ -183,6 +183,10 @@ fail_if_match \
   "$REPO_ROOT/clients/silencer/src/client/ui/hud"
 
 fail_if_match \
+  "DrawStatus|InGameStatusRoot|InGameStatusLine" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/hud/InGameOverlays.cpp"
+
+fail_if_match \
   "Draw[A-Za-z0-9_]*Clay|BuildInGameHudUi|BuildInGameOverlaysUi|client/ui/hud|Clay_BeginLayout|Clay_EndLayout|Clay_SetPointerState|clay_bridge" \
   "$REPO_ROOT/clients/silencer/src/render/renderer.cpp" \
   "$REPO_ROOT/clients/silencer/src/render/renderer.h"

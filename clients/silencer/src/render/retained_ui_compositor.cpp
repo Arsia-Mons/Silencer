@@ -340,6 +340,7 @@ void DrawText(Renderer& renderer,
 	if(w > 0 && h > 0 && !ClipDrawRect(dst->w, dst->h, x, y, w, h)) return;
 	FontSpec font = FontFor(text);
 	Uint8 color = text.color.r;
+	Uint8 brightness = text.color.g == 0 ? 128 : text.color.g;
 	renderer.DrawText(dst,
 	                  static_cast<Uint16>(std::max(0, x)),
 	                  static_cast<Uint16>(std::max(0, y)),
@@ -348,7 +349,7 @@ void DrawText(Renderer& renderer,
 	                  font.advance,
 	                  text.color.a < 255,
 	                  color,
-	                  128,
+	                  brightness,
 	                  false);
 }
 

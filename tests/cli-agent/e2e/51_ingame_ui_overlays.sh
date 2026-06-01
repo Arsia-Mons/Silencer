@@ -62,6 +62,7 @@ assert_mode_result() {
   if (mode === "playerlist" && !result.show_player_list) fail("player list not active");
   if (mode === "quit" && result.quit_state !== 1) fail(`quit prompt not active: ${JSON.stringify(result)}`);
   if (mode === "topmessage" && result.top_message_progress <= 0) fail(`top message not active: ${JSON.stringify(result)}`);
+  if (mode === "statusline" && result.status_message_count <= 0) fail(`status line not active: ${JSON.stringify(result)}`);
   ' "$mode" "$path"
 }
 
@@ -74,6 +75,7 @@ assert_overlay_changes_frame() {
     playerlist) crop="100,0,440,260" ;;
     quit) crop="180,180,300,70" ;;
     topmessage) crop="180,0,320,50" ;;
+    statusline) crop="150,330,340,70" ;;
   esac
   local diff
   diff="$(tools/pixdiff/build/pixdiff --crop "$crop" "$before" "$after")"
@@ -132,5 +134,6 @@ if (!result.tech_active || result.tech_selected_index < 1 || result.tech_item_co
 check_mode playerlist
 check_mode quit
 check_mode topmessage
+check_mode statusline
 
 echo "PASS 51_ingame_ui_overlays ($OUT_DIR)"
