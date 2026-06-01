@@ -539,8 +539,8 @@ struct GameRowProps {
 };
 
 ::ui::UiElement GameRow(const GameRowProps& props) {
-	const LobbyContextValue& lobby = UseLobby();
-	GameSelectPanelState * state = lobby.state.game_select;
+	const LobbyGameSelect& gameSelect = UseLobbyGameSelect();
+	GameSelectPanelState * state = gameSelect.state;
 	if(!state) return ::ui::empty();
 	int start = state->scrollPos;
 	int index = start + props.slot;
@@ -552,7 +552,7 @@ struct GameRowProps {
 	  idOffset={index}
 	  label={state->rows[static_cast<size_t>(index)].name.c_str()}
 	  selected={selected}
-	  onActivate={index_action_callback(lobby.actions.select_game, index)}
+	  onActivate={index_action_callback(gameSelect.select, index)}
 	  layout={row_button_layout(24.0f)}
 	  style={row_style(selected)}
 	/>
@@ -564,8 +564,8 @@ struct GameSelectUpperProps {
 
 ::ui::UiElement GameSelectUpper(const GameSelectUpperProps& props) {
 	(void)props;
-	const LobbyContextValue& lobby = UseLobby();
-	GameSelectPanelState * state = lobby.state.game_select;
+	const LobbyGameSelect& gameSelect = UseLobbyGameSelect();
+	GameSelectPanelState * state = gameSelect.state;
 	if(!state) return ::ui::empty();
 	return <Box key="select-upper" layout={upper_panel_layout()} style={panel_style()}>
 		<SectionHeading key="heading" value="GAME SELECT" />
@@ -573,7 +573,7 @@ struct GameSelectUpperProps {
 		  key="create"
 		  id="lobby.game_select.create"
 		  label="Create Game"
-		  onActivate={action_callback(lobby.actions.create_game)}
+		  onActivate={action_callback(gameSelect.create)}
 		  layout={row_button_layout(30.0f)}
 		/>
 		<FieldText
@@ -589,8 +589,8 @@ struct GameSelectTallProps {
 
 ::ui::UiElement GameSelectTall(const GameSelectTallProps& props) {
 	(void)props;
-	const LobbyContextValue& lobby = UseLobby();
-	GameSelectPanelState * state = lobby.state.game_select;
+	const LobbyGameSelect& gameSelect = UseLobbyGameSelect();
+	GameSelectPanelState * state = gameSelect.state;
 	if(!state) return ::ui::empty();
 	return <Box key="select-tall" layout={side_panel_layout()} style={panel_style()}>
 		<SectionHeading key="heading" value="ACTIVE GAMES" />
@@ -599,14 +599,14 @@ struct GameSelectTallProps {
 			  key="prev"
 			  id="lobby.game_select.prev"
 			  label="Prev"
-			  onActivate={index_action_callback(lobby.actions.scroll_games, -kGameSelectVisibleRows)}
+			  onActivate={index_action_callback(gameSelect.scroll, -kGameSelectVisibleRows)}
 			  layout={compact_button_layout()}
 			/>
 			<Button
 			  key="next"
 			  id="lobby.game_select.next"
 			  label="Next"
-			  onActivate={index_action_callback(lobby.actions.scroll_games, kGameSelectVisibleRows)}
+			  onActivate={index_action_callback(gameSelect.scroll, kGameSelectVisibleRows)}
 			  layout={compact_button_layout()}
 			/>
 		</Box>
@@ -630,7 +630,7 @@ struct GameSelectTallProps {
 		  id="lobby.game_select.spectate"
 		  label="Spectate"
 		  disabled={!state->spectateVisible}
-		  onActivate={action_callback(lobby.actions.spectate_game)}
+		  onActivate={action_callback(gameSelect.spectate)}
 		  layout={row_button_layout(27.0f)}
 		/>
 		<Button
@@ -638,7 +638,7 @@ struct GameSelectTallProps {
 		  id="lobby.game_select.join"
 		  label="Join"
 		  disabled={!state->joinVisible}
-		  onActivate={action_callback(lobby.actions.join_game)}
+		  onActivate={action_callback(gameSelect.join)}
 		  layout={row_button_layout(27.0f)}
 		/>
 	</Box>

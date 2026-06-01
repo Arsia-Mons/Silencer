@@ -96,7 +96,6 @@ bool LobbyScreen::BuildElement(ScreenContext & ctx, ::ui::UiElement * out)
 		.state = {
 			.version = version.c_str(),
 			.map_name = mapName.c_str(),
-			.game_select = &gameSelectState,
 			.game_create = &gameCreateState,
 			.game_join = &gameJoinState,
 			.game_tech = &gameTechState,
@@ -105,21 +104,6 @@ bool LobbyScreen::BuildElement(ScreenContext & ctx, ::ui::UiElement * out)
 			.game_tech_active = gameTechActive,
 		},
 		.actions = {
-			.select_game = [this](int index) {
-				silencer::client_ui::lobby::GameSelectPanelSelectRow(gameSelectState, index);
-			},
-			.scroll_games = [this](int delta) {
-				silencer::client_ui::lobby::GameSelectPanelScrollRows(gameSelectState, delta);
-			},
-			.create_game = [this]() {
-				silencer::client_ui::lobby::GameSelectPanelRequestCreate(gameSelectState);
-			},
-			.join_game = [this]() {
-				silencer::client_ui::lobby::GameSelectPanelRequestJoin(gameSelectState);
-			},
-			.spectate_game = [this]() {
-				silencer::client_ui::lobby::GameSelectPanelRequestSpectate(gameSelectState);
-			},
 			.select_create_map = [this](int index) {
 				silencer::client_ui::lobby::GameCreatePanelSelectMap(gameCreateState, index);
 			},
@@ -195,6 +179,24 @@ bool LobbyScreen::BuildElement(ScreenContext & ctx, ::ui::UiElement * out)
 			}
 		},
 	};
+	silencer::client_ui::lobby::LobbyGameSelect gameSelect{
+		.state = &gameSelectState,
+		.select = [this](int index) {
+			silencer::client_ui::lobby::GameSelectPanelSelectRow(gameSelectState, index);
+		},
+		.scroll = [this](int delta) {
+			silencer::client_ui::lobby::GameSelectPanelScrollRows(gameSelectState, delta);
+		},
+		.create = [this]() {
+			silencer::client_ui::lobby::GameSelectPanelRequestCreate(gameSelectState);
+		},
+		.join = [this]() {
+			silencer::client_ui::lobby::GameSelectPanelRequestJoin(gameSelectState);
+		},
+		.spectate = [this]() {
+			silencer::client_ui::lobby::GameSelectPanelRequestSpectate(gameSelectState);
+		},
+	};
 	*out = silencer::client_ui::lobby::LobbyScreenView(
 		silencer::client_ui::lobby::LobbyScreenViewProps{
 			.key = "lobby",
@@ -202,6 +204,7 @@ bool LobbyScreen::BuildElement(ScreenContext & ctx, ::ui::UiElement * out)
 			.navigation = ::ui::copy_value(navigation),
 			.chat = ::ui::copy_value(chat),
 			.character = ::ui::copy_value(character),
+			.game_select = ::ui::copy_value(gameSelect),
 		});
 	return true;
 }

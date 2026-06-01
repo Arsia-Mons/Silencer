@@ -11,10 +11,12 @@ namespace {
 ::ReactContext LobbyNavigationContext = {};
 ::ReactContext LobbyChatContext = {};
 ::ReactContext LobbyCharacterContext = {};
+::ReactContext LobbyGameSelectContext = {};
 const LobbyContextValue kEmptyLobby = {};
 const LobbyNavigation kEmptyNavigation = {};
 const LobbyChat kEmptyChat = {};
 const LobbyCharacter kEmptyCharacter = {};
+const LobbyGameSelect kEmptyGameSelect = {};
 }  // namespace
 
 const LobbyContextValue& UseLobby() {
@@ -41,6 +43,12 @@ const LobbyCharacter& UseLobbyCharacter() {
 	return value ? *value : kEmptyCharacter;
 }
 
+const LobbyGameSelect& UseLobbyGameSelect() {
+	const auto * value = static_cast<const LobbyGameSelect *>(
+		::use_context(&LobbyGameSelectContext));
+	return value ? *value : kEmptyGameSelect;
+}
+
 ::ui::UiElement LobbyScreenView(const LobbyScreenViewProps& props) {
 	const LobbyContextValue * stored = ::ui::copy_value(
 		props.value ? *props.value : kEmptyLobby);
@@ -50,18 +58,26 @@ const LobbyCharacter& UseLobbyCharacter() {
 		props.chat ? *props.chat : kEmptyChat);
 	const LobbyCharacter * character = ::ui::copy_value(
 		props.character ? *props.character : kEmptyCharacter);
-	if(!stored || !navigation || !chat || !character){
+	const LobbyGameSelect * gameSelect = ::ui::copy_value(
+		props.game_select ? *props.game_select : kEmptyGameSelect);
+	if(!stored || !navigation || !chat || !character || !gameSelect){
 		return ::ui::empty();
 	}
 	::ui::UiElement frame = ::ui::component(
 		"LobbyFrame",
 		LobbyFrameProps{ .key = "view" },
 		LobbyFrame);
+	::ui::UiElement gameSelectProvider = ::ui::provider(
+		"LobbyGameSelectProvider",
+		&LobbyGameSelectContext,
+		const_cast<LobbyGameSelect *>(gameSelect),
+		::ui::children({frame}),
+		"game-select");
 	::ui::UiElement characterProvider = ::ui::provider(
 		"LobbyCharacterProvider",
 		&LobbyCharacterContext,
 		const_cast<LobbyCharacter *>(character),
-		::ui::children({frame}),
+		::ui::children({gameSelectProvider}),
 		"character");
 	::ui::UiElement chatProvider = ::ui::provider(
 		"LobbyChatProvider",
