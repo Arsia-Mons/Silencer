@@ -248,41 +248,31 @@ void LobbyScreen::Build(ScreenContext & ctx)
 	silencer::client_ui::lobby::ChatPanelInit(chatState);
 	silencer::client_ui::lobby::GameSelectPanelInit(gameSelectState);
 	silencer::client_ui::lobby::GameJoinPanelInit(gameJoinState);
-	gameJoinActive = false;
 	silencer::client_ui::lobby::GameTechPanelInit(gameTechState);
-	gameTechActive = false;
-	gameCreateActive = false;
+	rightPane = LobbyRightPane::GameSelect;
 }
 
 void LobbyScreen::ShowGameSelect()
 {
-	gameCreateActive = false;
-	gameJoinActive   = false;
-	gameTechActive   = false;
+	rightPane = LobbyRightPane::GameSelect;
 }
 
 void LobbyScreen::ShowGameCreate(const silencer::client_ui::LobbyModel & lobby)
 {
 	silencer::client_ui::lobby::GameCreatePanelInit(gameCreateState, lobby);
-	gameCreateActive = true;
-	gameJoinActive   = false;
-	gameTechActive   = false;
+	rightPane = LobbyRightPane::GameCreate;
 }
 
 void LobbyScreen::ShowGameJoin()
 {
 	silencer::client_ui::lobby::GameJoinPanelInit(gameJoinState);
-	gameJoinActive   = true;
-	gameCreateActive = false;
-	gameTechActive   = false;
+	rightPane = LobbyRightPane::GameJoin;
 }
 
 void LobbyScreen::ShowGameTech()
 {
 	silencer::client_ui::lobby::GameTechPanelInit(gameTechState);
-	gameTechActive   = true;
-	gameJoinActive   = false;
-	gameCreateActive = false;
+	rightPane = LobbyRightPane::GameTech;
 }
 
 void LobbyScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime, silencer::ui::UiInteractionRegistry& interactions)
@@ -315,11 +305,15 @@ void LobbyScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime, s
 	const silencer::client_ui::AppModel app =
 		silencer::client_ui::use_app(
 			silencer::client_ui::MakeAppProvider(ctx));
+	const bool isGameSelectPane = rightPane == LobbyRightPane::GameSelect;
+	const bool isGameCreatePane = rightPane == LobbyRightPane::GameCreate;
+	const bool isGameJoinPane = rightPane == LobbyRightPane::GameJoin;
+	const bool isGameTechPane = rightPane == LobbyRightPane::GameTech;
 	ChatPanelSyncLayout(
 		chatState,
 		static_cast<Uint16>(std::max(0, mainLayout.chatW)),
 		static_cast<Uint16>(std::max(0, mainLayout.chatH)));
-	if(gameCreateActive){
+	if(isGameCreatePane){
 		GameCreatePanelSyncOptionsLayout(
 			gameCreateState,
 			static_cast<Uint16>(std::max(0, mainLayout.rightUpperW)),
@@ -335,18 +329,16 @@ void LobbyScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime, s
 			bodyY);
 	}
 	const GameCreatePreviewOverlayLayout gameCreatePreviewLayout =
-		gameCreateActive
+		isGameCreatePane
 			? ResolveGameCreatePreviewOverlayLayout(gameCreateState, input)
 			: GameCreatePreviewOverlayLayout{};
-	const bool gameSelectVisible =
-		!gameCreateActive && !gameJoinActive && !gameTechActive;
 	const int createButtonW = std::max(
 		1,
 		mainLayout.rightUpperW
 			- lobby_screen_detail::kGameSelectCreatePadLeft
 			- lobby_screen_detail::kGameSelectCreatePadRight);
 	const bool showGameSelectCreate =
-		gameSelectVisible &&
+		isGameSelectPane &&
 		mainLayout.rightUpperW > lobby_screen_detail::kGameSelectCreatePadLeft
 			+ lobby_screen_detail::kGameSelectCreatePadRight &&
 		mainLayout.upperH > lobby_screen_detail::kGameSelectCreatePadTop
@@ -363,7 +355,7 @@ void LobbyScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime, s
 			+ lobby_screen_detail::kGameSelectTallFooterGap
 			+ gameSelectActionsH;
 	const bool showGameSelectActions =
-		gameSelectVisible &&
+		isGameSelectPane &&
 		mainLayout.rightTallW >= lobby_screen_detail::kGameSelectActionButtonW &&
 		mainLayout.rightTallH >= gameSelectFooterH;
 	const int actionButtonX =
@@ -399,7 +391,7 @@ void LobbyScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime, s
 			+ lobby_screen_detail::kGameJoinButtonH
 			+ lobby_screen_detail::kGameJoinReadyPadTop;
 	const bool showGameJoinActions =
-		gameJoinActive &&
+		isGameJoinPane &&
 		mainLayout.rightUpperW > lobby_screen_detail::kGameJoinButtonPadLeft
 			+ lobby_screen_detail::kGameJoinButtonPadRight &&
 		mainLayout.upperH > gameJoinReadyY - bodyY
@@ -421,14 +413,14 @@ void LobbyScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime, s
 			+ lobby_screen_detail::kGameTechButtonH
 			+ lobby_screen_detail::kGameTechPeerColPadTop;
 	const bool showGameTechUpper =
-		gameTechActive &&
+		isGameTechPane &&
 		mainLayout.rightUpperW > lobby_screen_detail::kGameTechBackPadLeft
 			+ lobby_screen_detail::kGameTechBackPadRight &&
 		mainLayout.upperH > gameTechPeerY - bodyY + 11;
 	const bool showGameCreateUpper =
-		gameCreateActive && mainLayout.rightUpperW > 0 && mainLayout.upperH > 0;
+		isGameCreatePane && mainLayout.rightUpperW > 0 && mainLayout.upperH > 0;
 	const bool showGameCreateTall =
-		gameCreateActive && mainLayout.rightTallW > 0 && mainLayout.rightTallH > 0;
+		isGameCreatePane && mainLayout.rightTallW > 0 && mainLayout.rightTallH > 0;
 	const uint16_t titlePadX = static_cast<uint16_t>(
 		lobby_screen_detail::ClampInt((layoutWidth * 5) / 640, 5, 10));
 	const uint16_t titleRowGap = static_cast<uint16_t>(
@@ -518,7 +510,7 @@ void LobbyScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime, s
 			lobby.browser.join(
 				lobby_screen_detail::SelectedGameId(gameSelectState));
 		},
-		.show_game_select_tall = gameSelectVisible,
+		.show_game_select_tall = isGameSelectPane,
 		.game_select_tall_x = rightTallX,
 		.game_select_tall_y = bodyY,
 		.game_select_tall_width = mainLayout.rightTallW,
@@ -591,10 +583,7 @@ void LobbyScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime, s
 		.game_join_button_height = lobby_screen_detail::kGameJoinButtonH,
 		.game_join_choose_tech = [this, lobby]() {
 			lobby.pregame.tech.request_peer_list();
-			silencer::client_ui::lobby::GameTechPanelInit(gameTechState);
-			gameTechActive   = true;
-			gameJoinActive   = false;
-			gameCreateActive = false;
+			ShowGameTech();
 		},
 		.game_join_change_team = [lobby]() {
 			lobby.pregame.team.change();
@@ -602,7 +591,7 @@ void LobbyScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime, s
 		.game_join_ready = [lobby]() {
 			lobby.pregame.set_ready(true);
 		},
-		.show_game_join_roster = gameJoinActive,
+		.show_game_join_roster = isGameJoinPane,
 		.game_join = &gameJoinState,
 		.app_assets = &app.assets,
 		.game_join_roster_x = rightTallX,
@@ -616,10 +605,7 @@ void LobbyScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime, s
 		.game_tech_back_width = gameTechBackW,
 		.game_tech_back_height = lobby_screen_detail::kGameTechButtonH,
 		.game_tech_back = [this]() {
-			silencer::client_ui::lobby::GameJoinPanelInit(gameJoinState);
-			gameJoinActive   = true;
-			gameCreateActive = false;
-			gameTechActive   = false;
+			ShowGameJoin();
 		},
 		.game_tech_toggle = [lobby](int item_index) {
 			lobby.pregame.tech.toggle(item_index);
@@ -636,7 +622,7 @@ void LobbyScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime, s
 		.game_tech_peer_y = gameTechPeerY,
 		.game_tech_peer_width = gameTechPeerW,
 		.game_tech_peer_row_gap = lobby_screen_detail::kGameTechPeerRowGap,
-		.show_game_tech_tall = gameTechActive,
+		.show_game_tech_tall = isGameTechPane,
 		.game_tech_tall_x = rightTallX,
 		.game_tech_tall_y = bodyY,
 		.game_tech_tall_width = mainLayout.rightTallW,
@@ -706,19 +692,24 @@ void LobbyScreen::Tick(ScreenContext & ctx)
 	silencer::client_ui::lobby::CharacterPanelTick(characterState, lobby.character);
 	silencer::client_ui::lobby::ChatPanelTick(chatState, lobby.chat);
 
-	if(!gameCreateActive && !gameJoinActive && !gameTechActive){
+	const bool isGameSelectPane = rightPane == LobbyRightPane::GameSelect;
+	const bool isGameCreatePane = rightPane == LobbyRightPane::GameCreate;
+	const bool isGameJoinPane = rightPane == LobbyRightPane::GameJoin;
+	const bool isGameTechPane = rightPane == LobbyRightPane::GameTech;
+
+	if(isGameSelectPane){
 		silencer::client_ui::lobby::GameSelectPanelTick(
 			gameSelectState, lobby);
 	}
-	if(gameCreateActive){
+	if(isGameCreatePane){
 		silencer::client_ui::lobby::GameCreatePanelTick(
 			gameCreateState, lobby);
 	}
-	if(gameJoinActive){
+	if(isGameJoinPane){
 		silencer::client_ui::lobby::GameJoinPanelTick(
 			gameJoinState, lobby);
 	}
-	if(gameTechActive){
+	if(isGameTechPane){
 		silencer::client_ui::lobby::GameTechPanelTick(
 			gameTechState, lobby);
 	}
@@ -726,7 +717,7 @@ void LobbyScreen::Tick(ScreenContext & ctx)
 	MessageModal * progress =
 		lobby_screen_flow_detail::ProgressModal(gameCreateState);
 	const silencer::client_ui::LobbySessionPumpResult session =
-		lobby.session.pump(gameJoinActive || gameTechActive, progress != nullptr);
+		lobby.session.pump(isGameJoinPane || isGameTechPane, progress != nullptr);
 	if(session.lobby_disconnected){
 		silencer::client_ui::use_navigation()
 			.reset_to(std::make_unique<LobbyConnectScreen>());
@@ -762,14 +753,15 @@ bool LobbyScreen::HandleBack(ScreenContext & ctx)
 	silencer::client_ui::LobbyModel lobby =
 		silencer::client_ui::use_lobby(
 			silencer::client_ui::MakeLobbyProvider(ctx));
-	if(gameJoinActive || gameTechActive){
+	if(rightPane == LobbyRightPane::GameJoin ||
+	   rightPane == LobbyRightPane::GameTech){
 		lobby.pregame.leave_joined_game();
 		lobby.browser.mark_games_dirty();
 		SetMapNameOverlay("");
 		ShowGameSelect();
 		return true;
 	}
-	if(gameCreateActive){
+	if(rightPane == LobbyRightPane::GameCreate){
 		lobby.browser.mark_games_dirty();
 		ShowGameSelect();
 		return true;
@@ -786,10 +778,10 @@ bool LobbyScreen::HandleUiIntent(ScreenContext & ctx, const silencer::ui::UiActi
 		return true;
 	}
 	if(chromeFrame_.HandleUiIntent(action)) return true;
-	if(gameJoinActive){
+	if(rightPane == LobbyRightPane::GameJoin){
 		return false;
 	}
-	if(gameTechActive){
+	if(rightPane == LobbyRightPane::GameTech){
 		return false;
 	}
 	return false;

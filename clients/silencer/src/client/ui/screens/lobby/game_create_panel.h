@@ -119,7 +119,7 @@ void GameCreatePanelInit(GameCreatePanelState & state,
                          const LobbyModel & lobby);
 
 // Per-frame pump for the deferred CreateGame state machine (map upload ->
-// CreateGame -> CONNECTED -> ShowGameJoin handoff + progress-modal spinner
+// CreateGame -> CONNECTED -> joined-game pane handoff + progress-modal spinner
 // update + create-failure unwind).
 void GameCreatePanelTick(GameCreatePanelState & state,
                          LobbyModel & lobby);

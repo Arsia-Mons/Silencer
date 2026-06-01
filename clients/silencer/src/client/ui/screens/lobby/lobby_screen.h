@@ -31,6 +31,14 @@ public:
 	bool HandleUiIntent(ScreenContext & ctx, const silencer::ui::UiAction & action) override;
 	const ::ui::DrawCommandList * RetainedDrawCommands() const override;
 
+private:
+	enum class LobbyRightPane {
+		GameSelect,
+		GameCreate,
+		GameJoin,
+		GameTech,
+	};
+
 	// Map-name overlay written by the join handoff and cleared by HandleBack.
 	void SetMapNameOverlay(const char * name);
 
@@ -40,7 +48,6 @@ public:
 	void ShowGameJoin();
 	void ShowGameTech();
 
-private:
 	// Per-frame state for the chrome tree. Strings live on the screen so the
 	// layout pass can hold pointers that remain valid until the frame ends.
 	// Version is cached once at Build; mapName is updated by SetMapNameOverlay.
@@ -60,19 +67,11 @@ private:
 	// when another right-side panel is active.
 	silencer::client_ui::lobby::GameSelectPanelState gameSelectState;
 
-	// GameCreate state + active flag. When `gameCreateActive` is true the
-	// create panel owns the right column (suppresses the games-list tree)
-	// and the provider pumps the deferred create-game state machine.
+	// Right-side pane state. `rightPane` decides which one owns the column.
 	silencer::client_ui::lobby::GameCreatePanelState gameCreateState;
-	bool gameCreateActive = false;
-
-	// GameJoin state + active flag.
 	silencer::client_ui::lobby::GameJoinPanelState gameJoinState;
-	bool gameJoinActive = false;
-
-	// GameTech state + active flag.
 	silencer::client_ui::lobby::GameTechPanelState gameTechState;
-	bool gameTechActive = false;
+	LobbyRightPane rightPane = LobbyRightPane::GameSelect;
 
 	silencer::client_ui::RetainedFrame chromeFrame_;
 };
