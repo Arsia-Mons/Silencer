@@ -52,6 +52,11 @@ const uint8_t * CppxUiFrame(int & outW, int & outH) const;
 // Inject a single-frame pointer click (press+release) at a UI-space point, so
 // the control socket can activate a node by location.
 void InjectPointerClick(float x, float y);
+// Park a sticky pointer position at a UI-space point (no press) so the control
+// socket can drive focus-follows-hover headlessly (there is no real mouse). The
+// position persists across frames until moved again; click injection is still a
+// one-frame edge and does not disturb it.
+void InjectPointerMove(float x, float y);
 // The live retained UI tree owner, or null before the first cppx frame. The
 // control socket reads it for introspection (read-only tree + focus snapshots,
 // no friend/handle leak).
@@ -136,6 +141,12 @@ bool bundledMapsListed_ = false;
 bool injectedPointer_ = false;
 float injectedPointerX_ = 0.0f;
 float injectedPointerY_ = 0.0f;
+// Sticky injected hover position (headless focus-follows-hover automation): once
+// set via InjectPointerMove it drives `frame.pointer` every frame (no real mouse
+// in headless) until moved again.
+bool hasInjectedHover_ = false;
+float injectedHoverX_ = 0.0f;
+float injectedHoverY_ = 0.0f;
 bool prevPointerDown_ = false;
 bool textInputActive_ = false;
 PasswordModalResult passwordModal_ = {};

@@ -40,8 +40,8 @@ check_resize() {
   const width = Number(process.argv[2]);
   const height = Number(process.argv[3]);
   const data = JSON.parse(await Bun.file(inspectPath).text());
-  const expected = ["Tutorial", "Connect To Lobby", "Options", "Exit"];
-  const byLabel = new Map((data.widgets ?? []).map((w) => [w.label, w]));
+  const expected = ["Play Online", "Tutorial", "Options", "Quit"];
+  const byLabel = new Map((data.nodes ?? []).filter((w) => w.role === "button").map((w) => [w.label, w]));
   for (const label of expected) {
     const widget = byLabel.get(label);
     if (!widget) {
@@ -62,10 +62,28 @@ check_resize() {
   ' "$inspect_out" "$width" "$height")"
   local options_x options_y
   read -r options_x options_y <<< "$options_center"
+  # The Options cluster is a cppx overlay pushed over the menu (phase stays
+  # MAINMENU; there is no OPTIONS state). Clicking the inspect-computed center
+  # of the "Options" button must open that overlay, proving the resized
+  # layout's reported coordinates are the real interactive coordinates.
   cli --port "$PORT" click_at --x "$options_x" --y "$options_y" >/dev/null
-  cli --port "$PORT" wait_for_state --state OPTIONS --timeout-ms 5000 >/dev/null
-  cli --port "$PORT" back >/dev/null
-  cli --port "$PORT" wait_for_state --state MAINMENU --timeout-ms 5000 >/dev/null
+  cli --port "$PORT" wait_frames --n 3 >/dev/null
+  cli --port "$PORT" inspect | bun -e '
+  const r = JSON.parse(await new Response(Bun.stdin.stream()).text());
+  const labels = new Set((r.nodes ?? []).filter((n) => n.role === "button").map((b) => b.label));
+  for (const x of ["Audio", "Display", "Done", "Cancel"]) {
+    if (!labels.has(x)) { console.error(`Options overlay missing button: ${x}`); process.exit(1); }
+  }
+  '
+  # Cancel pops the overlay back to the main menu.
+  cli --port "$PORT" click --label OptionsCancel >/dev/null
+  cli --port "$PORT" wait_frames --n 3 >/dev/null
+  cli --port "$PORT" inspect | bun -e '
+  const r = JSON.parse(await new Response(Bun.stdin.stream()).text());
+  const onMenu = (r.nodes ?? []).some((n) => n.role === "button" && n.label === "Play Online");
+  const stillOptions = (r.nodes ?? []).some((n) => n.role === "button" && n.label === "Done");
+  if (!onMenu || stillOptions) { console.error("Cancel did not pop the Options overlay back to MainMenu"); process.exit(1); }
+  '
 }
 
 check_resize 1280 720 "$OUT_DIR/main-1280x720.png"

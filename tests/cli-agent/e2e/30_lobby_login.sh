@@ -133,15 +133,23 @@ wait_for_lobby_state AUTHENTICATING
 cli --port "$CTRL_PORT" click --label "Login/Create" >/dev/null
 
 # Fresh account → server reports no characters → the connect flow routes to
-# character creation.
+# character creation. The 3-step wizard opens on the roster screen (step0): click
+# "Create New Character" to reach the alias step (step1).
 cli --port "$CTRL_PORT" wait_for_state --state CREATECHARACTER --timeout-ms 15000
-wait_for_widget "Alias"
+wait_for_widget "Create New Character"
+cli --port "$CTRL_PORT" click --label "Create New Character" >/dev/null
 
-# Type an alias, then pick an agency — creating the agent. Once it round-trips
-# through the lobby the CREATECHARACTER tick routes to the lobby.
+# step1: type an alias into the "Alias" input, then "Continue" (AliasConfirm,
+# which is disabled until the alias is non-empty) advances to the agency step.
+wait_for_widget "Alias"
 for ch in A l i c e; do
   cli --port "$CTRL_PORT" key --key "$ch" >/dev/null
 done
+cli --port "$CTRL_PORT" click --label "Continue" >/dev/null
+
+# step2: pick an agency — creating the agent. Once it round-trips through the
+# lobby the CREATECHARACTER tick routes to the lobby.
+wait_for_widget "Black Rose"
 cli --port "$CTRL_PORT" click --label "Noxis" >/dev/null
 cli --port "$CTRL_PORT" wait_for_state --state LOBBY --timeout-ms 15000
 

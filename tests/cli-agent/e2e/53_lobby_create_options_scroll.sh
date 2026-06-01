@@ -1,31 +1,33 @@
 #!/usr/bin/env bash
+# Drives the cppx lobby GameCreate panel and proves it renders + stays usable
+# across window sizes. The legacy Clay GameCreate had a scrollable "Game Options
+# Form" with separate security/level option rows; the modern cppx GameCreate
+# panel has no scrollable surface (CreateGameRequest defaults those options), so
+# this is no longer a scroll test. Instead: connect → auth → create character →
+# LOBBY → New Game, then assert the GameCreate controls (name input + bundled-map
+# cycle + Create/Back) are present and laid out inside the virtual UI bounds at a
+# desktop size, a small 640x480 size, and a tall mobile 390x844 size.
 set -euo pipefail
 . "$(dirname "$0")/lib.sh"
 
 LOBBY_BIN="$(lobby_bin)"
 
-PIXDIFF="$REPO_ROOT/tools/pixdiff/build/pixdiff"
-[ -x "$PIXDIFF" ] || {
-  echo "pixdiff binary missing at $PIXDIFF" >&2
-  exit 1
-}
-
-TMP="$(mktemp -d)"
+# Per-run scratch — both for the lobby's user db (-db) and the silencer's
+# config dir (HOME-rooted on macOS / Linux). Two separate pid/log files so
+# the EXIT trap can tear both down cleanly.
+TMP=$(mktemp -d)
 LOBBY_LOG="$TMP/lobby.log"
 LOBBY_DB="$TMP/lobby.json"
 SILENCER_HOME="$TMP/home"
-OUT_DIR="$TMP/out"
-mkdir -p "$SILENCER_HOME/Library/Application Support/Silencer" "$TMP/maps" "$OUT_DIR"
+mkdir -p "$SILENCER_HOME"
 
-LOBBY_PORT="$(pick_port)"
-PLAYER_AUTH_PORT="$(pick_port)"
-MAP_API_PORT="$(pick_port)"
-CTRL_PORT="$(pick_port)"
+LOBBY_PORT=$(pick_port)
+PLAYER_AUTH_PORT=$(pick_port)
+MAP_API_PORT=$(pick_port)
+CTRL_PORT=$(pick_port)
 
-cat > "$SILENCER_HOME/Library/Application Support/Silencer/config.cfg" <<EOF
-mapapiurl=http://127.0.0.1:$MAP_API_PORT
-EOF
-
+# Match the version baked into the selected silencer binary — without this the
+# lobby rejects the handshake with "Wrong version".
 SILENCER_VERSION="$(silencer_version)"
 
 cleanup() {
@@ -40,6 +42,8 @@ cleanup() {
 }
 trap cleanup EXIT
 
+# Lobby on an unprivileged port. -version matches the binary so the handshake
+# passes; -maps-dir/-map-api-addr keep map traffic local.
 "$LOBBY_BIN" \
   -addr ":$LOBBY_PORT" \
   -db "$LOBBY_DB" \
@@ -51,6 +55,7 @@ trap cleanup EXIT
   >"$LOBBY_LOG" 2>&1 &
 LOBBY_PID=$!
 
+# Wait for the lobby's TCP listener to come up.
 for i in $(seq 1 60); do
   if (echo > "/dev/tcp/127.0.0.1/$LOBBY_PORT") 2>/dev/null; then
     break
@@ -63,6 +68,8 @@ for i in $(seq 1 60); do
   fi
 done
 
+# Silencer with a fresh HOME so the lobby host/port override doesn't get
+# persisted to the dev's real config.
 HOME="$SILENCER_HOME" "$SILENCER_BIN" \
   --headless \
   --control-port "$CTRL_PORT" \
@@ -72,14 +79,15 @@ HOME="$SILENCER_HOME" "$SILENCER_BIN" \
 SILENCER_PID=$!
 wait_alive "$CTRL_PORT"
 
+# Poll the retained cppx tree for a node whose control id OR accessibility label
+# equals the argument (the introspection `inspect` op returns `nodes`).
 wait_for_widget() {
   local label="$1"
   for i in $(seq 1 100); do
-    found="$(cli --port "$CTRL_PORT" inspect | LABEL="$label" bun -e \
-      'const t=await new Response(Bun.stdin.stream()).text();
-       const r=JSON.parse(t);
-       const label=process.env.LABEL;
-       console.log(r.widgets.some((w)=>w.label===label) ? "yes" : "no");' 2>/dev/null || echo no)"
+    found=$(cli --port "$CTRL_PORT" inspect | LABEL="$label" bun -e \
+      'const r = JSON.parse(await new Response(Bun.stdin.stream()).text());
+       const l = process.env.LABEL;
+       console.log((r.nodes||[]).some((w)=>w.label===l||w.control_id===l) ? "yes" : "no");' 2>/dev/null || echo no)
     if [ "$found" = "yes" ]; then return 0; fi
     sleep 0.05
   done
@@ -88,113 +96,141 @@ wait_for_widget() {
   return 1
 }
 
+# The Login button only submits credentials once the connect flow has advanced
+# (on the game tick) through Connect → version-check → AUTHENTICATING; a click
+# before that is silently consumed. `state` exposes lobby_state for this sync.
 wait_for_lobby_state() {
   local target="$1"
   for i in $(seq 1 80); do
-    ls="$(cli --port "$CTRL_PORT" state | bun -e \
-      'const t=await new Response(Bun.stdin.stream()).text(); console.log(JSON.parse(t).lobby_state||"");')"
+    ls=$(cli --port "$CTRL_PORT" state | bun -e \
+      'console.log(JSON.parse(await new Response(Bun.stdin.stream()).text()).lobby_state||"");')
     if [ "$ls" = "$target" ]; then return 0; fi
     sleep 0.1
   done
   echo "lobby_state never became $target (last=$ls)" >&2
+  cat "/tmp/silencer-e2e-$CTRL_PORT.log" >&2 || true
   return 1
 }
 
-cli --port "$CTRL_PORT" wait_for_state --state MAINMENU --timeout-ms 15000 >/dev/null
-wait_for_widget "Connect To Lobby"
-cli --port "$CTRL_PORT" click --label "Connect To Lobby" >/dev/null
-cli --port "$CTRL_PORT" wait_for_state --state LOBBYCONNECT --timeout-ms 5000 >/dev/null
-wait_for_widget "Login/Create"
-cli --port "$CTRL_PORT" set_text --uid 1 --text "scrolltest" >/dev/null
-cli --port "$CTRL_PORT" set_text --uid 2 --text "secret" >/dev/null
+cli --port "$CTRL_PORT" wait_for_state --state MAINMENU --timeout-ms 15000
+wait_for_widget "Play Online"
+cli --port "$CTRL_PORT" click --label "Play Online" >/dev/null
+cli --port "$CTRL_PORT" wait_for_state --state LOBBYCONNECT --timeout-ms 5000
+wait_for_widget "Username"
+
+# Type the credentials through the same key path real text input uses
+# (auto-creates the account on first login). Username is autofocused; Tab moves
+# focus to the password field.
+for ch in a l i c e; do
+  cli --port "$CTRL_PORT" key --key "$ch" >/dev/null
+done
+cli --port "$CTRL_PORT" key --key tab >/dev/null
+for ch in s e c r e t; do
+  cli --port "$CTRL_PORT" key --key "$ch" >/dev/null
+done
+
 wait_for_lobby_state AUTHENTICATING
 cli --port "$CTRL_PORT" click --label "Login/Create" >/dev/null
-create_initial_character "Scrolltest"
-wait_for_widget "Create Game"
-cli --port "$CTRL_PORT" click --label "Create Game" >/dev/null
-cli --port "$CTRL_PORT" wait_frames --n 5 >/dev/null
 
-cli --port "$CTRL_PORT" resize --w 640 --h 360 >/dev/null
+# Fresh account → server reports no characters → the connect flow routes to
+# character creation. The 3-step wizard: roster (step0) → alias (step1) →
+# agency (step2).
+cli --port "$CTRL_PORT" wait_for_state --state CREATECHARACTER --timeout-ms 15000
+
+# step0: roster — start a new character.
+wait_for_widget "Create New Character"
+cli --port "$CTRL_PORT" click --label "Create New Character" >/dev/null
+
+# step1: type an alias, then confirm to advance to the agency picker.
+wait_for_widget "Alias"
+for ch in A l i c e; do
+  cli --port "$CTRL_PORT" key --key "$ch" >/dev/null
+done
+cli --port "$CTRL_PORT" click --label "Continue" >/dev/null
+
+# step2: pick an agency — creating the agent. Once it round-trips through the
+# lobby the CREATECHARACTER tick routes to the lobby.
+wait_for_widget "Black Rose"
+cli --port "$CTRL_PORT" click --label "Noxis" >/dev/null
+cli --port "$CTRL_PORT" wait_for_state --state LOBBY --timeout-ms 15000
+
+# GameSelect is the default right column; swap to GameCreate (screen-local
+# use_state<ActivePanel>) by clicking New Game — this mounts the create form.
+wait_for_widget "NewGame"
+cli --port "$CTRL_PORT" click --label "New Game" >/dev/null
+wait_for_widget "CreateBack"
+
+# Assert the GameCreate panel controls are present and laid out within the UI
+# content viewport at the current window size. Controls are matched by
+# control_id (stable across copy changes). The viewport reference is the
+# bounding box of the whole retained tree (inspect emits every node's Yoga
+# layout x/y/w/h in one UI-space): each control must sit at non-negative
+# on-canvas coordinates with positive size, fully inside that content box. The
+# lobby lays out against a fixed virtual canvas, so this verifies the panel
+# renders intact and never collapses or drifts off-canvas as the window resizes.
+assert_create_panel_in_bounds() {
+  local what="$1"
+  local inspect_out
+  inspect_out="$(mktemp)"
+  cli --port "$CTRL_PORT" inspect > "$inspect_out"
+
+  bun -e '
+  const inspectPath = process.argv[1];
+  const what = process.argv[2];
+  const inspect = JSON.parse(await Bun.file(inspectPath).text());
+  const nodes = inspect.nodes ?? [];
+  if (nodes.length === 0) {
+    console.error(`${what}: inspect returned no nodes`);
+    process.exit(1);
+  }
+  // UI content viewport = bounding box of every laid-out node.
+  let maxX = 0, maxY = 0;
+  for (const n of nodes) {
+    if (Number.isFinite(n.x) && Number.isFinite(n.w)) maxX = Math.max(maxX, n.x + n.w);
+    if (Number.isFinite(n.y) && Number.isFinite(n.h)) maxY = Math.max(maxY, n.y + n.h);
+  }
+  if (!(maxX > 0) || !(maxY > 0)) {
+    console.error(`${what}: degenerate UI content viewport ${maxX}x${maxY}`);
+    process.exit(1);
+  }
+  // The GameCreate panel: game-name Input + bundled-map cycle + Create/Back.
+  const required = ["GameName", "MapPrev", "MapNext", "CreateGame", "CreateBack"];
+  const eps = 1;
+  for (const id of required) {
+    const n = nodes.find((w) => w.control_id === id);
+    if (!n) {
+      console.error(`${what}: GameCreate control ${id} missing`);
+      process.exit(1);
+    }
+    if (!(n.w > 0) || !(n.h > 0)) {
+      console.error(`${what}: control ${id} has non-positive size ${n.w}x${n.h}`);
+      process.exit(1);
+    }
+    if (n.x < -eps || n.y < -eps || n.x + n.w > maxX + eps || n.y + n.h > maxY + eps) {
+      console.error(`${what}: control ${id} outside UI viewport ${maxX}x${maxY}: ${JSON.stringify(n)}`);
+      process.exit(1);
+    }
+  }
+  console.log(`${what}: GameName+MapPrev+MapNext+CreateGame+CreateBack in-bounds within ${maxX}x${maxY}`);
+  ' "$inspect_out" "$what"
+
+  rm -f "$inspect_out"
+}
+
+# Default desktop size.
 cli --port "$CTRL_PORT" wait_frames --n 3 >/dev/null
+assert_create_panel_in_bounds "default"
 
-scroll_crop="$(cli --port "$CTRL_PORT" inspect | bun -e '
-const text = await new Response(Bun.stdin.stream()).text();
-const response = JSON.parse(text);
-const widgets = response.widgets ?? [];
-const elements = response.elements ?? [];
-const scroll = elements.find((e) =>
-  e.source === "clay" &&
-  e.kind === "container" &&
-  e.label === "Game Options Form" &&
-  e.value === "scroll" &&
-  e.w > 0 &&
-  e.h > 0
-);
-if (!scroll) {
-  console.error("missing game options scroll element");
-  process.exit(1);
-}
-const hasSecurity = widgets.some((w) => w.id === "lobby.game_create.security");
-const hasSpectatable = widgets.some((w) => w.id === "lobby.game_create.spectatable");
-if (!hasSecurity || hasSpectatable) {
-  console.error("tight viewport did not clip the options rows as expected");
-  process.exit(1);
-}
-console.log([
-  Math.max(0, Math.floor(scroll.x)),
-  Math.max(0, Math.floor(scroll.y)),
-  Math.max(1, Math.ceil(scroll.w)),
-  Math.max(1, Math.ceil(scroll.h)),
-].join(","));
-')"
-tight_h="${scroll_crop##*,}"
-
-before="$OUT_DIR/options-before.png"
-after="$OUT_DIR/options-after.png"
-cli --port "$CTRL_PORT" screenshot --out "$before" >/dev/null
-cli --port "$CTRL_PORT" scroll --label "Game Options Form" --amount 10 >/dev/null
-cli --port "$CTRL_PORT" wait_frames --n 2 >/dev/null
-cli --port "$CTRL_PORT" screenshot --out "$after" >/dev/null
-
-cli --port "$CTRL_PORT" inspect | bun -e '
-const text = await new Response(Bun.stdin.stream()).text();
-const response = JSON.parse(text);
-const widgets = response.widgets ?? [];
-const hasSecurity = widgets.some((w) => w.id === "lobby.game_create.security");
-const hasSpectatable = widgets.some((w) => w.id === "lobby.game_create.spectatable");
-if (hasSecurity || !hasSpectatable) {
-  console.error("scrolling did not reveal the lower game options row");
-  process.exit(1);
-}
-'
-
-diff="$("$PIXDIFF" --crop "$scroll_crop" "$before" "$after")"
-bun -e '
-const diff = Number(process.argv[1]);
-if (!Number.isFinite(diff) || diff <= 0.01) {
-  console.error(`expected game options viewport to visibly scroll, got diff ${diff}`);
-  process.exit(1);
-}
-' "$diff"
-
-cli --port "$CTRL_PORT" resize --w 1280 --h 720 >/dev/null
+# Small desktop size.
+cli --port "$CTRL_PORT" resize --w 640 --h 480 >/dev/null
 cli --port "$CTRL_PORT" wait_frames --n 3 >/dev/null
+wait_for_widget "CreateBack"
+assert_create_panel_in_bounds "640x480"
 
-cli --port "$CTRL_PORT" inspect | bun -e '
-const text = await new Response(Bun.stdin.stream()).text();
-const response = JSON.parse(text);
-const elements = response.elements ?? [];
-const scroll = elements.find((e) =>
-  e.source === "clay" &&
-  e.kind === "container" &&
-  e.label === "Game Options Form" &&
-  e.value === "scroll"
-);
-const tightH = Number(process.argv[1]);
-if (!scroll || !(scroll.h > tightH)) {
-  console.error(`expected game options viewport to grow from ${tightH}, got ${scroll?.h}`);
-  process.exit(1);
-}
-' "$tight_h"
+# Tall mobile size.
+cli --port "$CTRL_PORT" resize --w 390 --h 844 >/dev/null
+cli --port "$CTRL_PORT" wait_frames --n 3 >/dev/null
+wait_for_widget "CreateBack"
+assert_create_panel_in_bounds "390x844"
 
-echo "PASS 53_lobby_create_options_scroll ($OUT_DIR)"
+echo "PASS 53_lobby_create_options_scroll"

@@ -438,8 +438,24 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 		cmd.reply->set_value(OkResult(cmd.id, nlohmann::json::object()));
 		return;
 	}
-	if(cmd.op == "hover_at" ||
-	   cmd.op == "select" ||
+	if(cmd.op == "hover_at"){
+		if(!game.GetUiPipeline().TryClientUi()){
+			cmd.reply->set_value(Err(cmd.id, "WRONG_STATE",
+				"cppx UI has not rendered a frame yet"));
+			return;
+		}
+		float x = cmd.args.value("x", -1.0f);
+		float y = cmd.args.value("y", -1.0f);
+		if(x < 0.0f || y < 0.0f){
+			cmd.reply->set_value(Err(cmd.id, "BAD_ARGS", "hover_at requires --x --y"));
+			return;
+		}
+		// Park a sticky pointer at (x,y); focus-follows-hover tracks it next render.
+		game.GetUiPipeline().InjectPointerMove(x, y);
+		cmd.reply->set_value(OkResult(cmd.id, nlohmann::json::object()));
+		return;
+	}
+	if(cmd.op == "select" ||
 	   cmd.op == "scroll"){
 		cmd.reply->set_value(Err(cmd.id, "UNSUPPORTED", kUiUnsupportedMsg));
 		return;

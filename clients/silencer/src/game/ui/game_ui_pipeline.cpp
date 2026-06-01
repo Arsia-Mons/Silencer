@@ -685,6 +685,12 @@ frame.input.pointer_pressed = true;
 frame.input.pointer_released = true;
 frame.input.pointer_down = false;
 frame.input.source = ::ui::UiFocusSource::Mouse;
+}else if(hasInjectedHover_){
+// Sticky headless hover: park the pointer at the injected point (no press) so
+// focus-follows-hover tracks it. Persists until the next InjectPointerMove.
+mx = injectedHoverX_;
+my = injectedHoverY_;
+frame.input.source = ::ui::UiFocusSource::Mouse;
 }else if(win){
 float wx = 0.0f;
 float wy = 0.0f;
@@ -752,6 +758,12 @@ void GameUiPipeline::InjectPointerClick(float x, float y) {
 injectedPointer_ = true;
 injectedPointerX_ = x;
 injectedPointerY_ = y;
+}
+
+void GameUiPipeline::InjectPointerMove(float x, float y) {
+hasInjectedHover_ = true;
+injectedHoverX_ = x;
+injectedHoverY_ = y;
 }
 
 client::ui::ClientUi * GameUiPipeline::TryClientUi() {
