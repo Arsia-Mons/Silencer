@@ -4,18 +4,6 @@
 #include "objecttypes.h"
 #include "player.h"
 #include "state.h"
-#include "character_create_screen.h"
-#include "lobby_connect_screen.h"
-#include "main_menu_screen.h"
-#include "mission_summary_screen.h"
-#include "options_audio_screen.h"
-#include "options_controls_screen.h"
-#include "options_display_screen.h"
-#include "options_screen.h"
-#include "update_screen.h"
-#ifdef SILENCER_HAVE_LOBBY_UI
-#include "lobby_screen.h"
-#endif
 #include <stdio.h>
 #include <cstring>
 #include <vector>
@@ -303,9 +291,9 @@ bool Game::Tick(void){
 			}
 		}
 		if(world.gameplaystate == World::INLOBBY){
+			// Dedicated server pumps map transfers each frame; the client-side
+			// ready-button refresh is the cppx lobby screen's concern (SIL-20).
 			gameSession.MapDownloaderRef().ProcessMapDownload();
-			// Ready-button text refresh ("Waiting..." vs "Ready") happens
-			// in GameJoinPanelTick — runs each frame from LobbyScreen::Tick.
 		}
 		/*Peer * localpeer = world.peers.peerlist[world.peers.localpeerid];
 		if(localpeer){
@@ -369,6 +357,12 @@ bool Game::Tick(void){
 		}
 	}
 	
+	// SIL-14: the per-state blocks below keep their world side-effects and menu
+	// ambience, but no longer mount screens — the golden cppx AppRoot maps the
+	// session phase (projected from `state`) onto the owning screen. `game.cpp`
+	// names no screen. `stateisnew` stays: it is the game's state-entry latch,
+	// consumed by the gameplay tick handlers (TickInGame/HostGame/...), not a
+	// UI concern.
 	switch(state){
 		case FADEOUT: TickFadeOut(); break;
 		case MAINMENU:{
@@ -379,14 +373,11 @@ bool Game::Tick(void){
 				gameSession.UnloadGame();
 				world.GetAuthorityPeer()->controlledlist.clear();
 				world.DestroyAllObjects();
-				PushScreen(std::make_unique<MainMenuScreen>());
 				stateisnew = false;
 			}else{
 				if(gameSession.AmbienceMixerRef().FadedIn()){
 					gameSession.AmbienceMixerRef().PlayMusic(world.resources.menumusic);
 				}
-				// Button-click handling lives in MainMenuScreen::Tick, dispatched
-				// by ClientUi's navigation stack at the top of Game::Tick.
 			}
 		}break;
 		case LOBBYCONNECT:{
@@ -395,7 +386,6 @@ bool Game::Tick(void){
 				world.DestroyAllObjects();
 				world.lobby.ClearGames();
 				world.lobby.state = Lobby::WAITING;
-				PushScreen(std::make_unique<LobbyConnectScreen>());
 				stateisnew = false;
 			}else{
 				if(gameSession.AmbienceMixerRef().FadedIn()){
@@ -411,24 +401,17 @@ bool Game::Tick(void){
 				world.Disconnect();
 				world.choosingtech = false;
 				world.lobby.channelchanged = true;
-#ifdef SILENCER_HAVE_LOBBY_UI
-				PushScreen(std::make_unique<LobbyScreen>());
-#endif
 				stateisnew = false;
 			}else{
 				if(gameSession.AmbienceMixerRef().FadedIn()){
 					gameSession.AmbienceMixerRef().PlayMusic(world.resources.menumusic);
 				}
-				// Lobby pump (state-machine + deferred-create) lives in
-				// LobbyScreen::Tick, dispatched by ClientUi's navigation stack
-				// at the top of Game::Tick.
 			}
 		}break;
 		case CREATECHARACTER:{
 			if(stateisnew){
 				world.GetAuthorityPeer()->controlledlist.clear();
 				world.DestroyAllObjects();
-				PushScreen(std::make_unique<CharacterCreateScreen>());
 				stateisnew = false;
 			}else{
 				if(gameSession.AmbienceMixerRef().FadedIn()){
@@ -440,7 +423,6 @@ bool Game::Tick(void){
 			if(stateisnew){
 				world.GetAuthorityPeer()->controlledlist.clear();
 				world.DestroyAllObjects();
-				PushScreen(std::make_unique<UpdateScreen>());
 				stateisnew = false;
 			}else{
 				if(gameSession.AmbienceMixerRef().FadedIn()){
@@ -453,7 +435,6 @@ bool Game::Tick(void){
 			if(stateisnew){
 				gameSession.UnloadGame();
 				world.Disconnect();
-				PushScreen(std::make_unique<MissionSummaryScreen>());
 				stateisnew = false;
 			}else{
 				if(gameSession.AmbienceMixerRef().FadedIn()){
@@ -465,28 +446,24 @@ bool Game::Tick(void){
 		case OPTIONS:{
 			if(stateisnew){
 				world.DestroyAllObjects();
-				PushScreen(std::make_unique<OptionsScreen>());
 				stateisnew = false;
 			}
 		}break;
 		case OPTIONSCONTROLS:{
 			if(stateisnew){
 				world.DestroyAllObjects();
-				PushScreen(std::make_unique<OptionsControlsScreen>());
 				stateisnew = false;
 			}
 		}break;
 		case OPTIONSDISPLAY:{
 			if(stateisnew){
 				world.DestroyAllObjects();
-				PushScreen(std::make_unique<OptionsDisplayScreen>());
 				stateisnew = false;
 			}
 		}break;
 		case OPTIONSAUDIO:{
 			if(stateisnew){
 				world.DestroyAllObjects();
-				PushScreen(std::make_unique<OptionsAudioScreen>());
 				stateisnew = false;
 			}
 		}break;
@@ -518,8 +495,9 @@ void Game::GoToState(Uint8 newstate){
 }
 
 bool Game::GoBack(void){
-	Screen * top = GetTopScreen();
-	if(top && top->HandleBack(screenContext)) return true;
+	// SIL-14: per-screen "back" is now Tier-1 navigation — the cppx pipeline
+	// pops the top Overlay on cancel (ClientUi::end_layout). game.cpp no longer
+	// reaches into screens; a hard back request falls through to the main menu.
 	GoToState(MAINMENU);
 	return false;
 }

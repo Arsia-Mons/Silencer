@@ -164,37 +164,11 @@ Renderer::BlitSurface(&game.world.map.minimap.surface, 0, &surface, &dstrect);
 }
 
 void GameUiPipeline::RenderClientUiFrame(Surface& surface, float frametime) {
-if(CppxUiEnabled()){
-// SIL-14: golden retained path replaces the Clay frame. The live state
-// machine still runs (game.cpp Tick drives world side-effects); only the
-// rendered UI switches. GameRenderer::Present uploads the RGBA we stash.
+(void)frametime;
+// SIL-14: the golden retained cppx path is the live UI. GameRenderer::Present
+// uploads the RGBA we stash here. The Clay frame path is gone; the Clay
+// runtime/objects themselves are retired in SIL-22.
 RenderCppxClientUiFrame(surface);
-return;
-}
-if(!clientUi.HasScreens() && !game.world.map.loaded){
-return;
-}
-
-PrepareClientUiFrame(surface);
-BeginPreparedClientUiFrame();
-BuildVisibleClientUi(surface, frametime);
-Clay_RenderCommandArray cmds = EndClientUiFrame();
-silencer::clay_bridge::Render(game, &surface, cmds);
-if(game.state != GameState::FADEOUT){
-std::vector<silencer::ui::UiAction> unhandledUiActions =
-clientUi.DispatchInput(game.screenContext, preparedUiInput);
-if(!clientUi.HasScreens() && game.world.map.loaded){
-inGameUiController.ApplyActions(
-game.world.peers.localpeerid, unhandledUiActions, clientUi.Interactions());
-}
-bool nowFocused = clientUi.Interactions().HasTextInputFocus();
-if(nowFocused && !textInputFocused){
-SDL_StartTextInput(game.gameRenderer.GetWindow());
-}else if(!nowFocused && textInputFocused){
-SDL_StopTextInput(game.gameRenderer.GetWindow());
-}
-textInputFocused = nowFocused;
-}
 }
 
 void GameUiPipeline::ResetUiFrameDeltas() {
@@ -219,18 +193,6 @@ if(cppxReactInitialized){
 react_shutdown();
 cppxReactInitialized = false;
 }
-}
-
-bool GameUiPipeline::CppxUiEnabled() {
-#ifdef SILENCER_CPPX_FONT_DIR
-if(cppxUiFlag < 0){
-const char * env = std::getenv("SILENCER_CPPX_UI");
-cppxUiFlag = (env && env[0] && env[0] != '0') ? 1 : 0;
-}
-return cppxUiFlag == 1;
-#else
-return false;
-#endif
 }
 
 client::ui::SessionPhase GameUiPipeline::CurrentSessionPhase() const {

@@ -52,15 +52,12 @@ silencer::ui::UiInteractionRegistry & UiInteractions() { return clientUi.Interac
 const silencer::ui::UiInteractionRegistry & UiInteractions() const { return clientUi.Interactions(); }
 silencer::client_ui::InGameUiController & InGameUi() { return inGameUiController; }
 
-// --- SIL-14: golden retained cppx render path (flag-gated cutover) -------
-// When SILENCER_CPPX_UI is set, RenderClientUiFrame drives the golden
-// client::ui::UiPipeline (AppRoot + the session-phase reconciler) through the
-// SIL-11 PipelineHost instead of the Clay path, producing a premultiplied
-// RGBA frame that GameRenderer::Present hands to RenderDevice::UploadUiFrame.
-// Additive: with the flag off the Clay path is untouched; with it on the live
-// state machine still runs (drives world side-effects), only the *rendered* UI
-// switches. The state-machine deletion + default flip is the next step.
-bool CppxUiEnabled();
+// --- SIL-14: golden retained cppx render path (the live UI) --------------
+// RenderClientUiFrame drives the golden client::ui::UiPipeline (AppRoot + the
+// session-phase reconciler) through the SIL-11 PipelineHost, producing a
+// premultiplied RGBA frame that GameRenderer::Present hands to
+// RenderDevice::UploadUiFrame. The Clay frame path is retired; the Clay runtime
+// objects themselves are removed in SIL-22.
 // The cppx RGBA produced this frame (w*h*4, premultiplied), or null when the
 // cppx path did not render this frame. Owned by the PipelineHost; valid until
 // the next RenderClientUiFrame.
@@ -86,7 +83,6 @@ std::unique_ptr<silencer::cppx_ui::PipelineHost> cppxHost;
 const uint8_t * cppxUiRgba = nullptr;
 int cppxUiW = 0;
 int cppxUiH = 0;
-int cppxUiFlag = -1; // -1 unchecked, 0 off, 1 on
 bool cppxReactInitialized = false;
 bool cppxAppRootPushed = false;
 };
