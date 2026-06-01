@@ -19,7 +19,6 @@ struct LobbyContextValue {
 	struct State {
 		const char * version = "";
 		const char * map_name = "";
-		GameJoinPanelState * game_join = nullptr;
 		GameTechPanelState * game_tech = nullptr;
 		bool game_create_active = false;
 		bool game_join_active = false;
@@ -27,9 +26,6 @@ struct LobbyContextValue {
 	};
 
 	struct Actions {
-		std::function<void()> choose_tech = {};
-		std::function<void()> change_team = {};
-		std::function<void()> ready_game = {};
 		std::function<void()> back_to_team = {};
 		std::function<void(int)> preview_tech = {};
 		std::function<void(int)> toggle_tech = {};
@@ -90,6 +86,15 @@ struct LobbyGameCreate {
 
 const LobbyGameCreate& UseLobbyGameCreate();
 
+struct LobbyGameJoin {
+	GameJoinPanelState * state = nullptr;
+	std::function<void()> choose_tech = {};
+	std::function<void()> change_team = {};
+	std::function<void()> ready = {};
+};
+
+const LobbyGameJoin& UseLobbyGameJoin();
+
 struct LobbyFrameProps {
 	const char * key = nullptr;
 };
@@ -104,6 +109,7 @@ struct LobbyScreenViewProps {
 	const LobbyCharacter * character = nullptr;
 	const LobbyGameSelect * game_select = nullptr;
 	const LobbyGameCreate * game_create = nullptr;
+	const LobbyGameJoin * game_join = nullptr;
 };
 
 ::ui::UiElement LobbyScreenView(const LobbyScreenViewProps& props);

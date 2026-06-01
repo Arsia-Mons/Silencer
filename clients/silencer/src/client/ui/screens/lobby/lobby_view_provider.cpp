@@ -13,12 +13,14 @@ namespace {
 ::ReactContext LobbyCharacterContext = {};
 ::ReactContext LobbyGameSelectContext = {};
 ::ReactContext LobbyGameCreateContext = {};
+::ReactContext LobbyGameJoinContext = {};
 const LobbyContextValue kEmptyLobby = {};
 const LobbyNavigation kEmptyNavigation = {};
 const LobbyChat kEmptyChat = {};
 const LobbyCharacter kEmptyCharacter = {};
 const LobbyGameSelect kEmptyGameSelect = {};
 const LobbyGameCreate kEmptyGameCreate = {};
+const LobbyGameJoin kEmptyGameJoin = {};
 }  // namespace
 
 const LobbyContextValue& UseLobby() {
@@ -57,6 +59,12 @@ const LobbyGameCreate& UseLobbyGameCreate() {
 	return value ? *value : kEmptyGameCreate;
 }
 
+const LobbyGameJoin& UseLobbyGameJoin() {
+	const auto * value = static_cast<const LobbyGameJoin *>(
+		::use_context(&LobbyGameJoinContext));
+	return value ? *value : kEmptyGameJoin;
+}
+
 ::ui::UiElement LobbyScreenView(const LobbyScreenViewProps& props) {
 	const LobbyContextValue * stored = ::ui::copy_value(
 		props.value ? *props.value : kEmptyLobby);
@@ -70,18 +78,26 @@ const LobbyGameCreate& UseLobbyGameCreate() {
 		props.game_select ? *props.game_select : kEmptyGameSelect);
 	const LobbyGameCreate * gameCreate = ::ui::copy_value(
 		props.game_create ? *props.game_create : kEmptyGameCreate);
-	if(!stored || !navigation || !chat || !character || !gameSelect || !gameCreate){
+	const LobbyGameJoin * gameJoin = ::ui::copy_value(
+		props.game_join ? *props.game_join : kEmptyGameJoin);
+	if(!stored || !navigation || !chat || !character || !gameSelect || !gameCreate || !gameJoin){
 		return ::ui::empty();
 	}
 	::ui::UiElement frame = ::ui::component(
 		"LobbyFrame",
 		LobbyFrameProps{ .key = "view" },
 		LobbyFrame);
+	::ui::UiElement gameJoinProvider = ::ui::provider(
+		"LobbyGameJoinProvider",
+		&LobbyGameJoinContext,
+		const_cast<LobbyGameJoin *>(gameJoin),
+		::ui::children({frame}),
+		"game-join");
 	::ui::UiElement gameCreateProvider = ::ui::provider(
 		"LobbyGameCreateProvider",
 		&LobbyGameCreateContext,
 		const_cast<LobbyGameCreate *>(gameCreate),
-		::ui::children({frame}),
+		::ui::children({gameJoinProvider}),
 		"game-create");
 	::ui::UiElement gameSelectProvider = ::ui::provider(
 		"LobbyGameSelectProvider",

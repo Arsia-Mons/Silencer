@@ -96,22 +96,12 @@ bool LobbyScreen::BuildElement(ScreenContext & ctx, ::ui::UiElement * out)
 		.state = {
 			.version = version.c_str(),
 			.map_name = mapName.c_str(),
-			.game_join = &gameJoinState,
 			.game_tech = &gameTechState,
 			.game_create_active = gameCreateActive,
 			.game_join_active = gameJoinActive,
 			.game_tech_active = gameTechActive,
 		},
 		.actions = {
-			.choose_tech = [this]() {
-				silencer::client_ui::lobby::GameJoinPanelRequestTech(gameJoinState);
-			},
-			.change_team = [this]() {
-				silencer::client_ui::lobby::GameJoinPanelRequestTeam(gameJoinState);
-			},
-			.ready_game = [this]() {
-				silencer::client_ui::lobby::GameJoinPanelRequestReady(gameJoinState);
-			},
 			.back_to_team = [this]() {
 				silencer::client_ui::lobby::GameTechPanelRequestBack(gameTechState);
 			},
@@ -199,6 +189,18 @@ bool LobbyScreen::BuildElement(ScreenContext & ctx, ::ui::UiElement * out)
 			silencer::client_ui::lobby::GameCreatePanelSetMaxTeams(gameCreateState, value);
 		},
 	};
+	silencer::client_ui::lobby::LobbyGameJoin gameJoin{
+		.state = &gameJoinState,
+		.choose_tech = [this]() {
+			silencer::client_ui::lobby::GameJoinPanelRequestTech(gameJoinState);
+		},
+		.change_team = [this]() {
+			silencer::client_ui::lobby::GameJoinPanelRequestTeam(gameJoinState);
+		},
+		.ready = [this]() {
+			silencer::client_ui::lobby::GameJoinPanelRequestReady(gameJoinState);
+		},
+	};
 	*out = silencer::client_ui::lobby::LobbyScreenView(
 		silencer::client_ui::lobby::LobbyScreenViewProps{
 			.key = "lobby",
@@ -208,6 +210,7 @@ bool LobbyScreen::BuildElement(ScreenContext & ctx, ::ui::UiElement * out)
 			.character = ::ui::copy_value(character),
 			.game_select = ::ui::copy_value(gameSelect),
 			.game_create = ::ui::copy_value(gameCreate),
+			.game_join = ::ui::copy_value(gameJoin),
 		});
 	return true;
 }

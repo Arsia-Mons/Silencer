@@ -803,8 +803,8 @@ struct GameJoinUpperProps {
 
 ::ui::UiElement GameJoinUpper(const GameJoinUpperProps& props) {
 	(void)props;
-	const LobbyContextValue& lobby = UseLobby();
-	GameJoinPanelState * state = lobby.state.game_join;
+	const LobbyGameJoin& gameJoin = UseLobbyGameJoin();
+	GameJoinPanelState * state = gameJoin.state;
 	if(!state) return ::ui::empty();
 	return <Box key="join-upper" layout={upper_panel_layout()} style={panel_style()}>
 		<SectionHeading key="heading" value="TEAM" />
@@ -812,21 +812,21 @@ struct GameJoinUpperProps {
 		  key="tech"
 		  id="lobby.game_join.choose_tech"
 		  label="Choose Tech"
-		  onActivate={action_callback(lobby.actions.choose_tech)}
+		  onActivate={action_callback(gameJoin.choose_tech)}
 		  layout={row_button_layout(27.0f)}
 		/>
 		<Button
 		  key="team"
 		  id="lobby.game_join.change_team"
 		  label="Change Team"
-		  onActivate={action_callback(lobby.actions.change_team)}
+		  onActivate={action_callback(gameJoin.change_team)}
 		  layout={row_button_layout(27.0f)}
 		/>
 		<Button
 		  key="ready"
 		  id="lobby.game_join.ready"
 		  label={state->readyLabel.c_str()}
-		  onActivate={action_callback(lobby.actions.ready_game)}
+		  onActivate={action_callback(gameJoin.ready)}
 		  layout={row_button_layout(27.0f)}
 		/>
 	</Box>
@@ -838,8 +838,8 @@ struct RosterRowProps {
 };
 
 ::ui::UiElement RosterRow(const RosterRowProps& props) {
-	const LobbyContextValue& lobby = UseLobby();
-	GameJoinPanelState * state = lobby.state.game_join;
+	const LobbyGameJoin& gameJoin = UseLobbyGameJoin();
+	GameJoinPanelState * state = gameJoin.state;
 	if(!state) return ::ui::empty();
 	if(props.slot < 0 || props.slot >= static_cast<int>(state->rosterRows.size())) return ::ui::empty();
 	const GameJoinRosterRow& row = state->rosterRows[static_cast<size_t>(props.slot)];
