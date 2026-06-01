@@ -3,11 +3,6 @@
 #include "client/ui/modals/message_modal_view.h"
 #include "screen_context.h"
 
-namespace message_modal_detail
-{
-constexpr const char * kActionOk = "message_modal.ok";
-} // namespace message_modal_detail
-
 MessageModal::MessageModal(std::string message_, std::function<void()> onClose_)
     : message(std::move(message_)), hasOk(true), onClose(std::move(onClose_))
 {
@@ -64,15 +59,11 @@ void MessageModal::Destroy(ScreenContext & ctx)
 	(void)ctx;
 }
 
-bool MessageModal::HandleUiIntent(ScreenContext & ctx, const silencer::ui::UiAction & action)
+bool MessageModal::HandleBack(ScreenContext & ctx)
 {
 	if(!hasOk) return false;
-	if(action.kind == silencer::ui::UiActionKind::Cancel ||
-	   (action.kind == silencer::ui::UiActionKind::Activate && action.id == message_modal_detail::kActionOk)){
-		Close(ctx);
-		return true;
-	}
-	return false;
+	Close(ctx);
+	return true;
 }
 
 void MessageModal::SetText(ScreenContext & ctx, const std::string & text)

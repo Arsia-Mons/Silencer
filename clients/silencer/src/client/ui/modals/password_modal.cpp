@@ -9,7 +9,6 @@
 namespace password_modal_detail
 {
 constexpr const char * kActionPassword = "password_modal.password";
-constexpr const char * kActionOk = "password_modal.ok";
 
 void CopyUiText(char * dst, int dstLen, const std::string & value)
 {
@@ -80,10 +79,6 @@ bool PasswordModal::HandleUiIntent(ScreenContext & ctx, const silencer::ui::UiAc
 	}
 	if(action.kind == silencer::ui::UiActionKind::SubmitText && action.id == password_modal_detail::kActionPassword){
 		password_modal_detail::CopyUiText(password, static_cast<int>(sizeof(password)), action.value);
-		Submit(ctx);
-		return true;
-	}
-	if(action.kind == silencer::ui::UiActionKind::Activate && action.id == password_modal_detail::kActionOk){
 		Submit(ctx);
 		return true;
 	}
