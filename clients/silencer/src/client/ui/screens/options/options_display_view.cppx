@@ -101,20 +101,20 @@ namespace {
 	});
 }
 
-std::function<void(bool)> toggle_fullscreen_callback(const OptionsDisplayContextValue& display) {
+std::function<void(bool)> toggle_fullscreen_callback(const OptionsDisplay& display) {
 	return [display](bool) {
 		if(display.toggle_fullscreen) display.toggle_fullscreen();
 	};
 }
 
-std::function<void(bool)> toggle_smooth_scaling_callback(const OptionsDisplayContextValue& display) {
+std::function<void(bool)> toggle_smooth_scaling_callback(const OptionsDisplay& display) {
 	return [display](bool) {
 		if(display.toggle_smooth_scaling) display.toggle_smooth_scaling();
 	};
 }
 
 std::function<void(const ::ui::ActivationEvent&)> save_callback(
-	const OptionsDisplayContextValue& display,
+	const OptionsDisplay& display,
 	GameNavigation navigation) {
 	return [display, navigation](const ::ui::ActivationEvent&) {
 		if(display.save) display.save();
@@ -123,7 +123,7 @@ std::function<void(const ::ui::ActivationEvent&)> save_callback(
 }
 
 std::function<void(const ::ui::ActivationEvent&)> cancel_callback(
-	const OptionsDisplayContextValue& display,
+	const OptionsDisplay& display,
 	GameNavigation navigation) {
 	return [display, navigation](const ::ui::ActivationEvent&) {
 		if(display.cancel) display.cancel();
@@ -136,7 +136,7 @@ struct FullscreenToggleProps {
 };
 
 ::ui::UiElement FullscreenToggle(const FullscreenToggleProps& props) {
-	const OptionsDisplayContextValue& display = UseOptionsDisplay();
+	const OptionsDisplay& display = UseOptionsDisplay();
 	return <Checkbox
 	  key={props.key}
 	  id="options_display.fullscreen"
@@ -153,7 +153,7 @@ struct SmoothScalingToggleProps {
 };
 
 ::ui::UiElement SmoothScalingToggle(const SmoothScalingToggleProps& props) {
-	const OptionsDisplayContextValue& display = UseOptionsDisplay();
+	const OptionsDisplay& display = UseOptionsDisplay();
 	return <Checkbox
 	  key={props.key}
 	  id="options_display.smooth_scaling"
@@ -169,7 +169,7 @@ struct DisplaySaveButtonProps {
 };
 
 ::ui::UiElement DisplaySaveButton(const DisplaySaveButtonProps& props) {
-	const OptionsDisplayContextValue& display = UseOptionsDisplay();
+	const OptionsDisplay& display = UseOptionsDisplay();
 	GameNavigation navigation = use_game_navigation();
 	return <Button
 	  key={props.key}
@@ -185,7 +185,7 @@ struct DisplayCancelButtonProps {
 };
 
 ::ui::UiElement DisplayCancelButton(const DisplayCancelButtonProps& props) {
-	const OptionsDisplayContextValue& display = UseOptionsDisplay();
+	const OptionsDisplay& display = UseOptionsDisplay();
 	GameNavigation navigation = use_game_navigation();
 	return <Button
 	  key={props.key}

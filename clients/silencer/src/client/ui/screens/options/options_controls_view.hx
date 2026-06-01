@@ -10,7 +10,7 @@ namespace silencer::client_ui {
 
 constexpr int kOptionsControlsMaxRows = 30;
 
-struct OptionsControlsContextValue {
+struct OptionsControls {
 	const options::KeybindListView * keybinds = nullptr;
 	int frame_pad_left = 0;
 	int frame_pad_right = 0;
@@ -25,7 +25,7 @@ struct OptionsControlsContextValue {
 	std::function<void()> cancel = {};
 };
 
-const OptionsControlsContextValue& UseOptionsControls();
+const OptionsControls& UseOptionsControls();
 
 struct OptionsControlsFrameProps {
 	const char * key = nullptr;
@@ -35,7 +35,7 @@ struct OptionsControlsFrameProps {
 
 struct OptionsControlsViewProps {
 	const char * key = nullptr;
-	const OptionsControlsContextValue * value = nullptr;
+	const OptionsControls * controls = nullptr;
 };
 
 ::ui::UiElement OptionsControlsView(const OptionsControlsViewProps& props);

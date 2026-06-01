@@ -57,7 +57,7 @@ bool OptionsDisplayScreen::BuildElement(ScreenContext & ctx, ::ui::UiElement * o
 	if(!out) return false;
 
 	Config & cfg = Config::GetInstance();
-	const silencer::client_ui::OptionsDisplayContextValue context{
+	const silencer::client_ui::OptionsDisplay display{
 		.fullscreen = cfg.fullscreen,
 		.smooth_scaling = cfg.scalefilter,
 		.toggle_fullscreen = [window = ctx.window]() {
@@ -73,13 +73,13 @@ bool OptionsDisplayScreen::BuildElement(ScreenContext & ctx, ::ui::UiElement * o
 			options_display_screen_detail::CancelDisplaySettings(window, renderdevice);
 		},
 	};
-	const auto * stored = ::ui::copy_value(context);
+	const auto * stored = ::ui::copy_value(display);
 	if(!stored) return false;
 	*out = ::ui::component(
 		"OptionsDisplayView",
 		silencer::client_ui::OptionsDisplayViewProps{
 			.key = "options-display",
-			.value = stored,
+			.display = stored,
 		},
 		silencer::client_ui::OptionsDisplayView);
 	return true;

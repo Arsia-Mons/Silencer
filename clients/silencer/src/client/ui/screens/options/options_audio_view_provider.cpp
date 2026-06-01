@@ -7,11 +7,11 @@ namespace client_ui {
 
 namespace {
 ::ReactContext OptionsAudioContext = {};
-const OptionsAudioContextValue kEmptyOptionsAudio = {};
+const OptionsAudio kEmptyOptionsAudio = {};
 }  // namespace
 
-const OptionsAudioContextValue& UseOptionsAudio() {
-	const auto * value = static_cast<const OptionsAudioContextValue *>(
+const OptionsAudio& UseOptionsAudio() {
+	const auto * value = static_cast<const OptionsAudio *>(
 		::use_context(&OptionsAudioContext));
 	if(value) return *value;
 	::react_report_error("client/ui/options: missing OptionsAudioProvider for UseOptionsAudio\n");
@@ -19,15 +19,15 @@ const OptionsAudioContextValue& UseOptionsAudio() {
 }
 
 ::ui::UiElement OptionsAudioView(const OptionsAudioViewProps& props) {
-	const OptionsAudioContextValue * stored = ::ui::copy_value(
-		props.value ? *props.value : kEmptyOptionsAudio);
+	const OptionsAudio * stored = ::ui::copy_value(
+		props.audio ? *props.audio : kEmptyOptionsAudio);
 	if(!stored){
 		return ::ui::empty();
 	}
 	return ::ui::provider(
 		"OptionsAudioProvider",
 		&OptionsAudioContext,
-		const_cast<OptionsAudioContextValue *>(stored),
+		const_cast<OptionsAudio *>(stored),
 		::ui::children({
 			::ui::component("OptionsAudioFrame",
 			                OptionsAudioFrameProps{ .key = "frame" },

@@ -94,14 +94,14 @@ namespace {
 	});
 }
 
-std::function<void(bool)> toggle_music_callback(const OptionsAudioContextValue& audio) {
+std::function<void(bool)> toggle_music_callback(const OptionsAudio& audio) {
 	return [audio](bool) {
 		if(audio.toggle_music) audio.toggle_music();
 	};
 }
 
 std::function<void(const ::ui::ActivationEvent&)> save_callback(
-	const OptionsAudioContextValue& audio,
+	const OptionsAudio& audio,
 	GameNavigation navigation) {
 	return [audio, navigation](const ::ui::ActivationEvent&) {
 		if(audio.save) audio.save();
@@ -110,7 +110,7 @@ std::function<void(const ::ui::ActivationEvent&)> save_callback(
 }
 
 std::function<void(const ::ui::ActivationEvent&)> cancel_callback(
-	const OptionsAudioContextValue& audio,
+	const OptionsAudio& audio,
 	GameNavigation navigation) {
 	return [audio, navigation](const ::ui::ActivationEvent&) {
 		if(audio.cancel) audio.cancel();
@@ -123,7 +123,7 @@ struct MusicToggleProps {
 };
 
 ::ui::UiElement MusicToggle(const MusicToggleProps& props) {
-	const OptionsAudioContextValue& audio = UseOptionsAudio();
+	const OptionsAudio& audio = UseOptionsAudio();
 	return <Checkbox
 	  key={props.key}
 	  id="options_audio.music"
@@ -140,7 +140,7 @@ struct AudioSaveButtonProps {
 };
 
 ::ui::UiElement AudioSaveButton(const AudioSaveButtonProps& props) {
-	const OptionsAudioContextValue& audio = UseOptionsAudio();
+	const OptionsAudio& audio = UseOptionsAudio();
 	GameNavigation navigation = use_game_navigation();
 	return <Button
 	  key={props.key}
@@ -156,7 +156,7 @@ struct AudioCancelButtonProps {
 };
 
 ::ui::UiElement AudioCancelButton(const AudioCancelButtonProps& props) {
-	const OptionsAudioContextValue& audio = UseOptionsAudio();
+	const OptionsAudio& audio = UseOptionsAudio();
 	GameNavigation navigation = use_game_navigation();
 	return <Button
 	  key={props.key}

@@ -7,11 +7,11 @@ namespace client_ui {
 
 namespace {
 ::ReactContext OptionsDisplayContext = {};
-const OptionsDisplayContextValue kEmptyOptionsDisplay = {};
+const OptionsDisplay kEmptyOptionsDisplay = {};
 }  // namespace
 
-const OptionsDisplayContextValue& UseOptionsDisplay() {
-	const auto * value = static_cast<const OptionsDisplayContextValue *>(
+const OptionsDisplay& UseOptionsDisplay() {
+	const auto * value = static_cast<const OptionsDisplay *>(
 		::use_context(&OptionsDisplayContext));
 	if(value) return *value;
 	::react_report_error("client/ui/options: missing OptionsDisplayProvider for UseOptionsDisplay\n");
@@ -19,15 +19,15 @@ const OptionsDisplayContextValue& UseOptionsDisplay() {
 }
 
 ::ui::UiElement OptionsDisplayView(const OptionsDisplayViewProps& props) {
-	const OptionsDisplayContextValue * stored = ::ui::copy_value(
-		props.value ? *props.value : kEmptyOptionsDisplay);
+	const OptionsDisplay * stored = ::ui::copy_value(
+		props.display ? *props.display : kEmptyOptionsDisplay);
 	if(!stored){
 		return ::ui::empty();
 	}
 	return ::ui::provider(
 		"OptionsDisplayProvider",
 		&OptionsDisplayContext,
-		const_cast<OptionsDisplayContextValue *>(stored),
+		const_cast<OptionsDisplay *>(stored),
 		::ui::children({
 			::ui::component("OptionsDisplayFrame",
 			                OptionsDisplayFrameProps{ .key = "frame" },

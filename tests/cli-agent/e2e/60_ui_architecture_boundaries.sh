@@ -178,6 +178,21 @@ fail_if_match \
   "$REPO_ROOT/clients/silencer/src/client/ui/screens/mission_summary/mission_summary_view_provider.cpp"
 
 fail_if_match \
+  "\\bOptions(Audio|Controls|Display)ContextValue\\b" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens/options/options_audio_view.cppx" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens/options/options_audio_view.hx" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens/options/options_audio_screen.cpp" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens/options/options_audio_view_provider.cpp" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens/options/options_controls_view.cppx" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens/options/options_controls_view.hx" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens/options/options_controls_screen.cpp" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens/options/options_controls_view_provider.cpp" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens/options/options_display_view.cppx" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens/options/options_display_view.hx" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens/options/options_display_screen.cpp" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens/options/options_display_view_provider.cpp"
+
+fail_if_match \
   "UiActionKind::Activate" \
   "$REPO_ROOT/clients/silencer/src/client/ui/screens" \
   "$REPO_ROOT/clients/silencer/src/client/ui/modals"

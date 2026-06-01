@@ -7,11 +7,11 @@ namespace client_ui {
 
 namespace {
 ::ReactContext OptionsControlsContext = {};
-const OptionsControlsContextValue kEmptyOptionsControls = {};
+const OptionsControls kEmptyOptionsControls = {};
 }  // namespace
 
-const OptionsControlsContextValue& UseOptionsControls() {
-	const auto * value = static_cast<const OptionsControlsContextValue *>(
+const OptionsControls& UseOptionsControls() {
+	const auto * value = static_cast<const OptionsControls *>(
 		::use_context(&OptionsControlsContext));
 	if(value) return *value;
 	::react_report_error("client/ui/options: missing OptionsControlsProvider for UseOptionsControls\n");
@@ -19,15 +19,15 @@ const OptionsControlsContextValue& UseOptionsControls() {
 }
 
 ::ui::UiElement OptionsControlsView(const OptionsControlsViewProps& props) {
-	const OptionsControlsContextValue * stored = ::ui::copy_value(
-		props.value ? *props.value : kEmptyOptionsControls);
+	const OptionsControls * stored = ::ui::copy_value(
+		props.controls ? *props.controls : kEmptyOptionsControls);
 	if(!stored){
 		return ::ui::empty();
 	}
 	return ::ui::provider(
 		"OptionsControlsProvider",
 		&OptionsControlsContext,
-		const_cast<OptionsControlsContextValue *>(stored),
+		const_cast<OptionsControls *>(stored),
 		::ui::children({
 			::ui::component("OptionsControlsFrame",
 			                OptionsControlsFrameProps{ .key = "view" },

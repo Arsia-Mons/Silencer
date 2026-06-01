@@ -7,14 +7,14 @@
 
 namespace silencer::client_ui {
 
-struct OptionsAudioContextValue {
+struct OptionsAudio {
 	bool music = false;
 	std::function<void()> toggle_music = {};
 	std::function<void()> save = {};
 	std::function<void()> cancel = {};
 };
 
-const OptionsAudioContextValue& UseOptionsAudio();
+const OptionsAudio& UseOptionsAudio();
 
 struct OptionsAudioFrameProps {
 	const char * key = nullptr;
@@ -24,7 +24,7 @@ struct OptionsAudioFrameProps {
 
 struct OptionsAudioViewProps {
 	const char * key = nullptr;
-	const OptionsAudioContextValue * value = nullptr;
+	const OptionsAudio * audio = nullptr;
 };
 
 ::ui::UiElement OptionsAudioView(const OptionsAudioViewProps& props);

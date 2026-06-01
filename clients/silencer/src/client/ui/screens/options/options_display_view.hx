@@ -7,7 +7,7 @@
 
 namespace silencer::client_ui {
 
-struct OptionsDisplayContextValue {
+struct OptionsDisplay {
 	bool fullscreen = false;
 	bool smooth_scaling = false;
 	std::function<void()> toggle_fullscreen = {};
@@ -16,7 +16,7 @@ struct OptionsDisplayContextValue {
 	std::function<void()> cancel = {};
 };
 
-const OptionsDisplayContextValue& UseOptionsDisplay();
+const OptionsDisplay& UseOptionsDisplay();
 
 struct OptionsDisplayFrameProps {
 	const char * key = nullptr;
@@ -26,7 +26,7 @@ struct OptionsDisplayFrameProps {
 
 struct OptionsDisplayViewProps {
 	const char * key = nullptr;
-	const OptionsDisplayContextValue * value = nullptr;
+	const OptionsDisplay * display = nullptr;
 };
 
 ::ui::UiElement OptionsDisplayView(const OptionsDisplayViewProps& props);

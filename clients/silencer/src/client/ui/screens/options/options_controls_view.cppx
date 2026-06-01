@@ -105,7 +105,7 @@ std::function<void(const ::ui::ActivationEvent&)> navigation_action_callback(
 	};
 }
 
-::ui::LayoutStyle root_layout(const OptionsControlsContextValue& controls) {
+::ui::LayoutStyle root_layout(const OptionsControls& controls) {
 	return ::ui::LayoutStyle{
 		.direction = ::ui::FlexDirection::Column,
 		.align_items = ::ui::AlignItems::Center,
@@ -125,7 +125,7 @@ std::function<void(const ::ui::ActivationEvent&)> navigation_action_callback(
 	return ::ui::patch().background(::ui::Color{14, 18, 25, 255});
 }
 
-::ui::LayoutStyle panel_layout(const OptionsControlsContextValue& controls) {
+::ui::LayoutStyle panel_layout(const OptionsControls& controls) {
 	return ::ui::LayoutStyle{
 		.direction = ::ui::FlexDirection::Column,
 		.align_items = ::ui::AlignItems::Center,
@@ -301,7 +301,7 @@ struct KeybindRowProps {
 };
 
 ::ui::UiElement KeybindRow(const KeybindRowProps& props) {
-	const OptionsControlsContextValue& controls = UseOptionsControls();
+	const OptionsControls& controls = UseOptionsControls();
 	const options::KeybindRowView * row = row_at(controls.keybinds, props.index);
 	if(!row) return ::ui::empty();
 	const float scale = h_scale(controls.keybinds);
@@ -341,7 +341,7 @@ struct PresetButtonProps {
 };
 
 ::ui::UiElement PresetButton(const PresetButtonProps& props) {
-	const OptionsControlsContextValue& controls = UseOptionsControls();
+	const OptionsControls& controls = UseOptionsControls();
 	return <Button
 	  key={props.key}
 	  id="options_controls.preset"
@@ -358,7 +358,7 @@ struct ControlsSaveButtonProps {
 };
 
 ::ui::UiElement ControlsSaveButton(const ControlsSaveButtonProps& props) {
-	const OptionsControlsContextValue& controls = UseOptionsControls();
+	const OptionsControls& controls = UseOptionsControls();
 	GameNavigation navigation = use_game_navigation();
 	return <Button
 	  key={props.key}
@@ -374,7 +374,7 @@ struct ControlsCancelButtonProps {
 };
 
 ::ui::UiElement ControlsCancelButton(const ControlsCancelButtonProps& props) {
-	const OptionsControlsContextValue& controls = UseOptionsControls();
+	const OptionsControls& controls = UseOptionsControls();
 	GameNavigation navigation = use_game_navigation();
 	return <Button
 	  key={props.key}
@@ -388,7 +388,7 @@ struct ControlsCancelButtonProps {
 }  // namespace
 
 ::ui::UiElement OptionsControlsFrame(const OptionsControlsFrameProps& props) {
-	const OptionsControlsContextValue& controls = UseOptionsControls();
+	const OptionsControls& controls = UseOptionsControls();
 	return <Box key={props.key} layout={root_layout(controls)} style={root_style()}>
 		<Box key="panel" layout={panel_layout(controls)} style={panel_style()}>
 			<Text

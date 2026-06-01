@@ -57,7 +57,7 @@ bool OptionsAudioScreen::BuildElement(ScreenContext & ctx, ::ui::UiElement * out
 	if(!out) return false;
 
 	Config & cfg = Config::GetInstance();
-	const silencer::client_ui::OptionsAudioContextValue context{
+	const silencer::client_ui::OptionsAudio audio{
 		.music = cfg.music,
 		.toggle_music = []() {
 			options_audio_screen_detail::ToggleMusicSetting();
@@ -69,13 +69,13 @@ bool OptionsAudioScreen::BuildElement(ScreenContext & ctx, ::ui::UiElement * out
 			options_audio_screen_detail::CancelAudioSettings();
 		},
 	};
-	const auto * stored = ::ui::copy_value(context);
+	const auto * stored = ::ui::copy_value(audio);
 	if(!stored) return false;
 	*out = ::ui::component(
 		"OptionsAudioView",
 		silencer::client_ui::OptionsAudioViewProps{
 			.key = "options-audio",
-			.value = stored,
+			.audio = stored,
 		},
 		silencer::client_ui::OptionsAudioView);
 	return true;

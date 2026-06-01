@@ -230,7 +230,7 @@ bool OptionsControlsScreen::BuildElement(ScreenContext & ctx, ::ui::UiElement * 
 		keybindListView_.visibleRowCount = i + 1;
 	}
 
-	const silencer::client_ui::OptionsControlsContextValue context{
+	const silencer::client_ui::OptionsControls controls{
 		.keybinds = &keybindListView_,
 		.frame_pad_left = framePadLeft,
 		.frame_pad_right = framePadRight,
@@ -254,12 +254,12 @@ bool OptionsControlsScreen::BuildElement(ScreenContext & ctx, ::ui::UiElement * 
 			CancelControls(*screenContext);
 		},
 	};
-	const auto * stored = ::ui::copy_value(context);
+	const auto * stored = ::ui::copy_value(controls);
 	if(!stored) return false;
 	*out = silencer::client_ui::OptionsControlsView(
 		silencer::client_ui::OptionsControlsViewProps{
 			.key = "options-controls",
-			.value = stored,
+			.controls = stored,
 		});
 	return true;
 }
