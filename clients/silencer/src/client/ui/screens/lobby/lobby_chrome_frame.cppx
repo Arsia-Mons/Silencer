@@ -2,6 +2,7 @@
 
 #include "client/ui/hooks/use_app.h"
 #include "client/ui/screens/lobby/character_panel.h"
+#include "client/ui/screens/lobby/chat_panel.h"
 #include "client/ui/screens/lobby/game_join_panel.h"
 #include "client/ui/screens/lobby/game_select_panel.h"
 #include "client/ui/screens/lobby/game_tech_panel.h"
@@ -9,10 +10,12 @@
 #include "ui/components/button.h"
 #include "ui/components/common.h"
 #include "ui/components/text.h"
+#include "ui/components/text_input.h"
 #include "ui/style/style_patch.h"
 
 #include <algorithm>
 #include <cstdint>
+#include <cstring>
 #include <string>
 
 namespace silencer {
@@ -29,6 +32,8 @@ using ::ui::components::Button;
 using ::ui::components::ButtonProps;
 using ::ui::components::Text;
 using ::ui::components::TextProps;
+using ::ui::components::TextInput;
+using ::ui::components::TextInputProps;
 
 constexpr int kGameSelectHeadingPadLeft = 7;
 constexpr int kGameSelectHeadingPadTop = 6;
@@ -99,6 +104,11 @@ constexpr int kCharacterHeadingAdvance = 8;
 constexpr int kCharacterHeadingLineH = 13;
 constexpr std::uint8_t kCharacterAgencySpriteBank = 181;
 constexpr std::uint8_t kCharacterHeadingPalette = 200;
+constexpr int kChatLineSlots = 32;
+constexpr int kPresenceLineSlots = 32;
+constexpr int kChatLineH = 11;
+constexpr const char * kChatInputAction = "lobby.chat.input";
+constexpr int kChatInputUid = 1;
 
 const char * kGameSelectRowKeys[kGameSelectRowSlots] = {
 	"game-select-row-0",  "game-select-row-1",  "game-select-row-2",
@@ -156,6 +166,31 @@ const char * kGameTechDescLineKeys[kGameTechDescLineSlots] = {
 	"game-tech-desc-5",
 	"game-tech-desc-6",
 	"game-tech-desc-7",
+};
+
+const char * kChatLineKeys[kChatLineSlots] = {
+	"chat-line-0",  "chat-line-1",  "chat-line-2",  "chat-line-3",
+	"chat-line-4",  "chat-line-5",  "chat-line-6",  "chat-line-7",
+	"chat-line-8",  "chat-line-9",  "chat-line-10", "chat-line-11",
+	"chat-line-12", "chat-line-13", "chat-line-14", "chat-line-15",
+	"chat-line-16", "chat-line-17", "chat-line-18", "chat-line-19",
+	"chat-line-20", "chat-line-21", "chat-line-22", "chat-line-23",
+	"chat-line-24", "chat-line-25", "chat-line-26", "chat-line-27",
+	"chat-line-28", "chat-line-29", "chat-line-30", "chat-line-31",
+};
+
+const char * kPresenceLineKeys[kPresenceLineSlots] = {
+	"presence-line-0",  "presence-line-1",  "presence-line-2",
+	"presence-line-3",  "presence-line-4",  "presence-line-5",
+	"presence-line-6",  "presence-line-7",  "presence-line-8",
+	"presence-line-9",  "presence-line-10", "presence-line-11",
+	"presence-line-12", "presence-line-13", "presence-line-14",
+	"presence-line-15", "presence-line-16", "presence-line-17",
+	"presence-line-18", "presence-line-19", "presence-line-20",
+	"presence-line-21", "presence-line-22", "presence-line-23",
+	"presence-line-24", "presence-line-25", "presence-line-26",
+	"presence-line-27", "presence-line-28", "presence-line-29",
+	"presence-line-30", "presence-line-31",
 };
 
 inline std::uint32_t texture_id(std::uint8_t bank, std::uint16_t index) {
@@ -471,6 +506,48 @@ inline ::ui::LayoutStyle flex_column_layout(float width,
 		.height = height > 0.0f ? ::ui::Length::points(height) : ::ui::Length::auto_size(),
 		.gap = gap,
 	};
+}
+
+inline int max_scroll_for_line_count(int line_count,
+                                     int line_height,
+                                     int height) {
+	if(line_height <= 0) return 0;
+	const int visible = height / line_height;
+	const int max_scroll = line_count - visible;
+	return max_scroll > 0 ? max_scroll : 0;
+}
+
+inline int visible_chat_start(int line_count,
+                              int visible_slots,
+                              int scroll_position,
+                              int height) {
+	if(line_count <= 0 || visible_slots <= 0) return 0;
+	const int max_scroll =
+		max_scroll_for_line_count(line_count, kChatLineH, height);
+	const int clamped_scroll = clamp_int(scroll_position, 0, max_scroll);
+	const int start = line_count - visible_slots - (max_scroll - clamped_scroll);
+	return clamp_int(start, 0, std::max(0, line_count - visible_slots));
+}
+
+inline std::uint8_t line_alpha(std::uint8_t brightness) {
+	if(brightness >= 128) return 255;
+	return static_cast<std::uint8_t>(
+		clamp_int(static_cast<int>(brightness) * 2, 96, 255));
+}
+
+inline ::ui::StylePatch chat_input_patch() {
+	return ::ui::patch()
+		.border(::ui::Border{
+			{1.0f, 1.0f, 1.0f, 1.0f},
+			{{216, 0, 0, 255}, {216, 0, 0, 255},
+			 {216, 0, 0, 255}, {216, 0, 0, 255}},
+		})
+		.text(::ui::TextVisual{
+			.color = {0, 0, 0, 255},
+			.font_id = 133,
+			.font_size = 6,
+			.line_height = 11.0f,
+		});
 }
 
 inline const char * game_select_info_value(const GameSelectPanelState& state,
@@ -826,6 +903,660 @@ struct CharacterPanelViewProps {
 						/>
 					</Box>
 				</Box>
+			</Box>
+		</Box>
+	</Box>
+}
+
+struct ChatLineViewProps {
+	const char * key = nullptr;
+	const std::vector<ChatLine> * lines = nullptr;
+	int source = 0;
+	int slot = 0;
+	int width = 0;
+};
+
+::ui::UiElement ChatLineView(const ChatLineViewProps& props) {
+	if(!props.lines || props.source < 0 ||
+	   props.source >= static_cast<int>(props.lines->size())){
+		return ::ui::empty();
+	}
+	const ChatLine& line = (*props.lines)[static_cast<size_t>(props.source)];
+	const int indent = static_cast<int>(line.indent);
+	return <Text
+	  key={props.key}
+	  value={line.text.c_str()}
+	  layout={absolute_layout(indent, props.slot * kChatLineH, std::max(0, props.width - indent), kChatLineH)}
+	  style={palette_text_patch(line.color, 133, 6, 11.0f, ::ui::TextAlign::Left, line_alpha(line.brightness))}
+	/>
+}
+
+struct ChatLineSlotsProps {
+	const char * key = nullptr;
+	const ChatPanelState * state = nullptr;
+	int width = 0;
+	int height = 0;
+};
+
+::ui::UiElement ChatLineSlots(const ChatLineSlotsProps& props) {
+	const int line_count =
+		props.state ? static_cast<int>(props.state->chatLines.size()) : 0;
+	const int visible_slots =
+		std::min(kChatLineSlots, std::max(0, props.height / kChatLineH));
+	const int start = props.state
+		? visible_chat_start(
+			line_count,
+			visible_slots,
+			props.state->chatScrollPos,
+			props.height)
+		: 0;
+	return <Box key={props.key} layout={absolute_layout(0, 0, props.width, props.height)}>
+		<ChatLineView
+		  key={kChatLineKeys[0]}
+		  lines={props.state ? &props.state->chatLines : nullptr}
+		  source={start + 0}
+		  slot={0}
+		  width={props.width}
+		/>
+		<ChatLineView
+		  key={kChatLineKeys[1]}
+		  lines={props.state ? &props.state->chatLines : nullptr}
+		  source={start + 1}
+		  slot={1}
+		  width={props.width}
+		/>
+		<ChatLineView
+		  key={kChatLineKeys[2]}
+		  lines={props.state ? &props.state->chatLines : nullptr}
+		  source={start + 2}
+		  slot={2}
+		  width={props.width}
+		/>
+		<ChatLineView
+		  key={kChatLineKeys[3]}
+		  lines={props.state ? &props.state->chatLines : nullptr}
+		  source={start + 3}
+		  slot={3}
+		  width={props.width}
+		/>
+		<ChatLineView
+		  key={kChatLineKeys[4]}
+		  lines={props.state ? &props.state->chatLines : nullptr}
+		  source={start + 4}
+		  slot={4}
+		  width={props.width}
+		/>
+		<ChatLineView
+		  key={kChatLineKeys[5]}
+		  lines={props.state ? &props.state->chatLines : nullptr}
+		  source={start + 5}
+		  slot={5}
+		  width={props.width}
+		/>
+		<ChatLineView
+		  key={kChatLineKeys[6]}
+		  lines={props.state ? &props.state->chatLines : nullptr}
+		  source={start + 6}
+		  slot={6}
+		  width={props.width}
+		/>
+		<ChatLineView
+		  key={kChatLineKeys[7]}
+		  lines={props.state ? &props.state->chatLines : nullptr}
+		  source={start + 7}
+		  slot={7}
+		  width={props.width}
+		/>
+		<ChatLineView
+		  key={kChatLineKeys[8]}
+		  lines={props.state ? &props.state->chatLines : nullptr}
+		  source={start + 8}
+		  slot={8}
+		  width={props.width}
+		/>
+		<ChatLineView
+		  key={kChatLineKeys[9]}
+		  lines={props.state ? &props.state->chatLines : nullptr}
+		  source={start + 9}
+		  slot={9}
+		  width={props.width}
+		/>
+		<ChatLineView
+		  key={kChatLineKeys[10]}
+		  lines={props.state ? &props.state->chatLines : nullptr}
+		  source={start + 10}
+		  slot={10}
+		  width={props.width}
+		/>
+		<ChatLineView
+		  key={kChatLineKeys[11]}
+		  lines={props.state ? &props.state->chatLines : nullptr}
+		  source={start + 11}
+		  slot={11}
+		  width={props.width}
+		/>
+		<ChatLineView
+		  key={kChatLineKeys[12]}
+		  lines={props.state ? &props.state->chatLines : nullptr}
+		  source={start + 12}
+		  slot={12}
+		  width={props.width}
+		/>
+		<ChatLineView
+		  key={kChatLineKeys[13]}
+		  lines={props.state ? &props.state->chatLines : nullptr}
+		  source={start + 13}
+		  slot={13}
+		  width={props.width}
+		/>
+		<ChatLineView
+		  key={kChatLineKeys[14]}
+		  lines={props.state ? &props.state->chatLines : nullptr}
+		  source={start + 14}
+		  slot={14}
+		  width={props.width}
+		/>
+		<ChatLineView
+		  key={kChatLineKeys[15]}
+		  lines={props.state ? &props.state->chatLines : nullptr}
+		  source={start + 15}
+		  slot={15}
+		  width={props.width}
+		/>
+		<ChatLineView
+		  key={kChatLineKeys[16]}
+		  lines={props.state ? &props.state->chatLines : nullptr}
+		  source={start + 16}
+		  slot={16}
+		  width={props.width}
+		/>
+		<ChatLineView
+		  key={kChatLineKeys[17]}
+		  lines={props.state ? &props.state->chatLines : nullptr}
+		  source={start + 17}
+		  slot={17}
+		  width={props.width}
+		/>
+		<ChatLineView
+		  key={kChatLineKeys[18]}
+		  lines={props.state ? &props.state->chatLines : nullptr}
+		  source={start + 18}
+		  slot={18}
+		  width={props.width}
+		/>
+		<ChatLineView
+		  key={kChatLineKeys[19]}
+		  lines={props.state ? &props.state->chatLines : nullptr}
+		  source={start + 19}
+		  slot={19}
+		  width={props.width}
+		/>
+		<ChatLineView
+		  key={kChatLineKeys[20]}
+		  lines={props.state ? &props.state->chatLines : nullptr}
+		  source={start + 20}
+		  slot={20}
+		  width={props.width}
+		/>
+		<ChatLineView
+		  key={kChatLineKeys[21]}
+		  lines={props.state ? &props.state->chatLines : nullptr}
+		  source={start + 21}
+		  slot={21}
+		  width={props.width}
+		/>
+		<ChatLineView
+		  key={kChatLineKeys[22]}
+		  lines={props.state ? &props.state->chatLines : nullptr}
+		  source={start + 22}
+		  slot={22}
+		  width={props.width}
+		/>
+		<ChatLineView
+		  key={kChatLineKeys[23]}
+		  lines={props.state ? &props.state->chatLines : nullptr}
+		  source={start + 23}
+		  slot={23}
+		  width={props.width}
+		/>
+		<ChatLineView
+		  key={kChatLineKeys[24]}
+		  lines={props.state ? &props.state->chatLines : nullptr}
+		  source={start + 24}
+		  slot={24}
+		  width={props.width}
+		/>
+		<ChatLineView
+		  key={kChatLineKeys[25]}
+		  lines={props.state ? &props.state->chatLines : nullptr}
+		  source={start + 25}
+		  slot={25}
+		  width={props.width}
+		/>
+		<ChatLineView
+		  key={kChatLineKeys[26]}
+		  lines={props.state ? &props.state->chatLines : nullptr}
+		  source={start + 26}
+		  slot={26}
+		  width={props.width}
+		/>
+		<ChatLineView
+		  key={kChatLineKeys[27]}
+		  lines={props.state ? &props.state->chatLines : nullptr}
+		  source={start + 27}
+		  slot={27}
+		  width={props.width}
+		/>
+		<ChatLineView
+		  key={kChatLineKeys[28]}
+		  lines={props.state ? &props.state->chatLines : nullptr}
+		  source={start + 28}
+		  slot={28}
+		  width={props.width}
+		/>
+		<ChatLineView
+		  key={kChatLineKeys[29]}
+		  lines={props.state ? &props.state->chatLines : nullptr}
+		  source={start + 29}
+		  slot={29}
+		  width={props.width}
+		/>
+		<ChatLineView
+		  key={kChatLineKeys[30]}
+		  lines={props.state ? &props.state->chatLines : nullptr}
+		  source={start + 30}
+		  slot={30}
+		  width={props.width}
+		/>
+		<ChatLineView
+		  key={kChatLineKeys[31]}
+		  lines={props.state ? &props.state->chatLines : nullptr}
+		  source={start + 31}
+		  slot={31}
+		  width={props.width}
+		/>
+	</Box>
+}
+
+struct PresenceLineSlotsProps {
+	const char * key = nullptr;
+	const ChatPanelState * state = nullptr;
+	int width = 0;
+	int height = 0;
+};
+
+::ui::UiElement PresenceLineSlots(const PresenceLineSlotsProps& props) {
+	const int start = props.state ? static_cast<int>(props.state->presenceScrollPos) : 0;
+	return <Box key={props.key} layout={absolute_layout(0, 0, props.width, props.height)}>
+		<ChatLineView
+		  key={kPresenceLineKeys[0]}
+		  lines={props.state ? &props.state->presenceLines : nullptr}
+		  source={start + 0}
+		  slot={0}
+		  width={props.width}
+		/>
+		<ChatLineView
+		  key={kPresenceLineKeys[1]}
+		  lines={props.state ? &props.state->presenceLines : nullptr}
+		  source={start + 1}
+		  slot={1}
+		  width={props.width}
+		/>
+		<ChatLineView
+		  key={kPresenceLineKeys[2]}
+		  lines={props.state ? &props.state->presenceLines : nullptr}
+		  source={start + 2}
+		  slot={2}
+		  width={props.width}
+		/>
+		<ChatLineView
+		  key={kPresenceLineKeys[3]}
+		  lines={props.state ? &props.state->presenceLines : nullptr}
+		  source={start + 3}
+		  slot={3}
+		  width={props.width}
+		/>
+		<ChatLineView
+		  key={kPresenceLineKeys[4]}
+		  lines={props.state ? &props.state->presenceLines : nullptr}
+		  source={start + 4}
+		  slot={4}
+		  width={props.width}
+		/>
+		<ChatLineView
+		  key={kPresenceLineKeys[5]}
+		  lines={props.state ? &props.state->presenceLines : nullptr}
+		  source={start + 5}
+		  slot={5}
+		  width={props.width}
+		/>
+		<ChatLineView
+		  key={kPresenceLineKeys[6]}
+		  lines={props.state ? &props.state->presenceLines : nullptr}
+		  source={start + 6}
+		  slot={6}
+		  width={props.width}
+		/>
+		<ChatLineView
+		  key={kPresenceLineKeys[7]}
+		  lines={props.state ? &props.state->presenceLines : nullptr}
+		  source={start + 7}
+		  slot={7}
+		  width={props.width}
+		/>
+		<ChatLineView
+		  key={kPresenceLineKeys[8]}
+		  lines={props.state ? &props.state->presenceLines : nullptr}
+		  source={start + 8}
+		  slot={8}
+		  width={props.width}
+		/>
+		<ChatLineView
+		  key={kPresenceLineKeys[9]}
+		  lines={props.state ? &props.state->presenceLines : nullptr}
+		  source={start + 9}
+		  slot={9}
+		  width={props.width}
+		/>
+		<ChatLineView
+		  key={kPresenceLineKeys[10]}
+		  lines={props.state ? &props.state->presenceLines : nullptr}
+		  source={start + 10}
+		  slot={10}
+		  width={props.width}
+		/>
+		<ChatLineView
+		  key={kPresenceLineKeys[11]}
+		  lines={props.state ? &props.state->presenceLines : nullptr}
+		  source={start + 11}
+		  slot={11}
+		  width={props.width}
+		/>
+		<ChatLineView
+		  key={kPresenceLineKeys[12]}
+		  lines={props.state ? &props.state->presenceLines : nullptr}
+		  source={start + 12}
+		  slot={12}
+		  width={props.width}
+		/>
+		<ChatLineView
+		  key={kPresenceLineKeys[13]}
+		  lines={props.state ? &props.state->presenceLines : nullptr}
+		  source={start + 13}
+		  slot={13}
+		  width={props.width}
+		/>
+		<ChatLineView
+		  key={kPresenceLineKeys[14]}
+		  lines={props.state ? &props.state->presenceLines : nullptr}
+		  source={start + 14}
+		  slot={14}
+		  width={props.width}
+		/>
+		<ChatLineView
+		  key={kPresenceLineKeys[15]}
+		  lines={props.state ? &props.state->presenceLines : nullptr}
+		  source={start + 15}
+		  slot={15}
+		  width={props.width}
+		/>
+		<ChatLineView
+		  key={kPresenceLineKeys[16]}
+		  lines={props.state ? &props.state->presenceLines : nullptr}
+		  source={start + 16}
+		  slot={16}
+		  width={props.width}
+		/>
+		<ChatLineView
+		  key={kPresenceLineKeys[17]}
+		  lines={props.state ? &props.state->presenceLines : nullptr}
+		  source={start + 17}
+		  slot={17}
+		  width={props.width}
+		/>
+		<ChatLineView
+		  key={kPresenceLineKeys[18]}
+		  lines={props.state ? &props.state->presenceLines : nullptr}
+		  source={start + 18}
+		  slot={18}
+		  width={props.width}
+		/>
+		<ChatLineView
+		  key={kPresenceLineKeys[19]}
+		  lines={props.state ? &props.state->presenceLines : nullptr}
+		  source={start + 19}
+		  slot={19}
+		  width={props.width}
+		/>
+		<ChatLineView
+		  key={kPresenceLineKeys[20]}
+		  lines={props.state ? &props.state->presenceLines : nullptr}
+		  source={start + 20}
+		  slot={20}
+		  width={props.width}
+		/>
+		<ChatLineView
+		  key={kPresenceLineKeys[21]}
+		  lines={props.state ? &props.state->presenceLines : nullptr}
+		  source={start + 21}
+		  slot={21}
+		  width={props.width}
+		/>
+		<ChatLineView
+		  key={kPresenceLineKeys[22]}
+		  lines={props.state ? &props.state->presenceLines : nullptr}
+		  source={start + 22}
+		  slot={22}
+		  width={props.width}
+		/>
+		<ChatLineView
+		  key={kPresenceLineKeys[23]}
+		  lines={props.state ? &props.state->presenceLines : nullptr}
+		  source={start + 23}
+		  slot={23}
+		  width={props.width}
+		/>
+		<ChatLineView
+		  key={kPresenceLineKeys[24]}
+		  lines={props.state ? &props.state->presenceLines : nullptr}
+		  source={start + 24}
+		  slot={24}
+		  width={props.width}
+		/>
+		<ChatLineView
+		  key={kPresenceLineKeys[25]}
+		  lines={props.state ? &props.state->presenceLines : nullptr}
+		  source={start + 25}
+		  slot={25}
+		  width={props.width}
+		/>
+		<ChatLineView
+		  key={kPresenceLineKeys[26]}
+		  lines={props.state ? &props.state->presenceLines : nullptr}
+		  source={start + 26}
+		  slot={26}
+		  width={props.width}
+		/>
+		<ChatLineView
+		  key={kPresenceLineKeys[27]}
+		  lines={props.state ? &props.state->presenceLines : nullptr}
+		  source={start + 27}
+		  slot={27}
+		  width={props.width}
+		/>
+		<ChatLineView
+		  key={kPresenceLineKeys[28]}
+		  lines={props.state ? &props.state->presenceLines : nullptr}
+		  source={start + 28}
+		  slot={28}
+		  width={props.width}
+		/>
+		<ChatLineView
+		  key={kPresenceLineKeys[29]}
+		  lines={props.state ? &props.state->presenceLines : nullptr}
+		  source={start + 29}
+		  slot={29}
+		  width={props.width}
+		/>
+		<ChatLineView
+		  key={kPresenceLineKeys[30]}
+		  lines={props.state ? &props.state->presenceLines : nullptr}
+		  source={start + 30}
+		  slot={30}
+		  width={props.width}
+		/>
+		<ChatLineView
+		  key={kPresenceLineKeys[31]}
+		  lines={props.state ? &props.state->presenceLines : nullptr}
+		  source={start + 31}
+		  slot={31}
+		  width={props.width}
+		/>
+	</Box>
+}
+
+struct ChatPanelViewProps {
+	const char * key = nullptr;
+	bool show = false;
+	const ChatPanelState * state = nullptr;
+	int x = 0;
+	int y = 0;
+	int width = 0;
+	int height = 0;
+};
+
+::ui::UiElement ChatPanelView(const ChatPanelViewProps& props) {
+	if(!props.show || !props.state || props.width <= 0 || props.height <= 0){
+		return ::ui::empty();
+	}
+	const ChatPanelLayoutMetrics metrics = ResolveChatPanelLayout(
+		static_cast<Uint16>(props.width),
+		static_cast<Uint16>(props.height));
+	const int caret = static_cast<int>(std::strlen(props.state->inputBuffer));
+	return <Box
+	  key={props.key}
+	  id="ChatPanelContent"
+	  layout={character_root_layout(props.x, props.y, props.width, props.height)}
+	>
+		<Box
+		  key="content"
+		  layout={::ui::LayoutStyle{
+				.direction = ::ui::FlexDirection::Column,
+				.width = ::ui::Length::percent(100.0f),
+				.height = ::ui::Length::percent(100.0f),
+				.padding = {
+					static_cast<float>(metrics.rootPadX),
+					static_cast<float>(metrics.rootPadX),
+					static_cast<float>(metrics.rootPadTop),
+					static_cast<float>(metrics.rootPadBottom),
+				},
+				.overflow = ::ui::Overflow::Hidden,
+			}}
+		>
+			<Text
+			  key="channel"
+			  id="ChatChannelRow"
+			  value={props.state->channel.c_str()}
+			  layout={::ui::LayoutStyle{
+					.width = ::ui::Length::percent(100.0f),
+					.height = ::ui::Length::points(static_cast<float>(metrics.channelHeight)),
+				}}
+			  style={text_patch(134, 8, 13.0f)}
+			/>
+			<Box
+			  key="main-border"
+			  id="ChatMainBorder"
+			  layout={::ui::LayoutStyle{
+					.direction = ::ui::FlexDirection::Row,
+					.width = ::ui::Length::percent(100.0f),
+					.height = ::ui::Length::grow(1.0f),
+					.padding = {
+						static_cast<float>(metrics.bodyPadLeft),
+						static_cast<float>(metrics.bodyPadRight),
+						static_cast<float>(metrics.bodyPadTop),
+						static_cast<float>(metrics.bodyPadBottom),
+					},
+					.gap = static_cast<float>(metrics.bodyGap),
+					.overflow = ::ui::Overflow::Hidden,
+				}}
+			  style={inset_border_patch()}
+			>
+				<Box
+				  key="chat"
+				  id="ChatBoxWrap"
+				  layout={::ui::LayoutStyle{
+						.position = ::ui::PositionType::Relative,
+						.width = ::ui::Length::points(static_cast<float>(metrics.chatWidth)),
+						.height = ::ui::Length::points(static_cast<float>(metrics.chatHeight)),
+						.overflow = ::ui::Overflow::Hidden,
+					}}
+				>
+					<ChatLineSlots
+					  key="chat-lines"
+					  state={props.state}
+					  width={metrics.chatWidth}
+					  height={metrics.chatHeight}
+					/>
+				</Box>
+				<Box
+				  key="presence"
+				  id="ChatPresWrap"
+				  layout={::ui::LayoutStyle{
+						.position = ::ui::PositionType::Relative,
+						.width = ::ui::Length::points(static_cast<float>(metrics.presenceWidth)),
+						.height = ::ui::Length::points(static_cast<float>(metrics.presenceHeight)),
+						.overflow = ::ui::Overflow::Hidden,
+						.display = metrics.presenceWidth > 0 ? ::ui::Display::Flex : ::ui::Display::None,
+					}}
+				>
+					<PresenceLineSlots
+					  key="presence-lines"
+					  state={props.state}
+					  width={metrics.presenceWidth}
+					  height={metrics.presenceHeight}
+					/>
+				</Box>
+			</Box>
+			<Box
+			  key="input-gap"
+			  layout={::ui::LayoutStyle{
+					.width = ::ui::Length::points(1.0f),
+					.height = ::ui::Length::points(static_cast<float>(metrics.mainGap)),
+				}}
+			/>
+			<Box
+			  key="input-border"
+			  id="ChatInputBorder"
+			  layout={::ui::LayoutStyle{
+					.width = ::ui::Length::percent(100.0f),
+					.height = ::ui::Length::points(static_cast<float>(metrics.inputBorderHeight)),
+					.padding = {
+						static_cast<float>(metrics.inputPadX),
+						static_cast<float>(metrics.inputPadX),
+						static_cast<float>(metrics.inputPadTop),
+						static_cast<float>(metrics.inputPadBottom),
+					},
+				}}
+			  style={inset_border_patch()}
+			>
+				<TextInput
+				  key="input"
+				  id={kChatInputAction}
+				  idOffset={kChatInputUid}
+				  accessibility={{.label = "Chat"}}
+				  value={props.state->inputBuffer}
+				  textEdit={::ui::TextEditMetadata{
+						.caret = caret,
+						.selection_start = caret,
+						.selection_end = caret,
+					}}
+				  layout={::ui::LayoutStyle{
+						.width = ::ui::Length::points(static_cast<float>(metrics.inputWidth)),
+						.height = ::ui::Length::points(static_cast<float>(metrics.inputHeight)),
+						.padding = {3.0f, 3.0f, 1.0f, 1.0f},
+					}}
+				  style={chat_input_patch()}
+				/>
 			</Box>
 		</Box>
 	</Box>
@@ -2161,6 +2892,15 @@ using ::ui::components::TextProps;
 		  y={props.character_y}
 		  width={props.character_width}
 		  height={props.character_height}
+		/>
+		<lobby_chrome_frame_detail.ChatPanelView
+		  key="chat-panel"
+		  show={props.show_chat}
+		  state={props.chat}
+		  x={props.chat_x}
+		  y={props.chat_y}
+		  width={props.chat_width}
+		  height={props.chat_height}
 		/>
 		<lobby_chrome_frame_detail.GameSelectTallPanel
 		  key="game-select-tall"

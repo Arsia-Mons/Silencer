@@ -12,6 +12,7 @@ struct GameJoinPanelState;
 struct GameSelectPanelState;
 struct GameTechPanelState;
 struct CharacterPanelState;
+struct ChatPanelState;
 
 struct LobbyChromeFrameProps {
 	const char * key = nullptr;
@@ -30,6 +31,12 @@ struct LobbyChromeFrameProps {
 	int character_y = 0;
 	int character_width = 0;
 	int character_height = 0;
+	bool show_chat = false;
+	const ChatPanelState * chat = nullptr;
+	int chat_x = 0;
+	int chat_y = 0;
+	int chat_width = 0;
+	int chat_height = 0;
 	bool show_game_select_create = false;
 	int game_select_create_x = 0;
 	int game_select_create_y = 0;

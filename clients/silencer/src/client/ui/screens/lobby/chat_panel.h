@@ -1,9 +1,8 @@
 #ifndef SILENCER_CLIENT_UI_LOBBY_CHAT_PANEL_H
 #define SILENCER_CLIENT_UI_LOBBY_CHAT_PANEL_H
 
-// Screen-side lobby ChatPanel. Composes the ScrollTextBox (chat scrollback +
-// presence list) and TextInput primitives plus a small set of background
-// sprites + the channel-name header.
+// Screen-side lobby ChatPanel state. Retained cppx renders the chat scrollback,
+// presence list, input field, and channel-name header.
 //
 // Domain glue lives behind LobbyProvider/use_lobby. This panel keeps local
 // scroll/input/wrapping state and consumes a chat pump snapshot each tick.
@@ -95,13 +94,6 @@ ChatPanelLayoutMetrics ResolveChatPanelLayout(Uint16 panelWidth,
 void ChatPanelSyncLayout(ChatPanelState & state,
                          Uint16 panelWidth,
                          Uint16 panelHeight);
-
-// Emits the panel subtree. Must be called inside an open Clay layout pass
-// AFTER TextBeginFrame() + ScrollTextBoxBeginFrame() + TextInputBeginFrame().
-void BuildChatPanelTree(ChatPanelState & state,
-                        Uint16 panelWidth,
-                        Uint16 panelHeight,
-                        silencer::ui::UiInteractionRegistry& interactions);
 
 }  // namespace silencer::client_ui::lobby
 

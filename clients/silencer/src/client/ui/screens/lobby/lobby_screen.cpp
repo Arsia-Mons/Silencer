@@ -169,6 +169,10 @@ void LobbyScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime, s
 	const int bodyY = rootPadTop + (int)titleBarH + regionGap;
 	const LobbyMainAreaLayout mainLayout =
 		ResolveLobbyMainAreaLayout(bodyW, bodyH, regionGap);
+	ChatPanelSyncLayout(
+		chatState,
+		static_cast<Uint16>(std::max(0, mainLayout.chatW)),
+		static_cast<Uint16>(std::max(0, mainLayout.chatH)));
 	const bool gameSelectVisible =
 		!gameCreateActive && !gameJoinActive && !gameTechActive;
 	const int createButtonW = std::max(
@@ -279,6 +283,12 @@ void LobbyScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime, s
 		.character_y = bodyY,
 		.character_width = mainLayout.characterW,
 		.character_height = mainLayout.upperH,
+		.show_chat = mainLayout.chatW > 0 && mainLayout.chatH > 0,
+		.chat = &chatState,
+		.chat_x = bodyX,
+		.chat_y = bodyY + mainLayout.upperH + mainLayout.regionGap,
+		.chat_width = mainLayout.chatW,
+		.chat_height = mainLayout.chatH,
 		.show_game_select_create = showGameSelectCreate,
 		.game_select_create_x = bodyX + mainLayout.characterW + mainLayout.regionGap
 		                        + lobby_screen_detail::kGameSelectCreatePadLeft,

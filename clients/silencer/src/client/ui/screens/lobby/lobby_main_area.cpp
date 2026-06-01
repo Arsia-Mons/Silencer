@@ -4,7 +4,6 @@
 #include "clay_ui_compositor.h"
 #include "primitives/box.h"
 
-#include "chat_panel.h"
 #include "game_create_panel.h"
 #include "game_join_panel.h"
 
@@ -295,12 +294,7 @@ void BuildLobbySteppedPane(LobbyMainAreaPanels & panels,
 				             .layoutDirection = CLAY_TOP_TO_BOTTOM,
 				         },
 				         .clip = { .horizontal = true, .vertical = true },
-				     })) {
-					BuildChatPanelTree(panels.chat,
-					                   static_cast<Uint16>(std::max(0, layout.chatW)),
-					                   static_cast<Uint16>(std::max(0, layout.chatH)),
-					                   interactions);
-				}
+				     })) {}
 				CLAY(Box(RightEdgeChrome(), {
 				         .id = CLAY_ID("LobbyChatTallSeam"),
 				         .layout = {

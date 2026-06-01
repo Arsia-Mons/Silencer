@@ -339,8 +339,7 @@ fail_if_match \
 fail_if_match \
   "\\b(World|Resources|Lobby|LobbyGame)::|#include[[:space:]]*[<\"](world|lobby|lobbygame|resources)[.]h[>\"]" \
   "$REPO_ROOT/clients/silencer/src/client/ui/screens/lobby/chat_panel.cpp" \
-  "$REPO_ROOT/clients/silencer/src/client/ui/screens/lobby/chat_panel.h" \
-  "$REPO_ROOT/clients/silencer/src/client/ui/screens/lobby/chat_panel_layout.cpp"
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens/lobby/chat_panel.h"
 
 fail_if_match \
   "\\b(World|Resources|Lobby|LobbyGame|User|Config)::|#include[[:space:]]*[<\"](world|lobby|lobbygame|resources|user|config)[.]h[>\"]" \
