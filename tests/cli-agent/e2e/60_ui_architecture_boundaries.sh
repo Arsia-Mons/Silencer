@@ -196,6 +196,8 @@ fail_if_path_exists "clients/silencer/src/client/ui/hud/hud_system_camera.cpp"
 fail_if_path_exists "clients/silencer/src/client/ui/hud/hud_system_camera.h"
 fail_if_path_exists "clients/silencer/src/client/ui/hud/hud_secret_overlays.cpp"
 fail_if_path_exists "clients/silencer/src/client/ui/hud/hud_secret_overlays.h"
+fail_if_path_exists "clients/silencer/src/client/ui/hud/hud_status_sprites.cpp"
+fail_if_path_exists "clients/silencer/src/client/ui/hud/hud_status_sprites.h"
 
 fail_if_match \
   "Draw[A-Za-z0-9_]*Clay|BuildInGameHudUi|BuildInGameOverlaysUi|client/ui/hud|Clay_BeginLayout|Clay_EndLayout|Clay_SetPointerState|clay_bridge" \

@@ -172,9 +172,13 @@ inline ::ui::StylePatch image_patch(std::uint8_t bank,
                                     std::uint8_t brightness = 128,
                                     int source_width = 0,
                                     int source_height = 0,
-                                    bool tile = false) {
+                                    bool tile = false,
+                                    int source_x = 0,
+                                    int source_y = 0) {
 	return ::ui::patch().image(::ui::BackgroundImage{
 		.texture_id = texture_id(bank, index),
+		.source_x = static_cast<std::uint16_t>(std::max(0, source_x)),
+		.source_y = static_cast<std::uint16_t>(std::max(0, source_y)),
 		.source_w = static_cast<std::uint16_t>(std::max(0, source_width)),
 		.source_h = static_cast<std::uint16_t>(std::max(0, source_height)),
 		.brightness = brightness,
@@ -243,10 +247,27 @@ inline ::ui::StylePatch secret_progress_text_patch(std::uint8_t palette,
 	});
 }
 
+inline ::ui::StylePatch inventory_letter_text_patch(std::uint8_t brightness) {
+	return ::ui::patch().text(::ui::TextVisual{
+		.color = {0, brightness, 0, 255},
+		.font_id = kReadoutTinyBank,
+		.font_size = kReadoutTinyAdvance,
+		.line_height = static_cast<float>(kReadoutTinyLineHeight),
+	});
+}
+
 inline std::uint8_t animated_highlight_brightness(std::uint8_t phase) {
 	std::uint8_t brightness = 120;
 	if(phase % 32 < 16) brightness += (phase % 16);
 	else brightness += 16 - (phase % 16);
+	return brightness;
+}
+
+inline std::uint8_t animated_shield_brightness(std::uint8_t phase) {
+	const std::uint8_t time = 6;
+	std::uint8_t brightness = 136;
+	if(phase % (time * 2) < time) brightness += (phase % time) * 2;
+	else brightness += (time - (phase % time)) * 2;
 	return brightness;
 }
 
@@ -956,6 +977,131 @@ struct HudSecretOverlayProps {
 	</Box>
 }
 
+struct HudStatusSpriteProps {
+	const char * key = nullptr;
+	const HudStatusView * status = nullptr;
+	int index = 0;
+	std::uint8_t phase = 0;
+};
+
+::ui::UiElement HudStatusSprite(const HudStatusSpriteProps& props) {
+	if(!props.status || props.index < 0 ||
+	   props.index >= static_cast<int>(props.status->sprites.size())){
+		return ::ui::empty();
+	}
+	const HudSpriteView& sprite = props.status->sprites[props.index];
+	if(!sprite.visible || sprite.w <= 0 || sprite.h <= 0){
+		return ::ui::empty();
+	}
+	if(sprite.blinkWarning && props.phase % 8 > 3){
+		return ::ui::empty();
+	}
+	const std::uint8_t brightness = sprite.animatedShield
+		? animated_shield_brightness(props.phase)
+		: sprite.brightness;
+	return <Box
+	  key={props.key}
+	  id="HudStatusSprite"
+	  idOffset={props.index}
+	  layout={absolute_layout(sprite.x, sprite.y, sprite.w, sprite.h)}
+	  style={image_patch(sprite.spriteBank, sprite.spriteIndex, brightness, sprite.sourceW, sprite.sourceH, false, sprite.sourceX, sprite.sourceY)}
+	/>
+}
+
+struct HudInventoryIconProps {
+	const char * key = nullptr;
+	const HudStatusView * status = nullptr;
+	int index = 0;
+};
+
+::ui::UiElement HudInventoryIcon(const HudInventoryIconProps& props) {
+	if(!props.status || props.index < 0 || props.index >= 4){
+		return ::ui::empty();
+	}
+	const HudSpriteView& icon = props.status->inventory[props.index].icon;
+	if(!icon.visible || icon.w <= 0 || icon.h <= 0){
+		return ::ui::empty();
+	}
+	return <Box
+	  key={props.key}
+	  id="HudInventoryIcon"
+	  idOffset={props.index}
+	  layout={absolute_layout(icon.x, icon.y, icon.w, icon.h)}
+	  style={image_patch(icon.spriteBank, icon.spriteIndex, icon.brightness)}
+	/>
+}
+
+struct HudInventoryLetterProps {
+	const char * key = nullptr;
+	const HudStatusView * status = nullptr;
+	int index = 0;
+};
+
+::ui::UiElement HudInventoryLetter(const HudInventoryLetterProps& props) {
+	if(!props.status || props.index < 0 || props.index >= 4){
+		return ::ui::empty();
+	}
+	const HudInventorySlotView& slot = props.status->inventory[props.index];
+	if(slot.letter.empty()) return ::ui::empty();
+	return <Text
+	  key={props.key}
+	  id="HudInventoryLetter"
+	  idOffset={props.index}
+	  value={slot.letter.c_str()}
+	  layout={absolute_layout(slot.letterX, slot.letterY, 8, 8)}
+	  style={inventory_letter_text_patch(slot.letterBrightness)}
+	/>
+}
+
+struct HudStatusProps {
+	const char * key = nullptr;
+	bool show = false;
+	HudStatusView status = {};
+	std::uint8_t phase = 0;
+	int surface_width = 0;
+	int surface_height = 0;
+};
+
+::ui::UiElement HudStatus(const HudStatusProps& props) {
+	if(!props.show || !props.status.visible){
+		return ::ui::empty();
+	}
+	return <Box
+	  key={props.key}
+	  id="InGameHudStatusRoot"
+	  layout={layer_layout(props.surface_width, props.surface_height)}
+	>
+		<HudStatusSprite key="sprite-0" status={&props.status} index={0} phase={props.phase} />
+		<HudStatusSprite key="sprite-1" status={&props.status} index={1} phase={props.phase} />
+		<HudStatusSprite key="sprite-2" status={&props.status} index={2} phase={props.phase} />
+		<HudStatusSprite key="sprite-3" status={&props.status} index={3} phase={props.phase} />
+		<HudStatusSprite key="sprite-4" status={&props.status} index={4} phase={props.phase} />
+		<HudStatusSprite key="sprite-5" status={&props.status} index={5} phase={props.phase} />
+		<HudStatusSprite key="sprite-6" status={&props.status} index={6} phase={props.phase} />
+		<HudStatusSprite key="sprite-7" status={&props.status} index={7} phase={props.phase} />
+		<HudStatusSprite key="sprite-8" status={&props.status} index={8} phase={props.phase} />
+		<HudStatusSprite key="sprite-9" status={&props.status} index={9} phase={props.phase} />
+		<HudStatusSprite key="sprite-10" status={&props.status} index={10} phase={props.phase} />
+		<HudStatusSprite key="sprite-11" status={&props.status} index={11} phase={props.phase} />
+		<HudStatusSprite key="sprite-12" status={&props.status} index={12} phase={props.phase} />
+		<HudStatusSprite key="sprite-13" status={&props.status} index={13} phase={props.phase} />
+		<HudStatusSprite key="sprite-14" status={&props.status} index={14} phase={props.phase} />
+		<HudStatusSprite key="sprite-15" status={&props.status} index={15} phase={props.phase} />
+		<HudStatusSprite key="sprite-16" status={&props.status} index={16} phase={props.phase} />
+		<HudStatusSprite key="sprite-17" status={&props.status} index={17} phase={props.phase} />
+		<HudStatusSprite key="sprite-18" status={&props.status} index={18} phase={props.phase} />
+		<HudStatusSprite key="sprite-19" status={&props.status} index={19} phase={props.phase} />
+		<HudInventoryIcon key="inventory-icon-0" status={&props.status} index={0} />
+		<HudInventoryIcon key="inventory-icon-1" status={&props.status} index={1} />
+		<HudInventoryIcon key="inventory-icon-2" status={&props.status} index={2} />
+		<HudInventoryIcon key="inventory-icon-3" status={&props.status} index={3} />
+		<HudInventoryLetter key="inventory-letter-0" status={&props.status} index={0} />
+		<HudInventoryLetter key="inventory-letter-1" status={&props.status} index={1} />
+		<HudInventoryLetter key="inventory-letter-2" status={&props.status} index={2} />
+		<HudInventoryLetter key="inventory-letter-3" status={&props.status} index={3} />
+	</Box>
+}
+
 struct HudReadoutTextProps {
 	const char * key = nullptr;
 	const char * id = nullptr;
@@ -1427,6 +1573,14 @@ using ::ui::components::BoxProps;
 		  show={props.show_system_camera_frames}
 		  frames={props.system_camera_frames}
 		  count={props.system_camera_frame_count}
+		  surfaceWidth={props.width}
+		  surfaceHeight={props.height}
+		/>
+		<ingame_overlay_frame_detail.HudStatus
+		  key="status"
+		  show={props.show_status}
+		  status={props.status}
+		  phase={props.hud_phase}
 		  surfaceWidth={props.width}
 		  surfaceHeight={props.height}
 		/>

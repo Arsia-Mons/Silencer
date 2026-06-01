@@ -30,6 +30,8 @@ struct InGameOverlayFrameProps {
 	ChatOverlayView chat = {};
 	bool show_readouts = false;
 	HudReadoutsView readouts = {};
+	bool show_status = false;
+	HudStatusView status = {};
 	bool show_secret_overlay = false;
 	HudSecretOverlayView secret_overlay = {};
 	bool show_system_camera_frames = false;

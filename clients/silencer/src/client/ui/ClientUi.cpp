@@ -361,6 +361,7 @@ void ClientUi::BuildVisibleScreens(ScreenContext& ctx, Surface& dst, float frame
 			hudView.buyTech.visible && !hudView.buyTech.rows.empty() &&
 			hudView.buyTech.backgroundW > 0 && hudView.buyTech.backgroundH > 0;
 		const bool showChat = hudView.chat.visible;
+		const bool showHudStatus = hudView.status.visible;
 		const bool showReadouts = hudView.readouts.visible;
 		const bool showSecretOverlay = hudView.secretOverlay.visible;
 		const bool showSystemCameraFrames =
@@ -370,7 +371,8 @@ void ClientUi::BuildVisibleScreens(ScreenContext& ctx, Surface& dst, float frame
 		inGameOverlayFrameActive_ =
 			showQuitPrompt || showTopMessage || showMessage ||
 			showStatusMessages || showPlayerList || showBuyTech || showChat ||
-			showReadouts || showSecretOverlay || showSystemCameraFrames;
+			showHudStatus || showReadouts || showSecretOverlay ||
+			showSystemCameraFrames;
 		if(inGameOverlayFrameActive_){
 		#ifdef OUYA
 			const char * quitText = "Hit O To QUIT";
@@ -401,6 +403,8 @@ void ClientUi::BuildVisibleScreens(ScreenContext& ctx, Surface& dst, float frame
 				.buy_tech = hudView.buyTech,
 				.show_chat = showChat,
 				.chat = hudView.chat,
+				.show_status = showHudStatus,
+				.status = hudView.status,
 				.show_readouts = showReadouts,
 				.readouts = hudView.readouts,
 				.show_secret_overlay = showSecretOverlay,

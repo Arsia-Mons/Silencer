@@ -137,8 +137,14 @@ struct HudSpriteView {
 	int    h = 0;
 	Uint8  spriteBank = 0;
 	Uint16 spriteIndex = 0;
+	int    sourceX = 0;
+	int    sourceY = 0;
+	int    sourceW = 0;
+	int    sourceH = 0;
 	Uint8  brightness = 128;
 	bool   animatedHighlight = false;
+	bool   animatedShield = false;
+	bool   blinkWarning = false;
 };
 
 struct HudSecretOverlayView {
@@ -149,6 +155,20 @@ struct HudSecretOverlayView {
 	int  secretProgress = 0;
 	HudSpriteView sprites[3];
 	int spriteCount = 0;
+};
+
+struct HudInventorySlotView {
+	HudSpriteView icon;
+	std::string letter;
+	Uint8 letterBrightness = 128;
+	int letterX = 0;
+	int letterY = 0;
+};
+
+struct HudStatusView {
+	bool visible = false;
+	std::vector<HudSpriteView> sprites;
+	HudInventorySlotView inventory[4];
 };
 
 // One team member, for the buy/tech "give to teammate" menu and player list.
@@ -242,6 +262,7 @@ struct HudView {
 	std::vector<TeamHudView> teams;
 	HudReadoutsView readouts;
 	HudSecretOverlayView secretOverlay;
+	HudStatusView status;
 
 	// Buy/Tech overlay derived from viewed player and its team.
 	BuyTechOverlayView buyTech;

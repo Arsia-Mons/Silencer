@@ -468,6 +468,198 @@ void AddHudSprite(HudSpriteView * sprites,
 	sprite.animatedHighlight = animatedHighlight;
 }
 
+void AddStatusSprite(HudStatusView& status,
+                     const ::Resources& resources,
+                     int x,
+                     int y,
+                     Uint8 spriteBank,
+                     Uint16 spriteIndex,
+                     int sourceX = 0,
+                     int sourceY = 0,
+                     int sourceW = 0,
+                     int sourceH = 0,
+                     Uint8 brightness = 128,
+                     bool animatedShield = false,
+                     bool blinkWarning = false) {
+	const int w = sourceW > 0 ? sourceW : SpriteWidth(resources, spriteBank, spriteIndex);
+	const int h = sourceH > 0 ? sourceH : SpriteHeight(resources, spriteBank, spriteIndex);
+	if(w <= 0 || h <= 0) return;
+
+	HudSpriteView sprite;
+	sprite.visible = true;
+	sprite.x = x;
+	sprite.y = y;
+	sprite.w = w;
+	sprite.h = h;
+	sprite.spriteBank = spriteBank;
+	sprite.spriteIndex = spriteIndex;
+	sprite.sourceX = sourceX;
+	sprite.sourceY = sourceY;
+	sprite.sourceW = sourceW;
+	sprite.sourceH = sourceH;
+	sprite.brightness = brightness;
+	sprite.animatedShield = animatedShield;
+	sprite.blinkWarning = blinkWarning;
+	status.sprites.push_back(sprite);
+}
+
+Uint8 InventoryResIndex(Uint8 id) {
+	switch(id){
+		default:
+		case ::Player::INV_NONE:
+			return 0xFF;
+		case ::Player::INV_HEALTHPACK:
+			return 1;
+		case ::Player::INV_LAZARUSTRACT:
+			return 2;
+		case ::Player::INV_SECURITYPASS:
+			return 3;
+		case ::Player::INV_VIRUS:
+			return 14;
+		case ::Player::INV_POISON:
+			return 5;
+		case ::Player::INV_EMPBOMB:
+			return 6;
+		case ::Player::INV_SHAPEDBOMB:
+			return 7;
+		case ::Player::INV_PLASMABOMB:
+			return 8;
+		case ::Player::INV_NEUTRONBOMB:
+			return 9;
+		case ::Player::INV_PLASMADET:
+			return 12;
+		case ::Player::INV_FIXEDCANNON:
+			return 11;
+		case ::Player::INV_FLARE:
+			return 10;
+		case ::Player::INV_POISONFLARE:
+			return 13;
+		case ::Player::INV_CAMERA:
+			return 4;
+		case ::Player::INV_BASEDOOR:
+			return 0;
+	}
+}
+
+std::string InventoryLetter(Uint8 id) {
+	switch(id){
+		case ::Player::INV_PLASMABOMB:
+			return "P";
+		case ::Player::INV_SHAPEDBOMB:
+			return "S";
+		case ::Player::INV_NEUTRONBOMB:
+			return "N";
+		case ::Player::INV_EMPBOMB:
+			return "E";
+		case ::Player::INV_PLASMADET:
+			return "D";
+		case ::Player::INV_FLARE:
+			return "F";
+		default:
+			return "";
+	}
+}
+
+void PopulateStatus(HudView& out,
+                    const ::Resources& resources,
+                    const PlayerHudView& player) {
+	if(!player.valid) return;
+
+	HudStatusView& status = out.status;
+	status.visible = true;
+	AddStatusSprite(status, resources, SpriteX(resources, 94, 0), SpriteY(resources, 94, 0), 94, 0);
+	if(player.fuelLow){
+		AddStatusSprite(status, resources, SpriteX(resources, 95, 8), SpriteY(resources, 95, 8), 95, 8);
+	}
+
+	const int fuelW = player.maxFuel > 0
+		? static_cast<int>((static_cast<float>(player.fuel) / player.maxFuel) * SpriteWidth(resources, 95, 6))
+		: 0;
+	if(fuelW > 0){
+		AddStatusSprite(status, resources, SpriteX(resources, 95, 6), SpriteY(resources, 95, 6), 95, 6,
+		                0, 0, fuelW, SpriteHeight(resources, 95, 6));
+	}
+	AddStatusSprite(status, resources, SpriteX(resources, 95, 5), SpriteY(resources, 95, 5), 95, 5);
+
+	const int healthH = SpriteHeight(resources, 95, 0);
+	const int healthY = player.maxHealth > 0
+		? healthH - static_cast<int>((static_cast<float>(player.health) / player.maxHealth) * healthH)
+		: healthH;
+	if(healthH - healthY > 0){
+		AddStatusSprite(status, resources, SpriteX(resources, 95, 0), SpriteY(resources, 95, 0) + healthY, 95, 0,
+		                0, healthY, SpriteWidth(resources, 95, 0), healthH - healthY);
+	}
+
+	const int shieldH = SpriteHeight(resources, 95, 1);
+	int shieldY = player.maxShield > 0
+		? shieldH - static_cast<int>((static_cast<float>(player.shield) / player.maxShield) * shieldH)
+		: shieldH;
+	if(shieldY < 0) shieldY = 0;
+	if(shieldH - shieldY > 0){
+		AddStatusSprite(status, resources, SpriteX(resources, 95, 1), SpriteY(resources, 95, 1) + shieldY, 95, 1,
+		                0, shieldY, SpriteWidth(resources, 95, 1), shieldH - shieldY,
+		                128, player.shield > player.maxShield);
+	}
+
+	if(player.poisonedBy){
+		AddStatusSprite(status, resources, 183, 453, 97, 5);
+	}
+	const int filesW = player.maxFiles > 0
+		? static_cast<int>((static_cast<float>(player.files) / player.maxFiles) * SpriteWidth(resources, 95, 7))
+		: 0;
+	if(filesW > 0){
+		AddStatusSprite(status, resources, SpriteX(resources, 95, 7), SpriteY(resources, 95, 7), 95, 7,
+		                0, 0, filesW, SpriteHeight(resources, 95, 7));
+	}
+
+	Uint16 weaponFace = 1;
+	Uint16 weaponGlow = 5;
+	switch(player.currentWeapon){
+		case 1: weaponFace = 2; weaponGlow = 6; break;
+		case 2: weaponFace = 3; weaponGlow = 7; break;
+		case 3: weaponFace = 4; weaponGlow = 8; break;
+		default: break;
+	}
+	AddStatusSprite(status, resources, SpriteX(resources, 96, weaponFace), SpriteY(resources, 96, weaponFace), 96, weaponFace);
+	AddStatusSprite(status, resources, SpriteX(resources, 96, weaponGlow), SpriteY(resources, 96, weaponGlow), 96, weaponGlow);
+	AddStatusSprite(status, resources, SpriteX(resources, 96, 0), SpriteY(resources, 96, 0) + (player.currentWeapon * 14), 96, 0);
+	if(player.health && player.maxHealth > 0 &&
+	   static_cast<float>(player.health) / player.maxHealth <= 0.5f){
+		AddStatusSprite(status, resources, SpriteX(resources, 95, 3), SpriteY(resources, 95, 3), 95, 3,
+		                0, 0, 0, 0, 128, false, true);
+	}
+	if(player.shield && player.maxShield > 0 &&
+	   static_cast<float>(player.shield) / player.maxShield <= 0.5f){
+		AddStatusSprite(status, resources, SpriteX(resources, 95, 4), SpriteY(resources, 95, 4), 95, 4,
+		                0, 0, 0, 0, 128, false, true);
+	}
+	AddStatusSprite(status, resources, SpriteX(resources, 94, 2), SpriteY(resources, 94, 2), 94, 2);
+
+	const int xoffsets[] = {612, 584, 556, 528};
+	const int yoffsets[] = {13, 13, 11, 7};
+	for(int i = 0; i < 4; ++i){
+		const Uint8 inventoryIndex = InventoryResIndex(player.inventoryItems[i]);
+		const Uint8 brightness = player.currentInventoryItem == i ? 128 : 32;
+		HudInventorySlotView& slot = status.inventory[i];
+		slot.letter = InventoryLetter(player.inventoryItems[i]);
+		slot.letterBrightness = brightness;
+		slot.letterX = xoffsets[i] - 2;
+		slot.letterY = yoffsets[i];
+		const int w = SpriteWidth(resources, 97, inventoryIndex);
+		const int h = SpriteHeight(resources, 97, inventoryIndex);
+		if(w > 0 && h > 0){
+			slot.icon.visible = true;
+			slot.icon.x = SpriteX(resources, 97, inventoryIndex, xoffsets[i]);
+			slot.icon.y = SpriteY(resources, 97, inventoryIndex, yoffsets[i]);
+			slot.icon.w = w;
+			slot.icon.h = h;
+			slot.icon.spriteBank = 97;
+			slot.icon.spriteIndex = inventoryIndex;
+			slot.icon.brightness = brightness;
+		}
+	}
+}
+
 void PopulateSecretOverlay(HudView& out,
                            const ::Resources& resources,
                            const PlayerHudView& player) {
@@ -615,6 +807,7 @@ HudView BuildHudView(::World& world) {
 
 	// Teams strip + player-list rows
 	hudview_detail::PopulateTeams(view, world);
+	hudview_detail::PopulateStatus(view, world.resources, view.viewedPlayer);
 	hudview_detail::PopulateReadouts(view, view.viewedPlayer);
 	hudview_detail::PopulateSecretOverlay(view, world.resources, view.viewedPlayer);
 
