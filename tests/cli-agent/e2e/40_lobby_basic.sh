@@ -149,6 +149,8 @@ fi
 
 # Set the game name via Clay set_text.
 cli --port "$CTRL_PORT" set_text --label "Game name" --text "ClayTest" >/dev/null
+cli --port "$CTRL_PORT" set_text --label "Min Level" --text "1234" >/dev/null
+cli --port "$CTRL_PORT" set_text --label "Password" --text "joinpass" >/dev/null
 
 # Creating without a selected map should show a modal. While it is up,
 # inspect/click routes must be modal-scoped, not leak through to the
@@ -193,14 +195,21 @@ if [ "$sel" != "yes" ]; then
   exit 1
 fi
 
-# Verify the text input now reads "ClayTest".
-name=$(cli --port "$CTRL_PORT" inspect | bun -e \
+# Verify retained text-input metadata drove the set_text behavior.
+input_state=$(cli --port "$CTRL_PORT" inspect | bun -e \
   'const t=await new Response(Bun.stdin.stream()).text();
    const r=JSON.parse(t);
-   const w=r.widgets.find((w)=>w.kind==="textinput" && w.label==="Game name" && w.source==="clay");
-   console.log(w ? (w.text || "") : "");')
-if [ "$name" != "ClayTest" ]; then
-  echo "set_text on Game name did not stick (got: '$name')" >&2
+   const textInput=(label)=>r.widgets.find((w)=>w.kind==="textinput" && w.label===label && w.source==="clay");
+   const name=textInput("Game name");
+   const min=textInput("Min Level");
+   const password=textInput("Password");
+   const ok=
+     name && name.text==="ClayTest" && name.maxchars===35 &&
+     min && min.text==="12" && min.maxchars===2 &&
+     password && password.password===true && password.text==="********" && password.maxchars===20;
+   console.log(ok ? "ok" : JSON.stringify({name, min, password}));')
+if [ "$input_state" != "ok" ]; then
+  echo "game-create text input metadata did not stick (got: '$input_state')" >&2
   exit 1
 fi
 

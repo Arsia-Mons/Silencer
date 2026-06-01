@@ -18,7 +18,6 @@ class ScreenContext;
 class MessageModal;
 
 namespace silencer::ui {
-class UiInteractionRegistry;
 struct UiInputState;
 }
 
@@ -149,8 +148,6 @@ void GameCreatePanelSyncTallLayout(GameCreatePanelState & state,
 GameCreatePreviewOverlayLayout ResolveGameCreatePreviewOverlayLayout(
 	const GameCreatePanelState & state,
 	const silencer::ui::UiInputState & input);
-void GameCreatePanelRegisterUiFields(GameCreatePanelState & state,
-                                     silencer::ui::UiInteractionRegistry& interactions);
 
 }  // namespace silencer::client_ui::lobby
 

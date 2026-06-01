@@ -863,11 +863,6 @@ inline int game_create_map_rows_width(const GameCreatePanelState& state,
 	return std::max(0, width);
 }
 
-inline const char * game_create_password_display(const GameCreatePanelState& state) {
-	const std::string masked(std::strlen(state.password), '*');
-	return ::ui::copy_string(masked.c_str());
-}
-
 struct AbsoluteChromeButtonProps {
 	const char * key = nullptr;
 	const char * id = nullptr;
@@ -1925,6 +1920,8 @@ struct GameCreateOptionValueProps {
 				.selection_start = caret,
 				.selection_end = caret,
 			}}
+		  maxLength={2}
+		  numbersOnly={true}
 		  layout={absolute_layout(props.x, 0, input_width, kGameCreateFormRowH)}
 		  style={game_create_text_input_patch()}
 		/>
@@ -2659,6 +2656,7 @@ struct GameCreateTallPanelProps {
 				.selection_start = static_cast<int>(std::strlen(props.state->name)),
 				.selection_end = static_cast<int>(std::strlen(props.state->name)),
 			}}
+		  maxLength={35}
 		  layout={absolute_layout(kGameCreateTallPanelPad, name_input_y, layout.inputWidth, kGameCreateTallInputH)}
 		  style={game_create_text_input_patch()}
 		/>
@@ -2672,12 +2670,14 @@ struct GameCreateTallPanelProps {
 		  key="password-input"
 		  id={kGameCreatePasswordAction}
 		  accessibility={{.label = "Password"}}
-		  value={game_create_password_display(*props.state)}
+		  value={props.state->password}
 		  textEdit={::ui::TextEditMetadata{
 				.caret = static_cast<int>(std::strlen(props.state->password)),
 				.selection_start = static_cast<int>(std::strlen(props.state->password)),
 				.selection_end = static_cast<int>(std::strlen(props.state->password)),
 			}}
+		  maxLength={20}
+		  password={true}
 		  layout={absolute_layout(kGameCreateTallPanelPad, password_input_y, layout.inputWidth, kGameCreateTallInputH)}
 		  style={game_create_text_input_patch()}
 		/>

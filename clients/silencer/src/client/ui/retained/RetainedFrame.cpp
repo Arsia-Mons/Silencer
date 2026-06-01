@@ -4,7 +4,9 @@
 #include "ui/runtime/react.h"
 #include "ui/runtime/yoga_flex_layout.h"
 
+#include <cstring>
 #include <mutex>
+#include <string>
 #include <utility>
 
 namespace silencer {
@@ -169,11 +171,18 @@ void RetainedFrame::RegisterAutomation(
 		(node.control_id && *node.control_id) ? node.control_id : "";
 	const char * label = LabelFor(node);
 	if(*controlId || *label){
+		const char * nodeValue = node.value ? node.value : "";
+		const char * inputValue =
+			(node.text_edit.has_input_value && node.text_edit.input_value)
+				? node.text_edit.input_value
+				: nodeValue;
 		silencer::ui::UiElementSnapshot element;
 		element.id = controlId;
 		element.kind = ElementKindFor(node);
 		element.label = label;
-		element.value = node.value ? node.value : "";
+		element.value = node.text_edit.password
+			? std::string(std::strlen(inputValue), '*')
+			: nodeValue;
 		element.bounds = silencer::ui::UiRect{
 			node.layout.x,
 			node.layout.y,
@@ -187,6 +196,11 @@ void RetainedFrame::RegisterAutomation(
 	}
 
 	if(IsInteractive(node)){
+		const char * nodeValue = node.value ? node.value : "";
+		const char * inputValue =
+			(node.text_edit.has_input_value && node.text_edit.input_value)
+				? node.text_edit.input_value
+				: nodeValue;
 		silencer::ui::UiInteractable widget;
 		widget.id = controlId;
 		widget.labelText = label;
@@ -202,8 +216,13 @@ void RetainedFrame::RegisterAutomation(
 		widget.w = static_cast<int>(node.layout.width);
 		widget.h = static_cast<int>(node.layout.height);
 		widget.selected = node.interaction.checked;
-		widget.value = node.value ? node.value : "";
+		widget.value = inputValue;
 		widget.inactive = node.interaction.disabled;
+		if(widget.kind == silencer::ui::UiInteractableKind::TextInput){
+			widget.maxLength = node.text_edit.max_length;
+			widget.numbersOnly = node.text_edit.numbers_only;
+			widget.isPassword = node.text_edit.password;
+		}
 		interactions.RegisterInteractable(std::move(widget));
 	}
 

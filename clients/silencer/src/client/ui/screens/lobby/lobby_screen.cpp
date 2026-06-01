@@ -628,9 +628,6 @@ void LobbyScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime, s
 	                   layoutWidth,
 	                   layoutHeight,
 	                   interactions);
-	if(gameCreateActive){
-		GameCreatePanelRegisterUiFields(gameCreateState, interactions);
-	}
 
 	if(ctx.renderdevice){
 		ctx.renderdevice->BeginLobbyPanelBorderBlur(

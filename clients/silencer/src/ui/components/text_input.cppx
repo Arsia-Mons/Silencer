@@ -1,7 +1,35 @@
 #include "text_input.h"
 
+#include <cstring>
+#include <string>
+
 namespace ui {
 namespace components {
+
+namespace text_input_detail {
+
+inline const char * value_or_empty(const TextInputProps& props) {
+	return props.value ? props.value : "";
+}
+
+inline const char * display_value(const TextInputProps& props) {
+	const char * value = value_or_empty(props);
+	if(!props.password) return value;
+	const std::string masked(std::strlen(value), '*');
+	return ::ui::copy_string(masked.c_str());
+}
+
+inline ::ui::TextEditMetadata metadata_from_props(const TextInputProps& props) {
+	::ui::TextEditMetadata metadata = props.text_edit;
+	metadata.input_value = value_or_empty(props);
+	metadata.has_input_value = true;
+	metadata.max_length = props.max_length;
+	metadata.numbers_only = props.numbers_only;
+	metadata.password = props.password;
+	return metadata;
+}
+
+}  // namespace text_input_detail
 
 ::ui::UiElement TextInput(const TextInputProps& props) {
 	const ::ui::VisualStyle visual =
@@ -15,8 +43,8 @@ namespace components {
 	  idOffset={props.id_offset}
 	  style={detail::control_layout_style(props.layout)}
 	  visual={visual}
-	  text={::ui::HostTextProps{.value = props.value ? props.value : ""}}
-	  textEdit={props.text_edit}
+	  text={::ui::HostTextProps{.value = text_input_detail::display_value(props)}}
+	  textEdit={text_input_detail::metadata_from_props(props)}
 	  interaction={detail::interaction_from_props(props, true)}
 	  accessibility={detail::accessibility_from_props(props, ::ui::SemanticRole::TextBox)}
 	  callbacks={detail::callbacks_from_props(props)}

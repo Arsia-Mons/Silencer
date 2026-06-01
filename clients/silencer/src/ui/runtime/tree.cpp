@@ -228,6 +228,9 @@ bool UiTree::set_metadata(NodeId id, const NodeMetadata &metadata) {
   node->fiber_id = metadata.fiber_id;
   node->interaction = metadata.interaction;
   node->text_edit = metadata.text_edit;
+  copy_value(node->input_value, metadata.text_edit.input_value);
+  node->text_edit.input_value =
+      metadata.text_edit.has_input_value ? node->input_value : nullptr;
   copy_value(node->composition, metadata.text_edit.composition);
   node->text_edit.composition = node->composition;
   node->on_focus = metadata.on_focus;
@@ -457,6 +460,7 @@ UiTree::Node *UiTree::ensure_node(NodeId id, NodeId parent_id, const char *type,
     existing->accessibility_label[0] = '\0';
     existing->accessibility_description[0] = '\0';
     existing->value[0] = '\0';
+    existing->input_value[0] = '\0';
     existing->composition[0] = '\0';
     copy_label(existing->type, type);
     copy_label(existing->key, key);

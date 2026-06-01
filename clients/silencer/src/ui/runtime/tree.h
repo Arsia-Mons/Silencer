@@ -314,6 +314,11 @@ struct TextEditMetadata {
   int caret = 0;
   int selection_start = 0;
   int selection_end = 0;
+  const char *input_value = nullptr;
+  bool has_input_value = false;
+  int max_length = 0;
+  bool numbers_only = false;
+  bool password = false;
   const char *composition = "";
   int composition_start = 0;
   int composition_length = 0;
@@ -478,6 +483,7 @@ private:
     char accessibility_label[UI_RETAINED_VALUE_CAP] = {};
     char accessibility_description[UI_RETAINED_VALUE_CAP] = {};
     char value[UI_RETAINED_VALUE_CAP] = {};
+    char input_value[UI_RETAINED_VALUE_CAP] = {};
     char composition[UI_RETAINED_VALUE_CAP] = {};
     std::array<NodeId, UI_RETAINED_MAX_CHILDREN> children = {};
     NodeRole role = NodeRole::Generic;

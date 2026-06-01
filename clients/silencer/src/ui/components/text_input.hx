@@ -21,6 +21,9 @@ struct TextInputProps {
 	std::function<void(const ::ui::TextEditingEvent&)> on_text_editing = {};
 	const char * value = nullptr;
 	::ui::TextEditMetadata text_edit = {};
+	int max_length = 0;
+	bool numbers_only = false;
+	bool password = false;
 	::ui::LayoutStyle layout = {
 		.width = ::ui::Length::points(180.0f),
 		.height = ::ui::Length::points(18.0f),

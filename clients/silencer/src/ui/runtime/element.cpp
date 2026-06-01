@@ -398,6 +398,7 @@ HostProps UiElementFrame::copy_host_props(const HostProps &props) {
   copied.key = copy_string(props.key);
   copied.id = copy_string(props.id);
   copied.text.value = copy_string(props.text.value);
+  copied.text_edit.input_value = copy_string(props.text_edit.input_value);
   copied.text_edit.composition = copy_string(props.text_edit.composition);
   copied.accessibility.label = copy_string(props.accessibility.label);
   copied.accessibility.description =

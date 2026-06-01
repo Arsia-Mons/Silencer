@@ -65,6 +65,16 @@ static bool StartsWith(const std::string& value, const std::string& prefix){
 	       value.compare(0, prefix.size(), prefix) == 0;
 }
 
+static std::string StringArg(const nlohmann::json& args,
+                             const char * key,
+                             const std::string& fallback = std::string()) {
+	auto it = args.find(key);
+	if(it == args.end() || it->is_null()) return fallback;
+	if(it->is_string()) return it->get<std::string>();
+	if(it->is_number() || it->is_boolean()) return it->dump();
+	return fallback;
+}
+
 static bool UiWaitTargetExists(
 	const silencer::ui::UiInteractionRegistry& interactions,
 	const Game::PendingWait& wait){
@@ -758,7 +768,7 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 		return;
 	}
 	if(cmd.op == "set_text"){
-		std::string text = cmd.args.value("text", std::string());
+		std::string text = StringArg(cmd.args, "text");
 		const auto * cw = static_cast<const silencer::ui::UiInteractable *>(nullptr);
 		int count = 0;
 		if(cmd.args.contains("uid")){
@@ -841,7 +851,7 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 				}
 			}
 		}else if(cmd.args.contains("text")){
-			std::string text = cmd.args["text"].get<std::string>();
+			std::string text = StringArg(cmd.args, "text");
 			for(const auto & candidate : widgets){
 				if(candidate.kind == silencer::ui::UiInteractableKind::ListRow
 				   && silencer::ui::UiInteractableMatchesLabel(candidate, text.c_str())){
