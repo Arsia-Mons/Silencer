@@ -116,7 +116,7 @@ bool OptionsControlsScreen::HandleUiIntent(ScreenContext & ctx, const silencer::
 	return retainedFrame_.HandleUiIntent(action);
 }
 
-void OptionsControlsScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime, silencer::ui::UiInteractionRegistry& interactions) {
+void OptionsControlsScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime, const silencer::ui::UiInputState&, silencer::ui::UiInteractionRegistry& interactions) {
 	(void)frametime;
 	using namespace silencer::client_ui::options;
 	silencer::client_ui::OptionsModel options =

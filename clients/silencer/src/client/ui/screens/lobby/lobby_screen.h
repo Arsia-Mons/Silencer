@@ -25,7 +25,7 @@ public:
 
 	void Build(ScreenContext & ctx) override;
 	void Tick(ScreenContext & ctx) override;
-	void BuildUi(ScreenContext & ctx, Surface & dst, float frametime, silencer::ui::UiInteractionRegistry& interactions) override;
+	void BuildUi(ScreenContext & ctx, Surface & dst, float frametime, const silencer::ui::UiInputState& input, silencer::ui::UiInteractionRegistry& interactions) override;
 	void Destroy(ScreenContext & ctx) override;
 	bool HandleBack(ScreenContext & ctx) override;
 	bool HandleUiIntent(ScreenContext & ctx, const silencer::ui::UiAction & action) override;

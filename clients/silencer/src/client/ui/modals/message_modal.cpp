@@ -42,7 +42,7 @@ void MessageModal::Close()
 	if(cb) cb();
 }
 
-void MessageModal::BuildUi(ScreenContext & ctx, Surface & dst, float frametime, silencer::ui::UiInteractionRegistry& interactions)
+void MessageModal::BuildUi(ScreenContext & ctx, Surface & dst, float frametime, const silencer::ui::UiInputState&, silencer::ui::UiInteractionRegistry& interactions)
 {
 	(void)ctx;
 	(void)frametime;

@@ -15,6 +15,7 @@
 #include "renderdevice.h"
 #include "renderer.h"
 #include "surface.h"
+#include "ui/runtime/UiInputState.h"
 
 #include <SDL3/SDL.h>
 
@@ -266,13 +267,12 @@ void LobbyScreen::ShowGameTech()
 	rightPane = LobbyRightPane::GameTech;
 }
 
-void LobbyScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime, silencer::ui::UiInteractionRegistry& interactions)
+void LobbyScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime, const silencer::ui::UiInputState & input, silencer::ui::UiInteractionRegistry& interactions)
 {
 	(void)frametime;
 	(void)dst;
 	using namespace silencer::client_ui::lobby;
 
-	const silencer::ui::UiInputState & input = ctx.game.CurrentUiInput();
 	const int layoutWidth = std::max(1, input.width);
 	const int layoutHeight = std::max(1, input.height);
 	const int rootPadX = lobby_screen_detail::ScaleLegacyPx(

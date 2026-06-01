@@ -88,7 +88,7 @@ void MissionSummaryScreen::Tick(ScreenContext & ctx)
 	}
 }
 
-void MissionSummaryScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime, silencer::ui::UiInteractionRegistry& interactions)
+void MissionSummaryScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime, const silencer::ui::UiInputState&, silencer::ui::UiInteractionRegistry& interactions)
 {
 	(void)frametime;
 	const float uiScale = silencer::clay_bridge::UiScale();

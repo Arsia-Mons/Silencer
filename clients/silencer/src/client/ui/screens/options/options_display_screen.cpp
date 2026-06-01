@@ -23,7 +23,7 @@ void OptionsDisplayScreen::Tick(ScreenContext & ctx)
 	(void)ctx;
 }
 
-void OptionsDisplayScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime, silencer::ui::UiInteractionRegistry& interactions)
+void OptionsDisplayScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime, const silencer::ui::UiInputState&, silencer::ui::UiInteractionRegistry& interactions)
 {
 	(void)frametime;
 

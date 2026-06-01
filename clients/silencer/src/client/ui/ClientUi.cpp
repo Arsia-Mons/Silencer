@@ -329,7 +329,7 @@ void ClientUi::BuildVisibleScreens(ScreenContext& ctx,
                                    Uint8 hudPhase) {
 	inGameOverlayFrameActive_ = false;
 	NavigationProviderScope navigationScope(MakeNavigationProvider(ctx));
-	screens_.BuildVisible(ctx, dst, frametime, interactions_);
+	screens_.BuildVisible(ctx, dst, frametime, input, interactions_);
 	MatchModel match = use_match(MakeMatchProvider(ctx));
 	if(match.active()){
 		HudView hudView = match.hud.snapshot();

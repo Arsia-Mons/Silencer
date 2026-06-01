@@ -124,7 +124,7 @@ void LobbyConnectScreen::Tick(ScreenContext & ctx)
 	}
 }
 
-void LobbyConnectScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime, silencer::ui::UiInteractionRegistry& interactions)
+void LobbyConnectScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime, const silencer::ui::UiInputState&, silencer::ui::UiInteractionRegistry& interactions)
 {
 	(void)frametime;
 	silencer::client_ui::LobbyModel lobby =

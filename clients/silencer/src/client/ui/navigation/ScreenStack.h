@@ -14,6 +14,7 @@ struct DrawCommandList;
 
 namespace silencer {
 namespace ui {
+struct UiInputState;
 class UiInteractionRegistry;
 }
 namespace client_ui {
@@ -39,6 +40,7 @@ public:
 	void BuildVisible(ScreenContext& ctx,
 	                  Surface& dst,
 	                  float frametime,
+	                  const silencer::ui::UiInputState& input,
 	                  silencer::ui::UiInteractionRegistry& interactions);
 	std::vector<const ::ui::DrawCommandList *> RetainedDrawCommands() const;
 

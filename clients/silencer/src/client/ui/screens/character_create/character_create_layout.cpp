@@ -24,6 +24,7 @@ constexpr int kAliasInputUid = 31;
 void CharacterCreateScreen::BuildUi(ScreenContext & ctx,
                                     Surface & dst,
                                     float frametime,
+                                    const silencer::ui::UiInputState&,
                                     silencer::ui::UiInteractionRegistry& interactions)
 {
 	(void)frametime;

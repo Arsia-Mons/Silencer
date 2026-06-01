@@ -25,6 +25,7 @@ public:
 	void BuildUi(ScreenContext & ctx,
 	             Surface & dst,
 	             float frametime,
+	             const silencer::ui::UiInputState& input,
 	             silencer::ui::UiInteractionRegistry& interactions) override;
 	void Destroy(ScreenContext & ctx) override;
 	bool HandleBack(ScreenContext & ctx) override;

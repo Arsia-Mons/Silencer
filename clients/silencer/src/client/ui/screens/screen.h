@@ -37,8 +37,9 @@ public:
 	virtual void BuildUi(ScreenContext & ctx,
 	                     Surface & dst,
 	                     float frametime,
+	                     const silencer::ui::UiInputState& input,
 	                     silencer::ui::UiInteractionRegistry& interactions)
-	{ (void)ctx; (void)dst; (void)frametime; (void)interactions; }
+	{ (void)ctx; (void)dst; (void)frametime; (void)input; (void)interactions; }
 
 	// Tear down screen-owned UI state. Called on pop/replace.
 	virtual void Destroy(ScreenContext & ctx) = 0;
