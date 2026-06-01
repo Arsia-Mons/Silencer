@@ -1,0 +1,203 @@
+#include "client/ui/screens/options_controls.h"
+
+#include "client/ui/components/actions/actions.h"
+#include "client/ui/components/layout/layout.h"
+#include "client/ui/components/text/text.h"
+#include "client/ui/hooks/use_key_map.h"
+#include "client/ui/hooks/use_keybind_capture.h"
+#include "client/ui/hooks/use_navigation.h"
+#include "ui/runtime/react.h"
+
+#include <functional>
+#include <string>
+
+namespace client::ui {
+namespace {
+
+// JSX lowering emits each tag's component function + `<Tag>Props` type
+// unqualified, so pull in the silencer semantic layer + the runtime children().
+using namespace silencer;
+using ::ui::children;
+
+// Join an action's first combo into a display string (the chips are already
+// labeled by the composition root). "(unbound)" when the action has no combo.
+std::string binding_string(const KeyMap &km, Action action) {
+  for (const KeyMapAction &a : km.actions) {
+    if (a.action != action)
+      continue;
+    if (a.combos.empty())
+      return "(unbound)";
+    std::string out;
+    for (size_t i = 0; i < a.combos[0].chips.size(); ++i) {
+      if (i)
+        out += " + ";
+      out += a.combos[0].chips[i].label;
+    }
+    return out.empty() ? "(unbound)" : out;
+  }
+  return "(unbound)";
+}
+
+// Index of the combo a Rebind replaces (0 if the action already has one, else
+// -1 to append a fresh combo).
+int rebind_combo_index(const KeyMap &km, Action action) {
+  for (const KeyMapAction &a : km.actions) {
+    if (a.action == action)
+      return a.combos.empty() ? -1 : 0;
+  }
+  return -1;
+}
+
+std::string capture_banner(const KeybindCapture &cap) {
+  if (!cap.capturing)
+    return "Select Rebind, then press a key, mouse button, or gamepad input.";
+  std::string out = "Rebinding ";
+  out += cap.target_action_label; // pre-resolved by the composition root
+  out += ": ";
+  for (size_t i = 0; i < cap.pending_chips.size(); ++i) {
+    if (i)
+      out += " + ";
+    out += cap.pending_chips[i].label;
+  }
+  if (cap.pending_chips.empty())
+    out += "(press input)";
+  return out;
+}
+
+// One action's row: label + current binding + Rebind/Clear.
+struct ControlRowProps {
+  const char *key = nullptr;
+  const char *label = "";
+  const char *binding = "";
+  const char *rebind_id = nullptr;
+  std::function<void()> on_rebind = {};
+  std::function<void()> on_clear = {};
+};
+
+::ui::UiElement ControlRow(const ControlRowProps &props) {
+  return <ActionRow key={props.key}>
+    <BodyText key="label" variant={BodyTextVariant::Strong} value={props.label} />
+    <BodyText key="bind" variant={BodyTextVariant::Body} value={props.binding} />
+    <AppButton key="rebind" controlId={props.rebind_id} label="Rebind" onPress={props.on_rebind} />
+    <AppButton key="clear" label="Clear" onPress={props.on_clear} />
+  </ActionRow>
+}
+
+struct OptionsControlsProps {
+  uint32_t unused = 0;
+};
+
+::ui::UiElement OptionsControlsView(const OptionsControlsProps &) {
+  Navigation nav = use_navigation();
+  KeyMap km = use_key_map();
+  KeybindCapture cap = use_keybind_capture();
+  if (!nav.is_top)
+    return ::ui::empty();
+
+  std::function<void()> back = [nav]() {
+    if (nav.pop_current)
+      nav.pop_current();
+  };
+  auto make_rebind = [cap, &km](Action action) -> std::function<void()> {
+    int idx = rebind_combo_index(km, action);
+    return [cap, action, idx]() {
+      if (cap.begin_capture)
+        cap.begin_capture(action, idx);
+    };
+  };
+  auto make_clear = [&km](Action action) -> std::function<void()> {
+    std::function<void(Action)> clear_action = km.clear_action;
+    return [clear_action, action]() {
+      if (clear_action)
+        clear_action(action);
+    };
+  };
+
+  const char *preset = use_text_storage("Preset: %s%s", km.preset_label.c_str(),
+                                        km.dirty ? " *" : "");
+  const char *banner = use_text_storage("%s", capture_banner(cap).c_str());
+  const char *fire_b = use_text_storage("%s", binding_string(km, Action::Fire).c_str());
+  const char *jump_b = use_text_storage("%s", binding_string(km, Action::Jump).c_str());
+  const char *use_b = use_text_storage("%s", binding_string(km, Action::Use).c_str());
+  const char *chat_b = use_text_storage("%s", binding_string(km, Action::Chat).c_str());
+
+  return <ScreenLayout key="root" variant={ScreenLayoutVariant::Overlay}>
+    <ScreenTitle key="title" variant={ScreenTitleVariant::Screen} value="Controls" />
+    <ActionRow key="preset">
+      <BodyText key="label" variant={BodyTextVariant::Body} value={preset} />
+      <AppButton
+        key="cycle"
+        controlId="CyclePreset"
+        label="Cycle Preset"
+        onPress={km.cycle_preset}
+      />
+    </ActionRow>
+    <BodyText key="banner" variant={BodyTextVariant::Message} value={banner} />
+    <ActionRow key="capture">
+      <AppButton
+        key="confirm"
+        controlId="ConfirmBind"
+        disabled={!cap.capturing}
+        label="Confirm"
+        onPress={cap.confirm_chord}
+      />
+      <AppButton
+        key="cancelbind"
+        controlId="CancelBind"
+        disabled={!cap.capturing}
+        label="Cancel"
+        onPress={cap.cancel_capture}
+      />
+    </ActionRow>
+    <ControlRow
+      key="fire"
+      label="Fire"
+      binding={fire_b}
+      rebindId="RebindFire"
+      onRebind={make_rebind(Action::Fire)}
+      onClear={make_clear(Action::Fire)}
+    />
+    <ControlRow
+      key="jump"
+      label="Jump"
+      binding={jump_b}
+      rebindId="RebindJump"
+      onRebind={make_rebind(Action::Jump)}
+      onClear={make_clear(Action::Jump)}
+    />
+    <ControlRow
+      key="use"
+      label="Use"
+      binding={use_b}
+      rebindId="RebindUse"
+      onRebind={make_rebind(Action::Use)}
+      onClear={make_clear(Action::Use)}
+    />
+    <ControlRow
+      key="chat"
+      label="Chat"
+      binding={chat_b}
+      rebindId="RebindChat"
+      onRebind={make_rebind(Action::Chat)}
+      onClear={make_clear(Action::Chat)}
+    />
+    <ActionRow key="actions">
+      <AppButton key="save" controlId="SaveBinds" label="Save" onPress={km.commit} />
+      <AppButton key="revert" controlId="RevertBinds" label="Revert" onPress={km.revert} />
+      <AppButton key="back" controlId="ControlsBack" label="Back" onPress={back} />
+    </ActionRow>
+  </ScreenLayout>
+}
+
+} // namespace
+
+bool OptionsControlsScreen::build_element(::ui::UiElementFrame &,
+                                          ::ui::UiElement *out) {
+  if (!out)
+    return false;
+  *out = ::ui::component("OptionsControls", OptionsControlsProps{},
+                         OptionsControlsView, "options-controls");
+  return true;
+}
+
+} // namespace client::ui

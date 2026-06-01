@@ -261,6 +261,10 @@ set(SILENCER_CPPX_SOURCES
 	src/client/ui/screens/options_audio.hx
 	src/client/ui/screens/options_display.cppx
 	src/client/ui/screens/options_display.hx
+	# OptionsControls (SIL-19 part B): rows-of-combos + multi-device keybind
+	# capture (use_keybind_capture).
+	src/client/ui/screens/options_controls.cppx
+	src/client/ui/screens/options_controls.hx
 )
 cppx_transpile(SILENCER_CPPX_GENERATED ${SILENCER_CPPX_SOURCES})
 target_sources(${SILENCER_TARGET} PRIVATE ${SILENCER_CPPX_GENERATED})
@@ -421,13 +425,18 @@ set(_cppx_retained_sources
 	src/ui/style/text_measure.cpp
 	src/ui/style/default_theme.cpp
 	src/ui/style/resolve.cpp)
+# NOTE: app_root.cpp is deliberately NOT here. Its make_phase_element names the
+# real screens (which transitively pull the keybinds/config/os game deps), so it
+# is added only to the target that exercises the phase reconciler with real
+# screens (pipeline_host_tests). The lean shell tests below use their own test
+# screens and never name AppRoot.
 set(_cppx_app_shell_sources
 	src/client/ui/app_shell/client_ui.cpp
-	src/client/ui/app_shell/app_root.cpp
 	src/client/ui/app_shell/navigation/screen_stack.cpp
 	src/client/ui/app_theme.cpp
 	src/client/ui/providers/app_provider.cpp
 	src/client/ui/providers/key_map_provider.cpp
+	src/client/ui/providers/keybind_capture_provider.cpp
 	src/client/ui/providers/navigation_provider.cpp
 	src/client/ui/providers/server_provider.cpp
 	src/client/ui/providers/session_provider.cpp
@@ -437,13 +446,9 @@ set(_cppx_app_shell_sources
 add_executable(client_ui_tests
 	tests/client_ui_tests.cpp
 	${_cppx_app_shell_sources}
-	${_cppx_retained_sources}
-	# SIL-18: app_root.cpp's make_phase_element now names the authored screens,
-	# which compose the generated component + screen TUs.
-	${SILENCER_CPPX_GENERATED})
+	${_cppx_retained_sources})
 target_compile_features(client_ui_tests PRIVATE cxx_std_20)
-target_include_directories(client_ui_tests PRIVATE
-	"${CMAKE_CURRENT_SOURCE_DIR}/src" ${SILENCER_CPPX_INCLUDE_DIRS})
+target_include_directories(client_ui_tests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src")
 target_link_libraries(client_ui_tests PRIVATE yogacore)
 if(MSVC)
 	target_compile_definitions(client_ui_tests PRIVATE NOMINMAX)
@@ -454,13 +459,9 @@ add_executable(ui_pipeline_tests
 	tests/ui_pipeline_tests.cpp
 	src/client/ui/app_shell/ui_pipeline.cpp
 	${_cppx_app_shell_sources}
-	${_cppx_retained_sources}
-	# SIL-18: app_root.cpp's make_phase_element now names the authored screens,
-	# which compose the generated component + screen TUs.
-	${SILENCER_CPPX_GENERATED})
+	${_cppx_retained_sources})
 target_compile_features(ui_pipeline_tests PRIVATE cxx_std_20)
-target_include_directories(ui_pipeline_tests PRIVATE
-	"${CMAKE_CURRENT_SOURCE_DIR}/src" ${SILENCER_CPPX_INCLUDE_DIRS})
+target_include_directories(ui_pipeline_tests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src")
 target_link_libraries(ui_pipeline_tests PRIVATE yogacore)
 if(MSVC)
 	target_compile_definitions(ui_pipeline_tests PRIVATE NOMINMAX)
@@ -484,6 +485,11 @@ add_executable(pipeline_host_tests
 	src/render/cppx_ui/text_measure.cpp
 	src/ui/runtime/geometry.cpp
 	src/client/ui/app_shell/ui_pipeline.cpp
+	# AppRoot's make_phase_element renders the real phase screens (SIL-18/19); this
+	# is the one test that exercises the reconciler with them. The screen graph is
+	# kept game-dep-free (labels are pre-resolved by the composition root), so no
+	# keybinds/config/os link is needed here.
+	src/client/ui/app_shell/app_root.cpp
 	${_cppx_app_shell_sources}
 	${_cppx_retained_sources}
 	# SIL-16: the generated ui::components primitives, so the render test can

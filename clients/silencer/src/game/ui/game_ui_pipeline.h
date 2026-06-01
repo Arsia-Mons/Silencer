@@ -2,10 +2,12 @@
 #define GAME_UI_PIPELINE_H
 
 #include "surface.h"
+#include "input/keybinds.h" // Action, BindingKey, BindingDevice
 #include "ui/input.h"
 #include <cstdint>
 #include <memory>
 #include <string>
+#include <vector>
 
 class Game;
 
@@ -67,6 +69,24 @@ std::string value;
 };
 const PasswordModalResult & PasswordModal() const { return passwordModal_; }
 
+// --- Keybind capture (SIL-19 §7b) --------------------------------------
+// The capture state machine. Raw multi-device edges arrive in the game layer
+// (events.cpp, gated on IsCapturingKeybind) and the control socket; the UI
+// (use_keybind_capture) drives begin/confirm/cancel and renders the pending
+// chord. Live here (not in React state) because the edge source is global.
+bool IsCapturingKeybind() const { return keybindCapture_.active; }
+void BeginKeybindCapture(Action action, int comboIndex);
+// Append a raw edge to the pending chord (dedup; capped at CHORD_CAP). Returns
+// true when the chip was added. No-op when not capturing.
+bool FeedKeybindEdge(const BindingKey & key);
+// Commit the pending chord as the target combo (fork-if-builtin, caps), then
+// leave capture mode. No-op if the chord is empty.
+void ConfirmKeybindChord();
+void CancelKeybindCapture();
+const std::vector<BindingKey> & KeybindCapturePending() const {
+return keybindCapture_.pending;
+}
+
 private:
 void RenderCppxClientUiFrame(Surface & surface);
 client::ui::SessionPhase CurrentSessionPhase() const;
@@ -103,6 +123,15 @@ float injectedPointerY_ = 0.0f;
 bool prevPointerDown_ = false;
 bool textInputActive_ = false;
 PasswordModalResult passwordModal_ = {};
+
+// SIL-19 keybind capture state. `active` gates events.cpp's raw-edge intake.
+struct KeybindCaptureState {
+bool active = false;
+Action targetAction = Action::MoveUp;
+int targetComboIndex = -1; // -1 = append a new combo
+std::vector<BindingKey> pending = {}; // the chord under construction
+};
+KeybindCaptureState keybindCapture_ = {};
 };
 
 #endif

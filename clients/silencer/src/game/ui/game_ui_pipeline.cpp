@@ -16,11 +16,13 @@
 #include "client/ui/screens/message_modal.h"
 #include "client/ui/screens/password_modal.h"
 #include "client/ui/hooks/use_key_map.h"
+#include "client/ui/hooks/use_keybind_capture.h"
 #include "client/ui/hooks/use_session.h"
 #include "client/ui/hooks/use_settings.h"
 #include "client/ui/hooks/use_updater.h"
 #include "client/ui/providers/app_provider.h"
 #include "client/ui/providers/key_map_provider.h"
+#include "client/ui/providers/keybind_capture_provider.h"
 #include "client/ui/providers/server_provider.h"
 #include "client/ui/providers/session_provider.h"
 #include "client/ui/providers/settings_provider.h"
@@ -55,6 +57,36 @@ bool ChipsToBinding(const std::vector<client::ui::KeyMapChip> &chips,
 
 bool KeybindProfileIsBuiltin(const std::string &name) {
   return name == "default" || name == "wasd" || name == "gamepad";
+}
+
+// Label a BindingKey for the UI (the UI never re-derives labels): keyboard via
+// GetKeyName, mouse to LMB/MMB/RMB, gamepad button/axis via GamepadShortLabel
+// (type-aware). Shared by the use_key_map read view + the capture pending chord.
+client::ui::KeyMapChip ChipFromBindingKey(const BindingKey &bk,
+                                          SDL_GamepadType padType) {
+  client::ui::KeyMapChip chip;
+  chip.device = bk.device;
+  chip.code = bk.code;
+  chip.axis_dir = bk.axisDir;
+  switch (bk.device) {
+  case BindingDevice::Keyboard:
+    chip.label = KeyMap::GetKeyName((SDL_Scancode)bk.code);
+    break;
+  case BindingDevice::Mouse:
+    chip.label = (bk.code == 1)   ? "LMB"
+                 : (bk.code == 2) ? "MMB"
+                 : (bk.code == 3) ? "RMB"
+                                  : ("M" + std::to_string(bk.code));
+    break;
+  default: { // GamepadButton / GamepadAxis
+    std::string s = Stringify(bk);
+    auto colon = s.find(':');
+    std::string raw = (colon != std::string::npos) ? s.substr(colon + 1) : s;
+    chip.label = GamepadShortLabel(raw, padType);
+    break;
+  }
+  }
+  return chip;
 }
 } // namespace
 
@@ -265,19 +297,7 @@ const ActionBindings & ab = km.Get(a);
 for(const Binding & b : ab.bindings){
 client::ui::KeyMapCombo combo;
 for(const BindingKey & bk : b.keys){
-client::ui::KeyMapChip chip;
-chip.device = bk.device;
-chip.code = bk.code;
-chip.axis_dir = bk.axisDir;
-if(bk.device == BindingDevice::Keyboard){
-chip.label = KeyMap::GetKeyName((SDL_Scancode)bk.code);
-}else{
-std::string s = Stringify(bk);
-auto colon = s.find(':');
-std::string raw = (colon != std::string::npos) ? s.substr(colon + 1) : s;
-chip.label = GamepadShortLabel(raw, padType);
-}
-combo.chips.push_back(std::move(chip));
+combo.chips.push_back(ChipFromBindingKey(bk, padType));
 }
 outA.combos.push_back(std::move(combo));
 }
@@ -349,10 +369,33 @@ keymapDirty_ = false;
 };
 }
 
+// Keybind capture model (doc §7b): the comp-root-owned capture state, with the
+// pending chord labeled, + the begin/cancel/confirm closures. Published
+// globally (the raw multi-device edge source is global) though only
+// OptionsControls consumes it.
+client::ui::KeybindCapture capture = {};
+{
+SDL_Gamepad * pad = game.GetGamepad();
+SDL_GamepadType padType = pad ? SDL_GetGamepadType(pad) : SDL_GAMEPAD_TYPE_UNKNOWN;
+capture.capturing = keybindCapture_.active;
+capture.target_action = keybindCapture_.targetAction;
+capture.target_action_label = GetActionInfo(keybindCapture_.targetAction).label;
+capture.target_combo_index = keybindCapture_.targetComboIndex;
+for(const BindingKey & bk : keybindCapture_.pending){
+capture.pending_chips.push_back(ChipFromBindingKey(bk, padType));
+}
+capture.begin_capture = [this](Action a, int idx){ BeginKeybindCapture(a, idx); };
+capture.cancel_capture = [this](){ CancelKeybindCapture(); };
+capture.confirm_chord = [this](){ ConfirmKeybindChord(); };
+}
+
 // Global FrameProvider chain (doc §5), outermost (Theme) → innermost
-// (Updater): Theme ▸ Server ▸ App ▸ Session ▸ Settings ▸ KeyMap ▸ Updater ▸ <screen>.
-::ui::UiElement tree = client::ui::UpdaterProvider(
-client::ui::UpdaterProviderValue{updater}, ::ui::children({child}));
+// (KeybindCapture): Theme ▸ Server ▸ App ▸ Session ▸ Settings ▸ KeyMap ▸
+// Updater ▸ KeybindCapture ▸ <screen>.
+::ui::UiElement tree = client::ui::KeybindCaptureProvider(
+client::ui::KeybindCaptureProviderValue{std::move(capture)}, ::ui::children({child}));
+tree = client::ui::UpdaterProvider(
+client::ui::UpdaterProviderValue{updater}, ::ui::children({tree}));
 tree = client::ui::KeyMapProvider(
 client::ui::KeyMapProviderValue{std::move(key_map)}, ::ui::children({tree}));
 tree = client::ui::SettingsProvider(
@@ -464,5 +507,56 @@ client::ui::ClientUi * ui = TryClientUi();
 if(!ui) return;
 ui->push_screen(std::make_unique<client::ui::MessageModalScreen>(
 title ? title : "", message ? message : ""));
+}
+
+void GameUiPipeline::BeginKeybindCapture(Action action, int comboIndex) {
+keybindCapture_.active = true;
+keybindCapture_.targetAction = action;
+keybindCapture_.targetComboIndex = comboIndex;
+keybindCapture_.pending.clear();
+}
+
+bool GameUiPipeline::FeedKeybindEdge(const BindingKey & key) {
+if(!keybindCapture_.active) return false;
+if((int)keybindCapture_.pending.size() >= CHORD_CAP) return false;
+for(const BindingKey & k : keybindCapture_.pending){
+if(k.device == key.device && k.code == key.code && k.axisDir == key.axisDir){
+return false; // dedup: a held edge only adds its chip once
+}
+}
+keybindCapture_.pending.push_back(key);
+return true;
+}
+
+void GameUiPipeline::CancelKeybindCapture() {
+keybindCapture_.active = false;
+keybindCapture_.targetComboIndex = -1;
+keybindCapture_.pending.clear();
+}
+
+void GameUiPipeline::ConfirmKeybindChord() {
+if(!keybindCapture_.active || keybindCapture_.pending.empty()){
+CancelKeybindCapture();
+return;
+}
+// Apply directly (not via the after-render mutation queue): this also runs
+// from the control socket, which fires before begin_frame clears that queue.
+// A keymap edit is local config — not a structural tree mutation or a wire
+// message — so a direct, immediate write is safe and FADEOUT-gating-exempt.
+if((int)keybindCapture_.pending.size() <= CHORD_CAP){
+ForkActiveProfileIfBuiltin(game.GetKeyMap());
+ActionBindings & ab = game.GetKeyMap().Get(keybindCapture_.targetAction);
+Binding b;
+b.keys = keybindCapture_.pending;
+int idx = keybindCapture_.targetComboIndex;
+if(idx >= 0 && idx < (int)ab.bindings.size()){
+ab.bindings[idx] = std::move(b);
+keymapDirty_ = true;
+}else if((int)ab.bindings.size() < COMBO_CAP){
+ab.bindings.push_back(std::move(b));
+keymapDirty_ = true;
+}
+}
+CancelKeybindCapture();
 }
 

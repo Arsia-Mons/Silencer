@@ -970,6 +970,65 @@ static void HandleKeybind(Game& game, ControlCommand& cmd) {
 		return;
 	}
 
+	// ---- capture ------------------------------------------------------
+	// Drives the multi-device keybind-capture state machine (SIL-19 §7b) without
+	// SDL: begin → feed (one device edge per call, as a "KEY:..|MOUSE:..|PAD:.."
+	// string) → confirm/cancel. The same state machine the windowed event path
+	// feeds, so this exercises the real capture → use_key_map commit path.
+	if (subop == "capture") {
+		const std::string op = cmd.args.value("op", std::string());
+		GameUiPipeline& pipe = game.GetUiPipeline();
+		if (op == "begin") {
+			const std::string actionId = cmd.args.value("action", std::string());
+			const ActionInfo* info = FindAction(actionId);
+			if (!info) {
+				cmd.reply->set_value(Err(cmd.id, "NOT_FOUND", "no such action: " + actionId));
+				return;
+			}
+			int combo = cmd.args.value("combo", -1);
+			pipe.BeginKeybindCapture(info->action, combo);
+			nlohmann::json r;
+			r["action"] = info->id;
+			cmd.reply->set_value(OkResult(cmd.id, r));
+			return;
+		}
+		if (op == "feed") {
+			const std::string binding = cmd.args.value("binding", std::string());
+			BindingKey bk;
+			if (!ParseBindingKey(binding, bk)) {
+				cmd.reply->set_value(Err(cmd.id, "BAD_ARGS", "unrecognized binding: " + binding));
+				return;
+			}
+			bool added = pipe.FeedKeybindEdge(bk);
+			nlohmann::json r;
+			r["added"] = added;
+			cmd.reply->set_value(OkResult(cmd.id, r));
+			return;
+		}
+		if (op == "confirm") {
+			pipe.ConfirmKeybindChord();
+			cmd.reply->set_value(OkResult(cmd.id, nlohmann::json::object()));
+			return;
+		}
+		if (op == "cancel") {
+			pipe.CancelKeybindCapture();
+			cmd.reply->set_value(OkResult(cmd.id, nlohmann::json::object()));
+			return;
+		}
+		if (op == "status") {
+			nlohmann::json pend = nlohmann::json::array();
+			for (const BindingKey& k : pipe.KeybindCapturePending()) pend.push_back(Stringify(k));
+			nlohmann::json r;
+			r["capturing"] = pipe.IsCapturingKeybind();
+			r["pending"] = pend;
+			cmd.reply->set_value(OkResult(cmd.id, r));
+			return;
+		}
+		cmd.reply->set_value(Err(cmd.id, "BAD_REQUEST",
+			"keybind capture requires --op begin|feed|confirm|cancel|status"));
+		return;
+	}
+
 	cmd.reply->set_value(Err(cmd.id, "UNKNOWN_OP", "unknown keybind subop: " + subop));
 }
 

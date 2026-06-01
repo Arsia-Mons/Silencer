@@ -110,6 +110,9 @@ const STRING_FLAGS: Record<string, Record<string, Set<string>>> = {
     use: new Set(["profile"]),
     new: new Set(["profile", "from"]),
     delete: new Set(["profile"]),
+    // capture: --op begin|feed|confirm|cancel|status; --binding "KEY:K"/"PAD:south";
+    // --action stays a string id (e.g. "fire").
+    capture: new Set(["op", "action", "binding"]),
   },
   gas: {
     validate: new Set(["dir"]),

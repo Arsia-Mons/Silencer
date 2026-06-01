@@ -73,6 +73,14 @@ break;
 case SDL_EVENT_KEY_DOWN:{
 gameInput.OnScancodeDown(event.key.scancode);
 gameInput.GetKeystate()[event.key.scancode] = true;
+// While rebinding (SIL-19 §7b), keyboard edges build the pending chord
+// instead of driving UI nav/confirm — so Escape/Enter and arrows are
+// themselves bindable. Confirm/Cancel happen via the capture UI buttons.
+if(gameUiPipeline.IsCapturingKeybind()){
+gameUiPipeline.FeedKeybindEdge({BindingDevice::Keyboard,
+                                (int)event.key.scancode, 0});
+break;
+}
 ::ui::UiInputFrame & ui = gameUiPipeline.UiInput();
 ui.source = ::ui::UiFocusSource::Keyboard;
 ::ui::UiKey k = UiKeyFromSdl(event.key.key);
@@ -105,16 +113,45 @@ default: break;
 }
 }break;
 case SDL_EVENT_TEXT_INPUT:{
+if(gameUiPipeline.IsCapturingKeybind()) break; // no text while rebinding
 ::ui::UiInputFrame & ui = gameUiPipeline.UiInput();
 ::ui::ui_input_push_text(ui, event.text.text);
 ui.source = ::ui::UiFocusSource::Keyboard;
 }break;
 case SDL_EVENT_TEXT_EDITING:{
+if(gameUiPipeline.IsCapturingKeybind()) break;
 ::ui::UiInputFrame & ui = gameUiPipeline.UiInput();
 ::ui::ui_input_push_editing(ui, event.edit.text, event.edit.start,
                             event.edit.length);
 ui.source = ::ui::UiFocusSource::Keyboard;
 }break;
+// Multi-device keybind capture edges (SIL-19 §7b). Mouse-left is gated to
+// active capture so it never steals a UI click; gamepad button/axis are
+// event-driven only while capturing (gameplay reads the polled snapshot).
+case SDL_EVENT_MOUSE_BUTTON_DOWN:
+if(gameUiPipeline.IsCapturingKeybind()){
+gameUiPipeline.FeedKeybindEdge({BindingDevice::Mouse,
+                                (int)event.button.button, 0});
+}
+break;
+case SDL_EVENT_GAMEPAD_BUTTON_DOWN:
+if(gameUiPipeline.IsCapturingKeybind()){
+gameUiPipeline.FeedKeybindEdge({BindingDevice::GamepadButton,
+                                (int)event.gbutton.button, 0});
+}
+break;
+case SDL_EVENT_GAMEPAD_AXIS_MOTION:
+if(gameUiPipeline.IsCapturingKeybind()){
+int v = event.gaxis.value;
+if(v > AXIS_DEADZONE){
+gameUiPipeline.FeedKeybindEdge({BindingDevice::GamepadAxis,
+                                (int)event.gaxis.axis, 1});
+}else if(v < -AXIS_DEADZONE){
+gameUiPipeline.FeedKeybindEdge({BindingDevice::GamepadAxis,
+                                (int)event.gaxis.axis, -1});
+}
+}
+break;
 case SDL_EVENT_GAMEPAD_ADDED:
 if(!gameInput.GetGamepad()) gameInput.OpenFirstGamepad();
 break;
