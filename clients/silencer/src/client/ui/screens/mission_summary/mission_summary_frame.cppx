@@ -150,24 +150,24 @@ inline ::ui::LayoutStyle absolute_layout(float left,
 	};
 }
 
-const char * SummaryLine(const MissionSummaryFrameProps& props, int index) {
-	if(!props.summary_lines || index < 0 || index >= props.summary_line_count){
+const char * SummaryLine(const char * const * lines,
+                         int line_count,
+                         int index) {
+	if(!lines || index < 0 || index >= line_count){
 		return "";
 	}
-	return props.summary_lines[index] ? props.summary_lines[index] : "";
+	return lines[index] ? lines[index] : "";
 }
 
 	struct SummaryTextLineProps {
 		const char * key = nullptr;
-		const MissionSummaryFrameProps * frame = nullptr;
-		int index = 0;
+		const char * value = nullptr;
 	};
 
 	::ui::UiElement SummaryTextLine(const SummaryTextLineProps& props) {
-		if(!props.frame) return ::ui::empty();
 		return <Text
 		  key={props.key}
-		  value={SummaryLine(*props.frame, props.index)}
+		  value={props.value ? props.value : ""}
 		  layout={::ui::LayoutStyle{
 				.width = ::ui::Length::points(kSummaryW),
 				.height = ::ui::Length::points(kLineH),
@@ -194,16 +194,16 @@ const char * SummaryLine(const MissionSummaryFrameProps& props, int index) {
 
 	struct UpgradeButtonProps {
 		const char * key = nullptr;
-		const MissionSummaryFrameProps * frame = nullptr;
+		bool show = false;
 		int index = 0;
 		int button_y = 0;
+		std::function<void(int)> apply_upgrade = {};
 	};
 
 	::ui::UiElement UpgradeButton(const UpgradeButtonProps& props) {
-		if(!props.frame || !props.frame->upgrades_available[props.index]){
+		if(!props.show){
 			return ::ui::empty();
 		}
-		std::function<void(int)> applyUpgrade = props.frame->apply_upgrade;
 		std::string actionId = std::string("mission_summary.upgrade.") +
 			std::to_string(props.index);
 		std::string textKey = std::string("upgrade-button-text-") +
@@ -217,7 +217,7 @@ const char * SummaryLine(const MissionSummaryFrameProps& props, int index) {
 			  controlId={actionId.c_str()}
 			  size={AppButtonSize::MainMenu}
 			  accessibilityLabel={kUpgradeLabels[props.index]}
-			  onPress={[applyUpgrade, index = props.index]() {
+			  onPress={[applyUpgrade = props.apply_upgrade, index = props.index]() {
 					if(applyUpgrade) applyUpgrade(index);
 				}}
 			>
@@ -228,15 +228,16 @@ const char * SummaryLine(const MissionSummaryFrameProps& props, int index) {
 
 	struct UpgradeRowProps {
 		const char * key = nullptr;
-		const MissionSummaryFrameProps * frame = nullptr;
 		int index = 0;
+		int level = 0;
+		bool upgrade_available = false;
+		std::function<void(int)> apply_upgrade = {};
 	};
 
 	::ui::UiElement UpgradeRow(const UpgradeRowProps& props) {
-		if(!props.frame) return ::ui::empty();
 		const int rowY = kLevelStartY + props.index * kLevelRowGap;
 		const int buttonY = kUpgradeButtonY + props.index * kLevelRowGap;
-		std::string value = std::to_string(props.frame->levels[props.index]);
+		std::string value = std::to_string(props.level);
 		std::string buttonKey = std::string("upgrade-button-") +
 			std::to_string(props.index);
 		return <Box key={props.key}>
@@ -254,20 +255,21 @@ const char * SummaryLine(const MissionSummaryFrameProps& props, int index) {
 		/>
 			<UpgradeButton
 			  key={buttonKey.c_str()}
-			  frame={props.frame}
+			  show={props.upgrade_available}
 			  index={props.index}
 			  buttonY={buttonY}
+			  applyUpgrade={props.apply_upgrade}
 			/>
 		</Box>
 	}
 
 	struct UpgradeBannerProps {
 		const char * key = nullptr;
-		const MissionSummaryFrameProps * frame = nullptr;
+		bool show = false;
 	};
 
 	::ui::UiElement UpgradeBanner(const UpgradeBannerProps& props) {
-		if(!props.frame || !props.frame->upgrade_banner) return ::ui::empty();
+		if(!props.show) return ::ui::empty();
 		return <Text
 		  key={props.key}
 		  value="*NEW UPGRADE AVAILABLE*"
@@ -335,34 +337,118 @@ using mission_summary_frame_detail::UpgradeRowProps;
 					.height = ::ui::Length::points(mission_summary_frame_detail::kSummaryRenderH),
 				}}
 			>
-					<SummaryTextLine key="summary-line-0" frame={&props} index={0} />
-					<SummaryTextLine key="summary-line-1" frame={&props} index={1} />
-					<SummaryTextLine key="summary-line-2" frame={&props} index={2} />
-					<SummaryTextLine key="summary-line-3" frame={&props} index={3} />
-					<SummaryTextLine key="summary-line-4" frame={&props} index={4} />
-					<SummaryTextLine key="summary-line-5" frame={&props} index={5} />
-					<SummaryTextLine key="summary-line-6" frame={&props} index={6} />
-					<SummaryTextLine key="summary-line-7" frame={&props} index={7} />
-					<SummaryTextLine key="summary-line-8" frame={&props} index={8} />
-					<SummaryTextLine key="summary-line-9" frame={&props} index={9} />
-					<SummaryTextLine key="summary-line-10" frame={&props} index={10} />
-					<SummaryTextLine key="summary-line-11" frame={&props} index={11} />
-					<SummaryTextLine key="summary-line-12" frame={&props} index={12} />
-					<SummaryTextLine key="summary-line-13" frame={&props} index={13} />
-					<SummaryTextLine key="summary-line-14" frame={&props} index={14} />
-					<SummaryTextLine key="summary-line-15" frame={&props} index={15} />
-					<SummaryTextLine key="summary-line-16" frame={&props} index={16} />
-					<SummaryTextLine key="summary-line-17" frame={&props} index={17} />
-					<SummaryTextLine key="summary-line-18" frame={&props} index={18} />
-					<SummaryTextLine key="summary-line-19" frame={&props} index={19} />
-					<SummaryTextLine key="summary-line-20" frame={&props} index={20} />
-					<SummaryTextLine key="summary-line-21" frame={&props} index={21} />
-					<SummaryTextLine key="summary-line-22" frame={&props} index={22} />
-					<SummaryTextLine key="summary-line-23" frame={&props} index={23} />
-					<SummaryTextLine key="summary-line-24" frame={&props} index={24} />
-					<SummaryTextLine key="summary-line-25" frame={&props} index={25} />
-					<SummaryTextLine key="summary-line-26" frame={&props} index={26} />
-					<SummaryTextLine key="summary-line-27" frame={&props} index={27} />
+					<SummaryTextLine
+					  key="summary-line-0"
+					  value={mission_summary_frame_detail::SummaryLine(props.summary_lines, props.summary_line_count, 0)}
+					/>
+					<SummaryTextLine
+					  key="summary-line-1"
+					  value={mission_summary_frame_detail::SummaryLine(props.summary_lines, props.summary_line_count, 1)}
+					/>
+					<SummaryTextLine
+					  key="summary-line-2"
+					  value={mission_summary_frame_detail::SummaryLine(props.summary_lines, props.summary_line_count, 2)}
+					/>
+					<SummaryTextLine
+					  key="summary-line-3"
+					  value={mission_summary_frame_detail::SummaryLine(props.summary_lines, props.summary_line_count, 3)}
+					/>
+					<SummaryTextLine
+					  key="summary-line-4"
+					  value={mission_summary_frame_detail::SummaryLine(props.summary_lines, props.summary_line_count, 4)}
+					/>
+					<SummaryTextLine
+					  key="summary-line-5"
+					  value={mission_summary_frame_detail::SummaryLine(props.summary_lines, props.summary_line_count, 5)}
+					/>
+					<SummaryTextLine
+					  key="summary-line-6"
+					  value={mission_summary_frame_detail::SummaryLine(props.summary_lines, props.summary_line_count, 6)}
+					/>
+					<SummaryTextLine
+					  key="summary-line-7"
+					  value={mission_summary_frame_detail::SummaryLine(props.summary_lines, props.summary_line_count, 7)}
+					/>
+					<SummaryTextLine
+					  key="summary-line-8"
+					  value={mission_summary_frame_detail::SummaryLine(props.summary_lines, props.summary_line_count, 8)}
+					/>
+					<SummaryTextLine
+					  key="summary-line-9"
+					  value={mission_summary_frame_detail::SummaryLine(props.summary_lines, props.summary_line_count, 9)}
+					/>
+					<SummaryTextLine
+					  key="summary-line-10"
+					  value={mission_summary_frame_detail::SummaryLine(props.summary_lines, props.summary_line_count, 10)}
+					/>
+					<SummaryTextLine
+					  key="summary-line-11"
+					  value={mission_summary_frame_detail::SummaryLine(props.summary_lines, props.summary_line_count, 11)}
+					/>
+					<SummaryTextLine
+					  key="summary-line-12"
+					  value={mission_summary_frame_detail::SummaryLine(props.summary_lines, props.summary_line_count, 12)}
+					/>
+					<SummaryTextLine
+					  key="summary-line-13"
+					  value={mission_summary_frame_detail::SummaryLine(props.summary_lines, props.summary_line_count, 13)}
+					/>
+					<SummaryTextLine
+					  key="summary-line-14"
+					  value={mission_summary_frame_detail::SummaryLine(props.summary_lines, props.summary_line_count, 14)}
+					/>
+					<SummaryTextLine
+					  key="summary-line-15"
+					  value={mission_summary_frame_detail::SummaryLine(props.summary_lines, props.summary_line_count, 15)}
+					/>
+					<SummaryTextLine
+					  key="summary-line-16"
+					  value={mission_summary_frame_detail::SummaryLine(props.summary_lines, props.summary_line_count, 16)}
+					/>
+					<SummaryTextLine
+					  key="summary-line-17"
+					  value={mission_summary_frame_detail::SummaryLine(props.summary_lines, props.summary_line_count, 17)}
+					/>
+					<SummaryTextLine
+					  key="summary-line-18"
+					  value={mission_summary_frame_detail::SummaryLine(props.summary_lines, props.summary_line_count, 18)}
+					/>
+					<SummaryTextLine
+					  key="summary-line-19"
+					  value={mission_summary_frame_detail::SummaryLine(props.summary_lines, props.summary_line_count, 19)}
+					/>
+					<SummaryTextLine
+					  key="summary-line-20"
+					  value={mission_summary_frame_detail::SummaryLine(props.summary_lines, props.summary_line_count, 20)}
+					/>
+					<SummaryTextLine
+					  key="summary-line-21"
+					  value={mission_summary_frame_detail::SummaryLine(props.summary_lines, props.summary_line_count, 21)}
+					/>
+					<SummaryTextLine
+					  key="summary-line-22"
+					  value={mission_summary_frame_detail::SummaryLine(props.summary_lines, props.summary_line_count, 22)}
+					/>
+					<SummaryTextLine
+					  key="summary-line-23"
+					  value={mission_summary_frame_detail::SummaryLine(props.summary_lines, props.summary_line_count, 23)}
+					/>
+					<SummaryTextLine
+					  key="summary-line-24"
+					  value={mission_summary_frame_detail::SummaryLine(props.summary_lines, props.summary_line_count, 24)}
+					/>
+					<SummaryTextLine
+					  key="summary-line-25"
+					  value={mission_summary_frame_detail::SummaryLine(props.summary_lines, props.summary_line_count, 25)}
+					/>
+					<SummaryTextLine
+					  key="summary-line-26"
+					  value={mission_summary_frame_detail::SummaryLine(props.summary_lines, props.summary_line_count, 26)}
+					/>
+					<SummaryTextLine
+					  key="summary-line-27"
+					  value={mission_summary_frame_detail::SummaryLine(props.summary_lines, props.summary_line_count, 27)}
+					/>
 				</Box>
 			<Text
 			  key="xp"
@@ -370,13 +456,49 @@ using mission_summary_frame_detail::UpgradeRowProps;
 			  layout={mission_summary_frame_detail::absolute_layout(mission_summary_frame_detail::kXpCenterX - mission_summary_frame_detail::kXpW / 2, mission_summary_frame_detail::kXpY, mission_summary_frame_detail::kXpW, mission_summary_frame_detail::kXpH)}
 			  style={mission_summary_frame_detail::text_patch(tokens::kTextTitle, 136, 16, ::ui::TextAlign::Center)}
 			/>
-				<UpgradeBanner key="upgrade-banner" frame={&props} />
-				<UpgradeRow key="upgrade-row-0" frame={&props} index={0} />
-				<UpgradeRow key="upgrade-row-1" frame={&props} index={1} />
-				<UpgradeRow key="upgrade-row-2" frame={&props} index={2} />
-				<UpgradeRow key="upgrade-row-3" frame={&props} index={3} />
-				<UpgradeRow key="upgrade-row-4" frame={&props} index={4} />
-				<UpgradeRow key="upgrade-row-5" frame={&props} index={5} />
+				<UpgradeBanner key="upgrade-banner" show={props.upgrade_banner} />
+				<UpgradeRow
+				  key="upgrade-row-0"
+				  index={0}
+				  level={props.levels[0]}
+				  upgradeAvailable={props.upgrades_available[0]}
+				  applyUpgrade={props.apply_upgrade}
+				/>
+				<UpgradeRow
+				  key="upgrade-row-1"
+				  index={1}
+				  level={props.levels[1]}
+				  upgradeAvailable={props.upgrades_available[1]}
+				  applyUpgrade={props.apply_upgrade}
+				/>
+				<UpgradeRow
+				  key="upgrade-row-2"
+				  index={2}
+				  level={props.levels[2]}
+				  upgradeAvailable={props.upgrades_available[2]}
+				  applyUpgrade={props.apply_upgrade}
+				/>
+				<UpgradeRow
+				  key="upgrade-row-3"
+				  index={3}
+				  level={props.levels[3]}
+				  upgradeAvailable={props.upgrades_available[3]}
+				  applyUpgrade={props.apply_upgrade}
+				/>
+				<UpgradeRow
+				  key="upgrade-row-4"
+				  index={4}
+				  level={props.levels[4]}
+				  upgradeAvailable={props.upgrades_available[4]}
+				  applyUpgrade={props.apply_upgrade}
+				/>
+				<UpgradeRow
+				  key="upgrade-row-5"
+				  index={5}
+				  level={props.levels[5]}
+				  upgradeAvailable={props.upgrades_available[5]}
+				  applyUpgrade={props.apply_upgrade}
+				/>
 			<Box
 			  key="done-wrap"
 			  layout={mission_summary_frame_detail::absolute_layout(mission_summary_frame_detail::kDoneButtonX, mission_summary_frame_detail::kDoneButtonY, mission_summary_frame_detail::kButtonW, mission_summary_frame_detail::kButtonH)}
