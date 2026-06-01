@@ -1,0 +1,124 @@
+#include "client/ui/screens/character_create.h"
+
+#include "client/ui/components/actions/actions.h"
+#include "client/ui/components/layout/layout.h"
+#include "client/ui/components/surfaces/surfaces.h"
+#include "client/ui/components/text/text.h"
+#include "client/ui/hooks/use_characters.h"
+#include "client/ui/hooks/use_lobby_session.h"
+#include "ui/components/input.h"
+#include "ui/runtime/react.h"
+
+#include <functional>
+#include <string>
+
+namespace client::ui {
+namespace {
+
+using namespace silencer;
+using ::ui::children;
+using ::ui::components::Input;
+using ::ui::components::InputProps;
+
+// The five agencies, in `Team` enum / agency-index order (matches the index
+// CreateCharacter expects). Names mirror Team::GetAgencyName.
+struct AgencyRowProps {
+  const char *key = nullptr;
+  const char *control_id = nullptr;
+  const char *label = "";
+  bool enabled = false;
+  std::function<void()> on_create = {};
+};
+
+::ui::UiElement AgencyRow(const AgencyRowProps &props) {
+  return <AppButton
+    key={props.key}
+    controlId={props.control_id}
+    disabled={!props.enabled}
+    label={props.label}
+    onPress={props.on_create}
+  />
+}
+
+struct CharacterCreateProps {
+  uint32_t unused = 0;
+};
+
+::ui::UiElement CharacterCreateView(const CharacterCreateProps &) {
+  Characters chars = use_characters();
+  LobbySession lobby = use_lobby_session();
+  std::string *alias = use_state<std::string>(std::string());
+  if (!alias)
+    return ::ui::empty();
+
+  bool can_create = !alias->empty();
+  std::function<void(const std::string &)> set_alias =
+      [alias](const std::string &next) { *alias = next; };
+  std::function<void(const std::string &, int)> create = chars.create;
+  auto make_create = [create, alias](int agency) -> std::function<void()> {
+    return [create, alias, agency]() {
+      if (create && !alias->empty())
+        create(*alias, agency);
+    };
+  };
+
+  return <ScreenLayout key="root" variant={ScreenLayoutVariant::Menu}>
+    <Panel key="panel" variant={PanelVariant::Hero}>
+      <ScreenTitle key="title" variant={ScreenTitleVariant::Hero} value="Create Agent" />
+      <ScreenSubtitle key="subtitle" value="Choose an alias, then pick an agency" />
+      <Input
+        key="alias"
+        id="Alias"
+        autofocus={true}
+        accessibility={{.label = "Alias"}}
+        value={alias->c_str()}
+        onChange={set_alias}
+      />
+      <AgencyRow
+        key="noxis"
+        controlId="AgencyNoxis"
+        label="Noxis"
+        enabled={can_create}
+        onCreate={make_create(0)}
+      />
+      <AgencyRow
+        key="lazarus"
+        controlId="AgencyLazarus"
+        label="Lazarus"
+        enabled={can_create}
+        onCreate={make_create(1)}
+      />
+      <AgencyRow
+        key="caliber"
+        controlId="AgencyCaliber"
+        label="Caliber"
+        enabled={can_create}
+        onCreate={make_create(2)}
+      />
+      <AgencyRow
+        key="static"
+        controlId="AgencyStatic"
+        label="Static"
+        enabled={can_create}
+        onCreate={make_create(3)}
+      />
+      <AgencyRow
+        key="blackrose"
+        controlId="AgencyBlackRose"
+        label="Black Rose"
+        enabled={can_create}
+        onCreate={make_create(4)}
+      />
+      <AppButton key="cancel" controlId="Cancel" label="Cancel" onPress={lobby.cancel} />
+    </Panel>
+  </ScreenLayout>
+}
+
+} // namespace
+
+::ui::UiElement CharacterCreate(const char *key) {
+  return ::ui::component("CharacterCreate", CharacterCreateProps{},
+                         CharacterCreateView, key);
+}
+
+} // namespace client::ui

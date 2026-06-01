@@ -1,5 +1,6 @@
 #include "lobby_provider.h"
 
+#include "client/ui/hooks/use_characters.h"
 #include "client/ui/hooks/use_lobby_session.h"
 #include "client/ui/hooks/use_progression.h"
 #include "ui/runtime/react.h"
@@ -58,6 +59,21 @@ Progression use_progression() {
   out.upgrade = value->upgrade;
   out.finish = value->finish;
   return out;
+}
+
+Characters use_characters() {
+  LobbyProviderValue *value =
+      static_cast<LobbyProviderValue *>(use_context(&LobbyContext));
+  if (!value) {
+    react_report_error("client/ui: missing LobbyProvider\n");
+    return {};
+  }
+  return {
+      .roster = value->snapshot.character_names,
+      .received = value->snapshot.characters_received,
+      .create = value->create_character,
+      .select = value->select_character,
+  };
 }
 
 } // namespace client::ui

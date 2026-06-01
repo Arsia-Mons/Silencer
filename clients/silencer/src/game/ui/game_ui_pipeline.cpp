@@ -443,6 +443,30 @@ lb.UnlockMutex();
 game.GoToState(authed ? GameState::LOBBY : GameState::MAINMENU);
 });
 };
+lobby.create_character = [this](const std::string & alias, int agency){
+cppxHost->pipeline().client_ui().queue_deferred_mutation([this, alias, agency](){
+if(agency < 0 || agency > 4) return;
+Lobby & lb = game.world.lobby;
+lb.LockMutex();
+lb.charactersreceived = false;
+lb.CreateCharacter(alias.c_str(), (Uint8)agency);
+lb.UnlockMutex();
+// Routing waits for the roster to grow (CREATECHARACTER tick reconcile).
+});
+};
+lobby.select_character = [this](int index){
+cppxHost->pipeline().client_ui().queue_deferred_mutation([this, index](){
+Lobby & lb = game.world.lobby;
+bool selected = false;
+lb.LockMutex();
+if(index >= 0 && index < (int)lb.characters.size()){
+lb.SelectCharacter(lb.characters[index].id);
+selected = true;
+}
+lb.UnlockMutex();
+if(selected) game.GoToState(GameState::LOBBY);
+});
+};
 
 // Global FrameProvider chain (doc §5), outermost (Theme) → innermost (Lobby):
 // Theme ▸ Server ▸ App ▸ Session ▸ Settings ▸ KeyMap ▸ Updater ▸

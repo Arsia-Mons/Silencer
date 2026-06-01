@@ -129,6 +129,9 @@ Uint8 state;
 Uint8 nextstate;
 bool stateisnew;
 bool nextstateprocessed;
+// Roster size captured on entering CREATECHARACTER; when the roster grows past
+// it (a create round-tripped through the lobby), the tick routes to LOBBY.
+size_t charCreateCountOnEntry = 0;
 Uint16 sharedstate;
 Uint8 singleplayermessage;
 bool updatetitle;

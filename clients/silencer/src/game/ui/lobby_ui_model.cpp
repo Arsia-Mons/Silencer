@@ -71,7 +71,8 @@ client::ui::LobbySnapshot CaptureLobbySnapshot(Game &game,
   using P = client::ui::SessionPhase;
   const bool connectPhase = (phase == P::Connecting);
   const bool postMatchPhase = (phase == P::PostMatch);
-  if (!connectPhase && !postMatchPhase)
+  const bool charCreatePhase = (phase == P::CharacterCreate);
+  if (!connectPhase && !postMatchPhase && !charCreatePhase)
     return snap;
 
   Lobby &lobby = game.GetWorld().lobby;
@@ -83,6 +84,12 @@ client::ui::LobbySnapshot CaptureLobbySnapshot(Game &game,
     snap.credentials_pending = (st == Lobby::AUTHSENT);
     snap.connecting = !snap.awaiting_credentials && !snap.credentials_pending &&
                       st != Lobby::AUTHENTICATED && st != Lobby::IDLE;
+  }
+  if (charCreatePhase) {
+    snap.characters_received = lobby.charactersreceived;
+    snap.character_names.reserve(lobby.characters.size());
+    for (const Lobby::Character &c : lobby.characters)
+      snap.character_names.push_back(c.name);
   }
   if (postMatchPhase)
     BuildProgression(snap, lobby);

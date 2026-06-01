@@ -271,6 +271,10 @@ set(SILENCER_CPPX_SOURCES
 	src/client/ui/screens/lobby_connect.hx
 	src/client/ui/screens/mission_summary.cppx
 	src/client/ui/screens/mission_summary.hx
+	# CharacterCreate (SIL-21): the fresh-account gateway — alias + agency →
+	# create → LOBBY (via the CREATECHARACTER tick reconcile).
+	src/client/ui/screens/character_create.cppx
+	src/client/ui/screens/character_create.hx
 )
 cppx_transpile(SILENCER_CPPX_GENERATED ${SILENCER_CPPX_SOURCES})
 target_sources(${SILENCER_TARGET} PRIVATE ${SILENCER_CPPX_GENERATED})

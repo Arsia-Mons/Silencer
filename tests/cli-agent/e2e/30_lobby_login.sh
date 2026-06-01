@@ -133,8 +133,16 @@ wait_for_lobby_state AUTHENTICATING
 cli --port "$CTRL_PORT" click --label "Login/Create" >/dev/null
 
 # Fresh account → server reports no characters → the connect flow routes to
-# character creation. Reaching CREATECHARACTER proves connect→auth→route worked
-# end-to-end through the real lobby. (Character creation + lobby entry are SIL-21.)
+# character creation.
 cli --port "$CTRL_PORT" wait_for_state --state CREATECHARACTER --timeout-ms 15000
+wait_for_widget "Alias"
+
+# Type an alias, then pick an agency — creating the agent. Once it round-trips
+# through the lobby the CREATECHARACTER tick routes to the lobby.
+for ch in A l i c e; do
+  cli --port "$CTRL_PORT" key --key "$ch" >/dev/null
+done
+cli --port "$CTRL_PORT" click --label "Noxis" >/dev/null
+cli --port "$CTRL_PORT" wait_for_state --state LOBBY --timeout-ms 15000
 
 echo "PASS 30_lobby_login"

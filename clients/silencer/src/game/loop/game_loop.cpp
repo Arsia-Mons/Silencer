@@ -402,11 +402,22 @@ bool Game::Tick(void){
 			if(stateisnew){
 				world.GetAuthorityPeer()->controlledlist.clear();
 				world.DestroyAllObjects();
+				world.lobby.LockMutex();
+				charCreateCountOnEntry = world.lobby.characters.size();
+				world.lobby.UnlockMutex();
 				stateisnew = false;
 			}else{
 				if(gameSession.AmbienceMixerRef().FadedIn()){
 					gameSession.AmbienceMixerRef().PlayMusic(world.resources.menumusic);
 				}
+				// Route to the lobby once a newly created character has
+				// round-tripped (the cppx wizard fires use_characters.create;
+				// select routes itself via GoToState).
+				world.lobby.LockMutex();
+				bool created = world.lobby.charactersreceived
+					&& world.lobby.characters.size() > charCreateCountOnEntry;
+				world.lobby.UnlockMutex();
+				if(created) GoToState(LOBBY);
 			}
 		}break;
 		case UPDATING:{

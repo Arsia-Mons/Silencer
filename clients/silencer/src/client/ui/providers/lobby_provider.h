@@ -1,5 +1,6 @@
 #pragma once
 
+#include "client/ui/hooks/use_characters.h"
 #include "client/ui/hooks/use_lobby_session.h"
 #include "client/ui/hooks/use_progression.h"
 #include "ui/runtime/element.h"
@@ -7,6 +8,7 @@
 #include <cstdint>
 #include <functional>
 #include <string>
+#include <vector>
 
 namespace client::ui {
 
@@ -21,6 +23,10 @@ struct LobbySnapshot {
   bool awaiting_credentials = false;
   bool credentials_pending = false;
   bool authenticated = false;
+
+  // --- character roster (CharacterCreate / lobby CharacterPanel) ---
+  bool characters_received = false;
+  std::vector<std::string> character_names = {};
 
   // --- progression (MissionSummary) ---
   bool progression_loaded = false;
@@ -41,6 +47,10 @@ struct LobbyProviderValue {
   std::function<void()> cancel = {};
   std::function<void(int)> upgrade = {};
   std::function<void()> finish = {};
+  // CharacterCreate: create a new agent (alias, agency index 0..4) / select an
+  // existing one by roster index (routes to the lobby).
+  std::function<void(const std::string &, int)> create_character = {};
+  std::function<void(int)> select_character = {};
 };
 
 // Publishes the lobby model to the component tree. Mounted in the global
