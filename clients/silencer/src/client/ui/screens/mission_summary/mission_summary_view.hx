@@ -16,25 +16,17 @@ enum class MissionSummaryDestination {
 	Lobby,
 };
 
-struct MissionSummaryState {
+struct MissionSummary {
 	const char * xp = "";
 	bool upgrade_banner = false;
 	std::array<const char *, kMissionSummaryVisibleLines> summary_lines = {};
 	std::array<int, kMissionSummaryUpgradeCount> levels = {};
 	std::array<bool, kMissionSummaryUpgradeCount> upgrades_available = {};
-};
-
-struct MissionSummaryActions {
 	std::function<void(int)> upgrade = {};
 	std::function<MissionSummaryDestination()> done = {};
 };
 
-struct MissionSummaryContextValue {
-	MissionSummaryState state = {};
-	MissionSummaryActions actions = {};
-};
-
-const MissionSummaryContextValue& UseMissionSummary();
+const MissionSummary& UseMissionSummary();
 
 struct MissionSummaryFrameProps {
 	const char * key = nullptr;
@@ -44,7 +36,7 @@ struct MissionSummaryFrameProps {
 
 struct MissionSummaryViewProps {
 	const char * key = nullptr;
-	const MissionSummaryContextValue * value = nullptr;
+	const MissionSummary * summary = nullptr;
 };
 
 ::ui::UiElement MissionSummaryView(const MissionSummaryViewProps& props);

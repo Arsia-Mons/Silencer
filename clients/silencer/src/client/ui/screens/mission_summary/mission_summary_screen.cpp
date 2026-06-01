@@ -95,30 +95,26 @@ bool MissionSummaryScreen::BuildElement(ScreenContext & ctx, ::ui::UiElement * o
 
 	xpText = "+ " + std::to_string(experience) + " XP";
 
-	const silencer::client_ui::MissionSummaryContextValue context{
-		.state = silencer::client_ui::MissionSummaryState{
-			.xp = xpText.c_str(),
-			.upgrade_banner = upgradeBanner,
-			.summary_lines = lines,
-			.levels = levels,
-			.upgrades_available = upgradesAvailable,
+	const silencer::client_ui::MissionSummary summary{
+		.xp = xpText.c_str(),
+		.upgrade_banner = upgradeBanner,
+		.summary_lines = lines,
+		.levels = levels,
+		.upgrades_available = upgradesAvailable,
+		.upgrade = [world = &ctx.world](int index) {
+			mission_summary_screen_detail::UpgradeStat(*world, index);
 		},
-		.actions = silencer::client_ui::MissionSummaryActions{
-			.upgrade = [world = &ctx.world](int index) {
-				mission_summary_screen_detail::UpgradeStat(*world, index);
-			},
-			.done = [world = &ctx.world]() {
-				return mission_summary_screen_detail::FinishMissionSummary(*world);
-			},
+		.done = [world = &ctx.world]() {
+			return mission_summary_screen_detail::FinishMissionSummary(*world);
 		},
 	};
-	const auto * stored = ::ui::copy_value(context);
+	const auto * stored = ::ui::copy_value(summary);
 	if(!stored) return false;
 	*out = ::ui::component(
 		"MissionSummaryView",
 		silencer::client_ui::MissionSummaryViewProps{
 			.key = "mission-summary",
-			.value = stored,
+			.summary = stored,
 		},
 		silencer::client_ui::MissionSummaryView);
 	return true;

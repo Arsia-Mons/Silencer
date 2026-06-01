@@ -164,6 +164,13 @@ fail_if_match \
   "$REPO_ROOT/clients/silencer/src/client/ui/screens/update/update_view_provider.cpp"
 
 fail_if_match \
+  "\\bMissionSummary(ContextValue|Actions|State)\\b|summary[.]state\\b|summary[.]actions\\b" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens/mission_summary/mission_summary_view.cppx" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens/mission_summary/mission_summary_view.hx" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens/mission_summary/mission_summary_screen.cpp" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens/mission_summary/mission_summary_view_provider.cpp"
+
+fail_if_match \
   "UiActionKind::Activate" \
   "$REPO_ROOT/clients/silencer/src/client/ui/screens" \
   "$REPO_ROOT/clients/silencer/src/client/ui/modals"

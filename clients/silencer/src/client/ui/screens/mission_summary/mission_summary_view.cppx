@@ -288,11 +288,11 @@ Uint8 destination_state(MissionSummaryDestination destination) {
 }
 
 std::function<void(const ::ui::ActivationEvent&)> done_callback(
-	const MissionSummaryActions& actions,
+	std::function<MissionSummaryDestination()> done,
 	GameNavigation navigation) {
-	return [actions, navigation](const ::ui::ActivationEvent&) {
+	return [done, navigation](const ::ui::ActivationEvent&) {
 		MissionSummaryDestination destination = MissionSummaryDestination::MainMenu;
-		if(actions.done) destination = actions.done();
+		if(done) destination = done();
 		if(navigation.go_to_state) navigation.go_to_state(destination_state(destination));
 	};
 }
@@ -300,10 +300,8 @@ std::function<void(const ::ui::ActivationEvent&)> done_callback(
 }  // namespace
 
 ::ui::UiElement MissionSummaryFrame(const MissionSummaryFrameProps& props) {
-	const MissionSummaryContextValue& summary = UseMissionSummary();
+	const MissionSummary& mission = UseMissionSummary();
 	GameNavigation navigation = use_game_navigation();
-	const MissionSummaryState& state = summary.state;
-	const MissionSummaryActions& actions = summary.actions;
 	return <Box key={props.key} layout={root_layout()} style={root_style()}>
 		<Box key="panel" layout={panel_layout()} style={panel_style()}>
 			<Box key="summary-column" layout={summary_column_layout()}>
@@ -311,225 +309,225 @@ std::function<void(const ::ui::ActivationEvent&)> done_callback(
 				<Box key="summary-lines" layout={summary_list_layout()}>
 					<Text
 					  key="line-00"
-					  value={state.summary_lines[0]}
+					  value={mission.summary_lines[0]}
 					  layout={summary_line_layout()}
 					  style={body_style()}
 					/>
 					<Text
 					  key="line-01"
-					  value={state.summary_lines[1]}
+					  value={mission.summary_lines[1]}
 					  layout={summary_line_layout()}
 					  style={body_style()}
 					/>
 					<Text
 					  key="line-02"
-					  value={state.summary_lines[2]}
+					  value={mission.summary_lines[2]}
 					  layout={summary_line_layout()}
 					  style={body_style()}
 					/>
 					<Text
 					  key="line-03"
-					  value={state.summary_lines[3]}
+					  value={mission.summary_lines[3]}
 					  layout={summary_line_layout()}
 					  style={body_style()}
 					/>
 					<Text
 					  key="line-04"
-					  value={state.summary_lines[4]}
+					  value={mission.summary_lines[4]}
 					  layout={summary_line_layout()}
 					  style={body_style()}
 					/>
 					<Text
 					  key="line-05"
-					  value={state.summary_lines[5]}
+					  value={mission.summary_lines[5]}
 					  layout={summary_line_layout()}
 					  style={body_style()}
 					/>
 					<Text
 					  key="line-06"
-					  value={state.summary_lines[6]}
+					  value={mission.summary_lines[6]}
 					  layout={summary_line_layout()}
 					  style={body_style()}
 					/>
 					<Text
 					  key="line-07"
-					  value={state.summary_lines[7]}
+					  value={mission.summary_lines[7]}
 					  layout={summary_line_layout()}
 					  style={body_style()}
 					/>
 					<Text
 					  key="line-08"
-					  value={state.summary_lines[8]}
+					  value={mission.summary_lines[8]}
 					  layout={summary_line_layout()}
 					  style={body_style()}
 					/>
 					<Text
 					  key="line-09"
-					  value={state.summary_lines[9]}
+					  value={mission.summary_lines[9]}
 					  layout={summary_line_layout()}
 					  style={body_style()}
 					/>
 					<Text
 					  key="line-10"
-					  value={state.summary_lines[10]}
+					  value={mission.summary_lines[10]}
 					  layout={summary_line_layout()}
 					  style={body_style()}
 					/>
 					<Text
 					  key="line-11"
-					  value={state.summary_lines[11]}
+					  value={mission.summary_lines[11]}
 					  layout={summary_line_layout()}
 					  style={body_style()}
 					/>
 					<Text
 					  key="line-12"
-					  value={state.summary_lines[12]}
+					  value={mission.summary_lines[12]}
 					  layout={summary_line_layout()}
 					  style={body_style()}
 					/>
 					<Text
 					  key="line-13"
-					  value={state.summary_lines[13]}
+					  value={mission.summary_lines[13]}
 					  layout={summary_line_layout()}
 					  style={body_style()}
 					/>
 					<Text
 					  key="line-14"
-					  value={state.summary_lines[14]}
+					  value={mission.summary_lines[14]}
 					  layout={summary_line_layout()}
 					  style={body_style()}
 					/>
 					<Text
 					  key="line-15"
-					  value={state.summary_lines[15]}
+					  value={mission.summary_lines[15]}
 					  layout={summary_line_layout()}
 					  style={body_style()}
 					/>
 					<Text
 					  key="line-16"
-					  value={state.summary_lines[16]}
+					  value={mission.summary_lines[16]}
 					  layout={summary_line_layout()}
 					  style={body_style()}
 					/>
 					<Text
 					  key="line-17"
-					  value={state.summary_lines[17]}
+					  value={mission.summary_lines[17]}
 					  layout={summary_line_layout()}
 					  style={body_style()}
 					/>
 					<Text
 					  key="line-18"
-					  value={state.summary_lines[18]}
+					  value={mission.summary_lines[18]}
 					  layout={summary_line_layout()}
 					  style={body_style()}
 					/>
 					<Text
 					  key="line-19"
-					  value={state.summary_lines[19]}
+					  value={mission.summary_lines[19]}
 					  layout={summary_line_layout()}
 					  style={body_style()}
 					/>
 					<Text
 					  key="line-20"
-					  value={state.summary_lines[20]}
+					  value={mission.summary_lines[20]}
 					  layout={summary_line_layout()}
 					  style={body_style()}
 					/>
 					<Text
 					  key="line-21"
-					  value={state.summary_lines[21]}
+					  value={mission.summary_lines[21]}
 					  layout={summary_line_layout()}
 					  style={body_style()}
 					/>
 					<Text
 					  key="line-22"
-					  value={state.summary_lines[22]}
+					  value={mission.summary_lines[22]}
 					  layout={summary_line_layout()}
 					  style={body_style()}
 					/>
 					<Text
 					  key="line-23"
-					  value={state.summary_lines[23]}
+					  value={mission.summary_lines[23]}
 					  layout={summary_line_layout()}
 					  style={body_style()}
 					/>
 					<Text
 					  key="line-24"
-					  value={state.summary_lines[24]}
+					  value={mission.summary_lines[24]}
 					  layout={summary_line_layout()}
 					  style={body_style()}
 					/>
 					<Text
 					  key="line-25"
-					  value={state.summary_lines[25]}
+					  value={mission.summary_lines[25]}
 					  layout={summary_line_layout()}
 					  style={body_style()}
 					/>
 					<Text
 					  key="line-26"
-					  value={state.summary_lines[26]}
+					  value={mission.summary_lines[26]}
 					  layout={summary_line_layout()}
 					  style={body_style()}
 					/>
 				</Box>
 			</Box>
 			<Box key="upgrade-column" layout={upgrade_column_layout()}>
-				<Text key="xp" value={state.xp} layout={xp_layout()} style={prompt_style()} />
+				<Text key="xp" value={mission.xp} layout={xp_layout()} style={prompt_style()} />
 				<Text
 				  key="banner"
 				  value="*NEW UPGRADE AVAILABLE*"
-				  disabled={!state.upgrade_banner}
-				  layout={banner_layout(state.upgrade_banner)}
+				  disabled={!mission.upgrade_banner}
+				  layout={banner_layout(mission.upgrade_banner)}
 				  style={banner_style()}
 				/>
 				<UpgradeRow
 				  key="upgrade-row-0"
 				  index={0}
-				  level={state.levels[0]}
-				  available={state.upgrades_available[0]}
-				  upgrade={actions.upgrade}
+				  level={mission.levels[0]}
+				  available={mission.upgrades_available[0]}
+				  upgrade={mission.upgrade}
 				/>
 				<UpgradeRow
 				  key="upgrade-row-1"
 				  index={1}
-				  level={state.levels[1]}
-				  available={state.upgrades_available[1]}
-				  upgrade={actions.upgrade}
+				  level={mission.levels[1]}
+				  available={mission.upgrades_available[1]}
+				  upgrade={mission.upgrade}
 				/>
 				<UpgradeRow
 				  key="upgrade-row-2"
 				  index={2}
-				  level={state.levels[2]}
-				  available={state.upgrades_available[2]}
-				  upgrade={actions.upgrade}
+				  level={mission.levels[2]}
+				  available={mission.upgrades_available[2]}
+				  upgrade={mission.upgrade}
 				/>
 				<UpgradeRow
 				  key="upgrade-row-3"
 				  index={3}
-				  level={state.levels[3]}
-				  available={state.upgrades_available[3]}
-				  upgrade={actions.upgrade}
+				  level={mission.levels[3]}
+				  available={mission.upgrades_available[3]}
+				  upgrade={mission.upgrade}
 				/>
 				<UpgradeRow
 				  key="upgrade-row-4"
 				  index={4}
-				  level={state.levels[4]}
-				  available={state.upgrades_available[4]}
-				  upgrade={actions.upgrade}
+				  level={mission.levels[4]}
+				  available={mission.upgrades_available[4]}
+				  upgrade={mission.upgrade}
 				/>
 				<UpgradeRow
 				  key="upgrade-row-5"
 				  index={5}
-				  level={state.levels[5]}
-				  available={state.upgrades_available[5]}
-				  upgrade={actions.upgrade}
+				  level={mission.levels[5]}
+				  available={mission.upgrades_available[5]}
+				  upgrade={mission.upgrade}
 				/>
 				<Button
 				  key="done"
 				  id="mission_summary.done"
 				  label="Done"
 				  autofocus={true}
-				  onActivate={done_callback(actions, navigation)}
+				  onActivate={done_callback(mission.done, navigation)}
 				  layout={done_button_layout()}
 				/>
 			</Box>
