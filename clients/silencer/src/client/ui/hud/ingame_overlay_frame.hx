@@ -32,6 +32,8 @@ struct InGameOverlayFrameProps {
 	HudReadoutsView readouts = {};
 	bool show_status = false;
 	HudStatusView status = {};
+	bool show_team_strip = false;
+	HudTeamStripView team_strip = {};
 	bool show_secret_overlay = false;
 	HudSecretOverlayView secret_overlay = {};
 	bool show_system_camera_frames = false;

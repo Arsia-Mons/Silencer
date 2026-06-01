@@ -1,9 +1,7 @@
 #include "client/ui/ClientUi.h"
 
-#include "client/ui/hud/HudPayloadArena.h"
 #include "client/ui/hooks/use_app.h"
 #include "client/ui/hooks/use_match.h"
-#include "client/ui/hud/InGameHud.h"
 #include "client/ui/hud/ingame_overlay_frame.h"
 #include "game.h"
 #include "lobby_screen.h"
@@ -175,7 +173,6 @@ NavigationProviderValue ClientUi::MakeNavigationProvider(ScreenContext& ctx) {
 
 void ClientUi::BeginFrame(const silencer::ui::UiInputState& input) {
 	frameCtx_.BeginFrame(input.animationDeltaSeconds, input.animationStepSeconds);
-	silencer::client_ui::HudPayloadBeginFrame();
 	clay_.BeginFrame(input, interactions_);
 }
 
@@ -348,7 +345,6 @@ void ClientUi::BuildVisibleScreens(ScreenContext& ctx, Surface& dst, float frame
 		MatchModel match = use_match(MatchProviderValue{&ctx.world},
 		                             ctx.world.peers.localpeerid);
 		HudView hudView = match.hud.snapshot();
-		BuildInGameHudUi(ctx.renderer, ctx.world.resources, hudView, &dst);
 		const bool showQuitPrompt =
 			hudView.quitState == 1 || hudView.quitState == 2;
 		const bool showTopMessage =
@@ -362,6 +358,9 @@ void ClientUi::BuildVisibleScreens(ScreenContext& ctx, Surface& dst, float frame
 			hudView.buyTech.backgroundW > 0 && hudView.buyTech.backgroundH > 0;
 		const bool showChat = hudView.chat.visible;
 		const bool showHudStatus = hudView.status.visible;
+		const bool showTeamStrip =
+			hudView.localPlayer.valid && hudView.viewedPlayer.valid &&
+			hudView.teamStrip.visible;
 		const bool showReadouts = hudView.readouts.visible;
 		const bool showSecretOverlay = hudView.secretOverlay.visible;
 		const bool showSystemCameraFrames =
@@ -371,7 +370,7 @@ void ClientUi::BuildVisibleScreens(ScreenContext& ctx, Surface& dst, float frame
 		inGameOverlayFrameActive_ =
 			showQuitPrompt || showTopMessage || showMessage ||
 			showStatusMessages || showPlayerList || showBuyTech || showChat ||
-			showHudStatus || showReadouts || showSecretOverlay ||
+			showHudStatus || showTeamStrip || showReadouts || showSecretOverlay ||
 			showSystemCameraFrames;
 		if(inGameOverlayFrameActive_){
 		#ifdef OUYA
@@ -405,6 +404,8 @@ void ClientUi::BuildVisibleScreens(ScreenContext& ctx, Surface& dst, float frame
 				.chat = hudView.chat,
 				.show_status = showHudStatus,
 				.status = hudView.status,
+				.show_team_strip = showTeamStrip,
+				.team_strip = hudView.teamStrip,
 				.show_readouts = showReadouts,
 				.readouts = hudView.readouts,
 				.show_secret_overlay = showSecretOverlay,

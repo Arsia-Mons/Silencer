@@ -237,8 +237,15 @@ bool append_image(DrawCommandList &list, const NodeSnapshot &node) {
       .source_y = bi.source_y,
       .source_w = bi.source_w,
       .source_h = bi.source_h,
+      .effect_color = bi.effect_color,
       .brightness = bi.brightness,
+      .ramp_color = bi.ramp_color,
+      .ramp_plus = bi.ramp_plus,
+      .team_color = bi.team_color,
+      .outline_color = bi.outline_color,
       .tile = bi.tile,
+      .team_emblem = bi.team_emblem,
+      .scaled = bi.scaled,
   };
   return list.push(command);
 }

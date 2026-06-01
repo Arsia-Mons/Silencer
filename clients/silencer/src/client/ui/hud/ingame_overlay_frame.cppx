@@ -96,6 +96,8 @@ constexpr int kSecretProgressBank = 133;
 constexpr int kSecretProgressAdvance = 6;
 constexpr int kSecretProgressLineHeight = 11;
 constexpr int kSecretProgressLines = 9;
+constexpr int kTeamStripMaxSprites = 32;
+constexpr int kTeamStripMaxEmblems = 4;
 
 inline ::ui::LayoutStyle root_layout(int width, int height) {
 	return {
@@ -174,15 +176,35 @@ inline ::ui::StylePatch image_patch(std::uint8_t bank,
                                     int source_height = 0,
                                     bool tile = false,
                                     int source_x = 0,
-                                    int source_y = 0) {
+                                    int source_y = 0,
+                                    std::uint8_t effect_color = 0,
+                                    std::uint8_t ramp_color = 0,
+                                    std::uint8_t ramp_plus = 0) {
 	return ::ui::patch().image(::ui::BackgroundImage{
 		.texture_id = texture_id(bank, index),
 		.source_x = static_cast<std::uint16_t>(std::max(0, source_x)),
 		.source_y = static_cast<std::uint16_t>(std::max(0, source_y)),
 		.source_w = static_cast<std::uint16_t>(std::max(0, source_width)),
 		.source_h = static_cast<std::uint16_t>(std::max(0, source_height)),
+		.effect_color = effect_color,
 		.brightness = brightness,
+		.ramp_color = ramp_color,
+		.ramp_plus = ramp_plus,
 		.tile = tile,
+	});
+}
+
+inline ::ui::StylePatch team_emblem_patch(std::uint8_t bank,
+                                          std::uint16_t index,
+                                          std::uint8_t team_color,
+                                          std::uint8_t outline_color,
+                                          bool scaled) {
+	return ::ui::patch().image(::ui::BackgroundImage{
+		.texture_id = texture_id(bank, index),
+		.team_color = team_color,
+		.outline_color = outline_color,
+		.team_emblem = true,
+		.scaled = scaled,
 	});
 }
 
@@ -865,6 +887,124 @@ struct SystemCameraFramesProps {
 	>
 		<SystemCameraFrame key="camera-0" frames={props.frames} count={props.count} index={0} />
 		<SystemCameraFrame key="camera-1" frames={props.frames} count={props.count} index={1} />
+	</Box>
+}
+
+inline std::uint8_t team_strip_ramp_plus(const HudSpriteView& sprite,
+                                         std::uint8_t phase) {
+	if(sprite.rampColor == 0 || sprite.rampTime == 0) return sprite.rampPlus;
+	const std::uint8_t shifted = phase >> sprite.rampShift;
+	const std::uint8_t period = sprite.rampTime * 2;
+	if(period == 0) return sprite.rampPlus;
+	if(shifted % period < sprite.rampTime) return shifted % sprite.rampTime;
+	return sprite.rampTime - (shifted % sprite.rampTime);
+}
+
+struct HudTeamStripSpriteProps {
+	const char * key = nullptr;
+	const HudTeamStripView * strip = nullptr;
+	int index = 0;
+	std::uint8_t phase = 0;
+};
+
+::ui::UiElement HudTeamStripSprite(const HudTeamStripSpriteProps& props) {
+	if(!props.strip || props.index < 0 ||
+	   props.index >= static_cast<int>(props.strip->sprites.size()) ||
+	   props.index >= kTeamStripMaxSprites){
+		return ::ui::empty();
+	}
+	const HudSpriteView& sprite = props.strip->sprites[props.index];
+	if(!sprite.visible || sprite.w <= 0 || sprite.h <= 0){
+		return ::ui::empty();
+	}
+	return <Box
+	  key={props.key}
+	  id="HudTeamSprite"
+	  idOffset={props.index}
+	  layout={absolute_layout(sprite.x, sprite.y, sprite.w, sprite.h)}
+	  style={image_patch(sprite.spriteBank, sprite.spriteIndex, sprite.brightness, sprite.sourceW, sprite.sourceH, false, sprite.sourceX, sprite.sourceY, sprite.effectColor, sprite.rampColor, team_strip_ramp_plus(sprite, props.phase))}
+	/>
+}
+
+struct HudTeamEmblemProps {
+	const char * key = nullptr;
+	const HudTeamStripView * strip = nullptr;
+	int index = 0;
+};
+
+::ui::UiElement HudTeamEmblem(const HudTeamEmblemProps& props) {
+	if(!props.strip || props.index < 0 ||
+	   props.index >= static_cast<int>(props.strip->emblems.size()) ||
+	   props.index >= kTeamStripMaxEmblems){
+		return ::ui::empty();
+	}
+	const HudTeamEmblemView& emblem = props.strip->emblems[props.index];
+	if(!emblem.visible || emblem.w <= 0 || emblem.h <= 0){
+		return ::ui::empty();
+	}
+	return <Box
+	  key={props.key}
+	  id="HudTeamEmblem"
+	  idOffset={props.index}
+	  layout={absolute_layout(emblem.x, emblem.y, emblem.w, emblem.h)}
+	  style={team_emblem_patch(emblem.spriteBank, emblem.spriteIndex, emblem.teamColor, emblem.outlineColor, emblem.scaled)}
+	/>
+}
+
+struct HudTeamStripProps {
+	const char * key = nullptr;
+	bool show = false;
+	HudTeamStripView strip = {};
+	std::uint8_t phase = 0;
+	int surface_width = 0;
+	int surface_height = 0;
+};
+
+::ui::UiElement HudTeamStrip(const HudTeamStripProps& props) {
+	if(!props.show || !props.strip.visible){
+		return ::ui::empty();
+	}
+	return <Box
+	  key={props.key}
+	  id="InGameHudTeamsRoot"
+	  layout={layer_layout(props.surface_width, props.surface_height)}
+	>
+		<HudTeamStripSprite key="sprite-0" strip={&props.strip} index={0} phase={props.phase} />
+		<HudTeamStripSprite key="sprite-1" strip={&props.strip} index={1} phase={props.phase} />
+		<HudTeamStripSprite key="sprite-2" strip={&props.strip} index={2} phase={props.phase} />
+		<HudTeamStripSprite key="sprite-3" strip={&props.strip} index={3} phase={props.phase} />
+		<HudTeamStripSprite key="sprite-4" strip={&props.strip} index={4} phase={props.phase} />
+		<HudTeamStripSprite key="sprite-5" strip={&props.strip} index={5} phase={props.phase} />
+		<HudTeamStripSprite key="sprite-6" strip={&props.strip} index={6} phase={props.phase} />
+		<HudTeamStripSprite key="sprite-7" strip={&props.strip} index={7} phase={props.phase} />
+		<HudTeamStripSprite key="sprite-8" strip={&props.strip} index={8} phase={props.phase} />
+		<HudTeamStripSprite key="sprite-9" strip={&props.strip} index={9} phase={props.phase} />
+		<HudTeamStripSprite key="sprite-10" strip={&props.strip} index={10} phase={props.phase} />
+		<HudTeamStripSprite key="sprite-11" strip={&props.strip} index={11} phase={props.phase} />
+		<HudTeamStripSprite key="sprite-12" strip={&props.strip} index={12} phase={props.phase} />
+		<HudTeamStripSprite key="sprite-13" strip={&props.strip} index={13} phase={props.phase} />
+		<HudTeamStripSprite key="sprite-14" strip={&props.strip} index={14} phase={props.phase} />
+		<HudTeamStripSprite key="sprite-15" strip={&props.strip} index={15} phase={props.phase} />
+		<HudTeamStripSprite key="sprite-16" strip={&props.strip} index={16} phase={props.phase} />
+		<HudTeamStripSprite key="sprite-17" strip={&props.strip} index={17} phase={props.phase} />
+		<HudTeamStripSprite key="sprite-18" strip={&props.strip} index={18} phase={props.phase} />
+		<HudTeamStripSprite key="sprite-19" strip={&props.strip} index={19} phase={props.phase} />
+		<HudTeamStripSprite key="sprite-20" strip={&props.strip} index={20} phase={props.phase} />
+		<HudTeamStripSprite key="sprite-21" strip={&props.strip} index={21} phase={props.phase} />
+		<HudTeamStripSprite key="sprite-22" strip={&props.strip} index={22} phase={props.phase} />
+		<HudTeamStripSprite key="sprite-23" strip={&props.strip} index={23} phase={props.phase} />
+		<HudTeamStripSprite key="sprite-24" strip={&props.strip} index={24} phase={props.phase} />
+		<HudTeamStripSprite key="sprite-25" strip={&props.strip} index={25} phase={props.phase} />
+		<HudTeamStripSprite key="sprite-26" strip={&props.strip} index={26} phase={props.phase} />
+		<HudTeamStripSprite key="sprite-27" strip={&props.strip} index={27} phase={props.phase} />
+		<HudTeamStripSprite key="sprite-28" strip={&props.strip} index={28} phase={props.phase} />
+		<HudTeamStripSprite key="sprite-29" strip={&props.strip} index={29} phase={props.phase} />
+		<HudTeamStripSprite key="sprite-30" strip={&props.strip} index={30} phase={props.phase} />
+		<HudTeamStripSprite key="sprite-31" strip={&props.strip} index={31} phase={props.phase} />
+		<HudTeamEmblem key="emblem-0" strip={&props.strip} index={0} />
+		<HudTeamEmblem key="emblem-1" strip={&props.strip} index={1} />
+		<HudTeamEmblem key="emblem-2" strip={&props.strip} index={2} />
+		<HudTeamEmblem key="emblem-3" strip={&props.strip} index={3} />
 	</Box>
 }
 
@@ -1580,6 +1720,14 @@ using ::ui::components::BoxProps;
 		  key="status"
 		  show={props.show_status}
 		  status={props.status}
+		  phase={props.hud_phase}
+		  surfaceWidth={props.width}
+		  surfaceHeight={props.height}
+		/>
+		<ingame_overlay_frame_detail.HudTeamStrip
+		  key="team-strip"
+		  show={props.show_team_strip}
+		  strip={props.team_strip}
 		  phase={props.hud_phase}
 		  surfaceWidth={props.width}
 		  surfaceHeight={props.height}

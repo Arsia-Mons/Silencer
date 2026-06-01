@@ -182,6 +182,52 @@ void DrawNineSlice(Surface * src,
 	            dst, x + w - dstRight, y + h - dstBottom);
 }
 
+void OutlineVisiblePixels(::Renderer & renderer,
+                          Surface * source,
+                          Surface * target,
+                          Uint8 color) {
+	if(!source || !target) return;
+	int sw = std::min(source->w, target->w);
+	int sh = std::min(source->h, target->h);
+	for(int py = 0; py < sh; py++){
+		for(int px = 0; px < sw; px++){
+			if(renderer.GetPixel(source, px, py)) continue;
+			if((px > 0 && renderer.GetPixel(source, px - 1, py)) ||
+			   (px < sw - 1 && renderer.GetPixel(source, px + 1, py)) ||
+			   (py > 0 && renderer.GetPixel(source, px, py - 1)) ||
+			   (py < sh - 1 && renderer.GetPixel(source, px, py + 1))){
+				renderer.SetPixel(target, px, py, color);
+			}
+		}
+	}
+}
+
+void DrawTeamEmblem(Renderer& renderer,
+                    Surface * src,
+                    Surface * dst,
+                    int x,
+                    int y,
+                    const ::ui::ImageData& image) {
+	if(!src || !dst) return;
+	int scale = image.scaled ? 2 : 1;
+	int w = src->w * scale;
+	int h = src->h * scale;
+	int cx = x, cy = y, cw = w, ch = h;
+	if(!ClipDrawRect(dst->w, dst->h, cx, cy, cw, ch)) return;
+
+	Surface * copy = renderer.CreateSurfaceCopy(src);
+	if(!copy) return;
+	renderer.EffectTeamColor(copy, nullptr, image.team_color, false, true);
+	OutlineVisiblePixels(renderer, src, copy, image.outline_color);
+	Renderer::Rect dstrect{w, h, x, y};
+	if(image.scaled){
+		Renderer::DrawScaled(copy, nullptr, dst, &dstrect);
+	}else{
+		Renderer::BlitSurface(copy, nullptr, dst, &dstrect);
+	}
+	delete copy;
+}
+
 void DrawImage(Resources& resources,
                Renderer& renderer,
                Surface * dst,
@@ -195,10 +241,29 @@ void DrawImage(Resources& resources,
 	int w = static_cast<int>(std::ceil(command.rect.x + command.rect.w)) - x;
 	int h = static_cast<int>(std::ceil(command.rect.y + command.rect.h)) - y;
 	if(w <= 0 || h <= 0) return;
+	if(image.team_emblem){
+		DrawTeamEmblem(renderer, src, dst, x, y, image);
+		return;
+	}
 	Surface * work = src;
-	if(image.brightness != 128){
+	if(image.effect_color != 0 || image.ramp_color != 0 ||
+	   image.brightness != 128){
 		work = renderer.CreateSurfaceCopy(src);
-		renderer.EffectBrightness(work, nullptr, image.brightness);
+		if(!work) return;
+		if(image.effect_color != 0){
+			renderer.EffectColor(work, nullptr, image.effect_color);
+		}
+		if(image.ramp_color != 0){
+			if(image.ramp_plus != 0){
+				renderer.EffectRampColorPlus(work, nullptr, image.ramp_color,
+				                             image.ramp_plus);
+			}else{
+				renderer.EffectRampColor(work, nullptr, image.ramp_color);
+			}
+		}
+		if(image.brightness != 128){
+			renderer.EffectBrightness(work, nullptr, image.brightness);
+		}
 	}
 	if(HasNineSlice(image.nine_slice)){
 		DrawNineSlice(work, dst, x, y, w, h, image.nine_slice);

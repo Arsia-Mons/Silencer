@@ -198,6 +198,14 @@ fail_if_path_exists "clients/silencer/src/client/ui/hud/hud_secret_overlays.cpp"
 fail_if_path_exists "clients/silencer/src/client/ui/hud/hud_secret_overlays.h"
 fail_if_path_exists "clients/silencer/src/client/ui/hud/hud_status_sprites.cpp"
 fail_if_path_exists "clients/silencer/src/client/ui/hud/hud_status_sprites.h"
+fail_if_path_exists "clients/silencer/src/client/ui/hud/InGameHud.cpp"
+fail_if_path_exists "clients/silencer/src/client/ui/hud/InGameHud.h"
+fail_if_path_exists "clients/silencer/src/client/ui/hud/hud_teams.cpp"
+fail_if_path_exists "clients/silencer/src/client/ui/hud/hud_teams.h"
+fail_if_path_exists "clients/silencer/src/client/ui/hud/HudClayHelpers.cpp"
+fail_if_path_exists "clients/silencer/src/client/ui/hud/HudClayHelpers.h"
+fail_if_path_exists "clients/silencer/src/client/ui/hud/HudPayloadArena.cpp"
+fail_if_path_exists "clients/silencer/src/client/ui/hud/HudPayloadArena.h"
 
 fail_if_match \
   "Draw[A-Za-z0-9_]*Clay|BuildInGameHudUi|BuildInGameOverlaysUi|client/ui/hud|Clay_BeginLayout|Clay_EndLayout|Clay_SetPointerState|clay_bridge" \

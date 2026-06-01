@@ -141,10 +141,34 @@ struct HudSpriteView {
 	int    sourceY = 0;
 	int    sourceW = 0;
 	int    sourceH = 0;
+	Uint8  effectColor = 0;
 	Uint8  brightness = 128;
+	Uint8  rampColor = 0;
+	Uint8  rampPlus = 0;
+	Uint8  rampTime = 0;
+	Uint8  rampShift = 0;
 	bool   animatedHighlight = false;
 	bool   animatedShield = false;
 	bool   blinkWarning = false;
+};
+
+struct HudTeamEmblemView {
+	bool   visible = false;
+	int    x = 0;
+	int    y = 0;
+	int    w = 0;
+	int    h = 0;
+	Uint8  spriteBank = 0;
+	Uint16 spriteIndex = 0;
+	Uint8  teamColor = 0;
+	Uint8  outlineColor = 0;
+	bool   scaled = false;
+};
+
+struct HudTeamStripView {
+	bool visible = false;
+	std::vector<HudSpriteView> sprites;
+	std::vector<HudTeamEmblemView> emblems;
 };
 
 struct HudSecretOverlayView {
@@ -249,7 +273,7 @@ struct InGameTopMessageView {
 	std::string text;           // text long enough; HUD slices it
 };
 
-// Top-level snapshot consumed by InGameHud + retained in-game overlay frames.
+// Top-level snapshot consumed by retained in-game overlay frames.
 struct HudView {
 	bool   mapLoaded = false;
 	Uint32 tickCount = 0;
@@ -260,6 +284,7 @@ struct HudView {
 
 	// Team strip + per-team player rows.
 	std::vector<TeamHudView> teams;
+	HudTeamStripView teamStrip;
 	HudReadoutsView readouts;
 	HudSecretOverlayView secretOverlay;
 	HudStatusView status;

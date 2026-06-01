@@ -36,6 +36,8 @@ constexpr int kChatLineStepY = 10;
 constexpr int kChatMaxHistoryChars = 36;
 constexpr int kChatRightCapX = 36;
 constexpr Uint8 kPlayerStateHacking = 15;  // matches Player::HACKING
+constexpr Uint8 kPlayerStateDying = 20;    // matches Player::DYING
+constexpr Uint8 kPlayerStateDead = 21;     // matches Player::DEAD
 
 int SpriteWidth(const ::Resources& res, Uint8 bank, Uint16 index) {
 	if(bank >= res.spritebank.size() || index >= res.spritebank[bank].size()){
@@ -81,6 +83,28 @@ int SpriteX(const ::Resources& res, Uint8 bank, Uint16 index, int logicalX = 0) 
 
 int SpriteY(const ::Resources& res, Uint8 bank, Uint16 index, int logicalY = 0) {
 	return logicalY + SpriteOffsetY(res, bank, index);
+}
+
+int HudStripSpriteX(const ::Resources& res, Uint8 bank, Uint16 index, int logicalX = 0) {
+	return logicalX - SpriteOffsetX(res, bank, index);
+}
+
+int HudStripSpriteY(const ::Resources& res, Uint8 bank, Uint16 index, int logicalY = 0) {
+	return logicalY - SpriteOffsetY(res, bank, index);
+}
+
+int HudStripSpriteWidth(const ::Resources& res, Uint8 bank, Uint16 index) {
+	if(bank >= res.spritebank.size()) return 0;
+	if(index >= res.spritebank[bank].size()) return 0;
+	Surface* sprite = res.spritebank[bank][index].get();
+	return sprite ? sprite->w : 0;
+}
+
+int HudStripSpriteHeight(const ::Resources& res, Uint8 bank, Uint16 index) {
+	if(bank >= res.spritebank.size()) return 0;
+	if(index >= res.spritebank[bank].size()) return 0;
+	Surface* sprite = res.spritebank[bank][index].get();
+	return sprite ? sprite->h : 0;
 }
 
 std::string PaddedByte(Uint8 value) {
@@ -259,6 +283,139 @@ void PopulateTeams(HudView& out, ::World& world) {
 			}
 		}
 		out.teams.push_back(teamView);
+	}
+}
+
+void AddTeamStripSprite(HudTeamStripView& strip,
+                        const ::Resources& resources,
+                        int x,
+                        int y,
+                        Uint8 spriteBank,
+                        Uint16 spriteIndex,
+                        Uint8 rampColor = 0,
+                        Uint8 rampPlus = 0,
+                        Uint8 rampTime = 0,
+                        Uint8 rampShift = 0) {
+	const int w = HudStripSpriteWidth(resources, spriteBank, spriteIndex);
+	const int h = HudStripSpriteHeight(resources, spriteBank, spriteIndex);
+	if(w <= 0 || h <= 0) return;
+
+	HudSpriteView sprite;
+	sprite.visible = true;
+	sprite.x = x;
+	sprite.y = y;
+	sprite.w = w;
+	sprite.h = h;
+	sprite.spriteBank = spriteBank;
+	sprite.spriteIndex = spriteIndex;
+	sprite.rampColor = rampColor;
+	sprite.rampPlus = rampPlus;
+	sprite.rampTime = rampTime;
+	sprite.rampShift = rampShift;
+	strip.sprites.push_back(sprite);
+}
+
+void PopulateTeamStrip(HudView& out, const ::Resources& resources) {
+	if(out.teams.empty()) return;
+
+	HudTeamStripView& strip = out.teamStrip;
+	strip.visible = true;
+
+	if(out.teams.size() == 1){
+		AddTeamStripSprite(strip,
+		                   resources,
+		                   HudStripSpriteX(resources, 94, 1),
+		                   HudStripSpriteY(resources, 94, 1),
+		                   94,
+		                   1);
+	}else{
+		AddTeamStripSprite(strip,
+		                   resources,
+		                   HudStripSpriteX(resources, 103, 0),
+		                   HudStripSpriteY(resources, 103, 0,
+		                                   -133 + ((int)out.teams.size() - 1) * 20),
+		                   103,
+		                   0);
+		AddTeamStripSprite(strip,
+		                   resources,
+		                   HudStripSpriteX(resources, 103, 1),
+		                   HudStripSpriteY(resources, 103, 1),
+		                   103,
+		                   1);
+	}
+
+	int teamyoffset = 5;
+	for(const TeamHudView& team : out.teams){
+		for(int i = 0; i < team.numPeers; i++){
+			const TeamHudView::PeerSlot& slot = team.peerSlots[i];
+			if(!slot.present) continue;
+			const bool peerDead = slot.state == kPlayerStateDead ||
+			                      slot.state == kPlayerStateDying;
+			Uint8 index = peerDead ? 8 : 4;
+			Uint8 rampColor = 0;
+			Uint8 rampTime = 0;
+			Uint8 rampShift = 0;
+			if(slot.inBase || slot.hasSecret){
+				rampTime = 4;
+				rampShift = 2;
+				rampColor = 210;
+				if(slot.hasSecret){
+					rampTime = 8;
+					rampColor = 114;
+					rampShift = 0;
+				}
+			}
+			AddTeamStripSprite(strip,
+			                   resources,
+			                   HudStripSpriteX(resources, 103, index + i, 25 + (17 * i)),
+			                   HudStripSpriteY(resources, 103, index + i, teamyoffset),
+			                   103,
+			                   index + i,
+			                   rampColor,
+			                   0,
+			                   rampTime,
+			                   rampShift);
+		}
+
+		int playerswithsecret = 0;
+		for(int i = 0; i < team.numPeers; i++){
+			if(team.peerSlots[i].hasSecret) playerswithsecret++;
+		}
+		for(int i = 0; i < 3; i++){
+			Uint8 index = team.secrets > i ? 2 : 3;
+			Uint8 color = 0;
+			if(index == 3 && playerswithsecret > i - team.secrets &&
+			   out.tickCount % 12 < 6){
+				index = 2;
+			}
+			if(team.beamingTerminalId && team.secrets == i && index == 3){
+				color = 224;
+				index = 3;
+			}
+			AddTeamStripSprite(strip,
+			                   resources,
+			                   HudStripSpriteX(resources, 103, index,
+			                                   -(9 * (3 - i)) + 11),
+			                   HudStripSpriteY(resources, 103, index, teamyoffset),
+			                   103,
+			                   index,
+			                   color);
+		}
+
+		HudTeamEmblemView emblem;
+		emblem.visible = true;
+		emblem.x = 5;
+		emblem.y = teamyoffset + 1;
+		emblem.w = team.emblemW;
+		emblem.h = team.emblemH;
+		emblem.spriteBank = 181;
+		emblem.spriteIndex = team.agency;
+		emblem.teamColor = team.color;
+		emblem.outlineColor = 17;
+		emblem.scaled = true;
+		strip.emblems.push_back(emblem);
+
+		teamyoffset += 20;
 	}
 }
 
@@ -807,6 +964,7 @@ HudView BuildHudView(::World& world) {
 
 	// Teams strip + player-list rows
 	hudview_detail::PopulateTeams(view, world);
+	hudview_detail::PopulateTeamStrip(view, world.resources);
 	hudview_detail::PopulateStatus(view, world.resources, view.viewedPlayer);
 	hudview_detail::PopulateReadouts(view, view.viewedPlayer);
 	hudview_detail::PopulateSecretOverlay(view, world.resources, view.viewedPlayer);

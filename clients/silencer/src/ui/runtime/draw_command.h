@@ -65,8 +65,15 @@ struct ImageData {
   uint16_t source_y = 0;
   uint16_t source_w = 0;
   uint16_t source_h = 0;
+  uint8_t effect_color = 0;
   uint8_t brightness = 128;
+  uint8_t ramp_color = 0;
+  uint8_t ramp_plus = 0;
+  uint8_t team_color = 0;
+  uint8_t outline_color = 0;
   bool tile = false;
+  bool team_emblem = false;
+  bool scaled = false;
 };
 struct BitmapData {
   const uint8_t *pixels = nullptr;
