@@ -13,6 +13,7 @@
 #include "client/ui/hooks/use_session.h"
 #include "client/ui/providers/session_provider.h"
 #include "game/ui/session_phase.h"
+#include "ui/components/components.h"
 #include "ui/runtime/element.h"
 #include "ui/runtime/react.h"
 
@@ -173,6 +174,50 @@ static bool session_phase_projection_maps_game_states() {
   return true;
 }
 
+// SIL-16: the generic ui::components primitives render through the real
+// pipeline. A Button bottoms out in detail::Host, resolves its paint from the
+// (fallback) theme.button, and emits the draw IR the executor rasterizes — so a
+// pixel inside its box carries the theme's opaque control fill.
+struct PrimitiveScreenProps {};
+
+static ::ui::UiElement PrimitiveScreenView(const PrimitiveScreenProps &) {
+  ::ui::components::ButtonProps props = {};
+  props.label = "OK";
+  return ::ui::components::elements::Button(props);
+}
+
+class PrimitiveScreen final : public client::ui::UiScreen {
+public:
+  const char *debug_name() const override { return "Primitive"; }
+  bool build_element(::ui::UiElementFrame &, ::ui::UiElement *out) override {
+    if (!out)
+      return false;
+    *out = ::ui::component("PrimitiveScreenView", PrimitiveScreenProps{},
+                           PrimitiveScreenView, "primitive");
+    return true;
+  }
+  void build_ui() override {}
+};
+
+static bool pipeline_host_renders_generic_primitive() {
+  react_init_runtime();
+  silencer::cppx_ui::PipelineHost host;
+  CHECK(host.ensure(64, 48, SILENCER_TEST_FONT_DIR));
+  CHECK(host.pipeline().client_ui().push_screen(
+      std::make_unique<PrimitiveScreen>()));
+
+  int w = 0, h = 0;
+  const uint8_t *rgba = host.render(test_frame(64, 48), &w, &h);
+  CHECK(rgba != nullptr);
+  // The Button (default theme.button control fill) sits at the origin and its
+  // 132x38 box covers the top-left; a pixel inside it is an opaque neutral gray.
+  const uint8_t *px = rgba + ((size_t)8 * w + 8) * 4u;
+  CHECK(px[3] > 200);                                 // opaque control fill
+  CHECK(px[0] > 24 && px[0] < 110);                   // neutral gray, not black/white
+  CHECK(px[1] > 24 && px[1] < 110 && px[2] > 24 && px[2] < 120);
+  return true;
+}
+
 int main(void) {
   if (!SDL_Init(0)) {
     fprintf(stderr, "SDL_Init: %s\n", SDL_GetError());
@@ -180,6 +225,8 @@ int main(void) {
   }
   int rc = 0;
   if (!session_phase_projection_maps_game_states())
+    rc = 1;
+  if (!pipeline_host_renders_generic_primitive())
     rc = 1;
   if (!pipeline_host_renders_pushed_screen_to_pixels())
     rc = 1;

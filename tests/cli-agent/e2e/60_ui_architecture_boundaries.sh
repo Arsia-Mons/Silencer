@@ -21,7 +21,7 @@ fail_if_path_exists() {
   fi
 }
 
-fail_if_path_exists "clients/silencer/src/ui/components"
+# src/ui/components is now the cppx generic-primitive layer (SIL-16); no longer banned.
 fail_if_path_exists "clients/silencer/src/ui/modals"
 fail_if_path_exists "clients/silencer/src/ui/panels"
 fail_if_path_exists "clients/silencer/src/ui/screens"
@@ -30,7 +30,7 @@ fail_if_path_exists "clients/silencer/src/ui/runtime/clay_inspector.h"
 fail_if_path_exists "clients/silencer/src/ui/runtime/clay_inspector.cpp"
 
 fail_if_match \
-  "\\b(currentinterface|ProcessInGameInterfaces|Interface \\*|new Interface|ui/components|ui/modals|ui/panels|ui/screens)\\b" \
+  "\\b(currentinterface|ProcessInGameInterfaces|Interface \\*|new Interface|ui/modals|ui/panels|ui/screens)\\b" \
   "$REPO_ROOT/clients/silencer/src" \
   --glob '!third_party/**'
 

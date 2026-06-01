@@ -202,6 +202,21 @@ include(cppx_transpile)
 set(SILENCER_CPPX_SOURCES
 	src/ui/cppx_smoke.cppx
 	src/ui/cppx_smoke.hx
+	# Generic UI primitive layer (SIL-16): game-agnostic, theme-based,
+	# sprite-free components. common.h/components.h are plain headers
+	# resolved via the src/ include dir, not authored cppx sources.
+	src/ui/components/box.cppx
+	src/ui/components/box.hx
+	src/ui/components/button.cppx
+	src/ui/components/button.hx
+	src/ui/components/text.cppx
+	src/ui/components/text.hx
+	src/ui/components/checkbox.cppx
+	src/ui/components/checkbox.hx
+	src/ui/components/input.cppx
+	src/ui/components/input.hx
+	src/ui/components/dialog.cppx
+	src/ui/components/dialog.hx
 )
 cppx_transpile(SILENCER_CPPX_GENERATED ${SILENCER_CPPX_SOURCES})
 target_sources(${SILENCER_TARGET} PRIVATE ${SILENCER_CPPX_GENERATED})
@@ -412,9 +427,13 @@ add_executable(pipeline_host_tests
 	src/ui/runtime/geometry.cpp
 	src/client/ui/app_shell/ui_pipeline.cpp
 	${_cppx_app_shell_sources}
-	${_cppx_retained_sources})
+	${_cppx_retained_sources}
+	# SIL-16: the generated ui::components primitives, so the render test can
+	# drive them headlessly.
+	${SILENCER_CPPX_GENERATED})
 target_compile_features(pipeline_host_tests PRIVATE cxx_std_20)
-target_include_directories(pipeline_host_tests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src")
+target_include_directories(pipeline_host_tests PRIVATE
+	"${CMAKE_CURRENT_SOURCE_DIR}/src" ${SILENCER_CPPX_INCLUDE_DIRS})
 target_link_libraries(pipeline_host_tests PRIVATE SDL3::SDL3 SDL3_ttf::SDL3_ttf yogacore)
 target_compile_definitions(pipeline_host_tests PRIVATE
 	SILENCER_TEST_FONT_DIR="${SILENCER_SHARED_DIR}/fonts")
