@@ -7,7 +7,6 @@
 #include "options_display_screen.h"
 #include "client/ui/screens/options/options_frame.h"
 #include "screen_context.h"
-#include "clay_ui_compositor.h"
 #include "renderer.h"
 
 #include "runtime/UiInteractionRegistry.h"
@@ -30,7 +29,7 @@ void OptionsScreen::BuildUi(ScreenContext & ctx, float frametime, const silencer
 {
 	(void)ctx;
 	(void)frametime;
-	const float uiScale = silencer::clay_bridge::UiScale();
+	const float uiScale = input.uiScale;
 	const int virtualW = std::max(1, input.width);
 	const int virtualH = std::max(1, input.height);
 	silencer::client_ui::Navigation navigation =

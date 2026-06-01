@@ -659,6 +659,13 @@ fail_if_match \
   --glob '*.cpp'
 
 fail_if_match \
+  "clay_bridge::UiScale|clay_ui_compositor" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/modals" \
+  --glob '*.h' \
+  --glob '*.cpp'
+
+fail_if_match \
   "ctx[.]game[.]CurrentUiInput[[:space:]]*[(]|ctx[.]renderer[.]GetHudAnimationPhase[[:space:]]*[(]" \
   "$REPO_ROOT/clients/silencer/src/client/ui/ClientUi.cpp"
 

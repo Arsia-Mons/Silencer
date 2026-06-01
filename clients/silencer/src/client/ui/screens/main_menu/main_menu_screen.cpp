@@ -7,7 +7,6 @@
 #include "lobby_connect_screen.h"
 #include "options_screen.h"
 #include "screen_context.h"
-#include "clay_ui_compositor.h"
 #include "renderer.h"
 
 #include "runtime/UiInteractionRegistry.h"
@@ -46,7 +45,7 @@ void MainMenuScreen::BuildUi(ScreenContext & ctx, float frametime, const silence
 	versionText_ = "Silencer v";
 	versionText_ += app.version();
 
-	const float uiScale = silencer::clay_bridge::UiScale();
+	const float uiScale = input.uiScale;
 	const int virtualW = std::max(1, input.width);
 	const int virtualH = std::max(1, input.height);
 	silencer::client_ui::MainMenuFrameProps props{

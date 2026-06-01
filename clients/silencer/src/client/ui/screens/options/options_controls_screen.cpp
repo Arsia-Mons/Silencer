@@ -8,7 +8,6 @@
 #include "screen_context.h"
 #include "game.h"
 
-#include "clay_ui_compositor.h"
 #include "runtime/UiInteractionRegistry.h"
 
 #include <SDL3/SDL.h>
@@ -124,7 +123,7 @@ void OptionsControlsScreen::BuildUi(ScreenContext & ctx, float frametime, const 
 	silencer::client_ui::Navigation navigation =
 		silencer::client_ui::use_navigation();
 
-	const float uiScale = silencer::clay_bridge::UiScale();
+	const float uiScale = input.uiScale;
 	const int layoutWidth = std::max(1, input.width);
 	const int layoutHeight = std::max(1, input.height);
 	const int framePadLeft = options_controls_screen_detail::ScaleLegacyPx(

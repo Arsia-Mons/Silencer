@@ -5,7 +5,6 @@
 #include "client/ui/screens/update/update_frame.h"
 #include "main_menu_screen.h"
 #include "screen_context.h"
-#include "clay_ui_compositor.h"
 #include "renderer.h"
 
 #include "runtime/UiInteractionRegistry.h"
@@ -47,7 +46,7 @@ void UpdateScreen::BuildUi(ScreenContext & ctx, float frametime, const silencer:
 	silencer::client_ui::Navigation navigation =
 		silencer::client_ui::use_navigation();
 
-	const float uiScale = silencer::clay_bridge::UiScale();
+	const float uiScale = input.uiScale;
 	const int virtualW = std::max(1, input.width);
 	const int virtualH = std::max(1, input.height);
 	silencer::client_ui::UpdateFrameProps props{

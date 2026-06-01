@@ -5,7 +5,6 @@
 #include "screen_context.h"
 #include "renderer.h"
 
-#include "clay_ui_compositor.h"
 #include "runtime/UiInteractionRegistry.h"
 
 #include <algorithm>
@@ -80,7 +79,7 @@ void PasswordModal::BuildUi(ScreenContext & ctx, float frametime, const silencer
 	passwordDisplay_.assign(std::strlen(password), '*');
 	if(focused && blink) passwordDisplay_ += "|";
 
-	const float uiScale = silencer::clay_bridge::UiScale();
+	const float uiScale = input.uiScale;
 	const int virtualW = std::max(1, input.width);
 	const int virtualH = std::max(1, input.height);
 	silencer::client_ui::PasswordModalFrameProps props{

@@ -3,7 +3,6 @@
 #include "client/ui/hooks/use_lobby.h"
 #include "client/ui/hooks/use_navigation.h"
 #include "client/ui/screens/character_create/character_create_frame.h"
-#include "clay_ui_compositor.h"
 #include "game.h"
 #include "renderer.h"
 #include "runtime/UiInteractionRegistry.h"
@@ -112,7 +111,7 @@ void CharacterCreateScreen::BuildUi(ScreenContext & ctx,
 		},
 	};
 
-	const float uiScale = silencer::clay_bridge::UiScale();
+	const float uiScale = input.uiScale;
 	const int virtualW = std::max(1, input.width);
 	const int virtualH = std::max(1, input.height);
 	retainedFrame_.Build([&]() {

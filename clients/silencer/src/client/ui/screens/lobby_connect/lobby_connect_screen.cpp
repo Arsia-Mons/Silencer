@@ -10,7 +10,6 @@
 #include "screen_context.h"
 #include "renderer.h"
 
-#include "clay_ui_compositor.h"
 #include "runtime/UiInteractionRegistry.h"
 
 #include <algorithm>
@@ -148,7 +147,7 @@ void LobbyConnectScreen::BuildUi(ScreenContext & ctx, float frametime, const sil
 	passwordDisplay.assign(std::strlen(password), '*');
 	if(passwordFocused && blink) passwordDisplay += "|";
 
-	const float uiScale = silencer::clay_bridge::UiScale();
+	const float uiScale = input.uiScale;
 	const int virtualW = std::max(1, input.width);
 	const int virtualH = std::max(1, input.height);
 	silencer::client_ui::LobbyConnectFrameProps props{

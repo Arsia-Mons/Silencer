@@ -4,7 +4,6 @@
 #include "client/ui/hooks/use_options.h"
 #include "client/ui/screens/options/options_audio_frame.h"
 #include "screen_context.h"
-#include "clay_ui_compositor.h"
 #include "renderer.h"
 
 #include "runtime/UiInteractionRegistry.h"
@@ -31,7 +30,7 @@ void OptionsAudioScreen::BuildUi(ScreenContext & ctx, float frametime, const sil
 			silencer::client_ui::MakeOptionsProvider(ctx));
 	silencer::client_ui::Navigation navigation =
 		silencer::client_ui::use_navigation();
-	const float uiScale = silencer::clay_bridge::UiScale();
+	const float uiScale = input.uiScale;
 	const int virtualW = std::max(1, input.width);
 	const int virtualH = std::max(1, input.height);
 	silencer::client_ui::OptionsAudioFrameProps props{

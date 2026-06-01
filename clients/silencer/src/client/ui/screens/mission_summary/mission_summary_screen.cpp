@@ -6,7 +6,6 @@
 #include "lobby_screen.h"
 #include "main_menu_screen.h"
 #include "screen_context.h"
-#include "clay_ui_compositor.h"
 #include "runtime/UiInteractionRegistry.h"
 #include "renderer.h"
 
@@ -90,7 +89,7 @@ void MissionSummaryScreen::Tick(ScreenContext & ctx)
 void MissionSummaryScreen::BuildUi(ScreenContext & ctx, float frametime, const silencer::ui::UiInputState& input, Uint8, silencer::ui::UiInteractionRegistry& interactions)
 {
 	(void)frametime;
-	const float uiScale = silencer::clay_bridge::UiScale();
+	const float uiScale = input.uiScale;
 	const int virtualW = std::max(1, input.width);
 	const int virtualH = std::max(1, input.height);
 

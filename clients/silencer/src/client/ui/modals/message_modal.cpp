@@ -4,7 +4,6 @@
 #include "client/ui/modals/message_modal_frame.h"
 #include "screen_context.h"
 
-#include "clay_ui_compositor.h"
 #include "runtime/UiInteractionRegistry.h"
 
 #include <algorithm>
@@ -45,7 +44,7 @@ void MessageModal::BuildUi(ScreenContext & ctx, float frametime, const silencer:
 {
 	(void)ctx;
 	(void)frametime;
-	const float uiScale = silencer::clay_bridge::UiScale();
+	const float uiScale = input.uiScale;
 	const int virtualW = std::max(1, input.width);
 	const int virtualH = std::max(1, input.height);
 	silencer::client_ui::MessageModalFrameProps props{
