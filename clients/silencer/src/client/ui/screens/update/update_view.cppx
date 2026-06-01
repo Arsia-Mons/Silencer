@@ -129,37 +129,37 @@ const char * primary_label(UpdatePrimaryAction action) {
 	}
 }
 
-bool has_progress(const UpdateState& state) {
-	return state.progress && state.progress[0] != '\0';
+bool has_progress(const UpdateStatus& update) {
+	return update.progress && update.progress[0] != '\0';
 }
 
-bool has_primary_action(const UpdateState& state) {
-	return state.primary_action != UpdatePrimaryAction::None;
+bool has_primary_action(const UpdateStatus& update) {
+	return update.primary_action != UpdatePrimaryAction::None;
 }
 
 }  // namespace
 
 ::ui::UiElement UpdateFrame(const UpdateFrameProps& props) {
-	const UpdateContextValue& update = UseUpdate();
+	const UpdateStatus& update = UseUpdateStatus();
 	GameNavigation navigation = use_game_navigation();
-	const UpdateState& state = update.state;
-	const UpdateActions& actions = update.actions;
-	const bool primary_visible = has_primary_action(state);
+	const bool primary_visible = has_primary_action(update);
 	std::function<void(const ::ui::ActivationEvent&)> primary_activate = {};
-	switch(state.primary_action){
+	switch(update.primary_action){
 		case UpdatePrimaryAction::Update:
-			primary_activate = [actions](const ::ui::ActivationEvent&) {
-				if(actions.start_update) actions.start_update();
+			primary_activate = [start_update = update.start_update](
+				const ::ui::ActivationEvent&) {
+				if(start_update) start_update();
 			};
 			break;
 		case UpdatePrimaryAction::Retry:
-			primary_activate = [actions](const ::ui::ActivationEvent&) {
-				if(actions.retry) actions.retry();
+			primary_activate = [retry = update.retry](const ::ui::ActivationEvent&) {
+				if(retry) retry();
 			};
 			break;
 		case UpdatePrimaryAction::Download:
-			primary_activate = [actions, navigation](const ::ui::ActivationEvent&) {
-				const bool opened = actions.download ? actions.download() : false;
+			primary_activate = [download = update.download, navigation](
+				const ::ui::ActivationEvent&) {
+				const bool opened = download ? download() : false;
 				if(opened && navigation.go_to_state) navigation.go_to_state(GameState::MAINMENU);
 			};
 			break;
@@ -168,25 +168,25 @@ bool has_primary_action(const UpdateState& state) {
 			break;
 	}
 	std::function<void(const ::ui::ActivationEvent&)> cancel_activate =
-		[actions, navigation](const ::ui::ActivationEvent&) {
-			const bool cancelled = actions.cancel ? actions.cancel() : false;
+		[cancel = update.cancel, navigation](const ::ui::ActivationEvent&) {
+			const bool cancelled = cancel ? cancel() : false;
 			if(cancelled && navigation.go_to_state) navigation.go_to_state(GameState::MAINMENU);
 		};
 	return <Box key={props.key} layout={root_layout()}>
 		<Dialog key="dialog" modal={true} layout={dialog_layout()}>
-			<Text key="status" value={state.status} layout={status_layout()} style={status_style()} />
+			<Text key="status" value={update.status} layout={status_layout()} style={status_style()} />
 			<Text
 			  key="progress"
-			  value={state.progress}
-			  disabled={!has_progress(state)}
-			  layout={progress_layout(has_progress(state))}
+			  value={update.progress}
+			  disabled={!has_progress(update)}
+			  layout={progress_layout(has_progress(update))}
 			  style={progress_style()}
 			/>
 			<Box key="actions" layout={actions_layout()}>
 				<Button
 				  key="primary"
-				  id={primary_id(state.primary_action)}
-				  label={primary_label(state.primary_action)}
+				  id={primary_id(update.primary_action)}
+				  label={primary_label(update.primary_action)}
 				  disabled={!primary_visible}
 				  autofocus={primary_visible}
 				  onActivate={primary_activate}
@@ -196,10 +196,10 @@ bool has_primary_action(const UpdateState& state) {
 				  key="cancel"
 				  id="update.cancel"
 				  label="Cancel"
-				  disabled={!state.show_cancel}
-				  autofocus={!primary_visible && state.show_cancel}
+				  disabled={!update.show_cancel}
+				  autofocus={!primary_visible && update.show_cancel}
 				  onActivate={cancel_activate}
-				  layout={button_layout(state.show_cancel)}
+				  layout={button_layout(update.show_cancel)}
 				/>
 			</Box>
 		</Dialog>

@@ -138,35 +138,31 @@ bool UpdateScreen::BuildElement(ScreenContext & ctx, ::ui::UiElement * out)
 	if(!out) return false;
 	statusText_ = update_screen_detail::StatusText(ctx);
 	progressText_ = update_screen_detail::ProgressText(ctx);
-	const silencer::client_ui::UpdateContextValue context{
-		.state = silencer::client_ui::UpdateState{
-			.status = statusText_.c_str(),
-			.progress = progressText_.c_str(),
-			.primary_action = update_screen_detail::PrimaryAction(ctx),
-			.show_cancel = update_screen_detail::ShowCancel(ctx),
+	const silencer::client_ui::UpdateStatus status{
+		.status = statusText_.c_str(),
+		.progress = progressText_.c_str(),
+		.primary_action = update_screen_detail::PrimaryAction(ctx),
+		.show_cancel = update_screen_detail::ShowCancel(ctx),
+		.start_update = [updater = &ctx.updater]() {
+			update_screen_detail::StartUpdate(*updater);
 		},
-		.actions = silencer::client_ui::UpdateActions{
-			.start_update = [updater = &ctx.updater]() {
-				update_screen_detail::StartUpdate(*updater);
-			},
-			.retry = [updater = &ctx.updater]() {
-				update_screen_detail::RetryUpdate(*updater);
-			},
-			.download = [updater = &ctx.updater]() {
-				return update_screen_detail::OpenDownload(*updater);
-			},
-			.cancel = [updater = &ctx.updater]() {
-				return update_screen_detail::CancelUpdate(*updater);
-			},
+		.retry = [updater = &ctx.updater]() {
+			update_screen_detail::RetryUpdate(*updater);
+		},
+		.download = [updater = &ctx.updater]() {
+			return update_screen_detail::OpenDownload(*updater);
+		},
+		.cancel = [updater = &ctx.updater]() {
+			return update_screen_detail::CancelUpdate(*updater);
 		},
 	};
-	const auto * stored = ::ui::copy_value(context);
+	const auto * stored = ::ui::copy_value(status);
 	if(!stored) return false;
 	*out = ::ui::component(
 		"UpdateView",
 		silencer::client_ui::UpdateViewProps{
 			.key = "update",
-			.value = stored,
+			.status = stored,
 		},
 		silencer::client_ui::UpdateView);
 	return true;

@@ -157,6 +157,13 @@ fail_if_match \
   "$REPO_ROOT/clients/silencer/src/client/ui/screens/update/update_view.cppx"
 
 fail_if_match \
+  "\\bUpdate(ContextValue|Actions|State)\\b|\\bUseUpdate[[:space:]]*\\(" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens/update/update_view.cppx" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens/update/update_view.hx" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens/update/update_screen.cpp" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens/update/update_view_provider.cpp"
+
+fail_if_match \
   "UiActionKind::Activate" \
   "$REPO_ROOT/clients/silencer/src/client/ui/screens" \
   "$REPO_ROOT/clients/silencer/src/client/ui/modals"
