@@ -41,7 +41,7 @@ struct GameTechPanelState {
 };
 
 struct LobbyGameTech {
-	GameTechPanelState * state = nullptr;
+	const GameTechPanelState * snapshot = nullptr;
 	std::function<void()> back_to_team = {};
 	std::function<void(int)> preview = {};
 	std::function<void(int)> toggle = {};

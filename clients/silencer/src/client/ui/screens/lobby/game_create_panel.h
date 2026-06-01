@@ -60,7 +60,7 @@ struct GameCreatePanelState {
 };
 
 struct LobbyGameCreate {
-	GameCreatePanelState * state = nullptr;
+	const GameCreatePanelState * snapshot = nullptr;
 	std::function<void(int)> select_map = {};
 	std::function<void(int)> scroll_maps = {};
 	std::function<void()> cycle_security = {};

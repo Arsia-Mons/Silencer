@@ -47,7 +47,7 @@ struct GameJoinPanelState {
 };
 
 struct LobbyGameJoin {
-	GameJoinPanelState * state = nullptr;
+	const GameJoinPanelState * snapshot = nullptr;
 	std::function<void()> choose_tech = {};
 	std::function<void()> change_team = {};
 	std::function<void()> ready = {};

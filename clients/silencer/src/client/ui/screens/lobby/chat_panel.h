@@ -78,7 +78,7 @@ struct ChatPanelState {
 };
 
 struct LobbyChat {
-	ChatPanelState * state = nullptr;
+	const ChatPanelState * snapshot = nullptr;
 	std::function<void(const std::string&)> set_text = {};
 	std::function<void()> send = {};
 };

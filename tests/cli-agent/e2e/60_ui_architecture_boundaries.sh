@@ -244,6 +244,17 @@ fail_if_match \
   "$REPO_ROOT/clients/silencer/src/client/ui/screens/lobby/lobby_view_provider.cpp"
 
 fail_if_match \
+  "\\b(character|chat|gameSelect|gameCreate|gameJoin|gameTech)[.]state\\b|\\b(CharacterPanelState|ChatPanelState|GameSelectPanelState|GameCreatePanelState|GameJoinPanelState|GameTechPanelState)[[:space:]]*[*][[:space:]]*state\\b|if[[:space:]]*\\(!state\\)" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens/lobby/lobby_view.cppx" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens/lobby/lobby_screen.cpp" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens/lobby/character_panel.h" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens/lobby/chat_panel.h" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens/lobby/game_select_panel.h" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens/lobby/game_create_panel.h" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens/lobby/game_join_panel.h" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens/lobby/game_tech_panel.h"
+
+fail_if_match \
   "actions[.](go_back|set_chat_text|send_chat|change_agent|select_game|scroll_games|create_game|join_game|spectate_game|select_create_map|scroll_create_maps|cycle_create_security|toggle_create_spectatable|submit_create_game|set_create_name|set_create_password|set_create_min_level|set_create_max_level|set_create_max_players|set_create_max_teams|choose_tech|change_team|ready_game|back_to_team|preview_tech|toggle_tech)\\b|state[.](chat|character|game_select|game_create|game_join|game_tech)\\b" \
   "$REPO_ROOT/clients/silencer/src/client/ui/screens/lobby/lobby_view.cppx" \
   "$REPO_ROOT/clients/silencer/src/client/ui/screens/lobby/lobby_view.hx" \

@@ -423,17 +423,17 @@ struct CharacterPanelProps {
 ::ui::UiElement CharacterPanel(const CharacterPanelProps& props) {
 	(void)props;
 	const LobbyCharacter& character = UseLobbyCharacter();
-	CharacterPanelState * state = character.state;
-	if(!state) return ::ui::empty();
-	const bool locked = state->agentSelectionLocked;
+	const CharacterPanelState * snapshot = character.snapshot;
+	if(!snapshot) return ::ui::empty();
+	const bool locked = snapshot->agentSelectionLocked;
 	return <Box key="character" layout={character_panel_layout()} style={panel_style()}>
 		<SectionHeading key="heading" value="AGENT" />
-		<FieldText key="name" value={state->agentName.c_str()} />
-		<FieldText key="agency" value={agency_name(state->selectedAgency)} />
-		<FieldText key="level" value={state->levelText.c_str()} />
-		<FieldText key="record" value={state->recordText.c_str()} />
-		<FieldText key="stats-a" value={state->statsLineA.c_str()} />
-		<FieldText key="stats-b" value={state->statsLineB.c_str()} />
+		<FieldText key="name" value={snapshot->agentName.c_str()} />
+		<FieldText key="agency" value={agency_name(snapshot->selectedAgency)} />
+		<FieldText key="level" value={snapshot->levelText.c_str()} />
+		<FieldText key="record" value={snapshot->recordText.c_str()} />
+		<FieldText key="stats-a" value={snapshot->statsLineA.c_str()} />
+		<FieldText key="stats-b" value={snapshot->statsLineB.c_str()} />
 		<Button
 		  key="agents"
 		  id="lobby.character.agents"
@@ -453,27 +453,27 @@ struct ChatLineRowProps {
 
 ::ui::UiElement ChatLineRow(const ChatLineRowProps& props) {
 	const LobbyChat& chat = UseLobbyChat();
-	ChatPanelState * state = chat.state;
-	if(!state) return ::ui::empty();
+	const ChatPanelState * snapshot = chat.snapshot;
+	if(!snapshot) return ::ui::empty();
 	if(props.presence){
-		int start = static_cast<int>(state->presenceLines.size()) - kVisiblePresenceLines;
+		int start = static_cast<int>(snapshot->presenceLines.size()) - kVisiblePresenceLines;
 		if(start < 0) start = 0;
 		int index = start + props.slot;
-		if(index < 0 || index >= static_cast<int>(state->presenceLines.size())) return ::ui::empty();
+		if(index < 0 || index >= static_cast<int>(snapshot->presenceLines.size())) return ::ui::empty();
 		return <Text
 		  key={props.key}
-		  value={state->presenceLines[static_cast<size_t>(index)].text.c_str()}
+		  value={snapshot->presenceLines[static_cast<size_t>(index)].text.c_str()}
 		  layout={text_line_layout(15.0f)}
 		  style={muted_style()}
 		/>
 	}
-	int start = static_cast<int>(state->chatLines.size()) - kVisibleChatLines;
+	int start = static_cast<int>(snapshot->chatLines.size()) - kVisibleChatLines;
 	if(start < 0) start = 0;
 	int index = start + props.slot;
-	if(index < 0 || index >= static_cast<int>(state->chatLines.size())) return ::ui::empty();
+	if(index < 0 || index >= static_cast<int>(snapshot->chatLines.size())) return ::ui::empty();
 	return <Text
 	  key={props.key}
-	  value={state->chatLines[static_cast<size_t>(index)].text.c_str()}
+	  value={snapshot->chatLines[static_cast<size_t>(index)].text.c_str()}
 	  layout={text_line_layout(15.0f)}
 	  style={text_style(::ui::Color{222, 231, 238, 255})}
 	/>
@@ -486,9 +486,9 @@ struct ChatPanelProps {
 ::ui::UiElement ChatPanel(const ChatPanelProps& props) {
 	(void)props;
 	const LobbyChat& chat = UseLobbyChat();
-	ChatPanelState * state = chat.state;
-	if(!state) return ::ui::empty();
-	const char * channel = state->channel.empty() ? "Lobby" : state->channel.c_str();
+	const ChatPanelState * snapshot = chat.snapshot;
+	if(!snapshot) return ::ui::empty();
+	const char * channel = snapshot->channel.empty() ? "Lobby" : snapshot->channel.c_str();
 	return <Box key="chat" layout={chat_panel_layout()} style={panel_style()}>
 		<SectionHeading key="heading" value={channel} />
 		<Box key="body" layout={chat_body_layout()}>
@@ -516,7 +516,7 @@ struct ChatPanelProps {
 			<Input
 			  key="input"
 			  id="lobby.chat.input"
-			  value={state->inputBuffer}
+			  value={snapshot->inputBuffer}
 			  accessibility={::ui::components::AccessibilityProps{.role = ::ui::SemanticRole::TextBox, .label = "Chat message"}}
 			  onChange={chat.set_text}
 			  onKey={action_on_enter(chat.send)}
@@ -540,17 +540,17 @@ struct GameRowProps {
 
 ::ui::UiElement GameRow(const GameRowProps& props) {
 	const LobbyGameSelect& gameSelect = UseLobbyGameSelect();
-	GameSelectPanelState * state = gameSelect.state;
-	if(!state) return ::ui::empty();
-	int start = state->scrollPos;
+	const GameSelectPanelState * snapshot = gameSelect.snapshot;
+	if(!snapshot) return ::ui::empty();
+	int start = snapshot->scrollPos;
 	int index = start + props.slot;
-	if(index < 0 || index >= static_cast<int>(state->rows.size())) return ::ui::empty();
-	bool selected = index == state->selectedIndex;
+	if(index < 0 || index >= static_cast<int>(snapshot->rows.size())) return ::ui::empty();
+	bool selected = index == snapshot->selectedIndex;
 	return <Button
 	  key={props.key}
 	  id="lobby.game_select.row"
 	  idOffset={index}
-	  label={state->rows[static_cast<size_t>(index)].name.c_str()}
+	  label={snapshot->rows[static_cast<size_t>(index)].name.c_str()}
 	  selected={selected}
 	  onActivate={index_action_callback(gameSelect.select, index)}
 	  layout={row_button_layout(24.0f)}
@@ -565,8 +565,8 @@ struct GameSelectUpperProps {
 ::ui::UiElement GameSelectUpper(const GameSelectUpperProps& props) {
 	(void)props;
 	const LobbyGameSelect& gameSelect = UseLobbyGameSelect();
-	GameSelectPanelState * state = gameSelect.state;
-	if(!state) return ::ui::empty();
+	const GameSelectPanelState * snapshot = gameSelect.snapshot;
+	if(!snapshot) return ::ui::empty();
 	return <Box key="select-upper" layout={upper_panel_layout()} style={panel_style()}>
 		<SectionHeading key="heading" value="GAME SELECT" />
 		<Button
@@ -578,7 +578,7 @@ struct GameSelectUpperProps {
 		/>
 		<FieldText
 		  key="count"
-		  value={use_text_storage("%d active games", static_cast<int>(state->rows.size()))}
+		  value={use_text_storage("%d active games", static_cast<int>(snapshot->rows.size()))}
 		/>
 	</Box>
 }
@@ -590,8 +590,8 @@ struct GameSelectTallProps {
 ::ui::UiElement GameSelectTall(const GameSelectTallProps& props) {
 	(void)props;
 	const LobbyGameSelect& gameSelect = UseLobbyGameSelect();
-	GameSelectPanelState * state = gameSelect.state;
-	if(!state) return ::ui::empty();
+	const GameSelectPanelState * snapshot = gameSelect.snapshot;
+	if(!snapshot) return ::ui::empty();
 	return <Box key="select-tall" layout={side_panel_layout()} style={panel_style()}>
 		<SectionHeading key="heading" value="ACTIVE GAMES" />
 		<Box key="game-scroll" layout={compact_actions_layout()}>
@@ -619,17 +619,17 @@ struct GameSelectTallProps {
 		<GameRow key="game-6" slot={6} />
 		<GameRow key="game-7" slot={7} />
 		<Box key="info" layout={create_options_layout()} style={inner_panel_style()}>
-			<FieldText key="name" value={state->infoName.c_str()} />
-			<FieldText key="map" value={state->infoMap.c_str()} />
-			<FieldText key="security" value={state->infoSecurity.c_str()} />
-			<FieldText key="creator" value={state->infoCreator.c_str()} />
-			<FieldText key="limits" value={state->infoLimits.c_str()} />
+			<FieldText key="name" value={snapshot->infoName.c_str()} />
+			<FieldText key="map" value={snapshot->infoMap.c_str()} />
+			<FieldText key="security" value={snapshot->infoSecurity.c_str()} />
+			<FieldText key="creator" value={snapshot->infoCreator.c_str()} />
+			<FieldText key="limits" value={snapshot->infoLimits.c_str()} />
 		</Box>
 		<Button
 		  key="spectate"
 		  id="lobby.game_select.spectate"
 		  label="Spectate"
-		  disabled={!state->spectateVisible}
+		  disabled={!snapshot->spectateVisible}
 		  onActivate={action_callback(gameSelect.spectate)}
 		  layout={row_button_layout(27.0f)}
 		/>
@@ -637,7 +637,7 @@ struct GameSelectTallProps {
 		  key="join"
 		  id="lobby.game_select.join"
 		  label="Join"
-		  disabled={!state->joinVisible}
+		  disabled={!snapshot->joinVisible}
 		  onActivate={action_callback(gameSelect.join)}
 		  layout={row_button_layout(27.0f)}
 		/>
@@ -651,20 +651,20 @@ struct MapRowProps {
 
 ::ui::UiElement MapRow(const MapRowProps& props) {
 	const LobbyGameCreate& gameCreate = UseLobbyGameCreate();
-	GameCreatePanelState * state = gameCreate.state;
-	if(!state) return ::ui::empty();
-	int start = state->mapScrollPos;
+	const GameCreatePanelState * snapshot = gameCreate.snapshot;
+	if(!snapshot) return ::ui::empty();
+	int start = snapshot->mapScrollPos;
 	int index = start + props.slot;
-	if(index < 0 || index >= static_cast<int>(state->maps.size())) return ::ui::empty();
+	if(index < 0 || index >= static_cast<int>(snapshot->maps.size())) return ::ui::empty();
 	return <Button
 	  key={props.key}
 	  id="lobby.game_create.map"
 	  idOffset={index}
-	  label={state->maps[static_cast<size_t>(index)].c_str()}
-	  selected={index == state->mapSelectedIndex}
+	  label={snapshot->maps[static_cast<size_t>(index)].c_str()}
+	  selected={index == snapshot->mapSelectedIndex}
 	  onActivate={index_action_callback(gameCreate.select_map, index)}
 	  layout={row_button_layout(23.0f)}
-	  style={row_style(index == state->mapSelectedIndex)}
+	  style={row_style(index == snapshot->mapSelectedIndex)}
 	/>
 }
 
@@ -675,21 +675,21 @@ struct GameCreateUpperProps {
 ::ui::UiElement GameCreateUpper(const GameCreateUpperProps& props) {
 	(void)props;
 	const LobbyGameCreate& gameCreate = UseLobbyGameCreate();
-	GameCreatePanelState * state = gameCreate.state;
-	if(!state) return ::ui::empty();
+	const GameCreatePanelState * snapshot = gameCreate.snapshot;
+	if(!snapshot) return ::ui::empty();
 	return <Box key="create-upper" layout={upper_panel_layout()} style={panel_style()}>
 		<SectionHeading key="heading" value="GAME OPTIONS" />
 		<Button
 		  key="security"
 		  id="lobby.game_create.security"
-		  label={security_label(state->securityIndex)}
+		  label={security_label(snapshot->securityIndex)}
 		  onActivate={action_callback(gameCreate.cycle_security)}
 		  layout={row_button_layout(25.0f)}
 		/>
 		<Button
 		  key="spectatable"
 		  id="lobby.game_create.spectatable"
-		  label={state->spectatable ? "Spectatable: Yes" : "Spectatable: No"}
+		  label={snapshot->spectatable ? "Spectatable: Yes" : "Spectatable: No"}
 		  onActivate={action_callback(gameCreate.toggle_spectatable)}
 		  layout={row_button_layout(25.0f)}
 		/>
@@ -703,8 +703,8 @@ struct GameCreateTallProps {
 ::ui::UiElement GameCreateTall(const GameCreateTallProps& props) {
 	(void)props;
 	const LobbyGameCreate& gameCreate = UseLobbyGameCreate();
-	GameCreatePanelState * state = gameCreate.state;
-	if(!state) return ::ui::empty();
+	const GameCreatePanelState * snapshot = gameCreate.snapshot;
+	if(!snapshot) return ::ui::empty();
 	return <Box key="create-tall" layout={side_panel_layout()} style={panel_style()}>
 		<SectionHeading key="heading" value="SELECT MAP" />
 		<Box key="map-scroll" layout={compact_actions_layout()}>
@@ -740,7 +740,7 @@ struct GameCreateTallProps {
 			<Input
 			  key="name"
 			  id="lobby.game_create.name"
-			  value={state->name}
+			  value={snapshot->name}
 			  accessibility={::ui::components::AccessibilityProps{.role = ::ui::SemanticRole::TextBox, .label = "Game name"}}
 			  onChange={gameCreate.set_name}
 			  layout={row_button_layout(26.0f)}
@@ -748,7 +748,7 @@ struct GameCreateTallProps {
 			<Input
 			  key="password"
 			  id="lobby.game_create.password"
-			  value={state->password}
+			  value={snapshot->password}
 			  password={true}
 			  accessibility={::ui::components::AccessibilityProps{.role = ::ui::SemanticRole::TextBox, .label = "Game password"}}
 			  onChange={gameCreate.set_password}
@@ -757,7 +757,7 @@ struct GameCreateTallProps {
 			<Input
 			  key="min-level"
 			  id="lobby.game_create.min_level"
-			  value={state->minLevel}
+			  value={snapshot->minLevel}
 			  accessibility={::ui::components::AccessibilityProps{.role = ::ui::SemanticRole::TextBox, .label = "Min level"}}
 			  onChange={gameCreate.set_min_level}
 			  layout={row_button_layout(24.0f)}
@@ -765,7 +765,7 @@ struct GameCreateTallProps {
 			<Input
 			  key="max-level"
 			  id="lobby.game_create.max_level"
-			  value={state->maxLevel}
+			  value={snapshot->maxLevel}
 			  accessibility={::ui::components::AccessibilityProps{.role = ::ui::SemanticRole::TextBox, .label = "Max level"}}
 			  onChange={gameCreate.set_max_level}
 			  layout={row_button_layout(24.0f)}
@@ -773,7 +773,7 @@ struct GameCreateTallProps {
 			<Input
 			  key="max-players"
 			  id="lobby.game_create.max_players"
-			  value={state->maxPlayers}
+			  value={snapshot->maxPlayers}
 			  accessibility={::ui::components::AccessibilityProps{.role = ::ui::SemanticRole::TextBox, .label = "Max players"}}
 			  onChange={gameCreate.set_max_players}
 			  layout={row_button_layout(24.0f)}
@@ -781,7 +781,7 @@ struct GameCreateTallProps {
 			<Input
 			  key="max-teams"
 			  id="lobby.game_create.max_teams"
-			  value={state->maxTeams}
+			  value={snapshot->maxTeams}
 			  accessibility={::ui::components::AccessibilityProps{.role = ::ui::SemanticRole::TextBox, .label = "Max teams"}}
 			  onChange={gameCreate.set_max_teams}
 			  layout={row_button_layout(24.0f)}
@@ -804,8 +804,8 @@ struct GameJoinUpperProps {
 ::ui::UiElement GameJoinUpper(const GameJoinUpperProps& props) {
 	(void)props;
 	const LobbyGameJoin& gameJoin = UseLobbyGameJoin();
-	GameJoinPanelState * state = gameJoin.state;
-	if(!state) return ::ui::empty();
+	const GameJoinPanelState * snapshot = gameJoin.snapshot;
+	if(!snapshot) return ::ui::empty();
 	return <Box key="join-upper" layout={upper_panel_layout()} style={panel_style()}>
 		<SectionHeading key="heading" value="TEAM" />
 		<Button
@@ -825,7 +825,7 @@ struct GameJoinUpperProps {
 		<Button
 		  key="ready"
 		  id="lobby.game_join.ready"
-		  label={state->readyLabel.c_str()}
+		  label={snapshot->readyLabel.c_str()}
 		  onActivate={action_callback(gameJoin.ready)}
 		  layout={row_button_layout(27.0f)}
 		/>
@@ -839,10 +839,10 @@ struct RosterRowProps {
 
 ::ui::UiElement RosterRow(const RosterRowProps& props) {
 	const LobbyGameJoin& gameJoin = UseLobbyGameJoin();
-	GameJoinPanelState * state = gameJoin.state;
-	if(!state) return ::ui::empty();
-	if(props.slot < 0 || props.slot >= static_cast<int>(state->rosterRows.size())) return ::ui::empty();
-	const GameJoinRosterRow& row = state->rosterRows[static_cast<size_t>(props.slot)];
+	const GameJoinPanelState * snapshot = gameJoin.snapshot;
+	if(!snapshot) return ::ui::empty();
+	if(props.slot < 0 || props.slot >= static_cast<int>(snapshot->rosterRows.size())) return ::ui::empty();
+	const GameJoinRosterRow& row = snapshot->rosterRows[static_cast<size_t>(props.slot)];
 	return <Text
 	  key={props.key}
 	  value={use_text_storage("%s T%u %s %s", row.ready ? "Ready" : "Wait", row.teamNumber, agency_name(row.agency), row.name.c_str())}
@@ -879,10 +879,10 @@ struct TechRowProps {
 
 ::ui::UiElement TechRow(const TechRowProps& props) {
 	const LobbyGameTech& gameTech = UseLobbyGameTech();
-	GameTechPanelState * state = gameTech.state;
-	if(!state) return ::ui::empty();
-	if(props.slot < 0 || props.slot >= static_cast<int>(state->techRows.size())) return ::ui::empty();
-	const GameTechRow& row = state->techRows[static_cast<size_t>(props.slot)];
+	const GameTechPanelState * snapshot = gameTech.snapshot;
+	if(!snapshot) return ::ui::empty();
+	if(props.slot < 0 || props.slot >= static_cast<int>(snapshot->techRows.size())) return ::ui::empty();
+	const GameTechRow& row = snapshot->techRows[static_cast<size_t>(props.slot)];
 	if(!row.visible) return ::ui::empty();
 	return <Button
 	  key={props.key}
@@ -904,8 +904,8 @@ struct GameTechUpperProps {
 ::ui::UiElement GameTechUpper(const GameTechUpperProps& props) {
 	(void)props;
 	const LobbyGameTech& gameTech = UseLobbyGameTech();
-	GameTechPanelState * state = gameTech.state;
-	if(!state) return ::ui::empty();
+	const GameTechPanelState * snapshot = gameTech.snapshot;
+	if(!snapshot) return ::ui::empty();
 	return <Box key="tech-upper" layout={upper_panel_layout()} style={panel_style()}>
 		<SectionHeading key="heading" value="TECH" />
 		<Button
@@ -915,9 +915,9 @@ struct GameTechUpperProps {
 		  onActivate={action_callback(gameTech.back_to_team)}
 		  layout={row_button_layout(28.0f)}
 		/>
-		<FieldText key="peer-0" value={state->peerNameStrs[0].c_str()} />
-		<FieldText key="peer-1" value={state->peerNameStrs[1].c_str()} />
-		<FieldText key="peer-2" value={state->peerNameStrs[2].c_str()} />
+		<FieldText key="peer-0" value={snapshot->peerNameStrs[0].c_str()} />
+		<FieldText key="peer-1" value={snapshot->peerNameStrs[1].c_str()} />
+		<FieldText key="peer-2" value={snapshot->peerNameStrs[2].c_str()} />
 	</Box>
 }
 
@@ -928,10 +928,10 @@ struct GameTechTallProps {
 ::ui::UiElement GameTechTall(const GameTechTallProps& props) {
 	(void)props;
 	const LobbyGameTech& gameTech = UseLobbyGameTech();
-	GameTechPanelState * state = gameTech.state;
-	if(!state) return ::ui::empty();
+	const GameTechPanelState * snapshot = gameTech.snapshot;
+	if(!snapshot) return ::ui::empty();
 	return <Box key="tech-tall" layout={side_panel_layout()} style={panel_style()}>
-		<SectionHeading key="heading" value={state->slotsLeftStr.c_str()} />
+		<SectionHeading key="heading" value={snapshot->slotsLeftStr.c_str()} />
 		<TechRow key="tech-0" slot={0} />
 		<TechRow key="tech-1" slot={1} />
 		<TechRow key="tech-2" slot={2} />
@@ -943,13 +943,13 @@ struct GameTechTallProps {
 		<TechRow key="tech-8" slot={8} />
 		<TechRow key="tech-9" slot={9} />
 		<Box key="desc" layout={create_options_layout()} style={inner_panel_style()}>
-			<FieldText key="tech-name" value={state->techNameStr.c_str()} style={heading_style()} />
-			<FieldText key="desc-0" value={state->techDescLines[0].c_str()} />
-			<FieldText key="desc-1" value={state->techDescLines[1].c_str()} />
-			<FieldText key="desc-2" value={state->techDescLines[2].c_str()} />
-			<FieldText key="desc-3" value={state->techDescLines[3].c_str()} />
-			<FieldText key="desc-4" value={state->techDescLines[4].c_str()} />
-			<FieldText key="desc-5" value={state->techDescLines[5].c_str()} />
+			<FieldText key="tech-name" value={snapshot->techNameStr.c_str()} style={heading_style()} />
+			<FieldText key="desc-0" value={snapshot->techDescLines[0].c_str()} />
+			<FieldText key="desc-1" value={snapshot->techDescLines[1].c_str()} />
+			<FieldText key="desc-2" value={snapshot->techDescLines[2].c_str()} />
+			<FieldText key="desc-3" value={snapshot->techDescLines[3].c_str()} />
+			<FieldText key="desc-4" value={snapshot->techDescLines[4].c_str()} />
+			<FieldText key="desc-5" value={snapshot->techDescLines[5].c_str()} />
 		</Box>
 	</Box>
 }

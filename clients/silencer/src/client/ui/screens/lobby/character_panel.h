@@ -37,7 +37,7 @@ struct CharacterPanelState {
 };
 
 struct LobbyCharacter {
-	CharacterPanelState * state = nullptr;
+	const CharacterPanelState * snapshot = nullptr;
 	std::function<void()> change_agent = {};
 };
 

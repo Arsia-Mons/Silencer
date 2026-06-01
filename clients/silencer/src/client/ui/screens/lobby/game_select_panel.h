@@ -57,7 +57,7 @@ struct GameSelectPanelState {
 };
 
 struct LobbyGameSelect {
-	GameSelectPanelState * state = nullptr;
+	const GameSelectPanelState * snapshot = nullptr;
 	std::function<void(int)> select = {};
 	std::function<void(int)> scroll = {};
 	std::function<void()> create = {};

@@ -107,7 +107,7 @@ bool LobbyScreen::BuildElement(ScreenContext & ctx, ::ui::UiElement * out)
 		},
 	};
 	silencer::client_ui::lobby::LobbyChat chat{
-		.state = &chatState,
+		.snapshot = &chatState,
 		.set_text = [this](const std::string& value) {
 			silencer::client_ui::lobby::ChatPanelSetInput(chatState, value);
 		},
@@ -116,7 +116,7 @@ bool LobbyScreen::BuildElement(ScreenContext & ctx, ::ui::UiElement * out)
 		},
 	};
 	silencer::client_ui::lobby::LobbyCharacter character{
-		.state = &characterState,
+		.snapshot = &characterState,
 		.change_agent = [this]() {
 			if(!characterState.agentSelectionLocked){
 				characterState.newCharacterRequested = true;
@@ -124,7 +124,7 @@ bool LobbyScreen::BuildElement(ScreenContext & ctx, ::ui::UiElement * out)
 		},
 	};
 	silencer::client_ui::lobby::LobbyGameSelect gameSelect{
-		.state = &gameSelectState,
+		.snapshot = &gameSelectState,
 		.select = [this](int index) {
 			silencer::client_ui::lobby::GameSelectPanelSelectRow(gameSelectState, index);
 		},
@@ -142,7 +142,7 @@ bool LobbyScreen::BuildElement(ScreenContext & ctx, ::ui::UiElement * out)
 		},
 	};
 	silencer::client_ui::lobby::LobbyGameCreate gameCreate{
-		.state = &gameCreateState,
+		.snapshot = &gameCreateState,
 		.select_map = [this](int index) {
 			silencer::client_ui::lobby::GameCreatePanelSelectMap(gameCreateState, index);
 		},
@@ -178,7 +178,7 @@ bool LobbyScreen::BuildElement(ScreenContext & ctx, ::ui::UiElement * out)
 		},
 	};
 	silencer::client_ui::lobby::LobbyGameJoin gameJoin{
-		.state = &gameJoinState,
+		.snapshot = &gameJoinState,
 		.choose_tech = [this]() {
 			silencer::client_ui::lobby::GameJoinPanelRequestTech(gameJoinState);
 		},
@@ -190,7 +190,7 @@ bool LobbyScreen::BuildElement(ScreenContext & ctx, ::ui::UiElement * out)
 		},
 	};
 	silencer::client_ui::lobby::LobbyGameTech gameTech{
-		.state = &gameTechState,
+		.snapshot = &gameTechState,
 		.back_to_team = [this]() {
 			silencer::client_ui::lobby::GameTechPanelRequestBack(gameTechState);
 		},
