@@ -321,9 +321,10 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 		r["ui_height"] = game.CurrentUiInput().height;
 		r["ui_scale"] = game.CurrentUiInput().uiScale;
 		// Expose the lobby connection sub-state so test scripts can wait for
-		// AUTHENTICATING before dispatching a Login/Create click — the LobbyConnect
-		// state machine progresses asynchronously through Connect/version
-		// check, and a click before AUTHENTICATING is silently consumed.
+		// AUTHENTICATING before dispatching a Login/Create click. The
+		// LobbyConnect connection lifecycle progresses asynchronously through
+		// Connect/version check, and a click before AUTHENTICATING is silently
+		// consumed.
 		static const char * lobbyStateNames[] = {
 			"IDLE","WAITING","CONNECTING","RESOLVING","WAITINGFORRESOLVER",
 			"RESOLVED","RESOLVEFAILED","CONNECTIONFAILED","CONNECTED",

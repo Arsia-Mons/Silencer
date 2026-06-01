@@ -81,7 +81,7 @@ bool Game::Loop(void){
 				std::vector<int> pressedScancodes;
 				// Edge-detect: feed press/release transitions through the
 				// same handlers the SDL path uses, so the in-game ESC
-				// quitstate machine, F1 player-list, debug overlay etc.
+				// quit flow, F1 player-list, debug overlay etc.
 				// behave identically with a TUI keyboard.
 				for(int sc = 0; sc < SDL_SCANCODE_COUNT; ++sc){
 					bool was = gameInput.GetKeystate()[sc] != 0;

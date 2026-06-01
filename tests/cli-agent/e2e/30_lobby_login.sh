@@ -110,9 +110,9 @@ for ch in s e c r e t; do
   cli --port "$CTRL_PORT" key --key "$ch" >/dev/null
 done
 
-# The Login/Create button only dispatches credentials when the lobby state machine
-# has advanced through Connect → version-check → AUTHENTICATING; a click
-# before that is silently consumed. The `state` op exposes lobby_state for
+# The Login/Create button only dispatches credentials when the lobby connection
+# lifecycle has advanced through Connect -> version-check -> AUTHENTICATING; a
+# click before that is silently consumed. The `state` op exposes lobby_state for
 # exactly this kind of synchronization.
 wait_for_lobby_state() {
   local target="$1"
