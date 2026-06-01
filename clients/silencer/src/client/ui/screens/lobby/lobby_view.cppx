@@ -452,8 +452,8 @@ struct ChatLineRowProps {
 };
 
 ::ui::UiElement ChatLineRow(const ChatLineRowProps& props) {
-	const LobbyContextValue& lobby = UseLobby();
-	ChatPanelState * state = lobby.state.chat;
+	const LobbyChat& chat = UseLobbyChat();
+	ChatPanelState * state = chat.state;
 	if(!state) return ::ui::empty();
 	if(props.presence){
 		int start = static_cast<int>(state->presenceLines.size()) - kVisiblePresenceLines;
@@ -485,8 +485,8 @@ struct ChatPanelProps {
 
 ::ui::UiElement ChatPanel(const ChatPanelProps& props) {
 	(void)props;
-	const LobbyContextValue& lobby = UseLobby();
-	ChatPanelState * state = lobby.state.chat;
+	const LobbyChat& chat = UseLobbyChat();
+	ChatPanelState * state = chat.state;
 	if(!state) return ::ui::empty();
 	const char * channel = state->channel.empty() ? "Lobby" : state->channel.c_str();
 	return <Box key="chat" layout={chat_panel_layout()} style={panel_style()}>
@@ -518,15 +518,15 @@ struct ChatPanelProps {
 			  id="lobby.chat.input"
 			  value={state->inputBuffer}
 			  accessibility={::ui::components::AccessibilityProps{.role = ::ui::SemanticRole::TextBox, .label = "Chat message"}}
-			  onChange={lobby.actions.set_chat_text}
-			  onKey={action_on_enter(lobby.actions.send_chat)}
+			  onChange={chat.set_text}
+			  onKey={action_on_enter(chat.send)}
 			  layout={input_grow_layout()}
 			/>
 			<Button
 			  key="send"
 			  id="lobby.chat.send"
 			  label="Send"
-			  onActivate={action_callback(lobby.actions.send_chat)}
+			  onActivate={action_callback(chat.send)}
 			  layout={small_button_layout(72.0f)}
 			/>
 		</Box>

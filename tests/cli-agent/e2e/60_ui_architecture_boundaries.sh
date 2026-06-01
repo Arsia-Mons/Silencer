@@ -162,8 +162,10 @@ fail_if_match \
   "$REPO_ROOT/clients/silencer/src/client/ui/modals"
 
 fail_if_match \
-  "actions[.]go_back" \
-  "$REPO_ROOT/clients/silencer/src/client/ui/screens/lobby"
+  "actions[.](go_back|set_chat_text|send_chat)|state[.]chat" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens/lobby/lobby_view.cppx" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens/lobby/lobby_view.hx" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens/lobby/lobby_screen.cpp"
 
 fail_if_match \
   '::ui::(component|host|box|text|provider|fragment)[[:space:]]*\(' \

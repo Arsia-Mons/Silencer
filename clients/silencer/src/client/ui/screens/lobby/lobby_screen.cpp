@@ -97,7 +97,6 @@ bool LobbyScreen::BuildElement(ScreenContext & ctx, ::ui::UiElement * out)
 			.version = version.c_str(),
 			.map_name = mapName.c_str(),
 			.character = &characterState,
-			.chat = &chatState,
 			.game_select = &gameSelectState,
 			.game_create = &gameCreateState,
 			.game_join = &gameJoinState,
@@ -111,12 +110,6 @@ bool LobbyScreen::BuildElement(ScreenContext & ctx, ::ui::UiElement * out)
 				if(!characterState.agentSelectionLocked){
 					characterState.newCharacterRequested = true;
 				}
-			},
-			.set_chat_text = [this](const std::string& value) {
-				silencer::client_ui::lobby::ChatPanelSetInput(chatState, value);
-			},
-			.send_chat = [this]() {
-				chatSendClicked = true;
 			},
 			.select_game = [this](int index) {
 				silencer::client_ui::lobby::GameSelectPanelSelectRow(gameSelectState, index);
@@ -191,11 +184,21 @@ bool LobbyScreen::BuildElement(ScreenContext & ctx, ::ui::UiElement * out)
 			goBackClicked = true;
 		},
 	};
+	silencer::client_ui::lobby::LobbyChat chat{
+		.state = &chatState,
+		.set_text = [this](const std::string& value) {
+			silencer::client_ui::lobby::ChatPanelSetInput(chatState, value);
+		},
+		.send = [this]() {
+			chatSendClicked = true;
+		},
+	};
 	*out = silencer::client_ui::lobby::LobbyScreenView(
 		silencer::client_ui::lobby::LobbyScreenViewProps{
 			.key = "lobby",
 			.value = ::ui::copy_value(context),
 			.navigation = ::ui::copy_value(navigation),
+			.chat = ::ui::copy_value(chat),
 		});
 	return true;
 }

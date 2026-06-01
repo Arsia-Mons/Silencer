@@ -20,7 +20,6 @@ struct LobbyContextValue {
 		const char * version = "";
 		const char * map_name = "";
 		CharacterPanelState * character = nullptr;
-		ChatPanelState * chat = nullptr;
 		GameSelectPanelState * game_select = nullptr;
 		GameCreatePanelState * game_create = nullptr;
 		GameJoinPanelState * game_join = nullptr;
@@ -32,8 +31,6 @@ struct LobbyContextValue {
 
 	struct Actions {
 		std::function<void()> change_agent = {};
-		std::function<void(const std::string&)> set_chat_text = {};
-		std::function<void()> send_chat = {};
 		std::function<void(int)> select_game = {};
 		std::function<void(int)> scroll_games = {};
 		std::function<void()> create_game = {};
@@ -70,6 +67,14 @@ struct LobbyNavigation {
 
 const LobbyNavigation& UseLobbyNavigation();
 
+struct LobbyChat {
+	ChatPanelState * state = nullptr;
+	std::function<void(const std::string&)> set_text = {};
+	std::function<void()> send = {};
+};
+
+const LobbyChat& UseLobbyChat();
+
 struct LobbyFrameProps {
 	const char * key = nullptr;
 };
@@ -80,6 +85,7 @@ struct LobbyScreenViewProps {
 	const char * key = nullptr;
 	const LobbyContextValue * value = nullptr;
 	const LobbyNavigation * navigation = nullptr;
+	const LobbyChat * chat = nullptr;
 };
 
 ::ui::UiElement LobbyScreenView(const LobbyScreenViewProps& props);
