@@ -52,6 +52,14 @@ RUNTIME_FILES = [
     "src/ui/runtime/draw_command_builder.cpp",
     "src/ui/runtime/geometry.h",
     "src/ui/runtime/geometry.cpp",
+    # SIL-12 focus runtime + fiber-keyed interaction hooks. The tree IS the
+    # focusable registry (NodeInteraction.focusable); focus_update is a pure
+    # function over UiTree + a POD InputFrame, and use_focused/hovered/pressed
+    # read a snapshot via ReactContext. All SDL-free.
+    "src/ui/runtime/focus.h",
+    "src/ui/runtime/focus.cpp",
+    "src/ui/runtime/interaction_hooks.h",
+    "src/ui/runtime/interaction_hooks.cpp",
 ]
 
 SDL_INCLUDE_RE = re.compile(r'#\s*include\s*[<"]\s*(SDL3?/|SDL[._]|SDL_ttf)', re.IGNORECASE)

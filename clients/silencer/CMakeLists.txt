@@ -319,6 +319,39 @@ if(MSVC)
 endif()
 add_test(NAME retained_ui_yoga_tests COMMAND retained_ui_yoga_tests)
 
+# --- Focus runtime + interaction hooks (SIL-12) --------------------------
+# The vendored golden focus runtime, driven over a real Yoga-laid-out UiTree:
+# keyboard/gamepad nav (skip-disabled + source tracking), pointer press/release
+# confirm, and modal scope trap+restore. focus.cpp is a pure function over
+# UiTree + a POD InputFrame (SDL-free); compiles into the client via the glob.
+add_executable(retained_ui_focus_tests
+	tests/retained_ui_focus_tests.cpp
+	src/ui/runtime/focus.cpp
+	src/ui/runtime/tree.cpp
+	src/ui/style/text_measure.cpp
+	src/ui/runtime/flex_layout.cpp
+	src/ui/runtime/yoga_flex_layout.cpp)
+target_compile_features(retained_ui_focus_tests PRIVATE cxx_std_20)
+target_include_directories(retained_ui_focus_tests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src")
+target_link_libraries(retained_ui_focus_tests PRIVATE yogacore)
+if(MSVC)
+	target_compile_definitions(retained_ui_focus_tests PRIVATE NOMINMAX)
+endif()
+add_test(NAME retained_ui_focus_tests COMMAND retained_ui_focus_tests)
+
+# Fiber-keyed interaction hooks (use_focused/hovered/pressed/focus_visible).
+# Hermetic — reads a published InteractionSnapshot via ReactContext, no UiTree.
+add_executable(ui_interaction_hooks_tests
+	tests/ui_interaction_hooks_tests.cpp
+	src/ui/runtime/interaction_hooks.cpp
+	src/ui/runtime/react.cpp)
+target_compile_features(ui_interaction_hooks_tests PRIVATE cxx_std_20)
+target_include_directories(ui_interaction_hooks_tests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src")
+if(MSVC)
+	target_compile_definitions(ui_interaction_hooks_tests PRIVATE NOMINMAX)
+endif()
+add_test(NAME ui_interaction_hooks_tests COMMAND ui_interaction_hooks_tests)
+
 # --- SDL-free draw model (SIL-11 foundation) -----------------------------
 # RGBA DrawCommand IR + tessellation math. draw_command_builder.cpp compiles
 # into the client via the source glob; the renderer-side SDL executor/
