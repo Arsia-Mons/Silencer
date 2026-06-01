@@ -3,6 +3,7 @@
 #include "client/ui/screens/screen.h"
 #include "game.h"
 #include "lobby.h"
+#include "updater.h"
 #include "camera.h"
 #include "detonator.h"
 #include "gasloader.h"
@@ -16,9 +17,11 @@
 #include "render/cppx_ui/pipeline_host.h"
 #include "client/ui/app_shell/app_root.h"
 #include "client/ui/hooks/use_session.h"
+#include "client/ui/hooks/use_updater.h"
 #include "client/ui/providers/app_provider.h"
 #include "client/ui/providers/server_provider.h"
 #include "client/ui/providers/session_provider.h"
+#include "client/ui/providers/updater_provider.h"
 #include "session_phase.h"
 #include "ui/runtime/react.h"
 #include <algorithm>
@@ -258,8 +261,36 @@ session.leave_match = [this]{ game.LeaveJoinedGame(); };
 session.leave_to_menu = [this]{ game.GoToState(GameState::MAINMENU); };
 session.set_paused = [this](bool p){ game.paused = p; };
 
-::ui::UiElement tree = client::ui::SessionProvider(
-client::ui::SessionProviderValue{session}, ::ui::children({child}));
+// Updater model: poll the self-updater's main-thread-safe atomics + map its
+// state to the UI phase; intents route to the public ::Updater methods.
+client::ui::UpdaterModel updater = {};
+switch(game.updater.GetState()){
+case ::Updater::IDLE: updater.phase = client::ui::UpdaterPhase::Idle; break;
+case ::Updater::PROMPTING: updater.phase = client::ui::UpdaterPhase::Prompting; break;
+case ::Updater::DOWNLOADING: updater.phase = client::ui::UpdaterPhase::Downloading; break;
+case ::Updater::VERIFYING: updater.phase = client::ui::UpdaterPhase::Verifying; break;
+case ::Updater::STAGING: updater.phase = client::ui::UpdaterPhase::Staging; break;
+case ::Updater::FAILED: updater.phase = client::ui::UpdaterPhase::Failed; break;
+case ::Updater::DONE: updater.phase = client::ui::UpdaterPhase::Done; break;
+}
+updater.progress = game.updater.GetProgress();
+updater.error = game.updater.GetErrorMessage();
+updater.retry_count = game.updater.GetRetryCount();
+updater.download_url = game.updater.GetDownloadURL();
+updater.can_retry = (game.updater.GetState() == ::Updater::FAILED);
+updater.consent = [this]{ game.updater.Consent(); };
+updater.cancel = [this]{ game.updater.Cancel(); };
+updater.retry = [this]{ game.updater.Retry(); };
+updater.open_download_page = [this]{
+SDL_OpenURL(game.updater.GetDownloadURL().c_str());
+};
+
+// Global FrameProvider chain (doc §5), outermost (Server) → innermost
+// (Updater): Server ▸ App ▸ Session ▸ … ▸ Updater ▸ <screen>.
+::ui::UiElement tree = client::ui::UpdaterProvider(
+client::ui::UpdaterProviderValue{updater}, ::ui::children({child}));
+tree = client::ui::SessionProvider(
+client::ui::SessionProviderValue{session}, ::ui::children({tree}));
 tree = client::ui::AppProvider(
 client::ui::AppProviderValue{[this]{ game.quitRequested = true; }},
 ::ui::children({tree}));
