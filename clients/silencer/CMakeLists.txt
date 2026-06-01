@@ -434,6 +434,24 @@ if(MSVC)
 endif()
 add_test(NAME ui_surface_tests COMMAND ui_surface_tests)
 
+# Executor Image path: plain textured rect + nine-slice (9-patch) button,
+# corners 1:1. Headless software renderer + texture_registry upload.
+add_executable(draw_image_tests
+	tests/draw_image_tests.cpp
+	src/render/cppx_ui/draw_executor.cpp
+	src/render/cppx_ui/sdf_raster.cpp
+	src/render/cppx_ui/font_registry.cpp
+	src/render/cppx_ui/texture_registry.cpp
+	src/ui/runtime/draw_command.cpp
+	src/ui/runtime/geometry.cpp)
+target_compile_features(draw_image_tests PRIVATE cxx_std_20)
+target_include_directories(draw_image_tests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src")
+target_link_libraries(draw_image_tests PRIVATE SDL3::SDL3 SDL3_ttf::SDL3_ttf)
+if(MSVC)
+	target_compile_definitions(draw_image_tests PRIVATE NOMINMAX)
+endif()
+add_test(NAME draw_image_tests COMMAND draw_image_tests)
+
 # /Z7 embeds debug info into .obj files instead of routing it through MSVC's
 # mspdbsrv.exe — which has a habit of failing with C1090 PDB errors on some
 # Windows installs. /Zi (the default) is faster but unreliable; /Z7 is rock
