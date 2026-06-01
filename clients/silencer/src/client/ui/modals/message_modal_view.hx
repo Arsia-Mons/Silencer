@@ -7,21 +7,13 @@
 
 namespace silencer::client_ui {
 
-struct MessageModalState {
+struct MessageModalDialog {
 	const char * message = "";
 	bool show_ok = true;
-};
-
-struct MessageModalActions {
 	std::function<void()> close = {};
 };
 
-struct MessageModalContextValue {
-	MessageModalState state = {};
-	MessageModalActions actions = {};
-};
-
-const MessageModalContextValue& UseMessageModal();
+const MessageModalDialog& UseMessageModalDialog();
 
 struct MessageModalFrameProps {
 	const char * key = nullptr;
@@ -31,7 +23,7 @@ struct MessageModalFrameProps {
 
 struct MessageModalViewProps {
 	const char * key = nullptr;
-	const MessageModalContextValue * value = nullptr;
+	const MessageModalDialog * dialog = nullptr;
 };
 
 ::ui::UiElement MessageModalView(const MessageModalViewProps& props);

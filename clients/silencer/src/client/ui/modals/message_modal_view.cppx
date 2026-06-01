@@ -72,29 +72,27 @@ namespace {
 }
 
 std::function<void(const ::ui::ActivationEvent&)> close_callback(
-	const MessageModalActions& actions) {
-	return [actions](const ::ui::ActivationEvent&) {
-		if(actions.close) actions.close();
+	std::function<void()> close) {
+	return [close](const ::ui::ActivationEvent&) {
+		if(close) close();
 	};
 }
 
 }  // namespace
 
 ::ui::UiElement MessageModalFrame(const MessageModalFrameProps& props) {
-	const MessageModalContextValue& modal = UseMessageModal();
-	const MessageModalState& state = modal.state;
-	const MessageModalActions& actions = modal.actions;
+	const MessageModalDialog& dialog = UseMessageModalDialog();
 	return <Box key={props.key} layout={root_layout()}>
 		<Dialog key="dialog" modal={true} layout={dialog_layout()}>
-			<Text key="message" value={state.message} layout={message_layout()} style={message_style()} />
+			<Text key="message" value={dialog.message} layout={message_layout()} style={message_style()} />
 			<Button
 			  key="ok"
 			  id="message_modal.ok"
 			  label="OK"
-			  disabled={!state.show_ok}
-			  autofocus={state.show_ok}
-			  onActivate={close_callback(actions)}
-			  layout={ok_button_layout(state.show_ok)}
+			  disabled={!dialog.show_ok}
+			  autofocus={dialog.show_ok}
+			  onActivate={close_callback(dialog.close)}
+			  layout={ok_button_layout(dialog.show_ok)}
 			/>
 		</Dialog>
 	</Box>

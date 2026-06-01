@@ -31,24 +31,20 @@ void MessageModal::Tick(ScreenContext & ctx)
 bool MessageModal::BuildElement(ScreenContext & ctx, ::ui::UiElement * out)
 {
 	if(!out) return false;
-	const silencer::client_ui::MessageModalContextValue context{
-		.state = silencer::client_ui::MessageModalState{
-			.message = message.c_str(),
-			.show_ok = hasOk,
-		},
-		.actions = silencer::client_ui::MessageModalActions{
-			.close = [this, screenContext = &ctx]() {
-				Close(*screenContext);
-			},
+	const silencer::client_ui::MessageModalDialog dialog{
+		.message = message.c_str(),
+		.show_ok = hasOk,
+		.close = [this, screenContext = &ctx]() {
+			Close(*screenContext);
 		},
 	};
-	const auto * stored = ::ui::copy_value(context);
+	const auto * stored = ::ui::copy_value(dialog);
 	if(!stored) return false;
 	*out = ::ui::component(
 		"MessageModalView",
 		silencer::client_ui::MessageModalViewProps{
 			.key = "message-modal",
-			.value = stored,
+			.dialog = stored,
 		},
 		silencer::client_ui::MessageModalView);
 	return true;

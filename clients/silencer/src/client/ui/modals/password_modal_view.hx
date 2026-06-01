@@ -8,21 +8,13 @@
 
 namespace silencer::client_ui {
 
-struct PasswordModalState {
+struct PasswordModalCredentials {
 	const char * password = "";
-};
-
-struct PasswordModalActions {
 	std::function<void(const std::string&)> set_password = {};
 	std::function<void()> submit = {};
 };
 
-struct PasswordModalContextValue {
-	PasswordModalState state = {};
-	PasswordModalActions actions = {};
-};
-
-const PasswordModalContextValue& UsePasswordModal();
+const PasswordModalCredentials& UsePasswordModalCredentials();
 
 struct PasswordModalFrameProps {
 	const char * key = nullptr;
@@ -32,7 +24,7 @@ struct PasswordModalFrameProps {
 
 struct PasswordModalViewProps {
 	const char * key = nullptr;
-	const PasswordModalContextValue * value = nullptr;
+	const PasswordModalCredentials * credentials = nullptr;
 };
 
 ::ui::UiElement PasswordModalView(const PasswordModalViewProps& props);

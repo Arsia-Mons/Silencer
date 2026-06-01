@@ -7,27 +7,27 @@ namespace client_ui {
 
 namespace {
 ::ReactContext MessageModalContext = {};
-const MessageModalContextValue kEmptyMessageModal = {};
+const MessageModalDialog kEmptyMessageModal = {};
 }  // namespace
 
-const MessageModalContextValue& UseMessageModal() {
-	const auto * value = static_cast<const MessageModalContextValue *>(
+const MessageModalDialog& UseMessageModalDialog() {
+	const auto * value = static_cast<const MessageModalDialog *>(
 		::use_context(&MessageModalContext));
 	if(value) return *value;
-	::react_report_error("client/ui/modal: missing MessageModalProvider for UseMessageModal\n");
+	::react_report_error("client/ui/modal: missing MessageModalProvider for UseMessageModalDialog\n");
 	return kEmptyMessageModal;
 }
 
 ::ui::UiElement MessageModalView(const MessageModalViewProps& props) {
-	const MessageModalContextValue * stored = ::ui::copy_value(
-		props.value ? *props.value : kEmptyMessageModal);
+	const MessageModalDialog * stored = ::ui::copy_value(
+		props.dialog ? *props.dialog : kEmptyMessageModal);
 	if(!stored){
 		return ::ui::empty();
 	}
 	return ::ui::provider(
 		"MessageModalProvider",
 		&MessageModalContext,
-		const_cast<MessageModalContextValue *>(stored),
+		const_cast<MessageModalDialog *>(stored),
 		::ui::children({
 			::ui::component("MessageModalFrame",
 			                MessageModalFrameProps{ .key = "frame" },

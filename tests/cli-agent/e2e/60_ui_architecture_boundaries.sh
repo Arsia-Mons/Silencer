@@ -176,6 +176,17 @@ fail_if_match \
   "$REPO_ROOT/clients/silencer/src/client/ui/screens/lobby_connect/lobby_connect_view_provider.cpp"
 
 fail_if_match \
+  "\\b(MessageModal|PasswordModal)(ContextValue|Actions|State)\\b|\\bUse(MessageModal|PasswordModal)[[:space:]]*\\(" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/modals/message_modal_view.cppx" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/modals/message_modal_view.hx" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/modals/message_modal.cpp" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/modals/message_modal_view_provider.cpp" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/modals/password_modal_view.cppx" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/modals/password_modal_view.hx" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/modals/password_modal.cpp" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/modals/password_modal_view_provider.cpp"
+
+fail_if_match \
   "return[[:space:]]+value[[:space:]]*[?][[:space:]]*[*]value[[:space:]]*:[[:space:]]*kEmpty" \
   "$REPO_ROOT/clients/silencer/src/client/ui" \
   --glob '*_view_provider.cpp' \

@@ -39,26 +39,22 @@ void PasswordModal::Tick(ScreenContext & ctx)
 bool PasswordModal::BuildElement(ScreenContext & ctx, ::ui::UiElement * out)
 {
 	if(!out) return false;
-	const silencer::client_ui::PasswordModalContextValue context{
-		.state = silencer::client_ui::PasswordModalState{
-			.password = password,
+	const silencer::client_ui::PasswordModalCredentials credentials{
+		.password = password,
+		.set_password = [this](const std::string& value) {
+			password_modal_detail::CopyUiText(password, static_cast<int>(sizeof(password)), value);
 		},
-		.actions = silencer::client_ui::PasswordModalActions{
-			.set_password = [this](const std::string& value) {
-				password_modal_detail::CopyUiText(password, static_cast<int>(sizeof(password)), value);
-			},
-			.submit = [this, screenContext = &ctx]() {
-				Submit(*screenContext);
-			},
+		.submit = [this, screenContext = &ctx]() {
+			Submit(*screenContext);
 		},
 	};
-	const auto * stored = ::ui::copy_value(context);
+	const auto * stored = ::ui::copy_value(credentials);
 	if(!stored) return false;
 	*out = ::ui::component(
 		"PasswordModalView",
 		silencer::client_ui::PasswordModalViewProps{
 			.key = "password-modal",
-			.value = stored,
+			.credentials = stored,
 		},
 		silencer::client_ui::PasswordModalView);
 	return true;
