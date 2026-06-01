@@ -10,7 +10,6 @@
 #include "main_menu_screen.h"
 
 #include "screen_context.h"
-#include "game.h"
 #include "message_modal.h"
 #include "ui/runtime/UiInputState.h"
 

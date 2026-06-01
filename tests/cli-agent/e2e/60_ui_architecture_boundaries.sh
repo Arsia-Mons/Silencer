@@ -776,7 +776,7 @@ fail_if_match \
   --glob '!screen_context.*'
 
 fail_if_match \
-  "ctx[.](game|world|renderer|lobby|keymap|updater|ambienceMixer|mapDownloader|window|renderdevice)\\b" \
+  "ctx[.](game|world|renderer|lobby|keymap|updater|ambienceMixer|mapDownloader|window|renderdevice)\\b|#include[[:space:]]+\"game[.]h\"" \
   "$REPO_ROOT/clients/silencer/src/client/ui/screens" \
   "$REPO_ROOT/clients/silencer/src/client/ui/modals" \
   --glob '*.h' \

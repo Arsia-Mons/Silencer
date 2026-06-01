@@ -6,7 +6,6 @@
 #include "controls_keybind_list.h"
 
 #include "screen_context.h"
-#include "game.h"
 
 #include "runtime/UiInteractionRegistry.h"
 

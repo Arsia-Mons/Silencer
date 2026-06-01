@@ -3,7 +3,6 @@
 #include "client/ui/hooks/use_lobby.h"
 #include "client/ui/hooks/use_navigation.h"
 #include "client/ui/screens/character_create/character_create_frame.h"
-#include "game.h"
 #include "runtime/UiInteractionRegistry.h"
 #include "screen_context.h"
 
