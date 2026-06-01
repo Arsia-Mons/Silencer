@@ -118,6 +118,12 @@ fail_if_match \
   "$REPO_ROOT/clients/silencer/src/ui/components" \
   --glob '*.hx'
 
+fail_if_match \
+  'return[[:space:]]+([[:alnum:]_:]+[.])?[A-Z][A-Za-z0-9_]*[[:space:]]*[(]' \
+  "$REPO_ROOT/clients/silencer/src/client/ui" \
+  "$REPO_ROOT/clients/silencer/src/ui" \
+  --glob '*.cppx'
+
 if ! rg -q "src/client/ui/screens/.+[.](cppx|hx)" \
   "$REPO_ROOT/clients/silencer/CMakeLists.txt"; then
   echo "at least one product screen component must be authored as cppx" >&2
