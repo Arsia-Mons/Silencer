@@ -54,6 +54,12 @@ struct CharacterCreateContextValue {
 
 const CharacterCreateContextValue& UseCharacterCreate();
 
+struct CharacterCreateFrameProps {
+	const char * key = nullptr;
+};
+
+::ui::UiElement CharacterCreateFrame(const CharacterCreateFrameProps& props);
+
 struct CharacterCreateScreenViewProps {
 	const char * key = nullptr;
 	const CharacterCreateContextValue * value = nullptr;

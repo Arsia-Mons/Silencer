@@ -20,9 +20,6 @@ using ::ui::components::TextProps;
 
 namespace {
 
-::ReactContext CharacterCreateContext = {};
-const CharacterCreateContextValue kEmptyContext = {};
-
 struct AgencyView {
 	const char * name = "";
 	const char * advantages = "";
@@ -460,7 +457,9 @@ struct AliasModalProps {
 	</Box>
 }
 
-::ui::UiElement CharacterCreateView(const BoxProps& props) {
+}  // namespace
+
+::ui::UiElement CharacterCreateFrame(const CharacterCreateFrameProps& props) {
 	return <Box key={props.key} layout={root_layout()} style={root_style()}>
 		<Box key="panel" layout={panel_layout()} style={panel_style()}>
 			<AgentOrAgencyColumn key="chooser" />
@@ -468,25 +467,6 @@ struct AliasModalProps {
 			<AliasModal key="alias" />
 		</Box>
 	</Box>
-}
-
-}  // namespace
-
-const CharacterCreateContextValue& UseCharacterCreate() {
-	const auto * value = static_cast<const CharacterCreateContextValue *>(
-		::use_context(&CharacterCreateContext));
-	return value ? *value : kEmptyContext;
-}
-
-::ui::UiElement CharacterCreateScreenView(const CharacterCreateScreenViewProps& props) {
-	return ::ui::provider(
-		"CharacterCreateProvider",
-		&CharacterCreateContext,
-		const_cast<CharacterCreateContextValue *>(props.value),
-		children({
-			::ui::component("CharacterCreateView", BoxProps{ .key = "view" }, CharacterCreateView),
-		}),
-		props.key);
 }
 
 }  // namespace silencer::client_ui
