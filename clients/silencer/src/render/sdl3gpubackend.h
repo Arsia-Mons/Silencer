@@ -46,6 +46,8 @@ public:
 	void SetPalette(const SDL_Color *colors, int count) override;
 	void UploadFrame(const Uint8 *indexed_pixels, int w, int h) override;
 	void UploadUiFrame(const Uint8 *rgba, int w, int h) override;
+	void RequestCapture() override;
+	bool TakeCapturedFrame(std::vector<Uint8> &rgba, int &w, int &h) override;
 	void Present() override;
 	void SetScaleFilter(bool linear) override;
 	void BeginLobbyPanelBorderBlur(int virtualWidth, int virtualHeight, float uiScale) override;
@@ -103,6 +105,16 @@ private:
 	int                    ui_tex_h    = 0;
 	SDL_GPUTransferBuffer *ui_tbuf     = nullptr;
 	Uint32                 ui_tbuf_sz  = 0;
+
+	// --- Swapchain capture (SIL-11 screenshot): download the final composited
+	// frame on request. Armed by RequestCapture(), filled during Present(). ---
+	bool                   capture_pending = false;
+	SDL_GPUTransferBuffer *capture_tbuf    = nullptr;
+	Uint32                 capture_tbuf_sz = 0;
+	std::vector<Uint8>     captured_rgba;
+	int                    captured_w      = 0;
+	int                    captured_h      = 0;
+	bool                   captured_valid  = false;
 
 	// --- Lobby panel-border blur source ---
 	SDL_GPUTexture *lobby_panel_source_tex = nullptr; // full-res scene copy

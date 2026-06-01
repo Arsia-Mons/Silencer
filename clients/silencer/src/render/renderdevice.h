@@ -3,6 +3,8 @@
 
 #include "shared.h"
 
+#include <vector>
+
 // Abstract rendering interface. All game code talks through this; GPU-specific
 // types never leak into game code. SDL3GPUBackend is the Phase 2/3 implementation.
 // Console backends (NVN, GNM, D3D12) slot in without touching game code.
@@ -35,6 +37,15 @@ public:
 	// upload deferred to Present(), pixels must stay valid until then. Default
 	// no-op (TUI / headless ignore it). Pass null/0 to clear the overlay.
 	virtual void UploadUiFrame(const Uint8 * /*rgba*/, int /*w*/, int /*h*/) {}
+
+	// Capture the final composited frame (world + UI). Arm with RequestCapture()
+	// before a Present(); afterwards TakeCapturedFrame() yields the swapchain
+	// pixels as tightly-packed RGBA8 (out = w*h*4 bytes), returning false if no
+	// capture is available (default backends don't capture — the screenshot op
+	// falls back to the indexed Surface).
+	virtual void RequestCapture() {}
+	virtual bool TakeCapturedFrame(std::vector<Uint8> & /*rgba*/, int & /*w*/,
+	                               int & /*h*/) { return false; }
 
 	// Flush all pending work: uploads, compute, render passes, swap buffers.
 	// Skips the render pass silently when the window is minimized.

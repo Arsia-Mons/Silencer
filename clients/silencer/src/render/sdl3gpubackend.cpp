@@ -375,6 +375,7 @@ void SDL3GPUBackend::Shutdown() {
 	if (scene_tex)         { SDL_ReleaseGPUTexture(device, scene_tex);          scene_tex         = nullptr; }
 	if (ui_tex)            { SDL_ReleaseGPUTexture(device, ui_tex);             ui_tex            = nullptr; }
 	if (ui_tbuf)           { SDL_ReleaseGPUTransferBuffer(device, ui_tbuf);     ui_tbuf           = nullptr; }
+	if (capture_tbuf)      { SDL_ReleaseGPUTransferBuffer(device, capture_tbuf); capture_tbuf     = nullptr; }
 	if (ui_composite_pipeline) { SDL_ReleaseGPUGraphicsPipeline(device, ui_composite_pipeline); ui_composite_pipeline = nullptr; }
 	if (lobby_panel_source_tex) { SDL_ReleaseGPUTexture(device, lobby_panel_source_tex); lobby_panel_source_tex = nullptr; }
 	if (lobby_panel_mask_tex) { SDL_ReleaseGPUTexture(device, lobby_panel_mask_tex); lobby_panel_mask_tex = nullptr; }
@@ -736,6 +737,20 @@ void SDL3GPUBackend::UploadUiFrame(const Uint8 *rgba, int w, int h) {
 	pending_ui_h      = h;
 	ui_dirty          = true;
 	ui_present        = true;
+}
+
+void SDL3GPUBackend::RequestCapture() {
+	capture_pending = true;
+	captured_valid  = false;
+}
+
+bool SDL3GPUBackend::TakeCapturedFrame(std::vector<Uint8> &rgba, int &w, int &h) {
+	if (!captured_valid) return false;
+	rgba = captured_rgba; // already RGBA8, tightly packed
+	w = captured_w;
+	h = captured_h;
+	captured_valid = false;
+	return true;
 }
 
 void SDL3GPUBackend::SetScaleFilter(bool linear) {
@@ -1270,6 +1285,63 @@ void SDL3GPUBackend::Present() {
 			SDL_DrawGPUPrimitives(pass, 3, 1, 0, 0);
 			SDL_EndGPURenderPass(pass);
 		}
+	}
+
+	// ---- 9. Optional swapchain capture (SIL-11 screenshot) ----
+	// Download the final composited swapchain → CPU RGBA. Synchronous (fences
+	// this submit) so the captured frame is ready for the post-render handler;
+	// only runs when armed, so the normal present path is unaffected.
+	if (capture_pending && swapchain) {
+		const Uint32 need = sw_w * sw_h * 4u;
+		if (!capture_tbuf || capture_tbuf_sz < need) {
+			if (capture_tbuf) SDL_ReleaseGPUTransferBuffer(device, capture_tbuf);
+			SDL_GPUTransferBufferCreateInfo tbi = {};
+			tbi.usage = SDL_GPU_TRANSFERBUFFERUSAGE_DOWNLOAD;
+			tbi.size  = need;
+			capture_tbuf = SDL_CreateGPUTransferBuffer(device, &tbi);
+			capture_tbuf_sz = need;
+		}
+		if (capture_tbuf) {
+			SDL_GPUCopyPass *copy = SDL_BeginGPUCopyPass(cmd);
+			SDL_GPUTextureRegion reg = {};
+			reg.texture = swapchain;
+			reg.w = sw_w;
+			reg.h = sw_h;
+			reg.d = 1;
+			SDL_GPUTextureTransferInfo dst = {};
+			dst.transfer_buffer = capture_tbuf;
+			dst.rows_per_layer  = sw_h;
+			dst.pixels_per_row  = sw_w;
+			SDL_DownloadFromGPUTexture(copy, &reg, &dst);
+			SDL_EndGPUCopyPass(copy);
+
+			SDL_GPUFence *fence = SDL_SubmitGPUCommandBufferAndAcquireFence(cmd);
+			if (fence) {
+				SDL_WaitForGPUFences(device, true, &fence, 1);
+				SDL_ReleaseGPUFence(device, fence);
+				Uint8 *m = (Uint8 *)SDL_MapGPUTransferBuffer(device, capture_tbuf, false);
+				if (m) {
+					captured_rgba.resize(need);
+					const bool bgra =
+						SDL_GetGPUSwapchainTextureFormat(device, window) ==
+							SDL_GPU_TEXTUREFORMAT_B8G8R8A8_UNORM ||
+						SDL_GetGPUSwapchainTextureFormat(device, window) ==
+							SDL_GPU_TEXTUREFORMAT_B8G8R8A8_UNORM_SRGB;
+					for (Uint32 i = 0; i < need; i += 4) {
+						captured_rgba[i + 0] = bgra ? m[i + 2] : m[i + 0];
+						captured_rgba[i + 1] = m[i + 1];
+						captured_rgba[i + 2] = bgra ? m[i + 0] : m[i + 2];
+						captured_rgba[i + 3] = m[i + 3];
+					}
+					captured_w = (int)sw_w;
+					captured_h = (int)sw_h;
+					captured_valid = true;
+					SDL_UnmapGPUTransferBuffer(device, capture_tbuf);
+				}
+			}
+		}
+		capture_pending = false;
+		return; // already submitted (with fence) above
 	}
 
 	SDL_SubmitGPUCommandBuffer(cmd);

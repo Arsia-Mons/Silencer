@@ -21,6 +21,23 @@ void Game::Present() {
 gameRenderer.Present();
 }
 
+bool Game::CaptureCompositedFrame(const char * path) {
+	RenderDevice * dev = gameRenderer.GetRenderDevice();
+	if(dev){
+		// Arm + render one frame so the device downloads the final composited
+		// swapchain (world + cppx UI overlay). Textures retain the last upload,
+		// so this re-presents the same frame.
+		dev->RequestCapture();
+		gameRenderer.Present();
+		std::vector<Uint8> rgba; int w = 0, h = 0;
+		if(dev->TakeCapturedFrame(rgba, w, h) && !rgba.empty()){
+			return renderer.WriteRGBAPNG(rgba.data(), w, h, path);
+		}
+	}
+	// Fallback: the pre-GPU indexed Surface (TUI/headless or no swapchain capture).
+	return renderer.CapturePNG(GetScreenBuffer(), GetPaletteColors(), path);
+}
+
 void Game::JoinGame(LobbyGame & lobbygame, char * password) {
 gameSession.JoinGame(lobbygame, password);
 }

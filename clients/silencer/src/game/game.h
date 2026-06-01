@@ -47,6 +47,10 @@ WorldSummary GetWorldSummary();
 Surface & GetScreenBuffer() { return gameRenderer.GetScreenBuffer(); }
 const Surface & GetScreenBuffer() const { return gameRenderer.GetScreenBuffer(); }
 const SDL_Color * GetPaletteColors() const { return gameRenderer.GetPaletteColors(); }
+// Screenshot the final composited frame (world + cppx UI overlay) by capturing
+// the GPU swapchain; falls back to the indexed Surface when the device can't
+// capture (TUI/headless). SIL-11.
+bool CaptureCompositedFrame(const char * path);
 Renderer & GetRenderer() { return renderer; }
 silencer::client_ui::ClientUiInput & UiInput() { return gameUiPipeline.UiInput(); }
 const silencer::client_ui::ClientUiInput & UiInput() const { return gameUiPipeline.UiInput(); }

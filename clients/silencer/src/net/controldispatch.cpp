@@ -1036,8 +1036,7 @@ void HandlePostRender(Game& game, ControlCommand& cmd) {
 		#endif
 			out = buf;
 		}
-		bool ok = game.GetRenderer().CapturePNG(game.GetScreenBuffer(),
-			game.GetPaletteColors(), out.c_str());
+		bool ok = game.CaptureCompositedFrame(out.c_str());
 		if(!ok){
 			cmd.reply->set_value(Err(cmd.id, "INTERNAL", "stbi_write_png failed: " + out));
 			return;

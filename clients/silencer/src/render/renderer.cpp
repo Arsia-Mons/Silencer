@@ -2821,3 +2821,9 @@ bool Renderer::CapturePNG(const Surface& buf, const SDL_Color* palette, const ch
 	int rc = stbi_write_png(path, buf.w, buf.h, 3, rgb.data(), buf.w * 3);
 	return rc != 0;
 }
+
+bool Renderer::WriteRGBAPNG(const Uint8* rgba, int w, int h, const char* path){
+	if(!rgba || w <= 0 || h <= 0) return false;
+	int rc = stbi_write_png(path, w, h, 4, rgba, w * 4);
+	return rc != 0;
+}
