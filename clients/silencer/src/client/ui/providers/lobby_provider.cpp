@@ -32,36 +32,45 @@
 namespace silencer {
 namespace client_ui {
 
+struct LobbyProviderState {
+	World * world = nullptr;
+	Game * game = nullptr;
+	AmbienceMixer * ambience = nullptr;
+	MapDownloader * map_downloader = nullptr;
+	Updater * updater = nullptr;
+};
+
 LobbyProviderValue MakeLobbyProvider(ScreenContext& ctx) {
 	LobbyProviderValue value;
-	value.world = &ctx.world;
-	value.game = &ctx.game;
-	value.ambience = &ctx.ambienceMixer;
-	value.map_downloader = &ctx.mapDownloader;
-	value.updater = &ctx.updater;
+	value.state = std::make_shared<LobbyProviderState>();
+	value.state->world = &ctx.world;
+	value.state->game = &ctx.game;
+	value.state->ambience = &ctx.ambienceMixer;
+	value.state->map_downloader = &ctx.mapDownloader;
+	value.state->updater = &ctx.updater;
 	return value;
 }
 
 namespace lobby_provider_detail {
 
 World * LobbyWorld(const LobbyProviderValue& provider) {
-	return provider.world;
+	return provider.state ? provider.state->world : nullptr;
 }
 
 Game * LobbyGameOwner(const LobbyProviderValue& provider) {
-	return provider.game;
+	return provider.state ? provider.state->game : nullptr;
 }
 
 AmbienceMixer * LobbyAmbience(const LobbyProviderValue& provider) {
-	return provider.ambience;
+	return provider.state ? provider.state->ambience : nullptr;
 }
 
 MapDownloader * LobbyMapDownloader(const LobbyProviderValue& provider) {
-	return provider.map_downloader;
+	return provider.state ? provider.state->map_downloader : nullptr;
 }
 
 Updater * LobbyUpdater(const LobbyProviderValue& provider) {
-	return provider.updater;
+	return provider.state ? provider.state->updater : nullptr;
 }
 
 Navigation LobbyNavigation(const LobbyProviderValue& provider) {

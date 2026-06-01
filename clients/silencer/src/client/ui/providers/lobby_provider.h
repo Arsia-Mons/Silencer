@@ -1,21 +1,16 @@
 #pragma once
 
-class AmbienceMixer;
-class Game;
-class MapDownloader;
 class ScreenContext;
-class Updater;
-class World;
+
+#include <memory>
 
 namespace silencer {
 namespace client_ui {
 
+struct LobbyProviderState;
+
 struct LobbyProviderValue {
-	World * world = nullptr;
-	Game * game = nullptr;
-	AmbienceMixer * ambience = nullptr;
-	MapDownloader * map_downloader = nullptr;
-	Updater * updater = nullptr;
+	std::shared_ptr<LobbyProviderState> state;
 };
 
 LobbyProviderValue MakeLobbyProvider(ScreenContext& ctx);
