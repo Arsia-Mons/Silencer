@@ -2,7 +2,7 @@
 
 #include "client/ui/hud/ingame_hud_view.h"
 #include "client/ui/hud/hud_retained_payloads.h"
-#include "client/ui/navigation/NavigationProvider.h"
+#include "client/ui/providers/navigation_provider.h"
 #include "client/ui/views/HudView.h"
 #include "screen.h"
 #include "screen_context.h"
@@ -682,9 +682,9 @@ void ClientUi::BuildRetainedUi(ScreenContext& ctx,
 			return;
 		}
 		NavigationProviderValue navigation{
-			.clientUi = this,
-			.currentEntryId = visible[i]->EntryId(),
-			.isTop = i == visible.count - 1,
+			.client_ui = this,
+			.current_entry_id = visible[i]->EntryId(),
+			.is_top = i == visible.count - 1,
 		};
 		roots[rootCount++] = NavigationProvider(
 			navigation,

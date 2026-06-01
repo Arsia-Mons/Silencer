@@ -1,7 +1,8 @@
-#include "client/ui/navigation/NavigationProvider.h"
+#include "client/ui/providers/navigation_provider.h"
 
 #include "client/ui/ClientUi.h"
-#include "screen_context.h"
+#include "client/ui/hooks/use_navigation.h"
+#include "client/ui/screens/screen_context.h"
 #include "ui/runtime/react.h"
 
 #include <utility>
@@ -15,7 +16,7 @@ namespace {
 
 NavigationProviderValue * use_navigation_provider_value(const char * hook) {
 	auto * value = static_cast<NavigationProviderValue *>(::use_context(&NavigationContext));
-	if(!value || !value->clientUi){
+	if(!value || !value->client_ui){
 		::react_report_error("client/ui: missing NavigationProvider for %s\n", hook);
 		return nullptr;
 	}
@@ -40,41 +41,41 @@ NavigationProviderValue * use_navigation_provider_value(const char * hook) {
 		key);
 }
 
-Navigation UseNavigation() {
-	NavigationProviderValue * value = use_navigation_provider_value("UseNavigation");
+Navigation use_navigation() {
+	NavigationProviderValue * value = use_navigation_provider_value("use_navigation");
 	if(!value) return {};
-	ClientUi * clientUi = value->clientUi;
-	UiScreenEntryId entryId = value->currentEntryId;
+	ClientUi * client_ui = value->client_ui;
+	UiScreenEntryId entry_id = value->current_entry_id;
 	return Navigation{
-		.currentEntryId = entryId,
-		.isTop = value->isTop,
-		.push = [clientUi](std::unique_ptr<Screen> screen) {
-			clientUi->QueuePushScreen(std::move(screen));
+		.current_entry_id = entry_id,
+		.is_top = value->is_top,
+		.push = [client_ui](std::unique_ptr<Screen> screen) {
+			client_ui->QueuePushScreen(std::move(screen));
 		},
-		.replace = [clientUi](std::unique_ptr<Screen> screen) {
-			clientUi->QueueReplaceScreen(std::move(screen));
+		.replace = [client_ui](std::unique_ptr<Screen> screen) {
+			client_ui->QueueReplaceScreen(std::move(screen));
 		},
-		.resetTo = [clientUi](std::unique_ptr<Screen> screen) {
-			clientUi->QueueResetToScreen(std::move(screen));
+		.reset_to = [client_ui](std::unique_ptr<Screen> screen) {
+			client_ui->QueueResetToScreen(std::move(screen));
 		},
-		.popCurrent = [clientUi, entryId]() {
-			clientUi->QueuePopCurrent(entryId);
+		.pop_current = [client_ui, entry_id]() {
+			client_ui->QueuePopCurrent(entry_id);
 		},
-		.popTop = [clientUi]() {
-			clientUi->QueuePopTop();
+		.pop_top = [client_ui]() {
+			client_ui->QueuePopTop();
 		},
-		.goToState = [clientUi](Uint8 state) {
-			clientUi->QueueDeferredMutation([state](ScreenContext& ctx) {
+		.go_to_state = [client_ui](Uint8 state) {
+			client_ui->QueueDeferredMutation([state](ScreenContext& ctx) {
 				ctx.GoToState(state);
 			});
 		},
-		.goBack = [clientUi]() {
-			clientUi->QueueDeferredMutation([](ScreenContext& ctx) {
+		.go_back = [client_ui]() {
+			client_ui->QueueDeferredMutation([](ScreenContext& ctx) {
 				ctx.GoBack();
 			});
 		},
-		.requestQuit = [clientUi]() {
-			clientUi->QueueDeferredMutation([](ScreenContext& ctx) {
+		.request_quit = [client_ui]() {
+			client_ui->QueueDeferredMutation([](ScreenContext& ctx) {
 				ctx.RequestQuit();
 			});
 		},

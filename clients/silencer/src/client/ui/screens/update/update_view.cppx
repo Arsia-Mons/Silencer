@@ -1,6 +1,6 @@
 #include "client/ui/screens/update/update_view.h"
 
-#include "client/ui/navigation/NavigationProvider.h"
+#include "client/ui/hooks/use_navigation.h"
 #include "game_state.h"
 #include "ui/components/box.h"
 #include "ui/components/button.h"
@@ -141,7 +141,7 @@ bool has_primary_action(const UpdateState& state) {
 
 ::ui::UiElement UpdateFrame(const UpdateFrameProps& props) {
 	const UpdateContextValue& update = UseUpdate();
-	Navigation navigation = UseNavigation();
+	Navigation navigation = use_navigation();
 	const UpdateState& state = update.state;
 	const UpdateActions& actions = update.actions;
 	const bool primary_visible = has_primary_action(state);
@@ -160,7 +160,7 @@ bool has_primary_action(const UpdateState& state) {
 		case UpdatePrimaryAction::Download:
 			primary_activate = [actions, navigation](const ::ui::ActivationEvent&) {
 				const bool opened = actions.download ? actions.download() : false;
-				if(opened && navigation.goToState) navigation.goToState(GameState::MAINMENU);
+				if(opened && navigation.go_to_state) navigation.go_to_state(GameState::MAINMENU);
 			};
 			break;
 		case UpdatePrimaryAction::None:
@@ -170,7 +170,7 @@ bool has_primary_action(const UpdateState& state) {
 	std::function<void(const ::ui::ActivationEvent&)> cancel_activate =
 		[actions, navigation](const ::ui::ActivationEvent&) {
 			const bool cancelled = actions.cancel ? actions.cancel() : false;
-			if(cancelled && navigation.goToState) navigation.goToState(GameState::MAINMENU);
+			if(cancelled && navigation.go_to_state) navigation.go_to_state(GameState::MAINMENU);
 		};
 	return <Box key={props.key} layout={root_layout()}>
 		<Dialog key="dialog" modal={true} layout={dialog_layout()}>

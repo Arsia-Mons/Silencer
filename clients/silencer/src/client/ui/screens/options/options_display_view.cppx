@@ -1,6 +1,6 @@
 #include "client/ui/screens/options/options_display_view.h"
 
-#include "client/ui/navigation/NavigationProvider.h"
+#include "client/ui/hooks/use_navigation.h"
 #include "game_state.h"
 #include "ui/components/box.h"
 #include "ui/components/button.h"
@@ -118,7 +118,7 @@ std::function<void(const ::ui::ActivationEvent&)> save_callback(
 	Navigation navigation) {
 	return [display, navigation](const ::ui::ActivationEvent&) {
 		if(display.save) display.save();
-		if(navigation.goToState) navigation.goToState(GameState::OPTIONS);
+		if(navigation.go_to_state) navigation.go_to_state(GameState::OPTIONS);
 	};
 }
 
@@ -127,7 +127,7 @@ std::function<void(const ::ui::ActivationEvent&)> cancel_callback(
 	Navigation navigation) {
 	return [display, navigation](const ::ui::ActivationEvent&) {
 		if(display.cancel) display.cancel();
-		if(navigation.goToState) navigation.goToState(GameState::OPTIONS);
+		if(navigation.go_to_state) navigation.go_to_state(GameState::OPTIONS);
 	};
 }
 
@@ -170,7 +170,7 @@ struct DisplaySaveButtonProps {
 
 ::ui::UiElement DisplaySaveButton(const DisplaySaveButtonProps& props) {
 	const OptionsDisplayContextValue& display = UseOptionsDisplay();
-	Navigation navigation = UseNavigation();
+	Navigation navigation = use_navigation();
 	return <Button
 	  key={props.key}
 	  id="options_display.save"
@@ -186,7 +186,7 @@ struct DisplayCancelButtonProps {
 
 ::ui::UiElement DisplayCancelButton(const DisplayCancelButtonProps& props) {
 	const OptionsDisplayContextValue& display = UseOptionsDisplay();
-	Navigation navigation = UseNavigation();
+	Navigation navigation = use_navigation();
 	return <Button
 	  key={props.key}
 	  id="options_display.cancel"

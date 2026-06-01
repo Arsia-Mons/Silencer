@@ -1,6 +1,6 @@
 #include "client/ui/screens/mission_summary/mission_summary_view.h"
 
-#include "client/ui/navigation/NavigationProvider.h"
+#include "client/ui/hooks/use_navigation.h"
 #include "game_state.h"
 #include "ui/components/box.h"
 #include "ui/components/button.h"
@@ -293,7 +293,7 @@ std::function<void(const ::ui::ActivationEvent&)> done_callback(
 	return [actions, navigation](const ::ui::ActivationEvent&) {
 		MissionSummaryDestination destination = MissionSummaryDestination::MainMenu;
 		if(actions.done) destination = actions.done();
-		if(navigation.goToState) navigation.goToState(destination_state(destination));
+		if(navigation.go_to_state) navigation.go_to_state(destination_state(destination));
 	};
 }
 
@@ -301,7 +301,7 @@ std::function<void(const ::ui::ActivationEvent&)> done_callback(
 
 ::ui::UiElement MissionSummaryFrame(const MissionSummaryFrameProps& props) {
 	const MissionSummaryContextValue& summary = UseMissionSummary();
-	Navigation navigation = UseNavigation();
+	Navigation navigation = use_navigation();
 	const MissionSummaryState& state = summary.state;
 	const MissionSummaryActions& actions = summary.actions;
 	return <Box key={props.key} layout={root_layout()} style={root_style()}>

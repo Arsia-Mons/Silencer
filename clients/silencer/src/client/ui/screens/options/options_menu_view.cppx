@@ -1,6 +1,6 @@
 #include "client/ui/screens/options/options_menu_view.h"
 
-#include "client/ui/navigation/NavigationProvider.h"
+#include "client/ui/hooks/use_navigation.h"
 #include "game_state.h"
 #include "ui/components/box.h"
 #include "ui/components/button.h"
@@ -68,7 +68,7 @@ std::function<void(const ::ui::ActivationEvent&)> go_to_state_callback(
 	Navigation navigation,
 	Uint8 state) {
 	return [navigation, state](const ::ui::ActivationEvent&) {
-		if(navigation.goToState) navigation.goToState(state);
+		if(navigation.go_to_state) navigation.go_to_state(state);
 	};
 }
 
@@ -81,7 +81,7 @@ struct OptionsNavigationButtonProps {
 };
 
 ::ui::UiElement OptionsNavigationButton(const OptionsNavigationButtonProps& props) {
-	Navigation navigation = UseNavigation();
+	Navigation navigation = use_navigation();
 	return <Button
 	  key={props.key}
 	  id={props.id}

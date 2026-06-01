@@ -1,6 +1,6 @@
 #include "client/ui/screens/options/options_controls_view.h"
 
-#include "client/ui/navigation/NavigationProvider.h"
+#include "client/ui/hooks/use_navigation.h"
 #include "game_state.h"
 #include "ui/components/box.h"
 #include "ui/components/button.h"
@@ -101,7 +101,7 @@ std::function<void(const ::ui::ActivationEvent&)> navigation_action_callback(
 	Uint8 destination) {
 	return [action, navigation, destination](const ::ui::ActivationEvent&) {
 		if(action) action();
-		if(navigation.goToState) navigation.goToState(destination);
+		if(navigation.go_to_state) navigation.go_to_state(destination);
 	};
 }
 
@@ -359,7 +359,7 @@ struct ControlsSaveButtonProps {
 
 ::ui::UiElement ControlsSaveButton(const ControlsSaveButtonProps& props) {
 	const OptionsControlsContextValue& controls = UseOptionsControls();
-	Navigation navigation = UseNavigation();
+	Navigation navigation = use_navigation();
 	return <Button
 	  key={props.key}
 	  id="options_controls.save"
@@ -375,7 +375,7 @@ struct ControlsCancelButtonProps {
 
 ::ui::UiElement ControlsCancelButton(const ControlsCancelButtonProps& props) {
 	const OptionsControlsContextValue& controls = UseOptionsControls();
-	Navigation navigation = UseNavigation();
+	Navigation navigation = use_navigation();
 	return <Button
 	  key={props.key}
 	  id="options_controls.cancel"

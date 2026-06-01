@@ -1,6 +1,6 @@
 #include "client/ui/screens/lobby_connect/lobby_connect_view.h"
 
-#include "client/ui/navigation/NavigationProvider.h"
+#include "client/ui/hooks/use_navigation.h"
 #include "game_state.h"
 #include "ui/components/box.h"
 #include "ui/components/button.h"
@@ -161,7 +161,7 @@ std::function<void(const ::ui::ActivationEvent&)> cancel_callback(
 	Navigation navigation) {
 	return [actions, navigation](const ::ui::ActivationEvent&) {
 		if(actions.cancel) actions.cancel();
-		if(navigation.goToState) navigation.goToState(GameState::MAINMENU);
+		if(navigation.go_to_state) navigation.go_to_state(GameState::MAINMENU);
 	};
 }
 
@@ -226,7 +226,7 @@ struct LobbyConnectCancelButtonProps {
 
 ::ui::UiElement LobbyConnectCancelButton(const LobbyConnectCancelButtonProps& props) {
 	const LobbyConnectActions& actions = UseLobbyConnect().actions;
-	Navigation navigation = UseNavigation();
+	Navigation navigation = use_navigation();
 	return <Button
 	  key={props.key}
 	  id="lobby_connect.cancel"
