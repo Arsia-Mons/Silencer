@@ -422,8 +422,8 @@ struct CharacterPanelProps {
 
 ::ui::UiElement CharacterPanel(const CharacterPanelProps& props) {
 	(void)props;
-	const LobbyContextValue& lobby = UseLobby();
-	CharacterPanelState * state = lobby.state.character;
+	const LobbyCharacter& character = UseLobbyCharacter();
+	CharacterPanelState * state = character.state;
 	if(!state) return ::ui::empty();
 	const bool locked = state->agentSelectionLocked;
 	return <Box key="character" layout={character_panel_layout()} style={panel_style()}>
@@ -439,7 +439,7 @@ struct CharacterPanelProps {
 		  id="lobby.character.agents"
 		  label={locked ? "Agent Locked" : "Change Agent"}
 		  disabled={locked}
-		  onActivate={action_callback(lobby.actions.change_agent)}
+		  onActivate={action_callback(character.change_agent)}
 		  layout={row_button_layout(26.0f)}
 		/>
 	</Box>

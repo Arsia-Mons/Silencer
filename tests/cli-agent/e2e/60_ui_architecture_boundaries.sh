@@ -162,7 +162,7 @@ fail_if_match \
   "$REPO_ROOT/clients/silencer/src/client/ui/modals"
 
 fail_if_match \
-  "actions[.](go_back|set_chat_text|send_chat)|state[.]chat" \
+  "actions[.](go_back|set_chat_text|send_chat|change_agent)|state[.](chat|character)" \
   "$REPO_ROOT/clients/silencer/src/client/ui/screens/lobby/lobby_view.cppx" \
   "$REPO_ROOT/clients/silencer/src/client/ui/screens/lobby/lobby_view.hx" \
   "$REPO_ROOT/clients/silencer/src/client/ui/screens/lobby/lobby_screen.cpp"

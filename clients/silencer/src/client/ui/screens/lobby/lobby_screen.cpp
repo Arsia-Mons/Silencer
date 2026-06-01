@@ -96,7 +96,6 @@ bool LobbyScreen::BuildElement(ScreenContext & ctx, ::ui::UiElement * out)
 		.state = {
 			.version = version.c_str(),
 			.map_name = mapName.c_str(),
-			.character = &characterState,
 			.game_select = &gameSelectState,
 			.game_create = &gameCreateState,
 			.game_join = &gameJoinState,
@@ -106,11 +105,6 @@ bool LobbyScreen::BuildElement(ScreenContext & ctx, ::ui::UiElement * out)
 			.game_tech_active = gameTechActive,
 		},
 		.actions = {
-			.change_agent = [this]() {
-				if(!characterState.agentSelectionLocked){
-					characterState.newCharacterRequested = true;
-				}
-			},
 			.select_game = [this](int index) {
 				silencer::client_ui::lobby::GameSelectPanelSelectRow(gameSelectState, index);
 			},
@@ -193,12 +187,21 @@ bool LobbyScreen::BuildElement(ScreenContext & ctx, ::ui::UiElement * out)
 			chatSendClicked = true;
 		},
 	};
+	silencer::client_ui::lobby::LobbyCharacter character{
+		.state = &characterState,
+		.change_agent = [this]() {
+			if(!characterState.agentSelectionLocked){
+				characterState.newCharacterRequested = true;
+			}
+		},
+	};
 	*out = silencer::client_ui::lobby::LobbyScreenView(
 		silencer::client_ui::lobby::LobbyScreenViewProps{
 			.key = "lobby",
 			.value = ::ui::copy_value(context),
 			.navigation = ::ui::copy_value(navigation),
 			.chat = ::ui::copy_value(chat),
+			.character = ::ui::copy_value(character),
 		});
 	return true;
 }

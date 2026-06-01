@@ -10,9 +10,11 @@ namespace {
 ::ReactContext LobbyContext = {};
 ::ReactContext LobbyNavigationContext = {};
 ::ReactContext LobbyChatContext = {};
+::ReactContext LobbyCharacterContext = {};
 const LobbyContextValue kEmptyLobby = {};
 const LobbyNavigation kEmptyNavigation = {};
 const LobbyChat kEmptyChat = {};
+const LobbyCharacter kEmptyCharacter = {};
 }  // namespace
 
 const LobbyContextValue& UseLobby() {
@@ -33,6 +35,12 @@ const LobbyChat& UseLobbyChat() {
 	return value ? *value : kEmptyChat;
 }
 
+const LobbyCharacter& UseLobbyCharacter() {
+	const auto * value = static_cast<const LobbyCharacter *>(
+		::use_context(&LobbyCharacterContext));
+	return value ? *value : kEmptyCharacter;
+}
+
 ::ui::UiElement LobbyScreenView(const LobbyScreenViewProps& props) {
 	const LobbyContextValue * stored = ::ui::copy_value(
 		props.value ? *props.value : kEmptyLobby);
@@ -40,18 +48,26 @@ const LobbyChat& UseLobbyChat() {
 		props.navigation ? *props.navigation : kEmptyNavigation);
 	const LobbyChat * chat = ::ui::copy_value(
 		props.chat ? *props.chat : kEmptyChat);
-	if(!stored || !navigation || !chat){
+	const LobbyCharacter * character = ::ui::copy_value(
+		props.character ? *props.character : kEmptyCharacter);
+	if(!stored || !navigation || !chat || !character){
 		return ::ui::empty();
 	}
 	::ui::UiElement frame = ::ui::component(
 		"LobbyFrame",
 		LobbyFrameProps{ .key = "view" },
 		LobbyFrame);
+	::ui::UiElement characterProvider = ::ui::provider(
+		"LobbyCharacterProvider",
+		&LobbyCharacterContext,
+		const_cast<LobbyCharacter *>(character),
+		::ui::children({frame}),
+		"character");
 	::ui::UiElement chatProvider = ::ui::provider(
 		"LobbyChatProvider",
 		&LobbyChatContext,
 		const_cast<LobbyChat *>(chat),
-		::ui::children({frame}),
+		::ui::children({characterProvider}),
 		"chat");
 	::ui::UiElement navigationProvider = ::ui::provider(
 		"LobbyNavigationProvider",
