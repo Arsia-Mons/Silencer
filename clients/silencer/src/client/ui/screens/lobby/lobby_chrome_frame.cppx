@@ -3,6 +3,7 @@
 #include "client/ui/hooks/use_app.h"
 #include "client/ui/screens/lobby/character_panel.h"
 #include "client/ui/screens/lobby/chat_panel.h"
+#include "client/ui/screens/lobby/game_create_panel.h"
 #include "client/ui/screens/lobby/game_join_panel.h"
 #include "client/ui/screens/lobby/game_select_panel.h"
 #include "client/ui/screens/lobby/game_tech_panel.h"
@@ -109,6 +110,23 @@ constexpr int kPresenceLineSlots = 32;
 constexpr int kChatLineH = 11;
 constexpr const char * kChatInputAction = "lobby.chat.input";
 constexpr int kChatInputUid = 1;
+constexpr int kGameCreateOptionRowSlots = 6;
+constexpr int kGameCreatePanelPad = 6;
+constexpr int kGameCreateFormPadLeft = 4;
+constexpr int kGameCreateFormPadTop = 2;
+constexpr int kGameCreateFormPadBottom = 2;
+constexpr int kGameCreateFormRowH = 14;
+constexpr int kGameCreateFormRowGap = 3;
+constexpr int kGameCreateFormColumnGap = 6;
+constexpr int kGameCreateScrollbarWidth = 8;
+constexpr int kGameCreateScrollbarGap = 2;
+constexpr int kGameCreateScrollbarTrackPad = 1;
+constexpr const char * kGameCreateSecurityAction = "lobby.game_create.security";
+constexpr const char * kGameCreateSpectatableAction = "lobby.game_create.spectatable";
+constexpr const char * kGameCreateMinLevelAction = "lobby.game_create.min_level";
+constexpr const char * kGameCreateMaxLevelAction = "lobby.game_create.max_level";
+constexpr const char * kGameCreateMaxPlayersAction = "lobby.game_create.max_players";
+constexpr const char * kGameCreateMaxTeamsAction = "lobby.game_create.max_teams";
 
 const char * kGameSelectRowKeys[kGameSelectRowSlots] = {
 	"game-select-row-0",  "game-select-row-1",  "game-select-row-2",
@@ -191,6 +209,15 @@ const char * kPresenceLineKeys[kPresenceLineSlots] = {
 	"presence-line-24", "presence-line-25", "presence-line-26",
 	"presence-line-27", "presence-line-28", "presence-line-29",
 	"presence-line-30", "presence-line-31",
+};
+
+const char * kGameCreateOptionRowKeys[kGameCreateOptionRowSlots] = {
+	"game-create-option-row-0",
+	"game-create-option-row-1",
+	"game-create-option-row-2",
+	"game-create-option-row-3",
+	"game-create-option-row-4",
+	"game-create-option-row-5",
 };
 
 inline std::uint32_t texture_id(std::uint8_t bank, std::uint16_t index) {
@@ -560,6 +587,95 @@ inline const char * game_select_info_value(const GameSelectPanelState& state,
 		case 4: return state.infoLimits.c_str();
 	}
 	return "";
+}
+
+inline const char * game_create_security_label(std::uint8_t index) {
+	switch(index){
+		case 0: return "Off";
+		case 1: return "Low";
+		case 3: return "High";
+		default: return "Medium";
+	}
+}
+
+inline const char * game_create_option_label(int row) {
+	switch(row){
+		case 0: return "Security:";
+		case 1: return "Min Level:";
+		case 2: return "Max Level:";
+		case 3: return "Max Players:";
+		case 4: return "Max Teams:";
+		case 5: return "Spectatable:";
+	}
+	return "";
+}
+
+inline const char * game_create_option_accessibility_label(int row) {
+	switch(row){
+		case 0: return "Security";
+		case 1: return "Min Level";
+		case 2: return "Max Level";
+		case 3: return "Max Players";
+		case 4: return "Max Teams";
+		case 5: return "Spectatable";
+	}
+	return "";
+}
+
+inline const char * game_create_option_action_id(int row) {
+	switch(row){
+		case 0: return kGameCreateSecurityAction;
+		case 1: return kGameCreateMinLevelAction;
+		case 2: return kGameCreateMaxLevelAction;
+		case 3: return kGameCreateMaxPlayersAction;
+		case 4: return kGameCreateMaxTeamsAction;
+		case 5: return kGameCreateSpectatableAction;
+	}
+	return "";
+}
+
+inline const char * game_create_option_value(const GameCreatePanelState& state,
+                                             int row) {
+	switch(row){
+		case 0: return game_create_security_label(state.securityIndex);
+		case 1: return state.minLevel;
+		case 2: return state.maxLevel;
+		case 3: return state.maxPlayers;
+		case 4: return state.maxTeams;
+		case 5: return state.spectatable ? "Yes" : "No";
+	}
+	return "";
+}
+
+inline bool game_create_option_is_text_input(int row) {
+	return row >= 1 && row <= 4;
+}
+
+inline ::ui::VisualStyle game_create_inline_control_visual(bool selected) {
+	::ui::VisualStyle visual{};
+	visual.background = selected
+		? ::ui::Color{180, 0, 0, 72}
+		: ::ui::Color{0, 0, 0, 0};
+	return visual;
+}
+
+inline ::ui::StyleStatePatch game_create_text_input_patch() {
+	return ::ui::patch()
+		.border(::ui::Border{
+			{1.0f, 1.0f, 1.0f, 1.0f},
+			{{216, 0, 0, 255}, {216, 0, 0, 255},
+			 {216, 0, 0, 255}, {216, 0, 0, 255}},
+		})
+		.text(::ui::TextVisual{
+			.color = {0, 0, 0, 255},
+			.font_id = 133,
+			.font_size = 6,
+			.line_height = 11.0f,
+		});
+}
+
+inline ::ui::StyleStatePatch game_create_scrollbar_thumb_patch() {
+	return ::ui::patch().background({216, 0, 0, 255});
 }
 
 struct AbsoluteChromeButtonProps {
@@ -1556,6 +1672,316 @@ struct ChatPanelViewProps {
 						.padding = {3.0f, 3.0f, 1.0f, 1.0f},
 					}}
 				  style={chat_input_patch()}
+				/>
+			</Box>
+		</Box>
+	</Box>
+}
+
+struct GameCreateOptionValueProps {
+	const char * key = nullptr;
+	const GameCreatePanelState * state = nullptr;
+	int row = 0;
+	int x = 0;
+	int width = 0;
+};
+
+::ui::UiElement GameCreateOptionValue(const GameCreateOptionValueProps& props) {
+	if(!props.state) return ::ui::empty();
+	const char * action_id = game_create_option_action_id(props.row);
+	const char * label = game_create_option_accessibility_label(props.row);
+	const char * value = game_create_option_value(*props.state, props.row);
+	if(game_create_option_is_text_input(props.row)){
+		const int caret = static_cast<int>(std::strlen(value));
+		const int input_width = clamp_int(props.width, 20, 28);
+		return <TextInput
+		  key={props.key}
+		  id={action_id}
+		  accessibility={{.label = label}}
+		  value={value}
+		  textEdit={::ui::TextEditMetadata{
+				.caret = caret,
+				.selection_start = caret,
+				.selection_end = caret,
+			}}
+		  layout={absolute_layout(props.x, 0, input_width, kGameCreateFormRowH)}
+		  style={game_create_text_input_patch()}
+		/>
+	}
+	const bool selected = props.row == 5 && props.state->spectatable;
+	return <component_detail.Host
+	  kind={::ui::HostKind::Button}
+	  key={props.key}
+	  id={action_id}
+	  style={absolute_layout(props.x, 0, props.width, kGameCreateFormRowH)}
+	  visual={game_create_inline_control_visual(selected)}
+	  text={::ui::HostTextProps{.value = value}}
+	  interaction={::ui::NodeInteraction{.focusable = true, .checked = selected}}
+	  accessibility={{.role = props.row == 5 ? ::ui::SemanticRole::Checkbox : ::ui::SemanticRole::Button, .label = label}}
+	>
+		<Text
+		  key="label"
+		  value={value}
+		  layout={::ui::LayoutStyle{
+				.width = ::ui::Length::percent(100.0f),
+				.height = ::ui::Length::points(static_cast<float>(kGameCreateFormRowH)),
+				.padding = {2.0f, 2.0f, 1.0f, 1.0f},
+			}}
+		  style={text_patch(133, 6, 11.0f)}
+		/>
+	</component_detail.Host>
+}
+
+struct GameCreateOptionRowProps {
+	const char * key = nullptr;
+	const GameCreatePanelState * state = nullptr;
+	GameCreateOptionsLayout layout_metrics = {};
+	int row = 0;
+	int width = 0;
+};
+
+::ui::UiElement GameCreateOptionRow(const GameCreateOptionRowProps& props) {
+	if(!props.state || props.row < 0 || props.row >= kGameCreateOptionRowSlots){
+		return ::ui::empty();
+	}
+	const int first_row = static_cast<int>(props.state->optionsScrollPosition);
+	const int visible_rows = static_cast<int>(props.layout_metrics.visibleRows);
+	const int last_row = first_row + visible_rows;
+	if(props.row < first_row || props.row >= last_row){
+		return ::ui::empty();
+	}
+	const int slot = props.row - first_row;
+	const int y = slot * (kGameCreateFormRowH + kGameCreateFormRowGap);
+	const int value_width = static_cast<int>(props.layout_metrics.valueColumnWidth);
+	const int value_x = std::max(0, props.width - value_width);
+	const int label_width =
+		std::max(0, value_x - kGameCreateFormColumnGap);
+	return <Box
+	  key={props.key}
+	  id="GameCreateOptionRow"
+	  idOffset={props.row}
+	  layout={absolute_layout(0, y, props.width, kGameCreateFormRowH)}
+	>
+		<Text
+		  key="label"
+		  value={game_create_option_label(props.row)}
+		  layout={absolute_layout(0, 0, label_width, kGameCreateFormRowH)}
+		  style={text_patch(133, 6, 11.0f)}
+		/>
+		<GameCreateOptionValue
+		  key="value"
+		  state={props.state}
+		  row={props.row}
+		  x={value_x}
+		  width={value_width}
+		/>
+	</Box>
+}
+
+struct GameCreateOptionRowsProps {
+	const char * key = nullptr;
+	const GameCreatePanelState * state = nullptr;
+	GameCreateOptionsLayout layout_metrics = {};
+	int width = 0;
+	int height = 0;
+};
+
+::ui::UiElement GameCreateOptionRows(const GameCreateOptionRowsProps& props) {
+	return <Box key={props.key} layout={absolute_layout(0, 0, props.width, props.height)}>
+		<GameCreateOptionRow
+		  key={kGameCreateOptionRowKeys[0]}
+		  state={props.state}
+		  layoutMetrics={props.layout_metrics}
+		  row={0}
+		  width={props.width}
+		/>
+		<GameCreateOptionRow
+		  key={kGameCreateOptionRowKeys[1]}
+		  state={props.state}
+		  layoutMetrics={props.layout_metrics}
+		  row={1}
+		  width={props.width}
+		/>
+		<GameCreateOptionRow
+		  key={kGameCreateOptionRowKeys[2]}
+		  state={props.state}
+		  layoutMetrics={props.layout_metrics}
+		  row={2}
+		  width={props.width}
+		/>
+		<GameCreateOptionRow
+		  key={kGameCreateOptionRowKeys[3]}
+		  state={props.state}
+		  layoutMetrics={props.layout_metrics}
+		  row={3}
+		  width={props.width}
+		/>
+		<GameCreateOptionRow
+		  key={kGameCreateOptionRowKeys[4]}
+		  state={props.state}
+		  layoutMetrics={props.layout_metrics}
+		  row={4}
+		  width={props.width}
+		/>
+		<GameCreateOptionRow
+		  key={kGameCreateOptionRowKeys[5]}
+		  state={props.state}
+		  layoutMetrics={props.layout_metrics}
+		  row={5}
+		  width={props.width}
+		/>
+	</Box>
+}
+
+struct GameCreateOptionsScrollbarProps {
+	const char * key = nullptr;
+	bool show = false;
+	GameCreateOptionsLayout layout_metrics = {};
+	GameCreateOptionsScrollbarLayout scrollbar = {};
+};
+
+::ui::UiElement GameCreateOptionsScrollbar(const GameCreateOptionsScrollbarProps& props) {
+	if(!props.show) return ::ui::empty();
+	return <Box
+	  key={props.key}
+	  layout={::ui::LayoutStyle{
+			.direction = ::ui::FlexDirection::Column,
+			.width = ::ui::Length::points(static_cast<float>(kGameCreateScrollbarWidth)),
+			.height = ::ui::Length::points(static_cast<float>(props.layout_metrics.viewportHeight)),
+			.padding = {
+				static_cast<float>(kGameCreateScrollbarTrackPad),
+				static_cast<float>(kGameCreateScrollbarTrackPad),
+				static_cast<float>(kGameCreateScrollbarTrackPad),
+				static_cast<float>(kGameCreateScrollbarTrackPad),
+			},
+		}}
+	  style={inset_border_patch()}
+	>
+		<Box
+		  key="top"
+		  layout={::ui::LayoutStyle{
+				.width = ::ui::Length::grow(1.0f),
+				.height = ::ui::Length::points(static_cast<float>(props.scrollbar.topSpacer)),
+			}}
+		/>
+		<Box
+		  key="thumb"
+		  layout={::ui::LayoutStyle{
+				.width = ::ui::Length::grow(1.0f),
+				.height = ::ui::Length::points(static_cast<float>(props.scrollbar.thumbHeight)),
+			}}
+		  style={game_create_scrollbar_thumb_patch()}
+		/>
+		<Box
+		  key="bottom"
+		  layout={::ui::LayoutStyle{
+				.width = ::ui::Length::grow(1.0f),
+				.height = ::ui::Length::points(static_cast<float>(props.scrollbar.bottomSpacer)),
+			}}
+		/>
+	</Box>
+}
+
+struct GameCreateUpperPanelProps {
+	const char * key = nullptr;
+	bool show = false;
+	const GameCreatePanelState * state = nullptr;
+	int x = 0;
+	int y = 0;
+	int width = 0;
+	int height = 0;
+};
+
+::ui::UiElement GameCreateUpperPanel(const GameCreateUpperPanelProps& props) {
+	if(!props.show || !props.state || props.width <= 0 || props.height <= 0){
+		return ::ui::empty();
+	}
+	const GameCreateOptionsLayout layout =
+		ResolveGameCreateOptionsLayout(
+			static_cast<Uint16>(props.width),
+			static_cast<Uint16>(props.height));
+	const GameCreateOptionsScrollbarLayout scrollbar =
+		ResolveGameCreateOptionsScrollbarLayout(layout, *props.state);
+	const int content_width =
+		std::max(0, props.width - kGameCreatePanelPad * 2);
+	const int form_width =
+		layout.showScrollbar
+			? std::max(0, content_width - kGameCreateScrollbarWidth - kGameCreateScrollbarGap)
+			: content_width;
+	return <Box
+	  key={props.key}
+	  id="GameCreateOptionsContent"
+	  layout={character_root_layout(props.x, props.y, props.width, props.height)}
+	>
+		<Box
+		  key="content"
+		  layout={::ui::LayoutStyle{
+				.direction = ::ui::FlexDirection::Column,
+				.width = ::ui::Length::percent(100.0f),
+				.height = ::ui::Length::percent(100.0f),
+				.padding = {
+					static_cast<float>(kGameCreatePanelPad),
+					static_cast<float>(kGameCreatePanelPad),
+					static_cast<float>(kGameCreatePanelPad),
+					static_cast<float>(kGameCreatePanelPad),
+				},
+				.gap = static_cast<float>(kGameCreateFormRowGap),
+				.overflow = ::ui::Overflow::Hidden,
+			}}
+		>
+			<Text
+			  key="heading"
+			  value="Game Options"
+			  layout={::ui::LayoutStyle{
+					.width = ::ui::Length::percent(100.0f),
+					.height = ::ui::Length::points(static_cast<float>(layout.titleHeight)),
+				}}
+			  style={text_patch(134, 8, 13.0f)}
+			/>
+			<Box
+			  key="form-border"
+			  id="GameCreateOptionsFormBorder"
+			  layout={::ui::LayoutStyle{
+					.direction = ::ui::FlexDirection::Row,
+					.width = ::ui::Length::percent(100.0f),
+					.height = ::ui::Length::grow(1.0f),
+					.padding = {
+						static_cast<float>(kGameCreateFormPadLeft),
+						static_cast<float>(kGameCreateFormPadLeft),
+						static_cast<float>(kGameCreateFormPadTop),
+						static_cast<float>(kGameCreateFormPadBottom),
+					},
+					.gap = static_cast<float>(kGameCreateScrollbarGap),
+					.overflow = ::ui::Overflow::Hidden,
+				}}
+			  style={inset_border_patch()}
+			>
+				<component_detail.Host
+				  kind={::ui::HostKind::Box}
+				  key="viewport"
+				  id={kGameCreateOptionsScrollId}
+				  style={::ui::LayoutStyle{
+						.position = ::ui::PositionType::Relative,
+						.width = ::ui::Length::points(static_cast<float>(form_width)),
+						.height = ::ui::Length::points(static_cast<float>(layout.viewportHeight)),
+						.overflow = ::ui::Overflow::Hidden,
+					}}
+				  text={::ui::HostTextProps{.value = "scroll"}}
+				  accessibility={{.label = kGameCreateOptionsScrollLabel}}
+				>
+					<GameCreateOptionRows
+					  key="rows"
+					  state={props.state}
+					  layoutMetrics={layout}
+					  width={form_width}
+					  height={layout.viewportHeight}
+					/>
+				</component_detail.Host>
+				<GameCreateOptionsScrollbar
+				  key="scrollbar"
+				  show={layout.showScrollbar}
+				  layoutMetrics={layout}
+				  scrollbar={scrollbar}
 				/>
 			</Box>
 		</Box>
@@ -2910,6 +3336,15 @@ using ::ui::components::TextProps;
 		  y={props.game_select_tall_y}
 		  width={props.game_select_tall_width}
 		  height={props.game_select_tall_height}
+		/>
+		<lobby_chrome_frame_detail.GameCreateUpperPanel
+		  key="game-create-upper"
+		  show={props.show_game_create_upper}
+		  state={props.game_create}
+		  x={props.game_create_upper_x}
+		  y={props.game_create_upper_y}
+		  width={props.game_create_upper_width}
+		  height={props.game_create_upper_height}
 		/>
 		<lobby_chrome_frame_detail.AbsoluteChromeButton
 		  key="game-join-choose-tech"

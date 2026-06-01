@@ -173,6 +173,12 @@ void LobbyScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime, s
 		chatState,
 		static_cast<Uint16>(std::max(0, mainLayout.chatW)),
 		static_cast<Uint16>(std::max(0, mainLayout.chatH)));
+	if(gameCreateActive){
+		GameCreatePanelSyncOptionsLayout(
+			gameCreateState,
+			static_cast<Uint16>(std::max(0, mainLayout.rightUpperW)),
+			static_cast<Uint16>(std::max(0, mainLayout.upperH)));
+	}
 	const bool gameSelectVisible =
 		!gameCreateActive && !gameJoinActive && !gameTechActive;
 	const int createButtonW = std::max(
@@ -257,6 +263,8 @@ void LobbyScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime, s
 		mainLayout.rightUpperW > lobby_screen_detail::kGameTechBackPadLeft
 			+ lobby_screen_detail::kGameTechBackPadRight &&
 		mainLayout.upperH > gameTechPeerY - bodyY + 11;
+	const bool showGameCreateUpper =
+		gameCreateActive && mainLayout.rightUpperW > 0 && mainLayout.upperH > 0;
 	const uint16_t titlePadX = static_cast<uint16_t>(
 		lobby_screen_detail::ClampInt((layoutWidth * 5) / 640, 5, 10));
 	const uint16_t titleRowGap = static_cast<uint16_t>(
@@ -311,6 +319,12 @@ void LobbyScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime, s
 		.game_select_tall_width = mainLayout.rightTallW,
 		.game_select_tall_height = mainLayout.rightTallH,
 		.game_select = &gameSelectState,
+		.show_game_create_upper = showGameCreateUpper,
+		.game_create = &gameCreateState,
+		.game_create_upper_x = rightUpperX,
+		.game_create_upper_y = bodyY,
+		.game_create_upper_width = mainLayout.rightUpperW,
+		.game_create_upper_height = mainLayout.upperH,
 		.show_game_join_actions = showGameJoinActions,
 		.game_join_ready_label = gameJoinState.readyLabel.c_str(),
 		.game_join_button_x = rightUpperX + lobby_screen_detail::kGameJoinButtonPadLeft,

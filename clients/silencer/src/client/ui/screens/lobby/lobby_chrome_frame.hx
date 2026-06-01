@@ -11,6 +11,7 @@ namespace lobby {
 struct GameJoinPanelState;
 struct GameSelectPanelState;
 struct GameTechPanelState;
+struct GameCreatePanelState;
 struct CharacterPanelState;
 struct ChatPanelState;
 
@@ -56,6 +57,12 @@ struct LobbyChromeFrameProps {
 	int game_select_tall_width = 0;
 	int game_select_tall_height = 0;
 	const GameSelectPanelState * game_select = nullptr;
+	bool show_game_create_upper = false;
+	const GameCreatePanelState * game_create = nullptr;
+	int game_create_upper_x = 0;
+	int game_create_upper_y = 0;
+	int game_create_upper_width = 0;
+	int game_create_upper_height = 0;
 	bool show_game_join_actions = false;
 	const char * game_join_ready_label = nullptr;
 	int game_join_button_x = 0;

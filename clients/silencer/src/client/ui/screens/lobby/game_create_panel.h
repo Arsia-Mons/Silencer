@@ -2,9 +2,9 @@
 #define SILENCER_CLIENT_UI_LOBBY_GAME_CREATE_PANEL_H
 
 // Screen-side lobby GameCreatePanel: the game-options form on the right pane.
-// Composes Panel + LabelValueRow + TextInput + Button::Inline
-// (security/spectatable cyclers) + ScrollList (map list) +
-// Button::Chrome (Create).
+// The upper options pane is declared by retained cppx; this module owns the
+// screen-local state, layout metrics, and the legacy Clay map/create pane while
+// that lower pane is still migrating.
 //
 // Domain glue (CreateGame kickoff, config persistence, async map upload)
 // lives behind LobbyProvider/use_lobby. Primitives stay screen-agnostic.
@@ -81,6 +81,21 @@ struct GameCreatePanelState {
 	MessageModal * progressModal = nullptr;
 };
 
+struct GameCreateOptionsLayout {
+	Uint16 titleHeight = 0;
+	Uint16 viewportHeight = 0;
+	Uint16 valueColumnWidth = 0;
+	Uint16 scrollMax = 0;
+	Uint8 visibleRows = 0;
+	bool showScrollbar = false;
+};
+
+struct GameCreateOptionsScrollbarLayout {
+	Uint16 topSpacer = 0;
+	Uint16 thumbHeight = 0;
+	Uint16 bottomSpacer = 0;
+};
+
 // Hydrate state from LobbyCreateModel defaults and rebuild the map list from
 // the provider. Mirrors the legacy GameCreatePanel::Build's one-time setup.
 void GameCreatePanelInit(GameCreatePanelState & state, ScreenContext & ctx);
@@ -97,16 +112,14 @@ void GameCreatePanelTick(GameCreatePanelState & state,
 bool GameCreatePanelHandleUiIntent(GameCreatePanelState & state,
                                    const silencer::ui::UiAction & action);
 
-// Emits the upper stepped-pane subtree ("Game Options" heading + 6-row form:
-// security cycler, min/max level, max players, max teams, spectatable).
-// Called inside the LobbyRightUpperBox CLAY block; flex children only (no
-// floating).
-// BeginFrame requirements: TextBeginFrame, ButtonBeginFrame,
-// TextInputBeginFrame.
-void BuildGameCreateUpperTree(GameCreatePanelState & state,
-                              Uint16 panelWidth,
-                              Uint16 panelHeight,
-                              silencer::ui::UiInteractionRegistry& interactions);
+GameCreateOptionsLayout ResolveGameCreateOptionsLayout(Uint16 panelWidth,
+                                                       Uint16 panelHeight);
+GameCreateOptionsScrollbarLayout ResolveGameCreateOptionsScrollbarLayout(
+	const GameCreateOptionsLayout & layout,
+	const GameCreatePanelState & state);
+void GameCreatePanelSyncOptionsLayout(GameCreatePanelState & state,
+                                      Uint16 panelWidth,
+                                      Uint16 panelHeight);
 
 // Emits the tall stepped-pane subtree ("Select Map" heading + map list +
 // game-name + password inputs + Create button). Called inside the

@@ -179,15 +179,11 @@ void BuildRightUpperContents(LobbyMainAreaPanels & panels,
                              LobbyModel & lobby,
                              const LobbyMainAreaLayout & layout,
                              silencer::ui::UiInteractionRegistry& interactions) {
+	(void)panels;
 	(void)ctx;
 	(void)lobby;
-	if(panels.gameCreateActive){
-		BuildGameCreateUpperTree(
-			panels.gameCreate,
-			static_cast<Uint16>(std::max(0, layout.rightUpperW)),
-			static_cast<Uint16>(std::max(0, layout.upperH)),
-			interactions);
-	}
+	(void)layout;
+	(void)interactions;
 }
 
 void BuildRightTallContents(LobbyMainAreaPanels & panels,
