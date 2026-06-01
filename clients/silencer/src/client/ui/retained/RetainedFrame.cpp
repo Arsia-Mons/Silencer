@@ -128,6 +128,37 @@ bool RetainedFrame::Build(BuildRoot buildRoot,
 	return treeOk && commandsOk;
 }
 
+bool RetainedFrame::HandleUiIntent(
+	const silencer::ui::UiAction& action) const {
+	if(action.kind != silencer::ui::UiActionKind::Activate &&
+	   action.kind != silencer::ui::UiActionKind::Select){
+		return false;
+	}
+	if(action.id.empty()) return false;
+	return InvokeActionForNode(tree_.root_id(), action);
+}
+
+bool RetainedFrame::InvokeActionForNode(
+	::ui::NodeId id,
+	const silencer::ui::UiAction& action) const {
+	::ui::NodeSnapshot node = {};
+	if(!tree_.snapshot(id, &node)) return false;
+
+	const bool matches =
+		node.control_id && action.id == node.control_id;
+	if(matches && !node.interaction.disabled &&
+	   tree_.invoke_activate(node.id)){
+		return true;
+	}
+
+	for(int i = 0; i < tree_.child_count(id); ++i){
+		if(InvokeActionForNode(tree_.child_at(id, i), action)){
+			return true;
+		}
+	}
+	return false;
+}
+
 void RetainedFrame::RegisterAutomation(
 	::ui::NodeId id,
 	silencer::ui::UiInteractionRegistry& interactions) const {

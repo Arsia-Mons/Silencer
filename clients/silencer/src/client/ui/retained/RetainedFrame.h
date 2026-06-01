@@ -1,6 +1,7 @@
 #pragma once
 
 #include "runtime/UiInteractionRegistry.h"
+#include "runtime/UiActionQueue.h"
 #include "ui/runtime/draw_command.h"
 #include "ui/runtime/element.h"
 #include "ui/runtime/flex_layout.h"
@@ -21,10 +22,13 @@ public:
 	           silencer::ui::UiInteractionRegistry& interactions);
 
 	const ::ui::DrawCommandList& Commands() const { return commands_; }
+	bool HandleUiIntent(const silencer::ui::UiAction& action) const;
 
 private:
 	void RegisterAutomation(::ui::NodeId id,
 	                        silencer::ui::UiInteractionRegistry& interactions) const;
+	bool InvokeActionForNode(::ui::NodeId id,
+	                         const silencer::ui::UiAction& action) const;
 
 	::ui::UiElementFrame elementFrame_;
 	::ui::UiTree tree_;

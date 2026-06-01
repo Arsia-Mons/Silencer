@@ -19,14 +19,6 @@
 #include <memory>
 #include <string>
 
-namespace main_menu_screen_detail
-{
-constexpr const char * kActionTutorial = "main_menu.tutorial";
-constexpr const char * kActionLobby = "main_menu.lobby";
-constexpr const char * kActionOptions = "main_menu.options";
-constexpr const char * kActionExit = "main_menu.exit";
-} // namespace main_menu_screen_detail
-
 void MainMenuScreen::Build(ScreenContext & ctx)
 {
 	ctx.ResetPresentation(1);
@@ -34,41 +26,11 @@ void MainMenuScreen::Build(ScreenContext & ctx)
 
 	// The authored cppx frame owns the visible menu layout and publishes its
 	// retained bounds to the existing control-socket interaction registry.
-
-	tutorialClicked = false;
-	lobbyClicked = false;
-	optionsClicked = false;
-	exitClicked = false;
 }
 
 void MainMenuScreen::Tick(ScreenContext & ctx)
 {
-	if(tutorialClicked){
-		tutorialClicked = false;
-		silencer::client_ui::use_game_session(
-			silencer::client_ui::MakeGameSessionProvider(ctx))
-			.tutorial.start();
-		return;
-	}
-	if(lobbyClicked){
-		lobbyClicked = false;
-		silencer::client_ui::use_navigation()
-			.reset_to(std::make_unique<LobbyConnectScreen>());
-		return;
-	}
-	if(optionsClicked){
-		optionsClicked = false;
-		silencer::client_ui::use_navigation()
-			.push(std::make_unique<OptionsScreen>());
-		return;
-	}
-	if(exitClicked){
-		exitClicked = false;
-		silencer::client_ui::use_app(
-			silencer::client_ui::MakeAppProvider(ctx))
-			.lifecycle.quit();
-		return;
-	}
+	(void)ctx;
 }
 
 void MainMenuScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime, silencer::ui::UiInteractionRegistry& interactions)
@@ -77,6 +39,11 @@ void MainMenuScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime
 	silencer::client_ui::AppModel app =
 		silencer::client_ui::use_app(
 			silencer::client_ui::MakeAppProvider(ctx));
+	silencer::client_ui::GameSessionModel session =
+		silencer::client_ui::use_game_session(
+			silencer::client_ui::MakeGameSessionProvider(ctx));
+	silencer::client_ui::Navigation navigation =
+		silencer::client_ui::use_navigation();
 	versionText_ = "Silencer v";
 	versionText_ += app.version();
 
@@ -86,10 +53,14 @@ void MainMenuScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime
 	silencer::client_ui::MainMenuFrameProps props{
 		.key = "main-menu",
 		.version = versionText_.c_str(),
-		.start_tutorial = [this]() { tutorialClicked = true; },
-		.open_lobby = [this]() { lobbyClicked = true; },
-		.open_options = [this]() { optionsClicked = true; },
-		.quit = [this]() { exitClicked = true; },
+		.start_tutorial = [session]() { session.tutorial.start(); },
+		.open_lobby = [navigation]() {
+			navigation.reset_to(std::make_unique<LobbyConnectScreen>());
+		},
+		.open_options = [navigation]() {
+			navigation.push(std::make_unique<OptionsScreen>());
+		},
+		.quit = [app]() { app.lifecycle.quit(); },
 	};
 	retainedFrame_.Build([&]() {
 		                     return silencer::client_ui::MainMenuFrame(props);
@@ -112,24 +83,7 @@ bool MainMenuScreen::HandleUiIntent(ScreenContext & ctx, const silencer::ui::UiA
 			.lifecycle.quit();
 		return true;
 	}
-	if(action.kind != silencer::ui::UiActionKind::Activate) return false;
-	if(action.id == main_menu_screen_detail::kActionTutorial){
-		tutorialClicked = true;
-		return true;
-	}
-	if(action.id == main_menu_screen_detail::kActionLobby){
-		lobbyClicked = true;
-		return true;
-	}
-	if(action.id == main_menu_screen_detail::kActionOptions){
-		optionsClicked = true;
-		return true;
-	}
-	if(action.id == main_menu_screen_detail::kActionExit){
-		exitClicked = true;
-		return true;
-	}
-	return false;
+	return retainedFrame_.HandleUiIntent(action);
 }
 
 const ::ui::DrawCommandList * MainMenuScreen::RetainedDrawCommands() const

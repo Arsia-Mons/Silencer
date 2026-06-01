@@ -157,16 +157,16 @@ ClientUi::~ClientUi() = default;
 NavigationProviderValue ClientUi::MakeNavigationProvider(ScreenContext& ctx) {
 	return NavigationProviderValue{
 		[this, &ctx](std::unique_ptr<Screen> screen) {
-			return PushScreen(std::move(screen), ctx);
+			return RequestPushScreen(std::move(screen), ctx);
 		},
 		[this, &ctx](std::unique_ptr<Screen> screen) {
-			ResetToScreen(std::move(screen), ctx);
+			RequestResetToScreen(std::move(screen), ctx);
 		},
 		[this, &ctx]() {
-			PopScreen(ctx);
+			RequestPopScreen(ctx);
 		},
 		[this, &ctx]() {
-			PopScreen(ctx);
+			RequestPopScreen(ctx);
 		},
 	};
 }
@@ -207,20 +207,27 @@ std::vector<silencer::ui::UiAction> ClientUi::DispatchInput(
 			MatchModel match = use_match(MatchProviderValue{&ctx.world},
 			                             ctx.world.peers.localpeerid);
 			clientui_detail::DispatchMatchActions(match, actions, interactions_);
+			FlushNavigationRequests(ctx);
 			return std::vector<silencer::ui::UiAction>();
 		}
 		return actions;
 	}
 	std::vector<silencer::ui::UiAction> unhandled;
+	deferNavigationRequests_ = true;
+	bool suppressUnhandled = false;
 	for(const silencer::ui::UiAction& action : actions){
 		if(top && top->HandleUiIntent(ctx, action)){
 			if(action.kind == silencer::ui::UiActionKind::CaptureBinding){
-				return std::vector<silencer::ui::UiAction>();
+				suppressUnhandled = true;
+				break;
 			}
 			continue;
 		}
 		unhandled.push_back(action);
 	}
+	deferNavigationRequests_ = false;
+	FlushNavigationRequests(ctx);
+	if(suppressUnhandled) return std::vector<silencer::ui::UiAction>();
 	return unhandled;
 }
 
@@ -274,6 +281,64 @@ void ClientUi::ReplaceScreen(std::unique_ptr<Screen> screen, ScreenContext& ctx)
 Screen * ClientUi::ResetToScreen(std::unique_ptr<Screen> screen, ScreenContext& ctx) {
 	NavigationProviderScope navigationScope(MakeNavigationProvider(ctx));
 	return screens_.ResetTo(std::move(screen), ctx);
+}
+
+Screen * ClientUi::RequestPushScreen(std::unique_ptr<Screen> screen, ScreenContext& ctx) {
+	if(!screen) return nullptr;
+	if(deferNavigationRequests_){
+		QueueNavigationRequest(NavigationRequest{
+			NavigationRequestKind::Push,
+			std::move(screen),
+		});
+		return nullptr;
+	}
+	return PushScreen(std::move(screen), ctx);
+}
+
+void ClientUi::RequestResetToScreen(std::unique_ptr<Screen> screen, ScreenContext& ctx) {
+	if(!screen) return;
+	if(deferNavigationRequests_){
+		QueueNavigationRequest(NavigationRequest{
+			NavigationRequestKind::ResetTo,
+			std::move(screen),
+		});
+		return;
+	}
+	ResetToScreen(std::move(screen), ctx);
+}
+
+void ClientUi::RequestPopScreen(ScreenContext& ctx) {
+	if(deferNavigationRequests_){
+		QueueNavigationRequest(NavigationRequest{NavigationRequestKind::PopTop});
+		return;
+	}
+	PopScreen(ctx);
+}
+
+void ClientUi::QueueNavigationRequest(NavigationRequest request) {
+	deferredNavigationRequests_.push_back(std::move(request));
+}
+
+void ClientUi::FlushNavigationRequests(ScreenContext& ctx) {
+	if(deferredNavigationRequests_.empty()) return;
+	std::vector<NavigationRequest> requests;
+	requests.swap(deferredNavigationRequests_);
+	const bool previousDefer = deferNavigationRequests_;
+	deferNavigationRequests_ = false;
+	for(auto& request : requests){
+		switch(request.kind){
+			case NavigationRequestKind::Push:
+				PushScreen(std::move(request.screen), ctx);
+				break;
+			case NavigationRequestKind::ResetTo:
+				ResetToScreen(std::move(request.screen), ctx);
+				break;
+			case NavigationRequestKind::PopTop:
+				PopScreen(ctx);
+				break;
+		}
+	}
+	deferNavigationRequests_ = previousDefer;
 }
 
 Screen * ClientUi::ShowMainMenu(ScreenContext& ctx) {

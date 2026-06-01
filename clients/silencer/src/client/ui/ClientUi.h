@@ -60,9 +60,24 @@ public:
 
 private:
 	using ScreenRequest = Screen * (ClientUi::*)(ScreenContext&);
+	enum class NavigationRequestKind {
+		Push,
+		ResetTo,
+		PopTop,
+	};
+
+	struct NavigationRequest {
+		NavigationRequestKind kind = NavigationRequestKind::PopTop;
+		std::unique_ptr<Screen> screen = nullptr;
+	};
 
 	NavigationProviderValue MakeNavigationProvider(ScreenContext& ctx);
 	void RequestScreenAfterClear(ScreenRequest request);
+	Screen * RequestPushScreen(std::unique_ptr<Screen> screen, ScreenContext& ctx);
+	void RequestResetToScreen(std::unique_ptr<Screen> screen, ScreenContext& ctx);
+	void RequestPopScreen(ScreenContext& ctx);
+	void QueueNavigationRequest(NavigationRequest request);
+	void FlushNavigationRequests(ScreenContext& ctx);
 
 	silencer::ui::UiFrameContext frameCtx_;
 	silencer::ui::ClayService& clay_;
@@ -70,11 +85,13 @@ private:
 	ScreenStack screens_;
 	RetainedFrame inGameOverlayFrame_;
 	std::string hoveredAudioInteractableId_;
+	std::vector<NavigationRequest> deferredNavigationRequests_;
 	ScreenRequest screenAfterClear_ = nullptr;
 	ScreenRequest pendingScreenRequest_ = nullptr;
 	bool hasScreenAfterClear_ = false;
 	bool hasPendingScreenRequest_ = false;
 	bool inGameOverlayFrameActive_ = false;
+	bool deferNavigationRequests_ = false;
 };
 
 }  // namespace client_ui

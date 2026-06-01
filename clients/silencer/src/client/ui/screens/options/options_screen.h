@@ -15,10 +15,6 @@ public:
 	const ::ui::DrawCommandList * RetainedDrawCommands() const override;
 
 private:
-	bool goBackClicked = false;
-	bool controlsClicked = false;
-	bool displayClicked = false;
-	bool audioClicked = false;
 	silencer::client_ui::RetainedFrame retainedFrame_;
 };
 

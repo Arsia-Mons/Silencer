@@ -17,10 +17,6 @@ public:
 	const ::ui::DrawCommandList * RetainedDrawCommands() const override;
 
 private:
-	bool tutorialClicked = false;
-	bool lobbyClicked = false;
-	bool optionsClicked = false;
-	bool exitClicked = false;
 	std::string versionText_;
 	silencer::client_ui::RetainedFrame retainedFrame_;
 };

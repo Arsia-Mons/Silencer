@@ -15,21 +15,9 @@
 #include <memory>
 #include <string>
 
-namespace update_screen_detail
-{
-constexpr const char * kActionUpdate = "update.update";
-constexpr const char * kActionCancel = "update.cancel";
-constexpr const char * kActionRetry = "update.retry";
-constexpr const char * kActionDownload = "update.download";
-} // namespace update_screen_detail
-
 void UpdateScreen::Build(ScreenContext & ctx)
 {
 	ctx.ResetPresentation(2);
-	updateClicked = false;
-	cancelClicked = false;
-	retryClicked = false;
-	downloadClicked = false;
 }
 
 void UpdateScreen::Tick(ScreenContext & ctx)
@@ -37,30 +25,6 @@ void UpdateScreen::Tick(ScreenContext & ctx)
 	silencer::client_ui::UpdateModel update =
 		silencer::client_ui::use_update(
 			silencer::client_ui::MakeUpdateProvider(ctx));
-	if(updateClicked){
-		updateClicked = false;
-		update.consent();
-	}
-	if(cancelClicked){
-		cancelClicked = false;
-		if(update.cancel()){
-			silencer::client_ui::use_navigation()
-				.reset_to(std::make_unique<MainMenuScreen>());
-			return;
-		}
-	}
-	if(retryClicked){
-		retryClicked = false;
-		update.retry();
-	}
-	if(downloadClicked){
-		downloadClicked = false;
-		if(update.open_download()){
-			silencer::client_ui::use_navigation()
-				.reset_to(std::make_unique<MainMenuScreen>());
-			return;
-		}
-	}
 	silencer::client_ui::UpdateStage2Result stage2 =
 		update.launch_stage2_if_ready();
 	if(stage2 == silencer::client_ui::UpdateStage2Result::Spawned){
@@ -78,6 +42,11 @@ void UpdateScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime, 
 	silencer::client_ui::UpdateSnapshot update =
 		silencer::client_ui::use_update(
 			silencer::client_ui::MakeUpdateProvider(ctx)).snapshot();
+	silencer::client_ui::UpdateModel updateModel =
+		silencer::client_ui::use_update(
+			silencer::client_ui::MakeUpdateProvider(ctx));
+	silencer::client_ui::Navigation navigation =
+		silencer::client_ui::use_navigation();
 
 	const float uiScale = silencer::clay_bridge::UiScale();
 	const int virtualW = std::max(1, static_cast<int>(dst.w / uiScale));
@@ -90,6 +59,22 @@ void UpdateScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime, 
 		.can_cancel = update.can_cancel,
 		.can_retry = update.can_retry,
 		.can_download = update.can_download,
+		.start_update = [updateModel]() {
+			updateModel.consent();
+		},
+		.cancel = [updateModel, navigation]() {
+			if(updateModel.cancel()){
+				navigation.reset_to(std::make_unique<MainMenuScreen>());
+			}
+		},
+		.retry = [updateModel]() {
+			updateModel.retry();
+		},
+		.download = [updateModel, navigation]() {
+			if(updateModel.open_download()){
+				navigation.reset_to(std::make_unique<MainMenuScreen>());
+			}
+		},
 	};
 	retainedFrame_.Build([&]() {
 		                     return silencer::client_ui::UpdateFrame(props);
@@ -106,29 +91,21 @@ void UpdateScreen::Destroy(ScreenContext & ctx)
 
 bool UpdateScreen::HandleUiIntent(ScreenContext & ctx, const silencer::ui::UiAction & action)
 {
-	(void)ctx;
 	if(action.kind == silencer::ui::UiActionKind::Cancel){
-		cancelClicked = true;
+		CancelUpdate(ctx);
 		return true;
 	}
-	if(action.kind != silencer::ui::UiActionKind::Activate) return false;
-	if(action.id == update_screen_detail::kActionUpdate){
-		updateClicked = true;
-		return true;
+	return retainedFrame_.HandleUiIntent(action);
+}
+
+void UpdateScreen::CancelUpdate(ScreenContext & ctx) const {
+	silencer::client_ui::UpdateModel update =
+		silencer::client_ui::use_update(
+			silencer::client_ui::MakeUpdateProvider(ctx));
+	if(update.cancel()){
+		silencer::client_ui::use_navigation()
+			.reset_to(std::make_unique<MainMenuScreen>());
 	}
-	if(action.id == update_screen_detail::kActionCancel){
-		cancelClicked = true;
-		return true;
-	}
-	if(action.id == update_screen_detail::kActionRetry){
-		retryClicked = true;
-		return true;
-	}
-	if(action.id == update_screen_detail::kActionDownload){
-		downloadClicked = true;
-		return true;
-	}
-	return false;
 }
 
 const ::ui::DrawCommandList * UpdateScreen::RetainedDrawCommands() const

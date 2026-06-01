@@ -83,14 +83,22 @@ inline ::ui::StylePatch button_text_patch() {
 		const char * control_id = nullptr;
 		const char * label = nullptr;
 		bool show = false;
+		std::function<void()> on_press = {};
 	};
 
 	::ui::UiElement Action(const ActionProps& props) {
 		if(!props.show) return ::ui::empty();
+		std::function<void(const ::ui::ActivationEvent&)> on_activate = {};
+		if(props.on_press){
+			on_activate = [on_press = props.on_press](const ::ui::ActivationEvent&) {
+				on_press();
+			};
+		}
 		return <Button
 		  key={props.key}
 		  id={props.control_id}
 		  accessibility={{.label = props.label}}
+		  onActivate={on_activate}
 		  layout={::ui::LayoutStyle{
 				.align_items = ::ui::AlignItems::Center,
 				.justify_content = ::ui::JustifyContent::Center,
@@ -127,15 +135,34 @@ inline ::ui::StylePatch button_text_patch() {
 				.gap = 6.0f,
 			}}
 		>
-			<Action key="update" controlId="update.update" label="Update" show={props.frame->can_update} />
-			<Action key="retry" controlId="update.retry" label="Retry" show={props.frame->can_retry} />
+			<Action
+			  key="update"
+			  controlId="update.update"
+			  label="Update"
+			  show={props.frame->can_update}
+			  onPress={props.frame->start_update}
+			/>
+			<Action
+			  key="retry"
+			  controlId="update.retry"
+			  label="Retry"
+			  show={props.frame->can_retry}
+			  onPress={props.frame->retry}
+			/>
 			<Action
 			  key="download"
 			  controlId="update.download"
 			  label="Download"
 			  show={props.frame->can_download}
+			  onPress={props.frame->download}
 			/>
-			<Action key="cancel" controlId="update.cancel" label="Cancel" show={props.frame->can_cancel} />
+			<Action
+			  key="cancel"
+			  controlId="update.cancel"
+			  label="Cancel"
+			  show={props.frame->can_cancel}
+			  onPress={props.frame->cancel}
+			/>
 		</Box>
 	}
 

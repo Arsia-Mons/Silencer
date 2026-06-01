@@ -15,10 +15,7 @@ public:
 	const ::ui::DrawCommandList * RetainedDrawCommands() const override;
 
 private:
-	bool updateClicked = false;
-	bool cancelClicked = false;
-	bool retryClicked = false;
-	bool downloadClicked = false;
+	void CancelUpdate(ScreenContext & ctx) const;
 	silencer::client_ui::RetainedFrame retainedFrame_;
 };
 

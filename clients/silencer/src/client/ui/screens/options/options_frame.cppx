@@ -57,15 +57,29 @@ using ::ui::components::BoxProps;
 			  controlId="options.controls"
 			  size={AppButtonSize::MainMenu}
 			  label="Controls"
+			  onPress={props.open_controls}
 			/>
 			<AppButton
 			  key="display"
 			  controlId="options.display"
 			  size={AppButtonSize::MainMenu}
 			  label="Display"
+			  onPress={props.open_display}
 			/>
-			<AppButton key="audio" controlId="options.audio" size={AppButtonSize::MainMenu} label="Audio" />
-			<AppButton key="back" controlId="options.back" size={AppButtonSize::MainMenu} label="Go Back" />
+			<AppButton
+			  key="audio"
+			  controlId="options.audio"
+			  size={AppButtonSize::MainMenu}
+			  label="Audio"
+			  onPress={props.open_audio}
+			/>
+			<AppButton
+			  key="back"
+			  controlId="options.back"
+			  size={AppButtonSize::MainMenu}
+			  label="Go Back"
+			  onPress={props.go_back}
+			/>
 		</Box>
 	</Box>
 }

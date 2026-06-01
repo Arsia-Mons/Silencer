@@ -2,6 +2,8 @@
 
 #include "ui/runtime/element.h"
 
+#include <functional>
+
 namespace silencer {
 namespace client_ui {
 
@@ -13,6 +15,10 @@ struct UpdateFrameProps {
 	bool can_cancel = false;
 	bool can_retry = false;
 	bool can_download = false;
+	std::function<void()> start_update = {};
+	std::function<void()> cancel = {};
+	std::function<void()> retry = {};
+	std::function<void()> download = {};
 };
 
 ::ui::UiElement UpdateFrame(const UpdateFrameProps& props);
