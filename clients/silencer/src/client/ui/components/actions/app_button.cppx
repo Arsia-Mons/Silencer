@@ -2,6 +2,9 @@
 
 #include "client/ui/components/actions/app_button_variant.h"
 #include "ui/components/button.h"
+#include "ui/components/text.h"
+
+#include <cstring>
 
 namespace silencer {
 namespace client_ui {
@@ -9,6 +12,49 @@ namespace client_ui {
 using ::ui::children;
 using ::ui::components::Button;
 using ::ui::components::ButtonProps;
+using ::ui::components::Text;
+using ::ui::components::TextProps;
+
+namespace app_button_detail {
+
+inline float label_advance(AppButtonSize size) {
+	return size == AppButtonSize::MainMenu ? 11.0f : 8.0f;
+}
+
+inline float label_height(AppButtonSize size) {
+	return size == AppButtonSize::MainMenu ? 19.0f : 15.0f;
+}
+
+inline ::ui::LayoutStyle label_layout(const char * label, AppButtonSize size) {
+	const char * safe = label ? label : "";
+	const float width =
+		static_cast<float>(std::strlen(safe)) * label_advance(size);
+	return {
+		.width = ::ui::Length::points(width),
+		.height = ::ui::Length::points(label_height(size)),
+	};
+}
+
+}  // namespace app_button_detail
+
+struct AppButtonLabelProps {
+	const char * key = nullptr;
+	const char * label = nullptr;
+	AppButtonSize size = AppButtonSize::Md;
+	bool show = true;
+};
+
+::ui::UiElement AppButtonLabel(const AppButtonLabelProps& props) {
+	if(!props.show || !props.label || !*props.label){
+		return ::ui::empty();
+	}
+	return <Text
+	  key={props.key}
+	  value={props.label}
+	  layout={app_button_detail::label_layout(props.label, props.size)}
+	  style={::ui::patch().text(app_button_detail::sprite_text(props.size))}
+	/>
+}
 
 ::ui::UiElement AppButton(const AppButtonProps& props) {
 	std::function<void(const ::ui::ActivationEvent&)> on_activate = {};
@@ -27,13 +73,18 @@ using ::ui::components::ButtonProps;
 	  disabled={props.disabled}
 	  autofocus={props.default_focused}
 	  accessibility={{.label = accessibility_label}}
-	  label={props.label}
+	  label={nullptr}
 	  onActivate={on_activate}
 	  layout={app_button_detail::layout(props.size)}
 	  style={app_button_detail::variant_patch(props.variant, props.size)}
 	>
 		{props.children}
-		{props.children.count > 0 ? nullptr : props.label}
+		<AppButtonLabel
+		  key="label"
+		  label={props.label}
+		  size={props.size}
+		  show={props.children.count == 0}
+		/>
 	</Button>
 }
 

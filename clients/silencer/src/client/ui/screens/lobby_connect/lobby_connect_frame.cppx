@@ -9,10 +9,13 @@
 
 #include <cstdint>
 #include <cstring>
+#include <string>
 
 namespace silencer {
 namespace client_ui {
 namespace lobby_connect_frame_detail {
+
+constexpr ::ui::Color kLegacyText = {0, 128, 0, 255};
 
 inline std::uint32_t texture_id(std::uint8_t bank, std::uint16_t index) {
 	return (static_cast<std::uint32_t>(bank) << 16) |
@@ -28,22 +31,51 @@ inline ::ui::StylePatch panel_patch() {
 
 inline ::ui::StylePatch label_patch() {
 	return ::ui::patch().text(::ui::TextVisual{
-		.color = tokens::kTextTitle,
-		.font_id = tokens::kFontTitleBank,
-		.font_size = tokens::kFontTitleAdvance,
+		.color = kLegacyText,
+		.font_id = 134,
+		.font_size = 8,
 		.align = ::ui::TextAlign::Center,
 	});
 }
 
 inline ::ui::StylePatch log_patch() {
 	return ::ui::patch().text(::ui::TextVisual{
-		.color = tokens::kTextMuted,
-		.font_id = tokens::kFontBodyBank,
-		.font_size = tokens::kFontBodyAdvance,
+		.color = kLegacyText,
+		.font_id = 133,
+		.font_size = 6,
 		.align = ::ui::TextAlign::Left,
 		.wrap = ::ui::TextWrap::Words,
 		.line_height = 11.0f,
 	});
+}
+
+inline const char * log_line(const char * text, int index) {
+	if(!text || index < 0) return "";
+	const char * start = text;
+	int current = 0;
+	while(*start && current < index){
+		const char * newline = std::strchr(start, '\n');
+		if(!newline) return "";
+		start = newline + 1;
+		++current;
+	}
+	const char * end = std::strchr(start, '\n');
+	std::string line = end
+		? std::string(start, static_cast<std::size_t>(end - start))
+		: std::string(start);
+	return ::ui::copy_string(line.c_str());
+}
+
+inline ::ui::LayoutStyle log_line_layout(int index) {
+	::ui::EdgeSizes inset;
+	inset.left = ::ui::StyleValue::points(7.0f);
+	inset.top = ::ui::StyleValue::points(8.0f + index * 11.0f);
+	return ::ui::LayoutStyle{
+		.position = ::ui::PositionType::Absolute,
+		.position_inset = inset,
+		.width = ::ui::Length::points(250.0f),
+		.height = ::ui::Length::points(11.0f),
+	};
 }
 
 inline ::ui::StylePatch input_patch() {
@@ -55,9 +87,9 @@ inline ::ui::StylePatch input_patch() {
 			 tokens::kBorderPanel, tokens::kBorderPanel},
 		})
 		.text(::ui::TextVisual{
-			.color = tokens::kTextTitle,
+			.color = kLegacyText,
 			.font_id = tokens::kFontBodyBank,
-			.font_size = tokens::kFontBodyAdvance,
+			.font_size = 6,
 			.align = ::ui::TextAlign::Left,
 		});
 }
@@ -120,14 +152,93 @@ using ::ui::components::TextProps;
 		  style={lobby_connect_frame_detail::panel_patch()}
 		>
 			<Text
-			  key="log"
-			  value={log_text}
-			  layout={::ui::LayoutStyle{
-					.position = ::ui::PositionType::Absolute,
-					.position_inset = lobby_connect_frame_detail::inset_left_top(7.0f, 8.0f),
-					.width = ::ui::Length::points(250.0f),
-					.height = ::ui::Length::points(170.0f),
-				}}
+			  key="log-0"
+			  value={lobby_connect_frame_detail::log_line(log_text, 0)}
+			  layout={lobby_connect_frame_detail::log_line_layout(0)}
+			  style={lobby_connect_frame_detail::log_patch()}
+			/>
+			<Text
+			  key="log-1"
+			  value={lobby_connect_frame_detail::log_line(log_text, 1)}
+			  layout={lobby_connect_frame_detail::log_line_layout(1)}
+			  style={lobby_connect_frame_detail::log_patch()}
+			/>
+			<Text
+			  key="log-2"
+			  value={lobby_connect_frame_detail::log_line(log_text, 2)}
+			  layout={lobby_connect_frame_detail::log_line_layout(2)}
+			  style={lobby_connect_frame_detail::log_patch()}
+			/>
+			<Text
+			  key="log-3"
+			  value={lobby_connect_frame_detail::log_line(log_text, 3)}
+			  layout={lobby_connect_frame_detail::log_line_layout(3)}
+			  style={lobby_connect_frame_detail::log_patch()}
+			/>
+			<Text
+			  key="log-4"
+			  value={lobby_connect_frame_detail::log_line(log_text, 4)}
+			  layout={lobby_connect_frame_detail::log_line_layout(4)}
+			  style={lobby_connect_frame_detail::log_patch()}
+			/>
+			<Text
+			  key="log-5"
+			  value={lobby_connect_frame_detail::log_line(log_text, 5)}
+			  layout={lobby_connect_frame_detail::log_line_layout(5)}
+			  style={lobby_connect_frame_detail::log_patch()}
+			/>
+			<Text
+			  key="log-6"
+			  value={lobby_connect_frame_detail::log_line(log_text, 6)}
+			  layout={lobby_connect_frame_detail::log_line_layout(6)}
+			  style={lobby_connect_frame_detail::log_patch()}
+			/>
+			<Text
+			  key="log-7"
+			  value={lobby_connect_frame_detail::log_line(log_text, 7)}
+			  layout={lobby_connect_frame_detail::log_line_layout(7)}
+			  style={lobby_connect_frame_detail::log_patch()}
+			/>
+			<Text
+			  key="log-8"
+			  value={lobby_connect_frame_detail::log_line(log_text, 8)}
+			  layout={lobby_connect_frame_detail::log_line_layout(8)}
+			  style={lobby_connect_frame_detail::log_patch()}
+			/>
+			<Text
+			  key="log-9"
+			  value={lobby_connect_frame_detail::log_line(log_text, 9)}
+			  layout={lobby_connect_frame_detail::log_line_layout(9)}
+			  style={lobby_connect_frame_detail::log_patch()}
+			/>
+			<Text
+			  key="log-10"
+			  value={lobby_connect_frame_detail::log_line(log_text, 10)}
+			  layout={lobby_connect_frame_detail::log_line_layout(10)}
+			  style={lobby_connect_frame_detail::log_patch()}
+			/>
+			<Text
+			  key="log-11"
+			  value={lobby_connect_frame_detail::log_line(log_text, 11)}
+			  layout={lobby_connect_frame_detail::log_line_layout(11)}
+			  style={lobby_connect_frame_detail::log_patch()}
+			/>
+			<Text
+			  key="log-12"
+			  value={lobby_connect_frame_detail::log_line(log_text, 12)}
+			  layout={lobby_connect_frame_detail::log_line_layout(12)}
+			  style={lobby_connect_frame_detail::log_patch()}
+			/>
+			<Text
+			  key="log-13"
+			  value={lobby_connect_frame_detail::log_line(log_text, 13)}
+			  layout={lobby_connect_frame_detail::log_line_layout(13)}
+			  style={lobby_connect_frame_detail::log_patch()}
+			/>
+			<Text
+			  key="log-14"
+			  value={lobby_connect_frame_detail::log_line(log_text, 14)}
+			  layout={lobby_connect_frame_detail::log_line_layout(14)}
 			  style={lobby_connect_frame_detail::log_patch()}
 			/>
 			<Box
@@ -146,7 +257,7 @@ using ::ui::components::TextProps;
 				  value="Username"
 				  layout={::ui::LayoutStyle{
 						.width = ::ui::Length::points(86.0f),
-						.height = ::ui::Length::points(21.0f),
+						.height = ::ui::Length::points(15.0f),
 					}}
 				  style={lobby_connect_frame_detail::label_patch()}
 				/>
@@ -190,7 +301,7 @@ using ::ui::components::TextProps;
 				  value="Password"
 				  layout={::ui::LayoutStyle{
 						.width = ::ui::Length::points(86.0f),
-						.height = ::ui::Length::points(21.0f),
+						.height = ::ui::Length::points(15.0f),
 					}}
 				  style={lobby_connect_frame_detail::label_patch()}
 				/>

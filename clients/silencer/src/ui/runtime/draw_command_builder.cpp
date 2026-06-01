@@ -99,11 +99,12 @@ bool push_text_line(DrawCommandList &list, NodeId node_id, const DrawRect &rect,
 // Single-line convenience used by inputs and the no-measurer fallback.
 bool push_text_command(DrawCommandList &list, NodeId node_id, const Rect &rect,
                        const char *value, Color straight_color,
-                       uint16_t font_size, TextAlign align) {
+                       uint16_t font_id, uint16_t font_size,
+                       TextAlign align) {
   const char *safe = value ? value : "";
   uint32_t len = static_cast<uint32_t>(strlen(safe));
   return push_text_line(list, node_id, to_draw_rect(rect), safe, len,
-                        straight_color, 0, font_size, 0, align);
+                        straight_color, font_id, font_size, 0, align);
 }
 
 // The content box of a node: its laid-out rect minus its own border + padding.
@@ -397,8 +398,8 @@ bool append_text(DrawCommandList &list, const NodeSnapshot &node,
   MeasureTextFn measurer = text_measurer();
   if (!measurer) {
     // Hermetic fallback (no measurer installed): one line at the content rect.
-    return push_text_command(list, node.id, content, value, color, font_size,
-                             align);
+    return push_text_command(list, node.id, content, value, color, font_id,
+                             font_size, align);
   }
 
   TextMetricsQuery query = {};
@@ -486,8 +487,8 @@ bool append_input_contents(DrawCommandList &list, const NodeSnapshot &node,
           ? node.visual.text.color
           : ((node.interaction.disabled || inherited_disabled) ? kTextDisabledFill
                                                                : kTextFill);
-  if (!push_text_command(list, node.id, text_rect, value, text_color, font_size,
-                         TextAlign::Left))
+  if (!push_text_command(list, node.id, text_rect, value, text_color, font_id,
+                         font_size, TextAlign::Left))
     return false;
 
   if (focused) {

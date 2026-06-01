@@ -55,26 +55,69 @@ inline ::ui::BackgroundImage sprite(std::uint8_t bank,
 	};
 }
 
+inline ::ui::Border transparent_border() {
+	return ::ui::Border{};
+}
+
+inline ::ui::StylePatch transparent_control_patch() {
+	return ::ui::patch()
+		.background(::ui::Color{0, 0, 0, 0})
+		.corner_radius(0.0f)
+		.border(transparent_border())
+		.outline(::ui::Outline{});
+}
+
+inline ::ui::TextVisual sprite_text(AppButtonSize size) {
+	if(size == AppButtonSize::MainMenu){
+		return ::ui::TextVisual{
+			.color = {0, 128, 0, 255},
+			.font_id = 135,
+			.font_size = 11,
+			.align = ::ui::TextAlign::Center,
+		};
+	}
+	return ::ui::TextVisual{
+		.color = {0, 128, 0, 255},
+		.font_id = 134,
+		.font_size = 8,
+		.align = ::ui::TextAlign::Center,
+	};
+}
+
 inline ::ui::StylePatch sprite_patch(std::uint8_t bank,
                                      std::uint16_t index,
+                                     AppButtonSize size,
                                      ::ui::SideWidths nine_slice = {}) {
-	return ::ui::patch()
-		.image(sprite(bank, index, nine_slice))
-		.text(tokens::font_text(tokens::kTextButton,
-		                        tokens::kFontBodyBank,
-		                        tokens::kFontBodyAdvance));
+	::ui::StylePatch patch = transparent_control_patch();
+	patch.image = ::ui::opt(sprite(bank, index, nine_slice));
+	patch.text = ::ui::opt(sprite_text(size));
+	return patch;
+}
+
+inline ::ui::StyleStatePatch sprite_state_patch(std::uint8_t bank,
+                                                std::uint16_t index,
+                                                AppButtonSize size,
+                                                ::ui::SideWidths nine_slice = {}) {
+	::ui::StyleStatePatch patch{};
+	patch.base = sprite_patch(bank, index, size, nine_slice);
+	patch.hover = transparent_control_patch();
+	patch.focus_visible = transparent_control_patch();
+	patch.pressed = transparent_control_patch();
+	patch.disabled = transparent_control_patch();
+	return patch;
 }
 
 inline ::ui::StyleStatePatch variant_patch(AppButtonVariant variant,
                                            AppButtonSize size) {
 	if(size == AppButtonSize::MainMenu){
 		(void)variant;
-		return sprite_patch(6, 7);
+		return sprite_state_patch(6, 7, size);
 	}
 	if(variant == AppButtonVariant::Secondary){
-		return sprite_patch(
+		return sprite_state_patch(
 			7,
 			24,
+			size,
 			::ui::SideWidths{4.0f, 12.0f, 4.0f, 12.0f});
 	}
 
