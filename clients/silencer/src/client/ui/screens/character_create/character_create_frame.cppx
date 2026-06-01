@@ -308,8 +308,15 @@ alias_text_submit_callback(std::function<void(const char *)> on_submit) {
 }
 
 inline ::ui::HostCallbacks
-row_button_callbacks(std::function<void()> on_press) {
+row_button_callbacks(std::function<void()> on_press,
+                     std::function<void()> on_focus) {
 	::ui::HostCallbacks callbacks{};
+	if(on_focus){
+		callbacks.on_focus =
+			[on_focus](const ::ui::FocusEvent&) {
+				on_focus();
+			};
+	}
 	if(on_press){
 		callbacks.on_activate =
 			[on_press](const ::ui::ActivationEvent&) {
@@ -320,10 +327,10 @@ row_button_callbacks(std::function<void()> on_press) {
 }
 
 inline std::function<void()>
-indexed_press_callback(std::function<void(int)> on_press, int index) {
-	if(!on_press) return {};
-	return [on_press, index]() {
-		on_press(index);
+indexed_callback(std::function<void(int)> callback, int index) {
+	if(!callback) return {};
+	return [callback, index]() {
+		callback(index);
 	};
 }
 
@@ -353,10 +360,13 @@ indexed_press_callback(std::function<void(int)> on_press, int index) {
 		bool enabled = true;
 		bool selected = false;
 		bool selected_visual = false;
+		std::function<void()> on_focus = {};
 		std::function<void()> on_press = {};
 	};
 
 	::ui::UiElement RowButton(const RowButtonProps& props) {
+		std::function<void()> onFocus =
+			props.enabled ? props.on_focus : std::function<void()>{};
 		std::function<void()> onPress =
 			props.enabled ? props.on_press : std::function<void()>{};
 		return <detail.Host
@@ -377,7 +387,7 @@ indexed_press_callback(std::function<void(int)> on_press, int index) {
 				.disabled = !props.enabled,
 				.checked = props.selected,
 			}}
-		  callbacks={row_button_callbacks(onPress)}
+		  callbacks={row_button_callbacks(onPress, onFocus)}
 		  accessibility={{.role = ::ui::SemanticRole::Button, .label = props.label ? props.label : ""}}
 		>
 			<LabelText
@@ -418,6 +428,7 @@ indexed_press_callback(std::function<void(int)> on_press, int index) {
 		int preview_agent = -1;
 		bool selecting_agent = false;
 		int visible_row = 0;
+		std::function<void(int)> focus_agent = {};
 		std::function<void(int)> activate_agent = {};
 	};
 
@@ -438,7 +449,8 @@ indexed_press_callback(std::function<void(int)> on_press, int index) {
 		  enabled={props.selecting_agent}
 		  selected={selected}
 		  selectedVisual={selectedVisual}
-		  onPress={indexed_press_callback(props.activate_agent, source)}
+		  onFocus={indexed_callback(props.focus_agent, source)}
+		  onPress={indexed_callback(props.activate_agent, source)}
 		/>
 	}
 
@@ -450,6 +462,7 @@ indexed_press_callback(std::function<void(int)> on_press, int index) {
 		int selected_agent = 0;
 		int preview_agent = -1;
 		bool selecting_agent = false;
+		std::function<void(int)> focus_agent = {};
 		std::function<void(int)> activate_agent = {};
 	};
 
@@ -488,6 +501,7 @@ indexed_press_callback(std::function<void(int)> on_press, int index) {
 				  previewAgent={props.preview_agent}
 				  selectingAgent={props.selecting_agent}
 				  visibleRow={0}
+				  focusAgent={props.focus_agent}
 				  activateAgent={props.activate_agent}
 				/>
 				<AgentRow
@@ -499,6 +513,7 @@ indexed_press_callback(std::function<void(int)> on_press, int index) {
 				  previewAgent={props.preview_agent}
 				  selectingAgent={props.selecting_agent}
 				  visibleRow={1}
+				  focusAgent={props.focus_agent}
 				  activateAgent={props.activate_agent}
 				/>
 				<AgentRow
@@ -510,6 +525,7 @@ indexed_press_callback(std::function<void(int)> on_press, int index) {
 				  previewAgent={props.preview_agent}
 				  selectingAgent={props.selecting_agent}
 				  visibleRow={2}
+				  focusAgent={props.focus_agent}
 				  activateAgent={props.activate_agent}
 				/>
 				<AgentRow
@@ -521,6 +537,7 @@ indexed_press_callback(std::function<void(int)> on_press, int index) {
 				  previewAgent={props.preview_agent}
 				  selectingAgent={props.selecting_agent}
 				  visibleRow={3}
+				  focusAgent={props.focus_agent}
 				  activateAgent={props.activate_agent}
 				/>
 				<AgentRow
@@ -532,6 +549,7 @@ indexed_press_callback(std::function<void(int)> on_press, int index) {
 				  previewAgent={props.preview_agent}
 				  selectingAgent={props.selecting_agent}
 				  visibleRow={4}
+				  focusAgent={props.focus_agent}
 				  activateAgent={props.activate_agent}
 				/>
 				<AgentRow
@@ -543,6 +561,7 @@ indexed_press_callback(std::function<void(int)> on_press, int index) {
 				  previewAgent={props.preview_agent}
 				  selectingAgent={props.selecting_agent}
 				  visibleRow={5}
+				  focusAgent={props.focus_agent}
 				  activateAgent={props.activate_agent}
 				/>
 				<AgentRow
@@ -554,6 +573,7 @@ indexed_press_callback(std::function<void(int)> on_press, int index) {
 				  previewAgent={props.preview_agent}
 				  selectingAgent={props.selecting_agent}
 				  visibleRow={6}
+				  focusAgent={props.focus_agent}
 				  activateAgent={props.activate_agent}
 				/>
 				<AgentRow
@@ -565,6 +585,7 @@ indexed_press_callback(std::function<void(int)> on_press, int index) {
 				  previewAgent={props.preview_agent}
 				  selectingAgent={props.selecting_agent}
 				  visibleRow={7}
+				  focusAgent={props.focus_agent}
 				  activateAgent={props.activate_agent}
 				/>
 			</Box>
@@ -577,6 +598,7 @@ indexed_press_callback(std::function<void(int)> on_press, int index) {
 		int selected_agency = 0;
 		int preview_agency = -1;
 		bool waiting_for_create = false;
+		std::function<void(int)> focus_agency = {};
 		std::function<void(int)> activate_agency = {};
 	};
 
@@ -590,7 +612,8 @@ indexed_press_callback(std::function<void(int)> on_press, int index) {
 		  enabled={!props.waiting_for_create}
 		  selected={selected}
 		  selectedVisual={selectedVisual}
-		  onPress={indexed_press_callback(props.activate_agency, props.agency)}
+		  onFocus={indexed_callback(props.focus_agency, props.agency)}
+		  onPress={indexed_callback(props.activate_agency, props.agency)}
 		/>
 	}
 
@@ -599,6 +622,7 @@ indexed_press_callback(std::function<void(int)> on_press, int index) {
 		int selected_agency = 0;
 		int preview_agency = -1;
 		bool waiting_for_create = false;
+		std::function<void(int)> focus_agency = {};
 		std::function<void(int)> activate_agency = {};
 	};
 
@@ -633,6 +657,7 @@ indexed_press_callback(std::function<void(int)> on_press, int index) {
 				  selectedAgency={props.selected_agency}
 				  previewAgency={props.preview_agency}
 				  waitingForCreate={props.waiting_for_create}
+				  focusAgency={props.focus_agency}
 				  activateAgency={props.activate_agency}
 				/>
 				<AgencyRow
@@ -641,6 +666,7 @@ indexed_press_callback(std::function<void(int)> on_press, int index) {
 				  selectedAgency={props.selected_agency}
 				  previewAgency={props.preview_agency}
 				  waitingForCreate={props.waiting_for_create}
+				  focusAgency={props.focus_agency}
 				  activateAgency={props.activate_agency}
 				/>
 				<AgencyRow
@@ -649,6 +675,7 @@ indexed_press_callback(std::function<void(int)> on_press, int index) {
 				  selectedAgency={props.selected_agency}
 				  previewAgency={props.preview_agency}
 				  waitingForCreate={props.waiting_for_create}
+				  focusAgency={props.focus_agency}
 				  activateAgency={props.activate_agency}
 				/>
 				<AgencyRow
@@ -657,6 +684,7 @@ indexed_press_callback(std::function<void(int)> on_press, int index) {
 				  selectedAgency={props.selected_agency}
 				  previewAgency={props.preview_agency}
 				  waitingForCreate={props.waiting_for_create}
+				  focusAgency={props.focus_agency}
 				  activateAgency={props.activate_agency}
 				/>
 				<AgencyRow
@@ -665,6 +693,7 @@ indexed_press_callback(std::function<void(int)> on_press, int index) {
 				  selectedAgency={props.selected_agency}
 				  previewAgency={props.preview_agency}
 				  waitingForCreate={props.waiting_for_create}
+				  focusAgency={props.focus_agency}
 				  activateAgency={props.activate_agency}
 				/>
 			</Box>
@@ -718,7 +747,7 @@ indexed_press_callback(std::function<void(int)> on_press, int index) {
 		  enabled={true}
 		  selected={false}
 		  selectedVisual={false}
-		  onPress={indexed_press_callback(props.rename_agent, props.detail_agent)}
+		  onPress={indexed_callback(props.rename_agent, props.detail_agent)}
 		/>
 	}
 
@@ -926,12 +955,14 @@ indexed_press_callback(std::function<void(int)> on_press, int index) {
 		const char * alias = nullptr;
 		std::function<void(const char *)> set_alias = {};
 		std::function<void(const char *)> submit_alias = {};
+		std::function<void(int)> focus_agent = {};
 		std::function<void(int)> activate_agent = {};
 		std::function<void(int)> rename_agent = {};
 		bool alias_renaming = false;
 		bool waiting_for_create = false;
 		int selected_agency = 0;
 		int preview_agency = -1;
+		std::function<void(int)> focus_agency = {};
 		std::function<void(int)> activate_agency = {};
 		const std::uint8_t * agency_ids = nullptr;
 	};
@@ -957,6 +988,7 @@ indexed_press_callback(std::function<void(int)> on_press, int index) {
 				  selectedAgency={selectedAgency}
 				  previewAgency={props.preview_agency}
 				  waitingForCreate={props.waiting_for_create}
+				  focusAgency={props.focus_agency}
 				  activateAgency={props.activate_agency}
 				/>
 				<AgencyDetails key="agency-info" detailAgency={detailAgency} />
@@ -979,6 +1011,7 @@ indexed_press_callback(std::function<void(int)> on_press, int index) {
 			  selectedAgent={props.selected_agent}
 			  previewAgent={props.preview_agent}
 			  selectingAgent={props.step == CharacterCreateFrameStep::SelectAgent}
+			  focusAgent={props.focus_agent}
 			  activateAgent={props.activate_agent}
 			/>
 			<AgentDetails
@@ -1059,12 +1092,14 @@ using character_create_frame_detail::BodyProps;
 					  alias={props.alias}
 					  setAlias={props.set_alias}
 					  submitAlias={props.submit_alias}
+					  focusAgent={props.focus_agent}
 					  activateAgent={props.activate_agent}
 					  renameAgent={props.rename_agent}
 					  aliasRenaming={props.alias_renaming}
 					  waitingForCreate={props.waiting_for_create}
 					  selectedAgency={props.selected_agency}
 					  previewAgency={props.preview_agency}
+					  focusAgency={props.focus_agency}
 					  activateAgency={props.activate_agency}
 					  agencyIds={props.agency_ids}
 					/>

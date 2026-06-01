@@ -133,6 +133,7 @@ bool RetainedFrame::Build(BuildRoot buildRoot,
 bool RetainedFrame::HandleUiIntent(
 	const silencer::ui::UiAction& action) const {
 	if(action.kind != silencer::ui::UiActionKind::Activate &&
+	   action.kind != silencer::ui::UiActionKind::Navigate &&
 	   action.kind != silencer::ui::UiActionKind::Select &&
 	   action.kind != silencer::ui::UiActionKind::SetText &&
 	   action.kind != silencer::ui::UiActionKind::SubmitText &&
@@ -167,6 +168,10 @@ bool RetainedFrame::InvokeActionForNode(
 			}
 		}else if(action.kind == silencer::ui::UiActionKind::SubmitText){
 			if(tree_.invoke_text_submit(node.id, action.value.c_str())){
+				return true;
+			}
+		}else if(action.kind == silencer::ui::UiActionKind::Navigate){
+			if(tree_.invoke_focus(node.id)){
 				return true;
 			}
 		}else if(tree_.invoke_activate(node.id)){

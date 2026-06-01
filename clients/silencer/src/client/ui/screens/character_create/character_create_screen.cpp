@@ -10,30 +10,12 @@
 #include "renderer.h"
 
 #include <algorithm>
-#include <cstdlib>
 #include <cstring>
 #include <memory>
-#include <string>
 
 namespace {
 
 constexpr int kMaxRows = 32;
-constexpr const char * kActionAgentPrefix = "character_create.agent";
-constexpr const char * kActionAgencyPrefix = "character_create.agency";
-
-bool StartsWith(const std::string& value, const char * prefix)
-{
-	const size_t n = std::strlen(prefix);
-	return value.size() >= n && value.compare(0, n, prefix) == 0;
-}
-
-int SuffixInt(const std::string& value, const char * prefix)
-{
-	if(!StartsWith(value, prefix)) return -1;
-	const char * suffix = value.c_str() + std::strlen(prefix);
-	if(*suffix == '.') ++suffix;
-	return std::atoi(suffix);
-}
 
 int CreateRowIndex(size_t characterCount)
 {
@@ -155,9 +137,6 @@ bool CharacterCreateScreen::HandleBack(ScreenContext & ctx)
 bool CharacterCreateScreen::HandleUiIntent(ScreenContext & ctx,
                                            const silencer::ui::UiAction & action)
 {
-	silencer::client_ui::LobbyModel lobby =
-		silencer::client_ui::use_lobby(
-			silencer::client_ui::MakeLobbyProvider(ctx));
 	if(action.kind == silencer::ui::UiActionKind::Cancel){
 		return HandleBack(ctx);
 	}
@@ -167,33 +146,6 @@ bool CharacterCreateScreen::HandleUiIntent(ScreenContext & ctx,
 			return true;
 		}
 		return false;
-	}
-	if(action.kind == silencer::ui::UiActionKind::Navigate){
-		int agentIndex = SuffixInt(action.id, kActionAgentPrefix);
-		if(step == Step::SelectAgent && agentIndex >= 0){
-			previewAgentIndex = agentIndex;
-			return true;
-		}
-		int agencyIndex = SuffixInt(action.id, kActionAgencyPrefix);
-		if(step == Step::SelectAgency && agencyIndex >= 0 && agencyIndex < 5){
-			previewAgencyIndex = agencyIndex;
-			return true;
-		}
-	}
-	if(action.kind == silencer::ui::UiActionKind::Select){
-		int agentIndex = SuffixInt(action.id, kActionAgentPrefix);
-		if(step == Step::SelectAgent && agentIndex >= 0){
-			selectedAgentIndex = agentIndex;
-			previewAgentIndex = agentIndex;
-			return true;
-		}
-		int agencyIndex = SuffixInt(action.id, kActionAgencyPrefix);
-		if(step == Step::SelectAgency && agencyIndex >= 0 && agencyIndex < 5){
-			if(waitingForCreate) return true;
-			selectedAgency = lobby.character.agency_for_index(agencyIndex);
-			previewAgencyIndex = agencyIndex;
-			return true;
-		}
 	}
 	return retainedFrame_.HandleUiIntent(action);
 }

@@ -76,6 +76,9 @@ void CharacterCreateScreen::BuildUi(ScreenContext & ctx,
 				AdvanceAliasStep();
 			}
 		},
+		.focus_agent = [this](int agentIndex) {
+			previewAgentIndex = agentIndex;
+		},
 		.activate_agent = [this, lobby, navigation](int agentIndex) {
 			selectedAgentIndex = agentIndex;
 			previewAgentIndex = agentIndex;
@@ -88,6 +91,9 @@ void CharacterCreateScreen::BuildUi(ScreenContext & ctx,
 		.waiting_for_create = waitingForCreate,
 		.selected_agency = selectedAgency,
 		.preview_agency = previewAgencyIndex,
+		.focus_agency = [this](int agencyIndex) {
+			previewAgencyIndex = agencyIndex;
+		},
 		.activate_agency = [this, lobby, navigation](int agencyIndex) {
 			if(waitingForCreate) return;
 			if(agencyIndex < 0 || agencyIndex >= 5) return;
