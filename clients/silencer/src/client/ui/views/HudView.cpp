@@ -78,19 +78,19 @@ int SpriteOffsetY(const ::Resources& res, Uint8 bank, Uint16 index) {
 }
 
 int SpriteX(const ::Resources& res, Uint8 bank, Uint16 index, int logicalX = 0) {
-	return logicalX + SpriteOffsetX(res, bank, index);
-}
-
-int SpriteY(const ::Resources& res, Uint8 bank, Uint16 index, int logicalY = 0) {
-	return logicalY + SpriteOffsetY(res, bank, index);
-}
-
-int HudStripSpriteX(const ::Resources& res, Uint8 bank, Uint16 index, int logicalX = 0) {
 	return logicalX - SpriteOffsetX(res, bank, index);
 }
 
-int HudStripSpriteY(const ::Resources& res, Uint8 bank, Uint16 index, int logicalY = 0) {
+int SpriteY(const ::Resources& res, Uint8 bank, Uint16 index, int logicalY = 0) {
 	return logicalY - SpriteOffsetY(res, bank, index);
+}
+
+int HudStripSpriteX(const ::Resources& res, Uint8 bank, Uint16 index, int logicalX = 0) {
+	return SpriteX(res, bank, index, logicalX);
+}
+
+int HudStripSpriteY(const ::Resources& res, Uint8 bank, Uint16 index, int logicalY = 0) {
+	return SpriteY(res, bank, index, logicalY);
 }
 
 int HudStripSpriteWidth(const ::Resources& res, Uint8 bank, Uint16 index) {

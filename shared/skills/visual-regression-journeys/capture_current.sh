@@ -27,6 +27,12 @@ snap() {
   echo "  captured $name"
 }
 
+snap_now() {
+  local name="$1"
+  cli --port "$PORT" screenshot --out "$OUT_DIR/${name}.png" >/dev/null
+  echo "  captured $name"
+}
+
 snap_port() {
   local port="$1"
   local name="$2"
@@ -270,6 +276,14 @@ cli --port "$PORT" wait_for_ui --id options.controls --timeout-ms 5000 >/dev/nul
 go_back
 cli --port "$PORT" wait_for_ui --id main_menu.options --timeout-ms 5000 >/dev/null
 
+stop_silencer "$PID" "$PORT"
+trap - EXIT
+
+PORT="$(pick_port)"
+PID="$(start_silencer "$PORT")"
+trap 'stop_silencer "$PID" "$PORT"' EXIT
+wait_alive "$PORT"
+cli --port "$PORT" wait_for_ui --id main_menu.options --timeout-ms 15000 >/dev/null
 resize 640 480
 
 # --- Phase 3: in-game via Tutorial ---
@@ -296,26 +310,66 @@ cli --port "$PORT" ingame_ui_mode --mode clear >/dev/null
 cli --port "$PORT" wait_frames --n 3 >/dev/null
 snap "20_ingame_hud_640x480"
 
+stop_silencer "$PID" "$PORT"
+trap - EXIT
+
+PORT="$(pick_port)"
+PID="$(start_silencer "$PORT")"
+trap 'stop_silencer "$PID" "$PORT"' EXIT
+wait_alive "$PORT"
+cli --port "$PORT" wait_for_ui --id main_menu.options --timeout-ms 15000 >/dev/null
+resize 640 480
+cli --port "$PORT" click --label Tutorial >/dev/null
+cli --port "$PORT" wait_for_state --state SINGLEPLAYERGAME --timeout-ms 20000 >/dev/null
+for _ in $(seq 1 60); do
+  if cli --port "$PORT" world_state 2>/dev/null | bun -e '
+    const text = await new Response(Bun.stdin.stream()).text();
+    const response = JSON.parse(text);
+    const state = response.result ?? response;
+    if ((state.objects_count ?? 0) > 0 && (state.players?.length ?? 0) > 0) process.exit(0);
+    process.exit(1);
+  ' 2>/dev/null; then
+    break
+  fi
+  cli --port "$PORT" wait_ms --n 500 >/dev/null
+done
+
 cli --port "$PORT" ingame_ui_mode --mode playerlist >/dev/null
-cli --port "$PORT" wait_frames --n 3 >/dev/null
-snap "21_ingame_playerlist_640x480"
+snap_now "21_ingame_playerlist_640x480"
 
 cli --port "$PORT" ingame_ui_mode --mode buy >/dev/null
-cli --port "$PORT" wait_frames --n 3 >/dev/null
-snap "22_ingame_buy_640x480"
-
-cli --port "$PORT" ingame_ui_mode --mode tech >/dev/null
-cli --port "$PORT" wait_frames --n 3 >/dev/null
-snap "23_ingame_tech_640x480"
+snap_now "22_ingame_buy_640x480"
 
 cli --port "$PORT" ingame_ui_mode --mode chat >/dev/null
-cli --port "$PORT" wait_frames --n 3 >/dev/null
-snap "24_ingame_chat_640x480"
+snap_now "24_ingame_chat_640x480"
+
+cli --port "$PORT" ingame_ui_mode --mode tech >/dev/null
+snap_now "23_ingame_tech_640x480"
 
 # 1280x720 in-game reflow
-cli --port "$PORT" ingame_ui_mode --mode clear >/dev/null
+stop_silencer "$PID" "$PORT"
+trap - EXIT
+
+PORT="$(pick_port)"
+PID="$(start_silencer "$PORT")"
+trap 'stop_silencer "$PID" "$PORT"' EXIT
+wait_alive "$PORT"
+cli --port "$PORT" wait_for_ui --id main_menu.options --timeout-ms 15000 >/dev/null
 resize 1280 720
-cli --port "$PORT" wait_frames --n 3 >/dev/null
+cli --port "$PORT" click --label Tutorial >/dev/null
+cli --port "$PORT" wait_for_state --state SINGLEPLAYERGAME --timeout-ms 20000 >/dev/null
+for _ in $(seq 1 60); do
+  if cli --port "$PORT" world_state 2>/dev/null | bun -e '
+    const text = await new Response(Bun.stdin.stream()).text();
+    const response = JSON.parse(text);
+    const state = response.result ?? response;
+    if ((state.objects_count ?? 0) > 0 && (state.players?.length ?? 0) > 0) process.exit(0);
+    process.exit(1);
+  ' 2>/dev/null; then
+    break
+  fi
+  cli --port "$PORT" wait_frames --n 2 >/dev/null
+done
 snap "25_ingame_hud_1280x720"
 
 stop_silencer "$PID" "$PORT"
