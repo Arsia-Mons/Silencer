@@ -19,8 +19,6 @@ namespace {
 constexpr int kMaxRows = 32;
 constexpr const char * kActionAgentPrefix = "character_create.agent";
 constexpr const char * kActionAgencyPrefix = "character_create.agency";
-constexpr const char * kActionRenamePrefix = "character_create.rename";
-constexpr const char * kActionCreate = "character_create.create";
 constexpr const char * kActionAlias = "character_create.alias";
 
 bool StartsWith(const std::string& value, const char * prefix)
@@ -326,38 +324,6 @@ bool CharacterCreateScreen::HandleUiIntent(ScreenContext & ctx,
 		}else{
 			AdvanceAliasStep(ctx);
 		}
-		return true;
-	}
-	if(action.kind != silencer::ui::UiActionKind::Activate){
-		return false;
-	}
-	int agentIndex = SuffixInt(action.id, kActionAgentPrefix);
-	if(step == Step::SelectAgent && agentIndex >= 0){
-		selectedAgentIndex = agentIndex;
-		previewAgentIndex = agentIndex;
-		SelectCurrentAgent(ctx);
-		return true;
-	}
-	int renameIndex = SuffixInt(action.id, kActionRenamePrefix);
-	if(step == Step::SelectAgent && renameIndex >= 0){
-		StartRenameAgent(ctx, renameIndex);
-		return true;
-	}
-	int agencyIndex = SuffixInt(action.id, kActionAgencyPrefix);
-	if(step == Step::SelectAgency && agencyIndex >= 0){
-		if(waitingForCreate) return true;
-		if(agencyIndex < 5){
-			selectedAgency = AgencyForIndex(agencyIndex);
-			previewAgencyIndex = agencyIndex;
-			if(alias[0] != '\0'){
-				CreateCurrentAgent(ctx);
-			}
-		}
-		return true;
-	}
-	if(step == Step::SelectAgency && action.id == kActionCreate){
-		if(waitingForCreate) return true;
-		CreateCurrentAgent(ctx);
 		return true;
 	}
 	return false;
