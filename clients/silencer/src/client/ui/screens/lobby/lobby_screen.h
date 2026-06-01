@@ -46,7 +46,6 @@ private:
 	// Version is cached once at Build; mapName is updated by SetMapNameOverlay.
 	std::string version;
 	std::string mapName;
-	bool goBackClicked = false;
 	bool disconnectMessageOpen = false;
 
 	// CharacterPanel state. The lobby provider persists agency selection.

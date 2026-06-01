@@ -230,7 +230,6 @@ void LobbyScreen::Build(ScreenContext & ctx)
 	version += silencer::client_ui::use_app(
 		silencer::client_ui::MakeAppProvider(ctx)).version();
 	mapName.clear();
-	goBackClicked = false;
 	disconnectMessageOpen = false;
 
 	silencer::client_ui::LobbyModel lobby =
@@ -427,6 +426,8 @@ void LobbyScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime, s
 	const silencer::client_ui::AppModel app =
 		silencer::client_ui::use_app(
 			silencer::client_ui::MakeAppProvider(ctx));
+	silencer::client_ui::Navigation navigation =
+		silencer::client_ui::use_navigation();
 
 	silencer::client_ui::lobby::LobbyChromeFrameProps chromeProps{
 		.key = "lobby-chrome",
@@ -439,6 +440,9 @@ void LobbyScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime, s
 		.height = titleBarH,
 		.pad_x = titlePadX,
 		.row_gap = titleRowGap,
+		.go_back = [navigation]() {
+			navigation.reset_to(std::make_unique<MainMenuScreen>());
+		},
 		.show_body_chrome = bodyW > 0 && bodyH > 0,
 		.right_upper_x = rightUpperX,
 		.right_upper_y = bodyY,
@@ -584,8 +588,6 @@ void LobbyScreen::SetMapNameOverlay(const char * name)
 
 namespace lobby_screen_flow_detail {
 
-constexpr const char * kActionGoBack = "lobby.go_back";
-
 MessageModal * ProgressModal(silencer::client_ui::lobby::GameCreatePanelState & state)
 {
 	return state.progressModal;
@@ -610,15 +612,6 @@ void LobbyScreen::Tick(ScreenContext & ctx)
 	if(lobby.session.disconnect_lobby_if_needed()){
 		silencer::client_ui::use_navigation()
 			.reset_to(std::make_unique<LobbyConnectScreen>());
-		return;
-	}
-
-	// Chrome Go Back -- flag was set by a typed button intent on the previous
-	// frame. Consume it before pumping anything else.
-	if(goBackClicked){
-		goBackClicked = false;
-		silencer::client_ui::use_navigation()
-			.reset_to(std::make_unique<MainMenuScreen>());
 		return;
 	}
 
@@ -718,14 +711,11 @@ bool LobbyScreen::HandleUiIntent(ScreenContext & ctx, const silencer::ui::UiActi
 {
 	if(action.kind == silencer::ui::UiActionKind::Cancel){
 		if(HandleBack(ctx)) return true;
-		goBackClicked = true;
+		silencer::client_ui::use_navigation()
+			.reset_to(std::make_unique<MainMenuScreen>());
 		return true;
 	}
-	if(action.kind == silencer::ui::UiActionKind::Activate &&
-	   action.id == lobby_screen_flow_detail::kActionGoBack){
-		goBackClicked = true;
-		return true;
-	}
+	if(chromeFrame_.HandleUiIntent(action)) return true;
 	silencer::client_ui::LobbyModel lobby =
 		silencer::client_ui::use_lobby(
 			silencer::client_ui::MakeLobbyProvider(ctx, this));

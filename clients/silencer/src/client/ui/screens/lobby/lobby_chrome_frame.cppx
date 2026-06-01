@@ -4033,6 +4033,12 @@ using ::ui::components::Text;
 using ::ui::components::TextProps;
 
 ::ui::UiElement LobbyChromeFrame(const LobbyChromeFrameProps& props) {
+	std::function<void(const ::ui::ActivationEvent&)> goBack = {};
+	if(props.go_back){
+		goBack = [go_back = props.go_back](const ::ui::ActivationEvent&) {
+			go_back();
+		};
+	}
 	return <Box
 	  key={props.key}
 	  layout={::ui::LayoutStyle{
@@ -4081,6 +4087,7 @@ using ::ui::components::TextProps;
 			  id="lobby.go_back"
 			  label="Go Back"
 			  accessibility={{.label = "Go Back"}}
+			  onActivate={goBack}
 			  layout={::ui::LayoutStyle{
 					.align_items = ::ui::AlignItems::Center,
 					.justify_content = ::ui::JustifyContent::Center,

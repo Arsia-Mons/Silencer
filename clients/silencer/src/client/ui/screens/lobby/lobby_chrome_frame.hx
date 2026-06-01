@@ -3,6 +3,7 @@
 #include "ui/runtime/element.h"
 
 #include <cstdint>
+#include <functional>
 
 namespace silencer {
 namespace client_ui {
@@ -28,6 +29,7 @@ struct LobbyChromeFrameProps {
 	int height = 0;
 	int pad_x = 0;
 	int row_gap = 0;
+	std::function<void()> go_back = {};
 	bool show_body_chrome = false;
 	int right_upper_x = 0;
 	int right_upper_y = 0;
