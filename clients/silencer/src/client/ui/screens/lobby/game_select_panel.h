@@ -55,7 +55,12 @@ void GameSelectPanelTick(GameSelectPanelState & state,
 
 void GameSelectPanelSelect(GameSelectPanelState & state,
                            int index);
-Uint32 GameSelectPanelSelectedGameId(const GameSelectPanelState & state);
+bool GameSelectPanelCanJoin(const GameSelectPanelState & state);
+bool GameSelectPanelCanSpectate(const GameSelectPanelState & state);
+void GameSelectPanelJoin(const GameSelectPanelState & state,
+                         const LobbyModel & lobby);
+void GameSelectPanelSpectate(const GameSelectPanelState & state,
+                             const LobbyModel & lobby);
 
 }  // namespace silencer::client_ui::lobby
 

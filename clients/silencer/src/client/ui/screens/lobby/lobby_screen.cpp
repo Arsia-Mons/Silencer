@@ -484,9 +484,9 @@ void LobbyScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime, s
 			ShowGameCreate(lobby);
 		},
 		.show_game_select_spectate =
-			showGameSelectActions && gameSelectState.spectateVisible,
+			showGameSelectActions && GameSelectPanelCanSpectate(gameSelectState),
 		.show_game_select_join =
-			showGameSelectActions && gameSelectState.joinVisible,
+			showGameSelectActions && GameSelectPanelCanJoin(gameSelectState),
 		.game_select_spectate_x = actionButtonX,
 		.game_select_spectate_y = spectateButtonY,
 		.game_select_join_x = actionButtonX,
@@ -494,12 +494,10 @@ void LobbyScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime, s
 		.game_select_action_width = lobby_screen_detail::kGameSelectActionButtonW,
 		.game_select_action_height = lobby_screen_detail::kGameSelectActionButtonH,
 		.game_select_spectate = [this, lobby]() {
-			lobby.browser.spectate(
-				GameSelectPanelSelectedGameId(gameSelectState));
+			GameSelectPanelSpectate(gameSelectState, lobby);
 		},
 		.game_select_join = [this, lobby]() {
-			lobby.browser.join(
-				GameSelectPanelSelectedGameId(gameSelectState));
+			GameSelectPanelJoin(gameSelectState, lobby);
 		},
 		.show_game_select_tall = isGameSelectPane,
 		.game_select_tall_x = rightTallX,
@@ -644,22 +642,6 @@ void LobbyScreen::SetMapNameOverlay(const char * name)
 	mapName = name ? std::string(name).substr(0, 25) : std::string();
 }
 
-namespace lobby_screen_flow_detail {
-
-MessageModal * ProgressModal(silencer::client_ui::lobby::GameCreatePanelState & state)
-{
-	return state.progressModal;
-}
-
-void DismissProgressModal(silencer::client_ui::lobby::GameCreatePanelState & state)
-{
-	if(!state.progressModal) return;
-	silencer::client_ui::use_navigation().pop_top();
-	state.progressModal = nullptr;
-}
-
-}  // namespace lobby_screen_flow_detail
-
 void LobbyScreen::Tick(ScreenContext & ctx)
 {
 	silencer::client_ui::LobbyModel lobby =
@@ -698,7 +680,7 @@ void LobbyScreen::Tick(ScreenContext & ctx)
 	}
 
 	MessageModal * progress =
-		lobby_screen_flow_detail::ProgressModal(gameCreateState);
+		silencer::client_ui::lobby::GameCreatePanelProgressModal(gameCreateState);
 	const silencer::client_ui::LobbySessionPumpResult session =
 		lobby.session.pump(isGameJoinPane || isGameTechPane, progress != nullptr);
 	if(session.lobby_disconnected){
@@ -710,7 +692,8 @@ void LobbyScreen::Tick(ScreenContext & ctx)
 		progress->SetText(session.progress_text);
 	}
 	if(session.dismiss_progress){
-		lobby_screen_flow_detail::DismissProgressModal(gameCreateState);
+		silencer::client_ui::lobby::GameCreatePanelDismissProgressModal(
+			gameCreateState);
 	}
 	if(!session.message.empty()){
 		lobby.modal.show_message(session.message.c_str());

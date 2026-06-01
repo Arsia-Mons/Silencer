@@ -26,7 +26,11 @@ void CopyUiText(char * dst, int dstLen, const char * value)
 
 }  // namespace game_create_panel_detail
 
-static void DismissProgressModal(GameCreatePanelState & state) {
+MessageModal * GameCreatePanelProgressModal(GameCreatePanelState & state) {
+	return state.progressModal;
+}
+
+void GameCreatePanelDismissProgressModal(GameCreatePanelState & state) {
 	if(!state.progressModal) return;
 	silencer::client_ui::use_navigation().pop_top();
 	state.progressModal = nullptr;
@@ -128,7 +132,7 @@ void GameCreatePanelTick(GameCreatePanelState & state,
                          LobbyModel & lobby) {
 	const LobbyCreateModel::PumpResult pump = lobby.create.pump();
 	if(pump.dismiss_progress){
-		DismissProgressModal(state);
+		GameCreatePanelDismissProgressModal(state);
 		if(!pump.message.empty()){
 			lobby.modal.show_message(pump.message.c_str());
 		}

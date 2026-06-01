@@ -131,6 +131,8 @@ void GameCreatePanelSelectMap(GameCreatePanelState & state,
                               int index);
 void GameCreatePanelSubmit(GameCreatePanelState & state,
                            const LobbyModel & lobby);
+MessageModal * GameCreatePanelProgressModal(GameCreatePanelState & state);
+void GameCreatePanelDismissProgressModal(GameCreatePanelState & state);
 void GameCreatePanelSetText(GameCreatePanelState & state,
                             GameCreatePanelTextField field,
                             const char * value);

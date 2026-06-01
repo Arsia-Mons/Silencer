@@ -104,8 +104,22 @@ void GameSelectPanelSelect(GameSelectPanelState & state,
 	state.selectedIndex = index;
 }
 
-Uint32 GameSelectPanelSelectedGameId(const GameSelectPanelState & state) {
-	return game_select_panel_detail::SelectedGameId(state);
+bool GameSelectPanelCanJoin(const GameSelectPanelState & state) {
+	return state.joinVisible;
+}
+
+bool GameSelectPanelCanSpectate(const GameSelectPanelState & state) {
+	return state.spectateVisible;
+}
+
+void GameSelectPanelJoin(const GameSelectPanelState & state,
+                         const LobbyModel & lobby) {
+	lobby.browser.join(game_select_panel_detail::SelectedGameId(state));
+}
+
+void GameSelectPanelSpectate(const GameSelectPanelState & state,
+                             const LobbyModel & lobby) {
+	lobby.browser.spectate(game_select_panel_detail::SelectedGameId(state));
 }
 
 }  // namespace silencer::client_ui::lobby

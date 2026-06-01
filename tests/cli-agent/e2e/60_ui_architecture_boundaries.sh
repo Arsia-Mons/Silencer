@@ -402,6 +402,11 @@ fail_if_match \
   "$REPO_ROOT/clients/silencer/src/client/ui/screens/lobby/lobby_screen.h"
 
 fail_if_match \
+  "gameSelectState[.](joinVisible|spectateVisible)|GameSelectPanelSelectedGameId|gameCreateState[.]progressModal" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens/lobby/lobby_screen.cpp" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens/lobby/lobby_screen.h"
+
+fail_if_match \
   "MakeLobbyProvider[[:space:]]*[(][^)]*,|LobbyScreen[[:space:]]*[*][[:space:]]*screen" \
   "$REPO_ROOT/clients/silencer/src/client/ui/providers/lobby_provider.h" \
   "$REPO_ROOT/clients/silencer/src/client/ui/providers/lobby_provider.cpp" \
