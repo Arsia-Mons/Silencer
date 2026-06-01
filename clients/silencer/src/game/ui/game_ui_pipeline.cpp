@@ -107,7 +107,11 @@ return uiClayBackend.Commands();
 }
 
 void GameUiPipeline::BuildVisibleClientUi(Surface& surface, float frametime) {
-clientUi.BuildVisibleScreens(game.screenContext, surface, frametime);
+clientUi.BuildVisibleScreens(game.screenContext,
+                             surface,
+                             frametime,
+                             preparedUiInput,
+                             game.renderer.GetHudAnimationPhase());
 }
 
 void GameUiPipeline::DrawInGameWorldInsets(Surface& surface, float frametime) {

@@ -12,6 +12,8 @@
 #include <string>
 #include <vector>
 
+#include <SDL3/SDL_stdinc.h>
+
 class Screen;
 class ScreenContext;
 class Surface;
@@ -55,7 +57,11 @@ public:
 	void ClearScreensIfRequested(ScreenContext& ctx);
 	void RunPendingScreenRequest(ScreenContext& ctx);
 	void TickVisibleScreens(ScreenContext& ctx);
-	void BuildVisibleScreens(ScreenContext& ctx, Surface& dst, float frametime);
+	void BuildVisibleScreens(ScreenContext& ctx,
+	                         Surface& dst,
+	                         float frametime,
+	                         const silencer::ui::UiInputState& input,
+	                         Uint8 hudPhase);
 	std::vector<const ::ui::DrawCommandList *> RetainedDrawCommands() const;
 
 private:

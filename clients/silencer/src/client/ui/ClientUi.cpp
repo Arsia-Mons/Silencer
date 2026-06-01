@@ -322,20 +322,23 @@ void ClientUi::TickVisibleScreens(ScreenContext& ctx) {
 	}
 }
 
-void ClientUi::BuildVisibleScreens(ScreenContext& ctx, Surface& dst, float frametime) {
+void ClientUi::BuildVisibleScreens(ScreenContext& ctx,
+                                   Surface& dst,
+                                   float frametime,
+                                   const silencer::ui::UiInputState& input,
+                                   Uint8 hudPhase) {
 	inGameOverlayFrameActive_ = false;
 	NavigationProviderScope navigationScope(MakeNavigationProvider(ctx));
 	screens_.BuildVisible(ctx, dst, frametime, interactions_);
 	MatchModel match = use_match(MakeMatchProvider(ctx));
 	if(match.active()){
 		HudView hudView = match.hud.snapshot();
-		const silencer::ui::UiInputState& input = ctx.game.CurrentUiInput();
 		const InGameOverlayFrameState overlayFrame = MakeInGameOverlayFrameState(
 			hudView,
 			match,
 			input.width,
 			input.height,
-			ctx.renderer.GetHudAnimationPhase());
+			hudPhase);
 		inGameOverlayFrameActive_ = overlayFrame.visible;
 		if(inGameOverlayFrameActive_){
 			inGameOverlayFrame_.Build([&]() {
