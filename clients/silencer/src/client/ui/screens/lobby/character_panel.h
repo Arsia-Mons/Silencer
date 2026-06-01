@@ -26,7 +26,6 @@ struct CharacterPanelState {
 	// Last selectedAgency reflected into the world. -1 forces a first-frame
 	// reconcile on entry (matches legacy's initial agencychanged=true).
 	int lastReconciled = -1;
-	bool newCharacterRequested = false;
 	bool agentSelectionLocked = false;
 	Uint8 displayAgency = 0;
 	std::string agentName = "No Agent";

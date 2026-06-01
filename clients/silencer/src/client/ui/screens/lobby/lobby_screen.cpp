@@ -474,9 +474,9 @@ void LobbyScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime, s
 		.character_y = bodyY,
 		.character_width = mainLayout.characterW,
 		.character_height = mainLayout.upperH,
-		.character_open_agents = [this, lobby]() {
+		.character_open_agents = [lobby, navigation]() {
 			if(lobby.character.agent_selection_locked()) return;
-			characterState.newCharacterRequested = true;
+			navigation.reset_to(std::make_unique<CharacterCreateScreen>());
 		},
 		.show_chat = mainLayout.chatW > 0 && mainLayout.chatH > 0,
 		.chat = &chatState,
@@ -704,12 +704,6 @@ void LobbyScreen::Tick(ScreenContext & ctx)
 	}
 
 	silencer::client_ui::lobby::CharacterPanelTick(characterState, lobby.character);
-	if(characterState.newCharacterRequested){
-		characterState.newCharacterRequested = false;
-		silencer::client_ui::use_navigation()
-			.reset_to(std::make_unique<CharacterCreateScreen>());
-		return;
-	}
 	silencer::client_ui::lobby::ChatPanelTick(chatState, lobby.chat);
 
 	if(!gameCreateActive && !gameJoinActive && !gameTechActive){

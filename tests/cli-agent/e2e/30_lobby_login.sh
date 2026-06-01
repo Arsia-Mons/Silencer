@@ -135,6 +135,16 @@ cli --port "$CTRL_PORT" click --label "Login/Create" >/dev/null
 create_initial_character "Alice"
 wait_for_widget "Create Game"
 
+# The lobby character panel opens character selection directly through the
+# retained navigation callback; selecting the existing agent returns to lobby.
+wait_for_widget "Agents"
+cli --port "$CTRL_PORT" click --label "Agents" >/dev/null
+cli --port "$CTRL_PORT" wait_for_ui --id-prefix character_create. --timeout-ms 10000 >/dev/null
+wait_for_widget "Alice"
+cli --port "$CTRL_PORT" click --label "Alice" >/dev/null
+cli --port "$CTRL_PORT" wait_for_ui --id lobby.go_back --timeout-ms 10000 >/dev/null
+wait_for_widget "Create Game"
+
 # Go Back from the lobby returns to MAINMENU (FADEOUT is a brief
 # transient that wait_for_ui will skip past).
 cli --port "$CTRL_PORT" back >/dev/null
