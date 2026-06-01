@@ -536,6 +536,12 @@ fail_if_match \
   "$REPO_ROOT/clients/silencer/src/client/ui/screens/lobby/lobby_screen.cpp"
 
 fail_if_match \
+  "\\bCharacterPanelHandleUiIntent\\b" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens/lobby/character_panel.cpp" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens/lobby/character_panel.h" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens/lobby/lobby_screen.cpp"
+
+fail_if_match \
   "\\bUiActionKind::SetText\\b|\\bUpdateChatTextInput\\b" \
   "$REPO_ROOT/clients/silencer/src/client/ui/ClientUi.cpp"
 

@@ -1033,6 +1033,7 @@ struct CharacterPanelViewProps {
 	int y = 0;
 	int width = 0;
 	int height = 0;
+	std::function<void()> open_agents = {};
 };
 
 ::ui::UiElement CharacterPanelView(const CharacterPanelViewProps& props) {
@@ -1056,6 +1057,12 @@ struct CharacterPanelViewProps {
 		kCharacterHeadingAdvance);
 	const std::string xp_text = "XP " + state.xp;
 	const char * xp_label = ::ui::copy_string(xp_text.c_str());
+	std::function<void(const ::ui::ActivationEvent&)> open_agents = {};
+	if(props.open_agents){
+		open_agents = [open = props.open_agents](const ::ui::ActivationEvent&) {
+			open();
+		};
+	}
 	return <Box
 	  key={props.key}
 	  id="CharacterPanelContent"
@@ -1192,6 +1199,7 @@ struct CharacterPanelViewProps {
 						  label="Agents"
 						  disabled={state.agentSelectionLocked}
 						  accessibility={{.label = "Agents"}}
+						  onActivate={open_agents}
 						  layout={::ui::LayoutStyle{
 								.align_items = ::ui::AlignItems::Center,
 								.justify_content = ::ui::JustifyContent::Center,
@@ -4508,6 +4516,7 @@ using ::ui::components::TextProps;
 		  y={props.character_y}
 		  width={props.character_width}
 		  height={props.character_height}
+		  openAgents={props.character_open_agents}
 		/>
 		<lobby_chrome_frame_detail.ChatPanelView
 		  key="chat-panel"

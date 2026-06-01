@@ -54,6 +54,7 @@ struct LobbyChromeFrameProps {
 	int character_y = 0;
 	int character_width = 0;
 	int character_height = 0;
+	std::function<void()> character_open_agents = {};
 	bool show_chat = false;
 	const ChatPanelState * chat = nullptr;
 	int chat_x = 0;

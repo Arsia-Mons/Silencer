@@ -474,6 +474,10 @@ void LobbyScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime, s
 		.character_y = bodyY,
 		.character_width = mainLayout.characterW,
 		.character_height = mainLayout.upperH,
+		.character_open_agents = [this, lobby]() {
+			if(lobby.character.agent_selection_locked()) return;
+			characterState.newCharacterRequested = true;
+		},
 		.show_chat = mainLayout.chatW > 0 && mainLayout.chatH > 0,
 		.chat = &chatState,
 		.chat_x = bodyX,
@@ -788,13 +792,6 @@ bool LobbyScreen::HandleUiIntent(ScreenContext & ctx, const silencer::ui::UiActi
 		return true;
 	}
 	if(chromeFrame_.HandleUiIntent(action)) return true;
-	silencer::client_ui::LobbyModel lobby =
-		silencer::client_ui::use_lobby(
-			silencer::client_ui::MakeLobbyProvider(ctx));
-	if(silencer::client_ui::lobby::CharacterPanelHandleUiIntent(
-			characterState, lobby.character, action)){
-		return true;
-	}
 	if(gameJoinActive){
 		return false;
 	}

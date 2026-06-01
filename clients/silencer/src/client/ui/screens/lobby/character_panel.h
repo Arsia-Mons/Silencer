@@ -1,22 +1,16 @@
 #ifndef SILENCER_CLIENT_UI_LOBBY_CHARACTER_PANEL_H
 #define SILENCER_CLIENT_UI_LOBBY_CHARACTER_PANEL_H
 
-// Screen-side lobby CharacterPanel. Composes Text, sprite chrome, and Button
-// primitives into the compact lobby identity panel: fitted agent name,
-// selected agency emblem, core record stats, and navigation to the
-// character selection/create screen.
+// Lobby character panel state. The retained chrome component composes Text,
+// sprite chrome, and Button primitives into the compact lobby identity panel:
+// fitted agent name, selected agency emblem, core record stats, and navigation
+// to the character selection/create screen.
 //
 // Domain glue lives behind LobbyProvider/use_lobby. This panel keeps only
 // local UI state and renders the model snapshot it receives.
 
 #include "shared.h"
-#include "runtime/UiActionQueue.h"
-
 #include <string>
-
-namespace silencer::ui {
-class UiInteractionRegistry;
-}
 
 namespace silencer::client_ui {
 class LobbyCharacterModel;
@@ -56,9 +50,6 @@ void CharacterPanelInit(CharacterPanelState & state,
 // Called once per LobbyScreen::Tick.
 void CharacterPanelTick(CharacterPanelState & state,
                         LobbyCharacterModel & character);
-bool CharacterPanelHandleUiIntent(CharacterPanelState & state,
-                                  LobbyCharacterModel & character,
-                                  const silencer::ui::UiAction & action);
 
 }  // namespace silencer::client_ui::lobby
 

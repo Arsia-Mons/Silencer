@@ -7,8 +7,6 @@
 namespace silencer::client_ui::lobby {
 namespace character_panel_detail {
 
-constexpr const char * kActionAgents = "lobby.character.agents";
-
 void WriteFallbackStats(CharacterPanelState& state) {
 	state.levelLabel = "LV 0";
 	state.wins = "0";
@@ -75,18 +73,6 @@ void CharacterPanelTick(CharacterPanelState& state,
 		character.apply_selected_agency(state.selectedAgency);
 	}
 	character_panel_detail::RefreshSnapshot(state, character);
-}
-
-bool CharacterPanelHandleUiIntent(CharacterPanelState& state,
-                                  LobbyCharacterModel& character,
-                                  const silencer::ui::UiAction& action) {
-	if(action.kind != silencer::ui::UiActionKind::Activate) return false;
-	if(action.id == character_panel_detail::kActionAgents){
-		if(character.agent_selection_locked()) return true;
-		state.newCharacterRequested = true;
-		return true;
-	}
-	return false;
 }
 
 }  // namespace silencer::client_ui::lobby
