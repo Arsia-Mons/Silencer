@@ -7,7 +7,7 @@
 #include "os.h"
 #include "shared.h"
 #include "client/ui/hooks/use_navigation.h"
-#include "client/ui/hooks/use_match.h"
+#include "client/ui/test_support/match_ui_fixture.h"
 #include "clay_ui_tests/clay_ui_checks.h"
 #include "runtime/UiInteractionRegistry.h"
 #include "password_modal.h"
@@ -118,8 +118,8 @@ static ControlReply Err(int id, const char* code, const std::string& msg){
 	return rpl;
 }
 
-static const char * ModeName(silencer::client_ui::MatchUiControlMode mode){
-	using Mode = silencer::client_ui::MatchUiControlMode;
+static const char * ModeName(silencer::client_ui::MatchUiFixtureMode mode){
+	using Mode = silencer::client_ui::MatchUiFixtureMode;
 	switch(mode){
 		case Mode::Clear: return "clear";
 		case Mode::Status: return "status";
@@ -138,8 +138,8 @@ static const char * ModeName(silencer::client_ui::MatchUiControlMode mode){
 
 static bool ParseMode(
 	const std::string& value,
-	silencer::client_ui::MatchUiControlMode& mode){
-	using Mode = silencer::client_ui::MatchUiControlMode;
+	silencer::client_ui::MatchUiFixtureMode& mode){
+	using Mode = silencer::client_ui::MatchUiFixtureMode;
 	if(value == "clear"){
 		mode = Mode::Clear;
 		return true;
@@ -187,8 +187,8 @@ static bool ParseMode(
 	return false;
 }
 
-static nlohmann::json MatchUiControlResultToJson(
-	const silencer::client_ui::MatchUiControlResult& result){
+static nlohmann::json MatchUiFixtureResultToJson(
+	const silencer::client_ui::MatchUiFixtureResult& result){
 	nlohmann::json r;
 	r["mode"] = ModeName(result.mode);
 	r["ok"] = result.available;
@@ -196,7 +196,7 @@ static nlohmann::json MatchUiControlResultToJson(
 		if(!result.error.empty()) r["error"] = result.error;
 		return r;
 	}
-	if(result.mode == silencer::client_ui::MatchUiControlMode::Clear){
+	if(result.mode == silencer::client_ui::MatchUiFixtureMode::Clear){
 		return r;
 	}
 	r["chat_active"] = result.chatActive;
@@ -657,19 +657,18 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 	}
 	if(cmd.op == "ingame_ui_mode"){
 		std::string mode = cmd.args.value("mode", std::string());
-		silencer::client_ui::MatchUiControlMode controlMode;
-		if(mode.empty() || !ParseMode(mode, controlMode)){
+		silencer::client_ui::MatchUiFixtureMode fixtureMode;
+		if(mode.empty() || !ParseMode(mode, fixtureMode)){
 			cmd.reply->set_value(Err(cmd.id, "BAD_REQUEST",
 				"ingame_ui_mode needs --mode clear|status|chat|buy|tech|playerlist|quit|topmessage|message|statusline|all"));
 			return;
 		}
-		silencer::client_ui::MatchModel match =
-			silencer::client_ui::use_match(
+		silencer::client_ui::MatchUiFixtureResult result =
+			silencer::client_ui::ConfigureMatchUiFixture(
 				silencer::client_ui::MakeMatchProvider(
 					game.GetWorld(),
-					game.GetWorld().viewedpeerid));
-		silencer::client_ui::MatchUiControlResult result =
-			match.control.configure(controlMode);
+					game.GetWorld().viewedpeerid),
+				fixtureMode);
 		if(!result.available){
 			cmd.reply->set_value(Err(cmd.id, "WRONG_STATE",
 				result.error.empty()
@@ -677,8 +676,8 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 					: result.error));
 			return;
 		}
-		using Mode = silencer::client_ui::MatchUiControlMode;
-		if((controlMode == Mode::Chat || controlMode == Mode::All) &&
+		using Mode = silencer::client_ui::MatchUiFixtureMode;
+		if((fixtureMode == Mode::Chat || fixtureMode == Mode::All) &&
 		   cmd.args.contains("chat_line")){
 			std::string chatLine = cmd.args.value("chat_line", std::string());
 			if(!chatLine.empty()){
@@ -689,7 +688,7 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 				}
 			}
 		}
-		cmd.reply->set_value(OkResult(cmd.id, MatchUiControlResultToJson(result)));
+		cmd.reply->set_value(OkResult(cmd.id, MatchUiFixtureResultToJson(result)));
 		return;
 	}
 	if(cmd.op == "click"){

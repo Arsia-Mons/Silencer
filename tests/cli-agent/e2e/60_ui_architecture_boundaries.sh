@@ -623,6 +623,11 @@ fail_if_match \
   "$REPO_ROOT/clients/silencer/src/client/ui/hooks/use_match.h"
 
 fail_if_match \
+  "\\b(MatchUiControl|MatchControlSurface|control[[:space:]]*[;])\\b" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/hooks/use_match.h" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/providers/match_provider.cpp"
+
+fail_if_match \
   "use_match[[:space:]]*[(][^;]*," \
   "$REPO_ROOT/clients/silencer/src" \
   --glob '!third_party/**'

@@ -8,40 +8,6 @@
 namespace silencer {
 namespace client_ui {
 
-enum class MatchUiControlMode {
-	Clear,
-	Status,
-	Chat,
-	Buy,
-	Tech,
-	PlayerList,
-	QuitPrompt,
-	TopMessage,
-	Message,
-	StatusLine,
-	All,
-};
-
-struct MatchUiControlResult {
-	MatchUiControlMode mode = MatchUiControlMode::Status;
-	bool available = false;
-	std::string error;
-	bool chatActive = false;
-	std::string chatDraft;
-	bool buyActive = false;
-	bool techActive = false;
-	int showChatTicks = 0;
-	bool showPlayerList = false;
-	int buyItemCount = 0;
-	int techItemCount = 0;
-	int buySelectedIndex = 0;
-	int techSelectedIndex = 0;
-	int quitState = 0;
-	int topMessageProgress = 0;
-	int messageProgress = 0;
-	int statusMessageCount = 0;
-};
-
 class MatchChatModel {
 public:
 	MatchChatModel(const MatchProviderValue& provider,
@@ -88,16 +54,6 @@ private:
 	int local_peer_id_ = 0;
 };
 
-class MatchControlSurfaceModel {
-public:
-	explicit MatchControlSurfaceModel(const MatchProviderValue& provider);
-
-	MatchUiControlResult configure(MatchUiControlMode mode) const;
-
-private:
-	MatchProviderValue provider_;
-};
-
 class MatchModel {
 public:
 	explicit MatchModel(const MatchProviderValue& provider);
@@ -107,7 +63,6 @@ public:
 	MatchHudModel hud;
 	MatchChatModel chat;
 	MatchStationModel station;
-	MatchControlSurfaceModel control;
 
 private:
 	MatchProviderValue provider_;

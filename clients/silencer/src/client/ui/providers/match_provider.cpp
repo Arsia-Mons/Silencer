@@ -1,13 +1,10 @@
 #include "client/ui/hooks/use_match.h"
 
 #include "audio.h"
-#include "basedoor.h"
 #include "buyableitem.h"
 #include "gasloader.h"
-#include "objecttypes.h"
 #include "player.h"
 #include "screen_context.h"
-#include "team.h"
 #include "world.h"
 
 #include <cstring>
@@ -200,152 +197,11 @@ HudView MatchHudModel::snapshot() const {
 	return BuildHudView(*world);
 }
 
-MatchControlSurfaceModel::MatchControlSurfaceModel(
-		const MatchProviderValue& provider)
-	: provider_(provider) {}
-
-MatchUiControlResult MatchControlSurfaceModel::configure(MatchUiControlMode mode) const {
-	MatchUiControlResult result;
-	result.mode = mode;
-
-	World * world = provider_.world;
-	if(!world){
-		result.error = "no match world";
-		return result;
-	}
-	Player * player = world->GetPeerPlayer(world->viewedpeerid);
-	if(!player){
-		result.error = "no viewed player";
-		return result;
-	}
-
-	auto populate = [&]() {
-		std::vector<BuyableItem *> buyItems;
-		std::vector<BuyableItem *> techItems;
-		player->CollectBuyMenuItems(*world, false, buyItems);
-		player->CollectBuyMenuItems(*world, true, techItems);
-		result.available = true;
-		result.chatActive = player->chatActive;
-		result.chatDraft = player->chatText;
-		result.buyActive = player->isbuying;
-		result.techActive = player->techstationactive;
-		result.showChatTicks = world->messaging.showchat_i;
-		result.showPlayerList = world->IsShowingPlayerList();
-		result.quitState = world->quitstate;
-		result.topMessageProgress = world->messaging.topmessage_i;
-		result.messageProgress = world->messaging.message_i;
-		result.statusMessageCount =
-			static_cast<int>(world->messaging.statusmessages.size());
-		result.buyItemCount = static_cast<int>(buyItems.size());
-		result.techItemCount = static_cast<int>(techItems.size());
-		result.buySelectedIndex = player->buyifacelastitem;
-		result.techSelectedIndex = player->techifacelastitem;
-	};
-
-	auto clear = [&]() {
-		player->chatActive = false;
-		player->chatText[0] = '\0';
-		player->isbuying = false;
-		player->techstationactive = false;
-		world->messaging.showchat_i = 0;
-		world->SetShowingPlayerList(false);
-		world->quitstate = 0;
-		world->messaging.topmessage_i = 0;
-		world->messaging.topmessage[0] = '\0';
-		world->messaging.message_i = 0;
-		world->messaging.message[0] = '\0';
-		for(char * status : world->messaging.statusmessages){
-			delete[] status;
-		}
-		world->messaging.statusmessages.clear();
-	};
-
-	if(mode == MatchUiControlMode::Clear){
-		clear();
-		populate();
-		return result;
-	}
-
-	if(mode != MatchUiControlMode::Status) clear();
-	if(mode == MatchUiControlMode::Chat || mode == MatchUiControlMode::All){
-		player->chatActive = true;
-		player->chatwithteam = false;
-		std::strncpy(player->chatText, "clay chat smoke", sizeof(player->chatText) - 1);
-		player->chatText[sizeof(player->chatText) - 1] = '\0';
-		world->messaging.showchat_i = GASLoader::Get().gameengine.chatDisplayTicks;
-	}
-	if(mode == MatchUiControlMode::Buy || mode == MatchUiControlMode::All){
-		player->isbuying = true;
-		player->buyifacelastitem = 0;
-		player->buyifacelastscrolled = 0;
-	}
-	if(mode == MatchUiControlMode::Tech || mode == MatchUiControlMode::All){
-		Team * team = player->GetTeam(*world);
-		const std::vector<Uint16> & teams = world->GetObjectsByType(ObjectTypes::TEAM);
-		if(!team && !teams.empty()){
-			team = static_cast<Team *>(world->GetObjectFromId(teams[0]));
-		}
-		if(!team){
-			team = static_cast<Team *>(world->CreateObject(ObjectTypes::TEAM));
-			if(team){
-				team->agency = Team::NOXIS;
-				team->number = 0;
-				team->color = ((8 << 4) + 13);
-			}
-		}
-		if(team){
-			player->SetTeamId(team->id);
-			team->AddPeer(world->GetLocalPeerId());
-		}
-		BaseDoor * door = nullptr;
-		if(team){
-			team->disabledtech = 0xffffffff;
-			door = static_cast<BaseDoor *>(world->GetObjectFromId(team->basedoorid));
-			for(Uint16 objectid : world->GetObjectsByType(ObjectTypes::BASEDOOR)){
-				auto * candidate = static_cast<BaseDoor *>(world->GetObjectFromId(objectid));
-				if(candidate && candidate->teamid == team->id){
-					door = candidate;
-					break;
-				}
-			}
-		}
-		if(door){
-			player->SetBaseDoorEntering(door->id);
-		}
-		if(team){
-			int baseY = ((world->map.height + 10) * 64) + (team->number * 26 * 64) + 64;
-			player->y = static_cast<Sint16>(baseY);
-		}
-		player->techstationactive = true;
-		player->techifacelastitem = 0;
-		player->techifacelastscrolled = 0;
-	}
-	if(mode == MatchUiControlMode::PlayerList || mode == MatchUiControlMode::All){
-		world->SetShowingPlayerList(true);
-	}
-	if(mode == MatchUiControlMode::QuitPrompt || mode == MatchUiControlMode::All){
-		world->quitstate = 1;
-	}
-	if(mode == MatchUiControlMode::TopMessage || mode == MatchUiControlMode::All){
-		world->ShowTopMessage("        RETAINED TOP MESSAGE");
-	}
-	if(mode == MatchUiControlMode::Message || mode == MatchUiControlMode::All){
-		world->ShowMessage("RETAINED CENTER MESSAGE", 128, 0);
-	}
-	if(mode == MatchUiControlMode::StatusLine || mode == MatchUiControlMode::All){
-		world->ShowStatus("RETAINED STATUS MESSAGE", 153);
-	}
-
-	populate();
-	return result;
-}
-
 MatchModel::MatchModel(const MatchProviderValue& provider)
 	: provider_(provider),
 	  hud(provider, provider.local_peer_id),
 	  chat(provider, provider.local_peer_id),
-	  station(provider, provider.local_peer_id),
-	  control(provider) {}
+	  station(provider, provider.local_peer_id) {}
 
 bool MatchModel::active() const {
 	return provider_.world && provider_.world->map.loaded;
