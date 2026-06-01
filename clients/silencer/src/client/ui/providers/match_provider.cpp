@@ -220,6 +220,7 @@ MatchUiControlResult MatchControlSurfaceModel::configure(MatchUiControlMode mode
 		result.showPlayerList = world->IsShowingPlayerList();
 		result.quitState = world->quitstate;
 		result.topMessageProgress = world->messaging.topmessage_i;
+		result.messageProgress = world->messaging.message_i;
 		result.statusMessageCount =
 			static_cast<int>(world->messaging.statusmessages.size());
 		result.buyItemCount = static_cast<int>(buyItems.size());
@@ -238,6 +239,8 @@ MatchUiControlResult MatchControlSurfaceModel::configure(MatchUiControlMode mode
 		world->quitstate = 0;
 		world->messaging.topmessage_i = 0;
 		world->messaging.topmessage[0] = '\0';
+		world->messaging.message_i = 0;
+		world->messaging.message[0] = '\0';
 		for(char * status : world->messaging.statusmessages){
 			delete[] status;
 		}
@@ -312,6 +315,9 @@ MatchUiControlResult MatchControlSurfaceModel::configure(MatchUiControlMode mode
 	}
 	if(mode == MatchUiControlMode::TopMessage || mode == MatchUiControlMode::All){
 		world->ShowTopMessage("        RETAINED TOP MESSAGE");
+	}
+	if(mode == MatchUiControlMode::Message || mode == MatchUiControlMode::All){
+		world->ShowMessage("RETAINED CENTER MESSAGE", 128, 0);
 	}
 	if(mode == MatchUiControlMode::StatusLine || mode == MatchUiControlMode::All){
 		world->ShowStatus("RETAINED STATUS MESSAGE", 153);

@@ -17,6 +17,7 @@ enum class MatchUiControlMode {
 	PlayerList,
 	QuitPrompt,
 	TopMessage,
+	Message,
 	StatusLine,
 	All,
 };
@@ -36,6 +37,7 @@ struct MatchUiControlResult {
 	int techSelectedIndex = 0;
 	int quitState = 0;
 	int topMessageProgress = 0;
+	int messageProgress = 0;
 	int statusMessageCount = 0;
 };
 

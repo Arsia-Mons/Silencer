@@ -222,17 +222,25 @@ void UiElementFrame::reset() {
 }
 
 UiChildren UiElementFrame::children(std::initializer_list<UiElement> items) {
-  if (items.size() == 0)
+  return children(items.begin(), static_cast<int>(items.size()));
+}
+
+UiChildren UiElementFrame::children(const UiElement *items, int count) {
+  if (count <= 0)
     return {};
-  if (child_element_count_ + static_cast<int>(items.size()) >
-      UI_RETAINED_MAX_CHILD_ELEMENTS) {
+  if (!items) {
+    ++error_count_;
+    return {};
+  }
+  if (child_element_count_ + count > UI_RETAINED_MAX_CHILD_ELEMENTS) {
     ++error_count_;
     return {};
   }
 
   UiElement *start = &child_elements_[child_element_count_];
   int index = 0;
-  for (const UiElement &item : items) {
+  for (int i = 0; i < count; ++i) {
+    const UiElement &item = items[i];
     start[index++] = item;
   }
   child_element_count_ += index;
@@ -400,6 +408,11 @@ HostProps UiElementFrame::copy_host_props(const HostProps &props) {
 UiChildren children(std::initializer_list<UiElement> items) {
   UiElementFrame *frame = require_current_element_frame("children");
   return frame ? frame->children(items) : UiChildren{};
+}
+
+UiChildren children(const UiElement *items, int count) {
+  UiElementFrame *frame = require_current_element_frame("children");
+  return frame ? frame->children(items, count) : UiChildren{};
 }
 
 UiChildren children(std::initializer_list<UiChild> items) {

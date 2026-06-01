@@ -9,6 +9,7 @@
 #include <cstdint>
 #include <cstring>
 #include <string>
+#include <vector>
 
 namespace silencer {
 namespace client_ui {
@@ -52,6 +53,7 @@ constexpr int kPlayerListMaxPeers = 4;
 constexpr int kPlayerListTextBank = 133;
 constexpr int kPlayerListTextAdvance = 6;
 constexpr int kPlayerListTextLineHeight = 11;
+constexpr int kMessageLineAdvance = 20;
 
 inline ::ui::LayoutStyle root_layout(int width, int height) {
 	return {
@@ -135,6 +137,41 @@ inline ::ui::StylePatch player_list_text_patch() {
 	});
 }
 
+struct MessageTextMetrics {
+	std::uint16_t font_bank = 135;
+	std::uint16_t advance = 11;
+	int line_height = 19;
+};
+
+inline MessageTextMetrics title_message_metrics() {
+	return MessageTextMetrics{135, 11, 19};
+}
+
+inline MessageTextMetrics heading_message_metrics() {
+	return MessageTextMetrics{134, 10, 15};
+}
+
+inline MessageTextMetrics message_title_metrics() {
+	return MessageTextMetrics{136, 25, 23};
+}
+
+inline MessageTextMetrics message_subtitle_metrics() {
+	return MessageTextMetrics{135, 13, 19};
+}
+
+inline ::ui::VisualStyle message_glyph_visual(const MessageTextMetrics& metrics,
+                                              std::uint8_t palette,
+                                              std::uint8_t brightness) {
+	::ui::VisualStyle visual;
+	visual.text = ::ui::TextVisual{
+		.color = {palette, brightness, 0, 255},
+		.font_id = metrics.font_bank,
+		.font_size = metrics.advance,
+		.line_height = static_cast<float>(metrics.line_height),
+	};
+	return visual;
+}
+
 inline std::string top_message_slice(const char * text, int progress) {
 	const char * safe_text = text ? text : "";
 	const int length = static_cast<int>(std::strlen(safe_text));
@@ -186,6 +223,149 @@ struct TopMessageProps {
 	  layout={absolute_layout(kTopMessageX, kTopMessageY, kTopMessageWidth, kTopMessageHeight)}
 	  style={top_message_text_patch()}
 	/>
+}
+
+void append_message_glyph(std::vector<::ui::UiElement>& glyphs,
+                          int ordinal,
+                          const char * text,
+                          int x,
+                          int y,
+                          const MessageTextMetrics& metrics,
+                          std::uint8_t palette,
+                          std::uint8_t brightness) {
+	glyphs.push_back(::ui::host(::ui::HostKind::Text,
+	                            ::ui::HostProps{
+		                            .id = "InGameMessageGlyph",
+		                            .id_offset = ordinal,
+		                            .style = absolute_layout(
+			                            x, y, metrics.advance, metrics.line_height),
+		                            .visual = message_glyph_visual(
+			                            metrics, palette, brightness),
+		                            .text = ::ui::HostTextProps{.value = text},
+	                            }));
+}
+
+::ui::UiChildren message_glyph_children(const InGameMessageView& msg,
+                                        int surface_width) {
+	if(!msg.message_i || msg.message.empty()) return {};
+
+	std::vector<::ui::UiElement> glyphs;
+	const char * text = msg.message.c_str();
+	const int total_len = static_cast<int>(msg.message.size());
+	glyphs.reserve(static_cast<std::size_t>(std::min(total_len, static_cast<int>(msg.message_i))) * 2);
+	int line_length = total_len;
+	const char * newline = std::strchr(text, '\n');
+	if(newline) line_length = static_cast<int>(newline - text);
+	int line_y = 60;
+	std::uint8_t color = 208;
+	MessageTextMetrics metrics = title_message_metrics();
+	switch(msg.messagetype){
+		case 1:
+			color = 128;
+			line_y = 190;
+			metrics = heading_message_metrics();
+			break;
+		case 2:
+			color = 128;
+			break;
+		case 3:
+			color = 192;
+			break;
+		case 4:
+			color = 153;
+			break;
+		case 10:
+			color = 224;
+			break;
+		case 11:
+			color = 153;
+			break;
+		case 20:
+			color = 153;
+			line_y = 200;
+			break;
+	}
+	int next_line = line_length;
+	int line = 0;
+	for(int i = 0; i < total_len; ++i){
+		if(i >= msg.message_i) break;
+		std::uint8_t brightness = 128;
+		if(msg.messagetype < 10){
+			if(msg.message_i - msg.messagetime + 8 >= 0){
+				brightness -= (msg.message_i - msg.messagetime + 8) * 8;
+			}
+			if(msg.message_i % 32 >= 16){
+				brightness += ((16 - (msg.message_i % 16)) * 2);
+			}else{
+				brightness += ((msg.message_i % 16) * 2);
+			}
+		}
+		if(msg.message_i - i <= 5){
+			brightness += 40 - ((msg.message_i - i) * 8);
+		}
+		char glyph_text[2] = {text[i], 0};
+		if(msg.messagetype >= 10){
+			metrics = line == 0 ? message_title_metrics() : message_subtitle_metrics();
+		}
+		const std::uint8_t shadow_brightness =
+			(int(brightness) - 64) < 8 ? 8 : brightness - 64;
+		const int x =
+			((surface_width - (line_length * metrics.advance)) / 2) +
+			(metrics.advance * (line_length - next_line));
+		const int ordinal = static_cast<int>(glyphs.size());
+		append_message_glyph(glyphs,
+		                     ordinal,
+		                     glyph_text,
+		                     x + 1,
+		                     line_y + 1,
+		                     metrics,
+		                     color,
+		                     shadow_brightness);
+		append_message_glyph(glyphs,
+		                     ordinal + 1,
+		                     glyph_text,
+		                     x,
+		                     line_y,
+		                     metrics,
+		                     color,
+		                     brightness);
+		next_line--;
+		if(next_line < 0){
+			line_length = static_cast<int>(std::strlen(&text[i + 1]));
+			const char * next_newline = std::strchr(&text[i + 1], '\n');
+			if(next_newline){
+				line_length = static_cast<int>(next_newline - &text[i + 1]);
+			}
+			next_line = line_length;
+			line_y += (line == 0 && msg.messagetype >= 10)
+				? 40
+				: kMessageLineAdvance;
+			line++;
+		}
+	}
+	return ::ui::children(glyphs.data(), static_cast<int>(glyphs.size()));
+}
+
+struct MessageProps {
+	const char * key = nullptr;
+	bool show = false;
+	InGameMessageView message = {};
+	int surface_width = 0;
+	int surface_height = 0;
+};
+
+::ui::UiElement Message(const MessageProps& props) {
+	if(!props.show || !props.message.message_i ||
+	   props.message.message.empty()){
+		return ::ui::empty();
+	}
+	return <Box
+	  key={props.key}
+	  id="InGameMessageRoot"
+	  layout={root_layout(props.surface_width, props.surface_height)}
+	>
+		{message_glyph_children(props.message, props.surface_width)}
+	</Box>
 }
 
 inline bool player_list_has_peers(const TeamHudView * teams, int count) {
@@ -441,6 +621,13 @@ using ::ui::components::BoxProps;
 	  id="InGameOverlayRoot"
 	  layout={ingame_overlay_frame_detail::root_layout(props.width, props.height)}
 	>
+		<ingame_overlay_frame_detail.Message
+		  key="message"
+		  show={props.show_message}
+		  message={props.message}
+		  surfaceWidth={props.width}
+		  surfaceHeight={props.height}
+		/>
 		<ingame_overlay_frame_detail.PlayerList
 		  key="player-list"
 		  show={props.show_player_list}

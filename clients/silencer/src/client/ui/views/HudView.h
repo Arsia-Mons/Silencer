@@ -143,7 +143,7 @@ struct InGameTopMessageView {
 	std::string text;           // text long enough; HUD slices it
 };
 
-// Top-level snapshot consumed by InGameHud + InGameOverlays.
+// Top-level snapshot consumed by InGameHud + retained in-game overlay frames.
 struct HudView {
 	bool   mapLoaded = false;
 	Uint32 tickCount = 0;

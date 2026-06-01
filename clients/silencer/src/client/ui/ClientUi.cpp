@@ -4,7 +4,6 @@
 #include "client/ui/hooks/use_app.h"
 #include "client/ui/hooks/use_match.h"
 #include "client/ui/hud/InGameHud.h"
-#include "client/ui/hud/InGameOverlays.h"
 #include "client/ui/hud/ingame_overlay_frame.h"
 #include "game.h"
 #include "lobby_screen.h"
@@ -321,15 +320,17 @@ void ClientUi::BuildVisibleScreens(ScreenContext& ctx, Surface& dst, float frame
 		HudView hudView = match.hud.snapshot();
 		BuildInGameHudUi(
 			ctx.renderer, ctx.world.resources, hudView, &dst, interactions_);
-		BuildInGameOverlaysUi(ctx.renderer, ctx.world.resources, hudView, &dst);
 		const bool showQuitPrompt =
 			hudView.quitState == 1 || hudView.quitState == 2;
 		const bool showTopMessage =
 			hudView.topMessage.topmessage_i > 0 && !hudView.topMessage.text.empty();
+		const bool showMessage =
+			hudView.message.message_i > 0 && !hudView.message.message.empty();
 		const bool showStatusMessages = !hudView.statusMessages.empty();
 		const bool showPlayerList = hudView.showPlayerList;
 		inGameOverlayFrameActive_ =
-			showQuitPrompt || showTopMessage || showStatusMessages || showPlayerList;
+			showQuitPrompt || showTopMessage || showMessage ||
+			showStatusMessages || showPlayerList;
 		if(inGameOverlayFrameActive_){
 		#ifdef OUYA
 			const char * quitText = "Hit O To QUIT";
@@ -346,6 +347,8 @@ void ClientUi::BuildVisibleScreens(ScreenContext& ctx, Surface& dst, float frame
 				.show_top_message = showTopMessage,
 				.top_message_text = hudView.topMessage.text.c_str(),
 				.top_message_progress = hudView.topMessage.topmessage_i,
+				.show_message = showMessage,
+				.message = hudView.message,
 				.show_status_messages = showStatusMessages,
 				.status_messages = hudView.statusMessages.data(),
 				.status_message_count =

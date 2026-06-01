@@ -182,9 +182,10 @@ fail_if_match \
   "$REPO_ROOT/clients/silencer/src/client/ui/modals" \
   "$REPO_ROOT/clients/silencer/src/client/ui/hud"
 
-fail_if_match \
-  "DrawStatus|InGameStatusRoot|InGameStatusLine|BuildPlayerListOverlay|PlayerListRoot" \
-  "$REPO_ROOT/clients/silencer/src/client/ui/hud/InGameOverlays.cpp"
+fail_if_path_exists "clients/silencer/src/client/ui/hud/InGameOverlays.cpp"
+fail_if_path_exists "clients/silencer/src/client/ui/hud/InGameOverlays.h"
+fail_if_path_exists "clients/silencer/src/client/ui/hud/hud_player_list_overlay.cpp"
+fail_if_path_exists "clients/silencer/src/client/ui/hud/hud_player_list_overlay.h"
 
 fail_if_match \
   "Draw[A-Za-z0-9_]*Clay|BuildInGameHudUi|BuildInGameOverlaysUi|client/ui/hud|Clay_BeginLayout|Clay_EndLayout|Clay_SetPointerState|clay_bridge" \
@@ -430,14 +431,6 @@ fail_if_match \
   "DispatchInGameUiInput|Clay_OnHover" \
   "$REPO_ROOT/clients/silencer/src" \
   --glob '!third_party/**'
-
-fail_if_match \
-  "DrawQuitPrompt|QuitPromptRoot|QuitPromptText" \
-  "$REPO_ROOT/clients/silencer/src/client/ui/hud/InGameOverlays.cpp"
-
-fail_if_match \
-  "DrawTopMessage|InGameTopMessageRoot|InGameTopMessage" \
-  "$REPO_ROOT/clients/silencer/src/client/ui/hud/InGameOverlays.cpp"
 
 fail_if_match \
   "rawKeyDownCodes|CaptureRawKeyDown|BuildUiInputState|QueueUiTextInput|QueueUiNavAction|AddUiRawKeyDown|AddUiWheelDelta|QueueUiPointerWindowEvent|DispatchInGameUiActions|ConfigureInGameUiForControl" \

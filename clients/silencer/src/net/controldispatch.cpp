@@ -119,6 +119,7 @@ static const char * ModeName(silencer::client_ui::MatchUiControlMode mode){
 		case Mode::PlayerList: return "playerlist";
 		case Mode::QuitPrompt: return "quit";
 		case Mode::TopMessage: return "topmessage";
+		case Mode::Message: return "message";
 		case Mode::StatusLine: return "statusline";
 		case Mode::All: return "all";
 	}
@@ -161,6 +162,10 @@ static bool ParseMode(
 		mode = Mode::TopMessage;
 		return true;
 	}
+	if(value == "message"){
+		mode = Mode::Message;
+		return true;
+	}
 	if(value == "statusline"){
 		mode = Mode::StatusLine;
 		return true;
@@ -191,6 +196,7 @@ static nlohmann::json MatchUiControlResultToJson(
 	r["show_player_list"] = result.showPlayerList;
 	r["quit_state"] = result.quitState;
 	r["top_message_progress"] = result.topMessageProgress;
+	r["message_progress"] = result.messageProgress;
 	r["status_message_count"] = result.statusMessageCount;
 	r["buy_item_count"] = result.buyItemCount;
 	r["tech_item_count"] = result.techItemCount;
@@ -643,7 +649,7 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 		silencer::client_ui::MatchUiControlMode controlMode;
 		if(mode.empty() || !ParseMode(mode, controlMode)){
 			cmd.reply->set_value(Err(cmd.id, "BAD_REQUEST",
-				"ingame_ui_mode needs --mode clear|status|chat|buy|tech|playerlist|quit|topmessage|statusline|all"));
+				"ingame_ui_mode needs --mode clear|status|chat|buy|tech|playerlist|quit|topmessage|message|statusline|all"));
 			return;
 		}
 		silencer::client_ui::MatchModel match =
