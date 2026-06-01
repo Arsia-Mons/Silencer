@@ -705,6 +705,36 @@ using ::ui::components::TextProps;
 		  height={props.game_select_tall_height}
 		/>
 		<lobby_chrome_frame_detail.AbsoluteChromeButton
+		  key="game-join-choose-tech"
+		  id="lobby.game_join.choose_tech"
+		  label="Choose Tech"
+		  show={props.show_game_join_actions}
+		  x={props.game_join_button_x}
+		  y={props.game_join_choose_tech_y}
+		  width={props.game_join_button_width}
+		  height={props.game_join_button_height}
+		/>
+		<lobby_chrome_frame_detail.AbsoluteChromeButton
+		  key="game-join-change-team"
+		  id="lobby.game_join.change_team"
+		  label="Change Team"
+		  show={props.show_game_join_actions}
+		  x={props.game_join_button_x}
+		  y={props.game_join_change_team_y}
+		  width={props.game_join_button_width}
+		  height={props.game_join_button_height}
+		/>
+		<lobby_chrome_frame_detail.AbsoluteChromeButton
+		  key="game-join-ready"
+		  id="lobby.game_join.ready"
+		  label={props.game_join_ready_label ? props.game_join_ready_label : "Ready"}
+		  show={props.show_game_join_actions}
+		  x={props.game_join_button_x}
+		  y={props.game_join_ready_y}
+		  width={props.game_join_button_width}
+		  height={props.game_join_button_height}
+		/>
+		<lobby_chrome_frame_detail.AbsoluteChromeButton
 		  key="game-select-create"
 		  id="lobby.game_select.create"
 		  label="Create Game"

@@ -5,18 +5,11 @@
 #include "client/ui/hud/HudPayloadArena.h"
 #include "clay/clay.h"
 #include "clay_ui_compositor.h"
-#include "primitives/button.h"
 #include "primitives/text.h"
 #include "runtime/UiInteractionRegistry.h"
 
-#include <algorithm>
 #include <utility>
 
-using silencer::ui::primitives::Button;
-using silencer::ui::primitives::ButtonHandle;
-using silencer::ui::primitives::ButtonOpts;
-using silencer::ui::primitives::ButtonSize;
-using silencer::ui::primitives::ButtonVariant;
 using silencer::ui::primitives::Text;
 using silencer::ui::primitives::TextEffect;
 using silencer::ui::primitives::TextSize;
@@ -25,13 +18,6 @@ namespace silencer::client_ui::lobby {
 
 namespace game_join_panel_detail {
 
-// Upper stepped-pane slot interior layout knobs. The padding preserves the
-// legacy three-button vertical rhythm inside the shallow top shelf.
-constexpr uint16_t kBtnPadLeft   = 3;
-constexpr uint16_t kBtnPadRight  = 4;
-constexpr uint16_t kBtnTechPadTop  = 3;
-constexpr uint16_t kBtnTeamPadTop  = 11;
-constexpr uint16_t kBtnReadyPadTop = 39;
 constexpr const char * kActionTech = "lobby.game_join.choose_tech";
 constexpr const char * kActionTeam = "lobby.game_join.change_team";
 constexpr const char * kActionReady = "lobby.game_join.ready";
@@ -54,20 +40,6 @@ Clay_String FromStd(const std::string & s) {
 	cs.length = static_cast<int32_t>(s.size());
 	cs.chars  = s.c_str();
 	return cs;
-}
-
-ButtonOpts FullWidthUpperButtonOpts(Uint16 panelWidth) {
-	const int buttonWidth = std::max(
-		1,
-		static_cast<int>(panelWidth)
-			- static_cast<int>(kBtnPadLeft)
-			- static_cast<int>(kBtnPadRight));
-	return ButtonOpts{
-		.variant = ButtonVariant::Chrome,
-		.size = ButtonSize::Auto,
-		.minWidth = buttonWidth,
-		.maxWidth = buttonWidth,
-	};
 }
 
 }  // namespace game_join_panel_detail
@@ -131,43 +103,6 @@ bool GameJoinPanelHandleUiIntent(GameJoinPanelState & state,
 		return true;
 	}
 	return false;
-}
-
-void BuildGameJoinUpperTree(GameJoinPanelState & state,
-                            Uint16 panelWidth,
-                            silencer::ui::UiInteractionRegistry& interactions) {
-	const ButtonOpts buttonOpts =
-		game_join_panel_detail::FullWidthUpperButtonOpts(panelWidth);
-
-	// Choose Tech (top button).
-	CLAY({ .id = CLAY_ID("GJoinBtnTechWrap"),
-	       .layout = { .padding = { game_join_panel_detail::kBtnPadLeft, 0, game_join_panel_detail::kBtnTechPadTop, 0 } } }) {
-		Button(CLAY_STRING("GameJoinChooseTechButton"), CLAY_STRING("Choose Tech"),
-		           buttonOpts,
-		           ButtonHandle{ /*hoveredOut*/ nullptr,
-		                             /*actionId*/   game_join_panel_detail::kActionTech,
-		                             /*interactions*/ &interactions });
-	}
-
-	// Change Team (middle button).
-	CLAY({ .id = CLAY_ID("GJoinBtnTeamWrap"),
-	       .layout = { .padding = { game_join_panel_detail::kBtnPadLeft, 0, game_join_panel_detail::kBtnTeamPadTop, 0 } } }) {
-		Button(CLAY_STRING("GameJoinChangeTeamButton"), CLAY_STRING("Change Team"),
-		           buttonOpts,
-		           ButtonHandle{ /*hoveredOut*/ nullptr,
-		                             /*actionId*/   game_join_panel_detail::kActionTeam,
-		                             /*interactions*/ &interactions });
-	}
-
-	// Ready / Waiting... (bottom button). Label flips per Tick.
-	CLAY({ .id = CLAY_ID("GJoinBtnReadyWrap"),
-	       .layout = { .padding = { game_join_panel_detail::kBtnPadLeft, 0, game_join_panel_detail::kBtnReadyPadTop, 0 } } }) {
-		Button(CLAY_STRING("GameJoinReadyButton"), game_join_panel_detail::FromStd(state.readyLabel),
-		           buttonOpts,
-		           ButtonHandle{ /*hoveredOut*/ nullptr,
-		                             /*actionId*/   game_join_panel_detail::kActionReady,
-		                             /*interactions*/ &interactions });
-	}
 }
 
 void BuildGameJoinTallTree(GameJoinPanelState & state,

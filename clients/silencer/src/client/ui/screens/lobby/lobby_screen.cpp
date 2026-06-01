@@ -43,6 +43,12 @@ constexpr int kGameSelectTallFooterGap = 4;
 constexpr int kGameSelectActionButtonGap = 2;
 constexpr int kGameSelectActionButtonW = 156;
 constexpr int kGameSelectActionButtonH = 21;
+constexpr int kGameJoinButtonPadLeft = 3;
+constexpr int kGameJoinButtonPadRight = 4;
+constexpr int kGameJoinChooseTechPadTop = 3;
+constexpr int kGameJoinChangeTeamPadTop = 11;
+constexpr int kGameJoinReadyPadTop = 39;
+constexpr int kGameJoinButtonH = 21;
 
 int ClampInt(int value, int lo, int hi) {
 	if(value < lo) return lo;
@@ -195,6 +201,29 @@ void LobbyScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime, s
 		spectateButtonY
 			+ lobby_screen_detail::kGameSelectActionButtonH
 			+ lobby_screen_detail::kGameSelectActionButtonGap;
+	const int rightUpperX = bodyX + mainLayout.characterW + mainLayout.regionGap;
+	const int gameJoinButtonW = std::max(
+		1,
+		mainLayout.rightUpperW
+			- lobby_screen_detail::kGameJoinButtonPadLeft
+			- lobby_screen_detail::kGameJoinButtonPadRight);
+	const int gameJoinChooseTechY =
+		bodyY + lobby_screen_detail::kGameJoinChooseTechPadTop;
+	const int gameJoinChangeTeamY =
+		bodyY
+			+ lobby_screen_detail::kGameJoinChooseTechPadTop
+			+ lobby_screen_detail::kGameJoinButtonH
+			+ lobby_screen_detail::kGameJoinChangeTeamPadTop;
+	const int gameJoinReadyY =
+		gameJoinChangeTeamY
+			+ lobby_screen_detail::kGameJoinButtonH
+			+ lobby_screen_detail::kGameJoinReadyPadTop;
+	const bool showGameJoinActions =
+		gameJoinActive &&
+		mainLayout.rightUpperW > lobby_screen_detail::kGameJoinButtonPadLeft
+			+ lobby_screen_detail::kGameJoinButtonPadRight &&
+		mainLayout.upperH > gameJoinReadyY - bodyY
+			+ lobby_screen_detail::kGameJoinButtonH;
 	const uint16_t titlePadX = static_cast<uint16_t>(
 		lobby_screen_detail::ClampInt((layoutWidth * 5) / 640, 5, 10));
 	const uint16_t titleRowGap = static_cast<uint16_t>(
@@ -234,6 +263,14 @@ void LobbyScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime, s
 		.game_select_tall_width = mainLayout.rightTallW,
 		.game_select_tall_height = mainLayout.rightTallH,
 		.game_select = &gameSelectState,
+		.show_game_join_actions = showGameJoinActions,
+		.game_join_ready_label = gameJoinState.readyLabel.c_str(),
+		.game_join_button_x = rightUpperX + lobby_screen_detail::kGameJoinButtonPadLeft,
+		.game_join_choose_tech_y = gameJoinChooseTechY,
+		.game_join_change_team_y = gameJoinChangeTeamY,
+		.game_join_ready_y = gameJoinReadyY,
+		.game_join_button_width = gameJoinButtonW,
+		.game_join_button_height = lobby_screen_detail::kGameJoinButtonH,
 	};
 	chromeFrame_.Build([&]() {
 		                   return silencer::client_ui::lobby::LobbyChromeFrame(chromeProps);

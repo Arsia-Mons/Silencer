@@ -191,11 +191,6 @@ void BuildRightUpperContents(LobbyMainAreaPanels & panels,
 			static_cast<Uint16>(std::max(0, layout.rightUpperW)),
 			static_cast<Uint16>(std::max(0, layout.upperH)),
 			interactions);
-	}else if(panels.gameJoinActive){
-		BuildGameJoinUpperTree(
-			panels.gameJoin,
-			static_cast<Uint16>(std::max(0, layout.rightUpperW)),
-			interactions);
 	}else if(panels.gameTechActive){
 		BuildGameTechUpperTree(
 			panels.gameTech,
