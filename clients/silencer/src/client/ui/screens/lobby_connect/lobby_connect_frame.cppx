@@ -76,6 +76,13 @@ text_change_callback(std::function<void(const char *)> on_change) {
 	};
 }
 
+inline std::function<void(const ::ui::TextSubmitEvent&)>
+text_submit_callback(std::function<void(const char *)> on_submit) {
+	return [on_submit](const ::ui::TextSubmitEvent& event) {
+		if(on_submit) on_submit(event.value);
+	};
+}
+
 }  // namespace lobby_connect_frame_detail
 
 using ::ui::children;
@@ -155,8 +162,9 @@ using ::ui::components::TextProps;
 						.caret = username_caret,
 						.selection_start = username_caret,
 						.selection_end = username_caret,
-					}}
+				  }}
 				  onTextChange={lobby_connect_frame_detail::text_change_callback(props.set_username)}
+				  onTextSubmit={lobby_connect_frame_detail::text_submit_callback(props.submit_username)}
 				  maxLength={16}
 				  layout={::ui::LayoutStyle{
 						.width = ::ui::Length::points(183.0f),
@@ -197,8 +205,9 @@ using ::ui::components::TextProps;
 						.caret = password_caret,
 						.selection_start = password_caret,
 						.selection_end = password_caret,
-					}}
+				  }}
 				  onTextChange={lobby_connect_frame_detail::text_change_callback(props.set_password)}
+				  onTextSubmit={lobby_connect_frame_detail::text_submit_callback(props.submit_password)}
 				  maxLength={28}
 				  layout={::ui::LayoutStyle{
 						.width = ::ui::Length::points(183.0f),

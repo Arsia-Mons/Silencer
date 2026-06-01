@@ -171,6 +171,16 @@ void LobbyConnectScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frame
 			lobby_connect_screen_detail::CopyUiText(
 				password, static_cast<int>(sizeof(password)), value);
 		},
+		.submit_username = [this, lobby](const char * value) {
+			lobby_connect_screen_detail::CopyUiText(
+				username, static_cast<int>(sizeof(username)), value);
+			lobby.connection.submit_credentials(username, password);
+		},
+		.submit_password = [this, lobby](const char * value) {
+			lobby_connect_screen_detail::CopyUiText(
+				password, static_cast<int>(sizeof(password)), value);
+			lobby.connection.submit_credentials(username, password);
+		},
 		.login = [this, lobby]() {
 			lobby.connection.submit_credentials(username, password);
 		},
@@ -195,20 +205,6 @@ void LobbyConnectScreen::Destroy(ScreenContext & ctx)
 
 bool LobbyConnectScreen::HandleUiIntent(ScreenContext & ctx, const silencer::ui::UiAction & action)
 {
-	if(action.kind == silencer::ui::UiActionKind::SubmitText &&
-	   (action.id == lobby_connect_screen_detail::kActionUsername || action.id == lobby_connect_screen_detail::kActionPassword)){
-		if(action.id == lobby_connect_screen_detail::kActionUsername){
-			lobby_connect_screen_detail::CopyUiText(
-				username, static_cast<int>(sizeof(username)), action.value.c_str());
-		}else{
-			lobby_connect_screen_detail::CopyUiText(
-				password, static_cast<int>(sizeof(password)), action.value.c_str());
-		}
-		silencer::client_ui::use_lobby(
-			silencer::client_ui::MakeLobbyProvider(ctx))
-			.connection.submit_credentials(username, password);
-		return true;
-	}
 	if(action.kind == silencer::ui::UiActionKind::Cancel){
 		silencer::client_ui::LobbyModel lobby =
 			silencer::client_ui::use_lobby(

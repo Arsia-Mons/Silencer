@@ -15,6 +15,8 @@ struct LobbyConnectFrameProps {
 	bool inactive = false;
 	std::function<void(const char *)> set_username = {};
 	std::function<void(const char *)> set_password = {};
+	std::function<void(const char *)> submit_username = {};
+	std::function<void(const char *)> submit_password = {};
 	std::function<void()> login = {};
 	std::function<void()> cancel = {};
 };
