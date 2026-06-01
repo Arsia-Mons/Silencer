@@ -126,12 +126,5 @@ int BuildHudTeams(const HudView& view, Surface* surface,
 	return (int)view.teams.size();
 }
 
-const TeamHudView* FindTeamById(const HudView& view, Uint16 teamId) {
-	for(const TeamHudView& team : view.teams){
-		if(team.id == teamId) return &team;
-	}
-	return nullptr;
-}
-
 }  // namespace client_ui
 }  // namespace silencer

@@ -87,6 +87,15 @@ constexpr int kReadoutTinyCounterAdvance = 6;
 constexpr int kReadoutBodyBank = 133;
 constexpr int kReadoutBodyAdvance = 6;
 constexpr int kReadoutBodyLineHeight = 11;
+constexpr int kSecretProgressX = 10;
+constexpr int kSecretProgressBaseY = 54;
+constexpr int kSecretProgressStepY = 13;
+constexpr int kSecretProgressWidth = 110;
+constexpr int kSecretProgressHeight = 12;
+constexpr int kSecretProgressBank = 133;
+constexpr int kSecretProgressAdvance = 6;
+constexpr int kSecretProgressLineHeight = 11;
+constexpr int kSecretProgressLines = 9;
 
 inline ::ui::LayoutStyle root_layout(int width, int height) {
 	return {
@@ -222,6 +231,23 @@ inline ::ui::StylePatch readout_text_patch(std::uint8_t palette,
 		.align = align,
 		.line_height = line_height,
 	});
+}
+
+inline ::ui::StylePatch secret_progress_text_patch(std::uint8_t palette,
+                                                   std::uint8_t brightness) {
+	return ::ui::patch().text(::ui::TextVisual{
+		.color = {palette, brightness, 0, 255},
+		.font_id = kSecretProgressBank,
+		.font_size = kSecretProgressAdvance,
+		.line_height = static_cast<float>(kSecretProgressLineHeight),
+	});
+}
+
+inline std::uint8_t animated_highlight_brightness(std::uint8_t phase) {
+	std::uint8_t brightness = 120;
+	if(phase % 32 < 16) brightness += (phase % 16);
+	else brightness += 16 - (phase % 16);
+	return brightness;
 }
 
 struct MessageTextMetrics {
@@ -821,6 +847,115 @@ struct SystemCameraFramesProps {
 	</Box>
 }
 
+struct HudSecretSpriteProps {
+	const char * key = nullptr;
+	const HudSecretOverlayView * overlay = nullptr;
+	int index = 0;
+	std::uint8_t phase = 0;
+};
+
+::ui::UiElement HudSecretSprite(const HudSecretSpriteProps& props) {
+	if(!props.overlay || props.index < 0 ||
+	   props.index >= props.overlay->spriteCount || props.index >= 3){
+		return ::ui::empty();
+	}
+	const HudSpriteView& sprite = props.overlay->sprites[props.index];
+	if(!sprite.visible || sprite.w <= 0 || sprite.h <= 0){
+		return ::ui::empty();
+	}
+	const std::uint8_t brightness = sprite.animatedHighlight
+		? animated_highlight_brightness(props.phase)
+		: sprite.brightness;
+	return <Box
+	  key={props.key}
+	  id="HudSecretSprite"
+	  idOffset={props.index}
+	  layout={absolute_layout(sprite.x, sprite.y, sprite.w, sprite.h)}
+	  style={image_patch(sprite.spriteBank, sprite.spriteIndex, brightness)}
+	/>
+}
+
+inline const char * secret_progress_label(int index) {
+	switch(index){
+		case 0: return "Guv Net";
+		case 1: return "OS";
+		case 2: return "Protocol";
+		case 3: return "Cypher Lock 1";
+		case 4: return "Cypher Lock 2";
+		case 5: return "Cypher Lock 3";
+		case 6: return "Header";
+		case 7: return "Schedule";
+		case 8: return "Location";
+	}
+	return "";
+}
+
+inline bool secret_progress_dimmed(const HudSecretOverlayView& overlay,
+                                   int index,
+                                   std::uint8_t phase) {
+	const int progress = overlay.secretProgress - (20 * (index + 1));
+	const bool hackingTick =
+		overlay.hackingTickEligible && (phase % 16) < 8;
+	return progress < (hackingTick ? -20 : 0);
+}
+
+struct HudSecretProgressLineProps {
+	const char * key = nullptr;
+	const HudSecretOverlayView * overlay = nullptr;
+	int index = 0;
+	std::uint8_t phase = 0;
+};
+
+::ui::UiElement HudSecretProgressLine(const HudSecretProgressLineProps& props) {
+	if(!props.overlay || !props.overlay->showProgress ||
+	   props.index < 0 || props.index >= kSecretProgressLines){
+		return ::ui::empty();
+	}
+	const bool dimmed =
+		secret_progress_dimmed(*props.overlay, props.index, props.phase);
+	return <Text
+	  key={props.key}
+	  id="HudSecretProgressLine"
+	  idOffset={props.index}
+	  value={secret_progress_label(props.index)}
+	  layout={absolute_layout(kSecretProgressX, kSecretProgressBaseY + (props.index * kSecretProgressStepY) + props.overlay->yOffset, kSecretProgressWidth, kSecretProgressHeight)}
+	  style={secret_progress_text_patch(dimmed ? 114 : 0, dimmed ? 96 : 136)}
+	/>
+}
+
+struct HudSecretOverlayProps {
+	const char * key = nullptr;
+	bool show = false;
+	HudSecretOverlayView overlay = {};
+	std::uint8_t phase = 0;
+	int surface_width = 0;
+	int surface_height = 0;
+};
+
+::ui::UiElement HudSecretOverlay(const HudSecretOverlayProps& props) {
+	if(!props.show || !props.overlay.visible){
+		return ::ui::empty();
+	}
+	return <Box
+	  key={props.key}
+	  id="InGameHudSecretRoot"
+	  layout={layer_layout(props.surface_width, props.surface_height)}
+	>
+		<HudSecretSprite key="sprite-0" overlay={&props.overlay} index={0} phase={props.phase} />
+		<HudSecretSprite key="sprite-1" overlay={&props.overlay} index={1} phase={props.phase} />
+		<HudSecretSprite key="sprite-2" overlay={&props.overlay} index={2} phase={props.phase} />
+		<HudSecretProgressLine key="progress-0" overlay={&props.overlay} index={0} phase={props.phase} />
+		<HudSecretProgressLine key="progress-1" overlay={&props.overlay} index={1} phase={props.phase} />
+		<HudSecretProgressLine key="progress-2" overlay={&props.overlay} index={2} phase={props.phase} />
+		<HudSecretProgressLine key="progress-3" overlay={&props.overlay} index={3} phase={props.phase} />
+		<HudSecretProgressLine key="progress-4" overlay={&props.overlay} index={4} phase={props.phase} />
+		<HudSecretProgressLine key="progress-5" overlay={&props.overlay} index={5} phase={props.phase} />
+		<HudSecretProgressLine key="progress-6" overlay={&props.overlay} index={6} phase={props.phase} />
+		<HudSecretProgressLine key="progress-7" overlay={&props.overlay} index={7} phase={props.phase} />
+		<HudSecretProgressLine key="progress-8" overlay={&props.overlay} index={8} phase={props.phase} />
+	</Box>
+}
+
 struct HudReadoutTextProps {
 	const char * key = nullptr;
 	const char * id = nullptr;
@@ -1292,6 +1427,14 @@ using ::ui::components::BoxProps;
 		  show={props.show_system_camera_frames}
 		  frames={props.system_camera_frames}
 		  count={props.system_camera_frame_count}
+		  surfaceWidth={props.width}
+		  surfaceHeight={props.height}
+		/>
+		<ingame_overlay_frame_detail.HudSecretOverlay
+		  key="secret-overlay"
+		  show={props.show_secret_overlay}
+		  overlay={props.secret_overlay}
+		  phase={props.hud_phase}
 		  surfaceWidth={props.width}
 		  surfaceHeight={props.height}
 		/>

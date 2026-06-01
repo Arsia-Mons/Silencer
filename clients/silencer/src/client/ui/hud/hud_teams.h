@@ -17,9 +17,5 @@ struct TeamHudView;
 int BuildHudTeams(const HudView& view, Surface* surface,
                   const Resources& resources, Uint8 phase);
 
-// Linear lookup by team id. Used by the composition function to find the team
-// that owns the viewed player.
-const TeamHudView* FindTeamById(const HudView& view, Uint16 teamId);
-
 }  // namespace client_ui
 }  // namespace silencer

@@ -35,6 +35,7 @@ constexpr int kChatTextStartY = 10;
 constexpr int kChatLineStepY = 10;
 constexpr int kChatMaxHistoryChars = 36;
 constexpr int kChatRightCapX = 36;
+constexpr Uint8 kPlayerStateHacking = 15;  // matches Player::HACKING
 
 int SpriteWidth(const ::Resources& res, Uint8 bank, Uint16 index) {
 	if(bank >= res.spritebank.size() || index >= res.spritebank[bank].size()){
@@ -440,6 +441,87 @@ void PopulateReadouts(HudView& out, const PlayerHudView& player) {
 	if(player.tracetime > 0) readouts.traceTime = player.tracetime;
 }
 
+void AddHudSprite(HudSpriteView * sprites,
+                  int& count,
+                  int capacity,
+                  const ::Resources& resources,
+                  int x,
+                  int y,
+                  Uint8 spriteBank,
+                  Uint16 spriteIndex,
+                  Uint8 brightness = 128,
+                  bool animatedHighlight = false) {
+	if(!sprites || count < 0 || count >= capacity) return;
+	const int w = SpriteWidth(resources, spriteBank, spriteIndex);
+	const int h = SpriteHeight(resources, spriteBank, spriteIndex);
+	if(w <= 0 || h <= 0) return;
+
+	HudSpriteView& sprite = sprites[count++];
+	sprite.visible = true;
+	sprite.x = x;
+	sprite.y = y;
+	sprite.w = w;
+	sprite.h = h;
+	sprite.spriteBank = spriteBank;
+	sprite.spriteIndex = spriteIndex;
+	sprite.brightness = brightness;
+	sprite.animatedHighlight = animatedHighlight;
+}
+
+void PopulateSecretOverlay(HudView& out,
+                           const ::Resources& resources,
+                           const PlayerHudView& player) {
+	if(!player.valid) return;
+	const TeamHudView * team = FindTeamById(out, player.teamId);
+	if(!team || !team->baseDoorId) return;
+
+	int yoffset = 60;
+	const int teamCount = static_cast<int>(out.teams.size());
+	if(teamCount >= 3) yoffset += (teamCount * 20) - 65;
+
+	HudSecretOverlayView& overlay = out.secretOverlay;
+	overlay.visible = true;
+	overlay.yOffset = yoffset;
+	overlay.showProgress = !team->beamingTerminalId;
+	overlay.secretProgress = team->secretProgress;
+	overlay.hackingTickEligible =
+		player.state == kPlayerStateHacking && player.state_i == 16;
+
+	const Uint16 backgroundIndex = team->beamingTerminalId ? 1 : 0;
+	AddHudSprite(overlay.sprites,
+	             overlay.spriteCount,
+	             3,
+	             resources,
+	             SpriteX(resources, 187, backgroundIndex),
+	             SpriteY(resources, 187, backgroundIndex, yoffset),
+	             187,
+	             backgroundIndex);
+	if(out.highlightSecrets){
+		AddHudSprite(overlay.sprites,
+		             overlay.spriteCount,
+		             3,
+		             resources,
+		             SpriteX(resources, 86, 2),
+		             SpriteY(resources, 86, 2, yoffset),
+		             86,
+		             2,
+		             128,
+		             true);
+	}
+	if(out.highlightMinimap){
+		AddHudSprite(overlay.sprites,
+		             overlay.spriteCount,
+		             3,
+		             resources,
+		             SpriteX(resources, 86, 1),
+		             SpriteY(resources, 86, 1),
+		             86,
+		             1,
+		             128,
+		             true);
+	}
+}
+
 void PopulateSystemCameraFrame(HudView& out,
                                const ::Resources& resources,
                                int slot,
@@ -534,6 +616,7 @@ HudView BuildHudView(::World& world) {
 	// Teams strip + player-list rows
 	hudview_detail::PopulateTeams(view, world);
 	hudview_detail::PopulateReadouts(view, view.viewedPlayer);
+	hudview_detail::PopulateSecretOverlay(view, world.resources, view.viewedPlayer);
 
 	// Buy/Tech overlay derived from viewed player.
 	hudview_detail::PopulateBuyTech(view, world, viewedplayer);

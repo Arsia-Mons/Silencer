@@ -10,6 +10,7 @@ struct InGameOverlayFrameProps {
 	const char * key = nullptr;
 	int width = 0;
 	int height = 0;
+	Uint8 hud_phase = 0;
 	bool show_quit_prompt = false;
 	const char * quit_prompt_text = nullptr;
 	bool show_top_message = false;
@@ -29,6 +30,8 @@ struct InGameOverlayFrameProps {
 	ChatOverlayView chat = {};
 	bool show_readouts = false;
 	HudReadoutsView readouts = {};
+	bool show_secret_overlay = false;
+	HudSecretOverlayView secret_overlay = {};
 	bool show_system_camera_frames = false;
 	const SystemCameraFrameView * system_camera_frames = nullptr;
 	int system_camera_frame_count = 0;

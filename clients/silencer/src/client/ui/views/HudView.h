@@ -129,6 +129,28 @@ struct HudReadoutsView {
 	Uint8 traceTime = 0;
 };
 
+struct HudSpriteView {
+	bool   visible = false;
+	int    x = 0;
+	int    y = 0;
+	int    w = 0;
+	int    h = 0;
+	Uint8  spriteBank = 0;
+	Uint16 spriteIndex = 0;
+	Uint8  brightness = 128;
+	bool   animatedHighlight = false;
+};
+
+struct HudSecretOverlayView {
+	bool visible = false;
+	bool showProgress = false;
+	bool hackingTickEligible = false;
+	int  yOffset = 0;
+	int  secretProgress = 0;
+	HudSpriteView sprites[3];
+	int spriteCount = 0;
+};
+
 // One team member, for the buy/tech "give to teammate" menu and player list.
 struct TeamPeerView {
 	Uint8       peerId = 0;
@@ -219,6 +241,7 @@ struct HudView {
 	// Team strip + per-team player rows.
 	std::vector<TeamHudView> teams;
 	HudReadoutsView readouts;
+	HudSecretOverlayView secretOverlay;
 
 	// Buy/Tech overlay derived from viewed player and its team.
 	BuyTechOverlayView buyTech;
