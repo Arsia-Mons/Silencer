@@ -193,6 +193,13 @@ fail_if_match \
   "$REPO_ROOT/clients/silencer/src/client/ui/screens/options/options_display_view_provider.cpp"
 
 fail_if_match \
+  "\\bInGameHudContextValue\\b|\\bstruct[[:space:]]+(State|Actions)\\b|hud[.]state\\b|hud[.]actions\\b" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/hud/ingame_hud_view.cppx" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/hud/ingame_hud_view.hx" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/hud/ingame_hud_view_provider.cpp" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/ClientUi.cpp"
+
+fail_if_match \
   "UiActionKind::Activate" \
   "$REPO_ROOT/clients/silencer/src/client/ui/screens" \
   "$REPO_ROOT/clients/silencer/src/client/ui/modals"

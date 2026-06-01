@@ -11,26 +11,18 @@ class Resources;
 
 namespace silencer::client_ui {
 
-struct InGameHudContextValue {
-	struct State {
-		const HudView * view = nullptr;
-		const Resources * resources = nullptr;
-		Uint8 animationPhase = 0;
-	};
-
-	struct Actions {
-		std::function<void(const std::string&)> set_chat_text = {};
-		std::function<void(const std::string&)> submit_chat_text = {};
-		std::function<void()> toggle_chat_channel = {};
-		std::function<void(int)> focus_buy_tech = {};
-		std::function<void(int)> activate_buy_tech = {};
-	};
-
-	State state = {};
-	Actions actions = {};
+struct InGameHud {
+	const HudView * view = nullptr;
+	const Resources * resources = nullptr;
+	Uint8 animationPhase = 0;
+	std::function<void(const std::string&)> set_chat_text = {};
+	std::function<void(const std::string&)> submit_chat_text = {};
+	std::function<void()> toggle_chat_channel = {};
+	std::function<void(int)> focus_buy_tech = {};
+	std::function<void(int)> activate_buy_tech = {};
 };
 
-const InGameHudContextValue& UseInGameHud();
+const InGameHud& UseInGameHud();
 
 struct InGameHudFrameProps {
 	const char * key = nullptr;
@@ -40,7 +32,7 @@ struct InGameHudFrameProps {
 
 struct InGameHudViewProps {
 	const char * key = nullptr;
-	const InGameHudContextValue * value = nullptr;
+	const InGameHud * hud = nullptr;
 };
 
 ::ui::UiElement InGameHudView(const InGameHudViewProps& props);

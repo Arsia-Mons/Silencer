@@ -257,14 +257,14 @@ struct HudSpriteProps {
 };
 
 ::ui::UiElement HudSprite(const HudSpriteProps& props) {
-	const InGameHudContextValue& hud = UseInGameHud();
-	if(!hud.state.resources) return ::ui::empty();
+	const InGameHud& hud = UseInGameHud();
+	if(!hud.resources) return ::ui::empty();
 	const int width = props.w > 0
 		? props.w
-		: props.src_w > 0 ? props.src_w : sprite_width(*hud.state.resources, props.bank, props.index);
+		: props.src_w > 0 ? props.src_w : sprite_width(*hud.resources, props.bank, props.index);
 	const int height = props.h > 0
 		? props.h
-		: props.src_h > 0 ? props.src_h : sprite_height(*hud.state.resources, props.bank, props.index);
+		: props.src_h > 0 ? props.src_h : sprite_height(*hud.resources, props.bank, props.index);
 	if(width <= 0 || height <= 0) return ::ui::empty();
 	const RetainedHudSpritePayload payload{
 		.bank = props.bank,
@@ -297,9 +297,9 @@ struct HudFixedSpriteProps {
 };
 
 ::ui::UiElement HudFixedSprite(const HudFixedSpriteProps& props) {
-	const InGameHudContextValue& hud = UseInGameHud();
-	if(!hud.state.resources) return ::ui::empty();
-	const Resources& resources = *hud.state.resources;
+	const InGameHud& hud = UseInGameHud();
+	if(!hud.resources) return ::ui::empty();
+	const Resources& resources = *hud.resources;
 	return <HudSprite
 	  key={props.key}
 	  bank={props.bank}
@@ -328,8 +328,8 @@ struct FuelLowSpriteProps {
 };
 
 ::ui::UiElement FuelLowSprite(const FuelLowSpriteProps& props) {
-	const InGameHudContextValue& hud = UseInGameHud();
-	if(!hud.state.view || !hud.state.view->viewedPlayer.fuelLow) return ::ui::empty();
+	const InGameHud& hud = UseInGameHud();
+	if(!hud.view || !hud.view->viewedPlayer.fuelLow) return ::ui::empty();
 	return <HudFixedSprite key={props.key} bank={95} index={8} />
 }
 
@@ -338,10 +338,10 @@ struct FuelBarProps {
 };
 
 ::ui::UiElement FuelBar(const FuelBarProps& props) {
-	const InGameHudContextValue& hud = UseInGameHud();
-	if(!hud.state.view || !hud.state.resources) return ::ui::empty();
-	const PlayerHudView& player = hud.state.view->viewedPlayer;
-	const Resources& resources = *hud.state.resources;
+	const InGameHud& hud = UseInGameHud();
+	if(!hud.view || !hud.resources) return ::ui::empty();
+	const PlayerHudView& player = hud.view->viewedPlayer;
+	const Resources& resources = *hud.resources;
 	const int w = proportional_size(player.fuel, player.maxFuel, sprite_width(resources, 95, 6));
 	const int h = sprite_height(resources, 95, 6);
 	if(w <= 0 || h <= 0) return ::ui::empty();
@@ -363,10 +363,10 @@ struct HealthBarProps {
 };
 
 ::ui::UiElement HealthBar(const HealthBarProps& props) {
-	const InGameHudContextValue& hud = UseInGameHud();
-	if(!hud.state.view || !hud.state.resources) return ::ui::empty();
-	const PlayerHudView& player = hud.state.view->viewedPlayer;
-	const Resources& resources = *hud.state.resources;
+	const InGameHud& hud = UseInGameHud();
+	if(!hud.view || !hud.resources) return ::ui::empty();
+	const PlayerHudView& player = hud.view->viewedPlayer;
+	const Resources& resources = *hud.resources;
 	const int h = sprite_height(resources, 95, 0);
 	const int w = sprite_width(resources, 95, 0);
 	if(w <= 0 || h <= 0) return ::ui::empty();
@@ -392,10 +392,10 @@ struct ShieldBarProps {
 };
 
 ::ui::UiElement ShieldBar(const ShieldBarProps& props) {
-	const InGameHudContextValue& hud = UseInGameHud();
-	if(!hud.state.view || !hud.state.resources) return ::ui::empty();
-	const PlayerHudView& player = hud.state.view->viewedPlayer;
-	const Resources& resources = *hud.state.resources;
+	const InGameHud& hud = UseInGameHud();
+	if(!hud.view || !hud.resources) return ::ui::empty();
+	const PlayerHudView& player = hud.view->viewedPlayer;
+	const Resources& resources = *hud.resources;
 	const int h = sprite_height(resources, 95, 1);
 	const int w = sprite_width(resources, 95, 1);
 	if(w <= 0 || h <= 0) return ::ui::empty();
@@ -407,10 +407,10 @@ struct ShieldBarProps {
 	if(player.shield > player.maxShield){
 		const Uint8 time = 6;
 		brightness = 136;
-		if(hud.state.animationPhase % (time * 2) < time){
-			brightness += (hud.state.animationPhase % time) * 2;
+		if(hud.animationPhase % (time * 2) < time){
+			brightness += (hud.animationPhase % time) * 2;
 		}else{
-			brightness += (time - (hud.state.animationPhase % time)) * 2;
+			brightness += (time - (hud.animationPhase % time)) * 2;
 		}
 	}
 	return <HudSprite
@@ -433,8 +433,8 @@ struct PoisonedSpriteProps {
 };
 
 ::ui::UiElement PoisonedSprite(const PoisonedSpriteProps& props) {
-	const InGameHudContextValue& hud = UseInGameHud();
-	if(!hud.state.view || !hud.state.view->viewedPlayer.poisonedBy) return ::ui::empty();
+	const InGameHud& hud = UseInGameHud();
+	if(!hud.view || !hud.view->viewedPlayer.poisonedBy) return ::ui::empty();
 	return <HudFixedSprite key={props.key} bank={97} index={5} logicalX={183} logicalY={453} />
 }
 
@@ -443,10 +443,10 @@ struct FilesBarProps {
 };
 
 ::ui::UiElement FilesBar(const FilesBarProps& props) {
-	const InGameHudContextValue& hud = UseInGameHud();
-	if(!hud.state.view || !hud.state.resources) return ::ui::empty();
-	const PlayerHudView& player = hud.state.view->viewedPlayer;
-	const Resources& resources = *hud.state.resources;
+	const InGameHud& hud = UseInGameHud();
+	if(!hud.view || !hud.resources) return ::ui::empty();
+	const PlayerHudView& player = hud.view->viewedPlayer;
+	const Resources& resources = *hud.resources;
 	const int w = proportional_size(player.files, player.maxFiles, sprite_width(resources, 95, 7));
 	const int h = sprite_height(resources, 95, 7);
 	if(w <= 0 || h <= 0) return ::ui::empty();
@@ -468,10 +468,10 @@ struct WeaponFaceProps {
 };
 
 ::ui::UiElement WeaponFace(const WeaponFaceProps& props) {
-	const InGameHudContextValue& hud = UseInGameHud();
-	if(!hud.state.view) return ::ui::empty();
+	const InGameHud& hud = UseInGameHud();
+	if(!hud.view) return ::ui::empty();
 	Uint16 index = 1;
-	switch(hud.state.view->viewedPlayer.currentWeapon){
+	switch(hud.view->viewedPlayer.currentWeapon){
 		case 1: index = 2; break;
 		case 2: index = 3; break;
 		case 3: index = 4; break;
@@ -485,10 +485,10 @@ struct WeaponGlowProps {
 };
 
 ::ui::UiElement WeaponGlow(const WeaponGlowProps& props) {
-	const InGameHudContextValue& hud = UseInGameHud();
-	if(!hud.state.view) return ::ui::empty();
+	const InGameHud& hud = UseInGameHud();
+	if(!hud.view) return ::ui::empty();
 	Uint16 index = 5;
-	switch(hud.state.view->viewedPlayer.currentWeapon){
+	switch(hud.view->viewedPlayer.currentWeapon){
 		case 1: index = 6; break;
 		case 2: index = 7; break;
 		case 3: index = 8; break;
@@ -502,15 +502,15 @@ struct WeaponSelectorProps {
 };
 
 ::ui::UiElement WeaponSelector(const WeaponSelectorProps& props) {
-	const InGameHudContextValue& hud = UseInGameHud();
-	if(!hud.state.view || !hud.state.resources) return ::ui::empty();
-	const Resources& resources = *hud.state.resources;
+	const InGameHud& hud = UseInGameHud();
+	if(!hud.view || !hud.resources) return ::ui::empty();
+	const Resources& resources = *hud.resources;
 	return <HudSprite
 	  key={props.key}
 	  bank={96}
 	  index={0}
 	  x={sprite_x(resources, 96, 0)}
-	  y={sprite_y(resources, 96, 0) + (hud.state.view->viewedPlayer.currentWeapon * 14)}
+	  y={sprite_y(resources, 96, 0) + (hud.view->viewedPlayer.currentWeapon * 14)}
 	/>
 }
 
@@ -519,12 +519,12 @@ struct HealthWarningSpriteProps {
 };
 
 ::ui::UiElement HealthWarningSprite(const HealthWarningSpriteProps& props) {
-	const InGameHudContextValue& hud = UseInGameHud();
-	if(!hud.state.view) return ::ui::empty();
-	const PlayerHudView& player = hud.state.view->viewedPlayer;
+	const InGameHud& hud = UseInGameHud();
+	if(!hud.view) return ::ui::empty();
+	const PlayerHudView& player = hud.view->viewedPlayer;
 	if(!player.health || player.maxHealth <= 0) return ::ui::empty();
 	if(static_cast<float>(player.health) / player.maxHealth > 0.5f) return ::ui::empty();
-	if(hud.state.animationPhase % 8 > 3) return ::ui::empty();
+	if(hud.animationPhase % 8 > 3) return ::ui::empty();
 	return <HudFixedSprite key={props.key} bank={95} index={3} />
 }
 
@@ -533,12 +533,12 @@ struct ShieldWarningSpriteProps {
 };
 
 ::ui::UiElement ShieldWarningSprite(const ShieldWarningSpriteProps& props) {
-	const InGameHudContextValue& hud = UseInGameHud();
-	if(!hud.state.view) return ::ui::empty();
-	const PlayerHudView& player = hud.state.view->viewedPlayer;
+	const InGameHud& hud = UseInGameHud();
+	if(!hud.view) return ::ui::empty();
+	const PlayerHudView& player = hud.view->viewedPlayer;
 	if(!player.shield || player.maxShield <= 0) return ::ui::empty();
 	if(static_cast<float>(player.shield) / player.maxShield > 0.5f) return ::ui::empty();
-	if(hud.state.animationPhase % 8 > 3) return ::ui::empty();
+	if(hud.animationPhase % 8 > 3) return ::ui::empty();
 	return <HudFixedSprite key={props.key} bank={95} index={4} />
 }
 
@@ -548,13 +548,13 @@ struct InventoryIconProps {
 };
 
 ::ui::UiElement InventoryIcon(const InventoryIconProps& props) {
-	const InGameHudContextValue& hud = UseInGameHud();
-	if(!hud.state.view || !hud.state.resources) return ::ui::empty();
+	const InGameHud& hud = UseInGameHud();
+	if(!hud.view || !hud.resources) return ::ui::empty();
 	if(props.slot < 0 || props.slot >= 4) return ::ui::empty();
 	const int xOffsets[] = {612, 584, 556, 528};
 	const int yOffsets[] = {13, 13, 11, 7};
-	const PlayerHudView& player = hud.state.view->viewedPlayer;
-	const Resources& resources = *hud.state.resources;
+	const PlayerHudView& player = hud.view->viewedPlayer;
+	const Resources& resources = *hud.resources;
 	const Uint8 index = player.inventorySpriteIndexes[props.slot];
 	const int x = sprite_x(resources, 97, index, xOffsets[props.slot]);
 	const int y = sprite_y(resources, 97, index, yOffsets[props.slot]);
@@ -580,12 +580,12 @@ struct InventoryLetterProps {
 };
 
 ::ui::UiElement InventoryLetter(const InventoryLetterProps& props) {
-	const InGameHudContextValue& hud = UseInGameHud();
-	if(!hud.state.view) return ::ui::empty();
+	const InGameHud& hud = UseInGameHud();
+	if(!hud.view) return ::ui::empty();
 	if(props.slot < 0 || props.slot >= 4) return ::ui::empty();
 	const int xOffsets[] = {612, 584, 556, 528};
 	const int yOffsets[] = {13, 13, 11, 7};
-	const PlayerHudView& player = hud.state.view->viewedPlayer;
+	const PlayerHudView& player = hud.view->viewedPlayer;
 	const char letter = player.inventoryLetters[props.slot];
 	if(letter == '\0') return ::ui::empty();
 	const Uint8 brightness = player.currentInventoryItem == props.slot ? 128 : 32;
@@ -602,8 +602,8 @@ struct HudStatusSpritesProps {
 };
 
 ::ui::UiElement HudStatusSprites(const HudStatusSpritesProps& props) {
-	const InGameHudContextValue& hud = UseInGameHud();
-	if(!hud.state.view || !hud.state.view->viewedPlayer.valid) return ::ui::empty();
+	const InGameHud& hud = UseInGameHud();
+	if(!hud.view || !hud.view->viewedPlayer.valid) return ::ui::empty();
 	return <Box key={props.key} layout={root_layout()}>
 		<HudFixedSprite key="minimap-frame" bank={94} index={0} />
 		<FuelLowSprite key="fuel-low" />
@@ -712,9 +712,9 @@ struct HudTeamEmblemProps {
 };
 
 ::ui::UiElement HudTeamEmblem(const HudTeamEmblemProps& props) {
-	const InGameHudContextValue& hud = UseInGameHud();
-	if(!hud.state.view) return ::ui::empty();
-	const TeamHudView * team = team_at(*hud.state.view, props.slot);
+	const InGameHud& hud = UseInGameHud();
+	if(!hud.view) return ::ui::empty();
+	const TeamHudView * team = team_at(*hud.view, props.slot);
 	if(!team) return ::ui::empty();
 	const RetainedHudTeamEmblemPayload payload{
 		.bank = 181,
@@ -735,9 +735,9 @@ struct HudTeamChromeProps {
 };
 
 ::ui::UiElement HudTeamChrome(const HudTeamChromeProps& props) {
-	const InGameHudContextValue& hud = UseInGameHud();
-	if(!hud.state.view || hud.state.view->teams.empty()) return ::ui::empty();
-	if(hud.state.view->teams.size() == 1){
+	const InGameHud& hud = UseInGameHud();
+	if(!hud.view || hud.view->teams.empty()) return ::ui::empty();
+	if(hud.view->teams.size() == 1){
 		return <HudFixedSprite key={props.key} bank={94} index={1} />
 	}
 	return <Box key={props.key} layout={root_layout()}>
@@ -745,7 +745,7 @@ struct HudTeamChromeProps {
 		  key="team-strip-background"
 		  bank={103}
 		  index={0}
-		  logicalY={-133 + ((static_cast<int>(hud.state.view->teams.size()) - 1) * 20)}
+		  logicalY={-133 + ((static_cast<int>(hud.view->teams.size()) - 1) * 20)}
 		/>
 		<HudFixedSprite key="team-strip-front" bank={103} index={1} />
 	</Box>
@@ -758,9 +758,9 @@ struct HudTeamPeerSpriteProps {
 };
 
 ::ui::UiElement HudTeamPeerSprite(const HudTeamPeerSpriteProps& props) {
-	const InGameHudContextValue& hud = UseInGameHud();
-	if(!hud.state.view) return ::ui::empty();
-	const TeamHudView * team = team_at(*hud.state.view, props.team_slot);
+	const InGameHud& hud = UseInGameHud();
+	if(!hud.view) return ::ui::empty();
+	const TeamHudView * team = team_at(*hud.view, props.team_slot);
 	if(!team) return ::ui::empty();
 	if(props.peer_slot < 0 || props.peer_slot >= team->numPeers || props.peer_slot >= 4){
 		return ::ui::empty();
@@ -780,7 +780,7 @@ struct HudTeamPeerSpriteProps {
 			rampColor = 114;
 			shift = 0;
 		}
-		rampPlus = hud_pulse_plus(hud.state.animationPhase, time, shift);
+		rampPlus = hud_pulse_plus(hud.animationPhase, time, shift);
 	}
 	return <HudFixedSprite
 	  key={props.key}
@@ -800,15 +800,15 @@ struct HudTeamSecretSpriteProps {
 };
 
 ::ui::UiElement HudTeamSecretSprite(const HudTeamSecretSpriteProps& props) {
-	const InGameHudContextValue& hud = UseInGameHud();
-	if(!hud.state.view) return ::ui::empty();
-	const TeamHudView * team = team_at(*hud.state.view, props.team_slot);
+	const InGameHud& hud = UseInGameHud();
+	if(!hud.view) return ::ui::empty();
+	const TeamHudView * team = team_at(*hud.view, props.team_slot);
 	if(!team || props.secret_slot < 0 || props.secret_slot >= 3) return ::ui::empty();
 	Uint8 index = team->secrets > props.secret_slot ? 2 : 3;
 	Uint8 rampColor = 0;
 	const int secretPlayers = players_with_secret(*team);
 	if(index == 3 && secretPlayers > props.secret_slot - team->secrets &&
-	   hud.state.view->tickCount % 12 < 6){
+	   hud.view->tickCount % 12 < 6){
 		index = 2;
 	}
 	if(team->beamingTerminalId && team->secrets == props.secret_slot && index == 3){
@@ -831,8 +831,8 @@ struct HudTeamRowProps {
 };
 
 ::ui::UiElement HudTeamRow(const HudTeamRowProps& props) {
-	const InGameHudContextValue& hud = UseInGameHud();
-	if(!hud.state.view || !team_at(*hud.state.view, props.slot)) return ::ui::empty();
+	const InGameHud& hud = UseInGameHud();
+	if(!hud.view || !team_at(*hud.view, props.slot)) return ::ui::empty();
 	return <Box key={props.key} layout={root_layout()}>
 		<HudTeamPeerSprite key="peer-0" teamSlot={props.slot} peerSlot={0} />
 		<HudTeamPeerSprite key="peer-1" teamSlot={props.slot} peerSlot={1} />
@@ -850,8 +850,8 @@ struct HudTeamsProps {
 };
 
 ::ui::UiElement HudTeams(const HudTeamsProps& props) {
-	const InGameHudContextValue& hud = UseInGameHud();
-	if(!hud.state.view || hud.state.view->teams.empty()) return ::ui::empty();
+	const InGameHud& hud = UseInGameHud();
+	if(!hud.view || hud.view->teams.empty()) return ::ui::empty();
 	return <Box key={props.key} layout={root_layout()}>
 		<HudTeamChrome key="chrome" />
 		<HudTeamRow key="team-0" slot={0} />
@@ -872,14 +872,14 @@ struct HudSecretHighlightSpriteProps {
 };
 
 ::ui::UiElement HudSecretHighlightSprite(const HudSecretHighlightSpriteProps& props) {
-	const InGameHudContextValue& hud = UseInGameHud();
-	if(!hud.state.view || !hud.state.view->highlightSecrets) return ::ui::empty();
+	const InGameHud& hud = UseInGameHud();
+	if(!hud.view || !hud.view->highlightSecrets) return ::ui::empty();
 	return <HudFixedSprite
 	  key={props.key}
 	  bank={86}
 	  index={2}
-	  logicalY={secret_y_offset(*hud.state.view)}
-	  brightness={secret_highlight_brightness(hud.state.animationPhase)}
+	  logicalY={secret_y_offset(*hud.view)}
+	  brightness={secret_highlight_brightness(hud.animationPhase)}
 	/>
 }
 
@@ -888,22 +888,22 @@ struct HudMinimapHighlightSpriteProps {
 };
 
 ::ui::UiElement HudMinimapHighlightSprite(const HudMinimapHighlightSpriteProps& props) {
-	const InGameHudContextValue& hud = UseInGameHud();
-	if(!hud.state.view || !hud.state.view->highlightMinimap) return ::ui::empty();
+	const InGameHud& hud = UseInGameHud();
+	if(!hud.view || !hud.view->highlightMinimap) return ::ui::empty();
 	return <HudFixedSprite
 	  key={props.key}
 	  bank={86}
 	  index={1}
-	  brightness={secret_highlight_brightness(hud.state.animationPhase)}
+	  brightness={secret_highlight_brightness(hud.animationPhase)}
 	/>
 }
 
 ::ui::UiElement HudSecretSprites(const HudSecretSpritesProps& props) {
-	const InGameHudContextValue& hud = UseInGameHud();
-	if(!hud.state.view || !hud.state.resources) return ::ui::empty();
-	const TeamHudView * team = viewed_player_team(*hud.state.view);
+	const InGameHud& hud = UseInGameHud();
+	if(!hud.view || !hud.resources) return ::ui::empty();
+	const TeamHudView * team = viewed_player_team(*hud.view);
 	if(!team || !team->baseDoorId) return ::ui::empty();
-	const int yOffset = secret_y_offset(*hud.state.view);
+	const int yOffset = secret_y_offset(*hud.view);
 	const Uint16 backgroundIndex = team->beamingTerminalId ? 1 : 0;
 	return <Box key={props.key} layout={root_layout()}>
 		<HudFixedSprite key="secret-background" bank={187} index={backgroundIndex} logicalY={yOffset} />
@@ -918,17 +918,17 @@ struct SecretProgressLineProps {
 };
 
 ::ui::UiElement SecretProgressLine(const SecretProgressLineProps& props) {
-	const InGameHudContextValue& hud = UseInGameHud();
-	if(!hud.state.view) return ::ui::empty();
-	const TeamHudView * team = viewed_player_team(*hud.state.view);
+	const InGameHud& hud = UseInGameHud();
+	if(!hud.view) return ::ui::empty();
+	const TeamHudView * team = viewed_player_team(*hud.view);
 	if(!team || !team->baseDoorId || team->beamingTerminalId) return ::ui::empty();
 	if(props.line < 0 || props.line >= 9) return ::ui::empty();
-	const PlayerHudView& player = hud.state.view->viewedPlayer;
+	const PlayerHudView& player = hud.view->viewedPlayer;
 	return <Text
 	  key={props.key}
 	  value={secret_progress_label(props.line)}
-	  layout={text_layout(10, 54 + (props.line * 13) + secret_y_offset(*hud.state.view), 110, 12)}
-	  style={text_style(secret_progress_color(player, team->secretProgress, hud.state.animationPhase, props.line), 133, 6)}
+	  layout={text_layout(10, 54 + (props.line * 13) + secret_y_offset(*hud.view), 110, 12)}
+	  style={text_style(secret_progress_color(player, team->secretProgress, hud.animationPhase, props.line), 133, 6)}
 	/>
 }
 
@@ -955,8 +955,8 @@ struct HudSecretOverlayProps {
 };
 
 ::ui::UiElement HudSecretOverlay(const HudSecretOverlayProps& props) {
-	const InGameHudContextValue& hud = UseInGameHud();
-	if(!hud.state.view || !viewed_player_team(*hud.state.view)) return ::ui::empty();
+	const InGameHud& hud = UseInGameHud();
+	if(!hud.view || !viewed_player_team(*hud.view)) return ::ui::empty();
 	return <Box key={props.key} layout={root_layout()}>
 		<HudSecretSprites key="sprites" />
 		<HudSecretProgress key="progress" />
@@ -1018,9 +1018,9 @@ struct PlayerListPeerRowProps {
 };
 
 ::ui::UiElement PlayerListPeerRow(const PlayerListPeerRowProps& props) {
-	const InGameHudContextValue& hud = UseInGameHud();
-	if(!hud.state.view) return ::ui::empty();
-	const TeamHudView * team = team_at(*hud.state.view, props.team_slot);
+	const InGameHud& hud = UseInGameHud();
+	if(!hud.view) return ::ui::empty();
+	const TeamHudView * team = team_at(*hud.view, props.team_slot);
 	if(!team) return ::ui::empty();
 	const TeamPeerView * peer = player_list_peer_at(*team, props.peer_slot);
 	if(!peer) return ::ui::empty();
@@ -1051,9 +1051,9 @@ struct PlayerListTeamRowProps {
 };
 
 ::ui::UiElement PlayerListTeamRow(const PlayerListTeamRowProps& props) {
-	const InGameHudContextValue& hud = UseInGameHud();
-	if(!hud.state.view) return ::ui::empty();
-	const TeamHudView * team = team_at(*hud.state.view, props.slot);
+	const InGameHud& hud = UseInGameHud();
+	if(!hud.view) return ::ui::empty();
+	const TeamHudView * team = team_at(*hud.view, props.slot);
 	if(!team) return ::ui::empty();
 	const int emblemY = player_list_team_row_y(props.slot) + ((58 - team->emblemH) / 2);
 	return <Box key={props.key} layout={root_layout()}>
@@ -1070,15 +1070,11 @@ struct PlayerListOverlayProps {
 };
 
 ::ui::UiElement PlayerListOverlay(const PlayerListOverlayProps& props) {
-	const InGameHudContextValue& hud = UseInGameHud();
-	if(!hud.state.view || !hud.state.view->showPlayerList || hud.state.view->teams.empty()) return ::ui::empty();
-	if(!player_list_has_peers(*hud.state.view)) return ::ui::empty();
+	const InGameHud& hud = UseInGameHud();
+	if(!hud.view || !hud.view->showPlayerList || hud.view->teams.empty()) return ::ui::empty();
+	if(!player_list_has_peers(*hud.view)) return ::ui::empty();
 	return <Box key={props.key} layout={root_layout()}>
-		<Box
-		  key="panel"
-		  layout={player_list_panel_layout(*hud.state.view)}
-		  style={player_list_panel_style()}
-		/>
+		<Box key="panel" layout={player_list_panel_layout(*hud.view)} style={player_list_panel_style()} />
 		<PlayerListTeamRow key="team-0" slot={0} />
 		<PlayerListTeamRow key="team-1" slot={1} />
 		<PlayerListTeamRow key="team-2" slot={2} />
@@ -1167,9 +1163,9 @@ struct MessageLineProps {
 };
 
 ::ui::UiElement MessageLine(const MessageLineProps& props) {
-	const InGameHudContextValue& hud = UseInGameHud();
-	if(!hud.state.view) return ::ui::empty();
-	const InGameMessageView& message = hud.state.view->message;
+	const InGameHud& hud = UseInGameHud();
+	if(!hud.view) return ::ui::empty();
+	const InGameMessageView& message = hud.view->message;
 	std::string text = visible_message_line(message, props.line);
 	if(text.empty()) return ::ui::empty();
 	const MessageTextMetrics metrics = message_text_metrics(message.messagetype, props.line);
@@ -1190,8 +1186,8 @@ struct MessageOverlayProps {
 };
 
 ::ui::UiElement MessageOverlay(const MessageOverlayProps& props) {
-	const InGameHudContextValue& hud = UseInGameHud();
-	if(!hud.state.view || !hud.state.view->message.message_i || hud.state.view->message.message.empty()){
+	const InGameHud& hud = UseInGameHud();
+	if(!hud.view || !hud.view->message.message_i || hud.view->message.message.empty()){
 		return ::ui::empty();
 	}
 	return <Box key={props.key} layout={root_layout()}>
@@ -1277,9 +1273,9 @@ struct ChatBackgroundSpriteProps {
 };
 
 ::ui::UiElement ChatBackgroundSprite(const ChatBackgroundSpriteProps& props) {
-	const InGameHudContextValue& hud = UseInGameHud();
-	if(!hud.state.resources) return ::ui::empty();
-	const Resources& resources = *hud.state.resources;
+	const InGameHud& hud = UseInGameHud();
+	if(!hud.resources) return ::ui::empty();
+	const Resources& resources = *hud.resources;
 	const int w = props.src_w > 0
 		? props.src_w
 		: sprite_width(resources, kChatBackgroundBank, props.index);
@@ -1307,9 +1303,9 @@ struct ChatMiddleTileProps {
 };
 
 ::ui::UiElement ChatMiddleTile(const ChatMiddleTileProps& props) {
-	const InGameHudContextValue& hud = UseInGameHud();
-	if(!hud.state.resources) return ::ui::empty();
-	const Resources& resources = *hud.state.resources;
+	const InGameHud& hud = UseInGameHud();
+	if(!hud.resources) return ::ui::empty();
+	const Resources& resources = *hud.resources;
 	int tileW = 0;
 	const int logicalX = chat_middle_tile_x(resources, props.interior, props.slot, tileW);
 	if(logicalX < 0 || tileW <= 0) return ::ui::empty();
@@ -1363,9 +1359,9 @@ struct ChatHistoryLineProps {
 };
 
 ::ui::UiElement ChatHistoryLine(const ChatHistoryLineProps& props) {
-	const InGameHudContextValue& hud = UseInGameHud();
-	if(!hud.state.view) return ::ui::empty();
-	std::string text = chat_history_line_text(*hud.state.view, props.slot);
+	const InGameHud& hud = UseInGameHud();
+	if(!hud.view) return ::ui::empty();
+	std::string text = chat_history_line_text(*hud.view, props.slot);
 	if(text.empty()) return ::ui::empty();
 	return <Text
 	  key={props.key}
@@ -1381,9 +1377,9 @@ struct ChatInputLineProps {
 };
 
 ::ui::UiElement ChatInputLine(const ChatInputLineProps& props) {
-	const InGameHudContextValue& hud = UseInGameHud();
-	if(!hud.state.view) return ::ui::empty();
-	const PlayerHudView& player = hud.state.view->viewedPlayer;
+	const InGameHud& hud = UseInGameHud();
+	if(!hud.view) return ::ui::empty();
+	const PlayerHudView& player = hud.view->viewedPlayer;
 	if(!player.chatActive) return ::ui::empty();
 	const char * prefix = player.chatWithTeam ? "(TEAM):" : "(ALL):";
 	const int prefixW = static_cast<int>(std::strlen(prefix)) * kChatTextAdvance;
@@ -1394,7 +1390,7 @@ struct ChatInputLineProps {
 		  key={player.chatWithTeam ? "channel-hit-team" : "channel-hit-all"}
 		  focusable={true}
 		  accessibility={::ui::components::AccessibilityProps{.role = ::ui::SemanticRole::Button, .label = player.chatWithTeam ? "Team chat" : "All chat"}}
-		  onActivate={toggle_chat_channel(hud.actions.toggle_chat_channel)}
+		  onActivate={toggle_chat_channel(hud.toggle_chat_channel)}
 		  layout={text_layout(kChatX + kChatTextX, inputY, prefixW, kChatLineHeight)}
 		/>
 		<Text
@@ -1409,8 +1405,8 @@ struct ChatInputLineProps {
 		  value={player.chatText.c_str()}
 		  autofocus={true}
 		  accessibility={::ui::components::AccessibilityProps{.role = ::ui::SemanticRole::TextBox, .label = "In-game chat"}}
-		  onChange={hud.actions.set_chat_text}
-		  onActivate={submit_chat_text(hud.actions.submit_chat_text, player.chatText)}
+		  onChange={hud.set_chat_text}
+		  onActivate={submit_chat_text(hud.submit_chat_text, player.chatText)}
 		  layout={chat_input_layout(inputX, inputY, (kChatInputVisibleChars * kChatTextAdvance) + 16)}
 		  style={chat_input_style()}
 		/>
@@ -1422,11 +1418,11 @@ struct ChatOverlayProps {
 };
 
 ::ui::UiElement ChatOverlay(const ChatOverlayProps& props) {
-	const InGameHudContextValue& hud = UseInGameHud();
-	if(!hud.state.view) return ::ui::empty();
-	const PlayerHudView& player = hud.state.view->viewedPlayer;
-	if(!player.chatActive && hud.state.view->showChatTicks <= 0) return ::ui::empty();
-	const int lineCount = chat_visible_line_count(*hud.state.view);
+	const InGameHud& hud = UseInGameHud();
+	if(!hud.view) return ::ui::empty();
+	const PlayerHudView& player = hud.view->viewedPlayer;
+	if(!player.chatActive && hud.view->showChatTicks <= 0) return ::ui::empty();
+	const int lineCount = chat_visible_line_count(*hud.view);
 	if(lineCount <= 0 && !player.chatActive) return ::ui::empty();
 	const int inputY = kChatTextStartY + (lineCount * kChatLineStepY);
 	return <Box key={props.key} layout={root_layout()}>
@@ -1485,12 +1481,12 @@ struct BuyTechRowProps {
 };
 
 ::ui::UiElement BuyTechRow(const BuyTechRowProps& props) {
-	const InGameHudContextValue& hud = UseInGameHud();
-	if(!hud.state.view || !hud.state.resources) return ::ui::empty();
-	const BuyTechOverlayView& overlay = hud.state.view->buyTech;
+	const InGameHud& hud = UseInGameHud();
+	if(!hud.view || !hud.resources) return ::ui::empty();
+	const BuyTechOverlayView& overlay = hud.view->buyTech;
 	const BuyTechRowView * row = buy_tech_row_at(overlay, props.slot);
 	if(!row) return ::ui::empty();
-	const Resources& resources = *hud.state.resources;
+	const Resources& resources = *hud.resources;
 	const int yOffset = props.slot * 25;
 	const int highlightX = sprite_x(resources, 102, 1);
 	const int highlightY = sprite_y(resources, 102, 1) + yOffset;
@@ -1507,8 +1503,8 @@ struct BuyTechRowProps {
 		  focusable={true}
 		  autofocus={row->selected}
 		  accessibility={::ui::components::AccessibilityProps{.role = ::ui::SemanticRole::Button, .label = row->name.c_str()}}
-		  onFocus={focus_buy_tech_row(hud.actions.focus_buy_tech, row->index)}
-		  onActivate={activate_buy_tech_row(hud.actions.activate_buy_tech, row->index)}
+		  onFocus={focus_buy_tech_row(hud.focus_buy_tech, row->index)}
+		  onActivate={activate_buy_tech_row(hud.activate_buy_tech, row->index)}
 		  layout={text_layout(highlightX, highlightY, highlightW, highlightH)}
 		/>
 		<HudSprite
@@ -1542,9 +1538,9 @@ struct BuyTechSelectedHighlightProps {
 };
 
 ::ui::UiElement BuyTechSelectedHighlight(const BuyTechSelectedHighlightProps& props) {
-	const InGameHudContextValue& hud = UseInGameHud();
-	if(!hud.state.view) return ::ui::empty();
-	const BuyTechRowView * row = buy_tech_row_at(hud.state.view->buyTech, props.slot);
+	const InGameHud& hud = UseInGameHud();
+	if(!hud.view) return ::ui::empty();
+	const BuyTechRowView * row = buy_tech_row_at(hud.view->buyTech, props.slot);
 	if(!row || !row->selected) return ::ui::empty();
 	return <HudFixedSprite key={props.key} bank={102} index={1} logicalY={props.slot * 25} />
 }
@@ -1554,11 +1550,11 @@ struct BuyTechOverlayProps {
 };
 
 ::ui::UiElement BuyTechOverlay(const BuyTechOverlayProps& props) {
-	const InGameHudContextValue& hud = UseInGameHud();
-	if(!hud.state.view || !hud.state.view->buyTech.visible || hud.state.view->buyTech.rows.empty()){
+	const InGameHud& hud = UseInGameHud();
+	if(!hud.view || !hud.view->buyTech.visible || hud.view->buyTech.rows.empty()){
 		return ::ui::empty();
 	}
-	const BuyTechOverlayView& overlay = hud.state.view->buyTech;
+	const BuyTechOverlayView& overlay = hud.view->buyTech;
 	const int footerW = static_cast<int>(overlay.footer.size()) * 8;
 	return <Box key={props.key} layout={root_layout()}>
 		<HudFixedSprite key="background" bank={102} index={0} />
@@ -1587,16 +1583,16 @@ struct SystemCameraFrameProps {
 };
 
 ::ui::UiElement SystemCameraFrame(const SystemCameraFrameProps& props) {
-	const InGameHudContextValue& hud = UseInGameHud();
-	if(!hud.state.view || !hud.state.resources) return ::ui::empty();
+	const InGameHud& hud = UseInGameHud();
+	if(!hud.view || !hud.resources) return ::ui::empty();
 	if(props.slot < 0 || props.slot >= 2) return ::ui::empty();
-	if(!hud.state.view->systemCamera[props.slot].active) return ::ui::empty();
+	if(!hud.view->systemCamera[props.slot].active) return ::ui::empty();
 
 	const Uint8 bank = 95;
 	const Uint16 index = props.slot == 0 ? 2 : 11;
 	const Uint8 offsetBank = 92;
 	const int logicalY = props.slot == 0 ? 381 : 318;
-	const Resources& resources = *hud.state.resources;
+	const Resources& resources = *hud.resources;
 	const int w = sprite_width(resources, bank, index);
 	const int h = sprite_height(resources, bank, index);
 	if(w <= 0 || h <= 0) return ::ui::empty();
@@ -1616,9 +1612,9 @@ struct TopMessageProps {
 };
 
 ::ui::UiElement TopMessage(const TopMessageProps& props) {
-	const InGameHudContextValue& hud = UseInGameHud();
-	if(!hud.state.view) return ::ui::empty();
-	std::string text = visible_top_message(hud.state.view->topMessage);
+	const InGameHud& hud = UseInGameHud();
+	if(!hud.view) return ::ui::empty();
+	std::string text = visible_top_message(hud.view->topMessage);
 	if(text.empty()) return ::ui::empty();
 	return <Text
 	  key={props.key}
@@ -1635,12 +1631,12 @@ struct StatusLineProps {
 };
 
 ::ui::UiElement StatusLine(const StatusLineProps& props) {
-	const InGameHudContextValue& hud = UseInGameHud();
-	if(!hud.state.view) return ::ui::empty();
-	if(props.slot < 0 || props.slot >= static_cast<int>(hud.state.view->statusMessages.size())){
+	const InGameHud& hud = UseInGameHud();
+	if(!hud.view) return ::ui::empty();
+	if(props.slot < 0 || props.slot >= static_cast<int>(hud.view->statusMessages.size())){
 		return ::ui::empty();
 	}
-	const InGameStatusLineView& line = hud.state.view->statusMessages[static_cast<size_t>(props.slot)];
+	const InGameStatusLineView& line = hud.view->statusMessages[static_cast<size_t>(props.slot)];
 	const int width = static_cast<int>(line.text.size()) * 7;
 	const int x = (640 - width) / 2;
 	const int y = 370 - (props.slot * 10);
@@ -1682,8 +1678,8 @@ struct QuitPromptProps {
 };
 
 ::ui::UiElement QuitPrompt(const QuitPromptProps& props) {
-	const InGameHudContextValue& hud = UseInGameHud();
-	if(!hud.state.view || (hud.state.view->quitState != 1 && hud.state.view->quitState != 2)){
+	const InGameHud& hud = UseInGameHud();
+	if(!hud.view || (hud.view->quitState != 1 && hud.view->quitState != 2)){
 		return ::ui::empty();
 	}
 	const std::string text = quit_prompt_text();
@@ -1701,9 +1697,9 @@ struct HudReadoutsProps {
 };
 
 ::ui::UiElement HudReadouts(const HudReadoutsProps& props) {
-	const InGameHudContextValue& hud = UseInGameHud();
-	if(!hud.state.view || !hud.state.view->viewedPlayer.valid) return ::ui::empty();
-	const PlayerHudView& player = hud.state.view->viewedPlayer;
+	const InGameHud& hud = UseInGameHud();
+	if(!hud.view || !hud.view->viewedPlayer.valid) return ::ui::empty();
+	const PlayerHudView& player = hud.view->viewedPlayer;
 	const std::string currentAmmo = two_digit_text(current_ammo(player));
 	const std::string blasterAmmo = "99";
 	const std::string laserAmmo = player.laserAmmo > 0 ? two_digit_text(player.laserAmmo) : std::string();
@@ -1806,9 +1802,9 @@ struct TraceTimeProps {
 };
 
 ::ui::UiElement TraceTime(const TraceTimeProps& props) {
-	const InGameHudContextValue& hud = UseInGameHud();
-	if(!hud.state.view) return ::ui::empty();
-	const Uint8 value = trace_time(*hud.state.view);
+	const InGameHud& hud = UseInGameHud();
+	if(!hud.view) return ::ui::empty();
+	const Uint8 value = trace_time(*hud.view);
 	if(value == 0) return ::ui::empty();
 	const std::string text = "Government Trace Time: " + std::to_string(value);
 	return <Text

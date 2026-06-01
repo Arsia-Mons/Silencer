@@ -7,11 +7,11 @@ namespace client_ui {
 
 namespace {
 ::ReactContext InGameHudContext = {};
-const InGameHudContextValue kEmptyInGameHud = {};
+const InGameHud kEmptyInGameHud = {};
 }  // namespace
 
-const InGameHudContextValue& UseInGameHud() {
-	const auto * value = static_cast<const InGameHudContextValue *>(
+const InGameHud& UseInGameHud() {
+	const auto * value = static_cast<const InGameHud *>(
 		::use_context(&InGameHudContext));
 	if(value) return *value;
 	::react_report_error("client/ui/hud: missing InGameHudProvider for UseInGameHud\n");
@@ -19,15 +19,15 @@ const InGameHudContextValue& UseInGameHud() {
 }
 
 ::ui::UiElement InGameHudView(const InGameHudViewProps& props) {
-	const InGameHudContextValue * stored = ::ui::copy_value(
-		props.value ? *props.value : kEmptyInGameHud);
+	const InGameHud * stored = ::ui::copy_value(
+		props.hud ? *props.hud : kEmptyInGameHud);
 	if(!stored){
 		return ::ui::empty();
 	}
 	return ::ui::provider(
 		"InGameHudProvider",
 		&InGameHudContext,
-		const_cast<InGameHudContextValue *>(stored),
+		const_cast<InGameHud *>(stored),
 		::ui::children({
 			::ui::component("InGameHudFrame",
 			                InGameHudFrameProps{ .key = "frame" },

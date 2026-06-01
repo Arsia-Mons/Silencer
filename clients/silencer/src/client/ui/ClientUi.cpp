@@ -636,51 +636,47 @@ void ClientUi::BuildRetainedUi(ScreenContext& ctx,
 	int rootCount = 0;
 
 	if(view && resources && view->mapLoaded){
-		const InGameHudContextValue context{
-			.state = {
-				.view = view,
-				.resources = resources,
-				.animationPhase = animationPhase,
+		const InGameHud hud{
+			.view = view,
+			.resources = resources,
+			.animationPhase = animationPhase,
+			.set_chat_text = [this](const std::string& value) {
+				clientui_detail::QueueAction(
+					interactions_, silencer::ui::UiActionKind::SetText, "ingame.chat", value);
 			},
-			.actions = {
-				.set_chat_text = [this](const std::string& value) {
-					clientui_detail::QueueAction(
-						interactions_, silencer::ui::UiActionKind::SetText, "ingame.chat", value);
-				},
-				.submit_chat_text = [this](const std::string& value) {
-					clientui_detail::QueueAction(
-						interactions_, silencer::ui::UiActionKind::SubmitText, "ingame.chat", value);
-				},
-				.toggle_chat_channel = [this]() {
-					clientui_detail::QueueAction(
-						interactions_, silencer::ui::UiActionKind::Activate, "ingame.chat.channel");
-				},
-				.focus_buy_tech = [this](int index) {
-					clientui_detail::QueueAction(
-						interactions_,
-						silencer::ui::UiActionKind::Navigate,
-						clientui_detail::BuyTechActionId(index).c_str(),
-						"focus",
-						index);
-				},
-				.activate_buy_tech = [this](int index) {
-					clientui_detail::QueueAction(
-						interactions_,
-						silencer::ui::UiActionKind::Select,
-						clientui_detail::BuyTechActionId(index).c_str(),
-						"activate",
-						index);
-				},
+			.submit_chat_text = [this](const std::string& value) {
+				clientui_detail::QueueAction(
+					interactions_, silencer::ui::UiActionKind::SubmitText, "ingame.chat", value);
+			},
+			.toggle_chat_channel = [this]() {
+				clientui_detail::QueueAction(
+					interactions_, silencer::ui::UiActionKind::Activate, "ingame.chat.channel");
+			},
+			.focus_buy_tech = [this](int index) {
+				clientui_detail::QueueAction(
+					interactions_,
+					silencer::ui::UiActionKind::Navigate,
+					clientui_detail::BuyTechActionId(index).c_str(),
+					"focus",
+					index);
+			},
+			.activate_buy_tech = [this](int index) {
+				clientui_detail::QueueAction(
+					interactions_,
+					silencer::ui::UiActionKind::Select,
+					clientui_detail::BuyTechActionId(index).c_str(),
+					"activate",
+					index);
 			},
 		};
-		const auto * stored = ::ui::copy_value(context);
+		const auto * stored = ::ui::copy_value(hud);
 		if(!stored){
 			retainedCommands_.reset();
 			return;
 		}
 		roots[rootCount++] = InGameHudView(InGameHudViewProps{
 			.key = "in-game-hud",
-			.value = stored,
+			.hud = stored,
 		});
 	}
 
