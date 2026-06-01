@@ -9,7 +9,6 @@
 // Domain mutations go through use_lobby(); primitives stay screen-agnostic.
 
 #include "shared.h"
-#include "runtime/UiActionQueue.h"
 
 #include <string>
 #include <vector>
@@ -31,12 +30,6 @@ struct GameJoinRosterRow {
 };
 
 struct GameJoinPanelState {
-	// Per-frame click flags. Set by typed widget intents; consumed once
-	// by GameJoinPanelTick on the next frame.
-	bool readyClicked = false;
-	bool teamClicked  = false;
-	bool techClicked  = false;
-
 	// Cached Ready-button label — recomputed each Tick from the lobby
 	// pregame model.
 	// Pointer-stable across Build calls because it's std::string-owned
@@ -50,17 +43,10 @@ struct GameJoinPanelState {
 
 void GameJoinPanelInit(GameJoinPanelState & state);
 
-struct GameJoinPanelTickResult {
-	bool show_tech = false;
-};
-
 // Per-frame pump. Recomputes the Ready-button label (legacy
-// `if(world.gameplaystate == INLOBBY) ...` block) and consumes the click
-// flags through the lobby model.
-GameJoinPanelTickResult GameJoinPanelTick(GameJoinPanelState & state,
-                                          LobbyModel & lobby);
-bool GameJoinPanelHandleUiIntent(GameJoinPanelState & state,
-                                 const silencer::ui::UiAction & action);
+// `if(world.gameplaystate == INLOBBY) ...` block) and roster snapshot.
+void GameJoinPanelTick(GameJoinPanelState & state,
+                       LobbyModel & lobby);
 
 }  // namespace silencer::client_ui::lobby
 

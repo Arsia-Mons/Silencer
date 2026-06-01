@@ -527,6 +527,19 @@ void LobbyScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime, s
 		.game_join_ready_y = gameJoinReadyY,
 		.game_join_button_width = gameJoinButtonW,
 		.game_join_button_height = lobby_screen_detail::kGameJoinButtonH,
+		.game_join_choose_tech = [this, lobby]() {
+			lobby.pregame.tech.request_peer_list();
+			silencer::client_ui::lobby::GameTechPanelInit(gameTechState);
+			gameTechActive   = true;
+			gameJoinActive   = false;
+			gameCreateActive = false;
+		},
+		.game_join_change_team = [lobby]() {
+			lobby.pregame.team.change();
+		},
+		.game_join_ready = [lobby]() {
+			lobby.pregame.set_ready(true);
+		},
 		.show_game_join_roster = gameJoinActive,
 		.game_join = &gameJoinState,
 		.app_assets = &app.assets,
@@ -637,12 +650,8 @@ void LobbyScreen::Tick(ScreenContext & ctx)
 			gameCreateState, ctx, lobby);
 	}
 	if(gameJoinActive){
-		const silencer::client_ui::lobby::GameJoinPanelTickResult joined =
-			silencer::client_ui::lobby::GameJoinPanelTick(
-				gameJoinState, lobby);
-		if(joined.show_tech){
-			ShowGameTech(ctx);
-		}
+		silencer::client_ui::lobby::GameJoinPanelTick(
+			gameJoinState, lobby);
 	}
 	if(gameTechActive){
 		const silencer::client_ui::lobby::GameTechPanelTickResult tech =
@@ -730,7 +739,7 @@ bool LobbyScreen::HandleUiIntent(ScreenContext & ctx, const silencer::ui::UiActi
 		return silencer::client_ui::lobby::GameCreatePanelHandleUiIntent(gameCreateState, action);
 	}
 	if(gameJoinActive){
-		return silencer::client_ui::lobby::GameJoinPanelHandleUiIntent(gameJoinState, action);
+		return false;
 	}
 	if(gameTechActive){
 		return silencer::client_ui::lobby::GameTechPanelHandleUiIntent(gameTechState, action);

@@ -834,15 +834,23 @@ struct AbsoluteChromeButtonProps {
 	int y = 0;
 	int width = 0;
 	int height = 0;
+	std::function<void()> on_press = {};
 };
 
 ::ui::UiElement AbsoluteChromeButton(const AbsoluteChromeButtonProps& props) {
 	if(!props.show) return ::ui::empty();
+	std::function<void(const ::ui::ActivationEvent&)> on_activate = {};
+	if(props.on_press){
+		on_activate = [on_press = props.on_press](const ::ui::ActivationEvent&) {
+			on_press();
+		};
+	}
 	return <Button
 	  key={props.key}
 	  id={props.id}
 	  label={props.label}
 	  accessibility={{.label = props.label}}
+	  onActivate={on_activate}
 	  layout={absolute_button_layout(props.x, props.y, props.width, props.height)}
 	  style={chrome_button_patch()}
 	/>
@@ -4206,6 +4214,7 @@ using ::ui::components::TextProps;
 		  y={props.game_join_choose_tech_y}
 		  width={props.game_join_button_width}
 		  height={props.game_join_button_height}
+		  onPress={props.game_join_choose_tech}
 		/>
 		<lobby_chrome_frame_detail.AbsoluteChromeButton
 		  key="game-join-change-team"
@@ -4216,6 +4225,7 @@ using ::ui::components::TextProps;
 		  y={props.game_join_change_team_y}
 		  width={props.game_join_button_width}
 		  height={props.game_join_button_height}
+		  onPress={props.game_join_change_team}
 		/>
 		<lobby_chrome_frame_detail.AbsoluteChromeButton
 		  key="game-join-ready"
@@ -4226,6 +4236,7 @@ using ::ui::components::TextProps;
 		  y={props.game_join_ready_y}
 		  width={props.game_join_button_width}
 		  height={props.game_join_button_height}
+		  onPress={props.game_join_ready}
 		/>
 		<lobby_chrome_frame_detail.GameJoinRosterPanel
 		  key="game-join-roster"

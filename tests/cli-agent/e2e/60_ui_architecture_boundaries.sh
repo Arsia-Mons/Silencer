@@ -457,6 +457,11 @@ fail_if_match \
   "$REPO_ROOT/clients/silencer/src/client/ui/screens/lobby/lobby_screen.h"
 
 fail_if_match \
+  "\\b(readyClicked|teamClicked|techClicked)\\b" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens/lobby/game_join_panel.cpp" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens/lobby/game_join_panel.h"
+
+fail_if_match \
   "\\bokClicked\\b" \
   "$REPO_ROOT/clients/silencer/src/client/ui/modals/message_modal.cpp" \
   "$REPO_ROOT/clients/silencer/src/client/ui/modals/message_modal.h" \

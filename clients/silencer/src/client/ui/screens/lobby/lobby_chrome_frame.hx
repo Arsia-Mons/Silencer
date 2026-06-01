@@ -109,6 +109,9 @@ struct LobbyChromeFrameProps {
 	int game_join_ready_y = 0;
 	int game_join_button_width = 0;
 	int game_join_button_height = 0;
+	std::function<void()> game_join_choose_tech = {};
+	std::function<void()> game_join_change_team = {};
+	std::function<void()> game_join_ready = {};
 	bool show_game_join_roster = false;
 	const GameJoinPanelState * game_join = nullptr;
 	const AppAssetsModel * app_assets = nullptr;
