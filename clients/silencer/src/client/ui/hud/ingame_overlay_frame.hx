@@ -18,6 +18,9 @@ struct InGameOverlayFrameProps {
 	bool show_status_messages = false;
 	const InGameStatusLineView * status_messages = nullptr;
 	int status_message_count = 0;
+	bool show_player_list = false;
+	const TeamHudView * teams = nullptr;
+	int team_count = 0;
 };
 
 ::ui::UiElement InGameOverlayFrame(const InGameOverlayFrameProps& props);

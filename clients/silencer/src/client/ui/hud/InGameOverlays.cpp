@@ -1,7 +1,6 @@
 #include "client/ui/hud/InGameOverlays.h"
 
 #include "client/ui/hud/HudClayHelpers.h"
-#include "client/ui/hud/hud_player_list_overlay.h"
 #include "client/ui/views/HudView.h"
 #include "clay_ui_compositor.h"
 #include "render/renderer.h"
@@ -150,9 +149,6 @@ void BuildInGameOverlaysUi(Renderer& /*renderer*/, const Resources& /*resources*
                            const HudView& view, Surface* surface) {
 	if(!view.mapLoaded) return;
 	ingameoverlays_detail::DrawMessage(view, surface);
-	if(view.showPlayerList){
-		BuildPlayerListOverlay(view, surface);
-	}
 }
 
 }  // namespace client_ui

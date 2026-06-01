@@ -183,7 +183,7 @@ fail_if_match \
   "$REPO_ROOT/clients/silencer/src/client/ui/hud"
 
 fail_if_match \
-  "DrawStatus|InGameStatusRoot|InGameStatusLine" \
+  "DrawStatus|InGameStatusRoot|InGameStatusLine|BuildPlayerListOverlay|PlayerListRoot" \
   "$REPO_ROOT/clients/silencer/src/client/ui/hud/InGameOverlays.cpp"
 
 fail_if_match \

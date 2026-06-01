@@ -327,8 +327,9 @@ void ClientUi::BuildVisibleScreens(ScreenContext& ctx, Surface& dst, float frame
 		const bool showTopMessage =
 			hudView.topMessage.topmessage_i > 0 && !hudView.topMessage.text.empty();
 		const bool showStatusMessages = !hudView.statusMessages.empty();
+		const bool showPlayerList = hudView.showPlayerList;
 		inGameOverlayFrameActive_ =
-			showQuitPrompt || showTopMessage || showStatusMessages;
+			showQuitPrompt || showTopMessage || showStatusMessages || showPlayerList;
 		if(inGameOverlayFrameActive_){
 		#ifdef OUYA
 			const char * quitText = "Hit O To QUIT";
@@ -349,6 +350,9 @@ void ClientUi::BuildVisibleScreens(ScreenContext& ctx, Surface& dst, float frame
 				.status_messages = hudView.statusMessages.data(),
 				.status_message_count =
 					static_cast<int>(hudView.statusMessages.size()),
+				.show_player_list = showPlayerList,
+				.teams = hudView.teams.data(),
+				.team_count = static_cast<int>(hudView.teams.size()),
 			};
 			inGameOverlayFrame_.Build([&]() {
 				                          return InGameOverlayFrame(props);

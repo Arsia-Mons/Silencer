@@ -5,6 +5,7 @@
 #include "ui/style/style_patch.h"
 
 #include <algorithm>
+#include <cstdio>
 #include <cstdint>
 #include <cstring>
 #include <string>
@@ -13,8 +14,11 @@ namespace silencer {
 namespace client_ui {
 namespace ingame_overlay_frame_detail {
 
+using ::ui::components::Box;
+using ::ui::components::BoxProps;
 using ::ui::components::Text;
 using ::ui::components::TextProps;
+using ::ui::children;
 
 constexpr int kPromptY = 200;
 constexpr int kPromptFontBank = 136;
@@ -37,6 +41,17 @@ constexpr int kStatusMaxLines = 4;
 constexpr int kStatusFontBank = 133;
 constexpr int kStatusAdvance = 7;
 constexpr int kStatusLineHeight = 11;
+constexpr int kPlayerListRootPaddingX = 50;
+constexpr int kPlayerListRootPaddingTop = 50;
+constexpr int kPlayerListPanelPadding = 10;
+constexpr int kPlayerListTeamHeight = 58;
+constexpr int kPlayerListEmblemSlotWidth = 40;
+constexpr int kPlayerListPeerHeight = 12;
+constexpr int kPlayerListMaxTeams = 4;
+constexpr int kPlayerListMaxPeers = 4;
+constexpr int kPlayerListTextBank = 133;
+constexpr int kPlayerListTextAdvance = 6;
+constexpr int kPlayerListTextLineHeight = 11;
 
 inline ::ui::LayoutStyle root_layout(int width, int height) {
 	return {
@@ -95,6 +110,31 @@ inline ::ui::StylePatch status_text_patch(std::uint8_t palette,
 	});
 }
 
+inline std::uint32_t texture_id(std::uint8_t bank, std::uint16_t index) {
+	return (static_cast<std::uint32_t>(bank) << 16) |
+	       static_cast<std::uint32_t>(index);
+}
+
+inline ::ui::StylePatch image_patch(std::uint8_t bank, std::uint16_t index) {
+	return ::ui::patch().image(::ui::BackgroundImage{
+		.texture_id = texture_id(bank, index),
+	});
+}
+
+inline ::ui::StylePatch palette_fill_patch(std::uint8_t palette,
+                                           std::uint8_t alpha) {
+	return ::ui::patch().background(::ui::Color{palette, 0, 0, alpha});
+}
+
+inline ::ui::StylePatch player_list_text_patch() {
+	return ::ui::patch().text(::ui::TextVisual{
+		.color = {0, 0, 0, 255},
+		.font_id = kPlayerListTextBank,
+		.font_size = kPlayerListTextAdvance,
+		.line_height = static_cast<float>(kPlayerListTextLineHeight),
+	});
+}
+
 inline std::string top_message_slice(const char * text, int progress) {
 	const char * safe_text = text ? text : "";
 	const int length = static_cast<int>(std::strlen(safe_text));
@@ -148,6 +188,216 @@ struct TopMessageProps {
 	/>
 }
 
+inline bool player_list_has_peers(const TeamHudView * teams, int count) {
+	if(!teams || count <= 0) return false;
+	for(int i = 0; i < count; ++i){
+		if(!teams[i].playerListPeers.empty()) return true;
+	}
+	return false;
+}
+
+inline int player_list_team_count(int count) {
+	return std::max(0, std::min(kPlayerListMaxTeams, count));
+}
+
+inline std::string peer_stats_text(const TeamPeerView& peer) {
+	char stats[100];
+	std::snprintf(stats,
+	              sizeof(stats),
+	              "L:%d    E:%d  S:%d  J:%d  H:%d  C:%d",
+	              peer.agencyLevel,
+	              peer.agencyEndurance,
+	              peer.agencyShield,
+	              peer.agencyJetpack,
+	              peer.agencyHacking,
+	              peer.agencyContacts);
+	return std::string(stats);
+}
+
+struct PlayerListPeerRowProps {
+	const char * key = nullptr;
+	const TeamHudView * team = nullptr;
+	int peer_index = 0;
+	int x = 0;
+	int y = 0;
+	int width = 0;
+};
+
+::ui::UiElement PlayerListPeerRow(const PlayerListPeerRowProps& props) {
+	if(!props.team || props.peer_index < 0 ||
+	   props.peer_index >= static_cast<int>(props.team->playerListPeers.size()) ||
+	   props.peer_index >= kPlayerListMaxPeers){
+		return ::ui::empty();
+	}
+	const TeamPeerView& peer = props.team->playerListPeers[props.peer_index];
+	std::string stats = peer_stats_text(peer);
+	const int stats_width =
+		static_cast<int>(stats.size() + 1) * kPlayerListTextAdvance;
+	const int name_width = std::max(0, props.width - stats_width);
+	return <Box
+	  key="peer-row"
+	  id="PlayerListPeerRow"
+	  layout={absolute_layout(props.x, props.y, props.width, kPlayerListPeerHeight)}
+	>
+		<Text
+		  key="name"
+		  id="PlayerListPeerName"
+		  value={::ui::copy_string(peer.displayName.c_str())}
+		  layout={absolute_layout(0, 0, name_width, kPlayerListTextLineHeight)}
+		  style={player_list_text_patch()}
+		/>
+		<Text
+		  key="stats"
+		  id="PlayerListPeerStats"
+		  value={::ui::copy_string(stats.c_str())}
+		  layout={absolute_layout(name_width, 0, stats_width, kPlayerListTextLineHeight)}
+		  style={player_list_text_patch()}
+		/>
+	</Box>
+}
+
+struct PlayerListTeamRowProps {
+	const char * key = nullptr;
+	const TeamHudView * teams = nullptr;
+	int team_count = 0;
+	int team_index = 0;
+	int x = 0;
+	int y = 0;
+	int width = 0;
+};
+
+::ui::UiElement PlayerListTeamRow(const PlayerListTeamRowProps& props) {
+	if(!props.teams || props.team_index < 0 ||
+	   props.team_index >= props.team_count ||
+	   props.team_index >= kPlayerListMaxTeams){
+		return ::ui::empty();
+	}
+	const TeamHudView& team = props.teams[props.team_index];
+	const int emblem_y =
+		std::max(0, (kPlayerListTeamHeight - team.emblemH) / 2);
+	const int peer_column_x = kPlayerListEmblemSlotWidth;
+	const int peer_column_width =
+		std::max(0, props.width - kPlayerListEmblemSlotWidth);
+	int peer_y =
+		((kPlayerListMaxPeers -
+		  static_cast<int>(team.playerListPeers.size())) *
+		 kPlayerListPeerHeight) /
+		2;
+	if(peer_y < 0) peer_y = 0;
+	return <Box
+	  key="team-row"
+	  id="PlayerListTeamRow"
+	  layout={absolute_layout(props.x, props.y, props.width, kPlayerListTeamHeight)}
+	>
+		<Box
+		  key="emblem"
+		  id="PlayerListTeamEmblem"
+		  layout={absolute_layout(0, emblem_y, team.emblemW, team.emblemH)}
+		  style={image_patch(181, team.agency)}
+		/>
+		<PlayerListPeerRow
+		  key="peer-0"
+		  team={&team}
+		  peerIndex={0}
+		  x={peer_column_x}
+		  y={peer_y}
+		  width={peer_column_width}
+		/>
+		<PlayerListPeerRow
+		  key="peer-1"
+		  team={&team}
+		  peerIndex={1}
+		  x={peer_column_x}
+		  y={peer_y + kPlayerListPeerHeight}
+		  width={peer_column_width}
+		/>
+		<PlayerListPeerRow
+		  key="peer-2"
+		  team={&team}
+		  peerIndex={2}
+		  x={peer_column_x}
+		  y={peer_y + (kPlayerListPeerHeight * 2)}
+		  width={peer_column_width}
+		/>
+		<PlayerListPeerRow
+		  key="peer-3"
+		  team={&team}
+		  peerIndex={3}
+		  x={peer_column_x}
+		  y={peer_y + (kPlayerListPeerHeight * 3)}
+		  width={peer_column_width}
+		/>
+	</Box>
+}
+
+struct PlayerListProps {
+	const char * key = nullptr;
+	bool show = false;
+	const TeamHudView * teams = nullptr;
+	int team_count = 0;
+	int surface_width = 0;
+};
+
+::ui::UiElement PlayerList(const PlayerListProps& props) {
+	const int team_count = player_list_team_count(props.team_count);
+	if(!props.show || team_count <= 0 ||
+	   !player_list_has_peers(props.teams, team_count)){
+		return ::ui::empty();
+	}
+	const int panel_x = kPlayerListRootPaddingX;
+	const int panel_y = kPlayerListRootPaddingTop;
+	const int panel_w =
+		std::max(0, props.surface_width - (kPlayerListRootPaddingX * 2));
+	const int panel_h =
+		kPlayerListPanelPadding + (team_count * kPlayerListTeamHeight);
+	const int row_x = kPlayerListPanelPadding;
+	const int row_w = std::max(0, panel_w - (kPlayerListPanelPadding * 2));
+	const int first_row_y = kPlayerListPanelPadding;
+	return <Box
+	  key="player-list"
+	  id="PlayerListPanel"
+	  layout={absolute_layout(panel_x, panel_y, panel_w, panel_h)}
+	  style={palette_fill_patch(0, 128)}
+	>
+		<PlayerListTeamRow
+		  key="team-0"
+		  teams={props.teams}
+		  teamCount={team_count}
+		  teamIndex={0}
+		  x={row_x}
+		  y={first_row_y}
+		  width={row_w}
+		/>
+		<PlayerListTeamRow
+		  key="team-1"
+		  teams={props.teams}
+		  teamCount={team_count}
+		  teamIndex={1}
+		  x={row_x}
+		  y={first_row_y + kPlayerListTeamHeight}
+		  width={row_w}
+		/>
+		<PlayerListTeamRow
+		  key="team-2"
+		  teams={props.teams}
+		  teamCount={team_count}
+		  teamIndex={2}
+		  x={row_x}
+		  y={first_row_y + (kPlayerListTeamHeight * 2)}
+		  width={row_w}
+		/>
+		<PlayerListTeamRow
+		  key="team-3"
+		  teams={props.teams}
+		  teamCount={team_count}
+		  teamIndex={3}
+		  x={row_x}
+		  y={first_row_y + (kPlayerListTeamHeight * 3)}
+		  width={row_w}
+		/>
+	</Box>
+}
+
 struct StatusLineProps {
 	const char * key = nullptr;
 	bool show = false;
@@ -191,6 +441,13 @@ using ::ui::components::BoxProps;
 	  id="InGameOverlayRoot"
 	  layout={ingame_overlay_frame_detail::root_layout(props.width, props.height)}
 	>
+		<ingame_overlay_frame_detail.PlayerList
+		  key="player-list"
+		  show={props.show_player_list}
+		  teams={props.teams}
+		  teamCount={props.team_count}
+		  surfaceWidth={props.width}
+		/>
 		<ingame_overlay_frame_detail.QuitPrompt
 		  key="quit-prompt"
 		  surfaceWidth={props.width}
