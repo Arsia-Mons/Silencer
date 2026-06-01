@@ -373,6 +373,9 @@ void SDL3GPUBackend::Shutdown() {
 	if (frame_tex)         { SDL_ReleaseGPUTexture(device, frame_tex);          frame_tex         = nullptr; }
 	if (palette_tex)       { SDL_ReleaseGPUTexture(device, palette_tex);        palette_tex       = nullptr; }
 	if (scene_tex)         { SDL_ReleaseGPUTexture(device, scene_tex);          scene_tex         = nullptr; }
+	if (ui_tex)            { SDL_ReleaseGPUTexture(device, ui_tex);             ui_tex            = nullptr; }
+	if (ui_tbuf)           { SDL_ReleaseGPUTransferBuffer(device, ui_tbuf);     ui_tbuf           = nullptr; }
+	if (ui_composite_pipeline) { SDL_ReleaseGPUGraphicsPipeline(device, ui_composite_pipeline); ui_composite_pipeline = nullptr; }
 	if (lobby_panel_source_tex) { SDL_ReleaseGPUTexture(device, lobby_panel_source_tex); lobby_panel_source_tex = nullptr; }
 	if (lobby_panel_mask_tex) { SDL_ReleaseGPUTexture(device, lobby_panel_mask_tex); lobby_panel_mask_tex = nullptr; }
 	if (remap_pipeline)    { SDL_ReleaseGPUGraphicsPipeline(device, remap_pipeline);   remap_pipeline   = nullptr; }
@@ -479,6 +482,47 @@ bool SDL3GPUBackend::CreatePipelines() {
 		SDL_ReleaseGPUShader(device, fs);
 		if (!upscale_pipeline) {
 			SDL_Log("SDL3GPUBackend: upscale pipeline failed: %s", SDL_GetError());
+			return false;
+		}
+	}
+
+	// --- UI composite pipeline: ui_tex → swapchain (SIL-11) ---
+	// Reuses the upscale shaders unchanged (frag_upscale samples a texture and
+	// returns the texel as-is, alpha included); the only difference is
+	// premultiplied-alpha blending so the (premultiplied) UI overlay composites
+	// over the finished scene.
+	{
+		SDL_GPUShader *vs = LoadShader(SDL_GPU_SHADERSTAGE_VERTEX,   kVertScreen,  0);
+		SDL_GPUShader *fs = LoadShader(SDL_GPU_SHADERSTAGE_FRAGMENT, kFragUpscale, 1);
+		if (!vs || !fs) {
+			SDL_Log("SDL3GPUBackend: ui composite shaders failed: %s", SDL_GetError());
+			if (vs) SDL_ReleaseGPUShader(device, vs);
+			if (fs) SDL_ReleaseGPUShader(device, fs);
+			return false;
+		}
+
+		SDL_GPUColorTargetDescription ct = {};
+		ct.format = SDL_GetGPUSwapchainTextureFormat(device, window);
+		ct.blend_state.enable_blend          = true;
+		ct.blend_state.src_color_blendfactor = SDL_GPU_BLENDFACTOR_ONE; // premultiplied src
+		ct.blend_state.dst_color_blendfactor = SDL_GPU_BLENDFACTOR_ONE_MINUS_SRC_ALPHA;
+		ct.blend_state.color_blend_op        = SDL_GPU_BLENDOP_ADD;
+		ct.blend_state.src_alpha_blendfactor = SDL_GPU_BLENDFACTOR_ONE;
+		ct.blend_state.dst_alpha_blendfactor = SDL_GPU_BLENDFACTOR_ONE_MINUS_SRC_ALPHA;
+		ct.blend_state.alpha_blend_op        = SDL_GPU_BLENDOP_ADD;
+
+		SDL_GPUGraphicsPipelineCreateInfo pi = {};
+		pi.vertex_shader   = vs;
+		pi.fragment_shader = fs;
+		pi.primitive_type  = SDL_GPU_PRIMITIVETYPE_TRIANGLELIST;
+		pi.target_info.color_target_descriptions = &ct;
+		pi.target_info.num_color_targets         = 1;
+
+		ui_composite_pipeline = SDL_CreateGPUGraphicsPipeline(device, &pi);
+		SDL_ReleaseGPUShader(device, vs);
+		SDL_ReleaseGPUShader(device, fs);
+		if (!ui_composite_pipeline) {
+			SDL_Log("SDL3GPUBackend: ui composite pipeline failed: %s", SDL_GetError());
 			return false;
 		}
 	}
@@ -680,6 +724,20 @@ void SDL3GPUBackend::UploadFrame(const Uint8 *indexed_pixels, int w, int h) {
 	frame_dirty    = true;
 }
 
+void SDL3GPUBackend::UploadUiFrame(const Uint8 *rgba, int w, int h) {
+	if (!rgba || w <= 0 || h <= 0) {
+		// Clear the overlay for this frame.
+		pending_ui_pixels = nullptr;
+		ui_present        = false;
+		return;
+	}
+	pending_ui_pixels = rgba;
+	pending_ui_w      = w;
+	pending_ui_h      = h;
+	ui_dirty          = true;
+	ui_present        = true;
+}
+
 void SDL3GPUBackend::SetScaleFilter(bool linear) {
 	use_linear = linear;
 }
@@ -876,6 +934,34 @@ void SDL3GPUBackend::Present() {
 		palette_dirty = true;
 	}
 
+	// Lazily (re)create the UI overlay texture + transfer buffer to match the
+	// pending overlay dims (SIL-11). Only when an overlay is present this frame.
+	if (ui_present && pending_ui_pixels) {
+		if (!ui_tex || ui_tex_w != pending_ui_w || ui_tex_h != pending_ui_h) {
+			if (ui_tex) SDL_ReleaseGPUTexture(device, ui_tex);
+			SDL_GPUTextureCreateInfo ti = {};
+			ti.type                 = SDL_GPU_TEXTURETYPE_2D;
+			ti.format               = SDL_GPU_TEXTUREFORMAT_R8G8B8A8_UNORM;
+			ti.usage                = SDL_GPU_TEXTUREUSAGE_SAMPLER;
+			ti.width                = (Uint32)pending_ui_w;
+			ti.height               = (Uint32)pending_ui_h;
+			ti.layer_count_or_depth = 1;
+			ti.num_levels           = 1;
+			ui_tex   = SDL_CreateGPUTexture(device, &ti);
+			ui_tex_w = pending_ui_w;
+			ui_tex_h = pending_ui_h;
+		}
+		const Uint32 need = (Uint32)pending_ui_w * (Uint32)pending_ui_h * 4u;
+		if (ui_tex && (!ui_tbuf || ui_tbuf_sz < need)) {
+			if (ui_tbuf) SDL_ReleaseGPUTransferBuffer(device, ui_tbuf);
+			SDL_GPUTransferBufferCreateInfo tbi = {};
+			tbi.usage = SDL_GPU_TRANSFERBUFFERUSAGE_UPLOAD;
+			tbi.size  = need;
+			ui_tbuf   = SDL_CreateGPUTransferBuffer(device, &tbi);
+			ui_tbuf_sz = need;
+		}
+	}
+
 	SDL_GPUCommandBuffer *cmd = SDL_AcquireGPUCommandBuffer(device);
 	if (!cmd) return;
 
@@ -889,9 +975,10 @@ void SDL3GPUBackend::Present() {
 			pending_lobby_panel_blur_scale,
 			kLobbyPanelBlurRadius);
 
-	// ---- 1. Copy pass: upload frame + palette ----
+	// ---- 1. Copy pass: upload frame + palette + UI overlay ----
 	bool upload_frame = frame_dirty && pending_pixels && frame_tex && frame_tbuf;
-	if (upload_frame || palette_dirty) {
+	bool upload_ui    = ui_dirty && pending_ui_pixels && ui_tex && ui_tbuf;
+	if (upload_frame || palette_dirty || upload_ui) {
 		SDL_GPUCopyPass *copy = SDL_BeginGPUCopyPass(cmd);
 
 		if (upload_frame) {
@@ -930,6 +1017,26 @@ void SDL3GPUBackend::Present() {
 				SDL_UploadToGPUTexture(copy, &src, &region, false);
 			}
 			palette_dirty = false;
+		}
+
+		if (upload_ui) {
+			Uint8 *dst = (Uint8 *)SDL_MapGPUTransferBuffer(device, ui_tbuf, false);
+			if (dst) {
+				memcpy(dst, pending_ui_pixels,
+				       (size_t)pending_ui_w * (size_t)pending_ui_h * 4u);
+				SDL_UnmapGPUTransferBuffer(device, ui_tbuf);
+				SDL_GPUTextureTransferInfo src = {};
+				src.transfer_buffer = ui_tbuf;
+				src.rows_per_layer  = (Uint32)pending_ui_h;
+				src.pixels_per_row  = (Uint32)pending_ui_w;
+				SDL_GPUTextureRegion region = {};
+				region.texture = ui_tex;
+				region.w = (Uint32)pending_ui_w;
+				region.h = (Uint32)pending_ui_h;
+				region.d = 1;
+				SDL_UploadToGPUTexture(copy, &src, &region, false);
+			}
+			ui_dirty = false;
 		}
 
 		SDL_EndGPUCopyPass(copy);
@@ -1140,6 +1247,25 @@ void SDL3GPUBackend::Present() {
 			SDL_BindGPUGraphicsPipeline(pass, upscale_pipeline);
 			SDL_GPUSampler *up_samp = use_linear ? linear_sampler : nearest_sampler;
 			SDL_GPUTextureSamplerBinding bind = {scene_tex, up_samp};
+			SDL_BindGPUFragmentSamplers(pass, 0, &bind, 1);
+			SDL_DrawGPUPrimitives(pass, 3, 1, 0, 0);
+			SDL_EndGPURenderPass(pass);
+		}
+	}
+
+	// ---- 8. UI composite pass: ui_tex → swapchain (SIL-11, premult over) ----
+	// LOAD preserves the upscaled scene; the premultiplied UI overlay blends on
+	// top. Dormant unless an overlay was uploaded this frame.
+	if (ui_present && ui_tex && ui_composite_pipeline) {
+		SDL_GPUColorTargetInfo ct = {};
+		ct.texture  = swapchain;
+		ct.load_op  = SDL_GPU_LOADOP_LOAD;
+		ct.store_op = SDL_GPU_STOREOP_STORE;
+
+		SDL_GPURenderPass *pass = SDL_BeginGPURenderPass(cmd, &ct, 1, nullptr);
+		if (pass) {
+			SDL_BindGPUGraphicsPipeline(pass, ui_composite_pipeline);
+			SDL_GPUTextureSamplerBinding bind = {ui_tex, nearest_sampler};
 			SDL_BindGPUFragmentSamplers(pass, 0, &bind, 1);
 			SDL_DrawGPUPrimitives(pass, 3, 1, 0, 0);
 			SDL_EndGPURenderPass(pass);

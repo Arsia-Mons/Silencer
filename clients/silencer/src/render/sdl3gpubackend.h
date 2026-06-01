@@ -45,6 +45,7 @@ public:
 
 	void SetPalette(const SDL_Color *colors, int count) override;
 	void UploadFrame(const Uint8 *indexed_pixels, int w, int h) override;
+	void UploadUiFrame(const Uint8 *rgba, int w, int h) override;
 	void Present() override;
 	void SetScaleFilter(bool linear) override;
 	void BeginLobbyPanelBorderBlur(int virtualWidth, int virtualHeight, float uiScale) override;
@@ -95,6 +96,14 @@ private:
 	int             scene_tex_w = 0;
 	int             scene_tex_h = 0;
 
+	// --- cppx UI overlay (SIL-11): premultiplied RGBA composited over the
+	// swapchain after upscale. Dormant until UploadUiFrame is called. ---
+	SDL_GPUTexture        *ui_tex      = nullptr;
+	int                    ui_tex_w    = 0;
+	int                    ui_tex_h    = 0;
+	SDL_GPUTransferBuffer *ui_tbuf     = nullptr;
+	Uint32                 ui_tbuf_sz  = 0;
+
 	// --- Lobby panel-border blur source ---
 	SDL_GPUTexture *lobby_panel_source_tex = nullptr; // full-res scene copy
 	SDL_GPUTexture *lobby_panel_mask_tex = nullptr; // border pixels only
@@ -106,6 +115,7 @@ private:
 	// --- Pipelines ---
 	SDL_GPUGraphicsPipeline *remap_pipeline    = nullptr; // indexed → scene_tex
 	SDL_GPUGraphicsPipeline *upscale_pipeline  = nullptr; // scene_tex → swapchain
+	SDL_GPUGraphicsPipeline *ui_composite_pipeline = nullptr; // ui_tex → swapchain (premult blend)
 	SDL_GPUGraphicsPipeline *lobby_panel_blur_pipeline = nullptr; // scene taps → scene_tex
 	SDL_GPUGraphicsPipeline *lobby_panel_copy_pipeline = nullptr; // source → scene_tex
 	SDL_GPUGraphicsPipeline *light_pipeline    = nullptr; // additive disc → scene_tex
@@ -125,6 +135,13 @@ private:
 	const Uint8 *pending_pixels = nullptr;
 	int          pending_w      = 0;
 	int          pending_h      = 0;
+
+	// --- Pending UI overlay upload (SIL-11) ---
+	const Uint8 *pending_ui_pixels = nullptr;
+	int          pending_ui_w      = 0;
+	int          pending_ui_h      = 0;
+	bool         ui_dirty          = false;
+	bool         ui_present        = false; // an overlay exists to composite
 	bool         frame_dirty    = false;
 
 	// --- Pending lighting (Phase 3) ---

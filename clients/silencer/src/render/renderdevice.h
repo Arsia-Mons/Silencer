@@ -30,6 +30,12 @@ public:
 	// Upload is deferred to Present(); pixels must remain valid until then.
 	virtual void UploadFrame(const Uint8 *indexed_pixels, int w, int h) = 0;
 
+	// Queue a premultiplied-RGBA8 UI overlay (the cppx renderer bridge, SIL-11)
+	// to be composited over the final frame. `w*h*4` tightly-packed bytes;
+	// upload deferred to Present(), pixels must stay valid until then. Default
+	// no-op (TUI / headless ignore it). Pass null/0 to clear the overlay.
+	virtual void UploadUiFrame(const Uint8 * /*rgba*/, int /*w*/, int /*h*/) {}
+
 	// Flush all pending work: uploads, compute, render passes, swap buffers.
 	// Skips the render pass silently when the window is minimized.
 	virtual void Present() = 0;
