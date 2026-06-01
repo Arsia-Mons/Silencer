@@ -157,6 +157,11 @@ fail_if_match \
   "$REPO_ROOT/clients/silencer/src/client/ui/screens/update/update_view.cppx"
 
 fail_if_match \
+  "UiActionKind::Activate" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/modals"
+
+fail_if_match \
   '::ui::(component|host|box|text|provider|fragment)[[:space:]]*\(' \
   "$REPO_ROOT/clients/silencer/src/client/ui" \
   --glob '*.cppx'
