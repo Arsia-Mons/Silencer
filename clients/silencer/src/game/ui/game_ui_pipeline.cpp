@@ -17,6 +17,7 @@
 #include "client/ui/app_shell/app_root.h"
 #include "client/ui/app_shell/client_ui.h"
 #include "client/ui/app_theme.h"
+#include "client/ui/screens/gallery.h"
 #include "client/ui/screens/message_modal.h"
 #include "client/ui/screens/password_modal.h"
 #include "client/ui/hooks/use_key_map.h"
@@ -787,6 +788,12 @@ client::ui::ClientUi * ui = TryClientUi();
 if(!ui) return;
 ui->push_screen(std::make_unique<client::ui::MessageModalScreen>(
 title ? title : "", message ? message : ""));
+}
+
+void GameUiPipeline::ShowGallery() {
+client::ui::ClientUi * ui = TryClientUi();
+if(!ui) return;
+ui->push_screen(std::make_unique<client::ui::GalleryScreen>());
 }
 
 void GameUiPipeline::BeginKeybindCapture(Action action, int comboIndex) {

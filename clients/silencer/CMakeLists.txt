@@ -247,6 +247,8 @@ set(SILENCER_CPPX_SOURCES
 	# pushed via use_navigation.
 	src/client/ui/screens/main_menu.cppx
 	src/client/ui/screens/main_menu.hx
+	src/client/ui/screens/gallery.cppx
+	src/client/ui/screens/gallery.hx
 	src/client/ui/screens/update_screen.cppx
 	src/client/ui/screens/update_screen.hx
 	src/client/ui/screens/message_modal.cppx

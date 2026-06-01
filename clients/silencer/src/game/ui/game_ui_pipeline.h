@@ -67,6 +67,9 @@ client::ui::ClientUi * TryClientUi();
 // mutation queue).
 void ShowPasswordModal(const char * title);
 void ShowMessageModal(const char * title, const char * message);
+// SIL-24: push the design-system gallery overlay (visual-regression harness;
+// automation/debug only — not reachable from the product UI).
+void ShowGallery();
 // The latest password-modal interaction, for the control socket's
 // password_modal_result op.
 struct PasswordModalResult {

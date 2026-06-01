@@ -329,6 +329,18 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 		cmd.reply->set_value(OkResult(cmd.id, nlohmann::json::object()));
 		return;
 	}
+	if(cmd.op == "ui_gallery"){
+		if(!game.GetUiPipeline().TryClientUi()){
+			cmd.reply->set_value(Err(cmd.id, "WRONG_STATE",
+				"cppx UI has not rendered a frame yet"));
+			return;
+		}
+		// SIL-24: push the design-system gallery overlay so the visual-regression
+		// suite can golden every component variant in isolation. Pop via `back`.
+		game.GetUiPipeline().ShowGallery();
+		cmd.reply->set_value(OkResult(cmd.id, nlohmann::json::object()));
+		return;
+	}
 	if(cmd.op == "ingame_ui_mode"){
 		std::string mode = cmd.args.value("mode", std::string("status"));
 		namespace gu = silencer::game_ui;
