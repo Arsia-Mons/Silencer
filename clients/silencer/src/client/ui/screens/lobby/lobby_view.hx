@@ -15,19 +15,20 @@ struct GameCreatePanelState;
 struct GameJoinPanelState;
 struct GameTechPanelState;
 
-struct LobbyContextValue {
-	struct State {
-		const char * version = "";
-		const char * map_name = "";
-		bool game_create_active = false;
-		bool game_join_active = false;
-		bool game_tech_active = false;
-	};
-
-	State state = {};
+struct LobbyChrome {
+	const char * version = "";
+	const char * map_name = "";
 };
 
-const LobbyContextValue& UseLobby();
+const LobbyChrome& UseLobbyChrome();
+
+struct LobbySurface {
+	bool game_create_active = false;
+	bool game_join_active = false;
+	bool game_tech_active = false;
+};
+
+const LobbySurface& UseLobbySurface();
 
 struct LobbyNavigation {
 	std::function<void()> go_back = {};
@@ -104,7 +105,8 @@ struct LobbyFrameProps {
 
 struct LobbyScreenViewProps {
 	const char * key = nullptr;
-	const LobbyContextValue * value = nullptr;
+	const LobbyChrome * chrome = nullptr;
+	const LobbySurface * surface = nullptr;
 	const LobbyNavigation * navigation = nullptr;
 	const LobbyChat * chat = nullptr;
 	const LobbyCharacter * character = nullptr;

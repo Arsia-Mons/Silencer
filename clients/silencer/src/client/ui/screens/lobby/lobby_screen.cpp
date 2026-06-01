@@ -92,14 +92,14 @@ bool LobbyScreen::BuildElement(ScreenContext & ctx, ::ui::UiElement * out)
 		chatState,
 		static_cast<Uint16>(std::min(chatWidth, 1024)),
 		static_cast<Uint16>(std::min(chatHeight, 768)));
-	silencer::client_ui::lobby::LobbyContextValue context{
-		.state = {
-			.version = version.c_str(),
-			.map_name = mapName.c_str(),
-			.game_create_active = gameCreateActive,
-			.game_join_active = gameJoinActive,
-			.game_tech_active = gameTechActive,
-		},
+	silencer::client_ui::lobby::LobbyChrome chrome{
+		.version = version.c_str(),
+		.map_name = mapName.c_str(),
+	};
+	silencer::client_ui::lobby::LobbySurface surface{
+		.game_create_active = gameCreateActive,
+		.game_join_active = gameJoinActive,
+		.game_tech_active = gameTechActive,
 	};
 	silencer::client_ui::lobby::LobbyNavigation navigation{
 		.go_back = [this]() {
@@ -204,7 +204,8 @@ bool LobbyScreen::BuildElement(ScreenContext & ctx, ::ui::UiElement * out)
 	*out = silencer::client_ui::lobby::LobbyScreenView(
 		silencer::client_ui::lobby::LobbyScreenViewProps{
 			.key = "lobby",
-			.value = ::ui::copy_value(context),
+			.chrome = ::ui::copy_value(chrome),
+			.surface = ::ui::copy_value(surface),
 			.navigation = ::ui::copy_value(navigation),
 			.chat = ::ui::copy_value(chat),
 			.character = ::ui::copy_value(character),

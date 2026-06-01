@@ -393,11 +393,11 @@ struct TitleBarProps {
 
 ::ui::UiElement TitleBar(const TitleBarProps& props) {
 	(void)props;
-	const LobbyContextValue& lobby = UseLobby();
+	const LobbyChrome& chrome = UseLobbyChrome();
 	const LobbyNavigation& navigation = UseLobbyNavigation();
-	const char * meta = lobby.state.map_name && lobby.state.map_name[0] != '\0'
-		? use_text_storage("%s    %s", lobby.state.version, lobby.state.map_name)
-		: safe_text(lobby.state.version);
+	const char * meta = chrome.map_name && chrome.map_name[0] != '\0'
+		? use_text_storage("%s    %s", chrome.version, chrome.map_name)
+		: safe_text(chrome.version);
 	return <Box key="title-bar" layout={title_bar_layout()} style={panel_style()}>
 		<Text
 		  key="title"
@@ -960,14 +960,14 @@ struct RightUpperPanelProps {
 
 ::ui::UiElement RightUpperPanel(const RightUpperPanelProps& props) {
 	(void)props;
-	const LobbyContextValue& lobby = UseLobby();
-	if(lobby.state.game_create_active){
+	const LobbySurface& surface = UseLobbySurface();
+	if(surface.game_create_active){
 		return <GameCreateUpper key="create-upper-root" />
 	}
-	if(lobby.state.game_join_active){
+	if(surface.game_join_active){
 		return <GameJoinUpper key="join-upper-root" />
 	}
-	if(lobby.state.game_tech_active){
+	if(surface.game_tech_active){
 		return <GameTechUpper key="tech-upper-root" />
 	}
 	return <GameSelectUpper key="select-upper-root" />
@@ -979,14 +979,14 @@ struct RightTallPanelProps {
 
 ::ui::UiElement RightTallPanel(const RightTallPanelProps& props) {
 	(void)props;
-	const LobbyContextValue& lobby = UseLobby();
-	if(lobby.state.game_create_active){
+	const LobbySurface& surface = UseLobbySurface();
+	if(surface.game_create_active){
 		return <GameCreateTall key="create-tall-root" />
 	}
-	if(lobby.state.game_join_active){
+	if(surface.game_join_active){
 		return <GameJoinTall key="join-tall-root" />
 	}
-	if(lobby.state.game_tech_active){
+	if(surface.game_tech_active){
 		return <GameTechTall key="tech-tall-root" />
 	}
 	return <GameSelectTall key="select-tall-root" />
