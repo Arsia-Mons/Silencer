@@ -7,8 +7,11 @@
 
 #include "render/cppx_ui/pipeline_host.h"
 
+#include "client/ui/app_shell/app_root.h"
 #include "client/ui/app_shell/navigation/ui_screen.h"
 #include "client/ui/app_shell/ui_pipeline.h"
+#include "client/ui/hooks/use_session.h"
+#include "client/ui/providers/session_provider.h"
 #include "ui/runtime/element.h"
 #include "ui/runtime/react.h"
 
@@ -105,6 +108,41 @@ static bool pipeline_host_empty_stack_is_transparent() {
   return true;
 }
 
+// SIL-14: AppRoot (the always-mounted stack root) reads use_session().phase and
+// renders the owning phase's view as a child — the Tier-2 reconciler, expressed
+// declaratively. Flipping the SessionProvider's phase swaps the rendered screen
+// on the very next frame, with no stack churn.
+static bool pipeline_host_app_root_reconciles_phase() {
+  react_init_runtime();
+  silencer::cppx_ui::PipelineHost host;
+  CHECK(host.ensure(64, 48, SILENCER_TEST_FONT_DIR));
+
+  client::ui::SessionPhase phase = client::ui::SessionPhase::MainMenu;
+  host.pipeline().set_frame_provider([&phase](::ui::UiElement child) {
+    return client::ui::SessionProvider({.phase = phase},
+                                       ::ui::children({child}));
+  });
+  CHECK(host.pipeline().client_ui().push_screen(
+      std::make_unique<client::ui::AppRoot>()));
+
+  // MainMenu scaffold is {32,44,72} — blue-dominant.
+  int w = 0, h = 0;
+  const uint8_t *rgba = host.render(test_frame(64, 48), &w, &h);
+  CHECK(rgba != nullptr);
+  const uint8_t *px = rgba + ((size_t)(h / 2) * w + (w / 2)) * 4u;
+  CHECK(px[3] > 200);                    // opaque
+  CHECK(px[2] > px[0] && px[2] > px[1]); // blue-dominant
+
+  // Flip to InMatch ({40,96,40}, green-dominant) — reflected the same frame.
+  phase = client::ui::SessionPhase::InMatch;
+  rgba = host.render(test_frame(64, 48), &w, &h);
+  CHECK(rgba != nullptr);
+  px = rgba + ((size_t)(h / 2) * w + (w / 2)) * 4u;
+  CHECK(px[3] > 200);
+  CHECK(px[1] > px[0] && px[1] > px[2]); // green-dominant
+  return true;
+}
+
 int main(void) {
   if (!SDL_Init(0)) {
     fprintf(stderr, "SDL_Init: %s\n", SDL_GetError());
@@ -114,6 +152,8 @@ int main(void) {
   if (!pipeline_host_renders_pushed_screen_to_pixels())
     rc = 1;
   if (!pipeline_host_empty_stack_is_transparent())
+    rc = 1;
+  if (!pipeline_host_app_root_reconciles_phase())
     rc = 1;
   react_shutdown();
   SDL_Quit();
