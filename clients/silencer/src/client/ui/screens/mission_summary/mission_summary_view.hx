@@ -36,6 +36,12 @@ struct MissionSummaryContextValue {
 
 const MissionSummaryContextValue& UseMissionSummary();
 
+struct MissionSummaryFrameProps {
+	const char * key = nullptr;
+};
+
+::ui::UiElement MissionSummaryFrame(const MissionSummaryFrameProps& props);
+
 struct MissionSummaryViewProps {
 	const char * key = nullptr;
 	const MissionSummaryContextValue * value = nullptr;

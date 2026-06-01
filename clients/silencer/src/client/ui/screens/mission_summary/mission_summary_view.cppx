@@ -297,9 +297,7 @@ std::function<void(const ::ui::ActivationEvent&)> done_callback(
 	};
 }
 
-struct MissionSummaryFrameProps {
-	const char * key = nullptr;
-};
+}  // namespace
 
 ::ui::UiElement MissionSummaryFrame(const MissionSummaryFrameProps& props) {
 	const MissionSummaryContextValue& summary = UseMissionSummary();
@@ -537,32 +535,6 @@ struct MissionSummaryFrameProps {
 			</Box>
 		</Box>
 	</Box>
-}
-
-}  // namespace
-
-namespace {
-::ReactContext MissionSummaryContext = {};
-const MissionSummaryContextValue kEmptyMissionSummary = {};
-}
-
-const MissionSummaryContextValue& UseMissionSummary() {
-	const auto * value = static_cast<const MissionSummaryContextValue *>(
-		::use_context(&MissionSummaryContext));
-	return value ? *value : kEmptyMissionSummary;
-}
-
-::ui::UiElement MissionSummaryView(const MissionSummaryViewProps& props) {
-	return ::ui::provider(
-		"MissionSummaryProvider",
-		&MissionSummaryContext,
-		const_cast<MissionSummaryContextValue *>(props.value),
-		children({
-			::ui::component("MissionSummaryFrame",
-			                MissionSummaryFrameProps{ .key = "frame" },
-			                MissionSummaryFrame),
-		}),
-		props.key);
 }
 
 }  // namespace silencer::client_ui
