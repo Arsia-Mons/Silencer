@@ -147,6 +147,10 @@ fail_if_match \
   "$REPO_ROOT/clients/silencer/src/client/ui/providers/update_provider.h"
 
 fail_if_match \
+  "\\bWorld\\b" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/providers/match_provider.h"
+
+fail_if_match \
   "\\b(spriteBank|spriteIndex|bank|texture_id|nine_slice|palette)[[:space:]]*(=|;|,|\\)|\\})" \
   "$REPO_ROOT/clients/silencer/src/client/ui/components" \
   "$REPO_ROOT/clients/silencer/src/ui/components" \

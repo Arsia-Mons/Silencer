@@ -665,9 +665,8 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 		}
 		silencer::client_ui::MatchUiFixtureResult result =
 			silencer::client_ui::ConfigureMatchUiFixture(
-				silencer::client_ui::MakeMatchProvider(
-					game.GetWorld(),
-					game.GetWorld().viewedpeerid),
+				game.GetWorld(),
+				game.GetWorld().viewedpeerid,
 				fixtureMode);
 		if(!result.available){
 			cmd.reply->set_value(Err(cmd.id, "WRONG_STATE",

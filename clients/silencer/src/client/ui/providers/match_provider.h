@@ -1,18 +1,19 @@
 #pragma once
 
 class ScreenContext;
-class World;
+
+#include <memory>
 
 namespace silencer {
 namespace client_ui {
 
+struct MatchProviderState;
+
 struct MatchProviderValue {
-	World * world = nullptr;
-	int local_peer_id = 0;
+	std::shared_ptr<MatchProviderState> state;
 };
 
 MatchProviderValue MakeMatchProvider(ScreenContext& ctx);
-MatchProviderValue MakeMatchProvider(World& world, int local_peer_id);
 
 }  // namespace client_ui
 }  // namespace silencer

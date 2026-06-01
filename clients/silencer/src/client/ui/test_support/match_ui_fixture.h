@@ -1,8 +1,8 @@
 #pragma once
 
-#include "client/ui/providers/match_provider.h"
-
 #include <string>
+
+class World;
 
 namespace silencer {
 namespace client_ui {
@@ -42,7 +42,8 @@ struct MatchUiFixtureResult {
 };
 
 MatchUiFixtureResult ConfigureMatchUiFixture(
-	const MatchProviderValue& provider,
+	World& world,
+	int viewed_peer_id,
 	MatchUiFixtureMode mode);
 
 }  // namespace client_ui

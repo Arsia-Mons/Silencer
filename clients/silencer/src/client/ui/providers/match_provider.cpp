@@ -8,29 +8,40 @@
 #include "world.h"
 
 #include <cstring>
+#include <memory>
 
 namespace silencer {
 namespace client_ui {
 
-MatchProviderValue MakeMatchProvider(ScreenContext& ctx) {
-	return MakeMatchProvider(ctx.world, ctx.world.peers.localpeerid);
-}
+struct MatchProviderState {
+	World * world = nullptr;
+	int local_peer_id = 0;
+};
 
-MatchProviderValue MakeMatchProvider(World& world, int local_peer_id) {
+MatchProviderValue MakeMatchProvider(ScreenContext& ctx) {
 	MatchProviderValue value;
-	value.world = &world;
-	value.local_peer_id = local_peer_id;
+	value.state = std::make_shared<MatchProviderState>();
+	value.state->world = &ctx.world;
+	value.state->local_peer_id = ctx.world.peers.localpeerid;
 	return value;
 }
 
 namespace match_provider_detail {
+
+World * WorldFor(const MatchProviderValue& provider) {
+	return provider.state ? provider.state->world : nullptr;
+}
+
+int LocalPeerIdFor(const MatchProviderValue& provider) {
+	return provider.state ? provider.state->local_peer_id : 0;
+}
 
 Player * PlayerForPeer(World * world, int peer_id) {
 	return world ? world->GetPeerPlayer(peer_id) : nullptr;
 }
 
 Player * PlayerForPeer(const MatchProviderValue& provider, int peer_id) {
-	return PlayerForPeer(provider.world, peer_id);
+	return PlayerForPeer(WorldFor(provider), peer_id);
 }
 
 void CopyPlayerChatText(Player& player, const std::string& text) {
@@ -114,7 +125,7 @@ void MatchChatModel::set_draft(const std::string& text) const {
 }
 
 void MatchChatModel::submit(const std::string& text) const {
-	World * world = provider_.world;
+	World * world = match_provider_detail::WorldFor(provider_);
 	Player * player = match_provider_detail::PlayerForPeer(provider_, local_peer_id_);
 	if(!world || !player) return;
 	set_draft(text);
@@ -149,21 +160,21 @@ bool MatchStationModel::active() const {
 }
 
 void MatchStationModel::normalize_selection() const {
-	World * world = provider_.world;
+	World * world = match_provider_detail::WorldFor(provider_);
 	Player * player = match_provider_detail::PlayerForPeer(provider_, local_peer_id_);
 	if(!world || !player || !active()) return;
 	match_provider_detail::ClampBuyTechSelection(*player, *world);
 }
 
 void MatchStationModel::select_row(int index) const {
-	World * world = provider_.world;
+	World * world = match_provider_detail::WorldFor(provider_);
 	Player * player = match_provider_detail::PlayerForPeer(provider_, local_peer_id_);
 	if(!world || !player || !active()) return;
 	match_provider_detail::SelectBuyTechRow(*player, *world, index);
 }
 
 void MatchStationModel::activate_selected() const {
-	World * world = provider_.world;
+	World * world = match_provider_detail::WorldFor(provider_);
 	Player * player = match_provider_detail::PlayerForPeer(provider_, local_peer_id_);
 	if(!world || !player || !active()) return;
 	match_provider_detail::ActivateBuyTechSelection(*player, *world);
@@ -192,19 +203,20 @@ void MatchHudModel::update_overlay_state() const {
 }
 
 HudView MatchHudModel::snapshot() const {
-	World * world = provider_.world;
+	World * world = match_provider_detail::WorldFor(provider_);
 	if(!world) return HudView{};
 	return BuildHudView(*world);
 }
 
 MatchModel::MatchModel(const MatchProviderValue& provider)
 	: provider_(provider),
-	  hud(provider, provider.local_peer_id),
-	  chat(provider, provider.local_peer_id),
-	  station(provider, provider.local_peer_id) {}
+	  hud(provider, match_provider_detail::LocalPeerIdFor(provider)),
+	  chat(provider, match_provider_detail::LocalPeerIdFor(provider)),
+	  station(provider, match_provider_detail::LocalPeerIdFor(provider)) {}
 
 bool MatchModel::active() const {
-	return provider_.world && provider_.world->map.loaded;
+	World * world = match_provider_detail::WorldFor(provider_);
+	return world && world->map.loaded;
 }
 
 MatchModel use_match(const MatchProviderValue& provider) {

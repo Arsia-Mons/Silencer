@@ -15,17 +15,13 @@ namespace silencer {
 namespace client_ui {
 
 MatchUiFixtureResult ConfigureMatchUiFixture(
-		const MatchProviderValue& provider,
+		World& world,
+		int viewed_peer_id,
 		MatchUiFixtureMode mode) {
 	MatchUiFixtureResult result;
 	result.mode = mode;
 
-	World * world = provider.world;
-	if(!world){
-		result.error = "no match world";
-		return result;
-	}
-	Player * player = world->GetPeerPlayer(world->viewedpeerid);
+	Player * player = world.GetPeerPlayer(viewed_peer_id);
 	if(!player){
 		result.error = "no viewed player";
 		return result;
@@ -34,20 +30,20 @@ MatchUiFixtureResult ConfigureMatchUiFixture(
 	auto populate = [&]() {
 		std::vector<BuyableItem *> buyItems;
 		std::vector<BuyableItem *> techItems;
-		player->CollectBuyMenuItems(*world, false, buyItems);
-		player->CollectBuyMenuItems(*world, true, techItems);
+		player->CollectBuyMenuItems(world, false, buyItems);
+		player->CollectBuyMenuItems(world, true, techItems);
 		result.available = true;
 		result.chatActive = player->chatActive;
 		result.chatDraft = player->chatText;
 		result.buyActive = player->isbuying;
 		result.techActive = player->techstationactive;
-		result.showChatTicks = world->messaging.showchat_i;
-		result.showPlayerList = world->IsShowingPlayerList();
-		result.quitState = world->quitstate;
-		result.topMessageProgress = world->messaging.topmessage_i;
-		result.messageProgress = world->messaging.message_i;
+		result.showChatTicks = world.messaging.showchat_i;
+		result.showPlayerList = world.IsShowingPlayerList();
+		result.quitState = world.quitstate;
+		result.topMessageProgress = world.messaging.topmessage_i;
+		result.messageProgress = world.messaging.message_i;
 		result.statusMessageCount =
-			static_cast<int>(world->messaging.statusmessages.size());
+			static_cast<int>(world.messaging.statusmessages.size());
 		result.buyItemCount = static_cast<int>(buyItems.size());
 		result.techItemCount = static_cast<int>(techItems.size());
 		result.buySelectedIndex = player->buyifacelastitem;
@@ -59,17 +55,17 @@ MatchUiFixtureResult ConfigureMatchUiFixture(
 		player->chatText[0] = '\0';
 		player->isbuying = false;
 		player->techstationactive = false;
-		world->messaging.showchat_i = 0;
-		world->SetShowingPlayerList(false);
-		world->quitstate = 0;
-		world->messaging.topmessage_i = 0;
-		world->messaging.topmessage[0] = '\0';
-		world->messaging.message_i = 0;
-		world->messaging.message[0] = '\0';
-		for(char * status : world->messaging.statusmessages){
+		world.messaging.showchat_i = 0;
+		world.SetShowingPlayerList(false);
+		world.quitstate = 0;
+		world.messaging.topmessage_i = 0;
+		world.messaging.topmessage[0] = '\0';
+		world.messaging.message_i = 0;
+		world.messaging.message[0] = '\0';
+		for(char * status : world.messaging.statusmessages){
 			delete[] status;
 		}
-		world->messaging.statusmessages.clear();
+		world.messaging.statusmessages.clear();
 	};
 
 	if(mode == MatchUiFixtureMode::Clear){
@@ -84,7 +80,7 @@ MatchUiFixtureResult ConfigureMatchUiFixture(
 		player->chatwithteam = false;
 		std::strncpy(player->chatText, "clay chat smoke", sizeof(player->chatText) - 1);
 		player->chatText[sizeof(player->chatText) - 1] = '\0';
-		world->messaging.showchat_i = GASLoader::Get().gameengine.chatDisplayTicks;
+		world.messaging.showchat_i = GASLoader::Get().gameengine.chatDisplayTicks;
 	}
 	if(mode == MatchUiFixtureMode::Buy || mode == MatchUiFixtureMode::All){
 		player->isbuying = true;
@@ -92,13 +88,13 @@ MatchUiFixtureResult ConfigureMatchUiFixture(
 		player->buyifacelastscrolled = 0;
 	}
 	if(mode == MatchUiFixtureMode::Tech || mode == MatchUiFixtureMode::All){
-		Team * team = player->GetTeam(*world);
-		const std::vector<Uint16> & teams = world->GetObjectsByType(ObjectTypes::TEAM);
+		Team * team = player->GetTeam(world);
+		const std::vector<Uint16> & teams = world.GetObjectsByType(ObjectTypes::TEAM);
 		if(!team && !teams.empty()){
-			team = static_cast<Team *>(world->GetObjectFromId(teams[0]));
+			team = static_cast<Team *>(world.GetObjectFromId(teams[0]));
 		}
 		if(!team){
-			team = static_cast<Team *>(world->CreateObject(ObjectTypes::TEAM));
+			team = static_cast<Team *>(world.CreateObject(ObjectTypes::TEAM));
 			if(team){
 				team->agency = Team::NOXIS;
 				team->number = 0;
@@ -107,14 +103,14 @@ MatchUiFixtureResult ConfigureMatchUiFixture(
 		}
 		if(team){
 			player->SetTeamId(team->id);
-			team->AddPeer(world->GetLocalPeerId());
+			team->AddPeer(world.GetLocalPeerId());
 		}
 		BaseDoor * door = nullptr;
 		if(team){
 			team->disabledtech = 0xffffffff;
-			door = static_cast<BaseDoor *>(world->GetObjectFromId(team->basedoorid));
-			for(Uint16 objectid : world->GetObjectsByType(ObjectTypes::BASEDOOR)){
-				auto * candidate = static_cast<BaseDoor *>(world->GetObjectFromId(objectid));
+			door = static_cast<BaseDoor *>(world.GetObjectFromId(team->basedoorid));
+			for(Uint16 objectid : world.GetObjectsByType(ObjectTypes::BASEDOOR)){
+				auto * candidate = static_cast<BaseDoor *>(world.GetObjectFromId(objectid));
 				if(candidate && candidate->teamid == team->id){
 					door = candidate;
 					break;
@@ -125,7 +121,7 @@ MatchUiFixtureResult ConfigureMatchUiFixture(
 			player->SetBaseDoorEntering(door->id);
 		}
 		if(team){
-			int baseY = ((world->map.height + 10) * 64)
+			int baseY = ((world.map.height + 10) * 64)
 				+ (team->number * 26 * 64) + 64;
 			player->y = static_cast<Sint16>(baseY);
 		}
@@ -134,19 +130,19 @@ MatchUiFixtureResult ConfigureMatchUiFixture(
 		player->techifacelastscrolled = 0;
 	}
 	if(mode == MatchUiFixtureMode::PlayerList || mode == MatchUiFixtureMode::All){
-		world->SetShowingPlayerList(true);
+		world.SetShowingPlayerList(true);
 	}
 	if(mode == MatchUiFixtureMode::QuitPrompt || mode == MatchUiFixtureMode::All){
-		world->quitstate = 1;
+		world.quitstate = 1;
 	}
 	if(mode == MatchUiFixtureMode::TopMessage || mode == MatchUiFixtureMode::All){
-		world->ShowTopMessage("        RETAINED TOP MESSAGE");
+		world.ShowTopMessage("        RETAINED TOP MESSAGE");
 	}
 	if(mode == MatchUiFixtureMode::Message || mode == MatchUiFixtureMode::All){
-		world->ShowMessage("RETAINED CENTER MESSAGE", 128, 0);
+		world.ShowMessage("RETAINED CENTER MESSAGE", 128, 0);
 	}
 	if(mode == MatchUiFixtureMode::StatusLine || mode == MatchUiFixtureMode::All){
-		world->ShowStatus("RETAINED STATUS MESSAGE", 153);
+		world.ShowStatus("RETAINED STATUS MESSAGE", 153);
 	}
 
 	populate();
