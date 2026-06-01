@@ -2,6 +2,7 @@
 
 #include "client/ui/hooks/use_lobby.h"
 #include "client/ui/hooks/use_navigation.h"
+#include "runtime/UiInteractionRegistry.h"
 #include "screen_context.h"
 #include "message_modal.h"
 
@@ -10,6 +11,7 @@
 #include <cstring>
 #include <memory>
 #include <string>
+#include <utility>
 
 namespace silencer::client_ui::lobby {
 
@@ -39,6 +41,25 @@ void CopyUiText(char * dst, int dstLen, const std::string & value)
 	if(n > dstLen - 1) n = dstLen - 1;
 	std::memcpy(dst, value.data(), n);
 	dst[n] = '\0';
+}
+
+void UpdateExistingTextInput(const char * label,
+                             const char * actionId,
+                             char * buffer,
+                             int bufferLen,
+                             bool numbersOnly,
+                             bool password,
+                             silencer::ui::UiInteractionRegistry& interactions) {
+	if(!interactions.FindInteractableById(actionId)) return;
+	silencer::ui::UiInteractable input;
+	input.id = actionId;
+	input.labelText = label;
+	input.kind = silencer::ui::UiInteractableKind::TextInput;
+	input.value = buffer ? buffer : "";
+	input.maxLength = bufferLen > 0 ? bufferLen - 1 : 0;
+	input.numbersOnly = numbersOnly;
+	input.isPassword = password;
+	interactions.RegisterInteractable(std::move(input));
 }
 
 }  // namespace game_create_panel_detail
@@ -174,6 +195,58 @@ bool GameCreatePanelHandleUiIntent(GameCreatePanelState & state,
 		return true;
 	}
 	return false;
+}
+
+void GameCreatePanelRegisterUiFields(GameCreatePanelState & state,
+                                     silencer::ui::UiInteractionRegistry& interactions) {
+	game_create_panel_detail::UpdateExistingTextInput(
+		"Min Level",
+		game_create_panel_detail::kActionMinLevel,
+		state.minLevel,
+		static_cast<int>(sizeof(state.minLevel)),
+		true,
+		false,
+		interactions);
+	game_create_panel_detail::UpdateExistingTextInput(
+		"Max Level",
+		game_create_panel_detail::kActionMaxLevel,
+		state.maxLevel,
+		static_cast<int>(sizeof(state.maxLevel)),
+		true,
+		false,
+		interactions);
+	game_create_panel_detail::UpdateExistingTextInput(
+		"Max Players",
+		game_create_panel_detail::kActionMaxPlayers,
+		state.maxPlayers,
+		static_cast<int>(sizeof(state.maxPlayers)),
+		true,
+		false,
+		interactions);
+	game_create_panel_detail::UpdateExistingTextInput(
+		"Max Teams",
+		game_create_panel_detail::kActionMaxTeams,
+		state.maxTeams,
+		static_cast<int>(sizeof(state.maxTeams)),
+		true,
+		false,
+		interactions);
+	game_create_panel_detail::UpdateExistingTextInput(
+		"Game name",
+		game_create_panel_detail::kActionName,
+		state.name,
+		static_cast<int>(sizeof(state.name)),
+		false,
+		false,
+		interactions);
+	game_create_panel_detail::UpdateExistingTextInput(
+		"Password",
+		game_create_panel_detail::kActionPassword,
+		state.password,
+		static_cast<int>(sizeof(state.password)),
+		false,
+		true,
+		interactions);
 }
 
 }  // namespace silencer::client_ui::lobby

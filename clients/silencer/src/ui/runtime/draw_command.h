@@ -138,7 +138,7 @@ struct DrawCommandList {
 // Sizes pinned at first build (NodeId is uint64_t => 8-byte aligned header).
 static_assert(sizeof(DrawPayload) <= 56, "largest union arm grew; re-check the budget");
 static_assert(sizeof(DrawCommand) <= 96, "DrawCommand size budget; update the budget if intentional");
-constexpr unsigned UI_DRAWLIST_BUDGET = 256u * 1024u;
+constexpr unsigned UI_DRAWLIST_BUDGET = 512u * 1024u;
 static_assert(sizeof(DrawCommandList) < UI_DRAWLIST_BUDGET,
               "DrawCommandList exceeds its byte budget");
 

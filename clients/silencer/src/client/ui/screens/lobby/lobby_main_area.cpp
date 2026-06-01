@@ -191,15 +191,11 @@ void BuildRightTallContents(LobbyMainAreaPanels & panels,
                             LobbyModel & lobby,
                             const LobbyMainAreaLayout & layout,
                             silencer::ui::UiInteractionRegistry& interactions) {
-	if(panels.gameCreateActive){
-		BuildGameCreateTallTree(
-			panels.gameCreate,
-			ctx,
-			lobby,
-			static_cast<Uint16>(std::max(0, layout.rightTallW)),
-			static_cast<Uint16>(std::max(0, layout.rightTallH)),
-			interactions);
-	}
+	(void)panels;
+	(void)ctx;
+	(void)lobby;
+	(void)layout;
+	(void)interactions;
 }
 
 void BuildLobbySteppedPane(LobbyMainAreaPanels & panels,

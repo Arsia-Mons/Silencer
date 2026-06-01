@@ -63,6 +63,11 @@ struct LobbyChromeFrameProps {
 	int game_create_upper_y = 0;
 	int game_create_upper_width = 0;
 	int game_create_upper_height = 0;
+	bool show_game_create_tall = false;
+	int game_create_tall_x = 0;
+	int game_create_tall_y = 0;
+	int game_create_tall_width = 0;
+	int game_create_tall_height = 0;
 	bool show_game_join_actions = false;
 	const char * game_join_ready_label = nullptr;
 	int game_join_button_x = 0;

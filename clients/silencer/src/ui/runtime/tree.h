@@ -12,7 +12,7 @@ namespace ui {
 
 using NodeId = uint64_t;
 
-constexpr int UI_RETAINED_MAX_NODES = 256;
+constexpr int UI_RETAINED_MAX_NODES = 512;
 constexpr int UI_RETAINED_MAX_DEPTH = 64;
 constexpr int UI_RETAINED_MAX_CHILDREN = 64;
 constexpr int UI_RETAINED_LABEL_CAP = 48;

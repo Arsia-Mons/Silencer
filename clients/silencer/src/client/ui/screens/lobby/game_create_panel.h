@@ -3,8 +3,8 @@
 
 // Screen-side lobby GameCreatePanel: the game-options form on the right pane.
 // The upper options pane is declared by retained cppx; this module owns the
-// screen-local state, layout metrics, and the legacy Clay map/create pane while
-// that lower pane is still migrating.
+// screen-local state, layout metrics, retained frame metadata, and the
+// remaining Clay map-preview overlay while that overlay is still migrating.
 //
 // Domain glue (CreateGame kickoff, config persistence, async map upload)
 // lives behind LobbyProvider/use_lobby. Primitives stay screen-agnostic.
@@ -96,6 +96,15 @@ struct GameCreateOptionsScrollbarLayout {
 	Uint16 bottomSpacer = 0;
 };
 
+struct GameCreateTallLayout {
+	Uint16 listBoxWidth = 0;
+	Uint16 listBoxHeight = 0;
+	Uint16 listWidth = 0;
+	Uint16 listHeight = 0;
+	Uint16 inputWidth = 0;
+	Uint8 visibleMapRows = 0;
+};
+
 // Hydrate state from LobbyCreateModel defaults and rebuild the map list from
 // the provider. Mirrors the legacy GameCreatePanel::Build's one-time setup.
 void GameCreatePanelInit(GameCreatePanelState & state, ScreenContext & ctx);
@@ -120,19 +129,20 @@ GameCreateOptionsScrollbarLayout ResolveGameCreateOptionsScrollbarLayout(
 void GameCreatePanelSyncOptionsLayout(GameCreatePanelState & state,
                                       Uint16 panelWidth,
                                       Uint16 panelHeight);
+GameCreateTallLayout ResolveGameCreateTallLayout(Uint16 panelWidth,
+                                                 Uint16 panelHeight);
+void GameCreatePanelSyncTallLayout(GameCreatePanelState & state,
+                                   ScreenContext & ctx,
+                                   LobbyModel & lobby,
+                                   Uint16 panelWidth,
+                                   Uint16 panelHeight,
+                                   int panelX,
+                                   int panelY);
+void GameCreatePanelRegisterUiFields(GameCreatePanelState & state,
+                                     silencer::ui::UiInteractionRegistry& interactions);
 
-// Emits the tall stepped-pane subtree ("Select Map" heading + map list +
-// game-name + password inputs + Create button). Called inside the
-// LobbyRightTallBox CLAY block; flex children only.
-// BeginFrame requirements: TextBeginFrame, ButtonBeginFrame,
-// ScrollListBeginFrame, TextInputBeginFrame.
-void BuildGameCreateTallTree(GameCreatePanelState & state,
-                             ScreenContext & ctx,
-                             LobbyModel & lobby,
-                             Uint16 panelWidth,
-                             Uint16 panelHeight,
-                             silencer::ui::UiInteractionRegistry& interactions);
-
+// Emits the map hover preview overlay while the retained renderer lacks a
+// SurfacePayload command path.
 void BuildGameCreatePreviewOverlay(GameCreatePanelState & state,
                                    ScreenContext & ctx);
 

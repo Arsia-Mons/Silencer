@@ -121,12 +121,26 @@ constexpr int kGameCreateFormColumnGap = 6;
 constexpr int kGameCreateScrollbarWidth = 8;
 constexpr int kGameCreateScrollbarGap = 2;
 constexpr int kGameCreateScrollbarTrackPad = 1;
+constexpr int kGameCreateMapRowSlots = 32;
+constexpr int kGameCreateMapLineH = 14;
+constexpr int kGameCreateTallPanelPad = 6;
+constexpr int kGameCreateTallHeadingH = 13;
+constexpr int kGameCreateTallSectionGap = 4;
+constexpr int kGameCreateTallFooterGap = 4;
+constexpr int kGameCreateMapListBorderPad = 1;
+constexpr int kGameCreateMapScrollbarWidth = 8;
+constexpr int kGameCreateTallInputH = 14;
+constexpr int kGameCreateTallButtonH = 21;
 constexpr const char * kGameCreateSecurityAction = "lobby.game_create.security";
 constexpr const char * kGameCreateSpectatableAction = "lobby.game_create.spectatable";
 constexpr const char * kGameCreateMinLevelAction = "lobby.game_create.min_level";
 constexpr const char * kGameCreateMaxLevelAction = "lobby.game_create.max_level";
 constexpr const char * kGameCreateMaxPlayersAction = "lobby.game_create.max_players";
 constexpr const char * kGameCreateMaxTeamsAction = "lobby.game_create.max_teams";
+constexpr const char * kGameCreateMapActionPrefix = "lobby.game_create.map.";
+constexpr const char * kGameCreateNameAction = "lobby.game_create.name";
+constexpr const char * kGameCreatePasswordAction = "lobby.game_create.password";
+constexpr const char * kGameCreateCreateAction = "lobby.game_create.create";
 
 const char * kGameSelectRowKeys[kGameSelectRowSlots] = {
 	"game-select-row-0",  "game-select-row-1",  "game-select-row-2",
@@ -218,6 +232,25 @@ const char * kGameCreateOptionRowKeys[kGameCreateOptionRowSlots] = {
 	"game-create-option-row-3",
 	"game-create-option-row-4",
 	"game-create-option-row-5",
+};
+
+const char * kGameCreateMapRowKeys[kGameCreateMapRowSlots] = {
+	"game-create-map-row-0",  "game-create-map-row-1",
+	"game-create-map-row-2",  "game-create-map-row-3",
+	"game-create-map-row-4",  "game-create-map-row-5",
+	"game-create-map-row-6",  "game-create-map-row-7",
+	"game-create-map-row-8",  "game-create-map-row-9",
+	"game-create-map-row-10", "game-create-map-row-11",
+	"game-create-map-row-12", "game-create-map-row-13",
+	"game-create-map-row-14", "game-create-map-row-15",
+	"game-create-map-row-16", "game-create-map-row-17",
+	"game-create-map-row-18", "game-create-map-row-19",
+	"game-create-map-row-20", "game-create-map-row-21",
+	"game-create-map-row-22", "game-create-map-row-23",
+	"game-create-map-row-24", "game-create-map-row-25",
+	"game-create-map-row-26", "game-create-map-row-27",
+	"game-create-map-row-28", "game-create-map-row-29",
+	"game-create-map-row-30", "game-create-map-row-31",
 };
 
 inline std::uint32_t texture_id(std::uint8_t bank, std::uint16_t index) {
@@ -676,6 +709,44 @@ inline ::ui::StyleStatePatch game_create_text_input_patch() {
 
 inline ::ui::StyleStatePatch game_create_scrollbar_thumb_patch() {
 	return ::ui::patch().background({216, 0, 0, 255});
+}
+
+inline const char * game_create_map_label(const std::string& raw) {
+	if(raw.size() >= 5 && std::memcmp(raw.c_str(), "[DL] ", 5) == 0){
+		return raw.c_str() + 5;
+	}
+	return raw.c_str();
+}
+
+inline const char * copied_game_create_map_id(int source) {
+	return copied_prefixed_id(kGameCreateMapActionPrefix, source);
+}
+
+inline int game_create_map_scroll_max(const GameCreatePanelState& state,
+                                      const GameCreateTallLayout& layout) {
+	const int visible_rows = static_cast<int>(layout.visibleMapRows);
+	if(visible_rows <= 0) return 0;
+	const int max_scroll = static_cast<int>(state.maps.size()) - visible_rows;
+	return max_scroll > 0 ? max_scroll : 0;
+}
+
+inline bool game_create_map_show_scrollbar(const GameCreatePanelState& state,
+                                           const GameCreateTallLayout& layout) {
+	return game_create_map_scroll_max(state, layout) > 0;
+}
+
+inline int game_create_map_rows_width(const GameCreatePanelState& state,
+                                      const GameCreateTallLayout& layout) {
+	int width = static_cast<int>(layout.listWidth);
+	if(game_create_map_show_scrollbar(state, layout)){
+		width -= kGameCreateMapScrollbarWidth;
+	}
+	return std::max(0, width);
+}
+
+inline const char * game_create_password_display(const GameCreatePanelState& state) {
+	const std::string masked(std::strlen(state.password), '*');
+	return ::ui::copy_string(masked.c_str());
 }
 
 struct AbsoluteChromeButtonProps {
@@ -1985,6 +2056,418 @@ struct GameCreateUpperPanelProps {
 				/>
 			</Box>
 		</Box>
+	</Box>
+}
+
+struct GameCreateMapRowProps {
+	const char * key = nullptr;
+	const GameCreatePanelState * state = nullptr;
+	GameCreateTallLayout layout = {};
+	int visible_row = 0;
+};
+
+::ui::UiElement GameCreateMapRow(const GameCreateMapRowProps& props) {
+	if(!props.state || props.visible_row < 0 ||
+	   props.visible_row >= static_cast<int>(props.layout.visibleMapRows)){
+		return ::ui::empty();
+	}
+	const int source = static_cast<int>(props.state->mapScrollPos) + props.visible_row;
+	if(source < 0 || source >= static_cast<int>(props.state->maps.size())){
+		return ::ui::empty();
+	}
+	const std::string& raw = props.state->maps[static_cast<size_t>(source)];
+	const char * label = game_create_map_label(raw);
+	const bool selected = source == props.state->mapSelectedIndex;
+	const int rows_width =
+		game_create_map_rows_width(*props.state, props.layout);
+	return <component_detail.Host
+	  kind={::ui::HostKind::Button}
+	  key={props.key}
+	  id={copied_game_create_map_id(source)}
+	  idOffset={source + 1}
+	  style={absolute_layout(0, props.visible_row * kGameCreateMapLineH, rows_width, kGameCreateMapLineH)}
+	  visual={row_visual(selected)}
+	  interaction={::ui::NodeInteraction{
+			.focusable = true,
+			.checked = selected,
+		}}
+	  accessibility={{.role = ::ui::SemanticRole::ListRow, .label = label}}
+	>
+		<Text
+		  key="label"
+		  value={label}
+		  layout={::ui::LayoutStyle{
+				.width = ::ui::Length::percent(100.0f),
+				.height = ::ui::Length::points(11.0f),
+				.padding = {4.0f, 6.0f, 1.0f, 0.0f},
+			}}
+		  style={text_patch(133, 6, 11.0f)}
+		/>
+	</component_detail.Host>
+}
+
+struct GameCreateMapRowsProps {
+	const char * key = nullptr;
+	const GameCreatePanelState * state = nullptr;
+	GameCreateTallLayout layout = {};
+};
+
+::ui::UiElement GameCreateMapRows(const GameCreateMapRowsProps& props) {
+	return <Box
+	  key={props.key}
+	  layout={absolute_layout(0, 0, props.layout.listWidth, props.layout.listHeight)}
+	>
+		<GameCreateMapRow
+		  key={kGameCreateMapRowKeys[0]}
+		  state={props.state}
+		  layout={props.layout}
+		  visibleRow={0}
+		/>
+		<GameCreateMapRow
+		  key={kGameCreateMapRowKeys[1]}
+		  state={props.state}
+		  layout={props.layout}
+		  visibleRow={1}
+		/>
+		<GameCreateMapRow
+		  key={kGameCreateMapRowKeys[2]}
+		  state={props.state}
+		  layout={props.layout}
+		  visibleRow={2}
+		/>
+		<GameCreateMapRow
+		  key={kGameCreateMapRowKeys[3]}
+		  state={props.state}
+		  layout={props.layout}
+		  visibleRow={3}
+		/>
+		<GameCreateMapRow
+		  key={kGameCreateMapRowKeys[4]}
+		  state={props.state}
+		  layout={props.layout}
+		  visibleRow={4}
+		/>
+		<GameCreateMapRow
+		  key={kGameCreateMapRowKeys[5]}
+		  state={props.state}
+		  layout={props.layout}
+		  visibleRow={5}
+		/>
+		<GameCreateMapRow
+		  key={kGameCreateMapRowKeys[6]}
+		  state={props.state}
+		  layout={props.layout}
+		  visibleRow={6}
+		/>
+		<GameCreateMapRow
+		  key={kGameCreateMapRowKeys[7]}
+		  state={props.state}
+		  layout={props.layout}
+		  visibleRow={7}
+		/>
+		<GameCreateMapRow
+		  key={kGameCreateMapRowKeys[8]}
+		  state={props.state}
+		  layout={props.layout}
+		  visibleRow={8}
+		/>
+		<GameCreateMapRow
+		  key={kGameCreateMapRowKeys[9]}
+		  state={props.state}
+		  layout={props.layout}
+		  visibleRow={9}
+		/>
+		<GameCreateMapRow
+		  key={kGameCreateMapRowKeys[10]}
+		  state={props.state}
+		  layout={props.layout}
+		  visibleRow={10}
+		/>
+		<GameCreateMapRow
+		  key={kGameCreateMapRowKeys[11]}
+		  state={props.state}
+		  layout={props.layout}
+		  visibleRow={11}
+		/>
+		<GameCreateMapRow
+		  key={kGameCreateMapRowKeys[12]}
+		  state={props.state}
+		  layout={props.layout}
+		  visibleRow={12}
+		/>
+		<GameCreateMapRow
+		  key={kGameCreateMapRowKeys[13]}
+		  state={props.state}
+		  layout={props.layout}
+		  visibleRow={13}
+		/>
+		<GameCreateMapRow
+		  key={kGameCreateMapRowKeys[14]}
+		  state={props.state}
+		  layout={props.layout}
+		  visibleRow={14}
+		/>
+		<GameCreateMapRow
+		  key={kGameCreateMapRowKeys[15]}
+		  state={props.state}
+		  layout={props.layout}
+		  visibleRow={15}
+		/>
+		<GameCreateMapRow
+		  key={kGameCreateMapRowKeys[16]}
+		  state={props.state}
+		  layout={props.layout}
+		  visibleRow={16}
+		/>
+		<GameCreateMapRow
+		  key={kGameCreateMapRowKeys[17]}
+		  state={props.state}
+		  layout={props.layout}
+		  visibleRow={17}
+		/>
+		<GameCreateMapRow
+		  key={kGameCreateMapRowKeys[18]}
+		  state={props.state}
+		  layout={props.layout}
+		  visibleRow={18}
+		/>
+		<GameCreateMapRow
+		  key={kGameCreateMapRowKeys[19]}
+		  state={props.state}
+		  layout={props.layout}
+		  visibleRow={19}
+		/>
+		<GameCreateMapRow
+		  key={kGameCreateMapRowKeys[20]}
+		  state={props.state}
+		  layout={props.layout}
+		  visibleRow={20}
+		/>
+		<GameCreateMapRow
+		  key={kGameCreateMapRowKeys[21]}
+		  state={props.state}
+		  layout={props.layout}
+		  visibleRow={21}
+		/>
+		<GameCreateMapRow
+		  key={kGameCreateMapRowKeys[22]}
+		  state={props.state}
+		  layout={props.layout}
+		  visibleRow={22}
+		/>
+		<GameCreateMapRow
+		  key={kGameCreateMapRowKeys[23]}
+		  state={props.state}
+		  layout={props.layout}
+		  visibleRow={23}
+		/>
+		<GameCreateMapRow
+		  key={kGameCreateMapRowKeys[24]}
+		  state={props.state}
+		  layout={props.layout}
+		  visibleRow={24}
+		/>
+		<GameCreateMapRow
+		  key={kGameCreateMapRowKeys[25]}
+		  state={props.state}
+		  layout={props.layout}
+		  visibleRow={25}
+		/>
+		<GameCreateMapRow
+		  key={kGameCreateMapRowKeys[26]}
+		  state={props.state}
+		  layout={props.layout}
+		  visibleRow={26}
+		/>
+		<GameCreateMapRow
+		  key={kGameCreateMapRowKeys[27]}
+		  state={props.state}
+		  layout={props.layout}
+		  visibleRow={27}
+		/>
+		<GameCreateMapRow
+		  key={kGameCreateMapRowKeys[28]}
+		  state={props.state}
+		  layout={props.layout}
+		  visibleRow={28}
+		/>
+		<GameCreateMapRow
+		  key={kGameCreateMapRowKeys[29]}
+		  state={props.state}
+		  layout={props.layout}
+		  visibleRow={29}
+		/>
+		<GameCreateMapRow
+		  key={kGameCreateMapRowKeys[30]}
+		  state={props.state}
+		  layout={props.layout}
+		  visibleRow={30}
+		/>
+		<GameCreateMapRow
+		  key={kGameCreateMapRowKeys[31]}
+		  state={props.state}
+		  layout={props.layout}
+		  visibleRow={31}
+		/>
+	</Box>
+}
+
+struct GameCreateMapScrollbarProps {
+	const char * key = nullptr;
+	const GameCreatePanelState * state = nullptr;
+	GameCreateTallLayout layout = {};
+};
+
+::ui::UiElement GameCreateMapScrollbar(const GameCreateMapScrollbarProps& props) {
+	if(!props.state || !game_create_map_show_scrollbar(*props.state, props.layout) ||
+	   props.layout.listHeight <= kGameCreateScrollbarTrackPad * 2){
+		return ::ui::empty();
+	}
+	const int track_height =
+		static_cast<int>(props.layout.listHeight)
+		- kGameCreateScrollbarTrackPad * 2;
+	if(track_height <= 0) return ::ui::empty();
+	const int visible_rows = static_cast<int>(props.layout.visibleMapRows);
+	const int row_count = static_cast<int>(props.state->maps.size());
+	const int max_scroll = game_create_map_scroll_max(*props.state, props.layout);
+	int thumb_height = row_count > 0
+		? (track_height * visible_rows) / row_count
+		: track_height;
+	thumb_height = clamp_int(thumb_height, 12, track_height);
+	const int travel = track_height - thumb_height;
+	int top_spacer = 0;
+	if(max_scroll > 0 && travel > 0){
+		top_spacer =
+			(travel * static_cast<int>(props.state->mapScrollPos) + max_scroll / 2)
+			/ max_scroll;
+	}
+	top_spacer = clamp_int(top_spacer, 0, travel);
+	const int bottom_spacer = travel - top_spacer;
+	return <Box
+	  key={props.key}
+	  layout={absolute_layout(std::max(0, static_cast<int>(props.layout.listWidth) - kGameCreateMapScrollbarWidth), 0, kGameCreateMapScrollbarWidth, props.layout.listHeight)}
+	  style={inset_border_patch()}
+	>
+		<Box key="top" layout={absolute_layout(0, 0, kGameCreateMapScrollbarWidth, top_spacer)} />
+		<Box
+		  key="thumb"
+		  layout={absolute_layout(kGameCreateScrollbarTrackPad, kGameCreateScrollbarTrackPad + top_spacer, std::max(1, kGameCreateMapScrollbarWidth - kGameCreateScrollbarTrackPad * 2), thumb_height)}
+		  style={game_create_scrollbar_thumb_patch()}
+		/>
+		<Box
+		  key="bottom"
+		  layout={absolute_layout(0, kGameCreateScrollbarTrackPad + top_spacer + thumb_height, kGameCreateMapScrollbarWidth, bottom_spacer)}
+		/>
+	</Box>
+}
+
+struct GameCreateTallPanelProps {
+	const char * key = nullptr;
+	bool show = false;
+	const GameCreatePanelState * state = nullptr;
+	int x = 0;
+	int y = 0;
+	int width = 0;
+	int height = 0;
+};
+
+::ui::UiElement GameCreateTallPanel(const GameCreateTallPanelProps& props) {
+	if(!props.show || !props.state || props.width <= 0 || props.height <= 0){
+		return ::ui::empty();
+	}
+	const GameCreateTallLayout layout =
+		ResolveGameCreateTallLayout(
+			static_cast<Uint16>(props.width),
+			static_cast<Uint16>(props.height));
+	const int list_box_x = kGameCreateTallPanelPad;
+	const int list_box_y =
+		kGameCreateTallPanelPad
+		+ kGameCreateTallHeadingH
+		+ kGameCreateTallSectionGap;
+	const int list_x = list_box_x + kGameCreateMapListBorderPad;
+	const int list_y = list_box_y + kGameCreateMapListBorderPad;
+	const int footer_y =
+		list_box_y
+		+ static_cast<int>(layout.listBoxHeight)
+		+ kGameCreateTallSectionGap;
+	const int name_input_y =
+		footer_y + kGameCreateTallHeadingH + kGameCreateTallFooterGap;
+	const int password_label_y =
+		name_input_y + kGameCreateTallInputH + kGameCreateTallFooterGap;
+	const int password_input_y =
+		password_label_y + kGameCreateTallHeadingH + kGameCreateTallFooterGap;
+	const int create_y =
+		password_input_y + kGameCreateTallInputH + kGameCreateTallFooterGap;
+	return <Box
+	  key={props.key}
+	  id="GameCreateTallContent"
+	  layout={character_root_layout(props.x, props.y, props.width, props.height)}
+	>
+		<Text
+		  key="heading"
+		  value="Select Map"
+		  layout={absolute_layout(kGameCreateTallPanelPad, kGameCreateTallPanelPad, std::max(0, props.width - kGameCreateTallPanelPad), kGameCreateTallHeadingH)}
+		  style={text_patch(134, 8, 13.0f)}
+		/>
+		<Box
+		  key="list-border"
+		  id="GameCreateMapListBorder"
+		  layout={absolute_layout(list_box_x, list_box_y, layout.listBoxWidth, layout.listBoxHeight)}
+		  style={inset_border_patch()}
+		/>
+		<Box
+		  key="list-viewport"
+		  layout={absolute_layout(list_x, list_y, layout.listWidth, layout.listHeight)}
+		>
+			<GameCreateMapRows key="rows" state={props.state} layout={layout} />
+			<GameCreateMapScrollbar key="scrollbar" state={props.state} layout={layout} />
+		</Box>
+		<Text
+		  key="name-label"
+		  value="Game name:"
+		  layout={absolute_layout(kGameCreateTallPanelPad, footer_y, layout.inputWidth, kGameCreateTallHeadingH)}
+		  style={text_patch(134, 8, 13.0f)}
+		/>
+		<TextInput
+		  key="name-input"
+		  id={kGameCreateNameAction}
+		  accessibility={{.label = "Game name"}}
+		  value={props.state->name}
+		  textEdit={::ui::TextEditMetadata{
+				.caret = static_cast<int>(std::strlen(props.state->name)),
+				.selection_start = static_cast<int>(std::strlen(props.state->name)),
+				.selection_end = static_cast<int>(std::strlen(props.state->name)),
+			}}
+		  layout={absolute_layout(kGameCreateTallPanelPad, name_input_y, layout.inputWidth, kGameCreateTallInputH)}
+		  style={game_create_text_input_patch()}
+		/>
+		<Text
+		  key="password-label"
+		  value="Password (optional):"
+		  layout={absolute_layout(kGameCreateTallPanelPad, password_label_y, layout.inputWidth, kGameCreateTallHeadingH)}
+		  style={text_patch(134, 8, 13.0f)}
+		/>
+		<TextInput
+		  key="password-input"
+		  id={kGameCreatePasswordAction}
+		  accessibility={{.label = "Password"}}
+		  value={game_create_password_display(*props.state)}
+		  textEdit={::ui::TextEditMetadata{
+				.caret = static_cast<int>(std::strlen(props.state->password)),
+				.selection_start = static_cast<int>(std::strlen(props.state->password)),
+				.selection_end = static_cast<int>(std::strlen(props.state->password)),
+			}}
+		  layout={absolute_layout(kGameCreateTallPanelPad, password_input_y, layout.inputWidth, kGameCreateTallInputH)}
+		  style={game_create_text_input_patch()}
+		/>
+		<Button
+		  key="create"
+		  id={kGameCreateCreateAction}
+		  label="Create"
+		  accessibility={{.label = "Create"}}
+		  layout={absolute_button_layout(kGameCreateTallPanelPad, create_y, std::max(1, static_cast<int>(layout.inputWidth)), kGameCreateTallButtonH)}
+		  style={chrome_button_patch()}
+		/>
 	</Box>
 }
 
@@ -3345,6 +3828,15 @@ using ::ui::components::TextProps;
 		  y={props.game_create_upper_y}
 		  width={props.game_create_upper_width}
 		  height={props.game_create_upper_height}
+		/>
+		<lobby_chrome_frame_detail.GameCreateTallPanel
+		  key="game-create-tall"
+		  show={props.show_game_create_tall}
+		  state={props.game_create}
+		  x={props.game_create_tall_x}
+		  y={props.game_create_tall_y}
+		  width={props.game_create_tall_width}
+		  height={props.game_create_tall_height}
 		/>
 		<lobby_chrome_frame_detail.AbsoluteChromeButton
 		  key="game-join-choose-tech"

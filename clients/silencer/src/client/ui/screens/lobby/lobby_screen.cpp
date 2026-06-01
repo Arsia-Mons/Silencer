@@ -169,6 +169,9 @@ void LobbyScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime, s
 	const int bodyY = rootPadTop + (int)titleBarH + regionGap;
 	const LobbyMainAreaLayout mainLayout =
 		ResolveLobbyMainAreaLayout(bodyW, bodyH, regionGap);
+	silencer::client_ui::LobbyModel lobby =
+		silencer::client_ui::use_lobby(
+			silencer::client_ui::MakeLobbyProvider(ctx, this));
 	ChatPanelSyncLayout(
 		chatState,
 		static_cast<Uint16>(std::max(0, mainLayout.chatW)),
@@ -178,6 +181,14 @@ void LobbyScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime, s
 			gameCreateState,
 			static_cast<Uint16>(std::max(0, mainLayout.rightUpperW)),
 			static_cast<Uint16>(std::max(0, mainLayout.upperH)));
+		GameCreatePanelSyncTallLayout(
+			gameCreateState,
+			ctx,
+			lobby,
+			static_cast<Uint16>(std::max(0, mainLayout.rightTallW)),
+			static_cast<Uint16>(std::max(0, mainLayout.rightTallH)),
+			bodyX + mainLayout.topRowW,
+			bodyY);
 	}
 	const bool gameSelectVisible =
 		!gameCreateActive && !gameJoinActive && !gameTechActive;
@@ -265,6 +276,8 @@ void LobbyScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime, s
 		mainLayout.upperH > gameTechPeerY - bodyY + 11;
 	const bool showGameCreateUpper =
 		gameCreateActive && mainLayout.rightUpperW > 0 && mainLayout.upperH > 0;
+	const bool showGameCreateTall =
+		gameCreateActive && mainLayout.rightTallW > 0 && mainLayout.rightTallH > 0;
 	const uint16_t titlePadX = static_cast<uint16_t>(
 		lobby_screen_detail::ClampInt((layoutWidth * 5) / 640, 5, 10));
 	const uint16_t titleRowGap = static_cast<uint16_t>(
@@ -325,6 +338,11 @@ void LobbyScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime, s
 		.game_create_upper_y = bodyY,
 		.game_create_upper_width = mainLayout.rightUpperW,
 		.game_create_upper_height = mainLayout.upperH,
+		.show_game_create_tall = showGameCreateTall,
+		.game_create_tall_x = bodyX + mainLayout.topRowW,
+		.game_create_tall_y = bodyY,
+		.game_create_tall_width = mainLayout.rightTallW,
+		.game_create_tall_height = mainLayout.rightTallH,
 		.show_game_join_actions = showGameJoinActions,
 		.game_join_ready_label = gameJoinState.readyLabel.c_str(),
 		.game_join_button_x = rightUpperX + lobby_screen_detail::kGameJoinButtonPadLeft,
@@ -362,6 +380,9 @@ void LobbyScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime, s
 	                   layoutWidth,
 	                   layoutHeight,
 	                   interactions);
+	if(gameCreateActive){
+		GameCreatePanelRegisterUiFields(gameCreateState, interactions);
+	}
 
 	if(ctx.renderdevice){
 		ctx.renderdevice->BeginLobbyPanelBorderBlur(
@@ -402,9 +423,6 @@ void LobbyScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime, s
 			gameJoinActive,
 			gameTechActive,
 		};
-		silencer::client_ui::LobbyModel lobby =
-			silencer::client_ui::use_lobby(
-				silencer::client_ui::MakeLobbyProvider(ctx, this));
 		BuildLobbyMainArea(
 			panels, ctx, lobby, bodyX, bodyY, bodyW, bodyH, regionGap, interactions);
 		if(gameCreateActive){

@@ -13,15 +13,15 @@
 
 namespace ui {
 
-constexpr int UI_RETAINED_MAX_ELEMENTS = 384;
-constexpr int UI_RETAINED_MAX_CHILD_ELEMENTS = 384;
+constexpr int UI_RETAINED_MAX_ELEMENTS = 768;
+constexpr int UI_RETAINED_MAX_CHILD_ELEMENTS = 768;
 // Per-frame arena for copied component-prop records. Each props struct now
 // embeds a StyleStatePatch `style` (seven StylePatch slots), so a single record
 // is ~2.3 KB; a complex screen (the loadout) instantiates dozens, so the arena
 // is sized to hold them with headroom rather than the former 64 KB.
-constexpr int UI_RETAINED_ELEMENT_ARENA_BYTES = 262144;
-constexpr int UI_RETAINED_MAX_ELEMENT_DESTRUCTORS = 512;
-constexpr int UI_RETAINED_STRING_ARENA_BYTES = 8192;
+constexpr int UI_RETAINED_ELEMENT_ARENA_BYTES = 524288;
+constexpr int UI_RETAINED_MAX_ELEMENT_DESTRUCTORS = 1024;
+constexpr int UI_RETAINED_STRING_ARENA_BYTES = 16384;
 
 struct UiElement;
 class UiElementFrame;
