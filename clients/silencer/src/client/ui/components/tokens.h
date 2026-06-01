@@ -15,9 +15,9 @@ constexpr ::ui::Color kBorderPanel = {88, 104, 118, 255};
 constexpr ::ui::Color kAccent = {92, 164, 224, 255};
 constexpr ::ui::Color kAccentHover = {116, 184, 242, 255};
 constexpr ::ui::Color kAccentPressed = {70, 138, 202, 255};
-constexpr ::ui::Color kTextTitle = {236, 244, 240, 255};
-constexpr ::ui::Color kTextMuted = {160, 176, 186, 255};
-constexpr ::ui::Color kTextButton = {238, 246, 242, 255};
+constexpr ::ui::Color kTextTitle = {0, 128, 0, 255};
+constexpr ::ui::Color kTextMuted = {0, 96, 0, 255};
+constexpr ::ui::Color kTextButton = {0, 128, 0, 255};
 
 constexpr std::uint16_t kFontTitleBank = 135;
 constexpr std::uint16_t kFontTitleAdvance = 11;

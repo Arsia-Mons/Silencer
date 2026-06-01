@@ -333,6 +333,9 @@ inline ::ui::StylePatch map_text_patch() {
 inline ::ui::StyleStatePatch chrome_button_patch() {
 	::ui::StyleStatePatch patch{};
 	patch.base = ::ui::patch()
+		.background(::ui::Color{0, 0, 0, 0})
+		.border(::ui::Border{})
+		.outline(::ui::Outline{})
 		.image(::ui::BackgroundImage{
 			.texture_id = texture_id(7, 24),
 			.tint = {255, 255, 255, 255},
@@ -845,6 +848,7 @@ inline ::ui::VisualStyle game_create_inline_control_visual(bool selected) {
 
 inline ::ui::StyleStatePatch game_create_text_input_patch() {
 	return ::ui::patch()
+		.background(::ui::Color{0, 0, 0, 0})
 		.border(::ui::Border{
 			{1.0f, 1.0f, 1.0f, 1.0f},
 			{{216, 0, 0, 255}, {216, 0, 0, 255},

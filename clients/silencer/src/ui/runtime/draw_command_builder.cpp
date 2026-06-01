@@ -14,15 +14,9 @@ namespace {
 // fallback (that legacy path is gone; the transcriber reads node.visual only).
 // Premultiplication happens at emit (premul()), never here.
 constexpr Color kTransparent = {0, 0, 0, 0};
-constexpr Color kButtonFill = {24, 28, 36, 255};
-constexpr Color kButtonDisabledFill = {30, 34, 42, 255};
-constexpr Color kButtonBorder = {78, 88, 104, 255};
-constexpr Color kButtonDisabledBorder = {62, 68, 78, 255};
 constexpr Color kFocusBorder = {96, 165, 250, 255}; // accent (matches theme focus_ring)
 constexpr float kFocusBorderWidth = 2.0f;
 constexpr float kFocusBorderOffset = 2.0f;
-constexpr Color kCheckedFill = {44, 92, 128, 255};
-constexpr Color kInputFill = {18, 22, 28, 255};
 constexpr Color kSelectionFill = {72, 116, 164, 180};
 constexpr Color kCaretFill = {232, 240, 248, 255};
 constexpr Color kTextFill = {226, 234, 242, 255};
@@ -43,16 +37,6 @@ Color premul(Color c) {
 
 DrawRect to_draw_rect(const Rect &r) {
   return {r.x, r.y, r.width, r.height};
-}
-
-Color control_fill(const NodeSnapshot &node) {
-  if (node.interaction.disabled)
-    return kButtonDisabledFill;
-  if (node.role == NodeRole::Checkbox && node.interaction.checked)
-    return kCheckedFill;
-  if (node.role == NodeRole::Input)
-    return kInputFill;
-  return kButtonFill;
 }
 
 int text_length(const char *value) {
@@ -279,10 +263,7 @@ bool append_rect(DrawCommandList &list, const NodeSnapshot &node,
                     image_box ||
                     (v.border.color.top.a > 0 && v.border.width.top > 0.0f) ||
                     (v.outline.color.a > 0 && v.outline.width > 0.0f);
-  bool control_box = node.role == NodeRole::Button ||
-                     node.role == NodeRole::Checkbox ||
-                     node.role == NodeRole::Input;
-  if (!visual_box && !control_box && !focused) {
+  if (!visual_box && !focused) {
     return true;
   }
 
@@ -296,9 +277,7 @@ bool append_rect(DrawCommandList &list, const NodeSnapshot &node,
     return true;
   }
 
-  Color fill = has_color(v.background)
-                   ? v.background
-                   : (control_box ? control_fill(node) : kTransparent);
+  Color fill = has_color(v.background) ? v.background : kTransparent;
 
   return push_rect_command(list, node.id, node.layout, fill, v.corner_radius);
 }
@@ -310,24 +289,14 @@ bool append_rect(DrawCommandList &list, const NodeSnapshot &node,
 bool append_frame(DrawCommandList &list, const NodeSnapshot &node,
                   bool focused) {
   const VisualStyle &v = node.visual;
-  bool image_box = v.image.texture_id != 0;
-  bool control_box = node.role == NodeRole::Button ||
-                     node.role == NodeRole::Checkbox ||
-                     node.role == NodeRole::Input;
 
-  // Border: the resolved per-side VisualStyle border, else a control-role
-  // default (a 1px border in the role's border color). Non-control boxes with
-  // no resolved border get none.
+  // Border: emit only the resolved per-side VisualStyle border. Component/theme
+  // resolution owns defaults; the draw-list builder must not invent a fallback
+  // fill or stroke for transparent sprite/list controls.
   Border border = {};
   bool has_border = false;
   if (v.border.color.top.a > 0 && v.border.width.top > 0.0f) {
     border = v.border;
-    has_border = true;
-  } else if (control_box && !image_box) {
-    Color border_color =
-        node.interaction.disabled ? kButtonDisabledBorder : kButtonBorder;
-    border.width = {1.0f, 1.0f, 1.0f, 1.0f};
-    border.color = {border_color, border_color, border_color, border_color};
     has_border = true;
   }
 

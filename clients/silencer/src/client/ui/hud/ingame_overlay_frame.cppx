@@ -1550,6 +1550,13 @@ struct PlayerListPeerRowProps {
 	</Box>
 }
 
+inline ::ui::LayoutStyle player_list_emblem_slot_layout() {
+	::ui::LayoutStyle layout =
+		absolute_layout(0, 0, kPlayerListEmblemSlotWidth, kPlayerListTeamHeight);
+	layout.overflow = ::ui::Overflow::Hidden;
+	return layout;
+}
+
 struct PlayerListTeamRowProps {
 	const char * key = nullptr;
 	const TeamHudView * teams = nullptr;
@@ -1584,11 +1591,17 @@ struct PlayerListTeamRowProps {
 	  layout={absolute_layout(props.x, props.y, props.width, kPlayerListTeamHeight)}
 	>
 		<Box
-		  key="emblem"
-		  id="PlayerListTeamEmblem"
-		  layout={absolute_layout(0, emblem_y, team.emblemW, team.emblemH)}
-		  style={image_patch(181, team.agency)}
-		/>
+		  key="emblem-slot"
+		  id="PlayerListEmblemSlot"
+		  layout={player_list_emblem_slot_layout()}
+		>
+			<Box
+			  key="emblem"
+			  id="PlayerListTeamEmblem"
+			  layout={absolute_layout(0, emblem_y, team.emblemW, team.emblemH)}
+			  style={team_emblem_patch(181, team.agency, team.color, 17, true)}
+			/>
+		</Box>
 		<PlayerListPeerRow
 		  key="peer-0"
 		  team={&team}

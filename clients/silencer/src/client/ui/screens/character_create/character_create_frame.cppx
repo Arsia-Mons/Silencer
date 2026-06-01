@@ -168,17 +168,17 @@ inline ::ui::StylePatch detail_text_patch(std::uint16_t font_size = 7) {
 
 inline ::ui::VisualStyle row_visual(bool selectedVisual, bool disabled) {
 	::ui::VisualStyle visual{};
-	visual.background = selectedVisual ? ::ui::Color{44, 92, 128, 230}
-	                                   : ::ui::Color{14, 20, 28, 210};
+	(void)selectedVisual;
+	visual.background = {0, 0, 0, 0};
 	if(disabled){
-		visual.background = {18, 22, 28, 150};
+		visual.background = {0, 0, 0, 0};
 	}
 	visual.border = ::ui::Border{
 		{1.0f, 1.0f, 1.0f, 1.0f},
-		{{86, 112, 126, 255},
-		 {86, 112, 126, 255},
-		 {86, 112, 126, 255},
-		 {86, 112, 126, 255}},
+		{{216, 0, 0, 255},
+		 {216, 0, 0, 255},
+		 {216, 0, 0, 255},
+		 {216, 0, 0, 255}},
 	};
 	visual.text = {
 		.color = tokens::kTextButton,
@@ -191,13 +191,13 @@ inline ::ui::VisualStyle row_visual(bool selectedVisual, bool disabled) {
 
 inline ::ui::VisualStyle input_visual() {
 	::ui::VisualStyle visual{};
-	visual.background = {7, 10, 14, 245};
+	visual.background = {0, 0, 0, 0};
 	visual.border = ::ui::Border{
 		{1.0f, 1.0f, 1.0f, 1.0f},
-		{{92, 128, 144, 255},
-		 {92, 128, 144, 255},
-		 {92, 128, 144, 255},
-		 {92, 128, 144, 255}},
+		{{216, 0, 0, 255},
+		 {216, 0, 0, 255},
+		 {216, 0, 0, 255},
+		 {216, 0, 0, 255}},
 	};
 	visual.text = {
 		.color = tokens::kTextTitle,

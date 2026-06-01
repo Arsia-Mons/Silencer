@@ -337,12 +337,18 @@ done
 cli --port "$PORT" ingame_ui_mode --mode playerlist >/dev/null
 snap_now "21_ingame_playerlist_640x480"
 
+cli --port "$PORT" ingame_ui_mode --mode clear >/dev/null
+cli --port "$PORT" wait_frames --n 1 >/dev/null
 cli --port "$PORT" ingame_ui_mode --mode buy >/dev/null
 snap_now "22_ingame_buy_640x480"
 
+cli --port "$PORT" ingame_ui_mode --mode clear >/dev/null
+cli --port "$PORT" wait_frames --n 1 >/dev/null
 cli --port "$PORT" ingame_ui_mode --mode chat >/dev/null
 snap_now "24_ingame_chat_640x480"
 
+cli --port "$PORT" ingame_ui_mode --mode clear >/dev/null
+cli --port "$PORT" wait_frames --n 1 >/dev/null
 cli --port "$PORT" ingame_ui_mode --mode tech >/dev/null
 snap_now "23_ingame_tech_640x480"
 

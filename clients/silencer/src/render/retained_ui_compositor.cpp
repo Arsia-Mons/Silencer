@@ -338,7 +338,9 @@ void FillRect(Renderer& renderer,
 	if(w <= 0 || h <= 0) return;
 	if(!ClipDrawRect(dst->w, dst->h, x, y, w, h)) return;
 
-	Uint8 paletteIndex = color.r;
+	Uint8 paletteIndex = (color.g != 0 || color.b != 0)
+		? renderer.palette.ClosestMatch(SDL_Color{color.r, color.g, color.b, 255})
+		: color.r;
 	if(color.a == 255){
 		Renderer::DrawFilledRectangle(dst, x, y, x + w, y + h, paletteIndex);
 		return;

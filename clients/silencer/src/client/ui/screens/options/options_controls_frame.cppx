@@ -96,16 +96,23 @@ inline ::ui::StylePatch button_text_patch(std::uint16_t font_id,
 }
 
 inline ::ui::StyleStatePatch image_button_patch(std::uint16_t index) {
-	return ::ui::patch().image(::ui::BackgroundImage{
-		.texture_id = texture_id(6, index),
-		.tint = {255, 255, 255, 255},
-	});
+	return ::ui::patch()
+		.background(::ui::Color{0, 0, 0, 0})
+		.border(::ui::Border{})
+		.outline(::ui::Outline{})
+		.image(::ui::BackgroundImage{
+			.texture_id = texture_id(6, index),
+			.tint = {255, 255, 255, 255},
+		});
 }
 
 inline ::ui::StyleStatePatch ghost_button_patch() {
 	const ::ui::Color transparent = {0, 0, 0, 0};
 	auto solid = [](::ui::Color fill) {
-		return ::ui::patch().background(fill);
+		return ::ui::patch()
+			.background(fill)
+			.border(::ui::Border{})
+			.outline(::ui::Outline{});
 	};
 	::ui::StyleStatePatch patch{};
 	patch.base = solid(transparent);
