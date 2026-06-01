@@ -665,8 +665,9 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 		}
 		silencer::client_ui::MatchModel match =
 			silencer::client_ui::use_match(
-				silencer::client_ui::MatchProviderValue{&game.GetWorld()},
-				game.GetWorld().viewedpeerid);
+				silencer::client_ui::MakeMatchProvider(
+					game.GetWorld(),
+					game.GetWorld().viewedpeerid));
 		silencer::client_ui::MatchUiControlResult result =
 			match.control.configure(controlMode);
 		if(!result.available){

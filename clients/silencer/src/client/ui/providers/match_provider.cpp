@@ -6,6 +6,7 @@
 #include "gasloader.h"
 #include "objecttypes.h"
 #include "player.h"
+#include "screen_context.h"
 #include "team.h"
 #include "world.h"
 
@@ -13,6 +14,17 @@
 
 namespace silencer {
 namespace client_ui {
+
+MatchProviderValue MakeMatchProvider(ScreenContext& ctx) {
+	return MakeMatchProvider(ctx.world, ctx.world.peers.localpeerid);
+}
+
+MatchProviderValue MakeMatchProvider(World& world, int local_peer_id) {
+	MatchProviderValue value;
+	value.world = &world;
+	value.local_peer_id = local_peer_id;
+	return value;
+}
 
 namespace match_provider_detail {
 
@@ -178,7 +190,7 @@ bool MatchHudModel::has_input_target() const {
 }
 
 void MatchHudModel::update_overlay_state() const {
-	MatchModel match = use_match(provider_, local_peer_id_);
+	MatchModel match = use_match(provider_);
 	match.station.normalize_selection();
 }
 
@@ -328,16 +340,14 @@ MatchUiControlResult MatchControlSurfaceModel::configure(MatchUiControlMode mode
 	return result;
 }
 
-MatchModel::MatchModel(const MatchProviderValue& provider,
-                       int local_peer_id)
-	: hud(provider, local_peer_id),
-	  chat(provider, local_peer_id),
-	  station(provider, local_peer_id),
+MatchModel::MatchModel(const MatchProviderValue& provider)
+	: hud(provider, provider.local_peer_id),
+	  chat(provider, provider.local_peer_id),
+	  station(provider, provider.local_peer_id),
 	  control(provider) {}
 
-MatchModel use_match(const MatchProviderValue& provider,
-                     int local_peer_id) {
-	return MatchModel(provider, local_peer_id);
+MatchModel use_match(const MatchProviderValue& provider) {
+	return MatchModel(provider);
 }
 
 }  // namespace client_ui

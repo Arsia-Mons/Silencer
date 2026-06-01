@@ -100,8 +100,7 @@ private:
 
 class MatchModel {
 public:
-	MatchModel(const MatchProviderValue& provider,
-	           int local_peer_id);
+	explicit MatchModel(const MatchProviderValue& provider);
 
 	MatchHudModel hud;
 	MatchChatModel chat;
@@ -109,8 +108,7 @@ public:
 	MatchControlSurfaceModel control;
 };
 
-MatchModel use_match(const MatchProviderValue& provider,
-                     int local_peer_id);
+MatchModel use_match(const MatchProviderValue& provider);
 
 }  // namespace client_ui
 }  // namespace silencer

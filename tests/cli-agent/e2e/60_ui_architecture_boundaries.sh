@@ -623,6 +623,11 @@ fail_if_match \
   "$REPO_ROOT/clients/silencer/src/client/ui/hooks/use_match.h"
 
 fail_if_match \
+  "use_match[[:space:]]*[(][^;]*," \
+  "$REPO_ROOT/clients/silencer/src" \
+  --glob '!third_party/**'
+
+fail_if_match \
   "\\bsprite_(bounds|frame)[[:space:]]*\\(" \
   "$REPO_ROOT/clients/silencer/src/client/ui/hooks/use_app.h"
 
