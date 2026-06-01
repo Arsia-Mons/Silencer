@@ -94,6 +94,11 @@ void PasswordModal::BuildUi(ScreenContext & ctx, Surface & dst, float frametime,
 			password_modal_detail::CopyUiText(
 				password, static_cast<int>(sizeof(password)), value);
 		},
+		.submit_password = [this](const char * value) {
+			password_modal_detail::CopyUiText(
+				password, static_cast<int>(sizeof(password)), value);
+			Submit();
+		},
 		.submit = [this]() {
 			Submit();
 		},
@@ -115,11 +120,6 @@ void PasswordModal::Destroy(ScreenContext & ctx)
 bool PasswordModal::HandleUiIntent(ScreenContext & ctx, const silencer::ui::UiAction & action)
 {
 	(void)ctx;
-	if(action.kind == silencer::ui::UiActionKind::SubmitText && action.id == password_modal_detail::kActionPassword){
-		password_modal_detail::CopyUiText(password, static_cast<int>(sizeof(password)), action.value.c_str());
-		Submit();
-		return true;
-	}
 	return retainedFrame_.HandleUiIntent(action);
 }
 

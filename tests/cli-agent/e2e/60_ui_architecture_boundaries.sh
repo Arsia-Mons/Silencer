@@ -568,6 +568,11 @@ fail_if_match \
   "$REPO_ROOT/clients/silencer/src/client/ui/modals/password_modal.h"
 
 fail_if_match \
+  "\\bUiActionKind::SubmitText\\b" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/modals/password_modal.cpp" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/modals/password_modal.h"
+
+fail_if_match \
   '#include "(character_create_screen|lobby_connect_screen|main_menu_screen|mission_summary_screen|options_audio_screen|options_controls_screen|options_display_screen|options_screen|update_screen|lobby_screen|message_modal)[.]h"|std::make_unique<(MainMenuScreen|LobbyConnectScreen|LobbyScreen|CharacterCreateScreen|UpdateScreen|MissionSummaryScreen|OptionsScreen|OptionsControlsScreen|OptionsDisplayScreen|OptionsAudioScreen)|dynamic_cast<(LobbyScreen|MessageModal)' \
   "$REPO_ROOT/clients/silencer/src/game/ui/game_ui_pipeline.cpp"
 
