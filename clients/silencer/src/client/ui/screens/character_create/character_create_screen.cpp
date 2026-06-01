@@ -4,8 +4,10 @@
 #include "screen_context.h"
 #include "game_state.h"
 #include "lobby.h"
+#include "peer.h"
 #include "renderer.h"
 #include "team.h"
+#include "world.h"
 
 #include <algorithm>
 #include <cstdlib>
@@ -72,6 +74,8 @@ int CreateRowIndex(size_t characterCount)
 
 void CharacterCreateScreen::Build(ScreenContext & ctx)
 {
+	ctx.world.GetAuthorityPeer()->controlledlist.clear();
+	ctx.world.DestroyAllObjects();
 	ctx.ResetPresentation(1);
 	ctx.renderer.camera.SetPosition(320, 240);
 	step = Step::SelectAgent;

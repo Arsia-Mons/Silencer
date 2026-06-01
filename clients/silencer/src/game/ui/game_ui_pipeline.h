@@ -48,12 +48,10 @@ bool hasPreparedUiInput;
 Uint64 lastUiAnimationMs;
 bool textInputFocused;
 
-bool ShowScreenForState(Uint8 state);
 void PrepareClientUiFrame(Surface & surface);
 void BeginPreparedClientUiFrame();
 void EndClientUiFrame();
 void BuildVisibleClientUi();
-void EnterScreenState(Uint8 state);
 void PlayMenuMusicIfReady();
 };
 

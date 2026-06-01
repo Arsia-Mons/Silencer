@@ -7,6 +7,7 @@
 #include "updater.h"
 #include "ambience_mixer.h"
 #include "config.h"
+#include "peer.h"
 #include "world.h"
 
 #include <algorithm>
@@ -44,6 +45,10 @@ void SubmitCredentials(World & world, const char * username, const char * passwo
 
 void LobbyConnectScreen::Build(ScreenContext & ctx)
 {
+	ctx.world.GetAuthorityPeer()->controlledlist.clear();
+	ctx.world.DestroyAllObjects();
+	ctx.world.lobby.ClearGames();
+	ctx.world.lobby.state = Lobby::WAITING;
 	ctx.ResetPresentation(2);
 	motdprinted = false;
 	logLines.clear();

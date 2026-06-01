@@ -4,6 +4,7 @@
 
 #include "screen_context.h"
 #include "game.h"
+#include "lobby.h"
 #include "world.h"
 #include "renderer.h"
 
@@ -17,6 +18,12 @@ LobbyScreen::~LobbyScreen() = default;
 void LobbyScreen::Build(ScreenContext & ctx)
 {
 	World & world = ctx.world;
+	world.lobby.ForgetAllUserInfo();
+	world.SetLobbyGameplayState();
+	ctx.UnloadGame();
+	world.Disconnect();
+	world.choosingtech = false;
+	world.lobby.channelchanged = true;
 	ctx.ResetPresentation(2);
 	ctx.renderer.camera.SetPosition(320, 240);
 

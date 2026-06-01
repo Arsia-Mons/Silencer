@@ -6,6 +6,7 @@
 #include "renderer.h"
 #include "config.h"
 #include "renderdevice.h"
+#include "world.h"
 
 #include <SDL3/SDL_video.h>
 
@@ -46,6 +47,7 @@ void CancelDisplaySettings(SDL_Window * window, RenderDevice * renderdevice)
 
 void OptionsDisplayScreen::Build(ScreenContext & ctx)
 {
+	ctx.world.DestroyAllObjects();
 	ctx.ResetPresentation(1);
 	ctx.renderer.camera.SetPosition(320, 240);
 }

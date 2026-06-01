@@ -65,6 +65,8 @@ silencer::client_ui::MissionSummaryDestination FinishMissionSummary(World & worl
 
 void MissionSummaryScreen::Build(ScreenContext & ctx)
 {
+	ctx.UnloadGame();
+	ctx.world.Disconnect();
 	ctx.ResetPresentation(1);
 	ctx.renderer.camera.SetPosition(320, 240);
 	infoLoaded = false;

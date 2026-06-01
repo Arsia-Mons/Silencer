@@ -3,6 +3,8 @@
 #include "client/ui/screens/main_menu/main_menu_view.h"
 #include "screen_context.h"
 #include "game_state.h"
+#include "lobby.h"
+#include "peer.h"
 #include "renderer.h"
 #include "world.h"
 
@@ -18,6 +20,12 @@ constexpr const char * kActionExit = "main_menu.exit";
 
 void MainMenuScreen::Build(ScreenContext & ctx)
 {
+	ctx.world.Disconnect();
+	ctx.world.ClearGameplayState();
+	ctx.world.lobby.Disconnect();
+	ctx.UnloadGame();
+	ctx.world.GetAuthorityPeer()->controlledlist.clear();
+	ctx.world.DestroyAllObjects();
 	ctx.ResetPresentation(1);
 	ctx.renderer.camera.SetPosition(320, 240);
 }

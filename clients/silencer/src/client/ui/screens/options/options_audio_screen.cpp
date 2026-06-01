@@ -6,6 +6,7 @@
 #include "renderer.h"
 #include "config.h"
 #include "audio.h"
+#include "world.h"
 
 namespace options_audio_screen_detail
 {
@@ -44,6 +45,7 @@ void CancelAudioSettings()
 
 void OptionsAudioScreen::Build(ScreenContext & ctx)
 {
+	ctx.world.DestroyAllObjects();
 	ctx.ResetPresentation(1);
 	ctx.renderer.camera.SetPosition(320, 240);
 }

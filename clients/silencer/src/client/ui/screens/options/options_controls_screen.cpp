@@ -8,6 +8,7 @@
 #include "game.h"
 #include "game_state.h"
 #include "config.h"
+#include "world.h"
 
 #include <SDL3/SDL.h>
 
@@ -72,6 +73,7 @@ int OptionsControlsScreen::MaxScroll() const {
 }
 
 void OptionsControlsScreen::Build(ScreenContext & ctx) {
+	ctx.world.DestroyAllObjects();
 	ctx.ResetPresentation(1);
 	ctx.renderer.camera.SetPosition(320, 240);
 	scrollPosition = 0;

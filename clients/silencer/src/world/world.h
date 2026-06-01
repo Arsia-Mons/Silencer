@@ -94,6 +94,8 @@ class World {
     void           SendPing()                            { network.SendPing(); }
     int            GetPingTime()                         { return network.GetPingTime(); }
     int            AveragePingJitter()                   { return network.AveragePingJitter(); }
+    void           ClearGameplayState()                  { gameplaystate = NONE; }
+    void           SetLobbyGameplayState()               { gameplaystate = INLOBBY; }
 
     // Peers
     Peer *   GetAuthorityPeer()                          { return peers.GetAuthorityPeer(); }

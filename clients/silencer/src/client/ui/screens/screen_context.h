@@ -54,9 +54,10 @@ public:
 	void GoToState(Uint8 newState);
 	void GoBack();
 	void RequestQuit();
-	// Session-side cleanup when a screen leaves a joined game (handled by
-	// Game/World, never by a screen reaching into the world directly).
+	// Session-side cleanup handled by Game/World, never by screens reaching
+	// into GameSession directly.
 	void LeaveJoinedGame();
+	void UnloadGame();
 	void PushScreen(std::unique_ptr<Screen> s);
 	void PopScreen();
 	void ReplaceScreen(std::unique_ptr<Screen> s);

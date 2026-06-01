@@ -208,70 +208,18 @@ return inGameUi.HasInputTarget(game.world.peers.localpeerid);
 bool GameUiPipeline::TickScreenState(Uint8 state, bool entering) {
 if(!silencer::client_ui::IsScreenState(state)) return false;
 if(entering){
-EnterScreenState(state);
+std::unique_ptr<Screen> screen = silencer::client_ui::CreateScreenForState(state);
+if(screen) Push(std::move(screen));
 }else if(silencer::client_ui::ScreenStatePlaysMenuMusic(state)){
 PlayMenuMusicIfReady();
 }
 return true;
 }
 
-void GameUiPipeline::EnterScreenState(Uint8 state) {
-using namespace GameState;
-switch(state){
-case MAINMENU:
-game.world.Disconnect();
-game.world.gameplaystate = World::NONE;
-game.world.lobby.Disconnect();
-game.gameSession.UnloadGame();
-game.world.GetAuthorityPeer()->controlledlist.clear();
-game.world.DestroyAllObjects();
-break;
-case LOBBYCONNECT:
-game.world.GetAuthorityPeer()->controlledlist.clear();
-game.world.DestroyAllObjects();
-game.world.lobby.ClearGames();
-game.world.lobby.state = Lobby::WAITING;
-break;
-case LOBBY:
-game.world.lobby.ForgetAllUserInfo();
-game.world.gameplaystate = World::INLOBBY;
-game.gameSession.UnloadGame();
-game.world.Disconnect();
-game.world.choosingtech = false;
-game.world.lobby.channelchanged = true;
-break;
-case CREATECHARACTER:
-case UPDATING:
-game.world.GetAuthorityPeer()->controlledlist.clear();
-game.world.DestroyAllObjects();
-break;
-case MISSIONSUMMARY:
-game.gameSession.UnloadGame();
-game.world.Disconnect();
-break;
-case OPTIONS:
-case OPTIONSCONTROLS:
-case OPTIONSDISPLAY:
-case OPTIONSAUDIO:
-game.world.DestroyAllObjects();
-break;
-default:
-return;
-}
-ShowScreenForState(state);
-}
-
 void GameUiPipeline::PlayMenuMusicIfReady() {
 if(game.gameSession.AmbienceMixerRef().FadedIn()){
 game.gameSession.AmbienceMixerRef().PlayMusic(game.world.resources.menumusic);
 }
-}
-
-bool GameUiPipeline::ShowScreenForState(Uint8 state) {
-std::unique_ptr<Screen> screen = silencer::client_ui::CreateScreenForState(state);
-if(!screen) return false;
-Push(std::move(screen));
-return true;
 }
 
 void GameUiPipeline::Push(std::unique_ptr<Screen> s){

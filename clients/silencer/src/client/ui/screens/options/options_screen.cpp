@@ -4,6 +4,7 @@
 #include "screen_context.h"
 #include "game_state.h"
 #include "renderer.h"
+#include "world.h"
 
 namespace options_screen_detail {
 
@@ -16,6 +17,7 @@ constexpr const char * kActionBack = "options.back";
 
 void OptionsScreen::Build(ScreenContext & ctx)
 {
+	ctx.world.DestroyAllObjects();
 	ctx.ResetPresentation(1);
 	ctx.renderer.camera.SetPosition(320, 240);
 }

@@ -3,8 +3,10 @@
 #include "client/ui/screens/update/update_view.h"
 #include "screen_context.h"
 #include "game_state.h"
+#include "peer.h"
 #include "updater.h"
 #include "updaterstage2.h"
+#include "world.h"
 
 #include <cstdio>
 #include <cstdlib>
@@ -111,6 +113,8 @@ bool OpenDownload(Updater & updater)
 
 void UpdateScreen::Build(ScreenContext & ctx)
 {
+	ctx.world.GetAuthorityPeer()->controlledlist.clear();
+	ctx.world.DestroyAllObjects();
 	ctx.ResetPresentation(2);
 }
 

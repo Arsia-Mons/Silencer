@@ -142,10 +142,15 @@ fail_if_match \
   "$REPO_ROOT/clients/silencer/src/game/game.h"
 
 fail_if_match \
-  'main_menu_screen|lobby_connect_screen|character_create_screen|mission_summary_screen|options_(screen|audio_screen|controls_screen|display_screen)|update_screen|lobby_screen|std::make_unique<.*Screen' \
+  'main_menu_screen|lobby_connect_screen|character_create_screen|mission_summary_screen|options_(screen|audio_screen|controls_screen|display_screen)|update_screen|lobby_screen|std::make_unique<.*Screen|case[[:space:]]+(MAINMENU|LOBBYCONNECT|LOBBY|CREATECHARACTER|UPDATING|MISSIONSUMMARY|OPTIONS|OPTIONSCONTROLS|OPTIONSDISPLAY|OPTIONSAUDIO):|EnterScreenState|ShowScreenForState' \
   "$REPO_ROOT/clients/silencer/src/game/ui" \
   "$REPO_ROOT/clients/silencer/src/game/game.cpp" \
   "$REPO_ROOT/clients/silencer/src/game/game.h"
+
+fail_if_match \
+  'EnterScreenRoute|#include "game[.]h"|Game[[:space:]]*&|gameSession|DestroyAllObjects|GetAuthorityPeer|ClearGames|ForgetAllUserInfo|Disconnect[[:space:]]*\(' \
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens/screen_routes.cpp" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens/screen_routes.h"
 
 fail_if_match \
   "Handle(TextInput|KeyPress|ScancodeDown|MousePress|MouseMove)|DispatchKeyPress|DispatchPreparedUiNavActions|UiNavActionToAscii|DispatchChatKey|HandleInGameMenuKey" \
