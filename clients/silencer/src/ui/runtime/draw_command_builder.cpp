@@ -131,6 +131,28 @@ float measured_advance(const char *value, uint32_t len, uint16_t font_id,
   return result.width;
 }
 
+float measured_line_height(uint16_t font_id, uint16_t font_size,
+                           float line_height) {
+  if (line_height > 0.0f)
+    return line_height;
+  MeasureTextFn measurer = text_measurer();
+  if (!measurer)
+    return 16.0f;
+  TextMetricsQuery query = {};
+  query.utf8 = "M";
+  query.len = 1;
+  query.font_id = font_id;
+  query.font_size = font_size;
+  query.align = TextAlign::Left;
+  query.wrap = TextWrap::None;
+  query.line_height = line_height;
+  query.wrap_width = 0.0f;
+  TextMetricsResult result = measurer(query);
+  if (result.line_count > 0 && result.lines[0].h > 0.0f)
+    return result.lines[0].h;
+  return result.height > 0.0f ? result.height : 16.0f;
+}
+
 bool push_rect_command(DrawCommandList &list, NodeId node_id, const Rect &rect,
                        Color straight_fill, float corner_radius) {
   DrawCommand command = {};
@@ -409,21 +431,21 @@ bool append_input_contents(DrawCommandList &list, const NodeSnapshot &node,
     return true;
 
   constexpr float kInsetX = 8.0f;
-  constexpr float kTextHeight = 16.0f;
-  float text_y = node.layout.y + (node.layout.height - kTextHeight) * 0.5f;
-  Rect text_rect = {};
-  text_rect.x = node.layout.x + kInsetX;
-  text_rect.y = text_y;
-  text_rect.width = node.layout.width - kInsetX * 2.0f;
-  text_rect.height = kTextHeight;
-
-  const char *value = node.value ? node.value : "";
-  int length = text_length(value);
   uint16_t font_size = node.visual.text.font_size > 0 ? node.visual.text.font_size
                                                       : static_cast<uint16_t>(15);
   // Inputs are single-line; reuse the node's resolved text line height if any.
   float line_height = node.visual.text.line_height;
   uint16_t font_id = node.visual.text.font_id;
+  float text_height = measured_line_height(font_id, font_size, line_height);
+  float text_y = node.layout.y + (node.layout.height - text_height) * 0.5f;
+  Rect text_rect = {};
+  text_rect.x = node.layout.x + kInsetX;
+  text_rect.y = text_y;
+  text_rect.width = node.layout.width - kInsetX * 2.0f;
+  text_rect.height = text_height;
+
+  const char *value = node.value ? node.value : "";
+  int length = text_length(value);
 
   int selection_start = clamp_int(node.text_edit.selection_start, 0, length);
   int selection_end = clamp_int(node.text_edit.selection_end, 0, length);

@@ -7,6 +7,7 @@
 #include "surface.h"
 #include "ui/primitives/text.h"
 #include "ui/primitives/text_internal.h"
+#include "ui/style/text_measure.h"
 #include "world.h"
 
 #include <algorithm>
@@ -45,6 +46,133 @@ Uint16 FallbackLineHeightForClayFont(uint16_t fontId) {
 		case 136: return 23;
 		default:  return 11;
 	}
+}
+
+struct SpriteFontSpec {
+	Uint16 bank = 133;
+	Uint16 advance = 7;
+	Uint16 lineHeight = 11;
+};
+
+SpriteFontSpec RetainedFontFor(const ::ui::TextMetricsQuery& query) {
+	SpriteFontSpec font{};
+	if(query.font_id != 0 && query.font_size != 0){
+		font.bank = query.font_id;
+		font.advance = query.font_size;
+		font.lineHeight = FallbackLineHeightForClayFont(query.font_id);
+	}else if(query.font_size >= 18){
+		font = SpriteFontSpec{135, 11, 19};
+	}else if(query.font_size >= 12){
+		font = SpriteFontSpec{133, 7, 11};
+	}else{
+		font = SpriteFontSpec{133, 6, 11};
+	}
+	if(query.line_height > 0.0f){
+		font.lineHeight = static_cast<Uint16>(query.line_height);
+	}
+	return font;
+}
+
+float RetainedLineX(float lineWidth,
+                    float wrapWidth,
+                    ::ui::TextAlign align) {
+	if(wrapWidth <= 0.0f || lineWidth >= wrapWidth) return 0.0f;
+	switch(align){
+		case ::ui::TextAlign::Center:
+			return (wrapWidth - lineWidth) * 0.5f;
+		case ::ui::TextAlign::Right:
+			return wrapWidth - lineWidth;
+		case ::ui::TextAlign::Left:
+			break;
+	}
+	return 0.0f;
+}
+
+void PushRetainedLine(::ui::TextMetricsResult& result,
+                      uint32_t offset,
+                      uint32_t len,
+                      float lineWidth,
+                      const SpriteFontSpec& font,
+                      const ::ui::TextMetricsQuery& query) {
+	if(result.line_count >= ::ui::UI_MAX_TEXT_LINES){
+		result.overflowed = true;
+		return;
+	}
+	::ui::LineRun& line = result.lines[result.line_count];
+	line.slice_offset = offset;
+	line.slice_len = len;
+	line.x = RetainedLineX(lineWidth, query.wrap_width, query.align);
+	line.y = static_cast<float>(result.line_count) *
+	         static_cast<float>(font.lineHeight);
+	line.w = lineWidth;
+	line.h = static_cast<float>(font.lineHeight);
+	result.width = std::max(result.width, lineWidth);
+	result.height += static_cast<float>(font.lineHeight);
+	++result.line_count;
+}
+
+::ui::TextMetricsResult MeasureRetainedText(
+	const ::ui::TextMetricsQuery& query) {
+	::ui::TextMetricsResult result{};
+	const char * text = query.utf8 ? query.utf8 : "";
+	const uint32_t len = query.len;
+	const SpriteFontSpec font = RetainedFontFor(query);
+	const float advance = static_cast<float>(font.advance);
+	const float maxWidth =
+		query.wrap == ::ui::TextWrap::Words && query.wrap_width > 0.0f
+			? query.wrap_width
+			: 0.0f;
+
+	uint32_t lineStart = 0;
+	uint32_t lineLen = 0;
+	uint32_t lastBreak = UINT32_MAX;
+	uint32_t lastBreakLineLen = 0;
+	for(uint32_t i = 0; i < len; ++i){
+		const char c = text[i];
+		if(c == '\n'){
+			PushRetainedLine(result, lineStart, lineLen, lineLen * advance,
+			                 font, query);
+			lineStart = i + 1;
+			lineLen = 0;
+			lastBreak = UINT32_MAX;
+			lastBreakLineLen = 0;
+			continue;
+		}
+
+		++lineLen;
+		if(c == ' ' || c == '\t'){
+			lastBreak = i + 1;
+			lastBreakLineLen = lineLen;
+		}
+
+		if(maxWidth > 0.0f && lineLen > 0 &&
+		   lineLen * advance > maxWidth){
+			if(lastBreak != UINT32_MAX && lastBreak > lineStart){
+				const uint32_t visibleLen = lastBreakLineLen > 0
+					? lastBreakLineLen - 1
+					: 0;
+				PushRetainedLine(result, lineStart, visibleLen,
+				                 visibleLen * advance, font, query);
+				lineStart = lastBreak;
+				lineLen = i + 1 - lineStart;
+			}else{
+				const uint32_t visibleLen = lineLen > 1 ? lineLen - 1 : lineLen;
+				PushRetainedLine(result, lineStart, visibleLen,
+				                 visibleLen * advance, font, query);
+				lineStart += visibleLen;
+				lineLen = i + 1 - lineStart;
+			}
+			lastBreak = UINT32_MAX;
+			lastBreakLineLen = 0;
+		}
+	}
+
+	PushRetainedLine(result, lineStart, lineLen, lineLen * advance, font,
+	                 query);
+	if(result.line_count == 0 && !result.overflowed){
+		result.height = static_cast<float>(font.lineHeight);
+	}
+	return result;
 }
 
 const TextDrawData * TextDrawDataFor(void * userData) {
@@ -734,6 +862,7 @@ float UiScale() {
 
 void SetTextMeasureResources(const Resources * resources) {
 	g_textMeasureResources = resources;
+	::ui::set_text_measurer(MeasureRetainedText);
 }
 
 void RenderInto(::Resources & resources, ::Renderer & renderer,
