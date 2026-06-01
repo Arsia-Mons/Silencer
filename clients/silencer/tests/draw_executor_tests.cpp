@@ -112,16 +112,12 @@ int main(void) {
       }
     fonts.shutdown();
 
-    // NOTE: visible glyph ink is NOT asserted. The silencer-*.otf carry both a
-    // 'SVG ' (color) and a 'glyf' (mono) table; the available SDL_ttf has no SVG
-    // backend, so FreeType returns SVG-format glyphs it can't rasterize (empty)
-    // and does not fall back to glyf. Per SIL-6 the fix is the monochrome-glyf
-    // fallback (strip 'SVG ' / pure-glyf, or rebuild SDL_ttf with SVG) — tracked
-    // in Linear. What IS proven here: geometry renders, and the font cache
-    // rasterizes a sized texture (the executor's text path is wired).
-    printf("draw executor ok: rect fill renders; text rasterizes (tex %dx%d). "
-           "glyph ink px=%d sample=(%d,%d,%d) [visible ink pending SIL-6 mono "
-           "font fallback]\n",
+    // The mono-glyf faces (SIL-6 fallback: 'SVG ' stripped) render visible ink
+    // in the requested token color.
+    CHECK(ink > 0, "glyph drew visible pixels (token color)");
+
+    printf("draw executor ok: rect fill + TTF glyph render (tex %dx%d, %d ink "
+           "px, ink~(%d,%d,%d))\n",
            tw, th, ink, sr, sg, sb);
   }
 
