@@ -117,6 +117,7 @@ static const char * ModeName(silencer::client_ui::MatchUiControlMode mode){
 		case Mode::Buy: return "buy";
 		case Mode::Tech: return "tech";
 		case Mode::PlayerList: return "playerlist";
+		case Mode::QuitPrompt: return "quit";
 		case Mode::All: return "all";
 	}
 	return "status";
@@ -150,6 +151,10 @@ static bool ParseMode(
 		mode = Mode::PlayerList;
 		return true;
 	}
+	if(value == "quit"){
+		mode = Mode::QuitPrompt;
+		return true;
+	}
 	if(value == "all"){
 		mode = Mode::All;
 		return true;
@@ -174,6 +179,7 @@ static nlohmann::json MatchUiControlResultToJson(
 	r["tech_active"] = result.techActive;
 	r["show_chat_ticks"] = result.showChatTicks;
 	r["show_player_list"] = result.showPlayerList;
+	r["quit_state"] = result.quitState;
 	r["buy_item_count"] = result.buyItemCount;
 	r["tech_item_count"] = result.techItemCount;
 	r["buy_selected_index"] = result.buySelectedIndex;
@@ -625,7 +631,7 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 		silencer::client_ui::MatchUiControlMode controlMode;
 		if(mode.empty() || !ParseMode(mode, controlMode)){
 			cmd.reply->set_value(Err(cmd.id, "BAD_REQUEST",
-				"ingame_ui_mode needs --mode clear|status|chat|buy|tech|playerlist|all"));
+				"ingame_ui_mode needs --mode clear|status|chat|buy|tech|playerlist|quit|all"));
 			return;
 		}
 		silencer::client_ui::MatchModel match =

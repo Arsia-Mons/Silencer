@@ -218,6 +218,7 @@ MatchUiControlResult MatchControlSurfaceModel::configure(MatchUiControlMode mode
 		result.techActive = player->techstationactive;
 		result.showChatTicks = world->messaging.showchat_i;
 		result.showPlayerList = world->IsShowingPlayerList();
+		result.quitState = world->quitstate;
 		result.buyItemCount = static_cast<int>(buyItems.size());
 		result.techItemCount = static_cast<int>(techItems.size());
 		result.buySelectedIndex = player->buyifacelastitem;
@@ -231,6 +232,7 @@ MatchUiControlResult MatchControlSurfaceModel::configure(MatchUiControlMode mode
 		player->techstationactive = false;
 		world->messaging.showchat_i = 0;
 		world->SetShowingPlayerList(false);
+		world->quitstate = 0;
 	};
 
 	if(mode == MatchUiControlMode::Clear){
@@ -295,6 +297,9 @@ MatchUiControlResult MatchControlSurfaceModel::configure(MatchUiControlMode mode
 	}
 	if(mode == MatchUiControlMode::PlayerList || mode == MatchUiControlMode::All){
 		world->SetShowingPlayerList(true);
+	}
+	if(mode == MatchUiControlMode::QuitPrompt || mode == MatchUiControlMode::All){
+		world->quitstate = 1;
 	}
 
 	populate();

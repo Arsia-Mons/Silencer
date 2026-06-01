@@ -428,6 +428,10 @@ fail_if_match \
   --glob '!third_party/**'
 
 fail_if_match \
+  "DrawQuitPrompt|QuitPromptRoot|QuitPromptText" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/hud/InGameOverlays.cpp"
+
+fail_if_match \
   "rawKeyDownCodes|CaptureRawKeyDown|BuildUiInputState|QueueUiTextInput|QueueUiNavAction|AddUiRawKeyDown|AddUiWheelDelta|QueueUiPointerWindowEvent|DispatchInGameUiActions|ConfigureInGameUiForControl" \
   "$REPO_ROOT/clients/silencer/src" \
   "$REPO_ROOT/tests/ui_architecture_test.cpp" \

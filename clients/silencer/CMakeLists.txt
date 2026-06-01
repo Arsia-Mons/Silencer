@@ -50,6 +50,8 @@ set(SILENCER_CPPX_SOURCES
 	src/ui/components/text_input.hx
 	src/client/ui/components/actions/app_button.cppx
 	src/client/ui/components/actions/app_button.hx
+	src/client/ui/hud/ingame_overlay_frame.cppx
+	src/client/ui/hud/ingame_overlay_frame.hx
 	src/client/ui/modals/message_modal_frame.cppx
 	src/client/ui/modals/message_modal_frame.hx
 	src/client/ui/modals/password_modal_frame.cppx

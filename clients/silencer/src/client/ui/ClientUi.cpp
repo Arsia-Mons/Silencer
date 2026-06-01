@@ -5,6 +5,8 @@
 #include "client/ui/hooks/use_match.h"
 #include "client/ui/hud/InGameHud.h"
 #include "client/ui/hud/InGameOverlays.h"
+#include "client/ui/hud/ingame_overlay_frame.h"
+#include "game.h"
 #include "lobby_screen.h"
 #include "main_menu_screen.h"
 #include "mission_summary_screen.h"
@@ -310,6 +312,7 @@ void ClientUi::TickVisibleScreens(ScreenContext& ctx) {
 }
 
 void ClientUi::BuildVisibleScreens(ScreenContext& ctx, Surface& dst, float frametime) {
+	inGameOverlayFrameActive_ = false;
 	NavigationProviderScope navigationScope(MakeNavigationProvider(ctx));
 	screens_.BuildVisible(ctx, dst, frametime, interactions_);
 	if(ctx.world.map.loaded){
@@ -319,11 +322,39 @@ void ClientUi::BuildVisibleScreens(ScreenContext& ctx, Surface& dst, float frame
 		BuildInGameHudUi(
 			ctx.renderer, ctx.world.resources, hudView, &dst, interactions_);
 		BuildInGameOverlaysUi(ctx.renderer, ctx.world.resources, hudView, &dst);
+		inGameOverlayFrameActive_ =
+			hudView.quitState == 1 || hudView.quitState == 2;
+		if(inGameOverlayFrameActive_){
+		#ifdef OUYA
+			const char * quitText = "Hit O To QUIT";
+		#else
+			const char * quitText = "Hit Enter To Quit";
+		#endif
+			const silencer::ui::UiInputState& input = ctx.game.CurrentUiInput();
+			InGameOverlayFrameProps props{
+				.key = "ingame-overlay",
+				.width = input.width,
+				.height = input.height,
+				.show_quit_prompt = true,
+				.quit_prompt_text = quitText,
+			};
+			inGameOverlayFrame_.Build([&]() {
+				                          return InGameOverlayFrame(props);
+			                          },
+			                          input.width,
+			                          input.height,
+			                          interactions_);
+		}
 	}
 }
 
 std::vector<const ::ui::DrawCommandList *> ClientUi::RetainedDrawCommands() const {
-	return screens_.RetainedDrawCommands();
+	std::vector<const ::ui::DrawCommandList *> commands =
+		screens_.RetainedDrawCommands();
+	if(inGameOverlayFrameActive_){
+		commands.push_back(&inGameOverlayFrame_.Commands());
+	}
+	return commands;
 }
 
 }  // namespace client_ui

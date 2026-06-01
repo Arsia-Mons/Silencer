@@ -1,0 +1,98 @@
+#include "client/ui/hud/ingame_overlay_frame.h"
+
+#include "ui/components/box.h"
+#include "ui/components/text.h"
+#include "ui/style/style_patch.h"
+
+#include <algorithm>
+#include <cstdint>
+#include <cstring>
+
+namespace silencer {
+namespace client_ui {
+namespace ingame_overlay_frame_detail {
+
+using ::ui::components::Text;
+using ::ui::components::TextProps;
+
+constexpr int kPromptY = 200;
+constexpr int kPromptFontBank = 136;
+constexpr int kPromptAdvance = 16;
+constexpr int kPromptLineHeight = 23;
+constexpr std::uint8_t kPromptPalette = 202;
+
+inline ::ui::LayoutStyle root_layout(int width, int height) {
+	return {
+		.width = ::ui::Length::points(static_cast<float>(std::max(1, width))),
+		.height = ::ui::Length::points(static_cast<float>(std::max(1, height))),
+	};
+}
+
+inline ::ui::LayoutStyle absolute_layout(int x,
+                                         int y,
+                                         int width,
+                                         int height) {
+	::ui::EdgeSizes inset;
+	inset.left = ::ui::StyleValue::points(static_cast<float>(x));
+	inset.top = ::ui::StyleValue::points(static_cast<float>(y));
+	return {
+		.position = ::ui::PositionType::Absolute,
+		.width = ::ui::Length::points(static_cast<float>(std::max(0, width))),
+		.height = ::ui::Length::points(static_cast<float>(std::max(0, height))),
+		.position_inset = inset,
+	};
+}
+
+inline ::ui::StylePatch prompt_text_patch() {
+	return ::ui::patch().text(::ui::TextVisual{
+		.color = {kPromptPalette, 0, 0, 255},
+		.font_id = kPromptFontBank,
+		.font_size = kPromptAdvance,
+		.line_height = static_cast<float>(kPromptLineHeight),
+	});
+}
+
+struct QuitPromptProps {
+	const char * key = nullptr;
+	int surface_width = 0;
+	bool show = false;
+	const char * text = nullptr;
+};
+
+::ui::UiElement QuitPrompt(const QuitPromptProps& props) {
+	const char * text = props.text ? props.text : "";
+	if(!props.show || !*text) return ::ui::empty();
+	const int width = static_cast<int>(std::strlen(text)) * kPromptAdvance;
+	const int x = std::max(0, (props.surface_width - width) / 2);
+	return <Text
+	  key={props.key}
+	  id="QuitPromptText"
+	  value={text}
+	  layout={absolute_layout(x, kPromptY, width, kPromptLineHeight)}
+	  style={prompt_text_patch()}
+	/>
+}
+
+}  // namespace ingame_overlay_frame_detail
+
+using ::ui::children;
+using ::ui::components::Box;
+using ::ui::components::BoxProps;
+
+::ui::UiElement InGameOverlayFrame(const InGameOverlayFrameProps& props) {
+	return <Box
+	  key={props.key}
+	  id="InGameOverlayRoot"
+	  layout={ingame_overlay_frame_detail::root_layout(props.width, props.height)}
+	>
+		<ingame_overlay_frame_detail.QuitPrompt
+		  key="quit-prompt"
+		  surfaceWidth={props.width}
+		  show={props.show_quit_prompt}
+		  text={props.quit_prompt_text}
+		/>
+	</Box>
+}
+
+}  // namespace client_ui
+}  // namespace silencer

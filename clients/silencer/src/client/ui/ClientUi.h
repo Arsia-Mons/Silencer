@@ -5,6 +5,7 @@
 #include "ui/runtime/UiFrameContext.h"
 #include "client/ui/navigation/ScreenStack.h"
 #include "client/ui/providers/navigation_provider.h"
+#include "client/ui/retained/RetainedFrame.h"
 
 #include <functional>
 #include <memory>
@@ -67,11 +68,13 @@ private:
 	silencer::ui::ClayService& clay_;
 	silencer::ui::UiInteractionRegistry interactions_;
 	ScreenStack screens_;
+	RetainedFrame inGameOverlayFrame_;
 	std::string hoveredAudioInteractableId_;
 	ScreenRequest screenAfterClear_ = nullptr;
 	ScreenRequest pendingScreenRequest_ = nullptr;
 	bool hasScreenAfterClear_ = false;
 	bool hasPendingScreenRequest_ = false;
+	bool inGameOverlayFrameActive_ = false;
 };
 
 }  // namespace client_ui

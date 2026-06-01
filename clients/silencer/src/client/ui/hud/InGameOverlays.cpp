@@ -208,24 +208,6 @@ void DrawTopMessage(const HudView& view, Surface* surface) {
 	}
 }
 
-void DrawQuitPrompt(const HudView& /*view*/, Surface* surface) {
-#ifdef OUYA
-	std::string text = "Hit O To QUIT";
-#else
-	std::string text = "Hit Enter To Quit";
-#endif
-	const int width = (int)text.size() * TextAdvance(TextSize::Prompt);
-	CLAY({ .id = CLAY_ID("QuitPromptRoot"),
-	       .layout = { .sizing = { CLAY_SIZING_FIXED((float)surface->w), CLAY_SIZING_FIXED((float)surface->h) } } }) {
-		CLAY(FloatingTextElement("QuitPromptText", (surface->w - width) / 2, 200,
-		                         width, TextLineHeight(TextSize::Prompt))) {
-			Text(ClayStringFromStd(text),
-			     { .size = TextSize::Prompt,
-			       .effect = TextEffect::LegacyPalette(202) });
-		}
-	}
-}
-
 }  // namespace ingameoverlays_detail
 
 void BuildInGameOverlaysUi(Renderer& /*renderer*/, const Resources& /*resources*/,
@@ -236,9 +218,6 @@ void BuildInGameOverlaysUi(Renderer& /*renderer*/, const Resources& /*resources*
 	ingameoverlays_detail::DrawMessage(view, surface);
 	if(view.showPlayerList){
 		BuildPlayerListOverlay(view, surface);
-	}
-	if(view.quitState == 1 || view.quitState == 2){
-		ingameoverlays_detail::DrawQuitPrompt(view, surface);
 	}
 }
 

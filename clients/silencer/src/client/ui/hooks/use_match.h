@@ -15,6 +15,7 @@ enum class MatchUiControlMode {
 	Buy,
 	Tech,
 	PlayerList,
+	QuitPrompt,
 	All,
 };
 
@@ -31,6 +32,7 @@ struct MatchUiControlResult {
 	int techItemCount = 0;
 	int buySelectedIndex = 0;
 	int techSelectedIndex = 0;
+	int quitState = 0;
 };
 
 class MatchChatModel {
