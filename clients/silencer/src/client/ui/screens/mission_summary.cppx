@@ -1,0 +1,144 @@
+#include "client/ui/screens/mission_summary.h"
+
+#include "client/ui/components/actions/actions.h"
+#include "client/ui/components/layout/layout.h"
+#include "client/ui/components/surfaces/surfaces.h"
+#include "client/ui/components/text/text.h"
+#include "client/ui/hooks/use_progression.h"
+#include "ui/runtime/react.h"
+
+#include <functional>
+
+namespace client::ui {
+namespace {
+
+// JSX lowering emits each tag's component function + `<Tag>Props` unqualified;
+// pull in the silencer semantic layer + the runtime children().
+using namespace silencer;
+using ::ui::children;
+
+// Display names for the six upgradeable stats, in Progression index order.
+const char *kStatNames[6] = {"Endurance", "Shield", "Jetpack",
+                             "Tech Slots", "Hacking", "Contacts"};
+
+// One stat's upgrade row: "<name>: <level>" + an Upgrade button gated on
+// availability. Keyed component so use_text_storage gets a per-row buffer.
+struct UpgradeRowProps {
+  const char *key = nullptr;
+  const char *label = "";
+  int level = 0;
+  bool can_upgrade = false;
+  const char *upgrade_id = nullptr;
+  std::function<void()> on_upgrade = {};
+};
+
+::ui::UiElement UpgradeRow(const UpgradeRowProps &props) {
+  const char *text = use_text_storage("%s: %d", props.label, props.level);
+  return <ActionRow key={props.key}>
+    <BodyText key="label" variant={BodyTextVariant::Strong} value={text} />
+    <AppButton
+      key="up"
+      controlId={props.upgrade_id}
+      disabled={!props.can_upgrade}
+      label="Upgrade"
+      onPress={props.on_upgrade}
+    />
+  </ActionRow>
+}
+
+struct MissionSummaryProps {
+  uint32_t unused = 0;
+};
+
+::ui::UiElement MissionSummaryView(const MissionSummaryProps &) {
+  Progression prog = use_progression();
+
+  std::function<void(int)> upgrade = prog.upgrade;
+  auto make_upgrade = [upgrade](int index) -> std::function<void()> {
+    return [upgrade, index]() {
+      if (upgrade)
+        upgrade(index);
+    };
+  };
+
+  const char *experience = use_text_storage("Experience: %u", prog.experience);
+  // Copy the dynamic stat summary into the per-call-site scratch (children build
+  // after this returns, so a pointer into the transient `prog` model dangles).
+  const char *stats =
+      use_text_storage("%s", prog.loaded ? prog.stats_text.c_str() : "Loading results...");
+  bool can[6];
+  for (int i = 0; i < 6; ++i)
+    can[i] = prog.loaded && prog.upgrade_banner && prog.upgrades_available[i];
+
+  return <ScreenLayout key="root" variant={ScreenLayoutVariant::Menu}>
+    <Panel key="panel" variant={PanelVariant::Hero}>
+      <ScreenTitle key="title" variant={ScreenTitleVariant::Hero} value="Mission Summary" />
+      <BodyText key="exp" variant={BodyTextVariant::Strong} value={experience} />
+      <UpgradeRow
+        key="endurance"
+        label={kStatNames[0]}
+        level={prog.levels[0]}
+        canUpgrade={can[0]}
+        upgradeId="UpgradeEndurance"
+        onUpgrade={make_upgrade(0)}
+      />
+      <UpgradeRow
+        key="shield"
+        label={kStatNames[1]}
+        level={prog.levels[1]}
+        canUpgrade={can[1]}
+        upgradeId="UpgradeShield"
+        onUpgrade={make_upgrade(1)}
+      />
+      <UpgradeRow
+        key="jetpack"
+        label={kStatNames[2]}
+        level={prog.levels[2]}
+        canUpgrade={can[2]}
+        upgradeId="UpgradeJetpack"
+        onUpgrade={make_upgrade(2)}
+      />
+      <UpgradeRow
+        key="techslots"
+        label={kStatNames[3]}
+        level={prog.levels[3]}
+        canUpgrade={can[3]}
+        upgradeId="UpgradeTechSlots"
+        onUpgrade={make_upgrade(3)}
+      />
+      <UpgradeRow
+        key="hacking"
+        label={kStatNames[4]}
+        level={prog.levels[4]}
+        canUpgrade={can[4]}
+        upgradeId="UpgradeHacking"
+        onUpgrade={make_upgrade(4)}
+      />
+      <UpgradeRow
+        key="contacts"
+        label={kStatNames[5]}
+        level={prog.levels[5]}
+        canUpgrade={can[5]}
+        upgradeId="UpgradeContacts"
+        onUpgrade={make_upgrade(5)}
+      />
+      <BodyText key="stats" variant={BodyTextVariant::Detail} value={stats} />
+      <AppButton
+        key="continue"
+        controlId="Continue"
+        variant={AppButtonVariant::Primary}
+        label="Continue"
+        onPress={prog.finish}
+      />
+    </Panel>
+  </ScreenLayout>
+}
+
+} // namespace
+
+::ui::UiElement MissionSummary(const char *key) {
+  return ::ui::component("MissionSummary", MissionSummaryProps{},
+                         MissionSummaryView, key);
+}
+
+} // namespace client::ui

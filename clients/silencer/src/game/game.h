@@ -10,6 +10,7 @@
 #include "state.h"
 #include "state/game_state.h"
 #include "session/game_session.h"
+#include "session/lobby_connect_flow.h"
 #include "ui/game_ui_pipeline.h"
 #include "updater.h"
 #include "world.h"
@@ -89,6 +90,10 @@ void JoinGame(LobbyGame & lobbygame, char * password = 0);
 void SpectateGame(LobbyGame & lobbygame, char * password = 0);
 void LeaveJoinedGame();
 
+// The LobbyConnect status log, accumulated by the connect flow on the tick.
+// Public so the cppx composition root can snapshot it without a friend grant.
+const std::vector<std::string> & LobbyConnectLog() const { return lobbyConnectFlow.Log(); }
+
 private:
 bool Tick();
 void TickFadeOut();
@@ -108,6 +113,7 @@ GameRenderer gameRenderer;
 GameInput gameInput;
 GameUiPipeline gameUiPipeline;
 GameSession gameSession;
+LobbyConnectFlow lobbyConnectFlow;
 
 public:
 bool minimized;

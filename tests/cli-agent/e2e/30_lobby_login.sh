@@ -1,10 +1,12 @@
 #!/usr/bin/env bash
-# Drives the full lobby login flow: spawn a local lobby on an unprivileged
-# port + a fresh silencer pointing at it, click through MainMenu →
-# LobbyConnect → fill username/password → Login → LOBBY → Go Back →
-# MainMenu. Exercises LobbyScreen end-to-end (chrome, character/chat
-# panels, lobby pump, GoBack), the Lobby Go service's TCP auth path, and
-# the normalized CLI key-to-text path.
+# Drives the cppx lobby connect → auth → route path end-to-end: spawn a local
+# lobby on an unprivileged port + a fresh silencer pointing at it, click through
+# MainMenu → LobbyConnect → fill username/password → Login → real TCP connect +
+# version-check + auth → route to CREATECHARACTER (fresh account). Exercises the
+# game-tick connect flow (LobbyConnectFlow), the cppx LobbyConnect screen +
+# use_lobby_session intents, the Lobby Go service's TCP auth path, and the
+# normalized CLI key-to-text path. The character-create + lobby flows themselves
+# are SIL-21; reaching CREATECHARACTER proves connect→auth→route.
 set -euo pipefail
 . "$(dirname "$0")/lib.sh"
 
@@ -40,9 +42,8 @@ cleanup() {
 }
 trap cleanup EXIT
 
-# Lobby on an unprivileged port. -version "" accepts any client version
-# (the SILENCER_VERSION baked into the binary). -map-upload-key empty so
-# we don't need to thread a key through the test.
+# Lobby on an unprivileged port. -version matches the binary so the handshake
+# passes; -maps-dir/-map-api-addr keep map traffic local.
 "$LOBBY_BIN" \
   -addr ":$LOBBY_PORT" \
   -db "$LOBBY_DB" \
@@ -68,8 +69,7 @@ for i in $(seq 1 60); do
 done
 
 # Silencer with a fresh HOME so the lobby host/port override doesn't get
-# persisted to the dev's real config when CharacterPanel auto-saves on
-# first lobby entry.
+# persisted to the dev's real config.
 HOME="$SILENCER_HOME" "$SILENCER_BIN" \
   --headless \
   --control-port "$CTRL_PORT" \
@@ -79,14 +79,15 @@ HOME="$SILENCER_HOME" "$SILENCER_BIN" \
 SILENCER_PID=$!
 wait_alive "$CTRL_PORT"
 
+# Poll the retained cppx tree for a node whose control id OR accessibility label
+# equals the argument (the introspection `inspect` op returns `nodes`).
 wait_for_widget() {
   local label="$1"
   for i in $(seq 1 100); do
     found=$(cli --port "$CTRL_PORT" inspect | LABEL="$label" bun -e \
-      'const t=await new Response(Bun.stdin.stream()).text();
-       const r=JSON.parse(t);
-       const label=process.env.LABEL;
-       console.log(r.widgets.some((w)=>w.label===label) ? "yes" : "no");' 2>/dev/null || echo no)
+      'const r = JSON.parse(await new Response(Bun.stdin.stream()).text());
+       const l = process.env.LABEL;
+       console.log((r.nodes||[]).some((w)=>w.label===l||w.control_id===l) ? "yes" : "no");' 2>/dev/null || echo no)
     if [ "$found" = "yes" ]; then return 0; fi
     sleep 0.05
   done
@@ -96,13 +97,14 @@ wait_for_widget() {
 }
 
 cli --port "$CTRL_PORT" wait_for_state --state MAINMENU --timeout-ms 15000
-wait_for_widget "Connect To Lobby"
-cli --port "$CTRL_PORT" click --label "Connect To Lobby" >/dev/null
+wait_for_widget "Play Online"
+cli --port "$CTRL_PORT" click --label "Play Online" >/dev/null
 cli --port "$CTRL_PORT" wait_for_state --state LOBBYCONNECT --timeout-ms 5000
-wait_for_widget "Login/Create"
+wait_for_widget "Username"
 
 # Type the credentials through the same key path real text input uses
-# (auto-creates the account on first login).
+# (auto-creates the account on first login). Username is autofocused; Tab moves
+# focus to the password field.
 for ch in a l i c e; do
   cli --port "$CTRL_PORT" key --key "$ch" >/dev/null
 done
@@ -111,33 +113,28 @@ for ch in s e c r e t; do
   cli --port "$CTRL_PORT" key --key "$ch" >/dev/null
 done
 
-# The Login/Create button only dispatches credentials when the lobby state machine
-# has advanced through Connect → version-check → AUTHENTICATING; a click
-# before that is silently consumed. The `state` op exposes lobby_state for
-# exactly this kind of synchronization.
+# The Login button only submits credentials once the connect flow has advanced
+# (on the game tick) through Connect → version-check → AUTHENTICATING; a click
+# before that is silently consumed. `state` exposes lobby_state for this sync.
 wait_for_lobby_state() {
   local target="$1"
   for i in $(seq 1 80); do
     ls=$(cli --port "$CTRL_PORT" state | bun -e \
-      'const t=await new Response(Bun.stdin.stream()).text(); console.log(JSON.parse(t).lobby_state||"");')
+      'console.log(JSON.parse(await new Response(Bun.stdin.stream()).text()).lobby_state||"");')
     if [ "$ls" = "$target" ]; then return 0; fi
     sleep 0.1
   done
   echo "lobby_state never became $target (last=$ls)" >&2
+  cat "/tmp/silencer-e2e-$CTRL_PORT.log" >&2 || true
   return 1
 }
 wait_for_lobby_state AUTHENTICATING
 
 cli --port "$CTRL_PORT" click --label "Login/Create" >/dev/null
 
-# Auth + lobby state pump can take a couple of seconds in CI. Fresh
-# accounts now land in character creation before the lobby.
-create_initial_character "Alice"
-wait_for_widget "Create Game"
-
-# Go Back from the lobby returns to MAINMENU (FADEOUT is a brief
-# transient that wait_for_state will skip past).
-cli --port "$CTRL_PORT" back >/dev/null
-cli --port "$CTRL_PORT" wait_for_state --state MAINMENU --timeout-ms 10000
+# Fresh account → server reports no characters → the connect flow routes to
+# character creation. Reaching CREATECHARACTER proves connect→auth→route worked
+# end-to-end through the real lobby. (Character creation + lobby entry are SIL-21.)
+cli --port "$CTRL_PORT" wait_for_state --state CREATECHARACTER --timeout-ms 15000
 
 echo "PASS 30_lobby_login"

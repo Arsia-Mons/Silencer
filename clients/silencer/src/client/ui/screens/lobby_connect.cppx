@@ -1,0 +1,98 @@
+#include "client/ui/screens/lobby_connect.h"
+
+#include "client/ui/components/actions/actions.h"
+#include "client/ui/components/layout/layout.h"
+#include "client/ui/components/surfaces/surfaces.h"
+#include "client/ui/components/text/text.h"
+#include "client/ui/hooks/use_lobby_session.h"
+#include "ui/components/input.h"
+#include "ui/runtime/react.h"
+
+#include <functional>
+#include <string>
+
+namespace client::ui {
+namespace {
+
+// The JSX lowering emits each tag's component function + `<Tag>Props` type
+// unqualified: the silencer semantic layer plus the generic Input primitive,
+// plus the runtime's `children()` child-list builder.
+using namespace silencer;
+using ::ui::children;
+using ::ui::components::Input;
+using ::ui::components::InputProps;
+
+struct LobbyConnectProps {
+  uint32_t unused = 0;
+};
+
+::ui::UiElement LobbyConnectView(const LobbyConnectProps &) {
+  LobbySession lobby = use_lobby_session();
+  std::string *username = use_state<std::string>(std::string());
+  std::string *password = use_state<std::string>(std::string());
+  if (!username || !password)
+    return ::ui::empty();
+
+  // Submit the typed credentials; the action no-ops until the connect flow has
+  // reached AUTHENTICATING, so Enter / Login before then is harmless. Both the
+  // field activation (Enter) and the Login button route through it.
+  std::function<void()> submit = [lobby, username, password]() {
+    if (lobby.connect)
+      lobby.connect(*username, *password);
+  };
+  std::function<void(const std::string &)> set_username =
+      [username](const std::string &next) { *username = next; };
+  std::function<void(const std::string &)> set_password =
+      [password](const std::string &next) { *password = next; };
+  std::function<void(const ::ui::ActivationEvent &)> on_activate =
+      [submit](const ::ui::ActivationEvent &) { submit(); };
+
+  // Copy the dynamic log into the per-call-site scratch: component children
+  // build after this view returns, so a pointer into the transient `lobby`
+  // model would dangle by then (literals + use_text_storage are the stable
+  // paths). The snapshot already caps the log to the recent tail.
+  const char *log = use_text_storage("%s", lobby.status_log.c_str());
+
+  return <ScreenLayout key="root" variant={ScreenLayoutVariant::Menu}>
+    <Panel key="panel" variant={PanelVariant::Hero}>
+      <ScreenTitle key="title" variant={ScreenTitleVariant::Hero} value="Connect To Lobby" />
+      <BodyText key="log" variant={BodyTextVariant::Message} value={log} />
+      <Input
+        key="username"
+        id="Username"
+        autofocus={true}
+        accessibility={{.label = "Username"}}
+        value={username->c_str()}
+        onChange={set_username}
+        onActivate={on_activate}
+      />
+      <Input
+        key="password"
+        id="Password"
+        accessibility={{.label = "Password"}}
+        value={password->c_str()}
+        onChange={set_password}
+        onActivate={on_activate}
+      />
+      <ActionRow key="actions">
+        <AppButton
+          key="login"
+          controlId="Login"
+          variant={AppButtonVariant::Primary}
+          label="Login/Create"
+          onPress={submit}
+        />
+        <AppButton key="cancel" controlId="Cancel" label="Cancel" onPress={lobby.cancel} />
+      </ActionRow>
+    </Panel>
+  </ScreenLayout>
+}
+
+} // namespace
+
+::ui::UiElement LobbyConnect(const char *key) {
+  return ::ui::component("LobbyConnect", LobbyConnectProps{}, LobbyConnectView,
+                         key);
+}
+
+} // namespace client::ui

@@ -371,10 +371,15 @@ bool Game::Tick(void){
 				world.DestroyAllObjects();
 				world.lobby.ClearGames();
 				world.lobby.state = Lobby::WAITING;
+				lobbyConnectFlow.Reset();
 				stateisnew = false;
 			}else{
 				if(gameSession.AmbienceMixerRef().FadedIn()){
 					gameSession.AmbienceMixerRef().PlayMusic(world.resources.menumusic);
+					// Drive the connect FSM once the menu fade settles (mirrors the
+					// legacy gate); routing flips the game state, which the cppx
+					// session-phase reconciler turns into the destination screen.
+					lobbyConnectFlow.Advance(*this, updater);
 				}
 			}
 		}break;

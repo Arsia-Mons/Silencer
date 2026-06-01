@@ -4,6 +4,7 @@
 #include "surface.h"
 #include "input/keybinds.h" // Action, BindingKey, BindingDevice
 #include "ui/input.h"
+#include "client/ui/providers/lobby_provider.h" // client::ui::LobbySnapshot
 #include <cstdint>
 #include <memory>
 #include <string>
@@ -113,6 +114,11 @@ CommittedSettings committedSettings_ = {};
 bool committedSettingsInit_ = false;
 // SIL-15 use_key_map dirty flag (the live KeyMap has no dirty bit).
 bool keymapDirty_ = false;
+
+// SIL-20 lobby snapshot: the per-tick POD copy of lobby read-state, captured
+// under LockMutex before the build phase (doc §5). The frame provider reads
+// this when assembling the LobbyProvider value — no build-time lock.
+client::ui::LobbySnapshot lobbySnapshot_ = {};
 
 // SIL-18 UI input: the per-frame edges (events.cpp + control socket) and the
 // derived pointer state. Cleared each frame after the pipeline consumes them.

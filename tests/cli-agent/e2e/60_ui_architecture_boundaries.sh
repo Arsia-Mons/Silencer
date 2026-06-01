@@ -58,6 +58,17 @@ fail_if_match \
   "$REPO_ROOT/clients/silencer/src/ui" \
   --glob '!third_party/**'
 
+# SIL-20: the app-shell (providers/hooks/screens) reaches gameplay only through
+# hook intent closures + POD snapshots assembled by the composition root
+# (src/game/ui). It must never name a raw Game/World/Lobby — banning these
+# includes structurally forbids a raw `Lobby*` (or game/world handle) in screen,
+# hook, or provider code. The lobby snapshot is a POD in client::ui; the only
+# place that touches the real Lobby is the game-layer composition root.
+fail_if_match \
+  '#include "(game|world|player|lobby|lobbygame|team|buyableitem|weapon|renderer|surface)[.]h"' \
+  "$REPO_ROOT/clients/silencer/src/client/ui" \
+  --glob '!third_party/**'
+
 if rg -n "SDL_GetMouseState" \
   "$REPO_ROOT/clients/silencer/src/client/ui"; then
   echo "client UI must not collect SDL pointer state directly" >&2

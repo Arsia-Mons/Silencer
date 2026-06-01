@@ -265,6 +265,12 @@ set(SILENCER_CPPX_SOURCES
 	# capture (use_keybind_capture).
 	src/client/ui/screens/options_controls.cppx
 	src/client/ui/screens/options_controls.hx
+	# Lobby phase screens (SIL-20): LobbyConnect (connect/auth via the game-tick
+	# connect flow + use_lobby_session) and MissionSummary (use_progression).
+	src/client/ui/screens/lobby_connect.cppx
+	src/client/ui/screens/lobby_connect.hx
+	src/client/ui/screens/mission_summary.cppx
+	src/client/ui/screens/mission_summary.hx
 )
 cppx_transpile(SILENCER_CPPX_GENERATED ${SILENCER_CPPX_SOURCES})
 target_sources(${SILENCER_TARGET} PRIVATE ${SILENCER_CPPX_GENERATED})
@@ -437,6 +443,7 @@ set(_cppx_app_shell_sources
 	src/client/ui/providers/app_provider.cpp
 	src/client/ui/providers/key_map_provider.cpp
 	src/client/ui/providers/keybind_capture_provider.cpp
+	src/client/ui/providers/lobby_provider.cpp
 	src/client/ui/providers/navigation_provider.cpp
 	src/client/ui/providers/server_provider.cpp
 	src/client/ui/providers/session_provider.cpp

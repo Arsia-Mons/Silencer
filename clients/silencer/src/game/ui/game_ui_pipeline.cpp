@@ -23,10 +23,13 @@
 #include "client/ui/providers/app_provider.h"
 #include "client/ui/providers/key_map_provider.h"
 #include "client/ui/providers/keybind_capture_provider.h"
+#include "client/ui/providers/lobby_provider.h"
 #include "client/ui/providers/server_provider.h"
 #include "client/ui/providers/session_provider.h"
 #include "client/ui/providers/settings_provider.h"
 #include "client/ui/providers/updater_provider.h"
+#include "ui/lobby_ui_model.h"
+#include "actor/user.h"
 #include "session_phase.h"
 #include "config.h"
 #include "audio.h"
@@ -389,11 +392,65 @@ capture.cancel_capture = [this](){ CancelKeybindCapture(); };
 capture.confirm_chord = [this](){ ConfirmKeybindChord(); };
 }
 
-// Global FrameProvider chain (doc §5), outermost (Theme) → innermost
-// (KeybindCapture): Theme ▸ Server ▸ App ▸ Session ▸ Settings ▸ KeyMap ▸
-// Updater ▸ KeybindCapture ▸ <screen>.
-::ui::UiElement tree = client::ui::KeybindCaptureProvider(
-client::ui::KeybindCaptureProviderValue{std::move(capture)}, ::ui::children({child}));
+// Lobby model (doc §5/§6): the per-tick snapshot — captured under LockMutex
+// before this build, so no build-time lock — plus the queued intents over the
+// public lobby seam. Consumed by LobbyConnect (connect/auth) and MissionSummary
+// (progression). The connect *orchestration* lives on the game tick
+// (LobbyConnectFlow); this carries only the credential-submit/cancel + upgrade/
+// finish intents. SIL-20.
+client::ui::LobbyProviderValue lobby = {};
+lobby.snapshot = lobbySnapshot_;
+lobby.connect = [this](const std::string & user, const std::string & pass){
+cppxHost->pipeline().client_ui().queue_deferred_mutation([this, user, pass](){
+Lobby & lb = game.world.lobby;
+lb.LockMutex();
+if(lb.state == Lobby::AUTHENTICATING){
+lb.SetLocalUsername(user.c_str());
+lb.SendCredentials(user.c_str(), pass.c_str());
+lb.state = Lobby::AUTHSENT;
+}
+lb.UnlockMutex();
+});
+};
+lobby.cancel = [this](){
+cppxHost->pipeline().client_ui().queue_deferred_mutation([this](){
+Lobby & lb = game.world.lobby;
+lb.LockMutex();
+lb.Disconnect();
+lb.UnlockMutex();
+game.GoToState(GameState::MAINMENU);
+});
+};
+lobby.upgrade = [this](int index){
+cppxHost->pipeline().client_ui().queue_deferred_mutation([this, index](){
+if(index < 0 || index >= 6) return;
+static const Lobby::StatID kIds[6] = {Lobby::STAT_ENDURANCE, Lobby::STAT_SHIELD,
+Lobby::STAT_JETPACK, Lobby::STAT_TECHSLOTS, Lobby::STAT_HACKING, Lobby::STAT_CONTACTS};
+Lobby & lb = game.world.lobby;
+lb.LockMutex();
+User * user = lb.GetUserInfo(lb.accountid);
+if(user) lb.UpgradeStat(user->selectedcharid, user->statsagency, kIds[index]);
+lb.UnlockMutex();
+});
+};
+lobby.finish = [this](){
+cppxHost->pipeline().client_ui().queue_deferred_mutation([this](){
+Lobby & lb = game.world.lobby;
+lb.LockMutex();
+bool authed = (lb.state == Lobby::AUTHENTICATED);
+if(authed) lb.JoinChannel(lb.lastchannel);
+lb.UnlockMutex();
+game.GoToState(authed ? GameState::LOBBY : GameState::MAINMENU);
+});
+};
+
+// Global FrameProvider chain (doc §5), outermost (Theme) → innermost (Lobby):
+// Theme ▸ Server ▸ App ▸ Session ▸ Settings ▸ KeyMap ▸ Updater ▸
+// KeybindCapture ▸ Lobby ▸ <screen>.
+::ui::UiElement tree = client::ui::LobbyProvider(
+client::ui::LobbyProviderValue{std::move(lobby)}, ::ui::children({child}));
+tree = client::ui::KeybindCaptureProvider(
+client::ui::KeybindCaptureProviderValue{std::move(capture)}, ::ui::children({tree}));
 tree = client::ui::UpdaterProvider(
 client::ui::UpdaterProviderValue{updater}, ::ui::children({tree}));
 tree = client::ui::KeyMapProvider(
@@ -451,6 +508,11 @@ frame.input.source = ::ui::UiFocusSource::Mouse;
 prevPointerDown_ = down;
 }
 frame.pointer = {mx, my};
+
+// SIL-20: capture the lobby read-state once per tick, under LockMutex, *before*
+// the build below reads it (the frame provider copies lobbySnapshot_ with no
+// build-time lock). Default/empty outside lobby phases.
+lobbySnapshot_ = silencer::game_ui::CaptureLobbySnapshot(game, CurrentSessionPhase());
 
 int ow = 0;
 int oh = 0;

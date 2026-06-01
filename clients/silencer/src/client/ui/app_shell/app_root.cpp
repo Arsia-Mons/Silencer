@@ -1,7 +1,9 @@
 #include "client/ui/app_shell/app_root.h"
 
 #include "client/ui/hooks/use_session.h"
+#include "client/ui/screens/lobby_connect.h"
 #include "client/ui/screens/main_menu.h"
+#include "client/ui/screens/mission_summary.h"
 #include "client/ui/screens/update_screen.h"
 #include "ui/runtime/element.h"
 #include "ui/runtime/react.h"
@@ -57,7 +59,7 @@ bool AppRoot::build_element(::ui::UiElementFrame &, ::ui::UiElement *out) {
   case SessionPhase::MainMenu:
     return MainMenu("phase-main-menu");
   case SessionPhase::Connecting:
-    return phase_scaffold({40, 64, 96, 255}, "phase-connecting");
+    return LobbyConnect("phase-connecting");
   case SessionPhase::CharacterCreate:
     return phase_scaffold({72, 48, 88, 255}, "phase-character-create");
   case SessionPhase::Lobby:
@@ -69,7 +71,7 @@ bool AppRoot::build_element(::ui::UiElementFrame &, ::ui::UiElement *out) {
   case SessionPhase::InMatch:
     return phase_scaffold({40, 96, 40, 255}, "phase-in-match");
   case SessionPhase::PostMatch:
-    return phase_scaffold({96, 48, 40, 255}, "phase-post-match");
+    return MissionSummary("phase-post-match");
   case SessionPhase::SinglePlayer:
     return phase_scaffold({48, 80, 96, 255}, "phase-single-player");
   }
