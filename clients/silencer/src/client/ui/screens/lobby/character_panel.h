@@ -12,6 +12,8 @@
 #include "shared.h"
 #include "runtime/UiActionQueue.h"
 
+#include <string>
+
 namespace silencer::ui {
 class UiInteractionRegistry;
 }
@@ -32,6 +34,18 @@ struct CharacterPanelState {
 	int lastReconciled = -1;
 	bool newCharacterRequested = false;
 	bool agentSelectionLocked = false;
+	Uint8 displayAgency = 0;
+	std::string agentName = "No Agent";
+	std::string levelLabel = "LV 0";
+	std::string wins = "0";
+	std::string losses = "0";
+	std::string xp = "0/100";
+	std::string endurance = "0";
+	std::string shield = "0";
+	std::string jetpack = "0";
+	std::string techslots = "0";
+	std::string hacking = "0";
+	std::string contacts = "0";
 };
 
 // Initialise state from the lobby character model default agency.
@@ -45,13 +59,6 @@ void CharacterPanelTick(CharacterPanelState & state,
 bool CharacterPanelHandleUiIntent(CharacterPanelState & state,
                                   LobbyCharacterModel & character,
                                   const silencer::ui::UiAction & action);
-
-// Emit the panel subtree. Must be called inside an open Clay layout pass,
-// after the UI frame payload arenas have been reset.
-void BuildCharacterPanelTree(CharacterPanelState & state,
-                             Uint16 panelWidth,
-                             LobbyCharacterModel & character,
-                             silencer::ui::UiInteractionRegistry& interactions);
 
 }  // namespace silencer::client_ui::lobby
 

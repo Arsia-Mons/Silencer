@@ -1,6 +1,7 @@
 #include "client/ui/screens/lobby/lobby_chrome_frame.h"
 
 #include "client/ui/hooks/use_app.h"
+#include "client/ui/screens/lobby/character_panel.h"
 #include "client/ui/screens/lobby/game_join_panel.h"
 #include "client/ui/screens/lobby/game_select_panel.h"
 #include "client/ui/screens/lobby/game_tech_panel.h"
@@ -77,6 +78,27 @@ constexpr std::uint16_t kGameTechCheckboxOff = 19;
 constexpr std::uint8_t kGameTechTextPalette = 129;
 constexpr const char * kGameTechToggleActionPrefix = "lobby.game_tech.toggle.";
 constexpr const char * kGameTechDescriptionActionPrefix = "lobby.game_tech.description.";
+constexpr const char * kCharacterAgentsAction = "lobby.character.agents";
+constexpr int kCharacterPanelPad = 6;
+constexpr int kCharacterDetailsGap = 5;
+constexpr int kCharacterStatRowGap = 2;
+constexpr int kCharacterEmblemGap = 10;
+constexpr int kCharacterInfoGap = 10;
+constexpr int kCharacterButtonH = 21;
+constexpr int kCharacterUpgradePanelPadX = 4;
+constexpr int kCharacterUpgradePanelPadY = 3;
+constexpr int kCharacterUpgradeRowH = 12;
+constexpr int kCharacterUpgradeValueColumnMinW = 18;
+constexpr int kCharacterActionButtonMinW = 92;
+constexpr int kCharacterEmblemWidthPct = 18;
+constexpr int kCharacterEmblemMinW = 40;
+constexpr int kCharacterEmblemMaxW = 64;
+constexpr int kCharacterBodyAdvance = 6;
+constexpr int kCharacterBodyLineH = 11;
+constexpr int kCharacterHeadingAdvance = 8;
+constexpr int kCharacterHeadingLineH = 13;
+constexpr std::uint8_t kCharacterAgencySpriteBank = 181;
+constexpr std::uint8_t kCharacterHeadingPalette = 200;
 
 const char * kGameSelectRowKeys[kGameSelectRowSlots] = {
 	"game-select-row-0",  "game-select-row-1",  "game-select-row-2",
@@ -379,6 +401,78 @@ inline const char * copied_prefixed_id(const char * prefix, int value) {
 	return ::ui::copy_string(id.c_str());
 }
 
+inline int clamp_int(int value, int lo, int hi) {
+	if(value < lo) return lo;
+	if(value > hi) return hi;
+	return value;
+}
+
+inline int text_width(const std::string& value, int advance) {
+	return static_cast<int>(value.size()) * advance;
+}
+
+inline const char * fit_middle_ellipsis(const std::string& text,
+                                        int available_px,
+                                        int advance) {
+	const int max_chars = advance > 0 ? available_px / advance : 0;
+	if(max_chars <= 0) return "";
+	if(static_cast<int>(text.size()) <= max_chars) return text.c_str();
+	if(max_chars <= 3){
+		return ::ui::copy_string(
+			text.substr(0, static_cast<size_t>(max_chars)).c_str());
+	}
+	const int kept = max_chars - 3;
+	const int front = (kept + 1) / 2;
+	const int back = kept - front;
+	const std::string value =
+		text.substr(0, static_cast<size_t>(front)) + "..." +
+		text.substr(text.size() - static_cast<size_t>(back));
+	return ::ui::copy_string(value.c_str());
+}
+
+inline int character_upgrade_value_width(const CharacterPanelState& state) {
+	int width = text_width(state.endurance, kCharacterBodyAdvance);
+	width = std::max(width, text_width(state.shield, kCharacterBodyAdvance));
+	width = std::max(width, text_width(state.jetpack, kCharacterBodyAdvance));
+	width = std::max(width, text_width(state.techslots, kCharacterBodyAdvance));
+	width = std::max(width, text_width(state.hacking, kCharacterBodyAdvance));
+	width = std::max(width, text_width(state.contacts, kCharacterBodyAdvance));
+	return std::max(width + 4, kCharacterUpgradeValueColumnMinW);
+}
+
+inline ::ui::LayoutStyle character_root_layout(int x,
+                                               int y,
+                                               int width,
+                                               int height) {
+	::ui::LayoutStyle layout = absolute_layout(x, y, width, height);
+	layout.overflow = ::ui::Overflow::Hidden;
+	return layout;
+}
+
+inline ::ui::LayoutStyle flex_row_layout(float width,
+                                         float height,
+                                         float gap = 0.0f) {
+	return {
+		.direction = ::ui::FlexDirection::Row,
+		.align_items = ::ui::AlignItems::Center,
+		.width = width > 0.0f ? ::ui::Length::points(width) : ::ui::Length::auto_size(),
+		.height = height > 0.0f ? ::ui::Length::points(height) : ::ui::Length::auto_size(),
+		.gap = gap,
+	};
+}
+
+inline ::ui::LayoutStyle flex_column_layout(float width,
+                                            float height,
+                                            float gap = 0.0f) {
+	return {
+		.direction = ::ui::FlexDirection::Column,
+		.align_items = ::ui::AlignItems::Start,
+		.width = width > 0.0f ? ::ui::Length::points(width) : ::ui::Length::auto_size(),
+		.height = height > 0.0f ? ::ui::Length::points(height) : ::ui::Length::auto_size(),
+		.gap = gap,
+	};
+}
+
 inline const char * game_select_info_value(const GameSelectPanelState& state,
                                            int index) {
 	switch(index){
@@ -412,6 +506,329 @@ struct AbsoluteChromeButtonProps {
 	  layout={absolute_button_layout(props.x, props.y, props.width, props.height)}
 	  style={chrome_button_patch()}
 	/>
+}
+
+struct CharacterStatRowProps {
+	const char * key = nullptr;
+	int index = 0;
+	const char * label = nullptr;
+	const char * value = nullptr;
+	int label_width = 0;
+};
+
+::ui::UiElement CharacterStatRow(const CharacterStatRowProps& props) {
+	return <Box
+	  key={props.key}
+	  id="CharacterPanelStatRow"
+	  idOffset={props.index}
+	  layout={flex_row_layout(0.0f, static_cast<float>(kCharacterBodyLineH), 8.0f)}
+	>
+		<Text
+		  key="label"
+		  value={props.label}
+		  layout={::ui::LayoutStyle{
+				.width = ::ui::Length::points(static_cast<float>(props.label_width)),
+				.height = ::ui::Length::points(static_cast<float>(kCharacterBodyLineH)),
+			}}
+		  style={text_patch(133, 6, 11.0f)}
+		/>
+		<Text
+		  key="value"
+		  value={props.value}
+		  layout={::ui::LayoutStyle{
+				.width = ::ui::Length::auto_size(),
+				.height = ::ui::Length::points(static_cast<float>(kCharacterBodyLineH)),
+			}}
+		  style={text_patch(133, 6, 11.0f)}
+		/>
+	</Box>
+}
+
+struct CharacterUpgradeRowProps {
+	const char * key = nullptr;
+	int index = 0;
+	const char * label = nullptr;
+	const char * value = nullptr;
+	int value_width = 0;
+};
+
+::ui::UiElement CharacterUpgradeRow(const CharacterUpgradeRowProps& props) {
+	return <Box
+	  key={props.key}
+	  id="CharacterPanelUpgradeRow"
+	  idOffset={props.index}
+	  layout={::ui::LayoutStyle{
+			.direction = ::ui::FlexDirection::Row,
+			.align_items = ::ui::AlignItems::Center,
+			.width = ::ui::Length::percent(100.0f),
+			.height = ::ui::Length::points(static_cast<float>(kCharacterUpgradeRowH)),
+			.gap = 6.0f,
+		}}
+	>
+		<Text
+		  key="label"
+		  value={props.label}
+		  layout={::ui::LayoutStyle{
+				.width = ::ui::Length::grow(1.0f),
+				.height = ::ui::Length::points(static_cast<float>(kCharacterBodyLineH)),
+			}}
+		  style={text_patch(133, 6, 11.0f)}
+		/>
+		<Text
+		  key="value"
+		  value={props.value}
+		  layout={::ui::LayoutStyle{
+				.width = ::ui::Length::points(static_cast<float>(props.value_width)),
+				.height = ::ui::Length::points(static_cast<float>(kCharacterBodyLineH)),
+			}}
+		  style={text_patch(133, 6, 11.0f, ::ui::TextAlign::Right)}
+		/>
+	</Box>
+}
+
+struct CharacterPanelViewProps {
+	const char * key = nullptr;
+	bool show = false;
+	const CharacterPanelState * state = nullptr;
+	int x = 0;
+	int y = 0;
+	int width = 0;
+	int height = 0;
+};
+
+::ui::UiElement CharacterPanelView(const CharacterPanelViewProps& props) {
+	if(!props.show || !props.state || props.width <= 0 || props.height <= 0){
+		return ::ui::empty();
+	}
+	const CharacterPanelState& state = *props.state;
+	const int inner_width = std::max(1, props.width - kCharacterPanelPad * 2);
+	const int emblem_w = clamp_int(
+		inner_width * kCharacterEmblemWidthPct / 100,
+		kCharacterEmblemMinW,
+		kCharacterEmblemMaxW);
+	const int details_width =
+		std::max(0, inner_width - emblem_w - kCharacterEmblemGap);
+	const int label_width =
+		text_width("LOSSES", kCharacterBodyAdvance) + 4;
+	const int upgrade_value_width = character_upgrade_value_width(state);
+	const char * fitted_name = fit_middle_ellipsis(
+		state.agentName,
+		details_width,
+		kCharacterHeadingAdvance);
+	const std::string xp_text = "XP " + state.xp;
+	const char * xp_label = ::ui::copy_string(xp_text.c_str());
+	return <Box
+	  key={props.key}
+	  id="CharacterPanelContent"
+	  layout={character_root_layout(props.x, props.y, props.width, props.height)}
+	>
+		<Box
+		  key="content"
+		  layout={::ui::LayoutStyle{
+				.direction = ::ui::FlexDirection::Row,
+				.align_items = ::ui::AlignItems::Start,
+				.width = ::ui::Length::percent(100.0f),
+				.height = ::ui::Length::percent(100.0f),
+				.padding = {
+					static_cast<float>(kCharacterPanelPad),
+					static_cast<float>(kCharacterPanelPad),
+					static_cast<float>(kCharacterPanelPad),
+					static_cast<float>(kCharacterPanelPad),
+				},
+				.gap = static_cast<float>(kCharacterEmblemGap),
+				.overflow = ::ui::Overflow::Hidden,
+			}}
+		>
+			<Box
+			  key="left-rail"
+			  id="CharacterPanelLeftRail"
+			  layout={::ui::LayoutStyle{
+					.direction = ::ui::FlexDirection::Column,
+					.align_items = ::ui::AlignItems::Center,
+					.width = ::ui::Length::points(static_cast<float>(emblem_w)),
+					.height = ::ui::Length::auto_size(),
+					.gap = 4.0f,
+					.overflow = ::ui::Overflow::Hidden,
+				}}
+			>
+				<Box
+				  key="emblem"
+				  id="CharacterPanelAgencyEmblem"
+				  layout={::ui::LayoutStyle{
+						.width = ::ui::Length::points(static_cast<float>(emblem_w)),
+						.height = ::ui::Length::points(static_cast<float>(emblem_w)),
+					}}
+				  style={sprite_patch(kCharacterAgencySpriteBank, state.displayAgency)}
+				/>
+				<Text
+				  key="level"
+				  id="CharacterPanelLevelBadge"
+				  value={state.levelLabel.c_str()}
+				  layout={::ui::LayoutStyle{
+						.width = ::ui::Length::points(static_cast<float>(emblem_w)),
+						.height = ::ui::Length::points(static_cast<float>(kCharacterBodyLineH)),
+					}}
+				  style={text_patch(133, 6, 11.0f, ::ui::TextAlign::Center)}
+				/>
+			</Box>
+			<Box
+			  key="info"
+			  id="CharacterPanelInfoArea"
+			  layout={::ui::LayoutStyle{
+					.direction = ::ui::FlexDirection::Column,
+					.align_items = ::ui::AlignItems::Start,
+					.width = ::ui::Length::grow(1.0f),
+					.height = ::ui::Length::grow(1.0f),
+					.gap = static_cast<float>(kCharacterDetailsGap),
+					.overflow = ::ui::Overflow::Hidden,
+				}}
+			>
+				<Text
+				  key="name"
+				  id="CharacterPanelNameHeader"
+				  value={fitted_name}
+				  layout={::ui::LayoutStyle{
+						.width = ::ui::Length::percent(100.0f),
+						.height = ::ui::Length::points(static_cast<float>(kCharacterHeadingLineH)),
+					}}
+				  style={palette_text_patch(kCharacterHeadingPalette, 134, 8, 13.0f)}
+				/>
+				<Box
+				  key="details"
+				  id="CharacterPanelDetailsArea"
+				  layout={::ui::LayoutStyle{
+						.direction = ::ui::FlexDirection::Row,
+						.align_items = ::ui::AlignItems::Center,
+						.width = ::ui::Length::percent(100.0f),
+						.height = ::ui::Length::grow(1.0f),
+						.gap = static_cast<float>(kCharacterDetailsGap),
+						.overflow = ::ui::Overflow::Hidden,
+					}}
+				>
+					<Box
+					  key="stats"
+					  id="CharacterPanelStatsColumn"
+					  layout={::ui::LayoutStyle{
+							.direction = ::ui::FlexDirection::Column,
+							.align_items = ::ui::AlignItems::Start,
+							.width = ::ui::Length::auto_size(),
+							.height = ::ui::Length::grow(1.0f),
+							.gap = static_cast<float>(kCharacterInfoGap),
+							.overflow = ::ui::Overflow::Hidden,
+						}}
+					>
+						<Box
+						  key="stat-table"
+						  id="CharacterPanelStatTable"
+						  layout={flex_column_layout(0.0f, 0.0f, static_cast<float>(kCharacterStatRowGap))}
+						>
+							<CharacterStatRow
+							  key="wins"
+							  index={0}
+							  label="WINS"
+							  value={state.wins.c_str()}
+							  labelWidth={label_width}
+							/>
+							<CharacterStatRow
+							  key="losses"
+							  index={1}
+							  label="LOSSES"
+							  value={state.losses.c_str()}
+							  labelWidth={label_width}
+							/>
+						</Box>
+						<Text
+						  key="xp"
+						  id="CharacterPanelXpLine"
+						  value={xp_label}
+						  layout={::ui::LayoutStyle{
+								.width = ::ui::Length::auto_size(),
+								.height = ::ui::Length::points(static_cast<float>(kCharacterBodyLineH)),
+							}}
+						  style={text_patch(133, 6, 11.0f)}
+						/>
+						<Button
+						  key="agents"
+						  id={kCharacterAgentsAction}
+						  label="Agents"
+						  disabled={state.agentSelectionLocked}
+						  accessibility={{.label = "Agents"}}
+						  layout={::ui::LayoutStyle{
+								.align_items = ::ui::AlignItems::Center,
+								.justify_content = ::ui::JustifyContent::Center,
+								.width = ::ui::Length::points(static_cast<float>(kCharacterActionButtonMinW)),
+								.height = ::ui::Length::points(static_cast<float>(kCharacterButtonH)),
+								.padding = {12.0f, 12.0f, 4.0f, 4.0f},
+							}}
+						  style={chrome_button_patch()}
+						/>
+					</Box>
+					<Box
+					  key="upgrades"
+					  id="CharacterPanelUpgradePanel"
+					  layout={::ui::LayoutStyle{
+							.direction = ::ui::FlexDirection::Column,
+							.align_items = ::ui::AlignItems::Start,
+							.width = ::ui::Length::grow(1.0f),
+							.height = ::ui::Length::grow(1.0f),
+							.padding = {
+								static_cast<float>(kCharacterUpgradePanelPadX),
+								static_cast<float>(kCharacterUpgradePanelPadX),
+								static_cast<float>(kCharacterUpgradePanelPadY),
+								static_cast<float>(kCharacterUpgradePanelPadY),
+							},
+							.gap = static_cast<float>(kCharacterStatRowGap),
+							.overflow = ::ui::Overflow::Hidden,
+						}}
+					  style={inset_border_patch()}
+					>
+						<CharacterUpgradeRow
+						  key="endurance"
+						  index={10}
+						  label="ENDURANCE:"
+						  value={state.endurance.c_str()}
+						  valueWidth={upgrade_value_width}
+						/>
+						<CharacterUpgradeRow
+						  key="shield"
+						  index={11}
+						  label="SHIELD:"
+						  value={state.shield.c_str()}
+						  valueWidth={upgrade_value_width}
+						/>
+						<CharacterUpgradeRow
+						  key="jetpack"
+						  index={12}
+						  label="JETPACK:"
+						  value={state.jetpack.c_str()}
+						  valueWidth={upgrade_value_width}
+						/>
+						<CharacterUpgradeRow
+						  key="tech-slots"
+						  index={13}
+						  label="TECH SLOTS:"
+						  value={state.techslots.c_str()}
+						  valueWidth={upgrade_value_width}
+						/>
+						<CharacterUpgradeRow
+						  key="hacking"
+						  index={14}
+						  label="HACKING:"
+						  value={state.hacking.c_str()}
+						  valueWidth={upgrade_value_width}
+						/>
+						<CharacterUpgradeRow
+						  key="contacts"
+						  index={15}
+						  label="CONTACTS:"
+						  value={state.contacts.c_str()}
+						  valueWidth={upgrade_value_width}
+						/>
+					</Box>
+				</Box>
+			</Box>
+		</Box>
+	</Box>
 }
 
 struct GameSelectRowProps {
@@ -1736,6 +2153,15 @@ using ::ui::components::TextProps;
 			  style={lobby_chrome_frame_detail::chrome_button_patch()}
 			/>
 		</Box>
+		<lobby_chrome_frame_detail.CharacterPanelView
+		  key="character-panel"
+		  show={props.show_character}
+		  state={props.character}
+		  x={props.character_x}
+		  y={props.character_y}
+		  width={props.character_width}
+		  height={props.character_height}
+		/>
 		<lobby_chrome_frame_detail.GameSelectTallPanel
 		  key="game-select-tall"
 		  show={props.show_game_select_tall}

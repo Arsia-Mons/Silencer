@@ -11,6 +11,7 @@ namespace lobby {
 struct GameJoinPanelState;
 struct GameSelectPanelState;
 struct GameTechPanelState;
+struct CharacterPanelState;
 
 struct LobbyChromeFrameProps {
 	const char * key = nullptr;
@@ -23,6 +24,12 @@ struct LobbyChromeFrameProps {
 	int height = 0;
 	int pad_x = 0;
 	int row_gap = 0;
+	bool show_character = false;
+	const CharacterPanelState * character = nullptr;
+	int character_x = 0;
+	int character_y = 0;
+	int character_width = 0;
+	int character_height = 0;
 	bool show_game_select_create = false;
 	int game_select_create_x = 0;
 	int game_select_create_y = 0;

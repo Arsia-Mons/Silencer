@@ -273,6 +273,12 @@ void LobbyScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime, s
 		.height = titleBarH,
 		.pad_x = titlePadX,
 		.row_gap = titleRowGap,
+		.show_character = mainLayout.characterW > 0 && mainLayout.upperH > 0,
+		.character = &characterState,
+		.character_x = bodyX,
+		.character_y = bodyY,
+		.character_width = mainLayout.characterW,
+		.character_height = mainLayout.upperH,
 		.show_game_select_create = showGameSelectCreate,
 		.game_select_create_x = bodyX + mainLayout.characterW + mainLayout.regionGap
 		                        + lobby_screen_detail::kGameSelectCreatePadLeft,
