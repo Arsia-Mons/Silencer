@@ -5,8 +5,13 @@
 #include "client/ui/components/surfaces/surfaces.h"
 #include "client/ui/components/text/text.h"
 #include "client/ui/hooks/use_app.h"
+#include "client/ui/hooks/use_navigation.h"
 #include "client/ui/hooks/use_session.h"
+#include "client/ui/screens/options_screen.h"
 #include "ui/runtime/react.h"
+
+#include <functional>
+#include <memory>
 
 namespace client::ui {
 namespace {
@@ -25,11 +30,16 @@ struct MainMenuProps {
 ::ui::UiElement MainMenuView(const MainMenuProps &) {
   Session session = use_session();
   App app = use_app();
+  Navigation nav = use_navigation();
 
-  // The three SIL-18 actions whose intents are live: play online, the
-  // single-player tutorial, and quit. Lobby/options/character-create entries
-  // join as their screens land (SIL-19..SIL-21); the menu names no screen that
-  // does not yet exist.
+  // Options is Tier-1 navigation: an Overlay pushed over the menu (it never
+  // changes the session phase). Lobby/character-create entries join as those
+  // screens land (SIL-20..SIL-21).
+  std::function<void()> open_options = [nav]() {
+    if (nav.push)
+      nav.push(std::make_unique<OptionsScreen>());
+  };
+
   return <ScreenLayout key="root" variant={ScreenLayoutVariant::Menu}>
     <Panel key="panel" variant={PanelVariant::Hero}>
       <ScreenTitle key="title" variant={ScreenTitleVariant::Hero} value="SILENCER" />
@@ -47,6 +57,7 @@ struct MainMenuProps {
         label="Tutorial"
         onPress={session.start_tutorial}
       />
+      <AppButton key="options" controlId="Options" label="Options" onPress={open_options} />
       <AppButton
         key="quit"
         controlId="Quit"

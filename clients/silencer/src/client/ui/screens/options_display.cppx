@@ -1,0 +1,66 @@
+#include "client/ui/screens/options_display.h"
+
+#include "client/ui/components/actions/actions.h"
+#include "client/ui/components/layout/layout.h"
+#include "client/ui/components/text/text.h"
+#include "client/ui/hooks/use_navigation.h"
+#include "client/ui/hooks/use_settings.h"
+#include "ui/runtime/react.h"
+
+#include <functional>
+
+namespace client::ui {
+namespace {
+
+// JSX lowering emits each tag's component function + `<Tag>Props` type
+// unqualified, so pull in the silencer semantic layer + the runtime children().
+using namespace silencer;
+using ::ui::children;
+
+struct OptionsDisplayProps {
+  uint32_t unused = 0;
+};
+
+::ui::UiElement OptionsDisplayView(const OptionsDisplayProps &) {
+  Navigation nav = use_navigation();
+  Settings settings = use_settings();
+  if (!nav.is_top)
+    return ::ui::empty();
+
+  std::function<void()> back = [nav]() {
+    if (nav.pop_current)
+      nav.pop_current();
+  };
+
+  return <ScreenLayout key="root" variant={ScreenLayoutVariant::Overlay}>
+    <ScreenTitle key="title" variant={ScreenTitleVariant::Screen} value="Display" />
+    <AppCheckbox
+      key="fullscreen"
+      controlId="FullscreenToggle"
+      checked={settings.fullscreen}
+      label="Fullscreen"
+      onChange={settings.set_fullscreen}
+    />
+    <AppCheckbox
+      key="smooth"
+      controlId="SmoothScalingToggle"
+      checked={settings.smooth_scaling}
+      label="Smooth Scaling"
+      onChange={settings.set_smooth_scaling}
+    />
+    <AppButton key="back" controlId="OptionsBack" label="Back" onPress={back} />
+  </ScreenLayout>
+}
+
+} // namespace
+
+bool OptionsDisplayScreen::build_element(::ui::UiElementFrame &,
+                                         ::ui::UiElement *out) {
+  if (!out)
+    return false;
+  *out = ::ui::component("OptionsDisplay", OptionsDisplayProps{},
+                         OptionsDisplayView, "options-display");
+  return true;
+}
+
+} // namespace client::ui

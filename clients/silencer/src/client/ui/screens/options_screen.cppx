@@ -1,0 +1,77 @@
+#include "client/ui/screens/options_screen.h"
+
+#include "client/ui/components/actions/actions.h"
+#include "client/ui/components/layout/layout.h"
+#include "client/ui/components/text/text.h"
+#include "client/ui/hooks/use_navigation.h"
+#include "client/ui/hooks/use_settings.h"
+#include "client/ui/screens/options_audio.h"
+#include "client/ui/screens/options_display.h"
+#include "ui/runtime/react.h"
+
+#include <functional>
+#include <memory>
+
+namespace client::ui {
+namespace {
+
+// JSX lowering emits each tag's component function + `<Tag>Props` type
+// unqualified, so pull in the silencer semantic layer + the runtime children().
+using namespace silencer;
+using ::ui::children;
+
+struct OptionsProps {
+  uint32_t unused = 0;
+};
+
+::ui::UiElement OptionsView(const OptionsProps &) {
+  Navigation nav = use_navigation();
+  Settings settings = use_settings();
+  if (!nav.is_top)
+    return ::ui::empty();
+
+  std::function<void()> open_audio = [nav]() {
+    if (nav.push)
+      nav.push(std::make_unique<OptionsAudioScreen>());
+  };
+  std::function<void()> open_display = [nav]() {
+    if (nav.push)
+      nav.push(std::make_unique<OptionsDisplayScreen>());
+  };
+  // Done persists the live preview; Cancel restores the last-saved values.
+  std::function<void()> done = [nav, settings]() {
+    if (settings.commit)
+      settings.commit();
+    if (nav.pop_current)
+      nav.pop_current();
+  };
+  std::function<void()> cancel = [nav, settings]() {
+    if (settings.revert)
+      settings.revert();
+    if (nav.pop_current)
+      nav.pop_current();
+  };
+  const char *status = settings.dirty ? "Unsaved changes" : "";
+
+  return <ScreenLayout key="root" variant={ScreenLayoutVariant::Overlay}>
+    <ScreenTitle key="title" variant={ScreenTitleVariant::Screen} value="Options" />
+    <ScreenSubtitle key="status" value={status} />
+    <AppButton key="audio" controlId="OptionsAudio" label="Audio" onPress={open_audio} />
+    <AppButton key="display" controlId="OptionsDisplay" label="Display" onPress={open_display} />
+    <ActionRow key="actions">
+      <AppButton key="done" controlId="OptionsDone" label="Done" onPress={done} />
+      <AppButton key="cancel" controlId="OptionsCancel" label="Cancel" onPress={cancel} />
+    </ActionRow>
+  </ScreenLayout>
+}
+
+} // namespace
+
+bool OptionsScreen::build_element(::ui::UiElementFrame &, ::ui::UiElement *out) {
+  if (!out)
+    return false;
+  *out = ::ui::component("Options", OptionsProps{}, OptionsView, "options");
+  return true;
+}
+
+} // namespace client::ui

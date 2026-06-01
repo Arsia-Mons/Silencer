@@ -97,6 +97,7 @@ void CollectUiNodes(const ::ui::UiTree& tree, ::ui::NodeId id,
 		if(s.value && s.value[0]) n["value"] = s.value;
 		n["focusable"] = s.interaction.focusable;
 		n["disabled"] = s.interaction.disabled;
+		n["checked"] = s.interaction.checked;
 		n["focused"] = (focused != 0 && id == focused);
 		n["hovered"] = (hovered != 0 && id == hovered);
 		n["x"] = s.layout.x;

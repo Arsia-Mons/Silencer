@@ -253,6 +253,14 @@ set(SILENCER_CPPX_SOURCES
 	src/client/ui/screens/message_modal.hx
 	src/client/ui/screens/password_modal.cppx
 	src/client/ui/screens/password_modal.hx
+	# Options cluster (SIL-19): the root + Audio/Display sub-screens are Overlays
+	# pushed via use_navigation; they live-preview use_settings (Cancel reverts).
+	src/client/ui/screens/options_screen.cppx
+	src/client/ui/screens/options_screen.hx
+	src/client/ui/screens/options_audio.cppx
+	src/client/ui/screens/options_audio.hx
+	src/client/ui/screens/options_display.cppx
+	src/client/ui/screens/options_display.hx
 )
 cppx_transpile(SILENCER_CPPX_GENERATED ${SILENCER_CPPX_SOURCES})
 target_sources(${SILENCER_TARGET} PRIVATE ${SILENCER_CPPX_GENERATED})

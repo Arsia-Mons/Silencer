@@ -1,0 +1,80 @@
+#include "client/ui/screens/options_audio.h"
+
+#include "client/ui/components/actions/actions.h"
+#include "client/ui/components/layout/layout.h"
+#include "client/ui/components/text/text.h"
+#include "client/ui/hooks/use_navigation.h"
+#include "client/ui/hooks/use_settings.h"
+#include "ui/runtime/react.h"
+
+#include <cstdint>
+#include <functional>
+
+namespace client::ui {
+namespace {
+
+// JSX lowering emits each tag's component function + `<Tag>Props` type
+// unqualified, so pull in the silencer semantic layer + the runtime children().
+using namespace silencer;
+using ::ui::children;
+
+constexpr uint8_t kVolumeStep = 16;
+constexpr uint8_t kVolumeMax = 128;
+
+struct OptionsAudioProps {
+  uint32_t unused = 0;
+};
+
+::ui::UiElement OptionsAudioView(const OptionsAudioProps &) {
+  Navigation nav = use_navigation();
+  Settings settings = use_settings();
+  // Covered overlays render nothing (only the top overlay is interactive).
+  if (!nav.is_top)
+    return ::ui::empty();
+
+  uint8_t vol = settings.music_volume;
+  std::function<void()> back = [nav]() {
+    if (nav.pop_current)
+      nav.pop_current();
+  };
+  std::function<void()> vol_down = [settings, vol]() {
+    if (settings.set_music_volume)
+      settings.set_music_volume(vol >= kVolumeStep ? vol - kVolumeStep : 0);
+  };
+  std::function<void()> vol_up = [settings, vol]() {
+    if (settings.set_music_volume)
+      settings.set_music_volume(vol <= kVolumeMax - kVolumeStep ? vol + kVolumeStep
+                                                                : kVolumeMax);
+  };
+  const char *vol_text = use_text_storage("Volume: %d", static_cast<int>(vol));
+
+  return <ScreenLayout key="root" variant={ScreenLayoutVariant::Overlay}>
+    <ScreenTitle key="title" variant={ScreenTitleVariant::Screen} value="Audio" />
+    <AppCheckbox
+      key="music"
+      controlId="MusicToggle"
+      checked={settings.music}
+      label="Music"
+      onChange={settings.set_music}
+    />
+    <ActionRow key="volume">
+      <AppButton key="down" controlId="VolumeDown" label="-" onPress={vol_down} />
+      <BodyText key="value" variant={BodyTextVariant::Body} value={vol_text} />
+      <AppButton key="up" controlId="VolumeUp" label="+" onPress={vol_up} />
+    </ActionRow>
+    <AppButton key="back" controlId="OptionsBack" label="Back" onPress={back} />
+  </ScreenLayout>
+}
+
+} // namespace
+
+bool OptionsAudioScreen::build_element(::ui::UiElementFrame &,
+                                       ::ui::UiElement *out) {
+  if (!out)
+    return false;
+  *out = ::ui::component("OptionsAudio", OptionsAudioProps{}, OptionsAudioView,
+                         "options-audio");
+  return true;
+}
+
+} // namespace client::ui
