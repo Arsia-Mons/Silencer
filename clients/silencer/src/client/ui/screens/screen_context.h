@@ -49,6 +49,8 @@ public:
 	// from Screen::Build by every menu surface that owns its presentation.
 	void ResetPresentation(int paletteIdx);
 	void CenterPresentationCamera();
+	void BeginLobbyPanelBorderBlur(int virtualWidth, int virtualHeight, float uiScale);
+	void AddLobbyPanelBorderBlurRect(int x, int y, int w, int h);
 
 	// Clay frame ownership lives in Game/ClientUi. Screens declare UI through
 	// Screen::BuildUi only; they must not begin/end or render Clay directly.

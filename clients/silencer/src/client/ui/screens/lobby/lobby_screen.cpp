@@ -12,7 +12,6 @@
 #include "screen_context.h"
 #include "game.h"
 #include "message_modal.h"
-#include "renderdevice.h"
 #include "ui/runtime/UiInputState.h"
 
 #include <SDL3/SDL.h>
@@ -148,40 +147,43 @@ LobbyMainAreaLayout ResolveLobbyMainAreaLayout(int bodyW,
 	return out;
 }
 
-void AddPanelBorderBlur(RenderDevice * renderdevice, SDL_Rect rect) {
-	if(!renderdevice || rect.w <= 0 || rect.h <= 0) return;
-	renderdevice->AddLobbyPanelBorderBlurRect({ rect.x, rect.y, rect.w, 1 });
-	renderdevice->AddLobbyPanelBorderBlurRect({ rect.x, rect.y + rect.h - 1, rect.w, 1 });
-	renderdevice->AddLobbyPanelBorderBlurRect({ rect.x, rect.y, 1, rect.h });
-	renderdevice->AddLobbyPanelBorderBlurRect({ rect.x + rect.w - 1, rect.y, 1, rect.h });
+void AddPanelBorderBlur(ScreenContext & ctx,
+                        int x,
+                        int y,
+                        int w,
+                        int h) {
+	if(w <= 0 || h <= 0) return;
+	ctx.AddLobbyPanelBorderBlurRect(x, y, w, 1);
+	ctx.AddLobbyPanelBorderBlurRect(x, y + h - 1, w, 1);
+	ctx.AddLobbyPanelBorderBlurRect(x, y, 1, h);
+	ctx.AddLobbyPanelBorderBlurRect(x + w - 1, y, 1, h);
 }
 
-void AddPanelBorderBlur(RenderDevice * renderdevice,
+void AddPanelBorderBlur(ScreenContext & ctx,
                         int x,
                         int y,
                         int w,
                         int h,
                         Uint8 sides) {
-	if(!renderdevice || w <= 0 || h <= 0) return;
+	if(w <= 0 || h <= 0) return;
 	if(sides & kBorderTop){
-		renderdevice->AddLobbyPanelBorderBlurRect({ x, y, w, 1 });
+		ctx.AddLobbyPanelBorderBlurRect(x, y, w, 1);
 	}
 	if(sides & kBorderBottom){
-		renderdevice->AddLobbyPanelBorderBlurRect({ x, y + h - 1, w, 1 });
+		ctx.AddLobbyPanelBorderBlurRect(x, y + h - 1, w, 1);
 	}
 	if(sides & kBorderLeft){
-		renderdevice->AddLobbyPanelBorderBlurRect({ x, y, 1, h });
+		ctx.AddLobbyPanelBorderBlurRect(x, y, 1, h);
 	}
 	if(sides & kBorderRight){
-		renderdevice->AddLobbyPanelBorderBlurRect({ x + w - 1, y, 1, h });
+		ctx.AddLobbyPanelBorderBlurRect(x + w - 1, y, 1, h);
 	}
 }
 
-void QueueLobbyPanelBorderBlurRects(RenderDevice * renderdevice,
+void QueueLobbyPanelBorderBlurRects(ScreenContext & ctx,
                                     int bodyX,
                                     int bodyY,
                                     const LobbyMainAreaLayout & layout) {
-	if(!renderdevice) return;
 	const int topY = bodyY;
 	const int lowerY = bodyY + layout.upperH + layout.regionGap;
 	const int rightX = bodyX + layout.topRowW;
@@ -189,27 +191,27 @@ void QueueLobbyPanelBorderBlurRects(RenderDevice * renderdevice,
 	const int rightUpperX = bodyX + layout.characterW + layout.regionGap;
 	const int seamX = bodyX + layout.topRowW - layout.regionGap;
 
-	AddPanelBorderBlur(renderdevice,
+	AddPanelBorderBlur(ctx,
 	                   characterX, topY,
 	                   layout.characterW, layout.upperH,
 	                   kBorderAll);
-	AddPanelBorderBlur(renderdevice,
+	AddPanelBorderBlur(ctx,
 	                   rightUpperX, topY,
 	                   layout.rightUpperW, layout.upperH,
 	                   static_cast<Uint8>(kBorderTop | kBorderBottom | kBorderLeft));
-	AddPanelBorderBlur(renderdevice,
+	AddPanelBorderBlur(ctx,
 	                   seamX, bodyY + layout.upperH,
 	                   layout.regionGap, layout.regionGap,
 	                   kBorderRight);
-	AddPanelBorderBlur(renderdevice,
+	AddPanelBorderBlur(ctx,
 	                   bodyX, lowerY,
 	                   layout.chatW, layout.chatH,
 	                   kBorderAll);
-	AddPanelBorderBlur(renderdevice,
+	AddPanelBorderBlur(ctx,
 	                   seamX, lowerY,
 	                   layout.regionGap, layout.chatH,
 	                   kBorderRight);
-	AddPanelBorderBlur(renderdevice,
+	AddPanelBorderBlur(ctx,
 	                   rightX, bodyY,
 	                   layout.rightTallW, layout.rightTallH,
 	                   static_cast<Uint8>(kBorderTop | kBorderBottom | kBorderRight));
@@ -613,20 +615,18 @@ void LobbyScreen::BuildUi(ScreenContext & ctx, float frametime, const silencer::
 	                   layoutHeight,
 	                   interactions);
 
-	if(ctx.renderdevice){
-		ctx.renderdevice->BeginLobbyPanelBorderBlur(
-			layoutWidth,
-			layoutHeight,
-			input.uiScale);
-		lobby_screen_detail::AddPanelBorderBlur(
-			ctx.renderdevice,
-			SDL_Rect{ rootPadX, rootPadTop, bodyW, (int)titleBarH });
-		lobby_screen_detail::QueueLobbyPanelBorderBlurRects(
-			ctx.renderdevice,
-			bodyX,
-			bodyY,
-			mainLayout);
-	}
+	ctx.BeginLobbyPanelBorderBlur(layoutWidth, layoutHeight, input.uiScale);
+	lobby_screen_detail::AddPanelBorderBlur(
+		ctx,
+		rootPadX,
+		rootPadTop,
+		bodyW,
+		static_cast<int>(titleBarH));
+	lobby_screen_detail::QueueLobbyPanelBorderBlurRects(
+		ctx,
+		bodyX,
+		bodyY,
+		mainLayout);
 }
 
 void LobbyScreen::Destroy(ScreenContext & ctx)

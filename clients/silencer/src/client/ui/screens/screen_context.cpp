@@ -1,6 +1,7 @@
 #include "screen_context.h"
 
 #include "game.h"
+#include "renderdevice.h"
 #include "renderer.h"
 
 ScreenContext::ScreenContext(Game & game_,
@@ -32,4 +33,16 @@ void ScreenContext::ResetPresentation(int paletteIdx) {
 
 void ScreenContext::CenterPresentationCamera() {
 	renderer.camera.SetPosition(320, 240);
+}
+
+void ScreenContext::BeginLobbyPanelBorderBlur(int virtualWidth,
+                                              int virtualHeight,
+                                              float uiScale) {
+	if(!renderdevice) return;
+	renderdevice->BeginLobbyPanelBorderBlur(virtualWidth, virtualHeight, uiScale);
+}
+
+void ScreenContext::AddLobbyPanelBorderBlurRect(int x, int y, int w, int h) {
+	if(!renderdevice || w <= 0 || h <= 0) return;
+	renderdevice->AddLobbyPanelBorderBlurRect({ x, y, w, h });
 }
