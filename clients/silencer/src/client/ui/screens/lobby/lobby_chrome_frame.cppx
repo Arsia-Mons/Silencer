@@ -131,6 +131,12 @@ constexpr int kGameCreateMapListBorderPad = 1;
 constexpr int kGameCreateMapScrollbarWidth = 8;
 constexpr int kGameCreateTallInputH = 14;
 constexpr int kGameCreateTallButtonH = 21;
+constexpr std::uint8_t kChromeSideTop = 1 << 0;
+constexpr std::uint8_t kChromeSideRight = 1 << 1;
+constexpr std::uint8_t kChromeSideBottom = 1 << 2;
+constexpr std::uint8_t kChromeSideLeft = 1 << 3;
+constexpr std::uint8_t kChromeSideAll =
+	kChromeSideTop | kChromeSideRight | kChromeSideBottom | kChromeSideLeft;
 constexpr const char * kGameCreateSecurityAction = "lobby.game_create.security";
 constexpr const char * kGameCreateSpectatableAction = "lobby.game_create.spectatable";
 constexpr const char * kGameCreateMinLevelAction = "lobby.game_create.min_level";
@@ -263,6 +269,24 @@ inline ::ui::StylePatch chrome_border_patch() {
 		{1.0f, 1.0f, 1.0f, 1.0f},
 		{{216, 0, 0, 255}, {216, 0, 0, 255},
 		 {216, 0, 0, 255}, {216, 0, 0, 255}},
+	});
+}
+
+inline ::ui::StylePatch chrome_border_sides_patch(std::uint8_t sides) {
+	const ::ui::Color chrome = {216, 0, 0, 255};
+	return ::ui::patch().border(::ui::Border{
+		{
+			(sides & kChromeSideTop) ? 1.0f : 0.0f,
+			(sides & kChromeSideRight) ? 1.0f : 0.0f,
+			(sides & kChromeSideBottom) ? 1.0f : 0.0f,
+			(sides & kChromeSideLeft) ? 1.0f : 0.0f,
+		},
+		{
+			(sides & kChromeSideTop) ? chrome : ::ui::Color{},
+			(sides & kChromeSideRight) ? chrome : ::ui::Color{},
+			(sides & kChromeSideBottom) ? chrome : ::ui::Color{},
+			(sides & kChromeSideLeft) ? chrome : ::ui::Color{},
+		},
 	});
 }
 
@@ -769,6 +793,27 @@ struct AbsoluteChromeButtonProps {
 	  accessibility={{.label = props.label}}
 	  layout={absolute_button_layout(props.x, props.y, props.width, props.height)}
 	  style={chrome_button_patch()}
+	/>
+}
+
+struct LobbyPanelChromeProps {
+	const char * key = nullptr;
+	bool show = false;
+	int x = 0;
+	int y = 0;
+	int width = 0;
+	int height = 0;
+	std::uint8_t sides = kChromeSideAll;
+};
+
+::ui::UiElement LobbyPanelChrome(const LobbyPanelChromeProps& props) {
+	if(!props.show || props.width <= 0 || props.height <= 0){
+		return ::ui::empty();
+	}
+	return <Box
+	  key={props.key}
+	  layout={absolute_layout(props.x, props.y, props.width, props.height)}
+	  style={chrome_border_sides_patch(props.sides)}
 	/>
 }
 
@@ -3743,6 +3788,7 @@ using ::ui::components::TextProps;
 			.width = ::ui::Length::percent(100.0f),
 			.height = ::ui::Length::percent(100.0f),
 		}}
+	  style={lobby_chrome_frame_detail::sprite_patch(7, 1)}
 	>
 		<Box
 		  key="title-bar"
@@ -3793,6 +3839,60 @@ using ::ui::components::TextProps;
 			  style={lobby_chrome_frame_detail::chrome_button_patch()}
 			/>
 		</Box>
+		<lobby_chrome_frame_detail.LobbyPanelChrome
+		  key="character-chrome"
+		  show={props.show_body_chrome && props.show_character}
+		  x={props.character_x}
+		  y={props.character_y}
+		  width={props.character_width}
+		  height={props.character_height}
+		  sides={lobby_chrome_frame_detail::kChromeSideAll}
+		/>
+		<lobby_chrome_frame_detail.LobbyPanelChrome
+		  key="right-upper-chrome"
+		  show={props.show_body_chrome}
+		  x={props.right_upper_x}
+		  y={props.right_upper_y}
+		  width={props.right_upper_width}
+		  height={props.right_upper_height}
+		  sides={static_cast<std::uint8_t>(lobby_chrome_frame_detail::kChromeSideTop | lobby_chrome_frame_detail::kChromeSideBottom | lobby_chrome_frame_detail::kChromeSideLeft)}
+		/>
+		<lobby_chrome_frame_detail.LobbyPanelChrome
+		  key="elbow-seam-chrome"
+		  show={props.show_body_chrome}
+		  x={props.elbow_seam_x}
+		  y={props.elbow_seam_y}
+		  width={props.elbow_seam_width}
+		  height={props.elbow_seam_height}
+		  sides={lobby_chrome_frame_detail::kChromeSideRight}
+		/>
+		<lobby_chrome_frame_detail.LobbyPanelChrome
+		  key="chat-chrome"
+		  show={props.show_body_chrome && props.show_chat}
+		  x={props.chat_x}
+		  y={props.chat_y}
+		  width={props.chat_width}
+		  height={props.chat_height}
+		  sides={lobby_chrome_frame_detail::kChromeSideAll}
+		/>
+		<lobby_chrome_frame_detail.LobbyPanelChrome
+		  key="chat-tall-seam-chrome"
+		  show={props.show_body_chrome}
+		  x={props.chat_tall_seam_x}
+		  y={props.chat_tall_seam_y}
+		  width={props.chat_tall_seam_width}
+		  height={props.chat_tall_seam_height}
+		  sides={lobby_chrome_frame_detail::kChromeSideRight}
+		/>
+		<lobby_chrome_frame_detail.LobbyPanelChrome
+		  key="right-tall-chrome"
+		  show={props.show_body_chrome}
+		  x={props.right_tall_x}
+		  y={props.right_tall_y}
+		  width={props.right_tall_width}
+		  height={props.right_tall_height}
+		  sides={static_cast<std::uint8_t>(lobby_chrome_frame_detail::kChromeSideTop | lobby_chrome_frame_detail::kChromeSideBottom | lobby_chrome_frame_detail::kChromeSideRight)}
+		/>
 		<lobby_chrome_frame_detail.CharacterPanelView
 		  key="character-panel"
 		  show={props.show_character}

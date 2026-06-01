@@ -7,7 +7,6 @@
 #include "client/ui/hooks/use_navigation.h"
 #include "client/ui/screens/lobby/lobby_chrome_frame.h"
 #include "lobby_connect_screen.h"
-#include "lobby_main_area.h"
 #include "main_menu_screen.h"
 
 #include "screen_context.h"
@@ -16,9 +15,6 @@
 #include "renderdevice.h"
 #include "renderer.h"
 #include "surface.h"
-
-#include "clay/clay.h"
-#include "clay_ui_compositor.h"
 
 #include <SDL3/SDL.h>
 
@@ -57,11 +53,49 @@ constexpr int kGameTechPeerColPadLeft = 4;
 constexpr int kGameTechPeerColPadRight = 4;
 constexpr int kGameTechPeerColPadTop = 7;
 constexpr int kGameTechPeerRowGap = 5;
+constexpr int kLegacyBodyW = 620;
+constexpr int kLegacyBodyH = 391;
+constexpr int kLegacyTopRowContentW = 378;
+constexpr int kLegacyCharacterW = 218;
+constexpr int kLegacyTallW = 232;
+constexpr int kMinTallW = 170;
+constexpr int kMaxTallW = 320;
+constexpr int kMinChatW = 220;
+constexpr int kMinUpperW = 120;
+constexpr int kMinCharacterW = 140;
+constexpr int kMaxCharacterW = 300;
+constexpr int kMinLowerLeftH = 88;
+constexpr Uint8 kBorderTop = 1 << 0;
+constexpr Uint8 kBorderRight = 1 << 1;
+constexpr Uint8 kBorderBottom = 1 << 2;
+constexpr Uint8 kBorderLeft = 1 << 3;
+constexpr Uint8 kBorderAll =
+	kBorderTop | kBorderRight | kBorderBottom | kBorderLeft;
+
+struct LobbyMainAreaLayout {
+	int regionGap = 10;
+	int characterW = 218;
+	int rightUpperW = 0;
+	int upperH = 121;
+	int rightTallW = 232;
+	int rightTallH = 391;
+	int topRowW = 0;
+	int chatW = 0;
+	int chatH = 260;
+};
 
 int ClampInt(int value, int lo, int hi) {
 	if(value < lo) return lo;
 	if(value > hi) return hi;
 	return value;
+}
+
+int RoundRatio(int actual,
+               int numerator,
+               int denominator) {
+	if(denominator <= 0) return 0;
+	return static_cast<int>(
+		(static_cast<long long>(actual) * numerator + denominator / 2) / denominator);
 }
 
 int ScaleLegacyPx(int base,
@@ -74,12 +108,112 @@ int ScaleLegacyPx(int base,
 	return ClampInt(scaled, minValue, maxValue);
 }
 
+LobbyMainAreaLayout ResolveLobbyMainAreaLayout(int bodyW,
+                                               int bodyH,
+                                               int regionGap) {
+	LobbyMainAreaLayout out;
+	out.regionGap = regionGap;
+	out.upperH = ClampInt(RoundRatio(bodyH, 121, kLegacyBodyH), 84, 156);
+	int maxUpperH = std::max(0, bodyH - regionGap - kMinLowerLeftH);
+	if(maxUpperH > 0 && out.upperH > maxUpperH){
+		out.upperH = maxUpperH;
+	}
+
+	int desiredRightTallW =
+		ClampInt(RoundRatio(bodyW, kLegacyTallW, kLegacyBodyW), kMinTallW, kMaxTallW);
+	const int maxRightTallW = std::max(0, bodyW - kMinChatW);
+	if(desiredRightTallW > maxRightTallW){
+		desiredRightTallW = maxRightTallW;
+	}
+	if(maxRightTallW >= kMinTallW && desiredRightTallW < kMinTallW){
+		desiredRightTallW = kMinTallW;
+	}
+	out.rightTallW = desiredRightTallW;
+	out.rightTallH = std::max(0, bodyH);
+	out.topRowW = std::max(0, bodyW - out.rightTallW);
+	out.chatW = std::max(0, out.topRowW - regionGap);
+	out.chatH = std::max(0, bodyH - out.upperH - regionGap);
+
+	const int availableTopRowW = std::max(0, out.topRowW - regionGap);
+	const int desiredCharacterW = ClampInt(
+		RoundRatio(availableTopRowW, kLegacyCharacterW, kLegacyTopRowContentW),
+		kMinCharacterW,
+		kMaxCharacterW);
+	const int maxCharacterW = std::max(0, availableTopRowW - kMinUpperW);
+	if(maxCharacterW >= kMinCharacterW){
+		out.characterW = ClampInt(desiredCharacterW, kMinCharacterW, maxCharacterW);
+	}else{
+		out.characterW = maxCharacterW;
+	}
+	out.rightUpperW = std::max(0, availableTopRowW - out.characterW);
+	return out;
+}
+
 void AddPanelBorderBlur(RenderDevice * renderdevice, SDL_Rect rect) {
 	if(!renderdevice || rect.w <= 0 || rect.h <= 0) return;
 	renderdevice->AddLobbyPanelBorderBlurRect({ rect.x, rect.y, rect.w, 1 });
 	renderdevice->AddLobbyPanelBorderBlurRect({ rect.x, rect.y + rect.h - 1, rect.w, 1 });
 	renderdevice->AddLobbyPanelBorderBlurRect({ rect.x, rect.y, 1, rect.h });
 	renderdevice->AddLobbyPanelBorderBlurRect({ rect.x + rect.w - 1, rect.y, 1, rect.h });
+}
+
+void AddPanelBorderBlur(RenderDevice * renderdevice,
+                        int x,
+                        int y,
+                        int w,
+                        int h,
+                        Uint8 sides) {
+	if(!renderdevice || w <= 0 || h <= 0) return;
+	if(sides & kBorderTop){
+		renderdevice->AddLobbyPanelBorderBlurRect({ x, y, w, 1 });
+	}
+	if(sides & kBorderBottom){
+		renderdevice->AddLobbyPanelBorderBlurRect({ x, y + h - 1, w, 1 });
+	}
+	if(sides & kBorderLeft){
+		renderdevice->AddLobbyPanelBorderBlurRect({ x, y, 1, h });
+	}
+	if(sides & kBorderRight){
+		renderdevice->AddLobbyPanelBorderBlurRect({ x + w - 1, y, 1, h });
+	}
+}
+
+void QueueLobbyPanelBorderBlurRects(RenderDevice * renderdevice,
+                                    int bodyX,
+                                    int bodyY,
+                                    const LobbyMainAreaLayout & layout) {
+	if(!renderdevice) return;
+	const int topY = bodyY;
+	const int lowerY = bodyY + layout.upperH + layout.regionGap;
+	const int rightX = bodyX + layout.topRowW;
+	const int characterX = bodyX;
+	const int rightUpperX = bodyX + layout.characterW + layout.regionGap;
+	const int seamX = bodyX + layout.topRowW - layout.regionGap;
+
+	AddPanelBorderBlur(renderdevice,
+	                   characterX, topY,
+	                   layout.characterW, layout.upperH,
+	                   kBorderAll);
+	AddPanelBorderBlur(renderdevice,
+	                   rightUpperX, topY,
+	                   layout.rightUpperW, layout.upperH,
+	                   static_cast<Uint8>(kBorderTop | kBorderBottom | kBorderLeft));
+	AddPanelBorderBlur(renderdevice,
+	                   seamX, bodyY + layout.upperH,
+	                   layout.regionGap, layout.regionGap,
+	                   kBorderRight);
+	AddPanelBorderBlur(renderdevice,
+	                   bodyX, lowerY,
+	                   layout.chatW, layout.chatH,
+	                   kBorderAll);
+	AddPanelBorderBlur(renderdevice,
+	                   seamX, lowerY,
+	                   layout.regionGap, layout.chatH,
+	                   kBorderRight);
+	AddPanelBorderBlur(renderdevice,
+	                   rightX, bodyY,
+	                   layout.rightTallW, layout.rightTallH,
+	                   static_cast<Uint8>(kBorderTop | kBorderBottom | kBorderRight));
 }
 
 }  // namespace lobby_screen_detail
@@ -167,8 +301,8 @@ void LobbyScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime, s
 	                              - (int)titleBarH - regionGap);
 	const int bodyX = rootPadX;
 	const int bodyY = rootPadTop + (int)titleBarH + regionGap;
-	const LobbyMainAreaLayout mainLayout =
-		ResolveLobbyMainAreaLayout(bodyW, bodyH, regionGap);
+	const lobby_screen_detail::LobbyMainAreaLayout mainLayout =
+		lobby_screen_detail::ResolveLobbyMainAreaLayout(bodyW, bodyH, regionGap);
 	silencer::client_ui::LobbyModel lobby =
 		silencer::client_ui::use_lobby(
 			silencer::client_ui::MakeLobbyProvider(ctx, this));
@@ -231,6 +365,9 @@ void LobbyScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime, s
 			+ lobby_screen_detail::kGameSelectActionButtonH
 			+ lobby_screen_detail::kGameSelectActionButtonGap;
 	const int rightUpperX = bodyX + mainLayout.characterW + mainLayout.regionGap;
+	const int lowerY = bodyY + mainLayout.upperH + mainLayout.regionGap;
+	const int seamX = bodyX + mainLayout.topRowW - mainLayout.regionGap;
+	const int rightTallX = bodyX + mainLayout.topRowW;
 	const int gameJoinButtonW = std::max(
 		1,
 		mainLayout.rightUpperW
@@ -298,6 +435,23 @@ void LobbyScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime, s
 		.height = titleBarH,
 		.pad_x = titlePadX,
 		.row_gap = titleRowGap,
+		.show_body_chrome = bodyW > 0 && bodyH > 0,
+		.right_upper_x = rightUpperX,
+		.right_upper_y = bodyY,
+		.right_upper_width = mainLayout.rightUpperW,
+		.right_upper_height = mainLayout.upperH,
+		.elbow_seam_x = seamX,
+		.elbow_seam_y = bodyY + mainLayout.upperH,
+		.elbow_seam_width = mainLayout.regionGap,
+		.elbow_seam_height = mainLayout.regionGap,
+		.chat_tall_seam_x = seamX,
+		.chat_tall_seam_y = lowerY,
+		.chat_tall_seam_width = mainLayout.regionGap,
+		.chat_tall_seam_height = mainLayout.chatH,
+		.right_tall_x = rightTallX,
+		.right_tall_y = bodyY,
+		.right_tall_width = mainLayout.rightTallW,
+		.right_tall_height = mainLayout.rightTallH,
 		.show_character = mainLayout.characterW > 0 && mainLayout.upperH > 0,
 		.character = &characterState,
 		.character_x = bodyX,
@@ -327,7 +481,7 @@ void LobbyScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime, s
 		.game_select_action_width = lobby_screen_detail::kGameSelectActionButtonW,
 		.game_select_action_height = lobby_screen_detail::kGameSelectActionButtonH,
 		.show_game_select_tall = gameSelectVisible,
-		.game_select_tall_x = bodyX + mainLayout.topRowW,
+		.game_select_tall_x = rightTallX,
 		.game_select_tall_y = bodyY,
 		.game_select_tall_width = mainLayout.rightTallW,
 		.game_select_tall_height = mainLayout.rightTallH,
@@ -339,7 +493,7 @@ void LobbyScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime, s
 		.game_create_upper_width = mainLayout.rightUpperW,
 		.game_create_upper_height = mainLayout.upperH,
 		.show_game_create_tall = showGameCreateTall,
-		.game_create_tall_x = bodyX + mainLayout.topRowW,
+		.game_create_tall_x = rightTallX,
 		.game_create_tall_y = bodyY,
 		.game_create_tall_width = mainLayout.rightTallW,
 		.game_create_tall_height = mainLayout.rightTallH,
@@ -354,7 +508,7 @@ void LobbyScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime, s
 		.show_game_join_roster = gameJoinActive,
 		.game_join = &gameJoinState,
 		.app_assets = &app.assets,
-		.game_join_roster_x = bodyX + mainLayout.topRowW,
+		.game_join_roster_x = rightTallX,
 		.game_join_roster_y = bodyY,
 		.game_join_roster_width = mainLayout.rightTallW,
 		.game_join_roster_height = mainLayout.rightTallH,
@@ -369,7 +523,7 @@ void LobbyScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime, s
 		.game_tech_peer_width = gameTechPeerW,
 		.game_tech_peer_row_gap = lobby_screen_detail::kGameTechPeerRowGap,
 		.show_game_tech_tall = gameTechActive,
-		.game_tech_tall_x = bodyX + mainLayout.topRowW,
+		.game_tech_tall_x = rightTallX,
 		.game_tech_tall_y = bodyY,
 		.game_tech_tall_width = mainLayout.rightTallW,
 		.game_tech_tall_height = mainLayout.rightTallH,
@@ -392,42 +546,15 @@ void LobbyScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime, s
 		lobby_screen_detail::AddPanelBorderBlur(
 			ctx.renderdevice,
 			SDL_Rect{ rootPadX, rootPadTop, bodyW, (int)titleBarH });
+		lobby_screen_detail::QueueLobbyPanelBorderBlurRects(
+			ctx.renderdevice,
+			bodyX,
+			bodyY,
+			mainLayout);
 	}
 
-	CLAY({ .id = CLAY_ID("LobbyRoot"),
-	       .layout = {
-	           .sizing = { CLAY_SIZING_GROW(0),
-	                       CLAY_SIZING_GROW(0) },
-	           .padding = { static_cast<uint16_t>(rootPadX),
-	                        static_cast<uint16_t>(rootPadX),
-	                        static_cast<uint16_t>(rootPadTop),
-	                        static_cast<uint16_t>(rootPadBottom) },
-	           .childGap = static_cast<uint16_t>(regionGap),
-	           .layoutDirection = CLAY_TOP_TO_BOTTOM,
-	       },
-	       .image = { .imageData = silencer::clay_bridge::PackImageStretch(7, 1) } }) {
-		CLAY({ .id = CLAY_ID("LobbyTitleBarRetainedSlot"),
-		       .layout = {
-		           .sizing = { CLAY_SIZING_GROW(0),
-		                       CLAY_SIZING_FIXED(static_cast<float>(titleBarH)) },
-		       } }) {}
-
-		LobbyMainAreaPanels panels{
-			characterState,
-			chatState,
-			gameSelectState,
-			gameCreateState,
-			gameJoinState,
-			gameTechState,
-			gameCreateActive,
-			gameJoinActive,
-			gameTechActive,
-		};
-		BuildLobbyMainArea(
-			panels, ctx, lobby, bodyX, bodyY, bodyW, bodyH, regionGap, interactions);
-		if(gameCreateActive){
-			BuildGameCreatePreviewOverlay(gameCreateState, ctx);
-		}
+	if(gameCreateActive){
+		BuildGameCreatePreviewOverlay(gameCreateState, ctx);
 	}
 }
 

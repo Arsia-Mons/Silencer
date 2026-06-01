@@ -365,8 +365,8 @@ fail_if_match \
 
 fail_if_match \
   "ctx[.](world|mapDownloader|ambienceMixer)|\\b(World|Resources|MapDownloader|LobbyGame|Peer)[[:space:]*&]+|Config::|Lobby::|#include[[:space:]]*[<\"](world|resources|lobby|lobbygame|map_downloader|ambience_mixer|peer|config)[.]h[>\"]" \
-  "$REPO_ROOT/clients/silencer/src/client/ui/screens/lobby/lobby_main_area.cpp" \
-  "$REPO_ROOT/clients/silencer/src/client/ui/screens/lobby/lobby_main_area.h"
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens/lobby/lobby_chrome_frame.cppx" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens/lobby/lobby_chrome_frame.hx"
 
 fail_if_match \
   "ctx[.](world|mapDownloader|game)|\\b(World|Lobby|LobbyGame|Game|MapDownloader|Config)::|#include[[:space:]]*[<\"](world|lobby|lobbygame|game|config|map_downloader|mapfetch|os)[.]h[>\"]" \
