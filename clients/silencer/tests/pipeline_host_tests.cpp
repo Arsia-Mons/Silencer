@@ -120,7 +120,9 @@ static bool pipeline_host_app_root_reconciles_phase() {
 
   client::ui::SessionPhase phase = client::ui::SessionPhase::MainMenu;
   host.pipeline().set_frame_provider([&phase](::ui::UiElement child) {
-    return client::ui::SessionProvider({.phase = phase},
+    client::ui::Session session = {};
+    session.phase = phase;
+    return client::ui::SessionProvider(client::ui::SessionProviderValue{session},
                                        ::ui::children({child}));
   });
   CHECK(host.pipeline().client_ui().push_screen(

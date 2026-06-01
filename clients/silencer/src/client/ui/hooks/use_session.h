@@ -1,5 +1,8 @@
 #pragma once
 
+#include <cstdint>
+#include <functional>
+
 namespace client::ui {
 
 // The app's top-level mode. A read-only projection of the game's own state
@@ -20,11 +23,25 @@ enum class SessionPhase {
   SinglePlayer,
 };
 
-// SIL-14 carries only `phase` — the slice the AppRoot reconciler needs. SIL-15
-// grows this with `authenticated`/`paused`/`is_live_multiplayer`/
-// `current_game_id` + the named session intents (doc §6).
+// The session model (doc §6): cohesive read state + named intents. `phase` is
+// the read-only projection AppRoot's reconciler consumes; the intents are the
+// high-level transitions the menus drive (they route to the public Game/World
+// command seam — GoToState/LeaveJoinedGame/paused — installed by the
+// composition root, never a screen reaching into Game). They take effect for
+// the UI on the next frame via the phase reconciler.
 struct Session {
   SessionPhase phase = SessionPhase::MainMenu;
+  bool authenticated = false;
+  bool paused = false;
+  bool is_live_multiplayer = false;
+  uint32_t current_game_id = 0;
+
+  std::function<void()> play_online = {};
+  std::function<void()> start_tutorial = {};
+  std::function<void()> open_character_create = {};
+  std::function<void()> leave_match = {};
+  std::function<void()> leave_to_menu = {};
+  std::function<void(bool)> set_paused = {};
 };
 
 Session use_session();

@@ -5,12 +5,13 @@
 
 namespace client::ui {
 
-// Publishes the session phase to the component tree. Mounted feature-global in
-// the FrameProvider chain; the composition root computes `phase` once per tick
-// from the game's state machine and hands it in. The provider holds no game
-// handle — only the resolved projection (doc §5).
+// Publishes the session model to the component tree. Mounted feature-global in
+// the FrameProvider chain; the composition root assembles the `Session`
+// (read projection + intent closures over the public Game seam) once per tick
+// and hands it in. The provider holds no game handle — only the resolved model
+// (doc §5).
 struct SessionProviderValue {
-  SessionPhase phase = SessionPhase::MainMenu;
+  Session session = {};
 };
 
 ::ui::UiElement SessionProvider(const SessionProviderValue &value,

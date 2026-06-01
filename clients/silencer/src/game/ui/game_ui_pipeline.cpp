@@ -2,6 +2,7 @@
 
 #include "client/ui/screens/screen.h"
 #include "game.h"
+#include "lobby.h"
 #include "camera.h"
 #include "detonator.h"
 #include "gasloader.h"
@@ -242,9 +243,23 @@ if(!cppxAppRootPushed){
 // to AppRoot's reconciler. Theme/App/Settings/KeyMap/Updater join as their
 // hooks land.
 cppxHost->pipeline().set_frame_provider([this](::ui::UiElement child){
+// Assemble the session model fresh each frame: read projection + intent
+// closures over the public Game command seam (no friend, no handle leak).
+client::ui::Session session = {};
+session.phase = CurrentSessionPhase();
+session.authenticated = (game.world.lobby.state == Lobby::AUTHENTICATED);
+session.paused = game.paused;
+session.is_live_multiplayer = game.IsLiveMultiplayer();
+session.current_game_id = game.currentlobbygameid;
+session.play_online = [this]{ game.GoToState(GameState::LOBBYCONNECT); };
+session.start_tutorial = [this]{ game.GoToState(GameState::SINGLEPLAYERGAME); };
+session.open_character_create = [this]{ game.GoToState(GameState::CREATECHARACTER); };
+session.leave_match = [this]{ game.LeaveJoinedGame(); };
+session.leave_to_menu = [this]{ game.GoToState(GameState::MAINMENU); };
+session.set_paused = [this](bool p){ game.paused = p; };
+
 ::ui::UiElement tree = client::ui::SessionProvider(
-client::ui::SessionProviderValue{this->CurrentSessionPhase()},
-::ui::children({child}));
+client::ui::SessionProviderValue{session}, ::ui::children({child}));
 tree = client::ui::AppProvider(
 client::ui::AppProviderValue{[this]{ game.quitRequested = true; }},
 ::ui::children({tree}));

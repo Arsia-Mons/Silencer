@@ -26,9 +26,7 @@ Session use_session() {
     react_report_error("client/ui: missing SessionProvider\n");
     return {};
   }
-  return {
-      .phase = value->phase,
-  };
+  return value->session;
 }
 
 } // namespace client::ui
