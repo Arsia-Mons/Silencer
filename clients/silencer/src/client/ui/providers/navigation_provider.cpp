@@ -1,8 +1,8 @@
 #include "client/ui/providers/navigation_provider.h"
 
 #include "client/ui/ClientUi.h"
+#include "client/ui/deferred_ui_mutation.h"
 #include "client/ui/hooks/use_navigation.h"
-#include "client/ui/screens/screen_context.h"
 #include "ui/runtime/react.h"
 
 #include <utility>
@@ -64,23 +64,25 @@ Navigation use_navigation() {
 		.pop_top = [client_ui]() {
 			client_ui->QueuePopTop();
 		},
-		.go_to_state = [client_ui](Uint8 state) {
-			client_ui->QueueDeferredMutation([state](ScreenContext& ctx) {
-				ctx.GoToState(state);
-			});
-		},
-		.go_back = [client_ui]() {
-			client_ui->QueueDeferredMutation([](ScreenContext& ctx) {
-				ctx.GoBack();
-			});
-		},
-		.request_quit = [client_ui]() {
-			client_ui->QueueDeferredMutation([](ScreenContext& ctx) {
-				ctx.RequestQuit();
-			});
-		},
 	};
 }
+
+namespace internal {
+
+bool DeferredUiMutationSink::submit(DeferredUiMutation mutation) const {
+	if(!client_ui || !mutation) return false;
+	return client_ui->QueueDeferredMutation(std::move(mutation));
+}
+
+DeferredUiMutationSink use_deferred_ui_mutations() {
+	NavigationProviderValue * value = use_navigation_provider_value("use_deferred_ui_mutations");
+	if(!value) return {};
+	return DeferredUiMutationSink{
+		.client_ui = value->client_ui,
+	};
+}
+
+}  // namespace internal
 
 }  // namespace client_ui
 }  // namespace silencer

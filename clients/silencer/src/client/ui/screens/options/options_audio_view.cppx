@@ -1,6 +1,6 @@
 #include "client/ui/screens/options/options_audio_view.h"
 
-#include "client/ui/hooks/use_navigation.h"
+#include "client/ui/hooks/use_game_navigation.h"
 #include "game_state.h"
 #include "ui/components/box.h"
 #include "ui/components/button.h"
@@ -102,7 +102,7 @@ std::function<void(bool)> toggle_music_callback(const OptionsAudioContextValue& 
 
 std::function<void(const ::ui::ActivationEvent&)> save_callback(
 	const OptionsAudioContextValue& audio,
-	Navigation navigation) {
+	GameNavigation navigation) {
 	return [audio, navigation](const ::ui::ActivationEvent&) {
 		if(audio.save) audio.save();
 		if(navigation.go_to_state) navigation.go_to_state(GameState::OPTIONS);
@@ -111,7 +111,7 @@ std::function<void(const ::ui::ActivationEvent&)> save_callback(
 
 std::function<void(const ::ui::ActivationEvent&)> cancel_callback(
 	const OptionsAudioContextValue& audio,
-	Navigation navigation) {
+	GameNavigation navigation) {
 	return [audio, navigation](const ::ui::ActivationEvent&) {
 		if(audio.cancel) audio.cancel();
 		if(navigation.go_to_state) navigation.go_to_state(GameState::OPTIONS);
@@ -141,7 +141,7 @@ struct AudioSaveButtonProps {
 
 ::ui::UiElement AudioSaveButton(const AudioSaveButtonProps& props) {
 	const OptionsAudioContextValue& audio = UseOptionsAudio();
-	Navigation navigation = use_navigation();
+	GameNavigation navigation = use_game_navigation();
 	return <Button
 	  key={props.key}
 	  id="options_audio.save"
@@ -157,7 +157,7 @@ struct AudioCancelButtonProps {
 
 ::ui::UiElement AudioCancelButton(const AudioCancelButtonProps& props) {
 	const OptionsAudioContextValue& audio = UseOptionsAudio();
-	Navigation navigation = use_navigation();
+	GameNavigation navigation = use_game_navigation();
 	return <Button
 	  key={props.key}
 	  id="options_audio.cancel"

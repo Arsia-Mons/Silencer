@@ -1,6 +1,6 @@
 #include "client/ui/screens/update/update_view.h"
 
-#include "client/ui/hooks/use_navigation.h"
+#include "client/ui/hooks/use_game_navigation.h"
 #include "game_state.h"
 #include "ui/components/box.h"
 #include "ui/components/button.h"
@@ -141,7 +141,7 @@ bool has_primary_action(const UpdateState& state) {
 
 ::ui::UiElement UpdateFrame(const UpdateFrameProps& props) {
 	const UpdateContextValue& update = UseUpdate();
-	Navigation navigation = use_navigation();
+	GameNavigation navigation = use_game_navigation();
 	const UpdateState& state = update.state;
 	const UpdateActions& actions = update.actions;
 	const bool primary_visible = has_primary_action(state);

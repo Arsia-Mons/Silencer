@@ -1,6 +1,6 @@
 #include "client/ui/screens/main_menu/main_menu_view.h"
 
-#include "client/ui/hooks/use_navigation.h"
+#include "client/ui/hooks/use_game_navigation.h"
 #include "game_state.h"
 #include "ui/components/box.h"
 #include "ui/components/button.h"
@@ -95,7 +95,7 @@ namespace {
 }
 
 std::function<void(const ::ui::ActivationEvent&)> go_to_state_callback(
-	Navigation navigation,
+	GameNavigation navigation,
 	Uint8 state) {
 	return [navigation, state](const ::ui::ActivationEvent&) {
 		if(navigation.go_to_state) navigation.go_to_state(state);
@@ -103,7 +103,7 @@ std::function<void(const ::ui::ActivationEvent&)> go_to_state_callback(
 }
 
 std::function<void(const ::ui::ActivationEvent&)> request_quit_callback(
-	Navigation navigation) {
+	GameNavigation navigation) {
 	return [navigation](const ::ui::ActivationEvent&) {
 		if(navigation.request_quit) navigation.request_quit();
 	};
@@ -118,7 +118,7 @@ struct MenuNavigationButtonProps {
 };
 
 ::ui::UiElement MenuNavigationButton(const MenuNavigationButtonProps& props) {
-	Navigation navigation = use_navigation();
+	GameNavigation navigation = use_game_navigation();
 	return <Button
 	  key={props.key}
 	  id={props.id}
@@ -134,7 +134,7 @@ struct ExitButtonProps {
 };
 
 ::ui::UiElement ExitButton(const ExitButtonProps& props) {
-	Navigation navigation = use_navigation();
+	GameNavigation navigation = use_game_navigation();
 	return <Button
 	  key={props.key}
 	  id="main_menu.exit"

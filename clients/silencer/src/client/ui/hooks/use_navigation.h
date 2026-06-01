@@ -2,8 +2,6 @@
 
 #include "client/ui/screens/screen.h"
 
-#include <SDL3/SDL_stdinc.h>
-
 #include <functional>
 #include <memory>
 
@@ -18,9 +16,6 @@ struct Navigation {
 	std::function<void(std::unique_ptr<Screen>)> reset_to = {};
 	std::function<void()> pop_current = {};
 	std::function<void()> pop_top = {};
-	std::function<void(Uint8)> go_to_state = {};
-	std::function<void()> go_back = {};
-	std::function<void()> request_quit = {};
 };
 
 Navigation use_navigation();
