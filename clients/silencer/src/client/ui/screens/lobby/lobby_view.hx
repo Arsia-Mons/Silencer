@@ -31,7 +31,6 @@ struct LobbyContextValue {
 	};
 
 	struct Actions {
-		std::function<void()> go_back = {};
 		std::function<void()> change_agent = {};
 		std::function<void(const std::string&)> set_chat_text = {};
 		std::function<void()> send_chat = {};
@@ -65,6 +64,12 @@ struct LobbyContextValue {
 
 const LobbyContextValue& UseLobby();
 
+struct LobbyNavigation {
+	std::function<void()> go_back = {};
+};
+
+const LobbyNavigation& UseLobbyNavigation();
+
 struct LobbyFrameProps {
 	const char * key = nullptr;
 };
@@ -74,6 +79,7 @@ struct LobbyFrameProps {
 struct LobbyScreenViewProps {
 	const char * key = nullptr;
 	const LobbyContextValue * value = nullptr;
+	const LobbyNavigation * navigation = nullptr;
 };
 
 ::ui::UiElement LobbyScreenView(const LobbyScreenViewProps& props);

@@ -162,6 +162,10 @@ fail_if_match \
   "$REPO_ROOT/clients/silencer/src/client/ui/modals"
 
 fail_if_match \
+  "actions[.]go_back" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens/lobby"
+
+fail_if_match \
   '::ui::(component|host|box|text|provider|fragment)[[:space:]]*\(' \
   "$REPO_ROOT/clients/silencer/src/client/ui" \
   --glob '*.cppx'

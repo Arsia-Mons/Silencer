@@ -107,9 +107,6 @@ bool LobbyScreen::BuildElement(ScreenContext & ctx, ::ui::UiElement * out)
 			.game_tech_active = gameTechActive,
 		},
 		.actions = {
-			.go_back = [this]() {
-				goBackClicked = true;
-			},
 			.change_agent = [this]() {
 				if(!characterState.agentSelectionLocked){
 					characterState.newCharacterRequested = true;
@@ -189,10 +186,16 @@ bool LobbyScreen::BuildElement(ScreenContext & ctx, ::ui::UiElement * out)
 			},
 		},
 	};
+	silencer::client_ui::lobby::LobbyNavigation navigation{
+		.go_back = [this]() {
+			goBackClicked = true;
+		},
+	};
 	*out = silencer::client_ui::lobby::LobbyScreenView(
 		silencer::client_ui::lobby::LobbyScreenViewProps{
 			.key = "lobby",
 			.value = ::ui::copy_value(context),
+			.navigation = ::ui::copy_value(navigation),
 		});
 	return true;
 }

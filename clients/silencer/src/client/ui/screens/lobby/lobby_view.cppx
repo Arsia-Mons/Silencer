@@ -394,6 +394,7 @@ struct TitleBarProps {
 ::ui::UiElement TitleBar(const TitleBarProps& props) {
 	(void)props;
 	const LobbyContextValue& lobby = UseLobby();
+	const LobbyNavigation& navigation = UseLobbyNavigation();
 	const char * meta = lobby.state.map_name && lobby.state.map_name[0] != '\0'
 		? use_text_storage("%s    %s", lobby.state.version, lobby.state.map_name)
 		: safe_text(lobby.state.version);
@@ -409,7 +410,7 @@ struct TitleBarProps {
 		  key="back"
 		  id="lobby.go_back"
 		  label="Go Back"
-		  onActivate={action_callback(lobby.actions.go_back)}
+		  onActivate={action_callback(navigation.go_back)}
 		  layout={small_button_layout(94.0f)}
 		/>
 	</Box>
