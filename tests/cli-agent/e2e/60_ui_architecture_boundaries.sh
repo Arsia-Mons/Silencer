@@ -462,7 +462,7 @@ fail_if_match \
   "$REPO_ROOT/clients/silencer/src/client/ui/screens/lobby/game_create_panel.h"
 
 fail_if_match \
-  "\\b(GameCreatePanelRegisterUiFields|UpdateExistingTextInput)\\b" \
+  "\\b(GameCreatePanelRegisterUiFields|UpdateExistingTextInput|GameCreatePanelHandleUiIntent)\\b" \
   "$REPO_ROOT/clients/silencer/src/client/ui/screens/lobby/game_create_panel.cpp" \
   "$REPO_ROOT/clients/silencer/src/client/ui/screens/lobby/game_create_panel.h" \
   "$REPO_ROOT/clients/silencer/src/client/ui/screens/lobby/lobby_screen.cpp"

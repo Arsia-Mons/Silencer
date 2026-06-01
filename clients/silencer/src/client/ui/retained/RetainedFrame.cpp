@@ -134,10 +134,13 @@ bool RetainedFrame::HandleUiIntent(
 	const silencer::ui::UiAction& action) const {
 	if(action.kind != silencer::ui::UiActionKind::Activate &&
 	   action.kind != silencer::ui::UiActionKind::Select &&
-	   action.kind != silencer::ui::UiActionKind::SetText){
+	   action.kind != silencer::ui::UiActionKind::SetText &&
+	   action.kind != silencer::ui::UiActionKind::Scroll){
 		return false;
 	}
-	if(action.id.empty()) return false;
+	if(action.kind != silencer::ui::UiActionKind::Scroll && action.id.empty()){
+		return false;
+	}
 	return InvokeActionForNode(tree_.root_id(), action);
 }
 
@@ -149,7 +152,14 @@ bool RetainedFrame::InvokeActionForNode(
 
 	const bool matches =
 		node.control_id && action.id == node.control_id;
-	if(matches && !node.interaction.disabled){
+	if(action.kind == silencer::ui::UiActionKind::Scroll){
+		if(action.id.empty() || matches){
+			if(tree_.invoke_scroll(
+				   node.id, action.amount, action.value.c_str())){
+				return true;
+			}
+		}
+	}else if(matches && !node.interaction.disabled){
 		if(action.kind == silencer::ui::UiActionKind::SetText){
 			if(tree_.invoke_text_change(node.id, action.value.c_str())){
 				return true;

@@ -2159,7 +2159,19 @@ struct GameCreateUpperPanelProps {
 	std::function<void()> on_cycle_security = {};
 	std::function<void()> on_toggle_spectatable = {};
 	std::function<void(GameCreatePanelTextField, const char *)> on_set_text = {};
+	std::function<void(int)> on_scroll = {};
 };
+
+::ui::HostCallbacks game_create_options_scroll_callbacks(
+	const std::function<void(int)>& on_scroll) {
+	::ui::HostCallbacks callbacks = {};
+	if(on_scroll){
+		callbacks.on_scroll = [on_scroll](const ::ui::ScrollEvent& event) {
+			on_scroll(event.amount);
+		};
+	}
+	return callbacks;
+}
 
 ::ui::UiElement GameCreateUpperPanel(const GameCreateUpperPanelProps& props) {
 	if(!props.show || !props.state || props.width <= 0 || props.height <= 0){
@@ -2237,6 +2249,7 @@ struct GameCreateUpperPanelProps {
 					}}
 				  text={::ui::HostTextProps{.value = "scroll"}}
 				  accessibility={{.label = kGameCreateOptionsScrollLabel}}
+				  callbacks={game_create_options_scroll_callbacks(props.on_scroll)}
 				>
 					<GameCreateOptionRows
 					  key="rows"
@@ -4507,6 +4520,7 @@ using ::ui::components::TextProps;
 		  onCycleSecurity={props.game_create_cycle_security}
 		  onToggleSpectatable={props.game_create_toggle_spectatable}
 		  onSetText={props.game_create_set_text}
+		  onScroll={props.game_create_scroll_options}
 		/>
 		<lobby_chrome_frame_detail.GameCreateTallPanel
 		  key="game-create-tall"

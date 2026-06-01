@@ -540,6 +540,10 @@ void LobbyScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime, s
 			silencer::client_ui::lobby::GameCreatePanelSetText(
 				gameCreateState, field, value);
 		},
+		.game_create_scroll_options = [this](int amount) {
+			silencer::client_ui::lobby::GameCreatePanelScrollOptions(
+				gameCreateState, amount);
+		},
 		.show_game_create_tall = showGameCreateTall,
 		.game_create_tall_x = rightTallX,
 		.game_create_tall_y = bodyY,
@@ -788,9 +792,6 @@ bool LobbyScreen::HandleUiIntent(ScreenContext & ctx, const silencer::ui::UiActi
 	}
 	if(silencer::client_ui::lobby::ChatPanelHandleUiIntent(chatState, lobby.chat, action)){
 		return true;
-	}
-	if(gameCreateActive){
-		return silencer::client_ui::lobby::GameCreatePanelHandleUiIntent(gameCreateState, action);
 	}
 	if(gameJoinActive){
 		return false;

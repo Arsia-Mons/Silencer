@@ -15,9 +15,6 @@
 namespace silencer::client_ui::lobby {
 
 namespace game_create_panel_detail {
-
-constexpr const char * kActionOptionsScroll = kGameCreateOptionsScrollId;
-
 void CopyUiText(char * dst, int dstLen, const char * value)
 {
 	if(!dst || dstLen <= 0) return;
@@ -128,6 +125,10 @@ void GameCreatePanelSetText(GameCreatePanelState & state,
 	}
 }
 
+void GameCreatePanelScrollOptions(GameCreatePanelState & state, int amount) {
+	state.optionsScrollDelta += amount;
+}
+
 void GameCreatePanelTick(GameCreatePanelState & state,
                          ScreenContext & ctx,
                          LobbyModel & lobby) {
@@ -138,18 +139,6 @@ void GameCreatePanelTick(GameCreatePanelState & state,
 			lobby.modal.show_message(pump.message.c_str());
 		}
 	}
-}
-
-bool GameCreatePanelHandleUiIntent(GameCreatePanelState & state,
-                                   const silencer::ui::UiAction & action) {
-	if(action.kind == silencer::ui::UiActionKind::Scroll){
-		if(action.id.empty() || action.id == game_create_panel_detail::kActionOptionsScroll){
-			state.optionsScrollDelta += action.amount;
-			return true;
-		}
-		return false;
-	}
-	return false;
 }
 
 }  // namespace silencer::client_ui::lobby

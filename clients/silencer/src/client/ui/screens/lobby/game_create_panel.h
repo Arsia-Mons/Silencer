@@ -9,7 +9,6 @@
 // lives behind LobbyProvider/use_lobby. Primitives stay screen-agnostic.
 
 #include "shared.h"
-#include "runtime/UiActionQueue.h"
 
 #include <string>
 #include <vector>
@@ -126,8 +125,6 @@ void GameCreatePanelInit(GameCreatePanelState & state, ScreenContext & ctx);
 void GameCreatePanelTick(GameCreatePanelState & state,
                          ScreenContext & ctx,
                          LobbyModel & lobby);
-bool GameCreatePanelHandleUiIntent(GameCreatePanelState & state,
-                                   const silencer::ui::UiAction & action);
 void GameCreatePanelCycleSecurity(GameCreatePanelState & state);
 void GameCreatePanelToggleSpectatable(GameCreatePanelState & state,
                                       const LobbyModel & lobby);
@@ -139,6 +136,7 @@ void GameCreatePanelSubmit(GameCreatePanelState & state,
 void GameCreatePanelSetText(GameCreatePanelState & state,
                             GameCreatePanelTextField field,
                             const char * value);
+void GameCreatePanelScrollOptions(GameCreatePanelState & state, int amount);
 
 GameCreateOptionsLayout ResolveGameCreateOptionsLayout(Uint16 panelWidth,
                                                        Uint16 panelHeight);

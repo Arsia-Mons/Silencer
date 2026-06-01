@@ -92,6 +92,7 @@ struct LobbyChromeFrameProps {
 	std::function<void()> game_create_cycle_security = {};
 	std::function<void()> game_create_toggle_spectatable = {};
 	std::function<void(GameCreatePanelTextField, const char *)> game_create_set_text = {};
+	std::function<void(int)> game_create_scroll_options = {};
 	bool show_game_create_tall = false;
 	int game_create_tall_x = 0;
 	int game_create_tall_y = 0;

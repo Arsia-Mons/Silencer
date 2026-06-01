@@ -66,6 +66,7 @@ struct HostCallbacks {
   std::function<void(const KeyEvent &)> on_key = {};
   std::function<void(const TextInputEvent &)> on_text_input = {};
   std::function<void(const TextChangeEvent &)> on_text_change = {};
+  std::function<void(const ScrollEvent &)> on_scroll = {};
   std::function<void(const TextEditingEvent &)> on_text_editing = {};
 };
 
