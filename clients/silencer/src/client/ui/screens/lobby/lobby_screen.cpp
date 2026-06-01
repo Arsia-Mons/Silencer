@@ -534,6 +534,12 @@ void LobbyScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime, s
 			silencer::client_ui::lobby::GameCreatePanelToggleSpectatable(
 				gameCreateState, lobby);
 		},
+		.game_create_set_text = [this](
+			silencer::client_ui::lobby::GameCreatePanelTextField field,
+			const char * value) {
+			silencer::client_ui::lobby::GameCreatePanelSetText(
+				gameCreateState, field, value);
+		},
 		.show_game_create_tall = showGameCreateTall,
 		.game_create_tall_x = rightTallX,
 		.game_create_tall_y = bodyY,

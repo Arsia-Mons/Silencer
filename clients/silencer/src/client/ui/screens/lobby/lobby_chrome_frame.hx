@@ -1,5 +1,6 @@
 #pragma once
 
+#include "client/ui/screens/lobby/game_create_panel.h"
 #include "ui/runtime/element.h"
 
 #include <cstdint>
@@ -90,6 +91,7 @@ struct LobbyChromeFrameProps {
 	int game_create_upper_height = 0;
 	std::function<void()> game_create_cycle_security = {};
 	std::function<void()> game_create_toggle_spectatable = {};
+	std::function<void(GameCreatePanelTextField, const char *)> game_create_set_text = {};
 	bool show_game_create_tall = false;
 	int game_create_tall_x = 0;
 	int game_create_tall_y = 0;

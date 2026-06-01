@@ -106,6 +106,15 @@ struct GameCreatePreviewOverlayLayout {
 	int bitmapHeight = 0;
 };
 
+enum class GameCreatePanelTextField {
+	MinLevel,
+	MaxLevel,
+	MaxPlayers,
+	MaxTeams,
+	Name,
+	Password,
+};
+
 // Hydrate state from LobbyCreateModel defaults and rebuild the map list from
 // the provider. Mirrors the legacy GameCreatePanel::Build's one-time setup.
 void GameCreatePanelInit(GameCreatePanelState & state, ScreenContext & ctx);
@@ -127,6 +136,9 @@ void GameCreatePanelSelectMap(GameCreatePanelState & state,
                               int index);
 void GameCreatePanelSubmit(GameCreatePanelState & state,
                            const LobbyModel & lobby);
+void GameCreatePanelSetText(GameCreatePanelState & state,
+                            GameCreatePanelTextField field,
+                            const char * value);
 
 GameCreateOptionsLayout ResolveGameCreateOptionsLayout(Uint16 panelWidth,
                                                        Uint16 panelHeight);

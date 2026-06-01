@@ -348,6 +348,11 @@ struct TextInputEvent {
   const char *text = "";
 };
 
+struct TextChangeEvent {
+  NodeId target = 0;
+  const char *value = "";
+};
+
 struct TextEditingEvent {
   NodeId target = 0;
   const char *text = "";
@@ -372,6 +377,7 @@ struct NodeMetadata {
   std::function<void(const ActivationEvent &)> on_activate = {};
   std::function<void(const KeyEvent &)> on_key = {};
   std::function<void(const TextInputEvent &)> on_text_input = {};
+  std::function<void(const TextChangeEvent &)> on_text_change = {};
   std::function<void(const TextEditingEvent &)> on_text_editing = {};
 };
 
@@ -439,6 +445,7 @@ public:
   bool invoke_activate(NodeId id) const;
   bool invoke_key(NodeId id, const ::ui::UiKeyInputEvent &event) const;
   bool invoke_text_input(NodeId id, const ::ui::UiTextInputEvent &event) const;
+  bool invoke_text_change(NodeId id, const char *value) const;
   bool invoke_text_editing(NodeId id,
                            const ::ui::UiTextEditingEvent &event) const;
 
@@ -495,6 +502,7 @@ private:
     std::function<void(const ActivationEvent &)> on_activate = {};
     std::function<void(const KeyEvent &)> on_key = {};
     std::function<void(const TextInputEvent &)> on_text_input = {};
+    std::function<void(const TextChangeEvent &)> on_text_change = {};
     std::function<void(const TextEditingEvent &)> on_text_editing = {};
     LayoutStyle style = {};
     Rect layout = {};

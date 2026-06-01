@@ -803,6 +803,24 @@ inline bool game_create_option_is_text_input(int row) {
 	return row >= 1 && row <= 4;
 }
 
+inline GameCreatePanelTextField game_create_option_text_field(int row) {
+	switch(row){
+		case 2: return GameCreatePanelTextField::MaxLevel;
+		case 3: return GameCreatePanelTextField::MaxPlayers;
+		case 4: return GameCreatePanelTextField::MaxTeams;
+		default: return GameCreatePanelTextField::MinLevel;
+	}
+}
+
+inline std::function<void(const ::ui::TextChangeEvent&)>
+game_create_text_change_callback(
+	GameCreatePanelTextField field,
+	std::function<void(GameCreatePanelTextField, const char *)> on_change) {
+	return [field, on_change](const ::ui::TextChangeEvent& event) {
+		if(on_change) on_change(field, event.value);
+	};
+}
+
 inline ::ui::VisualStyle game_create_inline_control_visual(bool selected) {
 	::ui::VisualStyle visual{};
 	visual.background = selected
@@ -1900,6 +1918,7 @@ struct GameCreateOptionValueProps {
 	int width = 0;
 	std::function<void()> on_cycle_security = {};
 	std::function<void()> on_toggle_spectatable = {};
+	std::function<void(GameCreatePanelTextField, const char *)> on_set_text = {};
 };
 
 ::ui::UiElement GameCreateOptionValue(const GameCreateOptionValueProps& props) {
@@ -1920,6 +1939,7 @@ struct GameCreateOptionValueProps {
 				.selection_start = caret,
 				.selection_end = caret,
 			}}
+		  onTextChange={game_create_text_change_callback(game_create_option_text_field(props.row), props.on_set_text)}
 		  maxLength={2}
 		  numbersOnly={true}
 		  layout={absolute_layout(props.x, 0, input_width, kGameCreateFormRowH)}
@@ -1959,6 +1979,7 @@ struct GameCreateOptionRowProps {
 	int width = 0;
 	std::function<void()> on_cycle_security = {};
 	std::function<void()> on_toggle_spectatable = {};
+	std::function<void(GameCreatePanelTextField, const char *)> on_set_text = {};
 };
 
 ::ui::UiElement GameCreateOptionRow(const GameCreateOptionRowProps& props) {
@@ -1997,6 +2018,7 @@ struct GameCreateOptionRowProps {
 		  width={value_width}
 		  onCycleSecurity={props.on_cycle_security}
 		  onToggleSpectatable={props.on_toggle_spectatable}
+		  onSetText={props.on_set_text}
 		/>
 	</Box>
 }
@@ -2009,6 +2031,7 @@ struct GameCreateOptionRowsProps {
 	int height = 0;
 	std::function<void()> on_cycle_security = {};
 	std::function<void()> on_toggle_spectatable = {};
+	std::function<void(GameCreatePanelTextField, const char *)> on_set_text = {};
 };
 
 ::ui::UiElement GameCreateOptionRows(const GameCreateOptionRowsProps& props) {
@@ -2021,6 +2044,7 @@ struct GameCreateOptionRowsProps {
 		  width={props.width}
 		  onCycleSecurity={props.on_cycle_security}
 		  onToggleSpectatable={props.on_toggle_spectatable}
+		  onSetText={props.on_set_text}
 		/>
 		<GameCreateOptionRow
 		  key={kGameCreateOptionRowKeys[1]}
@@ -2030,6 +2054,7 @@ struct GameCreateOptionRowsProps {
 		  width={props.width}
 		  onCycleSecurity={props.on_cycle_security}
 		  onToggleSpectatable={props.on_toggle_spectatable}
+		  onSetText={props.on_set_text}
 		/>
 		<GameCreateOptionRow
 		  key={kGameCreateOptionRowKeys[2]}
@@ -2039,6 +2064,7 @@ struct GameCreateOptionRowsProps {
 		  width={props.width}
 		  onCycleSecurity={props.on_cycle_security}
 		  onToggleSpectatable={props.on_toggle_spectatable}
+		  onSetText={props.on_set_text}
 		/>
 		<GameCreateOptionRow
 		  key={kGameCreateOptionRowKeys[3]}
@@ -2048,6 +2074,7 @@ struct GameCreateOptionRowsProps {
 		  width={props.width}
 		  onCycleSecurity={props.on_cycle_security}
 		  onToggleSpectatable={props.on_toggle_spectatable}
+		  onSetText={props.on_set_text}
 		/>
 		<GameCreateOptionRow
 		  key={kGameCreateOptionRowKeys[4]}
@@ -2057,6 +2084,7 @@ struct GameCreateOptionRowsProps {
 		  width={props.width}
 		  onCycleSecurity={props.on_cycle_security}
 		  onToggleSpectatable={props.on_toggle_spectatable}
+		  onSetText={props.on_set_text}
 		/>
 		<GameCreateOptionRow
 		  key={kGameCreateOptionRowKeys[5]}
@@ -2066,6 +2094,7 @@ struct GameCreateOptionRowsProps {
 		  width={props.width}
 		  onCycleSecurity={props.on_cycle_security}
 		  onToggleSpectatable={props.on_toggle_spectatable}
+		  onSetText={props.on_set_text}
 		/>
 	</Box>
 }
@@ -2129,6 +2158,7 @@ struct GameCreateUpperPanelProps {
 	int height = 0;
 	std::function<void()> on_cycle_security = {};
 	std::function<void()> on_toggle_spectatable = {};
+	std::function<void(GameCreatePanelTextField, const char *)> on_set_text = {};
 };
 
 ::ui::UiElement GameCreateUpperPanel(const GameCreateUpperPanelProps& props) {
@@ -2216,6 +2246,7 @@ struct GameCreateUpperPanelProps {
 					  height={layout.viewportHeight}
 					  onCycleSecurity={props.on_cycle_security}
 					  onToggleSpectatable={props.on_toggle_spectatable}
+					  onSetText={props.on_set_text}
 					/>
 				</component_detail.Host>
 				<GameCreateOptionsScrollbar
@@ -2576,6 +2607,7 @@ struct GameCreateTallPanelProps {
 	int height = 0;
 	std::function<void(int)> on_select_map = {};
 	std::function<void()> on_create = {};
+	std::function<void(GameCreatePanelTextField, const char *)> on_set_text = {};
 };
 
 ::ui::UiElement GameCreateTallPanel(const GameCreateTallPanelProps& props) {
@@ -2656,6 +2688,7 @@ struct GameCreateTallPanelProps {
 				.selection_start = static_cast<int>(std::strlen(props.state->name)),
 				.selection_end = static_cast<int>(std::strlen(props.state->name)),
 			}}
+		  onTextChange={game_create_text_change_callback(GameCreatePanelTextField::Name, props.on_set_text)}
 		  maxLength={35}
 		  layout={absolute_layout(kGameCreateTallPanelPad, name_input_y, layout.inputWidth, kGameCreateTallInputH)}
 		  style={game_create_text_input_patch()}
@@ -2676,6 +2709,7 @@ struct GameCreateTallPanelProps {
 				.selection_start = static_cast<int>(std::strlen(props.state->password)),
 				.selection_end = static_cast<int>(std::strlen(props.state->password)),
 			}}
+		  onTextChange={game_create_text_change_callback(GameCreatePanelTextField::Password, props.on_set_text)}
 		  maxLength={20}
 		  password={true}
 		  layout={absolute_layout(kGameCreateTallPanelPad, password_input_y, layout.inputWidth, kGameCreateTallInputH)}
@@ -4472,6 +4506,7 @@ using ::ui::components::TextProps;
 		  height={props.game_create_upper_height}
 		  onCycleSecurity={props.game_create_cycle_security}
 		  onToggleSpectatable={props.game_create_toggle_spectatable}
+		  onSetText={props.game_create_set_text}
 		/>
 		<lobby_chrome_frame_detail.GameCreateTallPanel
 		  key="game-create-tall"
@@ -4483,6 +4518,7 @@ using ::ui::components::TextProps;
 		  height={props.game_create_tall_height}
 		  onSelectMap={props.game_create_select_map}
 		  onCreate={props.game_create_submit}
+		  onSetText={props.game_create_set_text}
 		/>
 		<lobby_chrome_frame_detail.AbsoluteChromeButton
 		  key="game-join-choose-tech"

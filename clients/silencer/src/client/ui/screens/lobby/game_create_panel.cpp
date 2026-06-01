@@ -16,20 +16,15 @@ namespace silencer::client_ui::lobby {
 
 namespace game_create_panel_detail {
 
-constexpr const char * kActionMinLevel = "lobby.game_create.min_level";
-constexpr const char * kActionMaxLevel = "lobby.game_create.max_level";
-constexpr const char * kActionMaxPlayers = "lobby.game_create.max_players";
-constexpr const char * kActionMaxTeams = "lobby.game_create.max_teams";
-constexpr const char * kActionName = "lobby.game_create.name";
-constexpr const char * kActionPassword = "lobby.game_create.password";
 constexpr const char * kActionOptionsScroll = kGameCreateOptionsScrollId;
 
-void CopyUiText(char * dst, int dstLen, const std::string & value)
+void CopyUiText(char * dst, int dstLen, const char * value)
 {
 	if(!dst || dstLen <= 0) return;
-	int n = static_cast<int>(value.size());
+	const char * src = value ? value : "";
+	int n = static_cast<int>(std::strlen(src));
 	if(n > dstLen - 1) n = dstLen - 1;
-	std::memcpy(dst, value.data(), n);
+	std::memcpy(dst, src, n);
 	dst[n] = '\0';
 }
 
@@ -102,6 +97,37 @@ void GameCreatePanelSubmit(GameCreatePanelState & state,
 	silencer::client_ui::use_navigation().push(std::move(progress));
 }
 
+void GameCreatePanelSetText(GameCreatePanelState & state,
+                            GameCreatePanelTextField field,
+                            const char * value) {
+	switch(field){
+		case GameCreatePanelTextField::MinLevel:
+			game_create_panel_detail::CopyUiText(
+				state.minLevel, static_cast<int>(sizeof(state.minLevel)), value);
+			break;
+		case GameCreatePanelTextField::MaxLevel:
+			game_create_panel_detail::CopyUiText(
+				state.maxLevel, static_cast<int>(sizeof(state.maxLevel)), value);
+			break;
+		case GameCreatePanelTextField::MaxPlayers:
+			game_create_panel_detail::CopyUiText(
+				state.maxPlayers, static_cast<int>(sizeof(state.maxPlayers)), value);
+			break;
+		case GameCreatePanelTextField::MaxTeams:
+			game_create_panel_detail::CopyUiText(
+				state.maxTeams, static_cast<int>(sizeof(state.maxTeams)), value);
+			break;
+		case GameCreatePanelTextField::Name:
+			game_create_panel_detail::CopyUiText(
+				state.name, static_cast<int>(sizeof(state.name)), value);
+			break;
+		case GameCreatePanelTextField::Password:
+			game_create_panel_detail::CopyUiText(
+				state.password, static_cast<int>(sizeof(state.password)), value);
+			break;
+	}
+}
+
 void GameCreatePanelTick(GameCreatePanelState & state,
                          ScreenContext & ctx,
                          LobbyModel & lobby) {
@@ -119,33 +145,6 @@ bool GameCreatePanelHandleUiIntent(GameCreatePanelState & state,
 	if(action.kind == silencer::ui::UiActionKind::Scroll){
 		if(action.id.empty() || action.id == game_create_panel_detail::kActionOptionsScroll){
 			state.optionsScrollDelta += action.amount;
-			return true;
-		}
-		return false;
-	}
-	if(action.kind == silencer::ui::UiActionKind::SetText){
-		if(action.id == game_create_panel_detail::kActionMinLevel){
-			game_create_panel_detail::CopyUiText(state.minLevel, static_cast<int>(sizeof(state.minLevel)), action.value);
-			return true;
-		}
-		if(action.id == game_create_panel_detail::kActionMaxLevel){
-			game_create_panel_detail::CopyUiText(state.maxLevel, static_cast<int>(sizeof(state.maxLevel)), action.value);
-			return true;
-		}
-		if(action.id == game_create_panel_detail::kActionMaxPlayers){
-			game_create_panel_detail::CopyUiText(state.maxPlayers, static_cast<int>(sizeof(state.maxPlayers)), action.value);
-			return true;
-		}
-		if(action.id == game_create_panel_detail::kActionMaxTeams){
-			game_create_panel_detail::CopyUiText(state.maxTeams, static_cast<int>(sizeof(state.maxTeams)), action.value);
-			return true;
-		}
-		if(action.id == game_create_panel_detail::kActionName){
-			game_create_panel_detail::CopyUiText(state.name, static_cast<int>(sizeof(state.name)), action.value);
-			return true;
-		}
-		if(action.id == game_create_panel_detail::kActionPassword){
-			game_create_panel_detail::CopyUiText(state.password, static_cast<int>(sizeof(state.password)), action.value);
 			return true;
 		}
 		return false;

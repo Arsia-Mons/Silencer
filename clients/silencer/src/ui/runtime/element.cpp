@@ -122,6 +122,7 @@ private:
         .on_activate = props.callbacks.on_activate,
         .on_key = props.callbacks.on_key,
         .on_text_input = props.callbacks.on_text_input,
+        .on_text_change = props.callbacks.on_text_change,
         .on_text_editing = props.callbacks.on_text_editing,
     };
     bool metadata_ok = tree_.set_metadata(id, metadata);
