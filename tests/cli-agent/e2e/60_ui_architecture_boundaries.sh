@@ -157,18 +157,9 @@ fail_if_match \
   "$REPO_ROOT/clients/silencer/src/client/ui/screens/update/update_view.cppx"
 
 fail_if_match \
-  '::ui::component[[:space:]]*\(' \
-  "$REPO_ROOT/clients/silencer/src/client/ui/screens/update/update_view.cppx" \
-  "$REPO_ROOT/clients/silencer/src/client/ui/screens/options/options_audio_view.cppx" \
-  "$REPO_ROOT/clients/silencer/src/client/ui/screens/options/options_display_view.cppx" \
-  "$REPO_ROOT/clients/silencer/src/client/ui/screens/options/options_controls_view.cppx" \
-  "$REPO_ROOT/clients/silencer/src/client/ui/modals/message_modal_view.cppx" \
-  "$REPO_ROOT/clients/silencer/src/client/ui/modals/password_modal_view.cppx" \
-  "$REPO_ROOT/clients/silencer/src/client/ui/screens/lobby_connect/lobby_connect_view.cppx" \
-  "$REPO_ROOT/clients/silencer/src/client/ui/screens/mission_summary/mission_summary_view.cppx" \
-  "$REPO_ROOT/clients/silencer/src/client/ui/screens/character_create/character_create_view.cppx" \
-  "$REPO_ROOT/clients/silencer/src/client/ui/screens/lobby/lobby_view.cppx" \
-  "$REPO_ROOT/clients/silencer/src/client/ui/hud/ingame_hud_view.cppx"
+  '::ui::(component|host|box|text|provider|fragment)[[:space:]]*\(' \
+  "$REPO_ROOT/clients/silencer/src/client/ui" \
+  --glob '*.cppx'
 
 fail_if_match \
   "Handle(TextInput|KeyPress|ScancodeDown|MousePress|MouseMove)|DispatchKeyPress|DispatchPreparedUiNavActions|UiNavActionToAscii|DispatchChatKey|HandleInGameMenuKey" \
