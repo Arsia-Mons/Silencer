@@ -200,6 +200,7 @@ static nlohmann::json MatchUiControlResultToJson(
 		return r;
 	}
 	r["chat_active"] = result.chatActive;
+	r["chat_draft"] = result.chatDraft;
 	r["buy_active"] = result.buyActive;
 	r["tech_active"] = result.techActive;
 	r["show_chat_ticks"] = result.showChatTicks;

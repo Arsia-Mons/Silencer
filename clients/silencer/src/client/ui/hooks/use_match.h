@@ -27,6 +27,7 @@ struct MatchUiControlResult {
 	bool available = false;
 	std::string error;
 	bool chatActive = false;
+	std::string chatDraft;
 	bool buyActive = false;
 	bool techActive = false;
 	int showChatTicks = 0;

@@ -9,6 +9,7 @@
 #include <cstdio>
 #include <cstdint>
 #include <cstring>
+#include <functional>
 #include <string>
 #include <vector>
 
@@ -742,7 +743,18 @@ struct ChatCaretProps {
 struct ChatInputProps {
 	const char * key = nullptr;
 	const ChatOverlayView * chat = nullptr;
+	std::function<void(const char *)> set_draft = {};
 };
+
+inline ::ui::HostCallbacks chat_input_callbacks(
+		std::function<void(const char *)> set_draft) {
+	::ui::HostCallbacks callbacks;
+	callbacks.on_text_change =
+		[set_draft](const ::ui::TextChangeEvent& event) {
+			if(set_draft) set_draft(event.value);
+		};
+	return callbacks;
+}
 
 ::ui::UiElement ChatInput(const ChatInputProps& props) {
 	if(!props.chat || !props.chat->inputActive) return ::ui::empty();
@@ -755,6 +767,7 @@ struct ChatInputProps {
 	const int caret_x =
 		std::min(std::max(0, input_width - 1),
 		         static_cast<int>(props.chat->inputText.size()) * kChatTextAdvance);
+	const int caret = static_cast<int>(props.chat->inputText.size());
 	return <Box
 	  key={props.key}
 	  id="InGameChatInputRow"
@@ -774,8 +787,21 @@ struct ChatInputProps {
 		  idOffset={kChatInputUid}
 		  style={absolute_layout(prefix_width, 0, input_width, kChatTextLineHeight)}
 		  text={::ui::HostTextProps{.value = props.chat->inputText.c_str()}}
-		  interaction={::ui::NodeInteraction{.focusable = true}}
+		  textEdit={::ui::TextEditMetadata{
+				.caret = caret,
+				.selection_start = caret,
+				.selection_end = caret,
+				.input_value = props.chat->inputText.c_str(),
+				.has_input_value = true,
+				.max_length = std::max(0, props.chat->inputCapacity - 1),
+			}}
+		  interaction={::ui::NodeInteraction{
+				.focusable = true,
+				.initial_focus = true,
+				.cancel_on_escape = true,
+			}}
 		  accessibility={{.role = ::ui::SemanticRole::TextBox, .label = "In-game chat"}}
+		  callbacks={chat_input_callbacks(props.set_draft)}
 		>
 			<Text
 			  key="value"
@@ -814,6 +840,7 @@ struct ChatOverlayProps {
 	const char * key = nullptr;
 	bool show = false;
 	ChatOverlayView chat = {};
+	std::function<void(const char *)> set_draft = {};
 };
 
 ::ui::UiElement ChatOverlay(const ChatOverlayProps& props) {
@@ -838,7 +865,7 @@ struct ChatOverlayProps {
 		<ChatLine key="line-2" chat={&props.chat} index={2} />
 		<ChatLine key="line-3" chat={&props.chat} index={3} />
 		<ChatLine key="line-4" chat={&props.chat} index={4} />
-		<ChatInput key="input" chat={&props.chat} />
+		<ChatInput key="input" chat={&props.chat} setDraft={props.set_draft} />
 	</Box>
 }
 
@@ -1761,7 +1788,12 @@ using ::ui::components::BoxProps;
 		  surfaceWidth={props.width}
 		  surfaceHeight={props.height}
 		/>
-		<ingame_overlay_frame_detail.ChatOverlay key="chat" show={props.show_chat} chat={props.chat} />
+		<ingame_overlay_frame_detail.ChatOverlay
+		  key="chat"
+		  show={props.show_chat}
+		  chat={props.chat}
+		  setDraft={props.set_chat_draft}
+		/>
 		<ingame_overlay_frame_detail.PlayerList
 		  key="player-list"
 		  show={props.show_player_list}

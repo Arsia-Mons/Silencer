@@ -308,6 +308,7 @@ struct NodeInteraction {
   bool checked = false;
   bool modal = false;
   bool initial_focus = false;
+  bool cancel_on_escape = false;
 };
 
 struct TextEditMetadata {

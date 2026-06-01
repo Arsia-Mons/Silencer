@@ -234,12 +234,24 @@ void RetainedFrame::RegisterAutomation(
 		widget.selected = node.interaction.checked;
 		widget.value = inputValue;
 		widget.inactive = node.interaction.disabled;
+		widget.cancelOnEscape = node.interaction.cancel_on_escape;
 		if(widget.kind == silencer::ui::UiInteractableKind::TextInput){
 			widget.maxLength = node.text_edit.max_length;
 			widget.numbersOnly = node.text_edit.numbers_only;
 			widget.isPassword = node.text_edit.password;
 		}
+		const std::string focusId = widget.id;
+		const int focusUid = widget.uid;
+		const bool wantsInitialFocus =
+			node.interaction.initial_focus && !interactions.HasFocus();
 		interactions.RegisterInteractable(std::move(widget));
+		if(wantsInitialFocus){
+			if(!focusId.empty()){
+				interactions.FocusInteractableById(focusId);
+			}else if(focusUid >= 0){
+				interactions.FocusTextInputByUid(focusUid);
+			}
+		}
 	}
 
 	for(int i = 0; i < tree_.child_count(id); ++i){

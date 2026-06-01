@@ -3,6 +3,8 @@
 #include "client/ui/views/HudView.h"
 #include "ui/runtime/element.h"
 
+#include <functional>
+
 namespace silencer {
 namespace client_ui {
 
@@ -28,6 +30,7 @@ struct InGameOverlayFrameProps {
 	BuyTechOverlayView buy_tech = {};
 	bool show_chat = false;
 	ChatOverlayView chat = {};
+	std::function<void(const char *)> set_chat_draft = {};
 	bool show_readouts = false;
 	HudReadoutsView readouts = {};
 	bool show_status = false;

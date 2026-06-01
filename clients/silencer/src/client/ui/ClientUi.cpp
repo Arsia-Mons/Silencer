@@ -70,10 +70,7 @@ bool DispatchMatchAction(const MatchModel& match,
                          silencer::ui::UiInteractionRegistry& interactions) {
 	if(match.chat.active() &&
 	   (action.id == "ingame.chat" || action.id == "ingame.chat.channel")){
-		if(action.kind == silencer::ui::UiActionKind::SetText &&
-		   action.id == "ingame.chat"){
-			match.chat.set_draft(action.value);
-		}else if(action.kind == silencer::ui::UiActionKind::SubmitText){
+		if(action.kind == silencer::ui::UiActionKind::SubmitText){
 			match.chat.submit(action.value);
 		}else if(action.kind == silencer::ui::UiActionKind::Cancel){
 			match.chat.cancel();
@@ -106,9 +103,13 @@ bool DispatchMatchAction(const MatchModel& match,
 }
 
 void DispatchMatchActions(const MatchModel& match,
+                          const RetainedFrame * overlayFrame,
                           const std::vector<silencer::ui::UiAction>& actions,
                           silencer::ui::UiInteractionRegistry& interactions) {
 	for(const silencer::ui::UiAction& action : actions){
+		if(overlayFrame && overlayFrame->HandleUiIntent(action)){
+			continue;
+		}
 		(void)DispatchMatchAction(match, action, interactions);
 	}
 }
@@ -121,25 +122,6 @@ void FocusSelectedBuyTechRow(const HudView& view,
 		interactions.FocusInteractableById(
 			"ingame.buytech.row." + std::to_string(row.index));
 		return;
-	}
-}
-
-void UpdateChatTextInput(const HudView& view,
-                         silencer::ui::UiInteractionRegistry& interactions) {
-	if(!view.chat.visible || !view.chat.inputActive) return;
-	silencer::ui::UiInteractable input;
-	input.id = "ingame.chat";
-	input.labelText = "In-game chat";
-	input.kind = silencer::ui::UiInteractableKind::TextInput;
-	input.uid = 9000;
-	input.value = view.chat.inputText;
-	input.maxLength = view.chat.inputCapacity > 0
-		? view.chat.inputCapacity - 1
-		: 0;
-	input.cancelOnEscape = true;
-	interactions.RegisterInteractable(std::move(input));
-	if(!interactions.HasFocus()){
-		interactions.FocusInteractableById("ingame.chat");
 	}
 }
 
@@ -206,7 +188,11 @@ std::vector<silencer::ui::UiAction> ClientUi::DispatchInput(
 		if(ctx.world.map.loaded){
 			MatchModel match = use_match(MatchProviderValue{&ctx.world},
 			                             ctx.world.peers.localpeerid);
-			clientui_detail::DispatchMatchActions(match, actions, interactions_);
+			clientui_detail::DispatchMatchActions(
+				match,
+				inGameOverlayFrameActive_ ? &inGameOverlayFrame_ : nullptr,
+				actions,
+				interactions_);
 			FlushNavigationRequests(ctx);
 			return std::vector<silencer::ui::UiAction>();
 		}
@@ -467,6 +453,9 @@ void ClientUi::BuildVisibleScreens(ScreenContext& ctx, Surface& dst, float frame
 				.buy_tech = hudView.buyTech,
 				.show_chat = showChat,
 				.chat = hudView.chat,
+				.set_chat_draft = [match](const char * value) {
+					match.chat.set_draft(value ? value : "");
+				},
 				.show_status = showHudStatus,
 				.status = hudView.status,
 				.show_team_strip = showTeamStrip,
@@ -487,9 +476,6 @@ void ClientUi::BuildVisibleScreens(ScreenContext& ctx, Surface& dst, float frame
 			                          interactions_);
 			if(showBuyTech){
 				clientui_detail::FocusSelectedBuyTechRow(hudView, interactions_);
-			}
-			if(showChat){
-				clientui_detail::UpdateChatTextInput(hudView, interactions_);
 			}
 		}
 	}

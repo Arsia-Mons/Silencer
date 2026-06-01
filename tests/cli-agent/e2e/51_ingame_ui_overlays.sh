@@ -111,6 +111,17 @@ check_mode() {
 }
 
 check_mode chat
+cli --port "$PORT" set_text --label "In-game chat" --text "retained draft" >/dev/null
+cli --port "$PORT" wait_frames --n 1 >/dev/null
+cli --port "$PORT" ingame_ui_mode --mode status | bun -e '
+const text = await new Response(Bun.stdin.stream()).text();
+const response = JSON.parse(text);
+const result = response.result ?? response;
+if (result.chat_draft !== "retained draft") {
+  console.error(`chat draft did not route through retained callback: ${JSON.stringify(result)}`);
+  process.exit(1);
+}
+'
 check_mode buy
 cli --port "$PORT" key --key down >/dev/null
 cli --port "$PORT" ingame_ui_mode --mode status | bun -e '

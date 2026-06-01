@@ -214,6 +214,7 @@ MatchUiControlResult MatchControlSurfaceModel::configure(MatchUiControlMode mode
 		player->CollectBuyMenuItems(*world, true, techItems);
 		result.available = true;
 		result.chatActive = player->chatActive;
+		result.chatDraft = player->chatText;
 		result.buyActive = player->isbuying;
 		result.techActive = player->techstationactive;
 		result.showChatTicks = world->messaging.showchat_i;
