@@ -15,6 +15,7 @@
 #include "render/cppx_ui/pipeline_host.h"
 #include "client/ui/app_shell/app_root.h"
 #include "client/ui/hooks/use_session.h"
+#include "client/ui/providers/server_provider.h"
 #include "client/ui/providers/session_provider.h"
 #include "session_phase.h"
 #include "ui/runtime/react.h"
@@ -235,12 +236,18 @@ cppxHost = std::make_unique<silencer::cppx_ui::PipelineHost>();
 if(!cppxHost->ensure(rw, rh, SILENCER_CPPX_FONT_DIR)) return;
 
 if(!cppxAppRootPushed){
-// The frame provider publishes the live phase to AppRoot each frame; AppRoot
-// renders the owning phase's view (declarative Tier-2 reconciler).
+// The global FrameProvider chain (doc §5), outermost-first. ServerProvider
+// carries the live Game handle; SessionProvider publishes the projected phase
+// to AppRoot's reconciler. Theme/App/Settings/KeyMap/Updater join as their
+// hooks land.
 cppxHost->pipeline().set_frame_provider([this](::ui::UiElement child){
-return client::ui::SessionProvider(
+::ui::UiElement tree = client::ui::SessionProvider(
 client::ui::SessionProviderValue{this->CurrentSessionPhase()},
 ::ui::children({child}));
+tree = silencer::game_ui::ServerProvider(
+silencer::game_ui::ServerProviderValue{&game},
+::ui::children({tree}));
+return tree;
 });
 cppxHost->pipeline().client_ui().push_screen(
 std::make_unique<client::ui::AppRoot>());

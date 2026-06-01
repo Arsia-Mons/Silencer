@@ -380,6 +380,7 @@ set(_cppx_app_shell_sources
 	src/client/ui/app_shell/app_root.cpp
 	src/client/ui/app_shell/navigation/screen_stack.cpp
 	src/client/ui/providers/navigation_provider.cpp
+	src/client/ui/providers/server_provider.cpp
 	src/client/ui/providers/session_provider.cpp)
 
 add_executable(client_ui_tests
