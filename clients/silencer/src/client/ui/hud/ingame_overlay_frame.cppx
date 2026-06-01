@@ -773,6 +773,54 @@ struct ChatOverlayProps {
 	</Box>
 }
 
+struct SystemCameraFrameProps {
+	const char * key = nullptr;
+	const SystemCameraFrameView * frames = nullptr;
+	int count = 0;
+	int index = 0;
+};
+
+::ui::UiElement SystemCameraFrame(const SystemCameraFrameProps& props) {
+	if(!props.frames || props.index < 0 || props.index >= props.count ||
+	   props.index >= 2){
+		return ::ui::empty();
+	}
+	const SystemCameraFrameView& frame = props.frames[props.index];
+	if(!frame.visible || frame.w <= 0 || frame.h <= 0){
+		return ::ui::empty();
+	}
+	return <Box
+	  key={props.key}
+	  id="HudSystemCameraFrame"
+	  idOffset={props.index}
+	  layout={absolute_layout(frame.x, frame.y, frame.w, frame.h)}
+	  style={image_patch(frame.spriteBank, frame.spriteIndex)}
+	/>
+}
+
+struct SystemCameraFramesProps {
+	const char * key = nullptr;
+	bool show = false;
+	const SystemCameraFrameView * frames = nullptr;
+	int count = 0;
+	int surface_width = 0;
+	int surface_height = 0;
+};
+
+::ui::UiElement SystemCameraFrames(const SystemCameraFramesProps& props) {
+	if(!props.show || !props.frames || props.count <= 0){
+		return ::ui::empty();
+	}
+	return <Box
+	  key={props.key}
+	  id="HudSystemCameraFramesRoot"
+	  layout={layer_layout(props.surface_width, props.surface_height)}
+	>
+		<SystemCameraFrame key="camera-0" frames={props.frames} count={props.count} index={0} />
+		<SystemCameraFrame key="camera-1" frames={props.frames} count={props.count} index={1} />
+	</Box>
+}
+
 struct HudReadoutTextProps {
 	const char * key = nullptr;
 	const char * id = nullptr;
@@ -1239,6 +1287,14 @@ using ::ui::components::BoxProps;
 	  id="InGameOverlayRoot"
 	  layout={ingame_overlay_frame_detail::root_layout(props.width, props.height)}
 	>
+		<ingame_overlay_frame_detail.SystemCameraFrames
+		  key="system-camera-frames"
+		  show={props.show_system_camera_frames}
+		  frames={props.system_camera_frames}
+		  count={props.system_camera_frame_count}
+		  surfaceWidth={props.width}
+		  surfaceHeight={props.height}
+		/>
 		<ingame_overlay_frame_detail.HudReadouts
 		  key="readouts"
 		  show={props.show_readouts}

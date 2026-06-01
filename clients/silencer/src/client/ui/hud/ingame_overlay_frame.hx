@@ -29,6 +29,9 @@ struct InGameOverlayFrameProps {
 	ChatOverlayView chat = {};
 	bool show_readouts = false;
 	HudReadoutsView readouts = {};
+	bool show_system_camera_frames = false;
+	const SystemCameraFrameView * system_camera_frames = nullptr;
+	int system_camera_frame_count = 0;
 };
 
 ::ui::UiElement InGameOverlayFrame(const InGameOverlayFrameProps& props);

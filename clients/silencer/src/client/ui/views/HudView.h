@@ -179,6 +179,16 @@ struct SystemCameraView {
 	Sint16 offsetY = 0;
 };
 
+struct SystemCameraFrameView {
+	bool   visible = false;
+	int    x = 0;
+	int    y = 0;
+	int    w = 0;
+	int    h = 0;
+	Uint8  spriteBank = 0;
+	Uint16 spriteIndex = 0;
+};
+
 struct InGameMessageView {
 	Uint8 message_i = 0;
 	Uint8 messagetype = 0;
@@ -218,9 +228,9 @@ struct HudView {
 	int                      showChatTicks = 0;
 	ChatOverlayView          chat;
 
-	// System camera insets (HUD draws frames around them; Game draws the
-	// world content via the renderer separately).
+	// System camera insets. Game draws world content; retained HUD draws chrome.
 	SystemCameraView systemCamera[2];
+	SystemCameraFrameView systemCameraFrames[2];
 
 	// Decorative globals.
 	bool highlightSecrets = false;

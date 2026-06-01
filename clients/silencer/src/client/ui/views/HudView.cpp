@@ -440,6 +440,30 @@ void PopulateReadouts(HudView& out, const PlayerHudView& player) {
 	if(player.tracetime > 0) readouts.traceTime = player.tracetime;
 }
 
+void PopulateSystemCameraFrame(HudView& out,
+                               const ::Resources& resources,
+                               int slot,
+                               Uint8 spriteBank,
+                               Uint16 spriteIndex,
+                               Uint8 offsetBank,
+                               int logicalY) {
+	if(slot < 0 || slot >= 2) return;
+	if(!out.systemCamera[slot].active) return;
+
+	const int w = SpriteWidth(resources, spriteBank, spriteIndex);
+	const int h = SpriteHeight(resources, spriteBank, spriteIndex);
+	if(w <= 0 || h <= 0) return;
+
+	SystemCameraFrameView& frame = out.systemCameraFrames[slot];
+	frame.visible = true;
+	frame.x = -SpriteOffsetX(resources, spriteBank, spriteIndex);
+	frame.y = -SpriteOffsetY(resources, offsetBank, spriteIndex) + logicalY;
+	frame.w = w;
+	frame.h = h;
+	frame.spriteBank = spriteBank;
+	frame.spriteIndex = spriteIndex;
+}
+
 }  // namespace hudview_detail
 
 HudView BuildHudView(::World& world) {
@@ -464,6 +488,8 @@ HudView BuildHudView(::World& world) {
 		view.systemCamera[slot].offsetX = world.GetSystemCameraX(slot);
 		view.systemCamera[slot].offsetY = world.GetSystemCameraY(slot);
 	}
+	hudview_detail::PopulateSystemCameraFrame(view, world.resources, 0, 95, 2, 92, 381);
+	hudview_detail::PopulateSystemCameraFrame(view, world.resources, 1, 95, 11, 92, 318);
 
 	// Messages
 	view.message.message_i = world.GetMessageProgress();
