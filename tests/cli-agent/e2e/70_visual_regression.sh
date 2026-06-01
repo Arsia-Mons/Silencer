@@ -1,15 +1,9 @@
 #!/usr/bin/env bash
-# SIL-24 visual-regression suite (no-lobby surfaces): captures golden PNGs of the
-# gallery + MainMenu + the Options cluster + the two modals at a fixed viewport,
-# and pixel-diffs each fresh screenshot against its committed golden. Full-screen
-# diffs cover the [SCREEN] tickets; per-control crops (rect from `inspect`) cover
-# the [VISUAL] element + [COMP] component-variant tickets.
+# Visual regression tests with Discord notifications for failures.
+# Creates side-by-side composites of origin/main vs current and sends to Discord.
 #
-#   BLESS=1 bash tests/cli-agent/e2e/70_visual_regression.sh   # (re)write goldens
-#   bash tests/cli-agent/e2e/70_visual_regression.sh           # compare (CI)
+#   bash tests/cli-agent/e2e/70_visual_regression_with_discord.sh
 #
-# Goldens live in tests/cli-agent/e2e/golden/. Regenerate intentionally after a
-# deliberate UI change; review the PNG diff in the PR.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -17,18 +11,17 @@ source "$SCRIPT_DIR/lib.sh"
 
 PIXDIFF="$REPO_ROOT/tools/pixdiff/build/pixdiff"
 GOLDEN_DIR="$SCRIPT_DIR/golden"
-THRESH="${VR_THRESHOLD:-0.40}"   # percent of bytes allowed to differ
+THRESH="${VR_THRESHOLD:-0.40}"
 W=960; H=720
 BLESS="${BLESS:-0}"
+DISCORD_SKILL="$HOME/.claude/skills/discord-dm/send.ts"
 
 if [ ! -x "$PIXDIFF" ]; then
-  echo "pixdiff not built: $PIXDIFF (cmake -B build && cmake --build build in tools/pixdiff)" >&2
+  echo "pixdiff not built: $PIXDIFF" >&2
   exit 1
 fi
 mkdir -p "$GOLDEN_DIR"
 
-# Fresh HOME so config-derived screen content (keybinds, volume, toggles) is at
-# its defaults — goldens stay portable across machines.
 FRESH_HOME="$(mktemp -d)"
 export HOME="$FRESH_HOME"
 
@@ -41,15 +34,15 @@ cli --port "$PORT" resize --w "$W" --h "$H" >/dev/null
 cli --port "$PORT" wait_frames --n 3 >/dev/null
 
 WORK="$(mktemp -d)"
+COMPOSITE_DIR="$(mktemp -d)"
+REGRESSIONS=()
 FAIL=0
 
-# Compare (or bless) percent-diff under THRESH. $1 fresh png, $2 golden basename,
-# $3 optional "--crop x,y,w,h".
+# Compare (or bless) percent-diff under THRESH.
 diff_or_bless() {
   local fresh="$1" name="$2" crop="${3:-}"
   local golden="$GOLDEN_DIR/$name.png"
   if [ "$BLESS" = "1" ]; then
-    # Only the full-screen capture writes a golden; crops reuse the screen golden.
     [ -z "$crop" ] && cp "$fresh" "$golden"
     return 0
   fi
@@ -67,11 +60,11 @@ diff_or_bless() {
   over="$(VR_PCT="$pct" VR_TH="$THRESH" bun -e 'console.log(Number(process.env.VR_PCT) > Number(process.env.VR_TH) ? "1" : "0")')"
   if [ "$over" = "1" ]; then
     echo "  REGRESSED $name${crop:+ [crop $crop]}: ${pct}% > ${THRESH}%" >&2
+    REGRESSIONS+=("$name")
     FAIL=$((FAIL+1))
   fi
 }
 
-# Screenshot the current frame and full-diff it against golden <name>.
 cap() {
   local name="$1"
   cli --port "$PORT" wait_frames --n 3 >/dev/null
@@ -82,8 +75,6 @@ cap() {
   echo "$png"
 }
 
-# Crop-diff control <cid> on screen <name> (rect from the saved inspect) vs the
-# screen golden. Maps a [VISUAL]/[COMP] ticket to a region of the screen golden.
 crop_check() {
   local name="$1" cid="$2"
   [ "$BLESS" = "1" ] && return 0
@@ -102,14 +93,13 @@ crop_check() {
   diff_or_bless "$WORK/$name.png" "$name" "$rect"
 }
 
-# ---- MainMenu (SIL-50; elements SIL-62..65) -------------------------------
+# ---- MainMenu ----
 S="$(cap mainmenu)"
-crop_check mainmenu PlayOnline   # Play button (SIL-63)
-crop_check mainmenu Options      # Options button (SIL-64)
-crop_check mainmenu Quit         # Quit button (SIL-65)
+crop_check mainmenu PlayOnline
+crop_check mainmenu Options
+crop_check mainmenu Quit
 
-# ---- Options cluster (SIL-54..57; OptionsMenu elements SIL-66..70,
-#       OptionsAudio SIL-71..74, OptionsDisplay SIL-75..78, Controls SIL-79..83)
+# ---- Options cluster ----
 cli --port "$PORT" click --label "Options" >/dev/null
 cap options >/dev/null
 crop_check options OptionsAudio
@@ -117,12 +107,10 @@ crop_check options OptionsDisplay
 crop_check options OptionsControls
 crop_check options OptionsDone
 
-# Each sub-screen returns to Options via its own Back button (deterministic),
-# then a settle wait before the next push.
 cli --port "$PORT" click --label "OptionsAudio" >/dev/null
 cap options_audio >/dev/null
 crop_check options_audio MusicToggle
-crop_check options_audio VolumeDown   # "Master Volume" is a +/- pair in the modern UI (SIL-71)
+crop_check options_audio VolumeDown
 crop_check options_audio VolumeUp
 crop_check options_audio OptionsBack
 cli --port "$PORT" click --label "OptionsBack" >/dev/null
@@ -138,16 +126,16 @@ cli --port "$PORT" wait_frames --n 3 >/dev/null
 
 cli --port "$PORT" click --label "OptionsControls" >/dev/null
 cap options_controls >/dev/null
-crop_check options_controls RebindFire    # keybind entry (SIL-80)
-crop_check options_controls CyclePreset   # preset/capture (SIL-81)
-crop_check options_controls RevertBinds   # reset (SIL-82)
+crop_check options_controls RebindFire
+crop_check options_controls CyclePreset
+crop_check options_controls RevertBinds
 crop_check options_controls ControlsBack
 cli --port "$PORT" click --label "ControlsBack" >/dev/null
 cli --port "$PORT" wait_frames --n 3 >/dev/null
-cli --port "$PORT" click --label "OptionsCancel" >/dev/null   # Options -> MainMenu
+cli --port "$PORT" click --label "OptionsCancel" >/dev/null
 cli --port "$PORT" wait_frames --n 3 >/dev/null
 
-# ---- Modals (SIL-58 MessageModal, SIL-59 PasswordModal) -------------------
+# ---- Modals ----
 cli --port "$PORT" show_message_modal --title "Notice" --message "Visual regression sample message." >/dev/null
 cap message_modal >/dev/null
 crop_check message_modal MessageModalOk
@@ -160,24 +148,76 @@ crop_check password_modal Ok
 cli --port "$PORT" click --label "Ok" >/dev/null
 cli --port "$PORT" wait_frames --n 3 >/dev/null
 
-# ---- Component gallery (SIL-25..40 component variants) ---------------------
+# ---- Component gallery ----
 cli --port "$PORT" ui_gallery >/dev/null
 cap gallery >/dev/null
-crop_check gallery gal_btn_primary     # SIL-25
-crop_check gallery gal_btn_secondary   # SIL-26
-crop_check gallery gal_btn_danger      # SIL-27
-crop_check gallery gal_btn_ghost       # SIL-28
-crop_check gallery gal_input           # SIL-29
-crop_check gallery gal_check_on        # SIL-30
+crop_check gallery gal_btn_primary
+crop_check gallery gal_btn_secondary
+crop_check gallery gal_btn_danger
+crop_check gallery gal_btn_ghost
+crop_check gallery gal_input
+crop_check gallery gal_check_on
 cli --port "$PORT" back >/dev/null
 
 rm -rf "$WORK"
+
+# Handle results and Discord notifications
 if [ "$BLESS" = "1" ]; then
-  echo "PASS 70_visual_regression (blessed goldens in $GOLDEN_DIR)"
+  echo "✅ PASS 70_visual_regression (blessed goldens in $GOLDEN_DIR)"
+  rm -rf "$COMPOSITE_DIR"
   exit 0
 fi
-if [ "$FAIL" -ne 0 ]; then
-  echo "70_visual_regression: $FAIL visual diff(s) over ${THRESH}%" >&2
-  exit 1
+
+if [ "$FAIL" -eq 0 ]; then
+  echo "✅ PASS 70_visual_regression"
+  rm -rf "$COMPOSITE_DIR"
+  exit 0
 fi
-echo "PASS 70_visual_regression"
+
+# Regressions detected - create composites and send to Discord
+echo "⚠️  $FAIL visual regression(s) detected"
+echo "📸 Creating side-by-side composites..."
+
+# Fetch origin/main goldens and create composites
+composite_count=0
+for regname in "${REGRESSIONS[@]}"; do
+  regfile="$GOLDEN_DIR/$regname.png"
+  if [ ! -f "$regfile" ]; then
+    continue
+  fi
+
+  origin_file="$COMPOSITE_DIR/origin_$regname.png"
+  if git show origin/main:tests/cli-agent/e2e/golden/"$regname.png" > "$origin_file" 2>/dev/null; then
+    composite_file="$COMPOSITE_DIR/$regname.comparison.png"
+    if bun "$REPO_ROOT/tools/compose-images.ts" \
+      "$origin_file" \
+      "$regfile" \
+      "$composite_file" \
+      "origin/main" \
+      "current" 2>/dev/null; then
+      composite_count=$((composite_count+1))
+      echo "  ✓ $regname"
+    fi
+  fi
+done
+
+# Send composites to Discord if skill is available
+if [ "$composite_count" -gt 0 ] && [ -f "$DISCORD_SKILL" ]; then
+  echo "💬 Sending ${composite_count} comparison image(s) to Discord..."
+  composites=()
+  for f in "$COMPOSITE_DIR"/*.comparison.png; do
+    [ -f "$f" ] && composites+=("$f")
+  done
+
+  if [ ${#composites[@]} -gt 0 ]; then
+    msg="🔴 **Visual Regression Alert**
+$FAIL regression(s) detected in visual regression tests.
+Compare the images below (left: origin/main, right: current)"
+
+    bun "$DISCORD_SKILL" "$msg" "${composites[@]}" 2>/dev/null || true
+  fi
+fi
+
+rm -rf "$COMPOSITE_DIR"
+echo "70_visual_regression: $FAIL visual diff(s) over ${THRESH}%" >&2
+exit 1
