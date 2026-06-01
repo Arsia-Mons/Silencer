@@ -96,7 +96,6 @@ bool LobbyScreen::BuildElement(ScreenContext & ctx, ::ui::UiElement * out)
 		.state = {
 			.version = version.c_str(),
 			.map_name = mapName.c_str(),
-			.game_create = &gameCreateState,
 			.game_join = &gameJoinState,
 			.game_tech = &gameTechState,
 			.game_create_active = gameCreateActive,
@@ -104,39 +103,6 @@ bool LobbyScreen::BuildElement(ScreenContext & ctx, ::ui::UiElement * out)
 			.game_tech_active = gameTechActive,
 		},
 		.actions = {
-			.select_create_map = [this](int index) {
-				silencer::client_ui::lobby::GameCreatePanelSelectMap(gameCreateState, index);
-			},
-			.scroll_create_maps = [this](int delta) {
-				silencer::client_ui::lobby::GameCreatePanelScrollMaps(gameCreateState, delta);
-			},
-			.cycle_create_security = [this]() {
-				silencer::client_ui::lobby::GameCreatePanelCycleSecurity(gameCreateState);
-			},
-			.toggle_create_spectatable = [this]() {
-				silencer::client_ui::lobby::GameCreatePanelToggleSpectatable(gameCreateState);
-			},
-			.submit_create_game = [this]() {
-				silencer::client_ui::lobby::GameCreatePanelRequestCreate(gameCreateState);
-			},
-			.set_create_name = [this](const std::string& value) {
-				silencer::client_ui::lobby::GameCreatePanelSetName(gameCreateState, value);
-			},
-			.set_create_password = [this](const std::string& value) {
-				silencer::client_ui::lobby::GameCreatePanelSetPassword(gameCreateState, value);
-			},
-			.set_create_min_level = [this](const std::string& value) {
-				silencer::client_ui::lobby::GameCreatePanelSetMinLevel(gameCreateState, value);
-			},
-			.set_create_max_level = [this](const std::string& value) {
-				silencer::client_ui::lobby::GameCreatePanelSetMaxLevel(gameCreateState, value);
-			},
-			.set_create_max_players = [this](const std::string& value) {
-				silencer::client_ui::lobby::GameCreatePanelSetMaxPlayers(gameCreateState, value);
-			},
-			.set_create_max_teams = [this](const std::string& value) {
-				silencer::client_ui::lobby::GameCreatePanelSetMaxTeams(gameCreateState, value);
-			},
 			.choose_tech = [this]() {
 				silencer::client_ui::lobby::GameJoinPanelRequestTech(gameJoinState);
 			},
@@ -197,6 +163,42 @@ bool LobbyScreen::BuildElement(ScreenContext & ctx, ::ui::UiElement * out)
 			silencer::client_ui::lobby::GameSelectPanelRequestSpectate(gameSelectState);
 		},
 	};
+	silencer::client_ui::lobby::LobbyGameCreate gameCreate{
+		.state = &gameCreateState,
+		.select_map = [this](int index) {
+			silencer::client_ui::lobby::GameCreatePanelSelectMap(gameCreateState, index);
+		},
+		.scroll_maps = [this](int delta) {
+			silencer::client_ui::lobby::GameCreatePanelScrollMaps(gameCreateState, delta);
+		},
+		.cycle_security = [this]() {
+			silencer::client_ui::lobby::GameCreatePanelCycleSecurity(gameCreateState);
+		},
+		.toggle_spectatable = [this]() {
+			silencer::client_ui::lobby::GameCreatePanelToggleSpectatable(gameCreateState);
+		},
+		.submit = [this]() {
+			silencer::client_ui::lobby::GameCreatePanelRequestCreate(gameCreateState);
+		},
+		.set_name = [this](const std::string& value) {
+			silencer::client_ui::lobby::GameCreatePanelSetName(gameCreateState, value);
+		},
+		.set_password = [this](const std::string& value) {
+			silencer::client_ui::lobby::GameCreatePanelSetPassword(gameCreateState, value);
+		},
+		.set_min_level = [this](const std::string& value) {
+			silencer::client_ui::lobby::GameCreatePanelSetMinLevel(gameCreateState, value);
+		},
+		.set_max_level = [this](const std::string& value) {
+			silencer::client_ui::lobby::GameCreatePanelSetMaxLevel(gameCreateState, value);
+		},
+		.set_max_players = [this](const std::string& value) {
+			silencer::client_ui::lobby::GameCreatePanelSetMaxPlayers(gameCreateState, value);
+		},
+		.set_max_teams = [this](const std::string& value) {
+			silencer::client_ui::lobby::GameCreatePanelSetMaxTeams(gameCreateState, value);
+		},
+	};
 	*out = silencer::client_ui::lobby::LobbyScreenView(
 		silencer::client_ui::lobby::LobbyScreenViewProps{
 			.key = "lobby",
@@ -205,6 +207,7 @@ bool LobbyScreen::BuildElement(ScreenContext & ctx, ::ui::UiElement * out)
 			.chat = ::ui::copy_value(chat),
 			.character = ::ui::copy_value(character),
 			.game_select = ::ui::copy_value(gameSelect),
+			.game_create = ::ui::copy_value(gameCreate),
 		});
 	return true;
 }

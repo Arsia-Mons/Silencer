@@ -650,8 +650,8 @@ struct MapRowProps {
 };
 
 ::ui::UiElement MapRow(const MapRowProps& props) {
-	const LobbyContextValue& lobby = UseLobby();
-	GameCreatePanelState * state = lobby.state.game_create;
+	const LobbyGameCreate& gameCreate = UseLobbyGameCreate();
+	GameCreatePanelState * state = gameCreate.state;
 	if(!state) return ::ui::empty();
 	int start = state->mapScrollPos;
 	int index = start + props.slot;
@@ -662,7 +662,7 @@ struct MapRowProps {
 	  idOffset={index}
 	  label={state->maps[static_cast<size_t>(index)].c_str()}
 	  selected={index == state->mapSelectedIndex}
-	  onActivate={index_action_callback(lobby.actions.select_create_map, index)}
+	  onActivate={index_action_callback(gameCreate.select_map, index)}
 	  layout={row_button_layout(23.0f)}
 	  style={row_style(index == state->mapSelectedIndex)}
 	/>
@@ -674,8 +674,8 @@ struct GameCreateUpperProps {
 
 ::ui::UiElement GameCreateUpper(const GameCreateUpperProps& props) {
 	(void)props;
-	const LobbyContextValue& lobby = UseLobby();
-	GameCreatePanelState * state = lobby.state.game_create;
+	const LobbyGameCreate& gameCreate = UseLobbyGameCreate();
+	GameCreatePanelState * state = gameCreate.state;
 	if(!state) return ::ui::empty();
 	return <Box key="create-upper" layout={upper_panel_layout()} style={panel_style()}>
 		<SectionHeading key="heading" value="GAME OPTIONS" />
@@ -683,14 +683,14 @@ struct GameCreateUpperProps {
 		  key="security"
 		  id="lobby.game_create.security"
 		  label={security_label(state->securityIndex)}
-		  onActivate={action_callback(lobby.actions.cycle_create_security)}
+		  onActivate={action_callback(gameCreate.cycle_security)}
 		  layout={row_button_layout(25.0f)}
 		/>
 		<Button
 		  key="spectatable"
 		  id="lobby.game_create.spectatable"
 		  label={state->spectatable ? "Spectatable: Yes" : "Spectatable: No"}
-		  onActivate={action_callback(lobby.actions.toggle_create_spectatable)}
+		  onActivate={action_callback(gameCreate.toggle_spectatable)}
 		  layout={row_button_layout(25.0f)}
 		/>
 	</Box>
@@ -702,8 +702,8 @@ struct GameCreateTallProps {
 
 ::ui::UiElement GameCreateTall(const GameCreateTallProps& props) {
 	(void)props;
-	const LobbyContextValue& lobby = UseLobby();
-	GameCreatePanelState * state = lobby.state.game_create;
+	const LobbyGameCreate& gameCreate = UseLobbyGameCreate();
+	GameCreatePanelState * state = gameCreate.state;
 	if(!state) return ::ui::empty();
 	return <Box key="create-tall" layout={side_panel_layout()} style={panel_style()}>
 		<SectionHeading key="heading" value="SELECT MAP" />
@@ -712,14 +712,14 @@ struct GameCreateTallProps {
 			  key="prev"
 			  id="lobby.game_create.map.prev"
 			  label="Prev"
-			  onActivate={index_action_callback(lobby.actions.scroll_create_maps, -kGameCreateVisibleMapRows)}
+			  onActivate={index_action_callback(gameCreate.scroll_maps, -kGameCreateVisibleMapRows)}
 			  layout={compact_button_layout()}
 			/>
 			<Button
 			  key="next"
 			  id="lobby.game_create.map.next"
 			  label="Next"
-			  onActivate={index_action_callback(lobby.actions.scroll_create_maps, kGameCreateVisibleMapRows)}
+			  onActivate={index_action_callback(gameCreate.scroll_maps, kGameCreateVisibleMapRows)}
 			  layout={compact_button_layout()}
 			/>
 		</Box>
@@ -742,7 +742,7 @@ struct GameCreateTallProps {
 			  id="lobby.game_create.name"
 			  value={state->name}
 			  accessibility={::ui::components::AccessibilityProps{.role = ::ui::SemanticRole::TextBox, .label = "Game name"}}
-			  onChange={lobby.actions.set_create_name}
+			  onChange={gameCreate.set_name}
 			  layout={row_button_layout(26.0f)}
 			/>
 			<Input
@@ -751,7 +751,7 @@ struct GameCreateTallProps {
 			  value={state->password}
 			  password={true}
 			  accessibility={::ui::components::AccessibilityProps{.role = ::ui::SemanticRole::TextBox, .label = "Game password"}}
-			  onChange={lobby.actions.set_create_password}
+			  onChange={gameCreate.set_password}
 			  layout={row_button_layout(26.0f)}
 			/>
 			<Input
@@ -759,7 +759,7 @@ struct GameCreateTallProps {
 			  id="lobby.game_create.min_level"
 			  value={state->minLevel}
 			  accessibility={::ui::components::AccessibilityProps{.role = ::ui::SemanticRole::TextBox, .label = "Min level"}}
-			  onChange={lobby.actions.set_create_min_level}
+			  onChange={gameCreate.set_min_level}
 			  layout={row_button_layout(24.0f)}
 			/>
 			<Input
@@ -767,7 +767,7 @@ struct GameCreateTallProps {
 			  id="lobby.game_create.max_level"
 			  value={state->maxLevel}
 			  accessibility={::ui::components::AccessibilityProps{.role = ::ui::SemanticRole::TextBox, .label = "Max level"}}
-			  onChange={lobby.actions.set_create_max_level}
+			  onChange={gameCreate.set_max_level}
 			  layout={row_button_layout(24.0f)}
 			/>
 			<Input
@@ -775,7 +775,7 @@ struct GameCreateTallProps {
 			  id="lobby.game_create.max_players"
 			  value={state->maxPlayers}
 			  accessibility={::ui::components::AccessibilityProps{.role = ::ui::SemanticRole::TextBox, .label = "Max players"}}
-			  onChange={lobby.actions.set_create_max_players}
+			  onChange={gameCreate.set_max_players}
 			  layout={row_button_layout(24.0f)}
 			/>
 			<Input
@@ -783,7 +783,7 @@ struct GameCreateTallProps {
 			  id="lobby.game_create.max_teams"
 			  value={state->maxTeams}
 			  accessibility={::ui::components::AccessibilityProps{.role = ::ui::SemanticRole::TextBox, .label = "Max teams"}}
-			  onChange={lobby.actions.set_create_max_teams}
+			  onChange={gameCreate.set_max_teams}
 			  layout={row_button_layout(24.0f)}
 			/>
 		</Box>
@@ -791,7 +791,7 @@ struct GameCreateTallProps {
 		  key="create"
 		  id="lobby.game_create.create"
 		  label="Create"
-		  onActivate={action_callback(lobby.actions.submit_create_game)}
+		  onActivate={action_callback(gameCreate.submit)}
 		  layout={row_button_layout(28.0f)}
 		/>
 	</Box>

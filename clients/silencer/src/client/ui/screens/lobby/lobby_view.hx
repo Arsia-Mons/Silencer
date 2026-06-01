@@ -19,7 +19,6 @@ struct LobbyContextValue {
 	struct State {
 		const char * version = "";
 		const char * map_name = "";
-		GameCreatePanelState * game_create = nullptr;
 		GameJoinPanelState * game_join = nullptr;
 		GameTechPanelState * game_tech = nullptr;
 		bool game_create_active = false;
@@ -28,17 +27,6 @@ struct LobbyContextValue {
 	};
 
 	struct Actions {
-		std::function<void(int)> select_create_map = {};
-		std::function<void(int)> scroll_create_maps = {};
-		std::function<void()> cycle_create_security = {};
-		std::function<void()> toggle_create_spectatable = {};
-		std::function<void()> submit_create_game = {};
-		std::function<void(const std::string&)> set_create_name = {};
-		std::function<void(const std::string&)> set_create_password = {};
-		std::function<void(const std::string&)> set_create_min_level = {};
-		std::function<void(const std::string&)> set_create_max_level = {};
-		std::function<void(const std::string&)> set_create_max_players = {};
-		std::function<void(const std::string&)> set_create_max_teams = {};
 		std::function<void()> choose_tech = {};
 		std::function<void()> change_team = {};
 		std::function<void()> ready_game = {};
@@ -85,6 +73,23 @@ struct LobbyGameSelect {
 
 const LobbyGameSelect& UseLobbyGameSelect();
 
+struct LobbyGameCreate {
+	GameCreatePanelState * state = nullptr;
+	std::function<void(int)> select_map = {};
+	std::function<void(int)> scroll_maps = {};
+	std::function<void()> cycle_security = {};
+	std::function<void()> toggle_spectatable = {};
+	std::function<void()> submit = {};
+	std::function<void(const std::string&)> set_name = {};
+	std::function<void(const std::string&)> set_password = {};
+	std::function<void(const std::string&)> set_min_level = {};
+	std::function<void(const std::string&)> set_max_level = {};
+	std::function<void(const std::string&)> set_max_players = {};
+	std::function<void(const std::string&)> set_max_teams = {};
+};
+
+const LobbyGameCreate& UseLobbyGameCreate();
+
 struct LobbyFrameProps {
 	const char * key = nullptr;
 };
@@ -98,6 +103,7 @@ struct LobbyScreenViewProps {
 	const LobbyChat * chat = nullptr;
 	const LobbyCharacter * character = nullptr;
 	const LobbyGameSelect * game_select = nullptr;
+	const LobbyGameCreate * game_create = nullptr;
 };
 
 ::ui::UiElement LobbyScreenView(const LobbyScreenViewProps& props);
