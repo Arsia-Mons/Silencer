@@ -433,6 +433,15 @@ fail_if_match \
   "$REPO_ROOT/clients/silencer/src/client/ui/screens/update/update_screen.h"
 
 fail_if_match \
+  "\\b(musicClicked|fullscreenClicked|smoothScalingClicked|presetClicked|saveClicked|cancelClicked|operatorClickedRow)\\b" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens/options/options_audio_screen.cpp" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens/options/options_audio_screen.h" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens/options/options_display_screen.cpp" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens/options/options_display_screen.h" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens/options/options_controls_screen.cpp" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens/options/options_controls_screen.h"
+
+fail_if_match \
   '#include "(character_create_screen|lobby_connect_screen|main_menu_screen|mission_summary_screen|options_audio_screen|options_controls_screen|options_display_screen|options_screen|update_screen|lobby_screen|message_modal)[.]h"|std::make_unique<(MainMenuScreen|LobbyConnectScreen|LobbyScreen|CharacterCreateScreen|UpdateScreen|MissionSummaryScreen|OptionsScreen|OptionsControlsScreen|OptionsDisplayScreen|OptionsAudioScreen)|dynamic_cast<(LobbyScreen|MessageModal)' \
   "$REPO_ROOT/clients/silencer/src/game/ui/game_ui_pipeline.cpp"
 

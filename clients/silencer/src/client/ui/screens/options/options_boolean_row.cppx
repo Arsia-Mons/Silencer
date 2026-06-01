@@ -101,6 +101,12 @@ using options_boolean_row_detail::IndicatorsProps;
 
 ::ui::UiElement OptionsBooleanRow(const OptionsBooleanRowProps& props) {
 	const char * label = props.label ? props.label : "";
+	std::function<void(const ::ui::ActivationEvent&)> on_activate = {};
+	if(props.on_press){
+		on_activate = [on_press = props.on_press](const ::ui::ActivationEvent&) {
+			on_press();
+		};
+	}
 	return <Box
 	  key={props.key}
 	  layout={::ui::LayoutStyle{
@@ -115,6 +121,7 @@ using options_boolean_row_detail::IndicatorsProps;
 		  key="button"
 		  id={props.control_id}
 		  accessibility={{.label = label}}
+		  onActivate={on_activate}
 		  layout={::ui::LayoutStyle{
 				.align_items = ::ui::AlignItems::Center,
 				.justify_content = ::ui::JustifyContent::Center,

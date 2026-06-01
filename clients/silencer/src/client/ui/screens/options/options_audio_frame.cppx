@@ -81,6 +81,7 @@ using ::ui::components::TextProps;
 			  controlId="options_audio.music"
 			  label="Music"
 			  selected={props.music_enabled}
+			  onPress={props.toggle_music}
 			/>
 			<Box
 			  key="actions"
@@ -98,12 +99,14 @@ using ::ui::components::TextProps;
 				  controlId="options_audio.save"
 				  size={AppButtonSize::MainMenu}
 				  label="Save"
+				  onPress={props.save}
 				/>
 				<AppButton
 				  key="cancel"
 				  controlId="options_audio.cancel"
 				  size={AppButtonSize::MainMenu}
 				  label="Cancel"
+				  onPress={props.cancel}
 				/>
 			</Box>
 		</Box>

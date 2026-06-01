@@ -26,18 +26,13 @@ private:
 	// Two-slot rebind capture stays as local per-frame interaction state.
 	// Keymap writes flow through use_options().
 	void BeginRebindFromVisibleRow(int row, int slot);
-	void ToggleOperatorFromVisibleRow(int row);
 	int MaxScroll() const;
 
 	int scrollPosition = 0;
 	int rebindRow = -1;
 	int rebindSlot = -1;
 	Uint32    optionscontrolstick = 0;
-	bool presetClicked = false;
-	bool saveClicked = false;
-	bool cancelClicked = false;
 	int scrollDelta = 0;
-	int operatorClickedRow = -1;
 	int visibleRowCapacity_ = silencer::client_ui::options::kKeybindListMinVisibleRows;
 	silencer::client_ui::options::KeybindListView keybindListView_;
 	silencer::client_ui::RetainedFrame retainedFrame_;

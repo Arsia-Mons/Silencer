@@ -90,12 +90,14 @@ using ::ui::components::TextProps;
 				  controlId="options_display.fullscreen"
 				  label="Fullscreen"
 				  selected={props.fullscreen_enabled}
+				  onPress={props.toggle_fullscreen}
 				/>
 				<OptionsBooleanRow
 				  key="smooth-scaling"
 				  controlId="options_display.smooth_scaling"
 				  label="Smooth Scaling"
 				  selected={props.smooth_scaling_enabled}
+				  onPress={props.toggle_smooth_scaling}
 				/>
 			</Box>
 			<Box
@@ -114,12 +116,14 @@ using ::ui::components::TextProps;
 				  controlId="options_display.save"
 				  size={AppButtonSize::MainMenu}
 				  label="Save"
+				  onPress={props.save}
 				/>
 				<AppButton
 				  key="cancel"
 				  controlId="options_display.cancel"
 				  size={AppButtonSize::MainMenu}
 				  label="Cancel"
+				  onPress={props.cancel}
 				/>
 			</Box>
 		</Box>

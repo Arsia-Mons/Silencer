@@ -35,23 +35,6 @@ constexpr uint16_t kPanelMinW = 560;
 constexpr uint16_t kPanelMinH = 420;
 constexpr uint16_t kPanelPadX = 48;
 constexpr uint16_t kPanelPadTop = 70;
-constexpr const char * kActionPreset = "options_controls.preset";
-constexpr const char * kActionSave = "options_controls.save";
-constexpr const char * kActionCancel = "options_controls.cancel";
-constexpr const char * kActionPrimaryPrefix = "options_controls.primary.";
-constexpr const char * kActionSecondaryPrefix = "options_controls.secondary.";
-constexpr const char * kActionOperatorPrefix = "options_controls.operator.";
-
-bool StartsWith(const std::string & value, const char * prefix) {
-	const size_t n = std::strlen(prefix);
-	return value.size() >= n && value.compare(0, n, prefix) == 0;
-}
-
-int SuffixInt(const std::string & value, const char * prefix) {
-	if(!StartsWith(value, prefix)) return -1;
-	return std::atoi(value.c_str() + std::strlen(prefix));
-}
-
 int ScaleLegacyPx(int value, int current, int legacy) {
 	return std::max(0, (value * current + legacy / 2) / legacy);
 }
@@ -74,11 +57,7 @@ void OptionsControlsScreen::Build(ScreenContext & ctx) {
 	scrollPosition = 0;
 	rebindRow = -1;
 	rebindSlot = -1;
-	presetClicked = false;
-	saveClicked = false;
-	cancelClicked = false;
 	scrollDelta = 0;
-	operatorClickedRow = -1;
 }
 
 void OptionsControlsScreen::BeginRebindFromVisibleRow(int row, int slot) {
@@ -86,12 +65,6 @@ void OptionsControlsScreen::BeginRebindFromVisibleRow(int row, int slot) {
 	if(absolute < 0 || absolute >= (int)Action::Count) return;
 	rebindRow = absolute;
 	rebindSlot = slot;
-}
-
-void OptionsControlsScreen::ToggleOperatorFromVisibleRow(int row) {
-	int absolute = scrollPosition + row;
-	if(absolute < 0 || absolute >= (int)Action::Count) return;
-	operatorClickedRow = absolute;
 }
 
 void OptionsControlsScreen::Tick(ScreenContext & ctx) {
@@ -102,15 +75,6 @@ void OptionsControlsScreen::Tick(ScreenContext & ctx) {
 	if(scrollDelta != 0){
 		scrollPosition = std::max(0, std::min(MaxScroll(), scrollPosition + scrollDelta));
 		scrollDelta = 0;
-	}
-	if(presetClicked){
-		presetClicked = false;
-		options.controls.cycle_preset();
-	}
-	if(operatorClickedRow >= 0 && operatorClickedRow < (int)Action::Count){
-		Action a = ACTION_TABLE[operatorClickedRow].action;
-		options.controls.toggle_operator(a);
-		operatorClickedRow = -1;
 	}
 	if(rebindRow >= 0){
 		const int tick = options.controls.tick_count();
@@ -123,17 +87,6 @@ void OptionsControlsScreen::Tick(ScreenContext & ctx) {
 		}
 	}else{
 		optionscontrolstick = 0;
-	}
-	if(saveClicked){
-		saveClicked = false;
-		options.controls.save();
-		silencer::client_ui::use_navigation().pop_top();
-		return;
-	}
-	if(cancelClicked){
-		cancelClicked = false;
-		options.controls.cancel();
-		silencer::client_ui::use_navigation().pop_top();
 	}
 }
 
@@ -149,7 +102,8 @@ bool OptionsControlsScreen::HandleUiIntent(ScreenContext & ctx, const silencer::
 		return true;
 	}
 	if(action.kind == silencer::ui::UiActionKind::Cancel){
-		cancelClicked = true;
+		options.controls.cancel();
+		silencer::client_ui::use_navigation().pop_top();
 		return true;
 	}
 	if(action.kind == silencer::ui::UiActionKind::Scroll){
@@ -159,35 +113,7 @@ bool OptionsControlsScreen::HandleUiIntent(ScreenContext & ctx, const silencer::
 		}
 		return false;
 	}
-	if(action.kind != silencer::ui::UiActionKind::Activate) return false;
-	if(action.id == options_controls_screen_detail::kActionPreset){
-		presetClicked = true;
-		return true;
-	}
-	if(action.id == options_controls_screen_detail::kActionSave){
-		saveClicked = true;
-		return true;
-	}
-	if(action.id == options_controls_screen_detail::kActionCancel){
-		cancelClicked = true;
-		return true;
-	}
-	int row = options_controls_screen_detail::SuffixInt(action.id, options_controls_screen_detail::kActionPrimaryPrefix);
-	if(row >= 0){
-		BeginRebindFromVisibleRow(row, 0);
-		return true;
-	}
-	row = options_controls_screen_detail::SuffixInt(action.id, options_controls_screen_detail::kActionSecondaryPrefix);
-	if(row >= 0){
-		BeginRebindFromVisibleRow(row, 1);
-		return true;
-	}
-	row = options_controls_screen_detail::SuffixInt(action.id, options_controls_screen_detail::kActionOperatorPrefix);
-	if(row >= 0){
-		ToggleOperatorFromVisibleRow(row);
-		return true;
-	}
-	return false;
+	return retainedFrame_.HandleUiIntent(action);
 }
 
 void OptionsControlsScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime, silencer::ui::UiInteractionRegistry& interactions) {
@@ -196,6 +122,8 @@ void OptionsControlsScreen::BuildUi(ScreenContext & ctx, Surface & dst, float fr
 	silencer::client_ui::OptionsModel options =
 		silencer::client_ui::use_options(
 			silencer::client_ui::MakeOptionsProvider(ctx));
+	silencer::client_ui::Navigation navigation =
+		silencer::client_ui::use_navigation();
 
 	const float uiScale = silencer::clay_bridge::UiScale();
 	const int layoutWidth = std::max(1, static_cast<int>(dst.w / uiScale));
@@ -283,6 +211,25 @@ void OptionsControlsScreen::BuildUi(ScreenContext & ctx, Surface & dst, float fr
 		.frame_pad_bottom = framePadBottom,
 		.panel_pad_x = panelPadX,
 		.panel_pad_bottom = panelPadBottom,
+		.cycle_preset = [controls = options.controls]() {
+			controls.cycle_preset();
+		},
+		.begin_rebind = [this](int row, int slot) {
+			BeginRebindFromVisibleRow(row, slot);
+		},
+		.toggle_operator = [this, controls = options.controls](int row) {
+			int absolute = scrollPosition + row;
+			if(absolute < 0 || absolute >= (int)Action::Count) return;
+			controls.toggle_operator(ACTION_TABLE[absolute].action);
+		},
+		.save = [controls = options.controls, navigation]() {
+			controls.save();
+			navigation.pop_top();
+		},
+		.cancel = [controls = options.controls, navigation]() {
+			controls.cancel();
+			navigation.pop_top();
+		},
 	};
 	retainedFrame_.Build([&]() {
 		                     return silencer::client_ui::OptionsControlsFrame(props);

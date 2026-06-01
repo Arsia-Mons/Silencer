@@ -12,48 +12,15 @@
 
 #include <algorithm>
 
-namespace options_display_screen_detail
-{
-constexpr const char * kActionFullscreen = "options_display.fullscreen";
-constexpr const char * kActionSmoothScaling = "options_display.smooth_scaling";
-constexpr const char * kActionSave = "options_display.save";
-constexpr const char * kActionCancel = "options_display.cancel";
-} // namespace options_display_screen_detail
-
 void OptionsDisplayScreen::Build(ScreenContext & ctx)
 {
 	ctx.ResetPresentation(1);
 	ctx.renderer.camera.SetPosition(320, 240);
-	fullscreenClicked = false;
-	smoothScalingClicked = false;
-	saveClicked = false;
-	cancelClicked = false;
 }
 
 void OptionsDisplayScreen::Tick(ScreenContext & ctx)
 {
-	silencer::client_ui::OptionsModel options =
-		silencer::client_ui::use_options(
-			silencer::client_ui::MakeOptionsProvider(ctx));
-	if(fullscreenClicked){
-		fullscreenClicked = false;
-		options.display.toggle_fullscreen();
-	}
-	if(smoothScalingClicked){
-		smoothScalingClicked = false;
-		options.display.toggle_smooth_scaling();
-	}
-	if(saveClicked){
-		saveClicked = false;
-		options.display.save();
-		silencer::client_ui::use_navigation().pop_top();
-		return;
-	}
-	if(cancelClicked){
-		cancelClicked = false;
-		options.display.cancel();
-		silencer::client_ui::use_navigation().pop_top();
-	}
+	(void)ctx;
 }
 
 void OptionsDisplayScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime, silencer::ui::UiInteractionRegistry& interactions)
@@ -63,6 +30,8 @@ void OptionsDisplayScreen::BuildUi(ScreenContext & ctx, Surface & dst, float fra
 	silencer::client_ui::OptionsModel options =
 		silencer::client_ui::use_options(
 			silencer::client_ui::MakeOptionsProvider(ctx));
+	silencer::client_ui::Navigation navigation =
+		silencer::client_ui::use_navigation();
 	const float uiScale = silencer::clay_bridge::UiScale();
 	const int virtualW = std::max(1, static_cast<int>(dst.w / uiScale));
 	const int virtualH = std::max(1, static_cast<int>(dst.h / uiScale));
@@ -70,6 +39,20 @@ void OptionsDisplayScreen::BuildUi(ScreenContext & ctx, Surface & dst, float fra
 		.key = "options-display",
 		.fullscreen_enabled = options.display.fullscreen_enabled(),
 		.smooth_scaling_enabled = options.display.smooth_scaling_enabled(),
+		.toggle_fullscreen = [options]() {
+			options.display.toggle_fullscreen();
+		},
+		.toggle_smooth_scaling = [options]() {
+			options.display.toggle_smooth_scaling();
+		},
+		.save = [options, navigation]() {
+			options.display.save();
+			navigation.pop_top();
+		},
+		.cancel = [options, navigation]() {
+			options.display.cancel();
+			navigation.pop_top();
+		},
 	};
 	retainedFrame_.Build([&]() {
 		                     return silencer::client_ui::OptionsDisplayFrame(props);
@@ -86,29 +69,15 @@ void OptionsDisplayScreen::Destroy(ScreenContext & ctx)
 
 bool OptionsDisplayScreen::HandleUiIntent(ScreenContext & ctx, const silencer::ui::UiAction & action)
 {
-	(void)ctx;
 	if(action.kind == silencer::ui::UiActionKind::Cancel){
-		cancelClicked = true;
+		silencer::client_ui::OptionsModel options =
+			silencer::client_ui::use_options(
+				silencer::client_ui::MakeOptionsProvider(ctx));
+		options.display.cancel();
+		silencer::client_ui::use_navigation().pop_top();
 		return true;
 	}
-	if(action.kind != silencer::ui::UiActionKind::Activate) return false;
-	if(action.id == options_display_screen_detail::kActionFullscreen){
-		fullscreenClicked = true;
-		return true;
-	}
-	if(action.id == options_display_screen_detail::kActionSmoothScaling){
-		smoothScalingClicked = true;
-		return true;
-	}
-	if(action.id == options_display_screen_detail::kActionSave){
-		saveClicked = true;
-		return true;
-	}
-	if(action.id == options_display_screen_detail::kActionCancel){
-		cancelClicked = true;
-		return true;
-	}
-	return false;
+	return retainedFrame_.HandleUiIntent(action);
 }
 
 const ::ui::DrawCommandList * OptionsDisplayScreen::RetainedDrawCommands() const

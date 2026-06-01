@@ -176,14 +176,22 @@ inline const char * copied_id(const char * prefix, int row) {
 		const char * label = nullptr;
 		float width = 0.0f;
 		std::uint16_t sprite_index = 0;
+		std::function<void()> on_press = {};
 	};
 
 	::ui::UiElement OvalButton(const OvalButtonProps& props) {
+		std::function<void(const ::ui::ActivationEvent&)> on_activate = {};
+		if(props.on_press){
+			on_activate = [on_press = props.on_press](const ::ui::ActivationEvent&) {
+				on_press();
+			};
+		}
 		return <Button
 		  key={props.key}
 		  id={props.id}
 		  accessibility={{.label = props.label ? props.label : ""}}
 		  label={props.label ? props.label : ""}
+		  onActivate={on_activate}
 		  layout={::ui::LayoutStyle{
 				.align_items = ::ui::AlignItems::Center,
 				.justify_content = ::ui::JustifyContent::Center,
@@ -202,14 +210,22 @@ inline const char * copied_id(const char * prefix, int row) {
 		const char * id = nullptr;
 		const char * label = nullptr;
 		float min_width = 0.0f;
+		std::function<void()> on_press = {};
 	};
 
 	::ui::UiElement OperatorButton(const OperatorButtonProps& props) {
+		std::function<void(const ::ui::ActivationEvent&)> on_activate = {};
+		if(props.on_press){
+			on_activate = [on_press = props.on_press](const ::ui::ActivationEvent&) {
+				on_press();
+			};
+		}
 		return <Button
 		  key={props.key}
 		  id={props.id}
 		  accessibility={{.label = props.label ? props.label : ""}}
 		  label={props.label ? props.label : ""}
+		  onActivate={on_activate}
 		  layout={::ui::LayoutStyle{
 				.align_items = ::ui::AlignItems::Center,
 				.justify_content = ::ui::JustifyContent::Center,
@@ -249,6 +265,9 @@ inline const char * copied_id(const char * prefix, int row) {
 			row.rebindingPrimary ? "-" : row.primaryLabel.c_str();
 		const char * secondaryText =
 			row.rebindingSecondary ? "-" : row.secondaryLabel.c_str();
+		const auto beginRebind = frame.begin_rebind;
+		const auto toggleOperator = frame.toggle_operator;
+		const int visibleRow = props.visible_row;
 		return <Box key={props.key} layout={row_layout(columnGap)}>
 			<Text
 			  key="action"
@@ -265,12 +284,18 @@ inline const char * copied_id(const char * prefix, int row) {
 			  label={primaryText}
 			  width={kRowActionW}
 			  spriteIndex={28}
+			  onPress={[beginRebind, visibleRow]() {
+				if(beginRebind) beginRebind(visibleRow, 0);
+			}}
 			/>
 			<OperatorButton
 			  key="operator"
 			  id={copied_id(kActionOperatorPrefix, props.visible_row)}
 			  label={row.operatorLabel.c_str()}
 			  minWidth={operatorW}
+			  onPress={[toggleOperator, visibleRow]() {
+				if(toggleOperator) toggleOperator(visibleRow);
+			}}
 			/>
 			<OvalButton
 			  key="secondary"
@@ -278,6 +303,9 @@ inline const char * copied_id(const char * prefix, int row) {
 			  label={secondaryText}
 			  width={kRowActionW}
 			  spriteIndex={28}
+			  onPress={[beginRebind, visibleRow]() {
+				if(beginRebind) beginRebind(visibleRow, 1);
+			}}
 			/>
 		</Box>
 	}
@@ -396,6 +424,7 @@ inline const char * copied_id(const char * prefix, int row) {
 			  label={preset}
 			  width={kPresetButtonW}
 			  spriteIndex={23}
+			  onPress={frame.cycle_preset}
 			/>
 		</Box>
 	}
@@ -420,8 +449,20 @@ inline const char * copied_id(const char * prefix, int row) {
 			.gap = actionGap,
 		}}
 		>
-		<AppButton key="save" controlId={kActionSave} size={AppButtonSize::MainMenu} label="Save" />
-		<AppButton key="cancel" controlId={kActionCancel} size={AppButtonSize::MainMenu} label="Cancel" />
+		<AppButton
+		  key="save"
+		  controlId={kActionSave}
+		  size={AppButtonSize::MainMenu}
+		  label="Save"
+		  onPress={props.frame->save}
+		/>
+		<AppButton
+		  key="cancel"
+		  controlId={kActionCancel}
+		  size={AppButtonSize::MainMenu}
+		  label="Cancel"
+		  onPress={props.frame->cancel}
+		/>
 		</Box>
 	}
 

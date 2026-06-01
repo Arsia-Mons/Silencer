@@ -408,6 +408,19 @@ FontSpec FontFor(const ::ui::TextData& text) {
 	return FontSpec{133, 6};
 }
 
+Uint8 TextEffectColor(Renderer& renderer, ::ui::Color color) {
+	if(color.b != 0){
+		return renderer.palette.ClosestMatch(
+			SDL_Color{color.r, color.g, color.b, 255});
+	}
+	return color.r;
+}
+
+Uint8 TextBrightness(::ui::Color color) {
+	if(color.b != 0) return 128;
+	return color.g == 0 ? 128 : color.g;
+}
+
 void DrawText(Renderer& renderer,
               Surface * dst,
               const ::ui::DrawCommandList& commands,
@@ -426,8 +439,8 @@ void DrawText(Renderer& renderer,
 	int h = static_cast<int>(command.rect.h);
 	if(w > 0 && h > 0 && !ClipDrawRect(dst->w, dst->h, x, y, w, h)) return;
 	FontSpec font = FontFor(text);
-	Uint8 color = text.color.r;
-	Uint8 brightness = text.color.g == 0 ? 128 : text.color.g;
+	Uint8 color = TextEffectColor(renderer, text.color);
+	Uint8 brightness = TextBrightness(text.color);
 	renderer.DrawText(dst,
 	                  static_cast<Uint16>(std::max(0, x)),
 	                  static_cast<Uint16>(std::max(0, y)),
