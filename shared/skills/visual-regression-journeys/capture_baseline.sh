@@ -46,20 +46,28 @@ run_capture() {
   (
     set -euo pipefail
     source "$WORKTREE/tests/cli-agent/e2e/lib.sh"
+    wait_state() {
+      cli --port "$PORT" wait_for_state --state "$1" --timeout-ms "$2" >/dev/null
+    }
     wait_main_menu() {
-      cli --port "$PORT" wait_for_ui --id main_menu.options --timeout-ms 15000 >/dev/null
+      cli --port "$PORT" wait_for_ui --id main_menu.options --timeout-ms 15000 >/dev/null 2>&1 ||
+        wait_state MAINMENU 15000
     }
     wait_options_root() {
-      cli --port "$PORT" wait_for_ui --id options.controls --timeout-ms 5000 >/dev/null
+      cli --port "$PORT" wait_for_ui --id options.controls --timeout-ms 5000 >/dev/null 2>&1 ||
+        wait_state OPTIONS 5000
     }
     wait_options_controls() {
-      cli --port "$PORT" wait_for_ui --id options_controls.preset --timeout-ms 5000 >/dev/null
+      cli --port "$PORT" wait_for_ui --id options_controls.preset --timeout-ms 5000 >/dev/null 2>&1 ||
+        wait_state OPTIONSCONTROLS 5000
     }
     wait_options_display() {
-      cli --port "$PORT" wait_for_ui --id options_display.fullscreen --timeout-ms 5000 >/dev/null
+      cli --port "$PORT" wait_for_ui --id options_display.fullscreen --timeout-ms 5000 >/dev/null 2>&1 ||
+        wait_state OPTIONSDISPLAY 5000
     }
     wait_options_audio() {
-      cli --port "$PORT" wait_for_ui --id options_audio.music --timeout-ms 5000 >/dev/null
+      cli --port "$PORT" wait_for_ui --id options_audio.music --timeout-ms 5000 >/dev/null 2>&1 ||
+        wait_state OPTIONSAUDIO 5000
     }
     PORT="$(pick_port)"
     PID="$(start_silencer "$PORT")"
@@ -125,20 +133,28 @@ run_live_lobby_capture() {
       return 1
     }
 
+    wait_control_state() {
+      cli --port "$CTRL_PORT" wait_for_state --state "$1" --timeout-ms "$2" >/dev/null
+    }
+
     wait_character_create() {
-      cli --port "$CTRL_PORT" wait_for_ui --id-prefix character_create. --timeout-ms 15000 >/dev/null
+      cli --port "$CTRL_PORT" wait_for_ui --id-prefix character_create. --timeout-ms 15000 >/dev/null 2>&1 ||
+        wait_control_state CREATECHARACTER 15000
     }
 
     wait_main_menu() {
-      cli --port "$CTRL_PORT" wait_for_ui --id main_menu.options --timeout-ms 15000 >/dev/null
+      cli --port "$CTRL_PORT" wait_for_ui --id main_menu.options --timeout-ms 15000 >/dev/null 2>&1 ||
+        wait_control_state MAINMENU 15000
     }
 
     wait_lobby_connect() {
-      cli --port "$CTRL_PORT" wait_for_ui --id lobby_connect.login --timeout-ms 5000 >/dev/null
+      cli --port "$CTRL_PORT" wait_for_ui --id lobby_connect.login --timeout-ms 5000 >/dev/null 2>&1 ||
+        wait_control_state LOBBYCONNECT 5000
     }
 
     wait_lobby_screen() {
-      cli --port "$CTRL_PORT" wait_for_ui --id lobby.go_back --timeout-ms 15000 >/dev/null
+      cli --port "$CTRL_PORT" wait_for_ui --id lobby.go_back --timeout-ms 15000 >/dev/null 2>&1 ||
+        wait_control_state LOBBY 15000
     }
 
     snap() {
