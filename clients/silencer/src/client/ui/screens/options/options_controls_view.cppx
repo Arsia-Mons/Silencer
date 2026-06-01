@@ -1,7 +1,6 @@
 #include "client/ui/screens/options/options_controls_view.h"
 
 #include "client/ui/hooks/use_game_navigation.h"
-#include "game_state.h"
 #include "ui/components/box.h"
 #include "ui/components/button.h"
 #include "ui/components/text.h"
@@ -98,10 +97,10 @@ std::function<void(const ::ui::ActivationEvent&)> action_callback(
 std::function<void(const ::ui::ActivationEvent&)> navigation_action_callback(
 	std::function<void()> action,
 	GameNavigation navigation,
-	Uint8 destination) {
+	ScreenDestination destination) {
 	return [action, navigation, destination](const ::ui::ActivationEvent&) {
 		if(action) action();
-		if(navigation.go_to_state) navigation.go_to_state(destination);
+		if(navigation.go_to) navigation.go_to(destination);
 	};
 }
 
@@ -364,7 +363,7 @@ struct ControlsSaveButtonProps {
 	  key={props.key}
 	  id="options_controls.save"
 	  label="Save"
-	  onActivate={navigation_action_callback(controls.save, navigation, GameState::OPTIONS)}
+	  onActivate={navigation_action_callback(controls.save, navigation, ScreenDestination::Options)}
 	  layout={footer_button_layout()}
 	/>
 }
@@ -380,7 +379,7 @@ struct ControlsCancelButtonProps {
 	  key={props.key}
 	  id="options_controls.cancel"
 	  label="Cancel"
-	  onActivate={navigation_action_callback(controls.cancel, navigation, GameState::OPTIONS)}
+	  onActivate={navigation_action_callback(controls.cancel, navigation, ScreenDestination::Options)}
 	  layout={footer_button_layout()}
 	/>
 }

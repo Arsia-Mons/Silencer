@@ -1,7 +1,6 @@
 #include "client/ui/screens/options/options_menu_view.h"
 
 #include "client/ui/hooks/use_game_navigation.h"
-#include "game_state.h"
 #include "ui/components/box.h"
 #include "ui/components/button.h"
 #include "ui/components/text.h"
@@ -64,11 +63,11 @@ namespace {
 	});
 }
 
-std::function<void(const ::ui::ActivationEvent&)> go_to_state_callback(
+std::function<void(const ::ui::ActivationEvent&)> go_to_destination_callback(
 	GameNavigation navigation,
-	Uint8 state) {
-	return [navigation, state](const ::ui::ActivationEvent&) {
-		if(navigation.go_to_state) navigation.go_to_state(state);
+	ScreenDestination destination) {
+	return [navigation, destination](const ::ui::ActivationEvent&) {
+		if(navigation.go_to) navigation.go_to(destination);
 	};
 }
 
@@ -76,7 +75,7 @@ struct OptionsNavigationButtonProps {
 	const char * key = nullptr;
 	const char * id = "";
 	const char * label = "";
-	Uint8 destination = 0;
+	ScreenDestination destination = ScreenDestination::MainMenu;
 	bool autofocus = false;
 };
 
@@ -87,7 +86,7 @@ struct OptionsNavigationButtonProps {
 	  id={props.id}
 	  label={props.label}
 	  autofocus={props.autofocus}
-	  onActivate={go_to_state_callback(navigation, props.destination)}
+	  onActivate={go_to_destination_callback(navigation, props.destination)}
 	  layout={button_layout(props.autofocus)}
 	/>
 }
@@ -102,26 +101,26 @@ struct OptionsNavigationButtonProps {
 			  key="controls"
 			  id="options.controls"
 			  label="Controls"
-			  destination={GameState::OPTIONSCONTROLS}
+			  destination={ScreenDestination::OptionsControls}
 			  autofocus={true}
 			/>
 			<OptionsNavigationButton
 			  key="display"
 			  id="options.display"
 			  label="Display"
-			  destination={GameState::OPTIONSDISPLAY}
+			  destination={ScreenDestination::OptionsDisplay}
 			/>
 			<OptionsNavigationButton
 			  key="audio"
 			  id="options.audio"
 			  label="Audio"
-			  destination={GameState::OPTIONSAUDIO}
+			  destination={ScreenDestination::OptionsAudio}
 			/>
 			<OptionsNavigationButton
 			  key="back"
 			  id="options.back"
 			  label="Go Back"
-			  destination={GameState::MAINMENU}
+			  destination={ScreenDestination::MainMenu}
 			/>
 		</Box>
 	</Box>

@@ -1,7 +1,6 @@
 #include "client/ui/screens/lobby_connect/lobby_connect_view.h"
 
 #include "client/ui/hooks/use_game_navigation.h"
-#include "game_state.h"
 #include "ui/components/box.h"
 #include "ui/components/button.h"
 #include "ui/components/input.h"
@@ -159,7 +158,7 @@ std::function<void(const ::ui::ActivationEvent&)> submit_callback(
 std::function<void(const ::ui::ActivationEvent&)> cancel_callback(
 	GameNavigation navigation) {
 	return [navigation](const ::ui::ActivationEvent&) {
-		if(navigation.go_to_state) navigation.go_to_state(GameState::MAINMENU);
+		if(navigation.go_to) navigation.go_to(ScreenDestination::MainMenu);
 	};
 }
 

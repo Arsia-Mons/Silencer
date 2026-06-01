@@ -1,7 +1,6 @@
 #include "client/ui/screens/update/update_view.h"
 
 #include "client/ui/hooks/use_game_navigation.h"
-#include "game_state.h"
 #include "ui/components/box.h"
 #include "ui/components/button.h"
 #include "ui/components/dialog.h"
@@ -160,7 +159,7 @@ bool has_primary_action(const UpdateStatus& update) {
 			primary_activate = [download = update.download, navigation](
 				const ::ui::ActivationEvent&) {
 				const bool opened = download ? download() : false;
-				if(opened && navigation.go_to_state) navigation.go_to_state(GameState::MAINMENU);
+				if(opened && navigation.go_to) navigation.go_to(ScreenDestination::MainMenu);
 			};
 			break;
 		case UpdatePrimaryAction::None:
@@ -170,7 +169,7 @@ bool has_primary_action(const UpdateStatus& update) {
 	std::function<void(const ::ui::ActivationEvent&)> cancel_activate =
 		[cancel = update.cancel, navigation](const ::ui::ActivationEvent&) {
 			const bool cancelled = cancel ? cancel() : false;
-			if(cancelled && navigation.go_to_state) navigation.go_to_state(GameState::MAINMENU);
+			if(cancelled && navigation.go_to) navigation.go_to(ScreenDestination::MainMenu);
 		};
 	return <Box key={props.key} layout={root_layout()}>
 		<Dialog key="dialog" modal={true} layout={dialog_layout()}>

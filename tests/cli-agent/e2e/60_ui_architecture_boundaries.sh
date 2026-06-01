@@ -200,6 +200,13 @@ fail_if_match \
   "$REPO_ROOT/clients/silencer/src/client/ui/ClientUi.cpp"
 
 fail_if_match \
+  "\\bGameState::|\\bgo_to_state\\b" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/modals" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/hud" \
+  --glob '*.cppx'
+
+fail_if_match \
   "UiActionKind::Activate" \
   "$REPO_ROOT/clients/silencer/src/client/ui/screens" \
   "$REPO_ROOT/clients/silencer/src/client/ui/modals"

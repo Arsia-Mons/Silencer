@@ -1,7 +1,6 @@
 #include "client/ui/screens/mission_summary/mission_summary_view.h"
 
 #include "client/ui/hooks/use_game_navigation.h"
-#include "game_state.h"
 #include "ui/components/box.h"
 #include "ui/components/button.h"
 #include "ui/components/text.h"
@@ -277,13 +276,13 @@ std::function<void(const ::ui::ActivationEvent&)> upgrade_callback(
 	</Box>
 }
 
-Uint8 destination_state(MissionSummaryDestination destination) {
+ScreenDestination screen_destination(MissionSummaryDestination destination) {
 	switch(destination){
 		case MissionSummaryDestination::Lobby:
-			return GameState::LOBBY;
+			return ScreenDestination::Lobby;
 		case MissionSummaryDestination::MainMenu:
 		default:
-			return GameState::MAINMENU;
+			return ScreenDestination::MainMenu;
 	}
 }
 
@@ -293,7 +292,7 @@ std::function<void(const ::ui::ActivationEvent&)> done_callback(
 	return [done, navigation](const ::ui::ActivationEvent&) {
 		MissionSummaryDestination destination = MissionSummaryDestination::MainMenu;
 		if(done) destination = done();
-		if(navigation.go_to_state) navigation.go_to_state(destination_state(destination));
+		if(navigation.go_to) navigation.go_to(screen_destination(destination));
 	};
 }
 

@@ -1,14 +1,26 @@
 #pragma once
 
-#include <SDL3/SDL_stdinc.h>
-
 #include <functional>
 
 namespace silencer {
 namespace client_ui {
 
+enum class ScreenDestination {
+	MainMenu,
+	SinglePlayerGame,
+	LobbyConnect,
+	Lobby,
+	CreateCharacter,
+	Updating,
+	MissionSummary,
+	Options,
+	OptionsControls,
+	OptionsDisplay,
+	OptionsAudio,
+};
+
 struct GameNavigation {
-	std::function<void(Uint8)> go_to_state = {};
+	std::function<void(ScreenDestination)> go_to = {};
 	std::function<void()> go_back = {};
 	std::function<void()> request_quit = {};
 };

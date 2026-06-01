@@ -1,7 +1,6 @@
 #include "client/ui/screens/options/options_display_view.h"
 
 #include "client/ui/hooks/use_game_navigation.h"
-#include "game_state.h"
 #include "ui/components/box.h"
 #include "ui/components/button.h"
 #include "ui/components/checkbox.h"
@@ -118,7 +117,7 @@ std::function<void(const ::ui::ActivationEvent&)> save_callback(
 	GameNavigation navigation) {
 	return [display, navigation](const ::ui::ActivationEvent&) {
 		if(display.save) display.save();
-		if(navigation.go_to_state) navigation.go_to_state(GameState::OPTIONS);
+		if(navigation.go_to) navigation.go_to(ScreenDestination::Options);
 	};
 }
 
@@ -127,7 +126,7 @@ std::function<void(const ::ui::ActivationEvent&)> cancel_callback(
 	GameNavigation navigation) {
 	return [display, navigation](const ::ui::ActivationEvent&) {
 		if(display.cancel) display.cancel();
-		if(navigation.go_to_state) navigation.go_to_state(GameState::OPTIONS);
+		if(navigation.go_to) navigation.go_to(ScreenDestination::Options);
 	};
 }
 
