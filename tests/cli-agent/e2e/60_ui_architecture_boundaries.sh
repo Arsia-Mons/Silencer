@@ -462,6 +462,11 @@ fail_if_match \
   "$REPO_ROOT/clients/silencer/src/client/ui/screens/lobby/game_join_panel.h"
 
 fail_if_match \
+  "\\b(backClicked|toggleClickedItemIndex|descClickedItemIndex)\\b" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens/lobby/game_tech_panel.cpp" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens/lobby/game_tech_panel.h"
+
+fail_if_match \
   "\\bokClicked\\b" \
   "$REPO_ROOT/clients/silencer/src/client/ui/modals/message_modal.cpp" \
   "$REPO_ROOT/clients/silencer/src/client/ui/modals/message_modal.h" \

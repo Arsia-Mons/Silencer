@@ -553,6 +553,23 @@ void LobbyScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime, s
 		.game_tech_back_y = gameTechBackY,
 		.game_tech_back_width = gameTechBackW,
 		.game_tech_back_height = lobby_screen_detail::kGameTechButtonH,
+		.game_tech_back = [this]() {
+			silencer::client_ui::lobby::GameJoinPanelInit(gameJoinState);
+			gameJoinActive   = true;
+			gameCreateActive = false;
+			gameTechActive   = false;
+		},
+		.game_tech_toggle = [lobby](int item_index) {
+			lobby.pregame.tech.toggle(item_index);
+		},
+		.game_tech_describe = [this, lobby](int item_index) {
+			const silencer::client_ui::LobbyPregameTechModel::Description desc =
+				lobby.pregame.tech.description(item_index);
+			if(!desc.name.empty()){
+				gameTechState.techNameStr = desc.name;
+				gameTechState.techDescLines = desc.lines;
+			}
+		},
 		.game_tech_peer_x = rightUpperX + lobby_screen_detail::kGameTechPeerColPadLeft,
 		.game_tech_peer_y = gameTechPeerY,
 		.game_tech_peer_width = gameTechPeerW,
@@ -654,12 +671,8 @@ void LobbyScreen::Tick(ScreenContext & ctx)
 			gameJoinState, lobby);
 	}
 	if(gameTechActive){
-		const silencer::client_ui::lobby::GameTechPanelTickResult tech =
-			silencer::client_ui::lobby::GameTechPanelTick(
-				gameTechState, lobby);
-		if(tech.show_roster){
-			ShowGameJoin(ctx);
-		}
+		silencer::client_ui::lobby::GameTechPanelTick(
+			gameTechState, lobby);
 	}
 
 	MessageModal * progress =
@@ -742,7 +755,7 @@ bool LobbyScreen::HandleUiIntent(ScreenContext & ctx, const silencer::ui::UiActi
 		return false;
 	}
 	if(gameTechActive){
-		return silencer::client_ui::lobby::GameTechPanelHandleUiIntent(gameTechState, action);
+		return false;
 	}
 	return silencer::client_ui::lobby::GameSelectPanelHandleUiIntent(gameSelectState, action);
 }

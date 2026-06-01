@@ -10,8 +10,6 @@
 // Domain mutations go through use_lobby(); primitives stay screen-agnostic.
 
 #include "shared.h"
-#include "runtime/UiActionQueue.h"
-
 #include <array>
 #include <string>
 #include <vector>
@@ -43,12 +41,6 @@ struct GameTechGridState {
 };
 
 struct GameTechPanelState {
-	// Per-frame click flags. Set by typed widget intents; consumed by Tick.
-	bool backClicked = false;
-	// -1 = no click this frame; otherwise the buyableitems[idx] index.
-	int  toggleClickedItemIndex = -1;
-	int  descClickedItemIndex   = -1;
-
 	// Pointer-stable strings (lifetime spans the layout pass via screen
 	// ownership). Recomputed each Tick.
 	std::string slotsLeftStr;                       // uid 70
@@ -60,16 +52,9 @@ struct GameTechPanelState {
 
 void GameTechPanelInit(GameTechPanelState & state);
 
-struct GameTechPanelTickResult {
-	bool show_roster = false;
-};
-
-// Per-frame pump. Recomputes slots-left, peer names, and consumes per-frame
-// click flags (toggle a tech bit, swap description, exit on Back).
-GameTechPanelTickResult GameTechPanelTick(GameTechPanelState & state,
-                                          LobbyModel & lobby);
-bool GameTechPanelHandleUiIntent(GameTechPanelState & state,
-                                 const silencer::ui::UiAction & action);
+// Per-frame read-only refresh of slots-left, peer names, and the tech grid.
+void GameTechPanelTick(GameTechPanelState & state,
+                       LobbyModel & lobby);
 
 }  // namespace silencer::client_ui::lobby
 

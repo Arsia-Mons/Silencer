@@ -3473,11 +3473,25 @@ inline std::uint8_t game_tech_label_alpha(std::uint8_t brightness) {
 	return brightness >= 128 ? 255 : 160;
 }
 
+inline ::ui::HostCallbacks game_tech_item_callbacks(
+	const std::function<void(int)>& on_press,
+	int item_index) {
+	::ui::HostCallbacks callbacks;
+	if(on_press){
+		callbacks.on_activate =
+			[on_press, item_index](const ::ui::ActivationEvent&) {
+				on_press(item_index);
+			};
+	}
+	return callbacks;
+}
+
 struct GameTechToggleCellProps {
 	const char * key = nullptr;
 	const GameTechGridRowState * row = nullptr;
 	int column = 0;
 	int row_position = 0;
+	std::function<void(int)> on_toggle = {};
 };
 
 ::ui::UiElement GameTechToggleCell(const GameTechToggleCellProps& props) {
@@ -3506,6 +3520,7 @@ struct GameTechToggleCellProps {
 				.checked = cell.selected,
 			}}
 		  accessibility={{.role = ::ui::SemanticRole::Checkbox, .label = props.row->label.c_str()}}
+		  callbacks={game_tech_item_callbacks(props.on_toggle, props.row->itemIndex)}
 		/>
 	}
 	return <Box
@@ -3520,6 +3535,7 @@ struct GameTechRowLabelProps {
 	const GameTechGridRowState * row = nullptr;
 	int row_position = 0;
 	int width = 0;
+	std::function<void(int)> on_describe = {};
 };
 
 ::ui::UiElement GameTechRowLabel(const GameTechRowLabelProps& props) {
@@ -3535,6 +3551,7 @@ struct GameTechRowLabelProps {
 	  style={absolute_layout(kGameTechLabelX, y, props.width - kGameTechLabelX, kGameTechRowH)}
 	  interaction={::ui::NodeInteraction{.focusable = true}}
 	  accessibility={{.role = ::ui::SemanticRole::Button, .label = props.row->label.c_str()}}
+	  callbacks={game_tech_item_callbacks(props.on_describe, props.row->itemIndex)}
 	>
 		<Text
 		  key="text"
@@ -3551,6 +3568,8 @@ struct GameTechGridRowViewProps {
 	int index = 0;
 	int width = 0;
 	int height = 0;
+	std::function<void(int)> on_toggle = {};
+	std::function<void(int)> on_describe = {};
 };
 
 ::ui::UiElement GameTechGridRowView(const GameTechGridRowViewProps& props) {
@@ -3562,15 +3581,40 @@ struct GameTechGridRowViewProps {
 	const GameTechGridRowState& row =
 		props.state->grid.rows[static_cast<size_t>(props.index)];
 	return <Box key={props.key} layout={absolute_layout(0, 0, props.width, props.height)}>
-		<GameTechToggleCell key="cell-0" row={&row} column={0} rowPosition={props.index} />
-		<GameTechToggleCell key="cell-1" row={&row} column={1} rowPosition={props.index} />
-		<GameTechToggleCell key="cell-2" row={&row} column={2} rowPosition={props.index} />
-		<GameTechToggleCell key="cell-3" row={&row} column={3} rowPosition={props.index} />
+		<GameTechToggleCell
+		  key="cell-0"
+		  row={&row}
+		  column={0}
+		  rowPosition={props.index}
+		  onToggle={props.on_toggle}
+		/>
+		<GameTechToggleCell
+		  key="cell-1"
+		  row={&row}
+		  column={1}
+		  rowPosition={props.index}
+		  onToggle={props.on_toggle}
+		/>
+		<GameTechToggleCell
+		  key="cell-2"
+		  row={&row}
+		  column={2}
+		  rowPosition={props.index}
+		  onToggle={props.on_toggle}
+		/>
+		<GameTechToggleCell
+		  key="cell-3"
+		  row={&row}
+		  column={3}
+		  rowPosition={props.index}
+		  onToggle={props.on_toggle}
+		/>
 		<GameTechRowLabel
 		  key="label"
 		  row={props.state->grid.localLabelsVisible ? &row : nullptr}
 		  rowPosition={props.index}
 		  width={props.width}
+		  onDescribe={props.on_describe}
 		/>
 	</Box>
 }
@@ -3580,6 +3624,8 @@ struct GameTechRowsProps {
 	const GameTechPanelState * state = nullptr;
 	int width = 0;
 	int height = 0;
+	std::function<void(int)> on_toggle = {};
+	std::function<void(int)> on_describe = {};
 };
 
 ::ui::UiElement GameTechRows(const GameTechRowsProps& props) {
@@ -3590,6 +3636,8 @@ struct GameTechRowsProps {
 		  index={0}
 		  width={props.width}
 		  height={props.height}
+		  onToggle={props.on_toggle}
+		  onDescribe={props.on_describe}
 		/>
 		<GameTechGridRowView
 		  key={kGameTechRowKeys[1]}
@@ -3597,6 +3645,8 @@ struct GameTechRowsProps {
 		  index={1}
 		  width={props.width}
 		  height={props.height}
+		  onToggle={props.on_toggle}
+		  onDescribe={props.on_describe}
 		/>
 		<GameTechGridRowView
 		  key={kGameTechRowKeys[2]}
@@ -3604,6 +3654,8 @@ struct GameTechRowsProps {
 		  index={2}
 		  width={props.width}
 		  height={props.height}
+		  onToggle={props.on_toggle}
+		  onDescribe={props.on_describe}
 		/>
 		<GameTechGridRowView
 		  key={kGameTechRowKeys[3]}
@@ -3611,6 +3663,8 @@ struct GameTechRowsProps {
 		  index={3}
 		  width={props.width}
 		  height={props.height}
+		  onToggle={props.on_toggle}
+		  onDescribe={props.on_describe}
 		/>
 		<GameTechGridRowView
 		  key={kGameTechRowKeys[4]}
@@ -3618,6 +3672,8 @@ struct GameTechRowsProps {
 		  index={4}
 		  width={props.width}
 		  height={props.height}
+		  onToggle={props.on_toggle}
+		  onDescribe={props.on_describe}
 		/>
 		<GameTechGridRowView
 		  key={kGameTechRowKeys[5]}
@@ -3625,6 +3681,8 @@ struct GameTechRowsProps {
 		  index={5}
 		  width={props.width}
 		  height={props.height}
+		  onToggle={props.on_toggle}
+		  onDescribe={props.on_describe}
 		/>
 		<GameTechGridRowView
 		  key={kGameTechRowKeys[6]}
@@ -3632,6 +3690,8 @@ struct GameTechRowsProps {
 		  index={6}
 		  width={props.width}
 		  height={props.height}
+		  onToggle={props.on_toggle}
+		  onDescribe={props.on_describe}
 		/>
 		<GameTechGridRowView
 		  key={kGameTechRowKeys[7]}
@@ -3639,6 +3699,8 @@ struct GameTechRowsProps {
 		  index={7}
 		  width={props.width}
 		  height={props.height}
+		  onToggle={props.on_toggle}
+		  onDescribe={props.on_describe}
 		/>
 		<GameTechGridRowView
 		  key={kGameTechRowKeys[8]}
@@ -3646,6 +3708,8 @@ struct GameTechRowsProps {
 		  index={8}
 		  width={props.width}
 		  height={props.height}
+		  onToggle={props.on_toggle}
+		  onDescribe={props.on_describe}
 		/>
 		<GameTechGridRowView
 		  key={kGameTechRowKeys[9]}
@@ -3653,6 +3717,8 @@ struct GameTechRowsProps {
 		  index={9}
 		  width={props.width}
 		  height={props.height}
+		  onToggle={props.on_toggle}
+		  onDescribe={props.on_describe}
 		/>
 		<GameTechGridRowView
 		  key={kGameTechRowKeys[10]}
@@ -3660,6 +3726,8 @@ struct GameTechRowsProps {
 		  index={10}
 		  width={props.width}
 		  height={props.height}
+		  onToggle={props.on_toggle}
+		  onDescribe={props.on_describe}
 		/>
 		<GameTechGridRowView
 		  key={kGameTechRowKeys[11]}
@@ -3667,6 +3735,8 @@ struct GameTechRowsProps {
 		  index={11}
 		  width={props.width}
 		  height={props.height}
+		  onToggle={props.on_toggle}
+		  onDescribe={props.on_describe}
 		/>
 		<GameTechGridRowView
 		  key={kGameTechRowKeys[12]}
@@ -3674,6 +3744,8 @@ struct GameTechRowsProps {
 		  index={12}
 		  width={props.width}
 		  height={props.height}
+		  onToggle={props.on_toggle}
+		  onDescribe={props.on_describe}
 		/>
 		<GameTechGridRowView
 		  key={kGameTechRowKeys[13]}
@@ -3681,6 +3753,8 @@ struct GameTechRowsProps {
 		  index={13}
 		  width={props.width}
 		  height={props.height}
+		  onToggle={props.on_toggle}
+		  onDescribe={props.on_describe}
 		/>
 		<GameTechGridRowView
 		  key={kGameTechRowKeys[14]}
@@ -3688,6 +3762,8 @@ struct GameTechRowsProps {
 		  index={14}
 		  width={props.width}
 		  height={props.height}
+		  onToggle={props.on_toggle}
+		  onDescribe={props.on_describe}
 		/>
 		<GameTechGridRowView
 		  key={kGameTechRowKeys[15]}
@@ -3695,6 +3771,8 @@ struct GameTechRowsProps {
 		  index={15}
 		  width={props.width}
 		  height={props.height}
+		  onToggle={props.on_toggle}
+		  onDescribe={props.on_describe}
 		/>
 		<GameTechGridRowView
 		  key={kGameTechRowKeys[16]}
@@ -3702,6 +3780,8 @@ struct GameTechRowsProps {
 		  index={16}
 		  width={props.width}
 		  height={props.height}
+		  onToggle={props.on_toggle}
+		  onDescribe={props.on_describe}
 		/>
 		<GameTechGridRowView
 		  key={kGameTechRowKeys[17]}
@@ -3709,6 +3789,8 @@ struct GameTechRowsProps {
 		  index={17}
 		  width={props.width}
 		  height={props.height}
+		  onToggle={props.on_toggle}
+		  onDescribe={props.on_describe}
 		/>
 		<GameTechGridRowView
 		  key={kGameTechRowKeys[18]}
@@ -3716,6 +3798,8 @@ struct GameTechRowsProps {
 		  index={18}
 		  width={props.width}
 		  height={props.height}
+		  onToggle={props.on_toggle}
+		  onDescribe={props.on_describe}
 		/>
 		<GameTechGridRowView
 		  key={kGameTechRowKeys[19]}
@@ -3723,6 +3807,8 @@ struct GameTechRowsProps {
 		  index={19}
 		  width={props.width}
 		  height={props.height}
+		  onToggle={props.on_toggle}
+		  onDescribe={props.on_describe}
 		/>
 		<GameTechGridRowView
 		  key={kGameTechRowKeys[20]}
@@ -3730,6 +3816,8 @@ struct GameTechRowsProps {
 		  index={20}
 		  width={props.width}
 		  height={props.height}
+		  onToggle={props.on_toggle}
+		  onDescribe={props.on_describe}
 		/>
 		<GameTechGridRowView
 		  key={kGameTechRowKeys[21]}
@@ -3737,6 +3825,8 @@ struct GameTechRowsProps {
 		  index={21}
 		  width={props.width}
 		  height={props.height}
+		  onToggle={props.on_toggle}
+		  onDescribe={props.on_describe}
 		/>
 		<GameTechGridRowView
 		  key={kGameTechRowKeys[22]}
@@ -3744,6 +3834,8 @@ struct GameTechRowsProps {
 		  index={22}
 		  width={props.width}
 		  height={props.height}
+		  onToggle={props.on_toggle}
+		  onDescribe={props.on_describe}
 		/>
 		<GameTechGridRowView
 		  key={kGameTechRowKeys[23]}
@@ -3751,6 +3843,8 @@ struct GameTechRowsProps {
 		  index={23}
 		  width={props.width}
 		  height={props.height}
+		  onToggle={props.on_toggle}
+		  onDescribe={props.on_describe}
 		/>
 		<GameTechGridRowView
 		  key={kGameTechRowKeys[24]}
@@ -3758,6 +3852,8 @@ struct GameTechRowsProps {
 		  index={24}
 		  width={props.width}
 		  height={props.height}
+		  onToggle={props.on_toggle}
+		  onDescribe={props.on_describe}
 		/>
 		<GameTechGridRowView
 		  key={kGameTechRowKeys[25]}
@@ -3765,6 +3861,8 @@ struct GameTechRowsProps {
 		  index={25}
 		  width={props.width}
 		  height={props.height}
+		  onToggle={props.on_toggle}
+		  onDescribe={props.on_describe}
 		/>
 		<GameTechGridRowView
 		  key={kGameTechRowKeys[26]}
@@ -3772,6 +3870,8 @@ struct GameTechRowsProps {
 		  index={26}
 		  width={props.width}
 		  height={props.height}
+		  onToggle={props.on_toggle}
+		  onDescribe={props.on_describe}
 		/>
 		<GameTechGridRowView
 		  key={kGameTechRowKeys[27]}
@@ -3779,6 +3879,8 @@ struct GameTechRowsProps {
 		  index={27}
 		  width={props.width}
 		  height={props.height}
+		  onToggle={props.on_toggle}
+		  onDescribe={props.on_describe}
 		/>
 		<GameTechGridRowView
 		  key={kGameTechRowKeys[28]}
@@ -3786,6 +3888,8 @@ struct GameTechRowsProps {
 		  index={28}
 		  width={props.width}
 		  height={props.height}
+		  onToggle={props.on_toggle}
+		  onDescribe={props.on_describe}
 		/>
 		<GameTechGridRowView
 		  key={kGameTechRowKeys[29]}
@@ -3793,6 +3897,8 @@ struct GameTechRowsProps {
 		  index={29}
 		  width={props.width}
 		  height={props.height}
+		  onToggle={props.on_toggle}
+		  onDescribe={props.on_describe}
 		/>
 		<GameTechGridRowView
 		  key={kGameTechRowKeys[30]}
@@ -3800,6 +3906,8 @@ struct GameTechRowsProps {
 		  index={30}
 		  width={props.width}
 		  height={props.height}
+		  onToggle={props.on_toggle}
+		  onDescribe={props.on_describe}
 		/>
 		<GameTechGridRowView
 		  key={kGameTechRowKeys[31]}
@@ -3807,6 +3915,8 @@ struct GameTechRowsProps {
 		  index={31}
 		  width={props.width}
 		  height={props.height}
+		  onToggle={props.on_toggle}
+		  onDescribe={props.on_describe}
 		/>
 	</Box>
 }
@@ -3911,6 +4021,8 @@ struct GameTechTallPanelProps {
 	int y = 0;
 	int width = 0;
 	int height = 0;
+	std::function<void(int)> on_toggle = {};
+	std::function<void(int)> on_describe = {};
 };
 
 ::ui::UiElement GameTechTallPanel(const GameTechTallPanelProps& props) {
@@ -3932,7 +4044,14 @@ struct GameTechTallPanelProps {
 		  layout={absolute_layout(kGameTechSlotsX, kGameTechSlotsY, props.width - kGameTechSlotsX, 11)}
 		  style={palette_text_patch(kGameTechTextPalette, 133, 6, 11.0f)}
 		/>
-		<GameTechRows key="rows" state={props.state} width={props.width} height={props.height} />
+		<GameTechRows
+		  key="rows"
+		  state={props.state}
+		  width={props.width}
+		  height={props.height}
+		  onToggle={props.on_toggle}
+		  onDescribe={props.on_describe}
+		/>
 		<Text
 		  key="selected-name"
 		  value={props.state->techNameStr.c_str()}
@@ -3978,6 +4097,7 @@ struct GameTechUpperProps {
 	int peer_y = 0;
 	int peer_width = 0;
 	int peer_row_gap = 0;
+	std::function<void()> on_back = {};
 };
 
 ::ui::UiElement GameTechUpper(const GameTechUpperProps& props) {
@@ -4002,6 +4122,7 @@ struct GameTechUpperProps {
 		  y={props.back_y}
 		  width={props.back_width}
 		  height={props.back_height}
+		  onPress={props.on_back}
 		/>
 		<GameTechPeerName
 		  key="peer-0"
@@ -4260,6 +4381,7 @@ using ::ui::components::TextProps;
 		  peerY={props.game_tech_peer_y}
 		  peerWidth={props.game_tech_peer_width}
 		  peerRowGap={props.game_tech_peer_row_gap}
+		  onBack={props.game_tech_back}
 		/>
 		<lobby_chrome_frame_detail.GameTechTallPanel
 		  key="game-tech-tall"
@@ -4269,6 +4391,8 @@ using ::ui::components::TextProps;
 		  y={props.game_tech_tall_y}
 		  width={props.game_tech_tall_width}
 		  height={props.game_tech_tall_height}
+		  onToggle={props.game_tech_toggle}
+		  onDescribe={props.game_tech_describe}
 		/>
 		<lobby_chrome_frame_detail.AbsoluteChromeButton
 		  key="game-select-create"

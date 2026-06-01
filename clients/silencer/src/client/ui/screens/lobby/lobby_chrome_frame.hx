@@ -125,6 +125,9 @@ struct LobbyChromeFrameProps {
 	int game_tech_back_y = 0;
 	int game_tech_back_width = 0;
 	int game_tech_back_height = 0;
+	std::function<void()> game_tech_back = {};
+	std::function<void(int)> game_tech_toggle = {};
+	std::function<void(int)> game_tech_describe = {};
 	int game_tech_peer_x = 0;
 	int game_tech_peer_y = 0;
 	int game_tech_peer_width = 0;
