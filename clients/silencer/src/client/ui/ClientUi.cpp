@@ -185,8 +185,8 @@ std::vector<silencer::ui::UiAction> ClientUi::DispatchInput(
 		}
 	}
 	if(!top){
-		if(ctx.world.map.loaded){
-			MatchModel match = use_match(MakeMatchProvider(ctx));
+		MatchModel match = use_match(MakeMatchProvider(ctx));
+		if(match.active()){
 			clientui_detail::DispatchMatchActions(
 				match,
 				inGameOverlayFrameActive_ ? &inGameOverlayFrame_ : nullptr,
@@ -222,8 +222,8 @@ std::vector<silencer::ui::UiAction> ClientUi::DrainActions() {
 
 bool ClientUi::HasInputTarget(ScreenContext& ctx) const {
 	if(TopScreen()) return true;
-	if(!ctx.world.map.loaded) return false;
 	MatchModel match = use_match(MakeMatchProvider(ctx));
+	if(!match.active()) return false;
 	return match.hud.has_input_target();
 }
 
@@ -379,8 +379,8 @@ void ClientUi::RunPendingScreenRequest(ScreenContext& ctx) {
 void ClientUi::TickVisibleScreens(ScreenContext& ctx) {
 	NavigationProviderScope navigationScope(MakeNavigationProvider(ctx));
 	screens_.TickVisible(ctx);
-	if(ctx.world.map.loaded){
-		MatchModel match = use_match(MakeMatchProvider(ctx));
+	MatchModel match = use_match(MakeMatchProvider(ctx));
+	if(match.active()){
 		match.hud.update_overlay_state();
 	}
 }
@@ -389,8 +389,8 @@ void ClientUi::BuildVisibleScreens(ScreenContext& ctx, Surface& dst, float frame
 	inGameOverlayFrameActive_ = false;
 	NavigationProviderScope navigationScope(MakeNavigationProvider(ctx));
 	screens_.BuildVisible(ctx, dst, frametime, interactions_);
-	if(ctx.world.map.loaded){
-		MatchModel match = use_match(MakeMatchProvider(ctx));
+	MatchModel match = use_match(MakeMatchProvider(ctx));
+	if(match.active()){
 		HudView hudView = match.hud.snapshot();
 		const bool showQuitPrompt =
 			hudView.quitState == 1 || hudView.quitState == 2;

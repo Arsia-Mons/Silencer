@@ -102,10 +102,15 @@ class MatchModel {
 public:
 	explicit MatchModel(const MatchProviderValue& provider);
 
+	bool active() const;
+
 	MatchHudModel hud;
 	MatchChatModel chat;
 	MatchStationModel station;
 	MatchControlSurfaceModel control;
+
+private:
+	MatchProviderValue provider_;
 };
 
 MatchModel use_match(const MatchProviderValue& provider);

@@ -628,6 +628,10 @@ fail_if_match \
   --glob '!third_party/**'
 
 fail_if_match \
+  "ctx[.]world[.]map[.]loaded" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/ClientUi.cpp"
+
+fail_if_match \
   "\\bsprite_(bounds|frame)[[:space:]]*\\(" \
   "$REPO_ROOT/clients/silencer/src/client/ui/hooks/use_app.h"
 

@@ -341,10 +341,15 @@ MatchUiControlResult MatchControlSurfaceModel::configure(MatchUiControlMode mode
 }
 
 MatchModel::MatchModel(const MatchProviderValue& provider)
-	: hud(provider, provider.local_peer_id),
+	: provider_(provider),
+	  hud(provider, provider.local_peer_id),
 	  chat(provider, provider.local_peer_id),
 	  station(provider, provider.local_peer_id),
 	  control(provider) {}
+
+bool MatchModel::active() const {
+	return provider_.world && provider_.world->map.loaded;
+}
 
 MatchModel use_match(const MatchProviderValue& provider) {
 	return MatchModel(provider);
