@@ -26,7 +26,9 @@ function usage(): never {
       `       silencer-cli set_text --uid 1 --text "alice"   (textbox or textinput)\n` +
       `       silencer-cli select --label LISTBOX --index 0\n` +
       `       silencer-cli scroll --label "Controls List" [--amount 3]\n` +
-      `       silencer-cli show_password_modal\n` +
+      `       silencer-cli key --key enter|escape|up|down|left|right|backspace|<char>\n` +
+      `       silencer-cli show_password_modal [--title TEXT]\n` +
+      `       silencer-cli show_message_modal --title TEXT --message TEXT\n` +
       `       silencer-cli password_modal_result\n` +
       `       silencer-cli back\n` +
       `       silencer-cli screenshot [--out /path/x.png]\n` +
@@ -130,9 +132,14 @@ const STRING_FLAGS: Record<string, Record<string, Set<string>>> = {
 const STRING_FLAGS_NO_SUBOP: Record<string, Set<string>> = {
   click: new Set(["label"]),
   ingame_ui_mode: new Set(["mode", "chat_line"]),
-  set_text: new Set(["label"]),
+  set_text: new Set(["label", "text"]),
   select: new Set(["label"]),
   scroll: new Set(["label"]),
+  // `key` values like "enter"/"escape" are names, and single-digit keys ("1")
+  // must stay strings so the C++ handler reads them as typed characters.
+  key: new Set(["key"]),
+  show_password_modal: new Set(["title"]),
+  show_message_modal: new Set(["title", "message"]),
 };
 // Bindings within VARIADIC_FLAGS that accept comma-separated chord syntax:
 // `--bindings KEY:Up,KEY:Left` becomes JSON `[["KEY:Up","KEY:Left"]]` (an

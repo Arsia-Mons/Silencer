@@ -1,6 +1,8 @@
 #include "client/ui/app_shell/app_root.h"
 
 #include "client/ui/hooks/use_session.h"
+#include "client/ui/screens/main_menu.h"
+#include "client/ui/screens/update_screen.h"
 #include "ui/runtime/element.h"
 #include "ui/runtime/react.h"
 
@@ -9,9 +11,9 @@ namespace {
 
 // --- Per-phase scaffold view (migration placeholder) ---------------------
 // A full-viewport fill tinted per phase, so the phase reconciliation is
-// observable on-screen and in tests before the real screens land. SIL-18..21
-// replace make_phase_element's bodies with the authored screen views; AppRoot
-// and the session projection stay put.
+// observable on-screen and in tests for the phases whose real screens have not
+// landed yet. SIL-19..21 replace the remaining scaffold cases with the authored
+// screen views; AppRoot and the session projection stay put.
 struct PhaseScaffoldProps {
   ::ui::Color color = {};
 };
@@ -53,7 +55,7 @@ bool AppRoot::build_element(::ui::UiElementFrame &, ::ui::UiElement *out) {
   // once they replace the scaffolds).
   switch (phase) {
   case SessionPhase::MainMenu:
-    return phase_scaffold({32, 44, 72, 255}, "phase-main-menu");
+    return MainMenu("phase-main-menu");
   case SessionPhase::Connecting:
     return phase_scaffold({40, 64, 96, 255}, "phase-connecting");
   case SessionPhase::CharacterCreate:
@@ -61,7 +63,7 @@ bool AppRoot::build_element(::ui::UiElementFrame &, ::ui::UiElement *out) {
   case SessionPhase::Lobby:
     return phase_scaffold({36, 72, 60, 255}, "phase-lobby");
   case SessionPhase::Updating:
-    return phase_scaffold({80, 72, 32, 255}, "phase-updating");
+    return UpdateScreen("phase-updating");
   case SessionPhase::Loading:
     return phase_scaffold({56, 56, 56, 255}, "phase-loading");
   case SessionPhase::InMatch:

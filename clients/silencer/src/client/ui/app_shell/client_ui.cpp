@@ -16,6 +16,12 @@ static const char *screen_provider_key(UiScreenEntryId entry_id) {
   return ::ui::copy_string(key);
 }
 
+static const char *screen_layer_key(UiScreenEntryId entry_id) {
+  char key[64] = {};
+  snprintf(key, sizeof(key), "screen-layer-%u", entry_id);
+  return ::ui::copy_string(key);
+}
+
 static ::ui::UiElement LegacyScreenBuild(const LegacyScreenBuildProps &props) {
   if (props.screen)
     props.screen->build_ui();
@@ -65,8 +71,22 @@ void ClientUi::build_visible_screens(const UiElementWrapper &wrap_root) {
         if (wrap_root) {
           provider = wrap_root(provider);
         }
+        // Composite every visible screen as a full-bleed ABSOLUTE layer. All
+        // visible screens commit into one retained tree as direct children of
+        // the root, whose default flex column would otherwise stack them
+        // vertically (an overlay would land below the viewport). Absolute +
+        // inset 0 makes each screen fill the viewport and OVERLAP; paint order
+        // equals stack order, so overlays draw on top of the base phase screen.
+        ::ui::HostProps layer = {};
+        layer.key = screen_layer_key(screen->entry_id());
+        layer.style.position = ::ui::PositionType::Absolute;
+        layer.style.position_inset =
+            ::ui::EdgeSizes::all_edges(::ui::StyleValue::points(0.0f));
+        layer.style.width = ::ui::Length::percent(100.0f);
+        layer.style.height = ::ui::Length::percent(100.0f);
+        layer.children = ::ui::children({provider});
         ::ui::ReconcileResult result = ::ui::commit_retained_elements(
-            retained_tree_, retained_element_frame_, provider);
+            retained_tree_, retained_element_frame_, ::ui::box(layer));
         if (!result.ok) {
           react_report_error(
               "client/ui: failed to commit returned screen %s (errors=%d)\n",

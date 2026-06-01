@@ -11,7 +11,10 @@
 // SIL-14 golden cppx render path.
 #include "render/cppx_ui/pipeline_host.h"
 #include "client/ui/app_shell/app_root.h"
+#include "client/ui/app_shell/client_ui.h"
 #include "client/ui/app_theme.h"
+#include "client/ui/screens/message_modal.h"
+#include "client/ui/screens/password_modal.h"
 #include "client/ui/hooks/use_key_map.h"
 #include "client/ui/hooks/use_session.h"
 #include "client/ui/hooks/use_settings.h"
@@ -370,14 +373,23 @@ std::make_unique<client::ui::AppRoot>());
 cppxAppRootPushed = true;
 }
 
-// Minimal input for the scaffold cut: pointer only (the per-phase scaffolds
-// are non-interactive). Full nav/text routing through focus_update lands with
-// the real screens.
+// SIL-18 input: the accumulated per-frame edges (events.cpp windowed +
+// control-socket injection) plus the derived pointer. An injected click is a
+// single-frame press+release at a UI-space point (so the control socket can
+// activate a node by location); otherwise the real mouse drives hover/press.
 client::ui::UiPipelineFrame frame = {};
 frame.layout = {static_cast<float>(rw), static_cast<float>(rh)};
+frame.input = uiInput_;
 float mx = -1000.0f;
 float my = -1000.0f;
-if(win){
+if(injectedPointer_){
+mx = injectedPointerX_;
+my = injectedPointerY_;
+frame.input.pointer_pressed = true;
+frame.input.pointer_released = true;
+frame.input.pointer_down = false;
+frame.input.source = ::ui::UiFocusSource::Mouse;
+}else if(win){
 float wx = 0.0f;
 float wy = 0.0f;
 Uint32 buttons = SDL_GetMouseState(&wx, &wy);
@@ -386,8 +398,14 @@ int wh = 0;
 SDL_GetWindowSize(win, &ww, &wh);
 mx = (ww > 0) ? (wx / static_cast<float>(ww)) * static_cast<float>(rw) : wx;
 my = (wh > 0) ? (wy / static_cast<float>(wh)) * static_cast<float>(rh) : wy;
-frame.input.pointer_down = (buttons & SDL_BUTTON_MASK(SDL_BUTTON_LEFT)) != 0;
+bool down = (buttons & SDL_BUTTON_MASK(SDL_BUTTON_LEFT)) != 0;
+frame.input.pointer_down = down;
+frame.input.pointer_pressed = down && !prevPointerDown_;
+frame.input.pointer_released = !down && prevPointerDown_;
+if(down || frame.input.pointer_pressed || frame.input.pointer_released){
 frame.input.source = ::ui::UiFocusSource::Mouse;
+}
+prevPointerDown_ = down;
 }
 frame.pointer = {mx, my};
 
@@ -399,8 +417,52 @@ cppxUiRgba = rgba;
 cppxUiW = ow;
 cppxUiH = oh;
 }
+
+// Text-input platform gating (windowed only): the cppx pipeline reports whether
+// the focused node is a text field; toggle SDL text input to match. This is the
+// only owner of SDL_StartTextInput/StopTextInput (see src/game/CLAUDE.md).
+if(win){
+bool wants = cppxHost->pipeline().client_ui().wants_text_input();
+if(wants != textInputActive_){
+if(wants) SDL_StartTextInput(win); else SDL_StopTextInput(win);
+textInputActive_ = wants;
+}
+}
+
+// One-frame edges are consumed; reset for the next accumulation window.
+uiInput_ = {};
+injectedPointer_ = false;
 #else
 (void)surface;
 #endif
+}
+
+void GameUiPipeline::InjectPointerClick(float x, float y) {
+injectedPointer_ = true;
+injectedPointerX_ = x;
+injectedPointerY_ = y;
+}
+
+client::ui::ClientUi * GameUiPipeline::TryClientUi() {
+return cppxHost ? &cppxHost->pipeline().client_ui() : nullptr;
+}
+
+void GameUiPipeline::ShowPasswordModal(const char * title) {
+client::ui::ClientUi * ui = TryClientUi();
+if(!ui) return;
+passwordModal_ = {true, false, {}};
+ui->push_screen(std::make_unique<client::ui::PasswordModalScreen>(
+title ? title : "Password",
+[this](const std::string & value){
+passwordModal_.submitted = true;
+passwordModal_.value = value;
+}));
+}
+
+void GameUiPipeline::ShowMessageModal(const char * title, const char * message) {
+client::ui::ClientUi * ui = TryClientUi();
+if(!ui) return;
+ui->push_screen(std::make_unique<client::ui::MessageModalScreen>(
+title ? title : "", message ? message : ""));
 }
 

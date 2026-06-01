@@ -2,8 +2,10 @@
 #define GAME_UI_PIPELINE_H
 
 #include "surface.h"
+#include "ui/input.h"
 #include <cstdint>
 #include <memory>
+#include <string>
 
 class Game;
 
@@ -12,6 +14,7 @@ class PipelineHost;
 }
 namespace client::ui {
 enum class SessionPhase;
+class ClientUi;
 }
 
 // Owns the live client UI for one frame. SIL-14/15: the golden retained cppx
@@ -35,6 +38,34 @@ void RenderClientUiFrame(Surface & surface, float frametime);
 // cppx path did not render this frame. Owned by the PipelineHost; valid until
 // the next RenderClientUiFrame.
 const uint8_t * CppxUiFrame(int & outW, int & outH) const;
+
+// --- UI input + control-socket automation seam (SIL-18) ----------------
+// The per-frame UI input frame. The single SDL-event site (events.cpp, windowed)
+// and the control socket (headless automation) accumulate nav/confirm/cancel/
+// key/text edges here; RenderCppxClientUiFrame consumes it, then clears the
+// one-frame edges.
+::ui::UiInputFrame & UiInput() { return uiInput_; }
+// Inject a single-frame pointer click (press+release) at a UI-space point, so
+// the control socket can activate a node by location.
+void InjectPointerClick(float x, float y);
+// The live retained UI tree owner, or null before the first cppx frame. The
+// control socket reads it for introspection (read-only tree + focus snapshots,
+// no friend/handle leak).
+client::ui::ClientUi * TryClientUi();
+// Push the props-only modal overlays (control socket today; screen-driven flows
+// in later slices). Direct (non-queued) push: it adds to the screen stack
+// immediately, surviving the next frame's begin_frame (which clears only the
+// mutation queue).
+void ShowPasswordModal(const char * title);
+void ShowMessageModal(const char * title, const char * message);
+// The latest password-modal interaction, for the control socket's
+// password_modal_result op.
+struct PasswordModalResult {
+bool open = false;
+bool submitted = false;
+std::string value;
+};
+const PasswordModalResult & PasswordModal() const { return passwordModal_; }
 
 private:
 void RenderCppxClientUiFrame(Surface & surface);
@@ -62,6 +93,16 @@ CommittedSettings committedSettings_ = {};
 bool committedSettingsInit_ = false;
 // SIL-15 use_key_map dirty flag (the live KeyMap has no dirty bit).
 bool keymapDirty_ = false;
+
+// SIL-18 UI input: the per-frame edges (events.cpp + control socket) and the
+// derived pointer state. Cleared each frame after the pipeline consumes them.
+::ui::UiInputFrame uiInput_ = {};
+bool injectedPointer_ = false;
+float injectedPointerX_ = 0.0f;
+float injectedPointerY_ = 0.0f;
+bool prevPointerDown_ = false;
+bool textInputActive_ = false;
+PasswordModalResult passwordModal_ = {};
 };
 
 #endif

@@ -48,6 +48,10 @@ const SDL_Color * GetPaletteColors() const { return gameRenderer.GetPaletteColor
 // capture (TUI/headless). SIL-11.
 bool CaptureCompositedFrame(const char * path);
 Renderer & GetRenderer() { return renderer; }
+// The cppx UI composition root. Public so the control socket can introspect the
+// retained UI tree and inject automation input (SIL-18) without a friend grant;
+// gameplay code drives navigation through the session-phase reconciler.
+GameUiPipeline & GetUiPipeline() { return gameUiPipeline; }
 bool ResizeRenderSurface(int width, int height);
 bool ResizeRenderSurfacePixels(int width, int height);
 bool SyncRenderSurfaceToWindowPixels();

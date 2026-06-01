@@ -1,0 +1,92 @@
+#include "client/ui/screens/update_screen.h"
+
+#include "client/ui/components/actions/actions.h"
+#include "client/ui/components/layout/layout.h"
+#include "client/ui/components/surfaces/surfaces.h"
+#include "client/ui/components/text/text.h"
+#include "client/ui/hooks/use_updater.h"
+#include "ui/runtime/react.h"
+
+namespace client::ui {
+namespace {
+
+// The JSX lowering emits each tag's component function + `<Tag>Props` type
+// unqualified, so the silencer semantic layer (functions + Props + variant
+// enums) is pulled wholesale into this TU-local namespace, plus the runtime's
+// `children()` child-list builder.
+using namespace silencer;
+using ::ui::children;
+
+struct UpdateScreenProps {
+  uint32_t unused = 0;
+};
+
+const char *phase_label(UpdaterPhase phase) {
+  switch (phase) {
+  case UpdaterPhase::Idle:
+    return "Up to date";
+  case UpdaterPhase::Prompting:
+    return "An update is available";
+  case UpdaterPhase::Downloading:
+    return "Downloading update";
+  case UpdaterPhase::Verifying:
+    return "Verifying update";
+  case UpdaterPhase::Staging:
+    return "Installing update";
+  case UpdaterPhase::Failed:
+    return "Update failed";
+  case UpdaterPhase::Done:
+    return "Update ready - restart to apply";
+  }
+  return "";
+}
+
+::ui::UiElement UpdateScreenView(const UpdateScreenProps &) {
+  UpdaterModel updater = use_updater();
+
+  // Action availability is expressed through `disabled`, not conditional JSX
+  // (the transpiler does not lower JSX inside C++ expressions): consent only
+  // while prompting, retry only when the updater says it can.
+  bool can_consent = updater.phase == UpdaterPhase::Prompting;
+  const char *progress_text =
+      use_text_storage("%d%%", static_cast<int>(updater.progress * 100.0f));
+
+  return <ScreenLayout key="root" variant={ScreenLayoutVariant::Menu}>
+    <Panel key="panel" variant={PanelVariant::Hero}>
+      <ScreenTitle key="title" variant={ScreenTitleVariant::Hero} value="Software Update" />
+      <ScreenSubtitle key="phase" value={phase_label(updater.phase)} />
+      <BodyText key="progress" variant={BodyTextVariant::Body} value={progress_text} />
+      <BodyText
+        key="error"
+        variant={BodyTextVariant::Message}
+        tone={BodyTextTone::Disabled}
+        value={updater.error.c_str()}
+      />
+      <AppButton
+        key="consent"
+        controlId="UpdateConsent"
+        variant={AppButtonVariant::Primary}
+        disabled={!can_consent}
+        label="Update Now"
+        onPress={updater.consent}
+      />
+      <AppButton
+        key="retry"
+        controlId="UpdateRetry"
+        disabled={!updater.can_retry}
+        label="Retry"
+        onPress={updater.retry}
+      />
+      <AppButton key="cancel" controlId="UpdateCancel" label="Cancel" onPress={updater.cancel} />
+    </Panel>
+  </ScreenLayout>
+}
+
+} // namespace
+
+::ui::UiElement UpdateScreen(const char *key) {
+  return ::ui::component("UpdateScreen", UpdateScreenProps{}, UpdateScreenView,
+                         key);
+}
+
+} // namespace client::ui

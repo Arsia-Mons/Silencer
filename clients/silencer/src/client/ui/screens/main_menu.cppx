@@ -1,0 +1,67 @@
+#include "client/ui/screens/main_menu.h"
+
+#include "client/ui/components/actions/actions.h"
+#include "client/ui/components/layout/layout.h"
+#include "client/ui/components/surfaces/surfaces.h"
+#include "client/ui/components/text/text.h"
+#include "client/ui/hooks/use_app.h"
+#include "client/ui/hooks/use_session.h"
+#include "ui/runtime/react.h"
+
+namespace client::ui {
+namespace {
+
+// The JSX lowering emits each tag's component function + `<Tag>Props` type
+// unqualified, so the silencer semantic layer (functions + Props + variant
+// enums) is pulled wholesale into this TU-local namespace, plus the runtime's
+// `children()` child-list builder.
+using namespace silencer;
+using ::ui::children;
+
+struct MainMenuProps {
+  uint32_t unused = 0;
+};
+
+::ui::UiElement MainMenuView(const MainMenuProps &) {
+  Session session = use_session();
+  App app = use_app();
+
+  // The three SIL-18 actions whose intents are live: play online, the
+  // single-player tutorial, and quit. Lobby/options/character-create entries
+  // join as their screens land (SIL-19..SIL-21); the menu names no screen that
+  // does not yet exist.
+  return <ScreenLayout key="root" variant={ScreenLayoutVariant::Menu}>
+    <Panel key="panel" variant={PanelVariant::Hero}>
+      <ScreenTitle key="title" variant={ScreenTitleVariant::Hero} value="SILENCER" />
+      <ScreenSubtitle key="subtitle" value="Tactical multiplayer action" />
+      <AppButton
+        key="play"
+        controlId="PlayOnline"
+        variant={AppButtonVariant::Primary}
+        label="Play Online"
+        onPress={session.play_online}
+      />
+      <AppButton
+        key="tutorial"
+        controlId="Tutorial"
+        label="Tutorial"
+        onPress={session.start_tutorial}
+      />
+      <AppButton
+        key="quit"
+        controlId="Quit"
+        disabled={!app.can_quit}
+        label="Quit"
+        onPress={app.quit}
+      />
+    </Panel>
+  </ScreenLayout>
+}
+
+} // namespace
+
+::ui::UiElement MainMenu(const char *key) {
+  return ::ui::component("MainMenu", MainMenuProps{}, MainMenuView, key);
+}
+
+} // namespace client::ui

@@ -29,8 +29,11 @@ fail_if_path_exists "clients/silencer/src/ui/clay"
 fail_if_path_exists "clients/silencer/src/ui/runtime/clay_inspector.h"
 fail_if_path_exists "clients/silencer/src/ui/runtime/clay_inspector.cpp"
 
+# The legacy Clay layer lived at src/ui/{modals,panels,screens}; ban references
+# to those exact paths. (The live cppx app-shell screens are a distinct, allowed
+# location: src/client/ui/screens — golden's layout. SIL-18.)
 fail_if_match \
-  "\\b(currentinterface|ProcessInGameInterfaces|Interface \\*|new Interface|ui/modals|ui/panels|ui/screens)\\b" \
+  "\\b(currentinterface|ProcessInGameInterfaces|Interface \\*|new Interface|src/ui/modals|src/ui/panels|src/ui/screens)\\b" \
   "$REPO_ROOT/clients/silencer/src" \
   --glob '!third_party/**'
 
@@ -67,6 +70,16 @@ if rg -n "SDL_EVENT_KEY_DOWN|SDL_EVENT_KEY_UP|SDL_KEYDOWN|SDL_KEYUP|SDL_PollEven
   "$REPO_ROOT/clients/silencer/src/client/ui" \
   "$REPO_ROOT/clients/silencer/src/ui/runtime"; then
   echo "client UI and ui/runtime must not consume raw SDL key events" >&2
+  exit 1
+fi
+
+# src/ui (the golden retained runtime + styling substrate) is SDL-free by
+# construction: it speaks the RGBA DrawCommand IR and the injected text-measure
+# seam, never SDL directly. SIL-18 wires real input, but only the game/event
+# layer touches SDL — the ui/ substrate must not gain an SDL include.
+if rg -n '#include +[<"]SDL' \
+  "$REPO_ROOT/clients/silencer/src/ui"; then
+  echo "src/ui runtime/styling must stay SDL-free (no SDL includes)" >&2
   exit 1
 fi
 

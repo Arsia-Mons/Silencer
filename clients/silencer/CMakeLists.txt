@@ -241,6 +241,18 @@ set(SILENCER_CPPX_SOURCES
 	src/client/ui/components/text/screen_subtitle.hx
 	src/client/ui/components/text/body_text.cppx
 	src/client/ui/components/text/body_text.hx
+	# Screens (SIL-18): the lowest-coupling screen views authored as cppx. Phase
+	# screens (MainMenu/UpdateScreen) are keyed component factories returned by
+	# AppRoot::make_phase_element; the modals are props-only OverlayScreens
+	# pushed via use_navigation.
+	src/client/ui/screens/main_menu.cppx
+	src/client/ui/screens/main_menu.hx
+	src/client/ui/screens/update_screen.cppx
+	src/client/ui/screens/update_screen.hx
+	src/client/ui/screens/message_modal.cppx
+	src/client/ui/screens/message_modal.hx
+	src/client/ui/screens/password_modal.cppx
+	src/client/ui/screens/password_modal.hx
 )
 cppx_transpile(SILENCER_CPPX_GENERATED ${SILENCER_CPPX_SOURCES})
 target_sources(${SILENCER_TARGET} PRIVATE ${SILENCER_CPPX_GENERATED})
@@ -417,9 +429,13 @@ set(_cppx_app_shell_sources
 add_executable(client_ui_tests
 	tests/client_ui_tests.cpp
 	${_cppx_app_shell_sources}
-	${_cppx_retained_sources})
+	${_cppx_retained_sources}
+	# SIL-18: app_root.cpp's make_phase_element now names the authored screens,
+	# which compose the generated component + screen TUs.
+	${SILENCER_CPPX_GENERATED})
 target_compile_features(client_ui_tests PRIVATE cxx_std_20)
-target_include_directories(client_ui_tests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src")
+target_include_directories(client_ui_tests PRIVATE
+	"${CMAKE_CURRENT_SOURCE_DIR}/src" ${SILENCER_CPPX_INCLUDE_DIRS})
 target_link_libraries(client_ui_tests PRIVATE yogacore)
 if(MSVC)
 	target_compile_definitions(client_ui_tests PRIVATE NOMINMAX)
@@ -430,9 +446,13 @@ add_executable(ui_pipeline_tests
 	tests/ui_pipeline_tests.cpp
 	src/client/ui/app_shell/ui_pipeline.cpp
 	${_cppx_app_shell_sources}
-	${_cppx_retained_sources})
+	${_cppx_retained_sources}
+	# SIL-18: app_root.cpp's make_phase_element now names the authored screens,
+	# which compose the generated component + screen TUs.
+	${SILENCER_CPPX_GENERATED})
 target_compile_features(ui_pipeline_tests PRIVATE cxx_std_20)
-target_include_directories(ui_pipeline_tests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src")
+target_include_directories(ui_pipeline_tests PRIVATE
+	"${CMAKE_CURRENT_SOURCE_DIR}/src" ${SILENCER_CPPX_INCLUDE_DIRS})
 target_link_libraries(ui_pipeline_tests PRIVATE yogacore)
 if(MSVC)
 	target_compile_definitions(ui_pipeline_tests PRIVATE NOMINMAX)

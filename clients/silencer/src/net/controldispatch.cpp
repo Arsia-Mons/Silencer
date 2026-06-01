@@ -6,10 +6,16 @@
 #include "gasloader.h"
 #include "os.h"
 #include "shared.h"
+#include "client/ui/app_shell/client_ui.h"
+#include "ui/game_ui_pipeline.h"
+#include "ui/input.h"
+#include "ui/runtime/focus.h"
+#include "ui/runtime/tree.h"
 #include <SDL3/SDL_keyboard.h>
 #include <cstring>
 #include <cstdio>
 #include <fstream>
+#include <string>
 #include <utility>
 #ifdef _WIN32
 #include <direct.h>
@@ -22,13 +28,116 @@
 namespace ControlDispatch {
 
 namespace {
-// UI-introspection/automation ops were bound to the deleted legacy
-// immediate-mode UI layer (its registry/screen-stack/screen-context bag). The
-// live UI is now the golden cppx path, which has no introspection surface yet.
-// These ops return a structured UNSUPPORTED error until cppx screens land
-// (SIL-18+).
+// A handful of list-oriented UI ops (select/scroll/hover_at) are bound to
+// screens that land in later slices (Options/lobby lists, SIL-19/20). They
+// return a structured UNSUPPORTED error until then. inspect/click/set_text/key
+// and the modal ops are live against the retained cppx tree (SIL-18).
 const char * const kUiUnsupportedMsg =
-	"UI introspection unavailable on cppx path (pending SIL-18+ screens)";
+	"UI op unavailable on cppx path yet (pending later screen slices)";
+
+// --- cppx UI introspection + automation (SIL-18) -------------------------
+// Read-only walks of the retained UiTree (client::ui::ClientUi) + a small
+// injection seam through GameUiPipeline. No friend grant, no handle leak: the
+// control socket sees node snapshots and pushes UiInputFrame edges only.
+
+const char * NodeRoleName(::ui::NodeRole role){
+	switch(role){
+		case ::ui::NodeRole::Box: return "box";
+		case ::ui::NodeRole::Text: return "text";
+		case ::ui::NodeRole::Button: return "button";
+		case ::ui::NodeRole::Input: return "input";
+		case ::ui::NodeRole::Checkbox: return "checkbox";
+		case ::ui::NodeRole::Dialog: return "dialog";
+		case ::ui::NodeRole::Generic: return "generic";
+	}
+	return "generic";
+}
+
+// A node matches a name if its control id OR accessibility label OR text value
+// equals it (control id first — it's the stable automation handle).
+bool NodeMatchesName(const ::ui::NodeSnapshot& s, const std::string& name){
+	if(s.control_id && name == s.control_id) return true;
+	if(s.accessibility_label && name == s.accessibility_label) return true;
+	if(s.value && name == s.value) return true;
+	return false;
+}
+
+// First node (pre-order) matching `name`. When focusableOnly, a non-focusable
+// match (e.g. a label text node) never shadows the focusable control carrying
+// the same label.
+::ui::NodeId FindUiNode(const ::ui::UiTree& tree, ::ui::NodeId id,
+                        const std::string& name, bool focusableOnly,
+                        ::ui::NodeSnapshot* out){
+	::ui::NodeSnapshot s = {};
+	if(tree.snapshot(id, &s)){
+		if((!focusableOnly || s.interaction.focusable) && NodeMatchesName(s, name)){
+			if(out) *out = s;
+			return id;
+		}
+	}
+	for(int i = 0; i < tree.child_count(id); ++i){
+		::ui::NodeId found = FindUiNode(tree, tree.child_at(id, i), name,
+		                                focusableOnly, out);
+		if(found) return found;
+	}
+	return 0;
+}
+
+void CollectUiNodes(const ::ui::UiTree& tree, ::ui::NodeId id,
+                    ::ui::NodeId focused, ::ui::NodeId hovered,
+                    nlohmann::json& out){
+	::ui::NodeSnapshot s = {};
+	if(tree.snapshot(id, &s)){
+		nlohmann::json n;
+		n["id"] = static_cast<uint64_t>(id);
+		n["type"] = s.type ? s.type : "";
+		n["role"] = NodeRoleName(s.role);
+		if(s.control_id && s.control_id[0]) n["control_id"] = s.control_id;
+		if(s.accessibility_label && s.accessibility_label[0]) n["label"] = s.accessibility_label;
+		if(s.value && s.value[0]) n["value"] = s.value;
+		n["focusable"] = s.interaction.focusable;
+		n["disabled"] = s.interaction.disabled;
+		n["focused"] = (focused != 0 && id == focused);
+		n["hovered"] = (hovered != 0 && id == hovered);
+		n["x"] = s.layout.x;
+		n["y"] = s.layout.y;
+		n["w"] = s.layout.width;
+		n["h"] = s.layout.height;
+		out.push_back(std::move(n));
+	}
+	for(int i = 0; i < tree.child_count(id); ++i){
+		CollectUiNodes(tree, tree.child_at(id, i), focused, hovered, out);
+	}
+}
+
+// Translate a `key` op value into per-frame UiInputFrame edges. Single-character
+// values are typed text (routed to the focused field); named keys map to nav /
+// confirm / cancel / editing keys.
+void InjectKeyOp(::ui::UiInputFrame& ui, const std::string& key){
+	ui.source = ::ui::UiFocusSource::Keyboard;
+	if(key.size() == 1){
+		char buf[2] = {key[0], '\0'};
+		::ui::ui_input_push_text(ui, buf);
+		return;
+	}
+	if(key == "enter" || key == "return"){
+		ui.confirm_pressed = true;
+		ui.confirm_down = true;
+	}else if(key == "space"){
+		::ui::ui_input_push_text(ui, " ");
+	}else if(key == "escape" || key == "esc"){
+		ui.cancel_pressed = true;
+		ui.cancel_down = true;
+	}else if(key == "up"){ ui.nav_up = true;
+	}else if(key == "down" || key == "tab"){ ui.nav_down = true;
+	}else if(key == "left"){ ui.nav_left = true;
+	}else if(key == "right"){ ui.nav_right = true;
+	}else if(key == "backspace"){
+		::ui::ui_input_push_key(ui, ::ui::UiKey::Backspace);
+	}else if(key == "delete"){
+		::ui::ui_input_push_key(ui, ::ui::UiKey::DeleteForward);
+	}
+}
 }
 
 ControlCommand::Phase PhaseFor(const std::string& op) {
@@ -168,25 +277,138 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 		return;
 	}
 	if(cmd.op == "inspect"){
-		cmd.reply->set_value(Err(cmd.id, "UNSUPPORTED", kUiUnsupportedMsg));
+		client::ui::ClientUi * ui = game.GetUiPipeline().TryClientUi();
+		if(!ui){
+			cmd.reply->set_value(Err(cmd.id, "WRONG_STATE",
+				"cppx UI has not rendered a frame yet"));
+			return;
+		}
+		const ::ui::UiTree & tree = ui->retained_tree();
+		::ui::NodeId focused = ::ui::focus_focused_id(ui->retained_focus());
+		::ui::NodeId hovered = ::ui::focus_hovered_id(ui->retained_focus());
+		nlohmann::json nodes = nlohmann::json::array();
+		if(tree.contains(tree.root_id())){
+			CollectUiNodes(tree, tree.root_id(), focused, hovered, nodes);
+		}
+		nlohmann::json r;
+		r["nodes"] = std::move(nodes);
+		r["focused_id"] = static_cast<uint64_t>(focused);
+		cmd.reply->set_value(OkResult(cmd.id, r));
 		return;
 	}
 	if(cmd.op == "world_state"){
 		cmd.reply->set_value(OkResult(cmd.id, WorldSummaryToJson(game.GetWorldSummary())));
 		return;
 	}
-	if(cmd.op == "show_password_modal" || cmd.op == "password_modal_result"){
-		cmd.reply->set_value(Err(cmd.id, "UNSUPPORTED", kUiUnsupportedMsg));
+	if(cmd.op == "show_password_modal"){
+		if(!game.GetUiPipeline().TryClientUi()){
+			cmd.reply->set_value(Err(cmd.id, "WRONG_STATE",
+				"cppx UI has not rendered a frame yet"));
+			return;
+		}
+		std::string title = cmd.args.value("title", std::string("Password"));
+		game.GetUiPipeline().ShowPasswordModal(title.c_str());
+		cmd.reply->set_value(OkResult(cmd.id, nlohmann::json::object()));
+		return;
+	}
+	if(cmd.op == "password_modal_result"){
+		const GameUiPipeline::PasswordModalResult & res = game.GetUiPipeline().PasswordModal();
+		nlohmann::json r;
+		r["open"] = res.open;
+		r["submitted"] = res.submitted;
+		r["value"] = res.value;
+		cmd.reply->set_value(OkResult(cmd.id, r));
+		return;
+	}
+	if(cmd.op == "show_message_modal"){
+		if(!game.GetUiPipeline().TryClientUi()){
+			cmd.reply->set_value(Err(cmd.id, "WRONG_STATE",
+				"cppx UI has not rendered a frame yet"));
+			return;
+		}
+		std::string title = cmd.args.value("title", std::string("Message"));
+		std::string message = cmd.args.value("message", std::string());
+		game.GetUiPipeline().ShowMessageModal(title.c_str(), message.c_str());
+		cmd.reply->set_value(OkResult(cmd.id, nlohmann::json::object()));
 		return;
 	}
 	if(cmd.op == "ingame_ui_mode"){
 		cmd.reply->set_value(Err(cmd.id, "UNSUPPORTED", kUiUnsupportedMsg));
 		return;
 	}
-	if(cmd.op == "click" ||
-	   cmd.op == "click_at" ||
-	   cmd.op == "hover_at" ||
-	   cmd.op == "set_text" ||
+	if(cmd.op == "click"){
+		client::ui::ClientUi * ui = game.GetUiPipeline().TryClientUi();
+		if(!ui){
+			cmd.reply->set_value(Err(cmd.id, "WRONG_STATE",
+				"cppx UI has not rendered a frame yet"));
+			return;
+		}
+		std::string label = cmd.args.value("label", std::string());
+		if(label.empty()){
+			cmd.reply->set_value(Err(cmd.id, "BAD_ARGS", "click requires --label"));
+			return;
+		}
+		const ::ui::UiTree & tree = ui->retained_tree();
+		::ui::NodeSnapshot s = {};
+		::ui::NodeId node = FindUiNode(tree, tree.root_id(), label, true, &s);
+		if(!node){
+			cmd.reply->set_value(Err(cmd.id, "NOT_FOUND", "no focusable widget: " + label));
+			return;
+		}
+		// Activate by location: a single-frame pointer press+release at the
+		// node center drives the real focus/hit-test path next render.
+		game.GetUiPipeline().InjectPointerClick(s.layout.x + s.layout.width * 0.5f,
+		                                        s.layout.y + s.layout.height * 0.5f);
+		nlohmann::json r;
+		r["widget_id"] = static_cast<uint64_t>(node);
+		cmd.reply->set_value(OkResult(cmd.id, r));
+		return;
+	}
+	if(cmd.op == "click_at"){
+		if(!game.GetUiPipeline().TryClientUi()){
+			cmd.reply->set_value(Err(cmd.id, "WRONG_STATE",
+				"cppx UI has not rendered a frame yet"));
+			return;
+		}
+		float x = cmd.args.value("x", -1.0f);
+		float y = cmd.args.value("y", -1.0f);
+		if(x < 0.0f || y < 0.0f){
+			cmd.reply->set_value(Err(cmd.id, "BAD_ARGS", "click_at requires --x --y"));
+			return;
+		}
+		game.GetUiPipeline().InjectPointerClick(x, y);
+		cmd.reply->set_value(OkResult(cmd.id, nlohmann::json::object()));
+		return;
+	}
+	if(cmd.op == "set_text"){
+		client::ui::ClientUi * ui = game.GetUiPipeline().TryClientUi();
+		if(!ui){
+			cmd.reply->set_value(Err(cmd.id, "WRONG_STATE",
+				"cppx UI has not rendered a frame yet"));
+			return;
+		}
+		std::string label = cmd.args.value("label", std::string());
+		std::string text = cmd.args.value("text", std::string());
+		if(label.empty()){
+			cmd.reply->set_value(Err(cmd.id, "BAD_ARGS", "set_text requires --label"));
+			return;
+		}
+		const ::ui::UiTree & tree = ui->retained_tree();
+		::ui::NodeSnapshot s = {};
+		::ui::NodeId node = FindUiNode(tree, tree.root_id(), label, true, &s);
+		if(!node){
+			cmd.reply->set_value(Err(cmd.id, "NOT_FOUND", "no text field: " + label));
+			return;
+		}
+		// Focus the field (click) and deliver the text in the same frame: the
+		// focus pass runs before text dispatch, so the field receives the insert.
+		game.GetUiPipeline().InjectPointerClick(s.layout.x + s.layout.width * 0.5f,
+		                                        s.layout.y + s.layout.height * 0.5f);
+		::ui::ui_input_push_text(game.GetUiPipeline().UiInput(), text.c_str());
+		cmd.reply->set_value(OkResult(cmd.id, nlohmann::json::object()));
+		return;
+	}
+	if(cmd.op == "hover_at" ||
 	   cmd.op == "select" ||
 	   cmd.op == "scroll"){
 		cmd.reply->set_value(Err(cmd.id, "UNSUPPORTED", kUiUnsupportedMsg));
@@ -228,7 +450,22 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 		HandleGas(game, cmd);
 		return;
 	}
-	if(cmd.op == "lobby_show_panel" || cmd.op == "key"){
+	if(cmd.op == "key"){
+		if(!game.GetUiPipeline().TryClientUi()){
+			cmd.reply->set_value(Err(cmd.id, "WRONG_STATE",
+				"cppx UI has not rendered a frame yet"));
+			return;
+		}
+		std::string key = cmd.args.value("key", std::string());
+		if(key.empty()){
+			cmd.reply->set_value(Err(cmd.id, "BAD_ARGS", "key requires --key"));
+			return;
+		}
+		InjectKeyOp(game.GetUiPipeline().UiInput(), key);
+		cmd.reply->set_value(OkResult(cmd.id, nlohmann::json::object()));
+		return;
+	}
+	if(cmd.op == "lobby_show_panel"){
 		cmd.reply->set_value(Err(cmd.id, "UNSUPPORTED", kUiUnsupportedMsg));
 		return;
 	}
