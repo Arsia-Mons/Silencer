@@ -125,8 +125,10 @@ inline ::ui::LayoutStyle absolute_button_layout(int x,
 	};
 }
 
-struct GameSelectCreateButtonProps {
+struct AbsoluteChromeButtonProps {
 	const char * key = nullptr;
+	const char * id = nullptr;
+	const char * label = nullptr;
 	bool show = false;
 	int x = 0;
 	int y = 0;
@@ -134,13 +136,13 @@ struct GameSelectCreateButtonProps {
 	int height = 0;
 };
 
-::ui::UiElement GameSelectCreateButton(const GameSelectCreateButtonProps& props) {
+::ui::UiElement AbsoluteChromeButton(const AbsoluteChromeButtonProps& props) {
 	if(!props.show) return ::ui::empty();
 	return <Button
 	  key={props.key}
-	  id="lobby.game_select.create"
-	  label="Create Game"
-	  accessibility={{.label = "Create Game"}}
+	  id={props.id}
+	  label={props.label}
+	  accessibility={{.label = props.label}}
 	  layout={absolute_button_layout(props.x, props.y, props.width, props.height)}
 	  style={chrome_button_patch()}
 	/>
@@ -214,13 +216,35 @@ using ::ui::components::TextProps;
 			  style={lobby_chrome_frame_detail::chrome_button_patch()}
 			/>
 		</Box>
-		<lobby_chrome_frame_detail.GameSelectCreateButton
+		<lobby_chrome_frame_detail.AbsoluteChromeButton
 		  key="game-select-create"
+		  id="lobby.game_select.create"
+		  label="Create Game"
 		  show={props.show_game_select_create}
 		  x={props.game_select_create_x}
 		  y={props.game_select_create_y}
 		  width={props.game_select_create_width}
 		  height={props.game_select_create_height}
+		/>
+		<lobby_chrome_frame_detail.AbsoluteChromeButton
+		  key="game-select-spectate"
+		  id="lobby.game_select.spectate"
+		  label="Spectate"
+		  show={props.show_game_select_spectate}
+		  x={props.game_select_spectate_x}
+		  y={props.game_select_spectate_y}
+		  width={props.game_select_action_width}
+		  height={props.game_select_action_height}
+		/>
+		<lobby_chrome_frame_detail.AbsoluteChromeButton
+		  key="game-select-join"
+		  id="lobby.game_select.join"
+		  label="Join Game"
+		  show={props.show_game_select_join}
+		  x={props.game_select_join_x}
+		  y={props.game_select_join_y}
+		  width={props.game_select_action_width}
+		  height={props.game_select_action_height}
 		/>
 	</Box>
 }

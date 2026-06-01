@@ -5,7 +5,6 @@
 #include "runtime/UiInteractionRegistry.h"
 #include "primitives/box.h"
 #include "primitives/text.h"
-#include "primitives/button.h"
 #include "primitives/scroll_list.h"
 
 #include <algorithm>
@@ -15,11 +14,6 @@
 using silencer::ui::primitives::Text;
 using silencer::ui::primitives::TextSize;
 using silencer::ui::primitives::Box;
-using silencer::ui::primitives::Button;
-using silencer::ui::primitives::ButtonHandle;
-using silencer::ui::primitives::ButtonOpts;
-using silencer::ui::primitives::ButtonSize;
-using silencer::ui::primitives::ButtonVariant;
 using silencer::ui::primitives::ScrollList;
 using silencer::ui::primitives::ScrollListHandle;
 using silencer::ui::primitives::ScrollListOpts;
@@ -48,8 +42,6 @@ constexpr uint16_t kTallButtonGap      = 2;
 
 constexpr int kMaxRows = 256;
 Clay_String g_itemSlab[kMaxRows];
-constexpr const char * kActionJoin = "lobby.game_select.join";
-constexpr const char * kActionSpectate = "lobby.game_select.spectate";
 constexpr const char * kActionRowPrefix = "lobby.game_select.row";
 
 struct GameSelectTallLayout {
@@ -173,49 +165,6 @@ void BuildGameSelectList(const GameSelectPanelState & state,
 	}
 }
 
-void BuildGameSelectActionButtons(const GameSelectPanelState & state,
-                                  silencer::ui::UiInteractionRegistry& interactions) {
-	CLAY({ .id = CLAY_ID("GSelButtons"),
-	       .layout = {
-	           .childGap = kTallButtonGap,
-	           .layoutDirection = CLAY_TOP_TO_BOTTOM,
-	       } }) {
-		// Fixed-height slots keep the footer stable regardless of which
-		// actions are available for the current selection.
-		CLAY({ .id = CLAY_ID("GSelBtnSpectateWrap"),
-		       .layout = {
-		           .sizing = { CLAY_SIZING_GROW(0),
-		                       CLAY_SIZING_FIXED(kTallButtonRowH) },
-		           .childAlignment = { .x = CLAY_ALIGN_X_CENTER },
-		       } }) {
-			if(state.spectateVisible){
-				Button(CLAY_STRING("GameSelectSpectateButton"), CLAY_STRING("Spectate"),
-				           ButtonOpts{ .variant = ButtonVariant::Chrome,
-				                       .size = ButtonSize::Compact },
-				           ButtonHandle{ /*hoveredOut*/ nullptr,
-				                             /*actionId*/   kActionSpectate,
-				                             /*interactions*/ &interactions });
-			}
-		}
-
-		CLAY({ .id = CLAY_ID("GSelBtnJoinWrap"),
-		       .layout = {
-		           .sizing = { CLAY_SIZING_GROW(0),
-		                       CLAY_SIZING_FIXED(kTallButtonRowH) },
-		           .childAlignment = { .x = CLAY_ALIGN_X_CENTER },
-		       } }) {
-			if(state.joinVisible){
-				Button(CLAY_STRING("GameSelectJoinButton"), CLAY_STRING("Join Game"),
-				           ButtonOpts{ .variant = ButtonVariant::Chrome,
-				                       .size = ButtonSize::Compact },
-				           ButtonHandle{ /*hoveredOut*/ nullptr,
-				                             /*actionId*/   kActionJoin,
-				                             /*interactions*/ &interactions });
-			}
-		}
-	}
-}
-
 }  // namespace game_select_panel_layout_detail
 
 void BuildGameSelectTallTree(GameSelectPanelState & state,
@@ -241,7 +190,6 @@ void BuildGameSelectTallTree(GameSelectPanelState & state,
 	           .layoutDirection = CLAY_TOP_TO_BOTTOM,
 	       } }) {
 		game_select_panel_layout_detail::BuildGameSelectInfoBlock(state);
-		game_select_panel_layout_detail::BuildGameSelectActionButtons(state, interactions);
 	}
 }
 

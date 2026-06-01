@@ -77,10 +77,9 @@ bool GameSelectPanelHandleUiIntent(GameSelectPanelState & state,
                                    const silencer::ui::UiAction & action);
 
 // Emits the tall stepped-pane subtree ("Active Games" header + games list +
-// info-block + Spectate/Join buttons). Must be called inside the
-// LobbyRightTallBox CLAY block; emits flex children only.
-// BeginFrame requirements: TextBeginFrame, ButtonBeginFrame,
-// ScrollListBeginFrame.
+// info-block). Must be called inside the LobbyRightTallBox CLAY block; emits
+// flex children only.
+// BeginFrame requirements: TextBeginFrame, ScrollListBeginFrame.
 void BuildGameSelectTallTree(GameSelectPanelState & state,
                              Uint16 panelWidth,
                              Uint16 panelHeight,

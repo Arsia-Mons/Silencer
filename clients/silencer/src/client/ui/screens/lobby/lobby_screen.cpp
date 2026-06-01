@@ -36,6 +36,13 @@ constexpr int kGameSelectCreatePadLeft = 4;
 constexpr int kGameSelectCreatePadRight = 4;
 constexpr int kGameSelectCreatePadTop = 4;
 constexpr int kGameSelectCreateButtonH = 21;
+constexpr int kGameSelectInfoRows = 5;
+constexpr int kGameSelectInfoRowH = 12;
+constexpr int kGameSelectTallFooterPadTop = 4;
+constexpr int kGameSelectTallFooterGap = 4;
+constexpr int kGameSelectActionButtonGap = 2;
+constexpr int kGameSelectActionButtonW = 156;
+constexpr int kGameSelectActionButtonH = 21;
 
 int ClampInt(int value, int lo, int hi) {
 	if(value < lo) return lo;
@@ -161,6 +168,33 @@ void LobbyScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime, s
 			+ lobby_screen_detail::kGameSelectCreatePadRight &&
 		mainLayout.upperH > lobby_screen_detail::kGameSelectCreatePadTop
 			+ lobby_screen_detail::kGameSelectCreateButtonH;
+	const int gameSelectInfoH =
+		lobby_screen_detail::kGameSelectInfoRows
+			* lobby_screen_detail::kGameSelectInfoRowH;
+	const int gameSelectActionsH =
+		lobby_screen_detail::kGameSelectActionButtonH * 2
+			+ lobby_screen_detail::kGameSelectActionButtonGap;
+	const int gameSelectFooterH =
+		lobby_screen_detail::kGameSelectTallFooterPadTop
+			+ gameSelectInfoH
+			+ lobby_screen_detail::kGameSelectTallFooterGap
+			+ gameSelectActionsH;
+	const bool showGameSelectActions =
+		gameSelectVisible &&
+		mainLayout.rightTallW >= lobby_screen_detail::kGameSelectActionButtonW &&
+		mainLayout.rightTallH >= gameSelectFooterH;
+	const int actionButtonX =
+		bodyX + mainLayout.topRowW
+			+ std::max(
+				0,
+				(mainLayout.rightTallW
+					- lobby_screen_detail::kGameSelectActionButtonW) / 2);
+	const int spectateButtonY =
+		bodyY + mainLayout.rightTallH - gameSelectActionsH;
+	const int joinButtonY =
+		spectateButtonY
+			+ lobby_screen_detail::kGameSelectActionButtonH
+			+ lobby_screen_detail::kGameSelectActionButtonGap;
 	const uint16_t titlePadX = static_cast<uint16_t>(
 		lobby_screen_detail::ClampInt((layoutWidth * 5) / 640, 5, 10));
 	const uint16_t titleRowGap = static_cast<uint16_t>(
@@ -184,6 +218,16 @@ void LobbyScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime, s
 		.game_select_create_y = bodyY + lobby_screen_detail::kGameSelectCreatePadTop,
 		.game_select_create_width = createButtonW,
 		.game_select_create_height = lobby_screen_detail::kGameSelectCreateButtonH,
+		.show_game_select_spectate =
+			showGameSelectActions && gameSelectState.spectateVisible,
+		.show_game_select_join =
+			showGameSelectActions && gameSelectState.joinVisible,
+		.game_select_spectate_x = actionButtonX,
+		.game_select_spectate_y = spectateButtonY,
+		.game_select_join_x = actionButtonX,
+		.game_select_join_y = joinButtonY,
+		.game_select_action_width = lobby_screen_detail::kGameSelectActionButtonW,
+		.game_select_action_height = lobby_screen_detail::kGameSelectActionButtonH,
 	};
 	chromeFrame_.Build([&]() {
 		                   return silencer::client_ui::lobby::LobbyChromeFrame(chromeProps);
