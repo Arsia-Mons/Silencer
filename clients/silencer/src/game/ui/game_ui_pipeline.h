@@ -9,15 +9,24 @@
 #include "keybinds.h"
 #include "surface.h"
 #include "ui/runtime/UiInputState.h"
+#include <cstdint>
 #include <memory>
 
 class Game;
 class Screen;
 
+namespace silencer::cppx_ui {
+class PipelineHost;
+}
+namespace client::ui {
+enum class SessionPhase;
+}
+
 class GameUiPipeline
 {
 public:
 explicit GameUiPipeline(Game & game);
+~GameUiPipeline();
 
 void PrepareClientUiFrame(Surface & surface);
 void BeginPreparedClientUiFrame();
@@ -43,7 +52,24 @@ silencer::ui::UiInteractionRegistry & UiInteractions() { return clientUi.Interac
 const silencer::ui::UiInteractionRegistry & UiInteractions() const { return clientUi.Interactions(); }
 silencer::client_ui::InGameUiController & InGameUi() { return inGameUiController; }
 
+// --- SIL-14: golden retained cppx render path (flag-gated cutover) -------
+// When SILENCER_CPPX_UI is set, RenderClientUiFrame drives the golden
+// client::ui::UiPipeline (AppRoot + the session-phase reconciler) through the
+// SIL-11 PipelineHost instead of the Clay path, producing a premultiplied
+// RGBA frame that GameRenderer::Present hands to RenderDevice::UploadUiFrame.
+// Additive: with the flag off the Clay path is untouched; with it on the live
+// state machine still runs (drives world side-effects), only the *rendered* UI
+// switches. The state-machine deletion + default flip is the next step.
+bool CppxUiEnabled();
+// The cppx RGBA produced this frame (w*h*4, premultiplied), or null when the
+// cppx path did not render this frame. Owned by the PipelineHost; valid until
+// the next RenderClientUiFrame.
+const uint8_t * CppxUiFrame(int & outW, int & outH) const;
+
 private:
+void RenderCppxClientUiFrame(Surface & surface);
+client::ui::SessionPhase CurrentSessionPhase() const;
+
 Game & game;
 silencer::client_ui::ClayBridgeFrameBackend uiClayBackend;
 silencer::ui::ClayService uiClayService;
@@ -54,6 +80,15 @@ silencer::ui::UiInputState preparedUiInput;
 bool hasPreparedUiInput;
 Uint64 lastUiAnimationMs;
 bool textInputFocused;
+
+// cppx render path (SIL-14). Lazily created on first cppx frame.
+std::unique_ptr<silencer::cppx_ui::PipelineHost> cppxHost;
+const uint8_t * cppxUiRgba = nullptr;
+int cppxUiW = 0;
+int cppxUiH = 0;
+int cppxUiFlag = -1; // -1 unchecked, 0 off, 1 on
+bool cppxReactInitialized = false;
+bool cppxAppRootPushed = false;
 };
 
 #endif

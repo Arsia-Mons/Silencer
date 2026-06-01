@@ -98,6 +98,14 @@ if(window && std::getenv("SILENCER_CPPX_UI_DEMO")){
 	}
 }
 #endif
+// SIL-14: when the golden cppx render path is active, composite its
+// premultiplied-RGBA frame over the world through the UI composite pass.
+{
+int uw = 0;
+int uh = 0;
+const uint8_t * uirgba = game.gameUiPipeline.CppxUiFrame(uw, uh);
+if(uirgba && uw > 0 && uh > 0) renderdevice->UploadUiFrame(uirgba, uw, uh);
+}
 renderdevice->Present();
 }
 }

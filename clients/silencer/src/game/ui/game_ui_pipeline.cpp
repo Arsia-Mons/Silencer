@@ -11,7 +11,15 @@
 #include "client/ui/hud/InGameOverlays.h"
 #include "client/ui/views/HudView.h"
 #include "clay_ui_compositor.h"
+// SIL-14 golden cppx render path.
+#include "render/cppx_ui/pipeline_host.h"
+#include "client/ui/app_shell/app_root.h"
+#include "client/ui/hooks/use_session.h"
+#include "client/ui/providers/session_provider.h"
+#include "session_phase.h"
+#include "ui/runtime/react.h"
 #include <algorithm>
+#include <cstdlib>
 #include <vector>
 
 namespace {
@@ -156,6 +164,13 @@ Renderer::BlitSurface(&game.world.map.minimap.surface, 0, &surface, &dstrect);
 }
 
 void GameUiPipeline::RenderClientUiFrame(Surface& surface, float frametime) {
+if(CppxUiEnabled()){
+// SIL-14: golden retained path replaces the Clay frame. The live state
+// machine still runs (game.cpp Tick drives world side-effects); only the
+// rendered UI switches. GameRenderer::Present uploads the RGBA we stash.
+RenderCppxClientUiFrame(surface);
+return;
+}
 if(!clientUi.HasScreens() && !game.world.map.loaded){
 return;
 }
@@ -195,6 +210,113 @@ GameUiPipeline::GameUiPipeline(Game & g)
 : game(g), uiClayService(uiClayBackend), clientUi(uiClayService),
   inGameUiController(g.world), hasPreparedUiInput(false),
   lastUiAnimationMs(0), textInputFocused(false) {
+}
+
+GameUiPipeline::~GameUiPipeline() {
+// Tear the cppx host down before the global hook runtime it depends on.
+cppxHost.reset();
+if(cppxReactInitialized){
+react_shutdown();
+cppxReactInitialized = false;
+}
+}
+
+bool GameUiPipeline::CppxUiEnabled() {
+#ifdef SILENCER_CPPX_FONT_DIR
+if(cppxUiFlag < 0){
+const char * env = std::getenv("SILENCER_CPPX_UI");
+cppxUiFlag = (env && env[0] && env[0] != '0') ? 1 : 0;
+}
+return cppxUiFlag == 1;
+#else
+return false;
+#endif
+}
+
+client::ui::SessionPhase GameUiPipeline::CurrentSessionPhase() const {
+return silencer::game_ui::project_session_phase(game.state, game.nextstate);
+}
+
+const uint8_t * GameUiPipeline::CppxUiFrame(int & outW, int & outH) const {
+outW = cppxUiW;
+outH = cppxUiH;
+return cppxUiRgba;
+}
+
+void GameUiPipeline::RenderCppxClientUiFrame(Surface& surface) {
+cppxUiRgba = nullptr;
+#ifdef SILENCER_CPPX_FONT_DIR
+// Native window-pixel resolution so the UI composite maps 1:1 over the
+// upscaled world frame (matches the SIL-11 demo). Headless / no window falls
+// back to the surface size so the path still runs (UploadUiFrame is a no-op
+// on devices without a UI composite pass).
+int rw = surface.w;
+int rh = surface.h;
+SDL_Window * win = game.gameRenderer.GetWindow();
+if(win){
+int pw = 0;
+int ph = 0;
+if(SDL_GetWindowSizeInPixels(win, &pw, &ph) && pw > 0 && ph > 0){
+rw = pw;
+rh = ph;
+}
+}
+if(rw < 1 || rh < 1) return;
+
+if(!cppxReactInitialized){
+react_init_runtime();
+cppxReactInitialized = true;
+}
+if(!cppxHost){
+cppxHost = std::make_unique<silencer::cppx_ui::PipelineHost>();
+}
+if(!cppxHost->ensure(rw, rh, SILENCER_CPPX_FONT_DIR)) return;
+
+if(!cppxAppRootPushed){
+// The frame provider publishes the live phase to AppRoot each frame; AppRoot
+// renders the owning phase's view (declarative Tier-2 reconciler).
+cppxHost->pipeline().set_frame_provider([this](::ui::UiElement child){
+return client::ui::SessionProvider(
+client::ui::SessionProviderValue{this->CurrentSessionPhase()},
+::ui::children({child}));
+});
+cppxHost->pipeline().client_ui().push_screen(
+std::make_unique<client::ui::AppRoot>());
+cppxAppRootPushed = true;
+}
+
+// Minimal input for the scaffold cut: pointer only (the per-phase scaffolds
+// are non-interactive). Full nav/text routing through focus_update lands with
+// the real screens.
+client::ui::UiPipelineFrame frame = {};
+frame.layout = {static_cast<float>(rw), static_cast<float>(rh)};
+float mx = -1000.0f;
+float my = -1000.0f;
+if(win){
+float wx = 0.0f;
+float wy = 0.0f;
+Uint32 buttons = SDL_GetMouseState(&wx, &wy);
+int ww = 0;
+int wh = 0;
+SDL_GetWindowSize(win, &ww, &wh);
+mx = (ww > 0) ? (wx / static_cast<float>(ww)) * static_cast<float>(rw) : wx;
+my = (wh > 0) ? (wy / static_cast<float>(wh)) * static_cast<float>(rh) : wy;
+frame.input.pointer_down = (buttons & SDL_BUTTON_MASK(SDL_BUTTON_LEFT)) != 0;
+frame.input.source = ::ui::UiFocusSource::Mouse;
+}
+frame.pointer = {mx, my};
+
+int ow = 0;
+int oh = 0;
+const uint8_t * rgba = cppxHost->render(frame, &ow, &oh);
+if(rgba){
+cppxUiRgba = rgba;
+cppxUiW = ow;
+cppxUiH = oh;
+}
+#else
+(void)surface;
+#endif
 }
 
 bool GameUiPipeline::HasInputTarget() {

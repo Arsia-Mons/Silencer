@@ -12,6 +12,7 @@
 #include "client/ui/app_shell/ui_pipeline.h"
 #include "client/ui/hooks/use_session.h"
 #include "client/ui/providers/session_provider.h"
+#include "game/ui/session_phase.h"
 #include "ui/runtime/element.h"
 #include "ui/runtime/react.h"
 
@@ -143,12 +144,41 @@ static bool pipeline_host_app_root_reconciles_phase() {
   return true;
 }
 
+// SIL-14: the live composition root projects the game's state machine onto the
+// session phase the SessionProvider feeds AppRoot. Pure mapping, so verify it
+// directly (the non-1:1 cases are the ones worth pinning).
+static bool session_phase_projection_maps_game_states() {
+  using P = client::ui::SessionPhase;
+  using silencer::game_ui::project_session_phase;
+  CHECK(project_session_phase(GameState::MAINMENU, 0) == P::MainMenu);
+  CHECK(project_session_phase(GameState::LOBBYCONNECT, 0) == P::Connecting);
+  CHECK(project_session_phase(GameState::LOBBY, 0) == P::Lobby);
+  CHECK(project_session_phase(GameState::UPDATING, 0) == P::Updating);
+  CHECK(project_session_phase(GameState::INGAME, 0) == P::InMatch);
+  CHECK(project_session_phase(GameState::TESTGAME, 0) == P::InMatch);
+  CHECK(project_session_phase(GameState::MISSIONSUMMARY, 0) == P::PostMatch);
+  CHECK(project_session_phase(GameState::SINGLEPLAYERGAME, 0) == P::SinglePlayer);
+  CHECK(project_session_phase(GameState::CREATECHARACTER, 0) == P::CharacterCreate);
+  CHECK(project_session_phase(GameState::JOINGAME, 0) == P::Loading);
+  CHECK(project_session_phase(GameState::HOSTGAME, 0) == P::Loading);
+  // OPTIONS* are overlays over the menu in the retained model -> MainMenu under.
+  CHECK(project_session_phase(GameState::OPTIONS, 0) == P::MainMenu);
+  CHECK(project_session_phase(GameState::OPTIONSCONTROLS, 0) == P::MainMenu);
+  CHECK(project_session_phase(GameState::NONE, 0) == P::MainMenu);
+  // FADEOUT tracks the pending destination, not a fade limbo.
+  CHECK(project_session_phase(GameState::FADEOUT, GameState::INGAME) == P::InMatch);
+  CHECK(project_session_phase(GameState::FADEOUT, GameState::LOBBY) == P::Lobby);
+  return true;
+}
+
 int main(void) {
   if (!SDL_Init(0)) {
     fprintf(stderr, "SDL_Init: %s\n", SDL_GetError());
     return 1;
   }
   int rc = 0;
+  if (!session_phase_projection_maps_game_states())
+    rc = 1;
   if (!pipeline_host_renders_pushed_screen_to_pixels())
     rc = 1;
   if (!pipeline_host_empty_stack_is_transparent())
