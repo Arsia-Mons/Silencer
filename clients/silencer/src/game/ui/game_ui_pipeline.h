@@ -23,7 +23,6 @@ void ResetUiFrameDeltas();
 bool HasInputTarget();
 void Push(std::unique_ptr<Screen> s);
 void Pop();
-void Replace(std::unique_ptr<Screen> s);
 void ResetTo(std::unique_ptr<Screen> s);
 Screen * Top() const;
 void QueueKeyboardInputForScancode(int scancode, const Uint8 * keystate,

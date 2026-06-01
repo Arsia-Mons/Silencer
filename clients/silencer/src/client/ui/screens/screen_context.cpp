@@ -45,7 +45,6 @@ void ScreenContext::LeaveJoinedGame() { game.LeaveJoinedGame(); }
 void ScreenContext::UnloadGame() { game.gameSession.UnloadGame(); }
 void ScreenContext::PushScreen(std::unique_ptr<Screen> s) { game.PushScreen(std::move(s)); }
 void ScreenContext::PopScreen() { game.PopScreen(); }
-void ScreenContext::ReplaceScreen(std::unique_ptr<Screen> s) { game.ReplaceScreen(std::move(s)); }
 void ScreenContext::ResetToScreen(std::unique_ptr<Screen> s) { game.ResetToScreen(std::move(s)); }
 void ScreenContext::ResetGameToUiScreen(std::unique_ptr<Screen> screen) {
 	game.state = GameState::NONE;

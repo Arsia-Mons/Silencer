@@ -494,18 +494,6 @@ void ClientUi::PopScreenEntry(UiScreenEntryId entryId, ScreenContext& ctx) {
 	}
 }
 
-void ClientUi::ReplaceScreen(std::unique_ptr<Screen> screen, ScreenContext& ctx) {
-	if(!screen) return;
-	Screen * top = screens_.top();
-	if(!top){
-		PushScreen(std::move(screen), ctx);
-		return;
-	}
-	top->Destroy(ctx);
-	screen->Build(ctx);
-	screens_.replace_top(std::move(screen));
-}
-
 void ClientUi::ResetToScreen(std::unique_ptr<Screen> screen, ScreenContext& ctx) {
 	if(!screen) return;
 	while(Screen * top = screens_.top()){
@@ -549,15 +537,6 @@ bool ClientUi::QueuePopTop() {
 	return true;
 }
 
-bool ClientUi::QueueReplaceScreen(std::unique_ptr<Screen> screen) {
-	if(!screen) return false;
-	QueuedUiMutation queued;
-	queued.kind = QueuedUiMutation::Kind::Replace;
-	queued.screen = std::move(screen);
-	deferredMutations_.push_back(std::move(queued));
-	return true;
-}
-
 bool ClientUi::QueueResetToScreen(std::unique_ptr<Screen> screen) {
 	if(!screen) return false;
 	QueuedUiMutation queued;
@@ -589,9 +568,6 @@ void ClientUi::ApplyQueuedMutation(QueuedUiMutation& mutation, ScreenContext& ct
 		break;
 	case QueuedUiMutation::Kind::PopTop:
 		PopScreen(ctx);
-		break;
-	case QueuedUiMutation::Kind::Replace:
-		ReplaceScreen(std::move(mutation.screen), ctx);
 		break;
 	case QueuedUiMutation::Kind::ResetTo:
 		ResetToScreen(std::move(mutation.screen), ctx);

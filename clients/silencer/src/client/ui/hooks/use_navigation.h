@@ -12,7 +12,6 @@ struct Navigation {
 	UiScreenEntryId current_entry_id = 0;
 	bool is_top = false;
 	std::function<void(std::unique_ptr<Screen>)> push = {};
-	std::function<void(std::unique_ptr<Screen>)> replace = {};
 	std::function<void(std::unique_ptr<Screen>)> reset_to = {};
 	std::function<void()> pop_current = {};
 	std::function<void()> pop_top = {};

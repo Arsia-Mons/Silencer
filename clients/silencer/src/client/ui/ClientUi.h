@@ -47,13 +47,11 @@ public:
 	void PushScreen(std::unique_ptr<Screen> screen, ScreenContext& ctx);
 	void PopScreen(ScreenContext& ctx);
 	void PopScreenEntry(UiScreenEntryId entryId, ScreenContext& ctx);
-	void ReplaceScreen(std::unique_ptr<Screen> screen, ScreenContext& ctx);
 	void ResetToScreen(std::unique_ptr<Screen> screen, ScreenContext& ctx);
 	bool QueueDeferredMutation(DeferredUiMutation mutation);
 	bool QueuePushScreen(std::unique_ptr<Screen> screen);
 	bool QueuePopCurrent(UiScreenEntryId entryId);
 	bool QueuePopTop();
-	bool QueueReplaceScreen(std::unique_ptr<Screen> screen);
 	bool QueueResetToScreen(std::unique_ptr<Screen> screen);
 	void DrainDeferredMutations(ScreenContext& ctx);
 	void RequestClearScreens();
@@ -82,7 +80,6 @@ private:
 			Push,
 			PopCurrent,
 			PopTop,
-			Replace,
 			ResetTo,
 		};
 

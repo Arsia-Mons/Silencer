@@ -78,7 +78,6 @@ bool tui;
 
 void PushScreen(std::unique_ptr<Screen> s);
 void PopScreen();
-void ReplaceScreen(std::unique_ptr<Screen> s);
 void ResetToScreen(std::unique_ptr<Screen> s);
 Screen * GetTopScreen() const;
 bool HasUiInputTarget();

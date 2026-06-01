@@ -22,7 +22,6 @@ public:
 	bool push(std::unique_ptr<Screen> screen);
 	bool pop_top();
 	bool pop_entry(UiScreenEntryId entryId);
-	bool replace_top(std::unique_ptr<Screen> screen);
 	bool reset_to(std::unique_ptr<Screen> screen);
 	void request_clear();
 	bool consume_clear_request();

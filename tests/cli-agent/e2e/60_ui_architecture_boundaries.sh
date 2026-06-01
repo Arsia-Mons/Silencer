@@ -221,6 +221,13 @@ fail_if_match \
   "$REPO_ROOT/clients/silencer/src/client/ui"
 
 fail_if_match \
+  "\\b(ReplaceScreen|QueueReplaceScreen|replace_top)\\b|[.]replace[[:space:]]*=" \
+  "$REPO_ROOT/clients/silencer/src/client/ui" \
+  "$REPO_ROOT/clients/silencer/src/game/ui" \
+  "$REPO_ROOT/clients/silencer/src/game/game.cpp" \
+  "$REPO_ROOT/clients/silencer/src/game/game.h"
+
+fail_if_match \
   "#include[[:space:]]+\"game_state[.]h\"|\\bGameState::|\\bGoToState[[:space:]]*\\(" \
   "$REPO_ROOT/clients/silencer/src/client/ui/screens" \
   --glob '!screen_context.*'

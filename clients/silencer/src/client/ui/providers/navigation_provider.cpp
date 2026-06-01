@@ -52,9 +52,6 @@ Navigation use_navigation() {
 		.push = [client_ui](std::unique_ptr<Screen> screen) {
 			client_ui->QueuePushScreen(std::move(screen));
 		},
-		.replace = [client_ui](std::unique_ptr<Screen> screen) {
-			client_ui->QueueReplaceScreen(std::move(screen));
-		},
 		.reset_to = [client_ui](std::unique_ptr<Screen> screen) {
 			client_ui->QueueResetToScreen(std::move(screen));
 		},

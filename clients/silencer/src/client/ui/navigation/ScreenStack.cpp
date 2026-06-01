@@ -42,14 +42,6 @@ bool ScreenStack::pop_entry(UiScreenEntryId entryId) {
 	return false;
 }
 
-bool ScreenStack::replace_top(std::unique_ptr<Screen> screen) {
-	if(!screen) return false;
-	if(count_ <= 0) return push(std::move(screen));
-	screen->SetEntryId(nextEntryId_++);
-	screens_[count_ - 1] = std::move(screen);
-	return true;
-}
-
 bool ScreenStack::reset_to(std::unique_ptr<Screen> screen) {
 	if(!screen) return false;
 	for(int i = 0; i < count_; ++i){
