@@ -6,7 +6,6 @@
 #include "lobby_screen.h"
 #include "message_modal.h"
 #include "screen_context.h"
-#include "game.h"
 #include "renderer.h"
 
 #include <algorithm>
@@ -97,7 +96,7 @@ void CharacterCreateScreen::Tick(ScreenContext & ctx)
 
 void CharacterCreateScreen::Destroy(ScreenContext & ctx)
 {
-	ctx.game.UiInteractions().ClearFocus();
+	(void)ctx;
 }
 
 bool CharacterCreateScreen::HandleBack(ScreenContext & ctx)

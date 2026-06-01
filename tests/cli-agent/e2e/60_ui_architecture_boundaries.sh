@@ -637,6 +637,10 @@ fail_if_match \
   "$REPO_ROOT/clients/silencer/src/client/ui/ClientUi.cpp"
 
 fail_if_match \
+  "ctx[.]game[.]UiInteractions[[:space:]]*[(]" \
+  "$REPO_ROOT/clients/silencer/src/client/ui"
+
+fail_if_match \
   "DispatchMatchAction|DispatchMatchActions|FocusSelectedBuyTechRow" \
   "$REPO_ROOT/clients/silencer/src/client/ui/ClientUi.cpp"
 

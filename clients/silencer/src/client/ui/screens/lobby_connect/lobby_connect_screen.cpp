@@ -8,7 +8,6 @@
 #include "main_menu_screen.h"
 #include "update_screen.h"
 #include "screen_context.h"
-#include "game.h"
 #include "renderer.h"
 #include "surface.h"
 
@@ -88,10 +87,6 @@ void LobbyConnectScreen::Build(ScreenContext & ctx)
 	logLines.clear();
 	username[0] = '\0';
 	password[0] = '\0';
-
-	lobby_connect_screen_detail::RegisterWidgets(this, username, password, false,
-	                ctx.game.UiInteractions());
-	ctx.game.UiInteractions().FocusTextInputByUid(lobby_connect_screen_detail::LBY_INPUT_USERNAME);
 }
 
 void LobbyConnectScreen::Tick(ScreenContext & ctx)
@@ -200,7 +195,7 @@ void LobbyConnectScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frame
 
 void LobbyConnectScreen::Destroy(ScreenContext & ctx)
 {
-	ctx.game.UiInteractions().ClearFocus();
+	(void)ctx;
 }
 
 bool LobbyConnectScreen::HandleUiIntent(ScreenContext & ctx, const silencer::ui::UiAction & action)

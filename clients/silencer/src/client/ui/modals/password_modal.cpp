@@ -3,7 +3,6 @@
 #include "client/ui/modals/password_modal_frame.h"
 #include "client/ui/hooks/use_navigation.h"
 #include "screen_context.h"
-#include "game.h"
 #include "renderer.h"
 #include "surface.h"
 
@@ -54,8 +53,6 @@ void PasswordModal::Build(ScreenContext & ctx)
 {
 	(void)ctx;
 	password[0] = '\0';
-	password_modal_detail::RegisterWidgets(this, password, ctx.game.UiInteractions());
-	ctx.game.UiInteractions().FocusTextInputByUid(password_modal_detail::kPasswordUid);
 }
 
 void PasswordModal::Tick(ScreenContext & ctx)
@@ -114,7 +111,7 @@ void PasswordModal::BuildUi(ScreenContext & ctx, Surface & dst, float frametime,
 
 void PasswordModal::Destroy(ScreenContext & ctx)
 {
-	ctx.game.UiInteractions().ClearFocus();
+	(void)ctx;
 }
 
 bool PasswordModal::HandleUiIntent(ScreenContext & ctx, const silencer::ui::UiAction & action)
