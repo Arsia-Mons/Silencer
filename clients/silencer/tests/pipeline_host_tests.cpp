@@ -134,21 +134,25 @@ static bool pipeline_host_app_root_reconciles_phase() {
   CHECK(host.pipeline().client_ui().push_screen(
       std::make_unique<client::ui::AppRoot>()));
 
-  // MainMenu scaffold is {32,44,72} — blue-dominant.
+  // MainMenu renders ScreenLayout(Menu) — an opaque, blue-dominant slate fill.
   int w = 0, h = 0;
   const uint8_t *rgba = host.render(test_frame(64, 48), &w, &h);
   CHECK(rgba != nullptr);
   const uint8_t *px = rgba + ((size_t)(h / 2) * w + (w / 2)) * 4u;
   CHECK(px[3] > 200);                    // opaque
   CHECK(px[2] > px[0] && px[2] > px[1]); // blue-dominant
+  const uint8_t menu0 = px[0], menu1 = px[1], menu2 = px[2], menu3 = px[3];
 
-  // Flip to InMatch ({40,96,40}, green-dominant) — reflected the same frame.
+  // Flip to InMatch -> AppRoot now renders InGameScreen (a transparent HUD that
+  // overlays the live world) in place of the menu. The swap is reflected the
+  // same frame: the center pixel is no longer the menu surface. (The HUD's exact
+  // paint is intentionally not asserted — it floats over gameplay, so a stable
+  // color check doesn't fit; what matters is the reconciler swapped the screen.)
   phase = client::ui::SessionPhase::InMatch;
   rgba = host.render(test_frame(64, 48), &w, &h);
   CHECK(rgba != nullptr);
   px = rgba + ((size_t)(h / 2) * w + (w / 2)) * 4u;
-  CHECK(px[3] > 200);
-  CHECK(px[1] > px[0] && px[1] > px[2]); // green-dominant
+  CHECK(px[0] != menu0 || px[1] != menu1 || px[2] != menu2 || px[3] != menu3);
   return true;
 }
 

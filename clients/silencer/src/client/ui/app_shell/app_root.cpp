@@ -2,6 +2,7 @@
 
 #include "client/ui/hooks/use_session.h"
 #include "client/ui/screens/character_create.h"
+#include "client/ui/screens/in_game_screen.h"
 #include "client/ui/screens/lobby_connect.h"
 #include "client/ui/screens/lobby_screen.h"
 #include "client/ui/screens/main_menu.h"
@@ -71,11 +72,11 @@ bool AppRoot::build_element(::ui::UiElementFrame &, ::ui::UiElement *out) {
   case SessionPhase::Loading:
     return phase_scaffold({56, 56, 56, 255}, "phase-loading");
   case SessionPhase::InMatch:
-    return phase_scaffold({40, 96, 40, 255}, "phase-in-match");
+    return InGameScreen("phase-in-match");
   case SessionPhase::PostMatch:
     return MissionSummary("phase-post-match");
   case SessionPhase::SinglePlayer:
-    return phase_scaffold({48, 80, 96, 255}, "phase-single-player");
+    return InGameScreen("phase-single-player");
   }
   return phase_scaffold({32, 44, 72, 255}, "phase-main-menu");
 }

@@ -275,10 +275,14 @@ set(SILENCER_CPPX_SOURCES
 	# create → LOBBY (via the CREATECHARACTER tick reconcile).
 	src/client/ui/screens/character_create.cppx
 	src/client/ui/screens/character_create.hx
-	# LobbyScreen (SIL-21 2/n): the read cluster — agent + chat + presence +
-	# games panels (chat drained on the LOBBY tick; join/staging are 3/n).
+	# LobbyScreen (SIL-21 2/n + 3/n): the read cluster + the game-join cluster
+	# (GameSelect/GameCreate/Staging right-column swap over use_games/use_staging).
 	src/client/ui/screens/lobby_screen.cppx
 	src/client/ui/screens/lobby_screen.hx
+	# InGameScreen (SIL-21 4/n): the in-match HUD — transparent ScreenLayout(Hud)
+	# over the live world, composed from use_match + use_player_status.
+	src/client/ui/screens/in_game_screen.cppx
+	src/client/ui/screens/in_game_screen.hx
 )
 cppx_transpile(SILENCER_CPPX_GENERATED ${SILENCER_CPPX_SOURCES})
 target_sources(${SILENCER_TARGET} PRIVATE ${SILENCER_CPPX_GENERATED})
@@ -456,7 +460,8 @@ set(_cppx_app_shell_sources
 	src/client/ui/providers/server_provider.cpp
 	src/client/ui/providers/session_provider.cpp
 	src/client/ui/providers/settings_provider.cpp
-	src/client/ui/providers/updater_provider.cpp)
+	src/client/ui/providers/updater_provider.cpp
+	src/client/ui/providers/world_session_provider.cpp)
 
 add_executable(client_ui_tests
 	tests/client_ui_tests.cpp

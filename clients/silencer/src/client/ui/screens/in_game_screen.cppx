@@ -1,0 +1,93 @@
+#include "client/ui/screens/in_game_screen.h"
+
+#include "client/ui/components/layout/layout.h"
+#include "client/ui/components/surfaces/surfaces.h"
+#include "client/ui/components/text/text.h"
+#include "client/ui/hooks/use_match.h"
+#include "client/ui/hooks/use_player_status.h"
+#include "ui/runtime/react.h"
+
+#include <string>
+
+namespace client::ui {
+namespace {
+
+using namespace silencer;
+using ::ui::children;
+
+const char *phase_label(uint8_t phase) {
+  switch (phase) {
+  case 1:
+    return "ACTIVE";
+  case 2:
+    return "OVER";
+  default:
+    return "WARMUP";
+  }
+}
+
+// Per-team scores joined into one readable line ("T1 3  T2 1"); empty list
+// renders a neutral placeholder.
+std::string build_score_text(const std::vector<uint16_t> &scores) {
+  if (scores.empty())
+    return "no score yet";
+  std::string out;
+  for (size_t i = 0; i < scores.size(); ++i) {
+    if (!out.empty())
+      out += "   ";
+    out += "T" + std::to_string(i + 1) + " " + std::to_string(scores[i]);
+  }
+  return out;
+}
+
+struct InGameScreenProps {
+  uint32_t unused = 0;
+};
+
+::ui::UiElement InGameScreenView(const InGameScreenProps &) {
+  PlayerStatus ps = use_player_status();
+  Match m = use_match();
+
+  const unsigned mins = m.time_secs / 60u;
+  const unsigned secs = m.time_secs % 60u;
+  const char *match_line =
+      m.valid ? use_text_storage("%s  ·  %s  ·  %02u:%02u", m.mode_name.c_str(),
+                                 phase_label(m.phase), mins, secs)
+              : use_text_storage("%s", "Loading match...");
+  const char *score_line =
+      use_text_storage("%s", build_score_text(m.scores).c_str());
+  const char *message = use_text_storage("%s", m.message.c_str());
+
+  const char *vitals =
+      ps.valid ? use_text_storage("HP %u/%u    SHD %u/%u    FUEL %u/%u",
+                                  (unsigned)ps.health, (unsigned)ps.max_health,
+                                  (unsigned)ps.shield, (unsigned)ps.max_shield,
+                                  (unsigned)ps.fuel, (unsigned)ps.max_fuel)
+               : use_text_storage("%s", "No agent in view");
+  const char *arms = use_text_storage(
+      "WPN %u    L:%u  R:%u  F:%u    Files %u/%u    $%u",
+      (unsigned)ps.current_weapon, (unsigned)ps.laser_ammo,
+      (unsigned)ps.rocket_ammo, (unsigned)ps.flamer_ammo, (unsigned)ps.files,
+      (unsigned)ps.max_files, (unsigned)ps.credits);
+
+  return <ScreenLayout key="root" variant={ScreenLayoutVariant::Hud}>
+    <Panel key="match" variant={PanelVariant::Sunken}>
+      <ScreenTitle key="mode" variant={ScreenTitleVariant::Dialog} value={match_line} />
+      <BodyText key="score" variant={BodyTextVariant::Body} value={score_line} />
+    </Panel>
+    <BodyText key="message" variant={BodyTextVariant::Message} value={message} />
+    <Panel key="status" variant={PanelVariant::Sunken}>
+      <BodyText key="vitals" variant={BodyTextVariant::Strong} value={vitals} />
+      <BodyText key="arms" variant={BodyTextVariant::Body} value={arms} />
+    </Panel>
+  </ScreenLayout>
+}
+
+} // namespace
+
+::ui::UiElement InGameScreen(const char *key) {
+  return ::ui::component("InGameScreen", InGameScreenProps{}, InGameScreenView,
+                         key);
+}
+
+} // namespace client::ui

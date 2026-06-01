@@ -5,6 +5,7 @@
 #include "input/keybinds.h" // Action, BindingKey, BindingDevice
 #include "ui/input.h"
 #include "client/ui/providers/lobby_provider.h" // client::ui::LobbySnapshot
+#include "client/ui/providers/world_session_provider.h" // client::ui::WorldSessionSnapshot
 #include <cstdint>
 #include <memory>
 #include <string>
@@ -119,6 +120,10 @@ bool keymapDirty_ = false;
 // under LockMutex before the build phase (doc §5). The frame provider reads
 // this when assembling the LobbyProvider value — no build-time lock.
 client::ui::LobbySnapshot lobbySnapshot_ = {};
+// SIL-21 (4/n) in-match snapshot: the per-tick POD copy of the viewed agent +
+// match read-state, captured on the game thread before the build phase (doc §5).
+// The frame provider reads this when assembling the WorldSessionProvider value.
+client::ui::WorldSessionSnapshot worldSessionSnapshot_ = {};
 // SIL-21 (3/n) create-form map choices: the bundled maps the GameCreatePanel
 // offers. Disk-listed once (maps don't change at runtime), then folded into the
 // lobby snapshot each lobby-phase frame.

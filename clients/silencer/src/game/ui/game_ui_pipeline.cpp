@@ -31,7 +31,10 @@
 #include "client/ui/providers/session_provider.h"
 #include "client/ui/providers/settings_provider.h"
 #include "client/ui/providers/updater_provider.h"
+#include "client/ui/providers/world_session_provider.h"
 #include "ui/lobby_ui_model.h"
+#include "ui/world_session_model.h"
+#include "player.h"
 #include "actor/user.h"
 #include "session_phase.h"
 #include "config.h"
@@ -544,11 +547,32 @@ game.LeaveJoinedGame();
 });
 };
 
-// Global FrameProvider chain (doc §5), outermost (Theme) → innermost (Lobby):
-// Theme ▸ Server ▸ App ▸ Session ▸ Settings ▸ KeyMap ▸ Updater ▸
-// KeybindCapture ▸ Lobby ▸ <screen>.
-::ui::UiElement tree = client::ui::LobbyProvider(
-client::ui::LobbyProviderValue{std::move(lobby)}, ::ui::children({child}));
+// In-match model (doc §5/§6): the per-tick world-session snapshot + the queued
+// intents over the public Game/World seam. Consumed by InGameScreen
+// (use_player_status / use_match). Snapshot is empty outside the in-match phases.
+client::ui::WorldSessionValue world_session = {};
+world_session.snapshot = worldSessionSnapshot_;
+world_session.select_inventory_slot = [this](int slot){
+cppxHost->pipeline().client_ui().queue_deferred_mutation([this, slot](){
+if(slot < 0 || slot > 3) return;
+Player * p = game.world.GetPeerPlayer(game.world.GetLocalPeerId());
+if(p) p->currentinventoryitem = (Uint8)slot;
+});
+};
+world_session.confirm_quit = [this](){
+cppxHost->pipeline().client_ui().queue_deferred_mutation([this](){
+// Quit to the menu (the full pause/leave→summary flow lands with PauseScreen).
+game.GoToState(GameState::MAINMENU);
+});
+};
+
+// Global FrameProvider chain (doc §5), outermost (Theme) → innermost
+// (WorldSession): Theme ▸ Server ▸ App ▸ Session ▸ Settings ▸ KeyMap ▸ Updater ▸
+// KeybindCapture ▸ Lobby ▸ WorldSession ▸ <screen>.
+::ui::UiElement tree = client::ui::WorldSessionProvider(
+client::ui::WorldSessionValue{std::move(world_session)}, ::ui::children({child}));
+tree = client::ui::LobbyProvider(
+client::ui::LobbyProviderValue{std::move(lobby)}, ::ui::children({tree}));
 tree = client::ui::KeybindCaptureProvider(
 client::ui::KeybindCaptureProviderValue{std::move(capture)}, ::ui::children({tree}));
 tree = client::ui::UpdaterProvider(
@@ -620,6 +644,9 @@ bundledMaps_ = game.gameSession.MapDownloaderRef().ListFiles((GetResDir() + "lev
 bundledMapsListed_ = true;
 }
 lobbySnapshot_.bundled_maps = bundledMaps_;
+// SIL-21 (4/n): capture the in-match read-state (viewed agent + replicated match
+// state) on the game thread before the build. Empty outside the match phases.
+worldSessionSnapshot_ = silencer::game_ui::CaptureWorldSessionSnapshot(game, CurrentSessionPhase());
 
 int ow = 0;
 int oh = 0;
