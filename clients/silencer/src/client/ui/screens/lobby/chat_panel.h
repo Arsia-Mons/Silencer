@@ -86,6 +86,7 @@ void ChatPanelInit(ChatPanelState & state);
 // Per-frame pump: consumes channel, presence, and chat-message updates from
 // LobbyChatModel. Mirrors legacy ChatPanel::Tick.
 void ChatPanelTick(ChatPanelState & state, LobbyChatModel & chat);
+void ChatPanelSetInput(ChatPanelState & state, const char * value);
 bool ChatPanelHandleUiIntent(ChatPanelState & state,
                              LobbyChatModel & chat,
                              const silencer::ui::UiAction & action);

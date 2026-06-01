@@ -184,12 +184,13 @@ void RebuildPresenceEntries(ChatPanelState & state,
 	state.presenceWrapDirty = true;
 }
 
-void CopyUiText(char * dst, int dstLen, const std::string & value)
+void CopyUiText(char * dst, int dstLen, const char * value)
 {
 	if(!dst || dstLen <= 0) return;
-	int n = static_cast<int>(value.size());
+	const char * src = value ? value : "";
+	int n = static_cast<int>(std::strlen(src));
 	if(n > dstLen - 1) n = dstLen - 1;
-	std::memcpy(dst, value.data(), n);
+	std::memcpy(dst, src, n);
 	dst[n] = '\0';
 }
 
@@ -371,16 +372,19 @@ void ChatPanelTick(ChatPanelState & state, LobbyChatModel & chat) {
 	}
 }
 
+void ChatPanelSetInput(ChatPanelState & state, const char * value) {
+	chat_panel_detail::CopyUiText(
+		state.inputBuffer,
+		static_cast<int>(sizeof(state.inputBuffer)),
+		value);
+}
+
 bool ChatPanelHandleUiIntent(ChatPanelState & state,
                              LobbyChatModel & chat,
                              const silencer::ui::UiAction & action) {
 	if(action.id != chat_panel_detail::kActionInput) return false;
-	if(action.kind == silencer::ui::UiActionKind::SetText){
-		chat_panel_detail::CopyUiText(state.inputBuffer, static_cast<int>(sizeof(state.inputBuffer)), action.value);
-		return true;
-	}
 	if(action.kind == silencer::ui::UiActionKind::SubmitText){
-		chat_panel_detail::CopyUiText(state.inputBuffer, static_cast<int>(sizeof(state.inputBuffer)), action.value);
+		ChatPanelSetInput(state, action.value.c_str());
 		if(std::strlen(state.inputBuffer) > 0){
 			chat.send(state.inputBuffer);
 			state.inputBuffer[0] = '\0';

@@ -480,6 +480,9 @@ void LobbyScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime, s
 		.chat_y = bodyY + mainLayout.upperH + mainLayout.regionGap,
 		.chat_width = mainLayout.chatW,
 		.chat_height = mainLayout.chatH,
+		.chat_set_input = [this](const char * value) {
+			silencer::client_ui::lobby::ChatPanelSetInput(chatState, value);
+		},
 		.show_game_select_create = showGameSelectCreate,
 		.game_select_create_x = bodyX + mainLayout.characterW + mainLayout.regionGap
 		                        + lobby_screen_detail::kGameSelectCreatePadLeft,

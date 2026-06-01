@@ -729,6 +729,13 @@ inline ::ui::StylePatch chat_input_patch() {
 		});
 }
 
+inline std::function<void(const ::ui::TextChangeEvent&)>
+chat_text_change_callback(std::function<void(const char *)> on_change) {
+	return [on_change](const ::ui::TextChangeEvent& event) {
+		if(on_change) on_change(event.value);
+	};
+}
+
 inline const char * game_select_info_value(const GameSelectPanelState& state,
                                            int index) {
 	switch(index){
@@ -1771,6 +1778,7 @@ struct ChatPanelViewProps {
 	int y = 0;
 	int width = 0;
 	int height = 0;
+	std::function<void(const char *)> set_input = {};
 };
 
 ::ui::UiElement ChatPanelView(const ChatPanelViewProps& props) {
@@ -1898,6 +1906,8 @@ struct ChatPanelViewProps {
 						.selection_start = caret,
 						.selection_end = caret,
 					}}
+				  onTextChange={chat_text_change_callback(props.set_input)}
+				  maxLength={200}
 				  layout={::ui::LayoutStyle{
 						.width = ::ui::Length::points(static_cast<float>(metrics.inputWidth)),
 						.height = ::ui::Length::points(static_cast<float>(metrics.inputHeight)),
@@ -4498,6 +4508,7 @@ using ::ui::components::TextProps;
 		  y={props.chat_y}
 		  width={props.chat_width}
 		  height={props.chat_height}
+		  setInput={props.chat_set_input}
 		/>
 		<lobby_chrome_frame_detail.GameSelectTallPanel
 		  key="game-select-tall"
