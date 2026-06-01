@@ -1,22 +1,16 @@
 #pragma once
 
-struct SDL_Gamepad;
-struct SDL_Window;
-class KeyMap;
-class RenderDevice;
 class ScreenContext;
 
-#include <SDL3/SDL_stdinc.h>
+#include <memory>
 
 namespace silencer {
 namespace client_ui {
 
+struct OptionsProviderState;
+
 struct OptionsProviderValue {
-	KeyMap * keymap = nullptr;
-	SDL_Window * window = nullptr;
-	RenderDevice * renderdevice = nullptr;
-	SDL_Gamepad * gamepad = nullptr;
-	const Uint32 * tick_count = nullptr;
+	std::shared_ptr<OptionsProviderState> state;
 };
 
 OptionsProviderValue MakeOptionsProvider(ScreenContext& ctx);

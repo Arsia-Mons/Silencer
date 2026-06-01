@@ -127,6 +127,10 @@ fail_if_match \
   --glob '*.h'
 
 fail_if_match \
+  "\\b(KeyMap|SDL_Window|SDL_Gamepad|RenderDevice|Uint32)\\b|SDL3/SDL_stdinc[.]h" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/providers/options_provider.h"
+
+fail_if_match \
   "\\b(spriteBank|spriteIndex|bank|texture_id|nine_slice|palette)[[:space:]]*(=|;|,|\\)|\\})" \
   "$REPO_ROOT/clients/silencer/src/client/ui/components" \
   "$REPO_ROOT/clients/silencer/src/ui/components" \

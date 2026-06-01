@@ -11,19 +11,29 @@
 
 #include <cstdint>
 #include <cstring>
+#include <memory>
 #include <string>
 #include <utility>
 
 namespace silencer {
 namespace client_ui {
 
+struct OptionsProviderState {
+	KeyMap * keymap = nullptr;
+	SDL_Window * window = nullptr;
+	RenderDevice * renderdevice = nullptr;
+	SDL_Gamepad * gamepad = nullptr;
+	const Uint32 * tick_count = nullptr;
+};
+
 OptionsProviderValue MakeOptionsProvider(ScreenContext& ctx) {
 	OptionsProviderValue value;
-	value.keymap = &ctx.keymap;
-	value.window = ctx.window;
-	value.renderdevice = ctx.renderdevice;
-	value.gamepad = ctx.game.GetGamepad();
-	value.tick_count = &ctx.world.tickcount;
+	value.state = std::make_shared<OptionsProviderState>();
+	value.state->keymap = &ctx.keymap;
+	value.state->window = ctx.window;
+	value.state->renderdevice = ctx.renderdevice;
+	value.state->gamepad = ctx.game.GetGamepad();
+	value.state->tick_count = &ctx.world.tickcount;
 	return value;
 }
 
@@ -33,20 +43,28 @@ Config& ConfigRef() {
 	return Config::GetInstance();
 }
 
+const OptionsProviderState * State(const OptionsProviderValue& provider) {
+	return provider.state.get();
+}
+
 KeyMap * Keymap(const OptionsProviderValue& provider) {
-	return provider.keymap;
+	const OptionsProviderState * state = State(provider);
+	return state ? state->keymap : nullptr;
 }
 
 SDL_Window * Window(const OptionsProviderValue& provider) {
-	return provider.window;
+	const OptionsProviderState * state = State(provider);
+	return state ? state->window : nullptr;
 }
 
 RenderDevice * Device(const OptionsProviderValue& provider) {
-	return provider.renderdevice;
+	const OptionsProviderState * state = State(provider);
+	return state ? state->renderdevice : nullptr;
 }
 
 SDL_Gamepad * Gamepad(const OptionsProviderValue& provider) {
-	return provider.gamepad;
+	const OptionsProviderState * state = State(provider);
+	return state ? state->gamepad : nullptr;
 }
 
 bool IsBuiltinKeybindProfile(const std::string & name) {
@@ -245,7 +263,8 @@ std::string OptionsControlsModel::binding_label(Action action, int slot) const {
 }
 
 int OptionsControlsModel::tick_count() const {
-	return provider_.tick_count ? static_cast<int>(*provider_.tick_count) : 0;
+	const OptionsProviderState * state = options_provider_detail::State(provider_);
+	return state && state->tick_count ? static_cast<int>(*state->tick_count) : 0;
 }
 
 void OptionsControlsModel::cycle_preset() const {
