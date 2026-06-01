@@ -4,7 +4,6 @@
 #include "clay_ui_compositor.h"
 #include "runtime/UiInteractionRegistry.h"
 #include "primitives/text.h"
-#include "primitives/button.h"
 
 #include "client/ui/hooks/use_lobby.h"
 #include "tech_selected_panel.h"
@@ -20,11 +19,6 @@
 using silencer::ui::primitives::Text;
 using silencer::ui::primitives::TextEffect;
 using silencer::ui::primitives::TextSize;
-using silencer::ui::primitives::Button;
-using silencer::ui::primitives::ButtonHandle;
-using silencer::ui::primitives::ButtonOpts;
-using silencer::ui::primitives::ButtonSize;
-using silencer::ui::primitives::ButtonVariant;
 
 namespace silencer::client_ui::lobby {
 
@@ -33,14 +27,6 @@ namespace game_tech_panel_detail {
 constexpr const char * kActionBack = "lobby.game_tech.back";
 constexpr const char * kActionTogglePrefix = "lobby.game_tech.toggle.";
 constexpr const char * kActionDescriptionPrefix = "lobby.game_tech.description.";
-
-// Upper stepped-pane slot interior layout knobs.
-constexpr uint16_t kUpperBackPadLeft = 4;
-constexpr uint16_t kUpperBackPadRight = 4;
-constexpr uint16_t kUpperBackPadTop  = 4;
-constexpr uint16_t kUpperPeerColPadLeft = 4;
-constexpr uint16_t kUpperPeerColPadTop  = 7;
-constexpr uint16_t kUpperPeerRowGap     = 5;
 
 // Tall stepped-pane slot interior layout knobs.
 constexpr uint16_t kTallSlotsPadLeft   = 57;
@@ -52,20 +38,6 @@ Clay_String FromStd(const std::string & s) {
 	cs.length = static_cast<int32_t>(s.size());
 	cs.chars  = s.c_str();
 	return cs;
-}
-
-ButtonOpts FullWidthUpperButtonOpts(Uint16 panelWidth) {
-	const int buttonWidth = std::max(
-		1,
-		static_cast<int>(panelWidth)
-			- static_cast<int>(kUpperBackPadLeft)
-			- static_cast<int>(kUpperBackPadRight));
-	return ButtonOpts{
-		.variant = ButtonVariant::Chrome,
-		.size = ButtonSize::Auto,
-		.minWidth = buttonWidth,
-		.maxWidth = buttonWidth,
-	};
 }
 
 bool StartsWith(const std::string & value, const char * prefix) {
@@ -134,47 +106,6 @@ bool GameTechPanelHandleUiIntent(GameTechPanelState & state,
 		return true;
 	}
 	return false;
-}
-
-void BuildGameTechUpperTree(GameTechPanelState & state,
-                            Uint16 panelWidth,
-                            silencer::ui::UiInteractionRegistry& interactions) {
-	// Back To Teams button.
-	CLAY({ .id = CLAY_ID("GTechBackWrap"),
-	       .layout = { .padding = { game_tech_panel_detail::kUpperBackPadLeft, 0,
-	                                game_tech_panel_detail::kUpperBackPadTop,  0 } } }) {
-		Button(CLAY_STRING("GameTechBackButton"), CLAY_STRING("Back To Teams"),
-		           game_tech_panel_detail::FullWidthUpperButtonOpts(panelWidth),
-		           ButtonHandle{ /*hoveredOut*/ nullptr,
-		                             /*actionId*/   game_tech_panel_detail::kActionBack,
-		                             /*interactions*/ &interactions });
-	}
-
-	// Teammate name labels: right-aligned column. ALIGN_X_RIGHT inside a
-	// grow-width wrapper aligns each name to the wrapper's right edge.
-	CLAY({ .id = CLAY_ID("GTechPeerNames"),
-	       .layout = {
-	           .padding = { game_tech_panel_detail::kUpperPeerColPadLeft, 4,
-	                        game_tech_panel_detail::kUpperPeerColPadTop, 0 },
-	           .childGap = game_tech_panel_detail::kUpperPeerRowGap,
-	           .childAlignment = { .x = CLAY_ALIGN_X_RIGHT },
-	           .layoutDirection = CLAY_TOP_TO_BOTTOM,
-	       } }) {
-		for(int i = 0; i < 3; ++i){
-			char idBuf[24];
-			std::snprintf(idBuf, sizeof(idBuf), "GTechPeerName%d", i);
-			Clay_String wid;
-			wid.isStaticallyAllocated = false;
-			wid.length = (int32_t)std::strlen(idBuf);
-			wid.chars  = idBuf;
-			CLAY({ .id = CLAY_SID(wid) }) {
-				if(!state.peerNameStrs[i].empty()){
-					Text(game_tech_panel_detail::FromStd(state.peerNameStrs[i]),
-					     { .size = TextSize::Body });
-				}
-			}
-		}
-	}
 }
 
 void BuildGameTechTallTree(GameTechPanelState & state,

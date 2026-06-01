@@ -1,6 +1,7 @@
 #include "client/ui/screens/lobby/lobby_chrome_frame.h"
 
 #include "client/ui/screens/lobby/game_select_panel.h"
+#include "client/ui/screens/lobby/game_tech_panel.h"
 #include "ui/components/box.h"
 #include "ui/components/button.h"
 #include "ui/components/common.h"
@@ -177,11 +178,13 @@ inline ::ui::LayoutStyle absolute_button_layout(int x,
 
 inline ::ui::StylePatch text_patch(std::uint16_t font_id,
                                    std::uint16_t font_size,
-                                   float line_height) {
+                                   float line_height,
+                                   ::ui::TextAlign align = ::ui::TextAlign::Left) {
 	return ::ui::patch().text(::ui::TextVisual{
 		.color = {0, 0, 0, 255},
 		.font_id = font_id,
 		.font_size = font_size,
+		.align = align,
 		.line_height = line_height,
 	});
 }
@@ -627,6 +630,93 @@ struct GameSelectTallPanelProps {
 	</Box>
 }
 
+struct GameTechPeerNameProps {
+	const char * key = nullptr;
+	const GameTechPanelState * state = nullptr;
+	int index = 0;
+	int x = 0;
+	int y = 0;
+	int width = 0;
+};
+
+::ui::UiElement GameTechPeerName(const GameTechPeerNameProps& props) {
+	if(!props.state || props.index < 0 || props.index >= 3){
+		return ::ui::empty();
+	}
+	const char * value = props.state->peerNameStrs[props.index].c_str();
+	if(!value || !*value) return ::ui::empty();
+	return <Text
+	  key={props.key}
+	  value={value}
+	  layout={absolute_layout(props.x, props.y, props.width, 11)}
+	  style={text_patch(133, 6, 11.0f, ::ui::TextAlign::Right)}
+	/>
+}
+
+struct GameTechUpperProps {
+	const char * key = nullptr;
+	bool show = false;
+	const GameTechPanelState * state = nullptr;
+	int back_x = 0;
+	int back_y = 0;
+	int back_width = 0;
+	int back_height = 0;
+	int peer_x = 0;
+	int peer_y = 0;
+	int peer_width = 0;
+	int peer_row_gap = 0;
+};
+
+::ui::UiElement GameTechUpper(const GameTechUpperProps& props) {
+	if(!props.show || !props.state){
+		return ::ui::empty();
+	}
+	return <Box
+	  key={props.key}
+	  layout={::ui::LayoutStyle{
+			.position = ::ui::PositionType::Absolute,
+			.width = ::ui::Length::percent(100.0f),
+			.height = ::ui::Length::percent(100.0f),
+			.position_inset = absolute_inset(0.0f, 0.0f),
+		}}
+	>
+		<AbsoluteChromeButton
+		  key="back"
+		  id="lobby.game_tech.back"
+		  label="Back To Teams"
+		  show={true}
+		  x={props.back_x}
+		  y={props.back_y}
+		  width={props.back_width}
+		  height={props.back_height}
+		/>
+		<GameTechPeerName
+		  key="peer-0"
+		  state={props.state}
+		  index={0}
+		  x={props.peer_x}
+		  y={props.peer_y}
+		  width={props.peer_width}
+		/>
+		<GameTechPeerName
+		  key="peer-1"
+		  state={props.state}
+		  index={1}
+		  x={props.peer_x}
+		  y={props.peer_y + 11 + props.peer_row_gap}
+		  width={props.peer_width}
+		/>
+		<GameTechPeerName
+		  key="peer-2"
+		  state={props.state}
+		  index={2}
+		  x={props.peer_x}
+		  y={props.peer_y + (11 + props.peer_row_gap) * 2}
+		  width={props.peer_width}
+		/>
+	</Box>
+}
+
 }  // namespace lobby_chrome_frame_detail
 
 using ::ui::children;
@@ -733,6 +823,19 @@ using ::ui::components::TextProps;
 		  y={props.game_join_ready_y}
 		  width={props.game_join_button_width}
 		  height={props.game_join_button_height}
+		/>
+		<lobby_chrome_frame_detail.GameTechUpper
+		  key="game-tech-upper"
+		  show={props.show_game_tech_upper}
+		  state={props.game_tech}
+		  backX={props.game_tech_back_x}
+		  backY={props.game_tech_back_y}
+		  backWidth={props.game_tech_back_width}
+		  backHeight={props.game_tech_back_height}
+		  peerX={props.game_tech_peer_x}
+		  peerY={props.game_tech_peer_y}
+		  peerWidth={props.game_tech_peer_width}
+		  peerRowGap={props.game_tech_peer_row_gap}
 		/>
 		<lobby_chrome_frame_detail.AbsoluteChromeButton
 		  key="game-select-create"

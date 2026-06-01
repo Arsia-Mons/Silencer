@@ -49,6 +49,14 @@ constexpr int kGameJoinChooseTechPadTop = 3;
 constexpr int kGameJoinChangeTeamPadTop = 11;
 constexpr int kGameJoinReadyPadTop = 39;
 constexpr int kGameJoinButtonH = 21;
+constexpr int kGameTechBackPadLeft = 4;
+constexpr int kGameTechBackPadRight = 4;
+constexpr int kGameTechBackPadTop = 4;
+constexpr int kGameTechButtonH = 21;
+constexpr int kGameTechPeerColPadLeft = 4;
+constexpr int kGameTechPeerColPadRight = 4;
+constexpr int kGameTechPeerColPadTop = 7;
+constexpr int kGameTechPeerRowGap = 5;
 
 int ClampInt(int value, int lo, int hi) {
 	if(value < lo) return lo;
@@ -224,6 +232,27 @@ void LobbyScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime, s
 			+ lobby_screen_detail::kGameJoinButtonPadRight &&
 		mainLayout.upperH > gameJoinReadyY - bodyY
 			+ lobby_screen_detail::kGameJoinButtonH;
+	const int gameTechBackW = std::max(
+		1,
+		mainLayout.rightUpperW
+			- lobby_screen_detail::kGameTechBackPadLeft
+			- lobby_screen_detail::kGameTechBackPadRight);
+	const int gameTechPeerW = std::max(
+		1,
+		mainLayout.rightUpperW
+			- lobby_screen_detail::kGameTechPeerColPadLeft
+			- lobby_screen_detail::kGameTechPeerColPadRight);
+	const int gameTechBackY = bodyY + lobby_screen_detail::kGameTechBackPadTop;
+	const int gameTechPeerY =
+		bodyY
+			+ lobby_screen_detail::kGameTechBackPadTop
+			+ lobby_screen_detail::kGameTechButtonH
+			+ lobby_screen_detail::kGameTechPeerColPadTop;
+	const bool showGameTechUpper =
+		gameTechActive &&
+		mainLayout.rightUpperW > lobby_screen_detail::kGameTechBackPadLeft
+			+ lobby_screen_detail::kGameTechBackPadRight &&
+		mainLayout.upperH > gameTechPeerY - bodyY + 11;
 	const uint16_t titlePadX = static_cast<uint16_t>(
 		lobby_screen_detail::ClampInt((layoutWidth * 5) / 640, 5, 10));
 	const uint16_t titleRowGap = static_cast<uint16_t>(
@@ -271,6 +300,16 @@ void LobbyScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime, s
 		.game_join_ready_y = gameJoinReadyY,
 		.game_join_button_width = gameJoinButtonW,
 		.game_join_button_height = lobby_screen_detail::kGameJoinButtonH,
+		.show_game_tech_upper = showGameTechUpper,
+		.game_tech = &gameTechState,
+		.game_tech_back_x = rightUpperX + lobby_screen_detail::kGameTechBackPadLeft,
+		.game_tech_back_y = gameTechBackY,
+		.game_tech_back_width = gameTechBackW,
+		.game_tech_back_height = lobby_screen_detail::kGameTechButtonH,
+		.game_tech_peer_x = rightUpperX + lobby_screen_detail::kGameTechPeerColPadLeft,
+		.game_tech_peer_y = gameTechPeerY,
+		.game_tech_peer_width = gameTechPeerW,
+		.game_tech_peer_row_gap = lobby_screen_detail::kGameTechPeerRowGap,
 	};
 	chromeFrame_.Build([&]() {
 		                   return silencer::client_ui::lobby::LobbyChromeFrame(chromeProps);

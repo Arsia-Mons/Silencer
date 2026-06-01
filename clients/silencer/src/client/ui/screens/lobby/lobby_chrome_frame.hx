@@ -7,6 +7,7 @@ namespace client_ui {
 namespace lobby {
 
 struct GameSelectPanelState;
+struct GameTechPanelState;
 
 struct LobbyChromeFrameProps {
 	const char * key = nullptr;
@@ -46,6 +47,16 @@ struct LobbyChromeFrameProps {
 	int game_join_ready_y = 0;
 	int game_join_button_width = 0;
 	int game_join_button_height = 0;
+	bool show_game_tech_upper = false;
+	const GameTechPanelState * game_tech = nullptr;
+	int game_tech_back_x = 0;
+	int game_tech_back_y = 0;
+	int game_tech_back_width = 0;
+	int game_tech_back_height = 0;
+	int game_tech_peer_x = 0;
+	int game_tech_peer_y = 0;
+	int game_tech_peer_width = 0;
+	int game_tech_peer_row_gap = 0;
 };
 
 ::ui::UiElement LobbyChromeFrame(const LobbyChromeFrameProps& props);
