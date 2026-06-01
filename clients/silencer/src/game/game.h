@@ -121,7 +121,6 @@ GameSession gameSession;
 
 public:
 bool minimized;
-bool creategameclicked;
 Uint32 & currentlobbygameid;
 bool & joininggame;
 

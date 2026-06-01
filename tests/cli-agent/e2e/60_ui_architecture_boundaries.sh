@@ -440,6 +440,11 @@ fail_if_match \
   "$REPO_ROOT/clients/silencer/src/client/ui/screens/lobby/lobby_screen.h"
 
 fail_if_match \
+  "\\bcreategameclicked\\b" \
+  "$REPO_ROOT/clients/silencer/src" \
+  --glob '!third_party/**'
+
+fail_if_match \
   "MakeLobbyProvider[[:space:]]*[(][^)]*,|LobbyScreen[[:space:]]*[*][[:space:]]*screen" \
   "$REPO_ROOT/clients/silencer/src/client/ui/providers/lobby_provider.h" \
   "$REPO_ROOT/clients/silencer/src/client/ui/providers/lobby_provider.cpp" \

@@ -611,7 +611,7 @@ LobbySessionPumpResult LobbySessionModel::pump(
 		   maps->mapUploadState.load(std::memory_order_relaxed) == 0 &&
 		   (world->IsConnected() || world->IsIdle())){
 			result.dismiss_progress = true;
-			game->creategameclicked = false;
+			maps->createGamePending = false;
 		}
 
 		if(world->IsConnected()){
@@ -825,9 +825,9 @@ LobbyCreateModel::Defaults LobbyCreateModel::defaults() const {
 
 void LobbyCreateModel::reset() const {
 	MapDownloader * maps = lobby_provider_detail::LobbyMapDownloader(provider_);
-	if(maps) maps->selectedmap = -1;
-	if(Game * game = lobby_provider_detail::LobbyGameOwner(provider_)){
-		game->creategameclicked = false;
+	if(maps){
+		maps->selectedmap = -1;
+		maps->createGamePending = false;
 	}
 }
 
@@ -873,15 +873,15 @@ LobbyCreateModel::PumpResult LobbyCreateModel::pump() const {
 			maps->pendingCreate.spectatable);
 	}else if(uploadState == 3){
 		maps->mapUploadState.store(0, std::memory_order_relaxed);
-		game->creategameclicked = false;
+		maps->createGamePending = false;
 		result.dismiss_progress = true;
 		result.message = "Could not upload map";
 		return result;
 	}
 
-	if(world->lobby.creategamestatus == 1 && game->creategameclicked){
+	if(world->lobby.creategamestatus == 1 && maps->createGamePending){
 		world->lobby.creategamestatus = 0;
-		game->creategameclicked = false;
+		maps->createGamePending = false;
 		LobbyGame * lobbygame = world->lobby.GetGameById(world->lobby.createdgameid);
 		if(lobbygame){
 			Serializer data;
@@ -893,9 +893,9 @@ LobbyCreateModel::PumpResult LobbyCreateModel::pump() const {
 		}
 	}else if(world->lobby.creategamestatus != 100 &&
 	         world->lobby.creategamestatus != 0 &&
-	         game->creategameclicked){
+	         maps->createGamePending){
 		world->lobby.creategamestatus = 0;
-		game->creategameclicked = false;
+		maps->createGamePending = false;
 		result.dismiss_progress = true;
 		result.message = "Could not create game";
 	}
@@ -906,9 +906,8 @@ LobbyCreateModel::StartResult LobbyCreateModel::start(const Request& request) co
 	StartResult result;
 	World * world = lobby_provider_detail::LobbyWorld(provider_);
 	MapDownloader * maps = lobby_provider_detail::LobbyMapDownloader(provider_);
-	Game * game = lobby_provider_detail::LobbyGameOwner(provider_);
-	if(!world || !maps || !game) return result;
-	if(game->creategameclicked) return result;
+	if(!world || !maps) return result;
+	if(maps->createGamePending) return result;
 	if(request.game_name.empty()){
 		result.message = "No game name";
 		return result;
@@ -963,7 +962,7 @@ LobbyCreateModel::StartResult LobbyCreateModel::start(const Request& request) co
 		});
 	}
 	world->lobby.creategamestatus = 0;
-	game->creategameclicked = true;
+	maps->createGamePending = true;
 	std::strncpy(Config::GetInstance().defaultgamename,
 	             request.game_name.c_str(),
 	             sizeof(Config::GetInstance().defaultgamename) - 1);

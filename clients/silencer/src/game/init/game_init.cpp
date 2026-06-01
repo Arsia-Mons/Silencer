@@ -44,7 +44,6 @@ Game::Game()
 	singleplayermessage = 0;
 	updatetitle = true;
 	minimized = false;
-	creategameclicked = false;
 	nextstateprocessed = false;
 #ifdef OUYA
 	quitscancode = SDL_SCANCODE_HOME;

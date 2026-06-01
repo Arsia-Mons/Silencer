@@ -37,7 +37,7 @@ public:
 	// destructor calls it again as a safety net (idempotent).
 	void JoinAndShutdown();
 
-	// "[DL] NAME.SIL" → sha1hex; populated when CreateGameCreateInterface
+	// "[DL] NAME.SIL" -> sha1hex; populated when the lobby create-game flow
 	// queries FetchServerMapList.
 	std::map<std::string, std::string> servermaps;
 
@@ -60,6 +60,7 @@ public:
 
 	// Map upload for create-game flow.
 	// State: 0=idle 1=uploading 2=ok 3=fail.
+	bool                  createGamePending = false;
 	std::atomic<int>      mapUploadState{0};
 	std::atomic<uint32_t> mapUploadGeneration{0};
 	std::thread           mapUploadThread;
