@@ -115,6 +115,20 @@ struct ChatOverlayView {
 	std::vector<ChatBackgroundSpriteView> backgroundSprites;
 };
 
+struct HudReadoutsView {
+	bool visible = false;
+	std::string currentAmmo;
+	std::string blasterAmmo;
+	std::string laserAmmo;
+	std::string rocketAmmo;
+	std::string flamerAmmo;
+	std::string credits;
+	std::string health;
+	std::string shield;
+	std::string inventoryCounts[4];
+	Uint8 traceTime = 0;
+};
+
 // One team member, for the buy/tech "give to teammate" menu and player list.
 struct TeamPeerView {
 	Uint8       peerId = 0;
@@ -194,6 +208,7 @@ struct HudView {
 
 	// Team strip + per-team player rows.
 	std::vector<TeamHudView> teams;
+	HudReadoutsView readouts;
 
 	// Buy/Tech overlay derived from viewed player and its team.
 	BuyTechOverlayView buyTech;

@@ -82,6 +82,17 @@ int SpriteY(const ::Resources& res, Uint8 bank, Uint16 index, int logicalY = 0) 
 	return logicalY + SpriteOffsetY(res, bank, index);
 }
 
+std::string PaddedByte(Uint8 value) {
+	return std::string(value < 10 ? " " : "") + std::to_string(value);
+}
+
+const TeamHudView * FindTeamById(const HudView& view, Uint16 teamId) {
+	for(const TeamHudView& team : view.teams){
+		if(team.id == teamId) return &team;
+	}
+	return nullptr;
+}
+
 void AddChatBackgroundSprite(ChatOverlayView& chat,
                              const ::Resources& resources,
                              Uint16 spriteIndex,
@@ -387,6 +398,48 @@ void PopulateChatOverlay(HudView& out, ::World& world, const PlayerHudView& play
 	PopulateChatBackground(chat, world.resources);
 }
 
+void PopulateReadouts(HudView& out, const PlayerHudView& player) {
+	if(!player.valid) return;
+
+	Uint8 currentAmmo = 0;
+	switch(player.currentWeapon){
+		case 0:
+			currentAmmo = 99;
+			break;
+		case 1:
+			currentAmmo = player.laserAmmo;
+			break;
+		case 2:
+			currentAmmo = player.rocketAmmo;
+			break;
+		case 3:
+			currentAmmo = player.flamerAmmo;
+			break;
+	}
+
+	HudReadoutsView& readouts = out.readouts;
+	readouts.visible = true;
+	readouts.currentAmmo = PaddedByte(currentAmmo);
+	readouts.blasterAmmo = "99";
+	readouts.laserAmmo = player.laserAmmo > 0 ? PaddedByte(player.laserAmmo) : "";
+	readouts.rocketAmmo = player.rocketAmmo > 0 ? PaddedByte(player.rocketAmmo) : "";
+	readouts.flamerAmmo = player.flamerAmmo > 0 ? PaddedByte(player.flamerAmmo) : "";
+	readouts.credits = std::to_string(player.credits);
+	readouts.health = std::to_string(player.health);
+	readouts.shield = std::to_string(player.shield);
+	for(int i = 0; i < 4; ++i){
+		if(player.inventoryItemsNum[i] > 1){
+			readouts.inventoryCounts[i] = std::to_string(player.inventoryItemsNum[i]);
+		}
+	}
+
+	const TeamHudView * team = FindTeamById(out, player.teamId);
+	if(team && team->beamingTerminalId && team->beamingTerminalTraceTime > 0){
+		readouts.traceTime = team->beamingTerminalTraceTime;
+	}
+	if(player.tracetime > 0) readouts.traceTime = player.tracetime;
+}
+
 }  // namespace hudview_detail
 
 HudView BuildHudView(::World& world) {
@@ -454,6 +507,7 @@ HudView BuildHudView(::World& world) {
 
 	// Teams strip + player-list rows
 	hudview_detail::PopulateTeams(view, world);
+	hudview_detail::PopulateReadouts(view, view.viewedPlayer);
 
 	// Buy/Tech overlay derived from viewed player.
 	hudview_detail::PopulateBuyTech(view, world, viewedplayer);
