@@ -15,6 +15,7 @@
 #include "render/cppx_ui/pipeline_host.h"
 #include "client/ui/app_shell/app_root.h"
 #include "client/ui/hooks/use_session.h"
+#include "client/ui/providers/app_provider.h"
 #include "client/ui/providers/server_provider.h"
 #include "client/ui/providers/session_provider.h"
 #include "session_phase.h"
@@ -244,6 +245,9 @@ cppxHost->pipeline().set_frame_provider([this](::ui::UiElement child){
 ::ui::UiElement tree = client::ui::SessionProvider(
 client::ui::SessionProviderValue{this->CurrentSessionPhase()},
 ::ui::children({child}));
+tree = client::ui::AppProvider(
+client::ui::AppProviderValue{[this]{ game.quitRequested = true; }},
+::ui::children({tree}));
 tree = silencer::game_ui::ServerProvider(
 silencer::game_ui::ServerProviderValue{&game},
 ::ui::children({tree}));
