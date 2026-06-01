@@ -5,7 +5,6 @@
 #include "client/ui/screens/update/update_frame.h"
 #include "main_menu_screen.h"
 #include "screen_context.h"
-#include "renderer.h"
 
 #include "runtime/UiInteractionRegistry.h"
 

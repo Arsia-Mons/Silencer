@@ -7,7 +7,6 @@
 #include "lobby_connect_screen.h"
 #include "options_screen.h"
 #include "screen_context.h"
-#include "renderer.h"
 
 #include "runtime/UiInteractionRegistry.h"
 
@@ -20,7 +19,7 @@
 void MainMenuScreen::Build(ScreenContext & ctx)
 {
 	ctx.ResetPresentation(1);
-	ctx.renderer.camera.SetPosition(320, 240);
+	ctx.CenterPresentationCamera();
 
 	// The authored cppx frame owns the visible menu layout and publishes its
 	// retained bounds to the existing control-socket interaction registry.

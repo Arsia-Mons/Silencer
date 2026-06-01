@@ -7,7 +7,6 @@
 #include "options_display_screen.h"
 #include "client/ui/screens/options/options_frame.h"
 #include "screen_context.h"
-#include "renderer.h"
 
 #include "runtime/UiInteractionRegistry.h"
 
@@ -17,7 +16,7 @@
 void OptionsScreen::Build(ScreenContext & ctx)
 {
 	ctx.ResetPresentation(1);
-	ctx.renderer.camera.SetPosition(320, 240);
+	ctx.CenterPresentationCamera();
 }
 
 void OptionsScreen::Tick(ScreenContext & ctx)

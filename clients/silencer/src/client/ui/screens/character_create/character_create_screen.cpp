@@ -6,7 +6,6 @@
 #include "lobby_screen.h"
 #include "message_modal.h"
 #include "screen_context.h"
-#include "renderer.h"
 
 #include <algorithm>
 #include <cstring>
@@ -32,7 +31,7 @@ void ShowMessage(const silencer::client_ui::Navigation & navigation,
 void CharacterCreateScreen::Build(ScreenContext & ctx)
 {
 	ctx.ResetPresentation(1);
-	ctx.renderer.camera.SetPosition(320, 240);
+	ctx.CenterPresentationCamera();
 	step = Step::SelectAgent;
 	selectedAgentIndex = 0;
 	previewAgentIndex = -1;

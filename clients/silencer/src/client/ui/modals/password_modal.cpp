@@ -3,8 +3,6 @@
 #include "client/ui/modals/password_modal_frame.h"
 #include "client/ui/hooks/use_navigation.h"
 #include "screen_context.h"
-#include "renderer.h"
-
 #include "runtime/UiInteractionRegistry.h"
 
 #include <algorithm>

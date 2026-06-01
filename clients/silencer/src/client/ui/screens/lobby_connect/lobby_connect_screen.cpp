@@ -8,7 +8,6 @@
 #include "main_menu_screen.h"
 #include "update_screen.h"
 #include "screen_context.h"
-#include "renderer.h"
 
 #include "runtime/UiInteractionRegistry.h"
 

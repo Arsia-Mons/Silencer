@@ -4,7 +4,6 @@
 #include "client/ui/hooks/use_options.h"
 #include "client/ui/screens/options/options_display_frame.h"
 #include "screen_context.h"
-#include "renderer.h"
 
 #include "runtime/UiInteractionRegistry.h"
 
@@ -13,7 +12,7 @@
 void OptionsDisplayScreen::Build(ScreenContext & ctx)
 {
 	ctx.ResetPresentation(1);
-	ctx.renderer.camera.SetPosition(320, 240);
+	ctx.CenterPresentationCamera();
 }
 
 void OptionsDisplayScreen::Tick(ScreenContext & ctx)

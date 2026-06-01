@@ -7,7 +7,6 @@
 #include "main_menu_screen.h"
 #include "screen_context.h"
 #include "runtime/UiInteractionRegistry.h"
-#include "renderer.h"
 
 #include <algorithm>
 #include <array>
@@ -57,7 +56,7 @@ void FinishMissionSummary(
 void MissionSummaryScreen::Build(ScreenContext & ctx)
 {
 	ctx.ResetPresentation(1);
-	ctx.renderer.camera.SetPosition(320, 240);
+	ctx.CenterPresentationCamera();
 	infoLoaded = false;
 	scrollDelta = 0;
 	scrollPosition = 0;

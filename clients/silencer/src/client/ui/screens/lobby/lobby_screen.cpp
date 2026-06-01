@@ -13,7 +13,6 @@
 #include "game.h"
 #include "message_modal.h"
 #include "renderdevice.h"
-#include "renderer.h"
 #include "ui/runtime/UiInputState.h"
 
 #include <SDL3/SDL.h>
@@ -224,7 +223,7 @@ LobbyScreen::~LobbyScreen() = default;
 void LobbyScreen::Build(ScreenContext & ctx)
 {
 	ctx.ResetPresentation(2);
-	ctx.renderer.camera.SetPosition(320, 240);
+	ctx.CenterPresentationCamera();
 
 	version  = "v.";
 	version += silencer::client_ui::use_app(

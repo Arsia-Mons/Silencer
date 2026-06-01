@@ -1,6 +1,7 @@
 #include "screen_context.h"
 
 #include "game.h"
+#include "renderer.h"
 
 ScreenContext::ScreenContext(Game & game_,
                              World & world_,
@@ -27,4 +28,8 @@ ScreenContext::ScreenContext(Game & game_,
 
 void ScreenContext::ResetPresentation(int paletteIdx) {
 	game.ResetPresentationPalette(paletteIdx);
+}
+
+void ScreenContext::CenterPresentationCamera() {
+	renderer.camera.SetPosition(320, 240);
 }

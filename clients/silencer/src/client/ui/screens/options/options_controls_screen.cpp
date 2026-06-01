@@ -51,7 +51,7 @@ int OptionsControlsScreen::MaxScroll() const {
 
 void OptionsControlsScreen::Build(ScreenContext & ctx) {
 	ctx.ResetPresentation(1);
-	ctx.renderer.camera.SetPosition(320, 240);
+	ctx.CenterPresentationCamera();
 	scrollPosition = 0;
 	rebindRow = -1;
 	rebindSlot = -1;
