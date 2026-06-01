@@ -2,6 +2,8 @@
 
 #include "ui/runtime/element.h"
 
+#include <functional>
+
 namespace silencer {
 namespace client_ui {
 
@@ -9,6 +11,7 @@ struct MessageModalFrameProps {
 	const char * key = nullptr;
 	const char * message = nullptr;
 	bool show_ok = true;
+	std::function<void()> ok = {};
 };
 
 ::ui::UiElement MessageModalFrame(const MessageModalFrameProps& props);

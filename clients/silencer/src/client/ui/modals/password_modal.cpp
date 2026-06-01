@@ -17,7 +17,6 @@ namespace password_modal_detail
 {
 constexpr int kPasswordUid = 1;
 constexpr const char * kActionPassword = "password_modal.password";
-constexpr const char * kActionOk = "password_modal.ok";
 
 void CopyUiText(char * dst, int dstLen, const std::string & value)
 {
@@ -53,7 +52,6 @@ PasswordModal::PasswordModal(std::function<void(const char *)> onSubmit_)
 void PasswordModal::Build(ScreenContext & ctx)
 {
 	(void)ctx;
-	okClicked = false;
 	password[0] = '\0';
 	password_modal_detail::RegisterWidgets(this, password, ctx.game.UiInteractions());
 	ctx.game.UiInteractions().FocusTextInputByUid(password_modal_detail::kPasswordUid);
@@ -61,8 +59,11 @@ void PasswordModal::Build(ScreenContext & ctx)
 
 void PasswordModal::Tick(ScreenContext & ctx)
 {
-	if(!okClicked) return;
-	okClicked = false;
+	(void)ctx;
+}
+
+void PasswordModal::Submit()
+{
 	std::string captured = password;
 	auto cb = std::move(onSubmit);
 	silencer::client_ui::use_navigation().pop_top();
@@ -88,6 +89,9 @@ void PasswordModal::BuildUi(ScreenContext & ctx, Surface & dst, float frametime,
 	silencer::client_ui::PasswordModalFrameProps props{
 		.key = "password-modal",
 		.password_display = passwordDisplay_.c_str(),
+		.submit = [this]() {
+			Submit();
+		},
 	};
 	retainedFrame_.Build([&]() {
 		                     return silencer::client_ui::PasswordModalFrame(props);
@@ -113,14 +117,10 @@ bool PasswordModal::HandleUiIntent(ScreenContext & ctx, const silencer::ui::UiAc
 	}
 	if(action.kind == silencer::ui::UiActionKind::SubmitText && action.id == password_modal_detail::kActionPassword){
 		password_modal_detail::CopyUiText(password, static_cast<int>(sizeof(password)), action.value);
-		okClicked = true;
+		Submit();
 		return true;
 	}
-	if(action.kind == silencer::ui::UiActionKind::Activate && action.id == password_modal_detail::kActionOk){
-		okClicked = true;
-		return true;
-	}
-	return false;
+	return retainedFrame_.HandleUiIntent(action);
 }
 
 const ::ui::DrawCommandList * PasswordModal::RetainedDrawCommands() const

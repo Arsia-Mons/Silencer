@@ -31,10 +31,10 @@ public:
 
 private:
 	MessageModal(std::string message, bool ok, std::function<void()> onClose);
+	void Close();
 
 	std::string message;
 	bool hasOk;
-	bool okClicked = false;
 	std::function<void()> onClose;
 	silencer::client_ui::RetainedFrame retainedFrame_;
 };

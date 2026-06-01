@@ -10,11 +10,6 @@
 
 #include <algorithm>
 
-namespace message_modal_detail
-{
-	constexpr const char * kActionOk = "message_modal.ok";
-} // namespace message_modal_detail
-
 MessageModal::MessageModal(std::string message_, std::function<void()> onClose_)
     : message(std::move(message_)), hasOk(true), onClose(std::move(onClose_))
 {
@@ -33,13 +28,15 @@ std::unique_ptr<MessageModal> MessageModal::Progress(std::string message)
 void MessageModal::Build(ScreenContext & ctx)
 {
 	(void)ctx;
-	okClicked = false;
 }
 
 void MessageModal::Tick(ScreenContext & ctx)
 {
-	if(!hasOk || !okClicked) return;
-	okClicked = false;
+	(void)ctx;
+}
+
+void MessageModal::Close()
+{
 	auto cb = std::move(onClose);
 	silencer::client_ui::use_navigation().pop_top();
 	if(cb) cb();
@@ -56,6 +53,9 @@ void MessageModal::BuildUi(ScreenContext & ctx, Surface & dst, float frametime, 
 		.key = "message-modal",
 		.message = message.c_str(),
 		.show_ok = hasOk,
+		.ok = [this]() {
+			Close();
+		},
 	};
 	retainedFrame_.Build([&]() {
 		                     return silencer::client_ui::MessageModalFrame(props);
@@ -74,12 +74,11 @@ bool MessageModal::HandleUiIntent(ScreenContext & ctx, const silencer::ui::UiAct
 {
 	(void)ctx;
 	if(!hasOk) return false;
-	if(action.kind == silencer::ui::UiActionKind::Cancel ||
-	   (action.kind == silencer::ui::UiActionKind::Activate && action.id == message_modal_detail::kActionOk)){
-		okClicked = true;
+	if(action.kind == silencer::ui::UiActionKind::Cancel){
+		Close();
 		return true;
 	}
-	return false;
+	return retainedFrame_.HandleUiIntent(action);
 }
 
 void MessageModal::SetText(ScreenContext & ctx, const std::string & text)

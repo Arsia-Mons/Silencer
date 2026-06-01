@@ -45,6 +45,7 @@ using ::ui::components::TextProps;
 struct MessageModalOkButtonProps {
 	const char * key = nullptr;
 	bool show = false;
+	std::function<void()> ok = {};
 };
 
 ::ui::UiElement MessageModalOkButton(const MessageModalOkButtonProps& props) {
@@ -54,6 +55,7 @@ struct MessageModalOkButtonProps {
 	  controlId="message_modal.ok"
 	  size={AppButtonSize::Sm}
 	  label="OK"
+	  onPress={props.ok}
 	/>
 }
 
@@ -90,7 +92,7 @@ struct MessageModalOkButtonProps {
 				}}
 			  style={message_modal_frame_detail::message_text_patch()}
 			/>
-			<MessageModalOkButton key="ok-button" show={props.show_ok} />
+			<MessageModalOkButton key="ok-button" show={props.show_ok} ok={props.ok} />
 		</Box>
 	</Box>
 }

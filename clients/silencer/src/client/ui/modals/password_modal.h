@@ -22,8 +22,9 @@ public:
 	const ::ui::DrawCommandList * RetainedDrawCommands() const override;
 
 private:
+	void Submit();
+
 	std::function<void(const char *)> onSubmit;
-	bool okClicked = false;
 	char password[21] = {};
 	std::string passwordDisplay_;
 	silencer::client_ui::RetainedFrame retainedFrame_;
