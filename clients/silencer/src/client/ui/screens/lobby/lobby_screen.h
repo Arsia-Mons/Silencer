@@ -11,8 +11,8 @@
 #include <string>
 
 // Top-level lobby surface. The retained cppx view owns the component tree and
-// reads lobby state through UseLobby(); this screen owns the lobby lifecycle
-// mutations that touch World/Game.
+// reads lobby state through narrow hooks/providers; this screen owns the lobby
+// lifecycle mutations that touch World/Game.
 class LobbyScreen : public Screen
 {
 public:

@@ -30,55 +30,73 @@ const LobbyGameTech kEmptyGameTech = {};
 const LobbyChrome& UseLobbyChrome() {
 	const auto * value = static_cast<const LobbyChrome *>(
 		::use_context(&LobbyChromeContext));
-	return value ? *value : kEmptyChrome;
+	if(value) return *value;
+	::react_report_error("client/ui/lobby: missing LobbyChromeProvider for UseLobbyChrome\n");
+	return kEmptyChrome;
 }
 
 const LobbySurface& UseLobbySurface() {
 	const auto * value = static_cast<const LobbySurface *>(
 		::use_context(&LobbySurfaceContext));
-	return value ? *value : kEmptySurface;
+	if(value) return *value;
+	::react_report_error("client/ui/lobby: missing LobbySurfaceProvider for UseLobbySurface\n");
+	return kEmptySurface;
 }
 
 const LobbyNavigation& UseLobbyNavigation() {
 	const auto * value = static_cast<const LobbyNavigation *>(
 		::use_context(&LobbyNavigationContext));
-	return value ? *value : kEmptyNavigation;
+	if(value) return *value;
+	::react_report_error("client/ui/lobby: missing LobbyNavigationProvider for UseLobbyNavigation\n");
+	return kEmptyNavigation;
 }
 
 const LobbyChat& UseLobbyChat() {
 	const auto * value = static_cast<const LobbyChat *>(
 		::use_context(&LobbyChatContext));
-	return value ? *value : kEmptyChat;
+	if(value) return *value;
+	::react_report_error("client/ui/lobby: missing LobbyChatProvider for UseLobbyChat\n");
+	return kEmptyChat;
 }
 
 const LobbyCharacter& UseLobbyCharacter() {
 	const auto * value = static_cast<const LobbyCharacter *>(
 		::use_context(&LobbyCharacterContext));
-	return value ? *value : kEmptyCharacter;
+	if(value) return *value;
+	::react_report_error("client/ui/lobby: missing LobbyCharacterProvider for UseLobbyCharacter\n");
+	return kEmptyCharacter;
 }
 
 const LobbyGameSelect& UseLobbyGameSelect() {
 	const auto * value = static_cast<const LobbyGameSelect *>(
 		::use_context(&LobbyGameSelectContext));
-	return value ? *value : kEmptyGameSelect;
+	if(value) return *value;
+	::react_report_error("client/ui/lobby: missing LobbyGameSelectProvider for UseLobbyGameSelect\n");
+	return kEmptyGameSelect;
 }
 
 const LobbyGameCreate& UseLobbyGameCreate() {
 	const auto * value = static_cast<const LobbyGameCreate *>(
 		::use_context(&LobbyGameCreateContext));
-	return value ? *value : kEmptyGameCreate;
+	if(value) return *value;
+	::react_report_error("client/ui/lobby: missing LobbyGameCreateProvider for UseLobbyGameCreate\n");
+	return kEmptyGameCreate;
 }
 
 const LobbyGameJoin& UseLobbyGameJoin() {
 	const auto * value = static_cast<const LobbyGameJoin *>(
 		::use_context(&LobbyGameJoinContext));
-	return value ? *value : kEmptyGameJoin;
+	if(value) return *value;
+	::react_report_error("client/ui/lobby: missing LobbyGameJoinProvider for UseLobbyGameJoin\n");
+	return kEmptyGameJoin;
 }
 
 const LobbyGameTech& UseLobbyGameTech() {
 	const auto * value = static_cast<const LobbyGameTech *>(
 		::use_context(&LobbyGameTechContext));
-	return value ? *value : kEmptyGameTech;
+	if(value) return *value;
+	::react_report_error("client/ui/lobby: missing LobbyGameTechProvider for UseLobbyGameTech\n");
+	return kEmptyGameTech;
 }
 
 ::ui::UiElement LobbyScreenView(const LobbyScreenViewProps& props) {

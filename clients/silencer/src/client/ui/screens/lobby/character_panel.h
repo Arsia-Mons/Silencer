@@ -24,9 +24,9 @@ struct CharacterPanelState {
 	bool newCharacterRequested = false;
 	bool agentSelectionLocked = false;
 
-	// Cached character snapshot for UseLobby() consumers. Rebuilt from
-	// World/Lobby during CharacterPanelTick so components do not receive a
-	// raw World pointer.
+	// Cached character snapshot for UseLobbyCharacter() consumers. Rebuilt
+	// from World/Lobby during CharacterPanelTick so components do not receive
+	// a raw World pointer.
 	std::string agentName = "Agent";
 	std::string levelText = "No character selected";
 	std::string recordText;

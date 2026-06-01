@@ -169,6 +169,10 @@ fail_if_match \
   "$REPO_ROOT/clients/silencer/src/client/ui/screens/lobby/lobby_view_provider.cpp"
 
 fail_if_match \
+  "return[[:space:]]+value[[:space:]]*[?][[:space:]]*[*]value[[:space:]]*:[[:space:]]*kEmpty" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens/lobby/lobby_view_provider.cpp"
+
+fail_if_match \
   "actions[.](go_back|set_chat_text|send_chat|change_agent|select_game|scroll_games|create_game|join_game|spectate_game|select_create_map|scroll_create_maps|cycle_create_security|toggle_create_spectatable|submit_create_game|set_create_name|set_create_password|set_create_min_level|set_create_max_level|set_create_max_players|set_create_max_teams|choose_tech|change_team|ready_game|back_to_team|preview_tech|toggle_tech)\\b|state[.](chat|character|game_select|game_create|game_join|game_tech)\\b" \
   "$REPO_ROOT/clients/silencer/src/client/ui/screens/lobby/lobby_view.cppx" \
   "$REPO_ROOT/clients/silencer/src/client/ui/screens/lobby/lobby_view.hx" \
