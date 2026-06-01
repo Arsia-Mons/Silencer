@@ -92,19 +92,20 @@ void UpdateScreen::Destroy(ScreenContext & ctx)
 bool UpdateScreen::HandleUiIntent(ScreenContext & ctx, const silencer::ui::UiAction & action)
 {
 	if(action.kind == silencer::ui::UiActionKind::Cancel){
-		CancelUpdate(ctx);
+		silencer::client_ui::UpdateModel update =
+			silencer::client_ui::use_update(
+				silencer::client_ui::MakeUpdateProvider(ctx));
+		CancelUpdate(update, silencer::client_ui::use_navigation());
 		return true;
 	}
 	return retainedFrame_.HandleUiIntent(action);
 }
 
-void UpdateScreen::CancelUpdate(ScreenContext & ctx) const {
-	silencer::client_ui::UpdateModel update =
-		silencer::client_ui::use_update(
-			silencer::client_ui::MakeUpdateProvider(ctx));
+void UpdateScreen::CancelUpdate(
+	const silencer::client_ui::UpdateModel & update,
+	const silencer::client_ui::Navigation & navigation) const {
 	if(update.cancel()){
-		silencer::client_ui::use_navigation()
-			.reset_to(std::make_unique<MainMenuScreen>());
+		navigation.reset_to(std::make_unique<MainMenuScreen>());
 	}
 }
 

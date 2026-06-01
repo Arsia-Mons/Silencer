@@ -81,9 +81,8 @@ bool MessageModal::HandleUiIntent(ScreenContext & ctx, const silencer::ui::UiAct
 	return retainedFrame_.HandleUiIntent(action);
 }
 
-void MessageModal::SetText(ScreenContext & ctx, const std::string & text)
+void MessageModal::SetText(const std::string & text)
 {
-	(void)ctx;
 	message = text;
 }
 

@@ -4,6 +4,13 @@
 #include "client/ui/retained/RetainedFrame.h"
 #include "screen.h"
 
+namespace silencer {
+namespace client_ui {
+struct Navigation;
+class UpdateModel;
+}
+}
+
 class UpdateScreen : public Screen
 {
 public:
@@ -15,7 +22,8 @@ public:
 	const ::ui::DrawCommandList * RetainedDrawCommands() const override;
 
 private:
-	void CancelUpdate(ScreenContext & ctx) const;
+	void CancelUpdate(const silencer::client_ui::UpdateModel & update,
+	                  const silencer::client_ui::Navigation & navigation) const;
 	silencer::client_ui::RetainedFrame retainedFrame_;
 };
 

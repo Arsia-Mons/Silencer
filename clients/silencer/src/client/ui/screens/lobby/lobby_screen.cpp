@@ -728,7 +728,7 @@ void LobbyScreen::Tick(ScreenContext & ctx)
 		return;
 	}
 	if(progress && !session.progress_text.empty()){
-		progress->SetText(ctx, session.progress_text);
+		progress->SetText(session.progress_text);
 	}
 	if(session.dismiss_progress){
 		lobby_screen_flow_detail::DismissProgressModal(gameCreateState);

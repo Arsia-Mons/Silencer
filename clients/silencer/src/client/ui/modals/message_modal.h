@@ -27,7 +27,7 @@ public:
 	const ::ui::DrawCommandList * RetainedDrawCommands() const override;
 
 	bool IsProgress() const { return !hasOk; }
-	void SetText(ScreenContext & ctx, const std::string & text);
+	void SetText(const std::string & text);
 
 private:
 	MessageModal(std::string message, bool ok, std::function<void()> onClose);
