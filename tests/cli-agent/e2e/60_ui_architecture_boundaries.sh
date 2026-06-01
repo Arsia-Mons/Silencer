@@ -687,6 +687,14 @@ fail_if_match \
   --glob '!screen_context.*'
 
 fail_if_match \
+  "ctx[.](game|world|renderer|lobby|keymap|updater|ambienceMixer|mapDownloader|window|renderdevice)\\b" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/modals" \
+  --glob '*.h' \
+  --glob '*.cpp' \
+  --glob '!screen_context.*'
+
+fail_if_match \
   "ctx[.]game[.]CurrentUiInput[[:space:]]*[(]|ctx[.]renderer[.]GetHudAnimationPhase[[:space:]]*[(]" \
   "$REPO_ROOT/clients/silencer/src/client/ui/ClientUi.cpp"
 
