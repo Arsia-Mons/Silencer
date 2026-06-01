@@ -1,17 +1,16 @@
 #pragma once
 
-class Game;
-class Resources;
 class ScreenContext;
-class World;
+
+#include <memory>
 
 namespace silencer {
 namespace client_ui {
 
+struct AppProviderState;
+
 struct AppProviderValue {
-	Game * game = nullptr;
-	Resources * resources = nullptr;
-	World * world = nullptr;
+	std::shared_ptr<AppProviderState> state;
 };
 
 AppProviderValue MakeAppProvider(ScreenContext& ctx);

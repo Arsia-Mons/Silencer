@@ -7,8 +7,16 @@
 #include "screen_context.h"
 #include "world.h"
 
+#include <memory>
+
 namespace silencer {
 namespace client_ui {
+
+struct AppProviderState {
+	Game * game = nullptr;
+	Resources * resources = nullptr;
+	World * world = nullptr;
+};
 
 namespace app_provider_detail {
 
@@ -17,13 +25,26 @@ constexpr std::uint16_t kReadyIndicatorBank = 7;
 constexpr std::uint16_t kReadyIndicatorReadyFrame = 18;
 constexpr std::uint16_t kReadyIndicatorWaitingFrame = 19;
 
+Game * GameFor(const AppProviderValue& provider) {
+	return provider.state ? provider.state->game : nullptr;
+}
+
+Resources * ResourcesFor(const AppProviderValue& provider) {
+	return provider.state ? provider.state->resources : nullptr;
+}
+
+World * WorldFor(const AppProviderValue& provider) {
+	return provider.state ? provider.state->world : nullptr;
+}
+
 }  // namespace app_provider_detail
 
 AppProviderValue MakeAppProvider(ScreenContext& ctx) {
 	AppProviderValue value;
-	value.game = &ctx.game;
-	value.resources = &ctx.world.resources;
-	value.world = &ctx.world;
+	value.state = std::make_shared<AppProviderState>();
+	value.state->game = &ctx.game;
+	value.state->resources = &ctx.world.resources;
+	value.state->world = &ctx.world;
 	return value;
 }
 
@@ -31,8 +52,8 @@ AppLifecycleModel::AppLifecycleModel(const AppProviderValue& provider)
 	: provider_(provider) {}
 
 void AppLifecycleModel::quit() const {
-	if(provider_.game){
-		provider_.game->quitRequested = true;
+	if(Game * game = app_provider_detail::GameFor(provider_)){
+		game->quitRequested = true;
 	}
 }
 
@@ -45,15 +66,15 @@ AppSpriteFrame SpriteFrame(const AppProviderValue& provider,
                            std::uint16_t bank,
                            std::uint16_t frame) {
 	AppSpriteFrame out;
-	if(!provider.resources) return out;
+	Resources * resources = app_provider_detail::ResourcesFor(provider);
+	if(!resources) return out;
 
-	Resources & resources = *provider.resources;
-	out.offset_x = resources.spriteoffsetx[bank][frame];
-	out.offset_y = resources.spriteoffsety[bank][frame];
+	out.offset_x = resources->spriteoffsetx[bank][frame];
+	out.offset_y = resources->spriteoffsety[bank][frame];
 	out.left = -out.offset_x;
 	out.top = -out.offset_y;
-	out.width = static_cast<int>(resources.spritewidth[bank][frame]);
-	out.height = static_cast<int>(resources.spriteheight[bank][frame]);
+	out.width = static_cast<int>(resources->spritewidth[bank][frame]);
+	out.height = static_cast<int>(resources->spriteheight[bank][frame]);
 	out.available = out.width > 0 && out.height > 0;
 	return out;
 }
@@ -79,10 +100,11 @@ void AppAudioModel::play_ui_click() const {
 #ifdef SILENCER_TEST_BUILD
 	(void)provider_;
 #else
-	if(!provider_.resources) return;
+	Resources * resources = app_provider_detail::ResourcesFor(provider_);
+	if(!resources) return;
 	const std::string & sound = GASLoader::Get().player.soundUIClick;
-	auto it = provider_.resources->soundbank.find(sound);
-	if(it != provider_.resources->soundbank.end() && it->second){
+	auto it = resources->soundbank.find(sound);
+	if(it != resources->soundbank.end() && it->second){
 		Audio::GetInstance().PlayUI(it->second);
 	}
 #endif
@@ -92,7 +114,8 @@ AppModel::AppModel(const AppProviderValue& provider)
 	: assets(provider), audio(provider), lifecycle(provider), provider_(provider) {}
 
 std::string AppModel::version() const {
-	return provider_.world ? provider_.world->GetVersion() : std::string();
+	World * world = app_provider_detail::WorldFor(provider_);
+	return world ? world->GetVersion() : std::string();
 }
 
 AppModel use_app(const AppProviderValue& provider) {

@@ -131,6 +131,10 @@ fail_if_match \
   "$REPO_ROOT/clients/silencer/src/client/ui/providers/options_provider.h"
 
 fail_if_match \
+  "\\b(Game|World|Resources)\\b" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/providers/app_provider.h"
+
+fail_if_match \
   "\\bGame\\b" \
   "$REPO_ROOT/clients/silencer/src/client/ui/providers/game_session_provider.h"
 
