@@ -1110,6 +1110,10 @@ bool BindingFromJson(const nlohmann::json& j, Binding& out, std::string& err) {
 			out.keys.push_back(k);
 		}
 		if (out.keys.empty()) { err = "empty chord"; return false; }
+		if ((int)out.keys.size() > CHORD_CAP) {
+			err = "chord exceeds " + std::to_string(CHORD_CAP) + " keys";
+			return false;
+		}
 		return true;
 	}
 	err = "binding must be string or array of strings";
@@ -1266,6 +1270,11 @@ static void HandleKeybind(Game& game, ControlCommand& cmd) {
 				return;
 			}
 			parsed.push_back(std::move(b));
+		}
+		if ((int)parsed.size() > COMBO_CAP) {
+			cmd.reply->set_value(Err(cmd.id, "BAD_REQUEST",
+				"too many combos for one action (max " + std::to_string(COMBO_CAP) + ")"));
+			return;
 		}
 
 		// Load (or copy-on-write) the target profile.
