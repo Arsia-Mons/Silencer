@@ -228,6 +228,12 @@ void LobbyScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime, s
 		.game_select_join_y = joinButtonY,
 		.game_select_action_width = lobby_screen_detail::kGameSelectActionButtonW,
 		.game_select_action_height = lobby_screen_detail::kGameSelectActionButtonH,
+		.show_game_select_tall = gameSelectVisible,
+		.game_select_tall_x = bodyX + mainLayout.topRowW,
+		.game_select_tall_y = bodyY,
+		.game_select_tall_width = mainLayout.rightTallW,
+		.game_select_tall_height = mainLayout.rightTallH,
+		.game_select = &gameSelectState,
 	};
 	chromeFrame_.Build([&]() {
 		                   return silencer::client_ui::lobby::LobbyChromeFrame(chromeProps);

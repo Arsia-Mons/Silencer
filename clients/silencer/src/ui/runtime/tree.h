@@ -172,6 +172,7 @@ enum class SemanticRole : uint8_t {
   Checkbox,
   TextBox,
   Tab,
+  ListRow,
   Dialog,
 };
 

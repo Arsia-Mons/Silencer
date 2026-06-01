@@ -6,7 +6,6 @@
 
 #include "character_panel.h"
 #include "chat_panel.h"
-#include "game_select_panel.h"
 #include "game_create_panel.h"
 #include "game_join_panel.h"
 #include "game_tech_panel.h"
@@ -225,12 +224,6 @@ void BuildRightTallContents(LobbyMainAreaPanels & panels,
 		BuildGameJoinTallTree(panels.gameJoin, app.assets, interactions);
 	}else if(panels.gameTechActive){
 		BuildGameTechTallTree(panels.gameTech, lobby, interactions);
-	}else{
-		BuildGameSelectTallTree(
-			panels.gameSelect,
-			static_cast<Uint16>(std::max(0, layout.rightTallW)),
-			static_cast<Uint16>(std::max(0, layout.rightTallH)),
-			interactions);
 	}
 }
 

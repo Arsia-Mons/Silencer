@@ -2,10 +2,9 @@
 #define SILENCER_CLIENT_UI_LOBBY_GAME_SELECT_PANEL_H
 
 // Screen-side lobby GameSelectPanel: the always-on right-side games list
-// surface (active when no Create/Join/Tech panel is up). Composes ScrollList
-// + Text + Button primitives and owns the per-frame info-block
-// strings + the Join/Spectate/Create button click flags. Domain mutations go
-// through use_lobby(); primitives stay screen-agnostic.
+// surface (active when no Create/Join/Tech panel is up). Owns the retained
+// frame's per-frame row snapshot, info strings, and Join/Spectate/Create click
+// flags. Domain mutations go through use_lobby().
 
 #include "shared.h"
 #include "runtime/UiActionQueue.h"
@@ -75,15 +74,6 @@ GameSelectPanelTickResult GameSelectPanelTick(GameSelectPanelState & state,
                                               LobbyModel & lobby);
 bool GameSelectPanelHandleUiIntent(GameSelectPanelState & state,
                                    const silencer::ui::UiAction & action);
-
-// Emits the tall stepped-pane subtree ("Active Games" header + games list +
-// info-block). Must be called inside the LobbyRightTallBox CLAY block; emits
-// flex children only.
-// BeginFrame requirements: TextBeginFrame, ScrollListBeginFrame.
-void BuildGameSelectTallTree(GameSelectPanelState & state,
-                             Uint16 panelWidth,
-                             Uint16 panelHeight,
-                             silencer::ui::UiInteractionRegistry& interactions);
 
 }  // namespace silencer::client_ui::lobby
 

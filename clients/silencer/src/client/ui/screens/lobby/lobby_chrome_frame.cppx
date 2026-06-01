@@ -1,16 +1,22 @@
 #include "client/ui/screens/lobby/lobby_chrome_frame.h"
 
+#include "client/ui/screens/lobby/game_select_panel.h"
 #include "ui/components/box.h"
 #include "ui/components/button.h"
+#include "ui/components/common.h"
 #include "ui/components/text.h"
 #include "ui/style/style_patch.h"
 
+#include <algorithm>
 #include <cstdint>
+#include <string>
 
 namespace silencer {
 namespace client_ui {
 namespace lobby {
 namespace lobby_chrome_frame_detail {
+
+namespace component_detail = ::ui::components::detail;
 
 using ::ui::children;
 using ::ui::components::Box;
@@ -19,6 +25,36 @@ using ::ui::components::Button;
 using ::ui::components::ButtonProps;
 using ::ui::components::Text;
 using ::ui::components::TextProps;
+
+constexpr int kGameSelectHeadingPadLeft = 7;
+constexpr int kGameSelectHeadingPadTop = 6;
+constexpr int kGameSelectHeadingLineH = 13;
+constexpr int kGameSelectListPadLeft = 9;
+constexpr int kGameSelectListPadTop = 4;
+constexpr int kGameSelectListBorderPad = 1;
+constexpr int kGameSelectListLineH = 14;
+constexpr int kGameSelectRowSlots = 32;
+constexpr int kGameSelectFooterPadTop = 4;
+constexpr int kGameSelectFooterGap = 4;
+constexpr int kGameSelectInfoPadLeft = 7;
+constexpr int kGameSelectInfoRowH = 12;
+constexpr int kGameSelectButtonRowH = 21;
+constexpr int kGameSelectButtonGap = 2;
+constexpr const char * kGameSelectRowActionPrefix = "lobby.game_select.row";
+
+const char * kGameSelectRowKeys[kGameSelectRowSlots] = {
+	"game-select-row-0",  "game-select-row-1",  "game-select-row-2",
+	"game-select-row-3",  "game-select-row-4",  "game-select-row-5",
+	"game-select-row-6",  "game-select-row-7",  "game-select-row-8",
+	"game-select-row-9",  "game-select-row-10", "game-select-row-11",
+	"game-select-row-12", "game-select-row-13", "game-select-row-14",
+	"game-select-row-15", "game-select-row-16", "game-select-row-17",
+	"game-select-row-18", "game-select-row-19", "game-select-row-20",
+	"game-select-row-21", "game-select-row-22", "game-select-row-23",
+	"game-select-row-24", "game-select-row-25", "game-select-row-26",
+	"game-select-row-27", "game-select-row-28", "game-select-row-29",
+	"game-select-row-30", "game-select-row-31",
+};
 
 inline std::uint32_t texture_id(std::uint8_t bank, std::uint16_t index) {
 	return (static_cast<std::uint32_t>(bank) << 16) |
@@ -108,6 +144,20 @@ inline ::ui::LayoutStyle text_slot(float width) {
 	};
 }
 
+inline ::ui::LayoutStyle absolute_layout(int x,
+                                         int y,
+                                         int width,
+                                         int height) {
+	return {
+		.position = ::ui::PositionType::Absolute,
+		.width = ::ui::Length::points(static_cast<float>(width)),
+		.height = ::ui::Length::points(static_cast<float>(height)),
+		.position_inset = absolute_inset(
+			static_cast<float>(x),
+			static_cast<float>(y)),
+	};
+}
+
 inline ::ui::LayoutStyle absolute_button_layout(int x,
                                                 int y,
                                                 int width,
@@ -123,6 +173,95 @@ inline ::ui::LayoutStyle absolute_button_layout(int x,
 			static_cast<float>(x),
 			static_cast<float>(y)),
 	};
+}
+
+inline ::ui::StylePatch text_patch(std::uint16_t font_id,
+                                   std::uint16_t font_size,
+                                   float line_height) {
+	return ::ui::patch().text(::ui::TextVisual{
+		.color = {0, 0, 0, 255},
+		.font_id = font_id,
+		.font_size = font_size,
+		.line_height = line_height,
+	});
+}
+
+inline ::ui::StylePatch inset_border_patch() {
+	return ::ui::patch().border(::ui::Border{
+		{1.0f, 1.0f, 1.0f, 1.0f},
+		{{220, 0, 0, 255}, {220, 0, 0, 255},
+		 {220, 0, 0, 255}, {220, 0, 0, 255}},
+	});
+}
+
+inline ::ui::VisualStyle row_visual(bool selected) {
+	::ui::VisualStyle visual{};
+	visual.background = selected
+		? ::ui::Color{180, 0, 0, 255}
+		: ::ui::Color{0, 0, 0, 0};
+	visual.text = ::ui::TextVisual{
+		.color = {0, 0, 0, 255},
+		.font_id = 133,
+		.font_size = 6,
+		.line_height = 11.0f,
+	};
+	return visual;
+}
+
+struct GameSelectTallLayout {
+	int list_box_x = 0;
+	int list_box_y = 0;
+	int list_box_w = 0;
+	int list_box_h = 0;
+	int list_x = 0;
+	int list_y = 0;
+	int list_w = 0;
+	int list_h = 0;
+	int visible_rows = 0;
+	int info_y = 0;
+};
+
+inline GameSelectTallLayout resolve_game_select_tall_layout(int width,
+                                                            int height) {
+	GameSelectTallLayout out;
+	const int titleWrapH = kGameSelectHeadingPadTop + kGameSelectHeadingLineH;
+	const int infoH = 5 * kGameSelectInfoRowH;
+	const int footerH =
+		kGameSelectFooterPadTop
+		+ infoH
+		+ kGameSelectFooterGap
+		+ kGameSelectButtonRowH
+		+ kGameSelectButtonGap
+		+ kGameSelectButtonRowH;
+	out.list_box_x = kGameSelectListPadLeft;
+	out.list_box_y = titleWrapH + kGameSelectListPadTop;
+	out.list_box_w = std::max(0, width - kGameSelectListPadLeft * 2);
+	out.list_box_h = std::max(0, height - titleWrapH - kGameSelectListPadTop - footerH);
+	out.list_x = out.list_box_x + kGameSelectListBorderPad;
+	out.list_y = out.list_box_y + kGameSelectListBorderPad;
+	out.list_w = std::max(0, out.list_box_w - kGameSelectListBorderPad * 2);
+	out.list_h = std::max(0, out.list_box_h - kGameSelectListBorderPad * 2);
+	out.visible_rows = std::min(kGameSelectRowSlots, out.list_h / kGameSelectListLineH);
+	out.info_y = height - footerH + kGameSelectFooterPadTop;
+	return out;
+}
+
+inline const char * copied_row_id(int source) {
+	std::string value =
+		std::string(kGameSelectRowActionPrefix) + "." + std::to_string(source);
+	return ::ui::copy_string(value.c_str());
+}
+
+inline const char * game_select_info_value(const GameSelectPanelState& state,
+                                           int index) {
+	switch(index){
+		case 0: return state.infoName.c_str();
+		case 1: return state.infoMap.c_str();
+		case 2: return state.infoSecurity.c_str();
+		case 3: return state.infoCreator.c_str();
+		case 4: return state.infoLimits.c_str();
+	}
+	return "";
 }
 
 struct AbsoluteChromeButtonProps {
@@ -146,6 +285,346 @@ struct AbsoluteChromeButtonProps {
 	  layout={absolute_button_layout(props.x, props.y, props.width, props.height)}
 	  style={chrome_button_patch()}
 	/>
+}
+
+struct GameSelectRowProps {
+	const char * key = nullptr;
+	const GameSelectPanelState * state = nullptr;
+	GameSelectTallLayout layout = {};
+	int visible_row = 0;
+};
+
+::ui::UiElement GameSelectRow(const GameSelectRowProps& props) {
+	if(!props.state || props.visible_row < 0 ||
+	   props.visible_row >= props.layout.visible_rows){
+		return ::ui::empty();
+	}
+	const int source = static_cast<int>(props.state->scrollPos) + props.visible_row;
+	if(source < 0 || source >= static_cast<int>(props.state->rows.size())){
+		return ::ui::empty();
+	}
+	const GameSelectPanelState::Row& row =
+		props.state->rows[static_cast<size_t>(source)];
+	const bool selected = source == props.state->selectedIndex;
+	return <component_detail.Host
+	  kind={::ui::HostKind::Button}
+	  key={props.key}
+	  id={copied_row_id(source)}
+	  idOffset={source + 1}
+	  style={absolute_layout(0, props.visible_row * kGameSelectListLineH, props.layout.list_w, kGameSelectListLineH)}
+	  visual={row_visual(selected)}
+	  interaction={::ui::NodeInteraction{
+			.focusable = true,
+			.checked = selected,
+		}}
+	  accessibility={{.role = ::ui::SemanticRole::ListRow, .label = row.name.c_str()}}
+	>
+		<Text
+		  key="label"
+		  value={row.name.c_str()}
+		  layout={::ui::LayoutStyle{
+				.width = ::ui::Length::percent(100.0f),
+				.height = ::ui::Length::points(11.0f),
+				.padding = {4.0f, 6.0f, 1.0f, 0.0f},
+			}}
+		  style={text_patch(133, 6, 11.0f)}
+		/>
+	</component_detail.Host>
+}
+
+struct GameSelectRowsProps {
+	const char * key = nullptr;
+	const GameSelectPanelState * state = nullptr;
+	GameSelectTallLayout layout = {};
+};
+
+::ui::UiElement GameSelectRows(const GameSelectRowsProps& props) {
+	return <Box
+	  key={props.key}
+	  layout={absolute_layout(props.layout.list_x, props.layout.list_y, props.layout.list_w, props.layout.list_h)}
+	>
+		<GameSelectRow
+		  key={kGameSelectRowKeys[0]}
+		  state={props.state}
+		  layout={props.layout}
+		  visibleRow={0}
+		/>
+		<GameSelectRow
+		  key={kGameSelectRowKeys[1]}
+		  state={props.state}
+		  layout={props.layout}
+		  visibleRow={1}
+		/>
+		<GameSelectRow
+		  key={kGameSelectRowKeys[2]}
+		  state={props.state}
+		  layout={props.layout}
+		  visibleRow={2}
+		/>
+		<GameSelectRow
+		  key={kGameSelectRowKeys[3]}
+		  state={props.state}
+		  layout={props.layout}
+		  visibleRow={3}
+		/>
+		<GameSelectRow
+		  key={kGameSelectRowKeys[4]}
+		  state={props.state}
+		  layout={props.layout}
+		  visibleRow={4}
+		/>
+		<GameSelectRow
+		  key={kGameSelectRowKeys[5]}
+		  state={props.state}
+		  layout={props.layout}
+		  visibleRow={5}
+		/>
+		<GameSelectRow
+		  key={kGameSelectRowKeys[6]}
+		  state={props.state}
+		  layout={props.layout}
+		  visibleRow={6}
+		/>
+		<GameSelectRow
+		  key={kGameSelectRowKeys[7]}
+		  state={props.state}
+		  layout={props.layout}
+		  visibleRow={7}
+		/>
+		<GameSelectRow
+		  key={kGameSelectRowKeys[8]}
+		  state={props.state}
+		  layout={props.layout}
+		  visibleRow={8}
+		/>
+		<GameSelectRow
+		  key={kGameSelectRowKeys[9]}
+		  state={props.state}
+		  layout={props.layout}
+		  visibleRow={9}
+		/>
+		<GameSelectRow
+		  key={kGameSelectRowKeys[10]}
+		  state={props.state}
+		  layout={props.layout}
+		  visibleRow={10}
+		/>
+		<GameSelectRow
+		  key={kGameSelectRowKeys[11]}
+		  state={props.state}
+		  layout={props.layout}
+		  visibleRow={11}
+		/>
+		<GameSelectRow
+		  key={kGameSelectRowKeys[12]}
+		  state={props.state}
+		  layout={props.layout}
+		  visibleRow={12}
+		/>
+		<GameSelectRow
+		  key={kGameSelectRowKeys[13]}
+		  state={props.state}
+		  layout={props.layout}
+		  visibleRow={13}
+		/>
+		<GameSelectRow
+		  key={kGameSelectRowKeys[14]}
+		  state={props.state}
+		  layout={props.layout}
+		  visibleRow={14}
+		/>
+		<GameSelectRow
+		  key={kGameSelectRowKeys[15]}
+		  state={props.state}
+		  layout={props.layout}
+		  visibleRow={15}
+		/>
+		<GameSelectRow
+		  key={kGameSelectRowKeys[16]}
+		  state={props.state}
+		  layout={props.layout}
+		  visibleRow={16}
+		/>
+		<GameSelectRow
+		  key={kGameSelectRowKeys[17]}
+		  state={props.state}
+		  layout={props.layout}
+		  visibleRow={17}
+		/>
+		<GameSelectRow
+		  key={kGameSelectRowKeys[18]}
+		  state={props.state}
+		  layout={props.layout}
+		  visibleRow={18}
+		/>
+		<GameSelectRow
+		  key={kGameSelectRowKeys[19]}
+		  state={props.state}
+		  layout={props.layout}
+		  visibleRow={19}
+		/>
+		<GameSelectRow
+		  key={kGameSelectRowKeys[20]}
+		  state={props.state}
+		  layout={props.layout}
+		  visibleRow={20}
+		/>
+		<GameSelectRow
+		  key={kGameSelectRowKeys[21]}
+		  state={props.state}
+		  layout={props.layout}
+		  visibleRow={21}
+		/>
+		<GameSelectRow
+		  key={kGameSelectRowKeys[22]}
+		  state={props.state}
+		  layout={props.layout}
+		  visibleRow={22}
+		/>
+		<GameSelectRow
+		  key={kGameSelectRowKeys[23]}
+		  state={props.state}
+		  layout={props.layout}
+		  visibleRow={23}
+		/>
+		<GameSelectRow
+		  key={kGameSelectRowKeys[24]}
+		  state={props.state}
+		  layout={props.layout}
+		  visibleRow={24}
+		/>
+		<GameSelectRow
+		  key={kGameSelectRowKeys[25]}
+		  state={props.state}
+		  layout={props.layout}
+		  visibleRow={25}
+		/>
+		<GameSelectRow
+		  key={kGameSelectRowKeys[26]}
+		  state={props.state}
+		  layout={props.layout}
+		  visibleRow={26}
+		/>
+		<GameSelectRow
+		  key={kGameSelectRowKeys[27]}
+		  state={props.state}
+		  layout={props.layout}
+		  visibleRow={27}
+		/>
+		<GameSelectRow
+		  key={kGameSelectRowKeys[28]}
+		  state={props.state}
+		  layout={props.layout}
+		  visibleRow={28}
+		/>
+		<GameSelectRow
+		  key={kGameSelectRowKeys[29]}
+		  state={props.state}
+		  layout={props.layout}
+		  visibleRow={29}
+		/>
+		<GameSelectRow
+		  key={kGameSelectRowKeys[30]}
+		  state={props.state}
+		  layout={props.layout}
+		  visibleRow={30}
+		/>
+		<GameSelectRow
+		  key={kGameSelectRowKeys[31]}
+		  state={props.state}
+		  layout={props.layout}
+		  visibleRow={31}
+		/>
+	</Box>
+}
+
+struct GameSelectInfoLineProps {
+	const char * key = nullptr;
+	const GameSelectPanelState * state = nullptr;
+	int index = 0;
+	int y = 0;
+	int width = 0;
+};
+
+::ui::UiElement GameSelectInfoLine(const GameSelectInfoLineProps& props) {
+	if(!props.state || props.index < 0 || props.index >= 5){
+		return ::ui::empty();
+	}
+	const char * value = game_select_info_value(*props.state, props.index);
+	if(!value || !*value) return ::ui::empty();
+	return <Text
+	  key={props.key}
+	  value={value}
+	  layout={absolute_layout(kGameSelectInfoPadLeft, props.y, props.width - kGameSelectInfoPadLeft, kGameSelectInfoRowH)}
+	  style={text_patch(133, 6, 11.0f)}
+	/>
+}
+
+struct GameSelectTallPanelProps {
+	const char * key = nullptr;
+	bool show = false;
+	const GameSelectPanelState * state = nullptr;
+	int x = 0;
+	int y = 0;
+	int width = 0;
+	int height = 0;
+};
+
+::ui::UiElement GameSelectTallPanel(const GameSelectTallPanelProps& props) {
+	if(!props.show || !props.state || props.width <= 0 || props.height <= 0){
+		return ::ui::empty();
+	}
+	const GameSelectTallLayout layout =
+		resolve_game_select_tall_layout(props.width, props.height);
+	return <Box key={props.key} layout={absolute_layout(props.x, props.y, props.width, props.height)}>
+		<Text
+		  key="heading"
+		  value="Active Games"
+		  layout={absolute_layout(kGameSelectHeadingPadLeft, kGameSelectHeadingPadTop, props.width - kGameSelectHeadingPadLeft, kGameSelectHeadingLineH)}
+		  style={text_patch(134, 8, 13.0f)}
+		/>
+		<Box
+		  key="list-border"
+		  layout={absolute_layout(layout.list_box_x, layout.list_box_y, layout.list_box_w, layout.list_box_h)}
+		  style={inset_border_patch()}
+		/>
+		<GameSelectRows key="rows" state={props.state} layout={layout} />
+		<GameSelectInfoLine
+		  key="info-name"
+		  state={props.state}
+		  index={0}
+		  y={layout.info_y}
+		  width={props.width}
+		/>
+		<GameSelectInfoLine
+		  key="info-map"
+		  state={props.state}
+		  index={1}
+		  y={layout.info_y + kGameSelectInfoRowH}
+		  width={props.width}
+		/>
+		<GameSelectInfoLine
+		  key="info-security"
+		  state={props.state}
+		  index={2}
+		  y={layout.info_y + kGameSelectInfoRowH * 2}
+		  width={props.width}
+		/>
+		<GameSelectInfoLine
+		  key="info-creator"
+		  state={props.state}
+		  index={3}
+		  y={layout.info_y + kGameSelectInfoRowH * 3}
+		  width={props.width}
+		/>
+		<GameSelectInfoLine
+		  key="info-limits"
+		  state={props.state}
+		  index={4}
+		  y={layout.info_y + kGameSelectInfoRowH * 4}
+		  width={props.width}
+		/>
+	</Box>
 }
 
 }  // namespace lobby_chrome_frame_detail
@@ -216,6 +695,15 @@ using ::ui::components::TextProps;
 			  style={lobby_chrome_frame_detail::chrome_button_patch()}
 			/>
 		</Box>
+		<lobby_chrome_frame_detail.GameSelectTallPanel
+		  key="game-select-tall"
+		  show={props.show_game_select_tall}
+		  state={props.game_select}
+		  x={props.game_select_tall_x}
+		  y={props.game_select_tall_y}
+		  width={props.game_select_tall_width}
+		  height={props.game_select_tall_height}
+		/>
 		<lobby_chrome_frame_detail.AbsoluteChromeButton
 		  key="game-select-create"
 		  id="lobby.game_select.create"

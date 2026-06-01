@@ -78,6 +78,7 @@ fail_if_path_exists "clients/silencer/src/ui/runtime/clay_inspector.cpp"
 fail_if_path_exists "clients/silencer/src/client/ui/state_screens.h"
 fail_if_path_exists "clients/silencer/src/client/ui/state_screens.cpp"
 fail_if_path_exists "clients/silencer/src/client/ui/navigation/ClientUiRoute.h"
+fail_if_path_exists "clients/silencer/src/client/ui/screens/lobby/game_select_panel_layout.cpp"
 fail_if_path_exists "clients/silencer/src/generated/cppx"
 fail_if_path_exists "clients/silencer/src/client/ui/generated"
 fail_if_path_exists "clients/silencer/src/ui/generated"
@@ -338,8 +339,7 @@ fail_if_match \
 fail_if_match \
   "\\b(World|Resources|Lobby|LobbyGame|User|Config)::|#include[[:space:]]*[<\"](world|lobby|lobbygame|resources|user|config)[.]h[>\"]" \
   "$REPO_ROOT/clients/silencer/src/client/ui/screens/lobby/game_select_panel.cpp" \
-  "$REPO_ROOT/clients/silencer/src/client/ui/screens/lobby/game_select_panel.h" \
-  "$REPO_ROOT/clients/silencer/src/client/ui/screens/lobby/game_select_panel_layout.cpp"
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens/lobby/game_select_panel.h"
 
 fail_if_match \
   "\\b(World|Resources|Lobby|LobbyGame|User|Team)::|#include[[:space:]]*[<\"](world|lobby|lobbygame|resources|user|team)[.]h[>\"]" \

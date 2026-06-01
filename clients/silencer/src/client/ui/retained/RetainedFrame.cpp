@@ -21,6 +21,9 @@ silencer::ui::UiInteractableKind InteractableKindFor(::ui::NodeSnapshot node) {
 	   node.role == ::ui::NodeRole::Checkbox){
 		return silencer::ui::UiInteractableKind::Toggle;
 	}
+	if(node.semantic_role == ::ui::SemanticRole::ListRow){
+		return silencer::ui::UiInteractableKind::ListRow;
+	}
 	return silencer::ui::UiInteractableKind::Button;
 }
 
@@ -39,6 +42,9 @@ silencer::ui::UiElementKind ElementKindFor(::ui::NodeSnapshot node) {
 	if(node.semantic_role == ::ui::SemanticRole::Checkbox ||
 	   node.role == ::ui::NodeRole::Checkbox){
 		return silencer::ui::UiElementKind::Button;
+	}
+	if(node.semantic_role == ::ui::SemanticRole::ListRow){
+		return silencer::ui::UiElementKind::ListItem;
 	}
 	return silencer::ui::UiElementKind::Container;
 }
@@ -60,7 +66,8 @@ bool IsInteractive(::ui::NodeSnapshot node) {
 	       node.role == ::ui::NodeRole::Checkbox ||
 	       node.semantic_role == ::ui::SemanticRole::Button ||
 	       node.semantic_role == ::ui::SemanticRole::TextBox ||
-	       node.semantic_role == ::ui::SemanticRole::Checkbox;
+	       node.semantic_role == ::ui::SemanticRole::Checkbox ||
+	       node.semantic_role == ::ui::SemanticRole::ListRow;
 }
 
 void EnsureReactRuntime() {
@@ -155,6 +162,10 @@ void RetainedFrame::RegisterAutomation(
 		widget.kind = InteractableKindFor(node);
 		widget.uid =
 			node.control_offset ? static_cast<int>(node.control_offset) : -1;
+		if(node.semantic_role == ::ui::SemanticRole::ListRow &&
+		   node.control_offset > 0){
+			widget.index = static_cast<int>(node.control_offset - 1);
+		}
 		widget.x = static_cast<int>(node.layout.x);
 		widget.y = static_cast<int>(node.layout.y);
 		widget.w = static_cast<int>(node.layout.width);
