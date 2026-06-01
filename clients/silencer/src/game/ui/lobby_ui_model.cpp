@@ -2,8 +2,12 @@
 
 #include "game.h"
 #include "lobby.h"
+#include "lobbygame.h"
 #include "world.h"
+#include "objecttypes.h"
+#include "actor/team.h"
 #include "actor/user.h"
+#include "peer.h"
 
 #include <algorithm>
 #include <cstdio>
@@ -17,6 +21,23 @@ constexpr int kVisibleLogLines = 15;
 // Keep the joined connect log within the per-call-site text scratch the screen
 // renders it through (REACT_TEXT_STORAGE_CAP), preferring the recent tail.
 constexpr size_t kStatusLogCap = 180;
+
+// Agency display names, indexed by Team::{NOXIS..BLACKROSE} / Character::agencyIdx.
+const char *const kAgency[5] = {"Noxis", "Lazarus", "Caliber", "Static",
+                                "Black Rose"};
+
+const char *SecurityLabel(Uint8 level) {
+  switch (level) {
+  case LobbyGame::SECHIGH:
+    return "High";
+  case LobbyGame::SECMEDIUM:
+    return "Medium";
+  case LobbyGame::SECLOW:
+    return "Low";
+  default:
+    return "Open";
+  }
+}
 
 // Build the post-match progression fields from the local user's stats copy.
 // Lobby mutex is held by the caller. Leaves `progression_loaded` false until the
@@ -73,8 +94,6 @@ void CapHead(std::string &s, size_t cap = 180) {
 // Build the lobby read panels (selected agent + presence + games). Lobby mutex
 // held by the caller. Chat is drained on the tick and joined separately.
 void BuildLobbyPanels(client::ui::LobbySnapshot &snap, Lobby &lobby) {
-  static const char *kAgency[5] = {"Noxis", "Lazarus", "Caliber", "Static",
-                                   "Black Rose"};
   const Lobby::Character *ch = lobby.GetSelectedCharacter();
   if (ch) {
     char line[160];
@@ -98,13 +117,77 @@ void BuildLobbyPanels(client::ui::LobbySnapshot &snap, Lobby &lobby) {
   for (LobbyGame *g : lobby.games) {
     if (!g)
       continue;
-    if (!snap.lobby_games.empty())
-      snap.lobby_games += "\n";
-    snap.lobby_games += g->name;
+    client::ui::GameBrowserEntry e;
+    e.id = g->id;
+    e.name = g->name;
+    const bool ingame = (g->state == 1);
+    e.password_protected = (g->password[0] != '\0');
+    e.joinable = (!ingame && g->players < g->maxplayers) ||
+                 (ingame && g->canrejoin);
+    e.spectatable = ingame && g->spectatable;
+    User *creator = lobby.GetUserInfo(g->accountid);
+    const char *who =
+        (creator && !creator->retrieving) ? creator->DisplayName() : "?";
+    char detail[160];
+    if (ingame) {
+      snprintf(detail, sizeof(detail), "%s · %s Sec · by %s · in progress%s",
+               g->mapname, SecurityLabel(g->securitylevel), who,
+               e.password_protected ? " · locked" : "");
+    } else {
+      snprintf(detail, sizeof(detail), "%s · %s Sec · by %s · %u/%u players%s",
+               g->mapname, SecurityLabel(g->securitylevel), who,
+               (unsigned)g->players, (unsigned)g->maxplayers,
+               e.password_protected ? " · locked" : "");
+    }
+    e.detail = detail;
+    snap.games.push_back(std::move(e));
   }
-  CapHead(snap.lobby_games);
-  if (snap.lobby_games.empty())
-    snap.lobby_games = "No open games";
+}
+
+// Build the pre-match staging roster from the connected world (doc §6). Called
+// only while connected to a game; reads world teams/peers (single-thread game
+// state) + the lobby user records (caller holds Lobby::LockMutex). Mirrors the
+// legacy GameJoinPanel: one row per non-observer peer, the host-ready guard
+// (is_host && !AllPeersDownloadedMap) pre-resolved into the Ready label.
+void BuildStaging(client::ui::LobbySnapshot &snap, World &world, Lobby &lobby) {
+  snap.staging_active = true;
+  snap.staging_in_lobby = world.IsInLobby();
+  const Uint8 localid = world.GetLocalPeerId();
+  Peer *localpeer = world.GetPeer(localid);
+  snap.staging_is_host = localpeer && localpeer->ishost;
+  snap.staging_ready_blocked =
+      snap.staging_is_host && !world.AllPeersDownloadedMap();
+  snap.staging_ready_label =
+      (snap.staging_in_lobby && snap.staging_ready_blocked) ? "Waiting..."
+                                                            : "Ready";
+
+  const std::vector<Uint16> &teamIds = world.GetObjectsByType(ObjectTypes::TEAM);
+  for (Uint16 teamId : teamIds) {
+    Team *team = static_cast<Team *>(world.GetObjectFromId(teamId));
+    if (!team || team->numpeers == 0)
+      continue;
+    for (int i = 0; i < team->numpeers; ++i) {
+      Peer *peer = world.GetPeer(team->peers[i]);
+      if (!peer || peer->observer || peer->disconnected)
+        continue;
+      User *user = lobby.GetUserInfo(peer->accountid);
+      if (!user || user->retrieving || !user->DisplayName()[0])
+        continue;
+      client::ui::StagingRosterRow row;
+      row.is_local = (team->peers[i] == localid);
+      row.ready = peer->isready;
+      row.team_number = team->number;
+      row.name = user->DisplayName();
+      if (row.is_local)
+        row.name += " (you)";
+      const char *agency = (team->agency < 5) ? kAgency[team->agency] : "?";
+      char detail[96];
+      snprintf(detail, sizeof(detail), "%s · L:%u", agency,
+               (unsigned)user->agency[team->agency].level);
+      row.detail = detail;
+      snap.staging_roster.push_back(std::move(row));
+    }
+  }
 }
 
 } // namespace
@@ -120,7 +203,8 @@ client::ui::LobbySnapshot CaptureLobbySnapshot(Game &game,
   if (!connectPhase && !postMatchPhase && !charCreatePhase && !lobbyPhase)
     return snap;
 
-  Lobby &lobby = game.GetWorld().lobby;
+  World &world = game.GetWorld();
+  Lobby &lobby = world.lobby;
   lobby.LockMutex();
   const int st = (int)lobby.state;
   snap.authenticated = (st == Lobby::AUTHENTICATED);
@@ -138,8 +222,11 @@ client::ui::LobbySnapshot CaptureLobbySnapshot(Game &game,
   }
   if (postMatchPhase)
     BuildProgression(snap, lobby);
-  if (lobbyPhase)
+  if (lobbyPhase) {
     BuildLobbyPanels(snap, lobby);
+    if (world.IsConnected())
+      BuildStaging(snap, world, lobby);
+  }
   lobby.UnlockMutex();
 
   // The lobby chat scrollback lives on the game-owned drain buffer (single

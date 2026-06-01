@@ -8,9 +8,11 @@
 #include "client/ui/hooks/use_games.h"
 #include "client/ui/hooks/use_lobby_chat.h"
 #include "client/ui/hooks/use_session.h"
+#include "client/ui/hooks/use_staging.h"
 #include "ui/components/input.h"
 #include "ui/runtime/react.h"
 
+#include <algorithm>
 #include <functional>
 #include <string>
 
@@ -22,6 +24,168 @@ using ::ui::children;
 using ::ui::components::Input;
 using ::ui::components::InputProps;
 
+// Keep joined display strings within the per-call-site text scratch
+// (REACT_TEXT_STORAGE_CAP); the head is fine for these short lists.
+constexpr size_t kListCap = 180;
+
+// The games browser as a single block, a "> " caret marking the selection.
+std::string build_games_text(const std::vector<GameBrowserEntry> &entries,
+                             int selected) {
+  if (entries.empty())
+    return "No open games";
+  std::string out;
+  for (int i = 0; i < (int)entries.size(); ++i) {
+    if (!out.empty())
+      out += "\n";
+    out += (i == selected) ? "> " : "  ";
+    out += entries[i].name;
+  }
+  if (out.size() > kListCap)
+    out.erase(kListCap);
+  return out;
+}
+
+// The staging roster as a block, "[R]" marking ready peers.
+std::string build_roster_text(const std::vector<StagingRosterRow> &roster) {
+  if (roster.empty())
+    return "Waiting for players...";
+  std::string out;
+  for (const StagingRosterRow &r : roster) {
+    if (!out.empty())
+      out += "\n";
+    out += r.ready ? "[R] " : "[ ] ";
+    out += r.name;
+    if (!r.detail.empty()) {
+      out += "  ";
+      out += r.detail;
+    }
+  }
+  if (out.size() > kListCap)
+    out.erase(kListCap);
+  return out;
+}
+
+// --- right-column panels (screen-local swap) ---------------------------------
+
+struct GameSelectPanelProps {
+  const char *games_text = "";
+  const char *sel_detail = "";
+  bool can_join = false;
+  bool can_spectate = false;
+  std::function<void()> on_prev = {};
+  std::function<void()> on_next = {};
+  std::function<void()> on_join = {};
+  std::function<void()> on_spectate = {};
+  std::function<void()> on_create = {};
+};
+
+::ui::UiElement GameSelectPanel(const GameSelectPanelProps &props) {
+  return <Panel key="select" variant={PanelVariant::Sunken}>
+    <ScreenTitle key="h" variant={ScreenTitleVariant::Dialog} value="Games" />
+    <BodyText key="list" variant={BodyTextVariant::Body} value={props.games_text} />
+    <BodyText key="detail" variant={BodyTextVariant::Detail} value={props.sel_detail} />
+    <ActionRow key="browse">
+      <AppButton key="prev" controlId="GamePrev" label="Prev" onPress={props.on_prev} />
+      <AppButton key="next" controlId="GameNext" label="Next" onPress={props.on_next} />
+    </ActionRow>
+    <ActionRow key="actions">
+      <AppButton
+        key="join"
+        controlId="JoinGame"
+        disabled={!props.can_join}
+        label="Join"
+        onPress={props.on_join}
+      />
+      <AppButton
+        key="spectate"
+        controlId="SpectateGame"
+        disabled={!props.can_spectate}
+        label="Spectate"
+        onPress={props.on_spectate}
+      />
+      <AppButton key="create" controlId="NewGame" label="New Game" onPress={props.on_create} />
+    </ActionRow>
+  </Panel>
+}
+
+struct GameCreatePanelProps {
+  const char *name = "";
+  const char *map_text = "";
+  bool can_create = false;
+  std::function<void(const std::string &)> on_name = {};
+  std::function<void()> on_prev_map = {};
+  std::function<void()> on_next_map = {};
+  std::function<void()> on_create = {};
+  std::function<void()> on_back = {};
+};
+
+::ui::UiElement GameCreatePanel(const GameCreatePanelProps &props) {
+  return <Panel key="create" variant={PanelVariant::Sunken}>
+    <ScreenTitle key="h" variant={ScreenTitleVariant::Dialog} value="Create Game" />
+    <Input
+      key="name"
+      id="GameName"
+      accessibility={{.label = "Game Name"}}
+      value={props.name}
+      onChange={props.on_name}
+    />
+    <BodyText key="map" variant={BodyTextVariant::Strong} value={props.map_text} />
+    <ActionRow key="maps">
+      <AppButton
+        key="prevmap"
+        controlId="MapPrev"
+        disabled={!props.can_create}
+        label="Prev Map"
+        onPress={props.on_prev_map}
+      />
+      <AppButton
+        key="nextmap"
+        controlId="MapNext"
+        disabled={!props.can_create}
+        label="Next Map"
+        onPress={props.on_next_map}
+      />
+    </ActionRow>
+    <ActionRow key="actions">
+      <AppButton
+        key="create"
+        controlId="CreateGame"
+        disabled={!props.can_create}
+        label="Create"
+        onPress={props.on_create}
+      />
+      <AppButton key="back" controlId="CreateBack" label="Back" onPress={props.on_back} />
+    </ActionRow>
+  </Panel>
+}
+
+struct StagingPanelProps {
+  const char *roster_text = "";
+  const char *ready_label = "Ready";
+  bool ready_blocked = false;
+  std::function<void()> on_ready = {};
+  std::function<void()> on_team = {};
+  std::function<void()> on_leave = {};
+};
+
+::ui::UiElement StagingPanel(const StagingPanelProps &props) {
+  return <Panel key="staging" variant={PanelVariant::Sunken}>
+    <ScreenTitle key="h" variant={ScreenTitleVariant::Dialog} value="Staging" />
+    <BodyText key="roster" variant={BodyTextVariant::Body} value={props.roster_text} />
+    <ActionRow key="actions">
+      <AppButton
+        key="ready"
+        controlId="StagingReady"
+        disabled={props.ready_blocked}
+        label={props.ready_label}
+        onPress={props.on_ready}
+      />
+      <AppButton key="team" controlId="ChangeTeam" label="Change Team" onPress={props.on_team} />
+      <AppButton key="leave" controlId="LeaveGame" label="Leave" onPress={props.on_leave} />
+    </ActionRow>
+  </Panel>
+}
+
 struct LobbyScreenProps {
   uint32_t unused = 0;
 };
@@ -30,19 +194,49 @@ struct LobbyScreenProps {
   Characters chars = use_characters();
   LobbyChat chat = use_lobby_chat();
   Games games = use_games();
+  Staging staging = use_staging();
   Session session = use_session();
   std::string *draft = use_state<std::string>(std::string());
-  if (!draft)
+  std::string *create_name = use_state<std::string>(std::string("Game"));
+  int *sel = use_state<int>(0);
+  int *map_index = use_state<int>(0);
+  bool *show_create = use_state<bool>(false);
+  if (!draft || !create_name || !sel || !map_index || !show_create)
     return ::ui::empty();
 
-  // Copy the dynamic panels into per-call-site scratch (children build after
-  // this returns, so a pointer into the transient hook models would dangle).
+  // Clamp the screen-local cursors against this frame's lists.
+  const int game_count = (int)games.entries.size();
+  if (*sel < 0)
+    *sel = 0;
+  if (game_count > 0 && *sel > game_count - 1)
+    *sel = game_count - 1;
+  const int map_count = (int)games.bundled_maps.size();
+  if (*map_index < 0)
+    *map_index = 0;
+  if (map_count > 0 && *map_index > map_count - 1)
+    *map_index = map_count - 1;
+
+  const uint32_t sel_id = game_count > 0 ? games.entries[*sel].id : 0;
+  const bool sel_joinable = game_count > 0 && games.entries[*sel].joinable;
+  const bool sel_spectatable = game_count > 0 && games.entries[*sel].spectatable;
+
+  // Per-call-site text scratch (stable order: computed every frame regardless of
+  // the active panel so the hook sequence never shifts).
   const char *agent = use_text_storage(
       "%s", chars.selected_summary.empty() ? "Loading agent..."
                                            : chars.selected_summary.c_str());
   const char *scrollback = use_text_storage("%s", chat.scrollback.c_str());
   const char *presence = use_text_storage("%s", chat.presence.c_str());
-  const char *game_list = use_text_storage("%s", games.list.c_str());
+  const char *games_text =
+      use_text_storage("%s", build_games_text(games.entries, *sel).c_str());
+  const char *sel_detail = use_text_storage(
+      "%s", game_count > 0 ? games.entries[*sel].detail.c_str() : "");
+  const char *map_text = use_text_storage(
+      "Map: %s",
+      map_count > 0 ? games.bundled_maps[*map_index].c_str() : "(no maps)");
+  const char *roster_text =
+      use_text_storage("%s", build_roster_text(staging.roster).c_str());
+  const char *ready_label = use_text_storage("%s", staging.ready_label.c_str());
 
   std::function<void(const std::string &)> set_draft =
       [draft](const std::string &next) { *draft = next; };
@@ -54,6 +248,59 @@ struct LobbyScreenProps {
   };
   std::function<void(const ::ui::ActivationEvent &)> on_activate =
       [send](const ::ui::ActivationEvent &) { send(); };
+
+  // Right-column selection: connected -> Staging; else the create form when the
+  // player opened it; else the games browser. (No screen names a destination —
+  // staging.active is the game-owned connection state surfaced by the hook.)
+  ::ui::UiElement right;
+  if (staging.active) {
+    StagingPanelProps sp;
+    sp.roster_text = roster_text;
+    sp.ready_label = ready_label;
+    sp.ready_blocked = staging.ready_blocked;
+    sp.on_ready = staging.send_ready;
+    sp.on_team = staging.change_team;
+    sp.on_leave = staging.leave;
+    right = StagingPanel(sp);
+  } else if (*show_create) {
+    GameCreatePanelProps cp;
+    cp.name = create_name->c_str();
+    cp.map_text = map_text;
+    cp.can_create = map_count > 0;
+    cp.on_name = [create_name](const std::string &next) { *create_name = next; };
+    cp.on_prev_map = [map_index]() { if (*map_index > 0) (*map_index)--; };
+    cp.on_next_map = [map_index, map_count]() {
+      if (*map_index < map_count - 1) (*map_index)++;
+    };
+    cp.on_create = [create = games.create_game, create_name, show_create,
+                    maps = games.bundled_maps, idx = *map_index]() {
+      if (create && idx >= 0 && idx < (int)maps.size()) {
+        CreateGameRequest req;
+        req.name = create_name->empty() ? "Game" : *create_name;
+        req.map = maps[idx];
+        create(req);
+        *show_create = false; // staging.active takes over once connected
+      }
+    };
+    cp.on_back = [show_create]() { *show_create = false; };
+    right = GameCreatePanel(cp);
+  } else {
+    GameSelectPanelProps gp;
+    gp.games_text = games_text;
+    gp.sel_detail = sel_detail;
+    gp.can_join = sel_joinable;
+    gp.can_spectate = sel_spectatable;
+    gp.on_prev = [sel]() { if (*sel > 0) (*sel)--; };
+    gp.on_next = [sel, game_count]() { if (*sel < game_count - 1) (*sel)++; };
+    gp.on_join = [join = games.join_game, sel_id]() {
+      if (join) join(sel_id, std::string());
+    };
+    gp.on_spectate = [spectate = games.spectate_game, sel_id]() {
+      if (spectate) spectate(sel_id);
+    };
+    gp.on_create = [show_create]() { *show_create = true; };
+    right = GameSelectPanel(gp);
+  }
 
   return <ScreenLayout key="root" variant={ScreenLayoutVariant::Game}>
     <ScreenTitle key="title" variant={ScreenTitleVariant::Screen} value="Lobby" />
@@ -80,13 +327,10 @@ struct LobbyScreenProps {
           onActivate={on_activate}
         />
         <AppButton key="send" controlId="SendChat" label="Send" onPress={send} />
-      </Panel>
-      <Panel key="games" variant={PanelVariant::Sunken}>
-        <ScreenTitle key="hg" variant={ScreenTitleVariant::Dialog} value="Games" />
-        <BodyText key="list" variant={BodyTextVariant::Body} value={game_list} />
         <ScreenTitle key="hp" variant={ScreenTitleVariant::Dialog} value="Online" />
         <BodyText key="presence" variant={BodyTextVariant::Detail} value={presence} />
       </Panel>
+      {right}
     </ActionRow>
   </ScreenLayout>
 }

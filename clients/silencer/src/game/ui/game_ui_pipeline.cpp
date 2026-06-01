@@ -2,6 +2,9 @@
 
 #include "game.h"
 #include "lobby.h"
+#include "lobbygame.h"
+#include "peer.h"
+#include "platform/os.h"
 #include "updater.h"
 #include "camera.h"
 #include "detonator.h"
@@ -476,6 +479,70 @@ lb.SendChat(lb.channel, message.c_str());
 lb.UnlockMutex();
 });
 };
+// Games browser intents (doc §6): id-based join/spectate/create over the public
+// seam, queued. The LOBBY-tick game-join pump drives connect → staging and the
+// create finalization (auto-join on creategamestatus==1 && creategameclicked).
+lobby.join_game = [this](uint32_t id, const std::string & password){
+cppxHost->pipeline().client_ui().queue_deferred_mutation([this, id, password](){
+Lobby & lb = game.world.lobby;
+lb.LockMutex();
+LobbyGame * lg = lb.GetGameById(id);
+lb.UnlockMutex();
+if(!lg) return;
+game.currentlobbygameid = id;
+char * pw = password.empty() ? nullptr : const_cast<char*>(password.c_str());
+game.JoinGame(*lg, pw);
+});
+};
+lobby.spectate_game = [this](uint32_t id){
+cppxHost->pipeline().client_ui().queue_deferred_mutation([this, id](){
+Lobby & lb = game.world.lobby;
+lb.LockMutex();
+LobbyGame * lg = lb.GetGameById(id);
+lb.UnlockMutex();
+if(!lg) return;
+game.currentlobbygameid = id;
+game.SpectateGame(*lg, nullptr);
+});
+};
+lobby.create_game = [this](const client::ui::CreateGameRequest & req){
+cppxHost->pipeline().client_ui().queue_deferred_mutation([this, req](){
+if(req.map.empty()) return;
+MapDownloader & md = game.gameSession.MapDownloaderRef();
+std::string path = md.FindMap(req.map.c_str());
+if(path.empty()) return;
+unsigned char maphash[20] = {0};
+md.CalculateMapHash(path.c_str(), &maphash);
+Lobby & lb = game.world.lobby;
+lb.LockMutex();
+lb.CreateGame(req.name.c_str(), req.map.c_str(), maphash,
+req.password.empty() ? nullptr : req.password.c_str(),
+req.security, req.min_level, req.max_level,
+req.max_players, req.max_teams, req.spectatable);
+lb.UnlockMutex();
+// The pump auto-joins our own created game once the lobby confirms it.
+game.creategameclicked = true;
+});
+};
+// Staging room intents (doc §6/§7a): ready/change-team/leave over the public
+// World seam. Host-ready is guarded hook-side (ishost && !AllPeersDownloadedMap).
+lobby.send_ready = [this](){
+cppxHost->pipeline().client_ui().queue_deferred_mutation([this](){
+Peer * lp = game.world.GetPeer(game.world.GetLocalPeerId());
+bool host = lp && lp->ishost;
+if(!host || game.world.AllPeersDownloadedMap()) game.world.SendReady();
+});
+};
+lobby.change_team = [this](){
+cppxHost->pipeline().client_ui().queue_deferred_mutation([this](){
+game.world.ChangeTeam();
+});
+};
+lobby.leave_game = [this](){
+cppxHost->pipeline().client_ui().queue_deferred_mutation([this](){
+game.LeaveJoinedGame();
+});
+};
 
 // Global FrameProvider chain (doc §5), outermost (Theme) → innermost (Lobby):
 // Theme ▸ Server ▸ App ▸ Session ▸ Settings ▸ KeyMap ▸ Updater ▸
@@ -546,6 +613,13 @@ frame.pointer = {mx, my};
 // the build below reads it (the frame provider copies lobbySnapshot_ with no
 // build-time lock). Default/empty outside lobby phases.
 lobbySnapshot_ = silencer::game_ui::CaptureLobbySnapshot(game, CurrentSessionPhase());
+// SIL-21 (3/n): fold in the bundled-map choices for the GameCreatePanel. Maps
+// don't change at runtime, so list them once (disk read on the game thread).
+if(!bundledMapsListed_){
+bundledMaps_ = game.gameSession.MapDownloaderRef().ListFiles((GetResDir() + "level").c_str());
+bundledMapsListed_ = true;
+}
+lobbySnapshot_.bundled_maps = bundledMaps_;
 
 int ow = 0;
 int oh = 0;

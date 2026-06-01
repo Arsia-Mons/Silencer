@@ -119,6 +119,11 @@ bool keymapDirty_ = false;
 // under LockMutex before the build phase (doc §5). The frame provider reads
 // this when assembling the LobbyProvider value — no build-time lock.
 client::ui::LobbySnapshot lobbySnapshot_ = {};
+// SIL-21 (3/n) create-form map choices: the bundled maps the GameCreatePanel
+// offers. Disk-listed once (maps don't change at runtime), then folded into the
+// lobby snapshot each lobby-phase frame.
+std::vector<std::string> bundledMaps_ = {};
+bool bundledMapsListed_ = false;
 
 // SIL-18 UI input: the per-frame edges (events.cpp + control socket) and the
 // derived pointer state. Cleared each frame after the pipeline consumes them.

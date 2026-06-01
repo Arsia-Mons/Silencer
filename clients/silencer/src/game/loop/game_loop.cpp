@@ -1,6 +1,7 @@
 #include "game.h"
 #include "controldispatch.h"
 #include "gasloader.h"
+#include "lobbygame.h"
 #include "objecttypes.h"
 #include "player.h"
 #include "state.h"
@@ -409,6 +410,30 @@ bool Game::Tick(void){
 				world.lobby.UnlockMutex();
 				if(lobbyChatLog.size() > 256)
 					lobbyChatLog.erase(lobbyChatLog.begin(), lobbyChatLog.begin() + (lobbyChatLog.size() - 256));
+
+				// SIL-21 (3/n) game-join pump (sibling of the chat drain). Drives a
+				// created/joined game from the LOBBY tick; the match-start transition
+				// (shared-state -> INGAME) stays in Game::Tick.
+				gameSession.MapDownloaderRef().ProcessMapDownload();
+				// Our own create succeeded -> seed world info + auto-join the spawned
+				// game (the cppx GameCreatePanel set creategameclicked).
+				if(world.lobby.creategamestatus == 1 && creategameclicked){
+					world.lobby.creategamestatus = 0;
+					creategameclicked = false;
+					world.lobby.LockMutex();
+					LobbyGame * lg = world.lobby.GetGameById(world.lobby.createdgameid);
+					world.lobby.UnlockMutex();
+					if(lg){
+						world.SeedGameInfo(*lg);
+						currentlobbygameid = lg->id;
+						gameSession.MapDownloaderRef().LoadMapData(gameSession.MapDownloaderRef().FindMap(lg->mapname, &lg->maphash).c_str());
+						JoinGame(*lg, lg->password[0] ? lg->password : nullptr);
+					}
+				}
+				// Join settle / fail: clear the in-flight flag once the connect
+				// resolves (connected -> staging; idle -> stayed in the browser).
+				if(joininggame && (world.IsConnected() || world.IsIdle()))
+					joininggame = false;
 			}
 		}break;
 		case CREATECHARACTER:{

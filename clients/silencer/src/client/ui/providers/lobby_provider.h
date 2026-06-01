@@ -1,8 +1,10 @@
 #pragma once
 
 #include "client/ui/hooks/use_characters.h"
+#include "client/ui/hooks/use_games.h"
 #include "client/ui/hooks/use_lobby_session.h"
 #include "client/ui/hooks/use_progression.h"
+#include "client/ui/hooks/use_staging.h"
 #include "ui/runtime/element.h"
 
 #include <cstdint>
@@ -32,7 +34,18 @@ struct LobbySnapshot {
   std::string lobby_agent = {};    // selected agent name + compact summary
   std::string lobby_chat = {};     // chat scrollback (drained on the tick)
   std::string lobby_presence = {}; // who's online
-  std::string lobby_games = {};    // open games (browser)
+
+  // --- games browser (LobbyScreen GameSelectPanel) ---
+  std::vector<GameBrowserEntry> games = {}; // open games (structured)
+  std::vector<std::string> bundled_maps = {}; // create-form map choices
+
+  // --- staging room (LobbyScreen GameJoinPanel) — built when connected ---
+  bool staging_active = false;       // connected to a game (staging or playing)
+  bool staging_in_lobby = false;     // World::IsInLobby() — still pre-match
+  bool staging_is_host = false;
+  bool staging_ready_blocked = false;
+  std::string staging_ready_label = "Ready";
+  std::vector<StagingRosterRow> staging_roster = {};
 
   // --- progression (MissionSummary) ---
   bool progression_loaded = false;
@@ -59,6 +72,15 @@ struct LobbyProviderValue {
   std::function<void(int)> select_character = {};
   // Lobby: post a chat message to the current channel.
   std::function<void(const std::string &)> send_chat = {};
+  // Games browser: id-based join / spectate / create over the public seam
+  // (queued; the LOBBY-tick pump drives the connect → staging transition).
+  std::function<void(uint32_t, const std::string &)> join_game = {};
+  std::function<void(uint32_t)> spectate_game = {};
+  std::function<void(const CreateGameRequest &)> create_game = {};
+  // Staging room: ready / change-team / leave over the §7a public World seam.
+  std::function<void()> send_ready = {};
+  std::function<void()> change_team = {};
+  std::function<void()> leave_game = {};
 };
 
 // Publishes the lobby model to the component tree. Mounted in the global
