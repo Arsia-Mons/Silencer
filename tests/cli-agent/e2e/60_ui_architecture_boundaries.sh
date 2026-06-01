@@ -65,9 +65,56 @@ fail_if_tracked_generated_cppx_outputs() {
   fi
 }
 
+fail_if_cppx_component_function_calls() {
+  local bad_matches
+  bad_matches="$(
+    python3 - "$REPO_ROOT" <<'PY'
+import pathlib
+import re
+import sys
+
+root = pathlib.Path(sys.argv[1])
+ui_roots = [
+    root / "clients/silencer/src/client/ui",
+    root / "clients/silencer/src/ui",
+]
+component_decl = re.compile(r"::ui::UiElement\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(")
+component_names = set()
+for ui_root in ui_roots:
+    for path in ui_root.rglob("*"):
+        if path.suffix not in {".h", ".hx"}:
+            continue
+        text = path.read_text(errors="ignore")
+        component_names.update(component_decl.findall(text))
+
+if not component_names:
+    sys.exit(0)
+
+name_pattern = "|".join(sorted(map(re.escape, component_names), key=len, reverse=True))
+direct_call = re.compile(
+    rf"(?P<prefix>return\s+|{{\s*)(?P<name>(?:(?:[A-Za-z_][A-Za-z0-9_]*)::)*"
+    rf"(?:{name_pattern}))\s*\("
+)
+
+for ui_root in ui_roots:
+    for path in ui_root.rglob("*.cppx"):
+        for lineno, line in enumerate(path.read_text(errors="ignore").splitlines(), 1):
+            if direct_call.search(line):
+                rel = path.relative_to(root)
+                print(f"{rel}:{lineno}:{line}")
+PY
+  )"
+  if [ -n "$bad_matches" ]; then
+    echo "$bad_matches" >&2
+    echo "authored .cppx components must be invoked with JSX tags, not direct function calls" >&2
+    exit 1
+  fi
+}
+
 fail_if_ui_taxonomy_dirs_escape_roots
 fail_if_ui_controller_paths
 fail_if_tracked_generated_cppx_outputs
+fail_if_cppx_component_function_calls
 
 fail_if_path_exists "clients/silencer/src/ui/modals"
 fail_if_path_exists "clients/silencer/src/ui/panels"
