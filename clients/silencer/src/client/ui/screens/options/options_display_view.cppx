@@ -131,10 +131,6 @@ std::function<void(const ::ui::ActivationEvent&)> cancel_callback(
 	};
 }
 
-struct OptionsDisplayFrameProps {
-	const char * key = nullptr;
-};
-
 struct FullscreenToggleProps {
 	const char * key = nullptr;
 };
@@ -200,6 +196,8 @@ struct DisplayCancelButtonProps {
 	/>
 }
 
+}  // namespace
+
 ::ui::UiElement OptionsDisplayFrame(const OptionsDisplayFrameProps& props) {
 	return <Box key={props.key} layout={root_layout()} style={root_style()}>
 		<Box key="panel" layout={panel_layout()}>
@@ -214,32 +212,6 @@ struct DisplayCancelButtonProps {
 			</Box>
 		</Box>
 	</Box>
-}
-
-}  // namespace
-
-namespace {
-::ReactContext OptionsDisplayContext = {};
-const OptionsDisplayContextValue kEmptyOptionsDisplay = {};
-}
-
-const OptionsDisplayContextValue& UseOptionsDisplay() {
-	const auto * value = static_cast<const OptionsDisplayContextValue *>(
-		::use_context(&OptionsDisplayContext));
-	return value ? *value : kEmptyOptionsDisplay;
-}
-
-::ui::UiElement OptionsDisplayView(const OptionsDisplayViewProps& props) {
-	return ::ui::provider(
-		"OptionsDisplayProvider",
-		&OptionsDisplayContext,
-		const_cast<OptionsDisplayContextValue *>(props.value),
-		children({
-			::ui::component("OptionsDisplayFrame",
-			                OptionsDisplayFrameProps{ .key = "frame" },
-			                OptionsDisplayFrame),
-		}),
-		props.key);
 }
 
 }  // namespace silencer::client_ui

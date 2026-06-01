@@ -118,10 +118,6 @@ std::function<void(const ::ui::ActivationEvent&)> cancel_callback(
 	};
 }
 
-struct OptionsAudioFrameProps {
-	const char * key = nullptr;
-};
-
 struct MusicToggleProps {
 	const char * key = nullptr;
 };
@@ -171,6 +167,8 @@ struct AudioCancelButtonProps {
 	/>
 }
 
+}  // namespace
+
 ::ui::UiElement OptionsAudioFrame(const OptionsAudioFrameProps& props) {
 	return <Box key={props.key} layout={root_layout()} style={root_style()}>
 		<Box key="panel" layout={panel_layout()}>
@@ -182,32 +180,6 @@ struct AudioCancelButtonProps {
 			</Box>
 		</Box>
 	</Box>
-}
-
-}  // namespace
-
-namespace {
-::ReactContext OptionsAudioContext = {};
-const OptionsAudioContextValue kEmptyOptionsAudio = {};
-}
-
-const OptionsAudioContextValue& UseOptionsAudio() {
-	const auto * value = static_cast<const OptionsAudioContextValue *>(
-		::use_context(&OptionsAudioContext));
-	return value ? *value : kEmptyOptionsAudio;
-}
-
-::ui::UiElement OptionsAudioView(const OptionsAudioViewProps& props) {
-	return ::ui::provider(
-		"OptionsAudioProvider",
-		&OptionsAudioContext,
-		const_cast<OptionsAudioContextValue *>(props.value),
-		children({
-			::ui::component("OptionsAudioFrame",
-			                OptionsAudioFrameProps{ .key = "frame" },
-			                OptionsAudioFrame),
-		}),
-		props.key);
 }
 
 }  // namespace silencer::client_ui

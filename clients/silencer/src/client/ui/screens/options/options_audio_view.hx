@@ -16,6 +16,12 @@ struct OptionsAudioContextValue {
 
 const OptionsAudioContextValue& UseOptionsAudio();
 
+struct OptionsAudioFrameProps {
+	const char * key = nullptr;
+};
+
+::ui::UiElement OptionsAudioFrame(const OptionsAudioFrameProps& props);
+
 struct OptionsAudioViewProps {
 	const char * key = nullptr;
 	const OptionsAudioContextValue * value = nullptr;

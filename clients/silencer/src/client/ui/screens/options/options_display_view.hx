@@ -18,6 +18,12 @@ struct OptionsDisplayContextValue {
 
 const OptionsDisplayContextValue& UseOptionsDisplay();
 
+struct OptionsDisplayFrameProps {
+	const char * key = nullptr;
+};
+
+::ui::UiElement OptionsDisplayFrame(const OptionsDisplayFrameProps& props);
+
 struct OptionsDisplayViewProps {
 	const char * key = nullptr;
 	const OptionsDisplayContextValue * value = nullptr;
