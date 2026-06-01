@@ -163,4 +163,30 @@ fail_if_match \
   "$REPO_ROOT/clients/silencer/src/net/controldispatch.cpp" \
   --glob '!third_party/**'
 
+# SIL-23: the draw IR's `Custom` kind is a reserved seat with no renderer path
+# (design §15). Components/builders must never emit it; the enum declaration
+# (`Custom,` in draw_command.h) is the only legal mention.
+fail_if_match \
+  "DrawCommandKind::Custom" \
+  "$REPO_ROOT/clients/silencer/src" \
+  --glob '!third_party/**'
+
+# SIL-23: the legacy clay_*_check control-socket probes are retired — the
+# cppx-primitive ops (inspect / click / set_text over the retained UiTree) are
+# the supported automation checks. Ban reintroduction of that vocabulary.
+fail_if_match \
+  "clay_button_check|clay_toggle_check|clay_scroll_list_check|clay_scroll_text_box_check|clay_text_input_check" \
+  "$REPO_ROOT/clients/silencer/src" \
+  --glob '!third_party/**'
+
+# SIL-23: reusable UI components expose semantic props only. Renderer /
+# draw-sink / screen-stack / mutation-sink plumbing must not leak into the
+# public component headers (the navigation seam lives in app_shell, the draw IR
+# in the runtime — components never name them).
+fail_if_match \
+  "DrawCommandList|DrawCommandSink|MutationSink|\\bScreenStack\\b|PipelineHost|DeferredUiMutation|queue_deferred_mutation" \
+  "$REPO_ROOT/clients/silencer/src/ui/components" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/components" \
+  --glob '*.h' --glob '*.hx'
+
 echo "PASS 60_ui_architecture_boundaries"

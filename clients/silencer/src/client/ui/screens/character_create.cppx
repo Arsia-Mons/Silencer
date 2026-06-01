@@ -90,7 +90,13 @@ const char *kAgencyControlIds[5] = {"AgencyNoxis", "AgencyLazarus",
     if (on_select)
       on_select(index);
   };
-  return <AppButton key={key} controlId="SelectAgent" controlOffset={index} label={label} onPress={on_press} />
+  return <AppButton
+    key={key}
+    controlId="SelectAgent"
+    controlOffset={index}
+    label={label}
+    onPress={on_press}
+  />
 }
 
 struct CharacterCreateContentProps {
@@ -138,7 +144,14 @@ struct CharacterCreateContentProps {
           onActivate={on_alias_enter}
         />
         <ActionRow key="actions">
-          <AppButton key="ok" controlId="AliasConfirm" variant={AppButtonVariant::Primary} disabled={w.alias.empty()} label="Continue" onPress={w.confirm_alias} />
+          <AppButton
+            key="ok"
+            controlId="AliasConfirm"
+            variant={AppButtonVariant::Primary}
+            disabled={w.alias.empty()}
+            label="Continue"
+            onPress={w.confirm_alias}
+          />
           <AppButton key="cancel" controlId="AliasCancel" label="Cancel" onPress={w.cancel} />
         </ActionRow>
       </Panel>
@@ -170,7 +183,13 @@ struct CharacterCreateContentProps {
       {roster_row(2, chars.roster, on_select)}
       {roster_row(3, chars.roster, on_select)}
       {roster_row(4, chars.roster, on_select)}
-      <AppButton key="new" controlId="CreateNewCharacter" variant={AppButtonVariant::Primary} label="Create New Character" onPress={w.open_alias} />
+      <AppButton
+        key="new"
+        controlId="CreateNewCharacter"
+        variant={AppButtonVariant::Primary}
+        label="Create New Character"
+        onPress={w.open_alias}
+      />
       <AppButton key="leave" controlId="CharCreateCancel" label="Back" onPress={lobby.cancel} />
     </Panel>
   </ScreenLayout>

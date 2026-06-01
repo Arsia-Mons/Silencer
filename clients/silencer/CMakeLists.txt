@@ -344,6 +344,30 @@ add_test(NAME cppx_runtime_sdl_free
 	COMMAND ${Python3_EXECUTABLE}
 		"${CMAKE_CURRENT_SOURCE_DIR}/tools/cppx_runtime_guard.py")
 
+# SIL-23: cppx transpiler golden-output regression. Transpiles the authored
+# fixtures and diffs against the committed *.expected.* (+ asserts the two error
+# fixtures emit their precise diagnostics). The transpiler is byte-identical to
+# the golden repo's, so the fixtures are reused verbatim.
+add_test(NAME cppx_transpiler_tests
+	COMMAND ${Python3_EXECUTABLE}
+		"${CMAKE_CURRENT_SOURCE_DIR}/tests/cppx_transpiler_tests.py"
+		--tool "${CMAKE_CURRENT_SOURCE_DIR}/tools/cppx_transpile.py"
+		--fixtures "tests/fixtures/cppx")
+# Run from the client root so the source paths the transpiler bakes into #line
+# directives are repo-relative (matching the committed *.expected.*).
+set_tests_properties(cppx_transpiler_tests PROPERTIES
+	WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")
+
+# SIL-23: component-descriptor architecture guard (ported from golden). Public
+# API is descriptor factories — no Component<T> wrapper, no direct generic
+# component bodies, no manual retained-provider macros; the transpiler lowers
+# .cppx into ::ui::component(...) descriptors.
+add_test(NAME component_descriptor_guard
+	COMMAND ${Python3_EXECUTABLE}
+		"${CMAKE_CURRENT_SOURCE_DIR}/tools/component_descriptor_guard.py"
+		--root "${CMAKE_CURRENT_SOURCE_DIR}"
+		--tool "${CMAKE_CURRENT_SOURCE_DIR}/tools/cppx_transpile.py")
+
 # --- Yoga flex layout (SIL-10) -------------------------------------------
 # Yoga v3.2.1, the layout backend behind the retained runtime. flex_layout.*
 # is a Yoga-free adapter (FlexLayoutAdapter seam over UiTree); only

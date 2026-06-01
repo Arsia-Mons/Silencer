@@ -7,11 +7,12 @@ and the single `MeasureTextFn` function pointer, neither of which names an SDL
 or SDL_ttf type. So no vendored runtime file may `#include` SDL/SDL_ttf or
 reference an `SDL_`/`TTF_` symbol.
 
-This guard scans an explicit ALLOWLIST of the vendored runtime files rather than
-all of `src/ui/`, because the legacy Clay runtime (also under `src/ui/`) still
-uses SDL during the migration. Extend RUNTIME_FILES as later slices vendor more
-golden runtime (SIL-10 flex_layout, SIL-11 draw_command, SIL-12 focus). Once the
-Clay runtime is deleted (SIL-22), SIL-23 folds this into a whole-`src/ui/` scan.
+Post-Clay (SIL-23): the legacy Clay runtime that used to share `src/ui/` is
+deleted, so this folds into a WHOLE-`src/ui/` scan — every authored runtime/style
+source (`.h/.cpp/.cppx/.hx`) under `src/ui/` must be SDL-free. It also covers the
+explicitly-listed vendored cppx app-shell files under `src/client/ui/` (the
+5-phase pipeline + navigation), whose only render seam is an injected
+`std::function` the host supplies (SDL lives in that host lambda, not here).
 
 Comments and string/char literals are stripped before scanning, so prose that
 mentions "SDL_ttf" stays legal (mirrors the golden runtime_dependency_guard).
@@ -25,46 +26,12 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]  # clients/silencer/
 
-# The vendored cppx retained runtime. Grows per migration slice.
-RUNTIME_FILES = [
-    "src/ui/input.h",
-    "src/ui/style/visual_style.h",
-    "src/ui/style/text_measure.h",
-    "src/ui/style/text_measure.cpp",
-    "src/ui/runtime/react.h",
-    "src/ui/runtime/react.cpp",
-    "src/ui/runtime/element.h",
-    "src/ui/runtime/element.cpp",
-    "src/ui/runtime/tree.h",
-    "src/ui/runtime/tree.cpp",
-    # SIL-10 Yoga flex layout adapter. yoga_flex_layout.cpp includes
-    # <yoga/Yoga.h> (not SDL) — Yoga is an allowed layout backend; the guard
-    # only bans SDL/SDL_ttf.
-    "src/ui/runtime/flex_layout.h",
-    "src/ui/runtime/flex_layout.cpp",
-    "src/ui/runtime/yoga_flex_layout.h",
-    "src/ui/runtime/yoga_flex_layout.cpp",
-    # SIL-11 SDL-free draw model (RGBA IR + tessellation). The renderer-side
-    # SDL executor/registries are a separate bridge layer (not listed here).
-    "src/ui/runtime/draw_command.h",
-    "src/ui/runtime/draw_command.cpp",
-    "src/ui/runtime/draw_command_builder.h",
-    "src/ui/runtime/draw_command_builder.cpp",
-    "src/ui/runtime/geometry.h",
-    "src/ui/runtime/geometry.cpp",
-    # SIL-12 focus runtime + fiber-keyed interaction hooks. The tree IS the
-    # focusable registry (NodeInteraction.focusable); focus_update is a pure
-    # function over UiTree + a POD InputFrame, and use_focused/hovered/pressed
-    # read a snapshot via ReactContext. All SDL-free.
-    "src/ui/runtime/focus.h",
-    "src/ui/runtime/focus.cpp",
-    "src/ui/runtime/interaction_hooks.h",
-    "src/ui/runtime/interaction_hooks.cpp",
-    # SIL-13 vendored cppx app-shell (namespace client::ui): the 5-phase
-    # UiPipeline + ClientUi + ScreenStack/UiScreen + the NavigationProvider it
-    # compile-depends on. All SDL-free — the render seam is an injected
-    # std::function the host supplies (SDL lives only in that host lambda).
-    "src/ui/span.h",
+_SCAN_EXTS = {".h", ".cpp", ".cppx", ".hx"}
+
+# The vendored cppx app-shell (namespace client::ui): the 5-phase UiPipeline +
+# ClientUi + ScreenStack/UiScreen + the NavigationProvider it compile-depends on.
+# All SDL-free — the render seam is an injected std::function the host supplies.
+CLIENT_APP_SHELL = [
     "src/client/ui/app_shell/navigation/ui_screen.h",
     "src/client/ui/app_shell/navigation/screen_stack.h",
     "src/client/ui/app_shell/navigation/screen_stack.cpp",
@@ -77,6 +44,17 @@ RUNTIME_FILES = [
     "src/client/ui/providers/navigation_provider.cpp",
     "src/client/ui/hooks/use_navigation.h",
 ]
+
+
+def runtime_files() -> list[Path]:
+    """The whole SDL-free substrate: every src/ui source + the app-shell list."""
+    files: list[Path] = []
+    ui_dir = ROOT / "src" / "ui"
+    for path in sorted(ui_dir.rglob("*")):
+        if path.suffix in _SCAN_EXTS:
+            files.append(path)
+    files.extend(ROOT / rel for rel in CLIENT_APP_SHELL)
+    return files
 
 SDL_INCLUDE_RE = re.compile(r'#\s*include\s*[<"]\s*(SDL3?/|SDL[._]|SDL_ttf)', re.IGNORECASE)
 SDL_SYMBOL_RE = re.compile(r'\b(?:SDL|TTF)_[A-Za-z][A-Za-z0-9_]*')
@@ -115,8 +93,12 @@ def strip_comments(text: str) -> str:
 
 def main() -> int:
     violations: list[str] = []
-    for rel in RUNTIME_FILES:
-        path = ROOT / rel
+    files = runtime_files()
+    for path in files:
+        try:
+            rel = path.relative_to(ROOT)
+        except ValueError:
+            rel = path
         if not path.exists():
             violations.append(f"{rel}: MISSING (expected vendored runtime file)")
             continue
@@ -131,7 +113,7 @@ def main() -> int:
         for v in violations:
             print(f"  {v}", file=sys.stderr)
         return 1
-    print(f"cppx runtime SDL-free guard OK ({len(RUNTIME_FILES)} files clean)")
+    print(f"cppx runtime SDL-free guard OK ({len(files)} files clean)")
     return 0
 
 

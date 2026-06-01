@@ -246,14 +246,9 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 		cmd.reply->set_value(OkResult(cmd.id, r));
 		return;
 	}
-	if(cmd.op == "clay_button_check" ||
-	   cmd.op == "clay_toggle_check" ||
-	   cmd.op == "clay_scroll_list_check" ||
-	   cmd.op == "clay_scroll_text_box_check" ||
-	   cmd.op == "clay_text_input_check"){
-		cmd.reply->set_value(Err(cmd.id, "UNSUPPORTED", kUiUnsupportedMsg));
-		return;
-	}
+	// SIL-23: the legacy clay_*_check probes are retired — the cppx-primitive
+	// ops (inspect / click / set_text over the retained UiTree) are the
+	// supported automation checks. Removed ops fall through to UNKNOWN_OP.
 	if(cmd.op == "state"){
 		nlohmann::json r;
 		r["state"] = Game::StateName(game.GetState());
