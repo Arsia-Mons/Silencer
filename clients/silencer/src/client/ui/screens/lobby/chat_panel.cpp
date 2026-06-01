@@ -2,15 +2,11 @@
 
 #include "client/ui/hooks/use_lobby.h"
 
-#include "primitives/scroll_text_box.h"
-
 #include "text_wrap.h"
 
 #include <algorithm>
 #include <cstring>
 #include <utility>
-
-using silencer::ui::primitives::ScrollTextBoxAutoScroll;
 
 namespace silencer::client_ui::lobby {
 
@@ -72,6 +68,18 @@ bool IsPinnedToBottom(Uint16 scrollPosition,
                       Uint16 height) {
 	return static_cast<int>(scrollPosition) >=
 	       MaxScrollForLineCount(lineCount, kLineHeight, height);
+}
+
+Uint16 AutoScrollToBottom(Uint16 prevScrollPosition,
+                          int prevLineCount,
+                          int newLineCount,
+                          Uint16 height) {
+	const int prevMax = MaxScrollForLineCount(prevLineCount, kLineHeight, height);
+	const int newMax = MaxScrollForLineCount(newLineCount, kLineHeight, height);
+	if(static_cast<int>(prevScrollPosition) >= prevMax){
+		return static_cast<Uint16>(newMax);
+	}
+	return prevScrollPosition;
 }
 
 void PushEntry(std::vector<ChatEntry> & entries,
@@ -363,11 +371,10 @@ void ChatPanelTick(ChatPanelState & state, LobbyChatModel & chat) {
 		const int prevCount = static_cast<int>(state.chatLines.size());
 		chat_panel_detail::RefreshChatLines(state);
 		const int newCount = static_cast<int>(state.chatLines.size());
-		state.chatScrollPos = ScrollTextBoxAutoScroll(
+		state.chatScrollPos = chat_panel_detail::AutoScrollToBottom(
 			state.chatScrollPos,
 			prevCount,
 			newCount,
-			chat_panel_detail::kLineHeight,
 			state.chatViewportHeight);
 	}
 }

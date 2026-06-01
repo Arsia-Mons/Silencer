@@ -262,6 +262,14 @@ fail_if_match \
   "$REPO_ROOT/clients/silencer/src/client/ui/modals" \
   "$REPO_ROOT/clients/silencer/src/client/ui/hud"
 
+fail_if_match \
+  '#include[[:space:]]+["<]primitives/(box|button|scroll_list|scroll_text_box|text|text_input|toggle)[.]h[">]' \
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/modals" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/hud" \
+  --glob '*.h' \
+  --glob '*.cpp'
+
 fail_if_path_exists "clients/silencer/src/client/ui/hud/InGameOverlays.cpp"
 fail_if_path_exists "clients/silencer/src/client/ui/hud/InGameOverlays.h"
 fail_if_path_exists "clients/silencer/src/client/ui/hud/hud_player_list_overlay.cpp"
