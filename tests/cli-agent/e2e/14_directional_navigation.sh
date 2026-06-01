@@ -9,7 +9,7 @@ PID="$(start_silencer "$PORT")"
 trap 'stop_silencer "$PID" "$PORT"' EXIT
 
 wait_alive "$PORT"
-cli --port "$PORT" wait_for_state --state MAINMENU --timeout-ms 15000 >/dev/null
+wait_for_widget "Connect To Lobby"
 
 # The control key op's directional names mirror the gamepad UI navigation
 # mapping in Game::TickGamepadMenuNavigation. MainMenuView autofocuses

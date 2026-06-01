@@ -44,6 +44,7 @@ void DismissProgressModal(ScreenContext & ctx)
 
 void LobbyScreen::Tick(ScreenContext & ctx)
 {
+	ctx.PlayMenuMusicIfReady();
 	World & world = ctx.world;
 	Game & game = ctx.game;
 

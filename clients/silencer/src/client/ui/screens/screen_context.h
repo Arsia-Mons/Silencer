@@ -61,8 +61,12 @@ public:
 	void PopScreen();
 	void ReplaceScreen(std::unique_ptr<Screen> s);
 	void ResetToScreen(std::unique_ptr<Screen> s);
+	void ShowMainMenu();
+	void ShowLobby();
+	void ShowMissionSummary();
 	void ShowModal(std::unique_ptr<Modal> m);
 	void ShowMessage(const char * msg, std::function<void()> onClose = nullptr);
+	void PlayMenuMusicIfReady();
 
 	// Switch the renderer's active palette and clear the framebuffer. Called
 	// from Screen::Build by every menu surface that owns its presentation.
@@ -71,6 +75,9 @@ public:
 	// Retained frame ownership lives in Game/ClientUi. Screens return retained
 	// roots through Screen::BuildElement; they must not begin/end or render
 	// UI frames directly.
+
+private:
+	void ResetGameToUiScreen(std::unique_ptr<Screen> screen);
 };
 
 #endif

@@ -90,8 +90,8 @@ wait_for_lobby_state() {
   return 1
 }
 
-# MainMenu -> LobbyConnect -> login (auto-creates account) -> CREATECHARACTER.
-cli --port "$CTRL_PORT" wait_for_state --state MAINMENU --timeout-ms 15000 >/dev/null
+# Main menu -> LobbyConnect -> login (auto-creates account) -> character create.
+wait_for_widget "Connect To Lobby"
 wait_for_widget "Connect To Lobby"
 cli --port "$CTRL_PORT" click --label "Connect To Lobby" >/dev/null
 wait_for_widget "Login/Create"

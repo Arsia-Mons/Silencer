@@ -116,6 +116,7 @@ void UpdateScreen::Build(ScreenContext & ctx)
 
 void UpdateScreen::Tick(ScreenContext & ctx)
 {
+	ctx.PlayMenuMusicIfReady();
 	if(ctx.updater.GetState() == Updater::STAGING){
 		std::string zippath =
 #ifdef _WIN32

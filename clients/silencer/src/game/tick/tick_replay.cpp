@@ -17,7 +17,7 @@ void Game::TickReplayGame(){
 		if((world.replay.IsPlaying() && !world.replay.ReadHeader(world)) || !world.replay.IsPlaying()){
 			printf("Replay error\n");
 			world.replay.EndPlaying();
-			GoToState(MAINMENU);
+			screenContext.ShowMainMenu();
 		}
 	}else{
 		while(world.replay.ReadToNextTick(world)){
@@ -29,7 +29,7 @@ void Game::TickReplayGame(){
 		}
 		if(!world.replay.GameStarted()){
 			world.replay.EndPlaying();
-			GoToState(MAINMENU);
+			screenContext.ShowMainMenu();
 		}
 	}
 }

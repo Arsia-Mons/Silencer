@@ -9,7 +9,7 @@ PID="$(start_silencer "$PORT")"
 trap 'stop_silencer "$PID" "$PORT"' EXIT
 
 wait_alive "$PORT"
-cli --port "$PORT" wait_for_state --state MAINMENU --timeout-ms 15000 >/dev/null
+wait_for_widget "Connect To Lobby"
 
 OUT_DIR="$(mktemp -d)"
 SMALL_INSPECT="$OUT_DIR/inspect-640x480.json"

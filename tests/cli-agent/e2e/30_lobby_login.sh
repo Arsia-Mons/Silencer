@@ -95,7 +95,7 @@ wait_for_widget() {
   return 1
 }
 
-cli --port "$CTRL_PORT" wait_for_state --state MAINMENU --timeout-ms 15000
+wait_for_widget "Connect To Lobby"
 wait_for_widget "Connect To Lobby"
 cli --port "$CTRL_PORT" click --label "Connect To Lobby" >/dev/null
 wait_for_widget "Login/Create"
@@ -134,8 +134,7 @@ cli --port "$CTRL_PORT" click --label "Login/Create" >/dev/null
 create_initial_character "Alice"
 wait_for_widget "Create Game"
 
-# Go Back from the lobby returns to MAINMENU (FADEOUT is a brief
-# transient that wait_for_state will skip past).
+# Go Back from the lobby returns to the main menu.
 cli --port "$CTRL_PORT" back >/dev/null
 wait_for_widget "Connect To Lobby"
 

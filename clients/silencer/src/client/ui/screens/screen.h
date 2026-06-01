@@ -51,8 +51,8 @@ public:
 	// Handle a back/cancel request (esc, right-click, "Go Back" button).
 	// Return true if the screen consumed the request internally (e.g. swapped
 	// a sub-panel) so Game should NOT fall through to its default action.
-	// Return false to let Game decide what happens next (typically pop or
-	// transition to MAINMENU).
+	// Return false to let Game decide what happens next (typically pop or reset
+	// the screen stack).
 	virtual bool HandleBack(ScreenContext & ctx) { (void)ctx; return false; }
 
 	// Typed UI intent emitted by the runtime input router. Screens own all

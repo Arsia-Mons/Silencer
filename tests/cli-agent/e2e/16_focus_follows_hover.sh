@@ -13,7 +13,7 @@ PID="$(start_silencer "$PORT")"
 trap 'stop_silencer "$PID" "$PORT"' EXIT
 
 wait_alive "$PORT"
-cli --port "$PORT" wait_for_state --state MAINMENU --timeout-ms 15000 >/dev/null
+wait_for_widget "Connect To Lobby"
 
 # Pin a known viewport, then read the retained button center from inspect so
 # the test follows the actual JSX layout instead of a stale coordinate table.

@@ -12,7 +12,7 @@ wait_alive "$PORT"
 
 OUT_DIR="$(mktemp -d)"
 
-cli --port "$PORT" wait_for_state --state MAINMENU --timeout-ms 15000 >/dev/null
+wait_for_widget "Connect To Lobby"
 cli --port "$PORT" click --label Tutorial >/dev/null
 cli --port "$PORT" wait_for_state --state SINGLEPLAYERGAME --timeout-ms 15000 >/dev/null
 

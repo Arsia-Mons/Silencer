@@ -21,7 +21,6 @@ void DrawInGameWorldInsets(Surface & surface, float frametime);
 void RenderClientUiFrame(Surface & surface, float frametime);
 void ResetUiFrameDeltas();
 bool HasInputTarget();
-bool TickScreenState(Uint8 state, bool entering);
 void Push(std::unique_ptr<Screen> s);
 void Pop();
 void Replace(std::unique_ptr<Screen> s);
@@ -53,7 +52,6 @@ void PrepareClientUiFrame(Surface & surface);
 void BeginPreparedClientUiFrame();
 void EndClientUiFrame();
 void BuildVisibleClientUi();
-void PlayMenuMusicIfReady();
 };
 
 #endif

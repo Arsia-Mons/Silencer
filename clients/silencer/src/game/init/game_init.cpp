@@ -37,14 +37,15 @@ Game::Game()
 	world.SetVersion(SILENCER_VERSION);
 	frames = 0;
 	fps = 0;
-	state = MAINMENU;
-	stateisnew = true;
+	state = NONE;
+	nextstate = NONE;
+	stateisnew = false;
 	sharedstate = 0;
 	singleplayermessage = 0;
 	updatetitle = true;
 	minimized = false;
 	creategameclicked = false;
-	nextstateprocessed = false;
+	nextstateprocessed = true;
 #ifdef OUYA
 	quitscancode = SDL_SCANCODE_HOME;
 #else
@@ -252,9 +253,9 @@ bool Game::Load(char * cmdline){
 			//SDL_Flip(screen);
 		}
 		// Headless mode skips SetColors() above, so palettecolors[] starts zeroed.
-		// It is first populated by SetColors() in the MAINMENU state handler in
-		// Loop(). Screenshot ops route to PostFrameReplies() AFTER Tick() runs,
-		// so the palette is always populated by the time a screenshot is captured.
+		// It is first populated when the main-menu screen is pushed below.
+		// Screenshot ops route to PostFrameReplies() AFTER Tick() runs, so the
+		// palette is always populated by the time a screenshot is captured.
 	}
 	printf("Loading resources...\n");
 	if(!world.resources.Load(this, world.dedicatedserver.active)){
@@ -267,6 +268,9 @@ bool Game::Load(char * cmdline){
 	printf("Resources loaded\n");
 	lasttick = SDL_GetTicks();
 	gameRenderer.RestartPaletteFade();
+	if(!world.dedicatedserver.active && state == NONE && !gameUiPipeline.ClientUiRef().HasScreens()){
+		screenContext.ShowMainMenu();
+	}
 	if(controlPort > 0){
 		auto drainPendingWaits = [this](){
 			for(auto& w : pendingWaits){

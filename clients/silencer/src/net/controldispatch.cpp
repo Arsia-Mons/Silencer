@@ -48,19 +48,6 @@ static ControlReply OkResult(int id, nlohmann::json r){
 	return rpl;
 }
 
-static bool StateNeedsScreen(const std::string& state){
-	return state == "MAINMENU" ||
-	       state == "LOBBYCONNECT" ||
-	       state == "LOBBY" ||
-	       state == "CREATECHARACTER" ||
-	       state == "UPDATING" ||
-	       state == "MISSIONSUMMARY" ||
-	       state == "OPTIONS" ||
-	       state == "OPTIONSCONTROLS" ||
-	       state == "OPTIONSDISPLAY" ||
-	       state == "OPTIONSAUDIO";
-}
-
 static ControlReply Err(int id, const char* code, const std::string& msg){
 	ControlReply rpl;
 	rpl.id = id;
@@ -875,25 +862,7 @@ void TickWaits(Game& game){
 		} else if(w.cmd.op == "wait_ms"){
 			if(now >= w.deadline_ms) done = true;
 		} else if(w.cmd.op == "wait_for_state"){
-			if(w.wait_state == Game::StateName(game.GetState()) &&
-			   (!StateNeedsScreen(w.wait_state) || game.GetTopScreen())){
-				if(StateNeedsScreen(w.wait_state)){
-					// State changes replace screens before the retained tree is
-					// rendered. Defer the reply until the new screen has produced
-					// an interaction snapshot for the next command.
-					if(!game.IsScreenStateSettled()){
-						w.frames_left = -1;
-						++it; continue;
-					}
-					if(w.frames_left < 0){
-						w.frames_left = 1;
-						++it; continue;
-					}
-					if(w.frames_left > 0){
-						--w.frames_left;
-						++it; continue;
-					}
-				}
+			if(w.wait_state == Game::StateName(game.GetState())){
 				w.cmd.reply->set_value(OkResult(w.cmd.id, nlohmann::json::object()));
 				it = v.erase(it); continue;
 			}
@@ -1359,12 +1328,11 @@ static void HandleGas(Game& game, ControlCommand& cmd) {
 		// private to the class, so compare via the StateName string keys
 		// (same approach as wait_for_state).
 		const std::string st = Game::StateName(game.GetState());
-		const bool safe = (st == "NONE" || st == "MAINMENU" ||
-		                   st == "LOBBY" || st == "MISSIONSUMMARY");
+		const bool safe = (st == "NONE");
 		if (!safe) {
 			cmd.reply->set_value(Err(cmd.id, "WRONG_STATE",
 				"gas reload not safe from state " + st +
-				" (allowed: NONE, MAINMENU, LOBBY, MISSIONSUMMARY)"));
+				" (allowed: NONE)"));
 			return;
 		}
 

@@ -1,7 +1,6 @@
 #include "ui/game_ui_pipeline.h"
 
 #include "client/ui/screens/screen.h"
-#include "client/ui/screens/screen_routes.h"
 #include "game.h"
 #include "camera.h"
 #include "detonator.h"
@@ -203,23 +202,6 @@ GameUiPipeline::GameUiPipeline(Game & g)
 bool GameUiPipeline::HasInputTarget() {
 if(Top()) return true;
 return inGameUi.HasInputTarget(game.world.peers.localpeerid);
-}
-
-bool GameUiPipeline::TickScreenState(Uint8 state, bool entering) {
-if(!silencer::client_ui::IsScreenState(state)) return false;
-if(entering){
-std::unique_ptr<Screen> screen = silencer::client_ui::CreateScreenForState(state);
-if(screen) Push(std::move(screen));
-}else if(silencer::client_ui::ScreenStatePlaysMenuMusic(state)){
-PlayMenuMusicIfReady();
-}
-return true;
-}
-
-void GameUiPipeline::PlayMenuMusicIfReady() {
-if(game.gameSession.AmbienceMixerRef().FadedIn()){
-game.gameSession.AmbienceMixerRef().PlayMusic(game.world.resources.menumusic);
-}
 }
 
 void GameUiPipeline::Push(std::unique_ptr<Screen> s){

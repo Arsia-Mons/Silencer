@@ -8,7 +8,7 @@ trap "stop_silencer $PID $PORT" EXIT
 wait_alive "$PORT"
 
 OUT_DIR="$(mktemp -d)"
-cli --port "$PORT" wait_for_state --state MAINMENU --timeout-ms 15000
+wait_for_widget "Connect To Lobby"
 cli --port "$PORT" screenshot --out "$OUT_DIR/main.png"
 test -s "$OUT_DIR/main.png"
 

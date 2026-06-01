@@ -95,6 +95,7 @@ void CharacterCreateScreen::Build(ScreenContext & ctx)
 
 void CharacterCreateScreen::Tick(ScreenContext & ctx)
 {
+	ctx.PlayMenuMusicIfReady();
 	if(waitingForCreate){
 		ctx.lobby.LockMutex();
 		const bool received = ctx.lobby.charactersreceived;

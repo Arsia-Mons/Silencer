@@ -65,6 +65,7 @@ void MissionSummaryScreen::Build(ScreenContext & ctx)
 
 void MissionSummaryScreen::Tick(ScreenContext & ctx)
 {
+	ctx.PlayMenuMusicIfReady();
 	World & world = ctx.world;
 	if(scrollDelta != 0){
 		int maxScroll = static_cast<int>(summaryLines.size()) - (mission_summary_screen_detail::kSummaryH / mission_summary_screen_detail::kLineH);

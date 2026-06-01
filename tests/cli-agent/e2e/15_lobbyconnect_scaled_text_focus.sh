@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Regression: at uiScale > 1, LOBBYCONNECT text-input hit bounds must be
+# Regression: at uiScale > 1, lobby-connect text-input hit bounds must be
 # resolved from the retained UI virtual layout, not stale native/window rectangles.
 set -euo pipefail
 . "$(dirname "$0")/lib.sh"
@@ -61,7 +61,7 @@ HOME="$SILENCER_HOME" "$SILENCER_BIN" \
 SILENCER_PID=$!
 wait_alive "$CTRL_PORT"
 
-cli --port "$CTRL_PORT" wait_for_state --state MAINMENU --timeout-ms 15000
+wait_for_widget "Connect To Lobby"
 cli --port "$CTRL_PORT" resize --w 2560 --h 1440 >/dev/null
 cli --port "$CTRL_PORT" wait_frames --n 3 >/dev/null
 cli --port "$CTRL_PORT" click --label "Connect To Lobby" >/dev/null

@@ -27,6 +27,8 @@ fail_if_path_exists "clients/silencer/src/ui/screens"
 fail_if_path_exists "clients/silencer/src/ui/clay"
 fail_if_path_exists "clients/silencer/src/ui/runtime/clay_inspector.h"
 fail_if_path_exists "clients/silencer/src/ui/runtime/clay_inspector.cpp"
+fail_if_path_exists "clients/silencer/src/client/ui/screens/screen_routes.h"
+fail_if_path_exists "clients/silencer/src/client/ui/screens/screen_routes.cpp"
 
 fail_if_match \
   "\\b(currentinterface|ProcessInGameInterfaces|Interface \\*|new Interface)\\b" \
@@ -149,15 +151,14 @@ fail_if_match \
   "$REPO_ROOT/clients/silencer/src/game/game.h"
 
 fail_if_match \
-  'main_menu_screen|lobby_connect_screen|character_create_screen|mission_summary_screen|options_(screen|audio_screen|controls_screen|display_screen)|update_screen|lobby_screen|std::make_unique<.*Screen|case[[:space:]]+(MAINMENU|LOBBYCONNECT|LOBBY|CREATECHARACTER|UPDATING|MISSIONSUMMARY|OPTIONS|OPTIONSCONTROLS|OPTIONSDISPLAY|OPTIONSAUDIO):|EnterScreenState|ShowScreenForState' \
+  'main_menu_screen|lobby_connect_screen|character_create_screen|mission_summary_screen|options_(screen|audio_screen|controls_screen|display_screen)|update_screen|lobby_screen|std::make_unique<.*Screen|case[[:space:]]+(MAINMENU|LOBBYCONNECT|LOBBY|CREATECHARACTER|UPDATING|MISSIONSUMMARY|OPTIONS|OPTIONSCONTROLS|OPTIONSDISPLAY|OPTIONSAUDIO):|EnterScreenState|ShowScreenForState|TickScreenState|CreateScreenForState|IsScreenState|ScreenStatePlaysMenuMusic|screen_routes' \
   "$REPO_ROOT/clients/silencer/src/game/ui" \
   "$REPO_ROOT/clients/silencer/src/game/game.cpp" \
   "$REPO_ROOT/clients/silencer/src/game/game.h"
 
 fail_if_match \
-  'EnterScreenRoute|#include "game[.]h"|Game[[:space:]]*&|gameSession|DestroyAllObjects|GetAuthorityPeer|ClearGames|ForgetAllUserInfo|Disconnect[[:space:]]*\(' \
-  "$REPO_ROOT/clients/silencer/src/client/ui/screens/screen_routes.cpp" \
-  "$REPO_ROOT/clients/silencer/src/client/ui/screens/screen_routes.h"
+  "\\b(MAINMENU|LOBBYCONNECT|LOBBY|CREATECHARACTER|UPDATING|MISSIONSUMMARY|OPTIONS|OPTIONSCONTROLS|OPTIONSDISPLAY|OPTIONSAUDIO)\\b" \
+  "$REPO_ROOT/clients/silencer/src/game/state/game_state.h"
 
 fail_if_match \
   '::ui::UiElement[[:space:]]+(PrimaryActionButton|CancelButton)[[:space:]]*\(' \
@@ -206,8 +207,7 @@ fail_if_match \
 fail_if_match \
   "#include[[:space:]]+\"game_state[.]h\"|\\bGameState::|\\bGoToState[[:space:]]*\\(" \
   "$REPO_ROOT/clients/silencer/src/client/ui/screens" \
-  --glob '!screen_context.*' \
-  --glob '!screen_routes.*'
+  --glob '!screen_context.*'
 
 fail_if_match \
   "\\bGameState::|\\bgo_to_state\\b" \

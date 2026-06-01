@@ -1,5 +1,10 @@
 #include "screen_context.h"
 
+#include "client/ui/screens/main_menu/main_menu_screen.h"
+#include "client/ui/screens/mission_summary/mission_summary_screen.h"
+#ifdef SILENCER_HAVE_LOBBY_UI
+#include "client/ui/screens/lobby/lobby_screen.h"
+#endif
 #include "game.h"
 #include "game_state.h"
 #include "renderer.h"
@@ -9,6 +14,7 @@
 #include "surface.h"
 
 #include <cassert>
+#include <memory>
 
 ScreenContext::ScreenContext(Game & game_,
                              World & world_,
@@ -41,6 +47,30 @@ void ScreenContext::PushScreen(std::unique_ptr<Screen> s) { game.PushScreen(std:
 void ScreenContext::PopScreen() { game.PopScreen(); }
 void ScreenContext::ReplaceScreen(std::unique_ptr<Screen> s) { game.ReplaceScreen(std::move(s)); }
 void ScreenContext::ResetToScreen(std::unique_ptr<Screen> s) { game.ResetToScreen(std::move(s)); }
+void ScreenContext::ResetGameToUiScreen(std::unique_ptr<Screen> screen) {
+	game.state = GameState::NONE;
+	game.nextstate = GameState::NONE;
+	game.stateisnew = false;
+	game.nextstateprocessed = true;
+	game.ResetToScreen(std::move(screen));
+}
+
+void ScreenContext::ShowMainMenu() {
+	ResetGameToUiScreen(std::make_unique<MainMenuScreen>());
+}
+
+void ScreenContext::ShowLobby() {
+#ifdef SILENCER_HAVE_LOBBY_UI
+	ResetGameToUiScreen(std::make_unique<LobbyScreen>());
+#else
+	ResetGameToUiScreen(std::make_unique<MainMenuScreen>());
+#endif
+}
+
+void ScreenContext::ShowMissionSummary() {
+	ResetGameToUiScreen(std::make_unique<MissionSummaryScreen>());
+}
+
 void ScreenContext::ShowModal(std::unique_ptr<Modal> m) {
 	game.PushScreen(std::unique_ptr<Screen>(static_cast<Screen *>(m.release())));
 }
@@ -53,4 +83,10 @@ void ScreenContext::ResetPresentation(int paletteIdx) {
 	renderer.palette.SetPalette(paletteIdx);
 	game.GetScreenBuffer().Clear(0);
 	game.gameRenderer.SetColors(renderer.palette.GetColors());
+}
+
+void ScreenContext::PlayMenuMusicIfReady() {
+	if(game.gameSession.AmbienceMixerRef().FadedIn()){
+		game.gameSession.AmbienceMixerRef().PlayMusic(world.resources.menumusic);
+	}
 }

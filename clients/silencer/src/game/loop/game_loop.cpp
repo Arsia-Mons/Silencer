@@ -357,18 +357,17 @@ bool Game::Tick(void){
 		}
 	}
 	
-	if(gameUiPipeline.TickScreenState(state, stateisnew)){
-		stateisnew = false;
-	}else{
-		switch(state){
-			case FADEOUT: TickFadeOut(); break;
-			case INGAME: TickInGame(); break;
-			case SINGLEPLAYERGAME: TickSinglePlayerGame(); break;
-			case HOSTGAME: TickHostGame(); break;
-			case JOINGAME: TickJoinGame(); break;
-			case TESTGAME: TickTestGame(); break;
-			case REPLAYGAME: TickReplayGame(); break;
-		}
+	switch(state){
+		case FADEOUT: TickFadeOut(); break;
+		case INGAME: TickInGame(); break;
+		case SINGLEPLAYERGAME: TickSinglePlayerGame(); break;
+		case HOSTGAME: TickHostGame(); break;
+		case JOINGAME: TickJoinGame(); break;
+		case TESTGAME: TickTestGame(); break;
+		case REPLAYGAME: TickReplayGame(); break;
+		case NONE:
+		default:
+			break;
 	}
 	if(gameRenderer.FadePhaseRef() < 16 && state != FADEOUT){
 		gameRenderer.ApplyPaletteFade(false);
@@ -387,38 +386,31 @@ void Game::GoToState(Uint8 newstate){
 	gameRenderer.RestartPaletteFade();
 	stateisnew = true;
 	nextstateprocessed = false;
-	// Keep the outgoing UI screen mounted until TickFadeOut reaches black.
-	// Legacy retained its world UI objects across FADEOUT, so there were still
-	// pixels for the palette fade to dim before the next state rebuilt UI.
+	// Keep the outgoing retained screen mounted until TickFadeOut reaches black.
+	// Gameplay states clear the UI stack at the end of the fade.
 }
 
 bool Game::GoBack(void){
 	Screen * top = GetTopScreen();
 	if(top && top->HandleBack(screenContext)) return true;
-	GoToState(MAINMENU);
-	return false;
+	if(top){
+		screenContext.ShowMainMenu();
+		return true;
+	}
+	screenContext.ShowMainMenu();
+	return true;
 }
 
 const char* Game::StateName(Uint8 s){
 	switch(s){
 		case NONE: return "NONE";
 		case FADEOUT: return "FADEOUT";
-		case MAINMENU: return "MAINMENU";
-		case LOBBYCONNECT: return "LOBBYCONNECT";
-		case LOBBY: return "LOBBY";
-		case UPDATING: return "UPDATING";
 		case INGAME: return "INGAME";
-		case MISSIONSUMMARY: return "MISSIONSUMMARY";
 		case SINGLEPLAYERGAME: return "SINGLEPLAYERGAME";
-		case OPTIONS: return "OPTIONS";
-		case OPTIONSCONTROLS: return "OPTIONSCONTROLS";
-		case OPTIONSDISPLAY: return "OPTIONSDISPLAY";
-		case OPTIONSAUDIO: return "OPTIONSAUDIO";
 		case HOSTGAME: return "HOSTGAME";
 		case JOINGAME: return "JOINGAME";
 		case REPLAYGAME: return "REPLAYGAME";
 		case TESTGAME: return "TESTGAME";
-		case CREATECHARACTER: return "CREATECHARACTER";
 		default: return "UNKNOWN";
 	}
 }

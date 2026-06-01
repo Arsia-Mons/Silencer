@@ -14,7 +14,7 @@ PID="$(start_silencer "$PORT")"
 trap 'stop_silencer "$PID" "$PORT"' EXIT
 
 wait_alive "$PORT"
-cli --port "$PORT" wait_for_state --state MAINMENU --timeout-ms 15000 >/dev/null
+wait_for_widget "Connect To Lobby"
 
 check_resize() {
   local width="$1" height="$2"

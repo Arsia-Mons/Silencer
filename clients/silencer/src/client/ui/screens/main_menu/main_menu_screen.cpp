@@ -23,7 +23,7 @@ void MainMenuScreen::Build(ScreenContext & ctx)
 
 void MainMenuScreen::Tick(ScreenContext & ctx)
 {
-	(void)ctx;
+	ctx.PlayMenuMusicIfReady();
 }
 
 bool MainMenuScreen::BuildElement(ScreenContext & ctx, ::ui::UiElement * out)

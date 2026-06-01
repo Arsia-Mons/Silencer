@@ -12,7 +12,7 @@ wait_alive "$PORT"
 
 OUT_DIR="$(mktemp -d)"
 
-cli --port "$PORT" wait_for_state --state MAINMENU --timeout-ms 15000
+wait_for_widget "Connect To Lobby"
 
 check_resize() {
   local width="$1" height="$2" out="$3"

@@ -11,8 +11,8 @@ class Stats;
 
 // End-of-mission stats screen with optional upgrade buttons. Owns the
 // upgrade-availability poll (driven by world.lobby.statupgraded /
-// retrieving) plus the Continue button that returns to LOBBY (if
-// authenticated) or MAINMENU.
+// retrieving) plus the Continue button that resets the screen stack to the
+// lobby (if authenticated) or main menu.
 class MissionSummaryScreen : public Screen
 {
 public:

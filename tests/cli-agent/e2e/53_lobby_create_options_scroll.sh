@@ -100,7 +100,7 @@ wait_for_lobby_state() {
   return 1
 }
 
-cli --port "$CTRL_PORT" wait_for_state --state MAINMENU --timeout-ms 15000 >/dev/null
+wait_for_widget "Connect To Lobby"
 wait_for_widget "Connect To Lobby"
 cli --port "$CTRL_PORT" click --label "Connect To Lobby" >/dev/null
 wait_for_widget "Login/Create"

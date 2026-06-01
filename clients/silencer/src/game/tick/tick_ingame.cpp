@@ -21,9 +21,9 @@ if(/*!world.map.loaded && */stateisnew){
 		world.Disconnect();
 		if(world.lobby.state == Lobby::AUTHENTICATED){
 			world.lobby.JoinChannel(world.lobby.lastchannel);
-			GoToState(LOBBY);
+			screenContext.ShowLobby();
 		}else{
-			GoToState(MAINMENU);
+			screenContext.ShowMainMenu();
 		}
 		return;
 	}
@@ -185,7 +185,8 @@ if(/*!world.map.loaded && */stateisnew){
 		//
 		if(!world.replay.ReadToNextTick(world)){
 			world.replay.EndPlaying();
-			GoToState(MAINMENU);
+			screenContext.ShowMainMenu();
+			return;
 		}
 	}
 	// Spectator controls. Mirrors the replay block above but reads from
@@ -291,32 +292,35 @@ if(/*!world.map.loaded && */stateisnew){
 	if(gameSession.CheckForQuit()){
 		world.Disconnect();
 		if(world.lobby.state == Lobby::AUTHENTICATED){
-			GoToState(LOBBY);
 			world.lobby.JoinChannel(world.lobby.lastchannel);
+			screenContext.ShowLobby();
 		}else{
 			if(world.replay.IsPlaying()){
 				world.replay.EndPlaying();
 			}
-			GoToState(MAINMENU);
+			screenContext.ShowMainMenu();
 		}
+		return;
 	}
 	if(gameSession.CheckForEndOfGame()){
 		if(world.lobby.state == Lobby::AUTHENTICATED){
-			GoToState(MISSIONSUMMARY);
+			screenContext.ShowMissionSummary();
 		}else{
 			if(world.replay.IsPlaying()){
 				world.replay.EndPlaying();
 			}
-			GoToState(MAINMENU);
+			screenContext.ShowMainMenu();
 		}
+		return;
 	}
 	if(gameSession.CheckForConnectionLost()){
 		if(world.lobby.state == Lobby::AUTHENTICATED){
-			GoToState(LOBBY);
 			world.lobby.JoinChannel(world.lobby.lastchannel);
+			screenContext.ShowLobby();
 		}else{
-			GoToState(MAINMENU);
+			screenContext.ShowMainMenu();
 		}
+		return;
 	}
 }
 }

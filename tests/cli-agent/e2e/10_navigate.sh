@@ -7,8 +7,8 @@ PID=$(start_silencer "$PORT")
 trap "stop_silencer $PID $PORT" EXIT
 wait_alive "$PORT"
 
-# MAINMENU -> OPTIONS
-cli --port "$PORT" wait_for_state --state MAINMENU --timeout-ms 15000
+# Main menu -> Options
+wait_for_widget "Connect To Lobby"
 cli --port "$PORT" click --label OPTIONS
 wait_for_widget "Controls"
 cli --port "$PORT" click --label CONTROLS
@@ -35,7 +35,7 @@ cli --port "$PORT" inspect | bun -e \
    if(!r.widgets.some((w)=>w.source==="ui" && w.label==="Music")) process.exit(1);'
 cli --port "$PORT" click --label CANCEL
 wait_for_widget "Controls"
-# OPTIONS -> back -> MAINMENU
+# Options -> back -> main menu
 cli --port "$PORT" back
 wait_for_widget "Connect To Lobby"
 echo "PASS 10_navigate"
