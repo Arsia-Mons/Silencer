@@ -4,8 +4,11 @@
 
 namespace silencer {
 namespace client_ui {
+class AppAssetsModel;
+
 namespace lobby {
 
+struct GameJoinPanelState;
 struct GameSelectPanelState;
 struct GameTechPanelState;
 
@@ -47,6 +50,13 @@ struct LobbyChromeFrameProps {
 	int game_join_ready_y = 0;
 	int game_join_button_width = 0;
 	int game_join_button_height = 0;
+	bool show_game_join_roster = false;
+	const GameJoinPanelState * game_join = nullptr;
+	const AppAssetsModel * app_assets = nullptr;
+	int game_join_roster_x = 0;
+	int game_join_roster_y = 0;
+	int game_join_roster_width = 0;
+	int game_join_roster_height = 0;
 	bool show_game_tech_upper = false;
 	const GameTechPanelState * game_tech = nullptr;
 	int game_tech_back_x = 0;

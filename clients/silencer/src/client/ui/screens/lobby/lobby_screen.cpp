@@ -258,6 +258,9 @@ void LobbyScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime, s
 	const uint16_t titleRowGap = static_cast<uint16_t>(
 		lobby_screen_detail::ClampInt((layoutWidth * 6) / 640, 4, 10));
 	const bool showMapName = !mapName.empty() && layoutWidth >= 700;
+	const silencer::client_ui::AppModel app =
+		silencer::client_ui::use_app(
+			silencer::client_ui::MakeAppProvider(ctx));
 
 	silencer::client_ui::lobby::LobbyChromeFrameProps chromeProps{
 		.key = "lobby-chrome",
@@ -300,6 +303,13 @@ void LobbyScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime, s
 		.game_join_ready_y = gameJoinReadyY,
 		.game_join_button_width = gameJoinButtonW,
 		.game_join_button_height = lobby_screen_detail::kGameJoinButtonH,
+		.show_game_join_roster = gameJoinActive,
+		.game_join = &gameJoinState,
+		.app_assets = &app.assets,
+		.game_join_roster_x = bodyX + mainLayout.topRowW,
+		.game_join_roster_y = bodyY,
+		.game_join_roster_width = mainLayout.rightTallW,
+		.game_join_roster_height = mainLayout.rightTallH,
 		.show_game_tech_upper = showGameTechUpper,
 		.game_tech = &gameTechState,
 		.game_tech_back_x = rightUpperX + lobby_screen_detail::kGameTechBackPadLeft,

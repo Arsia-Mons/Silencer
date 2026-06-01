@@ -10,7 +10,6 @@
 #include "game_join_panel.h"
 #include "game_tech_panel.h"
 
-#include "client/ui/hooks/use_app.h"
 #include "client/ui/hooks/use_lobby.h"
 #include "screen_context.h"
 #include "renderdevice.h"
@@ -207,11 +206,6 @@ void BuildRightTallContents(LobbyMainAreaPanels & panels,
 			static_cast<Uint16>(std::max(0, layout.rightTallW)),
 			static_cast<Uint16>(std::max(0, layout.rightTallH)),
 			interactions);
-	}else if(panels.gameJoinActive){
-		const silencer::client_ui::AppModel app =
-			silencer::client_ui::use_app(
-				silencer::client_ui::MakeAppProvider(ctx));
-		BuildGameJoinTallTree(panels.gameJoin, app.assets, interactions);
 	}else if(panels.gameTechActive){
 		BuildGameTechTallTree(panels.gameTech, lobby, interactions);
 	}

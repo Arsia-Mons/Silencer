@@ -2,9 +2,9 @@
 #define SILENCER_CLIENT_UI_LOBBY_GAME_JOIN_PANEL_H
 
 // Screen-side lobby GameJoinPanel: retained upper actions
-// (Choose Tech / Change Team / Ready) plus the joined-game roster in the tall
-// pane. The Ready button label flips to "Waiting..." while the host is still
-// waiting for peers to finish downloading the map.
+// (Choose Tech / Change Team / Ready) plus the retained joined-game roster.
+// The Ready button label flips to "Waiting..." while the host is still waiting
+// for peers to finish downloading the map.
 //
 // Domain mutations go through use_lobby(); primitives stay screen-agnostic.
 
@@ -14,12 +14,7 @@
 #include <string>
 #include <vector>
 
-namespace silencer::ui {
-class UiInteractionRegistry;
-}
-
 namespace silencer::client_ui {
-class AppAssetsModel;
 class LobbyModel;
 }
 
@@ -66,12 +61,6 @@ GameJoinPanelTickResult GameJoinPanelTick(GameJoinPanelState & state,
                                           LobbyModel & lobby);
 bool GameJoinPanelHandleUiIntent(GameJoinPanelState & state,
                                  const silencer::ui::UiAction & action);
-
-// Emits the tall stepped-pane subtree (joined-game roster). Must be called
-// inside the LobbyRightTallBox CLAY block.
-void BuildGameJoinTallTree(GameJoinPanelState & state,
-                           const silencer::client_ui::AppAssetsModel& assets,
-                           silencer::ui::UiInteractionRegistry& interactions);
 
 }  // namespace silencer::client_ui::lobby
 

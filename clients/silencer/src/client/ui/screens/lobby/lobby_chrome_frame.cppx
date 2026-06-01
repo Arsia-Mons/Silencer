@@ -1,5 +1,7 @@
 #include "client/ui/screens/lobby/lobby_chrome_frame.h"
 
+#include "client/ui/hooks/use_app.h"
+#include "client/ui/screens/lobby/game_join_panel.h"
 #include "client/ui/screens/lobby/game_select_panel.h"
 #include "client/ui/screens/lobby/game_tech_panel.h"
 #include "ui/components/box.h"
@@ -42,6 +44,16 @@ constexpr int kGameSelectInfoRowH = 12;
 constexpr int kGameSelectButtonRowH = 21;
 constexpr int kGameSelectButtonGap = 2;
 constexpr const char * kGameSelectRowActionPrefix = "lobby.game_select.row";
+constexpr int kGameJoinRosterSlots = 32;
+constexpr int kGameJoinRosterTeamStepY = 55;
+constexpr int kGameJoinRosterPeerStepY = 13;
+constexpr int kGameJoinRosterEmblemAnchorX = 22;
+constexpr int kGameJoinRosterEmblemAnchorY = 6;
+constexpr int kGameJoinRosterReadyAnchorX = 57;
+constexpr int kGameJoinRosterReadyAnchorY = 6;
+constexpr int kGameJoinRosterNameX = 75;
+constexpr int kGameJoinRosterTextY = 8;
+constexpr std::uint8_t kGameJoinRosterLevelColor = 170;
 
 const char * kGameSelectRowKeys[kGameSelectRowSlots] = {
 	"game-select-row-0",  "game-select-row-1",  "game-select-row-2",
@@ -55,6 +67,25 @@ const char * kGameSelectRowKeys[kGameSelectRowSlots] = {
 	"game-select-row-24", "game-select-row-25", "game-select-row-26",
 	"game-select-row-27", "game-select-row-28", "game-select-row-29",
 	"game-select-row-30", "game-select-row-31",
+};
+
+const char * kGameJoinRosterRowKeys[kGameJoinRosterSlots] = {
+	"game-join-roster-row-0",  "game-join-roster-row-1",
+	"game-join-roster-row-2",  "game-join-roster-row-3",
+	"game-join-roster-row-4",  "game-join-roster-row-5",
+	"game-join-roster-row-6",  "game-join-roster-row-7",
+	"game-join-roster-row-8",  "game-join-roster-row-9",
+	"game-join-roster-row-10", "game-join-roster-row-11",
+	"game-join-roster-row-12", "game-join-roster-row-13",
+	"game-join-roster-row-14", "game-join-roster-row-15",
+	"game-join-roster-row-16", "game-join-roster-row-17",
+	"game-join-roster-row-18", "game-join-roster-row-19",
+	"game-join-roster-row-20", "game-join-roster-row-21",
+	"game-join-roster-row-22", "game-join-roster-row-23",
+	"game-join-roster-row-24", "game-join-roster-row-25",
+	"game-join-roster-row-26", "game-join-roster-row-27",
+	"game-join-roster-row-28", "game-join-roster-row-29",
+	"game-join-roster-row-30", "game-join-roster-row-31",
 };
 
 inline std::uint32_t texture_id(std::uint8_t bank, std::uint16_t index) {
@@ -194,6 +225,22 @@ inline ::ui::StylePatch inset_border_patch() {
 		{1.0f, 1.0f, 1.0f, 1.0f},
 		{{220, 0, 0, 255}, {220, 0, 0, 255},
 		 {220, 0, 0, 255}, {220, 0, 0, 255}},
+	});
+}
+
+inline ::ui::StylePatch sprite_patch(std::uint8_t bank, std::uint16_t index) {
+	return ::ui::patch().image(::ui::BackgroundImage{
+		.texture_id = texture_id(bank, index),
+		.tint = {255, 255, 255, 255},
+	});
+}
+
+inline ::ui::StylePatch level_text_patch() {
+	return ::ui::patch().text(::ui::TextVisual{
+		.color = {kGameJoinRosterLevelColor, 0, 0, 255},
+		.font_id = 132,
+		.font_size = 4,
+		.line_height = 5.0f,
 	});
 }
 
@@ -630,6 +677,352 @@ struct GameSelectTallPanelProps {
 	</Box>
 }
 
+struct GameJoinRosterRowViewProps {
+	const char * key = nullptr;
+	const GameJoinPanelState * state = nullptr;
+	const AppAssetsModel * assets = nullptr;
+	int index = 0;
+	int width = 0;
+	int height = 0;
+};
+
+::ui::UiElement GameJoinRosterRowView(const GameJoinRosterRowViewProps& props) {
+	if(!props.state || props.index < 0 ||
+	   props.index >= static_cast<int>(props.state->rosterRows.size())){
+		return ::ui::empty();
+	}
+	const GameJoinRosterRow& row =
+		props.state->rosterRows[static_cast<size_t>(props.index)];
+	const int rowYOffset =
+		row.teamNumber * kGameJoinRosterTeamStepY
+		+ row.peerSlot * kGameJoinRosterPeerStepY;
+	const AppSpriteFrame emblem =
+		props.assets ? props.assets->agency_emblem(row.agency) : AppSpriteFrame{};
+	const int emblemW = emblem.available ? emblem.width : 16;
+	const int emblemH = emblem.available ? emblem.height : 16;
+	const int emblemX =
+		kGameJoinRosterEmblemAnchorX
+		- (emblem.available ? emblem.offset_x : 0);
+	const int emblemY =
+		kGameJoinRosterEmblemAnchorY
+		+ row.teamNumber * kGameJoinRosterTeamStepY
+		- (emblem.available ? emblem.offset_y : 0);
+	const std::uint16_t readyIndex = row.ready ? 18 : 19;
+	const AppSpriteFrame ready =
+		props.assets ? props.assets->ready_indicator(row.ready) : AppSpriteFrame{};
+	const int readyW = ready.available ? ready.width : 8;
+	const int readyH = ready.available ? ready.height : 8;
+	const int readyX =
+		kGameJoinRosterReadyAnchorX
+		- (ready.available ? ready.offset_x : 0);
+	const int readyY =
+		kGameJoinRosterReadyAnchorY
+		+ rowYOffset
+		- (ready.available ? ready.offset_y : 0);
+	const int levelX =
+		kGameJoinRosterNameX + static_cast<int>(row.name.size()) * 6 + 3;
+	return <Box key={props.key} layout={absolute_layout(0, 0, props.width, props.height)}>
+		<Box
+		  key="emblem"
+		  layout={absolute_layout(emblemX, emblemY, emblemW, emblemH)}
+		  style={row.drawEmblem ? sprite_patch(181, row.agency) : ::ui::StylePatch{}}
+		/>
+		<Box
+		  key="ready"
+		  layout={absolute_layout(readyX, readyY, readyW, readyH)}
+		  style={sprite_patch(7, readyIndex)}
+		/>
+		<Text
+		  key="name"
+		  value={row.name.c_str()}
+		  layout={absolute_layout(kGameJoinRosterNameX, kGameJoinRosterTextY + rowYOffset, props.width - kGameJoinRosterNameX, 11)}
+		  style={text_patch(133, 6, 11.0f)}
+		/>
+		<Text
+		  key="level"
+		  value={row.level.empty() ? "" : row.level.c_str()}
+		  layout={absolute_layout(levelX, kGameJoinRosterTextY + rowYOffset, props.width - levelX, 7)}
+		  style={level_text_patch()}
+		/>
+	</Box>
+}
+
+struct GameJoinRosterPanelProps {
+	const char * key = nullptr;
+	bool show = false;
+	const GameJoinPanelState * state = nullptr;
+	const AppAssetsModel * assets = nullptr;
+	int x = 0;
+	int y = 0;
+	int width = 0;
+	int height = 0;
+};
+
+::ui::UiElement GameJoinRosterPanel(const GameJoinRosterPanelProps& props) {
+	if(!props.show || !props.state || props.state->rosterRows.empty() ||
+	   props.width <= 0 || props.height <= 0){
+		return ::ui::empty();
+	}
+	return <Box key={props.key} layout={absolute_layout(props.x, props.y, props.width, props.height)}>
+		<GameJoinRosterRowView
+		  key={kGameJoinRosterRowKeys[0]}
+		  state={props.state}
+		  assets={props.assets}
+		  index={0}
+		  width={props.width}
+		  height={props.height}
+		/>
+		<GameJoinRosterRowView
+		  key={kGameJoinRosterRowKeys[1]}
+		  state={props.state}
+		  assets={props.assets}
+		  index={1}
+		  width={props.width}
+		  height={props.height}
+		/>
+		<GameJoinRosterRowView
+		  key={kGameJoinRosterRowKeys[2]}
+		  state={props.state}
+		  assets={props.assets}
+		  index={2}
+		  width={props.width}
+		  height={props.height}
+		/>
+		<GameJoinRosterRowView
+		  key={kGameJoinRosterRowKeys[3]}
+		  state={props.state}
+		  assets={props.assets}
+		  index={3}
+		  width={props.width}
+		  height={props.height}
+		/>
+		<GameJoinRosterRowView
+		  key={kGameJoinRosterRowKeys[4]}
+		  state={props.state}
+		  assets={props.assets}
+		  index={4}
+		  width={props.width}
+		  height={props.height}
+		/>
+		<GameJoinRosterRowView
+		  key={kGameJoinRosterRowKeys[5]}
+		  state={props.state}
+		  assets={props.assets}
+		  index={5}
+		  width={props.width}
+		  height={props.height}
+		/>
+		<GameJoinRosterRowView
+		  key={kGameJoinRosterRowKeys[6]}
+		  state={props.state}
+		  assets={props.assets}
+		  index={6}
+		  width={props.width}
+		  height={props.height}
+		/>
+		<GameJoinRosterRowView
+		  key={kGameJoinRosterRowKeys[7]}
+		  state={props.state}
+		  assets={props.assets}
+		  index={7}
+		  width={props.width}
+		  height={props.height}
+		/>
+		<GameJoinRosterRowView
+		  key={kGameJoinRosterRowKeys[8]}
+		  state={props.state}
+		  assets={props.assets}
+		  index={8}
+		  width={props.width}
+		  height={props.height}
+		/>
+		<GameJoinRosterRowView
+		  key={kGameJoinRosterRowKeys[9]}
+		  state={props.state}
+		  assets={props.assets}
+		  index={9}
+		  width={props.width}
+		  height={props.height}
+		/>
+		<GameJoinRosterRowView
+		  key={kGameJoinRosterRowKeys[10]}
+		  state={props.state}
+		  assets={props.assets}
+		  index={10}
+		  width={props.width}
+		  height={props.height}
+		/>
+		<GameJoinRosterRowView
+		  key={kGameJoinRosterRowKeys[11]}
+		  state={props.state}
+		  assets={props.assets}
+		  index={11}
+		  width={props.width}
+		  height={props.height}
+		/>
+		<GameJoinRosterRowView
+		  key={kGameJoinRosterRowKeys[12]}
+		  state={props.state}
+		  assets={props.assets}
+		  index={12}
+		  width={props.width}
+		  height={props.height}
+		/>
+		<GameJoinRosterRowView
+		  key={kGameJoinRosterRowKeys[13]}
+		  state={props.state}
+		  assets={props.assets}
+		  index={13}
+		  width={props.width}
+		  height={props.height}
+		/>
+		<GameJoinRosterRowView
+		  key={kGameJoinRosterRowKeys[14]}
+		  state={props.state}
+		  assets={props.assets}
+		  index={14}
+		  width={props.width}
+		  height={props.height}
+		/>
+		<GameJoinRosterRowView
+		  key={kGameJoinRosterRowKeys[15]}
+		  state={props.state}
+		  assets={props.assets}
+		  index={15}
+		  width={props.width}
+		  height={props.height}
+		/>
+		<GameJoinRosterRowView
+		  key={kGameJoinRosterRowKeys[16]}
+		  state={props.state}
+		  assets={props.assets}
+		  index={16}
+		  width={props.width}
+		  height={props.height}
+		/>
+		<GameJoinRosterRowView
+		  key={kGameJoinRosterRowKeys[17]}
+		  state={props.state}
+		  assets={props.assets}
+		  index={17}
+		  width={props.width}
+		  height={props.height}
+		/>
+		<GameJoinRosterRowView
+		  key={kGameJoinRosterRowKeys[18]}
+		  state={props.state}
+		  assets={props.assets}
+		  index={18}
+		  width={props.width}
+		  height={props.height}
+		/>
+		<GameJoinRosterRowView
+		  key={kGameJoinRosterRowKeys[19]}
+		  state={props.state}
+		  assets={props.assets}
+		  index={19}
+		  width={props.width}
+		  height={props.height}
+		/>
+		<GameJoinRosterRowView
+		  key={kGameJoinRosterRowKeys[20]}
+		  state={props.state}
+		  assets={props.assets}
+		  index={20}
+		  width={props.width}
+		  height={props.height}
+		/>
+		<GameJoinRosterRowView
+		  key={kGameJoinRosterRowKeys[21]}
+		  state={props.state}
+		  assets={props.assets}
+		  index={21}
+		  width={props.width}
+		  height={props.height}
+		/>
+		<GameJoinRosterRowView
+		  key={kGameJoinRosterRowKeys[22]}
+		  state={props.state}
+		  assets={props.assets}
+		  index={22}
+		  width={props.width}
+		  height={props.height}
+		/>
+		<GameJoinRosterRowView
+		  key={kGameJoinRosterRowKeys[23]}
+		  state={props.state}
+		  assets={props.assets}
+		  index={23}
+		  width={props.width}
+		  height={props.height}
+		/>
+		<GameJoinRosterRowView
+		  key={kGameJoinRosterRowKeys[24]}
+		  state={props.state}
+		  assets={props.assets}
+		  index={24}
+		  width={props.width}
+		  height={props.height}
+		/>
+		<GameJoinRosterRowView
+		  key={kGameJoinRosterRowKeys[25]}
+		  state={props.state}
+		  assets={props.assets}
+		  index={25}
+		  width={props.width}
+		  height={props.height}
+		/>
+		<GameJoinRosterRowView
+		  key={kGameJoinRosterRowKeys[26]}
+		  state={props.state}
+		  assets={props.assets}
+		  index={26}
+		  width={props.width}
+		  height={props.height}
+		/>
+		<GameJoinRosterRowView
+		  key={kGameJoinRosterRowKeys[27]}
+		  state={props.state}
+		  assets={props.assets}
+		  index={27}
+		  width={props.width}
+		  height={props.height}
+		/>
+		<GameJoinRosterRowView
+		  key={kGameJoinRosterRowKeys[28]}
+		  state={props.state}
+		  assets={props.assets}
+		  index={28}
+		  width={props.width}
+		  height={props.height}
+		/>
+		<GameJoinRosterRowView
+		  key={kGameJoinRosterRowKeys[29]}
+		  state={props.state}
+		  assets={props.assets}
+		  index={29}
+		  width={props.width}
+		  height={props.height}
+		/>
+		<GameJoinRosterRowView
+		  key={kGameJoinRosterRowKeys[30]}
+		  state={props.state}
+		  assets={props.assets}
+		  index={30}
+		  width={props.width}
+		  height={props.height}
+		/>
+		<GameJoinRosterRowView
+		  key={kGameJoinRosterRowKeys[31]}
+		  state={props.state}
+		  assets={props.assets}
+		  index={31}
+		  width={props.width}
+		  height={props.height}
+		/>
+	</Box>
+}
+
 struct GameTechPeerNameProps {
 	const char * key = nullptr;
 	const GameTechPanelState * state = nullptr;
@@ -823,6 +1216,16 @@ using ::ui::components::TextProps;
 		  y={props.game_join_ready_y}
 		  width={props.game_join_button_width}
 		  height={props.game_join_button_height}
+		/>
+		<lobby_chrome_frame_detail.GameJoinRosterPanel
+		  key="game-join-roster"
+		  show={props.show_game_join_roster}
+		  state={props.game_join}
+		  assets={props.app_assets}
+		  x={props.game_join_roster_x}
+		  y={props.game_join_roster_y}
+		  width={props.game_join_roster_width}
+		  height={props.game_join_roster_height}
 		/>
 		<lobby_chrome_frame_detail.GameTechUpper
 		  key="game-tech-upper"
