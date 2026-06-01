@@ -141,30 +141,26 @@ struct UpdateFrameProps {
 	const char * key = nullptr;
 };
 
-struct PrimaryActionButtonProps {
-	const char * key = nullptr;
-};
-
-::ui::UiElement PrimaryActionButton(const PrimaryActionButtonProps& props) {
+::ui::UiElement UpdateFrame(const UpdateFrameProps& props) {
 	const UpdateContextValue& update = UseUpdate();
 	Navigation navigation = UseNavigation();
 	const UpdateState& state = update.state;
 	const UpdateActions& actions = update.actions;
-	const bool visible = has_primary_action(state);
-	std::function<void(const ::ui::ActivationEvent&)> on_activate = {};
+	const bool primary_visible = has_primary_action(state);
+	std::function<void(const ::ui::ActivationEvent&)> primary_activate = {};
 	switch(state.primary_action){
 		case UpdatePrimaryAction::Update:
-			on_activate = [actions](const ::ui::ActivationEvent&) {
+			primary_activate = [actions](const ::ui::ActivationEvent&) {
 				if(actions.start_update) actions.start_update();
 			};
 			break;
 		case UpdatePrimaryAction::Retry:
-			on_activate = [actions](const ::ui::ActivationEvent&) {
+			primary_activate = [actions](const ::ui::ActivationEvent&) {
 				if(actions.retry) actions.retry();
 			};
 			break;
 		case UpdatePrimaryAction::Download:
-			on_activate = [actions, navigation](const ::ui::ActivationEvent&) {
+			primary_activate = [actions, navigation](const ::ui::ActivationEvent&) {
 				const bool opened = actions.download ? actions.download() : false;
 				if(opened && navigation.goToState) navigation.goToState(GameState::MAINMENU);
 			};
@@ -173,46 +169,11 @@ struct PrimaryActionButtonProps {
 		default:
 			break;
 	}
-	return <Button
-	  key={props.key}
-	  id={primary_id(state.primary_action)}
-	  label={primary_label(state.primary_action)}
-	  disabled={!visible}
-	  autofocus={visible}
-	  onActivate={on_activate}
-	  layout={button_layout(visible)}
-	/>
-}
-
-struct CancelButtonProps {
-	const char * key = nullptr;
-};
-
-::ui::UiElement CancelButton(const CancelButtonProps& props) {
-	const UpdateContextValue& update = UseUpdate();
-	Navigation navigation = UseNavigation();
-	const UpdateState& state = update.state;
-	const UpdateActions& actions = update.actions;
-	const bool primary_visible = has_primary_action(state);
-	std::function<void(const ::ui::ActivationEvent&)> on_activate =
+	std::function<void(const ::ui::ActivationEvent&)> cancel_activate =
 		[actions, navigation](const ::ui::ActivationEvent&) {
 			const bool cancelled = actions.cancel ? actions.cancel() : false;
 			if(cancelled && navigation.goToState) navigation.goToState(GameState::MAINMENU);
 		};
-	return <Button
-	  key={props.key}
-	  id="update.cancel"
-	  label="Cancel"
-	  disabled={!state.show_cancel}
-	  autofocus={!primary_visible && state.show_cancel}
-	  onActivate={on_activate}
-	  layout={button_layout(state.show_cancel)}
-	/>
-}
-
-::ui::UiElement UpdateFrame(const UpdateFrameProps& props) {
-	const UpdateContextValue& update = UseUpdate();
-	const UpdateState& state = update.state;
 	return <Box key={props.key} layout={root_layout()}>
 		<Dialog key="dialog" modal={true} layout={dialog_layout()}>
 			<Text key="status" value={state.status} layout={status_layout()} style={status_style()} />
@@ -224,8 +185,24 @@ struct CancelButtonProps {
 			  style={progress_style()}
 			/>
 			<Box key="actions" layout={actions_layout()}>
-				<PrimaryActionButton key="primary" />
-				<CancelButton key="cancel" />
+				<Button
+				  key="primary"
+				  id={primary_id(state.primary_action)}
+				  label={primary_label(state.primary_action)}
+				  disabled={!primary_visible}
+				  autofocus={primary_visible}
+				  onActivate={primary_activate}
+				  layout={button_layout(primary_visible)}
+				/>
+				<Button
+				  key="cancel"
+				  id="update.cancel"
+				  label="Cancel"
+				  disabled={!state.show_cancel}
+				  autofocus={!primary_visible && state.show_cancel}
+				  onActivate={cancel_activate}
+				  layout={button_layout(state.show_cancel)}
+				/>
 			</Box>
 		</Dialog>
 	</Box>
