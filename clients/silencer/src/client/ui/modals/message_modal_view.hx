@@ -23,6 +23,12 @@ struct MessageModalContextValue {
 
 const MessageModalContextValue& UseMessageModal();
 
+struct MessageModalFrameProps {
+	const char * key = nullptr;
+};
+
+::ui::UiElement MessageModalFrame(const MessageModalFrameProps& props);
+
 struct MessageModalViewProps {
 	const char * key = nullptr;
 	const MessageModalContextValue * value = nullptr;

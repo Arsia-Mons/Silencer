@@ -78,9 +78,7 @@ std::function<void(const ::ui::ActivationEvent&)> close_callback(
 	};
 }
 
-struct MessageModalFrameProps {
-	const char * key = nullptr;
-};
+}  // namespace
 
 ::ui::UiElement MessageModalFrame(const MessageModalFrameProps& props) {
 	const MessageModalContextValue& modal = UseMessageModal();
@@ -100,32 +98,6 @@ struct MessageModalFrameProps {
 			/>
 		</Dialog>
 	</Box>
-}
-
-}  // namespace
-
-namespace {
-::ReactContext MessageModalContext = {};
-const MessageModalContextValue kEmptyMessageModal = {};
-}
-
-const MessageModalContextValue& UseMessageModal() {
-	const auto * value = static_cast<const MessageModalContextValue *>(
-		::use_context(&MessageModalContext));
-	return value ? *value : kEmptyMessageModal;
-}
-
-::ui::UiElement MessageModalView(const MessageModalViewProps& props) {
-	return ::ui::provider(
-		"MessageModalProvider",
-		&MessageModalContext,
-		const_cast<MessageModalContextValue *>(props.value),
-		children({
-			::ui::component("MessageModalFrame",
-			                MessageModalFrameProps{ .key = "frame" },
-			                MessageModalFrame),
-		}),
-		props.key);
 }
 
 }  // namespace silencer::client_ui

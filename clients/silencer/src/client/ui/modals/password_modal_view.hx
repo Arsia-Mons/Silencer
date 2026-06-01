@@ -24,6 +24,12 @@ struct PasswordModalContextValue {
 
 const PasswordModalContextValue& UsePasswordModal();
 
+struct PasswordModalFrameProps {
+	const char * key = nullptr;
+};
+
+::ui::UiElement PasswordModalFrame(const PasswordModalFrameProps& props);
+
 struct PasswordModalViewProps {
 	const char * key = nullptr;
 	const PasswordModalContextValue * value = nullptr;
