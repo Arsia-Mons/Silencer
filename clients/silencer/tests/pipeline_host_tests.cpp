@@ -17,6 +17,11 @@
 #include "ui/runtime/element.h"
 #include "ui/runtime/react.h"
 
+// SIL-17: the product-intent semantic component layer (namespace silencer::).
+#include "client/ui/components/actions/actions.h"
+#include "client/ui/components/layout/layout.h"
+#include "client/ui/components/text/text.h"
+
 #include <SDL3/SDL.h>
 
 #include <memory>
@@ -218,6 +223,85 @@ static bool pipeline_host_renders_generic_primitive() {
   return true;
 }
 
+// SIL-17: a screen built PURELY from the semantic component layer renders. The
+// tree is silencer::ScreenLayout (Menu variant -> opaque slate menu surface)
+// wrapping a silencer::ScreenTitle (Hero) + a silencer::AppButton (Primary ->
+// accent-blue fill). No generic primitive, host, or VisualStyle appears in the
+// authored screen: paint resolves entirely through silencer::tokens + the
+// theme. A corner pixel carries the opaque menu surface; the center carries the
+// accent-blue button fill.
+struct SemanticScreenProps {};
+
+static ::ui::UiElement SemanticScreenView(const SemanticScreenProps &) {
+  silencer::ScreenLayoutProps layout = {};
+  layout.variant = silencer::ScreenLayoutVariant::Menu;
+
+  silencer::ScreenTitleProps title = {};
+  title.variant = silencer::ScreenTitleVariant::Hero;
+  title.value = "Silencer";
+
+  silencer::AppButtonProps button = {};
+  button.variant = silencer::AppButtonVariant::Primary;
+  button.label = "Play";
+
+  layout.children = ::ui::children({
+      ::ui::component("ScreenTitle", title, silencer::ScreenTitle, "title"),
+      ::ui::component("AppButton", button, silencer::AppButton, "play"),
+  });
+  return ::ui::component("ScreenLayout", layout, silencer::ScreenLayout,
+                         "root");
+}
+
+class SemanticScreen final : public client::ui::UiScreen {
+public:
+  const char *debug_name() const override { return "Semantic"; }
+  bool build_element(::ui::UiElementFrame &, ::ui::UiElement *out) override {
+    if (!out)
+      return false;
+    *out = ::ui::component("SemanticScreenView", SemanticScreenProps{},
+                           SemanticScreenView, "semantic");
+    return true;
+  }
+  void build_ui() override {}
+};
+
+static bool pipeline_host_renders_semantic_screen() {
+  react_init_runtime();
+  silencer::cppx_ui::PipelineHost host;
+  CHECK(host.ensure(64, 48, SILENCER_TEST_FONT_DIR));
+  CHECK(host.pipeline().client_ui().push_screen(
+      std::make_unique<SemanticScreen>()));
+
+  int w = 0, h = 0;
+  const uint8_t *rgba = host.render(test_frame(64, 48), &w, &h);
+  CHECK(rgba != nullptr);
+  CHECK(w == 64 && h == 48);
+
+  auto pixel = [&](int x, int y) { return rgba + ((size_t)y * w + x) * 4u; };
+
+  // The Menu ScreenLayout fills the viewport with the opaque dark slate menu
+  // surface (tokens::kSurfaceMenu = {8,14,18,255}). Mid-column gap row 30 is
+  // bare surface (title sits above, button below), so it shows the fill.
+  const uint8_t *surface = pixel(0, 30);
+  CHECK(surface[3] > 200);                                         // opaque
+  CHECK(surface[0] < 40 && surface[1] < 40 && surface[2] < 40);    // dark slate
+
+  // The ScreenTitle (Hero) paints near-white glyphs in the top rows
+  // (tokens::kTextHeroTitle = {235,246,242,255}); sample a lit glyph pixel.
+  const uint8_t *title = pixel(40, 12);
+  CHECK(title[3] > 200);                                           // opaque
+  CHECK(title[0] > 180 && title[1] > 180 && title[2] > 180);       // near-white
+
+  // The AppButton (Primary) paints its accent-blue fill across the bottom band
+  // (tokens::kAccent = {96,165,250,255}); the 132x38 button overflows the 64px
+  // width so it spans the row, blue-dominant over red/green.
+  const uint8_t *button = pixel(w / 2, 40);
+  CHECK(button[3] > 200);                          // opaque button fill
+  CHECK(button[2] > button[0]);                    // blue over red
+  CHECK(button[2] > surface[2] + 40);              // markedly bluer than surface
+  return true;
+}
+
 int main(void) {
   if (!SDL_Init(0)) {
     fprintf(stderr, "SDL_Init: %s\n", SDL_GetError());
@@ -227,6 +311,8 @@ int main(void) {
   if (!session_phase_projection_maps_game_states())
     rc = 1;
   if (!pipeline_host_renders_generic_primitive())
+    rc = 1;
+  if (!pipeline_host_renders_semantic_screen())
     rc = 1;
   if (!pipeline_host_renders_pushed_screen_to_pixels())
     rc = 1;

@@ -1,0 +1,92 @@
+#include "client/ui/components/layout/screen_layout.h"
+
+#include "client/ui/components/tokens.h"
+#include "ui/components/box.h"
+#include "ui/components/dialog.h"
+
+namespace silencer {
+
+using ::ui::children;
+using ::ui::components::Box;
+using ::ui::components::BoxProps;
+using ::ui::components::Dialog;
+using ::ui::components::DialogProps;
+
+// Each variant returns a single-root JSX element; the Box-vs-Dialog choice and
+// the per-variant style+visual are encoded here (never exposed as props). Paint
+// resolves through tokens:: surfaces; no frame carries a border (borders belong
+// to panels). Dialog's modal=true default is unchanged, so the Overlay frames
+// keep today's modal behavior.
+::ui::UiElement ScreenLayout(const ScreenLayoutProps &props) {
+  if (props.variant == ScreenLayoutVariant::Game) {
+    return <Box
+      key={props.key}
+      layout={::ui::LayoutStyle{
+        .direction = ::ui::FlexDirection::Column,
+        .width = ::ui::Length::percent(100.0f),
+        .height = ::ui::Length::percent(100.0f),
+        .padding = {24.0f, 24.0f, 24.0f, 24.0f},
+        .gap = 18.0f,
+      }}
+      style={tokens::fill_patch(tokens::kSurfaceGame)}
+    >
+      {props.children}
+    </Box>
+  }
+  if (props.variant == ScreenLayoutVariant::Overlay) {
+    return <Dialog
+      key={props.key}
+      layout={::ui::LayoutStyle{
+        .direction = ::ui::FlexDirection::Column,
+        .align_items = ::ui::AlignItems::Start,
+        .width = ::ui::Length::percent(100.0f),
+        .height = ::ui::Length::percent(100.0f),
+        .padding = {24.0f, 24.0f, 24.0f, 24.0f},
+        .gap = 12.0f,
+      }}
+      style={tokens::fill_patch(tokens::kSurfaceOverlay)}
+    >
+      {props.children}
+    </Dialog>
+  }
+  if (props.variant == ScreenLayoutVariant::CenteredOverlay) {
+    // A transparent full-screen centering container (the centered Panel paints
+    // itself). An un-patched Dialog would now resolve theme.dialog.base — an
+    // OPAQUE slate panel — so explicitly clear background + border to preserve
+    // the prior empty-visual look. modal=true (Dialog default) is kept for the
+    // focus trap.
+    return <Dialog
+      key={props.key}
+      layout={::ui::LayoutStyle{
+        .direction = ::ui::FlexDirection::Column,
+        .align_items = ::ui::AlignItems::Center,
+        .justify_content = ::ui::JustifyContent::Center,
+        .width = ::ui::Length::percent(100.0f),
+        .height = ::ui::Length::percent(100.0f),
+      }}
+      style={::ui::patch()
+        .background({0, 0, 0, 0})
+        .border(::ui::Border{{0.0f, 0.0f, 0.0f, 0.0f},
+                             {{0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0},
+                              {0, 0, 0, 0}}})}
+    >
+      {props.children}
+    </Dialog>
+  }
+  return <Box
+    key={props.key}
+    layout={::ui::LayoutStyle{
+      .direction = ::ui::FlexDirection::Column,
+      .align_items = ::ui::AlignItems::Center,
+      .justify_content = ::ui::JustifyContent::Center,
+      .width = ::ui::Length::percent(100.0f),
+      .height = ::ui::Length::percent(100.0f),
+      .padding = {36.0f, 36.0f, 36.0f, 36.0f},
+    }}
+    style={tokens::fill_patch(tokens::kSurfaceMenu)}
+  >
+    {props.children}
+  </Box>
+}
+
+} // namespace silencer

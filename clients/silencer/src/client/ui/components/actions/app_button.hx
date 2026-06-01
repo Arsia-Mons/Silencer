@@ -1,0 +1,35 @@
+#pragma once
+
+// AppButton: the one shared semantic button. Adapts ui::components::Button.
+// Public props read as product/UI intent (variant/size/label/on_press); host
+// details (id_offset/autofocus/LayoutStyle/ActivationEvent) stay inside the impl.
+
+#include "ui/components/common.h" // ::ui::UiChildren, ::ui::UiElement
+#include "client/ui/components/actions/app_button_variant.h"
+
+#include <functional>
+
+namespace silencer {
+
+struct AppButtonProps {
+  const char *key = nullptr;
+  const char *control_id = nullptr;
+  int control_offset = 0;
+  // Default Secondary == the theme's slate button (empty patch), so existing
+  // call sites that omit `variant` keep the baseline look. Primary (accent
+  // fill) is opt-in for prominent/primary actions.
+  AppButtonVariant variant = AppButtonVariant::Secondary;
+  AppButtonSize size = AppButtonSize::Md;
+  bool disabled = false;
+  bool selected = false;
+  bool default_focused = false;
+  const char *label = nullptr;
+  std::function<void()> on_press = {};
+  std::function<void()> on_focus = {};
+  const char *accessibility_label = nullptr;
+  ::ui::UiChildren children = {};
+};
+
+::ui::UiElement AppButton(const AppButtonProps &props);
+
+} // namespace silencer

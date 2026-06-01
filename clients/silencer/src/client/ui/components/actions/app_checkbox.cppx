@@ -1,0 +1,21 @@
+#include "client/ui/components/actions/app_checkbox.h"
+
+#include "ui/components/checkbox.h"
+#include "client/ui/components/tokens.h"
+
+namespace silencer {
+
+using ::ui::components::Checkbox;
+using ::ui::components::CheckboxProps;
+
+::ui::UiElement AppCheckbox(const AppCheckboxProps &props) {
+  return <Checkbox
+    key={props.key}
+    id={props.control_id}
+    checked={props.checked}
+    label={props.label}
+    onChange={props.on_change}
+  />
+}
+
+} // namespace silencer

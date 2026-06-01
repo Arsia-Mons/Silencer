@@ -93,8 +93,9 @@ time. The product look (dark slate, accent blue, control gradients) lives in
 (`default_theme()`). The renderer never sees the theme — components resolve
 their `VisualStyle` and the IR carries only resolved, premultiplied paint.
 
-The legacy `src/ui/design/Colors.h` + `Spacing.h` constants are transitional,
-being replaced by theme tokens; do not build new APIs on them.
+The legacy `src/ui/design/Colors.h` + `Spacing.h` constants were removed
+(SIL-17). `silencer::tokens` (`src/client/ui/components/tokens.h`) + the product
+theme (`app_theme.cpp`) are the single paint source.
 
 ### Input contract
 

@@ -22,7 +22,12 @@ It must stay screen-agnostic and game-agnostic — it knows nothing about
 | `style/resolve.{h,cpp}` | `resolve()` — layers role + override patches + interaction state into one `VisualStyle` at authoring time. |
 | `style/text_measure.{h,cpp}`, `text_wrap.{h,cpp}` | SDL-free text measure/wrap seam (`set_text_measurer`); the renderer installs the real measurer. |
 | `input.h` | `UiInputFrame` — the per-frame nav/confirm/cancel/pointer + key/text/editing event channels. |
-| `design/Colors.h`, `Spacing.h` | LEGACY/transitional palette + spacing constants; being replaced by theme tokens. Do not build new APIs on these. |
+
+The legacy `design/Colors.h` + `Spacing.h` constants are gone (SIL-17). The
+single source of app paint is now the design tokens (`silencer::tokens` in
+`src/client/ui/components/tokens.h`) plus the product theme
+(`src/client/ui/app_theme.cpp`); components resolve their `VisualStyle` from
+those, never from a standalone palette/spacing header.
 
 ## Boundaries
 

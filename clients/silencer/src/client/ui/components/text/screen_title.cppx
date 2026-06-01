@@ -1,0 +1,46 @@
+#include "client/ui/components/text/screen_title.h"
+
+#include "ui/components/text.h"
+
+#include "client/ui/components/tokens.h"
+
+namespace silencer {
+
+using ::ui::components::Text;
+using ::ui::components::TextProps;
+
+::ui::UiElement ScreenTitle(const ScreenTitleProps &props) {
+  ::ui::Color color = tokens::kTextTitle;
+  uint16_t font = tokens::kFontScreenTitle;
+  float height = 32.0f;
+  switch (props.variant) {
+  case ScreenTitleVariant::Hero:
+    color = tokens::kTextHeroTitle;
+    font = tokens::kFontHeroTitle;
+    height = 36.0f;
+    break;
+  case ScreenTitleVariant::Screen:
+    color = tokens::kTextTitle;
+    font = tokens::kFontScreenTitle;
+    height = 32.0f;
+    break;
+  case ScreenTitleVariant::Dialog:
+    color = tokens::kTextTitle;
+    font = tokens::kFontDialogTitle;
+    height = 34.0f;
+    break;
+  case ScreenTitleVariant::Popup:
+    color = tokens::kTextDialogTitle;
+    font = tokens::kFontPopupTitle;
+    height = 24.0f;
+    break;
+  }
+  return <Text
+    key={props.key}
+    value={props.value}
+    layout={{.height = ::ui::Length::points(height)}}
+    style={tokens::text_patch(color, font)}
+  />
+}
+
+} // namespace silencer

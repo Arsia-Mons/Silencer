@@ -1,0 +1,56 @@
+#include "client/ui/components/actions/app_button.h"
+
+#include "ui/components/button.h"
+#include "client/ui/components/tokens.h"
+
+#include <functional>
+
+namespace silencer {
+
+using ::ui::children;
+using ::ui::components::Button;
+using ::ui::components::ButtonProps;
+
+::ui::UiElement AppButton(const AppButtonProps &props) {
+  // Wrap the no-arg semantic callbacks into the event-taking ui callbacks; the
+  // host events are intentionally ignored (the semantic API is event-free).
+  std::function<void(const ::ui::ActivationEvent &)> on_activate = {};
+  if (props.on_press) {
+    on_activate = [on_press = props.on_press](const ::ui::ActivationEvent &) {
+      on_press();
+    };
+  }
+  std::function<void(const ::ui::FocusEvent &)> on_focus = {};
+  if (props.on_focus) {
+    on_focus = [on_focus_cb = props.on_focus](const ::ui::FocusEvent &) {
+      on_focus_cb();
+    };
+  }
+
+  const char *a11y_label =
+      props.accessibility_label ? props.accessibility_label : props.label;
+  ::ui::LayoutStyle layout = app_button_layout(props.size, props.selected);
+  auto style = app_button_variant_patch(props.variant);
+
+  // Children are plain expressions: props.children, plus a label fallback used
+  // only when no children were provided. The two {expr} children lower into the
+  // appended `.children = children({...})` (last, after layout/style).
+  return <Button
+    key={props.key}
+    id={props.control_id}
+    idOffset={props.control_offset}
+    disabled={props.disabled}
+    autofocus={props.default_focused}
+    accessibility={{.label = a11y_label}}
+    onFocus={on_focus}
+    label={props.label}
+    onActivate={on_activate}
+    layout={layout}
+    style={style}
+  >
+    {props.children}
+    {props.children.count > 0 ? nullptr : props.label}
+  </Button>
+}
+
+} // namespace silencer

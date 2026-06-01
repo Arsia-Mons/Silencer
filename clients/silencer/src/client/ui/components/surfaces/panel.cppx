@@ -1,0 +1,89 @@
+#include "client/ui/components/surfaces/panel.h"
+
+#include "client/ui/components/tokens.h"
+#include "ui/components/box.h"
+
+namespace silencer {
+
+using ::ui::children;
+using ::ui::components::Box;
+using ::ui::components::BoxProps;
+
+namespace {
+
+// Loadout "details" column background. This is a loadout-feature-local color
+// that no other shared surface consumes, so it is kept file-local rather than
+// added to the shared palette in tokens.h. (The plan permits it to live in
+// screens/loadout/loadout_tokens.h, but because Panel is a shared component it
+// must resolve its own paint without depending on a screen-local header.)
+constexpr ::ui::Color kSunkenBg = {22, 30, 36, 255};
+
+// Canonical width (points) for each PanelSize tier. Auto defers to the
+// variant's canonical width (handled by the caller).
+float panel_size_width(PanelSize size) {
+  switch (size) {
+  case PanelSize::Sm:
+    return 220.0f;
+  case PanelSize::Md:
+    return 260.0f;
+  case PanelSize::Lg:
+    return 340.0f;
+  case PanelSize::Auto:
+    break;
+  }
+  return 0.0f;
+}
+
+} // namespace
+
+::ui::UiElement Panel(const PanelProps &props) {
+  ::ui::LayoutStyle layout{};
+  ::ui::StylePatch overlay{};
+
+  switch (props.variant) {
+  case PanelVariant::Hero:
+    layout = ::ui::LayoutStyle{
+        .direction = ::ui::FlexDirection::Column,
+        .align_items = ::ui::AlignItems::Center,
+        .width = ::ui::Length::points(340.0f),
+        .padding = {24.0f, 24.0f, 24.0f, 24.0f},
+        .gap = 14.0f,
+        .border_width = tokens::kBorderWidth,
+    };
+    overlay = tokens::panel_patch(tokens::kSurfaceHeroPanel,
+                                  tokens::kBorderHeroPanel);
+    break;
+  case PanelVariant::Overlay:
+    layout = ::ui::LayoutStyle{
+        .direction = ::ui::FlexDirection::Column,
+        .align_items = ::ui::AlignItems::Center,
+        .width = ::ui::Length::points(220.0f),
+        .padding = {18.0f, 18.0f, 18.0f, 18.0f},
+        .gap = 12.0f,
+        .border_width = tokens::kBorderWidth,
+    };
+    overlay = tokens::panel_patch(tokens::kSurfacePanel, tokens::kBorderPanel);
+    break;
+  case PanelVariant::Sunken:
+    layout = ::ui::LayoutStyle{
+        .direction = ::ui::FlexDirection::Column,
+        .align_items = ::ui::AlignItems::Stretch,
+        .width = ::ui::Length::points(260.0f),
+        .padding = {14.0f, 14.0f, 14.0f, 14.0f},
+        .gap = 10.0f,
+        .border_width = 0.0f,
+    };
+    overlay = tokens::fill_patch(kSunkenBg);
+    break;
+  }
+
+  if (props.size != PanelSize::Auto) {
+    layout.width = ::ui::Length::points(panel_size_width(props.size));
+  }
+
+  return <Box key={props.key} layout={layout} style={overlay}>
+    {props.children}
+  </Box>
+}
+
+} // namespace silencer

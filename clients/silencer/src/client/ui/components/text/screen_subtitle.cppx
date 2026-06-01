@@ -1,0 +1,21 @@
+#include "client/ui/components/text/screen_subtitle.h"
+
+#include "ui/components/text.h"
+
+#include "client/ui/components/tokens.h"
+
+namespace silencer {
+
+using ::ui::components::Text;
+using ::ui::components::TextProps;
+
+::ui::UiElement ScreenSubtitle(const ScreenSubtitleProps &props) {
+  return <Text
+    key={props.key}
+    value={props.value}
+    layout={{.height = ::ui::Length::points(22.0f)}}
+    style={tokens::text_patch(tokens::kTextSubtitle, tokens::kFontSubtitle)}
+  />
+}
+
+} // namespace silencer

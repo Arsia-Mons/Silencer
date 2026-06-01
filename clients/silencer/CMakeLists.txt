@@ -217,16 +217,46 @@ set(SILENCER_CPPX_SOURCES
 	src/ui/components/input.hx
 	src/ui/components/dialog.cppx
 	src/ui/components/dialog.hx
+	# Product-intent semantic component layer (SIL-17): the shadcn-style app
+	# components over the generic primitives, in namespace silencer::. Paint
+	# resolves through silencer::tokens + the product theme. The plain headers
+	# (tokens.h, app_button_variant.h, and the per-family umbrella headers
+	# actions.h/layout.h/surfaces.h/text.h) are resolved via the src/ include
+	# dir, not authored cppx sources.
+	src/client/ui/components/actions/app_button.cppx
+	src/client/ui/components/actions/app_button.hx
+	src/client/ui/components/actions/app_checkbox.cppx
+	src/client/ui/components/actions/app_checkbox.hx
+	src/client/ui/components/actions/app_input.cppx
+	src/client/ui/components/actions/app_input.hx
+	src/client/ui/components/actions/action_row.cppx
+	src/client/ui/components/actions/action_row.hx
+	src/client/ui/components/layout/screen_layout.cppx
+	src/client/ui/components/layout/screen_layout.hx
+	src/client/ui/components/surfaces/panel.cppx
+	src/client/ui/components/surfaces/panel.hx
+	src/client/ui/components/text/screen_title.cppx
+	src/client/ui/components/text/screen_title.hx
+	src/client/ui/components/text/screen_subtitle.cppx
+	src/client/ui/components/text/screen_subtitle.hx
+	src/client/ui/components/text/body_text.cppx
+	src/client/ui/components/text/body_text.hx
 )
 cppx_transpile(SILENCER_CPPX_GENERATED ${SILENCER_CPPX_SOURCES})
 target_sources(${SILENCER_TARGET} PRIVATE ${SILENCER_CPPX_GENERATED})
 
-# Expose the generated root + each generated output's directory so authored
-# `.cppx`/`.hx` resolve their generated `.h` siblings by name. Generated TUs
-# use named namespaces (no anon-namespace / global `using` vocabulary), so
-# they are unity-safe — unlike the legacy Clay `_clay_unsafe_sources`.
-# Re-audit when adding generated TUs.
-set(SILENCER_CPPX_INCLUDE_DIRS "${CMAKE_CURRENT_BINARY_DIR}/generated/cppx")
+# Expose the generated root + the generated `src/` mirror + each generated
+# output's directory so authored `.cppx`/`.hx` resolve their generated `.h`
+# siblings both by bare name (generic primitives: `#include "button.h"`) and
+# src-rooted (semantic layer: `#include "client/ui/components/.../foo.h"`). The
+# generated tree mirrors `src/`, so its `src/` root must be on the include path
+# exactly like the real `src/` root is for the authored sources. Generated TUs
+# use named namespaces (no anon-namespace / global `using` vocabulary), so they
+# are unity-safe — unlike the legacy Clay `_clay_unsafe_sources`. Re-audit when
+# adding generated TUs.
+set(SILENCER_CPPX_INCLUDE_DIRS
+	"${CMAKE_CURRENT_BINARY_DIR}/generated/cppx"
+	"${CMAKE_CURRENT_BINARY_DIR}/generated/cppx/src")
 foreach(_gen ${SILENCER_CPPX_GENERATED})
 	get_filename_component(_gen_dir "${_gen}" DIRECTORY)
 	list(APPEND SILENCER_CPPX_INCLUDE_DIRS "${_gen_dir}")
