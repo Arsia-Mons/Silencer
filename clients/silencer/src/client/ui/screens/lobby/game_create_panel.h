@@ -3,14 +3,12 @@
 
 // Screen-side lobby GameCreatePanel: the game-options form on the right pane.
 // The upper options pane is declared by retained cppx; this module owns the
-// screen-local state, layout metrics, retained frame metadata, and the
-// remaining Clay map-preview overlay while that overlay is still migrating.
+// screen-local state, layout metrics, and retained frame metadata.
 //
 // Domain glue (CreateGame kickoff, config persistence, async map upload)
 // lives behind LobbyProvider/use_lobby. Primitives stay screen-agnostic.
 
 #include "shared.h"
-#include "clay_ui_payloads.h"
 #include "runtime/UiActionQueue.h"
 
 #include <string>
@@ -21,6 +19,7 @@ class MessageModal;
 
 namespace silencer::ui {
 class UiInteractionRegistry;
+struct UiInputState;
 }
 
 namespace silencer::client_ui {
@@ -73,8 +72,6 @@ struct GameCreatePanelState {
 	std::string hoverPreviewName;
 	std::string hoverPreviewDescription;
 	std::vector<Uint8> hoverPreviewPixels;
-	silencer::clay_bridge::SurfacePayload hoverPreviewSurface{};
-	silencer::clay_bridge::ClayCustomData hoverPreviewCustomData{};
 
 	// Create/upload progress overlay owned by this workflow. Tracking the modal
 	// here keeps lobby code from inspecting the global screen stack through Game.
@@ -103,6 +100,18 @@ struct GameCreateTallLayout {
 	Uint16 listHeight = 0;
 	Uint16 inputWidth = 0;
 	Uint8 visibleMapRows = 0;
+};
+
+struct GameCreatePreviewOverlayLayout {
+	bool visible = false;
+	int x = 0;
+	int y = 0;
+	int width = 0;
+	int height = 0;
+	int lineHeight = 0;
+	int gap = 0;
+	int bitmapWidth = 0;
+	int bitmapHeight = 0;
 };
 
 // Hydrate state from LobbyCreateModel defaults and rebuild the map list from
@@ -138,13 +147,11 @@ void GameCreatePanelSyncTallLayout(GameCreatePanelState & state,
                                    Uint16 panelHeight,
                                    int panelX,
                                    int panelY);
+GameCreatePreviewOverlayLayout ResolveGameCreatePreviewOverlayLayout(
+	const GameCreatePanelState & state,
+	const silencer::ui::UiInputState & input);
 void GameCreatePanelRegisterUiFields(GameCreatePanelState & state,
                                      silencer::ui::UiInteractionRegistry& interactions);
-
-// Emits the map hover preview overlay while the retained renderer lacks a
-// SurfacePayload command path.
-void BuildGameCreatePreviewOverlay(GameCreatePanelState & state,
-                                   ScreenContext & ctx);
 
 }  // namespace silencer::client_ui::lobby
 

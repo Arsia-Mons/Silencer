@@ -29,6 +29,7 @@ struct StylePatch {
   Opt<Outline> outline;
   Opt<Gradient> gradient;
   Opt<BackgroundImage> image;
+  Opt<RawBitmapImage> bitmap;
   Opt<Shadow> shadow;
   Opt<float> opacity;
   Opt<bool> hidden;
@@ -52,6 +53,8 @@ constexpr void apply(VisualStyle &dst, const StylePatch &p) {
     dst.gradient = p.gradient.value;
   if (p.image.set)
     dst.image = p.image.value;
+  if (p.bitmap.set)
+    dst.bitmap = p.bitmap.value;
   if (p.shadow.set)
     dst.shadow = p.shadow.value;
   if (p.opacity.set)
@@ -104,6 +107,10 @@ struct StylePatchBuilder {
   }
   StylePatchBuilder &image(BackgroundImage i) {
     p.image = opt(i);
+    return *this;
+  }
+  StylePatchBuilder &bitmap(RawBitmapImage i) {
+    p.bitmap = opt(i);
     return *this;
   }
   StylePatchBuilder &shadow(Shadow s) {

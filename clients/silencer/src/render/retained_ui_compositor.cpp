@@ -204,6 +204,41 @@ void DrawImage(Resources& resources,
 	}
 }
 
+void DrawBitmap(Surface * dst,
+                const ::ui::DrawCommand& command) {
+	const ::ui::BitmapData& bitmap = command.payload.bitmap;
+	if(!dst || !bitmap.pixels || bitmap.width == 0 || bitmap.height == 0) return;
+	int x = static_cast<int>(std::floor(command.rect.x));
+	int y = static_cast<int>(std::floor(command.rect.y));
+	int w = static_cast<int>(std::ceil(command.rect.x + command.rect.w)) - x;
+	int h = static_cast<int>(std::ceil(command.rect.y + command.rect.h)) - y;
+	if(w <= 0) w = bitmap.width;
+	if(h <= 0) h = bitmap.height;
+	if(w <= 0 || h <= 0) return;
+
+	int cx = x;
+	int cy = y;
+	int cw = w;
+	int ch = h;
+	if(!ClipDrawRect(dst->w, dst->h, cx, cy, cw, ch)) return;
+
+	for(int py = cy; py < cy + ch; ++py){
+		int sy = ((py - y) * static_cast<int>(bitmap.height)) / h;
+		if(sy < 0) sy = 0;
+		if(sy >= static_cast<int>(bitmap.height)) sy = bitmap.height - 1;
+		const Uint8 * srcRow = bitmap.pixels
+			+ static_cast<size_t>(sy) * static_cast<size_t>(bitmap.width);
+		Uint8 * dstRow = dst->pixels.data() + static_cast<size_t>(py) * dst->w;
+		for(int px = cx; px < cx + cw; ++px){
+			int sx = ((px - x) * static_cast<int>(bitmap.width)) / w;
+			if(sx < 0) sx = 0;
+			if(sx >= static_cast<int>(bitmap.width)) sx = bitmap.width - 1;
+			Uint8 col = srcRow[sx];
+			if(col) dstRow[px] = col;
+		}
+	}
+}
+
 void FillRect(Renderer& renderer,
               Surface * dst,
               const ::ui::DrawRect& rect,
@@ -357,6 +392,9 @@ void RenderInto(Resources& resources,
 			break;
 		case ::ui::DrawCommandKind::Image:
 			DrawImage(resources, dst, command);
+			break;
+		case ::ui::DrawCommandKind::Bitmap:
+			DrawBitmap(dst, command);
 			break;
 		case ::ui::DrawCommandKind::ClipPush:
 			PushClip(dst, command.rect);

@@ -324,6 +324,10 @@ void LobbyScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime, s
 			bodyX + mainLayout.topRowW,
 			bodyY);
 	}
+	const GameCreatePreviewOverlayLayout gameCreatePreviewLayout =
+		gameCreateActive
+			? ResolveGameCreatePreviewOverlayLayout(gameCreateState, input)
+			: GameCreatePreviewOverlayLayout{};
 	const bool gameSelectVisible =
 		!gameCreateActive && !gameJoinActive && !gameTechActive;
 	const int createButtonW = std::max(
@@ -497,6 +501,20 @@ void LobbyScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime, s
 		.game_create_tall_y = bodyY,
 		.game_create_tall_width = mainLayout.rightTallW,
 		.game_create_tall_height = mainLayout.rightTallH,
+		.show_game_create_preview = gameCreatePreviewLayout.visible,
+		.game_create_preview_x = gameCreatePreviewLayout.x,
+		.game_create_preview_y = gameCreatePreviewLayout.y,
+		.game_create_preview_width = gameCreatePreviewLayout.width,
+		.game_create_preview_height = gameCreatePreviewLayout.height,
+		.game_create_preview_line_height = gameCreatePreviewLayout.lineHeight,
+		.game_create_preview_gap = gameCreatePreviewLayout.gap,
+		.game_create_preview_bitmap_width = gameCreatePreviewLayout.bitmapWidth,
+		.game_create_preview_bitmap_height = gameCreatePreviewLayout.bitmapHeight,
+		.game_create_preview_name = gameCreateState.hoverPreviewName.c_str(),
+		.game_create_preview_description = gameCreateState.hoverPreviewDescription.c_str(),
+		.game_create_preview_pixels = gameCreateState.hoverPreviewPixels.empty()
+			? nullptr
+			: gameCreateState.hoverPreviewPixels.data(),
 		.show_game_join_actions = showGameJoinActions,
 		.game_join_ready_label = gameJoinState.readyLabel.c_str(),
 		.game_join_button_x = rightUpperX + lobby_screen_detail::kGameJoinButtonPadLeft,
@@ -551,10 +569,6 @@ void LobbyScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime, s
 			bodyX,
 			bodyY,
 			mainLayout);
-	}
-
-	if(gameCreateActive){
-		BuildGameCreatePreviewOverlay(gameCreateState, ctx);
 	}
 }
 

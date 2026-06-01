@@ -68,6 +68,8 @@ private:
 
 	bool havePointerPosition_ = false;
 	bool controlPointerActive_ = false;
+	// Control-socket hover is a virtual pointer position, not a one-frame edge.
+	bool controlHoverPointerHeld_ = false;
 	float pointerX_ = 0.0f;
 	float pointerY_ = 0.0f;
 	bool pointerDown_ = false;

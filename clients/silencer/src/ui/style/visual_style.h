@@ -82,6 +82,12 @@ struct BackgroundImage {
   SideWidths nine_slice{}; // all-zero => plain stretch; nonzero => 9-patch
 };
 
+struct RawBitmapImage {
+  const uint8_t *pixels = nullptr; // host-owned, consumed during the same frame
+  uint16_t width = 0;
+  uint16_t height = 0;
+};
+
 struct Shadow {
   Color color{}; // color.a==0 => no shadow
   Vec2 offset{};
@@ -108,6 +114,7 @@ struct VisualStyle {
   Outline outline{};         // focus ring etc.
   Gradient gradient{};       // stop_count==0 => no gradient
   BackgroundImage image{};   // texture_id==0 => no image
+  RawBitmapImage bitmap{};   // pixels==nullptr => no raw bitmap
   Shadow shadow{};           // color.a==0 => no shadow
   float opacity = 1.f;       // <1 => group-opacity layer
   bool hidden = false;       // skip paint, keep layout

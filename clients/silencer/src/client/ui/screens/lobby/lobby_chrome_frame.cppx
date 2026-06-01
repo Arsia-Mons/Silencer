@@ -131,6 +131,7 @@ constexpr int kGameCreateMapListBorderPad = 1;
 constexpr int kGameCreateMapScrollbarWidth = 8;
 constexpr int kGameCreateTallInputH = 14;
 constexpr int kGameCreateTallButtonH = 21;
+constexpr int kGameCreatePreviewDescLineSlots = 12;
 constexpr std::uint8_t kChromeSideTop = 1 << 0;
 constexpr std::uint8_t kChromeSideRight = 1 << 1;
 constexpr std::uint8_t kChromeSideBottom = 1 << 2;
@@ -257,6 +258,21 @@ const char * kGameCreateMapRowKeys[kGameCreateMapRowSlots] = {
 	"game-create-map-row-26", "game-create-map-row-27",
 	"game-create-map-row-28", "game-create-map-row-29",
 	"game-create-map-row-30", "game-create-map-row-31",
+};
+
+const char * kGameCreatePreviewDescLineKeys[kGameCreatePreviewDescLineSlots] = {
+	"game-create-preview-desc-0",
+	"game-create-preview-desc-1",
+	"game-create-preview-desc-2",
+	"game-create-preview-desc-3",
+	"game-create-preview-desc-4",
+	"game-create-preview-desc-5",
+	"game-create-preview-desc-6",
+	"game-create-preview-desc-7",
+	"game-create-preview-desc-8",
+	"game-create-preview-desc-9",
+	"game-create-preview-desc-10",
+	"game-create-preview-desc-11",
 };
 
 inline std::uint32_t texture_id(std::uint8_t bank, std::uint16_t index) {
@@ -424,6 +440,16 @@ inline ::ui::StylePatch sprite_patch(std::uint8_t bank, std::uint16_t index) {
 	});
 }
 
+inline ::ui::StylePatch raw_bitmap_patch(const std::uint8_t * pixels,
+                                         int width,
+                                         int height) {
+	return ::ui::patch().bitmap(::ui::RawBitmapImage{
+		.pixels = pixels,
+		.width = static_cast<std::uint16_t>(std::max(0, width)),
+		.height = static_cast<std::uint16_t>(std::max(0, height)),
+	});
+}
+
 inline ::ui::VisualStyle sprite_visual(std::uint8_t bank, std::uint16_t index) {
 	::ui::VisualStyle visual{};
 	visual.image = ::ui::BackgroundImage{
@@ -518,6 +544,32 @@ inline const char * copied_row_id(int source) {
 inline const char * copied_prefixed_id(const char * prefix, int value) {
 	std::string id = std::string(prefix) + std::to_string(value);
 	return ::ui::copy_string(id.c_str());
+}
+
+inline int split_line_count(const char * text) {
+	if(!text || !*text) return 0;
+	int count = 1;
+	for(const char * p = text; *p; ++p){
+		if(*p == '\n') ++count;
+	}
+	return count;
+}
+
+inline const char * copied_split_line(const char * text, int index) {
+	if(!text || index < 0) return "";
+	int current = 0;
+	const char * lineStart = text;
+	for(const char * p = text;; ++p){
+		if(*p != '\n' && *p != '\0') continue;
+		if(current == index){
+			std::string value(lineStart, static_cast<size_t>(p - lineStart));
+			return ::ui::copy_string(value.c_str());
+		}
+		if(*p == '\0') break;
+		++current;
+		lineStart = p + 1;
+	}
+	return "";
 }
 
 inline int clamp_int(int value, int lo, int hi) {
@@ -2516,6 +2568,206 @@ struct GameCreateTallPanelProps {
 	</Box>
 }
 
+struct GameCreatePreviewDescLineProps {
+	const char * key = nullptr;
+	const char * description = nullptr;
+	int index = 0;
+	int x = 0;
+	int y = 0;
+	int width = 0;
+	int line_height = 0;
+};
+
+::ui::UiElement GameCreatePreviewDescLine(const GameCreatePreviewDescLineProps& props) {
+	if(props.index < 0 ||
+	   props.index >= std::min(split_line_count(props.description), kGameCreatePreviewDescLineSlots)){
+		return ::ui::empty();
+	}
+	return <Text
+	  key={props.key}
+	  value={copied_split_line(props.description, props.index)}
+	  layout={absolute_layout(props.x, props.y + props.index * props.line_height, props.width, props.line_height)}
+	  style={palette_text_patch(129, 133, 7, static_cast<float>(props.line_height))}
+	/>
+}
+
+struct GameCreatePreviewDescLinesProps {
+	const char * key = nullptr;
+	const char * description = nullptr;
+	int x = 0;
+	int y = 0;
+	int width = 0;
+	int line_height = 0;
+};
+
+::ui::UiElement GameCreatePreviewDescLines(const GameCreatePreviewDescLinesProps& props) {
+	return <Box
+	  key={props.key}
+	  layout={absolute_layout(props.x, props.y, props.width, kGameCreatePreviewDescLineSlots * props.line_height)}
+	>
+		<GameCreatePreviewDescLine
+		  key={kGameCreatePreviewDescLineKeys[0]}
+		  description={props.description}
+		  index={0}
+		  x={0}
+		  y={0}
+		  width={props.width}
+		  lineHeight={props.line_height}
+		/>
+		<GameCreatePreviewDescLine
+		  key={kGameCreatePreviewDescLineKeys[1]}
+		  description={props.description}
+		  index={1}
+		  x={0}
+		  y={0}
+		  width={props.width}
+		  lineHeight={props.line_height}
+		/>
+		<GameCreatePreviewDescLine
+		  key={kGameCreatePreviewDescLineKeys[2]}
+		  description={props.description}
+		  index={2}
+		  x={0}
+		  y={0}
+		  width={props.width}
+		  lineHeight={props.line_height}
+		/>
+		<GameCreatePreviewDescLine
+		  key={kGameCreatePreviewDescLineKeys[3]}
+		  description={props.description}
+		  index={3}
+		  x={0}
+		  y={0}
+		  width={props.width}
+		  lineHeight={props.line_height}
+		/>
+		<GameCreatePreviewDescLine
+		  key={kGameCreatePreviewDescLineKeys[4]}
+		  description={props.description}
+		  index={4}
+		  x={0}
+		  y={0}
+		  width={props.width}
+		  lineHeight={props.line_height}
+		/>
+		<GameCreatePreviewDescLine
+		  key={kGameCreatePreviewDescLineKeys[5]}
+		  description={props.description}
+		  index={5}
+		  x={0}
+		  y={0}
+		  width={props.width}
+		  lineHeight={props.line_height}
+		/>
+		<GameCreatePreviewDescLine
+		  key={kGameCreatePreviewDescLineKeys[6]}
+		  description={props.description}
+		  index={6}
+		  x={0}
+		  y={0}
+		  width={props.width}
+		  lineHeight={props.line_height}
+		/>
+		<GameCreatePreviewDescLine
+		  key={kGameCreatePreviewDescLineKeys[7]}
+		  description={props.description}
+		  index={7}
+		  x={0}
+		  y={0}
+		  width={props.width}
+		  lineHeight={props.line_height}
+		/>
+		<GameCreatePreviewDescLine
+		  key={kGameCreatePreviewDescLineKeys[8]}
+		  description={props.description}
+		  index={8}
+		  x={0}
+		  y={0}
+		  width={props.width}
+		  lineHeight={props.line_height}
+		/>
+		<GameCreatePreviewDescLine
+		  key={kGameCreatePreviewDescLineKeys[9]}
+		  description={props.description}
+		  index={9}
+		  x={0}
+		  y={0}
+		  width={props.width}
+		  lineHeight={props.line_height}
+		/>
+		<GameCreatePreviewDescLine
+		  key={kGameCreatePreviewDescLineKeys[10]}
+		  description={props.description}
+		  index={10}
+		  x={0}
+		  y={0}
+		  width={props.width}
+		  lineHeight={props.line_height}
+		/>
+		<GameCreatePreviewDescLine
+		  key={kGameCreatePreviewDescLineKeys[11]}
+		  description={props.description}
+		  index={11}
+		  x={0}
+		  y={0}
+		  width={props.width}
+		  lineHeight={props.line_height}
+		/>
+	</Box>
+}
+
+struct GameCreatePreviewOverlayProps {
+	const char * key = nullptr;
+	bool show = false;
+	int x = 0;
+	int y = 0;
+	int width = 0;
+	int height = 0;
+	int line_height = 0;
+	int gap = 0;
+	int bitmap_width = 0;
+	int bitmap_height = 0;
+	const char * name = nullptr;
+	const char * description = nullptr;
+	const std::uint8_t * pixels = nullptr;
+};
+
+::ui::UiElement GameCreatePreviewOverlay(const GameCreatePreviewOverlayProps& props) {
+	if(!props.show || !props.pixels || props.width <= 0 || props.height <= 0 ||
+	   props.bitmap_width <= 0 || props.bitmap_height <= 0 || props.line_height <= 0){
+		return ::ui::empty();
+	}
+	const int bitmap_y = props.line_height + props.gap;
+	const int desc_y = bitmap_y + props.bitmap_height + props.gap;
+	return <Box
+	  key={props.key}
+	  id="GCrtMapPreview"
+	  layout={absolute_layout(props.x, props.y, props.width, props.height)}
+	>
+		<Text
+		  key="name"
+		  id="GCrtMapPreviewName"
+		  value={props.name}
+		  layout={absolute_layout(0, 0, props.width, props.line_height)}
+		  style={palette_text_patch(129, 133, 7, static_cast<float>(props.line_height))}
+		/>
+		<Box
+		  key="minimap"
+		  id="GCrtMapPreviewMinimap"
+		  layout={absolute_layout(0, bitmap_y, props.bitmap_width, props.bitmap_height)}
+		  style={raw_bitmap_patch(props.pixels, props.bitmap_width, props.bitmap_height)}
+		/>
+		<GameCreatePreviewDescLines
+		  key="description"
+		  description={props.description}
+		  x={0}
+		  y={desc_y}
+		  width={props.width}
+		  lineHeight={props.line_height}
+		/>
+	</Box>
+}
+
 struct GameSelectRowProps {
 	const char * key = nullptr;
 	const GameSelectPanelState * state = nullptr;
@@ -4029,6 +4281,21 @@ using ::ui::components::TextProps;
 		  y={props.game_select_join_y}
 		  width={props.game_select_action_width}
 		  height={props.game_select_action_height}
+		/>
+		<lobby_chrome_frame_detail.GameCreatePreviewOverlay
+		  key="game-create-preview"
+		  show={props.show_game_create_preview}
+		  x={props.game_create_preview_x}
+		  y={props.game_create_preview_y}
+		  width={props.game_create_preview_width}
+		  height={props.game_create_preview_height}
+		  lineHeight={props.game_create_preview_line_height}
+		  gap={props.game_create_preview_gap}
+		  bitmapWidth={props.game_create_preview_bitmap_width}
+		  bitmapHeight={props.game_create_preview_bitmap_height}
+		  name={props.game_create_preview_name}
+		  description={props.game_create_preview_description}
+		  pixels={props.game_create_preview_pixels}
 		/>
 	</Box>
 }

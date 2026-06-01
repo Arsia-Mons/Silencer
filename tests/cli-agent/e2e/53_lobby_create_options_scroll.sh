@@ -114,6 +114,51 @@ wait_for_widget "Create Game"
 cli --port "$CTRL_PORT" click --label "Create Game" >/dev/null
 cli --port "$CTRL_PORT" wait_frames --n 5 >/dev/null
 
+state_json="$(cli --port "$CTRL_PORT" state)"
+preview_target="$(cli --port "$CTRL_PORT" inspect | STATE_JSON="$state_json" bun -e '
+const inspect = JSON.parse(await new Response(Bun.stdin.stream()).text());
+const state = JSON.parse(process.env.STATE_JSON ?? "{}");
+const row = (inspect.widgets ?? []).find((w) =>
+  w.kind === "listrow" &&
+  w.source === "clay" &&
+  w.row_index === 0 &&
+  w.w > 0 &&
+  w.h > 0
+);
+if (!row) {
+  console.error("missing first create-map row for preview hover");
+  process.exit(1);
+}
+const hx = Math.floor(row.x + row.w / 2);
+const hy = Math.floor(row.y + row.h / 2);
+const previewW = 172;
+const previewH = 80;
+const uiW = Number(state.ui_width ?? 640);
+const uiH = Number(state.ui_height ?? 480);
+const px = Math.max(0, Math.min(hx - 185, uiW - previewW));
+const py = Math.max(0, Math.min(hy - 30, uiH - previewH));
+console.log([px, py, previewW, previewH, hx, hy].join(","));
+')"
+IFS=, read -r preview_x preview_y preview_w preview_h hover_x hover_y <<< "$preview_target"
+preview_crop="$preview_x,$preview_y,$preview_w,$preview_h"
+preview_before="$OUT_DIR/map-preview-before.png"
+preview_after="$OUT_DIR/map-preview-after.png"
+cli --port "$CTRL_PORT" screenshot --out "$preview_before" >/dev/null
+cli --port "$CTRL_PORT" hover_at --x "$hover_x" --y "$hover_y" >/dev/null
+cli --port "$CTRL_PORT" wait_frames --n 5 >/dev/null
+cli --port "$CTRL_PORT" screenshot --out "$preview_after" >/dev/null
+preview_diff="$("$PIXDIFF" --crop "$preview_crop" "$preview_before" "$preview_after")"
+if ! bun -e '
+const diff = Number(process.argv[1]);
+if (!Number.isFinite(diff) || diff <= 0.01) {
+  console.error(`expected retained map preview to appear, got diff ${diff}`);
+  process.exit(1);
+}
+' "$preview_diff"; then
+  cli --port "$CTRL_PORT" inspect >&2 || true
+  exit 1
+fi
+
 cli --port "$CTRL_PORT" resize --w 640 --h 360 >/dev/null
 cli --port "$CTRL_PORT" wait_frames --n 3 >/dev/null
 

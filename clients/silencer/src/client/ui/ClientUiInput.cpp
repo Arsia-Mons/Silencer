@@ -59,6 +59,7 @@ void ClientUiInput::QueueControlPointerPress(int x, int y) {
 	pointerY_ = static_cast<float>(y);
 	havePointerPosition_ = true;
 	controlPointerActive_ = true;
+	controlHoverPointerHeld_ = false;
 	silencer::ui::UiControlCommand command;
 	command.kind = silencer::ui::UiControlCommandKind::PointerPress;
 	command.x = x;
@@ -71,6 +72,7 @@ void ClientUiInput::QueueControlPointerHover(int x, int y) {
 	pointerY_ = static_cast<float>(y);
 	havePointerPosition_ = true;
 	controlPointerActive_ = true;
+	controlHoverPointerHeld_ = true;
 	silencer::ui::UiControlCommand command;
 	command.kind = silencer::ui::UiControlCommandKind::PointerHover;
 	command.x = x;
@@ -101,6 +103,7 @@ void ClientUiInput::QueuePointerSurfaceEvent(float surfaceX,
                                              bool pressed,
                                              bool released) {
 	controlPointerActive_ = false;
+	controlHoverPointerHeld_ = false;
 	pointerX_ = surfaceX;
 	pointerY_ = surfaceY;
 	havePointerPosition_ = true;
@@ -128,7 +131,7 @@ void ClientUiInput::SetPolledWindowPointer(float windowX,
 }
 
 void ClientUiInput::SetPolledSurfacePointer(float surfaceX, float surfaceY, bool down) {
-	if(controlPointerActive_) return;
+	if(controlPointerActive_ || controlHoverPointerHeld_) return;
 	pointerX_ = surfaceX;
 	pointerY_ = surfaceY;
 	havePointerPosition_ = true;

@@ -237,6 +237,23 @@ bool append_image(DrawCommandList &list, const NodeSnapshot &node) {
   return list.push(command);
 }
 
+bool append_bitmap(DrawCommandList &list, const NodeSnapshot &node) {
+  const RawBitmapImage &bitmap = node.visual.bitmap;
+  if (!bitmap.pixels || bitmap.width == 0 || bitmap.height == 0)
+    return true;
+
+  DrawCommand command = {};
+  command.kind = DrawCommandKind::Bitmap;
+  command.node_id = node.id;
+  command.rect = to_draw_rect(node.layout);
+  command.payload.bitmap = {
+      .pixels = bitmap.pixels,
+      .width = bitmap.width,
+      .height = bitmap.height,
+  };
+  return list.push(command);
+}
+
 // FILL: emit a Rect command carrying only the resolved fill (the legacy
 // append_rect fused fill + border + focus into one command; the new IR splits
 // the stroke into a separate Border command, emitted by append_frame).
@@ -521,6 +538,7 @@ bool append_node(const UiTree &tree, DrawCommandList &list, NodeId id,
   if (!append_shadow(list, node) ||
       !append_rect(list, node, focused) ||
       !append_image(list, node) ||
+      !append_bitmap(list, node) ||
       !append_frame(list, node, focused) ||
       !append_text(list, node, inherited_disabled) ||
       !append_input_contents(list, node, focused, inherited_disabled))

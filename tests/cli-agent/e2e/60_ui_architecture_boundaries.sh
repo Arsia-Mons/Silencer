@@ -86,6 +86,13 @@ fail_if_path_exists "clients/silencer/src/client/ui/generated"
 fail_if_path_exists "clients/silencer/src/ui/generated"
 
 fail_if_match \
+  "CLAY[[:space:]]*[(]|clay_ui_compositor|clay/clay[.]h|SurfacePayload|ClayCustomData" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens/lobby/game_create_panel.h" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens/lobby/game_create_panel_map_form.cpp" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens/lobby/lobby_chrome_frame.cppx" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens/lobby/lobby_screen.cpp"
+
+fail_if_match \
   "\\b(currentinterface|ProcessInGameInterfaces|Interface \\*|new Interface)\\b|(^|[^[:alnum:]_/])ui/(modals|panels|screens)\\b" \
   "$REPO_ROOT/clients/silencer/src" \
   --glob '!third_party/**'

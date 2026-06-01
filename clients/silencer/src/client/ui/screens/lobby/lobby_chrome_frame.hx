@@ -2,6 +2,8 @@
 
 #include "ui/runtime/element.h"
 
+#include <cstdint>
+
 namespace silencer {
 namespace client_ui {
 class AppAssetsModel;
@@ -85,6 +87,18 @@ struct LobbyChromeFrameProps {
 	int game_create_tall_y = 0;
 	int game_create_tall_width = 0;
 	int game_create_tall_height = 0;
+	bool show_game_create_preview = false;
+	int game_create_preview_x = 0;
+	int game_create_preview_y = 0;
+	int game_create_preview_width = 0;
+	int game_create_preview_height = 0;
+	int game_create_preview_line_height = 0;
+	int game_create_preview_gap = 0;
+	int game_create_preview_bitmap_width = 0;
+	int game_create_preview_bitmap_height = 0;
+	const char * game_create_preview_name = nullptr;
+	const char * game_create_preview_description = nullptr;
+	const std::uint8_t * game_create_preview_pixels = nullptr;
 	bool show_game_join_actions = false;
 	const char * game_join_ready_label = nullptr;
 	int game_join_button_x = 0;

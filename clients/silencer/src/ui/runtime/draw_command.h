@@ -4,8 +4,9 @@
 // copyable POD command stream produced by build_draw_command_list (a pure
 // transcriber) and executed linearly by the SDL renderer. Colors are
 // PREMULTIPLIED at emit. Variable data (text bytes, gradient stops) lives in
-// out-of-line arenas; arms hold integer handles, never pointers, so DrawCommand
-// stays trivially copyable and DrawList stays relocatable.
+// out-of-line arenas; texture images use integer handles. Raw bitmap commands
+// borrow host-owned pixels for immediate same-frame rendering; they still keep
+// the command stream trivially copyable.
 
 #include "../style/text_measure.h" // UI_MAX_TEXT_LINES
 #include "../style/visual_style.h"
@@ -23,6 +24,7 @@ enum class DrawCommandKind : uint8_t {
   Border,    // fused per-side border + signed-offset outline (co-feathered)
   Text,      // one wrapped line (per-line emission)
   Image,     // textured rect: tint + nine-slice + radius
+  Bitmap,    // raw indexed-pixel rect, host-owned for this frame
   Gradient,  // linear N-stop fill
   Shadow,    // drop shadow (feathered)
   ClipPush,  // push a clip rect (rect = header.rect)
@@ -60,6 +62,11 @@ struct ImageData {
   SideWidths nine_slice{};
   float corner_radius = 0.f;
 };
+struct BitmapData {
+  const uint8_t *pixels = nullptr;
+  uint16_t width = 0;
+  uint16_t height = 0;
+};
 struct GradientData {
   uint16_t stop_off = 0; // slice into DrawList::grad_arena
   uint8_t stop_count = 0;
@@ -85,6 +92,7 @@ union DrawPayload {
   BorderData border;
   TextData text;
   ImageData image;
+  BitmapData bitmap;
   GradientData gradient;
   ShadowData shadow;
   ClipData clip;

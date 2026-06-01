@@ -7,17 +7,10 @@
 #include "map.h"
 #include "text_wrap.h"
 
-#include "clay/clay.h"
-#include "clay_ui_compositor.h"
-#include "primitives/text.h"
-
 #include <algorithm>
 #include <cstdint>
 #include <cstring>
 #include <string>
-
-using silencer::ui::primitives::Text;
-using silencer::ui::primitives::TextSize;
 
 namespace silencer::client_ui::lobby {
 
@@ -39,10 +32,8 @@ constexpr int kPreviewOffsetX = -185;
 constexpr int kPreviewOffsetY = -30;
 constexpr size_t kPreviewNameChars = 29;
 constexpr int kHeadingH = 13;
-
-Clay_String FromStd(const std::string & s) {
-	return Clay_String{ false, static_cast<int32_t>(s.size()), s.c_str() };
-}
+constexpr int kPreviewLineH = 11;
+constexpr int kPreviewDescLineSlots = 12;
 
 std::string Basename(const std::string & path) {
 	const size_t slash = path.find_last_of("/\\");
@@ -55,8 +46,6 @@ void ResetHoverPreview(GameCreatePanelState & state) {
 	state.hoverPreviewName.clear();
 	state.hoverPreviewDescription.clear();
 	state.hoverPreviewPixels.clear();
-	state.hoverPreviewSurface = {};
-	state.hoverPreviewCustomData = {};
 }
 
 void HideHoverPreview(GameCreatePanelState & state) {
@@ -64,7 +53,6 @@ void HideHoverPreview(GameCreatePanelState & state) {
 }
 
 void LoadHoverPreview(GameCreatePanelState & state,
-                      ScreenContext & ctx,
                       LobbyModel & lobby,
                       int hoveredIndex) {
 	if(hoveredIndex < 0 || hoveredIndex >= static_cast<int>(state.maps.size())){
@@ -111,24 +99,18 @@ void LoadHoverPreview(GameCreatePanelState & state,
 		delete[] wrapped;
 	}
 
-	state.hoverPreviewSurface.pixels = state.hoverPreviewPixels.data();
-	state.hoverPreviewSurface.width = kPreviewW;
-	state.hoverPreviewSurface.height = kPreviewH;
-	state.hoverPreviewCustomData.kind = silencer::clay_bridge::CustomKind::Surface;
-	state.hoverPreviewCustomData.payload = &state.hoverPreviewSurface;
 	state.hoverPreviewMapIndex = hoveredIndex;
 	state.hoverPreviewVisible = true;
 }
 
 void UpdateHoverPreview(GameCreatePanelState & state,
-                        ScreenContext & ctx,
                         LobbyModel & lobby,
                         int hoveredIndex) {
 	if(hoveredIndex < 0){
 		HideHoverPreview(state);
 		return;
 	}
-	LoadHoverPreview(state, ctx, lobby, hoveredIndex);
+	LoadHoverPreview(state, lobby, hoveredIndex);
 }
 
 int CountPreviewLines(const std::string & text) {
@@ -239,19 +221,21 @@ void GameCreatePanelSyncTallLayout(GameCreatePanelState & state,
 	}
 	state.lastHoveredMapIndex = hoveredIndex;
 	game_create_panel_map_form_detail::UpdateHoverPreview(
-		state, ctx, lobby, hoveredIndex);
+		state, lobby, hoveredIndex);
 }
 
-void BuildGameCreatePreviewOverlay(GameCreatePanelState & state,
-                                   ScreenContext & ctx) {
+GameCreatePreviewOverlayLayout ResolveGameCreatePreviewOverlayLayout(
+	const GameCreatePanelState & state,
+	const silencer::ui::UiInputState & input) {
 	using namespace game_create_panel_map_form_detail;
-	if(!state.hoverPreviewVisible || state.hoverPreviewPixels.empty()) return;
+	GameCreatePreviewOverlayLayout out;
+	if(!state.hoverPreviewVisible || state.hoverPreviewPixels.empty()) return out;
 
-	const silencer::ui::UiInputState & input = ctx.game.CurrentUiInput();
-	const int lineHeight = silencer::ui::primitives::TextLineHeight(TextSize::BodySm);
-	const int descLines = CountPreviewLines(state.hoverPreviewDescription);
-	const int previewHeight = lineHeight + kPreviewGap + kPreviewH
-		+ (descLines > 0 ? kPreviewGap + (descLines * lineHeight) : 0);
+	const int descLines = std::min(
+		CountPreviewLines(state.hoverPreviewDescription),
+		kPreviewDescLineSlots);
+	const int previewHeight = kPreviewLineH + kPreviewGap + kPreviewH
+		+ (descLines > 0 ? kPreviewGap + (descLines * kPreviewLineH) : 0);
 	const int maxX = std::max(0, input.width - static_cast<int>(kPreviewW));
 	const int maxY = std::max(0, input.height - previewHeight);
 	int previewX = static_cast<int>(input.pointer.x) + kPreviewOffsetX;
@@ -261,53 +245,16 @@ void BuildGameCreatePreviewOverlay(GameCreatePanelState & state,
 	if(previewY < 0) previewY = 0;
 	if(previewY > maxY) previewY = maxY;
 
-	const silencer::ui::primitives::TextEffect previewEffect =
-		silencer::ui::primitives::TextEffect::LegacyPalette(129, 128 + 32, true);
-
-	CLAY({ .id = CLAY_ID("GCrtMapPreview"),
-	       .layout = {
-	           .sizing = { CLAY_SIZING_FIXED(static_cast<float>(kPreviewW)),
-	                       CLAY_SIZING_FIT(0) },
-	           .childGap = kPreviewGap,
-	           .layoutDirection = CLAY_TOP_TO_BOTTOM,
-	       },
-	       .floating = {
-	           .offset = { static_cast<float>(previewX), static_cast<float>(previewY) },
-	           .zIndex = 2,
-	           .pointerCaptureMode = CLAY_POINTER_CAPTURE_MODE_PASSTHROUGH,
-	           .attachTo = CLAY_ATTACH_TO_ROOT,
-	       } }) {
-		CLAY({ .id = CLAY_ID("GCrtMapPreviewName"),
-		       .layout = {
-		           .sizing = { CLAY_SIZING_FIXED(static_cast<float>(kPreviewW)),
-		                       CLAY_SIZING_FIT(0) },
-		       } }) {
-			Text(FromStd(state.hoverPreviewName),
-			     { .size = TextSize::BodySm,
-			       .wrap = silencer::ui::primitives::TextWrap::None,
-			       .effect = previewEffect });
-		}
-
-		CLAY({ .id = CLAY_ID("GCrtMapPreviewMinimap"),
-		       .layout = {
-		           .sizing = { CLAY_SIZING_FIXED(static_cast<float>(kPreviewW)),
-		                       CLAY_SIZING_FIXED(static_cast<float>(kPreviewH)) },
-		       },
-		       .custom = { .customData = &state.hoverPreviewCustomData } }) {}
-
-		if(!state.hoverPreviewDescription.empty()){
-			CLAY({ .id = CLAY_ID("GCrtMapPreviewDesc"),
-			       .layout = {
-			           .sizing = { CLAY_SIZING_FIXED(static_cast<float>(kPreviewW)),
-			                       CLAY_SIZING_FIT(0) },
-			       } }) {
-				Text(FromStd(state.hoverPreviewDescription),
-				     { .size = TextSize::BodySm,
-				       .wrap = silencer::ui::primitives::TextWrap::Newlines,
-				       .effect = previewEffect });
-			}
-		}
-	}
+	out.visible = true;
+	out.x = previewX;
+	out.y = previewY;
+	out.width = kPreviewW;
+	out.height = previewHeight;
+	out.lineHeight = kPreviewLineH;
+	out.gap = kPreviewGap;
+	out.bitmapWidth = kPreviewW;
+	out.bitmapHeight = kPreviewH;
+	return out;
 }
 
 }  // namespace silencer::client_ui::lobby
