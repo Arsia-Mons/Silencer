@@ -878,8 +878,8 @@ struct TechRowProps {
 };
 
 ::ui::UiElement TechRow(const TechRowProps& props) {
-	const LobbyContextValue& lobby = UseLobby();
-	GameTechPanelState * state = lobby.state.game_tech;
+	const LobbyGameTech& gameTech = UseLobbyGameTech();
+	GameTechPanelState * state = gameTech.state;
 	if(!state) return ::ui::empty();
 	if(props.slot < 0 || props.slot >= static_cast<int>(state->techRows.size())) return ::ui::empty();
 	const GameTechRow& row = state->techRows[static_cast<size_t>(props.slot)];
@@ -890,8 +890,8 @@ struct TechRowProps {
 	  idOffset={props.slot}
 	  label={row.label.c_str()}
 	  selected={row.selected}
-	  onFocus={index_focus_callback(lobby.actions.preview_tech, props.slot)}
-	  onActivate={index_action_callback(lobby.actions.toggle_tech, props.slot)}
+	  onFocus={index_focus_callback(gameTech.preview, props.slot)}
+	  onActivate={index_action_callback(gameTech.toggle, props.slot)}
 	  layout={row_button_layout(23.0f)}
 	  style={row_style(row.selected)}
 	/>
@@ -903,8 +903,8 @@ struct GameTechUpperProps {
 
 ::ui::UiElement GameTechUpper(const GameTechUpperProps& props) {
 	(void)props;
-	const LobbyContextValue& lobby = UseLobby();
-	GameTechPanelState * state = lobby.state.game_tech;
+	const LobbyGameTech& gameTech = UseLobbyGameTech();
+	GameTechPanelState * state = gameTech.state;
 	if(!state) return ::ui::empty();
 	return <Box key="tech-upper" layout={upper_panel_layout()} style={panel_style()}>
 		<SectionHeading key="heading" value="TECH" />
@@ -912,7 +912,7 @@ struct GameTechUpperProps {
 		  key="back"
 		  id="lobby.game_tech.back"
 		  label="Back To Teams"
-		  onActivate={action_callback(lobby.actions.back_to_team)}
+		  onActivate={action_callback(gameTech.back_to_team)}
 		  layout={row_button_layout(28.0f)}
 		/>
 		<FieldText key="peer-0" value={state->peerNameStrs[0].c_str()} />
@@ -927,8 +927,8 @@ struct GameTechTallProps {
 
 ::ui::UiElement GameTechTall(const GameTechTallProps& props) {
 	(void)props;
-	const LobbyContextValue& lobby = UseLobby();
-	GameTechPanelState * state = lobby.state.game_tech;
+	const LobbyGameTech& gameTech = UseLobbyGameTech();
+	GameTechPanelState * state = gameTech.state;
 	if(!state) return ::ui::empty();
 	return <Box key="tech-tall" layout={side_panel_layout()} style={panel_style()}>
 		<SectionHeading key="heading" value={state->slotsLeftStr.c_str()} />

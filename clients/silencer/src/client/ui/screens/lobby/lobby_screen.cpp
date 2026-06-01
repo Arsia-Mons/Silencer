@@ -96,21 +96,9 @@ bool LobbyScreen::BuildElement(ScreenContext & ctx, ::ui::UiElement * out)
 		.state = {
 			.version = version.c_str(),
 			.map_name = mapName.c_str(),
-			.game_tech = &gameTechState,
 			.game_create_active = gameCreateActive,
 			.game_join_active = gameJoinActive,
 			.game_tech_active = gameTechActive,
-		},
-		.actions = {
-			.back_to_team = [this]() {
-				silencer::client_ui::lobby::GameTechPanelRequestBack(gameTechState);
-			},
-			.preview_tech = [this](int index) {
-				silencer::client_ui::lobby::GameTechPanelPreviewItem(gameTechState, index);
-			},
-			.toggle_tech = [this](int index) {
-				silencer::client_ui::lobby::GameTechPanelToggleItem(gameTechState, index);
-			},
 		},
 	};
 	silencer::client_ui::lobby::LobbyNavigation navigation{
@@ -201,6 +189,18 @@ bool LobbyScreen::BuildElement(ScreenContext & ctx, ::ui::UiElement * out)
 			silencer::client_ui::lobby::GameJoinPanelRequestReady(gameJoinState);
 		},
 	};
+	silencer::client_ui::lobby::LobbyGameTech gameTech{
+		.state = &gameTechState,
+		.back_to_team = [this]() {
+			silencer::client_ui::lobby::GameTechPanelRequestBack(gameTechState);
+		},
+		.preview = [this](int index) {
+			silencer::client_ui::lobby::GameTechPanelPreviewItem(gameTechState, index);
+		},
+		.toggle = [this](int index) {
+			silencer::client_ui::lobby::GameTechPanelToggleItem(gameTechState, index);
+		},
+	};
 	*out = silencer::client_ui::lobby::LobbyScreenView(
 		silencer::client_ui::lobby::LobbyScreenViewProps{
 			.key = "lobby",
@@ -211,6 +211,7 @@ bool LobbyScreen::BuildElement(ScreenContext & ctx, ::ui::UiElement * out)
 			.game_select = ::ui::copy_value(gameSelect),
 			.game_create = ::ui::copy_value(gameCreate),
 			.game_join = ::ui::copy_value(gameJoin),
+			.game_tech = ::ui::copy_value(gameTech),
 		});
 	return true;
 }
