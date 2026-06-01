@@ -115,6 +115,17 @@ void DispatchMatchActions(const MatchModel& match,
 	}
 }
 
+void FocusSelectedBuyTechRow(const HudView& view,
+                             silencer::ui::UiInteractionRegistry& interactions) {
+	if(!view.buyTech.visible) return;
+	for(const BuyTechRowView& row : view.buyTech.rows){
+		if(!row.selected) continue;
+		interactions.FocusInteractableById(
+			"ingame.buytech.row." + std::to_string(row.index));
+		return;
+	}
+}
+
 void PlayMenuButtonSound(ScreenContext& ctx) {
 	use_app(MakeAppProvider(ctx)).audio.play_ui_click();
 }
@@ -328,9 +339,12 @@ void ClientUi::BuildVisibleScreens(ScreenContext& ctx, Surface& dst, float frame
 			hudView.message.message_i > 0 && !hudView.message.message.empty();
 		const bool showStatusMessages = !hudView.statusMessages.empty();
 		const bool showPlayerList = hudView.showPlayerList;
+		const bool showBuyTech =
+			hudView.buyTech.visible && !hudView.buyTech.rows.empty() &&
+			hudView.buyTech.backgroundW > 0 && hudView.buyTech.backgroundH > 0;
 		inGameOverlayFrameActive_ =
 			showQuitPrompt || showTopMessage || showMessage ||
-			showStatusMessages || showPlayerList;
+			showStatusMessages || showPlayerList || showBuyTech;
 		if(inGameOverlayFrameActive_){
 		#ifdef OUYA
 			const char * quitText = "Hit O To QUIT";
@@ -356,6 +370,8 @@ void ClientUi::BuildVisibleScreens(ScreenContext& ctx, Surface& dst, float frame
 				.show_player_list = showPlayerList,
 				.teams = hudView.teams.data(),
 				.team_count = static_cast<int>(hudView.teams.size()),
+				.show_buy_tech = showBuyTech,
+				.buy_tech = hudView.buyTech,
 			};
 			inGameOverlayFrame_.Build([&]() {
 				                          return InGameOverlayFrame(props);
@@ -363,6 +379,9 @@ void ClientUi::BuildVisibleScreens(ScreenContext& ctx, Surface& dst, float frame
 			                          input.width,
 			                          input.height,
 			                          interactions_);
+			if(showBuyTech){
+				clientui_detail::FocusSelectedBuyTechRow(hudView, interactions_);
+			}
 		}
 	}
 }

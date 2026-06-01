@@ -1,6 +1,7 @@
 #include "client/ui/hud/ingame_overlay_frame.h"
 
 #include "ui/components/box.h"
+#include "ui/components/common.h"
 #include "ui/components/text.h"
 #include "ui/style/style_patch.h"
 
@@ -14,6 +15,8 @@
 namespace silencer {
 namespace client_ui {
 namespace ingame_overlay_frame_detail {
+
+namespace component_detail = ::ui::components::detail;
 
 using ::ui::components::Box;
 using ::ui::components::BoxProps;
@@ -54,6 +57,17 @@ constexpr int kPlayerListTextBank = 133;
 constexpr int kPlayerListTextAdvance = 6;
 constexpr int kPlayerListTextLineHeight = 11;
 constexpr int kMessageLineAdvance = 20;
+constexpr int kBuyTechMaxRows = 5;
+constexpr int kBuyTechRowStep = 25;
+constexpr int kBuyTechNameX = 222;
+constexpr int kBuyTechTextY = 145;
+constexpr int kBuyTechNameWidth = 180;
+constexpr int kBuyTechPriceCenterX = 440;
+constexpr int kBuyTechFooterCenterX = 320;
+constexpr int kBuyTechFooterY = 275;
+constexpr int kBuyTechTextBank = 134;
+constexpr int kBuyTechTextAdvance = 8;
+constexpr int kBuyTechTextLineHeight = 15;
 
 inline ::ui::LayoutStyle root_layout(int width, int height) {
 	return {
@@ -117,9 +131,12 @@ inline std::uint32_t texture_id(std::uint8_t bank, std::uint16_t index) {
 	       static_cast<std::uint32_t>(index);
 }
 
-inline ::ui::StylePatch image_patch(std::uint8_t bank, std::uint16_t index) {
+inline ::ui::StylePatch image_patch(std::uint8_t bank,
+                                    std::uint16_t index,
+                                    std::uint8_t brightness = 128) {
 	return ::ui::patch().image(::ui::BackgroundImage{
 		.texture_id = texture_id(bank, index),
+		.brightness = brightness,
 	});
 }
 
@@ -135,6 +152,19 @@ inline ::ui::StylePatch player_list_text_patch() {
 		.font_size = kPlayerListTextAdvance,
 		.line_height = static_cast<float>(kPlayerListTextLineHeight),
 	});
+}
+
+inline ::ui::StylePatch buy_tech_text_patch(std::uint8_t brightness = 128) {
+	return ::ui::patch().text(::ui::TextVisual{
+		.color = {0, brightness, 0, 255},
+		.font_id = kBuyTechTextBank,
+		.font_size = kBuyTechTextAdvance,
+		.line_height = static_cast<float>(kBuyTechTextLineHeight),
+	});
+}
+
+inline std::string buy_tech_row_action_id(int index) {
+	return "ingame.buytech.row." + std::to_string(index);
 }
 
 struct MessageTextMetrics {
@@ -365,6 +395,158 @@ struct MessageProps {
 	  layout={root_layout(props.surface_width, props.surface_height)}
 	>
 		{message_glyph_children(props.message, props.surface_width)}
+	</Box>
+}
+
+struct BuyTechHighlightProps {
+	const char * key = nullptr;
+	bool show = false;
+	int width = 0;
+	int height = 0;
+};
+
+::ui::UiElement BuyTechHighlight(const BuyTechHighlightProps& props) {
+	if(!props.show || props.width <= 0 || props.height <= 0){
+		return ::ui::empty();
+	}
+	return <Box
+	  key={props.key}
+	  id="InGameBuyTechHighlight"
+	  layout={absolute_layout(0, 0, props.width, props.height)}
+	  style={image_patch(102, 1)}
+	/>
+}
+
+struct BuyTechIconProps {
+	const char * key = nullptr;
+	const BuyTechRowView * row = nullptr;
+	int x = 0;
+	int y = 0;
+};
+
+::ui::UiElement BuyTechIcon(const BuyTechIconProps& props) {
+	if(!props.row || props.row->iconW <= 0 || props.row->iconH <= 0){
+		return ::ui::empty();
+	}
+	return <Box
+	  key={props.key}
+	  id="InGameBuyTechIcon"
+	  layout={absolute_layout(props.x, props.y, props.row->iconW, props.row->iconH)}
+	  style={image_patch(props.row->spriteBank, props.row->spriteIndex, props.row->brightness)}
+	/>
+}
+
+struct BuyTechFooterProps {
+	const char * key = nullptr;
+	const char * text = nullptr;
+};
+
+::ui::UiElement BuyTechFooter(const BuyTechFooterProps& props) {
+	const char * text = props.text ? props.text : "";
+	if(!*text) return ::ui::empty();
+	const int width =
+		static_cast<int>(std::strlen(text)) * kBuyTechTextAdvance;
+	return <Text
+	  key={props.key}
+	  id="InGameBuyTechFooter"
+	  value={text}
+	  layout={absolute_layout(kBuyTechFooterCenterX - (width / 2), kBuyTechFooterY, width, kBuyTechTextLineHeight)}
+	  style={buy_tech_text_patch()}
+	/>
+}
+
+struct BuyTechRowProps {
+	const char * key = nullptr;
+	const BuyTechOverlayView * view = nullptr;
+	int visible_row = 0;
+};
+
+::ui::UiElement BuyTechRow(const BuyTechRowProps& props) {
+	if(!props.view || props.visible_row < 0 ||
+	   props.visible_row >= static_cast<int>(props.view->rows.size()) ||
+	   props.visible_row >= kBuyTechMaxRows){
+		return ::ui::empty();
+	}
+	const BuyTechRowView& row = props.view->rows[props.visible_row];
+	const int yoffset = props.visible_row * kBuyTechRowStep;
+	const int row_x = props.view->highlightX;
+	const int row_y = props.view->highlightY + yoffset;
+	const int name_x = kBuyTechNameX - row_x;
+	const int text_y = (kBuyTechTextY + yoffset) - row_y;
+	const int icon_x = row.iconX - row_x;
+	const int icon_y = row.iconY - row_y;
+	const int price_width =
+		static_cast<int>(row.price.size()) * kBuyTechTextAdvance;
+	const int price_x = (kBuyTechPriceCenterX - (price_width / 2)) - row_x;
+	std::string action_string = buy_tech_row_action_id(row.index);
+	const char * action_id = ::ui::copy_string(action_string.c_str());
+	return <component_detail.Host
+	  kind={::ui::HostKind::Box}
+	  key={props.key}
+	  id={action_id}
+	  idOffset={row.index + 1}
+	  style={absolute_layout(row_x, row_y, props.view->highlightW, props.view->highlightH)}
+	  interaction={::ui::NodeInteraction{
+			.focusable = true,
+			.checked = row.selected,
+		}}
+	  accessibility={{.role = ::ui::SemanticRole::ListRow, .label = row.name.c_str()}}
+	>
+		<BuyTechHighlight
+		  key="highlight"
+		  show={row.selected}
+		  width={props.view->highlightW}
+		  height={props.view->highlightH}
+		/>
+		<BuyTechIcon key="icon" row={&row} x={icon_x} y={icon_y} />
+		<Text
+		  key="name"
+		  id="InGameBuyTechName"
+		  value={row.name.c_str()}
+		  layout={absolute_layout(name_x, text_y, kBuyTechNameWidth, kBuyTechTextLineHeight)}
+		  style={buy_tech_text_patch(row.brightness)}
+		/>
+		<Text
+		  key="price"
+		  id="InGameBuyTechPrice"
+		  value={row.price.c_str()}
+		  layout={absolute_layout(price_x, text_y, price_width, kBuyTechTextLineHeight)}
+		  style={buy_tech_text_patch(row.brightness)}
+		/>
+	</component_detail.Host>
+}
+
+struct BuyTechOverlayProps {
+	const char * key = nullptr;
+	bool show = false;
+	BuyTechOverlayView view = {};
+	int surface_width = 0;
+	int surface_height = 0;
+};
+
+::ui::UiElement BuyTechOverlay(const BuyTechOverlayProps& props) {
+	if(!props.show || props.view.rows.empty() ||
+	   props.view.backgroundW <= 0 || props.view.backgroundH <= 0 ||
+	   props.view.highlightW <= 0 || props.view.highlightH <= 0){
+		return ::ui::empty();
+	}
+	return <Box
+	  key={props.key}
+	  id="InGameBuyTechRoot"
+	  layout={root_layout(props.surface_width, props.surface_height)}
+	>
+		<Box
+		  key="background"
+		  id="InGameBuyTechBackground"
+		  layout={absolute_layout(props.view.backgroundX, props.view.backgroundY, props.view.backgroundW, props.view.backgroundH)}
+		  style={image_patch(102, 0)}
+		/>
+		<BuyTechRow key="row-0" view={&props.view} visibleRow={0} />
+		<BuyTechRow key="row-1" view={&props.view} visibleRow={1} />
+		<BuyTechRow key="row-2" view={&props.view} visibleRow={2} />
+		<BuyTechRow key="row-3" view={&props.view} visibleRow={3} />
+		<BuyTechRow key="row-4" view={&props.view} visibleRow={4} />
+		<BuyTechFooter key="footer" text={props.view.footer.c_str()} />
 	</Box>
 }
 
@@ -625,6 +807,13 @@ using ::ui::components::BoxProps;
 		  key="message"
 		  show={props.show_message}
 		  message={props.message}
+		  surfaceWidth={props.width}
+		  surfaceHeight={props.height}
+		/>
+		<ingame_overlay_frame_detail.BuyTechOverlay
+		  key="buy-tech"
+		  show={props.show_buy_tech}
+		  view={props.buy_tech}
 		  surfaceWidth={props.width}
 		  surfaceHeight={props.height}
 		/>

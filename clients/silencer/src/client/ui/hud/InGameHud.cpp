@@ -1,6 +1,5 @@
 #include "client/ui/hud/InGameHud.h"
 
-#include "client/ui/hud/hud_buy_tech_overlay.h"
 #include "client/ui/hud/hud_chat_overlay.h"
 #include "client/ui/hud/hud_readouts.h"
 #include "client/ui/hud/hud_secret_overlays.h"
@@ -56,10 +55,6 @@ void BuildInGameHudUi(Renderer& renderer, const Resources& resources,
 	}
 	if(player.tracetime > 0) tracetime = player.tracetime;
 	if(tracetime > 0) BuildHudTraceTime(surface, tracetime);
-
-	if(view.buyTech.visible){
-		BuildBuyTechOverlay(view.buyTech, resources, surface, interactions);
-	}
 
 	if(view.showChatTicks || player.chatActive){
 		BuildChatOverlay(view, resources, surface, interactions);

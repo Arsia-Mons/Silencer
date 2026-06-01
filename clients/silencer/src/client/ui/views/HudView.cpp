@@ -24,6 +24,52 @@ namespace client_ui {
 
 namespace hudview_detail {
 
+int SpriteWidth(const ::Resources& res, Uint8 bank, Uint16 index) {
+	if(bank >= res.spritebank.size() || index >= res.spritebank[bank].size()){
+		return 0;
+	}
+	Surface* sprite = res.spritebank[bank][index].get();
+	if(!sprite) return 0;
+	if(bank < res.spritewidth.size() && index < res.spritewidth[bank].size()){
+		return static_cast<int>(res.spritewidth[bank][index]);
+	}
+	return sprite->w;
+}
+
+int SpriteHeight(const ::Resources& res, Uint8 bank, Uint16 index) {
+	if(bank >= res.spritebank.size() || index >= res.spritebank[bank].size()){
+		return 0;
+	}
+	Surface* sprite = res.spritebank[bank][index].get();
+	if(!sprite) return 0;
+	if(bank < res.spriteheight.size() && index < res.spriteheight[bank].size()){
+		return static_cast<int>(res.spriteheight[bank][index]);
+	}
+	return sprite->h;
+}
+
+int SpriteOffsetX(const ::Resources& res, Uint8 bank, Uint16 index) {
+	if(bank < res.spriteoffsetx.size() && index < res.spriteoffsetx[bank].size()){
+		return res.spriteoffsetx[bank][index];
+	}
+	return 0;
+}
+
+int SpriteOffsetY(const ::Resources& res, Uint8 bank, Uint16 index) {
+	if(bank < res.spriteoffsety.size() && index < res.spriteoffsety[bank].size()){
+		return res.spriteoffsety[bank][index];
+	}
+	return 0;
+}
+
+int SpriteX(const ::Resources& res, Uint8 bank, Uint16 index, int logicalX = 0) {
+	return logicalX + SpriteOffsetX(res, bank, index);
+}
+
+int SpriteY(const ::Resources& res, Uint8 bank, Uint16 index, int logicalY = 0) {
+	return logicalY + SpriteOffsetY(res, bank, index);
+}
+
 void PopulatePlayerFields(PlayerHudView& view, ::Player* player) {
 	view.valid = true;
 	view.health = player->health;
@@ -214,9 +260,19 @@ void PopulateBuyTech(HudView& out, ::World& world, ::Player* player) {
 	BuyTechOverlayView& view = out.buyTech;
 	view.visible = true;
 	view.isBuying = player->isbuying;
+	view.backgroundX = SpriteX(world.resources, 102, 0);
+	view.backgroundY = SpriteY(world.resources, 102, 0);
+	view.backgroundW = SpriteWidth(world.resources, 102, 0);
+	view.backgroundH = SpriteHeight(world.resources, 102, 0);
+	view.highlightX = SpriteX(world.resources, 102, 1);
+	view.highlightY = SpriteY(world.resources, 102, 1);
+	view.highlightW = SpriteWidth(world.resources, 102, 1);
+	view.highlightH = SpriteHeight(world.resources, 102, 1);
 	for(int i = scrolled; i < (int)menuitems.size() && (int)view.rows.size() < 5; ++i){
 		::BuyableItem* item = menuitems[i];
 		bool selected = (i == selecteditem);
+		const int visibleRow = static_cast<int>(view.rows.size());
+		const int yoffset = visibleRow * 25;
 		BuyTechRowView row;
 		row.index = i;
 		row.name = itemName(item);
@@ -225,6 +281,10 @@ void PopulateBuyTech(HudView& out, ::World& world, ::Player* player) {
 		row.brightness = selected ? selectedBrightness : (Uint8)128;
 		row.spriteBank = item->res_bank;
 		row.spriteIndex = item->res_index;
+		row.iconX = SpriteX(world.resources, row.spriteBank, row.spriteIndex, 169);
+		row.iconY = SpriteY(world.resources, row.spriteBank, row.spriteIndex, 139 + yoffset);
+		row.iconW = SpriteWidth(world.resources, row.spriteBank, row.spriteIndex);
+		row.iconH = SpriteHeight(world.resources, row.spriteBank, row.spriteIndex);
 		view.rows.push_back(row);
 	}
 

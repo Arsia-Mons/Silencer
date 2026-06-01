@@ -23,6 +23,8 @@ struct InGameOverlayFrameProps {
 	bool show_player_list = false;
 	const TeamHudView * teams = nullptr;
 	int team_count = 0;
+	bool show_buy_tech = false;
+	BuyTechOverlayView buy_tech = {};
 };
 
 ::ui::UiElement InGameOverlayFrame(const InGameOverlayFrameProps& props);

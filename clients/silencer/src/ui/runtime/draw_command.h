@@ -61,6 +61,7 @@ struct ImageData {
   Color tint{255, 255, 255, 255};
   SideWidths nine_slice{};
   float corner_radius = 0.f;
+  uint8_t brightness = 128;
 };
 struct BitmapData {
   const uint8_t *pixels = nullptr;

@@ -182,6 +182,7 @@ void DrawNineSlice(Surface * src,
 }
 
 void DrawImage(Resources& resources,
+               Renderer& renderer,
                Surface * dst,
                const ::ui::DrawCommand& command) {
 	const ::ui::ImageData& image = command.payload.image;
@@ -193,15 +194,22 @@ void DrawImage(Resources& resources,
 	int w = static_cast<int>(std::ceil(command.rect.x + command.rect.w)) - x;
 	int h = static_cast<int>(std::ceil(command.rect.y + command.rect.h)) - y;
 	if(w <= 0 || h <= 0) return;
+	Surface * work = src;
+	if(image.brightness != 128){
+		work = renderer.CreateSurfaceCopy(src);
+		renderer.EffectBrightness(work, nullptr, image.brightness);
+	}
 	if(HasNineSlice(image.nine_slice)){
-		DrawNineSlice(src, dst, x, y, w, h, image.nine_slice);
+		DrawNineSlice(work, dst, x, y, w, h, image.nine_slice);
+		if(work != src) delete work;
 		return;
 	}
-	if(w == src->w && h == src->h){
-		BlitClipped(src, Renderer::Rect{src->w, src->h, 0, 0}, dst, x, y);
+	if(w == work->w && h == work->h){
+		BlitClipped(work, Renderer::Rect{work->w, work->h, 0, 0}, dst, x, y);
 	}else{
-		StretchClipped(src, dst, x, y, w, h);
+		StretchClipped(work, dst, x, y, w, h);
 	}
+	if(work != src) delete work;
 }
 
 void DrawBitmap(Surface * dst,
@@ -392,7 +400,7 @@ void RenderInto(Resources& resources,
 			DrawText(renderer, dst, commands, command);
 			break;
 		case ::ui::DrawCommandKind::Image:
-			DrawImage(resources, dst, command);
+			DrawImage(resources, renderer, dst, command);
 			break;
 		case ::ui::DrawCommandKind::Bitmap:
 			DrawBitmap(dst, command);

@@ -66,11 +66,23 @@ struct BuyTechRowView {
 	// Sprite icon (passed to renderer at draw time).
 	Uint8  spriteBank = 0;
 	Uint16 spriteIndex = 0;
+	int    iconX = 0;
+	int    iconY = 0;
+	int    iconW = 0;
+	int    iconH = 0;
 };
 
 struct BuyTechOverlayView {
 	bool                        visible = false;
 	bool                        isBuying = false;
+	int                         backgroundX = 0;
+	int                         backgroundY = 0;
+	int                         backgroundW = 0;
+	int                         backgroundH = 0;
+	int                         highlightX = 0;
+	int                         highlightY = 0;
+	int                         highlightW = 0;
+	int                         highlightH = 0;
 	std::vector<BuyTechRowView> rows;
 	std::string                 footer;
 };

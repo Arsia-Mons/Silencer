@@ -80,6 +80,7 @@ struct BackgroundImage {
   uint32_t texture_id = 0; // 0 => no image
   Color tint{255, 255, 255, 255};
   SideWidths nine_slice{}; // all-zero => plain stretch; nonzero => 9-patch
+  uint8_t brightness = 128;
 };
 
 struct RawBitmapImage {
