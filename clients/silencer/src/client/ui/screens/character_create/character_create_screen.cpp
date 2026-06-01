@@ -187,53 +187,49 @@ bool CharacterCreateScreen::BuildElement(ScreenContext & ctx, ::ui::UiElement * 
 		stats[i] = detailStats[i].c_str();
 	}
 
-	silencer::client_ui::CharacterCreateContextValue context{
-		.state = {
-			.step = viewStep,
-			.agent_rows = &agentRows,
-			.agent_scroll = static_cast<int>(agentScroll),
-			.selected_agent_index = selectedAgentIndex,
-			.preview_agent_index = previewAgentIndex,
-			.detail_agent_index = detailAgentIndex,
-			.detail_agency_index = detailAgencyIndex,
-			.detail_rename_available = detailRenameAvailable,
-			.detail_stats = stats,
-			.alias = alias,
-			.alias_renaming = IsRenaming(),
-			.waiting = waitingForCreate || waitingForRename,
-			.selected_agency_index = AgencyIndex(selectedAgency),
-			.preview_agency_index = previewAgencyIndex,
+	silencer::client_ui::CharacterCreate character{
+		.step = viewStep,
+		.agent_rows = &agentRows,
+		.agent_scroll = static_cast<int>(agentScroll),
+		.selected_agent_index = selectedAgentIndex,
+		.preview_agent_index = previewAgentIndex,
+		.detail_agent_index = detailAgentIndex,
+		.detail_agency_index = detailAgencyIndex,
+		.detail_rename_available = detailRenameAvailable,
+		.detail_stats = stats,
+		.alias = alias,
+		.alias_renaming = IsRenaming(),
+		.waiting = waitingForCreate || waitingForRename,
+		.selected_agency_index = AgencyIndex(selectedAgency),
+		.preview_agency_index = previewAgencyIndex,
+		.preview_agent = [this](int index) {
+			previewAgentIndex = index;
 		},
-		.actions = {
-			.preview_agent = [this](int index) {
-				previewAgentIndex = index;
-			},
-			.activate_agent = [this, screenContext = &ctx](int index) {
-				ActivateAgent(*screenContext, index);
-			},
-			.rename_agent = [this, screenContext = &ctx](int index) {
-				StartRenameAgent(*screenContext, index);
-			},
-			.set_alias = [this](const std::string& value) {
-				CopyAlias(value);
-			},
-			.submit_alias = [this, screenContext = &ctx]() {
-				SubmitAlias(*screenContext);
-			},
-			.preview_agency = [this](int index) {
-				previewAgencyIndex = index;
-			},
-			.activate_agency = [this, screenContext = &ctx](int index) {
-				ActivateAgency(*screenContext, index);
-			},
+		.activate_agent = [this, screenContext = &ctx](int index) {
+			ActivateAgent(*screenContext, index);
+		},
+		.rename_agent = [this, screenContext = &ctx](int index) {
+			StartRenameAgent(*screenContext, index);
+		},
+		.set_alias = [this](const std::string& value) {
+			CopyAlias(value);
+		},
+		.submit_alias = [this, screenContext = &ctx]() {
+			SubmitAlias(*screenContext);
+		},
+		.preview_agency = [this](int index) {
+			previewAgencyIndex = index;
+		},
+		.activate_agency = [this, screenContext = &ctx](int index) {
+			ActivateAgency(*screenContext, index);
 		},
 	};
-	const auto * stored = ::ui::copy_value(context);
+	const auto * stored = ::ui::copy_value(character);
 	if(!stored) return false;
 	*out = silencer::client_ui::CharacterCreateScreenView(
 		silencer::client_ui::CharacterCreateScreenViewProps{
 			.key = "character-create",
-			.value = stored,
+			.character = stored,
 		});
 	return true;
 }

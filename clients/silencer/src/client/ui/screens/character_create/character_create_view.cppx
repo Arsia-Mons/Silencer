@@ -39,21 +39,25 @@ const AgencyView& agency_at(int index) {
 	return kAgencies[index];
 }
 
-bool is_alias_step(const CharacterCreateContextValue::State& state) {
-	return state.step == CharacterCreateViewStep::EnterAlias;
+bool is_alias_step(const CharacterCreate& character) {
+	return character.step == CharacterCreateViewStep::EnterAlias;
 }
 
-bool is_agency_step(const CharacterCreateContextValue::State& state) {
-	return state.step == CharacterCreateViewStep::SelectAgency;
+bool is_agency_step(const CharacterCreate& character) {
+	return character.step == CharacterCreateViewStep::SelectAgency;
 }
 
-const char * agent_label(const CharacterCreateContextValue::State& state, int index) {
-	if(!state.agent_rows || index < 0 || index >= static_cast<int>(state.agent_rows->size())) return "";
-	return (*state.agent_rows)[static_cast<size_t>(index)].c_str();
+const char * agent_label(const CharacterCreate& character, int index) {
+	if(!character.agent_rows ||
+	   index < 0 ||
+	   index >= static_cast<int>(character.agent_rows->size())) return "";
+	return (*character.agent_rows)[static_cast<size_t>(index)].c_str();
 }
 
-bool agent_row_visible(const CharacterCreateContextValue::State& state, int index) {
-	return state.agent_rows && index >= 0 && index < static_cast<int>(state.agent_rows->size());
+bool agent_row_visible(const CharacterCreate& character, int index) {
+	return character.agent_rows &&
+		index >= 0 &&
+		index < static_cast<int>(character.agent_rows->size());
 }
 
 const char * agent_id(int index) {
@@ -256,20 +260,19 @@ struct AgentRowProps {
 };
 
 ::ui::UiElement AgentRow(const AgentRowProps& props) {
-	const CharacterCreateContextValue& character = UseCharacterCreate();
-	const CharacterCreateContextValue::State& state = character.state;
-	const int index = state.agent_scroll + props.slot;
+	const CharacterCreate& character = UseCharacterCreate();
+	const int index = character.agent_scroll + props.slot;
 	const char * id = agent_id(index);
-	if(is_agency_step(state)) return ::ui::empty();
-	if(!agent_row_visible(state, index)) return ::ui::empty();
+	if(is_agency_step(character)) return ::ui::empty();
+	if(!agent_row_visible(character, index)) return ::ui::empty();
 	return <Button
 	  key={props.key}
 	  id={id}
-	  label={agent_label(state, index)}
-	  selected={index == state.selected_agent_index}
-	  disabled={is_alias_step(state)}
-	  onFocus={preview_index(character.actions.preview_agent, index)}
-	  onActivate={activate_index(character.actions.activate_agent, index)}
+	  label={agent_label(character, index)}
+	  selected={index == character.selected_agent_index}
+	  disabled={is_alias_step(character)}
+	  onFocus={preview_index(character.preview_agent, index)}
+	  onActivate={activate_index(character.activate_agent, index)}
 	  layout={row_button_layout()}
 	/>
 }
@@ -280,19 +283,18 @@ struct AgencyRowProps {
 };
 
 ::ui::UiElement AgencyRow(const AgencyRowProps& props) {
-	const CharacterCreateContextValue& character = UseCharacterCreate();
-	const CharacterCreateContextValue::State& state = character.state;
+	const CharacterCreate& character = UseCharacterCreate();
 	const char * id = agency_id(props.index);
-	if(!is_agency_step(state)) return ::ui::empty();
+	if(!is_agency_step(character)) return ::ui::empty();
 	const AgencyView& agency = agency_at(props.index);
 	return <Button
 	  key={props.key}
 	  id={id}
 	  label={agency.name}
-	  selected={props.index == state.selected_agency_index}
-	  disabled={state.waiting}
-	  onFocus={preview_index(character.actions.preview_agency, props.index)}
-	  onActivate={activate_index(character.actions.activate_agency, props.index)}
+	  selected={props.index == character.selected_agency_index}
+	  disabled={character.waiting}
+	  onFocus={preview_index(character.preview_agency, props.index)}
+	  onActivate={activate_index(character.activate_agency, props.index)}
 	  layout={row_button_layout()}
 	/>
 }
@@ -303,11 +305,11 @@ struct AgentOrAgencyColumnProps {
 
 ::ui::UiElement AgentOrAgencyColumn(const AgentOrAgencyColumnProps& props) {
 	(void)props;
-	const CharacterCreateContextValue::State& state = UseCharacterCreate().state;
+	const CharacterCreate& character = UseCharacterCreate();
 	return <Box key="left" layout={column_layout(236.0f)}>
 		<Text
 		  key="title"
-		  value={is_agency_step(state) ? "SELECT AGENCY" : "SELECT AGENT"}
+		  value={is_agency_step(character) ? "SELECT AGENCY" : "SELECT AGENT"}
 		  layout={title_layout()}
 		  style={title_style()}
 		/>
@@ -335,11 +337,12 @@ struct DetailPanelProps {
 
 ::ui::UiElement DetailPanel(const DetailPanelProps& props) {
 	(void)props;
-	const CharacterCreateContextValue& character = UseCharacterCreate();
-	const CharacterCreateContextValue::State& state = character.state;
-	const int agency_detail_index = is_agency_step(state)
-		? (state.preview_agency_index >= 0 ? state.preview_agency_index : state.selected_agency_index)
-		: state.detail_agency_index;
+	const CharacterCreate& character = UseCharacterCreate();
+	const int agency_detail_index = is_agency_step(character)
+		? (character.preview_agency_index >= 0
+			? character.preview_agency_index
+			: character.selected_agency_index)
+		: character.detail_agency_index;
 	const AgencyView& detail_agency = agency_at(agency_detail_index);
 	return <Box key="detail" layout={detail_layout()}>
 		<Text
@@ -368,51 +371,51 @@ struct DetailPanelProps {
 		/>
 		<Text
 		  key="security"
-		  value={state.detail_stats[0]}
-		  disabled={is_agency_step(state) || state.detail_agent_index < 0}
+		  value={character.detail_stats[0]}
+		  disabled={is_agency_step(character) || character.detail_agent_index < 0}
 		  layout={detail_line_layout()}
 		  style={detail_style()}
 		/>
 		<Text
 		  key="stat-1"
-		  value={state.detail_stats[1]}
-		  disabled={is_agency_step(state) || state.detail_agent_index < 0}
+		  value={character.detail_stats[1]}
+		  disabled={is_agency_step(character) || character.detail_agent_index < 0}
 		  layout={detail_line_layout()}
 		  style={detail_style()}
 		/>
 		<Text
 		  key="stat-2"
-		  value={state.detail_stats[2]}
-		  disabled={is_agency_step(state) || state.detail_agent_index < 0}
+		  value={character.detail_stats[2]}
+		  disabled={is_agency_step(character) || character.detail_agent_index < 0}
 		  layout={detail_line_layout()}
 		  style={detail_style()}
 		/>
 		<Text
 		  key="stat-3"
-		  value={state.detail_stats[3]}
-		  disabled={is_agency_step(state) || state.detail_agent_index < 0}
+		  value={character.detail_stats[3]}
+		  disabled={is_agency_step(character) || character.detail_agent_index < 0}
 		  layout={detail_line_layout()}
 		  style={detail_style()}
 		/>
 		<Button
 		  key="rename"
-		  id={rename_id(state.detail_agent_index)}
+		  id={rename_id(character.detail_agent_index)}
 		  label="Rename Once"
-		  disabled={!state.detail_rename_available || is_agency_step(state) || is_alias_step(state)}
-		  onActivate={activate_index(character.actions.rename_agent, state.detail_agent_index)}
+		  disabled={!character.detail_rename_available || is_agency_step(character) || is_alias_step(character)}
+		  onActivate={activate_index(character.rename_agent, character.detail_agent_index)}
 		  layout={rename_button_layout()}
 		/>
 		<Text
 		  key="description-heading"
 		  value="Description"
-		  disabled={!is_agency_step(state)}
+		  disabled={!is_agency_step(character)}
 		  layout={detail_line_layout()}
 		  style={detail_heading_style()}
 		/>
 		<Text
 		  key="description"
 		  value={detail_agency.description}
-		  disabled={!is_agency_step(state)}
+		  disabled={!is_agency_step(character)}
 		  layout={detail_paragraph_layout()}
 		  style={detail_style(::ui::TextWrap::Words)}
 		/>
@@ -425,33 +428,32 @@ struct AliasModalProps {
 
 ::ui::UiElement AliasModal(const AliasModalProps& props) {
 	(void)props;
-	const CharacterCreateContextValue& character = UseCharacterCreate();
-	const CharacterCreateContextValue::State& state = character.state;
-	const bool alias_step = is_alias_step(state);
+	const CharacterCreate& character = UseCharacterCreate();
+	const bool alias_step = is_alias_step(character);
 	return <Box key="alias-modal" layout={alias_modal_layout(alias_step)} style={panel_style()}>
 		<Text
 		  key="alias-title"
-		  value={state.alias_renaming ? "ONE-TIME RENAME" : "SILENCER ALIAS"}
+		  value={character.alias_renaming ? "ONE-TIME RENAME" : "SILENCER ALIAS"}
 		  layout={title_layout()}
 		  style={title_style()}
 		/>
 		<Input
 		  key="alias-input"
 		  id="character_create.alias"
-		  value={state.alias}
-		  disabled={!alias_step || state.waiting}
+		  value={character.alias}
+		  disabled={!alias_step || character.waiting}
 		  autofocus={alias_step}
 		  accessibility={::ui::components::AccessibilityProps{.role = ::ui::SemanticRole::TextBox, .label = "Alias"}}
-		  onActivate={action_callback(character.actions.submit_alias)}
-		  onChange={character.actions.set_alias}
+		  onActivate={action_callback(character.submit_alias)}
+		  onChange={character.set_alias}
 		  layout={alias_input_layout()}
 		/>
 		<Button
 		  key="alias-submit"
 		  id="character_create.alias.submit"
-		  label={state.alias_renaming ? "Rename" : "Continue"}
-		  disabled={!alias_step || state.waiting}
-		  onActivate={action_callback(character.actions.submit_alias)}
+		  label={character.alias_renaming ? "Rename" : "Continue"}
+		  disabled={!alias_step || character.waiting}
+		  onActivate={action_callback(character.submit_alias)}
 		  layout={rename_button_layout()}
 		/>
 	</Box>

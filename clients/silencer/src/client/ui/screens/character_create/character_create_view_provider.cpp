@@ -7,11 +7,11 @@ namespace client_ui {
 
 namespace {
 ::ReactContext CharacterCreateContext = {};
-const CharacterCreateContextValue kEmptyCharacterCreate = {};
+const CharacterCreate kEmptyCharacterCreate = {};
 }  // namespace
 
-const CharacterCreateContextValue& UseCharacterCreate() {
-	const auto * value = static_cast<const CharacterCreateContextValue *>(
+const CharacterCreate& UseCharacterCreate() {
+	const auto * value = static_cast<const CharacterCreate *>(
 		::use_context(&CharacterCreateContext));
 	if(value) return *value;
 	::react_report_error("client/ui/character-create: missing CharacterCreateProvider for UseCharacterCreate\n");
@@ -19,15 +19,15 @@ const CharacterCreateContextValue& UseCharacterCreate() {
 }
 
 ::ui::UiElement CharacterCreateScreenView(const CharacterCreateScreenViewProps& props) {
-	const CharacterCreateContextValue * stored = ::ui::copy_value(
-		props.value ? *props.value : kEmptyCharacterCreate);
+	const CharacterCreate * stored = ::ui::copy_value(
+		props.character ? *props.character : kEmptyCharacterCreate);
 	if(!stored){
 		return ::ui::empty();
 	}
 	return ::ui::provider(
 		"CharacterCreateProvider",
 		&CharacterCreateContext,
-		const_cast<CharacterCreateContextValue *>(stored),
+		const_cast<CharacterCreate *>(stored),
 		::ui::children({
 			::ui::component("CharacterCreateFrame",
 			                CharacterCreateFrameProps{ .key = "view" },

@@ -109,6 +109,13 @@ fail_if_match \
   "$REPO_ROOT/clients/silencer/src/client/ui/screens/character_create"
 
 fail_if_match \
+  "\\bCharacterCreateContextValue\\b|\\bstruct[[:space:]]+(State|Actions)\\b|character[.]state\\b|character[.]actions\\b" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens/character_create/character_create_view.cppx" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens/character_create/character_create_view.hx" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens/character_create/character_create_screen.cpp" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens/character_create/character_create_view_provider.cpp"
+
+fail_if_match \
   "extern ::ReactContext" \
   "$REPO_ROOT/clients/silencer/src/client/ui" \
   --glob '*.hx'
