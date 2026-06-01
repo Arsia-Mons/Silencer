@@ -5,9 +5,8 @@
 // presence list) and TextInput primitives plus a small set of background
 // sprites + the channel-name header.
 //
-// Domain glue lives HERE: draining `world.lobby.chatmessages`, watching
-// `presencechanged` / `channelchanged`, and routing the input field's Enter
-// to `world.lobby.SendChat`. The primitives stay screen-agnostic.
+// Domain glue lives behind LobbyProvider/use_lobby. This panel keeps local
+// scroll/input/wrapping state and consumes a chat pump snapshot each tick.
 
 #include "shared.h"
 #include "runtime/UiActionQueue.h"
@@ -15,11 +14,12 @@
 #include <string>
 #include <vector>
 
-class World;
-class Resources;
-
 namespace silencer::ui {
 class UiInteractionRegistry;
+}
+
+namespace silencer::client_ui {
+class LobbyChatModel;
 }
 
 namespace silencer::client_ui::lobby {
@@ -84,12 +84,11 @@ struct ChatPanelState {
 // One-time init. Clears state.
 void ChatPanelInit(ChatPanelState & state);
 
-// Per-frame pump: drains chatmessages, rebuilds presenceLines on
-// presencechanged, caches channel name on channelchanged. Mirrors legacy
-// ChatPanel::Tick.
-void ChatPanelTick(ChatPanelState & state, World & world);
+// Per-frame pump: consumes channel, presence, and chat-message updates from
+// LobbyChatModel. Mirrors legacy ChatPanel::Tick.
+void ChatPanelTick(ChatPanelState & state, LobbyChatModel & chat);
 bool ChatPanelHandleUiIntent(ChatPanelState & state,
-                             World & world,
+                             LobbyChatModel & chat,
                              const silencer::ui::UiAction & action);
 ChatPanelLayoutMetrics ResolveChatPanelLayout(Uint16 panelWidth,
                                               Uint16 panelHeight);
@@ -100,8 +99,6 @@ void ChatPanelSyncLayout(ChatPanelState & state,
 // Emits the panel subtree. Must be called inside an open Clay layout pass
 // AFTER TextBeginFrame() + ScrollTextBoxBeginFrame() + TextInputBeginFrame().
 void BuildChatPanelTree(ChatPanelState & state,
-                        World & world,
-                        Resources & resources,
                         Uint16 panelWidth,
                         Uint16 panelHeight,
                         silencer::ui::UiInteractionRegistry& interactions);

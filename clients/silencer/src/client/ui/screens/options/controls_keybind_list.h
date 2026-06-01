@@ -1,18 +1,11 @@
 #ifndef SILENCER_CLIENT_UI_OPTIONS_CONTROLS_KEYBIND_LIST_H
 #define SILENCER_CLIENT_UI_OPTIONS_CONTROLS_KEYBIND_LIST_H
 
-// Options→Controls keybind-list UI. Owns the screen-local panel content:
-// title, preset row, keybind rows, scroll-area metadata, and Save / Cancel.
+// Options Controls keybind-list view data and row-capacity math. The retained
+// frame owns presentation; this file stays free of Clay/runtime rendering.
 
 #include <string>
 #include <vector>
-
-class Surface;
-class OptionsControlsScreen;
-
-namespace silencer::ui {
-class UiInteractionRegistry;
-}
 
 namespace silencer::client_ui::options {
 
@@ -42,11 +35,6 @@ struct KeybindListView {
 };
 
 int KeybindListVisibleRowsForContentHeight(int contentHeight);
-
-// Emits the keybind-list panel interior into the current Clay frame. The
-// caller wraps in the scalable panel chrome.
-void BuildKeybindListBody(const KeybindListView & view,
-                          silencer::ui::UiInteractionRegistry& interactions);
 
 }  // namespace silencer::client_ui::options
 

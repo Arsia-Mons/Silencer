@@ -12,11 +12,11 @@ wait_alive "$PORT"
 
 OUT_DIR="$(mktemp -d)"
 
-cli --port "$PORT" wait_for_state --state MAINMENU --timeout-ms 15000 >/dev/null
+cli --port "$PORT" wait_for_ui --id main_menu.options --timeout-ms 15000 >/dev/null
 cli --port "$PORT" click --label OPTIONS >/dev/null
-cli --port "$PORT" wait_for_state --state OPTIONS --timeout-ms 5000 >/dev/null
+cli --port "$PORT" wait_for_ui --id options.controls --timeout-ms 5000 >/dev/null
 cli --port "$PORT" click --label CONTROLS >/dev/null
-cli --port "$PORT" wait_for_state --state OPTIONSCONTROLS --timeout-ms 5000 >/dev/null
+cli --port "$PORT" wait_for_ui --id options_controls.preset --timeout-ms 5000 >/dev/null
 cli --port "$PORT" wait_frames --n 2 >/dev/null
 
 cli --port "$PORT" inspect | bun -e '
@@ -86,7 +86,7 @@ if (!Number.isFinite(diff) || diff <= 0.01) {
 }
 ' "$diff"
 
-cli --port "$PORT" resize --w 1600 --h 1200 >/dev/null
+cli --port "$PORT" resize --w 1600 --h 1600 >/dev/null
 cli --port "$PORT" wait_frames --n 3 >/dev/null
 cli --port "$PORT" inspect | bun -e '
 const text = await new Response(Bun.stdin.stream()).text();
@@ -114,6 +114,6 @@ if (!list || list.h <= 254) {
 '
 
 cli --port "$PORT" click --label CANCEL >/dev/null
-cli --port "$PORT" wait_for_state --state OPTIONS --timeout-ms 5000 >/dev/null
+cli --port "$PORT" wait_for_ui --id options.controls --timeout-ms 5000 >/dev/null
 
 echo "PASS 12_controls_scroll ($OUT_DIR)"

@@ -32,6 +32,14 @@ class Serializer;
 class Audio;
 class BuyableItem;
 
+namespace silencer {
+namespace client_ui {
+class LobbyCreateModel;
+class LobbyPregameModel;
+class LobbyPregameTechModel;
+}
+}
+
 class World {
     public:
     enum modes { AUTHORITY, REPLICA };
@@ -204,7 +212,10 @@ class World {
     friend class Grenade;         friend class BaseDoor;
     friend class Terminal;        friend class PlayerAI;
     friend class Replay;          friend class Audio;
-    friend class TriggerGraph;    friend class LobbyScreen;
+    friend class TriggerGraph;
+    friend class silencer::client_ui::LobbyCreateModel;
+    friend class silencer::client_ui::LobbyPregameModel;
+    friend class silencer::client_ui::LobbyPregameTechModel;
 
     protected:
     void   SaveSnapshot(Serializer & data, Uint8 peerid)                                    { replication.SaveSnapshot(data, peerid); }

@@ -1,0 +1,180 @@
+#include "client/ui/screens/main_menu/main_menu_frame.h"
+
+#include "client/ui/components/actions/app_button.h"
+#include "client/ui/components/tokens.h"
+#include "ui/components/box.h"
+#include "ui/components/text.h"
+
+namespace silencer {
+namespace client_ui {
+
+using ::ui::children;
+using ::ui::components::Box;
+using ::ui::components::BoxProps;
+using ::ui::components::Text;
+using ::ui::components::TextProps;
+
+::ui::UiElement MainMenuFrame(const MainMenuFrameProps& props) {
+	return <Box
+	  key={props.key}
+	  layout={::ui::LayoutStyle{
+			.direction = ::ui::FlexDirection::Column,
+			.align_items = ::ui::AlignItems::Center,
+			.justify_content = ::ui::JustifyContent::Center,
+			.width = ::ui::Length::percent(100.0f),
+			.height = ::ui::Length::percent(100.0f),
+		}}
+	  style={tokens::fill_patch(tokens::kSurfaceMenu)}
+	>
+		<Box
+		  key="composition"
+		  layout={::ui::LayoutStyle{
+				.direction = ::ui::FlexDirection::Row,
+				.width = ::ui::Length::points(640.0f),
+				.height = ::ui::Length::points(480.0f),
+				.padding = {0.0f, 0.0f, 32.0f, 32.0f},
+			}}
+		>
+			<Box
+			  key="logo-group"
+			  layout={::ui::LayoutStyle{
+					.align_items = ::ui::AlignItems::Center,
+					.justify_content = ::ui::JustifyContent::Center,
+					.width = ::ui::Length::points(350.0f),
+					.height = ::ui::Length::grow(1.0f),
+					.padding = {7.0f, 0.0f, 0.0f, 0.0f},
+				}}
+			>
+				<Text
+				  key="title"
+				  value="Silencer"
+				  layout={::ui::LayoutStyle{.height = ::ui::Length::points(24.0f)}}
+				  style={tokens::text_patch(tokens::kTextTitle, tokens::kFontTitleBank, tokens::kFontTitleAdvance)}
+				/>
+			</Box>
+			<Box
+			  key="action-group"
+			  layout={::ui::LayoutStyle{
+					.position = ::ui::PositionType::Relative,
+					.width = ::ui::Length::points(290.0f),
+					.height = ::ui::Length::grow(1.0f),
+				}}
+			>
+				<Box
+				  key="actions"
+				  layout={::ui::LayoutStyle{
+						.position = ::ui::PositionType::Absolute,
+						.direction = ::ui::FlexDirection::Column,
+						.width = ::ui::Length::points(276.0f),
+						.height = ::ui::Length::points(234.0f),
+						.position_inset = tokens::inset_right_top(54.0f, 122.0f),
+						.gap = 34.0f,
+					}}
+				>
+					<Box
+					  key="tutorial-row"
+					  layout={::ui::LayoutStyle{
+						.direction = ::ui::FlexDirection::Row,
+						.width = ::ui::Length::points(276.0f),
+						.height = ::ui::Length::points(33.0f),
+					}}
+					>
+						<Box
+						  key="tutorial-spacer"
+						  layout={::ui::LayoutStyle{
+							.width = ::ui::Length::points(40.0f),
+							.height = ::ui::Length::points(1.0f),
+						}}
+						/>
+						<AppButton
+						  key="tutorial"
+						  controlId="main_menu.tutorial"
+						  size={AppButtonSize::MainMenu}
+						  variant={AppButtonVariant::Primary}
+						  label="Tutorial"
+						  onPress={props.start_tutorial}
+						/>
+					</Box>
+					<Box
+					  key="lobby-row"
+					  layout={::ui::LayoutStyle{
+						.direction = ::ui::FlexDirection::Row,
+						.width = ::ui::Length::points(276.0f),
+						.height = ::ui::Length::points(33.0f),
+					}}
+					>
+						<Box
+						  key="lobby-spacer"
+						  layout={::ui::LayoutStyle{
+							.width = ::ui::Length::points(80.0f),
+							.height = ::ui::Length::points(1.0f),
+						}}
+						/>
+						<AppButton
+						  key="lobby"
+						  controlId="main_menu.lobby"
+						  size={AppButtonSize::MainMenu}
+						  label="Connect To Lobby"
+						  onPress={props.open_lobby}
+						/>
+					</Box>
+					<Box
+					  key="options-row"
+					  layout={::ui::LayoutStyle{
+						.direction = ::ui::FlexDirection::Row,
+						.width = ::ui::Length::points(276.0f),
+						.height = ::ui::Length::points(33.0f),
+					}}
+					>
+						<Box
+						  key="options-spacer"
+						  layout={::ui::LayoutStyle{
+							.width = ::ui::Length::points(40.0f),
+							.height = ::ui::Length::points(1.0f),
+						}}
+						/>
+						<AppButton
+						  key="options"
+						  controlId="main_menu.options"
+						  size={AppButtonSize::MainMenu}
+						  label="Options"
+						  onPress={props.open_options}
+						/>
+					</Box>
+					<Box
+					  key="quit-row"
+					  layout={::ui::LayoutStyle{
+						.direction = ::ui::FlexDirection::Row,
+						.width = ::ui::Length::points(276.0f),
+						.height = ::ui::Length::points(33.0f),
+					}}
+					>
+						<AppButton
+						  key="quit"
+						  controlId="main_menu.exit"
+						  size={AppButtonSize::MainMenu}
+						  variant={AppButtonVariant::Ghost}
+						  label="Exit"
+						  onPress={props.quit}
+						/>
+					</Box>
+				</Box>
+			</Box>
+		</Box>
+		<Text
+		  key="version"
+		  value={props.version}
+		  layout={::ui::LayoutStyle{
+				.position = ::ui::PositionType::Absolute,
+				.position_inset = tokens::inset_left_bottom(10.0f, 6.0f),
+				.height = ::ui::Length::points(11.0f),
+			}}
+		  style={tokens::text_patch(::ui::Color{0, 0, 0, 255},
+		                            tokens::kFontFooterBank,
+		                            tokens::kFontFooterAdvance)}
+		/>
+	</Box>
+}
+
+}  // namespace client_ui
+}  // namespace silencer

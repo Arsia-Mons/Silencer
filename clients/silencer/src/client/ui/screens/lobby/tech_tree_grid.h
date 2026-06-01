@@ -5,17 +5,17 @@
 // columns + one local column with tech-name labels + per-row description
 // hit-target widget registration.
 
-class World;
-class LobbyScreen;
-
 namespace silencer::ui {
 class UiInteractionRegistry;
 }
 
+namespace silencer::client_ui {
+class LobbyModel;
+}
+
 namespace silencer::client_ui::lobby {
 
-void BuildTechTreeGrid(World & world,
-                       LobbyScreen & owner,
+void BuildTechTreeGrid(LobbyModel & lobby,
                        silencer::ui::UiInteractionRegistry& interactions);
 
 }  // namespace silencer::client_ui::lobby

@@ -243,7 +243,9 @@ bool append_image(DrawCommandList &list, const NodeSnapshot &node) {
 bool append_rect(DrawCommandList &list, const NodeSnapshot &node,
                  bool focused) {
   const VisualStyle &v = node.visual;
+  bool image_box = v.image.texture_id != 0;
   bool visual_box = has_color(v.background) || v.gradient.stop_count > 0 ||
+                    image_box ||
                     (v.border.color.top.a > 0 && v.border.width.top > 0.0f) ||
                     (v.outline.color.a > 0 && v.outline.width > 0.0f);
   bool control_box = node.role == NodeRole::Button ||
@@ -258,6 +260,9 @@ bool append_rect(DrawCommandList &list, const NodeSnapshot &node,
   if (v.gradient.stop_count > 0) {
     return push_gradient_command(list, node.id, node.layout, v.gradient,
                                  v.corner_radius);
+  }
+  if (image_box && !has_color(v.background)) {
+    return true;
   }
 
   Color fill = has_color(v.background)
@@ -274,6 +279,7 @@ bool append_rect(DrawCommandList &list, const NodeSnapshot &node,
 bool append_frame(DrawCommandList &list, const NodeSnapshot &node,
                   bool focused) {
   const VisualStyle &v = node.visual;
+  bool image_box = v.image.texture_id != 0;
   bool control_box = node.role == NodeRole::Button ||
                      node.role == NodeRole::Checkbox ||
                      node.role == NodeRole::Input;
@@ -286,7 +292,7 @@ bool append_frame(DrawCommandList &list, const NodeSnapshot &node,
   if (v.border.color.top.a > 0 && v.border.width.top > 0.0f) {
     border = v.border;
     has_border = true;
-  } else if (control_box) {
+  } else if (control_box && !image_box) {
     Color border_color =
         node.interaction.disabled ? kButtonDisabledBorder : kButtonBorder;
     border.width = {1.0f, 1.0f, 1.0f, 1.0f};

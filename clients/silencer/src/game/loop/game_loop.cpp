@@ -257,7 +257,6 @@ bool Game::Tick(void){
 	if(state != FADEOUT){
 		gameUiPipeline.TickVisibleScreens();
 	}
-	gameUiPipeline.InGameUi().UpdateOverlayState(world.peers.localpeerid);
 	if(!world.dedicatedserver.active){
 		if(world.lobby.state == Lobby::AUTHENTICATED){
 			// 0 = main lobby, 1 = pregame (game-specific lobby, waiting for
@@ -359,123 +358,22 @@ bool Game::Tick(void){
 	
 	switch(state){
 		case FADEOUT: TickFadeOut(); break;
-		case MAINMENU:{
+		case FRONTEND:{
 			if(stateisnew){
-				world.Disconnect();
-				world.gameplaystate = World::NONE;
-				world.lobby.Disconnect();
-				gameSession.UnloadGame();
-				world.GetAuthorityPeer()->controlledlist.clear();
-				world.DestroyAllObjects();
-				gameUiPipeline.ShowStateScreen(state);
+				FrontendPreparation preparation = frontendPreparation
+					? frontendPreparation
+					: &Game::PrepareMainMenuFrontend;
+				(this->*preparation)();
 				stateisnew = false;
 			}else{
 				if(gameSession.AmbienceMixerRef().FadedIn()){
 					gameSession.AmbienceMixerRef().PlayMusic(world.resources.menumusic);
 				}
-				// Button-click handling lives in MainMenuScreen::Tick, dispatched
-				// by ClientUi's navigation stack at the top of Game::Tick.
-			}
-		}break;
-		case LOBBYCONNECT:{
-			if(stateisnew){
-				world.GetAuthorityPeer()->controlledlist.clear();
-				world.DestroyAllObjects();
-				world.lobby.ClearGames();
-				world.lobby.state = Lobby::WAITING;
-				gameUiPipeline.ShowStateScreen(state);
-				stateisnew = false;
-			}else{
-				if(gameSession.AmbienceMixerRef().FadedIn()){
-					gameSession.AmbienceMixerRef().PlayMusic(world.resources.menumusic);
-				}
-			}
-		}break;
-		case LOBBY:{
-			if(stateisnew){
-				world.lobby.ForgetAllUserInfo();
-				world.gameplaystate = World::INLOBBY;
-				gameSession.UnloadGame();
-				world.Disconnect();
-				world.choosingtech = false;
-				world.lobby.channelchanged = true;
-				gameUiPipeline.ShowStateScreen(state);
-				stateisnew = false;
-			}else{
-				if(gameSession.AmbienceMixerRef().FadedIn()){
-					gameSession.AmbienceMixerRef().PlayMusic(world.resources.menumusic);
-				}
-				// Lobby pump (state-machine + deferred-create) lives in
-				// LobbyScreen::Tick, dispatched by ClientUi's navigation stack
-				// at the top of Game::Tick.
-			}
-		}break;
-		case CREATECHARACTER:{
-			if(stateisnew){
-				world.GetAuthorityPeer()->controlledlist.clear();
-				world.DestroyAllObjects();
-				gameUiPipeline.ShowStateScreen(state);
-				stateisnew = false;
-			}else{
-				if(gameSession.AmbienceMixerRef().FadedIn()){
-					gameSession.AmbienceMixerRef().PlayMusic(world.resources.menumusic);
-				}
-			}
-		}break;
-		case UPDATING:{
-			if(stateisnew){
-				world.GetAuthorityPeer()->controlledlist.clear();
-				world.DestroyAllObjects();
-				gameUiPipeline.ShowStateScreen(state);
-				stateisnew = false;
-			}else{
-				if(gameSession.AmbienceMixerRef().FadedIn()){
-					gameSession.AmbienceMixerRef().PlayMusic(world.resources.menumusic);
-				}
+				// Frontend screen behavior lives in ClientUi's navigation stack.
 			}
 		}break;
 		case INGAME: TickInGame(); break;
-		case MISSIONSUMMARY:{
-			if(stateisnew){
-				gameSession.UnloadGame();
-				world.Disconnect();
-				gameUiPipeline.ShowStateScreen(state);
-				stateisnew = false;
-			}else{
-				if(gameSession.AmbienceMixerRef().FadedIn()){
-					gameSession.AmbienceMixerRef().PlayMusic(world.resources.menumusic);
-				}
-			}
-		}break;
 		case SINGLEPLAYERGAME: TickSinglePlayerGame(); break;
-		case OPTIONS:{
-			if(stateisnew){
-				world.DestroyAllObjects();
-				gameUiPipeline.ShowStateScreen(state);
-				stateisnew = false;
-			}
-		}break;
-		case OPTIONSCONTROLS:{
-			if(stateisnew){
-				world.DestroyAllObjects();
-				gameUiPipeline.ShowStateScreen(state);
-				stateisnew = false;
-			}
-		}break;
-		case OPTIONSDISPLAY:{
-			if(stateisnew){
-				world.DestroyAllObjects();
-				gameUiPipeline.ShowStateScreen(state);
-				stateisnew = false;
-			}
-		}break;
-		case OPTIONSAUDIO:{
-			if(stateisnew){
-				world.DestroyAllObjects();
-				gameUiPipeline.ShowStateScreen(state);
-				stateisnew = false;
-			}
-		}break;
 		case HOSTGAME: TickHostGame(); break;
 		case JOINGAME: TickJoinGame(); break;
 		case TESTGAME: TickTestGame(); break;
@@ -503,9 +401,52 @@ void Game::GoToState(Uint8 newstate){
 	// pixels for the palette fade to dim before the next state rebuilt UI.
 }
 
+void Game::EnterFrontend(FrontendPreparation preparation){
+	frontendPreparation = preparation;
+	GoToState(FRONTEND);
+}
+
+void Game::GoToMainMenu(){
+	gameUiPipeline.ClientUiRoot().RequestMainMenuAfterClear();
+	EnterFrontend(&Game::PrepareMainMenuFrontend);
+}
+
+void Game::GoToLobby(){
+	gameUiPipeline.ClientUiRoot().RequestLobbyAfterClear();
+	EnterFrontend(&Game::PrepareLobbyFrontend);
+}
+
+void Game::GoToMissionSummary(){
+	gameUiPipeline.ClientUiRoot().RequestMissionSummaryAfterClear();
+	EnterFrontend(&Game::PrepareMissionSummaryFrontend);
+}
+
+void Game::PrepareMainMenuFrontend(){
+	world.Disconnect();
+	world.gameplaystate = World::NONE;
+	world.lobby.Disconnect();
+	gameSession.UnloadGame();
+	world.GetAuthorityPeer()->controlledlist.clear();
+	world.DestroyAllObjects();
+}
+
+void Game::PrepareLobbyFrontend(){
+	world.lobby.ForgetAllUserInfo();
+	world.gameplaystate = World::INLOBBY;
+	gameSession.UnloadGame();
+	world.Disconnect();
+	world.choosingtech = false;
+	world.lobby.channelchanged = true;
+}
+
+void Game::PrepareMissionSummaryFrontend(){
+	gameSession.UnloadGame();
+	world.Disconnect();
+}
+
 bool Game::GoBack(void){
 	if(gameUiPipeline.HandleBack()) return true;
-	GoToState(MAINMENU);
+	GoToMainMenu();
 	return false;
 }
 
@@ -513,22 +454,13 @@ const char* Game::StateName(Uint8 s){
 	switch(s){
 		case NONE: return "NONE";
 		case FADEOUT: return "FADEOUT";
-		case MAINMENU: return "MAINMENU";
-		case LOBBYCONNECT: return "LOBBYCONNECT";
-		case LOBBY: return "LOBBY";
-		case UPDATING: return "UPDATING";
 		case INGAME: return "INGAME";
-		case MISSIONSUMMARY: return "MISSIONSUMMARY";
 		case SINGLEPLAYERGAME: return "SINGLEPLAYERGAME";
-		case OPTIONS: return "OPTIONS";
-		case OPTIONSCONTROLS: return "OPTIONSCONTROLS";
-		case OPTIONSDISPLAY: return "OPTIONSDISPLAY";
-		case OPTIONSAUDIO: return "OPTIONSAUDIO";
 		case HOSTGAME: return "HOSTGAME";
 		case JOINGAME: return "JOINGAME";
 		case REPLAYGAME: return "REPLAYGAME";
 		case TESTGAME: return "TESTGAME";
-		case CREATECHARACTER: return "CREATECHARACTER";
+		case FRONTEND: return "FRONTEND";
 		default: return "UNKNOWN";
 	}
 }

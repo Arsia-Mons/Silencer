@@ -1,0 +1,139 @@
+#include "client/ui/screens/options/options_boolean_row.h"
+
+#include "client/ui/components/tokens.h"
+#include "ui/components/box.h"
+#include "ui/components/button.h"
+#include "ui/components/text.h"
+#include "ui/style/style_patch.h"
+
+#include <cstdint>
+
+namespace silencer {
+namespace client_ui {
+namespace options_boolean_row_detail {
+
+using ::ui::children;
+using ::ui::components::Box;
+using ::ui::components::BoxProps;
+using ::ui::components::Button;
+using ::ui::components::ButtonProps;
+using ::ui::components::Text;
+using ::ui::components::TextProps;
+
+inline std::uint32_t texture_id(std::uint8_t bank, std::uint16_t index) {
+	return (static_cast<std::uint32_t>(bank) << 16) |
+	       static_cast<std::uint32_t>(index);
+}
+
+inline ::ui::StylePatch image_patch(std::uint8_t bank, std::uint16_t index) {
+	return ::ui::patch().image(::ui::BackgroundImage{
+		.texture_id = texture_id(bank, index),
+		.tint = {255, 255, 255, 255},
+	});
+}
+
+inline ::ui::StyleStatePatch oval_button_patch() {
+	return ::ui::patch()
+		.image(::ui::BackgroundImage{
+			.texture_id = texture_id(6, 23),
+			.tint = {255, 255, 255, 255},
+		})
+		.text(tokens::font_text(tokens::kTextButton, tokens::kFontTitleBank, 11));
+}
+
+inline ::ui::StylePatch button_text_patch() {
+	return ::ui::patch().text(::ui::TextVisual{
+		.color = tokens::kTextButton,
+		.font_id = tokens::kFontTitleBank,
+		.font_size = 11,
+		.align = ::ui::TextAlign::Center,
+	});
+}
+
+	struct IndicatorProps {
+		const char * key = nullptr;
+		int index = 0;
+	};
+
+	::ui::UiElement Indicator(const IndicatorProps& props) {
+		return <Box
+		  key={props.key}
+		  layout={::ui::LayoutStyle{
+				.width = ::ui::Length::points(20.0f),
+				.height = ::ui::Length::points(33.0f),
+			}}
+		  style={image_patch(6, static_cast<std::uint16_t>(props.index))}
+		/>
+	}
+
+	struct IndicatorsProps {
+		const char * key = nullptr;
+		bool selected = false;
+	};
+
+	::ui::UiElement Indicators(const IndicatorsProps& props) {
+		return <Box
+		  key={props.key}
+		  layout={::ui::LayoutStyle{
+				.direction = ::ui::FlexDirection::Row,
+				.align_items = ::ui::AlignItems::Center,
+			.width = ::ui::Length::points(50.0f),
+			.height = ::ui::Length::points(33.0f),
+				.gap = 10.0f,
+			}}
+		>
+			<Indicator key="left" index={props.selected ? 12 : 13} />
+			<Indicator key="right" index={props.selected ? 15 : 14} />
+		</Box>
+	}
+
+}  // namespace options_boolean_row_detail
+
+using ::ui::children;
+using ::ui::components::Box;
+using ::ui::components::BoxProps;
+using ::ui::components::Button;
+using ::ui::components::ButtonProps;
+using ::ui::components::Text;
+using ::ui::components::TextProps;
+using options_boolean_row_detail::Indicators;
+using options_boolean_row_detail::IndicatorsProps;
+
+::ui::UiElement OptionsBooleanRow(const OptionsBooleanRowProps& props) {
+	const char * label = props.label ? props.label : "";
+	return <Box
+	  key={props.key}
+	  layout={::ui::LayoutStyle{
+			.direction = ::ui::FlexDirection::Row,
+			.align_items = ::ui::AlignItems::Center,
+			.width = ::ui::Length::points(294.0f),
+			.height = ::ui::Length::points(33.0f),
+			.gap = 24.0f,
+		}}
+	>
+		<Button
+		  key="button"
+		  id={props.control_id}
+		  accessibility={{.label = label}}
+		  layout={::ui::LayoutStyle{
+				.align_items = ::ui::AlignItems::Center,
+				.justify_content = ::ui::JustifyContent::Center,
+				.width = ::ui::Length::points(220.0f),
+				.height = ::ui::Length::points(33.0f),
+				.padding = {14.0f, 14.0f, 8.0f, 8.0f},
+			}}
+		  style={options_boolean_row_detail::oval_button_patch()}
+		>
+			<Text
+			  key="label"
+			  value={label}
+			  layout={::ui::LayoutStyle{.height = ::ui::Length::points(19.0f)}}
+			  style={options_boolean_row_detail::button_text_patch()}
+			/>
+		</Button>
+			<Indicators key="indicator" selected={props.selected} />
+		</Box>
+	}
+
+}  // namespace client_ui
+}  // namespace silencer

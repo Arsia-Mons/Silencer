@@ -78,6 +78,10 @@ void ClientUiInput::QueueControlPointerHover(int x, int y) {
 	controlCommands_.push_back(command);
 }
 
+void ClientUiInput::QueueNavigationRequest(std::function<void()> request) {
+	if(request) navigationRequests_.push_back(std::move(request));
+}
+
 void ClientUiInput::QueuePointerWindowEvent(float windowX,
                                             float windowY,
                                             int windowW,
@@ -199,11 +203,6 @@ silencer::ui::UiInputState ClientUiInput::BuildFrame(int width,
 	input.bindingInputs = bindingInputs_;
 	input.controlCommands = controlCommands_;
 	lastFramePointerDown_ = input.pointer.down;
-	return input;
-}
-
-void ClientUiInput::EndFrame() {
-	pointerWasDown_ = lastFramePointerDown_;
 	controlPointerActive_ = false;
 	wheelX_ = 0.0f;
 	wheelY_ = 0.0f;
@@ -213,6 +212,17 @@ void ClientUiInput::EndFrame() {
 	controlCommands_.clear();
 	pointerPressed_ = false;
 	pointerReleased_ = false;
+	return input;
+}
+
+std::vector<std::function<void()>> ClientUiInput::DrainNavigationRequests() {
+	std::vector<std::function<void()>> requests;
+	requests.swap(navigationRequests_);
+	return requests;
+}
+
+void ClientUiInput::EndFrame() {
+	pointerWasDown_ = lastFramePointerDown_;
 }
 
 }  // namespace client_ui

@@ -20,7 +20,7 @@
 // `password` masks the rendered glyphs to '*'. `inactive` overrides
 // `brightness` to 64 (matches legacy effectbrightness handling) and
 // suppresses the caret. `numbersOnly` is a registry input-filter hint; the
-// primitive ignores it for rendering. Enter handling is screen/controller-owned through
+// primitive ignores it for rendering. Enter handling is screen-owned through
 // UiInteractionRegistry; the primitive itself does not route SDL events.
 //
 // Memory: each call may allocate a small per-frame TextInputPayload + a

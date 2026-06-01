@@ -10,7 +10,7 @@ trap 'stop_silencer "$PID" "$PORT"' EXIT
 
 wait_alive "$PORT"
 
-cli --port "$PORT" wait_for_state --state MAINMENU --timeout-ms 15000 >/dev/null
+cli --port "$PORT" wait_for_ui --id main_menu.options --timeout-ms 15000 >/dev/null
 cli --port "$PORT" show_password_modal >/dev/null
 cli --port "$PORT" wait_frames --n 2 >/dev/null
 

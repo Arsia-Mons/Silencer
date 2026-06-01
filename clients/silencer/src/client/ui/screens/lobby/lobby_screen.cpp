@@ -1,13 +1,19 @@
 #include "lobby_screen.h"
 
+#include "character_create_screen.h"
 #include "game_create_panel.h"
+#include "client/ui/hooks/use_app.h"
+#include "client/ui/hooks/use_lobby.h"
+#include "client/ui/hooks/use_navigation.h"
 #include "lobby_chrome.h"
+#include "lobby_connect_screen.h"
 #include "lobby_main_area.h"
+#include "main_menu_screen.h"
 
 #include "screen_context.h"
 #include "game.h"
+#include "message_modal.h"
 #include "renderdevice.h"
-#include "world.h"
 #include "renderer.h"
 #include "surface.h"
 
@@ -18,6 +24,7 @@
 
 #include <algorithm>
 #include <cstdint>
+#include <memory>
 #include <string>
 
 namespace lobby_screen_detail {
@@ -56,16 +63,20 @@ LobbyScreen::~LobbyScreen() = default;
 
 void LobbyScreen::Build(ScreenContext & ctx)
 {
-	World & world = ctx.world;
 	ctx.ResetPresentation(2);
 	ctx.renderer.camera.SetPosition(320, 240);
 
 	version  = "v.";
-	version += world.GetVersion();
+	version += silencer::client_ui::use_app(
+		silencer::client_ui::MakeAppProvider(ctx)).version();
 	mapName.clear();
 	goBackClicked = false;
+	disconnectMessageOpen = false;
 
-	silencer::client_ui::lobby::CharacterPanelInit(characterState);
+	silencer::client_ui::LobbyModel lobby =
+		silencer::client_ui::use_lobby(
+			silencer::client_ui::MakeLobbyProvider(ctx, this));
+	silencer::client_ui::lobby::CharacterPanelInit(characterState, lobby.character);
 	silencer::client_ui::lobby::ChatPanelInit(chatState);
 	silencer::client_ui::lobby::GameSelectPanelInit(gameSelectState);
 	silencer::client_ui::lobby::GameJoinPanelInit(gameJoinState);
@@ -77,10 +88,10 @@ void LobbyScreen::Build(ScreenContext & ctx)
 
 void LobbyScreen::ShowGameSelect(ScreenContext & ctx)
 {
+	(void)ctx;
 	gameCreateActive = false;
 	gameJoinActive   = false;
 	gameTechActive   = false;
-	ctx.world.lobby.gamesprocessed = false;
 }
 
 void LobbyScreen::ShowGameCreate(ScreenContext & ctx)
@@ -101,9 +112,7 @@ void LobbyScreen::ShowGameJoin(ScreenContext & ctx)
 
 void LobbyScreen::ShowGameTech(ScreenContext & ctx)
 {
-	ctx.world.choosingtech = true;
-	ctx.world.RequestPeerList();
-
+	(void)ctx;
 	silencer::client_ui::lobby::GameTechPanelInit(gameTechState);
 	gameTechActive   = true;
 	gameJoinActive   = false;
@@ -168,8 +177,11 @@ void LobbyScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime, s
 			gameJoinActive,
 			gameTechActive,
 		};
+		silencer::client_ui::LobbyModel lobby =
+			silencer::client_ui::use_lobby(
+				silencer::client_ui::MakeLobbyProvider(ctx, this));
 		BuildLobbyMainArea(
-			panels, ctx, *this, bodyX, bodyY, bodyW, bodyH, regionGap, interactions);
+			panels, ctx, lobby, bodyX, bodyY, bodyW, bodyH, regionGap, interactions);
 		if(gameCreateActive){
 			BuildGameCreatePreviewOverlay(gameCreateState, ctx);
 		}
@@ -181,7 +193,173 @@ void LobbyScreen::Destroy(ScreenContext & ctx)
 	(void)ctx;
 }
 
-void LobbyScreen::SetMapNameOverlay(World & /*world*/, const char * name)
+void LobbyScreen::SetMapNameOverlay(const char * name)
 {
 	mapName = name ? std::string(name).substr(0, 25) : std::string();
+}
+
+namespace lobby_screen_flow_detail {
+
+constexpr const char * kActionGoBack = "lobby.go_back";
+
+MessageModal * ProgressModal(silencer::client_ui::lobby::GameCreatePanelState & state)
+{
+	return state.progressModal;
+}
+
+void DismissProgressModal(silencer::client_ui::lobby::GameCreatePanelState & state,
+                          ScreenContext & ctx)
+{
+	if(!state.progressModal) return;
+	silencer::client_ui::use_navigation().pop_top();
+	state.progressModal = nullptr;
+}
+
+}  // namespace lobby_screen_flow_detail
+
+void LobbyScreen::Tick(ScreenContext & ctx)
+{
+	silencer::client_ui::LobbyModel lobby =
+		silencer::client_ui::use_lobby(
+			silencer::client_ui::MakeLobbyProvider(ctx, this));
+
+	if(lobby.session.disconnect_lobby_if_needed()){
+		silencer::client_ui::use_navigation()
+			.reset_to(std::make_unique<LobbyConnectScreen>());
+		return;
+	}
+
+	// Chrome Go Back -- flag was set by a typed button intent on the previous
+	// frame. Consume it before pumping anything else.
+	if(goBackClicked){
+		goBackClicked = false;
+		silencer::client_ui::use_navigation()
+			.reset_to(std::make_unique<MainMenuScreen>());
+		return;
+	}
+
+	silencer::client_ui::lobby::CharacterPanelTick(characterState, lobby.character);
+	if(characterState.newCharacterRequested){
+		characterState.newCharacterRequested = false;
+		silencer::client_ui::use_navigation()
+			.reset_to(std::make_unique<CharacterCreateScreen>());
+		return;
+	}
+	silencer::client_ui::lobby::ChatPanelTick(chatState, lobby.chat);
+
+	if(!gameCreateActive && !gameJoinActive && !gameTechActive){
+		const silencer::client_ui::lobby::GameSelectPanelTickResult selected =
+			silencer::client_ui::lobby::GameSelectPanelTick(
+				gameSelectState, lobby);
+		if(selected.show_create){
+			ShowGameCreate(ctx);
+		}
+	}
+	if(gameCreateActive){
+		silencer::client_ui::lobby::GameCreatePanelTick(
+			gameCreateState, ctx, lobby);
+	}
+	if(gameJoinActive){
+		const silencer::client_ui::lobby::GameJoinPanelTickResult joined =
+			silencer::client_ui::lobby::GameJoinPanelTick(
+				gameJoinState, lobby);
+		if(joined.show_tech){
+			ShowGameTech(ctx);
+		}
+	}
+	if(gameTechActive){
+		const silencer::client_ui::lobby::GameTechPanelTickResult tech =
+			silencer::client_ui::lobby::GameTechPanelTick(
+				gameTechState, lobby);
+		if(tech.show_roster){
+			ShowGameJoin(ctx);
+		}
+	}
+
+	MessageModal * progress =
+		lobby_screen_flow_detail::ProgressModal(gameCreateState);
+	const silencer::client_ui::LobbySessionPumpResult session =
+		lobby.session.pump(gameJoinActive || gameTechActive, progress != nullptr);
+	if(session.lobby_disconnected){
+		silencer::client_ui::use_navigation()
+			.reset_to(std::make_unique<LobbyConnectScreen>());
+		return;
+	}
+	if(progress && !session.progress_text.empty()){
+		progress->SetText(ctx, session.progress_text);
+	}
+	if(session.dismiss_progress){
+		lobby_screen_flow_detail::DismissProgressModal(gameCreateState, ctx);
+	}
+	if(!session.message.empty()){
+		lobby.modal.show_message(session.message.c_str());
+	}
+	if(session.show_game_join){
+		ShowGameJoin(ctx);
+		SetMapNameOverlay(session.map_name.c_str());
+	}
+	if(session.disconnected_from_game && !disconnectMessageOpen){
+		disconnectMessageOpen = true;
+		silencer::client_ui::use_navigation().push(
+			std::make_unique<MessageModal>(
+				"Disconnected from game",
+				[]() {
+					silencer::client_ui::use_navigation()
+						.reset_to(std::make_unique<MainMenuScreen>());
+				}));
+	}
+}
+
+bool LobbyScreen::HandleBack(ScreenContext & ctx)
+{
+	silencer::client_ui::LobbyModel lobby =
+		silencer::client_ui::use_lobby(
+			silencer::client_ui::MakeLobbyProvider(ctx, this));
+	if(gameJoinActive || gameTechActive){
+		lobby.pregame.leave_joined_game();
+		lobby.browser.mark_games_dirty();
+		SetMapNameOverlay("");
+		ShowGameSelect(ctx);
+		return true;
+	}
+	if(gameCreateActive){
+		lobby.browser.mark_games_dirty();
+		ShowGameSelect(ctx);
+		return true;
+	}
+	return false;
+}
+
+bool LobbyScreen::HandleUiIntent(ScreenContext & ctx, const silencer::ui::UiAction & action)
+{
+	if(action.kind == silencer::ui::UiActionKind::Cancel){
+		if(HandleBack(ctx)) return true;
+		goBackClicked = true;
+		return true;
+	}
+	if(action.kind == silencer::ui::UiActionKind::Activate &&
+	   action.id == lobby_screen_flow_detail::kActionGoBack){
+		goBackClicked = true;
+		return true;
+	}
+	silencer::client_ui::LobbyModel lobby =
+		silencer::client_ui::use_lobby(
+			silencer::client_ui::MakeLobbyProvider(ctx, this));
+	if(silencer::client_ui::lobby::CharacterPanelHandleUiIntent(
+			characterState, lobby.character, action)){
+		return true;
+	}
+	if(silencer::client_ui::lobby::ChatPanelHandleUiIntent(chatState, lobby.chat, action)){
+		return true;
+	}
+	if(gameCreateActive){
+		return silencer::client_ui::lobby::GameCreatePanelHandleUiIntent(gameCreateState, action);
+	}
+	if(gameJoinActive){
+		return silencer::client_ui::lobby::GameJoinPanelHandleUiIntent(gameJoinState, action);
+	}
+	if(gameTechActive){
+		return silencer::client_ui::lobby::GameTechPanelHandleUiIntent(gameTechState, action);
+	}
+	return silencer::client_ui::lobby::GameSelectPanelHandleUiIntent(gameSelectState, action);
 }

@@ -6,26 +6,26 @@
 // selected agency emblem, core record stats, and navigation to the
 // character selection/create screen.
 //
-// Domain glue (Config::Save, World::SetAgency, agency-change detection)
-// lives HERE in the screen — not in the primitives. The primitives stay
-// screen-agnostic.
+// Domain glue lives behind LobbyProvider/use_lobby. This panel keeps only
+// local UI state and renders the model snapshot it receives.
 
 #include "shared.h"
 #include "runtime/UiActionQueue.h"
-
-class World;
-class Resources;
 
 namespace silencer::ui {
 class UiInteractionRegistry;
 }
 
+namespace silencer::client_ui {
+class LobbyCharacterModel;
+}
+
 namespace silencer::client_ui::lobby {
 
 struct CharacterPanelState {
-	// Currently-selected agency (Team::NOXIS .. Team::BLACKROSE). For
-	// authenticated accounts this mirrors the selected character's locked
-	// agency; offline fallback keeps using Config::defaultagency.
+	// Currently-selected agency id. For authenticated accounts this mirrors
+	// the selected character's locked agency; offline fallback comes from the
+	// lobby character model.
 	Uint8 selectedAgency = 0;
 	// Last selectedAgency reflected into the world. -1 forces a first-frame
 	// reconcile on entry (matches legacy's initial agencychanged=true).
@@ -34,22 +34,23 @@ struct CharacterPanelState {
 	bool agentSelectionLocked = false;
 };
 
-// Initialise state from Config (defaultagency).
-void CharacterPanelInit(CharacterPanelState & state);
+// Initialise state from the lobby character model default agency.
+void CharacterPanelInit(CharacterPanelState & state,
+                        LobbyCharacterModel & character);
 
-// Reconcile any selectedAgency change with Config + world. Called once per
-// LobbyScreen::Tick.
-void CharacterPanelTick(CharacterPanelState & state, World & world);
+// Reconcile any selectedAgency change through the lobby character model.
+// Called once per LobbyScreen::Tick.
+void CharacterPanelTick(CharacterPanelState & state,
+                        LobbyCharacterModel & character);
 bool CharacterPanelHandleUiIntent(CharacterPanelState & state,
-                                  World & world,
+                                  LobbyCharacterModel & character,
                                   const silencer::ui::UiAction & action);
 
 // Emit the panel subtree. Must be called inside an open Clay layout pass,
 // after the UI frame payload arenas have been reset.
 void BuildCharacterPanelTree(CharacterPanelState & state,
                              Uint16 panelWidth,
-                             World & world,
-                             Resources & resources,
+                             LobbyCharacterModel & character,
                              silencer::ui::UiInteractionRegistry& interactions);
 
 }  // namespace silencer::client_ui::lobby

@@ -133,14 +133,14 @@ stop_silencer() {
 
 create_initial_character() {
   local alias="${1:-Agent}"
-  cli --port "$CTRL_PORT" wait_for_state --state CREATECHARACTER --timeout-ms 15000 >/dev/null
+  cli --port "$CTRL_PORT" wait_for_ui --id-prefix character_create. --timeout-ms 15000 >/dev/null
   wait_for_widget "Create New Character"
   cli --port "$CTRL_PORT" click --label "Create New Character" >/dev/null
   wait_for_widget "Alias"
   cli --port "$CTRL_PORT" set_text --label "Alias" --text "$alias" >/dev/null
   cli --port "$CTRL_PORT" key --key enter >/dev/null
-  cli --port "$CTRL_PORT" wait_for_state --state CREATECHARACTER --timeout-ms 15000 >/dev/null
+  cli --port "$CTRL_PORT" wait_for_ui --id-prefix character_create. --timeout-ms 15000 >/dev/null
   wait_for_widget "Noxis"
   cli --port "$CTRL_PORT" click --label "Noxis" >/dev/null
-  cli --port "$CTRL_PORT" wait_for_state --state LOBBY --timeout-ms 15000 >/dev/null
+  cli --port "$CTRL_PORT" wait_for_ui --id lobby.go_back --timeout-ms 15000 >/dev/null
 }

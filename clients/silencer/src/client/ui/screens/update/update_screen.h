@@ -1,6 +1,7 @@
 #ifndef UPDATE_SCREEN_H
 #define UPDATE_SCREEN_H
 
+#include "client/ui/retained/RetainedFrame.h"
 #include "screen.h"
 
 class UpdateScreen : public Screen
@@ -11,12 +12,14 @@ public:
 	void BuildUi(ScreenContext & ctx, Surface & dst, float frametime, silencer::ui::UiInteractionRegistry& interactions) override;
 	void Destroy(ScreenContext & ctx) override;
 	bool HandleUiIntent(ScreenContext & ctx, const silencer::ui::UiAction & action) override;
+	const ::ui::DrawCommandList * RetainedDrawCommands() const override;
 
 private:
 	bool updateClicked = false;
 	bool cancelClicked = false;
 	bool retryClicked = false;
 	bool downloadClicked = false;
+	silencer::client_ui::RetainedFrame retainedFrame_;
 };
 
 #endif

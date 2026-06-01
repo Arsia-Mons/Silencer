@@ -240,10 +240,8 @@ void BuildGameSelectActionButtons(const GameSelectPanelState & state,
 
 void BuildGameSelectUpperTree(GameSelectPanelState & state,
                               Uint16 panelWidth,
-                              Resources & resources,
                               silencer::ui::UiInteractionRegistry& interactions) {
 	(void)state;
-	(void)resources;
 
 	// Create Game button — single flex child of the Upper box.
 	CLAY({ .id = CLAY_ID("GSelBtnCreateWrap"),
@@ -260,9 +258,7 @@ void BuildGameSelectUpperTree(GameSelectPanelState & state,
 void BuildGameSelectTallTree(GameSelectPanelState & state,
                              Uint16 panelWidth,
                              Uint16 panelHeight,
-                             Resources & resources,
                              silencer::ui::UiInteractionRegistry& interactions) {
-	(void)resources;
 	const game_select_panel_layout_detail::GameSelectTallLayout layout =
 		game_select_panel_layout_detail::ResolveTallLayout(panelWidth, panelHeight);
 

@@ -1,17 +1,20 @@
 #include "client/ui/ClientUi.h"
 
 #include "client/ui/hud/HudPayloadArena.h"
+#include "client/ui/hooks/use_app.h"
+#include "client/ui/hooks/use_match.h"
+#include "client/ui/hud/InGameHud.h"
+#include "client/ui/hud/InGameOverlays.h"
+#include "lobby_screen.h"
+#include "main_menu_screen.h"
+#include "mission_summary_screen.h"
 #include "screen.h"
 #include "screen_context.h"
 #include "runtime/UiInputRouter.h"
-
-#ifndef SILENCER_TEST_BUILD
-#include "audio.h"
-#include "gasloader.h"
 #include "world.h"
-#endif
 
 #include <utility>
+#include <cstring>
 
 namespace silencer {
 namespace client_ui {
@@ -59,17 +62,60 @@ bool ActionTargetsAudibleInteractable(const silencer::ui::UiInteractionRegistry&
 	return widget && IsAudibleInteractable(*widget);
 }
 
+bool StartsWith(const std::string& value, const char * prefix) {
+	return value.compare(0, std::strlen(prefix), prefix) == 0;
+}
+
+bool DispatchMatchAction(const MatchModel& match,
+                         const silencer::ui::UiAction& action,
+                         silencer::ui::UiInteractionRegistry& interactions) {
+	if(match.chat.active() &&
+	   (action.id == "ingame.chat" || action.id == "ingame.chat.channel")){
+		if(action.kind == silencer::ui::UiActionKind::SetText &&
+		   action.id == "ingame.chat"){
+			match.chat.set_draft(action.value);
+		}else if(action.kind == silencer::ui::UiActionKind::SubmitText){
+			match.chat.submit(action.value);
+		}else if(action.kind == silencer::ui::UiActionKind::Cancel){
+			match.chat.cancel();
+		}else if((action.kind == silencer::ui::UiActionKind::Navigate ||
+		          action.kind == silencer::ui::UiActionKind::Activate) &&
+		         action.id == "ingame.chat.channel"){
+			match.chat.toggle_channel();
+			interactions.FocusInteractableById("ingame.chat");
+		}
+		return true;
+	}
+
+	if(match.station.active() && StartsWith(action.id, "ingame.buytech.row.")){
+		if(action.index >= 0){
+			match.station.select_row(action.index);
+		}
+		if(action.kind == silencer::ui::UiActionKind::Select &&
+		   action.value != "focus_next" && action.value != "focus_previous"){
+			match.station.activate_selected();
+		}
+		return true;
+	}
+
+	if(match.station.active() && action.kind == silencer::ui::UiActionKind::Cancel){
+		match.station.close();
+		return true;
+	}
+
+	return false;
+}
+
+void DispatchMatchActions(const MatchModel& match,
+                          const std::vector<silencer::ui::UiAction>& actions,
+                          silencer::ui::UiInteractionRegistry& interactions) {
+	for(const silencer::ui::UiAction& action : actions){
+		(void)DispatchMatchAction(match, action, interactions);
+	}
+}
+
 void PlayMenuButtonSound(ScreenContext& ctx) {
-#ifdef SILENCER_TEST_BUILD
-	(void)ctx;
-#else
-	Audio& audio = Audio::GetInstance();
-	if(!audio.enabled) return;
-	const std::string& sound = GASLoader::Get().player.soundUIClick;
-	auto it = ctx.world.resources.soundbank.find(sound);
-	if(it == ctx.world.resources.soundbank.end() || !it->second) return;
-	audio.PlayUI(it->second);
-#endif
+	use_app(MakeAppProvider(ctx)).audio.play_ui_click();
 }
 
 }  // namespace clientui_detail
@@ -78,6 +124,23 @@ ClientUi::ClientUi(silencer::ui::ClayService& clay)
 	: clay_(clay) {}
 
 ClientUi::~ClientUi() = default;
+
+NavigationProviderValue ClientUi::MakeNavigationProvider(ScreenContext& ctx) {
+	return NavigationProviderValue{
+		[this, &ctx](std::unique_ptr<Screen> screen) {
+			return PushScreen(std::move(screen), ctx);
+		},
+		[this, &ctx](std::unique_ptr<Screen> screen) {
+			ResetToScreen(std::move(screen), ctx);
+		},
+		[this, &ctx]() {
+			PopScreen(ctx);
+		},
+		[this, &ctx]() {
+			PopScreen(ctx);
+		},
+	};
+}
 
 void ClientUi::BeginFrame(const silencer::ui::UiInputState& input) {
 	frameCtx_.BeginFrame(input.animationDeltaSeconds, input.animationStepSeconds);
@@ -92,6 +155,7 @@ std::vector<silencer::ui::UiRenderCommand> ClientUi::EndFrame() {
 std::vector<silencer::ui::UiAction> ClientUi::DispatchInput(
 	ScreenContext& ctx,
 	const silencer::ui::UiInputState& input) {
+	NavigationProviderScope navigationScope(MakeNavigationProvider(ctx));
 	Screen * top = screens_.Top();
 	silencer::ui::UiInputRouter router(interactions_);
 	std::vector<silencer::ui::UiAction> actions = router.Route(input);
@@ -110,7 +174,15 @@ std::vector<silencer::ui::UiAction> ClientUi::DispatchInput(
 			playedFeedback = true;
 		}
 	}
-	if(!top) return actions;
+	if(!top){
+		if(ctx.world.map.loaded){
+			MatchModel match = use_match(MatchProviderValue{&ctx.world},
+			                             ctx.world.peers.localpeerid);
+			clientui_detail::DispatchMatchActions(match, actions, interactions_);
+			return std::vector<silencer::ui::UiAction>();
+		}
+		return actions;
+	}
 	std::vector<silencer::ui::UiAction> unhandled;
 	for(const silencer::ui::UiAction& action : actions){
 		if(top && top->HandleUiIntent(ctx, action)){
@@ -128,16 +200,81 @@ std::vector<silencer::ui::UiAction> ClientUi::DrainActions() {
 	return interactions_.DrainActions();
 }
 
-void ClientUi::PushScreen(std::unique_ptr<Screen> screen, ScreenContext& ctx) {
-	screens_.Push(std::move(screen), ctx);
+bool ClientUi::HasInputTarget(ScreenContext& ctx) const {
+	if(TopScreen()) return true;
+	if(!ctx.world.map.loaded) return false;
+	MatchModel match = use_match(MatchProviderValue{&ctx.world},
+	                             ctx.world.peers.localpeerid);
+	return match.hud.has_input_target();
+}
+
+void ClientUi::EnsureDefaultScreen(ScreenContext& ctx) {
+	if(HasScreens()) return;
+	PushScreen(std::make_unique<MainMenuScreen>(), ctx);
+}
+
+bool ClientUi::HandleBack(ScreenContext& ctx) {
+	Screen * top = screens_.Top();
+	if(!top) return false;
+	NavigationProviderScope navigationScope(MakeNavigationProvider(ctx));
+	return top->HandleBack(ctx);
+}
+
+void ClientUi::RunNavigationRequests(ScreenContext& ctx, std::vector<std::function<void()>> requests) {
+	if(requests.empty()) return;
+	NavigationProviderScope navigationScope(MakeNavigationProvider(ctx));
+	for(auto& request : requests){
+		if(request) request();
+	}
+}
+
+Screen * ClientUi::PushScreen(std::unique_ptr<Screen> screen, ScreenContext& ctx) {
+	NavigationProviderScope navigationScope(MakeNavigationProvider(ctx));
+	return screens_.Push(std::move(screen), ctx);
 }
 
 void ClientUi::PopScreen(ScreenContext& ctx) {
+	NavigationProviderScope navigationScope(MakeNavigationProvider(ctx));
 	screens_.Pop(ctx);
 }
 
 void ClientUi::ReplaceScreen(std::unique_ptr<Screen> screen, ScreenContext& ctx) {
+	NavigationProviderScope navigationScope(MakeNavigationProvider(ctx));
 	screens_.Replace(std::move(screen), ctx);
+}
+
+Screen * ClientUi::ResetToScreen(std::unique_ptr<Screen> screen, ScreenContext& ctx) {
+	NavigationProviderScope navigationScope(MakeNavigationProvider(ctx));
+	return screens_.ResetTo(std::move(screen), ctx);
+}
+
+Screen * ClientUi::ShowMainMenu(ScreenContext& ctx) {
+	return ResetToScreen(std::make_unique<MainMenuScreen>(), ctx);
+}
+
+Screen * ClientUi::ShowLobby(ScreenContext& ctx) {
+	return ResetToScreen(std::make_unique<LobbyScreen>(), ctx);
+}
+
+Screen * ClientUi::ShowMissionSummary(ScreenContext& ctx) {
+	return ResetToScreen(std::make_unique<MissionSummaryScreen>(), ctx);
+}
+
+void ClientUi::RequestMainMenuAfterClear() {
+	RequestScreenAfterClear(&ClientUi::ShowMainMenu);
+}
+
+void ClientUi::RequestLobbyAfterClear() {
+	RequestScreenAfterClear(&ClientUi::ShowLobby);
+}
+
+void ClientUi::RequestMissionSummaryAfterClear() {
+	RequestScreenAfterClear(&ClientUi::ShowMissionSummary);
+}
+
+void ClientUi::RequestScreenAfterClear(ScreenRequest request) {
+	screenAfterClear_ = request;
+	hasScreenAfterClear_ = request != nullptr;
 }
 
 void ClientUi::RequestClearScreens() {
@@ -145,15 +282,48 @@ void ClientUi::RequestClearScreens() {
 }
 
 void ClientUi::ClearScreensIfRequested(ScreenContext& ctx) {
-	screens_.ClearIfRequested(ctx);
+	NavigationProviderScope navigationScope(MakeNavigationProvider(ctx));
+	if(screens_.ClearIfRequested(ctx) && hasScreenAfterClear_){
+		pendingScreenRequest_ = screenAfterClear_;
+		hasPendingScreenRequest_ = true;
+		screenAfterClear_ = nullptr;
+		hasScreenAfterClear_ = false;
+	}
+}
+
+void ClientUi::RunPendingScreenRequest(ScreenContext& ctx) {
+	if(!hasPendingScreenRequest_) return;
+	ScreenRequest request = pendingScreenRequest_;
+	pendingScreenRequest_ = nullptr;
+	hasPendingScreenRequest_ = false;
+	if(request) (this->*request)(ctx);
 }
 
 void ClientUi::TickVisibleScreens(ScreenContext& ctx) {
+	NavigationProviderScope navigationScope(MakeNavigationProvider(ctx));
 	screens_.TickVisible(ctx);
+	if(ctx.world.map.loaded){
+		MatchModel match = use_match(MatchProviderValue{&ctx.world},
+		                             ctx.world.peers.localpeerid);
+		match.hud.update_overlay_state();
+	}
 }
 
 void ClientUi::BuildVisibleScreens(ScreenContext& ctx, Surface& dst, float frametime) {
+	NavigationProviderScope navigationScope(MakeNavigationProvider(ctx));
 	screens_.BuildVisible(ctx, dst, frametime, interactions_);
+	if(ctx.world.map.loaded){
+		MatchModel match = use_match(MatchProviderValue{&ctx.world},
+		                             ctx.world.peers.localpeerid);
+		HudView hudView = match.hud.snapshot();
+		BuildInGameHudUi(
+			ctx.renderer, ctx.world.resources, hudView, &dst, interactions_);
+		BuildInGameOverlaysUi(ctx.renderer, ctx.world.resources, hudView, &dst);
+	}
+}
+
+std::vector<const ::ui::DrawCommandList *> ClientUi::RetainedDrawCommands() const {
+	return screens_.RetainedDrawCommands();
 }
 
 }  // namespace client_ui

@@ -9,7 +9,7 @@ PID="$(start_silencer "$PORT")"
 trap 'stop_silencer "$PID" "$PORT"' EXIT
 
 wait_alive "$PORT"
-cli --port "$PORT" wait_for_state --state MAINMENU --timeout-ms 15000 >/dev/null
+cli --port "$PORT" wait_for_ui --id main_menu.options --timeout-ms 15000 >/dev/null
 
 # The control key op's directional names mirror the gamepad UI navigation
 # mapping in Game::TickGamepadMenuNavigation.
@@ -17,9 +17,9 @@ cli --port "$PORT" key --key down >/dev/null
 cli --port "$PORT" key --key down >/dev/null
 cli --port "$PORT" key --key down >/dev/null
 cli --port "$PORT" key --key enter >/dev/null
-cli --port "$PORT" wait_for_state --state OPTIONS --timeout-ms 5000 >/dev/null
+cli --port "$PORT" wait_for_ui --id options.controls --timeout-ms 5000 >/dev/null
 
 cli --port "$PORT" back >/dev/null
-cli --port "$PORT" wait_for_state --state MAINMENU --timeout-ms 5000 >/dev/null
+cli --port "$PORT" wait_for_ui --id main_menu.options --timeout-ms 5000 >/dev/null
 
 echo "PASS 14_directional_navigation"

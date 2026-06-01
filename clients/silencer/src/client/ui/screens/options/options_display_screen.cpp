@@ -1,38 +1,19 @@
 #include "options_display_screen.h"
 
+#include "client/ui/hooks/use_navigation.h"
+#include "client/ui/hooks/use_options.h"
+#include "client/ui/screens/options/options_display_frame.h"
 #include "screen_context.h"
-#include "game_state.h"
-#include "game.h"
+#include "clay_ui_compositor.h"
 #include "renderer.h"
 #include "surface.h"
-#include "config.h"
-#include "renderdevice.h"
 
-#include "components/boolean_setting_row.h"
-#include "clay/clay.h"
-#include "clay_ui_compositor.h"
 #include "runtime/UiInteractionRegistry.h"
-#include "primitives/button.h"
-#include "primitives/text.h"
 
-#include <SDL3/SDL.h>
-#include <SDL3/SDL_video.h>
+#include <algorithm>
 
 namespace options_display_screen_detail
 {
-using silencer::ui::primitives::Button;
-using silencer::ui::primitives::ButtonHandle;
-using silencer::ui::primitives::ButtonOpts;
-using silencer::ui::primitives::ButtonSize;
-using silencer::ui::primitives::ButtonVariant;
-using silencer::ui::primitives::Text;
-using silencer::ui::primitives::TextSize;
-
-constexpr uint16_t kPanelW = 420;
-constexpr uint16_t kPanelPadX = 24;
-constexpr uint16_t kPanelPadY = 32;
-constexpr uint16_t kRowGap = 20;
-constexpr uint16_t kActionGap = 12;
 constexpr const char * kActionFullscreen = "options_display.fullscreen";
 constexpr const char * kActionSmoothScaling = "options_display.smooth_scaling";
 constexpr const char * kActionSave = "options_display.save";
@@ -51,100 +32,51 @@ void OptionsDisplayScreen::Build(ScreenContext & ctx)
 
 void OptionsDisplayScreen::Tick(ScreenContext & ctx)
 {
+	silencer::client_ui::OptionsModel options =
+		silencer::client_ui::use_options(
+			silencer::client_ui::MakeOptionsProvider(ctx));
 	if(fullscreenClicked){
 		fullscreenClicked = false;
-		Config & cfg = Config::GetInstance();
-		cfg.fullscreen = !cfg.fullscreen;
-		if(ctx.window) SDL_SetWindowFullscreen(ctx.window, cfg.fullscreen);
+		options.display.toggle_fullscreen();
 	}
 	if(smoothScalingClicked){
 		smoothScalingClicked = false;
-		Config & cfg = Config::GetInstance();
-		cfg.scalefilter = !cfg.scalefilter;
-		if(ctx.renderdevice) ctx.renderdevice->SetScaleFilter(cfg.scalefilter);
+		options.display.toggle_smooth_scaling();
 	}
 	if(saveClicked){
 		saveClicked = false;
-		Config::GetInstance().Save();
-		ctx.GoToState(GameState::OPTIONS);
+		options.display.save();
+		silencer::client_ui::use_navigation().pop_top();
 		return;
 	}
 	if(cancelClicked){
 		cancelClicked = false;
-		Config & cfg = Config::GetInstance();
-		cfg.Load();
-		if(ctx.renderdevice) ctx.renderdevice->SetScaleFilter(cfg.scalefilter);
-		if(ctx.window) SDL_SetWindowFullscreen(ctx.window, cfg.fullscreen);
-		ctx.GoToState(GameState::OPTIONS);
+		options.display.cancel();
+		silencer::client_ui::use_navigation().pop_top();
 	}
 }
 
 void OptionsDisplayScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime, silencer::ui::UiInteractionRegistry& interactions)
 {
 	(void)frametime;
-	(void)dst;
-	using namespace silencer::clay_bridge;
 
-	Config & cfg = Config::GetInstance();
-	CLAY({ .id = CLAY_ID("OptionsDisplayRoot"),
-	       .layout = {
-	           .sizing = { CLAY_SIZING_GROW(0),
-	                       CLAY_SIZING_GROW(0) },
-	           .padding = { 0, 0, 80, 0 },
-	           .childAlignment = { CLAY_ALIGN_X_CENTER, CLAY_ALIGN_Y_TOP },
-	       },
-	       .image = { .imageData = PackImage(6, 0) } }) {
-		CLAY({ .id = CLAY_ID("OptionsDisplayPanel"),
-		       .layout = {
-		           .sizing = { CLAY_SIZING_FIXED(options_display_screen_detail::kPanelW),
-		                       CLAY_SIZING_FIT(0) },
-		           .padding = { options_display_screen_detail::kPanelPadX, options_display_screen_detail::kPanelPadX,
-		                        options_display_screen_detail::kPanelPadY, options_display_screen_detail::kPanelPadY },
-		           .childGap = 22,
-		           .childAlignment = { CLAY_ALIGN_X_CENTER, CLAY_ALIGN_Y_TOP },
-		           .layoutDirection = CLAY_TOP_TO_BOTTOM,
-		       } }) {
-			options_display_screen_detail::Text(CLAY_STRING("Display Options"),
-			                                    { .size = options_display_screen_detail::TextSize::Title });
-			CLAY({ .id = CLAY_ID("OptionsDisplayRows"),
-			       .layout = {
-			           .sizing = { CLAY_SIZING_GROW(0), CLAY_SIZING_FIT(0) },
-			           .childGap = options_display_screen_detail::kRowGap,
-			           .childAlignment = { CLAY_ALIGN_X_CENTER, CLAY_ALIGN_Y_TOP },
-			           .layoutDirection = CLAY_TOP_TO_BOTTOM,
-			       } }) {
-				silencer::client_ui::options::BooleanSettingRow(
-					CLAY_STRING("OptionsDisplayFullscreenRow"),
-					CLAY_STRING("OptionsDisplayFullscreenButton"),
-					CLAY_STRING("Fullscreen"),
-					cfg.fullscreen,
-					options_display_screen_detail::kActionFullscreen,
-					interactions);
-				silencer::client_ui::options::BooleanSettingRow(
-					CLAY_STRING("OptionsDisplaySmoothScalingRow"),
-					CLAY_STRING("OptionsDisplaySmoothScalingButton"),
-					CLAY_STRING("Smooth Scaling"),
-					cfg.scalefilter,
-					options_display_screen_detail::kActionSmoothScaling,
-					interactions);
-			}
-			CLAY({ .id = CLAY_ID("OptionsDisplayActions"),
-			       .layout = {
-			           .sizing = { CLAY_SIZING_FIT(0), CLAY_SIZING_FIT(0) },
-			           .childGap = options_display_screen_detail::kActionGap,
-			           .layoutDirection = CLAY_LEFT_TO_RIGHT,
-			       } }) {
-				options_display_screen_detail::Button(CLAY_STRING("OptionsDisplaySaveButton"), CLAY_STRING("Save"),
-				           options_display_screen_detail::ButtonOpts{ .variant = options_display_screen_detail::ButtonVariant::Oval,
-				                                                      .size = options_display_screen_detail::ButtonSize::Md },
-				           options_display_screen_detail::ButtonHandle{ nullptr, options_display_screen_detail::kActionSave, &interactions });
-				options_display_screen_detail::Button(CLAY_STRING("OptionsDisplayCancelButton"), CLAY_STRING("Cancel"),
-				           options_display_screen_detail::ButtonOpts{ .variant = options_display_screen_detail::ButtonVariant::Oval,
-				                                                      .size = options_display_screen_detail::ButtonSize::Md },
-				           options_display_screen_detail::ButtonHandle{ nullptr, options_display_screen_detail::kActionCancel, &interactions });
-			}
-		}
-	}
+	silencer::client_ui::OptionsModel options =
+		silencer::client_ui::use_options(
+			silencer::client_ui::MakeOptionsProvider(ctx));
+	const float uiScale = silencer::clay_bridge::UiScale();
+	const int virtualW = std::max(1, static_cast<int>(dst.w / uiScale));
+	const int virtualH = std::max(1, static_cast<int>(dst.h / uiScale));
+	silencer::client_ui::OptionsDisplayFrameProps props{
+		.key = "options-display",
+		.fullscreen_enabled = options.display.fullscreen_enabled(),
+		.smooth_scaling_enabled = options.display.smooth_scaling_enabled(),
+	};
+	retainedFrame_.Build([&]() {
+		                     return silencer::client_ui::OptionsDisplayFrame(props);
+	                     },
+	                     virtualW,
+	                     virtualH,
+	                     interactions);
 }
 
 void OptionsDisplayScreen::Destroy(ScreenContext & ctx)
@@ -177,4 +109,9 @@ bool OptionsDisplayScreen::HandleUiIntent(ScreenContext & ctx, const silencer::u
 		return true;
 	}
 	return false;
+}
+
+const ::ui::DrawCommandList * OptionsDisplayScreen::RetainedDrawCommands() const
+{
+	return &retainedFrame_.Commands();
 }

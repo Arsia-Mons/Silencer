@@ -204,10 +204,10 @@ const std::vector<UiInteractable>& UiInteractionRegistry::Interactables() const 
 }
 
 const UiElementSnapshot* UiInteractionRegistry::FindById(const std::string& id) const {
-	auto it = std::find_if(elements_.begin(), elements_.end(), [&](const UiElementSnapshot& element) {
+	auto it = std::find_if(elements_.rbegin(), elements_.rend(), [&](const UiElementSnapshot& element) {
 		return element.id == id;
 	});
-	return it == elements_.end() ? nullptr : &*it;
+	return it == elements_.rend() ? nullptr : &*it;
 }
 
 const UiElementSnapshot* UiInteractionRegistry::FindByLabel(const std::string& label) const {

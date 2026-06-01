@@ -1,45 +1,27 @@
 #include "lobby_connect_screen.h"
 
+#include "client/ui/screens/lobby_connect/lobby_connect_frame.h"
+#include "client/ui/hooks/use_lobby.h"
+#include "client/ui/hooks/use_navigation.h"
+#include "character_create_screen.h"
+#include "lobby_screen.h"
+#include "main_menu_screen.h"
+#include "update_screen.h"
 #include "screen_context.h"
-#include "game_state.h"
 #include "game.h"
 #include "renderer.h"
 #include "surface.h"
-#include "lobby.h"
-#include "updater.h"
-#include "ambience_mixer.h"
-#include "config.h"
-#include "world.h"
 
-#include "clay/clay.h"
-#include "clay_ui_payloads.h"
 #include "clay_ui_compositor.h"
 #include "runtime/UiInteractionRegistry.h"
-#include "primitives/text.h"
-#include "primitives/button.h"
-#include "primitives/scroll_text_box.h"
-#include "primitives/text_input.h"
 
 #include <algorithm>
 #include <cstring>
-#include <cstdint>
+#include <memory>
 #include <string>
 
 namespace lobby_connect_screen_detail
 {
-using silencer::ui::primitives::Text;
-using silencer::ui::primitives::TextEffect;
-using silencer::ui::primitives::TextSize;
-using silencer::ui::primitives::Button;
-using silencer::ui::primitives::ButtonHandle;
-using silencer::ui::primitives::ButtonOpts;
-using silencer::ui::primitives::ButtonSize;
-using silencer::ui::primitives::ButtonVariant;
-using silencer::ui::primitives::ScrollTextBox;
-using silencer::ui::primitives::ScrollTextBoxLine;
-using silencer::ui::primitives::ScrollTextBoxOpts;
-using silencer::ui::primitives::ScrollTextBoxOrigin;
-
 // Prefixed to dodge anonymous-namespace collisions when SILENCER_UNITY_BUILD
 // merges this TU with sibling screen .cpp files (other screens already use
 // their own LBY_*-style prefixes).
@@ -48,48 +30,11 @@ enum LobbyConnectInput : Uint8 {
 	LBY_INPUT_PASSWORD = 2,
 };
 
-constexpr uint16_t kPanelW = 284;
-constexpr uint16_t kPanelH = 277;
-constexpr uint16_t kLogW = 250;
-constexpr uint16_t kLogH = 170;
-constexpr uint16_t kLogX = 7;
-constexpr uint16_t kLogY = 8;
-constexpr uint16_t kFormRowX = 4;
-constexpr uint16_t kFormRowY = 195;
-constexpr uint16_t kFormRowH = 21;
-constexpr uint16_t kFormRowGap = 6;
-constexpr uint16_t kLabelW = 86;
-constexpr uint16_t kInputW = 183;
-constexpr uint16_t kInputInsetX = 7;
-constexpr uint16_t kButtonGap = 0;
-constexpr uint16_t kButtonH = 21;
-constexpr uint16_t kButtonPatchX = 84;
-constexpr uint16_t kButtonPatchY = 246;
-constexpr uint16_t kButtonPatchW = 116;
-constexpr uint16_t kButtonPatchH = 24;
-constexpr uint16_t kButtonRowY = 249;
-constexpr uint16_t kButtonRowOffsetY = kButtonRowY - kButtonPatchY;
-constexpr int kButtonPaddingX = 10;
-constexpr int kMaxLogLines = 128;
+constexpr int kVisibleLogLines = 15;
 constexpr const char * kActionUsername = "lobby_connect.username";
 constexpr const char * kActionPassword = "lobby_connect.password";
 constexpr const char * kActionLogin = "lobby_connect.login";
 constexpr const char * kActionCancel = "lobby_connect.cancel";
-ScrollTextBoxLine g_logSlab[kMaxLogLines];
-Uint8 g_buttonPatchPixels[kButtonPatchW * kButtonPatchH];
-silencer::clay_bridge::SurfacePayload g_buttonPatchPayload{};
-silencer::clay_bridge::ClayCustomData g_buttonPatchCustomData{};
-bool g_buttonPatchInitialized = false;
-
-Clay_String FromCStr(const char * s)
-{
-	return Clay_String{ false, static_cast<int32_t>(std::strlen(s)), s };
-}
-
-Clay_String FromStd(const std::string & s)
-{
-	return Clay_String{ false, static_cast<int32_t>(s.size()), s.c_str() };
-}
 
 void CopyUiText(char * dst, int dstLen, const std::string & value)
 {
@@ -133,49 +78,13 @@ void RegisterWidgets(LobbyConnectScreen * screen,
 	RegisterInput("Password", kActionPassword, LBY_INPUT_PASSWORD,
 	              password, 29, true, inactive, interactions);
 }
-
-int FillLogSlab(const std::vector<std::string> & lines)
-{
-	int start = 0;
-	if(static_cast<int>(lines.size()) > kMaxLogLines){
-		start = static_cast<int>(lines.size()) - kMaxLogLines;
-	}
-	int count = 0;
-	for(int i = start; i < static_cast<int>(lines.size()); i++){
-		g_logSlab[count].text = FromStd(lines[i]);
-		g_logSlab[count].effect = TextEffect::Default();
-		g_logSlab[count].indent = 0;
-		count++;
-	}
-	return count;
-}
-
-void EnsureButtonPatch()
-{
-	if(g_buttonPatchInitialized) return;
-	// The original 52px login/cancel wells are baked into the panel sprite.
-	// Replace only that strip with the panel's stippled fill before drawing
-	// the measured-width buttons on top.
-	for(uint16_t y = 0; y < kButtonPatchH; ++y){
-		for(uint16_t x = 0; x < kButtonPatchW; ++x){
-			const uint16_t panelX = kButtonPatchX + x;
-			const uint16_t panelY = kButtonPatchY + y;
-			g_buttonPatchPixels[(y * kButtonPatchW) + x] =
-				((panelY & 1) == 0 || (panelX & 1) == 0) ? 210 : 146;
-		}
-	}
-	g_buttonPatchPayload.pixels = g_buttonPatchPixels;
-	g_buttonPatchPayload.width = kButtonPatchW;
-	g_buttonPatchPayload.height = kButtonPatchH;
-	g_buttonPatchCustomData.kind = silencer::clay_bridge::CustomKind::Surface;
-	g_buttonPatchCustomData.payload = &g_buttonPatchPayload;
-	g_buttonPatchInitialized = true;
-}
 } // namespace lobby_connect_screen_detail
 
 void LobbyConnectScreen::Build(ScreenContext & ctx)
 {
 	ctx.ResetPresentation(2);
+	silencer::client_ui::use_lobby(
+		silencer::client_ui::MakeLobbyProvider(ctx)).connection.reset();
 	motdprinted = false;
 	loginClicked = false;
 	cancelClicked = false;
@@ -190,346 +99,88 @@ void LobbyConnectScreen::Build(ScreenContext & ctx)
 
 void LobbyConnectScreen::Tick(ScreenContext & ctx)
 {
-	// Mirror the legacy LOBBYCONNECT case body's gate: nothing happens until
-	// the menu music has crossfaded in. The lobby state machine starts in
+	// Keep the legacy connection gate: nothing happens until the menu music
+	// has crossfaded in. The lobby state machine starts in
 	// WAITING and only kicks off the TCP connect on the first tick after
 	// the gate opens, so this delay shapes when the user sees "Connecting
 	// to ..." appear in the textbox.
-	if(!ctx.ambienceMixer.FadedIn()) return;
+	silencer::client_ui::LobbyModel lobby =
+		silencer::client_ui::use_lobby(
+			silencer::client_ui::MakeLobbyProvider(ctx));
+	if(!lobby.connection.ready()) return;
 
-	World & world = ctx.world;
-	world.lobby.LockMutex();
-	switch(world.lobby.state){
-		case Lobby::CONNECTING:
-
-		break;
-		case Lobby::WAITINGFORRESOLVER:
-
-		break;
-		case Lobby::AUTHSENT:
-
-		break;
-		case Lobby::IDLE:
-
-		break;
-		case Lobby::WAITING:{
-			char line[128];
-			snprintf(line, sizeof(line), "Connecting to %s:%d",
-			         Config::GetInstance().lobbyhost,
-			         Config::GetInstance().lobbyport);
-			AppendLog(line);
-			world.lobby.Connect(Config::GetInstance().lobbyhost,
-			                    Config::GetInstance().lobbyport);
-			//world.lobby.state = Lobby::AUTHENTICATED;
-		}break;
-		case Lobby::RESOLVING:
-			AppendLog("Resolving hostname...");
-			world.lobby.state = Lobby::WAITINGFORRESOLVER;
-		break;
-		case Lobby::RESOLVEFAILED:
-			AppendLog("Could not resolve hostname");
-			//world.lobby.Disconnect();
-			world.lobby.state = Lobby::IDLE;
-		break;
-		case Lobby::RESOLVED:
-			AppendLog("Hostname resolved");
-			world.lobby.Connect(Config::GetInstance().lobbyhost,
-			                    Config::GetInstance().lobbyport);
-		break;
-		case Lobby::CONNECTED:
-			AppendLog("Connected");
-			AppendLog("Checking version...");
-			world.lobby.SendVersion();
-			world.lobby.state = Lobby::CHECKINGVERSION;
-		break;
-		case Lobby::CHECKINGVERSION:
-			if(world.lobby.versionchecked){
-				if(world.lobby.versionok){
-					AppendLog("Software version is current");
-					world.lobby.state = Lobby::AUTHENTICATING;
-				}else{
-					if(world.lobby.updateavailable){
-						// Route into the auto-updater flow.
-						ctx.updater.PresentUpdate(world.lobby.updateurl,
-						                          world.lobby.updatesha256);
-						world.lobby.Disconnect();
-						world.lobby.state = Lobby::IDLE;
-						world.lobby.UnlockMutex();
-						ctx.GoToState(GameState::UPDATING);
-						return;
-					}else{
-						AppendLog("Software is out of date");
-						AppendLog("Get latest version at:");
-						AppendLog("https://github.com/Arsia-Mons/Silencer");
-						world.lobby.Disconnect();
-						world.lobby.state = Lobby::IDLE;
-					}
-				}
-			}
-		break;
-		case Lobby::AUTHENTICATING:
-			//world.lobby.state = Lobby::AUTHENTICATED;
-		break;
-		case Lobby::AUTHFAILED:
-			AppendLog("Authentication failed");
-			if(strlen(world.lobby.failmessage) > 0){
-				AppendLog(world.lobby.failmessage);
-			}
-			world.lobby.state = Lobby::AUTHENTICATING;
-			//world.lobby.Disconnect();
-		break;
-		case Lobby::AUTHENTICATED:
-			if(!world.lobby.charactersreceived){
-				break;
-			}
-			AppendLog("Authenticated");
-			{
-				const bool needsCharacter = world.lobby.characters.empty();
-				world.lobby.UnlockMutex();
-				ctx.GoToState(needsCharacter ? GameState::CREATECHARACTER : GameState::LOBBY);
-				return;
-			}
-		case Lobby::CONNECTIONFAILED:
-			AppendLog("Connection failed");
-			world.lobby.state = Lobby::IDLE;
-		break;
-		case Lobby::DISCONNECTED:
-			AppendLog("Disconnected");
-			world.lobby.state = Lobby::IDLE;
-		break;
+	silencer::client_ui::LobbyConnectionTickResult connection =
+		lobby.connection.tick(motdprinted);
+	for(const std::string& line : connection.log_lines){
+		AppendLog(line.c_str());
 	}
-	if(world.lobby.motdreceived && !motdprinted){
-		char * line = strtok(world.lobby.motd, "\n");
-		while(line != 0){
-			AppendLog(line);
-			line = strtok(NULL, "\n");
-		}
-		motdprinted = true;
+	if(connection.motd_printed) motdprinted = true;
+	if(connection.destination == silencer::client_ui::LobbyConnectionDestination::Update){
+		silencer::client_ui::use_navigation()
+			.reset_to(std::make_unique<UpdateScreen>());
+		return;
 	}
+	if(connection.destination == silencer::client_ui::LobbyConnectionDestination::CharacterCreate){
+		silencer::client_ui::use_navigation()
+			.reset_to(std::make_unique<CharacterCreateScreen>());
+		return;
+	}
+	if(connection.destination == silencer::client_ui::LobbyConnectionDestination::Lobby){
+		silencer::client_ui::use_navigation()
+			.reset_to(std::make_unique<LobbyScreen>());
+		return;
+	}
+
 	if(loginClicked){
 		loginClicked = false;
-		if(world.lobby.state == Lobby::AUTHENTICATING){
-			world.lobby.SetLocalUsername(username);
-			world.lobby.SendCredentials(username, password);
-			world.lobby.state = Lobby::AUTHSENT;
-		}
+		lobby.connection.submit_credentials(username, password);
 	}
-	world.lobby.UnlockMutex();
 
 	if(cancelClicked){
 		cancelClicked = false;
-		ctx.GoToState(GameState::MAINMENU);
+		lobby.connection.cancel();
+		silencer::client_ui::use_navigation()
+			.reset_to(std::make_unique<MainMenuScreen>());
 	}
 }
 
 void LobbyConnectScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime, silencer::ui::UiInteractionRegistry& interactions)
 {
 	(void)frametime;
-	using namespace silencer::clay_bridge;
-
-	int lineCount = lobby_connect_screen_detail::FillLogSlab(logLines);
-	Uint16 scroll = 0;
-	const int visibleLines = lobby_connect_screen_detail::kLogH / 11;
-	if(lineCount > visibleLines){
-		scroll = static_cast<Uint16>(lineCount - visibleLines);
+	bool inactive = silencer::client_ui::use_lobby(
+		silencer::client_ui::MakeLobbyProvider(ctx)).connection.credentials_pending();
+	lobby_connect_screen_detail::RegisterWidgets(this, username, password, inactive, interactions);
+	if(!inactive && !interactions.HasFocus()){
+		interactions.FocusTextInputByUid(lobby_connect_screen_detail::LBY_INPUT_USERNAME);
 	}
-	bool inactive = ctx.world.lobby.state == Lobby::AUTHSENT;
-	lobby_connect_screen_detail::EnsureButtonPatch();
 	const bool usernameFocused =
 		interactions.IsTextInputFocused(lobby_connect_screen_detail::LBY_INPUT_USERNAME);
 	const bool passwordFocused =
 		interactions.IsTextInputFocused(lobby_connect_screen_detail::LBY_INPUT_PASSWORD);
 	const bool blink = (ctx.renderer.GetHudAnimationPhase() % 32) < 16;
 
-	CLAY({ .id = CLAY_ID("LobbyConnectRoot"),
-	       .layout = {
-	           .sizing = { CLAY_SIZING_GROW(0),
-	                       CLAY_SIZING_GROW(0) },
-	           .childAlignment = { CLAY_ALIGN_X_CENTER, CLAY_ALIGN_Y_CENTER },
-	       } }) {
-		CLAY({ .id = CLAY_ID("LobbyConnectPanel"),
-		       .layout = {
-		           .sizing = { CLAY_SIZING_FIXED(lobby_connect_screen_detail::kPanelW),
-		                       CLAY_SIZING_FIXED(lobby_connect_screen_detail::kPanelH) },
-		           .childGap = 0,
-		           .childAlignment = { CLAY_ALIGN_X_LEFT, CLAY_ALIGN_Y_TOP },
-		           .layoutDirection = CLAY_TOP_TO_BOTTOM,
-		       },
-		       .image = { .imageData = PackImage(7, 2) } }) {
-			CLAY({ .id = CLAY_ID("LobbyConnectLogSlot"),
-			       .layout = {
-			           .sizing = { CLAY_SIZING_GROW(0),
-			                       CLAY_SIZING_FIXED(lobby_connect_screen_detail::kLogY) },
-			       } }) {}
+	UpdateLogText();
+	usernameDisplay = username;
+	if(usernameFocused && blink) usernameDisplay += "|";
+	passwordDisplay.assign(std::strlen(password), '*');
+	if(passwordFocused && blink) passwordDisplay += "|";
 
-			CLAY({ .id = CLAY_ID("LobbyConnectLogRow"),
-			       .layout = {
-			           .sizing = { CLAY_SIZING_GROW(0),
-			                       CLAY_SIZING_FIXED(lobby_connect_screen_detail::kLogH) },
-			           .padding = { lobby_connect_screen_detail::kLogX, 0, 0, 0 },
-			           .childGap = 0,
-			           .childAlignment = { CLAY_ALIGN_X_LEFT, CLAY_ALIGN_Y_TOP },
-			           .layoutDirection = CLAY_LEFT_TO_RIGHT,
-			       } }) {
-				lobby_connect_screen_detail::ScrollTextBox(CLAY_STRING("LobbyConnectLog"),
-				              lobby_connect_screen_detail::g_logSlab,
-				              lineCount,
-				              scroll,
-				              { .width = lobby_connect_screen_detail::kLogW,
-				                .height = lobby_connect_screen_detail::kLogH,
-				                .lineHeight = 11,
-				                .text = { .size = lobby_connect_screen_detail::TextSize::Body },
-				                .origin = lobby_connect_screen_detail::ScrollTextBoxOrigin::TopDown });
-			}
-
-			CLAY({ .id = CLAY_ID("LobbyConnectPreFormGap"),
-			       .layout = {
-			           .sizing = {
-			               CLAY_SIZING_GROW(0),
-			               CLAY_SIZING_FIXED(lobby_connect_screen_detail::kFormRowY -
-			                                  lobby_connect_screen_detail::kLogY -
-			                                  lobby_connect_screen_detail::kLogH) },
-			       } }) {
-			}
-
-			CLAY({ .id = CLAY_ID("LobbyConnectForm"),
-			       .layout = {
-			           .sizing = { CLAY_SIZING_GROW(0),
-			                       CLAY_SIZING_FIXED((lobby_connect_screen_detail::kFormRowH * 2) +
-			                                         lobby_connect_screen_detail::kFormRowGap) },
-			           .childGap = lobby_connect_screen_detail::kFormRowGap,
-			           .layoutDirection = CLAY_TOP_TO_BOTTOM,
-			       } }) {
-				CLAY({ .id = CLAY_ID("LobbyConnectUsernameRow"),
-				       .layout = {
-				           .sizing = { CLAY_SIZING_GROW(0),
-				                       CLAY_SIZING_FIXED(lobby_connect_screen_detail::kFormRowH) },
-				           .padding = { lobby_connect_screen_detail::kFormRowX, 0, 0, 0 },
-				           .childGap = 0,
-				           .childAlignment = { CLAY_ALIGN_X_LEFT,
-				                               CLAY_ALIGN_Y_CENTER },
-				           .layoutDirection = CLAY_LEFT_TO_RIGHT,
-				       } }) {
-					CLAY({ .id = CLAY_ID("LobbyConnectUsernameLabel"),
-					       .layout = {
-					           .sizing = { CLAY_SIZING_FIXED(lobby_connect_screen_detail::kLabelW),
-					                       CLAY_SIZING_FIXED(lobby_connect_screen_detail::kFormRowH) },
-					           .childGap = 0,
-					           .childAlignment = { CLAY_ALIGN_X_CENTER,
-					                               CLAY_ALIGN_Y_CENTER },
-					           .layoutDirection = CLAY_LEFT_TO_RIGHT,
-					       } }) {
-						lobby_connect_screen_detail::Text(
-							CLAY_STRING("Username"),
-							{ .size = lobby_connect_screen_detail::TextSize::Heading });
-					}
-					silencer::ui::primitives::TextInput(
-						CLAY_STRING("LobbyConnectUsernameInput"),
-						username,
-						{ .widthPx = lobby_connect_screen_detail::kInputW,
-						  .heightPx = lobby_connect_screen_detail::kFormRowH,
-						  .textSize = lobby_connect_screen_detail::TextSize::Body,
-						  .inactive = inactive,
-						  .showCaret = usernameFocused && blink,
-						  .contentInsetX = lobby_connect_screen_detail::kInputInsetX },
-						{ nullptr, lobby_connect_screen_detail::kActionUsername,
-						  "Username", &interactions,
-						  lobby_connect_screen_detail::LBY_INPUT_USERNAME, 16 });
-				}
-
-				CLAY({ .id = CLAY_ID("LobbyConnectPasswordRow"),
-				       .layout = {
-				           .sizing = { CLAY_SIZING_GROW(0),
-				                       CLAY_SIZING_FIXED(lobby_connect_screen_detail::kFormRowH) },
-				           .padding = { lobby_connect_screen_detail::kFormRowX, 0, 0, 0 },
-				           .childGap = 0,
-				           .childAlignment = { CLAY_ALIGN_X_LEFT,
-				                               CLAY_ALIGN_Y_CENTER },
-				           .layoutDirection = CLAY_LEFT_TO_RIGHT,
-				       } }) {
-					CLAY({ .id = CLAY_ID("LobbyConnectPasswordLabel"),
-					       .layout = {
-					           .sizing = { CLAY_SIZING_FIXED(lobby_connect_screen_detail::kLabelW),
-					                       CLAY_SIZING_FIXED(lobby_connect_screen_detail::kFormRowH) },
-					           .childGap = 0,
-					           .childAlignment = { CLAY_ALIGN_X_CENTER,
-					                               CLAY_ALIGN_Y_CENTER },
-					           .layoutDirection = CLAY_LEFT_TO_RIGHT,
-					       } }) {
-						lobby_connect_screen_detail::Text(
-							CLAY_STRING("Password"),
-							{ .size = lobby_connect_screen_detail::TextSize::Heading });
-					}
-					silencer::ui::primitives::TextInput(
-						CLAY_STRING("LobbyConnectPasswordInput"),
-						password,
-						{ .widthPx = lobby_connect_screen_detail::kInputW,
-						  .heightPx = lobby_connect_screen_detail::kFormRowH,
-						  .textSize = lobby_connect_screen_detail::TextSize::Body,
-						  .password = true,
-						  .inactive = inactive,
-						  .showCaret = passwordFocused && blink,
-						  .contentInsetX = lobby_connect_screen_detail::kInputInsetX },
-						{ nullptr, lobby_connect_screen_detail::kActionPassword,
-						  "Password", &interactions,
-						  lobby_connect_screen_detail::LBY_INPUT_PASSWORD, 28 });
-				}
-			}
-
-			CLAY({ .id = CLAY_ID("LobbyConnectPreButtonGap"),
-			       .layout = {
-			           .sizing = {
-			               CLAY_SIZING_GROW(0),
-			               CLAY_SIZING_FIXED(lobby_connect_screen_detail::kButtonPatchY -
-			                                  lobby_connect_screen_detail::kFormRowY -
-			                                  (lobby_connect_screen_detail::kFormRowH * 2) -
-			                                  lobby_connect_screen_detail::kFormRowGap) },
-			       } }) {
-			}
-
-			CLAY({ .id = CLAY_ID("LobbyConnectButtonArea"),
-			       .layout = {
-			           .sizing = { CLAY_SIZING_GROW(0),
-			                       CLAY_SIZING_FIXED(lobby_connect_screen_detail::kButtonPatchH) },
-			           .padding = { lobby_connect_screen_detail::kButtonPatchX, 0, 0, 0 },
-			           .layoutDirection = CLAY_LEFT_TO_RIGHT,
-			       } }) {
-				CLAY({ .id = CLAY_ID("LobbyConnectButtonPatch"),
-				       .layout = {
-				           .sizing = { CLAY_SIZING_FIXED(lobby_connect_screen_detail::kButtonPatchW),
-				                       CLAY_SIZING_FIXED(lobby_connect_screen_detail::kButtonPatchH) },
-				       },
-				       .custom = { .customData = &lobby_connect_screen_detail::g_buttonPatchCustomData } }) {}
-				CLAY({ .id = CLAY_ID("LobbyConnectButtons"),
-				       .layout = {
-				           .sizing = { CLAY_SIZING_GROW(0),
-				                       CLAY_SIZING_FIXED(lobby_connect_screen_detail::kButtonH) },
-				           .childGap = lobby_connect_screen_detail::kButtonGap,
-				           .childAlignment = { CLAY_ALIGN_X_CENTER, CLAY_ALIGN_Y_CENTER },
-				           .layoutDirection = CLAY_LEFT_TO_RIGHT,
-				       },
-				       .floating = {
-				           .offset = { 0.0f, static_cast<float>(lobby_connect_screen_detail::kButtonRowOffsetY) },
-				           .zIndex = 1,
-				           .attachPoints = { .element = CLAY_ATTACH_POINT_LEFT_TOP,
-				                             .parent = CLAY_ATTACH_POINT_LEFT_TOP },
-				           .attachTo = CLAY_ATTACH_TO_PARENT,
-				       } }) {
-					lobby_connect_screen_detail::Button(CLAY_STRING("LobbyConnectLoginButton"), CLAY_STRING("Login/Create"),
-						lobby_connect_screen_detail::ButtonOpts{ .variant = lobby_connect_screen_detail::ButtonVariant::Chrome,
-						                                         .size = lobby_connect_screen_detail::ButtonSize::Auto,
-						                                         .paddingX = lobby_connect_screen_detail::kButtonPaddingX },
-						lobby_connect_screen_detail::ButtonHandle{ nullptr, lobby_connect_screen_detail::kActionLogin, &interactions });
-					lobby_connect_screen_detail::Button(CLAY_STRING("LobbyConnectCancelButton"), CLAY_STRING("Cancel"),
-						lobby_connect_screen_detail::ButtonOpts{ .variant = lobby_connect_screen_detail::ButtonVariant::Chrome,
-						                                         .size = lobby_connect_screen_detail::ButtonSize::Auto,
-						                                         .paddingX = lobby_connect_screen_detail::kButtonPaddingX },
-						lobby_connect_screen_detail::ButtonHandle{ nullptr, lobby_connect_screen_detail::kActionCancel, &interactions });
-				}
-			}
-		}
-	}
-
+	const float uiScale = silencer::clay_bridge::UiScale();
+	const int virtualW = std::max(1, static_cast<int>(dst.w / uiScale));
+	const int virtualH = std::max(1, static_cast<int>(dst.h / uiScale));
+	silencer::client_ui::LobbyConnectFrameProps props{
+		.key = "lobby-connect",
+		.log_text = logText.c_str(),
+		.username_display = usernameDisplay.c_str(),
+		.password_display = passwordDisplay.c_str(),
+		.inactive = inactive,
+	};
+	retainedFrame_.Build([&]() {
+		                     return silencer::client_ui::LobbyConnectFrame(props);
+	                     },
+	                     virtualW,
+	                     virtualH,
+	                     interactions);
 	lobby_connect_screen_detail::RegisterWidgets(this, username, password, inactive, interactions);
 }
 
@@ -582,4 +233,20 @@ void LobbyConnectScreen::AppendLog(const char * text)
 		logLines.erase(logLines.begin(),
 		               logLines.begin() + (logLines.size() - 256));
 	}
+}
+
+void LobbyConnectScreen::UpdateLogText()
+{
+	logText.clear();
+	const int count = static_cast<int>(logLines.size());
+	const int start = std::max(0, count - lobby_connect_screen_detail::kVisibleLogLines);
+	for(int i = start; i < count; ++i){
+		if(!logText.empty()) logText += "\n";
+		logText += logLines[static_cast<std::size_t>(i)];
+	}
+}
+
+const ::ui::DrawCommandList * LobbyConnectScreen::RetainedDrawCommands() const
+{
+	return &retainedFrame_.Commands();
 }

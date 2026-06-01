@@ -1,0 +1,130 @@
+#include "client/ui/screens/options/options_display_frame.h"
+
+#include "client/ui/components/actions/app_button.h"
+#include "client/ui/components/tokens.h"
+#include "client/ui/screens/options/options_boolean_row.h"
+#include "ui/components/box.h"
+#include "ui/components/text.h"
+#include "ui/style/style_patch.h"
+
+#include <cstdint>
+
+namespace silencer {
+namespace client_ui {
+namespace options_display_frame_detail {
+
+using ::ui::children;
+using ::ui::components::Box;
+using ::ui::components::BoxProps;
+using ::ui::components::Text;
+using ::ui::components::TextProps;
+
+inline std::uint32_t texture_id(std::uint8_t bank, std::uint16_t index) {
+	return (static_cast<std::uint32_t>(bank) << 16) |
+	       static_cast<std::uint32_t>(index);
+}
+
+inline ::ui::StylePatch background_patch() {
+	return ::ui::patch().image(::ui::BackgroundImage{
+		.texture_id = texture_id(6, 0),
+		.tint = {255, 255, 255, 255},
+	});
+}
+
+inline ::ui::StylePatch title_patch() {
+	return ::ui::patch().text(::ui::TextVisual{
+		.color = tokens::kTextTitle,
+		.font_id = tokens::kFontTitleBank,
+		.font_size = 11,
+		.align = ::ui::TextAlign::Center,
+	});
+}
+
+}  // namespace options_display_frame_detail
+
+using ::ui::children;
+using ::ui::components::Box;
+using ::ui::components::BoxProps;
+using ::ui::components::Text;
+using ::ui::components::TextProps;
+
+::ui::UiElement OptionsDisplayFrame(const OptionsDisplayFrameProps& props) {
+	return <Box
+	  key={props.key}
+	  layout={::ui::LayoutStyle{
+			.align_items = ::ui::AlignItems::Center,
+			.justify_content = ::ui::JustifyContent::Start,
+			.width = ::ui::Length::percent(100.0f),
+			.height = ::ui::Length::percent(100.0f),
+			.padding = {0.0f, 0.0f, 80.0f, 0.0f},
+		}}
+	  style={options_display_frame_detail::background_patch()}
+	>
+		<Box
+		  key="panel"
+		  layout={::ui::LayoutStyle{
+				.direction = ::ui::FlexDirection::Column,
+				.align_items = ::ui::AlignItems::Center,
+				.width = ::ui::Length::points(420.0f),
+				.padding = {24.0f, 24.0f, 32.0f, 32.0f},
+				.gap = 22.0f,
+			}}
+		>
+			<Text
+			  key="title"
+			  value="Display Options"
+			  layout={::ui::LayoutStyle{.height = ::ui::Length::points(19.0f)}}
+			  style={options_display_frame_detail::title_patch()}
+			/>
+			<Box
+			  key="rows"
+			  layout={::ui::LayoutStyle{
+					.direction = ::ui::FlexDirection::Column,
+					.align_items = ::ui::AlignItems::Center,
+					.width = ::ui::Length::points(372.0f),
+					.gap = 20.0f,
+				}}
+			>
+				<OptionsBooleanRow
+				  key="fullscreen"
+				  controlId="options_display.fullscreen"
+				  label="Fullscreen"
+				  selected={props.fullscreen_enabled}
+				/>
+				<OptionsBooleanRow
+				  key="smooth-scaling"
+				  controlId="options_display.smooth_scaling"
+				  label="Smooth Scaling"
+				  selected={props.smooth_scaling_enabled}
+				/>
+			</Box>
+			<Box
+			  key="actions"
+			  layout={::ui::LayoutStyle{
+					.direction = ::ui::FlexDirection::Row,
+					.align_items = ::ui::AlignItems::Center,
+					.justify_content = ::ui::JustifyContent::Center,
+					.width = ::ui::Length::points(404.0f),
+					.height = ::ui::Length::points(33.0f),
+					.gap = 12.0f,
+				}}
+			>
+				<AppButton
+				  key="save"
+				  controlId="options_display.save"
+				  size={AppButtonSize::MainMenu}
+				  label="Save"
+				/>
+				<AppButton
+				  key="cancel"
+				  controlId="options_display.cancel"
+				  size={AppButtonSize::MainMenu}
+				  label="Cancel"
+				/>
+			</Box>
+		</Box>
+	</Box>
+}
+
+}  // namespace client_ui
+}  // namespace silencer

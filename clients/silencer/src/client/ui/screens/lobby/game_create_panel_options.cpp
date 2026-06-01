@@ -280,9 +280,7 @@ void BuildOptionRow(GameCreatePanelState & state,
 void BuildGameCreateUpperTree(GameCreatePanelState & state,
                               Uint16 panelWidth,
                               Uint16 panelHeight,
-                              Resources & resources,
                               silencer::ui::UiInteractionRegistry& interactions) {
-	(void)resources;
 	const auto layout = game_create_panel_options_detail::ResolveUpperLayout(
 		panelWidth, panelHeight);
 	game_create_panel_options_detail::ClampOptionsScroll(state, layout);

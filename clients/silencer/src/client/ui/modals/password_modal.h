@@ -1,6 +1,7 @@
 #ifndef PASSWORD_MODAL_H
 #define PASSWORD_MODAL_H
 
+#include "client/ui/retained/RetainedFrame.h"
 #include "modal.h"
 #include <functional>
 #include <string>
@@ -18,11 +19,14 @@ public:
 	void BuildUi(ScreenContext & ctx, Surface & dst, float frametime, silencer::ui::UiInteractionRegistry& interactions) override;
 	void Destroy(ScreenContext & ctx) override;
 	bool HandleUiIntent(ScreenContext & ctx, const silencer::ui::UiAction & action) override;
+	const ::ui::DrawCommandList * RetainedDrawCommands() const override;
 
 private:
 	std::function<void(const char *)> onSubmit;
 	bool okClicked = false;
 	char password[21] = {};
+	std::string passwordDisplay_;
+	silencer::client_ui::RetainedFrame retainedFrame_;
 };
 
 #endif

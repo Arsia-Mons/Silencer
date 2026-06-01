@@ -6,9 +6,8 @@
 // (security/spectatable cyclers) + ScrollList (map list) +
 // Button::Chrome (Create).
 //
-// Domain glue (CreateGame kickoff, Config persistence, async map upload)
-// lives in the screen-side GameCreatePanelTick. Primitives stay screen-
-// agnostic.
+// Domain glue (CreateGame kickoff, config persistence, async map upload)
+// lives behind LobbyProvider/use_lobby. Primitives stay screen-agnostic.
 
 #include "shared.h"
 #include "clay_ui_payloads.h"
@@ -17,13 +16,15 @@
 #include <string>
 #include <vector>
 
-class World;
-class Resources;
 class ScreenContext;
-class LobbyScreen;
+class MessageModal;
 
 namespace silencer::ui {
 class UiInteractionRegistry;
+}
+
+namespace silencer::client_ui {
+class LobbyModel;
 }
 
 namespace silencer::client_ui::lobby {
@@ -42,7 +43,7 @@ struct GameCreatePanelState {
 
 	// Security cycler: 0=Off, 1=Low, 2=Medium (default), 3=High.
 	Uint8 securityIndex = 2;
-	bool  spectatable   = true;  // hydrated from Config::lastspectatable on init.
+	bool  spectatable   = true;  // hydrated from LobbyCreateModel defaults on init.
 
 	// Map list snapshot. Built once during Init from the local level dirs
 	// + community server list. Display strings include any "[DL] " prefix
@@ -74,23 +75,25 @@ struct GameCreatePanelState {
 	std::vector<Uint8> hoverPreviewPixels;
 	silencer::clay_bridge::SurfacePayload hoverPreviewSurface{};
 	silencer::clay_bridge::ClayCustomData hoverPreviewCustomData{};
+
+	// Create/upload progress overlay owned by this workflow. Tracking the modal
+	// here keeps lobby code from inspecting the global screen stack through Game.
+	MessageModal * progressModal = nullptr;
 };
 
-// Hydrate state from Config (defaultgamename, lastspectatable) and rebuild
-// the map list from disk + the community map API. Mirrors the legacy
-// GameCreatePanel::Build's one-time setup.
+// Hydrate state from LobbyCreateModel defaults and rebuild the map list from
+// the provider. Mirrors the legacy GameCreatePanel::Build's one-time setup.
 void GameCreatePanelInit(GameCreatePanelState & state, ScreenContext & ctx);
 
 // Per-frame pump. Consumes click flags (cycle security, toggle spectatable,
 // kick off Create). Also pumps the deferred CreateGame state machine
-// (map upload → CreateGame → CONNECTED → ShowGameJoin handoff +
+// (map upload -> CreateGame -> CONNECTED -> ShowGameJoin handoff +
 // progress-modal spinner update + create-failure unwind). Mirrors the
 // legacy LobbyScreen::Tick's `if(gameCreate)` block + GameCreatePanel::Tick
 // button switch.
 void GameCreatePanelTick(GameCreatePanelState & state,
-                         World & world,
                          ScreenContext & ctx,
-                         LobbyScreen & owner);
+                         LobbyModel & lobby);
 bool GameCreatePanelHandleUiIntent(GameCreatePanelState & state,
                                    const silencer::ui::UiAction & action);
 
@@ -103,7 +106,6 @@ bool GameCreatePanelHandleUiIntent(GameCreatePanelState & state,
 void BuildGameCreateUpperTree(GameCreatePanelState & state,
                               Uint16 panelWidth,
                               Uint16 panelHeight,
-                              Resources & resources,
                               silencer::ui::UiInteractionRegistry& interactions);
 
 // Emits the tall stepped-pane subtree ("Select Map" heading + map list +
@@ -113,9 +115,9 @@ void BuildGameCreateUpperTree(GameCreatePanelState & state,
 // ScrollListBeginFrame, TextInputBeginFrame.
 void BuildGameCreateTallTree(GameCreatePanelState & state,
                              ScreenContext & ctx,
+                             LobbyModel & lobby,
                              Uint16 panelWidth,
                              Uint16 panelHeight,
-                             Resources & resources,
                              silencer::ui::UiInteractionRegistry& interactions);
 
 void BuildGameCreatePreviewOverlay(GameCreatePanelState & state,

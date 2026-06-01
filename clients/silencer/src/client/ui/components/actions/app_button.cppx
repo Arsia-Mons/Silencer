@@ -1,0 +1,41 @@
+#include "client/ui/components/actions/app_button.h"
+
+#include "client/ui/components/actions/app_button_variant.h"
+#include "ui/components/button.h"
+
+namespace silencer {
+namespace client_ui {
+
+using ::ui::children;
+using ::ui::components::Button;
+using ::ui::components::ButtonProps;
+
+::ui::UiElement AppButton(const AppButtonProps& props) {
+	std::function<void(const ::ui::ActivationEvent&)> on_activate = {};
+	if(props.on_press){
+		on_activate = [on_press = props.on_press](const ::ui::ActivationEvent&) {
+			on_press();
+		};
+	}
+
+	const char * accessibility_label =
+		props.accessibility_label ? props.accessibility_label : props.label;
+
+	return <Button
+	  key={props.key}
+	  id={props.control_id}
+	  disabled={props.disabled}
+	  autofocus={props.default_focused}
+	  accessibility={{.label = accessibility_label}}
+	  label={props.label}
+	  onActivate={on_activate}
+	  layout={app_button_detail::layout(props.size)}
+	  style={app_button_detail::variant_patch(props.variant, props.size)}
+	>
+		{props.children}
+		{props.children.count > 0 ? nullptr : props.label}
+	</Button>
+}
+
+}  // namespace client_ui
+}  // namespace silencer

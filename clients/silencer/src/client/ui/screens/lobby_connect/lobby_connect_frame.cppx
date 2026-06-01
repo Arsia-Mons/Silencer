@@ -1,0 +1,232 @@
+#include "client/ui/screens/lobby_connect/lobby_connect_frame.h"
+
+#include "client/ui/components/actions/app_button.h"
+#include "client/ui/components/tokens.h"
+#include "ui/components/box.h"
+#include "ui/components/text.h"
+#include "ui/components/text_input.h"
+#include "ui/style/style_patch.h"
+
+#include <cstdint>
+#include <cstring>
+
+namespace silencer {
+namespace client_ui {
+namespace lobby_connect_frame_detail {
+
+inline std::uint32_t texture_id(std::uint8_t bank, std::uint16_t index) {
+	return (static_cast<std::uint32_t>(bank) << 16) |
+	       static_cast<std::uint32_t>(index);
+}
+
+inline ::ui::StylePatch panel_patch() {
+	return ::ui::patch().image(::ui::BackgroundImage{
+		.texture_id = texture_id(7, 2),
+		.tint = {255, 255, 255, 255},
+	});
+}
+
+inline ::ui::StylePatch label_patch() {
+	return ::ui::patch().text(::ui::TextVisual{
+		.color = tokens::kTextTitle,
+		.font_id = tokens::kFontTitleBank,
+		.font_size = tokens::kFontTitleAdvance,
+		.align = ::ui::TextAlign::Center,
+	});
+}
+
+inline ::ui::StylePatch log_patch() {
+	return ::ui::patch().text(::ui::TextVisual{
+		.color = tokens::kTextMuted,
+		.font_id = tokens::kFontBodyBank,
+		.font_size = tokens::kFontBodyAdvance,
+		.align = ::ui::TextAlign::Left,
+		.wrap = ::ui::TextWrap::Words,
+		.line_height = 11.0f,
+	});
+}
+
+inline ::ui::StylePatch input_patch() {
+	return ::ui::patch()
+		.background(::ui::Color{3, 7, 10, 255})
+		.border(::ui::Border{
+			{1.0f, 1.0f, 1.0f, 1.0f},
+			{tokens::kBorderPanel, tokens::kBorderPanel,
+			 tokens::kBorderPanel, tokens::kBorderPanel},
+		})
+		.text(::ui::TextVisual{
+			.color = tokens::kTextTitle,
+			.font_id = tokens::kFontBodyBank,
+			.font_size = tokens::kFontBodyAdvance,
+			.align = ::ui::TextAlign::Left,
+		});
+}
+
+inline ::ui::EdgeSizes inset_left_top(float left, float top) {
+	::ui::EdgeSizes edges;
+	edges.left = ::ui::StyleValue::points(left);
+	edges.top = ::ui::StyleValue::points(top);
+	return edges;
+}
+
+}  // namespace lobby_connect_frame_detail
+
+using ::ui::children;
+using ::ui::components::Box;
+using ::ui::components::BoxProps;
+using ::ui::components::Text;
+using ::ui::components::TextInput;
+using ::ui::components::TextInputProps;
+using ::ui::components::TextProps;
+
+::ui::UiElement LobbyConnectFrame(const LobbyConnectFrameProps& props) {
+	const char * log_text = props.log_text ? props.log_text : "";
+	const char * username_display =
+		props.username_display ? props.username_display : "";
+	const char * password_display =
+		props.password_display ? props.password_display : "";
+	const int username_caret = static_cast<int>(std::strlen(username_display));
+	const int password_caret = static_cast<int>(std::strlen(password_display));
+	return <Box
+	  key={props.key}
+	  layout={::ui::LayoutStyle{
+			.align_items = ::ui::AlignItems::Center,
+			.justify_content = ::ui::JustifyContent::Center,
+			.width = ::ui::Length::percent(100.0f),
+			.height = ::ui::Length::percent(100.0f),
+		}}
+	>
+		<Box
+		  key="panel"
+		  layout={::ui::LayoutStyle{
+				.position = ::ui::PositionType::Relative,
+				.width = ::ui::Length::points(284.0f),
+				.height = ::ui::Length::points(277.0f),
+			}}
+		  style={lobby_connect_frame_detail::panel_patch()}
+		>
+			<Text
+			  key="log"
+			  value={log_text}
+			  layout={::ui::LayoutStyle{
+					.position = ::ui::PositionType::Absolute,
+					.position_inset = lobby_connect_frame_detail::inset_left_top(7.0f, 8.0f),
+					.width = ::ui::Length::points(250.0f),
+					.height = ::ui::Length::points(170.0f),
+				}}
+			  style={lobby_connect_frame_detail::log_patch()}
+			/>
+			<Box
+			  key="username-row"
+			  layout={::ui::LayoutStyle{
+					.position = ::ui::PositionType::Absolute,
+					.direction = ::ui::FlexDirection::Row,
+					.align_items = ::ui::AlignItems::Center,
+					.position_inset = lobby_connect_frame_detail::inset_left_top(4.0f, 195.0f),
+					.width = ::ui::Length::points(273.0f),
+					.height = ::ui::Length::points(21.0f),
+				}}
+			>
+				<Text
+				  key="username-label"
+				  value="Username"
+				  layout={::ui::LayoutStyle{
+						.width = ::ui::Length::points(86.0f),
+						.height = ::ui::Length::points(21.0f),
+					}}
+				  style={lobby_connect_frame_detail::label_patch()}
+				/>
+				<TextInput
+				  key="username"
+				  id="lobby_connect.username"
+				  idOffset={1}
+				  autofocus={true}
+				  disabled={props.inactive}
+				  accessibility={{.label = "Username"}}
+				  value={username_display}
+				  textEdit={::ui::TextEditMetadata{
+						.caret = username_caret,
+						.selection_start = username_caret,
+						.selection_end = username_caret,
+					}}
+				  layout={::ui::LayoutStyle{
+						.width = ::ui::Length::points(183.0f),
+						.height = ::ui::Length::points(21.0f),
+						.padding = {7.0f, 7.0f, 0.0f, 0.0f},
+					}}
+				  style={lobby_connect_frame_detail::input_patch()}
+				/>
+			</Box>
+			<Box
+			  key="password-row"
+			  layout={::ui::LayoutStyle{
+					.position = ::ui::PositionType::Absolute,
+					.direction = ::ui::FlexDirection::Row,
+					.align_items = ::ui::AlignItems::Center,
+					.position_inset = lobby_connect_frame_detail::inset_left_top(4.0f, 222.0f),
+					.width = ::ui::Length::points(273.0f),
+					.height = ::ui::Length::points(21.0f),
+				}}
+			>
+				<Text
+				  key="password-label"
+				  value="Password"
+				  layout={::ui::LayoutStyle{
+						.width = ::ui::Length::points(86.0f),
+						.height = ::ui::Length::points(21.0f),
+					}}
+				  style={lobby_connect_frame_detail::label_patch()}
+				/>
+				<TextInput
+				  key="password"
+				  id="lobby_connect.password"
+				  idOffset={2}
+				  disabled={props.inactive}
+				  accessibility={{.label = "Password"}}
+				  value={password_display}
+				  textEdit={::ui::TextEditMetadata{
+						.caret = password_caret,
+						.selection_start = password_caret,
+						.selection_end = password_caret,
+					}}
+				  layout={::ui::LayoutStyle{
+						.width = ::ui::Length::points(183.0f),
+						.height = ::ui::Length::points(21.0f),
+						.padding = {7.0f, 7.0f, 0.0f, 0.0f},
+					}}
+				  style={lobby_connect_frame_detail::input_patch()}
+				/>
+			</Box>
+			<Box
+			  key="buttons"
+			  layout={::ui::LayoutStyle{
+					.position = ::ui::PositionType::Absolute,
+					.direction = ::ui::FlexDirection::Row,
+					.align_items = ::ui::AlignItems::Center,
+					.justify_content = ::ui::JustifyContent::Center,
+					.position_inset = lobby_connect_frame_detail::inset_left_top(14.0f, 245.0f),
+					.width = ::ui::Length::points(256.0f),
+					.height = ::ui::Length::points(32.0f),
+				}}
+			>
+				<AppButton
+				  key="login"
+				  controlId="lobby_connect.login"
+				  size={AppButtonSize::Sm}
+				  variant={AppButtonVariant::Secondary}
+				  label="Login/Create"
+				/>
+				<AppButton
+				  key="cancel"
+				  controlId="lobby_connect.cancel"
+				  size={AppButtonSize::Sm}
+				  variant={AppButtonVariant::Secondary}
+				  label="Cancel"
+				/>
+			</Box>
+		</Box>
+	</Box>
+}
+
+}  // namespace client_ui
+}  // namespace silencer

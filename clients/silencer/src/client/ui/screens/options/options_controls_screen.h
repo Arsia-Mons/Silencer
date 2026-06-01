@@ -1,6 +1,7 @@
 #ifndef OPTIONS_CONTROLS_SCREEN_H
 #define OPTIONS_CONTROLS_SCREEN_H
 
+#include "client/ui/retained/RetainedFrame.h"
 #include "controls_keybind_list.h"
 #include "screen.h"
 #include "keybinds.h"
@@ -19,10 +20,11 @@ public:
 	void BuildUi(ScreenContext & ctx, Surface & dst, float frametime, silencer::ui::UiInteractionRegistry& interactions) override;
 	void Destroy(ScreenContext & ctx) override;
 	bool HandleUiIntent(ScreenContext & ctx, const silencer::ui::UiAction & action) override;
+	const ::ui::DrawCommandList * RetainedDrawCommands() const override;
 
 private:
-	// Two-slot rebind state machine + label resolution lives in
-	// controls_rebind_capture.{h,cpp}; these stay as the per-frame state.
+	// Two-slot rebind capture stays as local per-frame interaction state.
+	// Keymap writes flow through use_options().
 	void BeginRebindFromVisibleRow(int row, int slot);
 	void ToggleOperatorFromVisibleRow(int row);
 	int MaxScroll() const;
@@ -38,6 +40,7 @@ private:
 	int operatorClickedRow = -1;
 	int visibleRowCapacity_ = silencer::client_ui::options::kKeybindListMinVisibleRows;
 	silencer::client_ui::options::KeybindListView keybindListView_;
+	silencer::client_ui::RetainedFrame retainedFrame_;
 };
 
 #endif

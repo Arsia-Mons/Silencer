@@ -1,0 +1,22 @@
+#include "text.h"
+
+namespace ui {
+namespace components {
+
+::ui::UiElement Text(const TextProps& props) {
+	return <detail.Host
+	  kind={::ui::HostKind::Text}
+	  key={props.key}
+	  id={props.id}
+	  idOffset={props.id_offset}
+	  style={props.layout}
+	  visual={::ui::resolve(::ui::use_theme().text, props.style, detail::interaction_state(props.disabled))}
+	  text={::ui::HostTextProps{.value = props.value}}
+	  interaction={detail::interaction_from_props(props)}
+	  accessibility={detail::accessibility_from_props(props, ::ui::SemanticRole::Auto)}
+	  callbacks={detail::callbacks_from_props(props)}
+	/>
+}
+
+}  // namespace components
+}  // namespace ui

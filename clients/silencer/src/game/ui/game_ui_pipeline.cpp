@@ -1,6 +1,5 @@
 #include "ui/game_ui_pipeline.h"
 
-#include "client/ui/state_screens.h"
 #include "client/ui/screens/screen.h"
 #include "game.h"
 #include "camera.h"
@@ -8,10 +7,8 @@
 #include "gasloader.h"
 #include "objecttypes.h"
 #include "player.h"
-#include "client/ui/hud/InGameHud.h"
-#include "client/ui/hud/InGameOverlays.h"
-#include "client/ui/views/HudView.h"
 #include "clay_ui_compositor.h"
+#include "retained_ui_compositor.h"
 #include <algorithm>
 #include <vector>
 
@@ -111,13 +108,6 @@ return uiClayBackend.Commands();
 
 void GameUiPipeline::BuildVisibleClientUi(Surface& surface, float frametime) {
 clientUi.BuildVisibleScreens(game.screenContext, surface, frametime);
-if(game.world.map.loaded){
-silencer::client_ui::HudView hudView =
-silencer::client_ui::BuildHudView(game.world);
-silencer::client_ui::BuildInGameHudUi(
-game.renderer, game.world.resources, hudView, &surface, clientUi.Interactions());
-silencer::client_ui::BuildInGameOverlaysUi(game.renderer, game.world.resources, hudView, &surface);
-}
 }
 
 void GameUiPipeline::DrawInGameWorldInsets(Surface& surface, float frametime) {
@@ -157,22 +147,33 @@ Renderer::BlitSurface(&game.world.map.minimap.surface, 0, &surface, &dstrect);
 }
 
 void GameUiPipeline::RenderClientUiFrame(Surface& surface, float frametime) {
+clientUi.RunPendingScreenRequest(game.screenContext);
+if(!clientUi.HasScreens() && !game.world.map.loaded){
+clientUi.EnsureDefaultScreen(game.screenContext);
+}
 if(!clientUi.HasScreens() && !game.world.map.loaded){
 return;
 }
 
 PrepareClientUiFrame(surface);
 BeginPreparedClientUiFrame();
+clientUi.RunNavigationRequests(game.screenContext, clientUiInput.DrainNavigationRequests());
 BuildVisibleClientUi(surface, frametime);
 Clay_RenderCommandArray cmds = EndClientUiFrame();
 silencer::clay_bridge::Render(game, &surface, cmds);
+for(const ::ui::DrawCommandList * retainedCommands : clientUi.RetainedDrawCommands()){
+	if(retainedCommands){
+		silencer::retained_bridge::Render(game.world.resources,
+		                                  game.renderer, &surface, *retainedCommands,
+		                                  preparedUiInput.width,
+		                                  preparedUiInput.height,
+		                                  preparedUiInput.uiScale);
+	}
+}
 if(game.state != GameState::FADEOUT){
 std::vector<silencer::ui::UiAction> unhandledUiActions =
 clientUi.DispatchInput(game.screenContext, preparedUiInput);
-if(!clientUi.HasScreens() && game.world.map.loaded){
-inGameUiController.ApplyActions(
-game.world.peers.localpeerid, unhandledUiActions, clientUi.Interactions());
-}
+(void)unhandledUiActions;
 bool nowFocused = clientUi.Interactions().HasTextInputFocus();
 if(nowFocused && !textInputFocused){
 SDL_StartTextInput(game.gameRenderer.GetWindow());
@@ -194,17 +195,11 @@ preparedUiInput.controlCommands.clear();
 }
 GameUiPipeline::GameUiPipeline(Game & g)
 : game(g), uiClayService(uiClayBackend), clientUi(uiClayService),
-  inGameUiController(g.world), hasPreparedUiInput(false),
-  lastUiAnimationMs(0), textInputFocused(false) {
-}
-
-bool GameUiPipeline::HasScreen() const {
-return clientUi.HasScreens();
+  hasPreparedUiInput(false), lastUiAnimationMs(0), textInputFocused(false) {
 }
 
 bool GameUiPipeline::HasInputTarget() {
-if(Top()) return true;
-return inGameUiController.HasInputTarget(game.world.peers.localpeerid);
+return clientUi.HasInputTarget(game.screenContext);
 }
 
 void GameUiPipeline::RequestClearScreens() {
@@ -219,29 +214,8 @@ void GameUiPipeline::TickVisibleScreens() {
 clientUi.TickVisibleScreens(game.screenContext);
 }
 
-void GameUiPipeline::ShowStateScreen(Uint8 uiState) {
-silencer::client_ui::ShowStateScreen(clientUi, game.screenContext, uiState);
-}
-
 bool GameUiPipeline::HandleBack() {
-Screen * top = Top();
-return top && top->HandleBack(game.screenContext);
-}
-
-void GameUiPipeline::Push(std::unique_ptr<Screen> s){
-clientUi.PushScreen(std::move(s), game.screenContext);
-}
-
-void GameUiPipeline::Pop(){
-clientUi.PopScreen(game.screenContext);
-}
-
-void GameUiPipeline::Replace(std::unique_ptr<Screen> s){
-clientUi.ReplaceScreen(std::move(s), game.screenContext);
-}
-
-Screen * GameUiPipeline::Top() const {
-return clientUi.TopScreen();
+return clientUi.HandleBack(game.screenContext);
 }
 
 void GameUiPipeline::QueueKeyboardInputForScancode(int sc, const Uint8 * keystate,

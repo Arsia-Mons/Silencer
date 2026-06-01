@@ -61,11 +61,11 @@ HOME="$SILENCER_HOME" "$SILENCER_BIN" \
 SILENCER_PID=$!
 wait_alive "$CTRL_PORT"
 
-cli --port "$CTRL_PORT" wait_for_state --state MAINMENU --timeout-ms 15000
+cli --port "$CTRL_PORT" wait_for_ui --id main_menu.options --timeout-ms 15000
 cli --port "$CTRL_PORT" resize --w 2560 --h 1440 >/dev/null
 cli --port "$CTRL_PORT" wait_frames --n 3 >/dev/null
 cli --port "$CTRL_PORT" click --label "Connect To Lobby" >/dev/null
-cli --port "$CTRL_PORT" wait_for_state --state LOBBYCONNECT --timeout-ms 5000
+cli --port "$CTRL_PORT" wait_for_ui --id lobby_connect.login --timeout-ms 5000
 cli --port "$CTRL_PORT" wait_frames --n 5 >/dev/null
 
 target=$(cli --port "$CTRL_PORT" inspect | bun -e '

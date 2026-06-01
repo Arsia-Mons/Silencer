@@ -1,0 +1,99 @@
+#include "client/ui/modals/message_modal_frame.h"
+
+#include "client/ui/components/actions/app_button.h"
+#include "client/ui/components/tokens.h"
+#include "ui/components/box.h"
+#include "ui/components/text.h"
+#include "ui/style/style_patch.h"
+
+#include <cstdint>
+
+namespace silencer {
+namespace client_ui {
+namespace message_modal_frame_detail {
+
+inline std::uint32_t texture_id(std::uint8_t bank, std::uint16_t index) {
+	return (static_cast<std::uint32_t>(bank) << 16) |
+	       static_cast<std::uint32_t>(index);
+}
+
+inline ::ui::StylePatch dialog_patch() {
+	return ::ui::patch().image(::ui::BackgroundImage{
+		.texture_id = texture_id(40, 4),
+		.tint = {255, 255, 255, 255},
+	});
+}
+
+inline ::ui::StylePatch message_text_patch() {
+	return ::ui::patch().text(::ui::TextVisual{
+		.color = tokens::kTextTitle,
+		.font_id = tokens::kFontTitleBank,
+		.font_size = tokens::kFontTitleAdvance,
+		.align = ::ui::TextAlign::Center,
+		.wrap = ::ui::TextWrap::Words,
+	});
+}
+
+}  // namespace message_modal_frame_detail
+
+using ::ui::children;
+using ::ui::components::Box;
+using ::ui::components::BoxProps;
+using ::ui::components::Text;
+using ::ui::components::TextProps;
+
+struct MessageModalOkButtonProps {
+	const char * key = nullptr;
+	bool show = false;
+};
+
+::ui::UiElement MessageModalOkButton(const MessageModalOkButtonProps& props) {
+	if(!props.show) return ::ui::empty();
+	return <AppButton
+	  key={props.key}
+	  controlId="message_modal.ok"
+	  size={AppButtonSize::Sm}
+	  label="OK"
+	/>
+}
+
+::ui::UiElement MessageModalFrame(const MessageModalFrameProps& props) {
+	const char * message = props.message ? props.message : "";
+	return <Box
+	  key={props.key}
+	  layout={::ui::LayoutStyle{
+			.align_items = ::ui::AlignItems::Center,
+			.justify_content = ::ui::JustifyContent::Center,
+			.width = ::ui::Length::percent(100.0f),
+			.height = ::ui::Length::percent(100.0f),
+		}}
+	>
+		<Box
+		  key="dialog"
+		  layout={::ui::LayoutStyle{
+				.direction = ::ui::FlexDirection::Column,
+				.align_items = ::ui::AlignItems::Center,
+				.justify_content = ::ui::JustifyContent::Center,
+				.width = ::ui::Length::points(352.0f),
+				.height = ::ui::Length::points(178.0f),
+				.padding = {34.0f, 34.0f, 44.0f, 44.0f},
+				.gap = 18.0f,
+			}}
+		  style={message_modal_frame_detail::dialog_patch()}
+		>
+			<Text
+			  key="message"
+			  value={message}
+			  layout={::ui::LayoutStyle{
+					.width = ::ui::Length::points(284.0f),
+					.height = ::ui::Length::points(props.show_ok ? 42.0f : 54.0f),
+				}}
+			  style={message_modal_frame_detail::message_text_patch()}
+			/>
+			<MessageModalOkButton key="ok-button" show={props.show_ok} />
+		</Box>
+	</Box>
+}
+
+}  // namespace client_ui
+}  // namespace silencer

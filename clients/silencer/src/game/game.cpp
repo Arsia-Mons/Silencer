@@ -1,6 +1,4 @@
 #include "game.h"
-#include "screen.h"
-
 void Game::LoadProgressCallback(int progress, int totalprogressitems) {
 gameRenderer.LoadProgressCallback(progress, totalprogressitems);
 }
@@ -15,6 +13,12 @@ return gameRenderer.ResizeRenderSurfacePixels(width, height);
 
 bool Game::SyncRenderSurfaceToWindowPixels() {
 return gameRenderer.SyncRenderSurfaceToWindowPixels();
+}
+
+void Game::ResetPresentationPalette(int paletteIdx) {
+renderer.palette.SetPalette(paletteIdx);
+GetScreenBuffer().Clear(0);
+gameRenderer.SetColors(renderer.palette.GetColors());
 }
 
 void Game::Present() {
@@ -33,14 +37,10 @@ void Game::LeaveJoinedGame() {
 gameSession.LeaveJoinedGame();
 }
 
-Screen * Game::GetTopScreen() const {
-return gameUiPipeline.Top();
+void Game::StartTutorial() {
+GoToState(GameState::SINGLEPLAYERGAME);
 }
 
 bool Game::HasUiInputTarget() {
 return gameUiPipeline.HasInputTarget();
-}
-
-bool Game::HasVisibleUiScreen() const {
-return gameUiPipeline.HasScreen();
 }

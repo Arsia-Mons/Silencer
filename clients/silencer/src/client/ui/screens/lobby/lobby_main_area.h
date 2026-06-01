@@ -5,13 +5,14 @@
 // (upper shelf + tall column) that swaps between GameSelect / GameCreate /
 // GameJoin / GameTech. Composes into LobbyRoot beneath the title bar.
 
-class World;
-class Resources;
-class LobbyScreen;
 class ScreenContext;
 
 namespace silencer::ui {
 class UiInteractionRegistry;
+}
+
+namespace silencer::client_ui {
+class LobbyModel;
 }
 
 namespace silencer::client_ui::lobby {
@@ -39,7 +40,7 @@ struct LobbyMainAreaPanels {
 // the current Clay frame.
 void BuildLobbyMainArea(LobbyMainAreaPanels & panels,
                         ScreenContext & ctx,
-                        LobbyScreen & owner,
+                        LobbyModel & lobby,
                         int bodyX,
                         int bodyY,
                         int bodyW,

@@ -10,10 +10,12 @@ namespace client_ui {
 
 ScreenStack::~ScreenStack() = default;
 
-void ScreenStack::Push(std::unique_ptr<Screen> screen, ScreenContext& ctx) {
-	if(!screen) return;
+Screen * ScreenStack::Push(std::unique_ptr<Screen> screen, ScreenContext& ctx) {
+	if(!screen) return nullptr;
 	screen->Build(ctx);
+	Screen * pushed = screen.get();
 	screens_.push_back(std::move(screen));
+	return pushed;
 }
 
 void ScreenStack::Pop(ScreenContext& ctx) {
@@ -27,6 +29,11 @@ void ScreenStack::Replace(std::unique_ptr<Screen> screen, ScreenContext& ctx) {
 	Push(std::move(screen), ctx);
 }
 
+Screen * ScreenStack::ResetTo(std::unique_ptr<Screen> screen, ScreenContext& ctx) {
+	Clear(ctx);
+	return Push(std::move(screen), ctx);
+}
+
 void ScreenStack::Clear(ScreenContext& ctx) {
 	while(!screens_.empty()) Pop(ctx);
 }
@@ -35,10 +42,11 @@ void ScreenStack::RequestClear() {
 	clearRequested_ = true;
 }
 
-void ScreenStack::ClearIfRequested(ScreenContext& ctx) {
-	if(!clearRequested_) return;
+bool ScreenStack::ClearIfRequested(ScreenContext& ctx) {
+	if(!clearRequested_) return false;
 	Clear(ctx);
 	clearRequested_ = false;
+	return true;
 }
 
 Screen * ScreenStack::Top() const {
@@ -72,6 +80,18 @@ void ScreenStack::BuildVisible(ScreenContext& ctx,
 		}
 		screens_[i]->BuildUi(ctx, dst, frametime, interactions);
 	}
+}
+
+std::vector<const ::ui::DrawCommandList *> ScreenStack::RetainedDrawCommands() const {
+	std::vector<const ::ui::DrawCommandList *> commands;
+	if(screens_.empty()) return commands;
+	const std::size_t start = VisibleStart();
+	for(std::size_t i = start; i < screens_.size(); ++i) {
+		const ::ui::DrawCommandList * screenCommands =
+			screens_[i]->RetainedDrawCommands();
+		if(screenCommands) commands.push_back(screenCommands);
+	}
+	return commands;
 }
 
 }  // namespace client_ui

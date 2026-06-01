@@ -6,14 +6,12 @@
 #include "gasloader.h"
 #include "os.h"
 #include "shared.h"
+#include "client/ui/hooks/use_navigation.h"
+#include "client/ui/hooks/use_match.h"
 #include "clay_ui_tests/clay_ui_checks.h"
 #include "runtime/UiInteractionRegistry.h"
-#include "screen.h"
 #include "password_modal.h"
 #include <SDL3/SDL_keyboard.h>
-#ifdef SILENCER_HAVE_LOBBY_UI
-#include "lobby_screen.h"
-#endif
 #include "screen_context.h"
 #include <cstring>
 #include <cstdio>
@@ -37,7 +35,7 @@ bool g_controlPasswordModalSubmitted = false;
 ControlCommand::Phase PhaseFor(const std::string& op) {
 	if(op == "screenshot") return ControlCommand::POST_RENDER;
 	if(op == "wait_frames" || op == "wait_ms" ||
-	   op == "wait_for_state" || op == "step") return ControlCommand::MULTI_FRAME;
+	   op == "wait_for_state" || op == "wait_for_ui" || op == "step") return ControlCommand::MULTI_FRAME;
 	return ControlCommand::IMMEDIATE;
 }
 
@@ -49,7 +47,7 @@ static ControlReply OkResult(int id, nlohmann::json r){
 	return rpl;
 }
 
-static bool StateNeedsScreen(const std::string& state){
+static bool IsUiRouteStateName(const std::string& state){
 	return state == "MAINMENU" ||
 	       state == "LOBBYCONNECT" ||
 	       state == "LOBBY" ||
@@ -62,6 +60,45 @@ static bool StateNeedsScreen(const std::string& state){
 	       state == "OPTIONSAUDIO";
 }
 
+static bool StartsWith(const std::string& value, const std::string& prefix){
+	return value.size() >= prefix.size() &&
+	       value.compare(0, prefix.size(), prefix) == 0;
+}
+
+static bool UiWaitTargetExists(
+	const silencer::ui::UiInteractionRegistry& interactions,
+	const Game::PendingWait& wait){
+	if(!wait.wait_ui_id.empty()){
+		return interactions.FindById(wait.wait_ui_id) ||
+		       interactions.FindInteractableById(wait.wait_ui_id);
+	}
+	if(!wait.wait_ui_id_prefix.empty()){
+		for(const auto& element : interactions.Elements()){
+			if(StartsWith(element.id, wait.wait_ui_id_prefix)) return true;
+		}
+		for(const auto& widget : interactions.Interactables()){
+			if(StartsWith(widget.id, wait.wait_ui_id_prefix)) return true;
+		}
+		return false;
+	}
+	if(!wait.wait_ui_label.empty()){
+		return interactions.FindByLabel(wait.wait_ui_label) ||
+		       interactions.FindInteractableByLabel(wait.wait_ui_label.c_str());
+	}
+	if(wait.wait_ui_uid >= 0){
+		return interactions.FindInteractableByUid(wait.wait_ui_uid) != nullptr;
+	}
+	return false;
+}
+
+static std::string UiWaitTargetDescription(const Game::PendingWait& wait){
+	if(!wait.wait_ui_id.empty()) return "id " + wait.wait_ui_id;
+	if(!wait.wait_ui_id_prefix.empty()) return "id prefix " + wait.wait_ui_id_prefix;
+	if(!wait.wait_ui_label.empty()) return "label " + wait.wait_ui_label;
+	if(wait.wait_ui_uid >= 0) return "uid " + std::to_string(wait.wait_ui_uid);
+	return "target";
+}
+
 static ControlReply Err(int id, const char* code, const std::string& msg){
 	ControlReply rpl;
 	rpl.id = id;
@@ -71,8 +108,8 @@ static ControlReply Err(int id, const char* code, const std::string& msg){
 	return rpl;
 }
 
-static const char * ModeName(silencer::client_ui::InGameUiControlMode mode){
-	using Mode = silencer::client_ui::InGameUiControlMode;
+static const char * ModeName(silencer::client_ui::MatchUiControlMode mode){
+	using Mode = silencer::client_ui::MatchUiControlMode;
 	switch(mode){
 		case Mode::Clear: return "clear";
 		case Mode::Status: return "status";
@@ -87,8 +124,8 @@ static const char * ModeName(silencer::client_ui::InGameUiControlMode mode){
 
 static bool ParseMode(
 	const std::string& value,
-	silencer::client_ui::InGameUiControlMode& mode){
-	using Mode = silencer::client_ui::InGameUiControlMode;
+	silencer::client_ui::MatchUiControlMode& mode){
+	using Mode = silencer::client_ui::MatchUiControlMode;
 	if(value == "clear"){
 		mode = Mode::Clear;
 		return true;
@@ -120,8 +157,8 @@ static bool ParseMode(
 	return false;
 }
 
-static nlohmann::json InGameUiControlResultToJson(
-	const silencer::client_ui::InGameUiControlResult& result){
+static nlohmann::json MatchUiControlResultToJson(
+	const silencer::client_ui::MatchUiControlResult& result){
 	nlohmann::json r;
 	r["mode"] = ModeName(result.mode);
 	r["ok"] = result.available;
@@ -129,7 +166,7 @@ static nlohmann::json InGameUiControlResultToJson(
 		if(!result.error.empty()) r["error"] = result.error;
 		return r;
 	}
-	if(result.mode == silencer::client_ui::InGameUiControlMode::Clear){
+	if(result.mode == silencer::client_ui::MatchUiControlMode::Clear){
 		return r;
 	}
 	r["chat_active"] = result.chatActive;
@@ -566,10 +603,13 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 	if(cmd.op == "show_password_modal"){
 		g_controlPasswordModalValue.clear();
 		g_controlPasswordModalSubmitted = false;
-		game.GetScreenContext().ShowModal(std::make_unique<PasswordModal>([](const char * password) {
-			g_controlPasswordModalValue = password ? password : "";
-			g_controlPasswordModalSubmitted = true;
-		}));
+		game.UiInput().QueueNavigationRequest([]() {
+			silencer::client_ui::use_navigation().push(
+				std::make_unique<PasswordModal>([](const char * password) {
+					g_controlPasswordModalValue = password ? password : "";
+					g_controlPasswordModalSubmitted = true;
+				}));
+		});
 		cmd.reply->set_value(OkResult(cmd.id, nlohmann::json::object()));
 		return;
 	}
@@ -582,14 +622,18 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 	}
 	if(cmd.op == "ingame_ui_mode"){
 		std::string mode = cmd.args.value("mode", std::string());
-		silencer::client_ui::InGameUiControlMode controlMode;
+		silencer::client_ui::MatchUiControlMode controlMode;
 		if(mode.empty() || !ParseMode(mode, controlMode)){
 			cmd.reply->set_value(Err(cmd.id, "BAD_REQUEST",
 				"ingame_ui_mode needs --mode clear|status|chat|buy|tech|playerlist|all"));
 			return;
 		}
-		silencer::client_ui::InGameUiControlResult result =
-			game.InGameUi().ConfigureForControl(controlMode);
+		silencer::client_ui::MatchModel match =
+			silencer::client_ui::use_match(
+				silencer::client_ui::MatchProviderValue{&game.GetWorld()},
+				game.GetWorld().viewedpeerid);
+		silencer::client_ui::MatchUiControlResult result =
+			match.control.configure(controlMode);
 		if(!result.available){
 			cmd.reply->set_value(Err(cmd.id, "WRONG_STATE",
 				result.error.empty()
@@ -597,7 +641,7 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 					: result.error));
 			return;
 		}
-		using Mode = silencer::client_ui::InGameUiControlMode;
+		using Mode = silencer::client_ui::MatchUiControlMode;
 		if((controlMode == Mode::Chat || controlMode == Mode::All) &&
 		   cmd.args.contains("chat_line")){
 			std::string chatLine = cmd.args.value("chat_line", std::string());
@@ -609,7 +653,7 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 				}
 			}
 		}
-		cmd.reply->set_value(OkResult(cmd.id, InGameUiControlResultToJson(result)));
+		cmd.reply->set_value(OkResult(cmd.id, MatchUiControlResultToJson(result)));
 		return;
 	}
 	if(cmd.op == "click"){
@@ -885,34 +929,6 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 		HandleGas(game, cmd);
 		return;
 	}
-#ifdef SILENCER_HAVE_LOBBY_UI
-	if(cmd.op == "lobby_show_panel"){
-		// Drive the lobby's right-side panel swap from a CLI test. The lobby
-		// exposes these panels without world Interface objects, so
-		// `click --label "Create Game"` can't reach them. This
-		// op routes through `LobbyScreen::ShowGame*` directly.
-		Screen * top = game.GetTopScreen();
-		LobbyScreen * lobby = dynamic_cast<LobbyScreen *>(top);
-		if(!lobby){
-			cmd.reply->set_value(Err(cmd.id, "WRONG_STATE",
-				"top screen is not a LobbyScreen"));
-			return;
-		}
-		std::string which = cmd.args.value("panel", std::string());
-		ScreenContext & ctx = game.GetScreenContext();
-		if(which == "create")      lobby->ShowGameCreate(ctx);
-		else if(which == "select") lobby->ShowGameSelect(ctx);
-		else if(which == "join")   lobby->ShowGameJoin(ctx);
-		else if(which == "tech")   lobby->ShowGameTech(ctx);
-		else{
-			cmd.reply->set_value(Err(cmd.id, "BAD_REQUEST",
-				"lobby_show_panel needs --panel select|create|join|tech"));
-			return;
-		}
-		cmd.reply->set_value(OkResult(cmd.id, nlohmann::json::object()));
-		return;
-	}
-#endif
 	if(cmd.op == "key"){
 		// Edge-triggered key event for the active UI. The external CLI keeps
 		// its legacy ascii/name surface, but Game stores normalized text/nav
@@ -956,6 +972,31 @@ void EnqueueWait(Game& game, ControlCommand cmd){
 		w.deadline_ms = SDL_GetTicks() + (Uint64)ms;
 	} else if(w.cmd.op == "wait_for_state"){
 		w.wait_state = w.cmd.args.value("state", std::string());
+		if(IsUiRouteStateName(w.wait_state)){
+			w.cmd.reply->set_value(Err(w.cmd.id, "BAD_REQUEST",
+				"wait_for_state no longer accepts UI route state " + w.wait_state +
+				"; use wait_for_ui with a rendered UI id/label"));
+			return;
+		}
+		int t = w.cmd.args.value("timeout_ms", 5000);
+		w.deadline_ms = SDL_GetTicks() + (Uint64)t;
+	} else if(w.cmd.op == "wait_for_ui"){
+		w.wait_ui_id = w.cmd.args.value("id", std::string());
+		w.wait_ui_id_prefix = w.cmd.args.value("id_prefix", std::string());
+		w.wait_ui_label = w.cmd.args.value("label", std::string());
+		if(w.cmd.args.contains("uid") && w.cmd.args["uid"].is_number_integer()){
+			w.wait_ui_uid = w.cmd.args["uid"].get<int>();
+		}
+		int targetCount = 0;
+		if(!w.wait_ui_id.empty()) ++targetCount;
+		if(!w.wait_ui_id_prefix.empty()) ++targetCount;
+		if(!w.wait_ui_label.empty()) ++targetCount;
+		if(w.wait_ui_uid >= 0) ++targetCount;
+		if(targetCount != 1){
+			w.cmd.reply->set_value(Err(w.cmd.id, "BAD_REQUEST",
+				"wait_for_ui needs exactly one of --id, --id-prefix, --label, or --uid"));
+			return;
+		}
 		int t = w.cmd.args.value("timeout_ms", 5000);
 		w.deadline_ms = SDL_GetTicks() + (Uint64)t;
 	} else if(w.cmd.op == "step"){
@@ -998,14 +1039,23 @@ void TickWaits(Game& game){
 		} else if(w.cmd.op == "wait_ms"){
 			if(now >= w.deadline_ms) done = true;
 		} else if(w.cmd.op == "wait_for_state"){
-			if(w.wait_state == Game::StateName(game.GetState()) &&
-			   (!StateNeedsScreen(w.wait_state) || game.HasVisibleUiScreen())){
+			if(w.wait_state == Game::StateName(game.GetState())){
 				w.cmd.reply->set_value(OkResult(w.cmd.id, nlohmann::json::object()));
 				it = v.erase(it); continue;
 			}
 			if(now >= w.deadline_ms){
 				w.cmd.reply->set_value(Err(w.cmd.id, "TIMEOUT",
 					"state did not become " + w.wait_state));
+				it = v.erase(it); continue;
+			}
+		} else if(w.cmd.op == "wait_for_ui"){
+			if(UiWaitTargetExists(game.UiInteractions(), w)){
+				w.cmd.reply->set_value(OkResult(w.cmd.id, nlohmann::json::object()));
+				it = v.erase(it); continue;
+			}
+			if(now >= w.deadline_ms){
+				w.cmd.reply->set_value(Err(w.cmd.id, "TIMEOUT",
+					"ui target did not appear: " + UiWaitTargetDescription(w)));
 				it = v.erase(it); continue;
 			}
 		}
@@ -1464,12 +1514,11 @@ static void HandleGas(Game& game, ControlCommand& cmd) {
 		// private to the class, so compare via the StateName string keys
 		// (same approach as wait_for_state).
 		const std::string st = Game::StateName(game.GetState());
-		const bool safe = (st == "NONE" || st == "MAINMENU" ||
-		                   st == "LOBBY" || st == "MISSIONSUMMARY");
+		const bool safe = (st == "NONE" || st == "FRONTEND");
 		if (!safe) {
 			cmd.reply->set_value(Err(cmd.id, "WRONG_STATE",
 				"gas reload not safe from state " + st +
-				" (allowed: NONE, MAINMENU, LOBBY, MISSIONSUMMARY)"));
+				" (allowed: NONE, FRONTEND)"));
 			return;
 		}
 

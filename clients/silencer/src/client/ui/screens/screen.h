@@ -8,14 +8,18 @@
 class ScreenContext;
 class Surface;
 
+namespace ui {
+struct DrawCommandList;
+}
+
 namespace silencer {
 namespace ui {
 class UiInteractionRegistry;
 }
 }
 
-// Top-level UI surface bound to a Game state. One Screen is active at a time
-// (plus modals stacked on top). Lifecycle is owned by ClientUi's ScreenStack.
+// Top-level legacy UI surface owned by ClientUi's ScreenStack. One normal
+// screen is visible at a time, with overlay screens stacked above it.
 class Screen
 {
 public:
@@ -42,8 +46,7 @@ public:
 	// Handle a back/cancel request (esc, right-click, "Go Back" button).
 	// Return true if the screen consumed the request internally (e.g. swapped
 	// a sub-panel) so Game should NOT fall through to its default action.
-	// Return false to let Game decide what happens next (typically pop or
-	// transition to MAINMENU).
+	// Return false to let Game decide what happens next.
 	virtual bool HandleBack(ScreenContext & ctx) { (void)ctx; return false; }
 
 	// Typed UI intent emitted by the runtime input router. Screens own all
@@ -59,6 +62,11 @@ public:
 
 	// Modals draw the screen below them; non-modal Screens hide what's beneath.
 	virtual bool IsOverlay() const { return false; }
+
+	virtual const ::ui::DrawCommandList * RetainedDrawCommands() const
+	{
+		return nullptr;
+	}
 };
 
 #endif

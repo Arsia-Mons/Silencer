@@ -14,7 +14,7 @@ PID="$(start_silencer "$PORT")"
 trap 'stop_silencer "$PID" "$PORT"' EXIT
 
 wait_alive "$PORT"
-cli --port "$PORT" wait_for_state --state MAINMENU --timeout-ms 15000 >/dev/null
+cli --port "$PORT" wait_for_ui --id main_menu.options --timeout-ms 15000 >/dev/null
 
 check_resize() {
   local width="$1" height="$2"
@@ -59,9 +59,9 @@ check_resize() {
   local x y
   read -r x y <<< "$click_target"
   cli --port "$PORT" click_at --x "$x" --y "$y" >/dev/null
-  cli --port "$PORT" wait_for_state --state OPTIONS --timeout-ms 5000 >/dev/null
+  cli --port "$PORT" wait_for_ui --id options.controls --timeout-ms 5000 >/dev/null
   cli --port "$PORT" back >/dev/null
-  cli --port "$PORT" wait_for_state --state MAINMENU --timeout-ms 5000 >/dev/null
+  cli --port "$PORT" wait_for_ui --id main_menu.options --timeout-ms 5000 >/dev/null
 
   rm -f "$state_out" "$inspect_out"
 }

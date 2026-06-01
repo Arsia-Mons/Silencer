@@ -38,34 +38,34 @@ go_back() {
 }
 
 # --- Phase 1: menu surfaces at 640x480 ---
-cli --port "$PORT" wait_for_state --state MAINMENU --timeout-ms 15000 >/dev/null
+cli --port "$PORT" wait_for_ui --id main_menu.options --timeout-ms 15000 >/dev/null
 resize 640 480
 snap "01_mainmenu_640x480"
 
 cli --port "$PORT" click --label OPTIONS >/dev/null
-cli --port "$PORT" wait_for_state --state OPTIONS --timeout-ms 5000 >/dev/null
+cli --port "$PORT" wait_for_ui --id options.controls --timeout-ms 5000 >/dev/null
 snap "02_options_root_640x480"
 
 cli --port "$PORT" click --label CONTROLS >/dev/null
-cli --port "$PORT" wait_for_state --state OPTIONSCONTROLS --timeout-ms 5000 >/dev/null
+cli --port "$PORT" wait_for_ui --id options_controls.preset --timeout-ms 5000 >/dev/null
 snap "03_options_controls_640x480"
 cli --port "$PORT" click --label CANCEL >/dev/null
-cli --port "$PORT" wait_for_state --state OPTIONS --timeout-ms 5000 >/dev/null
+cli --port "$PORT" wait_for_ui --id options.controls --timeout-ms 5000 >/dev/null
 
 cli --port "$PORT" click --label DISPLAY >/dev/null
-cli --port "$PORT" wait_for_state --state OPTIONSDISPLAY --timeout-ms 5000 >/dev/null
+cli --port "$PORT" wait_for_ui --id options_display.fullscreen --timeout-ms 5000 >/dev/null
 snap "04_options_display_640x480"
 cli --port "$PORT" click --label CANCEL >/dev/null
-cli --port "$PORT" wait_for_state --state OPTIONS --timeout-ms 5000 >/dev/null
+cli --port "$PORT" wait_for_ui --id options.controls --timeout-ms 5000 >/dev/null
 
 cli --port "$PORT" click --label AUDIO >/dev/null
-cli --port "$PORT" wait_for_state --state OPTIONSAUDIO --timeout-ms 5000 >/dev/null
+cli --port "$PORT" wait_for_ui --id options_audio.music --timeout-ms 5000 >/dev/null
 snap "05_options_audio_640x480"
 cli --port "$PORT" click --label CANCEL >/dev/null
-cli --port "$PORT" wait_for_state --state OPTIONS --timeout-ms 5000 >/dev/null
+cli --port "$PORT" wait_for_ui --id options.controls --timeout-ms 5000 >/dev/null
 
 go_back
-cli --port "$PORT" wait_for_state --state MAINMENU --timeout-ms 5000 >/dev/null
+cli --port "$PORT" wait_for_ui --id main_menu.options --timeout-ms 5000 >/dev/null
 
 # Lobby connect (no live server needed — the connect-attempt UI is what we capture)
 if cli --port "$PORT" click --label "Connect To Lobby" 2>/dev/null >/dev/null \
@@ -74,7 +74,7 @@ if cli --port "$PORT" click --label "Connect To Lobby" 2>/dev/null >/dev/null \
   cli --port "$PORT" wait_ms --n 1500 >/dev/null
   snap "06_lobby_connect_640x480"
   go_back
-  cli --port "$PORT" wait_for_state --state MAINMENU --timeout-ms 5000 >/dev/null || true
+  cli --port "$PORT" wait_for_ui --id main_menu.options --timeout-ms 5000 >/dev/null || true
 else
   echo "  skipped lobby connect (no matching label)"
 fi
@@ -84,17 +84,17 @@ resize 1280 720
 snap "11_mainmenu_1280x720"
 
 cli --port "$PORT" click --label OPTIONS >/dev/null
-cli --port "$PORT" wait_for_state --state OPTIONS --timeout-ms 5000 >/dev/null
+cli --port "$PORT" wait_for_ui --id options.controls --timeout-ms 5000 >/dev/null
 snap "12_options_root_1280x720"
 
 cli --port "$PORT" click --label CONTROLS >/dev/null
-cli --port "$PORT" wait_for_state --state OPTIONSCONTROLS --timeout-ms 5000 >/dev/null
+cli --port "$PORT" wait_for_ui --id options_controls.preset --timeout-ms 5000 >/dev/null
 snap "13_options_controls_1280x720"
 cli --port "$PORT" click --label CANCEL >/dev/null
-cli --port "$PORT" wait_for_state --state OPTIONS --timeout-ms 5000 >/dev/null
+cli --port "$PORT" wait_for_ui --id options.controls --timeout-ms 5000 >/dev/null
 
 go_back
-cli --port "$PORT" wait_for_state --state MAINMENU --timeout-ms 5000 >/dev/null
+cli --port "$PORT" wait_for_ui --id main_menu.options --timeout-ms 5000 >/dev/null
 
 resize 640 480
 

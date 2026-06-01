@@ -8,12 +8,12 @@ trap "stop_silencer $PID $PORT" EXIT
 wait_alive "$PORT"
 
 OUT_DIR="$(mktemp -d)"
-cli --port "$PORT" wait_for_state --state MAINMENU --timeout-ms 15000
+cli --port "$PORT" wait_for_ui --id main_menu.options --timeout-ms 15000
 cli --port "$PORT" screenshot --out "$OUT_DIR/main.png"
 test -s "$OUT_DIR/main.png"
 
 cli --port "$PORT" click --label OPTIONS
-cli --port "$PORT" wait_for_state --state OPTIONS --timeout-ms 5000
+cli --port "$PORT" wait_for_ui --id options.controls --timeout-ms 5000
 cli --port "$PORT" screenshot --out "$OUT_DIR/options.png"
 test -s "$OUT_DIR/options.png"
 

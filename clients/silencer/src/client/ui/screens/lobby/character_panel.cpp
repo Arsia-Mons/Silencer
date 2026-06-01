@@ -1,17 +1,13 @@
 #include "character_panel.h"
 
+#include "client/ui/hooks/use_lobby.h"
+
 #include "clay/clay.h"
 #include "clay_ui_payloads.h"
 #include "runtime/UiInteractionRegistry.h"
 #include "primitives/button.h"
 #include "primitives/box.h"
 #include "primitives/text.h"
-
-#include "config.h"
-#include "lobby.h"
-#include "resources.h"
-#include "user.h"
-#include "world.h"
 
 #include <algorithm>
 #include <cstring>
@@ -276,29 +272,29 @@ namespace silencer::client_ui::lobby {
         }
     } // namespace character_panel_detail
 
-    void CharacterPanelInit(CharacterPanelState &state) {
-        state.selectedAgency = Config::GetInstance().defaultagency;
+    void CharacterPanelInit(CharacterPanelState &state,
+                            LobbyCharacterModel &character) {
+        state.selectedAgency = character.default_agency();
         state.lastReconciled = -1; // forces first-frame reconcile pass
         state.newCharacterRequested = false;
     }
 
-    void CharacterPanelTick(CharacterPanelState &state, World &world) {
-        state.selectedAgency = world.lobby.GetSelectedAgencyOrDefault(Config::GetInstance().defaultagency);
-        state.agentSelectionLocked = world.IsConnected();
+    void CharacterPanelTick(CharacterPanelState &state,
+                            LobbyCharacterModel &character) {
+        state.selectedAgency = character.selected_agency();
+        state.agentSelectionLocked = character.agent_selection_locked();
         if (static_cast<int>(state.selectedAgency) != state.lastReconciled) {
             state.lastReconciled = state.selectedAgency;
-            if (world.IsConnected()) {
-                world.SetAgency(state.selectedAgency);
-            }
+            character.apply_selected_agency(state.selectedAgency);
         }
     }
 
     bool CharacterPanelHandleUiIntent(CharacterPanelState &state,
-                                      World &world,
+                                      LobbyCharacterModel &character,
                                       const silencer::ui::UiAction &action) {
         if (action.kind != silencer::ui::UiActionKind::Activate) return false;
         if (action.id == character_panel_detail::kActionAgents) {
-            if (world.IsConnected()) return true;
+            if (character.agent_selection_locked()) return true;
             state.newCharacterRequested = true;
             return true;
         }
@@ -307,14 +303,14 @@ namespace silencer::client_ui::lobby {
 
     void BuildCharacterPanelTree(CharacterPanelState &state,
                                  Uint16 panelWidth,
-                                 World &world,
-                                 Resources &resources,
+                                 LobbyCharacterModel &character,
                                  silencer::ui::UiInteractionRegistry &interactions) {
         // Refresh display strings each frame. Clay rebuilds this compact panel
         // from scratch, so the buffers only need to remain stable through the
         // current layout pass.
-        const Uint8 a = state.selectedAgency;
-        const Lobby::Character *ch = world.lobby.GetSelectedCharacter();
+        const LobbyCharacterPanelSnapshot snapshot = character.panel(state.selectedAgency);
+        state.agentSelectionLocked = snapshot.agent_selection_locked;
+        const Uint8 a = snapshot.agency;
         const int innerWidth = std::max(1,
                                         static_cast<int>(panelWidth) -
                                         2 * static_cast<int>(character_panel_detail::kPanelPad));
@@ -327,22 +323,21 @@ namespace silencer::client_ui::lobby {
                                               character_panel_detail::kEmblemGap));
         character_panel_detail::g_stats.name =
                 character_panel_detail::FitMiddleEllipsis(
-                    ch ? std::string(ch->name) : std::string("No Agent"),
+                    snapshot.agent_name,
                     TextSize::Heading,
                     detailsWidth);
 
-        User *user = world.lobby.GetUserInfo(world.lobby.accountid);
-        if (user && !user->retrieving) {
-            const auto &stats = user->agency[a];
+        if (snapshot.progress.loaded) {
+            const LobbyCharacterProgress& stats = snapshot.progress;
             character_panel_detail::g_stats.level = "LV " + std::to_string(stats.level);
             character_panel_detail::g_stats.wins = std::to_string(stats.wins);
             character_panel_detail::g_stats.losses = std::to_string(stats.losses);
-            if (stats.level >= User::maxlevel) {
+            if (stats.max_level) {
                 character_panel_detail::g_stats.xp = "MAX";
             } else {
                 const int nextLevelXp = 100 * (static_cast<int>(stats.level) + 1);
                 character_panel_detail::g_stats.xp =
-                        std::to_string(stats.xptonextlevel) + "/" + std::to_string(nextLevelXp);
+                    std::to_string(stats.xptonextlevel) + "/" + std::to_string(nextLevelXp);
             }
             character_panel_detail::g_stats.endurance = std::to_string(stats.endurance);
             character_panel_detail::g_stats.shield = std::to_string(stats.shield);

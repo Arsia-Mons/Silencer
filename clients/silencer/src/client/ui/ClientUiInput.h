@@ -3,6 +3,7 @@
 #include "ui/runtime/UiInputState.h"
 
 #include <cstdint>
+#include <functional>
 #include <string>
 #include <vector>
 
@@ -18,6 +19,7 @@ public:
 	void QueueControlAction(silencer::ui::UiAction action);
 	void QueueControlPointerPress(int x, int y);
 	void QueueControlPointerHover(int x, int y);
+	void QueueNavigationRequest(std::function<void()> request);
 
 	void QueuePointerWindowEvent(float windowX,
 	                             float windowY,
@@ -42,6 +44,7 @@ public:
 	                                int16_t axisDeadzone);
 
 	silencer::ui::UiInputState BuildFrame(int width, int height, float uiScale, float deltaTimeSeconds);
+	std::vector<std::function<void()>> DrainNavigationRequests();
 	void EndFrame();
 
 private:
@@ -61,6 +64,7 @@ private:
 	std::vector<silencer::ui::UiNavAction> navActions_;
 	std::vector<silencer::ui::UiBindingInput> bindingInputs_;
 	std::vector<silencer::ui::UiControlCommand> controlCommands_;
+	std::vector<std::function<void()>> navigationRequests_;
 
 	bool havePointerPosition_ = false;
 	bool controlPointerActive_ = false;

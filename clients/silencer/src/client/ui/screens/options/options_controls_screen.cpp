@@ -1,15 +1,14 @@
 #include "options_controls_screen.h"
 
+#include "client/ui/hooks/use_navigation.h"
+#include "client/ui/hooks/use_options.h"
+#include "client/ui/screens/options/options_controls_frame.h"
 #include "controls_keybind_list.h"
-#include "controls_rebind_capture.h"
 
 #include "screen_context.h"
 #include "game.h"
-#include "game_state.h"
-#include "config.h"
 #include "surface.h"
 
-#include "clay/clay.h"
 #include "clay_ui_compositor.h"
 #include "runtime/UiInteractionRegistry.h"
 
@@ -42,10 +41,6 @@ constexpr const char * kActionCancel = "options_controls.cancel";
 constexpr const char * kActionPrimaryPrefix = "options_controls.primary.";
 constexpr const char * kActionSecondaryPrefix = "options_controls.secondary.";
 constexpr const char * kActionOperatorPrefix = "options_controls.operator.";
-
-bool IsBuiltinKeybindProfile(const std::string & name) {
-	return name == "default" || name == "wasd" || name == "gamepad";
-}
 
 bool StartsWith(const std::string & value, const char * prefix) {
 	const size_t n = std::strlen(prefix);
@@ -100,7 +95,9 @@ void OptionsControlsScreen::ToggleOperatorFromVisibleRow(int row) {
 }
 
 void OptionsControlsScreen::Tick(ScreenContext & ctx) {
-	using namespace silencer::client_ui::options;
+	silencer::client_ui::OptionsModel options =
+		silencer::client_ui::use_options(
+			silencer::client_ui::MakeOptionsProvider(ctx));
 
 	if(scrollDelta != 0){
 		scrollPosition = std::max(0, std::min(MaxScroll(), scrollPosition + scrollDelta));
@@ -108,51 +105,47 @@ void OptionsControlsScreen::Tick(ScreenContext & ctx) {
 	}
 	if(presetClicked){
 		presetClicked = false;
-		CycleKeybindPreset(ctx.keymap);
+		options.controls.cycle_preset();
 	}
 	if(operatorClickedRow >= 0 && operatorClickedRow < (int)Action::Count){
 		Action a = ACTION_TABLE[operatorClickedRow].action;
-		LegacyBindingView v = ViewLegacy(ctx.keymap, a);
-		v.and_ = !v.and_;
-		ForkActiveProfileIfBuiltin(ctx.keymap);
-		WriteLegacy(ctx.keymap, a, v.key1, v.key2, v.and_);
+		options.controls.toggle_operator(a);
 		operatorClickedRow = -1;
 	}
 	if(rebindRow >= 0){
+		const int tick = options.controls.tick_count();
 		if(optionscontrolstick == 0){
-			optionscontrolstick = ctx.world.tickcount;
+			optionscontrolstick = tick;
 		}
 		if(rebindRow >= 0 &&
-		   ctx.world.tickcount - optionscontrolstick > options_controls_screen_detail::REBIND_TIMEOUT_TICKS){
-			FinishKeyboardRebind(ctx, rebindRow, rebindSlot, SDL_SCANCODE_UNKNOWN);
+		   tick - optionscontrolstick > options_controls_screen_detail::REBIND_TIMEOUT_TICKS){
+			options.controls.finish_keyboard_rebind(rebindRow, rebindSlot, SDL_SCANCODE_UNKNOWN);
 		}
 	}else{
 		optionscontrolstick = 0;
 	}
 	if(saveClicked){
 		saveClicked = false;
-		const std::string active = Config::GetInstance().active_keybind_profile;
-		if(!options_controls_screen_detail::IsBuiltinKeybindProfile(active)){
-			ctx.keymap.SaveFile(WritableProfilePath(active));
-		}
-		Config::GetInstance().Save();
-		ctx.GoToState(GameState::OPTIONS);
+		options.controls.save();
+		silencer::client_ui::use_navigation().pop_top();
 		return;
 	}
 	if(cancelClicked){
 		cancelClicked = false;
-		LoadActiveKeymap(ctx.keymap);
-		Config::GetInstance().Load();
-		ctx.GoToState(GameState::OPTIONS);
+		options.controls.cancel();
+		silencer::client_ui::use_navigation().pop_top();
 	}
 }
 
 bool OptionsControlsScreen::HandleUiIntent(ScreenContext & ctx, const silencer::ui::UiAction & action) {
 	using namespace silencer::client_ui::options;
+	silencer::client_ui::OptionsModel options =
+		silencer::client_ui::use_options(
+			silencer::client_ui::MakeOptionsProvider(ctx));
 
 	if(action.kind == silencer::ui::UiActionKind::CaptureBinding){
 		if(rebindRow < 0) return false;
-		FinishBindingRebind(ctx, rebindRow, rebindSlot, action.binding);
+		options.controls.finish_binding_rebind(rebindRow, rebindSlot, action.binding);
 		return true;
 	}
 	if(action.kind == silencer::ui::UiActionKind::Cancel){
@@ -199,13 +192,14 @@ bool OptionsControlsScreen::HandleUiIntent(ScreenContext & ctx, const silencer::
 
 void OptionsControlsScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime, silencer::ui::UiInteractionRegistry& interactions) {
 	(void)frametime;
-	(void)dst;
-	using namespace silencer::clay_bridge;
 	using namespace silencer::client_ui::options;
+	silencer::client_ui::OptionsModel options =
+		silencer::client_ui::use_options(
+			silencer::client_ui::MakeOptionsProvider(ctx));
 
-	const silencer::ui::UiInputState & input = ctx.game.CurrentUiInput();
-	const int layoutWidth = std::max(1, input.width);
-	const int layoutHeight = std::max(1, input.height);
+	const float uiScale = silencer::clay_bridge::UiScale();
+	const int layoutWidth = std::max(1, static_cast<int>(dst.w / uiScale));
+	const int layoutHeight = std::max(1, static_cast<int>(dst.h / uiScale));
 	const int framePadLeft = options_controls_screen_detail::ScaleLegacyPx(
 		options_controls_screen_detail::kFrameMarginLeft,
 		layoutWidth,
@@ -256,9 +250,7 @@ void OptionsControlsScreen::BuildUi(ScreenContext & ctx, Surface & dst, float fr
 
 	keybindListView_ = KeybindListView{};
 	keybindListView_.hScale = keybindHScale;
-	keybindListView_.presetText = !ctx.keymap.label.empty() ? ctx.keymap.label
-	                            : !ctx.keymap.name.empty() ? ctx.keymap.name
-	                            : std::string(Config::GetInstance().active_keybind_profile);
+	keybindListView_.presetText = options.controls.profile_label();
 	keybindListView_.titleOffsetY = static_cast<float>(
 		std::max(0,
 		         options_controls_screen_detail::ScaleLegacyPx(
@@ -271,43 +263,40 @@ void OptionsControlsScreen::BuildUi(ScreenContext & ctx, Surface & dst, float fr
 		int row = scrollPosition + i;
 		if(row >= (int)Action::Count) break;
 		Action action = ACTION_TABLE[row].action;
-		LegacyBindingView v = ViewLegacy(ctx.keymap, action);
+		silencer::client_ui::OptionsBindingView v = options.controls.binding(action);
 		KeybindRowView & out = keybindListView_.rows[i];
 		out.actionLabel = std::string(GetActionInfo(action).label) + ":";
-		out.primaryLabel = GetBindingLabel(ctx, action, 0);
-		out.secondaryLabel = GetBindingLabel(ctx, action, 1);
+		out.primaryLabel = options.controls.binding_label(action, 0);
+		out.secondaryLabel = options.controls.binding_label(action, 1);
 		out.operatorLabel = v.and_ ? "AND" : "OR";
 		out.rebindingPrimary = (rebindRow == row && rebindSlot == 0);
 		out.rebindingSecondary = (rebindRow == row && rebindSlot == 1);
 		keybindListView_.visibleRowCount = i + 1;
 	}
 
-	CLAY({ .id = CLAY_ID("OptionsControlsRoot"),
-	       .layout = {
-	           .sizing = { CLAY_SIZING_GROW(0),
-	                       CLAY_SIZING_GROW(0) },
-	           .padding = { static_cast<uint16_t>(framePadLeft),
-	                        static_cast<uint16_t>(framePadRight),
-	                        static_cast<uint16_t>(framePadTop),
-	                        static_cast<uint16_t>(framePadBottom) },
-	           .childAlignment = { CLAY_ALIGN_X_CENTER, CLAY_ALIGN_Y_CENTER },
-	       },
-	       .image = { .imageData = PackImageStretch(6, 0) } }) {
-		CLAY({ .id = CLAY_ID("OptionsControlsPanel"),
-		       .layout = {
-		           .sizing = { CLAY_SIZING_GROW(0),
-		                       CLAY_SIZING_GROW(options_controls_screen_detail::kPanelMinH) },
-		           .padding = { static_cast<uint16_t>(panelPadX), static_cast<uint16_t>(panelPadX),
-		                        options_controls_screen_detail::kPanelPadTop, static_cast<uint16_t>(panelPadBottom) },
-		           .childAlignment = { CLAY_ALIGN_X_CENTER, CLAY_ALIGN_Y_TOP },
-		           .layoutDirection = CLAY_TOP_TO_BOTTOM,
-		       },
-		       .image = { .imageData = PackImageStretch(7, 7) } }) {
-			BuildKeybindListBody(keybindListView_, interactions);
-		}
-	}
+	silencer::client_ui::OptionsControlsFrameProps props{
+		.key = "options-controls",
+		.view = &keybindListView_,
+		.frame_pad_left = framePadLeft,
+		.frame_pad_right = framePadRight,
+		.frame_pad_top = framePadTop,
+		.frame_pad_bottom = framePadBottom,
+		.panel_pad_x = panelPadX,
+		.panel_pad_bottom = panelPadBottom,
+	};
+	retainedFrame_.Build([&]() {
+		                     return silencer::client_ui::OptionsControlsFrame(props);
+	                     },
+	                     layoutWidth,
+	                     layoutHeight,
+	                     interactions);
 }
 
 void OptionsControlsScreen::Destroy(ScreenContext & ctx) {
 	(void)ctx;
+}
+
+const ::ui::DrawCommandList * OptionsControlsScreen::RetainedDrawCommands() const
+{
+	return &retainedFrame_.Commands();
 }

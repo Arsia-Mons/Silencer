@@ -1,0 +1,27 @@
+#include "text_input.h"
+
+namespace ui {
+namespace components {
+
+::ui::UiElement TextInput(const TextInputProps& props) {
+	const ::ui::VisualStyle visual =
+		::ui::resolve(::ui::use_theme().input,
+		              props.style,
+		              detail::interaction_state(props.disabled));
+	return <detail.Host
+	  kind={::ui::HostKind::Input}
+	  key={props.key}
+	  id={props.id}
+	  idOffset={props.id_offset}
+	  style={detail::control_layout_style(props.layout)}
+	  visual={visual}
+	  text={::ui::HostTextProps{.value = props.value ? props.value : ""}}
+	  textEdit={props.text_edit}
+	  interaction={detail::interaction_from_props(props, true)}
+	  accessibility={detail::accessibility_from_props(props, ::ui::SemanticRole::TextBox)}
+	  callbacks={detail::callbacks_from_props(props)}
+	/>
+}
+
+}  // namespace components
+}  // namespace ui

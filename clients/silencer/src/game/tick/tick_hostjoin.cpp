@@ -188,7 +188,7 @@ void Game::TickTestGame(){
 			}
 		}*/
 		if(gameSession.CheckForQuit() || gameSession.CheckForEndOfGame()){
-			GoToState(MAINMENU);
+			GoToMainMenu();
 		}
 	}
 }

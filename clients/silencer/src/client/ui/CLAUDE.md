@@ -24,6 +24,7 @@ This UI is actively migrating toward good flexbox layout, Clay lifecycle, and sh
 - One primitive owns one concern. Checkbox/toggle state belongs to checkbox/toggle primitives, not a `Button` mode.
 - Every interactive, animated, scrollable, custom-rendered, tested, or automation-visible element needs an explicit stable Clay ID. A visible label must never double as the element ID.
 - Dynamic strings and custom payloads must live until after Clay render command consumption. Use per-frame primitive arenas; reset them once from `ClientUi::BeginFrame`, never from a screen.
+- In `.cppx`, authored components are composed with JSX syntax. Do not return or nest a component by calling its C++ function form, such as `return Row(props);` or `{Row(props)}`. Use `<Row ... />`, paired tags, and JSX children; reserve direct calls for non-component helpers and raw runtime escape hatches.
 
 ## Interaction
 

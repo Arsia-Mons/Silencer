@@ -12,7 +12,7 @@ wait_alive "$PORT"
 
 OUT_DIR="$(mktemp -d)"
 
-cli --port "$PORT" wait_for_state --state MAINMENU --timeout-ms 15000
+cli --port "$PORT" wait_for_ui --id main_menu.options --timeout-ms 15000
 
 check_resize() {
   local width="$1" height="$2" out="$3"
@@ -63,9 +63,9 @@ check_resize() {
   local options_x options_y
   read -r options_x options_y <<< "$options_center"
   cli --port "$PORT" click_at --x "$options_x" --y "$options_y" >/dev/null
-  cli --port "$PORT" wait_for_state --state OPTIONS --timeout-ms 5000 >/dev/null
+  cli --port "$PORT" wait_for_ui --id options.controls --timeout-ms 5000 >/dev/null
   cli --port "$PORT" back >/dev/null
-  cli --port "$PORT" wait_for_state --state MAINMENU --timeout-ms 5000 >/dev/null
+  cli --port "$PORT" wait_for_ui --id main_menu.options --timeout-ms 5000 >/dev/null
 }
 
 check_resize 1280 720 "$OUT_DIR/main-1280x720.png"

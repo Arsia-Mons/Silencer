@@ -91,10 +91,10 @@ wait_for_lobby_state() {
 }
 
 # MainMenu -> LobbyConnect -> login (auto-creates account) -> CREATECHARACTER.
-cli --port "$CTRL_PORT" wait_for_state --state MAINMENU --timeout-ms 15000 >/dev/null
+cli --port "$CTRL_PORT" wait_for_ui --id main_menu.options --timeout-ms 15000 >/dev/null
 wait_for_widget "Connect To Lobby"
 cli --port "$CTRL_PORT" click --label "Connect To Lobby" >/dev/null
-cli --port "$CTRL_PORT" wait_for_state --state LOBBYCONNECT --timeout-ms 5000 >/dev/null
+cli --port "$CTRL_PORT" wait_for_ui --id lobby_connect.login --timeout-ms 5000 >/dev/null
 wait_for_widget "Login/Create"
 for ch in a l i c e; do cli --port "$CTRL_PORT" key --key "$ch" >/dev/null; done
 cli --port "$CTRL_PORT" key --key tab >/dev/null
@@ -103,7 +103,7 @@ wait_for_lobby_state AUTHENTICATING
 cli --port "$CTRL_PORT" click --label "Login/Create" >/dev/null
 
 # Walk the create flow up to the SELECT AGENCY stage (5 oval agency rows).
-cli --port "$CTRL_PORT" wait_for_state --state CREATECHARACTER --timeout-ms 15000 >/dev/null
+cli --port "$CTRL_PORT" wait_for_ui --id-prefix character_create. --timeout-ms 15000 >/dev/null
 wait_for_widget "Create New Character"
 read -r CREATE_HX CREATE_HY < <(cli --port "$CTRL_PORT" inspect | bun -e '
 const t = await new Response(Bun.stdin.stream()).text();
@@ -134,12 +134,8 @@ if cli --port "$CTRL_PORT" click_at --x "$CREATE_HX" --y "$CREATE_HY" >/dev/null
   exit 1
 fi
 cli --port "$CTRL_PORT" wait_frames --n 2 >/dev/null
-CURRENT_STATE=$(cli --port "$CTRL_PORT" state | bun -e '
-const t = await new Response(Bun.stdin.stream()).text();
-console.log(JSON.parse(t).state || "");
-')
-if [ "$CURRENT_STATE" != "CREATECHARACTER" ]; then
-  echo "background click escaped alias modal into state $CURRENT_STATE" >&2
+if ! cli --port "$CTRL_PORT" wait_for_ui --id character_create.alias --timeout-ms 1000 >/dev/null; then
+  echo "background click escaped alias modal" >&2
   exit 1
 fi
 ALIAS_CLICK="$TMP/alias-click.json"
@@ -152,7 +148,7 @@ if (!alias) { console.error("Alias text input missing after background click"); 
 
 cli --port "$CTRL_PORT" set_text --label "Alias" --text "Alice" >/dev/null
 cli --port "$CTRL_PORT" key --key enter >/dev/null
-cli --port "$CTRL_PORT" wait_for_state --state CREATECHARACTER --timeout-ms 15000 >/dev/null
+cli --port "$CTRL_PORT" wait_for_ui --id-prefix character_create. --timeout-ms 15000 >/dev/null
 wait_for_widget "Black Rose"
 cli --port "$CTRL_PORT" wait_frames --n 2 >/dev/null
 
@@ -261,7 +257,7 @@ cli --port "$CTRL_PORT" hover_at --x "$HX" --y "$HY" >/dev/null
 cli --port "$CTRL_PORT" wait_frames --n 2 >/dev/null
 cli --port "$CTRL_PORT" click_at --x "$HX" --y "$HY" >/dev/null
 cli --port "$CTRL_PORT" click_at --x "$HX" --y "$HY" >/dev/null 2>&1 || true
-cli --port "$CTRL_PORT" wait_for_state --state LOBBY --timeout-ms 15000 >/dev/null
+cli --port "$CTRL_PORT" wait_for_ui --id lobby.go_back --timeout-ms 15000 >/dev/null
 CREATED_COUNT=$(bun -e '
 const db = JSON.parse(await Bun.file(process.argv[1]).text());
 const chars = db.users?.alice?.chars ?? [];

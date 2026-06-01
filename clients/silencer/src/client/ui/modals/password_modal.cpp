@@ -1,33 +1,20 @@
 #include "password_modal.h"
 
+#include "client/ui/modals/password_modal_frame.h"
+#include "client/ui/hooks/use_navigation.h"
 #include "screen_context.h"
 #include "game.h"
 #include "renderer.h"
 #include "surface.h"
 
-#include "clay/clay.h"
 #include "clay_ui_compositor.h"
 #include "runtime/UiInteractionRegistry.h"
-#include "primitives/button.h"
-#include "primitives/text.h"
-#include "primitives/text_input.h"
 
+#include <algorithm>
 #include <cstring>
 
 namespace password_modal_detail
 {
-using silencer::ui::primitives::Button;
-using silencer::ui::primitives::ButtonHandle;
-using silencer::ui::primitives::ButtonOpts;
-using silencer::ui::primitives::ButtonSize;
-using silencer::ui::primitives::ButtonVariant;
-using silencer::ui::primitives::Text;
-using silencer::ui::primitives::TextSize;
-
-constexpr uint16_t kDialogW = 352;
-constexpr uint16_t kDialogH = 148;
-constexpr uint16_t kInputW = 180;
-constexpr uint16_t kInputH = 14;
 constexpr int kPasswordUid = 1;
 constexpr const char * kActionPassword = "password_modal.password";
 constexpr const char * kActionOk = "password_modal.ok";
@@ -78,55 +65,36 @@ void PasswordModal::Tick(ScreenContext & ctx)
 	okClicked = false;
 	std::string captured = password;
 	auto cb = std::move(onSubmit);
-	ctx.PopScreen();
+	silencer::client_ui::use_navigation().pop_top();
 	if(cb) cb(captured.c_str());
 }
 
 void PasswordModal::BuildUi(ScreenContext & ctx, Surface & dst, float frametime, silencer::ui::UiInteractionRegistry& interactions)
 {
 	(void)frametime;
-	using namespace silencer::clay_bridge;
-
-
-
+	password_modal_detail::RegisterWidgets(this, password, interactions);
+	if(!interactions.HasFocus()){
+		interactions.FocusTextInputByUid(password_modal_detail::kPasswordUid);
+	}
 	bool focused = interactions.IsTextInputFocused(password_modal_detail::kPasswordUid);
 	bool blink = (ctx.renderer.GetHudAnimationPhase() % 32) < 16;
 
-	CLAY({ .id = CLAY_ID("PasswordModalRoot"),
-	       .layout = {
-	           .sizing = { CLAY_SIZING_GROW(0),
-	                       CLAY_SIZING_GROW(0) },
-	           .childAlignment = { CLAY_ALIGN_X_CENTER, CLAY_ALIGN_Y_CENTER },
-	       } }) {
-		CLAY({ .id = CLAY_ID("PasswordModalDialog"),
-		       .layout = {
-		           .sizing = { CLAY_SIZING_FIXED(password_modal_detail::kDialogW),
-		                       CLAY_SIZING_FIXED(password_modal_detail::kDialogH) },
-		           .padding = { 34, 34, 30, 24 },
-		           .childGap = 16,
-		           .childAlignment = { CLAY_ALIGN_X_CENTER, CLAY_ALIGN_Y_TOP },
-		           .layoutDirection = CLAY_TOP_TO_BOTTOM,
-		       },
-		       .image = { .imageData = PackImage(40, 2) } }) {
-			password_modal_detail::Text(CLAY_STRING("This game requires a password"),
-			         { .size = password_modal_detail::TextSize::Heading });
-			silencer::ui::primitives::TextInput(
-				CLAY_STRING("PasswordInput"),
-				password,
-				{ .widthPx = password_modal_detail::kInputW,
-				  .heightPx = password_modal_detail::kInputH,
-				  .textSize = password_modal_detail::TextSize::Title,
-				  .password = true,
-				  .showCaret = focused && blink },
-				{ nullptr, password_modal_detail::kActionPassword, "Password",
-				  &interactions, password_modal_detail::kPasswordUid, 20 });
-			password_modal_detail::Button(CLAY_STRING("PasswordModalOkButton"), CLAY_STRING("OK"),
-			           password_modal_detail::ButtonOpts{ .variant = password_modal_detail::ButtonVariant::Chrome,
-			                                             .size = password_modal_detail::ButtonSize::Compact },
-			           password_modal_detail::ButtonHandle{ nullptr, password_modal_detail::kActionOk, &interactions });
-		}
-	}
+	passwordDisplay_.assign(std::strlen(password), '*');
+	if(focused && blink) passwordDisplay_ += "|";
 
+	const float uiScale = silencer::clay_bridge::UiScale();
+	const int virtualW = std::max(1, static_cast<int>(dst.w / uiScale));
+	const int virtualH = std::max(1, static_cast<int>(dst.h / uiScale));
+	silencer::client_ui::PasswordModalFrameProps props{
+		.key = "password-modal",
+		.password_display = passwordDisplay_.c_str(),
+	};
+	retainedFrame_.Build([&]() {
+		                     return silencer::client_ui::PasswordModalFrame(props);
+	                     },
+	                     virtualW,
+	                     virtualH,
+	                     interactions);
 	password_modal_detail::RegisterWidgets(this, password, interactions);
 }
 
@@ -153,4 +121,9 @@ bool PasswordModal::HandleUiIntent(ScreenContext & ctx, const silencer::ui::UiAc
 		return true;
 	}
 	return false;
+}
+
+const ::ui::DrawCommandList * PasswordModal::RetainedDrawCommands() const
+{
+	return &retainedFrame_.Commands();
 }

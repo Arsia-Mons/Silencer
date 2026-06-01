@@ -7,8 +7,7 @@
 // overlay per local row, the centered tech-name + 8 description-line block,
 // and a "Back To Teams" chrome button.
 //
-// Domain glue (World::SetTech, Config save, ShowGameJoin) lives in the
-// screen-side GameTechPanelTick. Primitives stay screen-agnostic.
+// Domain mutations go through use_lobby(); primitives stay screen-agnostic.
 
 #include "shared.h"
 #include "runtime/UiActionQueue.h"
@@ -16,13 +15,12 @@
 #include <array>
 #include <string>
 
-class World;
-class Resources;
-class ScreenContext;
-class LobbyScreen;
-
 namespace silencer::ui {
 class UiInteractionRegistry;
+}
+
+namespace silencer::client_ui {
+class LobbyModel;
 }
 
 namespace silencer::client_ui::lobby {
@@ -44,12 +42,14 @@ struct GameTechPanelState {
 
 void GameTechPanelInit(GameTechPanelState & state);
 
+struct GameTechPanelTickResult {
+	bool show_roster = false;
+};
+
 // Per-frame pump. Recomputes slots-left, peer names, and consumes per-frame
 // click flags (toggle a tech bit, swap description, exit on Back).
-void GameTechPanelTick(GameTechPanelState & state,
-                       World & world,
-                       ScreenContext & ctx,
-                       LobbyScreen & owner);
+GameTechPanelTickResult GameTechPanelTick(GameTechPanelState & state,
+                                          LobbyModel & lobby);
 bool GameTechPanelHandleUiIntent(GameTechPanelState & state,
                                  const silencer::ui::UiAction & action);
 
@@ -59,9 +59,6 @@ bool GameTechPanelHandleUiIntent(GameTechPanelState & state,
 // BeginFrame requirements: TextBeginFrame, ButtonBeginFrame.
 void BuildGameTechUpperTree(GameTechPanelState & state,
                             Uint16 panelWidth,
-                            World & world,
-                            Resources & resources,
-                            LobbyScreen & owner,
                             silencer::ui::UiInteractionRegistry& interactions);
 
 // Emits the tall stepped-pane subtree (slots-left text + 4-column tech-choice
@@ -69,9 +66,7 @@ void BuildGameTechUpperTree(GameTechPanelState & state,
 // the LobbyRightTallBox CLAY block; flex children only.
 // BeginFrame requirements: TextBeginFrame, ToggleBeginFrame.
 void BuildGameTechTallTree(GameTechPanelState & state,
-                           World & world,
-                           Resources & resources,
-                           LobbyScreen & owner,
+                           LobbyModel & lobby,
                            silencer::ui::UiInteractionRegistry& interactions);
 
 }  // namespace silencer::client_ui::lobby

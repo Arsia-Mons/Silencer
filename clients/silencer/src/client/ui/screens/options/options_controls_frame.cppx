@@ -1,0 +1,532 @@
+#include "client/ui/screens/options/options_controls_frame.h"
+
+#include "client/ui/components/actions/app_button.h"
+#include "client/ui/components/tokens.h"
+#include "ui/components/box.h"
+#include "ui/components/button.h"
+#include "ui/components/common.h"
+#include "ui/components/text.h"
+#include "ui/style/style_patch.h"
+
+#include <algorithm>
+#include <cstdint>
+#include <string>
+
+namespace silencer {
+namespace client_ui {
+namespace options_controls_frame_detail {
+
+namespace detail = ::ui::components::detail;
+
+using ::ui::children;
+using ::ui::components::Box;
+using ::ui::components::BoxProps;
+using ::ui::components::Button;
+using ::ui::components::ButtonProps;
+using ::ui::components::Text;
+using ::ui::components::TextProps;
+
+constexpr int kPanelMinH = 420;
+constexpr int kPanelPadTop = 70;
+constexpr int kContentW = 486;
+constexpr int kPresetRowH = 43;
+constexpr int kRowH = 43;
+constexpr int kRowGap = 10;
+constexpr int kActionNameW = 180;
+constexpr int kOperatorW = 45;
+constexpr int kActionGap = 12;
+constexpr int kColumnGap = 12;
+constexpr int kPresetGap = 12;
+constexpr int kSectionGap = 8;
+constexpr int kActionTopGap = 16;
+constexpr int kActionRowH = 33;
+constexpr int kRowActionW = 112;
+constexpr int kPresetButtonW = 220;
+constexpr int kTitleH = 24;
+constexpr int kControlRowSlots = 30;
+constexpr const char * kActionPreset = "options_controls.preset";
+constexpr const char * kActionSave = "options_controls.save";
+constexpr const char * kActionCancel = "options_controls.cancel";
+constexpr const char * kActionPrimaryPrefix = "options_controls.primary.";
+constexpr const char * kActionSecondaryPrefix = "options_controls.secondary.";
+constexpr const char * kActionOperatorPrefix = "options_controls.operator.";
+
+const char * kRowKeys[kControlRowSlots] = {
+	"row-0",  "row-1",  "row-2",  "row-3",  "row-4",
+	"row-5",  "row-6",  "row-7",  "row-8",  "row-9",
+	"row-10", "row-11", "row-12", "row-13", "row-14",
+	"row-15", "row-16", "row-17", "row-18", "row-19",
+	"row-20", "row-21", "row-22", "row-23", "row-24",
+	"row-25", "row-26", "row-27", "row-28", "row-29",
+};
+
+inline std::uint32_t texture_id(std::uint8_t bank, std::uint16_t index) {
+	return (static_cast<std::uint32_t>(bank) << 16) |
+	       static_cast<std::uint32_t>(index);
+}
+
+inline ::ui::StylePatch image_patch(std::uint8_t bank, std::uint16_t index) {
+	return ::ui::patch().image(::ui::BackgroundImage{
+		.texture_id = texture_id(bank, index),
+		.tint = {255, 255, 255, 255},
+	});
+}
+
+inline ::ui::StylePatch text_patch(std::uint16_t font_id,
+                                   std::uint16_t font_size,
+                                   ::ui::TextAlign align = ::ui::TextAlign::Left,
+                                   float line_height = 0.0f) {
+	return ::ui::patch().text(::ui::TextVisual{
+		.color = tokens::kTextTitle,
+		.font_id = font_id,
+		.font_size = font_size,
+		.align = align,
+		.line_height = line_height,
+	});
+}
+
+inline ::ui::StylePatch button_text_patch(std::uint16_t font_id,
+                                          std::uint16_t font_size) {
+	return ::ui::patch().text(::ui::TextVisual{
+		.color = tokens::kTextButton,
+		.font_id = font_id,
+		.font_size = font_size,
+		.align = ::ui::TextAlign::Center,
+	});
+}
+
+inline ::ui::StyleStatePatch image_button_patch(std::uint16_t index) {
+	return ::ui::patch().image(::ui::BackgroundImage{
+		.texture_id = texture_id(6, index),
+		.tint = {255, 255, 255, 255},
+	});
+}
+
+inline ::ui::StyleStatePatch ghost_button_patch() {
+	const ::ui::Color transparent = {0, 0, 0, 0};
+	auto solid = [](::ui::Color fill) {
+		return ::ui::patch().background(fill);
+	};
+	::ui::StyleStatePatch patch{};
+	patch.base = solid(transparent);
+	patch.hover = solid({255, 255, 255, 18});
+	patch.pressed = solid({255, 255, 255, 30});
+	return patch;
+}
+
+inline int scaled_metric(int value, float scale) {
+	int result = static_cast<int>(value * scale + 0.5f);
+	return result < 1 ? 1 : result;
+}
+
+inline float horizontal_scale(const OptionsControlsFrameProps& props) {
+	return props.view ? props.view->hScale : 1.0f;
+}
+
+inline int visible_rows(const OptionsControlsFrameProps& props) {
+	if(!props.view) return 0;
+	return std::min(props.view->visibleRowCount,
+	                static_cast<int>(props.view->rows.size()));
+}
+
+inline ::ui::LayoutStyle fill_column_layout() {
+	return {
+		.direction = ::ui::FlexDirection::Column,
+		.align_items = ::ui::AlignItems::Center,
+		.width = ::ui::Length::percent(100.0f),
+		.height = ::ui::Length::percent(100.0f),
+	};
+}
+
+inline ::ui::LayoutStyle row_layout(float columnGap) {
+	return {
+		.direction = ::ui::FlexDirection::Row,
+		.align_items = ::ui::AlignItems::Center,
+		.width = ::ui::Length::percent(100.0f),
+		.height = ::ui::Length::grow(1.0f),
+		.min_height = ::ui::Length::points(static_cast<float>(kRowH)),
+		.gap = columnGap,
+	};
+}
+
+inline const char * copied_id(const char * prefix, int row) {
+	std::string id = std::string(prefix) + std::to_string(row);
+	return ::ui::copy_string(id.c_str());
+}
+
+	struct ButtonLabelProps {
+		const char * key = nullptr;
+		const char * value = nullptr;
+		std::uint16_t font_id = tokens::kFontTitleBank;
+		std::uint16_t font_size = 11;
+	};
+
+	::ui::UiElement ButtonLabel(const ButtonLabelProps& props) {
+		return <Text
+		  key={props.key}
+		  value={props.value ? props.value : ""}
+		  layout={::ui::LayoutStyle{.height = ::ui::Length::points(19.0f)}}
+		  style={button_text_patch(props.font_id, props.font_size)}
+		/>
+	}
+
+	struct OvalButtonProps {
+		const char * key = nullptr;
+		const char * id = nullptr;
+		const char * label = nullptr;
+		float width = 0.0f;
+		std::uint16_t sprite_index = 0;
+	};
+
+	::ui::UiElement OvalButton(const OvalButtonProps& props) {
+		return <Button
+		  key={props.key}
+		  id={props.id}
+		  accessibility={{.label = props.label ? props.label : ""}}
+		  label={props.label ? props.label : ""}
+		  layout={::ui::LayoutStyle{
+				.align_items = ::ui::AlignItems::Center,
+				.justify_content = ::ui::JustifyContent::Center,
+				.width = ::ui::Length::points(props.width),
+				.height = ::ui::Length::points(33.0f),
+				.padding = {14.0f, 14.0f, 7.0f, 7.0f},
+			}}
+		  style={image_button_patch(props.sprite_index)}
+		>
+			<ButtonLabel key="text" value={props.label} fontId={tokens::kFontTitleBank} fontSize={11} />
+		</Button>
+	}
+
+	struct OperatorButtonProps {
+		const char * key = nullptr;
+		const char * id = nullptr;
+		const char * label = nullptr;
+		float min_width = 0.0f;
+	};
+
+	::ui::UiElement OperatorButton(const OperatorButtonProps& props) {
+		return <Button
+		  key={props.key}
+		  id={props.id}
+		  accessibility={{.label = props.label ? props.label : ""}}
+		  label={props.label ? props.label : ""}
+		  layout={::ui::LayoutStyle{
+				.align_items = ::ui::AlignItems::Center,
+				.justify_content = ::ui::JustifyContent::Center,
+				.min_width = ::ui::Length::points(props.min_width),
+				.height = ::ui::Length::points(28.0f),
+				.padding = {6.0f, 6.0f, 4.0f, 4.0f},
+			}}
+		  style={ghost_button_patch()}
+		>
+			<ButtonLabel key="text" value={props.label} fontId={134} fontSize={8} />
+		</Button>
+	}
+
+	struct KeybindRowProps {
+		const char * key = nullptr;
+		const OptionsControlsFrameProps * frame = nullptr;
+		int visible_row = 0;
+	};
+
+	::ui::UiElement KeybindRow(const KeybindRowProps& props) {
+		if(!props.frame) return ::ui::empty();
+		const OptionsControlsFrameProps& frame = *props.frame;
+		const int rowCount = visible_rows(frame);
+		if(!frame.view || props.visible_row < 0 || props.visible_row >= rowCount ||
+		   props.visible_row >= kControlRowSlots){
+			return ::ui::empty();
+		}
+		const options::KeybindRowView& row = frame.view->rows[props.visible_row];
+		const float scale = horizontal_scale(frame);
+		const float actionNameW =
+			static_cast<float>(scaled_metric(kActionNameW, scale));
+		const float operatorW =
+		static_cast<float>(scaled_metric(kOperatorW, scale));
+	const float columnGap =
+		static_cast<float>(scaled_metric(kColumnGap, scale));
+		const char * primaryText =
+			row.rebindingPrimary ? "-" : row.primaryLabel.c_str();
+		const char * secondaryText =
+			row.rebindingSecondary ? "-" : row.secondaryLabel.c_str();
+		return <Box key={props.key} layout={row_layout(columnGap)}>
+			<Text
+			  key="action"
+			  value={row.actionLabel.c_str()}
+			  layout={::ui::LayoutStyle{
+				.width = ::ui::Length::points(actionNameW),
+				.height = ::ui::Length::points(15.0f),
+			}}
+			  style={text_patch(134, 8)}
+			/>
+			<OvalButton
+			  key="primary"
+			  id={copied_id(kActionPrimaryPrefix, props.visible_row)}
+			  label={primaryText}
+			  width={kRowActionW}
+			  spriteIndex={28}
+			/>
+			<OperatorButton
+			  key="operator"
+			  id={copied_id(kActionOperatorPrefix, props.visible_row)}
+			  label={row.operatorLabel.c_str()}
+			  minWidth={operatorW}
+			/>
+			<OvalButton
+			  key="secondary"
+			  id={copied_id(kActionSecondaryPrefix, props.visible_row)}
+			  label={secondaryText}
+			  width={kRowActionW}
+			  spriteIndex={28}
+			/>
+		</Box>
+	}
+
+	struct KeybindRowsProps {
+		const char * key = nullptr;
+		const OptionsControlsFrameProps * frame = nullptr;
+	};
+
+	::ui::UiElement KeybindRows(const KeybindRowsProps& props) {
+		return <Box
+		  key={props.key}
+		  layout={::ui::LayoutStyle{
+				.direction = ::ui::FlexDirection::Column,
+				.width = ::ui::Length::grow(1.0f),
+				.height = ::ui::Length::grow(1.0f),
+				.gap = static_cast<float>(kRowGap),
+			}}
+		>
+			<KeybindRow key={kRowKeys[0]} frame={props.frame} visibleRow={0} />
+			<KeybindRow key={kRowKeys[1]} frame={props.frame} visibleRow={1} />
+			<KeybindRow key={kRowKeys[2]} frame={props.frame} visibleRow={2} />
+			<KeybindRow key={kRowKeys[3]} frame={props.frame} visibleRow={3} />
+			<KeybindRow key={kRowKeys[4]} frame={props.frame} visibleRow={4} />
+			<KeybindRow key={kRowKeys[5]} frame={props.frame} visibleRow={5} />
+			<KeybindRow key={kRowKeys[6]} frame={props.frame} visibleRow={6} />
+			<KeybindRow key={kRowKeys[7]} frame={props.frame} visibleRow={7} />
+			<KeybindRow key={kRowKeys[8]} frame={props.frame} visibleRow={8} />
+			<KeybindRow key={kRowKeys[9]} frame={props.frame} visibleRow={9} />
+			<KeybindRow key={kRowKeys[10]} frame={props.frame} visibleRow={10} />
+			<KeybindRow key={kRowKeys[11]} frame={props.frame} visibleRow={11} />
+			<KeybindRow key={kRowKeys[12]} frame={props.frame} visibleRow={12} />
+			<KeybindRow key={kRowKeys[13]} frame={props.frame} visibleRow={13} />
+			<KeybindRow key={kRowKeys[14]} frame={props.frame} visibleRow={14} />
+			<KeybindRow key={kRowKeys[15]} frame={props.frame} visibleRow={15} />
+			<KeybindRow key={kRowKeys[16]} frame={props.frame} visibleRow={16} />
+			<KeybindRow key={kRowKeys[17]} frame={props.frame} visibleRow={17} />
+			<KeybindRow key={kRowKeys[18]} frame={props.frame} visibleRow={18} />
+			<KeybindRow key={kRowKeys[19]} frame={props.frame} visibleRow={19} />
+			<KeybindRow key={kRowKeys[20]} frame={props.frame} visibleRow={20} />
+			<KeybindRow key={kRowKeys[21]} frame={props.frame} visibleRow={21} />
+			<KeybindRow key={kRowKeys[22]} frame={props.frame} visibleRow={22} />
+			<KeybindRow key={kRowKeys[23]} frame={props.frame} visibleRow={23} />
+			<KeybindRow key={kRowKeys[24]} frame={props.frame} visibleRow={24} />
+			<KeybindRow key={kRowKeys[25]} frame={props.frame} visibleRow={25} />
+			<KeybindRow key={kRowKeys[26]} frame={props.frame} visibleRow={26} />
+			<KeybindRow key={kRowKeys[27]} frame={props.frame} visibleRow={27} />
+			<KeybindRow key={kRowKeys[28]} frame={props.frame} visibleRow={28} />
+			<KeybindRow key={kRowKeys[29]} frame={props.frame} visibleRow={29} />
+		</Box>
+	}
+
+	struct RowsViewportProps {
+		const char * key = nullptr;
+		const OptionsControlsFrameProps * frame = nullptr;
+	};
+
+	::ui::UiElement RowsViewport(const RowsViewportProps& props) {
+		return <detail.Host
+		  kind={::ui::HostKind::Box}
+		  key={props.key}
+		  id={options::kKeybindListScrollId}
+		  style={::ui::LayoutStyle{
+				.direction = ::ui::FlexDirection::Column,
+			.width = ::ui::Length::grow(1.0f),
+			.height = ::ui::Length::grow(1.0f),
+			.overflow = ::ui::Overflow::Hidden,
+			.gap = static_cast<float>(kRowGap),
+		}}
+		  text={::ui::HostTextProps{.value = "scroll"}}
+		  accessibility={{.label = options::kKeybindListScrollLabel}}
+		>
+			<KeybindRows key="rows" frame={props.frame} />
+		</detail.Host>
+	}
+
+	struct PresetRowProps {
+		const char * key = nullptr;
+		const OptionsControlsFrameProps * frame = nullptr;
+	};
+
+	::ui::UiElement PresetRow(const PresetRowProps& props) {
+		if(!props.frame) return ::ui::empty();
+		const OptionsControlsFrameProps& frame = *props.frame;
+		const float scale = horizontal_scale(frame);
+		const float actionNameW =
+			static_cast<float>(scaled_metric(kActionNameW, scale));
+		const float presetGap =
+			static_cast<float>(scaled_metric(kPresetGap, scale));
+		const char * preset =
+			(frame.view && !frame.view->presetText.empty())
+				? frame.view->presetText.c_str()
+				: "";
+		return <Box
+		  key={props.key}
+		  layout={::ui::LayoutStyle{
+				.direction = ::ui::FlexDirection::Row,
+				.align_items = ::ui::AlignItems::Center,
+			.width = ::ui::Length::grow(1.0f),
+			.height = ::ui::Length::points(static_cast<float>(kPresetRowH)),
+			.gap = presetGap,
+		}}
+		>
+		<Text
+		  key="label"
+		  value="Preset:"
+		  layout={::ui::LayoutStyle{
+				.width = ::ui::Length::points(actionNameW),
+				.height = ::ui::Length::points(15.0f),
+			}}
+		  style={text_patch(134, 8)}
+		/>
+			<OvalButton
+			  key="button"
+			  id={kActionPreset}
+			  label={preset}
+			  width={kPresetButtonW}
+			  spriteIndex={23}
+			/>
+		</Box>
+	}
+
+	struct ActionRowProps {
+		const char * key = nullptr;
+		const OptionsControlsFrameProps * frame = nullptr;
+	};
+
+	::ui::UiElement ActionRow(const ActionRowProps& props) {
+		if(!props.frame) return ::ui::empty();
+		const float scale = horizontal_scale(*props.frame);
+		const float actionGap =
+			static_cast<float>(scaled_metric(kActionGap, scale));
+		return <Box
+		  key={props.key}
+		  layout={::ui::LayoutStyle{
+				.direction = ::ui::FlexDirection::Row,
+				.align_items = ::ui::AlignItems::Center,
+			.justify_content = ::ui::JustifyContent::Center,
+			.height = ::ui::Length::points(static_cast<float>(kActionRowH)),
+			.gap = actionGap,
+		}}
+		>
+		<AppButton key="save" controlId={kActionSave} size={AppButtonSize::MainMenu} label="Save" />
+		<AppButton key="cancel" controlId={kActionCancel} size={AppButtonSize::MainMenu} label="Cancel" />
+		</Box>
+	}
+
+	struct ContentProps {
+		const char * key = nullptr;
+		const OptionsControlsFrameProps * frame = nullptr;
+	};
+
+	::ui::UiElement Content(const ContentProps& props) {
+		if(!props.frame) return ::ui::empty();
+		const OptionsControlsFrameProps& frame = *props.frame;
+		const float scale = horizontal_scale(frame);
+		const float contentW =
+			static_cast<float>(scaled_metric(kContentW, scale));
+		return <Box
+		  key={props.key}
+		  layout={::ui::LayoutStyle{
+				.direction = ::ui::FlexDirection::Column,
+				.align_items = ::ui::AlignItems::Center,
+			.width = ::ui::Length::points(contentW),
+			.height = ::ui::Length::grow(1.0f),
+			.gap = static_cast<float>(kSectionGap),
+			}}
+		>
+			<PresetRow key="preset-row" frame={props.frame} />
+			<RowsViewport key="rows-viewport" frame={props.frame} />
+			<Box
+			  key="action-spacer"
+			  layout={::ui::LayoutStyle{
+				.width = ::ui::Length::grow(1.0f),
+					.height = ::ui::Length::points(static_cast<float>(kActionTopGap)),
+				}}
+			/>
+			<ActionRow key="actions" frame={props.frame} />
+		</Box>
+	}
+
+}  // namespace options_controls_frame_detail
+
+using ::ui::children;
+using ::ui::components::Box;
+using ::ui::components::BoxProps;
+using ::ui::components::Text;
+using ::ui::components::TextProps;
+using options_controls_frame_detail::Content;
+using options_controls_frame_detail::ContentProps;
+
+::ui::UiElement OptionsControlsFrame(const OptionsControlsFrameProps& props) {
+	const float titleOffsetY =
+		props.view ? props.view->titleOffsetY : 8.0f;
+	return <Box
+	  key={props.key}
+	  layout={::ui::LayoutStyle{
+			.align_items = ::ui::AlignItems::Center,
+			.justify_content = ::ui::JustifyContent::Center,
+			.width = ::ui::Length::percent(100.0f),
+			.height = ::ui::Length::percent(100.0f),
+			.padding = {
+				static_cast<float>(props.frame_pad_left),
+				static_cast<float>(props.frame_pad_right),
+				static_cast<float>(props.frame_pad_top),
+				static_cast<float>(props.frame_pad_bottom),
+			},
+		}}
+	  style={options_controls_frame_detail::image_patch(6, 0)}
+	>
+		<Box
+		  key="panel"
+		  layout={::ui::LayoutStyle{
+				.direction = ::ui::FlexDirection::Column,
+				.align_items = ::ui::AlignItems::Center,
+				.width = ::ui::Length::percent(100.0f),
+				.height = ::ui::Length::grow(1.0f),
+				.min_height = ::ui::Length::points(static_cast<float>(options_controls_frame_detail::kPanelMinH)),
+				.padding = {
+					static_cast<float>(props.panel_pad_x),
+					static_cast<float>(props.panel_pad_x),
+					static_cast<float>(options_controls_frame_detail::kPanelPadTop),
+					static_cast<float>(props.panel_pad_bottom),
+				},
+			}}
+		  style={options_controls_frame_detail::image_patch(7, 7)}
+		>
+			<Box
+			  key="title-wrap"
+			  layout={::ui::LayoutStyle{
+					.position = ::ui::PositionType::Absolute,
+					.align_items = ::ui::AlignItems::Center,
+					.justify_content = ::ui::JustifyContent::Center,
+					.width = ::ui::Length::percent(100.0f),
+					.height = ::ui::Length::points(static_cast<float>(options_controls_frame_detail::kTitleH)),
+					.position_inset = {0.0f, 0.0f, titleOffsetY, 0.0f},
+				}}
+			>
+				<Text
+				  key="title"
+				  value="Configure Controls"
+				  layout={::ui::LayoutStyle{.height = ::ui::Length::points(19.0f)}}
+				  style={options_controls_frame_detail::text_patch(tokens::kFontTitleBank, 12, ::ui::TextAlign::Center)}
+				/>
+			</Box>
+				<Content key="content" frame={&props} />
+			</Box>
+		</Box>
+	}
+
+}  // namespace client_ui
+}  // namespace silencer

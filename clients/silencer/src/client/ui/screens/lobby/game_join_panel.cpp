@@ -1,5 +1,7 @@
 #include "game_join_panel.h"
 
+#include "client/ui/hooks/use_app.h"
+#include "client/ui/hooks/use_lobby.h"
 #include "client/ui/hud/HudPayloadArena.h"
 #include "clay/clay.h"
 #include "clay_ui_compositor.h"
@@ -7,15 +9,8 @@
 #include "primitives/text.h"
 #include "runtime/UiInteractionRegistry.h"
 
-#include "lobby_screen.h"
-#include "game.h"
-#include "resources.h"
-#include "screen_context.h"
-#include "team.h"
-#include "user.h"
-#include "world.h"
-
 #include <algorithm>
+#include <utility>
 
 using silencer::ui::primitives::Button;
 using silencer::ui::primitives::ButtonHandle;
@@ -81,57 +76,43 @@ void GameJoinPanelInit(GameJoinPanelState & state) {
 	state = GameJoinPanelState{};
 }
 
-void GameJoinPanelTick(GameJoinPanelState & state,
-                       World & world,
-                       ScreenContext & ctx,
-                       LobbyScreen & owner) {
-	if(owner.JoinPanelInLobby(world)){
-		state.readyLabel = owner.JoinPanelReadyBlocked(world) ? "Waiting..." : "Ready";
+GameJoinPanelTickResult GameJoinPanelTick(GameJoinPanelState & state,
+                                          LobbyModel & lobby) {
+	GameJoinPanelTickResult result;
+	if(lobby.pregame.in_lobby()){
+		state.readyLabel = lobby.pregame.ready_blocked() ? "Waiting..." : "Ready";
 	}else{
 		state.readyLabel = "Ready";
 	}
 
 	state.rosterRows.clear();
-	if(world.IsConnected()){
-		const std::vector<Uint16> & teamIds = world.GetObjectsByType(ObjectTypes::TEAM);
-		for(Uint16 teamId : teamIds){
-			Team * team = static_cast<Team *>(world.GetObjectFromId(teamId));
-			if(!team || team->numpeers == 0) continue;
-			bool drewEmblem = false;
-			for(int i = 0; i < team->numpeers; ++i){
-				Peer * peer = world.GetPeer(team->peers[i]);
-				if(!peer || peer->observer || peer->disconnected) continue;
-				User * user = world.lobby.GetUserInfo(peer->accountid);
-				if(!user || user->retrieving || !user->DisplayName()[0]) continue;
-
-				GameJoinRosterRow row;
-				row.ready = peer->isready;
-				row.agency = team->agency;
-				row.teamNumber = team->number;
-				row.peerSlot = static_cast<Uint8>(i);
-				row.drawEmblem = !drewEmblem;
-				row.name = peer->isbot ? std::string(user->DisplayName()) + " [BOT]"
-				                       : std::string(user->DisplayName());
-				row.level = "L:" + std::to_string(user->agency[team->agency].level);
-				state.rosterRows.push_back(row);
-				drewEmblem = true;
-			}
-		}
+	for(const LobbyPregameRosterRow& modelRow : lobby.pregame.roster()){
+		GameJoinRosterRow row;
+		row.ready = modelRow.ready;
+		row.agency = modelRow.agency;
+		row.teamNumber = modelRow.team_number;
+		row.peerSlot = modelRow.peer_slot;
+		row.drawEmblem = modelRow.draw_emblem;
+		row.name = modelRow.name;
+		row.level = modelRow.level;
+		state.rosterRows.push_back(std::move(row));
 	}
 
 	if(state.techClicked){
 		state.techClicked = false;
-		owner.ShowGameTech(ctx);
-		return;
+		lobby.pregame.tech.request_peer_list();
+		result.show_tech = true;
+		return result;
 	}
 	if(state.readyClicked){
 		state.readyClicked = false;
-		owner.JoinPanelSendReady(world);
+		lobby.pregame.set_ready(true);
 	}
 	if(state.teamClicked){
 		state.teamClicked = false;
-		owner.JoinPanelChangeTeam(world);
+		lobby.pregame.team.change();
 	}
+	return result;
 }
 
 bool GameJoinPanelHandleUiIntent(GameJoinPanelState & state,
@@ -154,9 +135,7 @@ bool GameJoinPanelHandleUiIntent(GameJoinPanelState & state,
 
 void BuildGameJoinUpperTree(GameJoinPanelState & state,
                             Uint16 panelWidth,
-                            Resources & resources,
                             silencer::ui::UiInteractionRegistry& interactions) {
-	(void)resources;
 	const ButtonOpts buttonOpts =
 		game_join_panel_detail::FullWidthUpperButtonOpts(panelWidth);
 
@@ -192,7 +171,7 @@ void BuildGameJoinUpperTree(GameJoinPanelState & state,
 }
 
 void BuildGameJoinTallTree(GameJoinPanelState & state,
-                           Resources & resources,
+                           const silencer::client_ui::AppAssetsModel& assets,
                            silencer::ui::UiInteractionRegistry& interactions) {
 	(void)interactions;
 
@@ -214,17 +193,13 @@ void BuildGameJoinTallTree(GameJoinPanelState & state,
 				unsigned int emblemH = 16;
 				int emblemOffsetX = 0;
 				int emblemOffsetY = 0;
-				if(181 < resources.spritewidth.size()
-				   && row.agency < resources.spritewidth[181].size()
-				   && row.agency < resources.spriteheight[181].size()){
-					emblemW = resources.spritewidth[181][row.agency];
-					emblemH = resources.spriteheight[181][row.agency];
-				}
-				if(181 < resources.spriteoffsetx.size()
-				   && row.agency < resources.spriteoffsetx[181].size()
-				   && row.agency < resources.spriteoffsety[181].size()){
-					emblemOffsetX = resources.spriteoffsetx[181][row.agency];
-					emblemOffsetY = resources.spriteoffsety[181][row.agency];
+				const silencer::client_ui::AppSpriteFrame emblem =
+					assets.agency_emblem(row.agency);
+				if(emblem.available){
+					emblemW = static_cast<unsigned int>(emblem.width);
+					emblemH = static_cast<unsigned int>(emblem.height);
+					emblemOffsetX = emblem.offset_x;
+					emblemOffsetY = emblem.offset_y;
 				}
 				CLAY({ .id = CLAY_IDI("GameJoinRosterEmblemWrap", static_cast<int>(i)),
 				       .layout = {
@@ -252,17 +227,13 @@ void BuildGameJoinTallTree(GameJoinPanelState & state,
 			unsigned int readyH = 8;
 			int readyOffsetX = 0;
 			int readyOffsetY = 0;
-			if(7 < resources.spritewidth.size()
-			   && readyIndex < resources.spritewidth[7].size()
-			   && readyIndex < resources.spriteheight[7].size()){
-				readyW = resources.spritewidth[7][readyIndex];
-				readyH = resources.spriteheight[7][readyIndex];
-			}
-			if(7 < resources.spriteoffsetx.size()
-			   && readyIndex < resources.spriteoffsetx[7].size()
-			   && readyIndex < resources.spriteoffsety[7].size()){
-				readyOffsetX = resources.spriteoffsetx[7][readyIndex];
-				readyOffsetY = resources.spriteoffsety[7][readyIndex];
+			const silencer::client_ui::AppSpriteFrame ready =
+				assets.ready_indicator(row.ready);
+			if(ready.available){
+				readyW = static_cast<unsigned int>(ready.width);
+				readyH = static_cast<unsigned int>(ready.height);
+				readyOffsetX = ready.offset_x;
+				readyOffsetY = ready.offset_y;
 			}
 			CLAY({ .id = CLAY_IDI("GameJoinRosterReadyWrap", static_cast<int>(i)),
 			       .layout = {

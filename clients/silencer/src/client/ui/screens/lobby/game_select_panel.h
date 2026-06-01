@@ -4,9 +4,8 @@
 // Screen-side lobby GameSelectPanel: the always-on right-side games list
 // surface (active when no Create/Join/Tech panel is up). Composes ScrollList
 // + Text + Button primitives and owns the per-frame info-block
-// strings + the Join/Spectate/Create button click flags. Domain glue
-// (JoinGame / SpectateGame / level checks / password modal / ShowGameCreate)
-// lives here in the screen; primitives stay screen-agnostic.
+// strings + the Join/Spectate/Create button click flags. Domain mutations go
+// through use_lobby(); primitives stay screen-agnostic.
 
 #include "shared.h"
 #include "runtime/UiActionQueue.h"
@@ -14,20 +13,19 @@
 #include <string>
 #include <vector>
 
-class World;
-class Resources;
-class ScreenContext;
-class LobbyScreen;
-
 namespace silencer::ui {
 class UiInteractionRegistry;
+}
+
+namespace silencer::client_ui {
+class LobbyModel;
 }
 
 namespace silencer::client_ui::lobby {
 
 struct GameSelectPanelState {
-	// Snapshot of the games list. Rebuilt from world.lobby.games whenever
-	// world.lobby.gamesprocessed flips false. Held in screen-side storage
+	// Snapshot of the games list. Rebuilt from LobbyBrowserModel whenever its
+	// dirty flag says the lobby game list changed. Held in screen-side storage
 	// so the layout pass can hold pointers into the std::strings safely.
 	struct Row {
 		std::string name;
@@ -59,24 +57,22 @@ struct GameSelectPanelState {
 	bool spectateVisible = false;
 };
 
-// One-time init. Clears state. The legacy panel ran a one-time games-list
-// rebuild on Build; we just clear here — the first Tick that observes
-// `gamesprocessed=false` will populate from world.lobby.games.
+// One-time init. Clears state. The first Tick that observes a dirty
+// LobbyBrowserModel game list will populate rows.
 void GameSelectPanelInit(GameSelectPanelState & state);
 
+struct GameSelectPanelTickResult {
+	bool show_create = false;
+};
+
 // Per-frame pump:
-//   - Rebuilds `rows` from world.lobby.games whenever
-//     `world.lobby.gamesprocessed == false`.
+//   - Rebuilds `rows` from LobbyBrowserModel whenever the game list is dirty.
 //   - Recomputes infoName/infoMap/.../joinVisible/spectateVisible from the
 //     selected game (or clears them when no game is selected).
-//   - Consumes joinClicked / spectateClicked / createClicked flags — runs
-//     the legacy GameSelectPanel::Tick's Join/Spectate flows (level checks,
-//     password modal, JoinGame/SpectateGame) and the Create flow (calls
-//     owner.ShowGameCreate).
-void GameSelectPanelTick(GameSelectPanelState & state,
-                         World & world,
-                         ScreenContext & ctx,
-                         LobbyScreen & owner);
+//   - Consumes joinClicked / spectateClicked / createClicked flags by asking
+//     the lobby model to run Join/Spectate/Create transitions.
+GameSelectPanelTickResult GameSelectPanelTick(GameSelectPanelState & state,
+                                              LobbyModel & lobby);
 bool GameSelectPanelHandleUiIntent(GameSelectPanelState & state,
                                    const silencer::ui::UiAction & action);
 
@@ -86,7 +82,6 @@ bool GameSelectPanelHandleUiIntent(GameSelectPanelState & state,
 // BeginFrame requirements: ButtonBeginFrame.
 void BuildGameSelectUpperTree(GameSelectPanelState & state,
                               Uint16 panelWidth,
-                              Resources & resources,
                               silencer::ui::UiInteractionRegistry& interactions);
 
 // Emits the tall stepped-pane subtree ("Active Games" header + games list +
@@ -97,7 +92,6 @@ void BuildGameSelectUpperTree(GameSelectPanelState & state,
 void BuildGameSelectTallTree(GameSelectPanelState & state,
                              Uint16 panelWidth,
                              Uint16 panelHeight,
-                             Resources & resources,
                              silencer::ui::UiInteractionRegistry& interactions);
 
 }  // namespace silencer::client_ui::lobby

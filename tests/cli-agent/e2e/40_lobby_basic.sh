@@ -102,10 +102,10 @@ wait_for_lobby_state() {
   return 1
 }
 
-cli --port "$CTRL_PORT" wait_for_state --state MAINMENU --timeout-ms 15000
+cli --port "$CTRL_PORT" wait_for_ui --id main_menu.options --timeout-ms 15000
 wait_for_widget "Connect To Lobby"
 cli --port "$CTRL_PORT" click --label "Connect To Lobby" >/dev/null
-cli --port "$CTRL_PORT" wait_for_state --state LOBBYCONNECT --timeout-ms 5000
+cli --port "$CTRL_PORT" wait_for_ui --id lobby_connect.login --timeout-ms 5000
 wait_for_widget "Login/Create"
 
 cli --port "$CTRL_PORT" set_text --uid 1 --text "claybob" >/dev/null

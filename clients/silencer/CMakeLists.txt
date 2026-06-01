@@ -40,6 +40,40 @@ endif()
 # Authored cppx UI sources live in-tree and generate ordinary C++ into the
 # build directory. Add new .cppx/.hx inputs here; never commit generated output.
 set(SILENCER_CPPX_SOURCES
+	src/ui/components/box.cppx
+	src/ui/components/box.hx
+	src/ui/components/button.cppx
+	src/ui/components/button.hx
+	src/ui/components/text.cppx
+	src/ui/components/text.hx
+	src/ui/components/text_input.cppx
+	src/ui/components/text_input.hx
+	src/client/ui/components/actions/app_button.cppx
+	src/client/ui/components/actions/app_button.hx
+	src/client/ui/modals/message_modal_frame.cppx
+	src/client/ui/modals/message_modal_frame.hx
+	src/client/ui/modals/password_modal_frame.cppx
+	src/client/ui/modals/password_modal_frame.hx
+	src/client/ui/screens/character_create/character_create_frame.cppx
+	src/client/ui/screens/character_create/character_create_frame.hx
+	src/client/ui/screens/lobby_connect/lobby_connect_frame.cppx
+	src/client/ui/screens/lobby_connect/lobby_connect_frame.hx
+	src/client/ui/screens/main_menu/main_menu_frame.cppx
+	src/client/ui/screens/main_menu/main_menu_frame.hx
+	src/client/ui/screens/mission_summary/mission_summary_frame.cppx
+	src/client/ui/screens/mission_summary/mission_summary_frame.hx
+	src/client/ui/screens/options/options_audio_frame.cppx
+	src/client/ui/screens/options/options_audio_frame.hx
+	src/client/ui/screens/options/options_boolean_row.cppx
+	src/client/ui/screens/options/options_boolean_row.hx
+	src/client/ui/screens/options/options_controls_frame.cppx
+	src/client/ui/screens/options/options_controls_frame.hx
+	src/client/ui/screens/options/options_display_frame.cppx
+	src/client/ui/screens/options/options_display_frame.hx
+	src/client/ui/screens/options/options_frame.cppx
+	src/client/ui/screens/options/options_frame.hx
+	src/client/ui/screens/update/update_frame.cppx
+	src/client/ui/screens/update/update_frame.hx
 )
 cppx_transpile(SILENCER_CPPX_GENERATED ${SILENCER_CPPX_SOURCES})
 list(APPEND sources ${SILENCER_CPPX_GENERATED})

@@ -1,0 +1,74 @@
+#include "client/ui/screens/options/options_frame.h"
+
+#include "client/ui/components/actions/app_button.h"
+#include "ui/components/box.h"
+#include "ui/style/style_patch.h"
+
+#include <cstdint>
+
+namespace silencer {
+namespace client_ui {
+namespace options_frame_detail {
+
+using ::ui::children;
+using ::ui::components::Box;
+using ::ui::components::BoxProps;
+
+inline std::uint32_t texture_id(std::uint8_t bank, std::uint16_t index) {
+	return (static_cast<std::uint32_t>(bank) << 16) |
+	       static_cast<std::uint32_t>(index);
+}
+
+inline ::ui::StylePatch background_patch() {
+	return ::ui::patch().image(::ui::BackgroundImage{
+		.texture_id = texture_id(6, 0),
+		.tint = {255, 255, 255, 255},
+	});
+}
+
+}  // namespace options_frame_detail
+
+using ::ui::children;
+using ::ui::components::Box;
+using ::ui::components::BoxProps;
+
+::ui::UiElement OptionsFrame(const OptionsFrameProps& props) {
+	return <Box
+	  key={props.key}
+	  layout={::ui::LayoutStyle{
+			.align_items = ::ui::AlignItems::Center,
+			.justify_content = ::ui::JustifyContent::Center,
+			.width = ::ui::Length::percent(100.0f),
+			.height = ::ui::Length::percent(100.0f),
+		}}
+	  style={options_frame_detail::background_patch()}
+	>
+		<Box
+		  key="buttons"
+		  layout={::ui::LayoutStyle{
+				.direction = ::ui::FlexDirection::Column,
+				.width = ::ui::Length::points(196.0f),
+				.height = ::ui::Length::points(189.0f),
+				.gap = 19.0f,
+			}}
+		>
+			<AppButton
+			  key="controls"
+			  controlId="options.controls"
+			  size={AppButtonSize::MainMenu}
+			  label="Controls"
+			/>
+			<AppButton
+			  key="display"
+			  controlId="options.display"
+			  size={AppButtonSize::MainMenu}
+			  label="Display"
+			/>
+			<AppButton key="audio" controlId="options.audio" size={AppButtonSize::MainMenu} label="Audio" />
+			<AppButton key="back" controlId="options.back" size={AppButtonSize::MainMenu} label="Go Back" />
+		</Box>
+	</Box>
+}
+
+}  // namespace client_ui
+}  // namespace silencer

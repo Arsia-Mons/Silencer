@@ -1,0 +1,799 @@
+#include "client/ui/screens/character_create/character_create_frame.h"
+
+#include "client/ui/components/tokens.h"
+#include "ui/components/box.h"
+#include "ui/components/common.h"
+#include "ui/components/text.h"
+#include "ui/components/text_input.h"
+#include "ui/style/style_patch.h"
+
+#include <algorithm>
+#include <cstdint>
+#include <string>
+
+namespace silencer {
+namespace client_ui {
+namespace character_create_frame_detail {
+
+namespace detail = ::ui::components::detail;
+
+using ::ui::children;
+using ::ui::components::Box;
+using ::ui::components::BoxProps;
+using ::ui::components::Text;
+using ::ui::components::TextInput;
+using ::ui::components::TextInputProps;
+using ::ui::components::TextProps;
+
+constexpr int kStageW = 640;
+constexpr int kStageH = 480;
+constexpr int kFrameMarginLeft = 5;
+constexpr int kFrameMarginRight = 7;
+constexpr int kFrameMarginTop = 19;
+constexpr int kFrameMarginBottom = 20;
+constexpr int kPanelMinW = 628;
+constexpr int kPanelMinH = 441;
+constexpr int kContentPadLeft = 55;
+constexpr int kContentPadRight = 22;
+constexpr int kContentPadTop = 18;
+constexpr int kContentPadBottom = 34;
+constexpr int kColumnGap = 78;
+constexpr int kLeftColumnW = 236;
+constexpr int kRightColumnW = 196;
+constexpr int kTitleH = 33;
+constexpr int kTitleTextPadLeft = 22;
+constexpr int kTitleToRowsGap = 14;
+constexpr int kRowH = 27;
+constexpr int kRowGap = 5;
+constexpr int kAgentRowsH = 272;
+constexpr int kAgencyRowsH = 168;
+constexpr int kDetailTopPad = 42;
+constexpr int kAgentDetailPadLeft = 22;
+constexpr int kAliasModalW = 284;
+constexpr int kAliasModalH = 108;
+constexpr int kAliasModalTop = 161;
+constexpr int kAliasTitleH = 33;
+constexpr int kAliasInputX = 24;
+constexpr int kAliasInputY = 49;
+constexpr int kAliasInputFrameW = 236;
+constexpr int kAliasInputW = 224;
+constexpr int kAliasInputUid = 31;
+constexpr int kAgencyCount = 5;
+constexpr const char * kActionAgentPrefix = "character_create.agent";
+constexpr const char * kActionAgencyPrefix = "character_create.agency";
+constexpr const char * kActionRenamePrefix = "character_create.rename";
+constexpr const char * kActionAlias = "character_create.alias";
+
+struct AgencyDef {
+	const char * displayName;
+	const char * advantages[3];
+	const char * description[5];
+};
+
+const AgencyDef kAgencies[kAgencyCount] = {
+	{
+		"Noxis",
+		{"Endurance +3", "Jump +5", ""},
+		{
+			"Terraforming contractors with rugged field training.",
+			"Better oxygen processing gives Noxis agents",
+			"more stamina, stronger jumps, and improved durability.",
+			"",
+			"",
+		},
+	},
+	{
+		"Lazarus",
+		{"Resurrection Ability", "", ""},
+		{
+			"An old urban legend that keeps returning.",
+			"Lazarus agents are rumored to stand back up",
+			"after wounds that should have ended the mission.",
+			"",
+			"",
+		},
+	},
+	{
+		"Caliber",
+		{"Contacts +3", "", ""},
+		{
+			"Access specialists who move quickly through favors",
+			"and procurement. Their contacts improve rewards",
+			"and help keep security pressure manageable.",
+			"",
+			"",
+		},
+	},
+	{
+		"Static",
+		{"Satellite Ability", "Hacking +3", ""},
+		{
+			"Technologists with a reputation for anti-government",
+			"operations. Static agents bring superior hacking",
+			"skills and satellite-backed interference.",
+			"",
+			"",
+		},
+	},
+	{
+		"Black Rose",
+		{"Stealth Ability", "Shield +2", ""},
+		{
+			"Secretive solo operators known for poison flare",
+			"tactics and quiet infiltration. Black Rose agents",
+			"trade trust for stealth and defensive discipline.",
+			"",
+			"",
+		},
+	},
+};
+
+inline std::uint32_t texture_id(std::uint8_t bank, std::uint16_t index) {
+	return (static_cast<std::uint32_t>(bank) << 16) |
+	       static_cast<std::uint32_t>(index);
+}
+
+inline ::ui::StylePatch image_patch(std::uint8_t bank, std::uint16_t index) {
+	return ::ui::patch().image(::ui::BackgroundImage{
+		.texture_id = texture_id(bank, index),
+		.tint = {255, 255, 255, 255},
+	});
+}
+
+inline ::ui::StylePatch text_patch(::ui::Color color,
+                                   std::uint16_t font_id,
+                                   std::uint16_t font_size,
+                                   ::ui::TextAlign align = ::ui::TextAlign::Left) {
+	return ::ui::patch().text(::ui::TextVisual{
+		.color = color,
+		.font_id = font_id,
+		.font_size = font_size,
+		.align = align,
+	});
+}
+
+inline ::ui::StylePatch title_text_patch() {
+	return text_patch(tokens::kTextTitle,
+	                  tokens::kFontTitleBank,
+	                  12,
+	                  ::ui::TextAlign::Center);
+}
+
+inline ::ui::StylePatch detail_text_patch(std::uint16_t font_size = 7) {
+	return text_patch({202, 226, 218, 255},
+	                  tokens::kFontBodyBank,
+	                  font_size,
+	                  ::ui::TextAlign::Left);
+}
+
+inline ::ui::VisualStyle row_visual(bool selectedVisual, bool disabled) {
+	::ui::VisualStyle visual{};
+	visual.background = selectedVisual ? ::ui::Color{44, 92, 128, 230}
+	                                   : ::ui::Color{14, 20, 28, 210};
+	if(disabled){
+		visual.background = {18, 22, 28, 150};
+	}
+	visual.border = ::ui::Border{
+		{1.0f, 1.0f, 1.0f, 1.0f},
+		{{86, 112, 126, 255},
+		 {86, 112, 126, 255},
+		 {86, 112, 126, 255},
+		 {86, 112, 126, 255}},
+	};
+	visual.text = {
+		.color = tokens::kTextButton,
+		.font_id = tokens::kFontBodyBank,
+		.font_size = 7,
+		.align = ::ui::TextAlign::Center,
+	};
+	return visual;
+}
+
+inline ::ui::VisualStyle input_visual() {
+	::ui::VisualStyle visual{};
+	visual.background = {7, 10, 14, 245};
+	visual.border = ::ui::Border{
+		{1.0f, 1.0f, 1.0f, 1.0f},
+		{{92, 128, 144, 255},
+		 {92, 128, 144, 255},
+		 {92, 128, 144, 255},
+		 {92, 128, 144, 255}},
+	};
+	visual.text = {
+		.color = tokens::kTextTitle,
+		.font_id = tokens::kFontBodyBank,
+		.font_size = 7,
+	};
+	return visual;
+}
+
+inline ::ui::EdgeSizes inset_left_top(float left, float top) {
+	::ui::EdgeSizes edges;
+	edges.left = ::ui::StyleValue::points(left);
+	edges.top = ::ui::StyleValue::points(top);
+	return edges;
+}
+
+inline const std::vector<std::string>& empty_rows() {
+	static const std::vector<std::string> rows;
+	return rows;
+}
+
+inline const std::vector<LobbyAgentSummary>& empty_agents() {
+	static const std::vector<LobbyAgentSummary> agents;
+	return agents;
+}
+
+inline const std::vector<std::string>& agent_rows(const CharacterCreateFrameProps& props) {
+	return props.agent_rows ? *props.agent_rows : empty_rows();
+}
+
+inline const std::vector<LobbyAgentSummary>& agents(const CharacterCreateFrameProps& props) {
+	return props.agents ? *props.agents : empty_agents();
+}
+
+inline int clamp_agency(int value) {
+	if(value < 0) return 0;
+	if(value >= kAgencyCount) return kAgencyCount - 1;
+	return value;
+}
+
+inline int agency_index_for_id(const CharacterCreateFrameProps& props,
+                               std::uint8_t agency) {
+	for(int i = 0; i < kAgencyCount; ++i){
+		if(props.agency_ids[i] == agency) return i;
+	}
+	return 0;
+}
+
+inline int selected_agency_index(const CharacterCreateFrameProps& props) {
+	return clamp_agency(agency_index_for_id(
+		props, static_cast<std::uint8_t>(props.selected_agency)));
+}
+
+inline int detail_agency_index(const CharacterCreateFrameProps& props) {
+	return props.preview_agency >= 0 ? clamp_agency(props.preview_agency)
+	                                 : selected_agency_index(props);
+}
+
+inline const AgencyDef& agency_def(int agency) {
+	return kAgencies[clamp_agency(agency)];
+}
+
+inline const char * copied_action_id(const char * prefix, int ordinal) {
+	std::string value = std::string(prefix) + "." + std::to_string(ordinal);
+	return ::ui::copy_string(value.c_str());
+}
+
+	struct LabelTextProps {
+		const char * key = nullptr;
+		const char * value = nullptr;
+		::ui::StylePatch style = {};
+		float height = 14.0f;
+	};
+
+	::ui::UiElement LabelText(const LabelTextProps& props) {
+		return <Text
+		  key={props.key}
+		  value={props.value ? props.value : ""}
+		  layout={::ui::LayoutStyle{
+				.width = ::ui::Length::percent(100.0f),
+				.height = ::ui::Length::points(props.height),
+			}}
+		  style={props.style}
+		/>
+	}
+
+	struct RowButtonProps {
+		const char * key = nullptr;
+		const char * id = nullptr;
+		const char * label = nullptr;
+		bool enabled = true;
+		bool selected = false;
+		bool selected_visual = false;
+	};
+
+	::ui::UiElement RowButton(const RowButtonProps& props) {
+		return <detail.Host
+		  kind={::ui::HostKind::Button}
+		  key={props.key}
+		  id={props.enabled ? props.id : nullptr}
+		  style={::ui::LayoutStyle{
+				.align_items = ::ui::AlignItems::Center,
+				.justify_content = ::ui::JustifyContent::Center,
+			.width = ::ui::Length::points(static_cast<float>(kLeftColumnW)),
+			.height = ::ui::Length::points(static_cast<float>(kRowH)),
+				.padding = {8.0f, 8.0f, 4.0f, 4.0f},
+			}}
+		  visual={row_visual(props.selected_visual, !props.enabled)}
+		  text={::ui::HostTextProps{.value = props.label ? props.label : ""}}
+		  interaction={::ui::NodeInteraction{
+				.focusable = props.enabled,
+				.disabled = !props.enabled,
+				.checked = props.selected,
+			}}
+		  accessibility={{.role = ::ui::SemanticRole::Button, .label = props.label ? props.label : ""}}
+		>
+			<LabelText
+			  key="label"
+			  value={props.label}
+			  style={text_patch(tokens::kTextButton, tokens::kFontBodyBank, 7, ::ui::TextAlign::Center)}
+			  height={13.0f}
+			/>
+		</detail.Host>
+	}
+
+	struct TitleProps {
+		const char * key = nullptr;
+		const char * value = nullptr;
+	};
+
+	::ui::UiElement Title(const TitleProps& props) {
+		return <Box
+		  key={props.key}
+		  layout={::ui::LayoutStyle{
+				.align_items = ::ui::AlignItems::Center,
+				.justify_content = ::ui::JustifyContent::Center,
+			.width = ::ui::Length::percent(100.0f),
+			.height = ::ui::Length::points(static_cast<float>(kTitleH)),
+				.padding = {static_cast<float>(kTitleTextPadLeft), 0.0f, 0.0f, 0.0f},
+			}}
+		>
+			<LabelText key="text" value={props.value} style={title_text_patch()} height={19.0f} />
+		</Box>
+	}
+
+	struct AgentRowProps {
+		const char * key = nullptr;
+		const CharacterCreateFrameProps * frame = nullptr;
+		int visible_row = 0;
+	};
+
+	::ui::UiElement AgentRow(const AgentRowProps& props) {
+		if(!props.frame) return ::ui::empty();
+		const CharacterCreateFrameProps& frame = *props.frame;
+		const std::vector<std::string>& rows = agent_rows(frame);
+		const std::vector<LobbyAgentSummary>& agentList = agents(frame);
+		const int source = frame.agent_scroll + props.visible_row;
+		const int count = std::min(static_cast<int>(rows.size()), 32);
+		if(source < 0 || source >= count) return ::ui::empty();
+		const bool existingAgent = source < static_cast<int>(agentList.size());
+		const bool selected = existingAgent && source == frame.selected_agent;
+		const bool selectedVisual = selected && frame.preview_agent == source;
+		const char * id = copied_action_id(kActionAgentPrefix, source);
+		return <RowButton
+		  key={props.key}
+		  id={id}
+		  label={rows[static_cast<size_t>(source)].c_str()}
+		  enabled={frame.step == CharacterCreateFrameStep::SelectAgent}
+		  selected={selected}
+		  selectedVisual={selectedVisual}
+		/>
+	}
+
+	struct AgentColumnProps {
+		const char * key = nullptr;
+		const CharacterCreateFrameProps * frame = nullptr;
+	};
+
+	::ui::UiElement AgentColumn(const AgentColumnProps& props) {
+		return <Box
+		  key={props.key}
+		  layout={::ui::LayoutStyle{
+				.direction = ::ui::FlexDirection::Column,
+				.align_items = ::ui::AlignItems::Center,
+			.width = ::ui::Length::points(static_cast<float>(kLeftColumnW)),
+			.height = ::ui::Length::grow(1.0f),
+				.gap = static_cast<float>(kRowGap),
+			}}
+		>
+			<Title key="title" value="SELECT AGENT" />
+			<Box
+			  key="spacer"
+			  layout={::ui::LayoutStyle{.height = ::ui::Length::points(static_cast<float>(kTitleToRowsGap))}}
+			/>
+		<Box
+		  key="rows"
+		  layout={::ui::LayoutStyle{
+				.direction = ::ui::FlexDirection::Column,
+				.width = ::ui::Length::points(static_cast<float>(kLeftColumnW)),
+				.height = ::ui::Length::points(static_cast<float>(kAgentRowsH)),
+				.overflow = ::ui::Overflow::Hidden,
+					.gap = static_cast<float>(kRowGap),
+				}}
+		>
+				<AgentRow key="agent-row-0" frame={props.frame} visibleRow={0} />
+				<AgentRow key="agent-row-1" frame={props.frame} visibleRow={1} />
+				<AgentRow key="agent-row-2" frame={props.frame} visibleRow={2} />
+				<AgentRow key="agent-row-3" frame={props.frame} visibleRow={3} />
+				<AgentRow key="agent-row-4" frame={props.frame} visibleRow={4} />
+				<AgentRow key="agent-row-5" frame={props.frame} visibleRow={5} />
+				<AgentRow key="agent-row-6" frame={props.frame} visibleRow={6} />
+				<AgentRow key="agent-row-7" frame={props.frame} visibleRow={7} />
+			</Box>
+		</Box>
+	}
+
+	struct AgencyRowProps {
+		const char * key = nullptr;
+		const CharacterCreateFrameProps * frame = nullptr;
+		int agency = 0;
+	};
+
+	::ui::UiElement AgencyRow(const AgencyRowProps& props) {
+		if(!props.frame) return ::ui::empty();
+		const CharacterCreateFrameProps& frame = *props.frame;
+		const bool selected = props.agency == selected_agency_index(frame);
+		const bool selectedVisual = selected && frame.preview_agency == props.agency;
+		return <RowButton
+		  key={props.key}
+		  id={copied_action_id(kActionAgencyPrefix, props.agency)}
+		  label={agency_def(props.agency).displayName}
+		  enabled={!frame.waiting_for_create}
+		  selected={selected}
+		  selectedVisual={selectedVisual}
+		/>
+	}
+
+	struct AgencyColumnProps {
+		const char * key = nullptr;
+		const CharacterCreateFrameProps * frame = nullptr;
+	};
+
+	::ui::UiElement AgencyColumn(const AgencyColumnProps& props) {
+		return <Box
+		  key={props.key}
+		  layout={::ui::LayoutStyle{
+				.direction = ::ui::FlexDirection::Column,
+				.align_items = ::ui::AlignItems::Center,
+			.width = ::ui::Length::points(static_cast<float>(kLeftColumnW)),
+			.height = ::ui::Length::grow(1.0f),
+				.gap = static_cast<float>(kRowGap),
+			}}
+		>
+			<Title key="title" value="SELECT AGENCY" />
+			<Box
+			  key="spacer"
+			  layout={::ui::LayoutStyle{.height = ::ui::Length::points(static_cast<float>(kTitleToRowsGap))}}
+			/>
+		<Box
+		  key="rows"
+		  layout={::ui::LayoutStyle{
+				.direction = ::ui::FlexDirection::Column,
+				.width = ::ui::Length::points(static_cast<float>(kLeftColumnW)),
+				.height = ::ui::Length::points(static_cast<float>(kAgencyRowsH)),
+					.gap = static_cast<float>(kRowGap),
+				}}
+		>
+				<AgencyRow key="agency-row-0" frame={props.frame} agency={0} />
+				<AgencyRow key="agency-row-1" frame={props.frame} agency={1} />
+				<AgencyRow key="agency-row-2" frame={props.frame} agency={2} />
+				<AgencyRow key="agency-row-3" frame={props.frame} agency={3} />
+				<AgencyRow key="agency-row-4" frame={props.frame} agency={4} />
+			</Box>
+		</Box>
+	}
+
+	struct DetailLineProps {
+		const char * key = nullptr;
+		const char * value = nullptr;
+	};
+
+	::ui::UiElement DetailLine(const DetailLineProps& props) {
+		if(!props.value || props.value[0] == '\0') return ::ui::empty();
+		return <LabelText
+		  key={props.key}
+		  value={props.value}
+		  style={detail_text_patch()}
+		  height={12.0f}
+		/>
+	}
+
+	struct AgencyIconProps {
+		const char * key = nullptr;
+		std::uint8_t agency_id = 0;
+	};
+
+	::ui::UiElement AgencyIcon(const AgencyIconProps& props) {
+		return <Box
+		  key={props.key}
+		  layout={::ui::LayoutStyle{
+				.width = ::ui::Length::points(32.0f),
+				.height = ::ui::Length::points(30.0f),
+			}}
+		  style={image_patch(181, props.agency_id)}
+		/>
+	}
+
+	struct RenameButtonProps {
+		const char * key = nullptr;
+		bool available = false;
+		int detail_agent = 0;
+	};
+
+	::ui::UiElement RenameButton(const RenameButtonProps& props) {
+		if(!props.available) return ::ui::empty();
+		return <RowButton
+		  key={props.key}
+		  id={copied_action_id(kActionRenamePrefix, props.detail_agent)}
+		  label="Rename Once"
+		  enabled={true}
+		  selected={false}
+		  selectedVisual={false}
+		/>
+	}
+
+	struct AgentDetailsProps {
+		const char * key = nullptr;
+		const CharacterCreateFrameProps * frame = nullptr;
+	};
+
+	::ui::UiElement AgentDetails(const AgentDetailsProps& props) {
+		if(!props.frame) return ::ui::empty();
+		const CharacterCreateFrameProps& frame = *props.frame;
+		const std::vector<LobbyAgentSummary>& agentList = agents(frame);
+		const int detailAgent = frame.preview_agent >= 0
+			? frame.preview_agent
+			: frame.selected_agent;
+		if(detailAgent < 0 || detailAgent >= static_cast<int>(agentList.size())){
+			return <Box
+			  key={props.key}
+			  layout={::ui::LayoutStyle{
+					.width = ::ui::Length::points(static_cast<float>(kRightColumnW)),
+					.height = ::ui::Length::grow(1.0f),
+			}}
+			/>
+		}
+		const LobbyAgentSummary& agent =
+			agentList[static_cast<size_t>(detailAgent)];
+		const int agency = agency_index_for_id(frame, agent.agency);
+		const AgencyDef& def = agency_def(agency);
+		std::string level = std::string("Security Level ") +
+			std::to_string(agent.stats.level);
+	std::string slots = std::string("Technology Slots: ") +
+		std::to_string(agent.stats.techslots);
+	std::string xp = std::string("Agency Points: ") +
+		std::to_string(agent.stats.xp);
+	std::string next = std::string("Next Level At: ") +
+		std::to_string((agent.stats.level + 1) * 100);
+	std::string wins = std::string("Successful Missions: ") +
+			std::to_string(agent.stats.wins);
+		return <Box
+		  key={props.key}
+		  layout={::ui::LayoutStyle{
+				.direction = ::ui::FlexDirection::Column,
+				.width = ::ui::Length::points(static_cast<float>(kRightColumnW)),
+			.height = ::ui::Length::grow(1.0f),
+			.padding = {static_cast<float>(kAgentDetailPadLeft), 0.0f, static_cast<float>(kDetailTopPad), 0.0f},
+				.gap = 5.0f,
+			}}
+		>
+			<LabelText key="agency-heading" value="Agency" style={detail_text_patch(8)} height={15.0f} />
+			<Box
+			  key="agency-row"
+			  layout={::ui::LayoutStyle{
+				.direction = ::ui::FlexDirection::Row,
+				.align_items = ::ui::AlignItems::Center,
+				.width = ::ui::Length::percent(100.0f),
+				.height = ::ui::Length::points(32.0f),
+					.gap = 10.0f,
+				}}
+			>
+				<AgencyIcon key="icon" agencyId={agent.agency} />
+				<LabelText
+				  key="agency-name"
+				  value={def.displayName}
+				  style={detail_text_patch(8)}
+				  height={15.0f}
+				/>
+			</Box>
+			<LabelText key="level" value={level.c_str()} style={detail_text_patch(8)} height={15.0f} />
+			<DetailLine key="slots" value={slots.c_str()} />
+			<DetailLine key="xp" value={xp.c_str()} />
+			<DetailLine key="next" value={next.c_str()} />
+			<DetailLine key="wins" value={wins.c_str()} />
+			<RenameButton key="rename" available={agent.rename_available} detailAgent={detailAgent} />
+			<LabelText key="advantages" value="Advantages" style={detail_text_patch(8)} height={15.0f} />
+			<DetailLine key="advantage-0" value={def.advantages[0]} />
+			<DetailLine key="advantage-1" value={def.advantages[1]} />
+			<DetailLine key="advantage-2" value={def.advantages[2]} />
+		</Box>
+	}
+
+	struct AgencyDetailsProps {
+		const char * key = nullptr;
+		const CharacterCreateFrameProps * frame = nullptr;
+	};
+
+	::ui::UiElement AgencyDetails(const AgencyDetailsProps& props) {
+		if(!props.frame) return ::ui::empty();
+		const CharacterCreateFrameProps& frame = *props.frame;
+		const AgencyDef& def = agency_def(detail_agency_index(frame));
+		return <Box
+		  key={props.key}
+		  layout={::ui::LayoutStyle{
+				.direction = ::ui::FlexDirection::Column,
+				.width = ::ui::Length::points(static_cast<float>(kRightColumnW)),
+			.height = ::ui::Length::grow(1.0f),
+			.padding = {0.0f, 0.0f, static_cast<float>(kDetailTopPad), 0.0f},
+				.gap = 6.0f,
+			}}
+		>
+			<LabelText
+			  key="advantages-title"
+			  value="Advantages"
+			  style={detail_text_patch(8)}
+			  height={15.0f}
+			/>
+			<DetailLine key="advantage-0" value={def.advantages[0]} />
+			<DetailLine key="advantage-1" value={def.advantages[1]} />
+			<DetailLine key="advantage-2" value={def.advantages[2]} />
+			<LabelText
+			  key="description-title"
+			  value="Description"
+			  style={detail_text_patch(8)}
+			  height={15.0f}
+			/>
+			<DetailLine key="description-0" value={def.description[0]} />
+			<DetailLine key="description-1" value={def.description[1]} />
+			<DetailLine key="description-2" value={def.description[2]} />
+			<DetailLine key="description-3" value={def.description[3]} />
+			<DetailLine key="description-4" value={def.description[4]} />
+		</Box>
+	}
+
+	struct AliasModalProps {
+		const char * key = nullptr;
+		const CharacterCreateFrameProps * frame = nullptr;
+	};
+
+	::ui::UiElement AliasModal(const AliasModalProps& props) {
+		if(!props.frame || props.frame->step != CharacterCreateFrameStep::EnterAlias){
+			return ::ui::empty();
+		}
+		const CharacterCreateFrameProps& frame = *props.frame;
+		const char * title = frame.alias_renaming ? "ONE-TIME RENAME" : "SILENCER ALIAS";
+		return <Box
+		  key={props.key}
+		  layout={::ui::LayoutStyle{
+				.position = ::ui::PositionType::Absolute,
+				.direction = ::ui::FlexDirection::Column,
+			.align_items = ::ui::AlignItems::Center,
+			.width = ::ui::Length::points(static_cast<float>(kAliasModalW)),
+			.height = ::ui::Length::points(static_cast<float>(kAliasModalH)),
+			.position_inset = inset_left_top(
+				static_cast<float>((kStageW - kAliasModalW) / 2),
+				static_cast<float>(kAliasModalTop)),
+		}}
+		  style={image_patch(40, 2)}
+		>
+		<Box
+		  key="title-wrap"
+		  layout={::ui::LayoutStyle{
+				.align_items = ::ui::AlignItems::Center,
+				.justify_content = ::ui::JustifyContent::Center,
+				.width = ::ui::Length::points(static_cast<float>(kAliasModalW)),
+					.height = ::ui::Length::points(static_cast<float>(kAliasTitleH)),
+				}}
+		>
+				<LabelText
+				  key="title"
+				  value={title}
+				  style={text_patch(tokens::kTextTitle, tokens::kFontTitleBank, 11, ::ui::TextAlign::Center)}
+				  height={19.0f}
+				/>
+			</Box>
+			<TextInput
+			  key="input"
+			  id={kActionAlias}
+			  idOffset={kAliasInputUid}
+			  accessibility={{.label = "Alias"}}
+			  value={frame.alias ? frame.alias : ""}
+			  layout={::ui::LayoutStyle{
+					.position = ::ui::PositionType::Absolute,
+					.width = ::ui::Length::points(static_cast<float>(kAliasInputFrameW)),
+				.height = ::ui::Length::points(static_cast<float>(kRowH)),
+				.padding = {static_cast<float>(kAliasInputFrameW - kAliasInputW), 6.0f, 4.0f, 4.0f},
+				.position_inset = inset_left_top(static_cast<float>(kAliasInputX), static_cast<float>(kAliasInputY)),
+			}}
+			  style={::ui::StyleStatePatch(::ui::StylePatch{
+				.background = ::ui::opt(input_visual().background),
+				.border = ::ui::opt(input_visual().border),
+				.text = ::ui::opt(input_visual().text),
+			})}
+			/>
+		</Box>
+	}
+
+	struct BodyProps {
+		const char * key = nullptr;
+		const CharacterCreateFrameProps * frame = nullptr;
+	};
+
+	::ui::UiElement Body(const BodyProps& props) {
+		if(!props.frame) return ::ui::empty();
+		if(props.frame->step == CharacterCreateFrameStep::SelectAgency){
+			return <Box
+			  key={props.key}
+			  layout={::ui::LayoutStyle{
+					.direction = ::ui::FlexDirection::Row,
+					.width = ::ui::Length::grow(1.0f),
+					.height = ::ui::Length::grow(1.0f),
+					.gap = static_cast<float>(kColumnGap),
+				}}
+			>
+				<AgencyColumn key="agency-column" frame={props.frame} />
+				<AgencyDetails key="agency-info" frame={props.frame} />
+			</Box>
+		}
+		return <Box
+		  key={props.key}
+		  layout={::ui::LayoutStyle{
+				.direction = ::ui::FlexDirection::Row,
+				.width = ::ui::Length::grow(1.0f),
+				.height = ::ui::Length::grow(1.0f),
+				.gap = static_cast<float>(kColumnGap),
+			}}
+		>
+			<AgentColumn key="agent-column" frame={props.frame} />
+			<AgentDetails key="details" frame={props.frame} />
+			<AliasModal key="alias-modal" frame={props.frame} />
+		</Box>
+	}
+
+}  // namespace character_create_frame_detail
+
+using ::ui::children;
+using ::ui::components::Box;
+using ::ui::components::BoxProps;
+using character_create_frame_detail::Body;
+using character_create_frame_detail::BodyProps;
+
+::ui::UiElement CharacterCreateFrame(const CharacterCreateFrameProps& props) {
+	return <Box
+	  key={props.key}
+	  layout={::ui::LayoutStyle{
+			.align_items = ::ui::AlignItems::Center,
+			.justify_content = ::ui::JustifyContent::Center,
+			.width = ::ui::Length::percent(100.0f),
+			.height = ::ui::Length::percent(100.0f),
+		}}
+	  style={character_create_frame_detail::image_patch(6, 0)}
+	>
+		<Box
+		  key="stage"
+		  layout={::ui::LayoutStyle{
+				.width = ::ui::Length::points(static_cast<float>(character_create_frame_detail::kStageW)),
+				.height = ::ui::Length::points(static_cast<float>(character_create_frame_detail::kStageH)),
+				.padding = {
+					static_cast<float>(character_create_frame_detail::kFrameMarginLeft),
+					static_cast<float>(character_create_frame_detail::kFrameMarginRight),
+					static_cast<float>(character_create_frame_detail::kFrameMarginTop),
+					static_cast<float>(character_create_frame_detail::kFrameMarginBottom),
+				},
+			}}
+		>
+			<Box
+			  key="panel"
+			  layout={::ui::LayoutStyle{
+					.direction = ::ui::FlexDirection::Row,
+					.width = ::ui::Length::points(static_cast<float>(character_create_frame_detail::kPanelMinW)),
+					.height = ::ui::Length::points(static_cast<float>(character_create_frame_detail::kPanelMinH)),
+					.padding = {
+						static_cast<float>(character_create_frame_detail::kContentPadLeft),
+						static_cast<float>(character_create_frame_detail::kContentPadRight),
+						static_cast<float>(character_create_frame_detail::kContentPadTop),
+						static_cast<float>(character_create_frame_detail::kContentPadBottom),
+					},
+					.gap = static_cast<float>(character_create_frame_detail::kColumnGap),
+				}}
+			  style={character_create_frame_detail::image_patch(7, 5)}
+			>
+					<Body key="body" frame={&props} />
+				</Box>
+			</Box>
+		</Box>
+}
+
+}  // namespace client_ui
+}  // namespace silencer

@@ -10,11 +10,11 @@
 #include "game_create_panel.h"
 #include "game_join_panel.h"
 #include "game_tech_panel.h"
-#include "lobby_screen.h"
 
+#include "client/ui/hooks/use_app.h"
+#include "client/ui/hooks/use_lobby.h"
 #include "screen_context.h"
 #include "renderdevice.h"
-#include "world.h"
 
 #include <algorithm>
 #include <cstdint>
@@ -193,78 +193,69 @@ LobbySteppedPaneLayout ResolveSteppedPaneLayout(int bodyW,
 
 void BuildRightUpperContents(LobbyMainAreaPanels & panels,
                              ScreenContext & ctx,
-                             LobbyScreen & owner,
+                             LobbyModel & lobby,
                              const LobbySteppedPaneLayout & layout,
                              silencer::ui::UiInteractionRegistry& interactions) {
-	World & world = ctx.world;
-	Resources & resources = world.resources;
+	(void)ctx;
+	(void)lobby;
 	if(panels.gameCreateActive){
 		BuildGameCreateUpperTree(
 			panels.gameCreate,
 			static_cast<Uint16>(std::max(0, layout.rightUpperW)),
 			static_cast<Uint16>(std::max(0, layout.upperH)),
-			resources,
 			interactions);
 	}else if(panels.gameJoinActive){
 		BuildGameJoinUpperTree(
 			panels.gameJoin,
 			static_cast<Uint16>(std::max(0, layout.rightUpperW)),
-			resources,
 			interactions);
 	}else if(panels.gameTechActive){
 		BuildGameTechUpperTree(
 			panels.gameTech,
 			static_cast<Uint16>(std::max(0, layout.rightUpperW)),
-			world,
-			resources,
-			owner,
 			interactions);
 	}else{
 		BuildGameSelectUpperTree(
 			panels.gameSelect,
 			static_cast<Uint16>(std::max(0, layout.rightUpperW)),
-			resources,
 			interactions);
 	}
 }
 
 void BuildRightTallContents(LobbyMainAreaPanels & panels,
                             ScreenContext & ctx,
-                            LobbyScreen & owner,
+                            LobbyModel & lobby,
                             const LobbySteppedPaneLayout & layout,
                             silencer::ui::UiInteractionRegistry& interactions) {
-	World & world = ctx.world;
-	Resources & resources = world.resources;
 	if(panels.gameCreateActive){
 		BuildGameCreateTallTree(
 			panels.gameCreate,
 			ctx,
+			lobby,
 			static_cast<Uint16>(std::max(0, layout.rightTallW)),
 			static_cast<Uint16>(std::max(0, layout.rightTallH)),
-			resources,
 			interactions);
 	}else if(panels.gameJoinActive){
-		BuildGameJoinTallTree(panels.gameJoin, resources, interactions);
+		const silencer::client_ui::AppModel app =
+			silencer::client_ui::use_app(
+				silencer::client_ui::MakeAppProvider(ctx));
+		BuildGameJoinTallTree(panels.gameJoin, app.assets, interactions);
 	}else if(panels.gameTechActive){
-		BuildGameTechTallTree(panels.gameTech, world, resources, owner, interactions);
+		BuildGameTechTallTree(panels.gameTech, lobby, interactions);
 	}else{
 		BuildGameSelectTallTree(
 			panels.gameSelect,
 			static_cast<Uint16>(std::max(0, layout.rightTallW)),
 			static_cast<Uint16>(std::max(0, layout.rightTallH)),
-			resources,
 			interactions);
 	}
 }
 
 void BuildLobbySteppedPane(LobbyMainAreaPanels & panels,
                            ScreenContext & ctx,
-                           LobbyScreen & owner,
+                           LobbyModel & lobby,
                            const LobbySteppedPaneLayout & layout,
                            silencer::ui::UiInteractionRegistry& interactions) {
-	World & world = ctx.world;
-	Resources & resources = world.resources;
-
 	CLAY({ .id = CLAY_ID("LobbyBody"),
 	       .layout = {
 	           .sizing = { CLAY_SIZING_GROW(0),
@@ -299,8 +290,7 @@ void BuildLobbySteppedPane(LobbyMainAreaPanels & panels,
 					BuildCharacterPanelTree(
 						panels.character,
 						static_cast<Uint16>(std::max(0, layout.characterW)),
-						world,
-						resources,
+						lobby.character,
 						interactions);
 				}
 
@@ -313,7 +303,7 @@ void BuildLobbySteppedPane(LobbyMainAreaPanels & panels,
 				         },
 				         .clip = { .horizontal = true, .vertical = true },
 				     })) {
-					BuildRightUpperContents(panels, ctx, owner, layout, interactions);
+					BuildRightUpperContents(panels, ctx, lobby, layout, interactions);
 				}
 			}
 
@@ -357,8 +347,6 @@ void BuildLobbySteppedPane(LobbyMainAreaPanels & panels,
 				         .clip = { .horizontal = true, .vertical = true },
 				     })) {
 					BuildChatPanelTree(panels.chat,
-					                   world,
-					                   resources,
 					                   static_cast<Uint16>(std::max(0, layout.chatW)),
 					                   static_cast<Uint16>(std::max(0, layout.chatH)),
 					                   interactions);
@@ -382,7 +370,7 @@ void BuildLobbySteppedPane(LobbyMainAreaPanels & panels,
 			         },
 			         .clip = { .horizontal = true, .vertical = true },
 			     })) {
-			BuildRightTallContents(panels, ctx, owner, layout, interactions);
+			BuildRightTallContents(panels, ctx, lobby, layout, interactions);
 		}
 	}
 }
@@ -391,7 +379,7 @@ void BuildLobbySteppedPane(LobbyMainAreaPanels & panels,
 
 void BuildLobbyMainArea(LobbyMainAreaPanels & panels,
                         ScreenContext & ctx,
-                        LobbyScreen & owner,
+                        LobbyModel & lobby,
                         int bodyX,
                         int bodyY,
                         int bodyW,
@@ -404,7 +392,7 @@ void BuildLobbyMainArea(LobbyMainAreaPanels & panels,
 	lobby_main_area_detail::BuildLobbySteppedPane(
 		panels,
 		ctx,
-		owner,
+		lobby,
 		layout,
 		interactions);
 }

@@ -1,14 +1,14 @@
 #include "chat_panel.h"
 
+#include "client/ui/hooks/use_lobby.h"
+
 #include "primitives/scroll_text_box.h"
 
-#include "lobby.h"
-#include "lobbygame.h"
 #include "text_wrap.h"
-#include "world.h"
 
 #include <algorithm>
 #include <cstring>
+#include <utility>
 
 using silencer::ui::primitives::ScrollTextBoxAutoScroll;
 
@@ -166,35 +166,13 @@ void RefreshPresenceLines(ChatPanelState & state) {
 	state.presenceWrapDirty = false;
 }
 
-void RebuildPresenceEntries(ChatPanelState & state, World & world) {
+void RebuildPresenceEntries(ChatPanelState & state,
+                            const std::vector<LobbyChatPresenceRow>& rows) {
 	state.presenceEntries.clear();
 	state.presenceScrollPos = 0;
 
-	struct Row { Uint8 group; std::string label; };
-	std::vector<Row> rows;
-	rows.reserve(world.lobby.presence.size());
-	for(auto & kv : world.lobby.presence){
-		Lobby::PresenceEntry & e = kv.second;
-		Row r;
-		r.label = e.name;
-		r.group = (e.status <= 2) ? e.status : 0;
-		if(e.gameid != 0){
-			LobbyGame * g = world.lobby.GetGameById(e.gameid);
-			if(g){
-				r.label += " [";
-				r.label += g->name;
-				r.label += "]";
-			}
-		}
-		rows.push_back(std::move(r));
-	}
-	std::sort(rows.begin(), rows.end(), [](const Row & a, const Row & b){
-		if(a.group != b.group) return a.group < b.group;
-		return a.label < b.label;
-	});
-
 	Uint8 lastgroup = 255;
-	for(auto & r : rows){
+	for(const LobbyChatPresenceRow& r : rows){
 		if(r.group != lastgroup){
 			const char * header = (r.group == 0) ? "In Lobby"
 			                    : (r.group == 1) ? "Pregame" : "Playing";
@@ -356,40 +334,29 @@ void ChatPanelInit(ChatPanelState & state) {
 	state.inputBuffer[0] = '\0';
 }
 
-void ChatPanelTick(ChatPanelState & state, World & world) {
-	if(world.lobby.channelchanged){
-		if(world.lobby.lastchannel[0] == '\0'){
-			strcpy(world.lobby.lastchannel, world.lobby.channel);
-		}
-		state.channel = world.lobby.channel;
-		world.lobby.channelchanged = false;
+void ChatPanelTick(ChatPanelState & state, LobbyChatModel & chat) {
+	const LobbyChatPump pump = chat.pump();
+	if(pump.channel_changed){
+		state.channel = pump.channel;
 	}
 
-	if(world.lobby.presencechanged || !world.lobby.gamesprocessed){
-		chat_panel_detail::RebuildPresenceEntries(state, world);
+	if(pump.presence_changed){
+		chat_panel_detail::RebuildPresenceEntries(state, pump.presence);
 		if(state.presenceWrapChars > 0){
 			chat_panel_detail::RefreshPresenceLines(state);
 		}
-		world.lobby.presencechanged = false;
 	}
 
 	bool chatChanged = false;
-	while(!world.lobby.chatmessages.empty()){
-		auto message = world.lobby.chatmessages.front();
-		const char * msgtext = message.data();
-		size_t msglen = std::strlen(msgtext);
-		Uint8 color = static_cast<Uint8>(message[msglen + 1]);
-		Uint8 brightness = static_cast<Uint8>(message[msglen + 2]);
-
+	for(const LobbyChatMessage& message : pump.messages){
 		chat_panel_detail::PushEntry(
 			state.chatEntries,
-			msgtext ? std::string(msgtext) : std::string(),
-			color,
-			brightness,
+			message.text,
+			message.color,
+			message.brightness,
 			2);
 		state.chatWrapDirty = true;
 		chatChanged = true;
-		world.lobby.chatmessages.pop_front();
 	}
 	if(chatChanged && state.chatWrapChars > 0){
 		const int prevCount = static_cast<int>(state.chatLines.size());
@@ -405,7 +372,7 @@ void ChatPanelTick(ChatPanelState & state, World & world) {
 }
 
 bool ChatPanelHandleUiIntent(ChatPanelState & state,
-                             World & world,
+                             LobbyChatModel & chat,
                              const silencer::ui::UiAction & action) {
 	if(action.id != chat_panel_detail::kActionInput) return false;
 	if(action.kind == silencer::ui::UiActionKind::SetText){
@@ -415,7 +382,7 @@ bool ChatPanelHandleUiIntent(ChatPanelState & state,
 	if(action.kind == silencer::ui::UiActionKind::SubmitText){
 		chat_panel_detail::CopyUiText(state.inputBuffer, static_cast<int>(sizeof(state.inputBuffer)), action.value);
 		if(std::strlen(state.inputBuffer) > 0){
-			world.lobby.SendChat(world.lobby.channel, state.inputBuffer);
+			chat.send(state.inputBuffer);
 			state.inputBuffer[0] = '\0';
 		}
 		return true;

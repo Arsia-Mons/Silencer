@@ -1,0 +1,394 @@
+#include "client/ui/screens/mission_summary/mission_summary_frame.h"
+
+#include "client/ui/components/actions/app_button.h"
+#include "client/ui/components/tokens.h"
+#include "ui/components/box.h"
+#include "ui/components/text.h"
+#include "ui/style/style_patch.h"
+
+#include <array>
+#include <cstdint>
+#include <string>
+
+namespace silencer {
+namespace client_ui {
+namespace mission_summary_frame_detail {
+
+using ::ui::children;
+using ::ui::components::Box;
+using ::ui::components::BoxProps;
+using ::ui::components::Text;
+using ::ui::components::TextProps;
+
+constexpr int kStageW = 640;
+constexpr int kStageH = 480;
+constexpr int kPanelX = 5;
+constexpr int kPanelY = 19;
+constexpr int kPanelW = 628;
+constexpr int kPanelH = 441;
+constexpr int kSummaryX = 89;
+constexpr int kSummaryY = 92;
+constexpr int kSummaryW = 180;
+constexpr int kSummaryRenderH = 308;
+constexpr int kLineH = 11;
+constexpr int kTitleCenterX = 192;
+constexpr int kTitleY = 44;
+constexpr int kTitleW = 180;
+constexpr int kTitleH = 24;
+constexpr int kXpCenterX = 467;
+constexpr int kXpY = 45;
+constexpr int kXpW = 160;
+constexpr int kXpH = 28;
+constexpr int kUpgradeBannerY = 77;
+constexpr int kBannerW = 160;
+constexpr int kBannerH = 16;
+constexpr int kLevelLabelX = 390;
+constexpr int kLevelValueX = 532;
+constexpr int kLevelStartY = 97;
+constexpr int kLevelRowGap = 46;
+constexpr int kLevelLabelW = 160;
+constexpr int kLevelValueW = 24;
+constexpr int kTextLineH = 14;
+constexpr int kUpgradeButtonX = 372;
+constexpr int kUpgradeButtonY = 108;
+constexpr int kDoneButtonX = 372;
+constexpr int kDoneButtonY = 388;
+constexpr int kButtonW = 196;
+constexpr int kButtonH = 33;
+
+const char * kUpgradeLabels[kMissionSummaryUpgradeCount] = {
+	"+1 Endurance",
+	"+1 Shield",
+	"+1 Jetpack",
+	"+1 Tech Slot",
+	"+1 Hacking",
+	"+1 Contacts",
+};
+
+const char * kLevelLabels[kMissionSummaryUpgradeCount] = {
+	"Current Endurance Level:",
+	"Current Shield Level:",
+	"Current Jetpack Level:",
+	"Current Tech Slot Level:",
+	"Current Hacking Level:",
+	"Current Contacts Level:",
+};
+
+const char * kSummaryLineKeys[kMissionSummaryVisibleLineCount] = {
+	"summary-line-0",
+	"summary-line-1",
+	"summary-line-2",
+	"summary-line-3",
+	"summary-line-4",
+	"summary-line-5",
+	"summary-line-6",
+	"summary-line-7",
+	"summary-line-8",
+	"summary-line-9",
+	"summary-line-10",
+	"summary-line-11",
+	"summary-line-12",
+	"summary-line-13",
+	"summary-line-14",
+	"summary-line-15",
+	"summary-line-16",
+	"summary-line-17",
+	"summary-line-18",
+	"summary-line-19",
+	"summary-line-20",
+	"summary-line-21",
+	"summary-line-22",
+	"summary-line-23",
+	"summary-line-24",
+	"summary-line-25",
+	"summary-line-26",
+	"summary-line-27",
+};
+
+inline std::uint32_t texture_id(std::uint8_t bank, std::uint16_t index) {
+	return (static_cast<std::uint32_t>(bank) << 16) |
+	       static_cast<std::uint32_t>(index);
+}
+
+inline ::ui::StylePatch image_patch(std::uint8_t bank, std::uint16_t index) {
+	return ::ui::patch().image(::ui::BackgroundImage{
+		.texture_id = texture_id(bank, index),
+		.tint = {255, 255, 255, 255},
+	});
+}
+
+inline ::ui::EdgeSizes inset_left_top(float left, float top) {
+	::ui::EdgeSizes edges;
+	edges.left = ::ui::StyleValue::points(left);
+	edges.top = ::ui::StyleValue::points(top);
+	return edges;
+}
+
+inline ::ui::StylePatch text_patch(::ui::Color color,
+                                   std::uint16_t font_id,
+                                   std::uint16_t font_size,
+                                   ::ui::TextAlign align = ::ui::TextAlign::Left,
+                                   float line_height = 0.0f) {
+	return ::ui::patch().text(::ui::TextVisual{
+		.color = color,
+		.font_id = font_id,
+		.font_size = font_size,
+		.align = align,
+		.line_height = line_height,
+	});
+}
+
+inline ::ui::LayoutStyle absolute_layout(float left,
+                                         float top,
+                                         float width,
+                                         float height) {
+	return {
+		.position = ::ui::PositionType::Absolute,
+		.position_inset = inset_left_top(left, top),
+		.width = ::ui::Length::points(width),
+		.height = ::ui::Length::points(height),
+	};
+}
+
+const char * SummaryLine(const MissionSummaryFrameProps& props, int index) {
+	if(!props.summary_lines || index < 0 || index >= props.summary_line_count){
+		return "";
+	}
+	return props.summary_lines[index] ? props.summary_lines[index] : "";
+}
+
+	struct SummaryTextLineProps {
+		const char * key = nullptr;
+		const MissionSummaryFrameProps * frame = nullptr;
+		int index = 0;
+	};
+
+	::ui::UiElement SummaryTextLine(const SummaryTextLineProps& props) {
+		if(!props.frame) return ::ui::empty();
+		return <Text
+		  key={props.key}
+		  value={SummaryLine(*props.frame, props.index)}
+		  layout={::ui::LayoutStyle{
+				.width = ::ui::Length::points(kSummaryW),
+				.height = ::ui::Length::points(kLineH),
+			}}
+		  style={text_patch(tokens::kTextTitle, tokens::kFontBodyBank, 6, ::ui::TextAlign::Left, static_cast<float>(kLineH))}
+		/>
+	}
+
+	struct ButtonLabelProps {
+		const char * key = nullptr;
+		const char * label = nullptr;
+	};
+
+	::ui::UiElement ButtonLabel(const ButtonLabelProps& props) {
+		return <Text
+		  key={props.key}
+		  value={props.label ? props.label : ""}
+		  layout={::ui::LayoutStyle{
+				.height = ::ui::Length::points(19.0f),
+			}}
+		  style={text_patch(tokens::kTextButton, tokens::kFontTitleBank, 11, ::ui::TextAlign::Center)}
+		/>
+	}
+
+	struct UpgradeButtonProps {
+		const char * key = nullptr;
+		const MissionSummaryFrameProps * frame = nullptr;
+		int index = 0;
+		int button_y = 0;
+	};
+
+	::ui::UiElement UpgradeButton(const UpgradeButtonProps& props) {
+		if(!props.frame || !props.frame->upgrades_available[props.index]){
+			return ::ui::empty();
+		}
+		std::string actionId = std::string("mission_summary.upgrade.") +
+			std::to_string(props.index);
+		std::string textKey = std::string("upgrade-button-text-") +
+			std::to_string(props.index);
+		return <Box
+		  key={props.key}
+		  layout={absolute_layout(kUpgradeButtonX, static_cast<float>(props.button_y), kButtonW, kButtonH)}
+		>
+			<AppButton
+			  key="button"
+			  controlId={actionId.c_str()}
+			  size={AppButtonSize::MainMenu}
+			  accessibilityLabel={kUpgradeLabels[props.index]}
+			>
+				<ButtonLabel key={textKey.c_str()} label={kUpgradeLabels[props.index]} />
+			</AppButton>
+		</Box>
+	}
+
+	struct UpgradeRowProps {
+		const char * key = nullptr;
+		const MissionSummaryFrameProps * frame = nullptr;
+		int index = 0;
+	};
+
+	::ui::UiElement UpgradeRow(const UpgradeRowProps& props) {
+		if(!props.frame) return ::ui::empty();
+		const int rowY = kLevelStartY + props.index * kLevelRowGap;
+		const int buttonY = kUpgradeButtonY + props.index * kLevelRowGap;
+		std::string value = std::to_string(props.frame->levels[props.index]);
+		std::string buttonKey = std::string("upgrade-button-") +
+			std::to_string(props.index);
+		return <Box key={props.key}>
+			<Text
+			  key="label"
+			  value={kLevelLabels[props.index]}
+			  layout={absolute_layout(kLevelLabelX, static_cast<float>(rowY), kLevelLabelW, kTextLineH)}
+			  style={text_patch(tokens::kTextTitle, tokens::kFontBodyBank, 6)}
+			/>
+		<Text
+		  key="value"
+		  value={value.c_str()}
+		  layout={absolute_layout(kLevelValueX, static_cast<float>(rowY), kLevelValueW, kTextLineH)}
+		  style={text_patch(tokens::kTextTitle, tokens::kFontBodyBank, 6, ::ui::TextAlign::Right)}
+		/>
+			<UpgradeButton
+			  key={buttonKey.c_str()}
+			  frame={props.frame}
+			  index={props.index}
+			  buttonY={buttonY}
+			/>
+		</Box>
+	}
+
+	struct UpgradeBannerProps {
+		const char * key = nullptr;
+		const MissionSummaryFrameProps * frame = nullptr;
+	};
+
+	::ui::UiElement UpgradeBanner(const UpgradeBannerProps& props) {
+		if(!props.frame || !props.frame->upgrade_banner) return ::ui::empty();
+		return <Text
+		  key={props.key}
+		  value="*NEW UPGRADE AVAILABLE*"
+		  layout={absolute_layout(kXpCenterX - kBannerW / 2, kUpgradeBannerY, kBannerW, kBannerH)}
+		  style={text_patch(tokens::kAccent, tokens::kFontBodyBank, 6, ::ui::TextAlign::Center)}
+		/>
+}
+
+}  // namespace mission_summary_frame_detail
+
+using ::ui::children;
+using ::ui::components::Box;
+using ::ui::components::BoxProps;
+using ::ui::components::Text;
+using ::ui::components::TextProps;
+using mission_summary_frame_detail::ButtonLabel;
+using mission_summary_frame_detail::ButtonLabelProps;
+using mission_summary_frame_detail::SummaryTextLine;
+using mission_summary_frame_detail::SummaryTextLineProps;
+using mission_summary_frame_detail::UpgradeBanner;
+using mission_summary_frame_detail::UpgradeBannerProps;
+using mission_summary_frame_detail::UpgradeRow;
+using mission_summary_frame_detail::UpgradeRowProps;
+
+::ui::UiElement MissionSummaryFrame(const MissionSummaryFrameProps& props) {
+	std::string xp = "+ " + std::to_string(props.experience) + " XP";
+	return <Box
+	  key={props.key}
+	  layout={::ui::LayoutStyle{
+			.align_items = ::ui::AlignItems::Center,
+			.justify_content = ::ui::JustifyContent::Center,
+			.width = ::ui::Length::percent(100.0f),
+			.height = ::ui::Length::percent(100.0f),
+		}}
+	  style={mission_summary_frame_detail::image_patch(6, 0)}
+	>
+		<Box
+		  key="stage"
+		  layout={::ui::LayoutStyle{
+				.position = ::ui::PositionType::Relative,
+				.width = ::ui::Length::points(static_cast<float>(mission_summary_frame_detail::kStageW)),
+				.height = ::ui::Length::points(static_cast<float>(mission_summary_frame_detail::kStageH)),
+			}}
+		>
+			<Box
+			  key="panel"
+			  layout={mission_summary_frame_detail::absolute_layout(mission_summary_frame_detail::kPanelX, mission_summary_frame_detail::kPanelY, mission_summary_frame_detail::kPanelW, mission_summary_frame_detail::kPanelH)}
+			  style={mission_summary_frame_detail::image_patch(7, 5)}
+			/>
+			<Text
+			  key="title"
+			  value="Mission Summary"
+			  layout={mission_summary_frame_detail::absolute_layout(mission_summary_frame_detail::kTitleCenterX - mission_summary_frame_detail::kTitleW / 2, mission_summary_frame_detail::kTitleY, mission_summary_frame_detail::kTitleW, mission_summary_frame_detail::kTitleH)}
+			  style={mission_summary_frame_detail::text_patch(tokens::kTextTitle, tokens::kFontTitleBank, 12, ::ui::TextAlign::Center)}
+			/>
+			<Box
+			  key="summary"
+			  layout={::ui::LayoutStyle{
+					.position = ::ui::PositionType::Absolute,
+					.direction = ::ui::FlexDirection::Column,
+					.position_inset = mission_summary_frame_detail::inset_left_top(
+						mission_summary_frame_detail::kSummaryX,
+						mission_summary_frame_detail::kSummaryY),
+					.width = ::ui::Length::points(mission_summary_frame_detail::kSummaryW),
+					.height = ::ui::Length::points(mission_summary_frame_detail::kSummaryRenderH),
+				}}
+			>
+					<SummaryTextLine key="summary-line-0" frame={&props} index={0} />
+					<SummaryTextLine key="summary-line-1" frame={&props} index={1} />
+					<SummaryTextLine key="summary-line-2" frame={&props} index={2} />
+					<SummaryTextLine key="summary-line-3" frame={&props} index={3} />
+					<SummaryTextLine key="summary-line-4" frame={&props} index={4} />
+					<SummaryTextLine key="summary-line-5" frame={&props} index={5} />
+					<SummaryTextLine key="summary-line-6" frame={&props} index={6} />
+					<SummaryTextLine key="summary-line-7" frame={&props} index={7} />
+					<SummaryTextLine key="summary-line-8" frame={&props} index={8} />
+					<SummaryTextLine key="summary-line-9" frame={&props} index={9} />
+					<SummaryTextLine key="summary-line-10" frame={&props} index={10} />
+					<SummaryTextLine key="summary-line-11" frame={&props} index={11} />
+					<SummaryTextLine key="summary-line-12" frame={&props} index={12} />
+					<SummaryTextLine key="summary-line-13" frame={&props} index={13} />
+					<SummaryTextLine key="summary-line-14" frame={&props} index={14} />
+					<SummaryTextLine key="summary-line-15" frame={&props} index={15} />
+					<SummaryTextLine key="summary-line-16" frame={&props} index={16} />
+					<SummaryTextLine key="summary-line-17" frame={&props} index={17} />
+					<SummaryTextLine key="summary-line-18" frame={&props} index={18} />
+					<SummaryTextLine key="summary-line-19" frame={&props} index={19} />
+					<SummaryTextLine key="summary-line-20" frame={&props} index={20} />
+					<SummaryTextLine key="summary-line-21" frame={&props} index={21} />
+					<SummaryTextLine key="summary-line-22" frame={&props} index={22} />
+					<SummaryTextLine key="summary-line-23" frame={&props} index={23} />
+					<SummaryTextLine key="summary-line-24" frame={&props} index={24} />
+					<SummaryTextLine key="summary-line-25" frame={&props} index={25} />
+					<SummaryTextLine key="summary-line-26" frame={&props} index={26} />
+					<SummaryTextLine key="summary-line-27" frame={&props} index={27} />
+				</Box>
+			<Text
+			  key="xp"
+			  value={xp.c_str()}
+			  layout={mission_summary_frame_detail::absolute_layout(mission_summary_frame_detail::kXpCenterX - mission_summary_frame_detail::kXpW / 2, mission_summary_frame_detail::kXpY, mission_summary_frame_detail::kXpW, mission_summary_frame_detail::kXpH)}
+			  style={mission_summary_frame_detail::text_patch(tokens::kTextTitle, 136, 16, ::ui::TextAlign::Center)}
+			/>
+				<UpgradeBanner key="upgrade-banner" frame={&props} />
+				<UpgradeRow key="upgrade-row-0" frame={&props} index={0} />
+				<UpgradeRow key="upgrade-row-1" frame={&props} index={1} />
+				<UpgradeRow key="upgrade-row-2" frame={&props} index={2} />
+				<UpgradeRow key="upgrade-row-3" frame={&props} index={3} />
+				<UpgradeRow key="upgrade-row-4" frame={&props} index={4} />
+				<UpgradeRow key="upgrade-row-5" frame={&props} index={5} />
+			<Box
+			  key="done-wrap"
+			  layout={mission_summary_frame_detail::absolute_layout(mission_summary_frame_detail::kDoneButtonX, mission_summary_frame_detail::kDoneButtonY, mission_summary_frame_detail::kButtonW, mission_summary_frame_detail::kButtonH)}
+			>
+				<AppButton
+				  key="done"
+				  controlId="mission_summary.done"
+				  size={AppButtonSize::MainMenu}
+				  accessibilityLabel="Done"
+				>
+						<ButtonLabel key="done-text" label="Done" />
+					</AppButton>
+				</Box>
+		</Box>
+	</Box>
+}
+
+}  // namespace client_ui
+}  // namespace silencer

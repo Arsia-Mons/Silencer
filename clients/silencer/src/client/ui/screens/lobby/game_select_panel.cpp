@@ -1,18 +1,10 @@
 #include "game_select_panel.h"
 
-#include "lobby_screen.h"
-#include "screen_context.h"
-#include "game.h"
-#include "world.h"
-#include "lobby.h"
-#include "lobbygame.h"
-#include "config.h"
-#include "user.h"
-#include "password_modal.h"
+#include "client/ui/hooks/use_lobby.h"
 
 #include <cstring>
-#include <memory>
 #include <string>
+#include <utility>
 
 namespace silencer::client_ui::lobby {
 
@@ -31,17 +23,17 @@ bool StartsWith(const std::string & value, const char * prefix) {
 	return value.size() >= n && value.compare(0, n, prefix) == 0;
 }
 
-void RebuildRows(GameSelectPanelState & state, World & world) {
+void RebuildRows(GameSelectPanelState & state,
+                 const std::vector<LobbyBrowserGameRow>& rows) {
 	Uint32 prevSelectedId = 0;
 	if(state.selectedIndex >= 0 && state.selectedIndex < (int)state.rows.size()){
 		prevSelectedId = state.rows[state.selectedIndex].gameid;
 	}
 	state.rows.clear();
-	for(LobbyGame * lg : world.lobby.games){
-		if(!lg) continue;
+	for(const LobbyBrowserGameRow& game : rows){
 		GameSelectPanelState::Row r;
-		r.name   = lg->name;
-		r.gameid = lg->id;
+		r.name   = game.name;
+		r.gameid = game.id;
 		state.rows.push_back(std::move(r));
 	}
 	state.selectedIndex = -1;
@@ -59,16 +51,16 @@ void RebuildRows(GameSelectPanelState & state, World & world) {
 	if(state.scrollPos > maxScroll) state.scrollPos = static_cast<Uint16>(maxScroll);
 }
 
-LobbyGame * GetSelectedGame(GameSelectPanelState & state, World & world) {
+Uint32 SelectedGameId(GameSelectPanelState & state) {
 	if(state.selectedIndex < 0 || state.selectedIndex >= (int)state.rows.size()){
-		return nullptr;
+		return 0;
 	}
-	return world.lobby.GetGameById(state.rows[state.selectedIndex].gameid);
+	return state.rows[state.selectedIndex].gameid;
 }
 
-void RecomputeInfoBlock(GameSelectPanelState & state, World & world) {
-	LobbyGame * lobbygame = GetSelectedGame(state, world);
-	if(!lobbygame){
+void RecomputeInfoBlock(GameSelectPanelState & state,
+                        const LobbyBrowserGameInfo& info) {
+	if(info.name.empty()){
 		state.infoName.clear();
 		state.infoMap.clear();
 		state.infoSecurity.clear();
@@ -78,113 +70,13 @@ void RecomputeInfoBlock(GameSelectPanelState & state, World & world) {
 		state.spectateVisible = false;
 		return;
 	}
-	state.infoName = lobbygame->name;
-
-	state.infoMap = "Map: ";
-	state.infoMap += lobbygame->mapname;
-
-	const char * passwordlock = (strlen(lobbygame->password) > 0)
-	                              ? "*PASSWORD LOCK*" : "";
-	std::string security = "No";
-	switch(lobbygame->securitylevel){
-		case LobbyGame::SECLOW:    security = "Low"; break;
-		case LobbyGame::SECMEDIUM: security = "Medium"; break;
-		case LobbyGame::SECHIGH:   security = "High"; break;
-	}
-	state.infoSecurity = security + " Security";
-	while(state.infoSecurity.length() < 21){
-		state.infoSecurity += " ";
-	}
-	state.infoSecurity += passwordlock;
-
-	User * creator = world.lobby.GetUserInfo(lobbygame->accountid);
-	state.infoCreator = "Creator: ";
-	if(creator) state.infoCreator += creator->name;
-
-	const bool ingame = lobbygame->state == 1;
-	if(!ingame){
-		state.infoLimits =
-			"MinLv:" + std::to_string(lobbygame->minlevel)
-			+ " MaxLv:" + std::to_string(lobbygame->maxlevel)
-			+ " MaxPl:" + std::to_string(lobbygame->maxplayers)
-			+ " MaxTm:" + std::to_string(lobbygame->maxteams);
-	}else{
-		state.infoLimits.clear();
-	}
-
-	state.joinVisible = false;
-	state.spectateVisible = false;
-	if(!ingame && lobbygame->players < lobbygame->maxplayers){
-		state.joinVisible = true;
-	}else if(ingame && lobbygame->canrejoin){
-		state.joinVisible = true;
-	}
-	if(ingame && lobbygame->spectatable){
-		state.spectateVisible = true;
-	}
-}
-
-void HandleJoinClick(GameSelectPanelState & state, World & world, ScreenContext & ctx) {
-	LobbyGame * lobbygame = GetSelectedGame(state, world);
-	if(!lobbygame){
-		ctx.ShowMessage("No game selected");
-		return;
-	}
-	if(!world.IsIdle()) return;
-	User * user = world.lobby.GetUserInfo(world.lobby.accountid);
-	bool canjoin = true;
-	if(user){
-		const Uint8 agency = world.lobby.GetSelectedAgencyOrDefault(Config::GetInstance().defaultagency);
-		if(lobbygame->minlevel > user->agency[agency].level){
-			canjoin = false;
-			ctx.ShowMessage("Your player level is too low");
-		}else if(lobbygame->maxlevel < user->agency[agency].level){
-			canjoin = false;
-			ctx.ShowMessage("Your player level is too high");
-		}
-	}
-	if(!canjoin) return;
-	ctx.game.currentlobbygameid = lobbygame->id;
-	if(strlen(lobbygame->password) > 0 && lobbygame->accountid != world.lobby.accountid){
-		Uint32 gameId = lobbygame->id;
-		ctx.PushScreen(std::make_unique<PasswordModal>(
-			[&ctx, gameId](const char * password){
-				LobbyGame * lg = ctx.world.lobby.GetGameById(gameId);
-				if(lg){
-					char buf[64];
-					std::strncpy(buf, password ? password : "", sizeof(buf) - 1);
-					buf[sizeof(buf) - 1] = '\0';
-					ctx.game.JoinGame(*lg, buf);
-				}
-			}));
-	}else{
-		ctx.game.JoinGame(*lobbygame);
-	}
-}
-
-void HandleSpectateClick(GameSelectPanelState & state, World & world, ScreenContext & ctx) {
-	LobbyGame * lobbygame = GetSelectedGame(state, world);
-	if(!lobbygame){
-		ctx.ShowMessage("No game selected");
-		return;
-	}
-	if(!world.IsIdle()) return;
-	ctx.game.currentlobbygameid = lobbygame->id;
-	if(strlen(lobbygame->password) > 0 && lobbygame->accountid != world.lobby.accountid){
-		Uint32 gameId = lobbygame->id;
-		ctx.PushScreen(std::make_unique<PasswordModal>(
-			[&ctx, gameId](const char * password){
-				LobbyGame * lg = ctx.world.lobby.GetGameById(gameId);
-				if(lg){
-					char buf[64];
-					std::strncpy(buf, password ? password : "", sizeof(buf) - 1);
-					buf[sizeof(buf) - 1] = '\0';
-					ctx.game.SpectateGame(*lg, buf);
-				}
-			}));
-	}else{
-		ctx.game.SpectateGame(*lobbygame);
-	}
+	state.infoName = info.name;
+	state.infoMap = info.map;
+	state.infoSecurity = info.security;
+	state.infoCreator = info.creator;
+	state.infoLimits = info.limits;
+	state.joinVisible = info.join_visible;
+	state.spectateVisible = info.spectate_visible;
 }
 
 }  // namespace game_select_panel_detail
@@ -206,13 +98,12 @@ void GameSelectPanelInit(GameSelectPanelState & state) {
 	state.spectateVisible = false;
 }
 
-void GameSelectPanelTick(GameSelectPanelState & state,
-                         World & world,
-                         ScreenContext & ctx,
-                         LobbyScreen & owner) {
-	if(!world.lobby.gamesprocessed){
-		game_select_panel_detail::RebuildRows(state, world);
-		world.lobby.gamesprocessed = true;
+GameSelectPanelTickResult GameSelectPanelTick(GameSelectPanelState & state,
+                                              LobbyModel & lobby) {
+	GameSelectPanelTickResult result;
+	const LobbyBrowserRowsSnapshot rows = lobby.browser.refresh_rows();
+	if(rows.rebuilt){
+		game_select_panel_detail::RebuildRows(state, rows.rows);
 	}
 
 	if(state.rowClickedIndex >= 0){
@@ -220,21 +111,25 @@ void GameSelectPanelTick(GameSelectPanelState & state,
 		state.rowClickedIndex = -1;
 	}
 
-	game_select_panel_detail::RecomputeInfoBlock(state, world);
+	const Uint32 selectedGameId = game_select_panel_detail::SelectedGameId(state);
+	game_select_panel_detail::RecomputeInfoBlock(
+		state,
+		lobby.browser.info(selectedGameId));
 
 	if(state.createClicked){
 		state.createClicked = false;
-		owner.ShowGameCreate(ctx);
-		return;
+		result.show_create = true;
+		return result;
 	}
 	if(state.joinClicked){
 		state.joinClicked = false;
-		game_select_panel_detail::HandleJoinClick(state, world, ctx);
+		lobby.browser.join(selectedGameId);
 	}
 	if(state.spectateClicked){
 		state.spectateClicked = false;
-		game_select_panel_detail::HandleSpectateClick(state, world, ctx);
+		lobby.browser.spectate(selectedGameId);
 	}
+	return result;
 }
 
 bool GameSelectPanelHandleUiIntent(GameSelectPanelState & state,

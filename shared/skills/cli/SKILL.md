@@ -52,7 +52,7 @@ PID=$(start_silencer "$PORT")
 trap "stop_silencer $PID $PORT" EXIT
 wait_alive "$PORT"
 
-cli --port "$PORT" wait_for_state --state MAINMENU --timeout-ms 15000
+cli --port "$PORT" wait_for_ui --id main_menu.options --timeout-ms 15000
 cli --port "$PORT" click --label OPTIONS
 cli --port "$PORT" screenshot --out /tmp/options.png
 ```
@@ -82,18 +82,20 @@ shorthand for the most common arg (`click LABEL`,
 | `step` | `--frames N` *or* `--ms N` | `{}` — advances the simulation, then re-pauses. One of the two flags is required. |
 | `wait_frames` | `--n N` | `{}` — replies after N rendered frames |
 | `wait_ms` | `--n N` | `{}` — replies after N wallclock ms |
-| `wait_for_state` | `--state X [--timeout-ms 5000]` | `{}` or `TIMEOUT`. **Timeout is in milliseconds.** |
+| `wait_for_ui` | `--id X`, `--id-prefix X`, `--label X`, or `--uid N` `[--timeout-ms 5000]` | `{}` or `TIMEOUT` once a rendered UI target is registered. **Timeout is in milliseconds.** |
+| `wait_for_state` | `--state X [--timeout-ms 5000]` | `{}` or `TIMEOUT` for engine/session states only. **Timeout is in milliseconds.** |
 | `quit` | — | `{}` — asks the game to shut down cleanly |
 
 #### Screen names
 
-`state` and `wait_for_state --state` use these names (defined by
-`Game::StateName`):
+`state` reports these names (defined by `Game::StateName`):
 
-`NONE`, `FADEOUT`, `MAINMENU`, `LOBBYCONNECT`, `LOBBY`, `UPDATING`,
-`INGAME`, `MISSIONSUMMARY`, `SINGLEPLAYERGAME`, `OPTIONS`,
-`OPTIONSCONTROLS`, `OPTIONSDISPLAY`, `OPTIONSAUDIO`, `HOSTGAME`,
-`JOINGAME`, `REPLAYGAME`, `TESTGAME`.
+`NONE`, `FADEOUT`, `FRONTEND`, `INGAME`, `SINGLEPLAYERGAME`,
+`HOSTGAME`, `JOINGAME`, `REPLAYGAME`, `TESTGAME`.
+
+Use `wait_for_state --state` only for engine/session states such as
+`SINGLEPLAYERGAME`, `HOSTGAME`, or `JOINGAME`. Menu/lobby/options routes are
+client UI navigation, so synchronize them with `wait_for_ui`.
 
 ### Keybind editor
 
@@ -124,8 +126,8 @@ cli --port "$PORT" gas reload
 
 Re-runs the C++ GAS loader against the running game's data directory
 and returns the same `{file, instancePath, code, message}` error shape
-as `gas validate`. Only safe from `NONE` / `MAINMENU` / `LOBBY` /
-`MISSIONSUMMARY` — errors `WRONG_STATE` mid-game.
+as `gas validate`. Only safe from `NONE` / `FRONTEND` — errors
+`WRONG_STATE` mid-game.
 
 The exit code is **0 as long as the reload ran**. Whether the new
 files were clean shows up in the response's `errors[]` array, not the
@@ -222,11 +224,11 @@ PORT=$(pick_port); PID=$(start_silencer "$PORT")
 trap "stop_silencer $PID $PORT" EXIT
 wait_alive "$PORT"
 
-cli --port "$PORT" wait_for_state --state MAINMENU --timeout-ms 15000
+cli --port "$PORT" wait_for_ui --id main_menu.options --timeout-ms 15000
 cli --port "$PORT" click --label OPTIONS
-cli --port "$PORT" wait_for_state --state OPTIONS --timeout-ms 5000
+cli --port "$PORT" wait_for_ui --id options.controls --timeout-ms 5000
 cli --port "$PORT" back
-cli --port "$PORT" wait_for_state --state MAINMENU --timeout-ms 5000
+cli --port "$PORT" wait_for_ui --id main_menu.options --timeout-ms 5000
 ```
 
 ### Discover what's on screen
@@ -294,9 +296,9 @@ trap cleanup EXIT
 SAMPLER_PID=$!
 
 # Normal semantic journey. The sampler is the video capture mechanism.
-cli --port "$PORT" wait_for_state --state MAINMENU --timeout-ms 15000
+cli --port "$PORT" wait_for_ui --id main_menu.options --timeout-ms 15000
 cli --port "$PORT" click --label "Connect To Lobby"
-cli --port "$PORT" wait_for_state --state LOBBYCONNECT --timeout-ms 12000
+cli --port "$PORT" wait_for_ui --id lobby_connect.login --timeout-ms 12000
 
 # For visible typing, prefer `key` over `set_text`. Use --ascii for
 # digits/punctuation so the CLI parser cannot coerce the value to a number.
@@ -312,7 +314,7 @@ ffmpeg -framerate 12 -i "$FRAMES/%05d.png" -vf "format=yuv420p" \
   -c:v libx264 -preset veryfast -crf 20 -movflags +faststart /tmp/silencer-e2e.mp4
 ```
 
-Use `wait_for_state`, `inspect` polling, and small wall-clock sleeps for
+Use `wait_for_ui`, engine-state `wait_for_state`, `inspect` polling, and small wall-clock sleeps for
 flow synchronization. Avoid `step --frames` in these videos: it pauses
 after advancing and can stall fades/transitions unless the whole script
 intentionally owns the frame clock. `set_text` is fine for setup, but
@@ -349,8 +351,7 @@ intentionally owns the frame clock. `set_text` is fine for setup, but
   in-process command registry lives at the top of
   `clients/cli/index.ts`.
 - **`gas reload` is screen-gated.** Errors `WRONG_STATE` outside
-  `NONE` / `MAINMENU` / `LOBBY` / `MISSIONSUMMARY`; the loader does
-  not run mid-game.
+  `NONE` / `FRONTEND`; the loader does not run mid-game.
 - **`lobby` has its own background process.** `silencer-lobbyd` is
   separate from the game; it auto-spawns on first `lobby spawn` and
   auto-exits when its last session dies. To force a clean restart:

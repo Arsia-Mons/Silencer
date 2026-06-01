@@ -18,7 +18,6 @@
 #include <string>
 #include <vector>
 
-class Screen;
 class Modal;
 class LobbyGame;
 
@@ -33,7 +32,6 @@ bool HandleSDLEvents();
 void LoadProgressCallback(int progress, int totalprogressitems);
 
 friend class Audio;
-friend class ScreenContext;
 friend class GameRenderer;
 friend class GameInput;
 friend class GameUiPipeline;
@@ -43,7 +41,6 @@ int GetFrameCount() const { return frames; }
 static const char * StateName(Uint8 s);
 Uint8 GetState() const { return state; }
 World & GetWorld() { return world; }
-ScreenContext & GetScreenContext() { return screenContext; }
 WorldSummary GetWorldSummary();
 Surface & GetScreenBuffer() { return gameRenderer.GetScreenBuffer(); }
 const Surface & GetScreenBuffer() const { return gameRenderer.GetScreenBuffer(); }
@@ -54,10 +51,10 @@ const silencer::client_ui::ClientUiInput & UiInput() const { return gameUiPipeli
 const silencer::ui::UiInputState & CurrentUiInput() const { return gameUiPipeline.CurrentUiInput(); }
 silencer::ui::UiInteractionRegistry & UiInteractions() { return gameUiPipeline.UiInteractions(); }
 const silencer::ui::UiInteractionRegistry & UiInteractions() const { return gameUiPipeline.UiInteractions(); }
-silencer::client_ui::InGameUiController & InGameUi() { return gameUiPipeline.InGameUi(); }
 bool ResizeRenderSurface(int width, int height);
 bool ResizeRenderSurfacePixels(int width, int height);
 bool SyncRenderSurfaceToWindowPixels();
+void ResetPresentationPalette(int paletteIdx);
 bool IsLiveMultiplayer() const;
 bool GoBack();
 struct PendingWait {
@@ -65,6 +62,10 @@ ControlCommand cmd;
 Uint64 deadline_ms = 0;
 int frames_left = -1;
 std::string wait_state;
+std::string wait_ui_id;
+std::string wait_ui_id_prefix;
+std::string wait_ui_label;
+int wait_ui_uid = -1;
 };
 std::vector<PendingWait> pendingWaits;
 bool quitRequested = false;
@@ -76,9 +77,7 @@ int tuiInputPort;
 bool headless;
 bool tui;
 
-Screen * GetTopScreen() const;
 bool HasUiInputTarget();
-bool HasVisibleUiScreen() const;
 
 KeyMap & GetKeyMap() { return gameInput.GetKeyMap(); }
 const KeyMap & GetKeyMap() const { return gameInput.GetKeyMap(); }
@@ -88,8 +87,11 @@ SDL_Gamepad * GetGamepad() const { return gameInput.GetGamepad(); }
 void JoinGame(LobbyGame & lobbygame, char * password = 0);
 void SpectateGame(LobbyGame & lobbygame, char * password = 0);
 void LeaveJoinedGame();
+void StartTutorial();
 
 private:
+using FrontendPreparation = void (Game::*)();
+
 bool Tick();
 void TickFadeOut();
 void TickInGame();
@@ -100,6 +102,13 @@ void TickTestGame();
 void TickReplayGame();
 void Present();
 void GoToState(Uint8 newstate);
+void GoToMainMenu();
+void GoToLobby();
+void GoToMissionSummary();
+void EnterFrontend(FrontendPreparation preparation);
+void PrepareMainMenuFrontend();
+void PrepareLobbyFrontend();
+void PrepareMissionSummaryFrontend();
 void DrainControlQueue();
 void PostFrameReplies();
 
@@ -125,6 +134,7 @@ Uint8 state;
 Uint8 nextstate;
 bool stateisnew;
 bool nextstateprocessed;
+FrontendPreparation frontendPreparation;
 Uint16 sharedstate;
 Uint8 singleplayermessage;
 bool updatetitle;

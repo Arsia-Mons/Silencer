@@ -1,9 +1,10 @@
 #ifndef SILENCER_CLIENT_UI_CHARACTER_CREATE_SCREEN_H
 #define SILENCER_CLIENT_UI_CHARACTER_CREATE_SCREEN_H
 
+#include "client/ui/hooks/use_lobby.h"
+#include "client/ui/retained/RetainedFrame.h"
 #include "screen.h"
 #include "shared.h"
-#include "clay/clay.h"
 
 #include <string>
 #include <vector>
@@ -22,6 +23,7 @@ public:
 	void Destroy(ScreenContext & ctx) override;
 	bool HandleBack(ScreenContext & ctx) override;
 	bool HandleUiIntent(ScreenContext & ctx, const silencer::ui::UiAction & action) override;
+	const ::ui::DrawCommandList * RetainedDrawCommands() const override;
 
 private:
 	enum class Step : Uint8 {
@@ -30,11 +32,6 @@ private:
 		SelectAgency,
 	};
 
-	void BuildSelectAgent(ScreenContext & ctx,
-	                      silencer::ui::UiInteractionRegistry& interactions,
-	                      bool interactive = true);
-	void BuildEnterAlias(ScreenContext & ctx, silencer::ui::UiInteractionRegistry& interactions);
-	void BuildSelectAgency(ScreenContext & ctx, silencer::ui::UiInteractionRegistry& interactions);
 	void SelectCurrentAgent(ScreenContext & ctx);
 	void CreateCurrentAgent(ScreenContext & ctx);
 	void StartRenameAgent(ScreenContext & ctx, int agentIndex);
@@ -58,6 +55,8 @@ private:
 	bool focusAliasRequested = false;
 	char alias[17] = {};
 	std::vector<std::string> agentRows;
+	std::vector<silencer::client_ui::LobbyAgentSummary> agents;
+	silencer::client_ui::RetainedFrame retainedFrame_;
 };
 
 #endif

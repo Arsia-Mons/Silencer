@@ -41,7 +41,7 @@ run_capture() {
     PID=\$(start_silencer \"\$PORT\")
     trap 'stop_silencer \"\$PID\" \"\$PORT\"' EXIT
     wait_alive \"\$PORT\"
-    cli --port \"\$PORT\" wait_for_state --state MAINMENU --timeout-ms 15000 >/dev/null
+    cli --port \"\$PORT\" wait_for_ui --id main_menu.options --timeout-ms 15000 >/dev/null
     $body
     cli --port \"\$PORT\" wait_ms --n 1500 >/dev/null 2>&1 || cli --port \"\$PORT\" wait_frames --n 30 >/dev/null 2>&1
     cli --port \"\$PORT\" screenshot --out \"$OUT_DIR/${name}.png\" >/dev/null 2>&1
@@ -70,34 +70,34 @@ run_capture "01_mainmenu_640x480" ""
 
 run_capture "02_options_root_640x480" "
 cli --port \"\$PORT\" click --label OPTIONS
-cli --port \"\$PORT\" wait_for_state --state OPTIONS --timeout-ms 5000 >/dev/null
+cli --port \"\$PORT\" wait_for_ui --id options.controls --timeout-ms 5000 >/dev/null
 cli --port \"\$PORT\" wait_ms --n 2000 >/dev/null
 "
 
 run_capture "03_options_controls_640x480" "
 cli --port \"\$PORT\" click --label OPTIONS
-cli --port \"\$PORT\" wait_for_state --state OPTIONS --timeout-ms 5000 >/dev/null
+cli --port \"\$PORT\" wait_for_ui --id options.controls --timeout-ms 5000 >/dev/null
 cli --port \"\$PORT\" wait_ms --n 2000 >/dev/null
 cli --port \"\$PORT\" click --label Controls
-cli --port \"\$PORT\" wait_for_state --state OPTIONSCONTROLS --timeout-ms 5000 >/dev/null
+cli --port \"\$PORT\" wait_for_ui --id options_controls.preset --timeout-ms 5000 >/dev/null
 cli --port \"\$PORT\" wait_ms --n 2000 >/dev/null
 "
 
 run_capture "04_options_display_640x480" "
 cli --port \"\$PORT\" click --label OPTIONS
-cli --port \"\$PORT\" wait_for_state --state OPTIONS --timeout-ms 5000 >/dev/null
+cli --port \"\$PORT\" wait_for_ui --id options.controls --timeout-ms 5000 >/dev/null
 cli --port \"\$PORT\" wait_ms --n 2000 >/dev/null
 cli --port \"\$PORT\" click --label Display
-cli --port \"\$PORT\" wait_for_state --state OPTIONSDISPLAY --timeout-ms 5000 >/dev/null
+cli --port \"\$PORT\" wait_for_ui --id options_display.fullscreen --timeout-ms 5000 >/dev/null
 cli --port \"\$PORT\" wait_ms --n 2000 >/dev/null
 "
 
 run_capture "05_options_audio_640x480" "
 cli --port \"\$PORT\" click --label OPTIONS
-cli --port \"\$PORT\" wait_for_state --state OPTIONS --timeout-ms 5000 >/dev/null
+cli --port \"\$PORT\" wait_for_ui --id options.controls --timeout-ms 5000 >/dev/null
 cli --port \"\$PORT\" wait_ms --n 2000 >/dev/null
 cli --port \"\$PORT\" click --label Audio
-cli --port \"\$PORT\" wait_for_state --state OPTIONSAUDIO --timeout-ms 5000 >/dev/null
+cli --port \"\$PORT\" wait_for_ui --id options_audio.music --timeout-ms 5000 >/dev/null
 cli --port \"\$PORT\" wait_ms --n 2000 >/dev/null
 "
 

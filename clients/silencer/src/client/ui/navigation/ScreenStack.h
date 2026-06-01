@@ -8,6 +8,10 @@ class Screen;
 class ScreenContext;
 class Surface;
 
+namespace ui {
+struct DrawCommandList;
+}
+
 namespace silencer {
 namespace ui {
 class UiInteractionRegistry;
@@ -21,12 +25,13 @@ public:
 	bool Empty() const { return screens_.empty(); }
 	std::size_t Size() const { return screens_.size(); }
 
-	void Push(std::unique_ptr<Screen> screen, ScreenContext& ctx);
+	Screen * Push(std::unique_ptr<Screen> screen, ScreenContext& ctx);
 	void Pop(ScreenContext& ctx);
 	void Replace(std::unique_ptr<Screen> screen, ScreenContext& ctx);
+	Screen * ResetTo(std::unique_ptr<Screen> screen, ScreenContext& ctx);
 	void Clear(ScreenContext& ctx);
 	void RequestClear();
-	void ClearIfRequested(ScreenContext& ctx);
+	bool ClearIfRequested(ScreenContext& ctx);
 
 	Screen * Top() const;
 
@@ -35,6 +40,7 @@ public:
 	                  Surface& dst,
 	                  float frametime,
 	                  silencer::ui::UiInteractionRegistry& interactions);
+	std::vector<const ::ui::DrawCommandList *> RetainedDrawCommands() const;
 
 private:
 	std::size_t VisibleStart() const;

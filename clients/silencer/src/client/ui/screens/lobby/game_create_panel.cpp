@@ -1,23 +1,15 @@
 #include "game_create_panel.h"
 
-#include "lobby_screen.h"
+#include "client/ui/hooks/use_lobby.h"
+#include "client/ui/hooks/use_navigation.h"
 #include "screen_context.h"
-#include "game.h"
-#include "world.h"
-#include "lobby.h"
-#include "lobbygame.h"
-#include "screen.h"
-#include "config.h"
-#include "os.h"
-#include "map_downloader.h"
-#include "mapfetch.h"
 #include "message_modal.h"
 
 #include <algorithm>
+#include <cstdlib>
 #include <cstring>
+#include <memory>
 #include <string>
-#include <thread>
-#include <vector>
 
 namespace silencer::client_ui::lobby {
 
@@ -49,52 +41,34 @@ void CopyUiText(char * dst, int dstLen, const std::string & value)
 	dst[n] = '\0';
 }
 
-void BuildMapList(GameCreatePanelState & state, ScreenContext & ctx) {
-	state.maps.clear();
-	MapDownloader & mapDownloader = ctx.mapDownloader;
-	std::vector<std::string> maps;
-	CDResDir();
-	auto files = mapDownloader.ListFiles((GetResDir() + "level").c_str());
-	maps.insert(maps.end(), files.begin(), files.end());
-	CDDataDir();
-	files = mapDownloader.ListFiles((GetDataDir() + "level/download").c_str());
-	for(auto & f : files){
-		if(std::find(maps.begin(), maps.end(), f) == maps.end()) maps.push_back(f);
-	}
-	std::sort(maps.begin(), maps.end());
-	for(auto & m : maps) state.maps.push_back(m);
-	mapDownloader.servermaps.clear();
-	for(auto & entry : FetchServerMapList(Config::GetInstance().mapapiurl)){
-		if(std::find(maps.begin(), maps.end(), entry.first) == maps.end()){
-			std::string label = "[DL] " + entry.first;
-			state.maps.push_back(label);
-			mapDownloader.servermaps[label] = entry.second;
-		}
-	}
-}
-
 }  // namespace game_create_panel_detail
+
+static void DismissProgressModal(GameCreatePanelState & state,
+                                 ScreenContext & ctx) {
+	if(!state.progressModal) return;
+	silencer::client_ui::use_navigation().pop_top();
+	state.progressModal = nullptr;
+}
 
 void GameCreatePanelInit(GameCreatePanelState & state, ScreenContext & ctx) {
 	state = GameCreatePanelState{};
-	state.spectatable = Config::GetInstance().lastspectatable;
-	std::strncpy(state.name, Config::GetInstance().defaultgamename, sizeof(state.name) - 1);
+	silencer::client_ui::LobbyModel lobby =
+		silencer::client_ui::use_lobby(
+			silencer::client_ui::MakeLobbyProvider(ctx));
+	const LobbyCreateModel::Defaults defaults = lobby.create.defaults();
+	state.spectatable = defaults.spectatable;
+	std::strncpy(state.name, defaults.game_name.c_str(), sizeof(state.name) - 1);
 	state.name[sizeof(state.name) - 1] = '\0';
-	game_create_panel_detail::BuildMapList(state, ctx);
-	ctx.mapDownloader.selectedmap = -1;
-	ctx.game.creategameclicked = false;
+	state.maps = defaults.maps;
+	lobby.create.reset();
 }
 
 void GameCreatePanelTick(GameCreatePanelState & state,
-                         World & world,
                          ScreenContext & ctx,
-                         LobbyScreen & owner) {
-	MapDownloader & mapDownloader = ctx.mapDownloader;
-	Game & game = ctx.game;
-
+                         LobbyModel & lobby) {
 	if(state.mapRowClickedIndex >= 0){
 		state.mapSelectedIndex = state.mapRowClickedIndex;
-		mapDownloader.selectedmap = state.mapRowClickedIndex;
+		lobby.create.select_map(state.mapRowClickedIndex);
 		state.mapRowClickedIndex = -1;
 	}
 	if(state.securityClicked){
@@ -104,112 +78,44 @@ void GameCreatePanelTick(GameCreatePanelState & state,
 	if(state.spectatableClicked){
 		state.spectatableClicked = false;
 		state.spectatable = !state.spectatable;
-		Config::GetInstance().lastspectatable = state.spectatable;
-		Config::GetInstance().Save();
+		lobby.create.set_spectatable(state.spectatable);
 	}
 
-	int us = mapDownloader.mapUploadState.load(std::memory_order_acquire);
-	if(us == 2){
-		mapDownloader.mapUploadState.store(0, std::memory_order_relaxed);
-		const char * pw = mapDownloader.pendingCreate.password.empty() ? nullptr : mapDownloader.pendingCreate.password.c_str();
-		world.lobby.CreateGame(
-			mapDownloader.pendingCreate.gamename.c_str(),
-			mapDownloader.pendingCreate.mapname.c_str(),
-			mapDownloader.pendingCreate.maphash,
-			pw,
-			mapDownloader.pendingCreate.securitylevel,
-			mapDownloader.pendingCreate.minlevel,
-			mapDownloader.pendingCreate.maxlevel,
-			mapDownloader.pendingCreate.maxplayers,
-			mapDownloader.pendingCreate.maxteams,
-			mapDownloader.pendingCreate.spectatable);
-	}else if(us == 3){
-		mapDownloader.mapUploadState.store(0, std::memory_order_relaxed);
-		game.creategameclicked = false;
-		Screen * top = game.GetTopScreen();
-		MessageModal * m = dynamic_cast<MessageModal *>(top);
-		if(m && m->IsProgress()) ctx.PopScreen();
-		ctx.ShowMessage("Could not upload map");
-	}
-	if(world.lobby.creategamestatus == 1 && game.creategameclicked){
-		world.lobby.creategamestatus = 0;
-		game.creategameclicked = false;
-		LobbyGame * lobbygame = world.lobby.GetGameById(world.lobby.createdgameid);
-		if(lobbygame){
-			owner.SeedHostGameInfo(world, *lobbygame);
-			game.JoinGame(*lobbygame, lobbygame->password);
-			mapDownloader.LoadMapData(mapDownloader.FindMap(lobbygame->mapname, &lobbygame->maphash).c_str());
-			game.currentlobbygameid = lobbygame->id;
+	const LobbyCreateModel::PumpResult pump = lobby.create.pump();
+	if(pump.dismiss_progress){
+		DismissProgressModal(state, ctx);
+		if(!pump.message.empty()){
+			lobby.modal.show_message(pump.message.c_str());
 		}
-	}else if(world.lobby.creategamestatus != 100 && world.lobby.creategamestatus != 0 && game.creategameclicked){
-		world.lobby.creategamestatus = 0;
-		game.creategameclicked = false;
-		Screen * top = game.GetTopScreen();
-		MessageModal * m = dynamic_cast<MessageModal *>(top);
-		if(m && m->IsProgress()) ctx.PopScreen();
-		ctx.ShowMessage("Could not create game");
 	}
 
 	if(!state.createClicked) return;
 	state.createClicked = false;
-	if(game.creategameclicked) return;
 
-	if(strlen(state.name) == 0){ ctx.ShowMessage("No game name"); return; }
-	if(state.mapSelectedIndex < 0 || state.mapSelectedIndex >= (int)state.maps.size()){
-		ctx.ShowMessage("No map selected"); return;
+	LobbyCreateModel::Request request;
+	request.game_name = state.name;
+	request.password = state.password;
+	if(state.mapSelectedIndex >= 0 && state.mapSelectedIndex < (int)state.maps.size()){
+		request.map_name = state.maps[state.mapSelectedIndex];
 	}
-	std::string mapname = state.maps[state.mapSelectedIndex];
-	if(mapDownloader.servermaps.count(mapname) > 0){
-		ctx.ShowMessage("Download the map first"); return;
-	}
-
-	Uint8 securitylevel = LobbyGame::SECNONE;
-	switch(state.securityIndex){
-		case 1: securitylevel = LobbyGame::SECLOW;    break;
-		case 2: securitylevel = LobbyGame::SECMEDIUM; break;
-		case 3: securitylevel = LobbyGame::SECHIGH;   break;
-	}
+	request.security_index = state.securityIndex;
 	Uint8 maxplayers = static_cast<Uint8>(atoi(state.maxPlayers)); if(maxplayers <= 0) maxplayers = 1;
 	Uint8 maxteams   = static_cast<Uint8>(atoi(state.maxTeams));   if(maxteams   <= 0) maxteams   = 1;
+	request.min_level = static_cast<Uint8>(atoi(state.minLevel));
+	request.max_level = static_cast<Uint8>(atoi(state.maxLevel));
+	request.max_players = maxplayers;
+	request.max_teams = maxteams;
+	request.spectatable = state.spectatable;
 
-	unsigned char maphash[20];
-	mapDownloader.CalculateMapHash(mapDownloader.FindMap(mapname.c_str()).c_str(), &maphash);
-	auto & pc = mapDownloader.pendingCreate;
-	pc.gamename      = state.name;
-	pc.mapname       = mapname;
-	pc.password      = state.password;
-	memcpy(pc.maphash, maphash, 20);
-	pc.securitylevel = securitylevel;
-	pc.minlevel      = static_cast<Uint8>(atoi(state.minLevel));
-	pc.maxlevel      = static_cast<Uint8>(atoi(state.maxLevel));
-	pc.maxplayers    = maxplayers;
-	pc.maxteams      = maxteams;
-	pc.spectatable   = state.spectatable;
-
-	if(mapDownloader.mapUploadThread.joinable()) mapDownloader.mapUploadThread.detach();
-	uint32_t gen = ++mapDownloader.mapUploadGeneration;
-	std::string mppath = mapDownloader.FindMap(mapname.c_str());
-	std::string dataDir = GetDataDir();
-	bool isBundledMap = dataDir.empty() || mppath.substr(0, dataDir.size()) != dataDir;
-	if(isBundledMap){
-		mapDownloader.mapUploadState.store(2, std::memory_order_release);
-	}else{
-		mapDownloader.mapUploadState.store(1, std::memory_order_relaxed);
-		std::string apiURL = Config::GetInstance().mapapiurl;
-		std::atomic<int> * uploadStatePtr     = &mapDownloader.mapUploadState;
-		std::atomic<uint32_t> * uploadGenPtr  = &mapDownloader.mapUploadGeneration;
-		mapDownloader.mapUploadThread = std::thread([mapname, mppath, apiURL, gen, uploadStatePtr, uploadGenPtr](){
-			bool ok = UploadMapToServer(mapname.c_str(), mppath.c_str(), apiURL.c_str());
-			if(uploadGenPtr->load(std::memory_order_relaxed) != gen) return;
-			uploadStatePtr->store(ok ? 2 : 3, std::memory_order_release);
-		});
+	const LobbyCreateModel::StartResult started = lobby.create.start(request);
+	if(!started.message.empty()){
+		lobby.modal.show_message(started.message.c_str());
+		return;
 	}
-	world.lobby.creategamestatus = 0;
-	game.creategameclicked = true;
-	std::strncpy(Config::GetInstance().defaultgamename, state.name, sizeof(Config::GetInstance().defaultgamename) - 1);
-	Config::GetInstance().defaultgamename[sizeof(Config::GetInstance().defaultgamename) - 1] = '\0';
-	Config::GetInstance().Save();
-	ctx.PushScreen(MessageModal::Progress("Uploading map..."));
+	if(!started.started) return;
+	std::unique_ptr<MessageModal> progress = MessageModal::Progress("Uploading map...");
+	state.progressModal = progress.get();
+	silencer::client_ui::use_navigation().push(std::move(progress));
 }
 
 bool GameCreatePanelHandleUiIntent(GameCreatePanelState & state,

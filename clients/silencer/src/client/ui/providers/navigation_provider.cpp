@@ -3,7 +3,10 @@
 #include "client/ui/app_shell/client_ui.h"
 #include "client/ui/app_shell/deferred_ui_mutation.h"
 #include "client/ui/hooks/use_navigation.h"
+#include "screen.h"
 #include "ui/runtime/react.h"
+
+#include <utility>
 
 namespace client::ui {
 
@@ -75,3 +78,50 @@ DeferredUiMutationSink use_deferred_ui_mutations() {
 } // namespace internal
 
 } // namespace client::ui
+
+namespace silencer {
+namespace client_ui {
+
+static NavigationProviderValue * currentNavigationProvider = nullptr;
+
+NavigationProviderScope::NavigationProviderScope(NavigationProviderValue value)
+	: value_(std::move(value)), previous_(currentNavigationProvider) {
+	currentNavigationProvider = &value_;
+}
+
+NavigationProviderScope::~NavigationProviderScope() {
+	currentNavigationProvider = previous_;
+}
+
+Navigation::Navigation(NavigationProviderValue provider)
+	: provider_(std::move(provider)) {}
+
+Screen * Navigation::push(std::unique_ptr<Screen> screen) const {
+	if(!provider_.push || !screen) return nullptr;
+	return provider_.push(std::move(screen));
+}
+
+void Navigation::reset_to(std::unique_ptr<Screen> screen) const {
+	if(!provider_.reset_to || !screen) return;
+	provider_.reset_to(std::move(screen));
+}
+
+void Navigation::pop_current() const {
+	if(provider_.pop_current){
+		provider_.pop_current();
+		return;
+	}
+	pop_top();
+}
+
+void Navigation::pop_top() const {
+	if(provider_.pop_top) provider_.pop_top();
+}
+
+Navigation use_navigation() {
+	if(!currentNavigationProvider) return Navigation(NavigationProviderValue{});
+	return Navigation(*currentNavigationProvider);
+}
+
+}  // namespace client_ui
+}  // namespace silencer

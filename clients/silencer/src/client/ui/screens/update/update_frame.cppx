@@ -1,0 +1,185 @@
+#include "client/ui/screens/update/update_frame.h"
+
+#include "client/ui/components/tokens.h"
+#include "ui/components/box.h"
+#include "ui/components/button.h"
+#include "ui/components/text.h"
+#include "ui/style/style_patch.h"
+
+#include <cstdint>
+
+namespace silencer {
+namespace client_ui {
+namespace update_frame_detail {
+
+using ::ui::children;
+using ::ui::components::Box;
+using ::ui::components::BoxProps;
+using ::ui::components::Button;
+using ::ui::components::ButtonProps;
+using ::ui::components::Text;
+using ::ui::components::TextProps;
+
+inline std::uint32_t texture_id(std::uint8_t bank, std::uint16_t index) {
+	return (static_cast<std::uint32_t>(bank) << 16) |
+	       static_cast<std::uint32_t>(index);
+}
+
+inline ::ui::StylePatch dialog_patch() {
+	return ::ui::patch().image(::ui::BackgroundImage{
+		.texture_id = texture_id(40, 4),
+		.tint = {255, 255, 255, 255},
+	});
+}
+
+inline ::ui::StyleStatePatch button_patch() {
+	return ::ui::patch()
+		.image(::ui::BackgroundImage{
+			.texture_id = texture_id(7, 24),
+			.tint = {255, 255, 255, 255},
+			.nine_slice = {4.0f, 12.0f, 4.0f, 12.0f},
+		})
+		.text(tokens::font_text(tokens::kTextButton, 134, 8));
+}
+
+inline ::ui::StylePatch heading_patch() {
+	return ::ui::patch().text(::ui::TextVisual{
+		.color = tokens::kTextTitle,
+		.font_id = 134,
+		.font_size = 8,
+		.align = ::ui::TextAlign::Center,
+	});
+}
+
+inline ::ui::StylePatch button_text_patch() {
+	return ::ui::patch().text(::ui::TextVisual{
+		.color = tokens::kTextButton,
+		.font_id = 134,
+		.font_size = 8,
+		.align = ::ui::TextAlign::Center,
+	});
+}
+
+	struct UpdateLineProps {
+		const char * key = nullptr;
+		const char * text = nullptr;
+	};
+
+	::ui::UiElement UpdateLine(const UpdateLineProps& props) {
+		if(!props.text || !*props.text) return ::ui::empty();
+		return <Text
+		  key={props.key}
+		  value={props.text}
+		  layout={::ui::LayoutStyle{
+				.width = ::ui::Length::points(284.0f),
+				.height = ::ui::Length::points(15.0f),
+		}}
+		  style={heading_patch()}
+		/>
+	}
+
+	struct ActionProps {
+		const char * key = nullptr;
+		const char * control_id = nullptr;
+		const char * label = nullptr;
+		bool show = false;
+	};
+
+	::ui::UiElement Action(const ActionProps& props) {
+		if(!props.show) return ::ui::empty();
+		return <Button
+		  key={props.key}
+		  id={props.control_id}
+		  accessibility={{.label = props.label}}
+		  layout={::ui::LayoutStyle{
+				.align_items = ::ui::AlignItems::Center,
+				.justify_content = ::ui::JustifyContent::Center,
+			.width = ::ui::Length::points(128.0f),
+			.height = ::ui::Length::points(21.0f),
+			.padding = {10.0f, 10.0f, 4.0f, 4.0f},
+		}}
+		  style={button_patch()}
+		>
+			<Text
+			  key="label"
+			  value={props.label}
+			  layout={::ui::LayoutStyle{.height = ::ui::Length::points(15.0f)}}
+			  style={button_text_patch()}
+			/>
+		</Button>
+	}
+
+	struct ActionsRowProps {
+		const char * key = nullptr;
+		const UpdateFrameProps * frame = nullptr;
+	};
+
+	::ui::UiElement ActionsRow(const ActionsRowProps& props) {
+		if(!props.frame) return ::ui::empty();
+		return <Box
+		  key={props.key}
+		  layout={::ui::LayoutStyle{
+				.direction = ::ui::FlexDirection::Row,
+				.align_items = ::ui::AlignItems::Center,
+			.justify_content = ::ui::JustifyContent::Center,
+			.width = ::ui::Length::points(284.0f),
+			.height = ::ui::Length::points(21.0f),
+				.gap = 6.0f,
+			}}
+		>
+			<Action key="update" controlId="update.update" label="Update" show={props.frame->can_update} />
+			<Action key="retry" controlId="update.retry" label="Retry" show={props.frame->can_retry} />
+			<Action
+			  key="download"
+			  controlId="update.download"
+			  label="Download"
+			  show={props.frame->can_download}
+			/>
+			<Action key="cancel" controlId="update.cancel" label="Cancel" show={props.frame->can_cancel} />
+		</Box>
+	}
+
+}  // namespace update_frame_detail
+
+using ::ui::children;
+using ::ui::components::Box;
+using ::ui::components::BoxProps;
+using update_frame_detail::ActionsRow;
+using update_frame_detail::ActionsRowProps;
+using update_frame_detail::UpdateLine;
+using update_frame_detail::UpdateLineProps;
+
+::ui::UiElement UpdateFrame(const UpdateFrameProps& props) {
+	const char * status = props.status_text ? props.status_text : "";
+	const char * progress = props.progress_text ? props.progress_text : "";
+	return <Box
+	  key={props.key}
+	  layout={::ui::LayoutStyle{
+			.align_items = ::ui::AlignItems::Center,
+			.justify_content = ::ui::JustifyContent::Center,
+			.width = ::ui::Length::percent(100.0f),
+			.height = ::ui::Length::percent(100.0f),
+		}}
+	>
+		<Box
+		  key="dialog"
+		  layout={::ui::LayoutStyle{
+				.direction = ::ui::FlexDirection::Column,
+				.align_items = ::ui::AlignItems::Center,
+				.justify_content = ::ui::JustifyContent::Center,
+				.width = ::ui::Length::points(352.0f),
+				.height = ::ui::Length::points(178.0f),
+				.padding = {34.0f, 34.0f, 42.0f, 42.0f},
+				.gap = 12.0f,
+			}}
+		  style={update_frame_detail::dialog_patch()}
+		>
+				<UpdateLine key="status" text={status} />
+				<UpdateLine key="progress" text={progress} />
+				<ActionsRow key="actions" frame={&props} />
+			</Box>
+		</Box>
+	}
+
+}  // namespace client_ui
+}  // namespace silencer

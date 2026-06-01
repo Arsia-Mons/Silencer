@@ -162,6 +162,12 @@ Add authored `.cppx`/`.hx` inputs to `SILENCER_CPPX_SOURCES` in
 `clients/silencer/CMakeLists.txt`. Generated C++ is written under the CMake
 build tree at `generated/cppx/`; do not commit generated outputs.
 
+When composing or returning authored UI components in `.cppx`, invoke them with
+JSX syntax, not as ordinary C++ functions. Use `<Foo ... />`,
+`<Foo>...</Foo>`, or JSX children instead of `return Foo(props);` or
+`{Foo(props)}`. Keep direct function calls for non-component helpers such as
+data lookup, style/id construction, and unavoidable raw runtime escape hatches.
+
 The SDL-free retained runtime/style substrate from `/Users/hv/repos/ui` lives
 under `src/ui/runtime`, `src/ui/style`, plus `src/ui/input.h` and
 `src/ui/span.h` in the `::ui` namespace. Silencer's existing Clay runtime stays

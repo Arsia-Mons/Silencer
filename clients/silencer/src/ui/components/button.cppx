@@ -1,0 +1,40 @@
+#include "button.h"
+
+namespace ui {
+namespace components {
+namespace {
+
+::ui::HostCallbacks button_callbacks(const ButtonProps& props) {
+	::ui::HostCallbacks callbacks = detail::callbacks_from_props(props);
+	if(props.on_activate){
+		callbacks.on_activate = props.on_activate;
+	}
+	return callbacks;
+}
+
+}  // namespace
+
+::ui::UiElement Button(const ButtonProps& props) {
+	const ::ui::VisualStyle visual =
+		::ui::resolve(::ui::use_theme().button,
+		              props.style,
+		              detail::interaction_state(props.disabled));
+	return <detail.Host
+	  kind={::ui::HostKind::Button}
+	  key={props.key}
+	  id={props.id}
+	  idOffset={props.id_offset}
+	  style={detail::control_layout_style(props.layout)}
+	  visual={visual}
+	  text={::ui::HostTextProps{.value = props.label}}
+	  interaction={detail::interaction_from_props(props, true)}
+	  accessibility={detail::accessibility_from_props(props, ::ui::SemanticRole::Button)}
+	  callbacks={button_callbacks(props)}
+	>
+		{props.children}
+		{props.children.count > 0 ? nullptr : props.label}
+	</detail.Host>
+}
+
+}  // namespace components
+}  // namespace ui

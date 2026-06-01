@@ -30,7 +30,8 @@ function usage(): never {
       `       silencer-cli password_modal_result\n` +
       `       silencer-cli back\n` +
       `       silencer-cli screenshot [--out /path/x.png]\n` +
-      `       silencer-cli wait_for_state --state OPTIONS [--timeout-ms 5000]\n` +
+      `       silencer-cli wait_for_ui --id main_menu.options [--timeout-ms 5000]\n` +
+      `       silencer-cli wait_for_state --state SINGLEPLAYERGAME [--timeout-ms 5000]\n` +
       `       silencer-cli wait_frames --n 30\n` +
       `       silencer-cli wait_ms --n 500\n` +
       `       silencer-cli pause | resume\n` +
@@ -48,7 +49,7 @@ function usage(): never {
       `       silencer-cli gas validate <dir>\n` +
       `         (runs locally; no daemon required. Exit 1 if errors[] non-empty.)\n` +
       `       silencer-cli gas reload\n` +
-      `         (re-runs the daemon's GAS loader; only safe from NONE/MAINMENU/LOBBY/MISSIONSUMMARY)\n` +
+      `         (re-runs the daemon's GAS loader; only safe from NONE/FRONTEND)\n` +
       `       silencer-cli lobby spawn --as alice --host H --port P --version V --user U --pass P\n` +
       `       silencer-cli lobby ls\n` +
       `       silencer-cli lobby chat --as alice --channel main --text "hi"\n` +
@@ -133,6 +134,8 @@ const STRING_FLAGS_NO_SUBOP: Record<string, Set<string>> = {
   set_text: new Set(["label"]),
   select: new Set(["label"]),
   scroll: new Set(["label"]),
+  wait_for_state: new Set(["state"]),
+  wait_for_ui: new Set(["id", "id_prefix", "label"]),
 };
 // Bindings within VARIADIC_FLAGS that accept comma-separated chord syntax:
 // `--bindings KEY:Up,KEY:Left` becomes JSON `[["KEY:Up","KEY:Left"]]` (an

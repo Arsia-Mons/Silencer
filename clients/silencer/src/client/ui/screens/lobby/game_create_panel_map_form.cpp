@@ -1,11 +1,11 @@
 #include "game_create_panel.h"
 
+#include "client/ui/hooks/use_app.h"
+#include "client/ui/hooks/use_lobby.h"
 #include "game.h"
 #include "screen_context.h"
 #include "map.h"
 #include "text_wrap.h"
-#include "audio.h"
-#include "gasloader.h"
 
 #include "clay/clay.h"
 #include "clay_ui_compositor.h"
@@ -96,6 +96,7 @@ void HideHoverPreview(GameCreatePanelState & state) {
 
 void LoadHoverPreview(GameCreatePanelState & state,
                       ScreenContext & ctx,
+                      LobbyModel & lobby,
                       int hoveredIndex) {
 	if(hoveredIndex < 0 || hoveredIndex >= static_cast<int>(state.maps.size())){
 		ResetHoverPreview(state);
@@ -103,10 +104,6 @@ void LoadHoverPreview(GameCreatePanelState & state,
 	}
 
 	const std::string & mapLabel = state.maps[hoveredIndex];
-	if(ctx.mapDownloader.servermaps.count(mapLabel) > 0){
-		ResetHoverPreview(state);
-		return;
-	}
 	if(state.hoverPreviewMapIndex == hoveredIndex && !state.hoverPreviewPixels.empty()){
 		state.hoverPreviewVisible = true;
 		return;
@@ -114,7 +111,7 @@ void LoadHoverPreview(GameCreatePanelState & state,
 
 	ResetHoverPreview(state);
 
-	const std::string filename = ctx.mapDownloader.FindMap(mapLabel.c_str());
+	const std::string filename = lobby.create.preview_map_path(mapLabel);
 	if(filename.empty()) return;
 
 	SDL_IOStream * file = SDL_IOFromFile(filename.c_str(), "rb");
@@ -156,12 +153,13 @@ void LoadHoverPreview(GameCreatePanelState & state,
 
 void UpdateHoverPreview(GameCreatePanelState & state,
                         ScreenContext & ctx,
+                        LobbyModel & lobby,
                         int hoveredIndex) {
 	if(hoveredIndex < 0){
 		HideHoverPreview(state);
 		return;
 	}
-	LoadHoverPreview(state, ctx, hoveredIndex);
+	LoadHoverPreview(state, ctx, lobby, hoveredIndex);
 }
 
 int CountPreviewLines(const std::string & text) {
@@ -272,6 +270,7 @@ GameCreateTallLayout ResolveTallLayout(Uint16 panelWidth,
 
 void BuildMapList(GameCreatePanelState & state,
                   ScreenContext & ctx,
+                  LobbyModel & lobby,
                   const GameCreateTallLayout & layout,
                   silencer::ui::UiInteractionRegistry& interactions) {
 	const int slotCount = std::min((int)state.maps.size(), kMaxMapRows);
@@ -306,13 +305,12 @@ void BuildMapList(GameCreatePanelState & state,
 		           ScrollListHandle{ nullptr, kActionMapPrefix, &interactions, &hoveredIndex });
 	}
 	if(hoveredIndex >= 0 && hoveredIndex != state.lastHoveredMapIndex){
-		const std::string & snd = GASLoader::Get().player.soundUIClick;
-		auto it = ctx.world.resources.soundbank.find(snd);
-		if(it != ctx.world.resources.soundbank.end() && it->second)
-			Audio::GetInstance().PlayUI(it->second);
+		silencer::client_ui::use_app(
+			silencer::client_ui::MakeAppProvider(ctx))
+			.audio.play_ui_click();
 	}
 	state.lastHoveredMapIndex = hoveredIndex;
-	UpdateHoverPreview(state, ctx, hoveredIndex);
+	UpdateHoverPreview(state, ctx, lobby, hoveredIndex);
 }
 
 void BuildNameAndPassword(GameCreatePanelState & state,
@@ -375,11 +373,10 @@ void BuildNameAndPassword(GameCreatePanelState & state,
 
 void BuildGameCreateTallTree(GameCreatePanelState & state,
                              ScreenContext & ctx,
+                             LobbyModel & lobby,
                              Uint16 panelWidth,
                              Uint16 panelHeight,
-                             Resources & resources,
                              silencer::ui::UiInteractionRegistry& interactions) {
-	(void)resources;
 	const game_create_panel_map_form_detail::GameCreateTallLayout layout =
 		game_create_panel_map_form_detail::ResolveTallLayout(panelWidth, panelHeight);
 
@@ -395,7 +392,8 @@ void BuildGameCreateTallTree(GameCreatePanelState & state,
 			     { .size = TextSize::Heading });
 		}
 
-		game_create_panel_map_form_detail::BuildMapList(state, ctx, layout, interactions);
+		game_create_panel_map_form_detail::BuildMapList(
+			state, ctx, lobby, layout, interactions);
 		game_create_panel_map_form_detail::BuildNameAndPassword(state, layout, interactions);
 	}
 }

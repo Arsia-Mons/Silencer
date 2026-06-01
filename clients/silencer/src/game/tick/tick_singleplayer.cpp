@@ -32,7 +32,7 @@ if(stateisnew){
 	world.GetAuthorityPeer()->controlledlist.push_back(player->id);
 	world.gameinfo.securitylevel = LobbyGame::SECNONE;
 	if(!gameSession.LoadMap((GetResDir() + "AGENCY04.SIL").c_str())){
-		GoToState(MAINMENU);
+		GoToMainMenu();
 	}
 	Audio::GetInstance().StopMusic();
 	world.map.RandomPlayerStartLocation(world, player->x, player->y);
@@ -398,12 +398,12 @@ if(player){
 				player->state_i = 0;
 			}
 			if(world.messaging.message_i >= 128 - 1){
-				GoToState(MAINMENU);
+				GoToMainMenu();
 			}
 		}break;
 	}
 }
 if(gameSession.CheckForQuit() || gameSession.CheckForEndOfGame()){
-	GoToState(MAINMENU);
+	GoToMainMenu();
 }
 }
