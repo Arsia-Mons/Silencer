@@ -200,14 +200,9 @@ bool CharacterCreateScreen::HandleUiIntent(ScreenContext & ctx,
 			return true;
 		}
 	}
-	if(action.kind == silencer::ui::UiActionKind::SetText &&
-	   step == Step::EnterAlias && action.id == kActionAlias){
-		CopyAlias(action.value);
-		return true;
-	}
 	if(action.kind == silencer::ui::UiActionKind::SubmitText &&
 	   step == Step::EnterAlias && action.id == kActionAlias){
-		CopyAlias(action.value);
+		CopyAlias(action.value.c_str());
 		if(IsRenaming()){
 			RenameCurrentAgent(lobby, navigation);
 		}else{
@@ -216,7 +211,7 @@ bool CharacterCreateScreen::HandleUiIntent(ScreenContext & ctx,
 		return true;
 	}
 	if(action.kind != silencer::ui::UiActionKind::Activate){
-		return false;
+		return retainedFrame_.HandleUiIntent(action);
 	}
 	int agentIndex = SuffixInt(action.id, kActionAgentPrefix);
 	if(step == Step::SelectAgent && agentIndex >= 0){
@@ -247,7 +242,7 @@ bool CharacterCreateScreen::HandleUiIntent(ScreenContext & ctx,
 		CreateCurrentAgent(lobby, navigation);
 		return true;
 	}
-	return false;
+	return retainedFrame_.HandleUiIntent(action);
 }
 
 void CharacterCreateScreen::SelectCurrentAgent(
@@ -301,7 +296,7 @@ void CharacterCreateScreen::StartRenameAgent(
 	selectedAgentIndex = agentIndex;
 	previewAgentIndex = agentIndex;
 	renameCharacterId = agent.id;
-	CopyAlias(agent.name);
+	CopyAlias(agent.name.c_str());
 	step = Step::EnterAlias;
 	focusAliasRequested = true;
 }
@@ -343,11 +338,12 @@ void CharacterCreateScreen::RebuildAgentRows(
 	}
 }
 
-void CharacterCreateScreen::CopyAlias(const std::string& value)
+void CharacterCreateScreen::CopyAlias(const char * value)
 {
-	size_t n = value.size();
+	const char * src = value ? value : "";
+	size_t n = std::strlen(src);
 	if(n > sizeof(alias) - 1) n = sizeof(alias) - 1;
-	std::memcpy(alias, value.data(), n);
+	std::memcpy(alias, src, n);
 	alias[n] = '\0';
 }
 

@@ -4,6 +4,7 @@
 #include "ui/runtime/element.h"
 
 #include <cstdint>
+#include <functional>
 #include <string>
 #include <vector>
 
@@ -25,6 +26,7 @@ struct CharacterCreateFrameProps {
 	int selected_agent = 0;
 	int preview_agent = -1;
 	const char * alias = nullptr;
+	std::function<void(const char *)> set_alias = {};
 	bool alias_renaming = false;
 	bool waiting_for_create = false;
 	int selected_agency = 0;

@@ -62,6 +62,9 @@ void CharacterCreateScreen::BuildUi(ScreenContext & ctx,
 		.selected_agent = selectedAgentIndex,
 		.preview_agent = previewAgentIndex,
 		.alias = alias,
+		.set_alias = [this](const char * value) {
+			CopyAlias(value);
+		},
 		.alias_renaming = IsRenaming(),
 		.waiting_for_create = waitingForCreate,
 		.selected_agency = selectedAgency,

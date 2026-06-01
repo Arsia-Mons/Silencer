@@ -47,7 +47,7 @@ private:
 	void RenameCurrentAgent(const silencer::client_ui::LobbyModel & lobby,
 	                        const silencer::client_ui::Navigation & navigation);
 	void RebuildAgentRows(const silencer::client_ui::LobbyModel & lobby);
-	void CopyAlias(const std::string& value);
+	void CopyAlias(const char * value);
 	void AdvanceAliasStep();
 	bool IsRenaming() const { return renameCharacterId != 0; }
 
