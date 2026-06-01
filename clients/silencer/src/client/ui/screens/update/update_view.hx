@@ -35,6 +35,12 @@ struct UpdateContextValue {
 
 const UpdateContextValue& UseUpdate();
 
+struct UpdateFrameProps {
+	const char * key = nullptr;
+};
+
+::ui::UiElement UpdateFrame(const UpdateFrameProps& props);
+
 struct UpdateViewProps {
 	const char * key = nullptr;
 	const UpdateContextValue * value = nullptr;

@@ -137,9 +137,7 @@ bool has_primary_action(const UpdateState& state) {
 	return state.primary_action != UpdatePrimaryAction::None;
 }
 
-struct UpdateFrameProps {
-	const char * key = nullptr;
-};
+}  // namespace
 
 ::ui::UiElement UpdateFrame(const UpdateFrameProps& props) {
 	const UpdateContextValue& update = UseUpdate();
@@ -206,32 +204,6 @@ struct UpdateFrameProps {
 			</Box>
 		</Dialog>
 	</Box>
-}
-
-}  // namespace
-
-namespace {
-::ReactContext UpdateContext = {};
-const UpdateContextValue kEmptyUpdate = {};
-}
-
-const UpdateContextValue& UseUpdate() {
-	const auto * value = static_cast<const UpdateContextValue *>(
-		::use_context(&UpdateContext));
-	return value ? *value : kEmptyUpdate;
-}
-
-::ui::UiElement UpdateView(const UpdateViewProps& props) {
-	return ::ui::provider(
-		"UpdateProvider",
-		&UpdateContext,
-		const_cast<UpdateContextValue *>(props.value),
-		children({
-			::ui::component("UpdateFrame",
-			                UpdateFrameProps{ .key = "frame" },
-			                UpdateFrame),
-		}),
-		props.key);
 }
 
 }  // namespace silencer::client_ui

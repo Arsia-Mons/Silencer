@@ -157,6 +157,10 @@ fail_if_match \
   "$REPO_ROOT/clients/silencer/src/client/ui/screens/update/update_view.cppx"
 
 fail_if_match \
+  '::ui::component[[:space:]]*\(' \
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens/update/update_view.cppx"
+
+fail_if_match \
   "Handle(TextInput|KeyPress|ScancodeDown|MousePress|MouseMove)|DispatchKeyPress|DispatchPreparedUiNavActions|UiNavActionToAscii|DispatchChatKey|HandleInGameMenuKey" \
   "$REPO_ROOT/clients/silencer/src" \
   --glob '!third_party/**'
