@@ -1,0 +1,57 @@
+# category	name	scene	baseline_crop	current_crop	note
+main_menu	logo	01_mainmenu_640x480	260x90+10+235	260x90+10+235	main menu wordmark
+main_menu	button_stack	01_mainmenu_640x480	280x280+290+140	280x280+290+140	main menu primary buttons
+main_menu	version	01_mainmenu_640x480	180x30+0+450	180x30+0+450	bottom-left version label
+options_root	button_stack	02_options_root_640x480	240x230+205+150	240x230+205+150	options root buttons
+options_controls	panel_shell	03_options_controls_640x480	640x440+0+0	640x440+0+0	controls framed panel
+options_controls	title	03_options_controls_640x480	300x60+170+0	300x60+170+0	controls title badge
+options_controls	preset_row	03_options_controls_640x480	560x75+40+85	560x75+40+85	preset label and selector
+options_controls	keybind_rows	03_options_controls_640x480	560x260+40+140	560x260+40+140	visible keybind rows
+options_controls	scrollbar	03_options_controls_640x480	55x310+525+115	55x310+525+115	controls scrollbar
+options_controls	actions	03_options_controls_640x480	460x60+90+400	460x60+90+400	save and cancel buttons
+options_display	title	04_options_display_640x480	320x55+160+140	320x55+160+140	display title text
+options_display	toggle_rows	04_options_display_640x480	390x135+120+190	390x135+120+190	fullscreen and smooth scaling rows
+options_display	actions	04_options_display_640x480	460x60+90+320	460x60+90+320	display save/cancel buttons
+options_audio	title	05_options_audio_640x480	320x55+160+140	320x55+160+140	audio title text
+options_audio	music_toggle	05_options_audio_640x480	390x70+120+200	390x70+120+200	music toggle row
+options_audio	actions	05_options_audio_640x480	460x60+90+260	460x60+90+260	audio save/cancel buttons
+lobby_connect	status_log	06_lobby_connect_640x480	300x195+175+100	300x195+175+100	connection status log
+lobby_connect	form	06_lobby_connect_640x480	300x95+175+290	300x95+175+290	login form block
+lobby_connect	username_input	06_lobby_connect_640x480	300x35+175+290	300x35+175+290	username row and input field
+lobby_connect	password_input	06_lobby_connect_640x480	300x35+175+320	300x35+175+320	password row and input field
+lobby_connect	actions	06_lobby_connect_640x480	300x45+175+345	300x45+175+345	login/create and cancel buttons
+password_modal	dialog	07_password_modal_640x480	430x170+130+175	430x170+130+175	password modal area
+ingame_hud	top_status	20_ingame_hud_640x480	140x35+0+0	140x35+0+0	top status icons
+ingame_hud	prompt	20_ingame_hud_640x480	380x90+130+110	380x90+130+110	tutorial or standby prompt
+ingame_hud	cockpit	20_ingame_hud_640x480	640x100+0+380	640x100+0+380	bottom cockpit HUD
+ingame_playerlist	panel	21_ingame_playerlist_640x480	590x90+45+45	590x90+45+45	player list overlay
+ingame_buy	menu	22_ingame_buy_640x480	420x230+110+125	420x230+110+125	buy menu table
+ingame_tech	menu	23_ingame_tech_640x480	420x230+110+125	420x230+110+125	tech menu table
+ingame_chat	input_overlay	24_ingame_chat_640x480	320x90+330+305	320x90+330+305	chat input overlay
+ingame_hud_1280	cockpit	25_ingame_hud_1280x720	640x100+0+380	640x100+0+380	post-resize HUD cockpit capture
+ingame_hud_1280	prompt	25_ingame_hud_1280x720	380x90+130+170	380x90+130+170	post-resize standby prompt capture
+lobby_login	status_log	30_lobby_login_640x480	300x195+175+100	300x195+175+100	local lobby login status log
+lobby_login	form	30_lobby_login_640x480	300x95+175+290	300x95+175+290	local lobby login form
+character_create	panel_shell	31_character_create_640x480	640x440+0+40	640x440+0+40	character select framed panel
+character_create	title	31_character_create_640x480	300x55+45+35	300x55+45+35	select agent title
+character_create	create_row	31_character_create_640x480	270x55+50+95	270x55+50+95	create new character row
+character_create	scrollbar	31_character_create_640x480	50x310+285+105	50x310+285+105	character list scrollbar
+character_create	preview_panel	31_character_create_640x480	270x370+340+55	270x370+340+55	agent preview panel
+character_alias	dialog	32_character_alias_modal_640x480	330x130+155+180	330x130+215+205	alias modal dialog
+lobby_chrome	top_lights	33_lobby_game_select_640x480	640x55+0+0	640x55+0+0	lobby chrome top lights
+lobby_chrome	header	33_lobby_game_select_640x480	640x75+0+45	640x75+0+45	lobby title and back button
+lobby_chrome	user_card	33_lobby_game_select_640x480	230x120+0+70	230x120+0+70	player card and portrait
+lobby_chrome	stats	33_lobby_game_select_640x480	130x120+155+85	130x120+155+85	player stats block
+lobby_chrome	chat_panel	33_lobby_game_select_640x480	390x265+5+250	390x265+5+250	lobby chat panel
+lobby_browser	create_button	33_lobby_game_select_640x480	180x45+230+95	180x45+230+95	create game button
+lobby_browser	active_games_panel	33_lobby_game_select_640x480	235x270+400+110	235x270+400+110	active games browser
+lobby_create	options_block	34_lobby_game_create_640x480	165x140+235+70	165x140+235+70	game create options block
+lobby_create	map_list	34_lobby_game_create_640x480	235x285+400+70	235x285+400+70	map list panel
+lobby_create	name_input	34_lobby_game_create_640x480	235x40+400+350	235x40+400+350	game name field
+lobby_create	password_input	34_lobby_game_create_640x480	235x40+400+390	235x40+400+390	game password field
+lobby_create	create_button	34_lobby_game_create_640x480	235x45+400+425	235x45+400+425	create game submit button
+lobby_create	no_map_modal	35_lobby_create_message_modal_640x480	430x200+120+135	430x200+120+135	no-map modal area
+lobby_create_1280	options_block	36_lobby_game_create_1280x720	350x260+470+125	350x260+470+125	large create options block
+lobby_create_1280	map_list	36_lobby_game_create_1280x720	460x360+795+125	460x360+795+125	large map list
+lobby_create_1280	name_password	36_lobby_game_create_1280x720	470x125+795+535	470x125+795+535	large name/password fields
+lobby_create_1280	create_button	36_lobby_game_create_1280x720	470x60+795+645	470x60+795+645	large create button
