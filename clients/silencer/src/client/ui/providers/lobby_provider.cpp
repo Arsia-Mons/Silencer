@@ -586,12 +586,12 @@ LobbySessionPumpResult LobbySessionModel::pump(
 	}
 
 	if(!in_join_or_tech_panel){
-		if(game->joininggame){
+		if(game->IsJoiningLobbyGame()){
 			if(world->IsConnected()){
-				game->joininggame = false;
+				game->ClearJoiningLobbyGame();
 			}
 			if(world->IsIdle()){
-				game->joininggame = false;
+				game->ClearJoiningLobbyGame();
 				result.dismiss_progress = true;
 				result.message = "Unable to join game";
 			}
@@ -626,7 +626,7 @@ LobbySessionPumpResult LobbySessionModel::pump(
 					Config::GetInstance().defaultagency);
 				world->SetTech(Config::GetInstance().defaulttechchoices[agency]);
 
-				LobbyGame * lobbygame = world->lobby.GetGameById(game->currentlobbygameid);
+				LobbyGame * lobbygame = world->lobby.GetGameById(game->CurrentLobbyGameId());
 				if(lobbygame && ambience){
 					char channel[256];
 					ambience->GetGameChannelName(*lobbygame, channel);
@@ -744,7 +744,7 @@ void LobbyBrowserModel::join(Uint32 game_id) const {
 	if(!lobby_provider_detail::CheckJoinLevel(provider_, *world, *game)){
 		return;
 	}
-	owner->currentlobbygameid = game->id;
+	owner->SetCurrentLobbyGameId(game->id);
 	if(std::strlen(game->password) > 0 && game->accountid != world->lobby.accountid){
 		Uint32 gameId = game->id;
 		lobby_provider_detail::LobbyNavigation(provider_).push(
@@ -771,7 +771,7 @@ void LobbyBrowserModel::spectate(Uint32 game_id) const {
 		return;
 	}
 	if(!world->IsIdle()) return;
-	owner->currentlobbygameid = game->id;
+	owner->SetCurrentLobbyGameId(game->id);
 	if(std::strlen(game->password) > 0 && game->accountid != world->lobby.accountid){
 		Uint32 gameId = game->id;
 		lobby_provider_detail::LobbyNavigation(provider_).push(
@@ -889,7 +889,7 @@ LobbyCreateModel::PumpResult LobbyCreateModel::pump() const {
 			world->gameinfo.Serialize(Serializer::READ, data);
 			game->JoinGame(*lobbygame, lobbygame->password);
 			maps->LoadMapData(maps->FindMap(lobbygame->mapname, &lobbygame->maphash).c_str());
-			game->currentlobbygameid = lobbygame->id;
+			game->SetCurrentLobbyGameId(lobbygame->id);
 		}
 	}else if(world->lobby.creategamestatus != 100 &&
 	         world->lobby.creategamestatus != 0 &&

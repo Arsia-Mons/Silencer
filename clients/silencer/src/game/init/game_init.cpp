@@ -29,8 +29,6 @@ Game::Game()
 	  gameInput(*this),
 	  gameUiPipeline(*this),
 	  gameSession(*this),
-	  currentlobbygameid(gameSession.CurrentLobbyGameIdRef()),
-	  joininggame(gameSession.JoiningGameRef()),
 	  screenContext(*this, world, renderer, world.lobby, gameInput.GetKeyMap(), updater,
 	                gameSession.AmbienceMixerRef(), gameSession.MapDownloaderRef(),
 	                gameRenderer.WindowRef(), gameRenderer.RenderDeviceRef()) {

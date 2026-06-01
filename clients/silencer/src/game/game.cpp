@@ -37,6 +37,22 @@ void Game::LeaveJoinedGame() {
 gameSession.LeaveJoinedGame();
 }
 
+Uint32 Game::CurrentLobbyGameId() const {
+return gameSession.CurrentLobbyGameId();
+}
+
+void Game::SetCurrentLobbyGameId(Uint32 gameid) {
+gameSession.SetCurrentLobbyGameId(gameid);
+}
+
+bool Game::IsJoiningLobbyGame() const {
+return gameSession.IsJoiningGame();
+}
+
+void Game::ClearJoiningLobbyGame() {
+gameSession.ClearJoiningGame();
+}
+
 void Game::StartTutorial() {
 GoToState(GameState::SINGLEPLAYERGAME);
 }

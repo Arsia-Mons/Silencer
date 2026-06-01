@@ -445,6 +445,15 @@ fail_if_match \
   --glob '!third_party/**'
 
 fail_if_match \
+  "\\b(Uint32|bool)[[:space:]]*&[[:space:]]+(currentlobbygameid|joininggame)\\b" \
+  "$REPO_ROOT/clients/silencer/src/game/game.h"
+
+fail_if_match \
+  "(->(currentlobbygameid|joininggame)\\b|[.](currentlobbygameid|joininggame)\\b)" \
+  "$REPO_ROOT/clients/silencer/src/client/ui" \
+  --glob '!third_party/**'
+
+fail_if_match \
   "MakeLobbyProvider[[:space:]]*[(][^)]*,|LobbyScreen[[:space:]]*[*][[:space:]]*screen" \
   "$REPO_ROOT/clients/silencer/src/client/ui/providers/lobby_provider.h" \
   "$REPO_ROOT/clients/silencer/src/client/ui/providers/lobby_provider.cpp" \

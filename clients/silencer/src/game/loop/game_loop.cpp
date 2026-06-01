@@ -263,8 +263,8 @@ bool Game::Tick(void){
 			// match start), 2 = playing (gameplaystate == INGAME).
 			Uint32 targetgid = 0;
 			Uint8 targetstatus = 0;
-			if(currentlobbygameid != 0 && world.network.state == World::CONNECTED){
-				targetgid = currentlobbygameid;
+			if(CurrentLobbyGameId() != 0 && world.network.state == World::CONNECTED){
+				targetgid = CurrentLobbyGameId();
 				targetstatus = (world.gameplaystate == World::INGAME) ? 2 : 1;
 			}
 			if(targetgid != gameSession.LastAnnouncedGameIdRef() || targetstatus != gameSession.LastAnnouncedStatusRef()){

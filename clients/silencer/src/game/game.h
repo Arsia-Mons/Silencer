@@ -87,6 +87,10 @@ SDL_Gamepad * GetGamepad() const { return gameInput.GetGamepad(); }
 void JoinGame(LobbyGame & lobbygame, char * password = 0);
 void SpectateGame(LobbyGame & lobbygame, char * password = 0);
 void LeaveJoinedGame();
+Uint32 CurrentLobbyGameId() const;
+void SetCurrentLobbyGameId(Uint32 gameid);
+bool IsJoiningLobbyGame() const;
+void ClearJoiningLobbyGame();
 void StartTutorial();
 
 private:
@@ -121,8 +125,6 @@ GameSession gameSession;
 
 public:
 bool minimized;
-Uint32 & currentlobbygameid;
-bool & joininggame;
 
 private:
 Updater updater;

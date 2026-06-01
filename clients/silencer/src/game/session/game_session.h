@@ -26,11 +26,13 @@ void GiveDefaultItems(Player & player);
 
 MapDownloader & MapDownloaderRef() { return mapDownloader; }
 AmbienceMixer & AmbienceMixerRef() { return ambienceMixer; }
-Uint32 & CurrentLobbyGameIdRef() { return currentlobbygameid; }
+Uint32 CurrentLobbyGameId() const { return currentlobbygameid; }
+void SetCurrentLobbyGameId(Uint32 gameid) { currentlobbygameid = gameid; }
+bool IsJoiningGame() const { return joininggame; }
+void ClearJoiningGame() { joininggame = false; }
 Uint32 & LastAnnouncedGameIdRef() { return lastannouncedgameid; }
 Uint8 & LastAnnouncedStatusRef() { return lastannouncedstatus; }
 bool & DeployMessageShownRef() { return deploymessageshown; }
-bool & JoiningGameRef() { return joininggame; }
 
 private:
 Game & game;
