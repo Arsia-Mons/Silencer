@@ -4,6 +4,9 @@
 #include "renderdevice.h"
 #include "surface.h"
 #include <SDL3/SDL.h>
+#include <memory>
+
+namespace silencer::cppx_ui { class UiDemoOverlay; }
 
 // Virtual resolution that the game was originally designed for.
 // Used by the renderer, UI pipeline, and game loop to compute scale factors.
@@ -17,6 +20,7 @@ class GameRenderer
 {
 public:
 explicit GameRenderer(Game & game);
+~GameRenderer();
 
 bool Setup(SDL_Window ** outWindow);
 static Uint32 TimerCallback(void * userdata, SDL_TimerID timerID, Uint32 interval);
@@ -49,6 +53,7 @@ SDL_Color palettecolors[256];
 SDL_Window * window;
 Uint8 fade_i;
 Uint64 fadeStartMs;
+std::unique_ptr<silencer::cppx_ui::UiDemoOverlay> cppxDemo; // SIL-11 flag-gated demo overlay
 };
 
 #endif

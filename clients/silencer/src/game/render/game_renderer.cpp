@@ -5,7 +5,9 @@
 #include "gasloader.h"
 #include "sdl3gpubackend.h"
 #include "tuibackend.h"
+#include "render/cppx_ui/ui_demo.h"
 #include <algorithm>
+#include <cstdlib>
 #include <cstring>
 
 
@@ -13,6 +15,8 @@ GameRenderer::GameRenderer(Game & g)
 : game(g), renderdevice(nullptr), screenbuffer(640, 480), window(nullptr), fade_i(0), fadeStartMs(0) {
 std::memset(palettecolors, 0, sizeof(palettecolors));
 }
+
+GameRenderer::~GameRenderer() = default;
 
 bool GameRenderer::Setup(SDL_Window ** outWindow) {
 if(outWindow) {
@@ -79,6 +83,21 @@ return ResizeRenderSurfacePixels(width, height);
 void GameRenderer::Present(){
 if(renderdevice){
 renderdevice->UploadFrame(screenbuffer.pixels.data(), screenbuffer.w, screenbuffer.h);
+#ifdef SILENCER_CPPX_FONT_DIR
+// SIL-11 end-to-end demo: when SILENCER_CPPX_UI_DEMO is set, render a cppx
+// nine-slice button + TTF text and hand it to the device's UI composite pass.
+if(window && std::getenv("SILENCER_CPPX_UI_DEMO")){
+	int pw = 0, ph = 0;
+	if(SDL_GetWindowSizeInPixels(window, &pw, &ph) && pw > 0 && ph > 0){
+		if(!cppxDemo) cppxDemo = std::make_unique<silencer::cppx_ui::UiDemoOverlay>();
+		if(cppxDemo->ensure(pw, ph, SILENCER_CPPX_FONT_DIR)){
+			int uw = 0, uh = 0;
+			const uint8_t * rgba = cppxDemo->render(&uw, &uh);
+			if(rgba) renderdevice->UploadUiFrame(rgba, uw, uh);
+		}
+	}
+}
+#endif
 renderdevice->Present();
 }
 }

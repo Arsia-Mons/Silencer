@@ -69,21 +69,21 @@ private:
 // routes radius>0.5 POINTS here, so the device-pixel fallback only triggers at
 // fractional scales — a deliberate fidelity/perf cutoff, not a missing case.
 void sdf_fill_rounded(SDL_Renderer *r, SdfMaskCache *cache,
-                      const ui::DrawRect &rect, float radius, ui::Color fill,
+                      const ::ui::DrawRect &rect, float radius, ::ui::Color fill,
                       float scale);
 
 // Fused frame via SDF: a uniform-width border ring (inside the border-box) plus
 // the signed-offset outline ring. Per-side border colors collapse to one ring
 // color in SDF mode (v1) — the theme uses uniform borders, so this is faithful.
 void sdf_frame_rounded(SDL_Renderer *r, SdfMaskCache *cache,
-                       const ui::DrawRect &rect, float radius,
-                       const ui::Border &border, const ui::Outline &outline,
+                       const ::ui::DrawRect &rect, float radius,
+                       const ::ui::Border &border, const ::ui::Outline &outline,
                        float scale);
 
 // Rounded gradient fill via SDF. The mask is per-pixel (color varies), so it is
 // always transient (not cached). stop_count==0 draws nothing.
-void sdf_gradient_rounded(SDL_Renderer *r, const ui::DrawRect &rect,
-                          float radius, const ui::Gradient &gradient,
+void sdf_gradient_rounded(SDL_Renderer *r, const ::ui::DrawRect &rect,
+                          float radius, const ::ui::Gradient &gradient,
                           float scale);
 
 } // namespace silencer::cppx_ui
