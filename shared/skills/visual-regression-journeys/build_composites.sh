@@ -83,6 +83,19 @@ else
   echo "  (no pairs found — check that BASE_DIR and CURRENT_DIR share filenames)"
 fi
 
+sheet_inputs=()
+for f in "$OUT_DIR"/[0-9][0-9]_*.png; do
+  [ -f "$f" ] || continue
+  sheet_inputs+=("$f")
+done
+if [ ${#sheet_inputs[@]} -gt 0 ]; then
+  magick "${sheet_inputs[@]}" -background "#111111" -gravity center -append \
+    "$OUT_DIR/00_all_scenes_contact_sheet.png"
+  echo ""
+  echo "=== contact sheet ==="
+  echo "  $OUT_DIR/00_all_scenes_contact_sheet.png"
+fi
+
 echo ""
 echo "=== one-sided coverage ==="
 for f in "$BASE_DIR"/*.png; do

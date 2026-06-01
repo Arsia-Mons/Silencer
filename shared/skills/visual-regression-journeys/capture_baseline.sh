@@ -9,7 +9,8 @@
 #
 # Labels assume legacy-era casing ("Controls", "Display", "Audio").
 # Tolerates absent features — older refs lack resize, ingame_ui_mode, etc.;
-# those journeys are skipped, not failed.
+# those journeys are marked failed by their individual capture without stopping
+# the rest of the baseline run.
 
 set +e
 
@@ -19,13 +20,28 @@ if [ -z "${WORKTREE:-}" ] || [ -z "${OUT_DIR:-}" ]; then
 fi
 mkdir -p "$OUT_DIR"
 
-export SILENCER_BIN="$WORKTREE/build/Silencer.app/Contents/MacOS/Silencer"
-if [ ! -x "$SILENCER_BIN" ]; then
-  # Linux fallback
-  export SILENCER_BIN="$WORKTREE/build/silencer"
-fi
-if [ ! -x "$SILENCER_BIN" ]; then
-  echo "no silencer binary in $WORKTREE/build/" >&2
+VISUAL_HOME="$(mktemp -d "${TMPDIR:-/tmp}/silencer-visual-baseline-home.XXXXXX")"
+mkdir -p "$VISUAL_HOME/Library/Application Support/Silencer" \
+  "$VISUAL_HOME/.config/silencer"
+cat > "$VISUAL_HOME/Library/Application Support/Silencer/config.cfg" <<EOF
+lobbyhost=127.0.0.1
+lobbyport=9
+EOF
+cp "$VISUAL_HOME/Library/Application Support/Silencer/config.cfg" \
+  "$VISUAL_HOME/.config/silencer/config.cfg"
+
+for candidate in \
+  "$WORKTREE/clients/silencer/build/Silencer.app/Contents/MacOS/Silencer" \
+  "$WORKTREE/clients/silencer/build/silencer" \
+  "$WORKTREE/build/Silencer.app/Contents/MacOS/Silencer" \
+  "$WORKTREE/build/silencer"; do
+  if [ -x "$candidate" ]; then
+    export SILENCER_BIN="$candidate"
+    break
+  fi
+done
+if [ ! -x "${SILENCER_BIN:-}" ]; then
+  echo "no silencer binary in $WORKTREE/clients/silencer/build/ or $WORKTREE/build/" >&2
   exit 1
 fi
 
@@ -34,7 +50,7 @@ fi
 run_capture() {
   local name="$1"
   local body="$2"
-  bash -c "
+  HOME="$VISUAL_HOME" bash -c "
     set +e
     source $WORKTREE/tests/cli-agent/e2e/lib.sh
     PORT=\$(pick_port)
@@ -108,6 +124,30 @@ cli --port \"\$PORT\" click --label 'Connect To Lobby' 2>/dev/null || \\
 cli --port \"\$PORT\" wait_ms --n 2000 >/dev/null
 "
 
+run_capture "11_mainmenu_1280x720" "
+cli --port \"\$PORT\" resize --w 1280 --h 720 >/dev/null
+cli --port \"\$PORT\" wait_ms --n 2000 >/dev/null
+"
+
+run_capture "12_options_root_1280x720" "
+cli --port \"\$PORT\" resize --w 1280 --h 720 >/dev/null
+cli --port \"\$PORT\" wait_ms --n 2000 >/dev/null
+cli --port \"\$PORT\" click --label OPTIONS
+cli --port \"\$PORT\" wait_for_state --state OPTIONS --timeout-ms 5000 >/dev/null
+cli --port \"\$PORT\" wait_ms --n 2000 >/dev/null
+"
+
+run_capture "13_options_controls_1280x720" "
+cli --port \"\$PORT\" resize --w 1280 --h 720 >/dev/null
+cli --port \"\$PORT\" wait_ms --n 2000 >/dev/null
+cli --port \"\$PORT\" click --label OPTIONS
+cli --port \"\$PORT\" wait_for_state --state OPTIONS --timeout-ms 5000 >/dev/null
+cli --port \"\$PORT\" wait_ms --n 2000 >/dev/null
+cli --port \"\$PORT\" click --label Controls
+cli --port \"\$PORT\" wait_for_state --state OPTIONSCONTROLS --timeout-ms 5000 >/dev/null
+cli --port \"\$PORT\" wait_ms --n 2000 >/dev/null
+"
+
 run_capture "20_ingame_hud_640x480" "
 cli --port \"\$PORT\" click --label Tutorial
 cli --port \"\$PORT\" wait_for_state --state SINGLEPLAYERGAME --timeout-ms 20000 >/dev/null
@@ -120,4 +160,71 @@ done
 cli --port \"\$PORT\" wait_ms --n 1500 >/dev/null
 "
 
+run_capture "21_ingame_playerlist_640x480" "
+cli --port \"\$PORT\" click --label Tutorial
+cli --port \"\$PORT\" wait_for_state --state SINGLEPLAYERGAME --timeout-ms 20000 >/dev/null
+for i in \$(seq 1 60); do
+  if cli --port \"\$PORT\" world_state 2>/dev/null | bun -e 'const t=await new Response(Bun.stdin.stream()).text();const r=JSON.parse(t);const s=r.result??r;if((s.objects_count??0)>0&&(s.players?.length??0)>0)process.exit(0);process.exit(1);' 2>/dev/null; then
+    break
+  fi
+  cli --port \"\$PORT\" wait_frames --n 2 >/dev/null
+done
+cli --port \"\$PORT\" ingame_ui_mode --mode playerlist >/dev/null
+cli --port \"\$PORT\" wait_ms --n 1500 >/dev/null
+"
+
+run_capture "22_ingame_buy_640x480" "
+cli --port \"\$PORT\" click --label Tutorial
+cli --port \"\$PORT\" wait_for_state --state SINGLEPLAYERGAME --timeout-ms 20000 >/dev/null
+for i in \$(seq 1 60); do
+  if cli --port \"\$PORT\" world_state 2>/dev/null | bun -e 'const t=await new Response(Bun.stdin.stream()).text();const r=JSON.parse(t);const s=r.result??r;if((s.objects_count??0)>0&&(s.players?.length??0)>0)process.exit(0);process.exit(1);' 2>/dev/null; then
+    break
+  fi
+  cli --port \"\$PORT\" wait_frames --n 2 >/dev/null
+done
+cli --port \"\$PORT\" ingame_ui_mode --mode buy >/dev/null
+cli --port \"\$PORT\" wait_ms --n 1500 >/dev/null
+"
+
+run_capture "23_ingame_tech_640x480" "
+cli --port \"\$PORT\" click --label Tutorial
+cli --port \"\$PORT\" wait_for_state --state SINGLEPLAYERGAME --timeout-ms 20000 >/dev/null
+for i in \$(seq 1 60); do
+  if cli --port \"\$PORT\" world_state 2>/dev/null | bun -e 'const t=await new Response(Bun.stdin.stream()).text();const r=JSON.parse(t);const s=r.result??r;if((s.objects_count??0)>0&&(s.players?.length??0)>0)process.exit(0);process.exit(1);' 2>/dev/null; then
+    break
+  fi
+  cli --port \"\$PORT\" wait_frames --n 2 >/dev/null
+done
+cli --port \"\$PORT\" ingame_ui_mode --mode tech >/dev/null
+cli --port \"\$PORT\" wait_ms --n 1500 >/dev/null
+"
+
+run_capture "24_ingame_chat_640x480" "
+cli --port \"\$PORT\" click --label Tutorial
+cli --port \"\$PORT\" wait_for_state --state SINGLEPLAYERGAME --timeout-ms 20000 >/dev/null
+for i in \$(seq 1 60); do
+  if cli --port \"\$PORT\" world_state 2>/dev/null | bun -e 'const t=await new Response(Bun.stdin.stream()).text();const r=JSON.parse(t);const s=r.result??r;if((s.objects_count??0)>0&&(s.players?.length??0)>0)process.exit(0);process.exit(1);' 2>/dev/null; then
+    break
+  fi
+  cli --port \"\$PORT\" wait_frames --n 2 >/dev/null
+done
+cli --port \"\$PORT\" ingame_ui_mode --mode chat >/dev/null
+cli --port \"\$PORT\" wait_ms --n 1500 >/dev/null
+"
+
+run_capture "25_ingame_hud_1280x720" "
+cli --port \"\$PORT\" click --label Tutorial
+cli --port \"\$PORT\" wait_for_state --state SINGLEPLAYERGAME --timeout-ms 20000 >/dev/null
+for i in \$(seq 1 60); do
+  if cli --port \"\$PORT\" world_state 2>/dev/null | bun -e 'const t=await new Response(Bun.stdin.stream()).text();const r=JSON.parse(t);const s=r.result??r;if((s.objects_count??0)>0&&(s.players?.length??0)>0)process.exit(0);process.exit(1);' 2>/dev/null; then
+    break
+  fi
+  cli --port \"\$PORT\" wait_frames --n 2 >/dev/null
+done
+cli --port \"\$PORT\" ingame_ui_mode --mode clear >/dev/null
+cli --port \"\$PORT\" resize --w 1280 --h 720 >/dev/null
+cli --port \"\$PORT\" wait_ms --n 1500 >/dev/null
+"
+
+rm -rf "$VISUAL_HOME"
 echo "DONE: $(ls "$OUT_DIR" 2>/dev/null | wc -l | tr -d ' ') captured in $OUT_DIR"

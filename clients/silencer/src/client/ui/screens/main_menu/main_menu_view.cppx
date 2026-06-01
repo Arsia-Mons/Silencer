@@ -2,12 +2,20 @@
 
 #include "client/ui/hooks/use_game_session.h"
 #include "client/ui/hooks/use_navigation.h"
+#include "client/ui/hud/hud_retained_payloads.h"
 #include "client/ui/screens/lobby_connect/lobby_connect_screen.h"
 #include "client/ui/screens/options/options_screen.h"
+#include "client/ui/style/silencer_style.h"
+#include "resources.h"
 #include "ui/components/box.h"
-#include "ui/components/button.h"
 #include "ui/components/text.h"
+#include "ui/runtime/react.h"
 
+#include "SDL3/SDL_timer.h"
+
+#include <algorithm>
+#include <cstdint>
+#include <limits>
 #include <memory>
 
 namespace silencer::client_ui {
@@ -15,86 +23,222 @@ namespace silencer::client_ui {
 using ::ui::children;
 using ::ui::components::Box;
 using ::ui::components::BoxProps;
-using ::ui::components::Button;
-using ::ui::components::ButtonProps;
 using ::ui::components::Text;
 using ::ui::components::TextProps;
 
 namespace {
 
+constexpr std::uint16_t kLogoBank = 208;
+constexpr std::uint16_t kLogoFirstFrame = 29;
+constexpr std::uint16_t kLogoHeldFrame = 60;
+constexpr std::uint64_t kLogoLegacyTickMs = 42;
+constexpr std::uint64_t kLogoRevealTicks = 60;
+constexpr std::uint64_t kLogoHeldEndTicks = 180;
+constexpr std::uint64_t kLogoCycleTicks = 240;
+constexpr int kActionExitOffset = -40;
+constexpr int kActionColumnOffset = 0;
+constexpr int kActionConnectOffset = 40;
+constexpr int kActionMinOffset = kActionExitOffset;
+
+struct LogoBounds {
+	int min_left = 0;
+	int min_top = 0;
+	int width = 0;
+	int height = 0;
+};
+
 ::ui::LayoutStyle root_layout() {
+	return ::ui::LayoutStyle{
+		.direction = ::ui::FlexDirection::Column,
+		.align_items = ::ui::AlignItems::Center,
+		.width = ::ui::Length::percent(100.0f),
+		.height = ::ui::Length::percent(100.0f),
+	};
+}
+
+::ui::StyleStatePatch root_style() {
+	return style::SpriteBackground(6, 0);
+}
+
+::ui::LayoutStyle chrome_layout() {
 	return ::ui::LayoutStyle{
 		.direction = ::ui::FlexDirection::Column,
 		.align_items = ::ui::AlignItems::Center,
 		.justify_content = ::ui::JustifyContent::Center,
 		.width = ::ui::Length::percent(100.0f),
 		.height = ::ui::Length::percent(100.0f),
-		.gap = 20.0f,
+		.padding = {0.0f, 0.0f, 32.0f, 32.0f},
 	};
 }
 
-::ui::StyleStatePatch root_style() {
-	return ::ui::patch().background(::ui::Color{14, 18, 25, 255});
+::ui::LayoutStyle composition_layout() {
+	return ::ui::LayoutStyle{
+		.direction = ::ui::FlexDirection::Row,
+		.width = ::ui::Length::points(640.0f),
+		.max_width = ::ui::Length::percent(100.0f),
+		.height = ::ui::Length::grow(1.0f),
+	};
 }
 
-::ui::LayoutStyle title_stack_layout() {
+::ui::LayoutStyle logo_group_layout() {
 	return ::ui::LayoutStyle{
 		.direction = ::ui::FlexDirection::Column,
-		.align_items = ::ui::AlignItems::Center,
-		.width = ::ui::Length::points(300.0f),
-		.gap = 8.0f,
+		.width = ::ui::Length::points(350.0f),
+		.height = ::ui::Length::grow(1.0f),
+		.flex_shrink = 1.0f,
+		.padding = {7.0f, 0.0f, 0.0f, 0.0f},
 	};
 }
 
-::ui::LayoutStyle title_layout() {
-	return ::ui::LayoutStyle{
-		.width = ::ui::Length::points(300.0f),
-		.height = ::ui::Length::points(34.0f),
-	};
-}
-
-::ui::LayoutStyle subtitle_layout() {
-	return ::ui::LayoutStyle{
-		.width = ::ui::Length::points(300.0f),
-		.height = ::ui::Length::points(16.0f),
-	};
-}
-
-::ui::LayoutStyle button_stack_layout() {
+::ui::LayoutStyle logo_region_layout() {
 	return ::ui::LayoutStyle{
 		.direction = ::ui::FlexDirection::Column,
-		.align_items = ::ui::AlignItems::Center,
-		.width = ::ui::Length::points(216.0f),
-		.gap = 14.0f,
-	};
-}
-
-::ui::LayoutStyle button_layout(bool autofocus = false) {
-	(void)autofocus;
-	return ::ui::LayoutStyle{
 		.align_items = ::ui::AlignItems::Center,
 		.justify_content = ::ui::JustifyContent::Center,
-		.width = ::ui::Length::points(216.0f),
-		.height = ::ui::Length::points(33.0f),
-		.padding = {24.0f, 24.0f, 7.0f, 7.0f},
+		.width = ::ui::Length::percent(100.0f),
+		.height = ::ui::Length::grow(1.0f),
+		.padding = {0.0f, 0.0f, 6.0f, 0.0f},
 	};
 }
 
-::ui::StyleStatePatch title_style() {
-	return ::ui::patch().text(::ui::TextVisual{
-		.color = {236, 241, 247, 255},
-		.font_id = 133,
-		.font_size = 22,
-		.align = ::ui::TextAlign::Center,
-	});
+::ui::LayoutStyle action_group_layout() {
+	return ::ui::LayoutStyle{
+		.direction = ::ui::FlexDirection::Column,
+		.align_items = ::ui::AlignItems::Start,
+		.justify_content = ::ui::JustifyContent::Center,
+		.width = ::ui::Length::points(290.0f),
+		.height = ::ui::Length::grow(1.0f),
+	};
 }
 
-::ui::StyleStatePatch subtitle_style() {
-	return ::ui::patch().text(::ui::TextVisual{
-		.color = {148, 162, 178, 255},
-		.font_id = 133,
-		.font_size = 10,
-		.align = ::ui::TextAlign::Center,
+::ui::EdgeSizes relative_offset(float x, float y) {
+	::ui::EdgeSizes inset;
+	inset.left = ::ui::StyleValue::points(x);
+	inset.top = ::ui::StyleValue::points(y);
+	return inset;
+}
+
+::ui::LayoutStyle action_stack_layout() {
+	return ::ui::LayoutStyle{
+		.position = ::ui::PositionType::Relative,
+		.position_inset = relative_offset(-40.0f, 31.0f),
+		.direction = ::ui::FlexDirection::Column,
+		.align_items = ::ui::AlignItems::Start,
+		.width = ::ui::Length::points(276.0f),
+		.height = ::ui::Length::points(234.0f),
+		.gap = 34.0f,
+	};
+}
+
+::ui::LayoutStyle action_row_layout(int columnOffset) {
+	return ::ui::LayoutStyle{
+		.direction = ::ui::FlexDirection::Row,
+		.align_items = ::ui::AlignItems::Start,
+		.width = ::ui::Length::points(
+			static_cast<float>(columnOffset - kActionMinOffset + 196)),
+		.height = ::ui::Length::points(33.0f),
+	};
+}
+
+::ui::LayoutStyle action_spacer_layout(int columnOffset) {
+	return ::ui::LayoutStyle{
+		.width = ::ui::Length::points(static_cast<float>(columnOffset - kActionMinOffset)),
+		.height = ::ui::Length::points(1.0f),
+	};
+}
+
+::ui::LayoutStyle button_layout() {
+	return ::ui::LayoutStyle{
+		.direction = ::ui::FlexDirection::Column,
+		.align_items = ::ui::AlignItems::Center,
+		.justify_content = ::ui::JustifyContent::Start,
+		.width = ::ui::Length::points(196.0f),
+		.height = ::ui::Length::points(33.0f),
+		.padding = {24.0f, 24.0f, 8.0f, 7.0f},
+	};
+}
+
+::ui::EdgeSizes version_position() {
+	::ui::EdgeSizes inset;
+	inset.left = ::ui::StyleValue::points(10.0f);
+	inset.bottom = ::ui::StyleValue::points(17.0f);
+	return inset;
+}
+
+::ui::LayoutStyle version_layout() {
+	return ::ui::LayoutStyle{
+		.position = ::ui::PositionType::Absolute,
+		.width = ::ui::Length::points(180.0f),
+		.height = ::ui::Length::points(11.0f),
+		.position_inset = version_position(),
+	};
+}
+
+bool logo_frame_loaded(const Resources& resources, std::uint16_t frame) {
+	return kLogoBank < resources.spritebank.size() &&
+	       frame < resources.spritebank[kLogoBank].size() &&
+	       resources.spritebank[kLogoBank][frame];
+}
+
+LogoBounds logo_bounds(const Resources& resources) {
+	LogoBounds bounds{};
+	int minLeft = std::numeric_limits<int>::max();
+	int minTop = std::numeric_limits<int>::max();
+	int maxRight = std::numeric_limits<int>::min();
+	int maxBottom = std::numeric_limits<int>::min();
+	for(std::uint16_t frame = kLogoFirstFrame; frame <= kLogoHeldFrame; ++frame){
+		if(!logo_frame_loaded(resources, frame)) continue;
+		const int left = -resources.spriteoffsetx[kLogoBank][frame];
+		const int top = -resources.spriteoffsety[kLogoBank][frame];
+		const int right = left + static_cast<int>(resources.spritewidth[kLogoBank][frame]);
+		const int bottom = top + static_cast<int>(resources.spriteheight[kLogoBank][frame]);
+		minLeft = std::min(minLeft, left);
+		minTop = std::min(minTop, top);
+		maxRight = std::max(maxRight, right);
+		maxBottom = std::max(maxBottom, bottom);
+	}
+	if(minLeft == std::numeric_limits<int>::max()) return bounds;
+	bounds.min_left = minLeft;
+	bounds.min_top = minTop;
+	bounds.width = maxRight - minLeft;
+	bounds.height = maxBottom - minTop;
+	return bounds;
+}
+
+std::uint16_t logo_frame(std::uint64_t startMs, std::uint64_t nowMs) {
+	if(nowMs <= startMs) return kLogoFirstFrame;
+	const std::uint64_t legacyTick =
+		((nowMs - startMs) / kLogoLegacyTickMs) % kLogoCycleTicks;
+	if(legacyTick < kLogoRevealTicks){
+		return static_cast<std::uint16_t>(kLogoFirstFrame + legacyTick / 2);
+	}
+	if(legacyTick < kLogoHeldEndTicks) return kLogoHeldFrame;
+	const int frame = 120 - static_cast<int>(legacyTick / 2) + kLogoFirstFrame;
+	return static_cast<std::uint16_t>(
+		frame <= kLogoFirstFrame ? kLogoFirstFrame : frame);
+}
+
+::ui::LayoutStyle logo_stage_layout(const LogoBounds& bounds) {
+	return ::ui::LayoutStyle{
+		.width = ::ui::Length::points(static_cast<float>(bounds.width)),
+		.height = ::ui::Length::points(static_cast<float>(bounds.height)),
+	};
+}
+
+::ui::StyleStatePatch logo_style(const Resources& resources,
+                                 const LogoBounds& bounds,
+                                 std::uint16_t frame) {
+	RetainedHudSpritePayload payload{};
+	payload.bank = static_cast<Uint8>(kLogoBank);
+	payload.index = frame;
+	payload.brightness = 128;
+	payload.dstOffsetX = static_cast<Sint16>(
+		-resources.spriteoffsetx[kLogoBank][frame] - bounds.min_left);
+	payload.dstOffsetY = static_cast<Sint16>(
+		resources.spriteoffsety[kLogoBank][frame] * -1 - bounds.min_top);
+	return ::ui::patch().image(::ui::BackgroundImage{
+		.texture_id = RetainedHudSpriteTextureId(payload),
+		.tint = {255, 255, 255, 255},
 	});
 }
 
@@ -130,47 +274,121 @@ std::function<void(const ::ui::ActivationEvent&)> request_quit_callback(
 	};
 }
 
+struct MainMenuLogoProps {
+	const char * key = nullptr;
+	const Resources * resources = nullptr;
+};
+
+::ui::UiElement MainMenuLogo(const MainMenuLogoProps& props) {
+	if(!props.resources) return ::ui::empty();
+	const LogoBounds bounds = logo_bounds(*props.resources);
+	if(bounds.width <= 0 || bounds.height <= 0) return ::ui::empty();
+	std::uint64_t * startMs = ::use_state<std::uint64_t>(SDL_GetTicks());
+	const std::uint64_t started = startMs ? *startMs : SDL_GetTicks();
+	const std::uint16_t frame = logo_frame(started, SDL_GetTicks());
+	if(!logo_frame_loaded(*props.resources, frame)) return ::ui::empty();
+	return <Box
+	  key={props.key}
+	  layout={logo_stage_layout(bounds)}
+	  style={logo_style(*props.resources, bounds, frame)}
+	/>
+}
+
+struct MenuActionButtonProps {
+	const char * key = nullptr;
+	const char * id = nullptr;
+	const char * label = nullptr;
+	bool autofocus = false;
+	std::function<void(const ::ui::ActivationEvent&)> on_activate = {};
+};
+
+::ui::UiElement MenuActionButton(const MenuActionButtonProps& props) {
+	return style::LegacyButton(style::LegacyButtonProps{
+		.key = props.key,
+		.id = props.id,
+		.autofocus = props.autofocus,
+		.label = props.label,
+		.on_activate = props.on_activate,
+		.layout = button_layout(),
+	});
+}
+
+struct MenuActionRowProps {
+	const char * key = nullptr;
+	const char * id = nullptr;
+	const char * label = nullptr;
+	int column_offset = 0;
+	bool autofocus = false;
+	std::function<void(const ::ui::ActivationEvent&)> on_activate = {};
+};
+
+::ui::UiElement MenuActionRow(const MenuActionRowProps& props) {
+	return <Box key={props.key} layout={action_row_layout(props.column_offset)}>
+		<Box key="spacer" layout={action_spacer_layout(props.column_offset)} />
+		<MenuActionButton
+		  key="button"
+		  id={props.id}
+		  label={props.label}
+		  autofocus={props.autofocus}
+		  onActivate={props.on_activate}
+		/>
+	</Box>
+}
+
 }  // namespace
 
 ::ui::UiElement MainMenuView(const MainMenuViewProps& props) {
 	Navigation navigation = use_navigation();
 	GameSessionActions session = use_game_session();
 	return <Box key={props.key} layout={root_layout()} style={root_style()}>
-		<Box key="title-stack" layout={title_stack_layout()}>
-			<Text key="title" value="Silencer" layout={title_layout()} style={title_style()} />
-			<Text key="version" value={props.version} layout={subtitle_layout()} style={subtitle_style()} />
+		<Box key="chrome" layout={chrome_layout()}>
+			<Box key="composition" layout={composition_layout()}>
+				<Box key="logo-group" layout={logo_group_layout()}>
+					<Box key="logo-region" layout={logo_region_layout()}>
+						<MainMenuLogo key="logo" resources={props.resources} />
+					</Box>
+				</Box>
+				<Box key="action-group" layout={action_group_layout()}>
+					<Box key="button-stack" layout={action_stack_layout()}>
+						<MenuActionRow
+						  key="tutorial"
+						  id="main_menu.tutorial"
+						  label="Tutorial"
+						  columnOffset={kActionColumnOffset}
+						  autofocus={true}
+						  onActivate={start_tutorial_callback(session)}
+						/>
+						<MenuActionRow
+						  key="lobby"
+						  id="main_menu.lobby"
+						  label="Connect To Lobby"
+						  columnOffset={kActionConnectOffset}
+						  onActivate={open_lobby_connect_callback(navigation)}
+						/>
+						<MenuActionRow
+						  key="options"
+						  id="main_menu.options"
+						  label="Options"
+						  columnOffset={kActionColumnOffset}
+						  onActivate={open_options_callback(navigation)}
+						/>
+						<MenuActionRow
+						  key="exit"
+						  id="main_menu.exit"
+						  label="Exit"
+						  columnOffset={kActionExitOffset}
+						  onActivate={request_quit_callback(session)}
+						/>
+					</Box>
+				</Box>
+			</Box>
 		</Box>
-		<Box key="button-stack" layout={button_stack_layout()}>
-			<Button
-			  key="tutorial"
-			  id="main_menu.tutorial"
-			  label="Tutorial"
-			  autofocus={true}
-			  onActivate={start_tutorial_callback(session)}
-			  layout={button_layout(true)}
-			/>
-			<Button
-			  key="lobby"
-			  id="main_menu.lobby"
-			  label="Connect To Lobby"
-			  onActivate={open_lobby_connect_callback(navigation)}
-			  layout={button_layout()}
-			/>
-			<Button
-			  key="options"
-			  id="main_menu.options"
-			  label="Options"
-			  onActivate={open_options_callback(navigation)}
-			  layout={button_layout()}
-			/>
-			<Button
-			  key="exit"
-			  id="main_menu.exit"
-			  label="Exit"
-			  onActivate={request_quit_callback(session)}
-			  layout={button_layout()}
-			/>
-		</Box>
+		<Text
+		  key="version"
+		  value={props.version}
+		  layout={version_layout()}
+		  style={style::LegacyBodyTextStyle(11)}
+		/>
 	</Box>
 }
 

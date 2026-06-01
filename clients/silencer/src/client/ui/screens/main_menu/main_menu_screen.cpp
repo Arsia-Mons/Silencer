@@ -37,6 +37,7 @@ bool MainMenuScreen::BuildElement(ScreenContext & ctx, ::ui::UiElement * out)
 		silencer::client_ui::MainMenuViewProps{
 			.key = "main-menu",
 			.version = versionText_.c_str(),
+			.resources = &ctx.world.resources,
 		},
 		silencer::client_ui::MainMenuView);
 	return true;

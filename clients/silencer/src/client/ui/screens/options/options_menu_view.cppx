@@ -4,9 +4,8 @@
 #include "client/ui/screens/options/options_audio_screen.h"
 #include "client/ui/screens/options/options_controls_screen.h"
 #include "client/ui/screens/options/options_display_screen.h"
+#include "client/ui/style/silencer_style.h"
 #include "ui/components/box.h"
-#include "ui/components/button.h"
-#include "ui/components/text.h"
 
 #include <memory>
 
@@ -15,10 +14,6 @@ namespace silencer::client_ui {
 using ::ui::children;
 using ::ui::components::Box;
 using ::ui::components::BoxProps;
-using ::ui::components::Button;
-using ::ui::components::ButtonProps;
-using ::ui::components::Text;
-using ::ui::components::TextProps;
 
 namespace {
 
@@ -32,6 +27,10 @@ namespace {
 	};
 }
 
+::ui::StyleStatePatch root_style() {
+	return style::SpriteBackground(6, 0);
+}
+
 ::ui::LayoutStyle column_layout() {
 	return ::ui::LayoutStyle{
 		.direction = ::ui::FlexDirection::Column,
@@ -41,31 +40,16 @@ namespace {
 	};
 }
 
-::ui::LayoutStyle title_layout() {
-	return ::ui::LayoutStyle{
-		.width = ::ui::Length::points(196.0f),
-		.height = ::ui::Length::points(24.0f),
-	};
-}
-
 ::ui::LayoutStyle button_layout(bool autofocus = false) {
 	(void)autofocus;
 	return ::ui::LayoutStyle{
+		.direction = ::ui::FlexDirection::Column,
 		.align_items = ::ui::AlignItems::Center,
-		.justify_content = ::ui::JustifyContent::Center,
+		.justify_content = ::ui::JustifyContent::Start,
 		.width = ::ui::Length::points(196.0f),
 		.height = ::ui::Length::points(33.0f),
-		.padding = {24.0f, 24.0f, 7.0f, 7.0f},
+		.padding = {24.0f, 24.0f, 8.0f, 7.0f},
 	};
-}
-
-::ui::StyleStatePatch title_style() {
-	return ::ui::patch().text(::ui::TextVisual{
-		.color = {226, 234, 242, 255},
-		.font_id = 133,
-		.font_size = 14,
-		.align = ::ui::TextAlign::Center,
-	});
 }
 
 std::function<void(const ::ui::ActivationEvent&)> open_controls_callback(
@@ -102,41 +86,55 @@ std::function<void(const ::ui::ActivationEvent&)> back_callback(
 	};
 }
 
+struct OptionsButtonProps {
+	const char * key = nullptr;
+	const char * id = nullptr;
+	const char * label = nullptr;
+	bool autofocus = false;
+	std::function<void(const ::ui::ActivationEvent&)> on_activate = {};
+};
+
+::ui::UiElement OptionsButton(const OptionsButtonProps& props) {
+	return style::LegacyButton(style::LegacyButtonProps{
+		.key = props.key,
+		.id = props.id,
+		.autofocus = props.autofocus,
+		.label = props.label,
+		.on_activate = props.on_activate,
+		.layout = button_layout(props.autofocus),
+	});
+}
+
 }  // namespace
 
 ::ui::UiElement OptionsMenuView(const OptionsMenuViewProps& props) {
 	Navigation navigation = use_navigation();
-	return <Box key={props.key} layout={root_layout()}>
+	return <Box key={props.key} layout={root_layout()} style={root_style()}>
 		<Box key="column" layout={column_layout()}>
-			<Text key="title" value="Options" layout={title_layout()} style={title_style()} />
-			<Button
+			<OptionsButton
 			  key="controls"
 			  id="options.controls"
 			  label="Controls"
 			  autofocus={true}
 			  onActivate={open_controls_callback(navigation)}
-			  layout={button_layout(true)}
 			/>
-			<Button
+			<OptionsButton
 			  key="display"
 			  id="options.display"
 			  label="Display"
 			  onActivate={open_display_callback(navigation)}
-			  layout={button_layout()}
 			/>
-			<Button
+			<OptionsButton
 			  key="audio"
 			  id="options.audio"
 			  label="Audio"
 			  onActivate={open_audio_callback(navigation)}
-			  layout={button_layout()}
 			/>
-			<Button
+			<OptionsButton
 			  key="back"
 			  id="options.back"
 			  label="Go Back"
 			  onActivate={back_callback(navigation)}
-			  layout={button_layout()}
 			/>
 		</Box>
 	</Box>

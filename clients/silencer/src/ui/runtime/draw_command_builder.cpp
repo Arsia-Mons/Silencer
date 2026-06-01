@@ -18,9 +18,6 @@ constexpr Color kButtonFill = {24, 28, 36, 255};
 constexpr Color kButtonDisabledFill = {30, 34, 42, 255};
 constexpr Color kButtonBorder = {78, 88, 104, 255};
 constexpr Color kButtonDisabledBorder = {62, 68, 78, 255};
-constexpr Color kFocusBorder = {96, 165, 250, 255}; // accent (matches theme focus_ring)
-constexpr float kFocusBorderWidth = 2.0f;
-constexpr float kFocusBorderOffset = 2.0f;
 constexpr Color kCheckedFill = {44, 92, 128, 255};
 constexpr Color kInputFill = {18, 22, 28, 255};
 constexpr Color kSelectionFill = {72, 116, 164, 180};
@@ -269,10 +266,12 @@ bool append_rect(DrawCommandList &list, const NodeSnapshot &node,
 
 // FRAME: the fused per-side border + signed-offset outline (focus ring). Mirror
 // append_rect's source-selection: component-resolved border preferred, else the
-// legacy single-color style/control border mapped to all four sides; outline is
-// the component-resolved focus ring, else the legacy focus injection.
+// legacy single-color style/control border mapped to all four sides. Focus rings
+// come from the resolved component/theme outline only; focusable sprite art does
+// not get an extra rectangular fallback ring.
 bool append_frame(DrawCommandList &list, const NodeSnapshot &node,
                   bool focused) {
+  (void)focused;
   const VisualStyle &v = node.visual;
   bool control_box = node.role == NodeRole::Button ||
                      node.role == NodeRole::Checkbox ||
@@ -294,15 +293,11 @@ bool append_frame(DrawCommandList &list, const NodeSnapshot &node,
     has_border = true;
   }
 
-  // Outline / focus ring: prefer the component-resolved outline, else the
-  // legacy any-source injection (focused && !disabled).
+  // Outline / focus ring: use only the component-resolved outline.
   Outline outline = {};
   bool has_outline = false;
   if (v.outline.color.a > 0 && v.outline.width > 0.0f) {
     outline = v.outline;
-    has_outline = true;
-  } else if (focused && !node.interaction.disabled) {
-    outline = {kFocusBorderWidth, kFocusBorder, kFocusBorderOffset};
     has_outline = true;
   }
 

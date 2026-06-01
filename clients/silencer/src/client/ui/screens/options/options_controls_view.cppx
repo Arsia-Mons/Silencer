@@ -1,8 +1,8 @@
 #include "client/ui/screens/options/options_controls_view.h"
 
 #include "client/ui/hooks/use_navigation.h"
+#include "client/ui/style/silencer_style.h"
 #include "ui/components/box.h"
-#include "ui/components/button.h"
 #include "ui/components/text.h"
 #include "ui/runtime/react.h"
 
@@ -11,8 +11,6 @@ namespace silencer::client_ui {
 using ::ui::children;
 using ::ui::components::Box;
 using ::ui::components::BoxProps;
-using ::ui::components::Button;
-using ::ui::components::ButtonProps;
 using ::ui::components::Text;
 using ::ui::components::TextProps;
 
@@ -21,8 +19,8 @@ namespace {
 constexpr int kContentW = 486;
 constexpr int kActionNameW = 180;
 constexpr int kOperatorW = 45;
-constexpr int kActionSlotW = 100;
-constexpr int kPresetButtonW = 240;
+constexpr int kActionSlotW = 112;
+constexpr int kPresetButtonW = 220;
 constexpr int kPanelMinW = 560;
 constexpr int kPanelMinH = 420;
 constexpr int kPresetRowH = 43;
@@ -120,7 +118,7 @@ std::function<void(const ::ui::ActivationEvent&)> navigation_action_callback(
 }
 
 ::ui::StyleStatePatch root_style() {
-	return ::ui::patch().background(::ui::Color{14, 18, 25, 255});
+	return style::SpriteBackground(6, 0);
 }
 
 ::ui::LayoutStyle panel_layout(const OptionsControls& controls) {
@@ -141,17 +139,7 @@ std::function<void(const ::ui::ActivationEvent&)> navigation_action_callback(
 }
 
 ::ui::StyleStatePatch panel_style() {
-	return ::ui::patch()
-		.background(::ui::Color{31, 36, 44, 248})
-		.border(::ui::Border{
-			.width = {1.0f, 1.0f, 1.0f, 1.0f},
-			.color = {
-				{74, 86, 102, 255},
-				{74, 86, 102, 255},
-				{74, 86, 102, 255},
-				{74, 86, 102, 255},
-			},
-		});
+	return style::SpriteBackground(7, 7);
 }
 
 ::ui::EdgeSizes title_position(float y) {
@@ -221,31 +209,34 @@ std::function<void(const ::ui::ActivationEvent&)> navigation_action_callback(
 
 ::ui::LayoutStyle preset_button_layout(float h_scale) {
 	return ::ui::LayoutStyle{
+		.direction = ::ui::FlexDirection::Column,
 		.align_items = ::ui::AlignItems::Center,
-		.justify_content = ::ui::JustifyContent::Center,
+		.justify_content = ::ui::JustifyContent::Start,
 		.width = ::ui::Length::points(static_cast<float>(scaled(h_scale, kPresetButtonW))),
 		.height = ::ui::Length::points(33.0f),
-		.padding = {24.0f, 24.0f, 7.0f, 7.0f},
+		.padding = {24.0f, 24.0f, 8.0f, 7.0f},
 	};
 }
 
 ::ui::LayoutStyle action_button_layout(float h_scale) {
 	return ::ui::LayoutStyle{
+		.direction = ::ui::FlexDirection::Column,
 		.align_items = ::ui::AlignItems::Center,
-		.justify_content = ::ui::JustifyContent::Center,
+		.justify_content = ::ui::JustifyContent::Start,
 		.width = ::ui::Length::points(static_cast<float>(scaled(h_scale, kActionSlotW))),
-		.height = ::ui::Length::points(28.0f),
-		.padding = {14.0f, 14.0f, 5.0f, 5.0f},
+		.height = ::ui::Length::points(33.0f),
+		.padding = {12.0f, 12.0f, 8.0f, 7.0f},
 	};
 }
 
 ::ui::LayoutStyle operator_button_layout(float h_scale) {
 	return ::ui::LayoutStyle{
+		.direction = ::ui::FlexDirection::Column,
 		.align_items = ::ui::AlignItems::Center,
 		.justify_content = ::ui::JustifyContent::Center,
 		.width = ::ui::Length::points(static_cast<float>(scaled(h_scale, kOperatorW))),
-		.height = ::ui::Length::points(28.0f),
-		.padding = {8.0f, 8.0f, 4.0f, 4.0f},
+		.height = ::ui::Length::points(23.0f),
+		.padding = {0.0f, 0.0f, 4.0f, 4.0f},
 	};
 }
 
@@ -268,35 +259,68 @@ std::function<void(const ::ui::ActivationEvent&)> navigation_action_callback(
 
 ::ui::LayoutStyle footer_button_layout() {
 	return ::ui::LayoutStyle{
+		.direction = ::ui::FlexDirection::Column,
 		.align_items = ::ui::AlignItems::Center,
-		.justify_content = ::ui::JustifyContent::Center,
+		.justify_content = ::ui::JustifyContent::Start,
 		.width = ::ui::Length::points(196.0f),
 		.height = ::ui::Length::points(33.0f),
-		.padding = {24.0f, 24.0f, 7.0f, 7.0f},
+		.padding = {24.0f, 24.0f, 8.0f, 7.0f},
 	};
 }
 
 ::ui::StyleStatePatch title_style() {
-	return ::ui::patch().text(::ui::TextVisual{
-		.color = {236, 241, 247, 255},
-		.font_id = 135,
-		.font_size = 12,
-		.align = ::ui::TextAlign::Center,
-	});
+	return style::LegacyScreenTitleTextStyle(12);
 }
 
 ::ui::StyleStatePatch heading_style() {
-	return ::ui::patch().text(::ui::TextVisual{
-		.color = {226, 234, 242, 255},
-		.font_id = 133,
-		.font_size = 8,
-	});
+	return style::LegacyHeadingTextStyle(8);
 }
 
 struct KeybindRowProps {
 	const char * key = nullptr;
 	int index = 0;
 };
+
+struct RowActionButtonProps {
+	const char * key = nullptr;
+	const char * id = nullptr;
+	const char * label = nullptr;
+	float scale = 1.0f;
+	std::function<void(const ::ui::ActivationEvent&)> on_activate = {};
+};
+
+::ui::UiElement RowActionButton(const RowActionButtonProps& props) {
+	return style::LegacyButton(style::LegacyButtonProps{
+		.key = props.key,
+		.id = props.id,
+		.label = props.label,
+		.on_activate = props.on_activate,
+		.layout = action_button_layout(props.scale),
+		.style = style::LegacyOvalButtonStyle(28),
+		.text_style = style::LegacyButtonTextStyle(11),
+	});
+}
+
+struct RowOperatorButtonProps {
+	const char * key = nullptr;
+	const char * id = nullptr;
+	const char * label = nullptr;
+	float scale = 1.0f;
+	std::function<void(const ::ui::ActivationEvent&)> on_activate = {};
+};
+
+::ui::UiElement RowOperatorButton(const RowOperatorButtonProps& props) {
+	return style::LegacyButton(style::LegacyButtonProps{
+		.key = props.key,
+		.id = props.id,
+		.label = props.label,
+		.on_activate = props.on_activate,
+		.layout = operator_button_layout(props.scale),
+		.style = style::LegacyTextButtonStyle(),
+		.text_style = style::LegacyHeadingTextStyle(8),
+		.text_layout = style::ButtonLabelLayout(15.0f),
+	});
+}
 
 ::ui::UiElement KeybindRow(const KeybindRowProps& props) {
 	const OptionsControls& controls = UseOptionsControls();
@@ -310,26 +334,26 @@ struct KeybindRowProps {
 		  layout={label_layout(scale)}
 		  style={heading_style()}
 		/>
-		<Button
+		<RowActionButton
 		  key="primary"
 		  id={primary_id(props.index)}
 		  label={row->rebindingPrimary ? "-" : row->primaryLabel.c_str()}
+		  scale={scale}
 		  onActivate={rebind_callback(controls.begin_rebind, props.index, 0)}
-		  layout={action_button_layout(scale)}
 		/>
-		<Button
+		<RowOperatorButton
 		  key="operator"
 		  id={operator_id(props.index)}
 		  label={row->operatorLabel.c_str()}
+		  scale={scale}
 		  onActivate={operator_callback(controls.toggle_operator, props.index)}
-		  layout={operator_button_layout(scale)}
 		/>
-		<Button
+		<RowActionButton
 		  key="secondary"
 		  id={secondary_id(props.index)}
 		  label={row->rebindingSecondary ? "-" : row->secondaryLabel.c_str()}
+		  scale={scale}
 		  onActivate={rebind_callback(controls.begin_rebind, props.index, 1)}
-		  layout={action_button_layout(scale)}
 		/>
 	</Box>
 }
@@ -340,15 +364,16 @@ struct PresetButtonProps {
 
 ::ui::UiElement PresetButton(const PresetButtonProps& props) {
 	const OptionsControls& controls = UseOptionsControls();
-	return <Button
-	  key={props.key}
-	  id="options_controls.preset"
-	  label={preset_text(controls.keybinds)}
-	  accessibility={::ui::components::AccessibilityProps{.label = "Preset"}}
-	  autofocus={true}
-	  onActivate={action_callback(controls.cycle_preset)}
-	  layout={preset_button_layout(h_scale(controls.keybinds))}
-	/>
+	return style::LegacyButton(style::LegacyButtonProps{
+		.key = props.key,
+		.id = "options_controls.preset",
+		.autofocus = true,
+		.accessibility = ::ui::components::AccessibilityProps{.label = "Preset"},
+		.label = preset_text(controls.keybinds),
+		.on_activate = action_callback(controls.cycle_preset),
+		.layout = preset_button_layout(h_scale(controls.keybinds)),
+		.style = style::LegacyOvalButtonStyle(23),
+	});
 }
 
 struct ControlsSaveButtonProps {
@@ -358,13 +383,13 @@ struct ControlsSaveButtonProps {
 ::ui::UiElement ControlsSaveButton(const ControlsSaveButtonProps& props) {
 	const OptionsControls& controls = UseOptionsControls();
 	Navigation navigation = use_navigation();
-	return <Button
-	  key={props.key}
-	  id="options_controls.save"
-	  label="Save"
-	  onActivate={navigation_action_callback(controls.save, navigation)}
-	  layout={footer_button_layout()}
-	/>
+	return style::LegacyButton(style::LegacyButtonProps{
+		.key = props.key,
+		.id = "options_controls.save",
+		.label = "Save",
+		.on_activate = navigation_action_callback(controls.save, navigation),
+		.layout = footer_button_layout(),
+	});
 }
 
 struct ControlsCancelButtonProps {
@@ -374,13 +399,13 @@ struct ControlsCancelButtonProps {
 ::ui::UiElement ControlsCancelButton(const ControlsCancelButtonProps& props) {
 	const OptionsControls& controls = UseOptionsControls();
 	Navigation navigation = use_navigation();
-	return <Button
-	  key={props.key}
-	  id="options_controls.cancel"
-	  label="Cancel"
-	  onActivate={navigation_action_callback(controls.cancel, navigation)}
-	  layout={footer_button_layout()}
-	/>
+	return style::LegacyButton(style::LegacyButtonProps{
+		.key = props.key,
+		.id = "options_controls.cancel",
+		.label = "Cancel",
+		.on_activate = navigation_action_callback(controls.cancel, navigation),
+		.layout = footer_button_layout(),
+	});
 }
 
 }  // namespace

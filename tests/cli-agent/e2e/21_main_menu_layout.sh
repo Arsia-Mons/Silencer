@@ -136,7 +136,7 @@ check_layout() {
       console.error(`button order mismatch at ${i}: expected ${e.label}, got ${b.label}`);
       process.exit(1);
     }
-    if (b.w !== 216 || b.h !== 33) {
+    if (b.w !== 196 || b.h !== 33) {
       console.error(`unexpected retained button bounds for ${b.label}: ${b.w}x${b.h}`);
       process.exit(1);
     }
@@ -148,9 +148,9 @@ check_layout() {
 
   const [tutorial, connect, options, exit] = buttons;
   const staggerChecks = [
-    [connect.x - tutorial.x, 0, "Connect should align with Tutorial"],
-    [connect.x - options.x, 0, "Connect should align with Options"],
-    [tutorial.x - exit.x, 0, "Exit should align with Tutorial"],
+    [connect.x - tutorial.x, 40, "Connect should keep the legacy right stagger"],
+    [connect.x - options.x, 40, "Connect should keep the legacy right stagger from Options"],
+    [tutorial.x - exit.x, 40, "Exit should keep the legacy left stagger"],
     [options.x - tutorial.x, 0, "Tutorial and Options should share x offset"],
   ];
   for (const [actual, expectedValue, message] of staggerChecks) {
@@ -165,16 +165,16 @@ check_layout() {
     options.y - (connect.y + connect.h),
     exit.y - (options.y + options.h),
   ];
-  if (!gaps.every((gap) => gap === 14)) {
-    console.error(`vertical gaps should preserve the retained 14px rhythm: ${gaps.join(",")}`);
+  if (!gaps.every((gap) => gap === 34)) {
+    console.error(`vertical gaps should preserve the legacy 34px rhythm: ${gaps.join(",")}`);
     process.exit(1);
   }
   if (viewportW === 640 && viewportH === 480) {
     const legacyBoxes = [
-      [tutorial, 212, 192],
-      [connect, 212, 239],
-      [options, 212, 286],
-      [exit, 212, 333],
+      [tutorial, 350, 154],
+      [connect, 390, 221],
+      [options, 350, 288],
+      [exit, 310, 355],
     ];
     for (const [button, x, y] of legacyBoxes) {
       if (button.x !== x || button.y !== y) {

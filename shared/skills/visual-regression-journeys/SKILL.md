@@ -28,9 +28,9 @@ Don't invoke for:
 1. **Capture** every reachable journey on the current branch into `/tmp/journeys-<current-sha>/`:
    - Main menu (640×480, 1280×720)
    - Options root, Options Controls, Options Display, Options Audio
-   - Lobby connect screen (no live lobby needed — the connect-attempt UI itself is captured)
+   - Lobby connect screen (no live lobby needed — both sides use a temporary config pointing at closed localhost port 9)
    - In-game HUD (via Tutorial), at 640×480 and 1280×720
-   - In-game overlays via `ingame_ui_mode --mode {chat,buy,tech,playerlist}` (note: tutorial mode may not surface buy/tech overlays because those need world stations — flag this in the report, don't claim success)
+   - In-game overlays via `ingame_ui_mode --mode {chat,buy,tech,playerlist}`. Current and baseline both start a fresh tutorial session per in-game row so buy/tech setup does not leak into chat/HUD captures.
 
 2. **Capture the baseline** in a git worktree (`/tmp/silencer-<ref>/`). The worktree pattern is mandatory because:
    - Older refs may lack newer CLI ops (`resize`, `ingame_ui_mode`, `wait_ms`).
@@ -63,16 +63,20 @@ SKIP_BASELINE=1 bash shared/skills/visual-regression-journeys/run.sh
 
 # Skip current branch capture (re-use existing)
 SKIP_CURRENT=1 bash shared/skills/visual-regression-journeys/run.sh
+
+# Skip the default Discord DM of the final contact sheet
+DISCORD_DM=0 bash shared/skills/visual-regression-journeys/run.sh
 ```
 
-The driver does five things in order: build current → capture current → checkout baseline worktree + build → capture baseline → pixdiff + composites. Each step is its own script; they can be invoked independently for debugging.
+The driver does six things in order: verify current build → capture current → checkout baseline worktree + build baseline through `clients/silencer/build.sh` → capture baseline → pixdiff + composites → Discord DM the final contact sheet. Each step is its own script; they can be invoked independently for debugging.
 
 ## Pre-flight requirements
 
-- `cmake --build build --target silencer -j 8` must succeed on the current branch first. The driver does NOT rebuild for you — it errors if `build/Silencer.app/Contents/MacOS/Silencer` is stale.
+- `clients/silencer/build.sh` must succeed on the current branch first. The driver does NOT rebuild the current branch for you — it errors if the client binary is missing.
 - `tools/pixdiff/build/pixdiff` must exist. Build with `cmake -B tools/pixdiff/build -S tools/pixdiff && cmake --build tools/pixdiff/build` if missing.
 - `magick` (ImageMagick 7) on PATH. `brew install imagemagick` if missing.
 - `ripgrep` (`rg`) for `tests/cli-agent/e2e/60_ui_architecture_boundaries.sh` to actually do anything when invoked. `brew install ripgrep`.
+- Discord DM is on by default. It needs Bun plus `discord-dm/send.ts` from the configured skill path; set `DISCORD_SEND_TS=/path/to/send.ts` when auto-detection misses it, or `DISCORD_DM=0` to skip.
 
 ## What it catches (real examples)
 
@@ -88,8 +92,8 @@ The driver does five things in order: build current → capture current → chec
 
 ## Files
 
-- `run.sh` — the orchestrator. Read it; it documents the flow as comments.
-- `capture_current.sh` — captures the current branch into `$OUT_DIR`. Uses `tests/cli-agent/e2e/lib.sh` from the current worktree. Uses Clay-era labels ("OPTIONS", "CONTROLS").
+- `run.sh` — the orchestrator. Read it; it documents the flow as comments. Sends `00_all_scenes_contact_sheet.png` by Discord DM unless `DISCORD_DM=0`.
+- `capture_current.sh` — captures the current branch into `$OUT_DIR`. Uses `tests/cli-agent/e2e/lib.sh` from the current worktree. Menu/options run in one client; every in-game row starts a fresh client to match baseline isolation.
 - `capture_baseline.sh` — captures the baseline ref. Sets `SILENCER_BIN` to the worktree's build output. Uses legacy-era labels ("Controls", "Display", "Audio"). Restarts the binary per screen because legacy UI flow is fragile to CLI back-navigation.
 - `build_composites.sh` — runs ImageMagick to produce side-by-side composites with diff scores. Uses `/System/Library/Fonts/Supplemental/Arial.ttf` to avoid ImageMagick's font fallback failure on macOS.
 
@@ -97,6 +101,8 @@ The driver does five things in order: build current → capture current → chec
 
 - **Label casing differs between branches.** Legacy UI uses "Controls" / "Display" / "Audio"; Clay UI uses "OPTIONS" / "CONTROLS" / "DISPLAY" / "AUDIO". The two capture scripts are split intentionally.
 - **Origin/main's legacy fade is slow.** Use `wait_ms --n 2000` post-state-transition, not `wait_frames --n 4`. The latter is ~167ms; legacy fade can take >1s.
+- **Lobby connect must not hit production.** The scripts write a temporary `config.cfg` under an isolated `HOME` with `lobbyhost=127.0.0.1` and `lobbyport=9`, so the row compares the local connect-failure panel instead of live-server version/update state.
+- **In-game modes mutate world state.** `tech` moves the local player into a base-space view. Keep each in-game row in its own client process; otherwise later chat/HUD rows compare a gameplay side effect instead of the overlay.
 - **`current_interface_id: 0` is a transient state on legacy UI.** After clicking a button to enter a state, the new Interface object instantiates one frame later. If you `inspect` or `click` too soon you get "no current interface". Wait ≥1.5s.
 - **`set -e` is dangerous in the orchestrator.** Some captures legitimately fail (e.g., Tutorial → SINGLEPLAYERGAME timeout in a CI env without GPU). Each capture must be its own subshell so one failure doesn't kill the rest.
 - **macOS Screen Recording perms** are not needed — these captures go through the in-process `cli screenshot` op which writes PNG from the indexed framebuffer.

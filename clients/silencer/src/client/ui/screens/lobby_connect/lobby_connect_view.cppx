@@ -2,8 +2,8 @@
 
 #include "client/ui/hooks/use_navigation.h"
 #include "client/ui/screens/main_menu/main_menu_screen.h"
+#include "client/ui/style/silencer_style.h"
 #include "ui/components/box.h"
-#include "ui/components/button.h"
 #include "ui/components/input.h"
 #include "ui/components/text.h"
 
@@ -14,8 +14,6 @@ namespace silencer::client_ui {
 using ::ui::children;
 using ::ui::components::Box;
 using ::ui::components::BoxProps;
-using ::ui::components::Button;
-using ::ui::components::ButtonProps;
 using ::ui::components::Input;
 using ::ui::components::InputProps;
 using ::ui::components::Text;
@@ -35,95 +33,62 @@ namespace {
 
 ::ui::LayoutStyle panel_layout() {
 	return ::ui::LayoutStyle{
+		.position = ::ui::PositionType::Relative,
 		.direction = ::ui::FlexDirection::Column,
-		.align_items = ::ui::AlignItems::Stretch,
 		.width = ::ui::Length::points(284.0f),
 		.height = ::ui::Length::points(277.0f),
-		.padding = {12.0f, 12.0f, 8.0f, 8.0f},
-		.gap = 7.0f,
 	};
 }
 
 ::ui::StyleStatePatch panel_style() {
-	return ::ui::patch()
-		.background(::ui::Color{31, 36, 44, 248})
-		.border(::ui::Border{
-			.width = {1.0f, 1.0f, 1.0f, 1.0f},
-			.color = {
-				{74, 86, 102, 255},
-				{74, 86, 102, 255},
-				{74, 86, 102, 255},
-				{74, 86, 102, 255},
-			},
-		});
+	return style::SpriteBackground(7, 2);
 }
 
-::ui::LayoutStyle log_layout() {
+::ui::EdgeSizes absolute_inset(int x, int y) {
+	::ui::EdgeSizes inset;
+	inset.left = ::ui::StyleValue::points(static_cast<float>(x));
+	inset.top = ::ui::StyleValue::points(static_cast<float>(y));
+	return inset;
+}
+
+::ui::LayoutStyle absolute_layout(int x, int y, int w, int h) {
 	return ::ui::LayoutStyle{
-		.direction = ::ui::FlexDirection::Column,
-		.align_items = ::ui::AlignItems::Start,
-		.width = ::ui::Length::points(250.0f),
-		.height = ::ui::Length::points(170.0f),
-		.gap = 0.0f,
+		.position = ::ui::PositionType::Absolute,
+		.width = ::ui::Length::points(static_cast<float>(w)),
+		.height = ::ui::Length::points(static_cast<float>(h)),
+		.position_inset = absolute_inset(x, y),
 	};
 }
 
-::ui::LayoutStyle log_line_layout() {
-	return ::ui::LayoutStyle{
-		.width = ::ui::Length::points(250.0f),
-		.height = ::ui::Length::points(11.0f),
-	};
+::ui::LayoutStyle log_line_layout(int slot) {
+	return absolute_layout(7, 8 + slot * 11, 250, 11);
 }
 
-::ui::LayoutStyle form_layout() {
-	return ::ui::LayoutStyle{
-		.direction = ::ui::FlexDirection::Column,
-		.gap = 6.0f,
-	};
+::ui::LayoutStyle label_layout(int y) {
+	return absolute_layout(4, y, 86, 21);
 }
 
-::ui::LayoutStyle form_row_layout() {
+::ui::LayoutStyle input_layout(int y) {
 	return ::ui::LayoutStyle{
-		.direction = ::ui::FlexDirection::Row,
-		.align_items = ::ui::AlignItems::Center,
-		.height = ::ui::Length::points(21.0f),
-	};
-}
-
-::ui::LayoutStyle label_layout() {
-	return ::ui::LayoutStyle{
-		.width = ::ui::Length::points(86.0f),
-		.height = ::ui::Length::points(21.0f),
-	};
-}
-
-::ui::LayoutStyle input_layout() {
-	return ::ui::LayoutStyle{
+		.position = ::ui::PositionType::Absolute,
 		.align_items = ::ui::AlignItems::Stretch,
 		.justify_content = ::ui::JustifyContent::Center,
 		.width = ::ui::Length::points(183.0f),
 		.height = ::ui::Length::points(21.0f),
-		.padding = {7.0f, 7.0f, 3.0f, 3.0f},
+		.position_inset = absolute_inset(90, y),
+		.padding = {7.0f, 0.0f, 4.0f, 0.0f},
 	};
 }
 
-::ui::LayoutStyle actions_layout() {
+::ui::LayoutStyle button_layout(int x, int width) {
 	return ::ui::LayoutStyle{
-		.direction = ::ui::FlexDirection::Row,
+		.position = ::ui::PositionType::Absolute,
 		.align_items = ::ui::AlignItems::Center,
 		.justify_content = ::ui::JustifyContent::Center,
-		.height = ::ui::Length::points(33.0f),
-		.gap = 0.0f,
-	};
-}
-
-::ui::LayoutStyle button_layout() {
-	return ::ui::LayoutStyle{
-		.align_items = ::ui::AlignItems::Center,
-		.justify_content = ::ui::JustifyContent::Center,
-		.width = ::ui::Length::points(112.0f),
-		.height = ::ui::Length::points(28.0f),
-		.padding = {10.0f, 10.0f, 5.0f, 5.0f},
+		.width = ::ui::Length::points(static_cast<float>(width)),
+		.height = ::ui::Length::points(21.0f),
+		.position_inset = absolute_inset(x, 249),
+		.padding = {10.0f, 10.0f, 4.0f, 0.0f},
 	};
 }
 
@@ -134,6 +99,27 @@ namespace {
 		.font_size = 8,
 		.align = ::ui::TextAlign::Center,
 	});
+}
+
+::ui::StyleStatePatch input_style() {
+	::ui::StylePatch clear = ::ui::patch()
+		.background(::ui::Color{0, 0, 0, 0})
+		.border(::ui::Border{})
+		.outline(::ui::Outline{})
+		.text(::ui::TextVisual{
+			.color = {226, 234, 242, 255},
+			.font_id = 133,
+			.font_size = 6,
+			.line_height = 11.0f,
+		});
+	::ui::StyleStatePatch state;
+	state.base = clear;
+	state.hover = clear;
+	state.focus_visible = clear;
+	state.pressed = clear;
+	state.active = clear;
+	state.disabled = clear;
+	return state;
 }
 
 ::ui::StyleStatePatch log_style() {
@@ -169,6 +155,7 @@ std::function<void(const ::ui::ActivationEvent&)> cancel_callback(
 
 struct UsernameInputProps {
 	const char * key = nullptr;
+	int y = 0;
 };
 
 ::ui::UiElement UsernameInput(const UsernameInputProps& props) {
@@ -181,12 +168,14 @@ struct UsernameInputProps {
 	  autofocus={true}
 	  accessibility={::ui::components::AccessibilityProps{.role = ::ui::SemanticRole::TextBox, .label = "Username"}}
 	  onChange={text_callback(credentials.set_username)}
-	  layout={input_layout()}
+	  layout={input_layout(props.y)}
+	  style={input_style()}
 	/>
 }
 
 struct PasswordInputProps {
 	const char * key = nullptr;
+	int y = 0;
 };
 
 ::ui::UiElement PasswordInput(const PasswordInputProps& props) {
@@ -199,7 +188,8 @@ struct PasswordInputProps {
 	  disabled={credentials.inactive}
 	  accessibility={::ui::components::AccessibilityProps{.role = ::ui::SemanticRole::TextBox, .label = "Password"}}
 	  onChange={text_callback(credentials.set_password)}
-	  layout={input_layout()}
+	  layout={input_layout(props.y)}
+	  style={input_style()}
 	/>
 }
 
@@ -209,13 +199,16 @@ struct LoginButtonProps {
 
 ::ui::UiElement LoginButton(const LoginButtonProps& props) {
 	const LobbyConnectCredentials& credentials = UseLobbyConnectCredentials();
-	return <Button
-	  key={props.key}
-	  id="lobby_connect.login"
-	  label="Login/Create"
-	  onActivate={submit_callback(credentials.submit)}
-	  layout={button_layout()}
-	/>
+	return style::LegacyButton(style::LegacyButtonProps{
+		.key = props.key,
+		.id = "lobby_connect.login",
+		.label = "Login/Create",
+		.on_activate = submit_callback(credentials.submit),
+		.layout = button_layout(50, 116),
+		.style = style::SpriteBackground(7, 24),
+		.text_style = style::LegacyHeadingTextStyle(8),
+		.text_layout = style::ButtonLabelLayout(13.0f),
+	});
 }
 
 struct LobbyConnectCancelButtonProps {
@@ -224,13 +217,16 @@ struct LobbyConnectCancelButtonProps {
 
 ::ui::UiElement LobbyConnectCancelButton(const LobbyConnectCancelButtonProps& props) {
 	Navigation navigation = use_navigation();
-	return <Button
-	  key={props.key}
-	  id="lobby_connect.cancel"
-	  label="Cancel"
-	  onActivate={cancel_callback(navigation)}
-	  layout={button_layout()}
-	/>
+	return style::LegacyButton(style::LegacyButtonProps{
+		.key = props.key,
+		.id = "lobby_connect.cancel",
+		.label = "Cancel",
+		.on_activate = cancel_callback(navigation),
+		.layout = button_layout(166, 68),
+		.style = style::SpriteBackground(7, 24),
+		.text_style = style::LegacyHeadingTextStyle(8),
+		.text_layout = style::ButtonLabelLayout(13.0f),
+	});
 }
 
 }  // namespace
@@ -239,37 +235,27 @@ struct LobbyConnectCancelButtonProps {
 	const LobbyConnectLog& log = UseLobbyConnectLog();
 	return <Box key={props.key} layout={root_layout()}>
 		<Box key="panel" layout={panel_layout()} style={panel_style()}>
-			<Box key="log" layout={log_layout()}>
-				<Text key="log-00" value={log.log_lines[0]} layout={log_line_layout()} style={log_style()} />
-				<Text key="log-01" value={log.log_lines[1]} layout={log_line_layout()} style={log_style()} />
-				<Text key="log-02" value={log.log_lines[2]} layout={log_line_layout()} style={log_style()} />
-				<Text key="log-03" value={log.log_lines[3]} layout={log_line_layout()} style={log_style()} />
-				<Text key="log-04" value={log.log_lines[4]} layout={log_line_layout()} style={log_style()} />
-				<Text key="log-05" value={log.log_lines[5]} layout={log_line_layout()} style={log_style()} />
-				<Text key="log-06" value={log.log_lines[6]} layout={log_line_layout()} style={log_style()} />
-				<Text key="log-07" value={log.log_lines[7]} layout={log_line_layout()} style={log_style()} />
-				<Text key="log-08" value={log.log_lines[8]} layout={log_line_layout()} style={log_style()} />
-				<Text key="log-09" value={log.log_lines[9]} layout={log_line_layout()} style={log_style()} />
-				<Text key="log-10" value={log.log_lines[10]} layout={log_line_layout()} style={log_style()} />
-				<Text key="log-11" value={log.log_lines[11]} layout={log_line_layout()} style={log_style()} />
-				<Text key="log-12" value={log.log_lines[12]} layout={log_line_layout()} style={log_style()} />
-				<Text key="log-13" value={log.log_lines[13]} layout={log_line_layout()} style={log_style()} />
-				<Text key="log-14" value={log.log_lines[14]} layout={log_line_layout()} style={log_style()} />
-			</Box>
-			<Box key="form" layout={form_layout()}>
-				<Box key="username-row" layout={form_row_layout()}>
-					<Text key="username-label" value="Username" layout={label_layout()} style={label_style()} />
-					<UsernameInput key="username" />
-				</Box>
-				<Box key="password-row" layout={form_row_layout()}>
-					<Text key="password-label" value="Password" layout={label_layout()} style={label_style()} />
-					<PasswordInput key="password" />
-				</Box>
-			</Box>
-			<Box key="actions" layout={actions_layout()}>
-				<LoginButton key="login" />
-				<LobbyConnectCancelButton key="cancel" />
-			</Box>
+			<Text key="log-00" value={log.log_lines[0]} layout={log_line_layout(0)} style={log_style()} />
+			<Text key="log-01" value={log.log_lines[1]} layout={log_line_layout(1)} style={log_style()} />
+			<Text key="log-02" value={log.log_lines[2]} layout={log_line_layout(2)} style={log_style()} />
+			<Text key="log-03" value={log.log_lines[3]} layout={log_line_layout(3)} style={log_style()} />
+			<Text key="log-04" value={log.log_lines[4]} layout={log_line_layout(4)} style={log_style()} />
+			<Text key="log-05" value={log.log_lines[5]} layout={log_line_layout(5)} style={log_style()} />
+			<Text key="log-06" value={log.log_lines[6]} layout={log_line_layout(6)} style={log_style()} />
+			<Text key="log-07" value={log.log_lines[7]} layout={log_line_layout(7)} style={log_style()} />
+			<Text key="log-08" value={log.log_lines[8]} layout={log_line_layout(8)} style={log_style()} />
+			<Text key="log-09" value={log.log_lines[9]} layout={log_line_layout(9)} style={log_style()} />
+			<Text key="log-10" value={log.log_lines[10]} layout={log_line_layout(10)} style={log_style()} />
+			<Text key="log-11" value={log.log_lines[11]} layout={log_line_layout(11)} style={log_style()} />
+			<Text key="log-12" value={log.log_lines[12]} layout={log_line_layout(12)} style={log_style()} />
+			<Text key="log-13" value={log.log_lines[13]} layout={log_line_layout(13)} style={log_style()} />
+			<Text key="log-14" value={log.log_lines[14]} layout={log_line_layout(14)} style={log_style()} />
+			<Text key="username-label" value="Username" layout={label_layout(195)} style={label_style()} />
+			<UsernameInput key="username" y={195} />
+			<Text key="password-label" value="Password" layout={label_layout(222)} style={label_style()} />
+			<PasswordInput key="password" y={222} />
+			<LoginButton key="login" />
+			<LobbyConnectCancelButton key="cancel" />
 		</Box>
 	</Box>
 }

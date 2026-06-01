@@ -37,6 +37,39 @@ offsetX = scaledW < surfaceW ? (surfaceW - scaledW) / 2 : 0;
 offsetY = scaledH < surfaceH ? (surfaceH - scaledH) / 2 : 0;
 }
 
+static void BlitScaledUiSurface(Surface& src,
+                                Surface& dst,
+                                float scale,
+                                int offsetX,
+                                int offsetY) {
+if(src.w <= 0 || src.h <= 0 || dst.w <= 0 || dst.h <= 0) return;
+if(scale <= 0.0f) scale = 1.0f;
+
+int scaledW = static_cast<int>(src.w * scale + 0.5f);
+int scaledH = static_cast<int>(src.h * scale + 0.5f);
+if(scaledW < 1) scaledW = 1;
+if(scaledH < 1) scaledH = 1;
+
+Uint8 * srcPixels = src.GetPixels();
+Uint8 * dstPixels = dst.GetPixels();
+for(int dy = 0; dy < scaledH; ++dy){
+int y = offsetY + dy;
+if(y < 0 || y >= dst.h) continue;
+int sy = static_cast<int>(static_cast<float>(dy) / scale);
+if(sy < 0) sy = 0;
+if(sy >= src.h) sy = src.h - 1;
+for(int dx = 0; dx < scaledW; ++dx){
+int x = offsetX + dx;
+if(x < 0 || x >= dst.w) continue;
+int sx = static_cast<int>(static_cast<float>(dx) / scale);
+if(sx < 0) sx = 0;
+if(sx >= src.w) sx = src.w - 1;
+Uint8 pixel = srcPixels[sx + sy * src.w];
+if(pixel) dstPixels[x + y * dst.w] = pixel;
+}
+}
+}
+
 } // namespace
 
 void GameUiPipeline::PrepareClientUiFrame(Surface& surface) {
@@ -163,7 +196,22 @@ PrepareClientUiFrame(surface);
 BeginPreparedClientUiFrame();
 BuildVisibleClientUi();
 EndClientUiFrame();
+const int virtualW = std::max(1, preparedUiInput.width);
+const int virtualH = std::max(1, preparedUiInput.height);
+const float uiScale = preparedUiInput.uiScale > 0.0f ? preparedUiInput.uiScale : 1.0f;
+int offsetX = 0;
+int offsetY = 0;
+CenteredLayoutOffset(surface.w, surface.h, virtualW, virtualH, uiScale, offsetX, offsetY);
+const bool transformed =
+uiScale != 1.0f || offsetX != 0 || offsetY != 0 ||
+virtualW != surface.w || virtualH != surface.h;
+if(transformed){
+Surface uiSurface(virtualW, virtualH, 0);
+clientUi.RenderRetainedScreens(game.renderer, game.world.resources, uiSurface);
+BlitScaledUiSurface(uiSurface, surface, uiScale, offsetX, offsetY);
+}else{
 clientUi.RenderRetainedScreens(game.renderer, game.world.resources, surface);
+}
 if(game.state != GameState::FADEOUT){
 std::vector<silencer::ui::UiAction> unhandledUiActions =
 clientUi.DispatchInput(game.screenContext, preparedUiInput);
