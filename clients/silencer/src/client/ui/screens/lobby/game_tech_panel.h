@@ -55,6 +55,9 @@ void GameTechPanelInit(GameTechPanelState & state);
 // Per-frame read-only refresh of slots-left, peer names, and the tech grid.
 void GameTechPanelTick(GameTechPanelState & state,
                        LobbyModel & lobby);
+void GameTechPanelDescribe(GameTechPanelState & state,
+                           const LobbyModel & lobby,
+                           int item_index);
 
 }  // namespace silencer::client_ui::lobby
 

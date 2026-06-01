@@ -45,4 +45,14 @@ void GameTechPanelTick(GameTechPanelState & state,
 	state.grid = MakeGridState(lobby.pregame.tech.grid());
 }
 
+void GameTechPanelDescribe(GameTechPanelState & state,
+                           const LobbyModel & lobby,
+                           int item_index) {
+	const LobbyPregameTechModel::Description desc =
+		lobby.pregame.tech.description(item_index);
+	if(desc.name.empty()) return;
+	state.techNameStr = desc.name;
+	state.techDescLines = desc.lines;
+}
+
 }  // namespace silencer::client_ui::lobby

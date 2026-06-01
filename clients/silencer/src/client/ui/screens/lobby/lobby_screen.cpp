@@ -599,12 +599,7 @@ void LobbyScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime, s
 			lobby.pregame.tech.toggle(item_index);
 		},
 		.game_tech_describe = [this, lobby](int item_index) {
-			const silencer::client_ui::LobbyPregameTechModel::Description desc =
-				lobby.pregame.tech.description(item_index);
-			if(!desc.name.empty()){
-				gameTechState.techNameStr = desc.name;
-				gameTechState.techDescLines = desc.lines;
-			}
+			GameTechPanelDescribe(gameTechState, lobby, item_index);
 		},
 		.game_tech_peer_x = rightUpperX + lobby_screen_detail::kGameTechPeerColPadLeft,
 		.game_tech_peer_y = gameTechPeerY,
