@@ -6,33 +6,51 @@ namespace silencer {
 namespace client_ui {
 
 namespace {
-::ReactContext LobbyConnectContext = {};
-const LobbyConnectContextValue kEmptyLobbyConnect = {};
+::ReactContext LobbyConnectLogContext = {};
+::ReactContext LobbyConnectCredentialsContext = {};
+const LobbyConnectLog kEmptyLobbyConnectLog = {};
+const LobbyConnectCredentials kEmptyLobbyConnectCredentials = {};
 }  // namespace
 
-const LobbyConnectContextValue& UseLobbyConnect() {
-	const auto * value = static_cast<const LobbyConnectContextValue *>(
-		::use_context(&LobbyConnectContext));
+const LobbyConnectLog& UseLobbyConnectLog() {
+	const auto * value = static_cast<const LobbyConnectLog *>(
+		::use_context(&LobbyConnectLogContext));
 	if(value) return *value;
-	::react_report_error("client/ui/lobby-connect: missing LobbyConnectProvider for UseLobbyConnect\n");
-	return kEmptyLobbyConnect;
+	::react_report_error("client/ui/lobby-connect: missing LobbyConnectLogProvider for UseLobbyConnectLog\n");
+	return kEmptyLobbyConnectLog;
+}
+
+const LobbyConnectCredentials& UseLobbyConnectCredentials() {
+	const auto * value = static_cast<const LobbyConnectCredentials *>(
+		::use_context(&LobbyConnectCredentialsContext));
+	if(value) return *value;
+	::react_report_error("client/ui/lobby-connect: missing LobbyConnectCredentialsProvider for UseLobbyConnectCredentials\n");
+	return kEmptyLobbyConnectCredentials;
 }
 
 ::ui::UiElement LobbyConnectView(const LobbyConnectViewProps& props) {
-	const LobbyConnectContextValue * stored = ::ui::copy_value(
-		props.value ? *props.value : kEmptyLobbyConnect);
-	if(!stored){
+	const LobbyConnectLog * log = ::ui::copy_value(
+		props.log ? *props.log : kEmptyLobbyConnectLog);
+	const LobbyConnectCredentials * credentials = ::ui::copy_value(
+		props.credentials ? *props.credentials : kEmptyLobbyConnectCredentials);
+	if(!log || !credentials){
 		return ::ui::empty();
 	}
-	return ::ui::provider(
-		"LobbyConnectProvider",
-		&LobbyConnectContext,
-		const_cast<LobbyConnectContextValue *>(stored),
+	::ui::UiElement frame = ::ui::provider(
+		"LobbyConnectCredentialsProvider",
+		&LobbyConnectCredentialsContext,
+		const_cast<LobbyConnectCredentials *>(credentials),
 		::ui::children({
 			::ui::component("LobbyConnectFrame",
 			                LobbyConnectFrameProps{ .key = "frame" },
 			                LobbyConnectFrame),
 		}),
+		"credentials");
+	return ::ui::provider(
+		"LobbyConnectLogProvider",
+		&LobbyConnectLogContext,
+		const_cast<LobbyConnectLog *>(log),
+		::ui::children({frame}),
 		props.key);
 }
 

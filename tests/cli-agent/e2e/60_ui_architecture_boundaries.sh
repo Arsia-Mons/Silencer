@@ -169,6 +169,13 @@ fail_if_match \
   "$REPO_ROOT/clients/silencer/src/client/ui/screens/lobby/lobby_view_provider.cpp"
 
 fail_if_match \
+  "\\bLobbyConnect(ContextValue|Actions)\\b|\\bUseLobbyConnect[[:space:]]*\\(" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens/lobby_connect/lobby_connect_view.cppx" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens/lobby_connect/lobby_connect_view.hx" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens/lobby_connect/lobby_connect_screen.cpp" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens/lobby_connect/lobby_connect_view_provider.cpp"
+
+fail_if_match \
   "return[[:space:]]+value[[:space:]]*[?][[:space:]]*[*]value[[:space:]]*:[[:space:]]*kEmpty" \
   "$REPO_ROOT/clients/silencer/src/client/ui" \
   --glob '*_view_provider.cpp' \

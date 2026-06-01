@@ -188,35 +188,34 @@ bool LobbyConnectScreen::BuildElement(ScreenContext & ctx, ::ui::UiElement * out
 	}
 
 	const bool inactive = ctx.world.lobby.state == Lobby::AUTHSENT;
-	const silencer::client_ui::LobbyConnectContextValue context{
-		.state = silencer::client_ui::LobbyConnectState{
-			.log_lines = lines,
-			.username = username,
-			.password = password,
-			.inactive = inactive,
+	const silencer::client_ui::LobbyConnectLog log{
+		.log_lines = lines,
+	};
+	const silencer::client_ui::LobbyConnectCredentials credentials{
+		.username = username,
+		.password = password,
+		.inactive = inactive,
+		.set_username = [this](const std::string& value) {
+			lobby_connect_screen_detail::CopyUiText(
+				username, static_cast<int>(sizeof(username)), value);
 		},
-		.actions = silencer::client_ui::LobbyConnectActions{
-			.set_username = [this](const std::string& value) {
-				lobby_connect_screen_detail::CopyUiText(
-					username, static_cast<int>(sizeof(username)), value);
-			},
-			.set_password = [this](const std::string& value) {
-				lobby_connect_screen_detail::CopyUiText(
-					password, static_cast<int>(sizeof(password)), value);
-			},
-			.submit = [this, world = &ctx.world]() {
-				lobby_connect_screen_detail::SubmitCredentials(*world, username, password);
-			},
-			.cancel = []() {},
+		.set_password = [this](const std::string& value) {
+			lobby_connect_screen_detail::CopyUiText(
+				password, static_cast<int>(sizeof(password)), value);
+		},
+		.submit = [this, world = &ctx.world]() {
+			lobby_connect_screen_detail::SubmitCredentials(*world, username, password);
 		},
 	};
-	const auto * stored = ::ui::copy_value(context);
-	if(!stored) return false;
+	const auto * storedLog = ::ui::copy_value(log);
+	const auto * storedCredentials = ::ui::copy_value(credentials);
+	if(!storedLog || !storedCredentials) return false;
 	*out = ::ui::component(
 		"LobbyConnectView",
 		silencer::client_ui::LobbyConnectViewProps{
 			.key = "lobby-connect",
-			.value = stored,
+			.log = storedLog,
+			.credentials = storedCredentials,
 		},
 		silencer::client_ui::LobbyConnectView);
 	return true;
