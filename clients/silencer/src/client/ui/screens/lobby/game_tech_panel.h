@@ -14,16 +14,33 @@
 
 #include <array>
 #include <string>
-
-namespace silencer::ui {
-class UiInteractionRegistry;
-}
+#include <vector>
 
 namespace silencer::client_ui {
 class LobbyModel;
 }
 
 namespace silencer::client_ui::lobby {
+
+struct GameTechGridCellState {
+	bool draw = false;
+	bool local = false;
+	bool selected = false;
+	Uint8 brightness = 64;
+};
+
+struct GameTechGridRowState {
+	int itemIndex = -1;
+	std::string label;
+	Uint8 labelBrightness = 64;
+	std::array<GameTechGridCellState, 4> cells{};
+};
+
+struct GameTechGridState {
+	bool visible = false;
+	bool localLabelsVisible = false;
+	std::vector<GameTechGridRowState> rows;
+};
 
 struct GameTechPanelState {
 	// Per-frame click flags. Set by typed widget intents; consumed by Tick.
@@ -38,6 +55,7 @@ struct GameTechPanelState {
 	std::string techNameStr;                        // uid 60 — "-ItemName-"
 	std::array<std::string, 8> techDescLines{};     // uid 61..68
 	std::array<std::string, 3> peerNameStrs{};      // uid 80..82 (non-local peers)
+	GameTechGridState grid;
 };
 
 void GameTechPanelInit(GameTechPanelState & state);
@@ -52,14 +70,6 @@ GameTechPanelTickResult GameTechPanelTick(GameTechPanelState & state,
                                           LobbyModel & lobby);
 bool GameTechPanelHandleUiIntent(GameTechPanelState & state,
                                  const silencer::ui::UiAction & action);
-
-// Emits the tall stepped-pane subtree (slots-left text + 4-column tech-choice
-// grid + centered tech-name heading + 8 description lines). Called inside
-// the LobbyRightTallBox CLAY block; flex children only.
-// BeginFrame requirements: TextBeginFrame, ToggleBeginFrame.
-void BuildGameTechTallTree(GameTechPanelState & state,
-                           LobbyModel & lobby,
-                           silencer::ui::UiInteractionRegistry& interactions);
 
 }  // namespace silencer::client_ui::lobby
 

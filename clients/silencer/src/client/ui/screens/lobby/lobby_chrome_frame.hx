@@ -67,6 +67,11 @@ struct LobbyChromeFrameProps {
 	int game_tech_peer_y = 0;
 	int game_tech_peer_width = 0;
 	int game_tech_peer_row_gap = 0;
+	bool show_game_tech_tall = false;
+	int game_tech_tall_x = 0;
+	int game_tech_tall_y = 0;
+	int game_tech_tall_width = 0;
+	int game_tech_tall_height = 0;
 };
 
 ::ui::UiElement LobbyChromeFrame(const LobbyChromeFrameProps& props);

@@ -54,6 +54,29 @@ constexpr int kGameJoinRosterReadyAnchorY = 6;
 constexpr int kGameJoinRosterNameX = 75;
 constexpr int kGameJoinRosterTextY = 8;
 constexpr std::uint8_t kGameJoinRosterLevelColor = 170;
+constexpr int kGameTechRowSlots = 32;
+constexpr int kGameTechDescLineSlots = 8;
+constexpr int kGameTechRowH = 13;
+constexpr int kGameTechSlotsX = 57;
+constexpr int kGameTechSlotsY = 36;
+constexpr int kGameTechGridX = 12;
+constexpr int kGameTechGridY = 61;
+constexpr int kGameTechCheckboxW = 13;
+constexpr int kGameTechCheckboxH = 13;
+constexpr int kGameTechColumnGap = 1;
+constexpr int kGameTechLabelX = 70;
+constexpr int kGameTechLabelPadY = 2;
+constexpr int kGameTechSelectedGapY = 16;
+constexpr int kGameTechNameH = 15;
+constexpr int kGameTechDescPadLeft = 7;
+constexpr int kGameTechDescGapY = 5;
+constexpr int kGameTechDescLineH = 10;
+constexpr std::uint8_t kGameTechCheckboxBank = 7;
+constexpr std::uint16_t kGameTechCheckboxOn = 18;
+constexpr std::uint16_t kGameTechCheckboxOff = 19;
+constexpr std::uint8_t kGameTechTextPalette = 129;
+constexpr const char * kGameTechToggleActionPrefix = "lobby.game_tech.toggle.";
+constexpr const char * kGameTechDescriptionActionPrefix = "lobby.game_tech.description.";
 
 const char * kGameSelectRowKeys[kGameSelectRowSlots] = {
 	"game-select-row-0",  "game-select-row-1",  "game-select-row-2",
@@ -86,6 +109,31 @@ const char * kGameJoinRosterRowKeys[kGameJoinRosterSlots] = {
 	"game-join-roster-row-26", "game-join-roster-row-27",
 	"game-join-roster-row-28", "game-join-roster-row-29",
 	"game-join-roster-row-30", "game-join-roster-row-31",
+};
+
+const char * kGameTechRowKeys[kGameTechRowSlots] = {
+	"game-tech-row-0",  "game-tech-row-1",  "game-tech-row-2",
+	"game-tech-row-3",  "game-tech-row-4",  "game-tech-row-5",
+	"game-tech-row-6",  "game-tech-row-7",  "game-tech-row-8",
+	"game-tech-row-9",  "game-tech-row-10", "game-tech-row-11",
+	"game-tech-row-12", "game-tech-row-13", "game-tech-row-14",
+	"game-tech-row-15", "game-tech-row-16", "game-tech-row-17",
+	"game-tech-row-18", "game-tech-row-19", "game-tech-row-20",
+	"game-tech-row-21", "game-tech-row-22", "game-tech-row-23",
+	"game-tech-row-24", "game-tech-row-25", "game-tech-row-26",
+	"game-tech-row-27", "game-tech-row-28", "game-tech-row-29",
+	"game-tech-row-30", "game-tech-row-31",
+};
+
+const char * kGameTechDescLineKeys[kGameTechDescLineSlots] = {
+	"game-tech-desc-0",
+	"game-tech-desc-1",
+	"game-tech-desc-2",
+	"game-tech-desc-3",
+	"game-tech-desc-4",
+	"game-tech-desc-5",
+	"game-tech-desc-6",
+	"game-tech-desc-7",
 };
 
 inline std::uint32_t texture_id(std::uint8_t bank, std::uint16_t index) {
@@ -235,12 +283,36 @@ inline ::ui::StylePatch sprite_patch(std::uint8_t bank, std::uint16_t index) {
 	});
 }
 
+inline ::ui::VisualStyle sprite_visual(std::uint8_t bank, std::uint16_t index) {
+	::ui::VisualStyle visual{};
+	visual.image = ::ui::BackgroundImage{
+		.texture_id = texture_id(bank, index),
+		.tint = {255, 255, 255, 255},
+	};
+	return visual;
+}
+
 inline ::ui::StylePatch level_text_patch() {
 	return ::ui::patch().text(::ui::TextVisual{
 		.color = {kGameJoinRosterLevelColor, 0, 0, 255},
 		.font_id = 132,
 		.font_size = 4,
 		.line_height = 5.0f,
+	});
+}
+
+inline ::ui::StylePatch palette_text_patch(std::uint8_t palette,
+                                           std::uint16_t font_id,
+                                           std::uint16_t font_size,
+                                           float line_height,
+                                           ::ui::TextAlign align = ::ui::TextAlign::Left,
+                                           std::uint8_t alpha = 255) {
+	return ::ui::patch().text(::ui::TextVisual{
+		.color = {palette, 0, 0, alpha},
+		.font_id = font_id,
+		.font_size = font_size,
+		.align = align,
+		.line_height = line_height,
 	});
 }
 
@@ -300,6 +372,11 @@ inline const char * copied_row_id(int source) {
 	std::string value =
 		std::string(kGameSelectRowActionPrefix) + "." + std::to_string(source);
 	return ::ui::copy_string(value.c_str());
+}
+
+inline const char * copied_prefixed_id(const char * prefix, int value) {
+	std::string id = std::string(prefix) + std::to_string(value);
+	return ::ui::copy_string(id.c_str());
 }
 
 inline const char * game_select_info_value(const GameSelectPanelState& state,
@@ -1023,6 +1100,487 @@ struct GameJoinRosterPanelProps {
 	</Box>
 }
 
+inline int game_tech_visible_rows(const GameTechPanelState * state) {
+	if(!state) return 0;
+	return std::min(
+		kGameTechRowSlots,
+		static_cast<int>(state->grid.rows.size()));
+}
+
+inline std::uint8_t game_tech_label_alpha(std::uint8_t brightness) {
+	return brightness >= 128 ? 255 : 160;
+}
+
+struct GameTechToggleCellProps {
+	const char * key = nullptr;
+	const GameTechGridRowState * row = nullptr;
+	int column = 0;
+	int row_position = 0;
+};
+
+::ui::UiElement GameTechToggleCell(const GameTechToggleCellProps& props) {
+	if(!props.row || props.column < 0 ||
+	   props.column >= static_cast<int>(props.row->cells.size())){
+		return ::ui::empty();
+	}
+	const GameTechGridCellState& cell =
+		props.row->cells[static_cast<size_t>(props.column)];
+	if(!cell.draw) return ::ui::empty();
+	const int x =
+		kGameTechGridX
+		+ props.column * (kGameTechCheckboxW + kGameTechColumnGap);
+	const int y = kGameTechGridY + props.row_position * kGameTechRowH;
+	const std::uint16_t spriteIndex =
+		cell.selected ? kGameTechCheckboxOn : kGameTechCheckboxOff;
+	if(cell.local){
+		return <component_detail.Host
+		  kind={::ui::HostKind::Box}
+		  key={props.key}
+		  id={copied_prefixed_id(kGameTechToggleActionPrefix, props.row->itemIndex)}
+		  style={absolute_layout(x, y, kGameTechCheckboxW, kGameTechCheckboxH)}
+		  visual={sprite_visual(kGameTechCheckboxBank, spriteIndex)}
+		  interaction={::ui::NodeInteraction{
+				.focusable = true,
+				.checked = cell.selected,
+			}}
+		  accessibility={{.role = ::ui::SemanticRole::Checkbox, .label = props.row->label.c_str()}}
+		/>
+	}
+	return <Box
+	  key={props.key}
+	  layout={absolute_layout(x, y, kGameTechCheckboxW, kGameTechCheckboxH)}
+	  style={sprite_patch(kGameTechCheckboxBank, spriteIndex)}
+	/>
+}
+
+struct GameTechRowLabelProps {
+	const char * key = nullptr;
+	const GameTechGridRowState * row = nullptr;
+	int row_position = 0;
+	int width = 0;
+};
+
+::ui::UiElement GameTechRowLabel(const GameTechRowLabelProps& props) {
+	if(!props.row || props.width <= kGameTechLabelX) return ::ui::empty();
+	const int y =
+		kGameTechGridY
+		+ kGameTechLabelPadY
+		+ props.row_position * kGameTechRowH;
+	return <component_detail.Host
+	  kind={::ui::HostKind::Box}
+	  key={props.key}
+	  id={copied_prefixed_id(kGameTechDescriptionActionPrefix, props.row->itemIndex)}
+	  style={absolute_layout(kGameTechLabelX, y, props.width - kGameTechLabelX, kGameTechRowH)}
+	  interaction={::ui::NodeInteraction{.focusable = true}}
+	  accessibility={{.role = ::ui::SemanticRole::Button, .label = props.row->label.c_str()}}
+	>
+		<Text
+		  key="text"
+		  value={props.row->label.c_str()}
+		  layout={absolute_layout(0, 0, props.width - kGameTechLabelX, kGameTechRowH)}
+		  style={palette_text_patch(0, 133, 6, 11.0f, ::ui::TextAlign::Left, game_tech_label_alpha(props.row->labelBrightness))}
+		/>
+	</component_detail.Host>
+}
+
+struct GameTechGridRowViewProps {
+	const char * key = nullptr;
+	const GameTechPanelState * state = nullptr;
+	int index = 0;
+	int width = 0;
+	int height = 0;
+};
+
+::ui::UiElement GameTechGridRowView(const GameTechGridRowViewProps& props) {
+	if(!props.state || !props.state->grid.visible ||
+	   props.index < 0 ||
+	   props.index >= static_cast<int>(props.state->grid.rows.size())){
+		return ::ui::empty();
+	}
+	const GameTechGridRowState& row =
+		props.state->grid.rows[static_cast<size_t>(props.index)];
+	return <Box key={props.key} layout={absolute_layout(0, 0, props.width, props.height)}>
+		<GameTechToggleCell key="cell-0" row={&row} column={0} rowPosition={props.index} />
+		<GameTechToggleCell key="cell-1" row={&row} column={1} rowPosition={props.index} />
+		<GameTechToggleCell key="cell-2" row={&row} column={2} rowPosition={props.index} />
+		<GameTechToggleCell key="cell-3" row={&row} column={3} rowPosition={props.index} />
+		<GameTechRowLabel
+		  key="label"
+		  row={props.state->grid.localLabelsVisible ? &row : nullptr}
+		  rowPosition={props.index}
+		  width={props.width}
+		/>
+	</Box>
+}
+
+struct GameTechRowsProps {
+	const char * key = nullptr;
+	const GameTechPanelState * state = nullptr;
+	int width = 0;
+	int height = 0;
+};
+
+::ui::UiElement GameTechRows(const GameTechRowsProps& props) {
+	return <Box key={props.key} layout={absolute_layout(0, 0, props.width, props.height)}>
+		<GameTechGridRowView
+		  key={kGameTechRowKeys[0]}
+		  state={props.state}
+		  index={0}
+		  width={props.width}
+		  height={props.height}
+		/>
+		<GameTechGridRowView
+		  key={kGameTechRowKeys[1]}
+		  state={props.state}
+		  index={1}
+		  width={props.width}
+		  height={props.height}
+		/>
+		<GameTechGridRowView
+		  key={kGameTechRowKeys[2]}
+		  state={props.state}
+		  index={2}
+		  width={props.width}
+		  height={props.height}
+		/>
+		<GameTechGridRowView
+		  key={kGameTechRowKeys[3]}
+		  state={props.state}
+		  index={3}
+		  width={props.width}
+		  height={props.height}
+		/>
+		<GameTechGridRowView
+		  key={kGameTechRowKeys[4]}
+		  state={props.state}
+		  index={4}
+		  width={props.width}
+		  height={props.height}
+		/>
+		<GameTechGridRowView
+		  key={kGameTechRowKeys[5]}
+		  state={props.state}
+		  index={5}
+		  width={props.width}
+		  height={props.height}
+		/>
+		<GameTechGridRowView
+		  key={kGameTechRowKeys[6]}
+		  state={props.state}
+		  index={6}
+		  width={props.width}
+		  height={props.height}
+		/>
+		<GameTechGridRowView
+		  key={kGameTechRowKeys[7]}
+		  state={props.state}
+		  index={7}
+		  width={props.width}
+		  height={props.height}
+		/>
+		<GameTechGridRowView
+		  key={kGameTechRowKeys[8]}
+		  state={props.state}
+		  index={8}
+		  width={props.width}
+		  height={props.height}
+		/>
+		<GameTechGridRowView
+		  key={kGameTechRowKeys[9]}
+		  state={props.state}
+		  index={9}
+		  width={props.width}
+		  height={props.height}
+		/>
+		<GameTechGridRowView
+		  key={kGameTechRowKeys[10]}
+		  state={props.state}
+		  index={10}
+		  width={props.width}
+		  height={props.height}
+		/>
+		<GameTechGridRowView
+		  key={kGameTechRowKeys[11]}
+		  state={props.state}
+		  index={11}
+		  width={props.width}
+		  height={props.height}
+		/>
+		<GameTechGridRowView
+		  key={kGameTechRowKeys[12]}
+		  state={props.state}
+		  index={12}
+		  width={props.width}
+		  height={props.height}
+		/>
+		<GameTechGridRowView
+		  key={kGameTechRowKeys[13]}
+		  state={props.state}
+		  index={13}
+		  width={props.width}
+		  height={props.height}
+		/>
+		<GameTechGridRowView
+		  key={kGameTechRowKeys[14]}
+		  state={props.state}
+		  index={14}
+		  width={props.width}
+		  height={props.height}
+		/>
+		<GameTechGridRowView
+		  key={kGameTechRowKeys[15]}
+		  state={props.state}
+		  index={15}
+		  width={props.width}
+		  height={props.height}
+		/>
+		<GameTechGridRowView
+		  key={kGameTechRowKeys[16]}
+		  state={props.state}
+		  index={16}
+		  width={props.width}
+		  height={props.height}
+		/>
+		<GameTechGridRowView
+		  key={kGameTechRowKeys[17]}
+		  state={props.state}
+		  index={17}
+		  width={props.width}
+		  height={props.height}
+		/>
+		<GameTechGridRowView
+		  key={kGameTechRowKeys[18]}
+		  state={props.state}
+		  index={18}
+		  width={props.width}
+		  height={props.height}
+		/>
+		<GameTechGridRowView
+		  key={kGameTechRowKeys[19]}
+		  state={props.state}
+		  index={19}
+		  width={props.width}
+		  height={props.height}
+		/>
+		<GameTechGridRowView
+		  key={kGameTechRowKeys[20]}
+		  state={props.state}
+		  index={20}
+		  width={props.width}
+		  height={props.height}
+		/>
+		<GameTechGridRowView
+		  key={kGameTechRowKeys[21]}
+		  state={props.state}
+		  index={21}
+		  width={props.width}
+		  height={props.height}
+		/>
+		<GameTechGridRowView
+		  key={kGameTechRowKeys[22]}
+		  state={props.state}
+		  index={22}
+		  width={props.width}
+		  height={props.height}
+		/>
+		<GameTechGridRowView
+		  key={kGameTechRowKeys[23]}
+		  state={props.state}
+		  index={23}
+		  width={props.width}
+		  height={props.height}
+		/>
+		<GameTechGridRowView
+		  key={kGameTechRowKeys[24]}
+		  state={props.state}
+		  index={24}
+		  width={props.width}
+		  height={props.height}
+		/>
+		<GameTechGridRowView
+		  key={kGameTechRowKeys[25]}
+		  state={props.state}
+		  index={25}
+		  width={props.width}
+		  height={props.height}
+		/>
+		<GameTechGridRowView
+		  key={kGameTechRowKeys[26]}
+		  state={props.state}
+		  index={26}
+		  width={props.width}
+		  height={props.height}
+		/>
+		<GameTechGridRowView
+		  key={kGameTechRowKeys[27]}
+		  state={props.state}
+		  index={27}
+		  width={props.width}
+		  height={props.height}
+		/>
+		<GameTechGridRowView
+		  key={kGameTechRowKeys[28]}
+		  state={props.state}
+		  index={28}
+		  width={props.width}
+		  height={props.height}
+		/>
+		<GameTechGridRowView
+		  key={kGameTechRowKeys[29]}
+		  state={props.state}
+		  index={29}
+		  width={props.width}
+		  height={props.height}
+		/>
+		<GameTechGridRowView
+		  key={kGameTechRowKeys[30]}
+		  state={props.state}
+		  index={30}
+		  width={props.width}
+		  height={props.height}
+		/>
+		<GameTechGridRowView
+		  key={kGameTechRowKeys[31]}
+		  state={props.state}
+		  index={31}
+		  width={props.width}
+		  height={props.height}
+		/>
+	</Box>
+}
+
+struct GameTechDescLineProps {
+	const char * key = nullptr;
+	const GameTechPanelState * state = nullptr;
+	int index = 0;
+	int y = 0;
+	int width = 0;
+};
+
+::ui::UiElement GameTechDescLine(const GameTechDescLineProps& props) {
+	if(!props.state || props.index < 0 ||
+	   props.index >= static_cast<int>(props.state->techDescLines.size())){
+		return ::ui::empty();
+	}
+	return <Text
+	  key={props.key}
+	  value={props.state->techDescLines[static_cast<size_t>(props.index)].c_str()}
+	  layout={absolute_layout(kGameTechDescPadLeft, props.y + props.index * kGameTechDescLineH, props.width - kGameTechDescPadLeft, kGameTechDescLineH)}
+	  style={palette_text_patch(kGameTechTextPalette, 133, 6, 11.0f)}
+	/>
+}
+
+struct GameTechDescLinesProps {
+	const char * key = nullptr;
+	const GameTechPanelState * state = nullptr;
+	int y = 0;
+	int width = 0;
+};
+
+::ui::UiElement GameTechDescLines(const GameTechDescLinesProps& props) {
+	return <Box
+	  key={props.key}
+	  layout={absolute_layout(0, 0, props.width, kGameTechDescLineSlots * kGameTechDescLineH)}
+	>
+		<GameTechDescLine
+		  key={kGameTechDescLineKeys[0]}
+		  state={props.state}
+		  index={0}
+		  y={props.y}
+		  width={props.width}
+		/>
+		<GameTechDescLine
+		  key={kGameTechDescLineKeys[1]}
+		  state={props.state}
+		  index={1}
+		  y={props.y}
+		  width={props.width}
+		/>
+		<GameTechDescLine
+		  key={kGameTechDescLineKeys[2]}
+		  state={props.state}
+		  index={2}
+		  y={props.y}
+		  width={props.width}
+		/>
+		<GameTechDescLine
+		  key={kGameTechDescLineKeys[3]}
+		  state={props.state}
+		  index={3}
+		  y={props.y}
+		  width={props.width}
+		/>
+		<GameTechDescLine
+		  key={kGameTechDescLineKeys[4]}
+		  state={props.state}
+		  index={4}
+		  y={props.y}
+		  width={props.width}
+		/>
+		<GameTechDescLine
+		  key={kGameTechDescLineKeys[5]}
+		  state={props.state}
+		  index={5}
+		  y={props.y}
+		  width={props.width}
+		/>
+		<GameTechDescLine
+		  key={kGameTechDescLineKeys[6]}
+		  state={props.state}
+		  index={6}
+		  y={props.y}
+		  width={props.width}
+		/>
+		<GameTechDescLine
+		  key={kGameTechDescLineKeys[7]}
+		  state={props.state}
+		  index={7}
+		  y={props.y}
+		  width={props.width}
+		/>
+	</Box>
+}
+
+struct GameTechTallPanelProps {
+	const char * key = nullptr;
+	bool show = false;
+	const GameTechPanelState * state = nullptr;
+	int x = 0;
+	int y = 0;
+	int width = 0;
+	int height = 0;
+};
+
+::ui::UiElement GameTechTallPanel(const GameTechTallPanelProps& props) {
+	if(!props.show || !props.state || props.width <= 0 || props.height <= 0){
+		return ::ui::empty();
+	}
+	const int selectedNameY =
+		kGameTechGridY
+		+ game_tech_visible_rows(props.state) * kGameTechRowH
+		+ kGameTechSelectedGapY;
+	const int descY =
+		selectedNameY
+		+ kGameTechNameH
+		+ kGameTechDescGapY;
+	return <Box key={props.key} layout={absolute_layout(props.x, props.y, props.width, props.height)}>
+		<Text
+		  key="slots-left"
+		  value={props.state->slotsLeftStr.c_str()}
+		  layout={absolute_layout(kGameTechSlotsX, kGameTechSlotsY, props.width - kGameTechSlotsX, 11)}
+		  style={palette_text_patch(kGameTechTextPalette, 133, 6, 11.0f)}
+		/>
+		<GameTechRows key="rows" state={props.state} width={props.width} height={props.height} />
+		<Text
+		  key="selected-name"
+		  value={props.state->techNameStr.c_str()}
+		  layout={absolute_layout(0, selectedNameY, props.width, kGameTechNameH)}
+		  style={palette_text_patch(0, 135, 11, 15.0f, ::ui::TextAlign::Center)}
+		/>
+		<GameTechDescLines key="description" state={props.state} y={descY} width={props.width} />
+	</Box>
+}
+
 struct GameTechPeerNameProps {
 	const char * key = nullptr;
 	const GameTechPanelState * state = nullptr;
@@ -1239,6 +1797,15 @@ using ::ui::components::TextProps;
 		  peerY={props.game_tech_peer_y}
 		  peerWidth={props.game_tech_peer_width}
 		  peerRowGap={props.game_tech_peer_row_gap}
+		/>
+		<lobby_chrome_frame_detail.GameTechTallPanel
+		  key="game-tech-tall"
+		  show={props.show_game_tech_tall}
+		  state={props.game_tech}
+		  x={props.game_tech_tall_x}
+		  y={props.game_tech_tall_y}
+		  width={props.game_tech_tall_width}
+		  height={props.game_tech_tall_height}
 		/>
 		<lobby_chrome_frame_detail.AbsoluteChromeButton
 		  key="game-select-create"

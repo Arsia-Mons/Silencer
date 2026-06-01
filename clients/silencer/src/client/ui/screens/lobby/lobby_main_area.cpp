@@ -8,7 +8,6 @@
 #include "chat_panel.h"
 #include "game_create_panel.h"
 #include "game_join_panel.h"
-#include "game_tech_panel.h"
 
 #include "client/ui/hooks/use_lobby.h"
 #include "screen_context.h"
@@ -206,8 +205,6 @@ void BuildRightTallContents(LobbyMainAreaPanels & panels,
 			static_cast<Uint16>(std::max(0, layout.rightTallW)),
 			static_cast<Uint16>(std::max(0, layout.rightTallH)),
 			interactions);
-	}else if(panels.gameTechActive){
-		BuildGameTechTallTree(panels.gameTech, lobby, interactions);
 	}
 }
 

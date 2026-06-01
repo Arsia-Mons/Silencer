@@ -320,6 +320,11 @@ void LobbyScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime, s
 		.game_tech_peer_y = gameTechPeerY,
 		.game_tech_peer_width = gameTechPeerW,
 		.game_tech_peer_row_gap = lobby_screen_detail::kGameTechPeerRowGap,
+		.show_game_tech_tall = gameTechActive,
+		.game_tech_tall_x = bodyX + mainLayout.topRowW,
+		.game_tech_tall_y = bodyY,
+		.game_tech_tall_width = mainLayout.rightTallW,
+		.game_tech_tall_height = mainLayout.rightTallH,
 	};
 	chromeFrame_.Build([&]() {
 		                   return silencer::client_ui::lobby::LobbyChromeFrame(chromeProps);

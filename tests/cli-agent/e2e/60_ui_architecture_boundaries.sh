@@ -355,9 +355,7 @@ fail_if_match \
 fail_if_match \
   "\\b(World|Resources|Lobby|LobbyGame|Team|Peer|User|BuyableItem|Config)::|#include[[:space:]]*[<\"](world|lobby|lobbygame|team|peer|user|buyableitem|config|resources)[.]h[>\"]" \
   "$REPO_ROOT/clients/silencer/src/client/ui/screens/lobby/game_tech_panel.cpp" \
-  "$REPO_ROOT/clients/silencer/src/client/ui/screens/lobby/game_tech_panel.h" \
-  "$REPO_ROOT/clients/silencer/src/client/ui/screens/lobby/tech_tree_grid.cpp" \
-  "$REPO_ROOT/clients/silencer/src/client/ui/screens/lobby/tech_tree_grid.h"
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens/lobby/game_tech_panel.h"
 
 fail_if_match \
   "ctx[.](world|mapDownloader|ambienceMixer)|\\b(World|MapDownloader|LobbyGame|Peer)[[:space:]*&]+|Config::|Lobby::|#include[[:space:]]*[<\"](world|lobby|lobbygame|map_downloader|ambience_mixer|peer|config)[.]h[>\"]" \
