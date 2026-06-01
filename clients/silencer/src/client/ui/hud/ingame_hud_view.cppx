@@ -25,8 +25,6 @@ using ::ui::components::TextProps;
 
 namespace {
 
-::ReactContext InGameHudContext = {};
-const InGameHudContextValue kEmptyContext = {};
 constexpr int kTopMessageMaxLength = 35;
 constexpr int kChatX = 400;
 constexpr int kChatY = 280;
@@ -1821,7 +1819,9 @@ struct TraceTimeProps {
 	/>
 }
 
-::ui::UiElement InGameHudFrame(const BoxProps& props) {
+}  // namespace
+
+::ui::UiElement InGameHudFrame(const InGameHudFrameProps& props) {
 	return <Box key={props.key} layout={root_layout()}>
 		<SystemCameraFrame key="system-camera-0" slot={0} />
 		<SystemCameraFrame key="system-camera-1" slot={1} />
@@ -1838,25 +1838,6 @@ struct TraceTimeProps {
 		<MessageOverlay key="message" />
 		<PlayerListOverlay key="player-list" />
 	</Box>
-}
-
-}  // namespace
-
-const InGameHudContextValue& UseInGameHud() {
-	const auto * value = static_cast<const InGameHudContextValue *>(
-		::use_context(&InGameHudContext));
-	return value ? *value : kEmptyContext;
-}
-
-::ui::UiElement InGameHudView(const InGameHudViewProps& props) {
-	return ::ui::provider(
-		"InGameHudProvider",
-		&InGameHudContext,
-		const_cast<InGameHudContextValue *>(props.value),
-		children({
-			::ui::component("InGameHudFrame", BoxProps{ .key = "frame" }, InGameHudFrame),
-		}),
-		props.key);
 }
 
 }  // namespace silencer::client_ui

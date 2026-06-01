@@ -32,6 +32,12 @@ struct InGameHudContextValue {
 
 const InGameHudContextValue& UseInGameHud();
 
+struct InGameHudFrameProps {
+	const char * key = nullptr;
+};
+
+::ui::UiElement InGameHudFrame(const InGameHudFrameProps& props);
+
 struct InGameHudViewProps {
 	const char * key = nullptr;
 	const InGameHudContextValue * value = nullptr;
