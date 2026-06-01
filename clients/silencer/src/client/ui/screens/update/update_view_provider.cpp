@@ -13,7 +13,9 @@ const UpdateContextValue kEmptyUpdate = {};
 const UpdateContextValue& UseUpdate() {
 	const auto * value = static_cast<const UpdateContextValue *>(
 		::use_context(&UpdateContext));
-	return value ? *value : kEmptyUpdate;
+	if(value) return *value;
+	::react_report_error("client/ui/update: missing UpdateProvider for UseUpdate\n");
+	return kEmptyUpdate;
 }
 
 ::ui::UiElement UpdateView(const UpdateViewProps& props) {

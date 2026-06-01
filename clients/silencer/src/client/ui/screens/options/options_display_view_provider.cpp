@@ -13,7 +13,9 @@ const OptionsDisplayContextValue kEmptyOptionsDisplay = {};
 const OptionsDisplayContextValue& UseOptionsDisplay() {
 	const auto * value = static_cast<const OptionsDisplayContextValue *>(
 		::use_context(&OptionsDisplayContext));
-	return value ? *value : kEmptyOptionsDisplay;
+	if(value) return *value;
+	::react_report_error("client/ui/options: missing OptionsDisplayProvider for UseOptionsDisplay\n");
+	return kEmptyOptionsDisplay;
 }
 
 ::ui::UiElement OptionsDisplayView(const OptionsDisplayViewProps& props) {

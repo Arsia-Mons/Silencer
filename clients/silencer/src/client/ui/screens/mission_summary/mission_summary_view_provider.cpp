@@ -13,7 +13,9 @@ const MissionSummaryContextValue kEmptyMissionSummary = {};
 const MissionSummaryContextValue& UseMissionSummary() {
 	const auto * value = static_cast<const MissionSummaryContextValue *>(
 		::use_context(&MissionSummaryContext));
-	return value ? *value : kEmptyMissionSummary;
+	if(value) return *value;
+	::react_report_error("client/ui/mission-summary: missing MissionSummaryProvider for UseMissionSummary\n");
+	return kEmptyMissionSummary;
 }
 
 ::ui::UiElement MissionSummaryView(const MissionSummaryViewProps& props) {

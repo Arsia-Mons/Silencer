@@ -13,7 +13,9 @@ const PasswordModalContextValue kEmptyPasswordModal = {};
 const PasswordModalContextValue& UsePasswordModal() {
 	const auto * value = static_cast<const PasswordModalContextValue *>(
 		::use_context(&PasswordModalContext));
-	return value ? *value : kEmptyPasswordModal;
+	if(value) return *value;
+	::react_report_error("client/ui/modal: missing PasswordModalProvider for UsePasswordModal\n");
+	return kEmptyPasswordModal;
 }
 
 ::ui::UiElement PasswordModalView(const PasswordModalViewProps& props) {

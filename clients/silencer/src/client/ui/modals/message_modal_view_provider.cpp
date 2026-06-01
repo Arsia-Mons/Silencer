@@ -13,7 +13,9 @@ const MessageModalContextValue kEmptyMessageModal = {};
 const MessageModalContextValue& UseMessageModal() {
 	const auto * value = static_cast<const MessageModalContextValue *>(
 		::use_context(&MessageModalContext));
-	return value ? *value : kEmptyMessageModal;
+	if(value) return *value;
+	::react_report_error("client/ui/modal: missing MessageModalProvider for UseMessageModal\n");
+	return kEmptyMessageModal;
 }
 
 ::ui::UiElement MessageModalView(const MessageModalViewProps& props) {

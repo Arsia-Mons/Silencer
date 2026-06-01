@@ -13,7 +13,9 @@ const OptionsControlsContextValue kEmptyOptionsControls = {};
 const OptionsControlsContextValue& UseOptionsControls() {
 	const auto * value = static_cast<const OptionsControlsContextValue *>(
 		::use_context(&OptionsControlsContext));
-	return value ? *value : kEmptyOptionsControls;
+	if(value) return *value;
+	::react_report_error("client/ui/options: missing OptionsControlsProvider for UseOptionsControls\n");
+	return kEmptyOptionsControls;
 }
 
 ::ui::UiElement OptionsControlsView(const OptionsControlsViewProps& props) {

@@ -13,7 +13,9 @@ const CharacterCreateContextValue kEmptyCharacterCreate = {};
 const CharacterCreateContextValue& UseCharacterCreate() {
 	const auto * value = static_cast<const CharacterCreateContextValue *>(
 		::use_context(&CharacterCreateContext));
-	return value ? *value : kEmptyCharacterCreate;
+	if(value) return *value;
+	::react_report_error("client/ui/character-create: missing CharacterCreateProvider for UseCharacterCreate\n");
+	return kEmptyCharacterCreate;
 }
 
 ::ui::UiElement CharacterCreateScreenView(const CharacterCreateScreenViewProps& props) {

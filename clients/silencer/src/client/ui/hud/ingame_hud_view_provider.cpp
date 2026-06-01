@@ -13,7 +13,9 @@ const InGameHudContextValue kEmptyInGameHud = {};
 const InGameHudContextValue& UseInGameHud() {
 	const auto * value = static_cast<const InGameHudContextValue *>(
 		::use_context(&InGameHudContext));
-	return value ? *value : kEmptyInGameHud;
+	if(value) return *value;
+	::react_report_error("client/ui/hud: missing InGameHudProvider for UseInGameHud\n");
+	return kEmptyInGameHud;
 }
 
 ::ui::UiElement InGameHudView(const InGameHudViewProps& props) {

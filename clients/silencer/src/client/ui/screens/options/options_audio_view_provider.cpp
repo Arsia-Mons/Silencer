@@ -13,7 +13,9 @@ const OptionsAudioContextValue kEmptyOptionsAudio = {};
 const OptionsAudioContextValue& UseOptionsAudio() {
 	const auto * value = static_cast<const OptionsAudioContextValue *>(
 		::use_context(&OptionsAudioContext));
-	return value ? *value : kEmptyOptionsAudio;
+	if(value) return *value;
+	::react_report_error("client/ui/options: missing OptionsAudioProvider for UseOptionsAudio\n");
+	return kEmptyOptionsAudio;
 }
 
 ::ui::UiElement OptionsAudioView(const OptionsAudioViewProps& props) {

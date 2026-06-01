@@ -13,7 +13,9 @@ const LobbyConnectContextValue kEmptyLobbyConnect = {};
 const LobbyConnectContextValue& UseLobbyConnect() {
 	const auto * value = static_cast<const LobbyConnectContextValue *>(
 		::use_context(&LobbyConnectContext));
-	return value ? *value : kEmptyLobbyConnect;
+	if(value) return *value;
+	::react_report_error("client/ui/lobby-connect: missing LobbyConnectProvider for UseLobbyConnect\n");
+	return kEmptyLobbyConnect;
 }
 
 ::ui::UiElement LobbyConnectView(const LobbyConnectViewProps& props) {
