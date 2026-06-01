@@ -9,8 +9,6 @@
 #include <string>
 #include <vector>
 
-class Surface;
-
 namespace silencer {
 namespace client_ui {
 struct Navigation;
@@ -23,7 +21,6 @@ public:
 	void Build(ScreenContext & ctx) override;
 	void Tick(ScreenContext & ctx) override;
 	void BuildUi(ScreenContext & ctx,
-	             Surface & dst,
 	             float frametime,
 	             const silencer::ui::UiInputState& input,
 	             Uint8 hudPhase,

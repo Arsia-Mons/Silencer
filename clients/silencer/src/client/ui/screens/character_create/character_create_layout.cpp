@@ -8,7 +8,6 @@
 #include "renderer.h"
 #include "runtime/UiInteractionRegistry.h"
 #include "screen_context.h"
-#include "surface.h"
 
 #include <algorithm>
 
@@ -22,9 +21,8 @@ constexpr int kAliasInputUid = 31;
 }  // namespace character_create_screen_detail
 
 void CharacterCreateScreen::BuildUi(ScreenContext & ctx,
-                                    Surface & dst,
                                     float frametime,
-                                    const silencer::ui::UiInputState&,
+                                    const silencer::ui::UiInputState& input,
                                     Uint8,
                                     silencer::ui::UiInteractionRegistry& interactions)
 {
@@ -115,8 +113,8 @@ void CharacterCreateScreen::BuildUi(ScreenContext & ctx,
 	};
 
 	const float uiScale = silencer::clay_bridge::UiScale();
-	const int virtualW = std::max(1, static_cast<int>(dst.w / uiScale));
-	const int virtualH = std::max(1, static_cast<int>(dst.h / uiScale));
+	const int virtualW = std::max(1, input.width);
+	const int virtualH = std::max(1, input.height);
 	retainedFrame_.Build([&]() {
 		                     return silencer::client_ui::CharacterCreateFrame(props);
 	                     },

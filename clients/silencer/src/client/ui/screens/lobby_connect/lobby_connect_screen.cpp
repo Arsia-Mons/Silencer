@@ -9,7 +9,6 @@
 #include "update_screen.h"
 #include "screen_context.h"
 #include "renderer.h"
-#include "surface.h"
 
 #include "clay_ui_compositor.h"
 #include "runtime/UiInteractionRegistry.h"
@@ -124,7 +123,7 @@ void LobbyConnectScreen::Tick(ScreenContext & ctx)
 	}
 }
 
-void LobbyConnectScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime, const silencer::ui::UiInputState&, Uint8 hudPhase, silencer::ui::UiInteractionRegistry& interactions)
+void LobbyConnectScreen::BuildUi(ScreenContext & ctx, float frametime, const silencer::ui::UiInputState& input, Uint8 hudPhase, silencer::ui::UiInteractionRegistry& interactions)
 {
 	(void)frametime;
 	silencer::client_ui::LobbyModel lobby =
@@ -150,8 +149,8 @@ void LobbyConnectScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frame
 	if(passwordFocused && blink) passwordDisplay += "|";
 
 	const float uiScale = silencer::clay_bridge::UiScale();
-	const int virtualW = std::max(1, static_cast<int>(dst.w / uiScale));
-	const int virtualH = std::max(1, static_cast<int>(dst.h / uiScale));
+	const int virtualW = std::max(1, input.width);
+	const int virtualH = std::max(1, input.height);
 	silencer::client_ui::LobbyConnectFrameProps props{
 		.key = "lobby-connect",
 		.log_text = logText.c_str(),

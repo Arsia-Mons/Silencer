@@ -6,7 +6,6 @@
 #include "runtime/UiInputState.h"
 
 class ScreenContext;
-class Surface;
 
 namespace ui {
 struct DrawCommandList;
@@ -35,12 +34,11 @@ public:
 	// begin/end Clay, render Clay commands, or reset primitive arenas; ClientUi
 	// owns the frame lifecycle for every visible UI surface.
 	virtual void BuildUi(ScreenContext & ctx,
-	                     Surface & dst,
 	                     float frametime,
 	                     const silencer::ui::UiInputState& input,
 	                     Uint8 hudPhase,
 	                     silencer::ui::UiInteractionRegistry& interactions)
-	{ (void)ctx; (void)dst; (void)frametime; (void)input; (void)hudPhase; (void)interactions; }
+	{ (void)ctx; (void)frametime; (void)input; (void)hudPhase; (void)interactions; }
 
 	// Tear down screen-owned UI state. Called on pop/replace.
 	virtual void Destroy(ScreenContext & ctx) = 0;

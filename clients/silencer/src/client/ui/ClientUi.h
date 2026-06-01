@@ -16,7 +16,6 @@
 
 class Screen;
 class ScreenContext;
-class Surface;
 
 namespace ui {
 struct DrawCommandList;
@@ -58,7 +57,6 @@ public:
 	void RunPendingScreenRequest(ScreenContext& ctx);
 	void TickVisibleScreens(ScreenContext& ctx);
 	void BuildVisibleScreens(ScreenContext& ctx,
-	                         Surface& dst,
 	                         float frametime,
 	                         const silencer::ui::UiInputState& input,
 	                         Uint8 hudPhase);

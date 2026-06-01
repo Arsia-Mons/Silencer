@@ -7,7 +7,6 @@
 
 #include "screen_context.h"
 #include "game.h"
-#include "surface.h"
 
 #include "clay_ui_compositor.h"
 #include "runtime/UiInteractionRegistry.h"
@@ -116,7 +115,7 @@ bool OptionsControlsScreen::HandleUiIntent(ScreenContext & ctx, const silencer::
 	return retainedFrame_.HandleUiIntent(action);
 }
 
-void OptionsControlsScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime, const silencer::ui::UiInputState&, Uint8, silencer::ui::UiInteractionRegistry& interactions) {
+void OptionsControlsScreen::BuildUi(ScreenContext & ctx, float frametime, const silencer::ui::UiInputState& input, Uint8, silencer::ui::UiInteractionRegistry& interactions) {
 	(void)frametime;
 	using namespace silencer::client_ui::options;
 	silencer::client_ui::OptionsModel options =
@@ -126,8 +125,8 @@ void OptionsControlsScreen::BuildUi(ScreenContext & ctx, Surface & dst, float fr
 		silencer::client_ui::use_navigation();
 
 	const float uiScale = silencer::clay_bridge::UiScale();
-	const int layoutWidth = std::max(1, static_cast<int>(dst.w / uiScale));
-	const int layoutHeight = std::max(1, static_cast<int>(dst.h / uiScale));
+	const int layoutWidth = std::max(1, input.width);
+	const int layoutHeight = std::max(1, input.height);
 	const int framePadLeft = options_controls_screen_detail::ScaleLegacyPx(
 		options_controls_screen_detail::kFrameMarginLeft,
 		layoutWidth,

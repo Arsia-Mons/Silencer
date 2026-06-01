@@ -106,9 +106,8 @@ hasPreparedUiInput = false;
 return uiClayBackend.Commands();
 }
 
-void GameUiPipeline::BuildVisibleClientUi(Surface& surface, float frametime) {
+void GameUiPipeline::BuildVisibleClientUi(float frametime) {
 clientUi.BuildVisibleScreens(game.screenContext,
-                             surface,
                              frametime,
                              preparedUiInput,
                              game.renderer.GetHudAnimationPhase());
@@ -162,7 +161,7 @@ return;
 PrepareClientUiFrame(surface);
 BeginPreparedClientUiFrame();
 clientUi.RunNavigationRequests(game.screenContext, clientUiInput.DrainNavigationRequests());
-BuildVisibleClientUi(surface, frametime);
+BuildVisibleClientUi(frametime);
 Clay_RenderCommandArray cmds = EndClientUiFrame();
 silencer::clay_bridge::Render(game, &surface, cmds);
 for(const ::ui::DrawCommandList * retainedCommands : clientUi.RetainedDrawCommands()){

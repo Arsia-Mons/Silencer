@@ -14,7 +14,6 @@
 #include "message_modal.h"
 #include "renderdevice.h"
 #include "renderer.h"
-#include "surface.h"
 #include "ui/runtime/UiInputState.h"
 
 #include <SDL3/SDL.h>
@@ -267,10 +266,9 @@ void LobbyScreen::ShowGameTech()
 	rightPane = LobbyRightPane::GameTech;
 }
 
-void LobbyScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime, const silencer::ui::UiInputState & input, Uint8, silencer::ui::UiInteractionRegistry& interactions)
+void LobbyScreen::BuildUi(ScreenContext & ctx, float frametime, const silencer::ui::UiInputState & input, Uint8, silencer::ui::UiInteractionRegistry& interactions)
 {
 	(void)frametime;
-	(void)dst;
 	using namespace silencer::client_ui::lobby;
 
 	const int layoutWidth = std::max(1, input.width);

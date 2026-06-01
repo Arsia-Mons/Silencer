@@ -6,7 +6,6 @@
 #include "screen_context.h"
 #include "clay_ui_compositor.h"
 #include "renderer.h"
-#include "surface.h"
 
 #include "runtime/UiInteractionRegistry.h"
 
@@ -23,7 +22,7 @@ void OptionsDisplayScreen::Tick(ScreenContext & ctx)
 	(void)ctx;
 }
 
-void OptionsDisplayScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime, const silencer::ui::UiInputState&, Uint8, silencer::ui::UiInteractionRegistry& interactions)
+void OptionsDisplayScreen::BuildUi(ScreenContext & ctx, float frametime, const silencer::ui::UiInputState& input, Uint8, silencer::ui::UiInteractionRegistry& interactions)
 {
 	(void)frametime;
 
@@ -33,8 +32,8 @@ void OptionsDisplayScreen::BuildUi(ScreenContext & ctx, Surface & dst, float fra
 	silencer::client_ui::Navigation navigation =
 		silencer::client_ui::use_navigation();
 	const float uiScale = silencer::clay_bridge::UiScale();
-	const int virtualW = std::max(1, static_cast<int>(dst.w / uiScale));
-	const int virtualH = std::max(1, static_cast<int>(dst.h / uiScale));
+	const int virtualW = std::max(1, input.width);
+	const int virtualH = std::max(1, input.height);
 	silencer::client_ui::OptionsDisplayFrameProps props{
 		.key = "options-display",
 		.fullscreen_enabled = options.display.fullscreen_enabled(),

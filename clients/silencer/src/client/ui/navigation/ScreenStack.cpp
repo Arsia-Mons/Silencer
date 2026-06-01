@@ -69,7 +69,6 @@ void ScreenStack::TickVisible(ScreenContext& ctx) {
 }
 
 void ScreenStack::BuildVisible(ScreenContext& ctx,
-                               Surface& dst,
                                float frametime,
                                const silencer::ui::UiInputState& input,
                                Uint8 hudPhase,
@@ -80,7 +79,7 @@ void ScreenStack::BuildVisible(ScreenContext& ctx,
 		if(i > start && screens_[i]->IsOverlay()) {
 			interactions.BeginFrame();
 		}
-		screens_[i]->BuildUi(ctx, dst, frametime, input, hudPhase, interactions);
+		screens_[i]->BuildUi(ctx, frametime, input, hudPhase, interactions);
 	}
 }
 

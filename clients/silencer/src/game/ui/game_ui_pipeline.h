@@ -20,7 +20,7 @@ explicit GameUiPipeline(Game & game);
 void PrepareClientUiFrame(Surface & surface);
 void BeginPreparedClientUiFrame();
 Clay_RenderCommandArray EndClientUiFrame();
-void BuildVisibleClientUi(Surface & surface, float frametime);
+void BuildVisibleClientUi(float frametime);
 void DrawInGameWorldInsets(Surface & surface, float frametime);
 void RenderClientUiFrame(Surface & surface, float frametime);
 void ResetUiFrameDeltas();

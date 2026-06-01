@@ -4,7 +4,6 @@
 #include "client/ui/hooks/use_navigation.h"
 #include "screen_context.h"
 #include "renderer.h"
-#include "surface.h"
 
 #include "clay_ui_compositor.h"
 #include "runtime/UiInteractionRegistry.h"
@@ -68,7 +67,7 @@ void PasswordModal::Submit()
 	if(cb) cb(captured.c_str());
 }
 
-void PasswordModal::BuildUi(ScreenContext & ctx, Surface & dst, float frametime, const silencer::ui::UiInputState&, Uint8 hudPhase, silencer::ui::UiInteractionRegistry& interactions)
+void PasswordModal::BuildUi(ScreenContext & ctx, float frametime, const silencer::ui::UiInputState& input, Uint8 hudPhase, silencer::ui::UiInteractionRegistry& interactions)
 {
 	(void)frametime;
 	password_modal_detail::RegisterWidgets(this, password, interactions);
@@ -82,8 +81,8 @@ void PasswordModal::BuildUi(ScreenContext & ctx, Surface & dst, float frametime,
 	if(focused && blink) passwordDisplay_ += "|";
 
 	const float uiScale = silencer::clay_bridge::UiScale();
-	const int virtualW = std::max(1, static_cast<int>(dst.w / uiScale));
-	const int virtualH = std::max(1, static_cast<int>(dst.h / uiScale));
+	const int virtualW = std::max(1, input.width);
+	const int virtualH = std::max(1, input.height);
 	silencer::client_ui::PasswordModalFrameProps props{
 		.key = "password-modal",
 		.password_display = passwordDisplay_.c_str(),

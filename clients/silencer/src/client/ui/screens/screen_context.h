@@ -12,7 +12,6 @@ class Game;
 class AmbienceMixer;
 class MapDownloader;
 class RenderDevice;
-class Surface;
 struct SDL_Window;
 
 // Bag of refs that legacy screens use to reach global subsystems while the

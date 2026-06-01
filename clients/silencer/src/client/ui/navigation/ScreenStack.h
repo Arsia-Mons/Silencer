@@ -8,7 +8,6 @@
 
 class Screen;
 class ScreenContext;
-class Surface;
 
 namespace ui {
 struct DrawCommandList;
@@ -40,7 +39,6 @@ public:
 
 	void TickVisible(ScreenContext& ctx);
 	void BuildVisible(ScreenContext& ctx,
-	                  Surface& dst,
 	                  float frametime,
 	                  const silencer::ui::UiInputState& input,
 	                  Uint8 hudPhase,

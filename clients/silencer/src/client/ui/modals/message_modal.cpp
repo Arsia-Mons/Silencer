@@ -3,7 +3,6 @@
 #include "client/ui/hooks/use_navigation.h"
 #include "client/ui/modals/message_modal_frame.h"
 #include "screen_context.h"
-#include "surface.h"
 
 #include "clay_ui_compositor.h"
 #include "runtime/UiInteractionRegistry.h"
@@ -42,13 +41,13 @@ void MessageModal::Close()
 	if(cb) cb();
 }
 
-void MessageModal::BuildUi(ScreenContext & ctx, Surface & dst, float frametime, const silencer::ui::UiInputState&, Uint8, silencer::ui::UiInteractionRegistry& interactions)
+void MessageModal::BuildUi(ScreenContext & ctx, float frametime, const silencer::ui::UiInputState& input, Uint8, silencer::ui::UiInteractionRegistry& interactions)
 {
 	(void)ctx;
 	(void)frametime;
 	const float uiScale = silencer::clay_bridge::UiScale();
-	const int virtualW = std::max(1, static_cast<int>(dst.w / uiScale));
-	const int virtualH = std::max(1, static_cast<int>(dst.h / uiScale));
+	const int virtualW = std::max(1, input.width);
+	const int virtualH = std::max(1, input.height);
 	silencer::client_ui::MessageModalFrameProps props{
 		.key = "message-modal",
 		.message = message.c_str(),
