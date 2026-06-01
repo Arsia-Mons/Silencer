@@ -60,6 +60,22 @@ RUNTIME_FILES = [
     "src/ui/runtime/focus.cpp",
     "src/ui/runtime/interaction_hooks.h",
     "src/ui/runtime/interaction_hooks.cpp",
+    # SIL-13 vendored cppx app-shell (namespace client::ui): the 5-phase
+    # UiPipeline + ClientUi + ScreenStack/UiScreen + the NavigationProvider it
+    # compile-depends on. All SDL-free — the render seam is an injected
+    # std::function the host supplies (SDL lives only in that host lambda).
+    "src/ui/span.h",
+    "src/client/ui/app_shell/navigation/ui_screen.h",
+    "src/client/ui/app_shell/navigation/screen_stack.h",
+    "src/client/ui/app_shell/navigation/screen_stack.cpp",
+    "src/client/ui/app_shell/client_ui.h",
+    "src/client/ui/app_shell/client_ui.cpp",
+    "src/client/ui/app_shell/deferred_ui_mutation.h",
+    "src/client/ui/app_shell/ui_pipeline.h",
+    "src/client/ui/app_shell/ui_pipeline.cpp",
+    "src/client/ui/providers/navigation_provider.h",
+    "src/client/ui/providers/navigation_provider.cpp",
+    "src/client/ui/hooks/use_navigation.h",
 ]
 
 SDL_INCLUDE_RE = re.compile(r'#\s*include\s*[<"]\s*(SDL3?/|SDL[._]|SDL_ttf)', re.IGNORECASE)

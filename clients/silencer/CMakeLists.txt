@@ -133,7 +133,12 @@ if(SILENCER_UNITY_BUILD)
 		src/render/cppx_ui/*.cpp
 		src/render/clay_ui_tests/*.cpp
 		src/client/ui/screens/character_create/*.cpp
-		src/client/ui/screens/lobby/*.cpp)
+		src/client/ui/screens/lobby/*.cpp
+		# SIL-13 vendored cppx app-shell (client::ui) — unity-exclude like the
+		# rest of the vendored cppx engine.
+		src/client/ui/app_shell/*.cpp
+		src/client/ui/app_shell/navigation/*.cpp
+		src/client/ui/providers/*.cpp)
 	set_source_files_properties(${_clay_unsafe_sources} PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON)
 endif()
 
@@ -351,6 +356,54 @@ if(MSVC)
 	target_compile_definitions(ui_interaction_hooks_tests PRIVATE NOMINMAX)
 endif()
 add_test(NAME ui_interaction_hooks_tests COMMAND ui_interaction_hooks_tests)
+
+# --- App-shell 5-phase pipeline (SIL-13) ---------------------------------
+# The golden frame contract: UiPipeline + ClientUi + ScreenStack/UiScreen +
+# the NavigationProvider/use_navigation it compile-depends on (namespace
+# client::ui, distinct from the live silencer::ui ClientUi/ScreenStack). All
+# SDL-free; the render seam is an injected std::function. Vendored ALONGSIDE
+# the live Clay pipeline — the production cutover is SIL-14+. The two CTests
+# drive the full retained closure (react+element+tree+focus+yoga+draw IR).
+set(_cppx_retained_sources
+	src/ui/runtime/react.cpp
+	src/ui/runtime/element.cpp
+	src/ui/runtime/tree.cpp
+	src/ui/runtime/focus.cpp
+	src/ui/runtime/interaction_hooks.cpp
+	src/ui/runtime/flex_layout.cpp
+	src/ui/runtime/yoga_flex_layout.cpp
+	src/ui/runtime/draw_command.cpp
+	src/ui/runtime/draw_command_builder.cpp
+	src/ui/style/text_measure.cpp)
+set(_cppx_app_shell_sources
+	src/client/ui/app_shell/client_ui.cpp
+	src/client/ui/app_shell/navigation/screen_stack.cpp
+	src/client/ui/providers/navigation_provider.cpp)
+
+add_executable(client_ui_tests
+	tests/client_ui_tests.cpp
+	${_cppx_app_shell_sources}
+	${_cppx_retained_sources})
+target_compile_features(client_ui_tests PRIVATE cxx_std_20)
+target_include_directories(client_ui_tests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src")
+target_link_libraries(client_ui_tests PRIVATE yogacore)
+if(MSVC)
+	target_compile_definitions(client_ui_tests PRIVATE NOMINMAX)
+endif()
+add_test(NAME client_ui_tests COMMAND client_ui_tests)
+
+add_executable(ui_pipeline_tests
+	tests/ui_pipeline_tests.cpp
+	src/client/ui/app_shell/ui_pipeline.cpp
+	${_cppx_app_shell_sources}
+	${_cppx_retained_sources})
+target_compile_features(ui_pipeline_tests PRIVATE cxx_std_20)
+target_include_directories(ui_pipeline_tests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src")
+target_link_libraries(ui_pipeline_tests PRIVATE yogacore)
+if(MSVC)
+	target_compile_definitions(ui_pipeline_tests PRIVATE NOMINMAX)
+endif()
+add_test(NAME ui_pipeline_tests COMMAND ui_pipeline_tests)
 
 # --- SDL-free draw model (SIL-11 foundation) -----------------------------
 # RGBA DrawCommand IR + tessellation math. draw_command_builder.cpp compiles
