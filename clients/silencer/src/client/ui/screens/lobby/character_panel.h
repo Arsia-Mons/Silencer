@@ -6,7 +6,9 @@
 // navigation to the character selection/create screen.
 
 #include "shared.h"
+#include "ui/runtime/element.h"
 
+#include <functional>
 #include <string>
 
 class World;
@@ -33,6 +35,16 @@ struct CharacterPanelState {
 	std::string statsLineA;
 	std::string statsLineB;
 };
+
+struct LobbyCharacter {
+	CharacterPanelState * state = nullptr;
+	std::function<void()> change_agent = {};
+};
+
+const LobbyCharacter& UseLobbyCharacter();
+::ui::UiElement LobbyCharacterProvider(const LobbyCharacter& value,
+                                       ::ui::UiChildren children,
+                                       const char * key = nullptr);
 
 // Initialise state from Config (defaultagency).
 void CharacterPanelInit(CharacterPanelState & state);

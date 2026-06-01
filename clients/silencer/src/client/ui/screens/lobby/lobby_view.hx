@@ -8,8 +8,8 @@
 
 namespace silencer::client_ui::lobby {
 
-struct CharacterPanelState;
 struct LobbyChat;
+struct LobbyCharacter;
 struct GameSelectPanelState;
 struct GameCreatePanelState;
 struct GameJoinPanelState;
@@ -35,13 +35,6 @@ struct LobbyNavigation {
 };
 
 const LobbyNavigation& UseLobbyNavigation();
-
-struct LobbyCharacter {
-	CharacterPanelState * state = nullptr;
-	std::function<void()> change_agent = {};
-};
-
-const LobbyCharacter& UseLobbyCharacter();
 
 struct LobbyGameSelect {
 	GameSelectPanelState * state = nullptr;
