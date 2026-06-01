@@ -456,6 +456,10 @@ fail_if_match \
   "$REPO_ROOT/clients/silencer/src/client/ui/screens/mission_summary/mission_summary_frame.cppx"
 
 fail_if_match \
+  "frame=\\{&props\\}|props[.]frame\\b|\\bCharacterCreateFrameProps[[:space:]]*[*][[:space:]]*frame\\b" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens/character_create/character_create_frame.cppx"
+
+fail_if_match \
   "\\b(loginClicked|cancelClicked)\\b" \
   "$REPO_ROOT/clients/silencer/src/client/ui/screens/lobby_connect/lobby_connect_screen.cpp" \
   "$REPO_ROOT/clients/silencer/src/client/ui/screens/lobby_connect/lobby_connect_screen.h"

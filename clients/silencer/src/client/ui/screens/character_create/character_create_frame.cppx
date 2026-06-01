@@ -248,22 +248,40 @@ inline int clamp_agency(int value) {
 	return value;
 }
 
-inline int agency_index_for_id(const CharacterCreateFrameProps& props,
+inline int agency_index_for_id(const std::uint8_t * agency_ids,
                                std::uint8_t agency) {
+	if(!agency_ids) return 0;
 	for(int i = 0; i < kAgencyCount; ++i){
-		if(props.agency_ids[i] == agency) return i;
+		if(agency_ids[i] == agency) return i;
 	}
 	return 0;
 }
 
-inline int selected_agency_index(const CharacterCreateFrameProps& props) {
+inline int agency_index_for_id(const CharacterCreateFrameProps& props,
+                               std::uint8_t agency) {
+	return agency_index_for_id(props.agency_ids, agency);
+}
+
+inline int selected_agency_index(const std::uint8_t * agency_ids,
+                                 int selected_agency) {
 	return clamp_agency(agency_index_for_id(
-		props, static_cast<std::uint8_t>(props.selected_agency)));
+		agency_ids, static_cast<std::uint8_t>(selected_agency)));
+}
+
+inline int selected_agency_index(const CharacterCreateFrameProps& props) {
+	return selected_agency_index(props.agency_ids, props.selected_agency);
+}
+
+inline int detail_agency_index(const std::uint8_t * agency_ids,
+                               int selected_agency,
+                               int preview_agency) {
+	return preview_agency >= 0 ? clamp_agency(preview_agency)
+	                           : selected_agency_index(agency_ids, selected_agency);
 }
 
 inline int detail_agency_index(const CharacterCreateFrameProps& props) {
-	return props.preview_agency >= 0 ? clamp_agency(props.preview_agency)
-	                                 : selected_agency_index(props);
+	return detail_agency_index(
+		props.agency_ids, props.selected_agency, props.preview_agency);
 }
 
 inline const AgencyDef& agency_def(int agency) {
@@ -647,16 +665,17 @@ inline const char * copied_action_id(const char * prefix, int ordinal) {
 
 	struct AgentDetailsProps {
 		const char * key = nullptr;
-		const CharacterCreateFrameProps * frame = nullptr;
+		const std::vector<LobbyAgentSummary> * agents = nullptr;
+		int selected_agent = 0;
+		int preview_agent = -1;
+		const std::uint8_t * agency_ids = nullptr;
 	};
 
 	::ui::UiElement AgentDetails(const AgentDetailsProps& props) {
-		if(!props.frame) return ::ui::empty();
-		const CharacterCreateFrameProps& frame = *props.frame;
-		const std::vector<LobbyAgentSummary>& agentList = agents(frame);
-		const int detailAgent = frame.preview_agent >= 0
-			? frame.preview_agent
-			: frame.selected_agent;
+		const std::vector<LobbyAgentSummary>& agentList = agents(props.agents);
+		const int detailAgent = props.preview_agent >= 0
+			? props.preview_agent
+			: props.selected_agent;
 		if(detailAgent < 0 || detailAgent >= static_cast<int>(agentList.size())){
 			return <Box
 			  key={props.key}
@@ -668,7 +687,7 @@ inline const char * copied_action_id(const char * prefix, int ordinal) {
 		}
 		const LobbyAgentSummary& agent =
 			agentList[static_cast<size_t>(detailAgent)];
-		const int agency = agency_index_for_id(frame, agent.agency);
+		const int agency = agency_index_for_id(props.agency_ids, agent.agency);
 		const AgencyDef& def = agency_def(agency);
 		std::string level = std::string("Security Level ") +
 			std::to_string(agent.stats.level);
@@ -724,13 +743,11 @@ inline const char * copied_action_id(const char * prefix, int ordinal) {
 
 	struct AgencyDetailsProps {
 		const char * key = nullptr;
-		const CharacterCreateFrameProps * frame = nullptr;
+		int detail_agency = 0;
 	};
 
 	::ui::UiElement AgencyDetails(const AgencyDetailsProps& props) {
-		if(!props.frame) return ::ui::empty();
-		const CharacterCreateFrameProps& frame = *props.frame;
-		const AgencyDef& def = agency_def(detail_agency_index(frame));
+		const AgencyDef& def = agency_def(props.detail_agency);
 		return <Box
 		  key={props.key}
 		  layout={::ui::LayoutStyle{
@@ -766,15 +783,16 @@ inline const char * copied_action_id(const char * prefix, int ordinal) {
 
 	struct AliasModalProps {
 		const char * key = nullptr;
-		const CharacterCreateFrameProps * frame = nullptr;
+		bool show = false;
+		bool alias_renaming = false;
+		const char * alias = nullptr;
 	};
 
 	::ui::UiElement AliasModal(const AliasModalProps& props) {
-		if(!props.frame || props.frame->step != CharacterCreateFrameStep::EnterAlias){
+		if(!props.show){
 			return ::ui::empty();
 		}
-		const CharacterCreateFrameProps& frame = *props.frame;
-		const char * title = frame.alias_renaming ? "ONE-TIME RENAME" : "SILENCER ALIAS";
+		const char * title = props.alias_renaming ? "ONE-TIME RENAME" : "SILENCER ALIAS";
 		return <Box
 		  key={props.key}
 		  layout={::ui::LayoutStyle{
@@ -810,7 +828,7 @@ inline const char * copied_action_id(const char * prefix, int ordinal) {
 			  id={kActionAlias}
 			  idOffset={kAliasInputUid}
 			  accessibility={{.label = "Alias"}}
-			  value={frame.alias ? frame.alias : ""}
+			  value={props.alias ? props.alias : ""}
 			  layout={::ui::LayoutStyle{
 					.position = ::ui::PositionType::Absolute,
 					.width = ::ui::Length::points(static_cast<float>(kAliasInputFrameW)),
@@ -829,13 +847,27 @@ inline const char * copied_action_id(const char * prefix, int ordinal) {
 
 	struct BodyProps {
 		const char * key = nullptr;
-		const CharacterCreateFrameProps * frame = nullptr;
+		CharacterCreateFrameStep step = CharacterCreateFrameStep::SelectAgent;
+		const std::vector<std::string> * agent_rows = nullptr;
+		const std::vector<LobbyAgentSummary> * agents = nullptr;
+		int agent_scroll = 0;
+		int selected_agent = 0;
+		int preview_agent = -1;
+		const char * alias = nullptr;
+		bool alias_renaming = false;
+		bool waiting_for_create = false;
+		int selected_agency = 0;
+		int preview_agency = -1;
+		const std::uint8_t * agency_ids = nullptr;
 	};
 
 	::ui::UiElement Body(const BodyProps& props) {
-		if(!props.frame) return ::ui::empty();
-		const CharacterCreateFrameProps& frame = *props.frame;
-		if(props.frame->step == CharacterCreateFrameStep::SelectAgency){
+		const int selectedAgency =
+			selected_agency_index(props.agency_ids, props.selected_agency);
+		const int detailAgency =
+			detail_agency_index(
+				props.agency_ids, props.selected_agency, props.preview_agency);
+		if(props.step == CharacterCreateFrameStep::SelectAgency){
 			return <Box
 			  key={props.key}
 			  layout={::ui::LayoutStyle{
@@ -847,11 +879,11 @@ inline const char * copied_action_id(const char * prefix, int ordinal) {
 			>
 				<AgencyColumn
 				  key="agency-column"
-				  selectedAgency={selected_agency_index(frame)}
-				  previewAgency={frame.preview_agency}
-				  waitingForCreate={frame.waiting_for_create}
+				  selectedAgency={selectedAgency}
+				  previewAgency={props.preview_agency}
+				  waitingForCreate={props.waiting_for_create}
 				/>
-				<AgencyDetails key="agency-info" frame={props.frame} />
+				<AgencyDetails key="agency-info" detailAgency={detailAgency} />
 			</Box>
 		}
 		return <Box
@@ -865,15 +897,26 @@ inline const char * copied_action_id(const char * prefix, int ordinal) {
 		>
 			<AgentColumn
 			  key="agent-column"
-			  rows={frame.agent_rows}
-			  agents={frame.agents}
-			  agentScroll={frame.agent_scroll}
-			  selectedAgent={frame.selected_agent}
-			  previewAgent={frame.preview_agent}
-			  selectingAgent={frame.step == CharacterCreateFrameStep::SelectAgent}
+			  rows={props.agent_rows}
+			  agents={props.agents}
+			  agentScroll={props.agent_scroll}
+			  selectedAgent={props.selected_agent}
+			  previewAgent={props.preview_agent}
+			  selectingAgent={props.step == CharacterCreateFrameStep::SelectAgent}
 			/>
-			<AgentDetails key="details" frame={props.frame} />
-			<AliasModal key="alias-modal" frame={props.frame} />
+			<AgentDetails
+			  key="details"
+			  agents={props.agents}
+			  selectedAgent={props.selected_agent}
+			  previewAgent={props.preview_agent}
+			  agencyIds={props.agency_ids}
+			/>
+			<AliasModal
+			  key="alias-modal"
+			  show={props.step == CharacterCreateFrameStep::EnterAlias}
+			  aliasRenaming={props.alias_renaming}
+			  alias={props.alias}
+			/>
 		</Box>
 	}
 
@@ -925,7 +968,21 @@ using character_create_frame_detail::BodyProps;
 				}}
 			  style={character_create_frame_detail::image_patch(7, 5)}
 			>
-					<Body key="body" frame={&props} />
+					<Body
+					  key="body"
+					  step={props.step}
+					  agentRows={props.agent_rows}
+					  agents={props.agents}
+					  agentScroll={props.agent_scroll}
+					  selectedAgent={props.selected_agent}
+					  previewAgent={props.preview_agent}
+					  alias={props.alias}
+					  aliasRenaming={props.alias_renaming}
+					  waitingForCreate={props.waiting_for_create}
+					  selectedAgency={props.selected_agency}
+					  previewAgency={props.preview_agency}
+					  agencyIds={props.agency_ids}
+					/>
 				</Box>
 			</Box>
 		</Box>
