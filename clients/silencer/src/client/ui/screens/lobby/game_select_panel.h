@@ -53,6 +53,10 @@ void GameSelectPanelInit(GameSelectPanelState & state);
 void GameSelectPanelTick(GameSelectPanelState & state,
                          LobbyModel & lobby);
 
+void GameSelectPanelSelect(GameSelectPanelState & state,
+                           int index);
+Uint32 GameSelectPanelSelectedGameId(const GameSelectPanelState & state);
+
 }  // namespace silencer::client_ui::lobby
 
 #endif

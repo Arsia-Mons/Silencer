@@ -96,4 +96,16 @@ void GameSelectPanelTick(GameSelectPanelState & state,
 		lobby.browser.info(selectedGameId));
 }
 
+void GameSelectPanelSelect(GameSelectPanelState & state,
+                           int index) {
+	if(index < 0 || index >= static_cast<int>(state.rows.size())){
+		return;
+	}
+	state.selectedIndex = index;
+}
+
+Uint32 GameSelectPanelSelectedGameId(const GameSelectPanelState & state) {
+	return game_select_panel_detail::SelectedGameId(state);
+}
+
 }  // namespace silencer::client_ui::lobby

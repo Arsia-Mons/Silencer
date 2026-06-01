@@ -90,18 +90,9 @@ int ClampInt(int value, int lo, int hi) {
 	return value;
 }
 
-Uint32 SelectedGameId(
-	const silencer::client_ui::lobby::GameSelectPanelState& state) {
-	if(state.selectedIndex < 0 ||
-	   state.selectedIndex >= static_cast<int>(state.rows.size())){
-		return 0;
-	}
-	return state.rows[static_cast<size_t>(state.selectedIndex)].gameid;
-}
-
-int RoundRatio(int actual,
-               int numerator,
-               int denominator) {
+	int RoundRatio(int actual,
+	               int numerator,
+	               int denominator) {
 	if(denominator <= 0) return 0;
 	return static_cast<int>(
 		(static_cast<long long>(actual) * numerator + denominator / 2) / denominator);
@@ -504,11 +495,11 @@ void LobbyScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime, s
 		.game_select_action_height = lobby_screen_detail::kGameSelectActionButtonH,
 		.game_select_spectate = [this, lobby]() {
 			lobby.browser.spectate(
-				lobby_screen_detail::SelectedGameId(gameSelectState));
+				GameSelectPanelSelectedGameId(gameSelectState));
 		},
 		.game_select_join = [this, lobby]() {
 			lobby.browser.join(
-				lobby_screen_detail::SelectedGameId(gameSelectState));
+				GameSelectPanelSelectedGameId(gameSelectState));
 		},
 		.show_game_select_tall = isGameSelectPane,
 		.game_select_tall_x = rightTallX,
@@ -517,10 +508,7 @@ void LobbyScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime, s
 		.game_select_tall_height = mainLayout.rightTallH,
 		.game_select = &gameSelectState,
 		.game_select_select = [this](int index) {
-			if(index < 0 || index >= static_cast<int>(gameSelectState.rows.size())){
-				return;
-			}
-			gameSelectState.selectedIndex = index;
+			GameSelectPanelSelect(gameSelectState, index);
 		},
 		.show_game_create_upper = showGameCreateUpper,
 		.game_create = &gameCreateState,
