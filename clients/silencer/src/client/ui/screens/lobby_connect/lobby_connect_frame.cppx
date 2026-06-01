@@ -69,6 +69,13 @@ inline ::ui::EdgeSizes inset_left_top(float left, float top) {
 	return edges;
 }
 
+inline std::function<void(const ::ui::TextChangeEvent&)>
+text_change_callback(std::function<void(const char *)> on_change) {
+	return [on_change](const ::ui::TextChangeEvent& event) {
+		if(on_change) on_change(event.value);
+	};
+}
+
 }  // namespace lobby_connect_frame_detail
 
 using ::ui::children;
@@ -149,6 +156,8 @@ using ::ui::components::TextProps;
 						.selection_start = username_caret,
 						.selection_end = username_caret,
 					}}
+				  onTextChange={lobby_connect_frame_detail::text_change_callback(props.set_username)}
+				  maxLength={16}
 				  layout={::ui::LayoutStyle{
 						.width = ::ui::Length::points(183.0f),
 						.height = ::ui::Length::points(21.0f),
@@ -189,6 +198,8 @@ using ::ui::components::TextProps;
 						.selection_start = password_caret,
 						.selection_end = password_caret,
 					}}
+				  onTextChange={lobby_connect_frame_detail::text_change_callback(props.set_password)}
+				  maxLength={28}
 				  layout={::ui::LayoutStyle{
 						.width = ::ui::Length::points(183.0f),
 						.height = ::ui::Length::points(21.0f),

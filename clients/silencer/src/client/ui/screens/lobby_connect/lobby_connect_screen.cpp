@@ -34,12 +34,13 @@ constexpr int kVisibleLogLines = 15;
 constexpr const char * kActionUsername = "lobby_connect.username";
 constexpr const char * kActionPassword = "lobby_connect.password";
 
-void CopyUiText(char * dst, int dstLen, const std::string & value)
+void CopyUiText(char * dst, int dstLen, const char * value)
 {
 	if(!dst || dstLen <= 0) return;
-	int n = static_cast<int>(value.size());
+	const char * src = value ? value : "";
+	int n = static_cast<int>(std::strlen(src));
 	if(n > dstLen - 1) n = dstLen - 1;
-	std::memcpy(dst, value.data(), n);
+	std::memcpy(dst, src, n);
 	dst[n] = '\0';
 }
 
@@ -162,6 +163,14 @@ void LobbyConnectScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frame
 		.username_display = usernameDisplay.c_str(),
 		.password_display = passwordDisplay.c_str(),
 		.inactive = inactive,
+		.set_username = [this](const char * value) {
+			lobby_connect_screen_detail::CopyUiText(
+				username, static_cast<int>(sizeof(username)), value);
+		},
+		.set_password = [this](const char * value) {
+			lobby_connect_screen_detail::CopyUiText(
+				password, static_cast<int>(sizeof(password)), value);
+		},
 		.login = [this, lobby]() {
 			lobby.connection.submit_credentials(username, password);
 		},
@@ -186,23 +195,14 @@ void LobbyConnectScreen::Destroy(ScreenContext & ctx)
 
 bool LobbyConnectScreen::HandleUiIntent(ScreenContext & ctx, const silencer::ui::UiAction & action)
 {
-	if(action.kind == silencer::ui::UiActionKind::SetText){
-		if(action.id == lobby_connect_screen_detail::kActionUsername){
-			lobby_connect_screen_detail::CopyUiText(username, static_cast<int>(sizeof(username)), action.value);
-			return true;
-		}
-		if(action.id == lobby_connect_screen_detail::kActionPassword){
-			lobby_connect_screen_detail::CopyUiText(password, static_cast<int>(sizeof(password)), action.value);
-			return true;
-		}
-		return false;
-	}
 	if(action.kind == silencer::ui::UiActionKind::SubmitText &&
 	   (action.id == lobby_connect_screen_detail::kActionUsername || action.id == lobby_connect_screen_detail::kActionPassword)){
 		if(action.id == lobby_connect_screen_detail::kActionUsername){
-			lobby_connect_screen_detail::CopyUiText(username, static_cast<int>(sizeof(username)), action.value);
+			lobby_connect_screen_detail::CopyUiText(
+				username, static_cast<int>(sizeof(username)), action.value.c_str());
 		}else{
-			lobby_connect_screen_detail::CopyUiText(password, static_cast<int>(sizeof(password)), action.value);
+			lobby_connect_screen_detail::CopyUiText(
+				password, static_cast<int>(sizeof(password)), action.value.c_str());
 		}
 		silencer::client_ui::use_lobby(
 			silencer::client_ui::MakeLobbyProvider(ctx))

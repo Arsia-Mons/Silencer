@@ -489,6 +489,10 @@ fail_if_match \
   "$REPO_ROOT/clients/silencer/src/client/ui/screens/lobby_connect/lobby_connect_screen.h"
 
 fail_if_match \
+  "\\bUiActionKind::SetText\\b" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens/lobby_connect/lobby_connect_screen.cpp"
+
+fail_if_match \
   "\\b(joinClicked|spectateClicked|createClicked|rowClickedIndex)\\b" \
   "$REPO_ROOT/clients/silencer/src/client/ui/screens/lobby/game_select_panel.cpp" \
   "$REPO_ROOT/clients/silencer/src/client/ui/screens/lobby/game_select_panel.h"
