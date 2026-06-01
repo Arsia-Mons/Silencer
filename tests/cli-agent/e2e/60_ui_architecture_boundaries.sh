@@ -170,6 +170,11 @@ fail_if_match \
 
 fail_if_match \
   "return[[:space:]]+value[[:space:]]*[?][[:space:]]*[*]value[[:space:]]*:[[:space:]]*kEmpty" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens/lobby/lobby_view_provider.cpp" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens/lobby/chat_panel_provider.cpp"
+
+fail_if_match \
+  "\\b(LobbyChatContext|UseLobbyChat[[:space:]]*\\()" \
   "$REPO_ROOT/clients/silencer/src/client/ui/screens/lobby/lobby_view_provider.cpp"
 
 fail_if_match \

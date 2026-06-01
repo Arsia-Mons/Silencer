@@ -1,5 +1,6 @@
 #include "client/ui/screens/lobby/lobby_view.h"
 
+#include "client/ui/screens/lobby/chat_panel.h"
 #include "ui/runtime/react.h"
 
 namespace silencer {
@@ -10,7 +11,6 @@ namespace {
 ::ReactContext LobbyChromeContext = {};
 ::ReactContext LobbySurfaceContext = {};
 ::ReactContext LobbyNavigationContext = {};
-::ReactContext LobbyChatContext = {};
 ::ReactContext LobbyCharacterContext = {};
 ::ReactContext LobbyGameSelectContext = {};
 ::ReactContext LobbyGameCreateContext = {};
@@ -19,7 +19,6 @@ namespace {
 const LobbyChrome kEmptyChrome = {};
 const LobbySurface kEmptySurface = {};
 const LobbyNavigation kEmptyNavigation = {};
-const LobbyChat kEmptyChat = {};
 const LobbyCharacter kEmptyCharacter = {};
 const LobbyGameSelect kEmptyGameSelect = {};
 const LobbyGameCreate kEmptyGameCreate = {};
@@ -49,14 +48,6 @@ const LobbyNavigation& UseLobbyNavigation() {
 	if(value) return *value;
 	::react_report_error("client/ui/lobby: missing LobbyNavigationProvider for UseLobbyNavigation\n");
 	return kEmptyNavigation;
-}
-
-const LobbyChat& UseLobbyChat() {
-	const auto * value = static_cast<const LobbyChat *>(
-		::use_context(&LobbyChatContext));
-	if(value) return *value;
-	::react_report_error("client/ui/lobby: missing LobbyChatProvider for UseLobbyChat\n");
-	return kEmptyChat;
 }
 
 const LobbyCharacter& UseLobbyCharacter() {
@@ -106,8 +97,6 @@ const LobbyGameTech& UseLobbyGameTech() {
 		props.surface ? *props.surface : kEmptySurface);
 	const LobbyNavigation * navigation = ::ui::copy_value(
 		props.navigation ? *props.navigation : kEmptyNavigation);
-	const LobbyChat * chat = ::ui::copy_value(
-		props.chat ? *props.chat : kEmptyChat);
 	const LobbyCharacter * character = ::ui::copy_value(
 		props.character ? *props.character : kEmptyCharacter);
 	const LobbyGameSelect * gameSelect = ::ui::copy_value(
@@ -118,7 +107,7 @@ const LobbyGameTech& UseLobbyGameTech() {
 		props.game_join ? *props.game_join : kEmptyGameJoin);
 	const LobbyGameTech * gameTech = ::ui::copy_value(
 		props.game_tech ? *props.game_tech : kEmptyGameTech);
-	if(!chrome || !surface || !navigation || !chat || !character || !gameSelect || !gameCreate || !gameJoin || !gameTech){
+	if(!chrome || !surface || !navigation || !character || !gameSelect || !gameCreate || !gameJoin || !gameTech){
 		return ::ui::empty();
 	}
 	::ui::UiElement frame = ::ui::component(
@@ -155,10 +144,8 @@ const LobbyGameTech& UseLobbyGameTech() {
 		const_cast<LobbyCharacter *>(character),
 		::ui::children({gameSelectProvider}),
 		"character");
-	::ui::UiElement chatProvider = ::ui::provider(
-		"LobbyChatProvider",
-		&LobbyChatContext,
-		const_cast<LobbyChat *>(chat),
+	::ui::UiElement chatProvider = LobbyChatProvider(
+		props.chat ? *props.chat : LobbyChat{},
 		::ui::children({characterProvider}),
 		"chat");
 	::ui::UiElement navigationProvider = ::ui::provider(

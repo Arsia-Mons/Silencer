@@ -10,7 +10,9 @@
 
 #include "shared.h"
 #include "runtime/UiActionQueue.h"
+#include "ui/runtime/element.h"
 
+#include <functional>
 #include <string>
 #include <vector>
 
@@ -74,6 +76,17 @@ struct ChatPanelState {
 	std::string channel;          // cached channel name, updated on channelchanged.
 	char inputBuffer[201]         = {0};  // legacy maxchars = 200 + NUL.
 };
+
+struct LobbyChat {
+	ChatPanelState * state = nullptr;
+	std::function<void(const std::string&)> set_text = {};
+	std::function<void()> send = {};
+};
+
+const LobbyChat& UseLobbyChat();
+::ui::UiElement LobbyChatProvider(const LobbyChat& value,
+                                  ::ui::UiChildren children,
+                                  const char * key = nullptr);
 
 // One-time init. Clears state.
 void ChatPanelInit(ChatPanelState & state);

@@ -9,7 +9,7 @@
 namespace silencer::client_ui::lobby {
 
 struct CharacterPanelState;
-struct ChatPanelState;
+struct LobbyChat;
 struct GameSelectPanelState;
 struct GameCreatePanelState;
 struct GameJoinPanelState;
@@ -35,14 +35,6 @@ struct LobbyNavigation {
 };
 
 const LobbyNavigation& UseLobbyNavigation();
-
-struct LobbyChat {
-	ChatPanelState * state = nullptr;
-	std::function<void(const std::string&)> set_text = {};
-	std::function<void()> send = {};
-};
-
-const LobbyChat& UseLobbyChat();
 
 struct LobbyCharacter {
 	CharacterPanelState * state = nullptr;
