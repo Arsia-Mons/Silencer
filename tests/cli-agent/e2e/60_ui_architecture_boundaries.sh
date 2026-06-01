@@ -21,6 +21,15 @@ fail_if_path_exists() {
   fi
 }
 
+require_match() {
+  local pattern="$1"
+  shift
+  if ! rg -n "$pattern" "$@" >/dev/null; then
+    echo "architecture boundary requirement missing: $pattern" >&2
+    exit 1
+  fi
+}
+
 fail_if_path_exists "clients/silencer/src/ui/modals"
 fail_if_path_exists "clients/silencer/src/ui/panels"
 fail_if_path_exists "clients/silencer/src/ui/screens"
@@ -281,6 +290,10 @@ fail_if_match \
   '::ui::(component|host|box|text|provider|fragment)[[:space:]]*\(' \
   "$REPO_ROOT/clients/silencer/src/client/ui" \
   --glob '*.cppx'
+
+require_match \
+  "command[.]payload[.]image[.]nine_slice|image[.]nine_slice" \
+  "$REPO_ROOT/clients/silencer/src/render/retained_surface_renderer.cpp"
 
 fail_if_match \
   "Handle(TextInput|KeyPress|ScancodeDown|MousePress|MouseMove)|DispatchKeyPress|DispatchPreparedUiNavActions|UiNavActionToAscii|DispatchChatKey|HandleInGameMenuKey" \

@@ -46,6 +46,105 @@ bool ClipRect(const Surface& dst, int& x, int& y, int& w, int& h) {
 	return true;
 }
 
+Renderer::Rect DrawRectToSurfaceRect(const ::ui::DrawRect& rect) {
+	int x = static_cast<int>(std::floor(rect.x));
+	int y = static_cast<int>(std::floor(rect.y));
+	int w = static_cast<int>(std::ceil(rect.x + rect.w)) - x;
+	int h = static_cast<int>(std::ceil(rect.y + rect.h)) - y;
+	return Renderer::Rect{w, h, x, y};
+}
+
+int RoundedInset(float value, int maxValue) {
+	if(value <= 0.0f) return 0;
+	int inset = static_cast<int>(std::round(value));
+	if(inset < 0) return 0;
+	return std::min(inset, maxValue);
+}
+
+bool HasNineSlice(const ::ui::SideWidths& nineSlice) {
+	return nineSlice.top > 0.0f ||
+	       nineSlice.right > 0.0f ||
+	       nineSlice.bottom > 0.0f ||
+	       nineSlice.left > 0.0f;
+}
+
+void BlitSpriteRegion(Surface * src,
+                      const Renderer::Rect& srcRect,
+                      Surface& dst,
+                      const Renderer::Rect& dstRect) {
+	if(!src || srcRect.w <= 0 || srcRect.h <= 0 || dstRect.w <= 0 || dstRect.h <= 0) return;
+	if(srcRect.x < 0 || srcRect.y < 0) return;
+	if(srcRect.x + srcRect.w > src->w || srcRect.y + srcRect.h > src->h) return;
+
+	if(srcRect.w == dstRect.w && srcRect.h == dstRect.h){
+		Renderer::Rect srcCopy = srcRect;
+		Renderer::Rect dstCopy = dstRect;
+		Renderer::BlitSurface(src, &srcCopy, &dst, &dstCopy);
+		return;
+	}
+
+	int x = dstRect.x;
+	int y = dstRect.y;
+	int w = dstRect.w;
+	int h = dstRect.h;
+	if(!ClipRect(dst, x, y, w, h)) return;
+
+	Uint8 * srcPixels = src->GetPixels();
+	Uint8 * dstPixels = dst.GetPixels();
+	for(int dy = y; dy < y + h; ++dy){
+		int relY = dy - dstRect.y;
+		int sy = srcRect.y + (relY * srcRect.h) / dstRect.h;
+		for(int dx = x; dx < x + w; ++dx){
+			int relX = dx - dstRect.x;
+			int sx = srcRect.x + (relX * srcRect.w) / dstRect.w;
+			Uint8 pixel = srcPixels[sx + sy * src->w];
+			if(pixel){
+				dstPixels[dx + dy * dst.w] = pixel;
+			}
+		}
+	}
+}
+
+void DrawNineSliceImage(Surface * src,
+                        Surface& dst,
+                        const Renderer::Rect& dstRect,
+                        const ::ui::SideWidths& nineSlice) {
+	if(!src || dstRect.w <= 0 || dstRect.h <= 0) return;
+
+	int left = RoundedInset(nineSlice.left, src->w);
+	int right = RoundedInset(nineSlice.right, src->w - left);
+	int top = RoundedInset(nineSlice.top, src->h);
+	int bottom = RoundedInset(nineSlice.bottom, src->h - top);
+
+	int dstLeft = std::min(left, dstRect.w);
+	int dstRight = std::min(right, std::max(0, dstRect.w - dstLeft));
+	int dstTop = std::min(top, dstRect.h);
+	int dstBottom = std::min(bottom, std::max(0, dstRect.h - dstTop));
+
+	int sx[4] = {0, left, src->w - right, src->w};
+	int sy[4] = {0, top, src->h - bottom, src->h};
+	int dx[4] = {dstRect.x, dstRect.x + dstLeft, dstRect.x + dstRect.w - dstRight, dstRect.x + dstRect.w};
+	int dy[4] = {dstRect.y, dstRect.y + dstTop, dstRect.y + dstRect.h - dstBottom, dstRect.y + dstRect.h};
+
+	for(int row = 0; row < 3; ++row){
+		for(int col = 0; col < 3; ++col){
+			Renderer::Rect srcSlice{
+				sx[col + 1] - sx[col],
+				sy[row + 1] - sy[row],
+				sx[col],
+				sy[row],
+			};
+			Renderer::Rect dstSlice{
+				dx[col + 1] - dx[col],
+				dy[row + 1] - dy[row],
+				dx[col],
+				dy[row],
+			};
+			BlitSpriteRegion(src, srcSlice, dst, dstSlice);
+		}
+	}
+}
+
 void FillRect(Renderer& renderer, Surface& dst, const ::ui::DrawRect& rect, ::ui::Color color) {
 	if(color.a == 0) return;
 	int x = static_cast<int>(std::floor(rect.x));
@@ -262,13 +361,21 @@ void DrawImage(Renderer& renderer,
 	}
 	Surface * src = ResolveSprite(resources, command.payload.image.texture_id);
 	if(!src) return;
-	Renderer::Rect dstrect{
+	const ::ui::ImageData& image = command.payload.image;
+	if(image.tint.a == 0) return;
+	Renderer::Rect dstrect = DrawRectToSurfaceRect(command.rect);
+	if(dstrect.w <= 0 || dstrect.h <= 0) return;
+	if(HasNineSlice(image.nine_slice)){
+		DrawNineSliceImage(src, dst, dstrect, image.nine_slice);
+		return;
+	}
+	Renderer::Rect srcrect{
 		src->w,
 		src->h,
-		static_cast<int>(std::floor(command.rect.x)),
-		static_cast<int>(std::floor(command.rect.y)),
+		0,
+		0,
 	};
-	Renderer::BlitSurface(src, nullptr, &dst, &dstrect);
+	BlitSpriteRegion(src, srcrect, dst, dstrect);
 }
 
 }  // namespace
