@@ -22,6 +22,7 @@ struct TextInputProps {
 	const char * value = nullptr;
 	::ui::TextEditMetadata text_edit = {};
 	std::function<void(const ::ui::TextChangeEvent&)> on_text_change = {};
+	std::function<void(const ::ui::TextSubmitEvent&)> on_text_submit = {};
 	int max_length = 0;
 	bool numbers_only = false;
 	bool password = false;

@@ -61,6 +61,7 @@ struct LobbyChromeFrameProps {
 	int chat_width = 0;
 	int chat_height = 0;
 	std::function<void(const char *)> chat_set_input = {};
+	std::function<void(const char *)> chat_submit_input = {};
 	bool show_game_select_create = false;
 	int game_select_create_x = 0;
 	int game_select_create_y = 0;

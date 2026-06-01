@@ -119,6 +119,41 @@ wait_for_widget "Create Game"
 # register widgets into the inspector.
 cli --port "$CTRL_PORT" step --frames 5 >/dev/null
 
+chat_center=$(cli --port "$CTRL_PORT" inspect | bun -e '
+const text = await new Response(Bun.stdin.stream()).text();
+const r = JSON.parse(text);
+const chat = (r.widgets ?? []).find((w) =>
+  w.kind === "textinput" && w.label === "Chat" && w.source === "clay");
+if (!chat) process.exit(1);
+console.log(`${Math.floor(chat.x + chat.w / 2)} ${Math.floor(chat.y + chat.h / 2)}`);
+')
+read -r chat_x chat_y <<<"$chat_center"
+cli --port "$CTRL_PORT" click_at --x "$chat_x" --y "$chat_y" >/dev/null
+cli --port "$CTRL_PORT" set_text --label "Chat" --text "retained lobby hello" >/dev/null
+cli --port "$CTRL_PORT" step --frames 1 >/dev/null
+cli --port "$CTRL_PORT" key --key enter >/dev/null
+for i in $(seq 1 80); do
+  if cli --port "$CTRL_PORT" inspect | bun -e '
+    const text = await new Response(Bun.stdin.stream()).text();
+    const r = JSON.parse(text);
+    const widgets = r.widgets ?? [];
+    const elements = r.elements ?? [];
+    const chat = widgets.find((w) =>
+      w.kind === "textinput" && w.label === "Chat" && w.source === "clay");
+    const sawLine = [...widgets, ...elements].some((w) =>
+      `${w.label ?? ""} ${w.value ?? ""}`.includes("retained lobby hello"));
+    process.exit(chat && chat.text === "" && sawLine ? 0 : 1);
+  ' >/dev/null 2>&1; then
+    break
+  fi
+  cli --port "$CTRL_PORT" step --frames 1 >/dev/null
+  if [ "$i" = 80 ]; then
+    echo "retained lobby chat submit did not clear input and echo the line" >&2
+    cli --port "$CTRL_PORT" inspect >&2 || true
+    exit 1
+  fi
+done
+
 # inspect should now list Clay widgets including "Create Game".
 got=$(cli --port "$CTRL_PORT" inspect | bun -e \
   'const t=await new Response(Bun.stdin.stream()).text();

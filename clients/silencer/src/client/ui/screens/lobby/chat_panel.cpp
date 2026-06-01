@@ -379,19 +379,14 @@ void ChatPanelSetInput(ChatPanelState & state, const char * value) {
 		value);
 }
 
-bool ChatPanelHandleUiIntent(ChatPanelState & state,
-                             LobbyChatModel & chat,
-                             const silencer::ui::UiAction & action) {
-	if(action.id != chat_panel_detail::kActionInput) return false;
-	if(action.kind == silencer::ui::UiActionKind::SubmitText){
-		ChatPanelSetInput(state, action.value.c_str());
-		if(std::strlen(state.inputBuffer) > 0){
-			chat.send(state.inputBuffer);
-			state.inputBuffer[0] = '\0';
-		}
-		return true;
+void ChatPanelSubmitInput(ChatPanelState & state,
+                          const LobbyChatModel & chat,
+                          const char * value) {
+	ChatPanelSetInput(state, value);
+	if(std::strlen(state.inputBuffer) > 0){
+		chat.send(state.inputBuffer);
+		state.inputBuffer[0] = '\0';
 	}
-	return action.kind == silencer::ui::UiActionKind::Select;
 }
 
 }  // namespace silencer::client_ui::lobby

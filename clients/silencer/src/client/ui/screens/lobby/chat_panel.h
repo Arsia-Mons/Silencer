@@ -87,9 +87,9 @@ void ChatPanelInit(ChatPanelState & state);
 // LobbyChatModel. Mirrors legacy ChatPanel::Tick.
 void ChatPanelTick(ChatPanelState & state, LobbyChatModel & chat);
 void ChatPanelSetInput(ChatPanelState & state, const char * value);
-bool ChatPanelHandleUiIntent(ChatPanelState & state,
-                             LobbyChatModel & chat,
-                             const silencer::ui::UiAction & action);
+void ChatPanelSubmitInput(ChatPanelState & state,
+                          const LobbyChatModel & chat,
+                          const char * value);
 ChatPanelLayoutMetrics ResolveChatPanelLayout(Uint16 panelWidth,
                                               Uint16 panelHeight);
 void ChatPanelSyncLayout(ChatPanelState & state,

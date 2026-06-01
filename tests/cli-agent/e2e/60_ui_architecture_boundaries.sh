@@ -530,6 +530,12 @@ fail_if_match \
   "$REPO_ROOT/clients/silencer/src/client/ui/screens/lobby/chat_panel.h"
 
 fail_if_match \
+  "\\bChatPanelHandleUiIntent\\b" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens/lobby/chat_panel.cpp" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens/lobby/chat_panel.h" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens/lobby/lobby_screen.cpp"
+
+fail_if_match \
   "\\bUiActionKind::SetText\\b|\\bUpdateChatTextInput\\b" \
   "$REPO_ROOT/clients/silencer/src/client/ui/ClientUi.cpp"
 

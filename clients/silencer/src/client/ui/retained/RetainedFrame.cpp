@@ -135,6 +135,7 @@ bool RetainedFrame::HandleUiIntent(
 	if(action.kind != silencer::ui::UiActionKind::Activate &&
 	   action.kind != silencer::ui::UiActionKind::Select &&
 	   action.kind != silencer::ui::UiActionKind::SetText &&
+	   action.kind != silencer::ui::UiActionKind::SubmitText &&
 	   action.kind != silencer::ui::UiActionKind::Scroll){
 		return false;
 	}
@@ -162,6 +163,10 @@ bool RetainedFrame::InvokeActionForNode(
 	}else if(matches && !node.interaction.disabled){
 		if(action.kind == silencer::ui::UiActionKind::SetText){
 			if(tree_.invoke_text_change(node.id, action.value.c_str())){
+				return true;
+			}
+		}else if(action.kind == silencer::ui::UiActionKind::SubmitText){
+			if(tree_.invoke_text_submit(node.id, action.value.c_str())){
 				return true;
 			}
 		}else if(tree_.invoke_activate(node.id)){

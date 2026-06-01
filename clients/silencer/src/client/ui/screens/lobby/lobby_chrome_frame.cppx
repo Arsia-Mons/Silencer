@@ -736,6 +736,13 @@ chat_text_change_callback(std::function<void(const char *)> on_change) {
 	};
 }
 
+inline std::function<void(const ::ui::TextSubmitEvent&)>
+chat_text_submit_callback(std::function<void(const char *)> on_submit) {
+	return [on_submit](const ::ui::TextSubmitEvent& event) {
+		if(on_submit) on_submit(event.value);
+	};
+}
+
 inline const char * game_select_info_value(const GameSelectPanelState& state,
                                            int index) {
 	switch(index){
@@ -1779,6 +1786,7 @@ struct ChatPanelViewProps {
 	int width = 0;
 	int height = 0;
 	std::function<void(const char *)> set_input = {};
+	std::function<void(const char *)> submit_input = {};
 };
 
 ::ui::UiElement ChatPanelView(const ChatPanelViewProps& props) {
@@ -1905,8 +1913,9 @@ struct ChatPanelViewProps {
 						.caret = caret,
 						.selection_start = caret,
 						.selection_end = caret,
-					}}
+				  }}
 				  onTextChange={chat_text_change_callback(props.set_input)}
+				  onTextSubmit={chat_text_submit_callback(props.submit_input)}
 				  maxLength={200}
 				  layout={::ui::LayoutStyle{
 						.width = ::ui::Length::points(static_cast<float>(metrics.inputWidth)),
@@ -4509,6 +4518,7 @@ using ::ui::components::TextProps;
 		  width={props.chat_width}
 		  height={props.chat_height}
 		  setInput={props.chat_set_input}
+		  submitInput={props.chat_submit_input}
 		/>
 		<lobby_chrome_frame_detail.GameSelectTallPanel
 		  key="game-select-tall"

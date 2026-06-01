@@ -483,6 +483,10 @@ void LobbyScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime, s
 		.chat_set_input = [this](const char * value) {
 			silencer::client_ui::lobby::ChatPanelSetInput(chatState, value);
 		},
+		.chat_submit_input = [this, lobby](const char * value) {
+			silencer::client_ui::lobby::ChatPanelSubmitInput(
+				chatState, lobby.chat, value);
+		},
 		.show_game_select_create = showGameSelectCreate,
 		.game_select_create_x = bodyX + mainLayout.characterW + mainLayout.regionGap
 		                        + lobby_screen_detail::kGameSelectCreatePadLeft,
@@ -789,9 +793,6 @@ bool LobbyScreen::HandleUiIntent(ScreenContext & ctx, const silencer::ui::UiActi
 			silencer::client_ui::MakeLobbyProvider(ctx));
 	if(silencer::client_ui::lobby::CharacterPanelHandleUiIntent(
 			characterState, lobby.character, action)){
-		return true;
-	}
-	if(silencer::client_ui::lobby::ChatPanelHandleUiIntent(chatState, lobby.chat, action)){
 		return true;
 	}
 	if(gameJoinActive){

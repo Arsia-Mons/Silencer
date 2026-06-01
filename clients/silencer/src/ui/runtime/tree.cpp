@@ -239,6 +239,7 @@ bool UiTree::set_metadata(NodeId id, const NodeMetadata &metadata) {
   node->on_key = metadata.on_key;
   node->on_text_input = metadata.on_text_input;
   node->on_text_change = metadata.on_text_change;
+  node->on_text_submit = metadata.on_text_submit;
   node->on_scroll = metadata.on_scroll;
   node->on_text_editing = metadata.on_text_editing;
   node->control_offset = metadata.control_offset;
@@ -338,6 +339,18 @@ bool UiTree::invoke_text_change(NodeId id, const char *value) const {
       !node->on_text_change)
     return false;
   node->on_text_change({
+      .target = id,
+      .value = value ? value : "",
+  });
+  return true;
+}
+
+bool UiTree::invoke_text_submit(NodeId id, const char *value) const {
+  const Node *node = find(id);
+  if (!node || !node->interaction.focusable || node->interaction.disabled ||
+      !node->on_text_submit)
+    return false;
+  node->on_text_submit({
       .target = id,
       .value = value ? value : "",
   });
@@ -479,6 +492,7 @@ UiTree::Node *UiTree::ensure_node(NodeId id, NodeId parent_id, const char *type,
     existing->on_key = {};
     existing->on_text_input = {};
     existing->on_text_change = {};
+    existing->on_text_submit = {};
     existing->on_scroll = {};
     existing->on_text_editing = {};
     existing->baseline = nullptr;

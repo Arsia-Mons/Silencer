@@ -32,6 +32,7 @@ inline ::ui::TextEditMetadata metadata_from_props(const TextInputProps& props) {
 inline ::ui::HostCallbacks callbacks_from_props(const TextInputProps& props) {
 	::ui::HostCallbacks callbacks = detail::callbacks_from_props(props);
 	callbacks.on_text_change = props.on_text_change;
+	callbacks.on_text_submit = props.on_text_submit;
 	return callbacks;
 }
 
