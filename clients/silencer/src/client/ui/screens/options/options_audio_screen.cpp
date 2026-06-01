@@ -23,7 +23,7 @@ void OptionsAudioScreen::Tick(ScreenContext & ctx)
 	(void)ctx;
 }
 
-void OptionsAudioScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime, const silencer::ui::UiInputState&, silencer::ui::UiInteractionRegistry& interactions)
+void OptionsAudioScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime, const silencer::ui::UiInputState&, Uint8, silencer::ui::UiInteractionRegistry& interactions)
 {
 	(void)frametime;
 

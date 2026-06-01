@@ -33,7 +33,7 @@ void MainMenuScreen::Tick(ScreenContext & ctx)
 	(void)ctx;
 }
 
-void MainMenuScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime, const silencer::ui::UiInputState&, silencer::ui::UiInteractionRegistry& interactions)
+void MainMenuScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime, const silencer::ui::UiInputState&, Uint8, silencer::ui::UiInteractionRegistry& interactions)
 {
 	(void)frametime;
 	silencer::client_ui::AppModel app =

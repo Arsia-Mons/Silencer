@@ -68,7 +68,7 @@ void PasswordModal::Submit()
 	if(cb) cb(captured.c_str());
 }
 
-void PasswordModal::BuildUi(ScreenContext & ctx, Surface & dst, float frametime, const silencer::ui::UiInputState&, silencer::ui::UiInteractionRegistry& interactions)
+void PasswordModal::BuildUi(ScreenContext & ctx, Surface & dst, float frametime, const silencer::ui::UiInputState&, Uint8 hudPhase, silencer::ui::UiInteractionRegistry& interactions)
 {
 	(void)frametime;
 	password_modal_detail::RegisterWidgets(this, password, interactions);
@@ -76,7 +76,7 @@ void PasswordModal::BuildUi(ScreenContext & ctx, Surface & dst, float frametime,
 		interactions.FocusTextInputByUid(password_modal_detail::kPasswordUid);
 	}
 	bool focused = interactions.IsTextInputFocused(password_modal_detail::kPasswordUid);
-	bool blink = (ctx.renderer.GetHudAnimationPhase() % 32) < 16;
+	bool blink = (hudPhase % 32) < 16;
 
 	passwordDisplay_.assign(std::strlen(password), '*');
 	if(focused && blink) passwordDisplay_ += "|";

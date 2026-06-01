@@ -124,7 +124,7 @@ void LobbyConnectScreen::Tick(ScreenContext & ctx)
 	}
 }
 
-void LobbyConnectScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime, const silencer::ui::UiInputState&, silencer::ui::UiInteractionRegistry& interactions)
+void LobbyConnectScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime, const silencer::ui::UiInputState&, Uint8 hudPhase, silencer::ui::UiInteractionRegistry& interactions)
 {
 	(void)frametime;
 	silencer::client_ui::LobbyModel lobby =
@@ -141,7 +141,7 @@ void LobbyConnectScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frame
 		interactions.IsTextInputFocused(lobby_connect_screen_detail::LBY_INPUT_USERNAME);
 	const bool passwordFocused =
 		interactions.IsTextInputFocused(lobby_connect_screen_detail::LBY_INPUT_PASSWORD);
-	const bool blink = (ctx.renderer.GetHudAnimationPhase() % 32) < 16;
+	const bool blink = (hudPhase % 32) < 16;
 
 	UpdateLogText();
 	usernameDisplay = username;

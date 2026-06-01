@@ -4,6 +4,8 @@
 #include <memory>
 #include <vector>
 
+#include <SDL3/SDL_stdinc.h>
+
 class Screen;
 class ScreenContext;
 class Surface;
@@ -41,6 +43,7 @@ public:
 	                  Surface& dst,
 	                  float frametime,
 	                  const silencer::ui::UiInputState& input,
+	                  Uint8 hudPhase,
 	                  silencer::ui::UiInteractionRegistry& interactions);
 	std::vector<const ::ui::DrawCommandList *> RetainedDrawCommands() const;
 

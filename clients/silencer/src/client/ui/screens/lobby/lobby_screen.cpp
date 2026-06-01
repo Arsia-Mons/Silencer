@@ -267,7 +267,7 @@ void LobbyScreen::ShowGameTech()
 	rightPane = LobbyRightPane::GameTech;
 }
 
-void LobbyScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime, const silencer::ui::UiInputState & input, silencer::ui::UiInteractionRegistry& interactions)
+void LobbyScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime, const silencer::ui::UiInputState & input, Uint8, silencer::ui::UiInteractionRegistry& interactions)
 {
 	(void)frametime;
 	(void)dst;

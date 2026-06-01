@@ -26,6 +26,7 @@ public:
 	             Surface & dst,
 	             float frametime,
 	             const silencer::ui::UiInputState& input,
+	             Uint8 hudPhase,
 	             silencer::ui::UiInteractionRegistry& interactions) override;
 	void Destroy(ScreenContext & ctx) override;
 	bool HandleBack(ScreenContext & ctx) override;

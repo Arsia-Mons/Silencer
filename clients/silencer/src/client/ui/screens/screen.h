@@ -38,8 +38,9 @@ public:
 	                     Surface & dst,
 	                     float frametime,
 	                     const silencer::ui::UiInputState& input,
+	                     Uint8 hudPhase,
 	                     silencer::ui::UiInteractionRegistry& interactions)
-	{ (void)ctx; (void)dst; (void)frametime; (void)input; (void)interactions; }
+	{ (void)ctx; (void)dst; (void)frametime; (void)input; (void)hudPhase; (void)interactions; }
 
 	// Tear down screen-owned UI state. Called on pop/replace.
 	virtual void Destroy(ScreenContext & ctx) = 0;

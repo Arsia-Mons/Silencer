@@ -72,6 +72,7 @@ void ScreenStack::BuildVisible(ScreenContext& ctx,
                                Surface& dst,
                                float frametime,
                                const silencer::ui::UiInputState& input,
+                               Uint8 hudPhase,
                                silencer::ui::UiInteractionRegistry& interactions) {
 	if(screens_.empty()) return;
 	const std::size_t start = VisibleStart();
@@ -79,7 +80,7 @@ void ScreenStack::BuildVisible(ScreenContext& ctx,
 		if(i > start && screens_[i]->IsOverlay()) {
 			interactions.BeginFrame();
 		}
-		screens_[i]->BuildUi(ctx, dst, frametime, input, interactions);
+		screens_[i]->BuildUi(ctx, dst, frametime, input, hudPhase, interactions);
 	}
 }
 
