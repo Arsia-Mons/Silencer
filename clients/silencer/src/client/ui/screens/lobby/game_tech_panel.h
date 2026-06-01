@@ -6,8 +6,10 @@
 // peer-name snapshots, and the selected-tech description snapshot.
 
 #include "shared.h"
+#include "ui/runtime/element.h"
 
 #include <array>
+#include <functional>
 #include <string>
 #include <vector>
 
@@ -37,6 +39,18 @@ struct GameTechPanelState {
 	std::array<std::string, 3> peerNameStrs{};      // uid 80..82 (non-local peers)
 	std::vector<GameTechRow> techRows;
 };
+
+struct LobbyGameTech {
+	GameTechPanelState * state = nullptr;
+	std::function<void()> back_to_team = {};
+	std::function<void(int)> preview = {};
+	std::function<void(int)> toggle = {};
+};
+
+const LobbyGameTech& UseLobbyGameTech();
+::ui::UiElement LobbyGameTechProvider(const LobbyGameTech& value,
+                                      ::ui::UiChildren children,
+                                      const char * key = nullptr);
 
 void GameTechPanelInit(GameTechPanelState & state);
 

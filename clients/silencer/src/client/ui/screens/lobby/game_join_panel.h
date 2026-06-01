@@ -6,7 +6,9 @@
 // and the joined-game roster snapshot.
 
 #include "shared.h"
+#include "ui/runtime/element.h"
 
+#include <functional>
 #include <string>
 #include <vector>
 
@@ -43,6 +45,18 @@ struct GameJoinPanelState {
 	// the connected world's current team/peer state.
 	std::vector<GameJoinRosterRow> rosterRows;
 };
+
+struct LobbyGameJoin {
+	GameJoinPanelState * state = nullptr;
+	std::function<void()> choose_tech = {};
+	std::function<void()> change_team = {};
+	std::function<void()> ready = {};
+};
+
+const LobbyGameJoin& UseLobbyGameJoin();
+::ui::UiElement LobbyGameJoinProvider(const LobbyGameJoin& value,
+                                      ::ui::UiChildren children,
+                                      const char * key = nullptr);
 
 void GameJoinPanelInit(GameJoinPanelState & state);
 

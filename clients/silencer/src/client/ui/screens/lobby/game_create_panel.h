@@ -7,7 +7,9 @@
 
 #include "shared.h"
 #include "runtime/UiActionQueue.h"
+#include "ui/runtime/element.h"
 
+#include <functional>
 #include <string>
 #include <vector>
 
@@ -56,6 +58,26 @@ struct GameCreatePanelState {
 	Uint8  optionsVisibleRows = 0;
 
 };
+
+struct LobbyGameCreate {
+	GameCreatePanelState * state = nullptr;
+	std::function<void(int)> select_map = {};
+	std::function<void(int)> scroll_maps = {};
+	std::function<void()> cycle_security = {};
+	std::function<void()> toggle_spectatable = {};
+	std::function<void()> submit = {};
+	std::function<void(const std::string&)> set_name = {};
+	std::function<void(const std::string&)> set_password = {};
+	std::function<void(const std::string&)> set_min_level = {};
+	std::function<void(const std::string&)> set_max_level = {};
+	std::function<void(const std::string&)> set_max_players = {};
+	std::function<void(const std::string&)> set_max_teams = {};
+};
+
+const LobbyGameCreate& UseLobbyGameCreate();
+::ui::UiElement LobbyGameCreateProvider(const LobbyGameCreate& value,
+                                        ::ui::UiChildren children,
+                                        const char * key = nullptr);
 
 // Hydrate state from Config (defaultgamename, lastspectatable) and rebuild
 // the map list from disk + the community map API. Mirrors the legacy

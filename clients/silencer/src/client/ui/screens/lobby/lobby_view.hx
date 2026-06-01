@@ -10,10 +10,10 @@ namespace silencer::client_ui::lobby {
 
 struct LobbyChat;
 struct LobbyCharacter;
-struct GameSelectPanelState;
-struct GameCreatePanelState;
-struct GameJoinPanelState;
-struct GameTechPanelState;
+struct LobbyGameSelect;
+struct LobbyGameCreate;
+struct LobbyGameJoin;
+struct LobbyGameTech;
 
 struct LobbyChrome {
 	const char * version = "";
@@ -35,52 +35,6 @@ struct LobbyNavigation {
 };
 
 const LobbyNavigation& UseLobbyNavigation();
-
-struct LobbyGameSelect {
-	GameSelectPanelState * state = nullptr;
-	std::function<void(int)> select = {};
-	std::function<void(int)> scroll = {};
-	std::function<void()> create = {};
-	std::function<void()> join = {};
-	std::function<void()> spectate = {};
-};
-
-const LobbyGameSelect& UseLobbyGameSelect();
-
-struct LobbyGameCreate {
-	GameCreatePanelState * state = nullptr;
-	std::function<void(int)> select_map = {};
-	std::function<void(int)> scroll_maps = {};
-	std::function<void()> cycle_security = {};
-	std::function<void()> toggle_spectatable = {};
-	std::function<void()> submit = {};
-	std::function<void(const std::string&)> set_name = {};
-	std::function<void(const std::string&)> set_password = {};
-	std::function<void(const std::string&)> set_min_level = {};
-	std::function<void(const std::string&)> set_max_level = {};
-	std::function<void(const std::string&)> set_max_players = {};
-	std::function<void(const std::string&)> set_max_teams = {};
-};
-
-const LobbyGameCreate& UseLobbyGameCreate();
-
-struct LobbyGameJoin {
-	GameJoinPanelState * state = nullptr;
-	std::function<void()> choose_tech = {};
-	std::function<void()> change_team = {};
-	std::function<void()> ready = {};
-};
-
-const LobbyGameJoin& UseLobbyGameJoin();
-
-struct LobbyGameTech {
-	GameTechPanelState * state = nullptr;
-	std::function<void()> back_to_team = {};
-	std::function<void(int)> preview = {};
-	std::function<void(int)> toggle = {};
-};
-
-const LobbyGameTech& UseLobbyGameTech();
 
 struct LobbyFrameProps {
 	const char * key = nullptr;

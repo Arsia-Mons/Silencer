@@ -8,7 +8,9 @@
 
 #include "shared.h"
 #include "runtime/UiActionQueue.h"
+#include "ui/runtime/element.h"
 
+#include <functional>
 #include <string>
 #include <vector>
 
@@ -53,6 +55,20 @@ struct GameSelectPanelState {
 	bool joinVisible     = false;
 	bool spectateVisible = false;
 };
+
+struct LobbyGameSelect {
+	GameSelectPanelState * state = nullptr;
+	std::function<void(int)> select = {};
+	std::function<void(int)> scroll = {};
+	std::function<void()> create = {};
+	std::function<void()> join = {};
+	std::function<void()> spectate = {};
+};
+
+const LobbyGameSelect& UseLobbyGameSelect();
+::ui::UiElement LobbyGameSelectProvider(const LobbyGameSelect& value,
+                                        ::ui::UiChildren children,
+                                        const char * key = nullptr);
 
 // One-time init. Clears state. The legacy panel ran a one-time games-list
 // rebuild on Build; we just clear here — the first Tick that observes
