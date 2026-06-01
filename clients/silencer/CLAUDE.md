@@ -195,12 +195,12 @@ field reference, the two sound-helper variants, and NPC-wiring steps:
 
 - `src/actordef.h` / `src/actordef.cpp` — actor definition system (see above).
 - `src/behaviortree.h` / `src/behaviortree.cpp` — BT interpreter (see above).
-- Top-level state machine (menus, lobby, in-game): `src/game/`.
-  `game.cpp` is the dispatcher; `events.cpp` handles SDL input,
-  `ingame.cpp` holds in-game lifecycle, `headless.cpp` glues the
-  control queue, and each gameplay-state Tick body lives in
-  `tick/tick_<state>.cpp`. `GameUiPipeline::RenderClientUiFrame` starts the
-  retained UI frame; `ClientUi` owns visible UI navigation.
+- Game/session lifecycle (lobby, gameplay, replay, headless): `src/game/`.
+  `game.cpp` coordinates lifecycle entry points; `events.cpp` handles SDL
+  input, `ingame.cpp` holds in-game lifecycle, `headless.cpp` glues the
+  control queue, and each gameplay Tick body lives in `tick/`.
+  `GameUiPipeline::RenderClientUiFrame` starts the retained UI frame;
+  `ClientUi` owns visible UI navigation.
 - Simulation loop, socket, peer list, replay: `src/world.cpp`.
 - Rendering: `src/render/renderer.cpp`, `src/render/surface.cpp`,
   `src/render/sprite.cpp`, `src/render/palette.cpp`. Renderer is not a UI

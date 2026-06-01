@@ -21,7 +21,7 @@ public:
 	bool HandleUiIntent(ScreenContext & ctx, const silencer::ui::UiAction & action) override;
 
 private:
-	// Two-slot rebind state machine + label resolution lives in
+	// Two-slot rebind capture flow + label resolution lives in
 	// controls_rebind_capture.{h,cpp}; these stay as the per-frame state.
 	void BeginRebindFromVisibleRow(int row, int slot);
 	void CyclePreset(ScreenContext & ctx);

@@ -62,7 +62,7 @@ void LobbyConnectScreen::Tick(ScreenContext & ctx)
 {
 	ctx.PlayMenuMusicIfReady();
 	// Mirror the legacy lobby-connect gate: nothing happens until
-	// the menu music has crossfaded in. The lobby state machine starts in
+	// the menu music has crossfaded in. The lobby connection lifecycle starts in
 	// WAITING and only kicks off the TCP connect on the first tick after
 	// the gate opens, so this delay shapes when the user sees "Connecting
 	// to ..." appear in the textbox.

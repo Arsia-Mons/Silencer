@@ -1,7 +1,7 @@
 #ifndef SILENCER_CLIENT_UI_LOBBY_GAME_CREATE_PANEL_H
 #define SILENCER_CLIENT_UI_LOBBY_GAME_CREATE_PANEL_H
 
-// Screen-side lobby GameCreatePanel state and domain glue. The cppx lobby view
+// Screen-side lobby GameCreatePanel snapshot and domain glue. The cppx lobby view
 // owns retained composition; this file owns CreateGame kickoff, Config
 // persistence, and async map upload.
 
@@ -50,7 +50,7 @@ struct GameCreatePanelState {
 	bool createClicked      = false;
 	int  mapRowClickedIndex = -1;
 
-	// Upper "Game Options" viewport state. The panel owns the visible-row
+	// Upper "Game Options" viewport data. The panel owns the visible-row
 	// window and applies wheel/control-socket scroll in row units.
 	Uint16 optionsScrollPosition = 0;
 	int    optionsScrollDelta = 0;
@@ -79,13 +79,13 @@ const LobbyGameCreate& UseLobbyGameCreate();
                                         ::ui::UiChildren children,
                                         const char * key = nullptr);
 
-// Hydrate state from Config (defaultgamename, lastspectatable) and rebuild
+// Hydrate panel data from Config (defaultgamename, lastspectatable) and rebuild
 // the map list from disk + the community map API. Mirrors the legacy
 // GameCreatePanel::Build's one-time setup.
 void GameCreatePanelInit(GameCreatePanelState & state, ScreenContext & ctx);
 
 // Per-frame pump. Consumes click flags (cycle security, toggle spectatable,
-// kick off Create). Also pumps the deferred CreateGame state machine
+// kick off Create). Also pumps the deferred CreateGame workflow
 // (map upload → CreateGame → CONNECTED → ShowGameJoin handoff +
 // progress-modal spinner update + create-failure unwind). Mirrors the
 // legacy LobbyScreen::Tick's `if(gameCreate)` block + GameCreatePanel::Tick

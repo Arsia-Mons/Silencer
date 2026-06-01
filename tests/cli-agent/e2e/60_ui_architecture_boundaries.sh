@@ -112,6 +112,13 @@ fail_if_match \
   "$REPO_ROOT/clients/silencer/src/ui/CLAUDE.md"
 
 fail_if_match \
+  "\\bstate[ -]machine\\b|\\bStateMachine\\b" \
+  "$REPO_ROOT/clients/silencer/src/client/ui" \
+  "$REPO_ROOT/clients/silencer/src/ui" \
+  "$REPO_ROOT/clients/silencer/CLAUDE.md" \
+  "$REPO_ROOT/clients/silencer/src/ui/CLAUDE.md"
+
+fail_if_match \
   "set_flag\\(|set_index\\(|focus_index\\(|copy_to\\(|copy_ui_text\\(|&state->" \
   "$REPO_ROOT/clients/silencer/src/client/ui/screens/lobby/lobby_view.cppx"
 
