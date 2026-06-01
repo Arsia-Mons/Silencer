@@ -6,7 +6,6 @@
 // peer-name snapshots, and the selected-tech description snapshot.
 
 #include "shared.h"
-#include "runtime/UiActionQueue.h"
 
 #include <array>
 #include <string>
@@ -25,7 +24,7 @@ struct GameTechRow {
 };
 
 struct GameTechPanelState {
-	// Per-frame click flags. Set by typed widget intents; consumed by Tick.
+	// Per-frame click flags. Set by retained callbacks; consumed by Tick.
 	bool backClicked = false;
 	// -1 = no click this frame; otherwise the buyableitems[idx] index.
 	int  toggleClickedItemIndex = -1;
@@ -47,8 +46,6 @@ void GameTechPanelTick(GameTechPanelState & state,
                        World & world,
                        ScreenContext & ctx,
                        LobbyScreen & owner);
-bool GameTechPanelHandleUiIntent(GameTechPanelState & state,
-                                 const silencer::ui::UiAction & action);
 void GameTechPanelRequestBack(GameTechPanelState & state);
 void GameTechPanelPreviewItem(GameTechPanelState & state, int index);
 void GameTechPanelToggleItem(GameTechPanelState & state, int index);

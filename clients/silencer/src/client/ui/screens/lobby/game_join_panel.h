@@ -6,7 +6,6 @@
 // and the joined-game roster snapshot.
 
 #include "shared.h"
-#include "runtime/UiActionQueue.h"
 
 #include <string>
 #include <vector>
@@ -28,7 +27,7 @@ struct GameJoinRosterRow {
 };
 
 struct GameJoinPanelState {
-	// Per-frame click flags. Set by typed widget intents; consumed once
+	// Per-frame click flags. Set by retained callbacks; consumed once
 	// by GameJoinPanelTick on the next frame.
 	bool readyClicked = false;
 	bool teamClicked  = false;
@@ -55,8 +54,6 @@ void GameJoinPanelTick(GameJoinPanelState & state,
                        World & world,
                        ScreenContext & ctx,
                        LobbyScreen & owner);
-bool GameJoinPanelHandleUiIntent(GameJoinPanelState & state,
-                                 const silencer::ui::UiAction & action);
 void GameJoinPanelRequestTech(GameJoinPanelState & state);
 void GameJoinPanelRequestTeam(GameJoinPanelState & state);
 void GameJoinPanelRequestReady(GameJoinPanelState & state);

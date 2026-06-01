@@ -111,7 +111,9 @@ bool LobbyScreen::BuildElement(ScreenContext & ctx, ::ui::UiElement * out)
 				goBackClicked = true;
 			},
 			.change_agent = [this]() {
-				characterState.newCharacterRequested = true;
+				if(!characterState.agentSelectionLocked){
+					characterState.newCharacterRequested = true;
+				}
 			},
 			.set_chat_text = [this](const std::string& value) {
 				silencer::client_ui::lobby::ChatPanelSetInput(chatState, value);

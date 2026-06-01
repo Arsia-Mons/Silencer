@@ -32,7 +32,7 @@ struct GameSelectPanelState {
 	int    selectedIndex = -1;  // -1 = no selection.
 	Uint16 scrollPos     = 0;
 
-	// Per-frame click flags. Set by typed widget intents; consumed
+	// Per-frame click flags. Set by retained callbacks; consumed
 	// once by GameSelectPanelTick on the next frame.
 	bool   joinClicked     = false;
 	bool   spectateClicked = false;

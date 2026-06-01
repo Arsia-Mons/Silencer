@@ -23,9 +23,6 @@ namespace silencer::client_ui::lobby {
 
 namespace game_create_panel_detail {
 
-constexpr const char * kActionSecurity = "lobby.game_create.security";
-constexpr const char * kActionSpectatable = "lobby.game_create.spectatable";
-constexpr const char * kActionCreate = "lobby.game_create.create";
 constexpr const char * kActionMapPrefix = "lobby.game_create.map";
 constexpr const char * kActionMinLevel = "lobby.game_create.min_level";
 constexpr const char * kActionMaxLevel = "lobby.game_create.max_level";
@@ -247,20 +244,6 @@ bool GameCreatePanelHandleUiIntent(GameCreatePanelState & state,
 			return true;
 		}
 		return false;
-	}
-	if(action.kind == silencer::ui::UiActionKind::Activate){
-		if(action.id == game_create_panel_detail::kActionSecurity){
-			GameCreatePanelCycleSecurity(state);
-			return true;
-		}
-		if(action.id == game_create_panel_detail::kActionSpectatable){
-			GameCreatePanelToggleSpectatable(state);
-			return true;
-		}
-		if(action.id == game_create_panel_detail::kActionCreate){
-			GameCreatePanelRequestCreate(state);
-			return true;
-		}
 	}
 	if(action.kind == silencer::ui::UiActionKind::Select &&
 	   game_create_panel_detail::StartsWith(action.id, game_create_panel_detail::kActionMapPrefix)){

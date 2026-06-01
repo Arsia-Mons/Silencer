@@ -21,9 +21,6 @@ namespace game_select_panel_detail {
 constexpr Uint16 kListH     = 265;
 constexpr Uint8  kListLineH = 14;
 
-constexpr const char * kActionCreate = "lobby.game_select.create";
-constexpr const char * kActionJoin = "lobby.game_select.join";
-constexpr const char * kActionSpectate = "lobby.game_select.spectate";
 constexpr const char * kActionRowPrefix = "lobby.game_select.row";
 
 bool StartsWith(const std::string & value, const char * prefix) {
@@ -239,20 +236,6 @@ void GameSelectPanelTick(GameSelectPanelState & state,
 
 bool GameSelectPanelHandleUiIntent(GameSelectPanelState & state,
                                    const silencer::ui::UiAction & action) {
-	if(action.kind == silencer::ui::UiActionKind::Activate){
-		if(action.id == game_select_panel_detail::kActionCreate){
-			GameSelectPanelRequestCreate(state);
-			return true;
-		}
-		if(action.id == game_select_panel_detail::kActionJoin){
-			GameSelectPanelRequestJoin(state);
-			return true;
-		}
-		if(action.id == game_select_panel_detail::kActionSpectate){
-			GameSelectPanelRequestSpectate(state);
-			return true;
-		}
-	}
 	if(action.kind == silencer::ui::UiActionKind::Select &&
 	   game_select_panel_detail::StartsWith(action.id, game_select_panel_detail::kActionRowPrefix)){
 		GameSelectPanelSelectRow(state, action.index);

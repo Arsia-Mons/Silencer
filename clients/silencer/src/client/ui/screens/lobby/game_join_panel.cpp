@@ -9,14 +9,6 @@
 
 namespace silencer::client_ui::lobby {
 
-namespace game_join_panel_detail {
-
-constexpr const char * kActionTech = "lobby.game_join.choose_tech";
-constexpr const char * kActionTeam = "lobby.game_join.change_team";
-constexpr const char * kActionReady = "lobby.game_join.ready";
-
-}  // namespace game_join_panel_detail
-
 void GameJoinPanelInit(GameJoinPanelState & state) {
 	state = GameJoinPanelState{};
 }
@@ -72,24 +64,6 @@ void GameJoinPanelTick(GameJoinPanelState & state,
 		state.teamClicked = false;
 		owner.JoinPanelChangeTeam(world);
 	}
-}
-
-bool GameJoinPanelHandleUiIntent(GameJoinPanelState & state,
-                                 const silencer::ui::UiAction & action) {
-	if(action.kind != silencer::ui::UiActionKind::Activate) return false;
-	if(action.id == game_join_panel_detail::kActionTech){
-		GameJoinPanelRequestTech(state);
-		return true;
-	}
-	if(action.id == game_join_panel_detail::kActionTeam){
-		GameJoinPanelRequestTeam(state);
-		return true;
-	}
-	if(action.id == game_join_panel_detail::kActionReady){
-		GameJoinPanelRequestReady(state);
-		return true;
-	}
-	return false;
 }
 
 void GameJoinPanelRequestTech(GameJoinPanelState & state) {

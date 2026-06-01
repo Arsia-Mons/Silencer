@@ -6,7 +6,6 @@
 // navigation to the character selection/create screen.
 
 #include "shared.h"
-#include "runtime/UiActionQueue.h"
 
 #include <string>
 
@@ -41,9 +40,6 @@ void CharacterPanelInit(CharacterPanelState & state);
 // Reconcile any selectedAgency change with Config + world. Called once per
 // LobbyScreen::Tick.
 void CharacterPanelTick(CharacterPanelState & state, World & world);
-bool CharacterPanelHandleUiIntent(CharacterPanelState & state,
-                                  World & world,
-                                  const silencer::ui::UiAction & action);
 
 }  // namespace silencer::client_ui::lobby
 

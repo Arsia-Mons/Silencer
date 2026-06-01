@@ -19,8 +19,6 @@
 
 namespace lobby_screen_detail {
 
-constexpr const char * kActionGoBack = "lobby.go_back";
-
 MessageModal * TopAsProgressModal(ScreenContext & ctx)
 {
 	Screen * top = ctx.game.GetTopScreen();
@@ -54,7 +52,7 @@ void LobbyScreen::Tick(ScreenContext & ctx)
 		return;
 	}
 
-	// Go Back was set by a typed button intent on the previous frame. Consume
+	// Go Back was set by a retained callback on the previous frame. Consume
 	// it before pumping anything else.
 	if(goBackClicked){
 		goBackClicked = false;
@@ -181,14 +179,6 @@ bool LobbyScreen::HandleUiIntent(ScreenContext & ctx, const silencer::ui::UiActi
 		goBackClicked = true;
 		return true;
 	}
-	if(action.kind == silencer::ui::UiActionKind::Activate &&
-	   action.id == lobby_screen_detail::kActionGoBack){
-		goBackClicked = true;
-		return true;
-	}
-	if(silencer::client_ui::lobby::CharacterPanelHandleUiIntent(characterState, ctx.world, action)){
-		return true;
-	}
 	if(silencer::client_ui::lobby::ChatPanelHandleUiIntent(chatState, ctx.world, action)){
 		return true;
 	}
@@ -196,10 +186,10 @@ bool LobbyScreen::HandleUiIntent(ScreenContext & ctx, const silencer::ui::UiActi
 		return silencer::client_ui::lobby::GameCreatePanelHandleUiIntent(gameCreateState, action);
 	}
 	if(gameJoinActive){
-		return silencer::client_ui::lobby::GameJoinPanelHandleUiIntent(gameJoinState, action);
+		return false;
 	}
 	if(gameTechActive){
-		return silencer::client_ui::lobby::GameTechPanelHandleUiIntent(gameTechState, action);
+		return false;
 	}
 	return silencer::client_ui::lobby::GameSelectPanelHandleUiIntent(gameSelectState, action);
 }

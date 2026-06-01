@@ -41,7 +41,7 @@ struct GameCreatePanelState {
 	int    mapSelectedIndex = -1;
 	Uint16 mapScrollPos     = 0;
 
-	// Per-frame click flags. Set by typed widget intents; consumed once
+	// Per-frame click flags. Set by retained callbacks; consumed once
 	// by GameCreatePanelTick on the next frame.
 	bool securityClicked    = false;
 	bool spectatableClicked = false;

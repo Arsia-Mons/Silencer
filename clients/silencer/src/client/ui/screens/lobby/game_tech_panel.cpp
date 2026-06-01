@@ -10,28 +10,9 @@
 #include "user.h"
 #include "world.h"
 
-#include <cstdlib>
 #include <cstring>
 
 namespace silencer::client_ui::lobby {
-
-namespace game_tech_panel_detail {
-
-constexpr const char * kActionBack = "lobby.game_tech.back";
-constexpr const char * kActionTogglePrefix = "lobby.game_tech.toggle.";
-constexpr const char * kActionDescriptionPrefix = "lobby.game_tech.description.";
-
-bool StartsWith(const std::string & value, const char * prefix) {
-	const size_t n = std::strlen(prefix);
-	return value.size() >= n && value.compare(0, n, prefix) == 0;
-}
-
-int SuffixInt(const std::string & value, const char * prefix) {
-	if(!StartsWith(value, prefix)) return -1;
-	return std::atoi(value.c_str() + std::strlen(prefix));
-}
-
-}  // namespace game_tech_panel_detail
 
 void GameTechPanelInit(GameTechPanelState & state) {
 	state = GameTechPanelState{};
@@ -136,26 +117,6 @@ void GameTechPanelTick(GameTechPanelState & state,
 		owner.ShowGameJoin(ctx);
 		return;
 	}
-}
-
-bool GameTechPanelHandleUiIntent(GameTechPanelState & state,
-                                 const silencer::ui::UiAction & action) {
-	if(action.kind != silencer::ui::UiActionKind::Activate) return false;
-	if(action.id == game_tech_panel_detail::kActionBack){
-		GameTechPanelRequestBack(state);
-		return true;
-	}
-	int index = game_tech_panel_detail::SuffixInt(action.id, game_tech_panel_detail::kActionTogglePrefix);
-	if(index >= 0){
-		GameTechPanelToggleItem(state, index);
-		return true;
-	}
-	index = game_tech_panel_detail::SuffixInt(action.id, game_tech_panel_detail::kActionDescriptionPrefix);
-	if(index >= 0){
-		GameTechPanelPreviewItem(state, index);
-		return true;
-	}
-	return false;
 }
 
 void GameTechPanelRequestBack(GameTechPanelState & state) {
