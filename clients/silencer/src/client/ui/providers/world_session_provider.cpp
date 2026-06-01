@@ -1,7 +1,11 @@
 #include "world_session_provider.h"
 
+#include "client/ui/hooks/use_buy_tech.h"
+#include "client/ui/hooks/use_ingame_chat.h"
 #include "client/ui/hooks/use_match.h"
 #include "client/ui/hooks/use_player_status.h"
+#include "client/ui/hooks/use_teams.h"
+#include "client/ui/hooks/use_tech.h"
 #include "ui/runtime/react.h"
 
 namespace client::ui {
@@ -72,6 +76,74 @@ Match use_match() {
       .message = s.message,
       .confirm_quit = value->confirm_quit,
   };
+}
+
+namespace {
+// The new overlay hooks share one read of the WorldSessionContext; nullptr means
+// no provider is mounted (off the in-match tree) and the hook returns a default.
+WorldSessionValue *world_session_value() {
+  WorldSessionValue *value =
+      static_cast<WorldSessionValue *>(use_context(&WorldSessionContext));
+  if (!value)
+    react_report_error("client/ui: missing WorldSessionProvider\n");
+  return value;
+}
+} // namespace
+
+Tech use_tech() {
+  WorldSessionValue *value = world_session_value();
+  if (!value)
+    return {};
+  const WorldSessionSnapshot &s = value->snapshot;
+  Tech out;
+  out.buy_active = s.buy_active;
+  out.tech_active = s.tech_active;
+  out.items = s.buytech_items;
+  out.purchase = value->buytech_purchase;
+  out.close = value->buytech_close;
+  return out;
+}
+
+BuyTech use_buy_tech() {
+  WorldSessionValue *value = world_session_value();
+  if (!value)
+    return {};
+  BuyTech out;
+  out.selected_index = value->snapshot.buytech_selected;
+  out.select = value->buytech_select;
+  return out;
+}
+
+IngameChat use_ingame_chat() {
+  WorldSessionValue *value = world_session_value();
+  if (!value)
+    return {};
+  const WorldSessionSnapshot &s = value->snapshot;
+  IngameChat out;
+  out.active = s.chat_active;
+  out.with_team = s.chat_with_team;
+  out.show_ticks = s.chat_show_ticks;
+  out.text = s.chat_text;
+  out.send = value->chat_send;
+  out.cancel = value->chat_cancel;
+  out.toggle_channel = value->chat_toggle_channel;
+  return out;
+}
+
+Teams use_teams() {
+  WorldSessionValue *value = world_session_value();
+  if (!value)
+    return {};
+  const WorldSessionSnapshot &s = value->snapshot;
+  Teams out;
+  out.showing = s.show_player_list;
+  out.teams.reserve(s.scores.size());
+  for (size_t i = 0; i < s.scores.size(); ++i)
+    out.teams.push_back({(uint8_t)i, s.scores[i]});
+  out.players = s.players;
+  out.set_show_player_list = value->set_show_player_list;
+  out.request_peer_list = value->request_peer_list;
+  return out;
 }
 
 } // namespace client::ui

@@ -8,6 +8,7 @@
 #include "shared.h"
 #include "client/ui/app_shell/client_ui.h"
 #include "ui/game_ui_pipeline.h"
+#include "ui/world_session_model.h"
 #include "ui/input.h"
 #include "ui/runtime/focus.h"
 #include "ui/runtime/tree.h"
@@ -334,7 +335,35 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 		return;
 	}
 	if(cmd.op == "ingame_ui_mode"){
-		cmd.reply->set_value(Err(cmd.id, "UNSUPPORTED", kUiUnsupportedMsg));
+		std::string mode = cmd.args.value("mode", std::string("status"));
+		namespace gu = silencer::game_ui;
+		gu::InGameUiMode m;
+		if(mode == "clear")            m = gu::InGameUiMode::Clear;
+		else if(mode == "chat")        m = gu::InGameUiMode::Chat;
+		else if(mode == "buy")         m = gu::InGameUiMode::Buy;
+		else if(mode == "tech")        m = gu::InGameUiMode::Tech;
+		else if(mode == "playerlist")  m = gu::InGameUiMode::PlayerList;
+		else if(mode == "all")         m = gu::InGameUiMode::All;
+		else                           m = gu::InGameUiMode::Status;
+		gu::InGameUiControlResult r = gu::ConfigureInGameUi(game, m);
+		if(!r.available){
+			cmd.reply->set_value(Err(cmd.id, "WRONG_STATE",
+				r.error.empty() ? std::string("not in a match") : r.error));
+			return;
+		}
+		nlohmann::json j;
+		j["ok"] = r.available;
+		j["mode"] = mode;
+		j["chat_active"] = r.chat_active;
+		j["buy_active"] = r.buy_active;
+		j["tech_active"] = r.tech_active;
+		j["show_chat_ticks"] = r.show_chat_ticks;
+		j["show_player_list"] = r.show_player_list;
+		j["buy_item_count"] = r.buy_item_count;
+		j["tech_item_count"] = r.tech_item_count;
+		j["buy_selected_index"] = r.buy_selected_index;
+		j["tech_selected_index"] = r.tech_selected_index;
+		cmd.reply->set_value(OkResult(cmd.id, j));
 		return;
 	}
 	if(cmd.op == "click"){

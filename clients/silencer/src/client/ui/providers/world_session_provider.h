@@ -1,7 +1,11 @@
 #pragma once
 
+#include "client/ui/hooks/use_buy_tech.h"
+#include "client/ui/hooks/use_ingame_chat.h"
 #include "client/ui/hooks/use_match.h"
 #include "client/ui/hooks/use_player_status.h"
+#include "client/ui/hooks/use_teams.h"
+#include "client/ui/hooks/use_tech.h"
 #include "ui/runtime/element.h"
 
 #include <cstdint>
@@ -45,6 +49,26 @@ struct WorldSessionSnapshot {
   uint16_t winning_team_id = 0;
   std::vector<uint16_t> scores = {};
   std::string message = {};
+
+  // --- buy/tech station overlay (use_tech / use_buy_tech) ---
+  // The viewed agent has at most one station open (buy XOR tech). `buytech_items`
+  // is the open station's rows; `buytech_selected` the replicated cursor
+  // (Player::buyifacelastitem / techifacelastitem).
+  bool buy_active = false;
+  bool tech_active = false;
+  int buytech_selected = 0;
+  std::vector<TechItem> buytech_items = {};
+
+  // --- in-game chat overlay (use_ingame_chat) ---
+  bool chat_active = false;
+  bool chat_with_team = false;
+  int chat_show_ticks = 0;
+  std::string chat_text = {};
+
+  // --- player list / scoreboard (use_teams) ---
+  // Per-team scores reuse `scores` above; `players` is the connected roster.
+  bool show_player_list = false;
+  std::vector<ScoreboardPlayer> players = {};
 };
 
 // The in-match frame value (doc §5): the per-tick snapshot + the queued intent
@@ -54,6 +78,20 @@ struct WorldSessionValue {
   WorldSessionSnapshot snapshot = {};
   std::function<void(int)> select_inventory_slot = {};
   std::function<void()> confirm_quit = {};
+
+  // Buy/tech station intents (use_tech / use_buy_tech).
+  std::function<void(int)> buytech_select = {};
+  std::function<void(int)> buytech_purchase = {};
+  std::function<void()> buytech_close = {};
+
+  // In-game chat intents (use_ingame_chat).
+  std::function<void(const std::string &)> chat_send = {};
+  std::function<void()> chat_cancel = {};
+  std::function<void()> chat_toggle_channel = {};
+
+  // Teams / scoreboard intents (use_teams).
+  std::function<void(bool)> set_show_player_list = {};
+  std::function<void()> request_peer_list = {};
 };
 
 // Publishes the in-match model to the component tree. Mounted by the composition

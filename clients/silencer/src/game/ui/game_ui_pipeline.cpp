@@ -11,6 +11,7 @@
 #include "gasloader.h"
 #include "objecttypes.h"
 #include "player.h"
+#include "buyableitem.h"
 // SIL-14 golden cppx render path.
 #include "render/cppx_ui/pipeline_host.h"
 #include "client/ui/app_shell/app_root.h"
@@ -44,6 +45,7 @@
 #include <SDL3/SDL.h>
 #include <algorithm>
 #include <cstdlib>
+#include <cstring>
 #include <vector>
 
 namespace {
@@ -563,6 +565,76 @@ world_session.confirm_quit = [this](){
 cppxHost->pipeline().client_ui().queue_deferred_mutation([this](){
 // Quit to the menu (the full pause/leave→summary flow lands with PauseScreen).
 game.GoToState(GameState::MAINMENU);
+});
+};
+// SIL-21 (5/n) in-match overlay intents (doc §6/§7a): buy/tech station, chat
+// compose, and the scoreboard toggle — queued over the public World/Player seam
+// (drained after render, FADEOUT-gated). The viewed agent matches the snapshot.
+world_session.buytech_select = [this](int index){
+cppxHost->pipeline().client_ui().queue_deferred_mutation([this, index](){
+Player * p = game.world.GetPeerPlayer(game.world.viewedpeerid);
+if(!p || !(p->isbuying || p->techstationactive)) return;
+std::vector<BuyableItem *> items;
+p->CollectBuyMenuItems(game.world, p->techstationactive, items);
+if(items.empty()) return;
+int i = index < 0 ? 0 : (index >= (int)items.size() ? (int)items.size() - 1 : index);
+if(p->techstationactive) p->techifacelastitem = i; else p->buyifacelastitem = i;
+});
+};
+world_session.buytech_purchase = [this](int index){
+cppxHost->pipeline().client_ui().queue_deferred_mutation([this, index](){
+Player * p = game.world.GetPeerPlayer(game.world.viewedpeerid);
+if(!p || !(p->isbuying || p->techstationactive)) return;
+std::vector<BuyableItem *> items;
+p->CollectBuyMenuItems(game.world, p->techstationactive, items);
+if(items.empty()) return;
+int i = index < 0 ? 0 : (index >= (int)items.size() ? (int)items.size() - 1 : index);
+Uint8 id = items[i]->id;
+if(p->isbuying) p->BuyItem(game.world, id);
+else if(p->InOwnBase(game.world)) p->RepairItem(game.world, id);
+else p->VirusItem(game.world, id);
+});
+};
+world_session.buytech_close = [this](){
+cppxHost->pipeline().client_ui().queue_deferred_mutation([this](){
+Player * p = game.world.GetPeerPlayer(game.world.viewedpeerid);
+if(p){ p->isbuying = false; p->techstationactive = false; }
+});
+};
+world_session.chat_send = [this](const std::string & text){
+cppxHost->pipeline().client_ui().queue_deferred_mutation([this, text](){
+Player * p = game.world.GetPeerPlayer(game.world.viewedpeerid);
+if(!p) return;
+if(!text.empty()){
+char buf[101];
+std::strncpy(buf, text.c_str(), sizeof(buf) - 1);
+buf[sizeof(buf) - 1] = '\0';
+game.world.SendChat(p->chatwithteam, buf);
+}
+p->chatActive = false;
+p->chatText[0] = '\0';
+});
+};
+world_session.chat_cancel = [this](){
+cppxHost->pipeline().client_ui().queue_deferred_mutation([this](){
+Player * p = game.world.GetPeerPlayer(game.world.viewedpeerid);
+if(p){ p->chatActive = false; p->chatText[0] = '\0'; }
+});
+};
+world_session.chat_toggle_channel = [this](){
+cppxHost->pipeline().client_ui().queue_deferred_mutation([this](){
+Player * p = game.world.GetPeerPlayer(game.world.viewedpeerid);
+if(p) p->chatwithteam = !p->chatwithteam;
+});
+};
+world_session.set_show_player_list = [this](bool show){
+cppxHost->pipeline().client_ui().queue_deferred_mutation([this, show](){
+game.world.SetShowingPlayerList(show);
+});
+};
+world_session.request_peer_list = [this](){
+cppxHost->pipeline().client_ui().queue_deferred_mutation([this](){
+game.world.RequestPeerList();
 });
 };
 

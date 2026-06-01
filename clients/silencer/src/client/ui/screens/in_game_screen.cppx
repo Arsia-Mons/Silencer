@@ -1,20 +1,38 @@
 #include "client/ui/screens/in_game_screen.h"
 
+#include "client/ui/components/actions/actions.h"
 #include "client/ui/components/layout/layout.h"
 #include "client/ui/components/surfaces/surfaces.h"
 #include "client/ui/components/text/text.h"
+#include "client/ui/components/tokens.h"
+#include "client/ui/hooks/use_buy_tech.h"
+#include "client/ui/hooks/use_ingame_chat.h"
 #include "client/ui/hooks/use_match.h"
 #include "client/ui/hooks/use_player_status.h"
+#include "client/ui/hooks/use_teams.h"
+#include "client/ui/hooks/use_tech.h"
+#include "ui/components/box.h"
+#include "ui/components/input.h"
 #include "ui/runtime/react.h"
 
+#include <functional>
 #include <string>
+#include <vector>
 
 namespace client::ui {
 namespace {
 
 using namespace silencer;
 using ::ui::children;
+using ::ui::components::Box;
+using ::ui::components::BoxProps;
+using ::ui::components::Input;
+using ::ui::components::InputProps;
 
+// The buy/tech overlay renders a fixed window of five focusable rows (the golden
+// loadout-tile idiom). The replicated cursor + nav drive selection; a full list
+// view (scroll window) is a follow-up. Five rows cover the in-band crop and the
+// nav-selection path the e2e exercises.
 const char *phase_label(uint8_t phase) {
   switch (phase) {
   case 1:
@@ -40,6 +58,131 @@ std::string build_score_text(const std::vector<uint16_t> &scores) {
   return out;
 }
 
+// Scoreboard as a single block: per-team scores, then the connected roster.
+std::string build_scoreboard_text(const std::vector<TeamScore> &teams,
+                                  const std::vector<ScoreboardPlayer> &players) {
+  std::string out;
+  for (const TeamScore &t : teams) {
+    if (!out.empty())
+      out += "\n";
+    out += "Team " + std::to_string((int)t.number + 1) + ":  " +
+           std::to_string((int)t.score);
+  }
+  if (players.empty()) {
+    if (!out.empty())
+      out += "\n";
+    out += "(no other agents)";
+  }
+  for (const ScoreboardPlayer &p : players) {
+    out += "\n";
+    out += p.name + "  [T" + std::to_string((int)p.team_number + 1) + "]";
+    if (p.local)
+      out += "  (you)";
+  }
+  return out;
+}
+
+// --- in-match overlays (InGameScreen children, gated by the snapshot flags) ---
+
+// One focusable buy/tech row. Focus drives the replicated cursor (so keyboard
+// nav moves selection); activation purchases the row. Out-of-range slots render
+// nothing so the row count stays stable across frames.
+::ui::UiElement buytech_row(int index, const std::vector<TechItem> &items,
+                            int selected, std::function<void(int)> select,
+                            std::function<void(int)> purchase) {
+  if (index < 0 || index >= (int)items.size())
+    return ::ui::empty();
+  const TechItem &it = items[index];
+  std::string text = it.label;
+  if (!it.detail.empty()) {
+    text += "   ";
+    text += it.detail;
+  }
+  if (!it.affordable)
+    text += "  (locked)";
+  const char *label = ::ui::copy_string(text.c_str());
+  const char *key = ::ui::copy_string(("btrow" + std::to_string(index)).c_str());
+  std::function<void()> on_focus = [select, index]() {
+    if (select)
+      select(index);
+  };
+  std::function<void()> on_press = [purchase, index]() {
+    if (purchase)
+      purchase(index);
+  };
+  return <AppButton
+    key={key}
+    controlId="BuyTechRow"
+    controlOffset={index}
+    selected={index == selected}
+    defaultFocused={index == selected}
+    label={label}
+    onFocus={on_focus}
+    onPress={on_press}
+  />
+}
+
+::ui::UiElement BuyTechOverlay(const Tech &tech, const BuyTech &cursor) {
+  const char *title = tech.tech_active ? "Tech" : "Buy";
+  const std::vector<TechItem> &items = tech.items;
+  const int sel = cursor.selected_index;
+  std::function<void(int)> select = cursor.select;
+  std::function<void(int)> purchase = tech.purchase;
+  return <Panel key="buytech" variant={PanelVariant::Hero}>
+    <ScreenTitle key="h" variant={ScreenTitleVariant::Dialog} value={title} />
+    {buytech_row(0, items, sel, select, purchase)}
+    {buytech_row(1, items, sel, select, purchase)}
+    {buytech_row(2, items, sel, select, purchase)}
+    {buytech_row(3, items, sel, select, purchase)}
+    {buytech_row(4, items, sel, select, purchase)}
+    <AppButton key="close" controlId="CloseBuyTech" label="Close" onPress={tech.close} />
+  </Panel>
+}
+
+::ui::UiElement PlayerListOverlay(const char *scoreboard) {
+  return <Panel key="scoreboard" variant={PanelVariant::Overlay}>
+    <ScreenTitle key="h" variant={ScreenTitleVariant::Screen} value="Scoreboard" />
+    <BodyText key="rows" variant={BodyTextVariant::Body} value={scoreboard} />
+  </Panel>
+}
+
+// A full-width chat bar pinned to the bottom band (a Panel's canonical width is
+// too narrow to span the HUD, so this is a token-filled Box).
+::ui::UiElement IngameChatOverlay(bool with_team, const char *draft,
+                                  std::function<void(const std::string &)> set_draft,
+                                  std::function<void()> send,
+                                  std::function<void()> toggle,
+                                  std::function<void()> cancel) {
+  const char *channel = with_team ? "Team Chat" : "Global Chat";
+  std::function<void(const ::ui::ActivationEvent &)> on_activate =
+      [send](const ::ui::ActivationEvent &) { if (send) send(); };
+  return <Box
+    key="chatbar"
+    layout={::ui::LayoutStyle{
+      .direction = ::ui::FlexDirection::Row,
+      .align_items = ::ui::AlignItems::Center,
+      .width = ::ui::Length::percent(100.0f),
+      .padding = {12.0f, 12.0f, 8.0f, 8.0f},
+      .gap = 10.0f,
+    }}
+    style={tokens::fill_patch(tokens::kSurfaceHudBand)}
+  >
+    <ScreenTitle key="ch" variant={ScreenTitleVariant::Dialog} value={channel} />
+    <Input
+      key="msg"
+      id="IngameChat"
+      autofocus={true}
+      accessibility={{.label = "Chat"}}
+      value={draft}
+      onChange={set_draft}
+      onActivate={on_activate}
+    />
+    <AppButton key="send" controlId="SendIngameChat" label="Send" onPress={send} />
+    <AppButton key="chan" controlId="ToggleChatChannel" label="Channel" onPress={toggle} />
+    <AppButton key="close" controlId="CloseChat" label="Close" onPress={cancel} />
+  </Box>
+}
+
 struct InGameScreenProps {
   uint32_t unused = 0;
 };
@@ -47,6 +190,13 @@ struct InGameScreenProps {
 ::ui::UiElement InGameScreenView(const InGameScreenProps &) {
   PlayerStatus ps = use_player_status();
   Match m = use_match();
+  Tech tech = use_tech();
+  BuyTech buy_tech = use_buy_tech();
+  IngameChat chat = use_ingame_chat();
+  Teams teams = use_teams();
+  std::string *draft = use_state<std::string>(std::string());
+  if (!draft)
+    return ::ui::empty();
 
   const unsigned mins = m.time_secs / 60u;
   const unsigned secs = m.time_secs % 60u;
@@ -69,17 +219,63 @@ struct InGameScreenProps {
       (unsigned)ps.current_weapon, (unsigned)ps.laser_ammo,
       (unsigned)ps.rocket_ammo, (unsigned)ps.flamer_ammo, (unsigned)ps.files,
       (unsigned)ps.max_files, (unsigned)ps.credits);
+  const char *scoreboard =
+      use_text_storage("%s", build_scoreboard_text(teams.teams, teams.players).c_str());
+
+  // State-driven overlays: each renders only while its world flag is up. Buy and
+  // tech share the station overlay (mutually exclusive); the scoreboard and chat
+  // are independent. Inactive overlays collapse to empty() so the child shape is
+  // stable.
+  ::ui::UiElement buytech =
+      (tech.buy_active || tech.tech_active) ? BuyTechOverlay(tech, buy_tech)
+                                            : ::ui::empty();
+  ::ui::UiElement scoreboard_overlay =
+      teams.showing ? PlayerListOverlay(scoreboard) : ::ui::empty();
+
+  std::function<void(const std::string &)> set_draft =
+      [draft](const std::string &next) { *draft = next; };
+  std::function<void()> send_chat = [send = chat.send, draft]() {
+    if (send)
+      send(*draft);
+    draft->clear();
+  };
+  ::ui::UiElement chatbar =
+      chat.active ? IngameChatOverlay(chat.with_team, draft->c_str(), set_draft,
+                                      send_chat, chat.toggle_channel, chat.cancel)
+                  : ::ui::empty();
 
   return <ScreenLayout key="root" variant={ScreenLayoutVariant::Hud}>
-    <Panel key="match" variant={PanelVariant::Sunken}>
-      <ScreenTitle key="mode" variant={ScreenTitleVariant::Dialog} value={match_line} />
-      <BodyText key="score" variant={BodyTextVariant::Body} value={score_line} />
-    </Panel>
+    <Box
+      key="top"
+      layout={::ui::LayoutStyle{
+        .direction = ::ui::FlexDirection::Column,
+        .align_items = ::ui::AlignItems::Start,
+        .gap = 10.0f,
+      }}
+    >
+      <Panel key="match" variant={PanelVariant::Sunken}>
+        <ScreenTitle key="mode" variant={ScreenTitleVariant::Dialog} value={match_line} />
+        <BodyText key="score" variant={BodyTextVariant::Body} value={score_line} />
+      </Panel>
+      {buytech}
+      {scoreboard_overlay}
+    </Box>
     <BodyText key="message" variant={BodyTextVariant::Message} value={message} />
-    <Panel key="status" variant={PanelVariant::Sunken}>
-      <BodyText key="vitals" variant={BodyTextVariant::Strong} value={vitals} />
-      <BodyText key="arms" variant={BodyTextVariant::Body} value={arms} />
-    </Panel>
+    <Box
+      key="bottom"
+      layout={::ui::LayoutStyle{
+        .direction = ::ui::FlexDirection::Column,
+        .align_items = ::ui::AlignItems::Stretch,
+        .width = ::ui::Length::percent(100.0f),
+        .gap = 10.0f,
+      }}
+    >
+      {chatbar}
+      <Panel key="status" variant={PanelVariant::Sunken}>
+        <BodyText key="vitals" variant={BodyTextVariant::Strong} value={vitals} />
+        <BodyText key="arms" variant={BodyTextVariant::Body} value={arms} />
+      </Panel>
+    </Box>
   </ScreenLayout>
 }
 
