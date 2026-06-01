@@ -27,7 +27,10 @@ void CharacterCreateScreen::BuildUi(ScreenContext & ctx,
 {
 	(void)frametime;
 
-	RebuildAgentRows(ctx);
+	const silencer::client_ui::LobbyModel lobby =
+		silencer::client_ui::use_lobby(
+			silencer::client_ui::MakeLobbyProvider(ctx));
+	RebuildAgentRows(lobby);
 	if(agentScrollDelta != 0){
 		int next = static_cast<int>(agentScroll) + agentScrollDelta;
 		const int visible = character_create_screen_detail::kAgentRowsH /
@@ -41,9 +44,7 @@ void CharacterCreateScreen::BuildUi(ScreenContext & ctx,
 		agentScrollDelta = 0;
 	}
 
-	const silencer::client_ui::LobbyCharacterModel character =
-		silencer::client_ui::use_lobby(
-			silencer::client_ui::MakeLobbyProvider(ctx)).character;
+	const silencer::client_ui::LobbyCharacterModel character = lobby.character;
 	silencer::client_ui::CharacterCreateFrameStep frameStep =
 		silencer::client_ui::CharacterCreateFrameStep::SelectAgent;
 	if(step == Step::EnterAlias){

@@ -43,26 +43,10 @@ int CreateRowIndex(size_t characterCount)
 	return std::min(static_cast<int>(characterCount), kMaxRows - 1);
 }
 
-silencer::client_ui::Navigation Nav(ScreenContext & ctx)
+void ShowMessage(const silencer::client_ui::Navigation & navigation,
+                 const char * message)
 {
-	(void)ctx;
-	return silencer::client_ui::use_navigation();
-}
-
-silencer::client_ui::LobbyModel UseLobby(ScreenContext & ctx)
-{
-	return silencer::client_ui::use_lobby(
-		silencer::client_ui::MakeLobbyProvider(ctx));
-}
-
-Uint8 AgencyForIndex(ScreenContext & ctx, int index)
-{
-	return UseLobby(ctx).character.agency_for_index(index);
-}
-
-void ShowMessage(ScreenContext & ctx, const char * message)
-{
-	Nav(ctx).push(std::make_unique<MessageModal>(message ? message : ""));
+	navigation.push(std::make_unique<MessageModal>(message ? message : ""));
 }
 
 }  // namespace
@@ -76,35 +60,43 @@ void CharacterCreateScreen::Build(ScreenContext & ctx)
 	previewAgentIndex = -1;
 	agentScroll = 0;
 	agentScrollDelta = 0;
-	selectedAgency = AgencyForIndex(ctx, 0);
+	silencer::client_ui::LobbyModel lobby =
+		silencer::client_ui::use_lobby(
+			silencer::client_ui::MakeLobbyProvider(ctx));
+	selectedAgency = lobby.character.agency_for_index(0);
 	previewAgencyIndex = -1;
-	characterCountOnEntry = UseLobby(ctx).agents.count();
+	characterCountOnEntry = lobby.agents.count();
 	waitingForCreate = false;
 	waitingForRename = false;
 	renameCharacterId = 0;
 	focusAliasRequested = false;
 	alias[0] = '\0';
-	RebuildAgentRows(ctx);
+	RebuildAgentRows(lobby);
 }
 
 void CharacterCreateScreen::Tick(ScreenContext & ctx)
 {
+	silencer::client_ui::LobbyModel lobby =
+		silencer::client_ui::use_lobby(
+			silencer::client_ui::MakeLobbyProvider(ctx));
+	silencer::client_ui::Navigation navigation =
+		silencer::client_ui::use_navigation();
 	if(waitingForCreate){
 		const silencer::client_ui::LobbyAgentCreateStatus status =
-			UseLobby(ctx).agents.create_status(characterCountOnEntry);
+			lobby.agents.create_status(characterCountOnEntry);
 		if(status.created){
 			waitingForCreate = false;
-			Nav(ctx).reset_to(std::make_unique<LobbyScreen>());
+			navigation.reset_to(std::make_unique<LobbyScreen>());
 			return;
 		}
 		if(status.received){
 			waitingForCreate = false;
-			ShowMessage(ctx, "Could not create character");
+			ShowMessage(navigation, "Could not create character");
 		}
 	}
 	if(waitingForRename){
 		const silencer::client_ui::LobbyAgentRenameStatus status =
-			UseLobby(ctx).agents.rename_status(renameCharacterId);
+			lobby.agents.rename_status(renameCharacterId);
 		if(status.renamed){
 			waitingForRename = false;
 			renameCharacterId = 0;
@@ -118,7 +110,7 @@ void CharacterCreateScreen::Tick(ScreenContext & ctx)
 		}
 		if(status.received){
 			waitingForRename = false;
-			ShowMessage(ctx, "Could not rename character");
+			ShowMessage(navigation, "Could not rename character");
 			focusAliasRequested = true;
 		}
 	}
@@ -149,12 +141,16 @@ bool CharacterCreateScreen::HandleBack(ScreenContext & ctx)
 		previewAgentIndex = -1;
 		return true;
 	}
-	silencer::client_ui::LobbyModel lobby = UseLobby(ctx);
+	silencer::client_ui::LobbyModel lobby =
+		silencer::client_ui::use_lobby(
+			silencer::client_ui::MakeLobbyProvider(ctx));
+	silencer::client_ui::Navigation navigation =
+		silencer::client_ui::use_navigation();
 	if(lobby.agents.has_any()){
-		Nav(ctx).reset_to(std::make_unique<LobbyScreen>());
+		navigation.reset_to(std::make_unique<LobbyScreen>());
 	}else{
 		lobby.connection.cancel();
-		Nav(ctx).reset_to(std::make_unique<LobbyConnectScreen>());
+		navigation.reset_to(std::make_unique<LobbyConnectScreen>());
 	}
 	return true;
 }
@@ -162,6 +158,11 @@ bool CharacterCreateScreen::HandleBack(ScreenContext & ctx)
 bool CharacterCreateScreen::HandleUiIntent(ScreenContext & ctx,
                                            const silencer::ui::UiAction & action)
 {
+	silencer::client_ui::LobbyModel lobby =
+		silencer::client_ui::use_lobby(
+			silencer::client_ui::MakeLobbyProvider(ctx));
+	silencer::client_ui::Navigation navigation =
+		silencer::client_ui::use_navigation();
 	if(action.kind == silencer::ui::UiActionKind::Cancel){
 		return HandleBack(ctx);
 	}
@@ -194,7 +195,7 @@ bool CharacterCreateScreen::HandleUiIntent(ScreenContext & ctx,
 		int agencyIndex = SuffixInt(action.id, kActionAgencyPrefix);
 		if(step == Step::SelectAgency && agencyIndex >= 0 && agencyIndex < 5){
 			if(waitingForCreate) return true;
-			selectedAgency = AgencyForIndex(ctx, agencyIndex);
+			selectedAgency = lobby.character.agency_for_index(agencyIndex);
 			previewAgencyIndex = agencyIndex;
 			return true;
 		}
@@ -208,9 +209,9 @@ bool CharacterCreateScreen::HandleUiIntent(ScreenContext & ctx,
 	   step == Step::EnterAlias && action.id == kActionAlias){
 		CopyAlias(action.value);
 		if(IsRenaming()){
-			RenameCurrentAgent(ctx);
+			RenameCurrentAgent(lobby, navigation);
 		}else{
-			AdvanceAliasStep(ctx);
+			AdvanceAliasStep();
 		}
 		return true;
 	}
@@ -221,37 +222,38 @@ bool CharacterCreateScreen::HandleUiIntent(ScreenContext & ctx,
 	if(step == Step::SelectAgent && agentIndex >= 0){
 		selectedAgentIndex = agentIndex;
 		previewAgentIndex = agentIndex;
-		SelectCurrentAgent(ctx);
+		SelectCurrentAgent(lobby, navigation);
 		return true;
 	}
 	int renameIndex = SuffixInt(action.id, kActionRenamePrefix);
 	if(step == Step::SelectAgent && renameIndex >= 0){
-		StartRenameAgent(ctx, renameIndex);
+		StartRenameAgent(lobby, renameIndex);
 		return true;
 	}
 	int agencyIndex = SuffixInt(action.id, kActionAgencyPrefix);
 	if(step == Step::SelectAgency && agencyIndex >= 0){
 		if(waitingForCreate) return true;
 		if(agencyIndex < 5){
-			selectedAgency = AgencyForIndex(ctx, agencyIndex);
+			selectedAgency = lobby.character.agency_for_index(agencyIndex);
 			previewAgencyIndex = agencyIndex;
 			if(alias[0] != '\0'){
-				CreateCurrentAgent(ctx);
+				CreateCurrentAgent(lobby, navigation);
 			}
 		}
 		return true;
 	}
 	if(step == Step::SelectAgency && action.id == kActionCreate){
 		if(waitingForCreate) return true;
-		CreateCurrentAgent(ctx);
+		CreateCurrentAgent(lobby, navigation);
 		return true;
 	}
 	return false;
 }
 
-void CharacterCreateScreen::SelectCurrentAgent(ScreenContext & ctx)
+void CharacterCreateScreen::SelectCurrentAgent(
+	const silencer::client_ui::LobbyModel & lobby,
+	const silencer::client_ui::Navigation & navigation)
 {
-	silencer::client_ui::LobbyModel lobby = UseLobby(ctx);
 	const size_t agentCount = lobby.agents.count();
 	const int createIndex = CreateRowIndex(agentCount);
 	if(selectedAgentIndex == createIndex ||
@@ -263,34 +265,37 @@ void CharacterCreateScreen::SelectCurrentAgent(ScreenContext & ctx)
 	}
 
 	if(lobby.agents.select(selectedAgentIndex)){
-		Nav(ctx).reset_to(std::make_unique<LobbyScreen>());
+		navigation.reset_to(std::make_unique<LobbyScreen>());
 	}
 }
 
-void CharacterCreateScreen::CreateCurrentAgent(ScreenContext & ctx)
+void CharacterCreateScreen::CreateCurrentAgent(
+	const silencer::client_ui::LobbyModel & lobby,
+	const silencer::client_ui::Navigation & navigation)
 {
 	if(waitingForCreate){
 		return;
 	}
 	if(alias[0] == '\0'){
-		ShowMessage(ctx, "Enter an alias");
+		ShowMessage(navigation, "Enter an alias");
 		step = Step::EnterAlias;
 		focusAliasRequested = true;
 		return;
 	}
-	silencer::client_ui::LobbyModel lobby = UseLobby(ctx);
 	characterCountOnEntry = lobby.agents.count();
 	lobby.agents.create(alias, selectedAgency);
 	waitingForCreate = true;
 }
 
-void CharacterCreateScreen::StartRenameAgent(ScreenContext & ctx, int agentIndex)
+void CharacterCreateScreen::StartRenameAgent(
+	const silencer::client_ui::LobbyModel & lobby,
+	int agentIndex)
 {
 	if(waitingForRename){
 		return;
 	}
 	silencer::client_ui::LobbyAgentSummary agent;
-	if(!UseLobby(ctx).agents.rename_start(agentIndex, agent)){
+	if(!lobby.agents.rename_start(agentIndex, agent)){
 		return;
 	}
 	selectedAgentIndex = agentIndex;
@@ -301,26 +306,29 @@ void CharacterCreateScreen::StartRenameAgent(ScreenContext & ctx, int agentIndex
 	focusAliasRequested = true;
 }
 
-void CharacterCreateScreen::RenameCurrentAgent(ScreenContext & ctx)
+void CharacterCreateScreen::RenameCurrentAgent(
+	const silencer::client_ui::LobbyModel & lobby,
+	const silencer::client_ui::Navigation & navigation)
 {
 	if(waitingForRename){
 		return;
 	}
 	if(alias[0] == '\0'){
-		ShowMessage(ctx, "Enter an alias");
+		ShowMessage(navigation, "Enter an alias");
 		focusAliasRequested = true;
 		return;
 	}
 	if(renameCharacterId == 0){
 		return;
 	}
-	UseLobby(ctx).agents.rename(renameCharacterId, alias);
+	lobby.agents.rename(renameCharacterId, alias);
 	waitingForRename = true;
 }
 
-void CharacterCreateScreen::RebuildAgentRows(ScreenContext & ctx)
+void CharacterCreateScreen::RebuildAgentRows(
+	const silencer::client_ui::LobbyModel & lobby)
 {
-	agents = UseLobby(ctx).agents.list();
+	agents = lobby.agents.list();
 	agentRows.clear();
 	for(const silencer::client_ui::LobbyAgentSummary& agent : agents){
 		agentRows.push_back(agent.name);
@@ -343,9 +351,8 @@ void CharacterCreateScreen::CopyAlias(const std::string& value)
 	alias[n] = '\0';
 }
 
-void CharacterCreateScreen::AdvanceAliasStep(ScreenContext & ctx)
+void CharacterCreateScreen::AdvanceAliasStep()
 {
-	(void)ctx;
 	if(alias[0] == '\0'){
 		return;
 	}

@@ -366,6 +366,12 @@ fail_if_match \
   "$REPO_ROOT/clients/silencer/src/client/ui/screens/character_create/character_create_layout.cpp"
 
 fail_if_match \
+  "\\b(Nav|UseLobby|AgencyForIndex|ShowMessage)[[:space:]]*[(][^)]*ScreenContext|\\b(SelectCurrentAgent|CreateCurrentAgent|StartRenameAgent|RenameCurrentAgent|RebuildAgentRows|AdvanceAliasStep)[[:space:]]*[(][^)]*ScreenContext" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens/character_create/character_create_screen.cpp" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens/character_create/character_create_screen.h" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens/character_create/character_create_layout.cpp"
+
+fail_if_match \
   "\\b(World|Resources|Lobby|User|Config)::|#include[[:space:]]*[<\"](world|lobby|resources|user|config)[.]h[>\"]" \
   "$REPO_ROOT/clients/silencer/src/client/ui/screens/lobby/character_panel.cpp" \
   "$REPO_ROOT/clients/silencer/src/client/ui/screens/lobby/character_panel.h"

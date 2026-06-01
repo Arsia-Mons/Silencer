@@ -11,6 +11,12 @@
 
 class Surface;
 
+namespace silencer {
+namespace client_ui {
+struct Navigation;
+}
+}
+
 class CharacterCreateScreen : public Screen
 {
 public:
@@ -32,13 +38,17 @@ private:
 		SelectAgency,
 	};
 
-	void SelectCurrentAgent(ScreenContext & ctx);
-	void CreateCurrentAgent(ScreenContext & ctx);
-	void StartRenameAgent(ScreenContext & ctx, int agentIndex);
-	void RenameCurrentAgent(ScreenContext & ctx);
-	void RebuildAgentRows(ScreenContext & ctx);
+	void SelectCurrentAgent(const silencer::client_ui::LobbyModel & lobby,
+	                        const silencer::client_ui::Navigation & navigation);
+	void CreateCurrentAgent(const silencer::client_ui::LobbyModel & lobby,
+	                        const silencer::client_ui::Navigation & navigation);
+	void StartRenameAgent(const silencer::client_ui::LobbyModel & lobby,
+	                      int agentIndex);
+	void RenameCurrentAgent(const silencer::client_ui::LobbyModel & lobby,
+	                        const silencer::client_ui::Navigation & navigation);
+	void RebuildAgentRows(const silencer::client_ui::LobbyModel & lobby);
 	void CopyAlias(const std::string& value);
-	void AdvanceAliasStep(ScreenContext & ctx);
+	void AdvanceAliasStep();
 	bool IsRenaming() const { return renameCharacterId != 0; }
 
 	Step step = Step::SelectAgent;
