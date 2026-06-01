@@ -13,6 +13,7 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 FORMATTER = ROOT / "tools" / "cppx_format.py"
 TRANSPILER = ROOT / "tools" / "cppx_transpile.py"
 CPPX_SUFFIXES = {".cppx", ".hx"}
+IMAGE_BUTTON_MARKERS = ("BackgroundImage", ".image(")
 
 
 def cppx_sources() -> list[pathlib.Path]:
@@ -67,6 +68,20 @@ def check_cmake_source_list(rel_sources: list[str]) -> int:
     return 1 if missing or stale else 0
 
 
+def check_button_images_are_nine_sliced() -> int:
+    button_source = ROOT / "src" / "ui" / "components" / "button.cppx"
+    if not button_source.exists():
+        return 0
+    text = button_source.read_text()
+    if any(marker in text for marker in IMAGE_BUTTON_MARKERS) and "nine_slice" not in text:
+        print(
+            "src/ui/components/button.cppx uses an image-backed button without "
+            "declaring nine_slice"
+        )
+        return 1
+    return 0
+
+
 def run(argv: list[str]) -> int:
 	result = subprocess.run(argv, cwd=ROOT)
 	return result.returncode
@@ -82,6 +97,10 @@ def main() -> int:
     cmake_status = check_cmake_source_list(rel_sources)
     if cmake_status != 0:
         return cmake_status
+
+    button_image_status = check_button_images_are_nine_sliced()
+    if button_image_status != 0:
+        return button_image_status
 
     format_status = run([sys.executable, str(FORMATTER), "--check", *rel_sources])
     if format_status != 0:
