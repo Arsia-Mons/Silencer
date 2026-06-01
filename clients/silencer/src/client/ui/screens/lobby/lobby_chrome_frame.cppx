@@ -541,6 +541,18 @@ inline const char * copied_row_id(int source) {
 	return ::ui::copy_string(value.c_str());
 }
 
+inline ::ui::HostCallbacks game_select_row_callbacks(
+	const std::function<void(int)>& on_select,
+	int source) {
+	::ui::HostCallbacks callbacks;
+	if(on_select){
+		callbacks.on_activate = [on_select, source](const ::ui::ActivationEvent&) {
+			on_select(source);
+		};
+	}
+	return callbacks;
+}
+
 inline const char * copied_prefixed_id(const char * prefix, int value) {
 	std::string id = std::string(prefix) + std::to_string(value);
 	return ::ui::copy_string(id.c_str());
@@ -2781,6 +2793,7 @@ struct GameSelectRowProps {
 	const GameSelectPanelState * state = nullptr;
 	GameSelectTallLayout layout = {};
 	int visible_row = 0;
+	std::function<void(int)> on_select = {};
 };
 
 ::ui::UiElement GameSelectRow(const GameSelectRowProps& props) {
@@ -2807,6 +2820,7 @@ struct GameSelectRowProps {
 			.checked = selected,
 		}}
 	  accessibility={{.role = ::ui::SemanticRole::ListRow, .label = row.name.c_str()}}
+	  callbacks={game_select_row_callbacks(props.on_select, source)}
 	>
 		<Text
 		  key="label"
@@ -2825,6 +2839,7 @@ struct GameSelectRowsProps {
 	const char * key = nullptr;
 	const GameSelectPanelState * state = nullptr;
 	GameSelectTallLayout layout = {};
+	std::function<void(int)> on_select = {};
 };
 
 ::ui::UiElement GameSelectRows(const GameSelectRowsProps& props) {
@@ -2837,192 +2852,224 @@ struct GameSelectRowsProps {
 		  state={props.state}
 		  layout={props.layout}
 		  visibleRow={0}
+		  onSelect={props.on_select}
 		/>
 		<GameSelectRow
 		  key={kGameSelectRowKeys[1]}
 		  state={props.state}
 		  layout={props.layout}
 		  visibleRow={1}
+		  onSelect={props.on_select}
 		/>
 		<GameSelectRow
 		  key={kGameSelectRowKeys[2]}
 		  state={props.state}
 		  layout={props.layout}
 		  visibleRow={2}
+		  onSelect={props.on_select}
 		/>
 		<GameSelectRow
 		  key={kGameSelectRowKeys[3]}
 		  state={props.state}
 		  layout={props.layout}
 		  visibleRow={3}
+		  onSelect={props.on_select}
 		/>
 		<GameSelectRow
 		  key={kGameSelectRowKeys[4]}
 		  state={props.state}
 		  layout={props.layout}
 		  visibleRow={4}
+		  onSelect={props.on_select}
 		/>
 		<GameSelectRow
 		  key={kGameSelectRowKeys[5]}
 		  state={props.state}
 		  layout={props.layout}
 		  visibleRow={5}
+		  onSelect={props.on_select}
 		/>
 		<GameSelectRow
 		  key={kGameSelectRowKeys[6]}
 		  state={props.state}
 		  layout={props.layout}
 		  visibleRow={6}
+		  onSelect={props.on_select}
 		/>
 		<GameSelectRow
 		  key={kGameSelectRowKeys[7]}
 		  state={props.state}
 		  layout={props.layout}
 		  visibleRow={7}
+		  onSelect={props.on_select}
 		/>
 		<GameSelectRow
 		  key={kGameSelectRowKeys[8]}
 		  state={props.state}
 		  layout={props.layout}
 		  visibleRow={8}
+		  onSelect={props.on_select}
 		/>
 		<GameSelectRow
 		  key={kGameSelectRowKeys[9]}
 		  state={props.state}
 		  layout={props.layout}
 		  visibleRow={9}
+		  onSelect={props.on_select}
 		/>
 		<GameSelectRow
 		  key={kGameSelectRowKeys[10]}
 		  state={props.state}
 		  layout={props.layout}
 		  visibleRow={10}
+		  onSelect={props.on_select}
 		/>
 		<GameSelectRow
 		  key={kGameSelectRowKeys[11]}
 		  state={props.state}
 		  layout={props.layout}
 		  visibleRow={11}
+		  onSelect={props.on_select}
 		/>
 		<GameSelectRow
 		  key={kGameSelectRowKeys[12]}
 		  state={props.state}
 		  layout={props.layout}
 		  visibleRow={12}
+		  onSelect={props.on_select}
 		/>
 		<GameSelectRow
 		  key={kGameSelectRowKeys[13]}
 		  state={props.state}
 		  layout={props.layout}
 		  visibleRow={13}
+		  onSelect={props.on_select}
 		/>
 		<GameSelectRow
 		  key={kGameSelectRowKeys[14]}
 		  state={props.state}
 		  layout={props.layout}
 		  visibleRow={14}
+		  onSelect={props.on_select}
 		/>
 		<GameSelectRow
 		  key={kGameSelectRowKeys[15]}
 		  state={props.state}
 		  layout={props.layout}
 		  visibleRow={15}
+		  onSelect={props.on_select}
 		/>
 		<GameSelectRow
 		  key={kGameSelectRowKeys[16]}
 		  state={props.state}
 		  layout={props.layout}
 		  visibleRow={16}
+		  onSelect={props.on_select}
 		/>
 		<GameSelectRow
 		  key={kGameSelectRowKeys[17]}
 		  state={props.state}
 		  layout={props.layout}
 		  visibleRow={17}
+		  onSelect={props.on_select}
 		/>
 		<GameSelectRow
 		  key={kGameSelectRowKeys[18]}
 		  state={props.state}
 		  layout={props.layout}
 		  visibleRow={18}
+		  onSelect={props.on_select}
 		/>
 		<GameSelectRow
 		  key={kGameSelectRowKeys[19]}
 		  state={props.state}
 		  layout={props.layout}
 		  visibleRow={19}
+		  onSelect={props.on_select}
 		/>
 		<GameSelectRow
 		  key={kGameSelectRowKeys[20]}
 		  state={props.state}
 		  layout={props.layout}
 		  visibleRow={20}
+		  onSelect={props.on_select}
 		/>
 		<GameSelectRow
 		  key={kGameSelectRowKeys[21]}
 		  state={props.state}
 		  layout={props.layout}
 		  visibleRow={21}
+		  onSelect={props.on_select}
 		/>
 		<GameSelectRow
 		  key={kGameSelectRowKeys[22]}
 		  state={props.state}
 		  layout={props.layout}
 		  visibleRow={22}
+		  onSelect={props.on_select}
 		/>
 		<GameSelectRow
 		  key={kGameSelectRowKeys[23]}
 		  state={props.state}
 		  layout={props.layout}
 		  visibleRow={23}
+		  onSelect={props.on_select}
 		/>
 		<GameSelectRow
 		  key={kGameSelectRowKeys[24]}
 		  state={props.state}
 		  layout={props.layout}
 		  visibleRow={24}
+		  onSelect={props.on_select}
 		/>
 		<GameSelectRow
 		  key={kGameSelectRowKeys[25]}
 		  state={props.state}
 		  layout={props.layout}
 		  visibleRow={25}
+		  onSelect={props.on_select}
 		/>
 		<GameSelectRow
 		  key={kGameSelectRowKeys[26]}
 		  state={props.state}
 		  layout={props.layout}
 		  visibleRow={26}
+		  onSelect={props.on_select}
 		/>
 		<GameSelectRow
 		  key={kGameSelectRowKeys[27]}
 		  state={props.state}
 		  layout={props.layout}
 		  visibleRow={27}
+		  onSelect={props.on_select}
 		/>
 		<GameSelectRow
 		  key={kGameSelectRowKeys[28]}
 		  state={props.state}
 		  layout={props.layout}
 		  visibleRow={28}
+		  onSelect={props.on_select}
 		/>
 		<GameSelectRow
 		  key={kGameSelectRowKeys[29]}
 		  state={props.state}
 		  layout={props.layout}
 		  visibleRow={29}
+		  onSelect={props.on_select}
 		/>
 		<GameSelectRow
 		  key={kGameSelectRowKeys[30]}
 		  state={props.state}
 		  layout={props.layout}
 		  visibleRow={30}
+		  onSelect={props.on_select}
 		/>
 		<GameSelectRow
 		  key={kGameSelectRowKeys[31]}
 		  state={props.state}
 		  layout={props.layout}
 		  visibleRow={31}
+		  onSelect={props.on_select}
 		/>
 	</Box>
 }
@@ -3057,6 +3104,7 @@ struct GameSelectTallPanelProps {
 	int y = 0;
 	int width = 0;
 	int height = 0;
+	std::function<void(int)> on_select = {};
 };
 
 ::ui::UiElement GameSelectTallPanel(const GameSelectTallPanelProps& props) {
@@ -3077,7 +3125,7 @@ struct GameSelectTallPanelProps {
 		  layout={absolute_layout(layout.list_box_x, layout.list_box_y, layout.list_box_w, layout.list_box_h)}
 		  style={inset_border_patch()}
 		/>
-		<GameSelectRows key="rows" state={props.state} layout={layout} />
+		<GameSelectRows key="rows" state={props.state} layout={layout} onSelect={props.on_select} />
 		<GameSelectInfoLine
 		  key="info-name"
 		  state={props.state}
@@ -4307,6 +4355,7 @@ using ::ui::components::TextProps;
 		  y={props.game_select_tall_y}
 		  width={props.game_select_tall_width}
 		  height={props.game_select_tall_height}
+		  onSelect={props.game_select_select}
 		/>
 		<lobby_chrome_frame_detail.GameCreateUpperPanel
 		  key="game-create-upper"
@@ -4403,6 +4452,7 @@ using ::ui::components::TextProps;
 		  y={props.game_select_create_y}
 		  width={props.game_select_create_width}
 		  height={props.game_select_create_height}
+		  onPress={props.game_select_create}
 		/>
 		<lobby_chrome_frame_detail.AbsoluteChromeButton
 		  key="game-select-spectate"
@@ -4413,6 +4463,7 @@ using ::ui::components::TextProps;
 		  y={props.game_select_spectate_y}
 		  width={props.game_select_action_width}
 		  height={props.game_select_action_height}
+		  onPress={props.game_select_spectate}
 		/>
 		<lobby_chrome_frame_detail.AbsoluteChromeButton
 		  key="game-select-join"
@@ -4423,6 +4474,7 @@ using ::ui::components::TextProps;
 		  y={props.game_select_join_y}
 		  width={props.game_select_action_width}
 		  height={props.game_select_action_height}
+		  onPress={props.game_select_join}
 		/>
 		<lobby_chrome_frame_detail.GameCreatePreviewOverlay
 		  key="game-create-preview"

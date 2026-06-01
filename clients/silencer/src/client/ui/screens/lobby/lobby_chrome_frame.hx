@@ -64,6 +64,7 @@ struct LobbyChromeFrameProps {
 	int game_select_create_y = 0;
 	int game_select_create_width = 0;
 	int game_select_create_height = 0;
+	std::function<void()> game_select_create = {};
 	bool show_game_select_spectate = false;
 	bool show_game_select_join = false;
 	int game_select_spectate_x = 0;
@@ -72,12 +73,15 @@ struct LobbyChromeFrameProps {
 	int game_select_join_y = 0;
 	int game_select_action_width = 0;
 	int game_select_action_height = 0;
+	std::function<void()> game_select_spectate = {};
+	std::function<void()> game_select_join = {};
 	bool show_game_select_tall = false;
 	int game_select_tall_x = 0;
 	int game_select_tall_y = 0;
 	int game_select_tall_width = 0;
 	int game_select_tall_height = 0;
 	const GameSelectPanelState * game_select = nullptr;
+	std::function<void(int)> game_select_select = {};
 	bool show_game_create_upper = false;
 	const GameCreatePanelState * game_create = nullptr;
 	int game_create_upper_x = 0;

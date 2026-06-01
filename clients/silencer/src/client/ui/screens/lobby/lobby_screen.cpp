@@ -90,6 +90,15 @@ int ClampInt(int value, int lo, int hi) {
 	return value;
 }
 
+Uint32 SelectedGameId(
+	const silencer::client_ui::lobby::GameSelectPanelState& state) {
+	if(state.selectedIndex < 0 ||
+	   state.selectedIndex >= static_cast<int>(state.rows.size())){
+		return 0;
+	}
+	return state.rows[static_cast<size_t>(state.selectedIndex)].gameid;
+}
+
 int RoundRatio(int actual,
                int numerator,
                int denominator) {
@@ -478,6 +487,9 @@ void LobbyScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime, s
 		.game_select_create_y = bodyY + lobby_screen_detail::kGameSelectCreatePadTop,
 		.game_select_create_width = createButtonW,
 		.game_select_create_height = lobby_screen_detail::kGameSelectCreateButtonH,
+		.game_select_create = [this, ctx = &ctx]() {
+			ShowGameCreate(*ctx);
+		},
 		.show_game_select_spectate =
 			showGameSelectActions && gameSelectState.spectateVisible,
 		.show_game_select_join =
@@ -488,12 +500,26 @@ void LobbyScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime, s
 		.game_select_join_y = joinButtonY,
 		.game_select_action_width = lobby_screen_detail::kGameSelectActionButtonW,
 		.game_select_action_height = lobby_screen_detail::kGameSelectActionButtonH,
+		.game_select_spectate = [this, lobby]() {
+			lobby.browser.spectate(
+				lobby_screen_detail::SelectedGameId(gameSelectState));
+		},
+		.game_select_join = [this, lobby]() {
+			lobby.browser.join(
+				lobby_screen_detail::SelectedGameId(gameSelectState));
+		},
 		.show_game_select_tall = gameSelectVisible,
 		.game_select_tall_x = rightTallX,
 		.game_select_tall_y = bodyY,
 		.game_select_tall_width = mainLayout.rightTallW,
 		.game_select_tall_height = mainLayout.rightTallH,
 		.game_select = &gameSelectState,
+		.game_select_select = [this](int index) {
+			if(index < 0 || index >= static_cast<int>(gameSelectState.rows.size())){
+				return;
+			}
+			gameSelectState.selectedIndex = index;
+		},
 		.show_game_create_upper = showGameCreateUpper,
 		.game_create = &gameCreateState,
 		.game_create_upper_x = rightUpperX,
@@ -655,12 +681,8 @@ void LobbyScreen::Tick(ScreenContext & ctx)
 	silencer::client_ui::lobby::ChatPanelTick(chatState, lobby.chat);
 
 	if(!gameCreateActive && !gameJoinActive && !gameTechActive){
-		const silencer::client_ui::lobby::GameSelectPanelTickResult selected =
-			silencer::client_ui::lobby::GameSelectPanelTick(
-				gameSelectState, lobby);
-		if(selected.show_create){
-			ShowGameCreate(ctx);
-		}
+		silencer::client_ui::lobby::GameSelectPanelTick(
+			gameSelectState, lobby);
 	}
 	if(gameCreateActive){
 		silencer::client_ui::lobby::GameCreatePanelTick(
@@ -757,7 +779,7 @@ bool LobbyScreen::HandleUiIntent(ScreenContext & ctx, const silencer::ui::UiActi
 	if(gameTechActive){
 		return false;
 	}
-	return silencer::client_ui::lobby::GameSelectPanelHandleUiIntent(gameSelectState, action);
+	return false;
 }
 
 const ::ui::DrawCommandList * LobbyScreen::RetainedDrawCommands() const

@@ -3,18 +3,13 @@
 
 // Screen-side lobby GameSelectPanel: the always-on right-side games list
 // surface (active when no Create/Join/Tech panel is up). Owns the retained
-// frame's per-frame row snapshot, info strings, and Join/Spectate/Create click
-// flags. Domain mutations go through use_lobby().
+// frame's per-frame row snapshot and info strings. Domain mutations go through
+// use_lobby().
 
 #include "shared.h"
-#include "runtime/UiActionQueue.h"
 
 #include <string>
 #include <vector>
-
-namespace silencer::ui {
-class UiInteractionRegistry;
-}
 
 namespace silencer::client_ui {
 class LobbyModel;
@@ -34,15 +29,6 @@ struct GameSelectPanelState {
 	int    selectedIndex = -1;  // -1 = no selection.
 	Uint16 scrollPos     = 0;
 
-	// Per-frame click flags. Set by typed widget intents; consumed
-	// once by GameSelectPanelTick on the next frame.
-	bool   joinClicked     = false;
-	bool   spectateClicked = false;
-	bool   createClicked   = false;
-
-	// Per-row click flag — the row that was last pressed. -1 = none.
-	int    rowClickedIndex = -1;
-
 	// Cached info-block strings (recomputed each Tick from the selected
 	// game). Static-lifetime so the layout pass can hold raw c_str()s.
 	std::string infoName;
@@ -60,20 +46,12 @@ struct GameSelectPanelState {
 // LobbyBrowserModel game list will populate rows.
 void GameSelectPanelInit(GameSelectPanelState & state);
 
-struct GameSelectPanelTickResult {
-	bool show_create = false;
-};
-
 // Per-frame pump:
 //   - Rebuilds `rows` from LobbyBrowserModel whenever the game list is dirty.
 //   - Recomputes infoName/infoMap/.../joinVisible/spectateVisible from the
 //     selected game (or clears them when no game is selected).
-//   - Consumes joinClicked / spectateClicked / createClicked flags by asking
-//     the lobby model to run Join/Spectate/Create transitions.
-GameSelectPanelTickResult GameSelectPanelTick(GameSelectPanelState & state,
-                                              LobbyModel & lobby);
-bool GameSelectPanelHandleUiIntent(GameSelectPanelState & state,
-                                   const silencer::ui::UiAction & action);
+void GameSelectPanelTick(GameSelectPanelState & state,
+                         LobbyModel & lobby);
 
 }  // namespace silencer::client_ui::lobby
 
