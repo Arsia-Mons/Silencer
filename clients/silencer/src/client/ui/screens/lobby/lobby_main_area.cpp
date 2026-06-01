@@ -73,18 +73,6 @@ BoxStrokeStyle RightEdgeChrome() {
 	return style;
 }
 
-struct LobbySteppedPaneLayout {
-	int regionGap = 10;
-	int characterW = kLegacyCharacterW;
-	int rightUpperW = 0;
-	int upperH = 121;
-	int rightTallW = kLegacyTallW;
-	int rightTallH = kLegacyBodyH;
-	int topRowW = 0;
-	int chatW = 0;
-	int chatH = kLegacyBodyH - 121 - 10;
-};
-
 void AddBorderBlurRect(RenderDevice * renderdevice, SDL_Rect rect) {
 	if(!renderdevice || rect.w <= 0 || rect.h <= 0) return;
 	renderdevice->AddLobbyPanelBorderBlurRect(rect);
@@ -114,7 +102,7 @@ void AddPanelBorderBlur(RenderDevice * renderdevice,
 void QueueLobbyPanelBorderBlurRects(ScreenContext & ctx,
                                     int bodyX,
                                     int bodyY,
-                                    const LobbySteppedPaneLayout & layout) {
+                                    const LobbyMainAreaLayout & layout) {
 	RenderDevice * renderdevice = ctx.renderdevice;
 	if(!renderdevice) return;
 	const int topY = bodyY;
@@ -150,10 +138,10 @@ void QueueLobbyPanelBorderBlurRects(ScreenContext & ctx,
 	                   static_cast<Uint8>(BoxSides::Top | BoxSides::Bottom | BoxSides::Right));
 }
 
-LobbySteppedPaneLayout ResolveSteppedPaneLayout(int bodyW,
-                                                int bodyH,
-                                                int regionGap) {
-	LobbySteppedPaneLayout out;
+LobbyMainAreaLayout ResolveSteppedPaneLayout(int bodyW,
+                                             int bodyH,
+                                             int regionGap) {
+	LobbyMainAreaLayout out;
 	out.regionGap = regionGap;
 	out.upperH = ClampInt(RoundRatio(bodyH, 121, kLegacyBodyH), 84, 156);
 	int maxUpperH = std::max(0, bodyH - regionGap - kMinLowerLeftH);
@@ -194,7 +182,7 @@ LobbySteppedPaneLayout ResolveSteppedPaneLayout(int bodyW,
 void BuildRightUpperContents(LobbyMainAreaPanels & panels,
                              ScreenContext & ctx,
                              LobbyModel & lobby,
-                             const LobbySteppedPaneLayout & layout,
+                             const LobbyMainAreaLayout & layout,
                              silencer::ui::UiInteractionRegistry& interactions) {
 	(void)ctx;
 	(void)lobby;
@@ -214,18 +202,13 @@ void BuildRightUpperContents(LobbyMainAreaPanels & panels,
 			panels.gameTech,
 			static_cast<Uint16>(std::max(0, layout.rightUpperW)),
 			interactions);
-	}else{
-		BuildGameSelectUpperTree(
-			panels.gameSelect,
-			static_cast<Uint16>(std::max(0, layout.rightUpperW)),
-			interactions);
 	}
 }
 
 void BuildRightTallContents(LobbyMainAreaPanels & panels,
                             ScreenContext & ctx,
                             LobbyModel & lobby,
-                            const LobbySteppedPaneLayout & layout,
+                            const LobbyMainAreaLayout & layout,
                             silencer::ui::UiInteractionRegistry& interactions) {
 	if(panels.gameCreateActive){
 		BuildGameCreateTallTree(
@@ -254,7 +237,7 @@ void BuildRightTallContents(LobbyMainAreaPanels & panels,
 void BuildLobbySteppedPane(LobbyMainAreaPanels & panels,
                            ScreenContext & ctx,
                            LobbyModel & lobby,
-                           const LobbySteppedPaneLayout & layout,
+                           const LobbyMainAreaLayout & layout,
                            silencer::ui::UiInteractionRegistry& interactions) {
 	CLAY({ .id = CLAY_ID("LobbyBody"),
 	       .layout = {
@@ -377,6 +360,15 @@ void BuildLobbySteppedPane(LobbyMainAreaPanels & panels,
 
 }  // namespace lobby_main_area_detail
 
+LobbyMainAreaLayout ResolveLobbyMainAreaLayout(int bodyW,
+                                               int bodyH,
+                                               int regionGap) {
+	return lobby_main_area_detail::ResolveSteppedPaneLayout(
+		bodyW,
+		bodyH,
+		regionGap);
+}
+
 void BuildLobbyMainArea(LobbyMainAreaPanels & panels,
                         ScreenContext & ctx,
                         LobbyModel & lobby,
@@ -386,8 +378,8 @@ void BuildLobbyMainArea(LobbyMainAreaPanels & panels,
                         int bodyH,
                         int regionGap,
                         silencer::ui::UiInteractionRegistry& interactions) {
-	const lobby_main_area_detail::LobbySteppedPaneLayout layout =
-		lobby_main_area_detail::ResolveSteppedPaneLayout(bodyW, bodyH, regionGap);
+	const LobbyMainAreaLayout layout =
+		ResolveLobbyMainAreaLayout(bodyW, bodyH, regionGap);
 	lobby_main_area_detail::QueueLobbyPanelBorderBlurRects(ctx, bodyX, bodyY, layout);
 	lobby_main_area_detail::BuildLobbySteppedPane(
 		panels,

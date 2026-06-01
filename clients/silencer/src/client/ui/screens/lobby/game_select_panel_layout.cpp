@@ -33,11 +33,6 @@ constexpr Uint8  kListLineH    = 14;
 
 constexpr Uint8  kScrollbarBank = 7;
 
-// Upper stepped-pane slot interior layout knobs.
-constexpr uint16_t kUpperBtnPadLeft = 4;
-constexpr uint16_t kUpperBtnPadRight = 4;
-constexpr uint16_t kUpperBtnPadTop  = 4;
-
 // Tall stepped-pane slot interior layout knobs.
 constexpr uint16_t kTallHeadingPadLeft = 7;
 constexpr uint16_t kTallHeadingPadTop  = 6;
@@ -53,7 +48,6 @@ constexpr uint16_t kTallButtonGap      = 2;
 
 constexpr int kMaxRows = 256;
 Clay_String g_itemSlab[kMaxRows];
-constexpr const char * kActionCreate = "lobby.game_select.create";
 constexpr const char * kActionJoin = "lobby.game_select.join";
 constexpr const char * kActionSpectate = "lobby.game_select.spectate";
 constexpr const char * kActionRowPrefix = "lobby.game_select.row";
@@ -75,20 +69,6 @@ Clay_String FromStd(const std::string & s) {
 
 Clay_String StaticId(const char * s) {
 	return Clay_String{ true, static_cast<int32_t>(strlen(s)), s };
-}
-
-ButtonOpts FullWidthUpperButtonOpts(Uint16 panelWidth) {
-	const int buttonWidth = std::max(
-		1,
-		static_cast<int>(panelWidth)
-			- static_cast<int>(kUpperBtnPadLeft)
-			- static_cast<int>(kUpperBtnPadRight));
-	return ButtonOpts{
-		.variant = ButtonVariant::Chrome,
-		.size = ButtonSize::Auto,
-		.minWidth = buttonWidth,
-		.maxWidth = buttonWidth,
-	};
 }
 
 GameSelectTallLayout ResolveTallLayout(Uint16 panelWidth,
@@ -237,23 +217,6 @@ void BuildGameSelectActionButtons(const GameSelectPanelState & state,
 }
 
 }  // namespace game_select_panel_layout_detail
-
-void BuildGameSelectUpperTree(GameSelectPanelState & state,
-                              Uint16 panelWidth,
-                              silencer::ui::UiInteractionRegistry& interactions) {
-	(void)state;
-
-	// Create Game button — single flex child of the Upper box.
-	CLAY({ .id = CLAY_ID("GSelBtnCreateWrap"),
-	       .layout = { .padding = { game_select_panel_layout_detail::kUpperBtnPadLeft, 0,
-	                                game_select_panel_layout_detail::kUpperBtnPadTop,  0 } } }) {
-		Button(CLAY_STRING("GameSelectCreateButton"), CLAY_STRING("Create Game"),
-		           game_select_panel_layout_detail::FullWidthUpperButtonOpts(panelWidth),
-		           ButtonHandle{ /*hoveredOut*/ nullptr,
-		                             /*actionId*/   game_select_panel_layout_detail::kActionCreate,
-		                             /*interactions*/ &interactions });
-	}
-}
 
 void BuildGameSelectTallTree(GameSelectPanelState & state,
                              Uint16 panelWidth,

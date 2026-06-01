@@ -32,6 +32,10 @@ namespace lobby_screen_detail {
 constexpr int kLegacyLayoutW = 640;
 constexpr int kLegacyLayoutH = 480;
 constexpr int kLobbyTitleBarH = 29;
+constexpr int kGameSelectCreatePadLeft = 4;
+constexpr int kGameSelectCreatePadRight = 4;
+constexpr int kGameSelectCreatePadTop = 4;
+constexpr int kGameSelectCreateButtonH = 21;
 
 int ClampInt(int value, int lo, int hi) {
 	if(value < lo) return lo;
@@ -142,6 +146,21 @@ void LobbyScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime, s
 	                              - (int)titleBarH - regionGap);
 	const int bodyX = rootPadX;
 	const int bodyY = rootPadTop + (int)titleBarH + regionGap;
+	const LobbyMainAreaLayout mainLayout =
+		ResolveLobbyMainAreaLayout(bodyW, bodyH, regionGap);
+	const bool gameSelectVisible =
+		!gameCreateActive && !gameJoinActive && !gameTechActive;
+	const int createButtonW = std::max(
+		1,
+		mainLayout.rightUpperW
+			- lobby_screen_detail::kGameSelectCreatePadLeft
+			- lobby_screen_detail::kGameSelectCreatePadRight);
+	const bool showGameSelectCreate =
+		gameSelectVisible &&
+		mainLayout.rightUpperW > lobby_screen_detail::kGameSelectCreatePadLeft
+			+ lobby_screen_detail::kGameSelectCreatePadRight &&
+		mainLayout.upperH > lobby_screen_detail::kGameSelectCreatePadTop
+			+ lobby_screen_detail::kGameSelectCreateButtonH;
 	const uint16_t titlePadX = static_cast<uint16_t>(
 		lobby_screen_detail::ClampInt((layoutWidth * 5) / 640, 5, 10));
 	const uint16_t titleRowGap = static_cast<uint16_t>(
@@ -159,6 +178,12 @@ void LobbyScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime, s
 		.height = titleBarH,
 		.pad_x = titlePadX,
 		.row_gap = titleRowGap,
+		.show_game_select_create = showGameSelectCreate,
+		.game_select_create_x = bodyX + mainLayout.characterW + mainLayout.regionGap
+		                        + lobby_screen_detail::kGameSelectCreatePadLeft,
+		.game_select_create_y = bodyY + lobby_screen_detail::kGameSelectCreatePadTop,
+		.game_select_create_width = createButtonW,
+		.game_select_create_height = lobby_screen_detail::kGameSelectCreateButtonH,
 	};
 	chromeFrame_.Build([&]() {
 		                   return silencer::client_ui::lobby::LobbyChromeFrame(chromeProps);

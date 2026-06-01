@@ -17,6 +17,11 @@ struct LobbyChromeFrameProps {
 	int height = 0;
 	int pad_x = 0;
 	int row_gap = 0;
+	bool show_game_select_create = false;
+	int game_select_create_x = 0;
+	int game_select_create_y = 0;
+	int game_select_create_width = 0;
+	int game_select_create_height = 0;
 };
 
 ::ui::UiElement LobbyChromeFrame(const LobbyChromeFrameProps& props);

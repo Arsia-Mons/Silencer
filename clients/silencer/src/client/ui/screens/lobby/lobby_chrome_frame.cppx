@@ -76,10 +76,14 @@ inline ::ui::StyleStatePatch chrome_button_patch() {
 	return patch;
 }
 
-inline ::ui::LayoutStyle title_layout(const LobbyChromeFrameProps& props) {
+inline ::ui::EdgeSizes absolute_inset(float left, float top) {
 	::ui::EdgeSizes inset;
-	inset.left = ::ui::StyleValue::points(static_cast<float>(props.x));
-	inset.top = ::ui::StyleValue::points(static_cast<float>(props.y));
+	inset.left = ::ui::StyleValue::points(left);
+	inset.top = ::ui::StyleValue::points(top);
+	return inset;
+}
+
+inline ::ui::LayoutStyle title_layout(const LobbyChromeFrameProps& props) {
 	return {
 		.position = ::ui::PositionType::Absolute,
 		.direction = ::ui::FlexDirection::Row,
@@ -91,7 +95,9 @@ inline ::ui::LayoutStyle title_layout(const LobbyChromeFrameProps& props) {
 		            4.0f,
 		            4.0f},
 		.gap = static_cast<float>(props.row_gap),
-		.position_inset = inset,
+		.position_inset = absolute_inset(
+			static_cast<float>(props.x),
+			static_cast<float>(props.y)),
 	};
 }
 
@@ -100,6 +106,44 @@ inline ::ui::LayoutStyle text_slot(float width) {
 		.width = width > 0.0f ? ::ui::Length::points(width) : ::ui::Length::auto_size(),
 		.height = ::ui::Length::points(21.0f),
 	};
+}
+
+inline ::ui::LayoutStyle absolute_button_layout(int x,
+                                                int y,
+                                                int width,
+                                                int height) {
+	return {
+		.position = ::ui::PositionType::Absolute,
+		.align_items = ::ui::AlignItems::Center,
+		.justify_content = ::ui::JustifyContent::Center,
+		.width = ::ui::Length::points(static_cast<float>(width)),
+		.height = ::ui::Length::points(static_cast<float>(height)),
+		.padding = {8.0f, 8.0f, 4.0f, 4.0f},
+		.position_inset = absolute_inset(
+			static_cast<float>(x),
+			static_cast<float>(y)),
+	};
+}
+
+struct GameSelectCreateButtonProps {
+	const char * key = nullptr;
+	bool show = false;
+	int x = 0;
+	int y = 0;
+	int width = 0;
+	int height = 0;
+};
+
+::ui::UiElement GameSelectCreateButton(const GameSelectCreateButtonProps& props) {
+	if(!props.show) return ::ui::empty();
+	return <Button
+	  key={props.key}
+	  id="lobby.game_select.create"
+	  label="Create Game"
+	  accessibility={{.label = "Create Game"}}
+	  layout={absolute_button_layout(props.x, props.y, props.width, props.height)}
+	  style={chrome_button_patch()}
+	/>
 }
 
 }  // namespace lobby_chrome_frame_detail
@@ -170,6 +214,14 @@ using ::ui::components::TextProps;
 			  style={lobby_chrome_frame_detail::chrome_button_patch()}
 			/>
 		</Box>
+		<lobby_chrome_frame_detail.GameSelectCreateButton
+		  key="game-select-create"
+		  show={props.show_game_select_create}
+		  x={props.game_select_create_x}
+		  y={props.game_select_create_y}
+		  width={props.game_select_create_width}
+		  height={props.game_select_create_height}
+		/>
 	</Box>
 }
 

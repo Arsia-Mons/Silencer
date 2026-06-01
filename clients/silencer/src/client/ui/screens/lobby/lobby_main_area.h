@@ -36,6 +36,22 @@ struct LobbyMainAreaPanels {
 	bool gameTechActive;
 };
 
+struct LobbyMainAreaLayout {
+	int regionGap = 10;
+	int characterW = 218;
+	int rightUpperW = 0;
+	int upperH = 121;
+	int rightTallW = 232;
+	int rightTallH = 391;
+	int topRowW = 0;
+	int chatW = 0;
+	int chatH = 260;
+};
+
+LobbyMainAreaLayout ResolveLobbyMainAreaLayout(int bodyW,
+                                               int bodyH,
+                                               int regionGap);
+
 // Emits the LobbyBody subtree (character + chat + stepped right pane) into
 // the current Clay frame.
 void BuildLobbyMainArea(LobbyMainAreaPanels & panels,
