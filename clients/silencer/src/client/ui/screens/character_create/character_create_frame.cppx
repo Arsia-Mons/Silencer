@@ -224,12 +224,22 @@ inline const std::vector<LobbyAgentSummary>& empty_agents() {
 	return agents;
 }
 
+inline const std::vector<std::string>& agent_rows(
+	const std::vector<std::string> * rows) {
+	return rows ? *rows : empty_rows();
+}
+
 inline const std::vector<std::string>& agent_rows(const CharacterCreateFrameProps& props) {
-	return props.agent_rows ? *props.agent_rows : empty_rows();
+	return agent_rows(props.agent_rows);
+}
+
+inline const std::vector<LobbyAgentSummary>& agents(
+	const std::vector<LobbyAgentSummary> * agent_list) {
+	return agent_list ? *agent_list : empty_agents();
 }
 
 inline const std::vector<LobbyAgentSummary>& agents(const CharacterCreateFrameProps& props) {
-	return props.agents ? *props.agents : empty_agents();
+	return agents(props.agents);
 }
 
 inline int clamp_agency(int value) {
@@ -345,27 +355,30 @@ inline const char * copied_action_id(const char * prefix, int ordinal) {
 
 	struct AgentRowProps {
 		const char * key = nullptr;
-		const CharacterCreateFrameProps * frame = nullptr;
+		const std::vector<std::string> * rows = nullptr;
+		const std::vector<LobbyAgentSummary> * agents = nullptr;
+		int agent_scroll = 0;
+		int selected_agent = 0;
+		int preview_agent = -1;
+		bool selecting_agent = false;
 		int visible_row = 0;
 	};
 
 	::ui::UiElement AgentRow(const AgentRowProps& props) {
-		if(!props.frame) return ::ui::empty();
-		const CharacterCreateFrameProps& frame = *props.frame;
-		const std::vector<std::string>& rows = agent_rows(frame);
-		const std::vector<LobbyAgentSummary>& agentList = agents(frame);
-		const int source = frame.agent_scroll + props.visible_row;
+		const std::vector<std::string>& rows = agent_rows(props.rows);
+		const std::vector<LobbyAgentSummary>& agentList = agents(props.agents);
+		const int source = props.agent_scroll + props.visible_row;
 		const int count = std::min(static_cast<int>(rows.size()), 32);
 		if(source < 0 || source >= count) return ::ui::empty();
 		const bool existingAgent = source < static_cast<int>(agentList.size());
-		const bool selected = existingAgent && source == frame.selected_agent;
-		const bool selectedVisual = selected && frame.preview_agent == source;
+		const bool selected = existingAgent && source == props.selected_agent;
+		const bool selectedVisual = selected && props.preview_agent == source;
 		const char * id = copied_action_id(kActionAgentPrefix, source);
 		return <RowButton
 		  key={props.key}
 		  id={id}
 		  label={rows[static_cast<size_t>(source)].c_str()}
-		  enabled={frame.step == CharacterCreateFrameStep::SelectAgent}
+		  enabled={props.selecting_agent}
 		  selected={selected}
 		  selectedVisual={selectedVisual}
 		/>
@@ -373,7 +386,12 @@ inline const char * copied_action_id(const char * prefix, int ordinal) {
 
 	struct AgentColumnProps {
 		const char * key = nullptr;
-		const CharacterCreateFrameProps * frame = nullptr;
+		const std::vector<std::string> * rows = nullptr;
+		const std::vector<LobbyAgentSummary> * agents = nullptr;
+		int agent_scroll = 0;
+		int selected_agent = 0;
+		int preview_agent = -1;
+		bool selecting_agent = false;
 	};
 
 	::ui::UiElement AgentColumn(const AgentColumnProps& props) {
@@ -402,34 +420,106 @@ inline const char * copied_action_id(const char * prefix, int ordinal) {
 					.gap = static_cast<float>(kRowGap),
 				}}
 		>
-				<AgentRow key="agent-row-0" frame={props.frame} visibleRow={0} />
-				<AgentRow key="agent-row-1" frame={props.frame} visibleRow={1} />
-				<AgentRow key="agent-row-2" frame={props.frame} visibleRow={2} />
-				<AgentRow key="agent-row-3" frame={props.frame} visibleRow={3} />
-				<AgentRow key="agent-row-4" frame={props.frame} visibleRow={4} />
-				<AgentRow key="agent-row-5" frame={props.frame} visibleRow={5} />
-				<AgentRow key="agent-row-6" frame={props.frame} visibleRow={6} />
-				<AgentRow key="agent-row-7" frame={props.frame} visibleRow={7} />
+				<AgentRow
+				  key="agent-row-0"
+				  rows={props.rows}
+				  agents={props.agents}
+				  agentScroll={props.agent_scroll}
+				  selectedAgent={props.selected_agent}
+				  previewAgent={props.preview_agent}
+				  selectingAgent={props.selecting_agent}
+				  visibleRow={0}
+				/>
+				<AgentRow
+				  key="agent-row-1"
+				  rows={props.rows}
+				  agents={props.agents}
+				  agentScroll={props.agent_scroll}
+				  selectedAgent={props.selected_agent}
+				  previewAgent={props.preview_agent}
+				  selectingAgent={props.selecting_agent}
+				  visibleRow={1}
+				/>
+				<AgentRow
+				  key="agent-row-2"
+				  rows={props.rows}
+				  agents={props.agents}
+				  agentScroll={props.agent_scroll}
+				  selectedAgent={props.selected_agent}
+				  previewAgent={props.preview_agent}
+				  selectingAgent={props.selecting_agent}
+				  visibleRow={2}
+				/>
+				<AgentRow
+				  key="agent-row-3"
+				  rows={props.rows}
+				  agents={props.agents}
+				  agentScroll={props.agent_scroll}
+				  selectedAgent={props.selected_agent}
+				  previewAgent={props.preview_agent}
+				  selectingAgent={props.selecting_agent}
+				  visibleRow={3}
+				/>
+				<AgentRow
+				  key="agent-row-4"
+				  rows={props.rows}
+				  agents={props.agents}
+				  agentScroll={props.agent_scroll}
+				  selectedAgent={props.selected_agent}
+				  previewAgent={props.preview_agent}
+				  selectingAgent={props.selecting_agent}
+				  visibleRow={4}
+				/>
+				<AgentRow
+				  key="agent-row-5"
+				  rows={props.rows}
+				  agents={props.agents}
+				  agentScroll={props.agent_scroll}
+				  selectedAgent={props.selected_agent}
+				  previewAgent={props.preview_agent}
+				  selectingAgent={props.selecting_agent}
+				  visibleRow={5}
+				/>
+				<AgentRow
+				  key="agent-row-6"
+				  rows={props.rows}
+				  agents={props.agents}
+				  agentScroll={props.agent_scroll}
+				  selectedAgent={props.selected_agent}
+				  previewAgent={props.preview_agent}
+				  selectingAgent={props.selecting_agent}
+				  visibleRow={6}
+				/>
+				<AgentRow
+				  key="agent-row-7"
+				  rows={props.rows}
+				  agents={props.agents}
+				  agentScroll={props.agent_scroll}
+				  selectedAgent={props.selected_agent}
+				  previewAgent={props.preview_agent}
+				  selectingAgent={props.selecting_agent}
+				  visibleRow={7}
+				/>
 			</Box>
 		</Box>
 	}
 
 	struct AgencyRowProps {
 		const char * key = nullptr;
-		const CharacterCreateFrameProps * frame = nullptr;
 		int agency = 0;
+		int selected_agency = 0;
+		int preview_agency = -1;
+		bool waiting_for_create = false;
 	};
 
 	::ui::UiElement AgencyRow(const AgencyRowProps& props) {
-		if(!props.frame) return ::ui::empty();
-		const CharacterCreateFrameProps& frame = *props.frame;
-		const bool selected = props.agency == selected_agency_index(frame);
-		const bool selectedVisual = selected && frame.preview_agency == props.agency;
+		const bool selected = props.agency == props.selected_agency;
+		const bool selectedVisual = selected && props.preview_agency == props.agency;
 		return <RowButton
 		  key={props.key}
 		  id={copied_action_id(kActionAgencyPrefix, props.agency)}
 		  label={agency_def(props.agency).displayName}
-		  enabled={!frame.waiting_for_create}
+		  enabled={!props.waiting_for_create}
 		  selected={selected}
 		  selectedVisual={selectedVisual}
 		/>
@@ -437,7 +527,9 @@ inline const char * copied_action_id(const char * prefix, int ordinal) {
 
 	struct AgencyColumnProps {
 		const char * key = nullptr;
-		const CharacterCreateFrameProps * frame = nullptr;
+		int selected_agency = 0;
+		int preview_agency = -1;
+		bool waiting_for_create = false;
 	};
 
 	::ui::UiElement AgencyColumn(const AgencyColumnProps& props) {
@@ -463,13 +555,43 @@ inline const char * copied_action_id(const char * prefix, int ordinal) {
 				.width = ::ui::Length::points(static_cast<float>(kLeftColumnW)),
 				.height = ::ui::Length::points(static_cast<float>(kAgencyRowsH)),
 					.gap = static_cast<float>(kRowGap),
-				}}
+		}}
 		>
-				<AgencyRow key="agency-row-0" frame={props.frame} agency={0} />
-				<AgencyRow key="agency-row-1" frame={props.frame} agency={1} />
-				<AgencyRow key="agency-row-2" frame={props.frame} agency={2} />
-				<AgencyRow key="agency-row-3" frame={props.frame} agency={3} />
-				<AgencyRow key="agency-row-4" frame={props.frame} agency={4} />
+				<AgencyRow
+				  key="agency-row-0"
+				  agency={0}
+				  selectedAgency={props.selected_agency}
+				  previewAgency={props.preview_agency}
+				  waitingForCreate={props.waiting_for_create}
+				/>
+				<AgencyRow
+				  key="agency-row-1"
+				  agency={1}
+				  selectedAgency={props.selected_agency}
+				  previewAgency={props.preview_agency}
+				  waitingForCreate={props.waiting_for_create}
+				/>
+				<AgencyRow
+				  key="agency-row-2"
+				  agency={2}
+				  selectedAgency={props.selected_agency}
+				  previewAgency={props.preview_agency}
+				  waitingForCreate={props.waiting_for_create}
+				/>
+				<AgencyRow
+				  key="agency-row-3"
+				  agency={3}
+				  selectedAgency={props.selected_agency}
+				  previewAgency={props.preview_agency}
+				  waitingForCreate={props.waiting_for_create}
+				/>
+				<AgencyRow
+				  key="agency-row-4"
+				  agency={4}
+				  selectedAgency={props.selected_agency}
+				  previewAgency={props.preview_agency}
+				  waitingForCreate={props.waiting_for_create}
+				/>
 			</Box>
 		</Box>
 	}
@@ -712,6 +834,7 @@ inline const char * copied_action_id(const char * prefix, int ordinal) {
 
 	::ui::UiElement Body(const BodyProps& props) {
 		if(!props.frame) return ::ui::empty();
+		const CharacterCreateFrameProps& frame = *props.frame;
 		if(props.frame->step == CharacterCreateFrameStep::SelectAgency){
 			return <Box
 			  key={props.key}
@@ -722,7 +845,12 @@ inline const char * copied_action_id(const char * prefix, int ordinal) {
 					.gap = static_cast<float>(kColumnGap),
 				}}
 			>
-				<AgencyColumn key="agency-column" frame={props.frame} />
+				<AgencyColumn
+				  key="agency-column"
+				  selectedAgency={selected_agency_index(frame)}
+				  previewAgency={frame.preview_agency}
+				  waitingForCreate={frame.waiting_for_create}
+				/>
 				<AgencyDetails key="agency-info" frame={props.frame} />
 			</Box>
 		}
@@ -735,7 +863,15 @@ inline const char * copied_action_id(const char * prefix, int ordinal) {
 				.gap = static_cast<float>(kColumnGap),
 			}}
 		>
-			<AgentColumn key="agent-column" frame={props.frame} />
+			<AgentColumn
+			  key="agent-column"
+			  rows={frame.agent_rows}
+			  agents={frame.agents}
+			  agentScroll={frame.agent_scroll}
+			  selectedAgent={frame.selected_agent}
+			  previewAgent={frame.preview_agent}
+			  selectingAgent={frame.step == CharacterCreateFrameStep::SelectAgent}
+			/>
 			<AgentDetails key="details" frame={props.frame} />
 			<AliasModal key="alias-modal" frame={props.frame} />
 		</Box>
