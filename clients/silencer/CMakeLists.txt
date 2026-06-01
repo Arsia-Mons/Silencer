@@ -56,6 +56,8 @@ set(SILENCER_CPPX_SOURCES
 	src/client/ui/modals/password_modal_frame.hx
 	src/client/ui/screens/character_create/character_create_frame.cppx
 	src/client/ui/screens/character_create/character_create_frame.hx
+	src/client/ui/screens/lobby/lobby_chrome_frame.cppx
+	src/client/ui/screens/lobby/lobby_chrome_frame.hx
 	src/client/ui/screens/lobby_connect/lobby_connect_frame.cppx
 	src/client/ui/screens/lobby_connect/lobby_connect_frame.hx
 	src/client/ui/screens/main_menu/main_menu_frame.cppx

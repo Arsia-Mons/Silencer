@@ -1,0 +1,178 @@
+#include "client/ui/screens/lobby/lobby_chrome_frame.h"
+
+#include "ui/components/box.h"
+#include "ui/components/button.h"
+#include "ui/components/text.h"
+#include "ui/style/style_patch.h"
+
+#include <cstdint>
+
+namespace silencer {
+namespace client_ui {
+namespace lobby {
+namespace lobby_chrome_frame_detail {
+
+using ::ui::children;
+using ::ui::components::Box;
+using ::ui::components::BoxProps;
+using ::ui::components::Button;
+using ::ui::components::ButtonProps;
+using ::ui::components::Text;
+using ::ui::components::TextProps;
+
+inline std::uint32_t texture_id(std::uint8_t bank, std::uint16_t index) {
+	return (static_cast<std::uint32_t>(bank) << 16) |
+	       static_cast<std::uint32_t>(index);
+}
+
+inline ::ui::StylePatch chrome_border_patch() {
+	return ::ui::patch().border(::ui::Border{
+		{1.0f, 1.0f, 1.0f, 1.0f},
+		{{216, 0, 0, 255}, {216, 0, 0, 255},
+		 {216, 0, 0, 255}, {216, 0, 0, 255}},
+	});
+}
+
+inline ::ui::StylePatch title_text_patch() {
+	return ::ui::patch().text(::ui::TextVisual{
+		.color = {152, 0, 0, 255},
+		.font_id = 135,
+		.font_size = 11,
+	});
+}
+
+inline ::ui::StylePatch version_text_patch() {
+	return ::ui::patch().text(::ui::TextVisual{
+		.color = {189, 0, 0, 255},
+		.font_id = 133,
+		.font_size = 6,
+	});
+}
+
+inline ::ui::StylePatch map_text_patch() {
+	return ::ui::patch().text(::ui::TextVisual{
+		.color = {129, 0, 0, 255},
+		.font_id = 135,
+		.font_size = 11,
+	});
+}
+
+inline ::ui::StyleStatePatch chrome_button_patch() {
+	::ui::StyleStatePatch patch{};
+	patch.base = ::ui::patch()
+		.image(::ui::BackgroundImage{
+			.texture_id = texture_id(7, 24),
+			.tint = {255, 255, 255, 255},
+		})
+		.text(::ui::TextVisual{
+			.color = {0, 0, 0, 255},
+			.font_id = 134,
+			.font_size = 8,
+			.align = ::ui::TextAlign::Center,
+	});
+	patch.hover = patch.base;
+	patch.focus_visible = patch.base;
+	patch.pressed = patch.base;
+	return patch;
+}
+
+inline ::ui::LayoutStyle title_layout(const LobbyChromeFrameProps& props) {
+	::ui::EdgeSizes inset;
+	inset.left = ::ui::StyleValue::points(static_cast<float>(props.x));
+	inset.top = ::ui::StyleValue::points(static_cast<float>(props.y));
+	return {
+		.position = ::ui::PositionType::Absolute,
+		.direction = ::ui::FlexDirection::Row,
+		.align_items = ::ui::AlignItems::Center,
+		.width = ::ui::Length::points(static_cast<float>(props.width)),
+		.height = ::ui::Length::points(static_cast<float>(props.height)),
+		.padding = {static_cast<float>(props.pad_x),
+		            static_cast<float>(props.pad_x),
+		            4.0f,
+		            4.0f},
+		.gap = static_cast<float>(props.row_gap),
+		.position_inset = inset,
+	};
+}
+
+inline ::ui::LayoutStyle text_slot(float width) {
+	return {
+		.width = width > 0.0f ? ::ui::Length::points(width) : ::ui::Length::auto_size(),
+		.height = ::ui::Length::points(21.0f),
+	};
+}
+
+}  // namespace lobby_chrome_frame_detail
+
+using ::ui::children;
+using ::ui::components::Box;
+using ::ui::components::BoxProps;
+using ::ui::components::Button;
+using ::ui::components::ButtonProps;
+using ::ui::components::Text;
+using ::ui::components::TextProps;
+
+::ui::UiElement LobbyChromeFrame(const LobbyChromeFrameProps& props) {
+	return <Box
+	  key={props.key}
+	  layout={::ui::LayoutStyle{
+			.position = ::ui::PositionType::Relative,
+			.width = ::ui::Length::percent(100.0f),
+			.height = ::ui::Length::percent(100.0f),
+		}}
+	>
+		<Box
+		  key="title-bar"
+		  id="LobbyTitleBar"
+		  layout={lobby_chrome_frame_detail::title_layout(props)}
+		  style={lobby_chrome_frame_detail::chrome_border_patch()}
+		>
+			<Text
+			  key="title"
+			  id="LobbyTitle"
+			  value="Silencer"
+			  layout={lobby_chrome_frame_detail::text_slot(88.0f)}
+			  style={lobby_chrome_frame_detail::title_text_patch()}
+			/>
+			<Text
+			  key="version"
+			  id="LobbyVer"
+			  value={props.version}
+			  layout={lobby_chrome_frame_detail::text_slot(72.0f)}
+			  style={lobby_chrome_frame_detail::version_text_patch()}
+			/>
+			<Text
+			  key="map-name"
+			  id="LobbyMapName"
+			  value={props.show_map_name ? props.map_name : ""}
+			  layout={lobby_chrome_frame_detail::text_slot(props.show_map_name ? 180.0f : 0.0f)}
+			  style={lobby_chrome_frame_detail::map_text_patch()}
+			/>
+			<Box
+			  key="spacer"
+			  layout={::ui::LayoutStyle{
+					.width = ::ui::Length::grow(1.0f),
+					.height = ::ui::Length::points(1.0f),
+				}}
+			/>
+			<Button
+			  key="go-back"
+			  id="lobby.go_back"
+			  label="Go Back"
+			  accessibility={{.label = "Go Back"}}
+			  layout={::ui::LayoutStyle{
+					.align_items = ::ui::AlignItems::Center,
+					.justify_content = ::ui::JustifyContent::Center,
+					.width = ::ui::Length::points(156.0f),
+					.height = ::ui::Length::points(21.0f),
+					.padding = {8.0f, 8.0f, 4.0f, 4.0f},
+				}}
+			  style={lobby_chrome_frame_detail::chrome_button_patch()}
+			/>
+		</Box>
+	</Box>
+}
+
+}  // namespace lobby
+}  // namespace client_ui
+}  // namespace silencer

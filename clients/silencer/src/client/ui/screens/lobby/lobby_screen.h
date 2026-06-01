@@ -8,6 +8,7 @@
 #include "game_create_panel.h"
 #include "game_join_panel.h"
 #include "game_tech_panel.h"
+#include "client/ui/retained/RetainedFrame.h"
 #include <string>
 
 class Surface;
@@ -28,6 +29,7 @@ public:
 	void Destroy(ScreenContext & ctx) override;
 	bool HandleBack(ScreenContext & ctx) override;
 	bool HandleUiIntent(ScreenContext & ctx, const silencer::ui::UiAction & action) override;
+	const ::ui::DrawCommandList * RetainedDrawCommands() const override;
 
 	// Map-name overlay written by the join handoff and cleared by HandleBack.
 	void SetMapNameOverlay(const char * name);
@@ -72,6 +74,8 @@ private:
 	// GameTech state + active flag.
 	silencer::client_ui::lobby::GameTechPanelState gameTechState;
 	bool gameTechActive = false;
+
+	silencer::client_ui::RetainedFrame chromeFrame_;
 };
 
 #endif

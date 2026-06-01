@@ -5,7 +5,7 @@
 #include "client/ui/hooks/use_app.h"
 #include "client/ui/hooks/use_lobby.h"
 #include "client/ui/hooks/use_navigation.h"
-#include "lobby_chrome.h"
+#include "client/ui/screens/lobby/lobby_chrome_frame.h"
 #include "lobby_connect_screen.h"
 #include "lobby_main_area.h"
 #include "main_menu_screen.h"
@@ -31,6 +31,7 @@ namespace lobby_screen_detail {
 
 constexpr int kLegacyLayoutW = 640;
 constexpr int kLegacyLayoutH = 480;
+constexpr int kLobbyTitleBarH = 29;
 
 int ClampInt(int value, int lo, int hi) {
 	if(value < lo) return lo;
@@ -135,12 +136,36 @@ void LobbyScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime, s
 	const int rootPadBottom = rootPadTop;
 	const int regionGap = lobby_screen_detail::ScaleLegacyPx(
 		10, layoutWidth, lobby_screen_detail::kLegacyLayoutW, 8, 16);
-	const uint16_t titleBarH = LobbyTitleBarHeight();
+	const uint16_t titleBarH = lobby_screen_detail::kLobbyTitleBarH;
 	const int bodyW = std::max(0, layoutWidth - rootPadX * 2);
 	const int bodyH = std::max(0, layoutHeight - rootPadTop - rootPadBottom
 	                              - (int)titleBarH - regionGap);
 	const int bodyX = rootPadX;
 	const int bodyY = rootPadTop + (int)titleBarH + regionGap;
+	const uint16_t titlePadX = static_cast<uint16_t>(
+		lobby_screen_detail::ClampInt((layoutWidth * 5) / 640, 5, 10));
+	const uint16_t titleRowGap = static_cast<uint16_t>(
+		lobby_screen_detail::ClampInt((layoutWidth * 6) / 640, 4, 10));
+	const bool showMapName = !mapName.empty() && layoutWidth >= 700;
+
+	silencer::client_ui::lobby::LobbyChromeFrameProps chromeProps{
+		.key = "lobby-chrome",
+		.version = version.c_str(),
+		.map_name = mapName.c_str(),
+		.show_map_name = showMapName,
+		.x = rootPadX,
+		.y = rootPadTop,
+		.width = bodyW,
+		.height = titleBarH,
+		.pad_x = titlePadX,
+		.row_gap = titleRowGap,
+	};
+	chromeFrame_.Build([&]() {
+		                   return silencer::client_ui::lobby::LobbyChromeFrame(chromeProps);
+	                   },
+	                   layoutWidth,
+	                   layoutHeight,
+	                   interactions);
 
 	if(ctx.renderdevice){
 		ctx.renderdevice->BeginLobbyPanelBorderBlur(
@@ -164,7 +189,11 @@ void LobbyScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime, s
 	           .layoutDirection = CLAY_TOP_TO_BOTTOM,
 	       },
 	       .image = { .imageData = silencer::clay_bridge::PackImageStretch(7, 1) } }) {
-		BuildLobbyTitleBar(version, mapName, layoutWidth, interactions);
+		CLAY({ .id = CLAY_ID("LobbyTitleBarRetainedSlot"),
+		       .layout = {
+		           .sizing = { CLAY_SIZING_GROW(0),
+		                       CLAY_SIZING_FIXED(static_cast<float>(titleBarH)) },
+		       } }) {}
 
 		LobbyMainAreaPanels panels{
 			characterState,
@@ -362,4 +391,9 @@ bool LobbyScreen::HandleUiIntent(ScreenContext & ctx, const silencer::ui::UiActi
 		return silencer::client_ui::lobby::GameTechPanelHandleUiIntent(gameTechState, action);
 	}
 	return silencer::client_ui::lobby::GameSelectPanelHandleUiIntent(gameSelectState, action);
+}
+
+const ::ui::DrawCommandList * LobbyScreen::RetainedDrawCommands() const
+{
+	return &chromeFrame_.Commands();
 }
