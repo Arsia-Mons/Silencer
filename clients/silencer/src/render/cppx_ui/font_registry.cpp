@@ -8,12 +8,13 @@ namespace silencer::cppx_ui {
 
 namespace {
 // Indexed by FaceId. shared/fonts/silencer-*.otf (generated from the legacy
-// bitmap banks 133/134/136/132 — exact in-game identity, per SIL-6).
+// bitmap banks 133/134/136/132/135 — exact in-game identity, per SIL-6/SIL-95).
 const char *kFaceFile[FontRegistry::FaceCount] = {
     "silencer-ui.otf",       // Body
     "silencer-ui-large.otf", // Large
     "silencer-title.otf",    // Title
     "silencer-tiny.otf",     // Tiny
+    "silencer-135.otf",      // Heading (bank 135)
 };
 
 // FNV-1a over the cache key (font_id + bytes + size + color) — a fast reject

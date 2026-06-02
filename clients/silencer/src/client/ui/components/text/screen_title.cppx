@@ -10,25 +10,35 @@ using ::ui::components::Text;
 using ::ui::components::TextProps;
 
 ::ui::UiElement ScreenTitle(const ScreenTitleProps &props) {
-  // All title variants render in the Title face at its native em; the variant
-  // only selects the text color (bank-135 screen titles approximated by Title).
+  // SIL-95: the Screen/Dialog heading variants now render in the dominant legacy
+  // bank-135 Heading face (silencer-135.otf) for glyph parity; the Hero banner +
+  // small Popup keep the larger Title face. The variant also selects the color.
   ::ui::Color color = tokens::kTextTitle;
-  float height = 32.0f;
+  uint16_t face = tokens::kFaceHeading;
+  uint16_t font = tokens::kFontHeading;
+  float line = tokens::kLineHeading;
+  float height = 26.0f;
   switch (props.variant) {
   case ScreenTitleVariant::Hero:
     color = tokens::kTextHeroTitle;
+    face = tokens::kFaceTitle;
+    font = tokens::kFontTitle;
+    line = tokens::kLineTitle;
     height = 36.0f;
     break;
   case ScreenTitleVariant::Screen:
     color = tokens::kTextTitle;
-    height = 32.0f;
+    height = 26.0f;
     break;
   case ScreenTitleVariant::Dialog:
     color = tokens::kTextTitle;
-    height = 34.0f;
+    height = 24.0f;
     break;
   case ScreenTitleVariant::Popup:
     color = tokens::kTextDialogTitle;
+    face = tokens::kFaceTitle;
+    font = tokens::kFontTitle;
+    line = tokens::kLineTitle;
     height = 24.0f;
     break;
   }
@@ -36,8 +46,7 @@ using ::ui::components::TextProps;
     key={props.key}
     value={props.value}
     layout={{.height = ::ui::Length::points(height)}}
-    style={tokens::text_patch(color, tokens::kFontTitle, tokens::kFaceTitle,
-                              tokens::kLineTitle)}
+    style={tokens::text_patch(color, font, face, line)}
   />
 }
 

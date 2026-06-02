@@ -16,8 +16,16 @@ namespace silencer::cppx_ui {
 class FontRegistry {
 public:
   // font_id contract: 0=body (silencer-ui), 1=large (ui-large), 2=title,
-  // 3=tiny (HUD digits). Matches doc §SIL-6 decision 1's face wiring.
-  enum FaceId : uint16_t { Body = 0, Large = 1, Title = 2, Tiny = 3, FaceCount = 4 };
+  // 3=tiny (HUD digits), 4=heading (bank-135, the dominant legacy title/heading
+  // face — SIL-95). Matches doc §SIL-6 decision 1's face wiring.
+  enum FaceId : uint16_t {
+    Body = 0,
+    Large = 1,
+    Title = 2,
+    Tiny = 3,
+    Heading = 4,
+    FaceCount = 5
+  };
 
   FontRegistry() = default;
   ~FontRegistry();

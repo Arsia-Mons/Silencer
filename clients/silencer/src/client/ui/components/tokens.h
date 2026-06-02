@@ -66,18 +66,21 @@ constexpr ::ui::Color kTextHud = {224, 231, 241, 255};         // #E0E7F1
 // The four bitmap-derived legacy OTF faces. The product layer sets font_id per
 // role so titles/headings/body/tiny each render in their own face (everything
 // previously collapsed to Body face 0 at arbitrary point sizes).
-constexpr uint16_t kFaceBody = 0;  // silencer-ui      (bank 133)
-constexpr uint16_t kFaceLarge = 1; // silencer-ui-large(bank 134) — headings
-constexpr uint16_t kFaceTitle = 2; // silencer-title   (bank 136) — titles
-constexpr uint16_t kFaceTiny = 3;  // silencer-tiny    (bank 132) — HUD/tiny
+constexpr uint16_t kFaceBody = 0;    // silencer-ui      (bank 133)
+constexpr uint16_t kFaceLarge = 1;   // silencer-ui-large(bank 134) — headings
+constexpr uint16_t kFaceTitle = 2;   // silencer-title   (bank 136) — titles
+constexpr uint16_t kFaceTiny = 3;    // silencer-tiny    (bank 132) — HUD/tiny
+constexpr uint16_t kFaceHeading = 4; // silencer-135     (bank 135) — the dominant
+                                     // legacy title/heading face (SIL-95)
 
 // ---- Native-em sizes + legacy line heights ----
 // Authority: legacy text.cpp advance/lineHeight table. The OTFs are bitmap-
 // derived, so rendering at the native em keeps glyphs crisp (no fractional
-// scaling). bank-135 roles (screen titles / HUD counters) are approximated by
-// the Title/Large faces until silencer-135.otf is generated (SIL-95).
+// scaling).
 constexpr uint16_t kFontTitle = 24;  // Title face native em
 constexpr float kLineTitle = 23.f;
+constexpr uint16_t kFontHeading = 17; // Heading face (bank 135) native em
+constexpr float kLineHeading = 19.f;  // legacy bank-135 line height
 constexpr uint16_t kFontLarge = 13;  // Large face native em (headings/labels)
 constexpr float kLineLarge = 15.f;
 constexpr uint16_t kFontBodyEm = 11; // Body face native em

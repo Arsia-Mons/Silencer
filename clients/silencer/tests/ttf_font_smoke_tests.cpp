@@ -48,6 +48,7 @@ int main(void) {
   if (!measure_font("silencer-ui-large.otf", 13.0f)) fails++;
   if (!measure_font("silencer-title.otf", 24.0f)) fails++;
   if (!measure_font("silencer-tiny.otf", 5.0f)) fails++;
+  if (!measure_font("silencer-135.otf", 17.0f)) fails++; // SIL-95 Heading face
   TTF_Quit();
   return fails ? 1 : 0;
 }
