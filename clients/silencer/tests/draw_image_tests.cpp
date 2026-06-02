@@ -114,8 +114,40 @@ int main(void) {
       CHECK(near(br, 255, 255, 0), "9-patch BR corner = yellow (1:1)");
     }
 
+    // --- Scene 3: source sub-rect (atlasing / partial-fill, SIL-93). A 2x1
+    // atlas — left texel red, right texel green — rendered selecting only the
+    // RIGHT texel (src_x=1,w=1) must fill the whole dest with green, proving
+    // the executor samples the sub-region, not the full texture. ---
+    {
+      uint8_t atlas[2 * 1 * 4];
+      set_px(atlas, 2, 0, 0, 255, 0, 0, 255); // left = red
+      set_px(atlas, 2, 1, 0, 0, 255, 0, 255); // right = green
+      uint32_t id = textures.upload_rgba(r, atlas, 2, 1);
+      CHECK(id != 0, "upload atlas texture");
+
+      SDL_SetRenderDrawColor(r, 0, 0, 0, 255);
+      SDL_RenderClear(r);
+      g_list.reset();
+      ui::DrawCommand img{
+          .kind = ui::DrawCommandKind::Image,
+          .rect = {0.f, 0.f, 16.f, 16.f},
+          .payload = {.image = {.texture_id = id,
+                                .tint = {255, 255, 255, 255},
+                                .src_x = 1.f,
+                                .src_y = 0.f,
+                                .src_w = 1.f,
+                                .src_h = 1.f}}};
+      CHECK(g_list.push(img), "push sub-rect image");
+      silencer::cppx_ui::execute_draw_commands(r, g_list, nullptr, &textures);
+      SDL_RenderPresent(r);
+      Uint8 c[4];
+      read_px(surf, 8, 8, c);
+      CHECK(near(c, 0, 255, 0), "sub-rect samples the RIGHT (green) atlas cell");
+    }
+
     if (g_fails == 0)
-      printf("draw image ok: plain stretch + nine-slice corners 1:1\n");
+      printf("draw image ok: plain stretch + nine-slice corners 1:1 + "
+             "sub-rect atlas sampling\n");
   }
 
   if (r)

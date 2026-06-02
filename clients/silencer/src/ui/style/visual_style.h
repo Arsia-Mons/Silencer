@@ -80,6 +80,11 @@ struct BackgroundImage {
   uint32_t texture_id = 0; // 0 => no image
   Color tint{255, 255, 255, 255};
   SideWidths nine_slice{}; // all-zero => plain stretch; nonzero => 9-patch
+  // Source sub-rect in texture pixels, for atlasing + partial-fill (drained
+  // HUD bars). w==0 || h==0 => sample the whole texture. Honored by the plain
+  // and rounded image paths; the nine-slice path always samples the full
+  // texture (its insets are already texture-space).
+  float src_x = 0.f, src_y = 0.f, src_w = 0.f, src_h = 0.f;
 };
 
 struct Shadow {

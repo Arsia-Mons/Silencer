@@ -59,6 +59,9 @@ struct ImageData {
   Color tint{255, 255, 255, 255};
   SideWidths nine_slice{};
   float corner_radius = 0.f;
+  // Source sub-rect in texture pixels (atlasing / partial-fill). w==0 || h==0
+  // => sample the whole texture. Honored by the plain + rounded paths.
+  float src_x = 0.f, src_y = 0.f, src_w = 0.f, src_h = 0.f;
 };
 struct GradientData {
   uint16_t stop_off = 0; // slice into DrawList::grad_arena

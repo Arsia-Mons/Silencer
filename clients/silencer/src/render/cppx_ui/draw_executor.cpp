@@ -142,6 +142,12 @@ void render_image(SDL_Renderer *r, const ::ui::DrawCommand &c,
   const bool nine = ns.top > 0.f || ns.right > 0.f || ns.bottom > 0.f ||
                     ns.left > 0.f;
 
+  // Source sub-rect (atlasing / partial-fill). w/h==0 => sample the whole
+  // texture. Texture-space pixels; nine-slice ignores it (insets are
+  // already texture-space).
+  const bool has_src = img.src_w > 0.f && img.src_h > 0.f;
+  const SDL_FRect src_sub = {img.src_x, img.src_y, img.src_w, img.src_h};
+
   if (nine) {
     // 9-patch: source insets in texture space, dest insets in dest space.
     // Corners 1:1 (source inset == dest inset); edges/center stretch.
@@ -189,12 +195,18 @@ void render_image(SDL_Renderer *r, const ::ui::DrawCommand &c,
     const float rx = c.rect.x, ry = c.rect.y;
     const float rw = c.rect.w > 0.f ? c.rect.w : 1.f;
     const float rh = c.rect.h > 0.f ? c.rect.h : 1.f;
+    // UV span: full [0,1] unless a source sub-rect selects an atlas region.
+    const float u0 = has_src ? img.src_x / tw : 0.f;
+    const float v0 = has_src ? img.src_y / th : 0.f;
+    const float u1 = has_src ? (img.src_x + img.src_w) / tw : 1.f;
+    const float v1 = has_src ? (img.src_y + img.src_h) / th : 1.f;
     for (int k = 0; k < sink.vcount; ++k) {
       const ::ui::Vertex &v = s.v[k];
       s.sv[k].position = {v.x * scale, v.y * scale}; // points -> device pixels
       s.sv[k].color = {v.color.r / 255.f, v.color.g / 255.f, v.color.b / 255.f,
                        v.color.a / 255.f}; // tint, premultiplied
-      s.sv[k].tex_coord = {(v.x - rx) / rw, (v.y - ry) / rh}; // uv in point space
+      s.sv[k].tex_coord = {u0 + ((v.x - rx) / rw) * (u1 - u0),
+                           v0 + ((v.y - ry) / rh) * (v1 - v0)}; // uv (sub-rect)
     }
     for (int k = 0; k < sink.icount; ++k)
       s.si[k] = static_cast<int>(s.i[k]);
@@ -202,12 +214,12 @@ void render_image(SDL_Renderer *r, const ::ui::DrawCommand &c,
     return;
   }
 
-  // Plain stretched textured rect.
+  // Plain stretched textured rect (optionally sampling an atlas sub-rect).
   SDL_SetTextureColorMod(tex, tint.r, tint.g, tint.b);
   SDL_SetTextureAlphaMod(tex, tint.a);
   SDL_FRect dst = {c.rect.x * scale, c.rect.y * scale, c.rect.w * scale,
                    c.rect.h * scale};
-  SDL_RenderTexture(r, tex, nullptr, &dst);
+  SDL_RenderTexture(r, tex, has_src ? &src_sub : nullptr, &dst);
   SDL_SetTextureColorMod(tex, 255, 255, 255);
   SDL_SetTextureAlphaMod(tex, 255);
 }

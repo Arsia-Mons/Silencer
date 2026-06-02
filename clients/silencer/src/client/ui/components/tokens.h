@@ -116,16 +116,30 @@ inline ::ui::StylePatch panel_patch(::ui::Color background, ::ui::Color border,
 // paint through this helper — never through the gradient-painting solid() path.
 // A texture_id of 0 yields a fully transparent patch (screens tolerate the
 // not-yet-baked frame without a flash).
-inline ::ui::StylePatch image_patch(uint32_t texture_id,
-                                    ::ui::Color tint = {255, 255, 255, 255},
-                                    ::ui::SideWidths nine_slice = {}) {
+inline ::ui::StylePatch image_patch(::ui::BackgroundImage image) {
   return ::ui::patch()
-      .image(::ui::BackgroundImage{texture_id, tint, nine_slice})
+      .image(image)
       .background(::ui::Color{0, 0, 0, 0}) // no opaque fill under the sprite
       .gradient(::ui::Gradient{})          // defeat the role's control gradient
       .border(::ui::Border{})              // sprite carries its own edge
       .outline(::ui::Outline{})            // no vector focus ring; focus = sprite brightness
       .corner_radius(0.f);                 // the sprite shape is authored, not rounded
+}
+inline ::ui::StylePatch image_patch(uint32_t texture_id,
+                                    ::ui::Color tint = {255, 255, 255, 255},
+                                    ::ui::SideWidths nine_slice = {}) {
+  return image_patch(::ui::BackgroundImage{texture_id, tint, nine_slice});
+}
+
+// Atlas / partial-fill variant: samples only the given source sub-rect (texture
+// pixels) of the texture — for packed-frame atlases and drained HUD bars.
+// w==0 || h==0 falls back to the whole texture (SIL-93).
+inline ::ui::StylePatch image_patch_sub(uint32_t texture_id, float src_x,
+                                        float src_y, float src_w, float src_h,
+                                        ::ui::Color tint = {255, 255, 255,
+                                                            255}) {
+  return image_patch(::ui::BackgroundImage{texture_id, tint, {}, src_x, src_y,
+                                           src_w, src_h});
 }
 
 // Text paint (color + face + native-em size + legacy line height). font_id
