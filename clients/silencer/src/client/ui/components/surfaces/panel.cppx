@@ -1,6 +1,7 @@
 #include "client/ui/components/surfaces/panel.h"
 
 #include "client/ui/components/tokens.h"
+#include "client/ui/hooks/use_chrome.h"
 #include "ui/components/box.h"
 
 namespace silencer {
@@ -75,6 +76,28 @@ float panel_size_width(PanelSize size) {
     };
     overlay = tokens::fill_patch(kSunkenBg);
     break;
+  case PanelVariant::Chrome: {
+    // Sprite-backed full chrome panel (bank 7 idx5), drawn as a PLAIN image at
+    // its native sprite size so the baked frame border + internal wells stay
+    // aligned. Content padding keeps children inside the frame chrome. Falls
+    // back to a vector Hero panel for the not-yet-baked frame.
+    client::ui::ChromeTextures chrome = client::ui::use_chrome();
+    const float w = chrome.chrome_panel_w ? (float)chrome.chrome_panel_w : 628.0f;
+    const float h = chrome.chrome_panel_h ? (float)chrome.chrome_panel_h : 441.0f;
+    layout = ::ui::LayoutStyle{
+        .direction = ::ui::FlexDirection::Column,
+        .align_items = ::ui::AlignItems::Center,
+        .width = ::ui::Length::points(w),
+        .height = ::ui::Length::points(h),
+        .padding = {40.0f, 40.0f, 40.0f, 40.0f},
+        .gap = 12.0f,
+    };
+    overlay = chrome.chrome_panel
+                  ? tokens::image_patch(chrome.chrome_panel)
+                  : tokens::panel_patch(tokens::kSurfaceHeroPanel,
+                                        tokens::kBorderHeroPanel);
+    break;
+  }
   }
 
   if (props.size != PanelSize::Auto) {

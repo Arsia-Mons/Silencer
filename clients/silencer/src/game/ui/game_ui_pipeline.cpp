@@ -185,13 +185,14 @@ const SDL_Color *palette = game.renderer.palette.GetColors();
 if(!palette) return;
 const auto &banks = game.world.resources.spritebank;
 
-auto bake = [&](size_t bank, size_t index, uint32_t &id_out){
+auto bake = [&](size_t bank, size_t index, uint32_t &id_out,
+                uint16_t *w_out = nullptr, uint16_t *h_out = nullptr){
 if(bank >= banks.size() || index >= banks[bank].size()) return;
 const std::shared_ptr<Surface> &sp = banks[bank][index];
 if(!sp || sp->w < 1 || sp->h < 1 || sp->pixels.empty()) return;
 uint32_t id = cppxHost->bake_chrome_sprite(sp->pixels.data(), sp->w, sp->h,
                                            palette);
-if(id) id_out = id;
+if(id){ id_out = id; if(w_out) *w_out = (uint16_t)sp->w; if(h_out) *h_out = (uint16_t)sp->h; }
 };
 
 // bank 6 — the green oval menu button, per legacy size (idx7 Md / idx28 Sm /
@@ -202,6 +203,10 @@ bake(6, 23, cppxChrome.oval_lg);
 // bank 7 — the metal-chrome nine-slice button (idx24 idle phase0 / idx28 focus phase4).
 bake(7, 24, cppxChrome.chrome_btn_idle);
 bake(7, 28, cppxChrome.chrome_btn_focus);
+// Frame sprites (plain, native size): bank-7 chrome panel + bank-40 dialog frames.
+bake(7, 5, cppxChrome.chrome_panel, &cppxChrome.chrome_panel_w, &cppxChrome.chrome_panel_h);
+bake(40, 4, cppxChrome.dialog_msg, &cppxChrome.dialog_msg_w, &cppxChrome.dialog_msg_h);
+bake(40, 2, cppxChrome.dialog_pw, &cppxChrome.dialog_pw_w, &cppxChrome.dialog_pw_h);
 }
 
 void GameUiPipeline::RenderCppxClientUiFrame(Surface& surface) {
