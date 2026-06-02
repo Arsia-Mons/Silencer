@@ -154,6 +154,23 @@ fallback-as-final, no kept migrated divergences.**
 7. **Scrolling** — real scroll viewports are in scope (new **SIL-111**); "clipped,
    no-scroll" is not a final state.
 
+## Per-ticket workflow (agents: follow this for every SIL-84 ticket)
+
+When a ticket's work is done and verified, do NOT mark it **Done** and do NOT
+block waiting for approval. Instead:
+
+1. Capture the control-socket verification screenshot (headless boot → `screenshot`).
+2. Upload that screenshot to the Linear ticket as an attachment, and Discord-DM
+   the same image to the user (proactive progress).
+3. Set the ticket to status **In Progress** + the **"In Review"** label (the
+   team has no "In Review" workflow status; the label is the proxy).
+4. Immediately move on to the next ticket — the user reviews asynchronously and
+   comments approval on the ticket; on approval it flips to **Done** (and the
+   label is dropped). Approval is non-blocking: keep grinding the backlog.
+
+Commits land directly on `hv/cppx-migration-cc` (the long-lived migration
+branch), one commit per ticket, message ending with the `SIL-NN` id.
+
 ## Risks / deferred
 
 - **Texture-cap (64)**: a cross-surface texture budget must be computed before
