@@ -2,20 +2,22 @@
 
 #include "client/ui/components/actions/actions.h"
 #include "client/ui/components/layout/layout.h"
-#include "client/ui/components/surfaces/surfaces.h"
 #include "client/ui/components/text/text.h"
+#include "client/ui/components/tokens.h"
+#include "client/ui/hooks/use_chrome.h"
 #include "client/ui/hooks/use_updater.h"
+#include "ui/components/box.h"
 #include "ui/runtime/react.h"
+
+#include <string>
 
 namespace client::ui {
 namespace {
 
-// The JSX lowering emits each tag's component function + `<Tag>Props` type
-// unqualified, so the silencer semantic layer (functions + Props + variant
-// enums) is pulled wholesale into this TU-local namespace, plus the runtime's
-// `children()` child-list builder.
 using namespace silencer;
 using ::ui::children;
+using ::ui::components::Box;
+using ::ui::components::BoxProps;
 
 struct UpdateScreenProps {
   uint32_t unused = 0;
@@ -41,44 +43,108 @@ const char *phase_label(UpdaterPhase phase) {
   return "";
 }
 
+// SIL-99: origin/main update screen — a bank-40 idx4 dialog sprite over the
+// prior screen (CenteredOverlay, no opaque menu), ONE Large-faced status line
+// per phase, an ASCII progress bar only while downloading, and a row of
+// state-gated chrome buttons. Conditional children use the fixed-slot
+// ternary-to-empty() idiom (UiChildren is non-owning — never a std::vector).
 ::ui::UiElement UpdateScreenView(const UpdateScreenProps &) {
   UpdaterModel updater = use_updater();
+  ChromeTextures chrome = use_chrome();
+  const UpdaterPhase phase = updater.phase;
+  const int pct = static_cast<int>(updater.progress * 100.0f);
 
-  // Action availability is expressed through `disabled`, not conditional JSX
-  // (the transpiler does not lower JSX inside C++ expressions): consent only
-  // while prompting, retry only when the updater says it can.
-  bool can_consent = updater.phase == UpdaterPhase::Prompting;
-  const char *progress_text =
-      use_text_storage("%d%%", static_cast<int>(updater.progress * 100.0f));
+  // ONE status string (carries the Failed error + Downloading percent).
+  std::string status_str;
+  if (phase == UpdaterPhase::Downloading)
+    status_str = std::string("Downloading update  ") + std::to_string(pct) + "%";
+  else if (phase == UpdaterPhase::Failed)
+    status_str = updater.error.empty() ? std::string("Update failed")
+                                       : ("Update failed: " + updater.error);
+  else
+    status_str = phase_label(phase);
+  const char *status = use_text_storage("%s", status_str.c_str());
 
-  return <ScreenLayout key="root" variant={ScreenLayoutVariant::Menu}>
-    <Panel key="panel" variant={PanelVariant::Hero}>
-      <ScreenTitle key="title" variant={ScreenTitleVariant::Hero} value="Software Update" />
-      <ScreenSubtitle key="phase" value={phase_label(updater.phase)} />
-      <BodyText key="progress" variant={BodyTextVariant::Body} value={progress_text} />
-      <BodyText
-        key="error"
-        variant={BodyTextVariant::Message}
-        tone={BodyTextTone::Disabled}
-        value={updater.error.c_str()}
-      />
-      <AppButton
-        key="consent"
-        controlId="UpdateConsent"
-        variant={AppButtonVariant::Primary}
-        disabled={!can_consent}
-        label="Update Now"
-        onPress={updater.consent}
-      />
-      <AppButton
-        key="retry"
-        controlId="UpdateRetry"
-        disabled={!updater.can_retry}
-        label="Retry"
-        onPress={updater.retry}
-      />
-      <AppButton key="cancel" controlId="UpdateCancel" label="Cancel" onPress={updater.cancel} />
-    </Panel>
+  // 20-cell ASCII progress bar (shown only while downloading).
+  int filled = static_cast<int>(updater.progress * 20.0f + 0.5f);
+  if (filled < 0)
+    filled = 0;
+  if (filled > 20)
+    filled = 20;
+  std::string bar_str =
+      "[" + std::string((size_t)filled, '#') + std::string((size_t)(20 - filled), '.') + "]";
+  const char *bar_text = use_text_storage("%s", bar_str.c_str());
+
+  auto chrome_button = [](const char *id, const char *label,
+                          std::function<void()> on) -> ::ui::UiElement {
+    AppButtonProps p{};
+    p.key = id;
+    p.control_id = id;
+    p.variant = AppButtonVariant::Chrome;
+    p.label = label;
+    p.on_press = std::move(on);
+    return AppButton(p);
+  };
+
+  const bool failed = phase == UpdaterPhase::Failed;
+  ::ui::UiElement progress_bar =
+      phase == UpdaterPhase::Downloading
+          ? BodyText(BodyTextProps{.key = "bar",
+                                   .variant = BodyTextVariant::Body,
+                                   .value = bar_text})
+          : ::ui::empty();
+  ::ui::UiElement update_btn =
+      phase == UpdaterPhase::Prompting
+          ? chrome_button("UpdateConsent", "Update", updater.consent)
+          : ::ui::empty();
+  ::ui::UiElement retry_btn =
+      (failed && updater.retry_count < 3)
+          ? chrome_button("UpdateRetry", "Retry", updater.retry)
+          : ::ui::empty();
+  ::ui::UiElement download_btn =
+      (failed && updater.retry_count >= 3)
+          ? chrome_button("UpdateDownload", "Download",
+                          updater.open_download_page)
+          : ::ui::empty();
+  ::ui::UiElement cancel_btn =
+      (phase == UpdaterPhase::Prompting ||
+       phase == UpdaterPhase::Downloading || failed)
+          ? chrome_button("UpdateCancel", "Cancel", updater.cancel)
+          : ::ui::empty();
+
+  const float w = chrome.dialog_msg_w ? (float)chrome.dialog_msg_w : 352.0f;
+  const float h = chrome.dialog_msg_h ? (float)chrome.dialog_msg_h : 178.0f;
+  ::ui::StylePatch panel_style =
+      chrome.dialog_msg ? tokens::image_patch(chrome.dialog_msg)
+                        : tokens::panel_patch(tokens::kSurfacePanel,
+                                              tokens::kBorderPanel);
+
+  return <ScreenLayout key="root" variant={ScreenLayoutVariant::CenteredOverlay}>
+    <Box
+      key="panel"
+      layout={::ui::LayoutStyle{
+        .direction = ::ui::FlexDirection::Column,
+        .align_items = ::ui::AlignItems::Center,
+        .justify_content = ::ui::JustifyContent::Center,
+        .width = ::ui::Length::points(w),
+        .height = ::ui::Length::points(h),
+        .padding = {34.0f, 34.0f, 42.0f, 42.0f},
+        .gap = 12.0f}}
+      style={panel_style}>
+      <ScreenSubtitle key="status" value={status} />
+      {progress_bar}
+      <Box
+        key="actions"
+        layout={::ui::LayoutStyle{
+          .direction = ::ui::FlexDirection::Row,
+          .justify_content = ::ui::JustifyContent::Center,
+          .gap = 6.0f}}>
+        {update_btn}
+        {retry_btn}
+        {download_btn}
+        {cancel_btn}
+      </Box>
+    </Box>
   </ScreenLayout>
 }
 
