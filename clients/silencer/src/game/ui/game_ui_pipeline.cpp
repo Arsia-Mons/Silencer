@@ -177,23 +177,28 @@ void GameUiPipeline::BakeChromeTextures() {
 // opaque ids travel to screens via the ChromeTexturesProvider.
 cppxChrome = {};
 if(!cppxHost) return;
-const SDL_Color *palette = game.GetPaletteColors();
+// Use the BASE palette, not GetPaletteColors(): the latter is the display cache
+// that is faded to black on menu/transition screens, which would bake the chrome
+// sprites pure black. The base palette carries the authored sprite colors (the
+// green oval lives at indices 210/213-224).
+const SDL_Color *palette = game.renderer.palette.GetColors();
 if(!palette) return;
 const auto &banks = game.world.resources.spritebank;
 
-auto bake = [&](size_t bank, size_t index, uint32_t &id_out,
-                uint16_t &w_out, uint16_t &h_out){
+auto bake = [&](size_t bank, size_t index, uint32_t &id_out){
 if(bank >= banks.size() || index >= banks[bank].size()) return;
 const std::shared_ptr<Surface> &sp = banks[bank][index];
 if(!sp || sp->w < 1 || sp->h < 1 || sp->pixels.empty()) return;
 uint32_t id = cppxHost->bake_chrome_sprite(sp->pixels.data(), sp->w, sp->h,
                                            palette);
-if(id){ id_out = id; w_out = (uint16_t)sp->w; h_out = (uint16_t)sp->h; }
+if(id) id_out = id;
 };
 
-// bank 6 idx 7 — the green oval menu button (196x33).
-bake(6, 7, cppxChrome.oval_button, cppxChrome.oval_button_w,
-     cppxChrome.oval_button_h);
+// bank 6 — the green oval menu button, per legacy size (idx7 Md / idx28 Sm /
+// idx23 Lg).
+bake(6, 7, cppxChrome.oval_md);
+bake(6, 28, cppxChrome.oval_sm);
+bake(6, 23, cppxChrome.oval_lg);
 }
 
 void GameUiPipeline::RenderCppxClientUiFrame(Surface& surface) {

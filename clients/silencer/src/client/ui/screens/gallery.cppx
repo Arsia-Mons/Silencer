@@ -59,6 +59,7 @@ struct GalleryProps {
           label="Disabled"
         />
         <AppButton key="bsm" controlId="gal_btn_sm" size={AppButtonSize::Sm} label="Small" />
+        <AppButton key="boval" controlId="gal_btn_oval" variant={AppButtonVariant::Oval} label="Oval" />
         <AppInput key="in" controlId="gal_input" accessibilityLabel="Input" value="text input" />
         <AppCheckbox key="ck1" controlId="gal_check_on" checked={true} label="Checked" />
         <AppCheckbox key="ck0" controlId="gal_check_off" checked={false} label="Unchecked" />

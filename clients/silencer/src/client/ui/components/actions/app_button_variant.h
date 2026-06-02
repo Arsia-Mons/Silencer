@@ -19,8 +19,8 @@
 
 namespace silencer {
 
-enum class AppButtonVariant { Primary, Secondary, Danger, Ghost };
-enum class AppButtonSize { Md, Sm };
+enum class AppButtonVariant { Primary, Secondary, Danger, Ghost, Oval };
+enum class AppButtonSize { Md, Sm, Lg };
 
 // Layout-only baseline geometry. Mirrors ui::components::ButtonProps default
 // LayoutStyle (button.hx:23-29) for Md; Sm shrinks height/padding to the
@@ -46,6 +46,61 @@ inline ::ui::LayoutStyle app_button_layout(AppButtonSize size, bool /*selected*/
         .padding = {14.0f, 14.0f, 8.0f, 8.0f},
     };
   }
+}
+
+// Fixed legacy oval-sprite geometry (origin/main button.cpp): Md 196x33 (idx7),
+// Sm 112x33 (idx28), Lg 220x33 (idx23). Height is 33 for every size. The label
+// rides centered on top of the plain-stretched sprite.
+inline ::ui::LayoutStyle app_button_oval_layout(AppButtonSize size) {
+  float w = 196.0f;
+  if (size == AppButtonSize::Sm)
+    w = 112.0f;
+  else if (size == AppButtonSize::Lg)
+    w = 220.0f;
+  return {
+      .align_items = ::ui::AlignItems::Center,
+      .justify_content = ::ui::JustifyContent::Center,
+      .width = ::ui::Length::points(w),
+      .height = ::ui::Length::points(33.0f),
+      .padding = {16.0f, 16.0f, 8.0f, 8.0f},
+  };
+}
+
+// Green oval sprite-button paint (SIL-89). Image-only patch over a baked bank-6
+// oval texture (use_chrome()), with the label in the Title face centered on top.
+// STATIC 2-state v1: idle is dimmer, focus/hover brightens via a discrete tint
+// (NOT the legacy smooth 5-phase 24fps ramp — that needs the clock seam, SIL-107).
+// texture_id 0 (not-yet-baked frame or seam slip) falls back to a vector
+// stadium-radius oval (corner_radius = h/2, cool-blue outline, dark fill).
+inline ::ui::StyleStatePatch app_button_oval_patch(uint32_t tex) {
+  const ::ui::TextVisual label{.color = tokens::kTextTitle,
+                               .font_id = tokens::kFaceTitle,
+                               .font_size = tokens::kFontTitle,
+                               .align = ::ui::TextAlign::Center,
+                               .line_height = tokens::kLineTitle};
+  ::ui::StyleStatePatch ov{};
+  if (!tex) {
+    ::ui::StylePatch p =
+        ::ui::patch()
+            .background(::ui::Color{16, 20, 28, 255})
+            .gradient(::ui::Gradient{})
+            .corner_radius(16.5f) // h/2 for the 33px stadium
+            .border(::ui::Border{{1, 1, 1, 1},
+                                 {tokens::kAccent, tokens::kAccent,
+                                  tokens::kAccent, tokens::kAccent}});
+    p.text = ::ui::opt(label);
+    ov.base = p;
+    return ov;
+  }
+  auto oval = [&](::ui::Color tint) -> ::ui::StylePatch {
+    ::ui::StylePatch p = tokens::image_patch(tex, tint);
+    p.text = ::ui::opt(label);
+    return p;
+  };
+  ov.base = oval(::ui::Color{150, 150, 150, 255});         // idle (dimmed)
+  ov.hover = oval(::ui::Color{255, 255, 255, 255});        // lit on hover
+  ov.focus_visible = oval(::ui::Color{255, 255, 255, 255}); // lit on focus
+  return ov;
 }
 
 // State-aware variant paint overlay over the theme's slate Button role. The

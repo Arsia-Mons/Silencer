@@ -2,6 +2,7 @@
 
 #include "ui/components/button.h"
 #include "client/ui/components/tokens.h"
+#include "client/ui/hooks/use_chrome.h"
 
 #include <functional>
 
@@ -30,7 +31,21 @@ using ::ui::components::ButtonProps;
   const char *a11y_label =
       props.accessibility_label ? props.accessibility_label : props.label;
   ::ui::LayoutStyle layout = app_button_layout(props.size, props.selected);
-  auto style = app_button_variant_patch(props.variant);
+  ::ui::StyleStatePatch style = app_button_variant_patch(props.variant);
+
+  // Oval is sprite-backed: it reads its baked bank-6 texture from use_chrome()
+  // (composition-root provider) and paints image-only at the fixed legacy
+  // geometry. Selected by size: Md/Sm/Lg → idx7/idx28/idx23.
+  if (props.variant == AppButtonVariant::Oval) {
+    client::ui::ChromeTextures chrome = client::ui::use_chrome();
+    uint32_t tex = chrome.oval_md;
+    if (props.size == AppButtonSize::Sm)
+      tex = chrome.oval_sm;
+    else if (props.size == AppButtonSize::Lg)
+      tex = chrome.oval_lg;
+    layout = app_button_oval_layout(props.size);
+    style = app_button_oval_patch(tex);
+  }
 
   // Children are plain expressions: props.children, plus a label fallback used
   // only when no children were provided. The two {expr} children lower into the
