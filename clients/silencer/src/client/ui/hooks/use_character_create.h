@@ -18,12 +18,18 @@ struct CharacterWizard {
   int step = 0;
   std::string alias = {};
   bool submitting = false;
+  // SIL-101: the agency row currently focused/previewed in step 2, feeding the
+  // right detail column. Clamped to 0 by the screen so the column is always
+  // populated (defaults to Noxis).
+  int preview_agency = 0;
 
   std::function<void(const std::string &)> set_alias = {};
   std::function<void()> open_alias = {};    // step 0 -> 1
   std::function<void()> confirm_alias = {}; // step 1 -> 2 (no-op if alias empty)
+  std::function<void()> reopen_alias = {};  // step 2 -> 1 (Rename Once)
   std::function<void()> cancel = {};        // -> step 0, clears alias + submit guard
   std::function<void()> begin_submit = {};  // latch the double-submit guard
+  std::function<void(int)> set_preview_agency = {}; // step-2 detail preview
 };
 
 CharacterWizard use_character_create();

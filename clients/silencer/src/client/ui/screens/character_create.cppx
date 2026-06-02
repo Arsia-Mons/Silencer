@@ -7,6 +7,8 @@
 #include "client/ui/hooks/use_character_create.h"
 #include "client/ui/hooks/use_characters.h"
 #include "client/ui/hooks/use_lobby_session.h"
+#include "client/ui/screens/character_create_data.h"
+#include "ui/components/box.h"
 #include "ui/components/input.h"
 #include "ui/runtime/react.h"
 
@@ -19,6 +21,8 @@ namespace {
 
 using namespace silencer;
 using ::ui::children;
+using ::ui::components::Box;
+using ::ui::components::BoxProps;
 using ::ui::components::Input;
 using ::ui::components::InputProps;
 
@@ -30,6 +34,7 @@ struct CharacterCreateContextValue {
   int *step = nullptr;
   std::string *alias = nullptr;
   bool *submitting = nullptr;
+  int *preview_agency = nullptr;
 };
 
 ReactContext CharacterCreateContext = {};
@@ -43,9 +48,10 @@ struct CharacterCreateProviderProps {
   int *step = use_state<int>(0);
   std::string *alias = use_state<std::string>(std::string());
   bool *submitting = use_state<bool>(false);
-  if (!step || !alias || !submitting)
+  int *preview_agency = use_state<int>(0);
+  if (!step || !alias || !submitting || !preview_agency)
     return ::ui::empty();
-  CharacterCreateContextValue value{step, alias, submitting};
+  CharacterCreateContextValue value{step, alias, submitting, preview_agency};
   const CharacterCreateContextValue *stored = ::ui::copy_value(value);
   if (!stored)
     return ::ui::empty();
@@ -54,28 +60,30 @@ struct CharacterCreateProviderProps {
                         props.children, props.key);
 }
 
-// The five agencies, in Team enum / agency-index order (matches CreateCharacter).
-const char *kAgencyNames[5] = {"Noxis", "Lazarus", "Caliber", "Static",
-                               "Black Rose"};
-const char *kAgencyControlIds[5] = {"AgencyNoxis", "AgencyLazarus",
-                                    "AgencyCaliber", "AgencyStatic",
-                                    "AgencyBlackRose"};
-
-// One agency row: a focusable selectable button. The default selection is the
-// first row; activating any row commits that agency and creates the agent.
-::ui::UiElement agency_row(int index, std::function<void(int)> on_pick) {
+// One agency row: a focusable selectable button (left column). Focusing a row
+// previews that agency in the right detail column; activating commits it and
+// creates the agent. The previewed row is shown selected.
+::ui::UiElement agency_row(int index, int preview,
+                           std::function<void(int)> on_pick,
+                           std::function<void(int)> set_preview) {
   std::function<void()> on_press = [on_pick, index]() {
     if (on_pick)
       on_pick(index);
   };
+  std::function<void()> on_focus = [set_preview, index]() {
+    if (set_preview)
+      set_preview(index);
+  };
   return <AppButton
-    key={kAgencyControlIds[index]}
-    controlId={kAgencyControlIds[index]}
+    key={kAgencies[index].control_id}
+    controlId={kAgencies[index].control_id}
     controlOffset={index}
-    selected={index == 0}
-    accessibilityLabel={kAgencyNames[index]}
-    label={kAgencyNames[index]}
+    selected={index == preview}
+    defaultFocused={index == 0}
+    accessibilityLabel={kAgencies[index].name}
+    label={kAgencies[index].name}
     onPress={on_press}
+    onFocus={on_focus}
   />
 }
 
@@ -159,16 +167,48 @@ struct CharacterCreateContentProps {
   }
 
   if (w.step == 2) {
+    const int pi =
+        (w.preview_agency >= 0 && w.preview_agency < kAgencyCount) ? w.preview_agency : 0;
+    const AgencyInfo &a = kAgencies[pi];
+    std::function<void(int)> set_preview = w.set_preview_agency;
+    auto col = [](float width) {
+      return ::ui::LayoutStyle{.direction = ::ui::FlexDirection::Column,
+                               .align_items = ::ui::AlignItems::Stretch,
+                               .width = ::ui::Length::points(width),
+                               .gap = ::ui::StyleValue::points(6.0f)};
+    };
     return <ScreenLayout key="agencymodal" variant={ScreenLayoutVariant::CenteredOverlay}>
       <Panel key="panel" variant={PanelVariant::Hero}>
         <ScreenTitle key="t" variant={ScreenTitleVariant::Dialog} value="Choose Agency" />
         <ScreenSubtitle key="s" value="Step 3 of 3 — pick an agency to deploy with" />
-        {agency_row(0, on_pick)}
-        {agency_row(1, on_pick)}
-        {agency_row(2, on_pick)}
-        {agency_row(3, on_pick)}
-        {agency_row(4, on_pick)}
-        <AppButton key="back" controlId="AgencyBack" label="Back" onPress={w.cancel} />
+        <Box key="cols" layout={::ui::LayoutStyle{
+            .direction = ::ui::FlexDirection::Row,
+            .align_items = ::ui::AlignItems::Start,
+            .gap = ::ui::StyleValue::points(78.0f)}}>
+          <Box key="left" layout={col(236.0f)}>
+            {agency_row(0, pi, on_pick, set_preview)}
+            {agency_row(1, pi, on_pick, set_preview)}
+            {agency_row(2, pi, on_pick, set_preview)}
+            {agency_row(3, pi, on_pick, set_preview)}
+            {agency_row(4, pi, on_pick, set_preview)}
+          </Box>
+          <Box key="right" layout={col(196.0f)}>
+            <Panel key="detail" variant={PanelVariant::Sunken}>
+              <ScreenTitle key="aname" variant={ScreenTitleVariant::Dialog} value={a.name} />
+              <BodyText key="tag" variant={BodyTextVariant::Strong} value={a.tagline} />
+              <BodyText key="sec" variant={BodyTextVariant::Detail} value={a.security} />
+              <BodyText key="s0" variant={BodyTextVariant::Body} value={a.stats[0]} />
+              <BodyText key="s1" variant={BodyTextVariant::Body} value={a.stats[1]} />
+              <BodyText key="s2" variant={BodyTextVariant::Body} value={a.stats[2]} />
+              <BodyText key="s3" variant={BodyTextVariant::Body} value={a.stats[3]} />
+              <BodyText key="desc" variant={BodyTextVariant::Detail} value={a.description} />
+            </Panel>
+          </Box>
+        </Box>
+        <ActionRow key="actions">
+          <AppButton key="rename" controlId="RenameOnce" label="Rename Once" onPress={w.reopen_alias} />
+          <AppButton key="back" controlId="AgencyBack" label="Back" onPress={w.cancel} />
+        </ActionRow>
       </Panel>
     </ScreenLayout>
   }
@@ -218,9 +258,11 @@ CharacterWizard use_character_create() {
   w.step = v->step ? *v->step : 0;
   w.alias = v->alias ? *v->alias : std::string();
   w.submitting = v->submitting ? *v->submitting : false;
+  w.preview_agency = v->preview_agency ? *v->preview_agency : 0;
   int *step = v->step;
   std::string *alias = v->alias;
   bool *submitting = v->submitting;
+  int *preview_agency = v->preview_agency;
   w.set_alias = [alias](const std::string &s) {
     if (alias)
       *alias = s;
@@ -233,6 +275,10 @@ CharacterWizard use_character_create() {
     if (step && alias && !alias->empty())
       *step = 2;
   };
+  w.reopen_alias = [step]() {
+    if (step)
+      *step = 1; // Rename Once: back to alias entry, keep the typed alias
+  };
   w.cancel = [step, alias, submitting]() {
     if (step)
       *step = 0;
@@ -244,6 +290,10 @@ CharacterWizard use_character_create() {
   w.begin_submit = [submitting]() {
     if (submitting)
       *submitting = true;
+  };
+  w.set_preview_agency = [preview_agency](int idx) {
+    if (preview_agency && idx >= 0 && idx < kAgencyCount)
+      *preview_agency = idx;
   };
   return w;
 }
