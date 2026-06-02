@@ -1,6 +1,8 @@
 #include "ui/game_ui_pipeline.h"
 
 #include "game.h"
+#include "world.h"
+#include "resources/resources.h" // spritebank (SIL-87 chrome bake)
 #include "lobby.h"
 #include "lobbygame.h"
 #include "peer.h"
@@ -26,6 +28,7 @@
 #include "client/ui/hooks/use_settings.h"
 #include "client/ui/hooks/use_updater.h"
 #include "client/ui/providers/app_provider.h"
+#include "client/ui/providers/chrome_textures_provider.h"
 #include "client/ui/providers/key_map_provider.h"
 #include "client/ui/providers/keybind_capture_provider.h"
 #include "client/ui/providers/lobby_provider.h"
@@ -167,6 +170,32 @@ outH = cppxUiH;
 return cppxUiRgba;
 }
 
+void GameUiPipeline::BakeChromeTextures() {
+// Bake the curated legacy chrome sprites into texture_ids. Runs once per host
+// renderer lifetime (guarded by PipelineHost::chrome_needs_bake). This is the
+// ONLY place that reads the indexed spritebank + active palette; the resulting
+// opaque ids travel to screens via the ChromeTexturesProvider.
+cppxChrome = {};
+if(!cppxHost) return;
+const SDL_Color *palette = game.GetPaletteColors();
+if(!palette) return;
+const auto &banks = game.world.resources.spritebank;
+
+auto bake = [&](size_t bank, size_t index, uint32_t &id_out,
+                uint16_t &w_out, uint16_t &h_out){
+if(bank >= banks.size() || index >= banks[bank].size()) return;
+const std::shared_ptr<Surface> &sp = banks[bank][index];
+if(!sp || sp->w < 1 || sp->h < 1 || sp->pixels.empty()) return;
+uint32_t id = cppxHost->bake_chrome_sprite(sp->pixels.data(), sp->w, sp->h,
+                                           palette);
+if(id){ id_out = id; w_out = (uint16_t)sp->w; h_out = (uint16_t)sp->h; }
+};
+
+// bank 6 idx 7 — the green oval menu button (196x33).
+bake(6, 7, cppxChrome.oval_button, cppxChrome.oval_button_w,
+     cppxChrome.oval_button_h);
+}
+
 void GameUiPipeline::RenderCppxClientUiFrame(Surface& surface) {
 cppxUiRgba = nullptr;
 #ifdef SILENCER_CPPX_FONT_DIR
@@ -195,6 +224,15 @@ if(!cppxHost){
 cppxHost = std::make_unique<silencer::cppx_ui::PipelineHost>();
 }
 if(!cppxHost->ensure(rw, rh, SILENCER_CPPX_FONT_DIR)) return;
+
+// SIL-87: bake the curated legacy chrome sprites into texture_ids once per
+// renderer lifetime (re-baked after a resize reset, never per frame). The
+// composition root is the only place that may read the indexed spritebank +
+// palette; the ids flow to screens through the ChromeTexturesProvider below.
+if(cppxHost->chrome_needs_bake()){
+BakeChromeTextures();
+cppxHost->mark_chrome_baked();
+}
 
 if(!cppxAppRootPushed){
 // The global FrameProvider chain (doc §5), outermost-first. ServerProvider
@@ -659,6 +697,8 @@ client::ui::SessionProviderValue{session}, ::ui::children({tree}));
 tree = client::ui::AppProvider(
 client::ui::AppProviderValue{[this]{ game.quitRequested = true; }},
 ::ui::children({tree}));
+// SIL-87: baked legacy-sprite chrome ids (read by use_chrome()).
+tree = client::ui::ChromeTexturesProvider(cppxChrome, ::ui::children({tree}));
 tree = silencer::game_ui::ServerProvider(
 silencer::game_ui::ServerProviderValue{&game},
 ::ui::children({tree}));

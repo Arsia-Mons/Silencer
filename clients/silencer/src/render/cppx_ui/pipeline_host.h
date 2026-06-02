@@ -49,6 +49,25 @@ public:
   const uint8_t *render(const client::ui::UiPipelineFrame &frame, int *out_w,
                         int *out_h);
 
+  // ---- Chrome sprite bake seam (SIL-87) ----------------------------------
+  // The SDL_Textures are bound to the software renderer `r_`, which ensure()
+  // recreates on a size change — so baked chrome must be re-baked whenever `r_`
+  // is recreated (tracked by `chrome_dirty_`), NOT every frame. The composition
+  // root (src/game/ui) owns WHICH legacy sprites to bake (it has Game/Surface/
+  // Palette); this host just bakes arbitrary indexed pixels into a texture_id.
+  //
+  // Usage per frame, after ensure():
+  //   if (host.chrome_needs_bake()) { /* bake_chrome_sprite()… */ host.mark_chrome_baked(); }
+  bool chrome_needs_bake() const { return chrome_dirty_; }
+
+  // Bake w*h palette indices (row-major) + a 256-entry palette into a
+  // premultiplied-RGBA texture owned by this host's registry; returns its
+  // texture_id (0 on failure / not initialized / registry full).
+  uint32_t bake_chrome_sprite(const uint8_t *indices, int w, int h,
+                              const SDL_Color *palette256);
+
+  void mark_chrome_baked() { chrome_dirty_ = false; }
+
 private:
   SDL_Surface *surf_ = nullptr;
   SDL_Renderer *r_ = nullptr;
@@ -57,8 +76,10 @@ private:
   UiSurface ui_;
   std::unique_ptr<client::ui::UiPipeline> pipeline_;
   std::vector<uint8_t> packed_;
+  std::vector<uint8_t> bake_scratch_;
   int w_ = 0;
   int h_ = 0;
+  bool chrome_dirty_ = true; // re-bake chrome when r_ (and its textures) reset
 };
 
 } // namespace silencer::cppx_ui

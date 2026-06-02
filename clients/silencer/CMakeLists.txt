@@ -479,6 +479,7 @@ set(_cppx_app_shell_sources
 	src/client/ui/app_shell/navigation/screen_stack.cpp
 	src/client/ui/app_theme.cpp
 	src/client/ui/providers/app_provider.cpp
+	src/client/ui/providers/chrome_textures_provider.cpp
 	src/client/ui/providers/key_map_provider.cpp
 	src/client/ui/providers/keybind_capture_provider.cpp
 	src/client/ui/providers/lobby_provider.cpp
@@ -528,6 +529,7 @@ add_executable(pipeline_host_tests
 	src/render/cppx_ui/sdf_raster.cpp
 	src/render/cppx_ui/font_registry.cpp
 	src/render/cppx_ui/texture_registry.cpp
+	src/render/cppx_ui/sprite_bake.cpp
 	src/render/cppx_ui/text_measure.cpp
 	src/ui/runtime/geometry.cpp
 	src/client/ui/app_shell/ui_pipeline.cpp

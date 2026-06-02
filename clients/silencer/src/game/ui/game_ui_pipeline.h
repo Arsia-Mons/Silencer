@@ -6,6 +6,7 @@
 #include "ui/input.h"
 #include "client/ui/providers/lobby_provider.h" // client::ui::LobbySnapshot
 #include "client/ui/providers/world_session_provider.h" // client::ui::WorldSessionSnapshot
+#include "client/ui/hooks/use_chrome.h" // client::ui::ChromeTextures
 #include <cstdint>
 #include <memory>
 #include <string>
@@ -99,6 +100,7 @@ return keybindCapture_.pending;
 
 private:
 void RenderCppxClientUiFrame(Surface & surface);
+void BakeChromeTextures(); // SIL-87: bake curated legacy sprites → cppxChrome
 client::ui::SessionPhase CurrentSessionPhase() const;
 
 Game & game;
@@ -110,6 +112,11 @@ int cppxUiW = 0;
 int cppxUiH = 0;
 bool cppxReactInitialized = false;
 bool cppxAppRootPushed = false;
+
+// SIL-87: baked legacy-sprite chrome ids, re-baked when the host resets its
+// renderer (resize). Populated after ensure(), read by the ChromeTexturesProvider
+// in the per-frame provider chain.
+client::ui::ChromeTextures cppxChrome;
 
 // SIL-15 use_settings dirty tracking: snapshot of the four persisted prefs as
 // of the last commit/revert; live Config diverging from it => Settings.dirty.

@@ -1,6 +1,7 @@
 #include "pipeline_host.h"
 
 #include "draw_executor.h"
+#include "sprite_bake.h"
 #include "text_measure.h"
 
 #include <SDL3_ttf/SDL_ttf.h>
@@ -28,6 +29,10 @@ bool PipelineHost::ensure(int w, int h, const char *font_dir) {
     return true;
 
   ui_.shutdown();
+  // The chrome textures are bound to the old renderer; drop them and flag a
+  // re-bake. The composition root re-bakes once after this ensure() returns.
+  textures_.shutdown();
+  chrome_dirty_ = true;
   if (r_) {
     SDL_DestroyRenderer(r_);
     r_ = nullptr;
@@ -60,6 +65,15 @@ bool PipelineHost::ensure(int w, int h, const char *font_dir) {
   h_ = h;
   packed_.assign((size_t)w * h * 4u, 0);
   return true;
+}
+
+uint32_t PipelineHost::bake_chrome_sprite(const uint8_t *indices, int w, int h,
+                                          const SDL_Color *palette256) {
+  if (!r_ || !indices || !palette256 || w < 1 || h < 1)
+    return 0;
+  bake_scratch_.assign((size_t)w * h * 4u, 0);
+  bake_indexed_rgba(indices, w, h, palette256, bake_scratch_.data());
+  return textures_.upload_rgba(r_, bake_scratch_.data(), w, h);
 }
 
 const uint8_t *PipelineHost::render(const client::ui::UiPipelineFrame &frame,
