@@ -18,17 +18,23 @@ namespace client::ui {
 // ---- Texture budget (single owning artifact; cap = 64) ------------------
 // Running tally of every baked chrome index across all surfaces. Keep this in
 // sync as surfaces add sprites; atlasing (source-rect UV) is the relief valve.
-//   bank 6  idx 7    oval_md   196x33   (SIL-89)
-//   bank 6  idx 28   oval_sm   112x33   (SIL-89)
-//   bank 6  idx 23   oval_lg   220x33   (SIL-89)
+//   bank 6  idx 7    oval_md          196x33   (SIL-89)
+//   bank 6  idx 28   oval_sm          112x33   (SIL-89)
+//   bank 6  idx 23   oval_lg          220x33   (SIL-89)
+//   bank 7  idx 24   chrome_btn_idle  156x21   (SIL-90, nine-slice {l12 r12 t4 b4})
+//   bank 7  idx 28   chrome_btn_focus 156x21   (SIL-90, phase-4 frame)
 //   ------------------------------------------------------------------
-//   total baked: 3 / 64
+//   total baked: 5 / 64
 struct ChromeTextures {
   // The green oval menu button (bank 6), per legacy size: Md/Sm/Lg. Brightness/
   // focus is a draw-time tint of the one sprite, not separate frames.
   uint32_t oval_md = 0; // idx 7  — 196x33
   uint32_t oval_sm = 0; // idx 28 — 112x33
   uint32_t oval_lg = 0; // idx 23 — 220x33
+  // The metal-chrome button (bank 7), nine-sliced. 2-state = two authored frames
+  // (idx24 phase 0 idle / idx28 phase 4 focused).
+  uint32_t chrome_btn_idle = 0;  // idx 24
+  uint32_t chrome_btn_focus = 0; // idx 28
 };
 
 // Read the baked chrome ids for the current frame. Requires a

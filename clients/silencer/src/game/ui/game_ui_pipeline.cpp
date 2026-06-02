@@ -199,6 +199,9 @@ if(id) id_out = id;
 bake(6, 7, cppxChrome.oval_md);
 bake(6, 28, cppxChrome.oval_sm);
 bake(6, 23, cppxChrome.oval_lg);
+// bank 7 — the metal-chrome nine-slice button (idx24 idle phase0 / idx28 focus phase4).
+bake(7, 24, cppxChrome.chrome_btn_idle);
+bake(7, 28, cppxChrome.chrome_btn_focus);
 }
 
 void GameUiPipeline::RenderCppxClientUiFrame(Surface& surface) {

@@ -19,7 +19,7 @@
 
 namespace silencer {
 
-enum class AppButtonVariant { Primary, Secondary, Danger, Ghost, Oval };
+enum class AppButtonVariant { Primary, Secondary, Danger, Ghost, Oval, Chrome };
 enum class AppButtonSize { Md, Sm, Lg };
 
 // Layout-only baseline geometry. Mirrors ui::components::ButtonProps default
@@ -100,6 +100,61 @@ inline ::ui::StyleStatePatch app_button_oval_patch(uint32_t tex) {
   ov.base = oval(::ui::Color{150, 150, 150, 255});         // idle (dimmed)
   ov.hover = oval(::ui::Color{255, 255, 255, 255});        // lit on hover
   ov.focus_visible = oval(::ui::Color{255, 255, 255, 255}); // lit on focus
+  return ov;
+}
+
+// Fixed legacy chrome-button geometry: ~156x21 (origin/main button.cpp Compact).
+// The bank-7 sprite is genuinely nine-sliced, so the box may differ from 156 and
+// the caps keep the metal corners crisp.
+inline ::ui::LayoutStyle app_button_chrome_layout() {
+  return {
+      .align_items = ::ui::AlignItems::Center,
+      .justify_content = ::ui::JustifyContent::Center,
+      .width = ::ui::Length::points(156.0f),
+      .height = ::ui::Length::points(21.0f),
+      .padding = {4.0f, 12.0f, 4.0f, 12.0f},
+  };
+}
+
+// Metal-chrome sprite-button paint (SIL-90). Nine-sliced bank-7 sprite (caps
+// {l12,r12,t4,b4}) with the label in the Large face. STATIC 2-state v1 swaps
+// TWO authored frames — idle idx24 (phase 0) vs focused idx28 (phase 4) — which
+// is more pixel-faithful than tinting, but still not the legacy 5-frame 24fps
+// ramp (that needs the clock seam, SIL-107). texture_id 0 falls back to a
+// rounded slate button.
+inline ::ui::StyleStatePatch app_button_chrome_patch(uint32_t idle,
+                                                     uint32_t focus) {
+  const ::ui::TextVisual label{.color = tokens::kTextTitle,
+                               .font_id = tokens::kFaceLarge,
+                               .font_size = tokens::kFontLarge,
+                               .align = ::ui::TextAlign::Center,
+                               .line_height = tokens::kLineLarge};
+  ::ui::StyleStatePatch ov{};
+  if (!idle) {
+    ::ui::StylePatch p =
+        ::ui::patch()
+            .background(::ui::Color{16, 20, 28, 255})
+            .gradient(::ui::Gradient{})
+            .corner_radius(3.0f)
+            .border(::ui::Border{{1, 1, 1, 1},
+                                 {tokens::kBorderPanel, tokens::kBorderPanel,
+                                  tokens::kBorderPanel, tokens::kBorderPanel}});
+    p.text = ::ui::opt(label);
+    ov.base = p;
+    return ov;
+  }
+  const ::ui::SideWidths caps{.top = 4.0f, .right = 12.0f, .bottom = 4.0f,
+                              .left = 12.0f};
+  auto chrome = [&](uint32_t tex) -> ::ui::StylePatch {
+    ::ui::StylePatch p =
+        tokens::image_patch(tex, ::ui::Color{255, 255, 255, 255}, caps);
+    p.text = ::ui::opt(label);
+    return p;
+  };
+  const uint32_t f = focus ? focus : idle;
+  ov.base = chrome(idle);
+  ov.hover = chrome(f);
+  ov.focus_visible = chrome(f);
   return ov;
 }
 

@@ -45,6 +45,11 @@ using ::ui::components::ButtonProps;
       tex = chrome.oval_lg;
     layout = app_button_oval_layout(props.size);
     style = app_button_oval_patch(tex);
+  } else if (props.variant == AppButtonVariant::Chrome) {
+    client::ui::ChromeTextures chrome = client::ui::use_chrome();
+    layout = app_button_chrome_layout();
+    style = app_button_chrome_patch(chrome.chrome_btn_idle,
+                                    chrome.chrome_btn_focus);
   }
 
   // Children are plain expressions: props.children, plus a label fallback used
