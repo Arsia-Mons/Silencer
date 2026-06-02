@@ -227,6 +227,8 @@ set(SILENCER_CPPX_SOURCES
 	src/client/ui/components/actions/app_button.hx
 	src/client/ui/components/actions/app_checkbox.cppx
 	src/client/ui/components/actions/app_checkbox.hx
+	src/client/ui/components/actions/boolean_setting_row.cppx
+	src/client/ui/components/actions/boolean_setting_row.hx
 	src/client/ui/components/actions/app_input.cppx
 	src/client/ui/components/actions/app_input.hx
 	src/client/ui/components/actions/action_row.cppx

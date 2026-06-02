@@ -54,6 +54,11 @@ struct ChromeTextures {
   // reveal animation; SIL-107 animates the 29..60 sequence).
   uint32_t logo = 0;
   uint16_t logo_w = 0, logo_h = 0;
+  // Boolean-toggle indicator cells (bank 6): a 2-cell-wide oval — OFF = idx12|13
+  // (hollow), ON = idx14|15 (filled). SIL-100 BooleanSettingRow.
+  uint32_t toggle_off_l = 0, toggle_off_r = 0; // idx12, idx13
+  uint32_t toggle_on_l = 0, toggle_on_r = 0;   // idx14, idx15
+  uint16_t toggle_w = 0, toggle_h = 0;
 };
 
 // Read the baked chrome ids for the current frame. Requires a

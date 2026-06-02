@@ -6,5 +6,6 @@
 #include "client/ui/components/actions/app_button_variant.h"
 #include "client/ui/components/actions/app_button.h"
 #include "client/ui/components/actions/app_checkbox.h"
+#include "client/ui/components/actions/boolean_setting_row.h"
 #include "client/ui/components/actions/app_input.h"
 #include "client/ui/components/actions/action_row.h"

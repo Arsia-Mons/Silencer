@@ -2,6 +2,7 @@
 
 #include "client/ui/components/actions/actions.h"
 #include "client/ui/components/layout/layout.h"
+#include "client/ui/components/surfaces/surfaces.h"
 #include "client/ui/components/text/text.h"
 #include "client/ui/hooks/use_navigation.h"
 #include "client/ui/hooks/use_settings.h"
@@ -34,21 +35,23 @@ struct OptionsDisplayProps {
 
   return <ScreenLayout key="root" variant={ScreenLayoutVariant::Overlay}>
     <ScreenTitle key="title" variant={ScreenTitleVariant::Screen} value="Display" />
-    <AppCheckbox
-      key="fullscreen"
-      controlId="FullscreenToggle"
-      checked={settings.fullscreen}
-      label="Fullscreen"
-      onChange={settings.set_fullscreen}
-    />
-    <AppCheckbox
-      key="smooth"
-      controlId="SmoothScalingToggle"
-      checked={settings.smooth_scaling}
-      label="Smooth Scaling"
-      onChange={settings.set_smooth_scaling}
-    />
-    <AppButton key="back" controlId="OptionsBack" variant={AppButtonVariant::Oval} label="Back" onPress={back} />
+    <Panel key="panel" variant={PanelVariant::Hero}>
+      <BooleanSettingRow
+        key="fullscreen"
+        controlId="FullscreenToggle"
+        checked={settings.fullscreen}
+        label="Fullscreen"
+        onChange={settings.set_fullscreen}
+      />
+      <BooleanSettingRow
+        key="smooth"
+        controlId="SmoothScalingToggle"
+        checked={settings.smooth_scaling}
+        label="Smooth Scaling"
+        onChange={settings.set_smooth_scaling}
+      />
+      <AppButton key="back" controlId="OptionsBack" variant={AppButtonVariant::Oval} label="Back" onPress={back} />
+    </Panel>
   </ScreenLayout>
 }
 

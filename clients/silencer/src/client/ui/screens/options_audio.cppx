@@ -2,6 +2,7 @@
 
 #include "client/ui/components/actions/actions.h"
 #include "client/ui/components/layout/layout.h"
+#include "client/ui/components/surfaces/surfaces.h"
 #include "client/ui/components/text/text.h"
 #include "client/ui/hooks/use_navigation.h"
 #include "client/ui/hooks/use_settings.h"
@@ -50,19 +51,21 @@ struct OptionsAudioProps {
 
   return <ScreenLayout key="root" variant={ScreenLayoutVariant::Overlay}>
     <ScreenTitle key="title" variant={ScreenTitleVariant::Screen} value="Audio" />
-    <AppCheckbox
-      key="music"
-      controlId="MusicToggle"
-      checked={settings.music}
-      label="Music"
-      onChange={settings.set_music}
-    />
-    <ActionRow key="volume">
-      <AppButton key="down" controlId="VolumeDown" label="-" onPress={vol_down} />
-      <BodyText key="value" variant={BodyTextVariant::Body} value={vol_text} />
-      <AppButton key="up" controlId="VolumeUp" label="+" onPress={vol_up} />
-    </ActionRow>
-    <AppButton key="back" controlId="OptionsBack" variant={AppButtonVariant::Oval} label="Back" onPress={back} />
+    <Panel key="panel" variant={PanelVariant::Hero}>
+      <BooleanSettingRow
+        key="music"
+        controlId="MusicToggle"
+        checked={settings.music}
+        label="Music"
+        onChange={settings.set_music}
+      />
+      <ActionRow key="volume">
+        <AppButton key="down" controlId="VolumeDown" label="-" onPress={vol_down} />
+        <BodyText key="value" variant={BodyTextVariant::Body} value={vol_text} />
+        <AppButton key="up" controlId="VolumeUp" label="+" onPress={vol_up} />
+      </ActionRow>
+      <AppButton key="back" controlId="OptionsBack" variant={AppButtonVariant::Oval} label="Back" onPress={back} />
+    </Panel>
   </ScreenLayout>
 }
 

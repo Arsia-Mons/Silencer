@@ -211,6 +211,11 @@ bake(40, 2, cppxChrome.dialog_pw, &cppxChrome.dialog_pw_w, &cppxChrome.dialog_pw
 bake(6, 0, cppxChrome.starfield);
 // bank 208 frame 60 — the static SILENCER logo (final reveal frame).
 bake(208, 60, cppxChrome.logo, &cppxChrome.logo_w, &cppxChrome.logo_h);
+// bank 6 idx12-15 — boolean toggle indicator cells (off = 12|13, on = 14|15).
+bake(6, 12, cppxChrome.toggle_off_l, &cppxChrome.toggle_w, &cppxChrome.toggle_h);
+bake(6, 13, cppxChrome.toggle_off_r);
+bake(6, 14, cppxChrome.toggle_on_l);
+bake(6, 15, cppxChrome.toggle_on_r);
 }
 
 void GameUiPipeline::RenderCppxClientUiFrame(Surface& surface) {

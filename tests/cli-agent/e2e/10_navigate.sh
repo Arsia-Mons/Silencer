@@ -28,23 +28,19 @@ for (const x of ["Audio", "Display", "Done", "Cancel"]) {
 }
 '
 
-# Options → Display: toggle Fullscreen (live preview reflected in the tree).
+# Options → Display: toggle Fullscreen (SIL-100: the boolean is now a sprite
+# BooleanSettingRow — an Oval label button + a two-cell toggle indicator, not a
+# checkbox node — so verify the toggle control exists and click it; its live-
+# preview EFFECT is asserted below when Options shows the unsaved edits).
 cli --port "$PORT" click --label OptionsDisplay >/dev/null
 cli --port "$PORT" wait_frames --n 3 >/dev/null
-before=$(cli --port "$PORT" inspect | bun -e '
+cli --port "$PORT" inspect | bun -e '
 const r = JSON.parse(await new Response(Bun.stdin.stream()).text());
-const c = (r.nodes ?? []).find((n) => n.role === "checkbox" && n.value === "Fullscreen");
-if (!c) { console.error("no Fullscreen checkbox"); process.exit(1); }
-console.log(c.checked);
-')
+const fs = (r.nodes ?? []).find((n) => n.role === "button" && n.label === "Fullscreen");
+if (!fs) { console.error("no Fullscreen toggle"); process.exit(1); }
+'
 cli --port "$PORT" click --label FullscreenToggle >/dev/null
 cli --port "$PORT" wait_frames --n 2 >/dev/null
-after=$(cli --port "$PORT" inspect | bun -e '
-const r = JSON.parse(await new Response(Bun.stdin.stream()).text());
-const c = (r.nodes ?? []).find((n) => n.role === "checkbox" && n.value === "Fullscreen");
-console.log(c.checked);
-')
-[ "$before" != "$after" ] || { echo "Fullscreen toggle did not live-preview ($before -> $after)"; exit 1; }
 cli --port "$PORT" click --label OptionsBack >/dev/null
 cli --port "$PORT" wait_frames --n 3 >/dev/null
 
