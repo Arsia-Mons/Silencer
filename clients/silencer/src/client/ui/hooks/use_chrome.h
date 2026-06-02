@@ -65,6 +65,10 @@ struct ChromeTextures {
   uint32_t toggle_off_l = 0, toggle_off_r = 0; // idx12, idx13
   uint32_t toggle_on_l = 0, toggle_on_r = 0;   // idx14, idx15
   uint16_t toggle_w = 0, toggle_h = 0;
+  // SIL-102: the five agency emblems (bank 181 idx0..4), shown in the Character
+  // Create detail column for the previewed agency. Indexed by agency 0..4.
+  uint32_t agency_emblem[5] = {};
+  uint16_t agency_emblem_w = 0, agency_emblem_h = 0;
 };
 
 // Read the baked chrome ids for the current frame. Requires a

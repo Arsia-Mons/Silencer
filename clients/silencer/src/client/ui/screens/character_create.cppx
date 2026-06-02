@@ -4,8 +4,10 @@
 #include "client/ui/components/layout/layout.h"
 #include "client/ui/components/surfaces/surfaces.h"
 #include "client/ui/components/text/text.h"
+#include "client/ui/components/tokens.h"
 #include "client/ui/hooks/use_character_create.h"
 #include "client/ui/hooks/use_characters.h"
+#include "client/ui/hooks/use_chrome.h"
 #include "client/ui/hooks/use_lobby_session.h"
 #include "client/ui/screens/character_create_data.h"
 #include "ui/components/box.h"
@@ -78,6 +80,7 @@ struct CharacterCreateProviderProps {
     key={kAgencies[index].control_id}
     controlId={kAgencies[index].control_id}
     controlOffset={index}
+    variant={AppButtonVariant::Oval}
     selected={index == preview}
     defaultFocused={index == 0}
     accessibilityLabel={kAgencies[index].name}
@@ -115,6 +118,7 @@ struct CharacterCreateContentProps {
   CharacterWizard w = use_character_create();
   Characters chars = use_characters();
   LobbySession lobby = use_lobby_session();
+  ChromeTextures chrome = use_chrome();
 
   std::function<void(int)> on_select = chars.select;
   std::function<void(int)> on_pick = [create = chars.create, alias = w.alias,
@@ -177,8 +181,19 @@ struct CharacterCreateContentProps {
                                .width = ::ui::Length::points(width),
                                .gap = ::ui::StyleValue::points(6.0f)};
     };
-    return <ScreenLayout key="agencymodal" variant={ScreenLayoutVariant::CenteredOverlay}>
-      <Panel key="panel" variant={PanelVariant::Hero}>
+    // The previewed agency's emblem (bank-181 sprite), shown atop the detail.
+    const uint32_t emblem = chrome.agency_emblem[pi];
+    const float ew = chrome.agency_emblem_w ? (float)chrome.agency_emblem_w : 32.0f;
+    const float eh = chrome.agency_emblem_h ? (float)chrome.agency_emblem_h : 32.0f;
+    ::ui::UiElement emblem_img =
+        emblem ? Box(BoxProps{
+                     .key = "emblem",
+                     .layout = ::ui::LayoutStyle{.width = ::ui::Length::points(ew),
+                                                 .height = ::ui::Length::points(eh)},
+                     .style = tokens::image_patch(emblem)})
+               : ::ui::empty();
+    return <ScreenLayout key="agencyscreen" variant={ScreenLayoutVariant::Overlay}>
+      <Panel key="panel" variant={PanelVariant::Chrome}>
         <ScreenTitle key="t" variant={ScreenTitleVariant::Dialog} value="Choose Agency" />
         <ScreenSubtitle key="s" value="Step 3 of 3 — pick an agency to deploy with" />
         <Box key="cols" layout={::ui::LayoutStyle{
@@ -194,6 +209,7 @@ struct CharacterCreateContentProps {
           </Box>
           <Box key="right" layout={col(196.0f)}>
             <Panel key="detail" variant={PanelVariant::Sunken}>
+              {emblem_img}
               <ScreenTitle key="aname" variant={ScreenTitleVariant::Dialog} value={a.name} />
               <BodyText key="tag" variant={BodyTextVariant::Strong} value={a.tagline} />
               <BodyText key="sec" variant={BodyTextVariant::Detail} value={a.security} />

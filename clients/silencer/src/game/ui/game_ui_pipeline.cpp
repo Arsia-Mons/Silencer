@@ -228,6 +228,11 @@ bake(6, 12, cppxChrome.toggle_off_l, &cppxChrome.toggle_w, &cppxChrome.toggle_h)
 bake(6, 13, cppxChrome.toggle_off_r);
 bake(6, 14, cppxChrome.toggle_on_l);
 bake(6, 15, cppxChrome.toggle_on_r);
+// bank 181 idx0-4 — the five agency emblems (SIL-102 Character Create detail).
+for(int i = 0; i < 5; ++i)
+bake(181, (size_t)i, cppxChrome.agency_emblem[i],
+     i == 0 ? &cppxChrome.agency_emblem_w : nullptr,
+     i == 0 ? &cppxChrome.agency_emblem_h : nullptr);
 }
 
 void GameUiPipeline::RenderCppxClientUiFrame(Surface& surface) {
