@@ -108,6 +108,25 @@ inline ::ui::StylePatch panel_patch(::ui::Color background, ::ui::Color border,
           {border, border, border, border}});
 }
 
+// Sprite-backed surface paint (SIL-88). Emits a baked legacy sprite (texture_id
+// from use_chrome()) and EXPLICITLY clears the fill/gradient/border/rounding so
+// the role's opaque control paint can't slab behind it: the sprite's index-0
+// transparent corners must reveal the background, not a rectangle. EVERY
+// sprite-backed variant (oval/chrome button, sprite panel, dialog frame) MUST
+// paint through this helper — never through the gradient-painting solid() path.
+// A texture_id of 0 yields a fully transparent patch (screens tolerate the
+// not-yet-baked frame without a flash).
+inline ::ui::StylePatch image_patch(uint32_t texture_id,
+                                    ::ui::Color tint = {255, 255, 255, 255},
+                                    ::ui::SideWidths nine_slice = {}) {
+  return ::ui::patch()
+      .image(::ui::BackgroundImage{texture_id, tint, nine_slice})
+      .background(::ui::Color{0, 0, 0, 0}) // no opaque fill under the sprite
+      .gradient(::ui::Gradient{})          // defeat the role's control gradient
+      .border(::ui::Border{})              // sprite carries its own edge
+      .corner_radius(0.f);                 // the sprite shape is authored, not rounded
+}
+
 // Text paint (color + face + native-em size + legacy line height). font_id
 // selects the OTF face; line_height 0 falls back to the face's natural skip.
 inline ::ui::StylePatch text_patch(::ui::Color color, uint16_t font_size,
