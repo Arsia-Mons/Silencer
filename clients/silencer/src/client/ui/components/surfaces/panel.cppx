@@ -76,6 +76,20 @@ float panel_size_width(PanelSize size) {
     };
     overlay = tokens::fill_patch(kSunkenBg);
     break;
+  case PanelVariant::Bordered:
+    // Legacy console panel (SIL-104): #10141C fill + 1px #565E6F border. The
+    // origin/main lobby uses bordered console panels, not the borderless slate
+    // Sunken. Stretch + tighter padding for dense lobby columns.
+    layout = ::ui::LayoutStyle{
+        .direction = ::ui::FlexDirection::Column,
+        .align_items = ::ui::AlignItems::Stretch,
+        .width = ::ui::Length::points(260.0f),
+        .padding = {12.0f, 12.0f, 12.0f, 12.0f},
+        .gap = 8.0f,
+        .border_width = tokens::kBorderWidth,
+    };
+    overlay = tokens::panel_patch(tokens::kSurfacePanel, tokens::kBorderPanel);
+    break;
   case PanelVariant::Chrome: {
     // Sprite-backed full chrome panel (bank 7 idx5), drawn as a PLAIN image at
     // its native sprite size so the baked frame border + internal wells stay

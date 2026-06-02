@@ -8,7 +8,7 @@ namespace silencer {
 // Variant selects the app-approved appearance bundle (background, border,
 // padding, gap, alignment, and canonical width). Size optionally overrides the
 // canonical width with one of the design-system width tiers.
-enum class PanelVariant { Hero, Overlay, Sunken, Chrome };
+enum class PanelVariant { Hero, Overlay, Sunken, Chrome, Bordered };
 
 // Auto = the variant's canonical width. Sm/Md/Lg are the three design-system
 // width tiers (220 / 260 / 340 points), matching the canonical widths of the
