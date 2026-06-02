@@ -62,7 +62,7 @@ struct OptionsAudioProps {
       <BodyText key="value" variant={BodyTextVariant::Body} value={vol_text} />
       <AppButton key="up" controlId="VolumeUp" label="+" onPress={vol_up} />
     </ActionRow>
-    <AppButton key="back" controlId="OptionsBack" label="Back" onPress={back} />
+    <AppButton key="back" controlId="OptionsBack" variant={AppButtonVariant::Oval} label="Back" onPress={back} />
   </ScreenLayout>
 }
 

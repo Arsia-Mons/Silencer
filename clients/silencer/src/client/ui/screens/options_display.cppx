@@ -48,7 +48,7 @@ struct OptionsDisplayProps {
       label="Smooth Scaling"
       onChange={settings.set_smooth_scaling}
     />
-    <AppButton key="back" controlId="OptionsBack" label="Back" onPress={back} />
+    <AppButton key="back" controlId="OptionsBack" variant={AppButtonVariant::Oval} label="Back" onPress={back} />
   </ScreenLayout>
 }
 

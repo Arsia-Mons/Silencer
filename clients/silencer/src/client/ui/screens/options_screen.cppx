@@ -61,17 +61,18 @@ struct OptionsProps {
   return <ScreenLayout key="root" variant={ScreenLayoutVariant::Overlay}>
     <ScreenTitle key="title" variant={ScreenTitleVariant::Screen} value="Options" />
     <ScreenSubtitle key="status" value={status} />
-    <AppButton key="audio" controlId="OptionsAudio" label="Audio" onPress={open_audio} />
-    <AppButton key="display" controlId="OptionsDisplay" label="Display" onPress={open_display} />
+    <AppButton key="audio" controlId="OptionsAudio" variant={AppButtonVariant::Oval} label="Audio" onPress={open_audio} />
+    <AppButton key="display" controlId="OptionsDisplay" variant={AppButtonVariant::Oval} label="Display" onPress={open_display} />
     <AppButton
       key="controls"
       controlId="OptionsControls"
+      variant={AppButtonVariant::Oval}
       label="Controls"
       onPress={open_controls}
     />
     <ActionRow key="actions">
-      <AppButton key="done" controlId="OptionsDone" label="Done" onPress={done} />
-      <AppButton key="cancel" controlId="OptionsCancel" label="Cancel" onPress={cancel} />
+      <AppButton key="done" controlId="OptionsDone" variant={AppButtonVariant::Oval} label="Done" onPress={done} />
+      <AppButton key="cancel" controlId="OptionsCancel" variant={AppButtonVariant::Oval} label="Cancel" onPress={cancel} />
     </ActionRow>
   </ScreenLayout>
 }

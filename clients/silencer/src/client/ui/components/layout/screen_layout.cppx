@@ -35,17 +35,24 @@ using ::ui::components::DialogProps;
     </Box>
   }
   if (props.variant == ScreenLayoutVariant::Overlay) {
+    // Full-screen options overlays carry the starfield (SIL-100); the sprite
+    // covers the screen behind so the legacy space backdrop reads, with the flat
+    // overlay surface as the not-yet-baked fallback.
+    client::ui::ChromeTextures chrome = client::ui::use_chrome();
+    ::ui::StylePatch overlay_bg =
+        chrome.starfield ? tokens::image_patch(chrome.starfield)
+                         : tokens::fill_patch(tokens::kSurfaceOverlay);
     return <Dialog
       key={props.key}
       layout={::ui::LayoutStyle{
         .direction = ::ui::FlexDirection::Column,
-        .align_items = ::ui::AlignItems::Start,
+        .align_items = ::ui::AlignItems::Center,
         .width = ::ui::Length::percent(100.0f),
         .height = ::ui::Length::percent(100.0f),
         .padding = {24.0f, 24.0f, 24.0f, 24.0f},
         .gap = 12.0f,
       }}
-      style={tokens::fill_patch(tokens::kSurfaceOverlay)}
+      style={overlay_bg}
     >
       {props.children}
     </Dialog>
