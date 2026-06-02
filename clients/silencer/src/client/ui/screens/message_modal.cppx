@@ -2,9 +2,11 @@
 
 #include "client/ui/components/actions/actions.h"
 #include "client/ui/components/layout/layout.h"
-#include "client/ui/components/surfaces/surfaces.h"
 #include "client/ui/components/text/text.h"
+#include "client/ui/components/tokens.h"
+#include "client/ui/hooks/use_chrome.h"
 #include "client/ui/hooks/use_navigation.h"
+#include "ui/components/box.h"
 #include "ui/runtime/react.h"
 
 #include <functional>
@@ -13,12 +15,10 @@
 namespace client::ui {
 namespace {
 
-// The JSX lowering emits each tag's component function + `<Tag>Props` type
-// unqualified, so the silencer semantic layer (functions + Props + variant
-// enums) is pulled wholesale into this TU-local namespace, plus the runtime's
-// `children()` child-list builder.
 using namespace silencer;
 using ::ui::children;
+using ::ui::components::Box;
+using ::ui::components::BoxProps;
 
 struct MessageModalProps {
   const char *title = "";
@@ -26,8 +26,12 @@ struct MessageModalProps {
   std::function<void()> on_dismiss = {};
 };
 
+// SIL-98: origin/main message modal — the bank-40 idx4 dialog sprite (no slate
+// card, no title heading), a single Large-faced message line, and a chrome OK
+// button. The modal stays a CenteredOverlay (focus-trapped Dialog).
 ::ui::UiElement MessageModalView(const MessageModalProps &props) {
   Navigation nav = use_navigation();
+  ChromeTextures chrome = use_chrome();
   std::function<void()> dismiss = [nav, on_dismiss = props.on_dismiss]() {
     if (nav.pop_current)
       nav.pop_current();
@@ -35,18 +39,35 @@ struct MessageModalProps {
       on_dismiss();
   };
 
+  const float w = chrome.dialog_msg_w ? (float)chrome.dialog_msg_w : 352.0f;
+  const float h = chrome.dialog_msg_h ? (float)chrome.dialog_msg_h : 178.0f;
+  ::ui::StylePatch panel_style =
+      chrome.dialog_msg ? tokens::image_patch(chrome.dialog_msg)
+                        : tokens::panel_patch(tokens::kSurfacePanel,
+                                              tokens::kBorderPanel);
+
   return <ScreenLayout key="root" variant={ScreenLayoutVariant::CenteredOverlay}>
-    <Panel key="panel" variant={PanelVariant::Overlay}>
-      <ScreenTitle key="title" variant={ScreenTitleVariant::Dialog} value={props.title} />
-      <BodyText key="message" variant={BodyTextVariant::Message} value={props.message} />
+    <Box
+      key="panel"
+      layout={::ui::LayoutStyle{
+        .direction = ::ui::FlexDirection::Column,
+        .align_items = ::ui::AlignItems::Center,
+        .justify_content = ::ui::JustifyContent::Center,
+        .width = ::ui::Length::points(w),
+        .height = ::ui::Length::points(h),
+        .padding = {34.0f, 34.0f, 44.0f, 44.0f},
+        .gap = 18.0f}}
+      style={panel_style}>
+      <ScreenSubtitle key="message" value={props.message} />
       <AppButton
         key="ok"
         controlId="MessageModalOk"
+        variant={AppButtonVariant::Chrome}
         defaultFocused={true}
         label="OK"
         onPress={dismiss}
       />
-    </Panel>
+    </Box>
   </ScreenLayout>
 }
 
