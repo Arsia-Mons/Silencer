@@ -207,6 +207,8 @@ bake(7, 28, cppxChrome.chrome_btn_focus);
 bake(7, 5, cppxChrome.chrome_panel, &cppxChrome.chrome_panel_w, &cppxChrome.chrome_panel_h);
 bake(40, 4, cppxChrome.dialog_msg, &cppxChrome.dialog_msg_w, &cppxChrome.dialog_msg_h);
 bake(40, 2, cppxChrome.dialog_pw, &cppxChrome.dialog_pw_w, &cppxChrome.dialog_pw_h);
+// bank 6 idx0 — the full-screen starfield+planet menu background.
+bake(6, 0, cppxChrome.starfield);
 }
 
 void GameUiPipeline::RenderCppxClientUiFrame(Surface& surface) {

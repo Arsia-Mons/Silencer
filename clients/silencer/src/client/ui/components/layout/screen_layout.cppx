@@ -1,6 +1,7 @@
 #include "client/ui/components/layout/screen_layout.h"
 
 #include "client/ui/components/tokens.h"
+#include "client/ui/hooks/use_chrome.h"
 #include "ui/components/box.h"
 #include "ui/components/dialog.h"
 
@@ -93,6 +94,13 @@ using ::ui::components::DialogProps;
       {props.children}
     </Dialog>
   }
+  // Menu root: paint the full-bleed bank-6 starfield behind the content
+  // (stretched to the screen; no aspect-cover in v1). Falls back to the flat
+  // black menu surface for the one not-yet-baked frame.
+  client::ui::ChromeTextures chrome = client::ui::use_chrome();
+  ::ui::StylePatch menu_bg = chrome.starfield
+                                 ? tokens::image_patch(chrome.starfield)
+                                 : tokens::fill_patch(tokens::kSurfaceMenu);
   return <Box
     key={props.key}
     layout={::ui::LayoutStyle{
@@ -103,7 +111,7 @@ using ::ui::components::DialogProps;
       .height = ::ui::Length::percent(100.0f),
       .padding = {36.0f, 36.0f, 36.0f, 36.0f},
     }}
-    style={tokens::fill_patch(tokens::kSurfaceMenu)}
+    style={menu_bg}
   >
     {props.children}
   </Box>

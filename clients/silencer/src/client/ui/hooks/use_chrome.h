@@ -26,8 +26,9 @@ namespace client::ui {
 //   bank 7  idx 5    chrome_panel     ~628x441 (SIL-91, plain native)
 //   bank 40 idx 4    dialog_msg       ~352x178 (SIL-91, plain native)
 //   bank 40 idx 2    dialog_pw        ~284x277 (SIL-91, plain native)
+//   bank 6  idx 0    starfield        full-bleed (SIL-92, stretch)
 //   ------------------------------------------------------------------
-//   total baked: 8 / 64
+//   total baked: 9 / 64
 struct ChromeTextures {
   // The green oval menu button (bank 6), per legacy size: Md/Sm/Lg. Brightness/
   // focus is a draw-time tint of the one sprite, not separate frames.
@@ -46,6 +47,9 @@ struct ChromeTextures {
   uint16_t dialog_msg_w = 0, dialog_msg_h = 0;
   uint32_t dialog_pw = 0; // bank 40 idx 2 (password / lobby-connect modal)
   uint16_t dialog_pw_w = 0, dialog_pw_h = 0;
+  // Full-screen starfield+planet background (bank 6 idx0), stretched to the
+  // screen root (no aspect-cover in v1 — legacy stretched too).
+  uint32_t starfield = 0;
 };
 
 // Read the baked chrome ids for the current frame. Requires a
