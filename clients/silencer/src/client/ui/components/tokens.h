@@ -16,47 +16,51 @@
 
 namespace silencer::tokens {
 
-// ---- Surface backgrounds ----
-constexpr ::ui::Color kSurfaceMenu = {8, 14, 18, 255};
-constexpr ::ui::Color kSurfaceGame = {10, 16, 18, 255};
-constexpr ::ui::Color kSurfaceOverlay = {14, 22, 28, 245};
-constexpr ::ui::Color kSurfacePanel = {17, 24, 30, 255};
-constexpr ::ui::Color kSurfaceHeroPanel = {18, 27, 32, 245};
-constexpr ::ui::Color kSurfaceHudBand = {18, 24, 28, 245};
+// ---- Surface backgrounds (legacy palette: Background #000000 for menu/game
+// roots, Panel #10141C for panels/overlays/bands) ----
+constexpr ::ui::Color kSurfaceMenu = {0, 0, 0, 255};      // Background #000000
+constexpr ::ui::Color kSurfaceGame = {0, 0, 0, 255};      // Background #000000
+constexpr ::ui::Color kSurfaceOverlay = {16, 20, 28, 245}; // Panel #10141C
+constexpr ::ui::Color kSurfacePanel = {16, 20, 28, 255};   // Panel #10141C
+constexpr ::ui::Color kSurfaceHeroPanel = {16, 20, 28, 245}; // Panel #10141C
+constexpr ::ui::Color kSurfaceHudBand = {16, 20, 28, 245};   // Panel #10141C
 
-// ---- Borders ----
-constexpr ::ui::Color kBorderPanel = {78, 96, 108, 255};
-constexpr ::ui::Color kBorderHeroPanel = {83, 108, 118, 255};
-constexpr ::ui::Color kBorderHudBand = {82, 106, 118, 255};
+// ---- Borders (legacy PanelBorder #565E6F) ----
+constexpr ::ui::Color kBorderPanel = {86, 94, 111, 255};
+constexpr ::ui::Color kBorderHeroPanel = {86, 94, 111, 255};
+constexpr ::ui::Color kBorderHudBand = {86, 94, 111, 255};
 
 // ---- Accent / semantic action colors (AppButton variant fills) ----
 // Each variant owns a base + hover (lighter) + pressed (darker) on-palette
 // triple so the AppButton variant patch can supply its own interaction states
 // rather than reverting to the theme's slate hover/pressed deltas.
-constexpr ::ui::Color kAccent = {96, 165, 250, 255};        // slate accent blue
-constexpr ::ui::Color kAccentBorder = {130, 188, 255, 255}; // brighter accent edge
-constexpr ::ui::Color kAccentHover = {124, 184, 255, 255};  // lighter on hover
-constexpr ::ui::Color kAccentHoverBorder = {158, 206, 255, 255};
-constexpr ::ui::Color kAccentPressed = {72, 138, 222, 255}; // darker on press
-constexpr ::ui::Color kAccentPressedBorder = {110, 168, 235, 255};
-constexpr ::ui::Color kDanger = {220, 60, 60, 255};         // destructive red
-constexpr ::ui::Color kDangerBorder = {240, 110, 110, 255}; // brighter danger edge
-constexpr ::ui::Color kDangerHover = {236, 84, 84, 255};    // lighter on hover
-constexpr ::ui::Color kDangerHoverBorder = {250, 134, 134, 255};
-constexpr ::ui::Color kDangerPressed = {190, 44, 44, 255};  // darker on press
-constexpr ::ui::Color kDangerPressedBorder = {220, 92, 92, 255};
+// Legacy accent #9FC9FF. In origin/main the accent edge was a baked sprite, not
+// a fill ramp; these hover/pressed/border stops are re-derived on the cool-blue
+// palette as a vector interim (the oval sprite button replaces them in SIL-89).
+constexpr ::ui::Color kAccent = {159, 201, 255, 255};       // #9FC9FF
+constexpr ::ui::Color kAccentBorder = {191, 219, 255, 255}; // brighter accent edge
+constexpr ::ui::Color kAccentHover = {191, 219, 255, 255};  // lighter on hover
+constexpr ::ui::Color kAccentHoverBorder = {214, 233, 255, 255};
+constexpr ::ui::Color kAccentPressed = {120, 167, 224, 255}; // darker on press
+constexpr ::ui::Color kAccentPressedBorder = {159, 201, 255, 255};
+constexpr ::ui::Color kDanger = {221, 80, 72, 255};         // #DD5048
+constexpr ::ui::Color kDangerBorder = {240, 120, 112, 255}; // brighter danger edge
+constexpr ::ui::Color kDangerHover = {236, 108, 100, 255};  // lighter on hover
+constexpr ::ui::Color kDangerHoverBorder = {248, 150, 142, 255};
+constexpr ::ui::Color kDangerPressed = {190, 58, 52, 255};  // darker on press
+constexpr ::ui::Color kDangerPressedBorder = {220, 96, 88, 255};
 
-// ---- Text ----
-constexpr ::ui::Color kTextTitle = {236, 246, 242, 255};
-constexpr ::ui::Color kTextHeroTitle = {235, 246, 242, 255};
-constexpr ::ui::Color kTextSubtitle = {154, 177, 184, 255};
-constexpr ::ui::Color kTextDialogTitle = {240, 248, 244, 255};
-constexpr ::ui::Color kTextBody = {226, 238, 236, 255};
-constexpr ::ui::Color kTextBodyMuted = {202, 218, 216, 255};
-constexpr ::ui::Color kTextWeaponName = {238, 246, 244, 255};
-constexpr ::ui::Color kTextWeaponDetail = {184, 204, 204, 255};
-constexpr ::ui::Color kTextWeaponDetailOff = {142, 148, 150, 255};
-constexpr ::ui::Color kTextHud = {224, 238, 236, 255};
+// ---- Text (legacy #E0E7F1; muted/subtitle/off re-derived cool-grey) ----
+constexpr ::ui::Color kTextTitle = {224, 231, 241, 255};      // #E0E7F1
+constexpr ::ui::Color kTextHeroTitle = {224, 231, 241, 255};  // #E0E7F1
+constexpr ::ui::Color kTextSubtitle = {150, 160, 178, 255};
+constexpr ::ui::Color kTextDialogTitle = {224, 231, 241, 255}; // #E0E7F1
+constexpr ::ui::Color kTextBody = {224, 231, 241, 255};        // #E0E7F1
+constexpr ::ui::Color kTextBodyMuted = {176, 186, 202, 255};
+constexpr ::ui::Color kTextWeaponName = {224, 231, 241, 255};  // #E0E7F1
+constexpr ::ui::Color kTextWeaponDetail = {176, 186, 202, 255};
+constexpr ::ui::Color kTextWeaponDetailOff = {120, 128, 142, 255};
+constexpr ::ui::Color kTextHud = {224, 231, 241, 255};         // #E0E7F1
 
 // ---- Font sizes ----
 constexpr uint16_t kFontHeroTitle = 30;

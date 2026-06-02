@@ -14,11 +14,12 @@
 
 namespace client::ui {
 
-// ---- v1 design tokens (the deliberate new look) ----------------------------
-// A cohesive modern dark UI: a deep neutral-slate palette, UNIFORM 8px rounded
-// corners on every interactive surface, a subtle top-lit vertical gradient on
-// controls, and a single crisp accent (cool blue) for the focus ring and the
-// checked/selection state. STRAIGHT alpha throughout; premultiplied at IR emit.
+// ---- design tokens (legacy origin/main palette) ----------------------------
+// The cool-blue legacy palette: black/Panel #10141C surfaces, PanelBorder
+// #565E6F edges, text #E0E7F1, a single cool-blue accent #9FC9FF for the focus
+// ring + checked/selection, danger #DD5048. The control gradient is collapsed
+// to a flat Panel fill (legacy had no gradient; sprite buttons land in SIL-89).
+// STRAIGHT alpha throughout; premultiplied at IR emit.
 namespace {
 using ::ui::Border;
 using ::ui::Color;
@@ -34,35 +35,39 @@ using ::ui::patch;
 
 constexpr float kRadius = 8.f; // uniform corner radius on all control surfaces
 
-// Accent: one cool blue, reused for the focus ring + checked/selection so the
-// system reads as a single design language rather than a grab-bag of colors.
-constexpr Color kAccent = {96, 165, 250, 255};
+// Accent: the legacy cool blue (#9FC9FF), reused for the focus ring +
+// checked/selection. In origin/main the accent was a baked sprite edge, not a
+// fill; this constant drives only the focus ring + selection wash here (the
+// oval sprite button lands in SIL-89).
+constexpr Color kAccent = {159, 201, 255, 255}; // #9FC9FF
 
-// Control surface: a subtle vertical gradient (top a touch lighter than bottom,
-// as if lit from above) over a deep slate. 90deg = straight down.
-constexpr Color kControlTop = {40, 46, 58, 255};
-constexpr Color kControlBottom = {28, 33, 43, 255};
-constexpr Color kControlBorder = {70, 80, 98, 255};
-constexpr Color kHoverTop = {48, 56, 70, 255};
-constexpr Color kHoverBottom = {34, 40, 52, 255};
-constexpr Color kHoverBorder = {90, 104, 126, 255};
-constexpr Color kPressedTop = {26, 31, 41, 255};
-constexpr Color kPressedBottom = {20, 24, 32, 255};
-constexpr Color kPressedBorder = {96, 165, 250, 255};
+// Control surface: the legacy palette has no control gradient — the vector
+// interim collapses to a flat Panel fill (#10141C) with a PanelBorder (#565E6F)
+// edge. Hover/pressed are subtle on-palette deltas until the sprite button
+// replaces this fill entirely.
+constexpr Color kControlTop = {16, 20, 28, 255};    // Panel #10141C
+constexpr Color kControlBottom = {16, 20, 28, 255}; // Panel #10141C
+constexpr Color kControlBorder = {86, 94, 111, 255}; // PanelBorder #565E6F
+constexpr Color kHoverTop = {22, 28, 38, 255};
+constexpr Color kHoverBottom = {22, 28, 38, 255};
+constexpr Color kHoverBorder = {110, 120, 140, 255};
+constexpr Color kPressedTop = {10, 13, 18, 255};
+constexpr Color kPressedBottom = {10, 13, 18, 255};
+constexpr Color kPressedBorder = {159, 201, 255, 255}; // accent #9FC9FF
 
-constexpr Color kDisabledTop = {30, 34, 42, 255};
-constexpr Color kDisabledBottom = {24, 27, 34, 255};
-constexpr Color kDisabledBorder = {52, 58, 68, 255};
+constexpr Color kDisabledTop = {12, 15, 21, 255};
+constexpr Color kDisabledBottom = {12, 15, 21, 255};
+constexpr Color kDisabledBorder = {52, 57, 67, 255};
 } // namespace
 
 const Theme &app_theme() {
   static const Theme t = [] {
     Theme th{};
     th.focus_ring = kAccent;
-    th.text_default = {226, 231, 240, 255};
+    th.text_default = {224, 231, 241, 255}; // #E0E7F1
     th.text_disabled = {118, 126, 140, 255};
-    th.caret = {226, 231, 240, 255};
-    th.selection = {96, 165, 250, 96}; // accent wash; premultiplied at IR emit
+    th.caret = {224, 231, 241, 255}; // #E0E7F1
+    th.selection = {159, 201, 255, 96}; // accent wash; premultiplied at IR emit
 
     // A vertical 2-stop gradient helper (top -> bottom). angle 90deg = downward.
     auto vgrad = [](Color top, Color bottom) {
@@ -121,13 +126,13 @@ const Theme &app_theme() {
 
     // Dialog: a rounded, slightly elevated panel a step darker than the controls
     // so stacked controls read as raised against it.
-    th.dialog.base.background = {20, 23, 30, 248};
+    th.dialog.base.background = {16, 20, 28, 255}; // Panel #10141C
     th.dialog.base.corner_radius = kRadius + 2.f;
     th.dialog.base.border.width = {1, 1, 1, 1};
-    th.dialog.base.border.color = {{46, 52, 64, 255},
-                                   {46, 52, 64, 255},
-                                   {46, 52, 64, 255},
-                                   {46, 52, 64, 255}};
+    th.dialog.base.border.color = {{86, 94, 111, 255}, // PanelBorder #565E6F
+                                   {86, 94, 111, 255},
+                                   {86, 94, 111, 255},
+                                   {86, 94, 111, 255}};
     return th;
   }();
   return t;
