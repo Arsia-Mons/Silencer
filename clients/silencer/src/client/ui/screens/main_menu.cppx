@@ -37,29 +37,42 @@ struct MainMenuProps {
   Navigation nav = use_navigation();
   ChromeTextures chrome = use_chrome();
 
-  // SIL-94: ping-pong the baked logo reveal frames on the per-frame wall clock
-  // (a slow ~8fps reveal/retract loop). Falls back to the static logo when the
-  // animation frames have not baked.
+  // SIL-107: the SILENCER logo reveal/hold/retract loop over the baked bank-208
+  // reveal frames (individual textures — the ticket's "accept the texture
+  // budget" path; the atlas/UV route had a bake issue). Step a frame index from
+  // the per-frame wall clock at the legacy ~24fps (42ms) cadence: reveal
+  // 0..N-1 -> hold on the full logo -> retract. Falls back to the static logo.
   Clock clock = use_clock();
   uint32_t *logo_accum = use_state<uint32_t>(0u);
   int *logo_step = use_state<int>(0);
   *logo_accum += clock.delta_ms;
-  const uint32_t kLogoFrameMs = 120;
+  const uint32_t kLogoFrameMs = 42;
   const int lf = chrome.logo_frame_count;
-  const int span = lf > 1 ? 2 * lf - 2 : 1; // ping-pong period
+  const int hold = 24; // ticks dwelling on the full logo (frame 0) before retract
+  const int loop = lf > 1 ? (2 * lf + hold) : 1;
   while (*logo_accum >= kLogoFrameMs) {
     *logo_accum -= kLogoFrameMs;
-    *logo_step = (*logo_step + 1) % span;
+    *logo_step = (*logo_step + 1) % (loop > 0 ? loop : 1);
   }
+  // logo_frame[0] is the full logo; later entries step back through the reveal.
+  // Map the loop phase to a frame: hold full, reveal toward sparse, retract.
   uint32_t logo_tex = chrome.logo;
   if (lf > 0) {
-    int idx = *logo_step < lf ? *logo_step : span - *logo_step;
+    const int s = *logo_step;
+    int idx;
+    if (s < hold)
+      idx = 0; // hold on the full logo
+    else if (s < hold + (lf - 1))
+      idx = s - hold; // retract 0 -> lf-1 (logo recedes)
+    else
+      idx = (lf - 1) - (s - hold - (lf - 1)); // reveal lf-1 -> 0 (logo returns)
     if (idx < 0)
       idx = 0;
     if (idx >= lf)
       idx = lf - 1;
     logo_tex = chrome.logo_frame[idx];
   }
+  ::ui::StylePatch logo_style = tokens::image_patch(logo_tex);
 
   std::function<void()> open_options = [nav]() {
     if (nav.push)
@@ -79,7 +92,7 @@ struct MainMenuProps {
                     .width = ::ui::Length::points(350.0f),
                     .min_width = ::ui::Length::points(0.0f),
                     .height = ::ui::Length::points((float)chrome.logo_h)},
-                .style = tokens::image_patch(logo_tex)})
+                .style = logo_style})
           : ScreenTitle(ScreenTitleProps{.key = "logotxt",
                                          .variant = ScreenTitleVariant::Hero,
                                          .value = "SILENCER"});

@@ -57,7 +57,10 @@ struct ChromeTextures {
   // SIL-94: a few bank-208 reveal frames for the animated logo. [0] is the
   // final/full frame (== `logo`); later entries step back through the reveal so
   // the main menu ping-pongs them via use_clock. count == 0 => static `logo`.
-  static constexpr int kLogoFrames = 4;
+  // SIL-94/107: bank-208 reveal frames as individual textures. [0] is the full
+  // logo; later entries step back through the legacy reveal so main_menu can
+  // play a reveal/hold/retract loop on the wall clock.
+  static constexpr int kLogoFrames = 8;
   uint32_t logo_frame[kLogoFrames] = {};
   int logo_frame_count = 0;
   // Boolean-toggle indicator cells (bank 6): a 2-cell-wide oval — OFF = idx12|13

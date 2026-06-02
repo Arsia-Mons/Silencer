@@ -212,10 +212,13 @@ bake(40, 2, cppxChrome.dialog_pw, &cppxChrome.dialog_pw_w, &cppxChrome.dialog_pw
 bake(6, 0, cppxChrome.starfield);
 // bank 208 frame 60 — the static SILENCER logo (final reveal frame).
 bake(208, 60, cppxChrome.logo, &cppxChrome.logo_w, &cppxChrome.logo_h);
-// SIL-94: a few reveal frames for the animated logo. [0] is the full frame; the
-// rest step back through the legacy reveal so use_clock can ping-pong them.
+// SIL-94/107: the logo reveal frames (individual textures). [0] is the full
+// logo (frame 60); later entries step back through the legacy reveal (the
+// latter, mostly-formed half so the wordmark stays legible through the loop).
+// main_menu plays a reveal/hold/retract loop over them on the wall clock.
 {
-const size_t kLogoIdx[client::ui::ChromeTextures::kLogoFrames] = {60, 56, 52, 48};
+const size_t kLogoIdx[client::ui::ChromeTextures::kLogoFrames] =
+    {60, 58, 56, 54, 52, 50, 48, 46};
 int n = 0;
 for(int i = 0; i < client::ui::ChromeTextures::kLogoFrames; ++i){
 bake(208, kLogoIdx[i], cppxChrome.logo_frame[i]);

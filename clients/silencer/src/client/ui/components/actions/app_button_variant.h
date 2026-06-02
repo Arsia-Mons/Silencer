@@ -122,13 +122,14 @@ inline ::ui::LayoutStyle app_button_chrome_layout() {
 }
 
 // Metal-chrome sprite-button paint (SIL-90). Nine-sliced bank-7 sprite (caps
-// {l12,r12,t4,b4}) with the label in the Large face. STATIC 2-state v1 swaps
-// TWO authored frames — idle idx24 (phase 0) vs focused idx28 (phase 4) — which
-// is more pixel-faithful than tinting, but still not the legacy 5-frame 24fps
-// ramp (that needs the clock seam, SIL-107). texture_id 0 falls back to a
-// rounded slate button.
-inline ::ui::StyleStatePatch app_button_chrome_patch(uint32_t idle,
-                                                     uint32_t focus) {
+// {l12,r12,t4,b4}) with the label in the Large face. The focus frame (idx28)
+// is brightness-ramped by `lit` — the composition root drives it from the
+// use_clock() phase so a focused chrome button ramps at the legacy ~24fps
+// cadence (SIL-107); idle (idx24) stays full white. texture_id 0 falls back to
+// a rounded slate button.
+inline ::ui::StyleStatePatch
+app_button_chrome_patch(uint32_t idle, uint32_t focus,
+                        ::ui::Color lit = {255, 255, 255, 255}) {
   const ::ui::TextVisual label{.color = tokens::kTextTitle,
                                .font_id = tokens::kFaceLarge,
                                .font_size = tokens::kFontLarge,
@@ -150,16 +151,15 @@ inline ::ui::StyleStatePatch app_button_chrome_patch(uint32_t idle,
   }
   const ::ui::SideWidths caps{.top = 4.0f, .right = 12.0f, .bottom = 4.0f,
                               .left = 12.0f};
-  auto chrome = [&](uint32_t tex) -> ::ui::StylePatch {
-    ::ui::StylePatch p =
-        tokens::image_patch(tex, ::ui::Color{255, 255, 255, 255}, caps);
+  auto chrome = [&](uint32_t tex, ::ui::Color tint) -> ::ui::StylePatch {
+    ::ui::StylePatch p = tokens::image_patch(tex, tint, caps);
     p.text = ::ui::opt(label);
     return p;
   };
   const uint32_t f = focus ? focus : idle;
-  ov.base = chrome(idle);
-  ov.hover = chrome(f);
-  ov.focus_visible = chrome(f);
+  ov.base = chrome(idle, ::ui::Color{255, 255, 255, 255});
+  ov.hover = chrome(f, lit);
+  ov.focus_visible = chrome(f, lit);
   return ov;
 }
 
