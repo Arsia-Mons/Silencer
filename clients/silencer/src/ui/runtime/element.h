@@ -64,6 +64,7 @@ struct HostCallbacks {
   std::function<void(const BlurEvent &)> on_blur = {};
   std::function<void(const ActivationEvent &)> on_activate = {};
   std::function<void(const KeyEvent &)> on_key = {};
+  std::function<void(const WheelEvent &)> on_wheel = {};
   std::function<void(const TextInputEvent &)> on_text_input = {};
   std::function<void(const TextEditingEvent &)> on_text_editing = {};
 };

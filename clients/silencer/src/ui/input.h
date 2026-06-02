@@ -29,6 +29,10 @@ enum class UiKey {
   Enter,
   Tab,
   A,
+  Up,
+  Down,
+  PageUp,
+  PageDown,
 };
 
 enum UiKeyModifier : uint16_t {
@@ -72,6 +76,11 @@ struct UiInputFrame {
   bool pointer_pressed = false;
   bool pointer_down = false;
   bool pointer_released = false;
+
+  // Accumulated scroll-wheel delta this frame (lines/notches; +y = wheel up).
+  // Routed to the hovered scrollable in the runtime. SIL-111.
+  float wheel_x = 0.0f;
+  float wheel_y = 0.0f;
 
   UiKeyInputEvent key_events[UI_INPUT_MAX_KEY_EVENTS] = {};
   int key_event_count = 0;

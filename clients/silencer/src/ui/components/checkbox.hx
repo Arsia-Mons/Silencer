@@ -16,6 +16,7 @@ struct CheckboxProps {
   std::function<void(const ::ui::BlurEvent &)> on_blur = {};
   std::function<void(const ::ui::ActivationEvent &)> on_activate = {};
   std::function<void(const ::ui::KeyEvent &)> on_key = {};
+  std::function<void(const ::ui::WheelEvent &)> on_wheel = {};
   std::function<void(const ::ui::TextInputEvent &)> on_text_input = {};
   std::function<void(const ::ui::TextEditingEvent &)> on_text_editing = {};
   bool checked = false;

@@ -40,6 +40,11 @@ struct InputFrame {
   float pointer_x = 0.0f;
   float pointer_y = 0.0f;
 
+  // Scroll-wheel delta this frame (+y = wheel up); routed to the hovered
+  // scrollable. SIL-111.
+  float wheel_x = 0.0f;
+  float wheel_y = 0.0f;
+
   ::ui::UiKeyInputEvent key_events[::ui::UI_INPUT_MAX_KEY_EVENTS] = {};
   int key_event_count = 0;
 

@@ -18,6 +18,10 @@ case SDLK_LEFT: return ::ui::UiKey::Left;
 case SDLK_RIGHT: return ::ui::UiKey::Right;
 case SDLK_HOME: return ::ui::UiKey::Home;
 case SDLK_END: return ::ui::UiKey::End;
+case SDLK_UP: return ::ui::UiKey::Up;
+case SDLK_DOWN: return ::ui::UiKey::Down;
+case SDLK_PAGEUP: return ::ui::UiKey::PageUp;
+case SDLK_PAGEDOWN: return ::ui::UiKey::PageDown;
 case SDLK_RETURN:
 case SDLK_KP_ENTER: return ::ui::UiKey::Enter;
 case SDLK_TAB: return ::ui::UiKey::Tab;
@@ -111,6 +115,17 @@ case SDLK_SPACE: ui.confirm_released = true; break;
 case SDLK_ESCAPE: ui.cancel_released = true; break;
 default: break;
 }
+}break;
+case SDL_EVENT_MOUSE_WHEEL:{
+// SIL-111: accumulate the scroll-wheel delta into the cppx input frame; the
+// runtime routes it to the hovered scrollable. SDL reports +y = wheel up;
+// FLIPPED (natural-scroll) inverts both axes.
+if(gameUiPipeline.IsCapturingKeybind()) break;
+::ui::UiInputFrame & ui = gameUiPipeline.UiInput();
+float dir = (event.wheel.direction == SDL_MOUSEWHEEL_FLIPPED) ? -1.0f : 1.0f;
+ui.wheel_x += dir * event.wheel.x;
+ui.wheel_y += dir * event.wheel.y;
+ui.source = ::ui::UiFocusSource::Mouse;
 }break;
 case SDL_EVENT_TEXT_INPUT:{
 if(gameUiPipeline.IsCapturingKeybind()) break; // no text while rebinding

@@ -462,8 +462,28 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 		cmd.reply->set_value(OkResult(cmd.id, nlohmann::json::object()));
 		return;
 	}
-	if(cmd.op == "select" ||
-	   cmd.op == "scroll"){
+	if(cmd.op == "scroll"){
+		// SIL-111: inject a scroll-wheel delta. Optionally park the pointer at
+		// (x,y) first so the runtime routes the wheel to that scrollable (wheel
+		// goes to the hovered node, mirroring a real mouse). +dy = wheel up.
+		if(!game.GetUiPipeline().TryClientUi()){
+			cmd.reply->set_value(Err(cmd.id, "WRONG_STATE",
+				"cppx UI has not rendered a frame yet"));
+			return;
+		}
+		if(cmd.args.contains("x") && cmd.args.contains("y")){
+			float x = cmd.args.value("x", 0.0f);
+			float y = cmd.args.value("y", 0.0f);
+			game.GetUiPipeline().InjectPointerMove(x, y);
+		}
+		::ui::UiInputFrame& ui = game.GetUiPipeline().UiInput();
+		ui.wheel_x += cmd.args.value("dx", 0.0f);
+		ui.wheel_y += cmd.args.value("dy", 0.0f);
+		ui.source = ::ui::UiFocusSource::Mouse;
+		cmd.reply->set_value(OkResult(cmd.id, nlohmann::json::object()));
+		return;
+	}
+	if(cmd.op == "select"){
 		cmd.reply->set_value(Err(cmd.id, "UNSUPPORTED", kUiUnsupportedMsg));
 		return;
 	}

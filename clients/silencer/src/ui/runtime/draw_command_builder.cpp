@@ -498,6 +498,26 @@ bool pop_layer(DrawCommandList &list, const NodeSnapshot &node) {
   return list.push(command);
 }
 
+// CLIP: overflow != Visible brackets the node's children in a ClipPush/ClipPop
+// so content outside the node's box is scissored away (design §9.7). The clip
+// rect is the node's layout (border) box; the executor intersects nested clips.
+// Required by the scroll-viewport primitive (SIL-111): the content track is
+// translated up by the scroll offset and clipped to the viewport window.
+bool push_clip(DrawCommandList &list, const NodeSnapshot &node) {
+  DrawCommand command = {};
+  command.kind = DrawCommandKind::ClipPush;
+  command.node_id = node.id;
+  command.rect = to_draw_rect(node.layout);
+  return list.push(command);
+}
+
+bool pop_clip(DrawCommandList &list, const NodeSnapshot &node) {
+  DrawCommand command = {};
+  command.kind = DrawCommandKind::ClipPop;
+  command.node_id = node.id;
+  return list.push(command);
+}
+
 bool append_node(const UiTree &tree, DrawCommandList &list, NodeId id,
                  bool inherited_disabled, NodeId focused_id) {
   NodeSnapshot node = {};
@@ -530,10 +550,15 @@ bool append_node(const UiTree &tree, DrawCommandList &list, NodeId id,
       !append_input_contents(list, node, focused, inherited_disabled))
     return false;
 
+  const bool clip = node.style.overflow != Overflow::Visible;
+  if (clip && !push_clip(list, node))
+    return false;
   for (int i = 0; i < tree.child_count(id); ++i) {
     if (!append_node(tree, list, tree.child_at(id, i), disabled, focused_id))
       return false;
   }
+  if (clip && !pop_clip(list, node))
+    return false;
 
   if (layer && !pop_layer(list, node))
     return false;

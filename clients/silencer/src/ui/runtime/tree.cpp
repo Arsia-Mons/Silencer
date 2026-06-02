@@ -234,6 +234,7 @@ bool UiTree::set_metadata(NodeId id, const NodeMetadata &metadata) {
   node->on_blur = metadata.on_blur;
   node->on_activate = metadata.on_activate;
   node->on_key = metadata.on_key;
+  node->on_wheel = metadata.on_wheel;
   node->on_text_input = metadata.on_text_input;
   node->on_text_editing = metadata.on_text_editing;
   node->control_offset = metadata.control_offset;
@@ -311,6 +312,14 @@ bool UiTree::invoke_key(NodeId id, const ::ui::UiKeyInputEvent &event) const {
       .modifiers = event.modifiers,
       .repeat = event.repeat,
   });
+  return true;
+}
+
+bool UiTree::invoke_wheel(NodeId id, float dx, float dy) const {
+  const Node *node = find(id);
+  if (!node || node->interaction.disabled || !node->on_wheel)
+    return false;
+  node->on_wheel({.target = id, .dx = dx, .dy = dy});
   return true;
 }
 
@@ -448,6 +457,7 @@ UiTree::Node *UiTree::ensure_node(NodeId id, NodeId parent_id, const char *type,
     existing->on_blur = {};
     existing->on_activate = {};
     existing->on_key = {};
+    existing->on_wheel = {};
     existing->on_text_input = {};
     existing->on_text_editing = {};
     existing->baseline = nullptr;

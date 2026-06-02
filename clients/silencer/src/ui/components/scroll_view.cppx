@@ -1,0 +1,139 @@
+#include "ui/components/scroll_view.h"
+
+#include "ui/components/box.h"
+#include "ui/runtime/react.h"
+
+#include <algorithm>
+#include <functional>
+
+namespace ui::components {
+
+using ::ui::children;
+
+::ui::UiElement ScrollView(const ScrollViewProps &props) {
+  float *offset = use_state<float>(0.0f);
+  const float max_off =
+      std::max(0.0f, props.content_height - props.viewport_height);
+  if (*offset > max_off)
+    *offset = max_off;
+  if (*offset < 0.0f)
+    *offset = 0.0f;
+  const float step = props.step > 0.0f ? props.step : 32.0f;
+  const float page = props.viewport_height > 0.0f ? props.viewport_height : step;
+
+  // Wheel: +dy = wheel up, which scrolls toward the top (offset decreases).
+  std::function<void(const ::ui::WheelEvent &)> on_wheel =
+      [offset, max_off, step](const ::ui::WheelEvent &e) {
+        float v = *offset - e.dy * step;
+        if (v < 0.0f)
+          v = 0.0f;
+        if (v > max_off)
+          v = max_off;
+        *offset = v;
+      };
+  std::function<void(const ::ui::KeyEvent &)> on_key =
+      [offset, max_off, step, page](const ::ui::KeyEvent &e) {
+        float v = *offset;
+        switch (e.key) {
+        case ::ui::UiKey::Up:
+          v -= step;
+          break;
+        case ::ui::UiKey::Down:
+          v += step;
+          break;
+        case ::ui::UiKey::PageUp:
+          v -= page;
+          break;
+        case ::ui::UiKey::PageDown:
+          v += page;
+          break;
+        case ::ui::UiKey::Home:
+          v = 0.0f;
+          break;
+        case ::ui::UiKey::End:
+          v = max_off;
+          break;
+        default:
+          return;
+        }
+        if (v < 0.0f)
+          v = 0.0f;
+        if (v > max_off)
+          v = max_off;
+        *offset = v;
+      };
+
+  // Viewport window: focusable so it receives hover (wheel routing) + keyboard
+  // focus (arrow/page scroll); overflow Hidden scissors the content track to it.
+  ::ui::LayoutStyle viewport = props.layout;
+  viewport.position = ::ui::PositionType::Relative;
+  viewport.overflow = ::ui::Overflow::Hidden;
+  viewport.height = ::ui::Length::points(props.viewport_height);
+
+  // Content track: out of flow, translated up by the offset. left/right 0 give
+  // it the viewport width; height auto = natural content height.
+  ::ui::LayoutStyle content = {};
+  content.position = ::ui::PositionType::Absolute;
+  content.direction = ::ui::FlexDirection::Column;
+  content.position_inset.left = ::ui::StyleValue::points(0.0f);
+  content.position_inset.right = ::ui::StyleValue::points(0.0f);
+  content.position_inset.top = ::ui::StyleValue::points(-*offset);
+
+  // Optional thin scrollbar thumb on the right edge (only when overflowing).
+  ::ui::UiElement bar = ::ui::empty();
+  if (props.show_scrollbar && max_off > 0.0f && props.viewport_height > 0.0f &&
+      props.content_height > 0.0f) {
+    const float ratio = props.viewport_height / props.content_height;
+    float thumb_h = props.viewport_height * ratio;
+    if (thumb_h < 16.0f)
+      thumb_h = 16.0f;
+    if (thumb_h > props.viewport_height)
+      thumb_h = props.viewport_height;
+    const float thumb_top = (props.viewport_height - thumb_h) * (*offset / max_off);
+
+    ::ui::LayoutStyle track = {};
+    track.position = ::ui::PositionType::Absolute;
+    track.position_inset.right = ::ui::StyleValue::points(2.0f);
+    track.position_inset.top = ::ui::StyleValue::points(0.0f);
+    track.width = ::ui::Length::points(4.0f);
+    track.height = ::ui::Length::points(props.viewport_height);
+
+    ::ui::LayoutStyle thumb = {};
+    thumb.position = ::ui::PositionType::Absolute;
+    thumb.position_inset.left = ::ui::StyleValue::points(0.0f);
+    thumb.position_inset.right = ::ui::StyleValue::points(0.0f);
+    thumb.position_inset.top = ::ui::StyleValue::points(thumb_top);
+    thumb.height = ::ui::Length::points(thumb_h);
+
+    ::ui::StylePatch thumb_paint =
+        ::ui::patch().background(::ui::Color{159, 201, 255, 150});
+    // Built via the component factory (not JSX) so the whole scrollbar is one
+    // local expression dropped into the return tree as {bar}.
+    bar = ::ui::component(
+        "Box", BoxProps{.key = "bar",
+                        .layout = track,
+                        .children = children({::ui::component(
+                            "Box",
+                            BoxProps{.key = "thumb",
+                                     .layout = thumb,
+                                     .style = thumb_paint},
+                            Box)})},
+        Box);
+  }
+
+  return <Box
+    key={props.key}
+    id={props.id}
+    focusable={true}
+    layout={viewport}
+    style={props.style}
+    onWheel={on_wheel}
+    onKey={on_key}>
+    <Box key="content" layout={content}>
+      {props.children}
+    </Box>
+    {bar}
+  </Box>
+}
+
+} // namespace ui::components

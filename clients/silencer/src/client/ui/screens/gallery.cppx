@@ -4,6 +4,7 @@
 #include "client/ui/components/layout/layout.h"
 #include "client/ui/components/surfaces/surfaces.h"
 #include "client/ui/components/text/text.h"
+#include "ui/components/scroll_view.h"
 #include "ui/runtime/react.h"
 
 namespace client::ui {
@@ -11,6 +12,8 @@ namespace {
 
 using namespace silencer;
 using ::ui::children;
+using ::ui::components::ScrollView;
+using ::ui::components::ScrollViewProps;
 
 struct GalleryProps {
   uint32_t unused = 0;
@@ -25,6 +28,25 @@ struct GalleryProps {
   return <ScreenLayout key="root" variant={ScreenLayoutVariant::Game}>
     <ScreenTitle key="t" variant={ScreenTitleVariant::Screen} value="Component Gallery" />
     <ActionRow key="cols">
+      <Panel key="scroll" variant={PanelVariant::Sunken}>
+        <ScreenTitle key="sh" variant={ScreenTitleVariant::Dialog} value="ScrollView" />
+        <ScrollView key="sv" id="gal_scroll" viewportHeight={120.0f} contentHeight={336.0f} step={40.0f}>
+          <BodyText key="r0" variant={BodyTextVariant::Strong} value="Row 01 - top" />
+          <BodyText key="r1" variant={BodyTextVariant::Strong} value="Row 02" />
+          <BodyText key="r2" variant={BodyTextVariant::Strong} value="Row 03" />
+          <BodyText key="r3" variant={BodyTextVariant::Strong} value="Row 04" />
+          <BodyText key="r4" variant={BodyTextVariant::Strong} value="Row 05" />
+          <BodyText key="r5" variant={BodyTextVariant::Strong} value="Row 06" />
+          <BodyText key="r6" variant={BodyTextVariant::Strong} value="Row 07" />
+          <BodyText key="r7" variant={BodyTextVariant::Strong} value="Row 08" />
+          <BodyText key="r8" variant={BodyTextVariant::Strong} value="Row 09" />
+          <BodyText key="r9" variant={BodyTextVariant::Strong} value="Row 10" />
+          <BodyText key="r10" variant={BodyTextVariant::Strong} value="Row 11" />
+          <BodyText key="r11" variant={BodyTextVariant::Strong} value="Row 12" />
+          <BodyText key="r12" variant={BodyTextVariant::Strong} value="Row 13" />
+          <BodyText key="r13" variant={BodyTextVariant::Strong} value="Row 14 - bottom" />
+        </ScrollView>
+      </Panel>
       <Panel key="buttons" variant={PanelVariant::Sunken}>
         <ScreenTitle key="bh" variant={ScreenTitleVariant::Dialog} value="Buttons" />
         <AppButton

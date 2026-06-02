@@ -5,6 +5,7 @@
 #include "checkbox.h"
 #include "dialog.h"
 #include "input.h"
+#include "scroll_view.h"
 #include "text.h"
 
 namespace ui::components::elements {
@@ -27,6 +28,10 @@ inline ::ui::UiElement Dialog(const DialogProps &props) {
 
 inline ::ui::UiElement Input(const InputProps &props) {
   return ::ui::component("Input", props, ::ui::components::Input);
+}
+
+inline ::ui::UiElement ScrollView(const ScrollViewProps &props) {
+  return ::ui::component("ScrollView", props, ::ui::components::ScrollView);
 }
 
 inline ::ui::UiElement Text(const TextProps &props) {

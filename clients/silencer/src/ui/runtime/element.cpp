@@ -121,6 +121,7 @@ private:
         .on_blur = props.callbacks.on_blur,
         .on_activate = props.callbacks.on_activate,
         .on_key = props.callbacks.on_key,
+        .on_wheel = props.callbacks.on_wheel,
         .on_text_input = props.callbacks.on_text_input,
         .on_text_editing = props.callbacks.on_text_editing,
     };

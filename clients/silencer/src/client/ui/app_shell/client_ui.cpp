@@ -137,6 +137,13 @@ bool ClientUi::update_retained_runtime(const ::ui::FlexLayoutAdapter &layout,
   for (int i = 0; i < input.key_event_count; ++i) {
     retained_tree_.invoke_key(active, input.key_events[i]);
   }
+  // Scroll wheel routes to the node under the pointer (the hovered scrollable),
+  // not the focused node — mirrors pointer hit-testing (SIL-111).
+  if (input.wheel_x != 0.0f || input.wheel_y != 0.0f) {
+    ::ui::NodeId hovered = ::ui::focus_hovered_id(retained_focus_);
+    if (hovered != 0)
+      retained_tree_.invoke_wheel(hovered, input.wheel_x, input.wheel_y);
+  }
   for (int i = 0; i < input.text_event_count; ++i) {
     retained_tree_.invoke_text_input(active, input.text_events[i]);
   }

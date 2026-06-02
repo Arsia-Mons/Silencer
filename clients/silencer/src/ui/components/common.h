@@ -82,6 +82,7 @@ inline ::ui::HostCallbacks callbacks_from_props(const Props &props) {
       .on_blur = props.on_blur,
       .on_activate = props.on_activate,
       .on_key = props.on_key,
+      .on_wheel = props.on_wheel,
       .on_text_input = props.on_text_input,
       .on_text_editing = props.on_text_editing,
   };

@@ -337,6 +337,12 @@ struct KeyEvent {
   bool repeat = false;
 };
 
+struct WheelEvent {
+  NodeId target = 0;
+  float dx = 0.0f;
+  float dy = 0.0f; // +y = wheel up
+};
+
 struct TextInputEvent {
   NodeId target = 0;
   const char *text = "";
@@ -367,6 +373,7 @@ struct NodeMetadata {
   std::function<void(const KeyEvent &)> on_key = {};
   std::function<void(const TextInputEvent &)> on_text_input = {};
   std::function<void(const TextEditingEvent &)> on_text_editing = {};
+  std::function<void(const WheelEvent &)> on_wheel = {};
 };
 
 using CleanupFn = void (*)(void *user);
@@ -432,6 +439,7 @@ public:
   bool invoke_blur(NodeId id) const;
   bool invoke_activate(NodeId id) const;
   bool invoke_key(NodeId id, const ::ui::UiKeyInputEvent &event) const;
+  bool invoke_wheel(NodeId id, float dx, float dy) const;
   bool invoke_text_input(NodeId id, const ::ui::UiTextInputEvent &event) const;
   bool invoke_text_editing(NodeId id,
                            const ::ui::UiTextEditingEvent &event) const;
@@ -489,6 +497,7 @@ private:
     std::function<void(const KeyEvent &)> on_key = {};
     std::function<void(const TextInputEvent &)> on_text_input = {};
     std::function<void(const TextEditingEvent &)> on_text_editing = {};
+    std::function<void(const WheelEvent &)> on_wheel = {};
     LayoutStyle style = {};
     Rect layout = {};
     CleanupFn cleanup = nullptr;

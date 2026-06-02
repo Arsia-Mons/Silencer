@@ -217,6 +217,8 @@ set(SILENCER_CPPX_SOURCES
 	src/ui/components/input.hx
 	src/ui/components/dialog.cppx
 	src/ui/components/dialog.hx
+	src/ui/components/scroll_view.cppx
+	src/ui/components/scroll_view.hx
 	# Product-intent semantic component layer (SIL-17): the shadcn-style app
 	# components over the generic primitives, in namespace silencer::. Paint
 	# resolves through silencer::tokens + the product theme. The plain headers
@@ -437,6 +439,22 @@ if(MSVC)
 	target_compile_definitions(retained_ui_focus_tests PRIVATE NOMINMAX)
 endif()
 add_test(NAME retained_ui_focus_tests COMMAND retained_ui_focus_tests)
+
+add_executable(ui_scroll_tests
+	tests/ui_scroll_tests.cpp
+	src/ui/runtime/tree.cpp
+	src/ui/runtime/draw_command.cpp
+	src/ui/runtime/draw_command_builder.cpp
+	src/ui/style/text_measure.cpp
+	src/ui/runtime/flex_layout.cpp
+	src/ui/runtime/yoga_flex_layout.cpp)
+target_compile_features(ui_scroll_tests PRIVATE cxx_std_20)
+target_include_directories(ui_scroll_tests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src")
+target_link_libraries(ui_scroll_tests PRIVATE yogacore)
+if(MSVC)
+	target_compile_definitions(ui_scroll_tests PRIVATE NOMINMAX)
+endif()
+add_test(NAME ui_scroll_tests COMMAND ui_scroll_tests)
 
 # Fiber-keyed interaction hooks (use_focused/hovered/pressed/focus_visible).
 # Hermetic — reads a published InteractionSnapshot via ReactContext, no UiTree.
