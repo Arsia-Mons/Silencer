@@ -40,7 +40,7 @@ check_resize() {
   const width = Number(process.argv[2]);
   const height = Number(process.argv[3]);
   const data = JSON.parse(await Bun.file(inspectPath).text());
-  const expected = ["Play Online", "Tutorial", "Options", "Quit"];
+  const expected = ["Connect To Lobby", "Tutorial", "Options", "Exit"];
   const byLabel = new Map((data.nodes ?? []).filter((w) => w.role === "button").map((w) => [w.label, w]));
   for (const label of expected) {
     const widget = byLabel.get(label);
@@ -80,7 +80,7 @@ check_resize() {
   cli --port "$PORT" wait_frames --n 3 >/dev/null
   cli --port "$PORT" inspect | bun -e '
   const r = JSON.parse(await new Response(Bun.stdin.stream()).text());
-  const onMenu = (r.nodes ?? []).some((n) => n.role === "button" && n.label === "Play Online");
+  const onMenu = (r.nodes ?? []).some((n) => n.role === "button" && n.label === "Connect To Lobby");
   const stillOptions = (r.nodes ?? []).some((n) => n.role === "button" && n.label === "Done");
   if (!onMenu || stillOptions) { console.error("Cancel did not pop the Options overlay back to MainMenu"); process.exit(1); }
   '

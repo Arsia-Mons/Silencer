@@ -286,7 +286,9 @@ bool append_frame(DrawCommandList &list, const NodeSnapshot &node,
   if (v.border.color.top.a > 0 && v.border.width.top > 0.0f) {
     border = v.border;
     has_border = true;
-  } else if (control_box) {
+  } else if (control_box && v.image.texture_id == 0) {
+    // Sprite-backed controls (an image is set) carry their own baked edge, so
+    // skip the intrinsic vector control border; vector controls still get it.
     Color border_color =
         node.interaction.disabled ? kButtonDisabledBorder : kButtonBorder;
     border.width = {1.0f, 1.0f, 1.0f, 1.0f};
@@ -301,7 +303,11 @@ bool append_frame(DrawCommandList &list, const NodeSnapshot &node,
   if (v.outline.color.a > 0 && v.outline.width > 0.0f) {
     outline = v.outline;
     has_outline = true;
-  } else if (focused && !node.interaction.disabled) {
+  } else if (focused && !node.interaction.disabled &&
+             v.image.texture_id == 0) {
+    // Sprite-backed controls (an image is set) own their own focus look — a
+    // brightness/frame swap baked into the sprite — so the vector fallback
+    // focus ring is injected only for non-sprite (vector) controls.
     outline = {kFocusBorderWidth, kFocusBorder, kFocusBorderOffset};
     has_outline = true;
   }

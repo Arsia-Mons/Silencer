@@ -7,7 +7,7 @@
 # creates exactly ONE character, not two.
 #
 # Driven end-to-end through a local Go lobby (harness lifted from
-# 30_lobby_login.sh): MainMenu -> Play Online -> login alice/secret ->
+# 30_lobby_login.sh): MainMenu -> Connect To Lobby -> login alice/secret ->
 # CREATECHARACTER -> Create New Character -> Alias=Alice -> Continue -> agency.
 set -euo pipefail
 . "$(dirname "$0")/lib.sh"
@@ -101,8 +101,8 @@ wait_for_lobby_state() {
 
 # MainMenu -> LobbyConnect -> login (auto-creates account) -> CREATECHARACTER.
 cli --port "$CTRL_PORT" wait_for_state --state MAINMENU --timeout-ms 15000 >/dev/null
-wait_for_widget "Play Online"
-cli --port "$CTRL_PORT" click --label "Play Online" >/dev/null
+wait_for_widget "Connect To Lobby"
+cli --port "$CTRL_PORT" click --label "Connect To Lobby" >/dev/null
 cli --port "$CTRL_PORT" wait_for_state --state LOBBYCONNECT --timeout-ms 5000 >/dev/null
 wait_for_widget "Username"
 for ch in a l i c e; do cli --port "$CTRL_PORT" key --key "$ch" >/dev/null; done

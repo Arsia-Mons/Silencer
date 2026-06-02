@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
-# SIL-18: the MainMenu is now an authored cppx screen (modern redesign, not a
-# legacy-pixel carry-over). It asserts the screen's structure via the retained
-# cppx tree (inspect → nodes with role/label/bounds), that the composite is a
-# real non-blank frame (headless UI compositing), and that the layout re-centers
-# responsively. Legacy sprite-pixel placements are intentionally NOT preserved.
+# SIL-96: the MainMenu restores the origin/main design (starfield + SILENCER logo
+# sprite + right-anchored staggered green oval buttons + version footer). It
+# asserts the screen's structure via the retained cppx tree (inspect → nodes with
+# role/label/bounds), that the composite is a real non-blank frame (headless UI
+# compositing), and that the layout stays in-bounds + re-flows responsively.
+# Exact legacy sprite-pixel placements are built with idiomatic flex, not pinned.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -77,7 +78,7 @@ check_layout() {
 
   // 2) The retained tree exposes the three menu buttons, in order, in-bounds.
   const data = JSON.parse(readFileSync(inspectPath, "utf8"));
-  const order = ["Play Online", "Tutorial", "Quit"];
+  const order = ["Connect To Lobby", "Tutorial", "Exit"];
   const buttons = order.map((label) =>
     (data.nodes ?? []).find((n) => n.role === "button" && n.label === label));
   if (buttons.some((b) => !b)) {
@@ -89,13 +90,15 @@ check_layout() {
       console.error(`button out of bounds in ${vw}x${vh}: ${JSON.stringify(b)}`); process.exit(1);
     }
   }
-  // Vertical stack, roughly column-aligned.
+  // Vertical stack with the legacy right-anchored horizontal stagger
+  // (origin/main: −40/0/+40/0 normalized), so x varies within a small band.
   const [play, tut, quit] = buttons;
   if (!(play.y < tut.y && tut.y < quit.y)) {
     console.error(`buttons not stacked top-to-bottom: ${buttons.map((b)=>b.y)}`); process.exit(1);
   }
-  if (Math.abs(play.x - tut.x) > 2 || Math.abs(tut.x - quit.x) > 2) {
-    console.error(`buttons not column-aligned: ${buttons.map((b)=>b.x)}`); process.exit(1);
+  const xs = buttons.map((b) => b.x);
+  if (Math.max(...xs) - Math.min(...xs) > 60) {
+    console.error(`buttons exceed the expected stagger band: ${xs}`); process.exit(1);
   }
   console.log(JSON.stringify({ vw, vh, nonBlack, play: [Math.round(play.x), Math.round(play.y)] }));
   ' "$inspect_out" "$screenshot_out" "$width" "$height"
@@ -112,7 +115,7 @@ bun -e '
 import { readFileSync } from "node:fs";
 const small = JSON.parse(readFileSync(process.argv[1], "utf8")).nodes;
 const large = JSON.parse(readFileSync(process.argv[2], "utf8")).nodes;
-const play = (ns) => ns.find((n) => n.role === "button" && n.label === "Play Online");
+const play = (ns) => ns.find((n) => n.role === "button" && n.label === "Connect To Lobby");
 const s = play(small), l = play(large);
 if (!(l.x > s.x + 50)) { console.error(`menu did not re-center horizontally: ${s.x} -> ${l.x}`); process.exit(1); }
 if (!(l.y > s.y + 50)) { console.error(`menu did not re-center vertically: ${s.y} -> ${l.y}`); process.exit(1); }

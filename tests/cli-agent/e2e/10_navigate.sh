@@ -79,7 +79,7 @@ cli --port "$PORT" click --label OptionsCancel >/dev/null
 cli --port "$PORT" wait_frames --n 3 >/dev/null
 cli --port "$PORT" inspect | bun -e '
 const r = JSON.parse(await new Response(Bun.stdin.stream()).text());
-const onMenu = (r.nodes ?? []).some((n) => n.role === "button" && n.label === "Play Online");
+const onMenu = (r.nodes ?? []).some((n) => n.role === "button" && n.label === "Connect To Lobby");
 const stillOptions = (r.nodes ?? []).some((n) => n.role === "button" && n.label === "Done");
 if (!onMenu || stillOptions) { console.error("Cancel did not revert + pop to MainMenu"); process.exit(1); }
 '

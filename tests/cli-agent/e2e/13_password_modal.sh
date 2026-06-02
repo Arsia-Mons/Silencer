@@ -27,7 +27,7 @@ const ok = nodes.find((n) => n.role === "button" && n.label === "OK");
 // Focus is trapped to the modal: its field is focused; the base MainMenu
 // buttons are still present underneath but no longer focused.
 const menuFocused = nodes.some((n) => n.role === "button" &&
-  ["Play Online","Tutorial","Quit"].includes(n.label) && n.focused);
+  ["Connect To Lobby","Tutorial","Exit"].includes(n.label) && n.focused);
 if (!field || !field.focusable || !field.focused || !ok || menuFocused) {
   console.error("password modal did not expose a focused, trapped field + OK button");
   process.exit(1);

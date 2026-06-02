@@ -16,9 +16,9 @@ trap 'stop_silencer "$PID" "$PORT"' EXIT
 wait_alive "$PORT"
 cli --port "$PORT" wait_for_state --state MAINMENU --timeout-ms 15000 >/dev/null
 
-# Main-menu focus order: Play Online -> Tutorial -> Options -> Quit (focus
-# starts on Play Online). Two tabs (tab == down) move focus to "Options".
-# A third tab would land on "Quit"; activating it quits the app.
+# Main-menu focus order: Connect To Lobby -> Tutorial -> Options -> Quit (focus
+# starts on Connect To Lobby). Two tabs (tab == down) move focus to "Options".
+# A third tab would land on "Exit"; activating it quits the app.
 cli --port "$PORT" key --key tab >/dev/null
 cli --port "$PORT" key --key tab >/dev/null
 
@@ -55,7 +55,7 @@ cli --port "$PORT" wait_frames --n 3 >/dev/null
 cli --port "$PORT" inspect | bun -e '
   const r = JSON.parse(require("fs").readFileSync(0, "utf8"));
   const labels = new Set((r.nodes ?? []).filter((n) => n.role === "button").map((b) => b.label));
-  if (!labels.has("Play Online")) { console.error("escape did not return to the main menu"); process.exit(1); }
+  if (!labels.has("Connect To Lobby")) { console.error("escape did not return to the main menu"); process.exit(1); }
   if (labels.has("Done")) { console.error("Options overlay still open after escape"); process.exit(1); }
 '
 

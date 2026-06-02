@@ -209,6 +209,8 @@ bake(40, 4, cppxChrome.dialog_msg, &cppxChrome.dialog_msg_w, &cppxChrome.dialog_
 bake(40, 2, cppxChrome.dialog_pw, &cppxChrome.dialog_pw_w, &cppxChrome.dialog_pw_h);
 // bank 6 idx0 — the full-screen starfield+planet menu background.
 bake(6, 0, cppxChrome.starfield);
+// bank 208 frame 60 — the static SILENCER logo (final reveal frame).
+bake(208, 60, cppxChrome.logo, &cppxChrome.logo_w, &cppxChrome.logo_h);
 }
 
 void GameUiPipeline::RenderCppxClientUiFrame(Surface& surface) {
@@ -710,7 +712,8 @@ client::ui::SettingsProviderValue{settings}, ::ui::children({tree}));
 tree = client::ui::SessionProvider(
 client::ui::SessionProviderValue{session}, ::ui::children({tree}));
 tree = client::ui::AppProvider(
-client::ui::AppProviderValue{[this]{ game.quitRequested = true; }},
+client::ui::AppProviderValue{.quit = [this]{ game.quitRequested = true; },
+                            .version = SILENCER_VERSION},
 ::ui::children({tree}));
 // SIL-87: baked legacy-sprite chrome ids (read by use_chrome()).
 tree = client::ui::ChromeTexturesProvider(cppxChrome, ::ui::children({tree}));

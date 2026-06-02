@@ -28,6 +28,7 @@ App use_app() {
   return {
       .can_quit = static_cast<bool>(value->quit),
       .quit = value->quit,
+      .version = value->version ? value->version : "",
   };
 }
 

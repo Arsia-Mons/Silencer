@@ -11,6 +11,9 @@ namespace client::ui {
 // the callback, never the handle.
 struct AppProviderValue {
   std::function<void()> quit = {};
+  // Build version string (a static string literal owned by the composition root,
+  // safe to copy by pointer); shown in the main-menu footer.
+  const char *version = "";
 };
 
 ::ui::UiElement AppProvider(const AppProviderValue &value,

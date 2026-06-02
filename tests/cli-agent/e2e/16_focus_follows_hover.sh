@@ -80,7 +80,7 @@ if (otherHovered.length !== 0) {
 }
 
 // Hover is a *visual* state only: focus must NOT have moved to Options. The
-// menu autofocuses "Play Online", and hovering Options must not change that.
+// menu autofocuses "Connect To Lobby", and hovering Options must not change that.
 const focusedWhileHover = buttons(hover).filter((b) => b.focused === true);
 if (focusedWhileHover.some((b) => b.label === "Options")) {
   console.error(`hover moved focus to Options (it must not): ${JSON.stringify(labelled(hover))}`);

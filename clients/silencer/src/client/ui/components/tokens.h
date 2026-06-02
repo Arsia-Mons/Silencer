@@ -124,6 +124,7 @@ inline ::ui::StylePatch image_patch(uint32_t texture_id,
       .background(::ui::Color{0, 0, 0, 0}) // no opaque fill under the sprite
       .gradient(::ui::Gradient{})          // defeat the role's control gradient
       .border(::ui::Border{})              // sprite carries its own edge
+      .outline(::ui::Outline{})            // no vector focus ring; focus = sprite brightness
       .corner_radius(0.f);                 // the sprite shape is authored, not rounded
 }
 

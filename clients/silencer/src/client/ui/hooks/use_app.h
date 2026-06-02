@@ -11,6 +11,8 @@ namespace client::ui {
 struct App {
   bool can_quit = false;
   std::function<void()> quit = {};
+  // Build version string for the menu footer (e.g. "v00058"); "" if unset.
+  const char *version = "";
 };
 
 App use_app();

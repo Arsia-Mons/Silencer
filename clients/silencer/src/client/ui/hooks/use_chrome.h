@@ -50,6 +50,10 @@ struct ChromeTextures {
   // Full-screen starfield+planet background (bank 6 idx0), stretched to the
   // screen root (no aspect-cover in v1 — legacy stretched too).
   uint32_t starfield = 0;
+  // Static SILENCER logo (bank 208 frame 60 — the final frame of the legacy
+  // reveal animation; SIL-107 animates the 29..60 sequence).
+  uint32_t logo = 0;
+  uint16_t logo_w = 0, logo_h = 0;
 };
 
 // Read the baked chrome ids for the current frame. Requires a

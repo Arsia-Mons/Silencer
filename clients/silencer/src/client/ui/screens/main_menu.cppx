@@ -2,12 +2,14 @@
 
 #include "client/ui/components/actions/actions.h"
 #include "client/ui/components/layout/layout.h"
-#include "client/ui/components/surfaces/surfaces.h"
 #include "client/ui/components/text/text.h"
+#include "client/ui/components/tokens.h"
 #include "client/ui/hooks/use_app.h"
+#include "client/ui/hooks/use_chrome.h"
 #include "client/ui/hooks/use_navigation.h"
 #include "client/ui/hooks/use_session.h"
 #include "client/ui/screens/options_screen.h"
+#include "ui/components/box.h"
 #include "ui/runtime/react.h"
 
 #include <functional>
@@ -16,56 +18,81 @@
 namespace client::ui {
 namespace {
 
-// The JSX lowering emits each tag's component function + `<Tag>Props` type
-// unqualified, so the silencer semantic layer (functions + Props + variant
-// enums) is pulled wholesale into this TU-local namespace, plus the runtime's
-// `children()` child-list builder.
 using namespace silencer;
 using ::ui::children;
+using ::ui::components::Box;
+using ::ui::components::BoxProps;
 
 struct MainMenuProps {
   uint32_t unused = 0;
 };
 
+// SIL-96: origin/main main menu — starfield root (ScreenLayout Menu), a left
+// SILENCER logo sprite + a right-anchored staggered stack of green oval buttons
+// with the legacy labels, and a bottom-left version footer. No slate card.
 ::ui::UiElement MainMenuView(const MainMenuProps &) {
   Session session = use_session();
   App app = use_app();
   Navigation nav = use_navigation();
+  ChromeTextures chrome = use_chrome();
 
-  // Options is Tier-1 navigation: an Overlay pushed over the menu (it never
-  // changes the session phase). Lobby/character-create entries join as those
-  // screens land (SIL-20..SIL-21).
   std::function<void()> open_options = [nav]() {
     if (nav.push)
       nav.push(std::make_unique<OptionsScreen>());
   };
 
+  // The SILENCER wordmark is the bank-208 logo sprite (drawn in a ~350px slot
+  // that flex-shrinks so the right oval stack stays in-bounds on narrow/portrait
+  // windows — the image stretches into the shrunk slot). Falls back to the
+  // Hero-title text if the sprite has not baked yet so the menu never blanks.
+  ::ui::UiElement logo =
+      chrome.logo
+          ? Box(BoxProps{
+                .key = "logoimg",
+                .layout = ::ui::LayoutStyle{
+                    .flex_shrink = ::ui::StyleFloat::points(1.0f),
+                    .width = ::ui::Length::points(350.0f),
+                    .min_width = ::ui::Length::points(0.0f),
+                    .height = ::ui::Length::points((float)chrome.logo_h)},
+                .style = tokens::image_patch(chrome.logo)})
+          : ScreenTitle(ScreenTitleProps{.key = "logotxt",
+                                         .variant = ScreenTitleVariant::Hero,
+                                         .value = "SILENCER"});
+
   return <ScreenLayout key="root" variant={ScreenLayoutVariant::Menu}>
-    <Panel key="panel" variant={PanelVariant::Hero}>
-      <ScreenTitle key="title" variant={ScreenTitleVariant::Hero} value="SILENCER" />
-      <ScreenSubtitle key="subtitle" value="Tactical multiplayer action" />
-      <AppButton
-        key="play"
-        controlId="PlayOnline"
-        variant={AppButtonVariant::Primary}
-        label="Play Online"
-        onPress={session.play_online}
-      />
-      <AppButton
-        key="tutorial"
-        controlId="Tutorial"
-        label="Tutorial"
-        onPress={session.start_tutorial}
-      />
-      <AppButton key="options" controlId="Options" label="Options" onPress={open_options} />
-      <AppButton
-        key="quit"
-        controlId="Quit"
-        disabled={!app.can_quit}
-        label="Quit"
-        onPress={app.quit}
-      />
-    </Panel>
+    <Box
+      key="row"
+      layout={::ui::LayoutStyle{
+        .direction = ::ui::FlexDirection::Row,
+        .align_items = ::ui::AlignItems::Center,
+        .justify_content = ::ui::JustifyContent::SpaceBetween,
+        .width = ::ui::Length::percent(100.0f),
+        .height = ::ui::Length::percent(100.0f)}}>
+      {logo}
+      <Box
+        key="stack"
+        layout={::ui::LayoutStyle{
+          .direction = ::ui::FlexDirection::Column,
+          .align_items = ::ui::AlignItems::Start,
+          .flex_shrink = ::ui::StyleFloat::points(0.0f),
+          .gap = 34.0f}}>
+        <Box key="w0" layout={::ui::LayoutStyle{.margin = ::ui::EdgeSizes{-40.0f, 0.0f, 0.0f, 0.0f}}}>
+          <AppButton key="connect" controlId="ConnectToLobby" variant={AppButtonVariant::Oval} label="Connect To Lobby" onPress={session.play_online} />
+        </Box>
+        <AppButton key="tutorial" controlId="Tutorial" variant={AppButtonVariant::Oval} label="Tutorial" onPress={session.start_tutorial} />
+        <Box key="w2" layout={::ui::LayoutStyle{.margin = ::ui::EdgeSizes{40.0f, 0.0f, 0.0f, 0.0f}}}>
+          <AppButton key="options" controlId="Options" variant={AppButtonVariant::Oval} label="Options" onPress={open_options} />
+        </Box>
+        <AppButton key="exit" controlId="Exit" variant={AppButtonVariant::Oval} disabled={!app.can_quit} label="Exit" onPress={app.quit} />
+      </Box>
+    </Box>
+    <Box
+      key="footer"
+      layout={::ui::LayoutStyle{
+        .position = ::ui::PositionType::Absolute,
+        .position_inset = ::ui::EdgeSizes{10.0f, {}, {}, 17.0f}}}>
+      <BodyText key="ver" variant={BodyTextVariant::Body} value={app.version} />
+    </Box>
   </ScreenLayout>
 }
 

@@ -96,8 +96,8 @@ wait_for_widget() {
 }
 
 cli --port "$CTRL_PORT" wait_for_state --state MAINMENU --timeout-ms 15000
-wait_for_widget "Play Online"
-cli --port "$CTRL_PORT" click --label "Play Online" >/dev/null
+wait_for_widget "Connect To Lobby"
+cli --port "$CTRL_PORT" click --label "Connect To Lobby" >/dev/null
 cli --port "$CTRL_PORT" wait_for_state --state LOBBYCONNECT --timeout-ms 5000
 wait_for_widget "Username"
 
