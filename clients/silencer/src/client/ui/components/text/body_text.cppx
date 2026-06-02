@@ -10,32 +10,28 @@ using ::ui::components::Text;
 using ::ui::components::TextProps;
 
 ::ui::UiElement BodyText(const BodyTextProps &props) {
-  uint16_t font = tokens::kFontBody;
+  // All body variants render in the Body face at its native em; the variant
+  // selects color + box height (the slate point-size deltas were inventions).
   float height = 16.0f;
   ::ui::Color color = tokens::kTextBody;
   switch (props.variant) {
   case BodyTextVariant::Body:
-    font = tokens::kFontBody;
     height = 16.0f;
     color = tokens::kTextBody;
     break;
   case BodyTextVariant::Strong:
-    font = tokens::kFontStrong;
     height = 18.0f;
     color = tokens::kTextWeaponName;
     break;
   case BodyTextVariant::Message:
-    font = tokens::kFontMessage;
     height = 18.0f;
     color = tokens::kTextBodyMuted;
     break;
   case BodyTextVariant::Detail:
-    font = tokens::kFontDetail;
     height = 16.0f;
     color = tokens::kTextWeaponDetail;
     break;
   case BodyTextVariant::Summary:
-    font = tokens::kFontBody;
     height = 18.0f;
     color = tokens::kTextBody;
     break;
@@ -54,7 +50,8 @@ using ::ui::components::TextProps;
     key={props.key}
     value={props.value}
     layout={{.height = ::ui::Length::points(height)}}
-    style={tokens::text_patch(color, font)}
+    style={tokens::text_patch(color, tokens::kFontBodyEm, tokens::kFaceBody,
+                              tokens::kLineBody)}
   />
 }
 

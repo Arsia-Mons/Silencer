@@ -14,7 +14,8 @@ using ::ui::components::TextProps;
     key={props.key}
     value={props.value}
     layout={{.height = ::ui::Length::points(22.0f)}}
-    style={tokens::text_patch(tokens::kTextSubtitle, tokens::kFontSubtitle)}
+    style={tokens::text_patch(tokens::kTextSubtitle, tokens::kFontLarge,
+                              tokens::kFaceLarge, tokens::kLineLarge)}
   />
 }
 

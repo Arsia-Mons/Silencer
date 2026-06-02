@@ -122,7 +122,8 @@ const Theme &app_theme() {
     th.checkbox_mark.checked.background = opt(kAccent); // visible accent mark
 
     th.box.base = VisualStyle{};
-    th.text.base.text = TextVisual{th.text_default, 0, 14};
+    // Base text role: Body face (0) at the legacy native em (11).
+    th.text.base.text = TextVisual{th.text_default, 0, 11};
 
     // Dialog: a rounded, slightly elevated panel a step darker than the controls
     // so stacked controls read as raised against it.

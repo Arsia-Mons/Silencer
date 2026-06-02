@@ -62,17 +62,28 @@ constexpr ::ui::Color kTextWeaponDetail = {176, 186, 202, 255};
 constexpr ::ui::Color kTextWeaponDetailOff = {120, 128, 142, 255};
 constexpr ::ui::Color kTextHud = {224, 231, 241, 255};         // #E0E7F1
 
-// ---- Font sizes ----
-constexpr uint16_t kFontHeroTitle = 30;
-constexpr uint16_t kFontScreenTitle = 26;
-constexpr uint16_t kFontDialogTitle = 28;
-constexpr uint16_t kFontPopupTitle = 22;
-constexpr uint16_t kFontSubtitle = 16;
-constexpr uint16_t kFontHud = 18;
-constexpr uint16_t kFontStrong = 16;
-constexpr uint16_t kFontMessage = 15;
-constexpr uint16_t kFontBody = 14;
-constexpr uint16_t kFontDetail = 12;
+// ---- Font faces (font_id; see render/cppx_ui/font_registry.h FaceId) ----
+// The four bitmap-derived legacy OTF faces. The product layer sets font_id per
+// role so titles/headings/body/tiny each render in their own face (everything
+// previously collapsed to Body face 0 at arbitrary point sizes).
+constexpr uint16_t kFaceBody = 0;  // silencer-ui      (bank 133)
+constexpr uint16_t kFaceLarge = 1; // silencer-ui-large(bank 134) — headings
+constexpr uint16_t kFaceTitle = 2; // silencer-title   (bank 136) — titles
+constexpr uint16_t kFaceTiny = 3;  // silencer-tiny    (bank 132) — HUD/tiny
+
+// ---- Native-em sizes + legacy line heights ----
+// Authority: legacy text.cpp advance/lineHeight table. The OTFs are bitmap-
+// derived, so rendering at the native em keeps glyphs crisp (no fractional
+// scaling). bank-135 roles (screen titles / HUD counters) are approximated by
+// the Title/Large faces until silencer-135.otf is generated (SIL-95).
+constexpr uint16_t kFontTitle = 24;  // Title face native em
+constexpr float kLineTitle = 23.f;
+constexpr uint16_t kFontLarge = 13;  // Large face native em (headings/labels)
+constexpr float kLineLarge = 15.f;
+constexpr uint16_t kFontBodyEm = 11; // Body face native em
+constexpr float kLineBody = 11.f;
+constexpr uint16_t kFontTiny = 5;    // Tiny face native em (HUD/tiny)
+constexpr float kLineTiny = 7.f;
 
 // ---- Border widths ----
 constexpr float kBorderWidth = 1.0f;
@@ -97,9 +108,15 @@ inline ::ui::StylePatch panel_patch(::ui::Color background, ::ui::Color border,
           {border, border, border, border}});
 }
 
-// Text paint (color + size). align/wrap/line_height stay defaults.
-inline ::ui::StylePatch text_patch(::ui::Color color, uint16_t font_size) {
-  return ::ui::patch().text(::ui::TextVisual{.color = color, .font_size = font_size});
+// Text paint (color + face + native-em size + legacy line height). font_id
+// selects the OTF face; line_height 0 falls back to the face's natural skip.
+inline ::ui::StylePatch text_patch(::ui::Color color, uint16_t font_size,
+                                   uint16_t font_id = kFaceBody,
+                                   float line_height = 0.f) {
+  return ::ui::patch().text(::ui::TextVisual{.color = color,
+                                             .font_id = font_id,
+                                             .font_size = font_size,
+                                             .line_height = line_height});
 }
 
 } // namespace silencer::tokens
