@@ -6,6 +6,7 @@
 #include "client/ui/components/tokens.h"
 #include "client/ui/hooks/use_app.h"
 #include "client/ui/hooks/use_chrome.h"
+#include "client/ui/hooks/use_clock.h"
 #include "client/ui/hooks/use_navigation.h"
 #include "client/ui/hooks/use_session.h"
 #include "client/ui/screens/options_screen.h"
@@ -36,6 +37,30 @@ struct MainMenuProps {
   Navigation nav = use_navigation();
   ChromeTextures chrome = use_chrome();
 
+  // SIL-94: ping-pong the baked logo reveal frames on the per-frame wall clock
+  // (a slow ~8fps reveal/retract loop). Falls back to the static logo when the
+  // animation frames have not baked.
+  Clock clock = use_clock();
+  uint32_t *logo_accum = use_state<uint32_t>(0u);
+  int *logo_step = use_state<int>(0);
+  *logo_accum += clock.delta_ms;
+  const uint32_t kLogoFrameMs = 120;
+  const int lf = chrome.logo_frame_count;
+  const int span = lf > 1 ? 2 * lf - 2 : 1; // ping-pong period
+  while (*logo_accum >= kLogoFrameMs) {
+    *logo_accum -= kLogoFrameMs;
+    *logo_step = (*logo_step + 1) % span;
+  }
+  uint32_t logo_tex = chrome.logo;
+  if (lf > 0) {
+    int idx = *logo_step < lf ? *logo_step : span - *logo_step;
+    if (idx < 0)
+      idx = 0;
+    if (idx >= lf)
+      idx = lf - 1;
+    logo_tex = chrome.logo_frame[idx];
+  }
+
   std::function<void()> open_options = [nav]() {
     if (nav.push)
       nav.push(std::make_unique<OptionsScreen>());
@@ -54,7 +79,7 @@ struct MainMenuProps {
                     .width = ::ui::Length::points(350.0f),
                     .min_width = ::ui::Length::points(0.0f),
                     .height = ::ui::Length::points((float)chrome.logo_h)},
-                .style = tokens::image_patch(chrome.logo)})
+                .style = tokens::image_patch(logo_tex)})
           : ScreenTitle(ScreenTitleProps{.key = "logotxt",
                                          .variant = ScreenTitleVariant::Hero,
                                          .value = "SILENCER"});

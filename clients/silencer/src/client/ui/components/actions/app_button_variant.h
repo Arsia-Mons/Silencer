@@ -72,7 +72,12 @@ inline ::ui::LayoutStyle app_button_oval_layout(AppButtonSize size) {
 // (NOT the legacy smooth 5-phase 24fps ramp — that needs the clock seam, SIL-107).
 // texture_id 0 (not-yet-baked frame or seam slip) falls back to a vector
 // stadium-radius oval (corner_radius = h/2, cool-blue outline, dark fill).
-inline ::ui::StyleStatePatch app_button_oval_patch(uint32_t tex) {
+// `lit` tints the hover/focus (active) states — the composition root drives it
+// from the use_clock() phase so a focused oval button ramps its brightness at the
+// legacy ~24fps cadence (SIL-94). The idle (base) state stays dimmed, so only the
+// active button animates.
+inline ::ui::StyleStatePatch
+app_button_oval_patch(uint32_t tex, ::ui::Color lit = {255, 255, 255, 255}) {
   const ::ui::TextVisual label{.color = tokens::kTextTitle,
                                .font_id = tokens::kFaceTitle,
                                .font_size = tokens::kFontTitle,
@@ -97,9 +102,9 @@ inline ::ui::StyleStatePatch app_button_oval_patch(uint32_t tex) {
     p.text = ::ui::opt(label);
     return p;
   };
-  ov.base = oval(::ui::Color{150, 150, 150, 255});         // idle (dimmed)
-  ov.hover = oval(::ui::Color{255, 255, 255, 255});        // lit on hover
-  ov.focus_visible = oval(::ui::Color{255, 255, 255, 255}); // lit on focus
+  ov.base = oval(::ui::Color{150, 150, 150, 255}); // idle (dimmed)
+  ov.hover = oval(lit);                            // lit on hover (clock-ramped)
+  ov.focus_visible = oval(lit);                    // lit on focus (clock-ramped)
   return ov;
 }
 

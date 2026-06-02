@@ -3,7 +3,10 @@
 #include "ui/components/button.h"
 #include "client/ui/components/tokens.h"
 #include "client/ui/hooks/use_chrome.h"
+#include "client/ui/hooks/use_clock.h"
+#include "ui/runtime/react.h"
 
+#include <cstdint>
 #include <functional>
 
 namespace silencer {
@@ -13,6 +16,21 @@ using ::ui::components::Button;
 using ::ui::components::ButtonProps;
 
 ::ui::UiElement AppButton(const AppButtonProps &props) {
+  // SIL-94: a frame-rate-independent phase counter stepped from the per-frame
+  // wall clock (~24fps legacy cadence). Hooks are unconditional (a button's
+  // variant is stable for its lifetime, but keep the call order invariant
+  // anyway); only the Oval branch consumes the ramp.
+  client::ui::Clock clock = client::ui::use_clock();
+  uint32_t *anim_accum = use_state<uint32_t>(0u);
+  int *anim_phase = use_state<int>(0);
+  *anim_accum += clock.delta_ms;
+  const uint32_t kFrameMs = 42; // ~24 fps
+  while (*anim_accum >= kFrameMs) {
+    *anim_accum -= kFrameMs;
+    *anim_phase = (*anim_phase + 1) % 10;
+  }
+  const int tri = *anim_phase < 5 ? *anim_phase : 9 - *anim_phase; // 0..4..0
+  const uint8_t lit = static_cast<uint8_t>(190 + tri * 16);        // 190..254
   // Wrap the no-arg semantic callbacks into the event-taking ui callbacks; the
   // host events are intentionally ignored (the semantic API is event-free).
   std::function<void(const ::ui::ActivationEvent &)> on_activate = {};
@@ -44,7 +62,7 @@ using ::ui::components::ButtonProps;
     else if (props.size == AppButtonSize::Lg)
       tex = chrome.oval_lg;
     layout = app_button_oval_layout(props.size);
-    style = app_button_oval_patch(tex);
+    style = app_button_oval_patch(tex, ::ui::Color{lit, lit, lit, 255});
   } else if (props.variant == AppButtonVariant::Chrome) {
     client::ui::ChromeTextures chrome = client::ui::use_chrome();
     layout = app_button_chrome_layout();

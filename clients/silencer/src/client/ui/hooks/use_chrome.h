@@ -51,9 +51,15 @@ struct ChromeTextures {
   // screen root (no aspect-cover in v1 — legacy stretched too).
   uint32_t starfield = 0;
   // Static SILENCER logo (bank 208 frame 60 — the final frame of the legacy
-  // reveal animation; SIL-107 animates the 29..60 sequence).
+  // reveal animation; SIL-107 animates the full 29..60 sequence).
   uint32_t logo = 0;
   uint16_t logo_w = 0, logo_h = 0;
+  // SIL-94: a few bank-208 reveal frames for the animated logo. [0] is the
+  // final/full frame (== `logo`); later entries step back through the reveal so
+  // the main menu ping-pongs them via use_clock. count == 0 => static `logo`.
+  static constexpr int kLogoFrames = 4;
+  uint32_t logo_frame[kLogoFrames] = {};
+  int logo_frame_count = 0;
   // Boolean-toggle indicator cells (bank 6): a 2-cell-wide oval — OFF = idx12|13
   // (hollow), ON = idx14|15 (filled). SIL-100 BooleanSettingRow.
   uint32_t toggle_off_l = 0, toggle_off_r = 0; // idx12, idx13

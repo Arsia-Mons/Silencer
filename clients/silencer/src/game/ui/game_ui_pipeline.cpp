@@ -29,6 +29,7 @@
 #include "client/ui/hooks/use_updater.h"
 #include "client/ui/providers/app_provider.h"
 #include "client/ui/providers/chrome_textures_provider.h"
+#include "client/ui/providers/clock_provider.h"
 #include "client/ui/providers/key_map_provider.h"
 #include "client/ui/providers/keybind_capture_provider.h"
 #include "client/ui/providers/lobby_provider.h"
@@ -211,6 +212,17 @@ bake(40, 2, cppxChrome.dialog_pw, &cppxChrome.dialog_pw_w, &cppxChrome.dialog_pw
 bake(6, 0, cppxChrome.starfield);
 // bank 208 frame 60 — the static SILENCER logo (final reveal frame).
 bake(208, 60, cppxChrome.logo, &cppxChrome.logo_w, &cppxChrome.logo_h);
+// SIL-94: a few reveal frames for the animated logo. [0] is the full frame; the
+// rest step back through the legacy reveal so use_clock can ping-pong them.
+{
+const size_t kLogoIdx[client::ui::ChromeTextures::kLogoFrames] = {60, 56, 52, 48};
+int n = 0;
+for(int i = 0; i < client::ui::ChromeTextures::kLogoFrames; ++i){
+bake(208, kLogoIdx[i], cppxChrome.logo_frame[i]);
+if(cppxChrome.logo_frame[i]) n = i + 1; // count contiguous baked frames
+}
+cppxChrome.logo_frame_count = n;
+}
 // bank 6 idx12-15 — boolean toggle indicator cells (off = 12|13, on = 14|15).
 bake(6, 12, cppxChrome.toggle_off_l, &cppxChrome.toggle_w, &cppxChrome.toggle_h);
 bake(6, 13, cppxChrome.toggle_off_r);
@@ -720,6 +732,14 @@ tree = client::ui::AppProvider(
 client::ui::AppProviderValue{.quit = [this]{ game.quitRequested = true; },
                             .version = SILENCER_VERSION},
 ::ui::children({tree}));
+// SIL-94: per-frame wall-clock for component animation (use_clock). Monotonic
+// SDL ticks at frame build; delta since the previous UI frame.
+uint32_t cppxNowMs = SDL_GetTicks();
+client::ui::Clock cppxClock = {
+cppxNowMs,
+cppxLastUiTicks_ ? (cppxNowMs - cppxLastUiTicks_) : 0u};
+cppxLastUiTicks_ = cppxNowMs;
+tree = client::ui::ClockProvider(cppxClock, ::ui::children({tree}));
 // SIL-87: baked legacy-sprite chrome ids (read by use_chrome()).
 tree = client::ui::ChromeTexturesProvider(cppxChrome, ::ui::children({tree}));
 tree = silencer::game_ui::ServerProvider(

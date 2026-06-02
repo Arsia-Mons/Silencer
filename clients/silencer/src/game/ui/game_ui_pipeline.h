@@ -112,6 +112,9 @@ int cppxUiW = 0;
 int cppxUiH = 0;
 bool cppxReactInitialized = false;
 bool cppxAppRootPushed = false;
+// SIL-94: monotonic wall-clock of the previous UI frame, for the use_clock()
+// delta. 0 until the first frame.
+uint32_t cppxLastUiTicks_ = 0;
 
 // SIL-87: baked legacy-sprite chrome ids, re-baked when the host resets its
 // renderer (resize). Populated after ensure(), read by the ChromeTexturesProvider
