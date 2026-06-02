@@ -10,6 +10,7 @@
 #include <new>
 #include <stdint.h>
 #include <type_traits>
+#include <vector>
 
 namespace ui {
 
@@ -151,6 +152,10 @@ public:
 
   UiChildren children(std::initializer_list<UiElement> items);
   UiChildren children(std::initializer_list<UiChild> items);
+  // Dynamic-count children: copies `count` elements into the frame arena. Lets
+  // a screen build a runtime-sized list (keybind table, lobby roster) with a
+  // real loop instead of the fixed-slot empty()-padding workaround.
+  UiChildren children(const UiElement *items, int count);
   UiElement empty();
   UiElement fragment(UiChildren children);
   UiElement host(HostKind kind, const HostProps &props);
@@ -267,6 +272,7 @@ private:
 UiElementFrame *current_element_frame();
 UiChildren children(std::initializer_list<UiElement> items);
 UiChildren children(std::initializer_list<UiChild> items);
+UiChildren children(const std::vector<UiElement> &items);
 UiElement empty();
 UiElement fragment(UiChildren children);
 UiElement host(HostKind kind, const HostProps &props);

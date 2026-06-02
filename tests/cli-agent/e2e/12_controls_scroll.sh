@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# Drives the modern cppx Options -> Controls (keybinds) screen and asserts the
-# keybind list renders. In the cppx UI, Options and Controls are modal dialogs
-# layered over MAINMENU (there is no separate OPTIONS / OPTIONSCONTROLS game
-# state), so navigation is verified by polling the retained node tree rather
-# than wait_for_state. The controls dialog shows one row per rebindable action
-# (Fire/Jump/Use/Chat) with a Rebind button, plus preset/save/back controls.
-# (Historically this scenario also drove a scroll op; the modern screens have no
-# scrollable surface, so that no longer applies.)
+# SIL-108: the Options -> Controls screen restored to origin/main full-IA parity.
+# It is now a REAL scrollable, selectable keybind table: every action in the
+# ACTION_TABLE renders as a selectable two-column row (label + AND/OR binding),
+# inside a virtualizing scroll-viewport (SIL-111). Selecting a row drives a
+# single Rebind/Clear pair below; preset is the green oval; Save/Revert/Back at
+# the foot. This scenario drives that screen: it mounts, the table SCROLLS
+# (wheel changes which rows are present — proving the viewport + virtualization),
+# and selecting a row updates the Selected readout.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -18,8 +18,6 @@ trap 'stop_silencer "$PID" "$PORT"' EXIT
 
 wait_alive "$PORT"
 
-# Poll the retained cppx tree for a node whose control id OR accessibility label
-# equals the argument (the introspection `inspect` op returns `nodes`).
 wait_for_node() {
   local label="$1"
   for i in $(seq 1 100); do
@@ -31,68 +29,66 @@ wait_for_node() {
     sleep 0.05
   done
   echo "node '$label' never appeared" >&2
-  cli --port "$PORT" inspect >&2 || true
   return 1
+}
+
+# Snapshot the set of visible keybind-row control ids (Bind*) — the virtualizing
+# viewport only mounts the window of rows currently on screen.
+visible_rows() {
+  cli --port "$PORT" inspect | bun -e '
+const r = JSON.parse(await new Response(Bun.stdin.stream()).text());
+const n = r.nodes ?? [];
+const binds = new Set(n.filter((x) => (x.control_id ?? "").startsWith("Bind")).map((x) => x.control_id));
+console.log([...binds].sort().join(","));
+'
 }
 
 cli --port "$PORT" wait_for_state --state MAINMENU --timeout-ms 15000 >/dev/null
 
-# Open the Options dialog, then enter the Controls (keybinds) screen. Both are
-# modal overlays over MAINMENU, surfaced as focusable buttons in the tree.
 cli --port "$PORT" click --label "Options" >/dev/null
 wait_for_node "OptionsControls"
 cli --port "$PORT" click --label "OptionsControls" >/dev/null
 wait_for_node "ControlsBack"
-cli --port "$PORT" wait_frames --n 2 >/dev/null
+cli --port "$PORT" wait_frames --n 3 >/dev/null
 
-# Assert the keybind list renders: a Rebind button per rebindable action, the
-# matching action labels, and the chrome (preset cycle, back). Everything must
-# be in-bounds of the UI-space viewport.
+# The full screen chrome is present (not truncated): title, oval preset, the
+# single select-then-act Rebind/Clear, and Save/Revert/Back.
 cli --port "$PORT" inspect | bun -e '
 const r = JSON.parse(await new Response(Bun.stdin.stream()).text());
-const nodes = r.nodes ?? [];
-
+const n = r.nodes ?? [];
 const fail = (m) => { console.error(m); process.exit(1); };
-
-// Per-action keybind rows: focusable buttons with a Rebind* control_id.
-const rebinds = nodes.filter((n) =>
-  n.role === "button" &&
-  n.focusable === true &&
-  typeof n.control_id === "string" &&
-  n.control_id.startsWith("Rebind")
-);
-if (rebinds.length < 3) {
-  fail(`expected multiple keybind rows, got ${rebinds.length}: ` +
-    JSON.stringify(rebinds.map((n) => n.control_id)));
+const has = (id) => n.some((x) => x.control_id === id);
+for (const id of ["CyclePreset", "RebindSelected", "ClearSelected", "SaveBinds", "RevertBinds", "ControlsBack", "ControlsList"]) {
+  if (!has(id)) fail(`Controls screen missing ${id}`);
 }
-
-// The action labels for those rows (text nodes) should be present.
-const textValues = new Set(
-  nodes.filter((n) => n.role === "text").map((n) => n.value)
-);
-for (const action of ["Fire", "Jump", "Use", "Chat"]) {
-  if (!textValues.has(action)) fail(`missing keybind action label: ${action}`);
-}
-
-// Controls-screen chrome must be present.
-if (!textValues.has("Controls")) fail("missing Controls title");
-if (!nodes.some((n) => n.control_id === "CyclePreset")) fail("missing Cycle Preset button");
-if (!nodes.some((n) => n.control_id === "ControlsBack")) fail("missing Back button");
-
-// Every keybind row must render with a positive in-bounds box. Root is the
-// full UI-space viewport.
-const root = nodes.find((n) => n.role === "generic") ?? nodes[0];
-if (!root || !(root.w > 0) || !(root.h > 0)) fail("missing root viewport node");
-for (const n of rebinds) {
-  if (!(n.w > 0) || !(n.h > 0)) fail(`keybind row ${n.control_id} has no size`);
-  if (n.x < 0 || n.y < 0 || n.x + n.w > root.w + 1 || n.y + n.h > root.h + 1) {
-    fail(`keybind row ${n.control_id} out of bounds: ` +
-      JSON.stringify({ x: n.x, y: n.y, w: n.w, h: n.h }));
-  }
-}
+if (!n.some((x) => x.role === "text" && x.value === "Controls")) fail("missing Controls title");
+const rows = n.filter((x) => (x.control_id ?? "").startsWith("Bind"));
+if (rows.length < 4) fail(`expected several visible keybind rows, got ${rows.length}`);
+if (!n.some((x) => x.role === "text" && (x.value ?? "").startsWith("Selected:"))) fail("missing Selected readout");
 '
 
-# Back returns to the Options dialog (its sub-buttons reappear).
+# Scroll the table: the visible row window must CHANGE (viewport + virtualization).
+top_rows="$(visible_rows)"
+cli --port "$PORT" scroll --x 320 --y 250 --dy -8 >/dev/null
+cli --port "$PORT" wait_frames --n 3 >/dev/null
+scrolled_rows="$(visible_rows)"
+if [ "$top_rows" = "$scrolled_rows" ]; then
+  echo "scroll did not change the visible row window ($top_rows)"; exit 1
+fi
+
+# Scroll back to the top and select a row; the Selected readout updates.
+cli --port "$PORT" scroll --x 320 --y 250 --dy 40 >/dev/null
+cli --port "$PORT" wait_frames --n 3 >/dev/null
+cli --port "$PORT" click --label Bind2 >/dev/null
+cli --port "$PORT" wait_frames --n 2 >/dev/null
+cli --port "$PORT" inspect | bun -e '
+const r = JSON.parse(await new Response(Bun.stdin.stream()).text());
+const sel = (r.nodes ?? []).find((n) => n.role === "text" && (n.value ?? "").startsWith("Selected:"));
+if (!sel) { console.error("no Selected readout after click"); process.exit(1); }
+if (sel.value === "Selected: (none)") { console.error("selection did not update"); process.exit(1); }
+'
+
+# Back returns to the Options dialog.
 cli --port "$PORT" click --label "ControlsBack" >/dev/null
 wait_for_node "OptionsControls"
 

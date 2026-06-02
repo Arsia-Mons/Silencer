@@ -15,6 +15,11 @@ struct ScrollViewProps {
   float viewport_height = 0.0f; // the clipped window height (points)
   float content_height = 0.0f;  // total content extent (points)
   float step = 32.0f;           // wheel notch / arrow-key line step
+  // Uniform row height. When > 0 the viewport VIRTUALIZES: only the children
+  // whose row intersects the window (plus 1 row of overscan each side) are
+  // rendered, so a 30+ row table stays within the retained-tree node budget.
+  // Children must be a flat, uniform-height list in row order. 0 => render all.
+  float row_height = 0.0f;
   bool show_scrollbar = true;   // thin right-edge thumb when content overflows
   ::ui::LayoutStyle layout = {}; // extra viewport layout (width, border, fill)
   ::ui::StyleStatePatch style = {}; // viewport paint overlay over theme.box

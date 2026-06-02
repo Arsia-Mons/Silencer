@@ -137,12 +137,21 @@ bool ClientUi::update_retained_runtime(const ::ui::FlexLayoutAdapter &layout,
   for (int i = 0; i < input.key_event_count; ++i) {
     retained_tree_.invoke_key(active, input.key_events[i]);
   }
-  // Scroll wheel routes to the node under the pointer (the hovered scrollable),
-  // not the focused node — mirrors pointer hit-testing (SIL-111).
+  // Scroll wheel routes to the node under the pointer, then BUBBLES up the
+  // ancestor chain to the first node that handles it (its on_wheel) — mirrors
+  // DOM wheel bubbling. The topmost hovered node is often a child control (a
+  // button in a scrollable row) with no on_wheel; the scroll viewport that owns
+  // the wheel is an ancestor (SIL-111).
   if (input.wheel_x != 0.0f || input.wheel_y != 0.0f) {
-    ::ui::NodeId hovered = ::ui::focus_hovered_id(retained_focus_);
-    if (hovered != 0)
-      retained_tree_.invoke_wheel(hovered, input.wheel_x, input.wheel_y);
+    ::ui::NodeId n = ::ui::focus_hovered_id(retained_focus_);
+    while (n != 0) {
+      if (retained_tree_.invoke_wheel(n, input.wheel_x, input.wheel_y))
+        break;
+      ::ui::NodeSnapshot s = {};
+      if (!retained_tree_.snapshot(n, &s))
+        break;
+      n = s.parent_id;
+    }
   }
   for (int i = 0; i < input.text_event_count; ++i) {
     retained_tree_.invoke_text_input(active, input.text_events[i]);

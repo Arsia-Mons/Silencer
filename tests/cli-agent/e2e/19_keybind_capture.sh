@@ -59,17 +59,20 @@ if ((r.pending ?? []).length !== 3) { console.error(`expected 3 pending chips, g
 '
 cli --port "$PORT" keybind capture --op cancel >/dev/null
 
-# --- OptionsControls UI mounts with rebind rows ----------------------------
+# --- OptionsControls UI mounts with the selectable keybind table (SIL-108) ---
 cli --port "$PORT" click --label Options >/dev/null
 cli --port "$PORT" wait_frames --n 2 >/dev/null
 cli --port "$PORT" click --label OptionsControls >/dev/null
 cli --port "$PORT" wait_frames --n 3 >/dev/null
 cli --port "$PORT" inspect | bun -e '
 const r = JSON.parse(await new Response(Bun.stdin.stream()).text());
-const rebinds = (r.nodes ?? []).filter((n) => n.role === "button" && (n.control_id ?? "").startsWith("Rebind"));
-if (rebinds.length < 4) { console.error(`expected the controls rows-of-combos, got ${rebinds.length} Rebind buttons`); process.exit(1); }
-const cycle = (r.nodes ?? []).some((n) => n.role === "button" && n.control_id === "CyclePreset");
-if (!cycle) { console.error("OptionsControls missing the preset cycle"); process.exit(1); }
+const n = r.nodes ?? [];
+// Selectable keybind rows (Bind* control ids) render in the virtualizing table.
+const rows = n.filter((x) => (x.control_id ?? "").startsWith("Bind"));
+if (rows.length < 4) { console.error(`expected the keybind table rows, got ${rows.length} Bind rows`); process.exit(1); }
+// Select-then-act Rebind + the preset cycle drive the capture flow.
+if (!n.some((x) => x.role === "button" && x.control_id === "RebindSelected")) { console.error("OptionsControls missing RebindSelected"); process.exit(1); }
+if (!n.some((x) => x.role === "button" && x.control_id === "CyclePreset")) { console.error("OptionsControls missing the preset cycle"); process.exit(1); }
 '
 
 echo "PASS 19_keybind_capture"

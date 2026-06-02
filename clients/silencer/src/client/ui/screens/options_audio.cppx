@@ -19,13 +19,13 @@ namespace {
 using namespace silencer;
 using ::ui::children;
 
-constexpr uint8_t kVolumeStep = 16;
-constexpr uint8_t kVolumeMax = 128;
-
 struct OptionsAudioProps {
   uint32_t unused = 0;
 };
 
+// SIL-108: origin/main's Audio screen is the Music on/off toggle — there is NO
+// volume slider/stepper (the migration's invented -/+ control was removed for
+// parity).
 ::ui::UiElement OptionsAudioView(const OptionsAudioProps &) {
   Navigation nav = use_navigation();
   Settings settings = use_settings();
@@ -33,21 +33,10 @@ struct OptionsAudioProps {
   if (!nav.is_top)
     return ::ui::empty();
 
-  uint8_t vol = settings.music_volume;
   std::function<void()> back = [nav]() {
     if (nav.pop_current)
       nav.pop_current();
   };
-  std::function<void()> vol_down = [settings, vol]() {
-    if (settings.set_music_volume)
-      settings.set_music_volume(vol >= kVolumeStep ? vol - kVolumeStep : 0);
-  };
-  std::function<void()> vol_up = [settings, vol]() {
-    if (settings.set_music_volume)
-      settings.set_music_volume(vol <= kVolumeMax - kVolumeStep ? vol + kVolumeStep
-                                                                : kVolumeMax);
-  };
-  const char *vol_text = use_text_storage("Volume: %d", static_cast<int>(vol));
 
   return <ScreenLayout key="root" variant={ScreenLayoutVariant::Overlay}>
     <ScreenTitle key="title" variant={ScreenTitleVariant::Screen} value="Audio" />
@@ -59,11 +48,6 @@ struct OptionsAudioProps {
         label="Music"
         onChange={settings.set_music}
       />
-      <ActionRow key="volume">
-        <AppButton key="down" controlId="VolumeDown" label="-" onPress={vol_down} />
-        <BodyText key="value" variant={BodyTextVariant::Body} value={vol_text} />
-        <AppButton key="up" controlId="VolumeUp" label="+" onPress={vol_up} />
-      </ActionRow>
       <AppButton key="back" controlId="OptionsBack" variant={AppButtonVariant::Oval} label="Back" onPress={back} />
     </Panel>
   </ScreenLayout>

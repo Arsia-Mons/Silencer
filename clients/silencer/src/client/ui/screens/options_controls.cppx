@@ -3,13 +3,17 @@
 #include "client/ui/components/actions/actions.h"
 #include "client/ui/components/layout/layout.h"
 #include "client/ui/components/text/text.h"
+#include "client/ui/components/tokens.h"
 #include "client/ui/hooks/use_key_map.h"
 #include "client/ui/hooks/use_keybind_capture.h"
 #include "client/ui/hooks/use_navigation.h"
+#include "ui/components/box.h"
+#include "ui/components/scroll_view.h"
 #include "ui/runtime/react.h"
 
 #include <functional>
 #include <string>
+#include <vector>
 
 namespace client::ui {
 namespace {
@@ -18,24 +22,37 @@ namespace {
 // unqualified, so pull in the silencer semantic layer + the runtime children().
 using namespace silencer;
 using ::ui::children;
+using ::ui::components::Box;
+using ::ui::components::BoxProps;
+using ::ui::components::ScrollView;
+using ::ui::components::ScrollViewProps;
 
-// Join an action's first combo into a display string (the chips are already
-// labeled by the composition root). "(unbound)" when the action has no combo.
-std::string binding_string(const KeyMap &km, Action action) {
-  for (const KeyMapAction &a : km.actions) {
-    if (a.action != action)
+// SIL-108: rebind auto-cancels after this many frames of inactivity (origin/main
+// used a 72-tick capture timeout; the capture hook delegates the timeout to the
+// screen — see use_keybind_capture.h).
+constexpr int kRebindTimeoutFrames = 72;
+
+// Full binding display for one action: chips within a combo are AND-joined with
+// " + "; multiple combos are OR-joined with "  or  ". "(unbound)" when empty.
+std::string binding_display(const KeyMapAction &a) {
+  if (a.combos.empty())
+    return "(unbound)";
+  std::string out;
+  for (size_t c = 0; c < a.combos.size(); ++c) {
+    if (c)
+      out += "  or  ";
+    const KeyMapCombo &combo = a.combos[c];
+    if (combo.chips.empty()) {
+      out += "(empty)";
       continue;
-    if (a.combos.empty())
-      return "(unbound)";
-    std::string out;
-    for (size_t i = 0; i < a.combos[0].chips.size(); ++i) {
-      if (i)
-        out += " + ";
-      out += a.combos[0].chips[i].label;
     }
-    return out.empty() ? "(unbound)" : out;
+    for (size_t k = 0; k < combo.chips.size(); ++k) {
+      if (k)
+        out += " + ";
+      out += combo.chips[k].label;
+    }
   }
-  return "(unbound)";
+  return out.empty() ? "(unbound)" : out;
 }
 
 // Index of the combo a Rebind replaces (0 if the action already has one, else
@@ -64,23 +81,40 @@ std::string capture_banner(const KeybindCapture &cap) {
   return out;
 }
 
-// One action's row: label + current binding + Rebind/Clear.
-struct ControlRowProps {
-  const char *key = nullptr;
-  const char *label = "";
-  const char *binding = "";
-  const char *rebind_id = nullptr;
-  std::function<void()> on_rebind = {};
-  std::function<void()> on_clear = {};
-};
-
-::ui::UiElement ControlRow(const ControlRowProps &props) {
-  return <ActionRow key={props.key}>
-    <BodyText key="label" variant={BodyTextVariant::Strong} value={props.label} />
-    <BodyText key="bind" variant={BodyTextVariant::Body} value={props.binding} />
-    <AppButton key="rebind" controlId={props.rebind_id} label="Rebind" onPress={props.on_rebind} />
-    <AppButton key="clear" label="Clear" onPress={props.on_clear} />
-  </ActionRow>
+// One selectable action row: label + binding (AND/OR), as a focusable two-column
+// Box (origin/main is select-then-rebind, not a button pair per row — which also
+// keeps the 30-row table within the retained-tree node budget). The selected row
+// is tinted; Rebind/Clear below act on it. A plain helper whose body is JSX
+// transpiles cleanly; building it inline inside a push_back arg does not.
+::ui::UiElement make_control_row(const char *key, const char *row_id, int index,
+                                 const char *label, const char *binding,
+                                 bool selected, std::function<void(int)> select) {
+  std::function<void(const ::ui::ActivationEvent &)> on_activate =
+      [select, index](const ::ui::ActivationEvent &) {
+        if (select)
+          select(index);
+      };
+  ::ui::StyleStatePatch row_style = {};
+  if (selected)
+    row_style.base = ::ui::patch().background(::ui::Color{159, 201, 255, 64});
+  return <Box
+    key={key}
+    id={row_id}
+    idOffset={index}
+    focusable={true}
+    onActivate={on_activate}
+    layout={::ui::LayoutStyle{
+      .direction = ::ui::FlexDirection::Row,
+      .align_items = ::ui::AlignItems::Center,
+      .width = ::ui::Length::percent(100.0f),
+      .height = ::ui::Length::points(34.0f),
+      .padding = ::ui::EdgeSizes::axes(::ui::StyleValue::points(10.0f),
+                                       ::ui::StyleValue::points(2.0f)),
+      .gap = ::ui::StyleValue::points(12.0f)}}
+    style={row_style}>
+    <BodyText key="label" variant={BodyTextVariant::Strong} value={label} />
+    <BodyText key="bind" variant={BodyTextVariant::Body} value={binding} />
+  </Box>
 }
 
 struct OptionsControlsProps {
@@ -94,32 +128,81 @@ struct OptionsControlsProps {
   if (!nav.is_top)
     return ::ui::empty();
 
+  // 72-tick rebind timeout: a stalled capture auto-cancels. The counter resets
+  // whenever capture is inactive or the pending chord grows.
+  int *idle = use_state<int>(0);
+  size_t *last_chips = use_state<size_t>(0);
+  if (cap.capturing) {
+    if (cap.pending_chips.size() != *last_chips) {
+      *last_chips = cap.pending_chips.size();
+      *idle = 0;
+    } else if (++*idle > kRebindTimeoutFrames) {
+      if (cap.cancel_capture)
+        cap.cancel_capture();
+      *idle = 0;
+    }
+  } else {
+    *idle = 0;
+    *last_chips = 0;
+  }
+
+  // Selected action row (clamped to range); Rebind/Clear act on it.
+  int *selected = use_state<int>(0);
+  const int action_count = static_cast<int>(km.actions.size());
+  if (*selected >= action_count)
+    *selected = action_count > 0 ? action_count - 1 : 0;
+  if (*selected < 0)
+    *selected = 0;
+  std::function<void(int)> select = [selected](int i) { *selected = i; };
+
   std::function<void()> back = [nav]() {
     if (nav.pop_current)
       nav.pop_current();
   };
-  auto make_rebind = [cap, &km](Action action) -> std::function<void()> {
-    int idx = rebind_combo_index(km, action);
-    return [cap, action, idx]() {
-      if (cap.begin_capture)
-        cap.begin_capture(action, idx);
-    };
+  Action sel_action = action_count > 0 ? km.actions[*selected].action : Action{};
+  std::function<void()> rebind_selected = [cap, km, sel_action]() {
+    if (cap.begin_capture)
+      cap.begin_capture(sel_action, rebind_combo_index(km, sel_action));
   };
-  auto make_clear = [&km](Action action) -> std::function<void()> {
-    std::function<void(Action)> clear_action = km.clear_action;
-    return [clear_action, action]() {
-      if (clear_action)
-        clear_action(action);
-    };
+  std::function<void()> clear_selected = [clear = km.clear_action, sel_action]() {
+    if (clear)
+      clear(sel_action);
   };
 
   const char *preset = use_text_storage("Preset: %s%s", km.preset_label.c_str(),
                                         km.dirty ? " *" : "");
   const char *banner = use_text_storage("%s", capture_banner(cap).c_str());
-  const char *fire_b = use_text_storage("%s", binding_string(km, Action::Fire).c_str());
-  const char *jump_b = use_text_storage("%s", binding_string(km, Action::Jump).c_str());
-  const char *use_b = use_text_storage("%s", binding_string(km, Action::Use).c_str());
-  const char *chat_b = use_text_storage("%s", binding_string(km, Action::Chat).c_str());
+  const char *sel_label = use_text_storage(
+      "Selected: %s",
+      action_count > 0 ? km.actions[*selected].label.c_str() : "(none)");
+
+  // The full ACTION_TABLE as a scrollable, selectable keybind table — every
+  // action in order, with AND/OR binding display. Built as a runtime list via
+  // the dynamic children API (no fixed-slot padding), inside the scroll viewport.
+  std::vector<::ui::UiElement> rows;
+  rows.reserve(km.actions.size());
+  for (int i = 0; i < action_count; ++i) {
+    const KeyMapAction &a = km.actions[i];
+    const char *rkey = ::ui::copy_string(("row" + std::to_string(i)).c_str());
+    const char *rid = ::ui::copy_string(("Bind" + std::to_string(i)).c_str());
+    const char *label = ::ui::copy_string(a.label.c_str());
+    const char *bind = ::ui::copy_string(binding_display(a).c_str());
+    rows.push_back(
+        make_control_row(rkey, rid, i, label, bind, i == *selected, select));
+  }
+  const float kRowHeight = 34.0f;
+  ::ui::UiElement table = ::ui::component(
+      "ScrollView",
+      ScrollViewProps{
+          .key = "table",
+          .id = "ControlsList",
+          .viewport_height = 178.0f,
+          .content_height = kRowHeight * static_cast<float>(action_count),
+          .step = kRowHeight,
+          .row_height = kRowHeight, // virtualize: only visible rows hit the tree
+          .layout = ::ui::LayoutStyle{.width = ::ui::Length::points(520.0f)},
+          .children = ::ui::children(rows)},
+      ScrollView);
 
   return <ScreenLayout key="root" variant={ScreenLayoutVariant::Overlay}>
     <ScreenTitle key="title" variant={ScreenTitleVariant::Screen} value="Controls" />
@@ -128,11 +211,18 @@ struct OptionsControlsProps {
       <AppButton
         key="cycle"
         controlId="CyclePreset"
+        variant={AppButtonVariant::Oval}
         label="Cycle Preset"
         onPress={km.cycle_preset}
       />
     </ActionRow>
+    {table}
     <BodyText key="banner" variant={BodyTextVariant::Message} value={banner} />
+    <ActionRow key="rebind">
+      <BodyText key="sel" variant={BodyTextVariant::Detail} value={sel_label} />
+      <AppButton key="dorebind" controlId="RebindSelected" label="Rebind" onPress={rebind_selected} />
+      <AppButton key="doclear" controlId="ClearSelected" label="Clear" onPress={clear_selected} />
+    </ActionRow>
     <ActionRow key="capture">
       <AppButton
         key="confirm"
@@ -149,38 +239,6 @@ struct OptionsControlsProps {
         onPress={cap.cancel_capture}
       />
     </ActionRow>
-    <ControlRow
-      key="fire"
-      label="Fire"
-      binding={fire_b}
-      rebindId="RebindFire"
-      onRebind={make_rebind(Action::Fire)}
-      onClear={make_clear(Action::Fire)}
-    />
-    <ControlRow
-      key="jump"
-      label="Jump"
-      binding={jump_b}
-      rebindId="RebindJump"
-      onRebind={make_rebind(Action::Jump)}
-      onClear={make_clear(Action::Jump)}
-    />
-    <ControlRow
-      key="use"
-      label="Use"
-      binding={use_b}
-      rebindId="RebindUse"
-      onRebind={make_rebind(Action::Use)}
-      onClear={make_clear(Action::Use)}
-    />
-    <ControlRow
-      key="chat"
-      label="Chat"
-      binding={chat_b}
-      rebindId="RebindChat"
-      onRebind={make_rebind(Action::Chat)}
-      onClear={make_clear(Action::Chat)}
-    />
     <ActionRow key="actions">
       <AppButton key="save" controlId="SaveBinds" label="Save" onPress={km.commit} />
       <AppButton key="revert" controlId="RevertBinds" label="Revert" onPress={km.revert} />

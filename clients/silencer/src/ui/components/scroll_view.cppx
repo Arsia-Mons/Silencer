@@ -79,6 +79,28 @@ using ::ui::children;
   content.position_inset.right = ::ui::StyleValue::points(0.0f);
   content.position_inset.top = ::ui::StyleValue::points(-*offset);
 
+  // Virtualize uniform-height lists: render only the row slice intersecting the
+  // window (+1 overscan each side). The slice is a contiguous subrange of the
+  // already-built children arena, so we just retarget the pointer — no copy —
+  // and shift the content track so global row `first` lands at first*row_height.
+  ::ui::UiChildren kids = props.children;
+  if (props.row_height > 0.0f && kids.count > 0) {
+    const float rh = props.row_height;
+    int first = (int)(*offset / rh) - 1;
+    if (first < 0)
+      first = 0;
+    int visible = (int)(props.viewport_height / rh) + 3;
+    if (first > kids.count - 1)
+      first = kids.count - 1;
+    int last = first + visible;
+    if (last > kids.count)
+      last = kids.count;
+    content.position_inset.top =
+        ::ui::StyleValue::points((float)first * rh - *offset);
+    kids.items = props.children.items + first;
+    kids.count = last - first;
+  }
+
   // Optional thin scrollbar thumb on the right edge (only when overflowing).
   ::ui::UiElement bar = ::ui::empty();
   if (props.show_scrollbar && max_off > 0.0f && props.viewport_height > 0.0f &&
@@ -130,7 +152,7 @@ using ::ui::children;
     onWheel={on_wheel}
     onKey={on_key}>
     <Box key="content" layout={content}>
-      {props.children}
+      {kids}
     </Box>
     {bar}
   </Box>

@@ -44,23 +44,25 @@ cli --port "$PORT" wait_frames --n 2 >/dev/null
 cli --port "$PORT" click --label OptionsBack >/dev/null
 cli --port "$PORT" wait_frames --n 3 >/dev/null
 
-# Options → Audio: bump the volume stepper (live preview).
+# Options → Audio: SIL-108 removed the invented -/+ volume slider for origin/main
+# parity — the Audio screen is the Music on/off toggle (a sprite BooleanSettingRow
+# button), no volume readout. Verify the slider is gone and the Music toggle exists.
 cli --port "$PORT" click --label OptionsAudio >/dev/null
 cli --port "$PORT" wait_frames --n 3 >/dev/null
-vol0=$(cli --port "$PORT" inspect | bun -e '
+cli --port "$PORT" inspect | bun -e '
 const r = JSON.parse(await new Response(Bun.stdin.stream()).text());
-const t = (r.nodes ?? []).find((n) => (n.value ?? "").startsWith("Volume:"));
-if (!t) { console.error("no volume readout"); process.exit(1); }
-console.log(t.value);
-')
-cli --port "$PORT" click --label VolumeUp >/dev/null
-cli --port "$PORT" wait_frames --n 2 >/dev/null
-vol1=$(cli --port "$PORT" inspect | bun -e '
-const r = JSON.parse(await new Response(Bun.stdin.stream()).text());
-const t = (r.nodes ?? []).find((n) => (n.value ?? "").startsWith("Volume:"));
-console.log(t.value);
-')
-[ "$vol0" != "$vol1" ] || { echo "volume stepper did not live-preview ($vol0 -> $vol1)"; exit 1; }
+const nodes = r.nodes ?? [];
+if (nodes.some((n) => (n.value ?? "").startsWith("Volume:"))) {
+  console.error("Audio still shows a Volume readout (invented slider not removed)"); process.exit(1);
+}
+const labels = new Set(nodes.filter((n) => n.role === "button").map((b) => b.label));
+if (labels.has("VolumeUp") || labels.has("+") || labels.has("-")) {
+  console.error("Audio still has volume stepper buttons"); process.exit(1);
+}
+if (!nodes.some((n) => n.role === "button" && n.label === "Music")) {
+  console.error("Audio missing the Music toggle"); process.exit(1);
+}
+'
 cli --port "$PORT" click --label OptionsBack >/dev/null
 cli --port "$PORT" wait_frames --n 3 >/dev/null
 
