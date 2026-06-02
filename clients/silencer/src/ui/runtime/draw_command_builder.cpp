@@ -262,7 +262,8 @@ bool append_rect(DrawCommandList &list, const NodeSnapshot &node,
 
   Color fill = has_color(v.background)
                    ? v.background
-                   : (control_box ? control_fill(node) : kTransparent);
+                   : (control_box && !v.chromeless ? control_fill(node)
+                                                    : kTransparent);
 
   return push_rect_command(list, node.id, node.layout, fill, v.corner_radius);
 }
@@ -286,9 +287,9 @@ bool append_frame(DrawCommandList &list, const NodeSnapshot &node,
   if (v.border.color.top.a > 0 && v.border.width.top > 0.0f) {
     border = v.border;
     has_border = true;
-  } else if (control_box && v.image.texture_id == 0) {
-    // Sprite-backed controls (an image is set) carry their own baked edge, so
-    // skip the intrinsic vector control border; vector controls still get it.
+  } else if (control_box && v.image.texture_id == 0 && !v.chromeless) {
+    // Sprite-backed (image) or chromeless controls carry their own baked edge
+    // (or none), so skip the intrinsic vector control border.
     Color border_color =
         node.interaction.disabled ? kButtonDisabledBorder : kButtonBorder;
     border.width = {1.0f, 1.0f, 1.0f, 1.0f};
@@ -304,10 +305,9 @@ bool append_frame(DrawCommandList &list, const NodeSnapshot &node,
     outline = v.outline;
     has_outline = true;
   } else if (focused && !node.interaction.disabled &&
-             v.image.texture_id == 0) {
-    // Sprite-backed controls (an image is set) own their own focus look — a
-    // brightness/frame swap baked into the sprite — so the vector fallback
-    // focus ring is injected only for non-sprite (vector) controls.
+             v.image.texture_id == 0 && !v.chromeless) {
+    // Sprite-backed (image) or chromeless controls own their own focus look, so
+    // the vector fallback focus ring is injected only for vector controls.
     outline = {kFocusBorderWidth, kFocusBorder, kFocusBorderOffset};
     has_outline = true;
   }

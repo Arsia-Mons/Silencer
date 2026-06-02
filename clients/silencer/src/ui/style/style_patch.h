@@ -32,6 +32,7 @@ struct StylePatch {
   Opt<Shadow> shadow;
   Opt<float> opacity;
   Opt<bool> hidden;
+  Opt<bool> chromeless;
   Opt<TextVisual> text;
 };
 
@@ -58,6 +59,8 @@ constexpr void apply(VisualStyle &dst, const StylePatch &p) {
     dst.opacity = p.opacity.value;
   if (p.hidden.set)
     dst.hidden = p.hidden.value;
+  if (p.chromeless.set)
+    dst.chromeless = p.chromeless.value;
   if (p.text.set)
     dst.text = p.text.value;
 }
@@ -116,6 +119,10 @@ struct StylePatchBuilder {
   }
   StylePatchBuilder &hidden(bool h) {
     p.hidden = opt(h);
+    return *this;
+  }
+  StylePatchBuilder &chromeless(bool c) {
+    p.chromeless = opt(c);
     return *this;
   }
   StylePatchBuilder &text(TextVisual t) {

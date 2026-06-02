@@ -1,10 +1,11 @@
 #include "client/ui/screens/lobby_connect.h"
 
 #include "client/ui/components/actions/actions.h"
-#include "client/ui/components/layout/layout.h"
-#include "client/ui/components/surfaces/surfaces.h"
 #include "client/ui/components/text/text.h"
+#include "client/ui/components/tokens.h"
+#include "client/ui/hooks/use_chrome.h"
 #include "client/ui/hooks/use_lobby_session.h"
+#include "ui/components/box.h"
 #include "ui/components/input.h"
 #include "ui/runtime/react.h"
 
@@ -14,11 +15,10 @@
 namespace client::ui {
 namespace {
 
-// The JSX lowering emits each tag's component function + `<Tag>Props` type
-// unqualified: the silencer semantic layer plus the generic Input primitive,
-// plus the runtime's `children()` child-list builder.
 using namespace silencer;
 using ::ui::children;
+using ::ui::components::Box;
+using ::ui::components::BoxProps;
 using ::ui::components::Input;
 using ::ui::components::InputProps;
 
@@ -26,16 +26,19 @@ struct LobbyConnectProps {
   uint32_t unused = 0;
 };
 
+// SIL-97: origin/main Lobby Connect — the bank-40 idx2 dialog sprite over black
+// (no slate Menu wash, no title heading). Two label + chromeless field rows sit
+// on the baked input wells (top of the sprite), a clipped connection-log region
+// fills the open area, and two chrome sprite buttons (Login/Create, Cancel)
+// anchor the bottom.
 ::ui::UiElement LobbyConnectView(const LobbyConnectProps &) {
   LobbySession lobby = use_lobby_session();
+  ChromeTextures chrome = use_chrome();
   std::string *username = use_state<std::string>(std::string());
   std::string *password = use_state<std::string>(std::string());
   if (!username || !password)
     return ::ui::empty();
 
-  // Submit the typed credentials; the action no-ops until the connect flow has
-  // reached AUTHENTICATING, so Enter / Login before then is harmless. Both the
-  // field activation (Enter) and the Login button route through it.
   std::function<void()> submit = [lobby, username, password]() {
     if (lobby.connect)
       lobby.connect(*username, *password);
@@ -47,45 +50,104 @@ struct LobbyConnectProps {
   std::function<void(const ::ui::ActivationEvent &)> on_activate =
       [submit](const ::ui::ActivationEvent &) { submit(); };
 
-  // Copy the dynamic log into the per-call-site scratch: component children
-  // build after this view returns, so a pointer into the transient `lobby`
-  // model would dangle by then (literals + use_text_storage are the stable
-  // paths). The snapshot already caps the log to the recent tail.
   const char *log = use_text_storage("%s", lobby.status_log.c_str());
 
-  return <ScreenLayout key="root" variant={ScreenLayoutVariant::Menu}>
-    <Panel key="panel" variant={PanelVariant::Hero}>
-      <ScreenTitle key="title" variant={ScreenTitleVariant::Hero} value="Connect To Lobby" />
-      <BodyText key="log" variant={BodyTextVariant::Message} value={log} />
-      <Input
-        key="username"
-        id="Username"
-        autofocus={true}
-        accessibility={{.label = "Username"}}
-        value={username->c_str()}
-        onChange={set_username}
-        onActivate={on_activate}
-      />
-      <Input
-        key="password"
-        id="Password"
-        accessibility={{.label = "Password"}}
-        value={password->c_str()}
-        onChange={set_password}
-        onActivate={on_activate}
-      />
-      <ActionRow key="actions">
-        <AppButton
-          key="login"
-          controlId="Login"
-          variant={AppButtonVariant::Primary}
-          label="Login/Create"
-          onPress={submit}
+  // Bare field paint: chromeless (suppresses the intrinsic input fill/border/
+  // ring) + cleared outline in every interaction slot so the focused field shows
+  // no vector ring — only the typed text + caret over the sprite's baked well.
+  ::ui::StylePatch clear = ::ui::patch()
+                               .chromeless(true)
+                               .background(::ui::Color{0, 0, 0, 0})
+                               .border(::ui::Border{})
+                               .outline(::ui::Outline{});
+  ::ui::StyleStatePatch bare{};
+  bare.base = clear;
+  bare.hover = clear;
+  bare.focus_visible = clear;
+  bare.pressed = clear;
+  auto field_layout = ::ui::LayoutStyle{
+      .align_items = ::ui::AlignItems::Center,
+      .justify_content = ::ui::JustifyContent::Start,
+      .width = ::ui::Length::points(150.0f),
+      .height = ::ui::Length::points(22.0f),
+      .padding = {6.0f, 6.0f, 2.0f, 2.0f}};
+  auto field_row = ::ui::LayoutStyle{
+      .direction = ::ui::FlexDirection::Row,
+      .align_items = ::ui::AlignItems::Center,
+      .gap = 8.0f};
+
+  const float pw = chrome.dialog_pw_w ? (float)chrome.dialog_pw_w : 284.0f;
+  const float ph = chrome.dialog_pw_h ? (float)chrome.dialog_pw_h : 277.0f;
+  ::ui::StylePatch panel_style =
+      chrome.dialog_pw ? tokens::image_patch(chrome.dialog_pw)
+                       : tokens::panel_patch(tokens::kSurfacePanel,
+                                             tokens::kBorderPanel);
+
+  return <Box
+    key="root"
+    layout={::ui::LayoutStyle{
+      .align_items = ::ui::AlignItems::Center,
+      .justify_content = ::ui::JustifyContent::Center,
+      .width = ::ui::Length::percent(100.0f),
+      .height = ::ui::Length::percent(100.0f)}}
+    style={tokens::fill_patch(::ui::Color{0, 0, 0, 255})}>
+    <Box
+      key="panel"
+      layout={::ui::LayoutStyle{
+        .direction = ::ui::FlexDirection::Column,
+        .align_items = ::ui::AlignItems::Center,
+        .width = ::ui::Length::points(pw),
+        .height = ::ui::Length::points(ph),
+        .padding = {30.0f, 30.0f, 26.0f, 22.0f},
+        .gap = 8.0f}}
+      style={panel_style}>
+      <Box key="urow" layout={field_row}>
+        <BodyText key="ulbl" variant={BodyTextVariant::Body} value="Username" />
+        <Input
+          key="username"
+          id="Username"
+          autofocus={true}
+          accessibility={{.label = "Username"}}
+          value={username->c_str()}
+          onChange={set_username}
+          onActivate={on_activate}
+          layout={field_layout}
+          style={bare}
         />
-        <AppButton key="cancel" controlId="Cancel" label="Cancel" onPress={lobby.cancel} />
-      </ActionRow>
-    </Panel>
-  </ScreenLayout>
+      </Box>
+      <Box key="prow" layout={field_row}>
+        <BodyText key="plbl" variant={BodyTextVariant::Body} value="Password" />
+        <Input
+          key="password"
+          id="Password"
+          accessibility={{.label = "Password"}}
+          value={password->c_str()}
+          onChange={set_password}
+          onActivate={on_activate}
+          layout={field_layout}
+          style={bare}
+        />
+      </Box>
+      <Box
+        key="logclip"
+        layout={::ui::LayoutStyle{
+          .overflow = ::ui::Overflow::Hidden,
+          .align_items = ::ui::AlignItems::Start,
+          .flex_grow = ::ui::StyleFloat::points(1.0f),
+          .width = ::ui::Length::percent(100.0f)}}>
+        <BodyText key="log" variant={BodyTextVariant::Message} value={log} />
+      </Box>
+      <Box
+        key="actions"
+        layout={::ui::LayoutStyle{
+          .direction = ::ui::FlexDirection::Row,
+          .justify_content = ::ui::JustifyContent::Center,
+          .gap = 10.0f}}>
+        <AppButton key="login" controlId="Login" variant={AppButtonVariant::Chrome} label="Login/Create" onPress={submit} />
+        <AppButton key="cancel" controlId="Cancel" variant={AppButtonVariant::Chrome} label="Cancel" onPress={lobby.cancel} />
+      </Box>
+    </Box>
+  </Box>
 }
 
 } // namespace

@@ -111,6 +111,7 @@ struct VisualStyle {
   Shadow shadow{};           // color.a==0 => no shadow
   float opacity = 1.f;       // <1 => group-opacity layer
   bool hidden = false;       // skip paint, keep layout
+  bool chromeless = false;   // control role: suppress intrinsic fill/border/ring
   TextVisual text{};
 };
 
