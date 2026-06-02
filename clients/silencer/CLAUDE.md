@@ -87,9 +87,15 @@ Rules:
 Styling is a from-first-principles substrate (`src/ui/style`): a `Theme` of
 `RoleStyle`s, sparse `StylePatch` overlays, and `resolve()` layering role +
 override patches + interaction state into one dense `VisualStyle` at authoring
-time. The product look (dark slate, accent blue, control gradients) lives in
+time. The current theme (dark slate, accent blue, control gradients) lives in
 `src/client/ui/app_theme.cpp` and is installed OUTERMOST via `ThemeProvider`;
-`use_tokens()`/`use_theme()` read it. `src/ui` keeps only a neutral fallback
+`use_tokens()`/`use_theme()` read it. **NOTE: this slate/blue palette is a visual
+regression, not the target design.** The golden visual design is Silencer's
+**origin/main** (the Clay UI: cool-blue `#9FC9FF`/panel `#10141C`/border `#565E6F`,
+green oval sprite buttons, sprite chrome/starfield). Restoring it *while keeping the
+cppx engine* is tracked by **SIL-84**
+(`docs/plans/2026-06-01-cppx-design-parity-restore.md`). The golden `~/repos/ui` repo
+is the authority for the cppx **engine + authoring conventions** only — NOT the look. `src/ui` keeps only a neutral fallback
 (`default_theme()`). The renderer never sees the theme — components resolve
 their `VisualStyle` and the IR carries only resolved, premultiplied paint.
 

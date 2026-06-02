@@ -60,9 +60,13 @@ expose read state + named intent closures — never a raw `Game`/`World` handle.
 
 ## Theme
 
-`app_theme.{h,cpp}` holds the product look (dark slate, accent blue, control
+`app_theme.{h,cpp}` holds the current theme (dark slate, accent blue, control
 gradients). `ThemeProvider` installs it OUTERMOST into `ui::ThemeContext` so
-`use_tokens()`/`use_theme()` resolves the slate palette tree-wide. The neutral
+`use_tokens()`/`use_theme()` resolves the palette tree-wide. **NOTE: the slate/blue
+palette is a visual regression** — the golden design is Silencer's **origin/main**
+(cool-blue `#9FC9FF`, green oval sprite buttons, sprite chrome); the restore (keeping
+the cppx engine) is tracked by **SIL-84**. `~/repos/ui` governs engine/conventions,
+not the visual design. The neutral
 fallback (`ui::default_theme()`) lives in `src/ui` and applies only when no
 provider is mounted. Components resolve their own `VisualStyle` at authoring
 time from the theme; the renderer never sees the theme.

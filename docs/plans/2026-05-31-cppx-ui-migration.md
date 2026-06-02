@@ -1,5 +1,14 @@
 # cppx UI migration — intent record (2026-05-31)
 
+> **Superseded on the visual question (2026-06-01).** This doc governs the
+> **engine replacement** (Clay → cppx). Where it calls `/Users/hv/repos/ui` "the
+> golden reference" or says it "wins on disagreement," that scope is the cppx
+> **engine + authoring conventions only** — NOT the product look. The migration's
+> SIL-17 "modern slate redesign" was a **visual regression**; the golden *visual*
+> design is Silencer's **origin/main** (the Clay UI). Restoring that look on top of
+> the cppx engine is tracked by **SIL-84** /
+> [docs/plans/2026-06-01-cppx-design-parity-restore.md](2026-06-01-cppx-design-parity-restore.md).
+
 Durable record of *why* and the stable high-level decisions. **The living source of
 truth is the Linear project**, not this file — see
 [Silencer client cppx migration](https://linear.app/silencer-cc/project/silencer-client-cppx-migration-f106f12cf8a7)
@@ -32,4 +41,6 @@ migration is a **full engine replacement**, not adding JSX on top of Clay.
 
 ## Execution
 Single long-lived branch `hv/cppx-migration-cc` → draft PR #267. Slices = Linear
-SIL-6…SIL-24 (blocked-by graph wired). `/Users/hv/repos/ui` wins on disagreement.
+SIL-6…SIL-24 (blocked-by graph wired). `/Users/hv/repos/ui` wins on disagreement
+about the **engine/authoring conventions**; for the **visual design**, origin/main
+wins (see the superseding note at the top + SIL-84).
