@@ -264,10 +264,15 @@ bool append_rect(DrawCommandList &list, const NodeSnapshot &node,
                                  v.corner_radius);
   }
 
+  // Sprite-backed (image) controls carry their own baked interior, so skip the
+  // intrinsic vector control fill — mirror append_frame's texture_id guard. Without
+  // this, a control_fill rect slabs an opaque pill behind a transparent-interior
+  // oval/chrome sprite (the golden ovals are transparent over the backdrop).
   Color fill = has_color(v.background)
                    ? v.background
-                   : (control_box && !v.chromeless ? control_fill(node)
-                                                    : kTransparent);
+                   : (control_box && v.image.texture_id == 0 && !v.chromeless
+                          ? control_fill(node)
+                          : kTransparent);
 
   return push_rect_command(list, node.id, node.layout, fill, v.corner_radius);
 }

@@ -22,6 +22,33 @@ namespace silencer {
 enum class AppButtonVariant { Primary, Secondary, Danger, Ghost, Oval, Chrome };
 enum class AppButtonSize { Md, Sm, Lg };
 
+// Per-variant label TextVisual (color + face + size + centered). The runtime only
+// paints text on Text-role nodes (draw_command_builder append_text), so a Button's
+// own `value` is never painted — the visible label must be a styled Text CHILD.
+// AppButton renders this through ui::components::Text so it resolves the green
+// app_theme text color + the variant's legacy face, instead of the bare-string
+// child fallback (which paints with the engine's neutral kTextFill grey).
+inline ::ui::TextVisual app_button_label_visual(AppButtonVariant variant,
+                                                bool disabled) {
+  const ::ui::Color c =
+      disabled ? tokens::kTextBodyMuted : tokens::kTextTitle;
+  switch (variant) {
+  case AppButtonVariant::Oval:
+    return {.color = c,
+            .font_id = tokens::kFaceTitle,
+            .font_size = tokens::kFontTitle,
+            .align = ::ui::TextAlign::Center,
+            .line_height = tokens::kLineTitle};
+  case AppButtonVariant::Chrome:
+  default:
+    return {.color = c,
+            .font_id = tokens::kFaceLarge,
+            .font_size = tokens::kFontLarge,
+            .align = ::ui::TextAlign::Center,
+            .line_height = tokens::kLineLarge};
+  }
+}
+
 // Layout-only baseline geometry. Mirrors ui::components::ButtonProps default
 // LayoutStyle (button.hx:23-29) for Md; Sm shrinks height/padding to the
 // loadout tab metrics. border_width stays 0 (Button's own resolved chrome owns

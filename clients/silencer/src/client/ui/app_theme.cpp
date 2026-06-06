@@ -39,35 +39,34 @@ constexpr float kRadius = 8.f; // uniform corner radius on all control surfaces
 // checked/selection. In origin/main the accent was a baked sprite edge, not a
 // fill; this constant drives only the focus ring + selection wash here (the
 // oval sprite button lands in SIL-89).
-constexpr Color kAccent = {159, 201, 255, 255}; // #9FC9FF
+constexpr Color kAccent = {92, 208, 92, 255}; // #5CD05C green-bright
 
-// Control surface: the legacy palette has no control gradient — the vector
-// interim collapses to a flat Panel fill (#10141C) with a PanelBorder (#565E6F)
-// edge. Hover/pressed are subtle on-palette deltas until the sprite button
-// replaces this fill entirely.
-constexpr Color kControlTop = {16, 20, 28, 255};    // Panel #10141C
-constexpr Color kControlBottom = {16, 20, 28, 255}; // Panel #10141C
-constexpr Color kControlBorder = {86, 94, 111, 255}; // PanelBorder #565E6F
-constexpr Color kHoverTop = {22, 28, 38, 255};
-constexpr Color kHoverBottom = {22, 28, 38, 255};
-constexpr Color kHoverBorder = {110, 120, 140, 255};
-constexpr Color kPressedTop = {10, 13, 18, 255};
-constexpr Color kPressedBottom = {10, 13, 18, 255};
-constexpr Color kPressedBorder = {159, 201, 255, 255}; // accent #9FC9FF
+// Control surface (green phosphor): near-black green-glass fill with a green-dim
+// edge; hover/pressed brighten the green stroke (origin/main never used slate).
+// Sprite-backed controls (oval/chrome) override this via image_patch.
+constexpr Color kControlTop = {6, 16, 8, 255};      // near-black green glass
+constexpr Color kControlBottom = {6, 16, 8, 255};
+constexpr Color kControlBorder = {46, 125, 69, 255}; // #2E7D45 green-dim
+constexpr Color kHoverTop = {10, 24, 12, 255};
+constexpr Color kHoverBottom = {10, 24, 12, 255};
+constexpr Color kHoverBorder = {92, 208, 92, 255};   // #5CD05C
+constexpr Color kPressedTop = {4, 12, 6, 255};
+constexpr Color kPressedBottom = {4, 12, 6, 255};
+constexpr Color kPressedBorder = {60, 255, 60, 255}; // #3CFF3C bright
 
-constexpr Color kDisabledTop = {12, 15, 21, 255};
-constexpr Color kDisabledBottom = {12, 15, 21, 255};
-constexpr Color kDisabledBorder = {52, 57, 67, 255};
+constexpr Color kDisabledTop = {6, 14, 8, 255};
+constexpr Color kDisabledBottom = {6, 14, 8, 255};
+constexpr Color kDisabledBorder = {30, 74, 44, 255}; // #1E4A2C green-disabled
 } // namespace
 
 const Theme &app_theme() {
   static const Theme t = [] {
     Theme th{};
     th.focus_ring = kAccent;
-    th.text_default = {224, 231, 241, 255}; // #E0E7F1
-    th.text_disabled = {118, 126, 140, 255};
-    th.caret = {224, 231, 241, 255}; // #E0E7F1
-    th.selection = {159, 201, 255, 96}; // accent wash; premultiplied at IR emit
+    th.text_default = {92, 208, 92, 255}; // #5CD05C green label/body
+    th.text_disabled = {46, 90, 55, 255}; // dim green
+    th.caret = {60, 255, 60, 255};        // #3CFF3C bright caret
+    th.selection = {92, 208, 92, 96};     // green wash; premultiplied at IR emit
 
     // A vertical 2-stop gradient helper (top -> bottom). angle 90deg = downward.
     auto vgrad = [](Color top, Color bottom) {
@@ -127,13 +126,13 @@ const Theme &app_theme() {
 
     // Dialog: a rounded, slightly elevated panel a step darker than the controls
     // so stacked controls read as raised against it.
-    th.dialog.base.background = {16, 20, 28, 255}; // Panel #10141C
+    th.dialog.base.background = {6, 16, 8, 255}; // near-black green glass
     th.dialog.base.corner_radius = kRadius + 2.f;
     th.dialog.base.border.width = {1, 1, 1, 1};
-    th.dialog.base.border.color = {{86, 94, 111, 255}, // PanelBorder #565E6F
-                                   {86, 94, 111, 255},
-                                   {86, 94, 111, 255},
-                                   {86, 94, 111, 255}};
+    th.dialog.base.border.color = {{46, 125, 69, 255}, // #2E7D45 green-dim
+                                   {46, 125, 69, 255},
+                                   {46, 125, 69, 255},
+                                   {46, 125, 69, 255}};
     return th;
   }();
   return t;

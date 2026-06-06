@@ -1,6 +1,7 @@
 #include "client/ui/components/actions/app_button.h"
 
 #include "ui/components/button.h"
+#include "ui/components/text.h"
 #include "client/ui/components/tokens.h"
 #include "client/ui/hooks/use_chrome.h"
 #include "client/ui/hooks/use_clock.h"
@@ -14,6 +15,8 @@ namespace silencer {
 using ::ui::children;
 using ::ui::components::Button;
 using ::ui::components::ButtonProps;
+using ::ui::components::Text;
+using ::ui::components::TextProps;
 
 ::ui::UiElement AppButton(const AppButtonProps &props) {
   // SIL-94: a frame-rate-independent phase counter stepped from the per-frame
@@ -71,9 +74,21 @@ using ::ui::components::ButtonProps;
                                     ::ui::Color{lit, lit, lit, 255});
   }
 
-  // Children are plain expressions: props.children, plus a label fallback used
-  // only when no children were provided. The two {expr} children lower into the
-  // appended `.children = children({...})` (last, after layout/style).
+  // The label is rendered as a styled Text CHILD (not the bare-string fallback):
+  // the runtime only paints text on Text-role nodes, so the Button's own value is
+  // never painted, and a bare string child paints with the engine's neutral grey.
+  // A Text child resolves the green app_theme text color + the variant's face.
+  ::ui::StyleStatePatch label_style{};
+  label_style.base = ::ui::patch().text(app_button_label_visual(
+      props.variant, props.disabled));
+  ::ui::UiElement label_el =
+      (props.label && props.children.count == 0)
+          ? Text(TextProps{.value = props.label, .style = label_style})
+          : ::ui::empty();
+
+  // Children are plain expressions: props.children, plus the styled label child
+  // used only when no children were provided. The two {expr} children lower into
+  // the appended `.children = children({...})` (last, after layout/style).
   return <Button
     key={props.key}
     id={props.control_id}
@@ -88,7 +103,7 @@ using ::ui::components::ButtonProps;
     style={style}
   >
     {props.children}
-    {props.children.count > 0 ? nullptr : props.label}
+    {label_el}
   </Button>
 }
 

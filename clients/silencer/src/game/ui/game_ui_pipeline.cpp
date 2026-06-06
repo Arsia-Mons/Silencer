@@ -186,13 +186,30 @@ const SDL_Color *palette = game.renderer.palette.GetColors();
 if(!palette) return;
 const auto &banks = game.world.resources.spritebank;
 
+// Each sprite bank's pixel indices are authored against a SPECIFIC palette page
+// (resources.cpp Load: bank 0->5, 1->6, 2->7, 3->8, 6->1, 7->2; others base).
+// Baking every bank with the single current page mapped bank 6's planet/oval and
+// bank 7's chrome indices onto the wrong colors — the rainbow-speckle Mars bug.
+// Select each bank's authored page so the bake matches the in-game palettization.
+auto page_for_bank = [&](size_t bank) -> const SDL_Color* {
+switch(bank){
+case 0: return game.renderer.palette.colors[5];
+case 1: return game.renderer.palette.colors[6];
+case 2: return game.renderer.palette.colors[7];
+case 3: return game.renderer.palette.colors[8];
+case 6: return game.renderer.palette.colors[1];
+case 7: return game.renderer.palette.colors[2];
+default: return palette;
+}
+};
+
 auto bake = [&](size_t bank, size_t index, uint32_t &id_out,
                 uint16_t *w_out = nullptr, uint16_t *h_out = nullptr){
 if(bank >= banks.size() || index >= banks[bank].size()) return;
 const std::shared_ptr<Surface> &sp = banks[bank][index];
 if(!sp || sp->w < 1 || sp->h < 1 || sp->pixels.empty()) return;
 uint32_t id = cppxHost->bake_chrome_sprite(sp->pixels.data(), sp->w, sp->h,
-                                           palette);
+                                           page_for_bank(bank));
 if(id){ id_out = id; if(w_out) *w_out = (uint16_t)sp->w; if(h_out) *h_out = (uint16_t)sp->h; }
 };
 

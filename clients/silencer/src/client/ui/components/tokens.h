@@ -16,19 +16,19 @@
 
 namespace silencer::tokens {
 
-// ---- Surface backgrounds (legacy palette: Background #000000 for menu/game
-// roots, Panel #10141C for panels/overlays/bands) ----
-constexpr ::ui::Color kSurfaceMenu = {0, 0, 0, 255};      // Background #000000
-constexpr ::ui::Color kSurfaceGame = {0, 0, 0, 255};      // Background #000000
-constexpr ::ui::Color kSurfaceOverlay = {16, 20, 28, 245}; // Panel #10141C
-constexpr ::ui::Color kSurfacePanel = {16, 20, 28, 255};   // Panel #10141C
-constexpr ::ui::Color kSurfaceHeroPanel = {16, 20, 28, 245}; // Panel #10141C
-constexpr ::ui::Color kSurfaceHudBand = {16, 20, 28, 245};   // Panel #10141C
+// ---- Surface backgrounds (green-phosphor: black menu/game roots, near-black
+// faint-green panels so the green chrome reads as glass over the starfield) ----
+constexpr ::ui::Color kSurfaceMenu = {0, 0, 0, 255};       // #000000
+constexpr ::ui::Color kSurfaceGame = {0, 0, 0, 255};       // #000000
+constexpr ::ui::Color kSurfaceOverlay = {6, 16, 8, 238};   // near-black green glass
+constexpr ::ui::Color kSurfacePanel = {6, 16, 8, 235};     // near-black green glass
+constexpr ::ui::Color kSurfaceHeroPanel = {6, 16, 8, 238};
+constexpr ::ui::Color kSurfaceHudBand = {4, 12, 6, 238};
 
-// ---- Borders (legacy PanelBorder #565E6F) ----
-constexpr ::ui::Color kBorderPanel = {86, 94, 111, 255};
-constexpr ::ui::Color kBorderHeroPanel = {86, 94, 111, 255};
-constexpr ::ui::Color kBorderHudBand = {86, 94, 111, 255};
+// ---- Borders (green-phosphor: green-dim #2E7D45 idle frame stroke) ----
+constexpr ::ui::Color kBorderPanel = {46, 125, 69, 255};   // #2E7D45 green-dim
+constexpr ::ui::Color kBorderHeroPanel = {46, 139, 46, 255}; // #2E8B2E chrome-border
+constexpr ::ui::Color kBorderHudBand = {46, 125, 69, 255};
 
 // ---- Accent / semantic action colors (AppButton variant fills) ----
 // Each variant owns a base + hover (lighter) + pressed (darker) on-palette
@@ -37,12 +37,14 @@ constexpr ::ui::Color kBorderHudBand = {86, 94, 111, 255};
 // Legacy accent #9FC9FF. In origin/main the accent edge was a baked sprite, not
 // a fill ramp; these hover/pressed/border stops are re-derived on the cool-blue
 // palette as a vector interim (the oval sprite button replaces them in SIL-89).
-constexpr ::ui::Color kAccent = {159, 201, 255, 255};       // #9FC9FF
-constexpr ::ui::Color kAccentBorder = {191, 219, 255, 255}; // brighter accent edge
-constexpr ::ui::Color kAccentHover = {191, 219, 255, 255};  // lighter on hover
-constexpr ::ui::Color kAccentHoverBorder = {214, 233, 255, 255};
-constexpr ::ui::Color kAccentPressed = {120, 167, 224, 255}; // darker on press
-constexpr ::ui::Color kAccentPressedBorder = {159, 201, 255, 255};
+// Green-phosphor accent (focus ring + selection wash). origin/main's accent edge
+// was a baked sprite, not a fill ramp; these stops are the green-phosphor family.
+constexpr ::ui::Color kAccent = {92, 208, 92, 255};         // #5CD05C green-bright
+constexpr ::ui::Color kAccentBorder = {60, 255, 60, 255};   // #3CFF3C focus stroke
+constexpr ::ui::Color kAccentHover = {136, 232, 136, 255};  // lighter on hover
+constexpr ::ui::Color kAccentHoverBorder = {60, 255, 60, 255};
+constexpr ::ui::Color kAccentPressed = {79, 184, 103, 255}; // darker on press
+constexpr ::ui::Color kAccentPressedBorder = {92, 208, 92, 255};
 constexpr ::ui::Color kDanger = {221, 80, 72, 255};         // #DD5048
 constexpr ::ui::Color kDangerBorder = {240, 120, 112, 255}; // brighter danger edge
 constexpr ::ui::Color kDangerHover = {236, 108, 100, 255};  // lighter on hover
@@ -50,17 +52,17 @@ constexpr ::ui::Color kDangerHoverBorder = {248, 150, 142, 255};
 constexpr ::ui::Color kDangerPressed = {190, 58, 52, 255};  // darker on press
 constexpr ::ui::Color kDangerPressedBorder = {220, 96, 88, 255};
 
-// ---- Text (legacy #E0E7F1; muted/subtitle/off re-derived cool-grey) ----
-constexpr ::ui::Color kTextTitle = {224, 231, 241, 255};      // #E0E7F1
-constexpr ::ui::Color kTextHeroTitle = {224, 231, 241, 255};  // #E0E7F1
-constexpr ::ui::Color kTextSubtitle = {150, 160, 178, 255};
-constexpr ::ui::Color kTextDialogTitle = {224, 231, 241, 255}; // #E0E7F1
-constexpr ::ui::Color kTextBody = {224, 231, 241, 255};        // #E0E7F1
-constexpr ::ui::Color kTextBodyMuted = {176, 186, 202, 255};
-constexpr ::ui::Color kTextWeaponName = {224, 231, 241, 255};  // #E0E7F1
-constexpr ::ui::Color kTextWeaponDetail = {176, 186, 202, 255};
-constexpr ::ui::Color kTextWeaponDetailOff = {120, 128, 142, 255};
-constexpr ::ui::Color kTextHud = {224, 231, 241, 255};         // #E0E7F1
+// ---- Text (green-phosphor family sampled from the goldens) ----
+constexpr ::ui::Color kTextTitle = {92, 208, 92, 255};        // #5CD05C label/title
+constexpr ::ui::Color kTextHeroTitle = {60, 255, 60, 255};    // #3CFF3C bright title
+constexpr ::ui::Color kTextSubtitle = {136, 200, 136, 255};   // #88C888 green-label
+constexpr ::ui::Color kTextDialogTitle = {92, 208, 92, 255};  // #5CD05C
+constexpr ::ui::Color kTextBody = {79, 184, 103, 255};        // #4FB867 green-mid
+constexpr ::ui::Color kTextBodyMuted = {46, 125, 69, 255};    // #2E7D45 green-dim
+constexpr ::ui::Color kTextWeaponName = {92, 208, 92, 255};   // #5CD05C
+constexpr ::ui::Color kTextWeaponDetail = {79, 184, 103, 255};
+constexpr ::ui::Color kTextWeaponDetailOff = {46, 125, 69, 255};
+constexpr ::ui::Color kTextHud = {61, 232, 61, 255};          // #3DE83D hud-green
 
 // ---- Font faces (font_id; see render/cppx_ui/font_registry.h FaceId) ----
 // The four bitmap-derived legacy OTF faces. The product layer sets font_id per
