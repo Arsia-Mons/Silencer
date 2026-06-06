@@ -39,7 +39,7 @@ cli --port "$PORT" wait_frames --n 3 >/dev/null
 cli --port "$PORT" inspect | bun -e '
   const r = JSON.parse(require("fs").readFileSync(0, "utf8"));
   const labels = new Set((r.nodes ?? []).filter((n) => n.role === "button").map((b) => b.label));
-  for (const x of ["Audio", "Display", "Done", "Cancel"]) {
+  for (const x of ["Controls", "Display", "Audio", "Go Back"]) {
     if (!labels.has(x)) { console.error(`enter on Options did not open the overlay (missing button: ${x})`); process.exit(1); }
   }
 '
@@ -56,7 +56,7 @@ cli --port "$PORT" inspect | bun -e '
   const r = JSON.parse(require("fs").readFileSync(0, "utf8"));
   const labels = new Set((r.nodes ?? []).filter((n) => n.role === "button").map((b) => b.label));
   if (!labels.has("Connect To Lobby")) { console.error("escape did not return to the main menu"); process.exit(1); }
-  if (labels.has("Done")) { console.error("Options overlay still open after escape"); process.exit(1); }
+  if (labels.has("Go Back")) { console.error("Options overlay still open after escape"); process.exit(1); }
 '
 
 echo "PASS 11_keyboard_navigation"

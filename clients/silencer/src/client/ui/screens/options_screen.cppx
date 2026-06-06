@@ -27,7 +27,6 @@ struct OptionsProps {
 
 ::ui::UiElement OptionsView(const OptionsProps &) {
   Navigation nav = use_navigation();
-  Settings settings = use_settings();
   if (!nav.is_top)
     return ::ui::empty();
 
@@ -43,37 +42,19 @@ struct OptionsProps {
     if (nav.push)
       nav.push(std::make_unique<OptionsControlsScreen>());
   };
-  // Done persists the live preview; Cancel restores the last-saved values.
-  std::function<void()> done = [nav, settings]() {
-    if (settings.commit)
-      settings.commit();
+  std::function<void()> go_back = [nav]() {
     if (nav.pop_current)
       nav.pop_current();
   };
-  std::function<void()> cancel = [nav, settings]() {
-    if (settings.revert)
-      settings.revert();
-    if (nav.pop_current)
-      nav.pop_current();
-  };
-  const char *status = settings.dirty ? "Unsaved changes" : "";
 
+  // origin/main: a plain centered oval menu — Controls / Display / Audio / Go Back
+  // over the starfield. Each sub-screen owns its own Save/Cancel (commit/revert),
+  // so the root is pure navigation: no title, no dirty indicator, no Done/Cancel.
   return <ScreenLayout key="root" variant={ScreenLayoutVariant::Overlay}>
-    <ScreenTitle key="title" variant={ScreenTitleVariant::Screen} value="Options" />
-    <ScreenSubtitle key="status" value={status} />
-    <AppButton key="audio" controlId="OptionsAudio" variant={AppButtonVariant::Oval} label="Audio" onPress={open_audio} />
+    <AppButton key="controls" controlId="OptionsControls" variant={AppButtonVariant::Oval} label="Controls" onPress={open_controls} />
     <AppButton key="display" controlId="OptionsDisplay" variant={AppButtonVariant::Oval} label="Display" onPress={open_display} />
-    <AppButton
-      key="controls"
-      controlId="OptionsControls"
-      variant={AppButtonVariant::Oval}
-      label="Controls"
-      onPress={open_controls}
-    />
-    <ActionRow key="actions">
-      <AppButton key="done" controlId="OptionsDone" variant={AppButtonVariant::Oval} label="Done" onPress={done} />
-      <AppButton key="cancel" controlId="OptionsCancel" variant={AppButtonVariant::Oval} label="Cancel" onPress={cancel} />
-    </ActionRow>
+    <AppButton key="audio" controlId="OptionsAudio" variant={AppButtonVariant::Oval} label="Audio" onPress={open_audio} />
+    <AppButton key="goback" controlId="OptionsGoBack" variant={AppButtonVariant::Oval} label="Go Back" onPress={go_back} />
   </ScreenLayout>
 }
 

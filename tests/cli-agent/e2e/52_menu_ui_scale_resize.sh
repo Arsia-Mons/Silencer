@@ -27,8 +27,8 @@ options_dialog_present() {
   const i = JSON.parse(await Bun.stdin.text());
   const nodes = i.nodes ?? [];
   const hasDialog = nodes.some((n) => n.role === "dialog");
-  const hasCancel = nodes.some((n) => n.role === "button" && n.label === "Cancel");
-  process.stdout.write(hasDialog && hasCancel ? "YES" : "NO");
+  const hasGoBack = nodes.some((n) => n.role === "button" && n.label === "Go Back");
+  process.stdout.write(hasDialog && hasGoBack ? "YES" : "NO");
   '
 }
 
@@ -92,7 +92,7 @@ check_resize() {
   fi
 
   # Dismiss the overlay and confirm we are back on the base menu.
-  cli --port "$PORT" click --label Cancel >/dev/null
+  cli --port "$PORT" click --label OptionsGoBack >/dev/null
   cli --port "$PORT" wait_frames --n 5 >/dev/null
   if [ "$(options_dialog_present)" != "NO" ]; then
     echo "Options overlay did not dismiss after Cancel at ${width}x${height}" >&2

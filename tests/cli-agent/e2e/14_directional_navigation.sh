@@ -20,13 +20,12 @@ focused_label() {
   '
 }
 
-# Returns "true" if an Options dialog (role=dialog with the OptionsDone
-# control) is currently mounted, else "false".
+# Returns "true" if the Options overlay (with the OptionsGoBack control) is
+# currently mounted, else "false".
 options_dialog_open() {
   cli --port "$PORT" inspect | bun -e '
     const r = JSON.parse(require("fs").readFileSync(0, "utf8"));
-    const open = r.nodes.some((n) => n.role === "dialog") &&
-      r.nodes.some((n) => n.control_id === "OptionsDone");
+    const open = r.nodes.some((n) => n.control_id === "OptionsGoBack");
     process.stdout.write(String(open));
   '
 }

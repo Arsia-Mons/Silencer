@@ -23,7 +23,7 @@ if (r.state !== "MAINMENU") { console.error(`Options should be an overlay, not a
 cli --port "$PORT" inspect | bun -e '
 const r = JSON.parse(await new Response(Bun.stdin.stream()).text());
 const labels = new Set((r.nodes ?? []).filter((n) => n.role === "button").map((b) => b.label));
-for (const x of ["Audio", "Display", "Done", "Cancel"]) {
+for (const x of ["Controls", "Display", "Audio", "Go Back"]) {
   if (!labels.has(x)) { console.error(`Options missing button: ${x}`); process.exit(1); }
 }
 '
@@ -39,9 +39,11 @@ const r = JSON.parse(await new Response(Bun.stdin.stream()).text());
 const fs = (r.nodes ?? []).find((n) => n.role === "button" && n.label === "Fullscreen");
 if (!fs) { console.error("no Fullscreen toggle"); process.exit(1); }
 '
+# Each sub-screen owns Save (commit) / Cancel (revert) — origin/main parity. Save
+# the Fullscreen edit and return to the options root.
 cli --port "$PORT" click --label FullscreenToggle >/dev/null
 cli --port "$PORT" wait_frames --n 2 >/dev/null
-cli --port "$PORT" click --label OptionsBack >/dev/null
+cli --port "$PORT" click --label OptionsSave >/dev/null
 cli --port "$PORT" wait_frames --n 3 >/dev/null
 
 # Options → Audio: SIL-108 removed the invented -/+ volume slider for origin/main
@@ -63,23 +65,25 @@ if (!nodes.some((n) => n.role === "button" && n.label === "Music")) {
   console.error("Audio missing the Music toggle"); process.exit(1);
 }
 '
-cli --port "$PORT" click --label OptionsBack >/dev/null
+# Cancel (revert) the Audio screen and return to the options root.
+cli --port "$PORT" click --label OptionsCancel >/dev/null
 cli --port "$PORT" wait_frames --n 3 >/dev/null
 
-# Options root reflects the unsaved edits, and Cancel reverts + pops to MainMenu.
+# Options root is a plain nav menu (Controls/Display/Audio/Go Back). Go Back pops
+# the overlay back to MainMenu.
 cli --port "$PORT" inspect | bun -e '
 const r = JSON.parse(await new Response(Bun.stdin.stream()).text());
-if (!(r.nodes ?? []).some((n) => n.value === "Unsaved changes")) {
-  console.error("Options did not show a dirty indicator after edits"); process.exit(1);
+if (!(r.nodes ?? []).some((n) => n.role === "button" && n.label === "Go Back")) {
+  console.error("Options root missing Go Back"); process.exit(1);
 }
 '
-cli --port "$PORT" click --label OptionsCancel >/dev/null
+cli --port "$PORT" click --label OptionsGoBack >/dev/null
 cli --port "$PORT" wait_frames --n 3 >/dev/null
 cli --port "$PORT" inspect | bun -e '
 const r = JSON.parse(await new Response(Bun.stdin.stream()).text());
 const onMenu = (r.nodes ?? []).some((n) => n.role === "button" && n.label === "Connect To Lobby");
-const stillOptions = (r.nodes ?? []).some((n) => n.role === "button" && n.label === "Done");
-if (!onMenu || stillOptions) { console.error("Cancel did not revert + pop to MainMenu"); process.exit(1); }
+const stillOptions = (r.nodes ?? []).some((n) => n.role === "button" && n.label === "Go Back");
+if (!onMenu || stillOptions) { console.error("Go Back did not pop to MainMenu"); process.exit(1); }
 '
 
 echo "PASS 10_navigate"
