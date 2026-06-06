@@ -114,10 +114,12 @@ struct MainMenuProps {
           .align_items = ::ui::AlignItems::Start,
           .flex_shrink = ::ui::StyleFloat::points(0.0f),
           .gap = 34.0f}}>
-        <Box key="w0" layout={::ui::LayoutStyle{.margin = ::ui::EdgeSizes{-40.0f, 0.0f, 0.0f, 0.0f}}}>
+        <Box key="w0" layout={::ui::LayoutStyle{.margin = ::ui::EdgeSizes{20.0f, 0.0f, 0.0f, 0.0f}}}>
+          <AppButton key="tutorial" controlId="Tutorial" variant={AppButtonVariant::Oval} label="Tutorial" onPress={session.start_tutorial} />
+        </Box>
+        <Box key="w1" layout={::ui::LayoutStyle{.margin = ::ui::EdgeSizes{-40.0f, 0.0f, 0.0f, 0.0f}}}>
           <AppButton key="connect" controlId="ConnectToLobby" variant={AppButtonVariant::Oval} label="Connect To Lobby" onPress={session.play_online} />
         </Box>
-        <AppButton key="tutorial" controlId="Tutorial" variant={AppButtonVariant::Oval} label="Tutorial" onPress={session.start_tutorial} />
         <Box key="w2" layout={::ui::LayoutStyle{.margin = ::ui::EdgeSizes{40.0f, 0.0f, 0.0f, 0.0f}}}>
           <AppButton key="options" controlId="Options" variant={AppButtonVariant::Oval} label="Options" onPress={open_options} />
         </Box>
@@ -129,7 +131,7 @@ struct MainMenuProps {
       layout={::ui::LayoutStyle{
         .position = ::ui::PositionType::Absolute,
         .position_inset = ::ui::EdgeSizes{10.0f, {}, {}, 17.0f}}}>
-      <BodyText key="ver" variant={BodyTextVariant::Body} value={app.version} />
+      <BodyText key="ver" variant={BodyTextVariant::Body} value={use_text_storage("Silencer v%s", app.version ? app.version : "")} />
     </Box>
   </ScreenLayout>
 }
