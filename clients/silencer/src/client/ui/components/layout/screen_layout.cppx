@@ -20,16 +20,23 @@ using ::ui::components::DialogProps;
 // keep today's modal behavior.
 ::ui::UiElement ScreenLayout(const ScreenLayoutProps &props) {
   if (props.variant == ScreenLayoutVariant::Game) {
+    // The lobby console floats over the starfield+Mars backdrop (origin/main),
+    // not flat black. Panels are near-opaque so the backdrop reads through the
+    // gutters + behind the center. Tight padding/gap so panels reach the edges.
+    client::ui::ChromeTextures chrome = client::ui::use_chrome();
+    ::ui::StylePatch game_bg =
+        chrome.starfield ? tokens::image_patch(chrome.starfield)
+                         : tokens::fill_patch(tokens::kSurfaceGame);
     return <Box
       key={props.key}
       layout={::ui::LayoutStyle{
         .direction = ::ui::FlexDirection::Column,
         .width = ::ui::Length::percent(100.0f),
         .height = ::ui::Length::percent(100.0f),
-        .padding = {24.0f, 24.0f, 24.0f, 24.0f},
-        .gap = 18.0f,
+        .padding = {10.0f, 10.0f, 8.0f, 8.0f},
+        .gap = 8.0f,
       }}
-      style={tokens::fill_patch(tokens::kSurfaceGame)}
+      style={game_bg}
     >
       {props.children}
     </Box>
