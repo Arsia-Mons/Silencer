@@ -17,10 +17,26 @@ namespace lobby_connect_frame_detail {
 
 constexpr ::ui::Color kLegacyText = {0, 128, 0, 255};
 constexpr std::uint16_t kPanelW = 284;
+constexpr std::uint16_t kPanelH = 277;
+constexpr std::uint16_t kLogW = 250;
+constexpr std::uint16_t kLogH = 170;
+constexpr std::uint16_t kLogX = 7;
+constexpr std::uint16_t kLogTopGap = 8;
+constexpr std::uint16_t kLogLineH = 11;
+constexpr std::uint16_t kFormRowX = 4;
+constexpr std::uint16_t kFormRowH = 21;
+constexpr std::uint16_t kFormRowGap = 6;
+constexpr std::uint16_t kLabelW = 86;
+constexpr std::uint16_t kInputW = 183;
+constexpr std::uint16_t kInputInsetX = 7;
 constexpr std::uint16_t kButtonPatchX = 84;
-constexpr std::uint16_t kButtonPatchY = 246;
 constexpr std::uint16_t kButtonPatchW = 116;
 constexpr std::uint16_t kButtonPatchH = 24;
+constexpr std::uint16_t kPreFormGap = 17;
+constexpr std::uint16_t kFormH = (kFormRowH * 2) + kFormRowGap;
+constexpr std::uint16_t kPreButtonGap = 3;
+constexpr std::uint16_t kButtonPatchPanelY =
+	kLogTopGap + kLogH + kPreFormGap + kFormH + kPreButtonGap;
 
 inline std::uint32_t texture_id(std::uint8_t bank, std::uint16_t index) {
 	return (static_cast<std::uint32_t>(bank) << 16) |
@@ -35,14 +51,14 @@ inline ::ui::StylePatch panel_patch() {
 }
 
 inline const std::uint8_t * button_well_pixels() {
-	static std::uint8_t pixels[kButtonPatchW * kButtonPatchH];
+	static std::uint8_t pixels[kPanelW * kButtonPatchH];
 	static bool initialized = false;
 	if(initialized) return pixels;
 	for(std::uint16_t y = 0; y < kButtonPatchH; ++y){
 		for(std::uint16_t x = 0; x < kButtonPatchW; ++x){
 			const std::uint16_t panelX = kButtonPatchX + x;
-			const std::uint16_t panelY = kButtonPatchY + y;
-			pixels[(y * kButtonPatchW) + x] =
+			const std::uint16_t panelY = kButtonPatchPanelY + y;
+			pixels[(y * kPanelW) + kButtonPatchX + x] =
 				((panelY & 1) == 0 || (panelX & 1) == 0) ? 210 : 146;
 		}
 	}
@@ -53,7 +69,7 @@ inline const std::uint8_t * button_well_pixels() {
 inline ::ui::StylePatch button_well_patch() {
 	return ::ui::patch().bitmap(::ui::RawBitmapImage{
 		.pixels = button_well_pixels(),
-		.width = kButtonPatchW,
+		.width = kPanelW,
 		.height = kButtonPatchH,
 	});
 }
@@ -96,14 +112,10 @@ inline const char * log_line(const char * text, int index) {
 }
 
 inline ::ui::LayoutStyle log_line_layout(int index) {
-	::ui::EdgeSizes inset;
-	inset.left = ::ui::StyleValue::points(7.0f);
-	inset.top = ::ui::StyleValue::points(8.0f + index * 11.0f);
+	(void)index;
 	return ::ui::LayoutStyle{
-		.position = ::ui::PositionType::Absolute,
-		.position_inset = inset,
-		.width = ::ui::Length::points(250.0f),
-		.height = ::ui::Length::points(11.0f),
+		.width = ::ui::Length::points(static_cast<float>(kLogW)),
+		.height = ::ui::Length::points(static_cast<float>(kLogLineH)),
 	};
 }
 
@@ -129,13 +141,6 @@ inline ::ui::StyleStatePatch input_patch() {
 	patch.pressed = transparent_input_chrome_patch();
 	patch.disabled = transparent_input_chrome_patch();
 	return patch;
-}
-
-inline ::ui::EdgeSizes inset_left_top(float left, float top) {
-	::ui::EdgeSizes edges;
-	edges.left = ::ui::StyleValue::points(left);
-	edges.top = ::ui::StyleValue::points(top);
-	return edges;
 }
 
 inline std::function<void(const ::ui::TextChangeEvent&)>
@@ -179,125 +184,182 @@ using ::ui::components::TextProps;
 			.height = ::ui::Length::percent(100.0f),
 		}}
 	>
-		<Box
-		  key="panel"
-		  layout={::ui::LayoutStyle{
-				.position = ::ui::PositionType::Relative,
-				.width = ::ui::Length::points(284.0f),
-				.height = ::ui::Length::points(277.0f),
-			}}
-		  style={lobby_connect_frame_detail::panel_patch()}
-		>
-			<Text
-			  key="log-0"
-			  value={lobby_connect_frame_detail::log_line(log_text, 0)}
-			  layout={lobby_connect_frame_detail::log_line_layout(0)}
-			  style={lobby_connect_frame_detail::log_patch()}
-			/>
-			<Text
-			  key="log-1"
-			  value={lobby_connect_frame_detail::log_line(log_text, 1)}
-			  layout={lobby_connect_frame_detail::log_line_layout(1)}
-			  style={lobby_connect_frame_detail::log_patch()}
-			/>
-			<Text
-			  key="log-2"
-			  value={lobby_connect_frame_detail::log_line(log_text, 2)}
-			  layout={lobby_connect_frame_detail::log_line_layout(2)}
-			  style={lobby_connect_frame_detail::log_patch()}
-			/>
-			<Text
-			  key="log-3"
-			  value={lobby_connect_frame_detail::log_line(log_text, 3)}
-			  layout={lobby_connect_frame_detail::log_line_layout(3)}
-			  style={lobby_connect_frame_detail::log_patch()}
-			/>
-			<Text
-			  key="log-4"
-			  value={lobby_connect_frame_detail::log_line(log_text, 4)}
-			  layout={lobby_connect_frame_detail::log_line_layout(4)}
-			  style={lobby_connect_frame_detail::log_patch()}
-			/>
-			<Text
-			  key="log-5"
-			  value={lobby_connect_frame_detail::log_line(log_text, 5)}
-			  layout={lobby_connect_frame_detail::log_line_layout(5)}
-			  style={lobby_connect_frame_detail::log_patch()}
-			/>
-			<Text
-			  key="log-6"
-			  value={lobby_connect_frame_detail::log_line(log_text, 6)}
-			  layout={lobby_connect_frame_detail::log_line_layout(6)}
-			  style={lobby_connect_frame_detail::log_patch()}
-			/>
-			<Text
-			  key="log-7"
-			  value={lobby_connect_frame_detail::log_line(log_text, 7)}
-			  layout={lobby_connect_frame_detail::log_line_layout(7)}
-			  style={lobby_connect_frame_detail::log_patch()}
-			/>
-			<Text
-			  key="log-8"
-			  value={lobby_connect_frame_detail::log_line(log_text, 8)}
-			  layout={lobby_connect_frame_detail::log_line_layout(8)}
-			  style={lobby_connect_frame_detail::log_patch()}
-			/>
-			<Text
-			  key="log-9"
-			  value={lobby_connect_frame_detail::log_line(log_text, 9)}
-			  layout={lobby_connect_frame_detail::log_line_layout(9)}
-			  style={lobby_connect_frame_detail::log_patch()}
-			/>
-			<Text
-			  key="log-10"
-			  value={lobby_connect_frame_detail::log_line(log_text, 10)}
-			  layout={lobby_connect_frame_detail::log_line_layout(10)}
-			  style={lobby_connect_frame_detail::log_patch()}
-			/>
-			<Text
-			  key="log-11"
-			  value={lobby_connect_frame_detail::log_line(log_text, 11)}
-			  layout={lobby_connect_frame_detail::log_line_layout(11)}
-			  style={lobby_connect_frame_detail::log_patch()}
-			/>
-			<Text
-			  key="log-12"
-			  value={lobby_connect_frame_detail::log_line(log_text, 12)}
-			  layout={lobby_connect_frame_detail::log_line_layout(12)}
-			  style={lobby_connect_frame_detail::log_patch()}
-			/>
-			<Text
-			  key="log-13"
-			  value={lobby_connect_frame_detail::log_line(log_text, 13)}
-			  layout={lobby_connect_frame_detail::log_line_layout(13)}
-			  style={lobby_connect_frame_detail::log_patch()}
-			/>
-			<Text
-			  key="log-14"
-			  value={lobby_connect_frame_detail::log_line(log_text, 14)}
-			  layout={lobby_connect_frame_detail::log_line_layout(14)}
-			  style={lobby_connect_frame_detail::log_patch()}
-			/>
 			<Box
-			  key="username-row"
+			  key="panel"
 			  layout={::ui::LayoutStyle{
-					.position = ::ui::PositionType::Absolute,
-					.direction = ::ui::FlexDirection::Row,
-					.align_items = ::ui::AlignItems::Center,
-					.position_inset = lobby_connect_frame_detail::inset_left_top(4.0f, 195.0f),
-					.width = ::ui::Length::points(273.0f),
-					.height = ::ui::Length::points(21.0f),
+					.direction = ::ui::FlexDirection::Column,
+					.width = ::ui::Length::points(
+						static_cast<float>(lobby_connect_frame_detail::kPanelW)),
+					.height = ::ui::Length::points(
+						static_cast<float>(lobby_connect_frame_detail::kPanelH)),
 				}}
+			  style={lobby_connect_frame_detail::panel_patch()}
 			>
-				<Text
-				  key="username-label"
-				  value="Username"
+				<Box
+				  key="log-top-gap"
 				  layout={::ui::LayoutStyle{
-						.width = ::ui::Length::points(86.0f),
-						.height = ::ui::Length::points(15.0f),
+						.width = ::ui::Length::percent(100.0f),
+						.height = ::ui::Length::points(
+								static_cast<float>(lobby_connect_frame_detail::kLogTopGap)),
 					}}
-				  style={lobby_connect_frame_detail::label_patch()}
 				/>
+				<Box
+				  key="log-row"
+				  layout={::ui::LayoutStyle{
+						.direction = ::ui::FlexDirection::Row,
+						.width = ::ui::Length::percent(100.0f),
+						.height = ::ui::Length::points(
+							static_cast<float>(lobby_connect_frame_detail::kLogH)),
+						.padding = {static_cast<float>(lobby_connect_frame_detail::kLogX),
+						            0.0f,
+						            0.0f,
+						            0.0f},
+					}}
+				>
+					<Box
+					  key="log-lines"
+					  layout={::ui::LayoutStyle{
+							.direction = ::ui::FlexDirection::Column,
+							.width = ::ui::Length::points(
+								static_cast<float>(lobby_connect_frame_detail::kLogW)),
+							.height = ::ui::Length::points(
+								static_cast<float>(lobby_connect_frame_detail::kLogH)),
+						}}
+					>
+						<Text
+						  key="log-0"
+						  value={lobby_connect_frame_detail::log_line(log_text, 0)}
+						  layout={lobby_connect_frame_detail::log_line_layout(0)}
+						  style={lobby_connect_frame_detail::log_patch()}
+						/>
+						<Text
+						  key="log-1"
+						  value={lobby_connect_frame_detail::log_line(log_text, 1)}
+						  layout={lobby_connect_frame_detail::log_line_layout(1)}
+						  style={lobby_connect_frame_detail::log_patch()}
+						/>
+						<Text
+						  key="log-2"
+						  value={lobby_connect_frame_detail::log_line(log_text, 2)}
+						  layout={lobby_connect_frame_detail::log_line_layout(2)}
+						  style={lobby_connect_frame_detail::log_patch()}
+						/>
+						<Text
+						  key="log-3"
+						  value={lobby_connect_frame_detail::log_line(log_text, 3)}
+						  layout={lobby_connect_frame_detail::log_line_layout(3)}
+						  style={lobby_connect_frame_detail::log_patch()}
+						/>
+						<Text
+						  key="log-4"
+						  value={lobby_connect_frame_detail::log_line(log_text, 4)}
+						  layout={lobby_connect_frame_detail::log_line_layout(4)}
+						  style={lobby_connect_frame_detail::log_patch()}
+						/>
+						<Text
+						  key="log-5"
+						  value={lobby_connect_frame_detail::log_line(log_text, 5)}
+						  layout={lobby_connect_frame_detail::log_line_layout(5)}
+						  style={lobby_connect_frame_detail::log_patch()}
+						/>
+						<Text
+						  key="log-6"
+						  value={lobby_connect_frame_detail::log_line(log_text, 6)}
+						  layout={lobby_connect_frame_detail::log_line_layout(6)}
+						  style={lobby_connect_frame_detail::log_patch()}
+						/>
+						<Text
+						  key="log-7"
+						  value={lobby_connect_frame_detail::log_line(log_text, 7)}
+						  layout={lobby_connect_frame_detail::log_line_layout(7)}
+						  style={lobby_connect_frame_detail::log_patch()}
+						/>
+						<Text
+						  key="log-8"
+						  value={lobby_connect_frame_detail::log_line(log_text, 8)}
+						  layout={lobby_connect_frame_detail::log_line_layout(8)}
+						  style={lobby_connect_frame_detail::log_patch()}
+						/>
+						<Text
+						  key="log-9"
+						  value={lobby_connect_frame_detail::log_line(log_text, 9)}
+						  layout={lobby_connect_frame_detail::log_line_layout(9)}
+						  style={lobby_connect_frame_detail::log_patch()}
+						/>
+						<Text
+						  key="log-10"
+						  value={lobby_connect_frame_detail::log_line(log_text, 10)}
+						  layout={lobby_connect_frame_detail::log_line_layout(10)}
+						  style={lobby_connect_frame_detail::log_patch()}
+						/>
+						<Text
+						  key="log-11"
+						  value={lobby_connect_frame_detail::log_line(log_text, 11)}
+						  layout={lobby_connect_frame_detail::log_line_layout(11)}
+						  style={lobby_connect_frame_detail::log_patch()}
+						/>
+						<Text
+						  key="log-12"
+						  value={lobby_connect_frame_detail::log_line(log_text, 12)}
+						  layout={lobby_connect_frame_detail::log_line_layout(12)}
+						  style={lobby_connect_frame_detail::log_patch()}
+						/>
+						<Text
+						  key="log-13"
+						  value={lobby_connect_frame_detail::log_line(log_text, 13)}
+						  layout={lobby_connect_frame_detail::log_line_layout(13)}
+						  style={lobby_connect_frame_detail::log_patch()}
+						/>
+						<Text
+						  key="log-14"
+						  value={lobby_connect_frame_detail::log_line(log_text, 14)}
+						  layout={lobby_connect_frame_detail::log_line_layout(14)}
+						  style={lobby_connect_frame_detail::log_patch()}
+						/>
+					</Box>
+				</Box>
+				<Box
+				  key="pre-form-gap"
+				  layout={::ui::LayoutStyle{
+						.width = ::ui::Length::percent(100.0f),
+						.height = ::ui::Length::points(
+							static_cast<float>(lobby_connect_frame_detail::kPreFormGap)),
+					}}
+				/>
+				<Box
+				  key="form"
+				  layout={::ui::LayoutStyle{
+						.direction = ::ui::FlexDirection::Column,
+						.width = ::ui::Length::percent(100.0f),
+						.height = ::ui::Length::points(
+							static_cast<float>(lobby_connect_frame_detail::kFormH)),
+						.gap = static_cast<float>(lobby_connect_frame_detail::kFormRowGap),
+					}}
+				>
+				<Box
+				  key="username-row"
+				  layout={::ui::LayoutStyle{
+						.direction = ::ui::FlexDirection::Row,
+						.align_items = ::ui::AlignItems::Center,
+						.width = ::ui::Length::percent(100.0f),
+						.height = ::ui::Length::points(
+							static_cast<float>(lobby_connect_frame_detail::kFormRowH)),
+						.padding = {static_cast<float>(lobby_connect_frame_detail::kFormRowX),
+						            0.0f,
+						            0.0f,
+						            0.0f},
+					}}
+				>
+					<Text
+					  key="username-label"
+					  value="Username"
+					  layout={::ui::LayoutStyle{
+							.width = ::ui::Length::points(
+								static_cast<float>(lobby_connect_frame_detail::kLabelW)),
+							.height = ::ui::Length::points(15.0f),
+						}}
+					  style={lobby_connect_frame_detail::label_patch()}
+					/>
 				<TextInput
 				  key="username"
 				  id="lobby_connect.username"
@@ -315,33 +377,42 @@ using ::ui::components::TextProps;
 				  onTextSubmit={lobby_connect_frame_detail::text_submit_callback(props.submit_username)}
 				  maxLength={16}
 				  layout={::ui::LayoutStyle{
-						.width = ::ui::Length::points(183.0f),
-						.height = ::ui::Length::points(21.0f),
-						.padding = {7.0f, 7.0f, 0.0f, 0.0f},
-					}}
+							.width = ::ui::Length::points(
+								static_cast<float>(lobby_connect_frame_detail::kInputW)),
+							.height = ::ui::Length::points(
+								static_cast<float>(lobby_connect_frame_detail::kFormRowH)),
+							.padding = {static_cast<float>(lobby_connect_frame_detail::kInputInsetX),
+							            0.0f,
+							            0.0f,
+							            0.0f},
+						}}
 				  style={lobby_connect_frame_detail::input_patch()}
 				/>
 			</Box>
-			<Box
-			  key="password-row"
-			  layout={::ui::LayoutStyle{
-					.position = ::ui::PositionType::Absolute,
-					.direction = ::ui::FlexDirection::Row,
-					.align_items = ::ui::AlignItems::Center,
-					.position_inset = lobby_connect_frame_detail::inset_left_top(4.0f, 222.0f),
-					.width = ::ui::Length::points(273.0f),
-					.height = ::ui::Length::points(21.0f),
-				}}
-			>
-				<Text
-				  key="password-label"
-				  value="Password"
+				<Box
+				  key="password-row"
 				  layout={::ui::LayoutStyle{
-						.width = ::ui::Length::points(86.0f),
-						.height = ::ui::Length::points(15.0f),
+						.direction = ::ui::FlexDirection::Row,
+						.align_items = ::ui::AlignItems::Center,
+						.width = ::ui::Length::percent(100.0f),
+						.height = ::ui::Length::points(
+							static_cast<float>(lobby_connect_frame_detail::kFormRowH)),
+						.padding = {static_cast<float>(lobby_connect_frame_detail::kFormRowX),
+						            0.0f,
+						            0.0f,
+						            0.0f},
 					}}
-				  style={lobby_connect_frame_detail::label_patch()}
-				/>
+				>
+					<Text
+					  key="password-label"
+					  value="Password"
+					  layout={::ui::LayoutStyle{
+							.width = ::ui::Length::points(
+								static_cast<float>(lobby_connect_frame_detail::kLabelW)),
+							.height = ::ui::Length::points(15.0f),
+						}}
+					  style={lobby_connect_frame_detail::label_patch()}
+					/>
 				<TextInput
 				  key="password"
 				  id="lobby_connect.password"
@@ -358,51 +429,47 @@ using ::ui::components::TextProps;
 				  onTextSubmit={lobby_connect_frame_detail::text_submit_callback(props.submit_password)}
 				  maxLength={28}
 				  layout={::ui::LayoutStyle{
-						.width = ::ui::Length::points(183.0f),
-						.height = ::ui::Length::points(21.0f),
-						.padding = {7.0f, 7.0f, 0.0f, 0.0f},
-					}}
+							.width = ::ui::Length::points(
+								static_cast<float>(lobby_connect_frame_detail::kInputW)),
+							.height = ::ui::Length::points(
+								static_cast<float>(lobby_connect_frame_detail::kFormRowH)),
+							.padding = {static_cast<float>(lobby_connect_frame_detail::kInputInsetX),
+							            0.0f,
+							            0.0f,
+							            0.0f},
+						}}
 				  style={lobby_connect_frame_detail::input_patch()}
 				/>
-			</Box>
-			<Box
-			  key="button-area"
-			  layout={::ui::LayoutStyle{
-					.position = ::ui::PositionType::Absolute,
-					.direction = ::ui::FlexDirection::Row,
-					.align_items = ::ui::AlignItems::Center,
-					.justify_content = ::ui::JustifyContent::Center,
-					.position_inset = lobby_connect_frame_detail::inset_left_top(
-						0.0f,
-						static_cast<float>(lobby_connect_frame_detail::kButtonPatchY)),
-					.width = ::ui::Length::points(
-						static_cast<float>(lobby_connect_frame_detail::kPanelW)),
-					.height = ::ui::Length::points(
-						static_cast<float>(lobby_connect_frame_detail::kButtonPatchH)),
-				}}
-			>
+				</Box>
+				</Box>
 				<Box
-				  key="button-well-fill"
+				  key="pre-button-gap"
 				  layout={::ui::LayoutStyle{
-						.position = ::ui::PositionType::Absolute,
-						.position_inset = lobby_connect_frame_detail::inset_left_top(
-							static_cast<float>(lobby_connect_frame_detail::kButtonPatchX),
-							0.0f),
-						.width = ::ui::Length::points(
-							static_cast<float>(lobby_connect_frame_detail::kButtonPatchW)),
+						.width = ::ui::Length::percent(100.0f),
+						.height = ::ui::Length::points(
+							static_cast<float>(lobby_connect_frame_detail::kPreButtonGap)),
+					}}
+				/>
+				<Box
+				  key="button-area"
+				  layout={::ui::LayoutStyle{
+						.direction = ::ui::FlexDirection::Row,
+						.align_items = ::ui::AlignItems::Center,
+						.justify_content = ::ui::JustifyContent::Center,
+						.width = ::ui::Length::percent(100.0f),
 						.height = ::ui::Length::points(
 							static_cast<float>(lobby_connect_frame_detail::kButtonPatchH)),
 					}}
 				  style={lobby_connect_frame_detail::button_well_patch()}
-				/>
-				<AppButton
-				  key="login"
-				  controlId="lobby_connect.login"
-				  size={AppButtonSize::FitContent}
-				  variant={AppButtonVariant::Secondary}
-				  label="Login/Create"
-				  onPress={props.login}
-				/>
+				>
+					<AppButton
+					  key="login"
+					  controlId="lobby_connect.login"
+					  size={AppButtonSize::FitContent}
+					  variant={AppButtonVariant::Secondary}
+					  label="Login/Create"
+					  onPress={props.login}
+					/>
 				<AppButton
 				  key="cancel"
 				  controlId="lobby_connect.cancel"

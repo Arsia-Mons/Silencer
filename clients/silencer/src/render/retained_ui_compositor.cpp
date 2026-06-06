@@ -54,6 +54,21 @@ bool ClipDrawRect(int dstW, int dstH, int& x, int& y, int& w, int& h) {
 	return true;
 }
 
+int PixelRound(float value) {
+	return static_cast<int>(std::round(value));
+}
+
+void SnapPaintRect(const ::ui::DrawRect& rect,
+                   int& x,
+                   int& y,
+                   int& w,
+                   int& h) {
+	x = PixelRound(rect.x);
+	y = PixelRound(rect.y);
+	w = PixelRound(rect.w);
+	h = PixelRound(rect.h);
+}
+
 bool ClipDrawRectWithin(int dstW,
                         int dstH,
                         const ClipRect& clip,
@@ -289,10 +304,11 @@ void DrawImage(Resources& resources,
 	if(!dst || image.texture_id == 0 || image.tint.a == 0) return;
 	Surface * src = ResolveSprite(resources, image.texture_id);
 	if(!src) return;
-	int x = static_cast<int>(std::floor(command.rect.x));
-	int y = static_cast<int>(std::floor(command.rect.y));
-	int w = static_cast<int>(std::ceil(command.rect.x + command.rect.w)) - x;
-	int h = static_cast<int>(std::ceil(command.rect.y + command.rect.h)) - y;
+	int x = 0;
+	int y = 0;
+	int w = 0;
+	int h = 0;
+	SnapPaintRect(command.rect, x, y, w, h);
 	if(w <= 0 || h <= 0) return;
 	if(image.team_emblem){
 		DrawTeamEmblem(renderer, src, dst, x, y, image);
@@ -371,10 +387,11 @@ void DrawBitmap(Surface * dst,
                 const ::ui::DrawCommand& command) {
 	const ::ui::BitmapData& bitmap = command.payload.bitmap;
 	if(!dst || !bitmap.pixels || bitmap.width == 0 || bitmap.height == 0) return;
-	int x = static_cast<int>(std::floor(command.rect.x));
-	int y = static_cast<int>(std::floor(command.rect.y));
-	int w = static_cast<int>(std::ceil(command.rect.x + command.rect.w)) - x;
-	int h = static_cast<int>(std::ceil(command.rect.y + command.rect.h)) - y;
+	int x = 0;
+	int y = 0;
+	int w = 0;
+	int h = 0;
+	SnapPaintRect(command.rect, x, y, w, h);
 	if(w <= 0) w = bitmap.width;
 	if(h <= 0) h = bitmap.height;
 	if(w <= 0 || h <= 0) return;
