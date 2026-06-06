@@ -11,6 +11,8 @@ constexpr int kOptionRowCount = 6;
 
 constexpr uint16_t kPanelPad = 6;
 constexpr uint16_t kTitleH = 13;
+constexpr uint16_t kInsetBorderWidth = 1;
+constexpr uint16_t kFormPadLeft = 4;
 constexpr uint16_t kFormPadTop = 2;
 constexpr uint16_t kFormPadBottom = 2;
 constexpr uint16_t kFormRowH = 14;
@@ -61,6 +63,7 @@ GameCreateOptionsLayout ResolveGameCreateOptionsLayout(Uint16 panelWidth,
 	const int viewportH = std::max(
 		0,
 		borderH
+			- static_cast<int>(game_create_panel_options_detail::kInsetBorderWidth) * 2
 			- static_cast<int>(game_create_panel_options_detail::kFormPadTop)
 			- static_cast<int>(game_create_panel_options_detail::kFormPadBottom));
 	out.viewportHeight = static_cast<Uint16>(viewportH);
@@ -84,13 +87,18 @@ GameCreateOptionsLayout ResolveGameCreateOptionsLayout(Uint16 panelWidth,
 	}
 	out.showScrollbar = out.scrollMax > 0;
 
-	int formContentW = contentW;
+	int formContentW = std::max(
+		0,
+		contentW
+			- static_cast<int>(game_create_panel_options_detail::kInsetBorderWidth) * 2
+			- static_cast<int>(game_create_panel_options_detail::kFormPadLeft) * 2);
 	if(out.showScrollbar){
 		formContentW -=
 			static_cast<int>(game_create_panel_options_detail::kScrollbarWidth)
 			+ static_cast<int>(game_create_panel_options_detail::kScrollbarGap);
 		if(formContentW < 0) formContentW = 0;
 	}
+	out.viewportWidth = static_cast<Uint16>(formContentW);
 	if(formContentW > 0){
 		int valueColumnWidth = formContentW / 3;
 		if(valueColumnWidth < static_cast<int>(game_create_panel_options_detail::kValueColumnMinW)){

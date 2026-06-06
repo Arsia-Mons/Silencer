@@ -71,6 +71,7 @@ struct GameCreatePanelState {
 
 struct GameCreateOptionsLayout {
 	Uint16 titleHeight = 0;
+	Uint16 viewportWidth = 0;
 	Uint16 viewportHeight = 0;
 	Uint16 valueColumnWidth = 0;
 	Uint16 scrollMax = 0;

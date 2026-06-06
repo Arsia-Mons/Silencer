@@ -2256,12 +2256,7 @@ struct GameCreateUpperPanelProps {
 			static_cast<Uint16>(props.height));
 	const GameCreateOptionsScrollbarLayout scrollbar =
 		ResolveGameCreateOptionsScrollbarLayout(layout, *props.state);
-	const int content_width =
-		std::max(0, props.width - kGameCreatePanelPad * 2);
-	const int form_width =
-		layout.showScrollbar
-			? std::max(0, content_width - kGameCreateScrollbarWidth - kGameCreateScrollbarGap)
-			: content_width;
+	const int form_width = static_cast<int>(layout.viewportWidth);
 	return <Box
 	  key={props.key}
 	  id="GameCreateOptionsContent"

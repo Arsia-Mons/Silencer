@@ -102,8 +102,8 @@ inline bool has_visible_border(const ::ui::VisualStyle& visual) {
 		|| (visual.border.color.left.a > 0 && visual.border.width.left > 0.0f);
 }
 
-inline ::ui::LayoutStyle control_layout_style(::ui::LayoutStyle style,
-                                              const ::ui::VisualStyle& visual) {
+inline ::ui::LayoutStyle reserve_visual_border(::ui::LayoutStyle style,
+                                               const ::ui::VisualStyle& visual) {
 	if(style.border_width <= 0.0f && has_visible_border(visual)){
 		style.border_width = 1.0f;
 	}

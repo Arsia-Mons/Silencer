@@ -48,7 +48,7 @@ inline ::ui::HostCallbacks callbacks_from_props(const TextInputProps& props) {
 	  key={props.key}
 	  id={props.id}
 	  idOffset={props.id_offset}
-	  style={detail::control_layout_style(props.layout, visual)}
+	  style={detail::reserve_visual_border(props.layout, visual)}
 	  visual={visual}
 	  text={::ui::HostTextProps{.value = text_input_detail::display_value(props)}}
 	  textEdit={text_input_detail::metadata_from_props(props)}
