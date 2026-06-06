@@ -95,8 +95,16 @@ inline ::ui::InteractionState interaction_state(bool disabled) {
 	return state;
 }
 
-inline ::ui::LayoutStyle control_layout_style(::ui::LayoutStyle style = {}) {
-	if(style.border_width <= 0.0f){
+inline bool has_visible_border(const ::ui::VisualStyle& visual) {
+	return (visual.border.color.top.a > 0 && visual.border.width.top > 0.0f)
+		|| (visual.border.color.right.a > 0 && visual.border.width.right > 0.0f)
+		|| (visual.border.color.bottom.a > 0 && visual.border.width.bottom > 0.0f)
+		|| (visual.border.color.left.a > 0 && visual.border.width.left > 0.0f);
+}
+
+inline ::ui::LayoutStyle control_layout_style(::ui::LayoutStyle style,
+                                              const ::ui::VisualStyle& visual) {
+	if(style.border_width <= 0.0f && has_visible_border(visual)){
 		style.border_width = 1.0f;
 	}
 	return style;

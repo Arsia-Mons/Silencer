@@ -130,10 +130,9 @@ constexpr int kGameCreateTallFooterGap = 4;
 constexpr int kGameCreateMapListBorderPad = 1;
 constexpr int kGameCreateMapScrollbarWidth = 8;
 constexpr int kGameCreateTallInputH = 14;
+constexpr int kGameCreateTallButtonW = 156;
 constexpr int kGameCreateTallButtonH = 21;
 constexpr int kGameCreatePreviewDescLineSlots = 12;
-constexpr std::uint8_t kChromeButtonTextPalette = 129;
-constexpr std::uint8_t kChromeButtonTextBrightness = 160;
 constexpr std::uint8_t kChromeSideTop = 1 << 0;
 constexpr std::uint8_t kChromeSideRight = 1 << 1;
 constexpr std::uint8_t kChromeSideBottom = 1 << 2;
@@ -324,6 +323,7 @@ inline ::ui::StylePatch title_text_patch() {
 		.color = {152, 0, 0, 255},
 		.font_id = 135,
 		.font_size = 11,
+		.line_height = 15.0f,
 	});
 }
 
@@ -332,6 +332,7 @@ inline ::ui::StylePatch version_text_patch() {
 		.color = {189, 0, 0, 255},
 		.font_id = 133,
 		.font_size = 6,
+		.line_height = 8.0f,
 	});
 }
 
@@ -340,12 +341,24 @@ inline ::ui::StylePatch map_text_patch() {
 		.color = {129, 0, 0, 255},
 		.font_id = 135,
 		.font_size = 11,
+		.line_height = 15.0f,
 	});
 }
 
-inline ::ui::StyleStatePatch chrome_button_patch() {
+inline ::ui::StyleStatePatch fixed_state_patch(::ui::StylePatch base) {
 	::ui::StyleStatePatch patch{};
-	patch.base = ::ui::patch()
+	patch.base = base;
+	patch.hover = base;
+	patch.focus_visible = base;
+	patch.pressed = base;
+	patch.checked = base;
+	patch.active = base;
+	patch.disabled = base;
+	return patch;
+}
+
+inline ::ui::StyleStatePatch chrome_button_patch() {
+	return fixed_state_patch(::ui::patch()
 		.background(::ui::Color{0, 0, 0, 0})
 		.border(::ui::Border{})
 		.outline(::ui::Outline{})
@@ -355,17 +368,12 @@ inline ::ui::StyleStatePatch chrome_button_patch() {
 			.nine_slice = {4.0f, 12.0f, 4.0f, 12.0f},
 		})
 		.text(::ui::TextVisual{
-			.color = legacy_text_color(kChromeButtonTextPalette,
-			                           kChromeButtonTextBrightness),
+			.color = legacy_text_color(0),
 			.font_id = 134,
 			.font_size = 8,
 			.align = ::ui::TextAlign::Center,
-		});
-	patch.hover = patch.base;
-	patch.focus_visible = patch.base;
-	patch.pressed = patch.base;
-	patch.disabled = patch.base;
-	return patch;
+			.line_height = 15.0f,
+		}));
 }
 
 inline ::ui::EdgeSizes absolute_inset(float left, float top) {
@@ -735,8 +743,8 @@ inline int visible_chat_start(int line_count,
 	return clamp_int(start, 0, std::max(0, line_count - visible_slots));
 }
 
-inline ::ui::StylePatch chat_input_patch() {
-	return ::ui::patch()
+inline ::ui::StyleStatePatch chat_input_patch() {
+	return fixed_state_patch(::ui::patch()
 		.background(::ui::Color{0, 0, 0, 0})
 		.border(::ui::Border{})
 		.outline(::ui::Outline{})
@@ -745,7 +753,7 @@ inline ::ui::StylePatch chat_input_patch() {
 			.font_id = 133,
 			.font_size = 6,
 			.line_height = 11.0f,
-		});
+		}));
 }
 
 inline std::function<void(const ::ui::TextChangeEvent&)>
@@ -863,7 +871,7 @@ inline ::ui::VisualStyle game_create_inline_control_visual(bool selected) {
 }
 
 inline ::ui::StyleStatePatch game_create_text_input_patch() {
-	return ::ui::patch()
+	return fixed_state_patch(::ui::patch()
 		.background(::ui::Color{0, 0, 0, 0})
 		.border(::ui::Border{})
 		.outline(::ui::Outline{})
@@ -872,7 +880,7 @@ inline ::ui::StyleStatePatch game_create_text_input_patch() {
 			.font_id = 133,
 			.font_size = 6,
 			.line_height = 11.0f,
-		});
+		}));
 }
 
 inline ::ui::StyleStatePatch game_create_scrollbar_thumb_patch() {
@@ -1060,7 +1068,7 @@ struct CharacterPanelViewProps {
 	}
 	const CharacterPanelState& state = *props.state;
 	const int inner_width = std::max(1, props.width - kCharacterPanelPad * 2);
-	const int emblem_w = clamp_int(
+	const int emblem_box = clamp_int(
 		inner_width * kCharacterEmblemWidthPct / 100,
 		kCharacterEmblemMinW,
 		kCharacterEmblemMaxW);
@@ -1068,9 +1076,22 @@ struct CharacterPanelViewProps {
 		props.app_assets
 			? props.app_assets->agency_emblem(state.displayAgency)
 			: AppSpriteFrame{};
-	const int emblem_draw_w = emblem.available ? emblem.width : emblem_w;
-	const int emblem_draw_h = emblem.available ? emblem.height : emblem_w;
-	const int emblem_rail_w = std::max(emblem_w, emblem_draw_w);
+	int emblem_draw_w = emblem_box;
+	int emblem_draw_h = emblem_box;
+	if(emblem.available && emblem.width > 0 && emblem.height > 0){
+		if(emblem.width >= emblem.height){
+			emblem_draw_w = emblem_box;
+			emblem_draw_h = std::max(
+				1,
+				(emblem_box * emblem.height + emblem.width / 2) / emblem.width);
+		}else{
+			emblem_draw_h = emblem_box;
+			emblem_draw_w = std::max(
+				1,
+				(emblem_box * emblem.width + emblem.height / 2) / emblem.height);
+		}
+	}
+	const int emblem_rail_w = emblem_box;
 	const int details_width =
 		std::max(0, inner_width - emblem_rail_w - kCharacterEmblemGap);
 	const int label_width =
@@ -2708,6 +2729,11 @@ struct GameCreateTallPanelProps {
 		password_label_y + kGameCreateTallHeadingH + kGameCreateTallFooterGap;
 	const int create_y =
 		password_input_y + kGameCreateTallInputH + kGameCreateTallFooterGap;
+	const int create_w =
+		std::min(kGameCreateTallButtonW, std::max(1, static_cast<int>(layout.inputWidth)));
+	const int create_x =
+		kGameCreateTallPanelPad
+		+ std::max(0, (static_cast<int>(layout.inputWidth) - create_w) / 2);
 	return <Box
 	  key={props.key}
 	  id="GameCreateTallContent"
@@ -2786,7 +2812,7 @@ struct GameCreateTallPanelProps {
 		  label="Create"
 		  accessibility={{.label = "Create"}}
 		  onActivate={create_activate}
-		  layout={absolute_button_layout(kGameCreateTallPanelPad, create_y, std::max(1, static_cast<int>(layout.inputWidth)), kGameCreateTallButtonH)}
+		  layout={absolute_button_layout(create_x, create_y, create_w, kGameCreateTallButtonH)}
 		  style={chrome_button_patch()}
 		/>
 	</Box>

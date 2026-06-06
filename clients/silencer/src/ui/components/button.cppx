@@ -34,7 +34,7 @@ namespace {
 	  key={props.key}
 	  id={props.id}
 	  idOffset={props.id_offset}
-	  style={detail::control_layout_style(props.layout)}
+	  style={detail::control_layout_style(props.layout, visual)}
 	  visual={visual}
 	  text={::ui::HostTextProps{.value = props.label}}
 	  interaction={detail::interaction_from_props(props, true)}

@@ -21,6 +21,7 @@ constexpr Uint16 kMinPresenceWidth = 72;
 constexpr Uint16 kMaxPresenceWidth = 220;
 constexpr int    kPresenceRatioNum = 110;
 constexpr int    kPresenceRatioDen = 358;
+constexpr Uint8  kPresenceHeadingBrightness = 192;
 constexpr size_t kMaxStoredEntries = 256;
 constexpr size_t kMaxStoredLines = 256;
 
@@ -184,7 +185,7 @@ void RebuildPresenceEntries(ChatPanelState & state,
 		if(r.group != lastgroup){
 			const char * header = (r.group == 0) ? "In Lobby"
 			                    : (r.group == 1) ? "Pregame" : "Playing";
-			PushEntry(state.presenceEntries, header, 0, 128 + 32, 0);
+			PushEntry(state.presenceEntries, header, 0, kPresenceHeadingBrightness, 0);
 			lastgroup = r.group;
 		}
 		PushEntry(state.presenceEntries, r.label, 0, 128, 2);

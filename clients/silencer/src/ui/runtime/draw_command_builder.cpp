@@ -317,7 +317,10 @@ bool append_frame(DrawCommandList &list, const NodeSnapshot &node,
   // fill or stroke for transparent sprite/list controls.
   Border border = {};
   bool has_border = false;
-  if (v.border.color.top.a > 0 && v.border.width.top > 0.0f) {
+  if ((v.border.color.top.a > 0 && v.border.width.top > 0.0f) ||
+      (v.border.color.right.a > 0 && v.border.width.right > 0.0f) ||
+      (v.border.color.bottom.a > 0 && v.border.width.bottom > 0.0f) ||
+      (v.border.color.left.a > 0 && v.border.width.left > 0.0f)) {
     border = v.border;
     has_border = true;
   }
