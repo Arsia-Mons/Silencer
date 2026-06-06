@@ -107,20 +107,28 @@ inline ::ui::LayoutStyle log_line_layout(int index) {
 	};
 }
 
-inline ::ui::StylePatch input_patch() {
+inline ::ui::StylePatch transparent_input_chrome_patch() {
 	return ::ui::patch()
 		.background(::ui::Color{0, 0, 0, 0})
-		.border(::ui::Border{
-			{1.0f, 1.0f, 1.0f, 1.0f},
-			{{216, 0, 0, 255}, {216, 0, 0, 255},
-			 {216, 0, 0, 255}, {216, 0, 0, 255}},
-		})
-		.text(::ui::TextVisual{
-			.color = kLegacyText,
-			.font_id = tokens::kFontBodyBank,
-			.font_size = 6,
-			.align = ::ui::TextAlign::Left,
-		});
+		.corner_radius(0.0f)
+		.border(::ui::Border{})
+		.outline(::ui::Outline{});
+}
+
+inline ::ui::StyleStatePatch input_patch() {
+	::ui::StyleStatePatch patch{};
+	patch.base = transparent_input_chrome_patch();
+	patch.base.text = ::ui::opt(::ui::TextVisual{
+		.color = kLegacyText,
+		.font_id = tokens::kFontBodyBank,
+		.font_size = 6,
+		.align = ::ui::TextAlign::Left,
+	});
+	patch.hover = transparent_input_chrome_patch();
+	patch.focus_visible = transparent_input_chrome_patch();
+	patch.pressed = transparent_input_chrome_patch();
+	patch.disabled = transparent_input_chrome_patch();
+	return patch;
 }
 
 inline ::ui::EdgeSizes inset_left_top(float left, float top) {
