@@ -47,6 +47,7 @@ using ::ui::components::DialogProps;
       layout={::ui::LayoutStyle{
         .direction = ::ui::FlexDirection::Column,
         .align_items = ::ui::AlignItems::Center,
+        .justify_content = ::ui::JustifyContent::Center,
         .width = ::ui::Length::percent(100.0f),
         .height = ::ui::Length::percent(100.0f),
         .padding = {24.0f, 24.0f, 24.0f, 24.0f},

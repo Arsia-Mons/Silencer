@@ -10,14 +10,16 @@ using ::ui::components::Text;
 using ::ui::components::TextProps;
 
 ::ui::UiElement ScreenTitle(const ScreenTitleProps &props) {
-  // SIL-95: the Screen/Dialog heading variants now render in the dominant legacy
-  // bank-135 Heading face (silencer-135.otf) for glyph parity; the Hero banner +
-  // small Popup keep the larger Title face. The variant also selects the color.
+  // All heading variants render in the legacy Title face (silencer-title.otf).
+  // NOTE: the bank-135 Heading face (silencer-135.otf, SIL-95) renders BLANK
+  // glyphs at present, so Screen/Dialog titles were invisible — using the Title
+  // face restores visible green headings (matches the golden look). Re-point to
+  // kFaceHeading once the silencer-135.otf glyph generation is fixed.
   ::ui::Color color = tokens::kTextTitle;
-  uint16_t face = tokens::kFaceHeading;
-  uint16_t font = tokens::kFontHeading;
-  float line = tokens::kLineHeading;
-  float height = 26.0f;
+  uint16_t face = tokens::kFaceTitle;
+  uint16_t font = tokens::kFontTitle;
+  float line = tokens::kLineTitle;
+  float height = 30.0f;
   switch (props.variant) {
   case ScreenTitleVariant::Hero:
     color = tokens::kTextHeroTitle;
@@ -28,7 +30,10 @@ using ::ui::components::TextProps;
     break;
   case ScreenTitleVariant::Screen:
     color = tokens::kTextTitle;
-    height = 26.0f;
+    face = tokens::kFaceTitle;
+    font = tokens::kFontTitle;
+    line = tokens::kLineTitle;
+    height = 30.0f;
     break;
   case ScreenTitleVariant::Dialog:
     color = tokens::kTextTitle;

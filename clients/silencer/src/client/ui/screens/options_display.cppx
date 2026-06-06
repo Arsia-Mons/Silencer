@@ -28,30 +28,41 @@ struct OptionsDisplayProps {
   if (!nav.is_top)
     return ::ui::empty();
 
-  std::function<void()> back = [nav]() {
+  // origin/main: floating title + the two display toggles + Save/Cancel ovals over
+  // the starfield — NO panel. Save persists, Cancel reverts the live edits.
+  std::function<void()> save = [nav, settings]() {
+    if (settings.commit)
+      settings.commit();
+    if (nav.pop_current)
+      nav.pop_current();
+  };
+  std::function<void()> cancel = [nav, settings]() {
+    if (settings.revert)
+      settings.revert();
     if (nav.pop_current)
       nav.pop_current();
   };
 
   return <ScreenLayout key="root" variant={ScreenLayoutVariant::Overlay}>
-    <ScreenTitle key="title" variant={ScreenTitleVariant::Screen} value="Display" />
-    <Panel key="panel" variant={PanelVariant::Hero}>
-      <BooleanSettingRow
-        key="fullscreen"
-        controlId="FullscreenToggle"
-        checked={settings.fullscreen}
-        label="Fullscreen"
-        onChange={settings.set_fullscreen}
-      />
-      <BooleanSettingRow
-        key="smooth"
-        controlId="SmoothScalingToggle"
-        checked={settings.smooth_scaling}
-        label="Smooth Scaling"
-        onChange={settings.set_smooth_scaling}
-      />
-      <AppButton key="back" controlId="OptionsBack" variant={AppButtonVariant::Oval} label="Back" onPress={back} />
-    </Panel>
+    <ScreenTitle key="title" variant={ScreenTitleVariant::Screen} value="Display Options" />
+    <BooleanSettingRow
+      key="fullscreen"
+      controlId="FullscreenToggle"
+      checked={settings.fullscreen}
+      label="Fullscreen"
+      onChange={settings.set_fullscreen}
+    />
+    <BooleanSettingRow
+      key="smooth"
+      controlId="SmoothScalingToggle"
+      checked={settings.smooth_scaling}
+      label="Smooth Scaling"
+      onChange={settings.set_smooth_scaling}
+    />
+    <ActionRow key="actions">
+      <AppButton key="save" controlId="OptionsSave" variant={AppButtonVariant::Oval} label="Save" onPress={save} />
+      <AppButton key="cancel" controlId="OptionsCancel" variant={AppButtonVariant::Oval} label="Cancel" onPress={cancel} />
+    </ActionRow>
   </ScreenLayout>
 }
 

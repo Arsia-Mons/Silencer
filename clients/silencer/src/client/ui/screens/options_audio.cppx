@@ -33,23 +33,34 @@ struct OptionsAudioProps {
   if (!nav.is_top)
     return ::ui::empty();
 
-  std::function<void()> back = [nav]() {
+  // origin/main: a floating title + the Music toggle + Save/Cancel ovals over the
+  // starfield — NO panel container. Save persists, Cancel reverts the live edits.
+  std::function<void()> save = [nav, settings]() {
+    if (settings.commit)
+      settings.commit();
+    if (nav.pop_current)
+      nav.pop_current();
+  };
+  std::function<void()> cancel = [nav, settings]() {
+    if (settings.revert)
+      settings.revert();
     if (nav.pop_current)
       nav.pop_current();
   };
 
   return <ScreenLayout key="root" variant={ScreenLayoutVariant::Overlay}>
-    <ScreenTitle key="title" variant={ScreenTitleVariant::Screen} value="Audio" />
-    <Panel key="panel" variant={PanelVariant::Hero}>
-      <BooleanSettingRow
-        key="music"
-        controlId="MusicToggle"
-        checked={settings.music}
-        label="Music"
-        onChange={settings.set_music}
-      />
-      <AppButton key="back" controlId="OptionsBack" variant={AppButtonVariant::Oval} label="Back" onPress={back} />
-    </Panel>
+    <ScreenTitle key="title" variant={ScreenTitleVariant::Screen} value="Audio Options" />
+    <BooleanSettingRow
+      key="music"
+      controlId="MusicToggle"
+      checked={settings.music}
+      label="Music"
+      onChange={settings.set_music}
+    />
+    <ActionRow key="actions">
+      <AppButton key="save" controlId="OptionsSave" variant={AppButtonVariant::Oval} label="Save" onPress={save} />
+      <AppButton key="cancel" controlId="OptionsCancel" variant={AppButtonVariant::Oval} label="Cancel" onPress={cancel} />
+    </ActionRow>
   </ScreenLayout>
 }
 
