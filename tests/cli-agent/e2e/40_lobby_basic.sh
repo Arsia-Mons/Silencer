@@ -188,7 +188,7 @@ wait_for_widget "CreateBack"
 # Name the game. The create form ships with a bundled map preselected; cycle the
 # map once to be safe so a concrete map is in hand before Create.
 cli --port "$CTRL_PORT" set_text --label "Game Name" --text "MyGame" >/dev/null
-cli --port "$CTRL_PORT" click --label "Next Map" >/dev/null
+cli --port "$CTRL_PORT" click --label "MapNext" >/dev/null
 
 # Create → lobby spawns a dedicated `silencer -s` server, the local player
 # auto-joins, and the right column swaps to the staging panel.
