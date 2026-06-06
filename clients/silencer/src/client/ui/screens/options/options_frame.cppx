@@ -23,6 +23,7 @@ inline ::ui::StylePatch background_patch() {
 	return ::ui::patch().image(::ui::BackgroundImage{
 		.texture_id = texture_id(6, 0),
 		.tint = {255, 255, 255, 255},
+		.fit = ::ui::ImageFit::Cover,
 	});
 }
 

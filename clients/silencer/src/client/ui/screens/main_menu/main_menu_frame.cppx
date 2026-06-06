@@ -30,6 +30,14 @@ inline ::ui::StylePatch image_patch(std::uint8_t bank, std::uint16_t index) {
 	});
 }
 
+inline ::ui::StylePatch background_patch() {
+	return ::ui::patch().image(::ui::BackgroundImage{
+		.texture_id = texture_id(6, 0),
+		.tint = {255, 255, 255, 255},
+		.fit = ::ui::ImageFit::Cover,
+	});
+}
+
 inline ::ui::StylePatch logo_patch() {
 	return image_patch(208, 60);
 }
@@ -109,7 +117,7 @@ inline ::ui::StylePatch logo_patch() {
 			.width = ::ui::Length::percent(100.0f),
 			.height = ::ui::Length::percent(100.0f),
 		}}
-	  style={main_menu_frame_detail::image_patch(6, 0)}
+	  style={main_menu_frame_detail::background_patch()}
 	>
 		<Box key="composition" layout={composition_layout}>
 			<Box key="logo-group" layout={logo_layout}>

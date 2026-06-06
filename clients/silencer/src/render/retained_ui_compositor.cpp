@@ -54,6 +54,31 @@ bool ClipDrawRect(int dstW, int dstH, int& x, int& y, int& w, int& h) {
 	return true;
 }
 
+bool ClipDrawRectWithin(int dstW,
+                        int dstH,
+                        const ClipRect& clip,
+                        int& x,
+                        int& y,
+                        int& w,
+                        int& h) {
+	ClipRect c;
+	if(!CurrentClip(dstW, dstH, c)) return false;
+	int clipX1 = std::max(c.x, clip.x);
+	int clipY1 = std::max(c.y, clip.y);
+	int clipX2 = std::min(c.x + c.w, clip.x + clip.w);
+	int clipY2 = std::min(c.y + c.h, clip.y + clip.h);
+	int x1 = std::max(x, clipX1);
+	int y1 = std::max(y, clipY1);
+	int x2 = std::min(x + w, clipX2);
+	int y2 = std::min(y + h, clipY2);
+	if(x2 <= x1 || y2 <= y1) return false;
+	x = x1;
+	y = y1;
+	w = x2 - x1;
+	h = y2 - y1;
+	return true;
+}
+
 Surface * ResolveSprite(Resources& resources, uint32_t textureId) {
 	const uint8_t bank = static_cast<uint8_t>((textureId >> 16) & 0xFFu);
 	const uint16_t index = static_cast<uint16_t>(textureId & 0xFFFFu);
@@ -202,6 +227,34 @@ void OutlineVisiblePixels(::Renderer & renderer,
 	}
 }
 
+void StretchClippedWithin(Surface * src,
+                          Renderer::Rect srcRect,
+                          Surface * dst,
+                          int x,
+                          int y,
+                          int w,
+                          int h,
+                          const ClipRect& clip) {
+	if(!src || !dst || srcRect.w <= 0 || srcRect.h <= 0 || w <= 0 || h <= 0) return;
+	int cx = x;
+	int cy = y;
+	int cw = w;
+	int ch = h;
+	if(!ClipDrawRectWithin(dst->w, dst->h, clip, cx, cy, cw, ch)) return;
+	for(int py = cy; py < cy + ch; ++py){
+		int sy = srcRect.y + ((py - y) * srcRect.h) / h;
+		if(sy < srcRect.y) sy = srcRect.y;
+		if(sy >= srcRect.y + srcRect.h) sy = srcRect.y + srcRect.h - 1;
+		for(int px = cx; px < cx + cw; ++px){
+			int sx = srcRect.x + ((px - x) * srcRect.w) / w;
+			if(sx < srcRect.x) sx = srcRect.x;
+			if(sx >= srcRect.x + srcRect.w) sx = srcRect.x + srcRect.w - 1;
+			Uint8 col = Renderer::GetPixel(src, sx, sy);
+			if(col) Renderer::SetPixel(dst, px, py, col);
+		}
+	}
+}
+
 void DrawTeamEmblem(Renderer& renderer,
                     Surface * src,
                     Surface * dst,
@@ -280,11 +333,34 @@ void DrawImage(Resources& resources,
 	const int sourceH = image.source_h > 0
 		? std::min<int>(image.source_h, maxSourceH)
 		: maxSourceH;
+	if(sourceW <= 0 || sourceH <= 0){
+		if(work != src) delete work;
+		return;
+	}
 	Renderer::Rect srcRect{sourceW, sourceH, srcX, srcY};
 	if(image.tile){
 		TileClipped(work, srcRect, dst, x, y, w, h);
 	}else if(w == sourceW && h == sourceH){
 		BlitClipped(work, srcRect, dst, x, y);
+	}else if(image.fit == ::ui::ImageFit::Cover ||
+	         image.fit == ::ui::ImageFit::Contain){
+		const float sx = static_cast<float>(w) / static_cast<float>(sourceW);
+		const float sy = static_cast<float>(h) / static_cast<float>(sourceH);
+		const float scale = image.fit == ::ui::ImageFit::Cover
+			? std::max(sx, sy)
+			: std::min(sx, sy);
+		const int drawW = std::max(1, static_cast<int>(sourceW * scale + 0.5f));
+		const int drawH = std::max(1, static_cast<int>(sourceH * scale + 0.5f));
+		const int drawX = x + (w - drawW) / 2;
+		const int drawY = y + (h - drawH) / 2;
+		StretchClippedWithin(work,
+		                     srcRect,
+		                     dst,
+		                     drawX,
+		                     drawY,
+		                     drawW,
+		                     drawH,
+		                     ClipRect{x, y, w, h});
 	}else{
 		StretchClipped(work, srcRect, dst, x, y, w, h);
 	}

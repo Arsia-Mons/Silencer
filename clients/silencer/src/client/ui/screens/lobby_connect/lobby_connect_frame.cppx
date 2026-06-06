@@ -16,6 +16,11 @@ namespace client_ui {
 namespace lobby_connect_frame_detail {
 
 constexpr ::ui::Color kLegacyText = {0, 128, 0, 255};
+constexpr std::uint16_t kPanelW = 284;
+constexpr std::uint16_t kButtonPatchX = 84;
+constexpr std::uint16_t kButtonPatchY = 246;
+constexpr std::uint16_t kButtonPatchW = 116;
+constexpr std::uint16_t kButtonPatchH = 24;
 
 inline std::uint32_t texture_id(std::uint8_t bank, std::uint16_t index) {
 	return (static_cast<std::uint32_t>(bank) << 16) |
@@ -26,6 +31,30 @@ inline ::ui::StylePatch panel_patch() {
 	return ::ui::patch().image(::ui::BackgroundImage{
 		.texture_id = texture_id(7, 2),
 		.tint = {255, 255, 255, 255},
+	});
+}
+
+inline const std::uint8_t * button_well_pixels() {
+	static std::uint8_t pixels[kButtonPatchW * kButtonPatchH];
+	static bool initialized = false;
+	if(initialized) return pixels;
+	for(std::uint16_t y = 0; y < kButtonPatchH; ++y){
+		for(std::uint16_t x = 0; x < kButtonPatchW; ++x){
+			const std::uint16_t panelX = kButtonPatchX + x;
+			const std::uint16_t panelY = kButtonPatchY + y;
+			pixels[(y * kButtonPatchW) + x] =
+				((panelY & 1) == 0 || (panelX & 1) == 0) ? 210 : 146;
+		}
+	}
+	initialized = true;
+	return pixels;
+}
+
+inline ::ui::StylePatch button_well_patch() {
+	return ::ui::patch().bitmap(::ui::RawBitmapImage{
+		.pixels = button_well_pixels(),
+		.width = kButtonPatchW,
+		.height = kButtonPatchH,
 	});
 }
 
@@ -329,17 +358,35 @@ using ::ui::components::TextProps;
 				/>
 			</Box>
 			<Box
-			  key="buttons"
+			  key="button-area"
 			  layout={::ui::LayoutStyle{
 					.position = ::ui::PositionType::Absolute,
 					.direction = ::ui::FlexDirection::Row,
 					.align_items = ::ui::AlignItems::Center,
 					.justify_content = ::ui::JustifyContent::Center,
-					.position_inset = lobby_connect_frame_detail::inset_left_top(14.0f, 245.0f),
-					.width = ::ui::Length::points(256.0f),
-					.height = ::ui::Length::points(32.0f),
+					.position_inset = lobby_connect_frame_detail::inset_left_top(
+						0.0f,
+						static_cast<float>(lobby_connect_frame_detail::kButtonPatchY)),
+					.width = ::ui::Length::points(
+						static_cast<float>(lobby_connect_frame_detail::kPanelW)),
+					.height = ::ui::Length::points(
+						static_cast<float>(lobby_connect_frame_detail::kButtonPatchH)),
 				}}
 			>
+				<Box
+				  key="button-well-fill"
+				  layout={::ui::LayoutStyle{
+						.position = ::ui::PositionType::Absolute,
+						.position_inset = lobby_connect_frame_detail::inset_left_top(
+							static_cast<float>(lobby_connect_frame_detail::kButtonPatchX),
+							0.0f),
+						.width = ::ui::Length::points(
+							static_cast<float>(lobby_connect_frame_detail::kButtonPatchW)),
+						.height = ::ui::Length::points(
+							static_cast<float>(lobby_connect_frame_detail::kButtonPatchH)),
+					}}
+				  style={lobby_connect_frame_detail::button_well_patch()}
+				/>
 				<AppButton
 				  key="login"
 				  controlId="lobby_connect.login"

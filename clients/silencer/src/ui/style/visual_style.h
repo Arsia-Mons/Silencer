@@ -76,10 +76,17 @@ struct Gradient {
   GradientStop stops[UI_MAX_GRADIENT_STOPS]{};
 };
 
+enum class ImageFit : uint8_t {
+  Stretch = 0,
+  Cover,
+  Contain,
+};
+
 struct BackgroundImage {
   uint32_t texture_id = 0; // 0 => no image
   Color tint{255, 255, 255, 255};
   SideWidths nine_slice{}; // all-zero => plain stretch; nonzero => 9-patch
+  ImageFit fit = ImageFit::Stretch;
   uint16_t source_x = 0;
   uint16_t source_y = 0;
   uint16_t source_w = 0; // 0 => full source width
