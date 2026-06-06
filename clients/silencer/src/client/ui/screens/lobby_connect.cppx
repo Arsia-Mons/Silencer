@@ -3,7 +3,6 @@
 #include "client/ui/components/actions/actions.h"
 #include "client/ui/components/text/text.h"
 #include "client/ui/components/tokens.h"
-#include "client/ui/hooks/use_chrome.h"
 #include "client/ui/hooks/use_lobby_session.h"
 #include "ui/components/box.h"
 #include "ui/components/input.h"
@@ -26,14 +25,13 @@ struct LobbyConnectProps {
   uint32_t unused = 0;
 };
 
-// SIL-97: origin/main Lobby Connect — the bank-40 idx2 dialog sprite over black
-// (no slate Menu wash, no title heading). Two label + chromeless field rows sit
-// on the baked input wells (top of the sprite), a clipped connection-log region
-// fills the open area, and two chrome sprite buttons (Login/Create, Cancel)
-// anchor the bottom.
+// origin/main Lobby Connect: a single thin green-bordered rectangle over black
+// (NOT the ornate bank-40 dialog sprite). A connection-log region grows to fill
+// the empty top, pushing Username/Password label+field rows and the Login/Create
+// + Cancel buttons to the bottom. Fields + buttons carry their own green theme
+// chrome (green-dim border, near-black fill) — no baked sprite wells.
 ::ui::UiElement LobbyConnectView(const LobbyConnectProps &) {
   LobbySession lobby = use_lobby_session();
-  ChromeTextures chrome = use_chrome();
   std::string *username = use_state<std::string>(std::string());
   std::string *password = use_state<std::string>(std::string());
   if (!username || !password)
@@ -52,19 +50,6 @@ struct LobbyConnectProps {
 
   const char *log = use_text_storage("%s", lobby.status_log.c_str());
 
-  // Bare field paint: chromeless (suppresses the intrinsic input fill/border/
-  // ring) + cleared outline in every interaction slot so the focused field shows
-  // no vector ring — only the typed text + caret over the sprite's baked well.
-  ::ui::StylePatch clear = ::ui::patch()
-                               .chromeless(true)
-                               .background(::ui::Color{0, 0, 0, 0})
-                               .border(::ui::Border{})
-                               .outline(::ui::Outline{});
-  ::ui::StyleStatePatch bare{};
-  bare.base = clear;
-  bare.hover = clear;
-  bare.focus_visible = clear;
-  bare.pressed = clear;
   auto field_layout = ::ui::LayoutStyle{
       .align_items = ::ui::AlignItems::Center,
       .justify_content = ::ui::JustifyContent::Start,
@@ -76,12 +61,8 @@ struct LobbyConnectProps {
       .align_items = ::ui::AlignItems::Center,
       .gap = 8.0f};
 
-  const float pw = chrome.dialog_pw_w ? (float)chrome.dialog_pw_w : 284.0f;
-  const float ph = chrome.dialog_pw_h ? (float)chrome.dialog_pw_h : 277.0f;
   ::ui::StylePatch panel_style =
-      chrome.dialog_pw ? tokens::image_patch(chrome.dialog_pw)
-                       : tokens::panel_patch(tokens::kSurfacePanel,
-                                             tokens::kBorderPanel);
+      tokens::panel_patch(tokens::kSurfaceMenu, tokens::kBorderPanel);
 
   return <Box
     key="root"
@@ -95,12 +76,21 @@ struct LobbyConnectProps {
       key="panel"
       layout={::ui::LayoutStyle{
         .direction = ::ui::FlexDirection::Column,
-        .align_items = ::ui::AlignItems::Center,
-        .width = ::ui::Length::points(pw),
-        .height = ::ui::Length::points(ph),
-        .padding = {30.0f, 30.0f, 26.0f, 22.0f},
-        .gap = 8.0f}}
+        .align_items = ::ui::AlignItems::Stretch,
+        .width = ::ui::Length::points(300.0f),
+        .height = ::ui::Length::points(280.0f),
+        .padding = {12.0f, 12.0f, 12.0f, 12.0f},
+        .gap = 6.0f}}
       style={panel_style}>
+      <Box
+        key="logclip"
+        layout={::ui::LayoutStyle{
+          .overflow = ::ui::Overflow::Hidden,
+          .align_items = ::ui::AlignItems::Start,
+          .flex_grow = ::ui::StyleFloat::points(1.0f),
+          .width = ::ui::Length::percent(100.0f)}}>
+        <BodyText key="log" variant={BodyTextVariant::Message} value={log} />
+      </Box>
       <Box key="urow" layout={field_row}>
         <BodyText key="ulbl" variant={BodyTextVariant::Body} value="Username" />
         <Input
@@ -112,7 +102,6 @@ struct LobbyConnectProps {
           onChange={set_username}
           onActivate={on_activate}
           layout={field_layout}
-          style={bare}
         />
       </Box>
       <Box key="prow" layout={field_row}>
@@ -125,17 +114,7 @@ struct LobbyConnectProps {
           onChange={set_password}
           onActivate={on_activate}
           layout={field_layout}
-          style={bare}
         />
-      </Box>
-      <Box
-        key="logclip"
-        layout={::ui::LayoutStyle{
-          .overflow = ::ui::Overflow::Hidden,
-          .align_items = ::ui::AlignItems::Start,
-          .flex_grow = ::ui::StyleFloat::points(1.0f),
-          .width = ::ui::Length::percent(100.0f)}}>
-        <BodyText key="log" variant={BodyTextVariant::Message} value={log} />
       </Box>
       <Box
         key="actions"
@@ -143,8 +122,8 @@ struct LobbyConnectProps {
           .direction = ::ui::FlexDirection::Row,
           .justify_content = ::ui::JustifyContent::Center,
           .gap = 10.0f}}>
-        <AppButton key="login" controlId="Login" variant={AppButtonVariant::Chrome} label="Login/Create" onPress={submit} />
-        <AppButton key="cancel" controlId="Cancel" variant={AppButtonVariant::Chrome} label="Cancel" onPress={lobby.cancel} />
+        <AppButton key="login" controlId="Login" variant={AppButtonVariant::Secondary} label="Login/Create" onPress={submit} />
+        <AppButton key="cancel" controlId="Cancel" variant={AppButtonVariant::Secondary} label="Cancel" onPress={lobby.cancel} />
       </Box>
     </Box>
   </Box>
