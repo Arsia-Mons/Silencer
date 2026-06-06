@@ -75,22 +75,31 @@ inline ::ui::LayoutStyle app_button_layout(AppButtonSize size, bool /*selected*/
   }
 }
 
-// Fixed legacy oval-sprite geometry (origin/main button.cpp): Md 196x33 (idx7),
-// Sm 112x33 (idx28), Lg 220x33 (idx23). Height is 33 for every size. The label
-// rides centered on top of the plain-stretched sprite.
+// Oval-sprite geometry. The sprite is NINE-SLICED (rounded end-caps preserved,
+// flat middle stretched) so the button SIZES TO ITS LABEL instead of stretching
+// one fixed-width sprite — origin/main sizes each oval to its text (e.g. "Connect
+// To Lobby" is wider than "Exit"). Native height 33; a per-size min width keeps
+// short labels from collapsing.
 inline ::ui::LayoutStyle app_button_oval_layout(AppButtonSize size) {
-  float w = 196.0f;
+  float min_w = 168.0f;
   if (size == AppButtonSize::Sm)
-    w = 112.0f;
+    min_w = 104.0f;
   else if (size == AppButtonSize::Lg)
-    w = 220.0f;
+    min_w = 200.0f;
   return {
       .align_items = ::ui::AlignItems::Center,
       .justify_content = ::ui::JustifyContent::Center,
-      .width = ::ui::Length::points(w),
+      .min_width = ::ui::Length::points(min_w),
       .height = ::ui::Length::points(33.0f),
-      .padding = {16.0f, 16.0f, 8.0f, 8.0f},
+      .padding = {28.0f, 28.0f, 6.0f, 6.0f}, // {left,right,top,bottom}; clear the caps
   };
+}
+
+// Horizontal nine-slice insets for the oval stadium sprite: ~17px rounded caps
+// left/right, flat middle; top/bottom 0 (height is the native 33, no vertical
+// stretch). SideWidths order is {top,right,bottom,left}.
+inline ::ui::SideWidths app_button_oval_caps() {
+  return {.top = 0.0f, .right = 18.0f, .bottom = 0.0f, .left = 18.0f};
 }
 
 // Green oval sprite-button paint (SIL-89). Image-only patch over a baked bank-6
@@ -125,7 +134,7 @@ app_button_oval_patch(uint32_t tex, ::ui::Color lit = {255, 255, 255, 255}) {
     return ov;
   }
   auto oval = [&](::ui::Color tint) -> ::ui::StylePatch {
-    ::ui::StylePatch p = tokens::image_patch(tex, tint);
+    ::ui::StylePatch p = tokens::image_patch(tex, tint, app_button_oval_caps());
     p.text = ::ui::opt(label);
     return p;
   };
