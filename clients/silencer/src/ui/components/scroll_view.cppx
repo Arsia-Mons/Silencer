@@ -128,7 +128,7 @@ using ::ui::children;
     thumb.height = ::ui::Length::points(thumb_h);
 
     ::ui::StylePatch thumb_paint =
-        ::ui::patch().background(::ui::Color{159, 201, 255, 150});
+        ::ui::patch().background(::ui::Color{92, 208, 92, 200});
     // Built via the component factory (not JSX) so the whole scrollbar is one
     // local expression dropped into the return tree as {bar}.
     bar = ::ui::component(

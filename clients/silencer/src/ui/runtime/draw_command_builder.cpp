@@ -14,19 +14,19 @@ namespace {
 // fallback (that legacy path is gone; the transcriber reads node.visual only).
 // Premultiplication happens at emit (premul()), never here.
 constexpr Color kTransparent = {0, 0, 0, 0};
-constexpr Color kButtonFill = {24, 28, 36, 255};
-constexpr Color kButtonDisabledFill = {30, 34, 42, 255};
-constexpr Color kButtonBorder = {78, 88, 104, 255};
-constexpr Color kButtonDisabledBorder = {62, 68, 78, 255};
-constexpr Color kFocusBorder = {159, 201, 255, 255}; // accent #9FC9FF (matches theme focus_ring)
+constexpr Color kButtonFill = {6, 16, 8, 255};       // near-black green glass
+constexpr Color kButtonDisabledFill = {6, 14, 8, 255};
+constexpr Color kButtonBorder = {46, 125, 69, 255};  // #2E7D45 green-dim
+constexpr Color kButtonDisabledBorder = {30, 74, 44, 255};
+constexpr Color kFocusBorder = {92, 208, 92, 255};   // #5CD05C (matches theme focus_ring)
 constexpr float kFocusBorderWidth = 2.0f;
 constexpr float kFocusBorderOffset = 2.0f;
-constexpr Color kCheckedFill = {44, 92, 128, 255};
+constexpr Color kCheckedFill = {34, 192, 76, 255};   // #22C04C toggle-on green
 constexpr Color kInputFill = {18, 22, 28, 255};
 constexpr Color kSelectionFill = {72, 116, 164, 180};
 constexpr Color kCaretFill = {232, 240, 248, 255};
-constexpr Color kTextFill = {226, 234, 242, 255};
-constexpr Color kTextDisabledFill = {126, 134, 148, 255};
+constexpr Color kTextFill = {92, 208, 92, 255};      // #5CD05C green (bare-text fallback)
+constexpr Color kTextDisabledFill = {46, 90, 55, 255};
 
 bool has_color(Color color) { return color.a > 0; }
 

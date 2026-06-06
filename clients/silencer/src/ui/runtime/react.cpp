@@ -6,8 +6,10 @@
 #include <string.h>
 
 // Fixed capacities. Bump if needed; "incredibly simple" hello-world doesn't
-// need much.
-#define REACT_MAX_FIBERS 128
+// need much. 256: the dense screens (Options·Controls' 30-action keybind table)
+// plus the stacked overlays below them (main menu + options root) exceed 128
+// component instances. Each Fiber is ~420B, so 256 costs ~54KB extra — cheap.
+#define REACT_MAX_FIBERS 256
 #define REACT_HOOKS_PER_FIBER 8
 #define REACT_MAX_EFFECT_QUEUE 64
 #define REACT_MAX_RENDER_DEPTH 128

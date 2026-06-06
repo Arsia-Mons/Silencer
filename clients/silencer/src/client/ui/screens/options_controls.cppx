@@ -96,7 +96,7 @@ std::string capture_banner(const KeybindCapture &cap) {
       };
   ::ui::StyleStatePatch row_style = {};
   if (selected)
-    row_style.base = ::ui::patch().background(::ui::Color{159, 201, 255, 64});
+    row_style.base = ::ui::patch().background(::ui::Color{92, 208, 92, 72});
   return <Box
     key={key}
     id={row_id}
