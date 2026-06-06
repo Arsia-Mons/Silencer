@@ -358,34 +358,60 @@ void DrawBorder(Renderer& renderer,
                 Surface * dst,
                 const ::ui::DrawCommand& command) {
 	const ::ui::BorderData& data = command.payload.border;
-	auto edge = [&](float x, float y, float w, float h, ::ui::Color color) {
-		FillRect(renderer, dst, ::ui::DrawRect{x, y, w, h}, color);
+	auto width_px = [](float width) {
+		if(width <= 0.0f) return 0;
+		return std::max(1, static_cast<int>(std::round(width)));
+	};
+	auto edge = [&](int x, int y, int w, int h, ::ui::Color color) {
+		if(w <= 0 || h <= 0) return;
+		FillRect(renderer,
+		         dst,
+		         ::ui::DrawRect{static_cast<float>(x),
+		                        static_cast<float>(y),
+		                        static_cast<float>(w),
+		                        static_cast<float>(h)},
+		         color);
+	};
+	auto border = [&](const ::ui::DrawRect& r,
+	                  const ::ui::SideWidths& widths,
+	                  const ::ui::SideColors& colors) {
+		const int x0 = static_cast<int>(std::floor(r.x));
+		const int y0 = static_cast<int>(std::floor(r.y));
+		const int x1 = static_cast<int>(std::ceil(r.x + r.w));
+		const int y1 = static_cast<int>(std::ceil(r.y + r.h));
+		const int w = std::max(0, x1 - x0);
+		const int h = std::max(0, y1 - y0);
+		const int top = width_px(widths.top);
+		const int right = width_px(widths.right);
+		const int bottom = width_px(widths.bottom);
+		const int left = width_px(widths.left);
+		if(top > 0) edge(x0, y0, w, top, colors.top);
+		if(bottom > 0) edge(x0, y1 - bottom, w, bottom, colors.bottom);
+		if(left > 0) edge(x0, y0, left, h, colors.left);
+		if(right > 0) edge(x1 - right, y0, right, h, colors.right);
 	};
 	const ::ui::DrawRect& r = command.rect;
-	if(data.border.width.top > 0.0f){
-		edge(r.x, r.y, r.w, data.border.width.top, data.border.color.top);
-	}
-	if(data.border.width.bottom > 0.0f){
-		edge(r.x, r.y + r.h - data.border.width.bottom, r.w,
-		     data.border.width.bottom, data.border.color.bottom);
-	}
-	if(data.border.width.left > 0.0f){
-		edge(r.x, r.y, data.border.width.left, r.h, data.border.color.left);
-	}
-	if(data.border.width.right > 0.0f){
-		edge(r.x + r.w - data.border.width.right, r.y,
-		     data.border.width.right, r.h, data.border.color.right);
-	}
+	border(r, data.border.width, data.border.color);
 	if(data.has_outline && data.outline.width > 0.0f && data.outline.color.a > 0){
-		float x = r.x - data.outline.offset;
-		float y = r.y - data.outline.offset;
-		float w = r.w + data.outline.offset * 2.0f;
-		float h = r.h + data.outline.offset * 2.0f;
-		float t = data.outline.width;
-		edge(x, y, w, t, data.outline.color);
-		edge(x, y + h - t, w, t, data.outline.color);
-		edge(x, y, t, h, data.outline.color);
-		edge(x + w - t, y, t, h, data.outline.color);
+		const ::ui::DrawRect outline_rect{
+			r.x - data.outline.offset,
+			r.y - data.outline.offset,
+			r.w + data.outline.offset * 2.0f,
+			r.h + data.outline.offset * 2.0f,
+		};
+		const ::ui::SideWidths outline_width{
+			data.outline.width,
+			data.outline.width,
+			data.outline.width,
+			data.outline.width,
+		};
+		const ::ui::SideColors outline_color{
+			data.outline.color,
+			data.outline.color,
+			data.outline.color,
+			data.outline.color,
+		};
+		border(outline_rect, outline_width, outline_color);
 	}
 }
 
@@ -410,17 +436,32 @@ FontSpec FontFor(const ::ui::TextData& text) {
 	return FontSpec{133, 6};
 }
 
+Uint8 StraightChannel(Uint8 channel, Uint8 alpha) {
+	if(alpha == 0 || alpha == 255) return channel;
+	return static_cast<Uint8>(
+		std::min(255, (static_cast<int>(channel) * 255 + alpha / 2) / alpha));
+}
+
+::ui::Color StraightTextColor(::ui::Color color) {
+	color.r = StraightChannel(color.r, color.a);
+	color.g = StraightChannel(color.g, color.a);
+	color.b = StraightChannel(color.b, color.a);
+	return color;
+}
+
 Uint8 TextEffectColor(Renderer& renderer, ::ui::Color color) {
-	if(color.b != 0){
+	const ::ui::Color straight = StraightTextColor(color);
+	if(straight.b != 0){
 		return renderer.palette.ClosestMatch(
-			SDL_Color{color.r, color.g, color.b, 255});
+			SDL_Color{straight.r, straight.g, straight.b, 255});
 	}
-	return color.r;
+	return straight.r;
 }
 
 Uint8 TextBrightness(::ui::Color color) {
-	if(color.b != 0) return 128;
-	return color.g == 0 ? 128 : color.g;
+	const ::ui::Color straight = StraightTextColor(color);
+	if(straight.b != 0) return 128;
+	return straight.g == 0 ? 128 : straight.g;
 }
 
 void DrawText(Renderer& renderer,

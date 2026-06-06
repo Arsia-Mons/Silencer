@@ -68,6 +68,7 @@ class OpenTag:
     attrs: list["Attr"] = field(default_factory=list)
     self_closing: bool = False
     indent: str = ""  # leading whitespace of the line that the tag starts on
+    embedded: bool = False  # tag starts after non-whitespace on its line
 
 
 @dataclass
@@ -112,7 +113,6 @@ def is_jsx_tag_start(source: str, i: int) -> bool:
             return False
     return True
 
-
 def line_indent(source: str, index: int) -> str:
     """Return the leading whitespace of the line containing `index`."""
     line_start = source.rfind("\n", 0, index) + 1
@@ -120,6 +120,17 @@ def line_indent(source: str, index: int) -> str:
     while j < len(source) and source[j] in " \t":
         j += 1
     return source[line_start:j]
+
+
+def is_embedded_tag(source: str, index: int) -> bool:
+    """True when a tag starts after non-whitespace expression text."""
+    line_start = source.rfind("\n", 0, index) + 1
+    prefix = source[line_start:index]
+    if not prefix.strip(" \t"):
+        return False
+    if prefix.strip() in {"return", "co_return"}:
+        return False
+    return True
 
 
 def parse_open_tag(source: str, start: int) -> OpenTag:
@@ -234,7 +245,15 @@ def parse_open_tag(source: str, start: int) -> OpenTag:
         attrs.append(Attr(name=attr_name, value=value_text))
 
     indent = line_indent(source, start)
-    return OpenTag(start=start, end=i, tag=tag, attrs=attrs, self_closing=self_closing, indent=indent)
+    return OpenTag(
+        start=start,
+        end=i,
+        tag=tag,
+        attrs=attrs,
+        self_closing=self_closing,
+        indent=indent,
+        embedded=is_embedded_tag(source, start),
+    )
 
 
 def find_open_tags(source: str) -> list[OpenTag]:
@@ -354,7 +373,7 @@ def render_inline(tag: OpenTag) -> str:
 
 
 def render_multiline(tag: OpenTag, indent_step: str) -> str:
-    base = tag.indent
+    base = tag.indent + indent_step if tag.embedded else tag.indent
     inner_indent = base + indent_step
     lines = [f"<{tag.tag}"]
     for attr in tag.attrs:
@@ -371,7 +390,9 @@ def render_tag(tag: OpenTag, line_width: int, indent_step: str, column_at_start:
     # Does the inline form fit? `column_at_start` is the column of `<` on
     # its original line (0-based). The rendered line includes everything
     # from column_at_start through the end of the tag.
-    if column_at_start + len(inline) <= line_width and "\n" not in inline:
+    if "\n" not in inline and column_at_start + len(inline) <= line_width:
+        return inline
+    if "\n" not in inline and tag.embedded and len(inline) <= line_width:
         return inline
     return render_multiline(tag, indent_step)
 

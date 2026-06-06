@@ -132,6 +132,8 @@ constexpr int kGameCreateMapScrollbarWidth = 8;
 constexpr int kGameCreateTallInputH = 14;
 constexpr int kGameCreateTallButtonH = 21;
 constexpr int kGameCreatePreviewDescLineSlots = 12;
+constexpr std::uint8_t kChromeButtonTextPalette = 129;
+constexpr std::uint8_t kChromeButtonTextBrightness = 160;
 constexpr std::uint8_t kChromeSideTop = 1 << 0;
 constexpr std::uint8_t kChromeSideRight = 1 << 1;
 constexpr std::uint8_t kChromeSideBottom = 1 << 2;
@@ -280,6 +282,17 @@ inline std::uint32_t texture_id(std::uint8_t bank, std::uint16_t index) {
 	       static_cast<std::uint32_t>(index);
 }
 
+inline ::ui::Color legacy_text_color(std::uint8_t palette,
+                                     std::uint8_t brightness = 128,
+                                     std::uint8_t alpha = 255) {
+	return {
+		palette,
+		brightness == 128 ? static_cast<std::uint8_t>(0) : brightness,
+		0,
+		alpha,
+	};
+}
+
 inline ::ui::StylePatch chrome_border_patch() {
 	return ::ui::patch().border(::ui::Border{
 		{1.0f, 1.0f, 1.0f, 1.0f},
@@ -339,16 +352,19 @@ inline ::ui::StyleStatePatch chrome_button_patch() {
 		.image(::ui::BackgroundImage{
 			.texture_id = texture_id(7, 24),
 			.tint = {255, 255, 255, 255},
+			.nine_slice = {4.0f, 12.0f, 4.0f, 12.0f},
 		})
 		.text(::ui::TextVisual{
-			.color = {0, 0, 0, 255},
+			.color = legacy_text_color(kChromeButtonTextPalette,
+			                           kChromeButtonTextBrightness),
 			.font_id = 134,
 			.font_size = 8,
 			.align = ::ui::TextAlign::Center,
-	});
+		});
 	patch.hover = patch.base;
 	patch.focus_visible = patch.base;
 	patch.pressed = patch.base;
+	patch.disabled = patch.base;
 	return patch;
 }
 
@@ -384,6 +400,13 @@ inline ::ui::LayoutStyle text_slot(float width) {
 	};
 }
 
+inline ::ui::LayoutStyle version_text_slot(float width) {
+	::ui::LayoutStyle style = text_slot(width);
+	style.height = ::ui::Length::points(11.0f);
+	style.align_self = ::ui::AlignItems::End;
+	return style;
+}
+
 inline ::ui::LayoutStyle absolute_layout(int x,
                                          int y,
                                          int width,
@@ -408,7 +431,7 @@ inline ::ui::LayoutStyle absolute_button_layout(int x,
 		.justify_content = ::ui::JustifyContent::Center,
 		.width = ::ui::Length::points(static_cast<float>(width)),
 		.height = ::ui::Length::points(static_cast<float>(height)),
-		.padding = {8.0f, 8.0f, 4.0f, 4.0f},
+		.padding = {8.0f, 8.0f, 0.0f, 0.0f},
 		.position_inset = absolute_inset(
 			static_cast<float>(x),
 			static_cast<float>(y)),
@@ -476,9 +499,10 @@ inline ::ui::StylePatch palette_text_patch(std::uint8_t palette,
                                            std::uint16_t font_size,
                                            float line_height,
                                            ::ui::TextAlign align = ::ui::TextAlign::Left,
+                                           std::uint8_t brightness = 128,
                                            std::uint8_t alpha = 255) {
 	return ::ui::patch().text(::ui::TextVisual{
-		.color = {palette, 0, 0, alpha},
+		.color = legacy_text_color(palette, brightness, alpha),
 		.font_id = font_id,
 		.font_size = font_size,
 		.align = align,
@@ -711,21 +735,13 @@ inline int visible_chat_start(int line_count,
 	return clamp_int(start, 0, std::max(0, line_count - visible_slots));
 }
 
-inline std::uint8_t line_alpha(std::uint8_t brightness) {
-	if(brightness >= 128) return 255;
-	return static_cast<std::uint8_t>(
-		clamp_int(static_cast<int>(brightness) * 2, 96, 255));
-}
-
 inline ::ui::StylePatch chat_input_patch() {
 	return ::ui::patch()
-		.border(::ui::Border{
-			{1.0f, 1.0f, 1.0f, 1.0f},
-			{{216, 0, 0, 255}, {216, 0, 0, 255},
-			 {216, 0, 0, 255}, {216, 0, 0, 255}},
-		})
+		.background(::ui::Color{0, 0, 0, 0})
+		.border(::ui::Border{})
+		.outline(::ui::Outline{})
 		.text(::ui::TextVisual{
-			.color = {0, 0, 0, 255},
+			.color = legacy_text_color(0),
 			.font_id = 133,
 			.font_size = 6,
 			.line_height = 11.0f,
@@ -852,7 +868,7 @@ inline ::ui::StyleStatePatch game_create_text_input_patch() {
 		.border(::ui::Border{})
 		.outline(::ui::Outline{})
 		.text(::ui::TextVisual{
-			.color = {0, 0, 0, 255},
+			.color = legacy_text_color(0),
 			.font_id = 133,
 			.font_size = 6,
 			.line_height = 11.0f,
@@ -1030,6 +1046,7 @@ struct CharacterPanelViewProps {
 	const char * key = nullptr;
 	bool show = false;
 	const CharacterPanelState * state = nullptr;
+	const AppAssetsModel * app_assets = nullptr;
 	int x = 0;
 	int y = 0;
 	int width = 0;
@@ -1047,8 +1064,15 @@ struct CharacterPanelViewProps {
 		inner_width * kCharacterEmblemWidthPct / 100,
 		kCharacterEmblemMinW,
 		kCharacterEmblemMaxW);
+	const AppSpriteFrame emblem =
+		props.app_assets
+			? props.app_assets->agency_emblem(state.displayAgency)
+			: AppSpriteFrame{};
+	const int emblem_draw_w = emblem.available ? emblem.width : emblem_w;
+	const int emblem_draw_h = emblem.available ? emblem.height : emblem_w;
+	const int emblem_rail_w = std::max(emblem_w, emblem_draw_w);
 	const int details_width =
-		std::max(0, inner_width - emblem_w - kCharacterEmblemGap);
+		std::max(0, inner_width - emblem_rail_w - kCharacterEmblemGap);
 	const int label_width =
 		text_width("LOSSES", kCharacterBodyAdvance) + 4;
 	const int upgrade_value_width = character_upgrade_value_width(state);
@@ -1092,7 +1116,7 @@ struct CharacterPanelViewProps {
 			  layout={::ui::LayoutStyle{
 					.direction = ::ui::FlexDirection::Column,
 					.align_items = ::ui::AlignItems::Center,
-					.width = ::ui::Length::points(static_cast<float>(emblem_w)),
+					.width = ::ui::Length::points(static_cast<float>(emblem_rail_w)),
 					.height = ::ui::Length::auto_size(),
 					.gap = 4.0f,
 					.overflow = ::ui::Overflow::Hidden,
@@ -1102,8 +1126,8 @@ struct CharacterPanelViewProps {
 				  key="emblem"
 				  id="CharacterPanelAgencyEmblem"
 				  layout={::ui::LayoutStyle{
-						.width = ::ui::Length::points(static_cast<float>(emblem_w)),
-						.height = ::ui::Length::points(static_cast<float>(emblem_w)),
+						.width = ::ui::Length::points(static_cast<float>(emblem_draw_w)),
+						.height = ::ui::Length::points(static_cast<float>(emblem_draw_h)),
 					}}
 				  style={sprite_patch(kCharacterAgencySpriteBank, state.displayAgency)}
 				/>
@@ -1112,7 +1136,7 @@ struct CharacterPanelViewProps {
 				  id="CharacterPanelLevelBadge"
 				  value={state.levelLabel.c_str()}
 				  layout={::ui::LayoutStyle{
-						.width = ::ui::Length::points(static_cast<float>(emblem_w)),
+						.width = ::ui::Length::points(static_cast<float>(emblem_rail_w)),
 						.height = ::ui::Length::points(static_cast<float>(kCharacterBodyLineH)),
 					}}
 				  style={text_patch(133, 6, 11.0f, ::ui::TextAlign::Center)}
@@ -1206,7 +1230,7 @@ struct CharacterPanelViewProps {
 								.justify_content = ::ui::JustifyContent::Center,
 								.width = ::ui::Length::points(static_cast<float>(kCharacterActionButtonMinW)),
 								.height = ::ui::Length::points(static_cast<float>(kCharacterButtonH)),
-								.padding = {12.0f, 12.0f, 4.0f, 4.0f},
+								.padding = {12.0f, 12.0f, 0.0f, 0.0f},
 							}}
 						  style={chrome_button_patch()}
 						/>
@@ -1298,7 +1322,7 @@ struct ChatLineViewProps {
 	  key={props.key}
 	  value={line.text.c_str()}
 	  layout={absolute_layout(indent, props.slot * kChatLineH, std::max(0, props.width - indent), kChatLineH)}
-	  style={palette_text_patch(line.color, 133, 6, 11.0f, ::ui::TextAlign::Left, line_alpha(line.brightness))}
+	  style={palette_text_patch(line.color, 133, 6, 11.0f, ::ui::TextAlign::Left, line.brightness)}
 	/>
 }
 
@@ -3785,7 +3809,7 @@ struct GameTechRowLabelProps {
 		  key="text"
 		  value={props.row->label.c_str()}
 		  layout={absolute_layout(0, 0, props.width - kGameTechLabelX, kGameTechRowH)}
-		  style={palette_text_patch(0, 133, 6, 11.0f, ::ui::TextAlign::Left, game_tech_label_alpha(props.row->labelBrightness))}
+		  style={palette_text_patch(0, 133, 6, 11.0f, ::ui::TextAlign::Left, 128, game_tech_label_alpha(props.row->labelBrightness))}
 		/>
 	</component_detail.Host>
 }
@@ -4422,7 +4446,7 @@ using ::ui::components::TextProps;
 			  key="version"
 			  id="LobbyVer"
 			  value={props.version}
-			  layout={lobby_chrome_frame_detail::text_slot(72.0f)}
+			  layout={lobby_chrome_frame_detail::version_text_slot(72.0f)}
 			  style={lobby_chrome_frame_detail::version_text_patch()}
 			/>
 			<Text
@@ -4450,7 +4474,7 @@ using ::ui::components::TextProps;
 					.justify_content = ::ui::JustifyContent::Center,
 					.width = ::ui::Length::points(156.0f),
 					.height = ::ui::Length::points(21.0f),
-					.padding = {8.0f, 8.0f, 4.0f, 4.0f},
+					.padding = {8.0f, 8.0f, 0.0f, 0.0f},
 				}}
 			  style={lobby_chrome_frame_detail::chrome_button_patch()}
 			/>
@@ -4513,6 +4537,7 @@ using ::ui::components::TextProps;
 		  key="character-panel"
 		  show={props.show_character}
 		  state={props.character}
+		  appAssets={props.app_assets}
 		  x={props.character_x}
 		  y={props.character_y}
 		  width={props.character_width}

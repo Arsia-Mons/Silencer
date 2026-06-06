@@ -398,6 +398,15 @@ if(SILENCER_BUILD_TESTS)
 	set_tests_properties(cppx_transpiler_tests PROPERTIES
 		WORKING_DIRECTORY ${SILENCER_REPO_ROOT}
 	)
+	add_test(
+		NAME cppx_formatter_tests
+		COMMAND ${Python3_EXECUTABLE}
+			${SILENCER_REPO_ROOT}/tests/cppx_formatter_tests.py
+			--tool ${CMAKE_CURRENT_SOURCE_DIR}/tools/cppx_format.py
+	)
+	set_tests_properties(cppx_formatter_tests PROPERTIES
+		WORKING_DIRECTORY ${SILENCER_REPO_ROOT}
+	)
 endif()
 
 include(CPack)

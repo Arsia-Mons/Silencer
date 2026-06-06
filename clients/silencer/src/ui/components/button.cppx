@@ -19,6 +19,16 @@ namespace {
 		::ui::resolve(::ui::use_theme().button,
 		              props.style,
 		              detail::interaction_state(props.disabled));
+	::ui::VisualStyle label_visual{};
+	label_visual.text = visual.text;
+	::ui::UiElement label_child =
+		props.children.count == 0
+			? ::ui::host(::ui::HostKind::Text, {
+				.key = "label",
+				.visual = label_visual,
+				.text = ::ui::HostTextProps{.value = props.label},
+			})
+			: ::ui::empty();
 	return <detail.Host
 	  kind={::ui::HostKind::Button}
 	  key={props.key}
@@ -32,7 +42,7 @@ namespace {
 	  callbacks={button_callbacks(props)}
 	>
 		{props.children}
-		{props.children.count > 0 ? nullptr : props.label}
+		{label_child}
 	</detail.Host>
 }
 
