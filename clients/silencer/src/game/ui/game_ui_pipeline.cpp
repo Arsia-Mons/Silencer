@@ -253,6 +253,14 @@ for(int i = 0; i < 5; ++i)
 bake(181, (size_t)i, cppxChrome.agency_emblem[i],
      i == 0 ? &cppxChrome.agency_emblem_w : nullptr,
      i == 0 ? &cppxChrome.agency_emblem_h : nullptr);
+// In-game HUD console chrome (banks 94/95). These are authored against the base
+// palette page (resources.cpp leaves them at paletteoffset 0), so the bake's
+// default page_for_bank arm (base) is correct — no per-bank page override.
+// Whole-sprite, native size: the top status bezel, the bottom dash, and the
+// bottom-center radar/minimap frame.
+bake(95, 2, cppxChrome.hud_bezel_top, &cppxChrome.hud_bezel_top_w, &cppxChrome.hud_bezel_top_h);
+bake(95, 11, cppxChrome.hud_bezel_bottom, &cppxChrome.hud_bezel_bottom_w, &cppxChrome.hud_bezel_bottom_h);
+bake(94, 0, cppxChrome.hud_radar, &cppxChrome.hud_radar_w, &cppxChrome.hud_radar_h);
 }
 
 void GameUiPipeline::RenderCppxClientUiFrame(Surface& surface) {

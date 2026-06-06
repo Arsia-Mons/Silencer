@@ -27,8 +27,11 @@ namespace client::ui {
 //   bank 40 idx 4    dialog_msg       ~352x178 (SIL-91, plain native)
 //   bank 40 idx 2    dialog_pw        ~284x277 (SIL-91, plain native)
 //   bank 6  idx 0    starfield        full-bleed (SIL-92, stretch)
+//   bank 95 idx 2    hud_bezel_top    native       (in-game HUD top bezel)
+//   bank 95 idx 11   hud_bezel_bottom native       (in-game HUD bottom dash)
+//   bank 94 idx 0    hud_radar        native       (in-game minimap frame)
 //   ------------------------------------------------------------------
-//   total baked: 9 / 64
+//   total baked: ~32 / 64 (incl. logo reveal frames + toggles + 5 emblems)
 struct ChromeTextures {
   // The green oval menu button (bank 6), per legacy size: Md/Sm/Lg. Brightness/
   // focus is a draw-time tint of the one sprite, not separate frames.
@@ -72,6 +75,16 @@ struct ChromeTextures {
   // Create detail column for the previewed agency. Indexed by agency 0..4.
   uint32_t agency_emblem[5] = {};
   uint16_t agency_emblem_w = 0, agency_emblem_h = 0;
+  // In-game HUD console chrome (banks 94/95, base palette page). Whole-sprite,
+  // edge-anchored over the live world; sized to native (_w/_h carried so the
+  // bezel paints at its authored width, not stretched). Radar viewport (94/0) is
+  // the bottom-center minimap frame. id of 0 => fall back to a green wire-rect.
+  uint32_t hud_bezel_top = 0; // bank 95 idx2  (top status bezel)
+  uint16_t hud_bezel_top_w = 0, hud_bezel_top_h = 0;
+  uint32_t hud_bezel_bottom = 0; // bank 95 idx11 (bottom dash bezel)
+  uint16_t hud_bezel_bottom_w = 0, hud_bezel_bottom_h = 0;
+  uint32_t hud_radar = 0; // bank 94 idx0  (radar/minimap frame)
+  uint16_t hud_radar_w = 0, hud_radar_h = 0;
 };
 
 // Read the baked chrome ids for the current frame. Requires a

@@ -64,6 +64,20 @@ constexpr ::ui::Color kTextWeaponDetail = {79, 184, 103, 255};
 constexpr ::ui::Color kTextWeaponDetailOff = {46, 125, 69, 255};
 constexpr ::ui::Color kTextHud = {61, 232, 61, 255};          // #3DE83D hud-green
 
+// ---- In-game HUD LCD palette (overlay over live world; spec §1.1) ----
+// SEPARATE from the menu green family above: these read against the live world,
+// not the starfield, so they run brighter/saturated. own-data=green,
+// economy=blue, warnings=red, radar schematic=amber, lozenge/scoreboard=black.
+constexpr ::ui::Color kHudGreen = {61, 232, 61, 255};    // #3DE83D own data/chat/scoreboard
+constexpr ::ui::Color kHudGreenDim = {30, 122, 30, 255}; // #1E7A1E chat body / inactive
+constexpr ::ui::Color kHudBlue = {58, 107, 255, 255};    // #3A6BFF economy/files/credits/dots
+constexpr ::ui::Color kHudRed = {224, 48, 48, 255};      // #E03030 FATIGUE/health/2ndary ammo
+constexpr ::ui::Color kHudAmber = {160, 86, 30, 255};    // #A0561E radar schematic
+constexpr ::ui::Color kHudBlack = {0, 0, 0, 210};        // ~85% scoreboard bar / radar viewport
+constexpr ::ui::Color kHudPanelFill = {0, 8, 2, 200};    // translucent green-black HUD well
+constexpr ::ui::Color kBlipAlly = {255, 255, 255, 255};
+constexpr ::ui::Color kBlipEnemy = {224, 48, 48, 255};
+
 // ---- Font faces (font_id; see render/cppx_ui/font_registry.h FaceId) ----
 // The four bitmap-derived legacy OTF faces. The product layer sets font_id per
 // role so titles/headings/body/tiny each render in their own face (everything

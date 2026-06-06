@@ -64,6 +64,7 @@ struct WorldSessionSnapshot {
   bool chat_with_team = false;
   int chat_show_ticks = 0;
   std::string chat_text = {};
+  std::vector<std::string> chat_log = {}; // recent scrollback, oldest -> newest
 
   // --- player list / scoreboard (use_teams) ---
   // Per-team scores reuse `scores` above; `players` is the connected roster.

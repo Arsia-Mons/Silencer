@@ -124,6 +124,7 @@ IngameChat use_ingame_chat() {
   out.with_team = s.chat_with_team;
   out.show_ticks = s.chat_show_ticks;
   out.text = s.chat_text;
+  out.log = s.chat_log;
   out.send = value->chat_send;
   out.cancel = value->chat_cancel;
   out.toggle_channel = value->chat_toggle_channel;

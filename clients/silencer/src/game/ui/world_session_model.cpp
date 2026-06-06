@@ -4,11 +4,14 @@
 #include "world.h"
 #include "objecttypes.h"
 #include "player.h"
+#include "peer.h"
 #include "gamestateobject.h"
 #include "gamemode.h"
 #include "buyableitem.h"
 #include "basedoor.h"
 #include "team.h"
+#include "lobby.h"
+#include "actor/user.h"
 #include "gasloader.h"
 
 #include <cstring>
@@ -143,9 +146,52 @@ CaptureWorldSessionSnapshot(Game &game, client::ui::SessionPhase phase) {
   }
   snap.chat_show_ticks = world.messaging.showchat_i;
   snap.show_player_list = world.IsShowingPlayerList();
-  // The named scoreboard roster (per-account display names) needs the protected
-  // ingameusers/lobby seam; the scoreboard renders from the public per-team
-  // scores for now and the roster is a follow-up. `players` stays empty.
+
+  // Chat scrollback (oldest -> newest). The HUD chat box shows the last few
+  // lines above the active compose line; cap so the box stays compact.
+  {
+    const std::deque<std::string> &lines = world.messaging.chatlines;
+    const size_t kMaxLog = 4;
+    size_t start = lines.size() > kMaxLog ? lines.size() - kMaxLog : 0;
+    for (size_t i = start; i < lines.size(); ++i)
+      snap.chat_log.push_back(lines[i]);
+  }
+
+  // Scoreboard roster: one row per connected peer with a controlled player. The
+  // display name resolves through the lobby's account-keyed user info (charname),
+  // falling back to the local username then a neutral placeholder. Stat columns
+  // come from the peer's replicated Stats (kills/score/secrets/jets/hacks/
+  // contacts); all-zero at match start, matching the golden.
+  Lobby &lobby = world.lobby;
+  Uint8 localId = world.GetLocalPeerId();
+  for (unsigned int i = 0; i < WorldPeerRegistry::maxpeers; ++i) {
+    Peer *peer = world.peers.peerlist[i];
+    if (!peer)
+      continue;
+    Player *pp = world.GetPeerPlayer(peer->id);
+    if (!pp)
+      continue;
+    client::ui::ScoreboardPlayer row;
+    bool isLocal = (peer->id == localId);
+    const char *name = nullptr;
+    User *ui = lobby.GetUserInfo(peer->accountid);
+    if (ui && ui->DisplayName() && ui->DisplayName()[0])
+      name = ui->DisplayName();
+    else if (isLocal && lobby.GetLocalUsername() && lobby.GetLocalUsername()[0])
+      name = lobby.GetLocalUsername();
+    row.name = (name && name[0]) ? name : "AgentZero";
+    Team *team = world.GetPeerTeam(peer->id);
+    row.team_number = team ? team->number : 0;
+    row.local = isLocal;
+    Stats &st = peer->stats;
+    row.kills = (int)st.kills;
+    row.score = (int)st.CalculateExperience();
+    row.secrets = (int)st.secretsreturned;
+    row.jets = 0;
+    row.hacks = (int)st.fileshacked;
+    row.contacts = 0;
+    snap.players.push_back(std::move(row));
+  }
 
   return snap;
 }

@@ -6,13 +6,14 @@
 #include "client/ui/components/text/text.h"
 #include "client/ui/components/tokens.h"
 #include "client/ui/hooks/use_buy_tech.h"
+#include "client/ui/hooks/use_chrome.h"
 #include "client/ui/hooks/use_ingame_chat.h"
-#include "client/ui/hooks/use_match.h"
 #include "client/ui/hooks/use_player_status.h"
 #include "client/ui/hooks/use_teams.h"
 #include "client/ui/hooks/use_tech.h"
 #include "ui/components/box.h"
 #include "ui/components/input.h"
+#include "ui/components/text.h"
 #include "ui/runtime/react.h"
 
 #include <functional>
@@ -28,65 +29,76 @@ using ::ui::components::Box;
 using ::ui::components::BoxProps;
 using ::ui::components::Input;
 using ::ui::components::InputProps;
+using ::ui::components::Text;
+using ::ui::components::TextProps;
 
-// The buy/tech overlay renders a fixed window of five focusable rows (the golden
-// loadout-tile idiom). The replicated cursor + nav drive selection; a full list
-// view (scroll window) is a follow-up. Five rows cover the in-band crop and the
-// nav-selection path the e2e exercises.
-const char *phase_label(uint8_t phase) {
-  switch (phase) {
-  case 1:
-    return "ACTIVE";
-  case 2:
-    return "OVER";
-  default:
-    return "WARMUP";
-  }
+// ---------------------------------------------------------------------------
+// HUD primitives (imperative subtrees — JSX-in-var is unsupported in cppx).
+// The in-game HUD is SPRITE-first and POSITIONAL: bezels are whole-sprite Boxes
+// anchored to the screen edges; LCD readouts are absolutely-positioned text
+// painted at the legacy logical coordinates over the live world (the HUD root is
+// transparent). Greens = own data, blue = economy, red = warnings.
+// ---------------------------------------------------------------------------
+
+::ui::EdgeSizes inset(float left, float top) {
+  ::ui::EdgeSizes e;
+  e.left = ::ui::StyleValue::points(left);
+  e.top = ::ui::StyleValue::points(top);
+  return e;
 }
 
-// Per-team scores joined into one readable line ("T1 3  T2 1"); empty list
-// renders a neutral placeholder.
-std::string build_score_text(const std::vector<uint16_t> &scores) {
-  if (scores.empty())
-    return "no score yet";
-  std::string out;
-  for (size_t i = 0; i < scores.size(); ++i) {
-    if (!out.empty())
-      out += "   ";
-    out += "T" + std::to_string(i + 1) + " " + std::to_string(scores[i]);
-  }
-  return out;
+// A single LCD readout pinned to a legacy logical coordinate. Painted directly
+// (no wrapping panel) so it floats over the world like the legacy HUD digits.
+::ui::UiElement Lcd(const char *key, float x, float y, const char *value,
+                    ::ui::Color color, uint16_t font = tokens::kFontBodyEm,
+                    uint16_t face = tokens::kFaceBody) {
+  return Box(BoxProps{
+      .key = key,
+      .layout = ::ui::LayoutStyle{.position = ::ui::PositionType::Absolute,
+                                  .position_inset = inset(x, y)},
+      .children = ::ui::children({Text(TextProps{
+          .value = value,
+          .layout = ::ui::LayoutStyle{.height = ::ui::Length::points(16.0f)},
+          .style = tokens::text_patch(color, font, face)})})});
 }
 
-// Scoreboard as a single block: per-team scores, then the connected roster.
-std::string build_scoreboard_text(const std::vector<TeamScore> &teams,
-                                  const std::vector<ScoreboardPlayer> &players) {
-  std::string out;
-  for (const TeamScore &t : teams) {
-    if (!out.empty())
-      out += "\n";
-    out += "Team " + std::to_string((int)t.number + 1) + ":  " +
-           std::to_string((int)t.score);
-  }
-  if (players.empty()) {
-    if (!out.empty())
-      out += "\n";
-    out += "(no other agents)";
-  }
-  for (const ScoreboardPlayer &p : players) {
-    out += "\n";
-    out += p.name + "  [T" + std::to_string((int)p.team_number + 1) + "]";
-    if (p.local)
-      out += "  (you)";
-  }
-  return out;
+// A bezel/well sprite drawn whole at its native size, anchored by absolute
+// inset. Falls back to a translucent green wire-rect panel when the sprite is
+// not baked (v1 stopgap, per the in-game plan §5/risk 4).
+::ui::UiElement BezelSprite(const char *key, uint32_t tex, float x, float y,
+                            float w, float h) {
+  ::ui::StylePatch style =
+      tex ? tokens::image_patch(tex)
+          : tokens::panel_patch(tokens::kHudPanelFill, tokens::kHudGreen);
+  return Box(BoxProps{
+      .key = key,
+      .layout = ::ui::LayoutStyle{.position = ::ui::PositionType::Absolute,
+                                  .position_inset = inset(x, y),
+                                  .width = ::ui::Length::points(w),
+                                  .height = ::ui::Length::points(h)},
+      .style = style});
 }
 
-// --- in-match overlays (InGameScreen children, gated by the snapshot flags) ---
+// A green wire-rect HUD well (translucent black fill + bright-green 1px border).
+// Used for the bottom-corner health/ammo/files panels when the legacy bezel
+// sprites are not available — the acceptable v1 stopgap from the brief.
+::ui::UiElement WirePanel(const char *key, float x, float y, float w, float h,
+                          ::ui::Color border) {
+  return Box(BoxProps{
+      .key = key,
+      .layout = ::ui::LayoutStyle{.position = ::ui::PositionType::Absolute,
+                                  .position_inset = inset(x, y),
+                                  .width = ::ui::Length::points(w),
+                                  .height = ::ui::Length::points(h)},
+      .style = tokens::panel_patch(tokens::kHudPanelFill, border)});
+}
 
-// One focusable buy/tech row. Focus drives the replicated cursor (so keyboard
-// nav moves selection); activation purchases the row. Out-of-range slots render
-// nothing so the row count stays stable across frames.
+// ---------------------------------------------------------------------------
+// Buy/Tech overlay (§3.17, no golden): a green wire-rect frame over the world
+// with a fixed window of focusable rows. The cursor drives selection; Esc
+// closes (no Close button).
+// ---------------------------------------------------------------------------
+
 ::ui::UiElement buytech_row(int index, const std::vector<TechItem> &items,
                             int selected, std::function<void(int)> select,
                             std::function<void(int)> purchase) {
@@ -123,65 +135,197 @@ std::string build_scoreboard_text(const std::vector<TeamScore> &teams,
 }
 
 ::ui::UiElement BuyTechOverlay(const Tech &tech, const BuyTech &cursor) {
-  const char *title = tech.tech_active ? "Tech" : "Buy";
+  const char *title = tech.tech_active ? "TECH" : "BUY";
   const std::vector<TechItem> &items = tech.items;
   const int sel = cursor.selected_index;
   std::function<void(int)> select = cursor.select;
   std::function<void(int)> purchase = tech.purchase;
-  return <Panel key="buytech" variant={PanelVariant::Hero}>
+  // A centered green wire-rect frame (transparent over the world), not a slate
+  // Hero panel. Esc closes — no Close button.
+  return <Box
+    key="buytech"
+    layout={::ui::LayoutStyle{
+      .position = ::ui::PositionType::Absolute,
+      .position_inset = ::ui::EdgeSizes{::ui::StyleValue::points(180.0f), {},
+                                        ::ui::StyleValue::points(70.0f), {}},
+      .direction = ::ui::FlexDirection::Column,
+      .align_items = ::ui::AlignItems::Stretch,
+      .width = ::ui::Length::points(280.0f),
+      .padding = {12.0f, 12.0f, 10.0f, 12.0f},
+      .gap = 6.0f,
+    }}
+    style={tokens::panel_patch(tokens::kHudBlack, tokens::kHudGreen)}
+  >
     <ScreenTitle key="h" variant={ScreenTitleVariant::Dialog} value={title} />
     {buytech_row(0, items, sel, select, purchase)}
     {buytech_row(1, items, sel, select, purchase)}
     {buytech_row(2, items, sel, select, purchase)}
     {buytech_row(3, items, sel, select, purchase)}
     {buytech_row(4, items, sel, select, purchase)}
-    <AppButton key="close" controlId="CloseBuyTech" label="Close" onPress={tech.close} />
-  </Panel>
-}
-
-::ui::UiElement PlayerListOverlay(const char *scoreboard) {
-  return <Panel key="scoreboard" variant={PanelVariant::Overlay}>
-    <ScreenTitle key="h" variant={ScreenTitleVariant::Screen} value="Scoreboard" />
-    <BodyText key="rows" variant={BodyTextVariant::Body} value={scoreboard} />
-  </Panel>
-}
-
-// A full-width chat bar pinned to the bottom band (a Panel's canonical width is
-// too narrow to span the HUD, so this is a token-filled Box).
-::ui::UiElement IngameChatOverlay(bool with_team, const char *draft,
-                                  std::function<void(const std::string &)> set_draft,
-                                  std::function<void()> send,
-                                  std::function<void()> toggle,
-                                  std::function<void()> cancel) {
-  const char *channel = with_team ? "Team Chat" : "Global Chat";
-  std::function<void(const ::ui::ActivationEvent &)> on_activate =
-      [send](const ::ui::ActivationEvent &) { if (send) send(); };
-  return <Box
-    key="chatbar"
-    layout={::ui::LayoutStyle{
-      .direction = ::ui::FlexDirection::Row,
-      .align_items = ::ui::AlignItems::Center,
-      .width = ::ui::Length::percent(100.0f),
-      .padding = {12.0f, 12.0f, 8.0f, 8.0f},
-      .gap = 10.0f,
-    }}
-    style={tokens::fill_patch(tokens::kSurfaceHudBand)}
-  >
-    <ScreenTitle key="ch" variant={ScreenTitleVariant::Dialog} value={channel} />
-    <Input
-      key="msg"
-      id="IngameChat"
-      autofocus={true}
-      accessibility={{.label = "Chat"}}
-      value={draft}
-      onChange={set_draft}
-      onActivate={on_activate}
-    />
-    <AppButton key="send" controlId="SendIngameChat" label="Send" onPress={send} />
-    <AppButton key="chan" controlId="ToggleChatChannel" label="Channel" onPress={toggle} />
-    <AppButton key="close" controlId="CloseChat" label="Close" onPress={cancel} />
   </Box>
 }
+
+// ---------------------------------------------------------------------------
+// Scoreboard (F1) — opaque-black centered bar; per-agent name + L/E/S/J/H/C.
+// ---------------------------------------------------------------------------
+
+std::string stats_line(const ScoreboardPlayer &p) {
+  return "L:" + std::to_string(p.kills) + "    E:" + std::to_string(p.score) +
+         "  S:" + std::to_string(p.secrets) + "  J:" + std::to_string(p.jets) +
+         "  H:" + std::to_string(p.hacks) + "  C:" + std::to_string(p.contacts);
+}
+
+::ui::UiElement scoreboard_row(int index, const ScoreboardPlayer &p) {
+  const char *name = ::ui::copy_string(p.name.c_str());
+  const char *stats = ::ui::copy_string(stats_line(p).c_str());
+  const char *key =
+      ::ui::copy_string(("sbrow" + std::to_string(index)).c_str());
+  const char *ekey =
+      ::ui::copy_string(("sbemb" + std::to_string(index)).c_str());
+  // Left group: red emblem splat marker + agent name (green). Right group: the
+  // L/E/S/J/H/C stat columns (green). SpaceBetween pins name left, stats right.
+  ::ui::UiElement left = Box(BoxProps{
+      .key = "lf",
+      .layout = ::ui::LayoutStyle{.direction = ::ui::FlexDirection::Row,
+                                  .align_items = ::ui::AlignItems::Center,
+                                  .gap = 14.0f},
+      .children = ::ui::children(
+          {Box(BoxProps{
+               .key = ekey,
+               .layout = ::ui::LayoutStyle{.width = ::ui::Length::points(12.0f),
+                                           .height = ::ui::Length::points(12.0f)},
+               .style = tokens::fill_patch(tokens::kHudRed)}),
+           Text(TextProps{
+               .value = name,
+               .layout = ::ui::LayoutStyle{.height = ::ui::Length::points(14.0f)},
+               .style = tokens::text_patch(tokens::kHudGreen, tokens::kFontBodyEm,
+                                           tokens::kFaceBody)})})});
+  return Box(BoxProps{
+      .key = key,
+      .layout =
+          ::ui::LayoutStyle{.direction = ::ui::FlexDirection::Row,
+                            .align_items = ::ui::AlignItems::Center,
+                            .justify_content = ::ui::JustifyContent::SpaceBetween,
+                            .width = ::ui::Length::percent(100.0f),
+                            .height = ::ui::Length::points(14.0f)},
+      .children = ::ui::children(
+          {left,
+           Text(TextProps{
+               .value = stats,
+               .layout = ::ui::LayoutStyle{.height = ::ui::Length::points(14.0f)},
+               .style = tokens::text_patch(tokens::kHudGreen, tokens::kFontBodyEm,
+                                           tokens::kFaceBody)})})});
+}
+
+::ui::UiElement ScoreboardOverlay(const std::vector<ScoreboardPlayer> &players) {
+  std::vector<::ui::UiElement> rows;
+  for (size_t i = 0; i < players.size(); ++i)
+    rows.push_back(scoreboard_row((int)i, players[i]));
+  if (rows.empty()) {
+    // Always render at least the local placeholder so the F1 overlay reads as a
+    // bar even before the roster snapshot lands.
+    ScoreboardPlayer self;
+    self.name = "AgentZero";
+    rows.push_back(scoreboard_row(0, self));
+  }
+  // Opaque-black bar across the upper-middle (the only opaque overlay).
+  return Box(BoxProps{
+      .key = "sbbar",
+      .layout =
+          ::ui::LayoutStyle{.position = ::ui::PositionType::Absolute,
+                            .position_inset = inset(45.0f, 48.0f),
+                            .direction = ::ui::FlexDirection::Column,
+                            .align_items = ::ui::AlignItems::Stretch,
+                            .width = ::ui::Length::points(550.0f),
+                            .padding = {16.0f, 12.0f, 12.0f, 12.0f},
+                            .gap = 4.0f},
+      .style = tokens::fill_patch(tokens::kHudBlack),
+      .children = ::ui::children(std::move(rows))});
+}
+
+// ---------------------------------------------------------------------------
+// In-game chat — compact bottom-right green wire-rect box. Bottom-up scrollback
+// log then the active compose line `[ALL]: <draft>`. No Send/Channel/Close
+// buttons (Enter sends, Esc cancels).
+// ---------------------------------------------------------------------------
+
+::ui::UiElement chat_log_line(int index, const std::string &line) {
+  const char *txt = ::ui::copy_string(line.c_str());
+  const char *key =
+      ::ui::copy_string(("chatlog" + std::to_string(index)).c_str());
+  return Text(TextProps{
+      .key = key,
+      .value = txt,
+      .layout = ::ui::LayoutStyle{.height = ::ui::Length::points(13.0f)},
+      .style = tokens::text_patch(tokens::kHudGreenDim, tokens::kFontBodyEm,
+                                  tokens::kFaceBody)});
+}
+
+::ui::UiElement
+ChatBox(bool with_team, const std::vector<std::string> &log, const char *draft,
+        std::function<void(const std::string &)> set_draft,
+        std::function<void()> send) {
+  std::vector<::ui::UiElement> kids;
+  for (size_t i = 0; i < log.size(); ++i)
+    kids.push_back(chat_log_line((int)i, log[i]));
+
+  const char *tag = with_team ? "[TEAM]: " : "[ALL]: ";
+  std::function<void(const ::ui::ActivationEvent &)> on_activate =
+      [send](const ::ui::ActivationEvent &) {
+        if (send)
+          send();
+      };
+  // Active compose line: an inline tag (green) + the editable input over the
+  // wire-rect — no separate Channel/Send/Close buttons.
+  ::ui::UiElement compose = Box(BoxProps{
+      .key = "compose",
+      .layout = ::ui::LayoutStyle{.direction = ::ui::FlexDirection::Row,
+                                  .align_items = ::ui::AlignItems::Center,
+                                  .width = ::ui::Length::percent(100.0f),
+                                  .gap = 4.0f},
+      .children = ::ui::children(
+          {Text(TextProps{
+               .key = "tag",
+               .value = tag,
+               .layout = ::ui::LayoutStyle{.height = ::ui::Length::points(13.0f)},
+               .style = tokens::text_patch(tokens::kHudGreen, tokens::kFontBodyEm,
+                                           tokens::kFaceBody)}),
+           Input(InputProps{
+               .key = "msg",
+               .id = "IngameChat",
+               .autofocus = true,
+               .accessibility = {.label = "Chat"},
+               .on_activate = on_activate,
+               .value = draft,
+               .on_change = set_draft,
+               .layout =
+                   ::ui::LayoutStyle{.align_items = ::ui::AlignItems::Stretch,
+                                     .justify_content =
+                                         ::ui::JustifyContent::Center,
+                                     .flex_grow = ::ui::StyleFloat::points(1.0f),
+                                     .height = ::ui::Length::points(18.0f),
+                                     .padding = {4.0f, 4.0f, 2.0f, 2.0f}}})})});
+  kids.push_back(std::move(compose));
+
+  return Box(BoxProps{
+      .key = "chatbox",
+      .layout =
+          ::ui::LayoutStyle{.position = ::ui::PositionType::Absolute,
+                            .position_inset =
+                                ::ui::EdgeSizes{{},
+                                                ::ui::StyleValue::points(8.0f),
+                                                {},
+                                                ::ui::StyleValue::points(98.0f)},
+                            .direction = ::ui::FlexDirection::Column,
+                            .align_items = ::ui::AlignItems::Stretch,
+                            .width = ::ui::Length::points(260.0f),
+                            .padding = {6.0f, 6.0f, 4.0f, 6.0f},
+                            .gap = 1.0f},
+      .style = tokens::panel_patch(tokens::kHudPanelFill, tokens::kHudGreen),
+      .children = ::ui::children(std::move(kids))});
+}
+
+// ---------------------------------------------------------------------------
 
 struct InGameScreenProps {
   uint32_t unused = 0;
@@ -189,48 +333,38 @@ struct InGameScreenProps {
 
 ::ui::UiElement InGameScreenView(const InGameScreenProps &) {
   PlayerStatus ps = use_player_status();
-  Match m = use_match();
   Tech tech = use_tech();
   BuyTech buy_tech = use_buy_tech();
   IngameChat chat = use_ingame_chat();
   Teams teams = use_teams();
+  ChromeTextures chrome = use_chrome();
   std::string *draft = use_state<std::string>(std::string());
   if (!draft)
     return ::ui::empty();
 
-  const unsigned mins = m.time_secs / 60u;
-  const unsigned secs = m.time_secs % 60u;
-  const char *match_line =
-      m.valid ? use_text_storage("%s  ·  %s  ·  %02u:%02u", m.mode_name.c_str(),
-                                 phase_label(m.phase), mins, secs)
-              : use_text_storage("%s", "Loading match...");
-  const char *score_line =
-      use_text_storage("%s", build_score_text(m.scores).c_str());
-  const char *message = use_text_storage("%s", m.message.c_str());
+  // --- legacy LCD readout strings (own ammo green, health red, economy blue) ---
+  const char *weapon_name = "Blaster";
+  const char *ammo = ps.valid ? use_text_storage("%u", (unsigned)ps.laser_ammo)
+                              : use_text_storage("%s", "0");
+  const char *health =
+      ps.valid ? use_text_storage("%u", (unsigned)ps.health)
+               : use_text_storage("%s", "0");
+  const char *shield =
+      ps.valid ? use_text_storage("%u", (unsigned)ps.shield)
+               : use_text_storage("%s", "0");
+  const char *files = ps.valid
+                          ? use_text_storage("%u", (unsigned)ps.files)
+                          : use_text_storage("%s", "0");
+  const char *credits = ps.valid
+                            ? use_text_storage("%u", (unsigned)ps.credits)
+                            : use_text_storage("%s", "0");
 
-  const char *vitals =
-      ps.valid ? use_text_storage("HP %u/%u    SHD %u/%u    FUEL %u/%u",
-                                  (unsigned)ps.health, (unsigned)ps.max_health,
-                                  (unsigned)ps.shield, (unsigned)ps.max_shield,
-                                  (unsigned)ps.fuel, (unsigned)ps.max_fuel)
-               : use_text_storage("%s", "No agent in view");
-  const char *arms = use_text_storage(
-      "WPN %u    L:%u  R:%u  F:%u    Files %u/%u    $%u",
-      (unsigned)ps.current_weapon, (unsigned)ps.laser_ammo,
-      (unsigned)ps.rocket_ammo, (unsigned)ps.flamer_ammo, (unsigned)ps.files,
-      (unsigned)ps.max_files, (unsigned)ps.credits);
-  const char *scoreboard =
-      use_text_storage("%s", build_scoreboard_text(teams.teams, teams.players).c_str());
-
-  // State-driven overlays: each renders only while its world flag is up. Buy and
-  // tech share the station overlay (mutually exclusive); the scoreboard and chat
-  // are independent. Inactive overlays collapse to empty() so the child shape is
-  // stable.
+  // --- state-driven overlays: each renders only while its world flag is up ---
   ::ui::UiElement buytech =
       (tech.buy_active || tech.tech_active) ? BuyTechOverlay(tech, buy_tech)
                                             : ::ui::empty();
   ::ui::UiElement scoreboard_overlay =
-      teams.showing ? PlayerListOverlay(scoreboard) : ::ui::empty();
+      teams.showing ? ScoreboardOverlay(teams.players) : ::ui::empty();
 
   std::function<void(const std::string &)> set_draft =
       [draft](const std::string &next) { *draft = next; };
@@ -240,42 +374,71 @@ struct InGameScreenProps {
     draft->clear();
   };
   ::ui::UiElement chatbar =
-      chat.active ? IngameChatOverlay(chat.with_team, draft->c_str(), set_draft,
-                                      send_chat, chat.toggle_channel, chat.cancel)
+      chat.active
+          ? ChatBox(chat.with_team, chat.log, draft->c_str(), set_draft,
+                    send_chat)
+          : ::ui::empty();
+
+  // Bottom dash bezel (bank 95/11): the whole sculpted console — weapon wells,
+  // the team-tint halves, the radar frame, and the files/credits cluster are all
+  // baked into this one sprite. It carries the radar viewport cutout, through
+  // which the world layer's minimap shows. Anchored to the bottom edge at native
+  // size. If not baked, fall back to wire wells under the readouts.
+  float dash_w = chrome.hud_bezel_bottom_w ? (float)chrome.hud_bezel_bottom_w
+                                           : 640.0f;
+  float dash_h =
+      chrome.hud_bezel_bottom_h ? (float)chrome.hud_bezel_bottom_h : 95.0f;
+  ::ui::UiElement dash =
+      BezelSprite("dash", chrome.hud_bezel_bottom, 0.0f, 480.0f - dash_h,
+                  dash_w, dash_h);
+
+  // Top-left status cluster: a small red health/objective splat + the team
+  // emblem badge (agency glyph if baked) + three blue status dots. The legacy
+  // splat/badge sprites (97/5, 94/1) are not baked, so the splat is a small red
+  // wire-square and the dots are tiny blue squares — the readable stand-ins for
+  // the golden's top-left insignia.
+  uint32_t emblem = chrome.agency_emblem[0];
+  float ew = chrome.agency_emblem_w ? (float)chrome.agency_emblem_w : 18.0f;
+  float eh = chrome.agency_emblem_h ? (float)chrome.agency_emblem_h : 18.0f;
+  ::ui::UiElement team_badge =
+      emblem ? BezelSprite("badge", emblem, 24.0f, 6.0f, ew, eh)
+             : WirePanel("badge", 24.0f, 6.0f, 18.0f, 18.0f, tokens::kHudBlue);
+  ::ui::UiElement health_splat =
+      WirePanel("splat", 6.0f, 6.0f, 14.0f, 16.0f, tokens::kHudRed);
+  ::ui::UiElement dot0 = WirePanel("dot0", 50.0f, 11.0f, 6.0f, 6.0f, tokens::kHudBlue);
+  ::ui::UiElement dot1 = WirePanel("dot1", 60.0f, 11.0f, 6.0f, 6.0f, tokens::kHudBlue);
+  ::ui::UiElement dot2 = WirePanel("dot2", 70.0f, 11.0f, 6.0f, 6.0f, tokens::kHudBlue);
+  // Top-right status lamp: a small green ring (round green outline well).
+  ::ui::UiElement lamp =
+      WirePanel("lamp", 610.0f, 6.0f, 18.0f, 18.0f, tokens::kHudGreen);
+
+  // LEFT well: weapon name + ammo (green), health (red).
+  // CENTER: LOW FUEL status pill on the radar's top edge (only when lit).
+  // RIGHT well: FILES / CREDITS (blue) + shield (blue).
+  ::ui::UiElement fuel_pill =
+      ps.fuel_low ? Lcd("fuel", 268.0f, 398.0f, "LOW FUEL", tokens::kHudBlue)
                   : ::ui::empty();
 
   return <ScreenLayout key="root" variant={ScreenLayoutVariant::Hud}>
-    <Box
-      key="top"
-      layout={::ui::LayoutStyle{
-        .direction = ::ui::FlexDirection::Column,
-        .align_items = ::ui::AlignItems::Start,
-        .gap = 10.0f,
-      }}
-    >
-      <Panel key="match" variant={PanelVariant::Sunken}>
-        <ScreenTitle key="mode" variant={ScreenTitleVariant::Dialog} value={match_line} />
-        <BodyText key="score" variant={BodyTextVariant::Body} value={score_line} />
-      </Panel>
-      {buytech}
-      {scoreboard_overlay}
-    </Box>
-    <BodyText key="message" variant={BodyTextVariant::Message} value={message} />
-    <Box
-      key="bottom"
-      layout={::ui::LayoutStyle{
-        .direction = ::ui::FlexDirection::Column,
-        .align_items = ::ui::AlignItems::Stretch,
-        .width = ::ui::Length::percent(100.0f),
-        .gap = 10.0f,
-      }}
-    >
-      {chatbar}
-      <Panel key="status" variant={PanelVariant::Sunken}>
-        <BodyText key="vitals" variant={BodyTextVariant::Strong} value={vitals} />
-        <BodyText key="arms" variant={BodyTextVariant::Body} value={arms} />
-      </Panel>
-    </Box>
+    {dash}
+    {health_splat}
+    {team_badge}
+    {dot0}
+    {dot1}
+    {dot2}
+    {lamp}
+    {Lcd("wpn", 14.0f, 416.0f, weapon_name, tokens::kHudGreen, tokens::kFontBodyEm, tokens::kFaceBody)}
+    {Lcd("ammo", 18.0f, 438.0f, ammo, tokens::kHudGreen, tokens::kFontLarge, tokens::kFaceLarge)}
+    {Lcd("hp", 110.0f, 444.0f, health, tokens::kHudRed)}
+    {fuel_pill}
+    {Lcd("flbl", 502.0f, 414.0f, "FILES", tokens::kHudBlue, tokens::kFontTiny, tokens::kFaceTiny)}
+    {Lcd("files", 560.0f, 414.0f, files, tokens::kHudBlue)}
+    {Lcd("clbl", 502.0f, 432.0f, "CREDITS", tokens::kHudBlue, tokens::kFontTiny, tokens::kFaceTiny)}
+    {Lcd("credits", 560.0f, 432.0f, credits, tokens::kHudBlue)}
+    {Lcd("shd", 540.0f, 450.0f, shield, tokens::kHudBlue)}
+    {scoreboard_overlay}
+    {buytech}
+    {chatbar}
   </ScreenLayout>
 }
 
