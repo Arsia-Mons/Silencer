@@ -51,20 +51,21 @@ cli --port "$PORT" click --label "OptionsControls" >/dev/null
 wait_for_node "ControlsBack"
 cli --port "$PORT" wait_frames --n 3 >/dev/null
 
-# The full screen chrome is present (not truncated): title, oval preset, the
-# single select-then-act Rebind/Clear, and Save/Revert/Back.
+# origin/main full-IA chrome is present (not truncated): "Configure Controls"
+# title, the oval Preset cycle, the virtualized binding list, and Save/Cancel.
+# Each action row is now a per-combo bind grid (label | primary bind oval | OR |
+# secondary bind well), not a select-then-act table.
 cli --port "$PORT" inspect | bun -e '
 const r = JSON.parse(await new Response(Bun.stdin.stream()).text());
 const n = r.nodes ?? [];
 const fail = (m) => { console.error(m); process.exit(1); };
 const has = (id) => n.some((x) => x.control_id === id);
-for (const id of ["CyclePreset", "RebindSelected", "ClearSelected", "SaveBinds", "RevertBinds", "ControlsBack", "ControlsList"]) {
+for (const id of ["CyclePreset", "SaveBinds", "ControlsBack", "ControlsList"]) {
   if (!has(id)) fail(`Controls screen missing ${id}`);
 }
-if (!n.some((x) => x.role === "text" && x.value === "Controls")) fail("missing Controls title");
-const rows = n.filter((x) => (x.control_id ?? "").startsWith("Bind"));
-if (rows.length < 4) fail(`expected several visible keybind rows, got ${rows.length}`);
-if (!n.some((x) => x.role === "text" && (x.value ?? "").startsWith("Selected:"))) fail("missing Selected readout");
+if (!n.some((x) => x.role === "text" && x.value === "Configure Controls")) fail("missing Configure Controls title");
+const rows = n.filter((x) => (x.control_id ?? "").startsWith("BindP"));
+if (rows.length < 3) fail(`expected several visible primary bind ovals, got ${rows.length}`);
 '
 
 # Scroll the table: the visible row window must CHANGE (viewport + virtualization).
@@ -76,17 +77,10 @@ if [ "$top_rows" = "$scrolled_rows" ]; then
   echo "scroll did not change the visible row window ($top_rows)"; exit 1
 fi
 
-# Scroll back to the top and select a row; the Selected readout updates.
+# Scroll back to the top; the first primary bind oval is present again.
 cli --port "$PORT" scroll --x 320 --y 250 --dy 40 >/dev/null
 cli --port "$PORT" wait_frames --n 3 >/dev/null
-cli --port "$PORT" click --label Bind2 >/dev/null
-cli --port "$PORT" wait_frames --n 2 >/dev/null
-cli --port "$PORT" inspect | bun -e '
-const r = JSON.parse(await new Response(Bun.stdin.stream()).text());
-const sel = (r.nodes ?? []).find((n) => n.role === "text" && (n.value ?? "").startsWith("Selected:"));
-if (!sel) { console.error("no Selected readout after click"); process.exit(1); }
-if (sel.value === "Selected: (none)") { console.error("selection did not update"); process.exit(1); }
-'
+wait_for_node "BindP0"
 
 # Back returns to the Options dialog.
 cli --port "$PORT" click --label "ControlsBack" >/dev/null

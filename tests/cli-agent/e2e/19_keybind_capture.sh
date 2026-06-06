@@ -67,11 +67,10 @@ cli --port "$PORT" wait_frames --n 3 >/dev/null
 cli --port "$PORT" inspect | bun -e '
 const r = JSON.parse(await new Response(Bun.stdin.stream()).text());
 const n = r.nodes ?? [];
-// Selectable keybind rows (Bind* control ids) render in the virtualizing table.
-const rows = n.filter((x) => (x.control_id ?? "").startsWith("Bind"));
-if (rows.length < 4) { console.error(`expected the keybind table rows, got ${rows.length} Bind rows`); process.exit(1); }
-// Select-then-act Rebind + the preset cycle drive the capture flow.
-if (!n.some((x) => x.role === "button" && x.control_id === "RebindSelected")) { console.error("OptionsControls missing RebindSelected"); process.exit(1); }
+// Per-combo bind ovals (BindP*/BindS*) render in the virtualizing grid; pressing
+// a primary bind oval arms capture for that action slot.
+const rows = n.filter((x) => (x.control_id ?? "").startsWith("BindP"));
+if (rows.length < 3) { console.error(`expected the keybind grid rows, got ${rows.length} BindP rows`); process.exit(1); }
 if (!n.some((x) => x.role === "button" && x.control_id === "CyclePreset")) { console.error("OptionsControls missing the preset cycle"); process.exit(1); }
 '
 
