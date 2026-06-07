@@ -201,7 +201,14 @@ struct OptionsControlsProps {
 
   return <ScreenLayout key="root" variant={ScreenLayoutVariant::Overlay}>
     <Panel key="frame" variant={PanelVariant::ControlsFrame}>
-      <ScreenTitle key="title" variant={ScreenTitleVariant::Screen} value="Configure Controls" />
+      <Box key="titlewrap" layout={::ui::LayoutStyle{
+          .position = ::ui::PositionType::Absolute,
+          .position_inset = ::ui::EdgeSizes{0.0f, 0.0f, 14.0f, {}},
+          .direction = ::ui::FlexDirection::Row,
+          .align_items = ::ui::AlignItems::Center,
+          .justify_content = ::ui::JustifyContent::Center}}>
+        <ScreenTitle key="title" variant={ScreenTitleVariant::Screen} value="Configure Controls" />
+      </Box>
       {table}
       <ActionRow key="actions">
         <AppButton key="save" controlId="SaveBinds" variant={AppButtonVariant::Oval} label="Save" onPress={save} />
