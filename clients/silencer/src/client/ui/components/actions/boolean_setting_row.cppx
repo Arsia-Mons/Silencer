@@ -23,9 +23,9 @@ using ::ui::components::BoxProps;
 
   const uint32_t left = checked ? chrome.toggle_on_l : chrome.toggle_off_l;
   const uint32_t right = checked ? chrome.toggle_on_r : chrome.toggle_off_r;
-  // origin/main draws the toggle coin at the full pill height (~69x49 = two
-  // 34x49 half-disc cells); upscale the baked sprite to that footprint.
-  auto cell = ::ui::LayoutStyle{.width = ::ui::Length::points(34.0f),
+  // origin/main draws the toggle as two separated half-disc cells (~28x49 each)
+  // with a gap between, upscaling the baked sprite to ~pill height.
+  auto cell = ::ui::LayoutStyle{.width = ::ui::Length::points(28.0f),
                                 .height = ::ui::Length::points(49.0f)};
 
   return <Box
@@ -39,14 +39,13 @@ using ::ui::components::BoxProps;
       controlId={props.control_id}
       variant={AppButtonVariant::Oval}
       size={AppButtonSize::Lg}
-      labelSize={45}
       label={props.label}
       onPress={toggle}
     />
     <Box
       key="ind"
-      layout={::ui::LayoutStyle{.direction = ::ui::FlexDirection::Row}}>
-      <Box key="cl" layout={cell} style={tokens::image_patch(left)} />
+      layout={::ui::LayoutStyle{.direction = ::ui::FlexDirection::Row, .gap = 13.0f}}>
+      <Box key="cl" layout={cell} style={tokens::image_patch(left, ::ui::Color{255, 255, 255, 255}, ::ui::SideWidths{}, true)} />
       <Box key="cr" layout={cell} style={tokens::image_patch(right)} />
     </Box>
   </Box>

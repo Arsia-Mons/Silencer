@@ -69,8 +69,8 @@ struct OptionsAudioProps {
         onChange={settings.set_music}
       />
       <ActionRow key="actions">
-        <AppButton key="save" controlId="OptionsSave" variant={AppButtonVariant::Oval} labelSize={45} label="Save" onPress={save} />
-        <AppButton key="cancel" controlId="OptionsCancel" variant={AppButtonVariant::Oval} labelSize={45} label="Cancel" onPress={cancel} />
+        <AppButton key="save" controlId="OptionsSave" variant={AppButtonVariant::Oval} label="Save" onPress={save} />
+        <AppButton key="cancel" controlId="OptionsCancel" variant={AppButtonVariant::Oval} label="Cancel" onPress={cancel} />
       </ActionRow>
     </Box>
   </ScreenLayout>

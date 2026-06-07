@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Persistent menu-cluster capture for cppx visual-parity work.
-# Dumps live cppx renders (960x720) to $OUT (default /tmp/cppx_renders).
+# Dumps live cppx renders (1920x1080) to $OUT (default /tmp/cppx_renders).
 # No diffing, no cleanup of renders — pixdiff them against the goldens yourself.
 set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -8,7 +8,7 @@ source "$SCRIPT_DIR/../../tests/cli-agent/e2e/lib.sh"
 
 OUT="${OUT:-/tmp/cppx_renders}"
 mkdir -p "$OUT"
-W="${W:-960}"; H="${H:-720}"
+W="${W:-1920}"; H="${H:-1080}"
 
 FRESH_HOME="$(mktemp -d)"; export HOME="$FRESH_HOME"
 PORT="$(pick_port)"; PID="$(start_silencer "$PORT")"

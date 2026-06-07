@@ -2,13 +2,13 @@
 # Persistent lobby-cluster capture for cppx visual-parity work.
 # Boots the Go lobby + a headless silencer, drives connect -> auth ->
 # character-create wizard -> lobby -> create-game -> (best-effort) staging/tech,
-# dumping live cppx renders (960x720) to $OUT (default /tmp/cppx_renders).
+# dumping live cppx renders (1920x1080) to $OUT (default /tmp/cppx_renders).
 set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 . "$SCRIPT_DIR/../../tests/cli-agent/e2e/lib.sh"
 
 OUT="${OUT:-/tmp/cppx_renders}"; mkdir -p "$OUT"
-W="${W:-960}"; H="${H:-720}"
+W="${W:-1920}"; H="${H:-1080}"
 LOBBY_BIN="$(lobby_bin)"
 
 TMP=$(mktemp -d)
@@ -86,12 +86,12 @@ shot cc_select_agency
 
 cli --port "$CTRL_PORT" click --label "Noxis" >/dev/null
 cli --port "$CTRL_PORT" wait_for_state --state LOBBY --timeout-ms 15000 >/dev/null
-wait_for_widget "Send"
+wait_for_widget "Agents" # origin lobby has no chat Send; key off the agent card
 shot lobby_screen
 
 # create_game panel
 cli --port "$CTRL_PORT" click --label "NewGame" >/dev/null
-wait_for_widget "CreateBack" && shot create_game
+wait_for_widget "CreateGame" && shot create_game
 
 # best-effort staging + tech (needs the dedicated server to spawn from provisioned maps)
 if cli --port "$CTRL_PORT" click --label "CreateGame" >/dev/null 2>&1; then

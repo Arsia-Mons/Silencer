@@ -161,8 +161,11 @@ inline ::ui::StylePatch image_patch(::ui::BackgroundImage image) {
 }
 inline ::ui::StylePatch image_patch(uint32_t texture_id,
                                     ::ui::Color tint = {255, 255, 255, 255},
-                                    ::ui::SideWidths nine_slice = {}) {
-  return image_patch(::ui::BackgroundImage{texture_id, tint, nine_slice});
+                                    ::ui::SideWidths nine_slice = {},
+                                    bool flip_h = false) {
+  ::ui::BackgroundImage img{texture_id, tint, nine_slice};
+  img.flip_h = flip_h;
+  return image_patch(img);
 }
 
 // Atlas / partial-fill variant: samples only the given source sub-rect (texture

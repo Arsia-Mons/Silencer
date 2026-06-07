@@ -28,6 +28,12 @@ using ::ui::components::BoxProps;
 using ::ui::components::Input;
 using ::ui::components::InputProps;
 
+// The floating ALIAS capsule + its header pill use a vector border (no baked
+// sprite). The golden draws that edge in a muted desaturated green (~84,156,104),
+// not the bright chrome stroke (kBorderHeroPanel 46,139,46) — sampled from the
+// cc_alias golden. Keep it file-local so it doesn't leak into other surfaces.
+constexpr ::ui::Color kAliasFrameBorder = {84, 156, 104, 255};
+
 // --- screen-local provider (doc §5/§6): the wizard cursor --------------------
 // Holds the staged-create UI state; setters mutate the use_state pointers
 // directly from event callbacks (the established Silencer screen idiom — the
@@ -81,6 +87,7 @@ struct CharacterCreateProviderProps {
     controlId={kAgencies[index].control_id}
     controlOffset={index}
     variant={AppButtonVariant::Oval}
+    size={AppButtonSize::List}
     selected={index == preview}
     defaultFocused={index == 0}
     accessibilityLabel={kAgencies[index].name}
@@ -95,12 +102,24 @@ struct CharacterCreateProviderProps {
 ::ui::UiElement advantage_row(const char *key, const Advantage &adv) {
   if (!adv.label || adv.label[0] == '\0')
     return ::ui::empty();
-  return <Box key={key} layout={::ui::LayoutStyle{
+  // Height ~28 (vs the ~16 text) gives the golden's loose ~30px row pitch; the
+  // bonus rows are indented under the "Advantages" header (golden insets ~24px).
+  return <Box
+    key={key}
+    layout={::ui::LayoutStyle{
       .direction = ::ui::FlexDirection::Row,
       .align_items = ::ui::AlignItems::Center,
       .width = ::ui::Length::percent(100.0f),
-      .gap = 8.0f}}>
-    <BodyText key="l" variant={BodyTextVariant::Body} tone={BodyTextTone::Prose} value={adv.label} />
+      .height = ::ui::Length::points(28.0f),
+      .padding = {24.0f, 0.0f, 0.0f, 0.0f},
+      .gap = 8.0f}}
+  >
+    <BodyText
+      key="l"
+      variant={BodyTextVariant::Body}
+      tone={BodyTextTone::Prose}
+      value={adv.label}
+    />
     <BodyText key="b" variant={BodyTextVariant::Strong} value={adv.bonus} />
   </Box>
 }
@@ -109,7 +128,12 @@ struct CharacterCreateProviderProps {
 // BodyText — the engine does not break on '\n' and screens don't use the wrap
 // path, so multi-line text is composed as stacked fixed-height rows).
 ::ui::UiElement desc_line(const char *key, const char *value) {
-  return <BodyText key={key} variant={BodyTextVariant::Body} tone={BodyTextTone::Prose} value={value} />
+  return <BodyText
+    key={key}
+    variant={BodyTextVariant::Body}
+    tone={BodyTextTone::Prose}
+    value={value}
+  />
 }
 
 // One roster row: select an existing agent. Out-of-range slots render nothing.
@@ -127,9 +151,30 @@ struct CharacterCreateProviderProps {
     key={key}
     controlId="SelectAgent"
     controlOffset={index}
+    variant={AppButtonVariant::Oval}
+    size={AppButtonSize::List}
     label={label}
     onPress={on_press}
   />
+}
+
+// Left-pane header: the screen title centered in the baked chrome notch pill at
+// the pane top (golden pill y54-102), with a fixed gap below so the first list
+// item lands at the golden's y141 (~39px under the pill). The title text is
+// top-anchored inside the header zone so it reads inside the pill, not centered
+// down into the gap; the bottom margin (not a uniform flex gap) makes the
+// header-to-list gap larger than the 9px inter-row spacing.
+::ui::UiElement pane_header(const char *value) {
+  return <Box
+    key="hdr"
+    layout={::ui::LayoutStyle{
+      .direction = ::ui::FlexDirection::Column,
+      .align_items = ::ui::AlignItems::Stretch,
+      .width = ::ui::Length::percent(100.0f),
+      .margin = ::ui::EdgeSizes{{}, {}, {}, 36.0f}}}
+  >
+    <ScreenTitle key="title" variant={ScreenTitleVariant::Screen} centered={true} value={value} />
+  </Box>
 }
 
 struct CharacterCreateContentProps {
@@ -171,40 +216,78 @@ struct CharacterCreateContentProps {
         chrome1.chrome_panel
             ? tokens::image_patch(chrome1.chrome_panel)
             : tokens::panel_patch(tokens::kSurfaceHeroPanel, tokens::kBorderHeroPanel);
+    // Stadium (fully-rounded) alias field — a thin muted-green bordered pill.
+    ::ui::StyleStatePatch alias_field_style{};
+    alias_field_style.base = tokens::panel_patch(
+        tokens::kSurfaceHeroPanel, kAliasFrameBorder, 2.0f, 20.0f);
     return <ScreenLayout key="aliasmodal" variant={ScreenLayoutVariant::Overlay}>
-      <Box key="frame" layout={::ui::LayoutStyle{
+      <Box
+        key="frame"
+        layout={::ui::LayoutStyle{
           .direction = ::ui::FlexDirection::Row,
           .align_items = ::ui::AlignItems::Stretch,
-          .width = ::ui::Length::points(912.0f),
+          .width = ::ui::Length::points(938.0f),
           .height = ::ui::Length::points(664.0f),
           .padding = {48.0f, 46.0f, 40.0f, 46.0f},
-          .gap = 44.0f}} style={frame1}>
-        <Box key="leftpane" layout={::ui::LayoutStyle{
+          .gap = 44.0f}}
+        style={frame1}
+      >
+        <Box
+          key="leftpane"
+          layout={::ui::LayoutStyle{
             .direction = ::ui::FlexDirection::Column,
             .align_items = ::ui::AlignItems::Stretch,
             .flex_grow = ::ui::StyleFloat::points(1.0f),
             .flex_basis = ::ui::Length::points(0.0f),
             .min_width = ::ui::Length::points(0.0f),
-            .gap = 12.0f}}>
-          <ScreenTitle key="title" variant={ScreenTitleVariant::Screen} centered={true} value="SELECT AGENT" />
-          <AppButton key="new" controlId="CreateNewCharacterBg" variant={AppButtonVariant::Oval} disabled={true} label="Create New Character" onPress={w.open_alias} />
+            .padding = {31.0f, 16.0f, 0.0f, 0.0f},
+            .gap = 9.0f}}
+        >
+          {pane_header("SELECT AGENT")}
+          <AppButton
+            key="new"
+            controlId="CreateNewCharacterBg"
+            variant={AppButtonVariant::Oval}
+            size={AppButtonSize::List}
+            disabled={true}
+            label="Create New Character"
+            onPress={w.open_alias}
+          />
         </Box>
-        <Box key="rightpane" layout={::ui::LayoutStyle{
+        <Box
+          key="rightpane"
+          layout={::ui::LayoutStyle{
             .flex_grow = ::ui::StyleFloat::points(1.0f),
             .flex_basis = ::ui::Length::points(0.0f),
-            .min_width = ::ui::Length::points(0.0f)}} />
+            .min_width = ::ui::Length::points(0.0f)}}
+        />
       </Box>
-      <Box key="aliasfloat" layout={::ui::LayoutStyle{
+      <Box
+        key="aliasfloat"
+        layout={::ui::LayoutStyle{
           .position = ::ui::PositionType::Absolute,
-          .position_inset = ::ui::EdgeSizes{268.0f, 250.0f, {}, {}},
+          .position_inset = ::ui::EdgeSizes{272.0f, {}, 242.0f, {}},
           .direction = ::ui::FlexDirection::Column,
           .align_items = ::ui::AlignItems::Stretch,
-          .width = ::ui::Length::points(424.0f),
-          .padding = {18.0f, 24.0f, 22.0f, 24.0f},
-          .gap = 14.0f,
+          .width = ::ui::Length::points(416.0f),
+          .padding = {16.0f, 16.0f, 8.0f, 44.0f},
+          .gap = 24.0f,
           .border_width = 2.0f}}
-        style={tokens::panel_patch(tokens::kSurfaceHeroPanel, tokens::kBorderHeroPanel, 2.0f, 14.0f)}>
-        <ScreenTitle key="t" variant={ScreenTitleVariant::Screen} centered={true} value="SILENCER ALIAS" />
+        style={tokens::panel_patch(tokens::kSurfaceHeroPanel, kAliasFrameBorder, 2.0f, 24.0f)}
+      >
+        <Box
+          key="hdr"
+          layout={::ui::LayoutStyle{
+            .direction = ::ui::FlexDirection::Row,
+            .justify_content = ::ui::JustifyContent::Center,
+            .align_items = ::ui::AlignItems::Center,
+            .width = ::ui::Length::percent(100.0f),
+            .height = ::ui::Length::points(40.0f),
+            .border_width = 2.0f}}
+          style={tokens::panel_patch(tokens::kSurfaceHeroPanel, kAliasFrameBorder, 2.0f, 18.0f)}
+        >
+          <ScreenTitle key="t" variant={ScreenTitleVariant::Screen} value="SILENCER ALIAS" />
+        </Box>
         <Input
           key="alias"
           id="Alias"
@@ -213,6 +296,13 @@ struct CharacterCreateContentProps {
           value={w.alias.c_str()}
           onChange={w.set_alias}
           onActivate={on_alias_enter}
+          layout={::ui::LayoutStyle{
+            .align_items = ::ui::AlignItems::Center,
+            .justify_content = ::ui::JustifyContent::Start,
+            .width = ::ui::Length::percent(100.0f),
+            .height = ::ui::Length::points(40.0f),
+            .padding = {20.0f, 20.0f, 8.0f, 8.0f}}}
+          style={alias_field_style}
         />
       </Box>
     </ScreenLayout>
@@ -242,42 +332,63 @@ struct CharacterCreateContentProps {
             ? tokens::image_patch(chrome2.chrome_panel)
             : tokens::panel_patch(tokens::kSurfaceHeroPanel, tokens::kBorderHeroPanel);
     return <ScreenLayout key="agencyscreen" variant={ScreenLayoutVariant::Overlay}>
-      <Box key="frame" layout={::ui::LayoutStyle{
+      <Box
+        key="frame"
+        layout={::ui::LayoutStyle{
           .direction = ::ui::FlexDirection::Row,
           .align_items = ::ui::AlignItems::Stretch,
-          .width = ::ui::Length::points(912.0f),
+          .width = ::ui::Length::points(938.0f),
           .height = ::ui::Length::points(664.0f),
           .padding = {48.0f, 46.0f, 40.0f, 46.0f},
-          .gap = 44.0f}} style={frame2}>
-        <Box key="left" layout={::ui::LayoutStyle{
+          .gap = 44.0f}}
+        style={frame2}
+      >
+        <Box
+          key="left"
+          layout={::ui::LayoutStyle{
             .direction = ::ui::FlexDirection::Column,
             .align_items = ::ui::AlignItems::Stretch,
-            .flex_grow = ::ui::StyleFloat::points(1.0f),
-            .flex_basis = ::ui::Length::points(0.0f),
+            .flex_grow = ::ui::StyleFloat::points(0.0f),
+            .flex_shrink = ::ui::StyleFloat::points(0.0f),
+            .flex_basis = ::ui::Length::points(387.0f),
             .min_width = ::ui::Length::points(0.0f),
-            .gap = 14.0f}}>
-          <ScreenTitle key="t" variant={ScreenTitleVariant::Screen} centered={true} value="SELECT AGENCY" />
+            .max_width = ::ui::Length::points(387.0f),
+            .padding = {31.0f, 16.0f, 0.0f, 0.0f},
+            .gap = 9.0f}}
+        >
+          {pane_header("SELECT AGENCY")}
           {agency_row(0, pi, on_pick, set_preview)}
           {agency_row(1, pi, on_pick, set_preview)}
           {agency_row(2, pi, on_pick, set_preview)}
           {agency_row(3, pi, on_pick, set_preview)}
           {agency_row(4, pi, on_pick, set_preview)}
         </Box>
-        <Box key="right" layout={::ui::LayoutStyle{
+        <Box
+          key="right"
+          layout={::ui::LayoutStyle{
             .direction = ::ui::FlexDirection::Column,
             .align_items = ::ui::AlignItems::Stretch,
-            .flex_grow = ::ui::StyleFloat::points(1.0f),
-            .flex_basis = ::ui::Length::points(0.0f),
+            .flex_grow = ::ui::StyleFloat::points(0.0f),
+            .flex_shrink = ::ui::StyleFloat::points(0.0f),
+            .flex_basis = ::ui::Length::points(387.0f),
             .min_width = ::ui::Length::points(0.0f),
+            .max_width = ::ui::Length::points(387.0f),
             .overflow = ::ui::Overflow::Hidden,
-            .gap = 4.0f}}>
+            .padding = {71.0f, 24.0f, 52.0f, 24.0f},
+            .gap = 4.0f}}
+        >
           <ScreenTitle key="adv" variant={ScreenTitleVariant::Prose} value="Advantages" />
           {advantage_row("a0", a.advantages[0])}
           {advantage_row("a1", a.advantages[1])}
           {advantage_row("a2", a.advantages[2])}
           {advantage_row("a3", a.advantages[3])}
           <ScreenTitle key="dh" variant={ScreenTitleVariant::Prose} value="Description" />
-          {desc_lines}
+          <Box key="desc" layout={::ui::LayoutStyle{
+              .direction = ::ui::FlexDirection::Column,
+              .width = ::ui::Length::percent(100.0f),
+              .gap = 0.0f}}>
+            {desc_lines}
+          </Box>
         </Box>
       </Box>
     </ScreenLayout>
@@ -294,25 +405,34 @@ struct CharacterCreateContentProps {
           ? tokens::image_patch(chrome0.chrome_panel)
           : tokens::panel_patch(tokens::kSurfaceHeroPanel, tokens::kBorderHeroPanel);
   return <ScreenLayout key="roster" variant={ScreenLayoutVariant::Overlay}>
-    <Box key="frame" layout={::ui::LayoutStyle{
+    <Box
+      key="frame"
+      layout={::ui::LayoutStyle{
         .direction = ::ui::FlexDirection::Row,
         .align_items = ::ui::AlignItems::Stretch,
-        .width = ::ui::Length::points(912.0f),
+        .width = ::ui::Length::points(938.0f),
         .height = ::ui::Length::points(664.0f),
         .padding = {48.0f, 46.0f, 40.0f, 46.0f},
-        .gap = 44.0f}} style={frame0}>
-      <Box key="leftpane" layout={::ui::LayoutStyle{
+        .gap = 44.0f}}
+      style={frame0}
+    >
+      <Box
+        key="leftpane"
+        layout={::ui::LayoutStyle{
           .direction = ::ui::FlexDirection::Column,
           .align_items = ::ui::AlignItems::Stretch,
           .flex_grow = ::ui::StyleFloat::points(1.0f),
           .flex_basis = ::ui::Length::points(0.0f),
           .min_width = ::ui::Length::points(0.0f),
-          .gap = 12.0f}}>
-        <ScreenTitle key="title" variant={ScreenTitleVariant::Screen} value="SELECT AGENT" />
+          .padding = {31.0f, 16.0f, 0.0f, 0.0f},
+          .gap = 9.0f}}
+      >
+        {pane_header("SELECT AGENT")}
         <AppButton
           key="new"
           controlId="CreateNewCharacter"
           variant={AppButtonVariant::Oval}
+          size={AppButtonSize::List}
           label="Create New Character"
           onPress={w.open_alias}
         />
@@ -322,10 +442,13 @@ struct CharacterCreateContentProps {
         {roster_row(3, chars.roster, on_select)}
         {roster_row(4, chars.roster, on_select)}
       </Box>
-      <Box key="rightpane" layout={::ui::LayoutStyle{
+      <Box
+        key="rightpane"
+        layout={::ui::LayoutStyle{
           .flex_grow = ::ui::StyleFloat::points(1.0f),
           .flex_basis = ::ui::Length::points(0.0f),
-          .min_width = ::ui::Length::points(0.0f)}} />
+          .min_width = ::ui::Length::points(0.0f)}}
+      />
     </Box>
   </ScreenLayout>
 }

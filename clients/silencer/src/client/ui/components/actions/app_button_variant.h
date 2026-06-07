@@ -20,7 +20,9 @@
 namespace silencer {
 
 enum class AppButtonVariant { Primary, Secondary, Danger, Ghost, Oval, Chrome, Rect };
-enum class AppButtonSize { Md, Sm, Lg };
+// List = the compact stadium row used by scrolling rosters (character-create
+// agency/agent lists): shorter than the Md menu pill, stretched to the pane width.
+enum class AppButtonSize { Md, Sm, Lg, List };
 
 // Per-variant label TextVisual (color + face + size + centered). The runtime only
 // paints text on Text-role nodes (draw_command_builder append_text), so a Button's
@@ -30,19 +32,19 @@ enum class AppButtonSize { Md, Sm, Lg };
 // child fallback (which paints with the engine's neutral kTextFill grey).
 inline ::ui::TextVisual app_button_label_visual(AppButtonVariant variant,
                                                 bool disabled,
-                                                uint16_t size_override = 0) {
+                                                AppButtonSize size = AppButtonSize::Md) {
   const ::ui::Color c =
       disabled ? tokens::kTextBodyMuted : tokens::kTextTitle;
+  // Lobby/login rect labels and the cc List rows are a tier smaller than the
+  // chunky menu oval pills (golden cc list caps ~17px vs the menu's ~21px).
   uint16_t sz = tokens::kFontHeading;
-  if (variant == AppButtonVariant::Rect)
-    sz = tokens::kFontLarge; // lobby/login labels smaller than menu pills
-  if (size_override)
-    sz = size_override;
+  if (variant == AppButtonVariant::Rect || size == AppButtonSize::List)
+    sz = tokens::kFontLarge;
   return {.color = c,
           .font_id = tokens::kFaceHeading,
           .font_size = sz,
           .align = ::ui::TextAlign::Center,
-          .line_height = (float)sz};
+          .line_height = static_cast<float>(sz)};
 }
 
 // Layout-only baseline geometry. Mirrors ui::components::ButtonProps default
@@ -82,17 +84,23 @@ inline ::ui::LayoutStyle app_button_oval_layout(AppButtonSize size) {
   // lobby/control oval.
   float min_w = 290.0f, h = 49.0f;
   if (size == AppButtonSize::Sm) {
+    // The keybind bind-slot oval (only Oval Sm user): golden ~42px tall, the
+    // column Stretch sets its width. Heading label (Sm is not the List tier).
     min_w = 104.0f;
-    h = 33.0f;
+    h = 42.0f;
   } else if (size == AppButtonSize::Lg) {
     min_w = 320.0f;
+  } else if (size == AppButtonSize::List) {
+    // golden cc list row: 38px tall, stretched to the pane width (small min).
+    min_w = 104.0f;
+    h = 38.0f;
   }
   return {
       .align_items = ::ui::AlignItems::Center,
       .justify_content = ::ui::JustifyContent::Center,
       .min_width = ::ui::Length::points(min_w),
       .height = ::ui::Length::points(h),
-      .padding = {16.0f, 16.0f, 6.0f, 6.0f}, // {left,right,top,bottom}; clear the caps
+      .padding = {16.0f, 16.0f, 6.0f, 6.0f},
   };
 }
 
@@ -104,17 +112,11 @@ inline ::ui::SideWidths app_button_oval_caps() {
 }
 
 // Green oval sprite-button paint (SIL-89). Image-only patch over a baked bank-6
-// oval texture (use_chrome()), with the label in the Title face centered on top.
-// STATIC 2-state v1: idle is dimmer, focus/hover brightens via a discrete tint
-// (NOT the legacy smooth 5-phase 24fps ramp — that needs the clock seam, SIL-107).
+// oval texture (use_chrome()), label in the Heading face centered on top.
 // texture_id 0 (not-yet-baked frame or seam slip) falls back to a vector
-// stadium-radius oval (corner_radius = h/2, cool-blue outline, dark fill).
-// `lit` tints the hover/focus (active) states — the composition root drives it
-// from the use_clock() phase so a focused oval button ramps its brightness at the
-// legacy ~24fps cadence (SIL-94). The idle (base) state stays dimmed, so only the
-// active button animates.
-inline ::ui::StyleStatePatch
-app_button_oval_patch(uint32_t tex, ::ui::Color lit = {255, 255, 255, 255}) {
+// stadium-radius oval. origin draws every oval frame at full bright with no
+// per-button dim/ramp, so a static bright tint keeps captures deterministic.
+inline ::ui::StyleStatePatch app_button_oval_patch(uint32_t tex) {
   const ::ui::TextVisual label{.color = tokens::kTextTitle,
                                .font_id = tokens::kFaceHeading,
                                .font_size = tokens::kFontHeading,
@@ -139,9 +141,10 @@ app_button_oval_patch(uint32_t tex, ::ui::Color lit = {255, 255, 255, 255}) {
     p.text = ::ui::opt(label);
     return p;
   };
-  ov.base = oval(::ui::Color{150, 150, 150, 255}); // idle (dimmed)
-  ov.hover = oval(lit);                            // lit on hover (clock-ramped)
-  ov.focus_visible = oval(lit);                    // lit on focus (clock-ramped)
+  const ::ui::Color bright{255, 255, 255, 255};
+  ov.base = oval(bright);
+  ov.hover = oval(bright);
+  ov.focus_visible = oval(bright);
   return ov;
 }
 
@@ -225,31 +228,31 @@ inline ::ui::StyleStatePatch app_button_rect_patch(bool selected,
                                .font_size = tokens::kFontLarge,
                                .align = ::ui::TextAlign::Center,
                                .line_height = tokens::kLineLarge};
-  auto rect = [&](::ui::Color fill, ::ui::Color border) -> ::ui::StylePatch {
+  auto rect = [&](::ui::Color top, ::ui::Color bot,
+                  ::ui::Color border) -> ::ui::StylePatch {
     ::ui::StylePatch p =
         ::ui::patch()
-            .background(fill)
+            .background(top)
             .gradient(::ui::Gradient{.angle_deg = 0.0f,
                                      .stop_count = 2,
-                                     .stops = {{0.0f, fill}, {1.0f, fill}}})
+                                     .stops = {{0.0f, top}, {1.0f, bot}}})
             .corner_radius(0.0f)
-            .border(::ui::Border{{1, 1, 1, 1},
-                                 {tokens::kBorderHeroPanel, tokens::kBorderHeroPanel,
-                                  tokens::kBorderHeroPanel, tokens::kBorderHeroPanel}});
-    p.border = ::ui::opt(::ui::Border{{1, 1, 1, 1}, {border, border, border, border}});
+            .border(::ui::Border{{1, 1, 1, 1}, {border, border, border, border}});
     p.text = ::ui::opt(label);
     return p;
   };
-  const ::ui::Color idle_fill = selected ? ::ui::Color{12, 56, 8, 255}
-                                         : ::ui::Color{2, 12, 2, 255};
-  const ::ui::Color idle_border =
-      selected ? tokens::kAccent : tokens::kBorderHeroPanel;
-  const ::ui::Color hot_fill = selected ? ::ui::Color{20, 92, 12, 255}
-                                        : ::ui::Color{8, 36, 6, 255};
+  // origin/main login/lobby rects are a top-lit green vertical gradient
+  // (~(8,84,0) down to (0,44,0)) with a kTextBody-green hairline — Login and
+  // Cancel share it (origin does not paint a distinct selected fill). `selected`
+  // only brightens the interaction states.
+  const ::ui::Color top{8, 84, 0, 255}, bot{0, 44, 0, 255};
+  const ::ui::Color htop = selected ? ::ui::Color{16, 108, 0, 255}
+                                    : ::ui::Color{12, 96, 0, 255};
+  const ::ui::Color hbot{4, 64, 0, 255};
   ::ui::StyleStatePatch ov{};
-  ov.base = rect(idle_fill, idle_border);
-  ov.hover = rect(hot_fill, lit);
-  ov.focus_visible = rect(hot_fill, lit);
+  ov.base = rect(top, bot, tokens::kTextBody);
+  ov.hover = rect(htop, hbot, lit);
+  ov.focus_visible = rect(htop, hbot, lit);
   return ov;
 }
 

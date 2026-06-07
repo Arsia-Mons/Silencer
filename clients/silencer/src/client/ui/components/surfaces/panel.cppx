@@ -128,7 +128,7 @@ float panel_size_width(PanelSize size) {
         .min_width = ::ui::Length::points(560.0f),
         .min_height = ::ui::Length::points(420.0f),
         .flex_grow = ::ui::StyleFloat::points(1.0f),
-        .padding = {48.0f, 48.0f, 70.0f, 20.0f},
+        .padding = {48.0f, 48.0f, 92.0f, 40.0f},
         .gap = 8.0f,
     };
     overlay = chrome.chrome_controls

@@ -5,15 +5,25 @@ cppx UI must match. They are NOT cppx renders.
 
 ## Source & method
 - **Source:** `origin/main` @ `af4c50c5` (Release **v00058**).
-- **Captured:** 2026-06-06, fresh, at **960×720** via the headless control port
-  (`clients/cli/index.ts` `screenshot`), driven through the real screens (menus,
-  Go lobby server login + character-create, dedicated-server staging).
-- **Fade disabled for determinism:** the capture build patched
-  `GameRenderer::PaletteFadePhaseFromClock()` → `return 16` so every screen renders
-  at full brightness instantly (no mid-fade dim frames). This patch lives ONLY in a
-  throwaway `origin-capture` worktree, never committed to origin/main.
-- Capture scripts: `/tmp/cap_menu.sh`, `/tmp/cap_mm.sh` (logo-decode match),
-  `/tmp/caplobby.sh`, `/tmp/capstaging.sh` (maps copied into the lobby `-maps-dir`).
+- **Captured:** 2026-06-07, fresh, at **1920×1080** (per-single-screen; user
+  requirement) via the headless control port (`clients/cli/index.ts` `screenshot`),
+  driven through the real screens (menus, Go lobby login + character-create,
+  dedicated-server staging). Re-captured from the prior 960×720 baselines.
+- **Fade disabled for determinism:** the `origin-capture` worktree
+  (`.worktrees/origin-capture` @ af4c50c5) patches
+  `GameRenderer::PaletteFadePhaseFromClock()` → `return 16` (full brightness, no
+  mid-fade dim frames). Uncommitted; the capture binary is built there.
+- Capture scripts (regenerated 2026-06-07, in `/tmp`): `cap_origin_menus.sh`
+  (menus) + `cap_origin_mm_stable.sh` (mainmenu logo-stability poll — waits until the
+  bank-208 SILENCER reveal HOLDS, i.e. logo green-px == previous read, because the
+  reveal is wall-clock-driven, NOT frame-count-deterministic; a fixed wait catches a
+  scrambled mid-reveal frame); and `cap_origin_lobby_final.sh` (lobby cluster; copies
+  maps into the lobby `-maps-dir`, selects a map + Login/Create → STAGING → Choose
+  Tech → tech_select).
+- **Origin control labels differ from cppx:** origin `inspect` returns `widgets`
+  (not cppx's `nodes`) keyed by `id` (`options.audio`, `lobby.game_create.create`,
+  `lobby.game_join.choose_tech`, …); navigate by visible label ("Audio"/"Create"/
+  "Choose Tech"). cppx cap scripts reading `r.nodes` find nothing against origin.
 
 ## Authentic origin/main baselines (13)
 mainmenu, options, options_audio, options_display, options_controls,

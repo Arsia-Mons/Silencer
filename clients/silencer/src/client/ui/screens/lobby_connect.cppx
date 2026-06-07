@@ -6,6 +6,7 @@
 #include "client/ui/hooks/use_lobby_session.h"
 #include "ui/components/box.h"
 #include "ui/components/input.h"
+#include "ui/components/text.h"
 #include "ui/runtime/react.h"
 
 #include <functional>
@@ -21,10 +22,26 @@ using ::ui::components::Box;
 using ::ui::components::BoxProps;
 using ::ui::components::Input;
 using ::ui::components::InputProps;
+using ::ui::components::Text;
+using ::ui::components::TextProps;
 
 struct LobbyConnectProps {
   uint32_t unused = 0;
 };
+
+// Username/Password field label: the golden draws these in the larger Large face
+// (bank 134, ~15px) — a tier above the body status log, not the body em. Fixed
+// width so both fields start at the same x.
+::ui::UiElement field_label(const char *key, const char *value) {
+  return <Box key={key} layout={::ui::LayoutStyle{
+      .flex_shrink = ::ui::StyleFloat::points(0.0f),
+      .width = ::ui::Length::points(96.0f)}}>
+    <Text key="t" value={value}
+      layout={::ui::LayoutStyle{.height = ::ui::Length::points(tokens::kLineLarge)}}
+      style={tokens::text_patch(tokens::kTextBody, tokens::kFontLarge,
+                               tokens::kFaceLarge, tokens::kLineLarge)} />
+  </Box>
+}
 
 // origin/main Lobby Connect: a single thin green-bordered rectangle over black
 // (NOT the ornate bank-40 dialog sprite). A connection-log region grows to fill
@@ -71,10 +88,16 @@ struct LobbyConnectProps {
     }
   }
 
+  // Panel + field interiors carry a faint warm-dark fill (golden ~(12,4,4)), not
+  // flat black — the origin login frame is a dim sprite-backed well over black.
+  const ::ui::Color kConnectBorder = {48, 140, 60, 255};
+  const ::ui::Color kConnectFill = {12, 4, 4, 255};
+  const ::ui::Color kConnectFormFill = {0, 24, 0, 255};
+
   // Square-cornered thin-green fields (origin/main login rects, not rounded).
   ::ui::StyleStatePatch field_style{};
   field_style.base = ::ui::patch()
-                         .background(::ui::Color{0, 0, 0, 255})
+                         .background(kConnectFill)
                          .gradient(::ui::Gradient{})
                          .corner_radius(0.0f)
                          .border(::ui::Border{{1, 1, 1, 1},
@@ -92,14 +115,14 @@ struct LobbyConnectProps {
       .width = ::ui::Length::percent(100.0f),
       .gap = 10.0f};
 
-  // The panel interior carries a faint dark fill (golden ~(12,4,4)), not flat
-  // black — the origin login frame is a dim sprite-backed well over black.
-  const ::ui::Color kConnectBorder = {46, 150, 46, 255};
-  const ::ui::Color kConnectFill = {11, 10, 7, 255};
+  // ONE connected outer frame (golden): the log well + form share the single
+  // panel border edge-to-edge, split by one internal divider hairline — NOT two
+  // nested bordered boxes. So the inner sections are fill-only (no own border).
   ::ui::StylePatch panel_style =
       tokens::panel_patch(kConnectFill, kConnectBorder, 2.0f);
-  ::ui::StylePatch logbox_style =
-      tokens::panel_patch(kConnectFill, kConnectBorder, 1.0f);
+  ::ui::StylePatch logbox_style = tokens::fill_patch(kConnectFill);
+  ::ui::StylePatch form_style = tokens::fill_patch(kConnectFormFill);
+  ::ui::StylePatch divider_style = tokens::fill_patch(kConnectBorder);
 
   return <Box
     key="root"
@@ -116,8 +139,8 @@ struct LobbyConnectProps {
         .align_items = ::ui::AlignItems::Stretch,
         .width = ::ui::Length::points(420.0f),
         .height = ::ui::Length::points(412.0f),
-        .padding = {7.0f, 7.0f, 7.0f, 7.0f},
-        .gap = 8.0f,
+        .padding = {0.0f, 0.0f, 0.0f, 0.0f},
+        .gap = 0.0f,
         .border_width = 2.0f}}
       style={panel_style}>
       <Box
@@ -128,47 +151,59 @@ struct LobbyConnectProps {
           .align_items = ::ui::AlignItems::Start,
           .flex_grow = ::ui::StyleFloat::points(1.0f),
           .width = ::ui::Length::percent(100.0f),
-          .padding = {8.0f, 8.0f, 6.0f, 6.0f},
-          .gap = 2.0f,
-          .border_width = 1.0f}}
+          .padding = {10.0f, 10.0f, 8.0f, 6.0f},
+          .gap = 2.0f}}
         style={logbox_style}>
         {::ui::children(log_lines)}
       </Box>
-      <Box key="urow" layout={field_row}>
-        <BodyText key="ulbl" variant={BodyTextVariant::Body} value="Username" />
-        <Input
-          key="username"
-          id="Username"
-          autofocus={true}
-          accessibility={{.label = "Username"}}
-          value={username->c_str()}
-          onChange={set_username}
-          onActivate={on_activate}
-          layout={field_layout}
-          style={field_style}
-        />
-      </Box>
-      <Box key="prow" layout={field_row}>
-        <BodyText key="plbl" variant={BodyTextVariant::Body} value="Password" />
-        <Input
-          key="password"
-          id="Password"
-          accessibility={{.label = "Password"}}
-          value={password->c_str()}
-          onChange={set_password}
-          onActivate={on_activate}
-          layout={field_layout}
-          style={field_style}
-        />
-      </Box>
-      <Box
-        key="actions"
-        layout={::ui::LayoutStyle{
-          .direction = ::ui::FlexDirection::Row,
-          .justify_content = ::ui::JustifyContent::Center,
-          .gap = 10.0f}}>
-        <AppButton key="login" controlId="Login" variant={AppButtonVariant::Rect} selected={true} label="Login/Create" onPress={submit} />
-        <AppButton key="cancel" controlId="Cancel" variant={AppButtonVariant::Rect} label="Cancel" onPress={lobby.cancel} />
+      <Box key="divider" layout={::ui::LayoutStyle{
+          .width = ::ui::Length::percent(100.0f),
+          .height = ::ui::Length::points(2.0f),
+          .flex_shrink = ::ui::StyleFloat::points(0.0f)}}
+        style={divider_style} />
+      <Box key="form" layout={::ui::LayoutStyle{
+          .direction = ::ui::FlexDirection::Column,
+          .align_items = ::ui::AlignItems::Stretch,
+          .width = ::ui::Length::percent(100.0f),
+          .padding = {10.0f, 10.0f, 8.0f, 10.0f},
+          .gap = 8.0f}}
+        style={form_style}>
+        <Box key="urow" layout={field_row}>
+          {field_label("ulbl", "Username")}
+          <Input
+            key="username"
+            id="Username"
+            autofocus={true}
+            accessibility={{.label = "Username"}}
+            value={username->c_str()}
+            onChange={set_username}
+            onActivate={on_activate}
+            layout={field_layout}
+            style={field_style}
+          />
+        </Box>
+        <Box key="prow" layout={field_row}>
+          {field_label("plbl", "Password")}
+          <Input
+            key="password"
+            id="Password"
+            accessibility={{.label = "Password"}}
+            value={password->c_str()}
+            onChange={set_password}
+            onActivate={on_activate}
+            layout={field_layout}
+            style={field_style}
+          />
+        </Box>
+        <Box
+          key="actions"
+          layout={::ui::LayoutStyle{
+            .direction = ::ui::FlexDirection::Row,
+            .justify_content = ::ui::JustifyContent::Center,
+            .gap = 10.0f}}>
+          <AppButton key="login" controlId="Login" variant={AppButtonVariant::Rect} selected={true} label="Login/Create" onPress={submit} />
+          <AppButton key="cancel" controlId="Cancel" variant={AppButtonVariant::Rect} label="Cancel" onPress={lobby.cancel} />
+        </Box>
       </Box>
     </Box>
   </Box>

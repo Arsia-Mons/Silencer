@@ -237,6 +237,7 @@ bool append_image(DrawCommandList &list, const NodeSnapshot &node) {
       .src_y = bi.src_y,
       .src_w = bi.src_w,
       .src_h = bi.src_h,
+      .flip_h = bi.flip_h,
   };
   return list.push(command);
 }

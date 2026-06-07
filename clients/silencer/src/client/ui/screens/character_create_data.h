@@ -20,7 +20,7 @@ struct AgencyInfo {
   const char *name;
   const char *control_id;
   static constexpr int kMaxAdvantages = 4;
-  static constexpr int kMaxDescLines = 16;
+  static constexpr int kMaxDescLines = 24;
   Advantage advantages[kMaxAdvantages]; // trailing {nullptr,nullptr} => unused
   const char *description[kMaxDescLines]; // trailing nullptr => end of prose
 };
@@ -30,18 +30,28 @@ constexpr int kAgencyCount = 5;
 constexpr AgencyInfo kAgencies[kAgencyCount] = {
     {"Noxis", "AgencyNoxis",
      {{"Endurance", "[+3]"}, {"Jump", "[+5]"}, {nullptr, nullptr}, {nullptr, nullptr}},
-     {"The Noxis corporation terraformed",
-      "the majority of the initial",
-      "habitable sectors of Mars, and",
-      "continues to do so, producing and",
-      "selling 70% of the breathable",
-      "oxygen. Widely known to the",
-      "populace and government, they",
-      "bolster their agents' health to",
-      "better avoid detection. Training in",
-      "bio-sporria rich environments and",
-      "advanced oxygen-processor suits",
-      "grants higher jumps, more stamina,",
+     {"The Noxis corporation",
+      "terraformed the majority of",
+      "the initial habitable",
+      "sectors of Mars, and",
+      "continues to do so, as well",
+      "as producing and selling 70",
+      "percent of the breathable",
+      "oxygen. Since they are",
+      "widely known to the",
+      "populace and government,",
+      "they have taken steps to",
+      "bolster their agent's",
+      "health so they are better",
+      "able to avoid detection.",
+      "Training in bio-sporria",
+      "rich environments, and",
+      "possessing suits with",
+      "advanced oxygen processors",
+      "and filters, has given",
+      "these agents improved",
+      "physical abilities such as",
+      "higher jumps, more stamina,",
       "and enhanced durability.", nullptr}},
     {"Lazarus", "AgencyLazarus",
      {{"Tech", "[+3]"}, {nullptr, nullptr}, {nullptr, nullptr}, {nullptr, nullptr}},

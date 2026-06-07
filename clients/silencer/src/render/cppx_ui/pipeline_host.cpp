@@ -94,8 +94,19 @@ const uint8_t *PipelineHost::render(const client::ui::UiPipelineFrame &frame,
   if (!surf_ || !r_ || !pipeline_)
     return nullptr;
 
+  // Responsive content scale: screens lay out against a logical canvas (height
+  // pinned to 720, width = aspect*720) and the executor scales every primitive
+  // up to the physical surface, so the whole UI grows with the window like
+  // origin/main — fonts re-rasterized crisply at the scaled cell, sprites
+  // upscaled. Derived from the surface/logical-layout ratio the composition root
+  // set in frame.layout; 1.0 when the layout already matches the surface.
+  float device_scale = (frame.layout.height > 0.0f)
+                           ? static_cast<float>(h_) / frame.layout.height
+                           : 1.0f;
+  if (device_scale < 1.0f)
+    device_scale = 1.0f;
   // Transparent clear: the UI composites over the already-rendered world frame.
-  const float scale = ui_.begin_frame(::ui::Color{0, 0, 0, 0}, 1.0f, 1);
+  const float scale = ui_.begin_frame(::ui::Color{0, 0, 0, 0}, device_scale, 1);
   pipeline_->render_client_ui_frame(frame, [&] {
     const ::ui::DrawCommandList &list =
         pipeline_->client_ui().retained_command_list();

@@ -275,7 +275,7 @@ bake(94, 0, cppxChrome.hud_radar, &cppxChrome.hud_radar_w, &cppxChrome.hud_radar
 using GF = silencer::cppx_ui::GlyphFonts;
 struct FaceBake { int face; int bank; float advance; float line_height; };
 static const FaceBake kFaceBakes[] = {
-    {0, 133, 6.f, 11.f},  // Body    — silencer-ui      (bank 133)
+    {0, 133, 5.8f, 11.f}, // Body    — silencer-ui      (bank 133)
     {1, 134, 8.f, 15.f},  // Large   — silencer-ui-large(bank 134)
     {2, 136, 16.f, 23.f}, // Title   — silencer-title   (bank 136)
     {3, 132, 4.f, 7.f},   // Tiny    — silencer-tiny    (bank 132)
@@ -322,6 +322,17 @@ rh = ph;
 }
 }
 if(rw < 1 || rh < 1) return;
+// Responsive logical canvas: screens are authored against a height-pinned 720
+// space (width = aspect*720), and PipelineHost::render scales that up to the
+// physical rw x rh surface (fonts re-rasterized crisply, sprites upscaled) so
+// the UI grows with the window like origin/main. Pin height to 720; the width
+// breathes with the aspect ratio (1280 at 16:9), and flex layouts spread to
+// fill it. scale >= 1 (never shrink below the authored size).
+const float kLogicalH = 720.0f;
+float cppxScale = static_cast<float>(rh) / kLogicalH;
+if(cppxScale < 1.0f) cppxScale = 1.0f;
+const float cppxLogicalW = static_cast<float>(rw) / cppxScale;
+const float cppxLogicalH = static_cast<float>(rh) / cppxScale;
 
 if(!cppxReactInitialized){
 react_init_runtime();
@@ -831,7 +842,7 @@ cppxAppRootPushed = true;
 // single-frame press+release at a UI-space point (so the control socket can
 // activate a node by location); otherwise the real mouse drives hover/press.
 client::ui::UiPipelineFrame frame = {};
-frame.layout = {static_cast<float>(rw), static_cast<float>(rh)};
+frame.layout = {cppxLogicalW, cppxLogicalH};
 frame.input = uiInput_;
 float mx = -1000.0f;
 float my = -1000.0f;
@@ -855,8 +866,10 @@ Uint32 buttons = SDL_GetMouseState(&wx, &wy);
 int ww = 0;
 int wh = 0;
 SDL_GetWindowSize(win, &ww, &wh);
-mx = (ww > 0) ? (wx / static_cast<float>(ww)) * static_cast<float>(rw) : wx;
-my = (wh > 0) ? (wy / static_cast<float>(wh)) * static_cast<float>(rh) : wy;
+// Map window pixels into the logical layout space (the tree lays out logical,
+// not physical — see frame.layout above).
+mx = (ww > 0) ? (wx / static_cast<float>(ww)) * cppxLogicalW : wx;
+my = (wh > 0) ? (wy / static_cast<float>(wh)) * cppxLogicalH : wy;
 bool down = (buttons & SDL_BUTTON_MASK(SDL_BUTTON_LEFT)) != 0;
 frame.input.pointer_down = down;
 frame.input.pointer_pressed = down && !prevPointerDown_;

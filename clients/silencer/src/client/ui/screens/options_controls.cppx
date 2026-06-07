@@ -10,6 +10,7 @@
 #include "client/ui/hooks/use_navigation.h"
 #include "ui/components/box.h"
 #include "ui/components/scroll_view.h"
+#include "ui/components/text.h"
 #include "ui/runtime/react.h"
 
 #include <functional>
@@ -25,6 +26,27 @@ using ::ui::components::Box;
 using ::ui::components::BoxProps;
 using ::ui::components::ScrollView;
 using ::ui::components::ScrollViewProps;
+using ::ui::components::Text;
+using ::ui::components::TextProps;
+
+// Keybind-grid column geometry (origin/main): labels left-aligned in a wide left
+// column, then the primary-bind / "OR" / secondary-bind columns laid out so every
+// row's ovals stack vertically. Widths sum under the panel content width, leaving
+// the right edge clear for the sprite's baked scrollbar rail.
+constexpr float kLabelCol = 345.0f; // label box; text indented inside it (sets the bind-oval left anchor ~x405)
+constexpr float kLabelIndent = 14.0f;
+constexpr float kBindCol = 166.0f;  // bind oval column (oval stretches to fill it)
+constexpr float kOrCol = 56.0f;
+constexpr float kRowH = 94.0f;      // origin row pitch (grid fills the panel)
+
+// One left-aligned grid label (origin uses the bank-134 large face, standard
+// phosphor green — bigger than BodyText's body em).
+::ui::UiElement grid_label(const char *value) {
+  return <Text key="lbl" value={value}
+    layout={::ui::LayoutStyle{.height = ::ui::Length::points(tokens::kLineLarge)}}
+    style={tokens::text_patch(tokens::kTextBody, tokens::kFontLarge,
+                             tokens::kFaceLarge, tokens::kLineLarge)} />
+}
 
 // SIL-108: rebind auto-cancels after this many frames of inactivity (origin/main
 // used a 72-tick capture timeout; the capture hook delegates it to the screen).
@@ -55,10 +77,10 @@ int rebind_combo_index(const KeyMap &km, Action action) {
   return -1;
 }
 
-// One selectable binding row: right-aligned label | primary bind oval | "OR" |
+// One selectable binding row: left-aligned label | primary bind oval | "OR" |
 // secondary bind oval (an empty oval = BindingWell when the combo is unbound).
-// Pressing a bind oval arms capture for that action's combo slot. origin/main
-// grid: the fixed column widths keep every row's ovals aligned.
+// Pressing a bind oval arms capture for that action's combo slot. The fixed
+// column widths stack every row's ovals into aligned vertical lanes.
 ::ui::UiElement make_binding_row(const char *key, const char *primary_id,
                                  const char *secondary_id, const char *label,
                                  const char *primary, const char *secondary,
@@ -70,26 +92,41 @@ int rebind_combo_index(const KeyMap &km, Action action) {
       .direction = ::ui::FlexDirection::Row,
       .align_items = ::ui::AlignItems::Center,
       .width = ::ui::Length::percent(100.0f),
-      .height = ::ui::Length::points(84.0f),
-      .gap = ::ui::StyleValue::points(10.0f)}}>
+      .height = ::ui::Length::points(kRowH)}}>
     <Box key="lblc" layout={::ui::LayoutStyle{
       .align_items = ::ui::AlignItems::Center,
-      .justify_content = ::ui::JustifyContent::End,
-      .width = ::ui::Length::points(180.0f)}}>
-      <BodyText key="lbl" variant={BodyTextVariant::Strong} value={label} />
+      .width = ::ui::Length::points(kLabelCol),
+      .padding = {kLabelIndent, 0.0f, 0.0f, 0.0f}}}>
+      {grid_label(label)}
     </Box>
-    <AppButton key="p" controlId={primary_id} variant={AppButtonVariant::Oval} size={AppButtonSize::Sm} label={primary} onPress={rebind_primary} />
+    <Box key="pc" layout={::ui::LayoutStyle{
+      .direction = ::ui::FlexDirection::Column,
+      .align_items = ::ui::AlignItems::Stretch,
+      .justify_content = ::ui::JustifyContent::Center,
+      .width = ::ui::Length::points(kBindCol)}}>
+      <AppButton key="p" controlId={primary_id} variant={AppButtonVariant::Oval} size={AppButtonSize::Sm} label={primary} onPress={rebind_primary} />
+    </Box>
     <Box key="orc" layout={::ui::LayoutStyle{
       .align_items = ::ui::AlignItems::Center,
       .justify_content = ::ui::JustifyContent::Center,
-      .width = ::ui::Length::points(45.0f)}}>
-      <BodyText key="or" variant={BodyTextVariant::Detail} value="OR" />
+      .width = ::ui::Length::points(kOrCol)}}>
+      <Text key="or" value="OR"
+        layout={::ui::LayoutStyle{.height = ::ui::Length::points(tokens::kLineBody)}}
+        style={tokens::text_patch(tokens::kTextBodyMuted, tokens::kFontBodyEm,
+                                 tokens::kFaceBody, tokens::kLineBody)} />
     </Box>
-    <AppButton key="s" controlId={secondary_id} variant={AppButtonVariant::Oval} size={AppButtonSize::Sm} label={secondary} onPress={rebind_secondary} />
+    <Box key="sc" layout={::ui::LayoutStyle{
+      .direction = ::ui::FlexDirection::Column,
+      .align_items = ::ui::AlignItems::Stretch,
+      .justify_content = ::ui::JustifyContent::Center,
+      .width = ::ui::Length::points(kBindCol)}}>
+      <AppButton key="s" controlId={secondary_id} variant={AppButtonVariant::Oval} size={AppButtonSize::Sm} label={secondary} onPress={rebind_secondary} />
+    </Box>
   </Box>
 }
 
-// Degenerate row: "Preset:" label + a single value oval cycling the preset.
+// Degenerate row: "Preset:" label + a single wide value oval (origin spans the
+// preset oval across both bind lanes) cycling the preset.
 ::ui::UiElement make_preset_row(const char *label, const char *value,
                                 std::function<void()> cycle) {
   return <Box
@@ -98,15 +135,14 @@ int rebind_combo_index(const KeyMap &km, Action action) {
       .direction = ::ui::FlexDirection::Row,
       .align_items = ::ui::AlignItems::Center,
       .width = ::ui::Length::percent(100.0f),
-      .height = ::ui::Length::points(84.0f),
-      .gap = ::ui::StyleValue::points(10.0f)}}>
+      .height = ::ui::Length::points(kRowH)}}>
     <Box key="lblc" layout={::ui::LayoutStyle{
       .align_items = ::ui::AlignItems::Center,
-      .justify_content = ::ui::JustifyContent::End,
-      .width = ::ui::Length::points(180.0f)}}>
-      <BodyText key="lbl" variant={BodyTextVariant::Strong} value={label} />
+      .width = ::ui::Length::points(kLabelCol),
+      .padding = {kLabelIndent, 0.0f, 0.0f, 0.0f}}}>
+      {grid_label(label)}
     </Box>
-    <AppButton key="cycle" controlId="CyclePreset" variant={AppButtonVariant::Oval} size={AppButtonSize::Sm} label={value} onPress={cycle} />
+    <AppButton key="cycle" controlId="CyclePreset" variant={AppButtonVariant::Oval} size={AppButtonSize::Lg} label={value} onPress={cycle} />
   </Box>
 }
 
@@ -162,7 +198,6 @@ struct OptionsControlsProps {
     const char *pval = ::ui::copy_string(km.preset_label.c_str());
     rows.push_back(make_preset_row("Preset:", pval, km.cycle_preset));
   }
-  const float kRowH = 84.0f;
   for (int i = 0; i < action_count; ++i) {
     const KeyMapAction &a = km.actions[i];
     const char *rkey = ::ui::copy_string(("row" + std::to_string(i)).c_str());
@@ -185,17 +220,32 @@ struct OptionsControlsProps {
     rows.push_back(
         make_binding_row(rkey, pid, sid, label, prim, sec, rb0, rb1));
   }
+  // Viewport spans the five golden rows (Preset + 4 Move); extra actions scroll
+  // through the sprite's baked rail. Full content width so the column lanes land
+  // under the baked scrollbar rail at the right edge.
+  // Clear the ScrollView viewport's default chrome — the baked sprite already
+  // draws the frame. The focusable viewport otherwise paints a focus OUTLINE
+  // rectangle (the spurious inner frame at x~54); clear background + border AND
+  // outline so only the sprite frame shows.
+  ::ui::StyleStatePatch table_style{};
+  const ::ui::Border kNoBorder{{0, 0, 0, 0},
+                               {{0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}}};
+  table_style.base =
+      ::ui::patch().background({0, 0, 0, 0}).border(kNoBorder).outline(::ui::Outline{});
+  table_style.focus_visible =
+      ::ui::patch().background({0, 0, 0, 0}).border(kNoBorder).outline(::ui::Outline{});
   ::ui::UiElement table = ::ui::component(
       "ScrollView",
       ScrollViewProps{
           .key = "table",
           .id = "ControlsList",
-          .viewport_height = 430.0f,
+          .viewport_height = kRowH * 5.0f,
           .content_height = kRowH * static_cast<float>(action_count + 1),
           .step = kRowH,
           .row_height = kRowH,
           .show_scrollbar = false,
-          .layout = ::ui::LayoutStyle{.width = ::ui::Length::points(740.0f)},
+          .layout = ::ui::LayoutStyle{.width = ::ui::Length::percent(100.0f)},
+          .style = table_style,
           .children = ::ui::children(rows)},
       ScrollView);
 
@@ -203,17 +253,26 @@ struct OptionsControlsProps {
     <Panel key="frame" variant={PanelVariant::ControlsFrame}>
       <Box key="titlewrap" layout={::ui::LayoutStyle{
           .position = ::ui::PositionType::Absolute,
-          .position_inset = ::ui::EdgeSizes{0.0f, 0.0f, 14.0f, {}},
+          .position_inset = ::ui::EdgeSizes{0.0f, 0.0f, -6.0f, {}},
           .direction = ::ui::FlexDirection::Row,
           .align_items = ::ui::AlignItems::Center,
           .justify_content = ::ui::JustifyContent::Center}}>
         <ScreenTitle key="title" variant={ScreenTitleVariant::Screen} value="Configure Controls" />
       </Box>
       {table}
-      <ActionRow key="actions">
-        <AppButton key="save" controlId="SaveBinds" variant={AppButtonVariant::Oval} label="Save" onPress={save} />
-        <AppButton key="cancel" controlId="ControlsBack" variant={AppButtonVariant::Oval} label="Cancel" onPress={cancel} />
-      </ActionRow>
+      <Box key="spring" layout={::ui::LayoutStyle{
+          .width = ::ui::Length::percent(100.0f),
+          .flex_grow = ::ui::StyleFloat::points(1.0f)}} />
+      <Box key="actionwrap" layout={::ui::LayoutStyle{
+          .align_items = ::ui::AlignItems::Center,
+          .justify_content = ::ui::JustifyContent::Center,
+          .width = ::ui::Length::percent(100.0f),
+          .padding = {0.0f, 0.0f, 0.0f, 12.0f}}}>
+        <ActionRow key="actions">
+          <AppButton key="save" controlId="SaveBinds" variant={AppButtonVariant::Oval} label="Save" onPress={save} />
+          <AppButton key="cancel" controlId="ControlsBack" variant={AppButtonVariant::Oval} label="Cancel" onPress={cancel} />
+        </ActionRow>
+      </Box>
     </Panel>
   </ScreenLayout>
 }

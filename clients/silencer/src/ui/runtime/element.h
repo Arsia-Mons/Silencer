@@ -24,8 +24,10 @@ constexpr int UI_RETAINED_MAX_CHILD_ELEMENTS = 1024;
 // Per-frame arena for copied component-prop records. Each props struct now
 // embeds a StyleStatePatch `style` (seven StylePatch slots), so a single record
 // is ~2.3 KB; a complex screen (the loadout) instantiates dozens, so the arena
-// is sized to hold them with headroom rather than the former 64 KB.
-constexpr int UI_RETAINED_ELEMENT_ARENA_BYTES = 524288;
+// is sized to hold them with headroom rather than the former 64 KB. The 30-row
+// keybind table stacked over the menu stack overflowed 512 KB (errors=10 →
+// OptionsControls failed to commit), so sized to 1 MB.
+constexpr int UI_RETAINED_ELEMENT_ARENA_BYTES = 1048576;
 constexpr int UI_RETAINED_MAX_ELEMENT_DESTRUCTORS = 1024;
 constexpr int UI_RETAINED_STRING_ARENA_BYTES = 16384;
 

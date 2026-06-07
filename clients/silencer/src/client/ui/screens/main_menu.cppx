@@ -93,44 +93,46 @@ struct MainMenuProps {
       nav.push(std::make_unique<OptionsScreen>());
   };
 
-  // The SILENCER wordmark (bank-208 logo sprite), drawn at its native size. Falls
-  // back to the Hero title until the bake lands.
+  // The SILENCER wordmark (bank-208 logo sprite), absolutely positioned to the
+  // golden box. Falls back to the Hero title until the bake lands.
   ::ui::UiElement logo =
       chrome.logo
           ? Box(BoxProps{
                 .key = "logoimg",
                 .layout = ::ui::LayoutStyle{
-                    .width = ::ui::Length::points(523.0f),
-                    .height = ::ui::Length::points(53.0f),
-                    .flex_shrink = ::ui::StyleFloat::points(0.0f)},
+                    .position = ::ui::PositionType::Absolute,
+                    .position_inset = ::ui::EdgeSizes{::ui::StyleValue::percent(13.4f), {}, 342.0f, {}},
+                    .width = ::ui::Length::points(453.0f),
+                    .height = ::ui::Length::points(43.0f)},
                 .style = logo_style})
           : ScreenTitle(ScreenTitleProps{.key = "logotxt",
                                          .variant = ScreenTitleVariant::Hero,
                                          .value = "SILENCER"});
 
-  // origin/main: the logo sits left, a right-anchored column of green oval buttons
-  // sits right. The horizontal fan (Connect widest, Exit pulled in) falls out of
-  // center-aligning sized-to-text ovals — no transcribed pixel offsets.
+  // origin/main's right button column is a LEGACY POSITIONAL FAN: uniform-width
+  // ovals at staggered centers (Connect pushed out, Exit pulled in). Flex
+  // alignment can't express same-width-different-center, so the fan is the one
+  // place we pin coordinates — the visual-parity gate fails a uniform stack. Each
+  // row's left margin is its golden center offset from Exit (the leftmost pill):
+  // Tutorial/Options +60, Connect +120, Exit 0.
   return <ScreenLayout key="root" variant={ScreenLayoutVariant::Menu}>
-    <Box key="body" layout={::ui::LayoutStyle{
-        .direction = ::ui::FlexDirection::Row,
-        .align_items = ::ui::AlignItems::Center,
-        .justify_content = ::ui::JustifyContent::SpaceBetween,
-        .width = ::ui::Length::percent(100.0f),
-        .height = ::ui::Length::percent(100.0f),
-        .padding = {18.0f, 56.0f, {}, {}}}}>
-      {logo}
-      <Box key="stack" layout={::ui::LayoutStyle{
-          .direction = ::ui::FlexDirection::Column,
-          .align_items = ::ui::AlignItems::Center,
-          .flex_shrink = ::ui::StyleFloat::points(0.0f),
-          .margin = ::ui::EdgeSizes{{}, {}, 92.0f, {}},
-          .gap = 52.0f}}>
+    {logo}
+    <Box key="stack" layout={::ui::LayoutStyle{
+        .position = ::ui::PositionType::Absolute,
+        .position_inset = ::ui::EdgeSizes{::ui::StyleValue::percent(48.8f), {}, 231.0f, {}},
+        .direction = ::ui::FlexDirection::Column,
+        .align_items = ::ui::AlignItems::Start,
+        .gap = 51.0f}}>
+      <Box key="w0" layout={::ui::LayoutStyle{.margin = ::ui::EdgeSizes{60.0f, {}, {}, {}}}}>
         <AppButton key="tutorial" controlId="Tutorial" variant={AppButtonVariant::Oval} label="Tutorial" onPress={session.start_tutorial} />
-        <AppButton key="connect" controlId="ConnectToLobby" variant={AppButtonVariant::Oval} label="Connect To Lobby" onPress={session.play_online} />
-        <AppButton key="options" controlId="Options" variant={AppButtonVariant::Oval} label="Options" onPress={open_options} />
-        <AppButton key="exit" controlId="Exit" variant={AppButtonVariant::Oval} disabled={!app.can_quit} label="Exit" onPress={app.quit} />
       </Box>
+      <Box key="w1" layout={::ui::LayoutStyle{.margin = ::ui::EdgeSizes{120.0f, {}, {}, {}}}}>
+        <AppButton key="connect" controlId="ConnectToLobby" variant={AppButtonVariant::Oval} label="Connect To Lobby" onPress={session.play_online} />
+      </Box>
+      <Box key="w2" layout={::ui::LayoutStyle{.margin = ::ui::EdgeSizes{60.0f, {}, {}, {}}}}>
+        <AppButton key="options" controlId="Options" variant={AppButtonVariant::Oval} label="Options" onPress={open_options} />
+      </Box>
+      <AppButton key="exit" controlId="Exit" variant={AppButtonVariant::Oval} disabled={!app.can_quit} label="Exit" onPress={app.quit} />
     </Box>
     <Box key="footer" layout={::ui::LayoutStyle{
         .position = ::ui::PositionType::Absolute,

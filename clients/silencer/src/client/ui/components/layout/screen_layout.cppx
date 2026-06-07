@@ -50,6 +50,14 @@ using ::ui::components::DialogProps;
     ::ui::StylePatch overlay_bg =
         chrome.starfield ? tokens::image_patch(chrome.starfield)
                          : tokens::fill_patch(tokens::kSurfaceOverlay);
+    // Clear the Dialog role's default slate border — an image/fill patch leaves
+    // border unset, so resolve() would otherwise draw theme.dialog's rounded
+    // frame as a spurious inner rect over the baked sprite chrome.
+    overlay_bg.border = ::ui::opt(::ui::Border{
+        {0.0f, 0.0f, 0.0f, 0.0f},
+        {{0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}}});
+    // Small inset so the near-full-bleed cc/controls frames reach the golden
+    // extents; the options menus center their content so it's unaffected.
     return <Dialog
       key={props.key}
       layout={::ui::LayoutStyle{
@@ -58,7 +66,7 @@ using ::ui::components::DialogProps;
         .justify_content = ::ui::JustifyContent::Center,
         .width = ::ui::Length::percent(100.0f),
         .height = ::ui::Length::percent(100.0f),
-        .padding = {24.0f, 24.0f, 24.0f, 24.0f},
+        .padding = {8.0f, 8.0f, 8.0f, 8.0f},
         .gap = 30.0f,
       }}
       style={overlay_bg}

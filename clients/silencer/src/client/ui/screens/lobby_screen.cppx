@@ -14,7 +14,6 @@
 #include "client/ui/hooks/use_staging.h"
 #include "client/ui/screens/character_create_data.h"
 #include "ui/components/box.h"
-#include "ui/components/input.h"
 #include "ui/components/text.h"
 #include "ui/runtime/react.h"
 
@@ -29,8 +28,6 @@ using namespace silencer;
 using ::ui::children;
 using ::ui::components::Box;
 using ::ui::components::BoxProps;
-using ::ui::components::Input;
-using ::ui::components::InputProps;
 using ::ui::components::Text;
 using ::ui::components::TextProps;
 
@@ -131,12 +128,10 @@ inline ::ui::StylePatch lobby_panel_style() {
 
 // --- right-column panels (screen-local swap) ---------------------------------
 
-// The default center region (origin/main): a small "Create Game" oval floating at
-// the top over the backdrop + the "In Lobby" presence float below it (who is in
-// the lobby right now). NOT a stat panel — the agent's stats live in the
-// AgentCard's StatColumn. controlId "NewGame" keeps the create intent targetable.
+// The default center region (origin/main): a "Create Game" button floating at the
+// top over the backdrop. The "In Lobby" presence lives in the shared Lobby panel
+// (so it shows in create/staging modes too), not here.
 struct CenterColProps {
-  const char *presence = "";
   std::function<void()> on_create = {};
 };
 
@@ -148,16 +143,7 @@ struct CenterColProps {
       .flex_basis = ::ui::Length::points(0.0f),
       .min_width = ::ui::Length::points(0.0f),
       .gap = 10.0f}}>
-    <AppButton key="creategame" controlId="NewGame" variant={AppButtonVariant::Rect} size={AppButtonSize::Sm} label="Create Game" onPress={props.on_create} />
-    <Box key="inlobby" layout={::ui::LayoutStyle{
-        .direction = ::ui::FlexDirection::Column,
-        .align_items = ::ui::AlignItems::Start,
-        .overflow = ::ui::Overflow::Hidden,
-        .padding = {5.0f, 10.0f, 5.0f, 10.0f},
-        .gap = 2.0f}} style={lobby_panel_style()}>
-      <ScreenTitle key="h" variant={ScreenTitleVariant::Console} value="In Lobby" />
-      <BodyText key="p" variant={BodyTextVariant::Detail} value={props.presence} />
-    </Box>
+    <AppButton key="creategame" controlId="NewGame" variant={AppButtonVariant::Rect} size={AppButtonSize::Sm} selected={true} label="Create Game" onPress={props.on_create} />
   </Box>
 }
 
@@ -223,60 +209,65 @@ struct GameBrowserProps {
   </Box>
 }
 
-struct GameCreatePanelProps {
-  const char *name = "";
-  const char *map_text = "";
-  bool can_create = false;
-  std::function<void(const std::string &)> on_name = {};
-  std::function<void()> on_prev_map = {};
-  std::function<void()> on_next_map = {};
-  std::function<void()> on_create = {};
-  std::function<void()> on_back = {};
-};
+// The lobby's right cockpit column: the Active Games browser, or (while creating
+// a game) the Select Map filename list (CreateRightCell). Both share the key
+// "rightcell" so the slot reconciles in place when the mode swaps.
+::ui::UiElement ActiveGamesCell(::ui::UiElement browser) {
+  return <Box key="rightcell" layout={lobby_cell_layout(1.0f)} style={lobby_panel_style()}>
+    <ScreenTitle key="h" variant={ScreenTitleVariant::Console} value="Active Games" />
+    {browser}
+  </Box>
+}
 
-::ui::UiElement GameCreatePanel(const GameCreatePanelProps &props) {
+// One "Label:   value" option line (origin's Game Options table).
+::ui::UiElement kv_row(const char *key, const char *label, const char *value) {
+  return <Box key={key} layout={::ui::LayoutStyle{
+      .direction = ::ui::FlexDirection::Row,
+      .align_items = ::ui::AlignItems::Center,
+      .justify_content = ::ui::JustifyContent::SpaceBetween,
+      .width = ::ui::Length::percent(100.0f),
+      .gap = 6.0f}}>
+    <BodyText key="l" variant={BodyTextVariant::Body} value={label} />
+    <BodyText key="v" variant={BodyTextVariant::Strong} value={value} />
+  </Box>
+}
+
+// origin/main "Game Options": a pill-notch title over a dense label:value table
+// (the values are the CreateGameRequest defaults). The Game name + Password +
+// Create live in the right Select-Map cell (CreateRightCell), matching golden.
+::ui::UiElement GameCreatePanel() {
   return <Box key="create" layout={lobby_col_layout(2.0f)} style={lobby_panel_style()}>
-    <ScreenTitle key="h" variant={ScreenTitleVariant::Console} value="Create Game" />
-    <Input
-      key="name"
-      id="GameName"
-      accessibility={{.label = "Game Name"}}
-      value={props.name}
-      onChange={props.on_name}
-    />
-    <BodyText key="map" variant={BodyTextVariant::Strong} value={props.map_text} />
-    <ActionRow key="maps">
-      <AppButton
-        key="prevmap"
-        controlId="MapPrev"
-        variant={AppButtonVariant::Rect}
-        size={AppButtonSize::Sm}
-        disabled={!props.can_create}
-        label="< Map"
-        onPress={props.on_prev_map}
-      />
-      <AppButton
-        key="nextmap"
-        controlId="MapNext"
-        variant={AppButtonVariant::Rect}
-        size={AppButtonSize::Sm}
-        disabled={!props.can_create}
-        label="Map >"
-        onPress={props.on_next_map}
-      />
-    </ActionRow>
-    <ActionRow key="actions">
-      <AppButton
-        key="create"
-        controlId="CreateGame"
-        variant={AppButtonVariant::Rect}
-        size={AppButtonSize::Sm}
-        disabled={!props.can_create}
-        label="Create"
-        onPress={props.on_create}
-      />
-      <AppButton key="back" controlId="CreateBack" variant={AppButtonVariant::Rect} size={AppButtonSize::Sm} label="Back" onPress={props.on_back} />
-    </ActionRow>
+    <ScreenTitle key="h" variant={ScreenTitleVariant::Console} value="Game Options" />
+    {kv_row("o0", "Security:", "Medium")}
+    {kv_row("o1", "Min Level:", "0")}
+    {kv_row("o2", "Max Level:", "99")}
+    {kv_row("o3", "Max Players:", "24")}
+    {kv_row("o4", "Max Teams:", "6")}
+  </Box>
+}
+
+// The right cockpit cell while creating a game: the Select Map filename list,
+// then (pushed to the bottom by a spring) the Game name + Password fields and
+// the wide Create button — origin/main stacks the create form under the map list.
+struct CreateRightCellProps {
+  ::ui::UiChildren rows = {};
+  const char *name = "";
+  bool can_create = false;
+  std::function<void()> on_create = {};
+};
+::ui::UiElement CreateRightCell(const CreateRightCellProps &props) {
+  // origin/main renders the create-form values as plain green text on the
+  // backdrop (no input box) — the Input host always paints its control chrome,
+  // so the name value is a flat BodyText. Wide rect Create button below.
+  return <Box key="rightcell" layout={lobby_cell_layout(1.0f)} style={lobby_panel_style()}>
+    <ScreenTitle key="h" variant={ScreenTitleVariant::Console} value="Select Map" />
+    {props.rows}
+    <Box key="sp" layout={::ui::LayoutStyle{.flex_grow = ::ui::StyleFloat::points(1.0f)}} />
+    <BodyText key="gn" variant={BodyTextVariant::Body} value="Game name:" />
+    <BodyText key="gv" variant={BodyTextVariant::Strong} value={props.name} />
+    <BodyText key="pwl" variant={BodyTextVariant::Body} value="Password [optional]:" />
+    <AppButton key="create" controlId="CreateGame" variant={AppButtonVariant::Rect}
+      disabled={!props.can_create} label="Create" onPress={props.on_create} />
   </Box>
 }
 
@@ -337,12 +328,11 @@ struct LobbyScreenProps {
   App app = use_app();
   Progression prog = use_progression();
   client::ui::ChromeTextures chrome = use_chrome();
-  std::string *draft = use_state<std::string>(std::string());
-  std::string *create_name = use_state<std::string>(std::string("Game"));
+  std::string *create_name = use_state<std::string>(std::string("New Game"));
   int *sel = use_state<int>(0);
   int *map_index = use_state<int>(0);
   bool *show_create = use_state<bool>(false);
-  if (!draft || !create_name || !sel || !map_index || !show_create)
+  if (!create_name || !sel || !map_index || !show_create)
     return ::ui::empty();
 
   // Clamp the screen-local cursors against this frame's lists.
@@ -370,9 +360,6 @@ struct LobbyScreenProps {
   const char *presence = use_text_storage("%s", chat.presence.c_str());
   const char *sel_detail = use_text_storage(
       "%s", game_count > 0 ? games.entries[*sel].detail.c_str() : "");
-  const char *map_text = use_text_storage(
-      "Map: %s",
-      map_count > 0 ? games.bundled_maps[*map_index].c_str() : "(no maps)");
   const char *ready_label = use_text_storage("%s", staging.ready_label.c_str());
   const char *version_text =
       use_text_storage("v.%s", app.version ? app.version : "");
@@ -397,34 +384,6 @@ struct LobbyScreenProps {
   }
   const uint32_t emblem_tex = chrome.agency_emblem[agency_idx];
 
-  std::function<void(const std::string &)> set_draft =
-      [draft](const std::string &next) { *draft = next; };
-  std::function<void()> send = [send = chat.send, draft]() {
-    if (send && !draft->empty()) {
-      send(*draft);
-      draft->clear();
-    }
-  };
-  std::function<void(const ::ui::ActivationEvent &)> on_activate =
-      [send](const ::ui::ActivationEvent &) { send(); };
-
-  // The chat field is a thin square-cornered hairline bar flush with the Send
-  // button (origin/main draws one connected input strip, not a rounded card).
-  auto chat_field_layout = ::ui::LayoutStyle{
-      .align_items = ::ui::AlignItems::Center,
-      .flex_grow = ::ui::StyleFloat::points(1.0f),
-      .min_width = ::ui::Length::points(0.0f),
-      .padding = {6.0f, 6.0f, 2.0f, 2.0f}};
-  ::ui::StyleStatePatch chat_field_style{};
-  chat_field_style.base =
-      ::ui::patch()
-          .background(::ui::Color{0, 8, 2, 210})
-          .gradient(::ui::Gradient{})
-          .corner_radius(0.0f)
-          .border(::ui::Border{{1, 1, 1, 1},
-                               {tokens::kBorderPanel, tokens::kBorderPanel,
-                                tokens::kBorderPanel, tokens::kBorderPanel}});
-
   // Right-column selection: connected -> Staging; else the create form when the
   // player opened it; else the games browser. (No screen names a destination —
   // staging.active is the game-owned connection state surfaced by the hook.)
@@ -439,30 +398,9 @@ struct LobbyScreenProps {
     sp.on_leave = staging.leave;
     right = StagingPanel(sp);
   } else if (*show_create) {
-    GameCreatePanelProps cp;
-    cp.name = create_name->c_str();
-    cp.map_text = map_text;
-    cp.can_create = map_count > 0;
-    cp.on_name = [create_name](const std::string &next) { *create_name = next; };
-    cp.on_prev_map = [map_index]() { if (*map_index > 0) (*map_index)--; };
-    cp.on_next_map = [map_index, map_count]() {
-      if (*map_index < map_count - 1) (*map_index)++;
-    };
-    cp.on_create = [create = games.create_game, create_name, show_create,
-                    maps = games.bundled_maps, idx = *map_index]() {
-      if (create && idx >= 0 && idx < (int)maps.size()) {
-        CreateGameRequest req;
-        req.name = create_name->empty() ? "Game" : *create_name;
-        req.map = maps[idx];
-        create(req);
-        *show_create = false; // staging.active takes over once connected
-      }
-    };
-    cp.on_back = [show_create]() { *show_create = false; };
-    right = GameCreatePanel(cp);
+    right = GameCreatePanel();
   } else {
     CenterColProps cc;
-    cc.presence = presence;
     cc.on_create = [show_create]() { *show_create = true; };
     right = CenterCol(cc);
   }
@@ -485,6 +423,50 @@ struct LobbyScreenProps {
   };
   ::ui::UiElement right_browser = GameBrowser(gp);
 
+  // The right column is the "Select Map" filename list while creating a game,
+  // otherwise the "Active Games" browser. Cap the rows at what the cell shows
+  // without scrolling (golden lists ~13).
+  constexpr int kMaxMapRows = 14;
+  std::vector<::ui::UiElement> map_rows;
+  if (*show_create) {
+    for (int i = 0; i < map_count && i < kMaxMapRows; ++i) {
+      const char *mk = ::ui::copy_string(("m" + std::to_string(i)).c_str());
+      const char *mv = ::ui::copy_string(games.bundled_maps[i].c_str());
+      map_rows.push_back(BodyText(BodyTextProps{
+          .key = mk,
+          .variant = i == *map_index ? BodyTextVariant::Strong : BodyTextVariant::Body,
+          .value = mv}));
+    }
+  }
+  ::ui::UiElement right_cell;
+  if (*show_create) {
+    CreateRightCellProps rc;
+    rc.rows = ::ui::children(map_rows);
+    rc.name = create_name->c_str();
+    rc.can_create = map_count > 0;
+    rc.on_create = [create = games.create_game, create_name,
+                    show_create, maps = games.bundled_maps, idx = *map_index]() {
+      if (create && idx >= 0 && idx < (int)maps.size()) {
+        CreateGameRequest req;
+        req.name = create_name->empty() ? "New Game" : *create_name;
+        req.map = maps[idx];
+        create(req);
+        *show_create = false; // staging.active takes over once connected
+      }
+    };
+    right_cell = CreateRightCell(rc);
+  } else {
+    right_cell = ActiveGamesCell(right_browser);
+  }
+
+  // Go Back cancels create-mode first (matching origin's single top button),
+  // otherwise leaves the lobby. Hoisted out of the JSX (the transpiler can't
+  // parse a brace-bodied lambda inside an attribute).
+  std::function<void()> on_go_back = [show_create, leave = session.leave_to_menu]() {
+    if (*show_create) { *show_create = false; return; }
+    if (leave) leave();
+  };
+
   return <ScreenLayout key="root" variant={ScreenLayoutVariant::Game}>
     <Box key="titlebar" layout={::ui::LayoutStyle{
         .direction = ::ui::FlexDirection::Row,
@@ -494,7 +476,7 @@ struct LobbyScreenProps {
       <ScreenTitle key="brand" variant={ScreenTitleVariant::Brand} value="Silencer" />
       <BodyText key="ver" variant={BodyTextVariant::Detail} tone={BodyTextTone::Warning} value={version_text} />
       <Box key="tbspace" layout={::ui::LayoutStyle{.flex_grow = ::ui::StyleFloat::points(1.0f)}} />
-      <AppButton key="goback" controlId="LobbyGoBack" variant={AppButtonVariant::Rect} size={AppButtonSize::Sm} label="Go Back" onPress={session.leave_to_menu} />
+      <AppButton key="goback" controlId="LobbyGoBack" variant={AppButtonVariant::Rect} size={AppButtonSize::Sm} label="Go Back" onPress={on_go_back} />
     </Box>
     <Box key="body" layout={::ui::LayoutStyle{
         .direction = ::ui::FlexDirection::Row,
@@ -572,12 +554,20 @@ struct LobbyScreenProps {
                 <BodyText key="s5" variant={BodyTextVariant::Body} tone={BodyTextTone::Muted} value="CONTACTS:" />
               </Box>
             </Box>
-            <AppButton key="leave" controlId="LeaveLobby" variant={AppButtonVariant::Rect} size={AppButtonSize::Sm} label="Agents" onPress={session.leave_to_menu} />
+            <AppButton key="leave" controlId="LeaveLobby" variant={AppButtonVariant::Rect} size={AppButtonSize::Sm} selected={true} label="Agents" onPress={session.leave_to_menu} />
           </Box>
           {right}
         </Box>
         <Box key="chat" layout={lobby_cell_layout(1.0f)} style={lobby_panel_style()}>
           <ScreenTitle key="h" variant={ScreenTitleVariant::Console} value="Lobby" />
+          <Box key="presence" layout={::ui::LayoutStyle{
+              .direction = ::ui::FlexDirection::Column,
+              .align_items = ::ui::AlignItems::Start,
+              .padding = {12.0f, 0.0f, 8.0f, 0.0f},
+              .gap = 1.0f}}>
+            <BodyText key="il" variant={BodyTextVariant::Detail} tone={BodyTextTone::Muted} value="In Lobby" />
+            <BodyText key="p" variant={BodyTextVariant::Detail} value={presence} />
+          </Box>
           <Box key="logclip" layout={::ui::LayoutStyle{
               .overflow = ::ui::Overflow::Hidden,
               .align_items = ::ui::AlignItems::Start,
@@ -585,29 +575,9 @@ struct LobbyScreenProps {
               .width = ::ui::Length::percent(100.0f)}}>
             <BodyText key="log" variant={BodyTextVariant::Message} value={scrollback} />
           </Box>
-          <Box key="inputrow" layout={::ui::LayoutStyle{
-              .direction = ::ui::FlexDirection::Row,
-              .align_items = ::ui::AlignItems::Stretch,
-              .width = ::ui::Length::percent(100.0f),
-              .gap = ::ui::StyleValue::points(4.0f)}}>
-            <Input
-              key="draft"
-              id="ChatInput"
-              accessibility={{.label = "Chat"}}
-              value={draft->c_str()}
-              onChange={set_draft}
-              onActivate={on_activate}
-              layout={chat_field_layout}
-              style={chat_field_style}
-            />
-            <AppButton key="send" controlId="SendChat" variant={AppButtonVariant::Rect} size={AppButtonSize::Sm} label="Send" onPress={send} />
-          </Box>
         </Box>
       </Box>
-      <Box key="activegames" layout={lobby_cell_layout(1.0f)} style={lobby_panel_style()}>
-        <ScreenTitle key="h" variant={ScreenTitleVariant::Console} value="Active Games" />
-        {right_browser}
-      </Box>
+      {right_cell}
     </Box>
   </ScreenLayout>
 }

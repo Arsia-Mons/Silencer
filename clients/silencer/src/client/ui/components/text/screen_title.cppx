@@ -48,15 +48,21 @@ using ::ui::components::TextProps;
     height = tokens::kLineLarge;
     break;
   case ScreenTitleVariant::Console:
+    // Lobby/console panel titles (Game Options, Select Map, Active Games, Lobby)
+    // — the chunky heading face at the Large size, a clear tier above the body
+    // rows so the panel headers read as headers, not the first data row.
     color = tokens::kTextTitle;
-    face = tokens::kFaceBody;
-    font = tokens::kFontBodyEm;
-    line = tokens::kLineBody;
-    height = tokens::kLineBody;
+    face = tokens::kFaceHeading;
+    font = tokens::kFontLarge;
+    line = tokens::kLineLarge;
+    height = tokens::kLineLarge;
     break;
   case ScreenTitleVariant::Prose:
+    // White section headers (Advantages/Description). Golden draws them with the
+    // heavy chunky Title face (bank 136) — same ~17px cap as the Heading face
+    // here but ~4x the ink/stroke weight; the Heading face reads too thin.
     color = tokens::kTextProse;
-    face = tokens::kFaceLarge;
+    face = tokens::kFaceTitle;
     font = tokens::kFontLarge;
     line = tokens::kLineLarge;
     height = tokens::kLineLarge;

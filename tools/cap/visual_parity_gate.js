@@ -15,6 +15,14 @@ const screen = a.screen || 'screen'
 const render = a.render
 const golden = a.golden
 const pix = (a.pixdiff != null) ? String(a.pixdiff) : 'n/a'
+// User requirement (2026-06-07): pixdiff target < 1%, ideally <= 0.5% — but
+// measured on a TOLERANT/perceptual diff (downscale ~320x180, % bytes off by
+// >16, or MAE), NOT raw byte-exact. Raw byte-exact tools/pixdiff is ~6% for a
+// black dialog and ~38% for backdrop screens even at perfect visual parity,
+// because origin point-upscales (scanline striping) while cppx renders crisp.
+// So a high RAW byte-exact pixdiff is NOT by itself a parity failure; the
+// critics' visual judgement + the tolerant metric are authoritative.
+const pixTolerant = (a.pixdiff_tolerant != null) ? String(a.pixdiff_tolerant) : 'n/a'
 const checklist = a.checklist || '(no per-screen checklist provided — derive the target from the golden image itself)'
 const codeFiles = a.files || '' // space-separated paths to scope the code-hygiene diff; empty = whole working tree
 
@@ -28,7 +36,7 @@ GROUND TRUTH ABOUT THE ORIGINAL LOOK (never "modernize" it): a DENSE, MULTI-COLO
 - Panels are CONNECTED ~1px green hairline frames tiling edge-to-edge with small seams, NOT spaced rounded cards with gaps/gutters/drop-shadows/large radii.
 - Buttons are sprite green ovals (menus) or thin-bordered rectangles (login); section titles sit inside baked pill-notch headers; type is condensed chunky upscaled-bitmap, NOT smooth modern sans, and not oversized.
 
-MANDATORY METHOD: (1) Read the GOLDEN image at ${golden} (the origin reference, native 960x720). (2) Read the RENDER image at ${render} (a native HIGH-DEF cppx capture at 1920x1440 — the UI scales uniformly from a 640x480 logical base, so this is the SAME layout at higher device scale, just crisper; it is NOT an upscaled fake). The render being higher-resolution/crisper than the golden is EXPECTED — do NOT flag that as a defect; judge layout/proportion/color/type only. (3) Compare them region by region by relative position (both cover the same composition). You MUST cite at least 4 specific regions describing what you saw in EACH image. A discrepancy that does not describe what you actually saw in BOTH images is invalid and will be discarded.
+MANDATORY METHOD: (1) Read the GOLDEN image at ${golden} (the origin/main reference, captured at 1920x1080). (2) Read the RENDER image at ${render} (the cppx capture, also at 1920x1080). Both are the SAME resolution and the SAME composition — the cppx UI lays out against a height-720 logical canvas and scales uniformly to 1920x1080, exactly as origin does. The cppx render may be crisper (text re-rasterized at device scale) — do NOT flag crispness as a defect; judge layout/proportion/color/type only. (3) Compare them region by region by relative position (both cover the same composition). You MUST cite at least 4 specific regions describing what you saw in EACH image. A discrepancy that does not describe what you actually saw in BOTH images is invalid and will be discarded.
 
 ZERO TOLERANCE for shadcn/SaaS drift: if the render flattens the multi-color palette to uniform green, uses spaced rounded cards with gaps instead of connected hairline panels, oversized/modern type, flat fills instead of sprite chrome/backdrops, or otherwise reads as a modern redesign rather than the gritty original — that is an automatic FAIL, even if it looks "cleaner".
 
@@ -122,7 +130,7 @@ const SYNTH = {
   },
 }
 const synth = await agent(
-  `Synthesize ${valid.length} independent VISUAL critic verdicts plus a CODE-hygiene review for the Silencer screen "${screen}" (numeric pixdiff vs golden = ${pix}%).\n\nVisual critic JSON:\n${JSON.stringify(valid)}\n\nCode-hygiene JSON:\n${JSON.stringify(codeReview)}\n\nRules: overall = PASS ONLY IF no visual critic returned FAIL AND there are zero high-severity visual discrepancies. Dedupe overlapping discrepancies across critics; rank by severity; produce an ACTIONABLE ordered top_fixes list phrased as concrete edits (which element, what to change). Be ruthless about shadcn/SaaS drift: if any critic flagged palette-flattening, spaced cards, oversized/modern type, or missing sprite backdrops, overall MUST be FAIL. Fold any high/medium code-hygiene findings (bloat comments, overengineering) into top_fixes too. Keep pixdiff as the passed-in number string.`,
+  `Synthesize ${valid.length} independent VISUAL critic verdicts plus a CODE-hygiene review for the Silencer screen "${screen}" (raw byte-exact pixdiff vs golden = ${pix}%; tolerant/perceptual pixdiff = ${pixTolerant}%).\n\nVisual critic JSON:\n${JSON.stringify(valid)}\n\nCode-hygiene JSON:\n${JSON.stringify(codeReview)}\n\nRules: overall = PASS ONLY IF no visual critic returned FAIL AND there are zero high-severity visual discrepancies. The pixdiff numbers are SECONDARY signals — the RAW byte-exact pixdiff is ~6% (black dialog) to ~38% (backdrop screens) even at perfect visual parity because origin point-upscales (scanline striping) while cppx renders crisp, so do NOT fail on raw pixdiff alone; the user's <1% target applies to the TOLERANT metric. Dedupe overlapping discrepancies across critics; rank by severity; produce an ACTIONABLE ordered top_fixes list phrased as concrete edits (which element, what to change). Be ruthless about shadcn/SaaS drift: if any critic flagged palette-flattening, spaced cards, oversized/modern type, or missing sprite backdrops, overall MUST be FAIL. Fold any high/medium code-hygiene findings (bloat comments, overengineering) into top_fixes too. Keep pixdiff as the passed-in number string.`,
   { label: 'synthesize', phase: 'Synthesize', schema: SYNTH },
 )
 

@@ -65,7 +65,7 @@ using ::ui::components::TextProps;
     else if (props.size == AppButtonSize::Lg)
       tex = chrome.oval_lg;
     layout = app_button_oval_layout(props.size);
-    style = app_button_oval_patch(tex, ::ui::Color{lit, lit, lit, 255});
+    style = app_button_oval_patch(tex);
   } else if (props.variant == AppButtonVariant::Chrome) {
     client::ui::ChromeTextures chrome = client::ui::use_chrome();
     layout = app_button_chrome_layout();
@@ -83,7 +83,7 @@ using ::ui::components::TextProps;
   // A Text child resolves the green app_theme text color + the variant's face.
   ::ui::StyleStatePatch label_style{};
   label_style.base = ::ui::patch().text(app_button_label_visual(
-      props.variant, props.disabled, props.label_size));
+      props.variant, props.disabled, props.size));
   ::ui::UiElement label_el =
       (props.label && props.children.count == 0)
           ? Text(TextProps{.value = props.label, .style = label_style})
