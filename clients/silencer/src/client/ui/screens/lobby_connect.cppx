@@ -53,16 +53,23 @@ struct LobbyConnectProps {
   auto field_layout = ::ui::LayoutStyle{
       .align_items = ::ui::AlignItems::Center,
       .justify_content = ::ui::JustifyContent::Start,
-      .width = ::ui::Length::points(150.0f),
-      .height = ::ui::Length::points(22.0f),
-      .padding = {6.0f, 6.0f, 2.0f, 2.0f}};
+      .flex_grow = ::ui::StyleFloat::points(1.0f),
+      .height = ::ui::Length::points(26.0f),
+      .padding = {8.0f, 8.0f, 2.0f, 2.0f}};
   auto field_row = ::ui::LayoutStyle{
       .direction = ::ui::FlexDirection::Row,
       .align_items = ::ui::AlignItems::Center,
-      .gap = 8.0f};
+      .width = ::ui::Length::percent(100.0f),
+      .gap = 10.0f};
 
+  // origin/main: a BRIGHT thick green frame over pure black, with an inner
+  // bordered well holding the connection log. Brighter/thicker than the dim
+  // lobby panels.
+  const ::ui::Color kConnectBorder = {60, 200, 60, 255};
   ::ui::StylePatch panel_style =
-      tokens::panel_patch(tokens::kSurfaceMenu, tokens::kBorderPanel);
+      tokens::panel_patch(tokens::kSurfaceMenu, kConnectBorder, 2.0f);
+  ::ui::StylePatch logbox_style =
+      tokens::panel_patch(::ui::Color{0, 0, 0, 255}, kConnectBorder, 1.0f);
 
   return <Box
     key="root"
@@ -77,18 +84,22 @@ struct LobbyConnectProps {
       layout={::ui::LayoutStyle{
         .direction = ::ui::FlexDirection::Column,
         .align_items = ::ui::AlignItems::Stretch,
-        .width = ::ui::Length::points(300.0f),
-        .height = ::ui::Length::points(280.0f),
+        .width = ::ui::Length::points(420.0f),
+        .height = ::ui::Length::points(420.0f),
         .padding = {12.0f, 12.0f, 12.0f, 12.0f},
-        .gap = 6.0f}}
+        .gap = 8.0f,
+        .border_width = 2.0f}}
       style={panel_style}>
       <Box
-        key="logclip"
+        key="logbox"
         layout={::ui::LayoutStyle{
           .overflow = ::ui::Overflow::Hidden,
           .align_items = ::ui::AlignItems::Start,
           .flex_grow = ::ui::StyleFloat::points(1.0f),
-          .width = ::ui::Length::percent(100.0f)}}>
+          .width = ::ui::Length::percent(100.0f),
+          .padding = {8.0f, 8.0f, 6.0f, 6.0f},
+          .border_width = 1.0f}}
+        style={logbox_style}>
         <BodyText key="log" variant={BodyTextVariant::Message} value={log} />
       </Box>
       <Box key="urow" layout={field_row}>
@@ -122,8 +133,8 @@ struct LobbyConnectProps {
           .direction = ::ui::FlexDirection::Row,
           .justify_content = ::ui::JustifyContent::Center,
           .gap = 10.0f}}>
-        <AppButton key="login" controlId="Login" variant={AppButtonVariant::Secondary} label="Login/Create" onPress={submit} />
-        <AppButton key="cancel" controlId="Cancel" variant={AppButtonVariant::Secondary} label="Cancel" onPress={lobby.cancel} />
+        <AppButton key="login" controlId="Login" variant={AppButtonVariant::Oval} size={AppButtonSize::Sm} label="Login/Create" onPress={submit} />
+        <AppButton key="cancel" controlId="Cancel" variant={AppButtonVariant::Oval} size={AppButtonSize::Sm} label="Cancel" onPress={lobby.cancel} />
       </Box>
     </Box>
   </Box>
