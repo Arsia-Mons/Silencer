@@ -392,6 +392,17 @@ struct InGameScreenProps {
       BezelSprite("dash", chrome.hud_bezel_bottom, 0.0f, 480.0f - dash_h,
                   dash_w, dash_h);
 
+  // Top status bezel (bank 95/2): the sculpted top chrome strip the legacy HUD
+  // anchors the health/armor splat, team badge, status dots, and radar lamp to.
+  // Baked but previously unmounted — drawn whole at the top edge so the top-left
+  // readouts sit ON the chrome instead of floating over bare world.
+  float topbar_w =
+      chrome.hud_bezel_top_w ? (float)chrome.hud_bezel_top_w : 640.0f;
+  float topbar_h =
+      chrome.hud_bezel_top_h ? (float)chrome.hud_bezel_top_h : 30.0f;
+  ::ui::UiElement topbar =
+      BezelSprite("topbar", chrome.hud_bezel_top, 0.0f, 0.0f, topbar_w, topbar_h);
+
   // Top-left status cluster: a small red health/objective splat + the team
   // emblem badge (agency glyph if baked) + three blue status dots. The legacy
   // splat/badge sprites (97/5, 94/1) are not baked, so the splat is a small red
@@ -420,6 +431,7 @@ struct InGameScreenProps {
                   : ::ui::empty();
 
   return <ScreenLayout key="root" variant={ScreenLayoutVariant::Hud}>
+    {topbar}
     {dash}
     {health_splat}
     {team_badge}

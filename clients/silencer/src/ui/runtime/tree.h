@@ -12,9 +12,15 @@ namespace ui {
 
 using NodeId = uint64_t;
 
-constexpr int UI_RETAINED_MAX_NODES = 256;
+// Retained-tree capacity. These are the whole-tree budgets across ALL mounted
+// screen layers (an overlay like Options·Controls commits OVER the base menu, so
+// both trees share the node budget). The dense keybind table + the lobby cockpit
+// grid push well past the original 256; sized generously so commits never
+// silently truncate (a too-small cap drops the tail of the tree — late rows +
+// the action row — with `errors=N` at commit). Cf. REACT_MAX_FIBERS (react.cpp).
+constexpr int UI_RETAINED_MAX_NODES = 512;
 constexpr int UI_RETAINED_MAX_DEPTH = 64;
-constexpr int UI_RETAINED_MAX_CHILDREN = 64;
+constexpr int UI_RETAINED_MAX_CHILDREN = 128;
 constexpr int UI_RETAINED_LABEL_CAP = 48;
 constexpr int UI_RETAINED_VALUE_CAP = 96;
 

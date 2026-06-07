@@ -52,16 +52,20 @@ constexpr ::ui::Color kDangerHoverBorder = {248, 150, 142, 255};
 constexpr ::ui::Color kDangerPressed = {190, 58, 52, 255};  // darker on press
 constexpr ::ui::Color kDangerPressedBorder = {220, 96, 88, 255};
 
-// ---- Text (green-phosphor family sampled from the goldens) ----
-constexpr ::ui::Color kTextTitle = {92, 208, 92, 255};        // #5CD05C label/title
-constexpr ::ui::Color kTextHeroTitle = {60, 255, 60, 255};    // #3CFF3C bright title
-constexpr ::ui::Color kTextSubtitle = {136, 200, 136, 255};   // #88C888 green-label
-constexpr ::ui::Color kTextDialogTitle = {92, 208, 92, 255};  // #5CD05C
-constexpr ::ui::Color kTextBody = {79, 184, 103, 255};        // #4FB867 green-mid
-constexpr ::ui::Color kTextBodyMuted = {46, 125, 69, 255};    // #2E7D45 green-dim
-constexpr ::ui::Color kTextWeaponName = {92, 208, 92, 255};   // #5CD05C
-constexpr ::ui::Color kTextWeaponDetail = {79, 184, 103, 255};
-constexpr ::ui::Color kTextWeaponDetailOff = {46, 125, 69, 255};
+// ---- Text (green-phosphor family — measured from the v00058 goldens) ----
+// The dominant UI text green is (24,124,20) with a darker AA ramp; it appears for
+// titles, button labels, body, and log lines. Description prose runs lighter and
+// desaturated (84,156,104). The glyph atlas is a white coverage mask, so these
+// token colors ARE the rendered text color (tinted at draw time).
+constexpr ::ui::Color kTextTitle = {24, 124, 20, 255};        // standard green
+constexpr ::ui::Color kTextHeroTitle = {48, 168, 44, 255};    // brand/hero (brighter)
+constexpr ::ui::Color kTextSubtitle = {84, 156, 104, 255};    // description prose (lighter)
+constexpr ::ui::Color kTextDialogTitle = {24, 124, 20, 255};
+constexpr ::ui::Color kTextBody = {24, 124, 20, 255};
+constexpr ::ui::Color kTextBodyMuted = {16, 96, 8, 255};      // dim (footer/OR/inactive)
+constexpr ::ui::Color kTextWeaponName = {24, 124, 20, 255};
+constexpr ::ui::Color kTextWeaponDetail = {24, 124, 20, 255};
+constexpr ::ui::Color kTextWeaponDetailOff = {10, 72, 8, 255}; // disabled
 constexpr ::ui::Color kTextHud = {61, 232, 61, 255};          // #3DE83D hud-green
 
 // ---- In-game HUD LCD palette (overlay over live world; spec §1.1) ----
@@ -89,20 +93,23 @@ constexpr uint16_t kFaceTiny = 3;    // silencer-tiny    (bank 132) — HUD/tiny
 constexpr uint16_t kFaceHeading = 4; // silencer-135     (bank 135) — the dominant
                                      // legacy title/heading face (SIL-95)
 
-// ---- Native-em sizes + legacy line heights ----
-// Authority: legacy text.cpp advance/lineHeight table. The OTFs are bitmap-
-// derived, so rendering at the native em keeps glyphs crisp (no fractional
-// scaling).
-constexpr uint16_t kFontTitle = 24;  // Title face native em
-constexpr float kLineTitle = 23.f;
-constexpr uint16_t kFontHeading = 17; // Heading face (bank 135) native em
-constexpr float kLineHeading = 19.f;  // legacy bank-135 line height
-constexpr uint16_t kFontLarge = 13;  // Large face native em (headings/labels)
-constexpr float kLineLarge = 15.f;
-constexpr uint16_t kFontBodyEm = 11; // Body face native em
-constexpr float kLineBody = 11.f;
-constexpr uint16_t kFontTiny = 5;    // Tiny face native em (HUD/tiny)
-constexpr float kLineTiny = 7.f;
+// ---- Glyph cell sizes (device px) + line heights ----
+// Text renders from the legacy bitmap glyph banks (origin/main parity), NOT TTF.
+// font_size here is the target DEVICE cell height. The golden is origin's
+// 640-space bank glyphs (line heights 23/19/15/11/7) upscaled ~1.5x to the 960
+// window, so each token = native bank lineHeight * 1.5 (rounded). The glyph
+// executor scales the native art by font_size/lineHeight (nearest-neighbor),
+// reproducing the chunky upscaled-bitmap look. kLine* match the cell height.
+constexpr uint16_t kFontTitle = 34;  // bank 136 hero/big prompt (23 * 1.5)
+constexpr float kLineTitle = 34.f;
+constexpr uint16_t kFontHeading = 28; // bank 135 titles + button labels (19 * 1.5)
+constexpr float kLineHeading = 28.f;
+constexpr uint16_t kFontLarge = 22;  // bank 134 sub-headings (15 * 1.5)
+constexpr float kLineLarge = 22.f;
+constexpr uint16_t kFontBodyEm = 16; // bank 133 body/log/detail (11 * 1.5)
+constexpr float kLineBody = 16.f;
+constexpr uint16_t kFontTiny = 10;   // bank 132 tiny (7 * 1.5)
+constexpr float kLineTiny = 10.f;
 
 // ---- Border widths ----
 constexpr float kBorderWidth = 1.0f;

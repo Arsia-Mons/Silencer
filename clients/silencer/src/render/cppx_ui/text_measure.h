@@ -8,10 +8,13 @@
 namespace silencer::cppx_ui {
 
 class FontRegistry;
+class GlyphFonts;
 
 // Wire the renderer-owned measurer into ui::set_text_measurer. The registry must
 // outlive every measure call (the app owns it for the process lifetime). Pass
-// nullptr to uninstall.
-void install_text_measurer(FontRegistry *fonts);
+// nullptr to uninstall. `glyphs` (optional) is the bitmap glyph-font set: when a
+// face has a baked atlas, the measurer uses its monospace metrics so measure ==
+// the executor's glyph paint; faces without an atlas fall back to TTF.
+void install_text_measurer(FontRegistry *fonts, GlyphFonts *glyphs = nullptr);
 
 } // namespace silencer::cppx_ui

@@ -14,15 +14,20 @@
 
 namespace ui {
 
-constexpr int UI_RETAINED_MAX_ELEMENTS = 384;
-constexpr int UI_RETAINED_MAX_CHILD_ELEMENTS = 384;
+// Per-frame element arena: every screen layer's WHOLE element tree is built here
+// before commit (a virtualizing ScrollView still CONSTRUCTS all its rows — only
+// the visible window is committed to the node tree). The 30-row keybind table +
+// the lobby cockpit build well past the original 384, so sized with headroom;
+// an overflow drops the tail of the element tree (`errors=N` at commit).
+constexpr int UI_RETAINED_MAX_ELEMENTS = 1024;
+constexpr int UI_RETAINED_MAX_CHILD_ELEMENTS = 1024;
 // Per-frame arena for copied component-prop records. Each props struct now
 // embeds a StyleStatePatch `style` (seven StylePatch slots), so a single record
 // is ~2.3 KB; a complex screen (the loadout) instantiates dozens, so the arena
 // is sized to hold them with headroom rather than the former 64 KB.
-constexpr int UI_RETAINED_ELEMENT_ARENA_BYTES = 262144;
-constexpr int UI_RETAINED_MAX_ELEMENT_DESTRUCTORS = 512;
-constexpr int UI_RETAINED_STRING_ARENA_BYTES = 8192;
+constexpr int UI_RETAINED_ELEMENT_ARENA_BYTES = 524288;
+constexpr int UI_RETAINED_MAX_ELEMENT_DESTRUCTORS = 1024;
+constexpr int UI_RETAINED_STRING_ARENA_BYTES = 16384;
 
 struct UiElement;
 class UiElementFrame;
@@ -223,9 +228,12 @@ private:
         (base + alignof(T) - 1u) & ~(uintptr_t)(alignof(T) - 1u);
     size_t next_offset =
         (aligned - reinterpret_cast<uintptr_t>(arena_.data())) + sizeof(T);
-    if (next_offset > arena_.size() ||
-        destructor_count_ >= UI_RETAINED_MAX_ELEMENT_DESTRUCTORS) {
-      ++error_count_;
+    if (next_offset > arena_.size()) {
+      report_overflow("component-props bytes", UI_RETAINED_ELEMENT_ARENA_BYTES);
+      return nullptr;
+    }
+    if (destructor_count_ >= UI_RETAINED_MAX_ELEMENT_DESTRUCTORS) {
+      report_overflow("prop destructors", UI_RETAINED_MAX_ELEMENT_DESTRUCTORS);
       return nullptr;
     }
 
@@ -242,6 +250,10 @@ private:
   UiElement component_raw(const char *name, const char *key, const void *props,
                           UiComponentRenderFn render);
   HostProps copy_host_props(const HostProps &props);
+  // Counts the overflow AND logs which fixed per-frame arena ran out, so a
+  // silently-truncated screen (the commit reports `errors=N`) is traceable to
+  // the exact cap to raise (UI_RETAINED_MAX_* in this header).
+  void report_overflow(const char *what, int cap);
 
   std::array<UiElement, UI_RETAINED_MAX_ELEMENTS> elements_ = {};
   std::array<UiElement, UI_RETAINED_MAX_CHILD_ELEMENTS> child_elements_ = {};

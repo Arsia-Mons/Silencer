@@ -4,6 +4,7 @@
 
 #include "client/ui/app_shell/ui_pipeline.h"
 #include "font_registry.h"
+#include "glyph_fonts.h"
 #include "texture_registry.h"
 #include "ui_surface.h"
 
@@ -66,12 +67,22 @@ public:
   uint32_t bake_chrome_sprite(const uint8_t *indices, int w, int h,
                               const SDL_Color *palette256);
 
+  // Build one bitmap glyph FACE atlas (origin/main text parity). `glyphs[i]` is
+  // the source sprite for char GlyphFonts::kFirstChar + i (null/empty = blank
+  // cell). advance/line_height are the native (640-space) bank metrics. Baked
+  // into a host-owned atlas texture re-created on each renderer reset (re-baked
+  // in the same pass as the chrome). Returns false on failure.
+  bool build_glyph_face(int face_id, const GlyphFonts::GlyphSrc *glyphs,
+                        int count, const SDL_Color *palette256, float advance,
+                        float line_height);
+
   void mark_chrome_baked() { chrome_dirty_ = false; }
 
 private:
   SDL_Surface *surf_ = nullptr;
   SDL_Renderer *r_ = nullptr;
   FontRegistry fonts_;
+  GlyphFonts glyph_fonts_;
   TextureRegistry textures_;
   UiSurface ui_;
   std::unique_ptr<client::ui::UiPipeline> pipeline_;

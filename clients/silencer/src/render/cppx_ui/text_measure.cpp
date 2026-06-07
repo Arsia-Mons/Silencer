@@ -1,51 +1,78 @@
 #include "text_measure.h"
 
 #include "font_registry.h"
+#include "glyph_fonts.h"
 #include "ui/style/text_measure.h"
 
 #include <SDL3_ttf/SDL_ttf.h>
 
 #include <string.h>
 
-// Measure/wrap/align logic adapted verbatim from the golden
-// renderer/text_measure_impl.cpp; the only Silencer change is multi-face
-// selection (font_for reads the face by query font_id instead of a single
-// default_font).
+// Measure/wrap/align logic adapted from the golden renderer/text_measure_impl;
+// the Silencer changes are multi-face selection AND the bitmap glyph-font path
+// (when a face has a baked atlas, measure uses its MONOSPACE metrics so measure
+// == the executor's glyph paint — same advance, same line box).
 
 namespace silencer::cppx_ui {
 
 namespace {
 
-// The FontRegistry the measurer reads. Set once by install_text_measurer; the
+// The registries the measurer reads. Set once by install_text_measurer; the
 // measurer is a free function (the seam is a plain function pointer). The app
-// owns the registry for the whole process, so this never dangles.
+// owns these for the whole process, so they never dangle.
 FontRegistry *g_fonts = nullptr;
+GlyphFonts *g_glyphs = nullptr;
 
-// Resolve the TTF_Font for a query: the face for q.font_id, sized per-query via
-// TTF_SetFontSize (matching the executor's text path so measure == paint).
-TTF_Font *font_for(const ::ui::TextMetricsQuery &q) {
-  if (!g_fonts)
-    return nullptr;
-  TTF_Font *font = g_fonts->face(q.font_id);
-  if (!font)
-    return nullptr;
-  if (q.font_size > 0)
-    TTF_SetFontSize(font, static_cast<float>(q.font_size));
-  return font;
+// One query's resolved metrics: bitmap-glyph (monospace) when the face has an
+// atlas, else TTF. `adv` is per-character advance (points); `line_h` is the line
+// box height (points). For TTF, `adv` is unused (width comes from TTF_GetStringSize).
+struct RunMetrics {
+  bool glyph = false;
+  const GlyphFonts::Face *gf = nullptr; // glyph mode
+  float adv = 0.0f;                     // glyph mode: per-char advance (points)
+  TTF_Font *font = nullptr;             // TTF mode
+  float line_h = 16.0f;
+};
+
+RunMetrics metrics_for(const ::ui::TextMetricsQuery &q) {
+  RunMetrics m;
+  const GlyphFonts::Face *gf = g_glyphs ? g_glyphs->face(q.font_id) : nullptr;
+  if (gf && gf->line_height > 0.0f && q.font_size > 0) {
+    // font_size is the target cell height (points). Scale native bank metrics by
+    // font_size/line_height (same mapping the executor uses) so measure==paint.
+    const float gscale = static_cast<float>(q.font_size) / gf->line_height;
+    m.glyph = true;
+    m.gf = gf;
+    m.adv = gf->advance * gscale;
+    // The cell height IS font_size; ignore q.line_height so a small legacy
+    // line-height token can't clip the (now larger) glyph cell.
+    m.line_h = static_cast<float>(q.font_size);
+    return m;
+  }
+  // TTF: face for q.font_id, sized per-query (matches the TTF paint path).
+  if (g_fonts) {
+    m.font = g_fonts->face(q.font_id);
+    if (m.font && q.font_size > 0)
+      TTF_SetFontSize(m.font, static_cast<float>(q.font_size));
+  }
+  if (q.line_height > 0.0f) {
+    m.line_h = q.line_height;
+  } else if (m.font) {
+    int skip = TTF_GetFontLineSkip(m.font);
+    m.line_h = skip > 0 ? static_cast<float>(skip) : 16.0f;
+  }
+  return m;
 }
 
-float line_box_height(TTF_Font *font, const ::ui::TextMetricsQuery &q) {
-  if (q.line_height > 0.0f)
-    return q.line_height;
-  int skip = TTF_GetFontLineSkip(font);
-  return skip > 0 ? static_cast<float>(skip) : 16.0f;
-}
-
-float advance_of(TTF_Font *font, const char *utf8, uint32_t len) {
+float advance_of(const RunMetrics &m, const char *utf8, uint32_t len) {
   if (len == 0)
     return 0.0f;
+  if (m.glyph)
+    return static_cast<float>(len) * m.adv; // monospace: spaces advance too
+  if (!m.font)
+    return 0.0f;
   int w = 0, h = 0;
-  if (!TTF_GetStringSize(font, utf8, len, &w, &h))
+  if (!TTF_GetStringSize(m.font, utf8, len, &w, &h))
     return 0.0f;
   return static_cast<float>(w);
 }
@@ -80,7 +107,7 @@ bool push_line(::ui::TextMetricsResult &out, uint32_t slice_off,
   return true;
 }
 
-::ui::TextMetricsResult measure_wrapped(TTF_Font *font,
+::ui::TextMetricsResult measure_wrapped(const RunMetrics &m,
                                         const ::ui::TextMetricsQuery &q,
                                         float line_h, float box_w) {
   ::ui::TextMetricsResult out = {};
@@ -105,7 +132,7 @@ bool push_line(::ui::TextMetricsResult &out, uint32_t slice_off,
       if (word_end == word_start) {
         break;
       }
-      float w = advance_of(font, s + line_start, word_end - line_start);
+      float w = advance_of(m, s + line_start, word_end - line_start);
       if (w <= box_w || !placed) {
         last_fit_end = word_end;
         placed = true;
@@ -129,7 +156,7 @@ bool push_line(::ui::TextMetricsResult &out, uint32_t slice_off,
       break;
     }
     uint32_t slice_len = last_fit_end - line_start;
-    float line_w = advance_of(font, s + line_start, slice_len);
+    float line_w = advance_of(m, s + line_start, slice_len);
     float x = aligned_x(q.align, line_w, box_w);
     if (!push_line(out, line_start, slice_len, x, y, line_w, line_h)) {
       out.overflowed = true;
@@ -147,23 +174,23 @@ bool push_line(::ui::TextMetricsResult &out, uint32_t slice_off,
 
 ::ui::TextMetricsResult measure(const ::ui::TextMetricsQuery &q) {
   ::ui::TextMetricsResult out = {};
-  TTF_Font *font = font_for(q);
+  RunMetrics m = metrics_for(q);
   const char *utf8 = q.utf8 ? q.utf8 : "";
   uint32_t len = q.len;
-  if (!font) {
+  if (!m.glyph && !m.font) {
     float h = q.line_height > 0.0f ? q.line_height : 16.0f;
     push_line(out, 0, len, 0.0f, 0.0f, 0.0f, h);
     out.height = h;
     return out;
   }
-  float line_h = line_box_height(font, q);
+  float line_h = m.line_h;
   float box_w = q.wrap_width;
 
   if (q.wrap == ::ui::TextWrap::Words && box_w > 0.0f && len > 0) {
-    return measure_wrapped(font, q, line_h, box_w);
+    return measure_wrapped(m, q, line_h, box_w);
   }
 
-  float w = advance_of(font, utf8, len);
+  float w = advance_of(m, utf8, len);
   float x = aligned_x(q.align, w, box_w);
   push_line(out, 0, len, x, 0.0f, w, line_h);
   out.height = line_h;
@@ -172,9 +199,10 @@ bool push_line(::ui::TextMetricsResult &out, uint32_t slice_off,
 
 } // namespace
 
-void install_text_measurer(FontRegistry *fonts) {
+void install_text_measurer(FontRegistry *fonts, GlyphFonts *glyphs) {
   g_fonts = fonts;
-  ::ui::set_text_measurer(fonts ? &measure : nullptr);
+  g_glyphs = glyphs;
+  ::ui::set_text_measurer((fonts || glyphs) ? &measure : nullptr);
 }
 
 } // namespace silencer::cppx_ui

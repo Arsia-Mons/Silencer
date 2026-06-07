@@ -78,7 +78,7 @@ check_layout() {
 
   // 2) The retained tree exposes the three menu buttons, in order, in-bounds.
   const data = JSON.parse(readFileSync(inspectPath, "utf8"));
-  const order = ["Connect To Lobby", "Tutorial", "Exit"];
+  const order = ["Tutorial", "Connect To Lobby", "Exit"];
   const buttons = order.map((label) =>
     (data.nodes ?? []).find((n) => n.role === "button" && n.label === label));
   if (buttons.some((b) => !b)) {

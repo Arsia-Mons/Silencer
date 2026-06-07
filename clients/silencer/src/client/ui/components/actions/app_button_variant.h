@@ -34,18 +34,19 @@ inline ::ui::TextVisual app_button_label_visual(AppButtonVariant variant,
       disabled ? tokens::kTextBodyMuted : tokens::kTextTitle;
   switch (variant) {
   case AppButtonVariant::Oval:
+    // origin/main oval/button labels render in bank 135 (the Heading face).
     return {.color = c,
-            .font_id = tokens::kFaceTitle,
-            .font_size = tokens::kFontTitle,
+            .font_id = tokens::kFaceHeading,
+            .font_size = tokens::kFontHeading,
             .align = ::ui::TextAlign::Center,
-            .line_height = tokens::kLineTitle};
+            .line_height = tokens::kLineHeading};
   case AppButtonVariant::Chrome:
   default:
     return {.color = c,
-            .font_id = tokens::kFaceLarge,
-            .font_size = tokens::kFontLarge,
+            .font_id = tokens::kFaceHeading,
+            .font_size = tokens::kFontHeading,
             .align = ::ui::TextAlign::Center,
-            .line_height = tokens::kLineLarge};
+            .line_height = tokens::kLineHeading};
   }
 }
 
@@ -115,10 +116,10 @@ inline ::ui::SideWidths app_button_oval_caps() {
 inline ::ui::StyleStatePatch
 app_button_oval_patch(uint32_t tex, ::ui::Color lit = {255, 255, 255, 255}) {
   const ::ui::TextVisual label{.color = tokens::kTextTitle,
-                               .font_id = tokens::kFaceTitle,
-                               .font_size = tokens::kFontTitle,
+                               .font_id = tokens::kFaceHeading,
+                               .font_size = tokens::kFontHeading,
                                .align = ::ui::TextAlign::Center,
-                               .line_height = tokens::kLineTitle};
+                               .line_height = tokens::kLineHeading};
   ::ui::StyleStatePatch ov{};
   if (!tex) {
     ::ui::StylePatch p =
@@ -167,10 +168,10 @@ inline ::ui::StyleStatePatch
 app_button_chrome_patch(uint32_t idle, uint32_t focus,
                         ::ui::Color lit = {255, 255, 255, 255}) {
   const ::ui::TextVisual label{.color = tokens::kTextTitle,
-                               .font_id = tokens::kFaceLarge,
-                               .font_size = tokens::kFontLarge,
+                               .font_id = tokens::kFaceHeading,
+                               .font_size = tokens::kFontHeading,
                                .align = ::ui::TextAlign::Center,
-                               .line_height = tokens::kLineLarge};
+                               .line_height = tokens::kLineHeading};
   ::ui::StyleStatePatch ov{};
   if (!idle) {
     ::ui::StylePatch p =

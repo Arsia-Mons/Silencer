@@ -90,6 +90,29 @@ struct CharacterCreateProviderProps {
   />
 }
 
+// One advantage line: "Endurance" left, "[+3]" right (green body palette). An
+// empty slot ({nullptr,...}) renders nothing.
+::ui::UiElement advantage_row(const char *key, const Advantage &adv) {
+  if (!adv.label || adv.label[0] == '\0')
+    return ::ui::empty();
+  return <Box key={key} layout={::ui::LayoutStyle{
+      .direction = ::ui::FlexDirection::Row,
+      .align_items = ::ui::AlignItems::Center,
+      .justify_content = ::ui::JustifyContent::SpaceBetween,
+      .width = ::ui::Length::percent(100.0f),
+      .gap = 8.0f}}>
+    <BodyText key="l" variant={BodyTextVariant::Body} value={adv.label} />
+    <BodyText key="b" variant={BodyTextVariant::Strong} value={adv.bonus} />
+  </Box>
+}
+
+// One description prose line (the lore paragraph is authored one line per
+// BodyText — the engine does not break on '\n' and screens don't use the wrap
+// path, so multi-line text is composed as stacked fixed-height rows).
+::ui::UiElement desc_line(const char *key, const char *value) {
+  return <BodyText key={key} variant={BodyTextVariant::Body} value={value} />
+}
+
 // One roster row: select an existing agent. Out-of-range slots render nothing.
 ::ui::UiElement roster_row(int index, const std::vector<std::string> &roster,
                            std::function<void(int)> on_select) {
@@ -118,7 +141,6 @@ struct CharacterCreateContentProps {
   CharacterWizard w = use_character_create();
   Characters chars = use_characters();
   LobbySession lobby = use_lobby_session();
-  ChromeTextures chrome = use_chrome();
 
   std::function<void(int)> on_select = chars.select;
   std::function<void(int)> on_pick = [create = chars.create, alias = w.alias,
@@ -145,7 +167,7 @@ struct CharacterCreateContentProps {
     return <ScreenLayout key="aliasmodal" variant={ScreenLayoutVariant::CenteredOverlay}>
       <Panel key="panel" variant={PanelVariant::Hero}>
         <ScreenTitle key="t" variant={ScreenTitleVariant::Dialog} value="New Agent" />
-        <ScreenSubtitle key="s" value="Step 2 of 3 — choose an alias" />
+        <ScreenSubtitle key="s" value="Step 2 of 3: choose an alias" />
         <Input
           key="alias"
           id="Alias"
@@ -159,7 +181,7 @@ struct CharacterCreateContentProps {
           <AppButton
             key="ok"
             controlId="AliasConfirm"
-            variant={AppButtonVariant::Primary}
+            variant={AppButtonVariant::Oval}
             disabled={w.alias.empty()}
             label="Continue"
             onPress={w.confirm_alias}
@@ -175,57 +197,66 @@ struct CharacterCreateContentProps {
         (w.preview_agency >= 0 && w.preview_agency < kAgencyCount) ? w.preview_agency : 0;
     const AgencyInfo &a = kAgencies[pi];
     std::function<void(int)> set_preview = w.set_preview_agency;
-    auto col = [](float width) {
-      return ::ui::LayoutStyle{.direction = ::ui::FlexDirection::Column,
-                               .align_items = ::ui::AlignItems::Stretch,
-                               .width = ::ui::Length::points(width),
-                               .gap = ::ui::StyleValue::points(6.0f)};
-    };
-    // The previewed agency's emblem (bank-181 sprite), shown atop the detail.
-    const uint32_t emblem = chrome.agency_emblem[pi];
-    const float ew = chrome.agency_emblem_w ? (float)chrome.agency_emblem_w : 32.0f;
-    const float eh = chrome.agency_emblem_h ? (float)chrome.agency_emblem_h : 32.0f;
-    ::ui::UiElement emblem_img =
-        emblem ? Box(BoxProps{
-                     .key = "emblem",
-                     .layout = ::ui::LayoutStyle{.width = ::ui::Length::points(ew),
-                                                 .height = ::ui::Length::points(eh)},
-                     .style = tokens::image_patch(emblem)})
-               : ::ui::empty();
+
+    // The lore paragraph is authored one BodyText per line (see data header).
+    std::vector<::ui::UiElement> desc;
+    for (int i = 0; i < AgencyInfo::kMaxDescLines && a.description[i]; ++i) {
+      const char *dk = ::ui::copy_string(("d" + std::to_string(i)).c_str());
+      desc.push_back(desc_line(dk, a.description[i]));
+    }
+    ::ui::UiChildren desc_lines = ::ui::children(desc);
+
+    // origin/main "SELECT AGENCY": two side-by-side GREEN bordered panels filling
+    // the starfield overlay — left = framed agency list, right = Advantages +
+    // Description. No outer wizard panel, no slate Sunken card, no emblem glyph,
+    // no step subtitle (the regression palette + stat dump are gone).
+    const ::ui::StylePatch panel_bg =
+        tokens::panel_patch(tokens::kSurfacePanel, tokens::kBorderPanel);
     return <ScreenLayout key="agencyscreen" variant={ScreenLayoutVariant::Overlay}>
-      <Panel key="panel" variant={PanelVariant::Chrome}>
-        <ScreenTitle key="t" variant={ScreenTitleVariant::Dialog} value="Choose Agency" />
-        <ScreenSubtitle key="s" value="Step 3 of 3 — pick an agency to deploy with" />
-        <Box key="cols" layout={::ui::LayoutStyle{
-            .direction = ::ui::FlexDirection::Row,
-            .align_items = ::ui::AlignItems::Start,
-            .gap = ::ui::StyleValue::points(78.0f)}}>
-          <Box key="left" layout={col(236.0f)}>
-            {agency_row(0, pi, on_pick, set_preview)}
-            {agency_row(1, pi, on_pick, set_preview)}
-            {agency_row(2, pi, on_pick, set_preview)}
-            {agency_row(3, pi, on_pick, set_preview)}
-            {agency_row(4, pi, on_pick, set_preview)}
-          </Box>
-          <Box key="right" layout={col(196.0f)}>
-            <Panel key="detail" variant={PanelVariant::Sunken}>
-              {emblem_img}
-              <ScreenTitle key="aname" variant={ScreenTitleVariant::Dialog} value={a.name} />
-              <BodyText key="tag" variant={BodyTextVariant::Strong} value={a.tagline} />
-              <BodyText key="sec" variant={BodyTextVariant::Detail} value={a.security} />
-              <BodyText key="s0" variant={BodyTextVariant::Body} value={a.stats[0]} />
-              <BodyText key="s1" variant={BodyTextVariant::Body} value={a.stats[1]} />
-              <BodyText key="s2" variant={BodyTextVariant::Body} value={a.stats[2]} />
-              <BodyText key="s3" variant={BodyTextVariant::Body} value={a.stats[3]} />
-              <BodyText key="desc" variant={BodyTextVariant::Detail} value={a.description} />
-            </Panel>
-          </Box>
+      <Box key="cols" layout={::ui::LayoutStyle{
+          .direction = ::ui::FlexDirection::Row,
+          .align_items = ::ui::AlignItems::Stretch,
+          .width = ::ui::Length::percent(100.0f),
+          .height = ::ui::Length::points(380.0f),
+          .gap = 14.0f}}>
+        <Box key="left" layout={::ui::LayoutStyle{
+            .direction = ::ui::FlexDirection::Column,
+            .align_items = ::ui::AlignItems::Stretch,
+            .flex_grow = ::ui::StyleFloat::points(1.15f),
+            .flex_basis = ::ui::Length::points(0.0f),
+            .min_width = ::ui::Length::points(0.0f),
+            .padding = {16.0f, 16.0f, 14.0f, 14.0f},
+            .gap = 8.0f,
+            .border_width = tokens::kBorderWidth}} style={panel_bg}>
+          <ScreenTitle key="t" variant={ScreenTitleVariant::Screen} value="SELECT AGENCY" />
+          {agency_row(0, pi, on_pick, set_preview)}
+          {agency_row(1, pi, on_pick, set_preview)}
+          {agency_row(2, pi, on_pick, set_preview)}
+          {agency_row(3, pi, on_pick, set_preview)}
+          {agency_row(4, pi, on_pick, set_preview)}
         </Box>
-        <ActionRow key="actions">
-          <AppButton key="rename" controlId="RenameOnce" label="Rename Once" onPress={w.reopen_alias} />
-          <AppButton key="back" controlId="AgencyBack" label="Back" onPress={w.cancel} />
-        </ActionRow>
-      </Panel>
+        <Box key="right" layout={::ui::LayoutStyle{
+            .direction = ::ui::FlexDirection::Column,
+            .align_items = ::ui::AlignItems::Stretch,
+            .flex_grow = ::ui::StyleFloat::points(1.0f),
+            .flex_basis = ::ui::Length::points(0.0f),
+            .min_width = ::ui::Length::points(0.0f),
+            .overflow = ::ui::Overflow::Hidden,
+            .padding = {16.0f, 16.0f, 14.0f, 14.0f},
+            .gap = 4.0f,
+            .border_width = tokens::kBorderWidth}} style={panel_bg}>
+          <ScreenTitle key="adv" variant={ScreenTitleVariant::Screen} value="Advantages" />
+          {advantage_row("a0", a.advantages[0])}
+          {advantage_row("a1", a.advantages[1])}
+          {advantage_row("a2", a.advantages[2])}
+          {advantage_row("a3", a.advantages[3])}
+          <ScreenTitle key="dh" variant={ScreenTitleVariant::Screen} value="Description" />
+          {desc_lines}
+        </Box>
+      </Box>
+      <ActionRow key="actions">
+        <AppButton key="back" controlId="AgencyBack" variant={AppButtonVariant::Oval} size={AppButtonSize::Sm} label="Back" onPress={w.cancel} />
+      </ActionRow>
     </ScreenLayout>
   }
 
@@ -233,7 +264,7 @@ struct CharacterCreateContentProps {
   return <ScreenLayout key="roster" variant={ScreenLayoutVariant::Menu}>
     <Panel key="panel" variant={PanelVariant::Hero}>
       <ScreenTitle key="title" variant={ScreenTitleVariant::Hero} value="Select Agent" />
-      <ScreenSubtitle key="sub" value="Step 1 of 3 — choose an agent or create a new one" />
+      <ScreenSubtitle key="sub" value="Step 1 of 3: choose an agent or create a new one" />
       {roster_row(0, chars.roster, on_select)}
       {roster_row(1, chars.roster, on_select)}
       {roster_row(2, chars.roster, on_select)}
@@ -242,7 +273,7 @@ struct CharacterCreateContentProps {
       <AppButton
         key="new"
         controlId="CreateNewCharacter"
-        variant={AppButtonVariant::Primary}
+        variant={AppButtonVariant::Oval}
         label="Create New Character"
         onPress={w.open_alias}
       />

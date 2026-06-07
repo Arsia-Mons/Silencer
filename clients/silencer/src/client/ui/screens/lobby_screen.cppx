@@ -8,6 +8,7 @@
 #include "client/ui/hooks/use_characters.h"
 #include "client/ui/hooks/use_games.h"
 #include "client/ui/hooks/use_lobby_chat.h"
+#include "client/ui/hooks/use_progression.h"
 #include "client/ui/hooks/use_session.h"
 #include "client/ui/hooks/use_staging.h"
 #include "ui/components/box.h"
@@ -50,8 +51,7 @@ using ::ui::components::InputProps;
 }
 
 // A bordered console column that GROWS to fill its flex slot (origin/main tiles
-// the lobby panels edge-to-edge). Replaces the fixed-260 Panel so three columns
-// fit 640 and stretch to fill the body height (cross-axis stretch).
+// the lobby panels edge-to-edge).
 ::ui::LayoutStyle lobby_col_layout(float grow) {
   return {
       .direction = ::ui::FlexDirection::Column,
@@ -61,41 +61,104 @@ using ::ui::components::InputProps;
       .padding = {8.0f, 8.0f, 6.0f, 6.0f},
       .gap = 4.0f};
 }
+// A bordered cockpit cell that grows on the MAIN axis inside a row/column whose
+// parent owns the cross-axis size (align_items Stretch). Tighter than a column.
+::ui::LayoutStyle lobby_cell_layout(float grow) {
+  return {
+      .direction = ::ui::FlexDirection::Column,
+      .align_items = ::ui::AlignItems::Stretch,
+      .flex_grow = ::ui::StyleFloat::points(grow),
+      .flex_basis = ::ui::Length::points(0.0f),
+      .min_width = ::ui::Length::points(0.0f),
+      .min_height = ::ui::Length::points(0.0f),
+      .padding = {8.0f, 8.0f, 6.0f, 6.0f},
+      .gap = 4.0f};
+}
 inline ::ui::StylePatch lobby_panel_style() {
   return tokens::panel_patch(tokens::kSurfacePanel, tokens::kBorderPanel);
 }
 
-// The bottom emblem strip: a row of glowing-green agency emblem ovals (origin/main
-// HUD signature). Rendered as simple green oval Boxes (whole-sprite emblem art is
-// a deferred follow-up — bank-181 emblems aren't a 1:1 fit for this strip).
-::ui::UiElement emblem_strip() {
+// A full-width HUD-frame light strip: a row of glowing-green ovals along an edge
+// of the cockpit (origin/main glows along BOTH the top and bottom edges). `id`
+// keys each instance uniquely so the strip can mount twice. Whole-sprite emblem
+// art (use_chrome().agency_emblem) is a deferred follow-up; the placeholder
+// ovals read as a thin edge glow rather than chunky pills.
+::ui::UiElement emblem_strip(const char *id) {
   std::vector<::ui::UiElement> e;
-  for (int i = 0; i < 9; ++i) {
+  for (int i = 0; i < 11; ++i) {
     e.push_back(::ui::component(
         "Box",
-        BoxProps{.key = ::ui::copy_string(("em" + std::to_string(i)).c_str()),
+        BoxProps{.key = ::ui::copy_string(
+                     (std::string(id) + std::to_string(i)).c_str()),
                  .layout = ::ui::LayoutStyle{
-                     .width = ::ui::Length::points(44.0f),
-                     .height = ::ui::Length::points(13.0f)},
+                     .width = ::ui::Length::points(40.0f),
+                     .height = ::ui::Length::points(8.0f)},
                  .style = ::ui::patch()
-                              .background(::ui::Color{46, 139, 46, 255})
-                              .corner_radius(6.5f)},
+                              .background(::ui::Color{61, 232, 61, 200})
+                              .corner_radius(4.0f)},
         Box));
   }
   ::ui::UiChildren emblems = ::ui::children(e);
-  return <Box key="emblems" layout={::ui::LayoutStyle{
+  return <Box key={::ui::copy_string((std::string(id) + "row").c_str())} layout={::ui::LayoutStyle{
       .direction = ::ui::FlexDirection::Row,
       .align_items = ::ui::AlignItems::Center,
       .justify_content = ::ui::JustifyContent::SpaceAround,
       .width = ::ui::Length::percent(100.0f),
-      .height = ::ui::Length::points(18.0f)}}>
+      .height = ::ui::Length::points(11.0f)}}>
     {emblems}
+  </Box>
+}
+
+// One "Endurance        5" loadout stat line: label left, value right.
+::ui::UiElement loadout_row(const char *key, const char *label, uint8_t value) {
+  const char *val = ::ui::copy_string(std::to_string((unsigned)value).c_str());
+  return <Box key={key} layout={::ui::LayoutStyle{
+      .direction = ::ui::FlexDirection::Row,
+      .align_items = ::ui::AlignItems::Center,
+      .justify_content = ::ui::JustifyContent::SpaceBetween,
+      .width = ::ui::Length::percent(100.0f),
+      .gap = 6.0f}}>
+    <BodyText key="l" variant={BodyTextVariant::Body} value={label} />
+    <BodyText key="v" variant={BodyTextVariant::Strong} value={val} />
   </Box>
 }
 
 // --- right-column panels (screen-local swap) ---------------------------------
 
-struct GameSelectPanelProps {
+// The "Create Game" loadout panel (origin/main top-row cell beside the agent
+// card): the selected agent's six upgrade stats + a New Game action that opens
+// the create form. NOTE: the stat values come from use_progression().levels,
+// which the model only populates post-match today — in the lobby they read 0
+// until BuildLobbyPanels fills them (deferred follow-up). The panel structure
+// matches the reference regardless.
+struct LoadoutStat {
+  const char *label;
+  uint8_t value;
+};
+struct LoadoutPanelProps {
+  std::vector<LoadoutStat> stats = {};
+  std::function<void()> on_create = {};
+};
+
+::ui::UiElement LoadoutPanel(const LoadoutPanelProps &props) {
+  std::vector<::ui::UiElement> rows;
+  for (int i = 0; i < (int)props.stats.size(); ++i) {
+    rows.push_back(loadout_row(
+        ::ui::copy_string(("ls" + std::to_string(i)).c_str()),
+        props.stats[i].label, props.stats[i].value));
+  }
+  ::ui::UiChildren stat_rows = ::ui::children(rows);
+  return <Box key="loadout" layout={lobby_cell_layout(1.4f)} style={lobby_panel_style()}>
+    <ScreenTitle key="h" variant={ScreenTitleVariant::Dialog} value="Create Game" />
+    {stat_rows}
+    <AppButton key="create" controlId="NewGame" variant={AppButtonVariant::Oval} size={AppButtonSize::Sm} label="New Game" onPress={props.on_create} />
+  </Box>
+}
+
+// The Active-Games browser body — chromeless (the panel chrome + "Active Games"
+// title live on the dedicated right cockpit cell). A flex spacer pushes the
+// browse/join actions to the bottom so the list reads sparse like the reference.
+struct GameBrowserProps {
   std::vector<GameBrowserEntry> entries = {};
   int selected = 0;
   const char *sel_detail = "";
@@ -105,10 +168,9 @@ struct GameSelectPanelProps {
   std::function<void()> on_next = {};
   std::function<void()> on_join = {};
   std::function<void()> on_spectate = {};
-  std::function<void()> on_create = {};
 };
 
-::ui::UiElement GameSelectPanel(const GameSelectPanelProps &props) {
+::ui::UiElement GameBrowser(const GameBrowserProps &props) {
   std::vector<::ui::UiElement> rows;
   if (props.entries.empty()) {
     rows.push_back(game_line("empty", "No open games", false));
@@ -121,35 +183,21 @@ struct GameSelectPanelProps {
     }
   }
   ::ui::UiChildren game_rows = ::ui::children(rows);
-  return <Box key="select" layout={lobby_col_layout(2.0f)} style={lobby_panel_style()}>
-    <ScreenTitle key="h" variant={ScreenTitleVariant::Dialog} value="Active Games" />
+  return <Box key="browserbody" layout={::ui::LayoutStyle{
+      .direction = ::ui::FlexDirection::Column,
+      .align_items = ::ui::AlignItems::Stretch,
+      .flex_grow = ::ui::StyleFloat::points(1.0f),
+      .width = ::ui::Length::percent(100.0f),
+      .gap = 4.0f}}>
     {game_rows}
     <BodyText key="detail" variant={BodyTextVariant::Detail} value={props.sel_detail} />
+    <Box key="spacer" layout={::ui::LayoutStyle{.flex_grow = ::ui::StyleFloat::points(1.0f)}} />
     <ActionRow key="browse">
       <AppButton key="prev" controlId="GamePrev" variant={AppButtonVariant::Oval} size={AppButtonSize::Sm} label="Prev" onPress={props.on_prev} />
       <AppButton key="next" controlId="GameNext" variant={AppButtonVariant::Oval} size={AppButtonSize::Sm} label="Next" onPress={props.on_next} />
     </ActionRow>
-    <ActionRow key="actions">
-      <AppButton
-        key="join"
-        controlId="JoinGame"
-        variant={AppButtonVariant::Oval}
-        size={AppButtonSize::Sm}
-        disabled={!props.can_join}
-        label="Join"
-        onPress={props.on_join}
-      />
-      <AppButton
-        key="spectate"
-        controlId="SpectateGame"
-        variant={AppButtonVariant::Oval}
-        size={AppButtonSize::Sm}
-        disabled={!props.can_spectate}
-        label="Spectate"
-        onPress={props.on_spectate}
-      />
-    </ActionRow>
-    <AppButton key="create" controlId="NewGame" variant={AppButtonVariant::Oval} label="New Game" onPress={props.on_create} />
+    <AppButton key="join" controlId="JoinGame" variant={AppButtonVariant::Oval} size={AppButtonSize::Sm} disabled={!props.can_join} label="Join" onPress={props.on_join} />
+    <AppButton key="spectate" controlId="SpectateGame" variant={AppButtonVariant::Oval} size={AppButtonSize::Sm} disabled={!props.can_spectate} label="Spectate" onPress={props.on_spectate} />
   </Box>
 }
 
@@ -265,6 +313,7 @@ struct LobbyScreenProps {
   Staging staging = use_staging();
   Session session = use_session();
   App app = use_app();
+  Progression prog = use_progression();
   std::string *draft = use_state<std::string>(std::string());
   std::string *create_name = use_state<std::string>(std::string("Game"));
   int *sel = use_state<int>(0);
@@ -352,36 +401,43 @@ struct LobbyScreenProps {
     cp.on_back = [show_create]() { *show_create = false; };
     right = GameCreatePanel(cp);
   } else {
-    GameSelectPanelProps gp;
-    gp.entries = games.entries;
-    gp.selected = *sel;
-    gp.sel_detail = sel_detail;
-    gp.can_join = sel_joinable;
-    gp.can_spectate = sel_spectatable;
-    gp.on_prev = [sel]() { if (*sel > 0) (*sel)--; };
-    gp.on_next = [sel, game_count]() { if (*sel < game_count - 1) (*sel)++; };
-    gp.on_join = [join = games.join_game, sel_id]() {
-      if (join) join(sel_id, std::string());
-    };
-    gp.on_spectate = [spectate = games.spectate_game, sel_id]() {
-      if (spectate) spectate(sel_id);
-    };
-    gp.on_create = [show_create]() { *show_create = true; };
-    right = GameSelectPanel(gp);
+    LoadoutPanelProps lp;
+    lp.stats = {{"Endurance", prog.levels[0]}, {"Shield", prog.levels[1]},
+                {"Jetpack", prog.levels[2]},   {"Tech Slots", prog.levels[3]},
+                {"Hacking", prog.levels[4]},   {"Contacts", prog.levels[5]}};
+    lp.on_create = [show_create]() { *show_create = true; };
+    right = LoadoutPanel(lp);
   }
 
-  ::ui::UiElement emblems = emblem_strip();
+  // The Active-Games browser lives in its own tall right cockpit cell, separate
+  // from the top-row swap above, so it is always built.
+  GameBrowserProps gp;
+  gp.entries = games.entries;
+  gp.selected = *sel;
+  gp.sel_detail = sel_detail;
+  gp.can_join = sel_joinable;
+  gp.can_spectate = sel_spectatable;
+  gp.on_prev = [sel]() { if (*sel > 0) (*sel)--; };
+  gp.on_next = [sel, game_count]() { if (*sel < game_count - 1) (*sel)++; };
+  gp.on_join = [join = games.join_game, sel_id]() {
+    if (join) join(sel_id, std::string());
+  };
+  gp.on_spectate = [spectate = games.spectate_game, sel_id]() {
+    if (spectate) spectate(sel_id);
+  };
+  ::ui::UiElement right_browser = GameBrowser(gp);
 
   return <ScreenLayout key="root" variant={ScreenLayoutVariant::Game}>
+    {emblem_strip("emt")}
     <Box key="titlebar" layout={::ui::LayoutStyle{
         .direction = ::ui::FlexDirection::Row,
         .align_items = ::ui::AlignItems::Center,
-        .justify_content = ::ui::JustifyContent::SpaceBetween,
         .width = ::ui::Length::percent(100.0f),
-        .gap = ::ui::StyleValue::points(12.0f)}}>
+        .gap = ::ui::StyleValue::points(10.0f)}}>
       <ScreenTitle key="brand" variant={ScreenTitleVariant::Hero} value="Silencer" />
       <BodyText key="ver" variant={BodyTextVariant::Detail} value={version_text} />
-      <AppButton key="goback" controlId="LobbyGoBack" variant={AppButtonVariant::Oval} label="Go Back" onPress={session.leave_to_menu} />
+      <Box key="tbspace" layout={::ui::LayoutStyle{.flex_grow = ::ui::StyleFloat::points(1.0f)}} />
+      <AppButton key="goback" controlId="LobbyGoBack" variant={AppButtonVariant::Oval} size={AppButtonSize::Sm} label="Go Back" onPress={session.leave_to_menu} />
     </Box>
     <Box key="body" layout={::ui::LayoutStyle{
         .direction = ::ui::FlexDirection::Row,
@@ -389,39 +445,78 @@ struct LobbyScreenProps {
         .flex_grow = ::ui::StyleFloat::points(1.0f),
         .width = ::ui::Length::percent(100.0f),
         .gap = ::ui::StyleValue::points(6.0f)}}>
-      <Box key="agent" layout={lobby_col_layout(1.0f)} style={lobby_panel_style()}>
-        <ScreenTitle key="h" variant={ScreenTitleVariant::Dialog} value="Agent" />
-        <Box key="avatar" layout={::ui::LayoutStyle{
-            .width = ::ui::Length::points(56.0f),
-            .height = ::ui::Length::points(56.0f)}}
-          style={::ui::patch().background(::ui::Color{40, 70, 150, 255}).corner_radius(3.0f)} />
-        <BodyText key="summary" variant={BodyTextVariant::Strong} value={agent} />
-        <AppButton key="leave" controlId="LeaveLobby" variant={AppButtonVariant::Oval} label="Agents" onPress={session.leave_to_menu} />
-      </Box>
-      <Box key="chat" layout={lobby_col_layout(1.3f)} style={lobby_panel_style()}>
-        <ScreenTitle key="h" variant={ScreenTitleVariant::Dialog} value="Lobby" />
-        <Box key="logclip" layout={::ui::LayoutStyle{
-            .overflow = ::ui::Overflow::Hidden,
-            .align_items = ::ui::AlignItems::Start,
-            .flex_grow = ::ui::StyleFloat::points(1.0f),
-            .width = ::ui::Length::percent(100.0f)}}>
-          <BodyText key="log" variant={BodyTextVariant::Message} value={scrollback} />
+      <Box key="leftstack" layout={::ui::LayoutStyle{
+          .direction = ::ui::FlexDirection::Column,
+          .align_items = ::ui::AlignItems::Stretch,
+          .flex_grow = ::ui::StyleFloat::points(1.5f),
+          .flex_basis = ::ui::Length::points(0.0f),
+          .min_width = ::ui::Length::points(0.0f),
+          .gap = ::ui::StyleValue::points(6.0f)}}>
+        <Box key="toprow" layout={::ui::LayoutStyle{
+            .direction = ::ui::FlexDirection::Row,
+            .align_items = ::ui::AlignItems::Stretch,
+            .width = ::ui::Length::percent(100.0f),
+            .gap = ::ui::StyleValue::points(6.0f)}}>
+          <Box key="agent" layout={::ui::LayoutStyle{
+              .direction = ::ui::FlexDirection::Column,
+              .align_items = ::ui::AlignItems::Stretch,
+              .width = ::ui::Length::points(160.0f),
+              .overflow = ::ui::Overflow::Hidden,
+              .padding = {8.0f, 8.0f, 6.0f, 6.0f},
+              .gap = 4.0f}} style={lobby_panel_style()}>
+            <ScreenTitle key="h" variant={ScreenTitleVariant::Dialog} value="Agent" />
+            <Box key="avatar" layout={::ui::LayoutStyle{
+                .width = ::ui::Length::points(44.0f),
+                .height = ::ui::Length::points(44.0f)}}
+              style={::ui::patch().background(::ui::Color{40, 70, 150, 255}).corner_radius(3.0f)} />
+            <Box key="summarywrap" layout={::ui::LayoutStyle{
+                .overflow = ::ui::Overflow::Hidden,
+                .align_items = ::ui::AlignItems::Start,
+                .width = ::ui::Length::percent(100.0f)}}>
+              <BodyText key="summary" variant={BodyTextVariant::Strong} value={agent} />
+            </Box>
+            <AppButton key="leave" controlId="LeaveLobby" variant={AppButtonVariant::Oval} size={AppButtonSize::Sm} label="Agents" onPress={session.leave_to_menu} />
+          </Box>
+          {right}
         </Box>
-        <Input
-          key="draft"
-          id="ChatInput"
-          accessibility={{.label = "Chat"}}
-          value={draft->c_str()}
-          onChange={set_draft}
-          onActivate={on_activate}
-        />
-        <AppButton key="send" controlId="SendChat" label="Send" onPress={send} />
-        <ScreenTitle key="hp" variant={ScreenTitleVariant::Dialog} value="Online" />
-        <BodyText key="presence" variant={BodyTextVariant::Detail} value={presence} />
+        <Box key="chat" layout={lobby_cell_layout(1.0f)} style={lobby_panel_style()}>
+          <ScreenTitle key="h" variant={ScreenTitleVariant::Dialog} value="Lobby" />
+          <Box key="logclip" layout={::ui::LayoutStyle{
+              .overflow = ::ui::Overflow::Hidden,
+              .align_items = ::ui::AlignItems::Start,
+              .flex_grow = ::ui::StyleFloat::points(1.0f),
+              .width = ::ui::Length::percent(100.0f)}}>
+            <BodyText key="log" variant={BodyTextVariant::Message} value={scrollback} />
+          </Box>
+          <Box key="inputrow" layout={::ui::LayoutStyle{
+              .direction = ::ui::FlexDirection::Row,
+              .align_items = ::ui::AlignItems::Center,
+              .width = ::ui::Length::percent(100.0f),
+              .gap = ::ui::StyleValue::points(6.0f)}}>
+            <Box key="inputgrow" layout={::ui::LayoutStyle{
+                .flex_grow = ::ui::StyleFloat::points(1.0f),
+                .min_width = ::ui::Length::points(0.0f)}}>
+              <Input
+                key="draft"
+                id="ChatInput"
+                accessibility={{.label = "Chat"}}
+                value={draft->c_str()}
+                onChange={set_draft}
+                onActivate={on_activate}
+              />
+            </Box>
+            <AppButton key="send" controlId="SendChat" variant={AppButtonVariant::Oval} size={AppButtonSize::Sm} label="Send" onPress={send} />
+          </Box>
+          <ScreenTitle key="hp" variant={ScreenTitleVariant::Dialog} value="Online" />
+          <BodyText key="presence" variant={BodyTextVariant::Detail} value={presence} />
+        </Box>
       </Box>
-      {right}
+      <Box key="activegames" layout={lobby_cell_layout(1.0f)} style={lobby_panel_style()}>
+        <ScreenTitle key="h" variant={ScreenTitleVariant::Dialog} value="Active Games" />
+        {right_browser}
+      </Box>
     </Box>
-    {emblems}
+    {emblem_strip("emb")}
   </ScreenLayout>
 }
 

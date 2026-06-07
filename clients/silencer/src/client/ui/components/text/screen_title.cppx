@@ -10,41 +10,31 @@ using ::ui::components::Text;
 using ::ui::components::TextProps;
 
 ::ui::UiElement ScreenTitle(const ScreenTitleProps &props) {
-  // All heading variants render in the legacy Title face (silencer-title.otf).
-  // NOTE: the bank-135 Heading face (silencer-135.otf, SIL-95) renders BLANK
-  // glyphs at present, so Screen/Dialog titles were invisible — using the Title
-  // face restores visible green headings (matches the golden look). Re-point to
-  // kFaceHeading once the silencer-135.otf glyph generation is fixed.
+  // Origin/main renders screen/section titles in bank 135 (the dominant heading
+  // face) and the big brand/prompt in bank 136. The cppx glyph atlas now renders
+  // those bitmap banks directly (no more blank silencer-135.otf), so titles use
+  // the Heading face (bank 135) and only Hero uses the larger Title face (136).
   ::ui::Color color = tokens::kTextTitle;
-  uint16_t face = tokens::kFaceTitle;
-  uint16_t font = tokens::kFontTitle;
-  float line = tokens::kLineTitle;
-  float height = 30.0f;
+  uint16_t face = tokens::kFaceHeading;
+  uint16_t font = tokens::kFontHeading;
+  float line = tokens::kLineHeading;
+  float height = tokens::kLineHeading;
   switch (props.variant) {
   case ScreenTitleVariant::Hero:
     color = tokens::kTextHeroTitle;
     face = tokens::kFaceTitle;
     font = tokens::kFontTitle;
     line = tokens::kLineTitle;
-    height = 36.0f;
+    height = tokens::kLineTitle;
     break;
   case ScreenTitleVariant::Screen:
     color = tokens::kTextTitle;
-    face = tokens::kFaceTitle;
-    font = tokens::kFontTitle;
-    line = tokens::kLineTitle;
-    height = 30.0f;
     break;
   case ScreenTitleVariant::Dialog:
     color = tokens::kTextTitle;
-    height = 24.0f;
     break;
   case ScreenTitleVariant::Popup:
     color = tokens::kTextDialogTitle;
-    face = tokens::kFaceTitle;
-    font = tokens::kFontTitle;
-    line = tokens::kLineTitle;
-    height = 24.0f;
     break;
   }
   return <Text

@@ -23,6 +23,7 @@ namespace silencer::cppx_ui {
 class FontRegistry;
 class TextureRegistry;
 class SdfMaskCache;
+class GlyphFonts;
 
 // How rounded vector primitives (fills, borders, gradients) are rasterized.
 // `mode` and `sdf_cache` are coupled — the cache is only consulted when
@@ -48,6 +49,7 @@ void execute_draw_commands(SDL_Renderer *renderer,
                            FontRegistry *fonts,
                            TextureRegistry *textures = nullptr,
                            float scale = 1.0f,
-                           const RasterConfig &raster = {});
+                           const RasterConfig &raster = {},
+                           GlyphFonts *glyphs = nullptr);
 
 } // namespace silencer::cppx_ui

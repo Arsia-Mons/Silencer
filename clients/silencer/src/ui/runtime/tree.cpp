@@ -1,5 +1,6 @@
 #include "tree.h"
 
+#include <cstdio> // retained-tree capacity diagnostics (see report_error sites)
 #include <string.h>
 
 namespace ui {
@@ -92,6 +93,10 @@ NodeId UiTree::begin_node(const char *type, const LayoutStyle &style) {
 NodeId UiTree::begin_keyed_node(const char *type, const char *key,
                                 const LayoutStyle &style) {
   if (stack_count_ <= 0 || stack_count_ >= UI_RETAINED_MAX_DEPTH) {
+    fprintf(stderr,
+            "ui/retained: node nesting too deep (depth=%d max=%d) at %s; raise "
+            "UI_RETAINED_MAX_DEPTH in ui/runtime/tree.h\n",
+            stack_count_, UI_RETAINED_MAX_DEPTH, type ? type : "?");
     report_error();
     return 0;
   }
@@ -106,6 +111,10 @@ NodeId UiTree::begin_keyed_node(const char *type, const char *key,
     return 0;
 
   if (parent.child_count >= UI_RETAINED_MAX_CHILDREN) {
+    fprintf(stderr,
+            "ui/retained: too many children on one node (max=%d) adding %s; "
+            "raise UI_RETAINED_MAX_CHILDREN in ui/runtime/tree.h\n",
+            UI_RETAINED_MAX_CHILDREN, type ? type : "?");
     report_error();
     return 0;
   }
@@ -482,6 +491,10 @@ UiTree::Node *UiTree::ensure_node(NodeId id, NodeId parent_id, const char *type,
   }
   if (slot < 0) {
     if (node_capacity_used_ >= UI_RETAINED_MAX_NODES) {
+      fprintf(stderr,
+              "ui/retained: node pool full (max=%d) adding %s; raise "
+              "UI_RETAINED_MAX_NODES in ui/runtime/tree.h\n",
+              UI_RETAINED_MAX_NODES, type ? type : "?");
       report_error();
       return nullptr;
     }

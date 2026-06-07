@@ -112,6 +112,31 @@ float panel_size_width(PanelSize size) {
                                         tokens::kBorderHeroPanel);
     break;
   }
+  case PanelVariant::ControlsFrame: {
+    // Single-pane Options·Controls frame (bank 7 idx7), drawn STRETCHED to
+    // GROW-FILL the overlay (origin/main PackImageStretch(7,7)) — NOT the
+    // two-pane native-size chrome_panel. The sprite bakes its own title-header
+    // notch (top-center) + right-edge scrollbar rail, so the screen draws
+    // neither. Content padding clears the baked frame + title notch (origin/main
+    // kPanelPadX≈48 / kPanelPadTop≈70). Falls back to a vector green panel.
+    client::ui::ChromeTextures chrome = client::ui::use_chrome();
+    layout = ::ui::LayoutStyle{
+        .direction = ::ui::FlexDirection::Column,
+        .align_items = ::ui::AlignItems::Center,
+        .width = ::ui::Length::percent(100.0f),
+        .height = ::ui::Length::percent(100.0f),
+        .min_width = ::ui::Length::points(560.0f),
+        .min_height = ::ui::Length::points(420.0f),
+        .flex_grow = ::ui::StyleFloat::points(1.0f),
+        .padding = {48.0f, 48.0f, 70.0f, 20.0f},
+        .gap = 8.0f,
+    };
+    overlay = chrome.chrome_controls
+                  ? tokens::image_patch(chrome.chrome_controls)
+                  : tokens::panel_patch(tokens::kSurfaceHeroPanel,
+                                        tokens::kBorderHeroPanel);
+    break;
+  }
   }
 
   if (props.size != PanelSize::Auto) {

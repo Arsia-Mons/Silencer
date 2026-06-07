@@ -15,6 +15,7 @@ PipelineHost::PipelineHost() = default;
 PipelineHost::~PipelineHost() {
   ui_.shutdown();
   textures_.shutdown();
+  glyph_fonts_.shutdown();
   fonts_.shutdown();
   if (r_)
     SDL_DestroyRenderer(r_);
@@ -29,9 +30,10 @@ bool PipelineHost::ensure(int w, int h, const char *font_dir) {
     return true;
 
   ui_.shutdown();
-  // The chrome textures are bound to the old renderer; drop them and flag a
-  // re-bake. The composition root re-bakes once after this ensure() returns.
+  // The chrome + glyph textures are bound to the old renderer; drop them and
+  // flag a re-bake. The composition root re-bakes once after ensure() returns.
   textures_.shutdown();
+  glyph_fonts_.shutdown();
   chrome_dirty_ = true;
   if (r_) {
     SDL_DestroyRenderer(r_);
@@ -54,7 +56,8 @@ bool PipelineHost::ensure(int w, int h, const char *font_dir) {
       TTF_Init();
     if (!fonts_.load_faces(font_dir))
       return false;
-    install_text_measurer(&fonts_);
+    // Measure reads the glyph fonts first (bitmap parity), TTF as fallback.
+    install_text_measurer(&fonts_, &glyph_fonts_);
   }
   if (!ui_.initialize(r_, fonts_))
     return false;
@@ -76,6 +79,16 @@ uint32_t PipelineHost::bake_chrome_sprite(const uint8_t *indices, int w, int h,
   return textures_.upload_rgba(r_, bake_scratch_.data(), w, h);
 }
 
+bool PipelineHost::build_glyph_face(int face_id,
+                                    const GlyphFonts::GlyphSrc *glyphs,
+                                    int count, const SDL_Color *palette256,
+                                    float advance, float line_height) {
+  if (!r_)
+    return false;
+  return glyph_fonts_.build_face(r_, face_id, glyphs, count, palette256, advance,
+                                 line_height);
+}
+
 const uint8_t *PipelineHost::render(const client::ui::UiPipelineFrame &frame,
                                     int *out_w, int *out_h) {
   if (!surf_ || !r_ || !pipeline_)
@@ -86,7 +99,8 @@ const uint8_t *PipelineHost::render(const client::ui::UiPipelineFrame &frame,
   pipeline_->render_client_ui_frame(frame, [&] {
     const ::ui::DrawCommandList &list =
         pipeline_->client_ui().retained_command_list();
-    execute_draw_commands(r_, list, &fonts_, &textures_, scale, {});
+    execute_draw_commands(r_, list, &fonts_, &textures_, scale, {},
+                          &glyph_fonts_);
   });
   ui_.resolve_frame();
   ui_.present();

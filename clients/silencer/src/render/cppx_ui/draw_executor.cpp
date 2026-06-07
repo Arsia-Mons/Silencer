@@ -1,6 +1,7 @@
 #include "draw_executor.h"
 
 #include "font_registry.h"
+#include "glyph_fonts.h"
 #include "sdf_raster.h"
 #include "texture_registry.h"
 #include "ui/runtime/geometry.h"
@@ -64,12 +65,64 @@ SDL_Color unpremultiply(::ui::Color c) {
   return {un(c.r), un(c.g), un(c.b), c.a};
 }
 
+// Render text as origin/main bitmap glyph sprites (monospace, char-33 -> glyph
+// in the face atlas), tinted by the token color, nearest-neighbor scaled — the
+// chunky look the golden has and TTF cannot reproduce. Returns false if this
+// face has no baked glyph atlas (caller falls back to the TTF path).
+bool render_text_glyphs(SDL_Renderer *r, const ::ui::DrawCommandList &list,
+                        const ::ui::DrawCommand &c, GlyphFonts *glyphs,
+                        float scale) {
+  if (!glyphs)
+    return false;
+  const ::ui::TextData &t = c.payload.text;
+  const GlyphFonts::Face *gf = glyphs->face(t.font_id);
+  if (!gf || !gf->atlas || gf->line_height <= 0.f || t.font_size == 0)
+    return false;
+
+  // font_size is the target device CELL height in points; the executor scales
+  // points -> device by `scale`. glyph scale maps native bank px -> device px.
+  const float gscale = (static_cast<float>(t.font_size) * scale) / gf->line_height;
+  const float adv = gf->advance * gscale;
+  const float ah = static_cast<float>(gf->atlas_h) * gscale;
+  float penx = c.rect.x * scale;
+  const float peny = c.rect.y * scale;
+
+  // Tint: the atlas is a white premultiplied mask; the IR color is premultiplied,
+  // so color-mod(rgb) + alpha-mod(a) reproduces the premultiplied token color
+  // exactly (drawn under BLEND_PREMULTIPLIED). No unpremultiply needed.
+  SDL_SetTextureColorMod(gf->atlas, t.color.r, t.color.g, t.color.b);
+  SDL_SetTextureAlphaMod(gf->atlas, t.color.a);
+  for (uint16_t i = 0; i < t.text_len; ++i) {
+    const unsigned char ch =
+        static_cast<unsigned char>(list.text_arena[t.text_off + i]);
+    if (ch >= GlyphFonts::kFirstChar && ch <= GlyphFonts::kLastChar) {
+      const int gi = ch - GlyphFonts::kFirstChar;
+      const int16_t gw = gf->gw[gi];
+      if (gw > 0) {
+        SDL_FRect src = {static_cast<float>(gf->gx[gi]), 0.f,
+                         static_cast<float>(gw),
+                         static_cast<float>(gf->atlas_h)};
+        SDL_FRect dst = {penx, peny, gw * gscale, ah};
+        SDL_RenderTexture(r, gf->atlas, &src, &dst);
+      }
+    }
+    penx += adv; // monospace: every char advances, art may be wider (overlap)
+  }
+  SDL_SetTextureColorMod(gf->atlas, 255, 255, 255);
+  SDL_SetTextureAlphaMod(gf->atlas, 255);
+  return true;
+}
+
 void render_text(SDL_Renderer *r, const ::ui::DrawCommandList &list,
-                 const ::ui::DrawCommand &c, FontRegistry *fonts, float scale) {
-  if (!fonts || !fonts->default_font())
-    return;
+                 const ::ui::DrawCommand &c, FontRegistry *fonts, float scale,
+                 GlyphFonts *glyphs) {
   const ::ui::TextData &t = c.payload.text;
   if (t.text_len == 0 || t.color.a == 0)
+    return;
+  // Origin bitmap-glyph path (preferred); TTF fallback if the face has no atlas.
+  if (render_text_glyphs(r, list, c, glyphs, scale))
+    return;
+  if (!fonts || !fonts->default_font())
     return;
   char buf[256];
   size_t n = t.text_len < 255 ? t.text_len : 255;
@@ -240,7 +293,8 @@ struct LayerSlot {
 void execute_draw_commands(SDL_Renderer *renderer,
                            const ::ui::DrawCommandList &list,
                            FontRegistry *fonts, TextureRegistry *textures,
-                           float scale, const RasterConfig &raster) {
+                           float scale, const RasterConfig &raster,
+                           GlyphFonts *glyphs) {
   if (!renderer)
     return;
   if (scale <= 0.f)
@@ -331,7 +385,7 @@ void execute_draw_commands(SDL_Renderer *renderer,
       render_image(renderer, c, textures, scratch, feather, scale);
       break;
     case ::ui::DrawCommandKind::Text:
-      render_text(renderer, list, c, fonts, scale);
+      render_text(renderer, list, c, fonts, scale, glyphs);
       break;
     case ::ui::DrawCommandKind::ClipPush: {
       SDL_Rect cr = round_out(c.rect, scale);

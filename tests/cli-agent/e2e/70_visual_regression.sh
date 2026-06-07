@@ -95,9 +95,9 @@ crop_check() {
 
 # ---- MainMenu ----
 S="$(cap mainmenu)"
-crop_check mainmenu PlayOnline
+crop_check mainmenu ConnectToLobby
 crop_check mainmenu Options
-crop_check mainmenu Quit
+crop_check mainmenu Exit
 
 # ---- Options cluster ----
 cli --port "$PORT" click --label "Options" >/dev/null
@@ -105,34 +105,34 @@ cap options >/dev/null
 crop_check options OptionsAudio
 crop_check options OptionsDisplay
 crop_check options OptionsControls
-crop_check options OptionsDone
+crop_check options OptionsGoBack
 
 cli --port "$PORT" click --label "OptionsAudio" >/dev/null
 cap options_audio >/dev/null
 crop_check options_audio MusicToggle
-crop_check options_audio VolumeDown
-crop_check options_audio VolumeUp
-crop_check options_audio OptionsBack
-cli --port "$PORT" click --label "OptionsBack" >/dev/null
+crop_check options_audio OptionsSave
+crop_check options_audio OptionsCancel
+crop_check options_audio MusicToggle
+cli --port "$PORT" click --label "OptionsCancel" >/dev/null
 cli --port "$PORT" wait_frames --n 3 >/dev/null
 
 cli --port "$PORT" click --label "OptionsDisplay" >/dev/null
 cap options_display >/dev/null
 crop_check options_display FullscreenToggle
 crop_check options_display SmoothScalingToggle
-crop_check options_display OptionsBack
-cli --port "$PORT" click --label "OptionsBack" >/dev/null
+crop_check options_display OptionsSave
+cli --port "$PORT" click --label "OptionsCancel" >/dev/null
 cli --port "$PORT" wait_frames --n 3 >/dev/null
 
 cli --port "$PORT" click --label "OptionsControls" >/dev/null
 cap options_controls >/dev/null
-crop_check options_controls RebindFire
+crop_check options_controls BindP0
 crop_check options_controls CyclePreset
-crop_check options_controls RevertBinds
+crop_check options_controls SaveBinds
 crop_check options_controls ControlsBack
 cli --port "$PORT" click --label "ControlsBack" >/dev/null
 cli --port "$PORT" wait_frames --n 3 >/dev/null
-cli --port "$PORT" click --label "OptionsCancel" >/dev/null
+cli --port "$PORT" click --label "OptionsGoBack" >/dev/null
 cli --port "$PORT" wait_frames --n 3 >/dev/null
 
 # ---- Modals ----

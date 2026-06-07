@@ -24,6 +24,7 @@ namespace client::ui {
 //   bank 7  idx 24   chrome_btn_idle  156x21   (SIL-90, nine-slice {l12 r12 t4 b4})
 //   bank 7  idx 28   chrome_btn_focus 156x21   (SIL-90, phase-4 frame)
 //   bank 7  idx 5    chrome_panel     ~628x441 (SIL-91, plain native)
+//   bank 7  idx 7    chrome_controls  ~628x441 (Options·Controls single-pane, stretch)
 //   bank 40 idx 4    dialog_msg       ~352x178 (SIL-91, plain native)
 //   bank 40 idx 2    dialog_pw        ~284x277 (SIL-91, plain native)
 //   bank 6  idx 0    starfield        full-bleed (SIL-92, stretch)
@@ -46,6 +47,11 @@ struct ChromeTextures {
   // the box can be sized exactly, keeping baked wells/borders aligned).
   uint32_t chrome_panel = 0; // bank 7 idx 5  (character_create / mission_summary)
   uint16_t chrome_panel_w = 0, chrome_panel_h = 0;
+  // Single-pane Options·Controls frame (bank 7 idx 7): a baked title-header notch
+  // (top-center) + right-edge scrollbar rail. STRETCHED to fill the overlay
+  // (origin/main PackImageStretch(7,7)), distinct from the two-pane chrome_panel.
+  uint32_t chrome_controls = 0; // bank 7 idx 7
+  uint16_t chrome_controls_w = 0, chrome_controls_h = 0;
   uint32_t dialog_msg = 0; // bank 40 idx 4 (message modal)
   uint16_t dialog_msg_w = 0, dialog_msg_h = 0;
   uint32_t dialog_pw = 0; // bank 40 idx 2 (password / lobby-connect modal)

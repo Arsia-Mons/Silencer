@@ -227,7 +227,7 @@ UiChildren UiElementFrame::children(std::initializer_list<UiElement> items) {
     return {};
   if (child_element_count_ + static_cast<int>(items.size()) >
       UI_RETAINED_MAX_CHILD_ELEMENTS) {
-    ++error_count_;
+    report_overflow("child-elements", UI_RETAINED_MAX_CHILD_ELEMENTS);
     return {};
   }
 
@@ -247,7 +247,7 @@ UiChildren UiElementFrame::children(const UiElement *items, int count) {
   if (!items || count <= 0)
     return {};
   if (child_element_count_ + count > UI_RETAINED_MAX_CHILD_ELEMENTS) {
-    ++error_count_;
+    report_overflow("child-elements", UI_RETAINED_MAX_CHILD_ELEMENTS);
     return {};
   }
   UiElement *start = &child_elements_[child_element_count_];
@@ -277,7 +277,7 @@ UiChildren UiElementFrame::children(std::initializer_list<UiChild> items) {
   if (child_count == 0)
     return {};
   if (child_element_count_ + child_count > UI_RETAINED_MAX_CHILD_ELEMENTS) {
-    ++error_count_;
+    report_overflow("child-elements", UI_RETAINED_MAX_CHILD_ELEMENTS);
     return {};
   }
 
@@ -300,11 +300,22 @@ UiChildren UiElementFrame::children(std::initializer_list<UiChild> items) {
   };
 }
 
+void UiElementFrame::report_overflow(const char *what, int cap) {
+  // Logged through the shared error channel (stderr) every frame it overflows —
+  // matching the existing per-frame "failed to commit" cadence — so a screen
+  // that grew past a fixed arena is debuggable instead of silently truncated.
+  react_report_error(
+      "ui/retained: %s arena overflow (cap=%d); raise the matching "
+      "UI_RETAINED_MAX_* in ui/runtime/element.h\n",
+      what, cap);
+  ++error_count_;
+}
+
 UiElement UiElementFrame::empty() { return {}; }
 
 UiElement UiElementFrame::fragment(UiChildren children) {
   if (element_count_ >= UI_RETAINED_MAX_ELEMENTS) {
-    ++error_count_;
+    report_overflow("elements", UI_RETAINED_MAX_ELEMENTS);
     return empty();
   }
   UiElement &element = elements_[element_count_++];
@@ -317,7 +328,7 @@ UiElement UiElementFrame::fragment(UiChildren children) {
 
 UiElement UiElementFrame::host(HostKind kind, const HostProps &props) {
   if (element_count_ >= UI_RETAINED_MAX_ELEMENTS) {
-    ++error_count_;
+    report_overflow("elements", UI_RETAINED_MAX_ELEMENTS);
     return empty();
   }
   UiElement &element = elements_[element_count_++];
@@ -349,7 +360,7 @@ UiElement UiElementFrame::provider(const char *name, ReactContext *context,
                                    void *value, UiChildren children,
                                    const char *key) {
   if (element_count_ >= UI_RETAINED_MAX_ELEMENTS) {
-    ++error_count_;
+    report_overflow("elements", UI_RETAINED_MAX_ELEMENTS);
     return empty();
   }
   UiElement &element = elements_[element_count_++];
@@ -373,7 +384,7 @@ const char *UiElementFrame::copy_string(const char *value) {
   size_t length = strlen(value);
   if (string_count_ + static_cast<int>(length) + 1 >
       UI_RETAINED_STRING_ARENA_BYTES) {
-    ++error_count_;
+    report_overflow("string", UI_RETAINED_STRING_ARENA_BYTES);
     return "";
   }
   char *dest = &strings_[string_count_];
@@ -386,7 +397,7 @@ UiElement UiElementFrame::component_raw(const char *name, const char *key,
                                         const void *props,
                                         UiComponentRenderFn render) {
   if (element_count_ >= UI_RETAINED_MAX_ELEMENTS) {
-    ++error_count_;
+    report_overflow("elements", UI_RETAINED_MAX_ELEMENTS);
     return empty();
   }
   UiElement &element = elements_[element_count_++];

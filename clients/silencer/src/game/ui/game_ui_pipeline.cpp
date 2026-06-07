@@ -223,6 +223,7 @@ bake(7, 24, cppxChrome.chrome_btn_idle);
 bake(7, 28, cppxChrome.chrome_btn_focus);
 // Frame sprites (plain, native size): bank-7 chrome panel + bank-40 dialog frames.
 bake(7, 5, cppxChrome.chrome_panel, &cppxChrome.chrome_panel_w, &cppxChrome.chrome_panel_h);
+bake(7, 7, cppxChrome.chrome_controls, &cppxChrome.chrome_controls_w, &cppxChrome.chrome_controls_h);
 bake(40, 4, cppxChrome.dialog_msg, &cppxChrome.dialog_msg_w, &cppxChrome.dialog_msg_h);
 bake(40, 2, cppxChrome.dialog_pw, &cppxChrome.dialog_pw_w, &cppxChrome.dialog_pw_h);
 // bank 6 idx0 — the full-screen starfield+planet menu background.
@@ -261,6 +262,43 @@ bake(181, (size_t)i, cppxChrome.agency_emblem[i],
 bake(95, 2, cppxChrome.hud_bezel_top, &cppxChrome.hud_bezel_top_w, &cppxChrome.hud_bezel_top_h);
 bake(95, 11, cppxChrome.hud_bezel_bottom, &cppxChrome.hud_bezel_bottom_w, &cppxChrome.hud_bezel_bottom_h);
 bake(94, 0, cppxChrome.hud_radar, &cppxChrome.hud_radar_w, &cppxChrome.hud_radar_h);
+
+// ---- Bitmap glyph fonts (origin/main text parity) -----------------------
+// origin/main renders ALL UI text from the legacy bitmap font banks 132..136
+// (renderer.cpp::DrawText), monospace, glyph index = char - ioffset (34 for
+// bank 132, else 33). Bake one atlas per cppx face; FaceId -> {bank, advance,
+// lineHeight} mirrors origin text.cpp's TextRenderStyle table (640-space native
+// metrics; the cppx token font sizes scale them up to the 960 window).
+{
+using GF = silencer::cppx_ui::GlyphFonts;
+struct FaceBake { int face; int bank; float advance; float line_height; };
+static const FaceBake kFaceBakes[] = {
+    {0, 133, 6.f, 11.f},  // Body    — silencer-ui      (bank 133)
+    {1, 134, 8.f, 15.f},  // Large   — silencer-ui-large(bank 134)
+    {2, 136, 16.f, 23.f}, // Title   — silencer-title   (bank 136)
+    {3, 132, 4.f, 7.f},   // Tiny    — silencer-tiny    (bank 132)
+    {4, 135, 11.f, 19.f}, // Heading — bank 135 (dominant label/heading face)
+};
+for(const FaceBake & fb : kFaceBakes){
+if((size_t)fb.bank >= banks.size()) continue;
+const auto & glyphbank = banks[fb.bank];
+const int ioffset = (fb.bank == 132) ? 34 : 33; // legacy GlyphOffsetForBank
+GF::GlyphSrc src[GF::kGlyphCount] = {};
+for(int i = 0; i < GF::kGlyphCount; ++i){
+const int ch = GF::kFirstChar + i; // 32..126
+const int gi = ch - ioffset;
+if(ch == ' ' || gi < 0 || (size_t)gi >= glyphbank.size()) continue; // blank cell
+const std::shared_ptr<Surface> & sp = glyphbank[gi];
+if(!sp || sp->w < 1 || sp->h < 1 || sp->pixels.empty()) continue;
+src[i].indices = sp->pixels.data();
+src[i].w = sp->w;
+src[i].h = sp->h;
+}
+// Font banks 132-136 are authored against the base palette page (page_for_bank's
+// default arm), so the base `palette` resolves their glyph ramp colors.
+cppxHost->build_glyph_face(fb.face, src, GF::kGlyphCount, palette, fb.advance, fb.line_height);
+}
+}
 }
 
 void GameUiPipeline::RenderCppxClientUiFrame(Surface& surface) {
