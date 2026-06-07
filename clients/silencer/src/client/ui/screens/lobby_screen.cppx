@@ -13,6 +13,7 @@
 #include "client/ui/hooks/use_staging.h"
 #include "ui/components/box.h"
 #include "ui/components/input.h"
+#include "ui/components/text.h"
 #include "ui/runtime/react.h"
 
 #include <algorithm>
@@ -28,6 +29,20 @@ using ::ui::components::Box;
 using ::ui::components::BoxProps;
 using ::ui::components::Input;
 using ::ui::components::InputProps;
+using ::ui::components::Text;
+using ::ui::components::TextProps;
+
+// A tiny single-line label (bank-132 face) for the dense AgentCard identity +
+// StatColumn, matching origin/main's small lobby stat type.
+::ui::UiElement tiny_line(const char *key, const char *value, ::ui::Color color) {
+  return <Text
+    key={key}
+    value={value}
+    layout={{.height = ::ui::Length::points(tokens::kLineTiny)}}
+    style={tokens::text_patch(color, tokens::kFontTiny, tokens::kFaceTiny,
+                              tokens::kLineTiny)}
+  />
+}
 
 // One staging-roster row as its own vector element (SIL-104: the structured,
 // multi-row roster — each peer on its own line, ready peers in the bright face).
@@ -74,28 +89,35 @@ using ::ui::components::InputProps;
       .padding = {8.0f, 8.0f, 6.0f, 6.0f},
       .gap = 4.0f};
 }
+// origin/main lobby panels are connected ~1px dim-green hairline frames whose
+// interior is mostly transparent so the Mars/starfield backdrop reads through
+// (not opaque cards). Faint dark-green wash + a thin green-dim border.
 inline ::ui::StylePatch lobby_panel_style() {
-  return tokens::panel_patch(tokens::kSurfacePanel, tokens::kBorderPanel);
+  return tokens::panel_patch(::ui::Color{4, 12, 6, 90}, tokens::kBorderPanel);
 }
 
-// A full-width HUD-frame light strip: a row of glowing-green ovals along an edge
-// of the cockpit (origin/main glows along BOTH the top and bottom edges). `id`
-// keys each instance uniquely so the strip can mount twice. Whole-sprite emblem
-// art (use_chrome().agency_emblem) is a deferred follow-up; the placeholder
-// ovals read as a thin edge glow rather than chunky pills.
+// The BOTTOM lamp strip (origin/main): ~7 soft-glowing green oval emblems evenly
+// spaced along the bottom edge of the console. Soft = low-alpha rounded ovals
+// (an edge glow, not chunky bright pills); origin glows only along the bottom.
 ::ui::UiElement emblem_strip(const char *id) {
   std::vector<::ui::UiElement> e;
-  for (int i = 0; i < 11; ++i) {
+  for (int i = 0; i < 7; ++i) {
     e.push_back(::ui::component(
         "Box",
         BoxProps{.key = ::ui::copy_string(
                      (std::string(id) + std::to_string(i)).c_str()),
                  .layout = ::ui::LayoutStyle{
-                     .width = ::ui::Length::points(40.0f),
-                     .height = ::ui::Length::points(8.0f)},
+                     .width = ::ui::Length::points(34.0f),
+                     .height = ::ui::Length::points(9.0f)},
                  .style = ::ui::patch()
-                              .background(::ui::Color{61, 232, 61, 200})
-                              .corner_radius(4.0f)},
+                              .background(::ui::Color{24, 96, 24, 150})
+                              .corner_radius(4.5f)
+                              .border(::ui::Border{
+                                  {1, 1, 1, 1},
+                                  {::ui::Color{40, 150, 40, 180},
+                                   ::ui::Color{40, 150, 40, 180},
+                                   ::ui::Color{40, 150, 40, 180},
+                                   ::ui::Color{40, 150, 40, 180}}})},
         Box));
   }
   ::ui::UiChildren emblems = ::ui::children(e);
@@ -104,7 +126,7 @@ inline ::ui::StylePatch lobby_panel_style() {
       .align_items = ::ui::AlignItems::Center,
       .justify_content = ::ui::JustifyContent::SpaceAround,
       .width = ::ui::Length::percent(100.0f),
-      .height = ::ui::Length::points(11.0f)}}>
+      .height = ::ui::Length::points(13.0f)}}>
     {emblems}
   </Box>
 }
@@ -125,33 +147,33 @@ inline ::ui::StylePatch lobby_panel_style() {
 
 // --- right-column panels (screen-local swap) ---------------------------------
 
-// The "Create Game" loadout panel (origin/main top-row cell beside the agent
-// card): the selected agent's six upgrade stats + a New Game action that opens
-// the create form. NOTE: the stat values come from use_progression().levels,
-// which the model only populates post-match today — in the lobby they read 0
-// until BuildLobbyPanels fills them (deferred follow-up). The panel structure
-// matches the reference regardless.
-struct LoadoutStat {
-  const char *label;
-  uint8_t value;
-};
-struct LoadoutPanelProps {
-  std::vector<LoadoutStat> stats = {};
+// The default center region (origin/main): a small "Create Game" oval floating at
+// the top over the backdrop + the "In Lobby" presence float below it (who is in
+// the lobby right now). NOT a stat panel — the agent's stats live in the
+// AgentCard's StatColumn. controlId "NewGame" keeps the create intent targetable.
+struct CenterColProps {
+  const char *presence = "";
   std::function<void()> on_create = {};
 };
 
-::ui::UiElement LoadoutPanel(const LoadoutPanelProps &props) {
-  std::vector<::ui::UiElement> rows;
-  for (int i = 0; i < (int)props.stats.size(); ++i) {
-    rows.push_back(loadout_row(
-        ::ui::copy_string(("ls" + std::to_string(i)).c_str()),
-        props.stats[i].label, props.stats[i].value));
-  }
-  ::ui::UiChildren stat_rows = ::ui::children(rows);
-  return <Box key="loadout" layout={lobby_cell_layout(1.4f)} style={lobby_panel_style()}>
-    <ScreenTitle key="h" variant={ScreenTitleVariant::Dialog} value="Create Game" />
-    {stat_rows}
-    <AppButton key="create" controlId="NewGame" variant={AppButtonVariant::Oval} size={AppButtonSize::Sm} label="New Game" onPress={props.on_create} />
+::ui::UiElement CenterCol(const CenterColProps &props) {
+  return <Box key="centercol" layout={::ui::LayoutStyle{
+      .direction = ::ui::FlexDirection::Column,
+      .align_items = ::ui::AlignItems::Center,
+      .flex_grow = ::ui::StyleFloat::points(1.4f),
+      .flex_basis = ::ui::Length::points(0.0f),
+      .min_width = ::ui::Length::points(0.0f),
+      .gap = 10.0f}}>
+    <AppButton key="creategame" controlId="NewGame" variant={AppButtonVariant::Oval} size={AppButtonSize::Sm} label="Create Game" onPress={props.on_create} />
+    <Box key="inlobby" layout={::ui::LayoutStyle{
+        .direction = ::ui::FlexDirection::Column,
+        .align_items = ::ui::AlignItems::Start,
+        .overflow = ::ui::Overflow::Hidden,
+        .padding = {5.0f, 10.0f, 5.0f, 10.0f},
+        .gap = 2.0f}} style={lobby_panel_style()}>
+      <ScreenTitle key="h" variant={ScreenTitleVariant::Dialog} value="In Lobby" />
+      <BodyText key="p" variant={BodyTextVariant::Detail} value={props.presence} />
+    </Box>
   </Box>
 }
 
@@ -170,6 +192,24 @@ struct GameBrowserProps {
   std::function<void()> on_spectate = {};
 };
 
+// Browse/join actions — a separate element so GameBrowser can omit it for an
+// empty list (the JSX tag can't live inside a ternary expression).
+::ui::UiElement GameBrowserActions(const GameBrowserProps &props) {
+  return <Box key="acts" layout={::ui::LayoutStyle{
+      .direction = ::ui::FlexDirection::Column,
+      .align_items = ::ui::AlignItems::Stretch,
+      .width = ::ui::Length::percent(100.0f),
+      .gap = 4.0f}}>
+    <BodyText key="detail" variant={BodyTextVariant::Detail} value={props.sel_detail} />
+    <ActionRow key="browse">
+      <AppButton key="prev" controlId="GamePrev" variant={AppButtonVariant::Oval} size={AppButtonSize::Sm} label="Prev" onPress={props.on_prev} />
+      <AppButton key="next" controlId="GameNext" variant={AppButtonVariant::Oval} size={AppButtonSize::Sm} label="Next" onPress={props.on_next} />
+    </ActionRow>
+    <AppButton key="join" controlId="JoinGame" variant={AppButtonVariant::Oval} size={AppButtonSize::Sm} disabled={!props.can_join} label="Join" onPress={props.on_join} />
+    <AppButton key="spectate" controlId="SpectateGame" variant={AppButtonVariant::Oval} size={AppButtonSize::Sm} disabled={!props.can_spectate} label="Spectate" onPress={props.on_spectate} />
+  </Box>
+}
+
 ::ui::UiElement GameBrowser(const GameBrowserProps &props) {
   std::vector<::ui::UiElement> rows;
   if (props.entries.empty()) {
@@ -183,6 +223,10 @@ struct GameBrowserProps {
     }
   }
   ::ui::UiChildren game_rows = ::ui::children(rows);
+  // Browse/join actions only when there are games to act on; an empty list reads
+  // sparse like the golden (the panel mostly shows the backdrop through).
+  ::ui::UiElement actions =
+      props.entries.empty() ? ::ui::empty() : GameBrowserActions(props);
   return <Box key="browserbody" layout={::ui::LayoutStyle{
       .direction = ::ui::FlexDirection::Column,
       .align_items = ::ui::AlignItems::Stretch,
@@ -190,14 +234,8 @@ struct GameBrowserProps {
       .width = ::ui::Length::percent(100.0f),
       .gap = 4.0f}}>
     {game_rows}
-    <BodyText key="detail" variant={BodyTextVariant::Detail} value={props.sel_detail} />
     <Box key="spacer" layout={::ui::LayoutStyle{.flex_grow = ::ui::StyleFloat::points(1.0f)}} />
-    <ActionRow key="browse">
-      <AppButton key="prev" controlId="GamePrev" variant={AppButtonVariant::Oval} size={AppButtonSize::Sm} label="Prev" onPress={props.on_prev} />
-      <AppButton key="next" controlId="GameNext" variant={AppButtonVariant::Oval} size={AppButtonSize::Sm} label="Next" onPress={props.on_next} />
-    </ActionRow>
-    <AppButton key="join" controlId="JoinGame" variant={AppButtonVariant::Oval} size={AppButtonSize::Sm} disabled={!props.can_join} label="Join" onPress={props.on_join} />
-    <AppButton key="spectate" controlId="SpectateGame" variant={AppButtonVariant::Oval} size={AppButtonSize::Sm} disabled={!props.can_spectate} label="Spectate" onPress={props.on_spectate} />
+    {actions}
   </Box>
 }
 
@@ -353,6 +391,13 @@ struct LobbyScreenProps {
   const char *ready_label = use_text_storage("%s", staging.ready_label.c_str());
   const char *version_text =
       use_text_storage("v%s", app.version ? app.version : "");
+  const char *xp_text = use_text_storage("XP %u/100", (unsigned)prog.experience);
+  // The agent's display name = first token of the summary ("Alice Noxis Level 0"
+  // -> "Alice"); the golden AgentCard shows the name prominently, stats below.
+  std::string summary_str = chars.selected_summary;
+  std::string name_str = summary_str.substr(0, summary_str.find(' '));
+  const char *agent_name =
+      use_text_storage("%s", name_str.empty() ? "Agent" : name_str.c_str());
 
   std::function<void(const std::string &)> set_draft =
       [draft](const std::string &next) { *draft = next; };
@@ -401,12 +446,10 @@ struct LobbyScreenProps {
     cp.on_back = [show_create]() { *show_create = false; };
     right = GameCreatePanel(cp);
   } else {
-    LoadoutPanelProps lp;
-    lp.stats = {{"Endurance", prog.levels[0]}, {"Shield", prog.levels[1]},
-                {"Jetpack", prog.levels[2]},   {"Tech Slots", prog.levels[3]},
-                {"Hacking", prog.levels[4]},   {"Contacts", prog.levels[5]}};
-    lp.on_create = [show_create]() { *show_create = true; };
-    right = LoadoutPanel(lp);
+    CenterColProps cc;
+    cc.presence = presence;
+    cc.on_create = [show_create]() { *show_create = true; };
+    right = CenterCol(cc);
   }
 
   // The Active-Games browser lives in its own tall right cockpit cell, separate
@@ -428,7 +471,6 @@ struct LobbyScreenProps {
   ::ui::UiElement right_browser = GameBrowser(gp);
 
   return <ScreenLayout key="root" variant={ScreenLayoutVariant::Game}>
-    {emblem_strip("emt")}
     <Box key="titlebar" layout={::ui::LayoutStyle{
         .direction = ::ui::FlexDirection::Row,
         .align_items = ::ui::AlignItems::Center,
@@ -459,21 +501,49 @@ struct LobbyScreenProps {
             .gap = ::ui::StyleValue::points(6.0f)}}>
           <Box key="agent" layout={::ui::LayoutStyle{
               .direction = ::ui::FlexDirection::Column,
-              .align_items = ::ui::AlignItems::Stretch,
-              .width = ::ui::Length::points(160.0f),
+              .align_items = ::ui::AlignItems::Start,
+              .width = ::ui::Length::points(330.0f),
               .overflow = ::ui::Overflow::Hidden,
-              .padding = {8.0f, 8.0f, 6.0f, 6.0f},
+              .padding = {6.0f, 8.0f, 6.0f, 8.0f},
               .gap = 4.0f}} style={lobby_panel_style()}>
-            <ScreenTitle key="h" variant={ScreenTitleVariant::Dialog} value="Agent" />
-            <Box key="avatar" layout={::ui::LayoutStyle{
-                .width = ::ui::Length::points(44.0f),
-                .height = ::ui::Length::points(44.0f)}}
-              style={::ui::patch().background(::ui::Color{40, 70, 150, 255}).corner_radius(3.0f)} />
-            <Box key="summarywrap" layout={::ui::LayoutStyle{
-                .overflow = ::ui::Overflow::Hidden,
+            <Box key="idrow" layout={::ui::LayoutStyle{
+                .direction = ::ui::FlexDirection::Row,
                 .align_items = ::ui::AlignItems::Start,
-                .width = ::ui::Length::percent(100.0f)}}>
-              <BodyText key="summary" variant={BodyTextVariant::Strong} value={agent} />
+                .width = ::ui::Length::percent(100.0f),
+                .overflow = ::ui::Overflow::Hidden,
+                .gap = ::ui::StyleValue::points(8.0f)}}>
+              <Box key="avatar" layout={::ui::LayoutStyle{
+                  .width = ::ui::Length::points(42.0f),
+                  .height = ::ui::Length::points(42.0f),
+                  .flex_shrink = ::ui::StyleFloat::points(0.0f)}}
+                style={::ui::patch().background(::ui::Color{40, 70, 150, 255}).corner_radius(2.0f)} />
+              <Box key="idcol" layout={::ui::LayoutStyle{
+                  .direction = ::ui::FlexDirection::Column,
+                  .align_items = ::ui::AlignItems::Start,
+                  .flex_grow = ::ui::StyleFloat::points(1.0f),
+                  .flex_basis = ::ui::Length::points(0.0f),
+                  .min_width = ::ui::Length::points(0.0f),
+                  .overflow = ::ui::Overflow::Hidden,
+                  .gap = ::ui::StyleValue::points(1.0f)}}>
+                <BodyText key="name" variant={BodyTextVariant::Strong} value={agent_name} />
+                {tiny_line("wins", "WINS  0", tokens::kTextBody)}
+                {tiny_line("loss", "LOSSES 0", tokens::kTextBody)}
+                {tiny_line("xp", xp_text, tokens::kTextBody)}
+              </Box>
+              <Box key="statcol" layout={::ui::LayoutStyle{
+                  .direction = ::ui::FlexDirection::Column,
+                  .align_items = ::ui::AlignItems::Start,
+                  .width = ::ui::Length::points(82.0f),
+                  .flex_shrink = ::ui::StyleFloat::points(0.0f),
+                  .overflow = ::ui::Overflow::Hidden,
+                  .gap = ::ui::StyleValue::points(1.0f)}}>
+                {tiny_line("s0", "ENDURANCE", tokens::kTextBodyMuted)}
+                {tiny_line("s1", "SHIELD", tokens::kTextBodyMuted)}
+                {tiny_line("s2", "JETPACK", tokens::kTextBodyMuted)}
+                {tiny_line("s3", "TECH SLOTS", tokens::kTextBodyMuted)}
+                {tiny_line("s4", "HACKING", tokens::kTextBodyMuted)}
+                {tiny_line("s5", "CONTACTS", tokens::kTextBodyMuted)}
+              </Box>
             </Box>
             <AppButton key="leave" controlId="LeaveLobby" variant={AppButtonVariant::Oval} size={AppButtonSize::Sm} label="Agents" onPress={session.leave_to_menu} />
           </Box>

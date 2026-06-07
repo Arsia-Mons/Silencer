@@ -10,7 +10,13 @@
 // plus the stacked overlays below them (main menu + options root) exceed 128
 // component instances. Each Fiber is ~420B, so 256 costs ~54KB extra — cheap.
 #define REACT_MAX_FIBERS 256
-#define REACT_HOOKS_PER_FIBER 8
+// A single screen view legitimately uses many hooks: the lobby view alone has
+// ~14 (5 use_state + 9 use_text_storage). At 8, take_slot returned null past
+// slot 8 and use_text_storage fell back to ONE shared thread-local sink buffer,
+// so later text on a screen silently overwrote earlier text (corrupt
+// version/name/stat lines). 32 gives comfortable headroom; a HookSlot is small
+// so 256 fibers * 32 slots is still modest.
+#define REACT_HOOKS_PER_FIBER 32
 #define REACT_MAX_EFFECT_QUEUE 64
 #define REACT_MAX_RENDER_DEPTH 128
 
