@@ -39,6 +39,11 @@ struct ChromeTextures {
   uint32_t oval_md = 0; // idx 7  — 196x33
   uint32_t oval_sm = 0; // idx 28 — 112x33
   uint32_t oval_lg = 0; // idx 23 — 220x33
+  // The legacy LIST-ROW plate (bank 6 idx 2): origin ButtonVariant::LegacyRow,
+  // 236x27, used for the character-create roster + agency list rows (a flat wide
+  // row plate, NOT the stadium oval). Nine-sliced to size to the pane.
+  uint32_t row_plate = 0; // idx 2 — 236x27
+  uint16_t row_plate_w = 0, row_plate_h = 0;
   // The metal-chrome button (bank 7), nine-sliced. 2-state = two authored frames
   // (idx24 phase 0 idle / idx28 phase 4 focused).
   uint32_t chrome_btn_idle = 0;  // idx 24
@@ -54,8 +59,10 @@ struct ChromeTextures {
   uint16_t chrome_controls_w = 0, chrome_controls_h = 0;
   uint32_t dialog_msg = 0; // bank 40 idx 4 (message modal)
   uint16_t dialog_msg_w = 0, dialog_msg_h = 0;
-  uint32_t dialog_pw = 0; // bank 40 idx 2 (password / lobby-connect modal)
+  uint32_t dialog_pw = 0; // bank 40 idx 2 (password modal + cc-alias confirm)
   uint16_t dialog_pw_w = 0, dialog_pw_h = 0;
+  uint32_t dialog_connect = 0; // bank 7 idx 2 (lobby-connect dialog — frame+glow+wells baked)
+  uint16_t dialog_connect_w = 0, dialog_connect_h = 0;
   // Full-screen starfield+planet background (bank 6 idx0), stretched to the
   // screen root (no aspect-cover in v1 — legacy stretched too).
   uint32_t starfield = 0;

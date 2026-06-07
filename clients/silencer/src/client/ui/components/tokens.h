@@ -179,6 +179,26 @@ inline ::ui::StylePatch image_patch_sub(uint32_t texture_id, float src_x,
                                            src_w, src_h});
 }
 
+// origin lobby panels are vector strokes, not sprites: Box(Chrome) = a 1px idx216
+// stroke (the connected frame), Box(Inset) = a dimmer idx220 stroke (inner wells).
+// Transparent fill so the Mars backdrop reads through, like origin.
+// Brighter than the golden's measured idx216 core (48,140,60) so the cppx's
+// CRISP 1-2px stroke reads with the same visual weight as origin's soft-glow
+// frame over the dark Mars backdrop (origin's GPU border-blur spreads the
+// frame; the cppx can't, so it leans brighter to compensate).
+constexpr ::ui::Color kChromeStroke = {64, 176, 84, 255}; // idx216 connected frame
+constexpr ::ui::Color kInsetStroke = {44, 138, 56, 255};  // idx220 inner well
+
+// Hairline frame over a transparent interior. Default width 2px carries the
+// golden's outer-frame weight; pass 1.0f for the dimmer inner wells.
+inline ::ui::StylePatch frame_patch(::ui::Color stroke, float width = 2.0f) {
+  return ::ui::patch()
+      .background(::ui::Color{0, 0, 0, 0})
+      .gradient(::ui::Gradient{})
+      .corner_radius(0.0f)
+      .border(::ui::Border{{width, width, width, width}, {stroke, stroke, stroke, stroke}});
+}
+
 // Text paint (color + face + native-em size + legacy line height). font_id
 // selects the OTF face; line_height 0 falls back to the face's natural skip.
 inline ::ui::StylePatch text_patch(::ui::Color color, uint16_t font_size,

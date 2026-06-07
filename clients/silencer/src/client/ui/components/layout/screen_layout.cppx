@@ -34,8 +34,8 @@ using ::ui::components::DialogProps;
         .direction = ::ui::FlexDirection::Column,
         .width = ::ui::Length::percent(100.0f),
         .height = ::ui::Length::percent(100.0f),
-        .padding = {10.0f, 10.0f, 34.0f, 34.0f},
-        .gap = 6.0f,
+        .padding = {18.0f, 18.0f, 37.0f, 28.0f},
+        .gap = 20.0f,
       }}
       style={game_bg}
     >

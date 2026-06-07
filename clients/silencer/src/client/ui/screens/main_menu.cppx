@@ -102,7 +102,7 @@ struct MainMenuProps {
                 .layout = ::ui::LayoutStyle{
                     .position = ::ui::PositionType::Absolute,
                     .position_inset = ::ui::EdgeSizes{::ui::StyleValue::percent(13.4f), {}, 342.0f, {}},
-                    .width = ::ui::Length::points(453.0f),
+                    .width = ::ui::Length::points(495.0f),
                     .height = ::ui::Length::points(43.0f)},
                 .style = logo_style})
           : ScreenTitle(ScreenTitleProps{.key = "logotxt",

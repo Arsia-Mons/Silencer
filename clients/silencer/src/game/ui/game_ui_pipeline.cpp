@@ -218,6 +218,8 @@ if(id){ id_out = id; if(w_out) *w_out = (uint16_t)sp->w; if(h_out) *h_out = (uin
 bake(6, 7, cppxChrome.oval_md);
 bake(6, 28, cppxChrome.oval_sm);
 bake(6, 23, cppxChrome.oval_lg);
+// bank 6 idx 2 — the LegacyRow list-row plate (cc roster + agency rows).
+bake(6, 2, cppxChrome.row_plate, &cppxChrome.row_plate_w, &cppxChrome.row_plate_h);
 // bank 7 — the metal-chrome nine-slice button (idx24 idle phase0 / idx28 focus phase4).
 bake(7, 24, cppxChrome.chrome_btn_idle);
 bake(7, 28, cppxChrome.chrome_btn_focus);
@@ -226,6 +228,9 @@ bake(7, 5, cppxChrome.chrome_panel, &cppxChrome.chrome_panel_w, &cppxChrome.chro
 bake(7, 7, cppxChrome.chrome_controls, &cppxChrome.chrome_controls_w, &cppxChrome.chrome_controls_h);
 bake(40, 4, cppxChrome.dialog_msg, &cppxChrome.dialog_msg_w, &cppxChrome.dialog_msg_h);
 bake(40, 2, cppxChrome.dialog_pw, &cppxChrome.dialog_pw_w, &cppxChrome.dialog_pw_h);
+// bank 7 idx 2 — the lobby-connect dialog (origin PackImage(7,2)): frame, soft
+// glow, log well, form sub-panel + field/button wells all baked in.
+bake(7, 2, cppxChrome.dialog_connect, &cppxChrome.dialog_connect_w, &cppxChrome.dialog_connect_h);
 // bank 6 idx0 — the full-screen starfield+planet menu background.
 bake(6, 0, cppxChrome.starfield);
 // bank 7 idx1 — the lobby backdrop (dim Mars + circuit HUD), distinct from bank 6.

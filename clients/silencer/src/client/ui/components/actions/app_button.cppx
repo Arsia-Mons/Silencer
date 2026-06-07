@@ -64,6 +64,8 @@ using ::ui::components::TextProps;
       tex = chrome.oval_sm;
     else if (props.size == AppButtonSize::Lg)
       tex = chrome.oval_lg;
+    else if (props.size == AppButtonSize::List)
+      tex = chrome.row_plate; // cc list rows = the flat LegacyRow plate, not the oval
     layout = app_button_oval_layout(props.size);
     style = app_button_oval_patch(tex);
   } else if (props.variant == AppButtonVariant::Chrome) {

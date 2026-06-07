@@ -33,7 +33,7 @@ using ::ui::components::TextProps;
 // column, then the primary-bind / "OR" / secondary-bind columns laid out so every
 // row's ovals stack vertically. Widths sum under the panel content width, leaving
 // the right edge clear for the sprite's baked scrollbar rail.
-constexpr float kLabelCol = 345.0f; // label box; text indented inside it (sets the bind-oval left anchor ~x405)
+constexpr float kLabelCol = 562.0f; // label box; text indented inside it (sets the bind-oval left anchor; golden 'Up' oval centers ~x645 logical)
 constexpr float kLabelIndent = 14.0f;
 constexpr float kBindCol = 166.0f;  // bind oval column (oval stretches to fill it)
 constexpr float kOrCol = 56.0f;
@@ -227,13 +227,13 @@ struct OptionsControlsProps {
   // draws the frame. The focusable viewport otherwise paints a focus OUTLINE
   // rectangle (the spurious inner frame at x~54); clear background + border AND
   // outline so only the sprite frame shows.
+  // chromeless GATES the builder's injected focus-ring outline (draw_command_builder
+  // append_frame: focus ring is injected unless chromeless) — clearing .outline()
+  // alone just re-injects it, which is the spurious inner "x54" frame the baked
+  // chrome_controls sprite already supplies. chromeless suppresses it.
   ::ui::StyleStatePatch table_style{};
-  const ::ui::Border kNoBorder{{0, 0, 0, 0},
-                               {{0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}}};
-  table_style.base =
-      ::ui::patch().background({0, 0, 0, 0}).border(kNoBorder).outline(::ui::Outline{});
-  table_style.focus_visible =
-      ::ui::patch().background({0, 0, 0, 0}).border(kNoBorder).outline(::ui::Outline{});
+  table_style.base = ::ui::patch().chromeless(true).background({0, 0, 0, 0});
+  table_style.focus_visible = table_style.base;
   ::ui::UiElement table = ::ui::component(
       "ScrollView",
       ScrollViewProps{
@@ -253,7 +253,7 @@ struct OptionsControlsProps {
     <Panel key="frame" variant={PanelVariant::ControlsFrame}>
       <Box key="titlewrap" layout={::ui::LayoutStyle{
           .position = ::ui::PositionType::Absolute,
-          .position_inset = ::ui::EdgeSizes{0.0f, 0.0f, -6.0f, {}},
+          .position_inset = ::ui::EdgeSizes{0.0f, 0.0f, 14.0f, {}},
           .direction = ::ui::FlexDirection::Row,
           .align_items = ::ui::AlignItems::Center,
           .justify_content = ::ui::JustifyContent::Center}}>

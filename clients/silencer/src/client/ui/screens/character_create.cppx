@@ -216,10 +216,18 @@ struct CharacterCreateContentProps {
         chrome1.chrome_panel
             ? tokens::image_patch(chrome1.chrome_panel)
             : tokens::panel_patch(tokens::kSurfaceHeroPanel, tokens::kBorderHeroPanel);
-    // Stadium (fully-rounded) alias field — a thin muted-green bordered pill.
+    // Chromeless field: text + caret only, over the baked input well in the
+    // dialog_pw modal sprite (origin's TextInput draws no well of its own).
     ::ui::StyleStatePatch alias_field_style{};
-    alias_field_style.base = tokens::panel_patch(
-        tokens::kSurfaceHeroPanel, kAliasFrameBorder, 2.0f, 20.0f);
+    alias_field_style.base = ::ui::patch()
+                                 .chromeless(true)
+                                 .background(::ui::Color{0, 0, 0, 0})
+                                 .gradient(::ui::Gradient{})
+                                 .corner_radius(0.0f)
+                                 .border(::ui::Border{})
+                                 .outline(::ui::Outline{});
+    alias_field_style.hover = alias_field_style.base;
+    alias_field_style.focus_visible = alias_field_style.base;
     return <ScreenLayout key="aliasmodal" variant={ScreenLayoutVariant::Overlay}>
       <Box
         key="frame"
@@ -266,44 +274,52 @@ struct CharacterCreateContentProps {
         key="aliasfloat"
         layout={::ui::LayoutStyle{
           .position = ::ui::PositionType::Absolute,
-          .position_inset = ::ui::EdgeSizes{272.0f, {}, 242.0f, {}},
+          .position_inset = ::ui::EdgeSizes{427.0f, {}, 243.0f, {}},
           .direction = ::ui::FlexDirection::Column,
           .align_items = ::ui::AlignItems::Stretch,
-          .width = ::ui::Length::points(416.0f),
-          .padding = {16.0f, 16.0f, 8.0f, 44.0f},
-          .gap = 24.0f,
-          .border_width = 2.0f}}
-        style={tokens::panel_patch(tokens::kSurfaceHeroPanel, kAliasFrameBorder, 2.0f, 24.0f)}
+          .width = ::ui::Length::points(426.0f),
+          .height = ::ui::Length::points(162.0f)}}
+        style={chrome1.dialog_pw
+                 ? tokens::image_patch(chrome1.dialog_pw)
+                 : tokens::panel_patch(tokens::kSurfaceHeroPanel, kAliasFrameBorder, 2.0f, 24.0f)}
       >
         <Box
-          key="hdr"
+          key="title"
           layout={::ui::LayoutStyle{
             .direction = ::ui::FlexDirection::Row,
             .justify_content = ::ui::JustifyContent::Center,
             .align_items = ::ui::AlignItems::Center,
             .width = ::ui::Length::percent(100.0f),
-            .height = ::ui::Length::points(40.0f),
-            .border_width = 2.0f}}
-          style={tokens::panel_patch(tokens::kSurfaceHeroPanel, kAliasFrameBorder, 2.0f, 18.0f)}
+            .height = ::ui::Length::points(50.0f)}}
         >
           <ScreenTitle key="t" variant={ScreenTitleVariant::Screen} value="SILENCER ALIAS" />
         </Box>
-        <Input
-          key="alias"
-          id="Alias"
-          autofocus={true}
-          accessibility={{.label = "Alias"}}
-          value={w.alias.c_str()}
-          onChange={w.set_alias}
-          onActivate={on_alias_enter}
+        <Box
+          key="inputrow"
           layout={::ui::LayoutStyle{
+            .position = ::ui::PositionType::Absolute,
+            .position_inset = ::ui::EdgeSizes{36.0f, {}, 74.0f, {}},
             .align_items = ::ui::AlignItems::Center,
-            .justify_content = ::ui::JustifyContent::Start,
-            .width = ::ui::Length::percent(100.0f),
-            .height = ::ui::Length::points(40.0f),
-            .padding = {20.0f, 20.0f, 8.0f, 8.0f}}}
-          style={alias_field_style}
-        />
+            .width = ::ui::Length::points(354.0f),
+            .height = ::ui::Length::points(40.0f)}}
+        >
+          <Input
+            key="alias"
+            id="Alias"
+            autofocus={true}
+            accessibility={{.label = "Alias"}}
+            value={w.alias.c_str()}
+            onChange={w.set_alias}
+            onActivate={on_alias_enter}
+            layout={::ui::LayoutStyle{
+              .align_items = ::ui::AlignItems::Center,
+              .justify_content = ::ui::JustifyContent::Start,
+              .flex_grow = ::ui::StyleFloat::points(1.0f),
+              .height = ::ui::Length::points(40.0f),
+              .padding = {18.0f, 0.0f, 0.0f, 0.0f}}}
+            style={alias_field_style}
+          />
+        </Box>
       </Box>
     </ScreenLayout>
   }

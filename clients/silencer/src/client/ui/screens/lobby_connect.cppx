@@ -3,6 +3,7 @@
 #include "client/ui/components/actions/actions.h"
 #include "client/ui/components/text/text.h"
 #include "client/ui/components/tokens.h"
+#include "client/ui/hooks/use_chrome.h"
 #include "client/ui/hooks/use_lobby_session.h"
 #include "ui/components/box.h"
 #include "ui/components/input.h"
@@ -29,13 +30,20 @@ struct LobbyConnectProps {
   uint32_t unused = 0;
 };
 
-// Username/Password field label: the golden draws these in the larger Large face
-// (bank 134, ~15px) — a tier above the body status log, not the body em. Fixed
-// width so both fields start at the same x.
+// origin authors this dialog in the 640x480 virtual space; the cppx logical
+// canvas is 1.5x that, so its fixed offsets carry through at x1.5.
+constexpr float kS = 1.5f;
+
+// Username/Password label: origin centers a Heading-face label in an 86px cell.
+// The cell's dotted notch is baked into the dialog sprite — the label is plain
+// text laid over it.
 ::ui::UiElement field_label(const char *key, const char *value) {
   return <Box key={key} layout={::ui::LayoutStyle{
+      .align_items = ::ui::AlignItems::Center,
+      .justify_content = ::ui::JustifyContent::Center,
       .flex_shrink = ::ui::StyleFloat::points(0.0f),
-      .width = ::ui::Length::points(96.0f)}}>
+      .width = ::ui::Length::points(86.0f * kS),
+      .height = ::ui::Length::points(21.0f * kS)}}>
     <Text key="t" value={value}
       layout={::ui::LayoutStyle{.height = ::ui::Length::points(tokens::kLineLarge)}}
       style={tokens::text_patch(tokens::kTextBody, tokens::kFontLarge,
@@ -43,13 +51,14 @@ struct LobbyConnectProps {
   </Box>
 }
 
-// origin/main Lobby Connect: a single thin green-bordered rectangle over black
-// (NOT the ornate bank-40 dialog sprite). A connection-log region grows to fill
-// the empty top, pushing Username/Password label+field rows and the Login/Create
-// + Cancel buttons to the bottom. Fields + buttons carry their own green theme
-// chrome (green-dim border, near-black fill) — no baked sprite wells.
+// origin/main Lobby Connect IS one baked sprite: PackImage(7,2) (chrome.dialog_connect,
+// 284x277) bakes the outer frame + soft glow, the log well, the form sub-panel and
+// the field/label/button wells. The connect log, Username/Password labels + inputs,
+// and the Login/Create + Cancel chrome buttons are laid ON TOP at origin's offsets.
+// Inputs are chromeless (text + caret only) since their wells are in the sprite.
 ::ui::UiElement LobbyConnectView(const LobbyConnectProps &) {
   LobbySession lobby = use_lobby_session();
+  client::ui::ChromeTextures chrome = use_chrome();
   std::string *username = use_state<std::string>(std::string());
   std::string *password = use_state<std::string>(std::string());
   if (!username || !password)
@@ -67,7 +76,7 @@ struct LobbyConnectProps {
       [submit](const ::ui::ActivationEvent &) { submit(); };
 
   // The status log is multi-line; the engine doesn't break on '\n', so each line
-  // is its own BodyText stacked in the log well.
+  // is its own BodyText stacked in the baked log well.
   std::vector<::ui::UiElement> log_lines;
   {
     const std::string &s = lobby.status_log;
@@ -88,41 +97,39 @@ struct LobbyConnectProps {
     }
   }
 
-  // Panel + field interiors carry a faint warm-dark fill (golden ~(12,4,4)), not
-  // flat black — the origin login frame is a dim sprite-backed well over black.
-  const ::ui::Color kConnectBorder = {48, 140, 60, 255};
-  const ::ui::Color kConnectFill = {12, 4, 4, 255};
-  const ::ui::Color kConnectFormFill = {0, 24, 0, 255};
+  const float panel_w =
+      chrome.dialog_connect ? chrome.dialog_connect_w * kS : 284.0f * kS;
+  const float panel_h =
+      chrome.dialog_connect ? chrome.dialog_connect_h * kS : 277.0f * kS;
+  const ::ui::StylePatch panel_style =
+      chrome.dialog_connect
+          ? tokens::image_patch(chrome.dialog_connect)
+          : tokens::panel_patch(::ui::Color{12, 4, 4, 255}, tokens::kBorderPanel, 2.0f);
 
-  // Square-cornered thin-green fields (origin/main login rects, not rounded).
+  // Chromeless field: text + caret only, over the sprite's baked well. chromeless
+  // suppresses the control-default chrome, but the theme input role's own
+  // border/gradient/radius are applied directly, so clear them explicitly.
   ::ui::StyleStatePatch field_style{};
   field_style.base = ::ui::patch()
-                         .background(kConnectFill)
+                         .chromeless(true)
+                         .background(::ui::Color{0, 0, 0, 0})
                          .gradient(::ui::Gradient{})
                          .corner_radius(0.0f)
-                         .border(::ui::Border{{1, 1, 1, 1},
-                                              {tokens::kBorderPanel, tokens::kBorderPanel,
-                                               tokens::kBorderPanel, tokens::kBorderPanel}});
+                         .border(::ui::Border{})
+                         .outline(::ui::Outline{});
+  field_style.hover = field_style.base;
+  field_style.focus_visible = field_style.base;
   auto field_layout = ::ui::LayoutStyle{
       .align_items = ::ui::AlignItems::Center,
       .justify_content = ::ui::JustifyContent::Start,
       .flex_grow = ::ui::StyleFloat::points(1.0f),
-      .height = ::ui::Length::points(26.0f),
-      .padding = {8.0f, 8.0f, 2.0f, 2.0f}};
+      .height = ::ui::Length::points(21.0f * kS),
+      .padding = {7.0f * kS, 0.0f, 0.0f, 0.0f}};
   auto field_row = ::ui::LayoutStyle{
       .direction = ::ui::FlexDirection::Row,
       .align_items = ::ui::AlignItems::Center,
-      .width = ::ui::Length::percent(100.0f),
-      .gap = 10.0f};
-
-  // ONE connected outer frame (golden): the log well + form share the single
-  // panel border edge-to-edge, split by one internal divider hairline — NOT two
-  // nested bordered boxes. So the inner sections are fill-only (no own border).
-  ::ui::StylePatch panel_style =
-      tokens::panel_patch(kConnectFill, kConnectBorder, 2.0f);
-  ::ui::StylePatch logbox_style = tokens::fill_patch(kConnectFill);
-  ::ui::StylePatch form_style = tokens::fill_patch(kConnectFormFill);
-  ::ui::StylePatch divider_style = tokens::fill_patch(kConnectBorder);
+      .height = ::ui::Length::points(21.0f * kS),
+      .gap = 0.0f};
 
   return <Box
     key="root"
@@ -137,37 +144,33 @@ struct LobbyConnectProps {
       layout={::ui::LayoutStyle{
         .direction = ::ui::FlexDirection::Column,
         .align_items = ::ui::AlignItems::Stretch,
-        .width = ::ui::Length::points(420.0f),
-        .height = ::ui::Length::points(412.0f),
-        .padding = {0.0f, 0.0f, 0.0f, 0.0f},
-        .gap = 0.0f,
-        .border_width = 2.0f}}
+        .width = ::ui::Length::points(panel_w),
+        .height = ::ui::Length::points(panel_h)}}
       style={panel_style}>
+      <Box key="logslot" layout={::ui::LayoutStyle{
+          .height = ::ui::Length::points(8.0f * kS),
+          .flex_shrink = ::ui::StyleFloat::points(0.0f)}} />
       <Box
-        key="logbox"
+        key="logrow"
         layout={::ui::LayoutStyle{
           .direction = ::ui::FlexDirection::Column,
           .overflow = ::ui::Overflow::Hidden,
           .align_items = ::ui::AlignItems::Start,
-          .flex_grow = ::ui::StyleFloat::points(1.0f),
-          .width = ::ui::Length::percent(100.0f),
-          .padding = {10.0f, 10.0f, 8.0f, 6.0f},
-          .gap = 2.0f}}
-        style={logbox_style}>
+          .height = ::ui::Length::points(170.0f * kS),
+          .flex_shrink = ::ui::StyleFloat::points(0.0f),
+          .padding = {7.0f * kS, 0.0f, 0.0f, 0.0f},
+          .gap = 2.0f}}>
         {::ui::children(log_lines)}
       </Box>
-      <Box key="divider" layout={::ui::LayoutStyle{
-          .width = ::ui::Length::percent(100.0f),
-          .height = ::ui::Length::points(2.0f),
-          .flex_shrink = ::ui::StyleFloat::points(0.0f)}}
-        style={divider_style} />
+      <Box key="preform" layout={::ui::LayoutStyle{
+          .height = ::ui::Length::points(17.0f * kS),
+          .flex_shrink = ::ui::StyleFloat::points(0.0f)}} />
       <Box key="form" layout={::ui::LayoutStyle{
           .direction = ::ui::FlexDirection::Column,
           .align_items = ::ui::AlignItems::Stretch,
-          .width = ::ui::Length::percent(100.0f),
-          .padding = {10.0f, 10.0f, 8.0f, 10.0f},
-          .gap = 8.0f}}
-        style={form_style}>
+          .flex_shrink = ::ui::StyleFloat::points(0.0f),
+          .padding = {4.0f * kS, 11.0f * kS, 0.0f, 0.0f},
+          .gap = 6.0f * kS}}>
         <Box key="urow" layout={field_row}>
           {field_label("ulbl", "Username")}
           <Input
@@ -195,15 +198,19 @@ struct LobbyConnectProps {
             style={field_style}
           />
         </Box>
-        <Box
-          key="actions"
-          layout={::ui::LayoutStyle{
-            .direction = ::ui::FlexDirection::Row,
-            .justify_content = ::ui::JustifyContent::Center,
-            .gap = 10.0f}}>
-          <AppButton key="login" controlId="Login" variant={AppButtonVariant::Rect} selected={true} label="Login/Create" onPress={submit} />
-          <AppButton key="cancel" controlId="Cancel" variant={AppButtonVariant::Rect} label="Cancel" onPress={lobby.cancel} />
-        </Box>
+      </Box>
+      <Box key="prebtn" layout={::ui::LayoutStyle{
+          .height = ::ui::Length::points(3.0f * kS),
+          .flex_shrink = ::ui::StyleFloat::points(0.0f)}} />
+      <Box key="btnarea" layout={::ui::LayoutStyle{
+          .direction = ::ui::FlexDirection::Row,
+          .justify_content = ::ui::JustifyContent::Center,
+          .align_items = ::ui::AlignItems::Center,
+          .height = ::ui::Length::points(24.0f * kS),
+          .flex_shrink = ::ui::StyleFloat::points(0.0f),
+          .gap = 0.0f}}>
+        <AppButton key="login" controlId="Login" variant={AppButtonVariant::Chrome} label="Login/Create" onPress={submit} />
+        <AppButton key="cancel" controlId="Cancel" variant={AppButtonVariant::Chrome} label="Cancel" onPress={lobby.cancel} />
       </Box>
     </Box>
   </Box>

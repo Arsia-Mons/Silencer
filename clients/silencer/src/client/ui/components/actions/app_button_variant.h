@@ -35,10 +35,11 @@ inline ::ui::TextVisual app_button_label_visual(AppButtonVariant variant,
                                                 AppButtonSize size = AppButtonSize::Md) {
   const ::ui::Color c =
       disabled ? tokens::kTextBodyMuted : tokens::kTextTitle;
-  // Lobby/login rect labels and the cc List rows are a tier smaller than the
-  // chunky menu oval pills (golden cc list caps ~17px vs the menu's ~21px).
+  // Lobby/login rect+chrome labels and the cc List rows are a tier smaller than
+  // the chunky menu oval pills (golden login/list caps ~17px vs the menu's ~21px).
   uint16_t sz = tokens::kFontHeading;
-  if (variant == AppButtonVariant::Rect || size == AppButtonSize::List)
+  if (variant == AppButtonVariant::Rect || variant == AppButtonVariant::Chrome ||
+      size == AppButtonSize::List)
     sz = tokens::kFontLarge;
   return {.color = c,
           .font_id = tokens::kFaceHeading,
@@ -148,16 +149,17 @@ inline ::ui::StyleStatePatch app_button_oval_patch(uint32_t tex) {
   return ov;
 }
 
-// Fixed legacy chrome-button geometry: ~156x21 (origin/main button.cpp Compact).
-// The bank-7 sprite is genuinely nine-sliced, so the box may differ from 156 and
-// the caps keep the metal corners crisp.
+// Chrome-button geometry. origin/main draws these nine-sliced and SIZED TO THE
+// LABEL (ButtonVariant::Chrome size Auto): native height 21 -> 31.5 logical
+// (x1.5), paddingX 10 -> 15; a small min-width keeps short labels (OK) from
+// collapsing. The bank-7 sprite's caps keep the metal corners crisp.
 inline ::ui::LayoutStyle app_button_chrome_layout() {
   return {
       .align_items = ::ui::AlignItems::Center,
       .justify_content = ::ui::JustifyContent::Center,
-      .width = ::ui::Length::points(156.0f),
-      .height = ::ui::Length::points(21.0f),
-      .padding = {4.0f, 12.0f, 4.0f, 12.0f},
+      .min_width = ::ui::Length::points(70.0f),
+      .height = ::ui::Length::points(32.0f),
+      .padding = {15.0f, 15.0f, 6.0f, 6.0f},
   };
 }
 
