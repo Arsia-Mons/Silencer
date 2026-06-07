@@ -272,7 +272,11 @@ void render_image(SDL_Renderer *r, const ::ui::DrawCommand &c,
   SDL_SetTextureAlphaMod(tex, tint.a);
   SDL_FRect dst = {c.rect.x * scale, c.rect.y * scale, c.rect.w * scale,
                    c.rect.h * scale};
-  SDL_RenderTexture(r, tex, has_src ? &src_sub : nullptr, &dst);
+  if (img.flip_h)
+    SDL_RenderTextureRotated(r, tex, has_src ? &src_sub : nullptr, &dst, 0.0,
+                             nullptr, SDL_FLIP_HORIZONTAL);
+  else
+    SDL_RenderTexture(r, tex, has_src ? &src_sub : nullptr, &dst);
   SDL_SetTextureColorMod(tex, 255, 255, 255);
   SDL_SetTextureAlphaMod(tex, 255);
 }

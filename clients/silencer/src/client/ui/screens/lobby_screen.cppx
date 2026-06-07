@@ -527,12 +527,19 @@ struct LobbyScreenProps {
                 .width = ::ui::Length::percent(100.0f),
                 .overflow = ::ui::Overflow::Hidden,
                 .gap = ::ui::StyleValue::points(8.0f)}}>
-              <Box key="avatar" layout={::ui::LayoutStyle{
-                  .width = ::ui::Length::points(42.0f),
-                  .height = ::ui::Length::points(42.0f),
-                  .flex_shrink = ::ui::StyleFloat::points(0.0f)}}
-                style={emblem_tex ? tokens::image_patch(emblem_tex)
-                                  : ::ui::patch().background(::ui::Color{40, 70, 150, 255}).corner_radius(2.0f)} />
+              <Box key="avatarcol" layout={::ui::LayoutStyle{
+                  .direction = ::ui::FlexDirection::Column,
+                  .align_items = ::ui::AlignItems::Center,
+                  .flex_shrink = ::ui::StyleFloat::points(0.0f),
+                  .gap = ::ui::StyleValue::points(2.0f)}}>
+                <Box key="avatar" layout={::ui::LayoutStyle{
+                    .width = ::ui::Length::points(48.0f),
+                    .height = ::ui::Length::points(48.0f),
+                    .flex_shrink = ::ui::StyleFloat::points(0.0f)}}
+                  style={emblem_tex ? tokens::image_patch(emblem_tex)
+                                    : ::ui::patch().background(::ui::Color{40, 70, 150, 255}).corner_radius(2.0f)} />
+                {tiny_line("lv", "LV 0", tokens::kTextBody)}
+              </Box>
               <Box key="idcol" layout={::ui::LayoutStyle{
                   .direction = ::ui::FlexDirection::Column,
                   .align_items = ::ui::AlignItems::Start,
@@ -540,7 +547,7 @@ struct LobbyScreenProps {
                   .flex_basis = ::ui::Length::points(0.0f),
                   .min_width = ::ui::Length::points(0.0f),
                   .overflow = ::ui::Overflow::Hidden,
-                  .gap = ::ui::StyleValue::points(1.0f)}}>
+                  .gap = ::ui::StyleValue::points(4.0f)}}>
                 <Text key="name" value={agent_name}
                   layout={{.height = ::ui::Length::points(tokens::kLineLarge)}}
                   style={tokens::text_patch(tokens::kTextAgentName, tokens::kFontLarge, tokens::kFaceLarge, tokens::kLineLarge)} />
@@ -551,16 +558,18 @@ struct LobbyScreenProps {
               <Box key="statcol" layout={::ui::LayoutStyle{
                   .direction = ::ui::FlexDirection::Column,
                   .align_items = ::ui::AlignItems::Start,
-                  .width = ::ui::Length::points(82.0f),
+                  .width = ::ui::Length::points(116.0f),
                   .flex_shrink = ::ui::StyleFloat::points(0.0f),
                   .overflow = ::ui::Overflow::Hidden,
-                  .gap = ::ui::StyleValue::points(1.0f)}}>
-                {tiny_line("s0", "ENDURANCE", tokens::kTextBodyMuted)}
-                {tiny_line("s1", "SHIELD", tokens::kTextBodyMuted)}
-                {tiny_line("s2", "JETPACK", tokens::kTextBodyMuted)}
-                {tiny_line("s3", "TECH SLOTS", tokens::kTextBodyMuted)}
-                {tiny_line("s4", "HACKING", tokens::kTextBodyMuted)}
-                {tiny_line("s5", "CONTACTS", tokens::kTextBodyMuted)}
+                  .padding = {7.0f, 6.0f, 6.0f, 6.0f},
+                  .gap = ::ui::StyleValue::points(5.0f)}}
+                style={tokens::panel_patch(::ui::Color{4, 12, 6, 40}, tokens::kBorderPanel)}>
+                <BodyText key="s0" variant={BodyTextVariant::Body} tone={BodyTextTone::Muted} value="ENDURANCE:" />
+                <BodyText key="s1" variant={BodyTextVariant::Body} tone={BodyTextTone::Muted} value="SHIELD:" />
+                <BodyText key="s2" variant={BodyTextVariant::Body} tone={BodyTextTone::Muted} value="JETPACK:" />
+                <BodyText key="s3" variant={BodyTextVariant::Body} tone={BodyTextTone::Muted} value="TECH SLOTS:" />
+                <BodyText key="s4" variant={BodyTextVariant::Body} tone={BodyTextTone::Muted} value="HACKING:" />
+                <BodyText key="s5" variant={BodyTextVariant::Body} tone={BodyTextTone::Muted} value="CONTACTS:" />
               </Box>
             </Box>
             <AppButton key="leave" controlId="LeaveLobby" variant={AppButtonVariant::Rect} size={AppButtonSize::Sm} label="Agents" onPress={session.leave_to_menu} />

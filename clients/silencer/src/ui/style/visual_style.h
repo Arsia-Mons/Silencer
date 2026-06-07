@@ -85,6 +85,7 @@ struct BackgroundImage {
   // and rounded image paths; the nine-slice path always samples the full
   // texture (its insets are already texture-space).
   float src_x = 0.f, src_y = 0.f, src_w = 0.f, src_h = 0.f;
+  bool flip_h = false; // mirror horizontally (e.g. the toggle's left half-disc)
 };
 
 struct Shadow {
