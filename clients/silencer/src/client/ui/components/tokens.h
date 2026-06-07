@@ -68,6 +68,12 @@ constexpr ::ui::Color kTextWeaponDetail = {24, 124, 20, 255};
 constexpr ::ui::Color kTextWeaponDetailOff = {10, 72, 8, 255}; // disabled
 constexpr ::ui::Color kTextHud = {61, 232, 61, 255};          // #3DE83D hud-green
 
+// origin/main UI text is multi-color, not uniform green (measured from v00058).
+constexpr ::ui::Color kTextBrand = {152, 28, 28, 255};     // "Silencer" wordmark (red)
+constexpr ::ui::Color kTextVersion = {140, 64, 8, 255};    // build version (amber)
+constexpr ::ui::Color kTextAgentName = {40, 96, 200, 255}; // agent names (cornflower blue)
+constexpr ::ui::Color kTextProse = {198, 198, 198, 255};   // white prose (agency detail/description)
+
 // ---- In-game HUD LCD palette (overlay over live world; spec §1.1) ----
 // SEPARATE from the menu green family above: these read against the live world,
 // not the starfield, so they run brighter/saturated. own-data=green,
@@ -126,9 +132,11 @@ inline ::ui::StylePatch fill_patch(::ui::Color background) {
 // Solid-fill surface with a uniform border (width feeds layout via
 // LayoutStyle.border_width; the color is carried here on all four sides).
 inline ::ui::StylePatch panel_patch(::ui::Color background, ::ui::Color border,
-                                    float border_width = kBorderWidth) {
+                                    float border_width = kBorderWidth,
+                                    float corner_radius = 0.0f) {
   return ::ui::patch()
       .background(background)
+      .corner_radius(corner_radius)
       .border(::ui::Border{
           {border_width, border_width, border_width, border_width},
           {border, border, border, border}});

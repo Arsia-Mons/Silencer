@@ -72,6 +72,9 @@ using ::ui::components::TextProps;
     style = app_button_chrome_patch(chrome.chrome_btn_idle,
                                     chrome.chrome_btn_focus,
                                     ::ui::Color{lit, lit, lit, 255});
+  } else if (props.variant == AppButtonVariant::Rect) {
+    layout = app_button_rect_layout();
+    style = app_button_rect_patch(props.selected, ::ui::Color{lit, lit, lit, 255});
   }
 
   // The label is rendered as a styled Text CHILD (not the bare-string fallback):
@@ -80,7 +83,7 @@ using ::ui::components::TextProps;
   // A Text child resolves the green app_theme text color + the variant's face.
   ::ui::StyleStatePatch label_style{};
   label_style.base = ::ui::patch().text(app_button_label_visual(
-      props.variant, props.disabled));
+      props.variant, props.disabled, props.label_size));
   ::ui::UiElement label_el =
       (props.label && props.children.count == 0)
           ? Text(TextProps{.value = props.label, .style = label_style})

@@ -228,6 +228,8 @@ bake(40, 4, cppxChrome.dialog_msg, &cppxChrome.dialog_msg_w, &cppxChrome.dialog_
 bake(40, 2, cppxChrome.dialog_pw, &cppxChrome.dialog_pw_w, &cppxChrome.dialog_pw_h);
 // bank 6 idx0 — the full-screen starfield+planet menu background.
 bake(6, 0, cppxChrome.starfield);
+// bank 7 idx1 — the lobby backdrop (dim Mars + circuit HUD), distinct from bank 6.
+bake(7, 1, cppxChrome.lobby_backdrop);
 // bank 208 frame 60 — the static SILENCER logo (final reveal frame).
 bake(208, 60, cppxChrome.logo, &cppxChrome.logo_w, &cppxChrome.logo_h);
 // SIL-94/107: the logo reveal frames (individual textures). [0] is the full

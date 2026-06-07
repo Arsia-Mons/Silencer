@@ -6,6 +6,7 @@
 #include "client/ui/components/text/text.h"
 #include "client/ui/hooks/use_navigation.h"
 #include "client/ui/hooks/use_settings.h"
+#include "ui/components/box.h"
 #include "ui/runtime/react.h"
 
 #include <functional>
@@ -17,6 +18,8 @@ namespace {
 // unqualified, so pull in the silencer semantic layer + the runtime children().
 using namespace silencer;
 using ::ui::children;
+using ::ui::components::Box;
+using ::ui::components::BoxProps;
 
 struct OptionsDisplayProps {
   uint32_t unused = 0;
@@ -43,26 +46,35 @@ struct OptionsDisplayProps {
       nav.pop_current();
   };
 
+  // origin/main anchors this dialog in the upper third (title baseline ~y168), not
+  // screen-centered like the options root.
   return <ScreenLayout key="root" variant={ScreenLayoutVariant::Overlay}>
-    <ScreenTitle key="title" variant={ScreenTitleVariant::Screen} value="Display Options" />
-    <BooleanSettingRow
-      key="fullscreen"
-      controlId="FullscreenToggle"
-      checked={settings.fullscreen}
-      label="Fullscreen"
-      onChange={settings.set_fullscreen}
-    />
-    <BooleanSettingRow
-      key="smooth"
-      controlId="SmoothScalingToggle"
-      checked={settings.smooth_scaling}
-      label="Smooth Scaling"
-      onChange={settings.set_smooth_scaling}
-    />
-    <ActionRow key="actions">
-      <AppButton key="save" controlId="OptionsSave" variant={AppButtonVariant::Oval} label="Save" onPress={save} />
-      <AppButton key="cancel" controlId="OptionsCancel" variant={AppButtonVariant::Oval} label="Cancel" onPress={cancel} />
-    </ActionRow>
+    <Box key="col" layout={::ui::LayoutStyle{
+        .position = ::ui::PositionType::Absolute,
+        .position_inset = ::ui::EdgeSizes{0.0f, 0.0f, 168.0f, {}},
+        .direction = ::ui::FlexDirection::Column,
+        .align_items = ::ui::AlignItems::Center,
+        .gap = 33.0f}}>
+      <ScreenTitle key="title" variant={ScreenTitleVariant::Screen} value="Display Options" />
+      <BooleanSettingRow
+        key="fullscreen"
+        controlId="FullscreenToggle"
+        checked={settings.fullscreen}
+        label="Fullscreen"
+        onChange={settings.set_fullscreen}
+      />
+      <BooleanSettingRow
+        key="smooth"
+        controlId="SmoothScalingToggle"
+        checked={settings.smooth_scaling}
+        label="Smooth Scaling"
+        onChange={settings.set_smooth_scaling}
+      />
+      <ActionRow key="actions">
+        <AppButton key="save" controlId="OptionsSave" variant={AppButtonVariant::Oval} labelSize={45} label="Save" onPress={save} />
+        <AppButton key="cancel" controlId="OptionsCancel" variant={AppButtonVariant::Oval} labelSize={45} label="Cancel" onPress={cancel} />
+      </ActionRow>
+    </Box>
   </ScreenLayout>
 }
 

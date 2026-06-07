@@ -15,6 +15,7 @@
 
 #include <functional>
 #include <memory>
+#include <string>
 
 namespace client::ui {
 namespace {
@@ -23,6 +24,19 @@ using namespace silencer;
 using ::ui::children;
 using ::ui::components::Box;
 using ::ui::components::BoxProps;
+
+// origin/main wide-tracks the version footer; the text engine has no letter-
+// spacing knob, so interleave spaces to reproduce the tracking.
+const char *spaced_version(const char *v) {
+  std::string s = std::string("Silencer v") + (v ? v : "");
+  std::string out;
+  for (size_t i = 0; i < s.size(); ++i) {
+    out += s[i];
+    if (i + 1 < s.size())
+      out += ' ';
+  }
+  return ::ui::copy_string(out.c_str());
+}
 
 struct MainMenuProps {
   uint32_t unused = 0;
@@ -79,59 +93,49 @@ struct MainMenuProps {
       nav.push(std::make_unique<OptionsScreen>());
   };
 
-  // The SILENCER wordmark is the bank-208 logo sprite (drawn in a ~350px slot
-  // that flex-shrinks so the right oval stack stays in-bounds on narrow/portrait
-  // windows — the image stretches into the shrunk slot). Falls back to the
-  // Hero-title text if the sprite has not baked yet so the menu never blanks.
+  // The SILENCER wordmark (bank-208 logo sprite), drawn at its native size. Falls
+  // back to the Hero title until the bake lands.
   ::ui::UiElement logo =
       chrome.logo
           ? Box(BoxProps{
                 .key = "logoimg",
                 .layout = ::ui::LayoutStyle{
-                    .flex_shrink = ::ui::StyleFloat::points(1.0f),
-                    .width = ::ui::Length::points(350.0f),
-                    .min_width = ::ui::Length::points(0.0f),
-                    .height = ::ui::Length::points((float)chrome.logo_h)},
+                    .width = ::ui::Length::points(523.0f),
+                    .height = ::ui::Length::points(53.0f),
+                    .flex_shrink = ::ui::StyleFloat::points(0.0f)},
                 .style = logo_style})
           : ScreenTitle(ScreenTitleProps{.key = "logotxt",
                                          .variant = ScreenTitleVariant::Hero,
                                          .value = "SILENCER"});
 
+  // origin/main: the logo sits left, a right-anchored column of green oval buttons
+  // sits right. The horizontal fan (Connect widest, Exit pulled in) falls out of
+  // center-aligning sized-to-text ovals — no transcribed pixel offsets.
   return <ScreenLayout key="root" variant={ScreenLayoutVariant::Menu}>
-    <Box
-      key="row"
-      layout={::ui::LayoutStyle{
+    <Box key="body" layout={::ui::LayoutStyle{
         .direction = ::ui::FlexDirection::Row,
         .align_items = ::ui::AlignItems::Center,
         .justify_content = ::ui::JustifyContent::SpaceBetween,
         .width = ::ui::Length::percent(100.0f),
-        .height = ::ui::Length::percent(100.0f)}}>
+        .height = ::ui::Length::percent(100.0f),
+        .padding = {18.0f, 56.0f, {}, {}}}}>
       {logo}
-      <Box
-        key="stack"
-        layout={::ui::LayoutStyle{
+      <Box key="stack" layout={::ui::LayoutStyle{
           .direction = ::ui::FlexDirection::Column,
-          .align_items = ::ui::AlignItems::Start,
+          .align_items = ::ui::AlignItems::Center,
           .flex_shrink = ::ui::StyleFloat::points(0.0f),
-          .gap = 34.0f}}>
-        <Box key="w0" layout={::ui::LayoutStyle{.margin = ::ui::EdgeSizes{20.0f, 0.0f, 0.0f, 0.0f}}}>
-          <AppButton key="tutorial" controlId="Tutorial" variant={AppButtonVariant::Oval} label="Tutorial" onPress={session.start_tutorial} />
-        </Box>
-        <Box key="w1" layout={::ui::LayoutStyle{.margin = ::ui::EdgeSizes{-40.0f, 0.0f, 0.0f, 0.0f}}}>
-          <AppButton key="connect" controlId="ConnectToLobby" variant={AppButtonVariant::Oval} label="Connect To Lobby" onPress={session.play_online} />
-        </Box>
-        <Box key="w2" layout={::ui::LayoutStyle{.margin = ::ui::EdgeSizes{40.0f, 0.0f, 0.0f, 0.0f}}}>
-          <AppButton key="options" controlId="Options" variant={AppButtonVariant::Oval} label="Options" onPress={open_options} />
-        </Box>
+          .margin = ::ui::EdgeSizes{{}, {}, 92.0f, {}},
+          .gap = 52.0f}}>
+        <AppButton key="tutorial" controlId="Tutorial" variant={AppButtonVariant::Oval} label="Tutorial" onPress={session.start_tutorial} />
+        <AppButton key="connect" controlId="ConnectToLobby" variant={AppButtonVariant::Oval} label="Connect To Lobby" onPress={session.play_online} />
+        <AppButton key="options" controlId="Options" variant={AppButtonVariant::Oval} label="Options" onPress={open_options} />
         <AppButton key="exit" controlId="Exit" variant={AppButtonVariant::Oval} disabled={!app.can_quit} label="Exit" onPress={app.quit} />
       </Box>
     </Box>
-    <Box
-      key="footer"
-      layout={::ui::LayoutStyle{
+    <Box key="footer" layout={::ui::LayoutStyle{
         .position = ::ui::PositionType::Absolute,
         .position_inset = ::ui::EdgeSizes{10.0f, {}, {}, 17.0f}}}>
-      <BodyText key="ver" variant={BodyTextVariant::Body} value={use_text_storage("Silencer v%s", app.version ? app.version : "")} />
+      <BodyText key="ver" variant={BodyTextVariant::Body} value={spaced_version(app.version)} />
     </Box>
   </ScreenLayout>
 }

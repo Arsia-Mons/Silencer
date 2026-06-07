@@ -19,7 +19,7 @@
 
 namespace silencer {
 
-enum class AppButtonVariant { Primary, Secondary, Danger, Ghost, Oval, Chrome };
+enum class AppButtonVariant { Primary, Secondary, Danger, Ghost, Oval, Chrome, Rect };
 enum class AppButtonSize { Md, Sm, Lg };
 
 // Per-variant label TextVisual (color + face + size + centered). The runtime only
@@ -29,25 +29,20 @@ enum class AppButtonSize { Md, Sm, Lg };
 // app_theme text color + the variant's legacy face, instead of the bare-string
 // child fallback (which paints with the engine's neutral kTextFill grey).
 inline ::ui::TextVisual app_button_label_visual(AppButtonVariant variant,
-                                                bool disabled) {
+                                                bool disabled,
+                                                uint16_t size_override = 0) {
   const ::ui::Color c =
       disabled ? tokens::kTextBodyMuted : tokens::kTextTitle;
-  switch (variant) {
-  case AppButtonVariant::Oval:
-    // origin/main oval/button labels render in bank 135 (the Heading face).
-    return {.color = c,
-            .font_id = tokens::kFaceHeading,
-            .font_size = tokens::kFontHeading,
-            .align = ::ui::TextAlign::Center,
-            .line_height = tokens::kLineHeading};
-  case AppButtonVariant::Chrome:
-  default:
-    return {.color = c,
-            .font_id = tokens::kFaceHeading,
-            .font_size = tokens::kFontHeading,
-            .align = ::ui::TextAlign::Center,
-            .line_height = tokens::kLineHeading};
-  }
+  uint16_t sz = tokens::kFontHeading;
+  if (variant == AppButtonVariant::Rect)
+    sz = tokens::kFontLarge; // lobby/login labels smaller than menu pills
+  if (size_override)
+    sz = size_override;
+  return {.color = c,
+          .font_id = tokens::kFaceHeading,
+          .font_size = sz,
+          .align = ::ui::TextAlign::Center,
+          .line_height = (float)sz};
 }
 
 // Layout-only baseline geometry. Mirrors ui::components::ButtonProps default
@@ -82,17 +77,22 @@ inline ::ui::LayoutStyle app_button_layout(AppButtonSize size, bool /*selected*/
 // To Lobby" is wider than "Exit"). Native height 33; a per-size min width keeps
 // short labels from collapsing.
 inline ::ui::LayoutStyle app_button_oval_layout(AppButtonSize size) {
-  float min_w = 168.0f;
-  if (size == AppButtonSize::Sm)
+  // origin/main draws the oval ~1.5x its native cell: menu pills (Md) and setting
+  // pills (Lg) are a tall fixed-width stadium (~290x49); Sm is the compact
+  // lobby/control oval.
+  float min_w = 290.0f, h = 49.0f;
+  if (size == AppButtonSize::Sm) {
     min_w = 104.0f;
-  else if (size == AppButtonSize::Lg)
-    min_w = 200.0f;
+    h = 33.0f;
+  } else if (size == AppButtonSize::Lg) {
+    min_w = 320.0f;
+  }
   return {
       .align_items = ::ui::AlignItems::Center,
       .justify_content = ::ui::JustifyContent::Center,
       .min_width = ::ui::Length::points(min_w),
-      .height = ::ui::Length::points(33.0f),
-      .padding = {28.0f, 28.0f, 6.0f, 6.0f}, // {left,right,top,bottom}; clear the caps
+      .height = ::ui::Length::points(h),
+      .padding = {16.0f, 16.0f, 6.0f, 6.0f}, // {left,right,top,bottom}; clear the caps
   };
 }
 
@@ -197,6 +197,59 @@ app_button_chrome_patch(uint32_t idle, uint32_t focus,
   ov.base = chrome(idle, ::ui::Color{255, 255, 255, 255});
   ov.hover = chrome(f, lit);
   ov.focus_visible = chrome(f, lit);
+  return ov;
+}
+
+// Square-cornered rect button geometry (origin/main lobby/login buttons): thin
+// green-hairline rectangles, compact. Sized to label with a per-call min width.
+inline ::ui::LayoutStyle app_button_rect_layout() {
+  return {
+      .align_items = ::ui::AlignItems::Center,
+      .justify_content = ::ui::JustifyContent::Center,
+      .min_width = ::ui::Length::points(96.0f),
+      .height = ::ui::Length::points(30.0f),
+      .padding = {14.0f, 14.0f, 4.0f, 4.0f},
+  };
+}
+
+// Green-hairline rect button paint (lobby/login). idle = near-black fill + dim
+// green border, square corners; `selected` fills it (the default/primary action,
+// e.g. Login/Create) and hover/focus brightens. The flat 2-stop gradient
+// replaces the theme-role's slate gradient so the green reads.
+inline ::ui::StyleStatePatch app_button_rect_patch(bool selected,
+                                                   ::ui::Color lit = {255, 255,
+                                                                      255,
+                                                                      255}) {
+  const ::ui::TextVisual label{.color = tokens::kTextTitle,
+                               .font_id = tokens::kFaceHeading,
+                               .font_size = tokens::kFontLarge,
+                               .align = ::ui::TextAlign::Center,
+                               .line_height = tokens::kLineLarge};
+  auto rect = [&](::ui::Color fill, ::ui::Color border) -> ::ui::StylePatch {
+    ::ui::StylePatch p =
+        ::ui::patch()
+            .background(fill)
+            .gradient(::ui::Gradient{.angle_deg = 0.0f,
+                                     .stop_count = 2,
+                                     .stops = {{0.0f, fill}, {1.0f, fill}}})
+            .corner_radius(0.0f)
+            .border(::ui::Border{{1, 1, 1, 1},
+                                 {tokens::kBorderHeroPanel, tokens::kBorderHeroPanel,
+                                  tokens::kBorderHeroPanel, tokens::kBorderHeroPanel}});
+    p.border = ::ui::opt(::ui::Border{{1, 1, 1, 1}, {border, border, border, border}});
+    p.text = ::ui::opt(label);
+    return p;
+  };
+  const ::ui::Color idle_fill = selected ? ::ui::Color{12, 56, 8, 255}
+                                         : ::ui::Color{2, 12, 2, 255};
+  const ::ui::Color idle_border =
+      selected ? tokens::kAccent : tokens::kBorderHeroPanel;
+  const ::ui::Color hot_fill = selected ? ::ui::Color{20, 92, 12, 255}
+                                        : ::ui::Color{8, 36, 6, 255};
+  ::ui::StyleStatePatch ov{};
+  ov.base = rect(idle_fill, idle_border);
+  ov.hover = rect(hot_fill, lit);
+  ov.focus_visible = rect(hot_fill, lit);
   return ov;
 }
 

@@ -1,11 +1,15 @@
 #include "client/ui/components/text/screen_title.h"
 
+#include "ui/components/box.h"
 #include "ui/components/text.h"
 
 #include "client/ui/components/tokens.h"
 
 namespace silencer {
 
+using ::ui::children;
+using ::ui::components::Box;
+using ::ui::components::BoxProps;
 using ::ui::components::Text;
 using ::ui::components::TextProps;
 
@@ -36,13 +40,43 @@ using ::ui::components::TextProps;
   case ScreenTitleVariant::Popup:
     color = tokens::kTextDialogTitle;
     break;
+  case ScreenTitleVariant::Brand:
+    color = tokens::kTextBrand;
+    face = tokens::kFaceTitle;
+    font = tokens::kFontLarge;
+    line = tokens::kLineLarge;
+    height = tokens::kLineLarge;
+    break;
+  case ScreenTitleVariant::Console:
+    color = tokens::kTextTitle;
+    face = tokens::kFaceBody;
+    font = tokens::kFontBodyEm;
+    line = tokens::kLineBody;
+    height = tokens::kLineBody;
+    break;
+  case ScreenTitleVariant::Prose:
+    color = tokens::kTextProse;
+    face = tokens::kFaceLarge;
+    font = tokens::kFontLarge;
+    line = tokens::kLineLarge;
+    height = tokens::kLineLarge;
+    break;
   }
-  return <Text
-    key={props.key}
-    value={props.value}
-    layout={{.height = ::ui::Length::points(height)}}
-    style={tokens::text_patch(color, font, face, line)}
-  />
+  ::ui::StylePatch style = ::ui::patch().text(::ui::TextVisual{
+      .color = color, .font_id = face, .font_size = font, .line_height = line});
+  if (!props.centered)
+    return <Text key={props.key} value={props.value}
+      layout={{.height = ::ui::Length::points(height)}} style={style} />
+  // A full-width row that centers its content-sized label (origin titles sit
+  // centered in a baked notch).
+  return <Box key={props.key} layout={::ui::LayoutStyle{
+      .direction = ::ui::FlexDirection::Row,
+      .justify_content = ::ui::JustifyContent::Center,
+      .width = ::ui::Length::percent(100.0f),
+      .height = ::ui::Length::points(height)}}>
+    <Text key="t" value={props.value}
+      layout={{.height = ::ui::Length::points(height)}} style={style} />
+  </Box>
 }
 
 } // namespace silencer

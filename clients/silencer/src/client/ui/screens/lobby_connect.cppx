@@ -10,6 +10,7 @@
 
 #include <functional>
 #include <string>
+#include <vector>
 
 namespace client::ui {
 namespace {
@@ -48,8 +49,37 @@ struct LobbyConnectProps {
   std::function<void(const ::ui::ActivationEvent &)> on_activate =
       [submit](const ::ui::ActivationEvent &) { submit(); };
 
-  const char *log = use_text_storage("%s", lobby.status_log.c_str());
+  // The status log is multi-line; the engine doesn't break on '\n', so each line
+  // is its own BodyText stacked in the log well.
+  std::vector<::ui::UiElement> log_lines;
+  {
+    const std::string &s = lobby.status_log;
+    size_t start = 0;
+    for (int i = 0; start <= s.size(); ++i) {
+      size_t nl = s.find('\n', start);
+      std::string line =
+          s.substr(start, nl == std::string::npos ? std::string::npos : nl - start);
+      if (!line.empty()) {
+        const char *lk = ::ui::copy_string(("ln" + std::to_string(i)).c_str());
+        const char *lv = ::ui::copy_string(line.c_str());
+        log_lines.push_back(BodyText(
+            BodyTextProps{.key = lk, .variant = BodyTextVariant::Detail, .value = lv}));
+      }
+      if (nl == std::string::npos)
+        break;
+      start = nl + 1;
+    }
+  }
 
+  // Square-cornered thin-green fields (origin/main login rects, not rounded).
+  ::ui::StyleStatePatch field_style{};
+  field_style.base = ::ui::patch()
+                         .background(::ui::Color{0, 0, 0, 255})
+                         .gradient(::ui::Gradient{})
+                         .corner_radius(0.0f)
+                         .border(::ui::Border{{1, 1, 1, 1},
+                                              {tokens::kBorderPanel, tokens::kBorderPanel,
+                                               tokens::kBorderPanel, tokens::kBorderPanel}});
   auto field_layout = ::ui::LayoutStyle{
       .align_items = ::ui::AlignItems::Center,
       .justify_content = ::ui::JustifyContent::Start,
@@ -62,14 +92,14 @@ struct LobbyConnectProps {
       .width = ::ui::Length::percent(100.0f),
       .gap = 10.0f};
 
-  // origin/main: a BRIGHT thick green frame over pure black, with an inner
-  // bordered well holding the connection log. Brighter/thicker than the dim
-  // lobby panels.
-  const ::ui::Color kConnectBorder = {60, 200, 60, 255};
+  // The panel interior carries a faint dark fill (golden ~(12,4,4)), not flat
+  // black — the origin login frame is a dim sprite-backed well over black.
+  const ::ui::Color kConnectBorder = {46, 150, 46, 255};
+  const ::ui::Color kConnectFill = {11, 10, 7, 255};
   ::ui::StylePatch panel_style =
-      tokens::panel_patch(tokens::kSurfaceMenu, kConnectBorder, 2.0f);
+      tokens::panel_patch(kConnectFill, kConnectBorder, 2.0f);
   ::ui::StylePatch logbox_style =
-      tokens::panel_patch(::ui::Color{0, 0, 0, 255}, kConnectBorder, 1.0f);
+      tokens::panel_patch(kConnectFill, kConnectBorder, 1.0f);
 
   return <Box
     key="root"
@@ -85,22 +115,24 @@ struct LobbyConnectProps {
         .direction = ::ui::FlexDirection::Column,
         .align_items = ::ui::AlignItems::Stretch,
         .width = ::ui::Length::points(420.0f),
-        .height = ::ui::Length::points(420.0f),
-        .padding = {12.0f, 12.0f, 12.0f, 12.0f},
+        .height = ::ui::Length::points(412.0f),
+        .padding = {7.0f, 7.0f, 7.0f, 7.0f},
         .gap = 8.0f,
         .border_width = 2.0f}}
       style={panel_style}>
       <Box
         key="logbox"
         layout={::ui::LayoutStyle{
+          .direction = ::ui::FlexDirection::Column,
           .overflow = ::ui::Overflow::Hidden,
           .align_items = ::ui::AlignItems::Start,
           .flex_grow = ::ui::StyleFloat::points(1.0f),
           .width = ::ui::Length::percent(100.0f),
           .padding = {8.0f, 8.0f, 6.0f, 6.0f},
+          .gap = 2.0f,
           .border_width = 1.0f}}
         style={logbox_style}>
-        <BodyText key="log" variant={BodyTextVariant::Message} value={log} />
+        {::ui::children(log_lines)}
       </Box>
       <Box key="urow" layout={field_row}>
         <BodyText key="ulbl" variant={BodyTextVariant::Body} value="Username" />
@@ -113,6 +145,7 @@ struct LobbyConnectProps {
           onChange={set_username}
           onActivate={on_activate}
           layout={field_layout}
+          style={field_style}
         />
       </Box>
       <Box key="prow" layout={field_row}>
@@ -125,6 +158,7 @@ struct LobbyConnectProps {
           onChange={set_password}
           onActivate={on_activate}
           layout={field_layout}
+          style={field_style}
         />
       </Box>
       <Box
@@ -133,8 +167,8 @@ struct LobbyConnectProps {
           .direction = ::ui::FlexDirection::Row,
           .justify_content = ::ui::JustifyContent::Center,
           .gap = 10.0f}}>
-        <AppButton key="login" controlId="Login" variant={AppButtonVariant::Oval} size={AppButtonSize::Sm} label="Login/Create" onPress={submit} />
-        <AppButton key="cancel" controlId="Cancel" variant={AppButtonVariant::Oval} size={AppButtonSize::Sm} label="Cancel" onPress={lobby.cancel} />
+        <AppButton key="login" controlId="Login" variant={AppButtonVariant::Rect} selected={true} label="Login/Create" onPress={submit} />
+        <AppButton key="cancel" controlId="Cancel" variant={AppButtonVariant::Rect} label="Cancel" onPress={lobby.cancel} />
       </Box>
     </Box>
   </Box>

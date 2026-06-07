@@ -98,10 +98,9 @@ struct CharacterCreateProviderProps {
   return <Box key={key} layout={::ui::LayoutStyle{
       .direction = ::ui::FlexDirection::Row,
       .align_items = ::ui::AlignItems::Center,
-      .justify_content = ::ui::JustifyContent::SpaceBetween,
       .width = ::ui::Length::percent(100.0f),
       .gap = 8.0f}}>
-    <BodyText key="l" variant={BodyTextVariant::Body} value={adv.label} />
+    <BodyText key="l" variant={BodyTextVariant::Body} tone={BodyTextTone::Prose} value={adv.label} />
     <BodyText key="b" variant={BodyTextVariant::Strong} value={adv.bonus} />
   </Box>
 }
@@ -110,7 +109,7 @@ struct CharacterCreateProviderProps {
 // BodyText — the engine does not break on '\n' and screens don't use the wrap
 // path, so multi-line text is composed as stacked fixed-height rows).
 ::ui::UiElement desc_line(const char *key, const char *value) {
-  return <BodyText key={key} variant={BodyTextVariant::Body} value={value} />
+  return <BodyText key={key} variant={BodyTextVariant::Body} tone={BodyTextTone::Prose} value={value} />
 }
 
 // One roster row: select an existing agent. Out-of-range slots render nothing.
@@ -187,7 +186,7 @@ struct CharacterCreateContentProps {
             .flex_basis = ::ui::Length::points(0.0f),
             .min_width = ::ui::Length::points(0.0f),
             .gap = 12.0f}}>
-          <ScreenTitle key="title" variant={ScreenTitleVariant::Screen} value="SELECT AGENT" />
+          <ScreenTitle key="title" variant={ScreenTitleVariant::Screen} centered={true} value="SELECT AGENT" />
           <AppButton key="new" controlId="CreateNewCharacterBg" variant={AppButtonVariant::Oval} disabled={true} label="Create New Character" onPress={w.open_alias} />
         </Box>
         <Box key="rightpane" layout={::ui::LayoutStyle{
@@ -199,13 +198,13 @@ struct CharacterCreateContentProps {
           .position = ::ui::PositionType::Absolute,
           .position_inset = ::ui::EdgeSizes{268.0f, 250.0f, {}, {}},
           .direction = ::ui::FlexDirection::Column,
-          .align_items = ::ui::AlignItems::Center,
+          .align_items = ::ui::AlignItems::Stretch,
           .width = ::ui::Length::points(424.0f),
-          .padding = {14.0f, 24.0f, 18.0f, 24.0f},
-          .gap = 12.0f,
+          .padding = {18.0f, 24.0f, 22.0f, 24.0f},
+          .gap = 14.0f,
           .border_width = 2.0f}}
-        style={tokens::panel_patch(tokens::kSurfaceHeroPanel, tokens::kBorderHeroPanel, 2.0f)}>
-        <ScreenTitle key="t" variant={ScreenTitleVariant::Screen} value="SILENCER ALIAS" />
+        style={tokens::panel_patch(tokens::kSurfaceHeroPanel, tokens::kBorderHeroPanel, 2.0f, 14.0f)}>
+        <ScreenTitle key="t" variant={ScreenTitleVariant::Screen} centered={true} value="SILENCER ALIAS" />
         <Input
           key="alias"
           id="Alias"
@@ -257,7 +256,7 @@ struct CharacterCreateContentProps {
             .flex_basis = ::ui::Length::points(0.0f),
             .min_width = ::ui::Length::points(0.0f),
             .gap = 14.0f}}>
-          <ScreenTitle key="t" variant={ScreenTitleVariant::Screen} value="SELECT AGENCY" />
+          <ScreenTitle key="t" variant={ScreenTitleVariant::Screen} centered={true} value="SELECT AGENCY" />
           {agency_row(0, pi, on_pick, set_preview)}
           {agency_row(1, pi, on_pick, set_preview)}
           {agency_row(2, pi, on_pick, set_preview)}
@@ -272,12 +271,12 @@ struct CharacterCreateContentProps {
             .min_width = ::ui::Length::points(0.0f),
             .overflow = ::ui::Overflow::Hidden,
             .gap = 4.0f}}>
-          <ScreenTitle key="adv" variant={ScreenTitleVariant::Screen} value="Advantages" />
+          <ScreenTitle key="adv" variant={ScreenTitleVariant::Prose} value="Advantages" />
           {advantage_row("a0", a.advantages[0])}
           {advantage_row("a1", a.advantages[1])}
           {advantage_row("a2", a.advantages[2])}
           {advantage_row("a3", a.advantages[3])}
-          <ScreenTitle key="dh" variant={ScreenTitleVariant::Screen} value="Description" />
+          <ScreenTitle key="dh" variant={ScreenTitleVariant::Prose} value="Description" />
           {desc_lines}
         </Box>
       </Box>

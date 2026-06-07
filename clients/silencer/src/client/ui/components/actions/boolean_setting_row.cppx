@@ -23,22 +23,23 @@ using ::ui::components::BoxProps;
 
   const uint32_t left = checked ? chrome.toggle_on_l : chrome.toggle_off_l;
   const uint32_t right = checked ? chrome.toggle_on_r : chrome.toggle_off_r;
-  const float cw = chrome.toggle_w ? (float)chrome.toggle_w : 16.0f;
-  const float ch = chrome.toggle_h ? (float)chrome.toggle_h : 16.0f;
-  auto cell = ::ui::LayoutStyle{.width = ::ui::Length::points(cw),
-                                .height = ::ui::Length::points(ch)};
+  // origin/main draws the toggle coin at the full pill height (~69x49 = two
+  // 34x49 half-disc cells); upscale the baked sprite to that footprint.
+  auto cell = ::ui::LayoutStyle{.width = ::ui::Length::points(34.0f),
+                                .height = ::ui::Length::points(49.0f)};
 
   return <Box
     key={props.key}
     layout={::ui::LayoutStyle{
       .direction = ::ui::FlexDirection::Row,
       .align_items = ::ui::AlignItems::Center,
-      .gap = 12.0f}}>
+      .gap = 43.0f}}>
     <AppButton
       key="lbl"
       controlId={props.control_id}
       variant={AppButtonVariant::Oval}
       size={AppButtonSize::Lg}
+      labelSize={45}
       label={props.label}
       onPress={toggle}
     />

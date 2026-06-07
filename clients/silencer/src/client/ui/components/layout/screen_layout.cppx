@@ -20,21 +20,22 @@ using ::ui::components::DialogProps;
 // keep today's modal behavior.
 ::ui::UiElement ScreenLayout(const ScreenLayoutProps &props) {
   if (props.variant == ScreenLayoutVariant::Game) {
-    // The lobby console floats over the starfield+Mars backdrop (origin/main),
-    // not flat black. Panels are near-opaque so the backdrop reads through the
-    // gutters + behind the center. Tight padding/gap so panels reach the edges.
+    // The lobby uses its own dim backdrop (bank 7 idx1), not the bright menu
+    // starfield. Falls back to starfield then flat black until baked.
     client::ui::ChromeTextures chrome = client::ui::use_chrome();
+    uint32_t backdrop = chrome.lobby_backdrop ? chrome.lobby_backdrop
+                                              : chrome.starfield;
     ::ui::StylePatch game_bg =
-        chrome.starfield ? tokens::image_patch(chrome.starfield)
-                         : tokens::fill_patch(tokens::kSurfaceGame);
+        backdrop ? tokens::image_patch(backdrop)
+                 : tokens::fill_patch(tokens::kSurfaceGame);
     return <Box
       key={props.key}
       layout={::ui::LayoutStyle{
         .direction = ::ui::FlexDirection::Column,
         .width = ::ui::Length::percent(100.0f),
         .height = ::ui::Length::percent(100.0f),
-        .padding = {10.0f, 10.0f, 8.0f, 8.0f},
-        .gap = 8.0f,
+        .padding = {10.0f, 10.0f, 34.0f, 34.0f},
+        .gap = 6.0f,
       }}
       style={game_bg}
     >
@@ -58,7 +59,7 @@ using ::ui::components::DialogProps;
         .width = ::ui::Length::percent(100.0f),
         .height = ::ui::Length::percent(100.0f),
         .padding = {24.0f, 24.0f, 24.0f, 24.0f},
-        .gap = 12.0f,
+        .gap = 30.0f,
       }}
       style={overlay_bg}
     >

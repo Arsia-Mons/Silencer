@@ -59,6 +59,9 @@ struct ChromeTextures {
   // Full-screen starfield+planet background (bank 6 idx0), stretched to the
   // screen root (no aspect-cover in v1 — legacy stretched too).
   uint32_t starfield = 0;
+  // Lobby backdrop (bank 7 idx1): dim Mars + circuit HUD, drawn full-screen by the
+  // lobby cluster instead of the bright menu starfield.
+  uint32_t lobby_backdrop = 0;
   // Static SILENCER logo (bank 208 frame 60 — the final frame of the legacy
   // reveal animation; SIL-107 animates the full 29..60 sequence).
   uint32_t logo = 0;

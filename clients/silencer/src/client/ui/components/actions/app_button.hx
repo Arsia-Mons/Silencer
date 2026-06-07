@@ -20,6 +20,9 @@ struct AppButtonProps {
   // fill) is opt-in for prominent/primary actions.
   AppButtonVariant variant = AppButtonVariant::Secondary;
   AppButtonSize size = AppButtonSize::Md;
+  // 0 => variant default. origin's settings dialogs (audio/display) draw a larger
+  // oval label than the menu screens, so those call sites set it explicitly.
+  uint16_t label_size = 0;
   bool disabled = false;
   bool selected = false;
   bool default_focused = false;

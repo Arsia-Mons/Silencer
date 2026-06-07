@@ -9,8 +9,10 @@
 #include "client/ui/hooks/use_games.h"
 #include "client/ui/hooks/use_lobby_chat.h"
 #include "client/ui/hooks/use_progression.h"
+#include "client/ui/hooks/use_chrome.h"
 #include "client/ui/hooks/use_session.h"
 #include "client/ui/hooks/use_staging.h"
+#include "client/ui/screens/character_create_data.h"
 #include "ui/components/box.h"
 #include "ui/components/input.h"
 #include "ui/components/text.h"
@@ -42,6 +44,21 @@ using ::ui::components::TextProps;
     style={tokens::text_patch(color, tokens::kFontTiny, tokens::kFaceTiny,
                               tokens::kLineTiny)}
   />
+}
+
+// One AgentCard stat row: label in a fixed-width column, value aligned after it
+// (origin lines the WINS/LOSSES/XP values into one column).
+::ui::UiElement stat_kv(const char *key, const char *label, const char *value) {
+  return <Box key={key} layout={::ui::LayoutStyle{
+      .direction = ::ui::FlexDirection::Row,
+      .width = ::ui::Length::percent(100.0f),
+      .height = ::ui::Length::points(tokens::kLineTiny),
+      .gap = 2.0f}}>
+    <Box key="lc" layout={::ui::LayoutStyle{.width = ::ui::Length::points(64.0f)}}>
+      {tiny_line("l", label, tokens::kTextBody)}
+    </Box>
+    {tiny_line("v", value, tokens::kTextBody)}
+  </Box>
 }
 
 // One staging-roster row as its own vector element (SIL-104: the structured,
@@ -93,42 +110,9 @@ using ::ui::components::TextProps;
 // interior is mostly transparent so the Mars/starfield backdrop reads through
 // (not opaque cards). Faint dark-green wash + a thin green-dim border.
 inline ::ui::StylePatch lobby_panel_style() {
-  return tokens::panel_patch(::ui::Color{4, 12, 6, 90}, tokens::kBorderPanel);
-}
-
-// The BOTTOM lamp strip (origin/main): ~7 soft-glowing green oval emblems evenly
-// spaced along the bottom edge of the console. Soft = low-alpha rounded ovals
-// (an edge glow, not chunky bright pills); origin glows only along the bottom.
-::ui::UiElement emblem_strip(const char *id) {
-  std::vector<::ui::UiElement> e;
-  for (int i = 0; i < 7; ++i) {
-    e.push_back(::ui::component(
-        "Box",
-        BoxProps{.key = ::ui::copy_string(
-                     (std::string(id) + std::to_string(i)).c_str()),
-                 .layout = ::ui::LayoutStyle{
-                     .width = ::ui::Length::points(34.0f),
-                     .height = ::ui::Length::points(9.0f)},
-                 .style = ::ui::patch()
-                              .background(::ui::Color{24, 96, 24, 150})
-                              .corner_radius(4.5f)
-                              .border(::ui::Border{
-                                  {1, 1, 1, 1},
-                                  {::ui::Color{40, 150, 40, 180},
-                                   ::ui::Color{40, 150, 40, 180},
-                                   ::ui::Color{40, 150, 40, 180},
-                                   ::ui::Color{40, 150, 40, 180}}})},
-        Box));
-  }
-  ::ui::UiChildren emblems = ::ui::children(e);
-  return <Box key={::ui::copy_string((std::string(id) + "row").c_str())} layout={::ui::LayoutStyle{
-      .direction = ::ui::FlexDirection::Row,
-      .align_items = ::ui::AlignItems::Center,
-      .justify_content = ::ui::JustifyContent::SpaceAround,
-      .width = ::ui::Length::percent(100.0f),
-      .height = ::ui::Length::points(13.0f)}}>
-    {emblems}
-  </Box>
+  // Bright green hairline frame over a faint wash that lets the backdrop read
+  // through (origin's connected-HUD panels read as clear bright frames).
+  return tokens::panel_patch(::ui::Color{4, 12, 6, 55}, ::ui::Color{58, 168, 90, 255});
 }
 
 // One "Endurance        5" loadout stat line: label left, value right.
@@ -164,14 +148,14 @@ struct CenterColProps {
       .flex_basis = ::ui::Length::points(0.0f),
       .min_width = ::ui::Length::points(0.0f),
       .gap = 10.0f}}>
-    <AppButton key="creategame" controlId="NewGame" variant={AppButtonVariant::Oval} size={AppButtonSize::Sm} label="Create Game" onPress={props.on_create} />
+    <AppButton key="creategame" controlId="NewGame" variant={AppButtonVariant::Rect} size={AppButtonSize::Sm} label="Create Game" onPress={props.on_create} />
     <Box key="inlobby" layout={::ui::LayoutStyle{
         .direction = ::ui::FlexDirection::Column,
         .align_items = ::ui::AlignItems::Start,
         .overflow = ::ui::Overflow::Hidden,
         .padding = {5.0f, 10.0f, 5.0f, 10.0f},
         .gap = 2.0f}} style={lobby_panel_style()}>
-      <ScreenTitle key="h" variant={ScreenTitleVariant::Dialog} value="In Lobby" />
+      <ScreenTitle key="h" variant={ScreenTitleVariant::Console} value="In Lobby" />
       <BodyText key="p" variant={BodyTextVariant::Detail} value={props.presence} />
     </Box>
   </Box>
@@ -202,19 +186,19 @@ struct GameBrowserProps {
       .gap = 4.0f}}>
     <BodyText key="detail" variant={BodyTextVariant::Detail} value={props.sel_detail} />
     <ActionRow key="browse">
-      <AppButton key="prev" controlId="GamePrev" variant={AppButtonVariant::Oval} size={AppButtonSize::Sm} label="Prev" onPress={props.on_prev} />
-      <AppButton key="next" controlId="GameNext" variant={AppButtonVariant::Oval} size={AppButtonSize::Sm} label="Next" onPress={props.on_next} />
+      <AppButton key="prev" controlId="GamePrev" variant={AppButtonVariant::Rect} size={AppButtonSize::Sm} label="Prev" onPress={props.on_prev} />
+      <AppButton key="next" controlId="GameNext" variant={AppButtonVariant::Rect} size={AppButtonSize::Sm} label="Next" onPress={props.on_next} />
     </ActionRow>
-    <AppButton key="join" controlId="JoinGame" variant={AppButtonVariant::Oval} size={AppButtonSize::Sm} disabled={!props.can_join} label="Join" onPress={props.on_join} />
-    <AppButton key="spectate" controlId="SpectateGame" variant={AppButtonVariant::Oval} size={AppButtonSize::Sm} disabled={!props.can_spectate} label="Spectate" onPress={props.on_spectate} />
+    <AppButton key="join" controlId="JoinGame" variant={AppButtonVariant::Rect} size={AppButtonSize::Sm} disabled={!props.can_join} label="Join" onPress={props.on_join} />
+    <AppButton key="spectate" controlId="SpectateGame" variant={AppButtonVariant::Rect} size={AppButtonSize::Sm} disabled={!props.can_spectate} label="Spectate" onPress={props.on_spectate} />
   </Box>
 }
 
 ::ui::UiElement GameBrowser(const GameBrowserProps &props) {
   std::vector<::ui::UiElement> rows;
-  if (props.entries.empty()) {
-    rows.push_back(game_line("empty", "No open games", false));
-  } else {
+  // origin/main shows an empty hairline frame when no games are open (no
+  // "No open games" placeholder).
+  if (!props.entries.empty()) {
     for (int i = 0; i < (int)props.entries.size(); ++i) {
       const bool on = i == props.selected;
       std::string s = std::string(on ? "> " : "  ") + props.entries[i].name;
@@ -252,7 +236,7 @@ struct GameCreatePanelProps {
 
 ::ui::UiElement GameCreatePanel(const GameCreatePanelProps &props) {
   return <Box key="create" layout={lobby_col_layout(2.0f)} style={lobby_panel_style()}>
-    <ScreenTitle key="h" variant={ScreenTitleVariant::Dialog} value="Create Game" />
+    <ScreenTitle key="h" variant={ScreenTitleVariant::Console} value="Create Game" />
     <Input
       key="name"
       id="GameName"
@@ -265,7 +249,7 @@ struct GameCreatePanelProps {
       <AppButton
         key="prevmap"
         controlId="MapPrev"
-        variant={AppButtonVariant::Oval}
+        variant={AppButtonVariant::Rect}
         size={AppButtonSize::Sm}
         disabled={!props.can_create}
         label="< Map"
@@ -274,7 +258,7 @@ struct GameCreatePanelProps {
       <AppButton
         key="nextmap"
         controlId="MapNext"
-        variant={AppButtonVariant::Oval}
+        variant={AppButtonVariant::Rect}
         size={AppButtonSize::Sm}
         disabled={!props.can_create}
         label="Map >"
@@ -285,13 +269,13 @@ struct GameCreatePanelProps {
       <AppButton
         key="create"
         controlId="CreateGame"
-        variant={AppButtonVariant::Oval}
+        variant={AppButtonVariant::Rect}
         size={AppButtonSize::Sm}
         disabled={!props.can_create}
         label="Create"
         onPress={props.on_create}
       />
-      <AppButton key="back" controlId="CreateBack" variant={AppButtonVariant::Oval} size={AppButtonSize::Sm} label="Back" onPress={props.on_back} />
+      <AppButton key="back" controlId="CreateBack" variant={AppButtonVariant::Rect} size={AppButtonSize::Sm} label="Back" onPress={props.on_back} />
     </ActionRow>
   </Box>
 }
@@ -323,19 +307,19 @@ struct StagingPanelProps {
   }
   ::ui::UiChildren roster_rows = ::ui::children(rows);
   return <Box key="staging" layout={lobby_col_layout(2.0f)} style={lobby_panel_style()}>
-    <ScreenTitle key="h" variant={ScreenTitleVariant::Dialog} value="Staging" />
+    <ScreenTitle key="h" variant={ScreenTitleVariant::Console} value="Staging" />
     {roster_rows}
     <ActionRow key="actions">
       <AppButton
         key="ready"
         controlId="StagingReady"
-        variant={AppButtonVariant::Oval}
+        variant={AppButtonVariant::Rect}
         disabled={props.ready_blocked}
         label={props.ready_label}
         onPress={props.on_ready}
       />
-      <AppButton key="team" controlId="ChangeTeam" variant={AppButtonVariant::Oval} size={AppButtonSize::Sm} label="Change Team" onPress={props.on_team} />
-      <AppButton key="leave" controlId="LeaveGame" variant={AppButtonVariant::Oval} size={AppButtonSize::Sm} label="Leave" onPress={props.on_leave} />
+      <AppButton key="team" controlId="ChangeTeam" variant={AppButtonVariant::Rect} size={AppButtonSize::Sm} label="Change Team" onPress={props.on_team} />
+      <AppButton key="leave" controlId="LeaveGame" variant={AppButtonVariant::Rect} size={AppButtonSize::Sm} label="Leave" onPress={props.on_leave} />
     </ActionRow>
   </Box>
 }
@@ -352,6 +336,7 @@ struct LobbyScreenProps {
   Session session = use_session();
   App app = use_app();
   Progression prog = use_progression();
+  client::ui::ChromeTextures chrome = use_chrome();
   std::string *draft = use_state<std::string>(std::string());
   std::string *create_name = use_state<std::string>(std::string("Game"));
   int *sel = use_state<int>(0);
@@ -390,14 +375,27 @@ struct LobbyScreenProps {
       map_count > 0 ? games.bundled_maps[*map_index].c_str() : "(no maps)");
   const char *ready_label = use_text_storage("%s", staging.ready_label.c_str());
   const char *version_text =
-      use_text_storage("v%s", app.version ? app.version : "");
-  const char *xp_text = use_text_storage("XP %u/100", (unsigned)prog.experience);
-  // The agent's display name = first token of the summary ("Alice Noxis Level 0"
-  // -> "Alice"); the golden AgentCard shows the name prominently, stats below.
+      use_text_storage("v.%s", app.version ? app.version : "");
+  const char *xp_text = use_text_storage("%u/100", (unsigned)prog.experience);
+  // selected_summary is newline-separated: "<alias>\n<agency>  Level N\n...". The
+  // agency name (which may contain a space, e.g. "Black Rose") runs up to the
+  // double-space before "Level".
   std::string summary_str = chars.selected_summary;
-  std::string name_str = summary_str.substr(0, summary_str.find(' '));
+  size_t nl = summary_str.find('\n');
+  std::string name_str = summary_str.substr(0, nl);
   const char *agent_name =
       use_text_storage("%s", name_str.empty() ? "Agent" : name_str.c_str());
+  int agency_idx = 0;
+  if (nl != std::string::npos) {
+    std::string line2 = summary_str.substr(nl + 1);
+    std::string ag = line2.substr(0, line2.find("  "));
+    for (int i = 0; i < kAgencyCount; ++i)
+      if (ag == kAgencies[i].name) {
+        agency_idx = i;
+        break;
+      }
+  }
+  const uint32_t emblem_tex = chrome.agency_emblem[agency_idx];
 
   std::function<void(const std::string &)> set_draft =
       [draft](const std::string &next) { *draft = next; };
@@ -409,6 +407,23 @@ struct LobbyScreenProps {
   };
   std::function<void(const ::ui::ActivationEvent &)> on_activate =
       [send](const ::ui::ActivationEvent &) { send(); };
+
+  // The chat field is a thin square-cornered hairline bar flush with the Send
+  // button (origin/main draws one connected input strip, not a rounded card).
+  auto chat_field_layout = ::ui::LayoutStyle{
+      .align_items = ::ui::AlignItems::Center,
+      .flex_grow = ::ui::StyleFloat::points(1.0f),
+      .min_width = ::ui::Length::points(0.0f),
+      .padding = {6.0f, 6.0f, 2.0f, 2.0f}};
+  ::ui::StyleStatePatch chat_field_style{};
+  chat_field_style.base =
+      ::ui::patch()
+          .background(::ui::Color{0, 8, 2, 210})
+          .gradient(::ui::Gradient{})
+          .corner_radius(0.0f)
+          .border(::ui::Border{{1, 1, 1, 1},
+                               {tokens::kBorderPanel, tokens::kBorderPanel,
+                                tokens::kBorderPanel, tokens::kBorderPanel}});
 
   // Right-column selection: connected -> Staging; else the create form when the
   // player opened it; else the games browser. (No screen names a destination —
@@ -476,10 +491,10 @@ struct LobbyScreenProps {
         .align_items = ::ui::AlignItems::Center,
         .width = ::ui::Length::percent(100.0f),
         .gap = ::ui::StyleValue::points(10.0f)}}>
-      <ScreenTitle key="brand" variant={ScreenTitleVariant::Hero} value="Silencer" />
-      <BodyText key="ver" variant={BodyTextVariant::Detail} value={version_text} />
+      <ScreenTitle key="brand" variant={ScreenTitleVariant::Brand} value="Silencer" />
+      <BodyText key="ver" variant={BodyTextVariant::Detail} tone={BodyTextTone::Warning} value={version_text} />
       <Box key="tbspace" layout={::ui::LayoutStyle{.flex_grow = ::ui::StyleFloat::points(1.0f)}} />
-      <AppButton key="goback" controlId="LobbyGoBack" variant={AppButtonVariant::Oval} size={AppButtonSize::Sm} label="Go Back" onPress={session.leave_to_menu} />
+      <AppButton key="goback" controlId="LobbyGoBack" variant={AppButtonVariant::Rect} size={AppButtonSize::Sm} label="Go Back" onPress={session.leave_to_menu} />
     </Box>
     <Box key="body" layout={::ui::LayoutStyle{
         .direction = ::ui::FlexDirection::Row,
@@ -516,7 +531,8 @@ struct LobbyScreenProps {
                   .width = ::ui::Length::points(42.0f),
                   .height = ::ui::Length::points(42.0f),
                   .flex_shrink = ::ui::StyleFloat::points(0.0f)}}
-                style={::ui::patch().background(::ui::Color{40, 70, 150, 255}).corner_radius(2.0f)} />
+                style={emblem_tex ? tokens::image_patch(emblem_tex)
+                                  : ::ui::patch().background(::ui::Color{40, 70, 150, 255}).corner_radius(2.0f)} />
               <Box key="idcol" layout={::ui::LayoutStyle{
                   .direction = ::ui::FlexDirection::Column,
                   .align_items = ::ui::AlignItems::Start,
@@ -525,10 +541,12 @@ struct LobbyScreenProps {
                   .min_width = ::ui::Length::points(0.0f),
                   .overflow = ::ui::Overflow::Hidden,
                   .gap = ::ui::StyleValue::points(1.0f)}}>
-                <BodyText key="name" variant={BodyTextVariant::Strong} value={agent_name} />
-                {tiny_line("wins", "WINS  0", tokens::kTextBody)}
-                {tiny_line("loss", "LOSSES 0", tokens::kTextBody)}
-                {tiny_line("xp", xp_text, tokens::kTextBody)}
+                <Text key="name" value={agent_name}
+                  layout={{.height = ::ui::Length::points(tokens::kLineLarge)}}
+                  style={tokens::text_patch(tokens::kTextAgentName, tokens::kFontLarge, tokens::kFaceLarge, tokens::kLineLarge)} />
+                {stat_kv("wins", "WINS", "0")}
+                {stat_kv("loss", "LOSSES", "0")}
+                {stat_kv("xp", "XP", xp_text)}
               </Box>
               <Box key="statcol" layout={::ui::LayoutStyle{
                   .direction = ::ui::FlexDirection::Column,
@@ -545,12 +563,12 @@ struct LobbyScreenProps {
                 {tiny_line("s5", "CONTACTS", tokens::kTextBodyMuted)}
               </Box>
             </Box>
-            <AppButton key="leave" controlId="LeaveLobby" variant={AppButtonVariant::Oval} size={AppButtonSize::Sm} label="Agents" onPress={session.leave_to_menu} />
+            <AppButton key="leave" controlId="LeaveLobby" variant={AppButtonVariant::Rect} size={AppButtonSize::Sm} label="Agents" onPress={session.leave_to_menu} />
           </Box>
           {right}
         </Box>
         <Box key="chat" layout={lobby_cell_layout(1.0f)} style={lobby_panel_style()}>
-          <ScreenTitle key="h" variant={ScreenTitleVariant::Dialog} value="Lobby" />
+          <ScreenTitle key="h" variant={ScreenTitleVariant::Console} value="Lobby" />
           <Box key="logclip" layout={::ui::LayoutStyle{
               .overflow = ::ui::Overflow::Hidden,
               .align_items = ::ui::AlignItems::Start,
@@ -560,33 +578,28 @@ struct LobbyScreenProps {
           </Box>
           <Box key="inputrow" layout={::ui::LayoutStyle{
               .direction = ::ui::FlexDirection::Row,
-              .align_items = ::ui::AlignItems::Center,
+              .align_items = ::ui::AlignItems::Stretch,
               .width = ::ui::Length::percent(100.0f),
-              .gap = ::ui::StyleValue::points(6.0f)}}>
-            <Box key="inputgrow" layout={::ui::LayoutStyle{
-                .flex_grow = ::ui::StyleFloat::points(1.0f),
-                .min_width = ::ui::Length::points(0.0f)}}>
-              <Input
-                key="draft"
-                id="ChatInput"
-                accessibility={{.label = "Chat"}}
-                value={draft->c_str()}
-                onChange={set_draft}
-                onActivate={on_activate}
-              />
-            </Box>
-            <AppButton key="send" controlId="SendChat" variant={AppButtonVariant::Oval} size={AppButtonSize::Sm} label="Send" onPress={send} />
+              .gap = ::ui::StyleValue::points(4.0f)}}>
+            <Input
+              key="draft"
+              id="ChatInput"
+              accessibility={{.label = "Chat"}}
+              value={draft->c_str()}
+              onChange={set_draft}
+              onActivate={on_activate}
+              layout={chat_field_layout}
+              style={chat_field_style}
+            />
+            <AppButton key="send" controlId="SendChat" variant={AppButtonVariant::Rect} size={AppButtonSize::Sm} label="Send" onPress={send} />
           </Box>
-          <ScreenTitle key="hp" variant={ScreenTitleVariant::Dialog} value="Online" />
-          <BodyText key="presence" variant={BodyTextVariant::Detail} value={presence} />
         </Box>
       </Box>
       <Box key="activegames" layout={lobby_cell_layout(1.0f)} style={lobby_panel_style()}>
-        <ScreenTitle key="h" variant={ScreenTitleVariant::Dialog} value="Active Games" />
+        <ScreenTitle key="h" variant={ScreenTitleVariant::Console} value="Active Games" />
         {right_browser}
       </Box>
     </Box>
-    {emblem_strip("emb")}
   </ScreenLayout>
 }
 

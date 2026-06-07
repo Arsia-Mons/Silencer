@@ -45,6 +45,12 @@ using ::ui::components::TextProps;
   case BodyTextTone::Disabled:
     color = tokens::kTextWeaponDetailOff;
     break;
+  case BodyTextTone::Warning:
+    color = tokens::kTextVersion;
+    break;
+  case BodyTextTone::Prose:
+    color = tokens::kTextProse;
+    break;
   }
   return <Text
     key={props.key}
