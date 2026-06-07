@@ -164,10 +164,48 @@ struct CharacterCreateContentProps {
   // stack-entries, since the flex layout has no absolute/z stacking — a noted
   // follow-up for the test-17 background-trap semantics.)
   if (w.step == 1) {
-    return <ScreenLayout key="aliasmodal" variant={ScreenLayoutVariant::CenteredOverlay}>
-      <Panel key="panel" variant={PanelVariant::Hero}>
-        <ScreenTitle key="t" variant={ScreenTitleVariant::Dialog} value="New Agent" />
-        <ScreenSubtitle key="s" value="Step 2 of 3: choose an alias" />
+    // origin/main "SILENCER ALIAS": the SELECT AGENT two-pane frame behind +
+    // a floating ALIAS panel centered over it with a single editable field
+    // (Enter confirms; no visible buttons). The frame reuses step 0's chrome.
+    client::ui::ChromeTextures chrome1 = use_chrome();
+    const ::ui::StylePatch frame1 =
+        chrome1.chrome_panel
+            ? tokens::image_patch(chrome1.chrome_panel)
+            : tokens::panel_patch(tokens::kSurfaceHeroPanel, tokens::kBorderHeroPanel);
+    return <ScreenLayout key="aliasmodal" variant={ScreenLayoutVariant::Overlay}>
+      <Box key="frame" layout={::ui::LayoutStyle{
+          .direction = ::ui::FlexDirection::Row,
+          .align_items = ::ui::AlignItems::Stretch,
+          .width = ::ui::Length::points(912.0f),
+          .height = ::ui::Length::points(664.0f),
+          .padding = {48.0f, 46.0f, 40.0f, 46.0f},
+          .gap = 44.0f}} style={frame1}>
+        <Box key="leftpane" layout={::ui::LayoutStyle{
+            .direction = ::ui::FlexDirection::Column,
+            .align_items = ::ui::AlignItems::Stretch,
+            .flex_grow = ::ui::StyleFloat::points(1.0f),
+            .flex_basis = ::ui::Length::points(0.0f),
+            .min_width = ::ui::Length::points(0.0f),
+            .gap = 12.0f}}>
+          <ScreenTitle key="title" variant={ScreenTitleVariant::Screen} value="SELECT AGENT" />
+          <AppButton key="new" controlId="CreateNewCharacterBg" variant={AppButtonVariant::Oval} disabled={true} label="Create New Character" onPress={w.open_alias} />
+        </Box>
+        <Box key="rightpane" layout={::ui::LayoutStyle{
+            .flex_grow = ::ui::StyleFloat::points(1.0f),
+            .flex_basis = ::ui::Length::points(0.0f),
+            .min_width = ::ui::Length::points(0.0f)}} />
+      </Box>
+      <Box key="aliasfloat" layout={::ui::LayoutStyle{
+          .position = ::ui::PositionType::Absolute,
+          .position_inset = ::ui::EdgeSizes{268.0f, 250.0f, {}, {}},
+          .direction = ::ui::FlexDirection::Column,
+          .align_items = ::ui::AlignItems::Center,
+          .width = ::ui::Length::points(424.0f),
+          .padding = {14.0f, 24.0f, 18.0f, 24.0f},
+          .gap = 12.0f,
+          .border_width = 2.0f}}
+        style={tokens::panel_patch(tokens::kSurfaceHeroPanel, tokens::kBorderHeroPanel, 2.0f)}>
+        <ScreenTitle key="t" variant={ScreenTitleVariant::Screen} value="SILENCER ALIAS" />
         <Input
           key="alias"
           id="Alias"
@@ -177,18 +215,7 @@ struct CharacterCreateContentProps {
           onChange={w.set_alias}
           onActivate={on_alias_enter}
         />
-        <ActionRow key="actions">
-          <AppButton
-            key="ok"
-            controlId="AliasConfirm"
-            variant={AppButtonVariant::Oval}
-            disabled={w.alias.empty()}
-            label="Continue"
-            onPress={w.confirm_alias}
-          />
-          <AppButton key="cancel" controlId="AliasCancel" label="Cancel" onPress={w.cancel} />
-        </ActionRow>
-      </Panel>
+      </Box>
     </ScreenLayout>
   }
 
@@ -206,28 +233,30 @@ struct CharacterCreateContentProps {
     }
     ::ui::UiChildren desc_lines = ::ui::children(desc);
 
-    // origin/main "SELECT AGENCY": two side-by-side GREEN bordered panels filling
-    // the starfield overlay — left = framed agency list, right = Advantages +
-    // Description. No outer wizard panel, no slate Sunken card, no emblem glyph,
-    // no step subtitle (the regression palette + stat dump are gone).
-    const ::ui::StylePatch panel_bg =
-        tokens::panel_patch(tokens::kSurfacePanel, tokens::kBorderPanel);
+    // origin/main "SELECT AGENCY": the same two-pane chrome frame as step 0 —
+    // LEFT pane = SELECT AGENCY title + the five agency ovals; RIGHT pane =
+    // Advantages + Description over the Mars backdrop. No outer wizard panel, no
+    // Back button (Esc cancels), no step subtitle.
+    client::ui::ChromeTextures chrome2 = use_chrome();
+    const ::ui::StylePatch frame2 =
+        chrome2.chrome_panel
+            ? tokens::image_patch(chrome2.chrome_panel)
+            : tokens::panel_patch(tokens::kSurfaceHeroPanel, tokens::kBorderHeroPanel);
     return <ScreenLayout key="agencyscreen" variant={ScreenLayoutVariant::Overlay}>
-      <Box key="cols" layout={::ui::LayoutStyle{
+      <Box key="frame" layout={::ui::LayoutStyle{
           .direction = ::ui::FlexDirection::Row,
           .align_items = ::ui::AlignItems::Stretch,
-          .width = ::ui::Length::percent(100.0f),
-          .height = ::ui::Length::points(380.0f),
-          .gap = 14.0f}}>
+          .width = ::ui::Length::points(912.0f),
+          .height = ::ui::Length::points(664.0f),
+          .padding = {48.0f, 46.0f, 40.0f, 46.0f},
+          .gap = 44.0f}} style={frame2}>
         <Box key="left" layout={::ui::LayoutStyle{
             .direction = ::ui::FlexDirection::Column,
             .align_items = ::ui::AlignItems::Stretch,
-            .flex_grow = ::ui::StyleFloat::points(1.15f),
+            .flex_grow = ::ui::StyleFloat::points(1.0f),
             .flex_basis = ::ui::Length::points(0.0f),
             .min_width = ::ui::Length::points(0.0f),
-            .padding = {16.0f, 16.0f, 14.0f, 14.0f},
-            .gap = 8.0f,
-            .border_width = tokens::kBorderWidth}} style={panel_bg}>
+            .gap = 14.0f}}>
           <ScreenTitle key="t" variant={ScreenTitleVariant::Screen} value="SELECT AGENCY" />
           {agency_row(0, pi, on_pick, set_preview)}
           {agency_row(1, pi, on_pick, set_preview)}
@@ -242,9 +271,7 @@ struct CharacterCreateContentProps {
             .flex_basis = ::ui::Length::points(0.0f),
             .min_width = ::ui::Length::points(0.0f),
             .overflow = ::ui::Overflow::Hidden,
-            .padding = {16.0f, 16.0f, 14.0f, 14.0f},
-            .gap = 4.0f,
-            .border_width = tokens::kBorderWidth}} style={panel_bg}>
+            .gap = 4.0f}}>
           <ScreenTitle key="adv" variant={ScreenTitleVariant::Screen} value="Advantages" />
           {advantage_row("a0", a.advantages[0])}
           {advantage_row("a1", a.advantages[1])}
@@ -254,31 +281,53 @@ struct CharacterCreateContentProps {
           {desc_lines}
         </Box>
       </Box>
-      <ActionRow key="actions">
-        <AppButton key="back" controlId="AgencyBack" variant={AppButtonVariant::Oval} size={AppButtonSize::Sm} label="Back" onPress={w.cancel} />
-      </ActionRow>
     </ScreenLayout>
   }
 
-  // step 0 — the roster + a "Create New Character" entry.
-  return <ScreenLayout key="roster" variant={ScreenLayoutVariant::Menu}>
-    <Panel key="panel" variant={PanelVariant::Hero}>
-      <ScreenTitle key="title" variant={ScreenTitleVariant::Hero} value="Select Agent" />
-      <ScreenSubtitle key="sub" value="Step 1 of 3: choose an agent or create a new one" />
-      {roster_row(0, chars.roster, on_select)}
-      {roster_row(1, chars.roster, on_select)}
-      {roster_row(2, chars.roster, on_select)}
-      {roster_row(3, chars.roster, on_select)}
-      {roster_row(4, chars.roster, on_select)}
-      <AppButton
-        key="new"
-        controlId="CreateNewCharacter"
-        variant={AppButtonVariant::Oval}
-        label="Create New Character"
-        onPress={w.open_alias}
-      />
-      <AppButton key="leave" controlId="CharCreateCancel" label="Back" onPress={lobby.cancel} />
-    </Panel>
+  // step 0 — SELECT AGENT: the origin/main two-pane character-create frame
+  // (chrome_panel sprite, bank 7 idx 5) filling the starfield. LEFT pane = the
+  // SELECT AGENT title + roster + Create New Character; RIGHT pane = empty (the
+  // Mars/starfield backdrop reads through). The sprite bakes the double borders
+  // + center divider; the content overlays its two panes.
+  client::ui::ChromeTextures chrome0 = use_chrome();
+  const ::ui::StylePatch frame0 =
+      chrome0.chrome_panel
+          ? tokens::image_patch(chrome0.chrome_panel)
+          : tokens::panel_patch(tokens::kSurfaceHeroPanel, tokens::kBorderHeroPanel);
+  return <ScreenLayout key="roster" variant={ScreenLayoutVariant::Overlay}>
+    <Box key="frame" layout={::ui::LayoutStyle{
+        .direction = ::ui::FlexDirection::Row,
+        .align_items = ::ui::AlignItems::Stretch,
+        .width = ::ui::Length::points(912.0f),
+        .height = ::ui::Length::points(664.0f),
+        .padding = {48.0f, 46.0f, 40.0f, 46.0f},
+        .gap = 44.0f}} style={frame0}>
+      <Box key="leftpane" layout={::ui::LayoutStyle{
+          .direction = ::ui::FlexDirection::Column,
+          .align_items = ::ui::AlignItems::Stretch,
+          .flex_grow = ::ui::StyleFloat::points(1.0f),
+          .flex_basis = ::ui::Length::points(0.0f),
+          .min_width = ::ui::Length::points(0.0f),
+          .gap = 12.0f}}>
+        <ScreenTitle key="title" variant={ScreenTitleVariant::Screen} value="SELECT AGENT" />
+        <AppButton
+          key="new"
+          controlId="CreateNewCharacter"
+          variant={AppButtonVariant::Oval}
+          label="Create New Character"
+          onPress={w.open_alias}
+        />
+        {roster_row(0, chars.roster, on_select)}
+        {roster_row(1, chars.roster, on_select)}
+        {roster_row(2, chars.roster, on_select)}
+        {roster_row(3, chars.roster, on_select)}
+        {roster_row(4, chars.roster, on_select)}
+      </Box>
+      <Box key="rightpane" layout={::ui::LayoutStyle{
+          .flex_grow = ::ui::StyleFloat::points(1.0f),
+          .flex_basis = ::ui::Length::points(0.0f),
+          .min_width = ::ui::Length::points(0.0f)}} />
+    </Box>
   </ScreenLayout>
 }
 
