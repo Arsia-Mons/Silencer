@@ -599,7 +599,7 @@ struct LobbyScreenProps {
   client::ui::ChromeTextures chrome = use_chrome();
   std::string *create_name = use_state<std::string>(std::string("New Game"));
   int *sel = use_state<int>(0);
-  int *map_index = use_state<int>(0);
+  int *map_index = use_state<int>(-1); // -1 = none picked yet (no highlight, like origin)
   bool *show_create = use_state<bool>(false);
   if (!create_name || !sel || !map_index || !show_create)
     return ::ui::empty();
@@ -749,7 +749,8 @@ struct LobbyScreenProps {
     rc.name = create_name->c_str();
     rc.can_create = map_count > 0;
     rc.on_create = [create = games.create_game, create_name,
-                    show_create, maps = games.bundled_maps, idx = *map_index]() {
+                    show_create, maps = games.bundled_maps,
+                    idx = *map_index < 0 ? 0 : *map_index]() {
       if (create && idx >= 0 && idx < (int)maps.size()) {
         CreateGameRequest req;
         req.name = create_name->empty() ? "New Game" : *create_name;

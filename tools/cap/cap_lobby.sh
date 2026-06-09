@@ -30,6 +30,19 @@ done
 LOBBY_PORT=$(pick_port); PLAYER_AUTH_PORT=$(pick_port); MAP_API_PORT=$(pick_port); CTRL_PORT=$(pick_port)
 SILENCER_VERSION="$(silencer_version)"
 
+# Point the client at the test lobby's map-api so the Select Map list appends
+# the server's maps (the golden's CHOKE13/darkcity1/test-copilot/sewers10 rows).
+printf 'mapapiurl = http://127.0.0.1:%s\r\n' "$MAP_API_PORT" \
+  > "$SILENCER_HOME/Library/Application Support/Silencer/config.cfg"
+# The golden's four community maps get UPLOADED to the map-api after it boots
+# (the store is index-driven; raw files in maps-dir aren't listed), in the
+# golden's order. test-copilot.sil isn't in the repo; synthesize the name.
+upload_map() { # path name
+  sleep 1.1 # distinct uploaded_at seconds keep the served order deterministic
+  curl -s -X POST "http://127.0.0.1:$MAP_API_PORT/api/maps" \
+    -H "X-Filename: $2" -H "X-Author: capture" --data-binary @"$1" >/dev/null || true
+}
+
 cleanup() {
   [ -n "${SILENCER_PID:-}" ] && stop_silencer "$SILENCER_PID" "$CTRL_PORT" || true
   [ -n "${LOBBY_PID:-}" ] && { kill "$LOBBY_PID" 2>/dev/null || true; wait "$LOBBY_PID" 2>/dev/null || true; }
@@ -43,6 +56,10 @@ trap cleanup EXIT
 LOBBY_PID=$!
 for i in $(seq 1 60); do (echo > "/dev/tcp/127.0.0.1/$LOBBY_PORT") 2>/dev/null && break; sleep 0.25
   [ "$i" = 60 ] && { echo "lobby never came up" >&2; cat "$TMP/lobby.log" >&2; exit 1; }; done
+upload_map "$REPO_ROOT/shared/assets/level/community/CHOKE13.SIL" CHOKE13.SIL
+upload_map "$REPO_ROOT/shared/assets/level/community/darkcity1.sil" darkcity1.sil
+upload_map "$REPO_ROOT/shared/assets/level/community/junkyard.sil" test-copilot.sil
+upload_map "$REPO_ROOT/shared/assets/level/community/sewers10.sil" sewers10.sil
 
 HOME="$SILENCER_HOME" "$SILENCER_BIN" --headless --control-port "$CTRL_PORT" \
   --lobby-host 127.0.0.1 --lobby-port "$LOBBY_PORT" >"/tmp/silencer-e2e-$CTRL_PORT.log" 2>&1 &
@@ -104,10 +121,10 @@ shot lobby_screen
 # create_game panel
 cli --port "$CTRL_PORT" click --label "NewGame" >/dev/null
 wait_for_widget "CreateGame" >/dev/null
-# The golden created its game on STAR72.SIL — select it before the shot so the
-# Select Map highlight, the staging header, and the chat channel all match.
-cli --port "$CTRL_PORT" click --label "STAR72.SIL" >/dev/null 2>&1 || true
+# The golden shot the create form BEFORE selecting a map; the STAR72 pick
+# (matching the golden's staging header + chat channel) happens after.
 shot create_game
+cli --port "$CTRL_PORT" click --label "STAR72.SIL" >/dev/null 2>&1 || true
 
 # best-effort staging + tech (needs the dedicated server to spawn from provisioned maps)
 if cli --port "$CTRL_PORT" click --label "CreateGame" >/dev/null 2>&1; then

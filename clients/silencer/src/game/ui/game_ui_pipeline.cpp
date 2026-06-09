@@ -45,6 +45,7 @@
 #include "actor/user.h"
 #include "session_phase.h"
 #include "config.h"
+#include "mapfetch.h"
 #include "audio.h"
 #include "renderdevice.h"
 #include "ui/runtime/react.h"
@@ -985,6 +986,13 @@ if(std::find(bundledMaps_.begin(), bundledMaps_.end(), f) == bundledMaps_.end())
 bundledMaps_.push_back(f);
 }
 std::sort(bundledMaps_.begin(), bundledMaps_.end());
+// origin appends the map-api server's list after the sorted local maps (the
+// "[DL] " tag is stripped at render, so they show as plain names in server
+// order). Names already local are skipped.
+for(auto & entry : FetchServerMapList(Config::GetInstance().mapapiurl)){
+if(std::find(bundledMaps_.begin(), bundledMaps_.end(), entry.first) == bundledMaps_.end())
+bundledMaps_.push_back(entry.first);
+}
 bundledMapsListed_ = true;
 }
 lobbySnapshot_.bundled_maps = bundledMaps_;
