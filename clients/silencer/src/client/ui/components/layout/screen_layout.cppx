@@ -29,14 +29,16 @@ using ::ui::components::DialogProps;
     ::ui::StylePatch game_bg =
         backdrop ? tokens::image_patch(backdrop)
                  : tokens::fill_patch(tokens::kSurfaceGame);
+    // Chrome metrics golden-measured: root pad 20 (origin 13.3), title-bar
+    // top 38.25, bottom edge 38.5 up; region gap 20.5 (origin ~13.7).
     return <Box
       key={props.key}
       layout={::ui::LayoutStyle{
         .direction = ::ui::FlexDirection::Column,
         .width = ::ui::Length::percent(100.0f),
         .height = ::ui::Length::percent(100.0f),
-        .padding = {18.0f, 18.0f, 37.0f, 28.0f},
-        .gap = 20.0f,
+        .padding = {20.0f, 20.0f, 38.25f, 38.5f},
+        .gap = 20.5f,
       }}
       style={game_bg}
     >

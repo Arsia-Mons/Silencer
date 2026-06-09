@@ -34,6 +34,7 @@ struct LobbySnapshot {
   std::string lobby_agent = {};    // selected agent name + compact summary
   std::string lobby_chat = {};     // chat scrollback (drained on the tick)
   std::string lobby_presence = {}; // who's online
+  std::string chat_channel = {};   // lobby.channel — the game channel in staging
 
   // --- games browser (LobbyScreen GameSelectPanel) ---
   std::vector<GameBrowserEntry> games = {}; // open games (structured)
@@ -45,6 +46,7 @@ struct LobbySnapshot {
   bool staging_is_host = false;
   bool staging_ready_blocked = false;
   std::string staging_ready_label = "Ready";
+  std::string staging_map_name = {}; // joined game's map (origin title-bar overlay)
   std::vector<StagingRosterRow> staging_roster = {};
 
   // --- progression (MissionSummary) ---

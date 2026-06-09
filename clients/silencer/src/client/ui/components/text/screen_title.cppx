@@ -44,11 +44,13 @@ using ::ui::components::TextProps;
     color = tokens::kTextDialogTitle;
     break;
   case ScreenTitleVariant::Brand:
+    // origin lobby header "Silencer": TextSize::Title — bank 135 at its
+    // native advance (not the heavy bank-136 prompt face).
     color = tokens::kTextBrand;
-    face = tokens::kFaceTitle;
-    font = tokens::kFontLarge;
-    line = tokens::kLineLarge;
-    height = tokens::kLineLarge;
+    face = tokens::kFaceHeading;
+    font = tokens::kFontHeading;
+    line = tokens::kLineHeading;
+    height = tokens::kLineHeading;
     break;
   case ScreenTitleVariant::Console:
     // Lobby/console panel titles (Game Options, Select Map, Active Games, Lobby)

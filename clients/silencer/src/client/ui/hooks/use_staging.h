@@ -32,6 +32,7 @@ struct Staging {
   bool is_host = false;
   bool ready_blocked = false;
   std::string ready_label = "Ready";
+  std::string map_name = {}; // origin shows it in the lobby title bar
   std::vector<StagingRosterRow> roster = {};
 
   std::function<void()> send_ready = {};

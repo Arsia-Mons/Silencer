@@ -224,8 +224,12 @@ client::ui::LobbySnapshot CaptureLobbySnapshot(Game &game,
     BuildProgression(snap, lobby);
   if (lobbyPhase) {
     BuildLobbyPanels(snap, lobby);
-    if (world.IsConnected())
+    snap.chat_channel = lobby.channel;
+    if (world.IsConnected()) {
       BuildStaging(snap, world, lobby);
+      if (LobbyGame *lg = lobby.GetGameById(game.currentlobbygameid))
+        snap.staging_map_name = lg->mapname;
+    }
   }
   lobby.UnlockMutex();
 

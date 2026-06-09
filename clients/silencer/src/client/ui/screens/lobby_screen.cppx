@@ -40,12 +40,12 @@ using ::ui::components::TextProps;
       .direction = ::ui::FlexDirection::Row,
       .align_items = ::ui::AlignItems::Center,
       .height = ::ui::Length::points(tokens::kLineBody),
-      .gap = 8.0f}}
+      .gap = 12.0f}}
   >
     <Box
       key="lc"
       layout={::ui::LayoutStyle{
-        .width = ::ui::Length::points(72.0f),
+        .width = ::ui::Length::points(60.0f),
         .flex_shrink = ::ui::StyleFloat::points(0.0f)}}
     >
       <BodyText key="l" variant={BodyTextVariant::Body} value={label} />
@@ -74,6 +74,19 @@ using ::ui::components::TextProps;
       .min_width = ::ui::Length::points(0.0f),
       .padding = {8.0f, 8.0f, 6.0f, 6.0f},
       .gap = 4.0f};
+}
+// The right tall column: golden-measured fixed 448.5 wide (origin clamps its
+// legacy 640-space width; at 16:9 it lands here).
+::ui::LayoutStyle lobby_right_cell_layout() {
+  ::ui::LayoutStyle l = {
+      .direction = ::ui::FlexDirection::Column,
+      .align_items = ::ui::AlignItems::Stretch,
+      .width = ::ui::Length::points(448.5f),
+      .min_height = ::ui::Length::points(0.0f),
+      .padding = {8.0f, 8.0f, 6.0f, 6.0f},
+      .gap = 4.0f};
+  l.flex_shrink = ::ui::StyleFloat::points(0.0f);
+  return l;
 }
 // A bordered cockpit cell that grows on the MAIN axis inside a row/column whose
 // parent owns the cross-axis size (align_items Stretch). Tighter than a column.
@@ -133,7 +146,7 @@ struct CenterColProps {
       .flex_grow = ::ui::StyleFloat::points(1.4f),
       .flex_basis = ::ui::Length::points(0.0f),
       .min_width = ::ui::Length::points(0.0f),
-      .padding = {8.0f, 8.0f, 6.0f, 6.0f},
+      .padding = {4.5f, 6.0f, 4.5f, 6.0f},
       .gap = 10.0f}}
   >
     <AppButton
@@ -248,7 +261,7 @@ struct GameBrowserProps {
 // a game) the Select Map filename list (CreateRightCell). Both share the key
 // "rightcell" so the slot reconciles in place when the mode swaps.
 ::ui::UiElement ActiveGamesCell(::ui::UiElement browser) {
-  return <Box key="rightcell" layout={lobby_cell_layout(1.0f)} style={lobby_panel_style()}>
+  return <Box key="rightcell" layout={lobby_right_cell_layout()} style={lobby_panel_style()}>
     <ScreenTitle key="h" variant={ScreenTitleVariant::Console} value="Active Games" />
     <Box
       key="well"
@@ -321,7 +334,7 @@ struct CreateRightCellProps {
   // origin/main renders the create-form values as plain green text on the
   // backdrop (no input box) — the Input host always paints its control chrome,
   // so the name value is a flat BodyText. Wide rect Create button below.
-  return <Box key="rightcell" layout={lobby_cell_layout(1.0f)} style={lobby_panel_style()}>
+  return <Box key="rightcell" layout={lobby_right_cell_layout()} style={lobby_panel_style()}>
     <ScreenTitle key="h" variant={ScreenTitleVariant::Console} value="Select Map" />
     <Box
       key="maplist"
@@ -437,7 +450,7 @@ struct StagingPanelProps {
         ::ui::copy_string(("rr" + std::to_string(i)).c_str()),
         ::ui::copy_string(r.name.c_str()), r.ready));
   }
-  return <Box key="rightcell" layout={lobby_cell_layout(1.0f)} style={lobby_panel_style()}>
+  return <Box key="rightcell" layout={lobby_right_cell_layout()} style={lobby_panel_style()}>
     {::ui::children(rows)}
   </Box>
 }
@@ -488,9 +501,24 @@ struct LobbyScreenProps {
   const char *sel_detail = use_text_storage(
       "%s", game_count > 0 ? games.entries[*sel].detail.c_str() : "");
   const char *ready_label = use_text_storage("%s", staging.ready_label.c_str());
+  const char *chat_title = chat.channel.empty()
+                               ? "Lobby"
+                               : ::ui::copy_string(chat.channel.c_str());
+  // origin staging title bar shows the joined game's map name (Title face).
+  ::ui::UiElement map_overlay =
+      staging.map_name.empty()
+          ? ::ui::empty()
+          : Text(TextProps{
+                .key = "mapname",
+                .value = ::ui::copy_string(staging.map_name.c_str()),
+                .layout = {.height = ::ui::Length::points(tokens::kLineHeading)},
+                .style = tokens::text_patch(tokens::kTextProse,
+                                            tokens::kFontHeading,
+                                            tokens::kFaceHeading,
+                                            tokens::kLineHeading)});
   const char *version_text =
       use_text_storage("v.%s", app.version ? app.version : "");
-  const char *xp_text = use_text_storage("%u/100", (unsigned)prog.experience);
+  const char *xp_line = use_text_storage("XP %u/100", (unsigned)prog.experience);
   // selected_summary is newline-separated: "<alias>\n<agency>  Level N\n...". The
   // agency name (which may contain a space, e.g. "Black Rose") runs up to the
   // double-space before "Level".
@@ -597,11 +625,6 @@ struct LobbyScreenProps {
     if (leave) leave();
   };
 
-  // The "In Lobby"/presence callout floats over the Mars in the body's central
-  // gap: clears the title bar (44) + the upper toprow (181) so it lands
-  // mid-backdrop like origin, instead of inside any one panel.
-  const float kPresenceFloatTop = 190.0f;
-
   return <ScreenLayout key="root" variant={ScreenLayoutVariant::Game}>
     <Box
       key="titlebar"
@@ -615,13 +638,22 @@ struct LobbyScreenProps {
         .gap = ::ui::StyleValue::points(10.0f)}}
       style={tokens::frame_patch(tokens::kChromeStroke)}
     >
-      <ScreenTitle key="brand" variant={ScreenTitleVariant::Brand} value="Silencer" />
-      <BodyText
-        key="ver"
-        variant={BodyTextVariant::Detail}
-        tone={BodyTextTone::Warning}
-        value={version_text}
-      />
+      <Box
+        key="brandrow"
+        layout={::ui::LayoutStyle{
+          .direction = ::ui::FlexDirection::Row,
+          .align_items = ::ui::AlignItems::End,
+          .gap = ::ui::StyleValue::points(10.0f)}}
+      >
+        <ScreenTitle key="brand" variant={ScreenTitleVariant::Brand} value="Silencer" />
+        <BodyText
+          key="ver"
+          variant={BodyTextVariant::Detail}
+          tone={BodyTextTone::Warning}
+          value={version_text}
+        />
+      </Box>
+      {map_overlay}
       <Box key="tbspace" layout={::ui::LayoutStyle{.flex_grow = ::ui::StyleFloat::points(1.0f)}} />
       <AppButton
         key="goback"
@@ -639,7 +671,7 @@ struct LobbyScreenProps {
         .align_items = ::ui::AlignItems::Stretch,
         .flex_grow = ::ui::StyleFloat::points(1.0f),
         .width = ::ui::Length::percent(100.0f),
-        .gap = ::ui::StyleValue::points(16.0f)}}
+        .gap = ::ui::StyleValue::points(44.5f)}}
     >
       <Box
         key="leftstack"
@@ -649,7 +681,7 @@ struct LobbyScreenProps {
           .flex_grow = ::ui::StyleFloat::points(1.5f),
           .flex_basis = ::ui::Length::points(0.0f),
           .min_width = ::ui::Length::points(0.0f),
-          .gap = ::ui::StyleValue::points(16.0f)}}
+          .gap = ::ui::StyleValue::points(20.5f)}}
       >
         <Box
           key="toprow"
@@ -657,9 +689,9 @@ struct LobbyScreenProps {
             .direction = ::ui::FlexDirection::Row,
             .align_items = ::ui::AlignItems::Stretch,
             .width = ::ui::Length::percent(100.0f),
-            .height = ::ui::Length::points(181.0f),
+            .height = ::ui::Length::points(178.5f),
             .flex_shrink = ::ui::StyleFloat::points(0.0f),
-            .gap = ::ui::StyleValue::points(16.0f)}}
+            .gap = ::ui::StyleValue::points(20.5f)}}
         >
           <Box
             key="agent"
@@ -727,7 +759,7 @@ struct LobbyScreenProps {
                 >
                   {stat_kv("wins", "WINS", "0")}
                   {stat_kv("loss", "LOSSES", "0")}
-                  {stat_kv("xp", "XP", xp_text)}
+                  <BodyText key="xp" variant={BodyTextVariant::Body} value={xp_line} />
                   <AppButton
                     key="leave"
                     controlId="LeaveLobby"
@@ -760,18 +792,47 @@ struct LobbyScreenProps {
           {right}
         </Box>
         <Box key="chat" layout={lobby_cell_layout(1.0f)} style={lobby_panel_style()}>
-          <ScreenTitle key="h" variant={ScreenTitleVariant::Console} value="Lobby" />
+          <ScreenTitle key="h" variant={ScreenTitleVariant::Console} value={chat_title} />
           <Box
             key="logwell"
             layout={::ui::LayoutStyle{
+              .direction = ::ui::FlexDirection::Row,
               .overflow = ::ui::Overflow::Hidden,
-              .align_items = ::ui::AlignItems::Start,
+              .align_items = ::ui::AlignItems::Stretch,
               .flex_grow = ::ui::StyleFloat::points(1.0f),
               .width = ::ui::Length::percent(100.0f),
-              .padding = {8.0f, 8.0f, 6.0f, 6.0f}}}
+              .padding = {8.0f, 8.0f, 6.0f, 6.0f},
+              .gap = 9.0f}}
             style={tokens::frame_patch(tokens::kInsetStroke)}
           >
-            <BodyText key="log" variant={BodyTextVariant::Message} value={scrollback} />
+            <Box
+              key="logcol"
+              layout={::ui::LayoutStyle{
+                .overflow = ::ui::Overflow::Hidden,
+                .align_items = ::ui::AlignItems::Start,
+                .flex_grow = ::ui::StyleFloat::points(1.0f),
+                .flex_basis = ::ui::Length::points(0.0f),
+                .min_width = ::ui::Length::points(0.0f)}}
+            >
+              <BodyText key="log" variant={BodyTextVariant::Message} value={scrollback} />
+            </Box>
+            <Box
+              key="prescol"
+              layout={::ui::LayoutStyle{
+                .direction = ::ui::FlexDirection::Column,
+                .align_items = ::ui::AlignItems::Start,
+                .width = ::ui::Length::points(110.0f),
+                .flex_shrink = ::ui::StyleFloat::points(0.0f),
+                .gap = 1.0f}}
+            >
+              <BodyText
+                key="il"
+                variant={BodyTextVariant::Detail}
+                tone={BodyTextTone::Muted}
+                value="In Lobby"
+              />
+              <BodyText key="p" variant={BodyTextVariant::Detail} value={presence} />
+            </Box>
           </Box>
           <Box
             key="inputstrip"
@@ -784,23 +845,6 @@ struct LobbyScreenProps {
         </Box>
       </Box>
       {right_cell}
-      <Box
-        key="presfloat"
-        layout={::ui::LayoutStyle{
-          .position = ::ui::PositionType::Absolute,
-          .position_inset = ::ui::EdgeSizes{0.0f, 0.0f, kPresenceFloatTop, {}},
-          .direction = ::ui::FlexDirection::Column,
-          .align_items = ::ui::AlignItems::Center,
-          .gap = 1.0f}}
-      >
-        <BodyText
-          key="il"
-          variant={BodyTextVariant::Detail}
-          tone={BodyTextTone::Muted}
-          value="In Lobby"
-        />
-        <BodyText key="p" variant={BodyTextVariant::Detail} value={presence} />
-      </Box>
     </Box>
   </ScreenLayout>
 }

@@ -168,7 +168,9 @@ struct CharacterCreateProviderProps {
   return <Text
     key="desc"
     value={value}
-    layout={::ui::LayoutStyle{.width = ::ui::Length::points(283.5f)}}
+    layout={::ui::LayoutStyle{
+      .width = ::ui::Length::points(283.5f),
+      .margin = ::ui::EdgeSizes{{}, {}, -3.0f, {}}}}
     style={st}
   />
 }

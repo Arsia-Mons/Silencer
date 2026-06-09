@@ -90,6 +90,7 @@ LobbyChat use_lobby_chat() {
   return {
       .scrollback = value->snapshot.lobby_chat,
       .presence = value->snapshot.lobby_presence,
+      .channel = value->snapshot.chat_channel,
       .send = value->send_chat,
   };
 }
@@ -132,6 +133,7 @@ Staging use_staging() {
       .is_host = s.staging_is_host,
       .ready_blocked = s.staging_ready_blocked,
       .ready_label = s.staging_ready_label,
+      .map_name = s.staging_map_name,
       .roster = s.staging_roster,
       .send_ready = value->send_ready,
       .change_team = value->change_team,

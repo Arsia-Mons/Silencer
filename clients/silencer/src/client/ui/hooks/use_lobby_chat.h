@@ -14,6 +14,7 @@ namespace client::ui {
 struct LobbyChat {
   std::string scrollback = {};
   std::string presence = {};
+  std::string channel = {}; // panel header: "Lobby", or the game channel in staging
 
   std::function<void(const std::string &)> send = {};
 };

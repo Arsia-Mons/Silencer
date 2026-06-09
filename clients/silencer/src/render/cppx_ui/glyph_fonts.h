@@ -32,7 +32,7 @@ class GlyphFonts {
 public:
   // Faces mirror FontRegistry::FaceId (Body/Large/Title/Tiny/Heading). Each maps
   // to a legacy bank; see game_ui_pipeline's glyph bake for the bank wiring.
-  static constexpr int kFaceCount = 5;
+  static constexpr int kFaceCount = 8;
   // Printable ASCII window stored in each atlas: space(32) .. '~'(126).
   static constexpr int kFirstChar = 32;
   static constexpr int kLastChar = 126;
