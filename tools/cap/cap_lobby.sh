@@ -13,8 +13,20 @@ LOBBY_BIN="$(lobby_bin)"
 
 TMP=$(mktemp -d)
 LOBBY_DB="$TMP/lobby.json"; SILENCER_HOME="$TMP/home"; mkdir -p "$SILENCER_HOME" "$TMP/maps"
-# Provision bundled maps so Create -> dedicated-spawn -> staging can succeed.
+# Provision the EXACT map set (and copy order) the origin goldens were captured
+# with: the 7 bundled level maps, then 6 community maps (the golden create_game
+# Select Map list shows them in this sequence).
 cp "$REPO_ROOT"/shared/assets/level/*.SIL "$TMP/maps/" 2>/dev/null || true
+for m in blades.sil junkyard.sil CHOKE13.SIL darkcity1.sil test-copilot.sil sewers10.sil; do
+  cp "$REPO_ROOT/shared/assets/level/community/$m" "$TMP/maps/" 2>/dev/null || true
+done
+# ... and the same extras into the CLIENT's data dir (the Select Map list =
+# bundle level/ + data-dir level/; the golden client had these 6 downloaded).
+CLIENT_LEVEL="$SILENCER_HOME/Library/Application Support/Silencer/level/download"
+mkdir -p "$CLIENT_LEVEL"
+for m in blades.sil junkyard.sil; do
+  cp "$REPO_ROOT/shared/assets/level/community/$m" "$CLIENT_LEVEL/" 2>/dev/null || true
+done
 LOBBY_PORT=$(pick_port); PLAYER_AUTH_PORT=$(pick_port); MAP_API_PORT=$(pick_port); CTRL_PORT=$(pick_port)
 SILENCER_VERSION="$(silencer_version)"
 

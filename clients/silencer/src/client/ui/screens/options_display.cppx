@@ -56,9 +56,11 @@ struct OptionsDisplayProps {
         .position_inset = ::ui::EdgeSizes{0.0f, 0.0f, 168.0f, {}},
         .direction = ::ui::FlexDirection::Column,
         .align_items = ::ui::AlignItems::Center,
-        .gap = 33.0f}}
+        .gap = 30.0f}}
     >
-      <ScreenTitle key="title" variant={ScreenTitleVariant::Screen} value="Display Options" />
+      <Box key="titlewrap" layout={::ui::LayoutStyle{.margin = ::ui::EdgeSizes{{}, {}, {}, 3.5f}}}>
+        <ScreenTitle key="title" variant={ScreenTitleVariant::Dialog} value="Display Options" />
+      </Box>
       <BooleanSettingRow
         key="fullscreen"
         controlId="FullscreenToggle"
@@ -73,6 +75,7 @@ struct OptionsDisplayProps {
         label="Smooth Scaling"
         onChange={settings.set_smooth_scaling}
       />
+      <Box key="actionpad" layout={::ui::LayoutStyle{.margin = ::ui::EdgeSizes{{}, {}, 6.0f, {}}}}>
       <ActionRow key="actions">
         <AppButton
           key="save"
@@ -89,6 +92,7 @@ struct OptionsDisplayProps {
           onPress={cancel}
         />
       </ActionRow>
+      </Box>
     </Box>
   </ScreenLayout>
 }

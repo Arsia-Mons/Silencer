@@ -903,7 +903,16 @@ lobbySnapshot_ = silencer::game_ui::CaptureLobbySnapshot(game, CurrentSessionPha
 // SIL-21 (3/n): fold in the bundled-map choices for the GameCreatePanel. Maps
 // don't change at runtime, so list them once (disk read on the game thread).
 if(!bundledMapsListed_){
+// origin BuildMapList: bundled res-dir maps + the player's downloaded maps
+// (data-dir level/download), deduped and sorted.
 bundledMaps_ = game.gameSession.MapDownloaderRef().ListFiles((GetResDir() + "level").c_str());
+std::vector<std::string> downloaded =
+    game.gameSession.MapDownloaderRef().ListFiles((GetDataDir() + "level/download").c_str());
+for(const std::string &f : downloaded){
+if(std::find(bundledMaps_.begin(), bundledMaps_.end(), f) == bundledMaps_.end())
+bundledMaps_.push_back(f);
+}
+std::sort(bundledMaps_.begin(), bundledMaps_.end());
 bundledMapsListed_ = true;
 }
 lobbySnapshot_.bundled_maps = bundledMaps_;

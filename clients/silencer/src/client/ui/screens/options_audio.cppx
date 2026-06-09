@@ -61,9 +61,9 @@ struct OptionsAudioProps {
         .position_inset = ::ui::EdgeSizes{0.0f, 0.0f, 168.0f, {}},
         .direction = ::ui::FlexDirection::Column,
         .align_items = ::ui::AlignItems::Center,
-        .gap = 36.0f}}
+        .gap = 33.0f}}
     >
-      <ScreenTitle key="title" variant={ScreenTitleVariant::Screen} value="Audio Options" />
+      <ScreenTitle key="title" variant={ScreenTitleVariant::Dialog} value="Audio Options" />
       <BooleanSettingRow
         key="music"
         controlId="MusicToggle"

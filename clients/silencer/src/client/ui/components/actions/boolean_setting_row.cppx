@@ -25,15 +25,15 @@ using ::ui::components::BoxProps;
   const uint32_t right = checked ? chrome.toggle_on_r : chrome.toggle_off_r;
   // origin/main draws the toggle as two separated half-disc cells (~28x49 each)
   // with a gap between, upscaling the baked sprite to ~pill height.
-  auto cell = ::ui::LayoutStyle{.width = ::ui::Length::points(28.0f),
-                                .height = ::ui::Length::points(49.0f)};
+  auto cell = ::ui::LayoutStyle{.width = ::ui::Length::points(30.0f),
+                                .height = ::ui::Length::points(49.5f)};
 
   return <Box
     key={props.key}
     layout={::ui::LayoutStyle{
       .direction = ::ui::FlexDirection::Row,
       .align_items = ::ui::AlignItems::Center,
-      .gap = 43.0f}}
+      .gap = 36.0f}}
   >
     <AppButton
       key="lbl"
@@ -43,7 +43,7 @@ using ::ui::components::BoxProps;
       label={props.label}
       onPress={toggle}
     />
-    <Box key="ind" layout={::ui::LayoutStyle{.direction = ::ui::FlexDirection::Row, .gap = 13.0f}}>
+    <Box key="ind" layout={::ui::LayoutStyle{.direction = ::ui::FlexDirection::Row, .gap = 15.0f}}>
       <Box
         key="cl"
         layout={cell}

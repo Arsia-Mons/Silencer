@@ -288,6 +288,7 @@ struct GameBrowserProps {
       .align_items = ::ui::AlignItems::Center,
       .justify_content = ::ui::JustifyContent::SpaceBetween,
       .width = ::ui::Length::percent(100.0f),
+      .height = ::ui::Length::points(21.0f),
       .gap = 6.0f}}
   >
     <BodyText key="l" variant={BodyTextVariant::Body} value={label} />
@@ -308,8 +309,8 @@ struct GameBrowserProps {
         .align_items = ::ui::AlignItems::Stretch,
         .flex_grow = ::ui::StyleFloat::points(1.0f),
         .width = ::ui::Length::percent(100.0f),
-        .padding = {8.0f, 8.0f, 6.0f, 6.0f},
-        .gap = 4.0f}}
+        .padding = {6.0f, 6.0f, 3.0f, 3.0f},
+        .gap = 4.5f}}
       style={tokens::frame_patch(tokens::kInsetStroke)}
     >
       {kv_row("o0", "Security:", "Medium")}
@@ -317,6 +318,7 @@ struct GameBrowserProps {
       {kv_row("o2", "Max Level:", "99")}
       {kv_row("o3", "Max Players:", "24")}
       {kv_row("o4", "Max Teams:", "6")}
+      {kv_row("o5", "Spectatable:", "Yes")}
     </Box>
   </Box>
 }
