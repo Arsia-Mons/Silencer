@@ -12,6 +12,7 @@
 #include "client/ui/screens/character_create_data.h"
 #include "ui/components/box.h"
 #include "ui/components/input.h"
+#include "ui/components/text.h"
 #include "ui/runtime/react.h"
 
 #include <functional>
@@ -27,6 +28,8 @@ using ::ui::components::Box;
 using ::ui::components::BoxProps;
 using ::ui::components::Input;
 using ::ui::components::InputProps;
+using ::ui::components::Text;
+using ::ui::components::TextProps;
 
 // The floating ALIAS capsule + its header pill use a vector border (no baked
 // sprite). The golden draws that edge in a muted desaturated green (~84,156,104),
@@ -97,42 +100,76 @@ struct CharacterCreateProviderProps {
   />
 }
 
-// One advantage line: "Endurance" left, "[+3]" right (green body palette). An
-// empty slot ({nullptr,...}) renders nothing.
+// One advantage metadata bracket: origin draws '['/']' from the bank-134 glyph
+// art cropped to a 4x11 sub-rect (bank 133's own bracket cells are dash-shaped)
+// — 6x16.5 at x1.5. srcX 0 for the left bracket, 1 for the right.
+::ui::UiElement advantage_bracket(const char *key, bool left) {
+  client::ui::ChromeTextures chrome = client::ui::use_chrome();
+  uint32_t tex = left ? chrome.bracket_l : chrome.bracket_r;
+  if (!tex)
+    return ::ui::empty();
+  return <Box
+    key={key}
+    layout={::ui::LayoutStyle{
+      .width = ::ui::Length::points(6.0f),
+      .height = ::ui::Length::points(16.5f)}}
+    style={tokens::image_patch_sub(tex, left ? 0.0f : 1.0f, 0.0f, 4.0f, 11.0f)}
+  />
+}
+
+// One advantage line, origin AdvantageLineText: label, a 6px gap, then the
+// bonus wrapped in bracket glyphs ("Endurance [+3]"); ability rows are
+// label-only. Empty slots ({nullptr,...}) render nothing.
 ::ui::UiElement advantage_row(const char *key, const Advantage &adv) {
   if (!adv.label || adv.label[0] == '\0')
     return ::ui::empty();
-  // Height ~28 (vs the ~16 text) gives the golden's loose ~30px row pitch; the
-  // bonus rows are indented under the "Advantages" header (golden insets ~24px).
+  std::vector<::ui::UiElement> cells;
+  cells.push_back(BodyText(BodyTextProps{.key = "l",
+                                         .variant = BodyTextVariant::Body,
+                                         .tone = BodyTextTone::Prose,
+                                         .value = adv.label}));
+  if (adv.bonus && adv.bonus[0] != '\0') {
+    cells.push_back(Box(BoxProps{
+        .key = "g",
+        .layout = ::ui::LayoutStyle{.width = ::ui::Length::points(6.0f)}}));
+    cells.push_back(advantage_bracket("bl", true));
+    cells.push_back(BodyText(BodyTextProps{.key = "b",
+                                           .variant = BodyTextVariant::Strong,
+                                           .value = adv.bonus}));
+    cells.push_back(advantage_bracket("br", false));
+  }
+  // origin: rows pitch at lineHeight + 1 gap (16.5 + 1.5 at x1.5), indented 30
+  // (kAdvantageListIndent 20) under the "Advantages" header.
   return <Box
     key={key}
     layout={::ui::LayoutStyle{
       .direction = ::ui::FlexDirection::Row,
       .align_items = ::ui::AlignItems::Center,
       .width = ::ui::Length::percent(100.0f),
-      .height = ::ui::Length::points(28.0f),
-      .padding = {24.0f, 0.0f, 0.0f, 0.0f},
-      .gap = 8.0f}}
+      .height = ::ui::Length::points(18.0f),
+      .padding = {30.0f, 0.0f, 0.0f, 0.0f}}}
   >
-    <BodyText
-      key="l"
-      variant={BodyTextVariant::Body}
-      tone={BodyTextTone::Prose}
-      value={adv.label}
-    />
-    <BodyText key="b" variant={BodyTextVariant::Strong} value={adv.bonus} />
+    {::ui::children(cells)}
   </Box>
 }
 
-// One description prose line (the lore paragraph is authored one line per
-// BodyText — the engine does not break on '\n' and screens don't use the wrap
-// path, so multi-line text is composed as stacked fixed-height rows).
-::ui::UiElement desc_line(const char *key, const char *value) {
-  return <BodyText
-    key={key}
-    variant={BodyTextVariant::Body}
-    tone={BodyTextTone::Prose}
+// The lore paragraph: one wrapped Text, exactly origin's DetailParagraph
+// (TextSize::BodySm + TextWrap::Words). A single node keeps the line pitch on
+// the exact 16.5 cell — per-line boxes round through Yoga's pixel grid and
+// drift ~0.75px/line against the golden.
+::ui::UiElement desc_paragraph(const char *value) {
+  ::ui::StylePatch st = tokens::text_patch(tokens::kTextProse,
+                                           tokens::kFontBodyEm,
+                                           tokens::kFaceBodySm,
+                                           tokens::kLineBody);
+  st.text.value.wrap = ::ui::TextWrap::Words;
+  // 283.5 = 27 chars x 10.5 advance: the golden wraps the lore at 27 chars
+  // (origin's effective wrap width is a hair under the 196 column).
+  return <Text
+    key="desc"
     value={value}
+    layout={::ui::LayoutStyle{.width = ::ui::Length::points(283.5f)}}
+    style={st}
   />
 }
 
@@ -168,12 +205,15 @@ struct CharacterCreateProviderProps {
   return <Box
     key="hdr"
     layout={::ui::LayoutStyle{
-      .direction = ::ui::FlexDirection::Column,
-      .align_items = ::ui::AlignItems::Stretch,
+      .direction = ::ui::FlexDirection::Row,
+      .align_items = ::ui::AlignItems::Center,
+      .justify_content = ::ui::JustifyContent::Center,
       .width = ::ui::Length::percent(100.0f),
-      .margin = ::ui::EdgeSizes{{}, {}, {}, 36.0f}}}
+      .height = ::ui::Length::points(49.5f),
+      .margin = ::ui::EdgeSizes{{}, {}, {}, 31.4f},
+      .padding = {33.0f, 0.0f, 0.0f, 0.0f}}}
   >
-    <ScreenTitle key="title" variant={ScreenTitleVariant::Screen} centered={true} value={value} />
+    <ScreenTitle key="title" variant={ScreenTitleVariant::Screen} value={value} />
   </Box>
 }
 
@@ -234,10 +274,11 @@ struct CharacterCreateContentProps {
         layout={::ui::LayoutStyle{
           .direction = ::ui::FlexDirection::Row,
           .align_items = ::ui::AlignItems::Stretch,
-          .width = ::ui::Length::points(938.0f),
-          .height = ::ui::Length::points(664.0f),
-          .padding = {48.0f, 46.0f, 40.0f, 46.0f},
-          .gap = 44.0f}}
+          .width = ::ui::Length::points(942.0f),
+          .height = ::ui::Length::points(661.5f),
+          .margin = {0.0f, 4.0f, 0.0f, 0.0f},
+          .padding = {82.5f, 33.0f, 27.0f, 51.0f},
+          .gap = 117.0f}}
         style={frame1}
       >
         <Box
@@ -245,11 +286,8 @@ struct CharacterCreateContentProps {
           layout={::ui::LayoutStyle{
             .direction = ::ui::FlexDirection::Column,
             .align_items = ::ui::AlignItems::Stretch,
-            .flex_grow = ::ui::StyleFloat::points(1.0f),
-            .flex_basis = ::ui::Length::points(0.0f),
-            .min_width = ::ui::Length::points(0.0f),
-            .padding = {31.0f, 16.0f, 0.0f, 0.0f},
-            .gap = 9.0f}}
+            .width = ::ui::Length::points(354.0f),
+            .gap = 7.5f}}
         >
           {pane_header("SELECT AGENT")}
           <AppButton
@@ -274,14 +312,12 @@ struct CharacterCreateContentProps {
         key="aliasfloat"
         layout={::ui::LayoutStyle{
           .position = ::ui::PositionType::Absolute,
-          .position_inset = ::ui::EdgeSizes{427.0f, {}, 243.0f, {}},
+          .position_inset = ::ui::EdgeSizes{427.0f, {}, 241.5f, {}},
           .direction = ::ui::FlexDirection::Column,
           .align_items = ::ui::AlignItems::Stretch,
           .width = ::ui::Length::points(426.0f),
           .height = ::ui::Length::points(162.0f)}}
-        style={chrome1.dialog_pw
-                 ? tokens::image_patch(chrome1.dialog_pw)
-                 : tokens::panel_patch(tokens::kSurfaceHeroPanel, kAliasFrameBorder, 2.0f, 24.0f)}
+        style={chrome1.dialog_pw ? tokens::image_patch(chrome1.dialog_pw) : tokens::panel_patch(tokens::kSurfaceHeroPanel, kAliasFrameBorder, 2.0f, 24.0f)}
       >
         <Box
           key="title"
@@ -290,15 +326,15 @@ struct CharacterCreateContentProps {
             .justify_content = ::ui::JustifyContent::Center,
             .align_items = ::ui::AlignItems::Center,
             .width = ::ui::Length::percent(100.0f),
-            .height = ::ui::Length::points(50.0f)}}
+            .height = ::ui::Length::points(49.5f)}}
         >
-          <ScreenTitle key="t" variant={ScreenTitleVariant::Screen} value="SILENCER ALIAS" />
+          <ScreenTitle key="t" variant={ScreenTitleVariant::Dialog} value="SILENCER ALIAS" />
         </Box>
         <Box
           key="inputrow"
           layout={::ui::LayoutStyle{
             .position = ::ui::PositionType::Absolute,
-            .position_inset = ::ui::EdgeSizes{36.0f, {}, 74.0f, {}},
+            .position_inset = ::ui::EdgeSizes{36.0f, {}, 73.5f, {}},
             .align_items = ::ui::AlignItems::Center,
             .width = ::ui::Length::points(354.0f),
             .height = ::ui::Length::points(40.0f)}}
@@ -330,13 +366,6 @@ struct CharacterCreateContentProps {
     const AgencyInfo &a = kAgencies[pi];
     std::function<void(int)> set_preview = w.set_preview_agency;
 
-    // The lore paragraph is authored one BodyText per line (see data header).
-    std::vector<::ui::UiElement> desc;
-    for (int i = 0; i < AgencyInfo::kMaxDescLines && a.description[i]; ++i) {
-      const char *dk = ::ui::copy_string(("d" + std::to_string(i)).c_str());
-      desc.push_back(desc_line(dk, a.description[i]));
-    }
-    ::ui::UiChildren desc_lines = ::ui::children(desc);
 
     // origin/main "SELECT AGENCY": the same two-pane chrome frame as step 0 —
     // LEFT pane = SELECT AGENCY title + the five agency ovals; RIGHT pane =
@@ -353,10 +382,11 @@ struct CharacterCreateContentProps {
         layout={::ui::LayoutStyle{
           .direction = ::ui::FlexDirection::Row,
           .align_items = ::ui::AlignItems::Stretch,
-          .width = ::ui::Length::points(938.0f),
-          .height = ::ui::Length::points(664.0f),
-          .padding = {48.0f, 46.0f, 40.0f, 46.0f},
-          .gap = 44.0f}}
+          .width = ::ui::Length::points(942.0f),
+          .height = ::ui::Length::points(661.5f),
+          .margin = {0.0f, 4.0f, 0.0f, 0.0f},
+          .padding = {82.5f, 33.0f, 27.0f, 51.0f},
+          .gap = 117.0f}}
         style={frame2}
       >
         <Box
@@ -364,13 +394,8 @@ struct CharacterCreateContentProps {
           layout={::ui::LayoutStyle{
             .direction = ::ui::FlexDirection::Column,
             .align_items = ::ui::AlignItems::Stretch,
-            .flex_grow = ::ui::StyleFloat::points(0.0f),
-            .flex_shrink = ::ui::StyleFloat::points(0.0f),
-            .flex_basis = ::ui::Length::points(387.0f),
-            .min_width = ::ui::Length::points(0.0f),
-            .max_width = ::ui::Length::points(387.0f),
-            .padding = {31.0f, 16.0f, 0.0f, 0.0f},
-            .gap = 9.0f}}
+            .width = ::ui::Length::points(354.0f),
+            .gap = 7.5f}}
         >
           {pane_header("SELECT AGENCY")}
           {agency_row(0, pi, on_pick, set_preview)}
@@ -384,14 +409,10 @@ struct CharacterCreateContentProps {
           layout={::ui::LayoutStyle{
             .direction = ::ui::FlexDirection::Column,
             .align_items = ::ui::AlignItems::Stretch,
-            .flex_grow = ::ui::StyleFloat::points(0.0f),
-            .flex_shrink = ::ui::StyleFloat::points(0.0f),
-            .flex_basis = ::ui::Length::points(387.0f),
-            .min_width = ::ui::Length::points(0.0f),
-            .max_width = ::ui::Length::points(387.0f),
+            .width = ::ui::Length::points(294.0f),
             .overflow = ::ui::Overflow::Hidden,
-            .padding = {71.0f, 24.0f, 52.0f, 24.0f},
-            .gap = 4.0f}}
+            .padding = {0.0f, 0.0f, 63.0f, 0.0f},
+            .gap = 12.0f}}
         >
           <ScreenTitle key="adv" variant={ScreenTitleVariant::Prose} value="Advantages" />
           {advantage_row("a0", a.advantages[0])}
@@ -399,12 +420,7 @@ struct CharacterCreateContentProps {
           {advantage_row("a2", a.advantages[2])}
           {advantage_row("a3", a.advantages[3])}
           <ScreenTitle key="dh" variant={ScreenTitleVariant::Prose} value="Description" />
-          <Box key="desc" layout={::ui::LayoutStyle{
-              .direction = ::ui::FlexDirection::Column,
-              .width = ::ui::Length::percent(100.0f),
-              .gap = 0.0f}}>
-            {desc_lines}
-          </Box>
+          {desc_paragraph(a.description)}
         </Box>
       </Box>
     </ScreenLayout>
@@ -426,10 +442,11 @@ struct CharacterCreateContentProps {
       layout={::ui::LayoutStyle{
         .direction = ::ui::FlexDirection::Row,
         .align_items = ::ui::AlignItems::Stretch,
-        .width = ::ui::Length::points(938.0f),
-        .height = ::ui::Length::points(664.0f),
-        .padding = {48.0f, 46.0f, 40.0f, 46.0f},
-        .gap = 44.0f}}
+        .width = ::ui::Length::points(942.0f),
+        .height = ::ui::Length::points(661.5f),
+        .margin = {0.0f, 4.0f, 0.0f, 0.0f},
+        .padding = {82.5f, 33.0f, 27.0f, 51.0f},
+        .gap = 117.0f}}
       style={frame0}
     >
       <Box
@@ -437,11 +454,8 @@ struct CharacterCreateContentProps {
         layout={::ui::LayoutStyle{
           .direction = ::ui::FlexDirection::Column,
           .align_items = ::ui::AlignItems::Stretch,
-          .flex_grow = ::ui::StyleFloat::points(1.0f),
-          .flex_basis = ::ui::Length::points(0.0f),
-          .min_width = ::ui::Length::points(0.0f),
-          .padding = {31.0f, 16.0f, 0.0f, 0.0f},
-          .gap = 9.0f}}
+          .width = ::ui::Length::points(354.0f),
+          .gap = 7.5f}}
       >
         {pane_header("SELECT AGENT")}
         <AppButton

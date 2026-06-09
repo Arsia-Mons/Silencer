@@ -57,7 +57,8 @@ struct MessageModalProps {
         .height = ::ui::Length::points(h),
         .padding = {34.0f, 34.0f, 44.0f, 44.0f},
         .gap = 18.0f}}
-      style={panel_style}>
+      style={panel_style}
+    >
       <ScreenSubtitle key="message" value={props.message} />
       <AppButton
         key="ok"

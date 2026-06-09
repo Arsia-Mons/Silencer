@@ -34,14 +34,20 @@ using ::ui::components::TextProps;
 // One AgentCard stat row (WINS/LOSSES/XP): a fixed-width Body label column with
 // the value aligned after it, origin's StatRow convention (Body face, not tiny).
 ::ui::UiElement stat_kv(const char *key, const char *label, const char *value) {
-  return <Box key={key} layout={::ui::LayoutStyle{
+  return <Box
+    key={key}
+    layout={::ui::LayoutStyle{
       .direction = ::ui::FlexDirection::Row,
       .align_items = ::ui::AlignItems::Center,
       .height = ::ui::Length::points(tokens::kLineBody),
-      .gap = 8.0f}}>
-    <Box key="lc" layout={::ui::LayoutStyle{
+      .gap = 8.0f}}
+  >
+    <Box
+      key="lc"
+      layout={::ui::LayoutStyle{
         .width = ::ui::Length::points(72.0f),
-        .flex_shrink = ::ui::StyleFloat::points(0.0f)}}>
+        .flex_shrink = ::ui::StyleFloat::points(0.0f)}}
+    >
       <BodyText key="l" variant={BodyTextVariant::Body} value={label} />
     </Box>
     <BodyText key="v" variant={BodyTextVariant::Strong} value={value} />
@@ -92,12 +98,15 @@ inline ::ui::StylePatch lobby_panel_style() {
 // One "Endurance        5" loadout stat line: label left, value right.
 ::ui::UiElement loadout_row(const char *key, const char *label, uint8_t value) {
   const char *val = ::ui::copy_string(std::to_string((unsigned)value).c_str());
-  return <Box key={key} layout={::ui::LayoutStyle{
+  return <Box
+    key={key}
+    layout={::ui::LayoutStyle{
       .direction = ::ui::FlexDirection::Row,
       .align_items = ::ui::AlignItems::Center,
       .justify_content = ::ui::JustifyContent::SpaceBetween,
       .width = ::ui::Length::percent(100.0f),
-      .gap = 6.0f}}>
+      .gap = 6.0f}}
+  >
     <BodyText key="l" variant={BodyTextVariant::Body} value={label} />
     <BodyText key="v" variant={BodyTextVariant::Strong} value={val} />
   </Box>
@@ -115,7 +124,9 @@ struct CenterColProps {
 ::ui::UiElement CenterCol(const CenterColProps &props) {
   // origin's RightUpperBox: the Create Game chrome button is the single
   // full-width child at the top of the box (FullWidthUpperButton).
-  return <Box key="centercol" layout={::ui::LayoutStyle{
+  return <Box
+    key="centercol"
+    layout={::ui::LayoutStyle{
       .direction = ::ui::FlexDirection::Column,
       .align_items = ::ui::AlignItems::Stretch,
       .justify_content = ::ui::JustifyContent::Start,
@@ -123,8 +134,15 @@ struct CenterColProps {
       .flex_basis = ::ui::Length::points(0.0f),
       .min_width = ::ui::Length::points(0.0f),
       .padding = {8.0f, 8.0f, 6.0f, 6.0f},
-      .gap = 10.0f}}>
-    <AppButton key="creategame" controlId="NewGame" variant={AppButtonVariant::Chrome} label="Create Game" onPress={props.on_create} />
+      .gap = 10.0f}}
+  >
+    <AppButton
+      key="creategame"
+      controlId="NewGame"
+      variant={AppButtonVariant::Chrome}
+      label="Create Game"
+      onPress={props.on_create}
+    />
   </Box>
 }
 
@@ -146,18 +164,51 @@ struct GameBrowserProps {
 // Browse/join actions — a separate element so GameBrowser can omit it for an
 // empty list (the JSX tag can't live inside a ternary expression).
 ::ui::UiElement GameBrowserActions(const GameBrowserProps &props) {
-  return <Box key="acts" layout={::ui::LayoutStyle{
+  return <Box
+    key="acts"
+    layout={::ui::LayoutStyle{
       .direction = ::ui::FlexDirection::Column,
       .align_items = ::ui::AlignItems::Stretch,
       .width = ::ui::Length::percent(100.0f),
-      .gap = 4.0f}}>
+      .gap = 4.0f}}
+  >
     <BodyText key="detail" variant={BodyTextVariant::Detail} value={props.sel_detail} />
     <ActionRow key="browse">
-      <AppButton key="prev" controlId="GamePrev" variant={AppButtonVariant::Chrome} size={AppButtonSize::Sm} label="Prev" onPress={props.on_prev} />
-      <AppButton key="next" controlId="GameNext" variant={AppButtonVariant::Chrome} size={AppButtonSize::Sm} label="Next" onPress={props.on_next} />
+      <AppButton
+        key="prev"
+        controlId="GamePrev"
+        variant={AppButtonVariant::Chrome}
+        size={AppButtonSize::Sm}
+        label="Prev"
+        onPress={props.on_prev}
+      />
+      <AppButton
+        key="next"
+        controlId="GameNext"
+        variant={AppButtonVariant::Chrome}
+        size={AppButtonSize::Sm}
+        label="Next"
+        onPress={props.on_next}
+      />
     </ActionRow>
-    <AppButton key="join" controlId="JoinGame" variant={AppButtonVariant::Chrome} size={AppButtonSize::Sm} disabled={!props.can_join} label="Join" onPress={props.on_join} />
-    <AppButton key="spectate" controlId="SpectateGame" variant={AppButtonVariant::Chrome} size={AppButtonSize::Sm} disabled={!props.can_spectate} label="Spectate" onPress={props.on_spectate} />
+    <AppButton
+      key="join"
+      controlId="JoinGame"
+      variant={AppButtonVariant::Chrome}
+      size={AppButtonSize::Sm}
+      disabled={!props.can_join}
+      label="Join"
+      onPress={props.on_join}
+    />
+    <AppButton
+      key="spectate"
+      controlId="SpectateGame"
+      variant={AppButtonVariant::Chrome}
+      size={AppButtonSize::Sm}
+      disabled={!props.can_spectate}
+      label="Spectate"
+      onPress={props.on_spectate}
+    />
   </Box>
 }
 
@@ -178,12 +229,15 @@ struct GameBrowserProps {
   // sparse like the golden (the panel mostly shows the backdrop through).
   ::ui::UiElement actions =
       props.entries.empty() ? ::ui::empty() : GameBrowserActions(props);
-  return <Box key="browserbody" layout={::ui::LayoutStyle{
+  return <Box
+    key="browserbody"
+    layout={::ui::LayoutStyle{
       .direction = ::ui::FlexDirection::Column,
       .align_items = ::ui::AlignItems::Stretch,
       .flex_grow = ::ui::StyleFloat::points(1.0f),
       .width = ::ui::Length::percent(100.0f),
-      .gap = 4.0f}}>
+      .gap = 4.0f}}
+  >
     {game_rows}
     <Box key="spacer" layout={::ui::LayoutStyle{.flex_grow = ::ui::StyleFloat::points(1.0f)}} />
     {actions}
@@ -196,13 +250,17 @@ struct GameBrowserProps {
 ::ui::UiElement ActiveGamesCell(::ui::UiElement browser) {
   return <Box key="rightcell" layout={lobby_cell_layout(1.0f)} style={lobby_panel_style()}>
     <ScreenTitle key="h" variant={ScreenTitleVariant::Console} value="Active Games" />
-    <Box key="well" layout={::ui::LayoutStyle{
+    <Box
+      key="well"
+      layout={::ui::LayoutStyle{
         .direction = ::ui::FlexDirection::Column,
         .align_items = ::ui::AlignItems::Stretch,
         .flex_grow = ::ui::StyleFloat::points(1.0f),
         .width = ::ui::Length::percent(100.0f),
         .padding = {6.0f, 6.0f, 5.0f, 5.0f},
-        .gap = 4.0f}} style={tokens::frame_patch(tokens::kInsetStroke)}>
+        .gap = 4.0f}}
+      style={tokens::frame_patch(tokens::kInsetStroke)}
+    >
       {browser}
     </Box>
   </Box>
@@ -210,12 +268,15 @@ struct GameBrowserProps {
 
 // One "Label:   value" option line (origin's Game Options table).
 ::ui::UiElement kv_row(const char *key, const char *label, const char *value) {
-  return <Box key={key} layout={::ui::LayoutStyle{
+  return <Box
+    key={key}
+    layout={::ui::LayoutStyle{
       .direction = ::ui::FlexDirection::Row,
       .align_items = ::ui::AlignItems::Center,
       .justify_content = ::ui::JustifyContent::SpaceBetween,
       .width = ::ui::Length::percent(100.0f),
-      .gap = 6.0f}}>
+      .gap = 6.0f}}
+  >
     <BodyText key="l" variant={BodyTextVariant::Body} value={label} />
     <BodyText key="v" variant={BodyTextVariant::Strong} value={value} />
   </Box>
@@ -227,13 +288,17 @@ struct GameBrowserProps {
 ::ui::UiElement GameCreatePanel() {
   return <Box key="create" layout={lobby_col_layout(2.0f)} style={lobby_panel_style()}>
     <ScreenTitle key="h" variant={ScreenTitleVariant::Console} value="Game Options" />
-    <Box key="well" layout={::ui::LayoutStyle{
+    <Box
+      key="well"
+      layout={::ui::LayoutStyle{
         .direction = ::ui::FlexDirection::Column,
         .align_items = ::ui::AlignItems::Stretch,
         .flex_grow = ::ui::StyleFloat::points(1.0f),
         .width = ::ui::Length::percent(100.0f),
         .padding = {8.0f, 8.0f, 6.0f, 6.0f},
-        .gap = 4.0f}} style={tokens::frame_patch(tokens::kInsetStroke)}>
+        .gap = 4.0f}}
+      style={tokens::frame_patch(tokens::kInsetStroke)}
+    >
       {kv_row("o0", "Security:", "Medium")}
       {kv_row("o1", "Min Level:", "0")}
       {kv_row("o2", "Max Level:", "99")}
@@ -258,21 +323,31 @@ struct CreateRightCellProps {
   // so the name value is a flat BodyText. Wide rect Create button below.
   return <Box key="rightcell" layout={lobby_cell_layout(1.0f)} style={lobby_panel_style()}>
     <ScreenTitle key="h" variant={ScreenTitleVariant::Console} value="Select Map" />
-    <Box key="maplist" layout={::ui::LayoutStyle{
+    <Box
+      key="maplist"
+      layout={::ui::LayoutStyle{
         .direction = ::ui::FlexDirection::Column,
         .align_items = ::ui::AlignItems::Stretch,
         .flex_grow = ::ui::StyleFloat::points(1.0f),
         .width = ::ui::Length::percent(100.0f),
         .overflow = ::ui::Overflow::Hidden,
         .padding = {8.0f, 8.0f, 6.0f, 6.0f},
-        .gap = 1.0f}} style={tokens::frame_patch(tokens::kInsetStroke)}>
+        .gap = 1.0f}}
+      style={tokens::frame_patch(tokens::kInsetStroke)}
+    >
       {props.rows}
     </Box>
     <BodyText key="gn" variant={BodyTextVariant::Body} value="Game name:" />
     <BodyText key="gv" variant={BodyTextVariant::Strong} value={props.name} />
     <BodyText key="pwl" variant={BodyTextVariant::Body} value="Password [optional]:" />
-    <AppButton key="create" controlId="CreateGame" variant={AppButtonVariant::Chrome}
-      disabled={!props.can_create} label="Create" onPress={props.on_create} />
+    <AppButton
+      key="create"
+      controlId="CreateGame"
+      variant={AppButtonVariant::Chrome}
+      disabled={!props.can_create}
+      label="Create"
+      onPress={props.on_create}
+    />
   </Box>
 }
 
@@ -289,23 +364,36 @@ struct StagingPanelProps {
   const ::ui::StylePatch cb =
       ready ? tokens::panel_patch(tokens::kChromeStroke, tokens::kChromeStroke, 1.0f)
             : tokens::frame_patch(tokens::kInsetStroke);
-  return <Box key={key} layout={::ui::LayoutStyle{
+  return <Box
+    key={key}
+    layout={::ui::LayoutStyle{
       .direction = ::ui::FlexDirection::Row,
       .align_items = ::ui::AlignItems::Center,
       .height = ::ui::Length::points(24.0f),
-      .gap = 8.0f}}>
-    <Box key="cb" layout={::ui::LayoutStyle{
+      .gap = 8.0f}}
+  >
+    <Box
+      key="cb"
+      layout={::ui::LayoutStyle{
         .width = ::ui::Length::points(14.0f),
         .height = ::ui::Length::points(14.0f),
-        .flex_shrink = ::ui::StyleFloat::points(0.0f)}} style={cb} />
-    <BodyText key="n" variant={ready ? BodyTextVariant::Strong : BodyTextVariant::Body} value={name} />
+        .flex_shrink = ::ui::StyleFloat::points(0.0f)}}
+      style={cb}
+    />
+    <BodyText
+      key="n"
+      variant={ready ? BodyTextVariant::Strong : BodyTextVariant::Body}
+      value={name}
+    />
   </Box>
 }
 
 // origin staging CENTER column: three stacked full-width chrome buttons spread
 // down the upper column (origin gives them generous vertical spacing).
 ::ui::UiElement StagingPanel(const StagingPanelProps &props) {
-  return <Box key="centercol" layout={::ui::LayoutStyle{
+  return <Box
+    key="centercol"
+    layout={::ui::LayoutStyle{
       .direction = ::ui::FlexDirection::Column,
       .align_items = ::ui::AlignItems::Stretch,
       .justify_content = ::ui::JustifyContent::Start,
@@ -313,11 +401,31 @@ struct StagingPanelProps {
       .flex_basis = ::ui::Length::points(0.0f),
       .min_width = ::ui::Length::points(0.0f),
       .padding = {8.0f, 8.0f, 10.0f, 14.0f},
-      .gap = 20.0f}}>
-    <AppButton key="tech" controlId="ChooseTech" variant={AppButtonVariant::Chrome} label="Choose Tech" onPress={props.on_tech} />
-    <AppButton key="team" controlId="ChangeTeam" variant={AppButtonVariant::Chrome} label="Change Team" onPress={props.on_team} />
+      .gap = 20.0f}}
+  >
+    <AppButton
+      key="tech"
+      controlId="ChooseTech"
+      variant={AppButtonVariant::Chrome}
+      label="Choose Tech"
+      onPress={props.on_tech}
+    />
+    <AppButton
+      key="team"
+      controlId="ChangeTeam"
+      variant={AppButtonVariant::Chrome}
+      label="Change Team"
+      onPress={props.on_team}
+    />
     <Box key="sp" layout={::ui::LayoutStyle{.flex_grow = ::ui::StyleFloat::points(1.0f)}} />
-    <AppButton key="ready" controlId="StagingReady" variant={AppButtonVariant::Chrome} disabled={props.ready_blocked} label={props.ready_label} onPress={props.on_ready} />
+    <AppButton
+      key="ready"
+      controlId="StagingReady"
+      variant={AppButtonVariant::Chrome}
+      disabled={props.ready_blocked}
+      label={props.ready_label}
+      onPress={props.on_ready}
+    />
   </Box>
 }
 
@@ -495,7 +603,9 @@ struct LobbyScreenProps {
   const float kPresenceFloatTop = 190.0f;
 
   return <ScreenLayout key="root" variant={ScreenLayoutVariant::Game}>
-    <Box key="titlebar" layout={::ui::LayoutStyle{
+    <Box
+      key="titlebar"
+      layout={::ui::LayoutStyle{
         .direction = ::ui::FlexDirection::Row,
         .align_items = ::ui::AlignItems::Center,
         .width = ::ui::Length::percent(100.0f),
@@ -503,87 +613,140 @@ struct LobbyScreenProps {
         .flex_shrink = ::ui::StyleFloat::points(0.0f),
         .padding = {16.0f, 16.0f, 4.0f, 4.0f},
         .gap = ::ui::StyleValue::points(10.0f)}}
-      style={tokens::frame_patch(tokens::kChromeStroke)}>
+      style={tokens::frame_patch(tokens::kChromeStroke)}
+    >
       <ScreenTitle key="brand" variant={ScreenTitleVariant::Brand} value="Silencer" />
-      <BodyText key="ver" variant={BodyTextVariant::Detail} tone={BodyTextTone::Warning} value={version_text} />
+      <BodyText
+        key="ver"
+        variant={BodyTextVariant::Detail}
+        tone={BodyTextTone::Warning}
+        value={version_text}
+      />
       <Box key="tbspace" layout={::ui::LayoutStyle{.flex_grow = ::ui::StyleFloat::points(1.0f)}} />
-      <AppButton key="goback" controlId="LobbyGoBack" variant={AppButtonVariant::Chrome} size={AppButtonSize::Sm} label="Go Back" onPress={on_go_back} />
+      <AppButton
+        key="goback"
+        controlId="LobbyGoBack"
+        variant={AppButtonVariant::Chrome}
+        size={AppButtonSize::Sm}
+        label="Go Back"
+        onPress={on_go_back}
+      />
     </Box>
-    <Box key="body" layout={::ui::LayoutStyle{
+    <Box
+      key="body"
+      layout={::ui::LayoutStyle{
         .direction = ::ui::FlexDirection::Row,
         .align_items = ::ui::AlignItems::Stretch,
         .flex_grow = ::ui::StyleFloat::points(1.0f),
         .width = ::ui::Length::percent(100.0f),
-        .gap = ::ui::StyleValue::points(16.0f)}}>
-      <Box key="leftstack" layout={::ui::LayoutStyle{
+        .gap = ::ui::StyleValue::points(16.0f)}}
+    >
+      <Box
+        key="leftstack"
+        layout={::ui::LayoutStyle{
           .direction = ::ui::FlexDirection::Column,
           .align_items = ::ui::AlignItems::Stretch,
           .flex_grow = ::ui::StyleFloat::points(1.5f),
           .flex_basis = ::ui::Length::points(0.0f),
           .min_width = ::ui::Length::points(0.0f),
-          .gap = ::ui::StyleValue::points(16.0f)}}>
-        <Box key="toprow" layout={::ui::LayoutStyle{
+          .gap = ::ui::StyleValue::points(16.0f)}}
+      >
+        <Box
+          key="toprow"
+          layout={::ui::LayoutStyle{
             .direction = ::ui::FlexDirection::Row,
             .align_items = ::ui::AlignItems::Stretch,
             .width = ::ui::Length::percent(100.0f),
             .height = ::ui::Length::points(181.0f),
             .flex_shrink = ::ui::StyleFloat::points(0.0f),
-            .gap = ::ui::StyleValue::points(16.0f)}}>
-          <Box key="agent" layout={::ui::LayoutStyle{
+            .gap = ::ui::StyleValue::points(16.0f)}}
+        >
+          <Box
+            key="agent"
+            layout={::ui::LayoutStyle{
               .direction = ::ui::FlexDirection::Row,
               .align_items = ::ui::AlignItems::Start,
               .width = ::ui::Length::points(436.0f),
               .flex_shrink = ::ui::StyleFloat::points(0.0f),
               .overflow = ::ui::Overflow::Hidden,
               .padding = {9.0f, 9.0f, 9.0f, 9.0f},
-              .gap = 10.0f}} style={lobby_panel_style()}>
-            <Box key="leftrail" layout={::ui::LayoutStyle{
+              .gap = 10.0f}}
+            style={lobby_panel_style()}
+          >
+            <Box
+              key="leftrail"
+              layout={::ui::LayoutStyle{
                 .direction = ::ui::FlexDirection::Column,
                 .align_items = ::ui::AlignItems::Center,
                 .width = ::ui::Length::points(64.0f),
                 .flex_shrink = ::ui::StyleFloat::points(0.0f),
-                .gap = ::ui::StyleValue::points(4.0f)}}>
-              <Box key="avatar" layout={::ui::LayoutStyle{
+                .gap = ::ui::StyleValue::points(4.0f)}}
+            >
+              <Box
+                key="avatar"
+                layout={::ui::LayoutStyle{
                   .width = ::ui::Length::points(64.0f),
                   .height = ::ui::Length::points(64.0f),
                   .flex_shrink = ::ui::StyleFloat::points(0.0f)}}
                 style={emblem_tex ? tokens::image_patch(emblem_tex)
-                                  : ::ui::patch().background(::ui::Color{40, 70, 150, 255}).corner_radius(2.0f)} />
+                                  : ::ui::patch().background(::ui::Color{40, 70, 150, 255}).corner_radius(2.0f)}
+              />
               <BodyText key="lv" variant={BodyTextVariant::Body} value="LV 0" />
             </Box>
-            <Box key="infoArea" layout={::ui::LayoutStyle{
+            <Box
+              key="infoArea"
+              layout={::ui::LayoutStyle{
                 .direction = ::ui::FlexDirection::Column,
                 .align_items = ::ui::AlignItems::Stretch,
                 .flex_grow = ::ui::StyleFloat::points(1.0f),
                 .flex_basis = ::ui::Length::points(0.0f),
                 .min_width = ::ui::Length::points(0.0f),
                 .overflow = ::ui::Overflow::Hidden,
-                .gap = ::ui::StyleValue::points(5.0f)}}>
-              <Text key="name" value={agent_name}
+                .gap = ::ui::StyleValue::points(5.0f)}}
+            >
+              <Text
+                key="name"
+                value={agent_name}
                 layout={{.height = ::ui::Length::points(tokens::kLineLarge)}}
-                style={tokens::text_patch(tokens::kTextAgentName, tokens::kFontLarge, tokens::kFaceLarge, tokens::kLineLarge)} />
-              <Box key="detailsArea" layout={::ui::LayoutStyle{
+                style={tokens::text_patch(tokens::kTextAgentName, tokens::kFontLarge, tokens::kFaceLarge, tokens::kLineLarge)}
+              />
+              <Box
+                key="detailsArea"
+                layout={::ui::LayoutStyle{
                   .direction = ::ui::FlexDirection::Row,
                   .align_items = ::ui::AlignItems::Start,
-                  .gap = ::ui::StyleValue::points(8.0f)}}>
-                <Box key="statsCol" layout={::ui::LayoutStyle{
+                  .gap = ::ui::StyleValue::points(8.0f)}}
+              >
+                <Box
+                  key="statsCol"
+                  layout={::ui::LayoutStyle{
                     .direction = ::ui::FlexDirection::Column,
                     .width = ::ui::Length::points(150.0f),
                     .flex_shrink = ::ui::StyleFloat::points(0.0f),
-                    .gap = ::ui::StyleValue::points(8.0f)}}>
+                    .gap = ::ui::StyleValue::points(8.0f)}}
+                >
                   {stat_kv("wins", "WINS", "0")}
                   {stat_kv("loss", "LOSSES", "0")}
                   {stat_kv("xp", "XP", xp_text)}
-                  <AppButton key="leave" controlId="LeaveLobby" variant={AppButtonVariant::Chrome} label="Agents" onPress={session.leave_to_menu} />
+                  <AppButton
+                    key="leave"
+                    controlId="LeaveLobby"
+                    variant={AppButtonVariant::Chrome}
+                    label="Agents"
+                    onPress={session.leave_to_menu}
+                  />
                 </Box>
-                <Box key="statWell" layout={::ui::LayoutStyle{
+                <Box
+                  key="statWell"
+                  layout={::ui::LayoutStyle{
                     .direction = ::ui::FlexDirection::Column,
                     .align_items = ::ui::AlignItems::Stretch,
                     .width = ::ui::Length::points(179.0f),
                     .flex_shrink = ::ui::StyleFloat::points(0.0f),
                     .padding = {10.0f, 8.0f, 5.0f, 5.0f},
                     .gap = ::ui::StyleValue::points(2.0f)}}
-                  style={tokens::frame_patch(tokens::kInsetStroke)}>
+                  style={tokens::frame_patch(tokens::kInsetStroke)}
+                >
                   {loadout_row("s0", "ENDURANCE:", 0)}
                   {loadout_row("s1", "SHIELD:", 0)}
                   {loadout_row("s2", "JETPACK:", 0)}
@@ -598,30 +761,44 @@ struct LobbyScreenProps {
         </Box>
         <Box key="chat" layout={lobby_cell_layout(1.0f)} style={lobby_panel_style()}>
           <ScreenTitle key="h" variant={ScreenTitleVariant::Console} value="Lobby" />
-          <Box key="logwell" layout={::ui::LayoutStyle{
+          <Box
+            key="logwell"
+            layout={::ui::LayoutStyle{
               .overflow = ::ui::Overflow::Hidden,
               .align_items = ::ui::AlignItems::Start,
               .flex_grow = ::ui::StyleFloat::points(1.0f),
               .width = ::ui::Length::percent(100.0f),
               .padding = {8.0f, 8.0f, 6.0f, 6.0f}}}
-            style={tokens::frame_patch(tokens::kInsetStroke)}>
+            style={tokens::frame_patch(tokens::kInsetStroke)}
+          >
             <BodyText key="log" variant={BodyTextVariant::Message} value={scrollback} />
           </Box>
-          <Box key="inputstrip" layout={::ui::LayoutStyle{
+          <Box
+            key="inputstrip"
+            layout={::ui::LayoutStyle{
               .width = ::ui::Length::percent(100.0f),
               .height = ::ui::Length::points(28.0f),
               .flex_shrink = ::ui::StyleFloat::points(0.0f)}}
-            style={tokens::frame_patch(tokens::kInsetStroke)} />
+            style={tokens::frame_patch(tokens::kInsetStroke)}
+          />
         </Box>
       </Box>
       {right_cell}
-      <Box key="presfloat" layout={::ui::LayoutStyle{
+      <Box
+        key="presfloat"
+        layout={::ui::LayoutStyle{
           .position = ::ui::PositionType::Absolute,
           .position_inset = ::ui::EdgeSizes{0.0f, 0.0f, kPresenceFloatTop, {}},
           .direction = ::ui::FlexDirection::Column,
           .align_items = ::ui::AlignItems::Center,
-          .gap = 1.0f}}>
-        <BodyText key="il" variant={BodyTextVariant::Detail} tone={BodyTextTone::Muted} value="In Lobby" />
+          .gap = 1.0f}}
+      >
+        <BodyText
+          key="il"
+          variant={BodyTextVariant::Detail}
+          tone={BodyTextTone::Muted}
+          value="In Lobby"
+        />
         <BodyText key="p" variant={BodyTextVariant::Detail} value={presence} />
       </Box>
     </Box>

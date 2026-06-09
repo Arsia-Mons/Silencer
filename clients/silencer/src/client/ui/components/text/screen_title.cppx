@@ -20,7 +20,7 @@ using ::ui::components::TextProps;
   // the Heading face (bank 135) and only Hero uses the larger Title face (136).
   ::ui::Color color = tokens::kTextTitle;
   uint16_t face = tokens::kFaceHeading;
-  uint16_t font = tokens::kFontHeading;
+  float font = tokens::kFontHeading;
   float line = tokens::kLineHeading;
   float height = tokens::kLineHeading;
   switch (props.variant) {
@@ -32,7 +32,10 @@ using ::ui::components::TextProps;
     height = tokens::kLineTitle;
     break;
   case ScreenTitleVariant::Screen:
+    // origin TextSize::ScreenTitle: bank 135 tracked at advance 12 (vs the
+    // Title face's 11) — the wider letterspacing of "Configure Controls" etc.
     color = tokens::kTextTitle;
+    face = tokens::kFaceScreenTitle;
     break;
   case ScreenTitleVariant::Dialog:
     color = tokens::kTextTitle;
@@ -58,11 +61,11 @@ using ::ui::components::TextProps;
     height = tokens::kLineLarge;
     break;
   case ScreenTitleVariant::Prose:
-    // White section headers (Advantages/Description). Golden draws them with the
-    // heavy chunky Title face (bank 136) — same ~17px cap as the Heading face
-    // here but ~4x the ink/stroke weight; the Heading face reads too thin.
+    // White section headers (Advantages/Description). origin renders these in
+    // TextSize::Heading — bank 134 at its native advance (character_create_
+    // layout.cpp AdvantageLines), not the heavy bank-136 prompt face.
     color = tokens::kTextProse;
-    face = tokens::kFaceTitle;
+    face = tokens::kFaceLarge;
     font = tokens::kFontLarge;
     line = tokens::kLineLarge;
     height = tokens::kLineLarge;
@@ -71,17 +74,28 @@ using ::ui::components::TextProps;
   ::ui::StylePatch style = ::ui::patch().text(::ui::TextVisual{
       .color = color, .font_id = face, .font_size = font, .line_height = line});
   if (!props.centered)
-    return <Text key={props.key} value={props.value}
-      layout={{.height = ::ui::Length::points(height)}} style={style} />
+    return <Text
+      key={props.key}
+      value={props.value}
+      layout={{.height = ::ui::Length::points(height)}}
+      style={style}
+    />
   // A full-width row that centers its content-sized label (origin titles sit
   // centered in a baked notch).
-  return <Box key={props.key} layout={::ui::LayoutStyle{
+  return <Box
+    key={props.key}
+    layout={::ui::LayoutStyle{
       .direction = ::ui::FlexDirection::Row,
       .justify_content = ::ui::JustifyContent::Center,
       .width = ::ui::Length::percent(100.0f),
-      .height = ::ui::Length::points(height)}}>
-    <Text key="t" value={props.value}
-      layout={{.height = ::ui::Length::points(height)}} style={style} />
+      .height = ::ui::Length::points(height)}}
+  >
+    <Text
+      key="t"
+      value={props.value}
+      layout={{.height = ::ui::Length::points(height)}}
+      style={style}
+    />
   </Box>
 }
 

@@ -76,6 +76,11 @@ struct Gradient {
   GradientStop stops[UI_MAX_GRADIENT_STOPS]{};
 };
 
+// How a textured box maps the texture onto its rect (CSS background-size).
+// Stretch scales x/y independently; Cover fills the box preserving aspect,
+// cropping the overflow centered; Contain letterboxes the texture inside.
+enum class ImageFit : uint8_t { Stretch = 0, Cover, Contain };
+
 struct BackgroundImage {
   uint32_t texture_id = 0; // 0 => no image
   Color tint{255, 255, 255, 255};
@@ -86,6 +91,7 @@ struct BackgroundImage {
   // texture (its insets are already texture-space).
   float src_x = 0.f, src_y = 0.f, src_w = 0.f, src_h = 0.f;
   bool flip_h = false; // mirror horizontally (e.g. the toggle's left half-disc)
+  ImageFit fit = ImageFit::Stretch; // plain path only; nine-slice/rounded ignore
 };
 
 struct Shadow {
@@ -101,7 +107,7 @@ enum class TextWrap : uint8_t { None = 0, Words };
 struct TextVisual {
   Color color{};
   uint16_t font_id = 0;
-  uint16_t font_size = 0;
+  float font_size = 0.f;
   TextAlign align = TextAlign::Left;
   TextWrap wrap = TextWrap::None;
   float line_height = 0.f; // 0 => face natural line skip

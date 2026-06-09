@@ -11,6 +11,7 @@
 #include "client/ui/hooks/use_session.h"
 #include "client/ui/screens/options_screen.h"
 #include "ui/components/box.h"
+#include "ui/components/text.h"
 #include "ui/runtime/react.h"
 
 #include <functional>
@@ -24,18 +25,12 @@ using namespace silencer;
 using ::ui::children;
 using ::ui::components::Box;
 using ::ui::components::BoxProps;
+using ::ui::components::Text;
+using ::ui::components::TextProps;
 
-// origin/main wide-tracks the version footer; the text engine has no letter-
-// spacing knob, so interleave spaces to reproduce the tracking.
-const char *spaced_version(const char *v) {
+const char *version_text(const char *v) {
   std::string s = std::string("Silencer v") + (v ? v : "");
-  std::string out;
-  for (size_t i = 0; i < s.size(); ++i) {
-    out += s[i];
-    if (i + 1 < s.size())
-      out += ' ';
-  }
-  return ::ui::copy_string(out.c_str());
+  return ::ui::copy_string(s.c_str());
 }
 
 struct MainMenuProps {
@@ -56,30 +51,32 @@ struct MainMenuProps {
   // budget" path; the atlas/UV route had a bake issue). Step a frame index from
   // the per-frame wall clock at the legacy ~24fps (42ms) cadence: reveal
   // 0..N-1 -> hold on the full logo -> retract. Falls back to the static logo.
+  // origin cadence (silencer_logo.cpp): 42ms legacy ticks, 240-tick cycle —
+  // reveal ticks 0..60, HOLD the full logo 60..180 (the ~5s stable window the
+  // golden was captured in), retract 180..240. The 8 baked frames span the
+  // origin reveal range, so map the tick phase onto them proportionally.
   Clock clock = use_clock();
   uint32_t *logo_accum = use_state<uint32_t>(0u);
   int *logo_step = use_state<int>(0);
   *logo_accum += clock.delta_ms;
   const uint32_t kLogoFrameMs = 42;
+  const int kRevealTicks = 60, kHeldEndTicks = 180, kCycleTicks = 240;
   const int lf = chrome.logo_frame_count;
-  const int hold = 24; // ticks dwelling on the full logo (frame 0) before retract
-  const int loop = lf > 1 ? (2 * lf + hold) : 1;
   while (*logo_accum >= kLogoFrameMs) {
     *logo_accum -= kLogoFrameMs;
-    *logo_step = (*logo_step + 1) % (loop > 0 ? loop : 1);
+    *logo_step = (*logo_step + 1) % kCycleTicks;
   }
   // logo_frame[0] is the full logo; later entries step back through the reveal.
-  // Map the loop phase to a frame: hold full, reveal toward sparse, retract.
   uint32_t logo_tex = chrome.logo;
   if (lf > 0) {
     const int s = *logo_step;
     int idx;
-    if (s < hold)
+    if (s < kRevealTicks)
+      idx = ((kRevealTicks - 1 - s) * lf) / kRevealTicks; // reveal sparse -> full
+    else if (s < kHeldEndTicks)
       idx = 0; // hold on the full logo
-    else if (s < hold + (lf - 1))
-      idx = s - hold; // retract 0 -> lf-1 (logo recedes)
     else
-      idx = (lf - 1) - (s - hold - (lf - 1)); // reveal lf-1 -> 0 (logo returns)
+      idx = ((s - kHeldEndTicks) * lf) / (kCycleTicks - kHeldEndTicks); // retract
     if (idx < 0)
       idx = 0;
     if (idx >= lf)
@@ -93,17 +90,25 @@ struct MainMenuProps {
       nav.push(std::make_unique<OptionsScreen>());
   };
 
-  // The SILENCER wordmark (bank-208 logo sprite), absolutely positioned to the
-  // golden box. Falls back to the Hero title until the bake lands.
+  // The SILENCER wordmark (bank-208 logo sprite) at NATIVE sprite size x1.5,
+  // centered where origin centers it: x in the 525-wide logo group of the
+  // centered 960 composition (group center 427.75), y in the padded chrome
+  // region (center 355.5, including origin's 6px bottom nudge). Falls back to
+  // the Hero title until the bake lands.
+  const float logo_w = static_cast<float>(chrome.logo_w) * 1.5f;
+  const float logo_h = static_cast<float>(chrome.logo_h) * 1.5f;
   ::ui::UiElement logo =
       chrome.logo
           ? Box(BoxProps{
                 .key = "logoimg",
                 .layout = ::ui::LayoutStyle{
                     .position = ::ui::PositionType::Absolute,
-                    .position_inset = ::ui::EdgeSizes{::ui::StyleValue::percent(13.4f), {}, 342.0f, {}},
-                    .width = ::ui::Length::points(495.0f),
-                    .height = ::ui::Length::points(43.0f)},
+                    // +3.3/+8.7: origin centers the UNION bounds of reveal
+                    // frames 29..60 and offsets frame 60 inside that box; the
+                    // bake only knows frame 60's own bounds.
+                    .position_inset = ::ui::EdgeSizes{431.0f - logo_w * 0.5f, {}, 364.2f - logo_h * 0.5f, {}},
+                    .width = ::ui::Length::points(logo_w),
+                    .height = ::ui::Length::points(logo_h)},
                 .style = logo_style})
           : ScreenTitle(ScreenTitleProps{.key = "logotxt",
                                          .variant = ScreenTitleVariant::Hero,
@@ -117,27 +122,63 @@ struct MainMenuProps {
   // Tutorial/Options +60, Connect +120, Exit 0.
   return <ScreenLayout key="root" variant={ScreenLayoutVariant::Menu}>
     {logo}
-    <Box key="stack" layout={::ui::LayoutStyle{
+    <Box
+      key="stack"
+      layout={::ui::LayoutStyle{
         .position = ::ui::PositionType::Absolute,
         .position_inset = ::ui::EdgeSizes{::ui::StyleValue::percent(48.8f), {}, 231.0f, {}},
         .direction = ::ui::FlexDirection::Column,
         .align_items = ::ui::AlignItems::Start,
-        .gap = 51.0f}}>
+        .gap = 51.0f}}
+    >
       <Box key="w0" layout={::ui::LayoutStyle{.margin = ::ui::EdgeSizes{60.0f, {}, {}, {}}}}>
-        <AppButton key="tutorial" controlId="Tutorial" variant={AppButtonVariant::Oval} label="Tutorial" onPress={session.start_tutorial} />
+        <AppButton
+          key="tutorial"
+          controlId="Tutorial"
+          variant={AppButtonVariant::Oval}
+          label="Tutorial"
+          onPress={session.start_tutorial}
+        />
       </Box>
       <Box key="w1" layout={::ui::LayoutStyle{.margin = ::ui::EdgeSizes{120.0f, {}, {}, {}}}}>
-        <AppButton key="connect" controlId="ConnectToLobby" variant={AppButtonVariant::Oval} label="Connect To Lobby" onPress={session.play_online} />
+        <AppButton
+          key="connect"
+          controlId="ConnectToLobby"
+          variant={AppButtonVariant::Oval}
+          label="Connect To Lobby"
+          onPress={session.play_online}
+        />
       </Box>
       <Box key="w2" layout={::ui::LayoutStyle{.margin = ::ui::EdgeSizes{60.0f, {}, {}, {}}}}>
-        <AppButton key="options" controlId="Options" variant={AppButtonVariant::Oval} label="Options" onPress={open_options} />
+        <AppButton
+          key="options"
+          controlId="Options"
+          variant={AppButtonVariant::Oval}
+          label="Options"
+          onPress={open_options}
+        />
       </Box>
-      <AppButton key="exit" controlId="Exit" variant={AppButtonVariant::Oval} disabled={!app.can_quit} label="Exit" onPress={app.quit} />
+      <AppButton
+        key="exit"
+        controlId="Exit"
+        variant={AppButtonVariant::Oval}
+        disabled={!app.can_quit}
+        label="Exit"
+        onPress={app.quit}
+      />
     </Box>
-    <Box key="footer" layout={::ui::LayoutStyle{
+    <Box
+      key="footer"
+      layout={::ui::LayoutStyle{
         .position = ::ui::PositionType::Absolute,
-        .position_inset = ::ui::EdgeSizes{10.0f, {}, {}, 17.0f}}}>
-      <BodyText key="ver" variant={BodyTextVariant::Body} value={spaced_version(app.version)} />
+        .position_inset = ::ui::EdgeSizes{15.0f, {}, 694.5f, {}}}}
+    >
+      <Text
+        key="ver"
+        value={version_text(app.version)}
+        layout={::ui::LayoutStyle{.height = ::ui::Length::points(tokens::kLineBody)}}
+        style={tokens::text_patch(tokens::kTextBody, tokens::kFontBodyEm, tokens::kFaceFooter, tokens::kLineBody)}
+      />
     </Box>
   </ScreenLayout>
 }

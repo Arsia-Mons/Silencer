@@ -92,30 +92,35 @@ constexpr ::ui::Color kBlipEnemy = {224, 48, 48, 255};
 // The four bitmap-derived legacy OTF faces. The product layer sets font_id per
 // role so titles/headings/body/tiny each render in their own face (everything
 // previously collapsed to Body face 0 at arbitrary point sizes).
-constexpr uint16_t kFaceBody = 0;    // silencer-ui      (bank 133)
-constexpr uint16_t kFaceLarge = 1;   // silencer-ui-large(bank 134) — headings
-constexpr uint16_t kFaceTitle = 2;   // silencer-title   (bank 136) — titles
-constexpr uint16_t kFaceTiny = 3;    // silencer-tiny    (bank 132) — HUD/tiny
-constexpr uint16_t kFaceHeading = 4; // silencer-135     (bank 135) — the dominant
-                                     // legacy title/heading face (SIL-95)
+constexpr uint16_t kFaceBody = 0;    // bank 133, advance 6  (origin Body)
+constexpr uint16_t kFaceLarge = 1;   // bank 134, advance 8  (origin Heading)
+constexpr uint16_t kFaceTitle = 2;   // bank 136, advance 16 (origin Prompt)
+constexpr uint16_t kFaceTiny = 3;    // bank 132, advance 4  (origin Tiny)
+constexpr uint16_t kFaceHeading = 4; // bank 135, advance 11 (origin Title — the
+                                     // dominant button-label/title face, SIL-95)
+// origin tracks the SAME bank at a wider advance for some styles (text.cpp
+// TextRenderStyle advance is per-style, not per-bank); each tracking gets its
+// own baked face since the glyph atlas advance is fixed at bake time.
+constexpr uint16_t kFaceScreenTitle = 5; // bank 135, advance 12 (origin ScreenTitle)
+constexpr uint16_t kFaceFooter = 6;      // bank 133, advance 11 (origin Footer)
+constexpr uint16_t kFaceBodySm = 7;      // bank 133, advance 7  (origin BodySm)
 
-// ---- Glyph cell sizes (device px) + line heights ----
+// ---- Glyph cell sizes (logical points) + line heights ----
 // Text renders from the legacy bitmap glyph banks (origin/main parity), NOT TTF.
-// font_size here is the target DEVICE cell height. The golden is origin's
-// 640-space bank glyphs (line heights 23/19/15/11/7) upscaled ~1.5x to the 960
-// window, so each token = native bank lineHeight * 1.5 (rounded). The glyph
-// executor scales the native art by font_size/lineHeight (nearest-neighbor),
-// reproducing the chunky upscaled-bitmap look. kLine* match the cell height.
-constexpr uint16_t kFontTitle = 34;  // bank 136 hero/big prompt (23 * 1.5)
-constexpr float kLineTitle = 34.f;
-constexpr uint16_t kFontHeading = 28; // bank 135 titles + button labels (19 * 1.5)
-constexpr float kLineHeading = 28.f;
-constexpr uint16_t kFontLarge = 22;  // bank 134 sub-headings (15 * 1.5)
-constexpr float kLineLarge = 22.f;
-constexpr uint16_t kFontBodyEm = 16; // bank 133 body/log/detail (11 * 1.5)
-constexpr float kLineBody = 16.f;
-constexpr uint16_t kFontTiny = 10;   // bank 132 tiny (7 * 1.5)
-constexpr float kLineTiny = 10.f;
+// font_size is the target cell height in logical points = the origin bank
+// lineHeight * 1.5 EXACTLY (the 720-tall logical canvas is origin's 480 * 1.5);
+// the glyph executor scales the native art by font_size/lineHeight. Fractional
+// sizes are required — rounding 28.5 down to 28 renders every glyph ~2% narrow.
+constexpr float kFontTitle = 34.5f;  // bank 136 hero/big prompt (23 * 1.5)
+constexpr float kLineTitle = 34.5f;
+constexpr float kFontHeading = 28.5f; // bank 135 titles + button labels (19 * 1.5)
+constexpr float kLineHeading = 28.5f;
+constexpr float kFontLarge = 22.5f;  // bank 134 sub-headings (15 * 1.5)
+constexpr float kLineLarge = 22.5f;
+constexpr float kFontBodyEm = 16.5f; // bank 133 body/log/detail (11 * 1.5)
+constexpr float kLineBody = 16.5f;
+constexpr float kFontTiny = 10.5f;   // bank 132 tiny (7 * 1.5)
+constexpr float kLineTiny = 10.5f;
 
 // ---- Border widths ----
 constexpr float kBorderWidth = 1.0f;
@@ -168,6 +173,15 @@ inline ::ui::StylePatch image_patch(uint32_t texture_id,
   return image_patch(img);
 }
 
+// Full-bleed backdrop variant: aspect-preserving centered-crop fill, matching
+// origin's PackImage default (CSS background-size: cover). Use for the
+// starfield / lobby backdrops so a 4:3 sprite isn't stretched on 16:9.
+inline ::ui::StylePatch image_patch_cover(uint32_t texture_id) {
+  ::ui::BackgroundImage img{texture_id};
+  img.fit = ::ui::ImageFit::Cover;
+  return image_patch(img);
+}
+
 // Atlas / partial-fill variant: samples only the given source sub-rect (texture
 // pixels) of the texture — for packed-frame atlases and drained HUD bars.
 // w==0 || h==0 falls back to the whole texture (SIL-93).
@@ -201,7 +215,7 @@ inline ::ui::StylePatch frame_patch(::ui::Color stroke, float width = 2.0f) {
 
 // Text paint (color + face + native-em size + legacy line height). font_id
 // selects the OTF face; line_height 0 falls back to the face's natural skip.
-inline ::ui::StylePatch text_patch(::ui::Color color, uint16_t font_size,
+inline ::ui::StylePatch text_patch(::ui::Color color, float font_size,
                                    uint16_t font_id = kFaceBody,
                                    float line_height = 0.f) {
   return ::ui::patch().text(::ui::TextVisual{.color = color,

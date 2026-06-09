@@ -155,7 +155,7 @@ namespace {
 
 // Resolved effective text paint for a node, mirroring the transcriber's source-
 // selection so layout and paint agree. The IR's font-size fallback is 15.
-uint16_t effective_font_size(const UiTree::TextMeasureView &view) {
+float effective_font_size(const UiTree::TextMeasureView &view) {
   if (view.font_size > 0)
     return view.font_size;
   return 15;
@@ -171,11 +171,17 @@ Size text_measure_shim(MeasureInput input, void *user) {
     return {0.0f, 16.0f};
   const char *utf8 = view->utf8 ? view->utf8 : "";
   uint32_t len = static_cast<uint32_t>(strlen(utf8));
-  uint16_t font_size = effective_font_size(*view);
+  float font_size = effective_font_size(*view);
 
   MeasureTextFn measurer = text_measurer();
-  float wrap_width =
-      (input.width_mode == MeasureMode::AtMost) ? input.width : 0.0f;
+  // Wrap inside any constrained width: AtMost (fit-content parents) AND
+  // Exactly (definite width, e.g. percent) — a definite-width wrapped Text
+  // must wrap at that width or measure returns one overflowing line while
+  // the paint path wraps, and the box height is a single line.
+  float wrap_width = (input.width_mode == MeasureMode::AtMost ||
+                      input.width_mode == MeasureMode::Exactly)
+                         ? input.width
+                         : 0.0f;
   if (!measurer) {
     // Deterministic fallback for tests without an installed measurer.
     float width = static_cast<float>(len) * 8.0f;

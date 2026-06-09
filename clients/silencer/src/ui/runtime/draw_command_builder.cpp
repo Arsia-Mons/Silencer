@@ -72,7 +72,7 @@ int clamp_int(int value, int low, int high) {
 // the executor blits at rect.x/rect.y verbatim.
 bool push_text_line(DrawCommandList &list, NodeId node_id, const DrawRect &rect,
                     const char *bytes, uint32_t byte_len, Color straight_color,
-                    uint16_t font_id, uint16_t font_size, uint16_t line_index,
+                    uint16_t font_id, float font_size, uint16_t line_index,
                     TextAlign align) {
   uint16_t n = byte_len > 0xFFFFu ? static_cast<uint16_t>(0xFFFFu)
                                   : static_cast<uint16_t>(byte_len);
@@ -99,7 +99,7 @@ bool push_text_line(DrawCommandList &list, NodeId node_id, const DrawRect &rect,
 // Single-line convenience used by inputs and the no-measurer fallback.
 bool push_text_command(DrawCommandList &list, NodeId node_id, const Rect &rect,
                        const char *value, Color straight_color,
-                       uint16_t font_size, TextAlign align) {
+                       float font_size, TextAlign align) {
   const char *safe = value ? value : "";
   uint32_t len = static_cast<uint32_t>(strlen(safe));
   return push_text_line(list, node_id, to_draw_rect(rect), safe, len,
@@ -127,7 +127,7 @@ Rect content_rect(const Rect &layout) {
 // measurer (design §10.5). No measurer (hermetic tests) => fixed 8px/byte so
 // caret math stays deterministic. wrap=None, no box (single run advance).
 float measured_advance(const char *value, uint32_t len, uint16_t font_id,
-                       uint16_t font_size, float line_height) {
+                       float font_size, float line_height) {
   if (len == 0)
     return 0.0f;
   MeasureTextFn measurer = text_measurer();
@@ -238,6 +238,7 @@ bool append_image(DrawCommandList &list, const NodeSnapshot &node) {
       .src_w = bi.src_w,
       .src_h = bi.src_h,
       .flip_h = bi.flip_h,
+      .fit = bi.fit,
   };
   return list.push(command);
 }
@@ -365,8 +366,7 @@ bool append_text(DrawCommandList &list, const NodeSnapshot &node,
                     : ((node.interaction.disabled || inherited_disabled)
                            ? kTextDisabledFill
                            : kTextFill);
-  uint16_t font_size =
-      v.text.font_size > 0 ? v.text.font_size : static_cast<uint16_t>(15);
+  float font_size = v.text.font_size > 0.f ? v.text.font_size : 15.f;
   uint16_t font_id = v.text.font_id;
   TextAlign align = v.text.align;
   const char *value = node.value ? node.value : "";
@@ -429,8 +429,8 @@ bool append_input_contents(DrawCommandList &list, const NodeSnapshot &node,
 
   const char *value = node.value ? node.value : "";
   int length = text_length(value);
-  uint16_t font_size = node.visual.text.font_size > 0 ? node.visual.text.font_size
-                                                      : static_cast<uint16_t>(15);
+  float font_size = node.visual.text.font_size > 0.f ? node.visual.text.font_size
+                                                      : 15.f;
   // Inputs are single-line; reuse the node's resolved text line height if any.
   float line_height = node.visual.text.line_height;
   uint16_t font_id = node.visual.text.font_id;

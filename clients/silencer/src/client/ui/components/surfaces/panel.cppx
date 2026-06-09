@@ -117,19 +117,23 @@ float panel_size_width(PanelSize size) {
     // GROW-FILL the overlay (origin/main PackImageStretch(7,7)) — NOT the
     // two-pane native-size chrome_panel. The sprite bakes its own title-header
     // notch (top-center) + right-edge scrollbar rail, so the screen draws
-    // neither. Content padding clears the baked frame + title notch (origin/main
-    // kPanelPadX≈48 / kPanelPadTop≈70). Falls back to a vector green panel.
+    // neither. origin frame margins from the screen edge are L10/R14/T9/B30
+    // logical (kFrameMargin* x-scaled); the Overlay layout already pads 8, so
+    // the margins carry the remainder. Vertical padding clears the baked title
+    // notch (kPanelPadTop 70 x1.5) and footer (22 x1.5); content centers itself
+    // horizontally (origin childAlignment CENTER_X). Falls back to a vector
+    // green panel.
     client::ui::ChromeTextures chrome = client::ui::use_chrome();
     layout = ::ui::LayoutStyle{
         .direction = ::ui::FlexDirection::Column,
         .align_items = ::ui::AlignItems::Center,
-        .width = ::ui::Length::percent(100.0f),
-        .height = ::ui::Length::percent(100.0f),
-        .min_width = ::ui::Length::points(560.0f),
-        .min_height = ::ui::Length::points(420.0f),
+        // origin's frame box measured from the golden ink: 1870.8 device wide
+        // (1247.2 logical), centered; percent-width + side margins can't express
+        // it (Yoga recenters the overflow), so the width is explicit.
+        .width = ::ui::Length::points(1254.5f),
         .flex_grow = ::ui::StyleFloat::points(1.0f),
-        .padding = {48.0f, 48.0f, 92.0f, 40.0f},
-        .gap = 8.0f,
+        .margin = {2.3f, 0.0f, 1.0f, 22.0f},
+        .padding = {0.0f, 0.0f, 105.0f, 33.0f},
     };
     overlay = chrome.chrome_controls
                   ? tokens::image_patch(chrome.chrome_controls)

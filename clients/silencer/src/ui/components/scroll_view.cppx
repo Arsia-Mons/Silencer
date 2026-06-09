@@ -150,7 +150,8 @@ using ::ui::children;
     layout={viewport}
     style={props.style}
     onWheel={on_wheel}
-    onKey={on_key}>
+    onKey={on_key}
+  >
     <Box key="content" layout={content}>
       {kids}
     </Box>

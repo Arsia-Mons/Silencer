@@ -30,7 +30,13 @@ struct GalleryProps {
     <ActionRow key="cols">
       <Panel key="scroll" variant={PanelVariant::Sunken}>
         <ScreenTitle key="sh" variant={ScreenTitleVariant::Dialog} value="ScrollView" />
-        <ScrollView key="sv" id="gal_scroll" viewportHeight={120.0f} contentHeight={336.0f} step={40.0f}>
+        <ScrollView
+          key="sv"
+          id="gal_scroll"
+          viewportHeight={120.0f}
+          contentHeight={336.0f}
+          step={40.0f}
+        >
           <BodyText key="r0" variant={BodyTextVariant::Strong} value="Row 01 - top" />
           <BodyText key="r1" variant={BodyTextVariant::Strong} value="Row 02" />
           <BodyText key="r2" variant={BodyTextVariant::Strong} value="Row 03" />
@@ -81,8 +87,18 @@ struct GalleryProps {
           label="Disabled"
         />
         <AppButton key="bsm" controlId="gal_btn_sm" size={AppButtonSize::Sm} label="Small" />
-        <AppButton key="boval" controlId="gal_btn_oval" variant={AppButtonVariant::Oval} label="Oval" />
-        <AppButton key="bchrome" controlId="gal_btn_chrome" variant={AppButtonVariant::Chrome} label="Chrome" />
+        <AppButton
+          key="boval"
+          controlId="gal_btn_oval"
+          variant={AppButtonVariant::Oval}
+          label="Oval"
+        />
+        <AppButton
+          key="bchrome"
+          controlId="gal_btn_chrome"
+          variant={AppButtonVariant::Chrome}
+          label="Chrome"
+        />
         <AppInput key="in" controlId="gal_input" accessibilityLabel="Input" value="text input" />
         <AppCheckbox key="ck1" controlId="gal_check_on" checked={true} label="Checked" />
         <AppCheckbox key="ck0" controlId="gal_check_off" checked={false} label="Unchecked" />

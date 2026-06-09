@@ -25,6 +25,10 @@ shot() { # name
   echo "  captured $1"
 }
 
+# Land inside the logo HOLD window (origin cadence: 42ms ticks, hold 60..180
+# = ~2.5s..7.5s after mount) so the wordmark is the stable full frame the
+# golden was captured in.
+sleep 3
 shot mainmenu
 cli --port "$PORT" click --label "Options" >/dev/null; shot options
 cli --port "$PORT" click --label "OptionsAudio" >/dev/null; shot options_audio

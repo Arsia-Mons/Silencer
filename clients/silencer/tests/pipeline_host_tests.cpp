@@ -134,13 +134,14 @@ static bool pipeline_host_app_root_reconciles_phase() {
   CHECK(host.pipeline().client_ui().push_screen(
       std::make_unique<client::ui::AppRoot>()));
 
-  // MainMenu renders ScreenLayout(Menu) — an opaque, blue-dominant slate fill.
+  // MainMenu renders ScreenLayout(Menu) — with no chrome starfield baked in the
+  // hermetic host, the opaque black menu surface (tokens::kSurfaceMenu).
   int w = 0, h = 0;
   const uint8_t *rgba = host.render(test_frame(64, 48), &w, &h);
   CHECK(rgba != nullptr);
   const uint8_t *px = rgba + ((size_t)(h / 2) * w + (w / 2)) * 4u;
-  CHECK(px[3] > 200);                    // opaque
-  CHECK(px[2] > px[0] && px[2] > px[1]); // blue-dominant
+  CHECK(px[3] > 200);                          // opaque
+  CHECK(px[0] < 40 && px[1] < 40 && px[2] < 40); // black menu surface
   const uint8_t menu0 = px[0], menu1 = px[1], menu2 = px[2], menu3 = px[3];
 
   // Flip to InMatch -> AppRoot now renders InGameScreen (a transparent HUD that
@@ -290,19 +291,25 @@ static bool pipeline_host_renders_semantic_screen() {
   CHECK(surface[3] > 200);                                         // opaque
   CHECK(surface[0] < 40 && surface[1] < 40 && surface[2] < 40);    // dark slate
 
-  // The ScreenTitle (Hero) paints near-white glyphs in the top rows
-  // (tokens::kTextHeroTitle = {235,246,242,255}); sample a lit glyph pixel.
-  const uint8_t *title = pixel(40, 12);
-  CHECK(title[3] > 200);                                           // opaque
-  CHECK(title[0] > 180 && title[1] > 180 && title[2] > 180);       // near-white
+  // The ScreenTitle (Hero) paints green-phosphor glyphs in the top rows
+  // (tokens::kTextHeroTitle = {48,168,44,255}). The hermetic host has no glyph
+  // atlas baked, so sample across the title band for any green-dominant lit
+  // pixel rather than pinning one glyph coordinate.
+  bool title_lit = false;
+  for (int y = 4; y < 20 && !title_lit; ++y)
+    for (int x = 0; x < w && !title_lit; ++x) {
+      const uint8_t *t = pixel(x, y);
+      title_lit = t[3] > 200 && t[1] > 80 && t[1] > t[0] && t[1] > t[2];
+    }
+  CHECK(title_lit); // green-phosphor hero title rendered
 
-  // The AppButton (Primary) paints its accent-blue fill across the bottom band
-  // (tokens::kAccent = {96,165,250,255}); the 132x38 button overflows the 64px
-  // width so it spans the row, blue-dominant over red/green.
+  // The AppButton (Primary) paints its green accent fill across the bottom band
+  // (tokens::kAccent = {92,208,92,255}); the 132x38 button overflows the 64px
+  // width so it spans the row, green-dominant over red/blue.
   const uint8_t *button = pixel(w / 2, 40);
   CHECK(button[3] > 200);                          // opaque button fill
-  CHECK(button[2] > button[0]);                    // blue over red
-  CHECK(button[2] > surface[2] + 40);              // markedly bluer than surface
+  CHECK(button[1] > button[0] && button[1] > button[2]); // green-dominant
+  CHECK(button[1] > surface[1] + 40);              // markedly greener than surface
   return true;
 }
 

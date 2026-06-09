@@ -49,12 +49,15 @@ struct OptionsDisplayProps {
   // origin/main anchors this dialog in the upper third (title baseline ~y168), not
   // screen-centered like the options root.
   return <ScreenLayout key="root" variant={ScreenLayoutVariant::Overlay}>
-    <Box key="col" layout={::ui::LayoutStyle{
+    <Box
+      key="col"
+      layout={::ui::LayoutStyle{
         .position = ::ui::PositionType::Absolute,
         .position_inset = ::ui::EdgeSizes{0.0f, 0.0f, 168.0f, {}},
         .direction = ::ui::FlexDirection::Column,
         .align_items = ::ui::AlignItems::Center,
-        .gap = 33.0f}}>
+        .gap = 33.0f}}
+    >
       <ScreenTitle key="title" variant={ScreenTitleVariant::Screen} value="Display Options" />
       <BooleanSettingRow
         key="fullscreen"
@@ -71,8 +74,20 @@ struct OptionsDisplayProps {
         onChange={settings.set_smooth_scaling}
       />
       <ActionRow key="actions">
-        <AppButton key="save" controlId="OptionsSave" variant={AppButtonVariant::Oval} label="Save" onPress={save} />
-        <AppButton key="cancel" controlId="OptionsCancel" variant={AppButtonVariant::Oval} label="Cancel" onPress={cancel} />
+        <AppButton
+          key="save"
+          controlId="OptionsSave"
+          variant={AppButtonVariant::Oval}
+          label="Save"
+          onPress={save}
+        />
+        <AppButton
+          key="cancel"
+          controlId="OptionsCancel"
+          variant={AppButtonVariant::Oval}
+          label="Cancel"
+          onPress={cancel}
+        />
       </ActionRow>
     </Box>
   </ScreenLayout>

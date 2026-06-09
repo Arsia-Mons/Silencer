@@ -256,6 +256,10 @@ bake(6, 12, cppxChrome.toggle_off_l, &cppxChrome.toggle_w, &cppxChrome.toggle_h)
 bake(6, 13, cppxChrome.toggle_off_r);
 bake(6, 14, cppxChrome.toggle_on_l);
 bake(6, 15, cppxChrome.toggle_on_r);
+// bank 134 '['/']' — the advantage-metadata bracket glyphs (origin borrows the
+// bank-134 art because bank 133's bracket cells are dash-shaped).
+bake(134, '[' - 33, cppxChrome.bracket_l, &cppxChrome.bracket_w, &cppxChrome.bracket_h);
+bake(134, ']' - 33, cppxChrome.bracket_r);
 // bank 181 idx0-4 — the five agency emblems (SIL-102 Character Create detail).
 for(int i = 0; i < 5; ++i)
 bake(181, (size_t)i, cppxChrome.agency_emblem[i],
@@ -279,12 +283,18 @@ bake(94, 0, cppxChrome.hud_radar, &cppxChrome.hud_radar_w, &cppxChrome.hud_radar
 {
 using GF = silencer::cppx_ui::GlyphFonts;
 struct FaceBake { int face; int bank; float advance; float line_height; };
+// advance/lineHeight mirror origin text.cpp ResolveTextRenderStyle EXACTLY.
+// Origin tracks the same bank at different advances per style (ScreenTitle/
+// Footer/BodySm), so each tracking is its own baked face.
 static const FaceBake kFaceBakes[] = {
-    {0, 133, 5.8f, 11.f}, // Body    — silencer-ui      (bank 133)
-    {1, 134, 8.f, 15.f},  // Large   — silencer-ui-large(bank 134)
-    {2, 136, 16.f, 23.f}, // Title   — silencer-title   (bank 136)
-    {3, 132, 4.f, 7.f},   // Tiny    — silencer-tiny    (bank 132)
-    {4, 135, 11.f, 19.f}, // Heading — bank 135 (dominant label/heading face)
+    {0, 133, 6.f, 11.f},  // Body        — bank 133 advance 6
+    {1, 134, 8.f, 15.f},  // Heading     — bank 134 advance 8
+    {2, 136, 16.f, 23.f}, // Prompt      — bank 136 advance 16
+    {3, 132, 4.f, 7.f},   // Tiny        — bank 132 advance 4
+    {4, 135, 11.f, 19.f}, // Title       — bank 135 advance 11
+    {5, 135, 12.f, 19.f}, // ScreenTitle — bank 135 tracked wider
+    {6, 133, 11.f, 11.f}, // Footer      — bank 133 tracked wide (version line)
+    {7, 133, 7.f, 11.f},  // BodySm      — bank 133 tracked +1
 };
 for(const FaceBake & fb : kFaceBakes){
 if((size_t)fb.bank >= banks.size()) continue;

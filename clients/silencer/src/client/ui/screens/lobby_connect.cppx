@@ -38,16 +38,21 @@ constexpr float kS = 1.5f;
 // The cell's dotted notch is baked into the dialog sprite — the label is plain
 // text laid over it.
 ::ui::UiElement field_label(const char *key, const char *value) {
-  return <Box key={key} layout={::ui::LayoutStyle{
+  return <Box
+    key={key}
+    layout={::ui::LayoutStyle{
       .align_items = ::ui::AlignItems::Center,
       .justify_content = ::ui::JustifyContent::Center,
       .flex_shrink = ::ui::StyleFloat::points(0.0f),
       .width = ::ui::Length::points(86.0f * kS),
-      .height = ::ui::Length::points(21.0f * kS)}}>
-    <Text key="t" value={value}
+      .height = ::ui::Length::points(21.0f * kS)}}
+  >
+    <Text
+      key="t"
+      value={value}
       layout={::ui::LayoutStyle{.height = ::ui::Length::points(tokens::kLineLarge)}}
-      style={tokens::text_patch(tokens::kTextBody, tokens::kFontLarge,
-                               tokens::kFaceLarge, tokens::kLineLarge)} />
+      style={tokens::text_patch(tokens::kTextBody, tokens::kFontLarge, tokens::kFaceLarge, tokens::kLineLarge)}
+    />
   </Box>
 }
 
@@ -138,7 +143,8 @@ constexpr float kS = 1.5f;
       .justify_content = ::ui::JustifyContent::Center,
       .width = ::ui::Length::percent(100.0f),
       .height = ::ui::Length::percent(100.0f)}}
-    style={tokens::fill_patch(::ui::Color{0, 0, 0, 255})}>
+    style={tokens::fill_patch(::ui::Color{0, 0, 0, 255})}
+  >
     <Box
       key="panel"
       layout={::ui::LayoutStyle{
@@ -146,10 +152,14 @@ constexpr float kS = 1.5f;
         .align_items = ::ui::AlignItems::Stretch,
         .width = ::ui::Length::points(panel_w),
         .height = ::ui::Length::points(panel_h)}}
-      style={panel_style}>
-      <Box key="logslot" layout={::ui::LayoutStyle{
+      style={panel_style}
+    >
+      <Box
+        key="logslot"
+        layout={::ui::LayoutStyle{
           .height = ::ui::Length::points(8.0f * kS),
-          .flex_shrink = ::ui::StyleFloat::points(0.0f)}} />
+          .flex_shrink = ::ui::StyleFloat::points(0.0f)}}
+      />
       <Box
         key="logrow"
         layout={::ui::LayoutStyle{
@@ -159,18 +169,25 @@ constexpr float kS = 1.5f;
           .height = ::ui::Length::points(170.0f * kS),
           .flex_shrink = ::ui::StyleFloat::points(0.0f),
           .padding = {7.0f * kS, 0.0f, 0.0f, 0.0f},
-          .gap = 2.0f}}>
+          .gap = 2.0f}}
+      >
         {::ui::children(log_lines)}
       </Box>
-      <Box key="preform" layout={::ui::LayoutStyle{
+      <Box
+        key="preform"
+        layout={::ui::LayoutStyle{
           .height = ::ui::Length::points(17.0f * kS),
-          .flex_shrink = ::ui::StyleFloat::points(0.0f)}} />
-      <Box key="form" layout={::ui::LayoutStyle{
+          .flex_shrink = ::ui::StyleFloat::points(0.0f)}}
+      />
+      <Box
+        key="form"
+        layout={::ui::LayoutStyle{
           .direction = ::ui::FlexDirection::Column,
           .align_items = ::ui::AlignItems::Stretch,
           .flex_shrink = ::ui::StyleFloat::points(0.0f),
           .padding = {4.0f * kS, 11.0f * kS, 0.0f, 0.0f},
-          .gap = 6.0f * kS}}>
+          .gap = 6.0f * kS}}
+      >
         <Box key="urow" layout={field_row}>
           {field_label("ulbl", "Username")}
           <Input
@@ -199,18 +216,36 @@ constexpr float kS = 1.5f;
           />
         </Box>
       </Box>
-      <Box key="prebtn" layout={::ui::LayoutStyle{
+      <Box
+        key="prebtn"
+        layout={::ui::LayoutStyle{
           .height = ::ui::Length::points(3.0f * kS),
-          .flex_shrink = ::ui::StyleFloat::points(0.0f)}} />
-      <Box key="btnarea" layout={::ui::LayoutStyle{
+          .flex_shrink = ::ui::StyleFloat::points(0.0f)}}
+      />
+      <Box
+        key="btnarea"
+        layout={::ui::LayoutStyle{
           .direction = ::ui::FlexDirection::Row,
           .justify_content = ::ui::JustifyContent::Center,
           .align_items = ::ui::AlignItems::Center,
           .height = ::ui::Length::points(24.0f * kS),
           .flex_shrink = ::ui::StyleFloat::points(0.0f),
-          .gap = 0.0f}}>
-        <AppButton key="login" controlId="Login" variant={AppButtonVariant::Chrome} label="Login/Create" onPress={submit} />
-        <AppButton key="cancel" controlId="Cancel" variant={AppButtonVariant::Chrome} label="Cancel" onPress={lobby.cancel} />
+          .gap = 0.0f}}
+      >
+        <AppButton
+          key="login"
+          controlId="Login"
+          variant={AppButtonVariant::Chrome}
+          label="Login/Create"
+          onPress={submit}
+        />
+        <AppButton
+          key="cancel"
+          controlId="Cancel"
+          variant={AppButtonVariant::Chrome}
+          label="Cancel"
+          onPress={lobby.cancel}
+        />
       </Box>
     </Box>
   </Box>

@@ -37,7 +37,7 @@ inline ::ui::TextVisual app_button_label_visual(AppButtonVariant variant,
       disabled ? tokens::kTextBodyMuted : tokens::kTextTitle;
   // Lobby/login rect+chrome labels and the cc List rows are a tier smaller than
   // the chunky menu oval pills (golden login/list caps ~17px vs the menu's ~21px).
-  uint16_t sz = tokens::kFontHeading;
+  float sz = tokens::kFontHeading;
   if (variant == AppButtonVariant::Rect || variant == AppButtonVariant::Chrome ||
       size == AppButtonSize::List)
     sz = tokens::kFontLarge;
@@ -45,7 +45,7 @@ inline ::ui::TextVisual app_button_label_visual(AppButtonVariant variant,
           .font_id = tokens::kFaceHeading,
           .font_size = sz,
           .align = ::ui::TextAlign::Center,
-          .line_height = static_cast<float>(sz)};
+          .line_height = sz};
 }
 
 // Layout-only baseline geometry. Mirrors ui::components::ButtonProps default
@@ -74,27 +74,23 @@ inline ::ui::LayoutStyle app_button_layout(AppButtonSize size, bool /*selected*/
   }
 }
 
-// Oval-sprite geometry. The sprite is NINE-SLICED (rounded end-caps preserved,
-// flat middle stretched) so the button SIZES TO ITS LABEL instead of stretching
-// one fixed-width sprite — origin/main sizes each oval to its text (e.g. "Connect
-// To Lobby" is wider than "Exit"). Native height 33; a per-size min width keeps
-// short labels from collapsing.
+// Oval-sprite geometry. The whole sprite STRETCHES to the box (origin blits the
+// stadium into the button bounds — a wide label like "Connect To Lobby" gets
+// gently elongated end caps exactly as origin does; nine-slicing instead draws
+// the caps at texture-pixel size, visibly squarer than the golden). Native cell
+// 196x33 (Md) -> 294x49.5 at the x1.5 logical scale; labels size wider ovals.
 inline ::ui::LayoutStyle app_button_oval_layout(AppButtonSize size) {
-  // origin/main draws the oval ~1.5x its native cell: menu pills (Md) and setting
-  // pills (Lg) are a tall fixed-width stadium (~290x49); Sm is the compact
-  // lobby/control oval.
-  float min_w = 290.0f, h = 49.0f;
+  float min_w = 294.0f, h = 49.5f;
   if (size == AppButtonSize::Sm) {
-    // The keybind bind-slot oval (only Oval Sm user): golden ~42px tall, the
-    // column Stretch sets its width. Heading label (Sm is not the List tier).
-    min_w = 104.0f;
-    h = 42.0f;
+    // The keybind bind-slot oval (only Oval Sm user): native 112x33 cell x1.5.
+    min_w = 168.0f;
   } else if (size == AppButtonSize::Lg) {
-    min_w = 320.0f;
+    min_w = 330.0f; // native 220x33 cell x1.5
   } else if (size == AppButtonSize::List) {
-    // golden cc list row: 38px tall, stretched to the pane width (small min).
+    // origin LegacyRow plate (bank 6 idx2, 236x27): 40.5 tall at x1.5,
+    // stretched to the pane width (small min).
     min_w = 104.0f;
-    h = 38.0f;
+    h = 40.5f;
   }
   return {
       .align_items = ::ui::AlignItems::Center,
@@ -105,12 +101,6 @@ inline ::ui::LayoutStyle app_button_oval_layout(AppButtonSize size) {
   };
 }
 
-// Horizontal nine-slice insets for the oval stadium sprite: ~17px rounded caps
-// left/right, flat middle; top/bottom 0 (height is the native 33, no vertical
-// stretch). SideWidths order is {top,right,bottom,left}.
-inline ::ui::SideWidths app_button_oval_caps() {
-  return {.top = 0.0f, .right = 18.0f, .bottom = 0.0f, .left = 18.0f};
-}
 
 // Green oval sprite-button paint (SIL-89). Image-only patch over a baked bank-6
 // oval texture (use_chrome()), label in the Heading face centered on top.
@@ -138,7 +128,7 @@ inline ::ui::StyleStatePatch app_button_oval_patch(uint32_t tex) {
     return ov;
   }
   auto oval = [&](::ui::Color tint) -> ::ui::StylePatch {
-    ::ui::StylePatch p = tokens::image_patch(tex, tint, app_button_oval_caps());
+    ::ui::StylePatch p = tokens::image_patch(tex, tint);
     p.text = ::ui::opt(label);
     return p;
   };

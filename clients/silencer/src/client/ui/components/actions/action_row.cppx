@@ -13,7 +13,7 @@ using ::ui::components::BoxProps;
   const ::ui::LayoutStyle layout = {
       .direction = ::ui::FlexDirection::Row,
       .align_items = ::ui::AlignItems::Start,
-      .gap = 12.0f,
+      .gap = 18.0f, // origin kActionGap 12 x1.5
   };
   return <Box key={props.key} layout={layout}>
     {props.children}

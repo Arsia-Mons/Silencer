@@ -22,7 +22,7 @@ constexpr int UI_RETAINED_MAX_NODES = 512;
 constexpr int UI_RETAINED_MAX_DEPTH = 64;
 constexpr int UI_RETAINED_MAX_CHILDREN = 128;
 constexpr int UI_RETAINED_LABEL_CAP = 48;
-constexpr int UI_RETAINED_VALUE_CAP = 96;
+constexpr int UI_RETAINED_VALUE_CAP = 640; // sized for the cc lore paragraphs (~560 chars), the longest wrapped Text values
 
 constexpr NodeId UI_RETAINED_ROOT_ID = 0xCBF29CE484222325ull;
 
@@ -459,7 +459,7 @@ public:
   struct TextMeasureView {
     const char *utf8 = "";
     uint16_t font_id = 0;
-    uint16_t font_size = 0; // from visual.text.font_size (0 => fallback)
+    float font_size = 0.f; // from visual.text.font_size (0 => fallback)
     TextAlign align = TextAlign::Left;
     TextWrap wrap = TextWrap::None;
     float line_height = 0.0f;

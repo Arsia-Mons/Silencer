@@ -91,6 +91,12 @@ struct ChromeTextures {
   // Create detail column for the previewed agency. Indexed by agency 0..4.
   uint32_t agency_emblem[5] = {};
   uint16_t agency_emblem_w = 0, agency_emblem_h = 0;
+  // Advantage metadata brackets. Bank 133's '['/']' glyph art is wrong (dash-
+  // shaped), so origin borrows bank 134's bracket glyphs cropped to a 4x11
+  // sub-rect (character_create_layout.cpp AdvantageBracket: srcX 0 left /
+  // 1 right). Baked whole-glyph; the consumer applies the sub-rect crop.
+  uint32_t bracket_l = 0, bracket_r = 0; // bank 134, '['-33 / ']'-33
+  uint16_t bracket_w = 0, bracket_h = 0;
   // In-game HUD console chrome (banks 94/95, base palette page). Whole-sprite,
   // edge-anchored over the live world; sized to native (_w/_h carried so the
   // bezel paints at its authored width, not stretched). Radar viewport (94/0) is

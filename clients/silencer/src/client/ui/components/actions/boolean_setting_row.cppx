@@ -33,7 +33,8 @@ using ::ui::components::BoxProps;
     layout={::ui::LayoutStyle{
       .direction = ::ui::FlexDirection::Row,
       .align_items = ::ui::AlignItems::Center,
-      .gap = 43.0f}}>
+      .gap = 43.0f}}
+  >
     <AppButton
       key="lbl"
       controlId={props.control_id}
@@ -42,10 +43,12 @@ using ::ui::components::BoxProps;
       label={props.label}
       onPress={toggle}
     />
-    <Box
-      key="ind"
-      layout={::ui::LayoutStyle{.direction = ::ui::FlexDirection::Row, .gap = 13.0f}}>
-      <Box key="cl" layout={cell} style={tokens::image_patch(left, ::ui::Color{255, 255, 255, 255}, ::ui::SideWidths{}, true)} />
+    <Box key="ind" layout={::ui::LayoutStyle{.direction = ::ui::FlexDirection::Row, .gap = 13.0f}}>
+      <Box
+        key="cl"
+        layout={cell}
+        style={tokens::image_patch(left, ::ui::Color{255, 255, 255, 255}, ::ui::SideWidths{}, true)}
+      />
       <Box key="cr" layout={cell} style={tokens::image_patch(right)} />
     </Box>
   </Box>

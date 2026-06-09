@@ -50,7 +50,7 @@ struct TextData {
   uint16_t text_len = 0;
   Color color{};
   uint16_t font_id = 0;
-  uint16_t font_size = 0;
+  float font_size = 0.f;
   uint16_t line_index = 0;
   TextAlign align = TextAlign::Left;
 };
@@ -63,6 +63,7 @@ struct ImageData {
   // => sample the whole texture. Honored by the plain + rounded paths.
   float src_x = 0.f, src_y = 0.f, src_w = 0.f, src_h = 0.f;
   bool flip_h = false; // mirror horizontally
+  ImageFit fit = ImageFit::Stretch; // plain path only
 };
 struct GradientData {
   uint16_t stop_off = 0; // slice into DrawList::grad_arena
@@ -145,7 +146,9 @@ static_assert(sizeof(DrawCommand) <= 96, "DrawCommand size budget; update the bu
 // Scales with UI_RETAINED_MAX_NODES (UI_MAX_DRAW_COMMANDS = nodes * cmds/node).
 // Raised alongside the 256->512 node-cap bump so the per-frame draw list still
 // fits with headroom (512 nodes * 7 cmds * <=96B ~= 344KB).
-constexpr unsigned UI_DRAWLIST_BUDGET = 512u * 1024u;
+// UI_MAX_TEXT_LINES 8->32 (the cc wrapped lore paragraph) raised the per-text-
+// node command ceiling to 34, so the worst-case list grew ~3x.
+constexpr unsigned UI_DRAWLIST_BUDGET = 2048u * 1024u;
 static_assert(sizeof(DrawCommandList) < UI_DRAWLIST_BUDGET,
               "DrawCommandList exceeds its byte budget");
 

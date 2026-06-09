@@ -21,7 +21,8 @@ using ::ui::components::DialogProps;
 ::ui::UiElement ScreenLayout(const ScreenLayoutProps &props) {
   if (props.variant == ScreenLayoutVariant::Game) {
     // The lobby uses its own dim backdrop (bank 7 idx1), not the bright menu
-    // starfield. Falls back to starfield then flat black until baked.
+    // starfield; origin stretches it (PackImageStretch(7,1)), so no cover here.
+    // Falls back to starfield then flat black until baked.
     client::ui::ChromeTextures chrome = client::ui::use_chrome();
     uint32_t backdrop = chrome.lobby_backdrop ? chrome.lobby_backdrop
                                               : chrome.starfield;
@@ -47,8 +48,10 @@ using ::ui::components::DialogProps;
     // covers the screen behind so the legacy space backdrop reads, with the flat
     // overlay surface as the not-yet-baked fallback.
     client::ui::ChromeTextures chrome = client::ui::use_chrome();
+    ::ui::BackgroundImage overlay_img{chrome.starfield};
+    overlay_img.fit = props.backdrop_fit;
     ::ui::StylePatch overlay_bg =
-        chrome.starfield ? tokens::image_patch(chrome.starfield)
+        chrome.starfield ? tokens::image_patch(overlay_img)
                          : tokens::fill_patch(tokens::kSurfaceOverlay);
     // Clear the Dialog role's default slate border — an image/fill patch leaves
     // border unset, so resolve() would otherwise draw theme.dialog's rounded
@@ -118,12 +121,14 @@ using ::ui::components::DialogProps;
       {props.children}
     </Dialog>
   }
-  // Menu root: paint the full-bleed bank-6 starfield behind the content
-  // (stretched to the screen; no aspect-cover in v1). Falls back to the flat
-  // black menu surface for the one not-yet-baked frame.
+  // Menu root: paint the full-bleed bank-6 starfield behind the content,
+  // aspect-cover like origin's PackImage(6,0). Falls back to the flat black
+  // menu surface for the one not-yet-baked frame.
   client::ui::ChromeTextures chrome = client::ui::use_chrome();
+  ::ui::BackgroundImage menu_img{chrome.starfield};
+  menu_img.fit = props.backdrop_fit;
   ::ui::StylePatch menu_bg = chrome.starfield
-                                 ? tokens::image_patch(chrome.starfield)
+                                 ? tokens::image_patch(menu_img)
                                  : tokens::fill_patch(tokens::kSurfaceMenu);
   return <Box
     key={props.key}

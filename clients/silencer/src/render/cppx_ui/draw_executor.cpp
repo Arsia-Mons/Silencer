@@ -267,16 +267,39 @@ void render_image(SDL_Renderer *r, const ::ui::DrawCommand &c,
     return;
   }
 
-  // Plain stretched textured rect (optionally sampling an atlas sub-rect).
+  // Plain textured rect (optionally sampling an atlas sub-rect). Cover crops
+  // the effective source to the dest aspect (centered); Contain letterboxes
+  // the dest to the source aspect — both preserve aspect like origin's
+  // PackImage cover/contain modes.
   SDL_SetTextureColorMod(tex, tint.r, tint.g, tint.b);
   SDL_SetTextureAlphaMod(tex, tint.a);
+  SDL_FRect src = has_src ? src_sub : SDL_FRect{0.f, 0.f, tw, th};
   SDL_FRect dst = {c.rect.x * scale, c.rect.y * scale, c.rect.w * scale,
                    c.rect.h * scale};
+  if (img.fit == ::ui::ImageFit::Cover && c.rect.w > 0.f && c.rect.h > 0.f) {
+    const float box_aspect = c.rect.w / c.rect.h;
+    if (src.w / src.h > box_aspect) {
+      const float crop_w = src.h * box_aspect;
+      src.x += (src.w - crop_w) * 0.5f;
+      src.w = crop_w;
+    } else {
+      const float crop_h = src.w / box_aspect;
+      src.y += (src.h - crop_h) * 0.5f;
+      src.h = crop_h;
+    }
+  } else if (img.fit == ::ui::ImageFit::Contain && src.w > 0.f && src.h > 0.f) {
+    const float fit_scale = std::min(dst.w / src.w, dst.h / src.h);
+    const float fit_w = src.w * fit_scale, fit_h = src.h * fit_scale;
+    dst.x += (dst.w - fit_w) * 0.5f;
+    dst.y += (dst.h - fit_h) * 0.5f;
+    dst.w = fit_w;
+    dst.h = fit_h;
+  }
   if (img.flip_h)
-    SDL_RenderTextureRotated(r, tex, has_src ? &src_sub : nullptr, &dst, 0.0,
-                             nullptr, SDL_FLIP_HORIZONTAL);
+    SDL_RenderTextureRotated(r, tex, &src, &dst, 0.0, nullptr,
+                             SDL_FLIP_HORIZONTAL);
   else
-    SDL_RenderTexture(r, tex, has_src ? &src_sub : nullptr, &dst);
+    SDL_RenderTexture(r, tex, &src, &dst);
   SDL_SetTextureColorMod(tex, 255, 255, 255);
   SDL_SetTextureAlphaMod(tex, 255);
 }

@@ -14,13 +14,13 @@
 
 namespace ui {
 
-constexpr int UI_MAX_TEXT_LINES = 8; // small cap; overflow => failed frame, never silent drop
+constexpr int UI_MAX_TEXT_LINES = 32; // sized for the cc lore paragraph (~23 wrapped lines); overflow => failed frame, never silent drop
 
 struct TextMetricsQuery {
   const char *utf8 = nullptr; // borrowed; points into the shared string arena
   uint32_t len = 0;           // byte length
   uint16_t font_id = 0;
-  uint16_t font_size = 0;
+  float font_size = 0.f;
   TextAlign align = TextAlign::Left;
   TextWrap wrap = TextWrap::None;
   float line_height = 0.f; // 0 => face natural line skip
