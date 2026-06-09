@@ -143,7 +143,18 @@ inline ::ui::StyleStatePatch app_button_oval_patch(uint32_t tex) {
 // LABEL (ButtonVariant::Chrome size Auto): native height 21 -> 31.5 logical
 // (x1.5), paddingX 10 -> 15; a small min-width keeps short labels (OK) from
 // collapsing. The bank-7 sprite's caps keep the metal corners crisp.
-inline ::ui::LayoutStyle app_button_chrome_layout() {
+inline ::ui::LayoutStyle app_button_chrome_layout(AppButtonSize size = AppButtonSize::Md) {
+  // Sm = origin's DEFAULT fixed chrome plate (156x21 native -> 234x31.5): the
+  // lobby Go Back. Other sizes keep the Auto label-fit (origin size Auto).
+  if (size == AppButtonSize::Sm) {
+    return {
+        .align_items = ::ui::AlignItems::Center,
+        .justify_content = ::ui::JustifyContent::Center,
+        .width = ::ui::Length::points(234.0f),
+        .height = ::ui::Length::points(31.5f),
+        .padding = {15.0f, 15.0f, 6.0f, 6.0f},
+    };
+  }
   return {
       .align_items = ::ui::AlignItems::Center,
       .justify_content = ::ui::JustifyContent::Center,

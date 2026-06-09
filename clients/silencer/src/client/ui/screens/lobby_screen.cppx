@@ -764,7 +764,7 @@ struct LobbyScreenProps {
         .width = ::ui::Length::percent(100.0f),
         .height = ::ui::Length::points(44.0f),
         .flex_shrink = ::ui::StyleFloat::points(0.0f),
-        .padding = {16.0f, 16.0f, 4.0f, 4.0f},
+        .padding = {9.5f, 8.0f, 6.0f, 4.0f},
         .gap = ::ui::StyleValue::points(10.0f)}}
       style={tokens::frame_patch(tokens::kChromeStroke)}
     >
@@ -831,8 +831,8 @@ struct LobbyScreenProps {
               .width = ::ui::Length::points(436.0f),
               .flex_shrink = ::ui::StyleFloat::points(0.0f),
               .overflow = ::ui::Overflow::Hidden,
-              .padding = {9.0f, 9.0f, 9.0f, 9.0f},
-              .gap = 10.0f}}
+              .padding = {9.0f, 9.0f, 6.0f, 9.0f},
+              .gap = 22.0f}}
             style={lobby_panel_style()}
           >
             <Box
@@ -842,6 +842,7 @@ struct LobbyScreenProps {
                 .align_items = ::ui::AlignItems::Center,
                 .width = ::ui::Length::points(64.0f),
                 .flex_shrink = ::ui::StyleFloat::points(0.0f),
+                .padding = {0.0f, 0.0f, 11.7f, 0.0f},
                 .gap = ::ui::StyleValue::points(4.0f)}}
             >
               <Box
@@ -883,7 +884,7 @@ struct LobbyScreenProps {
                   key="statsCol"
                   layout={::ui::LayoutStyle{
                     .direction = ::ui::FlexDirection::Column,
-                    .width = ::ui::Length::points(150.0f),
+                    .width = ::ui::Length::points(141.0f),
                     .flex_shrink = ::ui::StyleFloat::points(0.0f),
                     .gap = ::ui::StyleValue::points(8.0f)}}
                 >
