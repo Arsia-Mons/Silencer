@@ -89,6 +89,18 @@ bool PipelineHost::build_glyph_face(int face_id,
                                  line_height);
 }
 
+bool PipelineHost::build_glyph_color_face(int face_id, uint8_t key_r,
+                                          uint8_t key_g, uint8_t key_b,
+                                          const GlyphFonts::GlyphSrc *glyphs,
+                                          int count,
+                                          const SDL_Color *palette256,
+                                          float advance, float line_height) {
+  if (!r_)
+    return false;
+  return glyph_fonts_.build_color_face(r_, face_id, key_r, key_g, key_b, glyphs,
+                                       count, palette256, advance, line_height);
+}
+
 const uint8_t *PipelineHost::render(const client::ui::UiPipelineFrame &frame,
                                     int *out_w, int *out_h) {
   if (!surf_ || !r_ || !pipeline_)

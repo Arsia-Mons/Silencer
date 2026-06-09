@@ -75,7 +75,14 @@ bool render_text_glyphs(SDL_Renderer *r, const ::ui::DrawCommandList &list,
   if (!glyphs)
     return false;
   const ::ui::TextData &t = c.payload.text;
-  const GlyphFonts::Face *gf = glyphs->face(t.font_id);
+  // Exact-color variant first: pre-baked origin text pixels for this token
+  // color (opaque palette ramp, no tint). Fall back to the white-coverage
+  // atlas modulated by the token color.
+  const GlyphFonts::Face *cf =
+      t.color.a == 255
+          ? glyphs->color_face(t.font_id, t.color.r, t.color.g, t.color.b)
+          : nullptr;
+  const GlyphFonts::Face *gf = cf ? cf : glyphs->face(t.font_id);
   if (!gf || !gf->atlas || gf->line_height <= 0.f || t.font_size == 0)
     return false;
 
@@ -87,11 +94,14 @@ bool render_text_glyphs(SDL_Renderer *r, const ::ui::DrawCommandList &list,
   float penx = c.rect.x * scale;
   const float peny = c.rect.y * scale;
 
-  // Tint: the atlas is a white premultiplied mask; the IR color is premultiplied,
-  // so color-mod(rgb) + alpha-mod(a) reproduces the premultiplied token color
-  // exactly (drawn under BLEND_PREMULTIPLIED). No unpremultiply needed.
-  SDL_SetTextureColorMod(gf->atlas, t.color.r, t.color.g, t.color.b);
-  SDL_SetTextureAlphaMod(gf->atlas, t.color.a);
+  // Tint: the coverage atlas is a white premultiplied mask; the IR color is
+  // premultiplied, so color-mod(rgb) + alpha-mod(a) reproduces the token color
+  // exactly (drawn under BLEND_PREMULTIPLIED). Exact-color variants already
+  // carry origin's rendered pixels — draw them unmodulated.
+  if (!cf) {
+    SDL_SetTextureColorMod(gf->atlas, t.color.r, t.color.g, t.color.b);
+    SDL_SetTextureAlphaMod(gf->atlas, t.color.a);
+  }
   for (uint16_t i = 0; i < t.text_len; ++i) {
     const unsigned char ch =
         static_cast<unsigned char>(list.text_arena[t.text_off + i]);
@@ -108,8 +118,10 @@ bool render_text_glyphs(SDL_Renderer *r, const ::ui::DrawCommandList &list,
     }
     penx += adv; // monospace: every char advances, art may be wider (overlap)
   }
-  SDL_SetTextureColorMod(gf->atlas, 255, 255, 255);
-  SDL_SetTextureAlphaMod(gf->atlas, 255);
+  if (!cf) {
+    SDL_SetTextureColorMod(gf->atlas, 255, 255, 255);
+    SDL_SetTextureAlphaMod(gf->atlas, 255);
+  }
   return true;
 }
 

@@ -71,14 +71,38 @@ public:
                   int count, const SDL_Color *palette256, float advance,
                   float line_height);
 
+  // Exact-color variant atlas: bakes the glyphs' palettized colors VERBATIM
+  // (opaque where index != 0, exactly like origin's DrawText blit — no alpha
+  // ramp), registered under the token color the IR will carry. The caller runs
+  // the legacy Effect* pipeline on the indexed art FIRST, so the baked pixels
+  // are origin's rendered text pixels for that style. The executor selects the
+  // variant when a Text command's color matches `key` (premul a=255 == straight)
+  // and skips color modulation; unmatched colors use the coverage face.
+  bool build_color_face(SDL_Renderer *renderer, int face_id, uint8_t key_r,
+                        uint8_t key_g, uint8_t key_b, const GlyphSrc *glyphs,
+                        int count, const SDL_Color *palette256, float advance,
+                        float line_height);
+
   // The face for an id (Body fallback for out-of-range). null if not loaded.
   const Face *face(uint16_t face_id) const;
+  // The exact-color variant for (face, token color); null if none registered.
+  const Face *color_face(uint16_t face_id, uint8_t r, uint8_t g,
+                         uint8_t b) const;
   bool any_loaded() const;
 
   void shutdown();
 
 private:
+  static constexpr int kVariantCap = 24;
+  struct Variant {
+    Face face;
+    uint16_t face_id = 0;
+    uint8_t r = 0, g = 0, b = 0;
+    bool used = false;
+  };
+
   Face faces_[kFaceCount];
+  Variant variants_[kVariantCap];
 };
 
 } // namespace silencer::cppx_ui

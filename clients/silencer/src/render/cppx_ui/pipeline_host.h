@@ -76,6 +76,14 @@ public:
                         int count, const SDL_Color *palette256, float advance,
                         float line_height);
 
+  // Exact-color glyph variant (see GlyphFonts::build_color_face): the caller
+  // pre-applies the legacy Effect* pipeline to the indexed art; the variant is
+  // selected at draw time when a Text command carries the key color.
+  bool build_glyph_color_face(int face_id, uint8_t key_r, uint8_t key_g,
+                              uint8_t key_b, const GlyphFonts::GlyphSrc *glyphs,
+                              int count, const SDL_Color *palette256,
+                              float advance, float line_height);
+
   void mark_chrome_baked() { chrome_dirty_ = false; }
 
 private:

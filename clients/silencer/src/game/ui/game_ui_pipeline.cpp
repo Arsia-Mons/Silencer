@@ -19,6 +19,7 @@
 #include "client/ui/app_shell/app_root.h"
 #include "client/ui/app_shell/client_ui.h"
 #include "client/ui/app_theme.h"
+#include "client/ui/components/tokens.h"
 #include "client/ui/screens/gallery.h"
 #include "client/ui/screens/message_modal.h"
 #include "client/ui/screens/password_modal.h"
@@ -51,6 +52,7 @@
 #include <algorithm>
 #include <cstdlib>
 #include <cstring>
+#include <memory>
 #include <vector>
 
 namespace {
@@ -314,6 +316,71 @@ src[i].h = sp->h;
 // Font banks 132-136 are authored against the base palette page (page_for_bank's
 // default arm), so the base `palette` resolves their glyph ramp colors.
 cppxHost->build_glyph_face(fb.face, src, GF::kGlyphCount, palette, fb.advance, fb.line_height);
+}
+
+// Exact-color variants: bake origin's RENDERED text pixels per (face, token
+// color) by running the legacy Effect* pipeline on indexed copies of the
+// glyph art — the same transform origin's DrawText applies — and registering
+// the result under the cppx token color screens author with. Text drawn in a
+// registered color reproduces origin's palette-ramp pixels verbatim (opaque,
+// no alpha AA); other colors keep the coverage-tint path.
+{
+using GF = silencer::cppx_ui::GlyphFonts;
+enum class Fx { Raw, Color, Ramp };
+struct VariantBake {
+int face; int bank;
+float advance; float line_height;
+Fx fx; Uint8 fx_color; Uint8 brightness;
+::ui::Color key;
+};
+static const VariantBake kVariantBakes[] = {
+    // The authored art IS the standard green (24,124,20 core + dark ramp).
+    {0, 133, 6.f, 11.f, Fx::Raw, 0, 128, silencer::tokens::kTextBody},
+    {1, 134, 8.f, 15.f, Fx::Raw, 0, 128, silencer::tokens::kTextBody},
+    {4, 135, 11.f, 19.f, Fx::Raw, 0, 128, silencer::tokens::kTextBody},
+    {5, 135, 12.f, 19.f, Fx::Raw, 0, 128, silencer::tokens::kTextBody},
+    {6, 133, 11.f, 11.f, Fx::Raw, 0, 128, silencer::tokens::kTextBody},
+    {7, 133, 7.f, 11.f, Fx::Raw, 0, 128, silencer::tokens::kTextBody},
+    // cc detail prose: origin LegacyPalette(129, 160, ramp).
+    {0, 133, 6.f, 11.f, Fx::Ramp, 129, 160, silencer::tokens::kTextProse},
+    {1, 134, 8.f, 15.f, Fx::Ramp, 129, 160, silencer::tokens::kTextProse},
+    {7, 133, 7.f, 11.f, Fx::Ramp, 129, 160, silencer::tokens::kTextProse},
+    // lobby header brand + version: LegacyPalette(152) / LegacyPalette(189).
+    {4, 135, 11.f, 19.f, Fx::Color, 152, 128, silencer::tokens::kTextBrand},
+    {0, 133, 6.f, 11.f, Fx::Color, 189, 128, silencer::tokens::kTextVersion},
+    // agent display names: LegacyPalette(200).
+    {1, 134, 8.f, 15.f, Fx::Color, 200, 128, silencer::tokens::kTextAgentName},
+};
+for(const VariantBake & vb : kVariantBakes){
+if((size_t)vb.bank >= banks.size()) continue;
+const auto & glyphbank = banks[vb.bank];
+const int ioffset = (vb.bank == 132) ? 34 : 33;
+std::vector<std::unique_ptr<Surface>> fxcopies;
+GF::GlyphSrc src[GF::kGlyphCount] = {};
+for(int i = 0; i < GF::kGlyphCount; ++i){
+const int ch = GF::kFirstChar + i;
+const int gi = ch - ioffset;
+if(ch == ' ' || gi < 0 || (size_t)gi >= glyphbank.size()) continue;
+const std::shared_ptr<Surface> & sp = glyphbank[gi];
+if(!sp || sp->w < 1 || sp->h < 1 || sp->pixels.empty()) continue;
+if(vb.fx == Fx::Raw && vb.brightness == 128){
+src[i].indices = sp->pixels.data();
+}else{
+Surface * copy = game.renderer.CreateSurfaceCopy(sp.get());
+if(!copy) continue;
+if(vb.fx == Fx::Color) game.renderer.EffectColor(copy, nullptr, vb.fx_color);
+else if(vb.fx == Fx::Ramp) game.renderer.EffectRampColor(copy, nullptr, vb.fx_color);
+if(vb.brightness != 128) game.renderer.EffectBrightness(copy, nullptr, vb.brightness);
+fxcopies.emplace_back(copy);
+src[i].indices = copy->pixels.data();
+}
+src[i].w = sp->w;
+src[i].h = sp->h;
+}
+cppxHost->build_glyph_color_face(vb.face, vb.key.r, vb.key.g, vb.key.b, src,
+                                 GF::kGlyphCount, palette, vb.advance,
+                                 vb.line_height);
+}
 }
 }
 }

@@ -170,7 +170,7 @@ struct CharacterCreateProviderProps {
     value={value}
     layout={::ui::LayoutStyle{
       .width = ::ui::Length::points(283.5f),
-      .margin = ::ui::EdgeSizes{{}, {}, -3.0f, {}}}}
+      .margin = ::ui::EdgeSizes{-0.75f, {}, -2.25f, {}}}}
     style={st}
   />
 }
