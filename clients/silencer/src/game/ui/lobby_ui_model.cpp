@@ -256,8 +256,13 @@ client::ui::LobbySnapshot CaptureLobbySnapshot(Game &game,
     snap.chat_channel = lobby.channel;
     if (world.IsConnected()) {
       BuildStaging(snap, world, lobby);
-      if (LobbyGame *lg = lobby.GetGameById(game.currentlobbygameid))
+      if (LobbyGame *lg = lobby.GetGameById(game.currentlobbygameid)) {
         snap.staging_map_name = lg->mapname;
+        // origin joins the game channel on connect ("#<name>-<id>", ambience_
+        // mixer GetGameChannelName); the chat header shows it.
+        snap.chat_channel =
+            "#" + std::string(lg->name) + "-" + std::to_string(lg->id);
+      }
     }
   }
   lobby.UnlockMutex();

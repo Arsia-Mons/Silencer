@@ -415,8 +415,7 @@ struct StagingPanelProps {
       .flex_grow = ::ui::StyleFloat::points(1.4f),
       .flex_basis = ::ui::Length::points(0.0f),
       .min_width = ::ui::Length::points(0.0f),
-      .padding = {8.0f, 8.0f, 10.0f, 14.0f},
-      .gap = 20.0f}}
+      .padding = {4.5f, 6.0f, 4.5f, 6.0f}}}
   >
     <AppButton
       key="tech"
@@ -425,6 +424,7 @@ struct StagingPanelProps {
       label="Choose Tech"
       onPress={props.on_tech}
     />
+    <Box key="g1" layout={::ui::LayoutStyle{.height = ::ui::Length::points(16.5f)}} />
     <AppButton
       key="team"
       controlId="ChangeTeam"
@@ -432,7 +432,7 @@ struct StagingPanelProps {
       label="Change Team"
       onPress={props.on_team}
     />
-    <Box key="sp" layout={::ui::LayoutStyle{.flex_grow = ::ui::StyleFloat::points(1.0f)}} />
+    <Box key="g2" layout={::ui::LayoutStyle{.height = ::ui::Length::points(58.5f)}} />
     <AppButton
       key="ready"
       controlId="StagingReady"
@@ -556,15 +556,31 @@ struct StagingPanelProps {
 }
 
 ::ui::UiElement StagingRosterCell(const StagingPanelProps &props) {
+  // origin game_join_panel roster anchors x1.5: rows at pad-left 84/top 10.5,
+  // 19.5 pitch within a team, 82.5 between team blocks; each row = agency
+  // emblem | ready check | name.
   std::vector<::ui::UiElement> rows;
+  int prev_team = -1;
   for (int i = 0; i < (int)props.roster.size(); ++i) {
     const StagingRosterRow &r = props.roster[i];
+    if (prev_team >= 0 && r.team_number != prev_team)
+      rows.push_back(Box(BoxProps{
+          .key = ::ui::copy_string(("tg" + std::to_string(i)).c_str()),
+          .layout = ::ui::LayoutStyle{.height = ::ui::Length::points(63.0f)}}));
+    prev_team = r.team_number;
     rows.push_back(roster_check_row(
         ::ui::copy_string(("rr" + std::to_string(i)).c_str()),
         ::ui::copy_string(r.name.c_str()), r.ready));
   }
   return <Box key="rightcell" layout={lobby_right_cell_layout()} style={lobby_panel_style()}>
-    {::ui::children(rows)}
+    <Box
+      key="rosterpad"
+      layout={::ui::LayoutStyle{
+        .direction = ::ui::FlexDirection::Column,
+        .padding = {78.0f, 0.0f, 4.5f, 0.0f}}}
+    >
+      {::ui::children(rows)}
+    </Box>
   </Box>
 }
 
@@ -960,7 +976,7 @@ struct LobbyScreenProps {
                 key="il"
                 variant={BodyTextVariant::Detail}
                 tone={BodyTextTone::Muted}
-                value="In Lobby"
+                value={staging.active ? "Pregame" : "In Lobby"}
               />
               <BodyText key="p" variant={BodyTextVariant::Detail} value={presence} />
             </Box>
