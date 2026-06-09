@@ -48,6 +48,9 @@ struct LobbySnapshot {
   std::string staging_ready_label = "Ready";
   std::string staging_map_name = {}; // joined game's map (origin title-bar overlay)
   std::vector<StagingRosterRow> staging_roster = {};
+  std::vector<StagingTechRow> staging_tech = {};
+  uint32_t staging_tech_choices = 0;
+  std::string staging_tech_slots_label = {};
 
   // --- progression (MissionSummary) ---
   bool progression_loaded = false;
@@ -79,10 +82,12 @@ struct LobbyProviderValue {
   std::function<void(uint32_t, const std::string &)> join_game = {};
   std::function<void(uint32_t)> spectate_game = {};
   std::function<void(const CreateGameRequest &)> create_game = {};
-  // Staging room: ready / change-team / leave over the §7a public World seam.
+  // Staging room: ready / change-team / leave / tech loadout over the §7a
+  // public World seam.
   std::function<void()> send_ready = {};
   std::function<void()> change_team = {};
   std::function<void()> leave_game = {};
+  std::function<void(uint32_t)> set_tech = {};
 };
 
 // Publishes the lobby model to the component tree. Mounted in the global

@@ -444,6 +444,117 @@ struct StagingPanelProps {
   </Box>
 }
 
+// One pre-match tech row (origin tech_tree_grid): a checkbox lane, the tech
+// name, and the slot cost in the bank-134 bracket glyphs ("Laser [1]").
+// Unaffordable rows render muted and don't toggle.
+::ui::UiElement tech_row(int index, const StagingTechRow &row, uint32_t choices,
+                         std::function<void(uint32_t)> set_tech) {
+  client::ui::ChromeTextures chrome = client::ui::use_chrome();
+  const char *key = ::ui::copy_string(("tr" + std::to_string(index)).c_str());
+  const ::ui::StylePatch cb =
+      row.selected
+          ? tokens::panel_patch(tokens::kInsetStroke, tokens::kInsetStroke, 1.0f)
+          : tokens::frame_patch(tokens::kInsetStroke);
+  std::function<void(const ::ui::ActivationEvent &)> toggle =
+      [row, choices, set_tech](const ::ui::ActivationEvent &) {
+        if (row.interactable && set_tech)
+          set_tech(choices ^ row.choice_mask);
+      };
+  const char *slots = ::ui::copy_string(std::to_string((unsigned)row.slots).c_str());
+  auto bracket = [&](const char *bkey, bool left) -> ::ui::UiElement {
+    uint32_t tex = left ? chrome.bracket_l : chrome.bracket_r;
+    if (!tex)
+      return ::ui::empty();
+    return Box(BoxProps{
+        .key = bkey,
+        .layout = ::ui::LayoutStyle{.width = ::ui::Length::points(6.0f),
+                                    .height = ::ui::Length::points(16.5f)},
+        .style = tokens::image_patch_sub(tex, left ? 0.0f : 1.0f, 0.0f, 4.0f, 11.0f)});
+  };
+  return <Box
+    key={key}
+    id="TechRow"
+    idOffset={index}
+    focusable={true}
+    onActivate={toggle}
+    layout={::ui::LayoutStyle{
+      .direction = ::ui::FlexDirection::Row,
+      .align_items = ::ui::AlignItems::Center,
+      .height = ::ui::Length::points(19.5f),
+      .gap = 7.5f}}
+  >
+    <Box
+      key="cb"
+      layout={::ui::LayoutStyle{
+        .width = ::ui::Length::points(13.5f),
+        .height = ::ui::Length::points(13.5f),
+        .flex_shrink = ::ui::StyleFloat::points(0.0f)}}
+      style={cb}
+    />
+    <BodyText
+      key="n"
+      variant={BodyTextVariant::Body}
+      tone={row.interactable ? BodyTextTone::Default : BodyTextTone::Muted}
+      value={::ui::copy_string(row.name.c_str())}
+    />
+    {bracket("bl", true)}
+    <BodyText key="s" variant={BodyTextVariant::Body} value={slots} />
+    {bracket("br", false)}
+  </Box>
+}
+
+// Tech-select CENTER column (origin BuildGameTechUpperTree): the full-width
+// Back To Teams chrome button.
+::ui::UiElement TechUpperPanel(std::function<void()> on_back) {
+  return <Box
+    key="centercol"
+    layout={::ui::LayoutStyle{
+      .direction = ::ui::FlexDirection::Column,
+      .align_items = ::ui::AlignItems::Stretch,
+      .flex_grow = ::ui::StyleFloat::points(1.4f),
+      .flex_basis = ::ui::Length::points(0.0f),
+      .min_width = ::ui::Length::points(0.0f),
+      .padding = {4.5f, 6.0f, 4.5f, 6.0f},
+      .gap = 10.0f}}
+  >
+    <AppButton
+      key="back"
+      controlId="BackToTeams"
+      variant={AppButtonVariant::Chrome}
+      label="Back To Teams"
+      onPress={on_back}
+    />
+  </Box>
+}
+
+// Tech-select RIGHT cell (origin BuildGameTechTallTree): the slots-left
+// readout over the tech checkbox list (origin pads the grid in from the cell).
+::ui::UiElement TechListCell(const Staging &staging) {
+  std::vector<::ui::UiElement> rows;
+  rows.reserve(staging.tech.size());
+  for (int i = 0; i < (int)staging.tech.size(); ++i)
+    rows.push_back(tech_row(i, staging.tech[i], staging.tech_choices, staging.set_tech));
+  return <Box key="rightcell" layout={lobby_right_cell_layout()} style={lobby_panel_style()}>
+    <Box key="slotswrap" layout={::ui::LayoutStyle{.padding = {85.5f, 0.0f, 10.5f, 0.0f}}}>
+      <BodyText
+        key="slots"
+        variant={BodyTextVariant::Body}
+        tone={BodyTextTone::Prose}
+        value={::ui::copy_string(staging.tech_slots_label.c_str())}
+      />
+    </Box>
+    <Box
+      key="grid"
+      layout={::ui::LayoutStyle{
+        .direction = ::ui::FlexDirection::Column,
+        .padding = {85.5f, 0.0f, 0.0f, 0.0f},
+        .gap = 0.0f}}
+    >
+      {::ui::children(rows)}
+    </Box>
+  </Box>
+}
+
 ::ui::UiElement StagingRosterCell(const StagingPanelProps &props) {
   std::vector<::ui::UiElement> rows;
   for (int i = 0; i < (int)props.roster.size(); ++i) {
@@ -550,10 +661,15 @@ struct LobbyScreenProps {
   sp.ready_blocked = staging.ready_blocked;
   sp.on_ready = staging.send_ready;
   sp.on_team = staging.change_team;
-  sp.on_tech = []() {}; // SIL-21: the tech-select screen is not yet authored
+  bool *tech_open = use_state<bool>(false);
+  if (!staging.active && *tech_open)
+    *tech_open = false; // leaving staging closes the tech view
+  sp.on_tech = [tech_open]() { *tech_open = true; };
 
   ::ui::UiElement right;
-  if (staging.active) {
+  if (staging.active && *tech_open) {
+    right = TechUpperPanel([tech_open]() { *tech_open = false; });
+  } else if (staging.active) {
     right = StagingPanel(sp);
   } else if (*show_create) {
     right = GameCreatePanel();
@@ -590,14 +706,26 @@ struct LobbyScreenProps {
     for (int i = 0; i < map_count && i < kMaxMapRows; ++i) {
       const char *mk = ::ui::copy_string(("m" + std::to_string(i)).c_str());
       const char *mv = ::ui::copy_string(games.bundled_maps[i].c_str());
-      map_rows.push_back(BodyText(BodyTextProps{
+      std::function<void(const ::ui::ActivationEvent &)> pick =
+          [map_index, i](const ::ui::ActivationEvent &) { *map_index = i; };
+      map_rows.push_back(Box(BoxProps{
           .key = mk,
-          .variant = i == *map_index ? BodyTextVariant::Strong : BodyTextVariant::Body,
-          .value = mv}));
+          .id = "MapRow",
+          .id_offset = i,
+          .focusable = true,
+          .accessibility = {.label = mv},
+          .on_activate = pick,
+          .children = ::ui::children({BodyText(BodyTextProps{
+              .key = "t",
+              .variant = i == *map_index ? BodyTextVariant::Strong
+                                         : BodyTextVariant::Body,
+              .value = mv})})}));
     }
   }
   ::ui::UiElement right_cell;
-  if (staging.active) {
+  if (staging.active && *tech_open) {
+    right_cell = TechListCell(staging);
+  } else if (staging.active) {
     right_cell = StagingRosterCell(sp);
   } else if (*show_create) {
     CreateRightCellProps rc;

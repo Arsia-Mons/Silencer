@@ -135,7 +135,11 @@ Staging use_staging() {
       .ready_label = s.staging_ready_label,
       .map_name = s.staging_map_name,
       .roster = s.staging_roster,
+      .tech = s.staging_tech,
+      .tech_choices = s.staging_tech_choices,
+      .tech_slots_label = s.staging_tech_slots_label,
       .send_ready = value->send_ready,
+      .set_tech = value->set_tech,
       .change_team = value->change_team,
       .leave = value->leave_game,
   };

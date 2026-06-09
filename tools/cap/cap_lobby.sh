@@ -103,14 +103,18 @@ shot lobby_screen
 
 # create_game panel
 cli --port "$CTRL_PORT" click --label "NewGame" >/dev/null
-wait_for_widget "CreateGame" && shot create_game
+wait_for_widget "CreateGame" >/dev/null
+# The golden created its game on STAR72.SIL — select it before the shot so the
+# Select Map highlight, the staging header, and the chat channel all match.
+cli --port "$CTRL_PORT" click --label "STAR72.SIL" >/dev/null 2>&1 || true
+shot create_game
 
 # best-effort staging + tech (needs the dedicated server to spawn from provisioned maps)
 if cli --port "$CTRL_PORT" click --label "CreateGame" >/dev/null 2>&1; then
   if wait_for_lobby_state STAGING 2>/dev/null || wait_for_widget "Ready" 2>/dev/null; then
     shot game_staging
-    if cli --port "$CTRL_PORT" click --label "TechSelect" >/dev/null 2>&1 || cli --port "$CTRL_PORT" click --label "Tech" >/dev/null 2>&1; then
-      wait_for_widget "Tech" 2>/dev/null && shot tech_select
+    if cli --port "$CTRL_PORT" click --label "ChooseTech" >/dev/null 2>&1; then
+      wait_for_widget "BackToTeams" 2>/dev/null && shot tech_select
     fi
   else
     echo "  (staging not reached — capture later)"

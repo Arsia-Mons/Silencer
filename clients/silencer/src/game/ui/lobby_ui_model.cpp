@@ -8,6 +8,7 @@
 #include "actor/team.h"
 #include "actor/user.h"
 #include "peer.h"
+#include "buyableitem.h"
 
 #include <algorithm>
 #include <cstdio>
@@ -160,6 +161,34 @@ void BuildStaging(client::ui::LobbySnapshot &snap, World &world, Lobby &lobby) {
   snap.staging_ready_label =
       (snap.staging_in_lobby && snap.staging_ready_blocked) ? "Waiting..."
                                                             : "Ready";
+
+  // Pre-match tech loadout (origin GameTechPanelTick): slots-left from the
+  // user's agency techslots minus the chosen items; one row per GAS buyable
+  // that participates in tech choice.
+  if (localpeer) {
+    Team *team = world.GetPeerTeam(localid);
+    int slotsleft = 0;
+    if (team) {
+      if (User *user = lobby.GetUserInfo(localpeer->accountid)) {
+        slotsleft =
+            user->agency[team->agency].techslots - world.TechSlotsUsed(*localpeer);
+        snap.staging_tech_slots_label =
+            "Tech slots left: " + std::to_string(slotsleft);
+      }
+    }
+    snap.staging_tech_choices = localpeer->techchoices;
+    for (BuyableItem *item : world.buyableitems) {
+      if (!item || item->techchoice == 0)
+        continue;
+      client::ui::StagingTechRow row;
+      row.name = item->name;
+      row.slots = item->techslots;
+      row.choice_mask = item->techchoice;
+      row.selected = (localpeer->techchoices & item->techchoice) != 0;
+      row.interactable = row.selected || item->techslots <= slotsleft;
+      snap.staging_tech.push_back(row);
+    }
+  }
 
   const std::vector<Uint16> &teamIds = world.GetObjectsByType(ObjectTypes::TEAM);
   for (Uint16 teamId : teamIds) {

@@ -715,6 +715,11 @@ cppxHost->pipeline().client_ui().queue_deferred_mutation([this](){
 game.world.ChangeTeam();
 });
 };
+lobby.set_tech = [this](uint32_t choices){
+cppxHost->pipeline().client_ui().queue_deferred_mutation([this, choices](){
+game.world.SetTech(choices);
+});
+};
 lobby.leave_game = [this](){
 cppxHost->pipeline().client_ui().queue_deferred_mutation([this](){
 game.LeaveJoinedGame();

@@ -26,6 +26,17 @@ struct StagingRosterRow {
 // connected to a game (staging or playing); `in_game_lobby` while still
 // pre-match. Tech loadout (slots/buyable/wanted + set/toggle) joins in
 // SIL-21 (4/n).
+// One selectable pre-match tech (origin tech_tree_grid row): the GAS buyable's
+// name + slot cost, whether the local peer has it chosen, and whether it can be
+// toggled (enough slots left, or already chosen so it can be un-chosen).
+struct StagingTechRow {
+  std::string name = {};
+  uint8_t slots = 0;
+  uint32_t choice_mask = 0;
+  bool selected = false;
+  bool interactable = false;
+};
+
 struct Staging {
   bool active = false;
   bool in_game_lobby = false;
@@ -34,8 +45,14 @@ struct Staging {
   std::string ready_label = "Ready";
   std::string map_name = {}; // origin shows it in the lobby title bar
   std::vector<StagingRosterRow> roster = {};
+  // Pre-match tech loadout (origin GameTechPanel): the selectable techs, the
+  // local choice bitmask, and the slots-left readout.
+  std::vector<StagingTechRow> tech = {};
+  uint32_t tech_choices = 0;
+  std::string tech_slots_label = {};
 
   std::function<void()> send_ready = {};
+  std::function<void(uint32_t)> set_tech = {};
   std::function<void()> change_team = {};
   std::function<void()> leave = {};
 };
