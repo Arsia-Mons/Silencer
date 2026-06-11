@@ -94,6 +94,23 @@ bool render_text_glyphs(SDL_Renderer *r, const ::ui::DrawCommandList &list,
   float penx = c.rect.x * scale;
   const float peny = c.rect.y * scale;
 
+  // Per-phase string variant (origin text striping): exact-color text at 1:1
+  // virtual scale swaps for a whole-string bake through origin's magnify at
+  // its absolute device cell (string analog of resolve_legacy_variant).
+  if (cf) {
+    int out_w = 0, out_h = 0;
+    GlyphFonts::StringVariant sv;
+    if (SDL_GetCurrentRenderOutputSize(r, &out_w, &out_h) &&
+        glyphs->string_variant(r, t.font_id, t.color.r, t.color.g, t.color.b,
+                               &list.text_arena[t.text_off], t.text_len, penx,
+                               peny, gscale, out_w, out_h, &sv)) {
+      SDL_FRect d = {static_cast<float>(sv.x), static_cast<float>(sv.y),
+                     static_cast<float>(sv.w), static_cast<float>(sv.h)};
+      SDL_RenderTexture(r, sv.texture, nullptr, &d);
+      return true;
+    }
+  }
+
   // Tint: the coverage atlas is a white premultiplied mask; the IR color is
   // premultiplied, so color-mod(rgb) + alpha-mod(a) reproduces the token color
   // exactly (drawn under BLEND_PREMULTIPLIED). Exact-color variants already

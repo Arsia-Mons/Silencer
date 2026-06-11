@@ -10,19 +10,19 @@ All measured 2026-06-11 (iteration 0) with recalibrated tile gate, fresh capture
 
 | Surface | State | Evidence (global% / hot tiles / worst tile) | Notes |
 |---|---|---|---|
-| mainmenu | **PASS (full gate)** | pixdiff PASS 0.12%/0 hot + gate wf_6e530100-b59 overall=PASS 6/6 critics 0.95-0.97 (2026-06-11) | per-phase variants; several regions verified byte-identical (logo histogram counts exact) |
-| options | DIVERGED (1 tile) | 0.0735% / 1 / 5.4% @936,546 (was PASS 0.2578/0/4.2) | ovals + 3 of 4 labels now byte-exact (corr 1.0000); the one hot tile is the "Audio" label — GLYPH-PHASE family (golden text sits at a different device phase than the single-phase atlas; corr maxes 0.94 at any shift). Global 3.5x better; tile gate flipped red on this one tile |
-| options_audio | **PASS (full gate)** | pixdiff PASS 0.0658%/0 hot + gate wf_d51296b1-328 overall=PASS 6/6 critics 0.93-0.97 (2026-06-11) | toggle pair phase-exact (densities 0.25/0.81 match golden); UI bbox x504-1406/y252-542 identical |
-| options_display | DIVERGED | 0.1636% / 1 / 6.3% @702,468 (was 1.48/40/23.1) | action-row y fixed (392 -> vy 261, was ~4px low); single hot tile = "Smooth Scaling" label, glyph-phase + irreducible ±1 (same-frac labels want opposite shifts); <10% target met |
-| options_controls | DIVERGED | 0.3856% / 5 / 5.8% @*,0 (was 1.29/30/10.1) | bind/preset/save ovals per-phase exact (lanes x561/x833, save 335/608); residual = the 5 title-row tiles ("Configure Controls", dx=0, glyph-phase) at 5.1-5.8% |
-| lobby_connect | DIVERGED | 1.46% / 41 / 25.9% @780,780 | CORRECTED DIAGNOSIS: button row IS centered right (origin's floating row escapes pad-84 and centers across panel); real diff = button chrome detail (inner inset frame) + widths (L/C 275 vs 250 device px) |
-| character_create | DIVERGED | 1.59% / 41 / 17.9% @468,234 (was 2.17/58) | portrait row + panel chrome |
-| cc_alias | DIVERGED | 2.20% / 56 / 21.2% @624,468 (was 2.77/73) | alias dialog region |
-| cc_select_agency | DIVERGED | 7.09% / 125 / 40.7% @1092,546 | agency Description paragraph: glyph metrics/wrap slightly off → dense text amplifies |
-| lobby_screen | DIVERGED | 3.68% / 94 / 31.9% @234,312 (was 4.00/114) | VERIFIED BY EYE: agent-card emblem scale/pos, WINS/LOSSES/XP row spacing, Agents button high + wrong chrome. ORIGIN SPEC (character_panel.cpp, virtual px → ×1.5 logical): content pad 6, emblem↔info gap 10; left rail emblemBoxW=clamp(inner*18%,40,64) square Contain emblem + LevelBadge(bodyLineH, centered); info col gap 5: name(heading lineH) → details row: stats col gap 10 [stat table gap 2: WINS,LOSSES rows; label col = w("LOSSES")+4] → XP line → actions row h21 (Chrome "Agents" minW 92 padX 12). The LOSSES↔XP gap = 10 virtual (15 logical) — that's the visible golden gap before XP |
-| create_game | DIVERGED | 5.01% / 113 / 31.9% @234,312 | map-list pitch fixed (21 logical = origin kMapListLineH 14 virtual; was 16.5+1) — right-panel hot column (38.4 @1248,*) cleared; worst tile is now the shared agent-card region (see lobby_screen spec) |
+| mainmenu | **PASS — byte-identical** | pixdiff 0.0000%/0 hot, mae 0.00 (2026-06-11, string-variant bake); prior full gate wf_6e530100-b59 6/6 critics | per-phase sprite variants + per-phase string bake |
+| options | **PASS — byte-identical** | pixdiff 0.0000%/0 hot, mae 0.00 (2026-06-11) | "Audio" glyph-phase tile cleared by the string-variant bake |
+| options_audio | **PASS — byte-identical** | pixdiff 0.0000%/0 hot, mae 0.00 (2026-06-11); prior full gate wf_d51296b1-328 6/6 critics | |
+| options_display | **PASS — byte-identical** | pixdiff 0.0000%/0 hot, mae 0.00 (2026-06-11, was 0.1636/1/6.3) | string bake + fullscreenw row -1 (label pen vx 334) + indDx 1 (right toggle vx 553) |
+| options_controls | **PASS — byte-identical** | pixdiff 0.0000%/0 hot, mae 0.00 (2026-06-11, was 0.3856/5/5.8) | string bake + titlewrap inset-top 13 (title vy 14) + OR ml 2 (vx 513) |
+| lobby_connect | DIVERGED | 1.47% / 42 / 25.9% @780,780 (pre-text-bake 1.46/41) | CORRECTED DIAGNOSIS: button row IS centered right (origin's floating row escapes pad-84 and centers across panel); real diff = button chrome detail (inner inset frame) + widths (L/C 275 vs 250 device px) |
+| character_create | DIVERGED | 1.57% / 41 / 17.9% @468,234 (was 1.59/41) | portrait row + panel chrome |
+| cc_alias | DIVERGED | 2.17% / 56 / 21.2% @624,468 (was 2.20/56) | alias dialog region |
+| cc_select_agency | DIVERGED | 3.74% / 79 / 31.9% (was 7.09/125/40.7) | agency Description paragraph cleared by the string-variant bake (dense prose now phase-exact); residual = panel chrome + portraits |
+| lobby_screen | DIVERGED | 3.67% / 94 / 31.9% @234,312 (was 3.68/94) | VERIFIED BY EYE: agent-card emblem scale/pos, WINS/LOSSES/XP row spacing, Agents button high + wrong chrome. ORIGIN SPEC (character_panel.cpp, virtual px → ×1.5 logical): content pad 6, emblem↔info gap 10; left rail emblemBoxW=clamp(inner*18%,40,64) square Contain emblem + LevelBadge(bodyLineH, centered); info col gap 5: name(heading lineH) → details row: stats col gap 10 [stat table gap 2: WINS,LOSSES rows; label col = w("LOSSES")+4] → XP line → actions row h21 (Chrome "Agents" minW 92 padX 12). The LOSSES↔XP gap = 10 virtual (15 logical) — that's the visible golden gap before XP |
+| create_game | DIVERGED | 5.06% / 113 / 31.9% @234,312 (was 5.01/113) | map-list pitch fixed (21 logical = origin kMapListLineH 14 virtual; was 16.5+1) — right-panel hot column (38.4 @1248,*) cleared; worst tile is now the shared agent-card region (see lobby_screen spec) |
 | game_staging | DIVERGED | 4.20% / 93 / 32.9% @1248,156 | shares lobby panels + right panel |
-| tech_select | DIVERGED | 5.38% / 106 / 34.3% @1326,312 | tech grid region divergent |
+| tech_select | DIVERGED | 5.49% / 106 / 34.1% @234,312 (was 5.38/106/34.3) | tech grid region divergent; worst tile = shared agent-card "Agents" button (verified by eye: chrome + y-pos, not a text artifact). ±0.1 global movement here/create_game = un-grid-tuned text snapping to cells — resolves with the screens' own parity pass |
 
 Menu-cluster rows re-measured 2026-06-11 after the per-phase oval/logo variants landed;
 lobby/cc rows re-verified same day (all equal or marginally better, no regressions).
@@ -59,19 +59,28 @@ mr 1/2, display row2 mt -0.5, actionpad mt 3.5; controls content mr 2, kOrCol 68
 preset pad-b 2, actiongap 48.5, actions ml 1). vx = round(floor(dev_x)/2.25) must
 recover the golden cell (measure golden bboxes first).
 
-### [systemic] NEXT FAMILY: glyph-atlas phase (text striping)
+### [systemic] Glyph-atlas phase (text striping) — SOLVED 2026-06-11, all 5 menu screens byte-identical
 
-The exact-color glyph atlas (origin's rendered text pixels) is captured at ONE device
-phase; origin re-stripes text per absolute position like every sprite. Same-screen
-proof (options): "Controls" label corr 1.0000 (byte-exact) while "Audio" maxes 0.94 at
-any integer shift — the golden's text phase differs and the atlas can't express it.
-Binding residuals: options 5.4% tile (Audio lbl), controls title row 5.1-5.8% x5,
-display Smooth lbl 6.3%. Fix shape: per-phase text raster (string texture baked
-through the two-hop chain at its absolute device position — same mechanism as
-resolve_legacy_variant, applied to the text path in glyph_fonts/draw_executor).
-Label PLACEMENT is already floor-tuned: oval label padding {16.75,15.25,8.0,4.0}
-(+0.375/+0.75 device bias moves only the .75-fraction labels across the floor;
-remaining per-label ±1s are origin int-chain artifacts, irreducible by global bias).
+Landed: GlyphFonts::string_variant (glyph_fonts.{h,cpp}) + the draw_executor
+render_text_glyphs intercept — when a Text draw uses an exact-color face at 1:1
+virtual scale (gscale == s), the WHOLE string is baked through origin's chain at
+its absolute device cell: glyphs composited at integer virtual pen positions
+(vx + i*advance, transparent-skipping, later-over-earlier), then per-device-pixel
+magnify src = int((gx-off)/s). Drawn 1:1 at the cell; memo (face, color, string,
+X%18, Y%18); textures owned by GlyphFonts (cap 256, recycle-all at cap), NOT the
+64-cap TextureRegistry. build_color_face now keeps a CPU atlas copy + legacy dims.
+Measured proof that decided the design: the golden satisfies int(gx/s) duplication
+exactly over label regions, while the render's per-glyph float pen (advance 11 x
+2.25 = 24.75) fits NO single column phase — x-phase drifts WITHIN a string, so
+per-glyph atlas variants were unworkable; only a string-level bake covers both axes.
+Pen recovery vx=round(floor(dev)/s) needs the authored pen within ~±1 device px of
+the golden cell — three labels needed nudges (display fullscreenw mr 3 + indDx 1;
+controls titlewrap inset-top 13, OR ml 2). Result: mainmenu, options, options_audio,
+options_display, options_controls all pixdiff 0.0000 (byte-identical, mae 0.00).
+
+NEXT: lobby/cc cluster — dominated by panel chrome + agent-card layout (see
+lobby_screen ORIGIN SPEC row); text there now snaps to cells (cc_select_agency
+7.09 -> 3.74 for free) but pens must be grid-tuned per screen as layout lands.
 
 ### [systemic] Backdrop scanline-striping arithmetic — root of most menu hot tiles
 
@@ -128,10 +137,11 @@ F4 music toggle, F5 random music, Enter quit-confirm flow.
 | 17,30,31,40,50,52 | PASS | repaired by workflow 2026-06-11 (origin-correct flows: Enter submits alias, no Continue btn) |
 | 21_main_menu_layout | PASS | root cause was the content-scale ≥1 clamp (UI 1.5× oversized at 640×480); unclamped to floor 480/720 → origin-native proportions; test now bounds-checks in logical space, stagger band 130 (origin fan = 120 logical) |
 | 53_lobby_create_options_scroll | PASS | same scale-clamp root cause; green after unclamp |
-| 70_visual_regression | RED-BY-DESIGN | rebuilt: 1080p capture, tolerant verdict per origin screen, BLESS limited to cppx-only surfaces; goes green as parity lands |
-| 71_visual_regression_lobby | RED-BY-DESIGN | rebuilt likewise; red until lobby cluster parity |
+| 70_visual_regression | RED (1 surface) | 2026-06-11 post string-bake: ALL origin-golden menu surfaces MATCH; sole residual = `gallery` (cppx-only self-golden, stale since text snaps to cells — BLESS-eligible per the test's design, left unblessed for review) |
+| 71_visual_regression_lobby | RED-BY-DESIGN | rebuilt likewise; red until lobby cluster parity (5 diverged 2026-06-11, numbers in the table above) |
 
 Full suite 2026-06-11 (post scale-unclamp): 21/23 PASS; only 70/71 red (the parity gate).
+Re-run 2026-06-11 post string-bake: 22 green, 70 red on gallery only, 71 red on the 5 lobby surfaces.
 
 ## Functional — origin-behavior coverage gaps (no scenario yet)
 
@@ -160,7 +170,7 @@ Full suite 2026-06-11 (post scale-unclamp): 21/23 PASS; only 70/71 red (the pari
 | big-switch 7 cases | components/text/screen_title.cppx:26 |
 | big-switch 7 cases | screens/update_screen.cppx:27 |
 | god-view 260 lines | screens/character_create.cppx:226 CharacterCreateContent |
-| god-view 407 lines | screens/lobby_screen.cppx:591 LobbyScreenView |
+| god-view 409 lines | screens/lobby_screen.cppx:597 LobbyScreenView |
 
 ## Critic-panel architecture backlog (from gate runs wf_6e530100 + wf_d51296b1, 2026-06-11)
 

@@ -54,6 +54,11 @@ struct OptionsDisplayProps {
   // and Save/Cancel at 336/648 (vx 224/432); smooth's -0.5 top puts row 2 at
   // y=309 (vy 206) and actionpad 3.5 puts the action row at y=392 (vy 261 —
   // also fixes the action band sitting ~4 device px below the golden).
+  // fullscreenw mr 3 (not 1): row -1 logical so the centered label pen lands
+  // on the golden TEXT cell too (vx 334 — Yoga's 501.5 half-up rounding sat
+  // one device px past the string-bake recovery window); the oval (vx 279)
+  // and left toggle (vx 523) stay in their windows, indDx 1 keeps the right
+  // toggle on vx 553.
   return <ScreenLayout key="root" variant={ScreenLayoutVariant::Overlay}>
     <Box
       key="col"
@@ -67,12 +72,13 @@ struct OptionsDisplayProps {
       <Box key="titlewrap" layout={::ui::LayoutStyle{.margin = ::ui::EdgeSizes{{}, {}, {}, 3.5f}}}>
         <ScreenTitle key="title" variant={ScreenTitleVariant::Dialog} value="Display Options" />
       </Box>
-      <Box key="fullscreenw" layout={::ui::LayoutStyle{.margin = ::ui::EdgeSizes{{}, 1.0f, {}, {}}}}>
+      <Box key="fullscreenw" layout={::ui::LayoutStyle{.margin = ::ui::EdgeSizes{{}, 3.0f, {}, {}}}}>
         <BooleanSettingRow
           key="fullscreen"
           controlId="FullscreenToggle"
           checked={settings.fullscreen}
           label="Fullscreen"
+          indDx={1.0f}
           onChange={settings.set_fullscreen}
         />
       </Box>

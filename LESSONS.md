@@ -39,6 +39,21 @@
   the box (Yoga abs inset = parent border edge, padding excluded). Drive each correction
   by per-region ink-mask cross-correlation, not eyeballing.
 
+- **Simulate the bake in numpy before writing the C++.** (string-variant bake) Collapsing
+  the golden label through int(gx/s) and fitting run boundaries on the render proved, in
+  ~20 minutes, that (a) the golden obeys the whole-frame magnify exactly, (b) the render's
+  per-glyph float pen (advance*2.25 = 24.75) fits NO single column phase — x-phase drifts
+  WITHIN a string — and (c) round(dev/s) recovers the golden virtual pen. That killed the
+  per-glyph-atlas-rows design on evidence and made the per-string bake a safe bet.
+
+- **A phase-exact bake converts "fuzzy ±1 + wrong pattern" into "byte-exact or 2-3px off"**
+  — binary outcomes you can finish. After the string bake, every label was either 0.0000
+  or shifted one whole virtual cell (pen 1-2 device px outside the round-recovery window);
+  the json layout dump (px = floor(x*1.5), slack vs cell) located each offender in minutes,
+  and ≤1-logical nudges (wrapper mr, ml on the text, inset-top) closed all five menu
+  screens to byte-identical. Watch compound moves: shifting a row -1 for its label flipped
+  the row's right toggle out of ITS window (2.25-px windows; recompute every sibling).
+
 - **Measure geometry before touching layout code.** lobby_connect's "button shift" was a
   misdiagnosis from one eyeball pass — ink-mask bbox + cross-correlation showed the row was
   already centered (origin's floating row escapes its parent padding). The options fix went

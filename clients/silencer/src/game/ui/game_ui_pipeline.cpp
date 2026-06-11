@@ -485,7 +485,8 @@ src[i].h = sp->h;
 }
 cppxHost->build_glyph_color_face(vb.face, vb.key.r, vb.key.g, vb.key.b, src,
                                  GF::kGlyphCount, palette, vb.advance,
-                                 vb.line_height);
+                                 vb.line_height, kLegacyRenderWidth,
+                                 kLegacyRenderHeight);
 }
 }
 }

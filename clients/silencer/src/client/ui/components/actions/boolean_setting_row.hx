@@ -16,6 +16,10 @@ struct BooleanSettingRowProps {
   const char *control_id = nullptr;
   bool checked = false;
   const char *label = nullptr;
+  // Margin-left on the indicator pair, logical px: virtual-grid nudge so a
+  // row shifted for its LABEL's text cell can keep the toggle sprites on
+  // their golden cells (see options_display fullscreenw).
+  float ind_dx = 0.0f;
   std::function<void(bool)> on_change = {};
 };
 

@@ -133,7 +133,9 @@ int rebind_combo_index(const KeyMap &km, Action action) {
       <Text
         key="or"
         value="OR"
-        layout={::ui::LayoutStyle{.height = ::ui::Length::points(tokens::kLineLarge)}}
+        layout={::ui::LayoutStyle{
+          .height = ::ui::Length::points(tokens::kLineLarge),
+          .margin = ::ui::EdgeSizes{2.0f, {}, {}, {}}}}
         style={tokens::text_patch(tokens::kTextBody, tokens::kFontLarge, tokens::kFaceLarge, tokens::kLineLarge)}
       />
     </Box>
@@ -288,7 +290,9 @@ struct OptionsControlsProps {
   // margin-right 2 -> column x=273 so bind/preset lanes start at x=561
   // (device 841.5, origin vx 374); actiongap 48.5 + the margin-left-1
   // ActionRow wrapper put Save/Cancel at (335,608) -> device (502.5,912) =
-  // origin vx 223 / vy 405.
+  // origin vx 223 / vy 405. Text-cell nudges for the per-phase STRING bake:
+  // titlewrap inset-top 13 (not 12) puts the title pen on golden vy 14, and
+  // the OR label's margin-left 2 centers its pen on golden vx 513.
   return <ScreenLayout
     key="root"
     variant={ScreenLayoutVariant::Overlay}
@@ -299,7 +303,7 @@ struct OptionsControlsProps {
         key="titlewrap"
         layout={::ui::LayoutStyle{
           .position = ::ui::PositionType::Absolute,
-          .position_inset = ::ui::EdgeSizes{0.0f, 0.0f, 12.0f, {}},
+          .position_inset = ::ui::EdgeSizes{0.0f, 0.0f, 13.0f, {}},
           .direction = ::ui::FlexDirection::Row,
           .align_items = ::ui::AlignItems::Center,
           .justify_content = ::ui::JustifyContent::Center}}
