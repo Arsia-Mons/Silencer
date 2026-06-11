@@ -11,10 +11,10 @@ All measured 2026-06-11 (iteration 0) with recalibrated tile gate, fresh capture
 | Surface | State | Evidence (global% / hot tiles / worst tile) | Notes |
 |---|---|---|---|
 | mainmenu | **PASS — byte-identical** | pixdiff 0.0000%/0 hot, mae 0.00 (2026-06-11, string-variant bake); prior full gate wf_6e530100-b59 6/6 critics | per-phase sprite variants + per-phase string bake |
-| options | **PASS — byte-identical** | pixdiff 0.0000%/0 hot, mae 0.00 (2026-06-11) | "Audio" glyph-phase tile cleared by the string-variant bake |
+| options | **PASS (full gate)** | pixdiff 0.0000 byte-identical + gate wf_45c1807c-d48 overall=PASS | "Audio" glyph-phase tile cleared by the string-variant bake |
 | options_audio | **PASS — byte-identical** | pixdiff 0.0000%/0 hot, mae 0.00 (2026-06-11); prior full gate wf_d51296b1-328 6/6 critics | |
-| options_display | **PASS — byte-identical** | pixdiff 0.0000%/0 hot, mae 0.00 (2026-06-11, was 0.1636/1/6.3) | string bake + fullscreenw row -1 (label pen vx 334) + indDx 1 (right toggle vx 553) |
-| options_controls | **PASS — byte-identical** | pixdiff 0.0000%/0 hot, mae 0.00 (2026-06-11, was 0.3856/5/5.8) | string bake + titlewrap inset-top 13 (title vy 14) + OR ml 2 (vx 513) |
+| options_display | **PASS (full gate)** | pixdiff 0.0000 byte-identical (RGB MD5 match) + gate wf_1f9aedbb-fae overall=PASS 6/6 critics | string bake + fullscreenw row -1 (label pen vx 334) + indDx 1 (right toggle vx 553) |
+| options_controls | **PASS (full gate)** | pixdiff 0.0000 byte-identical (raw-RGB md5 match) + gate wf_b79c44ad-0ad overall=PASS 6/6 critics | string bake + titlewrap inset-top 13 (title vy 14) + OR ml 2 (vx 513) |
 | lobby_connect | DIVERGED | 1.47% / 42 / 25.9% @780,780 (pre-text-bake 1.46/41) | CORRECTED DIAGNOSIS: button row IS centered right (origin's floating row escapes pad-84 and centers across panel); real diff = button chrome detail (inner inset frame) + widths (L/C 275 vs 250 device px) |
 | character_create | DIVERGED | 1.57% / 41 / 17.9% @468,234 (was 1.59/41) | portrait row + panel chrome |
 | cc_alias | DIVERGED | 2.17% / 56 / 21.2% @624,468 (was 2.20/56) | alias dialog region |
@@ -137,7 +137,7 @@ F4 music toggle, F5 random music, Enter quit-confirm flow.
 | 17,30,31,40,50,52 | PASS | repaired by workflow 2026-06-11 (origin-correct flows: Enter submits alias, no Continue btn) |
 | 21_main_menu_layout | PASS | root cause was the content-scale ≥1 clamp (UI 1.5× oversized at 640×480); unclamped to floor 480/720 → origin-native proportions; test now bounds-checks in logical space, stagger band 130 (origin fan = 120 logical) |
 | 53_lobby_create_options_scroll | PASS | same scale-clamp root cause; green after unclamp |
-| 70_visual_regression | RED (1 surface) | 2026-06-11 post string-bake: ALL origin-golden menu surfaces MATCH; sole residual = `gallery` (cppx-only self-golden, stale since text snaps to cells — BLESS-eligible per the test's design, left unblessed for review) |
+| 70_visual_regression | PASS | GREEN 2026-06-11: all 5 origin-golden screens byte-identical; cppx-only baselines (gallery/modals) re-blessed via the sanctioned path |
 | 71_visual_regression_lobby | RED-BY-DESIGN | rebuilt likewise; red until lobby cluster parity (5 diverged 2026-06-11, numbers in the table above) |
 
 Full suite 2026-06-11 (post scale-unclamp): 21/23 PASS; only 70/71 red (the parity gate).
@@ -184,3 +184,11 @@ Visual verdicts PASSED; these CODE findings must close before the architecture b
 | MED | Options-Controls frame rect has two unsynchronized owners (BakeChromeTextures inline block + panel.cppx fallback rect) | screen-owned descriptor/shared constants; extract BakeControlsFrame(rw,rh,uiScale) |
 | MED | Save/Cancel row + BooleanSettingRow alignment duplicated at 3 call sites | extract shared DialogActions/SaveCancelRow primitive owning row + alignment |
 | LOW | 4x duplicated two-hop virtual-canvas math; unexplained 4.0f/+9 tolerances + doc drift; 640/480 impossible-state fallback; 9 hand-paired bake+register sites; failed bakes not memoized (per-frame rebake churn); split eligibility predicate; wrapper indent drift | helpers + named constants + bake_legacy() pairing + id=0 sentinel |
+
+Critic-panel additions (gate runs wf_1f9aedbb + wf_b79c44ad, 2026-06-11):
+
+| Sev | Finding | Fix shape |
+|---|---|---|
+| HIGH | string-variant memo key omits render scale s; cache only cleared at shutdown/256-cap — stale wrong-sized text after fullscreen toggle/resize (glyph_fonts.cpp:325-348) | fold quantized s (or out_w/out_h) into the key, store bake-time w/h, flush on output-size change |
+| MED | actionsnudge anonymous wrapper around ActionRow + mis-indented JSX (options_controls.cppx:334) | give ActionRow a layout override prop (engine-golden convention) or fold into actionwrap padding |
+| LOW | omnibus nudge comment; legacy_w>0?:640 ternary duplication; per-draw GetCurrentRenderOutputSize; ind_dx single-call-site prop on shared BooleanSettingRow; Panel::ControlsFrame owning screen placement (extract BakedFrame if a 2nd appears); exact-color eligibility decided in two places | cleanups |
