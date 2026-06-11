@@ -30,13 +30,74 @@ mainmenu, options, options_audio, options_display, options_controls,
 lobby_connect, character_create, **lobby_screen** (captured as `lobby`),
 cc_alias, cc_select_agency, create_game, game_staging, tech_select.
 
+## In-game goldens (8) — captured 2026-06-11, 640×480
+`ingame_hud_base, ingame_chat_open, ingame_chat_history, ingame_player_list,
+ingame_buy_tech, ingame_messages, ingame_tech_overlay, ingame_quit_prompt`
+
+(The earlier "HUD doesn't capture headless" deferral note was WRONG: origin renders
+world + HUD software-side into the 640×480 screenbuffer every frame; `--headless`
+only skips Present. The control-port `screenshot` op captures HUD included.)
+
+- **Source:** `origin/main` @ `af4c50c5` (v00058), built **PRISTINE** — the
+  deterministic-fade patch was stashed for these captures and restored after.
+  The patch corrupts the in-game palette: its FADEOUT branch writes brightness-0
+  into the shared `temppalette` across all 256 entries, and the in-game ambience
+  path (`game_loop.cpp:179` → `CopyWithBrightness(colors, ambience, 2, 114)`)
+  only rewrites indices 2..114, re-presenting the stale black entries for every
+  HUD/text color index → all in-game UI renders near-black. Pristine is safe
+  here because in-game captures happen minutes past the wall-clock fade.
+- **Resolution:** native **640×480** (in-game the screenbuffer is pinned to
+  kLegacyRender 640×480 even headless). Do NOT upscale; gate both sides at 640×480.
+- **Scene:** Tutorial single-player mission, map `AGENCY04.SIL` (night/rain bridge),
+  default keymap (the tutorial message embeds key display names: "By tapping Left
+  and Right."), spawn pinned at (2784,1350) (`RandomPlayerStartLocation` is
+  empirically constant on this map; the capture script asserts it).
+- **Capture script:** `tools/cap/cap_ingame_origin.sh` (this repo). Drive:
+  MAINMENU → click Tutorial → SINGLEPLAYERGAME → `pause` → feedback-stepped
+  (`step --frames N` + `world_state` message_progress convergence; multi-frame
+  steps overrun by ±1-2 ticks so all anchors single-step the final approach) to
+  the **anchor**: first ticks of tutorial message 2 ("Move your agent left and
+  right..."), which loops forever without player movement. Anchors:
+  - base tick = first `message_i == 0` after the anchor (center message hidden,
+    wraps mod 256): `ingame_hud_base`, `ingame_player_list` (`ingame_ui_mode
+    playerlist`), `ingame_buy_tech` (`ingame_ui_mode buy` — rows Laser/Rocket,
+    footer "Available Credits: 500"), `ingame_chat_open` (`ingame_ui_mode chat`
+    + `set_text` "parity check" on uid of `ingame.chat`; caret-ON enforced by
+    blink-pair compare), `ingame_chat_history` (two `--chat-line` pushes
+    "Recon: parity check one/two" + Esc closes input; display ticks frozen >0).
+    All overlays toggled while PAUSED — renders advance, sim doesn't, so every
+    overlay sees the identical world tick.
+  - `ingame_messages` = base tick + 94 (`message_i == 94`, both lines fully
+    revealed, brightness deterministic — message pulse keys off message_i, not
+    the wall-clock-seeded renderer phase).
+  - `ingame_tech_overlay` = next `message_i == 0` (`ingame_ui_mode tech` —
+    creates/joins a team and teleports the player to the team base, so it is
+    captured LAST; base interior has no sky → no rain → fully deterministic).
+  - `ingame_quit_prompt` = separate `--headless --tui` session (control ops
+    can't reach the quitstate machine — it listens to raw scancodes only):
+    throwaway TCP frame sink + scancode bitmask (ESC=41) over `--tui-input-port`,
+    press edge (quitstate 1) + release edge (quitstate 2, prompt latched), each
+    consuming one sim tick — anchored at `message_i == 254` so the capture
+    lands on `message_i == 0`.
+- **Nondeterministic regions (measured: 2 independent full runs, numpy diff):**
+  - **Rain streaks** — sparse 1-2 px diagonal dashes anywhere in the world view
+    (y0-~400), including THROUGH the transparent interiors of the chat/buy/
+    player-list panels and behind message text (~1300-3000 px per frame, ~0.5%).
+    Raindrops use C `rand()` whose call count is wall-clock-dependent
+    (renderer.cpp:45,282) — unfixable without a capture patch, and pointless to
+    fix since cppx rain can never align pixelwise anyway. MASK rain when gating.
+  - **Minimap inset, rect x235-406 y419-479** (172×62 blit at 235,419) — live
+    world view incl. rain, plus dot blinks keyed to the wall-clock-seeded
+    renderer phase (`state_i % 2`, renderer.cpp:1195).
+  - Everything else is **byte-identical across runs** (ingame_tech_overlay
+    differs ONLY in the minimap inset: 42 px).
+- **NOT captured** (no deterministic headless trigger; PARITY.md tracks):
+  top_ticker (only trigger is "Playing: <random track>" / F4-F9 paths),
+  status_lines (all `ShowStatus` callers need real gameplay actions),
+  hud_secret_overlay / hud_trace_time / hud_system_camera (need secrets/beaming/
+  system-camera world states), scoreboard-style F1 with multiple teams.
+
 ## NOT restored — do not trust as parity targets
-- **ingame_hud, scoreboard, ingame_chat** — DEFERRED. The in-game HUD/scoreboard/chat
-  overlay composites in a `Present()`/Clay layer that `--headless` skips, so the
-  headless screenshot only captures the world buffer (world + deployed agent render,
-  HUD does not). Needs a non-headless windowed capture (macOS `screencapture`) or a
-  capture-build patch to composite the overlay into the captured buffer. These files
-  are NOT present here yet.
 - **gallery.png** — cppx-only component showcase; no origin/main equivalent. Left as
   the prior cppx render.
 - **message_modal.png, password_modal.png** — no standalone origin trigger

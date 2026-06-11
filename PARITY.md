@@ -132,9 +132,20 @@ byte-identical, so every family below is closed except the create_game residual
 | message_modal | n/a (visual) | no standalone origin trigger; golden stale — do not gate |
 | password_modal | n/a (visual) | no standalone origin trigger; golden stale — do not gate |
 
-## Visual — in-game (goldens MISSING — capture from origin first)
+## Visual — in-game (origin goldens CAPTURED 2026-06-11 — UNVERIFIED vs cppx)
 
 Enumerated from origin source 2026-06-11 (Explore agent over .worktrees/origin-capture).
+
+**Goldens captured 2026-06-11** via `tools/cap/cap_ingame_origin.sh` →
+`tests/cli-agent/e2e/golden/ingame_*.png` (8 PNGs, 640×480, pristine af4c50c5
+binary — fade patch stashed for the capture, then restored; the patch's FADEOUT
+branch blacks out the in-game UI palette). Full provenance + per-golden
+nondeterminism masks (rain streaks; minimap inset x235-406 y419-479) in
+ORIGIN_GOLDENS.md. Two independent runs byte-identical outside those masks.
+Scene: Tutorial, AGENCY04.SIL, paused sim, feedback-stepped to message_i
+anchors; overlays forced via origin's `ingame_ui_mode` control op; quit prompt
+via a `--tui` session injecting the ESC scancode (control `key` op can't reach
+the quitstate machine).
 
 **Capture design (derived 2026-06-11) — the earlier "HUD doesn't capture headless" deferral
 is WRONG for origin.** Origin's game_loop.cpp renders world + in-game HUD/overlays
@@ -145,16 +156,18 @@ BuildInGameHudUi/BuildInGameOverlaysUi → clay_bridge::Render(game, &surface, c
 HUD included. Caveat: in-game the screenbuffer is FIXED 640×480 (kLegacyRender;
 game_loop.cpp:205 ResizeRenderSurfacePixels), so headless in-game shots are 640×480.
 
-Golden pipeline:
-1. Build the origin-capture worktree (deterministic-fade patch already there, uncommitted).
-2. Boot headless, drive into a real match (login → create → staging → launch; reuse the
-   31_lobby_create_staging harness flow); trigger each HUD state: chat (T), F1 list,
-   buy/tech station, quit prompt (Enter), messages.
-3. `screenshot` → 640×480 PNG per surface/state.
-4. Upscale to 1920×1080 with origin's GPU-stretch arithmetic: NEAREST, x=3.0, y=2.25,
-   dst px → src = int(d/scale) (config scalefilter default OFF ⇒ NEAREST). Use numpy index
-   maps, NOT PIL resize (PIL NEAREST center-samples; the bakes use int(d/s) floors).
-5. Document provenance in ORIGIN_GOLDENS.md; save as tests/cli-agent/e2e/golden/ingame_*.png.
+Golden pipeline (EXECUTED 2026-06-11 — actual pipeline deviated from the plan below):
+1. ~~Build with the fade patch~~ → built PRISTINE (patch stashed, restored after): the
+   patch's FADEOUT branch blacks out the in-game UI palette (see ORIGIN_GOLDENS.md).
+2. ~~Real match via lobby~~ → Tutorial single-player (AGENCY04.SIL): origin's own
+   `ingame_ui_mode` control op forces chat/buy/tech/playerlist deterministically, and
+   pause + feedback-stepping on message_progress pins the exact sim tick. A real lobby
+   match adds nothing visual that the tutorial HUD lacks except multi-team strips.
+3. `screenshot` → 640×480 PNG per surface/state. ✓
+4. ~~Upscale to 1920×1080~~ → NO upscale: gate both sides natively at 640×480 (our
+   client also renders in-game UI at surface size headless, step 6 below).
+5. Provenance + nondeterminism masks in ORIGIN_GOLDENS.md; saved as
+   tests/cli-agent/e2e/golden/ingame_*.png. ✓ Repeatable: tools/cap/cap_ingame_origin.sh.
 6. cppx-side path VERIFIED 2026-06-11 (read-only code analysis): headless (no window),
    RenderCppxClientUiFrame renders the UI at SURFACE size (game_ui_pipeline.cpp:651 —
    window-pixel size only when a window exists), and in-game the surface is forced to
@@ -169,19 +182,19 @@ Golden pipeline:
 
 | Surface | State | Origin anchor |
 |---|---|---|
-| hud_status_bar (minimap frame, fuel/health/shield/files gauges, poison, weapon glow+bracket, inventory) | UNVERIFIED | ui/hud/hud_status_sprites.cpp |
-| hud_readouts (ammo counter, per-weapon ammo, credits, health/shield numerics) | UNVERIFIED | ui/hud/hud_readouts.cpp:14-88 |
-| hud_team_strip (per-team peer sprites, in-base/secret pulses, secret slots, beaming) | UNVERIFIED | ui/hud/hud_teams.cpp |
-| hud_secret_overlay (9-line hack progress, highlight pulses) | UNVERIFIED | ui/hud/hud_secret_overlays.cpp:73-110 |
-| hud_trace_time ("Government Trace Time: NNN") | UNVERIFIED | ui/hud/hud_readouts.cpp:90-103 |
-| hud_system_camera (inset frames ×2) | UNVERIFIED | ui/hud/hud_system_camera.cpp:13-40 |
-| chat_overlay (history 5 lines, input + caret, ALL/TEAM toggle; T/Enter/Esc) | UNVERIFIED | ui/hud/hud_chat_overlay.cpp:142-236 |
-| buy_tech_overlay (5-row scroll list, credits/viruses footer; Up/Down/Enter/Esc) | UNVERIFIED | ui/hud/hud_buy_tech_overlay.cpp:58-190 |
-| player_list_overlay (F1 hold; per-team emblem + peer stats) | UNVERIFIED | ui/hud/hud_player_list_overlay.cpp:16-98 |
-| ingame_messages (center reveal text, typed colors) | UNVERIFIED | ui/hud/InGameOverlays.cpp:58-145 |
-| top_ticker (scrolling top message) | UNVERIFIED | ui/hud/InGameOverlays.cpp:185-209 |
-| status_lines (bottom-center stack, fading) | UNVERIFIED | ui/hud/InGameOverlays.cpp:147-183 |
-| quit_prompt ("Hit Enter To Quit"; Enter/Esc state machine) | UNVERIFIED | ui/hud/InGameOverlays.cpp:211-227 |
+| hud_status_bar (minimap frame, fuel/health/shield/files gauges, poison, weapon glow+bracket, inventory) | golden captured (UNVERIFIED vs cppx) — ingame_hud_base.png | ui/hud/hud_status_sprites.cpp |
+| hud_readouts (ammo counter, per-weapon ammo, credits, health/shield numerics) | golden captured (UNVERIFIED vs cppx) — ingame_hud_base.png (ammo 99, credits 500) | ui/hud/hud_readouts.cpp:14-88 |
+| hud_team_strip (per-team peer sprites, in-base/secret pulses, secret slots, beaming) | golden captured (UNVERIFIED vs cppx) — ingame_hud_base.png (1 team); 2-team variant in ingame_tech_overlay.png; pulse states NOT covered | ui/hud/hud_teams.cpp |
+| hud_secret_overlay (9-line hack progress, highlight pulses) | NO GOLDEN — needs secrets/hack world state, no deterministic headless trigger | ui/hud/hud_secret_overlays.cpp:73-110 |
+| hud_trace_time ("Government Trace Time: NNN") | NO GOLDEN — needs beaming-terminal/trace world state | ui/hud/hud_readouts.cpp:90-103 |
+| hud_system_camera (inset frames ×2) | NO GOLDEN — needs active system camera (detonator etc.) | ui/hud/hud_system_camera.cpp:13-40 |
+| chat_overlay (history 5 lines, input + caret, ALL/TEAM toggle; T/Enter/Esc) | golden captured (UNVERIFIED vs cppx) — ingame_chat_open.png ("(ALL): parity check", caret ON) + ingame_chat_history.png (2 lines, input closed) | ui/hud/hud_chat_overlay.cpp:142-236 |
+| buy_tech_overlay (5-row scroll list, credits/viruses footer; Up/Down/Enter/Esc) | golden captured (UNVERIFIED vs cppx) — ingame_buy_tech.png (buy: Laser/Rocket, credits footer) + ingame_tech_overlay.png (tech @ base: viruses footer) | ui/hud/hud_buy_tech_overlay.cpp:58-190 |
+| player_list_overlay (F1 hold; per-team emblem + peer stats) | golden captured (UNVERIFIED vs cppx) — ingame_player_list.png (1 team, via ingame_ui_mode playerlist = same flag F1 sets) | ui/hud/hud_player_list_overlay.cpp:16-98 |
+| ingame_messages (center reveal text, typed colors) | golden captured (UNVERIFIED vs cppx) — ingame_messages.png (type 0, message_i=94, both lines revealed); other types (1-4,10,11,20) NOT covered | ui/hud/InGameOverlays.cpp:58-145 |
+| top_ticker (scrolling top message) | NO GOLDEN — only headless-reachable trigger is "Playing: <random track>" (random text); F4/F9 paths contaminate (music state/debug overlay) | ui/hud/InGameOverlays.cpp:185-209 |
+| status_lines (bottom-center stack, fading) | NO GOLDEN — every ShowStatus caller needs real gameplay actions (virus/convert/pickup); not reachable via control ops; possible follow-up: TUI action-snapshot (keyuse with no target → "No target for virus") | ui/hud/InGameOverlays.cpp:147-183 |
+| quit_prompt ("Hit Enter To Quit"; Enter/Esc state machine) | golden captured (UNVERIFIED vs cppx) — ingame_quit_prompt.png (quitstate 2 via TUI ESC scancode edges; control `key` op gated on HasUiInputTarget which the quit flow excludes) | ui/hud/InGameOverlays.cpp:211-227 |
 
 Hardcoded in-game bindings to verify functionally: T chat, F1 player list, F2 team colors,
 F4 music toggle, F5 random music, Enter quit-confirm flow.

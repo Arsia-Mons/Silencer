@@ -118,6 +118,29 @@
   determinism machinery, diff the harness's drive sequence against the capture
   script that produces the passing standalone render (cap_lobby.sh) step by step.
 
+- **A capture patch that's safe for one screen family can corrupt another through
+  shared mutable state.** The deterministic-fade patch (menu-golden era) made
+  ApplyPaletteFade(fadeOut=true) write brightness-0 into the SHARED 256-entry
+  temppalette in one shot; the in-game ambience path only rewrites indices 2..114,
+  so every in-game capture re-presented the stale black entries for all UI/text
+  colors — HUD invisible, world fine. In-game goldens need the PRISTINE binary
+  (fade is irrelevant there: captures happen minutes past it). Trace a capture
+  patch's writes through every consumer of the buffer it touches.
+
+- **`step --frames N` is only exact for small N; feedback-step to a world counter
+  instead.** Multi-frame steps overran by ±1-2 ticks (wall-clock catch-up race in
+  origin's sim loop). Converging on message_progress (`+1/tick, wraps mod 256`)
+  with bulk steps that stop 30 short + exact single-step finish lands on a UNIQUE
+  absolute sim tick — two independent tutorial runs were byte-identical outside
+  rand()-driven rain. Never trust open-loop step counts for golden anchors.
+
+- **Enumerate what ISN'T sim-deterministic before declaring a capture flaky:**
+  origin's in-game frame has exactly three wall-clock leaks — rain (C rand(),
+  call count depends on elapsed menu frames), minimap dot blink (renderer state_i
+  parity), chat caret (SDL_GetTicks/50). Pause freezes the sim AND the renderer
+  phase (state_i ticks with the sim), message pulses key off message_i — so
+  everything else in the frame is exact. Mask the three leaks; gate the rest hard.
+
 - **Porting origin's responsive arithmetic can preserve byte-identity if the
   logical mapping is pinned to the recorded constants.** resolve_lobby_panes runs
   origin's integer virtual-space math (RoundRatio/ScaleLegacyPx) and converts with
