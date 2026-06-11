@@ -12,6 +12,8 @@
       "chaseRangeStop": 80,
       "chaseRangeMax": 90,
       "respawnSeconds": 30,
+      "poisonTickCycle": 24,
+      "poisonDamagePerTick": 1,
       "ladderCooldown": 120,
       "meleeCycleTicks": 32,
       "meleeDelayTicks": 10,
@@ -104,6 +106,8 @@
       "chaseRangeStop": 80,
       "chaseRangeMax": 90,
       "respawnSeconds": 30,
+      "poisonTickCycle": 24,
+      "poisonDamagePerTick": 1,
       "ladderCooldown": 120,
       "meleeCycleTicks": 32,
       "meleeDelayTicks": 10,
@@ -195,6 +199,8 @@
       "chaseRangeStop": 80,
       "chaseRangeMax": 90,
       "respawnSeconds": 30,
+      "poisonTickCycle": 24,
+      "poisonDamagePerTick": 1,
       "ladderCooldown": 120,
       "meleeCycleTicks": 32,
       "meleeDelayTicks": 10,
@@ -311,7 +317,7 @@
     },
     {
       "id": "civilian",
-      "health": 0,
+      "health": 10,
       "shield": 0,
       "speed": 4,
       "speedAlt": 5,
@@ -326,7 +332,9 @@
       "warpTeleportTick": 12,
       "runDurationTicks": 150,
       "deadRespawnTicks": 100,
-      "_note": "Civilian health is not set in constructor \u2014 Object base default applies."
+      "poisonTickCycle": 24,
+      "poisonDamagePerTick": 1,
+      "_note": "Civilian health is only drained by poison \u2014 any direct hit still kills instantly via the state machine."
     },
     {
       "id": "magistrate",

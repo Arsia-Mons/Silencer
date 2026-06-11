@@ -4,6 +4,7 @@
 #include "frameevents.h"
 #include "plume.h"
 #include "civilian.h"
+#include "guard.h"
 #include "EventBus.h"
 #include "robot.h"
 #include "terminal.h"
@@ -788,27 +789,39 @@ void Player::Tick(World & world){
 					if(world.IsAuthority()){
 						std::vector<Uint8> types;
 						types.push_back(ObjectTypes::PLAYER);
+						types.push_back(ObjectTypes::GUARD);
+						types.push_back(ObjectTypes::CIVILIAN);
 						int x1, y1, x2, y2;
 						GetAABB(world.resources, &x1, &y1, &x2, &y2);
 						std::vector<Object *> objects = world.TestAABB(x1, y1, x2, y2, types, id);
 						bool found = false;
+						const ItemDef* poisondef = GASLoader::Get().GetItemDef("poison");
+						int dose = poisondef ? poisondef->poisonDose : 3;
 						for(std::vector<Object *>::iterator it = objects.begin(); it != objects.end(); it++){
 							found = true;
-							Player * player = static_cast<Player *>(*it);
-							const ItemDef* poisondef = GASLoader::Get().GetItemDef("poison");
-							int dose = poisondef ? poisondef->poisonDose : 3;
-							if(player->Poison(world, id, dose)){
+							bool poisoned = false;
+							switch((*it)->type){
+								case ObjectTypes::PLAYER:{
+									Player * player = static_cast<Player *>(*it);
+									poisoned = player->Poison(world, id, dose);
+									if(!poisoned && player->poisonedamount == GASLoader::Get().player.maxPoisoned){
+										world.ShowStatus("Victim maximally poisoned", 208, true, GetPeer(world));
+									}
+								}break;
+								case ObjectTypes::GUARD:{
+									poisoned = static_cast<Guard *>(*it)->Poison(world, id, dose);
+								}break;
+								case ObjectTypes::CIVILIAN:{
+									poisoned = static_cast<Civilian *>(*it)->Poison(world, id, dose);
+								}break;
+							}
+							if(poisoned){
 								Peer * peer = GetPeer(world);
 								if(peer){
 									peer->stats.poisons++;
 								}
 								RemoveInventoryItem(INV_POISON);
 								break;
-							}else{
-								int maxpois = GASLoader::Get().player.maxPoisoned;
-								if(player->poisonedamount == maxpois){
-									world.ShowStatus("Victim maximally poisoned", 208, true, GetPeer(world));
-								}
 							}
 						}
 						if(!found){

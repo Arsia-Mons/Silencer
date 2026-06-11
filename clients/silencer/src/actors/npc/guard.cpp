@@ -42,6 +42,9 @@ Guard::Guard() : Object(ObjectTypes::GUARD){
 	{ const EnemyDef* _gd = GASLoader::Get().GetEnemyDef("guard-blaster");
 	  snapshotinterval = _gd ? _gd->snapshotInterval : 48; }
 	respawnseconds   = g ? g->respawnSeconds : 30;
+	poisonedby = 0;
+	poisonedamount = 0;
+	poisoned_i = 0;
 	patrol = false;
 	lastspoke = 0;
 	lastshot = 0;
@@ -584,6 +587,9 @@ void Guard::Serialize(bool write, Serializer & data, Serializer * old){
 	data.Serialize(write, patrol, old);
 	data.Serialize(write, originalx, old);
 	data.Serialize(write, originaly, old);
+	data.Serialize(write, poisonedby, old);
+	data.Serialize(write, poisonedamount, old);
+	data.Serialize(write, poisoned_i, old);
 }
 
 void Guard::Tick(World & world){
@@ -599,6 +605,7 @@ void Guard::Tick(World & world){
 	// 197:0-8 ladder shoot down
 	Hittable::Tick(*this, world);
 	Bipedal::Tick(*this, world);
+	TickPoison(world);
 
 	if(!bt_) InitBT();
 
@@ -1132,6 +1139,9 @@ void Guard::Tick(World & world){
 				  state_warp = _gd ? _gd->warpTeleportTick : GASLoader::Get().player.warpTeleportTick; }
 				health = maxhealth;
 				shield = maxshield;
+				poisonedby = 0;
+				poisonedamount = 0;
+				poisoned_i = 0;
 				break;
 			}
 			if(world.tickcount % GASLoader::Get().gameengine.ticksPerSecond != 0){
@@ -1209,24 +1219,7 @@ void Guard::HandleHit(World & world, Uint8 x, Uint8 y, Object & projectile){
 	if(health == 0 && state != DYING && state != DYINGEXPLODE && state != DEAD){
 		state = DYING;
 		state_i = 0;
-		if(weapon != 0){
-			PickUp * pickup = (PickUp *)world.CreateObject(ObjectTypes::PICKUP);
-			if(pickup){
-				if(weapon == 2){
-					pickup->type = PickUp::ROCKETAMMO;
-					{ const EnemyDef* _grd = GASLoader::Get().GetEnemyDef("guard-rocket"); pickup->quantity = _grd ? _grd->ammoDropQuantity : 3; }
-				}else
-				if(weapon == 1){
-					pickup->type = PickUp::LASERAMMO;
-					{ const EnemyDef* _gld = GASLoader::Get().GetEnemyDef("guard-laser"); pickup->quantity = _gld ? _gld->ammoDropQuantity : 5; }
-				}
-				pickup->x = Guard::x;
-				pickup->y = Guard::y - 1;
-				{ const EnemyDef* _gb = GASLoader::Get().GetEnemyDef("guard-blaster");
-				  pickup->xv = (world.Random() % (2 * (_gb ? _gb->deathDropXVRange : 4) + 1)) - (_gb ? _gb->deathDropXVRange : 4);
-				  pickup->yv = -(_gb ? _gb->deathDropYV : 15); }
-			}
-		}
+		DropAmmoPickup(world);
 		Object * owner = world.GetObjectFromId(projectile.ownerid);
 		if(owner && owner->type == ObjectTypes::PLAYER){
 			Player * player = static_cast<Player *>(owner);
@@ -1250,6 +1243,90 @@ void Guard::HandleHit(World & world, Uint8 x, Uint8 y, Object & projectile){
 			state = DYINGEXPLODE;
 			world.Explode(*this, 8, xpcnt);
 		}
+	}
+}
+
+bool Guard::Poison(World & world, Uint16 playerid, Uint8 amount){
+	if(state == DYING || state == DYINGEXPLODE || state == DEAD){
+		return false;
+	}
+	int maxpois = GASLoader::Get().player.maxPoisoned;
+	if(poisonedamount >= maxpois){
+		return false;
+	}
+	poisonedby = playerid;
+	poisonedamount += amount;
+	if(poisonedamount > maxpois){
+		poisonedamount = maxpois;
+	}
+	state_hit = 1 + (3 * 32);
+	hitx = 50;
+	hity = 50;
+	return true;
+}
+
+void Guard::TickPoison(World & world){
+	if(!poisonedby || state == DYING || state == DYINGEXPLODE || state == DEAD){
+		return;
+	}
+	const EnemyDef* gd = GASLoader::Get().GetEnemyDef(ActorDefName(weapon));
+	int cycle = gd ? gd->poisonTickCycle : 24;
+	int damage = gd ? gd->poisonDamagePerTick : 1;
+	if(poisoned_i % (cycle / poisonedamount) == 0){
+		health = health > damage ? health - damage : 0;
+		if(destructible && world.IsAuthority()){
+			GameEvent ev;
+			ev.actor_id = id;
+			if(health == 0){
+				ev.type = EventType::ACTOR_KILLED;
+			}else{
+				ev.type = EventType::ACTOR_DAMAGED;
+				ev.value = damage;
+			}
+			world.triggerGraph.Bus().Emit(ev);
+		}
+		if(health == 0){
+			// Silent death: no HIT state and no chasing update, so the guard
+			// never alerts — fits the Black Rose stealth kill.
+			state = DYING;
+			state_i = 0;
+			DropAmmoPickup(world);
+			Object * owner = world.GetObjectFromId(poisonedby);
+			if(owner && owner->type == ObjectTypes::PLAYER){
+				Peer * peer = static_cast<Player *>(owner)->GetPeer(world);
+				if(peer){
+					peer->stats.guardskilled++;
+				}
+			}
+			poisonedby = 0;
+			poisonedamount = 0;
+		}
+	}
+	poisoned_i++;
+	if(poisoned_i >= cycle){
+		poisoned_i = 0;
+	}
+}
+
+void Guard::DropAmmoPickup(World & world){
+	if(weapon == 0){
+		return;
+	}
+	PickUp * pickup = (PickUp *)world.CreateObject(ObjectTypes::PICKUP);
+	if(pickup){
+		if(weapon == 2){
+			pickup->type = PickUp::ROCKETAMMO;
+			{ const EnemyDef* _grd = GASLoader::Get().GetEnemyDef("guard-rocket"); pickup->quantity = _grd ? _grd->ammoDropQuantity : 3; }
+		}else
+		if(weapon == 1){
+			pickup->type = PickUp::LASERAMMO;
+			{ const EnemyDef* _gld = GASLoader::Get().GetEnemyDef("guard-laser"); pickup->quantity = _gld ? _gld->ammoDropQuantity : 5; }
+		}
+		pickup->x = Guard::x;
+		pickup->y = Guard::y - 1;
+		{ const EnemyDef* _gb = GASLoader::Get().GetEnemyDef("guard-blaster");
+		  pickup->xv = (world.Random() % (2 * (_gb ? _gb->deathDropXVRange : 4) + 1)) - (_gb ? _gb->deathDropXVRange : 4);
+		  pickup->yv = -(_gb ? _gb->deathDropYV : 15); }
 	}
 }
 

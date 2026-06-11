@@ -12,6 +12,7 @@ public:
 	void Serialize(bool write, Serializer & data, Serializer * old = 0);
 	void Tick(World & world);
 	void HandleHit(World & world, Uint8 x, Uint8 y, Object & projectile);
+	bool Poison(World & world, Uint16 playerid, Uint8 amount);
 	bool AddTract(Uint16 teamid);
 	Uint8 suitcolor;
 	Uint8 speed;
@@ -21,10 +22,14 @@ public:
 private:
 	bool Look(World & world);
 	bool CheckTractVictim(World & world);
+	void TickPoison(World & world);
 	void InitBT();
 	enum {NEW, STANDING, WALKING, RUNNING, DYINGFORWARD, DYINGBACKWARD, DYINGEXPLODE, DEAD};
 	Uint8 state;
 	Uint8 state_i;
+	Uint16 poisonedby;
+	Uint8 poisonedamount;
+	Uint8 poisoned_i;
 	const BehaviorTree* bt_;
 	BTContext btctx_;
 };
