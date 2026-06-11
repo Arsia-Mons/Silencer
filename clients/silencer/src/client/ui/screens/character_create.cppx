@@ -460,14 +460,20 @@ struct CharacterCreateContentProps {
           .gap = 7.5f}}
       >
         {pane_header("SELECT AGENT")}
-        <AppButton
-          key="new"
-          controlId="CreateNewCharacter"
-          variant={AppButtonVariant::Oval}
-          size={AppButtonSize::List}
-          label="Create New Character"
-          onPress={w.open_alias}
-        />
+        <Box
+          key="neww"
+          layout={::ui::LayoutStyle{
+            .margin = {-1.0f, 1.0f, -3.5f, 3.5f}}}
+        >
+          <AppButton
+            key="new"
+            controlId="CreateNewCharacter"
+            variant={AppButtonVariant::Oval}
+            size={AppButtonSize::List}
+            label="Create New Character"
+            onPress={w.open_alias}
+          />
+        </Box>
         {roster_row(0, chars.roster, on_select)}
         {roster_row(1, chars.roster, on_select)}
         {roster_row(2, chars.roster, on_select)}

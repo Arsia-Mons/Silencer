@@ -257,10 +257,15 @@ cppxHost->register_legacy_nineslice(id, sp->pixels.data(), sp->w, sp->h,
 };
 register_legacy_nine(7, 24, cppxChrome.chrome_btn_idle, 12, 12, 4, 4);
 register_legacy_nine(7, 28, cppxChrome.chrome_btn_focus, 12, 12, 4, 4);
-// Frame sprites (plain, native size): bank-7 chrome panel + bank-40 dialog frames.
+// Frame sprites (plain, native size): bank-7 chrome panel + bank-40 dialog
+// frames. All drawn 1:1 in virtual space — register for the per-phase swap.
 bake(7, 5, cppxChrome.chrome_panel, &cppxChrome.chrome_panel_w, &cppxChrome.chrome_panel_h);
 bake(40, 4, cppxChrome.dialog_msg, &cppxChrome.dialog_msg_w, &cppxChrome.dialog_msg_h);
 bake(40, 2, cppxChrome.dialog_pw, &cppxChrome.dialog_pw_w, &cppxChrome.dialog_pw_h);
+register_legacy(7, 5, cppxChrome.chrome_panel);
+register_legacy(40, 4, cppxChrome.dialog_msg);
+register_legacy(40, 2, cppxChrome.dialog_pw);
+register_legacy(6, 2, cppxChrome.row_plate);
 // bank 7 idx 2 — the lobby-connect dialog (origin PackImage(7,2)): frame, soft
 // glow, log well, form sub-panel + field/button wells all baked in. Drawn 1:1
 // in virtual space — register for the per-phase variant swap.

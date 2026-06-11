@@ -91,10 +91,12 @@ inline ::ui::LayoutStyle app_button_oval_layout(AppButtonSize size) {
     // stretched to the pane width (grow-able min, unlike the fixed ovals).
     return {
         .align_items = ::ui::AlignItems::Center,
-        .justify_content = ::ui::JustifyContent::Center,
+        .justify_content = ::ui::JustifyContent::Start,
         .min_width = ::ui::Length::points(104.0f),
         .height = ::ui::Length::points(40.5f),
-        .padding = {16.0f, 16.0f, 6.0f, 6.0f},
+        // golden-measured: the row-plate label ink sits at plate+9 virtual
+        // (origin LegacyRow yOffset 6 + ink-centering bias).
+        .padding = {16.0f, 16.0f, 11.0f, 1.5f},
     };
   }
   float w = 294.0f; // Md: native 196x33 cell x1.5
