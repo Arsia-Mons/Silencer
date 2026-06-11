@@ -142,11 +142,12 @@ const uint8_t *PipelineHost::render(const client::ui::UiPipelineFrame &frame,
   // origin/main — fonts re-rasterized crisply at the scaled cell, sprites
   // upscaled. Derived from the surface/logical-layout ratio the composition root
   // set in frame.layout; 1.0 when the layout already matches the surface.
+  // May be < 1 (small windows render the 720-authored canvas at origin's
+  // native 480-virtual proportions) — keep it in lockstep with the
+  // composition root's cppxScale, never re-clamp here.
   float device_scale = (frame.layout.height > 0.0f)
                            ? static_cast<float>(h_) / frame.layout.height
                            : 1.0f;
-  if (device_scale < 1.0f)
-    device_scale = 1.0f;
   // Transparent clear: the UI composites over the already-rendered world frame.
   const float scale = ui_.begin_frame(::ui::Color{0, 0, 0, 0}, device_scale, 1);
   pipeline_->render_client_ui_frame(frame, [&] {

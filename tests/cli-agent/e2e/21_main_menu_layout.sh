@@ -77,6 +77,11 @@ check_layout() {
   if (nonBlack < 2000) { console.error(`composite looks blank: nonBlack=${nonBlack}`); process.exit(1); }
 
   // 2) The retained tree exposes the three menu buttons, in order, in-bounds.
+  // Node coords are LOGICAL: the canvas is 720-high authored space scaled to
+  // the window (scale = clamp(vh/720, 480/720..)), so a 640x480 window lays
+  // out at 960x720 logical. Bounds-check in that space, not window px.
+  const scale = Math.max(vh / 720, 480 / 720);
+  const lw = vw / scale, lh = vh / scale;
   const data = JSON.parse(readFileSync(inspectPath, "utf8"));
   const order = ["Tutorial", "Connect To Lobby", "Exit"];
   const buttons = order.map((label) =>
@@ -86,8 +91,8 @@ check_layout() {
   }
   for (const b of buttons) {
     if (!b.focusable) { console.error(`button not focusable: ${b.label}`); process.exit(1); }
-    if (b.x < 0 || b.y < 0 || b.x + b.w > vw || b.y + b.h > vh) {
-      console.error(`button out of bounds in ${vw}x${vh}: ${JSON.stringify(b)}`); process.exit(1);
+    if (b.x < 0 || b.y < 0 || b.x + b.w > lw + 0.5 || b.y + b.h > lh + 0.5) {
+      console.error(`button out of bounds in logical ${lw}x${lh} (window ${vw}x${vh}): ${JSON.stringify(b)}`); process.exit(1);
     }
   }
   // Vertical stack with the legacy right-anchored horizontal stagger
@@ -96,8 +101,10 @@ check_layout() {
   if (!(play.y < tut.y && tut.y < quit.y)) {
     console.error(`buttons not stacked top-to-bottom: ${buttons.map((b)=>b.y)}`); process.exit(1);
   }
+  // origin stagger: Exit 0 / Tutorial +40 / Connect +80 virtual px -> 120
+  // logical spread at x1.5 (golden-measured fan in main_menu.cppx).
   const xs = buttons.map((b) => b.x);
-  if (Math.max(...xs) - Math.min(...xs) > 60) {
+  if (Math.max(...xs) - Math.min(...xs) > 130) {
     console.error(`buttons exceed the expected stagger band: ${xs}`); process.exit(1);
   }
   console.log(JSON.stringify({ vw, vh, nonBlack, play: [Math.round(play.x), Math.round(play.y)] }));
@@ -105,12 +112,14 @@ check_layout() {
 }
 
 SMALL="$OUT_DIR/inspect-640x480.json"
-LARGE="$OUT_DIR/inspect-960x720.json"
+LARGE="$OUT_DIR/inspect-1280x720.json"
 check_layout 640 480 "$SMALL" "$OUT_DIR/main-640x480.png"
-check_layout 960 720 "$LARGE" "$OUT_DIR/main-960x720.png"
+check_layout 1280 720 "$LARGE" "$OUT_DIR/main-1280x720.png"
 
-# The menu re-centers with the viewport (idiomatic flex centering, not a
-# pixel-pinned legacy layout): the larger viewport pushes the stack right + down.
+# The menu re-centers with the viewport's logical width (idiomatic flex
+# centering): a wider aspect grows the logical canvas (960 -> 1280) and the
+# centered stack shifts right. Logical HEIGHT is pinned at 720, so vertical
+# responsiveness is pure content-scale — y is identical by design.
 bun -e '
 import { readFileSync } from "node:fs";
 const small = JSON.parse(readFileSync(process.argv[1], "utf8")).nodes;
@@ -118,7 +127,6 @@ const large = JSON.parse(readFileSync(process.argv[2], "utf8")).nodes;
 const play = (ns) => ns.find((n) => n.role === "button" && n.label === "Connect To Lobby");
 const s = play(small), l = play(large);
 if (!(l.x > s.x + 50)) { console.error(`menu did not re-center horizontally: ${s.x} -> ${l.x}`); process.exit(1); }
-if (!(l.y > s.y + 50)) { console.error(`menu did not re-center vertically: ${s.y} -> ${l.y}`); process.exit(1); }
 ' "$SMALL" "$LARGE"
 
 echo "PASS 21_main_menu_layout ($OUT_DIR)"

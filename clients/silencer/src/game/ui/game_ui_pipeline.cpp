@@ -488,14 +488,17 @@ rh = ph;
 }
 if(rw < 1 || rh < 1) return;
 // Responsive logical canvas: screens are authored against a height-pinned 720
-// space (width = aspect*720), and PipelineHost::render scales that up to the
-// physical rw x rh surface (fonts re-rasterized crisply, sprites upscaled) so
-// the UI grows with the window like origin/main. Pin height to 720; the width
-// breathes with the aspect ratio (1280 at 16:9), and flex layouts spread to
-// fill it. scale >= 1 (never shrink below the authored size).
+// space (width = aspect*720), and PipelineHost::render scales that to the
+// physical rw x rh surface (fonts re-rasterized crisply, sprites scaled) so
+// the UI tracks the window like origin/main. Scale may drop BELOW 1: the
+// 720-space metrics are origin's 480-virtual metrics x1.5, so a 480-high
+// window at scale 2/3 reproduces origin's native 640x480 layout exactly —
+// clamping at 1 rendered the UI 1.5x oversized there (e2e 21/53 overflow).
+// Floor 480/720 mirrors origin (its virtual canvas never exceeds the window).
 const float kLogicalH = 720.0f;
 float cppxScale = static_cast<float>(rh) / kLogicalH;
-if(cppxScale < 1.0f) cppxScale = 1.0f;
+const float kMinScale = 480.0f / 720.0f;
+if(cppxScale < kMinScale) cppxScale = kMinScale;
 const float cppxLogicalW = static_cast<float>(rw) / cppxScale;
 const float cppxLogicalH = static_cast<float>(rh) / cppxScale;
 

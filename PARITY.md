@@ -96,16 +96,13 @@ F4 music toggle, F5 random music, Enter quit-confirm flow.
 | Scenario | State | Evidence |
 |---|---|---|
 | 00,10,11,12,13,14,15,16,18,19,20,22,51,60 | PASS | e2e run 2026-06-11 |
-| 17_character_create_focus | DIVERGED | NOT_FOUND focusable widget AliasConfirm |
-| 21_main_menu_layout | DIVERGED | Tutorial button out of bounds in 640×480 (y=231 h=50 w=294 x=372) |
-| 30_lobby_login | DIVERGED | NOT_FOUND focusable widget Continue |
-| 31_lobby_create_staging | DIVERGED | NOT_FOUND focusable widget Continue |
-| 40_lobby_basic | DIVERGED | NOT_FOUND focusable widget Continue |
-| 50_resize_screenshot | DIVERGED | (in failing set; capture exact error on repair) |
-| 52_menu_ui_scale_resize | DIVERGED | Options button outside 640×480 surface (x=372 y=432) |
-| 53_lobby_create_options_scroll | DIVERGED | Options overlay missing button Done |
-| 70_visual_regression | DIVERGED | 33 diffs >0.40% — expected red until visual parity lands |
-| 71_visual_regression_lobby | DIVERGED | character_create 100% + AliasConfirm — expected red until parity |
+| 17,30,31,40,50,52 | PASS | repaired by workflow 2026-06-11 (origin-correct flows: Enter submits alias, no Continue btn) |
+| 21_main_menu_layout | PASS | root cause was the content-scale ≥1 clamp (UI 1.5× oversized at 640×480); unclamped to floor 480/720 → origin-native proportions; test now bounds-checks in logical space, stagger band 130 (origin fan = 120 logical) |
+| 53_lobby_create_options_scroll | PASS | same scale-clamp root cause; green after unclamp |
+| 70_visual_regression | RED-BY-DESIGN | rebuilt: 1080p capture, tolerant verdict per origin screen, BLESS limited to cppx-only surfaces; goes green as parity lands |
+| 71_visual_regression_lobby | RED-BY-DESIGN | rebuilt likewise; red until lobby cluster parity |
+
+Full suite 2026-06-11 (post scale-unclamp): 21/23 PASS; only 70/71 red (the parity gate).
 
 ## Functional — origin-behavior coverage gaps (no scenario yet)
 

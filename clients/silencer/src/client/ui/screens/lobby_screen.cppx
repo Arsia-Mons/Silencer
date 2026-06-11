@@ -336,7 +336,12 @@ struct CreateRightCellProps {
   // origin/main renders the create-form values as plain green text on the
   // backdrop (no input box) — the Input host always paints its control chrome,
   // so the name value is a flat BodyText. Wide rect Create button below.
-  return <Box key="rightcell" layout={lobby_right_cell_layout()} style={lobby_panel_style()}>
+  // Shrinkable (unlike the browse cells): the 21px map rows overflow small
+  // canvases (640x480) and the scrollable list must absorb it, not push the
+  // Create button out of the viewport.
+  ::ui::LayoutStyle cell = lobby_right_cell_layout();
+  cell.flex_shrink = ::ui::StyleFloat::points(1.0f);
+  return <Box key="rightcell" layout={cell} style={lobby_panel_style()}>
     <ScreenTitle key="h" variant={ScreenTitleVariant::Console} value="Select Map" />
     <Box
       key="maplist"
@@ -344,7 +349,9 @@ struct CreateRightCellProps {
         .direction = ::ui::FlexDirection::Column,
         .align_items = ::ui::AlignItems::Stretch,
         .flex_grow = ::ui::StyleFloat::points(1.0f),
+        .flex_shrink = ::ui::StyleFloat::points(1.0f),
         .width = ::ui::Length::percent(100.0f),
+        .min_height = ::ui::Length::points(0.0f),
         .overflow = ::ui::Overflow::Hidden,
         .padding = {8.0f, 8.0f, 6.0f, 6.0f}}}
       style={tokens::frame_patch(tokens::kInsetStroke)}
