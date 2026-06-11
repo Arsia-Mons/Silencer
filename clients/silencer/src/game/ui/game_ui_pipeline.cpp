@@ -653,6 +653,8 @@ static const VariantBake kVariantBakes[] = {
     {5, 135, 12.f, 19.f, Fx::Raw, 0, 128, 0, silencer::tokens::kTextBody},
     {6, 133, 11.f, 11.f, Fx::Raw, 0, 128, 0, silencer::tokens::kTextBody},
     {7, 133, 7.f, 11.f, Fx::Raw, 0, 128, 0, silencer::tokens::kTextBody},
+    // mission_summary "+ N XP": origin TextSize::Prompt (bank 136) default green.
+    {2, 136, 16.f, 23.f, Fx::Raw, 0, 128, 0, silencer::tokens::kTextBody},
     // cc detail prose: origin LegacyPalette(129, 160, ramp). The Title-face
     // entry covers the staging title-bar map name (lobby_chrome mapText).
     {0, 133, 6.f, 11.f, Fx::Ramp, 129, 160, 0, silencer::tokens::kTextProse},

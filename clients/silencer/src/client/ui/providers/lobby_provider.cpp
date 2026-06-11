@@ -53,7 +53,7 @@ Progression use_progression() {
   Progression out;
   out.loaded = s.progression_loaded;
   out.experience = s.experience;
-  out.stats_text = s.stats_text;
+  out.summary_lines = s.summary_lines;
   out.upgrade_banner = s.upgrade_banner;
   for (int i = 0; i < 6; ++i) {
     out.levels[i] = s.levels[i];

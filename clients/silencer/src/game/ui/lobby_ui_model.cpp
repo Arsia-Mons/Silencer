@@ -12,6 +12,7 @@
 
 #include <algorithm>
 #include <cstdio>
+#include <cstring>
 #include <string>
 #include <vector>
 
@@ -40,11 +41,27 @@ const char *SecurityLabel(Uint8 level) {
   }
 }
 
+// One origin summaryLine: label + spaces padding the value flush-right into
+// the 30-char Body column (origin mission_summary_screen AddSummaryLine —
+// kSummaryW 180 / advance 6; non-percentage values carry a trailing space).
+void AddSummaryLine(std::vector<std::string> &out, const char *name,
+                    Uint32 value, bool percentage = false) {
+  char valuetext[64];
+  snprintf(valuetext, sizeof(valuetext), "%u%s", (unsigned)value,
+           percentage ? "%" : " ");
+  std::string line = name;
+  const int maxchars = 30;
+  const int used = (int)(line.size() + strlen(valuetext));
+  for (int i = 0; i < maxchars - used; i++)
+    line += ' ';
+  line += valuetext;
+  out.push_back(line);
+}
+
 // Build the post-match progression fields from the local user's stats copy.
-// Lobby mutex is held by the caller. Leaves `progression_loaded` false until the
-// user record arrives. The detailed per-weapon breakdown the legacy screen
-// scrolled is deferred to SIL-21 (which adds the scroll container); SIL-20 shows
-// experience + the upgradeable levels + a compact result line.
+// Lobby mutex is held by the caller. Leaves `progression_loaded` false until
+// the user record arrives. The summary lines mirror origin's Refresh()
+// verbatim (mission_summary_screen.cpp) — order, labels, indent and padding.
 void BuildProgression(client::ui::LobbySnapshot &snap, Lobby &lobby) {
   User *user = lobby.GetUserInfo(lobby.accountid);
   if (!user || user->retrieving)
@@ -55,12 +72,58 @@ void BuildProgression(client::ui::LobbySnapshot &snap, Lobby &lobby) {
   snap.experience = stats.CalculateExperience();
 
   auto &ag = user->agency[user->statsagency];
-  char summary[160];
-  snprintf(summary, sizeof(summary),
-           "Level %u\n%u kills / %u deaths\n%u wins / %u losses",
-           (unsigned)ag.level, (unsigned)stats.kills, (unsigned)stats.deaths,
-           (unsigned)ag.wins, (unsigned)ag.losses);
-  snap.stats_text = summary;
+  std::vector<std::string> &ls = snap.summary_lines;
+  ls.clear();
+  AddSummaryLine(ls, "Kills:", stats.kills);
+  AddSummaryLine(ls, "Deaths:", stats.deaths);
+  AddSummaryLine(ls, "Suicides", stats.suicides);
+  ls.push_back("");
+  ls.push_back("Secrets");
+  AddSummaryLine(ls, "  Returned:", stats.secretsreturned);
+  AddSummaryLine(ls, "  Stolen:", stats.secretsstolen);
+  AddSummaryLine(ls, "  Picked up:", stats.secretspickedup);
+  AddSummaryLine(ls, "  Fumbled:", stats.secretsdropped);
+  ls.push_back("");
+  AddSummaryLine(ls, "Civilians killed:", stats.civilianskilled);
+  AddSummaryLine(ls, "Guards killed:", stats.guardskilled);
+  AddSummaryLine(ls, "Robots killed:", stats.robotskilled);
+  AddSummaryLine(ls, "Defenses destroyed:", stats.defensekilled);
+  AddSummaryLine(ls, "Fixed Cannons destroyed:", stats.fixedcannonsdestroyed);
+  ls.push_back("");
+  ls.push_back("Files");
+  AddSummaryLine(ls, "  Hacked:", stats.fileshacked);
+  AddSummaryLine(ls, "  Returned:", stats.filesreturned);
+  ls.push_back("");
+  AddSummaryLine(ls, "Powerups picked up:", stats.powerupspickedup);
+  AddSummaryLine(ls, "Health packs used:", stats.healthpacksused);
+  AddSummaryLine(ls, "Cameras placed:", stats.camerasplanted);
+  AddSummaryLine(ls, "Detonators planted:", stats.detsplanted);
+  AddSummaryLine(ls, "Fixed Cannons placed:", stats.fixedcannonsplaced);
+  AddSummaryLine(ls, "Viruses used:", stats.virusesused);
+  AddSummaryLine(ls, "Poisons:", stats.poisons);
+  AddSummaryLine(ls, "Lazarus Tracts planted:", stats.tractsplanted);
+  ls.push_back("");
+  ls.push_back("Grenades thrown");
+  AddSummaryLine(ls, "  E.M.P:", stats.empsthrown);
+  AddSummaryLine(ls, "  Plasma:", stats.plasmasthrown);
+  AddSummaryLine(ls, "  Shaped:", stats.shapedthrown);
+  AddSummaryLine(ls, "  Flare:", stats.flaresthrown);
+  AddSummaryLine(ls, "  Poison Flare:", stats.poisonflaresthrown);
+  AddSummaryLine(ls, "  Neutron:", stats.neutronsthrown);
+  static const char *const kWeaponNames[4] = {"Blaster", "Laser", "Rocket",
+                                              "Flamer"};
+  for (int i = 0; i < 4; i++) {
+    ls.push_back("");
+    ls.push_back(kWeaponNames[i]);
+    AddSummaryLine(ls, "  Shots fired:", stats.weaponfires[i]);
+    AddSummaryLine(ls, "  Hits:", stats.weaponhits[i]);
+    const Uint32 accuracy =
+        stats.weaponfires[i]
+            ? (Uint32)((float(stats.weaponhits[i]) / stats.weaponfires[i]) * 100)
+            : 0;
+    AddSummaryLine(ls, "  Accuracy:", accuracy, true);
+    AddSummaryLine(ls, "  Player kills:", stats.playerkillsweapon[i]);
+  }
 
   snap.levels[0] = ag.endurance;
   snap.levels[1] = ag.shield;

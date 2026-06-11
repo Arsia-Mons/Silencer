@@ -4,10 +4,18 @@
 #include "client/ui/components/layout/layout.h"
 #include "client/ui/components/surfaces/surfaces.h"
 #include "client/ui/components/text/text.h"
+#include "client/ui/components/tokens.h"
+#include "client/ui/hooks/use_chrome.h"
 #include "client/ui/hooks/use_progression.h"
+#include "ui/components/box.h"
+#include "ui/components/text.h"
 #include "ui/runtime/react.h"
 
+#include <cstdio>
+#include <cstring>
 #include <functional>
+#include <string>
+#include <vector>
 
 namespace client::ui {
 namespace {
@@ -16,34 +24,108 @@ namespace {
 // pull in the silencer semantic layer + the runtime children().
 using namespace silencer;
 using ::ui::children;
+using ::ui::components::Box;
+using ::ui::components::BoxProps;
+using ::ui::components::Text;
+using ::ui::components::TextProps;
 
-// Display names for the six upgradeable stats, in Progression index order.
-const char *kStatNames[6] = {"Endurance", "Shield", "Jetpack",
-                             "Tech Slots", "Hacking", "Contacts"};
+// origin mission_summary_screen.cpp geometry: a 640×480 virtual stage whose
+// 628×441 chrome panel (bank 7 idx 5) sits at stage padding (left 5, top 19);
+// every element floats at fixed screen coords. Authored at ×1.5 logical,
+// frame-relative: inset = (screenX-5, screenY-19) × 1.5.
+constexpr float kS = 1.5f;
+constexpr int kFrameML = 5, kFrameMT = 19;
 
-// One stat's upgrade row: "<name>: <level>" + an Upgrade button gated on
-// availability. Keyed component so use_text_storage gets a per-row buffer.
-struct UpgradeRowProps {
-  const char *key = nullptr;
-  const char *label = "";
-  int level = 0;
-  bool can_upgrade = false;
-  const char *upgrade_id = nullptr;
-  std::function<void()> on_upgrade = {};
+// One origin text face: advance (MeasureText = strlen × advance) + the cppx
+// exact-color face it bakes through.
+struct FaceSpec {
+  int advance;
+  uint16_t face;
+  float font;
+  float line;
 };
+constexpr FaceSpec kBodyFace{6, tokens::kFaceBody, tokens::kFontBodyEm,
+                             tokens::kLineBody};
+constexpr FaceSpec kPromptFace{16, tokens::kFaceTitle, tokens::kFontTitle,
+                               tokens::kLineTitle};
+constexpr FaceSpec kScreenTitleFace{12, tokens::kFaceScreenTitle,
+                                    tokens::kFontHeading, tokens::kLineHeading};
 
-::ui::UiElement UpgradeRow(const UpgradeRowProps &props) {
-  const char *text = use_text_storage("%s: %d", props.label, props.level);
-  return <ActionRow key={props.key}>
-    <BodyText key="label" variant={BodyTextVariant::Strong} value={text} />
-    <AppButton
-      key="up"
-      controlId={props.upgrade_id}
-      disabled={!props.can_upgrade}
-      label="Upgrade"
-      onPress={props.on_upgrade}
-    />
-  </ActionRow>
+constexpr int kTitleCenterX = 192, kTitleY = 44;
+constexpr int kXpCenterX = 467, kXpY = 45;
+constexpr int kUpgradeBannerY = 77;
+constexpr int kSummaryX = 89, kSummaryY = 92;
+constexpr int kSummaryRenderH = 308;
+constexpr int kLineH = 11;
+constexpr int kLevelLabelX = 390, kLevelValueRightX = 556;
+constexpr int kLevelStartY = 97, kLevelRowGap = 46;
+constexpr int kUpgradeButtonX = 372, kUpgradeButtonY = 108;
+constexpr int kDoneButtonX = 372, kDoneButtonY = 388;
+constexpr int kButtonW = 196, kButtonH = 33;
+
+const char *const kUpgradeLabels[6] = {"+1 Endurance", "+1 Shield",
+                                       "+1 Jetpack",   "+1 Tech Slot",
+                                       "+1 Hacking",   "+1 Contacts"};
+const char *const kLevelLabels[6] = {
+    "Current Endurance Level:", "Current Shield Level:",
+    "Current Jetpack Level:",   "Current Tech Slot Level:",
+    "Current Hacking Level:",   "Current Contacts Level:"};
+const char *const kUpgradeIds[6] = {"UpgradeEndurance", "UpgradeShield",
+                                    "UpgradeJetpack",   "UpgradeTechSlots",
+                                    "UpgradeHacking",   "UpgradeContacts"};
+
+::ui::LayoutStyle abs_at(int screen_x, int screen_y, float w, float h,
+                         float dx = 0.0f, float dy = 0.0f) {
+  return ::ui::LayoutStyle{
+      .position = ::ui::PositionType::Absolute,
+      .width = ::ui::Length::points(w),
+      .height = ::ui::Length::points(h),
+      .position_inset =
+          ::ui::EdgeSizes{(float)(screen_x - kFrameML) * kS + dx, {},
+                          (float)(screen_y - kFrameMT) * kS + dy, {}},
+  };
+}
+
+// One floating text at origin screen coords (string-bake eligible: exact-color
+// face at 1:1 virtual scale). The box width is the measured string so nothing
+// wraps.
+::ui::UiElement text_at(const char *key, int screen_x, int screen_y,
+                        const char *value, ::ui::Color color,
+                        const FaceSpec &f) {
+  const float w = (float)((int)std::strlen(value) * f.advance) * kS;
+  return Text(TextProps{
+      .key = key,
+      .value = value,
+      .layout = abs_at(screen_x, screen_y, w > 0.0f ? w : kS, f.line),
+      .style = {tokens::text_patch(color, f.font, f.face, f.line)},
+  });
+}
+
+::ui::UiElement body_at(const char *key, int screen_x, int screen_y,
+                        const char *value, ::ui::Color color) {
+  return text_at(key, screen_x, screen_y, value, color, kBodyFace);
+}
+
+// One floating Oval Md button on the origin sprite grid. Sub-logical nudges
+// land the box on the golden sprite cell: -0.5 x (the raw 717.5 logical
+// rounds UP through Yoga onto cell 479) and -0.75 y (the Overlay frame
+// centering carries a +1.125-device vertical bias) — the per-phase oval bake
+// needs the box to start on its cell's first device row/col.
+::ui::UiElement oval_at(const char *key, int screen_x, int screen_y,
+                        const char *control_id, const char *label,
+                        bool default_focused, std::function<void()> on_press) {
+  return Box(BoxProps{
+      .key = key,
+      .layout = abs_at(screen_x, screen_y, kButtonW * kS, kButtonH * kS,
+                       -0.5f, -0.75f),
+      .children = ::ui::children({AppButton(AppButtonProps{
+          .key = "b",
+          .control_id = control_id,
+          .variant = AppButtonVariant::Oval,
+          .default_focused = default_focused,
+          .label = label,
+          .on_press = on_press,
+      })})});
 }
 
 struct MissionSummaryProps {
@@ -52,6 +134,7 @@ struct MissionSummaryProps {
 
 ::ui::UiElement MissionSummaryView(const MissionSummaryProps &) {
   Progression prog = use_progression();
+  client::ui::ChromeTextures chrome = use_chrome();
 
   std::function<void(int)> upgrade = prog.upgrade;
   auto make_upgrade = [upgrade](int index) -> std::function<void()> {
@@ -61,76 +144,101 @@ struct MissionSummaryProps {
     };
   };
 
-  const char *experience = use_text_storage("Experience: %u", prog.experience);
-  // Copy the dynamic stat summary into the per-call-site scratch (children build
-  // after this returns, so a pointer into the transient `prog` model dangles).
-  const char *stats =
-      use_text_storage("%s", prog.loaded ? prog.stats_text.c_str() : "Loading results...");
-  bool can[6];
-  for (int i = 0; i < 6; ++i)
-    can[i] = prog.loaded && prog.upgrade_banner && prog.upgrades_available[i];
+  const ::ui::StylePatch frame =
+      chrome.chrome_panel
+          ? tokens::image_patch(chrome.chrome_panel)
+          : tokens::panel_patch(tokens::kSurfaceHeroPanel,
+                                tokens::kBorderHeroPanel);
 
-  return <ScreenLayout key="root" variant={ScreenLayoutVariant::Menu}>
-    <Panel key="panel" variant={PanelVariant::Hero}>
-      <ScreenTitle key="title" variant={ScreenTitleVariant::Hero} value="Mission Summary" />
-      <BodyText key="exp" variant={BodyTextVariant::Strong} value={experience} />
-      <UpgradeRow
-        key="endurance"
-        label={kStatNames[0]}
-        level={prog.levels[0]}
-        canUpgrade={can[0]}
-        upgradeId="UpgradeEndurance"
-        onUpgrade={make_upgrade(0)}
-      />
-      <UpgradeRow
-        key="shield"
-        label={kStatNames[1]}
-        level={prog.levels[1]}
-        canUpgrade={can[1]}
-        upgradeId="UpgradeShield"
-        onUpgrade={make_upgrade(1)}
-      />
-      <UpgradeRow
-        key="jetpack"
-        label={kStatNames[2]}
-        level={prog.levels[2]}
-        canUpgrade={can[2]}
-        upgradeId="UpgradeJetpack"
-        onUpgrade={make_upgrade(2)}
-      />
-      <UpgradeRow
-        key="techslots"
-        label={kStatNames[3]}
-        level={prog.levels[3]}
-        canUpgrade={can[3]}
-        upgradeId="UpgradeTechSlots"
-        onUpgrade={make_upgrade(3)}
-      />
-      <UpgradeRow
-        key="hacking"
-        label={kStatNames[4]}
-        level={prog.levels[4]}
-        canUpgrade={can[4]}
-        upgradeId="UpgradeHacking"
-        onUpgrade={make_upgrade(4)}
-      />
-      <UpgradeRow
-        key="contacts"
-        label={kStatNames[5]}
-        level={prog.levels[5]}
-        canUpgrade={can[5]}
-        upgradeId="UpgradeContacts"
-        onUpgrade={make_upgrade(5)}
-      />
-      <BodyText key="stats" variant={BodyTextVariant::Detail} value={stats} />
-      <AppButton
-        key="continue"
-        controlId="Continue"
-        variant={AppButtonVariant::Primary}
-        label="Continue"
-        onPress={prog.finish}
-      />
-    </Panel>
+  std::vector<::ui::UiElement> kids;
+
+  // Title — origin centers on X 192 with the ScreenTitle face (advance 12).
+  {
+    const char *title = "Mission Summary";
+    const int title_x =
+        kTitleCenterX -
+        ((int)std::strlen(title) * kScreenTitleFace.advance) / 2;
+    kids.push_back(text_at("title", title_x, kTitleY, title,
+                           tokens::kTextTitle, kScreenTitleFace));
+  }
+
+  // "+ N XP" — Prompt face (bank 136, advance 16), centered on X 467.
+  {
+    char xp[32];
+    std::snprintf(xp, sizeof(xp), "+ %u XP", prog.experience);
+    const int xp_x =
+        kXpCenterX - ((int)std::strlen(xp) * kPromptFace.advance) / 2;
+    kids.push_back(text_at("xp", xp_x, kXpY, ::ui::copy_string(xp),
+                           tokens::kTextBody, kPromptFace));
+  }
+
+  // "*NEW UPGRADE AVAILABLE*" — Body face, LegacyPalette(129,160,ramp) = the
+  // kTextProse variant face, centered on X 467.
+  if (prog.loaded && prog.upgrade_banner) {
+    const char *banner = "*NEW UPGRADE AVAILABLE*";
+    const int banner_x =
+        kXpCenterX - ((int)std::strlen(banner) * kBodyFace.advance) / 2;
+    kids.push_back(body_at("banner", banner_x, kUpgradeBannerY, banner,
+                           tokens::kTextProse));
+  }
+
+  // Stats summary — origin draws lines[scroll..scroll+28] in a 180×308 Body
+  // column at (89,92); the scrollbar rail/thumb art is baked into the panel
+  // sprite (origin passes showScrollbar=false here).
+  {
+    const int visible = kSummaryRenderH / kLineH;
+    const int count = (int)prog.summary_lines.size();
+    for (int i = 0; i < visible && i < count; ++i) {
+      const std::string &line = prog.summary_lines[i];
+      if (line.empty())
+        continue;
+      const char *key = ::ui::copy_string(("sl" + std::to_string(i)).c_str());
+      kids.push_back(body_at(key, kSummaryX, kSummaryY + i * kLineH,
+                             ::ui::copy_string(line.c_str()),
+                             tokens::kTextBody));
+    }
+    if (!prog.loaded)
+      kids.push_back(body_at("loading", kSummaryX, kSummaryY,
+                             "Loading results...", tokens::kTextBody));
+  }
+
+  // Six stat rows: label + value right-aligned to origin's X 556 column, +
+  // the Upgrade oval when available.
+  for (int i = 0; i < 6; ++i) {
+    const int row_y = kLevelStartY + i * kLevelRowGap;
+    char value[16];
+    std::snprintf(value, sizeof(value), "%d", (int)prog.levels[i]);
+    const int value_x =
+        kLevelValueRightX - (int)std::strlen(value) * kBodyFace.advance;
+    const std::string n = std::to_string(i);
+    kids.push_back(body_at(::ui::copy_string(("lbl" + n).c_str()),
+                           kLevelLabelX, row_y, kLevelLabels[i],
+                           tokens::kTextBody));
+    kids.push_back(body_at(::ui::copy_string(("val" + n).c_str()), value_x,
+                           row_y, ::ui::copy_string(value), tokens::kTextBody));
+    if (prog.loaded && prog.upgrade_banner && prog.upgrades_available[i])
+      kids.push_back(oval_at(::ui::copy_string(("up" + n).c_str()),
+                             kUpgradeButtonX, kUpgradeButtonY + i * kLevelRowGap,
+                             kUpgradeIds[i], kUpgradeLabels[i], false,
+                             make_upgrade(i)));
+  }
+
+  kids.push_back(oval_at("done", kDoneButtonX, kDoneButtonY, "Done", "Done",
+                         true, prog.finish));
+
+  // Frame box mirrors character_create's chrome_panel placement: 942×661.5
+  // centered with margin-right 4 → device (250.5, 43.875) = the golden cell.
+  return <ScreenLayout key="root" variant={ScreenLayoutVariant::Overlay}>
+    <Box
+      key="frame"
+      layout={::ui::LayoutStyle{
+        .width = ::ui::Length::points(942.0f),
+        .height = ::ui::Length::points(661.5f),
+        .margin = {0.0f, 4.0f, 0.0f, 0.0f}}}
+      style={frame}
+    >
+      {::ui::children(kids)}
+    </Box>
   </ScreenLayout>
 }
 

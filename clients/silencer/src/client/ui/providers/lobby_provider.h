@@ -55,7 +55,9 @@ struct LobbySnapshot {
   // --- progression (MissionSummary) ---
   bool progression_loaded = false;
   uint32_t experience = 0;
-  std::string stats_text = {};
+  // The per-mission stat breakdown, one display line per entry — origin's
+  // summaryLines verbatim (value right-padded into a 30-char Body column).
+  std::vector<std::string> summary_lines = {};
   bool upgrade_banner = false;
   uint8_t levels[6] = {0, 0, 0, 0, 0, 0};
   bool upgrades_available[6] = {false, false, false, false, false, false};

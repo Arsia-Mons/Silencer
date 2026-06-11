@@ -195,3 +195,35 @@
   are (a) author logical = ceil(1.5·d − .25) so device floors recover d, and (b) snap
   near-1:1 image dst rects to integers in the executor — a w+1/3 rect bled an extra
   stipple row/column on parity-sensitive art.
+
+- **A "replicated" object can silently never replicate — check requiresauthority before
+  trusting any snapshot-driven UI state.** GameStateObject's header claims replicas get
+  it via snapshot, but Object defaults requiresauthority=false and the ctor never set
+  it: SaveSnapshot skips it entirely, so winningTeamId/matchPhase NEVER reach clients
+  (and GSO::Tick on replicas would clobber them anyway by recomputing from the local
+  never-set world.winningteamid). Result: a time-limit match end is unreachable on
+  origin lobby clients — they drop to LOBBY via CONNECTION LOST when the server exits.
+  The secrets path works only because Team::Tick runs on replicas (ProcessSnapshotQueue
+  → TickObjects).
+
+- **Control the AUTHORITY's lifetime, not the replica's clock, when driving a
+  client to a timed state.** The mission-summary drive needs the client's own
+  message_i to reach 240 AFTER winningteamid arrives, but the dedicated server quits
+  ~7s after its [stats] registration and its disconnect resets the client's message
+  cycle (CONNECTION LOST, type 20) — connection-loss then always wins at 48 < 240.
+  SIGSTOP-ing the server process on the lobby's [stats] log line freezes snapshots
+  (harmless — the result already replicated) while the client's local messaging keeps
+  ticking; the 10s peer timeout loses to the ≤10.6s worst-case cycle ~94% of runs.
+
+- **GAS is file-local, not fetched: the built bundle's Contents/assets/gas/*.json is a
+  zero-rebuild lever for both the client AND the lobby-spawned dedicated server** (same
+  bundle, CDResDir chdir). Edit + restore in the capture script; gameModes id 0 (Data
+  Retrieval) is what created lobby games run.
+
+- **The +0.375/+1.125-device frame bias only matters where a cell's FIRST device
+  row/col carries ink.** mission_summary authored at raw (sx-5,sy-19)×1.5 inside the
+  cc chrome_panel frame came out byte-identical everywhere except the ovals: text
+  recovery tolerates ±1 device px (glyph leading), but a sprite-cell texture origin
+  one px below/right of its cell start loses a 1px sliver, and a .5-logical x that
+  Yoga rounds UP lands the whole box one virtual cell off (+2 device). Two sub-logical
+  nudges (-0.5x, -0.75y) on the oval boxes alone closed the screen to 0.0000.

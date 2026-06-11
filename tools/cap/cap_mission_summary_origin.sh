@@ -34,8 +34,8 @@
 # the headless surface returns to the window size (1920×1080) like the other
 # 13 menu goldens. Binary may be pristine OR fade-patched: the capture settles
 # ~3s after the state flips, well past either fade ramp. Determinism: fresh
-# lobby db every run → fresh account, 1-player draw, zero stats, "+ 0 XP",
-# no upgrade buttons (level 0 → upgradeBanner false). Verify with two runs.
+# lobby db every run → fresh account, 1-player draw, zero stats, "+ 0 XP";
+# two independent runs measured byte-identical.
 #
 # Usage: tools/cap/cap_mission_summary_origin.sh [OUT_PNG]
 #   ORIGIN_ROOT  override origin worktree (default .worktrees/origin-capture)
@@ -147,7 +147,9 @@ if ! cli wait_for_state --state MISSIONSUMMARY --timeout-ms 30000 >/dev/null; th
   exit 2
 fi
 # In-game pinned the headless surface to 640×480; re-assert the menu window
-# size now that the map is unloaded, then settle past the fade ramp.
+# size AFTER the state-new tick has unloaded the map (resize while map.loaded
+# re-pins to 640×480), then settle past the fade ramp.
+cli wait_frames --n 5 >/dev/null
 cli resize --w 1920 --h 1080 >/dev/null
 sleep 3
 

@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <functional>
 #include <string>
+#include <vector>
 
 namespace client::ui {
 
@@ -17,9 +18,10 @@ struct Progression {
   // record is still `retrieving`). The screen shows a loading line until then.
   bool loaded = false;
   uint32_t experience = 0;
-  // The full per-mission stat breakdown (kills/deaths/secrets/…), newline-joined
-  // for display.
-  std::string stats_text = {};
+  // The full per-mission stat breakdown (kills/deaths/secrets/…), one display
+  // line per entry (origin summaryLines: value right-aligned in a 30-char
+  // Body column via space padding).
+  std::vector<std::string> summary_lines = {};
   // True when the player has upgrade points to spend this session.
   bool upgrade_banner = false;
   // Current upgrade level of each of the six stats.
