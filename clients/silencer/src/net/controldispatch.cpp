@@ -341,6 +341,23 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 		cmd.reply->set_value(OkResult(cmd.id, nlohmann::json::object()));
 		return;
 	}
+	if(cmd.op == "ui_audio"){
+		// Interaction-sound edge counter (hover-enter/activate/nav on audible
+		// buttons) — observable headless where Audio itself is disabled.
+		nlohmann::json j;
+		j["clicks"] = game.GetUiPipeline().UiClickCount();
+		cmd.reply->set_value(OkResult(cmd.id, j));
+		return;
+	}
+	if(cmd.op == "rain"){
+		// Capture plumbing: disable the (rand-driven, wall-clock) rain layer so
+		// in-game renders are deterministic against the origin goldens.
+		game.GetRenderer().rainDisabled = !cmd.args.value("enabled", 0);
+		nlohmann::json j;
+		j["enabled"] = !game.GetRenderer().rainDisabled;
+		cmd.reply->set_value(OkResult(cmd.id, j));
+		return;
+	}
 	if(cmd.op == "camera"){
 		// Test/capture plumbing: read or pin the world camera. The in-game
 		// camera's follow window has a 100px y-hysteresis (Camera::Follow

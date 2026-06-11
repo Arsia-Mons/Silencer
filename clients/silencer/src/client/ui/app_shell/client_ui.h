@@ -39,6 +39,17 @@ public:
   }
   bool wants_text_input() const { return wants_text_input_; }
 
+  // Per-frame interaction-audio edges (origin ClientUi PlayMenuButtonSound
+  // triggers), exposed as DATA: the composition root owns Audio — the UI side
+  // never plays sounds. Audible = an enabled Button (origin: toggles/inputs
+  // are silent).
+  struct UiAudioEvents {
+    ::ui::NodeId hovered_button = 0; // button under the pointer (no edge dedupe)
+    bool activated_button = false;   // confirm/click landed on a button
+    bool nav_focused_button = false; // keyboard nav moved focus onto a button
+  };
+  const UiAudioEvents &audio_events() const { return audio_events_; }
+
   void begin_frame(const ::ui::UiInputFrame &input);
   void build_visible_screens(const UiElementWrapper &wrap_root = {});
   void end_layout(const ::ui::UiInputFrame &input);
@@ -82,6 +93,7 @@ private:
   // The IR list driving the live render path, built each frame in
   // update_retained_runtime.
   ::ui::DrawCommandList retained_command_list_ = {};
+  UiAudioEvents audio_events_ = {};
   // Interaction state from the PREVIOUS frame's focus pass, published to the
   // component tree during the next build so use_focused()/use_hovered()/etc.
   // resolve (one-frame lag, by design — styling design §7).

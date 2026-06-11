@@ -330,8 +330,10 @@ void Renderer::DrawWorld(Surface * surface, Camera & camera, bool drawminimap, b
 			DrawParallax(surface, camera);
 		}
 		DrawBackground(surface, camera, drawluminance);
-		DrawRain(surface, camera, frametime);
-		DrawRainPuddles(surface, camera);
+		if(!rainDisabled){
+			DrawRain(surface, camera, frametime);
+			DrawRainPuddles(surface, camera);
+		}
 	}
 	objectlights.clear();
 	// Gather map lights using radius-aware screen overlap, not the sprite bounds.

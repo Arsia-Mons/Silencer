@@ -111,6 +111,8 @@ constexpr ::ui::Color kHudRed = {224, 48, 48, 255};      // #E03030 FATIGUE/heal
 constexpr ::ui::Color kHudAmber = {160, 86, 30, 255};    // #A0561E radar schematic
 constexpr ::ui::Color kHudBlack = {0, 0, 0, 210};        // ~85% scoreboard bar / radar viewport
 constexpr ::ui::Color kHudPanelFill = {0, 8, 2, 200};    // translucent green-black HUD well
+constexpr ::ui::Color kHudClear = {0, 0, 0, 0};          // chromeless-field transparent
+constexpr ::ui::Color kHudListDim = {0, 0, 0, 128};      // F1 player-list dim (palette idx 0 @ 50%)
 constexpr ::ui::Color kBlipAlly = {255, 255, 255, 255};
 constexpr ::ui::Color kBlipEnemy = {224, 48, 48, 255};
 

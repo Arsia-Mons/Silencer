@@ -86,6 +86,10 @@ public:
 	bool WriteRGBAPNG(const Uint8 * rgba, int w, int h, const char * path);
 	Camera camera;
 	Palette palette;
+	// Capture plumbing (`rain` control op): rain + puddle ripples are
+	// wall-clock/rand-driven — golden gating disables ours so renders are
+	// deterministic against the origin goldens' frozen rain.
+	bool rainDisabled = false;
 
 private:
 	class World & world;

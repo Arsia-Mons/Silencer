@@ -108,6 +108,11 @@ uint32_t EnsureHudRampVariant(uint8_t bank, uint16_t index, uint8_t rampColor,
 client::ui::ChromeTextures::Sprite EnsureHudTeamEmblem(uint8_t agency,
                                                        uint8_t color);
 
+// UI interaction-click edges fired so far (hover-enter / activate / nav onto
+// an audible button — origin PlayMenuButtonSound triggers). Counted even when
+// audio is disabled (headless) so e2e can assert the edges.
+uint32_t UiClickCount() const { return uiClickCount_; }
+
 private:
 void RenderCppxClientUiFrame(Surface & surface);
 // SIL-87: bake curated legacy sprites → cppxChrome. rw/rh = device resolution,
@@ -139,6 +144,10 @@ float cppxCanvasH_ = 0.0f;
 client::ui::ChromeTextures cppxChrome;
 // Memoized in-game HUD sprite variants (see EnsureHud*); cleared on rebake.
 std::map<uint64_t, uint32_t> hudRampVariants_;
+// Interaction-audio state: last hovered audible button (edge dedupe, origin
+// hoveredAudioInteractableId_) + the click-edge counter.
+uint64_t lastHoveredAudible_ = 0;
+uint32_t uiClickCount_ = 0;
 std::map<uint16_t, client::ui::ChromeTextures::Sprite> hudEmblems_;
 
 // SIL-15 use_settings dirty tracking: snapshot of the four persisted prefs as

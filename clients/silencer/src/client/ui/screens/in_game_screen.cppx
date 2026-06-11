@@ -376,7 +376,7 @@ struct ChatComposeProps {
   field.base =
       ::ui::patch()
           .chromeless(true)
-          .background(::ui::Color{0, 0, 0, 0})
+          .background(tokens::kHudClear)
           .gradient(::ui::Gradient{})
           .corner_radius(0.0f)
           .border(::ui::Border{})
@@ -459,7 +459,7 @@ void build_chat_overlay(std::vector<::ui::UiElement> &out,
 // ---------------------------------------------------------------------------
 
 void build_buy_tech(std::vector<::ui::UiElement> &out, const Tech &tech,
-                    const ChromeTextures::HudChrome &c) {
+                    const BuyTech &cursor, const ChromeTextures::HudChrome &c) {
   if (tech.items.empty())
     return;
   out.push_back(sprite_at("btbg", c.buy_bg));
@@ -467,6 +467,46 @@ void build_buy_tech(std::vector<::ui::UiElement> &out, const Tech &tech,
     const TechItem &row = tech.items[r];
     const int yoffset = (int)r * 25;
     const std::string id = std::to_string(r);
+    // Focusable (but unpainted + silent) row target: selection follows focus,
+    // Enter purchases — origin registers these as ListRow interactables.
+    {
+      const int item_index = row.index;
+      std::function<void(int)> select = cursor.select;
+      std::function<void(int)> purchase = tech.purchase;
+      std::function<void(const ::ui::FocusEvent &)> on_focus =
+          [select, item_index](const ::ui::FocusEvent &) {
+            if (select)
+              select(item_index);
+          };
+      std::function<void(const ::ui::ActivationEvent &)> on_activate =
+          [purchase, item_index](const ::ui::ActivationEvent &) {
+            if (purchase)
+              purchase(item_index);
+          };
+      // Ghost paint: the selection visual is the bank-102 highlight sprite,
+      // never a theme focus ring (origin draws no focus chrome here).
+      ::ui::StyleStatePatch ghost{};
+      ghost.base = ::ui::patch()
+                       .chromeless(true)
+                       .background(tokens::kHudClear)
+                       .gradient(::ui::Gradient{})
+                       .border(::ui::Border{})
+                       .outline(::ui::Outline{})
+                       .corner_radius(0.0f);
+      ghost.hover = ghost.base;
+      ghost.focus_visible = ghost.base;
+      out.push_back(Box(BoxProps{
+          .key = ::ui::copy_string(("btrow" + id).c_str()),
+          .id = "BuyTechRow",
+          .id_offset = row.index,
+          .focusable = true,
+          .autofocus = row.selected,
+          .on_focus = on_focus,
+          .on_activate = on_activate,
+          .layout = abs_at(-c.buy_highlight.x, -c.buy_highlight.y + yoffset,
+                           c.buy_highlight.w, c.buy_highlight.h),
+          .style = ghost}));
+    }
     if (row.selected)
       out.push_back(sprite_at(::ui::copy_string(("bth" + id).c_str()),
                               c.buy_highlight, 0, yoffset));
@@ -513,7 +553,7 @@ void build_player_list(std::vector<::ui::UiElement> &out, const Hud &hud) {
   out.push_back(Box(BoxProps{
       .key = "plbg",
       .layout = abs_at(panel_x, 50, panel_w, panel_h),
-      .style = tokens::fill_patch(::ui::Color{0, 0, 0, 128})}));
+      .style = tokens::fill_patch(tokens::kHudListDim)}));
   for (size_t t = 0; t < hud.teams.size(); ++t) {
     const HudTeamRow &team = hud.teams[t];
     const int row_y = 50 + 10 + (int)t * 58; // panel padding {10,10,10,0}
@@ -573,18 +613,19 @@ void build_center_message(std::vector<::ui::UiElement> &out, const Hud &hud) {
   // Only type<10 (Title-face, color from the table) is ported — those are the
   // golden-covered types; >=10 use MessageTitle/Subtitle faces (no goldens,
   // PARITY.md tracks).
+  // origin's type table (InGameOverlays.cpp DrawMessage): palette color + y.
+  struct MsgStyle { uint8_t type, color; int liney; };
+  static const MsgStyle kMsgStyles[] = {{1, 128, 190}, {2, 128, 60},
+                                        {3, 192, 60},  {4, 153, 60},
+                                        {10, 224, 60}, {11, 153, 60},
+                                        {20, 153, 200}};
   uint8_t color = 208;
   int liney = 60;
-  switch (hud.message_type) {
-  case 1: color = 128; liney = 190; break;
-  case 2: color = 128; break;
-  case 3: color = 192; break;
-  case 4: color = 153; break;
-  case 10: color = 224; break;
-  case 11: color = 153; break;
-  case 20: color = 153; liney = 200; break;
-  default: break;
-  }
+  for (const MsgStyle &ms : kMsgStyles)
+    if (ms.type == hud.message_type) {
+      color = ms.color;
+      liney = ms.liney;
+    }
   const char *text = hud.message.c_str();
   const int total = (int)hud.message.size();
   int linelength = total;
@@ -657,6 +698,7 @@ struct InGameScreenProps {
   PlayerStatus ps = use_player_status();
   Hud hud = use_hud();
   Tech tech = use_tech();
+  BuyTech buy_tech = use_buy_tech();
   IngameChat chat = use_ingame_chat();
   Teams teams = use_teams();
   ChromeTextures chrome = use_chrome();
@@ -670,7 +712,7 @@ struct InGameScreenProps {
     build_readouts(kids, ps);
     build_team_strip(kids, hud, chrome.hud);
     if (tech.buy_active || tech.tech_active)
-      build_buy_tech(kids, tech, chrome.hud);
+      build_buy_tech(kids, tech, buy_tech, chrome.hud);
     build_chat_overlay(kids, chat, chrome.hud, chrome.caret_game);
     build_center_message(kids, hud);
     if (teams.showing)

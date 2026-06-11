@@ -89,8 +89,16 @@ only skips Present. The control-port `screenshot` op captures HUD included.)
   - **Minimap inset, rect x235-406 y419-479** (172×62 blit at 235,419) — live
     world view incl. rain, plus dot blinks keyed to the wall-clock-seeded
     renderer phase (`state_i % 2`, renderer.cpp:1195).
+  - **Rain-impact puddle ripples** on the bridge deck — same rand() source as
+    the streaks; they concentrate in the deck band **y296-340** (full width).
   - Everything else is **byte-identical across runs** (ingame_tech_overlay
     differs ONLY in the minimap inset: 42 px).
+- **Gate masks (scenario 72 + tools/cap usage):** `pixdiff_tolerant.py --mask`
+  rectangles `235,419,406,479` (minimap inset), `0,296,640,340` (ripple band),
+  `624,0,640,419` (right-edge sliver: the 640px width leaves a half-width
+  16px tile column where sparse rain reads at double density). The cppx
+  capture additionally disables OUR rain layer (`rain` control op) so only the
+  goldens' frozen streaks remain in the diff (~0.2% global, sub-tile).
 - **NOT captured** (no deterministic headless trigger; PARITY.md tracks):
   top_ticker (only trigger is "Playing: <random track>" / F4-F9 paths),
   status_lines (all `ShowStatus` callers need real gameplay actions),

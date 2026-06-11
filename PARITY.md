@@ -133,7 +133,7 @@ byte-identical, so every family below is closed except the create_game residual
 | password_modal | n/a (visual) | no standalone origin trigger; golden stale — do not gate |
 | mission_summary (post-game XP/upgrade) | UNVERIFIED — NO GOLDEN, NO COVERAGE (flagged by owner 2026-06-11) | origin mission_summary_screen.cpp: "+ N XP" (stats.CalculateExperience), six stat rows + Upgrade buttons gated on world.lobby.statupgraded poll, upgrade banner; ours mission_summary.cppx (144 lines) implemented but never captured/gated. Golden capture needs a match to END — extend the cap_ingame_origin.sh harness (or a bot-finish flow) |
 
-## Visual — in-game (origin goldens CAPTURED 2026-06-11 — UNVERIFIED vs cppx)
+## Visual — in-game (ALL 8 GOLDEN SURFACES PASS 2026-06-11, e2e scenario 72)
 
 Enumerated from origin source 2026-06-11 (Explore agent over .worktrees/origin-capture).
 
@@ -181,21 +181,35 @@ Golden pipeline (EXECUTED 2026-06-11 — actual pipeline deviated from the plan 
    proportions. In-game presentation palette = page 0 (BakeChromeTextures page_color).
    Recreation spec for all 13 HUD surfaces: INGAME_SPECS.md (worktree root).
 
+**RECREATED 2026-06-11** (in_game_screen.cppx verbatim port of origin ui/hud/*;
+use_hud + HudChrome bakes; full mechanism list in the 4cc92899+ commits). Gate =
+`pixdiff_tolerant.py --mask` per ORIGIN_GOLDENS.md masks (minimap inset
+235,419,406,479; rain-ripple deck band 0,296,640,340; right-edge rain sliver
+624,0,640,419), our rain layer disabled via the `rain` control op (the
+goldens' frozen rain is the residual global ~0.2%). Camera pinned to each
+golden via the `camera` op + phase correlation (follow-cam has a 100px
+y-hysteresis; rest position is render-cadence-dependent). Evidence: scenario
+72 PASS in the full-suite run (suite all green, 25 scenarios) + standalone
+sweep 2026-06-11: hud_base 0.1978/0 hot, chat_open 0.1916/0, chat_history
+0.1921/0, player_list 0.1821/0 (worst tile 4.8% — deterministic residual,
+under gate), buy_tech 0.1629/0, tech_overlay 0.0124/0 (byte-identical outside
+golden rain), messages 0.1672/0, quit_prompt 0.3766/0.
+
 | Surface | State | Origin anchor |
 |---|---|---|
-| hud_status_bar (minimap frame, fuel/health/shield/files gauges, poison, weapon glow+bracket, inventory) | golden captured (UNVERIFIED vs cppx) — ingame_hud_base.png | ui/hud/hud_status_sprites.cpp |
-| hud_readouts (ammo counter, per-weapon ammo, credits, health/shield numerics) | golden captured (UNVERIFIED vs cppx) — ingame_hud_base.png (ammo 99, credits 500) | ui/hud/hud_readouts.cpp:14-88 |
-| hud_team_strip (per-team peer sprites, in-base/secret pulses, secret slots, beaming) | golden captured (UNVERIFIED vs cppx) — ingame_hud_base.png (1 team); 2-team variant in ingame_tech_overlay.png; pulse states NOT covered | ui/hud/hud_teams.cpp |
+| hud_status_bar (minimap frame, fuel/health/shield/files gauges, poison, weapon glow+bracket, inventory) | **PASS** — ingame_hud_base 0.1978/0 hot | ui/hud/hud_status_sprites.cpp |
+| hud_readouts (ammo counter via palette-Alpha-LUT bake, per-weapon ammo, credits, health/shield numerics) | **PASS** — ingame_hud_base | ui/hud/hud_readouts.cpp:14-88 |
+| hud_team_strip (per-team peer sprites, in-base/secret pulses, secret slots, beaming) | **PASS** — ingame_hud_base (1 team) + ingame_tech_overlay (2-team); pulse states still uncovered by goldens (ramp variants implemented, EnsureHudRampVariant) | ui/hud/hud_teams.cpp |
 | hud_secret_overlay (9-line hack progress, highlight pulses) | NO GOLDEN — needs secrets/hack world state, no deterministic headless trigger | ui/hud/hud_secret_overlays.cpp:73-110 |
 | hud_trace_time ("Government Trace Time: NNN") | NO GOLDEN — needs beaming-terminal/trace world state | ui/hud/hud_readouts.cpp:90-103 |
 | hud_system_camera (inset frames ×2) | NO GOLDEN — needs active system camera (detonator etc.) | ui/hud/hud_system_camera.cpp:13-40 |
-| chat_overlay (history 5 lines, input + caret, ALL/TEAM toggle; T/Enter/Esc) | golden captured (UNVERIFIED vs cppx) — ingame_chat_open.png ("(ALL): parity check", caret ON) + ingame_chat_history.png (2 lines, input closed) | ui/hud/hud_chat_overlay.cpp:142-236 |
-| buy_tech_overlay (5-row scroll list, credits/viruses footer; Up/Down/Enter/Esc) | golden captured (UNVERIFIED vs cppx) — ingame_buy_tech.png (buy: Laser/Rocket, credits footer) + ingame_tech_overlay.png (tech @ base: viruses footer) | ui/hud/hud_buy_tech_overlay.cpp:58-190 |
-| player_list_overlay (F1 hold; per-team emblem + peer stats) | golden captured (UNVERIFIED vs cppx) — ingame_player_list.png (1 team, via ingame_ui_mode playerlist = same flag F1 sets) | ui/hud/hud_player_list_overlay.cpp:16-98 |
-| ingame_messages (center reveal text, typed colors) | golden captured (UNVERIFIED vs cppx) — ingame_messages.png (type 0, message_i=94, both lines revealed); other types (1-4,10,11,20) NOT covered | ui/hud/InGameOverlays.cpp:58-145 |
+| chat_overlay (history 5 lines, input + caret, ALL/TEAM toggle) | **PASS** — chat_open 0.1916/0 + chat_history 0.1921/0; world-backed compose (chat_set_text intent), caret = page-0 idx140 with origin's wall-clock blink (Input show_caret) | ui/hud/hud_chat_overlay.cpp:142-236 |
+| buy_tech_overlay (5-row scroll window, UP/DOWN/repair price column, credits/viruses footer, wall-clock selection pulse) | **PASS** — buy_tech 0.1629/0 + tech_overlay 0.0124/0; focusable ghost rows (chromeless) keep Up/Down/Enter nav (scenario 51) | ui/hud/hud_buy_tech_overlay.cpp:58-190 |
+| player_list_overlay (F1; per-team emblem + peer agency stats) | **PASS** — player_list 0.1821/0; dim fill composited through origin's palette alpha LUT (game.cpp headless composite) | ui/hud/hud_player_list_overlay.cpp:16-98 |
+| ingame_messages (center reveal text, typed colors) | **PASS** — messages 0.1672/0 (type 0: per-char reveal + pulse brightness via hud_text_key(208,b) faces, b=64..160 baked). Types 1-4/10/11/20 colors ported but their exact-color faces NOT baked (no goldens) — they fall back to tinted coverage glyphs | ui/hud/InGameOverlays.cpp:58-145 |
 | top_ticker (scrolling top message) | NO GOLDEN — only headless-reachable trigger is "Playing: <random track>" (random text); F4/F9 paths contaminate (music state/debug overlay) | ui/hud/InGameOverlays.cpp:185-209 |
 | status_lines (bottom-center stack, fading) | NO GOLDEN — every ShowStatus caller needs real gameplay actions (virus/convert/pickup); not reachable via control ops; possible follow-up: TUI action-snapshot (keyuse with no target → "No target for virus") | ui/hud/InGameOverlays.cpp:147-183 |
-| quit_prompt ("Hit Enter To Quit"; Enter/Esc state machine) | golden captured (UNVERIFIED vs cppx) — ingame_quit_prompt.png (quitstate 2 via TUI ESC scancode edges; control `key` op gated on HasUiInputTarget which the quit flow excludes) | ui/hud/InGameOverlays.cpp:211-227 |
+| quit_prompt ("Hit Enter To Quit") | **PASS** — quit_prompt 0.3766/0 (Prompt face LegacyPalette(202)); captured via TUI ESC scancode edges like the golden | ui/hud/InGameOverlays.cpp:211-227 |
 
 Hardcoded in-game bindings to verify functionally: T chat, F1 player list, F2 team colors,
 F4 music toggle, F5 random music, Enter quit-confirm flow.
@@ -206,6 +220,8 @@ F4 music toggle, F5 random music, Enter quit-confirm flow.
 |---|---|---|
 | 00..22,30,31,40,50,51,52,60,70 | PASS | fresh full run 2026-06-11 (binary @ b8fc958b) |
 | 53_lobby_create_options_scroll | PASS | 73bb8fe2 — resolve_lobby_panes ports origin ResolveSteppedPaneLayout; green at 1280x720 / 640x480 / 1000x1100 / 390x844 |
+| 72_visual_regression_ingame | PASS | NEW 2026-06-11 — all 8 in-game goldens gated with the documented masks; full-suite run all green (25 scenarios) |
+| 73_ui_click_sounds | PASS | NEW 2026-06-11 — ui_audio edge counter asserts hover-enter/dedupe/nav triggers |
 | 71_visual_regression_lobby | PASS | d739bc5d — harness now captures lobby_connect at AUTHENTICATING (log populated) and cc_alias BEFORE typing (golden field is empty); the "caret blink" theory was wrong — the caret draws unconditionally while focused. Two consecutive green runs |
 
 Earlier same-day milestones: iteration-0 13/23 → post scale-unclamp 21/23 → post string-bake 22/23 → 24/24.
@@ -223,7 +239,7 @@ Earlier same-day milestones: iteration-0 13/23 → post scale-unclamp 21/23 → 
 | text-entry caps/length limits (alias, chat, password) vs origin | UNVERIFIED |
 | scrolling behaviors (controls list, map list) vs origin | UNVERIFIED |
 | hover/focus interaction VISUALS vs origin (oval/list focus cursors; Chrome buttons never swap art) | UNVERIFIED — all 13 goldens are rest-state; only functional e2e coverage today (flagged by owner 2026-06-11) |
-| UI interaction SOUNDS | **REGRESSED — unwired in cppx migration** (flagged by owner 2026-06-11). Origin ClientUi.cpp:95-111: PlayMenuButtonSound (GAS soundUIClick "whoom.wav" via Audio::PlayUI) on (a) hover-ENTER of an audible interactable (edge via hoveredAudioInteractableId_) and (b) Activate/Navigate actions on audible widgets. Ours: Audio::PlayUI + gasloader.soundUIClick intact, ZERO callers. Fix in the pipeline input pass + add an e2e scenario asserting the trigger edges |
+| UI interaction SOUNDS | **FIXED 2026-06-11** — ClientUi publishes per-frame UiAudioEvents (hovered audible Button / activate / keyboard-nav onto one; audible = enabled Button only, per origin: toggles/inputs silent); GameUiPipeline (sole Audio owner) dedupes the hover edge and plays GAS soundUIClick via Audio::PlayUI; edge counter exposed headless via the `ui_audio` op. Evidence: scenario 73 (hover-enter +1, steady hover 0, second hover +1, nav +1) green in the full suite |
 
 ## Architecture guard backlog (15 findings, re-confirmed 2026-06-11 post b8fc958b — must be 0 for done)
 

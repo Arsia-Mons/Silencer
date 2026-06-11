@@ -366,6 +366,16 @@ void render_image(SDL_Renderer *r, const ::ui::DrawCommand &c,
     dst.w = fit_w;
     dst.h = fit_h;
   }
+  // Native 1:1 sprite draw (in-game HUD at the 640x480 surface): authored
+  // coords land within 1/3 device px of the integer cell — snap so the
+  // fractional rect can't bleed an extra row/column (stipple art is
+  // parity-sensitive).
+  if (std::fabs(dst.w - src.w) < 0.5f && std::fabs(dst.h - src.h) < 0.5f) {
+    dst.x = std::floor(dst.x + 0.5f);
+    dst.y = std::floor(dst.y + 0.5f);
+    dst.w = src.w;
+    dst.h = src.h;
+  }
   if (img.flip_h)
     SDL_RenderTextureRotated(r, tex, &src, &dst, 0.0, nullptr,
                              SDL_FLIP_HORIZONTAL);

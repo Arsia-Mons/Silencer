@@ -1529,6 +1529,33 @@ cppxUiW = ow;
 cppxUiH = oh;
 }
 
+// UI interaction sounds (origin ClientUi.cpp:95-111 PlayMenuButtonSound):
+// hover-ENTER edge on an audible button (dedupe via the remembered id) or an
+// activate/keyboard-navigate landing on one -> GAS soundUIClick via
+// Audio::PlayUI. The edges come from the UI side as data; only this
+// composition root touches Audio. Count edges even when audio is disabled
+// (headless) so e2e can assert the triggers.
+{
+const client::ui::ClientUi::UiAudioEvents & ev =
+    cppxHost->pipeline().client_ui().audio_events();
+bool play = false;
+if(ev.hovered_button && (uint64_t)ev.hovered_button != lastHoveredAudible_)
+play = true;
+lastHoveredAudible_ = (uint64_t)ev.hovered_button;
+if(ev.activated_button || ev.nav_focused_button)
+play = true;
+if(play){
+++uiClickCount_;
+Audio & audio = Audio::GetInstance();
+if(audio.enabled){
+const std::string & sound = GASLoader::Get().player.soundUIClick;
+auto it = game.world.resources.soundbank.find(sound);
+if(it != game.world.resources.soundbank.end() && it->second)
+audio.PlayUI(it->second);
+}
+}
+}
+
 // Text-input platform gating (windowed only): the cppx pipeline reports whether
 // the focused node is a text field; toggle SDL text input to match. This is the
 // only owner of SDL_StartTextInput/StopTextInput (see src/game/CLAUDE.md).

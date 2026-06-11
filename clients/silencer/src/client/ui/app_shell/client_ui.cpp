@@ -133,6 +133,26 @@ bool ClientUi::update_retained_runtime(const ::ui::FlexLayoutAdapter &layout,
     retained_tree_.invoke_activate(confirmed);
   }
 
+  // Interaction-audio edges (origin ClientUi.cpp:95-111): hovered audible
+  // button + activate/keyboard-navigate onto one. Published as data; the
+  // composition root dedupes the hover edge and plays.
+  audio_events_ = {};
+  auto audible_button = [&](::ui::NodeId id) {
+    if (id == 0)
+      return false;
+    ::ui::NodeSnapshot s = {};
+    return retained_tree_.snapshot(id, &s) && s.role == ::ui::NodeRole::Button &&
+           !s.interaction.disabled;
+  };
+  ::ui::NodeId hovered_now = ::ui::focus_hovered_id(retained_focus_);
+  if (audible_button(hovered_now))
+    audio_events_.hovered_button = hovered_now;
+  if (audible_button(confirmed))
+    audio_events_.activated_button = true;
+  if ((input.nav_up || input.nav_down || input.nav_left || input.nav_right) &&
+      audible_button(focused))
+    audio_events_.nav_focused_button = true;
+
   ::ui::NodeId active = ::ui::focus_focused_id(retained_focus_);
   for (int i = 0; i < input.key_event_count; ++i) {
     retained_tree_.invoke_key(active, input.key_events[i]);

@@ -149,3 +149,49 @@
   (777/463/757/436/180/20/19). Verify the mapping against ALL authored values
   before wiring; a single uniform rounding rule does NOT exist (463.5 floors,
   19.5 rounds up).
+
+- **The follow-camera's rest position is render-cadence-dependent — pin it, don't chase
+  it.** Camera::Follow has a 100px y-hysteresis (h=100, yoffset=30): the endpoint after
+  the spawn fall depends on how many render frames sampled the fall, so a heavier UI
+  changed our camera endpoint vs origin's at the SAME sim tick (world content ~100px
+  off; sim itself byte-matched). Fix: a `camera` control op + per-capture phase
+  correlation of the world band against the golden (converges in 1-2 iterations).
+
+- **Rain can't be sampled away — disable it at the source for golden gating.** Median
+  capture (5..9 frames over up to 3s) still leaked slow parallax streaks and the
+  marginal tiles flapped around the 5% line run-to-run. The `rain` control op (skips
+  DrawRain/DrawRainPuddles) makes our render deterministic; the goldens' own frozen
+  rain is absorbed by the documented masks + tile tolerance (worst tile dropped 5.8 →
+  ~2.5%).
+
+- **A conditionally-mounted Input means conditional hooks — wrap it in its own
+  component.** The chat compose Input's internal use_state ran inside InGameScreenView
+  only while chat was active; hook slots shifted across frames and the Input subtree
+  intermittently failed to mount (probes fine, full captures missing the typed text).
+  Fiber-wrapping the compose row (::ui::component) made hook order stable. Symptom
+  signature: a subtree present in one run's `inspect` and absent in the next, with no
+  errors logged.
+
+- **"Invisible" focusable boxes still wear the theme — clear paint with
+  chromeless(true), not just background/border/outline.** The ghost buy/tech row
+  targets painted a sub-TOL stipple-parity artifact through the Box role's default
+  paint that turned tech_overlay from byte-identical to 505 px off; clearing individual
+  paint fields wasn't enough.
+
+- **origin `scaled=true` on TeamEmblem means DOWNsample.** Renderer::DrawScaled(factor
+  2) SKIPS every other pixel (half size), it does not magnify; the team-strip emblem is
+  the bank-181 sprite at half res (the cc screens scale the same art UP via Contain).
+  Read the blitter before trusting a flag name — same lesson as PackImage cover.
+
+- **origin's translucent UI fills are palette-INDEX mixes.** Clay backgroundColor.r is
+  a palette index and the compositor routes each pixel through the alpha LUT
+  (AlphaSrcIndex + Palette::Alpha), quantized to the palette. Linear RGB blending of
+  the F1 player-list dim read 30%/tile; reproducing the LUT in the headless composite
+  (and mapping black to index 0 — the low reserved rows are real mixes) made it exact.
+  Same family: DrawAlphaed ammo digits = Alpha(glyph, well_index) baked per glyph.
+
+- **At s=1 (in-game 640x480) the two-hop problem vanishes but float rects still
+  matter.** Sprites draw 1:1 with no phase variants needed; the only correctness rules
+  are (a) author logical = ceil(1.5·d − .25) so device floors recover d, and (b) snap
+  near-1:1 image dst rects to integers in the executor — a w+1/3 rect bled an extra
+  stipple row/column on parity-sensitive art.

@@ -161,49 +161,41 @@ PY
 # region best matches the golden.
 shot_pulse_match() {
   local name="$1" x0="$2" y0="$3" x1="$4" y1="$5"
-  local best="" bestv=999999999
-  for i in $(seq 1 10); do
+  for i in $(seq 1 40); do
     cli screenshot --out "/tmp/pulse_${PORT}_$i.png" >/dev/null
-    local v
-    v="$(python3 - "/tmp/pulse_${PORT}_$i.png" "$REPO_ROOT/tests/cli-agent/e2e/golden/$name.png" "$x0" "$y0" "$x1" "$y1" <<'PY'
+    cli wait_ms --n 90 >/dev/null
+  done
+  python3 - "$PORT" "$REPO_ROOT/tests/cli-agent/e2e/golden/$name.png" \
+    "$OUT_DIR/$name.png" "$x0" "$y0" "$x1" "$y1" <<'PY'
 import sys
 import numpy as np
 from PIL import Image
-a = np.array(Image.open(sys.argv[1]).convert("RGB"), dtype=int)
-b = np.array(Image.open(sys.argv[2]).convert("RGB"), dtype=int)
-x0, y0, x1, y1 = map(int, sys.argv[3:7])
-print(int(np.abs(a[y0:y1, x0:x1] - b[y0:y1, x0:x1]).sum()))
+port, golden, out = sys.argv[1:4]
+x0, y0, x1, y1 = map(int, sys.argv[4:8])
+b = np.array(Image.open(golden).convert("RGB"), dtype=int)
+frames, resids = [], []
+for i in range(1, 41):
+    a = np.array(Image.open(f"/tmp/pulse_{port}_{i}.png").convert("RGB"))
+    frames.append(a)
+    resids.append(int(np.abs(a[y0:y1, x0:x1].astype(int) - b[y0:y1, x0:x1]).sum()))
+order = np.argsort(resids)
+# Median the 5 best pulse-phase matches (same brightness recurs every 800ms)
+# so transient rain streaks drop out like the plain-shot median.
+pick = [frames[i] for i in order[:5]]
+med = np.median(np.stack(pick), axis=0).astype(np.uint8)
+Image.fromarray(med).save(out)
+print(f"captured {sys.argv[2].split('/')[-1].replace('.png','')} "
+      f"(pulse-matched median, best resid {resids[order[0]]})")
 PY
-)"
-    if [ "$v" -lt "$bestv" ]; then bestv="$v"; best="/tmp/pulse_${PORT}_$i.png"; fi
-    [ "$v" -eq 0 ] && break
-    cli wait_ms --n 110 >/dev/null
-  done
-  cp "$best" "$OUT_DIR/$name.png"
-  echo "captured $name (pulse-matched, resid $bestv)"
 }
 
-# shot <name>: per-pixel median of 5 frames. The sim is paused (the world is
-# static) but rain streaks animate per render frame on the wall clock — the
-# median erases OUR transient streaks so the diff carries only the golden's.
-shot() {
-  local name="$1"
-  for i in 1 2 3 4 5; do
-    cli screenshot --out "/tmp/med_${PORT}_$i.png" >/dev/null
-    cli wait_ms --n 60 >/dev/null
-  done
-  python3 - "$PORT" "$OUT_DIR/$name.png" <<'PY'
-import sys
-import numpy as np
-from PIL import Image
-port, out = sys.argv[1], sys.argv[2]
-stack = np.stack([np.array(Image.open(f"/tmp/med_{port}_{i}.png").convert("RGB"))
-                  for i in range(1, 6)])
-med = np.median(stack, axis=0).astype(np.uint8)
-assert med.shape[1] == 640 and med.shape[0] == 480, "not 640x480"
-Image.fromarray(med).save(out)
-PY
-  echo "captured $name (median of 5)"
+shot() { # shot <name> — single frame; our rain layer is disabled (`rain` op)
+  cli screenshot --out "$OUT_DIR/$1.png" >/dev/null
+  bun -e '
+    const b = new DataView(await Bun.file(process.argv[1]).arrayBuffer());
+    if (b.getUint32(16) !== 640 || b.getUint32(20) !== 480) { console.error("not 640x480"); process.exit(1); }
+  ' "$OUT_DIR/$1.png"
+  echo "captured $1"
 }
 
 # chat captures must be caret-ON (wall-clock blink): keep the brighter of a
@@ -246,6 +238,10 @@ PID=$!
 drive_to_anchor
 
 step_to_mp 0
+# Our rain/puddle layer is rand()-driven on the wall clock and can never match
+# the goldens' frozen streaks — disable it; the golden's own rain is absorbed
+# by the documented masks + tile tolerance.
+cli rain --enabled 0 >/dev/null
 cli wait_ms --n 1000 >/dev/null
 
 cli ingame_ui_mode --mode clear >/dev/null
