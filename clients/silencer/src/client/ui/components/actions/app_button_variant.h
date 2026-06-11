@@ -80,24 +80,32 @@ inline ::ui::LayoutStyle app_button_layout(AppButtonSize size, bool /*selected*/
 // the caps at texture-pixel size, visibly squarer than the golden). Native cell
 // 196x33 (Md) -> 294x49.5 at the x1.5 logical scale; labels size wider ovals.
 inline ::ui::LayoutStyle app_button_oval_layout(AppButtonSize size) {
-  float min_w = 294.0f, h = 49.5f;
-  if (size == AppButtonSize::Sm) {
-    // The keybind bind-slot oval (only Oval Sm user): native 112x33 cell x1.5.
-    min_w = 168.0f;
-  } else if (size == AppButtonSize::Lg) {
-    min_w = 330.0f; // native 220x33 cell x1.5
-  } else if (size == AppButtonSize::List) {
+  if (size == AppButtonSize::List) {
     // origin LegacyRow plate (bank 6 idx2, 236x27): 40.5 tall at x1.5,
-    // stretched to the pane width (small min).
-    min_w = 104.0f;
-    h = 40.5f;
+    // stretched to the pane width (grow-able min, unlike the fixed ovals).
+    return {
+        .align_items = ::ui::AlignItems::Center,
+        .justify_content = ::ui::JustifyContent::Center,
+        .min_width = ::ui::Length::points(104.0f),
+        .height = ::ui::Length::points(40.5f),
+        .padding = {16.0f, 16.0f, 6.0f, 6.0f},
+    };
   }
+  float w = 294.0f; // Md: native 196x33 cell x1.5
+  if (size == AppButtonSize::Sm)
+    w = 168.0f; // keybind bind-slot oval (only Oval Sm user): native 112x33
+  else if (size == AppButtonSize::Lg)
+    w = 330.0f; // native 220x33
+  // Origin ovals are FIXED sprite cells — a long label ("Connect To Lobby")
+  // squeezes inside the cell, never widens it (golden: all menu pills 441
+  // device px wide). Vertical padding asymmetric: origin's label baseline
+  // sits ~2 device px lower than symmetric centering.
   return {
       .align_items = ::ui::AlignItems::Center,
       .justify_content = ::ui::JustifyContent::Center,
-      .min_width = ::ui::Length::points(min_w),
-      .height = ::ui::Length::points(h),
-      .padding = {16.0f, 16.0f, 6.0f, 6.0f},
+      .width = ::ui::Length::points(w),
+      .height = ::ui::Length::points(49.5f),
+      .padding = {16.0f, 16.0f, 7.5f, 4.5f},
   };
 }
 

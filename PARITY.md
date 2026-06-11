@@ -10,10 +10,10 @@ All measured 2026-06-11 (iteration 0) with recalibrated tile gate, fresh capture
 
 | Surface | State | Evidence (global% / hot tiles / worst tile) | Notes |
 |---|---|---|---|
-| mainmenu | DIVERGED | 1.12% / 27 / 18.0% @1482,468 (was 2.32/49/32.5) | backdrop now matches; residual = oval buttons slightly wider/lower + sprite striping (single-hop chrome scale) |
-| options | DIVERGED | 1.21% / 32 / 22.3% @936,312 (was 2.77/64) | residual = bar plates ~2px off + chrome striping |
-| options_audio | DIVERGED | 0.74% / 22 / 17.9% @702,468 (was 2.23/52) | best screen; global under 1%, tiles = chrome/text detail |
-| options_display | DIVERGED | 1.51% / 43 / 27.6% @1170,468 (was 2.98/70) | toggle/row region |
+| mainmenu | DIVERGED | 0.83% / 18 / 10.0% @1170,312 (was 2.32/49/32.5) | labels ±1px (cross-correlated); residual = sprite-interior striping phase (GPU center-sample vs origin floor) — candidate global executor fix |
+| options | **PASS** | pixdiff PASS 0.26%/0 hot (4.2 max) + gate wf_45c1807c-d48 overall=PASS, 6/6 critics 0.95-0.97 (2026-06-11) | fixed-width ovals + gap 28.5 (origin kButtonGap 19) + label pad 7.5/4.5 |
+| options_audio | DIVERGED | 0.64% / 21 / 17.9% @1170,312 (was 2.23/52) | panel content rows |
+| options_display | DIVERGED | 1.52% / 38 / 27.6% @1170,468 (was 2.98/70) | toggle/row region |
 | options_controls | DIVERGED | 7.75% / 202 / 28.8% @1638,780 | UNCHANGED by backdrop fix — keybind grid itself diverges (row pitch/columns); panel covers most backdrop |
 | lobby_connect | DIVERGED | 1.46% / 41 / 25.9% @780,780 | CORRECTED DIAGNOSIS: button row IS centered right (origin's floating row escapes pad-84 and centers across panel); real diff = button chrome detail (inner inset frame) + widths (L/C 275 vs 250 device px) |
 | character_create | DIVERGED | 1.59% / 41 / 17.9% @468,234 (was 2.17/58) | portrait row + panel chrome |

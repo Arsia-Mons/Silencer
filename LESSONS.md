@@ -1,5 +1,13 @@
 # LESSONS.md — one lesson per entry, why it mattered
 
+- **Measure geometry before touching layout code.** lobby_connect's "button shift" was a
+  misdiagnosis from one eyeball pass — ink-mask bbox + cross-correlation showed the row was
+  already centered (origin's floating row escapes its parent padding). The options fix went
+  the other way: pill-bbox profiling found the real 3px pitch error in minutes and origin
+  source confirmed the constant (kButtonGap 19). numpy masks first, edits second.
+- **The cppx transpiler rejects comments inside JSX attribute initializer braces** —
+  put comments above the element, not inside `layout={{...}}`.
+
 - **Hot tiles cluster by family — diagnose the family before fixing screens.** Iteration 0:
   13/13 screens failed the tile gate, but the worst tiles in 8 of them are the same Mars
   backdrop region. Measuring one tile's row profile revealed a single systemic cause

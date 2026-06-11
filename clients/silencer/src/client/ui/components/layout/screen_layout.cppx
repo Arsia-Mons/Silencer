@@ -65,6 +65,7 @@ using ::ui::components::DialogProps;
         {{0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}}});
     // Small inset so the near-full-bleed cc/controls frames reach the golden
     // extents; the options menus center their content so it's unaffected.
+    // gap 28.5 = origin options_screen kButtonGap (19 virtual px x1.5).
     return <Dialog
       key={props.key}
       layout={::ui::LayoutStyle{
@@ -74,7 +75,7 @@ using ::ui::components::DialogProps;
         .width = ::ui::Length::percent(100.0f),
         .height = ::ui::Length::percent(100.0f),
         .padding = {8.0f, 8.0f, 8.0f, 8.0f},
-        .gap = 30.0f,
+        .gap = 28.5f,
       }}
       style={overlay_bg}
     >
