@@ -36,4 +36,21 @@ void bake_backdrop_rgba(const uint8_t *indices, int sw, int sh,
                         int legacy_w, int legacy_h, int dw, int dh,
                         uint8_t *out_rgba);
 
+// Element-level variant of the same two-hop chain, for STRETCHED chrome that
+// is not full-bleed (e.g. the Options-Controls frame, PackImageStretch(7,7)):
+// the sprite stretches into its virtual element box bx,by,bw,bh (virtual-
+// canvas px, origin DispatchImage int arithmetic), then the whole-frame
+// magnify maps device px back through int(gx/s). The output texture covers
+// ABSOLUTE device pixels [dev_x, dev_x+tex_w) x [dev_y, dev_y+tex_h) — a
+// device-grid-aligned cover of the element's footprint chosen by the caller —
+// so an element's internal dither phase depends on its virtual position
+// exactly as on origin's glass. Pixels outside the element box / sprite index
+// 0 stay transparent and composite over the separately-baked backdrop.
+// `out_rgba` >= tex_w*tex_h*4, zeroed by caller.
+void bake_element_rgba(const uint8_t *indices, int sw, int sh,
+                       const SDL_Color *palette256, int bx, int by, int bw,
+                       int bh, int legacy_w, int legacy_h, int dw, int dh,
+                       int dev_x, int dev_y, int tex_w, int tex_h,
+                       uint8_t *out_rgba);
+
 } // namespace silencer::cppx_ui

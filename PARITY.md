@@ -14,12 +14,12 @@ All measured 2026-06-11 (iteration 0) with recalibrated tile gate, fresh capture
 | options | **PASS** | pixdiff PASS 0.26%/0 hot (4.2 max) + gate wf_45c1807c-d48 overall=PASS, 6/6 critics 0.95-0.97 (2026-06-11) | fixed-width ovals + gap 28.5 (origin kButtonGap 19) + label pad 7.5/4.5 |
 | options_audio | DIVERGED | 0.61% / 21 / 12.0% @1170,312 (was 2.23/52/32.5) | toggle semantics fixed (origin: l=12 on/13 off, r=15 on/14 off — was mirrored single cell); cells now ±2px; residual = label-baseline band + striping phase |
 | options_display | DIVERGED | 1.48% / 40 / 23.1% @702,624 (was 2.98/70/32.5) | Save/Cancel pills ±2px; render label band extends ~5px lower than golden in action row |
-| options_controls | DIVERGED | 7.73% / 202 / 28.8% @1638,780 | DIAGNOSED 2026-06-11: rail/frame colors byte-identical (rail palette {0,52,0}/{4,76,0} matches), bind ovals ±2px — the heat is the STRETCHED chrome_controls sprite scaled single-hop vs origin two-hop (dither-phase shifts across the whole 628×441 frame). Fix = extend bake_backdrop two-hop to large stretched chrome at its device rect (origin has NO live scrollbar here — rail is baked; show_scrollbar=false is correct) |
+| options_controls | DIVERGED | 1.29% / 30 / 10.1% @1092,234 (was 7.73/202/28.8) | ELEMENT TWO-HOP BAKE LANDED 2026-06-11: chrome_controls baked at its device footprint (bake_element_rgba; virtual box from origin kFrameMargin* + GROW, phase from absolute device px), Panel draws it 1:1 via an absolutely-positioned device-grid-aligned rect — frame/rail/bottom bands byte-identical (rail diff frac 0.00000), content re-anchored (grid -1,0 cross-correlated). Residual = bind/preset OVAL interior striping (single-hop chrome family, same as mainmenu/options_*) + label ±2px |
 | lobby_connect | DIVERGED | 1.46% / 41 / 25.9% @780,780 | CORRECTED DIAGNOSIS: button row IS centered right (origin's floating row escapes pad-84 and centers across panel); real diff = button chrome detail (inner inset frame) + widths (L/C 275 vs 250 device px) |
 | character_create | DIVERGED | 1.59% / 41 / 17.9% @468,234 (was 2.17/58) | portrait row + panel chrome |
 | cc_alias | DIVERGED | 2.20% / 56 / 21.2% @624,468 (was 2.77/73) | alias dialog region |
 | cc_select_agency | DIVERGED | 7.09% / 125 / 40.7% @1092,546 | agency Description paragraph: glyph metrics/wrap slightly off → dense text amplifies |
-| lobby_screen | DIVERGED | 3.68% / 94 / 31.9% @234,312 (was 4.00/114) | VERIFIED BY EYE: agent-card emblem scale/pos, WINS/LOSSES/XP row spacing (golden has gap before XP), Agents button sits higher + wrong chrome |
+| lobby_screen | DIVERGED | 3.68% / 94 / 31.9% @234,312 (was 4.00/114) | VERIFIED BY EYE: agent-card emblem scale/pos, WINS/LOSSES/XP row spacing, Agents button high + wrong chrome. ORIGIN SPEC (character_panel.cpp, virtual px → ×1.5 logical): content pad 6, emblem↔info gap 10; left rail emblemBoxW=clamp(inner*18%,40,64) square Contain emblem + LevelBadge(bodyLineH, centered); info col gap 5: name(heading lineH) → details row: stats col gap 10 [stat table gap 2: WINS,LOSSES rows; label col = w("LOSSES")+4] → XP line → actions row h21 (Chrome "Agents" minW 92 padX 12). The LOSSES↔XP gap = 10 virtual (15 logical) — that's the visible golden gap before XP |
 | create_game | DIVERGED | 5.24% / 114 / 38.4% @1248,468 | Select Map list: tighter row pitch than golden + panel ~20px right |
 | game_staging | DIVERGED | 4.20% / 93 / 32.9% @1248,156 | shares lobby panels + right panel |
 | tech_select | DIVERGED | 5.38% / 106 / 34.3% @1326,312 | tech grid region divergent |
@@ -28,6 +28,21 @@ Measurements above re-run 2026-06-11 after the backdrop two-hop bake landed (bui
 fresh captures). Next systemic family: chrome sprites (ovals/panels/buttons) are baked
 native and scaled single-hop by the executor; origin scales them through the same
 two-hop virtual-canvas chain as the backdrop — sizes land ±few px and striping differs.
+
+ELEMENT TWO-HOP DESIGN — IMPLEMENTED 2026-06-11 (sprite_bake.cpp bake_element_rgba +
+PipelineHost::bake_element_sprite; first consumer chrome_controls in BakeChromeTextures):
+origin stretches the sprite into its virtual element box (bx,by,bw,bh virtual) then the
+global magnify maps device px src=int(gx/s) — an element's internal pixel phase depends on
+its virtual position, so the bake evaluates the full chain at ABSOLUTE device pixels and
+emits a texture covering the element's device footprint (index 0 → transparent, composites
+over the separately-baked two-hop backdrop). Draw contract: the texture rect snaps OUTWARD
+to logical points that land on integer device px (Yoga rounds layout to whole logical px —
+at scale 1.5 only EVEN logical coords are device-integral; uncovered fringe bakes
+transparent) and the consumer absolutely positions a box of exactly that logical rect
+(Yoga abs inset = parent border edge, padding excluded — verified in yoga-src
+AbsoluteLayout.cpp). Validated: rail/left/bottom frame bands byte-identical vs golden.
+Next consumers: the single-hop oval/chrome-button sprites (now the dominant residual
+family on options_* and mainmenu).
 
 ### [systemic] Backdrop scanline-striping arithmetic — root of most menu hot tiles
 

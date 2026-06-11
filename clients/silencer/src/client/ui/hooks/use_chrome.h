@@ -53,10 +53,14 @@ struct ChromeTextures {
   uint32_t chrome_panel = 0; // bank 7 idx 5  (character_create / mission_summary)
   uint16_t chrome_panel_w = 0, chrome_panel_h = 0;
   // Single-pane Options·Controls frame (bank 7 idx 7): a baked title-header notch
-  // (top-center) + right-edge scrollbar rail. STRETCHED to fill the overlay
-  // (origin/main PackImageStretch(7,7)), distinct from the two-pane chrome_panel.
+  // (top-center) + right-edge scrollbar rail. STRETCHED in origin
+  // (PackImageStretch(7,7)), so it is baked at its DEVICE footprint through
+  // origin's two-hop chain (like the backdrops) and must be drawn 1:1: the
+  // x/y/w/h carry the exact logical-point rect (absolute, screen-relative)
+  // the texture was baked for. w == 0 => not baked.
   uint32_t chrome_controls = 0; // bank 7 idx 7
-  uint16_t chrome_controls_w = 0, chrome_controls_h = 0;
+  float chrome_controls_x = 0, chrome_controls_y = 0;
+  float chrome_controls_w = 0, chrome_controls_h = 0;
   uint32_t dialog_msg = 0; // bank 40 idx 4 (message modal)
   uint16_t dialog_msg_w = 0, dialog_msg_h = 0;
   uint32_t dialog_pw = 0; // bank 40 idx 2 (password modal + cc-alias confirm)

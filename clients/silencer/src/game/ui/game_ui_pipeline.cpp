@@ -51,6 +51,7 @@
 #include "ui/runtime/react.h"
 #include <SDL3/SDL.h>
 #include <algorithm>
+#include <cmath>
 #include <cstdlib>
 #include <cstring>
 #include <memory>
@@ -174,7 +175,7 @@ outH = cppxUiH;
 return cppxUiRgba;
 }
 
-void GameUiPipeline::BakeChromeTextures() {
+void GameUiPipeline::BakeChromeTextures(int rw, int rh, float uiScale) {
 // Bake the curated legacy chrome sprites into texture_ids. Runs once per host
 // renderer lifetime (guarded by PipelineHost::chrome_needs_bake). This is the
 // ONLY place that reads the indexed spritebank + active palette; the resulting
@@ -228,7 +229,6 @@ bake(7, 24, cppxChrome.chrome_btn_idle);
 bake(7, 28, cppxChrome.chrome_btn_focus);
 // Frame sprites (plain, native size): bank-7 chrome panel + bank-40 dialog frames.
 bake(7, 5, cppxChrome.chrome_panel, &cppxChrome.chrome_panel_w, &cppxChrome.chrome_panel_h);
-bake(7, 7, cppxChrome.chrome_controls, &cppxChrome.chrome_controls_w, &cppxChrome.chrome_controls_h);
 bake(40, 4, cppxChrome.dialog_msg, &cppxChrome.dialog_msg_w, &cppxChrome.dialog_msg_h);
 bake(40, 2, cppxChrome.dialog_pw, &cppxChrome.dialog_pw_w, &cppxChrome.dialog_pw_h);
 // bank 7 idx 2 — the lobby-connect dialog (origin PackImage(7,2)): frame, soft
@@ -253,6 +253,72 @@ if(id) id_out = id;
 bake_backdrop(6, 0, false, cppxChrome.starfield);
 bake_backdrop(6, 0, true, cppxChrome.starfield_stretched);
 bake_backdrop(7, 1, true, cppxChrome.lobby_backdrop);
+// Options·Controls frame (bank 7 idx 7, origin PackImageStretch(7,7)): a
+// STRETCHED element, so its dither phase only matches the golden through the
+// same two-hop chain, evaluated at the element's absolute device footprint.
+// Recreate origin's virtual element box (options_controls_screen.cpp: root
+// padding = legacy margins L5/R7/T6/B20 scaled into the virtual canvas, panel
+// GROWs to fill, height min 420), then bake at a device rect snapped outward
+// to logical points that land on integer device px — Yoga rounds layout to
+// whole logical px, so only those draw 1:1 (e.g. even points at scale 1.5).
+// The Panel absolutely positions a box of exactly this logical rect.
+if(7 < banks.size() && 7 < banks[7].size()){
+const std::shared_ptr<Surface> &sp = banks[7][7];
+if(sp && sp->w > 0 && sp->h > 0 && !sp->pixels.empty()){
+float s = std::min(rw / (float)kLegacyRenderWidth, rh / (float)kLegacyRenderHeight);
+if(s < 1.0f) s = 1.0f;
+const int vw = std::max(1, (int)(rw / s));
+const int vh = std::max(1, (int)(rh / s));
+auto scale_legacy = [](int v, int cur, int legacy){
+return std::max(0, (v * cur + legacy / 2) / legacy);
+};
+const int bx = scale_legacy(5, vw, kLegacyRenderWidth);
+const int by = scale_legacy(6, vh, kLegacyRenderHeight);
+const int bw = vw - bx - scale_legacy(7, vw, kLegacyRenderWidth);
+const int bh = std::max(420, vh - by - scale_legacy(20, vh, kLegacyRenderHeight));
+// Device footprint of the element under the centered whole-frame magnify.
+const int scaledW = (int)(vw * s + 0.5f);
+const int scaledH = (int)(vh * s + 0.5f);
+const int offX = scaledW < rw ? (rw - scaledW) / 2 : 0;
+const int offY = scaledH < rh ? (rh - scaledH) / 2 : 0;
+const int fx0 = offX + (int)std::ceil(bx * s);
+const int fy0 = offY + (int)std::ceil(by * s);
+const int fx1 = std::min(offX + (int)std::ceil((bx + bw) * s), rw);
+const int fy1 = std::min(offY + (int)std::ceil((by + bh) * s), rh);
+// Snap a logical point onto the integer-device grid (bounded search; falls
+// back to the nearest logical px when uiScale admits no exact hit).
+auto device_integral = [&](int l){
+const float d = l * uiScale;
+return std::fabs(d - std::floor(d + 0.5f)) < 0.01f;
+};
+auto snap_lo = [&](int dev){
+int l = (int)std::floor(dev / uiScale);
+for(int k = 0; k < 8 && l > 0 && !device_integral(l); ++k) --l;
+return l;
+};
+auto snap_hi = [&](int dev){
+int l = (int)std::ceil(dev / uiScale);
+for(int k = 0; k < 8 && !device_integral(l); ++k) ++l;
+return l;
+};
+const int lx0 = snap_lo(fx0), ly0 = snap_lo(fy0);
+const int lx1 = snap_hi(fx1), ly1 = snap_hi(fy1);
+const int devX = (int)std::floor(lx0 * uiScale + 0.5f);
+const int devY = (int)std::floor(ly0 * uiScale + 0.5f);
+const int texW = (int)std::floor(lx1 * uiScale + 0.5f) - devX;
+const int texH = (int)std::floor(ly1 * uiScale + 0.5f) - devY;
+uint32_t id = cppxHost->bake_element_sprite(
+    sp->pixels.data(), sp->w, sp->h, page_for_bank(7), bx, by, bw, bh,
+    kLegacyRenderWidth, kLegacyRenderHeight, devX, devY, texW, texH);
+if(id){
+cppxChrome.chrome_controls = id;
+cppxChrome.chrome_controls_x = (float)lx0;
+cppxChrome.chrome_controls_y = (float)ly0;
+cppxChrome.chrome_controls_w = (float)(lx1 - lx0);
+cppxChrome.chrome_controls_h = (float)(ly1 - ly0);
+}
+}
+}
 // bank 208 frame 60 — the static SILENCER logo (final reveal frame).
 bake(208, 60, cppxChrome.logo, &cppxChrome.logo_w, &cppxChrome.logo_h);
 // SIL-94/107: the logo reveal frames (individual textures). [0] is the full
@@ -447,7 +513,7 @@ if(!cppxHost->ensure(rw, rh, SILENCER_CPPX_FONT_DIR)) return;
 // composition root is the only place that may read the indexed spritebank +
 // palette; the ids flow to screens through the ChromeTexturesProvider below.
 if(cppxHost->chrome_needs_bake()){
-BakeChromeTextures();
+BakeChromeTextures(rw, rh, cppxScale);
 cppxHost->mark_chrome_baked();
 }
 

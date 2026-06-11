@@ -113,32 +113,42 @@ float panel_size_width(PanelSize size) {
     break;
   }
   case PanelVariant::ControlsFrame: {
-    // Single-pane Options·Controls frame (bank 7 idx7), drawn STRETCHED to
-    // GROW-FILL the overlay (origin/main PackImageStretch(7,7)) — NOT the
-    // two-pane native-size chrome_panel. The sprite bakes its own title-header
-    // notch (top-center) + right-edge scrollbar rail, so the screen draws
-    // neither. origin frame margins from the screen edge are L10/R14/T9/B30
-    // logical (kFrameMargin* x-scaled); the Overlay layout already pads 8, so
-    // the margins carry the remainder. Vertical padding clears the baked title
-    // notch (kPanelPadTop 70 x1.5) and footer (22 x1.5); content centers itself
-    // horizontally (origin childAlignment CENTER_X). Falls back to a vector
-    // green panel.
+    // Single-pane Options·Controls frame (bank 7 idx7), STRETCHED in origin
+    // (PackImageStretch(7,7)). The sprite bakes its own title-header notch
+    // (top-center) + right-edge scrollbar rail, so the screen draws neither.
+    // The texture is baked at the element's DEVICE footprint through origin's
+    // two-hop chain (its dither phase is position-dependent), so the box must
+    // draw it 1:1: absolutely positioned at the exact logical rect the bake
+    // assumed (integer device px by construction). Padding re-centers the
+    // content where the previous flow layout put it (the keybind grid was
+    // pixdiff-tuned against the golden there): the baked title notch is
+    // cleared by the top padding, content centers horizontally (origin
+    // childAlignment CENTER_X). Falls back to a vector green panel.
     client::ui::ChromeTextures chrome = client::ui::use_chrome();
-    layout = ::ui::LayoutStyle{
-        .direction = ::ui::FlexDirection::Column,
-        .align_items = ::ui::AlignItems::Center,
-        // origin's frame box measured from the golden ink: 1870.8 device wide
-        // (1247.2 logical), centered; percent-width + side margins can't express
-        // it (Yoga recenters the overflow), so the width is explicit.
-        .width = ::ui::Length::points(1254.5f),
-        .flex_grow = ::ui::StyleFloat::points(1.0f),
-        .margin = {2.3f, 0.0f, 1.0f, 22.0f},
-        .padding = {0.0f, 0.0f, 105.0f, 33.0f},
-    };
-    overlay = chrome.chrome_controls
-                  ? tokens::image_patch(chrome.chrome_controls)
-                  : tokens::panel_patch(tokens::kSurfaceHeroPanel,
-                                        tokens::kBorderHeroPanel);
+    if (chrome.chrome_controls && chrome.chrome_controls_w > 0.0f) {
+      layout = ::ui::LayoutStyle{
+          .position = ::ui::PositionType::Absolute,
+          .direction = ::ui::FlexDirection::Column,
+          .align_items = ::ui::AlignItems::Center,
+          .width = ::ui::Length::points(chrome.chrome_controls_w),
+          .height = ::ui::Length::points(chrome.chrome_controls_h),
+          .padding = {0.0f, 0.0f, 106.5f, 33.0f},
+          .position_inset = {chrome.chrome_controls_x, {},
+                             chrome.chrome_controls_y, {}},
+      };
+      overlay = tokens::image_patch(chrome.chrome_controls);
+    } else {
+      layout = ::ui::LayoutStyle{
+          .direction = ::ui::FlexDirection::Column,
+          .align_items = ::ui::AlignItems::Center,
+          .width = ::ui::Length::points(1254.5f),
+          .flex_grow = ::ui::StyleFloat::points(1.0f),
+          .margin = {2.3f, 0.0f, 1.0f, 22.0f},
+          .padding = {0.0f, 0.0f, 105.0f, 33.0f},
+      };
+      overlay = tokens::panel_patch(tokens::kSurfaceHeroPanel,
+                                    tokens::kBorderHeroPanel);
+    }
     break;
   }
   }

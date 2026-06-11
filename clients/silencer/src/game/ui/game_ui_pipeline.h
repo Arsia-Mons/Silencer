@@ -100,7 +100,10 @@ return keybindCapture_.pending;
 
 private:
 void RenderCppxClientUiFrame(Surface & surface);
-void BakeChromeTextures(); // SIL-87: bake curated legacy sprites → cppxChrome
+// SIL-87: bake curated legacy sprites → cppxChrome. rw/rh = device resolution,
+// uiScale = the logical-canvas content scale (device-res element bakes derive
+// their logical draw rect from it).
+void BakeChromeTextures(int rw, int rh, float uiScale);
 client::ui::SessionPhase CurrentSessionPhase() const;
 
 Game & game;

@@ -75,6 +75,15 @@ public:
                                 const SDL_Color *palette256, bool stretch,
                                 int legacy_w, int legacy_h);
 
+  // Bake a STRETCHED (non-full-bleed) element through the same two-hop chain
+  // at its absolute device footprint (see bake_element_rgba). The caller
+  // derives the virtual element box bx,by,bw,bh and a device-grid-aligned
+  // texture rect; the texture must then be drawn 1:1 at exactly (dev_x, dev_y).
+  uint32_t bake_element_sprite(const uint8_t *indices, int w, int h,
+                               const SDL_Color *palette256, int bx, int by,
+                               int bw, int bh, int legacy_w, int legacy_h,
+                               int dev_x, int dev_y, int tex_w, int tex_h);
+
   // Build one bitmap glyph FACE atlas (origin/main text parity). `glyphs[i]` is
   // the source sprite for char GlyphFonts::kFirstChar + i (null/empty = blank
   // cell). advance/line_height are the native (640-space) bank metrics. Baked

@@ -43,7 +43,7 @@ constexpr float kRowContentH = 81.0f;
 constexpr float kRowGap = 15.0f;     // kRowGap 10 x1.5
 constexpr float kRowH = kRowContentH + kRowGap; // virtualized row pitch
 constexpr float kPresetRowH = 64.5f; // kPresetRowH 43 x1.5
-constexpr float kSectionGap = 12.0f; // kSectionGap 8 x1.5
+constexpr float kSectionGap = 10.5f; // kSectionGap 8 x1.5, -1.5 golden-measured
 constexpr float kViewportH = kRowH * 3.0f + kRowContentH; // 4 visible rows
 
 // One left-aligned grid label (origin TextSize::Heading, bank 134).
@@ -307,7 +307,7 @@ struct OptionsControlsProps {
           layout={::ui::LayoutStyle{.height = ::ui::Length::points(kSectionGap)}}
         />
         {table}
-        <Box key="actiongap" layout={::ui::LayoutStyle{.height = ::ui::Length::points(48.5f)}} />
+        <Box key="actiongap" layout={::ui::LayoutStyle{.height = ::ui::Length::points(50.0f)}} />
         <Box
           key="actionwrap"
           layout={::ui::LayoutStyle{
