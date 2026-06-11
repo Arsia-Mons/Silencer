@@ -1,34 +1,69 @@
 #!/usr/bin/env python3
-# Perceptual/tolerant pixdiff for cppx<->origin parity.
+# Tolerant pixdiff for cppx<->origin parity: global % + per-tile worst-case.
 #
-# Raw byte-exact tools/pixdiff is ~38% even at perfect visual parity because
-# origin point-upscales its low-res framebuffer (scanline striping + uneven
-# row-doubling) while cppx renders crisp. This downsamples both to a low res
-# (killing that high-frequency upscale/AA noise) and reports the structural
-# difference, which is what the user's "<1%, ideally 0.5%" target is about.
+# Why not byte-exact at full res: origin point-upscales a low-res framebuffer
+# (scanline striping) while cppx renders crisp, so raw pixdiff reads ~38% at
+# perfect visual parity. Why not a plain global average: a shifted button or
+# extra hairline is <0.2% of screen area and sails under any global threshold
+# (calibrated 2026-06-11 — the old 320x180 global-only metric passed renders
+# with 30px-misplaced buttons).
+#
+# Design (calibrated against injected defects vs noise proxies):
+# - compare at 640x360 BOX: kills 1px-offset / resample-striping noise
+#   (noise proxies max ~9.6%/tile) while real defects stay hot
+#   (6px shift ~20%/tile, palette flatten ~61%/tile).
+# - tile the working image into ~26px tiles (~80px regions at 1920x1080) and
+#   report the worst tiles with full-res coords for direct inspection.
+#
+# Gate: PASS requires global < 1.0% AND no tile > 5% (user-tightened from 10%,
+# 2026-06-11: prefer false FAILs over false PASSes). 5% catches typeface-drift
+# (~6.4%/tile) but sits below the synthetic noise ceiling (~9.6%/tile resample
+# proxy) — tiles in the 5-10% band can be renderer grain; adjudicate those by
+# opening both images at the printed coords. 1px hairline errors (~2%/tile)
+# remain below the floor — eyes + critic workflow own those.
 #
 #   python3 tools/cap/pixdiff_tolerant.py <render.png> <golden.png>
-#
-# Prints: tol% (channel-bytes off by >TOL at low-res) and mae (mean abs error).
 import sys
 from PIL import Image
 import numpy as np
 
-TOL = 16          # per-channel tolerance after downscale
-DW, DH = 320, 180  # low-res grid that removes upscale/AA striping
+TOL = 16            # per-channel tolerance after downscale
+DW, DH = 640, 360   # working res: lowest that separates defects from noise
+TILE = 26           # ~80px region at 1920x1080
+MAX_TILE_PCT = 5.0  # any tile hotter than this = localized defect (or grain to adjudicate)
+MAX_GLOBAL_PCT = 1.0
 
 def main():
     if len(sys.argv) != 3:
         print("usage: pixdiff_tolerant.py <render.png> <golden.png>", file=sys.stderr)
         print("100.0")
         return
-    a = Image.open(sys.argv[1]).convert("RGB").resize((DW, DH), Image.BOX)
-    b = Image.open(sys.argv[2]).convert("RGB").resize((DW, DH), Image.BOX)
-    a = np.asarray(a, dtype=int); b = np.asarray(b, dtype=int)
+    ra = Image.open(sys.argv[1]).convert("RGB")
+    ga = Image.open(sys.argv[2]).convert("RGB")
+    fw, fh = ga.size
+    a = np.asarray(ra.resize((DW, DH), Image.BOX), dtype=int)
+    b = np.asarray(ga.resize((DW, DH), Image.BOX), dtype=int)
     d = np.abs(a - b)
-    tol = (d > TOL).mean() * 100.0
+    glob = (d > TOL).mean() * 100.0
     mae = d.mean()
-    print(f"{tol:.4f}  (mae={mae:.2f})")
+
+    off = d > TOL
+    tiles = []
+    for y in range(0, DH, TILE):
+        for x in range(0, DW, TILE):
+            pct = off[y:y+TILE, x:x+TILE].mean() * 100.0
+            tiles.append((pct, x, y))
+    tiles.sort(reverse=True)
+    hot = [t for t in tiles if t[0] > MAX_TILE_PCT]
+
+    sx, sy = fw / DW, fh / DH
+    verdict = "PASS" if glob < MAX_GLOBAL_PCT and not hot else "FAIL"
+    print(f"{glob:.4f}  (mae={mae:.2f} maxtile={tiles[0][0]:.1f}% hot_tiles={len(hot)} {verdict})")
+    for pct, x, y in tiles[:5]:
+        if pct <= 1.0:
+            break
+        print(f"  tile {pct:5.1f}%  @ {int(x*sx)},{int(y*sy)} "
+              f"({int(TILE*sx)}x{int(TILE*sy)}px region at full res)")
 
 if __name__ == "__main__":
     main()

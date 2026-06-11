@@ -374,6 +374,14 @@ add_test(NAME component_descriptor_guard
 		--root "${CMAKE_CURRENT_SOURCE_DIR}"
 		--tool "${CMAKE_CURRENT_SOURCE_DIR}/tools/cppx_transpile.py")
 
+# React/shadcn architecture guard: deterministic smells in src/client/ui —
+# raw Color{} paint outside tokens/theme, big switches, fat props/signatures,
+# god view functions, same-line conditional hooks.
+add_test(NAME react_architecture_guard
+	COMMAND ${Python3_EXECUTABLE}
+		"${CMAKE_CURRENT_SOURCE_DIR}/tools/react_architecture_guard.py"
+		--root "${CMAKE_CURRENT_SOURCE_DIR}")
+
 # --- Yoga flex layout (SIL-10) -------------------------------------------
 # Yoga v3.2.1, the layout backend behind the retained runtime. flex_layout.*
 # is a Yoga-free adapter (FlexLayoutAdapter seam over UiTree); only

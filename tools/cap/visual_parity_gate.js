@@ -3,7 +3,7 @@ export const meta = {
   description: 'Rigorous multi-critic visual parity gate: each critic OPENS the shipped render AND the origin golden, compares them region-by-region, hunts shadcn/SaaS drift, then a synthesizer returns PASS/FAIL + ranked actionable fixes. Pixdiff is passed in; the critics are the visual eyes.',
   phases: [
     { title: 'Critique', detail: 'adversarial visual critics compare render vs golden (each reads BOTH images)' },
-    { title: 'CodeHygiene', detail: 'review the diff for bloat comments + overengineering + un-idiomatic code' },
+    { title: 'CodeHygiene', detail: 'architecture critic panel: hygiene, composition, state/data-flow, control-flow lenses over the diff' },
     { title: 'Synthesize', detail: 'dedupe + rank + overall PASS/FAIL verdict' },
   ],
 }
@@ -15,13 +15,13 @@ const screen = a.screen || 'screen'
 const render = a.render
 const golden = a.golden
 const pix = (a.pixdiff != null) ? String(a.pixdiff) : 'n/a'
-// User requirement (2026-06-07): pixdiff target < 1%, ideally <= 0.5% — but
-// measured on a TOLERANT/perceptual diff (downscale ~320x180, % bytes off by
-// >16, or MAE), NOT raw byte-exact. Raw byte-exact tools/pixdiff is ~6% for a
-// black dialog and ~38% for backdrop screens even at perfect visual parity,
-// because origin point-upscales (scanline striping) while cppx renders crisp.
-// So a high RAW byte-exact pixdiff is NOT by itself a parity failure; the
-// critics' visual judgement + the tolerant metric are authoritative.
+// Tolerant metric (tools/cap/pixdiff_tolerant.py, recalibrated 2026-06-11):
+// PASS requires global < 1% AND zero ~80px tiles over 5% at the 640x360
+// working res. NOT raw byte-exact — tools/pixdiff is ~6% (black dialog) to
+// ~38% (backdrop screens) even at perfect visual parity, because origin
+// point-upscales (scanline striping) while cppx renders crisp. A high RAW
+// pixdiff is NOT by itself a parity failure; the critics' visual judgement
+// + the tolerant tile gate are authoritative.
 const pixTolerant = (a.pixdiff_tolerant != null) ? String(a.pixdiff_tolerant) : 'n/a'
 const checklist = a.checklist || '(no per-screen checklist provided — derive the target from the golden image itself)'
 const codeFiles = a.files || '' // space-separated paths to scope the code-hygiene diff; empty = whole working tree
@@ -99,7 +99,7 @@ const CODE = {
         type: 'object', additionalProperties: false,
         required: ['kind', 'location', 'detail', 'severity'],
         properties: {
-          kind: { type: 'string', enum: ['bloat-comment', 'overengineering', 'non-idiomatic', 'dead-code', 'other'] },
+          kind: { type: 'string', enum: ['bloat-comment', 'overengineering', 'non-idiomatic', 'dead-code', 'composition', 'prop-drilling', 'state-ownership', 'control-flow', 'other'] },
           location: { type: 'string', description: 'file:line or quoted snippet' },
           detail: { type: 'string' },
           severity: { type: 'string', enum: ['high', 'medium', 'low'] },
@@ -108,10 +108,23 @@ const CODE = {
     },
   },
 }
-const codeReview = await agent(
-  `You are a 2026 senior reviewer enforcing clean, idiomatic component code (shadcn/React sensibility ported to this C++/cppx UI). Inspect the working-tree diff: run \`git --no-pager diff -- ${codeFiles || '.'}\` (also \`git --no-pager diff --staged -- ${codeFiles || '.'}\`) with the Bash tool.\n\nFlag, with ZERO tolerance for noise:\n1. bloat-comment: comments that restate what the code already says, narrate the obvious, re-explain a token's name, or pad with backstory. Quote each offending comment verbatim. A comment earns its place ONLY if it explains a non-obvious WHY. Be strict — the codebase owner explicitly does not want comment bloat.\n2. overengineering: needless abstraction, single-use indirection, speculative flexibility/config, defensive handling of impossible states.\n3. non-idiomatic: patterns that fight the component model, copy-paste that should compose, magic numbers that should be tokens.\n4. dead-code.\n\nReturn verdict NEEDS_WORK if any high/medium finding exists. Only review ADDED/CHANGED lines in the diff, not pre-existing code.`,
-  { label: 'code-hygiene', phase: 'CodeHygiene', schema: CODE },
-)
+const CODE_PREAMBLE = `You are a 2026 senior reviewer enforcing clean, idiomatic component code (shadcn/React sensibility ported to this C++/cppx UI). Inspect the working-tree diff: run \`git --no-pager diff -- ${codeFiles || '.'}\` (also \`git --no-pager diff --staged -- ${codeFiles || '.'}\`) with the Bash tool. Only review ADDED/CHANGED lines, not pre-existing code. The engine-idiom golden is /Users/hv/repos/ui — when unsure whether a pattern is idiomatic cppx, read how that repo's own components do it. Deterministic smells (raw Color{} paint, >6-case switches, fat props/signatures, god views, conditional hooks) are already machine-checked by clients/silencer/tools/react_architecture_guard.py — do not re-litigate those mechanically; focus on the judgement calls in your lens. Return verdict NEEDS_WORK if any high/medium finding exists. ZERO tolerance for noise: every finding cites file:line or a verbatim snippet.`
+
+const CODE_LENSES = [
+  { key: 'hygiene', focus: 'HYGIENE. (1) bloat-comment: comments that restate the code, narrate the obvious, or pad with backstory — quote each verbatim; a comment earns its place ONLY by explaining a non-obvious WHY (the owner explicitly rejects comment bloat). (2) overengineering: needless abstraction, single-use indirection, speculative flexibility/config, defensive handling of impossible states. (3) dead-code.' },
+  { key: 'composition', focus: 'COMPOSITION. Does each screen read top-down as a tree of named primitives, or as procedural orchestration? Repeated structure that should be extracted into the shared primitives (clients/silencer/src/client/ui/components/) instead of copy-pasted? One-off styling inline where a variant of an existing primitive exists? Sections of a view function that are really components wanting out?' },
+  { key: 'state', focus: 'STATE & DATA FLOW. State lives in the narrowest owner; derived values are computed at build, never stored-and-synced; cross-cutting state (focus, session, settings, theme) flows through providers/capability hooks (use_session/use_settings/...), not threaded through every props struct (prop drilling). Hooks called unconditionally at the top of the view; effects/intent closures for side-effects — screens never reach gameplay except through hook intent closures. Flag any pass-through prop that crosses 2+ levels untouched.' },
+  { key: 'controlflow', focus: 'CONTROL FLOW. Variants/modes dispatched via data (token maps, small local variant->token switches are the documented convention) — but flag MVC-shaped god-dispatchers: a function that knows every screen/mode, switch pyramids growing a case per feature, boolean-flag parameters that fork a function into two behaviors, deeply nested conditionals that should be early returns or separate components.' },
+]
+
+const codeReviews = (await parallel(CODE_LENSES.map((l) => () =>
+  agent(`${CODE_PREAMBLE}\n\nYOUR ASSIGNED LENS — ${l.key}:\n${l.focus}\n\nStay in your lens but you may note an obvious out-of-lens defect.`,
+    { label: `code:${l.key}`, phase: 'CodeHygiene', schema: CODE }),
+))).filter(Boolean)
+const codeReview = {
+  verdict: codeReviews.some((r) => r.verdict === 'NEEDS_WORK') ? 'NEEDS_WORK' : 'CLEAN',
+  findings: codeReviews.flatMap((r) => r.findings),
+}
 
 phase('Synthesize')
 const SYNTH = {
@@ -135,7 +148,7 @@ const SYNTH = {
   },
 }
 const synth = await agent(
-  `Synthesize ${valid.length} independent VISUAL critic verdicts plus a CODE-hygiene review for the Silencer screen "${screen}" (raw byte-exact pixdiff vs golden = ${pix}%; tolerant/perceptual pixdiff = ${pixTolerant}%).\n\nVisual critic JSON:\n${JSON.stringify(valid)}\n\nCode-hygiene JSON:\n${JSON.stringify(codeReview)}\n\nRules: overall = PASS ONLY IF no visual critic returned FAIL AND there are zero high-severity visual discrepancies. The pixdiff numbers are SECONDARY signals — the RAW byte-exact pixdiff is ~6% (black dialog) to ~38% (backdrop screens) even at perfect visual parity because origin point-upscales (scanline striping) while cppx renders crisp, so do NOT fail on raw pixdiff alone; the user's <1% target applies to the TOLERANT metric. Dedupe overlapping discrepancies across critics; rank by severity; produce an ACTIONABLE ordered top_fixes list phrased as concrete edits (which element, what to change). Be ruthless about shadcn/SaaS drift: if any critic flagged palette-flattening, spaced cards, oversized/modern type, or missing sprite backdrops, overall MUST be FAIL.
+  `Synthesize ${valid.length} independent VISUAL critic verdicts plus a CODE-hygiene review for the Silencer screen "${screen}" (raw byte-exact pixdiff vs golden = ${pix}%; tolerant/perceptual pixdiff = ${pixTolerant}%).\n\nVisual critic JSON:\n${JSON.stringify(valid)}\n\nCode-hygiene JSON:\n${JSON.stringify(codeReview)}\n\nRules: overall = PASS ONLY IF no visual critic returned FAIL AND there are zero high-severity visual discrepancies. The pixdiff numbers are SECONDARY signals — the RAW byte-exact pixdiff is ~6% (black dialog) to ~38% (backdrop screens) even at perfect visual parity because origin point-upscales (scanline striping) while cppx renders crisp, so do NOT fail on raw pixdiff alone; the user's gate is the TOLERANT tile metric (global <1% AND no ~80px tile >5% — pixdiff_tolerant.py prints the verdict). Dedupe overlapping discrepancies across critics; rank by severity; produce an ACTIONABLE ordered top_fixes list phrased as concrete edits (which element, what to change). Be ruthless about shadcn/SaaS drift: if any critic flagged palette-flattening, spaced cards, oversized/modern type, or missing sprite backdrops, overall MUST be FAIL.
 FIDELITY / VECTOR-FORGERY RULES (do not let a lookalike pass, but do not over-fail faithful sprites):
 - If the fidelity critic (or any critic) flagged a chrome element as a flat VECTOR approximation REPLACING the original SPRITE (a uniform hairline/box border lacking the sprite's structure, flat single-outline buttons vs a beveled sprite, smooth fills vs baked stipple/dither, rounded primitive corners vs square/notched, missing baked wells/notch-cells/rails), overall MUST be FAIL — even if pixdiff is low and other critics passed. A vector forgery of sprite chrome is NOT parity.
 - CRISPNESS EXCEPTION: do NOT FAIL when the render DOES use the original sprite art but is merely CRISPER, has a TIGHTER/BRIGHTER glow, or is slightly brighter than origin's soft point-upscaled output. That edge-softness/brightness gap is an inherent renderer difference (origin upscales a low-res framebuffer; cppx renders crisp) and the rubric forbids flagging crispness. A finding whose ONLY substance is "no soft glow / harder edge / brighter frame" on chrome that is otherwise the correct sprite is NOT a forgery — drop it to low and do not let it force FAIL.

@@ -3,7 +3,7 @@ export const meta = {
   description: 'Fan-out visual-parity critic panel across every target screen at once: per-screen 5-lens critics (each opens render+golden) -> per-screen PASS/FAIL + ranked fixes, plus one global code-hygiene pass over the diff.',
   phases: [
     { title: 'Critique', detail: '5 visual critics per screen compare render vs golden region-by-region' },
-    { title: 'CodeHygiene', detail: 'one review of the whole working-tree diff for bloat/overengineering' },
+    { title: 'CodeHygiene', detail: 'architecture critic panel over the working-tree diff: hygiene, composition, state/data-flow, control-flow' },
     { title: 'Report', detail: 'per-screen synthesis: PASS/FAIL + ranked top_fixes' },
   ],
 }
@@ -23,7 +23,7 @@ GROUND TRUTH ABOUT THE ORIGINAL LOOK (never "modernize" it): a DENSE, MULTI-COLO
 - Panels are CONNECTED ~1px green hairline frames tiling edge-to-edge with small seams, NOT spaced rounded cards with gaps/gutters/drop-shadows/large radii.
 - Buttons are LARGE sprite green ovals/pills (menus) or thin-bordered rectangles (login); section titles sit inside baked pill-notch headers; type is condensed chunky upscaled-bitmap, NOT smooth modern sans, and not oversized.
 
-MANDATORY METHOD: (1) Read the GOLDEN image at ${s.golden}. (2) Read the RENDER image at ${s.render}. (3) Compare region by region. If a region is hard to see, use the Bash tool with python3+PIL to crop/upscale that region of BOTH images (e.g. Image.open(p).crop((x,y,x2,y2)).resize((w*3,h*3))) and re-open. You MUST cite at least 4 specific regions (approx pixel coords; image is 960x720) describing what you saw in EACH image. A discrepancy that does not describe what you actually saw in BOTH images is invalid.
+MANDATORY METHOD: (1) Read the GOLDEN image at ${s.golden}. (2) Read the RENDER image at ${s.render}. (3) Compare region by region. If a region is hard to see, use the Bash tool with python3+PIL to crop/upscale that region of BOTH images (e.g. Image.open(p).crop((x,y,x2,y2)).resize((w*3,h*3))) and re-open. You MUST cite at least 4 specific regions (approx pixel coords; both images are 1920x1080) describing what you saw in EACH image. A discrepancy that does not describe what you actually saw in BOTH images is invalid.
 
 ZERO TOLERANCE for shadcn/SaaS drift: uniform-green flattening, spaced rounded cards with gaps instead of connected hairline panels, oversized/modern type, flat fills instead of sprite chrome/backdrops, undersized buttons, or anything that reads as a modern redesign = automatic FAIL even if "cleaner".
 
@@ -107,7 +107,7 @@ const CODE = {
         type: 'object', additionalProperties: false,
         required: ['kind', 'location', 'detail', 'severity'],
         properties: {
-          kind: { type: 'string', enum: ['bloat-comment', 'overengineering', 'non-idiomatic', 'dead-code', 'other'] },
+          kind: { type: 'string', enum: ['bloat-comment', 'overengineering', 'non-idiomatic', 'dead-code', 'composition', 'prop-drilling', 'state-ownership', 'control-flow', 'other'] },
           location: { type: 'string' },
           detail: { type: 'string' },
           severity: { type: 'string', enum: ['high', 'medium', 'low'] },
@@ -116,9 +116,22 @@ const CODE = {
     },
   },
 }
-const code = await agent(
-  `You are a 2026 senior reviewer enforcing clean, idiomatic component code (shadcn/React sensibility ported to this C++/cppx UI). Inspect the working-tree diff: run \`git --no-pager diff -- ${codeFiles || '.'}\` and \`git --no-pager diff --staged -- ${codeFiles || '.'}\` with Bash.\n\nFlag with ZERO tolerance for noise: (1) bloat-comment: comments restating code, narrating the obvious, re-explaining a token name, or padding backstory — quote each verbatim; a comment earns its place ONLY if it explains a non-obvious WHY. (2) overengineering: needless abstraction, single-use indirection, speculative flexibility, defensive handling of impossible states. (3) non-idiomatic: fighting the component model, copy-paste that should compose, magic numbers that should be tokens. (4) dead-code. Verdict NEEDS_WORK if any high/medium finding exists. Only review ADDED/CHANGED lines.`,
-  { label: 'code-hygiene', phase: 'CodeHygiene', schema: CODE },
-)
+const CODE_PREAMBLE = `You are a 2026 senior reviewer enforcing clean, idiomatic component code (shadcn/React sensibility ported to this C++/cppx UI). Inspect the working-tree diff: run \`git --no-pager diff -- ${codeFiles || '.'}\` and \`git --no-pager diff --staged -- ${codeFiles || '.'}\` with Bash. Only review ADDED/CHANGED lines, not pre-existing code. The engine-idiom golden is /Users/hv/repos/ui — when unsure whether a pattern is idiomatic cppx, read how that repo's own components do it. Deterministic smells (raw Color{} paint, >6-case switches, fat props/signatures, god views, conditional hooks) are machine-checked by clients/silencer/tools/react_architecture_guard.py — don't re-litigate those; focus on the judgement calls in your lens. Verdict NEEDS_WORK if any high/medium finding exists. ZERO tolerance for noise: every finding cites file:line or a verbatim snippet.`
+
+const CODE_LENSES = [
+  { key: 'hygiene', focus: 'HYGIENE. (1) bloat-comment: comments restating code, narrating the obvious, or padding backstory — quote each verbatim; a comment earns its place ONLY by explaining a non-obvious WHY (the owner explicitly rejects comment bloat). (2) overengineering: needless abstraction, single-use indirection, speculative flexibility, defensive handling of impossible states. (3) dead-code.' },
+  { key: 'composition', focus: 'COMPOSITION. Screens should read top-down as a tree of named primitives, not procedural orchestration. Flag repeated structure that should be extracted into the shared primitives (clients/silencer/src/client/ui/components/), one-off inline styling where a variant of an existing primitive exists, and view-function sections that are really components wanting out.' },
+  { key: 'state', focus: 'STATE & DATA FLOW. State in the narrowest owner; derived values computed at build, never stored-and-synced; cross-cutting state (focus, session, settings, theme) flows through providers/capability hooks (use_session/use_settings/...), not threaded through props structs (prop drilling). Hooks unconditional at the top of the view; gameplay reached only through hook intent closures. Flag any pass-through prop crossing 2+ levels untouched.' },
+  { key: 'controlflow', focus: 'CONTROL FLOW. Variants/modes dispatched via data (token maps; small local variant->token switches are the documented convention) — but flag MVC-shaped god-dispatchers: functions that know every screen/mode, switch pyramids growing a case per feature, boolean-flag params forking a function into two behaviors, deep conditional nesting that should be early returns or separate components.' },
+]
+
+const codeReviews = (await parallel(CODE_LENSES.map((l) => () =>
+  agent(`${CODE_PREAMBLE}\n\nYOUR ASSIGNED LENS — ${l.key}:\n${l.focus}\n\nStay in your lens but you may note an obvious out-of-lens defect.`,
+    { label: `code:${l.key}`, phase: 'CodeHygiene', schema: CODE }),
+))).filter(Boolean)
+const code = {
+  verdict: codeReviews.some((r) => r.verdict === 'NEEDS_WORK') ? 'NEEDS_WORK' : 'CLEAN',
+  findings: codeReviews.flatMap((r) => r.findings),
+}
 
 return { results: results.filter(Boolean), code }
