@@ -70,6 +70,7 @@ struct AccessibilityProps {
 struct HostCallbacks {
   std::function<void(const FocusEvent &)> on_focus = {};
   std::function<void(const BlurEvent &)> on_blur = {};
+  std::function<void(const HoverEvent &)> on_hover = {};
   std::function<void(const ActivationEvent &)> on_activate = {};
   std::function<void(const KeyEvent &)> on_key = {};
   std::function<void(const WheelEvent &)> on_wheel = {};

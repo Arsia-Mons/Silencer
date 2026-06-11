@@ -8,6 +8,9 @@ namespace {
   if (props.on_activate) {
     callbacks.on_activate = props.on_activate;
   }
+  if (props.on_hover) {
+    callbacks.on_hover = props.on_hover;
+  }
   return callbacks;
 }
 

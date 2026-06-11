@@ -230,13 +230,6 @@ uint32_t id = cppxHost->bake_chrome_sprite(sp->pixels.data(), sp->w, sp->h,
 if(id){ id_out = id; if(w_out) *w_out = (uint16_t)sp->w; if(h_out) *h_out = (uint16_t)sp->h; }
 };
 
-// bank 6 — the green oval menu button, per legacy size (idx7 Md / idx28 Sm /
-// idx23 Lg).
-bake(6, 7, cppxChrome.oval_md);
-bake(6, 28, cppxChrome.oval_sm);
-bake(6, 23, cppxChrome.oval_lg);
-// bank 6 idx 2 — the LegacyRow list-row plate (cc roster + agency rows).
-bake(6, 2, cppxChrome.row_plate, &cppxChrome.row_plate_w, &cppxChrome.row_plate_h);
 // The ovals (and the toggle cells below) are drawn 1:1 in origin's virtual
 // canvas: their device striping phase comes from the whole-frame magnify at
 // their absolute position. Register the indexed source so the executor swaps
@@ -252,9 +245,45 @@ cppxHost->register_legacy(id, sp->pixels.data(), sp->w, sp->h,
                           page_for_bank(bank), kLegacyRenderWidth,
                           kLegacyRenderHeight, fit, cl, cr, ct, cb);
 };
-register_legacy(6, 7, cppxChrome.oval_md);
-register_legacy(6, 28, cppxChrome.oval_sm);
-register_legacy(6, 23, cppxChrome.oval_lg);
+// bank 6 — the green oval menu button (idx7 Md / idx28 Sm / idx23 Lg) and
+// the LegacyRow list-row plate (idx2; cc roster + agency rows), each as
+// origin's 5-frame hover/focus ramp: frame p = sprite (base index + p) at
+// brightness 128 + p*2 (button.cpp SpriteIndexForFrame + FrameForPhase).
+// Frame 0 is the rest sprite every rest-state golden shows; every frame
+// registers so the per-phase device-cell variant swap covers hover states.
+auto bake_ramp = [&](size_t bank, size_t base, uint32_t *ids, LegacyFit fit,
+                     uint16_t *w_out = nullptr, uint16_t *h_out = nullptr){
+for(int p = 0; p < client::ui::ChromeTextures::kOvalPhases; ++p){
+const size_t index = base + (size_t)p;
+if(bank >= banks.size() || index >= banks[bank].size()) continue;
+const std::shared_ptr<Surface> &sp = banks[bank][index];
+if(!sp || sp->w < 1 || sp->h < 1 || sp->pixels.empty()) continue;
+const Uint8 brightness = (Uint8)(128 + p * 2);
+const uint8_t *indices = sp->pixels.data();
+std::unique_ptr<Surface> copy;
+if(brightness != 128){
+copy.reset(game.renderer.CreateSurfaceCopy(sp.get()));
+if(!copy) continue;
+game.renderer.EffectBrightness(copy.get(), nullptr, brightness);
+indices = copy->pixels.data();
+}
+uint32_t id = cppxHost->bake_chrome_sprite(indices, sp->w, sp->h,
+                                           page_for_bank(bank));
+if(!id) continue;
+cppxHost->register_legacy(id, indices, sp->w, sp->h, page_for_bank(bank),
+                          kLegacyRenderWidth, kLegacyRenderHeight, fit);
+ids[p] = id;
+if(p == 0){
+if(w_out) *w_out = (uint16_t)sp->w;
+if(h_out) *h_out = (uint16_t)sp->h;
+}
+}
+};
+bake_ramp(6, 7, cppxChrome.oval_md, LegacyFit::Cell);
+bake_ramp(6, 28, cppxChrome.oval_sm, LegacyFit::Cell);
+bake_ramp(6, 23, cppxChrome.oval_lg, LegacyFit::Cell);
+bake_ramp(6, 2, cppxChrome.row_plate, LegacyFit::Stretch,
+          &cppxChrome.row_plate_w, &cppxChrome.row_plate_h);
 // bank 7 — the metal-chrome nine-slice button (idx24; origin never swaps art on focus).
 bake(7, 24, cppxChrome.chrome_btn_idle);
 // origin draws it nine-sliced in VIRTUAL space (Button Chrome: caps L/R 12,
@@ -270,9 +299,6 @@ bake(40, 2, cppxChrome.dialog_pw, &cppxChrome.dialog_pw_w, &cppxChrome.dialog_pw
 register_legacy(7, 5, cppxChrome.chrome_panel);
 register_legacy(40, 4, cppxChrome.dialog_msg);
 register_legacy(40, 2, cppxChrome.dialog_pw);
-// The row plate stretches to its box (origin sizes it to the pane), so it
-// gets the STRETCH flavor (1:1 boxes bake identically through it).
-register_legacy(6, 2, cppxChrome.row_plate, LegacyFit::Stretch);
 // bank 7 idx 2 — the lobby-connect dialog (origin PackImage(7,2)): frame, soft
 // glow, log well, form sub-panel + field/button wells all baked in. Drawn 1:1
 // in virtual space — register for the per-phase variant swap.
@@ -762,6 +788,11 @@ bake_pulse(4, 135, 11.f, 19.f, 208, (Uint8)b);
 // Buy/tech selected-row pulse (Heading face, color 0, 129..136).
 for(int b = 129; b <= 136; ++b)
 bake_pulse(1, 134, 8.f, 15.f, 0, (Uint8)b);
+// Oval-button hover/focus label ramp (Title face — the bank-135 oval label —
+// color 0, brightness 130/132/134/136 = origin FrameForPhase 128 + p*2; the
+// bank-134 List-row labels reuse the buy/tech entries above).
+for(int b = 130; b <= 136; b += 2)
+bake_pulse(4, 135, 11.f, 19.f, 0, (Uint8)b);
 // Ammo counter: origin draws it DrawAlphaed — each glyph pixel is the
 // palette ALPHA-TABLE mix of the glyph index over the pixel under it. The
 // counter sits on the dash well's flat interior, so baking the face through
@@ -892,6 +923,15 @@ return out;
 void GameUiPipeline::RenderCppxClientUiFrame(Surface& surface) {
 cppxUiRgba = nullptr;
 #ifdef SILENCER_CPPX_FONT_DIR
+// SIL-94: snapshot the per-frame wall clock ONCE per render frame. The
+// frame-provider lambda below runs once per visible SCREEN LAYER (base +
+// overlays), so computing the delta there collapsed it to 0 on every layer
+// after the first — animation hooks never advanced.
+{
+const uint32_t nowMs = SDL_GetTicks();
+cppxClock_ = {nowMs, cppxLastUiTicks_ ? (nowMs - cppxLastUiTicks_) : 0u};
+cppxLastUiTicks_ = nowMs;
+}
 // Native window-pixel resolution so the UI composite maps 1:1 over the
 // upscaled world frame (matches the SIL-11 demo). Headless / no window falls
 // back to the surface size so the path still runs (UploadUiFrame is a no-op
@@ -1422,14 +1462,10 @@ client::ui::AppProviderValue{.quit = [this]{ game.quitRequested = true; },
                             .canvas_w = cppxCanvasW_,
                             .canvas_h = cppxCanvasH_},
 ::ui::children({tree}));
-// SIL-94: per-frame wall-clock for component animation (use_clock). Monotonic
-// SDL ticks at frame build; delta since the previous UI frame.
-uint32_t cppxNowMs = SDL_GetTicks();
-client::ui::Clock cppxClock = {
-cppxNowMs,
-cppxLastUiTicks_ ? (cppxNowMs - cppxLastUiTicks_) : 0u};
-cppxLastUiTicks_ = cppxNowMs;
-tree = client::ui::ClockProvider(cppxClock, ::ui::children({tree}));
+// SIL-94: per-frame wall-clock for component animation (use_clock) —
+// snapshotted once per render frame in RenderCppxClientUiFrame (this lambda
+// runs once per visible screen layer).
+tree = client::ui::ClockProvider(cppxClock_, ::ui::children({tree}));
 // SIL-87: baked legacy-sprite chrome ids (read by use_chrome()).
 tree = client::ui::ChromeTexturesProvider(cppxChrome, ::ui::children({tree}));
 tree = silencer::game_ui::ServerProvider(

@@ -329,6 +329,14 @@ struct FocusEvent {
   NodeId target = 0;
 };
 
+// Pointer hover enter/leave edge on a focusable host (React onMouseEnter/
+// Leave analog). Dispatched by the app shell when the hit-test's hovered
+// node changes; `entered` false = the pointer left this node.
+struct HoverEvent {
+  NodeId target = 0;
+  bool entered = false;
+};
+
 struct BlurEvent {
   NodeId target = 0;
 };
@@ -376,6 +384,7 @@ struct NodeMetadata {
   TextEditMetadata text_edit = {};
   std::function<void(const FocusEvent &)> on_focus = {};
   std::function<void(const BlurEvent &)> on_blur = {};
+  std::function<void(const HoverEvent &)> on_hover = {};
   std::function<void(const ActivationEvent &)> on_activate = {};
   std::function<void(const KeyEvent &)> on_key = {};
   std::function<void(const TextInputEvent &)> on_text_input = {};
@@ -444,6 +453,7 @@ public:
   bool set_layout(NodeId id, Rect rect);
   bool invoke_focus(NodeId id) const;
   bool invoke_blur(NodeId id) const;
+  bool invoke_hover(NodeId id, bool entered) const;
   bool invoke_activate(NodeId id) const;
   bool invoke_key(NodeId id, const ::ui::UiKeyInputEvent &event) const;
   bool invoke_wheel(NodeId id, float dx, float dy) const;
@@ -500,6 +510,7 @@ private:
     TextEditMetadata text_edit = {};
     std::function<void(const FocusEvent &)> on_focus = {};
     std::function<void(const BlurEvent &)> on_blur = {};
+    std::function<void(const HoverEvent &)> on_hover = {};
     std::function<void(const ActivationEvent &)> on_activate = {};
     std::function<void(const KeyEvent &)> on_key = {};
     std::function<void(const TextInputEvent &)> on_text_input = {};

@@ -19,7 +19,7 @@
 
 namespace silencer {
 
-enum class AppButtonVariant { Primary, Secondary, Danger, Ghost, Oval, Chrome, Rect };
+enum class AppButtonVariant { Primary, Secondary, Danger, Ghost, Oval, Chrome };
 // List = the compact stadium row used by scrolling rosters (character-create
 // agency/agent lists): shorter than the Md menu pill, stretched to the pane width.
 enum class AppButtonSize { Md, Sm, Lg, List };
@@ -32,21 +32,25 @@ enum class AppButtonSize { Md, Sm, Lg, List };
 // child fallback (which paints with the engine's neutral kTextFill grey).
 inline ::ui::TextVisual app_button_label_visual(AppButtonVariant variant,
                                                 bool disabled,
-                                                AppButtonSize size = AppButtonSize::Md) {
-  const ::ui::Color c =
-      disabled ? tokens::kTextBodyMuted : tokens::kTextTitle;
-  // Lobby/login rect+chrome labels and the cc List rows are a tier smaller than
-  // the chunky menu oval pills (golden login/list caps ~17px vs the menu's ~21px).
+                                                AppButtonSize size = AppButtonSize::Md,
+                                                int ramp_phase = 0) {
+  ::ui::Color c = disabled ? tokens::kTextBodyMuted : tokens::kTextTitle;
+  // Chrome labels and the cc List rows are a tier smaller than the chunky
+  // menu oval pills (golden login/list caps ~17px vs the menu's ~21px).
   // origin renders them in TextSize::Heading — bank 134 at native metrics
   // (button.cpp ResolveButton: Chrome/LegacyRow textSize Heading) — so use the
   // matching exact-color face 1:1 (also makes the labels string-bake eligible).
   float sz = tokens::kFontHeading;
   uint16_t face = tokens::kFaceHeading;
-  if (variant == AppButtonVariant::Rect || variant == AppButtonVariant::Chrome ||
-      size == AppButtonSize::List) {
+  if (variant == AppButtonVariant::Chrome || size == AppButtonSize::List) {
     sz = tokens::kFontLarge;
     face = tokens::kFaceLarge;
   }
+  // Hover/focus ramp (sprite families only): origin EmitButtonText re-renders
+  // the label at LegacyPalette(color, 128 + phase*2) — the registered
+  // hud_text_key faces carry those exact-brightness bakes.
+  if (ramp_phase > 0 && !disabled && variant == AppButtonVariant::Oval)
+    c = tokens::hud_text_key(0, (uint8_t)(128 + ramp_phase * 2));
   return {.color = c,
           .font_id = face,
           .font_size = sz,
@@ -127,8 +131,9 @@ inline ::ui::LayoutStyle app_button_oval_layout(AppButtonSize size) {
 // Green oval sprite-button paint (SIL-89). Image-only patch over a baked bank-6
 // oval texture (use_chrome()), label in the Heading face centered on top.
 // texture_id 0 (not-yet-baked frame or seam slip) falls back to a vector
-// stadium-radius oval. origin draws every oval frame at full bright with no
-// per-button dim/ramp, so a static bright tint keeps captures deterministic.
+// stadium-radius oval. The hover/focus ramp swaps the TEXTURE per phase
+// (AppButton owns the phase machine), so every state slot here draws the
+// caller's frame at full bright — never a tint ramp.
 inline ::ui::StyleStatePatch app_button_oval_patch(uint32_t tex) {
   const ::ui::TextVisual label{.color = tokens::kTextTitle,
                                .font_id = tokens::kFaceHeading,
@@ -201,12 +206,9 @@ inline ::ui::LayoutStyle app_button_chrome_layout(AppButtonSize size = AppButton
 }
 
 // Metal-chrome sprite-button paint (SIL-90). Nine-sliced bank-7 idx24 sprite
-// (caps {l12,r12,t4,b4}) with the label in the Large face, brightness-ramped
-// by `lit` — the composition root drives it from the use_clock() phase so a
-// focused chrome button ramps at the legacy ~24fps cadence (SIL-107).
-// texture_id 0 falls back to a rounded slate button.
-inline ::ui::StyleStatePatch
-app_button_chrome_patch(uint32_t idle, ::ui::Color lit = {255, 255, 255, 255}) {
+// (caps {l12,r12,t4,b4}) with the label in the Large face. texture_id 0 falls
+// back to a rounded slate button.
+inline ::ui::StyleStatePatch app_button_chrome_patch(uint32_t idle) {
   const ::ui::TextVisual label{.color = tokens::kTextTitle,
                                .font_id = tokens::kFaceHeading,
                                .font_size = tokens::kFontHeading,
@@ -233,67 +235,13 @@ app_button_chrome_patch(uint32_t idle, ::ui::Color lit = {255, 255, 255, 255}) {
     p.text = ::ui::opt(label);
     return p;
   };
-  // origin Chrome buttons NEVER swap art on focus/hover (SpriteIndexForFrame
-  // returns idx24 for every phase; only brightness ramps 128->136) — and the
-  // golden captures show the focused lobby Go Back at plain idle brightness.
-  // Keep idx24 for every state; the hover ramp tints the same art.
+  // origin Chrome buttons change NOTHING on hover/focus (button.cpp:148-149,
+  // 516, 300: SpriteIndexForFrame returns idx24 for every phase AND the
+  // brightness is pinned 128) — every state slot draws plain idle.
   const ::ui::Color bright{255, 255, 255, 255};
   ov.base = chrome(idle, bright);
-  ov.hover = chrome(idle, lit);
+  ov.hover = chrome(idle, bright);
   ov.focus_visible = chrome(idle, bright);
-  return ov;
-}
-
-// Square-cornered rect button geometry (origin/main lobby/login buttons): thin
-// green-hairline rectangles, compact. Sized to label with a per-call min width.
-inline ::ui::LayoutStyle app_button_rect_layout() {
-  return {
-      .align_items = ::ui::AlignItems::Center,
-      .justify_content = ::ui::JustifyContent::Center,
-      .min_width = ::ui::Length::points(96.0f),
-      .height = ::ui::Length::points(30.0f),
-      .padding = {14.0f, 14.0f, 4.0f, 4.0f},
-  };
-}
-
-// Green-hairline rect button paint (lobby/login). idle = near-black fill + dim
-// green border, square corners; `selected` fills it (the default/primary action,
-// e.g. Login/Create) and hover/focus brightens. The flat 2-stop gradient
-// replaces the theme-role's slate gradient so the green reads.
-inline ::ui::StyleStatePatch app_button_rect_patch(bool selected,
-                                                   ::ui::Color lit = {255, 255,
-                                                                      255,
-                                                                      255}) {
-  const ::ui::TextVisual label{.color = tokens::kTextTitle,
-                               .font_id = tokens::kFaceHeading,
-                               .font_size = tokens::kFontLarge,
-                               .align = ::ui::TextAlign::Center,
-                               .line_height = tokens::kLineLarge};
-  auto rect = [&](::ui::Color top, ::ui::Color bot,
-                  ::ui::Color border) -> ::ui::StylePatch {
-    ::ui::StylePatch p =
-        ::ui::patch()
-            .background(top)
-            .gradient(::ui::Gradient{.angle_deg = 0.0f,
-                                     .stop_count = 2,
-                                     .stops = {{0.0f, top}, {1.0f, bot}}})
-            .corner_radius(0.0f)
-            .border(::ui::Border{{1, 1, 1, 1}, {border, border, border, border}});
-    p.text = ::ui::opt(label);
-    return p;
-  };
-  // origin/main login/lobby rects are a top-lit green vertical gradient
-  // (~(8,84,0) down to (0,44,0)) with a kTextBody-green hairline — Login and
-  // Cancel share it (origin does not paint a distinct selected fill). `selected`
-  // only brightens the interaction states.
-  const ::ui::Color top{8, 84, 0, 255}, bot{0, 44, 0, 255};
-  const ::ui::Color htop = selected ? ::ui::Color{16, 108, 0, 255}
-                                    : ::ui::Color{12, 96, 0, 255};
-  const ::ui::Color hbot{4, 64, 0, 255};
-  ::ui::StyleStatePatch ov{};
-  ov.base = rect(top, bot, tokens::kTextBody);
-  ov.hover = rect(htop, hbot, lit);
-  ov.focus_visible = rect(htop, hbot, lit);
   return ov;
 }
 

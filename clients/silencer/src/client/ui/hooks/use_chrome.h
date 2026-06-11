@@ -20,9 +20,10 @@ namespace client::ui {
 // ---- Texture budget (single owning artifact; cap = 64) ------------------
 // Running tally of every baked chrome index across all surfaces. Keep this in
 // sync as surfaces add sprites; atlasing (source-rect UV) is the relief valve.
-//   bank 6  idx 7    oval_md          196x33   (SIL-89)
-//   bank 6  idx 28   oval_sm          112x33   (SIL-89)
-//   bank 6  idx 23   oval_lg          220x33   (SIL-89)
+//   bank 6  idx 7..11  oval_md ramp   196x33 ×5 (SIL-89 + hover phases)
+//   bank 6  idx 28..32 oval_sm ramp   112x33 ×5
+//   bank 6  idx 23..27 oval_lg ramp   220x33 ×5
+//   bank 6  idx 2..6   row_plate ramp 236x27 ×5
 //   bank 7  idx 24   chrome_btn_idle  156x21   (SIL-90, nine-slice {l12 r12 t4 b4})
 //   bank 7  idx 5    chrome_panel     ~628x441 (SIL-91, plain native)
 //   bank 7  idx 7    chrome_controls  ~628x441 (Options·Controls single-pane, stretch)
@@ -33,17 +34,21 @@ namespace client::ui {
 //   bank 95 idx 11   hud_bezel_bottom native       (in-game HUD bottom dash)
 //   bank 94 idx 0    hud_radar        native       (in-game minimap frame)
 //   ------------------------------------------------------------------
-//   total baked: ~32 / 64 (incl. logo reveal frames + toggles + 5 emblems)
+//   total baked: ~48 / 256 (incl. logo reveal frames + toggles + 5 emblems
+//   + the 16 hover-ramp phase frames)
 struct ChromeTextures {
-  // The green oval menu button (bank 6), per legacy size: Md/Sm/Lg. Brightness/
-  // focus is a draw-time tint of the one sprite, not separate frames.
-  uint32_t oval_md = 0; // idx 7  — 196x33
-  uint32_t oval_sm = 0; // idx 28 — 112x33
-  uint32_t oval_lg = 0; // idx 23 — 220x33
-  // The legacy LIST-ROW plate (bank 6 idx 2): origin ButtonVariant::LegacyRow,
-  // 236x27, used for the character-create roster + agency list rows (a flat wide
-  // row plate, NOT the stadium oval). Nine-sliced to size to the pane.
-  uint32_t row_plate = 0; // idx 2 — 236x27
+  // The green oval menu button (bank 6), per legacy size: Md/Sm/Lg, as the
+  // 5-frame hover/focus ramp (origin button.cpp SpriteIndexForFrame +
+  // FrameForPhase): [p] = sprite (base index + p) baked at brightness
+  // 128 + p*2. [0] is the rest frame every rest-state golden shows.
+  static constexpr int kOvalPhases = 5;
+  uint32_t oval_md[kOvalPhases] = {}; // idx 7..11  — 196x33
+  uint32_t oval_sm[kOvalPhases] = {}; // idx 28..32 — 112x33
+  uint32_t oval_lg[kOvalPhases] = {}; // idx 23..27 — 220x33
+  // The legacy LIST-ROW plate (bank 6 idx 2..6): origin ButtonVariant::
+  // LegacyRow, 236x27, used for the character-create roster + agency list
+  // rows (a flat wide row plate, NOT the stadium oval); same 5-phase ramp.
+  uint32_t row_plate[kOvalPhases] = {};
   uint16_t row_plate_w = 0, row_plate_h = 0;
   // The metal-chrome button (bank 7 idx 24), nine-sliced. origin never swaps
   // art on focus — only brightness ramps the one frame.

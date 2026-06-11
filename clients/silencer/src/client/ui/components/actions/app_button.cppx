@@ -5,6 +5,7 @@
 #include "client/ui/components/tokens.h"
 #include "client/ui/hooks/use_chrome.h"
 #include "client/ui/hooks/use_clock.h"
+#include "ui/runtime/interaction_hooks.h"
 #include "ui/runtime/react.h"
 
 #include <cstdint>
@@ -19,63 +20,90 @@ using ::ui::components::Text;
 using ::ui::components::TextProps;
 
 ::ui::UiElement AppButton(const AppButtonProps &props) {
-  // SIL-94: a frame-rate-independent phase counter stepped from the per-frame
-  // wall clock (~24fps legacy cadence). Hooks are unconditional (a button's
-  // variant is stable for its lifetime, but keep the call order invariant
-  // anyway); only the Oval branch consumes the ramp.
+  // origin button.cpp visual-state machine (StepVisualState/FrameForPhase):
+  // a TARGETED legacy button ramps phase 0→4 — sprite (base index + phase) at
+  // brightness 128 + phase*2, label at the same brightness — one phase per
+  // 42ms legacy frame; un-targeting ramps back down; disabled pins phase 0.
+  // origin targets on (hovered || focused || selected). Hover comes from the
+  // Button host's on_hover enter/leave edges; focus from its focus/blur edges,
+  // gated on a REAL input source — programmatic focus (our autofocus
+  // convenience; origin never autofocuses) does not ramp, so rest-state
+  // renders match the rest-state goldens. Only the sprite families ramp
+  // (Oval + List row); Chrome changes NOTHING on hover/focus in origin
+  // (idx24 at brightness 128 for every phase — the negative golden check).
   client::ui::Clock clock = client::ui::use_clock();
   uint32_t *anim_accum = use_state<uint32_t>(0u);
-  int *anim_phase = use_state<int>(0);
+  int *phase = use_state<int>(0);
+  bool *focused_now = use_state<bool>(false);
+  bool *hovered_now = use_state<bool>(false);
+  const auto *snap = static_cast<const ::ui::InteractionSnapshot *>(
+      use_context(&::ui::InteractionContext));
+  const bool source_real =
+      snap && (snap->source == ::ui::FocusSource::Mouse ||
+               snap->source == ::ui::FocusSource::Touch ||
+               snap->source == ::ui::FocusSource::Keyboard ||
+               snap->source == ::ui::FocusSource::Gamepad);
+  const bool targeted =
+      !props.disabled && (*hovered_now || (*focused_now && source_real));
+  const uint32_t kFrameMs = 42; // legacy ~24fps animation step
   *anim_accum += clock.delta_ms;
-  const uint32_t kFrameMs = 42; // ~24 fps
   while (*anim_accum >= kFrameMs) {
     *anim_accum -= kFrameMs;
-    *anim_phase = (*anim_phase + 1) % 10;
+    if (targeted && *phase < 4)
+      ++*phase;
+    else if (!targeted && *phase > 0)
+      --*phase;
   }
-  const int tri = *anim_phase < 5 ? *anim_phase : 9 - *anim_phase; // 0..4..0
-  const uint8_t lit = static_cast<uint8_t>(190 + tri * 16);        // 190..254
+  if (props.disabled)
+    *phase = 0;
+  const int p = *phase < 0 ? 0 : (*phase > 4 ? 4 : *phase);
+
   // Wrap the no-arg semantic callbacks into the event-taking ui callbacks; the
   // host events are intentionally ignored (the semantic API is event-free).
+  // Focus/blur edges also feed the ramp state (they fire in the focus pass,
+  // after this frame's build — the established deferred-mutation idiom).
   std::function<void(const ::ui::ActivationEvent &)> on_activate = {};
   if (props.on_press) {
     on_activate = [on_press = props.on_press](const ::ui::ActivationEvent &) {
       on_press();
     };
   }
-  std::function<void(const ::ui::FocusEvent &)> on_focus = {};
-  if (props.on_focus) {
-    on_focus = [on_focus_cb = props.on_focus](const ::ui::FocusEvent &) {
-      on_focus_cb();
-    };
-  }
+  std::function<void(const ::ui::FocusEvent &)> on_focus =
+      [focused_now, user = props.on_focus](const ::ui::FocusEvent &) {
+        *focused_now = true;
+        if (user)
+          user();
+      };
+  std::function<void(const ::ui::BlurEvent &)> on_blur =
+      [focused_now](const ::ui::BlurEvent &) { *focused_now = false; };
+  std::function<void(const ::ui::HoverEvent &)> on_hover =
+      [hovered_now](const ::ui::HoverEvent &e) { *hovered_now = e.entered; };
 
   const char *a11y_label =
       props.accessibility_label ? props.accessibility_label : props.label;
   ::ui::LayoutStyle layout = app_button_layout(props.size, props.selected);
   ::ui::StyleStatePatch style = app_button_variant_patch(props.variant);
 
-  // Oval is sprite-backed: it reads its baked bank-6 texture from use_chrome()
-  // (composition-root provider) and paints image-only at the fixed legacy
-  // geometry. Selected by size: Md/Sm/Lg → idx7/idx28/idx23.
+  // Oval is sprite-backed: it reads its baked bank-6 ramp frames from
+  // use_chrome() (composition-root provider) and paints image-only at the
+  // fixed legacy geometry. Selected by size: Md/Sm/Lg → idx7/idx28/idx23;
+  // List → the flat LegacyRow plate (idx2).
   if (props.variant == AppButtonVariant::Oval) {
     client::ui::ChromeTextures chrome = client::ui::use_chrome();
-    uint32_t tex = chrome.oval_md;
+    const uint32_t *frames = chrome.oval_md;
     if (props.size == AppButtonSize::Sm)
-      tex = chrome.oval_sm;
+      frames = chrome.oval_sm;
     else if (props.size == AppButtonSize::Lg)
-      tex = chrome.oval_lg;
+      frames = chrome.oval_lg;
     else if (props.size == AppButtonSize::List)
-      tex = chrome.row_plate; // cc list rows = the flat LegacyRow plate, not the oval
+      frames = chrome.row_plate;
+    const uint32_t tex = frames[p] ? frames[p] : frames[0];
     layout = app_button_oval_layout(props.size);
     style = app_button_oval_patch(tex);
   } else if (props.variant == AppButtonVariant::Chrome) {
     client::ui::ChromeTextures chrome = client::ui::use_chrome();
     layout = app_button_chrome_layout(props.size);
-    style = app_button_chrome_patch(chrome.chrome_btn_idle,
-                                    ::ui::Color{lit, lit, lit, 255});
-  } else if (props.variant == AppButtonVariant::Rect) {
-    layout = app_button_rect_layout();
-    style = app_button_rect_patch(props.selected, ::ui::Color{lit, lit, lit, 255});
+    style = app_button_chrome_patch(chrome.chrome_btn_idle);
   }
 
   if (props.padding.set)
@@ -87,7 +115,7 @@ using ::ui::components::TextProps;
   // A Text child resolves the green app_theme text color + the variant's face.
   ::ui::StyleStatePatch label_style{};
   label_style.base = ::ui::patch().text(app_button_label_visual(
-      props.variant, props.disabled, props.size));
+      props.variant, props.disabled, props.size, p));
   ::ui::UiElement label_el =
       (props.label && props.children.count == 0)
           ? Text(TextProps{.value = props.label, .style = label_style})
@@ -104,6 +132,8 @@ using ::ui::components::TextProps;
     autofocus={props.default_focused}
     accessibility={{.label = a11y_label}}
     onFocus={on_focus}
+    onBlur={on_blur}
+    onHover={on_hover}
     label={props.label}
     onActivate={on_activate}
     layout={layout}

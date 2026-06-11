@@ -7,6 +7,7 @@
 #include "client/ui/providers/lobby_provider.h" // client::ui::LobbySnapshot
 #include "client/ui/providers/world_session_provider.h" // client::ui::WorldSessionSnapshot
 #include "client/ui/hooks/use_chrome.h" // client::ui::ChromeTextures
+#include "client/ui/hooks/use_clock.h"  // client::ui::Clock
 #include <cstdint>
 #include <map>
 #include <memory>
@@ -131,8 +132,10 @@ int cppxUiH = 0;
 bool cppxReactInitialized = false;
 bool cppxAppRootPushed = false;
 // SIL-94: monotonic wall-clock of the previous UI frame, for the use_clock()
-// delta. 0 until the first frame.
+// delta. 0 until the first frame. The Clock value is snapshotted once per
+// render frame (the frame-provider lambda runs once per screen layer).
 uint32_t cppxLastUiTicks_ = 0;
+client::ui::Clock cppxClock_ = {};
 // Logical UI canvas of the current frame (height-pinned 720 space); published
 // to screens via the AppProvider (use_app().canvas_w/h).
 float cppxCanvasW_ = 0.0f;

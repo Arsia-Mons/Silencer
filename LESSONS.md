@@ -227,3 +227,28 @@
   one px below/right of its cell start loses a 1px sliver, and a .5-logical x that
   Yoga rounds UP lands the whole box one virtual cell off (+2 device). Two sub-logical
   nudges (-0.5x, -0.75y) on the oval boxes alone closed the screen to 0.0000.
+
+- **use_hovered()/use_focused() are useless in a PRODUCT component that wraps a
+  substrate control — the host node's fiber is the substrate's.** AppButton (its own
+  fiber via JSX lowering) wraps Button (another fiber) which commits the host: the
+  InteractionSnapshot keys by the host's fiber_id = Button's. Measured: hovered
+  Button → use_hovered()==false inside AppButton. Interaction-driven ANIMATION in a
+  product component needs edge callbacks instead — focus/blur existed; on_hover
+  enter/leave was added (ClientUi dispatches on hovered-node change). Hover also does
+  NOT move focus in the cppx model (scenario 16 — origin's hover-focuses model was
+  deliberately replaced), so "ramp on focus" alone would never fire for the pointer.
+
+- **The per-screen-layer frame-provider lambda silently zeroed use_clock deltas.**
+  The Clock value was computed inside the provider chain, which runs once per visible
+  screen LAYER (base + overlays): the second run in the same millisecond reset
+  last-ticks and published delta≈0, so any delta-driven animation froze on screens
+  with an overlay (the mainmenu logo only worked because mainmenu is single-layer).
+  Per-frame values must be snapshotted once in RenderCppxClientUiFrame, not in the
+  per-layer lambda.
+
+- **Autofocus vs origin's no-focus rest state: gate ramps on the focus SOURCE.** Our
+  screens autofocus for keyboard nav (origin never focuses anything until input);
+  ramping on any-focus would light a button in every rest capture. Gating the ramp on
+  hover-edge OR focus with source ∈ {Mouse,Touch,Keyboard,Gamepad} (Programmatic
+  excluded) keeps every rest golden byte-stable while keyboard/pointer interaction
+  ramps like origin.

@@ -145,6 +145,17 @@ bool ClientUi::update_retained_runtime(const ::ui::FlexLayoutAdapter &layout,
            !s.interaction.disabled;
   };
   ::ui::NodeId hovered_now = ::ui::focus_hovered_id(retained_focus_);
+  // Hover enter/leave edges (React onMouseEnter/Leave analog): components
+  // that animate on hover (the legacy oval ramp) track their own state via
+  // these callbacks — use_hovered() can't serve them, since the host node's
+  // fiber is the substrate Button's, not the product component's.
+  if (hovered_now != prev_hovered_node_) {
+    if (prev_hovered_node_ != 0)
+      retained_tree_.invoke_hover(prev_hovered_node_, false);
+    if (hovered_now != 0)
+      retained_tree_.invoke_hover(hovered_now, true);
+    prev_hovered_node_ = hovered_now;
+  }
   if (audible_button(hovered_now))
     audio_events_.hovered_button = hovered_now;
   if (audible_button(confirmed))

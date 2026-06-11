@@ -119,6 +119,7 @@ private:
         .text_edit = props.text_edit,
         .on_focus = props.callbacks.on_focus,
         .on_blur = props.callbacks.on_blur,
+        .on_hover = props.callbacks.on_hover,
         .on_activate = props.callbacks.on_activate,
         .on_key = props.callbacks.on_key,
         .on_wheel = props.callbacks.on_wheel,

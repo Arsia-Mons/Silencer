@@ -118,14 +118,20 @@ const char *const kUpgradeIds[6] = {"UpgradeEndurance", "UpgradeShield",
       .key = key,
       .layout = abs_at(screen_x, screen_y, kButtonW * kS, kButtonH * kS,
                        -0.5f, -0.75f),
-      .children = ::ui::children({AppButton(AppButtonProps{
-          .key = "b",
-          .control_id = control_id,
-          .variant = AppButtonVariant::Oval,
-          .default_focused = default_focused,
-          .label = label,
-          .on_press = on_press,
-      })})});
+      // A real component (not an inline call): AppButton owns per-button
+      // hooks (the hover/focus ramp state), so it needs its own fiber — the
+      // same shape the JSX lowering emits.
+      .children = ::ui::children({::ui::component(
+          "AppButton",
+          AppButtonProps{
+              .key = "b",
+              .control_id = control_id,
+              .variant = AppButtonVariant::Oval,
+              .default_focused = default_focused,
+              .label = label,
+              .on_press = on_press,
+          },
+          AppButton)})});
 }
 
 struct MissionSummaryProps {

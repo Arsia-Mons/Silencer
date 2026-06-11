@@ -247,6 +247,7 @@ bool UiTree::set_metadata(NodeId id, const NodeMetadata &metadata) {
   node->text_edit.composition = node->composition;
   node->on_focus = metadata.on_focus;
   node->on_blur = metadata.on_blur;
+  node->on_hover = metadata.on_hover;
   node->on_activate = metadata.on_activate;
   node->on_key = metadata.on_key;
   node->on_wheel = metadata.on_wheel;
@@ -304,6 +305,15 @@ bool UiTree::invoke_blur(NodeId id) const {
       !node->on_blur)
     return false;
   node->on_blur({.target = id});
+  return true;
+}
+
+bool UiTree::invoke_hover(NodeId id, bool entered) const {
+  const Node *node = find(id);
+  if (!node || !node->interaction.focusable || node->interaction.disabled ||
+      !node->on_hover)
+    return false;
+  node->on_hover({.target = id, .entered = entered});
   return true;
 }
 
@@ -470,6 +480,7 @@ UiTree::Node *UiTree::ensure_node(NodeId id, NodeId parent_id, const char *type,
     existing->text_edit = {};
     existing->on_focus = {};
     existing->on_blur = {};
+    existing->on_hover = {};
     existing->on_activate = {};
     existing->on_key = {};
     existing->on_wheel = {};

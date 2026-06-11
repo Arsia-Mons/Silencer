@@ -142,6 +142,30 @@ only skips Present. The control-port `screenshot` op captures HUD included.)
 - **Determinism:** two independent full runs byte-identical
   (md5 a2890322b49dcadbd877f74e8f081783), no masks needed.
 
+## hover_mainmenu_oval.png — captured 2026-06-11, 1920×1080
+
+- **Source:** `origin/main` @ `af4c50c5` (v00058), `.worktrees/origin-capture`
+  build (pristine fade; the uncommitted GSO capture patch from the
+  mission_summary capture does not affect menus).
+- **Capture script:** `tools/cap/cap_hover_origin.sh`. MAINMENU at 1920×1080
+  → `hover_at` the first oval's center (Tutorial, virtual 554,171) → settle
+  1s (origin's hover ramp reaches its steady state, phase 4, in 5 × 42ms
+  frames) → stable-pair poll (two consecutive byte-identical screenshots —
+  only true inside the ~5s logo HOLD window with the ramp settled).
+- **Content:** identical to mainmenu.png except the hovered Tutorial cell
+  (diff confined to x1026-1460 y347-420): origin button.cpp phase-4 frame —
+  sprite bank 6 idx 11 (base 7 + 4) at brightness 136, label at
+  LegacyPalette(0,136).
+- **Determinism:** two independent runs byte-identical
+  (md5 ab22079f39213419d77914092198a604).
+- **Chrome-button NEGATIVE (no stored golden):** the same script hovers the
+  lobby_connect Login (Chrome) button — measured in two runs: the button's
+  cell is byte-identical to the rest-state lobby_connect.png golden under
+  hover (origin Chrome buttons change nothing: idx24 + brightness 128 for
+  every phase). The whole-frame diffs were only the connect-log port text
+  (random per run) and a run-variant caret row; the existing lobby_connect
+  golden IS the chrome-hover golden.
+
 ## NOT restored — do not trust as parity targets
 - **gallery.png** — cppx-only component showcase; no origin/main equivalent. Left as
   the prior cppx render.
