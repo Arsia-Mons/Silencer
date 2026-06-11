@@ -109,3 +109,20 @@
 - **origin Chrome buttons never swap art on focus** (SpriteIndexForFrame returns
   idx24 for all phases; only brightness ramps) and golden captures show focused
   controls at plain idle — focus_visible must not change the sprite.
+
+- **Harness "flaky visual" diffs are usually capture-STATE, not rendering.** Scenario
+  71 red on lobby_connect/cc_alias was diagnosed as port nondeterminism + "caret
+  blink phase"; the real causes were capturing before the connect handshake populated
+  the status log, and capturing AFTER set_text while the golden's field is empty
+  (no blink exists — the caret draws unconditionally while focused). Before adding
+  determinism machinery, diff the harness's drive sequence against the capture
+  script that produces the passing standalone render (cap_lobby.sh) step by step.
+
+- **Porting origin's responsive arithmetic can preserve byte-identity if the
+  logical mapping is pinned to the recorded constants.** resolve_lobby_panes runs
+  origin's integer virtual-space math (RoundRatio/ScaleLegacyPx) and converts with
+  exactly two rules — pane sizes floor(v*1.5), gaps/pads lround(v*1.5) — chosen
+  because they reproduce every authored golden-cell constant at the design canvas
+  (777/463/757/436/180/20/19). Verify the mapping against ALL authored values
+  before wiring; a single uniform rounding rule does NOT exist (463.5 floors,
+  19.5 rounds up).
