@@ -172,9 +172,9 @@ inline ::ui::LayoutStyle app_button_chrome_layout(AppButtonSize size = AppButton
   return {
       .align_items = ::ui::AlignItems::Center,
       .justify_content = ::ui::JustifyContent::Center,
-      .min_width = ::ui::Length::points(70.0f),
-      .height = ::ui::Length::points(32.0f),
-      .padding = {15.0f, 15.0f, 6.0f, 6.0f},
+      .min_width = ::ui::Length::points(138.0f), // origin kActionButtonMinWidth 92 virtual
+      .height = ::ui::Length::points(31.5f),     // origin Chrome plate 21 virtual
+      .padding = {18.0f, 18.0f, 6.0f, 6.0f},     // origin paddingX 12 virtual
   };
 }
 

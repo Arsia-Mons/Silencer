@@ -212,6 +212,22 @@ inline ::ui::StylePatch frame_patch(::ui::Color stroke, float width = 1.34f) {
       .border(::ui::Border{{width, width, width, width}, {stroke, stroke, stroke, stroke}});
 }
 
+// Side-masked hairline frame (origin BoxSides): the lobby stepped pane
+// composes its connected chrome out of open-sided rectangles (e.g. the right
+// tall panel is open-left, the upper game panel open-right). A zero width
+// suppresses that edge entirely.
+inline ::ui::StylePatch frame_patch_sides(::ui::Color stroke, bool top,
+                                          bool right, bool bottom, bool left,
+                                          float width = 1.34f) {
+  return ::ui::patch()
+      .background(::ui::Color{0, 0, 0, 0})
+      .gradient(::ui::Gradient{})
+      .corner_radius(0.0f)
+      .border(::ui::Border{{top ? width : 0.0f, right ? width : 0.0f,
+                            bottom ? width : 0.0f, left ? width : 0.0f},
+                           {stroke, stroke, stroke, stroke}});
+}
+
 // Text paint (color + face + native-em size + legacy line height). font_id
 // selects the OTF face; line_height 0 falls back to the face's natural skip.
 inline ::ui::StylePatch text_patch(::ui::Color color, float font_size,

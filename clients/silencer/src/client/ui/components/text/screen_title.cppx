@@ -53,11 +53,11 @@ using ::ui::components::TextProps;
     height = tokens::kLineHeading;
     break;
   case ScreenTitleVariant::Console:
-    // Lobby/console panel titles (Game Options, Select Map, Active Games, Lobby)
-    // — the chunky heading face at the Large size, a clear tier above the body
-    // rows so the panel headers read as headers, not the first data row.
+    // Lobby/console panel titles (Game Options, Select Map, Active Games,
+    // Lobby) — origin renders these in TextSize::Heading (bank 134) at its
+    // native 1:1 metrics, which also makes them string-bake eligible.
     color = tokens::kTextTitle;
-    face = tokens::kFaceHeading;
+    face = tokens::kFaceLarge;
     font = tokens::kFontLarge;
     line = tokens::kLineLarge;
     height = tokens::kLineLarge;

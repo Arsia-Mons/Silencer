@@ -6,6 +6,7 @@
 #include "texture_registry.h"
 #include "ui/runtime/geometry.h"
 
+#include <cmath>
 #include <math.h>
 #include <string.h>
 
@@ -367,6 +368,93 @@ struct LayerSlot {
   float opacity = 1.f;
 };
 
+// Legacy hairline frame snap. origin draws the lobby panel chrome as
+// 1-VIRTUAL-px vector strokes on the 853x480 canvas and magnifies the whole
+// frame by s=2.25, so each edge line covers the device pixels
+// {p : int(p/s) == v} — alternating 2- and 3-px bands whose width/position
+// depend on the edge's absolute virtual coordinate. A uniform logical-width
+// border can land 1px off and can never produce the 3px phase, so (like
+// resolve_legacy_variant for sprites and string_variant for text) the
+// EXECUTOR owns the grid: each painted side of an eligible hairline border
+// is snapped to its origin virtual cell and filled directly. Eligible =
+// square corners, no outline, hairline widths, the exact legacy stroke
+// palette colors, and a quarter-integer virtual scale.
+bool snap_legacy_hairline_border(SDL_Renderer *r, const ::ui::DrawCommand &c,
+                                 float scale) {
+  const ::ui::BorderData &b = c.payload.border;
+  if (b.corner_radius > 0.01f)
+    return false;
+  if (b.outline.width > 0.f && b.outline.color.a > 0)
+    return false;
+  if (b.has_fill && b.fill.a > 0)
+    return false; // fused fill takes the mesh path
+  const float sv = scale * 1.5f; // device px per legacy virtual px
+  const float q = sv * 4.f;
+  if (std::fabs(q - std::floor(q + 0.5f)) > 0.001f || sv < 1.f)
+    return false;
+  auto legacy_stroke = [](::ui::Color col) {
+    return col.a == 255 &&
+           ((col.r == 8 && col.g == 84 && col.b == 0) ||
+            (col.r == 24 && col.g == 124 && col.b == 20));
+  };
+  const float kMaxHairline = 2.5f; // logical; anything wider isn't a hairline
+  const bool top = b.border.width.top > 0.f && b.border.color.top.a > 0;
+  const bool right = b.border.width.right > 0.f && b.border.color.right.a > 0;
+  const bool bottom =
+      b.border.width.bottom > 0.f && b.border.color.bottom.a > 0;
+  const bool left = b.border.width.left > 0.f && b.border.color.left.a > 0;
+  if (!(top || right || bottom || left))
+    return false;
+  if ((top && (b.border.width.top > kMaxHairline ||
+               !legacy_stroke(b.border.color.top))) ||
+      (right && (b.border.width.right > kMaxHairline ||
+                 !legacy_stroke(b.border.color.right))) ||
+      (bottom && (b.border.width.bottom > kMaxHairline ||
+                  !legacy_stroke(b.border.color.bottom))) ||
+      (left && (b.border.width.left > kMaxHairline ||
+                !legacy_stroke(b.border.color.left))))
+    return false;
+
+  // Device-space box edges -> virtual cells. cell(v) = [ceil(v*sv),
+  // ceil((v+1)*sv)) device px, i.e. exactly {p : int(p/sv) == v}.
+  const float dx0 = c.rect.x * scale, dy0 = c.rect.y * scale;
+  const float dx1 = (c.rect.x + c.rect.w) * scale;
+  const float dy1 = (c.rect.y + c.rect.h) * scale;
+  auto cell_lo = [&](float dev) { // line cell at a leading box edge
+    return (long)std::lround(dev / sv);
+  };
+  auto cell_hi = [&](float dev) { // line cell just inside a trailing edge
+    return (long)std::lround(dev / sv) - 1;
+  };
+  auto span_of = [&](long v, float *lo, float *hi) {
+    *lo = std::ceil((float)v * sv);
+    *hi = std::ceil((float)(v + 1) * sv);
+  };
+  float lx0, lx1, rx0, rx1, ty0, ty1, by0, by1;
+  span_of(cell_lo(dx0), &lx0, &lx1);
+  span_of(cell_hi(dx1), &rx0, &rx1);
+  span_of(cell_lo(dy0), &ty0, &ty1);
+  span_of(cell_hi(dy1), &by0, &by1);
+
+  auto fill = [&](float x0, float y0, float x1, float y1, ::ui::Color col) {
+    if (x1 <= x0 || y1 <= y0)
+      return;
+    SDL_SetRenderDrawColor(r, col.r, col.g, col.b, col.a);
+    SDL_FRect fr{x0, y0, x1 - x0, y1 - y0};
+    SDL_RenderFillRect(r, &fr);
+  };
+  // Bands span the full outer extent (corners overlap; same opaque ink).
+  if (top)
+    fill(lx0, ty0, rx1, ty1, b.border.color.top);
+  if (bottom)
+    fill(lx0, by0, rx1, by1, b.border.color.bottom);
+  if (left)
+    fill(lx0, ty0, lx1, by1, b.border.color.left);
+  if (right)
+    fill(rx0, ty0, rx1, by1, b.border.color.right);
+  return true;
+}
+
 void execute_draw_commands(SDL_Renderer *renderer,
                            const ::ui::DrawCommandList &list,
                            FontRegistry *fonts, TextureRegistry *textures,
@@ -433,6 +521,8 @@ void execute_draw_commands(SDL_Renderer *renderer,
       break;
     }
     case ::ui::DrawCommandKind::Border:
+      if (snap_legacy_hairline_border(renderer, c, scale))
+        break;
       if (use_sdf) {
         sdf_frame_rounded(renderer, sdf_cache, c.rect,
                           c.payload.border.corner_radius,

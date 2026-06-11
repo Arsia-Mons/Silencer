@@ -29,16 +29,19 @@ using ::ui::components::DialogProps;
     ::ui::StylePatch game_bg =
         backdrop ? tokens::image_patch(backdrop)
                  : tokens::fill_patch(tokens::kSurfaceGame);
-    // Chrome metrics golden-measured: root pad 20 (origin 13.3), title-bar
-    // top 38.25, bottom edge 38.5 up; region gap 20.5 (origin ~13.7).
+    // origin lobby_screen.cpp at the 853x480 virtual canvas: rootPadX 13,
+    // rootPadTop/Bottom 25, regionGap 13 (virtual). Authored so every panel
+    // edge lands on origin's device cell: padX 20 (v13), padTop 38 (title top
+    // line at v25), gap 19 (body top at v67 = L100), padBottom 38 (body
+    // bottom edge at L682 = v455).
     return <Box
       key={props.key}
       layout={::ui::LayoutStyle{
         .direction = ::ui::FlexDirection::Column,
         .width = ::ui::Length::percent(100.0f),
         .height = ::ui::Length::percent(100.0f),
-        .padding = {20.0f, 20.0f, 38.25f, 38.5f},
-        .gap = 20.5f,
+        .padding = {20.0f, 20.0f, 38.0f, 38.0f},
+        .gap = 19.0f,
       }}
       style={game_bg}
     >
