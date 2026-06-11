@@ -112,8 +112,9 @@ struct CharacterCreateProviderProps {
     key={key}
     layout={::ui::LayoutStyle{
       .width = ::ui::Length::points(6.0f),
-      .height = ::ui::Length::points(16.5f)}}
-    style={tokens::image_patch_sub(tex, left ? 0.0f : 1.0f, 0.0f, 4.0f, 11.0f)}
+      .height = ::ui::Length::points(16.5f),
+      .flex_shrink = ::ui::StyleFloat::points(0.0f)}}
+    style={tokens::image_patch(tex)}
   />
 }
 
@@ -134,7 +135,7 @@ struct CharacterCreateProviderProps {
         .layout = ::ui::LayoutStyle{.width = ::ui::Length::points(6.0f)}}));
     cells.push_back(advantage_bracket("bl", true));
     cells.push_back(BodyText(BodyTextProps{.key = "b",
-                                           .variant = BodyTextVariant::Strong,
+                                           .variant = BodyTextVariant::Body,
                                            .value = adv.bonus}));
     cells.push_back(advantage_bracket("br", false));
   }
@@ -144,9 +145,10 @@ struct CharacterCreateProviderProps {
     key={key}
     layout={::ui::LayoutStyle{
       .direction = ::ui::FlexDirection::Row,
-      .align_items = ::ui::AlignItems::Center,
+      .align_items = ::ui::AlignItems::Start,
       .width = ::ui::Length::percent(100.0f),
       .height = ::ui::Length::points(18.0f),
+      .flex_shrink = ::ui::StyleFloat::points(0.0f),
       .padding = {30.0f, 0.0f, 0.0f, 0.0f}}}
   >
     {::ui::children(cells)}
@@ -170,7 +172,7 @@ struct CharacterCreateProviderProps {
     value={value}
     layout={::ui::LayoutStyle{
       .width = ::ui::Length::points(283.5f),
-      .margin = ::ui::EdgeSizes{-0.75f, {}, -2.25f, {}}}}
+      .margin = ::ui::EdgeSizes{-0.75f, {}, -0.25f, {}}}}
     style={st}
   />
 }
@@ -406,11 +408,20 @@ struct CharacterCreateContentProps {
             .gap = 7.5f}}
         >
           {pane_header("SELECT AGENCY")}
-          {agency_row(0, pi, on_pick, set_preview)}
-          {agency_row(1, pi, on_pick, set_preview)}
-          {agency_row(2, pi, on_pick, set_preview)}
-          {agency_row(3, pi, on_pick, set_preview)}
-          {agency_row(4, pi, on_pick, set_preview)}
+          <Box
+            key="rows"
+            layout={::ui::LayoutStyle{
+              .direction = ::ui::FlexDirection::Column,
+              .align_items = ::ui::AlignItems::Stretch,
+              .margin = {0.0f, 2.0f, -3.0f, 3.0f},
+              .gap = 7.5f}}
+          >
+            {agency_row(0, pi, on_pick, set_preview)}
+            {agency_row(1, pi, on_pick, set_preview)}
+            {agency_row(2, pi, on_pick, set_preview)}
+            {agency_row(3, pi, on_pick, set_preview)}
+            {agency_row(4, pi, on_pick, set_preview)}
+          </Box>
         </Box>
         <Box
           key="right"
@@ -423,10 +434,21 @@ struct CharacterCreateContentProps {
             .gap = 12.0f}}
         >
           <ScreenTitle key="adv" variant={ScreenTitleVariant::Prose} value="Advantages" />
-          {advantage_row("a0", a.advantages[0])}
-          {advantage_row("a1", a.advantages[1])}
-          {advantage_row("a2", a.advantages[2])}
-          {advantage_row("a3", a.advantages[3])}
+          <Box
+            key="advrows"
+            layout={::ui::LayoutStyle{
+              .direction = ::ui::FlexDirection::Column,
+              .align_items = ::ui::AlignItems::Stretch,
+              .margin = {0.0f, 0.0f, -1.0f, 1.0f},
+              .gap = 10.0f}}
+          >
+            {advantage_row("a0", a.advantages[0])}
+            <Box key="a1w" layout={::ui::LayoutStyle{.margin = {0.0f, 0.0f, 1.0f, -1.0f}}}>
+              {advantage_row("a1", a.advantages[1])}
+            </Box>
+            {advantage_row("a2", a.advantages[2])}
+            {advantage_row("a3", a.advantages[3])}
+          </Box>
           <ScreenTitle key="dh" variant={ScreenTitleVariant::Prose} value="Description" />
           {desc_paragraph(a.description)}
         </Box>

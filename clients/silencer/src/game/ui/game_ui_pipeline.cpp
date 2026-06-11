@@ -265,7 +265,15 @@ bake(40, 2, cppxChrome.dialog_pw, &cppxChrome.dialog_pw_w, &cppxChrome.dialog_pw
 register_legacy(7, 5, cppxChrome.chrome_panel);
 register_legacy(40, 4, cppxChrome.dialog_msg);
 register_legacy(40, 2, cppxChrome.dialog_pw);
-register_legacy(6, 2, cppxChrome.row_plate);
+// The row plate stretches to its box (origin sizes it to the pane), so it
+// gets the STRETCH flavor (1:1 boxes bake identically through it).
+if(cppxChrome.row_plate && 6 < banks.size() && 2 < banks[6].size()){
+const std::shared_ptr<Surface> &rp = banks[6][2];
+if(rp && !rp->pixels.empty())
+cppxHost->register_legacy_stretch(cppxChrome.row_plate, rp->pixels.data(),
+                                  rp->w, rp->h, page_for_bank(6),
+                                  kLegacyRenderWidth, kLegacyRenderHeight);
+}
 // bank 7 idx 2 — the lobby-connect dialog (origin PackImage(7,2)): frame, soft
 // glow, log well, form sub-panel + field/button wells all baked in. Drawn 1:1
 // in virtual space — register for the per-phase variant swap.
@@ -406,9 +414,42 @@ register_legacy(6, 13, cppxChrome.toggle_l_off);
 register_legacy(6, 14, cppxChrome.toggle_r_off);
 register_legacy(6, 15, cppxChrome.toggle_r_on);
 // bank 134 '['/']' — the advantage-metadata bracket glyphs (origin borrows the
-// bank-134 art because bank 133's bracket cells are dash-shaped).
-bake(134, '[' - 33, cppxChrome.bracket_l, &cppxChrome.bracket_w, &cppxChrome.bracket_h);
-bake(134, ']' - 33, cppxChrome.bracket_r);
+// bank-134 art because bank 133's bracket cells are dash-shaped). origin's
+// AdvantageBracket draws a 4x11 crop (srcX 0 left / 1 right) through
+// EffectColor(224) at 1:1 virtual — bake the cropped+tinted cells and
+// register them so the per-phase variant swap applies (src-cropped draws are
+// not bake-eligible).
+{
+auto bake_bracket = [&](char ch, int src_x, uint32_t &id_out){
+if(134 >= banks.size()) return;
+size_t gi = (size_t)(ch - 33);
+if(gi >= banks[134].size()) return;
+const std::shared_ptr<Surface> &sp = banks[134][gi];
+if(!sp || sp->pixels.empty()) return;
+Surface * copy = game.renderer.CreateSurfaceCopy(sp.get());
+if(!copy) return;
+game.renderer.EffectColor(copy, nullptr, 224);
+static uint8_t crop[2][4 * 11];
+uint8_t *dst = crop[src_x ? 1 : 0];
+for(int y = 0; y < 11; ++y)
+for(int x = 0; x < 4; ++x){
+const int sx = src_x + x, sy = y;
+dst[y * 4 + x] = (sx < copy->w && sy < copy->h)
+                     ? copy->pixels[(size_t)sy * copy->w + sx] : 0;
+}
+delete copy;
+uint32_t id = cppxHost->bake_chrome_sprite(dst, 4, 11, palette);
+if(id){
+id_out = id;
+cppxHost->register_legacy_sprite(id, dst, 4, 11, palette,
+                                 kLegacyRenderWidth, kLegacyRenderHeight);
+}
+};
+bake_bracket('[', 0, cppxChrome.bracket_l);
+bake_bracket(']', 1, cppxChrome.bracket_r);
+cppxChrome.bracket_w = 4;
+cppxChrome.bracket_h = 11;
+}
 // bank 181 idx0-4 — the five agency emblems (SIL-102 Character Create detail).
 // origin draws them PackImageContain into their element box, so register the
 // contain flavor: the executor swaps each draw for a per-phase/per-size

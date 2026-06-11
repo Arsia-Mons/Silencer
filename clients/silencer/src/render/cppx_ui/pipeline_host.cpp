@@ -125,6 +125,14 @@ void PipelineHost::register_legacy_contain(uint32_t texture_id,
                                     legacy_w, legacy_h);
 }
 
+void PipelineHost::register_legacy_stretch(uint32_t texture_id,
+                                           const uint8_t *indices, int w,
+                                           int h, const SDL_Color *palette256,
+                                           int legacy_w, int legacy_h) {
+  textures_.register_legacy_stretch(texture_id, indices, w, h, palette256,
+                                    legacy_w, legacy_h);
+}
+
 void PipelineHost::register_legacy_nineslice(uint32_t texture_id,
                                              const uint8_t *indices, int w,
                                              int h,

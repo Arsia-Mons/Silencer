@@ -106,6 +106,11 @@ public:
                                int w, int h, const SDL_Color *palette256,
                                int legacy_w, int legacy_h);
 
+  // Stretch flavor (plates sized to their box, e.g. the cc row plates).
+  void register_legacy_stretch(uint32_t texture_id, const uint8_t *indices,
+                               int w, int h, const SDL_Color *palette256,
+                               int legacy_w, int legacy_h);
+
   // Build one bitmap glyph FACE atlas (origin/main text parity). `glyphs[i]` is
   // the source sprite for char GlyphFonts::kFirstChar + i (null/empty = blank
   // cell). advance/line_height are the native (640-space) bank metrics. Baked

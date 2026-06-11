@@ -110,7 +110,8 @@ bool TextureRegistry::resolve_legacy_nineslice_variant(
   if (!renderer || !out || out_w <= 0 || out_h <= 0)
     return false;
   auto it = legacy_.find(base_id);
-  if (it == legacy_.end() || !(it->second.nine_slice || it->second.contain))
+  if (it == legacy_.end() ||
+      !(it->second.nine_slice || it->second.contain || it->second.stretch))
     return false;
   const LegacySprite &sp = it->second;
   float s = std::min(out_w / (float)sp.legacy_w, out_h / (float)sp.legacy_h);
@@ -141,10 +142,14 @@ bool TextureRegistry::resolve_legacy_nineslice_variant(
                                   vx, vy, vw, vh, sp.cap_l, sp.cap_r, sp.cap_t,
                                   sp.cap_b, sp.legacy_w, sp.legacy_h, out_w,
                                   out_h, x, y, tw, th, rgba.data());
-    else
+    else if (sp.contain)
       bake_element_contain_rgba(sp.indices.data(), sp.w, sp.h, sp.palette, vx,
                                 vy, vw, vh, sp.legacy_w, sp.legacy_h, out_w,
                                 out_h, x, y, tw, th, rgba.data());
+    else // stretch (origin DispatchImage Stretch)
+      bake_element_rgba(sp.indices.data(), sp.w, sp.h, sp.palette, vx, vy, vw,
+                        vh, sp.legacy_w, sp.legacy_h, out_w, out_h, x, y, tw,
+                        th, rgba.data());
     id = upload_rgba(renderer, rgba.data(), tw, th);
     if (!id)
       return false;
@@ -161,11 +166,23 @@ bool TextureRegistry::resolve_legacy_nineslice_variant(
   return true;
 }
 
+void TextureRegistry::register_legacy_stretch(uint32_t base_id,
+                                              const uint8_t *indices, int w,
+                                              int h,
+                                              const SDL_Color *palette256,
+                                              int legacy_w, int legacy_h) {
+  if (!base_id || !indices || w <= 0 || h <= 0 || !palette256)
+    return;
+  register_legacy_sprite(base_id, indices, w, h, palette256, legacy_w,
+                         legacy_h);
+  legacy_[base_id].stretch = true;
+}
+
 bool TextureRegistry::resolve_legacy_contain_variant(
     uint32_t base_id, SDL_Renderer *renderer, float dev_x, float dev_y,
     float dev_w, float dev_h, int out_w, int out_h, LegacyVariant *out) {
   auto it = legacy_.find(base_id);
-  if (it == legacy_.end() || !it->second.contain)
+  if (it == legacy_.end() || !(it->second.contain || it->second.stretch))
     return false;
   return resolve_legacy_nineslice_variant(base_id, renderer, dev_x, dev_y,
                                           dev_w, dev_h, out_w, out_h, out);
@@ -180,7 +197,8 @@ bool TextureRegistry::resolve_legacy_variant(uint32_t base_id,
   if (!renderer || !out || out_w <= 0 || out_h <= 0)
     return false;
   auto it = legacy_.find(base_id);
-  if (it == legacy_.end() || it->second.nine_slice || it->second.contain)
+  if (it == legacy_.end() || it->second.nine_slice || it->second.contain ||
+      it->second.stretch)
     return false;
   const LegacySprite &sp = it->second;
   float s = std::min(out_w / (float)sp.legacy_w, out_h / (float)sp.legacy_h);

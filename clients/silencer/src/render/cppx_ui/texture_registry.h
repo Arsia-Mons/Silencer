@@ -71,6 +71,13 @@ public:
                                int w, int h, const SDL_Color *palette256,
                                int legacy_w, int legacy_h);
 
+  // Stretch flavor (origin DispatchImage Stretch / nine-slice-less plates
+  // sized to their box): the sprite stretches into an arbitrary-size virtual
+  // box before the whole-frame magnify.
+  void register_legacy_stretch(uint32_t base_id, const uint8_t *indices,
+                               int w, int h, const SDL_Color *palette256,
+                               int legacy_w, int legacy_h);
+
   // A resolved variant: drawn 1:1 at device (x,y), w x h texels. The rect may
   // exceed the requesting draw's box by up to 2px right/bottom — it covers the
   // sprite's full device cell (the box is Yoga-rounded, the cell is not).
@@ -107,9 +114,12 @@ public:
   void shutdown();
 
 private:
-  // 64-texture cap (doc §3: do not raise speculatively; atlasing only if >64
-  // chrome textures is proven, coordinated upstream).
-  static constexpr int kMaxTextures = 64;
+  // Raised from 64: the per-phase legacy variants (sprites, nine-slice
+  // buttons, contain emblems, stretch plates) accumulate across a session —
+  // a 13-screen capture run measurably exceeds 64 and silently fell back to
+  // raw draws (game_staging regression, 2026-06-11). Atlasing remains the
+  // long-term relief valve.
+  static constexpr int kMaxTextures = 256;
   SDL_Texture *textures_[kMaxTextures] = {};
   int count_ = 0;
 
@@ -119,6 +129,7 @@ private:
     int legacy_w = 640, legacy_h = 480;
     bool nine_slice = false;
     bool contain = false;
+    bool stretch = false;
     int cap_l = 0, cap_r = 0, cap_t = 0, cap_b = 0;
     SDL_Color palette[256] = {};
   };
