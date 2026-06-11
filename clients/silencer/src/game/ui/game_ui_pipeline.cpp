@@ -414,6 +414,26 @@ bake(7, 18, cppxChrome.ready_on, &cppxChrome.ready_w, &cppxChrome.ready_h);
 bake(7, 19, cppxChrome.ready_off);
 register_legacy(7, 18, cppxChrome.ready_on);
 register_legacy(7, 19, cppxChrome.ready_off);
+// Brightness-64 copies (origin tech_tree_grid non-interactable toggles).
+auto bake_dim = [&](size_t bank, size_t index, uint32_t &id_out){
+if(bank >= banks.size() || index >= banks[bank].size()) return;
+const std::shared_ptr<Surface> &sp = banks[bank][index];
+if(!sp || sp->pixels.empty()) return;
+Surface * copy = game.renderer.CreateSurfaceCopy(sp.get());
+if(!copy) return;
+game.renderer.EffectBrightness(copy, nullptr, 64);
+uint32_t id = cppxHost->bake_chrome_sprite(copy->pixels.data(), copy->w,
+                                           copy->h, page_for_bank(bank));
+if(id){
+id_out = id;
+cppxHost->register_legacy_sprite(id, copy->pixels.data(), copy->w, copy->h,
+                                 page_for_bank(bank), kLegacyRenderWidth,
+                                 kLegacyRenderHeight);
+}
+delete copy;
+};
+bake_dim(7, 18, cppxChrome.ready_on_dim);
+bake_dim(7, 19, cppxChrome.ready_off_dim);
 if(7 < res.spriteoffsetx.size() && 18 < res.spriteoffsetx[7].size())
 cppxChrome.ready_ox = (int16_t)res.spriteoffsetx[7][18];
 if(7 < res.spriteoffsety.size() && 18 < res.spriteoffsety[7].size())
@@ -507,6 +527,10 @@ static const VariantBake kVariantBakes[] = {
     {0, 133, 6.f, 11.f, Fx::Raw, 0, 160, silencer::tokens::kTextPresenceHeader},
     // staging roster level badges: Tiny LegacyPalette(170).
     {3, 132, 4.f, 7.f, Fx::Color, 170, 128, silencer::tokens::kTextRosterLevel},
+    // tech grid: non-interactable rows (brightness 64) + slots-left readout
+    // (LegacyPalette(129, 144, ramp)).
+    {0, 133, 6.f, 11.f, Fx::Raw, 0, 64, silencer::tokens::kTextTechDim},
+    {0, 133, 6.f, 11.f, Fx::Ramp, 129, 144, silencer::tokens::kTextTechSlots},
 };
 for(const VariantBake & vb : kVariantBakes){
 if((size_t)vb.bank >= banks.size()) continue;

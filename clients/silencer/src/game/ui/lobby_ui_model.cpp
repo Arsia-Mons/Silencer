@@ -187,8 +187,14 @@ void BuildStaging(client::ui::LobbySnapshot &snap, World &world, Lobby &lobby) {
       }
     }
     snap.staging_tech_choices = localpeer->techchoices;
+    Team *techteam = world.GetPeerTeam(localid);
     for (BuyableItem *item : world.buyableitems) {
       if (!item || item->techchoice == 0)
+        continue;
+      // origin tech_tree_grid: agency-specific items only show for their
+      // agency (and !techslots rows are skipped — techchoice==0 covers it).
+      if (item->agencyspecific != -1 && techteam &&
+          item->agencyspecific != techteam->agency)
         continue;
       client::ui::StagingTechRow row;
       row.name = item->name;

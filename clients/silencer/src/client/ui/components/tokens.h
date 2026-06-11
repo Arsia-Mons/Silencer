@@ -71,6 +71,10 @@ constexpr ::ui::Color kTextPresenceHeader = {92, 148, 92, 255};
 // Staging roster level badges ("L:0"): origin Tiny text LegacyPalette(170) —
 // primary of that ramp (orange).
 constexpr ::ui::Color kTextRosterLevel = {136, 84, 48, 255};
+// Tech grid: non-interactable rows at origin brightness 64; the slots-left
+// readout at LegacyPalette(129, 144, ramp) (grey-white).
+constexpr ::ui::Color kTextTechDim = {8, 56, 8, 255};
+constexpr ::ui::Color kTextTechSlots = {184, 184, 184, 255};
 constexpr ::ui::Color kTextWeaponDetailOff = {10, 72, 8, 255}; // disabled
 constexpr ::ui::Color kTextHud = {61, 232, 61, 255};          // #3DE83D hud-green
 

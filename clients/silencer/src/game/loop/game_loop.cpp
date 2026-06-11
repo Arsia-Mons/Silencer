@@ -1,4 +1,5 @@
 #include "game.h"
+#include "config.h"
 #include "controldispatch.h"
 #include "gasloader.h"
 #include "lobbygame.h"
@@ -432,8 +433,17 @@ bool Game::Tick(void){
 				}
 				// Join settle / fail: clear the in-flight flag once the connect
 				// resolves (connected -> staging; idle -> stayed in the browser).
-				if(joininggame && (world.IsConnected() || world.IsIdle()))
+				// On connect origin applies the per-agency DEFAULT TECH LOADOUT
+				// (lobby_controller.cpp: SetTech(defaulttechchoices[agency]),
+				// Laser+Rocket out of the box).
+				if(joininggame && (world.IsConnected() || world.IsIdle())){
+					if(world.IsConnected()){
+						const Uint8 agency = world.lobby.GetSelectedAgencyOrDefault(
+							Config::GetInstance().defaultagency);
+						world.SetTech(Config::GetInstance().defaulttechchoices[agency]);
+					}
 					joininggame = false;
+				}
 			}
 		}break;
 		case CREATECHARACTER:{

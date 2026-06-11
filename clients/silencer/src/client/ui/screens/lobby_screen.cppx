@@ -597,78 +597,22 @@ struct StagingPanelProps {
   </Box>
 }
 
-// One pre-match tech row (origin tech_tree_grid): a checkbox lane, the tech
-// name, and the slot cost in the bank-134 bracket glyphs ("Laser [1]").
-// Unaffordable rows render muted and don't toggle.
-::ui::UiElement tech_row(int index, const StagingTechRow &row, uint32_t choices,
-                         std::function<void(uint32_t)> set_tech) {
-  client::ui::ChromeTextures chrome = client::ui::use_chrome();
-  const char *key = ::ui::copy_string(("tr" + std::to_string(index)).c_str());
-  const ::ui::StylePatch cb =
-      row.selected
-          ? tokens::panel_patch(tokens::kInsetStroke, tokens::kInsetStroke, 1.0f)
-          : tokens::frame_patch(tokens::kInsetStroke);
-  std::function<void(const ::ui::ActivationEvent &)> toggle =
-      [row, choices, set_tech](const ::ui::ActivationEvent &) {
-        if (row.interactable && set_tech)
-          set_tech(choices ^ row.choice_mask);
-      };
-  const char *slots = ::ui::copy_string(std::to_string((unsigned)row.slots).c_str());
-  auto bracket = [&](const char *bkey, bool left) -> ::ui::UiElement {
-    uint32_t tex = left ? chrome.bracket_l : chrome.bracket_r;
-    if (!tex)
-      return ::ui::empty();
-    return Box(BoxProps{
-        .key = bkey,
-        .layout = ::ui::LayoutStyle{.width = ::ui::Length::points(6.0f),
-                                    .height = ::ui::Length::points(16.5f)},
-        .style = tokens::image_patch_sub(tex, left ? 0.0f : 1.0f, 0.0f, 4.0f, 11.0f)});
-  };
-  return <Box
-    key={key}
-    id="TechRow"
-    idOffset={index}
-    focusable={true}
-    onActivate={toggle}
-    layout={::ui::LayoutStyle{
-      .direction = ::ui::FlexDirection::Row,
-      .align_items = ::ui::AlignItems::Center,
-      .height = ::ui::Length::points(19.5f),
-      .gap = 7.5f}}
-  >
-    <Box
-      key="cb"
-      layout={::ui::LayoutStyle{
-        .width = ::ui::Length::points(13.5f),
-        .height = ::ui::Length::points(13.5f),
-        .flex_shrink = ::ui::StyleFloat::points(0.0f)}}
-      style={cb}
-    />
-    <BodyText
-      key="n"
-      variant={BodyTextVariant::Body}
-      tone={row.interactable ? BodyTextTone::Default : BodyTextTone::Muted}
-      value={::ui::copy_string(row.name.c_str())}
-    />
-    {bracket("bl", true)}
-    <BodyText key="s" variant={BodyTextVariant::Body} value={slots} />
-    {bracket("br", false)}
-  </Box>
-}
-
 // Tech-select CENTER column (origin BuildGameTechUpperTree): the full-width
 // Back To Teams chrome button.
 ::ui::UiElement TechUpperPanel(std::function<void()> on_back) {
+  // origin BuildGameTechUpperTree: GTechBackWrap pad L4 T4 (virtual) and the
+  // full-width chrome Back To Teams button (panel - 8 wide).
   return <Box
     key="centercol"
     layout={::ui::LayoutStyle{
       .direction = ::ui::FlexDirection::Column,
       .align_items = ::ui::AlignItems::Stretch,
-      .flex_grow = ::ui::StyleFloat::points(1.4f),
+      .justify_content = ::ui::JustifyContent::Start,
+      .flex_grow = ::ui::StyleFloat::points(1.0f),
       .flex_basis = ::ui::Length::points(0.0f),
       .min_width = ::ui::Length::points(0.0f),
-      .padding = {4.5f, 6.0f, 4.5f, 6.0f},
-      .gap = 10.0f}}
+      .padding = {6.0f, 6.0f, 7.0f, 0.0f}}}
+    style={lobby_panel_open_right()}
   >
     <AppButton
       key="back"
@@ -680,32 +624,76 @@ struct StagingPanelProps {
   </Box>
 }
 
-// Tech-select RIGHT cell (origin BuildGameTechTallTree): the slots-left
-// readout over the tech checkbox list (origin pads the grid in from the cell).
+// Tech-select RIGHT cell (origin BuildGameTechTallTree + tech_tree_grid):
+// slots readout at (57,36) pad in LegacyPalette(129,144,ramp); checkbox lanes
+// at x 543+14c (local col 3 = 585), rows y 128+13k; the local label column at
+// x 601, rows y 130+13k — "name (N)" Body at brightness 128/64. Anchors are
+// virtual; authored pen L = round(1.5*v) from the cell origin (797,100).
 ::ui::UiElement TechListCell(const Staging &staging) {
-  std::vector<::ui::UiElement> rows;
-  rows.reserve(staging.tech.size());
-  for (int i = 0; i < (int)staging.tech.size(); ++i)
-    rows.push_back(tech_row(i, staging.tech[i], staging.tech_choices, staging.set_tech));
-  return <Box key="rightcell" layout={lobby_right_cell_layout()} style={lobby_panel_open_left()}>
-    <Box key="slotswrap" layout={::ui::LayoutStyle{.padding = {85.5f, 0.0f, 10.5f, 0.0f}}}>
-      <BodyText
-        key="slots"
-        variant={BodyTextVariant::Body}
-        tone={BodyTextTone::Prose}
-        value={::ui::copy_string(staging.tech_slots_label.c_str())}
-      />
-    </Box>
-    <Box
-      key="grid"
-      layout={::ui::LayoutStyle{
-        .direction = ::ui::FlexDirection::Column,
-        .padding = {85.5f, 0.0f, 0.0f, 0.0f},
-        .gap = 0.0f}}
-    >
-      {::ui::children(rows)}
-    </Box>
-  </Box>
+  client::ui::ChromeTextures chrome = client::ui::use_chrome();
+  std::vector<::ui::UiElement> kids;
+  auto L = [](float v) { return (float)std::lround(1.5f * v); };
+  kids.push_back(Box(BoxProps{
+      .key = "slots",
+      .layout = ::ui::LayoutStyle{
+          .position = ::ui::PositionType::Absolute,
+          .position_inset = ::ui::EdgeSizes{L(588) - 797.0f, {}, L(103) - 100.0f, {}}},
+      .children = ::ui::children({Text(TextProps{
+          .key = "t",
+          .value = ::ui::copy_string(staging.tech_slots_label.c_str()),
+          .layout = {.height = ::ui::Length::points(tokens::kLineBody)},
+          .style = tokens::text_patch(tokens::kTextTechSlots, tokens::kFontBodyEm,
+                                      tokens::kFaceBody, tokens::kLineBody)})})}));
+  for (int i = 0; i < (int)staging.tech.size(); ++i) {
+    const StagingTechRow &row = staging.tech[i];
+    const std::string k = std::to_string(i);
+    const uint32_t tex =
+        row.selected ? (row.interactable ? chrome.ready_on : chrome.ready_on_dim)
+                     : (row.interactable ? chrome.ready_off : chrome.ready_off_dim);
+    std::function<void(const ::ui::ActivationEvent &)> toggle =
+        [row, choices = staging.tech_choices, set_tech = staging.set_tech](
+            const ::ui::ActivationEvent &) {
+          if (row.interactable && set_tech)
+            set_tech(choices ^ row.choice_mask);
+        };
+    if (tex)
+      kids.push_back(Box(BoxProps{
+          .key = ::ui::copy_string(("cb" + k).c_str()),
+          .id = "TechRow",
+          .id_offset = i,
+          .focusable = true,
+          .accessibility = {.label = ::ui::copy_string(row.name.c_str())},
+          .on_activate = toggle,
+          .layout = ::ui::LayoutStyle{
+              .position = ::ui::PositionType::Absolute,
+              .position_inset = ::ui::EdgeSizes{
+                  L(585) - 797.0f, {}, L(128 + 13 * i) - 100.0f, {}},
+              // origin blits the toggle sprite NATIVE from the 13x13 box's
+              // top-left without clipping — size the box to the sprite.
+              .width = ::ui::Length::points(chrome.ready_w * 1.5f),
+              .height = ::ui::Length::points(chrome.ready_h * 1.5f)},
+          .style = tokens::image_patch(tex)}));
+    const std::string lbl = row.name + " (" + std::to_string((unsigned)row.slots) + ")";
+    kids.push_back(Box(BoxProps{
+        .key = ::ui::copy_string(("tl" + k).c_str()),
+        .layout = ::ui::LayoutStyle{
+            .position = ::ui::PositionType::Absolute,
+            .position_inset = ::ui::EdgeSizes{
+                L(601) - 797.0f, {}, L(130 + 13 * i) - 100.0f, {}}},
+        .children = ::ui::children({Text(TextProps{
+            .key = "t",
+            .value = ::ui::copy_string(lbl.c_str()),
+            .layout = {.height = ::ui::Length::points(tokens::kLineBody)},
+            .style = tokens::text_patch(
+                row.interactable ? tokens::kTextBody : tokens::kTextTechDim,
+                tokens::kFontBodyEm, tokens::kFaceBody, tokens::kLineBody)})})}));
+  }
+  ::ui::LayoutStyle cell = lobby_right_cell_layout();
+  cell.padding = {0.0f, 0.0f, 0.0f, 0.0f};
+  return Box(BoxProps{.key = "rightcell",
+                      .layout = cell,
+                      .style = lobby_panel_open_left(),
+                      .children = ::ui::children(kids)});
 }
 
 ::ui::UiElement StagingRosterCell(const StagingPanelProps &props) {

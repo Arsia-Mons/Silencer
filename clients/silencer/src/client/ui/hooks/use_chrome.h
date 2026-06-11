@@ -108,6 +108,8 @@ struct ChromeTextures {
   // Staging roster ready checks (bank 7 idx18 ready / idx19 not-ready),
   // native size + offsets.
   uint32_t ready_on = 0, ready_off = 0;
+  // Brightness-64 copies for the tech grid's non-interactable rows.
+  uint32_t ready_on_dim = 0, ready_off_dim = 0;
   uint16_t ready_w = 0, ready_h = 0;
   int16_t ready_ox = 0, ready_oy = 0;
   // Advantage metadata brackets. Bank 133's '['/']' glyph art is wrong (dash-
