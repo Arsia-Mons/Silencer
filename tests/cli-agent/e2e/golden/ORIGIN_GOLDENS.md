@@ -105,6 +105,43 @@ only skips Present. The control-port `screenshot` op captures HUD included.)
   hud_secret_overlay / hud_trace_time / hud_system_camera (need secrets/beaming/
   system-camera world states), scoreboard-style F1 with multiple teams.
 
+## mission_summary.png — captured 2026-06-11, 1920×1080
+
+- **Source:** `origin/main` @ `af4c50c5` (v00058) + TWO uncommitted capture
+  patches in `.worktrees/origin-capture` (NEVER commit there):
+  1. the deterministic-fade patch was **stashed** (binary built pristine —
+     the summary settles >3s past the fade ramp, measured deterministic);
+  2. `gamestateobject.cpp`: ctor sets `requiresauthority=true;
+     snapshotinterval=0;` and `Tick()` early-returns on `World::REPLICA`
+     after adopting the replicated `winningTeamId` into
+     `world.winningteamid`. **Stock origin never replicates the
+     GameStateObject at all** (requiresauthority defaults false, contradicting
+     the header comment) AND replicas clobber the replicated field every
+     TickObjects — so a time-limit match end can never reach
+     CheckForEndOfGame on a lobby client and the client drops to LOBBY via
+     CONNECTION LOST when the dedicated server exits. The secrets win path
+     reaches MISSIONSUMMARY naturally (Team::Tick runs on replicas via
+     ProcessSnapshotQueue→TickObjects); the patch only lets the time-limit
+     end take the same screen path deterministically. The screen render
+     itself is 100% stock origin code.
+- **Capture script:** `tools/cap/cap_mission_summary_origin.sh`. Drive: Go
+  lobby (fresh db) → alice/secret → Alice/Noxis → Create Game STAR72.SIL →
+  Ready → dedicated server (same patched binary) ends the match at 5s via a
+  temporary `timeLimitSecs=5` on gameModes id 0 in the BUILT BUNDLE's
+  `Contents/assets/gas/gamemodes.json` (backed up + restored by the script)
+  → 1-team draw (`winningteamid=0xFFFF`) → server SIGSTOPped on the lobby's
+  `[stats]` log line (it would otherwise quit and put the client on the
+  connection-lost path) → client reaches `message_i>=240` →
+  GoToState(MISSIONSUMMARY) → resize 1920×1080 (in-game pinned the headless
+  surface to 640×480) → settle 3s → screenshot.
+- **Content:** fresh-account 1-player draw: "+ 0 XP", `*NEW UPGRADE
+  AVAILABLE*` banner, six "Current <Stat> Level:" rows (0/0/0/3/0/0), six
+  Upgrade oval buttons, zeroed stats scrollbox, Done. The upgrade-button
+  state is included (fresh char: totalbonusupgrades−defaultbonuses <
+  maxupgrades holds empirically).
+- **Determinism:** two independent full runs byte-identical
+  (md5 a2890322b49dcadbd877f74e8f081783), no masks needed.
+
 ## NOT restored — do not trust as parity targets
 - **gallery.png** — cppx-only component showcase; no origin/main equivalent. Left as
   the prior cppx render.
