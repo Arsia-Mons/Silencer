@@ -10,9 +10,9 @@ All measured 2026-06-11 (iteration 0) with recalibrated tile gate, fresh capture
 
 | Surface | State | Evidence (global% / hot tiles / worst tile) | Notes |
 |---|---|---|---|
-| mainmenu | **PASS** | pixdiff PASS 0.12%/0 hot (3.1 max) 2026-06-11 (was 0.83/18/10.0) | OVAL+LOGO PER-PHASE VARIANTS landed (see systemic entry below); stack inset 48.75% (=x624) lands pills on the virtual grid (vx 416/456/496); logo frames registered too (dark-brick interior striping was hot) |
+| mainmenu | **PASS (full gate)** | pixdiff PASS 0.12%/0 hot + gate wf_6e530100-b59 overall=PASS 6/6 critics 0.95-0.97 (2026-06-11) | per-phase variants; several regions verified byte-identical (logo histogram counts exact) |
 | options | DIVERGED (1 tile) | 0.0735% / 1 / 5.4% @936,546 (was PASS 0.2578/0/4.2) | ovals + 3 of 4 labels now byte-exact (corr 1.0000); the one hot tile is the "Audio" label — GLYPH-PHASE family (golden text sits at a different device phase than the single-phase atlas; corr maxes 0.94 at any shift). Global 3.5x better; tile gate flipped red on this one tile |
-| options_audio | **PASS** | pixdiff PASS 0.0658%/0 hot (3.2 max) 2026-06-11 (was 0.61/21/12.0) | ovals+toggles per-phase exact; row wrappers margin-right 1/2 land cells on the grid; title nudge ml=1 (+1 device) |
+| options_audio | **PASS (full gate)** | pixdiff PASS 0.0658%/0 hot + gate wf_d51296b1-328 overall=PASS 6/6 critics 0.93-0.97 (2026-06-11) | toggle pair phase-exact (densities 0.25/0.81 match golden); UI bbox x504-1406/y252-542 identical |
 | options_display | DIVERGED | 0.1636% / 1 / 6.3% @702,468 (was 1.48/40/23.1) | action-row y fixed (392 -> vy 261, was ~4px low); single hot tile = "Smooth Scaling" label, glyph-phase + irreducible ±1 (same-frac labels want opposite shifts); <10% target met |
 | options_controls | DIVERGED | 0.3856% / 5 / 5.8% @*,0 (was 1.29/30/10.1) | bind/preset/save ovals per-phase exact (lanes x561/x833, save 335/608); residual = the 5 title-row tiles ("Configure Controls", dx=0, glyph-phase) at 5.1-5.8% |
 | lobby_connect | DIVERGED | 1.46% / 41 / 25.9% @780,780 | CORRECTED DIAGNOSIS: button row IS centered right (origin's floating row escapes pad-84 and centers across panel); real diff = button chrome detail (inner inset frame) + widths (L/C 275 vs 250 device px) |
@@ -161,3 +161,16 @@ Full suite 2026-06-11 (post scale-unclamp): 21/23 PASS; only 70/71 red (the pari
 | big-switch 7 cases | screens/update_screen.cppx:27 |
 | god-view 260 lines | screens/character_create.cppx:226 CharacterCreateContent |
 | god-view 407 lines | screens/lobby_screen.cppx:591 LobbyScreenView |
+
+## Critic-panel architecture backlog (from gate runs wf_6e530100 + wf_d51296b1, 2026-06-11)
+
+Visual verdicts PASSED; these CODE findings must close before the architecture bar is met:
+
+| Sev | Finding | Fix shape |
+|---|---|---|
+| HIGH | per-screen nudge wrapper Boxes (options_screen w0-w3, audio musicw/actionsw/titlew, display fullscreenw/smoothw/actionpad, controls actionsnudge) — copy-pasted 1-2px magic margins | own grid-snap ONCE: resolve_legacy_variant draws at the snapped vx/vy it already computes, OR one shared dialog-column primitive; then delete all nudges |
+| MED | legacy-variant cache key %18 only valid for quarter-integer s; stale dims stretch cached textures at e.g. s=1.5625 | store bake-time w/h in LegacyVariant, draw at texture dims; fold s into key or fall through to plain path off the quarter-integer set |
+| MED | draw_executor legacy intercept sits after tint mods → in-branch un-mod rollback | hoist the intercept above the mod calls (clean early fork) |
+| MED | Options-Controls frame rect has two unsynchronized owners (BakeChromeTextures inline block + panel.cppx fallback rect) | screen-owned descriptor/shared constants; extract BakeControlsFrame(rw,rh,uiScale) |
+| MED | Save/Cancel row + BooleanSettingRow alignment duplicated at 3 call sites | extract shared DialogActions/SaveCancelRow primitive owning row + alignment |
+| LOW | 4x duplicated two-hop virtual-canvas math; unexplained 4.0f/+9 tolerances + doc drift; 640/480 impossible-state fallback; 9 hand-paired bake+register sites; failed bakes not memoized (per-frame rebake churn); split eligibility predicate; wrapper indent drift | helpers + named constants + bake_legacy() pairing + id=0 sentinel |
