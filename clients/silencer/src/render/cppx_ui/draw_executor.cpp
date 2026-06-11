@@ -97,7 +97,7 @@ bool render_text_glyphs(SDL_Renderer *r, const ::ui::DrawCommandList &list,
 
   // Per-phase string variant (origin text striping): exact-color text at 1:1
   // virtual scale swaps for a whole-string bake through origin's magnify at
-  // its absolute device cell (string analog of resolve_legacy_variant).
+  // its absolute device cell (string analog of resolve_legacy).
   if (cf) {
     int out_w = 0, out_h = 0;
     GlyphFonts::StringVariant sv;
@@ -235,14 +235,14 @@ void render_image(SDL_Renderer *r, const ::ui::DrawCommand &c,
     // Legacy chrome nine-slice (origin DispatchButtonNineSlice): swap the
     // draw for a per-phase/per-size variant baked through origin's virtual
     // nine-slice + whole-frame magnify at this element's absolute device
-    // cell (see resolve_legacy_variant for the plain-sprite analog).
+    // cell (see resolve_legacy for the plain-sprite analog).
     {
       int out_w = 0, out_h = 0;
       TextureRegistry::LegacyVariant v;
       if (SDL_GetCurrentRenderOutputSize(r, &out_w, &out_h) &&
-          textures->resolve_legacy_nineslice_variant(
-              img.texture_id, r, c.rect.x * scale, c.rect.y * scale,
-              c.rect.w * scale, c.rect.h * scale, out_w, out_h, &v)) {
+          textures->resolve_legacy(img.texture_id, r, c.rect.x * scale,
+                                   c.rect.y * scale, c.rect.w * scale,
+                                   c.rect.h * scale, out_w, out_h, &v)) {
         SDL_SetTextureColorMod(v.texture, tint.r, tint.g, tint.b);
         SDL_SetTextureAlphaMod(v.texture, tint.a);
         SDL_FRect d = {(float)v.x, (float)v.y, (float)v.w, (float)v.h};
@@ -334,11 +334,8 @@ void render_image(SDL_Renderer *r, const ::ui::DrawCommand &c,
     int out_w = 0, out_h = 0;
     TextureRegistry::LegacyVariant v;
     if (SDL_GetCurrentRenderOutputSize(r, &out_w, &out_h) &&
-        (textures->resolve_legacy_variant(img.texture_id, r, dst.x, dst.y,
-                                          dst.w, dst.h, out_w, out_h, &v) ||
-         textures->resolve_legacy_contain_variant(img.texture_id, r, dst.x,
-                                                  dst.y, dst.w, dst.h, out_w,
-                                                  out_h, &v))) {
+        textures->resolve_legacy(img.texture_id, r, dst.x, dst.y, dst.w,
+                                 dst.h, out_w, out_h, &v)) {
       SDL_SetTextureColorMod(tex, 255, 255, 255);
       SDL_SetTextureAlphaMod(tex, 255);
       SDL_SetTextureColorMod(v.texture, tint.r, tint.g, tint.b);
@@ -397,7 +394,7 @@ struct LayerSlot {
 // {p : int(p/s) == v} — alternating 2- and 3-px bands whose width/position
 // depend on the edge's absolute virtual coordinate. A uniform logical-width
 // border can land 1px off and can never produce the 3px phase, so (like
-// resolve_legacy_variant for sprites and string_variant for text) the
+// resolve_legacy for sprites and string_variant for text) the
 // EXECUTOR owns the grid: each painted side of an eligible hairline border
 // is snapped to its origin virtual cell and filled directly. Eligible =
 // square corners, no outline, hairline widths, the exact legacy stroke

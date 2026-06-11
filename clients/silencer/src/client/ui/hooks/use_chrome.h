@@ -24,7 +24,6 @@ namespace client::ui {
 //   bank 6  idx 28   oval_sm          112x33   (SIL-89)
 //   bank 6  idx 23   oval_lg          220x33   (SIL-89)
 //   bank 7  idx 24   chrome_btn_idle  156x21   (SIL-90, nine-slice {l12 r12 t4 b4})
-//   bank 7  idx 28   chrome_btn_focus 156x21   (SIL-90, phase-4 frame)
 //   bank 7  idx 5    chrome_panel     ~628x441 (SIL-91, plain native)
 //   bank 7  idx 7    chrome_controls  ~628x441 (Options·Controls single-pane, stretch)
 //   bank 40 idx 4    dialog_msg       ~352x178 (SIL-91, plain native)
@@ -46,10 +45,9 @@ struct ChromeTextures {
   // row plate, NOT the stadium oval). Nine-sliced to size to the pane.
   uint32_t row_plate = 0; // idx 2 — 236x27
   uint16_t row_plate_w = 0, row_plate_h = 0;
-  // The metal-chrome button (bank 7), nine-sliced. 2-state = two authored frames
-  // (idx24 phase 0 idle / idx28 phase 4 focused).
-  uint32_t chrome_btn_idle = 0;  // idx 24
-  uint32_t chrome_btn_focus = 0; // idx 28
+  // The metal-chrome button (bank 7 idx 24), nine-sliced. origin never swaps
+  // art on focus — only brightness ramps the one frame.
+  uint32_t chrome_btn_idle = 0;
   // Frame sprites rendered as PLAIN images at NATIVE sprite size (w/h carried so
   // the box can be sized exactly, keeping baked wells/borders aligned).
   uint32_t chrome_panel = 0; // bank 7 idx 5  (character_create / mission_summary)
@@ -123,7 +121,6 @@ struct ChromeTextures {
   // sub-rect (character_create_layout.cpp AdvantageBracket: srcX 0 left /
   // 1 right). Baked whole-glyph; the consumer applies the sub-rect crop.
   uint32_t bracket_l = 0, bracket_r = 0; // bank 134, '['-33 / ']'-33
-  uint16_t bracket_w = 0, bracket_h = 0;
   // In-game HUD console chrome (banks 94/95, base palette page). Whole-sprite,
   // edge-anchored over the live world; sized to native (_w/_h carried so the
   // bezel paints at its authored width, not stretched). Radar viewport (94/0) is

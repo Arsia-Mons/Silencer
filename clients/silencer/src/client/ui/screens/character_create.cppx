@@ -2,6 +2,7 @@
 
 #include "client/ui/components/actions/actions.h"
 #include "client/ui/components/layout/layout.h"
+#include "client/ui/components/layout/pen_grid.h"
 #include "client/ui/components/surfaces/surfaces.h"
 #include "client/ui/components/text/text.h"
 #include "client/ui/components/tokens.h"
@@ -138,12 +139,11 @@ struct CharacterCreateProviderProps {
   if (adv.bonus && adv.bonus[0] != '\0') {
     // origin: '[' at label-advance(7v per char) + gap 4v after the 20v
     // indent; metadata is BodySm in the standard green (LegacyPalette(224)),
-    // ']' 18v after '['. Anchored absolutely on the pen grid (L = lround of
-    // the 1.5x ideal) — flow placement inherits the TTF-measured label width
-    // and Yoga's .5-rounding, which flip the bracket bakes off their golden
-    // cells per label-length parity.
+    // ']' 18v after '['. Anchored absolutely on the pen grid — flow placement
+    // inherits the TTF-measured label width and Yoga's .5-rounding, which flip
+    // the bracket bakes off their golden cells per label-length parity.
     const float bx =
-        (float)std::lround(10.5f * (float)std::strlen(adv.label)) + 35.0f;
+        PenGrid::L(7.0f * (float)std::strlen(adv.label)) + 35.0f;
     auto abs_at = [](float left) {
       return ::ui::LayoutStyle{
           .position = ::ui::PositionType::Absolute,

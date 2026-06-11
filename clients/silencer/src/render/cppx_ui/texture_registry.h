@@ -17,6 +17,14 @@
 
 namespace silencer::cppx_ui {
 
+// How a registered legacy sprite meets its element box in origin's virtual
+// canvas (decides both the bake arithmetic and which draws qualify):
+//   Cell      — drawn 1:1 at its native size (per-phase device-cell variant)
+//   NineSlice — composited into the box with cropped corners + tiled bands
+//   Contain   — letterboxed into the box (origin DispatchImage Contain)
+//   Stretch   — stretched to the box (origin DispatchImage Stretch)
+enum class LegacyFit : uint8_t { Cell, NineSlice, Contain, Stretch };
+
 class TextureRegistry {
 public:
   TextureRegistry() = default;
@@ -49,34 +57,13 @@ public:
   // for a lazily-baked variant that evaluates origin's chain at the element's
   // absolute device cell. Variants memoize on (X%18, Y%18): the duplication
   // pattern period divides 18 for every quarter-integer s in play (1, 1.5,
-  // 2.25, 3, 4.5).
-  void register_legacy_sprite(uint32_t base_id, const uint8_t *indices, int w,
-                              int h, const SDL_Color *palette256, int legacy_w,
-                              int legacy_h);
-
-  // Nine-slice flavor (the metal-chrome buttons, origin
-  // DispatchButtonNineSlice): the sprite composites into an arbitrary-size
-  // virtual box (cropped corners, TILED edges/center) before the whole-frame
-  // magnify, so variants depend on the element's virtual size as well as its
-  // phase. Caps are sprite/virtual px.
-  void register_legacy_nineslice(uint32_t base_id, const uint8_t *indices,
-                                 int w, int h, const SDL_Color *palette256,
-                                 int legacy_w, int legacy_h, int cap_l,
-                                 int cap_r, int cap_t, int cap_b);
-
-  // Contain flavor (origin DispatchImage Contain — agency emblems): the
-  // sprite letterboxes into an arbitrary-size virtual box before the
-  // whole-frame magnify.
-  void register_legacy_contain(uint32_t base_id, const uint8_t *indices,
-                               int w, int h, const SDL_Color *palette256,
-                               int legacy_w, int legacy_h);
-
-  // Stretch flavor (origin DispatchImage Stretch / nine-slice-less plates
-  // sized to their box): the sprite stretches into an arbitrary-size virtual
-  // box before the whole-frame magnify.
-  void register_legacy_stretch(uint32_t base_id, const uint8_t *indices,
-                               int w, int h, const SDL_Color *palette256,
-                               int legacy_w, int legacy_h);
+  // 2.25, 3, 4.5). Sized fits (NineSlice/Contain/Stretch) composite into an
+  // arbitrary-size virtual box first, so their variants also memoize on the
+  // recovered virtual size. Caps (virtual px) apply to NineSlice only.
+  void register_legacy(uint32_t base_id, const uint8_t *indices, int w, int h,
+                       const SDL_Color *palette256, int legacy_w, int legacy_h,
+                       LegacyFit fit, int cap_l = 0, int cap_r = 0,
+                       int cap_t = 0, int cap_b = 0);
 
   // A resolved variant: drawn 1:1 at device (x,y), w x h texels. The rect may
   // exceed the requesting draw's box by up to 2px right/bottom — it covers the
@@ -86,30 +73,14 @@ public:
     int x = 0, y = 0, w = 0, h = 0;
   };
 
-  // Resolve (bake on first use) the per-phase variant for a draw with device
-  // rect (dev_x,dev_y,dev_w,dev_h) on an out_w x out_h output. False when the
-  // id isn't registered or the draw isn't the sprite at 1:1 virtual scale —
-  // caller falls through to the plain path.
-  bool resolve_legacy_variant(uint32_t base_id, SDL_Renderer *renderer,
-                              float dev_x, float dev_y, float dev_w,
-                              float dev_h, int out_w, int out_h,
-                              LegacyVariant *out);
-
-  // Nine-slice resolve: any box size qualifies (the slice stretches); the
-  // box's virtual rect is recovered by rounding and the variant memoizes on
-  // (base_id, X%18, Y%18, vw, vh).
-  bool resolve_legacy_nineslice_variant(uint32_t base_id,
-                                        SDL_Renderer *renderer, float dev_x,
-                                        float dev_y, float dev_w, float dev_h,
-                                        int out_w, int out_h,
-                                        LegacyVariant *out);
-
-  // Contain resolve: like the nine-slice flavor (any box size; memo includes
-  // the recovered virtual size).
-  bool resolve_legacy_contain_variant(uint32_t base_id, SDL_Renderer *renderer,
-                                      float dev_x, float dev_y, float dev_w,
-                                      float dev_h, int out_w, int out_h,
-                                      LegacyVariant *out);
+  // Resolve (bake on first use) the variant for a draw with device rect
+  // (dev_x,dev_y,dev_w,dev_h) on an out_w x out_h output, dispatching on the
+  // registered fit. False when the id isn't registered or (Cell fit) the draw
+  // isn't the sprite at 1:1 virtual scale — caller falls through to the plain
+  // path.
+  bool resolve_legacy(uint32_t base_id, SDL_Renderer *renderer, float dev_x,
+                      float dev_y, float dev_w, float dev_h, int out_w,
+                      int out_h, LegacyVariant *out);
 
   void shutdown();
 
@@ -127,12 +98,22 @@ private:
     std::vector<uint8_t> indices;
     int w = 0, h = 0;
     int legacy_w = 640, legacy_h = 480;
-    bool nine_slice = false;
-    bool contain = false;
-    bool stretch = false;
+    LegacyFit fit = LegacyFit::Cell;
     int cap_l = 0, cap_r = 0, cap_t = 0, cap_b = 0;
     SDL_Color palette[256] = {};
   };
+  // Sized-fit resolve (NineSlice/Contain/Stretch): the box's virtual rect is
+  // recovered by rounding; the variant memoizes on (base_id, X%18, Y%18, vw, vh).
+  bool resolve_legacy_sized(const LegacySprite &sp, uint32_t base_id,
+                            SDL_Renderer *renderer, float dev_x, float dev_y,
+                            float dev_w, float dev_h, int out_w, int out_h,
+                            LegacyVariant *out);
+  // Cell resolve: only 1:1-virtual draws qualify; memoizes on (base_id, X%18, Y%18).
+  bool resolve_legacy_cell(const LegacySprite &sp, uint32_t base_id,
+                           SDL_Renderer *renderer, float dev_x, float dev_y,
+                           float dev_w, float dev_h, int out_w, int out_h,
+                           LegacyVariant *out);
+
   std::map<uint32_t, LegacySprite> legacy_;     // base_id -> indexed source
   std::map<uint64_t, uint32_t> legacy_variants_; // (base_id, X%18, Y%18[, vw, vh]) -> id
 };

@@ -200,15 +200,13 @@ inline ::ui::LayoutStyle app_button_chrome_layout(AppButtonSize size = AppButton
   };
 }
 
-// Metal-chrome sprite-button paint (SIL-90). Nine-sliced bank-7 sprite (caps
-// {l12,r12,t4,b4}) with the label in the Large face. The focus frame (idx28)
-// is brightness-ramped by `lit` — the composition root drives it from the
-// use_clock() phase so a focused chrome button ramps at the legacy ~24fps
-// cadence (SIL-107); idle (idx24) stays full white. texture_id 0 falls back to
-// a rounded slate button.
+// Metal-chrome sprite-button paint (SIL-90). Nine-sliced bank-7 idx24 sprite
+// (caps {l12,r12,t4,b4}) with the label in the Large face, brightness-ramped
+// by `lit` — the composition root drives it from the use_clock() phase so a
+// focused chrome button ramps at the legacy ~24fps cadence (SIL-107).
+// texture_id 0 falls back to a rounded slate button.
 inline ::ui::StyleStatePatch
-app_button_chrome_patch(uint32_t idle, uint32_t focus,
-                        ::ui::Color lit = {255, 255, 255, 255}) {
+app_button_chrome_patch(uint32_t idle, ::ui::Color lit = {255, 255, 255, 255}) {
   const ::ui::TextVisual label{.color = tokens::kTextTitle,
                                .font_id = tokens::kFaceHeading,
                                .font_size = tokens::kFontHeading,
@@ -239,7 +237,6 @@ app_button_chrome_patch(uint32_t idle, uint32_t focus,
   // returns idx24 for every phase; only brightness ramps 128->136) — and the
   // golden captures show the focused lobby Go Back at plain idle brightness.
   // Keep idx24 for every state; the hover ramp tints the same art.
-  (void)focus;
   const ::ui::Color bright{255, 255, 255, 255};
   ov.base = chrome(idle, bright);
   ov.hover = chrome(idle, lit);

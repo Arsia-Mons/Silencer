@@ -109,40 +109,13 @@ uint32_t PipelineHost::bake_element_sprite(const uint8_t *indices, int w,
   return textures_.upload_rgba(r_, bake_scratch_.data(), tex_w, tex_h);
 }
 
-void PipelineHost::register_legacy_sprite(uint32_t texture_id,
-                                          const uint8_t *indices, int w, int h,
-                                          const SDL_Color *palette256,
-                                          int legacy_w, int legacy_h) {
-  textures_.register_legacy_sprite(texture_id, indices, w, h, palette256,
-                                   legacy_w, legacy_h);
-}
-
-void PipelineHost::register_legacy_contain(uint32_t texture_id,
-                                           const uint8_t *indices, int w,
-                                           int h, const SDL_Color *palette256,
-                                           int legacy_w, int legacy_h) {
-  textures_.register_legacy_contain(texture_id, indices, w, h, palette256,
-                                    legacy_w, legacy_h);
-}
-
-void PipelineHost::register_legacy_stretch(uint32_t texture_id,
-                                           const uint8_t *indices, int w,
-                                           int h, const SDL_Color *palette256,
-                                           int legacy_w, int legacy_h) {
-  textures_.register_legacy_stretch(texture_id, indices, w, h, palette256,
-                                    legacy_w, legacy_h);
-}
-
-void PipelineHost::register_legacy_nineslice(uint32_t texture_id,
-                                             const uint8_t *indices, int w,
-                                             int h,
-                                             const SDL_Color *palette256,
-                                             int legacy_w, int legacy_h,
-                                             int cap_l, int cap_r, int cap_t,
-                                             int cap_b) {
-  textures_.register_legacy_nineslice(texture_id, indices, w, h, palette256,
-                                      legacy_w, legacy_h, cap_l, cap_r, cap_t,
-                                      cap_b);
+void PipelineHost::register_legacy(uint32_t texture_id,
+                                   const uint8_t *indices, int w, int h,
+                                   const SDL_Color *palette256, int legacy_w,
+                                   int legacy_h, LegacyFit fit, int cap_l,
+                                   int cap_r, int cap_t, int cap_b) {
+  textures_.register_legacy(texture_id, indices, w, h, palette256, legacy_w,
+                            legacy_h, fit, cap_l, cap_r, cap_t, cap_b);
 }
 
 bool PipelineHost::build_glyph_face(int face_id,

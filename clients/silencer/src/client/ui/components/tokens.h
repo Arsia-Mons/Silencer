@@ -192,17 +192,6 @@ inline ::ui::StylePatch image_patch_cover(uint32_t texture_id) {
   return image_patch(img);
 }
 
-// Atlas / partial-fill variant: samples only the given source sub-rect (texture
-// pixels) of the texture — for packed-frame atlases and drained HUD bars.
-// w==0 || h==0 falls back to the whole texture (SIL-93).
-inline ::ui::StylePatch image_patch_sub(uint32_t texture_id, float src_x,
-                                        float src_y, float src_w, float src_h,
-                                        ::ui::Color tint = {255, 255, 255,
-                                                            255}) {
-  return image_patch(::ui::BackgroundImage{texture_id, tint, {}, src_x, src_y,
-                                           src_w, src_h});
-}
-
 // origin lobby panels are vector strokes, not sprites: Box(Chrome) = a 1px idx216
 // stroke (the connected frame), Box(Inset) = an idx220 stroke (inner wells).
 // Transparent fill so the Mars backdrop reads through, like origin. Colors are

@@ -3,6 +3,7 @@
 #include "client/ui/components/actions/actions.h"
 #include "client/ui/components/layout/layout.h"
 #include "client/ui/components/layout/lobby_panes.h"
+#include "client/ui/components/layout/pen_grid.h"
 #include "client/ui/components/surfaces/surfaces.h"
 #include "client/ui/components/text/text.h"
 #include "client/ui/hooks/use_app.h"
@@ -644,16 +645,16 @@ struct StagingPanelProps {
 // slots readout at (57,36) pad in LegacyPalette(129,144,ramp); checkbox lanes
 // at x 543+14c (local col 3 = 585), rows y 128+13k; the local label column at
 // x 601, rows y 130+13k — "name (N)" Body at brightness 128/64. Anchors are
-// virtual; authored pen L = round(1.5*v) from the cell origin (797,100).
+// virtual; anchored on kLobbyTallGrid (the cell's design origin).
 ::ui::UiElement TechListCell(const Staging &staging) {
   client::ui::ChromeTextures chrome = client::ui::use_chrome();
   std::vector<::ui::UiElement> kids;
-  auto L = [](float v) { return (float)std::lround(1.5f * v); };
+  const PenGrid &g = kLobbyTallGrid;
   kids.push_back(Box(BoxProps{
       .key = "slots",
       .layout = ::ui::LayoutStyle{
           .position = ::ui::PositionType::Absolute,
-          .position_inset = ::ui::EdgeSizes{L(588) - 797.0f, {}, L(103) - 100.0f, {}}},
+          .position_inset = g.at(588, 103)},
       .children = ::ui::children({Text(TextProps{
           .key = "t",
           .value = ::ui::copy_string(staging.tech_slots_label.c_str()),
@@ -682,8 +683,7 @@ struct StagingPanelProps {
           .on_activate = toggle,
           .layout = ::ui::LayoutStyle{
               .position = ::ui::PositionType::Absolute,
-              .position_inset = ::ui::EdgeSizes{
-                  L(585) - 797.0f, {}, L(128 + 13 * i) - 100.0f, {}},
+              .position_inset = g.at(585, 128 + 13 * i),
               // origin blits the toggle sprite NATIVE from the 13x13 box's
               // top-left without clipping — size the box to the sprite.
               .width = ::ui::Length::points(chrome.ready_w * 1.5f),
@@ -694,8 +694,7 @@ struct StagingPanelProps {
         .key = ::ui::copy_string(("tl" + k).c_str()),
         .layout = ::ui::LayoutStyle{
             .position = ::ui::PositionType::Absolute,
-            .position_inset = ::ui::EdgeSizes{
-                L(601) - 797.0f, {}, L(130 + 13 * i) - 100.0f, {}}},
+            .position_inset = g.at(601, 130 + 13 * i)},
         .children = ::ui::children({Text(TextProps{
             .key = "t",
             .value = ::ui::copy_string(lbl.c_str()),
@@ -717,10 +716,10 @@ struct StagingPanelProps {
   // tall-panel origin (virtual): emblem (22-ox, 6+team*55-oy) native size,
   // ready check bank7 idx18/19 (57-ox, 6+rowY-oy), name Body (75, 8+rowY),
   // level Tiny LegacyPalette(170) at (75+len*6+3, 8+rowY); rowY = team*55 +
-  // slot*13. Panel at virtual (531,67); authored pen L = round(1.5*v).
+  // slot*13. Panel at virtual (531,67); anchored on kLobbyTallGrid.
   client::ui::ChromeTextures chrome = client::ui::use_chrome();
   std::vector<::ui::UiElement> kids;
-  auto L = [](float v) { return (float)std::lround(1.5f * v); };
+  const PenGrid &g = kLobbyTallGrid;
   for (int i = 0; i < (int)props.roster.size(); ++i) {
     const StagingRosterRow &r = props.roster[i];
     const int rowY = r.team_number * 55 + r.peer_slot * 13;
@@ -731,9 +730,9 @@ struct StagingPanelProps {
           .key = ::ui::copy_string(("em" + k).c_str()),
           .layout = ::ui::LayoutStyle{
               .position = ::ui::PositionType::Absolute,
-              .position_inset = ::ui::EdgeSizes{
-                  L(553 - chrome.agency_emblem_ox[a]) - 797.0f, {},
-                  L(73 + r.team_number * 55 - chrome.agency_emblem_oy[a]) - 100.0f, {}},
+              .position_inset = g.at(553 - chrome.agency_emblem_ox[a],
+                                     73 + r.team_number * 55 -
+                                         chrome.agency_emblem_oy[a]),
               .width = ::ui::Length::points(chrome.agency_emblem_ws[a] * 1.5f),
               .height = ::ui::Length::points(chrome.agency_emblem_hs[a] * 1.5f)},
           .style = tokens::image_patch(chrome.agency_emblem[a])}));
@@ -744,9 +743,8 @@ struct StagingPanelProps {
           .key = ::ui::copy_string(("rc" + k).c_str()),
           .layout = ::ui::LayoutStyle{
               .position = ::ui::PositionType::Absolute,
-              .position_inset = ::ui::EdgeSizes{
-                  L(588 - chrome.ready_ox) - 797.0f, {},
-                  L(73 + rowY - chrome.ready_oy) - 100.0f, {}},
+              .position_inset =
+                  g.at(588 - chrome.ready_ox, 73 + rowY - chrome.ready_oy),
               .width = ::ui::Length::points(chrome.ready_w * 1.5f),
               .height = ::ui::Length::points(chrome.ready_h * 1.5f)},
           .style = tokens::image_patch(rtex)}));
@@ -755,8 +753,7 @@ struct StagingPanelProps {
         .key = ::ui::copy_string(("nm" + k).c_str()),
         .layout = ::ui::LayoutStyle{
             .position = ::ui::PositionType::Absolute,
-            .position_inset = ::ui::EdgeSizes{
-                112.0f, {}, L(75 + rowY) - 100.0f, {}}},
+            .position_inset = ::ui::EdgeSizes{112.0f, {}, g.y(75 + rowY), {}}},
         .children = ::ui::children({BodyText(BodyTextProps{
             .key = "t",
             .variant = BodyTextVariant::Body,
@@ -766,9 +763,8 @@ struct StagingPanelProps {
           .key = ::ui::copy_string(("lv" + k).c_str()),
           .layout = ::ui::LayoutStyle{
               .position = ::ui::PositionType::Absolute,
-              .position_inset = ::ui::EdgeSizes{
-                  L(609 + (int)r.name.size() * 6) - 797.0f, {},
-                  L(75 + rowY) - 100.0f, {}}},
+              .position_inset =
+                  g.at(609 + (int)r.name.size() * 6, 75 + rowY)},
           .children = ::ui::children({Text(TextProps{
               .key = "t",
               .value = ::ui::copy_string(r.level.c_str()),

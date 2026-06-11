@@ -85,31 +85,14 @@ public:
                                int dev_x, int dev_y, int tex_w, int tex_h);
 
   // Register an already-baked chrome texture's indexed source so the executor
-  // can swap qualifying draws (the sprite 1:1 in origin's virtual canvas) for
-  // lazily-baked per-phase device-cell variants — origin's magnify arithmetic
-  // at the element's absolute position (TextureRegistry::resolve_legacy_variant).
-  void register_legacy_sprite(uint32_t texture_id, const uint8_t *indices,
-                              int w, int h, const SDL_Color *palette256,
-                              int legacy_w, int legacy_h);
-
-  // Nine-slice flavor for the metal-chrome buttons (caps in virtual px); the
-  // executor swaps any nine-slice draw of this texture for a per-phase,
-  // per-virtual-size variant (TextureRegistry::resolve_legacy_nineslice_variant).
-  void register_legacy_nineslice(uint32_t texture_id, const uint8_t *indices,
-                                 int w, int h, const SDL_Color *palette256,
-                                 int legacy_w, int legacy_h, int cap_l,
-                                 int cap_r, int cap_t, int cap_b);
-
-  // Contain flavor (agency emblems): the sprite letterboxes into its virtual
-  // box with origin's DispatchImage arithmetic before the magnify.
-  void register_legacy_contain(uint32_t texture_id, const uint8_t *indices,
-                               int w, int h, const SDL_Color *palette256,
-                               int legacy_w, int legacy_h);
-
-  // Stretch flavor (plates sized to their box, e.g. the cc row plates).
-  void register_legacy_stretch(uint32_t texture_id, const uint8_t *indices,
-                               int w, int h, const SDL_Color *palette256,
-                               int legacy_w, int legacy_h);
+  // can swap qualifying draws for lazily-baked per-phase device-cell variants
+  // (origin's magnify arithmetic at the element's absolute position). `fit`
+  // picks the box arithmetic (TextureRegistry::LegacyFit); caps (virtual px)
+  // apply to NineSlice only.
+  void register_legacy(uint32_t texture_id, const uint8_t *indices, int w,
+                       int h, const SDL_Color *palette256, int legacy_w,
+                       int legacy_h, LegacyFit fit, int cap_l = 0,
+                       int cap_r = 0, int cap_t = 0, int cap_b = 0);
 
   // Build one bitmap glyph FACE atlas (origin/main text parity). `glyphs[i]` is
   // the source sprite for char GlyphFonts::kFirstChar + i (null/empty = blank

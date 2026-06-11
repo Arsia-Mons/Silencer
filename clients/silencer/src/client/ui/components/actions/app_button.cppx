@@ -72,7 +72,6 @@ using ::ui::components::TextProps;
     client::ui::ChromeTextures chrome = client::ui::use_chrome();
     layout = app_button_chrome_layout(props.size);
     style = app_button_chrome_patch(chrome.chrome_btn_idle,
-                                    chrome.chrome_btn_focus,
                                     ::ui::Color{lit, lit, lit, 255});
   } else if (props.variant == AppButtonVariant::Rect) {
     layout = app_button_rect_layout();

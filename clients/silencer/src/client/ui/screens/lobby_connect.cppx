@@ -1,6 +1,7 @@
 #include "client/ui/screens/lobby_connect.h"
 
 #include "client/ui/components/actions/actions.h"
+#include "client/ui/components/layout/pen_grid.h"
 #include "client/ui/components/text/text.h"
 #include "client/ui/components/tokens.h"
 #include "client/ui/hooks/use_chrome.h"
@@ -35,6 +36,37 @@ struct LobbyConnectProps {
 // canvas is 1.5x that, so its fixed offsets carry through at x1.5.
 constexpr float kS = 1.5f;
 
+// The status log is multi-line; each line is an absolutely-anchored Body text
+// on origin's ScrollTextBox pen grid: panel-virtual (291, 109 + 11k), anchored
+// on the dialog's design origin (427, 152); the x pen carries its recorded -1
+// golden-cell nudge.
+std::vector<::ui::UiElement> connect_status_log(const std::string &log) {
+  const PenGrid grid{427.0f, 152.0f};
+  std::vector<::ui::UiElement> lines;
+  size_t start = 0;
+  for (int i = 0; start <= log.size(); ++i) {
+    size_t nl = log.find('\n', start);
+    std::string line =
+        log.substr(start, nl == std::string::npos ? std::string::npos : nl - start);
+    if (!line.empty()) {
+      const char *lk = ::ui::copy_string(("ln" + std::to_string(i)).c_str());
+      const char *lv = ::ui::copy_string(line.c_str());
+      lines.push_back(Box(BoxProps{
+          .key = lk,
+          .layout = ::ui::LayoutStyle{
+              .position = ::ui::PositionType::Absolute,
+              .position_inset = ::ui::EdgeSizes{
+                  grid.x(291) - 1.0f, {}, grid.y(109.0f + 11.0f * i), {}}},
+          .children = ::ui::children({BodyText(BodyTextProps{
+              .key = "t", .variant = BodyTextVariant::Body, .value = lv})})}));
+    }
+    if (nl == std::string::npos)
+      break;
+    start = nl + 1;
+  }
+  return lines;
+}
+
 // origin/main Lobby Connect IS one baked sprite: PackImage(7,2) (chrome.dialog_connect,
 // 284x277) bakes the outer frame + soft glow, the log well, the form sub-panel and
 // the field/label/button wells. The connect log, Username/Password labels + inputs,
@@ -59,34 +91,7 @@ constexpr float kS = 1.5f;
   std::function<void(const ::ui::ActivationEvent &)> on_activate =
       [submit](const ::ui::ActivationEvent &) { submit(); };
 
-  // The status log is multi-line; each line is an absolutely-anchored Body
-  // text on origin's ScrollTextBox pen grid: panel-virtual (291, 109 + 11k),
-  // authored L = round(1.5*v) relative to the panel box at (427, 152).
-  std::vector<::ui::UiElement> log_lines;
-  {
-    const std::string &s = lobby.status_log;
-    size_t start = 0;
-    for (int i = 0; start <= s.size(); ++i) {
-      size_t nl = s.find('\n', start);
-      std::string line =
-          s.substr(start, nl == std::string::npos ? std::string::npos : nl - start);
-      if (!line.empty()) {
-        const char *lk = ::ui::copy_string(("ln" + std::to_string(i)).c_str());
-        const char *lv = ::ui::copy_string(line.c_str());
-        const float top = (float)std::lround(1.5f * (109.0f + 11.0f * i)) - 152.0f;
-        log_lines.push_back(Box(BoxProps{
-            .key = lk,
-            .layout = ::ui::LayoutStyle{
-                .position = ::ui::PositionType::Absolute,
-                .position_inset = ::ui::EdgeSizes{9.0f, {}, top, {}}},
-            .children = ::ui::children({BodyText(BodyTextProps{
-                .key = "t", .variant = BodyTextVariant::Body, .value = lv})})}));
-      }
-      if (nl == std::string::npos)
-        break;
-      start = nl + 1;
-    }
-  }
+  std::vector<::ui::UiElement> log_lines = connect_status_log(lobby.status_log);
 
   const float panel_w =
       chrome.dialog_connect ? chrome.dialog_connect_w * kS : 284.0f * kS;

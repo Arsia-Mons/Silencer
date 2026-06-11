@@ -238,36 +238,28 @@ bake(6, 2, cppxChrome.row_plate, &cppxChrome.row_plate_w, &cppxChrome.row_plate_
 // The ovals (and the toggle cells below) are drawn 1:1 in origin's virtual
 // canvas: their device striping phase comes from the whole-frame magnify at
 // their absolute position. Register the indexed source so the executor swaps
-// each draw for a per-phase device-cell variant (resolve_legacy_variant).
-auto register_legacy = [&](size_t bank, size_t index, uint32_t id){
+// each draw for a per-phase device-cell variant (resolve_legacy).
+using silencer::cppx_ui::LegacyFit;
+auto register_legacy = [&](size_t bank, size_t index, uint32_t id,
+                           LegacyFit fit = LegacyFit::Cell, int cl = 0,
+                           int cr = 0, int ct = 0, int cb = 0){
 if(!id || bank >= banks.size() || index >= banks[bank].size()) return;
 const std::shared_ptr<Surface> &sp = banks[bank][index];
 if(!sp || sp->pixels.empty()) return;
-cppxHost->register_legacy_sprite(id, sp->pixels.data(), sp->w, sp->h,
-                                 page_for_bank(bank), kLegacyRenderWidth,
-                                 kLegacyRenderHeight);
+cppxHost->register_legacy(id, sp->pixels.data(), sp->w, sp->h,
+                          page_for_bank(bank), kLegacyRenderWidth,
+                          kLegacyRenderHeight, fit, cl, cr, ct, cb);
 };
 register_legacy(6, 7, cppxChrome.oval_md);
 register_legacy(6, 28, cppxChrome.oval_sm);
 register_legacy(6, 23, cppxChrome.oval_lg);
-// bank 7 — the metal-chrome nine-slice button (idx24 idle phase0 / idx28 focus phase4).
+// bank 7 — the metal-chrome nine-slice button (idx24; origin never swaps art on focus).
 bake(7, 24, cppxChrome.chrome_btn_idle);
-bake(7, 28, cppxChrome.chrome_btn_focus);
-// origin draws these nine-sliced in VIRTUAL space (Button Chrome: caps
-// L/R 12, T/B 4) before the whole-frame magnify — register the indexed
-// sources so the executor swaps each nine-slice draw for a per-phase,
-// per-size device-cell variant (origin's tiled-band arithmetic).
-auto register_legacy_nine = [&](size_t bank, size_t index, uint32_t id,
-                                int cl, int cr, int ct, int cb){
-if(!id || bank >= banks.size() || index >= banks[bank].size()) return;
-const std::shared_ptr<Surface> &sp = banks[bank][index];
-if(!sp || sp->pixels.empty()) return;
-cppxHost->register_legacy_nineslice(id, sp->pixels.data(), sp->w, sp->h,
-                                    page_for_bank(bank), kLegacyRenderWidth,
-                                    kLegacyRenderHeight, cl, cr, ct, cb);
-};
-register_legacy_nine(7, 24, cppxChrome.chrome_btn_idle, 12, 12, 4, 4);
-register_legacy_nine(7, 28, cppxChrome.chrome_btn_focus, 12, 12, 4, 4);
+// origin draws it nine-sliced in VIRTUAL space (Button Chrome: caps L/R 12,
+// T/B 4) before the whole-frame magnify — the executor swaps each nine-slice
+// draw for a per-phase, per-size device-cell variant (tiled-band arithmetic).
+register_legacy(7, 24, cppxChrome.chrome_btn_idle, LegacyFit::NineSlice,
+                12, 12, 4, 4);
 // Frame sprites (plain, native size): bank-7 chrome panel + bank-40 dialog
 // frames. All drawn 1:1 in virtual space — register for the per-phase swap.
 bake(7, 5, cppxChrome.chrome_panel, &cppxChrome.chrome_panel_w, &cppxChrome.chrome_panel_h);
@@ -278,13 +270,7 @@ register_legacy(40, 4, cppxChrome.dialog_msg);
 register_legacy(40, 2, cppxChrome.dialog_pw);
 // The row plate stretches to its box (origin sizes it to the pane), so it
 // gets the STRETCH flavor (1:1 boxes bake identically through it).
-if(cppxChrome.row_plate && 6 < banks.size() && 2 < banks[6].size()){
-const std::shared_ptr<Surface> &rp = banks[6][2];
-if(rp && !rp->pixels.empty())
-cppxHost->register_legacy_stretch(cppxChrome.row_plate, rp->pixels.data(),
-                                  rp->w, rp->h, page_for_bank(6),
-                                  kLegacyRenderWidth, kLegacyRenderHeight);
-}
+register_legacy(6, 2, cppxChrome.row_plate, LegacyFit::Stretch);
 // bank 7 idx 2 — the lobby-connect dialog (origin PackImage(7,2)): frame, soft
 // glow, log well, form sub-panel + field/button wells all baked in. Drawn 1:1
 // in virtual space — register for the per-phase variant swap.
@@ -304,9 +290,9 @@ uint32_t id = cppxHost->bake_chrome_sprite(patch, kPatchW, kPatchH,
                                            page_for_bank(7));
 if(id){
 cppxChrome.dialog_btn_patch = id;
-cppxHost->register_legacy_sprite(id, patch, kPatchW, kPatchH,
-                                 page_for_bank(7), kLegacyRenderWidth,
-                                 kLegacyRenderHeight);
+cppxHost->register_legacy(id, patch, kPatchW, kPatchH, page_for_bank(7),
+                          kLegacyRenderWidth, kLegacyRenderHeight,
+                          silencer::cppx_ui::LegacyFit::Cell);
 }
 }
 // Full-bleed backdrops bake at DEVICE resolution through origin's two-hop
@@ -452,14 +438,13 @@ delete copy;
 uint32_t id = cppxHost->bake_chrome_sprite(dst, 4, 11, palette);
 if(id){
 id_out = id;
-cppxHost->register_legacy_sprite(id, dst, 4, 11, palette,
-                                 kLegacyRenderWidth, kLegacyRenderHeight);
+cppxHost->register_legacy(id, dst, 4, 11, palette, kLegacyRenderWidth,
+                          kLegacyRenderHeight,
+                          silencer::cppx_ui::LegacyFit::Cell);
 }
 };
 bake_bracket('[', 0, cppxChrome.bracket_l);
 bake_bracket(']', 1, cppxChrome.bracket_r);
-cppxChrome.bracket_w = 4;
-cppxChrome.bracket_h = 11;
 }
 // bank 181 idx0-4 — the five agency emblems (SIL-102 Character Create detail).
 // origin draws them PackImageContain into their element box, so register the
@@ -473,10 +458,10 @@ bake(181, (size_t)i, cppxChrome.agency_emblem[i],
 if(cppxChrome.agency_emblem[i] && 181 < banks.size() && (size_t)i < banks[181].size()){
 const std::shared_ptr<Surface> &esp = banks[181][(size_t)i];
 if(esp && !esp->pixels.empty()){
-cppxHost->register_legacy_contain(cppxChrome.agency_emblem[i],
-                                  esp->pixels.data(), esp->w, esp->h,
-                                  page_for_bank(181), kLegacyRenderWidth,
-                                  kLegacyRenderHeight);
+cppxHost->register_legacy(cppxChrome.agency_emblem[i], esp->pixels.data(),
+                          esp->w, esp->h, page_for_bank(181),
+                          kLegacyRenderWidth, kLegacyRenderHeight,
+                          silencer::cppx_ui::LegacyFit::Contain);
 cppxChrome.agency_emblem_ws[i] = (uint16_t)esp->w;
 cppxChrome.agency_emblem_hs[i] = (uint16_t)esp->h;
 }
@@ -506,9 +491,10 @@ uint32_t id = cppxHost->bake_chrome_sprite(copy->pixels.data(), copy->w,
                                            copy->h, page_for_bank(bank));
 if(id){
 id_out = id;
-cppxHost->register_legacy_sprite(id, copy->pixels.data(), copy->w, copy->h,
-                                 page_for_bank(bank), kLegacyRenderWidth,
-                                 kLegacyRenderHeight);
+cppxHost->register_legacy(id, copy->pixels.data(), copy->w, copy->h,
+                          page_for_bank(bank), kLegacyRenderWidth,
+                          kLegacyRenderHeight,
+                          silencer::cppx_ui::LegacyFit::Cell);
 }
 delete copy;
 };

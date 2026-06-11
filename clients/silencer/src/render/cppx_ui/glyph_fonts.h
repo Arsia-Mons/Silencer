@@ -97,7 +97,7 @@ public:
   // draw uses an exact-color face at 1:1 virtual scale (gscale == s), this
   // bakes the whole string through origin's chain at its absolute device cell
   // and returns a texture drawn 1:1 (string analog of TextureRegistry::
-  // resolve_legacy_variant). Memoized on (face, color, string, X%18, Y%18) —
+  // resolve_legacy). Memoized on (face, color, string, X%18, Y%18) —
   // the magnify pattern period divides 18 for every quarter-integer s in play.
   // Textures owned HERE, outside the 64-cap chrome TextureRegistry (the cap
   // note in texture_registry.h stands; string variants are unbounded-ish and
