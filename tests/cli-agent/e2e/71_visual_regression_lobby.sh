@@ -13,7 +13,12 @@ W=1920; H=1080
 
 TMP=$(mktemp -d)
 LOBBY_DB="$TMP/lobby.json"; SILENCER_HOME="$TMP/home"; mkdir -p "$SILENCER_HOME"
-LOBBY_PORT=$(pick_port); PLAYER_AUTH_PORT=$(pick_port); MAP_API_PORT=$(pick_port); CTRL_PORT=$(pick_port)
+# The lobby port is PINNED to the origin golden capture's (the connect log
+# renders "Connecting to 127.0.0.1:<port>"); random ports can never reach
+# pixel parity. Falls back to a random port if 63532 is taken.
+LOBBY_PORT=63532
+(echo > /dev/tcp/127.0.0.1/$LOBBY_PORT) 2>/dev/null && LOBBY_PORT=$(pick_port)
+PLAYER_AUTH_PORT=$(pick_port); MAP_API_PORT=$(pick_port); CTRL_PORT=$(pick_port)
 SILENCER_VERSION="$(silencer_version)"
 WORK="$TMP/work"; mkdir -p "$WORK"
 FAIL=0

@@ -15,14 +15,14 @@ All measured 2026-06-11 (iteration 0) with recalibrated tile gate, fresh capture
 | options_audio | **PASS — byte-identical** | pixdiff 0.0000%/0 hot, mae 0.00 (2026-06-11); prior full gate wf_d51296b1-328 6/6 critics | |
 | options_display | **PASS (full gate)** | pixdiff 0.0000 byte-identical (RGB MD5 match) + gate wf_1f9aedbb-fae overall=PASS 6/6 critics | string bake + fullscreenw row -1 (label pen vx 334) + indDx 1 (right toggle vx 553) |
 | options_controls | **PASS (full gate)** | pixdiff 0.0000 byte-identical (raw-RGB md5 match) + gate wf_b79c44ad-0ad overall=PASS 6/6 critics | string bake + titlewrap inset-top 13 (title vy 14) + OR ml 2 (vx 513) |
-| lobby_connect | DIVERGED | 1.47% / 42 / 25.9% @780,780 (pre-text-bake 1.46/41) | CORRECTED DIAGNOSIS: button row IS centered right (origin's floating row escapes pad-84 and centers across panel); real diff = button chrome detail (inner inset frame) + widths (L/C 275 vs 250 device px) |
-| character_create | DIVERGED | 1.57% / 41 / 17.9% @468,234 (was 1.59/41) | portrait row + panel chrome |
-| cc_alias | DIVERGED | 2.17% / 56 / 21.2% @624,468 (was 2.20/56) | alias dialog region |
-| cc_select_agency | DIVERGED | 3.74% / 79 / 31.9% (was 7.09/125/40.7) | agency Description paragraph cleared by the string-variant bake (dense prose now phase-exact); residual = panel chrome + portraits |
-| lobby_screen | DIVERGED | 3.67% / 94 / 31.9% @234,312 (was 3.68/94) | VERIFIED BY EYE: agent-card emblem scale/pos, WINS/LOSSES/XP row spacing, Agents button high + wrong chrome. ORIGIN SPEC (character_panel.cpp, virtual px → ×1.5 logical): content pad 6, emblem↔info gap 10; left rail emblemBoxW=clamp(inner*18%,40,64) square Contain emblem + LevelBadge(bodyLineH, centered); info col gap 5: name(heading lineH) → details row: stats col gap 10 [stat table gap 2: WINS,LOSSES rows; label col = w("LOSSES")+4] → XP line → actions row h21 (Chrome "Agents" minW 92 padX 12). The LOSSES↔XP gap = 10 virtual (15 logical) — that's the visible golden gap before XP |
-| create_game | DIVERGED | 5.06% / 113 / 31.9% @234,312 (was 5.01/113) | map-list pitch fixed (21 logical = origin kMapListLineH 14 virtual; was 16.5+1) — right-panel hot column (38.4 @1248,*) cleared; worst tile is now the shared agent-card region (see lobby_screen spec) |
-| game_staging | DIVERGED | 4.20% / 93 / 32.9% @1248,156 | shares lobby panels + right panel |
-| tech_select | DIVERGED | 5.49% / 106 / 34.1% @234,312 (was 5.38/106/34.3) | tech grid region divergent; worst tile = shared agent-card "Agents" button (verified by eye: chrome + y-pos, not a text artifact). ±0.1 global movement here/create_game = un-grid-tuned text snapping to cells — resolves with the screens' own parity pass |
+| lobby_connect | **PASS** | 0.0356% / 0 hot / max 2.0 (2026-06-11, cap_lobby) | dialog sprite + button-patch registered legacy; origin pen grid (log 291/109+11k, button row 334.5/350.5, Chrome Lg padX 10); capture pins lobby port 63532 (the golden's — the log renders it). NOTE: scenario-71's own harness still measures 0.29/8 (harness-state delta, not layout — see below) |
+| character_create | **PASS — byte-identical** | 0.0000, mae 0.00 (2026-06-11) | chrome_panel/row_plate registered; create plate on int-cast cell (166,94); List label pen cell 102 |
+| cc_alias | **PASS** | 0.0003% / 0 hot (2026-06-11) | modal on cell (283,161); origin caret (1v yellow, Body lineH); title pen 349. 71-harness shows 1 hot tile (caret-blink frame nondeterminism) |
+| cc_select_agency | DIVERGED (plateau) | 0.2590% / 8 hot / max 7.1 (2026-06-11; was 3.74/79) | agency plates on cells (166, 94+32k); advantage pens 102/121; prose cell 163; brackets baked 4x11 EffectColor(224). RESIDUAL: 8 tiles 5.3-7.1% = stretched row-plate right-cap phase (golden cap 2px left of the 235v and 236v stretch bakes — evidence: probe@y505 G 887-893 vs R 889-895 for both vw 235/236) + bracket float-phase. 3+ measured attempts; needs the plate's true origin draw chain (maybe Clay round-half-up x167 + w235) |
+| lobby_screen | **PASS** | 0.0182% / 0 hot (2026-06-11; was 3.67/94) | origin stepped pane + agent card + chat internals + border snap + nine-slice/contain bakes |
+| create_game | **PASS** | 0.1098% / 0 hot (2026-06-11; was 5.06/113) | Game Options origin form (scrollbar, BodySm values), Select Map origin list + abs footer grid |
+| game_staging | **PASS** | 0.0317% / 0 hot (2026-06-11; was 4.20/93) | origin roster anchors (emblem/ready/name/level), staging buttons 3/11/39, map-name Title variant, presence [game] suffix, default tech Laser+Rocket on connect |
+| tech_select | **PASS** | 0.0599% / 0 hot (2026-06-11; was 5.49/106) | origin tech grid (toggles native bank7 18/19 + dim 64 copies, labels "name (N)" 128/64, slots LegacyPalette(129,144)); agency-specific buyables filtered |
 
 Menu-cluster rows re-measured 2026-06-11 after the per-phase oval/logo variants landed;
 lobby/cc rows re-verified same day (all equal or marginally better, no regressions).
@@ -78,9 +78,19 @@ the golden cell — three labels needed nudges (display fullscreenw mr 3 + indDx
 controls titlewrap inset-top 13, OR ml 2). Result: mainmenu, options, options_audio,
 options_display, options_controls all pixdiff 0.0000 (byte-identical, mae 0.00).
 
-NEXT: lobby/cc cluster — dominated by panel chrome + agent-card layout (see
-lobby_screen ORIGIN SPEC row); text there now snaps to cells (cc_select_agency
-7.09 -> 3.74 for free) but pens must be grid-tuned per screen as layout lands.
+LOBBY CLUSTER LANDED 2026-06-11 (7/8 at the printed gate, character_create
+byte-identical). New systemic mechanisms: executor hairline-border snap
+(snap_legacy_hairline_border — idx216/220 hairlines snap per side to origin
+virtual cells), nine-slice element bake (origin DispatchButtonNineSlice tiled
+bands), contain + stretch legacy flavors, origin caret, kTextPresenceHeader/
+kTextRosterLevel/kTextTechDim/kTextTechSlots variant faces, texture cap 256
+(64 was exceeded by session-accumulated variants — silent raw-draw fallback).
+REMAINING: cc_select_agency residual (see row); scenario 53 (640x480) red —
+the origin-true stepped pane is transcribed at fixed 16:9 logical widths and
+overflows 4:3 (origin reflows via ResolveSteppedPaneLayout; port that
+arithmetic for responsiveness); scenario-71 harness deltas for lobby_connect
+(0.29 there vs 0.036 via cap_lobby — pinned port landed in both, residual is
+capture-state) and cc_alias (caret blink frame).
 
 ### [systemic] Backdrop scanline-striping arithmetic — root of most menu hot tiles
 

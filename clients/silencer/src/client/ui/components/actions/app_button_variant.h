@@ -240,9 +240,10 @@ app_button_chrome_patch(uint32_t idle, uint32_t focus,
   // golden captures show the focused lobby Go Back at plain idle brightness.
   // Keep idx24 for every state; the hover ramp tints the same art.
   (void)focus;
-  ov.base = chrome(idle, ::ui::Color{255, 255, 255, 255});
+  const ::ui::Color bright{255, 255, 255, 255};
+  ov.base = chrome(idle, bright);
   ov.hover = chrome(idle, lit);
-  ov.focus_visible = chrome(idle, ::ui::Color{255, 255, 255, 255});
+  ov.focus_visible = chrome(idle, bright);
   return ov;
 }
 

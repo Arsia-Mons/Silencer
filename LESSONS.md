@@ -85,3 +85,27 @@
   transcribed "cover" literally and got uniform 3× scaling + crop = wrong geometry AND
   wrong scanline arithmetic on 8 screens. When porting legacy draw flags, trace the full
   chain to the glass, not the flag name.
+
+- **The texture registry cap fails SILENTLY into raw draws.** Per-phase variants
+  accumulate per (position, size) across a session; a 13-screen capture run
+  exceeded the 64-texture cap and LATER screens lost their bakes — game_staging
+  "regressed" with zero code changes to it. When a previously-PASS screen drifts,
+  check resource caps before bisecting layout.
+- **Pen-grid rule: authored logical pen = round(1.5 × origin virtual pen).** The
+  string bake recovers vy from round(floor(dev)/2.25); .5-logical positions round
+  unpredictably through Yoga, so land pens on integers via that rule and verify
+  with the inspect JSON (floor(1.5L) must fall inside the cell's ±1.125 window).
+- **Origin's int-cast floats decide cells: int(x), not round(x).** Clay centers
+  produce .5 virtual coords; the compositor int-casts them (284.5 -> 284 for the
+  alias modal, 166.5 -> 166 for plates) while OUR recovery rounds. Every centered
+  origin element needs its golden cell measured from ink, not derived.
+- **Shift-test (np.roll argmin over dx,dy) classifies a hot region in seconds**:
+  dy=±2 with low residual = one virtual cell off (pen/grid); dx=dy=0 with high
+  residual = pattern family (unbaked sprite/nine-slice/brightness variant).
+- **Same-sprite, different draw mode = different flavor.** bank7 idx18/19 appear
+  1:1 (roster), brightness-dimmed (tech grid), and the row plate appears 1:1
+  (cc roster) AND stretched (agency rows): one base_id carries ONE flavor, so a
+  stretch flavor that degrades to 1:1 for equal sizes covers both call sites.
+- **origin Chrome buttons never swap art on focus** (SpriteIndexForFrame returns
+  idx24 for all phases; only brightness ramps) and golden captures show focused
+  controls at plain idle — focus_visible must not change the sprite.
