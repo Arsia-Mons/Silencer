@@ -131,7 +131,7 @@ byte-identical, so every family below is closed except the create_game residual
 | gallery | n/a (visual) | cppx-only showcase; golden is a stale cppx render — do not gate |
 | message_modal | n/a (visual) | no standalone origin trigger; golden stale — do not gate |
 | password_modal | n/a (visual) | no standalone origin trigger; golden stale — do not gate |
-| mission_summary (post-game XP/upgrade) | UNVERIFIED — NO GOLDEN, NO COVERAGE (flagged by owner 2026-06-11) | origin mission_summary_screen.cpp: "+ N XP" (stats.CalculateExperience), six stat rows + Upgrade buttons gated on world.lobby.statupgraded poll, upgrade banner; ours mission_summary.cppx (144 lines) implemented but never captured/gated. Golden capture needs a match to END — extend the cap_ingame_origin.sh harness (or a bot-finish flow) |
+| mission_summary (post-game XP/upgrade) | UNVERIFIED — NO GOLDEN; SPECS + DRIVE PATH READY (INGAME_SPECS.md Part II) | origin mission_summary_screen.cpp: "+ N XP" (stats.CalculateExperience), six stat rows + Upgrade buttons gated on world.lobby.statupgraded poll, upgrade banner; ours mission_summary.cppx (144 lines) implemented but never captured/gated. Golden capture: DETERMINISTIC PATH VERIFIED (world.cpp:100-114) — GAS GameModeConfig.timeLimitSecs ends the match on tick count (draw 0xFFFF), summary mounts iff lobby AUTHENTICATED; quit/conn-loss SKIP it. Harness: serve timeLimitSecs≈5 via GAS (adminapiurl stub or gasloader override), step (limit+3)*tps ticks |
 
 ## Visual — in-game (ALL 8 GOLDEN SURFACES PASS 2026-06-11, e2e scenario 72)
 
@@ -238,7 +238,7 @@ Earlier same-day milestones: iteration-0 13/23 → post scale-unclamp 21/23 → 
 | staging → tech_select → launch full flow vs origin | UNVERIFIED |
 | text-entry caps/length limits (alias, chat, password) vs origin | UNVERIFIED |
 | scrolling behaviors (controls list, map list) vs origin | UNVERIFIED |
-| hover/focus interaction VISUALS vs origin (oval/list focus cursors; Chrome buttons never swap art) | UNVERIFIED — all 13 goldens are rest-state; only functional e2e coverage today (flagged by owner 2026-06-11) |
+| hover/focus interaction VISUALS vs origin | UNVERIFIED — SPEC READY (INGAME_SPECS.md Part II C): ovals = 5-phase sprite+brightness ANIMATION (bank6 idx7→11 Md / 2→6 LegacyRow, brightness 128+phase*2, 1 phase/frame, hover/focus/selected all target phase 4); Chrome changes NOTHING (negative check); lists = selection bar only; one shared pointer/keyboard focus state, NO focus-cursor sprite. Our AppButton likely lacks the ramp — rest-state goldens never exercised it. Album capture: hover_at + step ≥4 ticks to settle phase 4 |
 | UI interaction SOUNDS | **FIXED 2026-06-11** — ClientUi publishes per-frame UiAudioEvents (hovered audible Button / activate / keyboard-nav onto one; audible = enabled Button only, per origin: toggles/inputs silent); GameUiPipeline (sole Audio owner) dedupes the hover edge and plays GAS soundUIClick via Audio::PlayUI; edge counter exposed headless via the `ui_audio` op. Evidence: scenario 73 (hover-enter +1, steady hover 0, second hover +1, nav +1) green in the full suite |
 
 ## Architecture guard backlog (15 findings, re-confirmed 2026-06-11 post b8fc958b — must be 0 for done)

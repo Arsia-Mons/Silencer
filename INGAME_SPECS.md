@@ -140,3 +140,75 @@ MessageHeading 15 · MessageTitle 23 · MessageSubtitle 19 · Prompt 23.
 94 minimap/team/inventory frames · 95 gauges/camera frames · 96 weapon faces/glows/bracket ·
 97 inventory icons/poison · 102 buy-tech · 103 team strip · 86 highlights · 181 emblems ·
 187 secret bg · 188 chat chrome.
+# Part II — mission_summary screen, match-end drive, hover/focus states
+
+Extracted 2026-06-11 (read-only Explore pass + follow-up).
+agent releases the worktree.
+
+## A) Mission summary screen (post-game XP/upgrade) — mission_summary_screen.cpp
+
+Canvas 640×480 menu virtual, presentation page ResetPresentation(1) (:241).
+- Backdrop PackImage(6,0) (:310); inner panel 628×441 PackImageStretch(7,5) at stage
+  padding (5,7,19,20) (:311-325).
+- Title "Mission Summary": ScreenTitle face, centered at (192,44) (:332-334).
+- "+ N XP": TextSize::Prompt, LegacyPalette(0), centered X 467 Y 45 (:370-372);
+  experience = stats.CalculateExperience() = kills*35 − deaths*10 + secretsreturned*125 + …
+  (stats.cpp:83-106).
+- Summary stats scrollbox: Body, lineHeight 11, viewport 300, column 180×308 (:335-349).
+- Six stat rows (Progression order): label "Current <Stat> Level:" Body at X=390,
+  Y=97+i*46 (:204-206); value right-aligned to X=556 (:209-215).
+- Upgrade buttons (one per stat when upgradesAvailable[i]): Oval Md (bank 6 idx 7 base,
+  phases 7-11), 196×33, at (372, 108+i*46) (:229-234).
+- Done button: Oval Md at (372,388) (:357-362).
+- "*NEW UPGRADE AVAILABLE*" banner: Body, LegacyPalette(129, 160, colorRamp=true), Y=77
+  (:386-391); shown when totalbonusupgrades − ag.defaultbonuses < maxupgrades (:509).
+- upgradesAvailable[i] from current<max per stat (e.g. ag.endurance < ag.maxendurance)
+  (:511-516).
+- Flow: upgradeClicked index from action.id suffix (:420-424) → Tick dispatches
+  world.lobby.UpgradeStat(selectedcharid, statsagency, kUpgradeStatIds[i]) (:267-274);
+  statupgraded network flag → Refresh() reloads user->statscopy (:260-265);
+  doneClicked → leaves via Tick (:276-284).
+- ENTRY: TickInGame → GoToState(MISSIONSUMMARY) iff gameSession.CheckForEndOfGame() AND
+  world.lobby.state == AUTHENTICATED (tick_ingame.cpp:303-311; else MAINMENU). Stats
+  copied at match end: user->statscopy = peer->stats, user->statsagency = team->agency
+  (game_session.cpp:181-202).
+
+## B) Match-end drive (for golden capture)
+
+- CheckForEndOfGame: world.winningteamid set AND messaging.message_i >= tps*3 (3s delay)
+  (game_session.cpp:174-211).
+- QUIT PATH SKIPS THE SUMMARY (straight to LOBBY/MAINMENU, tick_ingame.cpp:291-301);
+  connection-loss path also skips.
+- **DETERMINISTIC HEADLESS PATH (verified, world.cpp:100-114):** authority polls
+  IsMatchOver + TIME LIMIT each tick:
+  `cfg->timeLimitSecs > 0 && (int)(tickcount/tps) >= cfg->timeLimitSecs → over;
+  winningteamid = mode->WinningTeamId() or 0xFFFF (draw)`.
+  cfg = GASLoader::Get().GetGameModeConfig((int)gameMode->Id()) — GAS data the harness
+  controls. Serve a GameModeConfig with a tiny timeLimitSecs (e.g. 5), launch a 1-player
+  match AUTHENTICATED, step ~ (timeLimit + 3)*tps ticks → MISSIONSUMMARY mounts.
+  GAS is hot-fetched per map load from adminapiurl (defaults in gasloader when absent) —
+  either point adminapiurl at a stub server or check gasloader local-override path.
+
+## C) Hover/focus visual states per widget family (origin primitives)
+
+ONE shared focus state: pointer hover focuses (keyboard-focused element unhighlights —
+UiInputRouter.cpp:50-54). NO separate focus-cursor sprite anywhere.
+
+| Family | Hover/focus visual | Values |
+|---|---|---|
+| Oval buttons (+LegacyRow) | 5-phase sprite + brightness ANIMATION | bank6: Md base idx7, phases idx 7→11; LegacyRow idx 2→6; brightness 128 + phase*2 → 128-136 (button.cpp:199-209, 294-295); hover/focus/selected all target phase 4; disabled pins phase 0 |
+| Chrome rect buttons | NOTHING changes | bank7 idx24, brightness always 128 (button.cpp:148-149, 516, 300) — confirmed, focus art swap correctly absent |
+| List rows | selection bar only | full-width highlightColor (default palette 180) for SELECTED rows (scroll_list.cpp:151-155); hover/focus: no visual change |
+| Text inputs | caret only on focus | caret when focused && !inactive; inactive = brightness 64 (text_input.cpp:119-123); no hover visual |
+| Toggles | none on hover/focus | brightness selected/unselected (default 128/128) only (toggle.cpp:65-90) |
+| Scrollbars | none | caller sprites, no states (scroll_list.cpp:36-47) |
+| Ghost/Text buttons | brightness only | 128→136 same phase ramp; Text disabled = 64 |
+
+Hover-album capture implication: settle phase-4 deterministically (hover_at then step
+≥4 ticks — phase advances 1/frame via Activating mode) before screenshot; capture per
+family: oval phase-4, list selected-bar, input caret (already golden-covered), Chrome
+(should be byte-identical to rest — a NEGATIVE check).
+
+CPPX-side implication: our AppButton must implement the 5-phase oval ramp (sprite
+variants idx 7-11 + brightness) — verify whether it currently swaps art on focus at all;
+the rest-state goldens never exercised this.
