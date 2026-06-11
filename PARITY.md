@@ -12,8 +12,8 @@ All measured 2026-06-11 (iteration 0) with recalibrated tile gate, fresh capture
 |---|---|---|---|
 | mainmenu | DIVERGED | 0.83% / 18 / 10.0% @1170,312 (was 2.32/49/32.5) | labels ±1px (cross-correlated); residual = sprite-interior striping phase (GPU center-sample vs origin floor) — candidate global executor fix |
 | options | **PASS** | pixdiff PASS 0.26%/0 hot (4.2 max) + gate wf_45c1807c-d48 overall=PASS, 6/6 critics 0.95-0.97 (2026-06-11) | fixed-width ovals + gap 28.5 (origin kButtonGap 19) + label pad 7.5/4.5 |
-| options_audio | DIVERGED | 0.64% / 21 / 17.9% @1170,312 (was 2.23/52) | panel content rows |
-| options_display | DIVERGED | 1.52% / 38 / 27.6% @1170,468 (was 2.98/70) | toggle/row region |
+| options_audio | DIVERGED | 0.61% / 21 / 12.0% @1170,312 (was 2.23/52/32.5) | toggle semantics fixed (origin: l=12 on/13 off, r=15 on/14 off — was mirrored single cell); cells now ±2px; residual = label-baseline band + striping phase |
+| options_display | DIVERGED | 1.48% / 40 / 23.1% @702,624 (was 2.98/70/32.5) | Save/Cancel pills ±2px; render label band extends ~5px lower than golden in action row |
 | options_controls | DIVERGED | 7.75% / 202 / 28.8% @1638,780 | UNCHANGED by backdrop fix — keybind grid itself diverges (row pitch/columns); panel covers most backdrop |
 | lobby_connect | DIVERGED | 1.46% / 41 / 25.9% @780,780 | CORRECTED DIAGNOSIS: button row IS centered right (origin's floating row escapes pad-84 and centers across panel); real diff = button chrome detail (inner inset frame) + widths (L/C 275 vs 250 device px) |
 | character_create | DIVERGED | 1.59% / 41 / 17.9% @468,234 (was 2.17/58) | portrait row + panel chrome |
@@ -110,7 +110,7 @@ F4 music toggle, F5 random music, Enter quit-confirm flow.
 | Finding | Where |
 |---|---|
 | paint-literal ×5 | components/actions/app_button_variant.h:120,185,203,252,253 |
-| paint-literal | components/actions/boolean_setting_row.cppx:50 |
+| ~~paint-literal~~ FIXED 2026-06-11 (toggle rework) | ~~components/actions/boolean_setting_row.cppx:50~~ guard now 16 findings |
 | paint-literal | screens/character_create.cppx:266 |
 | paint-literal ×3 | screens/lobby_connect.cppx:112,120,146 |
 | paint-literal | screens/lobby_screen.cppx:872 |

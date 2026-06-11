@@ -21,10 +21,10 @@ using ::ui::components::BoxProps;
       on_change(!checked);
   };
 
-  const uint32_t left = checked ? chrome.toggle_on_l : chrome.toggle_off_l;
-  const uint32_t right = checked ? chrome.toggle_on_r : chrome.toggle_off_r;
-  // origin/main draws the toggle as two separated half-disc cells (~28x49 each)
-  // with a gap between, upscaling the baked sprite to ~pill height.
+  const uint32_t left = checked ? chrome.toggle_l_on : chrome.toggle_l_off;
+  const uint32_t right = checked ? chrome.toggle_r_on : chrome.toggle_r_off;
+  // origin BooleanIndicator: two 20x33-virtual cells (30x49.5 logical),
+  // cover-fit, distinct sprites per side — never a mirrored single cell.
   auto cell = ::ui::LayoutStyle{.width = ::ui::Length::points(30.0f),
                                 .height = ::ui::Length::points(49.5f)};
 
@@ -44,12 +44,8 @@ using ::ui::components::BoxProps;
       onPress={toggle}
     />
     <Box key="ind" layout={::ui::LayoutStyle{.direction = ::ui::FlexDirection::Row, .gap = 15.0f}}>
-      <Box
-        key="cl"
-        layout={cell}
-        style={tokens::image_patch(left, ::ui::Color{255, 255, 255, 255}, ::ui::SideWidths{}, true)}
-      />
-      <Box key="cr" layout={cell} style={tokens::image_patch(right)} />
+      <Box key="cl" layout={cell} style={tokens::image_patch_cover(left)} />
+      <Box key="cr" layout={cell} style={tokens::image_patch_cover(right)} />
     </Box>
   </Box>
 }

@@ -269,11 +269,12 @@ if(cppxChrome.logo_frame[i]) n = i + 1; // count contiguous baked frames
 }
 cppxChrome.logo_frame_count = n;
 }
-// bank 6 idx12-15 — boolean toggle indicator cells (off = 12|13, on = 14|15).
-bake(6, 12, cppxChrome.toggle_off_l, &cppxChrome.toggle_w, &cppxChrome.toggle_h);
-bake(6, 13, cppxChrome.toggle_off_r);
-bake(6, 14, cppxChrome.toggle_on_l);
-bake(6, 15, cppxChrome.toggle_on_r);
+// bank 6 idx12-15 — boolean toggle indicator cells (origin: left = 12 on /
+// 13 off, right = 15 on / 14 off).
+bake(6, 12, cppxChrome.toggle_l_on, &cppxChrome.toggle_w, &cppxChrome.toggle_h);
+bake(6, 13, cppxChrome.toggle_l_off);
+bake(6, 14, cppxChrome.toggle_r_off);
+bake(6, 15, cppxChrome.toggle_r_on);
 // bank 134 '['/']' — the advantage-metadata bracket glyphs (origin borrows the
 // bank-134 art because bank 133's bracket cells are dash-shaped).
 bake(134, '[' - 33, cppxChrome.bracket_l, &cppxChrome.bracket_w, &cppxChrome.bracket_h);

@@ -87,10 +87,11 @@ struct ChromeTextures {
   static constexpr int kLogoFrames = 8;
   uint32_t logo_frame[kLogoFrames] = {};
   int logo_frame_count = 0;
-  // Boolean-toggle indicator cells (bank 6): a 2-cell-wide oval — OFF = idx12|13
-  // (hollow), ON = idx14|15 (filled). SIL-100 BooleanSettingRow.
-  uint32_t toggle_off_l = 0, toggle_off_r = 0; // idx12, idx13
-  uint32_t toggle_on_l = 0, toggle_on_r = 0;   // idx14, idx15
+  // Boolean-toggle indicator cells (bank 6), per origin boolean_setting_row:
+  // LEFT cell = idx12 (on) / idx13 (off), RIGHT cell = idx15 (on) / idx14
+  // (off). Four distinct sprites — never mirror one cell to fake the other.
+  uint32_t toggle_l_on = 0, toggle_l_off = 0; // idx12, idx13
+  uint32_t toggle_r_off = 0, toggle_r_on = 0; // idx14, idx15
   uint16_t toggle_w = 0, toggle_h = 0;
   // SIL-102: the five agency emblems (bank 181 idx0..4), shown in the Character
   // Create detail column for the previewed agency. Indexed by agency 0..4.
