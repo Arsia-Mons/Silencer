@@ -695,6 +695,8 @@ const float kMinScale = 480.0f / 720.0f;
 if(cppxScale < kMinScale) cppxScale = kMinScale;
 const float cppxLogicalW = static_cast<float>(rw) / cppxScale;
 const float cppxLogicalH = static_cast<float>(rh) / cppxScale;
+cppxCanvasW_ = cppxLogicalW;
+cppxCanvasH_ = cppxLogicalH;
 
 if(!cppxReactInitialized){
 react_init_runtime();
@@ -1181,7 +1183,9 @@ tree = client::ui::SessionProvider(
 client::ui::SessionProviderValue{session}, ::ui::children({tree}));
 tree = client::ui::AppProvider(
 client::ui::AppProviderValue{.quit = [this]{ game.quitRequested = true; },
-                            .version = SILENCER_VERSION},
+                            .version = SILENCER_VERSION,
+                            .canvas_w = cppxCanvasW_,
+                            .canvas_h = cppxCanvasH_},
 ::ui::children({tree}));
 // SIL-94: per-frame wall-clock for component animation (use_clock). Monotonic
 // SDL ticks at frame build; delta since the previous UI frame.

@@ -2,6 +2,7 @@
 
 #include "client/ui/components/actions/actions.h"
 #include "client/ui/components/layout/layout.h"
+#include "client/ui/components/layout/lobby_panes.h"
 #include "client/ui/components/surfaces/surfaces.h"
 #include "client/ui/components/text/text.h"
 #include "client/ui/hooks/use_app.h"
@@ -76,26 +77,27 @@ using ::ui::components::TextProps;
       .padding = {8.0f, 8.0f, 6.0f, 6.0f},
       .gap = 4.0f};
 }
-// The right tall column: origin rightTallW = 309 virtual at the 853x480 canvas
-// (RoundRatio(827,232,620)) -> 463 logical, right edge on the root pad.
+// The right tall column (origin rightTallW; 463 logical at the design canvas,
+// right edge on the root pad). Width from resolve_lobby_panes.
 ::ui::LayoutStyle lobby_right_cell_layout() {
   ::ui::LayoutStyle l = {
       .direction = ::ui::FlexDirection::Column,
       .align_items = ::ui::AlignItems::Stretch,
-      .width = ::ui::Length::points(463.0f),
+      .width = ::ui::Length::points(
+          resolve_lobby_panes(client::ui::use_app().canvas_w).tall_w),
       .min_height = ::ui::Length::points(0.0f),
       .padding = {8.0f, 8.0f, 6.0f, 6.0f},
       .gap = 4.0f};
   l.flex_shrink = ::ui::StyleFloat::points(0.0f);
   return l;
 }
-// The chat panel: origin chatW = topRowW - regionGap = 505 virtual -> 757
-// logical, full height of the lower row (the 20-logical seam fills the rest).
-::ui::LayoutStyle lobby_chat_layout() {
+// The chat panel (origin chatW = topRowW - regionGap; 757 logical at the
+// design canvas), full height of the lower row (the seam fills the rest).
+::ui::LayoutStyle lobby_chat_layout(float chat_w) {
   ::ui::LayoutStyle l = {
       .direction = ::ui::FlexDirection::Column,
       .align_items = ::ui::AlignItems::Stretch,
-      .width = ::ui::Length::points(757.0f),
+      .width = ::ui::Length::points(chat_w),
       .min_height = ::ui::Length::points(0.0f),
       .padding = {10.0f, 10.0f, 8.0f, 7.0f},
       .gap = 0.0f};
@@ -507,7 +509,7 @@ struct CreateRightCellProps {
         layout={::ui::LayoutStyle{
           .direction = ::ui::FlexDirection::Column,
           .align_items = ::ui::AlignItems::Stretch,
-          .width = ::ui::Length::points(445.0f),
+          .width = ::ui::Length::percent(100.0f),
           .height = ::ui::Length::points(387.0f),
           .overflow = ::ui::Overflow::Hidden,
           .padding = {1.0f, 1.0f, 1.0f, 1.0f}}}
@@ -544,8 +546,7 @@ struct CreateRightCellProps {
       key="cbw"
       layout={::ui::LayoutStyle{
         .position = ::ui::PositionType::Absolute,
-        .position_inset = ::ui::EdgeSizes{9.0f, {}, 542.0f, {}},
-        .width = ::ui::Length::points(445.0f)}}
+        .position_inset = ::ui::EdgeSizes{9.0f, 9.0f, 542.0f, {}}}}
     >
       <AppButton
         key="create"
@@ -984,6 +985,10 @@ struct LobbyScreenProps {
     if (leave) leave();
   };
 
+  // Origin's stepped-pane widths reflowed to the live canvas (fixed authored
+  // values at the design canvas; shrink-to-fit below it, e.g. 4:3 windows).
+  const LobbyPanes panes = resolve_lobby_panes(use_app().canvas_w);
+
   return <ScreenLayout key="root" variant={ScreenLayoutVariant::Game}>
     <Box
       key="titlebar"
@@ -1044,7 +1049,7 @@ struct LobbyScreenProps {
         layout={::ui::LayoutStyle{
           .direction = ::ui::FlexDirection::Column,
           .align_items = ::ui::AlignItems::Stretch,
-          .width = ::ui::Length::points(777.0f),
+          .width = ::ui::Length::points(panes.left_w),
           .flex_shrink = ::ui::StyleFloat::points(0.0f)}}
       >
         <Box
@@ -1053,16 +1058,16 @@ struct LobbyScreenProps {
             .direction = ::ui::FlexDirection::Row,
             .align_items = ::ui::AlignItems::Stretch,
             .width = ::ui::Length::percent(100.0f),
-            .height = ::ui::Length::points(180.0f),
+            .height = ::ui::Length::points(panes.upper_h),
             .flex_shrink = ::ui::StyleFloat::points(0.0f),
-            .gap = ::ui::StyleValue::points(20.0f)}}
+            .gap = ::ui::StyleValue::points(panes.gap)}}
         >
           <Box
             key="agent"
             layout={::ui::LayoutStyle{
               .direction = ::ui::FlexDirection::Row,
               .align_items = ::ui::AlignItems::Start,
-              .width = ::ui::Length::points(436.0f),
+              .width = ::ui::Length::points(panes.agent_w),
               .flex_shrink = ::ui::StyleFloat::points(0.0f),
               .overflow = ::ui::Overflow::Hidden,
               .padding = {9.0f, 9.0f, 10.0f, 8.0f},
@@ -1186,14 +1191,14 @@ struct LobbyScreenProps {
           key="elbowrow"
           layout={::ui::LayoutStyle{
             .direction = ::ui::FlexDirection::Row,
-            .height = ::ui::Length::points(20.0f),
+            .height = ::ui::Length::points(panes.gap),
             .flex_shrink = ::ui::StyleFloat::points(0.0f)}}
         >
           <Box key="efill" layout={::ui::LayoutStyle{.flex_grow = ::ui::StyleFloat::points(1.0f)}} />
           <Box
             key="eseam"
             layout={::ui::LayoutStyle{
-              .width = ::ui::Length::points(20.0f),
+              .width = ::ui::Length::points(panes.gap),
               .flex_shrink = ::ui::StyleFloat::points(0.0f)}}
             style={tokens::frame_patch_sides(tokens::kChromeStroke, false, true, false, false)}
           />
@@ -1205,7 +1210,7 @@ struct LobbyScreenProps {
             .align_items = ::ui::AlignItems::Stretch,
             .flex_grow = ::ui::StyleFloat::points(1.0f)}}
         >
-        <Box key="chat" layout={lobby_chat_layout()} style={lobby_panel_style()}>
+        <Box key="chat" layout={lobby_chat_layout(panes.chat_w)} style={lobby_panel_style()}>
           <Box
             key="chanrow"
             layout={::ui::LayoutStyle{
@@ -1274,7 +1279,7 @@ struct LobbyScreenProps {
         <Box
           key="cseam"
           layout={::ui::LayoutStyle{
-            .width = ::ui::Length::points(20.0f),
+            .width = ::ui::Length::points(panes.gap),
             .flex_shrink = ::ui::StyleFloat::points(0.0f)}}
           style={tokens::frame_patch_sides(tokens::kChromeStroke, false, true, false, false)}
         />

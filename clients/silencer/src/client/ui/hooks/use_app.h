@@ -13,6 +13,10 @@ struct App {
   std::function<void()> quit = {};
   // Build version string for the menu footer (e.g. "v00058"); "" if unset.
   const char *version = "";
+  // Logical UI canvas (height-pinned 720 space, width = aspect*720) — the
+  // size screens lay out against. 0 if the composition root hasn't sized it.
+  float canvas_w = 0.0f;
+  float canvas_h = 0.0f;
 };
 
 App use_app();

@@ -29,6 +29,8 @@ App use_app() {
       .can_quit = static_cast<bool>(value->quit),
       .quit = value->quit,
       .version = value->version ? value->version : "",
+      .canvas_w = value->canvas_w,
+      .canvas_h = value->canvas_h,
   };
 }
 
