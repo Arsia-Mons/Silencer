@@ -14,6 +14,7 @@ a = a || {}
 const screens = a.screens
 if (!Array.isArray(screens) || !screens.length) throw new Error('gate-all: args.screens[] required ({screen,render,golden,pixdiff,checklist})')
 const codeFiles = a.files || ''
+const codeRange = a.range || ''
 
 const RUBRIC = (s) => `You are validating that a MIGRATED cppx UI render is a 100% VISUAL MATCH to the ORIGINAL origin/main golden for the Silencer game screen "${s.screen}". The goal is byte-for-byte VISUAL parity with the original, NOT a tasteful modern redesign.
 
@@ -116,7 +117,7 @@ const CODE = {
     },
   },
 }
-const CODE_PREAMBLE = `You are a 2026 senior reviewer enforcing clean, idiomatic component code (shadcn/React sensibility ported to this C++/cppx UI). Inspect the working-tree diff: run \`git --no-pager diff -- ${codeFiles || '.'}\` and \`git --no-pager diff --staged -- ${codeFiles || '.'}\` with Bash. Only review ADDED/CHANGED lines, not pre-existing code. The engine-idiom golden is /Users/hv/repos/ui — when unsure whether a pattern is idiomatic cppx, read how that repo's own components do it. Deterministic smells (raw Color{} paint, >6-case switches, fat props/signatures, god views, conditional hooks) are machine-checked by clients/silencer/tools/react_architecture_guard.py — don't re-litigate those; focus on the judgement calls in your lens. Verdict NEEDS_WORK if any high/medium finding exists. ZERO tolerance for noise: every finding cites file:line or a verbatim snippet.`
+const CODE_PREAMBLE = `You are a 2026 senior reviewer enforcing clean, idiomatic component code (shadcn/React sensibility ported to this C++/cppx UI). Inspect the diff: run ${codeRange ? `\`git --no-pager diff ${codeRange} -- ${codeFiles || '.'}\`` : `\`git --no-pager diff -- ${codeFiles || '.'}\` and \`git --no-pager diff --staged -- ${codeFiles || '.'}\``} with Bash. Only review ADDED/CHANGED lines, not pre-existing code. The engine-idiom golden is /Users/hv/repos/ui — when unsure whether a pattern is idiomatic cppx, read how that repo's own components do it. Deterministic smells (raw Color{} paint, >6-case switches, fat props/signatures, god views, conditional hooks) are machine-checked by clients/silencer/tools/react_architecture_guard.py — don't re-litigate those; focus on the judgement calls in your lens. Verdict NEEDS_WORK if any high/medium finding exists. ZERO tolerance for noise: every finding cites file:line or a verbatim snippet.`
 
 const CODE_LENSES = [
   { key: 'hygiene', focus: 'HYGIENE. (1) bloat-comment: comments restating code, narrating the obvious, or padding backstory — quote each verbatim; a comment earns its place ONLY by explaining a non-obvious WHY (the owner explicitly rejects comment bloat). (2) overengineering: needless abstraction, single-use indirection, speculative flexibility, defensive handling of impossible states. (3) dead-code.' },

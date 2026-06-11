@@ -15,14 +15,14 @@ All measured 2026-06-11 (iteration 0) with recalibrated tile gate, fresh capture
 | options_audio | **PASS — byte-identical** | pixdiff 0.0000%/0 hot, mae 0.00 (2026-06-11); prior full gate wf_d51296b1-328 6/6 critics | |
 | options_display | **PASS (full gate)** | pixdiff 0.0000 byte-identical (RGB MD5 match) + gate wf_1f9aedbb-fae overall=PASS 6/6 critics | string bake + fullscreenw row -1 (label pen vx 334) + indDx 1 (right toggle vx 553) |
 | options_controls | **PASS (full gate)** | pixdiff 0.0000 byte-identical (raw-RGB md5 match) + gate wf_b79c44ad-0ad overall=PASS 6/6 critics | string bake + titlewrap inset-top 13 (title vy 14) + OR ml 2 (vx 513) |
-| lobby_connect | **PASS** | 0.0356% / 0 hot / max 2.0 (2026-06-11, cap_lobby) | dialog sprite + button-patch registered legacy; origin pen grid (log 291/109+11k, button row 334.5/350.5, Chrome Lg padX 10); capture pins lobby port 63532 (the golden's — the log renders it). NOTE: scenario-71's own harness still measures 0.29/8 (harness-state delta, not layout — see below) |
-| character_create | **PASS — byte-identical** | 0.0000, mae 0.00 (2026-06-11) | chrome_panel/row_plate registered; create plate on int-cast cell (166,94); List label pen cell 102 |
-| cc_alias | **PASS** | 0.0003% / 0 hot (2026-06-11) | modal on cell (283,161); origin caret (1v yellow, Body lineH); title pen 349. 71-harness shows 1 hot tile (caret-blink frame nondeterminism) |
+| lobby_connect | DIVERGED (critic gate) | pixdiff 0.0356%/0 hot PASS but gate wf_195b6b93 FAIL: caret palette + 1px left frame (see [systemic] sub-tolerance palette drift) | dialog sprite + button-patch registered legacy; origin pen grid (log 291/109+11k, button row 334.5/350.5, Chrome Lg padX 10); capture pins lobby port 63532 (the golden's — the log renders it). NOTE: scenario-71's own harness still measures 0.29/8 (harness-state delta, not layout — see below) |
+| character_create | **PASS (full gate)** | 0.0000 byte-identical + gate wf_195b6b93 overall=PASS 5/5 critics | chrome_panel/row_plate registered; create plate on int-cast cell (166,94); List label pen cell 102 |
+| cc_alias | **PASS (full gate)** | 0.0003%/0 hot + gate wf_195b6b93 overall=PASS (one low: caret 1 device row short — blink phase) | modal on cell (283,161); origin caret (1v yellow, Body lineH); title pen 349. 71-harness shows 1 hot tile (caret-blink frame nondeterminism) |
 | cc_select_agency | DIVERGED (plateau) | 0.2590% / 8 hot / max 7.1 (2026-06-11; was 3.74/79) | agency plates on cells (166, 94+32k); advantage pens 102/121; prose cell 163; brackets baked 4x11 EffectColor(224). RESIDUAL: 8 tiles 5.3-7.1% = stretched row-plate right-cap phase (golden cap 2px left of the 235v and 236v stretch bakes — evidence: probe@y505 G 887-893 vs R 889-895 for both vw 235/236) + bracket float-phase. 3+ measured attempts; needs the plate's true origin draw chain (maybe Clay round-half-up x167 + w235) |
-| lobby_screen | **PASS** | 0.0182% / 0 hot (2026-06-11; was 3.67/94) | origin stepped pane + agent card + chat internals + border snap + nine-slice/contain bakes |
-| create_game | **PASS** | 0.1098% / 0 hot (2026-06-11; was 5.06/113) | Game Options origin form (scrollbar, BodySm values), Select Map origin list + abs footer grid |
-| game_staging | **PASS** | 0.0317% / 0 hot (2026-06-11; was 4.20/93) | origin roster anchors (emblem/ready/name/level), staging buttons 3/11/39, map-name Title variant, presence [game] suffix, default tech Laser+Rocket on connect |
-| tech_select | **PASS** | 0.0599% / 0 hot (2026-06-11; was 5.49/106) | origin tech grid (toggles native bank7 18/19 + dim 64 copies, labels "name (N)" 128/64, slots LegacyPalette(129,144)); agency-specific buyables filtered |
+| lobby_screen | DIVERGED (critic gate) | pixdiff 0.0182%/0 hot PASS but gate wf_195b6b93 FAIL: 'In Lobby' presence-header green + version amber (see [systemic]) | origin stepped pane + agent card + chat internals + border snap + nine-slice/contain bakes |
+| create_game | DIVERGED (critic gate) | pixdiff 0.1098%/0 hot PASS but gate wf_195b6b93 FAIL: spinner-value baseline +5px, Game Options bottom hairline 2px@y408 vs 3px@y405, presence green, scrollbar thumb +1px, version amber | Game Options origin form (scrollbar, BodySm values), Select Map origin list + abs footer grid |
+| game_staging | **PASS (full gate)** | 0.0317%/0 hot + gate wf_195b6b93 overall=PASS (mediums logged: 'Pregame' heading green, action-button right border 2px narrow, version amber — same systemic family) | origin roster anchors (emblem/ready/name/level), staging buttons 3/11/39, map-name Title variant, presence [game] suffix, default tech Laser+Rocket on connect |
+| tech_select | DIVERGED (critic gate) | pixdiff 0.0599%/0 hot PASS but gate wf_195b6b93 FAIL: disabled-row dim formula (blue channel zeroed vs golden gray-greens 8,56,8/16,64,16), 'Pregame' green, version amber | origin tech grid (toggles native bank7 18/19 + dim 64 copies, labels "name (N)" 128/64, slots LegacyPalette(129,144)); agency-specific buyables filtered |
 
 Menu-cluster rows re-measured 2026-06-11 after the per-phase oval/logo variants landed;
 lobby/cc rows re-verified same day (all equal or marginally better, no regressions).
@@ -106,6 +106,22 @@ PackImageStretch(6,0)) + lobby_backdrop (stretch) all baked this way, drawn 1:1 
 Earlier intermediate attempt (fit=Stretch single-hop) measured WORSE (mainmenu 2.32→3.28) —
 geometry must stay cover; only the resample chain was wrong.
 
+### [systemic] Sub-tolerance palette drift — critic gate wf_195b6b93-ab5 (2026-06-11)
+
+Pixdiff TOL=16 absorbs channel deltas 12-32, so these passed numerically but fail critic
+eyes. All verified against fresh 2026-06-11 captures (caret claim numpy-confirmed pixel-exact).
+
+| Family | Evidence | Root cause / fix shape |
+|---|---|---|
+| Input caret = palette idx 140, NOT yellow | golden lobby_connect caret rgb(116,156,104)@x858-859; golden cc_alias caret rgb(252,252,0); render always 252,252,0 | origin TextInputOpts.caretColor=140 (legacy default, text_input.h:49) resolved per-screen palette (cc palette idx140=yellow, lobby palette idx140=sage). OUR kCaretFill is hardcoded in draw_command_builder.cpp:29. Fix: caret color joins resolved VisualStyle (theme.caret exists unused); screens feed palette-resolved idx140 via chrome provider |
+| lobby_connect caret pen +10 device px | golden x858 vs render x868 (= our Input's ~7.67-logical default content padding; origin contentInsetX=7v measured from input box, our well box already sits AT the pen) | zero the field's content inset or shift the well; verify typed-text pen too (goldens have empty fields — text start untested) |
+| presence-header green ('In Lobby'/'Pregame') | golden sage rgb(92,148,92) fill + rgb(76,124,68)/(68,108,64) AA; render rgb(80,148,84)/(48,140,60) (~1000 px/screen on lobby_screen, create_game, game_staging, tech_select) | the brightness-160 presence variant face bakes the wrong effect color/ramp — re-derive from origin TextEffect for this state |
+| version 'v.00058' amber | golden rgb(140,64,8); render rgb(152,72,20) on the four lobby-cluster screens (~558 px each; menu screens byte-identical so menu path is right) | lobby-cluster version bake uses a brighter amber ramp than origin's lobby-palette text effect |
+| tech_select disabled-row dim | golden gray-greens rgb(8,56,8)/(16,64,16); render rgb(4,76,0)/(0,44,0)/(0,52,0) — blue channel zeroed | dim-64 formula diverges from origin's palette-brightness mapping; recompute via LegacyPalette brightness like origin, not a per-channel scale |
+| lobby_connect left outer frame 1px thin | golden dark col rgb(8,84,0) x639-641 (3px), render x640-641 (2px); right/top/bottom byte-identical | dialog sprite bake/draw rect floors the left edge asymmetrically — snap panel box x |
+| create_game geometry | spinner values top-aligned (golden +5px below label baseline: '0' y255-272 etc.); Game Options bottom hairline 2px@y408-409 vs golden 3px@y405-407; scrollbar thumb x1158 vs 1157 | pen-grid fixes in GameCreatePanel |
+| game_staging buttons | Choose Tech/Charge Team/Ready right border ends x1174-1176, golden x1175-1178 (452 vs 454 px wide) | widen 2 device px (button cell or nine-slice rect) |
+
 ## Visual — no origin golden (functional checks only)
 
 | Surface | State | Notes |
@@ -117,8 +133,29 @@ geometry must stay cover; only the resample chain was wrong.
 ## Visual — in-game (goldens MISSING — capture from origin first)
 
 Enumerated from origin source 2026-06-11 (Explore agent over .worktrees/origin-capture).
-Headless capture skips the HUD composite layer (ORIGIN_GOLDENS.md) — needs a capture-build
-patch or windowed capture before goldens can exist.
+
+**Capture design (derived 2026-06-11) — the earlier "HUD doesn't capture headless" deferral
+is WRONG for origin.** Origin's game_loop.cpp renders world + in-game HUD/overlays
+SOFTWARE-side into the screenbuffer every frame (RenderClientUiFrame →
+BuildInGameHudUi/BuildInGameOverlaysUi → clay_bridge::Render(game, &surface, cmds));
+`--headless` only skips Present()/cursor (game_loop.cpp:36,239,352). The control-port
+`screenshot` op captures GetScreenBuffer() (controldispatch.cpp:1027 HandlePostRender) —
+HUD included. Caveat: in-game the screenbuffer is FIXED 640×480 (kLegacyRender;
+game_loop.cpp:205 ResizeRenderSurfacePixels), so headless in-game shots are 640×480.
+
+Golden pipeline:
+1. Build the origin-capture worktree (deterministic-fade patch already there, uncommitted).
+2. Boot headless, drive into a real match (login → create → staging → launch; reuse the
+   31_lobby_create_staging harness flow); trigger each HUD state: chat (T), F1 list,
+   buy/tech station, quit prompt (Enter), messages.
+3. `screenshot` → 640×480 PNG per surface/state.
+4. Upscale to 1920×1080 with origin's GPU-stretch arithmetic: NEAREST, x=3.0, y=2.25,
+   dst px → src = int(d/scale) (config scalefilter default OFF ⇒ NEAREST). Use numpy index
+   maps, NOT PIL resize (PIL NEAREST center-samples; the bakes use int(d/s) floors).
+5. Document provenance in ORIGIN_GOLDENS.md; save as tests/cli-agent/e2e/golden/ingame_*.png.
+6. cppx-side gap to verify separately: whether OUR screenshot op composites the cppx RGBA
+   HUD layer in-game (menus do; in-game screenbuffer is 640×480 while the UI RGBA layer is
+   window-sized — check RenderCppxClientUiFrame consumers + capture path).
 
 | Surface | State | Origin anchor |
 |---|---|---|
@@ -139,19 +176,15 @@ patch or windowed capture before goldens can exist.
 Hardcoded in-game bindings to verify functionally: T chat, F1 player list, F2 team colors,
 F4 music toggle, F5 random music, Enter quit-confirm flow.
 
-## Functional — e2e suite (run 2026-06-11, /tmp/e2e_run_iter0.log: 13 PASS / 10 FAIL)
+## Functional — e2e suite (fresh full run 2026-06-11 post lobby-cluster, /tmp/e2e_full_run.log: 22 green / 2 red)
 
 | Scenario | State | Evidence |
 |---|---|---|
-| 00,10,11,12,13,14,15,16,18,19,20,22,51,60 | PASS | e2e run 2026-06-11 |
-| 17,30,31,40,50,52 | PASS | repaired by workflow 2026-06-11 (origin-correct flows: Enter submits alias, no Continue btn) |
-| 21_main_menu_layout | PASS | root cause was the content-scale ≥1 clamp (UI 1.5× oversized at 640×480); unclamped to floor 480/720 → origin-native proportions; test now bounds-checks in logical space, stagger band 130 (origin fan = 120 logical) |
-| 53_lobby_create_options_scroll | PASS | same scale-clamp root cause; green after unclamp |
-| 70_visual_regression | PASS | GREEN 2026-06-11: all 5 origin-golden screens byte-identical; cppx-only baselines (gallery/modals) re-blessed via the sanctioned path |
-| 71_visual_regression_lobby | RED-BY-DESIGN | rebuilt likewise; red until lobby cluster parity (5 diverged 2026-06-11, numbers in the table above) |
+| 00..22,30,31,40,50,51,52,60,70 | PASS | fresh run 2026-06-11 (70 includes the 5 byte-identical menu screens) |
+| 53_lobby_create_options_scroll | RED (regressed by design) | origin-true FIXED-width stepped panes (518/309v) overflow 4:3 at 640×480 — origin's ResolveSteppedPaneLayout has responsive arithmetic we didn't port; port it |
+| 71_visual_regression_lobby | RED | 3 surfaces: cc_select_agency 0.259/8 (real residual, see table) + TWO HARNESS DETERMINISM deltas: lobby_connect 0.292/8 max 14.6 in-harness vs 0.036 standalone (harness lobby port ≠ golden's 63532 → connect-log text differs; pin it like cap_lobby.sh) and cc_alias 0.0415/1 tile 13.3 (caret blink phase at capture; need deterministic caret state) |
 
-Full suite 2026-06-11 (post scale-unclamp): 21/23 PASS; only 70/71 red (the parity gate).
-Re-run 2026-06-11 post string-bake: 22 green, 70 red on gallery only, 71 red on the 5 lobby surfaces.
+Earlier same-day milestones: iteration-0 13/23 → post scale-unclamp 21/23 → post string-bake 22/23.
 
 ## Functional — origin-behavior coverage gaps (no scenario yet)
 
@@ -166,21 +199,23 @@ Re-run 2026-06-11 post string-bake: 22 green, 70 red on gallery only, 71 red on 
 | text-entry caps/length limits (alias, chat, password) vs origin | UNVERIFIED |
 | scrolling behaviors (controls list, map list) vs origin | UNVERIFIED |
 
-## Architecture guard backlog (17 findings, run 2026-06-11 — must be 0 for done)
+## Architecture guard backlog (15 findings, fresh run 2026-06-11 — must be 0 for done)
+
+`python3 clients/silencer/tools/react_architecture_guard.py --root clients/silencer` (NOT
+--root .../src/client/ui — that path exits 0 silently; line numbers below from the fresh run).
 
 | Finding | Where |
 |---|---|
-| paint-literal ×5 | components/actions/app_button_variant.h:120,185,203,252,253 |
-| ~~paint-literal~~ FIXED 2026-06-11 (toggle rework) | ~~components/actions/boolean_setting_row.cppx:50~~ guard now 16 findings |
-| paint-literal | screens/character_create.cppx:266 |
-| paint-literal ×3 | screens/lobby_connect.cppx:112,120,146 |
-| paint-literal | screens/lobby_screen.cppx:872 |
+| paint-literal ×4 | components/actions/app_button_variant.h:142,221,293,294 |
+| paint-literal | screens/character_create.cppx:268 |
+| paint-literal ×3 | screens/lobby_connect.cppx:98,106,139 |
+| paint-literal | screens/lobby_screen.cppx:1073 |
 | paint-literal | screens/password_modal.cppx:55 |
 | big-switch 9 cases | app_shell/app_root.cpp:61 |
 | big-switch 7 cases | components/text/screen_title.cppx:26 |
 | big-switch 7 cases | screens/update_screen.cppx:27 |
-| god-view 260 lines | screens/character_create.cppx:226 CharacterCreateContent |
-| god-view 409 lines | screens/lobby_screen.cppx:597 LobbyScreenView |
+| god-view 292 lines | screens/character_create.cppx:228 CharacterCreateContent |
+| god-view 494 lines | screens/lobby_screen.cppx:777 LobbyScreenView |
 
 ## Critic-panel architecture backlog (from gate runs wf_6e530100 + wf_d51296b1, 2026-06-11)
 
@@ -202,3 +237,15 @@ Critic-panel additions (gate runs wf_1f9aedbb + wf_b79c44ad, 2026-06-11):
 | HIGH | string-variant memo key omits render scale s; cache only cleared at shutdown/256-cap — stale wrong-sized text after fullscreen toggle/resize (glyph_fonts.cpp:325-348) | fold quantized s (or out_w/out_h) into the key, store bake-time w/h, flush on output-size change |
 | MED | actionsnudge anonymous wrapper around ActionRow + mis-indented JSX (options_controls.cppx:334) | give ActionRow a layout override prop (engine-golden convention) or fold into actionwrap padding |
 | LOW | omnibus nudge comment; legacy_w>0?:640 ternary duplication; per-draw GetCurrentRenderOutputSize; ind_dx single-call-site prop on shared BooleanSettingRow; Panel::ControlsFrame owning screen placement (extract BakedFrame if a 2nd appears); exact-color eligibility decided in two places | cleanups |
+
+Critic-panel additions (gate run wf_195b6b93-ab5 over the lobby-cluster diff adb39e78..HEAD, 2026-06-11 — 25 findings):
+
+| Sev | Finding | Fix shape |
+|---|---|---|
+| HIGH | pen-grid anchoring idiom duplicated raw at every site: `auto L = [](float v){ return (float)std::lround(1.5f * v); }` verbatim ×2 (lobby_screen.cppx:635,707) + open-coded right-cell origins `-797.0f`/`-100.0f` ×8; same idiom inline in lobby_connect.cppx:76 | one shared pen-grid primitive (component or helper in tokens/layout) owning L() + per-panel origin |
+| MED | dead code: tokens.h:198 image_patch_sub (last users removed); app_button_variant.h:242 chrome focus texture param ignored but still plumbed; game_ui_pipeline.cpp:450 bracket_w/h write-only fields | delete |
+| MED | legacy-fit flavors = 3 mutually-exclusive bools (nine_slice/contain/stretch) on LegacySprite + 3 near-identical register fns + dispatch smeared over 4 fns (texture_registry) | one Fit enum, one register(fit) |
+| MED | composition regressions: TechListCell/StagingRosterCell became 60-90-line for-loop orchestration (named row components deleted); lobby_connect field label/well blocks pasted ×2 (field_label helper deleted); 6 inline text_patch paints where a BodyText variant is the shape | re-extract row components + text variants |
+| MED | use_chrome duplicated truth: agency_emblem_ws/hs[5] arrays added while scalar agency_emblem_w/h kept; parallel-array growth (emblem ×5 fields, ready ×7) | struct-of-arrays → array of small structs; delete scalars |
+| MED | caret rect hardcoded in SHARED engine runtime (draw_command_builder.cpp:486: width 1.5f "1 legacy virtual px", height 16.5f) — Silencer-specific constants in the engine | derive from resolved style (joins the caret-color fix above) |
+| LOW | kv_row bool `sm` flag-param; 2×2 nested-ternary ready-texture select; decorative scrollbar built inline; "neww" margin-nudge wrapper pasted in both branches; eseam/cseam boolean-blind frame_patch_sides calls; per-row whole-struct closure captures; function-local static bake scratch buffers; bake registration fn accreting per-asset paragraphs; draw_emblem stored-derived flag; bloat comment lobby_ui_model.cpp:230; bake_element_nineslice/stretch copy ~25 lines of two-hop scaffolding | cleanups, table-driven bakes |
