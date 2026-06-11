@@ -339,20 +339,45 @@ struct GameBrowserProps {
   </Box>
 }
 
-// One "Label:   value" option line (origin's Game Options table).
-::ui::UiElement kv_row(const char *key, const char *label, const char *value) {
+// One "Label:   value" option line (origin BuildOptionRow): a growing label
+// cell, then the value LEFT-ALIGNED in a fixed 64-virtual (96 logical) column.
+// `sm` = origin's Text-button values (Security/Spectatable): BodySm tracking.
+::ui::UiElement kv_row(const char *key, const char *label, const char *value,
+                       bool sm = false) {
   return <Box
     key={key}
     layout={::ui::LayoutStyle{
       .direction = ::ui::FlexDirection::Row,
       .align_items = ::ui::AlignItems::Center,
-      .justify_content = ::ui::JustifyContent::SpaceBetween,
       .width = ::ui::Length::percent(100.0f),
       .height = ::ui::Length::points(21.0f),
-      .gap = 6.0f}}
+      .flex_shrink = ::ui::StyleFloat::points(0.0f),
+      .gap = 9.0f}}
   >
-    <BodyText key="l" variant={BodyTextVariant::Body} value={label} />
-    <BodyText key="v" variant={BodyTextVariant::Strong} value={value} />
+    <Box
+      key="lc"
+      layout={::ui::LayoutStyle{
+        .flex_grow = ::ui::StyleFloat::points(1.0f),
+        .flex_basis = ::ui::Length::points(0.0f),
+        .min_width = ::ui::Length::points(0.0f)}}
+    >
+      <BodyText key="l" variant={BodyTextVariant::Body} value={label} />
+    </Box>
+    <Box
+      key="vc"
+      layout={::ui::LayoutStyle{
+        .width = ::ui::Length::points(96.0f),
+        .flex_shrink = ::ui::StyleFloat::points(0.0f)}}
+    >
+      <Text
+        key="v"
+        value={value}
+        layout={{.height = ::ui::Length::points(tokens::kLineBody)}}
+        style={tokens::text_patch(tokens::kTextBody, tokens::kFontBodyEm,
+                                  sm ? tokens::kFaceBodySm : tokens::kFaceBody,
+                                  tokens::kLineBody)}
+      />
+    </Box>
   </Box>
 }
 
@@ -360,25 +385,77 @@ struct GameBrowserProps {
 // (the values are the CreateGameRequest defaults). The Game name + Password +
 // Create live in the right Select-Map cell (CreateRightCell), matching golden.
 ::ui::UiElement GameCreatePanel() {
-  return <Box key="create" layout={lobby_col_layout(2.0f)} style={lobby_panel_open_right()}>
-    <ScreenTitle key="h" variant={ScreenTitleVariant::Console} value="Game Options" />
+  // origin BuildGameCreateUpperTree at the 214x120 upper box: content pad 6,
+  // gap 3, Heading title, Inset form border (pad 4/2, gap 2) holding a
+  // 5-visible-row viewport (rows h14 gap 3, value col 64 left-aligned) and
+  // the 8-wide scrollbar track with a 5/6 thumb at top. Virtual x1.5,
+  // authored on the pen grid (title 110, well 137, rows 139+25.5k).
+  return <Box
+    key="create"
+    layout={::ui::LayoutStyle{
+      .direction = ::ui::FlexDirection::Column,
+      .flex_grow = ::ui::StyleFloat::points(1.0f),
+      .flex_basis = ::ui::Length::points(0.0f),
+      .min_width = ::ui::Length::points(0.0f),
+      .padding = {9.0f, 9.0f, 10.0f, 8.0f},
+      .gap = 4.5f}}
+    style={lobby_panel_open_right()}
+  >
+    <Box
+      key="hwrap"
+      layout={::ui::LayoutStyle{
+        .height = ::ui::Length::points(22.5f),
+        .flex_shrink = ::ui::StyleFloat::points(0.0f)}}
+    >
+      <ScreenTitle key="h" variant={ScreenTitleVariant::Console} value="Game Options" />
+    </Box>
     <Box
       key="well"
       layout={::ui::LayoutStyle{
-        .direction = ::ui::FlexDirection::Column,
+        .direction = ::ui::FlexDirection::Row,
         .align_items = ::ui::AlignItems::Stretch,
         .flex_grow = ::ui::StyleFloat::points(1.0f),
         .width = ::ui::Length::percent(100.0f),
-        .padding = {6.0f, 6.0f, 3.0f, 3.0f},
+        .padding = {6.0f, 6.0f, 2.0f, 4.5f},
         .gap = 4.5f}}
       style={tokens::frame_patch(tokens::kInsetStroke)}
     >
-      {kv_row("o0", "Security:", "Medium")}
-      {kv_row("o1", "Min Level:", "0")}
-      {kv_row("o2", "Max Level:", "99")}
-      {kv_row("o3", "Max Players:", "24")}
-      {kv_row("o4", "Max Teams:", "6")}
-      {kv_row("o5", "Spectatable:", "Yes")}
+      <Box
+        key="rows"
+        layout={::ui::LayoutStyle{
+          .direction = ::ui::FlexDirection::Column,
+          .overflow = ::ui::Overflow::Hidden,
+          .flex_grow = ::ui::StyleFloat::points(1.0f),
+          .flex_basis = ::ui::Length::points(0.0f),
+          .min_width = ::ui::Length::points(0.0f),
+          .height = ::ui::Length::points(129.0f),
+          .gap = 4.5f}}
+      >
+        {kv_row("o0", "Security:", "Medium", true)}
+        {kv_row("o1", "Min Level:", "0")}
+        {kv_row("o2", "Max Level:", "99")}
+        {kv_row("o3", "Max Players:", "24")}
+        {kv_row("o4", "Max Teams:", "6")}
+        {kv_row("o5", "Spectatable:", "Yes", true)}
+      </Box>
+      <Box
+        key="sbtrack"
+        layout={::ui::LayoutStyle{
+          .direction = ::ui::FlexDirection::Column,
+          .width = ::ui::Length::points(12.0f),
+          .height = ::ui::Length::points(129.0f),
+          .flex_shrink = ::ui::StyleFloat::points(0.0f),
+          .padding = {1.5f, 1.5f, 1.5f, 1.5f}}}
+        style={tokens::frame_patch(tokens::kInsetStroke)}
+      >
+        <Box
+          key="thumb"
+          layout={::ui::LayoutStyle{
+            .height = ::ui::Length::points(105.0f),
+            .flex_shrink = ::ui::StyleFloat::points(0.0f)}}
+          style={::ui::patch().background(tokens::kChromeStroke).gradient(::ui::Gradient{}).corner_radius(0.0f)}
+        />
+      </Box>
     </Box>
   </Box>
 }
@@ -393,42 +470,79 @@ struct CreateRightCellProps {
   std::function<void()> on_create = {};
 };
 ::ui::UiElement CreateRightCell(const CreateRightCellProps &props) {
-  // origin/main renders the create-form values as plain green text on the
-  // backdrop (no input box) — the Input host always paints its control chrome,
-  // so the name value is a flat BodyText. Wide rect Create button below.
-  // Shrinkable (unlike the browse cells): the 21px map rows overflow small
-  // canvases (640x480) and the scrollable list must absorb it, not push the
-  // Create button out of the viewport.
+  // origin BuildGameCreateTallTree at the 309x388 tall box: content pad 6,
+  // gap 4; "Select Map" Heading; Inset list box (297x172v -> 445x387 with the
+  // footer carved out: heading 15 + gaps + footer 95) with 14-virtual rows;
+  // footer = Game name/Password Heading labels + Body values + the full-width
+  // Create chrome button, all on the pen grid (abs anchors 531/561/587/642).
   ::ui::LayoutStyle cell = lobby_right_cell_layout();
-  cell.flex_shrink = ::ui::StyleFloat::points(1.0f);
+  cell.padding = {0.0f, 0.0f, 0.0f, 0.0f};
+  cell.gap = 0.0f;
   return <Box key="rightcell" layout={cell} style={lobby_panel_open_left()}>
-    <ScreenTitle key="h" variant={ScreenTitleVariant::Console} value="Select Map" />
     <Box
-      key="maplist"
-      layout={::ui::LayoutStyle{
-        .direction = ::ui::FlexDirection::Column,
-        .align_items = ::ui::AlignItems::Stretch,
-        .flex_grow = ::ui::StyleFloat::points(1.0f),
-        .flex_shrink = ::ui::StyleFloat::points(1.0f),
-        .width = ::ui::Length::percent(100.0f),
-        .min_height = ::ui::Length::points(0.0f),
-        .overflow = ::ui::Overflow::Hidden,
-        .padding = {8.0f, 8.0f, 6.0f, 6.0f}}}
-      style={tokens::frame_patch(tokens::kInsetStroke)}
+      key="hwrap"
+      layout={::ui::LayoutStyle{.padding = {9.0f, 0.0f, 10.0f, 0.0f}}}
     >
-      {props.rows}
+      <ScreenTitle key="h" variant={ScreenTitleVariant::Console} value="Select Map" />
     </Box>
-    <BodyText key="gn" variant={BodyTextVariant::Body} value="Game name:" />
-    <BodyText key="gv" variant={BodyTextVariant::Strong} value={props.name} />
-    <BodyText key="pwl" variant={BodyTextVariant::Body} value="Password [optional]:" />
-    <AppButton
-      key="create"
-      controlId="CreateGame"
-      variant={AppButtonVariant::Chrome}
-      disabled={!props.can_create}
-      label="Create"
-      onPress={props.on_create}
-    />
+    <Box
+      key="listwrap"
+      layout={::ui::LayoutStyle{.padding = {9.0f, 9.0f, 5.0f, 0.0f}}}
+    >
+      <Box
+        key="maplist"
+        layout={::ui::LayoutStyle{
+          .direction = ::ui::FlexDirection::Column,
+          .align_items = ::ui::AlignItems::Stretch,
+          .width = ::ui::Length::points(445.0f),
+          .height = ::ui::Length::points(387.0f),
+          .overflow = ::ui::Overflow::Hidden,
+          .padding = {1.0f, 1.0f, 1.0f, 1.0f}}}
+        style={tokens::frame_patch(tokens::kInsetStroke)}
+      >
+        {props.rows}
+      </Box>
+    </Box>
+    <Box
+      key="gnl"
+      layout={::ui::LayoutStyle{
+        .position = ::ui::PositionType::Absolute,
+        .position_inset = ::ui::EdgeSizes{9.0f, {}, 431.0f, {}}}}
+    >
+      <ScreenTitle key="t" variant={ScreenTitleVariant::Console} value="Game name:" />
+    </Box>
+    <Box
+      key="gnv"
+      layout={::ui::LayoutStyle{
+        .position = ::ui::PositionType::Absolute,
+        .position_inset = ::ui::EdgeSizes{9.0f, {}, 464.0f, {}}}}
+    >
+      <BodyText key="t" variant={BodyTextVariant::Body} value={props.name} />
+    </Box>
+    <Box
+      key="pwl"
+      layout={::ui::LayoutStyle{
+        .position = ::ui::PositionType::Absolute,
+        .position_inset = ::ui::EdgeSizes{9.0f, {}, 487.0f, {}}}}
+    >
+      <ScreenTitle key="t" variant={ScreenTitleVariant::Console} value="Password (optional):" />
+    </Box>
+    <Box
+      key="cbw"
+      layout={::ui::LayoutStyle{
+        .position = ::ui::PositionType::Absolute,
+        .position_inset = ::ui::EdgeSizes{9.0f, {}, 542.0f, {}},
+        .width = ::ui::Length::points(445.0f)}}
+    >
+      <AppButton
+        key="create"
+        controlId="CreateGame"
+        variant={AppButtonVariant::Chrome}
+        disabled={!props.can_create}
+        label="Create"
+        onPress={props.on_create}
+      />
+    </Box>
   </Box>
 }
 
@@ -695,8 +809,7 @@ struct LobbyScreenProps {
   if (game_count > 0 && *sel > game_count - 1)
     *sel = game_count - 1;
   const int map_count = (int)games.bundled_maps.size();
-  if (*map_index < 0)
-    *map_index = 0;
+  // origin starts with NO map selected (mapSelectedIndex -1, no highlight).
   if (map_count > 0 && *map_index > map_count - 1)
     *map_index = map_count - 1;
 
@@ -821,8 +934,12 @@ struct LobbyScreenProps {
           .focusable = true,
           .accessibility = {.label = mv},
           .on_activate = pick,
-          // origin kMapListLineH = 14 virtual px -> 21 logical row slots.
-          .layout = ::ui::LayoutStyle{.height = ::ui::Length::points(21.0f)},
+          // origin kMapListLineH = 14 virtual px -> 21 logical row slots;
+          // ScrollList rows inset text 4 virtual (6) with a 2 top bias so the
+          // ink-centered pen lands on origin's cell (94+14k).
+          .layout = ::ui::LayoutStyle{.height = ::ui::Length::points(21.0f),
+                                      .flex_shrink = ::ui::StyleFloat::points(0.0f),
+                                      .padding = {6.0f, 0.0f, 2.0f, 0.0f}},
           .children = ::ui::children({BodyText(BodyTextProps{
               .key = "t",
               .variant = i == *map_index ? BodyTextVariant::Strong
