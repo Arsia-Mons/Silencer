@@ -11,9 +11,12 @@ namespace client::ui {
 // pre-formatted by the composition root; `is_local` marks the viewing player's
 // row, `ready` reflects the peer's ready flag, `team_number` groups rows.
 struct StagingRosterRow {
-  std::string name = {};   // display name (+ " (you)" / " [BOT]")
-  std::string detail = {}; // "Agency · L:n"
+  std::string name = {};  // display name (+ " [BOT]" for bots, like origin)
+  std::string level = {}; // "L:n" (origin Tiny palette-170 badge)
   uint8_t team_number = 0;
+  uint8_t peer_slot = 0;  // slot within the team (origin kRosterPeerStepY)
+  uint8_t agency = 0;     // team agency (emblem index)
+  bool draw_emblem = false; // first row of each team carries the emblem
   bool ready = false;
   bool is_local = false;
 };

@@ -174,7 +174,7 @@ inline ::ui::LayoutStyle app_button_chrome_layout(AppButtonSize size = AppButton
         .justify_content = ::ui::JustifyContent::Start,
         .width = ::ui::Length::points(234.0f),
         .height = ::ui::Length::points(31.5f),
-        .padding = {15.0f, 15.0f, 6.0f, 0.0f},
+        .padding = {15.0f, 15.0f, 5.0f, 0.0f},
     };
   }
   return {
@@ -182,7 +182,8 @@ inline ::ui::LayoutStyle app_button_chrome_layout(AppButtonSize size = AppButton
       .justify_content = ::ui::JustifyContent::Start,
       .min_width = ::ui::Length::points(138.0f), // origin kActionButtonMinWidth 92 virtual
       .height = ::ui::Length::points(31.5f),     // origin Chrome plate 21 virtual
-      .padding = {18.0f, 18.0f, 6.0f, 0.0f},     // origin paddingX 12 virtual
+      .padding = {18.0f, 18.0f, 5.0f, 0.0f},     // origin paddingX 12 virtual; pad-top
+                                                 // 5 lands the label on vy_btn+4
   };
 }
 

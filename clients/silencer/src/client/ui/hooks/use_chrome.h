@@ -99,8 +99,17 @@ struct ChromeTextures {
   uint16_t toggle_w = 0, toggle_h = 0;
   // SIL-102: the five agency emblems (bank 181 idx0..4), shown in the Character
   // Create detail column for the previewed agency. Indexed by agency 0..4.
+  // Per-agency native size + sprite-sheet offsets (origin's roster anchors
+  // subtract the offsets when placing the native-size sprite).
   uint32_t agency_emblem[5] = {};
   uint16_t agency_emblem_w = 0, agency_emblem_h = 0;
+  uint16_t agency_emblem_ws[5] = {}, agency_emblem_hs[5] = {};
+  int16_t agency_emblem_ox[5] = {}, agency_emblem_oy[5] = {};
+  // Staging roster ready checks (bank 7 idx18 ready / idx19 not-ready),
+  // native size + offsets.
+  uint32_t ready_on = 0, ready_off = 0;
+  uint16_t ready_w = 0, ready_h = 0;
+  int16_t ready_ox = 0, ready_oy = 0;
   // Advantage metadata brackets. Bank 133's '['/']' glyph art is wrong (dash-
   // shaped), so origin borrows bank 134's bracket glyphs cropped to a 4x11
   // sub-rect (character_create_layout.cpp AdvantageBracket: srcX 0 left /

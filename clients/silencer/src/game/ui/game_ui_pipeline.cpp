@@ -387,19 +387,37 @@ bake(134, ']' - 33, cppxChrome.bracket_r);
 // origin draws them PackImageContain into their element box, so register the
 // contain flavor: the executor swaps each draw for a per-phase/per-size
 // variant baked through origin's letterbox + magnify arithmetic.
+const auto &res = game.world.resources;
 for(int i = 0; i < 5; ++i){
 bake(181, (size_t)i, cppxChrome.agency_emblem[i],
      i == 0 ? &cppxChrome.agency_emblem_w : nullptr,
      i == 0 ? &cppxChrome.agency_emblem_h : nullptr);
 if(cppxChrome.agency_emblem[i] && 181 < banks.size() && (size_t)i < banks[181].size()){
 const std::shared_ptr<Surface> &esp = banks[181][(size_t)i];
-if(esp && !esp->pixels.empty())
+if(esp && !esp->pixels.empty()){
 cppxHost->register_legacy_contain(cppxChrome.agency_emblem[i],
                                   esp->pixels.data(), esp->w, esp->h,
                                   page_for_bank(181), kLegacyRenderWidth,
                                   kLegacyRenderHeight);
+cppxChrome.agency_emblem_ws[i] = (uint16_t)esp->w;
+cppxChrome.agency_emblem_hs[i] = (uint16_t)esp->h;
+}
+if(181 < res.spriteoffsetx.size() && (size_t)i < res.spriteoffsetx[181].size())
+cppxChrome.agency_emblem_ox[i] = (int16_t)res.spriteoffsetx[181][i];
+if(181 < res.spriteoffsety.size() && (size_t)i < res.spriteoffsety[181].size())
+cppxChrome.agency_emblem_oy[i] = (int16_t)res.spriteoffsety[181][i];
 }
 }
+// Staging roster ready checks (bank 7 idx18/19), drawn 1:1 in virtual space —
+// register as plain legacy sprites for the per-phase variant swap.
+bake(7, 18, cppxChrome.ready_on, &cppxChrome.ready_w, &cppxChrome.ready_h);
+bake(7, 19, cppxChrome.ready_off);
+register_legacy(7, 18, cppxChrome.ready_on);
+register_legacy(7, 19, cppxChrome.ready_off);
+if(7 < res.spriteoffsetx.size() && 18 < res.spriteoffsetx[7].size())
+cppxChrome.ready_ox = (int16_t)res.spriteoffsetx[7][18];
+if(7 < res.spriteoffsety.size() && 18 < res.spriteoffsety[7].size())
+cppxChrome.ready_oy = (int16_t)res.spriteoffsety[7][18];
 // In-game HUD console chrome (banks 94/95). These are authored against the base
 // palette page (resources.cpp leaves them at paletteoffset 0), so the bake's
 // default page_for_bank arm (base) is correct — no per-bank page override.
@@ -474,10 +492,12 @@ static const VariantBake kVariantBakes[] = {
     {5, 135, 12.f, 19.f, Fx::Raw, 0, 128, silencer::tokens::kTextBody},
     {6, 133, 11.f, 11.f, Fx::Raw, 0, 128, silencer::tokens::kTextBody},
     {7, 133, 7.f, 11.f, Fx::Raw, 0, 128, silencer::tokens::kTextBody},
-    // cc detail prose: origin LegacyPalette(129, 160, ramp).
+    // cc detail prose: origin LegacyPalette(129, 160, ramp). The Title-face
+    // entry covers the staging title-bar map name (lobby_chrome mapText).
     {0, 133, 6.f, 11.f, Fx::Ramp, 129, 160, silencer::tokens::kTextProse},
     {1, 134, 8.f, 15.f, Fx::Ramp, 129, 160, silencer::tokens::kTextProse},
     {7, 133, 7.f, 11.f, Fx::Ramp, 129, 160, silencer::tokens::kTextProse},
+    {4, 135, 11.f, 19.f, Fx::Ramp, 129, 160, silencer::tokens::kTextProse},
     // lobby header brand + version: LegacyPalette(152) / LegacyPalette(189).
     {4, 135, 11.f, 19.f, Fx::Color, 152, 128, silencer::tokens::kTextBrand},
     {0, 133, 6.f, 11.f, Fx::Color, 189, 128, silencer::tokens::kTextVersion},
@@ -485,6 +505,8 @@ static const VariantBake kVariantBakes[] = {
     {1, 134, 8.f, 15.f, Fx::Color, 200, 128, silencer::tokens::kTextAgentName},
     // lobby presence group headers: LegacyPalette(0, 160).
     {0, 133, 6.f, 11.f, Fx::Raw, 0, 160, silencer::tokens::kTextPresenceHeader},
+    // staging roster level badges: Tiny LegacyPalette(170).
+    {3, 132, 4.f, 7.f, Fx::Color, 170, 128, silencer::tokens::kTextRosterLevel},
 };
 for(const VariantBake & vb : kVariantBakes){
 if((size_t)vb.bank >= banks.size()) continue;

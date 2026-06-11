@@ -113,6 +113,16 @@ void BuildLobbyPanels(client::ui::LobbySnapshot &snap, Lobby &lobby) {
     if (!snap.lobby_presence.empty())
       snap.lobby_presence += "\n";
     snap.lobby_presence += kv.second.name;
+    // origin chat_panel RebuildPresenceEntries: peers in a game append
+    // " [<game name>]" (bank 133 renders the brackets as dashes).
+    if (kv.second.gameid != 0) {
+      LobbyGame *g = lobby.GetGameById(kv.second.gameid);
+      if (g) {
+        snap.lobby_presence += " [";
+        snap.lobby_presence += g->name;
+        snap.lobby_presence += "]";
+      }
+    }
   }
   CapHead(snap.lobby_presence);
   for (LobbyGame *g : lobby.games) {
@@ -195,6 +205,7 @@ void BuildStaging(client::ui::LobbySnapshot &snap, World &world, Lobby &lobby) {
     Team *team = static_cast<Team *>(world.GetObjectFromId(teamId));
     if (!team || team->numpeers == 0)
       continue;
+    bool drew_emblem = false;
     for (int i = 0; i < team->numpeers; ++i) {
       Peer *peer = world.GetPeer(team->peers[i]);
       if (!peer || peer->observer || peer->disconnected)
@@ -206,14 +217,15 @@ void BuildStaging(client::ui::LobbySnapshot &snap, World &world, Lobby &lobby) {
       row.is_local = (team->peers[i] == localid);
       row.ready = peer->isready;
       row.team_number = team->number;
+      row.peer_slot = (uint8_t)i;
+      row.agency = team->agency;
+      row.draw_emblem = !drew_emblem;
+      drew_emblem = true;
+      // origin game_join_panel: plain display name; bots get " [BOT]".
       row.name = user->DisplayName();
-      if (row.is_local)
-        row.name += " (you)";
-      const char *agency = (team->agency < 5) ? kAgency[team->agency] : "?";
-      char detail[96];
-      snprintf(detail, sizeof(detail), "%s · L:%u", agency,
-               (unsigned)user->agency[team->agency].level);
-      row.detail = detail;
+      if (peer->isbot)
+        row.name += " [BOT]";
+      row.level = "L:" + std::to_string((unsigned)user->agency[team->agency].level);
       snap.staging_roster.push_back(std::move(row));
     }
   }

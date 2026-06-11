@@ -68,6 +68,9 @@ constexpr ::ui::Color kTextWeaponDetail = {24, 124, 20, 255};
 // Lobby presence group headers ("In Lobby"/"Pregame"): origin draws them at
 // brightness 160 (chat_panel PushEntry 128+32) — primary of that ramp.
 constexpr ::ui::Color kTextPresenceHeader = {92, 148, 92, 255};
+// Staging roster level badges ("L:0"): origin Tiny text LegacyPalette(170) —
+// primary of that ramp (orange).
+constexpr ::ui::Color kTextRosterLevel = {136, 84, 48, 255};
 constexpr ::ui::Color kTextWeaponDetailOff = {10, 72, 8, 255}; // disabled
 constexpr ::ui::Color kTextHud = {61, 232, 61, 255};          // #3DE83D hud-green
 
