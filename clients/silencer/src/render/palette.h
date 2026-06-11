@@ -12,6 +12,7 @@ public:
 	bool Load(void);
 	void SetParallaxColors(Uint8 parallax);
 	bool SetPalette(Uint8 palette);
+	Uint8 CurrentPalette(void) const { return currentpalette; }
 	SDL_Color * GetColors(void);
 	Uint8 ClosestMatch(SDL_Color color, bool upperonly = false);
 	inline Uint8 Brightness(Uint8 a, Uint8 i){

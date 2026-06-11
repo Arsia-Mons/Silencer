@@ -73,6 +73,7 @@ const Theme &default_theme() {
     seed_control(th.button);
     seed_control(th.input);
     seed_control(th.checkbox);
+    th.input.base.caret = {th.caret, 1.f};
 
     // The checkbox BODY does not react to `checked` (only the mark does).
     th.checkbox_mark.base.background = {0, 0, 0, 0}; // hidden until checked

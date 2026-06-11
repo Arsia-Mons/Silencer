@@ -34,6 +34,7 @@ struct StylePatch {
   Opt<bool> hidden;
   Opt<bool> chromeless;
   Opt<TextVisual> text;
+  Opt<Caret> caret;
 };
 
 static_assert(std::is_aggregate_v<StylePatch>);
@@ -63,6 +64,8 @@ constexpr void apply(VisualStyle &dst, const StylePatch &p) {
     dst.chromeless = p.chromeless.value;
   if (p.text.set)
     dst.text = p.text.value;
+  if (p.caret.set)
+    dst.caret = p.caret.value;
 }
 
 // Per-instance override with the same interaction-state slots as RoleStyle.
@@ -127,6 +130,10 @@ struct StylePatchBuilder {
   }
   StylePatchBuilder &text(TextVisual t) {
     p.text = opt(t);
+    return *this;
+  }
+  StylePatchBuilder &caret(Caret c) {
+    p.caret = opt(c);
     return *this;
   }
   operator StylePatch() const { return p; }

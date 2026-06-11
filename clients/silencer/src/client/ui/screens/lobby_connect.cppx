@@ -92,14 +92,31 @@ constexpr float kS = 1.5f;
       chrome.dialog_connect ? chrome.dialog_connect_w * kS : 284.0f * kS;
   const float panel_h =
       chrome.dialog_connect ? chrome.dialog_connect_h * kS : 277.0f * kS;
+  // The sprite rides an absolute child at -1 logical: origin draws the dialog
+  // at virtual cell 284 (device x639), but the centered panel box floors to
+  // device 640, clipping the frame's 3px left column. Anchoring the sprite box
+  // one logical px left restores the cell without moving the panel's children.
   const ::ui::StylePatch panel_style =
       chrome.dialog_connect
-          ? tokens::image_patch(chrome.dialog_connect)
+          ? ::ui::StylePatch{}
           : tokens::panel_patch(::ui::Color{12, 4, 4, 255}, tokens::kBorderPanel, 2.0f);
+  ::ui::UiElement chrome_frame =
+      chrome.dialog_connect
+          ? Box(BoxProps{
+                .key = "chromeframe",
+                .layout = ::ui::LayoutStyle{
+                    .position = ::ui::PositionType::Absolute,
+                    .position_inset = ::ui::EdgeSizes{-1.0f, {}, 0.0f, {}},
+                    .width = ::ui::Length::points(panel_w),
+                    .height = ::ui::Length::points(panel_h)},
+                .style = tokens::image_patch(chrome.dialog_connect)})
+          : ::ui::empty();
 
   // Chromeless field: text + caret only, over the sprite's baked well. chromeless
   // suppresses the control-default chrome, but the theme input role's own
   // border/gradient/radius are applied directly, so clear them explicitly.
+  // Typed text is origin Body green; the caret is palette idx 140 resolved on
+  // the lobby palette (sage), 1 virtual px wide.
   ::ui::StyleStatePatch field_style{};
   field_style.base = ::ui::patch()
                          .chromeless(true)
@@ -107,14 +124,23 @@ constexpr float kS = 1.5f;
                          .gradient(::ui::Gradient{})
                          .corner_radius(0.0f)
                          .border(::ui::Border{})
-                         .outline(::ui::Outline{});
+                         .outline(::ui::Outline{})
+                         .text(::ui::TextVisual{.color = tokens::kTextBody,
+                                                .font_id = tokens::kFaceBody,
+                                                .font_size = tokens::kFontBodyEm,
+                                                .line_height = tokens::kLineBody})
+                         .caret(::ui::Caret{chrome.caret_lobby, 1.5f});
   field_style.hover = field_style.base;
   field_style.focus_visible = field_style.base;
+  // Field height 30.5 (not the well's authored 31.5): the engine centers the
+  // 16.5-logical caret in the field box, and (30.5-16.5)/2 = 7 lands the caret
+  // on origin's exact device row (678 at 1080p; 31.5 put it half a device px
+  // low and rasterized one row down).
   auto field_layout = ::ui::LayoutStyle{
       .align_items = ::ui::AlignItems::Center,
       .justify_content = ::ui::JustifyContent::Start,
       .width = ::ui::Length::percent(100.0f),
-      .height = ::ui::Length::points(31.5f)};
+      .height = ::ui::Length::points(30.5f)};
   // The 116x24 stipple patch covering the dialog's baked button wells
   // (panel-virtual (368, 347), origin EnsureButtonPatch).
   ::ui::UiElement btn_patch =
@@ -145,6 +171,7 @@ constexpr float kS = 1.5f;
         .height = ::ui::Length::points(panel_h)}}
       style={panel_style}
     >
+      {chrome_frame}
       {::ui::children(log_lines)}
       <Box
         key="ulblw"
@@ -178,7 +205,7 @@ constexpr float kS = 1.5f;
           .position = ::ui::PositionType::Absolute,
           .position_inset = ::ui::EdgeSizes{144.0f, {}, 293.0f, {}},
           .width = ::ui::Length::points(264.0f),
-          .height = ::ui::Length::points(31.5f)}}
+          .height = ::ui::Length::points(30.5f)}}
       >
         <Input
           key="username"
@@ -198,7 +225,7 @@ constexpr float kS = 1.5f;
           .position = ::ui::PositionType::Absolute,
           .position_inset = ::ui::EdgeSizes{144.0f, {}, 333.5f, {}},
           .width = ::ui::Length::points(264.0f),
-          .height = ::ui::Length::points(31.5f)}}
+          .height = ::ui::Length::points(30.5f)}}
       >
         <Input
           key="password"

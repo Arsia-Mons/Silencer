@@ -262,6 +262,8 @@ struct CharacterCreateContentProps {
             : tokens::panel_patch(tokens::kSurfaceHeroPanel, tokens::kBorderHeroPanel);
     // Chromeless field: text + caret only, over the baked input well in the
     // dialog_pw modal sprite (origin's TextInput draws no well of its own).
+    // Typed text is origin Body green; caret = palette idx 140 on the menu
+    // palette (yellow), 1 virtual px wide.
     ::ui::StyleStatePatch alias_field_style{};
     alias_field_style.base = ::ui::patch()
                                  .chromeless(true)
@@ -269,7 +271,13 @@ struct CharacterCreateContentProps {
                                  .gradient(::ui::Gradient{})
                                  .corner_radius(0.0f)
                                  .border(::ui::Border{})
-                                 .outline(::ui::Outline{});
+                                 .outline(::ui::Outline{})
+                                 .text(::ui::TextVisual{
+                                     .color = tokens::kTextBody,
+                                     .font_id = tokens::kFaceBody,
+                                     .font_size = tokens::kFontBodyEm,
+                                     .line_height = tokens::kLineBody})
+                                 .caret(::ui::Caret{chrome1.caret_menu, 1.5f});
     alias_field_style.hover = alias_field_style.base;
     alias_field_style.focus_visible = alias_field_style.base;
     return <ScreenLayout key="aliasmodal" variant={ScreenLayoutVariant::Overlay}>
@@ -362,7 +370,7 @@ struct CharacterCreateContentProps {
               .justify_content = ::ui::JustifyContent::Start,
               .flex_grow = ::ui::StyleFloat::points(1.0f),
               .height = ::ui::Length::points(40.0f),
-              .padding = {18.0f, 0.0f, 0.0f, 0.0f}}}
+              .padding = {7.0f, 0.0f, 0.0f, 0.0f}}}
             style={alias_field_style}
           />
         </Box>

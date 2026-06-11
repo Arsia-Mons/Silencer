@@ -1,5 +1,7 @@
 #pragma once
 
+#include "ui/style/visual_style.h"
+
 #include <cstdint>
 
 namespace client::ui {
@@ -132,6 +134,13 @@ struct ChromeTextures {
   uint16_t hud_bezel_bottom_w = 0, hud_bezel_bottom_h = 0;
   uint32_t hud_radar = 0; // bank 94 idx0  (radar/minimap frame)
   uint16_t hud_radar_w = 0, hud_radar_h = 0;
+  // origin TextInput caret color = legacy palette idx 140 resolved against the
+  // presenting screen's palette page (ResetPresentation): menus/cc page 1
+  // (yellow), lobby cluster page 2 (sage), in-game page 0. Screens feed this
+  // into their input field's style caret.
+  ::ui::Color caret_menu{};
+  ::ui::Color caret_lobby{};
+  ::ui::Color caret_game{};
 };
 
 // Read the baked chrome ids for the current frame. Requires a

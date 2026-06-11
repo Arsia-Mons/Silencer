@@ -190,6 +190,17 @@ const SDL_Color *palette = game.renderer.palette.GetColors();
 if(!palette) return;
 const auto &banks = game.world.resources.spritebank;
 
+// origin TextInput caret = legacy palette idx 140 resolved against the screen's
+// presentation palette page (menus/cc ResetPresentation(1), lobby cluster (2),
+// in-game (0)); screens read these off use_chrome().
+auto page_color = [&](int pageIdx, int colorIdx){
+const SDL_Color &c = game.renderer.palette.colors[pageIdx][colorIdx];
+return ::ui::Color{c.r, c.g, c.b, 255};
+};
+cppxChrome.caret_menu = page_color(1, 140);
+cppxChrome.caret_lobby = page_color(2, 140);
+cppxChrome.caret_game = page_color(0, 140);
+
 // Each sprite bank's pixel indices are authored against a SPECIFIC palette page
 // (resources.cpp Load: bank 0->5, 1->6, 2->7, 3->8, 6->1, 7->2; others base).
 // Baking every bank with the single current page mapped bank 6's planet/oval and
@@ -481,7 +492,9 @@ bake(7, 18, cppxChrome.ready_on, &cppxChrome.ready_w, &cppxChrome.ready_h);
 bake(7, 19, cppxChrome.ready_off);
 register_legacy(7, 18, cppxChrome.ready_on);
 register_legacy(7, 19, cppxChrome.ready_off);
-// Brightness-64 copies (origin tech_tree_grid non-interactable toggles).
+// Brightness-64 copies (origin tech_tree_grid non-interactable toggles). The
+// tech grid presents on palette page 2 — the brightness index table must be
+// page 2's, like the dim text variant.
 auto bake_dim = [&](size_t bank, size_t index, uint32_t &id_out){
 if(bank >= banks.size() || index >= banks[bank].size()) return;
 const std::shared_ptr<Surface> &sp = banks[bank][index];
@@ -499,8 +512,13 @@ cppxHost->register_legacy_sprite(id, copy->pixels.data(), copy->w, copy->h,
 }
 delete copy;
 };
+{
+const Uint8 prevPage = game.renderer.palette.CurrentPalette();
+if(prevPage != 2) game.renderer.palette.SetPalette(2);
 bake_dim(7, 18, cppxChrome.ready_on_dim);
 bake_dim(7, 19, cppxChrome.ready_off_dim);
+if(prevPage != 2) game.renderer.palette.SetPalette(prevPage);
+}
 if(7 < res.spriteoffsetx.size() && 18 < res.spriteoffsetx[7].size())
 cppxChrome.ready_ox = (int16_t)res.spriteoffsetx[7][18];
 if(7 < res.spriteoffsety.size() && 18 < res.spriteoffsety[7].size())
@@ -569,40 +587,48 @@ struct VariantBake {
 int face; int bank;
 float advance; float line_height;
 Fx fx; Uint8 fx_color; Uint8 brightness;
+Uint8 page; // presentation palette page: the Effect* index tables AND the
+            // final RGB resolve through it (lobby cluster presents on page 2;
+            // page 0's tables map e.g. brightness-160 green and EffectColor-189
+            // amber to measurably different ramps than the lobby golden)
 ::ui::Color key;
 };
 static const VariantBake kVariantBakes[] = {
     // The authored art IS the standard green (24,124,20 core + dark ramp).
-    {0, 133, 6.f, 11.f, Fx::Raw, 0, 128, silencer::tokens::kTextBody},
-    {1, 134, 8.f, 15.f, Fx::Raw, 0, 128, silencer::tokens::kTextBody},
-    {4, 135, 11.f, 19.f, Fx::Raw, 0, 128, silencer::tokens::kTextBody},
-    {5, 135, 12.f, 19.f, Fx::Raw, 0, 128, silencer::tokens::kTextBody},
-    {6, 133, 11.f, 11.f, Fx::Raw, 0, 128, silencer::tokens::kTextBody},
-    {7, 133, 7.f, 11.f, Fx::Raw, 0, 128, silencer::tokens::kTextBody},
+    {0, 133, 6.f, 11.f, Fx::Raw, 0, 128, 0, silencer::tokens::kTextBody},
+    {1, 134, 8.f, 15.f, Fx::Raw, 0, 128, 0, silencer::tokens::kTextBody},
+    {4, 135, 11.f, 19.f, Fx::Raw, 0, 128, 0, silencer::tokens::kTextBody},
+    {5, 135, 12.f, 19.f, Fx::Raw, 0, 128, 0, silencer::tokens::kTextBody},
+    {6, 133, 11.f, 11.f, Fx::Raw, 0, 128, 0, silencer::tokens::kTextBody},
+    {7, 133, 7.f, 11.f, Fx::Raw, 0, 128, 0, silencer::tokens::kTextBody},
     // cc detail prose: origin LegacyPalette(129, 160, ramp). The Title-face
     // entry covers the staging title-bar map name (lobby_chrome mapText).
-    {0, 133, 6.f, 11.f, Fx::Ramp, 129, 160, silencer::tokens::kTextProse},
-    {1, 134, 8.f, 15.f, Fx::Ramp, 129, 160, silencer::tokens::kTextProse},
-    {7, 133, 7.f, 11.f, Fx::Ramp, 129, 160, silencer::tokens::kTextProse},
-    {4, 135, 11.f, 19.f, Fx::Ramp, 129, 160, silencer::tokens::kTextProse},
+    {0, 133, 6.f, 11.f, Fx::Ramp, 129, 160, 0, silencer::tokens::kTextProse},
+    {1, 134, 8.f, 15.f, Fx::Ramp, 129, 160, 0, silencer::tokens::kTextProse},
+    {7, 133, 7.f, 11.f, Fx::Ramp, 129, 160, 0, silencer::tokens::kTextProse},
+    {4, 135, 11.f, 19.f, Fx::Ramp, 129, 160, 0, silencer::tokens::kTextProse},
     // lobby header brand + version: LegacyPalette(152) / LegacyPalette(189).
-    {4, 135, 11.f, 19.f, Fx::Color, 152, 128, silencer::tokens::kTextBrand},
-    {0, 133, 6.f, 11.f, Fx::Color, 189, 128, silencer::tokens::kTextVersion},
+    {4, 135, 11.f, 19.f, Fx::Color, 152, 128, 0, silencer::tokens::kTextBrand},
+    {0, 133, 6.f, 11.f, Fx::Color, 189, 128, 2, silencer::tokens::kTextVersion},
     // agent display names: LegacyPalette(200).
-    {1, 134, 8.f, 15.f, Fx::Color, 200, 128, silencer::tokens::kTextAgentName},
+    {1, 134, 8.f, 15.f, Fx::Color, 200, 128, 0, silencer::tokens::kTextAgentName},
     // lobby presence group headers: LegacyPalette(0, 160).
-    {0, 133, 6.f, 11.f, Fx::Raw, 0, 160, silencer::tokens::kTextPresenceHeader},
+    {0, 133, 6.f, 11.f, Fx::Raw, 0, 160, 2, silencer::tokens::kTextPresenceHeader},
     // staging roster level badges: Tiny LegacyPalette(170).
-    {3, 132, 4.f, 7.f, Fx::Color, 170, 128, silencer::tokens::kTextRosterLevel},
+    {3, 132, 4.f, 7.f, Fx::Color, 170, 128, 0, silencer::tokens::kTextRosterLevel},
     // tech grid: non-interactable rows (brightness 64) + slots-left readout
     // (LegacyPalette(129, 144, ramp)).
-    {0, 133, 6.f, 11.f, Fx::Raw, 0, 64, silencer::tokens::kTextTechDim},
-    {0, 133, 6.f, 11.f, Fx::Ramp, 129, 144, silencer::tokens::kTextTechSlots},
+    {0, 133, 6.f, 11.f, Fx::Raw, 0, 64, 2, silencer::tokens::kTextTechDim},
+    {0, 133, 6.f, 11.f, Fx::Ramp, 129, 144, 2, silencer::tokens::kTextTechSlots},
 };
+const Uint8 prevPage = game.renderer.palette.CurrentPalette();
 for(const VariantBake & vb : kVariantBakes){
 if((size_t)vb.bank >= banks.size()) continue;
 const auto & glyphbank = banks[vb.bank];
 const int ioffset = (vb.bank == 132) ? 34 : 33;
+const SDL_Color * vpal = game.renderer.palette.colors[vb.page];
+if(game.renderer.palette.CurrentPalette() != vb.page)
+game.renderer.palette.SetPalette(vb.page);
 std::vector<std::unique_ptr<Surface>> fxcopies;
 GF::GlyphSrc src[GF::kGlyphCount] = {};
 for(int i = 0; i < GF::kGlyphCount; ++i){
@@ -626,10 +652,12 @@ src[i].w = sp->w;
 src[i].h = sp->h;
 }
 cppxHost->build_glyph_color_face(vb.face, vb.key.r, vb.key.g, vb.key.b, src,
-                                 GF::kGlyphCount, palette, vb.advance,
+                                 GF::kGlyphCount, vpal, vb.advance,
                                  vb.line_height, kLegacyRenderWidth,
                                  kLegacyRenderHeight);
 }
+if(game.renderer.palette.CurrentPalette() != prevPage)
+game.renderer.palette.SetPalette(prevPage);
 }
 }
 }
@@ -1228,8 +1256,12 @@ lobbySnapshot_ = silencer::game_ui::CaptureLobbySnapshot(game, CurrentSessionPha
 // don't change at runtime, so list them once (disk read on the game thread).
 if(!bundledMapsListed_){
 // origin BuildMapList: bundled res-dir maps + the player's downloaded maps
-// (data-dir level/download), deduped and sorted.
+// (data-dir level/download), deduped and sorted. On macOS GetResDir() is
+// empty and "level" resolves against the CWD, so pin it like origin does
+// (CDResDir before the res listing, CDDataDir after).
+CDResDir();
 bundledMaps_ = game.gameSession.MapDownloaderRef().ListFiles((GetResDir() + "level").c_str());
+CDDataDir();
 std::vector<std::string> downloaded =
     game.gameSession.MapDownloaderRef().ListFiles((GetDataDir() + "level/download").c_str());
 for(const std::string &f : downloaded){

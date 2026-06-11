@@ -101,6 +101,13 @@ struct Shadow {
   float spread = 0.f;
 };
 
+// Input caret paint. color.a==0 / width==0 => the transcriber's intrinsic
+// default (the theme's input role normally supplies both).
+struct Caret {
+  Color color{};
+  float width = 0.f;
+};
+
 enum class TextAlign : uint8_t { Left = 0, Center, Right };
 enum class TextWrap : uint8_t { None = 0, Words };
 
@@ -125,6 +132,7 @@ struct VisualStyle {
   bool hidden = false;       // skip paint, keep layout
   bool chromeless = false;   // control role: suppress intrinsic fill/border/ring
   TextVisual text{};
+  Caret caret{};             // input caret paint
 };
 
 static_assert(std::is_aggregate_v<VisualStyle>);

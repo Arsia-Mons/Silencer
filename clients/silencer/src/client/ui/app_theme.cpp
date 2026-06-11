@@ -113,6 +113,10 @@ const Theme &app_theme() {
     seed_control(th.button);
     seed_control(th.input);
     seed_control(th.checkbox);
+    // origin TextInput caret: a 1-virtual-px (1.5 logical) bar in legacy
+    // palette idx 140, resolved per screen palette — sprite-chrome screens
+    // override the color from use_chrome() via their field style patch.
+    th.input.base.caret = {th.caret, 1.5f};
 
     // The checkbox BODY does not react to `checked` (only the mark does). The
     // mark inherits the body's 8px radius so the fill sits flush inside.
