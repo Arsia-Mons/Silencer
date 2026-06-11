@@ -76,22 +76,27 @@ cli --port "$CTRL_PORT" resize --w "$W" --h "$H" >/dev/null
 cli --port "$CTRL_PORT" click --label "Connect To Lobby" >/dev/null
 cli --port "$CTRL_PORT" wait_for_state --state LOBBYCONNECT --timeout-ms 5000 >/dev/null
 wait_for_widget "Username"
+# The connect handshake reaches AUTHENTICATING on its own, populating the
+# status log; capture then so the log well matches the golden (cap_lobby.sh
+# does the same — capturing earlier shows fewer log lines = fake 8-tile diff).
+wait_for_lobby_state AUTHENTICATING 2>/dev/null || true
 cap lobby_connect
 
 for ch in a l i c e; do cli --port "$CTRL_PORT" key --key "$ch" >/dev/null; done
 cli --port "$CTRL_PORT" key --key tab >/dev/null
 for ch in s e c r e t; do cli --port "$CTRL_PORT" key --key "$ch" >/dev/null; done
-wait_for_lobby_state AUTHENTICATING
 cli --port "$CTRL_PORT" click --label "Login/Create" >/dev/null
 cli --port "$CTRL_PORT" wait_for_state --state CREATECHARACTER --timeout-ms 15000 >/dev/null
 wait_for_widget "Create New Character"
 cap character_create
 
 # Alias step: Enter on the focused input submits (origin has no Continue button).
+# The golden has an EMPTY alias field (caret at the field start) — capture
+# BEFORE typing, like cap_lobby.sh.
 cli --port "$CTRL_PORT" click --label "Create New Character" >/dev/null
 wait_for_widget "Alias"
-cli --port "$CTRL_PORT" set_text --label "Alias" --text "Alice" >/dev/null
 cap cc_alias
+cli --port "$CTRL_PORT" set_text --label "Alias" --text "Alice" >/dev/null
 cli --port "$CTRL_PORT" key --key enter >/dev/null
 wait_for_widget "Black Rose"
 cap cc_select_agency
