@@ -79,6 +79,9 @@ using ::ui::components::TextProps;
     style = app_button_rect_patch(props.selected, ::ui::Color{lit, lit, lit, 255});
   }
 
+  if (props.padding.set)
+    layout.padding = props.padding.value;
+
   // The label is rendered as a styled Text CHILD (not the bare-string fallback):
   // the runtime only paints text on Text-role nodes, so the Button's own value is
   // never painted, and a bare string child paints with the engine's neutral grey.

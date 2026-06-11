@@ -27,6 +27,10 @@ struct AppButtonProps {
   std::function<void()> on_press = {};
   std::function<void()> on_focus = {};
   const char *accessibility_label = nullptr;
+  // Sparse padding override of the variant's default content insets (label
+  // pen). Lists whose BOX is nudged onto a legacy sprite cell use it to keep
+  // the label pen on its own golden cell.
+  ::ui::Opt<::ui::EdgeSizes> padding = {};
   ::ui::UiChildren children = {};
 };
 

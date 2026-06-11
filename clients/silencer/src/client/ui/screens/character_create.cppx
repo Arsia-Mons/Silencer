@@ -15,6 +15,8 @@
 #include "ui/components/text.h"
 #include "ui/runtime/react.h"
 
+#include <cmath>
+#include <cstring>
 #include <functional>
 #include <string>
 #include <vector>
@@ -85,6 +87,9 @@ struct CharacterCreateProviderProps {
     if (set_preview)
       set_preview(index);
   };
+  // The agency rows sit one virtual col left of the roster rows (origin blits
+  // the plate at int(box.x)); the rows wrapper carries the -1.5 box nudge and
+  // pad-left 17.5 keeps the label pen on its own golden cell.
   return <AppButton
     key={kAgencies[index].control_id}
     controlId={kAgencies[index].control_id}
@@ -95,6 +100,7 @@ struct CharacterCreateProviderProps {
     defaultFocused={index == 0}
     accessibilityLabel={kAgencies[index].name}
     label={kAgencies[index].name}
+    padding={::ui::opt(::ui::EdgeSizes{17.5f, 14.5f, 11.0f, 1.5f})}
     onPress={on_press}
     onFocus={on_focus}
   />
@@ -130,14 +136,42 @@ struct CharacterCreateProviderProps {
                                          .tone = BodyTextTone::Prose,
                                          .value = adv.label}));
   if (adv.bonus && adv.bonus[0] != '\0') {
-    cells.push_back(Box(BoxProps{
-        .key = "g",
-        .layout = ::ui::LayoutStyle{.width = ::ui::Length::points(6.0f)}}));
-    cells.push_back(advantage_bracket("bl", true));
-    cells.push_back(BodyText(BodyTextProps{.key = "b",
-                                           .variant = BodyTextVariant::Body,
-                                           .value = adv.bonus}));
-    cells.push_back(advantage_bracket("br", false));
+    // origin: '[' at label-advance(7v per char) + gap 4v after the 20v
+    // indent; metadata is BodySm in the standard green (LegacyPalette(224)),
+    // ']' 18v after '['. Anchored absolutely on the pen grid (L = lround of
+    // the 1.5x ideal) — flow placement inherits the TTF-measured label width
+    // and Yoga's .5-rounding, which flip the bracket bakes off their golden
+    // cells per label-length parity.
+    const float bx =
+        (float)std::lround(10.5f * (float)std::strlen(adv.label)) + 35.0f;
+    auto abs_at = [](float left) {
+      return ::ui::LayoutStyle{
+          .position = ::ui::PositionType::Absolute,
+          .position_inset = ::ui::EdgeSizes{left, {}, 0.0f, {}}};
+    };
+    ::ui::LayoutStyle bl = abs_at(bx);
+    bl.width = ::ui::Length::points(6.0f);
+    bl.height = ::ui::Length::points(16.5f);
+    ::ui::LayoutStyle bt = abs_at(bx + 6.0f);
+    bt.height = ::ui::Length::points(tokens::kLineBody);
+    ::ui::LayoutStyle br = abs_at(bx + 27.0f);
+    br.width = ::ui::Length::points(6.0f);
+    br.height = ::ui::Length::points(16.5f);
+    client::ui::ChromeTextures chrome = client::ui::use_chrome();
+    if (chrome.bracket_l)
+      cells.push_back(Box(BoxProps{.key = "bl",
+                                   .layout = bl,
+                                   .style = tokens::image_patch(chrome.bracket_l)}));
+    cells.push_back(Text(TextProps{
+        .key = "b",
+        .value = adv.bonus,
+        .layout = bt,
+        .style = tokens::text_patch(tokens::kTextBody, tokens::kFontBodyEm,
+                                    tokens::kFaceBodySm, tokens::kLineBody)}));
+    if (chrome.bracket_r)
+      cells.push_back(Box(BoxProps{.key = "br",
+                                   .layout = br,
+                                   .style = tokens::image_patch(chrome.bracket_r)}));
   }
   // origin: rows pitch at lineHeight + 1 gap (16.5 + 1.5 at x1.5), indented 30
   // (kAdvantageListIndent 20) under the "Advantages" header.
@@ -421,7 +455,7 @@ struct CharacterCreateContentProps {
             layout={::ui::LayoutStyle{
               .direction = ::ui::FlexDirection::Column,
               .align_items = ::ui::AlignItems::Stretch,
-              .margin = {0.0f, 2.0f, -3.0f, 3.0f},
+              .margin = {-1.5f, 3.5f, -3.0f, 3.0f},
               .gap = 7.5f}}
           >
             {agency_row(0, pi, on_pick, set_preview)}
