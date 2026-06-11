@@ -20,7 +20,7 @@ All measured 2026-06-11 (iteration 0) with recalibrated tile gate, fresh capture
 | cc_alias | DIVERGED | 2.20% / 56 / 21.2% @624,468 (was 2.77/73) | alias dialog region |
 | cc_select_agency | DIVERGED | 7.09% / 125 / 40.7% @1092,546 | agency Description paragraph: glyph metrics/wrap slightly off → dense text amplifies |
 | lobby_screen | DIVERGED | 3.68% / 94 / 31.9% @234,312 (was 4.00/114) | VERIFIED BY EYE: agent-card emblem scale/pos, WINS/LOSSES/XP row spacing, Agents button high + wrong chrome. ORIGIN SPEC (character_panel.cpp, virtual px → ×1.5 logical): content pad 6, emblem↔info gap 10; left rail emblemBoxW=clamp(inner*18%,40,64) square Contain emblem + LevelBadge(bodyLineH, centered); info col gap 5: name(heading lineH) → details row: stats col gap 10 [stat table gap 2: WINS,LOSSES rows; label col = w("LOSSES")+4] → XP line → actions row h21 (Chrome "Agents" minW 92 padX 12). The LOSSES↔XP gap = 10 virtual (15 logical) — that's the visible golden gap before XP |
-| create_game | DIVERGED | 5.24% / 114 / 38.4% @1248,468 | Select Map list: tighter row pitch than golden + panel ~20px right |
+| create_game | DIVERGED | 5.01% / 113 / 31.9% @234,312 | map-list pitch fixed (21 logical = origin kMapListLineH 14 virtual; was 16.5+1) — right-panel hot column (38.4 @1248,*) cleared; worst tile is now the shared agent-card region (see lobby_screen spec) |
 | game_staging | DIVERGED | 4.20% / 93 / 32.9% @1248,156 | shares lobby panels + right panel |
 | tech_select | DIVERGED | 5.38% / 106 / 34.3% @1326,312 | tech grid region divergent |
 

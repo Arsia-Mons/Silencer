@@ -1,5 +1,14 @@
 # LESSONS.md — one lesson per entry, why it mattered
 
+- **Don't bake a phase — bake at absolute device coordinates, and snap the draw rect to
+  what Yoga can express.** (element two-hop bake, options_controls 7.73→1.29) Evaluating
+  origin's full int chain per absolute device pixel (out-of-box → transparent) is exact by
+  construction and composites over the two-hop backdrop since both share src=int(dx/s).
+  Draw side: Yoga rounds to whole LOGICAL px, so at scale 1.5 only even logical coords are
+  device-integral — snap the texture rect outward to such coords and absolutely position
+  the box (Yoga abs inset = parent border edge, padding excluded). Drive each correction
+  by per-region ink-mask cross-correlation, not eyeballing.
+
 - **Measure geometry before touching layout code.** lobby_connect's "button shift" was a
   misdiagnosis from one eyeball pass — ink-mask bbox + cross-correlation showed the row was
   already centered (origin's floating row escapes its parent padding). The options fix went

@@ -346,8 +346,7 @@ struct CreateRightCellProps {
         .flex_grow = ::ui::StyleFloat::points(1.0f),
         .width = ::ui::Length::percent(100.0f),
         .overflow = ::ui::Overflow::Hidden,
-        .padding = {8.0f, 8.0f, 6.0f, 6.0f},
-        .gap = 1.0f}}
+        .padding = {8.0f, 8.0f, 6.0f, 6.0f}}}
       style={tokens::frame_patch(tokens::kInsetStroke)}
     >
       {props.rows}
@@ -731,6 +730,8 @@ struct LobbyScreenProps {
           .focusable = true,
           .accessibility = {.label = mv},
           .on_activate = pick,
+          // origin kMapListLineH = 14 virtual px -> 21 logical row slots.
+          .layout = ::ui::LayoutStyle{.height = ::ui::Length::points(21.0f)},
           .children = ::ui::children({BodyText(BodyTextProps{
               .key = "t",
               .variant = i == *map_index ? BodyTextVariant::Strong
