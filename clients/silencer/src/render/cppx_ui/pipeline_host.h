@@ -67,6 +67,14 @@ public:
   uint32_t bake_chrome_sprite(const uint8_t *indices, int w, int h,
                               const SDL_Color *palette256);
 
+  // Bake a full-bleed backdrop sprite at this host's device resolution via
+  // origin's two-hop menu compositing (see bake_backdrop_rgba). Drawn 1:1
+  // full-screen, so the texture carries the fit (cover/stretch) baked in.
+  // legacy_w/h = the 640x480 design res the virtual-canvas scale derives from.
+  uint32_t bake_backdrop_sprite(const uint8_t *indices, int w, int h,
+                                const SDL_Color *palette256, bool stretch,
+                                int legacy_w, int legacy_h);
+
   // Build one bitmap glyph FACE atlas (origin/main text parity). `glyphs[i]` is
   // the source sprite for char GlyphFonts::kFirstChar + i (null/empty = blank
   // cell). advance/line_height are the native (640-space) bank metrics. Baked

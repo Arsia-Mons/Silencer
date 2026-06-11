@@ -16,10 +16,10 @@ enum class ScreenLayoutVariant { Menu, Game, Overlay, CenteredOverlay, Hud };
 struct ScreenLayoutProps {
   const char *key = nullptr;
   ScreenLayoutVariant variant = ScreenLayoutVariant::Menu;
-  // Backdrop sprite fit. Origin covers (aspect-preserving centered crop) every
-  // menu/overlay backdrop EXCEPT Options-Controls and the lobby cluster, which
-  // it stretches — callers replicate that exception, never invent new fits.
-  ::ui::ImageFit backdrop_fit = ::ui::ImageFit::Cover;
+  // Origin's one backdrop-fit exception: Options·Controls stretches the
+  // starfield (PackImageStretch(6,0)) where every other menu covers it. The
+  // fit is baked into the chrome texture, so this only picks which bake.
+  bool stretched_backdrop = false;
   ::ui::UiChildren children = {};
 };
 

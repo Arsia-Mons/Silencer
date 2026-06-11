@@ -234,10 +234,25 @@ bake(40, 2, cppxChrome.dialog_pw, &cppxChrome.dialog_pw_w, &cppxChrome.dialog_pw
 // bank 7 idx 2 — the lobby-connect dialog (origin PackImage(7,2)): frame, soft
 // glow, log well, form sub-panel + field/button wells all baked in.
 bake(7, 2, cppxChrome.dialog_connect, &cppxChrome.dialog_connect_w, &cppxChrome.dialog_connect_h);
-// bank 6 idx0 — the full-screen starfield+planet menu background.
-bake(6, 0, cppxChrome.starfield);
-// bank 7 idx1 — the lobby backdrop (dim Mars + circuit HUD), distinct from bank 6.
-bake(7, 1, cppxChrome.lobby_backdrop);
+// Full-bleed backdrops bake at DEVICE resolution through origin's two-hop
+// menu compositing (cover/stretch into the virtual canvas, then magnify) so
+// the uneven scanline striping matches the golden pixel-for-pixel. Fits per
+// origin: menus PackImage(6,0)=cover, Options·Controls PackImageStretch(6,0),
+// lobby PackImageStretch(7,1).
+auto bake_backdrop = [&](size_t bank, size_t index, bool stretch,
+                         uint32_t &id_out){
+if(bank >= banks.size() || index >= banks[bank].size()) return;
+const std::shared_ptr<Surface> &sp = banks[bank][index];
+if(!sp || sp->w < 1 || sp->h < 1 || sp->pixels.empty()) return;
+uint32_t id = cppxHost->bake_backdrop_sprite(sp->pixels.data(), sp->w, sp->h,
+                                             page_for_bank(bank), stretch,
+                                             kLegacyRenderWidth,
+                                             kLegacyRenderHeight);
+if(id) id_out = id;
+};
+bake_backdrop(6, 0, false, cppxChrome.starfield);
+bake_backdrop(6, 0, true, cppxChrome.starfield_stretched);
+bake_backdrop(7, 1, true, cppxChrome.lobby_backdrop);
 // bank 208 frame 60 — the static SILENCER logo (final reveal frame).
 bake(208, 60, cppxChrome.logo, &cppxChrome.logo_w, &cppxChrome.logo_h);
 // SIL-94/107: the logo reveal frames (individual textures). [0] is the full

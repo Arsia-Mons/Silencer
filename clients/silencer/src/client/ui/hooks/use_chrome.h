@@ -63,11 +63,16 @@ struct ChromeTextures {
   uint16_t dialog_pw_w = 0, dialog_pw_h = 0;
   uint32_t dialog_connect = 0; // bank 7 idx 2 (lobby-connect dialog — frame+glow+wells baked)
   uint16_t dialog_connect_w = 0, dialog_connect_h = 0;
-  // Full-screen starfield+planet background (bank 6 idx0), stretched to the
-  // screen root (no aspect-cover in v1 — legacy stretched too).
+  // Full-screen starfield+planet background (bank 6 idx0), baked at DEVICE
+  // resolution through origin's two-hop menu compositing (fit into the
+  // virtual canvas, then magnify) so the uneven scanline striping matches the
+  // golden exactly; drawn 1:1 full-bleed. `starfield` carries origin's cover
+  // fit (PackImage(6,0), the menus); `starfield_stretched` carries the
+  // stretch fit (PackImageStretch(6,0), Options·Controls only).
   uint32_t starfield = 0;
-  // Lobby backdrop (bank 7 idx1): dim Mars + circuit HUD, drawn full-screen by the
-  // lobby cluster instead of the bright menu starfield.
+  uint32_t starfield_stretched = 0;
+  // Lobby backdrop (bank 7 idx1): dim Mars + circuit HUD, same device-res bake
+  // with origin's stretch fit (PackImageStretch(7,1)).
   uint32_t lobby_backdrop = 0;
   // Static SILENCER logo (bank 208 frame 60 — the final frame of the legacy
   // reveal animation; SIL-107 animates the full 29..60 sequence).

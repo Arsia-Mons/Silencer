@@ -281,7 +281,7 @@ struct OptionsControlsProps {
   return <ScreenLayout
     key="root"
     variant={ScreenLayoutVariant::Overlay}
-    backdropFit={::ui::ImageFit::Stretch}
+    stretchedBackdrop={true}
   >
     <Panel key="frame" variant={PanelVariant::ControlsFrame}>
       <Box
