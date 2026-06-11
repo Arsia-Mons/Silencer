@@ -53,4 +53,18 @@ void bake_element_rgba(const uint8_t *indices, int sw, int sh,
                        int dev_x, int dev_y, int tex_w, int tex_h,
                        uint8_t *out_rgba);
 
+// Nine-slice variant of the element bake, for the metal-chrome buttons
+// (origin DispatchButtonNineSlice): hop 1 composites the sprite into the
+// virtual element box with cropped 1:1 corners and TILED (not stretched)
+// edge/center bands — origin's exact int arithmetic — then the whole-frame
+// magnify maps absolute device px through int(gx/s) as in bake_element_rgba.
+// Caps are in sprite (virtual) pixels.
+void bake_element_nineslice_rgba(const uint8_t *indices, int sw, int sh,
+                                 const SDL_Color *palette256, int bx, int by,
+                                 int bw, int bh, int cap_l, int cap_r,
+                                 int cap_t, int cap_b, int legacy_w,
+                                 int legacy_h, int dw, int dh, int dev_x,
+                                 int dev_y, int tex_w, int tex_h,
+                                 uint8_t *out_rgba);
+
 } // namespace silencer::cppx_ui

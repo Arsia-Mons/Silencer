@@ -117,6 +117,18 @@ void PipelineHost::register_legacy_sprite(uint32_t texture_id,
                                    legacy_w, legacy_h);
 }
 
+void PipelineHost::register_legacy_nineslice(uint32_t texture_id,
+                                             const uint8_t *indices, int w,
+                                             int h,
+                                             const SDL_Color *palette256,
+                                             int legacy_w, int legacy_h,
+                                             int cap_l, int cap_r, int cap_t,
+                                             int cap_b) {
+  textures_.register_legacy_nineslice(texture_id, indices, w, h, palette256,
+                                      legacy_w, legacy_h, cap_l, cap_r, cap_t,
+                                      cap_b);
+}
+
 bool PipelineHost::build_glyph_face(int face_id,
                                     const GlyphFonts::GlyphSrc *glyphs,
                                     int count, const SDL_Color *palette256,

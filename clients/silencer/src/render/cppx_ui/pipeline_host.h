@@ -92,6 +92,14 @@ public:
                               int w, int h, const SDL_Color *palette256,
                               int legacy_w, int legacy_h);
 
+  // Nine-slice flavor for the metal-chrome buttons (caps in virtual px); the
+  // executor swaps any nine-slice draw of this texture for a per-phase,
+  // per-virtual-size variant (TextureRegistry::resolve_legacy_nineslice_variant).
+  void register_legacy_nineslice(uint32_t texture_id, const uint8_t *indices,
+                                 int w, int h, const SDL_Color *palette256,
+                                 int legacy_w, int legacy_h, int cap_l,
+                                 int cap_r, int cap_t, int cap_b);
+
   // Build one bitmap glyph FACE atlas (origin/main text parity). `glyphs[i]` is
   // the source sprite for char GlyphFonts::kFirstChar + i (null/empty = blank
   // cell). advance/line_height are the native (640-space) bank metrics. Baked

@@ -73,6 +73,74 @@ void TextureRegistry::register_legacy_sprite(uint32_t base_id,
   std::memcpy(sp.palette, palette256, sizeof(sp.palette));
 }
 
+void TextureRegistry::register_legacy_nineslice(
+    uint32_t base_id, const uint8_t *indices, int w, int h,
+    const SDL_Color *palette256, int legacy_w, int legacy_h, int cap_l,
+    int cap_r, int cap_t, int cap_b) {
+  if (!base_id || !indices || w <= 0 || h <= 0 || !palette256)
+    return;
+  register_legacy_sprite(base_id, indices, w, h, palette256, legacy_w,
+                         legacy_h);
+  LegacySprite &sp = legacy_[base_id];
+  sp.nine_slice = true;
+  sp.cap_l = cap_l;
+  sp.cap_r = cap_r;
+  sp.cap_t = cap_t;
+  sp.cap_b = cap_b;
+}
+
+bool TextureRegistry::resolve_legacy_nineslice_variant(
+    uint32_t base_id, SDL_Renderer *renderer, float dev_x, float dev_y,
+    float dev_w, float dev_h, int out_w, int out_h, LegacyVariant *out) {
+  if (!renderer || !out || out_w <= 0 || out_h <= 0)
+    return false;
+  auto it = legacy_.find(base_id);
+  if (it == legacy_.end() || !it->second.nine_slice)
+    return false;
+  const LegacySprite &sp = it->second;
+  float s = std::min(out_w / (float)sp.legacy_w, out_h / (float)sp.legacy_h);
+  if (s < 1.0f)
+    s = 1.0f;
+  // Software-renderer truncation, then recover the authored virtual box.
+  const int x = (int)dev_x, y = (int)dev_y;
+  const int vx = (int)std::floor(x / s + 0.5f);
+  const int vy = (int)std::floor(y / s + 0.5f);
+  const int vw = (int)std::floor(dev_w / s + 0.5f);
+  const int vh = (int)std::floor(dev_h / s + 0.5f);
+  if (vw < 1 || vh < 1 || vw > 4095 || vh > 4095)
+    return false;
+  const int tw = (int)std::ceil((vx + vw) * s) - x;
+  const int th = (int)std::ceil((vy + vh) * s) - y;
+  if (tw <= 0 || th <= 0 || tw > (int)(vw * s) + 9 || th > (int)(vh * s) + 9)
+    return false;
+  const uint64_t key = (1ull << 63) | ((uint64_t)(base_id & 0xFFFF) << 34) |
+                       ((uint64_t)(((x % 18) + 18) % 18) << 29) |
+                       ((uint64_t)(((y % 18) + 18) % 18) << 24) |
+                       ((uint64_t)(vw & 0xFFF) << 12) | (uint64_t)(vh & 0xFFF);
+  auto vit = legacy_variants_.find(key);
+  uint32_t id = vit != legacy_variants_.end() ? vit->second : 0;
+  if (!id) {
+    std::vector<uint8_t> rgba((size_t)tw * th * 4u, 0u);
+    bake_element_nineslice_rgba(sp.indices.data(), sp.w, sp.h, sp.palette, vx,
+                                vy, vw, vh, sp.cap_l, sp.cap_r, sp.cap_t,
+                                sp.cap_b, sp.legacy_w, sp.legacy_h, out_w,
+                                out_h, x, y, tw, th, rgba.data());
+    id = upload_rgba(renderer, rgba.data(), tw, th);
+    if (!id)
+      return false;
+    legacy_variants_[key] = id;
+  }
+  SDL_Texture *tex = lookup(id);
+  if (!tex)
+    return false;
+  out->texture = tex;
+  out->x = x;
+  out->y = y;
+  out->w = tw;
+  out->h = th;
+  return true;
+}
+
 bool TextureRegistry::resolve_legacy_variant(uint32_t base_id,
                                              SDL_Renderer *renderer,
                                              float dev_x, float dev_y,
@@ -82,7 +150,7 @@ bool TextureRegistry::resolve_legacy_variant(uint32_t base_id,
   if (!renderer || !out || out_w <= 0 || out_h <= 0)
     return false;
   auto it = legacy_.find(base_id);
-  if (it == legacy_.end())
+  if (it == legacy_.end() || it->second.nine_slice)
     return false;
   const LegacySprite &sp = it->second;
   float s = std::min(out_w / (float)sp.legacy_w, out_h / (float)sp.legacy_h);

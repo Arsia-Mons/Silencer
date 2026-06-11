@@ -242,6 +242,21 @@ register_legacy(6, 23, cppxChrome.oval_lg);
 // bank 7 — the metal-chrome nine-slice button (idx24 idle phase0 / idx28 focus phase4).
 bake(7, 24, cppxChrome.chrome_btn_idle);
 bake(7, 28, cppxChrome.chrome_btn_focus);
+// origin draws these nine-sliced in VIRTUAL space (Button Chrome: caps
+// L/R 12, T/B 4) before the whole-frame magnify — register the indexed
+// sources so the executor swaps each nine-slice draw for a per-phase,
+// per-size device-cell variant (origin's tiled-band arithmetic).
+auto register_legacy_nine = [&](size_t bank, size_t index, uint32_t id,
+                                int cl, int cr, int ct, int cb){
+if(!id || bank >= banks.size() || index >= banks[bank].size()) return;
+const std::shared_ptr<Surface> &sp = banks[bank][index];
+if(!sp || sp->pixels.empty()) return;
+cppxHost->register_legacy_nineslice(id, sp->pixels.data(), sp->w, sp->h,
+                                    page_for_bank(bank), kLegacyRenderWidth,
+                                    kLegacyRenderHeight, cl, cr, ct, cb);
+};
+register_legacy_nine(7, 24, cppxChrome.chrome_btn_idle, 12, 12, 4, 4);
+register_legacy_nine(7, 28, cppxChrome.chrome_btn_focus, 12, 12, 4, 4);
 // Frame sprites (plain, native size): bank-7 chrome panel + bank-40 dialog frames.
 bake(7, 5, cppxChrome.chrome_panel, &cppxChrome.chrome_panel_w, &cppxChrome.chrome_panel_h);
 bake(40, 4, cppxChrome.dialog_msg, &cppxChrome.dialog_msg_w, &cppxChrome.dialog_msg_h);

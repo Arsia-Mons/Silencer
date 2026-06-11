@@ -135,4 +135,84 @@ void bake_element_rgba(const uint8_t *indices, int sw, int sh,
   }
 }
 
+void bake_element_nineslice_rgba(const uint8_t *indices, int sw, int sh,
+                                 const SDL_Color *palette256, int bx, int by,
+                                 int bw, int bh, int cap_l, int cap_r,
+                                 int cap_t, int cap_b, int legacy_w,
+                                 int legacy_h, int dw, int dh, int dev_x,
+                                 int dev_y, int tex_w, int tex_h,
+                                 uint8_t *out_rgba) {
+  if (bw <= 0 || bh <= 0 || sw <= 0 || sh <= 0)
+    return;
+  float s = std::min(dw / (float)legacy_w, dh / (float)legacy_h);
+  if (s < 1.0f)
+    s = 1.0f;
+  const int vw = std::max(1, (int)(dw / s));
+  const int vh = std::max(1, (int)(dh / s));
+  const int scaled_w = (int)(vw * s + 0.5f);
+  const int scaled_h = (int)(vh * s + 0.5f);
+  const int off_x = scaled_w < dw ? (dw - scaled_w) / 2 : 0;
+  const int off_y = scaled_h < dh ? (dh - scaled_h) / 2 : 0;
+  const int draw_w = std::min(scaled_w, dw - off_x);
+  const int draw_h = std::min(scaled_h, dh - off_y);
+  // origin DispatchButtonNineSlice cap clamps (virtual px).
+  const int src_l = std::min(cap_l, sw / 2);
+  const int src_r = std::min(cap_r, sw - src_l);
+  const int src_t = std::min(cap_t, sh / 2);
+  const int src_b = std::min(cap_b, sh - src_t);
+  const int dst_l = std::min(src_l, bw / 2);
+  const int dst_r = std::min(src_r, bw - dst_l);
+  const int dst_t = std::min(src_t, bh / 2);
+  const int dst_b = std::min(src_b, bh - dst_t);
+  const int src_mid_w = std::max(1, sw - src_l - src_r);
+  const int src_mid_h = std::max(1, sh - src_t - src_b);
+  for (int ty = 0; ty < tex_h; ++ty) {
+    const int gy = dev_y + ty - off_y;
+    if (gy < 0 || gy >= draw_h)
+      continue;
+    const int vy = std::min((int)(gy / s), vh - 1);
+    const int ly = vy - by;
+    if (ly < 0 || ly >= bh)
+      continue;
+    int syi;
+    if (ly < dst_t)
+      syi = ly; // top band (cropped corner row)
+    else if (ly >= bh - dst_b)
+      syi = sh - (bh - ly); // bottom band
+    else
+      syi = src_t + (ly - dst_t) % src_mid_h; // tiled middle
+    if (syi < 0 || syi >= sh)
+      continue;
+    const uint8_t *srow = indices + (size_t)syi * sw;
+    uint8_t *orow = out_rgba + (size_t)ty * tex_w * 4;
+    for (int tx = 0; tx < tex_w; ++tx) {
+      const int gx = dev_x + tx - off_x;
+      if (gx < 0 || gx >= draw_w)
+        continue;
+      const int vx = std::min((int)(gx / s), vw - 1);
+      const int lx = vx - bx;
+      if (lx < 0 || lx >= bw)
+        continue;
+      int sxi;
+      if (lx < dst_l)
+        sxi = lx;
+      else if (lx >= bw - dst_r)
+        sxi = sw - (bw - lx);
+      else
+        sxi = src_l + (lx - dst_l) % src_mid_w;
+      if (sxi < 0 || sxi >= sw)
+        continue;
+      const uint8_t idx = srow[sxi];
+      if (idx == 0)
+        continue;
+      const SDL_Color &c = palette256[idx];
+      uint8_t *o = orow + (size_t)tx * 4;
+      o[0] = c.r;
+      o[1] = c.g;
+      o[2] = c.b;
+      o[3] = 255;
+    }
+  }
+}
+
 } // namespace silencer::cppx_ui

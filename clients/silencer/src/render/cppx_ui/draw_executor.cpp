@@ -232,6 +232,26 @@ void render_image(SDL_Renderer *r, const ::ui::DrawCommand &c,
   const SDL_FRect src_sub = {img.src_x, img.src_y, img.src_w, img.src_h};
 
   if (nine) {
+    // Legacy chrome nine-slice (origin DispatchButtonNineSlice): swap the
+    // draw for a per-phase/per-size variant baked through origin's virtual
+    // nine-slice + whole-frame magnify at this element's absolute device
+    // cell (see resolve_legacy_variant for the plain-sprite analog).
+    {
+      int out_w = 0, out_h = 0;
+      TextureRegistry::LegacyVariant v;
+      if (SDL_GetCurrentRenderOutputSize(r, &out_w, &out_h) &&
+          textures->resolve_legacy_nineslice_variant(
+              img.texture_id, r, c.rect.x * scale, c.rect.y * scale,
+              c.rect.w * scale, c.rect.h * scale, out_w, out_h, &v)) {
+        SDL_SetTextureColorMod(v.texture, tint.r, tint.g, tint.b);
+        SDL_SetTextureAlphaMod(v.texture, tint.a);
+        SDL_FRect d = {(float)v.x, (float)v.y, (float)v.w, (float)v.h};
+        SDL_RenderTexture(r, v.texture, nullptr, &d);
+        SDL_SetTextureColorMod(v.texture, 255, 255, 255);
+        SDL_SetTextureAlphaMod(v.texture, 255);
+        return;
+      }
+    }
     // 9-patch: source insets in texture space, dest insets in dest space.
     // Corners 1:1 (source inset == dest inset); edges/center stretch.
     SDL_SetTextureColorMod(tex, tint.r, tint.g, tint.b);

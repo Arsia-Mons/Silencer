@@ -54,6 +54,16 @@ public:
                               int h, const SDL_Color *palette256, int legacy_w,
                               int legacy_h);
 
+  // Nine-slice flavor (the metal-chrome buttons, origin
+  // DispatchButtonNineSlice): the sprite composites into an arbitrary-size
+  // virtual box (cropped corners, TILED edges/center) before the whole-frame
+  // magnify, so variants depend on the element's virtual size as well as its
+  // phase. Caps are sprite/virtual px.
+  void register_legacy_nineslice(uint32_t base_id, const uint8_t *indices,
+                                 int w, int h, const SDL_Color *palette256,
+                                 int legacy_w, int legacy_h, int cap_l,
+                                 int cap_r, int cap_t, int cap_b);
+
   // A resolved variant: drawn 1:1 at device (x,y), w x h texels. The rect may
   // exceed the requesting draw's box by up to 2px right/bottom — it covers the
   // sprite's full device cell (the box is Yoga-rounded, the cell is not).
@@ -71,6 +81,15 @@ public:
                               float dev_h, int out_w, int out_h,
                               LegacyVariant *out);
 
+  // Nine-slice resolve: any box size qualifies (the slice stretches); the
+  // box's virtual rect is recovered by rounding and the variant memoizes on
+  // (base_id, X%18, Y%18, vw, vh).
+  bool resolve_legacy_nineslice_variant(uint32_t base_id,
+                                        SDL_Renderer *renderer, float dev_x,
+                                        float dev_y, float dev_w, float dev_h,
+                                        int out_w, int out_h,
+                                        LegacyVariant *out);
+
   void shutdown();
 
 private:
@@ -84,10 +103,12 @@ private:
     std::vector<uint8_t> indices;
     int w = 0, h = 0;
     int legacy_w = 640, legacy_h = 480;
+    bool nine_slice = false;
+    int cap_l = 0, cap_r = 0, cap_t = 0, cap_b = 0;
     SDL_Color palette[256] = {};
   };
   std::map<uint32_t, LegacySprite> legacy_;     // base_id -> indexed source
-  std::map<uint64_t, uint32_t> legacy_variants_; // (base_id, X%18, Y%18) -> id
+  std::map<uint64_t, uint32_t> legacy_variants_; // (base_id, X%18, Y%18[, vw, vh]) -> id
 };
 
 } // namespace silencer::cppx_ui

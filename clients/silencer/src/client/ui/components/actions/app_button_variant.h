@@ -37,12 +37,18 @@ inline ::ui::TextVisual app_button_label_visual(AppButtonVariant variant,
       disabled ? tokens::kTextBodyMuted : tokens::kTextTitle;
   // Lobby/login rect+chrome labels and the cc List rows are a tier smaller than
   // the chunky menu oval pills (golden login/list caps ~17px vs the menu's ~21px).
+  // origin renders them in TextSize::Heading — bank 134 at native metrics
+  // (button.cpp ResolveButton: Chrome/LegacyRow textSize Heading) — so use the
+  // matching exact-color face 1:1 (also makes the labels string-bake eligible).
   float sz = tokens::kFontHeading;
+  uint16_t face = tokens::kFaceHeading;
   if (variant == AppButtonVariant::Rect || variant == AppButtonVariant::Chrome ||
-      size == AppButtonSize::List)
+      size == AppButtonSize::List) {
     sz = tokens::kFontLarge;
+    face = tokens::kFaceLarge;
+  }
   return {.color = c,
-          .font_id = tokens::kFaceHeading,
+          .font_id = face,
           .font_size = sz,
           .align = ::ui::TextAlign::Center,
           .line_height = sz};
