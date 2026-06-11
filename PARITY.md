@@ -131,6 +131,7 @@ byte-identical, so every family below is closed except the create_game residual
 | gallery | n/a (visual) | cppx-only showcase; golden is a stale cppx render — do not gate |
 | message_modal | n/a (visual) | no standalone origin trigger; golden stale — do not gate |
 | password_modal | n/a (visual) | no standalone origin trigger; golden stale — do not gate |
+| mission_summary (post-game XP/upgrade) | UNVERIFIED — NO GOLDEN, NO COVERAGE (flagged by owner 2026-06-11) | origin mission_summary_screen.cpp: "+ N XP" (stats.CalculateExperience), six stat rows + Upgrade buttons gated on world.lobby.statupgraded poll, upgrade banner; ours mission_summary.cppx (144 lines) implemented but never captured/gated. Golden capture needs a match to END — extend the cap_ingame_origin.sh harness (or a bot-finish flow) |
 
 ## Visual — in-game (origin goldens CAPTURED 2026-06-11 — UNVERIFIED vs cppx)
 
@@ -221,6 +222,8 @@ Earlier same-day milestones: iteration-0 13/23 → post scale-unclamp 21/23 → 
 | staging → tech_select → launch full flow vs origin | UNVERIFIED |
 | text-entry caps/length limits (alias, chat, password) vs origin | UNVERIFIED |
 | scrolling behaviors (controls list, map list) vs origin | UNVERIFIED |
+| hover/focus interaction VISUALS vs origin (oval/list focus cursors; Chrome buttons never swap art) | UNVERIFIED — all 13 goldens are rest-state; only functional e2e coverage today (flagged by owner 2026-06-11) |
+| UI interaction SOUNDS | **REGRESSED — unwired in cppx migration** (flagged by owner 2026-06-11). Origin ClientUi.cpp:95-111: PlayMenuButtonSound (GAS soundUIClick "whoom.wav" via Audio::PlayUI) on (a) hover-ENTER of an audible interactable (edge via hoveredAudioInteractableId_) and (b) Activate/Navigate actions on audible widgets. Ours: Audio::PlayUI + gasloader.soundUIClick intact, ZERO callers. Fix in the pipeline input pass + add an e2e scenario asserting the trigger edges |
 
 ## Architecture guard backlog (15 findings, re-confirmed 2026-06-11 post b8fc958b — must be 0 for done)
 
