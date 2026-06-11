@@ -341,6 +341,22 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 		cmd.reply->set_value(OkResult(cmd.id, nlohmann::json::object()));
 		return;
 	}
+	if(cmd.op == "camera"){
+		// Test/capture plumbing: read or pin the world camera. The in-game
+		// camera's follow window has a 100px y-hysteresis (Camera::Follow
+		// h=100/yoffset=30), so its rest position depends on render cadence
+		// during the spawn fall — capture scripts pin it to the golden's.
+		Camera & cam = game.GetRenderer().camera;
+		if(cmd.args.contains("x") && cmd.args.contains("y")){
+			cam.SetPosition((Sint16)cmd.args.value("x", 0),
+			                (Sint16)cmd.args.value("y", 0));
+		}
+		nlohmann::json j;
+		j["x"] = cam.x;
+		j["y"] = cam.y;
+		cmd.reply->set_value(OkResult(cmd.id, j));
+		return;
+	}
 	if(cmd.op == "ingame_ui_mode"){
 		std::string mode = cmd.args.value("mode", std::string("status"));
 		namespace gu = silencer::game_ui;
@@ -352,7 +368,10 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 		else if(mode == "playerlist")  m = gu::InGameUiMode::PlayerList;
 		else if(mode == "all")         m = gu::InGameUiMode::All;
 		else                           m = gu::InGameUiMode::Status;
-		gu::InGameUiControlResult r = gu::ConfigureInGameUi(game, m);
+		gu::InGameUiChatSeed seed;
+		seed.text = cmd.args.value("chat_text", std::string());
+		seed.line = cmd.args.value("chat_line", std::string());
+		gu::InGameUiControlResult r = gu::ConfigureInGameUi(game, m, seed);
 		if(!r.available){
 			cmd.reply->set_value(Err(cmd.id, "WRONG_STATE",
 				r.error.empty() ? std::string("not in a match") : r.error));

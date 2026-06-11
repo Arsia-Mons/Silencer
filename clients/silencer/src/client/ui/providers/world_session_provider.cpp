@@ -1,6 +1,7 @@
 #include "world_session_provider.h"
 
 #include "client/ui/hooks/use_buy_tech.h"
+#include "client/ui/hooks/use_hud.h"
 #include "client/ui/hooks/use_ingame_chat.h"
 #include "client/ui/hooks/use_match.h"
 #include "client/ui/hooks/use_player_status.h"
@@ -51,6 +52,8 @@ PlayerStatus use_player_status() {
   for (int i = 0; i < 4; ++i) {
     out.inventory_items[i] = s.inventory_items[i];
     out.inventory_counts[i] = s.inventory_counts[i];
+    out.inventory_res_index[i] = s.inventory_res_index[i];
+    out.inventory_letters[i] = s.inventory_letters[i];
   }
   out.current_inventory = s.current_inventory;
   out.select_inventory_slot = value->select_inventory_slot;
@@ -99,6 +102,7 @@ Tech use_tech() {
   out.buy_active = s.buy_active;
   out.tech_active = s.tech_active;
   out.items = s.buytech_items;
+  out.footer = s.buytech_footer;
   out.purchase = value->buytech_purchase;
   out.close = value->buytech_close;
   return out;
@@ -122,12 +126,56 @@ IngameChat use_ingame_chat() {
   IngameChat out;
   out.active = s.chat_active;
   out.with_team = s.chat_with_team;
+  out.caret_on = s.chat_caret_on;
   out.show_ticks = s.chat_show_ticks;
   out.text = s.chat_text;
   out.log = s.chat_log;
+  out.set_text = value->chat_set_text;
   out.send = value->chat_send;
   out.cancel = value->chat_cancel;
   out.toggle_channel = value->chat_toggle_channel;
+  return out;
+}
+
+Hud use_hud() {
+  WorldSessionValue *value = world_session_value();
+  if (!value)
+    return {};
+  const WorldSessionSnapshot &s = value->snapshot;
+  Hud out;
+  out.valid = s.player_valid;
+  out.phase = s.hud_phase;
+  out.tick = s.hud_tick;
+  out.poisoned = s.poisoned;
+  out.quit_state = s.quit_state;
+  out.message = s.message;
+  out.message_i = s.message_i;
+  out.message_type = s.message_type;
+  out.message_time = s.message_time;
+  out.teams.reserve(s.hud_teams.size());
+  for (const WorldSessionSnapshot::HudTeamStrip &t : s.hud_teams) {
+    HudTeamRow row;
+    row.secrets = t.secrets;
+    row.beaming = t.beaming;
+    row.num_peers = t.num_peers;
+    for (int i = 0; i < 4; ++i) {
+      row.peers[i].present = t.peers[i].present;
+      row.peers[i].dead = t.peers[i].dead;
+      row.peers[i].has_secret = t.peers[i].has_secret;
+      row.peers[i].sprite = t.peers[i].sprite;
+      row.peers[i].name = t.peers[i].name;
+      row.peers[i].level = t.peers[i].level;
+      row.peers[i].endurance = t.peers[i].endurance;
+      row.peers[i].shield = t.peers[i].shield;
+      row.peers[i].jetpack = t.peers[i].jetpack;
+      row.peers[i].hacking = t.peers[i].hacking;
+      row.peers[i].contacts = t.peers[i].contacts;
+    }
+    row.emblem = t.emblem;
+    row.emblem_w = t.emblem_w;
+    row.emblem_h = t.emblem_h;
+    out.teams.push_back(row);
+  }
   return out;
 }
 

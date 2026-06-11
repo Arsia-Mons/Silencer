@@ -39,6 +39,15 @@ struct InGameUiControlResult {
   int tech_selected_index = 0;
 };
 
-InGameUiControlResult ConfigureInGameUi(Game &game, InGameUiMode mode);
+// Chat seeding (mode == Chat): `text` fills the compose buffer; `line`
+// instead appends a history line without opening the input (mirrors the
+// origin capture harness's --chat-line).
+struct InGameUiChatSeed {
+  std::string text = {};
+  std::string line = {};
+};
+
+InGameUiControlResult ConfigureInGameUi(Game &game, InGameUiMode mode,
+                                        const InGameUiChatSeed &chat = {});
 
 } // namespace silencer::game_ui

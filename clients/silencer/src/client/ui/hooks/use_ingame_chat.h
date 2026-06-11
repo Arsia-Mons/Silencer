@@ -15,12 +15,14 @@ namespace client::ui {
 struct IngameChat {
   bool active = false;
   bool with_team = false;
+  bool caret_on = false; // origin wall-clock blink phase
   int show_ticks = 0;
   std::string text = {};
   // Recent visible chat scrollback (oldest -> newest), e.g.
   // "AgentZero: rushing objective!". Drawn above the active compose line.
   std::vector<std::string> log = {};
 
+  std::function<void(const std::string &)> set_text = {};
   std::function<void(const std::string &)> send = {};
   std::function<void()> cancel = {};
   std::function<void()> toggle_channel = {};

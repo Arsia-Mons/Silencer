@@ -8,6 +8,7 @@
 #include "client/ui/providers/world_session_provider.h" // client::ui::WorldSessionSnapshot
 #include "client/ui/hooks/use_chrome.h" // client::ui::ChromeTextures
 #include <cstdint>
+#include <map>
 #include <memory>
 #include <string>
 #include <vector>
@@ -98,6 +99,15 @@ const std::vector<BindingKey> & KeybindCapturePending() const {
 return keybindCapture_.pending;
 }
 
+// In-game HUD per-frame sprite variants (origin draw-time Effect* on indexed
+// sprites): pulse ramps (EffectRampColorPlus) + team-colorized emblems.
+// Lazily baked + memoized; invalidated with the chrome bake. 0 = not bakeable
+// yet (screens tolerate per the use_chrome contract).
+uint32_t EnsureHudRampVariant(uint8_t bank, uint16_t index, uint8_t rampColor,
+                              uint8_t rampPlus, uint8_t brightness = 128);
+client::ui::ChromeTextures::Sprite EnsureHudTeamEmblem(uint8_t agency,
+                                                       uint8_t color);
+
 private:
 void RenderCppxClientUiFrame(Surface & surface);
 // SIL-87: bake curated legacy sprites → cppxChrome. rw/rh = device resolution,
@@ -127,6 +137,9 @@ float cppxCanvasH_ = 0.0f;
 // renderer (resize). Populated after ensure(), read by the ChromeTexturesProvider
 // in the per-frame provider chain.
 client::ui::ChromeTextures cppxChrome;
+// Memoized in-game HUD sprite variants (see EnsureHud*); cleared on rebake.
+std::map<uint64_t, uint32_t> hudRampVariants_;
+std::map<uint16_t, client::ui::ChromeTextures::Sprite> hudEmblems_;
 
 // SIL-15 use_settings dirty tracking: snapshot of the four persisted prefs as
 // of the last commit/revert; live Config diverging from it => Settings.dirty.

@@ -134,12 +134,13 @@ bool PipelineHost::build_glyph_color_face(int face_id, uint8_t key_r,
                                           int count,
                                           const SDL_Color *palette256,
                                           float advance, float line_height,
-                                          int legacy_w, int legacy_h) {
+                                          int legacy_w, int legacy_h,
+                                          uint8_t alpha) {
   if (!r_)
     return false;
   return glyph_fonts_.build_color_face(r_, face_id, key_r, key_g, key_b, glyphs,
                                        count, palette256, advance, line_height,
-                                       legacy_w, legacy_h);
+                                       legacy_w, legacy_h, alpha);
 }
 
 const uint8_t *PipelineHost::render(const client::ui::UiPipelineFrame &frame,

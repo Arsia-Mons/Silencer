@@ -121,16 +121,50 @@ struct ChromeTextures {
   // sub-rect (character_create_layout.cpp AdvantageBracket: srcX 0 left /
   // 1 right). Baked whole-glyph; the consumer applies the sub-rect crop.
   uint32_t bracket_l = 0, bracket_r = 0; // bank 134, '['-33 / ']'-33
-  // In-game HUD console chrome (banks 94/95, base palette page). Whole-sprite,
-  // edge-anchored over the live world; sized to native (_w/_h carried so the
-  // bezel paints at its authored width, not stretched). Radar viewport (94/0) is
-  // the bottom-center minimap frame. id of 0 => fall back to a green wire-rect.
-  uint32_t hud_bezel_top = 0; // bank 95 idx2  (top status bezel)
-  uint16_t hud_bezel_top_w = 0, hud_bezel_top_h = 0;
-  uint32_t hud_bezel_bottom = 0; // bank 95 idx11 (bottom dash bezel)
-  uint16_t hud_bezel_bottom_w = 0, hud_bezel_bottom_h = 0;
-  uint32_t hud_radar = 0; // bank 94 idx0  (radar/minimap frame)
-  uint16_t hud_radar_w = 0, hud_radar_h = 0;
+  // ---- In-game HUD sprites (origin ui/hud/*, base palette page 0) --------
+  // A baked sprite + its native size + authored sheet offsets. Origin places
+  // HUD sprites at SpriteX/Y(bank,idx, anchor) = anchor - offset; screens do
+  // the same arithmetic from `x`/`y` (the offsets), never hardcoded coords.
+  struct Sprite {
+    uint32_t id = 0;
+    uint16_t w = 0, h = 0;
+    int16_t x = 0, y = 0; // sprite-sheet offsets (subtract from the anchor)
+  };
+  struct HudChrome {
+    Sprite minimap_frame; // 94/0
+    Sprite team_frame;    // 94/1 (single-team strip)
+    Sprite inv_frame;     // 94/2
+    Sprite health_bar;    // 95/0 (vertical fill, bottom-up)
+    Sprite shield_bar;    // 95/1
+    Sprite health_warn;   // 95/3
+    Sprite shield_warn;   // 95/4
+    Sprite fuel_mask;     // 95/5
+    Sprite fuel_bar;      // 95/6 (horizontal fill)
+    Sprite files_bar;     // 95/7
+    Sprite fuel_low;      // 95/8
+    Sprite poison;        // 97/5
+    Sprite weapon_bracket;  // 96/0 (selector, +weapon*14)
+    Sprite weapon_face[4];  // 96/1..4 (Blaster/Laser/Rocket/Flamer)
+    Sprite weapon_glow[4];  // 96/5..8
+    // Team strip (bank 103): multi-team frame cap/body, secret slots, peers.
+    Sprite team_cap;        // 103/0
+    Sprite team_body;       // 103/1
+    Sprite secret_full;     // 103/2
+    Sprite secret_empty;    // 103/3
+    Sprite secret_beaming;  // 103/3 EffectColor 224
+    Sprite peer_alive[4];   // 103/4..7
+    Sprite peer_dead[4];    // 103/8..11
+    // Inventory icons (bank 97 by Renderer::InvIdToResIndex), normal
+    // (brightness 128) + unselected-dim (brightness 32) flavors.
+    static constexpr int kInvIcons = 19; // bank 97 idx 0..18
+    Sprite inv_icon[kInvIcons];
+    Sprite inv_icon_dim[kInvIcons];
+    // Buy/tech overlay (bank 102) + chat chrome strips (bank 188 idx0..8).
+    Sprite buy_bg;        // 102/0
+    Sprite buy_highlight; // 102/1
+    Sprite chat_edge[9];  // 188/0..8 (top cap/tile/cap, ..., bottom cap/tile/cap)
+  };
+  HudChrome hud;
   // origin TextInput caret color = legacy palette idx 140 resolved against the
   // presenting screen's palette page (ResetPresentation): menus/cc page 1
   // (yellow), lobby cluster page 2 (sage), in-game page 0. Screens feed this

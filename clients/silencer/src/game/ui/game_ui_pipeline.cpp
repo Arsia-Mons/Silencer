@@ -181,6 +181,8 @@ void GameUiPipeline::BakeChromeTextures(int rw, int rh, float uiScale) {
 // ONLY place that reads the indexed spritebank + active palette; the resulting
 // opaque ids travel to screens via the ChromeTexturesProvider.
 cppxChrome = {};
+hudRampVariants_.clear();
+hudEmblems_.clear();
 if(!cppxHost) return;
 // Use the BASE palette, not GetPaletteColors(): the latter is the display cache
 // that is faded to black on menu/transition screens, which would bake the chrome
@@ -509,14 +511,73 @@ if(7 < res.spriteoffsetx.size() && 18 < res.spriteoffsetx[7].size())
 cppxChrome.ready_ox = (int16_t)res.spriteoffsetx[7][18];
 if(7 < res.spriteoffsety.size() && 18 < res.spriteoffsety[7].size())
 cppxChrome.ready_oy = (int16_t)res.spriteoffsety[7][18];
-// In-game HUD console chrome (banks 94/95). These are authored against the base
-// palette page (resources.cpp leaves them at paletteoffset 0), so the bake's
-// default page_for_bank arm (base) is correct — no per-bank page override.
-// Whole-sprite, native size: the top status bezel, the bottom dash, and the
-// bottom-center radar/minimap frame.
-bake(95, 2, cppxChrome.hud_bezel_top, &cppxChrome.hud_bezel_top_w, &cppxChrome.hud_bezel_top_h);
-bake(95, 11, cppxChrome.hud_bezel_bottom, &cppxChrome.hud_bezel_bottom_w, &cppxChrome.hud_bezel_bottom_h);
-bake(94, 0, cppxChrome.hud_radar, &cppxChrome.hud_radar_w, &cppxChrome.hud_radar_h);
+// In-game HUD sprites (origin ui/hud/*). Authored against the base palette
+// page (resources.cpp leaves banks 94-103 at paletteoffset 0). Each entry
+// carries native size + sheet offsets so the screen reproduces origin's
+// SpriteX/Y(bank,idx) = anchor - offset placement from data.
+{
+auto hud_bake = [&](size_t bank, size_t index,
+                    client::ui::ChromeTextures::Sprite &out,
+                    uint8_t effect_color = 0, uint8_t brightness = 128){
+if(bank >= banks.size() || index >= banks[bank].size()) return;
+const std::shared_ptr<Surface> &sp = banks[bank][index];
+if(!sp || sp->w < 1 || sp->h < 1 || sp->pixels.empty()) return;
+uint32_t id = 0;
+if(effect_color == 0 && brightness == 128){
+id = cppxHost->bake_chrome_sprite(sp->pixels.data(), sp->w, sp->h, palette);
+}else{
+Surface * copy = game.renderer.CreateSurfaceCopy(sp.get());
+if(!copy) return;
+if(effect_color) game.renderer.EffectColor(copy, nullptr, effect_color);
+if(brightness != 128) game.renderer.EffectBrightness(copy, nullptr, brightness);
+id = cppxHost->bake_chrome_sprite(copy->pixels.data(), copy->w, copy->h, palette);
+delete copy;
+}
+if(!id) return;
+out.id = id;
+out.w = (uint16_t)sp->w;
+out.h = (uint16_t)sp->h;
+if(bank < res.spriteoffsetx.size() && index < res.spriteoffsetx[bank].size())
+out.x = (int16_t)res.spriteoffsetx[bank][index];
+if(bank < res.spriteoffsety.size() && index < res.spriteoffsety[bank].size())
+out.y = (int16_t)res.spriteoffsety[bank][index];
+};
+auto &hud = cppxChrome.hud;
+hud_bake(94, 0, hud.minimap_frame);
+hud_bake(94, 1, hud.team_frame);
+hud_bake(94, 2, hud.inv_frame);
+hud_bake(95, 0, hud.health_bar);
+hud_bake(95, 1, hud.shield_bar);
+hud_bake(95, 3, hud.health_warn);
+hud_bake(95, 4, hud.shield_warn);
+hud_bake(95, 5, hud.fuel_mask);
+hud_bake(95, 6, hud.fuel_bar);
+hud_bake(95, 7, hud.files_bar);
+hud_bake(95, 8, hud.fuel_low);
+hud_bake(97, 5, hud.poison);
+hud_bake(96, 0, hud.weapon_bracket);
+for(int i = 0; i < 4; ++i){
+hud_bake(96, (size_t)(1 + i), hud.weapon_face[i]);
+hud_bake(96, (size_t)(5 + i), hud.weapon_glow[i]);
+}
+hud_bake(103, 0, hud.team_cap);
+hud_bake(103, 1, hud.team_body);
+hud_bake(103, 2, hud.secret_full);
+hud_bake(103, 3, hud.secret_empty);
+hud_bake(103, 3, hud.secret_beaming, /*effect_color=*/224);
+for(int i = 0; i < 4; ++i){
+hud_bake(103, (size_t)(4 + i), hud.peer_alive[i]);
+hud_bake(103, (size_t)(8 + i), hud.peer_dead[i]);
+}
+for(int i = 0; i < client::ui::ChromeTextures::HudChrome::kInvIcons; ++i){
+hud_bake(97, (size_t)i, hud.inv_icon[i]);
+hud_bake(97, (size_t)i, hud.inv_icon_dim[i], 0, /*brightness=*/32);
+}
+hud_bake(102, 0, hud.buy_bg);
+hud_bake(102, 1, hud.buy_highlight);
+for(int i = 0; i < 9; ++i)
+hud_bake(188, (size_t)i, hud.chat_edge[i]);
+}
 
 // ---- Bitmap glyph fonts (origin/main text parity) -----------------------
 // origin/main renders ALL UI text from the legacy bitmap font banks 132..136
@@ -539,6 +600,10 @@ static const FaceBake kFaceBakes[] = {
     {5, 135, 12.f, 19.f}, // ScreenTitle — bank 135 tracked wider
     {6, 133, 11.f, 11.f}, // Footer      — bank 133 tracked wide (version line)
     {7, 133, 7.f, 11.f},  // BodySm      — bank 133 tracked +1
+    {8, 132, 6.f, 7.f},   // TinyCounter — bank 132 tracked wide (HUD inv counts)
+    {9, 134, 10.f, 15.f}, // MessageHeading — bank 134 tracked wide
+    {10, 136, 25.f, 23.f},// MessageTitle   — bank 136 tracked wide
+    {11, 135, 13.f, 19.f},// MessageSubtitle— bank 135 tracked wide
 };
 for(const FaceBake & fb : kFaceBakes){
 if((size_t)fb.bank >= banks.size()) continue;
@@ -578,6 +643,7 @@ Uint8 page; // presentation palette page: the Effect* index tables AND the
             // page 0's tables map e.g. brightness-160 green and EffectColor-189
             // amber to measurably different ramps than the lobby golden)
 ::ui::Color key;
+Uint8 alpha = 255; // <255: premultiplied translucent bake (origin DrawAlphaed)
 };
 static const VariantBake kVariantBakes[] = {
     // The authored art IS the standard green (24,124,20 core + dark ramp).
@@ -606,6 +672,18 @@ static const VariantBake kVariantBakes[] = {
     // (LegacyPalette(129, 144, ramp)).
     {0, 133, 6.f, 11.f, Fx::Raw, 0, 64, 2, silencer::tokens::kTextTechDim},
     {0, 133, 6.f, 11.f, Fx::Ramp, 129, 144, 2, silencer::tokens::kTextTechSlots},
+    // ---- in-game HUD (presentation palette page 0, INGAME_SPECS.md) ----
+    {3, 132, 4.f, 7.f, Fx::Raw, 0, 128, 0, silencer::tokens::kTextHudDefault},
+    {3, 132, 4.f, 7.f, Fx::Color, 202, 128, 0, silencer::tokens::kTextHudCredits},
+    {3, 132, 4.f, 7.f, Fx::Color, 161, 128, 0, silencer::tokens::kTextHudHealth},
+    {3, 132, 4.f, 7.f, Fx::Raw, 0, 32, 0, silencer::tokens::kTextHudDim32},
+    {8, 132, 6.f, 7.f, Fx::Raw, 0, 128, 0, silencer::tokens::kTextHudDefault},
+    {0, 133, 6.f, 11.f, Fx::Raw, 0, 128, 0, silencer::tokens::kTextHudDefault},
+    {0, 133, 6.f, 11.f, Fx::Raw, 0, 136, 0, silencer::tokens::kTextHudBright},
+    {1, 134, 8.f, 15.f, Fx::Raw, 0, 128, 0, silencer::tokens::kTextHudDefault},
+    {1, 134, 8.f, 15.f, Fx::Raw, 0, 64, 0, silencer::tokens::kTextHudDim64},
+    {5, 135, 12.f, 19.f, Fx::Color, 202, 128, 0, silencer::tokens::kTextHudCredits},
+    {2, 136, 16.f, 23.f, Fx::Color, 202, 128, 0, silencer::tokens::kTextHudCredits},
 };
 const Uint8 prevPage = game.renderer.palette.CurrentPalette();
 for(const VariantBake & vb : kVariantBakes){
@@ -640,12 +718,173 @@ src[i].h = sp->h;
 cppxHost->build_glyph_color_face(vb.face, vb.key.r, vb.key.g, vb.key.b, src,
                                  GF::kGlyphCount, vpal, vb.advance,
                                  vb.line_height, kLegacyRenderWidth,
+                                 kLegacyRenderHeight, vb.alpha);
+}
+// Pulse-driven HUD text (page 0): center-message reveal (Title face, color
+// 208, brightness 64..160 — text + shadow ramps) and buy-row selection
+// (Heading face, color 0, brightness 128..136). Baked under the generic
+// tokens::hud_text_key(color, brightness) keys.
+{
+const Uint8 prevPage = game.renderer.palette.CurrentPalette();
+if(prevPage != 0) game.renderer.palette.SetPalette(0);
+const SDL_Color * vpal = game.renderer.palette.colors[0];
+auto bake_pulse = [&](int face, int bank, float advance, float line_height,
+                      Uint8 color, Uint8 brightness){
+if((size_t)bank >= banks.size()) return;
+const auto & glyphbank = banks[bank];
+const int ioffset = (bank == 132) ? 34 : 33;
+std::vector<std::unique_ptr<Surface>> fxcopies;
+GF::GlyphSrc src[GF::kGlyphCount] = {};
+for(int i = 0; i < GF::kGlyphCount; ++i){
+const int ch = GF::kFirstChar + i;
+const int gi = ch - ioffset;
+if(ch == ' ' || gi < 0 || (size_t)gi >= glyphbank.size()) continue;
+const std::shared_ptr<Surface> & sp = glyphbank[gi];
+if(!sp || sp->w < 1 || sp->h < 1 || sp->pixels.empty()) continue;
+Surface * copy = game.renderer.CreateSurfaceCopy(sp.get());
+if(!copy) continue;
+if(color) game.renderer.EffectColor(copy, nullptr, color);
+if(brightness != 128) game.renderer.EffectBrightness(copy, nullptr, brightness);
+fxcopies.emplace_back(copy);
+src[i].indices = copy->pixels.data();
+src[i].w = sp->w;
+src[i].h = sp->h;
+}
+const ::ui::Color key = silencer::tokens::hud_text_key(color, brightness);
+cppxHost->build_glyph_color_face(face, key.r, key.g, key.b, src,
+                                 GF::kGlyphCount, vpal, advance, line_height,
+                                 kLegacyRenderWidth, kLegacyRenderHeight);
+};
+for(int b = 64; b <= 160; b += 2)
+bake_pulse(4, 135, 11.f, 19.f, 208, (Uint8)b);
+// Buy/tech selected-row pulse (Heading face, color 0, 129..136).
+for(int b = 129; b <= 136; ++b)
+bake_pulse(1, 134, 8.f, 15.f, 0, (Uint8)b);
+// Ammo counter: origin draws it DrawAlphaed — each glyph pixel is the
+// palette ALPHA-TABLE mix of the glyph index over the pixel under it. The
+// counter sits on the dash well's flat interior, so baking the face through
+// Alpha(glyph, well_index) reproduces origin's exact quantized mix.
+{
+Uint8 well = 0;
+if(94 < banks.size() && 0 < banks[94].size() && banks[94][0] &&
+   !banks[94][0]->pixels.empty()){
+const Surface * dash = banks[94][0].get();
+int ox = 0, oy = 0;
+if(94 < game.world.resources.spriteoffsetx.size() &&
+   !game.world.resources.spriteoffsetx[94].empty()){
+ox = game.world.resources.spriteoffsetx[94][0];
+oy = game.world.resources.spriteoffsety[94][0];
+}
+const int sx = 124 + ox, sy = 462 + oy; // inside the counter well
+if(sx >= 0 && sy >= 0 && sx < dash->w && sy < dash->h)
+well = dash->pixels[(size_t)sy * dash->w + sx];
+}
+const auto & glyphbank = banks[135];
+GF::GlyphSrc src[GF::kGlyphCount] = {};
+std::vector<std::vector<uint8_t>> mixed;
+for(int i = 0; i < GF::kGlyphCount; ++i){
+const int ch = GF::kFirstChar + i;
+const int gi = ch - 33;
+if(ch == ' ' || gi < 0 || (size_t)gi >= glyphbank.size()) continue;
+const std::shared_ptr<Surface> & sp = glyphbank[gi];
+if(!sp || sp->w < 1 || sp->h < 1 || sp->pixels.empty()) continue;
+mixed.emplace_back(sp->pixels);
+for(uint8_t & px : mixed.back())
+if(px) px = game.renderer.palette.Alpha(px, well);
+src[i].indices = mixed.back().data();
+src[i].w = sp->w;
+src[i].h = sp->h;
+}
+const ::ui::Color key = silencer::tokens::kTextHudAmmo;
+cppxHost->build_glyph_color_face(5, key.r, key.g, key.b, src, GF::kGlyphCount,
+                                 vpal, 12.f, 19.f, kLegacyRenderWidth,
                                  kLegacyRenderHeight);
+}
+if(prevPage != 0) game.renderer.palette.SetPalette(prevPage);
 }
 if(game.renderer.palette.CurrentPalette() != prevPage)
 game.renderer.palette.SetPalette(prevPage);
 }
 }
+}
+
+uint32_t GameUiPipeline::EnsureHudRampVariant(uint8_t bank, uint16_t index,
+                                              uint8_t rampColor,
+                                              uint8_t rampPlus,
+                                              uint8_t brightness) {
+if(!cppxHost) return 0;
+const uint64_t key = ((uint64_t)brightness << 32) | ((uint64_t)bank << 24) |
+                     ((uint64_t)index << 16) | ((uint64_t)rampColor << 8) |
+                     rampPlus;
+auto it = hudRampVariants_.find(key);
+if(it != hudRampVariants_.end()) return it->second;
+const auto &banks = game.world.resources.spritebank;
+if(bank >= banks.size() || index >= banks[bank].size()) return 0;
+const std::shared_ptr<Surface> &sp = banks[bank][index];
+if(!sp || sp->pixels.empty()) return 0;
+const SDL_Color *palette = game.renderer.palette.GetColors();
+if(!palette) return 0;
+uint32_t id = 0;
+if(rampColor == 0 && brightness == 128){
+id = cppxHost->bake_chrome_sprite(sp->pixels.data(), sp->w, sp->h, palette);
+}else{
+Surface * copy = game.renderer.CreateSurfaceCopy(sp.get());
+if(!copy) return 0;
+if(rampColor){
+if(rampPlus) game.renderer.EffectRampColorPlus(copy, nullptr, rampColor, rampPlus);
+else game.renderer.EffectRampColor(copy, nullptr, rampColor);
+}
+if(brightness != 128) game.renderer.EffectBrightness(copy, nullptr, brightness);
+id = cppxHost->bake_chrome_sprite(copy->pixels.data(), copy->w, copy->h, palette);
+delete copy;
+}
+hudRampVariants_[key] = id;
+return id;
+}
+
+client::ui::ChromeTextures::Sprite
+GameUiPipeline::EnsureHudTeamEmblem(uint8_t agency, uint8_t color) {
+client::ui::ChromeTextures::Sprite out;
+if(!cppxHost) return out;
+const uint16_t key = ((uint16_t)agency << 8) | color;
+auto it = hudEmblems_.find(key);
+if(it != hudEmblems_.end()) return it->second;
+const auto &banks = game.world.resources.spritebank;
+if(181 >= banks.size() || agency >= banks[181].size()) return out;
+const std::shared_ptr<Surface> &sp = banks[181][agency];
+if(!sp || sp->pixels.empty()) return out;
+const SDL_Color *palette = game.renderer.palette.GetColors();
+if(!palette) return out;
+// origin TeamEmblem custom draw: team-colorize + outline the VISIBLE-pixel
+// border (color 17), then DrawScaled factor 2 — a pixel-SKIPPING downsample
+// to half size. Bake the skipped pixels so the texture draws 1:1.
+Surface * copy = game.renderer.CreateSurfaceCopy(sp.get());
+if(!copy) return out;
+game.renderer.EffectTeamColor(copy, nullptr, color, false, true);
+for(int py = 0; py < sp->h; ++py)
+for(int px = 0; px < sp->w; ++px){
+if(sp->pixels[(size_t)py * sp->w + px]) continue;
+const bool edge =
+    (px > 0 && sp->pixels[(size_t)py * sp->w + px - 1]) ||
+    (px < sp->w - 1 && sp->pixels[(size_t)py * sp->w + px + 1]) ||
+    (py > 0 && sp->pixels[(size_t)(py - 1) * sp->w + px]) ||
+    (py < sp->h - 1 && sp->pixels[(size_t)(py + 1) * sp->w + px]);
+if(edge) copy->pixels[(size_t)py * copy->w + px] = 17;
+}
+const int hw = (sp->w + 1) / 2, hh = (sp->h + 1) / 2;
+std::vector<uint8_t> half((size_t)hw * hh);
+for(int py = 0, y2 = 0; py < sp->h; py += 2, ++y2)
+for(int px = 0, x2 = 0; px < sp->w; px += 2, ++x2)
+half[(size_t)y2 * hw + x2] = copy->pixels[(size_t)py * copy->w + px];
+delete copy;
+uint32_t id = cppxHost->bake_chrome_sprite(half.data(), hw, hh, palette);
+if(id){
+out.id = id;
+out.w = (uint16_t)hw;
+out.h = (uint16_t)hh;
+}
+hudEmblems_[key] = out;
+return out;
 }
 
 void GameUiPipeline::RenderCppxClientUiFrame(Surface& surface) {
@@ -1111,6 +1350,14 @@ world_session.buytech_close = [this](){
 cppxHost->pipeline().client_ui().queue_deferred_mutation([this](){
 Player * p = game.world.GetPeerPlayer(game.world.viewedpeerid);
 if(p){ p->isbuying = false; p->techstationactive = false; }
+});
+};
+world_session.chat_set_text = [this](const std::string & text){
+cppxHost->pipeline().client_ui().queue_deferred_mutation([this, text](){
+Player * p = game.world.GetPeerPlayer(game.world.viewedpeerid);
+if(!p) return;
+std::strncpy(p->chatText, text.c_str(), sizeof(p->chatText) - 1);
+p->chatText[sizeof(p->chatText) - 1] = '\0';
 });
 };
 world_session.chat_send = [this](const std::string & text){

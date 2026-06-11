@@ -111,7 +111,7 @@ public:
                               uint8_t key_b, const GlyphFonts::GlyphSrc *glyphs,
                               int count, const SDL_Color *palette256,
                               float advance, float line_height, int legacy_w,
-                              int legacy_h);
+                              int legacy_h, uint8_t alpha = 255);
 
   void mark_chrome_baked() { chrome_dirty_ = false; }
 

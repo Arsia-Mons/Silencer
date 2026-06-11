@@ -113,11 +113,13 @@ void publish_change(const std::function<void(const std::string &)> &on_change,
     on_change(value);
 }
 
-::ui::TextEditMetadata text_edit_metadata(const InputEditState &state) {
+::ui::TextEditMetadata text_edit_metadata(const InputEditState &state,
+                                           bool show_caret) {
   int start =
       state.selection_anchor >= 0 ? selection_start(state) : state.caret;
   int end = state.selection_anchor >= 0 ? selection_end(state) : state.caret;
   return {
+      .show_caret = show_caret,
       .caret = state.caret,
       .selection_start = start,
       .selection_end = end,
@@ -226,7 +228,7 @@ void publish_change(const std::function<void(const std::string &)> &on_change,
     visual={visual}
     text={::ui::HostTextProps{.value = props.value}}
     interaction={detail::interaction_from_props(props, true)}
-    textEdit={text_edit_metadata(*state)}
+    textEdit={text_edit_metadata(*state, props.show_caret)}
     accessibility={detail::accessibility_from_props(props, ::ui::SemanticRole::TextBox)}
     callbacks={callbacks}
   />

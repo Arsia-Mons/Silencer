@@ -36,7 +36,7 @@ class GlyphFonts {
 public:
   // Faces mirror FontRegistry::FaceId (Body/Large/Title/Tiny/Heading). Each maps
   // to a legacy bank; see game_ui_pipeline's glyph bake for the bank wiring.
-  static constexpr int kFaceCount = 8;
+  static constexpr int kFaceCount = 12;
   // Printable ASCII window stored in each atlas: space(32) .. '~'(126).
   static constexpr int kFirstChar = 32;
   static constexpr int kLastChar = 126;
@@ -87,7 +87,9 @@ public:
   bool build_color_face(SDL_Renderer *renderer, int face_id, uint8_t key_r,
                         uint8_t key_g, uint8_t key_b, const GlyphSrc *glyphs,
                         int count, const SDL_Color *palette256, float advance,
-                        float line_height, int legacy_w, int legacy_h);
+                        float line_height, int legacy_w, int legacy_h,
+                        uint8_t alpha = 255); // <255: premultiplied translucent
+                                              // pixels (origin DrawAlphaed text)
 
   // Per-phase STRING variant (origin text striping parity). origin composites
   // text on its virtual canvas (integer pen, advance per char) and the whole-
@@ -122,7 +124,7 @@ public:
   void shutdown();
 
 private:
-  static constexpr int kVariantCap = 24;
+  static constexpr int kVariantCap = 128; // menus ~18 + HUD palette/brightness ramps (~80)
   // Per-screen string count is small (menus ~20); lobby lists stay well under
   // this. At cap the whole store recycles (cheap rebake, no eviction churn).
   static constexpr int kStringVariantCap = 256;

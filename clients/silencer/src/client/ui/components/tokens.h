@@ -84,6 +84,22 @@ constexpr ::ui::Color kTextVersion = {140, 64, 8, 255};    // build version (amb
 constexpr ::ui::Color kTextAgentName = {40, 96, 200, 255}; // agent names (cornflower blue)
 constexpr ::ui::Color kTextProse = {198, 198, 198, 255};   // white prose (agency detail/description)
 
+// ---- In-game HUD exact-color text keys (variant faces baked on palette
+// page 0 — origin LegacyPalette(color, brightness) per INGAME_SPECS.md).
+// The KEY is an arbitrary unique id; the baked pixels are origin's.
+constexpr ::ui::Color kTextHudDefault = {61, 233, 61, 255};  // (0, 128)
+constexpr ::ui::Color kTextHudBright = {62, 234, 62, 255};   // (0, 136) chat/hack/trace
+constexpr ::ui::Color kTextHudDim32 = {63, 235, 63, 255};    // (0, 32) inv letters
+constexpr ::ui::Color kTextHudDim64 = {64, 236, 64, 255};    // (0, 64) buy rows dim
+constexpr ::ui::Color kTextHudAmmo = {65, 237, 65, 255};     // (0, 128, alphaed) ammo
+constexpr ::ui::Color kTextHudCredits = {66, 238, 66, 255};  // (202, 128)
+constexpr ::ui::Color kTextHudHealth = {67, 239, 67, 255};   // (161, 128)
+// Generic key for pulse-driven HUD text (center-message reveal, buy-row
+// selection): LegacyPalette(color_idx, brightness) baked under {idx, b, 7}.
+constexpr ::ui::Color hud_text_key(uint8_t color_idx, uint8_t brightness) {
+  return {color_idx, brightness, 7, 255};
+}
+
 // ---- In-game HUD LCD palette (overlay over live world; spec §1.1) ----
 // SEPARATE from the menu green family above: these read against the live world,
 // not the starfield, so they run brighter/saturated. own-data=green,
@@ -114,6 +130,13 @@ constexpr uint16_t kFaceHeading = 4; // bank 135, advance 11 (origin Title — t
 constexpr uint16_t kFaceScreenTitle = 5; // bank 135, advance 12 (origin ScreenTitle)
 constexpr uint16_t kFaceFooter = 6;      // bank 133, advance 11 (origin Footer)
 constexpr uint16_t kFaceBodySm = 7;      // bank 133, advance 7  (origin BodySm)
+// In-game HUD faces (origin TextSize table, text.cpp ResolveTextRenderStyle).
+// HudCounter (bank 135, advance 12) is the same tracking as ScreenTitle.
+constexpr uint16_t kFaceHudCounter = 5;
+constexpr uint16_t kFaceTinyCounter = 8;      // bank 132, advance 6
+constexpr uint16_t kFaceMessageHeading = 9;   // bank 134, advance 10
+constexpr uint16_t kFaceMessageTitle = 10;    // bank 136, advance 25
+constexpr uint16_t kFaceMessageSubtitle = 11; // bank 135, advance 13
 
 // ---- Glyph cell sizes (logical points) + line heights ----
 // Text renders from the legacy bitmap glyph banks (origin/main parity), NOT TTF.

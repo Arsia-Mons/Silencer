@@ -38,6 +38,10 @@ struct WorldSessionSnapshot {
   uint16_t credits = 0;
   uint8_t inventory_items[4] = {0, 0, 0, 0};
   uint8_t inventory_counts[4] = {0, 0, 0, 0};
+  // Render projections of the slot item ids (origin Renderer::InvIdToResIndex /
+  // InvIdToLetter): bank-97 sprite index (0xFF = none) + slot letter (0 = none).
+  uint8_t inventory_res_index[4] = {0xFF, 0xFF, 0xFF, 0xFF};
+  char inventory_letters[4] = {0, 0, 0, 0};
   uint8_t current_inventory = 0;
 
   // --- match (use_match), read from the replicated GameStateObject ---
@@ -58,10 +62,12 @@ struct WorldSessionSnapshot {
   bool tech_active = false;
   int buytech_selected = 0;
   std::vector<TechItem> buytech_items = {};
+  std::string buytech_footer = {};
 
   // --- in-game chat overlay (use_ingame_chat) ---
   bool chat_active = false;
   bool chat_with_team = false;
+  bool chat_caret_on = false; // origin blink: (SDL_GetTicks()/50)%32 < 16
   int chat_show_ticks = 0;
   std::string chat_text = {};
   std::vector<std::string> chat_log = {}; // recent scrollback, oldest -> newest
@@ -70,6 +76,35 @@ struct WorldSessionSnapshot {
   // Per-team scores reuse `scores` above; `players` is the connected roster.
   bool show_player_list = false;
   std::vector<ScoreboardPlayer> players = {};
+
+  // --- in-game HUD (use_hud, origin ui/hud parity) ---
+  // Per-team strip rows. `peers[].sprite` is the pulse-resolved texture for
+  // this frame (in-base / has-secret ramps applied game-side); `emblem` is the
+  // team-colorized, outlined, 2x emblem.
+  struct HudTeamStrip {
+    uint8_t secrets = 0;
+    bool beaming = false;
+    int num_peers = 0;
+    struct Peer {
+      bool present = false;
+      bool dead = false;
+      bool has_secret = false;
+      uint32_t sprite = 0;
+      // Player-list (F1) row data: display name + the user's per-agency
+      // profile stats (origin HudView TeamPeerView).
+      std::string name = {};
+      int level = 0, endurance = 0, shield = 0, jetpack = 0, hacking = 0,
+          contacts = 0;
+    } peers[4];
+    uint32_t emblem = 0;
+    uint16_t emblem_w = 0, emblem_h = 0;
+  };
+  uint8_t hud_phase = 0;  // renderer pulse clock (+1/sim frame)
+  uint32_t hud_tick = 0;  // world tick (secret-slot flicker)
+  bool poisoned = false;
+  uint8_t quit_state = 0; // 1/2 => "Hit Enter To Quit"
+  uint8_t message_i = 0, message_type = 0, message_time = 0;
+  std::vector<HudTeamStrip> hud_teams = {};
 };
 
 // The in-match frame value (doc §5): the per-tick snapshot + the queued intent
@@ -86,6 +121,7 @@ struct WorldSessionValue {
   std::function<void()> buytech_close = {};
 
   // In-game chat intents (use_ingame_chat).
+  std::function<void(const std::string &)> chat_set_text = {};
   std::function<void(const std::string &)> chat_send = {};
   std::function<void()> chat_cancel = {};
   std::function<void()> chat_toggle_channel = {};

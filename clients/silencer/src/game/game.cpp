@@ -51,6 +51,27 @@ bool Game::CaptureCompositedFrame(const char * path) {
 			SDL_Color c = palette[buf.pixels[i]];
 			int sa = ui[i * 4 + 3];
 			int inv = 255 - sa;
+			if(sa > 0 && sa < 255){
+				// Translucent UI over the palettized world (player-list dim
+				// fill): origin mixes in PALETTE space (alpha lookup table,
+				// quantized to the palette) — linear RGB blending diverges by
+				// up to half a palette step. Reproduce origin's table mix.
+				SDL_Color sc = {
+					static_cast<Uint8>(ui[i * 4 + 0] * 255 / sa),
+					static_cast<Uint8>(ui[i * 4 + 1] * 255 / sa),
+					static_cast<Uint8>(ui[i * 4 + 2] * 255 / sa), 255};
+				// origin authors translucent fills as palette INDICES (the
+				// player-list dim is index 0 = black); the alpha LUT's low
+				// reserved rows are real mixes, so map black straight to 0.
+				Uint8 si = (sc.r | sc.g | sc.b) == 0
+					? 0 : renderer.palette.ClosestMatch(sc);
+				SDL_Color mixed = palette[renderer.palette.Alpha(si, buf.pixels[i])];
+				rgba[i * 4 + 0] = mixed.r;
+				rgba[i * 4 + 1] = mixed.g;
+				rgba[i * 4 + 2] = mixed.b;
+				rgba[i * 4 + 3] = 255;
+				continue;
+			}
 			rgba[i * 4 + 0] = static_cast<Uint8>(ui[i * 4 + 0] + c.r * inv / 255);
 			rgba[i * 4 + 1] = static_cast<Uint8>(ui[i * 4 + 1] + c.g * inv / 255);
 			rgba[i * 4 + 2] = static_cast<Uint8>(ui[i * 4 + 2] + c.b * inv / 255);

@@ -1,4 +1,5 @@
 #include "ui/world_session_model.h"
+#include "ui/game_ui_pipeline.h"
 
 #include "game.h"
 #include "world.h"
@@ -13,6 +14,8 @@
 #include "lobby.h"
 #include "actor/user.h"
 #include "gasloader.h"
+
+#include <SDL3/SDL_timer.h>
 
 #include <cstring>
 #include <string>
@@ -82,6 +85,10 @@ CaptureWorldSessionSnapshot(Game &game, client::ui::SessionPhase phase) {
     for (int i = 0; i < 4; ++i) {
       snap.inventory_items[i] = p->inventoryitems[i];
       snap.inventory_counts[i] = p->inventoryitemsnum[i];
+      snap.inventory_res_index[i] =
+          game.GetRenderer().InvIdToResIndex(p->inventoryitems[i]);
+      const char *letter = Renderer::InvIdToLetter(p->inventoryitems[i]);
+      snap.inventory_letters[i] = letter && letter[0] ? letter[0] : 0;
     }
     snap.current_inventory = p->currentinventoryitem;
   }
@@ -122,30 +129,175 @@ CaptureWorldSessionSnapshot(Game &game, client::ui::SessionPhase phase) {
     snap.tech_active = p->techstationactive;
     snap.chat_active = p->chatActive;
     snap.chat_with_team = p->chatwithteam;
+    snap.chat_caret_on = (SDL_GetTicks() / 50) % 32 < 16;
     snap.chat_text = p->chatText;
     if (p->isbuying || p->techstationactive) {
+      // Port of origin HudView.cpp PopulateBuyTech: visible 5-row scroll
+      // window, give-row peer names, UP/DOWN/repair price column, wall-clock
+      // selection pulse (SDL_GetTicks/50, brightness 128..136), and the
+      // per-row icon at that brightness.
       const bool tech = p->techstationactive;
-      snap.buytech_selected =
-          tech ? p->techifacelastitem : p->buyifacelastitem;
+      Team *buyTechTeam = p->GetTeam(world);
+      Team *otherteam = nullptr;
+      if (!p->InOwnBase(world)) {
+        for (Uint16 tid : world.GetObjectsByType(ObjectTypes::TEAM)) {
+          Team *t = static_cast<Team *>(world.GetObjectFromId(tid));
+          if (t && t != buyTechTeam)
+            otherteam = t;
+        }
+      }
       std::vector<BuyableItem *> items;
       p->CollectBuyMenuItems(world, tech, items);
-      for (BuyableItem *bi : items) {
+      int selecteditem = tech ? p->techifacelastitem : p->buyifacelastitem;
+      int scrolled = tech ? p->techifacelastscrolled : p->buyifacelastscrolled;
+      if (selecteditem < 0)
+        selecteditem = 0;
+      if (!items.empty() && selecteditem >= (int)items.size())
+        selecteditem = (int)items.size() - 1;
+      if (scrolled < 0)
+        scrolled = 0;
+      snap.buytech_selected = selecteditem;
+      Uint8 uiTick = (Uint8)(SDL_GetTicks() / 50);
+      Uint8 selectedBrightness = 128;
+      if (uiTick % 16 >= 8)
+        selectedBrightness += (uiTick % 8);
+      else
+        selectedBrightness += 8 - (uiTick % 8);
+      GameUiPipeline &pipe = game.GetUiPipeline();
+      const Resources &res = world.resources;
+      for (int i = scrolled;
+           i < (int)items.size() && (int)snap.buytech_items.size() < 5; ++i) {
+        BuyableItem *bi = items[i];
         client::ui::TechItem row;
+        row.index = i;
         row.label = bi->name;
-        if (tech) {
-          row.detail = std::to_string((int)bi->techslots) +
-                       (bi->techslots == 1 ? " slot" : " slots");
-          row.affordable = true;
-        } else {
-          row.detail = "$" + std::to_string(bi->price);
-          row.affordable = (int)p->credits >= bi->price;
+        int peerIndex = -1;
+        if (bi->id == World::BUY_GIVE0) peerIndex = 0;
+        if (bi->id == World::BUY_GIVE1) peerIndex = 1;
+        if (bi->id == World::BUY_GIVE2) peerIndex = 2;
+        if (bi->id == World::BUY_GIVE3) peerIndex = 3;
+        if (peerIndex >= 0 && buyTechTeam) {
+          Peer *targetPeer = world.GetPeer(buyTechTeam->peers[peerIndex]);
+          if (targetPeer) {
+            User *user = world.lobby.GetUserInfo(targetPeer->accountid);
+            if (user)
+              row.label += user->DisplayName();
+          }
         }
+        if (p->isbuying) {
+          row.price = (buyTechTeam && (buyTechTeam->disabledtech & bi->techchoice))
+                          ? "DOWN"
+                          : std::to_string(bi->price);
+        } else if (!p->InOwnBase(world)) {
+          row.price = (otherteam && (otherteam->disabledtech & bi->techchoice))
+                          ? "DOWN"
+                          : std::to_string(bi->repairprice);
+        } else if (buyTechTeam && (buyTechTeam->disabledtech & bi->techchoice)) {
+          row.price = std::to_string(bi->repairprice);
+        } else {
+          row.price = "UP";
+        }
+        row.selected = (i == selecteditem);
+        row.brightness = row.selected ? selectedBrightness : (Uint8)128;
+        row.icon =
+            pipe.EnsureHudRampVariant(bi->res_bank, bi->res_index, 0, 0,
+                                      row.brightness);
+        if (bi->res_bank < res.spritebank.size() &&
+            bi->res_index < res.spritebank[bi->res_bank].size()) {
+          Surface *icon = res.spritebank[bi->res_bank][bi->res_index].get();
+          if (icon) {
+            row.icon_w = (uint16_t)icon->w;
+            row.icon_h = (uint16_t)icon->h;
+          }
+        }
+        if (bi->res_bank < res.spriteoffsetx.size() &&
+            bi->res_index < res.spriteoffsetx[bi->res_bank].size())
+          row.icon_ox = (int16_t)res.spriteoffsetx[bi->res_bank][bi->res_index];
+        if (bi->res_bank < res.spriteoffsety.size() &&
+            bi->res_index < res.spriteoffsety[bi->res_bank].size())
+          row.icon_oy = (int16_t)res.spriteoffsety[bi->res_bank][bi->res_index];
         snap.buytech_items.push_back(std::move(row));
       }
+      snap.buytech_footer =
+          (p->isbuying || p->InOwnBase(world))
+              ? "Available Credits: " + std::to_string((int)p->credits)
+              : "Viruses Available: " +
+                    std::to_string((int)p->InventoryItemCount(Player::INV_VIRUS));
     }
   }
   snap.chat_show_ticks = world.messaging.showchat_i;
   snap.show_player_list = world.IsShowingPlayerList();
+
+  // --- in-game HUD (use_hud): pulse clock, message reveal, team strip ---
+  snap.hud_phase = game.GetRenderer().GetHudAnimationPhase();
+  snap.hud_tick = world.tickcount;
+  snap.quit_state = world.quitstate;
+  snap.message_i = world.messaging.message_i;
+  snap.message_type = world.messaging.messagetype;
+  snap.message_time = world.messaging.messagetime;
+  if (p)
+    snap.poisoned = p->GetPoisonedBy() != 0;
+  GameUiPipeline &pipe = game.GetUiPipeline();
+  const Uint8 pulse = snap.hud_phase;
+  for (Uint16 tid : world.GetObjectsByType(ObjectTypes::TEAM)) {
+    Team *team = static_cast<Team *>(world.GetObjectFromId(tid));
+    if (!team)
+      continue;
+    client::ui::WorldSessionSnapshot::HudTeamStrip row;
+    row.secrets = team->secrets;
+    row.beaming = team->beamingterminalid != 0;
+    row.num_peers = team->numpeers;
+    for (int i = 0; i < row.num_peers && i < 4; ++i) {
+      Peer *tp = world.GetPeer(team->peers[i]);
+      if (!tp)
+        continue;
+      Player *pp = world.GetPeerPlayer(tp->id);
+      if (!pp)
+        continue;
+      auto &slot = row.peers[i];
+      slot.present = true;
+      // Player's state enum is private; 20/21 = DYING/DEAD (origin
+      // HudClayHelpers kPlayerStateDead = 21).
+      slot.dead = pp->GetState() == 21 || pp->GetState() == 20;
+      slot.has_secret = pp->hassecret;
+      User *user = world.lobby.GetUserInfo(tp->accountid);
+      if (user) {
+        slot.name = user->DisplayName();
+        if (tp->isbot)
+          slot.name += " [BOT]";
+        slot.level = user->agency[team->agency].level;
+        slot.endurance = user->agency[team->agency].endurance;
+        slot.shield = user->agency[team->agency].shield;
+        slot.jetpack = user->agency[team->agency].jetpack;
+        slot.hacking = user->agency[team->agency].hacking;
+        slot.contacts = user->agency[team->agency].contacts;
+      }
+      // origin hud_teams.cpp pulses: in-base ramp 210 (triangle on phase>>2,
+      // period 8), has-secret ramp 114 (triangle on phase, period 16).
+      Uint8 rampColor = 0, rampPlus = 0;
+      if (pp->InBase(world) || pp->hassecret) {
+        Uint8 time = 4, shift = 2;
+        rampColor = 210;
+        if (pp->hassecret) {
+          time = 8;
+          rampColor = 114;
+          shift = 0;
+        }
+        if ((pulse >> shift) % (time * 2) < time)
+          rampPlus += (pulse >> shift) % time;
+        else
+          rampPlus += time - ((pulse >> shift) % time);
+      }
+      slot.sprite = pipe.EnsureHudRampVariant(
+          103, (uint16_t)((slot.dead ? 8 : 4) + i), rampColor, rampPlus);
+    }
+    client::ui::ChromeTextures::Sprite emblem =
+        pipe.EnsureHudTeamEmblem(team->agency, team->GetColor());
+    row.emblem = emblem.id;
+    row.emblem_w = emblem.w;
+    row.emblem_h = emblem.h;
+    snap.hud_teams.push_back(row);
+  }
 
   // Chat scrollback (oldest -> newest). The HUD chat box shows the last few
   // lines above the active compose line; cap so the box stays compact.
@@ -196,7 +348,8 @@ CaptureWorldSessionSnapshot(Game &game, client::ui::SessionPhase phase) {
   return snap;
 }
 
-InGameUiControlResult ConfigureInGameUi(Game &game, InGameUiMode mode) {
+InGameUiControlResult ConfigureInGameUi(Game &game, InGameUiMode mode,
+                                        const InGameUiChatSeed &chat) {
   InGameUiControlResult result;
   World &world = game.GetWorld();
 
@@ -242,11 +395,18 @@ InGameUiControlResult ConfigureInGameUi(Game &game, InGameUiMode mode) {
     clear();
 
   if (mode == InGameUiMode::Chat || mode == InGameUiMode::All) {
-    player->chatActive = true;
-    player->chatwithteam = false;
-    std::strncpy(player->chatText, "ui chat smoke",
-                 sizeof(player->chatText) - 1);
-    player->chatText[sizeof(player->chatText) - 1] = '\0';
+    if (!chat.line.empty()) {
+      world.messaging.chatlines.push_back(chat.line);
+      while ((int)world.messaging.chatlines.size() >
+             GASLoader::Get().gameengine.chatMaxLines)
+        world.messaging.chatlines.pop_front();
+    } else {
+      player->chatActive = true;
+      player->chatwithteam = false;
+      std::strncpy(player->chatText, chat.text.c_str(),
+                   sizeof(player->chatText) - 1);
+      player->chatText[sizeof(player->chatText) - 1] = '\0';
+    }
     world.messaging.showchat_i = GASLoader::Get().gameengine.chatDisplayTicks;
   }
   if (mode == InGameUiMode::Buy || mode == InGameUiMode::All) {

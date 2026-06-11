@@ -153,7 +153,7 @@ bool GlyphFonts::build_color_face(SDL_Renderer *renderer, int face_id,
                                   const GlyphSrc *glyphs, int count,
                                   const SDL_Color *palette256, float advance,
                                   float line_height, int legacy_w,
-                                  int legacy_h) {
+                                  int legacy_h, uint8_t alpha) {
   if (!renderer || face_id < 0 || face_id >= kFaceCount || !glyphs ||
       !palette256)
     return false;
@@ -200,10 +200,12 @@ bool GlyphFonts::build_color_face(SDL_Renderer *renderer, int face_id,
         if (idx == 0)
           continue;
         const SDL_Color &c = palette256[idx];
-        drow[x * 4 + 0] = c.r;
-        drow[x * 4 + 1] = c.g;
-        drow[x * 4 + 2] = c.b;
-        drow[x * 4 + 3] = 255;
+        // Premultiplied: alpha<255 reproduces origin's DrawAlphaed text
+        // (palette-table ~50% mix with whatever is under it).
+        drow[x * 4 + 0] = (uint8_t)((c.r * alpha + 127) / 255);
+        drow[x * 4 + 1] = (uint8_t)((c.g * alpha + 127) / 255);
+        drow[x * 4 + 2] = (uint8_t)((c.b * alpha + 127) / 255);
+        drow[x * 4 + 3] = alpha;
       }
     }
   }

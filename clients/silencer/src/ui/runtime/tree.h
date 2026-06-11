@@ -316,6 +316,7 @@ struct NodeInteraction {
 };
 
 struct TextEditMetadata {
+  bool show_caret = true; // origin TextInputOpts.showCaret (wall-clock blink)
   int caret = 0;
   int selection_start = 0;
   int selection_end = 0;

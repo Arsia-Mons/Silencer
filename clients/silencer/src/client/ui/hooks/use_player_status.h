@@ -32,6 +32,8 @@ struct PlayerStatus {
   // Four inventory slots: item id + count, plus the selected slot.
   uint8_t inventory_items[4] = {0, 0, 0, 0};
   uint8_t inventory_counts[4] = {0, 0, 0, 0};
+  uint8_t inventory_res_index[4] = {0xFF, 0xFF, 0xFF, 0xFF}; // bank-97 sprite
+  char inventory_letters[4] = {0, 0, 0, 0};                  // slot letter
   uint8_t current_inventory = 0;
 
   std::function<void(int)> select_inventory_slot = {};

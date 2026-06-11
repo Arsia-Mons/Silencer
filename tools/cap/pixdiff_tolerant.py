@@ -22,25 +22,44 @@
 # opening both images at the printed coords. 1px hairline errors (~2%/tile)
 # remain below the floor — eyes + critic workflow own those.
 #
-#   python3 tools/cap/pixdiff_tolerant.py <render.png> <golden.png>
+#   python3 tools/cap/pixdiff_tolerant.py <render.png> <golden.png> [--mask x0,y0,x1,y1 ...]
+#
+# --mask (repeatable): zero the rect [x0,x1)x[y0,y1) (full-res input coords) in
+# BOTH images before scoring — for known-nondeterministic regions (rain,
+# minimap). No mask = unchanged behavior.
+import argparse
 import sys
 from PIL import Image
 import numpy as np
 
 TOL = 16            # per-channel tolerance after downscale
-DW, DH = 640, 360   # working res: lowest that separates defects from noise
+MAX_DW, MAX_DH = 640, 360  # working-res cap: lowest that separates defects from noise
 TILE = 26           # ~80px region at 1920x1080
 MAX_TILE_PCT = 5.0  # any tile hotter than this = localized defect (or grain to adjudicate)
 MAX_GLOBAL_PCT = 1.0
 
 def main():
-    if len(sys.argv) != 3:
-        print("usage: pixdiff_tolerant.py <render.png> <golden.png>", file=sys.stderr)
-        print("100.0")
-        return
-    ra = Image.open(sys.argv[1]).convert("RGB")
-    ga = Image.open(sys.argv[2]).convert("RGB")
+    ap = argparse.ArgumentParser()
+    ap.add_argument("render")
+    ap.add_argument("golden")
+    ap.add_argument("--mask", action="append", default=[],
+                    help="x0,y0,x1,y1 full-res rect zeroed in both images (repeatable)")
+    args = ap.parse_args()
+    ra = Image.open(args.render).convert("RGB")
+    ga = Image.open(args.golden).convert("RGB")
     fw, fh = ga.size
+    if args.mask:
+        rn = np.array(ra, dtype=np.uint8)
+        gn = np.array(ga, dtype=np.uint8)
+        for m in args.mask:
+            x0, y0, x1, y1 = (int(v) for v in m.split(","))
+            rn[y0:y1, x0:x1] = 0
+            gn[y0:y1, x0:x1] = 0
+        ra = Image.fromarray(rn)
+        ga = Image.fromarray(gn)
+    # Working res = min(input, 640x360): 1920x1080 menus collapse 3:1 as
+    # calibrated; small inputs (640x480 in-game) never upscale.
+    DW, DH = min(fw, MAX_DW), min(fh, MAX_DH)
     a = np.asarray(ra.resize((DW, DH), Image.BOX), dtype=int)
     b = np.asarray(ga.resize((DW, DH), Image.BOX), dtype=int)
     d = np.abs(a - b)

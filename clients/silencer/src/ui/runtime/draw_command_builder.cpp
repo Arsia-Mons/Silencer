@@ -483,7 +483,7 @@ bool append_input_contents(DrawCommandList &list, const NodeSnapshot &node,
                          TextAlign::Left))
     return false;
 
-  if (focused) {
+  if (focused && node.text_edit.show_caret) {
     int caret = clamp_int(node.text_edit.caret, 0, length);
     float caret_x = advance_to(caret);
     // Caret paint comes from the resolved style; height follows origin's

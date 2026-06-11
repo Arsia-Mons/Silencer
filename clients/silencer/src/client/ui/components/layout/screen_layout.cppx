@@ -90,18 +90,14 @@ using ::ui::components::DialogProps;
   }
   if (props.variant == ScreenLayoutVariant::Hud) {
     // The in-match HUD floats over the live world: a transparent full-screen
-    // Box (the UI frame composites over the world, so the root must NOT paint a
-    // surface). Readout chips (Panels) carry their own paint. Space-between so
-    // top and bottom readouts hug the screen edges.
+    // Box (the UI frame composites over the world, so the root must NOT paint
+    // a surface). Children are absolutely positioned at origin's 640x480
+    // sprite anchors (x1.5 logical) — absolute placement IS the origin design.
     return <Box
       key={props.key}
       layout={::ui::LayoutStyle{
-        .direction = ::ui::FlexDirection::Column,
-        .justify_content = ::ui::JustifyContent::SpaceBetween,
         .width = ::ui::Length::percent(100.0f),
         .height = ::ui::Length::percent(100.0f),
-        .padding = {16.0f, 16.0f, 16.0f, 16.0f},
-        .gap = 12.0f,
       }}
       style={::ui::patch().background({0, 0, 0, 0})}
     >
