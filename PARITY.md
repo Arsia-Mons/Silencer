@@ -155,9 +155,17 @@ Golden pipeline:
    dst px → src = int(d/scale) (config scalefilter default OFF ⇒ NEAREST). Use numpy index
    maps, NOT PIL resize (PIL NEAREST center-samples; the bakes use int(d/s) floors).
 5. Document provenance in ORIGIN_GOLDENS.md; save as tests/cli-agent/e2e/golden/ingame_*.png.
-6. cppx-side gap to verify separately: whether OUR screenshot op composites the cppx RGBA
-   HUD layer in-game (menus do; in-game screenbuffer is 640×480 while the UI RGBA layer is
-   window-sized — check RenderCppxClientUiFrame consumers + capture path).
+6. cppx-side path VERIFIED 2026-06-11 (read-only code analysis): headless (no window),
+   RenderCppxClientUiFrame renders the UI at SURFACE size (game_ui_pipeline.cpp:651 —
+   window-pixel size only when a window exists), and in-game the surface is forced to
+   640×480 (game_renderer.cpp SyncRenderSurfaceToWindowPixels: map.loaded ⇒
+   kLegacyRenderWidth/Height, same as origin). CaptureCompositedFrame's headless fallback
+   (game.cpp:25) CPU-composites the premultiplied cppx layer over the palettized world
+   when sizes match — so headless in-game screenshots INCLUDE the HUD at 640×480 on our
+   side too. Gate plan: capture BOTH sides at 640×480 and pixdiff there (or upscale both
+   with the same int(d/s) NEAREST maps). cppxScale floor 480/720 ⇒ origin-native 640×480
+   proportions. In-game presentation palette = page 0 (BakeChromeTextures page_color).
+   Recreation spec for all 13 HUD surfaces: INGAME_SPECS.md (worktree root).
 
 | Surface | State | Origin anchor |
 |---|---|---|
