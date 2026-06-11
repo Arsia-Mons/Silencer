@@ -10,6 +10,7 @@
 #include "ui/components/text.h"
 #include "ui/runtime/react.h"
 
+#include <cmath>
 #include <functional>
 #include <string>
 #include <vector>
@@ -33,28 +34,6 @@ struct LobbyConnectProps {
 // origin authors this dialog in the 640x480 virtual space; the cppx logical
 // canvas is 1.5x that, so its fixed offsets carry through at x1.5.
 constexpr float kS = 1.5f;
-
-// Username/Password label: origin centers a Heading-face label in an 86px cell.
-// The cell's dotted notch is baked into the dialog sprite — the label is plain
-// text laid over it.
-::ui::UiElement field_label(const char *key, const char *value) {
-  return <Box
-    key={key}
-    layout={::ui::LayoutStyle{
-      .align_items = ::ui::AlignItems::Center,
-      .justify_content = ::ui::JustifyContent::Center,
-      .flex_shrink = ::ui::StyleFloat::points(0.0f),
-      .width = ::ui::Length::points(86.0f * kS),
-      .height = ::ui::Length::points(21.0f * kS)}}
-  >
-    <Text
-      key="t"
-      value={value}
-      layout={::ui::LayoutStyle{.height = ::ui::Length::points(tokens::kLineLarge)}}
-      style={tokens::text_patch(tokens::kTextBody, tokens::kFontLarge, tokens::kFaceLarge, tokens::kLineLarge)}
-    />
-  </Box>
-}
 
 // origin/main Lobby Connect IS one baked sprite: PackImage(7,2) (chrome.dialog_connect,
 // 284x277) bakes the outer frame + soft glow, the log well, the form sub-panel and
@@ -80,8 +59,9 @@ constexpr float kS = 1.5f;
   std::function<void(const ::ui::ActivationEvent &)> on_activate =
       [submit](const ::ui::ActivationEvent &) { submit(); };
 
-  // The status log is multi-line; the engine doesn't break on '\n', so each line
-  // is its own BodyText stacked in the baked log well.
+  // The status log is multi-line; each line is an absolutely-anchored Body
+  // text on origin's ScrollTextBox pen grid: panel-virtual (291, 109 + 11k),
+  // authored L = round(1.5*v) relative to the panel box at (427, 152).
   std::vector<::ui::UiElement> log_lines;
   {
     const std::string &s = lobby.status_log;
@@ -93,8 +73,14 @@ constexpr float kS = 1.5f;
       if (!line.empty()) {
         const char *lk = ::ui::copy_string(("ln" + std::to_string(i)).c_str());
         const char *lv = ::ui::copy_string(line.c_str());
-        log_lines.push_back(BodyText(
-            BodyTextProps{.key = lk, .variant = BodyTextVariant::Detail, .value = lv}));
+        const float top = (float)std::lround(1.5f * (109.0f + 11.0f * i)) - 152.0f;
+        log_lines.push_back(Box(BoxProps{
+            .key = lk,
+            .layout = ::ui::LayoutStyle{
+                .position = ::ui::PositionType::Absolute,
+                .position_inset = ::ui::EdgeSizes{9.0f, {}, top, {}}},
+            .children = ::ui::children({BodyText(BodyTextProps{
+                .key = "t", .variant = BodyTextVariant::Body, .value = lv})})}));
       }
       if (nl == std::string::npos)
         break;
@@ -127,14 +113,21 @@ constexpr float kS = 1.5f;
   auto field_layout = ::ui::LayoutStyle{
       .align_items = ::ui::AlignItems::Center,
       .justify_content = ::ui::JustifyContent::Start,
-      .flex_grow = ::ui::StyleFloat::points(1.0f),
-      .height = ::ui::Length::points(21.0f * kS),
-      .padding = {7.0f * kS, 0.0f, 0.0f, 0.0f}};
-  auto field_row = ::ui::LayoutStyle{
-      .direction = ::ui::FlexDirection::Row,
-      .align_items = ::ui::AlignItems::Center,
-      .height = ::ui::Length::points(21.0f * kS),
-      .gap = 0.0f};
+      .width = ::ui::Length::percent(100.0f),
+      .height = ::ui::Length::points(31.5f)};
+  // The 116x24 stipple patch covering the dialog's baked button wells
+  // (panel-virtual (368, 347), origin EnsureButtonPatch).
+  ::ui::UiElement btn_patch =
+      chrome.dialog_btn_patch
+          ? Box(BoxProps{
+                .key = "btnpatch",
+                .layout = ::ui::LayoutStyle{
+                    .position = ::ui::PositionType::Absolute,
+                    .position_inset = ::ui::EdgeSizes{126.0f, {}, 369.0f, {}},
+                    .width = ::ui::Length::points(174.0f),
+                    .height = ::ui::Length::points(36.0f)},
+                .style = tokens::image_patch(chrome.dialog_btn_patch)})
+          : ::ui::empty();
 
   return <Box
     key="root"
@@ -148,94 +141,90 @@ constexpr float kS = 1.5f;
     <Box
       key="panel"
       layout={::ui::LayoutStyle{
-        .direction = ::ui::FlexDirection::Column,
-        .align_items = ::ui::AlignItems::Stretch,
         .width = ::ui::Length::points(panel_w),
         .height = ::ui::Length::points(panel_h)}}
       style={panel_style}
     >
+      {::ui::children(log_lines)}
       <Box
-        key="logslot"
+        key="ulblw"
         layout={::ui::LayoutStyle{
-          .height = ::ui::Length::points(8.0f * kS),
-          .flex_shrink = ::ui::StyleFloat::points(0.0f)}}
-      />
-      <Box
-        key="logrow"
-        layout={::ui::LayoutStyle{
-          .direction = ::ui::FlexDirection::Column,
-          .overflow = ::ui::Overflow::Hidden,
-          .align_items = ::ui::AlignItems::Start,
-          .height = ::ui::Length::points(170.0f * kS),
-          .flex_shrink = ::ui::StyleFloat::points(0.0f),
-          .padding = {7.0f * kS, 0.0f, 0.0f, 0.0f},
-          .gap = 2.0f}}
+          .position = ::ui::PositionType::Absolute,
+          .position_inset = ::ui::EdgeSizes{21.0f, {}, 296.0f, {}}}}
       >
-        {::ui::children(log_lines)}
+        <Text
+          key="t"
+          value="Username"
+          layout={::ui::LayoutStyle{.height = ::ui::Length::points(tokens::kLineLarge)}}
+          style={tokens::text_patch(tokens::kTextBody, tokens::kFontLarge, tokens::kFaceLarge, tokens::kLineLarge)}
+        />
       </Box>
       <Box
-        key="preform"
+        key="plblw"
         layout={::ui::LayoutStyle{
-          .height = ::ui::Length::points(17.0f * kS),
-          .flex_shrink = ::ui::StyleFloat::points(0.0f)}}
-      />
-      <Box
-        key="form"
-        layout={::ui::LayoutStyle{
-          .direction = ::ui::FlexDirection::Column,
-          .align_items = ::ui::AlignItems::Stretch,
-          .flex_shrink = ::ui::StyleFloat::points(0.0f),
-          .padding = {4.0f * kS, 11.0f * kS, 0.0f, 0.0f},
-          .gap = 6.0f * kS}}
+          .position = ::ui::PositionType::Absolute,
+          .position_inset = ::ui::EdgeSizes{21.0f, {}, 337.0f, {}}}}
       >
-        <Box key="urow" layout={field_row}>
-          {field_label("ulbl", "Username")}
-          <Input
-            key="username"
-            id="Username"
-            autofocus={true}
-            accessibility={{.label = "Username"}}
-            value={username->c_str()}
-            onChange={set_username}
-            onActivate={on_activate}
-            layout={field_layout}
-            style={field_style}
-          />
-        </Box>
-        <Box key="prow" layout={field_row}>
-          {field_label("plbl", "Password")}
-          <Input
-            key="password"
-            id="Password"
-            accessibility={{.label = "Password"}}
-            value={password->c_str()}
-            onChange={set_password}
-            onActivate={on_activate}
-            layout={field_layout}
-            style={field_style}
-          />
-        </Box>
+        <Text
+          key="t"
+          value="Password"
+          layout={::ui::LayoutStyle{.height = ::ui::Length::points(tokens::kLineLarge)}}
+          style={tokens::text_patch(tokens::kTextBody, tokens::kFontLarge, tokens::kFaceLarge, tokens::kLineLarge)}
+        />
       </Box>
       <Box
-        key="prebtn"
+        key="uwell"
         layout={::ui::LayoutStyle{
-          .height = ::ui::Length::points(3.0f * kS),
-          .flex_shrink = ::ui::StyleFloat::points(0.0f)}}
-      />
+          .position = ::ui::PositionType::Absolute,
+          .position_inset = ::ui::EdgeSizes{144.0f, {}, 293.0f, {}},
+          .width = ::ui::Length::points(264.0f),
+          .height = ::ui::Length::points(31.5f)}}
+      >
+        <Input
+          key="username"
+          id="Username"
+          autofocus={true}
+          accessibility={{.label = "Username"}}
+          value={username->c_str()}
+          onChange={set_username}
+          onActivate={on_activate}
+          layout={field_layout}
+          style={field_style}
+        />
+      </Box>
       <Box
-        key="btnarea"
+        key="pwell"
+        layout={::ui::LayoutStyle{
+          .position = ::ui::PositionType::Absolute,
+          .position_inset = ::ui::EdgeSizes{144.0f, {}, 333.5f, {}},
+          .width = ::ui::Length::points(264.0f),
+          .height = ::ui::Length::points(31.5f)}}
+      >
+        <Input
+          key="password"
+          id="Password"
+          accessibility={{.label = "Password"}}
+          value={password->c_str()}
+          onChange={set_password}
+          onActivate={on_activate}
+          layout={field_layout}
+          style={field_style}
+        />
+      </Box>
+      {btn_patch}
+      <Box
+        key="btnrow"
         layout={::ui::LayoutStyle{
           .direction = ::ui::FlexDirection::Row,
-          .justify_content = ::ui::JustifyContent::Center,
-          .align_items = ::ui::AlignItems::Center,
-          .height = ::ui::Length::points(24.0f * kS),
-          .flex_shrink = ::ui::StyleFloat::points(0.0f),
+          .position = ::ui::PositionType::Absolute,
+          .position_inset = ::ui::EdgeSizes{74.0f, {}, 373.0f, {}},
           .gap = 0.0f}}
       >
         <AppButton
           key="login"
           controlId="Login"
           variant={AppButtonVariant::Chrome}
+          size={AppButtonSize::Lg}
           label="Login/Create"
           onPress={submit}
         />
@@ -243,6 +232,7 @@ constexpr float kS = 1.5f;
           key="cancel"
           controlId="Cancel"
           variant={AppButtonVariant::Chrome}
+          size={AppButtonSize::Lg}
           label="Cancel"
           onPress={lobby.cancel}
         />

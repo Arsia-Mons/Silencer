@@ -177,6 +177,17 @@ inline ::ui::LayoutStyle app_button_chrome_layout(AppButtonSize size = AppButton
         .padding = {15.0f, 15.0f, 5.0f, 0.0f},
     };
   }
+  // Lg = origin's label-fit chrome with paddingX 10 and NO min width (the
+  // lobby-connect Login/Create + Cancel pair). The Button host adds 1 logical
+  // px per side, so 14 + 1 = origin's 10 virtual.
+  if (size == AppButtonSize::Lg) {
+    return {
+        .align_items = ::ui::AlignItems::Center,
+        .justify_content = ::ui::JustifyContent::Start,
+        .height = ::ui::Length::points(31.5f),
+        .padding = {14.0f, 14.0f, 5.0f, 0.0f},
+    };
+  }
   return {
       .align_items = ::ui::AlignItems::Center,
       .justify_content = ::ui::JustifyContent::Start,

@@ -67,6 +67,10 @@ struct ChromeTextures {
   uint16_t dialog_pw_w = 0, dialog_pw_h = 0;
   uint32_t dialog_connect = 0; // bank 7 idx 2 (lobby-connect dialog — frame+glow+wells baked)
   uint16_t dialog_connect_w = 0, dialog_connect_h = 0;
+  // 116x24 stipple patch covering the dialog's baked 52px button wells
+  // (origin lobby_connect EnsureButtonPatch); the measured-width chrome
+  // buttons draw on top.
+  uint32_t dialog_btn_patch = 0;
   // Full-screen starfield+planet background (bank 6 idx0), baked at DEVICE
   // resolution through origin's two-hop menu compositing (fit into the
   // virtual canvas, then magnify) so the uneven scanline striping matches the

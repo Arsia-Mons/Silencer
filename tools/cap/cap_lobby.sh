@@ -27,7 +27,12 @@ mkdir -p "$CLIENT_LEVEL"
 for m in blades.sil junkyard.sil; do
   cp "$REPO_ROOT/shared/assets/level/community/$m" "$CLIENT_LEVEL/" 2>/dev/null || true
 done
-LOBBY_PORT=$(pick_port); PLAYER_AUTH_PORT=$(pick_port); MAP_API_PORT=$(pick_port); CTRL_PORT=$(pick_port)
+# The lobby port is PINNED to the golden capture's (the connect log renders
+# "Connecting to 127.0.0.1:<port>" — a random port can never reach pixel
+# parity). Falls back to a random port if 63532 is taken.
+LOBBY_PORT=63532
+(echo > /dev/tcp/127.0.0.1/$LOBBY_PORT) 2>/dev/null && LOBBY_PORT=$(pick_port)
+PLAYER_AUTH_PORT=$(pick_port); MAP_API_PORT=$(pick_port); CTRL_PORT=$(pick_port)
 SILENCER_VERSION="$(silencer_version)"
 
 # Point the client at the test lobby's map-api so the Select Map list appends

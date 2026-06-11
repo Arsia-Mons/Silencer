@@ -262,8 +262,29 @@ bake(7, 5, cppxChrome.chrome_panel, &cppxChrome.chrome_panel_w, &cppxChrome.chro
 bake(40, 4, cppxChrome.dialog_msg, &cppxChrome.dialog_msg_w, &cppxChrome.dialog_msg_h);
 bake(40, 2, cppxChrome.dialog_pw, &cppxChrome.dialog_pw_w, &cppxChrome.dialog_pw_h);
 // bank 7 idx 2 — the lobby-connect dialog (origin PackImage(7,2)): frame, soft
-// glow, log well, form sub-panel + field/button wells all baked in.
+// glow, log well, form sub-panel + field/button wells all baked in. Drawn 1:1
+// in virtual space — register for the per-phase variant swap.
 bake(7, 2, cppxChrome.dialog_connect, &cppxChrome.dialog_connect_w, &cppxChrome.dialog_connect_h);
+register_legacy(7, 2, cppxChrome.dialog_connect);
+// The 116x24 stipple strip that covers the dialog's baked 52px button wells
+// (origin lobby_connect EnsureButtonPatch: panel-coord parity, idx 210/146).
+{
+constexpr int kPatchW = 116, kPatchH = 24;
+constexpr int kPatchX = 84, kPatchY = 246; // panel-relative parity anchors
+static uint8_t patch[kPatchW * kPatchH];
+for(int y = 0; y < kPatchH; ++y)
+for(int x = 0; x < kPatchW; ++x)
+patch[y * kPatchW + x] =
+    (((kPatchY + y) & 1) == 0 || ((kPatchX + x) & 1) == 0) ? 210 : 146;
+uint32_t id = cppxHost->bake_chrome_sprite(patch, kPatchW, kPatchH,
+                                           page_for_bank(7));
+if(id){
+cppxChrome.dialog_btn_patch = id;
+cppxHost->register_legacy_sprite(id, patch, kPatchW, kPatchH,
+                                 page_for_bank(7), kLegacyRenderWidth,
+                                 kLegacyRenderHeight);
+}
+}
 // Full-bleed backdrops bake at DEVICE resolution through origin's two-hop
 // menu compositing (cover/stretch into the virtual canvas, then magnify) so
 // the uneven scanline striping matches the golden pixel-for-pixel. Fits per
