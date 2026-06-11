@@ -139,13 +139,14 @@ cli --port "$CTRL_PORT" wait_for_state --state CREATECHARACTER --timeout-ms 1500
 wait_for_widget "Create New Character"
 cli --port "$CTRL_PORT" click --label "Create New Character" >/dev/null
 
-# step1: type an alias into the "Alias" input, then "Continue" (AliasConfirm,
-# which is disabled until the alias is non-empty) advances to the agency step.
+# step1: type an alias into the autofocused "Alias" input, then Enter submits
+# the alias and advances to the agency step (there is no separate Continue
+# button on this step — Enter on the focused input is the confirm path).
 wait_for_widget "Alias"
 for ch in A l i c e; do
   cli --port "$CTRL_PORT" key --key "$ch" >/dev/null
 done
-cli --port "$CTRL_PORT" click --label "Continue" >/dev/null
+cli --port "$CTRL_PORT" key --key enter >/dev/null
 
 # step2: pick an agency — creating the agent. Once it round-trips through the
 # lobby the CREATECHARACTER tick routes to the lobby.
@@ -154,8 +155,10 @@ cli --port "$CTRL_PORT" click --label "Noxis" >/dev/null
 cli --port "$CTRL_PORT" wait_for_state --state LOBBY --timeout-ms 15000
 
 # The lobby renders the real read cluster (agent + chat + games panels), not the
-# old scaffold: its Send/Leave controls are present.
-wait_for_widget "Send"
+# old scaffold: its leave ("Agents"/LeaveLobby) and create ("Create Game"/NewGame)
+# controls are present. (The chat panel has no Send button in this design — its
+# input strip is non-interactive chrome.)
 wait_for_widget "Agents"
+wait_for_widget "NewGame"
 
 echo "PASS 30_lobby_login"

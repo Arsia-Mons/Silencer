@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# SIL-108: the Options -> Controls screen restored to origin/main full-IA parity.
-# It is now a REAL scrollable, selectable keybind table: every action in the
-# ACTION_TABLE renders as a selectable two-column row (label + AND/OR binding),
-# inside a virtualizing scroll-viewport (SIL-111). Selecting a row drives a
-# single Rebind/Clear pair below; preset is the green oval; Save/Revert/Back at
-# the foot. This scenario drives that screen: it mounts, the table SCROLLS
-# (wheel changes which rows are present — proving the viewport + virtualization),
-# and selecting a row updates the Selected readout.
+# Options -> Controls keybind screen renders its full chrome and keybind table.
+# Navigation: MAINMENU -> click "Options" (overlay dialog; game state stays
+# MAINMENU) -> click "Controls" (control_id OptionsControls) -> the Configure
+# Controls screen mounts with the preset cycle, the keybind list (action label +
+# primary bind | OR | secondary bind per row), and Save/Cancel. This scenario
+# asserts the chrome + several in-viewport keybind rows, then Cancel returns to
+# the Options dialog. NOTE: the modern cppx screens have no scroll op — the
+# list assertion is presence + geometry, not wheel-driven.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -32,17 +32,6 @@ wait_for_node() {
   return 1
 }
 
-# Snapshot the set of visible keybind-row control ids (Bind*) — the virtualizing
-# viewport only mounts the window of rows currently on screen.
-visible_rows() {
-  cli --port "$PORT" inspect | bun -e '
-const r = JSON.parse(await new Response(Bun.stdin.stream()).text());
-const n = r.nodes ?? [];
-const binds = new Set(n.filter((x) => (x.control_id ?? "").startsWith("Bind")).map((x) => x.control_id));
-console.log([...binds].sort().join(","));
-'
-}
-
 cli --port "$PORT" wait_for_state --state MAINMENU --timeout-ms 15000 >/dev/null
 
 cli --port "$PORT" click --label "Options" >/dev/null
@@ -51,38 +40,45 @@ cli --port "$PORT" click --label "OptionsControls" >/dev/null
 wait_for_node "ControlsBack"
 cli --port "$PORT" wait_frames --n 3 >/dev/null
 
-# origin/main full-IA chrome is present (not truncated): "Configure Controls"
-# title, the oval Preset cycle, the virtualized binding list, and Save/Cancel.
-# Each action row is now a per-combo bind grid (label | primary bind oval | OR |
-# secondary bind well), not a select-then-act table.
+# Full chrome present: "Configure Controls" title, the preset cycle button,
+# the keybind list container, and Save/Cancel. The keybind table renders as
+# per-action rows: action label text + primary bind button (BindPn) + "OR" +
+# secondary bind button (BindSn). Several rows must be focusable buttons that
+# actually sit inside the ControlsList viewport (in-bounds), each with its
+# paired secondary bind.
 cli --port "$PORT" inspect | bun -e '
 const r = JSON.parse(await new Response(Bun.stdin.stream()).text());
 const n = r.nodes ?? [];
 const fail = (m) => { console.error(m); process.exit(1); };
-const has = (id) => n.some((x) => x.control_id === id);
+const byId = (id) => n.find((x) => x.control_id === id);
 for (const id of ["CyclePreset", "SaveBinds", "ControlsBack", "ControlsList"]) {
-  if (!has(id)) fail(`Controls screen missing ${id}`);
+  if (!byId(id)) fail(`Controls screen missing ${id}`);
 }
 if (!n.some((x) => x.role === "text" && x.value === "Configure Controls")) fail("missing Configure Controls title");
-const rows = n.filter((x) => (x.control_id ?? "").startsWith("BindP"));
-if (rows.length < 3) fail(`expected several visible primary bind ovals, got ${rows.length}`);
+
+const list = byId("ControlsList");
+const primaries = n.filter((x) => /^BindP\d+$/.test(x.control_id ?? ""));
+if (primaries.length < 4) fail(`expected several primary bind buttons, got ${primaries.length}`);
+
+const intersects = (a, b) =>
+  a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
+const inView = primaries.filter((x) => intersects(x, list));
+if (inView.length < 3) fail(`expected >=3 keybind rows inside the ControlsList viewport, got ${inView.length}`);
+
+for (const p of inView) {
+  if (p.role !== "button" || !p.focusable) fail(`${p.control_id} is not a focusable button`);
+  if (!(p.w > 0 && p.h > 0)) fail(`${p.control_id} has degenerate geometry ${p.w}x${p.h}`);
+  const sid = p.control_id.replace("BindP", "BindS");
+  const s = byId(sid);
+  if (!s || s.role !== "button") fail(`row ${p.control_id} missing secondary bind ${sid}`);
+}
+
+// Rows are labelled actions: the action-name texts render alongside the binds.
+const actionTexts = n.filter((x) => x.role === "text" && /:\s*$/.test(x.value ?? ""));
+if (actionTexts.length < 3) fail(`expected action-label texts next to bind rows, got ${actionTexts.length}`);
 '
 
-# Scroll the table: the visible row window must CHANGE (viewport + virtualization).
-top_rows="$(visible_rows)"
-cli --port "$PORT" scroll --x 320 --y 250 --dy -8 >/dev/null
-cli --port "$PORT" wait_frames --n 3 >/dev/null
-scrolled_rows="$(visible_rows)"
-if [ "$top_rows" = "$scrolled_rows" ]; then
-  echo "scroll did not change the visible row window ($top_rows)"; exit 1
-fi
-
-# Scroll back to the top; the first primary bind oval is present again.
-cli --port "$PORT" scroll --x 320 --y 250 --dy 40 >/dev/null
-cli --port "$PORT" wait_frames --n 3 >/dev/null
-wait_for_node "BindP0"
-
-# Back returns to the Options dialog.
+# Cancel/Back returns to the Options dialog.
 cli --port "$PORT" click --label "ControlsBack" >/dev/null
 wait_for_node "OptionsControls"
 

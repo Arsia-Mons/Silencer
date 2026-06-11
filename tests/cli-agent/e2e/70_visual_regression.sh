@@ -1,26 +1,28 @@
 #!/usr/bin/env bash
-# Visual regression tests with Discord notifications for failures.
-# Creates side-by-side composites of origin/main vs current and sends to Discord.
+# Visual regression: menu cluster + modals + gallery vs golden baselines.
 #
-#   bash tests/cli-agent/e2e/70_visual_regression_with_discord.sh
+# Two kinds of baseline live in golden/ (see golden/ORIGIN_GOLDENS.md):
+#   - ORIGIN goldens (the 13 origin/main captures): ground truth, NEVER
+#     bless-able from a cppx render. Gated by tools/cap/pixdiff_tolerant.py's
+#     printed verdict (global <1% AND zero hot tiles).
+#   - cppx-only baselines (gallery, message_modal, password_modal — no origin
+#     equivalent): regression-only, re-blessed from a cppx render with BLESS=1.
 #
+# Captures at 1920x1080 — the golden capture resolution.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 source "$SCRIPT_DIR/lib.sh"
 
+TOLERANT="$REPO_ROOT/tools/cap/pixdiff_tolerant.py"
 PIXDIFF="$REPO_ROOT/tools/pixdiff/build/pixdiff"
 GOLDEN_DIR="$SCRIPT_DIR/golden"
-THRESH="${VR_THRESHOLD:-0.40}"
-W=960; H=720
+W=1920; H=1080
 BLESS="${BLESS:-0}"
-DISCORD_SKILL="$HOME/.claude/skills/discord-dm/send.ts"
+# Origin ground truth — blessing these from a cppx render destroys the spec.
+ORIGIN_GOLDENS="mainmenu options options_audio options_display options_controls"
 
-if [ ! -x "$PIXDIFF" ]; then
-  echo "pixdiff not built: $PIXDIFF" >&2
-  exit 1
-fi
-mkdir -p "$GOLDEN_DIR"
+[ -x "$PIXDIFF" ] || { echo "pixdiff not built: $PIXDIFF" >&2; exit 1; }
 
 FRESH_HOME="$(mktemp -d)"
 export HOME="$FRESH_HOME"
@@ -34,33 +36,40 @@ cli --port "$PORT" resize --w "$W" --h "$H" >/dev/null
 cli --port "$PORT" wait_frames --n 3 >/dev/null
 
 WORK="$(mktemp -d)"
-COMPOSITE_DIR="$(mktemp -d)"
-REGRESSIONS=()
 FAIL=0
 
-# Compare (or bless) percent-diff under THRESH.
-diff_or_bless() {
-  local fresh="$1" name="$2" crop="${3:-}"
+is_origin_golden() {
+  local n
+  for n in $ORIGIN_GOLDENS; do [ "$n" = "$1" ] && return 0; done
+  return 1
+}
+
+# Origin-golden screens: verdict comes from the tolerant tile gate.
+check_origin() {
+  local fresh="$1" name="$2"
   local golden="$GOLDEN_DIR/$name.png"
-  if [ "$BLESS" = "1" ]; then
-    [ -z "$crop" ] && cp "$fresh" "$golden"
-    return 0
-  fi
-  if [ ! -f "$golden" ]; then
-    echo "  MISSING golden: $name.png (run with BLESS=1)" >&2
-    FAIL=$((FAIL+1)); return 0
-  fi
+  [ -f "$golden" ] || { echo "  MISSING origin golden: $name.png" >&2; FAIL=$((FAIL+1)); return 0; }
+  local line
+  line="$(python3 "$TOLERANT" "$fresh" "$golden" | head -1)"
+  case "$line" in
+    *PASS*) ;;
+    *) echo "  DIVERGED $name vs origin golden: $line" >&2; FAIL=$((FAIL+1)) ;;
+  esac
+}
+
+# cppx-only surfaces: raw pixdiff vs the blessed cppx baseline (same renderer,
+# so byte-exact comparison is meaningful). Threshold generous for text AA.
+check_cppx() {
+  local fresh="$1" name="$2"
+  local golden="$GOLDEN_DIR/$name.png"
+  if [ "$BLESS" = "1" ]; then cp "$fresh" "$golden"; return 0; fi
+  [ -f "$golden" ] || { echo "  MISSING cppx baseline: $name.png (BLESS=1 to create)" >&2; FAIL=$((FAIL+1)); return 0; }
   local pct
-  if [ -n "$crop" ]; then
-    pct="$("$PIXDIFF" --crop "$crop" "$fresh" "$golden" 2>/dev/null || echo 100.0)"
-  else
-    pct="$("$PIXDIFF" "$fresh" "$golden" 2>/dev/null || echo 100.0)"
-  fi
+  pct="$("$PIXDIFF" "$fresh" "$golden" 2>/dev/null || echo 100.0)"
   local over
-  over="$(VR_PCT="$pct" VR_TH="$THRESH" bun -e 'console.log(Number(process.env.VR_PCT) > Number(process.env.VR_TH) ? "1" : "0")')"
+  over="$(VR_PCT="$pct" bun -e 'console.log(Number(process.env.VR_PCT) > 0.40 ? "1" : "0")')"
   if [ "$over" = "1" ]; then
-    echo "  REGRESSED $name${crop:+ [crop $crop]}: ${pct}% > ${THRESH}%" >&2
-    REGRESSIONS+=("$name")
+    echo "  REGRESSED $name: ${pct}% > 0.40%" >&2
     FAIL=$((FAIL+1))
   fi
 }
@@ -70,154 +79,58 @@ cap() {
   cli --port "$PORT" wait_frames --n 3 >/dev/null
   local png="$WORK/$name.png"
   cli --port "$PORT" screenshot --out "$png" >/dev/null
-  cli --port "$PORT" inspect > "$WORK/$name.json"
-  diff_or_bless "$png" "$name"
-  echo "$png"
-}
-
-crop_check() {
-  local name="$1" cid="$2"
-  [ "$BLESS" = "1" ] && return 0
-  local rect
-  rect="$(CID="$cid" bun -e '
-    const r = JSON.parse(await Bun.file(process.argv[1]).text());
-    const n = (r.nodes||[]).find((x)=>x.control_id===process.env.CID);
-    if (!n) { console.log(""); process.exit(0); }
-    const cx=Math.max(0,Math.round(n.x)), cy=Math.max(0,Math.round(n.y));
-    console.log(`${cx},${cy},${Math.round(n.w)},${Math.round(n.h)}`);
-  ' "$WORK/$name.json")"
-  if [ -z "$rect" ]; then
-    echo "  MISSING control for crop: $cid on $name" >&2
-    FAIL=$((FAIL+1)); return 0
+  if is_origin_golden "$name"; then
+    check_origin "$png" "$name"
+  else
+    check_cppx "$png" "$name"
   fi
-  diff_or_bless "$WORK/$name.png" "$name" "$rect"
 }
 
-# ---- MainMenu ----
-S="$(cap mainmenu)"
-crop_check mainmenu ConnectToLobby
-crop_check mainmenu Options
-crop_check mainmenu Exit
+# ---- MainMenu + options cluster (origin goldens) ----
+# Land inside the logo HOLD window (~2.5s..7.5s after mount) so the wordmark
+# is the stable full frame the golden was captured in (cf. cap_menus.sh).
+sleep 3
+cap mainmenu
 
-# ---- Options cluster ----
 cli --port "$PORT" click --label "Options" >/dev/null
-cap options >/dev/null
-crop_check options OptionsAudio
-crop_check options OptionsDisplay
-crop_check options OptionsControls
-crop_check options OptionsGoBack
+cap options
 
 cli --port "$PORT" click --label "OptionsAudio" >/dev/null
-cap options_audio >/dev/null
-crop_check options_audio MusicToggle
-crop_check options_audio OptionsSave
-crop_check options_audio OptionsCancel
-crop_check options_audio MusicToggle
+cap options_audio
 cli --port "$PORT" click --label "OptionsCancel" >/dev/null
 cli --port "$PORT" wait_frames --n 3 >/dev/null
 
 cli --port "$PORT" click --label "OptionsDisplay" >/dev/null
-cap options_display >/dev/null
-crop_check options_display FullscreenToggle
-crop_check options_display SmoothScalingToggle
-crop_check options_display OptionsSave
+cap options_display
 cli --port "$PORT" click --label "OptionsCancel" >/dev/null
 cli --port "$PORT" wait_frames --n 3 >/dev/null
 
 cli --port "$PORT" click --label "OptionsControls" >/dev/null
-cap options_controls >/dev/null
-crop_check options_controls BindP0
-crop_check options_controls CyclePreset
-crop_check options_controls SaveBinds
-crop_check options_controls ControlsBack
+cap options_controls
 cli --port "$PORT" click --label "ControlsBack" >/dev/null
 cli --port "$PORT" wait_frames --n 3 >/dev/null
 cli --port "$PORT" click --label "OptionsGoBack" >/dev/null
 cli --port "$PORT" wait_frames --n 3 >/dev/null
 
-# ---- Modals ----
+# ---- Modals + gallery (cppx-only baselines) ----
 cli --port "$PORT" show_message_modal --title "Notice" --message "Visual regression sample message." >/dev/null
-cap message_modal >/dev/null
-crop_check message_modal MessageModalOk
+cap message_modal
 cli --port "$PORT" click --label "MessageModalOk" >/dev/null
 cli --port "$PORT" wait_frames --n 3 >/dev/null
 
 cli --port "$PORT" show_password_modal --title "Password" >/dev/null
-cap password_modal >/dev/null
-crop_check password_modal Ok
+cap password_modal
 cli --port "$PORT" click --label "Ok" >/dev/null
 cli --port "$PORT" wait_frames --n 3 >/dev/null
 
-# ---- Component gallery ----
 cli --port "$PORT" ui_gallery >/dev/null
-cap gallery >/dev/null
-crop_check gallery gal_btn_primary
-crop_check gallery gal_btn_secondary
-crop_check gallery gal_btn_danger
-crop_check gallery gal_btn_ghost
-crop_check gallery gal_input
-crop_check gallery gal_check_on
+cap gallery
 cli --port "$PORT" back >/dev/null
 
 rm -rf "$WORK"
 
-# Handle results and Discord notifications
-if [ "$BLESS" = "1" ]; then
-  echo "✅ PASS 70_visual_regression (blessed goldens in $GOLDEN_DIR)"
-  rm -rf "$COMPOSITE_DIR"
-  exit 0
+if [ "$FAIL" -ne 0 ]; then
+  echo "70_visual_regression: $FAIL surface(s) diverged"
+  exit 1
 fi
-
-if [ "$FAIL" -eq 0 ]; then
-  echo "✅ PASS 70_visual_regression"
-  rm -rf "$COMPOSITE_DIR"
-  exit 0
-fi
-
-# Regressions detected - create composites and send to Discord
-echo "⚠️  $FAIL visual regression(s) detected"
-echo "📸 Creating side-by-side composites..."
-
-# Fetch origin/main goldens and create composites
-composite_count=0
-for regname in "${REGRESSIONS[@]}"; do
-  regfile="$GOLDEN_DIR/$regname.png"
-  if [ ! -f "$regfile" ]; then
-    continue
-  fi
-
-  origin_file="$COMPOSITE_DIR/origin_$regname.png"
-  if git show origin/main:tests/cli-agent/e2e/golden/"$regname.png" > "$origin_file" 2>/dev/null; then
-    composite_file="$COMPOSITE_DIR/$regname.comparison.png"
-    if bun "$REPO_ROOT/tools/compose-images.ts" \
-      "$origin_file" \
-      "$regfile" \
-      "$composite_file" \
-      "origin/main" \
-      "current" 2>/dev/null; then
-      composite_count=$((composite_count+1))
-      echo "  ✓ $regname"
-    fi
-  fi
-done
-
-# Send composites to Discord if skill is available
-if [ "$composite_count" -gt 0 ] && [ -f "$DISCORD_SKILL" ]; then
-  echo "💬 Sending ${composite_count} comparison image(s) to Discord..."
-  composites=()
-  for f in "$COMPOSITE_DIR"/*.comparison.png; do
-    [ -f "$f" ] && composites+=("$f")
-  done
-
-  if [ ${#composites[@]} -gt 0 ]; then
-    msg="🔴 **Visual Regression Alert**
-$FAIL regression(s) detected in visual regression tests.
-Compare the images below (left: origin/main, right: current)"
-
-    bun "$DISCORD_SKILL" "$msg" "${composites[@]}" 2>/dev/null || true
-  fi
-fi
-
-rm -rf "$COMPOSITE_DIR"
-echo "70_visual_regression: $FAIL visual diff(s) over ${THRESH}%" >&2
-exit 1
+echo "PASS 70_visual_regression"

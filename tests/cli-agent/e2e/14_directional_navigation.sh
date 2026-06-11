@@ -30,11 +30,10 @@ options_dialog_open() {
   '
 }
 
-# Main-menu focus order: Connect To Lobby -> Tutorial -> Options -> Quit, with
-# initial focus on "Connect To Lobby" (index 0). The control "down" op mirrors the
-# gamepad menu-navigation mapping in Game::TickGamepadMenuNavigation, so two
-# "down" presses move focus to "Options". A third "down" would land on "Exit"
-# and activating it quits the app.
+# Main-menu focus order: Play Online -> Tutorial -> Options -> Quit, with
+# initial focus on "Play Online" (index 0). Two "down" presses move focus to
+# "Options". A third "down" would land on "Quit" and activating it quits the
+# app (the control connection would then refuse further ops).
 cli --port "$PORT" key --key down >/dev/null
 cli --port "$PORT" key --key down >/dev/null
 

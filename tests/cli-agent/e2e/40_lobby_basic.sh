@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 # Drives the cppx lobby create-game path past connect → auth → CREATECHARACTER →
-# LOBBY, then through the GameCreate form to a real Create: New Game → fill the
-# game name → Create. Creating a game asks the Go lobby to spawn a dedicated
+# LOBBY, then through the GameCreate form to a real Create: New Game → pick a
+# map row → Create. Creating a game asks the Go lobby to spawn a dedicated
 # `silencer -s` server; the local player auto-joins and the right column swaps to
 # the staging panel. The test proves the create path reached staging
-# (StagingReady / LeaveGame). Exercises use_games.create_game, the screen-local
-# GameSelect → GameCreate panel swap, the LOBBY-tick game-join pump, and the
-# dedicated-spawn → auto-join → staging transition end to end.
+# (StagingReady / ChangeTeam / ChooseTech). Exercises use_games.create_game, the
+# screen-local GameSelect → GameCreate panel swap, the LOBBY-tick game-join pump,
+# and the dedicated-spawn → auto-join → staging transition end to end.
 #
 # Harness (lobby spawn + connect/auth/route + wait_for_widget/state) is copied
 # verbatim from 30_lobby_login.sh.
@@ -99,6 +99,26 @@ wait_for_widget() {
   return 1
 }
 
+# Like wait_for_widget but additionally requires the node to be clickable —
+# focusable and not disabled. Needed for buttons like AliasConfirm ("Continue")
+# and CreateGame that stay disabled until their input is non-empty: set_text
+# lands on the control thread but the enabled state only commits on the next
+# UI frame, so an immediate click races it.
+wait_for_enabled() {
+  local label="$1"
+  for i in $(seq 1 100); do
+    found=$(cli --port "$CTRL_PORT" inspect | LABEL="$label" bun -e \
+      'const r = JSON.parse(await new Response(Bun.stdin.stream()).text());
+       const l = process.env.LABEL;
+       console.log((r.nodes||[]).some((w)=>(w.label===l||w.control_id===l)&&w.focusable&&!w.disabled) ? "yes" : "no");' 2>/dev/null || echo no)
+    if [ "$found" = "yes" ]; then return 0; fi
+    sleep 0.05
+  done
+  echo "widget '$label' never became enabled" >&2
+  cli --port "$CTRL_PORT" inspect >&2 || true
+  return 1
+}
+
 # Like wait_for_widget but waits for ANY of the given control-ids/labels and
 # echoes which one appeared (or empty + nonzero on timeout). Used for the
 # create → staging transition where either StagingReady or LeaveGame may anchor
@@ -164,40 +184,45 @@ cli --port "$CTRL_PORT" wait_for_state --state CREATECHARACTER --timeout-ms 1500
 wait_for_widget "Create New Character"
 cli --port "$CTRL_PORT" click --label "Create New Character" >/dev/null
 
-# step1: type an alias, then confirm to advance to the agency picker.
+# step1: type an alias, then confirm to advance to the agency picker. The alias
+# Input's onActivate is the confirm path (character_create.cppx wires Enter →
+# confirm_alias), same as lib.sh's create_initial_character helper.
 wait_for_widget "Alias"
 cli --port "$CTRL_PORT" set_text --label "Alias" --text "Alice" >/dev/null
-cli --port "$CTRL_PORT" click --label "Continue" >/dev/null
+cli --port "$CTRL_PORT" key --key enter >/dev/null
 
 # step2: pick an agency — creating the agent. Once it round-trips through the
 # lobby the CREATECHARACTER tick routes to the lobby.
-wait_for_widget "Black Rose"
+wait_for_widget "Noxis"
 cli --port "$CTRL_PORT" click --label "Noxis" >/dev/null
 cli --port "$CTRL_PORT" wait_for_state --state LOBBY --timeout-ms 15000
 
 # --- LOBBY: GameSelect → GameCreate → Create ------------------------------
-# GameSelect is the default right column (browse + Join/Spectate/New Game).
-wait_for_widget "Send"
+# GameSelect is the default right column; its NewGame button anchors it.
 wait_for_widget "NewGame"
 
-# Swap to the GameCreate form (screen-local use_state<ActivePanel>).
-cli --port "$CTRL_PORT" click --label "New Game" >/dev/null
+# Swap to the GameCreate form (screen-local use_state show_create). The shipped
+# create cell is the origin-golden "Select Map" list: focusable MapRow rows +
+# the wide Create button (CreateGame). There is no Game Name input — the name
+# renders as flat text and defaults to "New Game" — and Go Back cancels create.
+cli --port "$CTRL_PORT" click --label "NewGame" >/dev/null
 wait_for_widget "CreateGame"
-wait_for_widget "CreateBack"
+wait_for_widget "MapRow"
 
-# Name the game. The create form ships with a bundled map preselected; cycle the
-# map once to be safe so a concrete map is in hand before Create.
-cli --port "$CTRL_PORT" set_text --label "Game Name" --text "MyGame" >/dev/null
-cli --port "$CTRL_PORT" click --label "MapNext" >/dev/null
+# Pick a concrete map: activating a MapRow sets map_index. The first row is the
+# deterministic map-api ordering's first bundled map.
+cli --port "$CTRL_PORT" click --label "MapRow" >/dev/null
 
 # Create → lobby spawns a dedicated `silencer -s` server, the local player
 # auto-joins, and the right column swaps to the staging panel.
+wait_for_enabled "Create"
 cli --port "$CTRL_PORT" click --label "Create" >/dev/null
 
 # Prefer proving staging: poll up to ~20s for the staging panel to anchor
-# (StagingReady or its sibling LeaveGame). The dedicated-spawn → auto-join →
-# staging transition runs through the LOBBY-tick game-join pump.
-if hit=$(wait_for_any_widget 200 "StagingReady" "LeaveGame"); then
+# (StagingReady, or its center-column siblings ChangeTeam/ChooseTech). The
+# dedicated-spawn → auto-join → staging transition runs through the LOBBY-tick
+# game-join pump.
+if hit=$(wait_for_any_widget 200 "StagingReady" "ChangeTeam" "ChooseTech"); then
   echo "reached staging panel via '$hit'"
   echo "PASS 40_lobby_basic"
   exit 0
@@ -205,16 +230,16 @@ fi
 
 # Fallback: spawning a dedicated server proved unreliable in this environment.
 # Still assert the create request was accepted — the GameCreate form closed
-# (its CreateGame/CreateBack controls are no longer the active right panel) and
-# the client moved on (back to a games browser or into staging). This proves
-# Create dispatched a real create_game intent, not just that we exited 0.
+# (CreateGame/MapRow are no longer the active right cell) and the client moved
+# on (back to the games browser or into staging). This proves Create dispatched
+# a real create_game intent, not just that we exited 0.
 panel_closed=$(cli --port "$CTRL_PORT" inspect | bun -e \
   'const r = JSON.parse(await new Response(Bun.stdin.stream()).text());
    const has = (l) => (r.nodes||[]).some((w)=>w.label===l||w.control_id===l);
-   // GameCreate form gone AND we are either back in GameSelect (NewGame) or in
-   // staging (StagingReady/LeaveGame) — i.e. Create consumed the form.
-   const createClosed = !has("CreateGame") && !has("CreateBack");
-   const elsewhere = has("NewGame") || has("StagingReady") || has("LeaveGame");
+   // Create form gone AND we are either back in GameSelect (NewGame) or in
+   // staging (StagingReady/ChangeTeam) — i.e. Create consumed the form.
+   const createClosed = !has("CreateGame") && !has("MapRow");
+   const elsewhere = has("NewGame") || has("StagingReady") || has("ChangeTeam");
    console.log(createClosed && elsewhere ? "ok" : "bad");')
 if [ "$panel_closed" = "ok" ]; then
   echo "WARN: dedicated staging not observed; create form closed + request accepted" >&2

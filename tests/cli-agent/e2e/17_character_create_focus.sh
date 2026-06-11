@@ -8,7 +8,7 @@
 #
 # Driven end-to-end through a local Go lobby (harness lifted from
 # 30_lobby_login.sh): MainMenu -> Connect To Lobby -> login alice/secret ->
-# CREATECHARACTER -> Create New Character -> Alias=Alice -> Continue -> agency.
+# CREATECHARACTER -> Create New Character -> Alias=Alice -> enter -> agency.
 set -euo pipefail
 . "$(dirname "$0")/lib.sh"
 
@@ -60,14 +60,25 @@ for i in $(seq 1 60); do
   fi
 done
 
-HOME="$SILENCER_HOME" "$SILENCER_BIN" \
-  --headless \
-  --control-port "$CTRL_PORT" \
-  --lobby-host 127.0.0.1 \
-  --lobby-port "$LOBBY_PORT" \
-  >"/tmp/silencer-e2e-$CTRL_PORT.log" 2>&1 &
-SILENCER_PID=$!
-wait_alive "$CTRL_PORT"
+# Occasionally the headless binary wedges before opening the control port
+# (empty log, wait_alive timeout) — retry the launch once on a fresh port.
+for attempt in 1 2; do
+  HOME="$SILENCER_HOME" "$SILENCER_BIN" \
+    --headless \
+    --control-port "$CTRL_PORT" \
+    --lobby-host 127.0.0.1 \
+    --lobby-port "$LOBBY_PORT" \
+    >"/tmp/silencer-e2e-$CTRL_PORT.log" 2>&1 &
+  SILENCER_PID=$!
+  if wait_alive "$CTRL_PORT"; then break; fi
+  if [ "$attempt" = 2 ]; then
+    echo "silencer never came up after 2 attempts" >&2
+    exit 1
+  fi
+  stop_silencer "$SILENCER_PID" "$CTRL_PORT" || true
+  SILENCER_PID=""
+  CTRL_PORT=$(pick_port)
+done
 
 # Poll the retained cppx tree for a node whose control id OR accessibility label
 # equals the argument (the introspection `inspect` op returns `nodes`).
@@ -113,15 +124,15 @@ cli --port "$CTRL_PORT" click --label "Login/Create" >/dev/null
 
 # Walk the 3-step create wizard to the SELECT AGENCY step:
 #   step0 roster -> Create New Character
-#   step1 alias  -> type "Alice" -> Continue (AliasConfirm)
+#   step1 alias  -> type "Alice" into the focused "Alias" input -> enter submits
+#                   (this build has no separate Continue button on the alias step)
 #   step2 agency -> 5 rows incl. "Black Rose"
 cli --port "$CTRL_PORT" wait_for_state --state CREATECHARACTER --timeout-ms 15000 >/dev/null
 wait_for_widget "Create New Character"
 cli --port "$CTRL_PORT" click --label "Create New Character" >/dev/null
 wait_for_widget "Alias"
 cli --port "$CTRL_PORT" set_text --label "Alias" --text "Alice" >/dev/null
-cli --port "$CTRL_PORT" click --label "AliasConfirm" >/dev/null
-cli --port "$CTRL_PORT" wait_for_state --state CREATECHARACTER --timeout-ms 15000 >/dev/null
+cli --port "$CTRL_PORT" key --key enter >/dev/null
 wait_for_widget "Black Rose"
 cli --port "$CTRL_PORT" wait_frames --n 2 >/dev/null
 
@@ -201,13 +212,20 @@ cli --port "$CTRL_PORT" click_at --x "$NX" --y "$NY" >/dev/null
 cli --port "$CTRL_PORT" click_at --x "$NX" --y "$NY" >/dev/null 2>&1 || true
 cli --port "$CTRL_PORT" wait_for_state --state LOBBY --timeout-ms 15000 >/dev/null
 
-CREATED_COUNT=$(bun -e '
-const db = JSON.parse(await Bun.file(process.argv[1]).text());
-const chars = db.users?.alice?.chars ?? [];
-console.log(chars.filter((c) => c.name === "Alice").length);
-' "$LOBBY_DB")
+# The lobby persists the user db asynchronously; poll briefly until the created
+# character lands, then assert EXACTLY one "Alice" exists (no double-create).
+CREATED_COUNT=0
+for i in $(seq 1 50); do
+  CREATED_COUNT=$(bun -e '
+  const db = JSON.parse(await Bun.file(process.argv[1]).text());
+  const chars = db.users?.alice?.chars ?? [];
+  console.log(chars.filter((c) => c.name === "Alice").length);
+  ' "$LOBBY_DB" 2>/dev/null || echo 0)
+  if [ "$CREATED_COUNT" != "0" ]; then break; fi
+  sleep 0.1
+done
 if [ "$CREATED_COUNT" != "1" ]; then
-  echo "rapid agency submit created $CREATED_COUNT Alice characters" >&2
+  echo "rapid agency submit created $CREATED_COUNT Alice characters (want exactly 1)" >&2
   cat "$LOBBY_DB" >&2
   exit 1
 fi

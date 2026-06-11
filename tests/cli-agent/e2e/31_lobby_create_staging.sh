@@ -140,12 +140,13 @@ cli --port "$CTRL_PORT" wait_for_state --state CREATECHARACTER --timeout-ms 1500
 wait_for_widget "Create New Character"
 cli --port "$CTRL_PORT" click --label "Create New Character" >/dev/null
 
-# step1: type an alias, then confirm to advance to the agency picker.
+# step1: type an alias into the autofocused "Alias" input, then Enter confirms
+# and advances to the agency picker.
 wait_for_widget "Alias"
 for ch in A l i c e; do
   cli --port "$CTRL_PORT" key --key "$ch" >/dev/null
 done
-cli --port "$CTRL_PORT" click --label "Continue" >/dev/null
+cli --port "$CTRL_PORT" key --key enter >/dev/null
 
 # step2: pick an agency — creating the agent. Once it round-trips through the
 # lobby the CREATECHARACTER tick routes to the lobby.
@@ -153,26 +154,47 @@ wait_for_widget "Black Rose"
 cli --port "$CTRL_PORT" click --label "Noxis" >/dev/null
 cli --port "$CTRL_PORT" wait_for_state --state LOBBY --timeout-ms 15000
 
-# GameSelect is the default right column (browse + Join/Spectate/New Game). Its
-# Join control is present (the structured games browser replaced the read-only
-# (2/n) list); "Send"/"Leave" still anchor the always-on chat + agent panels.
-wait_for_widget "Send"
-wait_for_widget "JoinGame"
+# Poll until a node with the given control id / label is GONE — proves a panel
+# actually unmounted, not just that its sibling appeared.
+wait_for_widget_gone() {
+  local label="$1"
+  for i in $(seq 1 100); do
+    found=$(cli --port "$CTRL_PORT" inspect | LABEL="$label" bun -e \
+      'const r = JSON.parse(await new Response(Bun.stdin.stream()).text());
+       const l = process.env.LABEL;
+       console.log((r.nodes||[]).some((w)=>w.label===l||w.control_id===l) ? "yes" : "no");' 2>/dev/null || echo yes)
+    if [ "$found" = "no" ]; then return 0; fi
+    sleep 0.05
+  done
+  echo "widget '$label' never disappeared" >&2
+  cli --port "$CTRL_PORT" inspect >&2 || true
+  return 1
+}
 
-# Swap to GameCreate (screen-local use_state<ActivePanel>): clicking New Game
-# mounts the create form (name + bundled-map cycle + Create/Back). CreateBack is
-# unique to this panel ("Leave" is shared with the always-on Agent panel), so it
-# proves the swap landed.
-cli --port "$CTRL_PORT" click --label "New Game" >/dev/null
-wait_for_widget "CreateBack"
-wait_for_widget "CreateGame"
-
-# Back reverses the swap → GameSelect (New Game reappears). Proves the
-# bidirectional screen-local panel swap end to end. The create intent +
-# dedicated-spawn → auto-join → staging room run through the LOBBY-tick game-join
-# pump; the live staging room is exercised in the capstone E2E (which provisions
-# a map for the spawned dedicated server).
-cli --port "$CTRL_PORT" click --label "Back" >/dev/null
+# GameSelect is the default lobby cockpit: the Go Back header button, the agent
+# panel's Agents control (control id LeaveLobby), and the center column's
+# "Create Game" button (control id NewGame) are all live.
+wait_for_widget "LobbyGoBack"
+wait_for_widget "LeaveLobby"
 wait_for_widget "NewGame"
+
+# Swap to GameCreate (screen-local use_state): clicking Create Game replaces
+# the Active Games browser with the Select Map list (focusable MapRow entries)
+# + the Create submit (control id CreateGame), and unmounts the Create Game
+# button itself — proving the right-column swap landed.
+cli --port "$CTRL_PORT" click --label "NewGame" >/dev/null
+wait_for_widget "MapRow"
+wait_for_widget "CreateGame"
+wait_for_widget_gone "NewGame"
+
+# Go Back cancels create-mode first (origin's single top button) → GameSelect
+# (Create Game remounts, the map list unmounts). Proves the bidirectional
+# screen-local panel swap end to end. The create intent + dedicated-spawn →
+# auto-join → staging room run through the LOBBY-tick game-join pump; the live
+# staging room is exercised in the capstone E2E (which provisions a map for the
+# spawned dedicated server).
+cli --port "$CTRL_PORT" click --label "LobbyGoBack" >/dev/null
+wait_for_widget "NewGame"
+wait_for_widget_gone "CreateGame"
 
 echo "PASS 31_lobby_create_staging"

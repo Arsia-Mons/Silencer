@@ -2,11 +2,13 @@
 # Regression: as the desktop window is resized the modern cppx menu must keep
 # laying its controls out responsively and keep routing pointer clicks through
 # the UI-space layout to the correct control. The retained cppx engine (Yoga
-# flex) lays out directly in UI/screen-pixel space — there is no fixed
-# virtual-resolution snap — so the reported control geometry must track the
-# resized surface and a click computed from inspect coords must still activate
-# the control under it. expectedScale (max(1, min(w/640, h/480))) is kept as the
-# documented sizing reference and asserted to grow monotonically with viewport.
+# flex) lays out on a logical UI canvas whose height is pinned to 720 and whose
+# width tracks the window aspect (width = aspect * 720); inspect coords,
+# hover_at and click_at all live in that UI space. So the reported control
+# geometry must stay inside the aspect-tracking logical canvas after a resize,
+# and a click computed from inspect coords must still activate the control
+# under it. expectedScale (max(1, min(w/640, h/480))) is kept as the documented
+# sizing reference and asserted to never drop below 1.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -69,10 +71,14 @@ check_resize() {
     console.error("Options button missing after resize");
     process.exit(1);
   }
-  // The control must lay out fully inside the resized surface — i.e. the layout
-  // tracked the resize rather than snapping to a stale virtual resolution.
-  if (options.x < 0 || options.y < 0 || options.x + options.w > surfW || options.y + options.h > surfH) {
-    console.error(`Options button is outside render surface ${surfW}x${surfH}: ${JSON.stringify(options)}`);
+  // Inspect/click coords live on the logical UI canvas: height pinned to 720,
+  // width tracking the realized surface aspect. The control must lay out fully
+  // inside that canvas — i.e. the layout tracked the resized aspect rather
+  // than snapping to a stale fixed-width canvas.
+  const uiH = 720;
+  const uiW = (surfW / surfH) * uiH;
+  if (options.x < 0 || options.y < 0 || options.x + options.w > uiW + 0.5 || options.y + options.h > uiH + 0.5) {
+    console.error(`Options button is outside UI canvas ${uiW.toFixed(1)}x${uiH} (surface ${surfW}x${surfH}): ${JSON.stringify(options)}`);
     process.exit(1);
   }
   console.log(`${Math.floor(options.x + options.w / 2)} ${Math.floor(options.y + options.h / 2)}`);

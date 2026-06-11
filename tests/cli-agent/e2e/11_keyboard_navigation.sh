@@ -16,8 +16,8 @@ trap 'stop_silencer "$PID" "$PORT"' EXIT
 wait_alive "$PORT"
 cli --port "$PORT" wait_for_state --state MAINMENU --timeout-ms 15000 >/dev/null
 
-# Main-menu focus order: Connect To Lobby -> Tutorial -> Options -> Quit (focus
-# starts on Connect To Lobby). Two tabs (tab == down) move focus to "Options".
+# Main-menu focus order: Tutorial -> Connect To Lobby -> Options -> Exit (focus
+# starts on Tutorial). Two tabs (tab == down) move focus to "Options".
 # A third tab would land on "Exit"; activating it quits the app.
 cli --port "$PORT" key --key tab >/dev/null
 cli --port "$PORT" key --key tab >/dev/null

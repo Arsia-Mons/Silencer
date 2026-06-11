@@ -2,11 +2,17 @@
 # Drives the cppx lobby GameCreate panel and proves it renders + stays usable
 # across window sizes. The legacy Clay GameCreate had a scrollable "Game Options
 # Form" with separate security/level option rows; the modern cppx GameCreate
-# panel has no scrollable surface (CreateGameRequest defaults those options), so
-# this is no longer a scroll test. Instead: connect → auth → create character →
-# LOBBY → New Game, then assert the GameCreate controls (name input + bundled-map
-# cycle + Create/Back) are present and laid out inside the virtual UI bounds at a
-# desktop size, a small 640x480 size, and a tall mobile 390x844 size.
+# panel has no scrollable surface (CreateGameRequest defaults those options —
+# they render as a read-only "Game Options" table), so this is no longer a
+# scroll test. Instead: connect → auth → create character → LOBBY → New Game,
+# then assert the GameCreate panel (Select Map list of focusable MapRow entries,
+# Game name display, Create button, Go Back) is present and laid out inside the
+# UI viewport at a desktop size, a small 640x480 size, and a tall 1000x1100
+# portrait size. The logical canvas pins height at 720 (width = aspect*720,
+# game_ui_pipeline.cpp) and the lobby cockpit's authored min logical width is
+# ~640, so a phone-narrow 390x844 window crops horizontally BY DESIGN — at that
+# size we assert the panel still mounts (controls exist, positive size,
+# vertically in-bounds) rather than full horizontal containment.
 set -euo pipefail
 . "$(dirname "$0")/lib.sh"
 
@@ -141,12 +147,13 @@ cli --port "$CTRL_PORT" wait_for_state --state CREATECHARACTER --timeout-ms 1500
 wait_for_widget "Create New Character"
 cli --port "$CTRL_PORT" click --label "Create New Character" >/dev/null
 
-# step1: type an alias, then confirm to advance to the agency picker.
+# step1: set the alias (the Alias input is not autofocused, so set_text by
+# accessibility label rather than raw key chars), then enter confirms
+# (AliasConfirm is disabled until the alias is non-empty) and advances to the
+# agency picker.
 wait_for_widget "Alias"
-for ch in A l i c e; do
-  cli --port "$CTRL_PORT" key --key "$ch" >/dev/null
-done
-cli --port "$CTRL_PORT" click --label "Continue" >/dev/null
+cli --port "$CTRL_PORT" set_text --label "Alias" --text "Alice" >/dev/null
+cli --port "$CTRL_PORT" key --key enter >/dev/null
 
 # step2: pick an agency — creating the agent. Once it round-trips through the
 # lobby the CREATECHARACTER tick routes to the lobby.
@@ -156,20 +163,28 @@ cli --port "$CTRL_PORT" wait_for_state --state LOBBY --timeout-ms 15000
 
 # GameSelect is the default right column; swap to GameCreate (screen-local
 # use_state<ActivePanel>) by clicking New Game — this mounts the create form.
+# The NewGame button's visible label is "Create Game"; click by control_id.
 wait_for_widget "NewGame"
-cli --port "$CTRL_PORT" click --label "New Game" >/dev/null
-wait_for_widget "CreateBack"
+cli --port "$CTRL_PORT" click --label "NewGame" >/dev/null
+wait_for_widget "CreateGame"
 
-# Assert the GameCreate panel controls are present and laid out within the UI
-# content viewport at the current window size. Controls are matched by
-# control_id (stable across copy changes). The viewport reference is the
-# bounding box of the whole retained tree (inspect emits every node's Yoga
-# layout x/y/w/h in one UI-space): each control must sit at non-negative
-# on-canvas coordinates with positive size, fully inside that content box. The
-# lobby lays out against a fixed virtual canvas, so this verifies the panel
-# renders intact and never collapses or drifts off-canvas as the window resizes.
+# Assert the GameCreate panel is present and laid out within the UI viewport at
+# the current window size. The modern origin-parity panel (lobby_screen.cppx)
+# is: a "Game Options" read-only table, a "Select Map" list of focusable MapRow
+# entries, the "Game name:" display (plain text by design — no Input chrome),
+# the wide "Create" button (control_id CreateGame), and the cockpit "Go Back"
+# button (LobbyGoBack) that exits the create panel. Buttons are matched by
+# control_id (stable across copy changes); the viewport is the retained tree's
+# Root node (the logical UI canvas). Each interactive control must have
+# positive size and sit fully inside the viewport — proving the panel renders
+# intact and never collapses or drifts off-canvas as the window resizes.
+# Second arg "vertical" relaxes the horizontal containment (for windows
+# narrower than the cockpit's authored min logical width, where horizontal
+# cropping is the designed behavior) while still requiring presence, positive
+# size, and vertical containment.
 assert_create_panel_in_bounds() {
   local what="$1"
+  local mode="${2:-full}"
   local inspect_out
   inspect_out="$(mktemp)"
   cli --port "$CTRL_PORT" inspect > "$inspect_out"
@@ -177,60 +192,96 @@ assert_create_panel_in_bounds() {
   bun -e '
   const inspectPath = process.argv[1];
   const what = process.argv[2];
+  const fullBounds = process.argv[3] !== "vertical";
   const inspect = JSON.parse(await Bun.file(inspectPath).text());
   const nodes = inspect.nodes ?? [];
   if (nodes.length === 0) {
     console.error(`${what}: inspect returned no nodes`);
     process.exit(1);
   }
-  // UI content viewport = bounding box of every laid-out node.
-  let maxX = 0, maxY = 0;
-  for (const n of nodes) {
-    if (Number.isFinite(n.x) && Number.isFinite(n.w)) maxX = Math.max(maxX, n.x + n.w);
-    if (Number.isFinite(n.y) && Number.isFinite(n.h)) maxY = Math.max(maxY, n.y + n.h);
-  }
+  // UI viewport = the retained tree root (the logical UI canvas).
+  const root = nodes.find((n) => n.type === "Root") ?? nodes[0];
+  const maxX = root.x + root.w, maxY = root.y + root.h;
   if (!(maxX > 0) || !(maxY > 0)) {
-    console.error(`${what}: degenerate UI content viewport ${maxX}x${maxY}`);
+    console.error(`${what}: degenerate UI viewport ${maxX}x${maxY}`);
     process.exit(1);
   }
-  // The GameCreate panel: game-name Input + bundled-map cycle + Create/Back.
-  const required = ["GameName", "MapPrev", "MapNext", "CreateGame", "CreateBack"];
   const eps = 1;
-  for (const id of required) {
+  const inBounds = (n) =>
+    n.y >= -eps && n.y + n.h <= maxY + eps &&
+    (!fullBounds || (n.x >= -eps && n.x + n.w <= maxX + eps));
+  const assertControl = (n, id) => {
+    if (!(n.w > 0) || !(n.h > 0)) {
+      console.error(`${what}: control ${id} has non-positive size ${n.w}x${n.h}`);
+      process.exit(1);
+    }
+    if (!inBounds(n)) {
+      console.error(`${what}: control ${id} outside UI viewport ${maxX}x${maxY}: ${JSON.stringify(n)}`);
+      process.exit(1);
+    }
+  };
+  // Required buttons: the Create submit + the cockpit Go Back that leaves the
+  // create panel.
+  for (const id of ["CreateGame", "LobbyGoBack"]) {
     const n = nodes.find((w) => w.control_id === id);
     if (!n) {
       console.error(`${what}: GameCreate control ${id} missing`);
       process.exit(1);
     }
-    if (!(n.w > 0) || !(n.h > 0)) {
-      console.error(`${what}: control ${id} has non-positive size ${n.w}x${n.h}`);
+    if (!n.focusable) {
+      console.error(`${what}: control ${id} not focusable`);
       process.exit(1);
     }
-    if (n.x < -eps || n.y < -eps || n.x + n.w > maxX + eps || n.y + n.h > maxY + eps) {
-      console.error(`${what}: control ${id} outside UI viewport ${maxX}x${maxY}: ${JSON.stringify(n)}`);
+    assertControl(n, id);
+  };
+  // The Select Map list: at least one focusable MapRow entry, all in-bounds
+  // (the maplist box clips with Overflow::Hidden, but the capped row count
+  // must still lay out on-canvas).
+  const rows = nodes.filter((w) => w.control_id === "MapRow");
+  if (rows.length === 0) {
+    console.error(`${what}: no MapRow entries in the Select Map list`);
+    process.exit(1);
+  }
+  rows.forEach((n, i) => assertControl(n, `MapRow[${i}] ${n.label ?? ""}`));
+  // Panel copy that anchors the create form: the options table title, the map
+  // list title, and the game-name field label.
+  for (const text of ["Game Options", "Select Map", "Game name:"]) {
+    if (!nodes.some((w) => w.role === "text" && w.value === text)) {
+      console.error(`${what}: GameCreate text "${text}" missing`);
       process.exit(1);
     }
   }
-  console.log(`${what}: GameName+MapPrev+MapNext+CreateGame+CreateBack in-bounds within ${maxX}x${maxY}`);
-  ' "$inspect_out" "$what"
+  console.log(`${what}: CreateGame+LobbyGoBack+${rows.length} MapRows ${fullBounds ? "in-bounds" : "mounted + vertically in-bounds"} within ${maxX}x${maxY}`);
+  ' "$inspect_out" "$what" "$mode"
 
   rm -f "$inspect_out"
 }
 
-# Default desktop size.
+# Desktop size (headless default is small, so resize explicitly).
+cli --port "$CTRL_PORT" resize --w 1280 --h 720 >/dev/null
 cli --port "$CTRL_PORT" wait_frames --n 3 >/dev/null
-assert_create_panel_in_bounds "default"
+wait_for_widget "CreateGame"
+assert_create_panel_in_bounds "1280x720"
 
 # Small desktop size.
 cli --port "$CTRL_PORT" resize --w 640 --h 480 >/dev/null
 cli --port "$CTRL_PORT" wait_frames --n 3 >/dev/null
-wait_for_widget "CreateBack"
+wait_for_widget "CreateGame"
 assert_create_panel_in_bounds "640x480"
 
-# Tall mobile size.
+# Tall portrait size whose logical width (1000/(1100/720) ≈ 654) still clears
+# the cockpit's authored min width — full containment must hold.
+cli --port "$CTRL_PORT" resize --w 1000 --h 1100 >/dev/null
+cli --port "$CTRL_PORT" wait_frames --n 3 >/dev/null
+wait_for_widget "CreateGame"
+assert_create_panel_in_bounds "1000x1100"
+
+# Phone-narrow portrait: the logical canvas (≈333x720) is narrower than the
+# cockpit's authored min width, so horizontal cropping is by design — the panel
+# must still mount with positive-size controls inside the vertical bounds.
 cli --port "$CTRL_PORT" resize --w 390 --h 844 >/dev/null
 cli --port "$CTRL_PORT" wait_frames --n 3 >/dev/null
-wait_for_widget "CreateBack"
-assert_create_panel_in_bounds "390x844"
+wait_for_widget "CreateGame"
+assert_create_panel_in_bounds "390x844" vertical
 
 echo "PASS 53_lobby_create_options_scroll"
