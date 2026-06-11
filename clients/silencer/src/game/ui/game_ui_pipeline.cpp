@@ -384,10 +384,22 @@ register_legacy(6, 15, cppxChrome.toggle_r_on);
 bake(134, '[' - 33, cppxChrome.bracket_l, &cppxChrome.bracket_w, &cppxChrome.bracket_h);
 bake(134, ']' - 33, cppxChrome.bracket_r);
 // bank 181 idx0-4 — the five agency emblems (SIL-102 Character Create detail).
-for(int i = 0; i < 5; ++i)
+// origin draws them PackImageContain into their element box, so register the
+// contain flavor: the executor swaps each draw for a per-phase/per-size
+// variant baked through origin's letterbox + magnify arithmetic.
+for(int i = 0; i < 5; ++i){
 bake(181, (size_t)i, cppxChrome.agency_emblem[i],
      i == 0 ? &cppxChrome.agency_emblem_w : nullptr,
      i == 0 ? &cppxChrome.agency_emblem_h : nullptr);
+if(cppxChrome.agency_emblem[i] && 181 < banks.size() && (size_t)i < banks[181].size()){
+const std::shared_ptr<Surface> &esp = banks[181][(size_t)i];
+if(esp && !esp->pixels.empty())
+cppxHost->register_legacy_contain(cppxChrome.agency_emblem[i],
+                                  esp->pixels.data(), esp->w, esp->h,
+                                  page_for_bank(181), kLegacyRenderWidth,
+                                  kLegacyRenderHeight);
+}
+}
 // In-game HUD console chrome (banks 94/95). These are authored against the base
 // palette page (resources.cpp leaves them at paletteoffset 0), so the bake's
 // default page_for_bank arm (base) is correct — no per-bank page override.
@@ -471,6 +483,8 @@ static const VariantBake kVariantBakes[] = {
     {0, 133, 6.f, 11.f, Fx::Color, 189, 128, silencer::tokens::kTextVersion},
     // agent display names: LegacyPalette(200).
     {1, 134, 8.f, 15.f, Fx::Color, 200, 128, silencer::tokens::kTextAgentName},
+    // lobby presence group headers: LegacyPalette(0, 160).
+    {0, 133, 6.f, 11.f, Fx::Raw, 0, 160, silencer::tokens::kTextPresenceHeader},
 };
 for(const VariantBake & vb : kVariantBakes){
 if((size_t)vb.bank >= banks.size()) continue;

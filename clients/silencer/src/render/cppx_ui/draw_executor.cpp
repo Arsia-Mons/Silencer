@@ -334,8 +334,11 @@ void render_image(SDL_Renderer *r, const ::ui::DrawCommand &c,
     int out_w = 0, out_h = 0;
     TextureRegistry::LegacyVariant v;
     if (SDL_GetCurrentRenderOutputSize(r, &out_w, &out_h) &&
-        textures->resolve_legacy_variant(img.texture_id, r, dst.x, dst.y,
-                                         dst.w, dst.h, out_w, out_h, &v)) {
+        (textures->resolve_legacy_variant(img.texture_id, r, dst.x, dst.y,
+                                          dst.w, dst.h, out_w, out_h, &v) ||
+         textures->resolve_legacy_contain_variant(img.texture_id, r, dst.x,
+                                                  dst.y, dst.w, dst.h, out_w,
+                                                  out_h, &v))) {
       SDL_SetTextureColorMod(tex, 255, 255, 255);
       SDL_SetTextureAlphaMod(tex, 255);
       SDL_SetTextureColorMod(v.texture, tint.r, tint.g, tint.b);

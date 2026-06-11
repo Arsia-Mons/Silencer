@@ -166,21 +166,23 @@ inline ::ui::StyleStatePatch app_button_oval_patch(uint32_t tex) {
 inline ::ui::LayoutStyle app_button_chrome_layout(AppButtonSize size = AppButtonSize::Md) {
   // Sm = origin's DEFAULT fixed chrome plate (156x21 native -> 234x31.5): the
   // lobby Go Back. Other sizes keep the Auto label-fit (origin size Auto).
+  // origin top-aligns the label 4 virtual px (yOffset 4) below the plate top
+  // (Chrome has no centerContentY) — justify Start + pad-top 6 logical.
   if (size == AppButtonSize::Sm) {
     return {
         .align_items = ::ui::AlignItems::Center,
-        .justify_content = ::ui::JustifyContent::Center,
+        .justify_content = ::ui::JustifyContent::Start,
         .width = ::ui::Length::points(234.0f),
         .height = ::ui::Length::points(31.5f),
-        .padding = {15.0f, 15.0f, 6.0f, 6.0f},
+        .padding = {15.0f, 15.0f, 6.0f, 0.0f},
     };
   }
   return {
       .align_items = ::ui::AlignItems::Center,
-      .justify_content = ::ui::JustifyContent::Center,
+      .justify_content = ::ui::JustifyContent::Start,
       .min_width = ::ui::Length::points(138.0f), // origin kActionButtonMinWidth 92 virtual
       .height = ::ui::Length::points(31.5f),     // origin Chrome plate 21 virtual
-      .padding = {18.0f, 18.0f, 6.0f, 6.0f},     // origin paddingX 12 virtual
+      .padding = {18.0f, 18.0f, 6.0f, 0.0f},     // origin paddingX 12 virtual
   };
 }
 
@@ -219,10 +221,14 @@ app_button_chrome_patch(uint32_t idle, uint32_t focus,
     p.text = ::ui::opt(label);
     return p;
   };
-  const uint32_t f = focus ? focus : idle;
+  // origin Chrome buttons NEVER swap art on focus/hover (SpriteIndexForFrame
+  // returns idx24 for every phase; only brightness ramps 128->136) — and the
+  // golden captures show the focused lobby Go Back at plain idle brightness.
+  // Keep idx24 for every state; the hover ramp tints the same art.
+  (void)focus;
   ov.base = chrome(idle, ::ui::Color{255, 255, 255, 255});
-  ov.hover = chrome(f, lit);
-  ov.focus_visible = chrome(f, lit);
+  ov.hover = chrome(idle, lit);
+  ov.focus_visible = chrome(idle, ::ui::Color{255, 255, 255, 255});
   return ov;
 }
 

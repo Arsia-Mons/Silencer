@@ -100,6 +100,12 @@ public:
                                  int legacy_w, int legacy_h, int cap_l,
                                  int cap_r, int cap_t, int cap_b);
 
+  // Contain flavor (agency emblems): the sprite letterboxes into its virtual
+  // box with origin's DispatchImage arithmetic before the magnify.
+  void register_legacy_contain(uint32_t texture_id, const uint8_t *indices,
+                               int w, int h, const SDL_Color *palette256,
+                               int legacy_w, int legacy_h);
+
   // Build one bitmap glyph FACE atlas (origin/main text parity). `glyphs[i]` is
   // the source sprite for char GlyphFonts::kFirstChar + i (null/empty = blank
   // cell). advance/line_height are the native (640-space) bank metrics. Baked

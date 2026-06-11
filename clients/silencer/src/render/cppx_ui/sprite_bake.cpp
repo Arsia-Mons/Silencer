@@ -215,4 +215,68 @@ void bake_element_nineslice_rgba(const uint8_t *indices, int sw, int sh,
   }
 }
 
+void bake_element_contain_rgba(const uint8_t *indices, int sw, int sh,
+                               const SDL_Color *palette256, int bx, int by,
+                               int bw, int bh, int legacy_w, int legacy_h,
+                               int dw, int dh, int dev_x, int dev_y, int tex_w,
+                               int tex_h, uint8_t *out_rgba) {
+  if (bw <= 0 || bh <= 0 || sw <= 0 || sh <= 0)
+    return;
+  float s = std::min(dw / (float)legacy_w, dh / (float)legacy_h);
+  if (s < 1.0f)
+    s = 1.0f;
+  const int vw = std::max(1, (int)(dw / s));
+  const int vh = std::max(1, (int)(dh / s));
+  const int scaled_w = (int)(vw * s + 0.5f);
+  const int scaled_h = (int)(vh * s + 0.5f);
+  const int off_x = scaled_w < dw ? (dw - scaled_w) / 2 : 0;
+  const int off_y = scaled_h < dh ? (dh - scaled_h) / 2 : 0;
+  const int draw_w = std::min(scaled_w, dw - off_x);
+  const int draw_h = std::min(scaled_h, dh - off_y);
+  // origin DispatchImage Contain: float min-scale, int(+0.5) draw size,
+  // int-centered, per-pixel src = int((p - o) / scale) (C truncation).
+  const float cscale = std::min((float)bw / sw, (float)bh / sh);
+  if (cscale <= 0.0f)
+    return;
+  const int contain_w = std::max(1, (int)(sw * cscale + 0.5f));
+  const int contain_h = std::max(1, (int)(sh * cscale + 0.5f));
+  const int ox = (bw - contain_w) / 2; // box-relative
+  const int oy = (bh - contain_h) / 2;
+  for (int ty = 0; ty < tex_h; ++ty) {
+    const int gy = dev_y + ty - off_y;
+    if (gy < 0 || gy >= draw_h)
+      continue;
+    const int vy = std::min((int)(gy / s), vh - 1);
+    const int ly = vy - by;
+    if (ly < 0 || ly >= bh)
+      continue;
+    const int syi = (int)((ly - oy) / cscale);
+    if (syi < 0 || syi >= sh)
+      continue;
+    const uint8_t *srow = indices + (size_t)syi * sw;
+    uint8_t *orow = out_rgba + (size_t)ty * tex_w * 4;
+    for (int tx = 0; tx < tex_w; ++tx) {
+      const int gx = dev_x + tx - off_x;
+      if (gx < 0 || gx >= draw_w)
+        continue;
+      const int vx = std::min((int)(gx / s), vw - 1);
+      const int lx = vx - bx;
+      if (lx < 0 || lx >= bw)
+        continue;
+      const int sxi = (int)((lx - ox) / cscale);
+      if (sxi < 0 || sxi >= sw)
+        continue;
+      const uint8_t idx = srow[sxi];
+      if (idx == 0)
+        continue;
+      const SDL_Color &c = palette256[idx];
+      uint8_t *o = orow + (size_t)tx * 4;
+      o[0] = c.r;
+      o[1] = c.g;
+      o[2] = c.b;
+      o[3] = 255;
+    }
+  }
+}
+
 } // namespace silencer::cppx_ui

@@ -96,8 +96,8 @@ using ::ui::components::TextProps;
       .align_items = ::ui::AlignItems::Stretch,
       .width = ::ui::Length::points(757.0f),
       .min_height = ::ui::Length::points(0.0f),
-      .padding = {8.0f, 8.0f, 6.0f, 6.0f},
-      .gap = 4.0f};
+      .padding = {10.0f, 10.0f, 8.0f, 7.0f},
+      .gap = 0.0f};
   l.flex_shrink = ::ui::StyleFloat::points(0.0f);
   return l;
 }
@@ -140,7 +140,7 @@ inline ::ui::StylePatch lobby_panel_open_left() {
     key={key}
     layout={::ui::LayoutStyle{
       .direction = ::ui::FlexDirection::Row,
-      .align_items = ::ui::AlignItems::Center,
+      .align_items = ::ui::AlignItems::Start,
       .width = ::ui::Length::percent(100.0f),
       .height = ::ui::Length::points(18.0f),
       .flex_shrink = ::ui::StyleFloat::points(0.0f),
@@ -310,16 +310,17 @@ struct GameBrowserProps {
   // 21 - 4 - footer 112 = 251 virtual -> 376.5), Inset stroke, 1px border pad.
   ::ui::LayoutStyle cell = lobby_right_cell_layout();
   cell.padding = {0.0f, 0.0f, 0.0f, 0.0f};
+  cell.gap = 0.0f;
   return <Box key="rightcell" layout={cell} style={lobby_panel_open_left()}>
     <Box
       key="hwrap"
-      layout={::ui::LayoutStyle{.padding = {10.5f, 0.0f, 9.0f, 0.0f}}}
+      layout={::ui::LayoutStyle{.padding = {10.5f, 0.0f, 10.0f, 0.0f}}}
     >
       <ScreenTitle key="h" variant={ScreenTitleVariant::Console} value="Active Games" />
     </Box>
     <Box
       key="listwrap"
-      layout={::ui::LayoutStyle{.padding = {13.5f, 13.5f, 6.0f, 0.0f}}}
+      layout={::ui::LayoutStyle{.padding = {13.0f, 13.0f, 5.0f, 0.0f}}}
     >
       <Box
         key="well"
@@ -925,7 +926,7 @@ struct LobbyScreenProps {
               .width = ::ui::Length::points(436.0f),
               .flex_shrink = ::ui::StyleFloat::points(0.0f),
               .overflow = ::ui::Overflow::Hidden,
-              .padding = {9.0f, 9.0f, 9.0f, 9.0f},
+              .padding = {9.0f, 9.0f, 10.0f, 8.0f},
               .gap = 15.0f}}
             style={lobby_panel_style()}
           >
@@ -981,7 +982,7 @@ struct LobbyScreenProps {
                   .direction = ::ui::FlexDirection::Row,
                   .align_items = ::ui::AlignItems::Stretch,
                   .flex_grow = ::ui::StyleFloat::points(1.0f),
-                  .gap = ::ui::StyleValue::points(7.5f)}}
+                  .gap = ::ui::StyleValue::points(7.0f)}}
               >
                 <Box
                   key="statsCol"
@@ -995,7 +996,7 @@ struct LobbyScreenProps {
                     key="stattable"
                     layout={::ui::LayoutStyle{
                       .direction = ::ui::FlexDirection::Column,
-                      .gap = ::ui::StyleValue::points(3.0f)}}
+                      .gap = ::ui::StyleValue::points(2.5f)}}
                   >
                     {stat_kv("wins", "WINS", "0")}
                     {stat_kv("loss", "LOSSES", "0")}
@@ -1026,7 +1027,7 @@ struct LobbyScreenProps {
                     .flex_grow = ::ui::StyleFloat::points(1.0f),
                     .flex_basis = ::ui::Length::points(0.0f),
                     .min_width = ::ui::Length::points(0.0f),
-                    .padding = {6.0f, 6.0f, 4.5f, 4.5f},
+                    .padding = {6.0f, 6.0f, 4.0f, 4.5f},
                     .gap = ::ui::StyleValue::points(3.0f)}}
                   style={tokens::frame_patch(tokens::kInsetStroke)}
                 >
@@ -1066,7 +1067,14 @@ struct LobbyScreenProps {
             .flex_grow = ::ui::StyleFloat::points(1.0f)}}
         >
         <Box key="chat" layout={lobby_chat_layout()} style={lobby_panel_style()}>
-          <ScreenTitle key="h" variant={ScreenTitleVariant::Console} value={chat_title} />
+          <Box
+            key="chanrow"
+            layout={::ui::LayoutStyle{
+              .height = ::ui::Length::points(24.0f),
+              .flex_shrink = ::ui::StyleFloat::points(0.0f)}}
+          >
+            <ScreenTitle key="h" variant={ScreenTitleVariant::Console} value={chat_title} />
+          </Box>
           <Box
             key="logwell"
             layout={::ui::LayoutStyle{
@@ -1075,8 +1083,8 @@ struct LobbyScreenProps {
               .align_items = ::ui::AlignItems::Stretch,
               .flex_grow = ::ui::StyleFloat::points(1.0f),
               .width = ::ui::Length::percent(100.0f),
-              .padding = {8.0f, 8.0f, 6.0f, 6.0f},
-              .gap = 9.0f}}
+              .padding = {8.0f, 8.0f, 6.0f, 3.0f},
+              .gap = 12.0f}}
             style={tokens::frame_patch(tokens::kInsetStroke)}
           >
             <Box
@@ -1095,24 +1103,31 @@ struct LobbyScreenProps {
               layout={::ui::LayoutStyle{
                 .direction = ::ui::FlexDirection::Column,
                 .align_items = ::ui::AlignItems::Start,
-                .width = ::ui::Length::points(110.0f),
-                .flex_shrink = ::ui::StyleFloat::points(0.0f),
-                .gap = 1.0f}}
+                .width = ::ui::Length::points(222.0f),
+                .flex_shrink = ::ui::StyleFloat::points(0.0f)}}
             >
-              <BodyText
+              <Text
                 key="il"
-                variant={BodyTextVariant::Detail}
-                tone={BodyTextTone::Muted}
                 value={staging.active ? "Pregame" : "In Lobby"}
+                layout={{.height = ::ui::Length::points(tokens::kLineBody)}}
+                style={tokens::text_patch(tokens::kTextPresenceHeader,
+                                          tokens::kFontBodyEm, tokens::kFaceBody,
+                                          tokens::kLineBody)}
               />
               <BodyText key="p" variant={BodyTextVariant::Detail} value={presence} />
             </Box>
           </Box>
           <Box
+            key="ingap"
+            layout={::ui::LayoutStyle{
+              .height = ::ui::Length::points(6.0f),
+              .flex_shrink = ::ui::StyleFloat::points(0.0f)}}
+          />
+          <Box
             key="inputstrip"
             layout={::ui::LayoutStyle{
               .width = ::ui::Length::percent(100.0f),
-              .height = ::ui::Length::points(28.0f),
+              .height = ::ui::Length::points(25.0f),
               .flex_shrink = ::ui::StyleFloat::points(0.0f)}}
             style={tokens::frame_patch(tokens::kInsetStroke)}
           />

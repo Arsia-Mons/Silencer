@@ -67,4 +67,14 @@ void bake_element_nineslice_rgba(const uint8_t *indices, int sw, int sh,
                                  int dev_y, int tex_w, int tex_h,
                                  uint8_t *out_rgba);
 
+// Contain variant (origin DispatchImage ImageFit::Contain — the agency
+// emblems): the sprite scales by min(bw/sw, bh/sh) (float), centers in the
+// virtual box with origin's int arithmetic, then the whole-frame magnify
+// maps absolute device px through int(gx/s).
+void bake_element_contain_rgba(const uint8_t *indices, int sw, int sh,
+                               const SDL_Color *palette256, int bx, int by,
+                               int bw, int bh, int legacy_w, int legacy_h,
+                               int dw, int dh, int dev_x, int dev_y, int tex_w,
+                               int tex_h, uint8_t *out_rgba);
+
 } // namespace silencer::cppx_ui

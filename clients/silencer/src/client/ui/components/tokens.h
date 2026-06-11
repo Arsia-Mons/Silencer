@@ -65,6 +65,9 @@ constexpr ::ui::Color kTextBody = {24, 124, 20, 255};
 constexpr ::ui::Color kTextBodyMuted = {16, 96, 8, 255};      // dim (footer/OR/inactive)
 constexpr ::ui::Color kTextWeaponName = {24, 124, 20, 255};
 constexpr ::ui::Color kTextWeaponDetail = {24, 124, 20, 255};
+// Lobby presence group headers ("In Lobby"/"Pregame"): origin draws them at
+// brightness 160 (chat_panel PushEntry 128+32) — primary of that ramp.
+constexpr ::ui::Color kTextPresenceHeader = {92, 148, 92, 255};
 constexpr ::ui::Color kTextWeaponDetailOff = {10, 72, 8, 255}; // disabled
 constexpr ::ui::Color kTextHud = {61, 232, 61, 255};          // #3DE83D hud-green
 

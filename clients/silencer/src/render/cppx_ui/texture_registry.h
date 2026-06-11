@@ -64,6 +64,13 @@ public:
                                  int legacy_w, int legacy_h, int cap_l,
                                  int cap_r, int cap_t, int cap_b);
 
+  // Contain flavor (origin DispatchImage Contain — agency emblems): the
+  // sprite letterboxes into an arbitrary-size virtual box before the
+  // whole-frame magnify.
+  void register_legacy_contain(uint32_t base_id, const uint8_t *indices,
+                               int w, int h, const SDL_Color *palette256,
+                               int legacy_w, int legacy_h);
+
   // A resolved variant: drawn 1:1 at device (x,y), w x h texels. The rect may
   // exceed the requesting draw's box by up to 2px right/bottom — it covers the
   // sprite's full device cell (the box is Yoga-rounded, the cell is not).
@@ -90,6 +97,13 @@ public:
                                         int out_w, int out_h,
                                         LegacyVariant *out);
 
+  // Contain resolve: like the nine-slice flavor (any box size; memo includes
+  // the recovered virtual size).
+  bool resolve_legacy_contain_variant(uint32_t base_id, SDL_Renderer *renderer,
+                                      float dev_x, float dev_y, float dev_w,
+                                      float dev_h, int out_w, int out_h,
+                                      LegacyVariant *out);
+
   void shutdown();
 
 private:
@@ -104,6 +118,7 @@ private:
     int w = 0, h = 0;
     int legacy_w = 640, legacy_h = 480;
     bool nine_slice = false;
+    bool contain = false;
     int cap_l = 0, cap_r = 0, cap_t = 0, cap_b = 0;
     SDL_Color palette[256] = {};
   };

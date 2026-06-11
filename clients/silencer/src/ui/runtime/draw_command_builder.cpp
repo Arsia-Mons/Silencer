@@ -292,10 +292,16 @@ bool append_frame(DrawCommandList &list, const NodeSnapshot &node,
 
   // Border: the resolved per-side VisualStyle border, else a control-role
   // default (a 1px border in the role's border color). Non-control boxes with
-  // no resolved border get none.
+  // no resolved border get none. ANY painted side qualifies (side-masked
+  // frames — e.g. the lobby stepped-pane seams — paint right/bottom only).
   Border border = {};
   bool has_border = false;
-  if (v.border.color.top.a > 0 && v.border.width.top > 0.0f) {
+  const bool any_border_side =
+      (v.border.color.top.a > 0 && v.border.width.top > 0.0f) ||
+      (v.border.color.right.a > 0 && v.border.width.right > 0.0f) ||
+      (v.border.color.bottom.a > 0 && v.border.width.bottom > 0.0f) ||
+      (v.border.color.left.a > 0 && v.border.width.left > 0.0f);
+  if (any_border_side) {
     border = v.border;
     has_border = true;
   } else if (control_box && v.image.texture_id == 0 && !v.chromeless) {
