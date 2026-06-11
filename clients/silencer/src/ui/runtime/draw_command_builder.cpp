@@ -24,7 +24,9 @@ constexpr float kFocusBorderOffset = 2.0f;
 constexpr Color kCheckedFill = {34, 192, 76, 255};   // #22C04C toggle-on green
 constexpr Color kInputFill = {18, 22, 28, 255};
 constexpr Color kSelectionFill = {72, 116, 164, 180};
-constexpr Color kCaretFill = {232, 240, 248, 255};
+// Legacy caret: origin TextInput draws a 1-virtual-px (1.5 logical) yellow
+// bar at the text pen, caretHeight = the Body line height (11 virtual).
+constexpr Color kCaretFill = {252, 252, 0, 255};
 constexpr Color kTextFill = {92, 208, 92, 255};      // #5CD05C green (bare-text fallback)
 constexpr Color kTextDisabledFill = {46, 90, 55, 255};
 
@@ -481,9 +483,9 @@ bool append_input_contents(DrawCommandList &list, const NodeSnapshot &node,
     float caret_x = advance_to(caret);
     Rect caret_rect = {};
     caret_rect.x = text_rect.x + caret_x;
-    caret_rect.y = text_rect.y - 1.0f;
-    caret_rect.width = 1.0f;
-    caret_rect.height = text_rect.height + 2.0f;
+    caret_rect.width = 1.5f;  // 1 legacy virtual px
+    caret_rect.height = 16.5f; // legacy Body line height (11 virtual)
+    caret_rect.y = node.layout.y + (node.layout.height - caret_rect.height) * 0.5f;
     if (!push_rect_command(list, node.id, caret_rect, kCaretFill, 0.0f))
       return false;
   }

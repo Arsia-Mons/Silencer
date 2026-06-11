@@ -292,15 +292,20 @@ struct CharacterCreateContentProps {
             .gap = 7.5f}}
         >
           {pane_header("SELECT AGENT")}
-          <AppButton
-            key="new"
-            controlId="CreateNewCharacterBg"
-            variant={AppButtonVariant::Oval}
-            size={AppButtonSize::List}
-            disabled={true}
-            label="Create New Character"
-            onPress={w.open_alias}
-          />
+          <Box
+            key="neww"
+            layout={::ui::LayoutStyle{
+              .margin = {-1.0f, 1.0f, -3.5f, 3.5f}}}
+          >
+            <AppButton
+              key="new"
+              controlId="CreateNewCharacterBg"
+              variant={AppButtonVariant::Oval}
+              size={AppButtonSize::List}
+              label="Create New Character"
+              onPress={w.open_alias}
+            />
+          </Box>
         </Box>
         <Box
           key="rightpane"
@@ -314,7 +319,7 @@ struct CharacterCreateContentProps {
         key="aliasfloat"
         layout={::ui::LayoutStyle{
           .position = ::ui::PositionType::Absolute,
-          .position_inset = ::ui::EdgeSizes{427.0f, {}, 241.5f, {}},
+          .position_inset = ::ui::EdgeSizes{425.0f, {}, 241.5f, {}},
           .direction = ::ui::FlexDirection::Column,
           .align_items = ::ui::AlignItems::Stretch,
           .width = ::ui::Length::points(426.0f),
@@ -325,19 +330,20 @@ struct CharacterCreateContentProps {
           key="title"
           layout={::ui::LayoutStyle{
             .direction = ::ui::FlexDirection::Row,
-            .justify_content = ::ui::JustifyContent::Center,
             .align_items = ::ui::AlignItems::Center,
             .width = ::ui::Length::percent(100.0f),
-            .height = ::ui::Length::points(49.5f)}}
+            .height = ::ui::Length::points(49.5f),
+            .padding = {98.0f, 0.0f, 0.0f, 0.0f}}}
         >
           <ScreenTitle key="t" variant={ScreenTitleVariant::Dialog} value="SILENCER ALIAS" />
         </Box>
         <Box
           key="inputrow"
           layout={::ui::LayoutStyle{
+            .direction = ::ui::FlexDirection::Row,
             .position = ::ui::PositionType::Absolute,
-            .position_inset = ::ui::EdgeSizes{36.0f, {}, 73.5f, {}},
-            .align_items = ::ui::AlignItems::Center,
+            .position_inset = ::ui::EdgeSizes{45.5f, {}, 73.5f, {}},
+            .align_items = ::ui::AlignItems::Stretch,
             .width = ::ui::Length::points(354.0f),
             .height = ::ui::Length::points(40.0f)}}
         >
