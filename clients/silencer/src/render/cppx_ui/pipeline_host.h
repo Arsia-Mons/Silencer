@@ -84,6 +84,14 @@ public:
                                int bw, int bh, int legacy_w, int legacy_h,
                                int dev_x, int dev_y, int tex_w, int tex_h);
 
+  // Register an already-baked chrome texture's indexed source so the executor
+  // can swap qualifying draws (the sprite 1:1 in origin's virtual canvas) for
+  // lazily-baked per-phase device-cell variants — origin's magnify arithmetic
+  // at the element's absolute position (TextureRegistry::resolve_legacy_variant).
+  void register_legacy_sprite(uint32_t texture_id, const uint8_t *indices,
+                              int w, int h, const SDL_Color *palette256,
+                              int legacy_w, int legacy_h);
+
   // Build one bitmap glyph FACE atlas (origin/main text parity). `glyphs[i]` is
   // the source sprite for char GlyphFonts::kFirstChar + i (null/empty = blank
   // cell). advance/line_height are the native (640-space) bank metrics. Baked

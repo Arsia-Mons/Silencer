@@ -99,13 +99,19 @@ inline ::ui::LayoutStyle app_button_oval_layout(AppButtonSize size) {
   // Origin ovals are FIXED sprite cells — a long label ("Connect To Lobby")
   // squeezes inside the cell, never widens it (golden: all menu pills 441
   // device px wide). Vertical padding asymmetric: origin's label baseline
-  // sits ~2 device px lower than symmetric centering.
+  // sits ~2 device px lower than symmetric centering. The +0.25/+0.5 logical
+  // label bias (left/top padding) is floor-tuned against the goldens: glyph
+  // device positions are floor(1.5 * float-centered-x); labels whose fraction
+  // is .75 (odd box coord or odd centering offset) sit 1 device px LEFT/UP of
+  // origin's ceil-based virtual text placement, while .25/.125-fraction labels
+  // are already exact (corr 1.0 on the options column). +0.375/+0.75 device
+  // bumps only the former across the floor without moving the latter.
   return {
       .align_items = ::ui::AlignItems::Center,
       .justify_content = ::ui::JustifyContent::Center,
       .width = ::ui::Length::points(w),
       .height = ::ui::Length::points(49.5f),
-      .padding = {16.0f, 16.0f, 7.5f, 4.5f},
+      .padding = {16.75f, 15.25f, 8.0f, 4.0f},
   };
 }
 

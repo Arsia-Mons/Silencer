@@ -48,6 +48,12 @@ struct OptionsDisplayProps {
 
   // origin/main anchors this dialog in the upper third (title baseline ~y168), not
   // screen-centered like the options root.
+  //
+  // Wrapper margins land every oval on the golden's virtual grid for the
+  // per-phase bake: margin-right 1/2 centers rows at x=419 (Lg cell vx 279)
+  // and Save/Cancel at 336/648 (vx 224/432); smooth's -0.5 top puts row 2 at
+  // y=309 (vy 206) and actionpad 3.5 puts the action row at y=392 (vy 261 —
+  // also fixes the action band sitting ~4 device px below the golden).
   return <ScreenLayout key="root" variant={ScreenLayoutVariant::Overlay}>
     <Box
       key="col"
@@ -61,21 +67,25 @@ struct OptionsDisplayProps {
       <Box key="titlewrap" layout={::ui::LayoutStyle{.margin = ::ui::EdgeSizes{{}, {}, {}, 3.5f}}}>
         <ScreenTitle key="title" variant={ScreenTitleVariant::Dialog} value="Display Options" />
       </Box>
-      <BooleanSettingRow
-        key="fullscreen"
-        controlId="FullscreenToggle"
-        checked={settings.fullscreen}
-        label="Fullscreen"
-        onChange={settings.set_fullscreen}
-      />
-      <BooleanSettingRow
-        key="smooth"
-        controlId="SmoothScalingToggle"
-        checked={settings.smooth_scaling}
-        label="Smooth Scaling"
-        onChange={settings.set_smooth_scaling}
-      />
-      <Box key="actionpad" layout={::ui::LayoutStyle{.margin = ::ui::EdgeSizes{{}, {}, 6.0f, {}}}}>
+      <Box key="fullscreenw" layout={::ui::LayoutStyle{.margin = ::ui::EdgeSizes{{}, 1.0f, {}, {}}}}>
+        <BooleanSettingRow
+          key="fullscreen"
+          controlId="FullscreenToggle"
+          checked={settings.fullscreen}
+          label="Fullscreen"
+          onChange={settings.set_fullscreen}
+        />
+      </Box>
+      <Box key="smoothw" layout={::ui::LayoutStyle{.margin = ::ui::EdgeSizes{{}, 1.0f, -0.5f, {}}}}>
+        <BooleanSettingRow
+          key="smooth"
+          controlId="SmoothScalingToggle"
+          checked={settings.smooth_scaling}
+          label="Smooth Scaling"
+          onChange={settings.set_smooth_scaling}
+        />
+      </Box>
+      <Box key="actionpad" layout={::ui::LayoutStyle{.margin = ::ui::EdgeSizes{{}, 2.0f, 3.5f, {}}}}>
       <ActionRow key="actions">
         <AppButton
           key="save"

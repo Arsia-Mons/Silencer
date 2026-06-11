@@ -109,6 +109,14 @@ uint32_t PipelineHost::bake_element_sprite(const uint8_t *indices, int w,
   return textures_.upload_rgba(r_, bake_scratch_.data(), tex_w, tex_h);
 }
 
+void PipelineHost::register_legacy_sprite(uint32_t texture_id,
+                                          const uint8_t *indices, int w, int h,
+                                          const SDL_Color *palette256,
+                                          int legacy_w, int legacy_h) {
+  textures_.register_legacy_sprite(texture_id, indices, w, h, palette256,
+                                   legacy_w, legacy_h);
+}
+
 bool PipelineHost::build_glyph_face(int face_id,
                                     const GlyphFonts::GlyphSrc *glyphs,
                                     int count, const SDL_Color *palette256,

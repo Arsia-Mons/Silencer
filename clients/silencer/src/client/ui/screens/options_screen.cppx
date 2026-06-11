@@ -8,6 +8,7 @@
 #include "client/ui/screens/options_audio.h"
 #include "client/ui/screens/options_controls.h"
 #include "client/ui/screens/options_display.h"
+#include "ui/components/box.h"
 #include "ui/runtime/react.h"
 
 #include <functional>
@@ -20,6 +21,8 @@ namespace {
 // unqualified, so pull in the silencer semantic layer + the runtime children().
 using namespace silencer;
 using ::ui::children;
+using ::ui::components::Box;
+using ::ui::components::BoxProps;
 
 struct OptionsProps {
   uint32_t unused = 0;
@@ -50,35 +53,47 @@ struct OptionsProps {
   // origin/main: a plain centered oval menu — Controls / Display / Audio / Go Back
   // over the starfield. Each sub-screen owns its own Save/Cancel (commit/revert),
   // so the root is pure navigation: no title, no dirty indicator, no Done/Cancel.
+  // Each oval sits in a margin-right-2 wrapper: centering 294+2 in 1280 puts
+  // the cell at x=492 (device 738 = origin vx 328 exactly) so the per-phase
+  // oval bake lands on the golden's virtual grid (bare centering gives 493).
+  const ::ui::LayoutStyle grid_nudge{.margin = ::ui::EdgeSizes{{}, 2.0f, {}, {}}};
   return <ScreenLayout key="root" variant={ScreenLayoutVariant::Overlay}>
-    <AppButton
-      key="controls"
-      controlId="OptionsControls"
-      variant={AppButtonVariant::Oval}
-      label="Controls"
-      onPress={open_controls}
-    />
-    <AppButton
-      key="display"
-      controlId="OptionsDisplay"
-      variant={AppButtonVariant::Oval}
-      label="Display"
-      onPress={open_display}
-    />
-    <AppButton
-      key="audio"
-      controlId="OptionsAudio"
-      variant={AppButtonVariant::Oval}
-      label="Audio"
-      onPress={open_audio}
-    />
-    <AppButton
-      key="goback"
-      controlId="OptionsGoBack"
-      variant={AppButtonVariant::Oval}
-      label="Go Back"
-      onPress={go_back}
-    />
+    <Box key="w0" layout={grid_nudge}>
+      <AppButton
+        key="controls"
+        controlId="OptionsControls"
+        variant={AppButtonVariant::Oval}
+        label="Controls"
+        onPress={open_controls}
+      />
+    </Box>
+    <Box key="w1" layout={grid_nudge}>
+      <AppButton
+        key="display"
+        controlId="OptionsDisplay"
+        variant={AppButtonVariant::Oval}
+        label="Display"
+        onPress={open_display}
+      />
+    </Box>
+    <Box key="w2" layout={grid_nudge}>
+      <AppButton
+        key="audio"
+        controlId="OptionsAudio"
+        variant={AppButtonVariant::Oval}
+        label="Audio"
+        onPress={open_audio}
+      />
+    </Box>
+    <Box key="w3" layout={grid_nudge}>
+      <AppButton
+        key="goback"
+        controlId="OptionsGoBack"
+        variant={AppButtonVariant::Oval}
+        label="Go Back"
+        onPress={go_back}
+      />
+    </Box>
   </ScreenLayout>
 }
 

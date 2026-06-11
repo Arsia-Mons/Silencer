@@ -1,5 +1,35 @@
 # LESSONS.md — one lesson per entry, why it mattered
 
+- **The software renderer FLOORS float dst rects — sampling phase is uncontrollable from
+  the draw rect.** (oval striping fix) Measured: dst.x=1027.5 rasterizes ink from 1027.
+  So `+0.5`/src-offset tricks that work on real GPU float rects are dead here; with
+  integer rects + center sampling only one of origin's four phases is reachable. The
+  exact path is the same as the backdrop/element bakes: evaluate origin's int chain at
+  absolute device pixels and draw the result 1:1. Verify the rasterization rule from
+  ink bboxes BEFORE designing around a sampling model.
+
+- **Draw-time variant resolution beats build-time texture choice for phase-dependent
+  sprites.** Retained UI builds before layout, so a component can't pick its phase
+  variant — but the EXECUTOR sees the final device rect. register_legacy_sprite +
+  resolve_legacy_variant (lazy bake memoized on (X%18, Y%18)) needed no IR change, no
+  per-screen textures, and automatically covers every future screen using the sprite.
+  The authoring side only owes the grid: <=1-logical-px nudges so round(X/2.25) hits
+  the golden cell (measure golden bboxes first — mainmenu alone uses all 4 y-phases,
+  so canonical-phase layouts are impossible).
+
+- **A texture's interior can be byte-exact and labels still red the tile — text has its
+  own phase family.** After the oval fix, options labels split corr 1.0000 ("Controls",
+  exact to the byte) vs 0.94-max ("Audio") on the SAME screen with identical authoring
+  arithmetic: the single-phase glyph atlas can't render a string whose golden phase
+  differs. Don't chase such tiles with position nudges — corr that plateaus below ~0.99
+  at every integer shift means the PATTERN differs, not the placement.
+
+- **Sub-device-pixel padding bias can fix half the labels without moving the rest.**
+  Glyph x = floor(1.5 * float-center): labels split into .25/.125- and .75/.625-fraction
+  classes; +0.375/+0.75 device of left/top padding pushes only the high-fraction class
+  across the floor (+1 px) and leaves the already-exact class untouched. Floor-tune
+  biases against measured fractions instead of nudging whole logical pixels.
+
 - **Don't bake a phase — bake at absolute device coordinates, and snap the draw rect to
   what Yoga can express.** (element two-hop bake, options_controls 7.73→1.29) Evaluating
   origin's full int chain per absolute device pixel (out-of-box → transparent) is exact by

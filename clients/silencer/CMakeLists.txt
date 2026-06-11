@@ -668,6 +668,7 @@ add_executable(draw_executor_tests
 	src/render/cppx_ui/sdf_raster.cpp
 	src/render/cppx_ui/font_registry.cpp
 	src/render/cppx_ui/texture_registry.cpp
+	src/render/cppx_ui/sprite_bake.cpp
 	src/ui/runtime/draw_command.cpp
 	src/ui/runtime/geometry.cpp)
 target_compile_features(draw_executor_tests PRIVATE cxx_std_20)
@@ -690,6 +691,7 @@ add_executable(ui_surface_tests
 	src/render/cppx_ui/sdf_raster.cpp
 	src/render/cppx_ui/font_registry.cpp
 	src/render/cppx_ui/texture_registry.cpp
+	src/render/cppx_ui/sprite_bake.cpp
 	src/ui/runtime/draw_command.cpp
 	src/ui/runtime/geometry.cpp)
 target_compile_features(ui_surface_tests PRIVATE cxx_std_20)
@@ -711,6 +713,7 @@ add_executable(draw_image_tests
 	src/render/cppx_ui/sdf_raster.cpp
 	src/render/cppx_ui/font_registry.cpp
 	src/render/cppx_ui/texture_registry.cpp
+	src/render/cppx_ui/sprite_bake.cpp
 	src/ui/runtime/draw_command.cpp
 	src/ui/runtime/geometry.cpp)
 target_compile_features(draw_image_tests PRIVATE cxx_std_20)

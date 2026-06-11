@@ -1,5 +1,10 @@
 #include "texture_registry.h"
 
+#include "sprite_bake.h"
+
+#include <algorithm>
+#include <cmath>
+#include <cstring>
 #include <vector>
 
 namespace silencer::cppx_ui {
@@ -53,6 +58,77 @@ SDL_Texture *TextureRegistry::lookup(uint32_t id) const {
   return textures_[id - 1];
 }
 
+void TextureRegistry::register_legacy_sprite(uint32_t base_id,
+                                             const uint8_t *indices, int w,
+                                             int h, const SDL_Color *palette256,
+                                             int legacy_w, int legacy_h) {
+  if (!base_id || !indices || w <= 0 || h <= 0 || !palette256)
+    return;
+  LegacySprite &sp = legacy_[base_id];
+  sp.indices.assign(indices, indices + (size_t)w * h);
+  sp.w = w;
+  sp.h = h;
+  sp.legacy_w = legacy_w > 0 ? legacy_w : 640;
+  sp.legacy_h = legacy_h > 0 ? legacy_h : 480;
+  std::memcpy(sp.palette, palette256, sizeof(sp.palette));
+}
+
+bool TextureRegistry::resolve_legacy_variant(uint32_t base_id,
+                                             SDL_Renderer *renderer,
+                                             float dev_x, float dev_y,
+                                             float dev_w, float dev_h,
+                                             int out_w, int out_h,
+                                             LegacyVariant *out) {
+  if (!renderer || !out || out_w <= 0 || out_h <= 0)
+    return false;
+  auto it = legacy_.find(base_id);
+  if (it == legacy_.end())
+    return false;
+  const LegacySprite &sp = it->second;
+  float s = std::min(out_w / (float)sp.legacy_w, out_h / (float)sp.legacy_h);
+  if (s < 1.0f)
+    s = 1.0f;
+  // Only 1:1-virtual draws qualify (box == the sprite cell at the menu scale).
+  if (std::fabs(dev_w - sp.w * s) > 4.0f || std::fabs(dev_h - sp.h * s) > 4.0f)
+    return false;
+  // The software renderer truncates float dst rects; mirror it so the variant
+  // lands exactly where the plain path would have drawn.
+  const int x = (int)dev_x, y = (int)dev_y;
+  // Nearest virtual cell. Authoring positions the box at (or 1-2 device px
+  // before) the cell start, so rounding recovers the authored virtual coords.
+  const int vx = (int)std::floor(x / s + 0.5f);
+  const int vy = (int)std::floor(y / s + 0.5f);
+  // Cover the cell's full device footprint [x, ceil((v+sprite)*s)).
+  const int tw = (int)std::ceil((vx + sp.w) * s) - x;
+  const int th = (int)std::ceil((vy + sp.h) * s) - y;
+  if (tw <= 0 || th <= 0 || tw > (int)(sp.w * s) + 9 || th > (int)(sp.h * s) + 9)
+    return false;
+  const uint64_t key = ((uint64_t)base_id << 16) |
+                       ((uint64_t)(((x % 18) + 18) % 18) << 8) |
+                       (uint64_t)(((y % 18) + 18) % 18);
+  auto vit = legacy_variants_.find(key);
+  uint32_t id = vit != legacy_variants_.end() ? vit->second : 0;
+  if (!id) {
+    std::vector<uint8_t> rgba((size_t)tw * th * 4u, 0u);
+    bake_element_rgba(sp.indices.data(), sp.w, sp.h, sp.palette, vx, vy, sp.w,
+                      sp.h, sp.legacy_w, sp.legacy_h, out_w, out_h, x, y, tw,
+                      th, rgba.data());
+    id = upload_rgba(renderer, rgba.data(), tw, th);
+    if (!id)
+      return false;
+    legacy_variants_[key] = id;
+  }
+  SDL_Texture *tex = lookup(id);
+  if (!tex)
+    return false;
+  out->texture = tex;
+  out->x = x;
+  out->y = y;
+  out->w = tw;
+  out->h = th;
+  return true;
+}
+
 void TextureRegistry::shutdown() {
   for (int i = 0; i < count_; ++i) {
     if (textures_[i])
@@ -60,6 +136,8 @@ void TextureRegistry::shutdown() {
     textures_[i] = nullptr;
   }
   count_ = 0;
+  legacy_.clear();
+  legacy_variants_.clear();
 }
 
 } // namespace silencer::cppx_ui

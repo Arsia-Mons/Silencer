@@ -288,6 +288,27 @@ void render_image(SDL_Renderer *r, const ::ui::DrawCommand &c,
   SDL_FRect src = has_src ? src_sub : SDL_FRect{0.f, 0.f, tw, th};
   SDL_FRect dst = {c.rect.x * scale, c.rect.y * scale, c.rect.w * scale,
                    c.rect.h * scale};
+  // Legacy virtual-grid sprite (origin menu chrome): swap the draw for a
+  // per-phase variant baked through origin's whole-frame magnify at this
+  // element's absolute device cell, drawn 1:1 — GPU/SW resampling of the
+  // native sprite can't reproduce origin's int(dx/s) duplication phase.
+  if (!has_src && !img.flip_h) {
+    int out_w = 0, out_h = 0;
+    TextureRegistry::LegacyVariant v;
+    if (SDL_GetCurrentRenderOutputSize(r, &out_w, &out_h) &&
+        textures->resolve_legacy_variant(img.texture_id, r, dst.x, dst.y,
+                                         dst.w, dst.h, out_w, out_h, &v)) {
+      SDL_SetTextureColorMod(tex, 255, 255, 255);
+      SDL_SetTextureAlphaMod(tex, 255);
+      SDL_SetTextureColorMod(v.texture, tint.r, tint.g, tint.b);
+      SDL_SetTextureAlphaMod(v.texture, tint.a);
+      SDL_FRect d = {(float)v.x, (float)v.y, (float)v.w, (float)v.h};
+      SDL_RenderTexture(r, v.texture, nullptr, &d);
+      SDL_SetTextureColorMod(v.texture, 255, 255, 255);
+      SDL_SetTextureAlphaMod(v.texture, 255);
+      return;
+    }
+  }
   if (img.fit == ::ui::ImageFit::Cover && c.rect.w > 0.f && c.rect.h > 0.f) {
     const float box_aspect = c.rect.w / c.rect.h;
     if (src.w / src.h > box_aspect) {

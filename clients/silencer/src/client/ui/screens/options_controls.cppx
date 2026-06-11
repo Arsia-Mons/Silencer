@@ -38,7 +38,10 @@ constexpr float kContentW = 729.0f;
 constexpr float kLabelCol = 270.0f;  // kActionNameW 180 x1.5
 constexpr float kColGap = 18.0f;     // kColumnGap 12 x1.5
 constexpr float kBindCol = 168.0f;   // Oval Sm 112 x1.5
-constexpr float kOrCol = 67.5f;      // kOperatorW 45 x1.5
+// kOperatorW 45 x1.5 = 67.5, +0.5 so the right bind lane lands at x=833
+// (device 1249 = origin vx 555 cell) instead of the ambiguous 832.5 — the
+// per-phase oval bake needs cells on the golden's virtual grid.
+constexpr float kOrCol = 68.0f;
 constexpr float kRowContentH = 81.0f;
 constexpr float kRowGap = 15.0f;     // kRowGap 10 x1.5
 constexpr float kRowH = kRowContentH + kRowGap; // virtualized row pitch
@@ -149,6 +152,8 @@ int rebind_combo_index(const KeyMap &km, Action action) {
 // preset oval across both bind lanes) cycling the preset.
 ::ui::UiElement make_preset_row(const char *label, const char *value,
                                 std::function<void()> cycle) {
+  // padding-bottom 2 biases the centered oval to y=122 (device 183 = origin
+  // vy 81 cell) — bare centering gives 123, one device px below the cell.
   return <Box
     key="presetrow"
     layout={::ui::LayoutStyle{
@@ -156,6 +161,7 @@ int rebind_combo_index(const KeyMap &km, Action action) {
       .align_items = ::ui::AlignItems::Center,
       .width = ::ui::Length::percent(100.0f),
       .height = ::ui::Length::points(kPresetRowH),
+      .padding = {0.0f, 0.0f, 0.0f, 2.0f},
       .gap = kColGap}}
   >
     <Box
@@ -278,6 +284,11 @@ struct OptionsControlsProps {
 
   const char *pval = ::ui::copy_string(km.preset_label.c_str());
 
+  // Virtual-grid nudges for the per-phase oval bake (golden cells): content
+  // margin-right 2 -> column x=273 so bind/preset lanes start at x=561
+  // (device 841.5, origin vx 374); actiongap 48.5 + the margin-left-1
+  // ActionRow wrapper put Save/Cancel at (335,608) -> device (502.5,912) =
+  // origin vx 223 / vy 405.
   return <ScreenLayout
     key="root"
     variant={ScreenLayoutVariant::Overlay}
@@ -299,7 +310,8 @@ struct OptionsControlsProps {
         key="content"
         layout={::ui::LayoutStyle{
           .direction = ::ui::FlexDirection::Column,
-          .width = ::ui::Length::points(kContentW)}}
+          .width = ::ui::Length::points(kContentW),
+          .margin = ::ui::EdgeSizes{{}, 2.0f, {}, {}}}}
       >
         {make_preset_row("Preset:", pval, km.cycle_preset)}
         <Box
@@ -307,7 +319,7 @@ struct OptionsControlsProps {
           layout={::ui::LayoutStyle{.height = ::ui::Length::points(kSectionGap)}}
         />
         {table}
-        <Box key="actiongap" layout={::ui::LayoutStyle{.height = ::ui::Length::points(50.0f)}} />
+        <Box key="actiongap" layout={::ui::LayoutStyle{.height = ::ui::Length::points(48.5f)}} />
         <Box
           key="actionwrap"
           layout={::ui::LayoutStyle{
@@ -315,6 +327,7 @@ struct OptionsControlsProps {
             .justify_content = ::ui::JustifyContent::Center,
             .width = ::ui::Length::percent(100.0f)}}
         >
+          <Box key="actionsnudge" layout={::ui::LayoutStyle{.margin = ::ui::EdgeSizes{1.0f, {}, {}, {}}}}>
           <ActionRow key="actions">
             <AppButton
               key="save"
@@ -331,6 +344,7 @@ struct OptionsControlsProps {
               onPress={cancel}
             />
           </ActionRow>
+          </Box>
         </Box>
       </Box>
     </Panel>

@@ -224,6 +224,21 @@ bake(6, 28, cppxChrome.oval_sm);
 bake(6, 23, cppxChrome.oval_lg);
 // bank 6 idx 2 — the LegacyRow list-row plate (cc roster + agency rows).
 bake(6, 2, cppxChrome.row_plate, &cppxChrome.row_plate_w, &cppxChrome.row_plate_h);
+// The ovals (and the toggle cells below) are drawn 1:1 in origin's virtual
+// canvas: their device striping phase comes from the whole-frame magnify at
+// their absolute position. Register the indexed source so the executor swaps
+// each draw for a per-phase device-cell variant (resolve_legacy_variant).
+auto register_legacy = [&](size_t bank, size_t index, uint32_t id){
+if(!id || bank >= banks.size() || index >= banks[bank].size()) return;
+const std::shared_ptr<Surface> &sp = banks[bank][index];
+if(!sp || sp->pixels.empty()) return;
+cppxHost->register_legacy_sprite(id, sp->pixels.data(), sp->w, sp->h,
+                                 page_for_bank(bank), kLegacyRenderWidth,
+                                 kLegacyRenderHeight);
+};
+register_legacy(6, 7, cppxChrome.oval_md);
+register_legacy(6, 28, cppxChrome.oval_sm);
+register_legacy(6, 23, cppxChrome.oval_lg);
 // bank 7 — the metal-chrome nine-slice button (idx24 idle phase0 / idx28 focus phase4).
 bake(7, 24, cppxChrome.chrome_btn_idle);
 bake(7, 28, cppxChrome.chrome_btn_focus);
@@ -319,8 +334,11 @@ cppxChrome.chrome_controls_h = (float)(ly1 - ly0);
 }
 }
 }
-// bank 208 frame 60 — the static SILENCER logo (final reveal frame).
+// bank 208 frame 60 — the static SILENCER logo (final reveal frame). Drawn at
+// native x1.5 logical = 1:1 in origin's virtual canvas, so it striped like the
+// ovals — register every logo frame for the per-phase variant swap too.
 bake(208, 60, cppxChrome.logo, &cppxChrome.logo_w, &cppxChrome.logo_h);
+register_legacy(208, 60, cppxChrome.logo);
 // SIL-94/107: the logo reveal frames (individual textures). [0] is the full
 // logo (frame 60); later entries step back through the legacy reveal (the
 // latter, mostly-formed half so the wordmark stays legible through the loop).
@@ -331,6 +349,7 @@ const size_t kLogoIdx[client::ui::ChromeTextures::kLogoFrames] =
 int n = 0;
 for(int i = 0; i < client::ui::ChromeTextures::kLogoFrames; ++i){
 bake(208, kLogoIdx[i], cppxChrome.logo_frame[i]);
+register_legacy(208, kLogoIdx[i], cppxChrome.logo_frame[i]);
 if(cppxChrome.logo_frame[i]) n = i + 1; // count contiguous baked frames
 }
 cppxChrome.logo_frame_count = n;
@@ -341,6 +360,10 @@ bake(6, 12, cppxChrome.toggle_l_on, &cppxChrome.toggle_w, &cppxChrome.toggle_h);
 bake(6, 13, cppxChrome.toggle_l_off);
 bake(6, 14, cppxChrome.toggle_r_off);
 bake(6, 15, cppxChrome.toggle_r_on);
+register_legacy(6, 12, cppxChrome.toggle_l_on);
+register_legacy(6, 13, cppxChrome.toggle_l_off);
+register_legacy(6, 14, cppxChrome.toggle_r_off);
+register_legacy(6, 15, cppxChrome.toggle_r_on);
 // bank 134 '['/']' — the advantage-metadata bracket glyphs (origin borrows the
 // bank-134 art because bank 133's bracket cells are dash-shaped).
 bake(134, '[' - 33, cppxChrome.bracket_l, &cppxChrome.bracket_w, &cppxChrome.bracket_h);

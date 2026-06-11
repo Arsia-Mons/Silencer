@@ -119,14 +119,16 @@ struct MainMenuProps {
   // alignment can't express same-width-different-center, so the fan is the one
   // place we pin coordinates — the visual-parity gate fails a uniform stack. Each
   // row's left margin is its golden center offset from Exit (the leftmost pill):
-  // Tutorial/Options +60, Connect +120, Exit 0.
+  // Tutorial/Options +60, Connect +120, Exit 0. The 48.75% inset = x624 exactly
+  // at 1280 logical, landing every pill on origin's 4-virtual-px grid
+  // (vx 416/456/496) so the per-phase oval bake matches the golden cells.
   return <ScreenLayout key="root" variant={ScreenLayoutVariant::Menu}>
     {logo}
     <Box
       key="stack"
       layout={::ui::LayoutStyle{
         .position = ::ui::PositionType::Absolute,
-        .position_inset = ::ui::EdgeSizes{::ui::StyleValue::percent(48.8f), {}, 231.0f, {}},
+        .position_inset = ::ui::EdgeSizes{::ui::StyleValue::percent(48.75f), {}, 231.0f, {}},
         .direction = ::ui::FlexDirection::Column,
         .align_items = ::ui::AlignItems::Start,
         .gap = 51.0f}}

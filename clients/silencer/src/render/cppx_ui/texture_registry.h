@@ -12,6 +12,9 @@
 
 #include <stdint.h>
 
+#include <map>
+#include <vector>
+
 namespace silencer::cppx_ui {
 
 class TextureRegistry {
@@ -37,6 +40,37 @@ public:
   // Maps an id back to its SDL_Texture* (nullptr for id==0 or unknown).
   SDL_Texture *lookup(uint32_t id) const;
 
+  // ---- Legacy virtual-grid sprites (origin menu striping parity) ----------
+  // origin composites menus on a virtual int(W/s) x int(H/s) canvas and then
+  // NEAREST-magnifies the whole frame by s (src = int(dx/s)) — a sprite drawn
+  // 1:1 in virtual space gets its device pixel-duplication PHASE from its
+  // absolute position. Registering a baked chrome texture's indexed source
+  // lets the executor swap qualifying draws (the sprite at 1:1 virtual scale)
+  // for a lazily-baked variant that evaluates origin's chain at the element's
+  // absolute device cell. Variants memoize on (X%18, Y%18): the duplication
+  // pattern period divides 18 for every quarter-integer s in play (1, 1.5,
+  // 2.25, 3, 4.5).
+  void register_legacy_sprite(uint32_t base_id, const uint8_t *indices, int w,
+                              int h, const SDL_Color *palette256, int legacy_w,
+                              int legacy_h);
+
+  // A resolved variant: drawn 1:1 at device (x,y), w x h texels. The rect may
+  // exceed the requesting draw's box by up to 2px right/bottom — it covers the
+  // sprite's full device cell (the box is Yoga-rounded, the cell is not).
+  struct LegacyVariant {
+    SDL_Texture *texture = nullptr;
+    int x = 0, y = 0, w = 0, h = 0;
+  };
+
+  // Resolve (bake on first use) the per-phase variant for a draw with device
+  // rect (dev_x,dev_y,dev_w,dev_h) on an out_w x out_h output. False when the
+  // id isn't registered or the draw isn't the sprite at 1:1 virtual scale —
+  // caller falls through to the plain path.
+  bool resolve_legacy_variant(uint32_t base_id, SDL_Renderer *renderer,
+                              float dev_x, float dev_y, float dev_w,
+                              float dev_h, int out_w, int out_h,
+                              LegacyVariant *out);
+
   void shutdown();
 
 private:
@@ -45,6 +79,15 @@ private:
   static constexpr int kMaxTextures = 64;
   SDL_Texture *textures_[kMaxTextures] = {};
   int count_ = 0;
+
+  struct LegacySprite {
+    std::vector<uint8_t> indices;
+    int w = 0, h = 0;
+    int legacy_w = 640, legacy_h = 480;
+    SDL_Color palette[256] = {};
+  };
+  std::map<uint32_t, LegacySprite> legacy_;     // base_id -> indexed source
+  std::map<uint64_t, uint32_t> legacy_variants_; // (base_id, X%18, Y%18) -> id
 };
 
 } // namespace silencer::cppx_ui
