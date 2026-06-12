@@ -325,9 +325,13 @@ bool GlyphFonts::string_variant(SDL_Renderer *renderer, uint16_t face_id,
   if (tw <= 0 || th <= 0)
     return false;
 
-  // Memo key: face | color | device-cell phase | string bytes.
+  // Memo key: face | color | device-cell phase | render scale | string bytes.
+  // s must be in the key: after a resize the same (face, color, phase, string)
+  // can recur at a different magnify, and a stale-scale texture would draw at
+  // its bake-time dims.
+  const int s_q = (int)(s * 1000.0f + 0.5f);
   std::string key;
-  key.reserve((size_t)len + 8);
+  key.reserve((size_t)len + 10);
   key.push_back((char)(face_id & 0xff));
   key.push_back((char)(face_id >> 8));
   key.push_back((char)r);
@@ -335,6 +339,8 @@ bool GlyphFonts::string_variant(SDL_Renderer *renderer, uint16_t face_id,
   key.push_back((char)b);
   key.push_back((char)(((x0 % 18) + 18) % 18));
   key.push_back((char)(((y0 % 18) + 18) % 18));
+  key.push_back((char)(s_q & 0xff));
+  key.push_back((char)((s_q >> 8) & 0xff));
   key.append(text, (size_t)len);
   auto it = string_variants_.find(key);
   if (it != string_variants_.end()) {
