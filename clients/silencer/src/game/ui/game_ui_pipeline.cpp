@@ -951,14 +951,21 @@ const uint32_t nowMs = SDL_GetTicks();
 cppxClock_ = {nowMs, cppxLastUiTicks_ ? (nowMs - cppxLastUiTicks_) : 0u};
 cppxLastUiTicks_ = nowMs;
 }
-// Native window-pixel resolution so the UI composite maps 1:1 over the
-// upscaled world frame (matches the SIL-11 demo). Headless / no window falls
-// back to the surface size so the path still runs (UploadUiFrame is a no-op
-// on devices without a UI composite pass).
+// Menus render at native window-pixel resolution so the UI composite maps 1:1
+// over the upscaled world frame (matches the SIL-11 demo). Headless / no
+// window falls back to the surface size so the path still runs (UploadUiFrame
+// is a no-op on devices without a UI composite pass).
+// IN-GAME the UI renders at the SURFACE size (640x480, kLegacyRender) on ALL
+// paths: origin draws world + HUD into one 640x480 screenbuffer and the
+// present pass stretches the whole frame NON-uniformly to the window, so
+// right-anchored HUD elements land at the window edge with non-square pixels.
+// The backend's UI composite is a fullscreen quad like the world upscale, so a
+// 640x480 ui_tex reproduces origin's stretch verbatim; window-res rendering
+// here uniformly scaled the HUD (a 612-virtual anchor landed mid-screen).
 int rw = surface.w;
 int rh = surface.h;
 SDL_Window * win = game.gameRenderer.GetWindow();
-if(win){
+if(win && !game.world.map.loaded){
 int pw = 0;
 int ph = 0;
 if(SDL_GetWindowSizeInPixels(win, &pw, &ph) && pw > 0 && ph > 0){
