@@ -47,6 +47,7 @@ struct CharacterCreateContextValue {
   int *step = nullptr;
   std::string *alias = nullptr;
   bool *submitting = nullptr;
+  int *preview_agent = nullptr;
   int *preview_agency = nullptr;
 };
 
@@ -61,10 +62,12 @@ struct CharacterCreateProviderProps {
   int *step = use_state<int>(0);
   std::string *alias = use_state<std::string>(std::string());
   bool *submitting = use_state<bool>(false);
+  int *preview_agent = use_state<int>(0);
   int *preview_agency = use_state<int>(0);
-  if (!step || !alias || !submitting || !preview_agency)
+  if (!step || !alias || !submitting || !preview_agent || !preview_agency)
     return ::ui::empty();
-  CharacterCreateContextValue value{step, alias, submitting, preview_agency};
+  CharacterCreateContextValue value{step, alias, submitting, preview_agent,
+                                    preview_agency};
   const CharacterCreateContextValue *stored = ::ui::copy_value(value);
   if (!stored)
     return ::ui::empty();
@@ -84,6 +87,10 @@ struct CharacterCreateProviderProps {
       on_pick(index);
   };
   std::function<void()> on_focus = [set_preview, index]() {
+    if (set_preview)
+      set_preview(index);
+  };
+  std::function<void()> on_hover = [set_preview, index]() {
     if (set_preview)
       set_preview(index);
   };
@@ -107,6 +114,7 @@ struct CharacterCreateProviderProps {
     padding={::ui::opt(::ui::EdgeSizes{17.5f, 14.5f, 11.0f, 1.5f})}
     onPress={on_press}
     onFocus={on_focus}
+    onHover={on_hover}
   />
 }
 
@@ -196,16 +204,102 @@ struct CharacterCreateProviderProps {
   />
 }
 
-// One roster row: select an existing agent. Out-of-range slots render nothing.
-::ui::UiElement roster_row(int index, const std::vector<std::string> &roster,
-                           std::function<void(int)> on_select) {
-  if (index < 0 || index >= (int)roster.size())
+int clamp_agency_index(int index) {
+  return index >= 0 && index < kAgencyCount ? index : 0;
+}
+
+::ui::UiElement detail_text(const char *key, const std::string &value) {
+  return BodyText(BodyTextProps{.key = key,
+                                .variant = BodyTextVariant::Body,
+                                .tone = BodyTextTone::Prose,
+                                .value = ::ui::copy_string(value.c_str())});
+}
+
+::ui::UiElement agent_detail_panel(const Characters &chars, int preview) {
+  if (preview < 0 || preview >= (int)chars.profiles.size())
     return ::ui::empty();
-  const char *label = ::ui::copy_string(roster[index].c_str());
+  const CharacterProfile &profile = chars.profiles[preview];
+  const int agency_index = clamp_agency_index(profile.agency_index);
+  const AgencyInfo &agency = kAgencies[agency_index];
+  client::ui::ChromeTextures chrome = use_chrome();
+  const uint32_t emblem = chrome.agency_emblem[agency_index];
+  return <Box
+    key="rightpane"
+    layout={::ui::LayoutStyle{
+      .direction = ::ui::FlexDirection::Column,
+      .align_items = ::ui::AlignItems::Stretch,
+      .width = ::ui::Length::points(294.0f),
+      .overflow = ::ui::Overflow::Hidden,
+      .padding = {33.0f, 0.0f, 63.0f, 0.0f},
+      .gap = 7.5f}}
+  >
+    <ScreenTitle key="agencyh" variant={ScreenTitleVariant::Prose} value="Agency" />
+    <Box
+      key="agencyrow"
+      layout={::ui::LayoutStyle{
+        .direction = ::ui::FlexDirection::Row,
+        .align_items = ::ui::AlignItems::Center,
+        .height = ::ui::Length::points(45.0f),
+        .gap = 12.0f}}
+    >
+      <ScreenTitle key="agency" variant={ScreenTitleVariant::Prose} value={agency.name} />
+      <Box
+        key="emblem"
+        layout={::ui::LayoutStyle{
+          .width = ::ui::Length::points(48.0f),
+          .height = ::ui::Length::points(45.0f),
+          .flex_shrink = ::ui::StyleFloat::points(0.0f)}}
+        style={emblem ? tokens::image_patch(emblem) : ::ui::patch().background(tokens::kEmblemFallbackFill)}
+      />
+    </Box>
+    <ScreenTitle
+      key="security"
+      variant={ScreenTitleVariant::Prose}
+      value={::ui::copy_string(("Security Level " + std::to_string((unsigned)profile.level)).c_str())}
+    />
+    <Box
+      key="stats"
+      layout={::ui::LayoutStyle{
+        .direction = ::ui::FlexDirection::Column,
+        .align_items = ::ui::AlignItems::Stretch,
+        .gap = 1.5f}}
+    >
+      {detail_text("tech", "Technology Slots:" + std::to_string((unsigned)profile.techslots))}
+      {detail_text("xp", "Agency Points:" + std::to_string((unsigned)profile.xp))}
+      {detail_text("next", "Next Level At:" + std::to_string(((unsigned)profile.level + 1u) * 100u))}
+      {detail_text("wins", "Successful Missions:" + std::to_string((unsigned)profile.wins))}
+    </Box>
+    <ScreenTitle key="adv" variant={ScreenTitleVariant::Prose} value="Advantages" />
+    <Box
+      key="advrows"
+      layout={::ui::LayoutStyle{
+        .direction = ::ui::FlexDirection::Column,
+        .align_items = ::ui::AlignItems::Stretch,
+        .gap = 1.5f}}
+    >
+      {advantage_row("a0", agency.advantages[0])}
+      {advantage_row("a1", agency.advantages[1])}
+      {advantage_row("a2", agency.advantages[2])}
+      {advantage_row("a3", agency.advantages[3])}
+    </Box>
+  </Box>
+}
+
+// One roster row: select an existing agent. Out-of-range slots render nothing.
+::ui::UiElement roster_row(int index, const std::vector<CharacterProfile> &profiles,
+                           int preview, std::function<void(int)> on_select,
+                           std::function<void(int)> set_preview) {
+  if (index < 0 || index >= (int)profiles.size())
+    return ::ui::empty();
+  const char *label = ::ui::copy_string(profiles[index].name.c_str());
   const char *key = ::ui::copy_string(("agent" + std::to_string(index)).c_str());
   std::function<void()> on_press = [on_select, index]() {
     if (on_select)
       on_select(index);
+  };
+  std::function<void()> on_preview = [set_preview, index]() {
+    if (set_preview)
+      set_preview(index);
   };
   return <AppButton
     key={key}
@@ -213,8 +307,11 @@ struct CharacterCreateProviderProps {
     controlOffset={index}
     variant={AppButtonVariant::Oval}
     size={AppButtonSize::List}
+    selected={index == preview}
     label={label}
     onPress={on_press}
+    onFocus={on_preview}
+    onHover={on_preview}
   />
 }
 
@@ -421,15 +518,25 @@ struct CharacterCreateProviderProps {
   </ScreenLayout>
 }
 
-// step 0 — SELECT AGENT: LEFT pane = the SELECT AGENT title + roster + Create
-// New Character; RIGHT pane = empty.
+// step 0 — SELECT AGENT: LEFT pane = the roster + Create New Character; RIGHT
+// pane previews the currently focused/hovered existing agent, matching origin.
 ::ui::UiElement RosterStep(const CharacterWizard &w, const Characters &chars,
                            std::function<void(int)> on_select) {
   client::ui::ChromeTextures chrome = use_chrome();
+  const int preview =
+      (w.preview_agent >= 0 && w.preview_agent < (int)chars.profiles.size())
+          ? w.preview_agent
+          : 0;
+  std::function<void(int)> set_preview = w.set_preview_agent;
   return <ScreenLayout key="roster" variant={ScreenLayoutVariant::Overlay}>
     <Box key="frame" layout={wizard_frame_layout()} style={wizard_frame_style(chrome)}>
       <Box key="leftpane" layout={wizard_left_pane_layout()}>
         {pane_header("SELECT AGENT")}
+        {roster_row(0, chars.profiles, preview, on_select, set_preview)}
+        {roster_row(1, chars.profiles, preview, on_select, set_preview)}
+        {roster_row(2, chars.profiles, preview, on_select, set_preview)}
+        {roster_row(3, chars.profiles, preview, on_select, set_preview)}
+        {roster_row(4, chars.profiles, preview, on_select, set_preview)}
         <Box
           key="neww"
           layout={::ui::LayoutStyle{
@@ -444,13 +551,8 @@ struct CharacterCreateProviderProps {
             onPress={w.open_alias}
           />
         </Box>
-        {roster_row(0, chars.roster, on_select)}
-        {roster_row(1, chars.roster, on_select)}
-        {roster_row(2, chars.roster, on_select)}
-        {roster_row(3, chars.roster, on_select)}
-        {roster_row(4, chars.roster, on_select)}
       </Box>
-      <Box key="rightpane" layout={wizard_right_spacer_layout()} />
+      {agent_detail_panel(chars, preview)}
     </Box>
   </ScreenLayout>
 }
@@ -513,10 +615,12 @@ CharacterWizard use_character_create() {
   w.step = v->step ? *v->step : 0;
   w.alias = v->alias ? *v->alias : std::string();
   w.submitting = v->submitting ? *v->submitting : false;
+  w.preview_agent = v->preview_agent ? *v->preview_agent : 0;
   w.preview_agency = v->preview_agency ? *v->preview_agency : 0;
   int *step = v->step;
   std::string *alias = v->alias;
   bool *submitting = v->submitting;
+  int *preview_agent = v->preview_agent;
   int *preview_agency = v->preview_agency;
   // origin cap: alias[17] (character_create_screen.h) — 16 chars.
   w.set_alias = [alias](const std::string &s) {
@@ -550,6 +654,10 @@ CharacterWizard use_character_create() {
   w.set_preview_agency = [preview_agency](int idx) {
     if (preview_agency && idx >= 0 && idx < kAgencyCount)
       *preview_agency = idx;
+  };
+  w.set_preview_agent = [preview_agent](int idx) {
+    if (preview_agent && idx >= 0)
+      *preview_agent = idx;
   };
   return w;
 }

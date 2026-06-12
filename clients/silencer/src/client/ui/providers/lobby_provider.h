@@ -29,6 +29,7 @@ struct LobbySnapshot {
   // --- character roster (CharacterCreate / lobby CharacterPanel) ---
   bool characters_received = false;
   std::vector<std::string> character_names = {};
+  std::vector<CharacterProfile> character_profiles = {};
 
   // --- lobby (LobbyScreen, read panels) — recent tails, newline-joined ---
   std::string lobby_agent = {};    // selected agent name + compact summary

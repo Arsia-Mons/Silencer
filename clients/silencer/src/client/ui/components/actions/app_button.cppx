@@ -79,7 +79,11 @@ using ::ui::components::TextProps;
   std::function<void(const ::ui::BlurEvent &)> on_blur =
       [focused_now](const ::ui::BlurEvent &) { *focused_now = false; };
   std::function<void(const ::ui::HoverEvent &)> on_hover =
-      [hovered_now](const ::ui::HoverEvent &e) { *hovered_now = e.entered; };
+      [hovered_now, user = props.on_hover](const ::ui::HoverEvent &e) {
+        *hovered_now = e.entered;
+        if (e.entered && user)
+          user();
+      };
 
   const char *a11y_label =
       props.accessibility_label ? props.accessibility_label : props.label;

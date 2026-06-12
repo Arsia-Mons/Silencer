@@ -21,6 +21,7 @@ struct CharacterWizard {
   // SIL-101: the agency row currently focused/previewed in step 2, feeding the
   // right detail column. Clamped to 0 by the screen so the column is always
   // populated (defaults to Noxis).
+  int preview_agent = 0;
   int preview_agency = 0;
 
   std::function<void(const std::string &)> set_alias = {};
@@ -29,6 +30,7 @@ struct CharacterWizard {
   std::function<void()> reopen_alias = {};  // step 2 -> 1 (Rename Once)
   std::function<void()> cancel = {};        // -> step 0, clears alias + submit guard
   std::function<void()> begin_submit = {};  // latch the double-submit guard
+  std::function<void(int)> set_preview_agent = {}; // step-0 detail preview
   std::function<void(int)> set_preview_agency = {}; // step-2 detail preview
 };
 

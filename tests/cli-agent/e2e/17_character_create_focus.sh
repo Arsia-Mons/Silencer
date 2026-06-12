@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # Character-create SELECT AGENCY step (step2 of the 3-step wizard): verify the
-# golden cppx interaction model on the agency rows. Hovering a row sets that
-# node's hovered pseudo-class (visual only) without moving focus, committing a
-# selection, or leaving CREATECHARACTER; hovering empty space clears it. Then
-# verify the double-submit guard: clicking an agency twice in quick succession
-# creates exactly ONE character, not two.
+# golden interaction model on the agency rows. Hovering a row previews that
+# agency's details and sets its hovered pseudo-class without moving focus,
+# committing a selection, or leaving CREATECHARACTER; hovering empty space
+# clears the hover state. Then verify the double-submit guard: clicking an
+# agency twice in quick succession creates exactly ONE character, not two.
 #
 # Driven end-to-end through a local Go lobby (harness lifted from
 # 30_lobby_login.sh): MainMenu -> Connect To Lobby -> login alice/secret ->
@@ -137,6 +137,7 @@ wait_for_widget "Black Rose"
 cli --port "$CTRL_PORT" wait_frames --n 2 >/dev/null
 
 OUT_DIR="$(mktemp -d)"
+BASE="$OUT_DIR/inspect-base.json"
 HOVER="$OUT_DIR/inspect-hover.json"
 HOVER_OUT="$OUT_DIR/inspect-hover-out.json"
 
@@ -151,8 +152,22 @@ if (!target) { console.error("Lazarus agency row missing"); process.exit(1); }
 console.log(`${Math.round(target.x + target.w/2)} ${Math.round(target.y + target.h/2)}`);
 ')
 
-# (A) Hover the Lazarus row -> its node.hovered must become true. Hover is a
-# visual pseudo-class only; do NOT assert it moves focus or any "selected".
+cli --port "$CTRL_PORT" inspect > "$BASE"
+bun -e '
+const base = JSON.parse(await Bun.file(process.argv[1]).text());
+const text = (base.nodes ?? []).map((n) => `${n.value || ""} ${n.label || ""}`).join("\n");
+if (!text.includes("The Noxis corporation")) {
+  console.error("baseline agency details did not show Noxis");
+  process.exit(1);
+}
+if (text.includes("Like the mythical phoenix")) {
+  console.error("baseline agency details already showed Lazarus");
+  process.exit(1);
+}
+' "$BASE"
+
+# (A) Hover the Lazarus row -> its node.hovered must become true and the right
+# details column must preview Lazarus without moving focus.
 cli --port "$CTRL_PORT" hover_at --x "$HX" --y "$HY" >/dev/null
 cli --port "$CTRL_PORT" wait_frames --n 2 >/dev/null
 cli --port "$CTRL_PORT" inspect > "$HOVER"
@@ -171,6 +186,16 @@ if (!under || under.label !== "Lazarus") {
 const hovered = rowsOf(hover).filter((w) => w.hovered === true);
 if (hovered.length !== 1 || hovered[0].label !== "Lazarus") {
   console.error(`expected only Lazarus hovered, got ${JSON.stringify(hovered.map((w)=>w.label))}`);
+  process.exit(1);
+}
+const text = (hover.nodes ?? []).map((n) => `${n.value || ""} ${n.label || ""}`).join("\n");
+if (!text.includes("Resurrection Ability") ||
+    !text.includes("Like the mythical phoenix")) {
+  console.error("hovering Lazarus did not update agency details");
+  process.exit(1);
+}
+if (text.includes("The Noxis corporation")) {
+  console.error("hovering Lazarus left Noxis details visible");
   process.exit(1);
 }
 ' "$HOVER" "$HX" "$HY"

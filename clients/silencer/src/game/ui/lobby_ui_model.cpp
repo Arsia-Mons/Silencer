@@ -327,8 +327,25 @@ client::ui::LobbySnapshot CaptureLobbySnapshot(Game &game,
   if (charCreatePhase) {
     snap.characters_received = lobby.charactersreceived;
     snap.character_names.reserve(lobby.characters.size());
-    for (const Lobby::Character &c : lobby.characters)
+    snap.character_profiles.reserve(lobby.characters.size());
+    for (const Lobby::Character &c : lobby.characters) {
       snap.character_names.push_back(c.name);
+      client::ui::CharacterProfile profile;
+      profile.name = c.name;
+      profile.agency_index = c.agencyIdx;
+      profile.rename_available = c.renameAvailable;
+      profile.wins = c.stats.wins;
+      profile.losses = c.stats.losses;
+      profile.xp = c.stats.xp;
+      profile.level = c.stats.level;
+      profile.endurance = c.stats.endurance;
+      profile.shield = c.stats.shield;
+      profile.jetpack = c.stats.jetpack;
+      profile.techslots = c.stats.techslots;
+      profile.hacking = c.stats.hacking;
+      profile.contacts = c.stats.contacts;
+      snap.character_profiles.push_back(profile);
+    }
   }
   if (postMatchPhase)
     BuildProgression(snap, lobby);

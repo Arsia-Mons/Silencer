@@ -73,6 +73,7 @@ Characters use_characters() {
   }
   return {
       .roster = value->snapshot.character_names,
+      .profiles = value->snapshot.character_profiles,
       .received = value->snapshot.characters_received,
       .selected_summary = value->snapshot.lobby_agent,
       .create = value->create_character,
