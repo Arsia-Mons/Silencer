@@ -34,7 +34,7 @@ State: IN PROGRESS
 | message_modal / password_modal | EXAMINED 2026-06-12 | U-7 |
 | ingame: hud_base / top_ticker / status_lines | EXAMINED 2026-06-12 | none (see unit note) |
 | ingame: chat (open + history) / messages | EXAMINED 2026-06-12 | none (see unit note) |
-| ingame: player_list / system_camera | UNEXAMINED | |
+| ingame: player_list / system_camera | EXAMINED 2026-06-12 | none (see unit note) |
 | ingame: tech_overlay / buy_tech / secret_overlay | UNEXAMINED | |
 | ingame: quit_prompt | UNEXAMINED | |
 
@@ -1473,3 +1473,80 @@ for evidence:
   ALL/TEAM, and compose text caps at 100 chars. Those are already documented
   in PARITY.md as origin behavior, not design defects. No Linear ticket opened
   because there is no new ARTIFACT/DEFECT/ERA-LIMIT candidate in this unit.
+
+### Unit note — ingame: player_list / system_camera (2026-06-12)
+
+Audited after fresh persistent captures:
+`PATH=/tmp/cppx-uplift-py/bin:$PATH PORT=<fresh> bash
+tools/cap/cap_ingame_cppx.sh /tmp/cppx_uplift_ingame_player_system/base`
+and `... cap_ingame_cppx_extra.sh
+/tmp/cppx_uplift_ingame_player_system/extra`. The base script captured
+`ingame_player_list`; the extra script captured `ingame_system_camera` after
+its inset-presence probe. `ingame_player_list` passed the documented tolerant
+gate against the current golden (`0.1821 (mae=0.12 maxtile=4.8% hot_tiles=0
+PASS)` with the standard in-game masks). `bash
+tests/cli-agent/e2e/78_ingame_bindings_quit.sh` also passed, re-confirming
+the raw-scancode F1 hold semantics. **Zero candidates.** What was checked and
+cleared:
+
+- **Player-list authored shape matches origin intent:** origin F1 is
+  hold-driven (`origin/main:clients/silencer/src/game/input/game_input.cpp:
+  270-307`), and the current input path matches it
+  (`clients/silencer/src/game/input/game_input.cpp:220-258`). Origin
+  `BuildPlayerListOverlay` uses one fixed root with 50px side/top padding, a
+  centered panel of height `10 + teams*58`, 10px panel padding, 40px emblem
+  slot, 58px team rows, vertically-centered 12px peer rows, and the exact
+  stats string (`origin/main:clients/silencer/src/client/ui/hud/
+  hud_player_list_overlay.cpp:16-98`). The cppx port is the same integer
+  640x480 device-coordinate layout in
+  `clients/silencer/src/client/ui/screens/in_game_screen.cppx:561-625`.
+  Origin populates row data from each team's peers/user profile stats and
+  2x bank-181 emblem size
+  (`origin/main:clients/silencer/src/client/ui/views/HudView.cpp:79-144`);
+  current snapshot/provider code copies the same peer names, agency stats,
+  dead/secret state, pulse-resolved team sprites, and emblem texture data
+  (`clients/silencer/src/game/ui/world_session_model.cpp:256-314`,
+  `clients/silencer/src/client/ui/providers/world_session_provider.cpp:
+  140-194`).
+- **Player-list golden pixels express that shape cleanly:** current
+  player-list-vs-hud-base overlay bbox is exactly `(50,50)-(589,117)` =
+  `540x68`, matching the one-team panel contract. Within the panel, the
+  current and golden green UI bbox is identical at `(100,78)-(573,87)`, 572
+  px. The fresh crop shows the emblem, "Player" label, and stats text aligned
+  and unclipped; residual full-frame diff is the already documented in-game
+  rain/minimap nondeterminism outside the overlay contract. Evidence:
+  `docs/plans/uplift-evidence/ingame_player_list_system_camera/
+  player_list_golden_vs_current_panel_4x.png` and
+  `player_list_diff_panel_amplified_4x.png`.
+- **System-camera authored shape matches origin intent:** origin draws each
+  active system-camera world inset as a 135x44 surface, follows the configured
+  object plus world offsets, calls `DrawWorldScaled(..., factor=2)`, applies
+  `EffectRampColor(..., 190)`, and blits slot 0/1 at `(5,349)` / `(500,348)`
+  before the minimap (`origin/main:clients/silencer/src/game/ui/
+  game_ui_pipeline.cpp:122-155`). Current pipeline code is the same
+  (`clients/silencer/src/game/ui/game_ui_pipeline.cpp:113-146`). Origin's
+  frame builder positions the bank-95 frame at `x=-spriteoffsetx[95][idx]`
+  and y anchored to bank-92's offset plus logical y
+  (`origin/main:clients/silencer/src/client/ui/hud/
+  hud_system_camera.cpp:13-40`); current cppx frame code mirrors that with
+  `kLogicalY={381,318}` and `syscam_oy` from bank 92
+  (`clients/silencer/src/client/ui/screens/in_game_screen.cppx:631-642`,
+  `clients/silencer/src/client/ui/hooks/use_chrome.h:178-181`).
+- **System-camera geometry is clean; the mismatch is the known waiver:** the
+  fresh full-frame current-vs-golden system-camera comparison still fails
+  (`1.8232 ... FAIL`) for the PARITY.md stale-temppalette origin bug after
+  base entry; that deliberate divergence is already documented and not
+  re-opened. Geometry measurements in the audited crop are identical:
+  current and golden green frame/inset bbox `(1,327)-(140,444)`, 8935 px, and
+  dark-green fill bbox `(1,327)-(140,444)`, 8332 px. The crop diff bbox
+  `(0,319)-(159,444)` with max channel delta 32 is a palette/brightness
+  difference over the same shape, not a new placement, clipping, or scaling
+  defect. Evidence:
+  `docs/plans/uplift-evidence/ingame_player_list_system_camera/
+  system_camera_golden_vs_current_left_inset_4x.png` and
+  `system_camera_diff_left_inset_amplified_4x.png`.
+- **Already-adjudicated, not re-opened:** `ingame_system_camera` remains
+  intentionally not render-gated for the documented palette-history waiver,
+  and ORIGIN_GOLDENS already calls out that the multi-team F1 scoreboard
+  variant is not captured. This unit found no new ARTIFACT/DEFECT/ERA-LIMIT
+  candidate to ticket.
