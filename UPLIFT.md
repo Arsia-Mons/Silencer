@@ -25,7 +25,7 @@ State: IN PROGRESS
 | lobby_connect | EXAMINED 2026-06-12 | none (see unit note) |
 | character_create | EXAMINED 2026-06-12 | none (see unit note) |
 | cc_alias | EXAMINED 2026-06-12 | none (see unit note) |
-| cc_select_agency | UNEXAMINED | |
+| cc_select_agency | EXAMINED 2026-06-12 | none (see unit note) |
 | lobby_screen | UNEXAMINED | |
 | create_game | UNEXAMINED | |
 | game_staging | UNEXAMINED | |
@@ -884,3 +884,60 @@ Clay-era source. **Zero candidates.** What was checked and cleared:
   already records the U-1/U-2/U-3 supersession and the historical one-frame
   caret low-tile disclosure; the current real-flow capture is byte-identical
   to the golden.
+
+### Unit note — cc_select_agency (2026-06-12)
+
+Audited the agency picker's current golden
+(`tests/cli-agent/e2e/golden/cc_select_agency.png`) after regenerating the
+lobby cluster with
+`OUT=/tmp/cppx_renders_uplift_cc_select_agency bash tools/cap/cap_lobby.sh`;
+the fresh `/tmp/cppx_renders_uplift_cc_select_agency/cc_select_agency.png`
+byte-matches the current golden (`cmp_exit=0`, sha256
+`5c22d6e92c4fceee5bd8064299fcf3c87c67cab00f5487d1809b65dcdeb4c6ad`).
+Compared against the pristine origin capture
+(`git show ba345131:tests/cli-agent/e2e/golden/cc_select_agency.png`) and
+the origin Clay-era source. Focused lobby visual gate
+`bash tests/cli-agent/e2e/71_visual_regression_lobby.sh` passed. **Zero
+candidates.** What was checked and cleared:
+
+- **Authored shape matches origin intent:** origin fixes the shared wizard
+  grid at a 640x480 stage, 628x441 panel, 236px left column, 196px right
+  column, 78px column gap, 33px title band, 14px title-to-rows gap, 27px
+  rows, and 5px row gap
+  (`origin/main:clients/silencer/src/client/ui/screens/character_create/
+  character_create_layout.cpp:45-68`). `BuildSelectAgency` lays out exactly
+  one `SELECT AGENCY` left column with five `LegacyRow` buttons and one right
+  info column with `Advantages`, parsed advantage rows, `Description`, and a
+  wrapped paragraph (`:820-887`). The cppx screen mirrors that contract with
+  the same two-pane frame and no extra subtitle/back button/modal chrome
+  (`clients/silencer/src/client/ui/screens/character_create.cppx:362-419`).
+- **Golden pixels express that shape cleanly:** the live inspect tree places
+  the frame at logical `(167,29) 942x662`, the agency rows wrapper at
+  `(249,141) 354x232`, five focusable rows at y `141/189/237/285/333` with
+  48 logical px pitch, and the right pane at `(721,56) 294x584`. Direct pixel
+  component measurement on the current golden found the five row-plate
+  components as identical 531x61 device boxes at x `373-903` and y
+  `211-271`, `283-343`, `355-415`, `427-487`, `499-559` — the U-4 repaired
+  full-width closed ovals. The right-pane green chrome bbox is continuous at
+  `(1024,84)-(1563,992)`, matching pristine origin's bbox; the description
+  wraps to the same final visible line, ending with `and enhanced durability.`
+  Evidence:
+  `docs/plans/uplift-evidence/cc_select_agency/current_form_150pct.png`,
+  `agency_rows_current_4x.png`, `right_pane_pristine_vs_current_2x.png`,
+  `panel_divider_current_6x.png`, and `panel_right_edge_current_6x.png`.
+- **No remaining `right-panel clip @x1080` candidate:** the PARITY.md
+  breadcrumb was rechecked directly. The focused x1080 crop contains text and
+  backdrop only, not a panel edge; green UI-pixel count in
+  `x=1068..1091, y=90..359` is zero for both pristine origin and current.
+  White text in that crop shifts by one device px (`origin bbox x1080-1091`,
+  current x1081-1091), which is the already adjudicated U-1 canonical-glyph
+  phase divergence, not a clipped stroke or pane boundary. Evidence:
+  `docs/plans/uplift-evidence/cc_select_agency/
+  right_panel_x1080_origin_vs_current_12x.png`.
+- **Already-adjudicated, not re-opened:** current-vs-pristine differences are
+  the documented U-1/U-2/U-3/U-4 supersessions (canonical glyphs, canonical
+  legacy sprites, single-hop backdrop, and restored agency-row caps). The
+  bracket glyphs still show the PARITY.md two-tone-ramp polish residual, but
+  those bracket sprites are present in origin and current, sit beside the same
+  parsed `+3`/`+5` metadata, and do not show a design-intent miss. No Linear
+  ticket opened because there is no new ARTIFACT/DEFECT/ERA-LIMIT candidate.
