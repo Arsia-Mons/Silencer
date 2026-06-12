@@ -411,6 +411,8 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 		j["tech_item_count"] = r.tech_item_count;
 		j["buy_selected_index"] = r.buy_selected_index;
 		j["tech_selected_index"] = r.tech_selected_index;
+		j["buy_scrolled_index"] = r.buy_scrolled_index;
+		j["tech_scrolled_index"] = r.tech_scrolled_index;
 		cmd.reply->set_value(OkResult(cmd.id, j));
 		return;
 	}

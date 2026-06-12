@@ -40,6 +40,8 @@ struct InGameUiControlResult {
   int tech_item_count = 0;
   int buy_selected_index = 0;
   int tech_selected_index = 0;
+  int buy_scrolled_index = 0;  // first visible row of the 5-row window
+  int tech_scrolled_index = 0;
 };
 
 // Chat seeding (mode == Chat): `text` fills the compose buffer; `line`

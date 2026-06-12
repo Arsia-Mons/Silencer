@@ -149,14 +149,27 @@ CaptureWorldSessionSnapshot(Game &game, client::ui::SessionPhase phase) {
       }
       std::vector<BuyableItem *> items;
       p->CollectBuyMenuItems(world, tech, items);
-      int selecteditem = tech ? p->techifacelastitem : p->buyifacelastitem;
-      int scrolled = tech ? p->techifacelastscrolled : p->buyifacelastscrolled;
-      if (selecteditem < 0)
+      // origin InGameUiController::UpdateOverlayState (per-frame, pre-UI):
+      // clamp the selection to the list and keep the 5-row window following
+      // it, persisted on the player's iface fields like origin (they survive
+      // overlay close/reopen).
+      int &selecteditem = tech ? p->techifacelastitem : p->buyifacelastitem;
+      int &scrolled = tech ? p->techifacelastscrolled : p->buyifacelastscrolled;
+      if (items.empty()) {
         selecteditem = 0;
-      if (!items.empty() && selecteditem >= (int)items.size())
-        selecteditem = (int)items.size() - 1;
-      if (scrolled < 0)
         scrolled = 0;
+      } else {
+        if (selecteditem < 0)
+          selecteditem = 0;
+        if (selecteditem >= (int)items.size())
+          selecteditem = (int)items.size() - 1;
+        if (selecteditem >= scrolled + 5)
+          scrolled = selecteditem - 4;
+        if (selecteditem < scrolled)
+          scrolled = selecteditem;
+        if (scrolled < 0)
+          scrolled = 0;
+      }
       snap.buytech_selected = selecteditem;
       Uint8 uiTick = (Uint8)(SDL_GetTicks() / 50);
       Uint8 selectedBrightness = 128;
@@ -425,6 +438,8 @@ InGameUiControlResult ConfigureInGameUi(Game &game, InGameUiMode mode,
     result.tech_item_count = (int)techItems.size();
     result.buy_selected_index = player->buyifacelastitem;
     result.tech_selected_index = player->techifacelastitem;
+    result.buy_scrolled_index = player->buyifacelastscrolled;
+    result.tech_scrolled_index = player->techifacelastscrolled;
   };
 
   auto clear = [&]() {
