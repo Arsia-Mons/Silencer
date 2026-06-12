@@ -31,7 +31,7 @@ State: IN PROGRESS
 | game_staging | EXAMINED 2026-06-12 | none (see unit note) |
 | tech_select | EXAMINED 2026-06-12 | none (see unit note) |
 | mission_summary | EXAMINED 2026-06-12 | none (see unit note) |
-| message_modal / password_modal | UNEXAMINED | |
+| message_modal / password_modal | EXAMINED 2026-06-12 | U-7 |
 | ingame: hud_base / top_ticker / status_lines | UNEXAMINED | |
 | ingame: chat (open + history) / messages | UNEXAMINED | |
 | ingame: player_list / system_camera | UNEXAMINED | |
@@ -471,6 +471,63 @@ iterations don't re-litigate:
   captures (that set is the strongest remaining verification anchor; in-game
   suites still gate against it). Churn > benefit; the auditing iteration
   itself predicted likely user rejection. Left for the user to decide.
+
+### U-7: message/password modals use raw sprite size instead of origin fixed dialog boxes
+- **Unit:** message_modal / password_modal
+- **Class:** DEFECT
+- **Severity:** med
+- **Golden shows:** The current cppx-only baselines render both modal panels
+  at the raw registered bank-40 sprite box instead of the fixed origin modal
+  element. Fresh captures from this audit byte-match the checked-in baselines
+  (`cmp=0`, `pixdiff=0.0000`; full gate 70 PASS). In `message_modal.png`,
+  inspect reports the panel at logical `(480,316) 320x88` → device
+  `(720,474) 480x132`, while the sample message text spans device
+  `(663,486) 594x33`, visibly spilling past both sides of the frame. In
+  `password_modal.png`, inspect reports the panel at logical
+  `(498,306) 284x108` → device `(747,459) 426x162`, while the prompt spans
+  device `(699,466) 522x33`, again outside the panel. Evidence:
+  `docs/plans/uplift-evidence/message_modal_password_modal/`
+  (`message_modal_current_yellow_vs_origin_cyan_2x.png`,
+  `password_modal_current_yellow_vs_origin_cyan_2x.png`,
+  `modal_size_overflow_before_overlay_2x.png`; yellow=current raw-sprite box,
+  cyan=origin fixed dialog rect).
+- **Origin cause:** none — origin sizes the modal element explicitly,
+  independent of raw sprite dimensions:
+  `origin/main:clients/silencer/src/client/ui/modals/message_modal.cpp`
+  lines 26-29 and 82-93 use `kDialogW=352`, `kDialogH=178`,
+  `kDialogPadX=34`, `kDialogPadY=44`, `.image = PackImage(40,4)`;
+  `origin/main:clients/silencer/src/client/ui/modals/password_modal.cpp`
+  lines 27-30 and 101-123 use `kDialogW=352`, `kDialogH=148`,
+  `kInputW=180`, `kInputH=14`, `.image = PackImage(40,2)`. Origin text
+  defaults to word wrapping (`clients/silencer/src/ui/primitives/text.h`
+  lines 89-94; `text.cpp` lines 195-205), and origin `DispatchImage` samples
+  sprites into the Clay bounding box (`render/clay_ui_compositor.cpp` lines
+  495-549).
+- **Port cause:** the retained cppx screens override those origin constants
+  with raw registered sprite dimensions whenever `use_chrome()` has the
+  texture: `message_modal.cppx:42-45` uses `chrome.dialog_msg_w/h`, and
+  `password_modal.cppx:69-72` uses `chrome.dialog_pw_w/h`. `ScreenSubtitle`
+  also paints through the retained text component with `TextVisual.wrap`
+  defaulting to `None`, so the smaller raw boxes expose the overflow in the
+  blessed cppx-only baselines.
+- **Inferred intent:** centered modal dialog with the fixed origin modal
+  footprint and internal word-wrapped prompt/message content, not raw sprite
+  dimensions accidentally controlling the whole dialog layout.
+- **Elevated target:** restore the origin modal layout contract: fixed
+  logical `352x178` message and `352x148` password dialog containers; render
+  the bank-40 dialog art using origin `PackImage` cover semantics into those
+  boxes; constrain/wrap the message/prompt text to the padded inner width;
+  keep the password input `180x14`, OK Chrome button, modal focus trap, and
+  existing control IDs. Supersede `message_modal.png` and
+  `password_modal.png` after before/after attribution.
+- **Parity blast radius:** two cppx-only regression baselines:
+  `message_modal.png` and `password_modal.png`; possibly `update_screen` if
+  it shares `dialog_msg_w/h` and the same fixed-origin dimensions. No
+  origin-restored menu/lobby/in-game goldens should change unless the shared
+  dialog helper is over-broadened.
+- **Effort:** M
+- **Ticket:** SIL-51
+- **Status:** TICKETED
 
 ### Unit note — mainmenu (2026-06-12)
 
@@ -1246,3 +1303,37 @@ origin Clay-era source. **Zero candidates.** What was checked and cleared:
   the screen, while cppx routes wheel through the hovered `SummaryScroll`
   target. No Linear ticket opened because there is no new
   ARTIFACT/DEFECT/ERA-LIMIT candidate.
+
+### Unit note — message_modal / password_modal (2026-06-12)
+
+Audited the two cppx-only modal baselines after running the full menu/modal
+gate `bash tests/cli-agent/e2e/70_visual_regression.sh` (PASS) and then
+recapturing both modals with the same `show_message_modal` /
+`show_password_modal` control-port sequence plus the logo-HOLD stability
+poll. Fresh captures in `/tmp/cppx_uplift_modals_20260612/` byte-match the
+current goldens (`cmp=0`, `pixdiff=0.0000` for both), and inspect dumps prove
+the expected modal focus behavior (message OK focused; password input focused;
+mainmenu remains mounted behind the overlay).
+
+Outcome: one candidate, U-7. These baselines have no standalone origin trigger
+(`ORIGIN_GOLDENS.md` already marks them cppx-only), but the old origin modal
+classes are still source evidence and they contradict the current pixels:
+origin fixes the message/password modal element boxes at `352x178` and
+`352x148`, while current cppx sizes them from the raw registered bank-40
+sprite dimensions (`320x88` and `284x108` logical in the live tree). The
+result is visible text overflow in both current baselines. Evidence crops:
+`docs/plans/uplift-evidence/message_modal_password_modal/
+message_modal_current_dialog_2x.png`,
+`password_modal_current_dialog_2x.png`,
+`message_modal_text_button_4x.png`,
+`password_modal_prompt_field_button_4x.png`,
+`message_modal_current_yellow_vs_origin_cyan_2x.png`,
+`password_modal_current_yellow_vs_origin_cyan_2x.png`, and
+`modal_size_overflow_before_overlay_2x.png` (also attached to SIL-51).
+
+No separate candidate recorded for the animated mainmenu backdrop behind the
+modals: scenario 70 intentionally captures during the logo HOLD window, and
+the background differences are already covered by the prior U-1/U-2/U-3
+supersessions. The Chrome OK buttons remain the origin no-hover chrome family
+documented in ORIGIN_GOLDENS; this audit found no additional button-state or
+focus-trap issue beyond the modal container/text layout defect.
