@@ -18,7 +18,7 @@ State: IN PROGRESS
 | [systemic] palette quantization & dim formulas | EXAMINED 2026-06-12 | U-6 (+ unit note: dim/brighten LUTs clean at all used combos) |
 | [systemic] spacing/alignment consistency across siblings | EXAMINED 2026-06-12 | none (see unit note) |
 | mainmenu | EXAMINED 2026-06-12 | none (see unit note) |
-| options | UNEXAMINED | |
+| options | EXAMINED 2026-06-12 | none (see unit note) |
 | options_audio | UNEXAMINED | |
 | options_display | UNEXAMINED | |
 | options_controls | UNEXAMINED | |
@@ -566,3 +566,47 @@ indDx 1, controls titlewrap inset-top 13) are sub-device-pixel pen-recovery
 glue from the U-1 string-bake era — port-side authoring offsets, not
 evidence of origin spacing accidents; their consolidation remains a
 PARITY.md refactor item, not an uplift.
+
+### Unit note — options (2026-06-12)
+
+Audited the root Options overlay after regenerating the menu-cluster renders
+with `OUT=/tmp/cppx_renders bash tools/cap/cap_menus.sh`; the fresh
+`/tmp/cppx_renders/options.png` byte-matches the current golden
+(`cmp_exit=0`, pixdiff 0.0000, tolerant gate 0.0000/PASS). **Zero candidates.**
+What was checked and cleared:
+
+- **Authored shape matches origin intent:** origin `options_screen.cpp`
+  resets presentation to the menu palette/camera (lines 34-37), draws only the
+  full-screen bank-6 starfield (lines 77-83), and centers one 196-virtual-px
+  column (lines 84-90) containing four Md oval buttons in order
+  Controls/Display/Audio/Go Back (lines 91-106). Origin `button.cpp`
+  resolves Md oval buttons to bank 6 idx7, fixed 196x33, Title text, yOffset 8
+  (lines 110-120). The current cppx screen is the same plain centered oval
+  nav menu with no title/panel/dirty controls (`options_screen.cppx:53-60`,
+  buttons at :61-95) and uses the shared Overlay screen layout gap of 28.5
+  logical = 19 virtual (`screen_layout.cppx:72-85`).
+- **Golden pixels express that shape cleanly:** current overlay button rects
+  from the live inspect tree are all `294x50` logical at x=492, y=218/296/374/452,
+  i.e. device rects x=738, y=327/444/561/678, 441x75. The top pitch is exactly
+  117 device px for all three gaps (= 52 virtual × 2.25). Evidence:
+  `docs/plans/uplift-evidence/options/button_stack_current_3x.png`.
+- **No hidden title/chrome accident:** the region above the stack is only the
+  U-3-updated starfield; no stray title, slate dialog border, panel frame, or
+  mainmenu content leaks through the overlay. Evidence:
+  `docs/plans/uplift-evidence/options/top_left_no_title_current_3x.png`.
+- **Button chrome is not clipped:** green-ink bboxes for the four overlay
+  ovals are aligned at x738-1172 with y bands 327-401, 444-518, 561-635,
+  678-752. The cap curvature and bottom highlight are continuous in the
+  current crop; the origin-vs-current crop shows only already-adjudicated
+  U-1/U-2/U-3 differences (canonical text/sprite phase and single-hop
+  backdrop), not a new options-specific defect. Evidence:
+  `docs/plans/uplift-evidence/options/controls_oval_current_6x.png` and
+  `docs/plans/uplift-evidence/options/origin_vs_current_button_stack_2x.png`.
+- **Already-adjudicated, not re-opened:** the current ovals are 75px high
+  where the pristine origin capture's green-mask bbox is 74px, the expected
+  U-2 canonical-sprite supersession residual at 2.25x; backdrop deltas vs
+  pristine origin are the U-3 single-hop supersession; label crispness/stripe
+  changes are U-1. The options `grid_nudge` wrapper remains a PARITY.md
+  cleanup breadcrumb for old phase recovery, but the rendered result is
+  centered on origin's virtual x=328 cell and does not create a visible
+  design-intent miss.
