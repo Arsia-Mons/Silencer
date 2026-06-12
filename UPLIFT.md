@@ -28,7 +28,7 @@ State: IN PROGRESS
 | cc_select_agency | EXAMINED 2026-06-12 | none (see unit note) |
 | lobby_screen | EXAMINED 2026-06-12 | none (see unit note) |
 | create_game | EXAMINED 2026-06-12 | none (see unit note) |
-| game_staging | UNEXAMINED | |
+| game_staging | EXAMINED 2026-06-12 | none (see unit note) |
 | tech_select | UNEXAMINED | |
 | mission_summary | UNEXAMINED | |
 | message_modal / password_modal | UNEXAMINED | |
@@ -1065,3 +1065,61 @@ origin Clay-era source. **Zero candidates.** What was checked and cleared:
   `pristine_vs_current_right_cell_150pct.png`, and
   `pristine_vs_current_changed_pixels_magenta_2x.png`. No Linear ticket
   opened because there is no new ARTIFACT/DEFECT/ERA-LIMIT candidate.
+
+### Unit note — game_staging (2026-06-12)
+
+Audited the pregame staging screen after regenerating the lobby cluster with
+`OUT=/tmp/cppx_renders_uplift_game_staging bash tools/cap/cap_lobby.sh`;
+the fresh `/tmp/cppx_renders_uplift_game_staging/game_staging.png`
+byte-matches the current golden (`cmp_exit=0`, sha256
+`f86758a5be74544a4bd1afc6303043f35f5856a9515947736eaa465240298718`) and
+the tolerant pixdiff is `0.0000 (mae=0.00 maxtile=0.0% hot_tiles=0 PASS)`.
+Compared against the pristine origin capture
+(`git show ba345131:tests/cli-agent/e2e/golden/game_staging.png`, sha256
+`81c2c37bf4a30958e6cc93fc3742460aaf6071369ccfbcd23ebe0daab2dc6c3a`) and
+the origin Clay-era source. **Zero candidates.** What was checked and
+cleared:
+
+- **Authored shape matches origin intent:** origin `LobbyScreen` switches the
+  joined-game state into `gameJoinActive` and shows the joined map name in the
+  title bar (`origin/main:clients/silencer/src/client/ui/screens/lobby/
+  lobby_screen.cpp` lines 94-111, 184-187). The staging upper cell is exactly
+  three full-width Chrome buttons with authored top pads 3/11/39 virtual px
+  (`game_join_panel.cpp:33-39,155-191`). The right-tall staging roster uses
+  fixed anchors for agency emblem, ready checkbox, player name, and level
+  text, with rowY = `team*55 + slot*13`
+  (`game_join_panel.cpp:194-319`). The chat panel groups presence rows as
+  `In Lobby` / `Pregame` / `Playing` and derives the two-column chat/presence
+  layout from the panel metrics (`chat_panel.cpp:169-205,220-318`). The cppx
+  screen mirrors those contracts in `StagingPanel`, `StagingRosterCell`,
+  `LobbyTitleBar`, and `LobbyChatPanel`
+  (`clients/silencer/src/client/ui/screens/lobby_screen.cppx:525-575,
+  675-743,748-820,968-1032,1222-1277`).
+- **Golden pixels express that shape cleanly:** the live inspect tree places
+  the staging buttons at logical `(480,105)`, `(480,153)`, and `(480,243)`,
+  all `311x32`; the right roster cell at `(797,100) 463x582`; the player row
+  emblem at `(830,113) 48x41`, ready box at `(882,110) 24x20`, name at
+  `(909,113)`, and level at `(959,113)`; and the chat title/presence at
+  `#New Game-1` `(30,308)`, `Pregame` `(537,338)`, and
+  `Alice [New Game]` `(537,354)`. Direct pixel measurement found continuous
+  green UI bboxes for the title bar `(30,57)-(1889,121)`, agent card
+  `(30,151)-(683,420)`, staging-button region `(714,151)-(1210,430)`, chat
+  panel `(30,450)-(1178,1035)`, and roster cell `(1180,151)-(1889,1023)`.
+  Evidence:
+  `docs/plans/uplift-evidence/game_staging/current_layout_50pct.png`,
+  `staging_buttons_current_4x.png`, `roster_row_current_6x.png`, and
+  `chat_pregame_current_3x.png`.
+- **No screen-specific accident found:** the three staging buttons have
+  continuous Chrome rings, the large empty right-tall area below the single
+  local player is the expected one-player roster state, the title-bar map
+  overlay is present and aligned, and the chat/presence panel shows the
+  pregame channel state without clipped text, row bleed, or missing chrome.
+  Current-vs-pristine origin differs by 176,348 pixels, but the changed-pixel
+  overlay shows the same already-adjudicated U-1/U-2/U-3 families as
+  lobby_screen/create_game: canonical text, canonical legacy sprites, and
+  single-hop lobby backdrop. Evidence:
+  `docs/plans/uplift-evidence/game_staging/
+  pristine_origin_vs_current_upper_roster_50pct.png`,
+  `pristine_vs_current_changed_pixels_magenta_50pct.png`, and
+  `current_vs_golden_diff_black_50pct.png`. No Linear ticket opened because
+  there is no new ARTIFACT/DEFECT/ERA-LIMIT candidate.
