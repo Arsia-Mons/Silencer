@@ -401,25 +401,75 @@ cppxChrome.chrome_controls_h = bh * s / uiScale;
 }
 }
 }
-// bank 208 frame 60 — the static SILENCER logo (final reveal frame). Drawn at
-// native x1.5 logical = 1:1 in origin's virtual canvas like the ovals —
-// register every logo frame for the canonical variant swap too.
-bake(208, 60, cppxChrome.logo, &cppxChrome.logo_w, &cppxChrome.logo_h);
-register_legacy(208, 60, cppxChrome.logo);
-// SIL-94/107: the logo reveal frames (individual textures). [0] is the full
-// logo (frame 60); later entries step back through the legacy reveal (the
-// latter, mostly-formed half so the wordmark stays legible through the loop).
-// main_menu plays a reveal/hold/retract loop over them on the wall clock.
+// bank 208 frames 29..60 — the animated SILENCER logo. Origin draws each
+// native-size frame inside a fixed union stage derived from sprite offsets.
 {
-const size_t kLogoIdx[client::ui::ChromeTextures::kLogoFrames] =
-    {60, 58, 56, 54, 52, 50, 48, 46};
+const size_t kLogoBank = 208;
+const int kFirst = client::ui::ChromeTextures::kLogoFirstFrame;
+const int kHeld = client::ui::ChromeTextures::kLogoHeldFrame;
+bool any = false;
+int minLeft = 0, minTop = 0, maxRight = 0, maxBottom = 0;
+if(kLogoBank < banks.size()){
+for(int frame = kFirst; frame <= kHeld; ++frame){
+const size_t index = static_cast<size_t>(frame);
+if(index >= banks[kLogoBank].size()) continue;
+const std::shared_ptr<Surface> &sp = banks[kLogoBank][index];
+if(!sp || sp->w < 1 || sp->h < 1 || sp->pixels.empty()) continue;
+const int left = -game.world.resources.spriteoffsetx[kLogoBank][index];
+const int top = -game.world.resources.spriteoffsety[kLogoBank][index];
+const int right = left + sp->w;
+const int bottom = top + sp->h;
+if(!any){
+minLeft = left;
+minTop = top;
+maxRight = right;
+maxBottom = bottom;
+any = true;
+}else{
+minLeft = std::min(minLeft, left);
+minTop = std::min(minTop, top);
+maxRight = std::max(maxRight, right);
+maxBottom = std::max(maxBottom, bottom);
+}
+}
+}
+if(any && maxRight > minLeft && maxBottom > minTop){
+cppxChrome.logo_stage_w = static_cast<uint16_t>(maxRight - minLeft);
+cppxChrome.logo_stage_h = static_cast<uint16_t>(maxBottom - minTop);
 int n = 0;
-for(int i = 0; i < client::ui::ChromeTextures::kLogoFrames; ++i){
-bake(208, kLogoIdx[i], cppxChrome.logo_frame[i]);
-register_legacy(208, kLogoIdx[i], cppxChrome.logo_frame[i]);
-if(cppxChrome.logo_frame[i]) n = i + 1; // count contiguous baked frames
+for(int frame = kFirst; frame <= kHeld; ++frame){
+const size_t index = static_cast<size_t>(frame);
+if(kLogoBank >= banks.size() || index >= banks[kLogoBank].size()) continue;
+const std::shared_ptr<Surface> &sp = banks[kLogoBank][index];
+if(!sp || sp->w < 1 || sp->h < 1 || sp->pixels.empty()) continue;
+uint32_t id = cppxHost->bake_chrome_sprite(sp->pixels.data(), sp->w, sp->h,
+                                           page_for_bank(kLogoBank));
+if(!id) continue;
+cppxHost->register_legacy(id, sp->pixels.data(), sp->w, sp->h,
+                          page_for_bank(kLogoBank), kLegacyRenderWidth,
+                          kLegacyRenderHeight, LegacyFit::Cell);
+const int i = frame - kFirst;
+client::ui::ChromeTextures::LogoFrame &out = cppxChrome.logo_frame[i];
+out.id = id;
+out.w = static_cast<uint16_t>(sp->w);
+out.h = static_cast<uint16_t>(sp->h);
+out.x = static_cast<int16_t>(
+    -game.world.resources.spriteoffsetx[kLogoBank][index] - minLeft);
+out.y = static_cast<int16_t>(
+    -game.world.resources.spriteoffsety[kLogoBank][index] - minTop);
+if(frame == kHeld){
+cppxChrome.logo = id;
+cppxChrome.logo_w = out.w;
+cppxChrome.logo_h = out.h;
+}
+if(n == i) n = i + 1;
 }
 cppxChrome.logo_frame_count = n;
+}
+if(!cppxChrome.logo){
+bake(208, 60, cppxChrome.logo, &cppxChrome.logo_w, &cppxChrome.logo_h);
+register_legacy(208, 60, cppxChrome.logo);
+}
 }
 // bank 6 idx12-15 — boolean toggle indicator cells (origin: left = 12 on /
 // 13 off, right = 15 on / 14 off).

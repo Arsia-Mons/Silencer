@@ -37,6 +37,37 @@ struct MainMenuProps {
   uint32_t unused = 0;
 };
 
+constexpr float kLogoScale = 1.5f;
+constexpr float kLogoStageCenterX = 431.0f;
+constexpr float kLogoStageCenterY = 364.2f;
+constexpr uint32_t kLogoLegacyTickMs = 42;
+constexpr uint32_t kLogoRevealTicks = 60;
+constexpr uint32_t kLogoHeldEndTicks = 180;
+constexpr uint32_t kLogoCycleTicks = 240;
+
+uint32_t current_logo_frame(uint32_t now_ms, uint32_t start_ms) {
+  if (!start_ms || now_ms <= start_ms)
+    return ChromeTextures::kLogoFirstFrame;
+
+  const uint32_t legacy_tick =
+      ((now_ms - start_ms) / kLogoLegacyTickMs) % kLogoCycleTicks;
+  if (legacy_tick < kLogoRevealTicks)
+    return ChromeTextures::kLogoFirstFrame + legacy_tick / 2;
+  if (legacy_tick < kLogoHeldEndTicks)
+    return ChromeTextures::kLogoHeldFrame;
+
+  const int frame =
+      120 - static_cast<int>(legacy_tick / 2) + ChromeTextures::kLogoFirstFrame;
+  return frame <= ChromeTextures::kLogoFirstFrame
+             ? ChromeTextures::kLogoFirstFrame
+             : static_cast<uint32_t>(frame);
+}
+
+bool has_logo_animation(const ChromeTextures &chrome) {
+  return chrome.logo_stage_w > 0 && chrome.logo_stage_h > 0 &&
+         chrome.logo_frame_count == ChromeTextures::kLogoFrames;
+}
+
 // SIL-96: origin/main main menu — starfield root (ScreenLayout Menu), a left
 // SILENCER logo sprite + a right-anchored staggered stack of green oval buttons
 // with the legacy labels, and a bottom-left version footer. No slate card.
@@ -46,73 +77,64 @@ struct MainMenuProps {
   Navigation nav = use_navigation();
   ChromeTextures chrome = use_chrome();
 
-  // SIL-107: the SILENCER logo reveal/hold/retract loop over the baked bank-208
-  // reveal frames (individual textures — the ticket's "accept the texture
-  // budget" path; the atlas/UV route had a bake issue). Step a frame index from
-  // the per-frame wall clock at the legacy ~24fps (42ms) cadence: reveal
-  // 0..N-1 -> hold on the full logo -> retract. Falls back to the static logo.
-  // origin cadence (silencer_logo.cpp): 42ms legacy ticks, 240-tick cycle —
-  // reveal ticks 0..60, HOLD the full logo 60..180 (the ~5s stable window the
-  // golden was captured in), retract 180..240. The 8 baked frames span the
-  // origin reveal range, so map the tick phase onto them proportionally.
   Clock clock = use_clock();
-  uint32_t *logo_accum = use_state<uint32_t>(0u);
-  int *logo_step = use_state<int>(0);
-  *logo_accum += clock.delta_ms;
-  const uint32_t kLogoFrameMs = 42;
-  const int kRevealTicks = 60, kHeldEndTicks = 180, kCycleTicks = 240;
-  const int lf = chrome.logo_frame_count;
-  while (*logo_accum >= kLogoFrameMs) {
-    *logo_accum -= kLogoFrameMs;
-    *logo_step = (*logo_step + 1) % kCycleTicks;
-  }
-  // logo_frame[0] is the full logo; later entries step back through the reveal.
-  uint32_t logo_tex = chrome.logo;
-  if (lf > 0) {
-    const int s = *logo_step;
-    int idx;
-    if (s < kRevealTicks)
-      idx = ((kRevealTicks - 1 - s) * lf) / kRevealTicks; // reveal sparse -> full
-    else if (s < kHeldEndTicks)
-      idx = 0; // hold on the full logo
-    else
-      idx = ((s - kHeldEndTicks) * lf) / (kCycleTicks - kHeldEndTicks); // retract
-    if (idx < 0)
-      idx = 0;
-    if (idx >= lf)
-      idx = lf - 1;
-    logo_tex = chrome.logo_frame[idx];
-  }
-  ::ui::StylePatch logo_style = tokens::image_patch(logo_tex);
+  uint32_t *logo_start_ms = use_state<uint32_t>(0u);
+  if (!*logo_start_ms && clock.now_ms)
+    *logo_start_ms = clock.now_ms;
 
   std::function<void()> open_options = [nav]() {
     if (nav.push)
       nav.push(std::make_unique<OptionsScreen>());
   };
 
-  // The SILENCER wordmark (bank-208 logo sprite) at NATIVE sprite size x1.5,
-  // centered where origin centers it: x in the 525-wide logo group of the
-  // centered 960 composition (group center 427.75), y in the padded chrome
-  // region (center 355.5, including origin's 6px bottom nudge). Falls back to
-  // the Hero title until the bake lands.
-  const float logo_w = static_cast<float>(chrome.logo_w) * 1.5f;
-  const float logo_h = static_cast<float>(chrome.logo_h) * 1.5f;
-  ::ui::UiElement logo =
-      chrome.logo
-          ? Box(BoxProps{
-                .key = "logoimg",
-                .layout = ::ui::LayoutStyle{
-                    .position = ::ui::PositionType::Absolute,
-                    // +3.3/+8.7: origin centers the UNION bounds of reveal
-                    // frames 29..60 and offsets frame 60 inside that box; the
-                    // bake only knows frame 60's own bounds.
-                    .position_inset = ::ui::EdgeSizes{431.0f - logo_w * 0.5f, {}, 364.2f - logo_h * 0.5f, {}},
-                    .width = ::ui::Length::points(logo_w),
-                    .height = ::ui::Length::points(logo_h)},
-                .style = logo_style})
-          : ScreenTitle(ScreenTitleProps{.key = "logotxt",
-                                         .variant = ScreenTitleVariant::Hero,
-                                         .value = "SILENCER"});
+  ::ui::UiElement logo = ScreenTitle(ScreenTitleProps{.key = "logotxt",
+                                                      .variant = ScreenTitleVariant::Hero,
+                                                      .value = "SILENCER"});
+  if (has_logo_animation(chrome)) {
+    const uint32_t frame_no = current_logo_frame(clock.now_ms, *logo_start_ms);
+    const int frame_index =
+        static_cast<int>(frame_no) - ChromeTextures::kLogoFirstFrame;
+    const ChromeTextures::LogoFrame &frame = chrome.logo_frame[frame_index];
+    if (frame.id && frame.w > 0 && frame.h > 0) {
+      const float stage_w = static_cast<float>(chrome.logo_stage_w) * kLogoScale;
+      const float stage_h = static_cast<float>(chrome.logo_stage_h) * kLogoScale;
+      const float frame_w = static_cast<float>(frame.w) * kLogoScale;
+      const float frame_h = static_cast<float>(frame.h) * kLogoScale;
+      logo = Box(BoxProps{
+          .key = "logostage",
+          .layout = ::ui::LayoutStyle{
+              .position = ::ui::PositionType::Absolute,
+              .always_forms_containing_block = true,
+              .position_inset = ::ui::EdgeSizes{kLogoStageCenterX - stage_w * 0.5f, {},
+                                                kLogoStageCenterY - stage_h * 0.5f, {}},
+              .width = ::ui::Length::points(stage_w),
+              .height = ::ui::Length::points(stage_h)},
+          .style = tokens::chromeless_clear_patch(),
+          .children = children({Box(BoxProps{
+              .key = "logoimg",
+              .layout = ::ui::LayoutStyle{
+                  .position = ::ui::PositionType::Absolute,
+                  .position_inset = ::ui::EdgeSizes{static_cast<float>(frame.x) * kLogoScale,
+                                                    {},
+                                                    static_cast<float>(frame.y) * kLogoScale,
+                                                    {}},
+                  .width = ::ui::Length::points(frame_w),
+                  .height = ::ui::Length::points(frame_h)},
+              .style = tokens::image_patch(frame.id)})})});
+    }
+  } else if (chrome.logo) {
+    const float logo_w = static_cast<float>(chrome.logo_w) * kLogoScale;
+    const float logo_h = static_cast<float>(chrome.logo_h) * kLogoScale;
+    logo = Box(BoxProps{
+        .key = "logoimg",
+        .layout = ::ui::LayoutStyle{
+            .position = ::ui::PositionType::Absolute,
+            .position_inset = ::ui::EdgeSizes{431.0f - logo_w * 0.5f, {},
+                                              364.2f - logo_h * 0.5f, {}},
+            .width = ::ui::Length::points(logo_w),
+            .height = ::ui::Length::points(logo_h)},
+        .style = tokens::image_patch(chrome.logo)});
+  }
 
   // origin/main's right button column is a LEGACY POSITIONAL FAN: uniform-width
   // ovals at staggered centers (Connect pushed out, Exit pulled in). Flex

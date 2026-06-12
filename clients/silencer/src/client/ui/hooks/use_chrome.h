@@ -34,8 +34,8 @@ namespace client::ui {
 //   bank 95 idx 11   hud_bezel_bottom native       (in-game HUD bottom dash)
 //   bank 94 idx 0    hud_radar        native       (in-game minimap frame)
 //   ------------------------------------------------------------------
-//   total baked: ~48 / 256 (incl. logo reveal frames + toggles + 5 emblems
-//   + the 16 hover-ramp phase frames)
+//   total baked: ~72 / 256 (incl. full logo reveal frames + toggles + 5
+//   emblems + the 16 hover-ramp phase frames)
 struct ChromeTextures {
   // The green oval menu button (bank 6), per legacy size: Md/Sm/Lg, as the
   // 5-frame hover/focus ramp (origin button.cpp SpriteIndexForFrame +
@@ -89,18 +89,24 @@ struct ChromeTextures {
   // with origin's stretch fit (PackImageStretch(7,1)).
   uint32_t lobby_backdrop = 0;
   // Static SILENCER logo (bank 208 frame 60 — the final frame of the legacy
-  // reveal animation; SIL-107 animates the full 29..60 sequence).
+  // reveal animation; SIL-195 animates the full 29..60 sequence).
   uint32_t logo = 0;
   uint16_t logo_w = 0, logo_h = 0;
-  // SIL-94: a few bank-208 reveal frames for the animated logo. [0] is the
-  // final/full frame (== `logo`); later entries step back through the reveal so
-  // the main menu ping-pongs them via use_clock. count == 0 => static `logo`.
-  // SIL-94/107: bank-208 reveal frames as individual textures. [0] is the full
-  // logo; later entries step back through the legacy reveal so main_menu can
-  // play a reveal/hold/retract loop on the wall clock.
-  static constexpr int kLogoFrames = 8;
-  uint32_t logo_frame[kLogoFrames] = {};
+  // SIL-195: bank-208 reveal frames 29..60 as individual native-size textures.
+  // `x/y` are the frame's offset inside the fixed union stage, matching
+  // origin/main SilencerLogo::EnsureBounds and draw positioning. count == 0 or
+  // missing stage dimensions => static `logo` fallback.
+  struct LogoFrame {
+    uint32_t id = 0;
+    uint16_t w = 0, h = 0;
+    int16_t x = 0, y = 0;
+  };
+  static constexpr int kLogoFirstFrame = 29;
+  static constexpr int kLogoHeldFrame = 60;
+  static constexpr int kLogoFrames = kLogoHeldFrame - kLogoFirstFrame + 1;
+  LogoFrame logo_frame[kLogoFrames] = {};
   int logo_frame_count = 0;
+  uint16_t logo_stage_w = 0, logo_stage_h = 0;
   // Boolean-toggle indicator cells (bank 6), per origin boolean_setting_row:
   // LEFT cell = idx12 (on) / idx13 (off), RIGHT cell = idx15 (on) / idx14
   // (off). Four distinct sprites — never mirror one cell to fake the other.
