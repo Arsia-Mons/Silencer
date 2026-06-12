@@ -173,6 +173,8 @@ const enemyDef = {
     lookDirMaxX:          int('Robot directional look AABB: far X edge', 200),
     lookDirY1:            int('Robot directional look AABB: top Y offset', -10),
     lookDirY2:            int('Robot directional look AABB: bottom Y offset', -100),
+    poisonTickCycle:      int('Ticks per poison damage cycle (more doses = faster ticks)', 24),
+    poisonDamagePerTick:  int('Health lost per poison damage event', 1),
     _note:               { type: 'string', description: 'Optional dev note (ignored by game)' },
   },
 };

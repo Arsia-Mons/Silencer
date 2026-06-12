@@ -15,6 +15,12 @@ Civilian::Civilian() : Object(ObjectTypes::CIVILIAN){
 	state_i = 0;
 	const EnemyDef* c = GASLoader::Get().GetEnemyDef("civilian");
 	speed = c ? c->speed : 4;
+	// Health pool only matters for poison DoT — direct hits kill via the state machine.
+	maxhealth = c ? c->health : 10;
+	health = maxhealth;
+	poisonedby = 0;
+	poisonedamount = 0;
+	poisoned_i = 0;
 	res_bank = 121;
 	res_index = 0;
 	suitcolor = defaultsuitcolor;
@@ -118,11 +124,15 @@ void Civilian::Serialize(bool write, Serializer & data, Serializer * old){
 	data.Serialize(write, state, old);
 	data.Serialize(write, state_i, old);
 	data.Serialize(write, tractteamid, old);
+	data.Serialize(write, poisonedby, old);
+	data.Serialize(write, poisonedamount, old);
+	data.Serialize(write, poisoned_i, old);
 }
 
 void Civilian::Tick(World & world){
 	Hittable::Tick(*this, world);
 	Bipedal::Tick(*this, world);
+	TickPoison(world);
 	switch(state){
 		case NEW:{
 			if(FindCurrentPlatform(*this, world)){
@@ -305,6 +315,10 @@ void Civilian::Tick(World & world){
 				state = WALKING;
 				state_warp = _cd ? _cd->warpTeleportTick : GASLoader::Get().player.warpTeleportTick;
 				state_i = -1;
+				health = maxhealth;
+				poisonedby = 0;
+				poisonedamount = 0;
+				poisoned_i = 0;
 				break;
 			  }
 			}
@@ -345,6 +359,67 @@ void Civilian::HandleHit(World & world, Uint8 x, Uint8 y, Object & projectile){
 		}
 	}
 	state_i = 0;
+}
+
+bool Civilian::Poison(World & world, Uint16 playerid, Uint8 amount){
+	if(state == DYINGFORWARD || state == DYINGBACKWARD || state == DYINGEXPLODE || state == DEAD){
+		return false;
+	}
+	int maxpois = GASLoader::Get().player.maxPoisoned;
+	if(poisonedamount >= maxpois){
+		return false;
+	}
+	poisonedby = playerid;
+	poisonedamount += amount;
+	if(poisonedamount > maxpois){
+		poisonedamount = maxpois;
+	}
+	state_hit = 1 + (3 * 32);
+	hitx = 50;
+	hity = 50;
+	return true;
+}
+
+void Civilian::TickPoison(World & world){
+	if(!poisonedby || state == DYINGFORWARD || state == DYINGBACKWARD || state == DYINGEXPLODE || state == DEAD){
+		return;
+	}
+	const EnemyDef* cd = GASLoader::Get().GetEnemyDef("civilian");
+	int cycle = cd ? cd->poisonTickCycle : 24;
+	int damage = cd ? cd->poisonDamagePerTick : 1;
+	if(poisoned_i % (cycle / poisonedamount) == 0){
+		health = health > damage ? health - damage : 0;
+		if(destructible && world.IsAuthority()){
+			GameEvent ev;
+			ev.actor_id = id;
+			if(health == 0){
+				ev.type = EventType::ACTOR_KILLED;
+			}else{
+				ev.type = EventType::ACTOR_DAMAGED;
+				ev.value = damage;
+			}
+			world.triggerGraph.Bus().Emit(ev);
+		}
+		if(health == 0){
+			// Silent collapse in place — no knockback, no threat reaction.
+			state = DYINGFORWARD;
+			state_i = 0;
+			xv = 0;
+			Object * owner = world.GetObjectFromId(poisonedby);
+			if(owner && owner->type == ObjectTypes::PLAYER){
+				Peer * peer = static_cast<Player *>(owner)->GetPeer(world);
+				if(peer){
+					peer->stats.civilianskilled++;
+				}
+			}
+			poisonedby = 0;
+			poisonedamount = 0;
+		}
+	}
+	poisoned_i++;
+	if(poisoned_i >= cycle){
+		poisoned_i = 0;
+	}
 }
 
 bool Civilian::Look(World & world){

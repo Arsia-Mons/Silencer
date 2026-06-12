@@ -12,6 +12,7 @@ public:
 	void Serialize(bool write, Serializer & data, Serializer * old = 0);
 	void Tick(World & world);
 	void HandleHit(World & world, Uint8 x, Uint8 y, Object & projectile);
+	bool Poison(World & world, Uint16 playerid, Uint8 amount);
 	Uint8 weapon;
 	bool patrol;
 	Sint16 originalx;
@@ -22,6 +23,8 @@ public:
 private:
 	Object * Look(World & world, Uint8 direction);
 	void Fire(World & world, Uint8 direction);
+	void TickPoison(World & world);
+	void DropAmmoPickup(World & world);
 	bool CooledDown(World & world);
 	bool ShouldTarget(Object & object, World & world);
 	void InitBT();
@@ -35,6 +38,9 @@ private:
 	Uint16 maxhealth;
 	Uint16 maxshield;
 	Uint8 respawnseconds;
+	Uint16 poisonedby;
+	Uint8 poisonedamount;
+	Uint8 poisoned_i;
 	Uint32 lastspoke;
 	Uint32 lastshot;
 	const BehaviorTree* bt_;

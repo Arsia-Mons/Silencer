@@ -435,6 +435,9 @@ struct EnemyDef {
     int warpTeleportTick  = 12;   // state_warp value at which warp completes
     int runDurationTicks  = 150;  // civilian: ticks in RUNNING state before reverting
     int deadRespawnTicks  = 100;  // civilian: ticks in DEAD state before respawning
+    // ---- Poison (Black Rose) -----------------------------------------------------
+    int poisonTickCycle     = 24; // ticks per poison damage cycle (more doses = faster ticks)
+    int poisonDamagePerTick = 1;  // health lost per poison damage event
     int activationTicks   = 7200; // magistrate: ticks after level start before becoming active (default 2 min @ 60fps)
     std::map<int, GuardLookBox> lookBoxes; // guard: vision AABB per direction index
     std::string behaviorTree = "";         // override BT asset ID (empty = use class default)

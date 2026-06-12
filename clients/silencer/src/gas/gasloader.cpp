@@ -427,6 +427,8 @@ static void LoadEnemies(const std::string& dir, std::vector<EnemyDef>& out,
             e.deathDropXVRange      = ej.value("deathDropXVRange",      e.deathDropXVRange);
             e.meleeHitDuration      = ej.value("meleeHitDuration",      e.meleeHitDuration);
             e.ammoDropQuantity      = ej.value("ammoDropQuantity",      e.ammoDropQuantity);
+            e.poisonTickCycle       = ej.value("poisonTickCycle",       e.poisonTickCycle);
+            e.poisonDamagePerTick   = ej.value("poisonDamagePerTick",   e.poisonDamagePerTick);
             e.lookDefaultMinX       = ej.value("lookDefaultMinX",       e.lookDefaultMinX);
             e.lookDefaultMaxX       = ej.value("lookDefaultMaxX",       e.lookDefaultMaxX);
             e.lookDefaultY          = ej.value("lookDefaultY",          e.lookDefaultY);
