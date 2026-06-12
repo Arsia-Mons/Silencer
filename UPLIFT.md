@@ -13,7 +13,7 @@ State: IN PROGRESS
 |---|---|---|
 | [systemic] whole-frame magnify: glyph striping | EXAMINED 2026-06-12 | U-1 |
 | [systemic] whole-frame magnify: sprite phase striping | EXAMINED 2026-06-12 | U-2 |
-| [systemic] background image double-scaling / banding | UNEXAMINED | |
+| [systemic] background image double-scaling / banding | EXAMINED 2026-06-12 | U-3 |
 | [systemic] float-rect flooring: 1px seams & jitter | UNEXAMINED | |
 | [systemic] palette quantization & dim formulas | UNEXAMINED | |
 | [systemic] spacing/alignment consistency across siblings | UNEXAMINED | |
@@ -175,3 +175,58 @@ State: IN PROGRESS
 - **Effort:** M
 - **Ticket:** SIL-204
 - **Status:** IN REVIEW (SIL-204)
+
+### U-3: backdrop double-scaling banding from origin's two-hop menu compositing
+- **Unit:** [systemic] background image double-scaling / banding
+- **Class:** ARTIFACT
+- **Severity:** med
+- **Golden shows:** Full-bleed menu backdrops carry an irregular {2,2,5}
+  duplication-run pattern on BOTH axes — each source px becomes 2, 2, then 5
+  device px instead of a uniform 3, because the image is nearest-resampled
+  twice. Measured in `tests/cli-agent/e2e/golden/mainmenu.png`: (a) the Mars
+  planet's authored regular scanline rows render as 2/2/5-px-thick bands —
+  row runs through the limb (x1570-1880, y260-560) = [5,2,2,5,2,2,…] avg 2.97;
+  (b) the same authored 1-src-px star (rgb 32,8,8) renders 2×2 @(556,653),
+  5×5 @(675,684), 2×5 @(556,531), 5×2 @(657,986) — 6.25× area variance by
+  position alone; star blob width histogram {2,4,5,7,9,11} = exactly the
+  two-hop run sums (uniform 3× ⇒ {3,6,9}); (c) stretch backdrops
+  (lobby_screen, options_controls goldens) show the same {2,2,5} column
+  banding horizontally + the standard {3,2,2,2} 2.25× stripe vertically;
+  (d) the backdrop fills only 1919/1920 columns (scaled_w=int(853·2.25+0.5))
+  — golden col x1919 fully black, x1918 has 540 backdrop px (mainmenu).
+  Current render reproduces it byte-for-byte (backdrop strips diff 0 vs
+  golden; pre-U-1/U-2 renders confirm backdrop bytes unchanged by those
+  fixes). Evidence: `docs/plans/uplift-evidence/systemic-backdrop-banding/`
+  (planet_banding_before_vs_mock_3x.png — golden vs simulated single-hop
+  elevated target; same_star_four_sizes_10x_brightened.png).
+- **Origin cause:** two compounding nearest resamples in
+  `origin/main:clients/silencer/src/render/clay_ui_compositor.cpp`: hop 1
+  DrawImage (~L505-552) cover/stretch-blits the 640×480 backdrop into the
+  853×480 virtual scratch at ×1.333 ({1,1,2} runs); hop 2 Render() s>1
+  branch (~L1206-1233) whole-frame magnifies ×2.25 ({3,2,2,2} runs). The
+  patterns multiply: avg 3.0 but distributed {2,2,5}. At 1080p the
+  end-to-end ratio is exactly 3.0 — a single resample would be perfectly
+  uniform.
+- **Inferred intent:** "Fill the screen with this backdrop image" (cover for
+  menus, stretch for Options·Controls + lobby). The source art's regular
+  scanline texture and uniform stars make even scaling the unambiguous
+  intent. Third arm of the user-confirmed whole-frame-magnify seed candidate
+  (U-1 glyphs, U-2 sprites).
+- **Elevated target:** single-hop nearest resample sprite→device geometry in
+  `bake_backdrop_rgba` (sprite_bake.cpp): compute cover/stretch fit at
+  device res (cover @1080p = uniform 3×3 px blocks, centered crop; stretch
+  keeps the unavoidable single-hop {2,2,2,3} vertical at 2.25 — same
+  residual U-1/U-2 accept), sample src=int(dst/scale) once, fill all 1920
+  columns. Delete the two-hop emulation arithmetic; call sites + 1:1
+  full-bleed draw unchanged; s=1 already identity so in-game untouched by
+  construction.
+- **Parity blast radius:** Systemic — the backdrop layer of every menu/lobby
+  golden (~15: mainmenu, options×4, character_create, cc_alias,
+  cc_select_agency, lobby_connect, lobby_screen, create_game, game_staging,
+  tech_select, mission_summary, hover_mainmenu_oval, modals/gallery). Large
+  raw pixel deltas expected (full background) with zero layout change —
+  diff attribution = backdrop only, chrome/text byte-stable. In-game goldens
+  unaffected. Same supersession protocol as U-1/U-2.
+- **Effort:** S
+- **Ticket:** SIL-205
+- **Status:** TICKETED
