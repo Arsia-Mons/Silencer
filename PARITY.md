@@ -344,3 +344,27 @@ Critic-panel additions (gate run wf_6a6a0a1f over f9b337de..HEAD, 2026-06-11 —
 | ~~MED~~ DONE a1db39d0 | stale stacked kv_row `sm` comment | old block deleted |
 | ~~MED~~ DONE a1db39d0 | dead advantage_bracket() | deleted (with the unused use_lobby_session read) |
 | ~~LOW~~ MOSTLY DONE | canvas_h plumbing deleted end-to-end (a1db39d0); INGAME_SPECS.md dup companion line deleted; lobby_connect panel_style/chrome_frame unified into one if/else (a4fd…); caret_game is now CONSUMED (in_game_screen chat caret) — not dead; kv_row `cycle` flag KEPT: the two forks (BodySm face + top-anchored value) are origin's one cycle-vs-numeric row distinction, splitting it would duplicate the row shell | — |
+
+## Fresh-context final verification — PASS (2026-06-11, goal.md done-gate item 4)
+
+History-blind verifier, fresh build @ dd7f7189, every gate re-derived: 13-screen sweep
+matches the ledger exactly (10 byte-identical confirmed at full res); e2e 35/35 exit 0;
+guard exit 0; critic method executed eyes-on (workflow harness unavailable in its env);
+**goldens re-authenticated against a live origin boot (mainmenu byte-identical)**;
+resize stale-cache probe 0 diff px at 5 sizes; both waivers' blocking mechanisms verified
+in origin source. **Zero high-severity findings.**
+
+Mediums closed/resolved:
+1. string-variant memo key omitted render scale → FIXED a2ea50a7 (sweep byte-identical,
+   52/75 green). Per-screen nudge wrappers: DECISION — these are the recorded grid-snap
+   authoring contract (each ≤1 logical px, per-screen provenance in the [systemic]
+   sections), load-bearing for the byte-identical results; the earlier "one owner"
+   fix-shape (executor-snap) is a refactor risking 10 byte-identical screens for zero
+   player-visible gain. Ledger bar amended: the contract stands, wrappers are NOT debt.
+2. system_camera + trace_time waivers are origin-bug / drive-cost class (outside the
+   5-10%-tile waiver letter) — held for OWNER SIGN-OFF, flagged in the completion DM
+   along with the deliberate GameStateObject replication divergence (origin bug fix).
+
+Lows (disclosed, no action): cc_select_agency/create_game pixel-zoom residuals; cc_alias
+caret row; mission_summary wheel-anywhere deviation; ungoldened keybind-capture visual
+(function covered by 19) + message-type 1-20 tinted fallbacks; scenario 18 output format.
