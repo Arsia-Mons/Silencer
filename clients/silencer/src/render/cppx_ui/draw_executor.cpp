@@ -399,6 +399,23 @@ struct LayerSlot {
   float opacity = 1.f;
 };
 
+// The two legacy chrome stroke/fill colors (palette idx216 connected frame,
+// idx220 inner well) — the eligibility palette for the legacy grid snaps.
+bool legacy_stroke(::ui::Color col) {
+  return col.a == 255 && ((col.r == 8 && col.g == 84 && col.b == 0) ||
+                          (col.r == 24 && col.g == 124 && col.b == 20));
+}
+
+// Quarter-integer virtual scale (device px per legacy virtual px), or 0 if
+// this scale has no legacy grid. Shared gate of the legacy snaps below.
+float legacy_virtual_scale(float scale) {
+  const float sv = scale * 1.5f;
+  const float q = sv * 4.f;
+  if (std::fabs(q - std::floor(q + 0.5f)) > 0.001f || sv < 1.f)
+    return 0.f;
+  return sv;
+}
+
 // Legacy hairline frame snap. origin draws the lobby panel chrome as
 // 1-VIRTUAL-px vector strokes on the 853x480 canvas and magnifies the whole
 // frame by s=2.25, so each edge line covers the device pixels
@@ -419,15 +436,9 @@ bool snap_legacy_hairline_border(SDL_Renderer *r, const ::ui::DrawCommand &c,
     return false;
   if (b.has_fill && b.fill.a > 0)
     return false; // fused fill takes the mesh path
-  const float sv = scale * 1.5f; // device px per legacy virtual px
-  const float q = sv * 4.f;
-  if (std::fabs(q - std::floor(q + 0.5f)) > 0.001f || sv < 1.f)
+  const float sv = legacy_virtual_scale(scale);
+  if (sv <= 0.f)
     return false;
-  auto legacy_stroke = [](::ui::Color col) {
-    return col.a == 255 &&
-           ((col.r == 8 && col.g == 84 && col.b == 0) ||
-            (col.r == 24 && col.g == 124 && col.b == 20));
-  };
   const float kMaxHairline = 2.5f; // logical; anything wider isn't a hairline
   const bool top = b.border.width.top > 0.f && b.border.color.top.a > 0;
   const bool right = b.border.width.right > 0.f && b.border.color.right.a > 0;
@@ -486,6 +497,39 @@ bool snap_legacy_hairline_border(SDL_Renderer *r, const ::ui::DrawCommand &c,
   return true;
 }
 
+// Legacy solid-fill snap (SIL-207). origin fills chrome plates (the
+// create_game scrollbar thumb) as integer rects on the same virtual canvas
+// its hairline strokes live on. Our box comes out of flex layout with
+// fractional logical edges, so the raw quad can raster half a cell off the
+// SNAPPED borders around it — a 1px gutter against one stroke and a 1px
+// overpaint of the opposite one. Same grid, same eligibility palette as
+// snap_legacy_hairline_border: snap each edge to its virtual cell so the
+// fill is flush with the snapped strokes by construction.
+bool snap_legacy_solid_fill(SDL_Renderer *r, const ::ui::DrawCommand &c,
+                            float scale) {
+  const ::ui::RectData &rd = c.payload.rect;
+  if (rd.corner_radius > 0.01f)
+    return false;
+  if (!legacy_stroke(rd.fill))
+    return false;
+  const float sv = legacy_virtual_scale(scale);
+  if (sv <= 0.f)
+    return false;
+  // Edge -> nearest virtual line, line -> first device px of its cell
+  // (cell(v) = [ceil(v*sv), ceil((v+1)*sv)), as in the border snap).
+  auto snap = [&](float logical) {
+    return std::ceil((float)std::lround(logical * scale / sv) * sv);
+  };
+  const float x0 = snap(c.rect.x), y0 = snap(c.rect.y);
+  const float x1 = snap(c.rect.x + c.rect.w), y1 = snap(c.rect.y + c.rect.h);
+  if (x1 <= x0 || y1 <= y0)
+    return false;
+  SDL_SetRenderDrawColor(r, rd.fill.r, rd.fill.g, rd.fill.b, rd.fill.a);
+  SDL_FRect fr{x0, y0, x1 - x0, y1 - y0};
+  SDL_RenderFillRect(r, &fr);
+  return true;
+}
+
 void execute_draw_commands(SDL_Renderer *renderer,
                            const ::ui::DrawCommandList &list,
                            FontRegistry *fonts, TextureRegistry *textures,
@@ -525,6 +569,8 @@ void execute_draw_commands(SDL_Renderer *renderer,
     switch (c.kind) {
     case ::ui::DrawCommandKind::Rect:
       if (c.payload.rect.fill.a > 0) {
+        if (snap_legacy_solid_fill(renderer, c, scale))
+          break;
         if (use_sdf && c.payload.rect.corner_radius > 0.5f) {
           sdf_fill_rounded(renderer, sdf_cache, c.rect,
                            c.payload.rect.corner_radius, c.payload.rect.fill,

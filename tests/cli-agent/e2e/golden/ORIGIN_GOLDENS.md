@@ -1,5 +1,33 @@
 # Origin/main golden baselines — provenance
 
+> ## Uplifted goldens (2026-06-12 — U-5 / SIL-207)
+>
+> `create_game.png` was superseded once more after fixing the second PORT-side
+> defect the parity gate had passed sub-tolerance and the U-1/2/3 supersessions
+> enshrined (`uplift: create_game scrollbar thumb 1px short of track`,
+> UPLIFT.md finding U-5, SIL-207). Like U-4 this CONVERGES back toward
+> origin's correct rendering: the Game Options scrollbar thumb is a flex Box
+> whose solid fill rasterized as a raw quad at fractional logical edges, while
+> the track strokes around it snap to origin's virtual cell grid
+> (`snap_legacy_hairline_border`) — the unsnapped fill landed half a virtual
+> cell up-left of its cell (device rect x1156-1168 / y211-367: a 1px black
+> gutter against the track's right stroke at x1169 and a 1px overpaint of the
+> left stroke's inner column x1156 and the top stroke's inner row y211; origin
+> renders x1157-1169 / y212-368, flush all round). Fix: the executor now snaps
+> eligible solid Rect fills to the same virtual cell grid as the hairline
+> strokes (`snap_legacy_solid_fill`, draw_executor.cpp — square corners, the
+> two legacy stroke palette colors, quarter-integer virtual scale; the thumb is
+> the only such fill today), so fills are flush with snapped strokes by
+> construction. Diff attribution (this supersession's gate): BEFORE captures
+> byte-matched all 8 lobby-cluster goldens; the BEFORE→AFTER diff is 338 px
+> with bbox exactly the thumb region (x1156-1169, y211-368); AFTER minus
+> pristine-origin (ba345131) in the scrollbar region equals BEFORE's residual
+> set exactly (the documented U-3 backdrop texels) — the thumb itself is
+> byte-equal origin; every other screen byte-stable (suites
+> 70/71/72/74/75/76 + 12/17/31/53 all PASS; evidence:
+> `docs/plans/uplift-evidence/U-5/`). Pre-U-5 baseline remains in git history
+> (commit a560a5b4 and earlier).
+
 > ## Uplifted goldens (2026-06-12 — U-4 / SIL-206)
 >
 > `cc_select_agency.png` was superseded a fourth time after fixing a

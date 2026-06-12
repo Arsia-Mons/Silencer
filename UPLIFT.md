@@ -361,8 +361,36 @@ origin-side flooring candidate found; recording zero rather than padding.
   edges (floor(right) − floor(left)) so the device extent fills the interior
   (to x1169, 161 rows). Supersede create_game.png, diff confined to the
   thumb-fill rect.
+- **As implemented (2026-06-12):** fresh measurement sharpened the diagnosis:
+  the whole 13×157 fill rect sat HALF A VIRTUAL CELL up-left (device
+  x1156-1168 / y211-367 vs origin x1157-1169 / y212-368) — a 1px gutter
+  against the track's right stroke at x1169 AND a 1px overpaint of the left
+  stroke's inner column (x1156) and top stroke's inner row (y211), not a
+  width/height shortfall. Root mechanism: the thumb is a flex Box whose solid
+  fill rasterized as a raw geometry quad at fractional logical edges, while
+  the surrounding track strokes snap to origin's virtual cell grid
+  (snap_legacy_hairline_border) — the one legacy primitive left unsnapped
+  (borders, sprites, glyphs already snap). Fix is the consistent completion,
+  in the executor not the screen: `snap_legacy_solid_fill`
+  (draw_executor.cpp) snaps eligible solid Rect fills (square corners, the
+  two legacy stroke palette colors — shared `legacy_stroke` helper — at
+  quarter-integer virtual scale, shared `legacy_virtual_scale` gate) onto the
+  same cell grid, so fills sit flush against snapped strokes by construction
+  (robust to sub-cell layout drift; no authoring nudge). The thumb is the
+  only legacy-green solid fill in the tree today (grep: one
+  `background(tokens::kChromeStroke)` user). Verified with evidence
+  (docs/plans/uplift-evidence/U-5/): 8 BEFORE lobby-cluster captures
+  byte-matched the goldens; AFTER thumb = fill x1157-1169 rows y212-368 with
+  both track strokes fully restored; BEFORE→AFTER diff 338 px, bbox exactly
+  the thumb region; AFTER-vs-pristine-origin residual set in the scrollbar
+  region is EXACTLY BEFORE's (the documented U-3 backdrop texels) — the
+  thumb itself byte-equal origin; all other captured screens byte-unchanged.
+  Suites 70/71/72/74/75/76 + 12/17/31/53 PASS (in-game untouched; sv-gate +
+  no legacy-green fills at s=1). create_game.png superseded;
+  ORIGIN_GOLDENS.md U-5 section + PARITY.md row updated (polish note
+  resolved).
 - **Parity blast radius:** single screen — create_game.png (suite 71).
   Resolves the PARITY.md polish note.
 - **Effort:** S
 - **Ticket:** SIL-207
-- **Status:** TICKETED
+- **Status:** IN REVIEW (SIL-207)
