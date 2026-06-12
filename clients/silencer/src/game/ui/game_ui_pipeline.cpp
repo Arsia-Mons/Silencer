@@ -323,10 +323,10 @@ cppxHost->register_legacy(id, patch, kPatchW, kPatchH, page_for_bank(7),
                           silencer::cppx_ui::LegacyFit::Cell);
 }
 }
-// Full-bleed backdrops bake at DEVICE resolution through origin's two-hop
-// menu compositing (cover/stretch into the virtual canvas, then magnify) so
-// the uneven scanline striping matches the golden pixel-for-pixel. Fits per
-// origin: menus PackImage(6,0)=cover, Options·Controls PackImageStretch(6,0),
+// Full-bleed backdrops bake at DEVICE resolution via a single NEAREST
+// resample (U-3/SIL-205 — origin's two-hop chain banded unevenly; the intent,
+// "fill the screen with this image", scales uniformly). Fits per origin:
+// menus PackImage(6,0)=cover, Options·Controls PackImageStretch(6,0),
 // lobby PackImageStretch(7,1).
 auto bake_backdrop = [&](size_t bank, size_t index, bool stretch,
                          uint32_t &id_out){
@@ -334,9 +334,7 @@ if(bank >= banks.size() || index >= banks[bank].size()) return;
 const std::shared_ptr<Surface> &sp = banks[bank][index];
 if(!sp || sp->w < 1 || sp->h < 1 || sp->pixels.empty()) return;
 uint32_t id = cppxHost->bake_backdrop_sprite(sp->pixels.data(), sp->w, sp->h,
-                                             page_for_bank(bank), stretch,
-                                             kLegacyRenderWidth,
-                                             kLegacyRenderHeight);
+                                             page_for_bank(bank), stretch);
 if(id) id_out = id;
 };
 bake_backdrop(6, 0, false, cppxChrome.starfield);

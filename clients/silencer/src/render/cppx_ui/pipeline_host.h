@@ -67,13 +67,11 @@ public:
   uint32_t bake_chrome_sprite(const uint8_t *indices, int w, int h,
                               const SDL_Color *palette256);
 
-  // Bake a full-bleed backdrop sprite at this host's device resolution via
-  // origin's two-hop menu compositing (see bake_backdrop_rgba). Drawn 1:1
+  // Bake a full-bleed backdrop sprite at this host's device resolution via a
+  // single NEAREST resample (see bake_backdrop_rgba — U-3/SIL-205). Drawn 1:1
   // full-screen, so the texture carries the fit (cover/stretch) baked in.
-  // legacy_w/h = the 640x480 design res the virtual-canvas scale derives from.
   uint32_t bake_backdrop_sprite(const uint8_t *indices, int w, int h,
-                                const SDL_Color *palette256, bool stretch,
-                                int legacy_w, int legacy_h);
+                                const SDL_Color *palette256, bool stretch);
 
   // Register an already-baked chrome texture's indexed source so the executor
   // can swap qualifying draws for lazily-baked CANONICAL device-cell variants

@@ -1,5 +1,32 @@
 # Origin/main golden baselines — provenance
 
+> ## Uplifted goldens (2026-06-12 — U-3 / SIL-205)
+>
+> 14 menu/lobby baselines (the 13 minus `lobby_connect.png`, which has no
+> visible backdrop and stayed byte-identical, plus `mission_summary.png` and
+> `hover_mainmenu_oval.png`) were superseded a third time by cppx renders
+> after the single-hop backdrop resample (`uplift: backdrop double-scaling
+> banding`, UPLIFT.md finding U-3, SIL-205) — the backdrop arm of the same
+> whole-frame-magnify artifact family as U-1/U-2. Origin nearest-resampled
+> full-bleed backdrops TWICE (sprite → 853×480 virtual canvas → ×2.25 frame
+> magnify), compounding to irregular {2,2,5} duplication runs: the mainmenu
+> planet's authored scanlines rendered as 2/2/5-px bands, the same 1-src-px
+> star rendered 2×2 / 5×5 / 2×5 / 5×2 by position, and column x1919 was never
+> filled. The fix resamples once at device geometry (cover @1080p = uniform
+> 3×3 blocks, centered crop; stretch keeps the unavoidable single-hop
+> {3,2,2,2} vertical at 2.25; all 1920 columns filled). Diff attribution
+> (this supersession's gate): every changed pixel is backdrop-visible —
+> mainmenu/lobby_screen changed px proven src-equivalent to the same source
+> texels (99.8%/99.2% strict set-membership; remainder = UI-edge occlusion +
+> the lobby panel-border blur over the changed backdrop), hover_mainmenu_oval
+> changed px byte-equal mainmenu's at every coordinate, magenta overlays show
+> chrome/text/layout untouched (evidence: `docs/plans/uplift-evidence/U-3/`).
+> The cppx-only baselines (`gallery`, `message_modal`, `password_modal`) were
+> re-blessed for the same reason (backdrop visible behind modals/gallery).
+> **In-game goldens remain pristine origin captures** (no menu backdrop;
+> suites 72/76 pass unchanged). Pre-U-3 baselines remain in git history
+> (commit 101a83a8 and earlier).
+
 > ## Uplifted goldens (2026-06-12 — U-2 / SIL-204)
 >
 > The same 15 baselines (13 menu/lobby + `mission_summary.png` +

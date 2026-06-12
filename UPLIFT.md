@@ -220,13 +220,34 @@ State: IN PROGRESS
   columns. Delete the two-hop emulation arithmetic; call sites + 1:1
   full-bleed draw unchanged; s=1 already identity so in-game untouched by
   construction.
-- **Parity blast radius:** Systemic — the backdrop layer of every menu/lobby
-  golden (~15: mainmenu, options×4, character_create, cc_alias,
-  cc_select_agency, lobby_connect, lobby_screen, create_game, game_staging,
-  tech_select, mission_summary, hover_mainmenu_oval, modals/gallery). Large
-  raw pixel deltas expected (full background) with zero layout change —
-  diff attribution = backdrop only, chrome/text byte-stable. In-game goldens
-  unaffected. Same supersession protocol as U-1/U-2.
+- **As implemented (2026-06-12):** bake_backdrop_rgba (sprite_bake.cpp) is now
+  a single NEAREST resample sprite→device: cover = max(dw/sw, dh/sh) float
+  scale, int(+0.5) draw size, int-centered crop, src=int((d-o)/scale); stretch
+  = per-axis dw/sw, dh/sh. Two-hop virtual-canvas arithmetic deleted, and with
+  it the legacy_w/h plumbing through PipelineHost::bake_backdrop_sprite +
+  game_ui_pipeline (the fit needs only sprite + device dims; no shims).
+  dw==sw && dh==sh is the identity, so 1:1 draws are untouched by
+  construction. Verified with evidence (docs/plans/uplift-evidence/U-3/):
+  15 BEFORE captures byte-matched the goldens; AFTER @1080p — planet limb
+  row runs all exactly 3 (before [5,2,2,…]), star(32,8,8) blob histogram
+  collapses to 3×3 (1013 blobs) + 3-multiples for adjacent clusters (before
+  2×2/5×5/2×5/5×2 mix), col x1919 filled (540 backdrop px = x1918's count).
+  Diff attribution: mainmenu changed px 99.83% strict src-equivalent to the
+  same source texels via the before-render (1148 residual all at UI-element
+  edges = occluded-texel candidates), lobby_screen 99.2% (residual = the
+  panel-border blur strip @x1100-1199 blending the changed backdrop),
+  hover_mainmenu_oval changed px byte-equal mainmenu's at every coordinate,
+  magenta overlays on 7 screens + modals/gallery show every changed px on
+  backdrop (chrome/text/layout byte-stable). lobby_connect byte-unchanged
+  (no visible backdrop).
+- **Parity blast radius:** As landed — 14 menu/lobby goldens superseded
+  (mainmenu, options×4, character_create, cc_alias, cc_select_agency,
+  lobby_screen, create_game, game_staging, tech_select, mission_summary,
+  hover_mainmenu_oval; lobby_connect byte-unchanged) + modals/gallery
+  re-blessed. Suites 70/71/74/75 PASS against the superseded goldens;
+  in-game 72/76 PASS against pristine origin goldens (no backdrop at s=1).
+  ORIGIN_GOLDENS.md "Uplifted goldens (U-3)" + PARITY.md UPLIFTED rows +
+  systemic section updated.
 - **Effort:** S
 - **Ticket:** SIL-205
-- **Status:** TICKETED
+- **Status:** IN REVIEW (SIL-205)

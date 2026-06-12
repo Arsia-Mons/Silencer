@@ -28,39 +28,34 @@ void bake_indexed_rgba(const uint8_t *indices, int w, int h,
 }
 
 void bake_backdrop_rgba(const uint8_t *indices, int sw, int sh,
-                        const SDL_Color *palette256, bool stretch,
-                        int legacy_w, int legacy_h, int dw, int dh,
-                        uint8_t *out_rgba) {
-  float s = std::min(dw / (float)legacy_w, dh / (float)legacy_h);
-  if (s < 1.0f)
-    s = 1.0f;
-  const int vw = std::max(1, (int)(dw / s));
-  const int vh = std::max(1, (int)(dh / s));
-  // Hop 1 (sprite -> virtual canvas), origin DrawImage arithmetic.
-  const float sx_scale = (float)vw / sw;
-  const float sy_scale = (float)vh / sh;
-  const float cover = std::max(sx_scale, sy_scale);
-  const int draw_w = stretch ? vw : std::max(1, (int)(sw * cover + 0.5f));
-  const int draw_h = stretch ? vh : std::max(1, (int)(sh * cover + 0.5f));
-  const int ox = (vw - draw_w) / 2;
-  const int oy = (vh - draw_h) / 2;
-  // Hop 2 (virtual -> device), origin whole-frame magnify, centered.
-  const int scaled_w = (int)(vw * s + 0.5f);
-  const int scaled_h = (int)(vh * s + 0.5f);
-  const int off_x = scaled_w < dw ? (dw - scaled_w) / 2 : 0;
-  const int off_y = scaled_h < dh ? (dh - scaled_h) / 2 : 0;
-  const int out_w = std::min(scaled_w, dw - off_x);
-  const int out_h = std::min(scaled_h, dh - off_y);
-  for (int dy = 0; dy < out_h; ++dy) {
-    int vy = std::min((int)(dy / s), vh - 1);
-    int syi = stretch ? (int)(vy / sy_scale) : (int)((vy - oy) / cover);
+                        const SDL_Color *palette256, bool stretch, int dw,
+                        int dh, uint8_t *out_rgba) {
+  if (sw < 1 || sh < 1 || dw < 1 || dh < 1)
+    return;
+  // Single-hop NEAREST fit, sprite -> device (U-3 / SIL-205). One resample
+  // gives every source px a uniform duplication footprint; origin resampled
+  // twice (sprite -> virtual canvas -> whole-frame magnify) and the compounded
+  // runs banded unevenly ({2,2,5} at 1080p where a single hop is exactly 3).
+  // Cover scales by max(dw/sw, dh/sh) and center-crops; stretch fills both
+  // axes. Fits fill all dw columns/dh rows. At dw==sw, dh==sh this is the
+  // identity.
+  const float xs_stretch = (float)dw / sw;
+  const float ys_stretch = (float)dh / sh;
+  const float cover = std::max(xs_stretch, ys_stretch);
+  const float xs = stretch ? xs_stretch : cover;
+  const float ys = stretch ? ys_stretch : cover;
+  const int draw_w = std::max(1, (int)(sw * xs + 0.5f));
+  const int draw_h = std::max(1, (int)(sh * ys + 0.5f));
+  const int ox = (dw - draw_w) / 2; // <= 0: crop is centered
+  const int oy = (dh - draw_h) / 2;
+  for (int dy = 0; dy < dh; ++dy) {
+    const int syi = (int)((dy - oy) / ys);
     if (syi < 0 || syi >= sh)
       continue;
-    uint8_t *orow = out_rgba + ((size_t)(off_y + dy) * dw + off_x) * 4;
+    uint8_t *orow = out_rgba + (size_t)dy * dw * 4;
     const uint8_t *srow = indices + (size_t)syi * sw;
-    for (int dx = 0; dx < out_w; ++dx) {
-      int vx = std::min((int)(dx / s), vw - 1);
-      int sxi = stretch ? (int)(vx / sx_scale) : (int)((vx - ox) / cover);
+    for (int dx = 0; dx < dw; ++dx) {
+      const int sxi = (int)((dx - ox) / xs);
       if (sxi < 0 || sxi >= sw)
         continue;
       const uint8_t idx = srow[sxi];

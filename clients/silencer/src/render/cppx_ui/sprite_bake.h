@@ -22,19 +22,16 @@ namespace silencer::cppx_ui {
 void bake_indexed_rgba(const uint8_t *indices, int w, int h,
                        const SDL_Color *palette256, uint8_t *out_rgba);
 
-// Bake a full-bleed menu backdrop at device resolution dw*dh by replicating
-// origin/main's two-hop menu compositing chain: the sprite
-// NEAREST-fits (cover, or stretch when `stretch`) into the virtual menu canvas
-// int(dw/s) x int(dh/s), s = min(dw/legacy_w, dh/legacy_h), then the canvas
-// NEAREST-magnifies by s, centered. A single-hop scale yields uniform pixel
-// runs that visibly differ from origin's uneven two-hop striping, so both
-// integer mappings are reproduced exactly. legacy_w/h = the 640x480 design
-// res (kLegacyRenderWidth/Height — passed in to keep this layer game-free).
+// Bake a full-bleed menu backdrop at device resolution dw*dh: a SINGLE
+// NEAREST resample sprite -> device (cover fit with centered crop, or stretch
+// when `stretch`), so every source px gets a uniform duplication footprint
+// (U-3 / SIL-205 — origin resampled twice, sprite -> virtual canvas -> whole-
+// frame magnify, and the compounded runs banded unevenly). All dw*dh pixels
+// the sprite covers are filled; dw==sw && dh==sh is the identity.
 // `out_rgba` >= dw*dh*4, zeroed by caller; index 0 stays transparent.
 void bake_backdrop_rgba(const uint8_t *indices, int sw, int sh,
-                        const SDL_Color *palette256, bool stretch,
-                        int legacy_w, int legacy_h, int dw, int dh,
-                        uint8_t *out_rgba);
+                        const SDL_Color *palette256, bool stretch, int dw,
+                        int dh, uint8_t *out_rgba);
 
 // ---- Canonical-phase element bakes (U-2 / SIL-204) -------------------------
 // Origin whole-frame-magnified the composed virtual frame (src = int(dx/s)),
