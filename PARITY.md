@@ -211,8 +211,35 @@ golden rain), messages 0.1672/0, quit_prompt 0.3766/0.
 | status_lines (bottom-center stack, fading) | **PASS** — ingame_status_lines 0.0030/0 hot (2026-06-11, scenario 76, + civilian-rand mask 270,230,330,290). Trigger: keyuse with INV_BASEDOOR next to the deck data terminal (x=1824) → CanCreateBase TERMINAL-in-AABB fail → "Can't build a base here" (208); golden captured MID-FADE at time=8 (brightness 64) so the fade arithmetic is gated. View implemented (build_status_lines, shadow max(8,b-64), face-7 (208,b) bakes b=8..128 step 8) | ui/hud/InGameOverlays.cpp:147-183 |
 | quit_prompt ("Hit Enter To Quit") | **PASS** — quit_prompt 0.3766/0 (Prompt face LegacyPalette(202)); captured via TUI ESC scancode edges like the golden | ui/hud/InGameOverlays.cpp:211-227 |
 
-Hardcoded in-game bindings to verify functionally: T chat, F1 player list, F2 team colors,
-F4 music toggle, F5 random music, Enter quit-confirm flow.
+### Windowed in-game UI stretch — FIXED 2026-06-11 (1eb4d9a2), windowed gate pending a GUI session
+
+Divergence: origin renders world + HUD into ONE 640×480 screenbuffer and the
+present pass stretches the whole frame NON-uniformly to the window (1920×1080 =
+×3.0/×2.25 NEAREST) — right-anchored HUD elements (inventory anchors
+612/584/556/528) land at the window's right edge. Our windowed path rendered
+the in-game cppx UI at window-pixel res with uniform cppxScale, putting a
+612-virtual anchor at device ~1377 instead of 1836. Invisible to every
+headless gate (no window ⇒ surface-size render already).
+
+Fix: RenderCppxClientUiFrame skips the window-size override when
+game.world.map.loaded — the in-game UI frame is surface-sized (640×480) on ALL
+paths; the backend UI composite is a fullscreen quad like the world upscale
+(sdl3gpubackend.cpp pass 7 vs 8: same kVertScreen 3-vertex triangle +
+nearest_sampler), so the ui_tex stretches exactly like the world. Menus keep
+window-res rendering (two-hop bakes assume it). Pointer mapping was already
+proportional (wx/ww × logicalW) so hit-testing follows the smaller canvas
+automatically — scenarios 72/73/76/80 green on the fixed build.
+
+Verification status: headless evidence complete (scenario 72/76 green = the
+640×480 in-game frame is golden-true; composite equivalence is by construction,
+both passes verified identical fullscreen draws). The WINDOWED capture gate is
+`tools/cap/cap_ingame_windowed_verify.sh` (real window at 1920×1080 →
+composited-swapchain capture → exact src-map downsample vs ingame_hud_base
+golden under the scenario-72 masks + the inventory-band x1836 check). It could
+NOT be executed this session: the host has no logged-in GUI session (SDL
+"video driver did not add any displays"; `open`/LaunchServices and System
+Events launch also fail — /dev/console owned by root). Run the script once a
+console session exists.
 
 ## Functional — e2e suite (fresh full run 2026-06-11 post in-game-surfaces + functional scenarios: ALL 33 GREEN)
 
@@ -220,7 +247,7 @@ F4 music toggle, F5 random music, Enter quit-confirm flow.
 |---|---|---|
 | 00..22,30,31,40,50,51,52,60,70 | PASS | fresh full run 2026-06-11 (binary @ b8fc958b; re-verified post in-game work — 70's modal baselines re-captured at the logo HOLD + stability-polled, see ORIGIN_GOLDENS.md) |
 | 53_lobby_create_options_scroll | PASS | 73bb8fe2 — resolve_lobby_panes ports origin ResolveSteppedPaneLayout; green at 1280x720 / 640x480 / 1000x1100 / 390x844 |
-| 72_visual_regression_ingame | PASS | NEW 2026-06-11 — all 8 in-game goldens gated with the documented masks; full-suite run all green (25 scenarios) |
+| 72_visual_regression_ingame | PASS | NEW 2026-06-11 — all 8 in-game goldens gated with the documented masks; full-suite run all green (25 scenarios). FLAKE HARDENED fc29aba1: quit_prompt capture (cap_ingame_cppx session B) re-drives up to 3× when align_camera sticks at a constant shift (follow-cam rest x outside Camera::Follow's ±7 x-window under load) |
 | 73_ui_click_sounds | PASS | NEW 2026-06-11 — ui_audio edge counter asserts hover-enter/dedupe/nav triggers |
 | 71_visual_regression_lobby | PASS | d739bc5d — harness now captures lobby_connect at AUTHENTICATING (log populated) and cc_alias BEFORE typing (golden field is empty); the "caret blink" theory was wrong — the caret draws unconditionally while focused. Two consecutive green runs |
 | 76_visual_regression_ingame_extra | PASS | NEW 2026-06-11 — top_ticker/status_lines/secret_overlay gated vs the new gameplay-driven goldens (system_camera captured non-gated, see its row); full-suite green |
@@ -246,28 +273,26 @@ Earlier same-day milestones: iteration-0 13/23 → post scale-unclamp 21/23 → 
 | hover/focus interaction VISUALS vs origin | **PASS (2026-06-11)** — hover_mainmenu_oval golden (origin, 2 runs byte-identical) gated at 0.0000/0 hot; chrome NEGATIVE verified both sides (origin: hovered Login cell byte-equals the rest golden ×2 runs; ours: 0 diff px in the cell before/after hover); scenario 75 green. IMPLEMENTED: origin's 5-phase ramp in AppButton (sprite base+phase at brightness 128+2p baked per phase + registered for the device-cell variant swap — oval Md/Sm/Lg + LegacyRow; label ramps through hud_text_key(0,128+2p) face bakes), one phase/42ms toward target, disabled pins 0. Target = hover (NEW engine on_hover enter/leave edge — use_hovered can't serve product components, the host's fiber is the substrate Button's) OR focus with a real input source (programmatic autofocus does NOT ramp — origin never autofocuses, keeps rest goldens byte-stable; hover does not move focus in our model, per scenario 16). DEVIATIONS (documented): `selected` does not ramp yet (origin selectedVisual; no golden exercises it — cc preview-selected rows must stay phase 0 at rest anyway); Ghost/Text 128→136 brightness ramp not implemented (no golden; in-game ghost rows must stay chromeless). FIXED EN ROUTE: use_clock delta_ms collapsed to 0 on multi-layer frames (computed per screen layer, not per frame) — no prior consumer animated on overlays, now snapshotted once per render frame |
 | UI interaction SOUNDS | **FIXED 2026-06-11** — ClientUi publishes per-frame UiAudioEvents (hovered audible Button / activate / keyboard-nav onto one; audible = enabled Button only, per origin: toggles/inputs silent); GameUiPipeline (sole Audio owner) dedupes the hover edge and plays GAS soundUIClick via Audio::PlayUI; edge counter exposed headless via the `ui_audio` op. Evidence: scenario 73 (hover-enter +1, steady hover 0, second hover +1, nav +1) green in the full suite |
 
-## Architecture guard backlog (15 findings, re-confirmed 2026-06-11 post b8fc958b — must be 0 for done)
+## Architecture guard backlog — CLOSED 2026-06-11 (a1db39d0): guard EXIT 0
 
-(56725dc0 had pushed LobbyConnectView over the 200-line god-view threshold —
-16 findings; the connect_status_log extraction in b8fc958b restored 15.
-character_create's CharacterCreateContent is now 300 lines and lobby_screen's
-LobbyScreenView 494; line numbers below drift with edits — re-run for exact.)
+`python3 clients/silencer/tools/react_architecture_guard.py --root clients/silencer`
+returns exit 0 (was 14 findings at batch start). How each family closed:
 
-`python3 clients/silencer/tools/react_architecture_guard.py --root clients/silencer` (NOT
---root .../src/client/ui — that path exits 0 silently; line numbers below from the fresh run).
+- paint-literals (8): semantic tokens kControlFallbackFill / kDialogFallbackFill /
+  kEmblemFallbackFill + the shared tokens::chromeless_clear_patch() /
+  chromeless_field_style(caret, text) helpers (the 5-copy chromeless-input
+  StyleStatePatch recipe now has one owner: lobby_connect, character_create,
+  in_game_screen, password_modal, options_controls all consume it).
+- big-switches (3): app_root phase reconciler → kPhaseScreens factory map
+  indexed by SessionPhase; ScreenTitle → kTitleSpecs variant table;
+  UpdateScreen → kPhaseLabels table.
+- god-views (2): CharacterCreateContent → AliasStep/AgencyStep/RosterStep +
+  shared wizard frame helpers; LobbyScreenView → LobbyTitleBar/AgentCard/
+  LobbyChatPanel/LobbyPaneGrid sections + map_list_rows.
 
-| Finding | Where |
-|---|---|
-| paint-literal ×4 | components/actions/app_button_variant.h:142,221,293,294 |
-| paint-literal | screens/character_create.cppx:268 |
-| paint-literal ×3 | screens/lobby_connect.cppx:98,106,139 |
-| paint-literal | screens/lobby_screen.cppx:1073 |
-| paint-literal | screens/password_modal.cppx:55 |
-| big-switch 9 cases | app_shell/app_root.cpp:61 |
-| big-switch 7 cases | components/text/screen_title.cppx:26 |
-| big-switch 7 cases | screens/update_screen.cppx:27 |
-| god-view 292 lines | screens/character_create.cppx:228 CharacterCreateContent |
-| god-view 494 lines | screens/lobby_screen.cppx:777 LobbyScreenView |
+Pixel-identical proof: 13-screen sweep unchanged (10 byte-identical at 0.0000;
+cc_alias 0.0003 / cc_select_agency 0.0540 / create_game 0.0082 — exactly the
+recorded residuals), scenarios 72/74/75/76 green, full suite green.
 
 ## Critic-panel architecture backlog (from gate runs wf_6e530100 + wf_d51296b1, 2026-06-11)
 
@@ -306,8 +331,8 @@ Critic-panel additions (gate run wf_6a6a0a1f over f9b337de..HEAD, 2026-06-11 —
 
 | Sev | Finding | Fix shape |
 |---|---|---|
-| MED | chromeless-input StyleStatePatch triplicated (character_create alias_field_style, lobby_connect field_style, password_modal) — one parity fix required the same edit at 3 sites | extract tokens::chromeless_field_style(caret_color) or a ChromelessInput component |
-| MED | lobby pane arithmetic re-resolved at 6 points/frame; lobby_right_cell_layout() calls use_app() INSIDE a free layout helper (hook-in-helper) while sibling lobby_chat_layout(chat_w) takes a param | resolve panes once in LobbyScreen, pass values down (match lobby_chat_layout's shape) |
-| MED | stale stacked kv_row comments (old `sm` comment kept when `cycle` block added, lobby_screen.cppx:345-351) | delete the old block |
-| MED | advantage_bracket() dead after inline abs_at replacement (character_create.cppx:110-126) | delete |
-| LOW | dead plumbing: caret_game (use_chrome.h:140) and canvas_h (use_app/app_provider/pipeline) written never read; INGAME_SPECS.md duplicate companion line; kv_row `cycle` flag forks typeface+anchoring at once; lobby_connect panel_style/chrome_frame split conditionals on one predicate | cleanups |
+| ~~MED~~ DONE a1db39d0 | chromeless-input StyleStatePatch was copied in FIVE files (character_create, lobby_connect, in_game_screen, password_modal, options_controls) | tokens::chromeless_field_style(caret, text) + chromeless_clear_patch() |
+| ~~MED~~ DONE a1db39d0 | lobby pane hook-in-helper (lobby_right_cell_layout called use_app() inside a free layout helper) | resolve_lobby_panes once in LobbyScreenView; tall_w passed down (lobby_chat_layout shape); dead lobby_col_layout/lobby_cell_layout deleted |
+| ~~MED~~ DONE a1db39d0 | stale stacked kv_row `sm` comment | old block deleted |
+| ~~MED~~ DONE a1db39d0 | dead advantage_bracket() | deleted (with the unused use_lobby_session read) |
+| ~~LOW~~ MOSTLY DONE | canvas_h plumbing deleted end-to-end (a1db39d0); INGAME_SPECS.md dup companion line deleted; lobby_connect panel_style/chrome_frame unified into one if/else (a4fd…); caret_game is now CONSUMED (in_game_screen chat caret) — not dead; kv_row `cycle` flag KEPT: the two forks (BodySm face + top-anchored value) are origin's one cycle-vs-numeric row distinction, splitting it would duplicate the row shell | — |

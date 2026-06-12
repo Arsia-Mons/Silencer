@@ -102,21 +102,22 @@ std::vector<::ui::UiElement> connect_status_log(const std::string &log) {
   // at virtual cell 284 (device x639), but the centered panel box floors to
   // device 640, clipping the frame's 3px left column. Anchoring the sprite box
   // one logical px left restores the cell without moving the panel's children.
-  const ::ui::StylePatch panel_style =
-      chrome.dialog_connect
-          ? ::ui::StylePatch{}
-          : tokens::panel_patch(tokens::kDialogFallbackFill, tokens::kBorderPanel, 2.0f);
-  ::ui::UiElement chrome_frame =
-      chrome.dialog_connect
-          ? Box(BoxProps{
-                .key = "chromeframe",
-                .layout = ::ui::LayoutStyle{
-                    .position = ::ui::PositionType::Absolute,
-                    .position_inset = ::ui::EdgeSizes{-1.0f, {}, 0.0f, {}},
-                    .width = ::ui::Length::points(panel_w),
-                    .height = ::ui::Length::points(panel_h)},
-                .style = tokens::image_patch(chrome.dialog_connect)})
-          : ::ui::empty();
+  // Without the baked sprite, the panel itself paints the vector fallback.
+  ::ui::StylePatch panel_style{};
+  ::ui::UiElement chrome_frame = ::ui::empty();
+  if (chrome.dialog_connect) {
+    chrome_frame = Box(BoxProps{
+        .key = "chromeframe",
+        .layout = ::ui::LayoutStyle{
+            .position = ::ui::PositionType::Absolute,
+            .position_inset = ::ui::EdgeSizes{-1.0f, {}, 0.0f, {}},
+            .width = ::ui::Length::points(panel_w),
+            .height = ::ui::Length::points(panel_h)},
+        .style = tokens::image_patch(chrome.dialog_connect)});
+  } else {
+    panel_style =
+        tokens::panel_patch(tokens::kDialogFallbackFill, tokens::kBorderPanel, 2.0f);
+  }
 
   // Chromeless fields over the sprite's baked wells; caret = palette idx 140
   // resolved on the lobby palette (sage).

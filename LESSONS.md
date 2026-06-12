@@ -299,6 +299,29 @@
   pre-frame game-side code must mutate the world directly (safe — the
   no-mutation rule guards mid-build only).
 
+- **Headless gates can't see window-only render paths — audit every
+  `if(window)` fork against the capture path.** The in-game UI rendered at
+  window-pixel res (uniform scale) while origin stretches its one 640×480
+  screenbuffer non-uniformly; every gate passed because headless has no window
+  and silently took the correct surface-size branch. The divergence only
+  exists at a real window, where a 612-virtual HUD anchor sat at device 1377
+  instead of 1836. When the capture path and the user path fork on
+  window-presence, the gate is gating the wrong branch.
+
+- **This host can't open SDL windows without a console login.** No WindowServer
+  session for uid 501 (/dev/console owned by root): direct launch fails with
+  "video driver did not add any displays", SDL_VIDEODRIVER=offscreen gets a
+  window but no SDL_GPU backend, and `open`/System Events can't reach a GUI
+  domain. Windowed verification scripts (cap_ingame_windowed_verify.sh) need a
+  logged-in console session — don't burn cycles on launch workarounds.
+
+- **align_camera stuck at a CONSTANT shift = the correction is outside the
+  follow window, not a convergence problem.** Camera::Follow's x-window is
+  ±7 (w=15, xoffset=0): the per-render-frame Follow snaps any pinned x back
+  inside it, so a needed correction beyond ±7 repeats the same measured shift
+  forever (observed 10,0 under full-suite load). More iterations can't help —
+  tear down and re-drive (the rest position re-rolls), bounded retries.
+
 - **Pointer click = on_activate on ANY focusable in the engine — gate inputs.**
   Every submit-on-activate text field (password modal, lobby connect, chat
   compose) fired its submit when set_text's synthetic focus-click landed.
