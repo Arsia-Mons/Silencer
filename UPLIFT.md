@@ -12,7 +12,7 @@ State: IN PROGRESS
 | Unit | State | Findings |
 |---|---|---|
 | [systemic] whole-frame magnify: glyph striping | EXAMINED 2026-06-12 | U-1 |
-| [systemic] whole-frame magnify: sprite phase striping | UNEXAMINED | |
+| [systemic] whole-frame magnify: sprite phase striping | EXAMINED 2026-06-12 | U-2 |
 | [systemic] background image double-scaling / banding | UNEXAMINED | |
 | [systemic] float-rect flooring: 1px seams & jitter | UNEXAMINED | |
 | [systemic] palette quantization & dim formulas | UNEXAMINED | |
@@ -98,3 +98,58 @@ State: IN PROGRESS
 - **Effort:** M
 - **Ticket:** SIL-190
 - **Status:** IN REVIEW (SIL-190)
+
+### U-2: position-dependent sprite striping from origin's whole-frame magnify
+- **Unit:** [systemic] whole-frame magnify: sprite phase striping
+- **Class:** ARTIFACT
+- **Severity:** med
+- **Golden shows:** The same chrome sprite renders with different pixel
+  patterns — and different overall size — depending on absolute screen
+  position. Measured in `tests/cli-agent/e2e/golden/mainmenu.png`: the four
+  green button ovals are the same 435px-wide sprite assembly at ring tops
+  y347/y498/y648/y799 (y mod 9 = 5/3/0/7 — four distinct phases of the
+  {3,2,2,2} row-duplication cycle), yet the Options oval is 75 px tall while
+  its three siblings are 74; left-cap row-run phases differ per instance
+  (Tutorial [2,2,3,2,2,2,3…], Exit [2,3,2,2,2,3…], Options [3,2,2,2…]);
+  Tutorial vs Exit left caps (40×74 @x1026,y347 vs @x936,y799) differ in 77
+  of 615 ring-ink px (12.5%). In
+  `tests/cli-agent/e2e/golden/options_display.png` the filled toggle
+  half-disc (38×74 @x1245) differs between row 1 (y345) and row 2 (y464) in
+  46 disc-ink px (2.0%) — visibly different edge stepping on two toggles of
+  the same screen. Current render byte-matches the golden in all measured
+  regions (we reproduce the artifact). Evidence:
+  `docs/plans/uplift-evidence/systemic-sprite-striping/`
+  (oval_left_caps_tut_exit_opt_4x.png, oval_cap_tut_vs_exit_diff_4x.png,
+  toggle_disc_row1_row2_diff_4x.png).
+- **Origin cause:** `origin/main:clients/silencer/src/render/clay_ui_compositor.cpp`
+  Render() s>1 branch (~L1186-1233) — sprites composite 1:1 into the virtual
+  scratch (853×480 @1080p), then the whole frame nearest-magnifies by s=2.25
+  with sx=int(dx/s), sy=int(dy/s); each virtual px becomes 2 or 3 device px
+  in a {3,2,2,2} cycle phased by absolute frame position (period 9 device px
+  at s=2.25). Nothing per-sprite is authored.
+- **Inferred intent:** "Draw this sprite at UI scale s" — every instance of a
+  sprite identical pixels and identical size, like U-1's glyphs. Same root
+  mechanism as U-1 (confirmed-by-user seed candidate), sprite arm.
+- **Elevated target:** Canonical-phase sprite rendering, mirroring U-1 as
+  landed: bake each registered legacy sprite ONCE at canonical phase
+  (src=int(lx/s), lx from 0), draw at floor-quantized integer device cells
+  sized to the canonical bake. Keeps the 2.25× nearest retro chunkiness;
+  removes positional unevenness. Scope = everything
+  `TextureRegistry::resolve_legacy` serves (Cell + NineSlice + Contain +
+  Stretch fits, `texture_registry.{h,cpp}`); backdrops (bake_backdrop_rgba)
+  are the separate double-scaling unit. Deletes the (X%18, Y%18) positional
+  memo key (variants collapse to one per sprite — texture-cap pressure from
+  per-phase accumulation disappears) and obsoletes the per-screen ≤1-logical-px
+  authoring-nudge contract recorded in PARITY.md "[systemic] Per-phase
+  legacy-sprite variants" (nudges existed only so vx=round(floor(dev_x)/s)
+  recovers the golden cell). Apply U-1's landed lessons: element boxes keep
+  their design-metric layout (no size growth) and floor (not round) dst
+  quantization so 1:1-scale in-game draws are untouched.
+- **Parity blast radius:** Systemic — every golden with legacy chrome sprites
+  at scale >1: the 13 menu/lobby goldens + hover_mainmenu_oval +
+  mission_summary + gallery (sprite bands: ovals, toggles, logo, nine-slice
+  buttons, emblems, plates). In-game goldens unaffected (s=1 path has no
+  magnify striping). Same supersession protocol as U-1.
+- **Effort:** M
+- **Ticket:** SIL-204
+- **Status:** TICKETED
