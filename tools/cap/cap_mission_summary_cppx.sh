@@ -118,5 +118,24 @@ bun -e '
   const b = new DataView(await Bun.file(process.argv[1]).arrayBuffer());
   if (b.getUint32(16) !== 1920 || b.getUint32(20) !== 1080) { console.error("not 1920x1080"); process.exit(1); }
 ' "$OUT_PNG"
-c inspect > "${OUT_PNG%.png}.json" 2>/dev/null || true
+c inspect > "${OUT_PNG%.png}.json"
 echo "captured $OUT_PNG"
+
+# Functional wheel probe — AFTER the rest capture so the PNG stays rest-state.
+# origin mission_summary wheel (scrollDelta accumulate + clamp, screen.cpp
+# :254-258/:415-417): scenario 74 asserts the window from these three dumps.
+read -r SX SY <<<"$(bun -e '
+  const r = JSON.parse(await Bun.file(process.argv[1]).text());
+  const b = (r.nodes||[]).find((n)=>n.control_id==="SummaryScroll");
+  if (!b) { console.error("no SummaryScroll node"); process.exit(1); }
+  console.log(`${Math.round(b.x+b.w/2)} ${Math.round(b.y+b.h/2)}`);
+' "${OUT_PNG%.png}.json")"
+probe() { # probe <dy> <out_suffix>
+  c scroll --x "$SX" --y "$SY" --dy "$1" >/dev/null
+  c wait_frames --n 2 >/dev/null
+  c inspect > "${OUT_PNG%.png}.$2.json"
+}
+probe -3   scrolled
+probe -100 end
+probe 200  top
+echo "scroll probes dumped beside $OUT_PNG"

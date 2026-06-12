@@ -55,7 +55,11 @@ constexpr int kTitleCenterX = 192, kTitleY = 44;
 constexpr int kXpCenterX = 467, kXpY = 45;
 constexpr int kUpgradeBannerY = 77;
 constexpr int kSummaryX = 89, kSummaryY = 92;
+constexpr int kSummaryW = 180;
 constexpr int kSummaryRenderH = 308;
+// origin kSummaryH: the legacy TextBox scroll limit uses the 300px viewport
+// (27 rows) while RENDERING 308px (28 rows — one extra line at the lower edge).
+constexpr int kSummaryScrollH = 300;
 constexpr int kLineH = 11;
 constexpr int kLevelLabelX = 390, kLevelValueRightX = 556;
 constexpr int kLevelStartY = 97, kLevelRowGap = 46;
@@ -190,12 +194,43 @@ struct MissionSummaryProps {
 
   // Stats summary — origin draws lines[scroll..scroll+28] in a 180×308 Body
   // column at (89,92); the scrollbar rail/thumb art is baked into the panel
-  // sprite (origin passes showScrollbar=false here).
+  // sprite (origin passes showScrollbar=false here). Wheel scroll = origin
+  // mission_summary_screen.cpp:254-258/:415-417: 1 row per notch (amount =
+  // -int(wheelY)), clamped to [0, lines − 27] (the 300px legacy window).
   {
     const int visible = kSummaryRenderH / kLineH;
     const int count = (int)prog.summary_lines.size();
-    for (int i = 0; i < visible && i < count; ++i) {
-      const std::string &line = prog.summary_lines[i];
+    int max_scroll = count - kSummaryScrollH / kLineH;
+    if (max_scroll < 0)
+      max_scroll = 0;
+    int *scroll = use_state<int>(0);
+    if (*scroll > max_scroll)
+      *scroll = max_scroll;
+    std::function<void(const ::ui::WheelEvent &)> on_wheel =
+        [scroll, max_scroll](const ::ui::WheelEvent &e) {
+          int v = *scroll - (int)e.dy;
+          if (v < 0)
+            v = 0;
+          if (v > max_scroll)
+            v = max_scroll;
+          *scroll = v;
+        };
+    // Ghost wheel target over the stats column (wheel routes from the hovered
+    // focusable; chromeless so the rest golden stays byte-identical).
+    ::ui::StyleStatePatch ghost{};
+    ghost.base = tokens::chromeless_clear_patch();
+    ghost.hover = ghost.base;
+    ghost.focus_visible = ghost.base;
+    kids.push_back(Box(BoxProps{
+        .key = "slwheel",
+        .id = "SummaryScroll",
+        .focusable = true,
+        .on_wheel = on_wheel,
+        .layout = abs_at(kSummaryX, kSummaryY, kSummaryW * kS,
+                         (float)kSummaryRenderH * kS),
+        .style = ghost}));
+    for (int i = 0; i < visible && *scroll + i < count; ++i) {
+      const std::string &line = prog.summary_lines[*scroll + i];
       if (line.empty())
         continue;
       const char *key = ::ui::copy_string(("sl" + std::to_string(i)).c_str());
