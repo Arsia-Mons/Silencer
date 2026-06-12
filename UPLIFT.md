@@ -23,7 +23,7 @@ State: IN PROGRESS
 | options_display | EXAMINED 2026-06-12 | none (see unit note) |
 | options_controls | EXAMINED 2026-06-12 | none (see unit note) |
 | lobby_connect | EXAMINED 2026-06-12 | none (see unit note) |
-| character_create | UNEXAMINED | |
+| character_create | EXAMINED 2026-06-12 | none (see unit note) |
 | cc_alias | UNEXAMINED | |
 | cc_select_agency | UNEXAMINED | |
 | lobby_screen | UNEXAMINED | |
@@ -796,3 +796,45 @@ What was checked and cleared:
   The ORIGIN_GOLDENS chrome-hover negative check also confirms this Chrome
   button family intentionally has no hover visual change, so the rest-state
   buttons are not hiding a missing focused/hovered frame.
+
+### Unit note — character_create (2026-06-12)
+
+Audited the roster step's current golden
+(`tests/cli-agent/e2e/golden/character_create.png`) against the pristine
+origin capture (`git show ba345131:tests/cli-agent/e2e/golden/
+character_create.png`) and the origin Clay-era source
+(`origin/main:clients/silencer/src/client/ui/screens/character_create/
+character_create_layout.cpp`). Full lobby visual gate
+`bash tests/cli-agent/e2e/71_visual_regression_lobby.sh` passed this session,
+which re-captures `character_create` in the real login flow. **Zero
+candidates.** What was checked and cleared:
+
+- **Authored shape matches origin intent:** origin fixes the stage/panel at
+  640x480 and 628x441 virtual px with frame/content padding, a 236px left
+  column, 196px right column, 33px title band, 14px title-to-rows gap, 27px
+  row height, 5px row gap, and 272px agent-row area
+  (`character_create_layout.cpp:45-68`). The root draws the bank-6 starfield
+  and baked bank-7 idx5 panel (`:572-599`). The select-agent step is exactly
+  a title, a fixed row list, and an empty detail pane unless an existing
+  agent is selected (`:621-725`); each row is the `LegacyRow` button sprite
+  at `minWidth = kLeftColumnW` (`:493-510`).
+- **Golden pixels express that shape cleanly:** direct component measurement
+  on the current golden found the closed roster row as one green component at
+  `(373,211)-(903,271)` = 531x61 device px; the pristine origin row is the
+  same size at `(374,212)-(904,272)`, the known U-2 one-pixel phase residual.
+  The title/pane chrome is one continuous left-pane component at
+  `(334,82)-(996,972)`, the empty right pane is continuous at
+  `(1024,84)-(1563,992)`, and the baked scroll rail is continuous at
+  `(914,199)-(956,888)` with its inner fill `(919,235)-(951,852)`.
+  Evidence:
+  `docs/plans/uplift-evidence/character_create/title_row_scroll_current_3x.png`,
+  `roster_row_closed_6x.png`, and `center_divider_join_4x.png`.
+- **No screen-specific accident found:** the visible scrollbar/rail is baked
+  into the origin panel art rather than conditional row-list logic, the single
+  row's oval cap/ring is closed, the panel joins have no 1px seam or broken
+  stroke, and the empty right pane is deliberate for a roster with no existing
+  agent. Current-vs-pristine differences in the left-pane crop are the already
+  adjudicated U-1/U-2/U-3 families (canonical glyphs, canonical legacy
+  sprites, single-hop backdrop), not a new roster-step defect. Evidence:
+  `docs/plans/uplift-evidence/character_create/
+  pristine_vs_current_left_pane_250pct.png`.
