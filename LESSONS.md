@@ -351,3 +351,11 @@
   server the client reports peers=1 while `peerlist` carries both the local
   peer and the dedicated AUTHORITY peer (id 0, accountid 0) — assert peer
   topology from `peerlist` + `authoritypeer`, not the scalar.
+
+- **Stale "completed" task notifications ≠ agent done.** Agents that end a turn while a
+  monitor/suite watcher is pending emit completion notifications while STILL ALIVE (three
+  times today: hover, polish, ledger-tail). Before touching the tree after such a
+  notification, check `pgrep run.sh` AND `git status` — the orchestrator edited scenario 72
+  concurrently with the ledger-tail agent (both converged only by luck + the agent's
+  verify-before-commit discipline). Treat the mutex as held until the agent's FINAL report
+  (one with per-item outcomes) or a clean process table.
