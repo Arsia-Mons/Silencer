@@ -15,7 +15,7 @@ State: IN PROGRESS
 | [systemic] whole-frame magnify: sprite phase striping | EXAMINED 2026-06-12 | U-2 |
 | [systemic] background image double-scaling / banding | EXAMINED 2026-06-12 | U-3 |
 | [systemic] float-rect flooring: 1px seams & jitter | EXAMINED 2026-06-12 | U-4, U-5 (no ORIGIN-side candidates — see unit note) |
-| [systemic] palette quantization & dim formulas | UNEXAMINED | |
+| [systemic] palette quantization & dim formulas | EXAMINED 2026-06-12 | U-6 (+ unit note: dim/brighten LUTs clean at all used combos) |
 | [systemic] spacing/alignment consistency across siblings | UNEXAMINED | |
 | mainmenu | UNEXAMINED | |
 | options | UNEXAMINED | |
@@ -394,3 +394,74 @@ origin-side flooring candidate found; recording zero rather than padding.
 - **Effort:** S
 - **Ticket:** SIL-207
 - **Status:** IN REVIEW (SIL-207)
+
+### Unit note — [systemic] palette quantization & dim formulas (2026-06-12)
+
+Replicated origin's full palette pipeline in analysis tooling
+(`PALETTE.BIN` 772-byte-stride pages + `<<2` expansion, verified against
+known golden colors page1[140]=yellow / page2[140]=sage; `Palette::Brightness`
+linear-scale/blend-to-white + `ClosestMatch` LUTs; `Color` luma-offset;
+page-0 ramp arithmetic) and probed every dim/brighten combo the UI actually
+uses. Everything except U-6 came back CLEAN — recording so per-screen
+iterations don't re-litigate:
+
+- Menu pages (1=menus, 2=lobby cluster) always take the
+  ClosestMatch-quantized path (`palette.cpp` Calculate: the ramp-arithmetic
+  dim is page-0-only). Computed full LUTs for the used intensities — 64
+  (tech dim), 96 (Muted), 136 (hover max = 128+phase·2, button.cpp
+  FrameForPhase), 160 (presence) — zero entries with err>40 or hue-shift>40°
+  on any index the menus actually render (the only outliers are unused
+  yellow/red entries: page1@96 idx138-143, page2@160 idx155/161).
+- Hover brightening measured in the goldens directly:
+  hover_mainmenu_oval vs mainmenu diff = 31,471 px, 23 distinct color
+  substitutions, ALL on-ramp green→brighter-green (plus gray→gray). No
+  off-ramp speckle, no collisions.
+- Page-0 in-game dim ramp arithmetic: all seven ramps in the dimmable range
+  (idx 2-113) are luminance-monotone; the one ramp not anchored at black
+  (idx 18-33, starts lum 75) is exactly the `colorramp==16` exception origin
+  already special-cases to ClosestMatch. Handled, not an accident.
+- PARITY-confirmed palette semantics (caret = per-page idx140, presence
+  sage, version amber, tech dim formula) — INTENT, matched to origin's
+  palette logic during the parity grind; nothing new found against them.
+- ClosestMatch quirks (start=2, page-0 upperonly≥114) and the alpha-LUT
+  0.5→1 step are in-game-only mechanisms with no golden-visible defect to
+  point to; no candidate recorded.
+
+### U-6: 6-bit palette expansion by plain `<<2` caps every channel at 252 — white is never white
+- **Unit:** [systemic] palette quantization & dim formulas
+- **Class:** ARTIFACT
+- **Severity:** low
+- **Golden shows:** No palette-derived pixel in any golden exceeds channel
+  value 252. Full-extrema sweep of all 30 goldens this session: 12 saturate
+  at exactly 252, none above (gallery.png's lone 255-green is a cppx-only
+  test color). Concrete instances: cc_alias caret = rgb(252,252,0), 48 px
+  @x718-719, y491-514 ("full yellow"); ingame_hud_base brightest text =
+  rgb(252,252,252) ("full white" at 98.8%); every in-game golden's whites
+  likewise. Evidence:
+  `docs/plans/uplift-evidence/systemic-palette-quantization/`
+  (cc_alias_caret_252_vs_proper_expansion_12x.png,
+  ingame_hud_white_252_vs_proper_expansion_8x.png,
+  mainmenu_expansion_delta_map_amplified85x.png).
+- **Origin cause:** `origin/main:clients/silencer/src/render/palette.cpp`
+  Load() ~L44-52 — PALETTE.BIN stores VGA 6-bit DAC values (0..63);
+  expansion is a plain `r << 2` (63→252). Our port replicates it verbatim
+  (`clients/silencer/src/render/palette.cpp:50-52`); all cppx UI color
+  sourcing flows through the same table (game_ui_pipeline.cpp page_color +
+  sprite/glyph bakes), so the artifact is in every golden.
+- **Inferred intent:** 6-bit 63 = maximum DAC intensity = full brightness on
+  original hardware. The palette author authored pure white/yellow; 252 is
+  the standard sloppy 6→8-bit expansion losing the top 3 intensity levels.
+- **Elevated target:** canonical bit-replicating expansion
+  `(v << 2) | (v >> 4)` in Palette::Load (one line ×3 channels); per-pixel
+  effect on existing colors is exactly `c | (c >> 6)` (+0..3/channel,
+  saturated → true 255). Delete cached PALETTECALC*.BIN so the ClosestMatch
+  LUTs recompute from corrected colors.
+- **Parity blast radius:** systemic, the widest yet — EVERY golden
+  (all 30, including the so-far-pristine in-game set) shifts by ≤3/channel.
+  Diff trivially attributable (pure recolor, geometry byte-stable), but
+  honest note: max delta 3/255, mainmenu only 5.4% of px change at all (by
+  1-2) — at/below perception threshold; value is correctness of saturated
+  colors. Reasonable for the user to reject on golden-churn grounds.
+- **Effort:** S
+- **Ticket:** SIL-208
+- **Status:** TICKETED
