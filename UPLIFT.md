@@ -33,7 +33,7 @@ State: IN PROGRESS
 | mission_summary | EXAMINED 2026-06-12 | none (see unit note) |
 | message_modal / password_modal | EXAMINED 2026-06-12 | U-7 |
 | ingame: hud_base / top_ticker / status_lines | EXAMINED 2026-06-12 | none (see unit note) |
-| ingame: chat (open + history) / messages | UNEXAMINED | |
+| ingame: chat (open + history) / messages | EXAMINED 2026-06-12 | none (see unit note) |
 | ingame: player_list / system_camera | UNEXAMINED | |
 | ingame: tech_overlay / buy_tech / secret_overlay | UNEXAMINED | |
 | ingame: quit_prompt | UNEXAMINED | |
@@ -1417,3 +1417,59 @@ produced the crops below. **Zero candidates.** What was checked and cleared:
   U-1/U-5, so palette U-6 and menu-scale uplift decisions are not re-litigated
   here. No Linear ticket opened because there is no new ARTIFACT/DEFECT/
   ERA-LIMIT candidate in this unit.
+
+### Unit note — ingame: chat (open + history) / messages (2026-06-12)
+
+Audited the in-game chat compose/history surfaces plus the center tutorial
+message after fresh capture and gates:
+`bash tests/cli-agent/e2e/72_visual_regression_ingame.sh` PASS and
+`bash tests/cli-agent/e2e/77_ingame_chat_behavior.sh` PASS. Persistent capture
+for evidence:
+`PORT=63920 bash tools/cap/cap_ingame_cppx.sh /tmp/cppx_uplift_ingame_chat_20260612`.
+**Zero candidates.** What was checked and cleared:
+
+- **Authored shape matches origin intent:** origin chat chrome is explicitly
+  fixed at `kChatX=400`, `kChatY=280`, `kChatW=231`, `kChatChromeH=70`,
+  `kTextX=10`, `kTextStartY=10`, and `kLineStepY=10`
+  (`origin/main:clients/silencer/src/client/ui/hud/hud_chat_overlay.cpp:25-36`).
+  `BuildChatOverlay` only renders when chat is active or `showChatTicks > 0`,
+  keeps at most five displayed rows by dropping the oldest row when compose is
+  active, truncates history lines to 36 chars, draws `(ALL):` / `(TEAM):` plus
+  a 28-visible-char input, and registers the channel toggle over the prefix
+  (`hud_chat_overlay.cpp:142-236`). Chat wrapping/history population and the
+  100-char send cap are origin world behavior
+  (`world_messaging.cpp:34-52`, `:119-127`). The cppx port mirrors those
+  constants and branches in `build_chat_overlay`
+  (`clients/silencer/src/client/ui/screens/in_game_screen.cppx:414-482`), with
+  scrollback copied oldest->newest from world messaging
+  (`clients/silencer/src/game/ui/world_session_model.cpp:363-370`).
+- **Golden pixels express that shape cleanly:** fresh
+  `ingame_chat_open` and `ingame_chat_history` crops visually match the
+  goldens. The remaining crop diffs are sparse rain pixels, not panel/text
+  structure: open chat crop `(380,270)-(640,370)` has 209 changed px, 174
+  inside documented masks and 35 outside at `(475,270)-(539,294)`; history
+  crop has 189 changed px, 171 inside masks and 18 outside at
+  `(471,270)-(579,295)`. The current panel/text green bboxes are stable at
+  `(390,278)-(634,349)` for both chat surfaces. Evidence:
+  `docs/plans/uplift-evidence/ingame_chat_open_history_messages/`
+  (`ingame_chat_open_golden_vs_current_diff_4x.png`,
+  `ingame_chat_history_golden_vs_current_diff_4x.png`, `measurements.json`).
+- **Center message reveal matches origin intent:** origin `DrawMessage` reveals
+  one glyph per `message_i`, uses type-0 color 208 at `liney=60`, title
+  advance 11, 20px line height, per-character centering, shadow at `(x+1,y+1)`,
+  and the documented pulse/fade brightness arithmetic
+  (`origin/main:clients/silencer/src/client/ui/hud/InGameOverlays.cpp:58-129`).
+  The cppx port is the same arithmetic in `build_center_message`
+  (`clients/silencer/src/client/ui/screens/in_game_screen.cppx:755-825`).
+  Fresh `ingame_messages` high-blue glyph mask is byte-stable against the
+  golden: bbox `(156,60)-(483,96)`, 2244 px current vs 2244 px golden, xor 0.
+  The visual crop's 134 differing px are rain/background, not glyph pixels.
+  Evidence:
+  `docs/plans/uplift-evidence/ingame_chat_open_history_messages/`
+  (`ingame_messages_golden_vs_current_diff_3x.png`, `measurements.json`).
+- **Behavioral contract remains origin-matched:** scenario 77 re-confirmed Esc
+  closes compose without history, Enter sends and closes without appending a
+  local single-player history line, channel toggle keeps input open and flips
+  ALL/TEAM, and compose text caps at 100 chars. Those are already documented
+  in PARITY.md as origin behavior, not design defects. No Linear ticket opened
+  because there is no new ARTIFACT/DEFECT/ERA-LIMIT candidate in this unit.
