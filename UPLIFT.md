@@ -35,7 +35,7 @@ State: IN PROGRESS
 | ingame: hud_base / top_ticker / status_lines | EXAMINED 2026-06-12 | none (see unit note) |
 | ingame: chat (open + history) / messages | EXAMINED 2026-06-12 | none (see unit note) |
 | ingame: player_list / system_camera | EXAMINED 2026-06-12 | none (see unit note) |
-| ingame: tech_overlay / buy_tech / secret_overlay | UNEXAMINED | |
+| ingame: tech_overlay / buy_tech / secret_overlay | EXAMINED 2026-06-12 | none (see unit note) |
 | ingame: quit_prompt | UNEXAMINED | |
 
 ## Findings
@@ -1550,3 +1550,70 @@ cleared:
   and ORIGIN_GOLDENS already calls out that the multi-team F1 scoreboard
   variant is not captured. This unit found no new ARTIFACT/DEFECT/ERA-LIMIT
   candidate to ticket.
+
+### Unit note — ingame: tech_overlay / buy_tech / secret_overlay (2026-06-12)
+
+Audited after fresh captures into `/tmp/uplift_ingame_tech_unit`:
+`PORT=63921 bash tools/cap/cap_ingame_cppx.sh
+/tmp/uplift_ingame_tech_unit` produced `ingame_buy_tech` and
+`ingame_tech_overlay` from the deterministic tutorial anchor, then
+`PORT=63941 bash tools/cap/cap_ingame_cppx_extra.sh
+/tmp/uplift_ingame_tech_unit` produced `ingame_secret_overlay` after the real
+TUI-driven base-door path. **Zero candidates.** What was checked and cleared:
+
+- **Buy/tech overlay authored shape matches origin intent:** origin
+  `BuildBuyTechOverlay` places bank-102 background/highlight sprites from
+  `SpriteX/Y`, advances visible rows by 25px, places item icons at anchor
+  `(169,139+yoffset)`, names at `(222,145+yoffset)`, centered prices at
+  `440 - priceWidth/2`, and the footer at `320 - footerWidth/2,275`
+  (`origin/main:clients/silencer/src/client/ui/hud/
+  hud_buy_tech_overlay.cpp:66-160`). The cppx port uses the same integer
+  640x480 device-coordinate contract and keeps interactive rows ghost-painted
+  behind the origin bank-102 highlight visual
+  (`clients/silencer/src/client/ui/screens/in_game_screen.cppx:488-555`).
+  The capture provenance in ORIGIN_GOLDENS confirms `ingame_buy_tech` rows
+  Laser/Rocket with footer "Available Credits: 500", and
+  `ingame_tech_overlay` as the base-interior tech station variant with the
+  same overlay contract.
+- **Buy/tech golden pixels express that shape cleanly:** tolerant gates passed
+  against the current goldens with the documented in-game masks:
+  `ingame_buy_tech` = `0.1629 (mae=0.09 maxtile=2.6% hot_tiles=0 PASS)`;
+  `ingame_tech_overlay` = `0.0124 (mae=0.01 maxtile=3.2% hot_tiles=0 PASS)`.
+  Focused overlay crops show no hidden geometry defect: the tech-overlay crop
+  `(0,120)-(520,300)` is exactly byte-identical (`crop_diff_px=0`), while
+  the buy-overlay crop has 260 strict diff px, all visible in the amplified
+  crop as sparse rain streaks through transparent/world portions of the panel
+  (ORIGIN_GOLDENS already documents frozen rain through transparent buy/chat
+  panels as nondeterminism). Chrome lines, icons, selected-row fill, labels,
+  prices, and footer align and are unclipped. Evidence:
+  `docs/plans/uplift-evidence/ingame-tech-buy-secret/
+  buy_tech_golden_current_diff_4x.png` and
+  `tech_overlay_golden_current_diff_4x.png`.
+- **Secret overlay authored shape matches origin intent:** origin draws
+  bank-187 normal/beaming secret-panel background at `SpriteX/Y(...,
+  yoffset)`, optional bank-86 highlight flashes at pulse brightness 120-136,
+  then nine hack-progress labels at `x=10`, `y=54 + i*13 + yoffset`, dimming
+  later lines to palette key `(114,96)` when progress has not reached them
+  (`origin/main:clients/silencer/src/client/ui/hud/
+  hud_secret_overlays.cpp:27-113`). The cppx port mirrors the same sprite
+  offsets, highlight positions, label list, progress decrement, hacking tick
+  threshold, and 13px line pitch
+  (`clients/silencer/src/client/ui/screens/in_game_screen.cppx:649-683`).
+- **Secret-overlay golden pixels express that shape cleanly:** the fresh
+  gameplay-driven capture landed on `message_progress == 0`, matching the
+  documented golden anchor. The tolerant gate passed:
+  `ingame_secret_overlay` = `0.0738 (mae=0.05 maxtile=2.4% hot_tiles=0 PASS)`
+  with the standard in-game masks plus the documented civilian-rand mask.
+  The focused secret-panel crop `(0,95)-(125,235)` is byte-identical
+  (`crop_diff_px=0`): background panel, the nine dim text labels, and line
+  spacing match with no clipping, broken sprite edge, or off-by-one seam.
+  Evidence:
+  `docs/plans/uplift-evidence/ingame-tech-buy-secret/
+  secret_overlay_panel_golden_current_diff_4x.png`.
+- **Already-adjudicated, not re-opened:** the unit is native 640x480, so the
+  U-1/U-2/U-3 whole-frame magnify artifacts do not apply; ORIGIN_GOLDENS
+  explicitly says these in-game goldens remain pristine origin captures.
+  PARITY.md already records the missing `hud_trace_time` golden and the
+  un-gated secret/minimap highlight pulse variants as coverage limits, not
+  visible design defects in these captured surfaces. No Linear ticket opened
+  because there is no new ARTIFACT/DEFECT/ERA-LIMIT candidate in this unit.
