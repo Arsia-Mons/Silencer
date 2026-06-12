@@ -119,7 +119,7 @@ void RenderCppxClientUiFrame(Surface & surface);
 // SIL-87: bake curated legacy sprites → cppxChrome. rw/rh = device resolution,
 // uiScale = the logical-canvas content scale (device-res element bakes derive
 // their logical draw rect from it).
-void BakeChromeTextures(int rw, int rh, float uiScale);
+void BakeChromeTextures(int rw, int rh, float uiScale, bool deferredPass);
 client::ui::SessionPhase CurrentSessionPhase() const;
 
 Game & game;
@@ -151,6 +151,7 @@ std::map<uint64_t, uint32_t> hudRampVariants_;
 uint64_t lastHoveredAudible_ = 0;
 uint32_t uiClickCount_ = 0;
 std::map<uint16_t, client::ui::ChromeTextures::Sprite> hudEmblems_;
+bool chromeDeferredBaked_ = false;
 
 // SIL-15 use_settings dirty tracking: snapshot of the four persisted prefs as
 // of the last commit/revert; live Config diverging from it => Settings.dirty.

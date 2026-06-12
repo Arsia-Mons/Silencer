@@ -77,16 +77,13 @@ struct ChromeTextures {
   // (origin lobby_connect EnsureButtonPatch); the measured-width chrome
   // buttons draw on top.
   uint32_t dialog_btn_patch = 0;
-  // Full-screen starfield+planet background (bank 6 idx0), baked at DEVICE
-  // resolution through origin's two-hop menu compositing (fit into the
-  // virtual canvas, then magnify) so the uneven scanline striping matches the
-  // golden exactly; drawn 1:1 full-bleed. `starfield` carries origin's cover
-  // fit (PackImage(6,0), the menus); `starfield_stretched` carries the
-  // stretch fit (PackImageStretch(6,0), Options·Controls only).
+  // Full-screen starfield+planet background (bank 6 idx0), stored as the native
+  // source texture. ScreenLayout chooses Cover for menus and Stretch for
+  // Options·Controls so startup does not bake/upload full-screen RGBA copies.
   uint32_t starfield = 0;
   uint32_t starfield_stretched = 0;
-  // Lobby backdrop (bank 7 idx1): dim Mars + circuit HUD, same device-res bake
-  // with origin's stretch fit (PackImageStretch(7,1)).
+  // Lobby backdrop (bank 7 idx1): dim Mars + circuit HUD, native source texture
+  // drawn with origin's stretch fit (PackImageStretch(7,1)).
   uint32_t lobby_backdrop = 0;
   // Static SILENCER logo (bank 208 frame 60 — the final frame of the legacy
   // reveal animation; SIL-195 animates the full 29..60 sequence).

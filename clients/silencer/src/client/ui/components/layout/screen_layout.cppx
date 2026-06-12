@@ -60,6 +60,8 @@ using ::ui::components::DialogProps;
                              ? chrome.starfield_stretched
                              : chrome.starfield;
     ::ui::BackgroundImage overlay_img{starfield};
+    if (!props.stretched_backdrop)
+      overlay_img.fit = ::ui::ImageFit::Cover;
     ::ui::StylePatch overlay_bg =
         starfield ? tokens::image_patch(overlay_img)
                   : tokens::fill_patch(tokens::kSurfaceOverlay);
@@ -128,14 +130,11 @@ using ::ui::components::DialogProps;
       {props.children}
     </Dialog>
   }
-  // Menu root: paint the full-bleed bank-6 starfield behind the content. The
-  // texture is baked at device resolution with origin's two-hop compositing
-  // (cover into the virtual canvas, then magnify), so it draws 1:1 here.
+  // Menu root: paint the full-bleed bank-6 starfield behind the content.
   // Falls back to flat black until baked.
   client::ui::ChromeTextures chrome = client::ui::use_chrome();
-  ::ui::BackgroundImage menu_img{chrome.starfield};
   ::ui::StylePatch menu_bg = chrome.starfield
-                                 ? tokens::image_patch(menu_img)
+                                 ? tokens::image_patch_cover(chrome.starfield)
                                  : tokens::fill_patch(tokens::kSurfaceMenu);
   return <Box
     key={props.key}

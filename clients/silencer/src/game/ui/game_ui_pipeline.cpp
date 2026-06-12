@@ -175,14 +175,18 @@ outH = cppxUiH;
 return cppxUiRgba;
 }
 
-void GameUiPipeline::BakeChromeTextures(int rw, int rh, float uiScale) {
+void GameUiPipeline::BakeChromeTextures(int rw, int rh, float uiScale,
+                                        bool deferredPass) {
 // Bake the curated legacy chrome sprites into texture_ids. Runs once per host
 // renderer lifetime (guarded by PipelineHost::chrome_needs_bake). This is the
 // ONLY place that reads the indexed spritebank + active palette; the resulting
 // opaque ids travel to screens via the ChromeTexturesProvider.
+if(!deferredPass){
 cppxChrome = {};
 hudRampVariants_.clear();
 hudEmblems_.clear();
+chromeDeferredBaked_ = false;
+}
 if(!cppxHost) return;
 // Use the BASE palette, not GetPaletteColors(): the latter is the display cache
 // that is faded to black on menu/transition screens, which would bake the chrome
@@ -284,6 +288,7 @@ bake_ramp(6, 28, cppxChrome.oval_sm, LegacyFit::Cell);
 bake_ramp(6, 23, cppxChrome.oval_lg, LegacyFit::Cell);
 bake_ramp(6, 2, cppxChrome.row_plate, LegacyFit::Stretch,
           &cppxChrome.row_plate_w, &cppxChrome.row_plate_h);
+if(deferredPass){
 // bank 7 — the metal-chrome nine-slice button. origin never swaps Chrome art
 // (always idx24), but StepVisualState still ramps brightness 128..136.
 {
@@ -343,23 +348,25 @@ cppxHost->register_legacy(id, patch, kPatchW, kPatchH, page_for_bank(7),
                           silencer::cppx_ui::LegacyFit::Cell);
 }
 }
-// Full-bleed backdrops bake at DEVICE resolution via a single NEAREST
-// resample (U-3/SIL-205 — origin's two-hop chain banded unevenly; the intent,
-// "fill the screen with this image", scales uniformly). Fits per origin:
-// menus PackImage(6,0)=cover, Options·Controls PackImageStretch(6,0),
-// lobby PackImageStretch(7,1).
-auto bake_backdrop = [&](size_t bank, size_t index, bool stretch,
-                         uint32_t &id_out){
+}
+// Full-bleed backdrops stay as native source textures. Baking them at device
+// resolution made the first menu frame upload multiple full-screen RGBA copies;
+// the draw executor can scale these static backgrounds directly.
+auto bake_backdrop = [&](size_t bank, size_t index, uint32_t &id_out){
 if(bank >= banks.size() || index >= banks[bank].size()) return;
 const std::shared_ptr<Surface> &sp = banks[bank][index];
 if(!sp || sp->w < 1 || sp->h < 1 || sp->pixels.empty()) return;
-uint32_t id = cppxHost->bake_backdrop_sprite(sp->pixels.data(), sp->w, sp->h,
-                                             page_for_bank(bank), stretch);
+uint32_t id = cppxHost->bake_chrome_sprite(sp->pixels.data(), sp->w, sp->h,
+                                           page_for_bank(bank));
 if(id) id_out = id;
 };
-bake_backdrop(6, 0, false, cppxChrome.starfield);
-bake_backdrop(6, 0, true, cppxChrome.starfield_stretched);
-bake_backdrop(7, 1, true, cppxChrome.lobby_backdrop);
+if(!deferredPass){
+bake_backdrop(6, 0, cppxChrome.starfield);
+cppxChrome.starfield_stretched = cppxChrome.starfield;
+}else{
+bake_backdrop(7, 1, cppxChrome.lobby_backdrop);
+}
+if(deferredPass){
 // Options·Controls frame (bank 7 idx 7, origin PackImageStretch(7,7)): a
 // STRETCHED element. Recreate origin's virtual element box
 // (options_controls_screen.cpp: root padding = legacy margins L5/R7/T6/B20
@@ -401,6 +408,8 @@ cppxChrome.chrome_controls_h = bh * s / uiScale;
 }
 }
 }
+}
+if(!deferredPass){
 // bank 208 frames 29..60 — the animated SILENCER logo. Origin draws each
 // native-size frame inside a fixed union stage derived from sprite offsets.
 {
@@ -471,8 +480,10 @@ bake(208, 60, cppxChrome.logo, &cppxChrome.logo_w, &cppxChrome.logo_h);
 register_legacy(208, 60, cppxChrome.logo);
 }
 }
+}
 // bank 6 idx12-15 — boolean toggle indicator cells (origin: left = 12 on /
 // 13 off, right = 15 on / 14 off).
+if(deferredPass){
 bake(6, 12, cppxChrome.toggle_l_on, &cppxChrome.toggle_w, &cppxChrome.toggle_h);
 bake(6, 13, cppxChrome.toggle_l_off);
 bake(6, 14, cppxChrome.toggle_r_off);
@@ -658,6 +669,7 @@ if(2 < res.spriteoffsety[92].size()) hud.syscam_oy[0] = (int16_t)res.spriteoffse
 if(11 < res.spriteoffsety[92].size()) hud.syscam_oy[1] = (int16_t)res.spriteoffsety[92][11];
 }
 }
+}
 
 // ---- Bitmap glyph fonts (origin/main text parity) -----------------------
 // origin/main renders ALL UI text from the legacy bitmap font banks 132..136
@@ -665,6 +677,7 @@ if(11 < res.spriteoffsety[92].size()) hud.syscam_oy[1] = (int16_t)res.spriteoffs
 // bank 132, else 33). Bake one atlas per cppx face; FaceId -> {bank, advance,
 // lineHeight} mirrors origin text.cpp's TextRenderStyle table (640-space native
 // metrics; the cppx token font sizes scale them up to the 960 window).
+if(!deferredPass){
 {
 using GF = silencer::cppx_ui::GlyphFonts;
 struct FaceBake { int face; int bank; float advance; float line_height; };
@@ -703,6 +716,8 @@ src[i].h = sp->h;
 // Font banks 132-136 are authored against the base palette page (page_for_bank's
 // default arm), so the base `palette` resolves their glyph ramp colors.
 cppxHost->build_glyph_face(fb.face, src, GF::kGlyphCount, palette, fb.advance, fb.line_height);
+}
+}
 }
 
 // Exact-color variants: bake origin's RENDERED text pixels per (face, token
@@ -772,7 +787,17 @@ static const VariantBake kVariantBakes[] = {
      silencer::tokens::hud_text_key(114, 96)},
 };
 const Uint8 prevPage = game.renderer.palette.CurrentPalette();
+auto same_color = [](const ::ui::Color &a, const ::ui::Color &b){
+return a.r == b.r && a.g == b.g && a.b == b.b;
+};
+auto startup_variant = [&](const VariantBake &vb){
+return vb.fx == Fx::Raw && vb.brightness == 128 && vb.page == 0 &&
+       same_color(vb.key, silencer::tokens::kTextBody) &&
+       (vb.face == 0 || vb.face == 1 || vb.face == 2 || vb.face == 4 ||
+        vb.face == 5 || vb.face == 6 || vb.face == 7);
+};
 for(const VariantBake & vb : kVariantBakes){
+if(deferredPass == startup_variant(vb)) continue;
 if((size_t)vb.bank >= banks.size()) continue;
 const auto & glyphbank = banks[vb.bank];
 const int ioffset = (vb.bank == 132) ? 34 : 33;
@@ -839,6 +864,7 @@ const ::ui::Color key = silencer::tokens::hud_text_key(color, brightness);
 cppxHost->build_glyph_color_face(face, key.r, key.g, key.b, src,
                                  GF::kGlyphCount, vpal, advance, line_height);
 };
+if(deferredPass){
 for(int b = 64; b <= 160; b += 2)
 bake_pulse(4, 135, 11.f, 19.f, 208, (Uint8)b);
 // Status-line fade (BodySm, color 208): brightness 128-(16-time)*8 plus the
@@ -848,15 +874,18 @@ bake_pulse(7, 133, 7.f, 11.f, 208, (Uint8)b);
 // Buy/tech selected-row pulse (Heading face, color 0, 129..136).
 for(int b = 129; b <= 136; ++b)
 bake_pulse(1, 134, 8.f, 15.f, 0, (Uint8)b);
+}
 // Oval-button hover/focus label ramp (Title face — the bank-135 oval label —
 // color 0, brightness 130/132/134/136 = origin FrameForPhase 128 + p*2; the
 // bank-134 List-row labels reuse the buy/tech entries above).
+if(!deferredPass)
 for(int b = 130; b <= 136; b += 2)
 bake_pulse(4, 135, 11.f, 19.f, 0, (Uint8)b);
 // Ammo counter: origin draws it DrawAlphaed — each glyph pixel is the
 // palette ALPHA-TABLE mix of the glyph index over the pixel under it. The
 // counter sits on the dash well's flat interior, so baking the face through
 // Alpha(glyph, well_index) reproduces origin's exact quantized mix.
+if(deferredPass)
 {
 Uint8 well = 0;
 if(94 < banks.size() && 0 < banks[94].size() && banks[94][0] &&
@@ -896,7 +925,6 @@ if(prevPage != 0) game.renderer.palette.SetPalette(prevPage);
 }
 if(game.renderer.palette.CurrentPalette() != prevPage)
 game.renderer.palette.SetPalette(prevPage);
-}
 }
 }
 
@@ -1044,7 +1072,7 @@ if(!cppxHost->ensure(rw, rh, SILENCER_CPPX_FONT_DIR)) return;
 // composition root is the only place that may read the indexed spritebank +
 // palette; the ids flow to screens through the ChromeTexturesProvider below.
 if(cppxHost->chrome_needs_bake()){
-BakeChromeTextures(rw, rh, cppxScale);
+BakeChromeTextures(rw, rh, cppxScale, false);
 cppxHost->mark_chrome_baked();
 }
 
@@ -1541,6 +1569,17 @@ return tree;
 cppxHost->pipeline().client_ui().push_screen(
 std::make_unique<client::ui::AppRoot>());
 cppxAppRootPushed = true;
+}
+
+{
+const bool phaseNeedsDeferred =
+    CurrentSessionPhase() != client::ui::SessionPhase::MainMenu;
+const bool stackNeedsDeferred =
+    cppxHost->pipeline().client_ui().screens().count() > 1;
+if(!chromeDeferredBaked_ && (phaseNeedsDeferred || stackNeedsDeferred)){
+BakeChromeTextures(rw, rh, cppxScale, true);
+chromeDeferredBaked_ = true;
+}
 }
 
 // In-game Cancel routing (origin InGameUiController::ApplyActions): Esc
