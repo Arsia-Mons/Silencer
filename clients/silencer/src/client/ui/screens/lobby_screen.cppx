@@ -843,13 +843,13 @@ struct LobbyTitleBarProps {
 }
 
 // The upper-left agent card: emblem rail + name + WINS/LOSSES/XP column +
-// loadout stat well + the Agents (leave) button.
+// loadout stat well + the Agents button.
 struct AgentCardProps {
   const char *agent_name = "";
   const char *xp_line = "";
   uint32_t emblem_tex = 0;
   float agent_w = 0.0f;
-  std::function<void()> on_leave = {};
+  std::function<void()> on_agents = {};
 };
 
 ::ui::UiElement AgentCard(const AgentCardProps &props) {
@@ -945,12 +945,12 @@ struct AgentCardProps {
               .flex_shrink = ::ui::StyleFloat::points(0.0f)}}
           >
             <AppButton
-              key="leave"
-              controlId="LeaveLobby"
+              key="agents"
+              controlId="LobbyAgents"
               variant={AppButtonVariant::Chrome}
               targetFeedback={true}
               label="Agents"
-              onPress={props.on_leave}
+              onPress={props.on_agents}
             />
           </Box>
         </Box>
@@ -1388,7 +1388,7 @@ struct LobbyScreenProps {
       .xp_line = xp_line,
       .emblem_tex = emblem_tex,
       .agent_w = panes.agent_w,
-      .on_leave = session.leave_to_menu});
+      .on_agents = session.open_character_create});
   ::ui::UiElement chat_panel = ::ui::component(
       "LobbyChatPanel",
       LobbyChatPanelProps{

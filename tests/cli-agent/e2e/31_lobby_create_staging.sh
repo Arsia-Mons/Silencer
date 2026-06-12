@@ -172,10 +172,10 @@ wait_for_widget_gone() {
 }
 
 # GameSelect is the default lobby cockpit: the Go Back header button, the agent
-# panel's Agents control (control id LeaveLobby), and the center column's
+# panel's Agents control (control id LobbyAgents), and the center column's
 # "Create Game" button (control id NewGame) are all live.
 wait_for_widget "LobbyGoBack"
-wait_for_widget "LeaveLobby"
+wait_for_widget "LobbyAgents"
 wait_for_widget "NewGame"
 
 # Swap to GameCreate (screen-local use_state): clicking Create Game replaces

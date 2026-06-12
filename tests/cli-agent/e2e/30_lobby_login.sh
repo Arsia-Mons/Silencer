@@ -155,7 +155,7 @@ cli --port "$CTRL_PORT" click --label "Noxis" >/dev/null
 cli --port "$CTRL_PORT" wait_for_state --state LOBBY --timeout-ms 15000
 
 # The lobby renders the real read cluster (agent + chat + games panels), not the
-# old scaffold: its leave ("Agents"/LeaveLobby), create ("Create Game"/NewGame),
+# old scaffold: its Agents ("Agents"/LobbyAgents), create ("Create Game"/NewGame),
 # and chat compose controls are present.
 wait_for_widget "Agents"
 wait_for_widget "NewGame"
