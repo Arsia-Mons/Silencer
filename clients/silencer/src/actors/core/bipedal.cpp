@@ -41,8 +41,13 @@ bool Bipedal::FollowGround(Object & object, World & world, Sint8 velocity){
 	if(velocity == 0 || currentplatformid == 0){
 		return true;
 	}
+	auto it = world.map.platformids.find(currentplatformid);
+	if(it == world.map.platformids.end() || !it->second){
+		currentplatformid = 0;
+		return false;
+	}
 	object.x += velocity;
-	Platform * currentplatform = world.map.platformids[currentplatformid];
+	Platform * currentplatform = it->second;
 	Platform * oldplatform = currentplatform;
 	object.y = currentplatform->XtoY(object.x);
 	if(object.x > currentplatform->x2){
@@ -87,7 +92,9 @@ bool Bipedal::FindCurrentPlatform(Object & object, World & world){
 
 int Bipedal::DistanceToEnd(Object & object, World & world){
 	if(currentplatformid){
-		Platform * platform = world.map.platformids[currentplatformid];
+		auto it = world.map.platformids.find(currentplatformid);
+		Platform * platform = (it != world.map.platformids.end()) ? it->second : nullptr;
+		if(!platform){ return -1; }
 		if(object.mirrored){
 			Platform & leftmost = world.map.GetLeftmostPlatform(*platform);
 			return object.x - leftmost.x1;
