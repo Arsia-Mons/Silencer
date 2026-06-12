@@ -1,5 +1,28 @@
 # Origin/main golden baselines — provenance
 
+> ## Uplifted goldens (2026-06-12 — U-4 / SIL-206)
+>
+> `cc_select_agency.png` was superseded a fourth time after fixing a
+> PORT-side defect the earlier supersessions had enshrined (`uplift:
+> cc_select_agency agency ovals — right cap sheared, ring broken`, UPLIFT.md
+> finding U-4, SIL-206). Unlike U-1/2/3 this diverges from the old golden by
+> CONVERGING back toward origin's correct rendering: the agency-rows wrapper's
+> `-1.5/+3.5` margin nudge netted the grow-to-pane List rows 2 logical px
+> narrower than the pane's 354 (= 236 virtual), so the Stretch row-plate bake
+> nearest-decimated 236 source columns to 235 and dropped the right cap's
+> outermost ring column — the stadium ring rendered OPEN at every oval's
+> vertical middle (origin and the roster rows render it closed). The fix
+> (`character_create.cppx`) keeps the −1.5 one-virtual-col left shift but
+> makes the right margin symmetric (+1.5) so the box keeps full 236-virtual
+> width and the bake is 1:1. Diff attribution (this supersession's gate):
+> all 3385 changed px lie in exactly five row bands = the five agency oval
+> plates (y229-253/301-325/373-397/445-469/517-541, x ≤ 903); the AFTER
+> right-cap strip is byte-identical to the roster-row oval's in
+> `character_create.png` (same canonical bake, position-independent per U-2);
+> text, backdrop, and every other screen byte-stable (suites 70/71/72/74/75/76
+> all PASS; evidence: `docs/plans/uplift-evidence/U-4/`). Pre-U-4 baseline
+> remains in git history (commit d8936dda and earlier).
+
 > ## Uplifted goldens (2026-06-12 — U-3 / SIL-205)
 >
 > 14 menu/lobby baselines (the 13 minus `lobby_connect.png`, which has no

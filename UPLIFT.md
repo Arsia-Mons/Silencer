@@ -311,11 +311,29 @@ origin-side flooring candidate found; recording zero rather than padding.
   the label pen on its golden cell); stretch bake at native size → no
   decimation, ring closes, 531 device px. Supersede cc_select_agency.png,
   diff confined to the five ovals' right-cap region.
+- **As implemented (2026-06-12):** wrapper margin `{-1.5, 3.5, -3.0, 3.0}` →
+  `{-1.5, 1.5, -3.0, 3.0}` (character_create.cppx) — keeps the −1.5
+  one-virtual-col left shift, restores the box to the pane's full 354 logical
+  = 236 virtual so resolve_legacy_sized computes vw=236 (was 235) and the
+  Stretch bake is 1:1. Verified with evidence
+  (docs/plans/uplift-evidence/U-4/): BEFORE capture byte-matched the golden;
+  AFTER — every oval 531 px (373→903, the roster rows' exact cell), mid-row
+  bright ring ink restored (was NO ink y238-244), AFTER right-cap strip
+  byte-identical to character_create's roster oval (canonical bakes are
+  position-independent per U-2; 13 residual px in the left strip = corner
+  transparency over different backdrop texels — explained); BEFORE→AFTER diff
+  = 3385 px in exactly five bands matching the five oval plates
+  (y229-253/301-325/373-397/445-469/517-541, x ≤ 903), labels/text
+  byte-stable. Note: cap lands at 373→903 not origin's 374→904 — same 531px
+  width, 1px positional phase = the documented U-2 supersession residual
+  (consistent with the roster step), not a seam. Suites 70/71/72/74/75/76 +
+  17 all PASS; golden superseded + ORIGIN_GOLDENS.md U-4 section + PARITY.md
+  row updated (polish note resolved).
 - **Parity blast radius:** single screen — cc_select_agency.png (suite 71).
   In-game/hover untouched. Resolves the PARITY.md polish note.
 - **Effort:** S
 - **Ticket:** SIL-206
-- **Status:** TICKETED
+- **Status:** IN REVIEW (SIL-206)
 
 ### U-5: create_game scrollbar thumb 1px short of track (right + bottom)
 - **Unit:** [systemic] float-rect flooring: 1px seams & jitter

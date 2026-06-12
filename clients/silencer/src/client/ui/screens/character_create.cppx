@@ -88,8 +88,12 @@ struct CharacterCreateProviderProps {
       set_preview(index);
   };
   // The agency rows sit one virtual col left of the roster rows (origin blits
-  // the plate at int(box.x)); the rows wrapper carries the -1.5 box nudge and
-  // pad-left 17.5 keeps the label pen on its own golden cell.
+  // the plate at int(box.x)); the rows wrapper carries the -1.5/+1.5 box nudge
+  // and pad-left 17.5 keeps the label pen on its own golden cell. The nudge
+  // must NOT shrink the box: the rows keep the pane's full 354 logical = 236
+  // virtual width so the Stretch row-plate bakes 1:1 — a narrower box
+  // nearest-decimates 236 src cols to 235 and drops the right cap's ring
+  // column (U-4 / SIL-206).
   return <AppButton
     key={kAgencies[index].control_id}
     controlId={kAgencies[index].control_id}
@@ -374,7 +378,7 @@ struct CharacterCreateProviderProps {
           layout={::ui::LayoutStyle{
             .direction = ::ui::FlexDirection::Column,
             .align_items = ::ui::AlignItems::Stretch,
-            .margin = {-1.5f, 3.5f, -3.0f, 3.0f},
+            .margin = {-1.5f, 1.5f, -3.0f, 3.0f},
             .gap = 7.5f}}
         >
           {agency_row(0, pi, on_pick, set_preview)}
