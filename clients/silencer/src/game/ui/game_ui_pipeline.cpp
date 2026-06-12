@@ -284,13 +284,33 @@ bake_ramp(6, 28, cppxChrome.oval_sm, LegacyFit::Cell);
 bake_ramp(6, 23, cppxChrome.oval_lg, LegacyFit::Cell);
 bake_ramp(6, 2, cppxChrome.row_plate, LegacyFit::Stretch,
           &cppxChrome.row_plate_w, &cppxChrome.row_plate_h);
-// bank 7 — the metal-chrome nine-slice button (idx24; origin never swaps art on focus).
-bake(7, 24, cppxChrome.chrome_btn_idle);
-// origin draws it nine-sliced in VIRTUAL space (Button Chrome: caps L/R 12,
-// T/B 4) before the whole-frame magnify — the executor swaps each nine-slice
-// draw for a canonical per-size device-cell variant (tiled-band arithmetic).
-register_legacy(7, 24, cppxChrome.chrome_btn_idle, LegacyFit::NineSlice,
-                12, 12, 4, 4);
+// bank 7 — the metal-chrome nine-slice button. origin never swaps Chrome art
+// (always idx24), but StepVisualState still ramps brightness 128..136.
+{
+const size_t bank = 7, index = 24;
+for(int p = 0; p < client::ui::ChromeTextures::kOvalPhases; ++p){
+if(bank >= banks.size() || index >= banks[bank].size()) continue;
+const std::shared_ptr<Surface> &sp = banks[bank][index];
+if(!sp || sp->w < 1 || sp->h < 1 || sp->pixels.empty()) continue;
+const Uint8 brightness = static_cast<Uint8>(128 + p * 2);
+const uint8_t *indices = sp->pixels.data();
+std::unique_ptr<Surface> copy;
+if(brightness != 128){
+copy.reset(game.renderer.CreateSurfaceCopy(sp.get()));
+if(!copy) continue;
+game.renderer.EffectBrightness(copy.get(), nullptr, brightness);
+indices = copy->pixels.data();
+}
+uint32_t id = cppxHost->bake_chrome_sprite(indices, sp->w, sp->h,
+                                           page_for_bank(bank));
+if(!id) continue;
+cppxHost->register_legacy(id, indices, sp->w, sp->h, page_for_bank(bank),
+                          kLegacyRenderWidth, kLegacyRenderHeight,
+                          LegacyFit::NineSlice, 12, 12, 4, 4);
+cppxChrome.chrome_btn[p] = id;
+if(p == 0) cppxChrome.chrome_btn_idle = id;
+}
+}
 // Frame sprites (plain, native size): bank-7 chrome panel + bank-40 dialog
 // frames. All drawn 1:1 in virtual space — register for the canonical swap.
 bake(7, 5, cppxChrome.chrome_panel, &cppxChrome.chrome_panel_w, &cppxChrome.chrome_panel_h);
@@ -1722,4 +1742,3 @@ keymapDirty_ = true;
 }
 CancelKeybindCapture();
 }
-

@@ -23,6 +23,9 @@ struct AppButtonProps {
   bool disabled = false;
   bool selected = false;
   bool default_focused = false;
+  // Opt in for chrome actions whose origin behavior visibly ramps on hover or
+  // real focus. Dialog chrome can stay static when its backdrop owns the wells.
+  bool target_feedback = false;
   const char *label = nullptr;
   std::function<void()> on_press = {};
   std::function<void()> on_focus = {};

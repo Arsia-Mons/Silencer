@@ -24,7 +24,7 @@ namespace client::ui {
 //   bank 6  idx 28..32 oval_sm ramp   112x33 ×5
 //   bank 6  idx 23..27 oval_lg ramp   220x33 ×5
 //   bank 6  idx 2..6   row_plate ramp 236x27 ×5
-//   bank 7  idx 24   chrome_btn_idle  156x21   (SIL-90, nine-slice {l12 r12 t4 b4})
+//   bank 7  idx 24   chrome_btn ramp   156x21 ×5 (SIL-90, same art, brightness ramp)
 //   bank 7  idx 5    chrome_panel     ~628x441 (SIL-91, plain native)
 //   bank 7  idx 7    chrome_controls  ~628x441 (Options·Controls single-pane, stretch)
 //   bank 40 idx 4    dialog_msg       ~352x178 (SIL-91, plain native)
@@ -52,6 +52,7 @@ struct ChromeTextures {
   uint16_t row_plate_w = 0, row_plate_h = 0;
   // The metal-chrome button (bank 7 idx 24), nine-sliced. origin never swaps
   // art on focus — only brightness ramps the one frame.
+  uint32_t chrome_btn[kOvalPhases] = {};
   uint32_t chrome_btn_idle = 0;
   // Frame sprites rendered as PLAIN images at NATIVE sprite size (w/h carried so
   // the box can be sized exactly, keeping baked wells/borders aligned).

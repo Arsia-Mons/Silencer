@@ -5,10 +5,10 @@
 #    gate the settled frame against the origin golden hover_mainmenu_oval.png
 #    (origin button.cpp: hover targets phase 4 — sprite base+4, brightness
 #    136, label at 136).
-# 2) Chrome negative: hovering the lobby_connect Login button must change
-#    NOTHING inside the button's cell (origin Chrome buttons never swap art
-#    or brightness — verified against origin: two hovered captures byte-equal
-#    the rest golden in the button region).
+# 2) lobby_connect Chrome negative: hovering the Login button must change
+#    NOTHING inside the button's cell. That dialog's baked button wells own the
+#    visual affordance; real LOBBY action buttons are covered separately by
+#    83_lobby_hover_visual.sh.
 set -euo pipefail
 . "$(dirname "$0")/lib.sh"
 
@@ -52,9 +52,9 @@ b = np.array(Image.open("/tmp/hover_chrome_after.png").convert("RGB"), dtype=int
 x0, x1 = int(x * 1.5) - 2, int((x + w) * 1.5) + 2
 y0, y1 = int(y * 1.5) - 2, int((y + h) * 1.5) + 2
 d = (np.abs(a - b).sum(axis=2) > 0)[y0:y1, x0:x1].sum()
-print(f"chrome button region diff px under hover: {d}")
+print(f"lobby_connect chrome button region diff px under hover: {d}")
 if d:
-    raise SystemExit("chrome button changed on hover — origin changes nothing")
+    raise SystemExit("lobby_connect chrome button changed on hover")
 PY
 
 echo "PASS 75_visual_regression_hover"

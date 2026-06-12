@@ -189,6 +189,7 @@ struct CenterColProps {
       key="creategame"
       controlId="NewGame"
       variant={AppButtonVariant::Chrome}
+      targetFeedback={true}
       label="Create Game"
       onPress={props.on_create}
     />
@@ -227,6 +228,7 @@ struct GameBrowserProps {
         key="prev"
         controlId="GamePrev"
         variant={AppButtonVariant::Chrome}
+        targetFeedback={true}
         size={AppButtonSize::Sm}
         label="Prev"
         onPress={props.on_prev}
@@ -235,6 +237,7 @@ struct GameBrowserProps {
         key="next"
         controlId="GameNext"
         variant={AppButtonVariant::Chrome}
+        targetFeedback={true}
         size={AppButtonSize::Sm}
         label="Next"
         onPress={props.on_next}
@@ -244,6 +247,7 @@ struct GameBrowserProps {
       key="join"
       controlId="JoinGame"
       variant={AppButtonVariant::Chrome}
+      targetFeedback={true}
       size={AppButtonSize::Sm}
       disabled={!props.can_join}
       label="Join"
@@ -253,6 +257,7 @@ struct GameBrowserProps {
       key="spectate"
       controlId="SpectateGame"
       variant={AppButtonVariant::Chrome}
+      targetFeedback={true}
       size={AppButtonSize::Sm}
       disabled={!props.can_spectate}
       label="Spectate"
@@ -525,6 +530,7 @@ struct CreateRightCellProps {
         key="create"
         controlId="CreateGame"
         variant={AppButtonVariant::Chrome}
+        targetFeedback={true}
         disabled={!props.can_create}
         label="Create"
         onPress={props.on_create}
@@ -563,6 +569,7 @@ struct StagingPanelProps {
       key="tech"
       controlId="ChooseTech"
       variant={AppButtonVariant::Chrome}
+      targetFeedback={true}
       label="Choose Tech"
       onPress={props.on_tech}
     />
@@ -571,6 +578,7 @@ struct StagingPanelProps {
       key="team"
       controlId="ChangeTeam"
       variant={AppButtonVariant::Chrome}
+      targetFeedback={true}
       label="Change Team"
       onPress={props.on_team}
     />
@@ -579,6 +587,7 @@ struct StagingPanelProps {
       key="ready"
       controlId="StagingReady"
       variant={AppButtonVariant::Chrome}
+      targetFeedback={true}
       disabled={props.ready_blocked}
       label={props.ready_label}
       onPress={props.on_ready}
@@ -607,6 +616,7 @@ struct StagingPanelProps {
       key="back"
       controlId="BackToTeams"
       variant={AppButtonVariant::Chrome}
+      targetFeedback={true}
       label="Back To Teams"
       onPress={on_back}
     />
@@ -824,6 +834,7 @@ struct LobbyTitleBarProps {
       key="goback"
       controlId="LobbyGoBack"
       variant={AppButtonVariant::Chrome}
+      targetFeedback={true}
       size={AppButtonSize::Sm}
       label="Go Back"
       onPress={props.on_go_back}
@@ -937,6 +948,7 @@ struct AgentCardProps {
               key="leave"
               controlId="LeaveLobby"
               variant={AppButtonVariant::Chrome}
+              targetFeedback={true}
               label="Agents"
               onPress={props.on_leave}
             />

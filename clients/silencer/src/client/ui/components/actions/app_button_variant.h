@@ -46,10 +46,11 @@ inline ::ui::TextVisual app_button_label_visual(AppButtonVariant variant,
     sz = tokens::kFontLarge;
     face = tokens::kFaceLarge;
   }
-  // Hover/focus ramp (sprite families only): origin EmitButtonText re-renders
-  // the label at LegacyPalette(color, 128 + phase*2) — the registered
-  // hud_text_key faces carry those exact-brightness bakes.
-  if (ramp_phase > 0 && !disabled && variant == AppButtonVariant::Oval)
+  // Hover/focus ramp: origin EmitButtonText re-renders sprite-backed labels at
+  // LegacyPalette(color, 128 + phase*2) — the registered hud_text_key faces
+  // carry those exact-brightness bakes. Callers pass phase 0 for static chrome.
+  if (ramp_phase > 0 && !disabled &&
+      (variant == AppButtonVariant::Oval || variant == AppButtonVariant::Chrome))
     c = tokens::hud_text_key(0, (uint8_t)(128 + ramp_phase * 2));
   return {.color = c,
           .font_id = face,
@@ -206,16 +207,17 @@ inline ::ui::LayoutStyle app_button_chrome_layout(AppButtonSize size = AppButton
 }
 
 // Metal-chrome sprite-button paint (SIL-90). Nine-sliced bank-7 idx24 sprite
-// (caps {l12,r12,t4,b4}) with the label in the Large face. texture_id 0 falls
-// back to a rounded slate button.
-inline ::ui::StyleStatePatch app_button_chrome_patch(uint32_t idle) {
+// (caps {l12,r12,t4,b4}) with the label in the Large face. The caller supplies
+// the phase-resolved texture when target feedback is enabled; texture_id 0
+// falls back to a rounded slate button.
+inline ::ui::StyleStatePatch app_button_chrome_patch(uint32_t tex) {
   const ::ui::TextVisual label{.color = tokens::kTextTitle,
                                .font_id = tokens::kFaceHeading,
                                .font_size = tokens::kFontHeading,
                                .align = ::ui::TextAlign::Center,
                                .line_height = tokens::kLineHeading};
   ::ui::StyleStatePatch ov{};
-  if (!idle) {
+  if (!tex) {
     ::ui::StylePatch p =
         ::ui::patch()
             .background(tokens::kControlFallbackFill)
@@ -235,13 +237,10 @@ inline ::ui::StyleStatePatch app_button_chrome_patch(uint32_t idle) {
     p.text = ::ui::opt(label);
     return p;
   };
-  // origin Chrome buttons change NOTHING on hover/focus (button.cpp:148-149,
-  // 516, 300: SpriteIndexForFrame returns idx24 for every phase AND the
-  // brightness is pinned 128) — every state slot draws plain idle.
   const ::ui::Color bright{255, 255, 255, 255};
-  ov.base = chrome(idle, bright);
-  ov.hover = chrome(idle, bright);
-  ov.focus_visible = chrome(idle, bright);
+  ov.base = chrome(tex, bright);
+  ov.hover = chrome(tex, bright);
+  ov.focus_visible = chrome(tex, bright);
   return ov;
 }
 
