@@ -1,5 +1,31 @@
 # Origin/main golden baselines — provenance
 
+> ## Uplifted goldens (2026-06-12 — U-1 / SIL-190)
+>
+> The 13 menu/lobby baselines below, plus `mission_summary.png` and
+> `hover_mainmenu_oval.png`, are **no longer raw origin captures**: they were
+> superseded by cppx renders after the canonical-glyph-cell fix
+> (`uplift: position-dependent glyph striping`, UPLIFT.md finding U-1,
+> SIL-190). Origin composited menus at virtual resolution and whole-frame
+> nearest-magnified, striping every glyph by its absolute screen position; the
+> fix renders each glyph in a canonical integer device cell (same letter =
+> byte-identical pixels everywhere), deliberately diverging from origin on
+> glyph-text pixels ONLY. Per-screen diff attribution (this supersession's
+> gate): every changed pixel sits in a text-line band; chrome, sprites,
+> backdrops and layout are untouched (evidence:
+> `docs/plans/uplift-evidence/U-1/`). The pre-uplift origin captures remain in
+> git history (commit a560a5b4 and earlier).
+>
+> The cppx-only baselines (`gallery`, `message_modal`, `password_modal`) were
+> re-blessed the same day for the same reason. **In-game goldens are still
+> pristine origin captures** — the fix's floor pen quantization reproduces the
+> legacy 1:1 text rendering exactly (scenarios 72/76 pass against them
+> unchanged; `ingame_tech_overlay` still gates 0.0000).
+>
+> These uplifted baselines stay bless-protected: future re-blesses need the
+> same per-pixel diff attribution + an UPLIFT.md finding, never a green-making
+> copy.
+
 These PNGs are the **visual parity targets**: the real origin/main design that the
 cppx UI must match. They are NOT cppx renders.
 

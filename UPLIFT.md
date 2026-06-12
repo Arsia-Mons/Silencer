@@ -70,10 +70,31 @@ State: IN PROGRESS
   `glyph_fonts.{h,cpp}` string_variant (memo (face,color,string,X%18,Y%18)) +
   the render_text_glyphs executor intercept; delete the per-position variant
   machinery and the PARITY.md pen nudges it obsoletes.
-- **Parity blast radius:** Systemic — every golden containing menu text (all
-  menu/lobby screens, modals, mission_summary, in-game overlays using
-  exact-color faces). All affected goldens superseded per protocol
-  (ORIGIN_GOLDENS.md + PARITY.md UPLIFTED rows).
+- **As implemented (2026-06-12):** canonical INTEGER DEVICE CELLS — every
+  glyph draws into floor(pen + i·adv)-positioned rects of size
+  round(gw·gscale) × round(atlas_h·gscale); the SW renderer's nearest scaling
+  of identical src/dst dims yields byte-identical pixels for every instance of
+  a letter (verified: all repeated letters in mainmenu "Connect To Lobby" are
+  byte-equal; before, same letters differed in size AND stripes). Two spec
+  refinements, both evidence-driven:
+  (1) the pen keeps the FRACTIONAL design metric (11·gscale = 24.75 @1080p)
+  and snaps per glyph (24/25 rhythm — origin's own integer-virtual-pen rhythm)
+  instead of a uniform 25: the uniform advance grew every string ~1%,
+  re-wrapped cc_select_agency's description and clipped its final words out of
+  the fixed panel (text metric = layout intent; evidence in session log);
+  (2) floor (not round) quantization matches the legacy SW dst-rect floor, so
+  1:1-scale in-game text (640×480, integer native advance) renders EXACTLY as
+  before — zero in-game golden churn (72/76 green vs pristine origin goldens,
+  ingame_tech_overlay still 0.0000).
+  string_variant machinery + CPU atlas copies + legacy_w/h plumbing deleted
+  (glyph_fonts, draw_executor, pipeline_host, game_ui_pipeline). Authoring pen
+  nudges kept: they are plain layout offsets (also sprite-shared); their
+  consolidation stays a PARITY.md refactor item.
+- **Parity blast radius:** Systemic — every golden containing menu text. As
+  landed: 13 origin menu/lobby goldens + mission_summary + hover_mainmenu_oval
+  + 3 cppx-only baselines (gallery, modals) superseded, diff-attributed to
+  text-line bands only (chrome/sprites/backdrops byte-stable); in-game goldens
+  untouched. ORIGIN_GOLDENS.md "Uplifted goldens" + PARITY.md UPLIFTED rows.
 - **Effort:** M
 - **Ticket:** SIL-190
-- **Status:** TICKETED
+- **Status:** IN REVIEW (SIL-190)

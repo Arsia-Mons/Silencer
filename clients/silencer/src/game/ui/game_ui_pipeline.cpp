@@ -760,8 +760,7 @@ src[i].h = sp->h;
 }
 cppxHost->build_glyph_color_face(vb.face, vb.key.r, vb.key.g, vb.key.b, src,
                                  GF::kGlyphCount, vpal, vb.advance,
-                                 vb.line_height, kLegacyRenderWidth,
-                                 kLegacyRenderHeight, vb.alpha);
+                                 vb.line_height, vb.alpha);
 }
 // Pulse-driven HUD text (page 0): center-message reveal (Title face, color
 // 208, brightness 64..160 — text + shadow ramps) and buy-row selection
@@ -795,8 +794,7 @@ src[i].h = sp->h;
 }
 const ::ui::Color key = silencer::tokens::hud_text_key(color, brightness);
 cppxHost->build_glyph_color_face(face, key.r, key.g, key.b, src,
-                                 GF::kGlyphCount, vpal, advance, line_height,
-                                 kLegacyRenderWidth, kLegacyRenderHeight);
+                                 GF::kGlyphCount, vpal, advance, line_height);
 };
 for(int b = 64; b <= 160; b += 2)
 bake_pulse(4, 135, 11.f, 19.f, 208, (Uint8)b);
@@ -849,8 +847,7 @@ src[i].h = sp->h;
 }
 const ::ui::Color key = silencer::tokens::kTextHudAmmo;
 cppxHost->build_glyph_color_face(5, key.r, key.g, key.b, src, GF::kGlyphCount,
-                                 vpal, 12.f, 19.f, kLegacyRenderWidth,
-                                 kLegacyRenderHeight);
+                                 vpal, 12.f, 19.f);
 }
 if(prevPage != 0) game.renderer.palette.SetPalette(prevPage);
 }

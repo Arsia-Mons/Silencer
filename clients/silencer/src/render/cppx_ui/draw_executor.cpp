@@ -70,6 +70,16 @@ SDL_Color unpremultiply(::ui::Color c) {
 // in the face atlas), tinted by the token color, nearest-neighbor scaled — the
 // chunky look the golden has and TTF cannot reproduce. Returns false if this
 // face has no baked glyph atlas (caller falls back to the TTF path).
+//
+// Canonical glyph cells (SIL-190): every glyph draws into an INTEGER device
+// rect whose size is rounded ONCE from the native art (round(gw*gscale) x
+// round(atlas_h*gscale)) — same letter, byte-identical pixels anywhere on
+// screen. This deliberately diverges from origin, whose whole-frame nearest
+// magnify striped glyphs by absolute position (golden supersession documented
+// in ORIGIN_GOLDENS.md / PARITY.md). The pen still accumulates the DESIGN
+// metric (advance * gscale, fractional) and only snaps per glyph, so string
+// widths, wraps and centering keep origin's layout exactly (a uniform integer
+// advance was tried and re-wrapped prose out of its fixed containers).
 bool render_text_glyphs(SDL_Renderer *r, const ::ui::DrawCommandList &list,
                         const ::ui::DrawCommand &c, GlyphFonts *glyphs,
                         float scale) {
@@ -91,26 +101,12 @@ bool render_text_glyphs(SDL_Renderer *r, const ::ui::DrawCommandList &list,
   // points -> device by `scale`. glyph scale maps native bank px -> device px.
   const float gscale = (static_cast<float>(t.font_size) * scale) / gf->line_height;
   const float adv = gf->advance * gscale;
-  const float ah = static_cast<float>(gf->atlas_h) * gscale;
-  float penx = c.rect.x * scale;
-  const float peny = c.rect.y * scale;
-
-  // Per-phase string variant (origin text striping): exact-color text at 1:1
-  // virtual scale swaps for a whole-string bake through origin's magnify at
-  // its absolute device cell (string analog of resolve_legacy).
-  if (cf) {
-    int out_w = 0, out_h = 0;
-    GlyphFonts::StringVariant sv;
-    if (SDL_GetCurrentRenderOutputSize(r, &out_w, &out_h) &&
-        glyphs->string_variant(r, t.font_id, t.color.r, t.color.g, t.color.b,
-                               &list.text_arena[t.text_off], t.text_len, penx,
-                               peny, gscale, out_w, out_h, &sv)) {
-      SDL_FRect d = {static_cast<float>(sv.x), static_cast<float>(sv.y),
-                     static_cast<float>(sv.w), static_cast<float>(sv.h)};
-      SDL_RenderTexture(r, sv.texture, nullptr, &d);
-      return true;
-    }
-  }
+  const int ah = static_cast<int>(static_cast<float>(gf->atlas_h) * gscale + 0.5f);
+  // floor (not round) quantization: matches the legacy SW renderer's dst-rect
+  // floor, so 1:1-scale text (in-game 640x480, integer native advance) lands on
+  // exactly the pixels it always did.
+  const float penx = c.rect.x * scale;
+  const int peny = static_cast<int>(SDL_floorf(c.rect.y * scale));
 
   // Tint: the coverage atlas is a white premultiplied mask; the IR color is
   // premultiplied, so color-mod(rgb) + alpha-mod(a) reproduces the token color
@@ -130,11 +126,15 @@ bool render_text_glyphs(SDL_Renderer *r, const ::ui::DrawCommandList &list,
         SDL_FRect src = {static_cast<float>(gf->gx[gi]), 0.f,
                          static_cast<float>(gw),
                          static_cast<float>(gf->atlas_h)};
-        SDL_FRect dst = {penx, peny, gw * gscale, ah};
+        SDL_FRect dst = {
+            SDL_floorf(penx + adv * i), static_cast<float>(peny),
+            static_cast<float>(static_cast<int>(gw * gscale + 0.5f)),
+            static_cast<float>(ah)};
         SDL_RenderTexture(r, gf->atlas, &src, &dst);
       }
     }
-    penx += adv; // monospace: every char advances, art may be wider (overlap)
+    // monospace: every char advances by the fractional design metric (the dst
+    // rect above snaps per glyph); art may be wider than the step (overlap).
   }
   if (!cf) {
     SDL_SetTextureColorMod(gf->atlas, 255, 255, 255);
@@ -404,7 +404,7 @@ struct LayerSlot {
 // {p : int(p/s) == v} — alternating 2- and 3-px bands whose width/position
 // depend on the edge's absolute virtual coordinate. A uniform logical-width
 // border can land 1px off and can never produce the 3px phase, so (like
-// resolve_legacy for sprites and string_variant for text) the
+// resolve_legacy for sprites) the
 // EXECUTOR owns the grid: each painted side of an eligible hairline border
 // is snapped to its origin virtual cell and filled directly. Eligible =
 // square corners, no outline, hairline widths, the exact legacy stroke

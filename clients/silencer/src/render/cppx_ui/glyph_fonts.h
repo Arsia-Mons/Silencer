@@ -26,10 +26,6 @@
 
 #include <stdint.h>
 
-#include <map>
-#include <string>
-#include <vector>
-
 namespace silencer::cppx_ui {
 
 class GlyphFonts {
@@ -82,37 +78,12 @@ public:
   // are origin's rendered text pixels for that style. The executor selects the
   // variant when a Text command's color matches `key` (premul a=255 == straight)
   // and skips color modulation; unmatched colors use the coverage face.
-  // legacy_w/h = the 640x480 design res origin's virtual-canvas scale derives
-  // from (carried per variant for the string-variant bake below).
   bool build_color_face(SDL_Renderer *renderer, int face_id, uint8_t key_r,
                         uint8_t key_g, uint8_t key_b, const GlyphSrc *glyphs,
                         int count, const SDL_Color *palette256, float advance,
-                        float line_height, int legacy_w, int legacy_h,
+                        float line_height,
                         uint8_t alpha = 255); // <255: premultiplied translucent
                                               // pixels (origin DrawAlphaed text)
-
-  // Per-phase STRING variant (origin text striping parity). origin composites
-  // text on its virtual canvas (integer pen, advance per char) and the whole-
-  // frame NEAREST magnify (src = int(gx/s)) stripes it per ABSOLUTE position —
-  // a single-phase atlas can never match a string whose golden phase differs,
-  // and the per-glyph float pen drifts x-phase WITHIN a string. When a Text
-  // draw uses an exact-color face at 1:1 virtual scale (gscale == s), this
-  // bakes the whole string through origin's chain at its absolute device cell
-  // and returns a texture drawn 1:1 (string analog of TextureRegistry::
-  // resolve_legacy). Memoized on (face, color, string, X%18, Y%18) —
-  // the magnify pattern period divides 18 for every quarter-integer s in play.
-  // Textures owned HERE, outside the 64-cap chrome TextureRegistry (the cap
-  // note in texture_registry.h stands; string variants are unbounded-ish and
-  // get their own capped store). False when the face has no exact-color
-  // variant or the draw isn't 1:1 virtual — caller keeps the atlas path.
-  struct StringVariant {
-    SDL_Texture *texture = nullptr;
-    int x = 0, y = 0, w = 0, h = 0; // absolute device cell, drawn 1:1
-  };
-  bool string_variant(SDL_Renderer *renderer, uint16_t face_id, uint8_t r,
-                      uint8_t g, uint8_t b, const char *text, int len,
-                      float pen_dev_x, float pen_dev_y, float gscale,
-                      int out_w, int out_h, StringVariant *out);
 
   // The face for an id (Body fallback for out-of-range). null if not loaded.
   const Face *face(uint16_t face_id) const;
@@ -125,24 +96,15 @@ public:
 
 private:
   static constexpr int kVariantCap = 128; // menus ~18 + HUD palette/brightness ramps (~80)
-  // Per-screen string count is small (menus ~20); lobby lists stay well under
-  // this. At cap the whole store recycles (cheap rebake, no eviction churn).
-  static constexpr int kStringVariantCap = 256;
   struct Variant {
     Face face;
     uint16_t face_id = 0;
     uint8_t r = 0, g = 0, b = 0;
     bool used = false;
-    // CPU copy of the atlas (straight RGBA, ink opaque) + virtual-canvas dims,
-    // kept for the string-variant bake.
-    std::vector<uint8_t> pixels;
-    int atlas_w = 0;
-    int legacy_w = 640, legacy_h = 480;
   };
 
   Face faces_[kFaceCount];
   Variant variants_[kVariantCap];
-  std::map<std::string, StringVariant> string_variants_;
 };
 
 } // namespace silencer::cppx_ui
