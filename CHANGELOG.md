@@ -4,6 +4,22 @@ All notable changes to Silencer are documented here.
 
 ## [Unreleased]
 
+## [v00059] — 2026-06-11
+
+### Game client
+
+#### Black Rose poison — guards and civilians (#135, #273)
+
+- Black Rose agents can now poison guards and civilians via the `INV_POISON` item (proximity use), not just enemy players.
+- Poisoned NPCs take damage over time and die silently — no alarm triggered, no knockback, fitting the stealth identity.
+- Guard poison death credits the poisoner's `guardskilled` stat and drops ammo; civilian poison death credits `civilianskilled`.
+- `ACTOR_DAMAGED` and `ACTOR_KILLED` triggers fire correctly on poison ticks and deaths.
+- GAS params `poisonTickCycle` and `poisonDamagePerTick` added to `EnemyDef` for per-NPC-type tuning.
+
+#### Stability (#277)
+
+- Fixed a crash (`SIGSEGV`) in `Bipedal::FollowGround` and `DistanceToEnd` caused by `std::map::operator[]` inserting null entries for unknown platform IDs. Stale platform IDs now cause the actor to fall rather than crash.
+
 ## [v00058] — 2026-05-31
 
 ### Game client
