@@ -1,4 +1,5 @@
 #include "game.h"
+#include "client/ui/app_shell/client_ui.h"
 #include "config.h"
 #include "controldispatch.h"
 #include "gasloader.h"
@@ -11,6 +12,142 @@
 #include <vector>
 
 using namespace GameState;
+
+namespace {
+
+uint16_t TuiUiModsFromScancodes(const Uint8 * state){
+	uint16_t out = ::ui::UI_KEY_MOD_NONE;
+	if(state[SDL_SCANCODE_LSHIFT] || state[SDL_SCANCODE_RSHIFT]) out |= ::ui::UI_KEY_MOD_SHIFT;
+	if(state[SDL_SCANCODE_LCTRL] || state[SDL_SCANCODE_RCTRL]) out |= ::ui::UI_KEY_MOD_CTRL;
+	if(state[SDL_SCANCODE_LALT] || state[SDL_SCANCODE_RALT]) out |= ::ui::UI_KEY_MOD_ALT;
+	if(state[SDL_SCANCODE_LGUI] || state[SDL_SCANCODE_RGUI]) out |= ::ui::UI_KEY_MOD_SUPER;
+	return out;
+}
+
+::ui::UiKey TuiUiKeyFromScancode(SDL_Scancode sc){
+	switch(sc){
+	case SDL_SCANCODE_BACKSPACE: return ::ui::UiKey::Backspace;
+	case SDL_SCANCODE_DELETE: return ::ui::UiKey::DeleteForward;
+	case SDL_SCANCODE_LEFT: return ::ui::UiKey::Left;
+	case SDL_SCANCODE_RIGHT: return ::ui::UiKey::Right;
+	case SDL_SCANCODE_HOME: return ::ui::UiKey::Home;
+	case SDL_SCANCODE_END: return ::ui::UiKey::End;
+	case SDL_SCANCODE_UP: return ::ui::UiKey::Up;
+	case SDL_SCANCODE_DOWN: return ::ui::UiKey::Down;
+	case SDL_SCANCODE_PAGEUP: return ::ui::UiKey::PageUp;
+	case SDL_SCANCODE_PAGEDOWN: return ::ui::UiKey::PageDown;
+	case SDL_SCANCODE_RETURN:
+	case SDL_SCANCODE_KP_ENTER: return ::ui::UiKey::Enter;
+	case SDL_SCANCODE_TAB: return ::ui::UiKey::Tab;
+	case SDL_SCANCODE_A: return ::ui::UiKey::A;
+	default: return ::ui::UiKey::Unknown;
+	}
+}
+
+char TuiPrintableFromScancode(SDL_Scancode sc, uint16_t mods){
+	if(mods & (::ui::UI_KEY_MOD_CTRL | ::ui::UI_KEY_MOD_ALT | ::ui::UI_KEY_MOD_SUPER)) return '\0';
+	bool shift = (mods & ::ui::UI_KEY_MOD_SHIFT) != 0;
+	if(sc >= SDL_SCANCODE_A && sc <= SDL_SCANCODE_Z){
+		char c = (char)('a' + (sc - SDL_SCANCODE_A));
+		return shift ? (char)(c - 'a' + 'A') : c;
+	}
+	switch(sc){
+	case SDL_SCANCODE_1: return '1';
+	case SDL_SCANCODE_2: return '2';
+	case SDL_SCANCODE_3: return '3';
+	case SDL_SCANCODE_4: return '4';
+	case SDL_SCANCODE_5: return '5';
+	case SDL_SCANCODE_6: return '6';
+	case SDL_SCANCODE_7: return '7';
+	case SDL_SCANCODE_8: return '8';
+	case SDL_SCANCODE_9: return '9';
+	case SDL_SCANCODE_0: return '0';
+	case SDL_SCANCODE_SPACE: return ' ';
+	default: return '\0';
+	}
+}
+
+bool TuiAllowsTextInput(Game & game, bool chatWasActive){
+	if(chatWasActive) return true;
+	client::ui::ClientUi * ui = game.GetUiPipeline().TryClientUi();
+	return ui && ui->wants_text_input();
+}
+
+void FeedTuiUiScancodeDown(Game & game, SDL_Scancode sc, const Uint8 * newkeystate,
+                           bool routeTextInput){
+	if(game.GetUiPipeline().IsCapturingKeybind()){
+		game.GetUiPipeline().FeedKeybindEdge({BindingDevice::Keyboard, (int)sc, 0});
+		return;
+	}
+
+	::ui::UiInputFrame & ui = game.GetUiPipeline().UiInput();
+	uint16_t mods = TuiUiModsFromScancodes(newkeystate);
+	::ui::UiKey key = TuiUiKeyFromScancode(sc);
+	bool fedUi = false;
+	if(routeTextInput && key != ::ui::UiKey::Unknown){
+		::ui::ui_input_push_key(ui, key, mods, false);
+		fedUi = true;
+	}
+	switch(sc){
+	case SDL_SCANCODE_UP: ui.nav_up = true; fedUi = true; break;
+	case SDL_SCANCODE_DOWN: ui.nav_down = true; fedUi = true; break;
+	case SDL_SCANCODE_LEFT: ui.nav_left = true; fedUi = true; break;
+	case SDL_SCANCODE_RIGHT: ui.nav_right = true; fedUi = true; break;
+	case SDL_SCANCODE_TAB:
+		if(mods & ::ui::UI_KEY_MOD_SHIFT)
+			ui.nav_previous = true;
+		else
+			ui.nav_next = true;
+		fedUi = true;
+		break;
+	case SDL_SCANCODE_RETURN:
+	case SDL_SCANCODE_KP_ENTER:
+		if(!routeTextInput) break;
+		ui.confirm_pressed = true;
+		ui.confirm_down = true;
+		fedUi = true;
+		break;
+	case SDL_SCANCODE_ESCAPE:
+		if(!routeTextInput) break;
+		ui.cancel_pressed = true;
+		ui.cancel_down = true;
+		fedUi = true;
+		break;
+	default: break;
+	}
+	if(routeTextInput){
+		char c = TuiPrintableFromScancode(sc, mods);
+		if(c != '\0'){
+			char text[2] = {c, '\0'};
+			::ui::ui_input_push_text(ui, text);
+			fedUi = true;
+		}
+	}
+	if(fedUi) ui.source = ::ui::UiFocusSource::Keyboard;
+}
+
+void FeedTuiUiScancodeUp(Game & game, SDL_Scancode sc, bool routeTextInput){
+	if(!routeTextInput) return;
+	::ui::UiInputFrame & ui = game.GetUiPipeline().UiInput();
+	ui.source = ::ui::UiFocusSource::Keyboard;
+	switch(sc){
+	case SDL_SCANCODE_RETURN:
+	case SDL_SCANCODE_KP_ENTER:
+		ui.confirm_released = true;
+		break;
+	case SDL_SCANCODE_ESCAPE:
+		ui.cancel_released = true;
+		break;
+	default: break;
+	}
+}
+
+bool ViewedPlayerChatActive(Game & game){
+	Player * p = game.GetWorld().GetPeerPlayer(game.GetWorld().viewedpeerid);
+	return p && p->chatActive;
+}
+
+} // namespace
 
 
 bool Game::Loop(void){
@@ -83,15 +220,20 @@ bool Game::Loop(void){
 				// Edge-detect: feed press/release transitions through the
 				// same handlers the SDL path uses, so the in-game ESC
 				// quitstate machine, F1 player-list, debug overlay etc.
-				// behave identically with a TUI keyboard.
+				// behave identically with a TUI keyboard. TUI has no SDL text
+				// events, so text-focus/chat key edges synthesize the cppx UI
+				// key/text/cancel channels that events.cpp normally fills.
+				bool routeTextInput = TuiAllowsTextInput(*this, ViewedPlayerChatActive(*this));
 				for(int sc = 0; sc < SDL_SCANCODE_COUNT; ++sc){
 					bool was = gameInput.GetKeystate()[sc] != 0;
 					bool now = newkeystate[sc] != 0;
 					if(was == now) continue;
 					if(now){
 						gameInput.OnScancodeDown(sc);
+						FeedTuiUiScancodeDown(*this, (SDL_Scancode)sc, newkeystate, routeTextInput);
 					}else{
 						gameInput.OnScancodeUp(sc);
+						FeedTuiUiScancodeUp(*this, (SDL_Scancode)sc, routeTextInput);
 					}
 				}
 				memcpy(gameInput.GetKeystate(), newkeystate, SDL_SCANCODE_COUNT * sizeof(Uint8));
