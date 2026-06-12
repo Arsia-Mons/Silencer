@@ -19,7 +19,7 @@ State: IN PROGRESS
 | [systemic] spacing/alignment consistency across siblings | EXAMINED 2026-06-12 | none (see unit note) |
 | mainmenu | EXAMINED 2026-06-12 | none (see unit note) |
 | options | EXAMINED 2026-06-12 | none (see unit note) |
-| options_audio | UNEXAMINED | |
+| options_audio | EXAMINED 2026-06-12 | none (see unit note) |
 | options_display | UNEXAMINED | |
 | options_controls | UNEXAMINED | |
 | lobby_connect | UNEXAMINED | |
@@ -610,3 +610,42 @@ What was checked and cleared:
   cleanup breadcrumb for old phase recovery, but the rendered result is
   centered on origin's virtual x=328 cell and does not create a visible
   design-intent miss.
+
+### Unit note — options_audio (2026-06-12)
+
+Audited after regenerating the menu-cluster renders with
+`OUT=/tmp/cppx_renders_uplift_options_audio bash tools/cap/cap_menus.sh`;
+the fresh `/tmp/cppx_renders_uplift_options_audio/options_audio.png`
+byte-matches the current golden (`cmp_exit=0`, pixdiff `0.0000`,
+tolerant gate `0.0000 ... PASS`). **Zero candidates.** What was checked
+and cleared:
+
+- **Authored shape matches origin intent:** origin `options_audio_screen.cpp`
+  resets to the menu palette/camera (lines 50-51), draws only the full-screen
+  bank-6 starfield on the root (lines 87-94), then uses an invisible
+  layout-only `OptionsAudioPanel` fixed at 420 virtual px with 24/32 padding
+  and 22px child gaps (lines 95-104). Its contents are exactly one title
+  (lines 105-106), one Boolean row (lines 107-113), and Save/Cancel Md ovals
+  (lines 114-128). The shared origin Boolean row is likewise fixed geometry:
+  33px row height, 24px button-to-indicator gap, 10px indicator gap, and two
+  20x33 indicator sprites (components/boolean_setting_row.cpp:19-23, 51-69);
+  `button.cpp` resolves the Music Lg oval to bank 6 idx23 at 220x33 and the
+  Save/Cancel Md ovals to bank 6 idx7 at 196x33 (lines 113-143).
+- **Golden pixels express that shape cleanly:** the live inspect tree places
+  the title at logical `(533,168) 215x29`, the Music row at `(419,230) 441x49`
+  with the 330px Lg button at x419 and the two indicator cells at x785/x830,
+  and the action row at `(336,312) 606x50` with 294x50 Save/Cancel ovals at
+  x336/x648. Pixel measurement on the fresh 1920x1080 capture found the title
+  green bbox `(801,252)-(1120,289)`, the Music/toggle row bbox
+  `(628,345)-(1283,419)`, the action row bbox `(504,468)-(1406,542)`, and no
+  green UI pixels in the empty upper band. Evidence:
+  `docs/plans/uplift-evidence/options_audio/current_form_2x.png`,
+  `music_toggle_row_4x.png`, and `save_cancel_row_3x.png`.
+- **No screen-specific accident found:** there is intentionally no visible
+  panel frame, the oval/toggle chrome is continuous, and the one-row form's
+  spacing follows the same fixed origin constants used by options_display.
+  The pristine-origin vs current comparison shows only the already
+  adjudicated U-1/U-2/U-3 supersession families (canonical glyphs, canonical
+  chrome sprites, and single-hop backdrop), not a new Audio-specific defect.
+  Evidence:
+  `docs/plans/uplift-evidence/options_audio/pristine_vs_current_form_150pct.png`.
