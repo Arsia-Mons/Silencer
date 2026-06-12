@@ -299,14 +299,6 @@ bun -e '
 SINK_PID=$!
 sleep 0.5
 
-SILENCER_TUI_FRAME_HOST=127.0.0.1 SILENCER_TUI_FRAME_PORT="$FRAME_PORT" \
-  "$BIN" --headless --tui --tui-input-port "$INPUT_PORT" --control-port "$PORT" \
-  >"/tmp/silencer-ingame-cppx-$PORT.log" 2>&1 &
-PID=$!
-drive_to_anchor
-# ESC press/release below consume one sim tick each → capture sits at mp==0.
-step_to_mp 254
-
 send_scancodes() { # <byte 5 of the 64-byte scancode mask> — ESC=41 = byte 5 bit 1
   bun -e '
     const [port, byte5] = process.argv.slice(1).map(Number);
@@ -327,13 +319,34 @@ send_scancodes() { # <byte 5 of the 64-byte scancode mask> — ESC=41 = byte 5 b
   ' "$INPUT_PORT" "$1"
 }
 
-send_scancodes 2
-cli step --frames 1 >/dev/null
-send_scancodes 0
-cli step --frames 1 >/dev/null
-cli wait_frames --n 2 >/dev/null
-align_camera "$REPO_ROOT/tests/cli-agent/e2e/golden/ingame_quit_prompt.png"
-shot ingame_quit_prompt
+# Bounded re-drive: under full-suite load the follow-camera's rest position
+# occasionally lands where the x correction is outside Camera::Follow's ±7
+# window (w=15) and align_camera sticks at a constant shift — a fresh drive
+# re-rolls the rest position. A visual gate must not be flaky.
+quit_prompt_attempt() {
+  SILENCER_TUI_FRAME_HOST=127.0.0.1 SILENCER_TUI_FRAME_PORT="$FRAME_PORT" \
+    "$BIN" --headless --tui --tui-input-port "$INPUT_PORT" --control-port "$PORT" \
+    >"/tmp/silencer-ingame-cppx-$PORT.log" 2>&1 &
+  PID=$!
+  drive_to_anchor || return 1
+  # ESC press/release below consume one sim tick each → capture sits at mp==0.
+  step_to_mp 254 || return 1
+  send_scancodes 2
+  cli step --frames 1 >/dev/null
+  send_scancodes 0
+  cli step --frames 1 >/dev/null
+  cli wait_frames --n 2 >/dev/null
+  align_camera "$REPO_ROOT/tests/cli-agent/e2e/golden/ingame_quit_prompt.png" || return 1
+  shot ingame_quit_prompt
+}
+
+captured=""
+for attempt in 1 2 3; do
+  if quit_prompt_attempt; then captured="yes"; break; fi
+  echo "quit_prompt attempt $attempt failed; tearing down + re-driving" >&2
+  stop_session
+done
+[ -n "$captured" ] || { echo "quit_prompt capture failed after 3 drives" >&2; exit 1; }
 
 stop_session
 echo "all in-game cppx renders captured to $OUT_DIR"
