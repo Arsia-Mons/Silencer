@@ -27,7 +27,7 @@ State: IN PROGRESS
 | cc_alias | EXAMINED 2026-06-12 | none (see unit note) |
 | cc_select_agency | EXAMINED 2026-06-12 | none (see unit note) |
 | lobby_screen | EXAMINED 2026-06-12 | none (see unit note) |
-| create_game | UNEXAMINED | |
+| create_game | EXAMINED 2026-06-12 | none (see unit note) |
 | game_staging | UNEXAMINED | |
 | tech_select | UNEXAMINED | |
 | mission_summary | UNEXAMINED | |
@@ -1005,3 +1005,63 @@ origin Clay-era source. **Zero candidates.** What was checked and cleared:
   pristine_vs_current_left_pane_grid.png`; those differences do not expose a
   new lobby-screen-specific ARTIFACT/DEFECT/ERA-LIMIT candidate. No Linear
   ticket opened.
+
+### Unit note — create_game (2026-06-12)
+
+Audited the Create Game lobby panel after regenerating the lobby cluster with
+`OUT=/tmp/cppx_renders_uplift_create_game bash tools/cap/cap_lobby.sh`; the
+fresh `/tmp/cppx_renders_uplift_create_game/create_game.png` byte-matches the
+current golden (`cmp_exit=0`, sha256
+`672621b5bed1d9552e7128b01343c89fc7dc0a8694853ebd31f5df2b473cb966`).
+Compared against the pristine origin capture
+(`git show ba345131:tests/cli-agent/e2e/golden/create_game.png`) and the
+origin Clay-era source. **Zero candidates.** What was checked and cleared:
+
+- **Authored shape matches origin intent:** origin routes create mode into the
+  same stepped lobby grid as the logged-in lobby: `ResolveSteppedPaneLayout`
+  computes upper/right-tall cells, `BuildRightUpperContents` mounts
+  `BuildGameCreateUpperTree`, and `BuildRightTallContents` mounts
+  `BuildGameCreateTallTree`
+  (`origin/main:clients/silencer/src/client/ui/screens/lobby/lobby_main_area.cpp:153-240`).
+  The upper tree is a fixed Game Options form: content pad 6, heading, inset
+  form border, five visible 14px rows from a six-row option list, value
+  column, and an 8px scrollbar with a 1px track pad
+  (`origin/main:clients/silencer/src/client/ui/screens/lobby/game_create_panel_options.cpp:99-150,280-440`).
+  The tall tree is a Select Map heading, inset map list, Game name/Password
+  footer, and full-width Create button
+  (`origin/main:clients/silencer/src/client/ui/screens/lobby/game_create_panel_map_form.cpp:243-270,285-307,318-370,376-400`).
+  The current cppx screen mirrors those two cells in `GameCreatePanel`,
+  `CreateRightCell`, and `map_list_rows`
+  (`clients/silencer/src/client/ui/screens/lobby_screen.cppx:316-443,455-522,1035-1065`).
+- **Golden pixels express that shape cleanly:** the live inspect tree places
+  the Game Options title at device `(728,165)` with rows at y
+  `212/250/288/327/364/404`; numeric values sit on the intended top-biased
+  cells (`0` at y255, `99` at y292, `24` at y332, `6` at y369). The map list
+  rows are 21 logical px / 32 device px slots, from `ALLY10c.sil`
+  `(1210,208)` through `sewers10.sil` `(1210,586)`, and the footer anchors at
+  `Game name:` `(1209,796)`, `New Game` `(1209,846)`,
+  `Password (optional):` `(1209,880)`, and Create button
+  `(1209,963) 668x48`. Pixel masks found continuous green UI bboxes for the
+  options cell `(714,151)-(1209,444)`, right cell `(1180,151)-(1889,1039)`,
+  map-list well `(1209,190)-(1876,619)`, and Create button
+  `(1193,963)-(1889,1023)`. Evidence:
+  `docs/plans/uplift-evidence/create_game/current_game_options_4x.png`,
+  `current_right_cell_2x.png`, and `current_map_list_footer_2x.png`.
+- **No remaining scrollbar or clipping candidate:** the U-5 scrollbar repair
+  is present in the current golden; the thumb is flush inside the snapped
+  track (solid fill columns x1157-1169 have 161 green rows each), with no
+  right-side gutter or top-left overpaint. Evidence:
+  `docs/plans/uplift-evidence/create_game/current_scrollbar_thumb_8x.png`.
+  The Select Map list frame, footer text, and wide Create chrome are
+  continuous; no row is clipped, and no off-viewport row bleeds into the
+  footer/action area.
+- **Already-adjudicated, not re-opened:** current-vs-pristine origin differs
+  in 176,710 pixels across the screen, expected after the documented
+  U-1/U-2/U-3/U-5 supersessions (canonical text, canonical legacy sprites,
+  single-hop lobby backdrop, restored scrollbar thumb). Side-by-side and
+  changed-pixel evidence is saved at
+  `docs/plans/uplift-evidence/create_game/
+  pristine_vs_current_game_options_2x.png`,
+  `pristine_vs_current_right_cell_150pct.png`, and
+  `pristine_vs_current_changed_pixels_magenta_2x.png`. No Linear ticket
+  opened because there is no new ARTIFACT/DEFECT/ERA-LIMIT candidate.
