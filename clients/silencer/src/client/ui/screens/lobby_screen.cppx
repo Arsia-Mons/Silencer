@@ -293,16 +293,10 @@ struct GameBrowserProps {
   cell.padding = {0.0f, 0.0f, 0.0f, 0.0f};
   cell.gap = 0.0f;
   return <Box key="rightcell" layout={cell} style={lobby_panel_open_left()}>
-    <Box
-      key="hwrap"
-      layout={::ui::LayoutStyle{.padding = {10.5f, 0.0f, 10.0f, 0.0f}}}
-    >
+    <Box key="hwrap" layout={::ui::LayoutStyle{.padding = {10.5f, 0.0f, 10.0f, 0.0f}}}>
       <ScreenTitle key="h" variant={ScreenTitleVariant::Console} value="Active Games" />
     </Box>
-    <Box
-      key="listwrap"
-      layout={::ui::LayoutStyle{.padding = {13.0f, 13.0f, 5.0f, 0.0f}}}
-    >
+    <Box key="listwrap" layout={::ui::LayoutStyle{.padding = {13.0f, 13.0f, 5.0f, 0.0f}}}>
       <Box
         key="well"
         layout={::ui::LayoutStyle{
@@ -355,9 +349,7 @@ struct GameBrowserProps {
         key="v"
         value={value}
         layout={{.height = ::ui::Length::points(tokens::kLineBody)}}
-        style={tokens::text_patch(tokens::kTextBody, tokens::kFontBodyEm,
-                                  cycle ? tokens::kFaceBodySm : tokens::kFaceBody,
-                                  tokens::kLineBody)}
+        style={tokens::text_patch(tokens::kTextBody, tokens::kFontBodyEm, cycle ? tokens::kFaceBodySm : tokens::kFaceBody, tokens::kLineBody)}
       />
     </Box>
   </Box>
@@ -470,16 +462,10 @@ struct CreateRightCellProps {
   cell.padding = {0.0f, 0.0f, 0.0f, 0.0f};
   cell.gap = 0.0f;
   return <Box key="rightcell" layout={cell} style={lobby_panel_open_left()}>
-    <Box
-      key="hwrap"
-      layout={::ui::LayoutStyle{.padding = {9.0f, 0.0f, 10.0f, 0.0f}}}
-    >
+    <Box key="hwrap" layout={::ui::LayoutStyle{.padding = {9.0f, 0.0f, 10.0f, 0.0f}}}>
       <ScreenTitle key="h" variant={ScreenTitleVariant::Console} value="Select Map" />
     </Box>
-    <Box
-      key="listwrap"
-      layout={::ui::LayoutStyle{.padding = {9.0f, 9.0f, 5.0f, 0.0f}}}
-    >
+    <Box key="listwrap" layout={::ui::LayoutStyle{.padding = {9.0f, 9.0f, 5.0f, 0.0f}}}>
       <Box
         key="maplist"
         layout={::ui::LayoutStyle{
@@ -872,8 +858,7 @@ struct AgentCardProps {
           .width = ::ui::Length::points(75.0f),
           .height = ::ui::Length::points(75.0f),
           .flex_shrink = ::ui::StyleFloat::points(0.0f)}}
-        style={props.emblem_tex ? tokens::image_patch(props.emblem_tex)
-                                : ::ui::patch().background(tokens::kEmblemFallbackFill).corner_radius(2.0f)}
+        style={props.emblem_tex ? tokens::image_patch(props.emblem_tex) : ::ui::patch().background(tokens::kEmblemFallbackFill).corner_radius(2.0f)}
       />
       <Box
         key="lvbox"
@@ -1025,9 +1010,7 @@ struct LobbyChatPanelProps {
           key="il"
           value={props.pregame ? "Pregame" : "In Lobby"}
           layout={{.height = ::ui::Length::points(tokens::kLineBody)}}
-          style={tokens::text_patch(tokens::kTextPresenceHeader,
-                                    tokens::kFontBodyEm, tokens::kFaceBody,
-                                    tokens::kLineBody)}
+          style={tokens::text_patch(tokens::kTextPresenceHeader, tokens::kFontBodyEm, tokens::kFaceBody, tokens::kLineBody)}
         />
         <BodyText key="p" variant={BodyTextVariant::Detail} value={props.presence} />
       </Box>

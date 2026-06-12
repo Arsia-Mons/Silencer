@@ -289,11 +289,7 @@ struct OptionsControlsProps {
   // origin vx 223 / vy 405. Text-cell nudges for the per-phase STRING bake:
   // titlewrap inset-top 13 (not 12) puts the title pen on golden vy 14, and
   // the OR label's margin-left 2 centers its pen on golden vx 513.
-  return <ScreenLayout
-    key="root"
-    variant={ScreenLayoutVariant::Overlay}
-    stretchedBackdrop={true}
-  >
+  return <ScreenLayout key="root" variant={ScreenLayoutVariant::Overlay} stretchedBackdrop={true}>
     <Panel key="frame" variant={PanelVariant::ControlsFrame}>
       <Box
         key="titlewrap"
@@ -327,7 +323,10 @@ struct OptionsControlsProps {
             .justify_content = ::ui::JustifyContent::Center,
             .width = ::ui::Length::percent(100.0f)}}
         >
-          <Box key="actionsnudge" layout={::ui::LayoutStyle{.margin = ::ui::EdgeSizes{1.0f, {}, {}, {}}}}>
+          <Box
+            key="actionsnudge"
+            layout={::ui::LayoutStyle{.margin = ::ui::EdgeSizes{1.0f, {}, {}, {}}}}
+          >
           <ActionRow key="actions">
             <AppButton
               key="save"
