@@ -1,5 +1,27 @@
 # Origin/main golden baselines — provenance
 
+> ## Uplifted goldens (2026-06-12 — U-2 / SIL-204)
+>
+> The same 15 baselines (13 menu/lobby + `mission_summary.png` +
+> `hover_mainmenu_oval.png`) were superseded a second time the same day by
+> cppx renders after the canonical-phase SPRITE bake (`uplift:
+> position-dependent sprite striping`, UPLIFT.md finding U-2, SIL-204) — the
+> sprite arm of the same whole-frame-magnify artifact U-1 fixed for glyphs.
+> Origin's chain striped every chrome sprite (ovals, toggles, logo,
+> nine-slice buttons, emblems, plates, dialog/panel frames) by its absolute
+> position — the mainmenu Options oval was even a different SIZE (75 px) than
+> its three siblings (74 px). The fix bakes each registered legacy sprite
+> once at phase 0 and draws it at floor-quantized device cells: same sprite =
+> byte-identical pixels + identical size everywhere. Per-screen diff
+> attribution (this supersession's gate): every changed pixel sits on legacy
+> chrome sprites; glyph text and backdrops are byte-stable (evidence:
+> `docs/plans/uplift-evidence/U-2/`, incl. magenta diff overlays). The
+> cppx-only baselines (`gallery`, `message_modal`, `password_modal`) were
+> re-blessed for the same reason. **In-game goldens remain pristine origin
+> captures** — the s=1 path is byte-identical by construction (suites 72/76
+> pass unchanged). Pre-U-2 baselines remain in git history (commit 207239db
+> and earlier).
+>
 > ## Uplifted goldens (2026-06-12 — U-1 / SIL-190)
 >
 > The 13 menu/lobby baselines below, plus `mission_summary.png` and

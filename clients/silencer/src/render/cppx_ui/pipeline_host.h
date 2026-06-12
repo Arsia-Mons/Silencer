@@ -75,18 +75,9 @@ public:
                                 const SDL_Color *palette256, bool stretch,
                                 int legacy_w, int legacy_h);
 
-  // Bake a STRETCHED (non-full-bleed) element through the same two-hop chain
-  // at its absolute device footprint (see bake_element_rgba). The caller
-  // derives the virtual element box bx,by,bw,bh and a device-grid-aligned
-  // texture rect; the texture must then be drawn 1:1 at exactly (dev_x, dev_y).
-  uint32_t bake_element_sprite(const uint8_t *indices, int w, int h,
-                               const SDL_Color *palette256, int bx, int by,
-                               int bw, int bh, int legacy_w, int legacy_h,
-                               int dev_x, int dev_y, int tex_w, int tex_h);
-
   // Register an already-baked chrome texture's indexed source so the executor
-  // can swap qualifying draws for lazily-baked per-phase device-cell variants
-  // (origin's magnify arithmetic at the element's absolute position). `fit`
+  // can swap qualifying draws for lazily-baked CANONICAL device-cell variants
+  // (origin's magnify arithmetic at phase 0 — U-2/SIL-204). `fit`
   // picks the box arithmetic (TextureRegistry::LegacyFit); caps (virtual px)
   // apply to NineSlice only.
   void register_legacy(uint32_t texture_id, const uint8_t *indices, int w,

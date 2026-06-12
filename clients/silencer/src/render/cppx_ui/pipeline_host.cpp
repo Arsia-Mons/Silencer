@@ -92,23 +92,6 @@ uint32_t PipelineHost::bake_backdrop_sprite(const uint8_t *indices, int w,
   return textures_.upload_rgba(r_, bake_scratch_.data(), w_, h_);
 }
 
-uint32_t PipelineHost::bake_element_sprite(const uint8_t *indices, int w,
-                                           int h, const SDL_Color *palette256,
-                                           int bx, int by, int bw, int bh,
-                                           int legacy_w, int legacy_h,
-                                           int dev_x, int dev_y, int tex_w,
-                                           int tex_h) {
-  if (!r_ || !indices || !palette256 || w < 1 || h < 1 || w_ < 1 || h_ < 1 ||
-      legacy_w < 1 || legacy_h < 1 || bw < 1 || bh < 1 || tex_w < 1 ||
-      tex_h < 1)
-    return 0;
-  bake_scratch_.assign((size_t)tex_w * tex_h * 4u, 0);
-  bake_element_rgba(indices, w, h, palette256, bx, by, bw, bh, legacy_w,
-                    legacy_h, w_, h_, dev_x, dev_y, tex_w, tex_h,
-                    bake_scratch_.data());
-  return textures_.upload_rgba(r_, bake_scratch_.data(), tex_w, tex_h);
-}
-
 void PipelineHost::register_legacy(uint32_t texture_id,
                                    const uint8_t *indices, int w, int h,
                                    const SDL_Color *palette256, int legacy_w,

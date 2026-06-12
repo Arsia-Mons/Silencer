@@ -104,39 +104,40 @@ bool TextureRegistry::resolve_legacy_sized(
   float s = std::min(out_w / (float)sp.legacy_w, out_h / (float)sp.legacy_h);
   if (s < 1.0f)
     s = 1.0f;
-  // Software-renderer truncation, then recover the authored virtual box.
-  const int x = (int)dev_x, y = (int)dev_y;
-  const int vx = (int)std::floor(x / s + 0.5f);
-  const int vy = (int)std::floor(y / s + 0.5f);
+  // Recover the authored virtual box SIZE (design metric); position no longer
+  // participates (canonical phase, U-2/SIL-204).
   const int vw = (int)std::floor(dev_w / s + 0.5f);
   const int vh = (int)std::floor(dev_h / s + 0.5f);
   if (vw < 1 || vh < 1 || vw > 4095 || vh > 4095)
     return false;
-  const int tw = (int)std::ceil((vx + vw) * s) - x;
-  const int th = (int)std::ceil((vy + vh) * s) - y;
-  if (tw <= 0 || th <= 0 || tw > (int)(vw * s) + 9 || th > (int)(vh * s) + 9)
+  // Floor-quantized device cell (legacy SW dst-rect floor — s==1 in-game
+  // draws land byte-identical); footprint = the canonical chain's ceil(v*s).
+  const int x = (int)std::floor(dev_x), y = (int)std::floor(dev_y);
+  const int tw = (int)std::ceil(vw * s - 0.001f);
+  const int th = (int)std::ceil(vh * s - 0.001f);
+  if (tw <= 0 || th <= 0)
     return false;
-  const uint64_t key = (1ull << 63) | ((uint64_t)(base_id & 0xFFFF) << 34) |
-                       ((uint64_t)(((x % 18) + 18) % 18) << 29) |
-                       ((uint64_t)(((y % 18) + 18) % 18) << 24) |
+  // One variant per (sprite, scale, virtual box size). Scale is in the key:
+  // after a window resize the same box recurs at a different magnify and a
+  // stale-scale texture would draw at its bake-time dims.
+  const int s_q = (int)(s * 1000.0f + 0.5f);
+  const uint64_t key = (1ull << 63) | ((uint64_t)(base_id & 0xFFFF) << 40) |
+                       ((uint64_t)(s_q & 0xFFFF) << 24) |
                        ((uint64_t)(vw & 0xFFF) << 12) | (uint64_t)(vh & 0xFFF);
   auto vit = legacy_variants_.find(key);
   uint32_t id = vit != legacy_variants_.end() ? vit->second : 0;
   if (!id) {
     std::vector<uint8_t> rgba((size_t)tw * th * 4u, 0u);
     if (sp.fit == LegacyFit::NineSlice)
-      bake_element_nineslice_rgba(sp.indices.data(), sp.w, sp.h, sp.palette,
-                                  vx, vy, vw, vh, sp.cap_l, sp.cap_r, sp.cap_t,
-                                  sp.cap_b, sp.legacy_w, sp.legacy_h, out_w,
-                                  out_h, x, y, tw, th, rgba.data());
+      bake_canonical_nineslice_rgba(sp.indices.data(), sp.w, sp.h, sp.palette,
+                                    vw, vh, sp.cap_l, sp.cap_r, sp.cap_t,
+                                    sp.cap_b, s, tw, th, rgba.data());
     else if (sp.fit == LegacyFit::Contain)
-      bake_element_contain_rgba(sp.indices.data(), sp.w, sp.h, sp.palette, vx,
-                                vy, vw, vh, sp.legacy_w, sp.legacy_h, out_w,
-                                out_h, x, y, tw, th, rgba.data());
+      bake_canonical_contain_rgba(sp.indices.data(), sp.w, sp.h, sp.palette,
+                                  vw, vh, s, tw, th, rgba.data());
     else // LegacyFit::Stretch (origin DispatchImage Stretch)
-      bake_element_rgba(sp.indices.data(), sp.w, sp.h, sp.palette, vx, vy, vw,
-                        vh, sp.legacy_w, sp.legacy_h, out_w, out_h, x, y, tw,
-                        th, rgba.data());
+      bake_canonical_stretch_rgba(sp.indices.data(), sp.w, sp.h, sp.palette,
+                                  vw, vh, s, tw, th, rgba.data());
     id = upload_rgba(renderer, rgba.data(), tw, th);
     if (!id)
       return false;
@@ -163,28 +164,23 @@ bool TextureRegistry::resolve_legacy_cell(
   // Only 1:1-virtual draws qualify (box == the sprite cell at the menu scale).
   if (std::fabs(dev_w - sp.w * s) > 4.0f || std::fabs(dev_h - sp.h * s) > 4.0f)
     return false;
-  // The software renderer truncates float dst rects; mirror it so the variant
-  // lands exactly where the plain path would have drawn.
-  const int x = (int)dev_x, y = (int)dev_y;
-  // Nearest virtual cell. Authoring positions the box at (or 1-2 device px
-  // before) the cell start, so rounding recovers the authored virtual coords.
-  const int vx = (int)std::floor(x / s + 0.5f);
-  const int vy = (int)std::floor(y / s + 0.5f);
-  // Cover the cell's full device footprint [x, ceil((v+sprite)*s)).
-  const int tw = (int)std::ceil((vx + sp.w) * s) - x;
-  const int th = (int)std::ceil((vy + sp.h) * s) - y;
-  if (tw <= 0 || th <= 0 || tw > (int)(sp.w * s) + 9 || th > (int)(sp.h * s) + 9)
+  // Canonical cell (U-2/SIL-204): ONE variant per (sprite, scale), drawn at
+  // the floor-quantized device position (legacy SW dst-rect floor — s==1
+  // in-game draws land byte-identical). Same sprite, same pixels, same size,
+  // anywhere on screen.
+  const int x = (int)std::floor(dev_x), y = (int)std::floor(dev_y);
+  const int tw = (int)std::ceil(sp.w * s - 0.001f);
+  const int th = (int)std::ceil(sp.h * s - 0.001f);
+  if (tw <= 0 || th <= 0)
     return false;
-  const uint64_t key = ((uint64_t)base_id << 16) |
-                       ((uint64_t)(((x % 18) + 18) % 18) << 8) |
-                       (uint64_t)(((y % 18) + 18) % 18);
+  const int s_q = (int)(s * 1000.0f + 0.5f);
+  const uint64_t key = ((uint64_t)base_id << 16) | (uint64_t)(s_q & 0xFFFF);
   auto vit = legacy_variants_.find(key);
   uint32_t id = vit != legacy_variants_.end() ? vit->second : 0;
   if (!id) {
     std::vector<uint8_t> rgba((size_t)tw * th * 4u, 0u);
-    bake_element_rgba(sp.indices.data(), sp.w, sp.h, sp.palette, vx, vy, sp.w,
-                      sp.h, sp.legacy_w, sp.legacy_h, out_w, out_h, x, y, tw,
-                      th, rgba.data());
+    bake_canonical_cell_rgba(sp.indices.data(), sp.w, sp.h, sp.palette, s, tw,
+                             th, rgba.data());
     id = upload_rgba(renderer, rgba.data(), tw, th);
     if (!id)
       return false;

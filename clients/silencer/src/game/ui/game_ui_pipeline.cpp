@@ -231,9 +231,9 @@ if(id){ id_out = id; if(w_out) *w_out = (uint16_t)sp->w; if(h_out) *h_out = (uin
 };
 
 // The ovals (and the toggle cells below) are drawn 1:1 in origin's virtual
-// canvas: their device striping phase comes from the whole-frame magnify at
-// their absolute position. Register the indexed source so the executor swaps
-// each draw for a per-phase device-cell variant (resolve_legacy).
+// canvas. Register the indexed source so the executor swaps each draw for the
+// canonical device-cell variant (resolve_legacy) — origin's NEAREST-magnify
+// duplication bands at phase 0, identical at every position (U-2/SIL-204).
 using silencer::cppx_ui::LegacyFit;
 auto register_legacy = [&](size_t bank, size_t index, uint32_t id,
                            LegacyFit fit = LegacyFit::Cell, int cl = 0,
@@ -250,7 +250,7 @@ cppxHost->register_legacy(id, sp->pixels.data(), sp->w, sp->h,
 // origin's 5-frame hover/focus ramp: frame p = sprite (base index + p) at
 // brightness 128 + p*2 (button.cpp SpriteIndexForFrame + FrameForPhase).
 // Frame 0 is the rest sprite every rest-state golden shows; every frame
-// registers so the per-phase device-cell variant swap covers hover states.
+// registers so the canonical device-cell variant swap covers hover states.
 auto bake_ramp = [&](size_t bank, size_t base, uint32_t *ids, LegacyFit fit,
                      uint16_t *w_out = nullptr, uint16_t *h_out = nullptr){
 for(int p = 0; p < client::ui::ChromeTextures::kOvalPhases; ++p){
@@ -288,11 +288,11 @@ bake_ramp(6, 2, cppxChrome.row_plate, LegacyFit::Stretch,
 bake(7, 24, cppxChrome.chrome_btn_idle);
 // origin draws it nine-sliced in VIRTUAL space (Button Chrome: caps L/R 12,
 // T/B 4) before the whole-frame magnify — the executor swaps each nine-slice
-// draw for a per-phase, per-size device-cell variant (tiled-band arithmetic).
+// draw for a canonical per-size device-cell variant (tiled-band arithmetic).
 register_legacy(7, 24, cppxChrome.chrome_btn_idle, LegacyFit::NineSlice,
                 12, 12, 4, 4);
 // Frame sprites (plain, native size): bank-7 chrome panel + bank-40 dialog
-// frames. All drawn 1:1 in virtual space — register for the per-phase swap.
+// frames. All drawn 1:1 in virtual space — register for the canonical swap.
 bake(7, 5, cppxChrome.chrome_panel, &cppxChrome.chrome_panel_w, &cppxChrome.chrome_panel_h);
 bake(40, 4, cppxChrome.dialog_msg, &cppxChrome.dialog_msg_w, &cppxChrome.dialog_msg_h);
 bake(40, 2, cppxChrome.dialog_pw, &cppxChrome.dialog_pw_w, &cppxChrome.dialog_pw_h);
@@ -301,7 +301,7 @@ register_legacy(40, 4, cppxChrome.dialog_msg);
 register_legacy(40, 2, cppxChrome.dialog_pw);
 // bank 7 idx 2 — the lobby-connect dialog (origin PackImage(7,2)): frame, soft
 // glow, log well, form sub-panel + field/button wells all baked in. Drawn 1:1
-// in virtual space — register for the per-phase variant swap.
+// in virtual space — register for the canonical variant swap.
 bake(7, 2, cppxChrome.dialog_connect, &cppxChrome.dialog_connect_w, &cppxChrome.dialog_connect_h);
 register_legacy(7, 2, cppxChrome.dialog_connect);
 // The 116x24 stipple strip that covers the dialog's baked 52px button wells
@@ -343,14 +343,12 @@ bake_backdrop(6, 0, false, cppxChrome.starfield);
 bake_backdrop(6, 0, true, cppxChrome.starfield_stretched);
 bake_backdrop(7, 1, true, cppxChrome.lobby_backdrop);
 // Options·Controls frame (bank 7 idx 7, origin PackImageStretch(7,7)): a
-// STRETCHED element, so its dither phase only matches the golden through the
-// same two-hop chain, evaluated at the element's absolute device footprint.
-// Recreate origin's virtual element box (options_controls_screen.cpp: root
-// padding = legacy margins L5/R7/T6/B20 scaled into the virtual canvas, panel
-// GROWs to fill, height min 420), then bake at a device rect snapped outward
-// to logical points that land on integer device px — Yoga rounds layout to
-// whole logical px, so only those draw 1:1 (e.g. even points at scale 1.5).
-// The Panel absolutely positions a box of exactly this logical rect.
+// STRETCHED element. Recreate origin's virtual element box
+// (options_controls_screen.cpp: root padding = legacy margins L5/R7/T6/B20
+// scaled into the virtual canvas, panel GROWs to fill, height min 420) and
+// hand the Panel its logical rect; the executor swaps the draw for the
+// canonical per-size Stretch variant (register_legacy below) — no
+// device-footprint bake, position no longer affects the pattern (U-2).
 if(7 < banks.size() && 7 < banks[7].size()){
 const std::shared_ptr<Surface> &sp = banks[7][7];
 if(sp && sp->w > 0 && sp->h > 0 && !sp->pixels.empty()){
@@ -365,52 +363,29 @@ const int bx = scale_legacy(5, vw, kLegacyRenderWidth);
 const int by = scale_legacy(6, vh, kLegacyRenderHeight);
 const int bw = vw - bx - scale_legacy(7, vw, kLegacyRenderWidth);
 const int bh = std::max(420, vh - by - scale_legacy(20, vh, kLegacyRenderHeight));
-// Device footprint of the element under the centered whole-frame magnify.
+// Logical rect of the box under the centered whole-frame magnify.
 const int scaledW = (int)(vw * s + 0.5f);
 const int scaledH = (int)(vh * s + 0.5f);
 const int offX = scaledW < rw ? (rw - scaledW) / 2 : 0;
 const int offY = scaledH < rh ? (rh - scaledH) / 2 : 0;
-const int fx0 = offX + (int)std::ceil(bx * s);
-const int fy0 = offY + (int)std::ceil(by * s);
-const int fx1 = std::min(offX + (int)std::ceil((bx + bw) * s), rw);
-const int fy1 = std::min(offY + (int)std::ceil((by + bh) * s), rh);
-// Snap a logical point onto the integer-device grid (bounded search; falls
-// back to the nearest logical px when uiScale admits no exact hit).
-auto device_integral = [&](int l){
-const float d = l * uiScale;
-return std::fabs(d - std::floor(d + 0.5f)) < 0.01f;
-};
-auto snap_lo = [&](int dev){
-int l = (int)std::floor(dev / uiScale);
-for(int k = 0; k < 8 && l > 0 && !device_integral(l); ++k) --l;
-return l;
-};
-auto snap_hi = [&](int dev){
-int l = (int)std::ceil(dev / uiScale);
-for(int k = 0; k < 8 && !device_integral(l); ++k) ++l;
-return l;
-};
-const int lx0 = snap_lo(fx0), ly0 = snap_lo(fy0);
-const int lx1 = snap_hi(fx1), ly1 = snap_hi(fy1);
-const int devX = (int)std::floor(lx0 * uiScale + 0.5f);
-const int devY = (int)std::floor(ly0 * uiScale + 0.5f);
-const int texW = (int)std::floor(lx1 * uiScale + 0.5f) - devX;
-const int texH = (int)std::floor(ly1 * uiScale + 0.5f) - devY;
-uint32_t id = cppxHost->bake_element_sprite(
-    sp->pixels.data(), sp->w, sp->h, page_for_bank(7), bx, by, bw, bh,
-    kLegacyRenderWidth, kLegacyRenderHeight, devX, devY, texW, texH);
+uint32_t id = cppxHost->bake_chrome_sprite(sp->pixels.data(), sp->w, sp->h,
+                                           page_for_bank(7));
 if(id){
+cppxHost->register_legacy(id, sp->pixels.data(), sp->w, sp->h,
+                          page_for_bank(7), kLegacyRenderWidth,
+                          kLegacyRenderHeight,
+                          silencer::cppx_ui::LegacyFit::Stretch);
 cppxChrome.chrome_controls = id;
-cppxChrome.chrome_controls_x = (float)lx0;
-cppxChrome.chrome_controls_y = (float)ly0;
-cppxChrome.chrome_controls_w = (float)(lx1 - lx0);
-cppxChrome.chrome_controls_h = (float)(ly1 - ly0);
+cppxChrome.chrome_controls_x = (offX + (float)std::ceil(bx * s)) / uiScale;
+cppxChrome.chrome_controls_y = (offY + (float)std::ceil(by * s)) / uiScale;
+cppxChrome.chrome_controls_w = bw * s / uiScale;
+cppxChrome.chrome_controls_h = bh * s / uiScale;
 }
 }
 }
 // bank 208 frame 60 — the static SILENCER logo (final reveal frame). Drawn at
-// native x1.5 logical = 1:1 in origin's virtual canvas, so it striped like the
-// ovals — register every logo frame for the per-phase variant swap too.
+// native x1.5 logical = 1:1 in origin's virtual canvas like the ovals —
+// register every logo frame for the canonical variant swap too.
 bake(208, 60, cppxChrome.logo, &cppxChrome.logo_w, &cppxChrome.logo_h);
 register_legacy(208, 60, cppxChrome.logo);
 // SIL-94/107: the logo reveal frames (individual textures). [0] is the full
@@ -442,7 +417,7 @@ register_legacy(6, 15, cppxChrome.toggle_r_on);
 // bank-134 art because bank 133's bracket cells are dash-shaped). origin's
 // AdvantageBracket draws a 4x11 crop (srcX 0 left / 1 right) through
 // EffectColor(224) at 1:1 virtual — bake the cropped+tinted cells and
-// register them so the per-phase variant swap applies (src-cropped draws are
+// register them so the canonical variant swap applies (src-cropped draws are
 // not bake-eligible).
 {
 auto bake_bracket = [&](char ch, int src_x, uint32_t &id_out){
@@ -476,7 +451,7 @@ bake_bracket(']', 1, cppxChrome.bracket_r);
 }
 // bank 181 idx0-4 — the five agency emblems (SIL-102 Character Create detail).
 // origin draws them PackImageContain into their element box, so register the
-// contain flavor: the executor swaps each draw for a per-phase/per-size
+// contain flavor: the executor swaps each draw for a canonical per-size
 // variant baked through origin's letterbox + magnify arithmetic.
 const auto &res = game.world.resources;
 for(int i = 0; i < 5; ++i){
@@ -500,7 +475,7 @@ cppxChrome.agency_emblem_oy[i] = (int16_t)res.spriteoffsety[181][i];
 }
 }
 // Staging roster ready checks (bank 7 idx18/19), drawn 1:1 in virtual space —
-// register as plain legacy sprites for the per-phase variant swap.
+// register as plain legacy sprites for the canonical variant swap.
 bake(7, 18, cppxChrome.ready_on, &cppxChrome.ready_w, &cppxChrome.ready_h);
 bake(7, 19, cppxChrome.ready_off);
 register_legacy(7, 18, cppxChrome.ready_on);

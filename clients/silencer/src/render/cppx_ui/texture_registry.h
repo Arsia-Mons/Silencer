@@ -19,7 +19,7 @@ namespace silencer::cppx_ui {
 
 // How a registered legacy sprite meets its element box in origin's virtual
 // canvas (decides both the bake arithmetic and which draws qualify):
-//   Cell      — drawn 1:1 at its native size (per-phase device-cell variant)
+//   Cell      — drawn 1:1 at its native size
 //   NineSlice — composited into the box with cropped corners + tiled bands
 //   Contain   — letterboxed into the box (origin DispatchImage Contain)
 //   Stretch   — stretched to the box (origin DispatchImage Stretch)
@@ -48,18 +48,18 @@ public:
   // Maps an id back to its SDL_Texture* (nullptr for id==0 or unknown).
   SDL_Texture *lookup(uint32_t id) const;
 
-  // ---- Legacy virtual-grid sprites (origin menu striping parity) ----------
-  // origin composites menus on a virtual int(W/s) x int(H/s) canvas and then
-  // NEAREST-magnifies the whole frame by s (src = int(dx/s)) — a sprite drawn
-  // 1:1 in virtual space gets its device pixel-duplication PHASE from its
-  // absolute position. Registering a baked chrome texture's indexed source
-  // lets the executor swap qualifying draws (the sprite at 1:1 virtual scale)
-  // for a lazily-baked variant that evaluates origin's chain at the element's
-  // absolute device cell. Variants memoize on (X%18, Y%18): the duplication
-  // pattern period divides 18 for every quarter-integer s in play (1, 1.5,
-  // 2.25, 3, 4.5). Sized fits (NineSlice/Contain/Stretch) composite into an
-  // arbitrary-size virtual box first, so their variants also memoize on the
-  // recovered virtual size. Caps (virtual px) apply to NineSlice only.
+  // ---- Legacy virtual-grid sprites (canonical-phase bake, U-2/SIL-204) ----
+  // origin composited menus on a virtual int(W/s) x int(H/s) canvas and then
+  // NEAREST-magnified the whole frame by s (src = int(dx/s)) — a sprite's
+  // device pixels (and size) depended on its absolute position, an accident
+  // of the pipeline. Registering a baked chrome texture's indexed source lets
+  // the executor swap qualifying draws (the sprite at 1:1 virtual scale, or a
+  // sized fit) for a lazily-baked CANONICAL variant: origin's chain evaluated
+  // at phase 0 (src = int(lx/s), lx from 0), so every instance of a sprite is
+  // pixel-identical and identically sized. Variants memoize on (base_id, s) —
+  // sized fits (NineSlice/Contain/Stretch) composite into an arbitrary-size
+  // virtual box first, so theirs also memoize on the recovered virtual size.
+  // Caps (virtual px) apply to NineSlice only.
   void register_legacy(uint32_t base_id, const uint8_t *indices, int w, int h,
                        const SDL_Color *palette256, int legacy_w, int legacy_h,
                        LegacyFit fit, int cap_l = 0, int cap_r = 0,
@@ -85,11 +85,10 @@ public:
   void shutdown();
 
 private:
-  // Raised from 64: the per-phase legacy variants (sprites, nine-slice
-  // buttons, contain emblems, stretch plates) accumulate across a session —
-  // a 13-screen capture run measurably exceeds 64 and silently fell back to
-  // raw draws (game_staging regression, 2026-06-11). Atlasing remains the
-  // long-term relief valve.
+  // Raised from 64 when variants were per-phase (X%18, Y%18) and a 13-screen
+  // capture run exceeded it (game_staging regression, 2026-06-11). Canonical
+  // variants (U-2) collapse to one per sprite/size, but the headroom stays —
+  // ramp/team palette variants register many base sprites.
   static constexpr int kMaxTextures = 256;
   SDL_Texture *textures_[kMaxTextures] = {};
   int count_ = 0;
@@ -102,20 +101,20 @@ private:
     int cap_l = 0, cap_r = 0, cap_t = 0, cap_b = 0;
     SDL_Color palette[256] = {};
   };
-  // Sized-fit resolve (NineSlice/Contain/Stretch): the box's virtual rect is
-  // recovered by rounding; the variant memoizes on (base_id, X%18, Y%18, vw, vh).
+  // Sized-fit resolve (NineSlice/Contain/Stretch): the box's virtual SIZE is
+  // recovered by rounding; the variant memoizes on (base_id, s, vw, vh).
   bool resolve_legacy_sized(const LegacySprite &sp, uint32_t base_id,
                             SDL_Renderer *renderer, float dev_x, float dev_y,
                             float dev_w, float dev_h, int out_w, int out_h,
                             LegacyVariant *out);
-  // Cell resolve: only 1:1-virtual draws qualify; memoizes on (base_id, X%18, Y%18).
+  // Cell resolve: only 1:1-virtual draws qualify; memoizes on (base_id, s).
   bool resolve_legacy_cell(const LegacySprite &sp, uint32_t base_id,
                            SDL_Renderer *renderer, float dev_x, float dev_y,
                            float dev_w, float dev_h, int out_w, int out_h,
                            LegacyVariant *out);
 
   std::map<uint32_t, LegacySprite> legacy_;     // base_id -> indexed source
-  std::map<uint64_t, uint32_t> legacy_variants_; // (base_id, X%18, Y%18[, vw, vh]) -> id
+  std::map<uint64_t, uint32_t> legacy_variants_; // (base_id, s[, vw, vh]) -> id
 };
 
 } // namespace silencer::cppx_ui

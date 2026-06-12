@@ -233,9 +233,9 @@ void render_image(SDL_Renderer *r, const ::ui::DrawCommand &c,
 
   if (nine) {
     // Legacy chrome nine-slice (origin DispatchButtonNineSlice): swap the
-    // draw for a per-phase/per-size variant baked through origin's virtual
-    // nine-slice + whole-frame magnify at this element's absolute device
-    // cell (see resolve_legacy for the plain-sprite analog).
+    // draw for a canonical per-size variant baked through origin's virtual
+    // nine-slice + NEAREST magnify at phase 0 (U-2/SIL-204 — identical
+    // pixels at every position; see resolve_legacy).
     {
       int out_w = 0, out_h = 0;
       TextureRegistry::LegacyVariant v;
@@ -326,10 +326,11 @@ void render_image(SDL_Renderer *r, const ::ui::DrawCommand &c,
   SDL_FRect src = has_src ? src_sub : SDL_FRect{0.f, 0.f, tw, th};
   SDL_FRect dst = {c.rect.x * scale, c.rect.y * scale, c.rect.w * scale,
                    c.rect.h * scale};
-  // Legacy virtual-grid sprite (origin menu chrome): swap the draw for a
-  // per-phase variant baked through origin's whole-frame magnify at this
-  // element's absolute device cell, drawn 1:1 — GPU/SW resampling of the
-  // native sprite can't reproduce origin's int(dx/s) duplication phase.
+  // Legacy virtual-grid sprite (origin menu chrome): swap the draw for the
+  // canonical variant baked through origin's NEAREST magnify at phase 0,
+  // drawn 1:1 at the floor-quantized device cell (U-2/SIL-204) — GPU/SW
+  // resampling of the native sprite can't reproduce the int(lx/s)
+  // duplication bands.
   if (!has_src && !img.flip_h) {
     int out_w = 0, out_h = 0;
     TextureRegistry::LegacyVariant v;

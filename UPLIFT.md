@@ -145,6 +145,28 @@ State: IN PROGRESS
   recovers the golden cell). Apply U-1's landed lessons: element boxes keep
   their design-metric layout (no size growth) and floor (not round) dst
   quantization so 1:1-scale in-game draws are untouched.
+- **As implemented (2026-06-12):** canonical bakes per fit
+  (bake_canonical_{cell,stretch,nineslice,contain}_rgba, sprite_bake.cpp):
+  hop-1 composite into the box-local virtual buffer (origin int arithmetic,
+  bx=by=0), then shared NEAREST magnify from phase 0 (src=int(t/s), footprint
+  ceil(v*s) so every virtual px keeps its full duplication band). Variants
+  memoize on (base_id, s[, vw, vh]) — scale in the key fixes the latent
+  stale-scale-after-resize bug the old key had (U-1's a2ea50a7 lesson); the
+  (X%18, Y%18) positional key is gone. Draw position floor-quantized; at s=1
+  the bake is the identity so in-game draws are byte-identical by
+  construction (suites 72/76 PASS against pristine origin in-game goldens).
+  Deleted with no shims: per-position memo key, bake_element_rgba,
+  bake_element_nineslice_rgba, bake_element_contain_rgba,
+  PipelineHost::bake_element_sprite + the options_controls device-footprint
+  snap-outward contract (chrome_controls converted to the standard
+  register_legacy Stretch path; Panel keeps its absolute logical rect).
+  Authoring nudges kept as plain layout offsets (U-1 precedent). Verified
+  with evidence (docs/plans/uplift-evidence/U-2/): mainmenu md-oval left caps
+  Tutorial/Options/Exit — BEFORE sizes 74/75/74 + 36-41 differing ink px,
+  AFTER all 75 with 0 ink-mask and 0 ink-value diffs; options_display toggle
+  discs rows 1/2 — BEFORE 46 differing px, AFTER 0; diff overlays show
+  changes confined to legacy chrome sprites (text + backdrops byte-stable).
+  15 BEFORE captures byte-matched the goldens before the change.
 - **Parity blast radius:** Systemic — every golden with legacy chrome sprites
   at scale >1: the 13 menu/lobby goldens + hover_mainmenu_oval +
   mission_summary + gallery (sprite bands: ovals, toggles, logo, nine-slice
@@ -152,4 +174,4 @@ State: IN PROGRESS
   magnify striping). Same supersession protocol as U-1.
 - **Effort:** M
 - **Ticket:** SIL-204
-- **Status:** TICKETED
+- **Status:** IN REVIEW (SIL-204)
