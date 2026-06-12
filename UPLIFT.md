@@ -5,7 +5,7 @@ ledger catalogs where the golden was a faulty target: origin implementation
 accidents we recreated that should instead be elevated to the inferred
 intent. Findings are PROPOSED until the user signs off per-item.
 
-State: IN PROGRESS
+State: REVIEW COMPLETE — remaining items awaiting user
 
 ## Coverage
 
@@ -1678,3 +1678,25 @@ and cleared:
   separate TUI scancode capture path and the quit-prompt-only civilian-wander
   mask band. No Linear ticket opened because there is no new
   ARTIFACT/DEFECT/ERA-LIMIT candidate in this unit.
+
+### Final completeness pass — 2026-06-12
+
+The coverage table has no remaining `UNEXAMINED` rows. The live golden
+directory contains 30 PNG baselines; every product screen golden is covered by
+the table's screen/unit rows, while `hover_mainmenu_oval.png` and
+`gallery.png` are non-screen support baselines already documented by the
+systemic U-1/U-2/U-3 supersession notes plus PARITY.md/ORIGIN_GOLDENS.md.
+
+No finding is contradicted by a later unit note. The implemented findings
+remain in review: U-1/SIL-190, U-2/SIL-204, U-3/SIL-205, U-4/SIL-206,
+U-5/SIL-207, and U-7/SIL-51. U-6/SIL-208 is the only remaining ticketed
+finding; it stays user-decision-only because the correction is at/below
+perception threshold (max 3/255 per channel) and would supersede all 30
+goldens, including the pristine in-game verification anchors.
+
+One non-golden caveat remains outside this audit's ticketing scope:
+`update_screen.cppx` has no current golden and still sizes its dialog from
+`chrome.dialog_msg_w/h` with `tokens::image_patch(chrome.dialog_msg)`. U-7
+fixed the message/password modal baselines that had pixel evidence; add
+updater visual coverage before treating the update screen as an audited
+uplift target.
