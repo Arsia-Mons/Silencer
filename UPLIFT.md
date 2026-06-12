@@ -26,7 +26,7 @@ State: IN PROGRESS
 | character_create | EXAMINED 2026-06-12 | none (see unit note) |
 | cc_alias | EXAMINED 2026-06-12 | none (see unit note) |
 | cc_select_agency | EXAMINED 2026-06-12 | none (see unit note) |
-| lobby_screen | UNEXAMINED | |
+| lobby_screen | EXAMINED 2026-06-12 | none (see unit note) |
 | create_game | UNEXAMINED | |
 | game_staging | UNEXAMINED | |
 | tech_select | UNEXAMINED | |
@@ -941,3 +941,67 @@ candidates.** What was checked and cleared:
   those bracket sprites are present in origin and current, sit beside the same
   parsed `+3`/`+5` metadata, and do not show a design-intent miss. No Linear
   ticket opened because there is no new ARTIFACT/DEFECT/ERA-LIMIT candidate.
+
+### Unit note — lobby_screen (2026-06-12)
+
+Audited the logged-in lobby's current golden
+(`tests/cli-agent/e2e/golden/lobby_screen.png`) after regenerating the lobby
+cluster with
+`OUT=/tmp/cppx_renders_uplift_lobby_screen bash tools/cap/cap_lobby.sh`;
+the fresh `/tmp/cppx_renders_uplift_lobby_screen/lobby_screen.png`
+byte-matches the current golden (`cmp_exit=0`, sha256
+`5087a1b09b3124ae1fb8a42358e52709255ef338e7e37d823f0746d693312375`) and
+the tolerant pixdiff is `0.0000 (mae=0.00 maxtile=0.0% hot_tiles=0 PASS)`.
+Compared against the pristine origin capture
+(`git show ba345131:tests/cli-agent/e2e/golden/lobby_screen.png`) and the
+origin Clay-era source. **Zero candidates.** What was checked and cleared:
+
+- **Authored shape matches origin intent:** origin `LobbyScreen::BuildUi`
+  resets to lobby palette/page 2, stretches the bank-7 lobby backdrop, then
+  computes `rootPadX`, `rootPadTop`, `regionGap`, title height, and body rect
+  from the live surface (`origin/main:clients/silencer/src/client/ui/screens/
+  lobby/lobby_screen.cpp:57-76,113-176`). The stepped cockpit panes are then
+  resolved with fixed legacy ratios: character panel, open-right upper pane,
+  elbow seam, chat pane, chat/tall seam, and open-left right-tall pane
+  (`lobby_main_area.cpp:153-192,260-386`). The title bar, agent card, empty
+  game browser, and chat/presence layout are likewise explicit source
+  structure (`lobby_chrome.cpp:91-183`, `character_panel.cpp:308-520`,
+  `game_select_panel_layout.cpp:241-287`, `chat_panel_layout.cpp:63-195`).
+  The current cppx screen mirrors those constants through
+  `resolve_lobby_panes` and the screen-local `LobbyPaneGrid`/panel components
+  (`clients/silencer/src/client/ui/components/layout/lobby_panes.h:28-75`,
+  `clients/silencer/src/client/ui/components/layout/screen_layout.cppx:23-53`,
+  `clients/silencer/src/client/ui/screens/lobby_screen.cppx:70-113,
+  756-1032,1067-1143,1150-1344`).
+- **Golden pixels express that shape cleanly:** at 1920x1080 the resolved
+  design geometry is `pad_x=20`, `pad_top=38`, `gap=20`, `left_w=777`,
+  `tall_w=463`, `chat_w=757`, `agent_w=436`, `upper_h=180` logical. Direct
+  pixel measurement on the current golden found the title bar UI bbox at
+  `(30,57)-(1889,121)`, agent card `(30,151)-(683,420)`, upper-right/create
+  pane `(714,151)-(1195,421)`, right-tall Active Games cell
+  `(1195,151)-(1889,1023)`, chat panel `(30,450)-(1165,1023)`, chat log well
+  `(45,499)-(1149,965)`, Active Games well `(1216,207)-(1869,771)`, and
+  agent stat well `(397,211)-(670,407)`. Evidence:
+  `docs/plans/uplift-evidence/lobby_screen/agent_card_current_2x.png`,
+  `active_games_empty_cell_current_2x.png`, and
+  `chat_presence_split_current_2x.png`.
+- **No new screen-specific accident found:** the apparent overlapping
+  cockpit lines are the authored open-edge pane joins and seam strips from
+  origin's `OpenRightChrome`, `OpenLeftChrome`, `RightEdgeChrome`, and
+  `LobbyElbowGapSeam`/`LobbyChatTallSeam` layout, not a clipped or doubled
+  border. The zoomed seam crop shows continuous strokes at the elbow/right
+  tall join with no 1px black gutter or broken endpoint:
+  `docs/plans/uplift-evidence/lobby_screen/
+  pane_elbow_and_right_tall_seam_current_4x.png`. The large empty
+  Active Games well is also intentional: origin builds an empty scroll-list
+  frame when `state.rows` is empty and has no placeholder text
+  (`game_select_panel.cpp:34-60,192-207`;
+  `game_select_panel_layout.cpp:154-193`).
+- **Already-adjudicated, not re-opened:** current-vs-pristine differences are
+  the documented U-1/U-2/U-3 supersessions (canonical text, canonical legacy
+  sprites/buttons/emblem, and single-hop lobby backdrop). A side-by-side crop
+  of the pristine and current left pane grid is saved at
+  `docs/plans/uplift-evidence/lobby_screen/
+  pristine_vs_current_left_pane_grid.png`; those differences do not expose a
+  new lobby-screen-specific ARTIFACT/DEFECT/ERA-LIMIT candidate. No Linear
+  ticket opened.
