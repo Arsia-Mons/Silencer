@@ -29,7 +29,7 @@ State: IN PROGRESS
 | lobby_screen | EXAMINED 2026-06-12 | none (see unit note) |
 | create_game | EXAMINED 2026-06-12 | none (see unit note) |
 | game_staging | EXAMINED 2026-06-12 | none (see unit note) |
-| tech_select | UNEXAMINED | |
+| tech_select | EXAMINED 2026-06-12 | none (see unit note) |
 | mission_summary | UNEXAMINED | |
 | message_modal / password_modal | UNEXAMINED | |
 | ingame: hud_base / top_ticker / status_lines | UNEXAMINED | |
@@ -1122,4 +1122,62 @@ cleared:
   pristine_origin_vs_current_upper_roster_50pct.png`,
   `pristine_vs_current_changed_pixels_magenta_50pct.png`, and
   `current_vs_golden_diff_black_50pct.png`. No Linear ticket opened because
+  there is no new ARTIFACT/DEFECT/ERA-LIMIT candidate.
+
+### Unit note — tech_select (2026-06-12)
+
+Audited the pregame Choose Tech panel after regenerating the lobby cluster
+with
+`OUT=/tmp/cppx_uplift_tech_select_20260612093756 bash tools/cap/cap_lobby.sh`;
+the fresh `/tmp/cppx_uplift_tech_select_20260612093756/tech_select.png`
+byte-matches the current golden (`cmp_exit=0`, sha256
+`8beb5c93fc442cdb6c62917e90ad8a82b179435f05698f904aad3d2fbf07f240`) and
+the tolerant pixdiff is `0.0000 (mae=0.00 maxtile=0.0% hot_tiles=0 PASS)`.
+Compared against the pristine origin capture
+(`git show ba345131:tests/cli-agent/e2e/golden/tech_select.png`, sha256
+`fdd5b56a1216600b714c8ced5fb4de3982e7b10449885a20054e9939b818129f`) and
+the origin Clay-era source. **Zero candidates.** What was checked and
+cleared:
+
+- **Authored shape matches origin intent:** origin mounts the tech screen by
+  swapping the joined-game upper cell from Choose/Change/Ready to a single
+  full-width `Back To Teams` button, and the right-tall cell to
+  `BuildGameTechTallTree`
+  (`origin/main:clients/silencer/src/client/ui/screens/lobby/
+  lobby_main_area.cpp:215-249`). The tech tall tree places
+  `Tech slots left: N` at virtual pad `(57,36)` with
+  `LegacyPalette(129,144,true)`, then builds the grid
+  (`game_tech_panel.cpp:252-264`). The grid constants are fixed 13px rows,
+  local column 3, 13x13 bank-7 toggle sprites, 1px column gap, and labels two
+  px to the right/two px down from the toggle row
+  (`tech_tree_grid.cpp:32-46,70-75,101-118,131-146,191-245`). The current
+  cppx screen mirrors those anchors directly in `TechUpperPanel` and
+  `TechListCell`
+  (`clients/silencer/src/client/ui/screens/lobby_screen.cppx:584-602,
+  605-672`), with the same model-side slots-left/filter/interactable rules
+  (`clients/silencer/src/game/ui/lobby_ui_model.cpp:238-268`).
+- **Golden pixels express that shape cleanly:** live inspect found 15
+  `TechRow` controls, all at logical x `878`, with row y positions
+  `192/212/231/251/270/290/309/329/348/368/387/407/426/446/465`; at the
+  1920x1080 device scale those floor to
+  `288/318/346/376/405/435/463/493/522/552/580/610/639/669/697`, the
+  expected 13-virtual-px rhythm at 2.25x (`30/28/30/29` repeating). The slots
+  text gray-pixel bbox is `(1325,232)-(1566,250)`, matching virtual
+  `(588,103)` after scale/ink-bearing offset. The visible rows are the
+  origin-filtered Noxis list: `Laser`, `Rocket`, `Flamer Ammo`,
+  `Health Pack`, `E.M.P. Bomb`, `Shaped Bomb`, `Plasma Bomb`,
+  `Neutron Bomb`, `Plasma Detonator`, `Fixed Cannon`, `Flare`, `Camera`,
+  `Base Door`, `Base Defense`, `Insider Info`. The first two selected rows
+  and the one-slot enabled rows remain bright; multi-slot rows are dim because
+  the readout reports one slot left. Evidence:
+  `docs/plans/uplift-evidence/tech_select/tech_grid_anchor_overlay_2x.png`.
+- **No screen-specific accident found:** checkbox rings are closed, selected
+  fills are not clipped, dim rows follow the origin `techslotsleft` logic,
+  labels stay inside the right-tall panel, and the `Back To Teams` chrome is
+  continuous. Current-vs-pristine origin differs by 177,648 pixels, but the
+  differences are the documented U-1/U-2/U-3 supersessions (canonical text,
+  canonical legacy sprites/toggles/buttons, and single-hop lobby backdrop).
+  Side-by-side context is saved at
+  `docs/plans/uplift-evidence/tech_select/
+  tech_grid_pristine_vs_current_2x.png`. No Linear ticket opened because
   there is no new ARTIFACT/DEFECT/ERA-LIMIT candidate.
