@@ -155,10 +155,79 @@ cli --port "$CTRL_PORT" click --label "Noxis" >/dev/null
 cli --port "$CTRL_PORT" wait_for_state --state LOBBY --timeout-ms 15000
 
 # The lobby renders the real read cluster (agent + chat + games panels), not the
-# old scaffold: its leave ("Agents"/LeaveLobby) and create ("Create Game"/NewGame)
-# controls are present. (The chat panel has no Send button in this design — its
-# input strip is non-interactive chrome.)
+# old scaffold: its leave ("Agents"/LeaveLobby), create ("Create Game"/NewGame),
+# and chat compose controls are present.
 wait_for_widget "Agents"
 wait_for_widget "NewGame"
+wait_for_widget "Chat"
+
+if [ -n "${SIL193_ARTIFACT_DIR:-}" ]; then
+  mkdir -p "$SIL193_ARTIFACT_DIR"
+  cli --port "$CTRL_PORT" inspect > "$SIL193_ARTIFACT_DIR/after-lobby.json"
+fi
+
+cli --port "$CTRL_PORT" inspect | bun -e '
+const r = JSON.parse(await new Response(Bun.stdin.stream()).text());
+const chat = (r.nodes || []).find((n) =>
+  (n.control_id === "LobbyChat" || n.label === "Chat") && n.role === "input");
+if (!chat) {
+  console.error("LobbyChat input/textbox not found");
+  process.exit(1);
+}
+'
+
+wait_for_chat_value() {
+  local want="$1"
+  local got=""
+  for i in $(seq 1 50); do
+    got=$(cli --port "$CTRL_PORT" inspect | WANT="$want" bun -e '
+      const r = JSON.parse(await new Response(Bun.stdin.stream()).text());
+      const want = process.env.WANT;
+      const chat = (r.nodes || []).find((n) =>
+        n.control_id === "LobbyChat" || n.label === "Chat");
+      if (!chat) { console.log("<missing>"); process.exit(0); }
+      console.log((chat.value || "") === want ? "ok" : (chat.value || ""));
+    ' 2>/dev/null || true)
+    if [ "$got" = "ok" ]; then return 0; fi
+    cli --port "$CTRL_PORT" wait_frames --n 2 >/dev/null
+  done
+  echo "LobbyChat value ${got:-<missing>}, want '$want'" >&2
+  cli --port "$CTRL_PORT" inspect >&2 || true
+  return 1
+}
+
+wait_for_lobby_chat_echo() {
+  local needle="$1"
+  for i in $(seq 1 100); do
+    if cli --port "$CTRL_PORT" inspect | NEEDLE="$needle" bun -e '
+      const r = JSON.parse(await new Response(Bun.stdin.stream()).text());
+      const nodes = r.nodes || [];
+      const hasEcho = nodes.some((n) =>
+        n.role === "text" && (n.value || "").includes(process.env.NEEDLE));
+      const chat = nodes.find((n) =>
+        n.control_id === "LobbyChat" || n.label === "Chat");
+      const cleared = chat && (chat.value || "") === "";
+      process.exit(hasEcho && cleared ? 0 : 1);
+    '; then
+      return 0
+    fi
+    cli --port "$CTRL_PORT" wait_frames --n 2 >/dev/null
+  done
+  echo "Lobby chat echo '$needle' did not appear with cleared compose field" >&2
+  cli --port "$CTRL_PORT" inspect >&2 || true
+  return 1
+}
+
+CHAT_MESSAGE="hello linear"
+cli --port "$CTRL_PORT" set_text --label "Chat" --text "$CHAT_MESSAGE" >/dev/null
+wait_for_chat_value "$CHAT_MESSAGE"
+if [ -n "${SIL193_ARTIFACT_DIR:-}" ]; then
+  cli --port "$CTRL_PORT" inspect > "$SIL193_ARTIFACT_DIR/after-set-text.json"
+fi
+cli --port "$CTRL_PORT" key --key enter >/dev/null
+wait_for_lobby_chat_echo "$CHAT_MESSAGE"
+if [ -n "${SIL193_ARTIFACT_DIR:-}" ]; then
+  cli --port "$CTRL_PORT" inspect > "$SIL193_ARTIFACT_DIR/after-send.json"
+fi
 
 echo "PASS 30_lobby_login"

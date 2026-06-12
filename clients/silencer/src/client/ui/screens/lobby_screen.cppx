@@ -16,6 +16,7 @@
 #include "client/ui/hooks/use_staging.h"
 #include "client/ui/screens/character_create_data.h"
 #include "ui/components/box.h"
+#include "ui/components/input.h"
 #include "ui/components/text.h"
 #include "ui/runtime/react.h"
 
@@ -31,8 +32,18 @@ using namespace silencer;
 using ::ui::children;
 using ::ui::components::Box;
 using ::ui::components::BoxProps;
+using ::ui::components::Input;
+using ::ui::components::InputProps;
 using ::ui::components::Text;
 using ::ui::components::TextProps;
+
+constexpr size_t kLobbyChatMaxChars = 200;
+
+std::string cap_lobby_chat_text(const std::string &value) {
+  if (value.size() <= kLobbyChatMaxChars)
+    return value;
+  return value.substr(0, kLobbyChatMaxChars);
+}
 
 // One AgentCard stat row (WINS/LOSSES/XP): a fixed-width Body label column with
 // the value aligned after it, origin's StatRow convention (Body face, not tiny).
@@ -955,12 +966,64 @@ struct AgentCardProps {
   </Box>
 }
 
-// The lower-left chat panel: channel title, log well + presence column, the
-// decorative input strip.
+struct LobbyChatComposeProps {
+  const char *key = nullptr;
+  std::function<void(const std::string &)> send = {};
+  ::ui::Color caret_color = {};
+};
+
+::ui::UiElement LobbyChatCompose(const LobbyChatComposeProps &props) {
+  std::string *compose = use_state<std::string>(std::string());
+  std::string *live = use_state<std::string>(std::string());
+  if (!compose || !live)
+    return ::ui::empty();
+  *live = *compose;
+
+  std::function<void(const std::string &)> on_change =
+      [compose, live](const std::string &value) {
+        std::string next = cap_lobby_chat_text(value);
+        *compose = next;
+        *live = next;
+      };
+  std::function<void(const ::ui::ActivationEvent &)> on_activate =
+      [compose, live, send = props.send](const ::ui::ActivationEvent &) {
+        std::string message = cap_lobby_chat_text(*live);
+        if (message.empty())
+          return;
+        if (send)
+          send(message);
+        compose->clear();
+        live->clear();
+      };
+  const ::ui::StyleStatePatch field_style =
+      tokens::chromeless_field_style(props.caret_color, tokens::kTextBody);
+
+  return <Input
+    key="field"
+    id="LobbyChat"
+    accessibility={{.label = "Chat"}}
+    value={compose->c_str()}
+    onChange={on_change}
+    onActivate={on_activate}
+    layout={::ui::LayoutStyle{
+      .align_items = ::ui::AlignItems::Center,
+      .justify_content = ::ui::JustifyContent::Start,
+      .width = ::ui::Length::percent(100.0f),
+      .height = ::ui::Length::percent(100.0f),
+      .padding = {6.0f, 0.0f, 0.0f, 0.0f}}}
+    style={field_style}
+  />
+}
+
+// The lower-left chat panel: channel title, log well + presence column, and the
+// lobby chat compose field.
 struct LobbyChatPanelProps {
+  const char *key = nullptr;
   const char *title = "Lobby";
   const char *scrollback = "";
   const char *presence = "";
+  std::function<void(const std::string &)> send = {};
+  ::ui::Color caret_color = {};
   bool pregame = false; // staging connected: header reads "Pregame"
   float chat_w = 0.0f;
 };
@@ -1028,7 +1091,9 @@ struct LobbyChatPanelProps {
         .height = ::ui::Length::points(25.0f),
         .flex_shrink = ::ui::StyleFloat::points(0.0f)}}
       style={tokens::frame_patch(tokens::kInsetStroke)}
-    />
+    >
+      <LobbyChatCompose key="compose" send={props.send} caretColor={props.caret_color} />
+    </Box>
   </Box>
 }
 
@@ -1312,12 +1377,18 @@ struct LobbyScreenProps {
       .emblem_tex = emblem_tex,
       .agent_w = panes.agent_w,
       .on_leave = session.leave_to_menu});
-  ::ui::UiElement chat_panel = LobbyChatPanel(LobbyChatPanelProps{
-      .title = chat_title,
-      .scrollback = scrollback,
-      .presence = presence,
-      .pregame = staging.active,
-      .chat_w = panes.chat_w});
+  ::ui::UiElement chat_panel = ::ui::component(
+      "LobbyChatPanel",
+      LobbyChatPanelProps{
+          .key = "chatPanel",
+          .title = chat_title,
+          .scrollback = scrollback,
+          .presence = presence,
+          .send = chat.send,
+          .caret_color = chrome.caret_lobby,
+          .pregame = staging.active,
+          .chat_w = panes.chat_w},
+      LobbyChatPanel);
 
   ::ui::UiElement grid = LobbyPaneGrid(LobbyPaneGridProps{
       .panes = panes,
