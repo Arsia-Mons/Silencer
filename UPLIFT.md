@@ -32,7 +32,7 @@ State: IN PROGRESS
 | tech_select | EXAMINED 2026-06-12 | none (see unit note) |
 | mission_summary | EXAMINED 2026-06-12 | none (see unit note) |
 | message_modal / password_modal | EXAMINED 2026-06-12 | U-7 |
-| ingame: hud_base / top_ticker / status_lines | UNEXAMINED | |
+| ingame: hud_base / top_ticker / status_lines | EXAMINED 2026-06-12 | none (see unit note) |
 | ingame: chat (open + history) / messages | UNEXAMINED | |
 | ingame: player_list / system_camera | UNEXAMINED | |
 | ingame: tech_overlay / buy_tech / secret_overlay | UNEXAMINED | |
@@ -1360,3 +1360,60 @@ the background differences are already covered by the prior U-1/U-2/U-3
 supersessions. The Chrome OK buttons remain the origin no-hover chrome family
 documented in ORIGIN_GOLDENS; this audit found no additional button-state or
 focus-trap issue beyond the modal container/text layout defect.
+
+### Unit note — ingame: hud_base / top_ticker / status_lines (2026-06-12)
+
+Audited the first in-game unit after running the in-game gates and then
+recapturing persistent evidence with the same deterministic drives:
+`bash tests/cli-agent/e2e/72_visual_regression_ingame.sh` PASS and
+`bash tests/cli-agent/e2e/76_visual_regression_ingame_extra.sh` PASS;
+`tools/cap/cap_ingame_cppx.sh /tmp/cppx_uplift_ingame_base_20260612` and
+`tools/cap/cap_ingame_cppx_extra.sh /tmp/cppx_uplift_ingame_extra_20260612`
+produced the crops below. **Zero candidates.** What was checked and cleared:
+
+- **Authored shape matches origin intent:** origin's in-game HUD remains a
+  fixed 640x480 device-coordinate overlay, not the menu whole-frame magnify
+  path. `origin/main:clients/silencer/src/client/ui/hud/InGameHud.cpp:20-67`
+  orders system camera, status sprites, readouts, team strip, secret/trace,
+  buy/tech, and chat. `hud_status_sprites.cpp:40-180` places minimap,
+  gauges, weapon face/selector, inventory icons, and letters at exact sprite
+  offsets. `hud_readouts.cpp:14-88` places ammo/health/shield/credits and
+  inventory counts at fixed pens. `InGameOverlays.cpp:147-209` centers the
+  bottom status stack with `TextAdvance(BodySm)=7`, draws shadow/main lines
+  at `(x+1, y+1)` and `(x, y)`, and draws the top ticker at `(200,10)` with
+  a 35-char window. The cppx port mirrors these rules through `L(d)` integer
+  device recovery and the same coordinates in
+  `clients/silencer/src/client/ui/screens/in_game_screen.cppx:24-120`,
+  `:127-260`, and `:702-748`; snapshot state for top/status lines is copied
+  from world messaging in
+  `clients/silencer/src/game/ui/world_session_model.cpp:316-329`.
+- **Golden pixels express that shape cleanly:** fresh `ingame_hud_base`
+  current-vs-golden measurements were byte-identical in the checked HUD
+  readout regions: lower-left ammo/weapon/status crop `(0,400)-(180,480)`,
+  lower-right files/credits crop `(450,400)-(640,480)`, and the top-right
+  inventory crop `(520,0)-(640,80)` all had `changed_px=0`. Evidence:
+  `docs/plans/uplift-evidence/ingame_hud_base_top_ticker_status_lines/
+  hud_lower_left_golden_vs_current_4x.png`,
+  `hud_lower_right_golden_vs_current_4x.png`,
+  `hud_inventory_golden_vs_current_4x.png`, and `measurements.json`.
+- **Top ticker has no ticker-specific artifact:** the golden/current crop
+  shows `*MUSIC PAUSED*` at the origin window, with text ink at the expected
+  leading-space offset. The fresh crop `(190,0)-(470,35)` differs only in
+  sparse rain pixels (`top_ticker_diff_black_5x.png` marks changed pixels as
+  magenta); no changed pixels touch the green ticker glyphs. Evidence:
+  `top_ticker_golden_vs_current_5x.png` and
+  `top_ticker_diff_black_5x.png`.
+- **Status stack has no fade/centering defect:** `Can't build a base here`
+  appears centered over the terminal at the origin fade frame, and the
+  golden/current status crop `(190,340)-(470,390)` is byte-identical
+  (`changed_px=0`). The line's x/y, shadow offset, color fade, and
+  bottom-stack position match origin's `DrawStatus` arithmetic. Evidence:
+  `status_line_golden_vs_current_6x.png` and
+  `status_line_diff_black_6x.png`.
+- **Already-adjudicated, not re-opened:** full-frame fresh captures still
+  show the documented in-game capture nondeterminism from ORIGIN_GOLDENS
+  (rain/minimap/civilian masks), and the scenario gates passed under those
+  masks. The in-game set remains intentionally pristine-origin-gated after
+  U-1/U-5, so palette U-6 and menu-scale uplift decisions are not re-litigated
+  here. No Linear ticket opened because there is no new ARTIFACT/DEFECT/
+  ERA-LIMIT candidate in this unit.
