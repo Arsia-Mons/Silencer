@@ -137,6 +137,12 @@ ingame_system_camera`
   behaviortree.cpp:81) that wall-clock rain also consumes — wandering
   civilians need masks: `270,230,330,290` (status_lines, by the terminal) and
   `395,230,480,320` (secret_overlay, deck right of the door).
+  quit_prompt addendum (2026-06-11): its longer TUI quit drive lets the civilians
+  wander the full deck — observed flapping tiles at (234,242) and (416,242) across
+  full-suite runs (3.6%→5.2% on the same tile). The 72 gate masks their whole
+  traversal band `0,242,624,296` (bodies above the already-masked ripple band
+  y296-340) for quit_prompt only; other surfaces keep the tighter per-spot boxes.
+
 - **ingame_system_camera is NOT render-gated:** after the first base entry,
   origin's ambience repaint (game_loop.cpp:184 `CopyWithBrightness(colors,
   level, 2, 114)`) stamps the SHARED temppalette's stale high indices into

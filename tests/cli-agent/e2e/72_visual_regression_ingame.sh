@@ -32,8 +32,14 @@ gate_all() {
   local fail=0 s out verdict
   for s in hud_base chat_open chat_history player_list buy_tech tech_overlay \
            messages quit_prompt; do
+    # quit_prompt's long TUI drive lets the rand()-driven civilians wander the
+    # whole deck (two flapping tiles at y242 across runs); mask their traversal
+    # band above the ripple band — ORIGIN_GOLDENS.md "NPC wander".
+    # (${extra[@]+...}: macOS bash 3.2 + set -u abort on empty-array expansion.)
+    local extra=()
+    [ "$s" = quit_prompt ] && extra=(--mask 0,242,624,296)
     out="$(python3 "$TOLERANT" "$WORK/ingame_$s.png" \
-           "$GOLDEN_DIR/ingame_$s.png" "${MASKS[@]}")"
+           "$GOLDEN_DIR/ingame_$s.png" "${MASKS[@]}" ${extra[@]+"${extra[@]}"})"
     verdict="$(printf '%s\n' "$out" | head -1)"
     echo "ingame_$s: $verdict"
     case "$verdict" in
