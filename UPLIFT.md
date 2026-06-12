@@ -22,7 +22,7 @@ State: IN PROGRESS
 | options_audio | EXAMINED 2026-06-12 | none (see unit note) |
 | options_display | EXAMINED 2026-06-12 | none (see unit note) |
 | options_controls | EXAMINED 2026-06-12 | none (see unit note) |
-| lobby_connect | UNEXAMINED | |
+| lobby_connect | EXAMINED 2026-06-12 | none (see unit note) |
 | character_create | UNEXAMINED | |
 | cc_alias | UNEXAMINED | |
 | cc_select_agency | UNEXAMINED | |
@@ -749,3 +749,50 @@ What was checked and cleared:
   The PARITY.md breadcrumbs (`titlewrap inset-top 13`, `OR ml 2`) remain the
   port-side phase-recovery cleanup called out by the systemic
   spacing/alignment audit, not an uplift candidate.
+
+### Unit note — lobby_connect (2026-06-12)
+
+Audited after regenerating the lobby cluster with
+`OUT=/tmp/cppx_renders_uplift_lobby_connect bash tools/cap/cap_lobby.sh`;
+the fresh `/tmp/cppx_renders_uplift_lobby_connect/lobby_connect.png`
+byte-matches the current golden (`cmp_exit=0`, md5
+`397d8e32e7f512cae8d5f20ae93001c7`) and the tolerant pixdiff is
+`0.0000 (mae=0.00 maxtile=0.0% hot_tiles=0 PASS)`. **Zero candidates.**
+What was checked and cleared:
+
+- **Authored shape matches origin intent:** origin `LobbyConnectScreen`
+  defines one fixed 284x277 virtual dialog with a 250x170 log well, two
+  21px form rows, a 116x24 stipple patch over the baked button wells, and
+  label-fit Chrome buttons (`lobby_connect_screen.cpp:51-70`). It centers
+  the baked `PackImage(7, 2)` dialog sprite (`:344-358`), draws the log via
+  `ScrollTextBox` at `kLogX/kLogY` with 11px line height (`:365-382`), lays
+  out Username/Password labels + text inputs over the baked wells
+  (`:395-475`), then patches the old button wells and draws Login/Create +
+  Cancel over them (`:497-527`). The cppx screen mirrors the same contract:
+  one baked `dialog_connect` sprite with chromeless overlays
+  (`clients/silencer/src/client/ui/screens/lobby_connect.cppx:70-147`) and
+  absolute log/field/button positions (`:159-257`).
+- **Golden pixels express that shape cleanly:** the live inspect tree places
+  the panel at logical `(427,152) 426x416` with the sprite anchored one
+  logical px left (device x639), log text at logical x436 and y164/180/197/
+  213/230, Username/Password labels at `(448,448)` and `(448,489)`, input
+  wells at `(571,445) 264x31` and `(571,486) 264x30`, and Login/Create +
+  Cancel at `(501,525) 174x32` and `(675,525) 102x32`. Direct pixel
+  measurement found the current non-black dialog bbox
+  `(639,228)-(1273,851)`; the focused Username caret is the documented lobby
+  sage rgb `(116,156,104)` at `(858,678)-(859,701)`. Evidence:
+  `docs/plans/uplift-evidence/lobby_connect/current_dialog_2x.png`,
+  `current_log_form_3x.png`, `current_chrome_buttons_6x.png`, and
+  `username_caret_sage_8x.png`.
+- **No screen-specific accident found:** the frame, log well, form wells,
+  caret, stipple patch, and Chrome buttons are continuous with no broken cap,
+  gutter, clipped stroke, or unintended hover state. The current-vs-pristine
+  origin comparison (`git show ba345131:tests/cli-agent/e2e/golden/
+  lobby_connect.png`) differs only inside the dialog region
+  `(639,230)-(1273,851)`, matching the already adjudicated U-1 canonical text
+  and U-2 canonical legacy-sprite supersessions; PARITY.md explicitly notes
+  U-3 left this screen byte-unchanged because no backdrop is visible. Evidence:
+  `docs/plans/uplift-evidence/lobby_connect/pristine_vs_current_dialog_diff_2x.png`.
+  The ORIGIN_GOLDENS chrome-hover negative check also confirms this Chrome
+  button family intentionally has no hover visual change, so the rest-state
+  buttons are not hiding a missing focused/hovered frame.
