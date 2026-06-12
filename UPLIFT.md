@@ -24,7 +24,7 @@ State: IN PROGRESS
 | options_controls | EXAMINED 2026-06-12 | none (see unit note) |
 | lobby_connect | EXAMINED 2026-06-12 | none (see unit note) |
 | character_create | EXAMINED 2026-06-12 | none (see unit note) |
-| cc_alias | UNEXAMINED | |
+| cc_alias | EXAMINED 2026-06-12 | none (see unit note) |
 | cc_select_agency | UNEXAMINED | |
 | lobby_screen | UNEXAMINED | |
 | create_game | UNEXAMINED | |
@@ -838,3 +838,49 @@ candidates.** What was checked and cleared:
   sprites, single-hop backdrop), not a new roster-step defect. Evidence:
   `docs/plans/uplift-evidence/character_create/
   pristine_vs_current_left_pane_250pct.png`.
+
+### Unit note — cc_alias (2026-06-12)
+
+Audited the alias modal's current golden
+(`tests/cli-agent/e2e/golden/cc_alias.png`) after regenerating the lobby
+cluster with
+`OUT=/tmp/cppx_renders_uplift_cc_alias bash tools/cap/cap_lobby.sh`; the
+fresh `/tmp/cppx_renders_uplift_cc_alias/cc_alias.png` byte-matches the
+current golden (`cmp_exit=0`, md5 `9b9b9300f755bcbfb08ac5fbc1894311`).
+Compared against the pristine origin capture
+(`git show ba345131:tests/cli-agent/e2e/golden/cc_alias.png`) and the origin
+Clay-era source. **Zero candidates.** What was checked and cleared:
+
+- **Authored shape matches origin intent:** origin uses the same select-agent
+  frame behind the modal (`BuildEnterAlias` calls `BuildSelectAgent` with
+  `interactive=false`, `origin/main:clients/silencer/src/client/ui/screens/
+  character_create/character_create_layout.cpp:728-735`), then floats a fixed
+  284x108 virtual `PackImage(40, 2)` alias dialog at `kAliasModalTop=161`
+  (`:92-100`, `:737-754`). The title is centered in a 33px title band
+  (`:755-773`), and the text input is a fixed 236x27 virtual frame at
+  offset `(24,49)` (`:774-790`). The cppx screen mirrors that contract with
+  the underlying frame plus a 426x162 logical dialog sprite, a dialog title,
+  and a chromeless focused input over the baked well
+  (`clients/silencer/src/client/ui/screens/character_create.cppx:279-360`).
+- **Golden pixels express that shape cleanly:** the live inspect tree places
+  the alias modal at logical `(425,242) 426x162`, title text at
+  `(523,252) 231x29`, and the focused Alias input at `(471,316) 354x40`.
+  Direct pixel measurement on the current golden found the input well as one
+  closed green component `(691,474)-(1221,533)` = 531x60 device px, and the
+  empty-field caret as exact menu-palette yellow rgb `(252,252,0)` at
+  `(718,491)-(719,514)` (48 px). Evidence:
+  `docs/plans/uplift-evidence/cc_alias/current_alias_modal_2x.png`,
+  `input_caret_current_6x.png`, and
+  `current_frame_and_modal_150pct.png`.
+- **No screen-specific accident found:** the dialog frame, side caps, input
+  oval, caret, underlying roster row, and baked scroll rail are continuous
+  with no clipped cap, gutter, broken ring, or stray focus/hover state.
+  Current-vs-pristine differences span the screen because `cc_alias` was
+  intentionally superseded by U-1/U-2/U-3; inside the modal crop the visual
+  differences are the already adjudicated canonical glyphs, canonical sprite
+  phase, and single-hop backdrop, not a new alias-specific defect. Evidence:
+  `docs/plans/uplift-evidence/cc_alias/
+  pristine_vs_current_alias_modal_150pct.png`. PARITY.md's cc_alias row
+  already records the U-1/U-2/U-3 supersession and the historical one-frame
+  caret low-tile disclosure; the current real-flow capture is byte-identical
+  to the golden.
