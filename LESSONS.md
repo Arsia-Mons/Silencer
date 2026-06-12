@@ -291,3 +291,18 @@
   post-base-entry origin golden carries it; our page-color-baked RGBA HUD can't
   follow live palette mutation — that gate is waived (PARITY.md), and a trace-time
   golden would need a no-base-entry drive to dodge it.
+
+- **queue_deferred_mutation only survives if queued DURING the frame** —
+  begin_frame clears the deferred queue, so a mutation queued from pre-frame
+  code (control dispatch, the pipeline's input pre-pass) silently vanishes.
+  Event handlers (on_change/on_activate) run inside the frame and may queue;
+  pre-frame game-side code must mutate the world directly (safe — the
+  no-mutation rule guards mid-build only).
+
+- **Pointer click = on_activate on ANY focusable in the engine — gate inputs.**
+  Every submit-on-activate text field (password modal, lobby connect, chat
+  compose) fired its submit when set_text's synthetic focus-click landed.
+  origin inputs submit on RETURN only; fixed at the substrate
+  (FocusRuntime.confirmed_by_pointer + ClientUi skips invoke_activate for
+  Input-role pointer confirms). Symptom signature: a modal that closes itself
+  the moment a script set_texts into it.
