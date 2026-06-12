@@ -115,6 +115,7 @@ private:
         .accessibility_label = props.accessibility.label,
         .accessibility_description = props.accessibility.description,
         .value = props.text.value,
+        .display_value = props.text.display_value,
         .interaction = props.interaction,
         .text_edit = props.text_edit,
         .on_focus = props.callbacks.on_focus,
@@ -420,6 +421,7 @@ HostProps UiElementFrame::copy_host_props(const HostProps &props) {
   copied.key = copy_string(props.key);
   copied.id = copy_string(props.id);
   copied.text.value = copy_string(props.text.value);
+  copied.text.display_value = copy_string(props.text.display_value);
   copied.text_edit.composition = copy_string(props.text_edit.composition);
   copied.accessibility.label = copy_string(props.accessibility.label);
   copied.accessibility.description =

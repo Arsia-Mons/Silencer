@@ -137,6 +137,10 @@ void publish_change(const std::function<void(const std::string &)> &on_change,
     return ::ui::empty();
 
   std::string rendered_value = props.value ? props.value : "";
+  std::string display_value = rendered_value;
+  if (props.password) {
+    display_value.assign(rendered_value.size(), '*');
+  }
   if (!state->initialized) {
     state->caret = value_length(rendered_value);
     state->selection_anchor = -1;
@@ -226,7 +230,7 @@ void publish_change(const std::function<void(const std::string &)> &on_change,
     idOffset={props.id_offset}
     style={detail::control_layout_style(props.layout)}
     visual={visual}
-    text={::ui::HostTextProps{.value = props.value}}
+    text={::ui::HostTextProps{.value = props.value, .display_value = display_value.c_str()}}
     interaction={detail::interaction_from_props(props, true)}
     textEdit={text_edit_metadata(*state, props.show_caret)}
     accessibility={detail::accessibility_from_props(props, ::ui::SemanticRole::TextBox)}

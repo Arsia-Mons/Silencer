@@ -441,7 +441,10 @@ bool append_input_contents(DrawCommandList &list, const NodeSnapshot &node,
   text_rect.height = kTextHeight;
 
   const char *value = node.value ? node.value : "";
+  const char *display_value =
+      node.display_value && node.display_value[0] ? node.display_value : value;
   int length = text_length(value);
+  int display_length = text_length(display_value);
   float font_size = node.visual.text.font_size > 0.f ? node.visual.text.font_size
                                                       : 15.f;
   // Inputs are single-line; reuse the node's resolved text line height if any.
@@ -458,7 +461,8 @@ bool append_input_contents(DrawCommandList &list, const NodeSnapshot &node,
 
   // Measured pen x for the prefix [0, idx) of the value.
   auto advance_to = [&](int idx) -> float {
-    return measured_advance(value, static_cast<uint32_t>(idx), font_id,
+    int display_idx = clamp_int(idx, 0, display_length);
+    return measured_advance(display_value, static_cast<uint32_t>(display_idx), font_id,
                             font_size, line_height);
   };
 
@@ -479,8 +483,8 @@ bool append_input_contents(DrawCommandList &list, const NodeSnapshot &node,
           ? node.visual.text.color
           : ((node.interaction.disabled || inherited_disabled) ? kTextDisabledFill
                                                                : kTextFill);
-  if (!push_text_command(list, node.id, text_rect, value, text_color, font_size,
-                         TextAlign::Left))
+  if (!push_text_command(list, node.id, text_rect, display_value, text_color,
+                         font_size, TextAlign::Left))
     return false;
 
   if (focused && node.text_edit.show_caret) {

@@ -225,6 +225,7 @@ std::vector<::ui::UiElement> connect_status_log(const std::string &log) {
           value={password->c_str()}
           onChange={set_password}
           onActivate={on_activate}
+          password={true}
           layout={field_layout}
           style={field_style}
         />

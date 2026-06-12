@@ -259,6 +259,7 @@ bool UiTree::set_metadata(NodeId id, const NodeMetadata &metadata) {
   copy_value(node->accessibility_description,
              metadata.accessibility_description);
   copy_value(node->value, metadata.value);
+  copy_value(node->display_value, metadata.display_value);
   return true;
 }
 
@@ -394,6 +395,7 @@ bool UiTree::snapshot(NodeId id, NodeSnapshot *out) const {
       .accessibility_label = node->accessibility_label,
       .accessibility_description = node->accessibility_description,
       .value = node->value,
+      .display_value = node->display_value,
       .role = node->role,
       .semantic_role = node->semantic_role,
       .interaction = node->interaction,

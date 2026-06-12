@@ -23,6 +23,7 @@ struct InputProps {
   std::function<void(const ::ui::TextEditingEvent &)> on_text_editing = {};
   const char *value = "";
   std::function<void(const std::string &)> on_change = {};
+  bool password = false;
   bool show_caret = true; // blink gate (origin TextInputOpts.showCaret)
   ::ui::LayoutStyle layout = {
       .align_items = ::ui::AlignItems::Stretch,

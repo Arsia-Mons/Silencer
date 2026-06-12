@@ -61,6 +61,7 @@ enum class HostKind : uint8_t {
 
 struct HostTextProps {
   const char *value = "";
+  const char *display_value = "";
 };
 
 struct AccessibilityProps {
