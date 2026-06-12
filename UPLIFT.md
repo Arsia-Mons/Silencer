@@ -20,7 +20,7 @@ State: IN PROGRESS
 | mainmenu | EXAMINED 2026-06-12 | none (see unit note) |
 | options | EXAMINED 2026-06-12 | none (see unit note) |
 | options_audio | EXAMINED 2026-06-12 | none (see unit note) |
-| options_display | UNEXAMINED | |
+| options_display | EXAMINED 2026-06-12 | none (see unit note) |
 | options_controls | UNEXAMINED | |
 | lobby_connect | UNEXAMINED | |
 | character_create | UNEXAMINED | |
@@ -649,3 +649,47 @@ and cleared:
   chrome sprites, and single-hop backdrop), not a new Audio-specific defect.
   Evidence:
   `docs/plans/uplift-evidence/options_audio/pristine_vs_current_form_150pct.png`.
+
+### Unit note — options_display (2026-06-12)
+
+Audited after regenerating the menu-cluster renders with
+`OUT=/tmp/cppx_renders_uplift_options_display bash tools/cap/cap_menus.sh`;
+the fresh `/tmp/cppx_renders_uplift_options_display/options_display.png`
+byte-matches the current golden (`cmp_exit=0`, pixdiff `0.0000`,
+tolerant gate `0.0000 ... PASS`). Full visual gate
+`bash tests/cli-agent/e2e/70_visual_regression.sh` also passed. **Zero
+candidates.** What was checked and cleared:
+
+- **Authored shape matches origin intent:** origin `OptionsDisplayScreen`
+  resets to palette/camera for the overlay, draws only the full-screen bank-6
+  starfield on the root (`options_display_screen.cpp:42-50, 89-96`), then
+  lays out a fixed 420-virtual panel with 24/32 padding and 22px child gaps
+  but no visible frame (`:97-106`). Its visible contents are one title
+  (`:107-108`), two Boolean rows (`:116-129`), and Save/Cancel Md ovals
+  (`:131-145`). Origin `BooleanSettingRow` is fixed geometry: 33px row
+  height, 24px button-to-indicator gap, 10px indicator gap, and two 20x33
+  indicator sprites (`components/boolean_setting_row.cpp:19-23, 58-68`);
+  origin `button.cpp:110-143` resolves the row label to the 220x33 Lg oval
+  and Save/Cancel to 196x33 Md ovals.
+- **Golden pixels express that shape cleanly:** the live inspect tree places
+  the title at logical `(516,168) 248x29`, the Fullscreen row at
+  `(418,230) 442x50`, the Smooth Scaling row at `(419,309) 441x50`, and the
+  action row at `(336,392) 606x50`. Pixel measurement on the fresh capture
+  found the title green bbox `(776,252)-(1142,289)`, row bboxes
+  `(627,345)-(1283,419)` and `(628,463)-(1283,537)`, matching 118px vertical
+  pitch, and the action row bbox `(504,588)-(1406,662)`. Both toggle stacks
+  are aligned at x1177 with identical bbox sizes. Evidence:
+  `docs/plans/uplift-evidence/options_display/current_form_2x.png`,
+  `toggle_rows_current_4x.png`, `save_cancel_row_current_4x.png`, and
+  `current_vs_golden_diff_black_2x.png`.
+- **No screen-specific accident found:** there is intentionally no visible
+  panel frame, both toggle pairs are continuous and aligned, and the two-row
+  spacing follows the same fixed origin constants as Audio/Controls. The
+  pristine-origin vs current comparison shows only the already adjudicated
+  U-1/U-2/U-3 supersession families (canonical glyphs, canonical chrome
+  sprites, and single-hop backdrop), not a new Display-specific defect.
+  Evidence:
+  `docs/plans/uplift-evidence/options_display/pristine_origin_vs_current_form_150pct.png`.
+  The remaining PARITY.md breadcrumb (`fullscreenw` row nudge + `indDx`) is
+  port-side phase-recovery glue already called out by the systemic
+  spacing/alignment audit as a cleanup item, not an uplift candidate.
