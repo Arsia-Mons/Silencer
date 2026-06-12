@@ -14,7 +14,7 @@ State: IN PROGRESS
 | [systemic] whole-frame magnify: glyph striping | EXAMINED 2026-06-12 | U-1 |
 | [systemic] whole-frame magnify: sprite phase striping | EXAMINED 2026-06-12 | U-2 |
 | [systemic] background image double-scaling / banding | EXAMINED 2026-06-12 | U-3 |
-| [systemic] float-rect flooring: 1px seams & jitter | UNEXAMINED | |
+| [systemic] float-rect flooring: 1px seams & jitter | EXAMINED 2026-06-12 | U-4, U-5 (no ORIGIN-side candidates — see unit note) |
 | [systemic] palette quantization & dim formulas | UNEXAMINED | |
 | [systemic] spacing/alignment consistency across siblings | UNEXAMINED | |
 | mainmenu | UNEXAMINED | |
@@ -251,3 +251,100 @@ State: IN PROGRESS
 - **Effort:** S
 - **Ticket:** SIL-205
 - **Status:** IN REVIEW (SIL-205)
+
+### Unit note — [systemic] float-rect flooring (2026-06-12)
+
+Examined the three flooring/rounding breadcrumbs PARITY.md recorded
+(cc_select_agency oval right-cap clip + right-panel 1px clip, create_game
+scrollbar thumb rounding) against the PRISTINE origin goldens
+(`git show ba345131:tests/cli-agent/e2e/golden/...` — raw origin captures,
+pre-supersession). Outcome inverts the audit brief's assumption: **origin's
+pixels are correct in all three spots** — its int-virtual-grid pipeline
+(unscaled sprite blits at int coords, integer thumb arithmetic) doesn't
+produce these defects. The clips/gaps are OURS (fractional logical boxes +
+floor quantization + nearest stretch decimation), passed sub-gate by the old
+pixdiff metric and then enshrined as the target by the U-1/2/3 golden
+supersessions → findings U-4, U-5 (DEFECT, port-side). The remaining
+pristine-vs-current ±1px deltas in those regions (cc right-panel border
+strokes 2↔3px, scrollbar rail columns, corner pieces) are stroke-phase
+shifts attributable to U-2's canonical-bake divergence (documented
+supersession), not seams — no ticket. Origin-side positional jitter that
+DOES exist (mainmenu oval pitch 151/150/151, 24/25 pen rhythm) is the
+accepted non-integer-scale residual U-1/U-2 already adjudicated. No
+origin-side flooring candidate found; recording zero rather than padding.
+
+### U-4: cc_select_agency agency ovals — right cap sheared, ring broken (port defect enshrined by supersession)
+- **Unit:** [systemic] float-rect flooring: 1px seams & jitter
+- **Class:** DEFECT (ours — origin renders it correctly)
+- **Severity:** med
+- **Golden shows:** All five agency-row ovals in the CURRENT
+  `tests/cli-agent/e2e/golden/cc_select_agency.png` have a flat-sheared right
+  cap with the ring BROKEN at the oval's vertical middle. Noxis oval
+  (y211-271): right ink stops at x901 and rows y236-246 have no ring ink at
+  all (dark fill bleeds out the gap); left cap complete to x373. Symmetry
+  (top edge x394-883, center 638.5) puts the intended right extreme at x904.
+  Assembly 529 device px wide vs correct 531. The PRISTINE origin golden
+  (ba345131) renders it full + symmetric: 374→904 every row, ring closed.
+  character_create's roster row (same 236×27 row_plate sprite) is full-width
+  531 with closed ring in the CURRENT golden — the break is agency-step-only.
+  HEAD render == golden re-verified this session (suite 71 PASS). Evidence:
+  `docs/plans/uplift-evidence/systemic-float-rect-flooring/`
+  (cc_agency_oval_rightcap_origin_vs_current_6x.png,
+  cc_oval_leftcap_mirrored_vs_rightcap_6x.png).
+- **Origin cause:** none — origin blits the full unscaled 236×27 sprite at
+  int coords (`DispatchButtonSprite`,
+  `origin/main:clients/silencer/src/render/clay_ui_compositor.cpp` ~L602-619;
+  box = sprite width: kLeftColumnW=236, `character_create_layout.cpp:59,509`).
+- **Port cause:** agency-rows wrapper `.margin = {-1.5f, 3.5f, -3.0f, 3.0f}`
+  (`client/ui/screens/character_create.cppx:377`, a label-pen parity nudge)
+  nets the grow-to-pane List rows ~2 logical px narrower than the roster
+  step's; row_plate is `LegacyFit::Stretch` (`game_ui_pipeline.cpp:285`), so
+  the stretch bake nearest-decimates 236 src cols into ~235 virtual and drops
+  the cap's outermost ring column. Predates U-2 (present in the 2026-06-11
+  pre-uplift render; flagged sub-gate by the parity critic: PARITY.md
+  cc_select_agency "oval right-cap 2px clip @x903-904").
+- **Inferred intent:** closed symmetric stadium oval, identical to the roster
+  rows and origin's own render. Inverse case of U-1/2/3: the golden canonizes
+  OUR regression against an origin render that was already right.
+- **Elevated target:** agency rows' content box back to the full 236-virtual
+  width (rework the wrapper margins into non-box-shrinking offsets, keeping
+  the label pen on its golden cell); stretch bake at native size → no
+  decimation, ring closes, 531 device px. Supersede cc_select_agency.png,
+  diff confined to the five ovals' right-cap region.
+- **Parity blast radius:** single screen — cc_select_agency.png (suite 71).
+  In-game/hover untouched. Resolves the PARITY.md polish note.
+- **Effort:** S
+- **Ticket:** SIL-206
+- **Status:** TICKETED
+
+### U-5: create_game scrollbar thumb 1px short of track (right + bottom)
+- **Unit:** [systemic] float-rect flooring: 1px seams & jitter
+- **Class:** DEFECT (ours — origin renders it correctly)
+- **Severity:** low
+- **Golden shows:** CURRENT `tests/cli-agent/e2e/golden/create_game.png`:
+  Game Options scrollbar thumb fill spans x1157-1168 (160 rows/col), leaving
+  a 1px black gutter at x1169 before the track right edge (x1170-1172) while
+  sitting flush against the left edge (x1155-56); fill 1 row shorter than
+  origin's. PRISTINE origin golden (ba345131): fill flush x1157-1169, 161
+  rows, no gutter. HEAD render == golden (suite 71 PASS this session).
+  Evidence: `docs/plans/uplift-evidence/systemic-float-rect-flooring/
+  cg_scrollbar_thumb_origin_vs_current_5x.png`.
+- **Origin cause:** none — origin's custom scrollbar fill is integer
+  arithmetic on the virtual grid
+  (`origin/main:clients/silencer/src/render/clay_ui_compositor.cpp`
+  ~L955-1020), flush by construction.
+- **Port cause:** our inline decorative scrollbar (GameCreatePanel) computes
+  the thumb rect from fractional logical coords; floor of left + floor of
+  width drops the last device column/row on the right/bottom only. Flagged
+  sub-gate by the parity critic (PARITY.md create_game "scrollbar thumb 1px
+  rounding"); enshrined by the golden supersessions.
+- **Inferred intent:** thumb fill flush to the track interior on all sides.
+- **Elevated target:** compute the thumb's right/bottom as floored track
+  edges (floor(right) − floor(left)) so the device extent fills the interior
+  (to x1169, 161 rows). Supersede create_game.png, diff confined to the
+  thumb-fill rect.
+- **Parity blast radius:** single screen — create_game.png (suite 71).
+  Resolves the PARITY.md polish note.
+- **Effort:** S
+- **Ticket:** SIL-207
+- **Status:** TICKETED
