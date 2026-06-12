@@ -131,7 +131,9 @@ void InjectKeyOp(::ui::UiInputFrame& ui, const std::string& key){
 		ui.cancel_pressed = true;
 		ui.cancel_down = true;
 	}else if(key == "up"){ ui.nav_up = true;
-	}else if(key == "down" || key == "tab"){ ui.nav_down = true;
+	}else if(key == "down"){ ui.nav_down = true;
+	}else if(key == "tab"){ ui.nav_next = true;
+	}else if(key == "shift-tab" || key == "shift+tab"){ ui.nav_previous = true;
 	}else if(key == "left"){ ui.nav_left = true;
 	}else if(key == "right"){ ui.nav_right = true;
 	}else if(key == "backspace"){

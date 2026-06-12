@@ -88,15 +88,21 @@ break;
 ::ui::UiInputFrame & ui = gameUiPipeline.UiInput();
 ui.source = ::ui::UiFocusSource::Keyboard;
 ::ui::UiKey k = UiKeyFromSdl(event.key.key);
+uint16_t mods = UiModsFromSdl(SDL_GetModState());
 if(k != ::ui::UiKey::Unknown){
-::ui::ui_input_push_key(ui, k, UiModsFromSdl(SDL_GetModState()),
-                        event.key.repeat);
+::ui::ui_input_push_key(ui, k, mods, event.key.repeat);
 }
 switch(event.key.key){
 case SDLK_UP: ui.nav_up = true; break;
 case SDLK_DOWN: ui.nav_down = true; break;
 case SDLK_LEFT: ui.nav_left = true; break;
 case SDLK_RIGHT: ui.nav_right = true; break;
+case SDLK_TAB:
+if(mods & ::ui::UI_KEY_MOD_SHIFT)
+ui.nav_previous = true;
+else
+ui.nav_next = true;
+break;
 case SDLK_RETURN:
 case SDLK_KP_ENTER:
 case SDLK_SPACE: ui.confirm_pressed = true; ui.confirm_down = true; break;

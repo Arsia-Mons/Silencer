@@ -168,7 +168,8 @@ bool ClientUi::update_retained_runtime(const ::ui::FlexLayoutAdapter &layout,
     audio_events_.hovered_button = hovered_now;
   if (audible_button(confirmed))
     audio_events_.activated_button = true;
-  if ((input.nav_up || input.nav_down || input.nav_left || input.nav_right) &&
+  if ((input.nav_up || input.nav_down || input.nav_left || input.nav_right ||
+       input.nav_next || input.nav_previous) &&
       audible_button(focused))
     audio_events_.nav_focused_button = true;
 

@@ -33,6 +33,8 @@ namespace {
       .nav_down = frame.input.nav_down,
       .nav_left = frame.input.nav_left,
       .nav_right = frame.input.nav_right,
+      .nav_next = frame.input.nav_next,
+      .nav_previous = frame.input.nav_previous,
       .confirm_pressed = frame.input.confirm_pressed,
       .pointer_pressed = frame.input.pointer_pressed,
       .pointer_down = frame.input.pointer_down,

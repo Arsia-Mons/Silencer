@@ -26,7 +26,7 @@ function usage(): never {
       `       silencer-cli set_text --uid 1 --text "alice"   (textbox or textinput)\n` +
       `       silencer-cli select --label LISTBOX --index 0\n` +
       `       silencer-cli scroll --label "Controls List" [--amount 3]\n` +
-      `       silencer-cli key --key enter|escape|up|down|left|right|backspace|<char>\n` +
+      `       silencer-cli key --key enter|escape|up|down|left|right|tab|shift-tab|shift+tab|backspace|<char>\n` +
       `       silencer-cli show_password_modal [--title TEXT]\n` +
       `       silencer-cli show_message_modal --title TEXT --message TEXT\n` +
       `       silencer-cli password_modal_result\n` +

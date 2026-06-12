@@ -211,6 +211,31 @@ NodeId first_enabled(const FocusRuntime &runtime) {
   return 0;
 }
 
+NodeId resolve_sequential(const FocusRuntime &runtime, NodeId from_id,
+                          bool reverse) {
+  if (runtime.focusable_count <= 0)
+    return 0;
+
+  int start = reverse ? runtime.focusable_count : -1;
+  for (int i = 0; i < runtime.focusable_count; ++i) {
+    if (same_id(runtime.focusables[i].id, from_id)) {
+      start = i;
+      break;
+    }
+  }
+
+  for (int offset = 1; offset <= runtime.focusable_count; ++offset) {
+    int idx = reverse ? start - offset : start + offset;
+    idx %= runtime.focusable_count;
+    if (idx < 0)
+      idx += runtime.focusable_count;
+    const FocusableLayout &candidate = runtime.focusables[idx];
+    if (!candidate.disabled)
+      return candidate.id;
+  }
+  return 0;
+}
+
 NodeId hovered_enabled(const FocusRuntime &runtime, const InputFrame &input) {
   if (!input.pointer_valid)
     return 0;
@@ -320,8 +345,15 @@ bool focus_update(FocusRuntime *runtime, const UiTree &tree,
   }
 
   FocusDirection dir = FocusDirection::Down;
-  if (read_nav_dir(input, &dir) && !focused_text_input_should_handle_navigation(
-                                       tree, *runtime, input, dir)) {
+  if (input.nav_next || input.nav_previous) {
+    NodeId next =
+        resolve_sequential(*runtime, runtime->focused_id, input.nav_previous);
+    if (next != 0 && !same_id(next, runtime->focused_id)) {
+      set_focus(*runtime, next, navigation_source(input));
+    }
+  } else if (read_nav_dir(input, &dir) &&
+             !focused_text_input_should_handle_navigation(tree, *runtime, input,
+                                                          dir)) {
     NodeId next = resolve_spatial(*runtime, runtime->focused_id, dir);
     if (next != 0 && !same_id(next, runtime->focused_id)) {
       set_focus(*runtime, next, navigation_source(input));

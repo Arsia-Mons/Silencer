@@ -64,6 +64,8 @@ struct UiInputFrame {
   bool nav_down = false;
   bool nav_left = false;
   bool nav_right = false;
+  bool nav_next = false;
+  bool nav_previous = false;
 
   bool confirm_pressed = false;
   bool confirm_down = false;

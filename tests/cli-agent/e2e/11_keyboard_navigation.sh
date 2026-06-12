@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Keyboard-only navigation of the main menu: tab (= down) moves focus through
-# the registry order, and enter activates the focused button. In the modern
+# Keyboard-only navigation of the main menu: Tab cycles focus forward,
+# Shift+Tab cycles it backward, and Enter activates the focused button. In the modern
 # cppx UI the Options cluster is an overlay pushed over the menu (the session
 # phase stays MAINMENU; see 10_navigate.sh), so we verify the overlay opened
 # rather than waiting for a defunct OPTIONS game state.
@@ -16,22 +16,39 @@ trap 'stop_silencer "$PID" "$PORT"' EXIT
 wait_alive "$PORT"
 cli --port "$PORT" wait_for_state --state MAINMENU --timeout-ms 15000 >/dev/null
 
-# Main-menu focus order: Tutorial -> Connect To Lobby -> Options -> Exit (focus
-# starts on Tutorial). Two tabs (tab == down) move focus to "Options".
-# A third tab would land on "Exit"; activating it quits the app.
-cli --port "$PORT" key --key tab >/dev/null
-cli --port "$PORT" key --key tab >/dev/null
-
-# Verify keyboard nav landed focus on "Options" before activating it.
-focused_label="$(cli --port "$PORT" inspect | bun -e '
+focused_label() {
+  cli --port "$PORT" inspect | bun -e '
   const r = JSON.parse(require("fs").readFileSync(0, "utf8"));
   const n = r.nodes.find((n) => n.id === r.focused_id);
   process.stdout.write(n ? (n.label || "") : "");
-')"
-if [ "$focused_label" != "Options" ]; then
-  echo "FAIL 11_keyboard_navigation: expected focus on 'Options', got '$focused_label'" >&2
+'
+}
+press_and_expect_focus() {
+  local key="$1"
+  local want="$2"
+  cli --port "$PORT" key --key "$key" >/dev/null
+  cli --port "$PORT" wait_frames --n 2 >/dev/null
+  local got
+  got="$(focused_label)"
+  if [ "$got" != "$want" ]; then
+    echo "FAIL 11_keyboard_navigation: after '$key' expected focus '$want', got '$got'" >&2
+    exit 1
+  fi
+}
+
+# Main-menu focus order: Tutorial -> Connect To Lobby -> Options -> Exit.
+if [ "$(focused_label)" != "Tutorial" ]; then
+  echo "FAIL 11_keyboard_navigation: expected initial focus on Tutorial, got '$(focused_label)'" >&2
   exit 1
 fi
+press_and_expect_focus tab "Connect To Lobby"
+press_and_expect_focus tab "Options"
+press_and_expect_focus tab "Exit"
+press_and_expect_focus tab "Tutorial"
+press_and_expect_focus shift-tab "Exit"
+press_and_expect_focus shift-tab "Options"
+press_and_expect_focus shift-tab "Connect To Lobby"
+press_and_expect_focus tab "Options"
 
 # Enter activates the focused button -> Options overlay opens over the menu.
 cli --port "$PORT" key --key enter >/dev/null
