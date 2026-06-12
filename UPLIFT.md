@@ -17,7 +17,7 @@ State: IN PROGRESS
 | [systemic] float-rect flooring: 1px seams & jitter | EXAMINED 2026-06-12 | U-4, U-5 (no ORIGIN-side candidates — see unit note) |
 | [systemic] palette quantization & dim formulas | EXAMINED 2026-06-12 | U-6 (+ unit note: dim/brighten LUTs clean at all used combos) |
 | [systemic] spacing/alignment consistency across siblings | EXAMINED 2026-06-12 | none (see unit note) |
-| mainmenu | UNEXAMINED | |
+| mainmenu | EXAMINED 2026-06-12 | none (see unit note) |
 | options | UNEXAMINED | |
 | options_audio | UNEXAMINED | |
 | options_display | UNEXAMINED | |
@@ -471,6 +471,46 @@ iterations don't re-litigate:
   captures (that set is the strongest remaining verification anchor; in-game
   suites still gate against it). Churn > benefit; the auditing iteration
   itself predicted likely user rejection. Left for the user to decide.
+
+### Unit note — mainmenu (2026-06-12)
+
+First per-screen audit. Examined the current golden
+(`tests/cli-agent/e2e/golden/mainmenu.png`, post U-1/2/3 supersession)
+against the pristine origin capture (`git show ba345131:...`) and origin
+source (`origin/main:clients/silencer/src/client/ui/screens/main_menu/
+main_menu_screen.cpp` + `components/silencer_logo.cpp`). Suite 70 re-run
+this session: PASS (fresh render byte-matches the golden; the stale
+`/tmp/cppx_renders/mainmenu.png` from Jun 11 equals the PRISTINE golden —
+670,909 px diff vs current is exactly the documented U-1/2/3 supersession,
+don't be fooled by it). **Zero candidates.** What was checked and cleared:
+
+- **Logo sprite (bank 208, held frame 60):** no occlusion box — the dark
+  vertical band behind "R"/right ring continues far above and below the
+  logo stage (authored backdrop art, planet-limb shadow; evidence
+  `docs/plans/uplift-evidence/mainmenu/logo_dark_band_authored_backdrop_2x.png`);
+  backdrop-red px present in every column of the logo band (no transparency
+  defect). Tick marks between S/1 and 3/R, ring terminals, and the
+  horizontal wire are all present in the pristine origin golden — authored
+  animation art (logo_left/right_pristine_vs_current_4x.png). Ink bbox
+  pristine 772×66 @(257,513) vs current 771×65 @(258,514) — 1px stripe-phase
+  shift, the documented U-2 canonical-bake residual; no size growth, no
+  clipping (stage = frames-29..60 union bounds, frame ink well inside).
+- **Oval assemblies (U-4 lens):** Tutorial oval ring closed on every row
+  (no no-left/no-right holes, no empty columns), top/bottom edges flat at a
+  single device row across all 355 middle columns — no cap/middle seam;
+  the only edge jumps (7 device px at x1029/1035/1452/1458) are the cap
+  curvature steps of the authored art at 2.25×. Post-U-2 the four ovals are
+  byte-identical assemblies, so one oval proves all four.
+- **Layout arithmetic vs intent:** stagger spacers 40/80/40/0 virtual land
+  the left caps at x1026/1112(Lobby)/1026/936 — exactly 90 device px per
+  40-virtual step; version footer ink top-left at (22,1042) device =
+  origin's authored (kVersionFooterX=10, 480−17=463) cell exactly.
+- **Already-adjudicated, not re-litigated:** oval pitch 151/150/151 + 24/25
+  glyph-pen rhythm (U-1/U-2 non-integer-scale residual), label centering
+  bearing asymmetry (INTENT, siblings unit note), hover ramp (palette unit
+  note), backdrop banding/stars (U-3, fixed), slashed capital 'O' in
+  "Options" (font's authored glyph). PARITY.md's mainmenu nudges
+  (per-phase variants + string bake) were deleted by U-1/U-2 — none remain.
 
 ### Unit note — [systemic] spacing/alignment consistency across siblings (2026-06-12)
 
