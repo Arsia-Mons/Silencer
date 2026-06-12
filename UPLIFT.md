@@ -30,7 +30,7 @@ State: IN PROGRESS
 | create_game | EXAMINED 2026-06-12 | none (see unit note) |
 | game_staging | EXAMINED 2026-06-12 | none (see unit note) |
 | tech_select | EXAMINED 2026-06-12 | none (see unit note) |
-| mission_summary | UNEXAMINED | |
+| mission_summary | EXAMINED 2026-06-12 | none (see unit note) |
 | message_modal / password_modal | UNEXAMINED | |
 | ingame: hud_base / top_ticker / status_lines | UNEXAMINED | |
 | ingame: chat (open + history) / messages | UNEXAMINED | |
@@ -1181,3 +1181,68 @@ cleared:
   `docs/plans/uplift-evidence/tech_select/
   tech_grid_pristine_vs_current_2x.png`. No Linear ticket opened because
   there is no new ARTIFACT/DEFECT/ERA-LIMIT candidate.
+
+### Unit note — mission_summary (2026-06-12)
+
+Audited the post-match Mission Summary after running the dedicated gate
+`bash tests/cli-agent/e2e/74_visual_regression_mission_summary.sh`; the
+fresh `/tmp/cppx_renders/mission_summary_e2e.png` byte-matches the current
+golden (`fresh_vs_golden_changed_px=0`) and the tolerant pixdiff is
+`0.0000 (mae=0.00 maxtile=0.0% hot_tiles=0 PASS)`. The same gate also
+re-asserted the scroll behavior: rest first line `Kills:`, after -3 notches
+first visible text `Secrets`, clamped end includes the final Flamer
+`Player kills:` line, and scrolling back clamps at the top. Compared against
+the pristine origin capture
+(`git show ba345131:tests/cli-agent/e2e/golden/mission_summary.png`) and the
+origin Clay-era source. **Zero candidates.** What was checked and cleared:
+
+- **Authored shape matches origin intent:** origin defines one fixed
+  `640x480` stage with a `628x441` bank-7 idx-5 panel, frame margins
+  `5/7/19/20`, a stats column at `(89,92)` sized `180x308` but clamped by a
+  `300px` scroll window, six upgrade rows at `kLevelStartY + index*46`, and
+  seven `196x33` medium ovals for upgrades + Done
+  (`origin/main:clients/silencer/src/client/ui/screens/mission_summary/
+  mission_summary_screen.cpp:41-72,304-397`). Wheel input in origin is a
+  single accumulated `Scroll` action clamped to `[0, lines - 27]`
+  (`mission_summary_screen.cpp:251-258,407-417`). The cppx screen mirrors
+  the same floating grid, scroll window, row constants, and upgrade labels in
+  `clients/silencer/src/client/ui/screens/mission_summary.cppx:32-68,
+  195-239,246-268`.
+- **Golden pixels express that shape cleanly:** live inspect places the
+  stats wheel target at `(293,139) 270x462`, title at `(312,66)`, XP at
+  `(788,68)`, upgrade labels at x `744`, right-aligned values at x `984`,
+  six upgrade controls at x `717` with y `162/231/300/369/438/507`, and
+  Done at `(717,582)`, all `294x50` logical controls. Direct pixel masks on
+  the fresh render found continuous green components for the outer panel
+  `(250,43)-(1658,1035)`, left stats pane `(334,82)-(996,972)`, right upgrade
+  pane `(1024,84)-(1563,992)`, scroll rail `(914,199)-(956,888)`, its inner
+  fill `(919,235)-(951,852)`, and seven oval buttons
+  `(1075,243)-(1509,947)` at the expected row bands. Evidence:
+  `docs/plans/uplift-evidence/mission_summary/current_panel_150pct.png`,
+  `summary_column_current_3x.png`, `upgrade_rows_current_2x.png`, and
+  `scrollbar_and_done_current_4x.png`.
+- **No screen-specific accident found:** the panel joins, scroll rail,
+  summary text column, six upgrade rows, and Done button are continuous with
+  no broken cap, gutter, clipped stroke, row bleed, or unintended overlap.
+  The apparent static scrollbar is baked into the origin panel art while the
+  text window itself scrolls; origin passes `showScrollbar=false` for the
+  `ScrollTextBox`, and the real wheel probe above verifies the text movement.
+  Text-content quirks were also checked: origin literally passes
+  `Suicides` without a colon and uses bare section headers such as
+  `Secrets`, `Files`, and `Grenades thrown` in the same summary-line list
+  (`mission_summary_screen.cpp:443-479`), so there is no pixel-level
+  evidence of a rendering miss to elevate.
+- **Already-adjudicated, not re-opened:** current-vs-pristine origin has a
+  tolerant diff of `3.2245` with hot tiles concentrated around the panel and
+  buttons, expected after the documented U-1/U-2/U-3 supersessions
+  (canonical text, canonical legacy sprites/buttons/panel, and single-hop
+  backdrop). Changed-pixel context is saved at
+  `docs/plans/uplift-evidence/mission_summary/
+  pristine_vs_current_uplift_delta_overlay.png`; the zero fresh-vs-golden
+  comparison is saved at
+  `docs/plans/uplift-evidence/mission_summary/
+  fresh_vs_golden_diff_black.png`. The known PARITY.md wheel-scope
+  deviation remains deliberately documented: origin scrolls from anywhere on
+  the screen, while cppx routes wheel through the hovered `SummaryScroll`
+  target. No Linear ticket opened because there is no new
+  ARTIFACT/DEFECT/ERA-LIMIT candidate.
