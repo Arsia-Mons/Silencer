@@ -144,7 +144,7 @@ inline ::ui::StyleStatePatch app_button_oval_patch(uint32_t tex) {
   if (!tex) {
     ::ui::StylePatch p =
         ::ui::patch()
-            .background(::ui::Color{6, 16, 8, 255})
+            .background(tokens::kControlFallbackFill)
             .gradient(::ui::Gradient{})
             .corner_radius(16.5f) // h/2 for the 33px stadium
             .border(::ui::Border{{1, 1, 1, 1},
@@ -218,7 +218,7 @@ inline ::ui::StyleStatePatch app_button_chrome_patch(uint32_t idle) {
   if (!idle) {
     ::ui::StylePatch p =
         ::ui::patch()
-            .background(::ui::Color{6, 16, 8, 255})
+            .background(tokens::kControlFallbackFill)
             .gradient(::ui::Gradient{})
             .corner_radius(3.0f)
             .border(::ui::Border{{1, 1, 1, 1},

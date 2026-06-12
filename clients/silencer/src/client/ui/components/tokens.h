@@ -84,6 +84,12 @@ constexpr ::ui::Color kTextVersion = {140, 64, 8, 255};    // build version (amb
 constexpr ::ui::Color kTextAgentName = {40, 96, 200, 255}; // agent names (cornflower blue)
 constexpr ::ui::Color kTextProse = {198, 198, 198, 255};   // white prose (agency detail/description)
 
+// ---- Vector fallbacks (drawn only while a chrome sprite is not yet baked;
+// never on the golden path) ----
+constexpr ::ui::Color kControlFallbackFill = {6, 16, 8, 255};   // oval/chrome button body
+constexpr ::ui::Color kDialogFallbackFill = {12, 4, 4, 255};    // connect dialog panel
+constexpr ::ui::Color kEmblemFallbackFill = {40, 70, 150, 255}; // agent-card emblem slot
+
 // ---- In-game HUD exact-color text keys (variant faces baked on palette
 // page 0 — origin LegacyPalette(color, brightness) per INGAME_SPECS.md).
 // The KEY is an arbitrary unique id; the baked pixels are origin's.
@@ -261,6 +267,38 @@ inline ::ui::StylePatch text_patch(::ui::Color color, float font_size,
                                              .font_id = font_id,
                                              .font_size = font_size,
                                              .line_height = line_height});
+}
+
+// Ghost/chromeless paint: suppress the control role's chrome (fill, gradient,
+// border, rounding) AND the builder-injected focus-ring outline (chromeless
+// gates it; clearing .outline() alone re-injects) — the visual is a baked
+// sprite well or sibling text, never theme chrome.
+inline ::ui::StylePatch chromeless_clear_patch() {
+  return ::ui::patch()
+      .chromeless(true)
+      .background(::ui::Color{0, 0, 0, 0})
+      .gradient(::ui::Gradient{})
+      .corner_radius(0.0f)
+      .border(::ui::Border{})
+      .outline(::ui::Outline{});
+}
+
+// Chromeless input field over a sprite's baked well: typed text in the Body
+// face + origin's 1-virtual-px caret (palette idx 140 resolved per screen
+// palette, fed from use_chrome()). Same paint across rest/hover/focus.
+inline ::ui::StyleStatePatch chromeless_field_style(::ui::Color caret,
+                                                    ::ui::Color text_color) {
+  ::ui::StylePatch p = chromeless_clear_patch();
+  p.text = ::ui::opt(::ui::TextVisual{.color = text_color,
+                                      .font_id = kFaceBody,
+                                      .font_size = kFontBodyEm,
+                                      .line_height = kLineBody});
+  p.caret = ::ui::opt(::ui::Caret{caret, 1.5f});
+  ::ui::StyleStatePatch s{};
+  s.base = p;
+  s.hover = p;
+  s.focus_visible = p;
+  return s;
 }
 
 } // namespace silencer::tokens

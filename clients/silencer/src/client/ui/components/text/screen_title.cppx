@@ -5,6 +5,9 @@
 
 #include "client/ui/components/tokens.h"
 
+#include <cstddef>
+#include <iterator>
+
 namespace silencer {
 
 using ::ui::children;
@@ -13,68 +16,43 @@ using ::ui::components::BoxProps;
 using ::ui::components::Text;
 using ::ui::components::TextProps;
 
+// Variant -> {color, face, em} map, indexed by ScreenTitleVariant. Origin/main
+// renders screen/section titles in bank 135 (the dominant heading face) and
+// the big brand/prompt in bank 136; the cppx glyph atlas renders those bitmap
+// banks directly. Notes per row:
+//   Screen  — origin TextSize::ScreenTitle: bank 135 tracked at advance 12
+//             (the wider letterspacing of "Configure Controls" etc.).
+//   Brand   — origin lobby header "Silencer": TextSize::Title, bank 135 at its
+//             native advance (not the heavy bank-136 prompt face).
+//   Console — lobby/console panel titles (Game Options, Select Map, Lobby):
+//             origin TextSize::Heading (bank 134) at native 1:1 metrics, which
+//             also makes them string-bake eligible.
+//   Prose   — white section headers (Advantages/Description): also bank 134
+//             (character_create_layout.cpp AdvantageLines).
+struct TitleSpec {
+  ::ui::Color color;
+  uint16_t face;
+  float em; // font_size == line_height == box height for every variant
+};
+constexpr TitleSpec kTitleSpecs[] = {
+    /* Hero */ {tokens::kTextHeroTitle, tokens::kFaceTitle, tokens::kFontTitle},
+    /* Screen */ {tokens::kTextTitle, tokens::kFaceScreenTitle, tokens::kFontHeading},
+    /* Dialog */ {tokens::kTextTitle, tokens::kFaceHeading, tokens::kFontHeading},
+    /* Popup */ {tokens::kTextDialogTitle, tokens::kFaceHeading, tokens::kFontHeading},
+    /* Brand */ {tokens::kTextBrand, tokens::kFaceHeading, tokens::kFontHeading},
+    /* Console */ {tokens::kTextTitle, tokens::kFaceLarge, tokens::kFontLarge},
+    /* Prose */ {tokens::kTextProse, tokens::kFaceLarge, tokens::kFontLarge},
+};
+
 ::ui::UiElement ScreenTitle(const ScreenTitleProps &props) {
-  // Origin/main renders screen/section titles in bank 135 (the dominant heading
-  // face) and the big brand/prompt in bank 136. The cppx glyph atlas now renders
-  // those bitmap banks directly (no more blank silencer-135.otf), so titles use
-  // the Heading face (bank 135) and only Hero uses the larger Title face (136).
-  ::ui::Color color = tokens::kTextTitle;
-  uint16_t face = tokens::kFaceHeading;
-  float font = tokens::kFontHeading;
-  float line = tokens::kLineHeading;
-  float height = tokens::kLineHeading;
-  switch (props.variant) {
-  case ScreenTitleVariant::Hero:
-    color = tokens::kTextHeroTitle;
-    face = tokens::kFaceTitle;
-    font = tokens::kFontTitle;
-    line = tokens::kLineTitle;
-    height = tokens::kLineTitle;
-    break;
-  case ScreenTitleVariant::Screen:
-    // origin TextSize::ScreenTitle: bank 135 tracked at advance 12 (vs the
-    // Title face's 11) — the wider letterspacing of "Configure Controls" etc.
-    color = tokens::kTextTitle;
-    face = tokens::kFaceScreenTitle;
-    break;
-  case ScreenTitleVariant::Dialog:
-    color = tokens::kTextTitle;
-    break;
-  case ScreenTitleVariant::Popup:
-    color = tokens::kTextDialogTitle;
-    break;
-  case ScreenTitleVariant::Brand:
-    // origin lobby header "Silencer": TextSize::Title — bank 135 at its
-    // native advance (not the heavy bank-136 prompt face).
-    color = tokens::kTextBrand;
-    face = tokens::kFaceHeading;
-    font = tokens::kFontHeading;
-    line = tokens::kLineHeading;
-    height = tokens::kLineHeading;
-    break;
-  case ScreenTitleVariant::Console:
-    // Lobby/console panel titles (Game Options, Select Map, Active Games,
-    // Lobby) — origin renders these in TextSize::Heading (bank 134) at its
-    // native 1:1 metrics, which also makes them string-bake eligible.
-    color = tokens::kTextTitle;
-    face = tokens::kFaceLarge;
-    font = tokens::kFontLarge;
-    line = tokens::kLineLarge;
-    height = tokens::kLineLarge;
-    break;
-  case ScreenTitleVariant::Prose:
-    // White section headers (Advantages/Description). origin renders these in
-    // TextSize::Heading — bank 134 at its native advance (character_create_
-    // layout.cpp AdvantageLines), not the heavy bank-136 prompt face.
-    color = tokens::kTextProse;
-    face = tokens::kFaceLarge;
-    font = tokens::kFontLarge;
-    line = tokens::kLineLarge;
-    height = tokens::kLineLarge;
-    break;
-  }
+  size_t vi = static_cast<size_t>(props.variant);
+  if (vi >= std::size(kTitleSpecs))
+    vi = static_cast<size_t>(ScreenTitleVariant::Screen);
+  const TitleSpec &spec = kTitleSpecs[vi];
+  const float height = spec.em;
   ::ui::StylePatch style = ::ui::patch().text(::ui::TextVisual{
-      .color = color, .font_id = face, .font_size = font, .line_height = line});
+      .color = spec.color, .font_id = spec.face, .font_size = spec.em,
+      .line_height = spec.em});
   if (!props.centered)
     return <Text
       key={props.key}

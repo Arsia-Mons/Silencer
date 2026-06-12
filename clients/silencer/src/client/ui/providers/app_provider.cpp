@@ -30,7 +30,6 @@ App use_app() {
       .quit = value->quit,
       .version = value->version ? value->version : "",
       .canvas_w = value->canvas_w,
-      .canvas_h = value->canvas_h,
   };
 }
 

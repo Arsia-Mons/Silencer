@@ -136,10 +136,9 @@ bool cppxAppRootPushed = false;
 // render frame (the frame-provider lambda runs once per screen layer).
 uint32_t cppxLastUiTicks_ = 0;
 client::ui::Clock cppxClock_ = {};
-// Logical UI canvas of the current frame (height-pinned 720 space); published
-// to screens via the AppProvider (use_app().canvas_w/h).
+// Logical UI canvas width of the current frame (height-pinned 720 space);
+// published to screens via the AppProvider (use_app().canvas_w).
 float cppxCanvasW_ = 0.0f;
-float cppxCanvasH_ = 0.0f;
 
 // SIL-87: baked legacy-sprite chrome ids, re-baked when the host resets its
 // renderer (resize). Populated after ensure(), read by the ChromeTexturesProvider

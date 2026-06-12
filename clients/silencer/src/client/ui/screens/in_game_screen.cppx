@@ -379,22 +379,8 @@ struct ChatComposeProps {
   *live = p.text;
   // Chromeless input over the chrome: typed text Body (0,128); caret = palette
   // idx 140 (page 0), blinking on origin's wall-clock phase.
-  ::ui::StyleStatePatch field{};
-  field.base =
-      ::ui::patch()
-          .chromeless(true)
-          .background(tokens::kHudClear)
-          .gradient(::ui::Gradient{})
-          .corner_radius(0.0f)
-          .border(::ui::Border{})
-          .outline(::ui::Outline{})
-          .text(::ui::TextVisual{.color = tokens::kTextHudDefault,
-                                 .font_id = tokens::kFaceBody,
-                                 .font_size = tokens::kFontBodyEm,
-                                 .line_height = tokens::kLineBody})
-          .caret(::ui::Caret{p.caret_color, 1.5f});
-  field.hover = field.base;
-  field.focus_visible = field.base;
+  const ::ui::StyleStatePatch field =
+      tokens::chromeless_field_style(p.caret_color, tokens::kTextHudDefault);
   return Box(BoxProps{
       .key = "chatinwrap",
       .layout = abs_at(p.x, p.y, kChatVisibleChars * kAdvBody, 11),
@@ -468,13 +454,7 @@ void build_chat_overlay(std::vector<::ui::UiElement> &out,
   {
     std::function<void()> toggle = chat.toggle_channel;
     ::ui::StyleStatePatch ghost{};
-    ghost.base = ::ui::patch()
-                     .chromeless(true)
-                     .background(tokens::kHudClear)
-                     .gradient(::ui::Gradient{})
-                     .border(::ui::Border{})
-                     .outline(::ui::Outline{})
-                     .corner_radius(0.0f);
+    ghost.base = tokens::chromeless_clear_patch();
     ghost.hover = ghost.base;
     ghost.focus_visible = ghost.base;
     out.push_back(Box(BoxProps{
@@ -533,13 +513,7 @@ void build_buy_tech(std::vector<::ui::UiElement> &out, const Tech &tech,
       // Ghost paint: the selection visual is the bank-102 highlight sprite,
       // never a theme focus ring (origin draws no focus chrome here).
       ::ui::StyleStatePatch ghost{};
-      ghost.base = ::ui::patch()
-                       .chromeless(true)
-                       .background(tokens::kHudClear)
-                       .gradient(::ui::Gradient{})
-                       .border(::ui::Border{})
-                       .outline(::ui::Outline{})
-                       .corner_radius(0.0f);
+      ghost.base = tokens::chromeless_clear_patch();
       ghost.hover = ghost.base;
       ghost.focus_visible = ghost.base;
       out.push_back(Box(BoxProps{

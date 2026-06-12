@@ -9,6 +9,8 @@
 #include "ui/components/box.h"
 #include "ui/runtime/react.h"
 
+#include <cstddef>
+#include <iterator>
 #include <string>
 
 namespace client::ui {
@@ -23,24 +25,20 @@ struct UpdateScreenProps {
   uint32_t unused = 0;
 };
 
+// UpdaterPhase -> status line, indexed by phase.
+constexpr const char *kPhaseLabels[] = {
+    /* Idle */ "Up to date",
+    /* Prompting */ "An update is available",
+    /* Downloading */ "Downloading update",
+    /* Verifying */ "Verifying update",
+    /* Staging */ "Installing update",
+    /* Failed */ "Update failed",
+    /* Done */ "Update ready - restart to apply",
+};
+
 const char *phase_label(UpdaterPhase phase) {
-  switch (phase) {
-  case UpdaterPhase::Idle:
-    return "Up to date";
-  case UpdaterPhase::Prompting:
-    return "An update is available";
-  case UpdaterPhase::Downloading:
-    return "Downloading update";
-  case UpdaterPhase::Verifying:
-    return "Verifying update";
-  case UpdaterPhase::Staging:
-    return "Installing update";
-  case UpdaterPhase::Failed:
-    return "Update failed";
-  case UpdaterPhase::Done:
-    return "Update ready - restart to apply";
-  }
-  return "";
+  const size_t i = static_cast<size_t>(phase);
+  return i < std::size(kPhaseLabels) ? kPhaseLabels[i] : "";
 }
 
 // SIL-99: origin/main update screen — a bank-40 idx4 dialog sprite over the

@@ -14,9 +14,8 @@ struct AppProviderValue {
   // Build version string (a static string literal owned by the composition root,
   // safe to copy by pointer); shown in the main-menu footer.
   const char *version = "";
-  // Logical UI canvas size (see App::canvas_w/canvas_h).
+  // Logical UI canvas width (see App::canvas_w).
   float canvas_w = 0.0f;
-  float canvas_h = 0.0f;
 };
 
 ::ui::UiElement AppProvider(const AppProviderValue &value,

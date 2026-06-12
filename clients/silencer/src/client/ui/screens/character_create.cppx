@@ -9,7 +9,6 @@
 #include "client/ui/hooks/use_character_create.h"
 #include "client/ui/hooks/use_characters.h"
 #include "client/ui/hooks/use_chrome.h"
-#include "client/ui/hooks/use_lobby_session.h"
 #include "client/ui/screens/character_create_data.h"
 #include "ui/components/box.h"
 #include "ui/components/input.h"
@@ -104,24 +103,6 @@ struct CharacterCreateProviderProps {
     padding={::ui::opt(::ui::EdgeSizes{17.5f, 14.5f, 11.0f, 1.5f})}
     onPress={on_press}
     onFocus={on_focus}
-  />
-}
-
-// One advantage metadata bracket: origin draws '['/']' from the bank-134 glyph
-// art cropped to a 4x11 sub-rect (bank 133's own bracket cells are dash-shaped)
-// — 6x16.5 at x1.5. srcX 0 for the left bracket, 1 for the right.
-::ui::UiElement advantage_bracket(const char *key, bool left) {
-  client::ui::ChromeTextures chrome = client::ui::use_chrome();
-  uint32_t tex = left ? chrome.bracket_l : chrome.bracket_r;
-  if (!tex)
-    return ::ui::empty();
-  return <Box
-    key={key}
-    layout={::ui::LayoutStyle{
-      .width = ::ui::Length::points(6.0f),
-      .height = ::ui::Length::points(16.5f),
-      .flex_shrink = ::ui::StyleFloat::points(0.0f)}}
-    style={tokens::image_patch(tex)}
   />
 }
 
@@ -255,280 +236,195 @@ struct CharacterCreateProviderProps {
   </Box>
 }
 
-struct CharacterCreateContentProps {
-  const char *key = nullptr;
-};
-
-::ui::UiElement CharacterCreateContent(const CharacterCreateContentProps &) {
-  CharacterWizard w = use_character_create();
-  Characters chars = use_characters();
-  LobbySession lobby = use_lobby_session();
-
-  std::function<void(int)> on_select = chars.select;
-  std::function<void(int)> on_pick = [create = chars.create, alias = w.alias,
-                                      submitting = w.submitting,
-                                      begin = w.begin_submit](int agency) {
-    if (submitting)
-      return;
-    if (begin)
-      begin();
-    if (create)
-      create(alias, agency);
-  };
-  std::function<void(const ::ui::ActivationEvent &)> on_alias_enter =
-      [confirm = w.confirm_alias](const ::ui::ActivationEvent &) {
-        if (confirm)
-          confirm();
-      };
-
-  // The wizard is a staged single-root view: roster → alias → agency. (Rendering
-  // the alias/agency as true modals layered over the roster needs overlay
-  // stack-entries, since the flex layout has no absolute/z stacking — a noted
-  // follow-up for the test-17 background-trap semantics.)
-  if (w.step == 1) {
-    // origin/main "SILENCER ALIAS": the SELECT AGENT two-pane frame behind +
-    // a floating ALIAS panel centered over it with a single editable field
-    // (Enter confirms; no visible buttons). The frame reuses step 0's chrome.
-    client::ui::ChromeTextures chrome1 = use_chrome();
-    const ::ui::StylePatch frame1 =
-        chrome1.chrome_panel
-            ? tokens::image_patch(chrome1.chrome_panel)
-            : tokens::panel_patch(tokens::kSurfaceHeroPanel, tokens::kBorderHeroPanel);
-    // Chromeless field: text + caret only, over the baked input well in the
-    // dialog_pw modal sprite (origin's TextInput draws no well of its own).
-    // Typed text is origin Body green; caret = palette idx 140 on the menu
-    // palette (yellow), 1 virtual px wide.
-    ::ui::StyleStatePatch alias_field_style{};
-    alias_field_style.base = ::ui::patch()
-                                 .chromeless(true)
-                                 .background(::ui::Color{0, 0, 0, 0})
-                                 .gradient(::ui::Gradient{})
-                                 .corner_radius(0.0f)
-                                 .border(::ui::Border{})
-                                 .outline(::ui::Outline{})
-                                 .text(::ui::TextVisual{
-                                     .color = tokens::kTextBody,
-                                     .font_id = tokens::kFaceBody,
-                                     .font_size = tokens::kFontBodyEm,
-                                     .line_height = tokens::kLineBody})
-                                 .caret(::ui::Caret{chrome1.caret_menu, 1.5f});
-    alias_field_style.hover = alias_field_style.base;
-    alias_field_style.focus_visible = alias_field_style.base;
-    return <ScreenLayout key="aliasmodal" variant={ScreenLayoutVariant::Overlay}>
-      <Box
-        key="frame"
-        layout={::ui::LayoutStyle{
-          .direction = ::ui::FlexDirection::Row,
+// --- shared wizard chrome: every step sits in the same two-pane frame --------
+// (chrome_panel sprite, bank 7 idx 5) over the starfield; LEFT pane is the
+// 354-wide list column, RIGHT pane is step-specific (or empty — the Mars
+// backdrop reads through). The sprite bakes the double borders + divider.
+::ui::LayoutStyle wizard_frame_layout() {
+  return {.direction = ::ui::FlexDirection::Row,
           .align_items = ::ui::AlignItems::Stretch,
           .width = ::ui::Length::points(942.0f),
           .height = ::ui::Length::points(661.5f),
           .margin = {0.0f, 4.0f, 0.0f, 0.0f},
           .padding = {82.5f, 33.0f, 27.0f, 51.0f},
-          .gap = 117.0f}}
-        style={frame1}
-      >
-        <Box
-          key="leftpane"
-          layout={::ui::LayoutStyle{
-            .direction = ::ui::FlexDirection::Column,
-            .align_items = ::ui::AlignItems::Stretch,
-            .width = ::ui::Length::points(354.0f),
-            .gap = 7.5f}}
-        >
-          {pane_header("SELECT AGENT")}
-          <Box
-            key="neww"
-            layout={::ui::LayoutStyle{
-              .margin = {-1.0f, 1.0f, -3.5f, 3.5f}}}
-          >
-            <AppButton
-              key="new"
-              controlId="CreateNewCharacterBg"
-              variant={AppButtonVariant::Oval}
-              size={AppButtonSize::List}
-              label="Create New Character"
-              onPress={w.open_alias}
-            />
-          </Box>
-        </Box>
-        <Box
-          key="rightpane"
-          layout={::ui::LayoutStyle{
-            .flex_grow = ::ui::StyleFloat::points(1.0f),
-            .flex_basis = ::ui::Length::points(0.0f),
-            .min_width = ::ui::Length::points(0.0f)}}
-        />
-      </Box>
-      <Box
-        key="aliasfloat"
-        layout={::ui::LayoutStyle{
-          .position = ::ui::PositionType::Absolute,
-          .position_inset = ::ui::EdgeSizes{425.0f, {}, 241.5f, {}},
-          .direction = ::ui::FlexDirection::Column,
+          .gap = 117.0f};
+}
+
+::ui::StylePatch wizard_frame_style(const ChromeTextures &chrome) {
+  return chrome.chrome_panel
+             ? tokens::image_patch(chrome.chrome_panel)
+             : tokens::panel_patch(tokens::kSurfaceHeroPanel, tokens::kBorderHeroPanel);
+}
+
+::ui::LayoutStyle wizard_left_pane_layout() {
+  return {.direction = ::ui::FlexDirection::Column,
           .align_items = ::ui::AlignItems::Stretch,
-          .width = ::ui::Length::points(426.0f),
-          .height = ::ui::Length::points(162.0f)}}
-        style={chrome1.dialog_pw ? tokens::image_patch(chrome1.dialog_pw) : tokens::panel_patch(tokens::kSurfaceHeroPanel, kAliasFrameBorder, 2.0f, 24.0f)}
-      >
+          .width = ::ui::Length::points(354.0f),
+          .gap = 7.5f};
+}
+
+::ui::LayoutStyle wizard_right_spacer_layout() {
+  return {.flex_grow = ::ui::StyleFloat::points(1.0f),
+          .flex_basis = ::ui::Length::points(0.0f),
+          .min_width = ::ui::Length::points(0.0f)};
+}
+
+// step 1 — origin/main "SILENCER ALIAS": the SELECT AGENT two-pane frame
+// behind + a floating ALIAS panel centered over it with a single editable
+// field (Enter confirms; no visible buttons). The frame reuses step 0's chrome.
+::ui::UiElement AliasStep(const CharacterWizard &w,
+                          std::function<void(const ::ui::ActivationEvent &)>
+                              on_alias_enter) {
+  client::ui::ChromeTextures chrome = use_chrome();
+  // Chromeless field over the baked input well in the dialog_pw modal sprite
+  // (origin's TextInput draws no well of its own); caret = palette idx 140 on
+  // the menu palette (yellow).
+  const ::ui::StyleStatePatch alias_field_style =
+      tokens::chromeless_field_style(chrome.caret_menu, tokens::kTextBody);
+  return <ScreenLayout key="aliasmodal" variant={ScreenLayoutVariant::Overlay}>
+    <Box key="frame" layout={wizard_frame_layout()} style={wizard_frame_style(chrome)}>
+      <Box key="leftpane" layout={wizard_left_pane_layout()}>
+        {pane_header("SELECT AGENT")}
         <Box
-          key="title"
+          key="neww"
           layout={::ui::LayoutStyle{
-            .direction = ::ui::FlexDirection::Row,
-            .align_items = ::ui::AlignItems::Center,
-            .width = ::ui::Length::percent(100.0f),
-            .height = ::ui::Length::points(49.5f),
-            .padding = {98.0f, 0.0f, 0.0f, 0.0f}}}
+            .margin = {-1.0f, 1.0f, -3.5f, 3.5f}}}
         >
-          <ScreenTitle key="t" variant={ScreenTitleVariant::Dialog} value="SILENCER ALIAS" />
-        </Box>
-        <Box
-          key="inputrow"
-          layout={::ui::LayoutStyle{
-            .direction = ::ui::FlexDirection::Row,
-            .position = ::ui::PositionType::Absolute,
-            .position_inset = ::ui::EdgeSizes{45.5f, {}, 73.5f, {}},
-            .align_items = ::ui::AlignItems::Stretch,
-            .width = ::ui::Length::points(354.0f),
-            .height = ::ui::Length::points(40.0f)}}
-        >
-          <Input
-            key="alias"
-            id="Alias"
-            autofocus={true}
-            accessibility={{.label = "Alias"}}
-            value={w.alias.c_str()}
-            onChange={w.set_alias}
-            onActivate={on_alias_enter}
-            layout={::ui::LayoutStyle{
-              .align_items = ::ui::AlignItems::Center,
-              .justify_content = ::ui::JustifyContent::Start,
-              .flex_grow = ::ui::StyleFloat::points(1.0f),
-              .height = ::ui::Length::points(40.0f),
-              .padding = {7.0f, 0.0f, 0.0f, 0.0f}}}
-            style={alias_field_style}
+          <AppButton
+            key="new"
+            controlId="CreateNewCharacterBg"
+            variant={AppButtonVariant::Oval}
+            size={AppButtonSize::List}
+            label="Create New Character"
+            onPress={w.open_alias}
           />
         </Box>
       </Box>
-    </ScreenLayout>
-  }
-
-  if (w.step == 2) {
-    const int pi =
-        (w.preview_agency >= 0 && w.preview_agency < kAgencyCount) ? w.preview_agency : 0;
-    const AgencyInfo &a = kAgencies[pi];
-    std::function<void(int)> set_preview = w.set_preview_agency;
-
-
-    // origin/main "SELECT AGENCY": the same two-pane chrome frame as step 0 —
-    // LEFT pane = SELECT AGENCY title + the five agency ovals; RIGHT pane =
-    // Advantages + Description over the Mars backdrop. No outer wizard panel, no
-    // Back button (Esc cancels), no step subtitle.
-    client::ui::ChromeTextures chrome2 = use_chrome();
-    const ::ui::StylePatch frame2 =
-        chrome2.chrome_panel
-            ? tokens::image_patch(chrome2.chrome_panel)
-            : tokens::panel_patch(tokens::kSurfaceHeroPanel, tokens::kBorderHeroPanel);
-    return <ScreenLayout key="agencyscreen" variant={ScreenLayoutVariant::Overlay}>
-      <Box
-        key="frame"
-        layout={::ui::LayoutStyle{
-          .direction = ::ui::FlexDirection::Row,
-          .align_items = ::ui::AlignItems::Stretch,
-          .width = ::ui::Length::points(942.0f),
-          .height = ::ui::Length::points(661.5f),
-          .margin = {0.0f, 4.0f, 0.0f, 0.0f},
-          .padding = {82.5f, 33.0f, 27.0f, 51.0f},
-          .gap = 117.0f}}
-        style={frame2}
-      >
-        <Box
-          key="left"
-          layout={::ui::LayoutStyle{
-            .direction = ::ui::FlexDirection::Column,
-            .align_items = ::ui::AlignItems::Stretch,
-            .width = ::ui::Length::points(354.0f),
-            .gap = 7.5f}}
-        >
-          {pane_header("SELECT AGENCY")}
-          <Box
-            key="rows"
-            layout={::ui::LayoutStyle{
-              .direction = ::ui::FlexDirection::Column,
-              .align_items = ::ui::AlignItems::Stretch,
-              .margin = {-1.5f, 3.5f, -3.0f, 3.0f},
-              .gap = 7.5f}}
-          >
-            {agency_row(0, pi, on_pick, set_preview)}
-            {agency_row(1, pi, on_pick, set_preview)}
-            {agency_row(2, pi, on_pick, set_preview)}
-            {agency_row(3, pi, on_pick, set_preview)}
-            {agency_row(4, pi, on_pick, set_preview)}
-          </Box>
-        </Box>
-        <Box
-          key="right"
-          layout={::ui::LayoutStyle{
-            .direction = ::ui::FlexDirection::Column,
-            .align_items = ::ui::AlignItems::Stretch,
-            .width = ::ui::Length::points(294.0f),
-            .overflow = ::ui::Overflow::Hidden,
-            .padding = {0.0f, 0.0f, 63.0f, 0.0f},
-            .gap = 12.0f}}
-        >
-          <ScreenTitle key="adv" variant={ScreenTitleVariant::Prose} value="Advantages" />
-          <Box
-            key="advrows"
-            layout={::ui::LayoutStyle{
-              .direction = ::ui::FlexDirection::Column,
-              .align_items = ::ui::AlignItems::Stretch,
-              .margin = {0.0f, 0.0f, -1.0f, 1.0f},
-              .gap = 10.0f}}
-          >
-            {advantage_row("a0", a.advantages[0])}
-            <Box key="a1w" layout={::ui::LayoutStyle{.margin = {0.0f, 0.0f, 1.0f, -1.0f}}}>
-              {advantage_row("a1", a.advantages[1])}
-            </Box>
-            {advantage_row("a2", a.advantages[2])}
-            {advantage_row("a3", a.advantages[3])}
-          </Box>
-          <ScreenTitle key="dh" variant={ScreenTitleVariant::Prose} value="Description" />
-          {desc_paragraph(a.description)}
-        </Box>
-      </Box>
-    </ScreenLayout>
-  }
-
-  // step 0 — SELECT AGENT: the origin/main two-pane character-create frame
-  // (chrome_panel sprite, bank 7 idx 5) filling the starfield. LEFT pane = the
-  // SELECT AGENT title + roster + Create New Character; RIGHT pane = empty (the
-  // Mars/starfield backdrop reads through). The sprite bakes the double borders
-  // + center divider; the content overlays its two panes.
-  client::ui::ChromeTextures chrome0 = use_chrome();
-  const ::ui::StylePatch frame0 =
-      chrome0.chrome_panel
-          ? tokens::image_patch(chrome0.chrome_panel)
-          : tokens::panel_patch(tokens::kSurfaceHeroPanel, tokens::kBorderHeroPanel);
-  return <ScreenLayout key="roster" variant={ScreenLayoutVariant::Overlay}>
+      <Box key="rightpane" layout={wizard_right_spacer_layout()} />
+    </Box>
     <Box
-      key="frame"
+      key="aliasfloat"
       layout={::ui::LayoutStyle{
-        .direction = ::ui::FlexDirection::Row,
+        .position = ::ui::PositionType::Absolute,
+        .position_inset = ::ui::EdgeSizes{425.0f, {}, 241.5f, {}},
+        .direction = ::ui::FlexDirection::Column,
         .align_items = ::ui::AlignItems::Stretch,
-        .width = ::ui::Length::points(942.0f),
-        .height = ::ui::Length::points(661.5f),
-        .margin = {0.0f, 4.0f, 0.0f, 0.0f},
-        .padding = {82.5f, 33.0f, 27.0f, 51.0f},
-        .gap = 117.0f}}
-      style={frame0}
+        .width = ::ui::Length::points(426.0f),
+        .height = ::ui::Length::points(162.0f)}}
+      style={chrome.dialog_pw ? tokens::image_patch(chrome.dialog_pw) : tokens::panel_patch(tokens::kSurfaceHeroPanel, kAliasFrameBorder, 2.0f, 24.0f)}
     >
       <Box
-        key="leftpane"
+        key="title"
+        layout={::ui::LayoutStyle{
+          .direction = ::ui::FlexDirection::Row,
+          .align_items = ::ui::AlignItems::Center,
+          .width = ::ui::Length::percent(100.0f),
+          .height = ::ui::Length::points(49.5f),
+          .padding = {98.0f, 0.0f, 0.0f, 0.0f}}}
+      >
+        <ScreenTitle key="t" variant={ScreenTitleVariant::Dialog} value="SILENCER ALIAS" />
+      </Box>
+      <Box
+        key="inputrow"
+        layout={::ui::LayoutStyle{
+          .direction = ::ui::FlexDirection::Row,
+          .position = ::ui::PositionType::Absolute,
+          .position_inset = ::ui::EdgeSizes{45.5f, {}, 73.5f, {}},
+          .align_items = ::ui::AlignItems::Stretch,
+          .width = ::ui::Length::points(354.0f),
+          .height = ::ui::Length::points(40.0f)}}
+      >
+        <Input
+          key="alias"
+          id="Alias"
+          autofocus={true}
+          accessibility={{.label = "Alias"}}
+          value={w.alias.c_str()}
+          onChange={w.set_alias}
+          onActivate={on_alias_enter}
+          layout={::ui::LayoutStyle{
+            .align_items = ::ui::AlignItems::Center,
+            .justify_content = ::ui::JustifyContent::Start,
+            .flex_grow = ::ui::StyleFloat::points(1.0f),
+            .height = ::ui::Length::points(40.0f),
+            .padding = {7.0f, 0.0f, 0.0f, 0.0f}}}
+          style={alias_field_style}
+        />
+      </Box>
+    </Box>
+  </ScreenLayout>
+}
+
+// step 2 — origin/main "SELECT AGENCY": LEFT pane = SELECT AGENCY title + the
+// five agency ovals; RIGHT pane = Advantages + Description over the Mars
+// backdrop. No outer wizard panel, no Back button (Esc cancels), no subtitle.
+::ui::UiElement AgencyStep(const CharacterWizard &w,
+                           std::function<void(int)> on_pick) {
+  const int pi =
+      (w.preview_agency >= 0 && w.preview_agency < kAgencyCount) ? w.preview_agency : 0;
+  const AgencyInfo &a = kAgencies[pi];
+  std::function<void(int)> set_preview = w.set_preview_agency;
+  client::ui::ChromeTextures chrome = use_chrome();
+  return <ScreenLayout key="agencyscreen" variant={ScreenLayoutVariant::Overlay}>
+    <Box key="frame" layout={wizard_frame_layout()} style={wizard_frame_style(chrome)}>
+      <Box key="left" layout={wizard_left_pane_layout()}>
+        {pane_header("SELECT AGENCY")}
+        <Box
+          key="rows"
+          layout={::ui::LayoutStyle{
+            .direction = ::ui::FlexDirection::Column,
+            .align_items = ::ui::AlignItems::Stretch,
+            .margin = {-1.5f, 3.5f, -3.0f, 3.0f},
+            .gap = 7.5f}}
+        >
+          {agency_row(0, pi, on_pick, set_preview)}
+          {agency_row(1, pi, on_pick, set_preview)}
+          {agency_row(2, pi, on_pick, set_preview)}
+          {agency_row(3, pi, on_pick, set_preview)}
+          {agency_row(4, pi, on_pick, set_preview)}
+        </Box>
+      </Box>
+      <Box
+        key="right"
         layout={::ui::LayoutStyle{
           .direction = ::ui::FlexDirection::Column,
           .align_items = ::ui::AlignItems::Stretch,
-          .width = ::ui::Length::points(354.0f),
-          .gap = 7.5f}}
+          .width = ::ui::Length::points(294.0f),
+          .overflow = ::ui::Overflow::Hidden,
+          .padding = {0.0f, 0.0f, 63.0f, 0.0f},
+          .gap = 12.0f}}
       >
+        <ScreenTitle key="adv" variant={ScreenTitleVariant::Prose} value="Advantages" />
+        <Box
+          key="advrows"
+          layout={::ui::LayoutStyle{
+            .direction = ::ui::FlexDirection::Column,
+            .align_items = ::ui::AlignItems::Stretch,
+            .margin = {0.0f, 0.0f, -1.0f, 1.0f},
+            .gap = 10.0f}}
+        >
+          {advantage_row("a0", a.advantages[0])}
+          <Box key="a1w" layout={::ui::LayoutStyle{.margin = {0.0f, 0.0f, 1.0f, -1.0f}}}>
+            {advantage_row("a1", a.advantages[1])}
+          </Box>
+          {advantage_row("a2", a.advantages[2])}
+          {advantage_row("a3", a.advantages[3])}
+        </Box>
+        <ScreenTitle key="dh" variant={ScreenTitleVariant::Prose} value="Description" />
+        {desc_paragraph(a.description)}
+      </Box>
+    </Box>
+  </ScreenLayout>
+}
+
+// step 0 — SELECT AGENT: LEFT pane = the SELECT AGENT title + roster + Create
+// New Character; RIGHT pane = empty.
+::ui::UiElement RosterStep(const CharacterWizard &w, const Characters &chars,
+                           std::function<void(int)> on_select) {
+  client::ui::ChromeTextures chrome = use_chrome();
+  return <ScreenLayout key="roster" variant={ScreenLayoutVariant::Overlay}>
+    <Box key="frame" layout={wizard_frame_layout()} style={wizard_frame_style(chrome)}>
+      <Box key="leftpane" layout={wizard_left_pane_layout()}>
         {pane_header("SELECT AGENT")}
         <Box
           key="neww"
@@ -550,15 +446,44 @@ struct CharacterCreateContentProps {
         {roster_row(3, chars.roster, on_select)}
         {roster_row(4, chars.roster, on_select)}
       </Box>
-      <Box
-        key="rightpane"
-        layout={::ui::LayoutStyle{
-          .flex_grow = ::ui::StyleFloat::points(1.0f),
-          .flex_basis = ::ui::Length::points(0.0f),
-          .min_width = ::ui::Length::points(0.0f)}}
-      />
+      <Box key="rightpane" layout={wizard_right_spacer_layout()} />
     </Box>
   </ScreenLayout>
+}
+
+struct CharacterCreateContentProps {
+  const char *key = nullptr;
+};
+
+// The wizard is a staged single-root view: roster → alias → agency. (Rendering
+// the alias/agency as true modals layered over the roster needs overlay
+// stack-entries, since the flex layout has no absolute/z stacking — a noted
+// follow-up for the test-17 background-trap semantics.)
+::ui::UiElement CharacterCreateContent(const CharacterCreateContentProps &) {
+  CharacterWizard w = use_character_create();
+  Characters chars = use_characters();
+
+  std::function<void(int)> on_pick = [create = chars.create, alias = w.alias,
+                                      submitting = w.submitting,
+                                      begin = w.begin_submit](int agency) {
+    if (submitting)
+      return;
+    if (begin)
+      begin();
+    if (create)
+      create(alias, agency);
+  };
+  std::function<void(const ::ui::ActivationEvent &)> on_alias_enter =
+      [confirm = w.confirm_alias](const ::ui::ActivationEvent &) {
+        if (confirm)
+          confirm();
+      };
+
+  if (w.step == 1)
+    return AliasStep(w, on_alias_enter);
+  if (w.step == 2)
+    return AgencyStep(w, on_pick);
+  return RosterStep(w, chars, chars.select);
 }
 
 struct CharacterCreateProps {

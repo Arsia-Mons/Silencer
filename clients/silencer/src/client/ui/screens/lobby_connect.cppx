@@ -105,7 +105,7 @@ std::vector<::ui::UiElement> connect_status_log(const std::string &log) {
   const ::ui::StylePatch panel_style =
       chrome.dialog_connect
           ? ::ui::StylePatch{}
-          : tokens::panel_patch(::ui::Color{12, 4, 4, 255}, tokens::kBorderPanel, 2.0f);
+          : tokens::panel_patch(tokens::kDialogFallbackFill, tokens::kBorderPanel, 2.0f);
   ::ui::UiElement chrome_frame =
       chrome.dialog_connect
           ? Box(BoxProps{
@@ -118,26 +118,10 @@ std::vector<::ui::UiElement> connect_status_log(const std::string &log) {
                 .style = tokens::image_patch(chrome.dialog_connect)})
           : ::ui::empty();
 
-  // Chromeless field: text + caret only, over the sprite's baked well. chromeless
-  // suppresses the control-default chrome, but the theme input role's own
-  // border/gradient/radius are applied directly, so clear them explicitly.
-  // Typed text is origin Body green; the caret is palette idx 140 resolved on
-  // the lobby palette (sage), 1 virtual px wide.
-  ::ui::StyleStatePatch field_style{};
-  field_style.base = ::ui::patch()
-                         .chromeless(true)
-                         .background(::ui::Color{0, 0, 0, 0})
-                         .gradient(::ui::Gradient{})
-                         .corner_radius(0.0f)
-                         .border(::ui::Border{})
-                         .outline(::ui::Outline{})
-                         .text(::ui::TextVisual{.color = tokens::kTextBody,
-                                                .font_id = tokens::kFaceBody,
-                                                .font_size = tokens::kFontBodyEm,
-                                                .line_height = tokens::kLineBody})
-                         .caret(::ui::Caret{chrome.caret_lobby, 1.5f});
-  field_style.hover = field_style.base;
-  field_style.focus_visible = field_style.base;
+  // Chromeless fields over the sprite's baked wells; caret = palette idx 140
+  // resolved on the lobby palette (sage).
+  const ::ui::StyleStatePatch field_style =
+      tokens::chromeless_field_style(chrome.caret_lobby, tokens::kTextBody);
   // Field height 30.5 (not the well's authored 31.5): the engine centers the
   // 16.5-logical caret in the field box, and (30.5-16.5)/2 = 7 lands the caret
   // on origin's exact device row (678 at 1080p; 31.5 put it half a device px
@@ -168,7 +152,7 @@ std::vector<::ui::UiElement> connect_status_log(const std::string &log) {
       .justify_content = ::ui::JustifyContent::Center,
       .width = ::ui::Length::percent(100.0f),
       .height = ::ui::Length::percent(100.0f)}}
-    style={tokens::fill_patch(::ui::Color{0, 0, 0, 255})}
+    style={tokens::fill_patch(tokens::kSurfaceMenu)}
   >
     <Box
       key="panel"

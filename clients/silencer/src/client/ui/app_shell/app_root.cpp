@@ -11,6 +11,9 @@
 #include "ui/runtime/element.h"
 #include "ui/runtime/react.h"
 
+#include <cstddef>
+#include <iterator>
+
 namespace client::ui {
 namespace {
 
@@ -37,6 +40,29 @@ struct PhaseScaffoldProps {
                          PhaseScaffoldView, key);
 }
 
+::ui::UiElement loading_scaffold(const char *key) {
+  return phase_scaffold({56, 56, 56, 255}, key);
+}
+
+// Phase -> screen-factory map, indexed by SessionPhase. Distinct keys per
+// phase so a phase flip is a genuine unmount/mount (the real screens are
+// distinct component types, so this falls out naturally).
+struct PhaseScreen {
+  ::ui::UiElement (*make)(const char *key);
+  const char *key;
+};
+constexpr PhaseScreen kPhaseScreens[] = {
+    /* MainMenu */ {MainMenu, "phase-main-menu"},
+    /* Connecting */ {LobbyConnect, "phase-connecting"},
+    /* CharacterCreate */ {CharacterCreate, "phase-character-create"},
+    /* Lobby */ {LobbyScreen, "phase-lobby"},
+    /* Updating */ {UpdateScreen, "phase-updating"},
+    /* Loading */ {loading_scaffold, "phase-loading"},
+    /* InMatch */ {InGameScreen, "phase-in-match"},
+    /* PostMatch */ {MissionSummary, "phase-post-match"},
+    /* SinglePlayer */ {InGameScreen, "phase-single-player"},
+};
+
 // --- AppRoot view --------------------------------------------------------
 struct AppRootProps {};
 
@@ -55,30 +81,10 @@ bool AppRoot::build_element(::ui::UiElementFrame &, ::ui::UiElement *out) {
 }
 
 ::ui::UiElement make_phase_element(SessionPhase phase) {
-  // Distinct keys per phase so a phase flip is a genuine unmount/mount (the
-  // real screens are distinct component types, so this falls out naturally
-  // once they replace the scaffolds).
-  switch (phase) {
-  case SessionPhase::MainMenu:
-    return MainMenu("phase-main-menu");
-  case SessionPhase::Connecting:
-    return LobbyConnect("phase-connecting");
-  case SessionPhase::CharacterCreate:
-    return CharacterCreate("phase-character-create");
-  case SessionPhase::Lobby:
-    return LobbyScreen("phase-lobby");
-  case SessionPhase::Updating:
-    return UpdateScreen("phase-updating");
-  case SessionPhase::Loading:
-    return phase_scaffold({56, 56, 56, 255}, "phase-loading");
-  case SessionPhase::InMatch:
-    return InGameScreen("phase-in-match");
-  case SessionPhase::PostMatch:
-    return MissionSummary("phase-post-match");
-  case SessionPhase::SinglePlayer:
-    return InGameScreen("phase-single-player");
-  }
-  return phase_scaffold({32, 44, 72, 255}, "phase-main-menu");
+  const size_t i = static_cast<size_t>(phase);
+  if (i >= std::size(kPhaseScreens))
+    return phase_scaffold({32, 44, 72, 255}, "phase-main-menu");
+  return kPhaseScreens[i].make(kPhaseScreens[i].key);
 }
 
 } // namespace client::ui

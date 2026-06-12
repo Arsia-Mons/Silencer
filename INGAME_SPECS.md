@@ -3,7 +3,6 @@
 Extracted 2026-06-11 from .worktrees/origin-capture source (read-only Explore pass).
 Companion to the in-game golden capture plan in PARITY.md. All coordinates in 640×480
 space; colors are palette indices + brightness; sprites from resource banks.
-Companion ledger: PARITY.md (capture plan + state rows).
 
 ## Composition root
 `InGameHud.cpp:20-67` `BuildInGameHudUi()`, trigger `view.mapLoaded && view.localPlayer.valid`.
