@@ -168,6 +168,17 @@ struct ChromeTextures {
     Sprite buy_bg;        // 102/0
     Sprite buy_highlight; // 102/1
     Sprite chat_edge[9];  // 188/0..8 (top cap/tile/cap, ..., bottom cap/tile/cap)
+    // Secret hack panel (bank 187: 0 normal / 1 beaming) + highlight flashes
+    // (bank 86: 1 minimap / 2 secrets — pulse variants resolve per frame,
+    // these carry dims/offsets).
+    Sprite secret_bg;         // 187/0
+    Sprite secret_bg_beaming; // 187/1
+    Sprite highlight_minimap; // 86/1
+    Sprite highlight_secrets; // 86/2
+    // System camera inset frames; y anchors to bank 92's offset at the same
+    // index (origin BuildHudSystemCameraFrame offsetBank=92).
+    Sprite syscam_frame[2];        // 95/2 (slot 0), 95/11 (slot 1)
+    int16_t syscam_oy[2] = {0, 0}; // spriteoffsety[92][2], [92][11]
   };
   HudChrome hud;
   // origin TextInput caret color = legacy palette idx 140 resolved against the

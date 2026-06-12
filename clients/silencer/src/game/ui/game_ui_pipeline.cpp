@@ -603,6 +603,17 @@ hud_bake(102, 0, hud.buy_bg);
 hud_bake(102, 1, hud.buy_highlight);
 for(int i = 0; i < 9; ++i)
 hud_bake(188, (size_t)i, hud.chat_edge[i]);
+hud_bake(187, 0, hud.secret_bg);
+hud_bake(187, 1, hud.secret_bg_beaming);
+hud_bake(86, 1, hud.highlight_minimap);
+hud_bake(86, 2, hud.highlight_secrets);
+hud_bake(95, 2, hud.syscam_frame[0]);
+hud_bake(95, 11, hud.syscam_frame[1]);
+// origin anchors the frame's y to bank 92's offset at the same index.
+if(92 < res.spriteoffsety.size()){
+if(2 < res.spriteoffsety[92].size()) hud.syscam_oy[0] = (int16_t)res.spriteoffsety[92][2];
+if(11 < res.spriteoffsety[92].size()) hud.syscam_oy[1] = (int16_t)res.spriteoffsety[92][11];
+}
 }
 
 // ---- Bitmap glyph fonts (origin/main text parity) -----------------------
@@ -712,6 +723,10 @@ static const VariantBake kVariantBakes[] = {
     {1, 134, 8.f, 15.f, Fx::Raw, 0, 64, 0, silencer::tokens::kTextHudDim64},
     {5, 135, 12.f, 19.f, Fx::Color, 202, 128, 0, silencer::tokens::kTextHudCredits},
     {2, 136, 16.f, 23.f, Fx::Color, 202, 128, 0, silencer::tokens::kTextHudCredits},
+    // top ticker (BodySm default effect) + hack-progress dim rows (114, 96)
+    {7, 133, 7.f, 11.f, Fx::Raw, 0, 128, 0, silencer::tokens::kTextHudDefault},
+    {0, 133, 6.f, 11.f, Fx::Color, 114, 96, 0,
+     silencer::tokens::hud_text_key(114, 96)},
 };
 const Uint8 prevPage = game.renderer.palette.CurrentPalette();
 for(const VariantBake & vb : kVariantBakes){
@@ -785,6 +800,10 @@ cppxHost->build_glyph_color_face(face, key.r, key.g, key.b, src,
 };
 for(int b = 64; b <= 160; b += 2)
 bake_pulse(4, 135, 11.f, 19.f, 208, (Uint8)b);
+// Status-line fade (BodySm, color 208): brightness 128-(16-time)*8 plus the
+// max(8, b-64) shadow ramp — all multiples of 8 in 8..128.
+for(int b = 8; b <= 128; b += 8)
+bake_pulse(7, 133, 7.f, 11.f, 208, (Uint8)b);
 // Buy/tech selected-row pulse (Heading face, color 0, 129..136).
 for(int b = 129; b <= 136; ++b)
 bake_pulse(1, 134, 8.f, 15.f, 0, (Uint8)b);

@@ -18,9 +18,13 @@ using NodeId = uint64_t;
 // grid push well past the original 256; sized generously so commits never
 // silently truncate (a too-small cap drops the tail of the tree — late rows +
 // the action row — with `errors=N` at commit). Cf. REACT_MAX_FIBERS (react.cpp).
-constexpr int UI_RETAINED_MAX_NODES = 512;
+// The in-game HUD's center-message reveal puts every glyph (text + shadow) on
+// the flat "hud" Box — a 75-char tutorial message alone is ~300 nodes / ~150
+// children, which blew the old 512/128 (commit failed -> the UI froze on the
+// last good frame mid-capture).
+constexpr int UI_RETAINED_MAX_NODES = 1024;
 constexpr int UI_RETAINED_MAX_DEPTH = 64;
-constexpr int UI_RETAINED_MAX_CHILDREN = 128;
+constexpr int UI_RETAINED_MAX_CHILDREN = 512;
 constexpr int UI_RETAINED_LABEL_CAP = 48;
 constexpr int UI_RETAINED_VALUE_CAP = 640; // sized for the cc lore paragraphs (~560 chars), the longest wrapped Text values
 

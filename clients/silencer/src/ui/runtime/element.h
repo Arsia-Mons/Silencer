@@ -19,7 +19,9 @@ namespace ui {
 // the visible window is committed to the node tree). The 30-row keybind table +
 // the lobby cockpit build well past the original 384, so sized with headroom;
 // an overflow drops the tail of the element tree (`errors=N` at commit).
-constexpr int UI_RETAINED_MAX_ELEMENTS = 1024;
+// Sized with tree.h's node budget: the in-game center-message reveal emits 2
+// elements per revealed glyph (text + shadow) on top of the full HUD.
+constexpr int UI_RETAINED_MAX_ELEMENTS = 4096;
 constexpr int UI_RETAINED_MAX_CHILD_ELEMENTS = 1024;
 // Per-frame arena for copied component-prop records. Each props struct now
 // embeds a StyleStatePatch `style` (seven StylePatch slots), so a single record

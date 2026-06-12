@@ -11,6 +11,7 @@
 #include "buyableitem.h"
 #include "basedoor.h"
 #include "team.h"
+#include "terminal.h"
 #include "lobby.h"
 #include "actor/user.h"
 #include "gasloader.h"
@@ -297,6 +298,53 @@ CaptureWorldSessionSnapshot(Game &game, client::ui::SessionPhase phase) {
     row.emblem_w = emblem.w;
     row.emblem_h = emblem.h;
     snap.hud_teams.push_back(row);
+  }
+
+  // Remaining HUD overlays (origin InGameHud.cpp + InGameOverlays.cpp).
+  snap.system_camera[0] = world.IsSystemCameraActive(0);
+  snap.system_camera[1] = world.IsSystemCameraActive(1);
+  snap.top_message_i = world.messaging.GetTopMessageProgress();
+  if (snap.top_message_i)
+    snap.top_message = world.messaging.GetTopMessageText();
+  // Status strings encode [text\0][time][color] in adjacent bytes (origin
+  // WorldMessaging::CreateStatusString); deque front = newest.
+  for (char *raw : world.messaging.statusmessages) {
+    client::ui::WorldSessionSnapshot::HudStatus line;
+    line.text = raw;
+    line.time = (uint8_t)raw[std::strlen(raw) + 1];
+    line.color = (uint8_t)raw[std::strlen(raw) + 2];
+    snap.status_lines.push_back(std::move(line));
+  }
+  if (p) {
+    Team *team = p->GetTeam(world);
+    if (team && team->beamingterminalid) {
+      Terminal *terminal = static_cast<Terminal *>(
+          world.GetObjectFromId(team->beamingterminalid));
+      if (terminal && terminal->tracetime > 0)
+        snap.trace_time = terminal->tracetime;
+    }
+    if (p->GetTraceTime() > 0)
+      snap.trace_time = p->GetTraceTime();
+    if (team && team->basedoorid) {
+      auto &sec = snap.secret;
+      sec.visible = true;
+      sec.beaming = team->beamingterminalid != 0;
+      sec.progress = team->secretprogress;
+      const int teamCount = (int)snap.hud_teams.size();
+      sec.yoffset = 60 + (teamCount >= 3 ? teamCount * 20 - 65 : 0);
+      // 15 = Player::HACKING (enum is private; matches the 20/21 dead check).
+      sec.hacking_tick = p->GetState() == 15 && p->GetStateProgress() == 16;
+      // Highlight flashes pulse 120..136 on phase%32 (hud_secret_overlays).
+      Uint8 hb = 120;
+      if (pulse % 32 < 16)
+        hb += pulse % 16;
+      else
+        hb += 16 - (pulse % 16);
+      if (world.ShouldHighlightSecrets())
+        sec.highlight_secrets = pipe.EnsureHudRampVariant(86, 2, 0, 0, hb);
+      if (world.ShouldHighlightMinimap())
+        sec.highlight_minimap = pipe.EnsureHudRampVariant(86, 1, 0, 0, hb);
+    }
   }
 
   // Chat scrollback (oldest -> newest). The HUD chat box shows the last few

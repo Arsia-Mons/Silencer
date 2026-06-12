@@ -152,6 +152,21 @@ Hud use_hud() {
   out.message_i = s.message_i;
   out.message_type = s.message_type;
   out.message_time = s.message_time;
+  out.trace_time = s.trace_time;
+  out.system_camera[0] = s.system_camera[0];
+  out.system_camera[1] = s.system_camera[1];
+  out.top_message = s.top_message;
+  out.top_message_i = s.top_message_i;
+  out.status_lines.reserve(s.status_lines.size());
+  for (const WorldSessionSnapshot::HudStatus &line : s.status_lines)
+    out.status_lines.push_back({line.text, line.time, line.color});
+  out.secret.visible = s.secret.visible;
+  out.secret.beaming = s.secret.beaming;
+  out.secret.progress = s.secret.progress;
+  out.secret.yoffset = s.secret.yoffset;
+  out.secret.hacking_tick = s.secret.hacking_tick;
+  out.secret.highlight_secrets = s.secret.highlight_secrets;
+  out.secret.highlight_minimap = s.secret.highlight_minimap;
   out.teams.reserve(s.hud_teams.size());
   for (const WorldSessionSnapshot::HudTeamStrip &t : s.hud_teams) {
     HudTeamRow row;

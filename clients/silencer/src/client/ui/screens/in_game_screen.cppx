@@ -44,6 +44,7 @@ using Sprite = ChromeTextures::Sprite;
 // Native glyph advances per face (origin text.cpp ResolveTextRenderStyle).
 constexpr int kAdvTiny = 4;
 constexpr int kAdvBody = 6;
+constexpr int kAdvBodySm = 7;
 constexpr int kAdvHeading = 8;
 constexpr int kAdvTitle = 11;
 constexpr int kAdvHudCounter = 12;
@@ -604,6 +605,130 @@ void build_player_list(std::vector<::ui::UiElement> &out, const Hud &hud) {
 }
 
 // ---------------------------------------------------------------------------
+// System camera inset frames (origin hud_system_camera.cpp)
+// ---------------------------------------------------------------------------
+
+void build_system_camera(std::vector<::ui::UiElement> &out, const Hud &hud,
+                         const ChromeTextures::HudChrome &c) {
+  static const int kLogicalY[2] = {381, 318};
+  for (int slot = 0; slot < 2; ++slot) {
+    if (!hud.system_camera[slot])
+      continue;
+    const Sprite &sp = c.syscam_frame[slot];
+    const char *k = slot ? "syscam1" : "syscam0";
+    // y anchors to bank 92's sheet offset, not the frame sprite's own.
+    out.push_back(tex_at(k, sp.id, -sp.x, kLogicalY[slot] - c.syscam_oy[slot],
+                         sp.w, sp.h));
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Secret hack panel + highlight flashes (origin hud_secret_overlays.cpp)
+// ---------------------------------------------------------------------------
+
+void build_secret_overlay(std::vector<::ui::UiElement> &out, const Hud &hud,
+                          const ChromeTextures::HudChrome &c) {
+  const HudSecretOverlay &sec = hud.secret;
+  if (!sec.visible)
+    return;
+  const int yoffset = sec.yoffset;
+  out.push_back(sprite_at("secbg",
+                          sec.beaming ? c.secret_bg_beaming : c.secret_bg, 0,
+                          yoffset));
+  if (sec.highlight_secrets)
+    out.push_back(tex_at("hlsec", sec.highlight_secrets,
+                         -c.highlight_secrets.x,
+                         yoffset - c.highlight_secrets.y,
+                         c.highlight_secrets.w, c.highlight_secrets.h));
+  if (sec.highlight_minimap)
+    out.push_back(tex_at("hlmap", sec.highlight_minimap,
+                         -c.highlight_minimap.x, -c.highlight_minimap.y,
+                         c.highlight_minimap.w, c.highlight_minimap.h));
+  if (sec.beaming)
+    return;
+  static const char *kNames[9] = {
+      "Guv Net", "OS",       "Protocol", "Cypher Lock 1", "Cypher Lock 2",
+      "Cypher Lock 3", "Header", "Schedule", "Location"};
+  int progress = sec.progress;
+  const bool hack_shift = sec.hacking_tick && hud.phase % 16 < 8;
+  ::ui::Color color = tokens::kTextHudBright;
+  for (int i = 0; i < 9; ++i) {
+    progress -= 20;
+    if (progress < (hack_shift ? -20 : 0))
+      color = tokens::hud_text_key(114, 96);
+    const char *k = ::ui::copy_string(("hack" + std::to_string(i)).c_str());
+    out.push_back(hud_text(k, 10, 54 + i * 13 + yoffset, kNames[i], color,
+                           tokens::kFontBodyEm, tokens::kFaceBody));
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Trace timer (origin hud_readouts.cpp BuildHudTraceTime)
+// ---------------------------------------------------------------------------
+
+void build_trace_time(std::vector<::ui::UiElement> &out, const Hud &hud) {
+  if (!hud.trace_time)
+    return;
+  out.push_back(hud_text(
+      "trace", 20, 350,
+      use_text_storage("Government Trace Time: %u", (unsigned)hud.trace_time),
+      tokens::kTextHudBright, tokens::kFontBodyEm, tokens::kFaceBody));
+}
+
+// ---------------------------------------------------------------------------
+// Status line stack (origin InGameOverlays.cpp DrawStatus)
+// ---------------------------------------------------------------------------
+
+void build_status_lines(std::vector<::ui::UiElement> &out, const Hud &hud) {
+  int liney = 0;
+  int i = 0;
+  for (const HudStatusLine &line : hud.status_lines) {
+    int brightness = 128;
+    if (line.time <= 16)
+      brightness -= (16 - line.time) * 8;
+    const int shadow = brightness - 64 < 8 ? 8 : brightness - 64;
+    // (0,128) is the pre-baked default face; other combos use the fade bakes.
+    auto key = [&](int b) {
+      return (line.color == 0 && b == 128)
+                 ? tokens::kTextHudDefault
+                 : tokens::hud_text_key(line.color, (uint8_t)b);
+    };
+    const int x = (640 - (int)line.text.size() * kAdvBodySm) / 2;
+    const std::string id = std::to_string(i++);
+    out.push_back(hud_text(::ui::copy_string(("stats" + id).c_str()), x + 1,
+                           370 + liney + 1,
+                           ::ui::copy_string(line.text.c_str()), key(shadow),
+                           tokens::kFontBodyEm, tokens::kFaceBodySm));
+    out.push_back(hud_text(::ui::copy_string(("stat" + id).c_str()), x,
+                           370 + liney, ::ui::copy_string(line.text.c_str()),
+                           key(brightness), tokens::kFontBodyEm,
+                           tokens::kFaceBodySm));
+    liney -= 10;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Top ticker (origin InGameOverlays.cpp DrawTopMessage)
+// ---------------------------------------------------------------------------
+
+void build_top_ticker(std::vector<::ui::UiElement> &out, const Hud &hud) {
+  if (!hud.top_message_i || hud.top_message.empty())
+    return;
+  const int slen = (int)hud.top_message.size();
+  int start = 0;
+  if (hud.top_message_i / 2 > 24) {
+    start = (hud.top_message_i / 2) - 24;
+    if (start > slen)
+      start = slen;
+  }
+  const std::string window = hud.top_message.substr(start, 35);
+  out.push_back(hud_text("ticker", 200, 10,
+                         ::ui::copy_string(window.c_str()),
+                         tokens::kTextHudDefault, tokens::kFontBodyEm,
+                         tokens::kFaceBodySm));
+}
+
+// ---------------------------------------------------------------------------
 // Center message reveal (origin InGameOverlays.cpp DrawMessage)
 // ---------------------------------------------------------------------------
 
@@ -638,18 +763,23 @@ void build_center_message(std::vector<::ui::UiElement> &out, const Hud &hud) {
   for (int i = 0; i < total; ++i) {
     if (i >= (int)hud.message_i)
       break;
-    int brightness = 128;
-    if ((int)hud.message_i - (int)hud.message_time + 8 >= 0)
-      brightness -= ((int)hud.message_i - (int)hud.message_time + 8) * 8;
-    if (hud.message_i % 32 >= 16)
-      brightness += (16 - (hud.message_i % 16)) * 2;
-    else
-      brightness += (hud.message_i % 16) * 2;
+    // origin computes brightness in a Uint8 — the fade subtraction and pulse
+    // WRAP mod 256 (e.g. mp-time+8 == 32 subtracts 0, not 256). Keep the
+    // exact arithmetic; clamping instead leaves the message black where
+    // origin shows it at full brightness.
+    uint8_t brightness = 128;
+    if (hud.message_type < 10) {
+      if ((int)hud.message_i - (int)hud.message_time + 8 >= 0)
+        brightness -= (uint8_t)((((int)hud.message_i -
+                                  (int)hud.message_time + 8) * 8) & 0xFF);
+      if (hud.message_i % 32 >= 16)
+        brightness += (16 - (hud.message_i % 16)) * 2;
+      else
+        brightness += (hud.message_i % 16) * 2;
+    }
     if ((int)hud.message_i - i <= 5)
       brightness += 40 - (((int)hud.message_i - i) * 8);
-    if (brightness < 0)
-      brightness = 0;
-    int shadow = brightness - 64 < 8 ? 8 : brightness - 64;
+    int shadow = (int)brightness - 64 < 8 ? 8 : brightness - 64;
     const int x = ((640 - linelength * adv) / 2) + adv * (linelength - nextline);
     const char glyph[2] = {text[i], 0};
     if (glyph[0] != '\n' && glyph[0] != ' ') {
@@ -705,15 +835,21 @@ struct InGameScreenProps {
 
   std::vector<::ui::UiElement> kids;
   if (ps.valid) {
-    // origin BuildInGameHudUi order: status sprites -> readouts -> team strip
-    // -> buy/tech -> chat; then overlays: center message -> player list ->
-    // quit prompt.
+    // origin BuildInGameHudUi order: system camera -> status sprites ->
+    // readouts -> team strip -> secret panel -> trace timer -> buy/tech ->
+    // chat; then InGameOverlays order: status lines -> top ticker -> center
+    // message -> player list -> quit prompt.
+    build_system_camera(kids, hud, chrome.hud);
     build_status_sprites(kids, ps, hud, chrome.hud);
     build_readouts(kids, ps);
     build_team_strip(kids, hud, chrome.hud);
+    build_secret_overlay(kids, hud, chrome.hud);
+    build_trace_time(kids, hud);
     if (tech.buy_active || tech.tech_active)
       build_buy_tech(kids, tech, buy_tech, chrome.hud);
     build_chat_overlay(kids, chat, chrome.hud, chrome.caret_game);
+    build_status_lines(kids, hud);
+    build_top_ticker(kids, hud);
     build_center_message(kids, hud);
     if (teams.showing)
       build_player_list(kids, hud);

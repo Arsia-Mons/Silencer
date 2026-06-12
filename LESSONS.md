@@ -252,3 +252,42 @@
   hover-edge OR focus with source ∈ {Mouse,Touch,Keyboard,Gamepad} (Programmatic
   excluded) keeps every rest golden byte-stable while keyboard/pointer interaction
   ramps like origin.
+
+- **The TUI ACTION channel makes "needs real gameplay" surfaces capturable.** The
+  input server (net/inputserver.cpp) accepts full action-bit snapshots (move/jump/
+  jetpack/use/fire/weapon bits), cached latest-wins — under pause+step every input
+  lands on an exact sim tick, so the whole tutorial curriculum (run→jump→jetpack→
+  crouch→roll→disguise→fire→weapon→base build→buy→rocket) replays deterministically.
+  Prior "no deterministic headless trigger" waivers for status_lines/secret_overlay/
+  system_camera/top_ticker were all wrong; only data-dependence (trace time's 4-
+  terminal drain) remains expensive.
+
+- **NPC behavior trees share the C rand() stream with wall-clock rain** (civilian
+  .cpp:61, behaviortree.cpp:81): any civilian/guard near a capture region wanders
+  nondeterministically across runs AND across binaries (our rain-off changes the
+  draw count). Mask wandering NPCs like rain; don't chase their pose.
+
+- **origin's center-message brightness is Uint8 arithmetic — it WRAPS, not clamps.**
+  `brightness -= (mp - time + 8) * 8` at mp-time+8==32 subtracts 256%256=0, so the
+  "faded out" message renders at FULL brightness at high mp. Porting it as clamped
+  int left our message black (then red via unbaked-face fallback) where origin shows
+  bright text. Port legacy Uint8 math with explicit wraps, never "sane" clamps.
+
+- **A frozen UI layer mid-capture = retained-tree commit failure, not staleness.**
+  The center-message reveal emits 2 nodes per revealed glyph onto the flat hud Box;
+  a 75-char message blew UI_RETAINED_MAX_CHILDREN(128)/NODES(512) and every commit
+  failed from that frame on — screenshots showed the last-good frame (message stuck
+  mid-reveal) while world_state advanced. Grep the run log for "failed to commit" /
+  "too many children" BEFORE debugging snapshot plumbing; caps raised to 512/1024
+  (drawlist budget 4MB).
+
+- **origin's in-game palette has HISTORY: the ambience repaint stamps stale
+  temppalette.** CopyWithBrightness(colors, level, 2, 114) writes only 2..114 of the
+  SHARED temppalette and SetColors applies ALL 256 — the >114 (UI/parallax) entries
+  re-present whatever the last full-range write left (the boot fade at phase 14 =
+  112/128). First base entry changes the ambience level, fires the repaint, and dims
+  every UI index by 12.5% for the REST OF THE SESSION (measured: 8.8k px at exactly
+  ratio 128/112 in the syscam golden). Same bug family as the fade-patch lesson. Any
+  post-base-entry origin golden carries it; our page-color-baked RGBA HUD can't
+  follow live palette mutation — that gate is waived (PARITY.md), and a trace-time
+  golden would need a no-base-entry drive to dodge it.

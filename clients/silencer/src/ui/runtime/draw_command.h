@@ -148,7 +148,8 @@ static_assert(sizeof(DrawCommand) <= 96, "DrawCommand size budget; update the bu
 // fits with headroom (512 nodes * 7 cmds * <=96B ~= 344KB).
 // UI_MAX_TEXT_LINES 8->32 (the cc wrapped lore paragraph) raised the per-text-
 // node command ceiling to 34, so the worst-case list grew ~3x.
-constexpr unsigned UI_DRAWLIST_BUDGET = 2048u * 1024u;
+// 512->1024 node bump (in-game center-message glyph stacks): 1024 * 34 * 96B.
+constexpr unsigned UI_DRAWLIST_BUDGET = 4096u * 1024u;
 static_assert(sizeof(DrawCommandList) < UI_DRAWLIST_BUDGET,
               "DrawCommandList exceeds its byte budget");
 

@@ -99,11 +99,53 @@ only skips Present. The control-port `screenshot` op captures HUD included.)
   16px tile column where sparse rain reads at double density). The cppx
   capture additionally disables OUR rain layer (`rain` control op) so only the
   goldens' frozen streaks remain in the diff (~0.2% global, sub-tile).
-- **NOT captured** (no deterministic headless trigger; PARITY.md tracks):
-  top_ticker (only trigger is "Playing: <random track>" / F4-F9 paths),
-  status_lines (all `ShowStatus` callers need real gameplay actions),
-  hud_secret_overlay / hud_trace_time / hud_system_camera (need secrets/beaming/
-  system-camera world states), scoreboard-style F1 with multiple teams.
+- **NOT captured** (PARITY.md tracks): hud_trace_time (needs beaming =
+  team.secretprogress >= 180, i.e. fully draining 4+ data terminals across the
+  map), scoreboard-style F1 with multiple teams.
+
+## Gameplay-driven in-game goldens (4) — captured 2026-06-11, 640×480
+
+`ingame_top_ticker, ingame_status_lines, ingame_secret_overlay,
+ingame_system_camera`
+
+- **Source:** `origin/main` @ `af4c50c5` (v00058), PRISTINE build (both
+  capture patches stashed). **Capture script:**
+  `tools/cap/cap_ingame_origin_extra.sh` (+ `tools/cap/ingame_drive_lib.sh`):
+  same paused/feedback-stepped tutorial session as the 8 above, plus TUI
+  ACTION snapshots (net/inputserver.cpp keymask protocol) driving real
+  gameplay — the earlier "needs real gameplay actions" deferral was wrong;
+  the TUI input port replays the whole tutorial curriculum deterministically.
+- **Drive:** anchor → F4 scancode edge → `ShowTopMessage("          *MUSIC
+  PAUSED*")` (headless audio disabled ⇒ `MusicPaused()` always false, text
+  stable) → **ingame_top_ticker** at topmessage_i==2, message_i==0. Tutorial
+  cases 0-8 (run/jump/jetpack/crouch/roll/disguise×2/fire/weapon-switch);
+  case 9 grants INV_BASEDOOR. Walk to the deck data terminal at x=1824
+  (parsed from AGENCY04.SIL actor records, id 54) → keyuse → CanCreateBase
+  fails on TERMINAL-in-AABB (player.cpp:3097) → "Can't build a base here"
+  (color 208) → **ingame_status_lines** 92 ticks after the push (status
+  time==8, mid-fade brightness 64; trigger pinned at message_i==60 so the
+  capture lands at 152). Walk clear (x≈2100) → keyuse → base door built →
+  **ingame_secret_overlay** at message_i==0 (secret panel bank 187 idx0 + 9
+  dim hack lines, secretprogress 0). Enter base, buy Rocket ×2 at the
+  inventory station (control-op row click = ActivateBuyTechSelection), exit,
+  fire from open deck at message_i==230 → **ingame_system_camera** ~7 ticks
+  into the rocket's flight (slot-0 "SYSTEM" frame bank95 idx2 + live inset).
+- **Determinism:** two independent runs (ports 63554/63574) differ only in
+  sparse rain dashes + the minimap inset (same classes as the 8 above); all
+  UI/text regions byte-identical. NEW nondeterminism class found: **NPC
+  behavior trees draw from the shared C rand() stream** (civilian.cpp:61,
+  behaviortree.cpp:81) that wall-clock rain also consumes — wandering
+  civilians need masks: `270,230,330,290` (status_lines, by the terminal) and
+  `395,230,480,320` (secret_overlay, deck right of the door).
+- **ingame_system_camera is NOT render-gated:** after the first base entry,
+  origin's ambience repaint (game_loop.cpp:184 `CopyWithBrightness(colors,
+  level, 2, 114)`) stamps the SHARED temppalette's stale high indices into
+  the live palette — palette.cpp:227 only rewrites 2..114, and the last
+  full-range temppalette write was the boot fade at phase 14 — so every
+  UI/parallax index (>114) presents at 112/128 brightness from then on
+  (measured: 8.8k diff px at exactly ratio 1.143 vs our render). Our
+  pre-baked RGBA HUD can't track live palette mutation; PARITY.md tracks the
+  waiver. The golden is still the origin truth for the surface's geometry.
 
 ## mission_summary.png — captured 2026-06-11, 1920×1080
 

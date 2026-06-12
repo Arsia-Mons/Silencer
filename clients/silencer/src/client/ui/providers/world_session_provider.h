@@ -105,6 +105,22 @@ struct WorldSessionSnapshot {
   uint8_t quit_state = 0; // 1/2 => "Hit Enter To Quit"
   uint8_t message_i = 0, message_type = 0, message_time = 0;
   std::vector<HudTeamStrip> hud_teams = {};
+
+  // Remaining HUD overlays (origin InGameHud + InGameOverlays order).
+  uint8_t trace_time = 0;
+  bool system_camera[2] = {false, false};
+  std::string top_message = {};
+  uint8_t top_message_i = 0;
+  struct HudStatus {
+    std::string text;
+    uint8_t time = 0, color = 0;
+  };
+  std::vector<HudStatus> status_lines = {};
+  struct HudSecret {
+    bool visible = false, beaming = false, hacking_tick = false;
+    int progress = 0, yoffset = 60;
+    uint32_t highlight_secrets = 0, highlight_minimap = 0;
+  } secret = {};
 };
 
 // The in-match frame value (doc §5): the per-tick snapshot + the queued intent

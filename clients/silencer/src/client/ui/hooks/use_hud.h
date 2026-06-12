@@ -26,6 +26,26 @@ struct HudTeamRow {
   uint16_t emblem_w = 0, emblem_h = 0;
 };
 
+// Bottom-center fading status stack (origin WorldMessaging statusmessages):
+// newest first; `time` is the remaining ticks (fade-out under 16).
+struct HudStatusLine {
+  std::string text;
+  uint8_t time = 0;
+  uint8_t color = 0;
+};
+
+// Team-base hack panel (origin hud_secret_overlays.cpp). Shown whenever the
+// viewed player's team has a base door; progress lines hidden while beaming.
+struct HudSecretOverlay {
+  bool visible = false;
+  bool beaming = false;
+  int progress = 0;     // team secretprogress (20 per line)
+  int yoffset = 60;     // 60, + teams*20-65 when >=3 teams
+  bool hacking_tick = false; // player HACKING at the threshold-shift tick
+  // Pulse-resolved highlight flash textures (0 = flag off this frame).
+  uint32_t highlight_secrets = 0, highlight_minimap = 0;
+};
+
 struct Hud {
   bool valid = false;
   uint8_t phase = 0;  // origin renderer.GetHudAnimationPhase()
@@ -34,6 +54,12 @@ struct Hud {
   uint8_t quit_state = 0;
   std::string message = {};
   uint8_t message_i = 0, message_type = 0, message_time = 0;
+  uint8_t trace_time = 0; // "Government Trace Time: N" when > 0
+  bool system_camera[2] = {false, false};
+  std::string top_message = {};
+  uint8_t top_message_i = 0;
+  std::vector<HudStatusLine> status_lines = {};
+  HudSecretOverlay secret = {};
   std::vector<HudTeamRow> teams = {};
 };
 
