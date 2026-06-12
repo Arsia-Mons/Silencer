@@ -1,5 +1,24 @@
 # Origin/main golden baselines — provenance
 
+> ## Uplifted goldens (2026-06-12 — U-7 / SIL-51)
+>
+> `message_modal.png` and `password_modal.png` were superseded after restoring
+> the origin fixed-dialog layout contract for the cppx-only modal baselines
+> (`uplift: restore fixed-size message/password modal containers`, UPLIFT.md
+> finding U-7, SIL-51). These screens have no standalone origin trigger, but
+> origin source sizes the bank-40 modal element explicitly (`352x178` for
+> message, `352x148` for password) and draws `PackImage(40,4)` /
+> `PackImage(40,2)` into those boxes; the prior cppx baselines instead let the
+> raw registered sprite dimensions size the whole modal, so the text overflowed
+> outside the frame. The fix pins the dialog boxes to those origin constants,
+> uses cover-fit dialog art, wraps the message text inside the padded content
+> width, restores the password input to `180x14`, and uses the fixed Chrome
+> OK plate. Diff attribution: BEFORE captures byte-matched the prior baselines;
+> BEFORE→AFTER changed only the modal regions
+> (`message_modal` bbox x663-1247/y406-672, `password_modal` bbox
+> x696-1223/y429-650), with the mainmenu backdrop/logo outside those boxes
+> stable. Evidence: `docs/plans/uplift-evidence/U-7/`.
+
 > ## Uplifted goldens (2026-06-12 — U-5 / SIL-207)
 >
 > `create_game.png` was superseded once more after fixing the second PORT-side

@@ -146,8 +146,8 @@ byte-identical, so every family below is closed except the create_game residual
 | Surface | State | Notes |
 |---|---|---|
 | gallery | n/a (visual) | cppx-only showcase; baseline re-blessed 2026-06-12 (U-1 / SIL-190 canonical glyph text); regression-gated by scenario 70 |
-| message_modal | n/a (visual) | no standalone origin trigger; cppx baseline re-blessed 2026-06-12 (U-1 / SIL-190); regression-gated by scenario 70 |
-| password_modal | n/a (visual) | no standalone origin trigger; cppx baseline re-blessed 2026-06-12 (U-1 / SIL-190); regression-gated by scenario 70 |
+| message_modal | n/a (visual) | no standalone origin trigger; cppx baseline re-blessed 2026-06-12 (U-1 / SIL-190) and superseded 2026-06-12 (U-7 / SIL-51) to restore origin fixed `352x178` dialog sizing + wrapped message content; regression-gated by scenario 70 |
+| password_modal | n/a (visual) | no standalone origin trigger; cppx baseline re-blessed 2026-06-12 (U-1 / SIL-190) and superseded 2026-06-12 (U-7 / SIL-51) to restore origin fixed `352x148` dialog sizing + `180x14` input; regression-gated by scenario 70 |
 
 ## Visual — in-game (ALL 8 GOLDEN SURFACES PASS 2026-06-11, e2e scenario 72)
 

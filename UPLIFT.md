@@ -520,6 +520,29 @@ iterations don't re-litigate:
   keep the password input `180x14`, OK Chrome button, modal focus trap, and
   existing control IDs. Supersede `message_modal.png` and
   `password_modal.png` after before/after attribution.
+- **As implemented (2026-06-12):** message/password modals no longer size
+  themselves from `chrome.dialog_*_w/h`; they use the origin fixed containers
+  (`352x178` message, `352x148` password), cover-fit the bank-40 dialog art
+  (`tokens::image_patch_cover` = origin `PackImage` semantics), use fixed
+  Chrome OK plates, and restore the password field to `180x14`. Message text
+  renders as a wrapped Large-face text box at the padded inner width
+  (`284` logical), so the visual-regression sample now stays inside the
+  dialog. Password prompt keeps word-wrap enabled but uses the fixed dialog
+  width with centered text: origin metrics keep this specific prompt on one
+  line, while forcing it through the retained font's `284`-logical inner
+  width wrapped it into the input well (rejected during after-crop review).
+  Verified with evidence (`docs/plans/uplift-evidence/U-7/`): BEFORE captures
+  byte-matched the prior baselines; AFTER inspect reports message text
+  `498,312 284x45`, message OK `523,376 234x31`, password prompt
+  `464,316 352x23`, input `550,355 180x14`, password OK
+  `523,385 234x31`; BEFORE→AFTER diff bboxes are confined to the modal
+  regions (`message_modal` x663-1247/y406-672, `password_modal`
+  x696-1223/y429-650). `message_modal.png` and `password_modal.png` were
+  superseded; ORIGIN_GOLDENS.md + PARITY.md document U-7. Verification:
+  build wrapper PASS; scenarios 13, 22, 70, 71, 72, 74, 75, and 76 PASS
+  (a mistaken attempt to run nonexistent `76_visual_regression_ingame_goldens.sh`
+  failed with "No such file or directory"; the actual remaining script
+  `76_visual_regression_ingame_extra.sh` passed).
 - **Parity blast radius:** two cppx-only regression baselines:
   `message_modal.png` and `password_modal.png`; possibly `update_screen` if
   it shares `dialog_msg_w/h` and the same fixed-origin dimensions. No
@@ -527,7 +550,7 @@ iterations don't re-litigate:
   dialog helper is over-broadened.
 - **Effort:** M
 - **Ticket:** SIL-51
-- **Status:** TICKETED
+- **Status:** IN REVIEW (SIL-51)
 
 ### Unit note — mainmenu (2026-06-12)
 
