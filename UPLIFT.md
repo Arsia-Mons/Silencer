@@ -21,7 +21,7 @@ State: IN PROGRESS
 | options | EXAMINED 2026-06-12 | none (see unit note) |
 | options_audio | EXAMINED 2026-06-12 | none (see unit note) |
 | options_display | EXAMINED 2026-06-12 | none (see unit note) |
-| options_controls | UNEXAMINED | |
+| options_controls | EXAMINED 2026-06-12 | none (see unit note) |
 | lobby_connect | UNEXAMINED | |
 | character_create | UNEXAMINED | |
 | cc_alias | UNEXAMINED | |
@@ -693,3 +693,59 @@ candidates.** What was checked and cleared:
   The remaining PARITY.md breadcrumb (`fullscreenw` row nudge + `indDx`) is
   port-side phase-recovery glue already called out by the systemic
   spacing/alignment audit as a cleanup item, not an uplift candidate.
+
+### Unit note — options_controls (2026-06-12)
+
+Audited after regenerating the menu-cluster renders with
+`OUT=/tmp/cppx_renders_uplift_options_controls bash tools/cap/cap_menus.sh`;
+the fresh `/tmp/cppx_renders_uplift_options_controls/options_controls.png`
+byte-matches the current golden (`cmp_exit=0`, md5
+`9e39388a184403cd75e820cad1ecb639`) and the tolerant pixdiff is
+`0.0000 (mae=0.00 maxtile=0.0% hot_tiles=0 PASS)`. **Zero candidates.**
+What was checked and cleared:
+
+- **Authored shape matches origin intent:** origin `OptionsControlsScreen`
+  resets to the menu palette/camera (`options_controls_screen.cpp:76-79`),
+  then paints a stretched bank-6 backdrop and stretched bank-7 idx7 controls
+  frame (`:285-306`). Its frame/action arithmetic is explicit:
+  frame margins 5/7/6/20, min panel 560x420, title y=14, panel pad top 70,
+  action top y=405, action row h=33 (`:25-38`, `:225-242`). Origin
+  `BuildKeybindListBody` fixes the content grid at 486 virtual px with a
+  43px preset row, 43px keybind rows, 10px row gaps, 180/112/45/112 columns
+  and 12px gaps, 8px section gaps, 16px action spacer, then Save/Cancel Md
+  ovals (`controls_keybind_list.cpp:27-38`, `:146-250`). The cppx screen is
+  the same x1.5 grid and frame composition
+  (`options_controls.cppx:32-50`, `:292-349`).
+- **Golden pixels express that shape cleanly:** the live inspect tree places
+  the title at logical `(476,22) 324x29` (device approx `(714,33) 486x44`),
+  content at `(273,116) 729x542`, the scroll viewport at `(273,191) 729x369`,
+  preset button at `(561,123) 330x50`, keybind primary/secondary lanes at
+  x=561/x=833 logical, and Save/Cancel at `(335,609)`/`(647,609)`. Pixel
+  measurement on the current golden found title green bbox
+  `(680,33)-(1234,87)`, preset oval `(841,184)-(1329,258)`, primary oval
+  bboxes `(841,310)-(1090,384)`, `(841,454)-(1090,528)`,
+  `(841,598)-(1090,672)`, `(841,742)-(1090,816)`, the secondary lane
+  `(1249,310)-(1498,816)`, scrollbar `(1636,193)-(1724,869)`, and action
+  buttons `(470,913)-(1424,987)`. Evidence:
+  `docs/plans/uplift-evidence/options_controls/current_form_150pct.png`,
+  `keybind_rows_current_2x.png`, `scrollbar_track_current_4x.png`, and
+  `current_vs_golden_diff_black.png`.
+- **No hidden clipped-row or frame accident:** retained off-viewport row nodes
+  exist in the inspect dump, but direct pixel sampling found zero green UI px
+  in the pre-action gap regions where row 4 would bleed
+  (`x380-690/y860-912`, `x1120-1225/y860-912`,
+  `x1240-1530/y860-912`); the only green below the viewport is the
+  Save/Cancel chrome beginning at y=913. The controls frame, scrollbar rail,
+  and four visible keybind rows are continuous with no broken cap/ring seam or
+  1px gutter. Evidence:
+  `docs/plans/uplift-evidence/options_controls/viewport_bottom_actions_current_3x.png`.
+- **Already-adjudicated, not re-opened:** pristine origin
+  (`ba345131:tests/cli-agent/e2e/golden/options_controls.png`) shows the same
+  four visible movement rows and control structure; current-vs-pristine
+  differences are the documented U-1/U-2/U-3 supersessions (canonical text,
+  canonical legacy sprites, single-hop stretched backdrop), not a
+  Controls-specific defect. Evidence:
+  `docs/plans/uplift-evidence/options_controls/pristine_origin_vs_current_form.png`.
+  The PARITY.md breadcrumbs (`titlewrap inset-top 13`, `OR ml 2`) remain the
+  port-side phase-recovery cleanup called out by the systemic
+  spacing/alignment audit, not an uplift candidate.
