@@ -329,3 +329,25 @@
   (FocusRuntime.confirmed_by_pointer + ClientUi skips invoke_activate for
   Input-role pointer confirms). Symptom signature: a modal that closes itself
   the moment a script set_texts into it.
+
+- **Prove a code path is input-reachable in ORIGIN before building a drive to
+  exercise it.** The buy/tech window-follow (scrolled = selected−4) looked like
+  a missing feature, but origin registers interactables for the VISIBLE rows
+  only and has no in-game Scroll handler — no input can move the selection past
+  the window in origin either. The complete close-out was a verbatim source
+  port + asserts over the reachable subset (window pinned at 0, selection
+  clamps), not an expensive 20-row gameplay drive that would assert the same
+  zeros.
+
+- **Wheel parity needs no scrolled-state golden when step arithmetic + row
+  content are asserted through the control socket.** A scrolled capture would
+  re-test the same row pixels the byte-identical rest golden already gates;
+  what scrolling changes is WHICH rows are in the viewport — asserted exactly
+  via in-view row indices + first-row label per notch and at both clamp ends
+  (scenario 82), and via first/last visible line for mission_summary
+  (scenario 74's post-capture probes).
+
+- **`world_state.peers` ≠ peerlist length.** In a lobby match vs a dedicated
+  server the client reports peers=1 while `peerlist` carries both the local
+  peer and the dedicated AUTHORITY peer (id 0, accountid 0) — assert peer
+  topology from `peerlist` + `authoritypeer`, not the scalar.
