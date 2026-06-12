@@ -214,15 +214,20 @@ golden rain), messages 0.1672/0, quit_prompt 0.3766/0.
 Hardcoded in-game bindings to verify functionally: T chat, F1 player list, F2 team colors,
 F4 music toggle, F5 random music, Enter quit-confirm flow.
 
-## Functional — e2e suite (fresh full run 2026-06-11 post responsive-panes + refactors: ALL 24 GREEN)
+## Functional — e2e suite (fresh full run 2026-06-11 post in-game-surfaces + functional scenarios: ALL 33 GREEN)
 
 | Scenario | State | Evidence |
 |---|---|---|
-| 00..22,30,31,40,50,51,52,60,70 | PASS | fresh full run 2026-06-11 (binary @ b8fc958b) |
+| 00..22,30,31,40,50,51,52,60,70 | PASS | fresh full run 2026-06-11 (binary @ b8fc958b; re-verified post in-game work — 70's modal baselines re-captured at the logo HOLD + stability-polled, see ORIGIN_GOLDENS.md) |
 | 53_lobby_create_options_scroll | PASS | 73bb8fe2 — resolve_lobby_panes ports origin ResolveSteppedPaneLayout; green at 1280x720 / 640x480 / 1000x1100 / 390x844 |
 | 72_visual_regression_ingame | PASS | NEW 2026-06-11 — all 8 in-game goldens gated with the documented masks; full-suite run all green (25 scenarios) |
 | 73_ui_click_sounds | PASS | NEW 2026-06-11 — ui_audio edge counter asserts hover-enter/dedupe/nav triggers |
 | 71_visual_regression_lobby | PASS | d739bc5d — harness now captures lobby_connect at AUTHENTICATING (log populated) and cc_alias BEFORE typing (golden field is empty); the "caret blink" theory was wrong — the caret draws unconditionally while focused. Two consecutive green runs |
+| 76_visual_regression_ingame_extra | PASS | NEW 2026-06-11 — top_ticker/status_lines/secret_overlay gated vs the new gameplay-driven goldens (system_camera captured non-gated, see its row); full-suite green |
+| 77_ingame_chat_behavior | PASS | NEW 2026-06-11 — Enter sends/Esc cancels/channel toggle/100-char cap (origin-verified single-player no-history quirk) |
+| 78_ingame_bindings_quit | PASS | NEW 2026-06-11 — F1 hold, F2 toggle, F4 ticker, quit machine 0→1→2→3→0 + RETURN quit, via TUI scancodes |
+| 79_text_input_caps | PASS | NEW 2026-06-11 — lobby 16/28 + modal 20 caps via controlled-Input round-trip |
+| 80_ingame_buytech_nav | PASS | NEW 2026-06-11 — selection clamp (no wrap) + Esc close |
 
 Earlier same-day milestones: iteration-0 13/23 → post scale-unclamp 21/23 → post string-bake 22/23 → 24/24.
 
@@ -230,14 +235,14 @@ Earlier same-day milestones: iteration-0 13/23 → post scale-unclamp 21/23 → 
 
 | Behavior | State |
 |---|---|
-| chat entry/log in-game (T → type → Enter, TEAM/ALL toggle) | UNVERIFIED |
-| buy/tech overlay navigation + purchase | UNVERIFIED |
-| player-list F1 hold | UNVERIFIED |
-| quit-prompt Enter/Esc state machine | UNVERIFIED |
-| F2/F4/F5 bindings | UNVERIFIED |
-| staging → tech_select → launch full flow vs origin | UNVERIFIED |
-| text-entry caps/length limits (alias, chat, password) vs origin | UNVERIFIED |
-| scrolling behaviors (controls list, map list) vs origin | UNVERIFIED |
+| chat entry/log in-game (Enter sends, Esc cancels, TEAM/ALL toggle, 100-char cap) | **PASS (2026-06-11)** — scenario 77. IMPLEMENTED en route: compose Enter→send (Input on_activate; live value via fiber state since the snapshot prop is a frame stale), Esc→cancel (GameUiPipeline cancel routing — ClientUi's cancel pass only pops Overlays, the in-game HUD is the base screen; mirrors origin InGameUiController Cancel incl. buy/tech close), channel-toggle ghost target over the prefix (origin "ingame.chat.channel"). ORIGIN-VERIFIED QUIRK: in single-player the sent line never reaches history — SendChat fires MSG_CHAT at the authority (yourself) whose socket is never bound (tick_singleplayer.cpp comments out world.Listen); confirmed against the origin binary; the scenario asserts the origin-exact behavior. ENGINE FIX: pointer clicks no longer fire on_activate on Input nodes (focus only — origin inputs submit on RETURN alone; previously clicking the password-modal/lobby fields fired their submit) — focus.cpp confirmed_by_pointer + ClientUi gate |
+| buy/tech overlay navigation + purchase | **PASS (2026-06-11)** — scenario 80 (Up/Down moves + clamps both ends per origin ClampBuyTechSelection — no wrap; Esc closes) + scenario 76's drive asserts a REAL purchase end-to-end (Down+Enter at the base inventory station → Player::BuyItem → rocketammo>0 gates the tutorial case-13 message). Insufficient credits = silent no-op in origin (BuyItem early-return, no status) — nothing to assert |
+| player-list F1 hold | **PASS (2026-06-11)** — scenario 78: HOLD semantics (origin events: OnScancodeDown F1 → SetShowingPlayerList(true), OnScancodeUp → false) via TUI scancodes |
+| quit-prompt Enter/Esc state machine | **PASS (2026-06-11)** — scenario 78: ESC down/up 0→1→2 (prompt), second ESC 2→3→0 (cancel), RETURN held while 1/2 → CheckForQuit → MAINMENU (tutorial unauthenticated). quit_state now exposed in world_state |
+| F2/F4/F5 bindings | **PASS (2026-06-11)** — scenario 78: F2 toggles SetShowingTeamColors (world_state show_team_colors), F4 → "          *MUSIC PAUSED*" ticker (headless audio disabled ⇒ MusicPaused() always false ⇒ same text on repeat — origin-exact), F5 has no headless-observable effect (LoadRandomGameMusic + PlayMusic both no-op with audio disabled) |
+| staging → tech_select → launch full flow vs origin | UNVERIFIED — scenario 31 covers create→staging, the mission_summary drive (tools/cap) covers a full launch via lobby; no single launch-flow scenario yet |
+| text-entry caps/length limits (alias, chat, password) vs origin | **PASS (2026-06-11)** — scenario 79 (lobby username 16 / password 28, modal password 20 — origin lobby_connect_screen.h username[17]/password[29], password_modal.cpp maxLength 20) + scenario 77 (chat 100 = chatText[101]). IMPLEMENTED en route: the caps (set_username/set_password/set_alias/modal on_change substr truncation — our Inputs are fully controlled so the consumer cap is authoritative); alias 16 shares the implementation (not separately asserted — needs the lobby boot) |
+| scrolling behaviors (controls list, map list) vs origin | PARTIAL — scenarios 12 (controls list scroll) + 53 (map-list/options reflow) cover keyboard/scroll reachability; wheel-vs-origin pixel comparison not done |
 | hover/focus interaction VISUALS vs origin | **PASS (2026-06-11)** — hover_mainmenu_oval golden (origin, 2 runs byte-identical) gated at 0.0000/0 hot; chrome NEGATIVE verified both sides (origin: hovered Login cell byte-equals the rest golden ×2 runs; ours: 0 diff px in the cell before/after hover); scenario 75 green. IMPLEMENTED: origin's 5-phase ramp in AppButton (sprite base+phase at brightness 128+2p baked per phase + registered for the device-cell variant swap — oval Md/Sm/Lg + LegacyRow; label ramps through hud_text_key(0,128+2p) face bakes), one phase/42ms toward target, disabled pins 0. Target = hover (NEW engine on_hover enter/leave edge — use_hovered can't serve product components, the host's fiber is the substrate Button's) OR focus with a real input source (programmatic autofocus does NOT ramp — origin never autofocuses, keeps rest goldens byte-stable; hover does not move focus in our model, per scenario 16). DEVIATIONS (documented): `selected` does not ramp yet (origin selectedVisual; no golden exercises it — cc preview-selected rows must stay phase 0 at rest anyway); Ghost/Text 128→136 brightness ramp not implemented (no golden; in-game ghost rows must stay chromeless). FIXED EN ROUTE: use_clock delta_ms collapsed to 0 on multi-layer frames (computed per screen layer, not per frame) — no prior consumer animated on overlays, now snapshotted once per render frame |
 | UI interaction SOUNDS | **FIXED 2026-06-11** — ClientUi publishes per-frame UiAudioEvents (hovered audible Button / activate / keyboard-nav onto one; audible = enabled Button only, per origin: toggles/inputs silent); GameUiPipeline (sole Audio owner) dedupes the hover edge and plays GAS soundUIClick via Audio::PlayUI; edge counter exposed headless via the `ui_audio` op. Evidence: scenario 73 (hover-enter +1, steady hover 0, second hover +1, nav +1) green in the full suite |
 

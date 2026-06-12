@@ -589,9 +589,10 @@ CharacterWizard use_character_create() {
   std::string *alias = v->alias;
   bool *submitting = v->submitting;
   int *preview_agency = v->preview_agency;
+  // origin cap: alias[17] (character_create_screen.h) — 16 chars.
   w.set_alias = [alias](const std::string &s) {
     if (alias)
-      *alias = s;
+      *alias = s.substr(0, 16);
   };
   w.open_alias = [step]() {
     if (step)

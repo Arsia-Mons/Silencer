@@ -113,12 +113,38 @@ cli --port "$PORT" click --label "OptionsGoBack" >/dev/null
 cli --port "$PORT" wait_frames --n 3 >/dev/null
 
 # ---- Modals + gallery (cppx-only baselines) ----
+# The mainmenu logo keeps cycling its wall-clock reveal BEHIND the modals
+# (visible since the retained-tree cap bump let multi-layer frames commit);
+# wait for the reveal HOLD (logo region stable across two frames) before each
+# modal cap so the baselines stay deterministic.
+wait_logo_hold() {
+  local a="$WORK/logo_a.png" b="$WORK/logo_b.png"
+  for _ in $(seq 1 30); do
+    cli --port "$PORT" screenshot --out "$a" >/dev/null
+    cli --port "$PORT" wait_ms --n 400 >/dev/null
+    cli --port "$PORT" screenshot --out "$b" >/dev/null
+    if python3 - "$a" "$b" <<'PY'
+import sys
+import numpy as np
+from PIL import Image
+a = np.array(Image.open(sys.argv[1]).convert("RGB"))[500:590, 250:850]
+b = np.array(Image.open(sys.argv[2]).convert("RGB"))[500:590, 250:850]
+sys.exit(0 if (a == b).all() else 1)
+PY
+    then return 0; fi
+  done
+  echo "logo never reached its HOLD window" >&2
+  return 1
+}
+
 cli --port "$PORT" show_message_modal --title "Notice" --message "Visual regression sample message." >/dev/null
+wait_logo_hold
 cap message_modal
 cli --port "$PORT" click --label "MessageModalOk" >/dev/null
 cli --port "$PORT" wait_frames --n 3 >/dev/null
 
 cli --port "$PORT" show_password_modal --title "Password" >/dev/null
+wait_logo_hold
 cap password_modal
 cli --port "$PORT" click --label "Ok" >/dev/null
 cli --port "$PORT" wait_frames --n 3 >/dev/null

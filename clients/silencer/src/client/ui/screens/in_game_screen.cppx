@@ -368,9 +368,15 @@ struct ChatComposeProps {
   bool caret_on = false;
   ::ui::Color caret_color = {};
   std::function<void(const std::string &)> on_change = {};
+  std::function<void(const std::string &)> send = {};
 };
 
 ::ui::UiElement ChatComposeView(const ChatComposeProps &p) {
+  // Enter sends the CURRENT text (origin SubmitText carries the live value):
+  // edits flow through on_change before the key event dispatches, so track
+  // them in fiber state — the snapshot prop is one frame stale.
+  std::string *live = use_state(std::string(p.text));
+  *live = p.text;
   // Chromeless input over the chrome: typed text Body (0,128); caret = palette
   // idx 140 (page 0), blinking on origin's wall-clock phase.
   ::ui::StyleStatePatch field{};
@@ -397,8 +403,20 @@ struct ChatComposeProps {
           .id = "IngameChat",
           .autofocus = true,
           .accessibility = {.label = "Chat"},
+          // Enter arrives as confirm->activation on the focused node (the
+          // key channel only carries editing keys).
+          .on_activate =
+              [live, send = p.send](const ::ui::ActivationEvent &) {
+                if (send)
+                  send(*live);
+              },
           .value = ::ui::copy_string(p.text.c_str()),
-          .on_change = p.on_change,
+          .on_change =
+              [live, on_change = p.on_change](const std::string &v) {
+                *live = v;
+                if (on_change)
+                  on_change(v);
+              },
           .show_caret = p.caret_on,
           .layout =
               ::ui::LayoutStyle{.align_items = ::ui::AlignItems::Center,
@@ -444,6 +462,33 @@ void build_chat_overlay(std::vector<::ui::UiElement> &out,
   out.push_back(hud_text("chatpre", kChatX + kChatTextX, kChatY + yoffset,
                          prefix, tokens::kTextHudBright, tokens::kFontBodyEm,
                          tokens::kFaceBody));
+  // Channel toggle over the prefix (origin "ingame.chat.channel"
+  // interactable): activate flips TEAM/ALL. Ghost paint — the prefix text is
+  // the whole visual.
+  {
+    std::function<void()> toggle = chat.toggle_channel;
+    ::ui::StyleStatePatch ghost{};
+    ghost.base = ::ui::patch()
+                     .chromeless(true)
+                     .background(tokens::kHudClear)
+                     .gradient(::ui::Gradient{})
+                     .border(::ui::Border{})
+                     .outline(::ui::Outline{})
+                     .corner_radius(0.0f);
+    ghost.hover = ghost.base;
+    ghost.focus_visible = ghost.base;
+    out.push_back(Box(BoxProps{
+        .key = "chatchan",
+        .id = "IngameChatChannel",
+        .focusable = true,
+        .on_activate =
+            [toggle](const ::ui::ActivationEvent &) {
+              if (toggle)
+                toggle();
+            },
+        .layout = abs_at(kChatX + kChatTextX, kChatY + yoffset, prefix_w, 11),
+        .style = ghost}));
+  }
   ChatComposeProps compose;
   compose.x = kChatX + kChatTextX + prefix_w;
   compose.y = kChatY + yoffset;
@@ -451,6 +496,7 @@ void build_chat_overlay(std::vector<::ui::UiElement> &out,
   compose.caret_on = chat.caret_on;
   compose.caret_color = caret_color;
   compose.on_change = chat.set_text;
+  compose.send = chat.send;
   out.push_back(
       ::ui::component("HudChatCompose", compose, ChatComposeView, "compose"));
 }

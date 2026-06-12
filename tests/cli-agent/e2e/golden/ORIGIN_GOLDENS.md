@@ -212,8 +212,10 @@ ingame_system_camera`
 - **gallery.png** — cppx-only component showcase; no origin/main equivalent. Left as
   the prior cppx render.
 - **message_modal.png, password_modal.png** — no standalone origin trigger
-  (`show_password_modal` registers widgets but renders nothing from MAINMENU). Left as
-  prior renders — treat as STALE/contaminated until recaptured.
+  (`show_password_modal` registers widgets but renders nothing from MAINMENU).
+  cppx-only drift baselines, re-captured 2026-06-11 at the logo HOLD window
+  (the retained-tree cap bump let the mainmenu logo keep animating under
+  modals; scenario 70 now stability-polls the logo before each modal cap).
 
 ## Rules (see [[feedback_visual_parity_golden_gate]])
 - These are the design SPEC. The visual-regression suite will show diffs until the

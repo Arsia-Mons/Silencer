@@ -130,7 +130,15 @@ bool ClientUi::update_retained_runtime(const ::ui::FlexLayoutAdapter &layout,
   }
   ::ui::NodeId confirmed = ::ui::focus_confirmed_id(retained_focus_);
   if (confirmed != 0) {
-    retained_tree_.invoke_activate(confirmed);
+    // Clicking a text input focuses it but never activates (origin: inputs
+    // submit on RETURN only — a pointer click must not fire on_activate, or
+    // every submit-on-activate field fires on focus-click).
+    ::ui::NodeSnapshot cs = {};
+    bool pointer_on_input = ::ui::focus_confirmed_by_pointer(retained_focus_) &&
+                            retained_tree_.snapshot(confirmed, &cs) &&
+                            cs.role == ::ui::NodeRole::Input;
+    if (!pointer_on_input)
+      retained_tree_.invoke_activate(confirmed);
   }
 
   // Interaction-audio edges (origin ClientUi.cpp:95-111): hovered audible

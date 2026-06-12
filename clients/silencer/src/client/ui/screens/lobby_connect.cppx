@@ -84,10 +84,11 @@ std::vector<::ui::UiElement> connect_status_log(const std::string &log) {
     if (lobby.connect)
       lobby.connect(*username, *password);
   };
+  // origin caps: username[17] / password[29] (lobby_connect_screen.h)
   std::function<void(const std::string &)> set_username =
-      [username](const std::string &next) { *username = next; };
+      [username](const std::string &next) { *username = next.substr(0, 16); };
   std::function<void(const std::string &)> set_password =
-      [password](const std::string &next) { *password = next; };
+      [password](const std::string &next) { *password = next.substr(0, 28); };
   std::function<void(const ::ui::ActivationEvent &)> on_activate =
       [submit](const ::ui::ActivationEvent &) { submit(); };
 

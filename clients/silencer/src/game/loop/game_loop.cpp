@@ -591,6 +591,8 @@ WorldSummary Game::GetWorldSummary(){
 	summary.messageType = static_cast<int>(world.GetMessageType());
 	summary.messageTime = static_cast<int>(world.GetMessageTime());
 	summary.topMessageText = world.GetTopMessageText();
+	summary.quitState = world.quitstate;
+	summary.showTeamColors = world.IsShowingTeamColors();
 	summary.topMessageProgress = static_cast<int>(world.GetTopMessageProgress());
 	for(unsigned int i = 0; i < world.maxpeers; i++){
 		Peer * p = world.peers.peerlist[i];

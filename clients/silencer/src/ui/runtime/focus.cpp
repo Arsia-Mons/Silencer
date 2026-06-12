@@ -284,6 +284,7 @@ bool focus_update(FocusRuntime *runtime, const UiTree &tree,
 
   runtime->focusable_count = 0;
   runtime->confirmed_id = 0;
+  runtime->confirmed_by_pointer = false;
   runtime->focus_changed_id = 0;
   runtime->blurred_id = 0;
 
@@ -339,6 +340,7 @@ bool focus_update(FocusRuntime *runtime, const UiTree &tree,
     NodeId hovered = hovered_enabled(*runtime, input);
     if (same_id(runtime->pointer_press_origin, hovered)) {
       runtime->confirmed_id = hovered;
+      runtime->confirmed_by_pointer = true;
     }
     runtime->pointer_press_origin = 0;
   } else if (!input.pointer_down) {
@@ -348,6 +350,7 @@ bool focus_update(FocusRuntime *runtime, const UiTree &tree,
   if (input.confirm_pressed &&
       contains_enabled(*runtime, runtime->focused_id)) {
     runtime->confirmed_id = runtime->focused_id;
+    runtime->confirmed_by_pointer = false;
   }
 
   runtime->hovered_id = hovered_enabled(*runtime, input);
@@ -369,6 +372,10 @@ NodeId focus_changed_id(const FocusRuntime &runtime) {
 
 NodeId focus_confirmed_id(const FocusRuntime &runtime) {
   return runtime.confirmed_id;
+}
+
+bool focus_confirmed_by_pointer(const FocusRuntime &runtime) {
+  return runtime.confirmed_by_pointer;
 }
 
 NodeId focus_hovered_id(const FocusRuntime &runtime) {

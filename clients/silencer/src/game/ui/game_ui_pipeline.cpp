@@ -1498,6 +1498,30 @@ std::make_unique<client::ui::AppRoot>());
 cppxAppRootPushed = true;
 }
 
+// In-game Cancel routing (origin InGameUiController::ApplyActions): Esc
+// closes the chat compose (text dropped) or the buy/tech overlay. Handled
+// here because the in-game HUD is the BASE screen — ClientUi's cancel pass
+// only pops Overlay screens. The raw-ESC quit machine stays blocked this
+// frame (OnScancodeDown gates on !chatActive, which the deferred close
+// flips after render — same ordering as origin).
+// (direct mutation: this runs BEFORE begin_frame, which clears the deferred
+// queue — and pre-frame world writes are safe, the no-mutation rule guards
+// mid-build only)
+if(uiInput_.cancel_pressed && game.world.map.loaded){
+Player * p = game.world.GetPeerPlayer(game.world.viewedpeerid);
+if(p && (p->chatActive || p->isbuying || p->techstationactive)){
+if(p->chatActive){
+p->chatActive = false;
+p->chatText[0] = '\0';
+}else{
+p->isbuying = false;
+p->techstationactive = false;
+}
+uiInput_.cancel_pressed = false;
+uiInput_.cancel_down = false;
+}
+}
+
 // SIL-18 input: the accumulated per-frame edges (events.cpp windowed +
 // control-socket injection) plus the derived pointer. An injected click is a
 // single-frame press+release at a UI-space point (so the control socket can

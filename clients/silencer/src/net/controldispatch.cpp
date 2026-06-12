@@ -209,6 +209,8 @@ static nlohmann::json WorldSummaryToJson(const WorldSummary& summary){
 	r["message_time"] = summary.messageTime;
 	r["topmessage_text"] = summary.topMessageText;
 	r["topmessage_progress"] = summary.topMessageProgress;
+	r["quit_state"] = summary.quitState;
+	r["show_team_colors"] = summary.showTeamColors;
 	return r;
 }
 
@@ -398,6 +400,9 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 		j["ok"] = r.available;
 		j["mode"] = mode;
 		j["chat_active"] = r.chat_active;
+		j["chat_with_team"] = r.chat_with_team;
+		j["chat_line_count"] = r.chat_line_count;
+		j["chat_text_len"] = r.chat_text_len;
 		j["buy_active"] = r.buy_active;
 		j["tech_active"] = r.tech_active;
 		j["show_chat_ticks"] = r.show_chat_ticks;

@@ -414,6 +414,9 @@ InGameUiControlResult ConfigureInGameUi(Game &game, InGameUiMode mode,
     player->CollectBuyMenuItems(world, true, techItems);
     result.available = true;
     result.chat_active = player->chatActive;
+    result.chat_with_team = player->chatwithteam;
+    result.chat_line_count = (int)world.messaging.chatlines.size();
+    result.chat_text_len = (int)std::strlen(player->chatText);
     result.buy_active = player->isbuying;
     result.tech_active = player->techstationactive;
     result.show_chat_ticks = world.messaging.showchat_i;

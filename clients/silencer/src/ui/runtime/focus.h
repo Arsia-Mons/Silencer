@@ -77,6 +77,7 @@ struct FocusRuntime {
   NodeId hovered_id = 0; // top-most enabled focusable under the pointer this frame
   NodeId pointer_press_origin = 0;
   NodeId confirmed_id = 0;
+  bool confirmed_by_pointer = false; // click-confirm vs keyboard confirm
   FocusSource source = FocusSource::None;
   int error_count = 0;
 };
@@ -89,6 +90,7 @@ NodeId focus_focused_id(const FocusRuntime &runtime);
 NodeId focus_blurred_id(const FocusRuntime &runtime);
 NodeId focus_changed_id(const FocusRuntime &runtime);
 NodeId focus_confirmed_id(const FocusRuntime &runtime);
+bool focus_confirmed_by_pointer(const FocusRuntime &runtime);
 NodeId focus_hovered_id(const FocusRuntime &runtime);
 NodeId focus_pressed_id(const FocusRuntime &runtime);
 FocusSource focus_source(const FocusRuntime &runtime);

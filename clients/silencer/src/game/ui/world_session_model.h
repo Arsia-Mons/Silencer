@@ -29,6 +29,9 @@ struct InGameUiControlResult {
   bool available = false;
   std::string error = {};
   bool chat_active = false;
+  bool chat_with_team = false;
+  int chat_line_count = 0; // world chatlines (history) size
+  int chat_text_len = 0;   // compose buffer length (cap = chatText[101])
   bool buy_active = false;
   bool tech_active = false;
   int show_chat_ticks = 0;
