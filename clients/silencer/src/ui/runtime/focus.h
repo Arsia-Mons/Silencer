@@ -61,6 +61,7 @@ struct InputFrame {
 
 struct FocusableLayout {
   NodeId id = 0;
+  NodeId focus_parent = 0;
   Rect rect = {};
   bool disabled = false;
   bool initial_focus = false;

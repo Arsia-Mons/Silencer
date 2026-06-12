@@ -20,6 +20,26 @@ bool interval_overlaps(float a0, float a1, float b0, float b1) {
   return a0 < b1 && b0 < a1;
 }
 
+bool rect_overlaps(Rect a, Rect b) {
+  return interval_overlaps(a.x, a.x + a.width, b.x, b.x + b.width) &&
+         interval_overlaps(a.y, a.y + a.height, b.y, b.y + b.height);
+}
+
+Rect intersect_rect(Rect a, Rect b) {
+  const float x0 = a.x > b.x ? a.x : b.x;
+  const float y0 = a.y > b.y ? a.y : b.y;
+  const float x1 = a.x + a.width < b.x + b.width ? a.x + a.width
+                                                  : b.x + b.width;
+  const float y1 = a.y + a.height < b.y + b.height ? a.y + a.height
+                                                    : b.y + b.height;
+  Rect r = a;
+  r.x = x0;
+  r.y = y0;
+  r.width = x1 > x0 ? x1 - x0 : 0.0f;
+  r.height = y1 > y0 ? y1 - y0 : 0.0f;
+  return r;
+}
+
 bool is_candidate_in_direction(Rect from, Rect to, FocusDirection dir) {
   switch (dir) {
   case FocusDirection::Left:
@@ -122,27 +142,52 @@ bool subtree_contains(const UiTree &tree, NodeId root, NodeId target) {
 }
 
 bool collect_focusables(const UiTree &tree, FocusRuntime &runtime, NodeId id,
-                        uint32_t *order) {
+                        uint32_t *order, Rect clip, bool clipped,
+                        NodeId focus_parent) {
   NodeSnapshot node = {};
   if (!tree.snapshot(id, &node))
     return false;
 
+  Rect focus_rect = node.layout;
+  bool visible = true;
+  if (clipped) {
+    visible = rect_overlaps(node.layout, clip);
+    if (visible)
+      focus_rect = intersect_rect(node.layout, clip);
+  }
+
+  NodeId child_focus_parent = focus_parent;
   if (node.interaction.focusable) {
-    if (runtime.focusable_count >= UI_RETAINED_MAX_FOCUSABLES) {
+    child_focus_parent = id;
+    if (!visible) {
+      // Descendants can still be visible with absolute positioning, so only skip
+      // this node. The inherited clip below will reject fully clipped children.
+    } else if (runtime.focusable_count >= UI_RETAINED_MAX_FOCUSABLES) {
       ++runtime.error_count;
       return false;
+    } else {
+      runtime.focusables[runtime.focusable_count++] = {
+          .id = id,
+          .focus_parent = focus_parent,
+          .rect = focus_rect,
+          .disabled = node.interaction.disabled,
+          .initial_focus = node.interaction.initial_focus,
+          .order = (*order)++,
+      };
     }
-    runtime.focusables[runtime.focusable_count++] = {
-        .id = id,
-        .rect = node.layout,
-        .disabled = node.interaction.disabled,
-        .initial_focus = node.interaction.initial_focus,
-        .order = (*order)++,
-    };
+  }
+
+  Rect child_clip = clip;
+  bool child_clipped = clipped;
+  if (node.style.overflow == Overflow::Hidden ||
+      node.style.overflow == Overflow::Scroll) {
+    child_clip = clipped ? intersect_rect(clip, node.layout) : node.layout;
+    child_clipped = true;
   }
 
   for (int i = 0; i < tree.child_count(id); ++i) {
-    if (!collect_focusables(tree, runtime, tree.child_at(id, i), order))
+    if (!collect_focusables(tree, runtime, tree.child_at(id, i), order,
+                            child_clip, child_clipped, child_focus_parent))
       return false;
   }
   return true;
@@ -161,6 +206,37 @@ const FocusableLayout *find_layout(const FocusRuntime &runtime, NodeId id) {
 bool contains_enabled(const FocusRuntime &runtime, NodeId id) {
   const FocusableLayout *layout = find_layout(runtime, id);
   return layout && !layout->disabled;
+}
+
+bool is_focus_descendant(const FocusRuntime &runtime,
+                         const FocusableLayout &candidate,
+                         NodeId ancestor_id) {
+  NodeId parent = candidate.focus_parent;
+  while (parent != 0) {
+    if (same_id(parent, ancestor_id))
+      return true;
+    const FocusableLayout *layout = find_layout(runtime, parent);
+    if (!layout)
+      return false;
+    parent = layout->focus_parent;
+  }
+  return false;
+}
+
+bool has_directional_focus_descendant(const FocusRuntime &runtime,
+                                      const FocusableLayout &candidate,
+                                      const FocusableLayout &from,
+                                      FocusDirection dir) {
+  for (int i = 0; i < runtime.focusable_count; ++i) {
+    const FocusableLayout &other = runtime.focusables[i];
+    if (other.disabled || same_id(other.id, candidate.id))
+      continue;
+    if (!is_focus_descendant(runtime, other, candidate.id))
+      continue;
+    if (is_candidate_in_direction(from.rect, other.rect, dir))
+      return true;
+  }
+  return false;
 }
 
 bool set_focus(FocusRuntime &runtime, NodeId id, FocusSource source) {
@@ -266,6 +342,8 @@ NodeId resolve_spatial(const FocusRuntime &runtime, NodeId from_id,
       continue;
     if (!is_candidate_in_direction(from->rect, candidate->rect, dir))
       continue;
+    if (has_directional_focus_descendant(runtime, *candidate, *from, dir))
+      continue;
 
     float primary = primary_distance(from->rect, candidate->rect, dir);
     if (primary < 0.0f)
@@ -327,7 +405,8 @@ bool focus_update(FocusRuntime *runtime, const UiTree &tree,
   runtime->active_scope_id = active_scope;
 
   uint32_t order = 0;
-  if (!collect_focusables(tree, *runtime, active_scope, &order))
+  Rect clip = {};
+  if (!collect_focusables(tree, *runtime, active_scope, &order, clip, false, 0))
     return false;
 
   bool restore_parent_focus =
