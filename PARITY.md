@@ -241,7 +241,7 @@ NOT be executed this session: the host has no logged-in GUI session (SDL
 Events launch also fail — /dev/console owned by root). Run the script once a
 console session exists.
 
-## Functional — e2e suite (fresh full run 2026-06-11 post in-game-surfaces + functional scenarios: ALL 33 GREEN)
+## Functional — e2e suite (fresh full run 2026-06-11 post ledger-tail batch: ALL 35 GREEN, suite exit 0)
 
 | Scenario | State | Evidence |
 |---|---|---|
@@ -255,6 +255,14 @@ console session exists.
 | 78_ingame_bindings_quit | PASS | NEW 2026-06-11 — F1 hold, F2 toggle, F4 ticker, quit machine 0→1→2→3→0 + RETURN quit, via TUI scancodes |
 | 79_text_input_caps | PASS | NEW 2026-06-11 — lobby 16/28 + modal 20 caps via controlled-Input round-trip |
 | 80_ingame_buytech_nav | PASS | NEW 2026-06-11 — selection clamp (no wrap) + Esc close |
+| 81_launch_flow | PASS | NEW 2026-06-11 (ledger-tail) — staging → tech hop → Ready → INGAME vs the lobby-spawned dedicated server (evidence in the launch-flow row below) |
+| 82_wheel_scroll_steps | PASS | NEW 2026-06-11 (ledger-tail) — wheel step arithmetic + scrolled row content vs origin source (evidence in the scrolling row below) |
+
+Scenario 72 gained one bounded RE-CAPTURE on failure (160c5ff0): the first
+full ledger-tail suite run flapped quit_prompt's rain/NPC-rand world tile
+3.6→5.2% (gate line 5%) under suite load while standalone runs pass; the retry
+re-rolls the documented nondeterminism, gate threshold untouched. The second
+full run (35/35, exit 0) passed 72 first-try — no retry consumed.
 
 Earlier same-day milestones: iteration-0 13/23 → post scale-unclamp 21/23 → post string-bake 22/23 → 24/24.
 
