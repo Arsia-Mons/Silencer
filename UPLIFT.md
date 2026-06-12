@@ -16,7 +16,7 @@ State: IN PROGRESS
 | [systemic] background image double-scaling / banding | EXAMINED 2026-06-12 | U-3 |
 | [systemic] float-rect flooring: 1px seams & jitter | EXAMINED 2026-06-12 | U-4, U-5 (no ORIGIN-side candidates — see unit note) |
 | [systemic] palette quantization & dim formulas | EXAMINED 2026-06-12 | U-6 (+ unit note: dim/brighten LUTs clean at all used combos) |
-| [systemic] spacing/alignment consistency across siblings | UNEXAMINED | |
+| [systemic] spacing/alignment consistency across siblings | EXAMINED 2026-06-12 | none (see unit note) |
 | mainmenu | UNEXAMINED | |
 | options | UNEXAMINED | |
 | options_audio | UNEXAMINED | |
@@ -464,4 +464,65 @@ iterations don't re-litigate:
   colors. Reasonable for the user to reject on golden-churn grounds.
 - **Effort:** S
 - **Ticket:** SIL-208
-- **Status:** TICKETED
+- **Status:** TICKETED — judged NOT implementable now (2026-06-12 iteration):
+  benefit is sub-perceptual (max delta 3/255) while the blast radius is the
+  widest possible — it would supersede ALL 30 goldens including the pristine
+  in-game set that U-1..U-5 deliberately kept byte-identical to raw origin
+  captures (that set is the strongest remaining verification anchor; in-game
+  suites still gate against it). Churn > benefit; the auditing iteration
+  itself predicted likely user rejection. Left for the user to decide.
+
+### Unit note — [systemic] spacing/alignment consistency across siblings (2026-06-12)
+
+Swept every sibling set with ≥3 members across the goldens (vertical pitch,
+horizontal column alignment, and label-centering lenses), cross-checking
+suspicious pitches against origin/main layout source and, where the U-1/2/3
+supersessions could mask things, against the pristine origin goldens
+(`git show ba345131:...`). Outcome: **zero candidates** — every sibling set
+origin computes identically IS uniform; recording the evidence so per-screen
+iterations don't re-measure:
+
+- **options** ovals: device tops 327/444/561/678 — pitch 117 exact
+  (= 52 virtual), all four 75 px tall (post-U-2). Uniform.
+- **options_display**: both rows pitch 118; toggle stacks aligned at the
+  same x (1245) on both rows. Uniform.
+- **options_controls** keybind rows: value-oval tops 310/454/598/742 —
+  pitch 144,144,144. The preset→rows gap differs (126) but is the authored
+  section boundary (kSectionGap=8 + viewport start; source kRowH=43,
+  kRowGap=10, rows GROW — `controls_keybind_list.cpp:28-30`). Uniform.
+- **create_game**: map-list rows alternate 31/32 device = uniform virtual
+  pitch 14; Game Options rows pristine pitches {38,38,39,38} = uniform
+  virtual 17 (current 39/38/39/37 is the documented U-1 floor-quantization
+  ±1 residual — same virtual layout, verified label tops byte-aligned at
+  x727 all five rows); character stat rows alternate 31/32 = uniform 14.
+- **tech_select**: rows fixed `kRowH=13`, no gap, checkbox cell 13×13
+  (`tech_tree_grid.cpp:32-38,240`); measured pitches avg 29.25 (=13×2.25),
+  apparent 28/30 wobble is threshold noise from dim (unavailable-tech) rows
+  over the busy backdrop, not layout.
+- **mission_summary**: stat lines `kLineH=11` uniform; upgrade column
+  `kLevelStartY + index*kLevelRowGap` (46) — pure index arithmetic
+  (`mission_summary_screen.cpp:55,66,202,226`). Screen is byte-identical
+  parity (verbatim origin grid port). Uniform by construction.
+- **game_staging** button stack: wrapper padTops 3/11/39
+  (`game_join_panel.cpp:37-39`) — the larger Ready gap is authored
+  hierarchy (INTENT); roster rows are `team*55 + slot*13` index arithmetic.
+- **mainmenu**: stagger step 40 authored (`main_menu_screen.cpp` 
+  kActionStaggerStep); oval pitch 151/150/151 and the 24/25 glyph-pen
+  rhythm are the adjudicated U-1/U-2 non-integer-scale residuals.
+- **Label centering in ovals** (mainmenu + options, 8 buttons): ink-bbox
+  asymmetry dH spreads 0..+10 device but tracks the LAST glyph's right
+  bearing in the monospace 11-advance cell ('l'/'y' full-cell → ~0;
+  's'/'t' → +8); vertical dV is −5 without descenders, −1 with ('p','y')
+  — i.e. the full line box IS centered. INTENT, not mis-centering. Same
+  bearing effect explains the 2px 'M'-vs-digit variance in create_game's
+  value column (1007 vs 1005 = sub-virtual-pixel).
+- **In-game overlays** (s=1, byte-identical parity): no set has ≥3 visible
+  siblings in the goldens (buy_tech 2 rows, player_list 1 row, messages 2
+  lines); buy-tech row pitch 29 vs origin's grid — nothing measurable
+  beyond parity already proves.
+
+The PARITY.md "nudge" breadcrumbs in this area (display fullscreenw mr 3 +
+indDx 1, controls titlewrap inset-top 13) are sub-device-pixel pen-recovery
+glue from the U-1 string-bake era — port-side authoring offsets, not
+evidence of origin spacing accidents; their consolidation remains a
+PARITY.md refactor item, not an uplift.
