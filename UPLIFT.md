@@ -36,7 +36,7 @@ State: IN PROGRESS
 | ingame: chat (open + history) / messages | EXAMINED 2026-06-12 | none (see unit note) |
 | ingame: player_list / system_camera | EXAMINED 2026-06-12 | none (see unit note) |
 | ingame: tech_overlay / buy_tech / secret_overlay | EXAMINED 2026-06-12 | none (see unit note) |
-| ingame: quit_prompt | UNEXAMINED | |
+| ingame: quit_prompt | EXAMINED 2026-06-12 | none (see unit note) |
 
 ## Findings
 
@@ -1617,3 +1617,64 @@ TUI-driven base-door path. **Zero candidates.** What was checked and cleared:
   un-gated secret/minimap highlight pulse variants as coverage limits, not
   visible design defects in these captured surfaces. No Linear ticket opened
   because there is no new ARTIFACT/DEFECT/ERA-LIMIT candidate in this unit.
+
+### Unit note — ingame: quit_prompt (2026-06-12)
+
+Audited after running the full in-game visual gate
+`bash tests/cli-agent/e2e/72_visual_regression_ingame.sh` (PASS) and the
+focused raw-scancode behavior gate
+`bash tests/cli-agent/e2e/78_ingame_bindings_quit.sh` (PASS). Persistent
+evidence was captured with
+`PORT=63961 bash tools/cap/cap_ingame_cppx.sh
+/tmp/cppx_uplift_ingame_quit_prompt_20260612`; the first quit-prompt drive
+hit the documented camera-alignment retry (`last shift 10,0`) and the second
+drive captured `ingame_quit_prompt`. **Zero candidates.** What was checked
+and cleared:
+
+- **Authored shape matches origin intent:** origin draws the quit prompt only
+  while `quitState == 1 || quitState == 2`, with literal text
+  `Hit Enter To Quit`, Prompt advance `16`, centered at
+  `(surface->w - len*advance)/2`, y `200`, and `LegacyPalette(202)`
+  (`origin/main:clients/silencer/src/client/ui/hud/InGameOverlays.cpp:
+  211-241`). Origin input latches the prompt through raw ESC scancode
+  down/up (`game/input/game_input.cpp:256-305`) and quits on live RETURN while
+  the prompt is latched (`game/session/game_session.cpp:164-171`). The cppx
+  port mirrors the prompt text and coordinates in
+  `clients/silencer/src/client/ui/screens/in_game_screen.cppx:832-839`, and
+  the current input/session paths mirror the ESC/RETURN state machine
+  (`clients/silencer/src/game/input/game_input.cpp:206-255`,
+  `clients/silencer/src/game/session/game_session.cpp:164-171`).
+
+- **Golden pixels express that shape cleanly:** the current and origin golden
+  are both native `640x480` in-game captures. The expected prompt box is
+  x `184`, y `200`, width `272` (`17` chars * `16` px advance). In the
+  focused prompt band `(150,185)-(490,235)`, the fresh capture differs from
+  the golden in only `152` sparse background pixels, while the derived prompt
+  text mask selects `1828` saturated prompt-blue pixels at bbox
+  `(184,200)-(453,219)` and all `1828/1828` are byte-identical between the
+  fresh capture and golden. Evidence:
+  `docs/plans/uplift-evidence/ingame_quit_prompt/
+  prompt_band_golden_left_current_right.png`,
+  `prompt_band_diff_magenta_on_black.png`,
+  `prompt_text_mask_current_yellow_6x.png`, and `measurements.json`.
+
+- **No prompt-specific accident found:** the tolerant comparison for the
+  persistent quit-prompt capture passed against the golden with the documented
+  in-game masks:
+  `0.2944 (mae=0.18 maxtile=3.4% hot_tiles=0 PASS)`. The larger diffs in the
+  full prompt context (`686` px) and the deck/NPC band (`1813` px) align with
+  ORIGIN_GOLDENS' existing rain, right-edge, minimap, and quit-prompt
+  civilian-wander mask contract, not with prompt text, placement, clipping, or
+  palette drift. Evidence:
+  `docs/plans/uplift-evidence/ingame_quit_prompt/
+  full_prompt_context_golden_left_current_right.png`,
+  `full_prompt_context_diff_magenta_on_black.png`,
+  `npc_mask_band_context_golden_left_current_right.png`, and
+  `npc_mask_band_context_diff_magenta_on_black.png`.
+
+- **Already-adjudicated, not re-opened:** `ingame_quit_prompt` uses the
+  native 640x480 in-game overlay path, so the U-1/U-2/U-3 menu whole-frame
+  magnify artifacts do not apply. ORIGIN_GOLDENS already documents the
+  separate TUI scancode capture path and the quit-prompt-only civilian-wander
+  mask band. No Linear ticket opened because there is no new
+  ARTIFACT/DEFECT/ERA-LIMIT candidate in this unit.
