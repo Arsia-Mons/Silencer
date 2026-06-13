@@ -30,6 +30,7 @@
 #include "client/ui/hooks/use_updater.h"
 #include "client/ui/providers/app_provider.h"
 #include "client/ui/providers/chrome_textures_provider.h"
+#include "client/ui/providers/map_previews_provider.h"
 #include "client/ui/providers/clock_provider.h"
 #include "client/ui/providers/key_map_provider.h"
 #include "client/ui/providers/keybind_capture_provider.h"
@@ -928,6 +929,44 @@ game.renderer.palette.SetPalette(prevPage);
 }
 }
 
+void GameUiPipeline::BakeMapPreviews() {
+// SIL-216: decompress each bundled map's stored 172x62 minimap and bake it to a
+// preview texture_id, once (maps don't change at runtime). This is the only
+// place that reads the map files + indexed minimap + palette for the UI; the
+// opaque ids travel to screens via the MapPreviewsProvider. The Create-Game map
+// list shows the hovered map's preview, cursor-following.
+if(mapPreviewsBaked_ || !cppxHost) return;
+mapPreviewsBaked_ = true;
+// The minimap indices render against the base palette page 0 (the world's
+// palette), index 0 transparent — exactly the sprite_bake contract. GetColors()
+// is the base page.
+const SDL_Color *palette = game.renderer.palette.GetColors();
+if(!palette) return;
+const int w = client::ui::MapPreviews::kWidth;
+const int h = client::ui::MapPreviews::kHeight;
+// FindMap resolves the bundled filename to a full path (level / download /
+// archive). CDResDir before the lookup like the list pass; restore after.
+CDResDir();
+for(const std::string &label : bundledMaps_){
+if(cppxMapPreviews_.by_filename.count(label)) continue;
+const std::string path = game.gameSession.MapDownloaderRef().FindMap(label.c_str());
+if(path.empty()) continue;
+SDL_IOStream *file = SDL_IOFromFile(path.c_str(), "rb");
+if(!file) continue;
+Map::Header header;
+const bool ok = Map::LoadHeader(file, header);
+SDL_CloseIO(file);
+if(!ok) continue;
+Uint8 pixels[172 * 62];
+if(!Map::UncompressMinimap(&pixels, header.minimapcompressed,
+                           header.minimapcompressedsize))
+continue;
+uint32_t id = cppxHost->bake_chrome_sprite(pixels, w, h, palette);
+if(id) cppxMapPreviews_.by_filename[label] = id;
+}
+CDDataDir();
+}
+
 uint32_t GameUiPipeline::EnsureHudRampVariant(uint8_t bank, uint16_t index,
                                               uint8_t rampColor,
                                               uint8_t rampPlus,
@@ -1074,6 +1113,12 @@ if(!cppxHost->ensure(rw, rh, SILENCER_CPPX_FONT_DIR)) return;
 if(cppxHost->chrome_needs_bake()){
 BakeChromeTextures(rw, rh, cppxScale, false);
 cppxHost->mark_chrome_baked();
+// SIL-216: a renderer reset (e.g. resize) clears the texture registry and
+// re-IDs every chrome texture, so the map-preview ids baked earlier now alias
+// other textures. Invalidate them so BakeMapPreviews re-bakes against the fresh
+// registry on the next lobby frame.
+cppxMapPreviews_.by_filename.clear();
+mapPreviewsBaked_ = false;
 }
 
 if(!cppxAppRootPushed){
@@ -1566,6 +1611,8 @@ client::ui::AppProviderValue{.quit = [this]{ game.quitRequested = true; },
 tree = client::ui::ClockProvider(cppxClock_, ::ui::children({tree}));
 // SIL-87: baked legacy-sprite chrome ids (read by use_chrome()).
 tree = client::ui::ChromeTexturesProvider(cppxChrome, ::ui::children({tree}));
+// SIL-216: baked per-map minimap previews (read by use_map_previews()).
+tree = client::ui::MapPreviewsProvider(cppxMapPreviews_, ::ui::children({tree}));
 tree = silencer::game_ui::ServerProvider(
 silencer::game_ui::ServerProviderValue{&game},
 ::ui::children({tree}));
@@ -1708,6 +1755,11 @@ bundledMaps_.push_back(entry.first);
 }
 bundledMapsListed_ = true;
 }
+// SIL-216: bake each local bundled map's minimap to a preview texture once the
+// list is known (server-only maps have no local file and are skipped). Self-
+// guards on mapPreviewsBaked_, so this re-bakes after a renderer reset cleared
+// the ids but is otherwise a no-op.
+BakeMapPreviews();
 lobbySnapshot_.bundled_maps = bundledMaps_;
 // SIL-21 (4/n): capture the in-match read-state (viewed agent + replicated match
 // state) on the game thread before the build. Empty outside the match phases.

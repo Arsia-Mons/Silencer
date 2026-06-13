@@ -8,6 +8,7 @@
 #include "client/ui/providers/world_session_provider.h" // client::ui::WorldSessionSnapshot
 #include "client/ui/hooks/use_chrome.h" // client::ui::ChromeTextures
 #include "client/ui/hooks/use_clock.h"  // client::ui::Clock
+#include "client/ui/hooks/use_map_previews.h" // client::ui::MapPreviews
 #include <cstdint>
 #include <map>
 #include <memory>
@@ -127,6 +128,10 @@ void RenderCppxClientUiFrame(Surface & surface);
 // uiScale = the logical-canvas content scale (device-res element bakes derive
 // their logical draw rect from it).
 void BakeChromeTextures(int rw, int rh, float uiScale, bool deferredPass);
+// SIL-216: decompress each bundled map's stored 172x62 minimap and bake it to a
+// preview texture_id (keyed by filename), once. Runs right after the bundled-map
+// list is resolved; the ids travel to screens via the MapPreviewsProvider.
+void BakeMapPreviews();
 client::ui::SessionPhase CurrentSessionPhase() const;
 
 Game & game;
@@ -186,6 +191,11 @@ client::ui::WorldSessionSnapshot worldSessionSnapshot_ = {};
 // lobby snapshot each lobby-phase frame.
 std::vector<std::string> bundledMaps_ = {};
 bool bundledMapsListed_ = false;
+// SIL-216: baked minimap-preview textures (filename → texture_id), baked once
+// when the bundled-map list is resolved. Read by the MapPreviewsProvider in the
+// per-frame provider chain; the Create-Game map list shows the hovered map's.
+client::ui::MapPreviews cppxMapPreviews_;
+bool mapPreviewsBaked_ = false;
 
 // SIL-18 UI input: the per-frame edges (events.cpp + control socket) and the
 // derived pointer state. Cleared each frame after the pipeline consumes them.

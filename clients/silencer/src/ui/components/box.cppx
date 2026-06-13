@@ -3,6 +3,11 @@
 namespace ui::components {
 
 ::ui::UiElement Box(const BoxProps &props) {
+  // Box also forwards on_hover (pointer enter/leave edges on a focusable host);
+  // the shared callbacks_from_props is kept hover-agnostic since not every
+  // control's props carry it.
+  ::ui::HostCallbacks callbacks = detail::callbacks_from_props(props);
+  callbacks.on_hover = props.on_hover;
   return <detail.Host
     kind={::ui::HostKind::Box}
     key={props.key}
@@ -12,7 +17,7 @@ namespace ui::components {
     visual={::ui::resolve(::ui::use_theme().box, props.style, {})}
     interaction={detail::interaction_from_props(props)}
     accessibility={detail::accessibility_from_props(props, ::ui::SemanticRole::Auto)}
-    callbacks={detail::callbacks_from_props(props)}
+    callbacks={callbacks}
   >
     {props.children}
   </detail.Host>

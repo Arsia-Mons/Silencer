@@ -512,6 +512,7 @@ set(_cppx_app_shell_sources
 	src/client/ui/providers/key_map_provider.cpp
 	src/client/ui/providers/keybind_capture_provider.cpp
 	src/client/ui/providers/lobby_provider.cpp
+	src/client/ui/providers/map_previews_provider.cpp
 	src/client/ui/providers/navigation_provider.cpp
 	src/client/ui/providers/server_provider.cpp
 	src/client/ui/providers/session_provider.cpp

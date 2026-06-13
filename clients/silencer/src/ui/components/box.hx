@@ -14,6 +14,7 @@ struct BoxProps {
   AccessibilityProps accessibility = {};
   std::function<void(const ::ui::FocusEvent &)> on_focus = {};
   std::function<void(const ::ui::BlurEvent &)> on_blur = {};
+  std::function<void(const ::ui::HoverEvent &)> on_hover = {};
   std::function<void(const ::ui::ActivationEvent &)> on_activate = {};
   std::function<void(const ::ui::KeyEvent &)> on_key = {};
   std::function<void(const ::ui::WheelEvent &)> on_wheel = {};

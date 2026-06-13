@@ -12,7 +12,9 @@
 #include "client/ui/hooks/use_lobby_chat.h"
 #include "client/ui/hooks/use_progression.h"
 #include "client/ui/hooks/use_chrome.h"
+#include "client/ui/hooks/use_map_previews.h"
 #include "client/ui/hooks/use_session.h"
+#include "client/ui/app_shell/ui_pipeline.h"
 #include "client/ui/hooks/use_staging.h"
 #include "client/ui/screens/character_create_data.h"
 #include "ui/components/box.h"
@@ -1399,7 +1401,7 @@ struct LobbyChatPanelProps {
 // -> 21 logical row slots; rows inset text 4 virtual (6) with a 2 top bias so
 // the ink-centered pen lands on origin's cell (94+14k).
 std::vector<::ui::UiElement> map_list_rows(const std::vector<std::string> &maps,
-                                           int *map_index) {
+                                           int *map_index, int *hovered_map) {
   constexpr int kMaxMapRows = 14;
   std::vector<::ui::UiElement> rows;
   for (int i = 0; i < (int)maps.size() && i < kMaxMapRows; ++i) {
@@ -1407,12 +1409,22 @@ std::vector<::ui::UiElement> map_list_rows(const std::vector<std::string> &maps,
     const char *mv = ::ui::copy_string(maps[i].c_str());
     std::function<void(const ::ui::ActivationEvent &)> pick =
         [map_index, i](const ::ui::ActivationEvent &) { *map_index = i; };
+    // SIL-216: track the hovered row so the screen can float that map's minimap
+    // preview at the cursor. Clear only if leaving the row we last set.
+    std::function<void(const ::ui::HoverEvent &)> hover =
+        [hovered_map, i](const ::ui::HoverEvent &e) {
+          if (e.entered)
+            *hovered_map = i;
+          else if (*hovered_map == i)
+            *hovered_map = -1;
+        };
     rows.push_back(Box(BoxProps{
         .key = mk,
         .id = "MapRow",
         .id_offset = i,
         .focusable = true,
         .accessibility = {.label = mv},
+        .on_hover = hover,
         .on_activate = pick,
         .layout = ::ui::LayoutStyle{.height = ::ui::Length::points(21.0f),
                                     .flex_shrink = ::ui::StyleFloat::points(0.0f),
@@ -1425,6 +1437,65 @@ std::vector<::ui::UiElement> map_list_rows(const std::vector<std::string> &maps,
             .value = mv})})}));
   }
   return rows;
+}
+
+// SIL-216: the cursor-following minimap preview card. A small bordered panel
+// drawn at the live pointer (offset up-left so it doesn't sit under the cursor),
+// showing the hovered map's baked 172x62 minimap at ~2x. Absolutely positioned
+// at the screen root so it floats over the lobby. Returns empty when nothing is
+// hovered or the texture isn't baked.
+::ui::UiElement MapPreviewOverlay(uint32_t texture, float pointer_x,
+                                  float pointer_y, float origin_x,
+                                  float origin_y) {
+  if (!texture)
+    return ::ui::empty();
+  // 172x62 at ~2x reads well at the logical 1280x720 canvas; 4px border card.
+  constexpr float kPreviewW = 172.0f * 2.0f;
+  constexpr float kPreviewH = 62.0f * 2.0f;
+  constexpr float kPad = 4.0f;
+  constexpr float kCardW = kPreviewW + kPad * 2.0f;
+  constexpr float kCardH = kPreviewH + kPad * 2.0f;
+  // The pointer is in full-canvas logical space; the overlay's absolute inset is
+  // measured from the ScreenLayout root's content box (after its pad). Subtract
+  // the root pad (origin_x/origin_y) so the card tracks the true cursor.
+  const float px = pointer_x - origin_x;
+  const float py = pointer_y - origin_y;
+  // Offset the card up-left of the cursor (origin's preview sat to the cursor's
+  // upper-left); flip below/right if it would clip off the top-left.
+  float left = px - kCardW - 12.0f;
+  float top = py - kCardH - 8.0f;
+  if (left < 0.0f)
+    left = px + 18.0f;
+  if (top < 0.0f)
+    top = py + 18.0f;
+  // Dark panel backing + the chrome hairline border, so the minimap reads as a
+  // floating card (frame_patch alone is a transparent interior).
+  ::ui::StylePatch card = ::ui::patch()
+                              .background(tokens::kSurfacePanel)
+                              .gradient(::ui::Gradient{})
+                              .corner_radius(0.0f)
+                              .border(::ui::Border{
+                                  {1.34f, 1.34f, 1.34f, 1.34f},
+                                  {tokens::kChromeStroke, tokens::kChromeStroke,
+                                   tokens::kChromeStroke, tokens::kChromeStroke}});
+  return <Box
+    key="map-preview"
+    layout={::ui::LayoutStyle{
+      .position = ::ui::PositionType::Absolute,
+      .position_inset = ::ui::EdgeSizes{left, {}, top, {}},
+      .width = ::ui::Length::points(kCardW),
+      .height = ::ui::Length::points(kCardH),
+      .padding = {kPad, kPad, kPad, kPad}}}
+    style={card}
+  >
+    <Box
+      key="img"
+      layout={::ui::LayoutStyle{
+        .width = ::ui::Length::points(kPreviewW),
+        .height = ::ui::Length::points(kPreviewH)}}
+      style={tokens::image_patch(texture)}
+    />
+  </Box>
 }
 
 // The stepped-pane cockpit grid (origin ResolveSteppedPaneLayout): left stack
@@ -1519,10 +1590,15 @@ struct LobbyScreenProps {
   App app = use_app();
   Progression prog = use_progression();
   client::ui::ChromeTextures chrome = use_chrome();
+  // SIL-216: baked per-map minimap previews + the live pointer, for the
+  // cursor-following Select-Map preview. Read unconditionally (stable hooks).
+  MapPreviews map_previews = use_map_previews();
+  const UiPipelineFrame *pipeline_frame = use_ui_pipeline_frame();
   std::string *create_name = use_state<std::string>(std::string("New Game"));
   std::string *create_password = use_state<std::string>(std::string());
   int *sel = use_state<int>(0);
   int *map_index = use_state<int>(-1); // -1 = none picked yet (no highlight, like origin)
+  int *hovered_map = use_state<int>(-1); // SIL-216: row under the cursor (-1 = none)
   bool *show_create = use_state<bool>(false);
   uint8_t *opt_security = use_state<uint8_t>(2);
   uint8_t *opt_min_level = use_state<uint8_t>(0);
@@ -1530,7 +1606,8 @@ struct LobbyScreenProps {
   uint8_t *opt_max_players = use_state<uint8_t>(24);
   uint8_t *opt_max_teams = use_state<uint8_t>(6);
   bool *opt_spectatable = use_state<bool>(true);
-  if (!create_name || !create_password || !sel || !map_index || !show_create || !opt_security ||
+  if (!create_name || !create_password || !sel || !map_index || !hovered_map ||
+      !show_create || !opt_security ||
       !opt_min_level || !opt_max_level || !opt_max_players || !opt_max_teams ||
       !opt_spectatable)
     return ::ui::empty();
@@ -1668,7 +1745,7 @@ struct LobbyScreenProps {
   // The right column is the "Select Map" filename list while creating a game,
   // otherwise the "Active Games" browser.
   std::vector<::ui::UiElement> map_rows =
-      *show_create ? map_list_rows(games.bundled_maps, map_index)
+      *show_create ? map_list_rows(games.bundled_maps, map_index, hovered_map)
                    : std::vector<::ui::UiElement>{};
   ::ui::UiElement right_cell;
   if (staging.active && *tech_open) {
@@ -1755,9 +1832,24 @@ struct LobbyScreenProps {
       .chat_panel = chat_panel,
       .right_cell = right_cell});
 
+  // SIL-216: the cursor-following minimap preview over the Select Map list. Only
+  // while creating a game, when a row is hovered and its minimap baked. Reads the
+  // live pointer (logical canvas space) so the card tracks the cursor.
+  ::ui::UiElement map_preview = ::ui::empty();
+  if (*show_create && *hovered_map >= 0 && *hovered_map < map_count) {
+    uint32_t tex = map_previews.texture_for(games.bundled_maps[*hovered_map]);
+    if (tex && pipeline_frame)
+      map_preview = MapPreviewOverlay(tex, pipeline_frame->pointer.x,
+                                      pipeline_frame->pointer.y, panes.pad_x,
+                                      panes.pad_top);
+  } else if (!*show_create && *hovered_map != -1) {
+    *hovered_map = -1; // leaving create mode clears the hover
+  }
+
   return <ScreenLayout key="root" variant={ScreenLayoutVariant::Game}>
     {title_bar}
     {grid}
+    {map_preview}
   </ScreenLayout>
 }
 
