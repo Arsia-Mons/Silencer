@@ -1,6 +1,7 @@
 #include "ui/components/scroll_view.h"
 
 #include "ui/components/box.h"
+#include "ui/runtime/interaction_hooks.h"
 #include "ui/runtime/react.h"
 
 #include <algorithm>
@@ -12,6 +13,16 @@ using ::ui::children;
 
 ::ui::UiElement ScrollView(const ScrollViewProps &props) {
   float *offset = use_state<float>(0.0f);
+
+  // SIL-213 scroll-into-view: if keyboard/gamepad focus moved to one of our
+  // descendants and that node is outside the viewport, the focus pass published
+  // a signed delta (keyed by our control id). Apply it so the focused row scrolls
+  // into view — this also re-virtualizes the row slice below, committing rows
+  // that were previously culled so focus can keep stepping past the fold. One
+  // frame lagged (the request reflects last frame's focus), which matches the
+  // runtime's interaction model.
+  *offset += use_scroll_into_view(props.id);
+
   const float max_off =
       std::max(0.0f, props.content_height - props.viewport_height);
   if (*offset > max_off)
@@ -80,16 +91,26 @@ using ::ui::children;
   content.position_inset.top = ::ui::StyleValue::points(-*offset);
 
   // Virtualize uniform-height lists: render only the row slice intersecting the
-  // window (+1 overscan each side). The slice is a contiguous subrange of the
-  // already-built children arena, so we just retarget the pointer — no copy —
-  // and shift the content track so global row `first` lands at first*row_height.
+  // window, with overscan on each side. The slice is a contiguous subrange of
+  // the already-built children arena, so we just retarget the pointer — no copy
+  // — and shift the content track so global row `first` lands at first*row_height.
+  //
+  // The below-fold overscan (kOverscan rows past the last fully-visible row) is
+  // load-bearing for keyboard scroll-into-view (SIL-213): focus can only land on
+  // a COMMITTED row, and scroll-into-view fires only AFTER focus moves onto an
+  // off-viewport row. So the row immediately past the fold must already be
+  // committed for Down to reach it (which then drives the scroll, sliding the
+  // window down to commit the next one). With too little overscan focus would
+  // stall on the last visible row and jump out of the list. `+1` top overscan,
+  // `+kOverscan` bottom, plus the partial-row term covers the fractional offset.
   ::ui::UiChildren kids = props.children;
   if (props.row_height > 0.0f && kids.count > 0) {
     const float rh = props.row_height;
+    constexpr int kOverscan = 2;
     int first = (int)(*offset / rh) - 1;
     if (first < 0)
       first = 0;
-    int visible = (int)(props.viewport_height / rh) + 3;
+    int visible = (int)(props.viewport_height / rh) + 2 + kOverscan;
     if (first > kids.count - 1)
       first = kids.count - 1;
     int last = first + visible;

@@ -20,26 +20,6 @@ bool interval_overlaps(float a0, float a1, float b0, float b1) {
   return a0 < b1 && b0 < a1;
 }
 
-bool rect_overlaps(Rect a, Rect b) {
-  return interval_overlaps(a.x, a.x + a.width, b.x, b.x + b.width) &&
-         interval_overlaps(a.y, a.y + a.height, b.y, b.y + b.height);
-}
-
-Rect intersect_rect(Rect a, Rect b) {
-  const float x0 = a.x > b.x ? a.x : b.x;
-  const float y0 = a.y > b.y ? a.y : b.y;
-  const float x1 = a.x + a.width < b.x + b.width ? a.x + a.width
-                                                  : b.x + b.width;
-  const float y1 = a.y + a.height < b.y + b.height ? a.y + a.height
-                                                    : b.y + b.height;
-  Rect r = a;
-  r.x = x0;
-  r.y = y0;
-  r.width = x1 > x0 ? x1 - x0 : 0.0f;
-  r.height = y1 > y0 ? y1 - y0 : 0.0f;
-  return r;
-}
-
 bool is_candidate_in_direction(Rect from, Rect to, FocusDirection dir) {
   switch (dir) {
   case FocusDirection::Left:
@@ -142,55 +122,107 @@ bool subtree_contains(const UiTree &tree, NodeId root, NodeId target) {
 }
 
 bool collect_focusables(const UiTree &tree, FocusRuntime &runtime, NodeId id,
-                        uint32_t *order, Rect clip, bool clipped,
-                        NodeId focus_parent) {
+                        uint32_t *order, NodeId focus_parent,
+                        NodeId scroll_container) {
   NodeSnapshot node = {};
   if (!tree.snapshot(id, &node))
     return false;
 
-  Rect focus_rect = node.layout;
-  bool visible = true;
-  if (clipped) {
-    visible = rect_overlaps(node.layout, clip);
-    if (visible)
-      focus_rect = intersect_rect(node.layout, clip);
-  }
-
+  // A focusable inside a scrolling clip keeps its UNCLIPPED layout rect as its
+  // nav rect: directional/sequential nav must be able to REACH a row that is
+  // currently scrolled out of (or partially clipped by) the viewport, in true
+  // document order (SIL-213). SIL-199's "don't rest on an invisible row" intent
+  // is preserved by scroll-into-view (focus_scroll_request below): once focus
+  // lands on such a row, the owning container scrolls it into view, so we never
+  // permanently rest on an off-viewport node. The full node.layout rect (not the
+  // clipped intersection) keeps ordering and direction tests aligned with the
+  // row's real document position even while it is off-screen.
   NodeId child_focus_parent = focus_parent;
   if (node.interaction.focusable) {
     child_focus_parent = id;
-    if (!visible) {
-      // Descendants can still be visible with absolute positioning, so only skip
-      // this node. The inherited clip below will reject fully clipped children.
-    } else if (runtime.focusable_count >= UI_RETAINED_MAX_FOCUSABLES) {
+    if (runtime.focusable_count >= UI_RETAINED_MAX_FOCUSABLES) {
       ++runtime.error_count;
       return false;
-    } else {
-      runtime.focusables[runtime.focusable_count++] = {
-          .id = id,
-          .focus_parent = focus_parent,
-          .rect = focus_rect,
-          .disabled = node.interaction.disabled,
-          .initial_focus = node.interaction.initial_focus,
-          .order = (*order)++,
-      };
     }
+    runtime.focusables[runtime.focusable_count++] = {
+        .id = id,
+        .focus_parent = focus_parent,
+        .scroll_container = scroll_container,
+        .rect = node.layout,
+        .disabled = node.interaction.disabled,
+        .initial_focus = node.interaction.initial_focus,
+        .order = (*order)++,
+    };
   }
 
-  Rect child_clip = clip;
-  bool child_clipped = clipped;
-  if (node.style.overflow == Overflow::Hidden ||
-      node.style.overflow == Overflow::Scroll) {
-    child_clip = clipped ? intersect_rect(clip, node.layout) : node.layout;
-    child_clipped = true;
+  // The nearest scroll-clip ancestor for this node's descendants. A node is its
+  // children's scroll container when it clips overflow (Scroll/Hidden).
+  NodeId child_scroll_container = scroll_container;
+  if (node.style.overflow == Overflow::Scroll ||
+      node.style.overflow == Overflow::Hidden) {
+    child_scroll_container = id;
   }
 
   for (int i = 0; i < tree.child_count(id); ++i) {
     if (!collect_focusables(tree, runtime, tree.child_at(id, i), order,
-                            child_clip, child_clipped, child_focus_parent))
+                            child_focus_parent, child_scroll_container))
       return false;
   }
   return true;
+}
+
+// Walk the focused node's ancestor chain in document order to find its nearest
+// scrolling-clip container (overflow Scroll/Hidden) and compute how far that
+// container must shift its scroll offset to bring the focused node fully into
+// its clip rect. Both rects are in absolute layout space, so the delta is
+// offset-independent: the container applies it to whatever local offset it
+// holds. Negative delta scrolls toward the top (reveal above), positive scrolls
+// down (reveal below); 0 = already in view. SIL-213.
+FocusScrollRequest compute_scroll_request(const UiTree &tree, NodeId focused) {
+  FocusScrollRequest request = {};
+  if (focused == 0)
+    return request;
+
+  NodeSnapshot node = {};
+  if (!tree.snapshot(focused, &node))
+    return request;
+  const Rect focus_rect = node.layout;
+
+  NodeId ancestor = node.parent_id;
+  while (ancestor != 0) {
+    NodeSnapshot anc = {};
+    if (!tree.snapshot(ancestor, &anc))
+      break;
+    if (anc.style.overflow == Overflow::Scroll ||
+        anc.style.overflow == Overflow::Hidden) {
+      const Rect clip = anc.layout;
+      float delta = 0.0f;
+      // Reveal a node clipped above the window (scroll up: negative delta), or
+      // below it (scroll down: positive delta). If the node is taller than the
+      // viewport, prefer aligning its top.
+      if (focus_rect.y < clip.y) {
+        delta = focus_rect.y - clip.y;
+      } else if (focus_rect.y + focus_rect.height > clip.y + clip.height) {
+        delta = (focus_rect.y + focus_rect.height) - (clip.y + clip.height);
+        // Never scroll so far down that the node's top leaves the top edge.
+        const float max_up = focus_rect.y - clip.y;
+        if (delta > max_up)
+          delta = max_up;
+      }
+      request.delta_y = delta;
+      request.valid = true;
+      // Copy the container's control id (truncating to the label cap) so a
+      // ScrollView can match against its own props.id without a node lookup.
+      const char *cid = anc.control_id ? anc.control_id : "";
+      size_t n = 0;
+      for (; cid[n] && n + 1 < UI_RETAINED_LABEL_CAP; ++n)
+        request.viewport_control_id[n] = cid[n];
+      request.viewport_control_id[n] = '\0';
+      return request;
+    }
+    ancestor = anc.parent_id;
+  }
+  return request;
 }
 
 const FocusableLayout *find_layout(const FocusRuntime &runtime, NodeId id) {
@@ -361,6 +393,7 @@ NodeId resolve_spatial(const FocusRuntime &runtime, NodeId from_id,
   float best_perp = 0.0f;
   float best_primary = 0.0f;
   float best_center = 0.0f;
+  bool best_in_container = false;
 
   for (int i = 0; i < runtime.focusable_count; ++i) {
     const FocusableLayout *candidate = &runtime.focusables[i];
@@ -380,18 +413,36 @@ NodeId resolve_spatial(const FocusRuntime &runtime, NodeId from_id,
     float dy = center_y(candidate->rect) - center_y(from->rect);
     float center = dx * dx + dy * dy;
 
-    bool better = !best || perp < best_perp ||
-                  (perp == best_perp && primary < best_primary) ||
-                  (perp == best_perp && primary == best_primary &&
-                   center < best_center) ||
-                  (perp == best_perp && primary == best_primary &&
-                   center == best_center && candidate->order < best->order);
+    // SIL-213: when `from` lives in a scrolling container, prefer candidates in
+    // that SAME container so directional nav walks every row in order (even ones
+    // scrolled off-screen, whose nav rect now sits outside the viewport) before
+    // it leaves the list. Without this, a row at the viewport edge would jump to
+    // a closer node OUTSIDE the list (e.g. the preset row just above the window),
+    // skipping the off-screen rows the user is trying to reach.
+    bool in_container = from->scroll_container != 0 &&
+                        same_id(candidate->scroll_container,
+                                from->scroll_container);
+
+    bool better;
+    if (!best) {
+      better = true;
+    } else if (in_container != best_in_container) {
+      better = in_container; // same-container candidates always win
+    } else {
+      better = perp < best_perp ||
+               (perp == best_perp && primary < best_primary) ||
+               (perp == best_perp && primary == best_primary &&
+                center < best_center) ||
+               (perp == best_perp && primary == best_primary &&
+                center == best_center && candidate->order < best->order);
+    }
 
     if (better) {
       best = candidate;
       best_perp = perp;
       best_primary = primary;
       best_center = center;
+      best_in_container = in_container;
     }
   }
 
@@ -431,8 +482,7 @@ bool focus_update(FocusRuntime *runtime, const UiTree &tree,
   runtime->active_scope_id = active_scope;
 
   uint32_t order = 0;
-  Rect clip = {};
-  if (!collect_focusables(tree, *runtime, active_scope, &order, clip, false, 0))
+  if (!collect_focusables(tree, *runtime, active_scope, &order, 0, 0))
     return false;
 
   bool restore_parent_focus =
@@ -498,6 +548,21 @@ bool focus_update(FocusRuntime *runtime, const UiTree &tree,
 
   runtime->hovered_id = hovered_enabled(*runtime, input);
 
+  // SIL-213: publish how far the focused node's nearest scrolling container must
+  // move to bring it into view. The owning ScrollView reads this next build and
+  // applies the delta to its local offset (one-frame lag, by design). Gate it on
+  // focus having MOVED this frame via a keyboard/gamepad/programmatic source: a
+  // continuously-published request would fight wheel/pointer scrolling (the user
+  // wheels a focused row off-screen and scroll-into-view yanks it back). Firing
+  // only on the nav edge means each Down/Up triggers exactly one follow-scroll,
+  // and free wheel/drag scrolling is untouched.
+  runtime->scroll_request = {};
+  if (runtime->focus_changed_id != 0 &&
+      focus_source_is_visible(runtime->source)) {
+    runtime->scroll_request =
+        compute_scroll_request(tree, runtime->focused_id);
+  }
+
   return runtime->error_count == 0;
 }
 
@@ -530,6 +595,10 @@ NodeId focus_pressed_id(const FocusRuntime &runtime) {
 }
 
 FocusSource focus_source(const FocusRuntime &runtime) { return runtime.source; }
+
+const FocusScrollRequest &focus_scroll_request(const FocusRuntime &runtime) {
+  return runtime.scroll_request;
+}
 
 int focus_error_count(const FocusRuntime &runtime) {
   return runtime.error_count;

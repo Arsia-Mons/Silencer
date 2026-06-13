@@ -1,8 +1,11 @@
 #include "interaction_hooks.h"
 
+#include <string.h>
+
 namespace ui {
 
 ReactContext InteractionContext = {};
+ReactContext FocusScrollContext = {};
 
 namespace {
 const InteractionSnapshot *current_snapshot() {
@@ -33,6 +36,16 @@ bool use_focus_visible() {
   ReactFiberId me = react_current_fiber_id();
   return s && me != 0 && s->focused_fiber == me &&
          focus_source_is_visible(s->source);
+}
+
+float use_scroll_into_view(const char *viewport_control_id) {
+  const FocusScrollRequest *r =
+      static_cast<const FocusScrollRequest *>(use_context(&FocusScrollContext));
+  if (!r || !r->valid || r->delta_y == 0.0f || !viewport_control_id)
+    return 0.0f;
+  if (strcmp(r->viewport_control_id, viewport_control_id) != 0)
+    return 0.0f;
+  return r->delta_y;
 }
 
 } // namespace ui

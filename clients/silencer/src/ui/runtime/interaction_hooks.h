@@ -23,9 +23,21 @@ struct InteractionSnapshot {
 
 extern ReactContext InteractionContext; // current = const InteractionSnapshot*
 
+// SIL-213 scroll-into-view: the runtime publishes the focused node's
+// scroll-into-view request (computed by the focus pass) at the tree root via
+// FocusScrollContext. A scrollable container reads it during render and, if the
+// request targets its own control id, applies the delta to its scroll offset.
+extern ReactContext FocusScrollContext; // current = const FocusScrollRequest*
+
 bool use_focused();       // this component's host is the focused node
 bool use_hovered();       // ... is the hovered node
 bool use_pressed();       // ... is the pressed (pointer-down) node
 bool use_focus_visible(); // focused AND focus arrived via a non-pointer source
+
+// The scroll-into-view delta the focused node's owning container should apply
+// this frame, IF that container's control id == `viewport_control_id`. Returns 0
+// (no scroll) when there is no request, or it targets a different container.
+// SIL-213.
+float use_scroll_into_view(const char *viewport_control_id);
 
 } // namespace ui

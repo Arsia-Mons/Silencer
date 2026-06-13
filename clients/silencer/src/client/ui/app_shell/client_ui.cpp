@@ -68,6 +68,12 @@ void ClientUi::build_visible_screens(const UiElementWrapper &wrap_root) {
             "InteractionProvider", &::ui::InteractionContext,
             const_cast<::ui::InteractionSnapshot *>(&interaction_snapshot_),
             ::ui::children({provider}));
+        // SIL-213: publish last frame's scroll-into-view request so a scrollable
+        // container can follow keyboard focus (one-frame lag, by design).
+        provider = ::ui::provider(
+            "FocusScrollProvider", &::ui::FocusScrollContext,
+            const_cast<::ui::FocusScrollRequest *>(&focus_scroll_request_),
+            ::ui::children({provider}));
         if (wrap_root) {
           provider = wrap_root(provider);
         }
@@ -218,6 +224,8 @@ bool ClientUi::update_retained_runtime(const ::ui::FlexLayoutAdapter &layout,
       .pressed_fiber = fiber_of(::ui::focus_pressed_id(retained_focus_)),
       .source = ::ui::focus_source(retained_focus_),
   };
+  // SIL-213: carry this frame's scroll-into-view request to next frame's build.
+  focus_scroll_request_ = ::ui::focus_scroll_request(retained_focus_);
 
   // Build the tagged-union IR that the live render path executes via
   // renderer::execute_draw_commands.
