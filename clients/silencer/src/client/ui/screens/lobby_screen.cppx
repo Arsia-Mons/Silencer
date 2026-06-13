@@ -661,7 +661,7 @@ struct CreateRightCellProps {
         .position = ::ui::PositionType::Absolute,
         .width = ::ui::Length::points(264.0f),
         .height = ::ui::Length::points(30.5f),
-        .position_inset = ::ui::EdgeSizes{9.0f, {}, 464.0f, {}}}}
+        .position_inset = ::ui::EdgeSizes{9.0f, {}, 457.0f, {}}}}
     >
       <Input
         key="t"
