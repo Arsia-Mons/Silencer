@@ -621,6 +621,10 @@ struct GameCreateOptionsProps {
 struct CreateRightCellProps {
   ::ui::UiChildren rows = {};
   const char *name = "";
+  std::function<void(const std::string &)> on_name = {};
+  const char *password = "";
+  std::function<void(const std::string &)> on_password = {};
+  ::ui::Color caret_color = {};
   float tall_w = 0.0f;
   bool can_create = false;
   std::function<void()> on_create = {};
@@ -634,6 +638,13 @@ struct CreateRightCellProps {
   ::ui::LayoutStyle cell = lobby_right_cell_layout(props.tall_w);
   cell.padding = {0.0f, 0.0f, 0.0f, 0.0f};
   cell.gap = 0.0f;
+  const ::ui::StyleStatePatch field_style =
+      tokens::chromeless_field_style(props.caret_color, tokens::kTextBody);
+  auto field_layout = ::ui::LayoutStyle{
+      .align_items = ::ui::AlignItems::Center,
+      .justify_content = ::ui::JustifyContent::Start,
+      .width = ::ui::Length::percent(100.0f),
+      .height = ::ui::Length::percent(100.0f)};
   return <Box key="rightcell" layout={cell} style={lobby_panel_open_left()}>
     <Box key="hwrap" layout={::ui::LayoutStyle{.padding = {9.0f, 0.0f, 10.0f, 0.0f}}}>
       <ScreenTitle key="h" variant={ScreenTitleVariant::Console} value="Select Map" />
@@ -665,9 +676,19 @@ struct CreateRightCellProps {
       key="gnv"
       layout={::ui::LayoutStyle{
         .position = ::ui::PositionType::Absolute,
-        .position_inset = ::ui::EdgeSizes{9.0f, {}, 464.0f, {}}}}
+        .position_inset = ::ui::EdgeSizes{9.0f, {}, 464.0f, {}},
+        .width = ::ui::Length::points(264.0f),
+        .height = ::ui::Length::points(30.5f)}}
     >
-      <BodyText key="t" variant={BodyTextVariant::Body} value={props.name} />
+      <Input
+        key="t"
+        id="GameName"
+        accessibility={{.label = "Game name"}}
+        value={props.name}
+        onChange={props.on_name}
+        layout={field_layout}
+        style={field_style}
+      />
     </Box>
     <Box
       key="pwl"
@@ -676,6 +697,25 @@ struct CreateRightCellProps {
         .position_inset = ::ui::EdgeSizes{9.0f, {}, 487.0f, {}}}}
     >
       <ScreenTitle key="t" variant={ScreenTitleVariant::Console} value="Password (optional):" />
+    </Box>
+    <Box
+      key="pwv"
+      layout={::ui::LayoutStyle{
+        .position = ::ui::PositionType::Absolute,
+        .position_inset = ::ui::EdgeSizes{9.0f, {}, 510.0f, {}},
+        .width = ::ui::Length::points(264.0f),
+        .height = ::ui::Length::points(30.5f)}}
+    >
+      <Input
+        key="t"
+        id="GamePassword"
+        accessibility={{.label = "Password"}}
+        value={props.password}
+        onChange={props.on_password}
+        password={true}
+        layout={field_layout}
+        style={field_style}
+      />
     </Box>
     <Box
       key="cbw"
@@ -1446,6 +1486,7 @@ struct LobbyScreenProps {
   Progression prog = use_progression();
   client::ui::ChromeTextures chrome = use_chrome();
   std::string *create_name = use_state<std::string>(std::string("New Game"));
+  std::string *create_password = use_state<std::string>(std::string());
   int *sel = use_state<int>(0);
   int *map_index = use_state<int>(-1); // -1 = none picked yet (no highlight, like origin)
   bool *show_create = use_state<bool>(false);
@@ -1455,7 +1496,7 @@ struct LobbyScreenProps {
   uint8_t *opt_max_players = use_state<uint8_t>(24);
   uint8_t *opt_max_teams = use_state<uint8_t>(6);
   bool *opt_spectatable = use_state<bool>(true);
-  if (!create_name || !sel || !map_index || !show_create || !opt_security ||
+  if (!create_name || !create_password || !sel || !map_index || !show_create || !opt_security ||
       !opt_min_level || !opt_max_level || !opt_max_players || !opt_max_teams ||
       !opt_spectatable)
     return ::ui::empty();
@@ -1601,9 +1642,17 @@ struct LobbyScreenProps {
     CreateRightCellProps rc;
     rc.rows = ::ui::children(map_rows);
     rc.name = create_name->c_str();
+    rc.on_name = [create_name](const std::string &next) {
+      *create_name = next.substr(0, 31);
+    };
+    rc.password = create_password->c_str();
+    rc.on_password = [create_password](const std::string &next) {
+      *create_password = next.substr(0, 31);
+    };
+    rc.caret_color = chrome.caret_lobby;
     rc.tall_w = panes.tall_w;
     rc.can_create = map_count > 0;
-    rc.on_create = [create = games.create_game, create_name,
+    rc.on_create = [create = games.create_game, create_name, create_password,
                     show_create, maps = games.bundled_maps,
                     security = *opt_security,
                     min_level = *opt_min_level,
@@ -1615,6 +1664,7 @@ struct LobbyScreenProps {
       if (create && idx >= 0 && idx < (int)maps.size()) {
         CreateGameRequest req;
         req.name = create_name->empty() ? "New Game" : *create_name;
+        req.password = *create_password;
         req.map = maps[idx];
         req.security = security;
         req.min_level = min_level;
