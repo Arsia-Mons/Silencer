@@ -163,6 +163,9 @@ inline ::ui::StyleStatePatch app_button_oval_patch(uint32_t tex) {
   const ::ui::Color bright{255, 255, 255, 255};
   ov.base = oval(bright);
   ov.hover = oval(bright);
+  ov.pressed = oval(bright); // SIL-223: override the theme's pressed border so
+                             // no rectangular box leaks over the oval sprite on
+                             // mouse-down (the sprite ramp is the press feedback)
   ov.focus_visible = oval(bright);
   return ov;
 }
@@ -240,6 +243,9 @@ inline ::ui::StyleStatePatch app_button_chrome_patch(uint32_t tex) {
   const ::ui::Color bright{255, 255, 255, 255};
   ov.base = chrome(tex, bright);
   ov.hover = chrome(tex, bright);
+  ov.pressed = chrome(tex, bright); // SIL-223: override the theme's pressed
+                                    // border so no rectangular box leaks over
+                                    // the chrome sprite on mouse-down
   ov.focus_visible = chrome(tex, bright);
   return ov;
 }
