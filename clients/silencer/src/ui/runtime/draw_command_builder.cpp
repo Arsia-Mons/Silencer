@@ -149,6 +149,26 @@ float measured_advance(const char *value, uint32_t len, uint16_t font_id,
   return result.width;
 }
 
+// Cap-top..baseline of the resolved face, in points, via the injected measurer.
+// Returns 0 when no measurer/ascent is available (caller falls back to the line
+// box). Drives the input caret height so it spans the glyph ink, not the
+// descender-inclusive cell (SIL-217).
+float measured_ascent(uint16_t font_id, float font_size, float line_height) {
+  MeasureTextFn measurer = text_measurer();
+  if (!measurer)
+    return 0.0f;
+  TextMetricsQuery query = {};
+  query.utf8 = "";
+  query.len = 0;
+  query.font_id = font_id;
+  query.font_size = font_size;
+  query.align = TextAlign::Left;
+  query.wrap = TextWrap::None;
+  query.line_height = line_height;
+  query.wrap_width = 0.0f;
+  return measurer(query).ascent;
+}
+
 bool push_rect_command(DrawCommandList &list, NodeId node_id, const Rect &rect,
                        Color straight_fill, float corner_radius) {
   DrawCommand command = {};
@@ -490,18 +510,30 @@ bool append_input_contents(DrawCommandList &list, const NodeSnapshot &node,
   if (focused && node.text_edit.show_caret) {
     int caret = clamp_int(node.text_edit.caret, 0, length);
     float caret_x = advance_to(caret);
-    // Caret paint comes from the resolved style; height follows origin's
-    // TextInput rule min(boxH*4/5, line height).
+    // Caret height tracks the glyph INK, not the box. The glyph atlas cell
+    // includes descender space below the baseline (g/j/p/q/y), and glyphs are
+    // top-aligned at text_y; a caret sized to the full cell / box therefore
+    // hangs ~1-2px below the visible baseline of non-descender text (SIL-217).
+    // Span cap-top..baseline (the measured ascent), top-aligned with the text,
+    // so the caret matches the ink for ALL inputs. Fall back to the legacy
+    // min(boxH*4/5, line box) when ascent is unavailable (no measurer).
     const Caret &ck = node.visual.caret;
-    float caret_h = node.layout.height * 0.8f;
-    float line_box = line_height > 0.f ? line_height : kTextHeight;
-    if (line_box < caret_h)
-      caret_h = line_box;
+    float ascent = measured_ascent(font_id, font_size, line_height);
     Rect caret_rect = {};
     caret_rect.x = text_rect.x + caret_x;
     caret_rect.width = ck.width > 0.f ? ck.width : kCaretWidth;
-    caret_rect.height = caret_h;
-    caret_rect.y = node.layout.y + (node.layout.height - caret_rect.height) * 0.5f;
+    if (ascent > 0.f) {
+      caret_rect.height = ascent;
+      caret_rect.y = text_y; // top-aligned with the top-aligned glyph cell
+    } else {
+      float caret_h = node.layout.height * 0.8f;
+      float line_box = line_height > 0.f ? line_height : kTextHeight;
+      if (line_box < caret_h)
+        caret_h = line_box;
+      caret_rect.height = caret_h;
+      caret_rect.y =
+          node.layout.y + (node.layout.height - caret_rect.height) * 0.5f;
+    }
     Color caret_color = ck.color.a > 0 ? ck.color : kCaretFill;
     if (!push_rect_command(list, node.id, caret_rect, caret_color, 0.0f))
       return false;

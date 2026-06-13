@@ -4,6 +4,49 @@
 
 namespace silencer::cppx_ui {
 
+namespace {
+
+// Derive the face baseline (ascent in native px) from the glyph art. Glyphs are
+// baked TOP-ALIGNED (y=0 = cell top), so a glyph's ink-bottom row is its descent
+// from the cap-top. Non-descender glyphs (letters, digits, the bulk of the bank)
+// all bottom out on the shared baseline; descenders (g/j/p/q/y) extend below it.
+// The baseline is therefore the MODAL ink-bottom row across the glyph set — the
+// row where the bulk of glyphs sit. atlas_h - ascent is the empty descender zone
+// that used to push the centered caret too low (SIL-217). Falls back to atlas_h
+// when no ink is found.
+int derive_ascent(const GlyphFonts::GlyphSrc *glyphs, int count, int atlas_h) {
+  if (atlas_h < 1)
+    return atlas_h;
+  std::vector<int> histo(static_cast<size_t>(atlas_h) + 1, 0);
+  for (int i = 0; i < count; ++i) {
+    const GlyphFonts::GlyphSrc &g = glyphs[i];
+    if (!g.indices || g.w <= 0 || g.h <= 0)
+      continue;
+    int ink_bottom = 0; // 1-based row count to the lowest inked row
+    for (int y = 0; y < g.h; ++y) {
+      const uint8_t *row = g.indices + static_cast<size_t>(y) * g.w;
+      for (int x = 0; x < g.w; ++x) {
+        if (row[x] != 0) {
+          ink_bottom = y + 1;
+          break;
+        }
+      }
+    }
+    if (ink_bottom > 0 && ink_bottom <= atlas_h)
+      histo[static_cast<size_t>(ink_bottom)]++;
+  }
+  int mode = 0, mode_count = 0;
+  for (int k = 1; k <= atlas_h; ++k) {
+    if (histo[static_cast<size_t>(k)] > mode_count) {
+      mode_count = histo[static_cast<size_t>(k)];
+      mode = k;
+    }
+  }
+  return mode > 0 ? mode : atlas_h;
+}
+
+} // namespace
+
 GlyphFonts::~GlyphFonts() { shutdown(); }
 
 void GlyphFonts::shutdown() {
@@ -80,6 +123,7 @@ bool GlyphFonts::build_face(SDL_Renderer *renderer, int face_id,
   const int atlas_w = pen > 0 ? pen : 1;
   const int atlas_h = max_h > 0 ? max_h : 1;
   f.atlas_h = atlas_h;
+  f.ascent = derive_ascent(glyphs, count, atlas_h);
 
   // Pass 2: bake each glyph as a WHITE coverage mask (premultiplied) into the
   // atlas. Index 0 is transparent (the world renderer's sprite convention);
@@ -173,6 +217,7 @@ bool GlyphFonts::build_color_face(SDL_Renderer *renderer, int face_id,
   const int atlas_w = pen > 0 ? pen : 1;
   const int atlas_h = max_h > 0 ? max_h : 1;
   f.atlas_h = atlas_h;
+  f.ascent = derive_ascent(glyphs, count, atlas_h);
 
   // Verbatim palettized colors, opaque where index != 0 — origin's DrawText
   // blits the indexed glyph with no alpha blending, so the rendered text IS

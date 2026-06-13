@@ -32,6 +32,7 @@ struct RunMetrics {
   float adv = 0.0f;                     // glyph mode: per-char advance (points)
   TTF_Font *font = nullptr;             // TTF mode
   float line_h = 16.0f;
+  float ascent = 0.0f; // cap-top..baseline of the resolved face, points (0 = ?)
 };
 
 RunMetrics metrics_for(const ::ui::TextMetricsQuery &q) {
@@ -47,6 +48,10 @@ RunMetrics metrics_for(const ::ui::TextMetricsQuery &q) {
     // The cell height IS font_size; ignore q.line_height so a small legacy
     // line-height token can't clip the (now larger) glyph cell.
     m.line_h = static_cast<float>(q.font_size);
+    // Cap-top..baseline in points: native ascent scaled the same as the cell.
+    // Drives the SIL-217 caret height (glyph ink, not the descender-padded cell).
+    if (gf->ascent > 0)
+      m.ascent = static_cast<float>(gf->ascent) * gscale;
     return m;
   }
   // TTF: face for q.font_id, sized per-query (matches the TTF paint path).
@@ -60,6 +65,11 @@ RunMetrics metrics_for(const ::ui::TextMetricsQuery &q) {
   } else if (m.font) {
     int skip = TTF_GetFontLineSkip(m.font);
     m.line_h = skip > 0 ? static_cast<float>(skip) : 16.0f;
+  }
+  if (m.font) {
+    int asc = TTF_GetFontAscent(m.font);
+    if (asc > 0)
+      m.ascent = static_cast<float>(asc);
   }
   return m;
 }
@@ -218,13 +228,16 @@ bool wrap_paragraph(::ui::TextMetricsResult &out, const RunMetrics &m,
   float box_w = q.wrap_width;
 
   if (q.wrap == ::ui::TextWrap::Words && box_w > 0.0f && len > 0) {
-    return measure_wrapped(m, q, line_h, box_w);
+    ::ui::TextMetricsResult wrapped = measure_wrapped(m, q, line_h, box_w);
+    wrapped.ascent = m.ascent;
+    return wrapped;
   }
 
   float w = advance_of(m, utf8, len);
   float x = aligned_x(q.align, w, box_w);
   push_line(out, 0, len, x, 0.0f, w, line_h);
   out.height = line_h;
+  out.ascent = m.ascent;
   return out;
 }
 

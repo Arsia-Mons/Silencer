@@ -50,6 +50,11 @@ public:
   struct Face {
     SDL_Texture *atlas = nullptr; // all glyphs packed left-to-right; owned
     int atlas_h = 0;              // atlas (= max native glyph) height, px
+    int ascent = 0;               // cap-top..baseline height, px (640-space):
+                                  // the modal glyph ink-bottom row. Glyphs are
+                                  // baked top-aligned, so atlas_h - ascent is the
+                                  // descender zone below the baseline. Drives the
+                                  // text caret height (SIL-217).
     float advance = 0.f;          // native monospace pen step, px (640-space)
     float line_height = 0.f;      // native bank line height, px (640-space)
     int16_t gx[kGlyphCount] = {}; // glyph x-origin in the atlas
