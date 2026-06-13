@@ -167,7 +167,7 @@ cppxReactInitialized = false;
 }
 
 client::ui::SessionPhase GameUiPipeline::CurrentSessionPhase() const {
-return silencer::game_ui::project_session_phase(game.state, game.nextstate);
+return silencer::game_ui::project_session_phase(game.state, game.fadefromstate);
 }
 
 const uint8_t * GameUiPipeline::CppxUiFrame(int & outW, int & outH) const {

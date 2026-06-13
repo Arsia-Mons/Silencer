@@ -675,6 +675,10 @@ bool Game::Tick(void){
 
 
 void Game::GoToState(Uint8 newstate){
+	// Remember the state we're leaving so the session-phase projection keeps the
+	// outgoing screen mounted through the fade. Guard against a re-entrant
+	// GoToState (already mid-FADEOUT) clobbering the real source with FADEOUT.
+	if(state != FADEOUT) fadefromstate = state;
 	nextstate = newstate;
 	state = FADEOUT;
 	gameRenderer.RestartPaletteFade();

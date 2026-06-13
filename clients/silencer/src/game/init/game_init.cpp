@@ -35,6 +35,7 @@ Game::Game()
 	frames = 0;
 	fps = 0;
 	state = MAINMENU;
+	fadefromstate = MAINMENU;
 	stateisnew = true;
 	sharedstate = 0;
 	singleplayermessage = 0;

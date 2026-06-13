@@ -133,6 +133,10 @@ ControlServer controlserver;
 InputServer inputserver;
 Uint8 state;
 Uint8 nextstate;
+// The state a FADEOUT transition is leaving. The session-phase projection holds
+// this (not nextstate) while state==FADEOUT so the outgoing screen stays
+// mounted and fades to black before the switch.
+Uint8 fadefromstate;
 bool stateisnew;
 bool nextstateprocessed;
 // Roster size captured on entering CREATECHARACTER; when the roster grows past

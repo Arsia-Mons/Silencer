@@ -8,10 +8,12 @@
 namespace silencer::game_ui {
 
 // Projects the live game state machine (game.cpp `state`) onto the retained
-// UI's session phase (doc §6). `state` is a GameState::* value; `nextstate` is
-// the pending target the FADEOUT transition is heading toward, so while a fade
-// masks the switch the phase already tracks the destination (the retained UI
-// has no separate fade state to dwell in).
+// UI's session phase (doc §6). `state` is a GameState::* value; `fadefromstate`
+// is the state the in-flight FADEOUT transition is leaving. While the fade
+// masks the switch the outgoing screen must stay mounted and dim to black
+// (legacy retained its world UI objects across FADEOUT) — so during FADEOUT the
+// phase tracks the SOURCE, not the destination. Only once TickFadeOut reaches
+// black does `state` flip to the target and the new screen fade in.
 //
 // Notes on the non-1:1 cases:
 //   * OPTIONS* are Tier-1 overlays over the menu in the retained model
@@ -20,9 +22,9 @@ namespace silencer::game_ui {
 //     in-match variants -> InMatch.
 //   * NONE (boot) falls back to MainMenu.
 inline client::ui::SessionPhase project_session_phase(Uint8 state,
-                                                      Uint8 nextstate) {
+                                                      Uint8 fadefromstate) {
   using namespace GameState;
-  const Uint8 effective = (state == FADEOUT) ? nextstate : state;
+  const Uint8 effective = (state == FADEOUT) ? fadefromstate : state;
   switch (effective) {
   case MAINMENU:
     return client::ui::SessionPhase::MainMenu;

@@ -178,8 +178,11 @@ static bool session_phase_projection_maps_game_states() {
   CHECK(project_session_phase(GameState::OPTIONS, 0) == P::MainMenu);
   CHECK(project_session_phase(GameState::OPTIONSCONTROLS, 0) == P::MainMenu);
   CHECK(project_session_phase(GameState::NONE, 0) == P::MainMenu);
-  // FADEOUT tracks the pending destination, not a fade limbo.
-  CHECK(project_session_phase(GameState::FADEOUT, GameState::INGAME) == P::InMatch);
+  // During a FADEOUT transition the OUTGOING screen stays mounted and fades to
+  // black before the switch; the second arg is the state being faded FROM. Only
+  // after the fade completes does `state` flip to the destination and the new
+  // screen fade in, so the projection must hold the source here, not the target.
+  CHECK(project_session_phase(GameState::FADEOUT, GameState::MAINMENU) == P::MainMenu);
   CHECK(project_session_phase(GameState::FADEOUT, GameState::LOBBY) == P::Lobby);
   return true;
 }
