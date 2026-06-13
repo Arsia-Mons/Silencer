@@ -11,6 +11,7 @@
 #include "buyableitem.h"
 
 #include <algorithm>
+#include <cctype>
 #include <cstdio>
 #include <cstring>
 #include <string>
@@ -27,6 +28,27 @@ constexpr size_t kStatusLogCap = 180;
 // Agency display names, indexed by Team::{NOXIS..BLACKROSE} / Character::agencyIdx.
 const char *const kAgency[5] = {"Noxis", "Lazarus", "Caliber", "Static",
                                 "Black Rose"};
+
+std::string NormalizeTechDescription(const char *description) {
+  if (!description || !description[0])
+    return {};
+
+  std::string out;
+  bool pending_space = false;
+  for (const unsigned char *p =
+           reinterpret_cast<const unsigned char *>(description);
+       *p; ++p) {
+    if (std::isspace(*p)) {
+      pending_space = true;
+      continue;
+    }
+    if (pending_space && !out.empty())
+      out.push_back(' ');
+    out.push_back((char)*p);
+    pending_space = false;
+  }
+  return out;
+}
 
 const char *SecurityLabel(Uint8 level) {
   switch (level) {
@@ -261,6 +283,8 @@ void BuildStaging(client::ui::LobbySnapshot &snap, World &world, Lobby &lobby) {
         continue;
       client::ui::StagingTechRow row;
       row.name = item->name;
+      row.description_title = "-" + row.name + "-";
+      row.description = NormalizeTechDescription(item->description);
       row.slots = item->techslots;
       row.choice_mask = item->techchoice;
       row.selected = (localpeer->techchoices & item->techchoice) != 0;

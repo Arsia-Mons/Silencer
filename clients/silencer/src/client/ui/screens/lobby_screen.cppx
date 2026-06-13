@@ -785,7 +785,9 @@ struct StagingPanelProps {
 // at x 543+14c (local col 3 = 585), rows y 128+13k; the local label column at
 // x 601, rows y 130+13k — "name (N)" Body at brightness 128/64. Anchors are
 // virtual; anchored on kLobbyTallGrid (the cell's design origin).
-::ui::UiElement TechListCell(const Staging &staging, float tall_w) {
+::ui::UiElement TechListCell(const Staging &staging, float tall_w,
+                             int selected,
+                             std::function<void(int)> on_select) {
   client::ui::ChromeTextures chrome = client::ui::use_chrome();
   std::vector<::ui::UiElement> kids;
   const PenGrid &g = kLobbyTallGrid;
@@ -806,9 +808,17 @@ struct StagingPanelProps {
     const uint32_t tex =
         row.selected ? (row.interactable ? chrome.ready_on : chrome.ready_on_dim)
                      : (row.interactable ? chrome.ready_off : chrome.ready_off_dim);
+    std::function<void(const ::ui::FocusEvent &)> select =
+        [on_select, i](const ::ui::FocusEvent &) {
+          if (on_select)
+            on_select(i);
+        };
     std::function<void(const ::ui::ActivationEvent &)> toggle =
-        [row, choices = staging.tech_choices, set_tech = staging.set_tech](
+        [row, choices = staging.tech_choices, set_tech = staging.set_tech,
+         on_select, i](
             const ::ui::ActivationEvent &) {
+          if (on_select)
+            on_select(i);
           if (row.interactable && set_tech)
             set_tech(choices ^ row.choice_mask);
         };
@@ -819,6 +829,7 @@ struct StagingPanelProps {
           .id_offset = i,
           .focusable = true,
           .accessibility = {.label = ::ui::copy_string(row.name.c_str())},
+          .on_focus = select,
           .on_activate = toggle,
           .layout = ::ui::LayoutStyle{
               .position = ::ui::PositionType::Absolute,
@@ -831,6 +842,12 @@ struct StagingPanelProps {
     const std::string lbl = row.name + " (" + std::to_string((unsigned)row.slots) + ")";
     kids.push_back(Box(BoxProps{
         .key = ::ui::copy_string(("tl" + k).c_str()),
+        .id = "TechRowLabel",
+        .id_offset = i,
+        .focusable = true,
+        .accessibility = {.label = ::ui::copy_string(lbl.c_str())},
+        .on_focus = select,
+        .on_activate = toggle,
         .layout = ::ui::LayoutStyle{
             .position = ::ui::PositionType::Absolute,
             .position_inset = g.at(601, 130 + 13 * i)},
@@ -841,6 +858,44 @@ struct StagingPanelProps {
             .style = tokens::text_patch(
                 row.interactable ? tokens::kTextBody : tokens::kTextTechDim,
                 tokens::kFontBodyEm, tokens::kFaceBody, tokens::kLineBody)})})}));
+  }
+  if (!staging.tech.empty() && selected >= 0 && selected < (int)staging.tech.size()) {
+    const StagingTechRow &row = staging.tech[selected];
+    const char *title = ::ui::copy_string(row.description_title.c_str());
+    const float desc_x = g.x(538);
+    const float desc_w = tall_w - desc_x - 10.0f;
+    ::ui::StylePatch desc_style =
+        tokens::text_patch(tokens::kTextTechSlots, tokens::kFontBodyEm,
+                           tokens::kFaceBody, tokens::kLineBody);
+    desc_style.text.value.wrap = ::ui::TextWrap::Words;
+    kids.push_back(Box(BoxProps{
+        .key = "desc-title",
+        .layout = ::ui::LayoutStyle{
+            .position = ::ui::PositionType::Absolute,
+            .position_inset = ::ui::EdgeSizes{0.0f, 0.0f, g.y(350), {}},
+            .width = ::ui::Length::percent(100.0f),
+            .height = ::ui::Length::points(tokens::kLineLarge),
+            .align_items = ::ui::AlignItems::Center},
+        .children = ::ui::children({Text(TextProps{
+            .key = "t",
+            .value = title,
+            .layout = {.height = ::ui::Length::points(tokens::kLineLarge)},
+            .style = tokens::text_patch(tokens::kTextBody, tokens::kFontLarge,
+                                        tokens::kFaceLarge,
+                                        tokens::kLineLarge)})})}));
+    if (!row.description.empty()) {
+      kids.push_back(Box(BoxProps{
+          .key = "desc-text",
+          .layout = ::ui::LayoutStyle{
+              .position = ::ui::PositionType::Absolute,
+              .position_inset = ::ui::EdgeSizes{desc_x, {}, g.y(365), {}},
+              .width = ::ui::Length::points(desc_w)},
+          .children = ::ui::children({Text(TextProps{
+              .key = "t",
+              .value = ::ui::copy_string(row.description.c_str()),
+              .layout = {.width = ::ui::Length::percent(100.0f)},
+              .style = desc_style})})}));
+    }
   }
   ::ui::LayoutStyle cell = lobby_right_cell_layout(tall_w);
   cell.padding = {0.0f, 0.0f, 0.0f, 0.0f};
@@ -1471,8 +1526,15 @@ struct LobbyScreenProps {
   sp.on_ready = staging.send_ready;
   sp.on_team = staging.change_team;
   bool *tech_open = use_state<bool>(false);
+  int *tech_sel = use_state<int>(0);
+  if (!tech_open || !tech_sel)
+    return ::ui::empty();
   if (!staging.active && *tech_open)
     *tech_open = false; // leaving staging closes the tech view
+  if (*tech_sel < 0)
+    *tech_sel = 0;
+  if (!staging.tech.empty() && *tech_sel > (int)staging.tech.size() - 1)
+    *tech_sel = (int)staging.tech.size() - 1;
   sp.on_tech = [tech_open]() { *tech_open = true; };
 
   GameCreateOptionsProps options_props;
@@ -1531,7 +1593,8 @@ struct LobbyScreenProps {
                    : std::vector<::ui::UiElement>{};
   ::ui::UiElement right_cell;
   if (staging.active && *tech_open) {
-    right_cell = TechListCell(staging, panes.tall_w);
+    right_cell = TechListCell(staging, panes.tall_w, *tech_sel,
+                              [tech_sel](int index) { *tech_sel = index; });
   } else if (staging.active) {
     right_cell = StagingRosterCell(sp, panes.tall_w);
   } else if (*show_create) {

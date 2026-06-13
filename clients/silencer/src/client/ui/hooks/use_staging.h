@@ -34,6 +34,8 @@ struct StagingRosterRow {
 // toggled (enough slots left, or already chosen so it can be un-chosen).
 struct StagingTechRow {
   std::string name = {};
+  std::string description_title = {};
+  std::string description = {};
   uint8_t slots = 0;
   uint32_t choice_mask = 0;
   bool selected = false;
