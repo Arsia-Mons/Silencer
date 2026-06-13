@@ -117,26 +117,36 @@ using ::ui::children;
     track.position = ::ui::PositionType::Absolute;
     track.position_inset.right = ::ui::StyleValue::points(2.0f);
     track.position_inset.top = ::ui::StyleValue::points(0.0f);
-    track.width = ::ui::Length::points(4.0f);
+    track.width = ::ui::Length::points(8.0f);
     track.height = ::ui::Length::points(props.viewport_height);
+    // Faint full-height rail so the scrollbar reads as a gutter, with the thumb
+    // riding inside it (1px inset on each side).
+    ::ui::StylePatch track_paint =
+        ::ui::patch().background(::ui::Color{40, 72, 40, 110}).corner_radius(1.0f);
 
     ::ui::LayoutStyle thumb = {};
     thumb.position = ::ui::PositionType::Absolute;
-    thumb.position_inset.left = ::ui::StyleValue::points(0.0f);
-    thumb.position_inset.right = ::ui::StyleValue::points(0.0f);
+    thumb.position_inset.left = ::ui::StyleValue::points(1.0f);
+    thumb.position_inset.right = ::ui::StyleValue::points(1.0f);
     thumb.position_inset.top = ::ui::StyleValue::points(thumb_top);
     thumb.height = ::ui::Length::points(thumb_h);
 
     ::ui::StylePatch thumb_paint =
-        ::ui::patch().background(::ui::Color{92, 208, 92, 200});
+        ::ui::patch().background(::ui::Color{92, 208, 92, 235}).corner_radius(1.0f);
+    // Give the thumb a stable control id derived from the ScrollView's id so it
+    // is inspectable/testable (e.g. "GameOptionsList" -> "GameOptionsListThumb").
+    const char *thumb_id =
+        props.id ? use_text_storage("%sThumb", props.id) : "ScrollThumb";
     // Built via the component factory (not JSX) so the whole scrollbar is one
     // local expression dropped into the return tree as {bar}.
     bar = ::ui::component(
         "Box", BoxProps{.key = "bar",
                         .layout = track,
+                        .style = track_paint,
                         .children = children({::ui::component(
                             "Box",
                             BoxProps{.key = "thumb",
+                                     .id = thumb_id,
                                      .layout = thumb,
                                      .style = thumb_paint},
                             Box)})},

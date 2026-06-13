@@ -551,7 +551,7 @@ struct GameCreateOptionsProps {
               kGameOptionRowH * static_cast<float>(kGameOptionRowCount),
           .step = kGameOptionRowH,
           .row_height = kGameOptionRowH,
-          .show_scrollbar = false,
+          .show_scrollbar = true,
           .layout = ::ui::LayoutStyle{
               .flex_grow = ::ui::StyleFloat::points(1.0f),
               .flex_basis = ::ui::Length::points(0.0f),
@@ -588,29 +588,10 @@ struct GameCreateOptionsProps {
         .align_items = ::ui::AlignItems::Stretch,
         .flex_grow = ::ui::StyleFloat::points(1.0f),
         .width = ::ui::Length::percent(100.0f),
-        .padding = {6.0f, 6.0f, 2.0f, 3.0f},
-        .gap = 4.5f}}
+        .padding = {6.0f, 6.0f, 2.0f, 3.0f}}}
       style={tokens::frame_patch(tokens::kInsetStroke)}
     >
       {option_list}
-      <Box
-        key="sbtrack"
-        layout={::ui::LayoutStyle{
-          .direction = ::ui::FlexDirection::Column,
-          .width = ::ui::Length::points(12.0f),
-          .height = ::ui::Length::points(129.0f),
-          .flex_shrink = ::ui::StyleFloat::points(0.0f),
-          .padding = {1.0f, 2.0f, 1.5f, 1.5f}}}
-        style={tokens::frame_patch(tokens::kInsetStroke)}
-      >
-        <Box
-          key="thumb"
-          layout={::ui::LayoutStyle{
-            .height = ::ui::Length::points(105.0f),
-            .flex_shrink = ::ui::StyleFloat::points(0.0f)}}
-          style={::ui::patch().background(tokens::kChromeStroke).gradient(::ui::Gradient{}).corner_radius(0.0f)}
-        />
-      </Box>
     </Box>
   </Box>
 }
