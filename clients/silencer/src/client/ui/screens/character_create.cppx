@@ -182,23 +182,20 @@ struct CharacterCreateProviderProps {
   </Box>
 }
 
-// The lore paragraph: one wrapped Text, exactly origin's DetailParagraph
-// (TextSize::BodySm + TextWrap::Words). A single node keeps the line pitch on
-// the exact 16.5 cell — per-line boxes round through Yoga's pixel grid and
-// drift ~0.75px/line against the golden.
+// The lore paragraph: one wrapped Text using origin's DetailParagraph styling.
+// A single node keeps the line pitch on the exact 16.5 cell — per-line boxes
+// round through Yoga's pixel grid and drift ~0.75px/line against the golden.
 ::ui::UiElement desc_paragraph(const char *value) {
   ::ui::StylePatch st = tokens::text_patch(tokens::kTextProse,
                                            tokens::kFontBodyEm,
                                            tokens::kFaceBodySm,
                                            tokens::kLineBody);
   st.text.value.wrap = ::ui::TextWrap::Words;
-  // 283.5 = 27 chars x 10.5 advance: the golden wraps the lore at 27 chars
-  // (origin's effective wrap width is a hair under the 196 column).
   return <Text
     key="desc"
     value={value}
     layout={::ui::LayoutStyle{
-      .width = ::ui::Length::points(283.5f),
+      .width = ::ui::Length::percent(100.0f),
       .margin = ::ui::EdgeSizes{-0.75f, {}, -0.25f, {}}}}
     style={st}
   />

@@ -287,6 +287,26 @@ NodeId first_enabled(const FocusRuntime &runtime) {
   return 0;
 }
 
+// First/last enabled node in pure document (array) order. Unlike first_enabled
+// these have no initial_focus preference: edge entry from a neutral state must
+// be the true topmost/bottommost item, matching resolve_sequential's Tab /
+// Shift+Tab.
+NodeId first_enabled_in_order(const FocusRuntime &runtime) {
+  for (int i = 0; i < runtime.focusable_count; ++i) {
+    if (!runtime.focusables[i].disabled)
+      return runtime.focusables[i].id;
+  }
+  return 0;
+}
+
+NodeId last_enabled(const FocusRuntime &runtime) {
+  for (int i = runtime.focusable_count - 1; i >= 0; --i) {
+    if (!runtime.focusables[i].disabled)
+      return runtime.focusables[i].id;
+  }
+  return 0;
+}
+
 NodeId resolve_sequential(const FocusRuntime &runtime, NodeId from_id,
                           bool reverse) {
   if (runtime.focusable_count <= 0)
@@ -328,8 +348,14 @@ NodeId hovered_enabled(const FocusRuntime &runtime, const InputFrame &input) {
 NodeId resolve_spatial(const FocusRuntime &runtime, NodeId from_id,
                        FocusDirection dir) {
   const FocusableLayout *from = find_layout(runtime, from_id);
-  if (!from || from->disabled)
-    return first_enabled(runtime);
+  if (!from || from->disabled) {
+    // Neutral entry: enter from the edge matching the direction. Down/Right
+    // come in at the top/left (first in order); Up/Left at the bottom/right
+    // (last in order).
+    if (dir == FocusDirection::Up || dir == FocusDirection::Left)
+      return last_enabled(runtime);
+    return first_enabled_in_order(runtime);
+  }
 
   const FocusableLayout *best = nullptr;
   float best_perp = 0.0f;
@@ -413,11 +439,17 @@ bool focus_update(FocusRuntime *runtime, const UiTree &tree,
       previous_scope != 0 && !same_id(previous_scope, active_scope) &&
       runtime->previous_focus_before_modal != 0 &&
       contains_enabled(*runtime, runtime->previous_focus_before_modal);
+  // When a nav input is present this frame, leave focus neutral so the nav
+  // pass below enters from the direction's matching edge (SIL-211). Without
+  // nav (e.g. the focused element vanished), auto-focus the first enabled node.
+  FocusDirection nav_probe = FocusDirection::Down;
+  bool nav_present =
+      input.nav_next || input.nav_previous || read_nav_dir(input, &nav_probe);
   if (restore_parent_focus) {
     set_focus(*runtime, runtime->previous_focus_before_modal,
               FocusSource::Programmatic);
     runtime->previous_focus_before_modal = 0;
-  } else if (!contains_enabled(*runtime, runtime->focused_id)) {
+  } else if (!nav_present && !contains_enabled(*runtime, runtime->focused_id)) {
     NodeId next = first_enabled(*runtime);
     set_focus(*runtime, next,
               next != 0 ? FocusSource::Programmatic : FocusSource::None);

@@ -130,6 +130,58 @@ bool navigation_skips_disabled_and_tracks_source() {
   return true;
 }
 
+// SIL-211: from a neutral (no-focus) state a directional/sequential nav input
+// should enter from the matching edge — Down/Right/Tab land on the first
+// (topmost) enabled node, Up/Left/Shift+Tab on the last (bottommost). The
+// off-by-one bug auto-focused the first node, then advanced, landing one item
+// past the edge.
+bool neutral_nav_enters_from_matching_edge() {
+  // Down from neutral -> first enabled (start), not the second.
+  {
+    Menu menu = {};
+    CHECK(build_menu(&menu, false));
+    FocusRuntime focus = {};
+    focus_init(&focus);
+    CHECK(focus_update(&focus, menu.tree,
+                       {.nav_down = true, .source = FocusSource::Keyboard}));
+    CHECK(focus_focused_id(focus) == menu.start);
+  }
+
+  // Up from neutral -> last enabled (options), not the first.
+  {
+    Menu menu = {};
+    CHECK(build_menu(&menu, false));
+    FocusRuntime focus = {};
+    focus_init(&focus);
+    CHECK(focus_update(&focus, menu.tree,
+                       {.nav_up = true, .source = FocusSource::Keyboard}));
+    CHECK(focus_focused_id(focus) == menu.options);
+  }
+
+  // Tab from neutral -> first enabled (start).
+  {
+    Menu menu = {};
+    CHECK(build_menu(&menu, false));
+    FocusRuntime focus = {};
+    focus_init(&focus);
+    CHECK(focus_update(&focus, menu.tree,
+                       {.nav_next = true, .source = FocusSource::Keyboard}));
+    CHECK(focus_focused_id(focus) == menu.start);
+  }
+
+  // Shift+Tab from neutral -> last enabled (options).
+  {
+    Menu menu = {};
+    CHECK(build_menu(&menu, false));
+    FocusRuntime focus = {};
+    focus_init(&focus);
+    CHECK(focus_update(&focus, menu.tree,
+                       {.nav_previous = true, .source = FocusSource::Keyboard}));
+    CHECK(focus_focused_id(focus) == menu.options);
+  }
+  return true;
+}
+
 bool pointer_release_confirms_original_target() {
   Menu menu = {};
   CHECK(build_menu(&menu, false));
@@ -223,6 +275,8 @@ bool snapshot_exposes_automation_metadata() {
 
 int main() {
   if (!navigation_skips_disabled_and_tracks_source())
+    return 1;
+  if (!neutral_nav_enters_from_matching_edge())
     return 1;
   if (!pointer_release_confirms_original_target())
     return 1;
