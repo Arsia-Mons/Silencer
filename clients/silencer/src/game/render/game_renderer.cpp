@@ -80,6 +80,33 @@ return ResizeRenderSurfacePixels(kLegacyRenderWidth, kLegacyRenderHeight);
 return ResizeRenderSurfacePixels(width, height);
 }
 
+float GameRenderer::UiFadeAlpha() const {
+using namespace GameState;
+// In-match the world palette is driven by ambience, not the transition fade;
+// the cppx HUD shouldn't dim with it. Restrict the UI fade to the menu/UI
+// flow, where the FADEOUT palette fade is the only thing touching brightness.
+if(game.world.map.loaded) return 1.0f;
+const int phase = static_cast<int>(fade_i);
+// Mirror ApplyPaletteFade's brightness exactly so UI and world fade together.
+int brightness;
+if(game.GetState() == FADEOUT){
+// Fading OUT: full at phase 0 -> black at phase 15.
+int p = phase > 15 ? 15 : phase;
+brightness = (15 - p) * 8;
+}else if(phase < 16){
+// Fading IN after the switch: dark at phase 0 -> full at phase >= 15.
+if(phase >= 15) return 1.0f;
+brightness = phase * 8;
+}else{
+return 1.0f; // at rest
+}
+// Palette::Brightness maps brightness<128 to a linear (brightness/128) dim.
+float frac = static_cast<float>(brightness) / 128.0f;
+if(frac < 0.0f) frac = 0.0f;
+if(frac > 1.0f) frac = 1.0f;
+return frac;
+}
+
 void GameRenderer::Present(){
 if(renderdevice){
 renderdevice->UploadFrame(screenbuffer.pixels.data(), screenbuffer.w, screenbuffer.h);
@@ -104,7 +131,9 @@ if(window && std::getenv("SILENCER_CPPX_UI_DEMO")){
 int uw = 0;
 int uh = 0;
 const uint8_t * uirgba = game.gameUiPipeline.CppxUiFrame(uw, uh);
-if(uirgba && uw > 0 && uh > 0) renderdevice->UploadUiFrame(uirgba, uw, uh);
+// SIL-219: fade the cppx UI layer in lockstep with the FADEOUT palette fade so
+// the UI fades out/in with the world on the transitions that already fade it.
+if(uirgba && uw > 0 && uh > 0) renderdevice->UploadUiFrame(uirgba, uw, uh, UiFadeAlpha());
 }
 renderdevice->Present();
 }

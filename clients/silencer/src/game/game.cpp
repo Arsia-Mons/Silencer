@@ -45,12 +45,20 @@ bool Game::CaptureCompositedFrame(const char * path) {
 	int uw = 0;
 	int uh = 0;
 	const Uint8 * ui = gameUiPipeline.CppxUiFrame(uw, uh);
+	// SIL-219: match the GPU composite — dim the premultiplied UI layer by the
+	// transition fade so headless screenshots reflect the same UI fade the
+	// windowed backend applies in UploadUiFrame. 255 (at rest) is a no-op.
+	const Uint32 uia = (Uint32)(gameRenderer.UiFadeAlpha() * 255.0f + 0.5f);
+	auto dim = [uia](int v) -> int { return uia >= 255 ? v : (int)((v * uia + 127u) / 255u); };
 	if(ui && uw == buf.w && uh == buf.h && palette){
 		std::vector<Uint8> rgba(static_cast<size_t>(buf.w) * buf.h * 4);
 		for(int i = 0; i < buf.w * buf.h; ++i){
 			SDL_Color c = palette[buf.pixels[i]];
+			// Branch on the ORIGINAL alpha so the fade dim never reroutes opaque
+			// UI through the translucent palette-mix path. The dim scales the
+			// premultiplied output (all channels) in the blend branch below.
 			int sa = ui[i * 4 + 3];
-			int inv = 255 - sa;
+			int inv = 255 - dim(sa);
 			if(sa > 0 && sa < 255){
 				// Translucent UI over the palettized world (player-list dim
 				// fill): origin mixes in PALETTE space (alpha lookup table,
@@ -72,9 +80,9 @@ bool Game::CaptureCompositedFrame(const char * path) {
 				rgba[i * 4 + 3] = 255;
 				continue;
 			}
-			rgba[i * 4 + 0] = static_cast<Uint8>(ui[i * 4 + 0] + c.r * inv / 255);
-			rgba[i * 4 + 1] = static_cast<Uint8>(ui[i * 4 + 1] + c.g * inv / 255);
-			rgba[i * 4 + 2] = static_cast<Uint8>(ui[i * 4 + 2] + c.b * inv / 255);
+			rgba[i * 4 + 0] = static_cast<Uint8>(dim(ui[i * 4 + 0]) + c.r * inv / 255);
+			rgba[i * 4 + 1] = static_cast<Uint8>(dim(ui[i * 4 + 1]) + c.g * inv / 255);
+			rgba[i * 4 + 2] = static_cast<Uint8>(dim(ui[i * 4 + 2]) + c.b * inv / 255);
 			rgba[i * 4 + 3] = 255;
 		}
 		return renderer.WriteRGBAPNG(rgba.data(), buf.w, buf.h, path);

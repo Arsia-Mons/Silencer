@@ -33,6 +33,11 @@ void RestartPaletteFade();
 bool PaletteFadeFinished() const;
 Uint8 PaletteFadePhaseFromClock() const;
 void ApplyPaletteFade(bool fadeOut);
+// SIL-219: the global opacity [0,1] the cppx UI layer should composite at so
+// it fades in/out in lockstep with the world's transition palette fade. 1.0
+// at rest (no fade); mirrors the brightness fraction ApplyPaletteFade applies
+// to the world during a FADEOUT transition and the subsequent fade-in.
+float UiFadeAlpha() const;
 float LegacyUiAnimationStepSeconds() const;
 void LoadProgressCallback(int progress, int totalprogressitems);
 

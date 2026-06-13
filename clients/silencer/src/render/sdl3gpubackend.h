@@ -45,7 +45,7 @@ public:
 
 	void SetPalette(const SDL_Color *colors, int count) override;
 	void UploadFrame(const Uint8 *indexed_pixels, int w, int h) override;
-	void UploadUiFrame(const Uint8 *rgba, int w, int h) override;
+	void UploadUiFrame(const Uint8 *rgba, int w, int h, float global_alpha = 1.0f) override;
 	void RequestCapture() override;
 	bool TakeCapturedFrame(std::vector<Uint8> &rgba, int &w, int &h) override;
 	void Present() override;
@@ -154,6 +154,9 @@ private:
 	int          pending_ui_h      = 0;
 	bool         ui_dirty          = false;
 	bool         ui_present        = false; // an overlay exists to composite
+	// SIL-219: global opacity (0..255) the UI layer is dimmed by during a
+	// FADEOUT transition so it fades with the world. 255 = no change (at rest).
+	Uint8        ui_global_alpha   = 255;
 	bool         frame_dirty    = false;
 
 	// --- Pending lighting (Phase 3) ---

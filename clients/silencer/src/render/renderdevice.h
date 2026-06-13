@@ -36,7 +36,14 @@ public:
 	// to be composited over the final frame. `w*h*4` tightly-packed bytes;
 	// upload deferred to Present(), pixels must stay valid until then. Default
 	// no-op (TUI / headless ignore it). Pass null/0 to clear the overlay.
-	virtual void UploadUiFrame(const Uint8 * /*rgba*/, int /*w*/, int /*h*/) {}
+	//
+	// `global_alpha` (SIL-219) scales the whole layer's opacity in lockstep with
+	// the game's FADEOUT palette fade so the cppx UI fades in/out together with
+	// the world on screen transitions. The buffer is PREMULTIPLIED, so dimming
+	// multiplies ALL four channels by the fraction. 1.0 (the default, at rest)
+	// is a no-op — the overlay composites byte-for-byte as uploaded.
+	virtual void UploadUiFrame(const Uint8 * /*rgba*/, int /*w*/, int /*h*/,
+	                           float /*global_alpha*/ = 1.0f) {}
 
 	// Capture the final composited frame (world + UI). Arm with RequestCapture()
 	// before a Present(); afterwards TakeCapturedFrame() yields the swapchain

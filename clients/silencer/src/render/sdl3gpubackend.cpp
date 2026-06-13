@@ -725,13 +725,20 @@ void SDL3GPUBackend::UploadFrame(const Uint8 *indexed_pixels, int w, int h) {
 	frame_dirty    = true;
 }
 
-void SDL3GPUBackend::UploadUiFrame(const Uint8 *rgba, int w, int h) {
+void SDL3GPUBackend::UploadUiFrame(const Uint8 *rgba, int w, int h, float global_alpha) {
 	if (!rgba || w <= 0 || h <= 0) {
 		// Clear the overlay for this frame.
 		pending_ui_pixels = nullptr;
 		ui_present        = false;
 		return;
 	}
+	// SIL-219: quantize the fade fraction to a 0..255 byte applied at copy time.
+	// (ui_dirty is set unconditionally below, so the dimmed buffer re-uploads
+	// every frame the overlay is present.)
+	float a = global_alpha;
+	if (a < 0.0f) a = 0.0f;
+	if (a > 1.0f) a = 1.0f;
+	ui_global_alpha   = (Uint8)(a * 255.0f + 0.5f);
 	pending_ui_pixels = rgba;
 	pending_ui_w      = w;
 	pending_ui_h      = h;
@@ -1037,8 +1044,19 @@ void SDL3GPUBackend::Present() {
 		if (upload_ui) {
 			Uint8 *dst = (Uint8 *)SDL_MapGPUTransferBuffer(device, ui_tbuf, false);
 			if (dst) {
-				memcpy(dst, pending_ui_pixels,
-				       (size_t)pending_ui_w * (size_t)pending_ui_h * 4u);
+				const size_t bytes = (size_t)pending_ui_w * (size_t)pending_ui_h * 4u;
+				if (ui_global_alpha >= 255) {
+					// At rest (no fade): byte-identical passthrough.
+					memcpy(dst, pending_ui_pixels, bytes);
+				} else {
+					// SIL-219: dim the premultiplied RGBA layer to fade with the
+					// world. Premultiplied alpha means scaling ALL four channels
+					// (RGB and A) by the same fraction is the correct dim.
+					const Uint32 m = (Uint32)ui_global_alpha;
+					for (size_t i = 0; i < bytes; ++i) {
+						dst[i] = (Uint8)((pending_ui_pixels[i] * m + 127u) / 255u);
+					}
+				}
 				SDL_UnmapGPUTransferBuffer(device, ui_tbuf);
 				SDL_GPUTextureTransferInfo src = {};
 				src.transfer_buffer = ui_tbuf;
