@@ -140,10 +140,16 @@ using ::ui::children;
     track.position_inset.top = ::ui::StyleValue::points(0.0f);
     track.width = ::ui::Length::points(8.0f);
     track.height = ::ui::Length::points(props.viewport_height);
-    // Faint full-height rail so the scrollbar reads as a gutter, with the thumb
-    // riding inside it (1px inset on each side).
-    ::ui::StylePatch track_paint =
-        ::ui::patch().background(::ui::Color{40, 72, 40, 110}).corner_radius(1.0f);
+    // origin/main green-phosphor scroll box (measured from the v00058 goldens):
+    // a bright idx220 inner-well rail outlines the gutter, with the thumb riding
+    // inside it (1px inset on each side) as a flat darker idx216 green fill. These
+    // mirror silencer::tokens kInsetStroke/kChromeStroke, which this
+    // screen-agnostic engine layer cannot include.
+    const ::ui::Color rail_stroke{24, 124, 20, 255};
+    const ::ui::Color thumb_fill{8, 84, 0, 255};
+    ::ui::StylePatch track_paint = ::ui::patch().border(::ui::Border{
+        {1.0f, 1.0f, 1.0f, 1.0f},
+        {rail_stroke, rail_stroke, rail_stroke, rail_stroke}});
 
     ::ui::LayoutStyle thumb = {};
     thumb.position = ::ui::PositionType::Absolute;
@@ -152,8 +158,7 @@ using ::ui::children;
     thumb.position_inset.top = ::ui::StyleValue::points(thumb_top);
     thumb.height = ::ui::Length::points(thumb_h);
 
-    ::ui::StylePatch thumb_paint =
-        ::ui::patch().background(::ui::Color{92, 208, 92, 235}).corner_radius(1.0f);
+    ::ui::StylePatch thumb_paint = ::ui::patch().background(thumb_fill);
     // Give the thumb a stable control id derived from the ScrollView's id so it
     // is inspectable/testable (e.g. "GameOptionsList" -> "GameOptionsListThumb").
     const char *thumb_id =
