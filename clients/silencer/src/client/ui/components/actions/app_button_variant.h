@@ -97,8 +97,8 @@ inline ::ui::LayoutStyle app_button_oval_layout(AppButtonSize size) {
     return {
         .align_items = ::ui::AlignItems::Center,
         .justify_content = ::ui::JustifyContent::Start,
-        .min_width = ::ui::Length::points(104.0f),
         .height = ::ui::Length::points(40.5f),
+        .min_width = ::ui::Length::points(104.0f),
         // golden-measured: the row-plate label ink sits at plate+9 virtual
         // (origin LegacyRow yOffset 6 + ink-centering bias).
         .padding = {16.0f, 16.0f, 11.0f, 1.5f},
@@ -202,8 +202,8 @@ inline ::ui::LayoutStyle app_button_chrome_layout(AppButtonSize size = AppButton
   return {
       .align_items = ::ui::AlignItems::Center,
       .justify_content = ::ui::JustifyContent::Start,
-      .min_width = ::ui::Length::points(138.0f), // origin kActionButtonMinWidth 92 virtual
       .height = ::ui::Length::points(31.5f),     // origin Chrome plate 21 virtual
+      .min_width = ::ui::Length::points(138.0f), // origin kActionButtonMinWidth 92 virtual
       .padding = {18.0f, 18.0f, 5.0f, 0.0f},     // origin paddingX 12 virtual; pad-top
                                                  // 5 lands the label on vy_btn+4
   };

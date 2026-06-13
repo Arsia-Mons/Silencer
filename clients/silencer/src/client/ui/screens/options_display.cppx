@@ -64,9 +64,9 @@ struct OptionsDisplayProps {
       key="col"
       layout={::ui::LayoutStyle{
         .position = ::ui::PositionType::Absolute,
-        .position_inset = ::ui::EdgeSizes{0.0f, 0.0f, 168.0f, {}},
         .direction = ::ui::FlexDirection::Column,
         .align_items = ::ui::AlignItems::Center,
+        .position_inset = ::ui::EdgeSizes{0.0f, 0.0f, 168.0f, {}},
         .gap = 30.0f}}
     >
       <Box key="titlewrap" layout={::ui::LayoutStyle{.margin = ::ui::EdgeSizes{{}, {}, {}, 3.5f}}}>

@@ -64,9 +64,9 @@ float L(int d) { return std::ceil(d * 1.5f - 0.25f); }
 
 ::ui::LayoutStyle abs_at(int dx, int dy, int dw, int dh) {
   return ::ui::LayoutStyle{.position = ::ui::PositionType::Absolute,
-                           .position_inset = inset_lt(L(dx), L(dy)),
                            .width = ::ui::Length::points(L(dw)),
-                           .height = ::ui::Length::points(L(dh))};
+                           .height = ::ui::Length::points(L(dh)),
+                           .position_inset = inset_lt(L(dx), L(dy))};
 }
 
 // A baked texture drawn at a device rect.

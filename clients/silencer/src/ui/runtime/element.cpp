@@ -123,9 +123,9 @@ private:
         .on_hover = props.callbacks.on_hover,
         .on_activate = props.callbacks.on_activate,
         .on_key = props.callbacks.on_key,
-        .on_wheel = props.callbacks.on_wheel,
         .on_text_input = props.callbacks.on_text_input,
         .on_text_editing = props.callbacks.on_text_editing,
+        .on_wheel = props.callbacks.on_wheel,
     };
     bool metadata_ok = tree_.set_metadata(id, metadata);
     if (!metadata_ok) {

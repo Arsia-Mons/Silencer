@@ -45,7 +45,7 @@ using ::ui::components::BoxProps;
     />
     <Box
       key="ind"
-      layout={::ui::LayoutStyle{.direction = ::ui::FlexDirection::Row, .gap = 15.0f, .margin = ::ui::EdgeSizes{props.ind_dx, {}, {}, {}}}}
+      layout={::ui::LayoutStyle{.direction = ::ui::FlexDirection::Row, .margin = ::ui::EdgeSizes{props.ind_dx, {}, {}, {}}, .gap = 15.0f}}
     >
       <Box key="cl" layout={cell} style={tokens::image_patch_cover(left)} />
       <Box key="cr" layout={cell} style={tokens::image_patch_cover(right)} />

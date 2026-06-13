@@ -295,10 +295,10 @@ struct OptionsControlsProps {
         key="titlewrap"
         layout={::ui::LayoutStyle{
           .position = ::ui::PositionType::Absolute,
-          .position_inset = ::ui::EdgeSizes{0.0f, 0.0f, 13.0f, {}},
           .direction = ::ui::FlexDirection::Row,
           .align_items = ::ui::AlignItems::Center,
-          .justify_content = ::ui::JustifyContent::Center}}
+          .justify_content = ::ui::JustifyContent::Center,
+          .position_inset = ::ui::EdgeSizes{0.0f, 0.0f, 13.0f, {}}}}
       >
         <ScreenTitle key="title" variant={ScreenTitleVariant::Screen} value="Configure Controls" />
       </Box>

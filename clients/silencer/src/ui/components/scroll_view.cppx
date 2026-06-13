@@ -178,10 +178,10 @@ using ::ui::children;
     key={props.key}
     id={props.id}
     focusable={true}
+    onKey={on_key}
+    onWheel={on_wheel}
     layout={viewport}
     style={props.style}
-    onWheel={on_wheel}
-    onKey={on_key}
   >
     <Box key="content" layout={content}>
       {kids}

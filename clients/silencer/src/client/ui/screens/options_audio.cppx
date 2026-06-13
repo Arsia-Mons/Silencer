@@ -69,9 +69,9 @@ struct OptionsAudioProps {
       key="col"
       layout={::ui::LayoutStyle{
         .position = ::ui::PositionType::Absolute,
-        .position_inset = ::ui::EdgeSizes{0.0f, 0.0f, 168.0f, {}},
         .direction = ::ui::FlexDirection::Column,
         .align_items = ::ui::AlignItems::Center,
+        .position_inset = ::ui::EdgeSizes{0.0f, 0.0f, 168.0f, {}},
         .gap = 33.0f}}
     >
       <Box key="titlew" layout={title_nudge}>

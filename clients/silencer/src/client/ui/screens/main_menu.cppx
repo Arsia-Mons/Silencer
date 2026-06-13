@@ -105,21 +105,21 @@ bool has_logo_animation(const ChromeTextures &chrome) {
           .layout = ::ui::LayoutStyle{
               .position = ::ui::PositionType::Absolute,
               .always_forms_containing_block = true,
-              .position_inset = ::ui::EdgeSizes{kLogoStageCenterX - stage_w * 0.5f, {},
-                                                kLogoStageCenterY - stage_h * 0.5f, {}},
               .width = ::ui::Length::points(stage_w),
-              .height = ::ui::Length::points(stage_h)},
+              .height = ::ui::Length::points(stage_h),
+              .position_inset = ::ui::EdgeSizes{kLogoStageCenterX - stage_w * 0.5f, {},
+                                                kLogoStageCenterY - stage_h * 0.5f, {}}},
           .style = tokens::chromeless_clear_patch(),
           .children = children({Box(BoxProps{
               .key = "logoimg",
               .layout = ::ui::LayoutStyle{
                   .position = ::ui::PositionType::Absolute,
+                  .width = ::ui::Length::points(frame_w),
+                  .height = ::ui::Length::points(frame_h),
                   .position_inset = ::ui::EdgeSizes{static_cast<float>(frame.x) * kLogoScale,
                                                     {},
                                                     static_cast<float>(frame.y) * kLogoScale,
-                                                    {}},
-                  .width = ::ui::Length::points(frame_w),
-                  .height = ::ui::Length::points(frame_h)},
+                                                    {}}},
               .style = tokens::image_patch(frame.id)})})});
     }
   } else if (chrome.logo) {
@@ -129,10 +129,10 @@ bool has_logo_animation(const ChromeTextures &chrome) {
         .key = "logoimg",
         .layout = ::ui::LayoutStyle{
             .position = ::ui::PositionType::Absolute,
-            .position_inset = ::ui::EdgeSizes{431.0f - logo_w * 0.5f, {},
-                                              364.2f - logo_h * 0.5f, {}},
             .width = ::ui::Length::points(logo_w),
-            .height = ::ui::Length::points(logo_h)},
+            .height = ::ui::Length::points(logo_h),
+            .position_inset = ::ui::EdgeSizes{431.0f - logo_w * 0.5f, {},
+                                              364.2f - logo_h * 0.5f, {}}},
         .style = tokens::image_patch(chrome.logo)});
   }
 
@@ -150,9 +150,9 @@ bool has_logo_animation(const ChromeTextures &chrome) {
       key="stack"
       layout={::ui::LayoutStyle{
         .position = ::ui::PositionType::Absolute,
-        .position_inset = ::ui::EdgeSizes{::ui::StyleValue::percent(48.75f), {}, 231.0f, {}},
         .direction = ::ui::FlexDirection::Column,
         .align_items = ::ui::AlignItems::Start,
+        .position_inset = ::ui::EdgeSizes{::ui::StyleValue::percent(48.75f), {}, 231.0f, {}},
         .gap = 51.0f}}
     >
       <Box key="w0" layout={::ui::LayoutStyle{.margin = ::ui::EdgeSizes{60.0f, {}, {}, {}}}}>

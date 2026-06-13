@@ -109,12 +109,12 @@ struct CharacterCreateProviderProps {
     size={AppButtonSize::List}
     selected={index == preview}
     defaultFocused={index == 0}
-    accessibilityLabel={kAgencies[index].name}
     label={kAgencies[index].name}
-    padding={::ui::opt(::ui::EdgeSizes{17.5f, 14.5f, 11.0f, 1.5f})}
     onPress={on_press}
     onFocus={on_focus}
     onHover={on_hover}
+    accessibilityLabel={kAgencies[index].name}
+    padding={::ui::opt(::ui::EdgeSizes{17.5f, 14.5f, 11.0f, 1.5f})}
   />
 }
 
@@ -223,10 +223,10 @@ int clamp_agency_index(int index) {
   return <Box
     key="rightpane"
     layout={::ui::LayoutStyle{
+      .overflow = ::ui::Overflow::Hidden,
       .direction = ::ui::FlexDirection::Column,
       .align_items = ::ui::AlignItems::Stretch,
       .width = ::ui::Length::points(294.0f),
-      .overflow = ::ui::Overflow::Hidden,
       .padding = {33.0f, 0.0f, 63.0f, 0.0f},
       .gap = 7.5f}}
   >
@@ -362,9 +362,9 @@ int clamp_agency_index(int index) {
 }
 
 ::ui::LayoutStyle wizard_right_spacer_layout() {
-  return {.flex_grow = ::ui::StyleFloat::points(1.0f),
+  return {.min_width = ::ui::Length::points(0.0f),
           .flex_basis = ::ui::Length::points(0.0f),
-          .min_width = ::ui::Length::points(0.0f)};
+          .flex_grow = ::ui::StyleFloat::points(1.0f)};
 }
 
 // step 1 — origin/main "SILENCER ALIAS": the SELECT AGENT two-pane frame
@@ -404,11 +404,11 @@ int clamp_agency_index(int index) {
       key="aliasfloat"
       layout={::ui::LayoutStyle{
         .position = ::ui::PositionType::Absolute,
-        .position_inset = ::ui::EdgeSizes{425.0f, {}, 241.5f, {}},
         .direction = ::ui::FlexDirection::Column,
         .align_items = ::ui::AlignItems::Stretch,
         .width = ::ui::Length::points(426.0f),
-        .height = ::ui::Length::points(162.0f)}}
+        .height = ::ui::Length::points(162.0f),
+        .position_inset = ::ui::EdgeSizes{425.0f, {}, 241.5f, {}}}}
       style={chrome.dialog_pw ? tokens::image_patch(chrome.dialog_pw) : tokens::panel_patch(tokens::kSurfaceHeroPanel, kAliasFrameBorder, 2.0f, 24.0f)}
     >
       <Box
@@ -425,26 +425,26 @@ int clamp_agency_index(int index) {
       <Box
         key="inputrow"
         layout={::ui::LayoutStyle{
-          .direction = ::ui::FlexDirection::Row,
           .position = ::ui::PositionType::Absolute,
-          .position_inset = ::ui::EdgeSizes{45.5f, {}, 73.5f, {}},
+          .direction = ::ui::FlexDirection::Row,
           .align_items = ::ui::AlignItems::Stretch,
           .width = ::ui::Length::points(354.0f),
-          .height = ::ui::Length::points(40.0f)}}
+          .height = ::ui::Length::points(40.0f),
+          .position_inset = ::ui::EdgeSizes{45.5f, {}, 73.5f, {}}}}
       >
         <Input
           key="alias"
           id="Alias"
           autofocus={true}
           accessibility={{.label = "Alias"}}
+          onActivate={on_alias_enter}
           value={w.alias.c_str()}
           onChange={w.set_alias}
-          onActivate={on_alias_enter}
           layout={::ui::LayoutStyle{
             .align_items = ::ui::AlignItems::Center,
             .justify_content = ::ui::JustifyContent::Start,
-            .flex_grow = ::ui::StyleFloat::points(1.0f),
             .height = ::ui::Length::points(40.0f),
+            .flex_grow = ::ui::StyleFloat::points(1.0f),
             .padding = {7.0f, 0.0f, 0.0f, 0.0f}}}
           style={alias_field_style}
         />
@@ -485,10 +485,10 @@ int clamp_agency_index(int index) {
       <Box
         key="right"
         layout={::ui::LayoutStyle{
+          .overflow = ::ui::Overflow::Hidden,
           .direction = ::ui::FlexDirection::Column,
           .align_items = ::ui::AlignItems::Stretch,
           .width = ::ui::Length::points(294.0f),
-          .overflow = ::ui::Overflow::Hidden,
           .padding = {0.0f, 0.0f, 63.0f, 0.0f},
           .gap = 12.0f}}
       >

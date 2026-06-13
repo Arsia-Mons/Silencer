@@ -149,9 +149,9 @@ inline ::ui::StylePatch lobby_panel_open_left() {
     <Box
       key="lc"
       layout={::ui::LayoutStyle{
-        .flex_grow = ::ui::StyleFloat::points(1.0f),
+        .min_width = ::ui::Length::points(0.0f),
         .flex_basis = ::ui::Length::points(0.0f),
-        .min_width = ::ui::Length::points(0.0f)}}
+        .flex_grow = ::ui::StyleFloat::points(1.0f)}}
     >
       <BodyText key="l" variant={BodyTextVariant::Body} value={label} />
     </Box>
@@ -187,9 +187,9 @@ struct CenterColProps {
       .direction = ::ui::FlexDirection::Column,
       .align_items = ::ui::AlignItems::Stretch,
       .justify_content = ::ui::JustifyContent::Start,
-      .flex_grow = ::ui::StyleFloat::points(1.0f),
-      .flex_basis = ::ui::Length::points(0.0f),
       .min_width = ::ui::Length::points(0.0f),
+      .flex_basis = ::ui::Length::points(0.0f),
+      .flex_grow = ::ui::StyleFloat::points(1.0f),
       .padding = {6.0f, 6.0f, 7.0f, 0.0f}}}
     style={lobby_panel_open_right()}
   >
@@ -236,8 +236,8 @@ struct GameBrowserProps {
         key="prev"
         controlId="GamePrev"
         variant={AppButtonVariant::Chrome}
-        targetFeedback={true}
         size={AppButtonSize::Sm}
+        targetFeedback={true}
         label="Prev"
         onPress={props.on_prev}
       />
@@ -245,8 +245,8 @@ struct GameBrowserProps {
         key="next"
         controlId="GameNext"
         variant={AppButtonVariant::Chrome}
-        targetFeedback={true}
         size={AppButtonSize::Sm}
+        targetFeedback={true}
         label="Next"
         onPress={props.on_next}
       />
@@ -255,9 +255,9 @@ struct GameBrowserProps {
       key="join"
       controlId="JoinGame"
       variant={AppButtonVariant::Chrome}
-      targetFeedback={true}
       size={AppButtonSize::Sm}
       disabled={!props.can_join}
+      targetFeedback={true}
       label="Join"
       onPress={props.on_join}
     />
@@ -265,9 +265,9 @@ struct GameBrowserProps {
       key="spectate"
       controlId="SpectateGame"
       variant={AppButtonVariant::Chrome}
-      targetFeedback={true}
       size={AppButtonSize::Sm}
       disabled={!props.can_spectate}
+      targetFeedback={true}
       label="Spectate"
       onPress={props.on_spectate}
     />
@@ -296,8 +296,8 @@ struct GameBrowserProps {
     layout={::ui::LayoutStyle{
       .direction = ::ui::FlexDirection::Column,
       .align_items = ::ui::AlignItems::Stretch,
-      .flex_grow = ::ui::StyleFloat::points(1.0f),
       .width = ::ui::Length::percent(100.0f),
+      .flex_grow = ::ui::StyleFloat::points(1.0f),
       .gap = 4.0f}}
   >
     {game_rows}
@@ -324,11 +324,11 @@ struct GameBrowserProps {
       <Box
         key="well"
         layout={::ui::LayoutStyle{
+          .overflow = ::ui::Overflow::Hidden,
           .direction = ::ui::FlexDirection::Column,
           .align_items = ::ui::AlignItems::Stretch,
           .height = ::ui::Length::points(376.5f),
-          .padding = {1.5f, 1.5f, 1.5f, 1.5f},
-          .overflow = ::ui::Overflow::Hidden}}
+          .padding = {1.5f, 1.5f, 1.5f, 1.5f}}}
         style={tokens::frame_patch(tokens::kInsetStroke)}
       >
         {browser}
@@ -395,9 +395,9 @@ std::function<void(const std::string &)> set_u8_text(uint8_t *slot, int lo,
   return <Box
     key={key}
     layout={::ui::LayoutStyle{
-      .flex_grow = ::ui::StyleFloat::points(1.0f),
+      .min_width = ::ui::Length::points(0.0f),
       .flex_basis = ::ui::Length::points(0.0f),
-      .min_width = ::ui::Length::points(0.0f)}}
+      .flex_grow = ::ui::StyleFloat::points(1.0f)}}
   >
     <BodyText key="l" variant={BodyTextVariant::Body} value={label} />
   </Box>
@@ -555,11 +555,11 @@ struct GameCreateOptionsProps {
           .row_height = kGameOptionRowH,
           .show_scrollbar = true,
           .layout = ::ui::LayoutStyle{
-              .flex_grow = ::ui::StyleFloat::points(1.0f),
-              .flex_basis = ::ui::Length::points(0.0f),
+              .width = ::ui::Length::percent(100.0f),
               .min_width = ::ui::Length::points(180.0f),
-              .flex_shrink = ::ui::StyleFloat::points(0.0f),
-              .width = ::ui::Length::percent(100.0f)},
+              .flex_basis = ::ui::Length::points(0.0f),
+              .flex_grow = ::ui::StyleFloat::points(1.0f),
+              .flex_shrink = ::ui::StyleFloat::points(0.0f)},
           .style = scroll_style,
           .children = ::ui::children(rows)},
       ScrollView);
@@ -568,9 +568,9 @@ struct GameCreateOptionsProps {
     key="create"
     layout={::ui::LayoutStyle{
       .direction = ::ui::FlexDirection::Column,
-      .flex_grow = ::ui::StyleFloat::points(1.0f),
-      .flex_basis = ::ui::Length::points(0.0f),
       .min_width = ::ui::Length::points(0.0f),
+      .flex_basis = ::ui::Length::points(0.0f),
+      .flex_grow = ::ui::StyleFloat::points(1.0f),
       .padding = {9.0f, 9.0f, 10.0f, 8.0f},
       .gap = 4.5f}}
     style={lobby_panel_open_right()}
@@ -588,8 +588,8 @@ struct GameCreateOptionsProps {
       layout={::ui::LayoutStyle{
         .direction = ::ui::FlexDirection::Row,
         .align_items = ::ui::AlignItems::Stretch,
-        .flex_grow = ::ui::StyleFloat::points(1.0f),
         .width = ::ui::Length::percent(100.0f),
+        .flex_grow = ::ui::StyleFloat::points(1.0f),
         .padding = {6.0f, 6.0f, 2.0f, 3.0f}}}
       style={tokens::frame_patch(tokens::kInsetStroke)}
     >
@@ -636,11 +636,11 @@ struct CreateRightCellProps {
       <Box
         key="maplist"
         layout={::ui::LayoutStyle{
+          .overflow = ::ui::Overflow::Hidden,
           .direction = ::ui::FlexDirection::Column,
           .align_items = ::ui::AlignItems::Stretch,
           .width = ::ui::Length::percent(100.0f),
           .height = ::ui::Length::points(387.0f),
-          .overflow = ::ui::Overflow::Hidden,
           .padding = {1.0f, 1.0f, 1.0f, 1.0f}}}
         style={tokens::frame_patch(tokens::kInsetStroke)}
       >
@@ -659,9 +659,9 @@ struct CreateRightCellProps {
       key="gnv"
       layout={::ui::LayoutStyle{
         .position = ::ui::PositionType::Absolute,
-        .position_inset = ::ui::EdgeSizes{9.0f, {}, 464.0f, {}},
         .width = ::ui::Length::points(264.0f),
-        .height = ::ui::Length::points(30.5f)}}
+        .height = ::ui::Length::points(30.5f),
+        .position_inset = ::ui::EdgeSizes{9.0f, {}, 464.0f, {}}}}
     >
       <Input
         key="t"
@@ -685,9 +685,9 @@ struct CreateRightCellProps {
       key="pwv"
       layout={::ui::LayoutStyle{
         .position = ::ui::PositionType::Absolute,
-        .position_inset = ::ui::EdgeSizes{9.0f, {}, 510.0f, {}},
         .width = ::ui::Length::points(264.0f),
-        .height = ::ui::Length::points(30.5f)}}
+        .height = ::ui::Length::points(30.5f),
+        .position_inset = ::ui::EdgeSizes{9.0f, {}, 510.0f, {}}}}
     >
       <Input
         key="t"
@@ -710,8 +710,8 @@ struct CreateRightCellProps {
         key="create"
         controlId="CreateGame"
         variant={AppButtonVariant::Chrome}
-        targetFeedback={true}
         disabled={!props.can_create}
+        targetFeedback={true}
         label="Create"
         onPress={props.on_create}
       />
@@ -739,9 +739,9 @@ struct StagingPanelProps {
       .direction = ::ui::FlexDirection::Column,
       .align_items = ::ui::AlignItems::Stretch,
       .justify_content = ::ui::JustifyContent::Start,
-      .flex_grow = ::ui::StyleFloat::points(1.0f),
-      .flex_basis = ::ui::Length::points(0.0f),
       .min_width = ::ui::Length::points(0.0f),
+      .flex_basis = ::ui::Length::points(0.0f),
+      .flex_grow = ::ui::StyleFloat::points(1.0f),
       .padding = {4.0f, 6.5f, 5.0f, 0.0f}}}
     style={lobby_panel_open_right()}
   >
@@ -767,8 +767,8 @@ struct StagingPanelProps {
       key="ready"
       controlId="StagingReady"
       variant={AppButtonVariant::Chrome}
-      targetFeedback={true}
       disabled={props.ready_blocked}
+      targetFeedback={true}
       label={props.ready_label}
       onPress={props.on_ready}
     />
@@ -786,9 +786,9 @@ struct StagingPanelProps {
       .direction = ::ui::FlexDirection::Column,
       .align_items = ::ui::AlignItems::Stretch,
       .justify_content = ::ui::JustifyContent::Start,
-      .flex_grow = ::ui::StyleFloat::points(1.0f),
-      .flex_basis = ::ui::Length::points(0.0f),
       .min_width = ::ui::Length::points(0.0f),
+      .flex_basis = ::ui::Length::points(0.0f),
+      .flex_grow = ::ui::StyleFloat::points(1.0f),
       .padding = {6.0f, 6.0f, 7.0f, 0.0f}}}
     style={lobby_panel_open_right()}
   >
@@ -856,11 +856,11 @@ struct StagingPanelProps {
           .on_activate = toggle,
           .layout = ::ui::LayoutStyle{
               .position = ::ui::PositionType::Absolute,
-              .position_inset = g.at(585, 128 + 13 * i),
               // origin blits the toggle sprite NATIVE from the 13x13 box's
               // top-left without clipping — size the box to the sprite.
               .width = ::ui::Length::points(chrome.ready_w * 1.5f),
-              .height = ::ui::Length::points(chrome.ready_h * 1.5f)},
+              .height = ::ui::Length::points(chrome.ready_h * 1.5f),
+              .position_inset = g.at(585, 128 + 13 * i)},
           .style = tokens::image_patch(tex)}));
     const std::string lbl = row.name + " (" + std::to_string((unsigned)row.slots) + ")";
     kids.push_back(Box(BoxProps{
@@ -895,10 +895,10 @@ struct StagingPanelProps {
         .key = "desc-title",
         .layout = ::ui::LayoutStyle{
             .position = ::ui::PositionType::Absolute,
-            .position_inset = ::ui::EdgeSizes{0.0f, 0.0f, g.y(350), {}},
+            .align_items = ::ui::AlignItems::Center,
             .width = ::ui::Length::percent(100.0f),
             .height = ::ui::Length::points(tokens::kLineLarge),
-            .align_items = ::ui::AlignItems::Center},
+            .position_inset = ::ui::EdgeSizes{0.0f, 0.0f, g.y(350), {}}},
         .children = ::ui::children({Text(TextProps{
             .key = "t",
             .value = title,
@@ -911,8 +911,8 @@ struct StagingPanelProps {
           .key = "desc-text",
           .layout = ::ui::LayoutStyle{
               .position = ::ui::PositionType::Absolute,
-              .position_inset = ::ui::EdgeSizes{desc_x, {}, g.y(365), {}},
-              .width = ::ui::Length::points(desc_w)},
+              .width = ::ui::Length::points(desc_w),
+              .position_inset = ::ui::EdgeSizes{desc_x, {}, g.y(365), {}}},
           .children = ::ui::children({Text(TextProps{
               .key = "t",
               .value = ::ui::copy_string(row.description.c_str()),
@@ -947,11 +947,11 @@ struct StagingPanelProps {
           .key = ::ui::copy_string(("em" + k).c_str()),
           .layout = ::ui::LayoutStyle{
               .position = ::ui::PositionType::Absolute,
+              .width = ::ui::Length::points(chrome.agency_emblem_ws[a] * 1.5f),
+              .height = ::ui::Length::points(chrome.agency_emblem_hs[a] * 1.5f),
               .position_inset = g.at(553 - chrome.agency_emblem_ox[a],
                                      73 + r.team_number * 55 -
-                                         chrome.agency_emblem_oy[a]),
-              .width = ::ui::Length::points(chrome.agency_emblem_ws[a] * 1.5f),
-              .height = ::ui::Length::points(chrome.agency_emblem_hs[a] * 1.5f)},
+                                         chrome.agency_emblem_oy[a])},
           .style = tokens::image_patch(chrome.agency_emblem[a])}));
     }
     const uint32_t rtex = r.ready ? chrome.ready_on : chrome.ready_off;
@@ -960,10 +960,10 @@ struct StagingPanelProps {
           .key = ::ui::copy_string(("rc" + k).c_str()),
           .layout = ::ui::LayoutStyle{
               .position = ::ui::PositionType::Absolute,
-              .position_inset =
-                  g.at(588 - chrome.ready_ox, 73 + rowY - chrome.ready_oy),
               .width = ::ui::Length::points(chrome.ready_w * 1.5f),
-              .height = ::ui::Length::points(chrome.ready_h * 1.5f)},
+              .height = ::ui::Length::points(chrome.ready_h * 1.5f),
+              .position_inset =
+                  g.at(588 - chrome.ready_ox, 73 + rowY - chrome.ready_oy)},
           .style = tokens::image_patch(rtex)}));
     }
     kids.push_back(Box(BoxProps{
@@ -1069,8 +1069,8 @@ struct LobbyTitleBarProps {
       key="goback"
       controlId="LobbyGoBack"
       variant={AppButtonVariant::Chrome}
-      targetFeedback={true}
       size={AppButtonSize::Sm}
+      targetFeedback={true}
       label="Go Back"
       onPress={props.on_go_back}
     />
@@ -1091,11 +1091,11 @@ struct AgentCardProps {
   return <Box
     key="agent"
     layout={::ui::LayoutStyle{
+      .overflow = ::ui::Overflow::Hidden,
       .direction = ::ui::FlexDirection::Row,
       .align_items = ::ui::AlignItems::Start,
       .width = ::ui::Length::points(props.agent_w),
       .flex_shrink = ::ui::StyleFloat::points(0.0f),
-      .overflow = ::ui::Overflow::Hidden,
       .padding = {9.0f, 9.0f, 10.0f, 8.0f},
       .gap = 15.0f}}
     style={lobby_panel_style()}
@@ -1131,12 +1131,12 @@ struct AgentCardProps {
     <Box
       key="infoArea"
       layout={::ui::LayoutStyle{
+        .overflow = ::ui::Overflow::Hidden,
         .direction = ::ui::FlexDirection::Column,
         .align_items = ::ui::AlignItems::Stretch,
-        .flex_grow = ::ui::StyleFloat::points(1.0f),
-        .flex_basis = ::ui::Length::points(0.0f),
         .min_width = ::ui::Length::points(0.0f),
-        .overflow = ::ui::Overflow::Hidden,
+        .flex_basis = ::ui::Length::points(0.0f),
+        .flex_grow = ::ui::StyleFloat::points(1.0f),
         .gap = ::ui::StyleValue::points(7.5f)}}
     >
       <Text
@@ -1194,9 +1194,9 @@ struct AgentCardProps {
           layout={::ui::LayoutStyle{
             .direction = ::ui::FlexDirection::Column,
             .align_items = ::ui::AlignItems::Stretch,
-            .flex_grow = ::ui::StyleFloat::points(1.0f),
-            .flex_basis = ::ui::Length::points(0.0f),
             .min_width = ::ui::Length::points(0.0f),
+            .flex_basis = ::ui::Length::points(0.0f),
+            .flex_grow = ::ui::StyleFloat::points(1.0f),
             .padding = {6.0f, 6.0f, 4.0f, 4.5f},
             .gap = ::ui::StyleValue::points(3.0f)}}
           style={tokens::frame_patch(tokens::kInsetStroke)}
@@ -1249,9 +1249,9 @@ struct LobbyChatComposeProps {
     key="field"
     id="LobbyChat"
     accessibility={{.label = "Chat"}}
+    onActivate={on_activate}
     value={compose->c_str()}
     onChange={on_change}
-    onActivate={on_activate}
     layout={::ui::LayoutStyle{
       .align_items = ::ui::AlignItems::Center,
       .justify_content = ::ui::JustifyContent::Start,
@@ -1307,11 +1307,11 @@ struct LobbyChatPanelProps {
     <Box
       key="logwell"
       layout={::ui::LayoutStyle{
-        .direction = ::ui::FlexDirection::Row,
         .overflow = ::ui::Overflow::Hidden,
+        .direction = ::ui::FlexDirection::Row,
         .align_items = ::ui::AlignItems::Stretch,
-        .flex_grow = ::ui::StyleFloat::points(1.0f),
         .width = ::ui::Length::percent(100.0f),
+        .flex_grow = ::ui::StyleFloat::points(1.0f),
         .padding = {8.0f, 8.0f, 6.0f, 3.0f},
         .gap = 12.0f}}
       style={tokens::frame_patch(tokens::kInsetStroke)}
@@ -1321,9 +1321,9 @@ struct LobbyChatPanelProps {
         layout={::ui::LayoutStyle{
           .overflow = ::ui::Overflow::Hidden,
           .align_items = ::ui::AlignItems::Start,
-          .flex_grow = ::ui::StyleFloat::points(1.0f),
+          .min_width = ::ui::Length::points(0.0f),
           .flex_basis = ::ui::Length::points(0.0f),
-          .min_width = ::ui::Length::points(0.0f)}}
+          .flex_grow = ::ui::StyleFloat::points(1.0f)}}
       >
         {chat_transcript(props.scrollback)}
       </Box>
@@ -1482,10 +1482,10 @@ std::vector<::ui::UiElement> map_list_rows(const std::vector<std::string> &maps,
     key="map-preview"
     layout={::ui::LayoutStyle{
       .position = ::ui::PositionType::Absolute,
-      .position_inset = ::ui::EdgeSizes{left, {}, top, {}},
       .width = ::ui::Length::points(kCardW),
       .height = ::ui::Length::points(kCardH),
-      .padding = {kPad, kPad, kPad, kPad}}}
+      .padding = {kPad, kPad, kPad, kPad},
+      .position_inset = ::ui::EdgeSizes{left, {}, top, {}}}}
     style={card}
   >
     <Box
@@ -1516,8 +1516,8 @@ struct LobbyPaneGridProps {
     layout={::ui::LayoutStyle{
       .direction = ::ui::FlexDirection::Row,
       .align_items = ::ui::AlignItems::Stretch,
-      .flex_grow = ::ui::StyleFloat::points(1.0f),
-      .width = ::ui::Length::percent(100.0f)}}
+      .width = ::ui::Length::percent(100.0f),
+      .flex_grow = ::ui::StyleFloat::points(1.0f)}}
   >
     <Box
       key="leftstack"
