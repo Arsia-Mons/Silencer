@@ -14,6 +14,7 @@
 #include "ui/components/text.h"
 #include "ui/runtime/react.h"
 
+#include <cmath>
 #include <functional>
 #include <memory>
 #include <string>
@@ -107,8 +108,8 @@ bool has_logo_animation(const ChromeTextures &chrome) {
               .always_forms_containing_block = true,
               .width = ::ui::Length::points(stage_w),
               .height = ::ui::Length::points(stage_h),
-              .position_inset = ::ui::EdgeSizes{kLogoStageCenterX - stage_w * 0.5f, {},
-                                                kLogoStageCenterY - stage_h * 0.5f, {}}},
+              .position_inset = ::ui::EdgeSizes{std::floor(kLogoStageCenterX - stage_w * 0.5f), {},
+                                                std::floor(kLogoStageCenterY - stage_h * 0.5f), {}}},
           .style = tokens::chromeless_clear_patch(),
           .children = children({Box(BoxProps{
               .key = "logoimg",
@@ -116,9 +117,9 @@ bool has_logo_animation(const ChromeTextures &chrome) {
                   .position = ::ui::PositionType::Absolute,
                   .width = ::ui::Length::points(frame_w),
                   .height = ::ui::Length::points(frame_h),
-                  .position_inset = ::ui::EdgeSizes{static_cast<float>(frame.x) * kLogoScale,
+                  .position_inset = ::ui::EdgeSizes{std::floor(static_cast<float>(frame.x) * kLogoScale),
                                                     {},
-                                                    static_cast<float>(frame.y) * kLogoScale,
+                                                    std::floor(static_cast<float>(frame.y) * kLogoScale),
                                                     {}}},
               .style = tokens::image_patch(frame.id)})})});
     }
@@ -131,8 +132,8 @@ bool has_logo_animation(const ChromeTextures &chrome) {
             .position = ::ui::PositionType::Absolute,
             .width = ::ui::Length::points(logo_w),
             .height = ::ui::Length::points(logo_h),
-            .position_inset = ::ui::EdgeSizes{431.0f - logo_w * 0.5f, {},
-                                              364.2f - logo_h * 0.5f, {}}},
+            .position_inset = ::ui::EdgeSizes{std::floor(431.0f - logo_w * 0.5f), {},
+                                              std::floor(364.2f - logo_h * 0.5f), {}}},
         .style = tokens::image_patch(chrome.logo)});
   }
 
