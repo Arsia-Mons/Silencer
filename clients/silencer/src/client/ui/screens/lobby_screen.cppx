@@ -17,6 +17,7 @@
 #include "client/ui/screens/character_create_data.h"
 #include "ui/components/box.h"
 #include "ui/components/input.h"
+#include "ui/components/scroll_view.h"
 #include "ui/components/text.h"
 #include "ui/runtime/react.h"
 
@@ -34,10 +35,15 @@ using ::ui::components::Box;
 using ::ui::components::BoxProps;
 using ::ui::components::Input;
 using ::ui::components::InputProps;
+using ::ui::components::ScrollView;
+using ::ui::components::ScrollViewProps;
 using ::ui::components::Text;
 using ::ui::components::TextProps;
 
 constexpr size_t kLobbyChatMaxChars = 200;
+constexpr float kGameOptionViewportH = 129.0f;
+constexpr float kGameOptionRowH = 25.5f;
+constexpr int kGameOptionRowCount = 6;
 
 std::string cap_lobby_chat_text(const std::string &value) {
   if (value.size() <= kLobbyChatMaxChars)
@@ -333,48 +339,174 @@ struct GameBrowserProps {
 // BodySm text buttons centered in the row, and numeric values as inline
 // TextInputs whose Body pen sits 3 virtual px under the row top — so the
 // numeric value column is top-anchored at +4.5 logical, not centered.
-::ui::UiElement kv_row(const char *key, const char *label, const char *value,
-                       bool cycle = false) {
-  ::ui::LayoutStyle vc_layout{.width = ::ui::Length::points(96.0f),
-                              .flex_shrink = ::ui::StyleFloat::points(0.0f)};
-  if (!cycle) {
-    vc_layout.height = ::ui::Length::points(21.0f);
-    vc_layout.padding = {0.0f, 0.0f, 5.5f, 0.0f};
+const char *security_label(uint8_t security) {
+  switch (security) {
+  case 0:
+    return "None";
+  case 1:
+    return "Low";
+  case 2:
+    return "Medium";
+  case 3:
+    return "High";
+  default:
+    return "Medium";
   }
+}
+
+int parse_u8_option(const std::string &value, int fallback, int lo, int hi) {
+  if (value.empty())
+    return fallback;
+  int next = 0;
+  for (char c : value) {
+    if (c < '0' || c > '9')
+      return fallback;
+    next = next * 10 + (c - '0');
+    if (next > hi)
+      return hi;
+  }
+  if (next < lo)
+    return lo;
+  return next;
+}
+
+std::function<void(const std::string &)> set_u8_text(uint8_t *slot, int lo,
+                                                     int hi) {
+  return [slot, lo, hi](const std::string &value) {
+    if (!slot)
+      return;
+    *slot = (uint8_t)parse_u8_option(value, *slot, lo, hi);
+  };
+}
+
+::ui::StyleStatePatch game_option_row_style() {
+  ::ui::StylePatch p = tokens::chromeless_clear_patch();
+  ::ui::StyleStatePatch s{};
+  s.base = p;
+  s.hover = p;
+  s.pressed = p;
+  s.focus_visible = p;
+  return s;
+}
+
+::ui::UiElement option_label(const char *key, const char *label) {
+  return <Box
+    key={key}
+    layout={::ui::LayoutStyle{
+      .flex_grow = ::ui::StyleFloat::points(1.0f),
+      .flex_basis = ::ui::Length::points(0.0f),
+      .min_width = ::ui::Length::points(0.0f)}}
+  >
+    <BodyText key="l" variant={BodyTextVariant::Body} value={label} />
+  </Box>
+}
+
+::ui::UiElement option_value_text(const char *key, const char *value,
+                                  bool cycle) {
+  return <Box
+    key={key}
+    layout={::ui::LayoutStyle{
+      .width = ::ui::Length::points(96.0f),
+      .height = ::ui::Length::points(21.0f),
+      .flex_shrink = ::ui::StyleFloat::points(0.0f),
+      .padding = cycle ? ::ui::EdgeSizes{} : ::ui::EdgeSizes{0.0f, 0.0f, 5.5f, 0.0f}}}
+  >
+    <Text
+      key="v"
+      value={value}
+      layout={{.height = ::ui::Length::points(tokens::kLineBody)}}
+      style={tokens::text_patch(tokens::kTextBody, tokens::kFontBodyEm, cycle ? tokens::kFaceBodySm : tokens::kFaceBody, tokens::kLineBody)}
+    />
+  </Box>
+}
+
+::ui::UiElement option_cycle_row(const char *key, const char *id,
+                                 const char *label, const char *value,
+                                 std::function<void()> on_press) {
+  std::function<void(const ::ui::ActivationEvent &)> activate =
+      [on_press](const ::ui::ActivationEvent &) {
+        if (on_press)
+          on_press();
+      };
+  return <Box
+    key={key}
+    id={id}
+    focusable={true}
+    accessibility={{.label = id}}
+    onActivate={activate}
+    layout={::ui::LayoutStyle{
+      .direction = ::ui::FlexDirection::Row,
+      .align_items = ::ui::AlignItems::Center,
+      .width = ::ui::Length::percent(100.0f),
+      .height = ::ui::Length::points(kGameOptionRowH),
+      .flex_shrink = ::ui::StyleFloat::points(0.0f),
+      .padding = {0.0f, 0.0f, 0.0f, 0.0f},
+      .gap = 9.0f}}
+    style={game_option_row_style()}
+  >
+    {option_label("lc", label)}
+    {option_value_text("vc", value, true)}
+  </Box>
+}
+
+::ui::UiElement option_input_row(const char *key, const char *id,
+                                 const char *label, uint8_t value,
+                                 std::function<void(const std::string &)> on_change) {
+  ::ui::LayoutStyle vc_layout{.width = ::ui::Length::points(96.0f),
+                              .height = ::ui::Length::points(21.0f),
+                              .flex_shrink = ::ui::StyleFloat::points(0.0f),
+                              .padding = {0.0f, 0.0f, 5.5f, 0.0f}};
+  const char *display = ::ui::copy_string(std::to_string((unsigned)value).c_str());
   return <Box
     key={key}
     layout={::ui::LayoutStyle{
       .direction = ::ui::FlexDirection::Row,
       .align_items = ::ui::AlignItems::Center,
       .width = ::ui::Length::percent(100.0f),
-      .height = ::ui::Length::points(21.0f),
+      .height = ::ui::Length::points(kGameOptionRowH),
       .flex_shrink = ::ui::StyleFloat::points(0.0f),
       .gap = 9.0f}}
+    style={game_option_row_style()}
   >
-    <Box
-      key="lc"
-      layout={::ui::LayoutStyle{
-        .flex_grow = ::ui::StyleFloat::points(1.0f),
-        .flex_basis = ::ui::Length::points(0.0f),
-        .min_width = ::ui::Length::points(0.0f)}}
-    >
-      <BodyText key="l" variant={BodyTextVariant::Body} value={label} />
-    </Box>
+    {option_label("lc", label)}
     <Box key="vc" layout={vc_layout}>
-      <Text
-        key="v"
-        value={value}
-        layout={{.height = ::ui::Length::points(tokens::kLineBody)}}
-        style={tokens::text_patch(tokens::kTextBody, tokens::kFontBodyEm, cycle ? tokens::kFaceBodySm : tokens::kFaceBody, tokens::kLineBody)}
+      <Input
+        key="input"
+        id={id}
+        accessibility={{.label = id}}
+        value={display}
+        onChange={on_change}
+        layout={::ui::LayoutStyle{
+          .align_items = ::ui::AlignItems::Start,
+          .justify_content = ::ui::JustifyContent::Start,
+          .width = ::ui::Length::points(96.0f),
+          .height = ::ui::Length::points(21.0f),
+          .padding = {0.0f, 0.0f, 0.0f, 0.0f}}}
+        style={tokens::chromeless_field_style(tokens::kChromeStroke, tokens::kTextBody)}
       />
     </Box>
   </Box>
 }
 
+struct GameCreateOptionsProps {
+  uint8_t security = 2;
+  uint8_t min_level = 0;
+  uint8_t max_level = 99;
+  uint8_t max_players = 24;
+  uint8_t max_teams = 6;
+  bool spectatable = true;
+  std::function<void()> cycle_security = {};
+  std::function<void()> cycle_spectatable = {};
+  std::function<void(const std::string &)> set_min_level = {};
+  std::function<void(const std::string &)> set_max_level = {};
+  std::function<void(const std::string &)> set_max_players = {};
+  std::function<void(const std::string &)> set_max_teams = {};
+};
+
 // origin/main "Game Options": a pill-notch title over a dense label:value table
-// (the values are the CreateGameRequest defaults). The Game name + Password +
-// Create live in the right Select-Map cell (CreateRightCell), matching golden.
-::ui::UiElement GameCreatePanel() {
+// backed by the CreateGameRequest fields. The Game name + Password + Create live
+// in the right Select-Map cell (CreateRightCell), matching golden.
+::ui::UiElement GameCreatePanel(const GameCreateOptionsProps &props) {
   // origin BuildGameCreateUpperTree at the 214x120 upper box: content pad 6,
   // gap 3, Heading title, Inset form border (pad 4/2, gap 2) holding a
   // 5-visible-row viewport (rows h14 gap 3, value col 64 left-aligned) and
@@ -388,6 +520,48 @@ struct GameBrowserProps {
   // each side sat one device px right). Numeric value pens: vc pad-top 5.5
   // (not 4.5) — the row tops alternate .5-logical fractions and 5.5 is the
   // one offset whose floor(1.5y) lands every row in its golden cell window.
+  std::vector<::ui::UiElement> rows;
+  rows.reserve(kGameOptionRowCount);
+  rows.push_back(option_cycle_row("o0", "GameOptionSecurity", "Security:",
+                                  security_label(props.security),
+                                  props.cycle_security));
+  rows.push_back(option_input_row("o1", "GameOptionMinLevel", "Min Level:",
+                                  props.min_level, props.set_min_level));
+  rows.push_back(option_input_row("o2", "GameOptionMaxLevel", "Max Level:",
+                                  props.max_level, props.set_max_level));
+  rows.push_back(option_input_row("o3", "GameOptionMaxPlayers", "Max Players:",
+                                  props.max_players, props.set_max_players));
+  rows.push_back(option_input_row("o4", "GameOptionMaxTeams", "Max Teams:",
+                                  props.max_teams, props.set_max_teams));
+  rows.push_back(option_cycle_row("o5", "GameOptionSpectatable",
+                                  "Spectatable:",
+                                  props.spectatable ? "Yes" : "No",
+                                  props.cycle_spectatable));
+
+  ::ui::StyleStatePatch scroll_style{};
+  scroll_style.base = tokens::chromeless_clear_patch();
+  scroll_style.focus_visible = scroll_style.base;
+  ::ui::UiElement option_list = ::ui::component(
+      "ScrollView",
+      ScrollViewProps{
+          .key = "rows",
+          .id = "GameOptionsList",
+          .viewport_height = kGameOptionViewportH,
+          .content_height =
+              kGameOptionRowH * static_cast<float>(kGameOptionRowCount),
+          .step = kGameOptionRowH,
+          .row_height = kGameOptionRowH,
+          .show_scrollbar = false,
+          .layout = ::ui::LayoutStyle{
+              .flex_grow = ::ui::StyleFloat::points(1.0f),
+              .flex_basis = ::ui::Length::points(0.0f),
+              .min_width = ::ui::Length::points(180.0f),
+              .flex_shrink = ::ui::StyleFloat::points(0.0f),
+              .width = ::ui::Length::percent(100.0f)},
+          .style = scroll_style,
+          .children = ::ui::children(rows)},
+      ScrollView);
+
   return <Box
     key="create"
     layout={::ui::LayoutStyle{
@@ -418,24 +592,7 @@ struct GameBrowserProps {
         .gap = 4.5f}}
       style={tokens::frame_patch(tokens::kInsetStroke)}
     >
-      <Box
-        key="rows"
-        layout={::ui::LayoutStyle{
-          .direction = ::ui::FlexDirection::Column,
-          .overflow = ::ui::Overflow::Hidden,
-          .flex_grow = ::ui::StyleFloat::points(1.0f),
-          .flex_basis = ::ui::Length::points(0.0f),
-          .min_width = ::ui::Length::points(0.0f),
-          .height = ::ui::Length::points(129.0f),
-          .gap = 4.5f}}
-      >
-        {kv_row("o0", "Security:", "Medium", true)}
-        {kv_row("o1", "Min Level:", "0")}
-        {kv_row("o2", "Max Level:", "99")}
-        {kv_row("o3", "Max Players:", "24")}
-        {kv_row("o4", "Max Teams:", "6")}
-        {kv_row("o5", "Spectatable:", "Yes", true)}
-      </Box>
+      {option_list}
       <Box
         key="sbtrack"
         layout={::ui::LayoutStyle{
@@ -1237,7 +1394,15 @@ struct LobbyScreenProps {
   int *sel = use_state<int>(0);
   int *map_index = use_state<int>(-1); // -1 = none picked yet (no highlight, like origin)
   bool *show_create = use_state<bool>(false);
-  if (!create_name || !sel || !map_index || !show_create)
+  uint8_t *opt_security = use_state<uint8_t>(2);
+  uint8_t *opt_min_level = use_state<uint8_t>(0);
+  uint8_t *opt_max_level = use_state<uint8_t>(99);
+  uint8_t *opt_max_players = use_state<uint8_t>(24);
+  uint8_t *opt_max_teams = use_state<uint8_t>(6);
+  bool *opt_spectatable = use_state<bool>(true);
+  if (!create_name || !sel || !map_index || !show_create || !opt_security ||
+      !opt_min_level || !opt_max_level || !opt_max_players || !opt_max_teams ||
+      !opt_spectatable)
     return ::ui::empty();
 
   // Clamp the screen-local cursors against this frame's lists.
@@ -1310,13 +1475,31 @@ struct LobbyScreenProps {
     *tech_open = false; // leaving staging closes the tech view
   sp.on_tech = [tech_open]() { *tech_open = true; };
 
+  GameCreateOptionsProps options_props;
+  options_props.security = *opt_security;
+  options_props.min_level = *opt_min_level;
+  options_props.max_level = *opt_max_level;
+  options_props.max_players = *opt_max_players;
+  options_props.max_teams = *opt_max_teams;
+  options_props.spectatable = *opt_spectatable;
+  options_props.cycle_security = [opt_security]() {
+    *opt_security = (uint8_t)((*opt_security + 1) % 4);
+  };
+  options_props.cycle_spectatable = [opt_spectatable]() {
+    *opt_spectatable = !*opt_spectatable;
+  };
+  options_props.set_min_level = set_u8_text(opt_min_level, 0, 99);
+  options_props.set_max_level = set_u8_text(opt_max_level, 0, 99);
+  options_props.set_max_players = set_u8_text(opt_max_players, 1, 64);
+  options_props.set_max_teams = set_u8_text(opt_max_teams, 1, 16);
+
   ::ui::UiElement right;
   if (staging.active && *tech_open) {
     right = TechUpperPanel([tech_open]() { *tech_open = false; });
   } else if (staging.active) {
     right = StagingPanel(sp);
   } else if (*show_create) {
-    right = GameCreatePanel();
+    right = GameCreatePanel(options_props);
   } else {
     CenterColProps cc;
     cc.on_create = [show_create]() { *show_create = true; };
@@ -1359,11 +1542,23 @@ struct LobbyScreenProps {
     rc.can_create = map_count > 0;
     rc.on_create = [create = games.create_game, create_name,
                     show_create, maps = games.bundled_maps,
+                    security = *opt_security,
+                    min_level = *opt_min_level,
+                    max_level = *opt_max_level,
+                    max_players = *opt_max_players,
+                    max_teams = *opt_max_teams,
+                    spectatable = *opt_spectatable,
                     idx = *map_index < 0 ? 0 : *map_index]() {
       if (create && idx >= 0 && idx < (int)maps.size()) {
         CreateGameRequest req;
         req.name = create_name->empty() ? "New Game" : *create_name;
         req.map = maps[idx];
+        req.security = security;
+        req.min_level = min_level;
+        req.max_level = max_level < min_level ? min_level : max_level;
+        req.max_players = max_players;
+        req.max_teams = max_teams;
+        req.spectatable = spectatable;
         create(req);
         *show_create = false; // staging.active takes over once connected
       }

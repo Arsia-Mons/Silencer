@@ -1,18 +1,14 @@
 #!/usr/bin/env bash
 # Drives the cppx lobby GameCreate panel and proves it renders + stays usable
 # across window sizes. The legacy Clay GameCreate had a scrollable "Game Options
-# Form" with separate security/level option rows; the modern cppx GameCreate
-# panel has no scrollable surface (CreateGameRequest defaults those options —
-# they render as a read-only "Game Options" table), so this is no longer a
-# scroll test. Instead: connect → auth → create character → LOBBY → New Game,
-# then assert the GameCreate panel (Select Map list of focusable MapRow entries,
-# Game name display, Create button, Go Back) is present and laid out inside the
-# UI viewport at a desktop size, a small 640x480 size, and a tall 1000x1100
-# portrait size. The logical canvas pins height at 720 (width = aspect*720,
-# game_ui_pipeline.cpp) and the lobby cockpit's authored min logical width is
-# ~640, so a phone-narrow 390x844 window crops horizontally BY DESIGN — at that
-# size we assert the panel still mounts (controls exist, positive size,
-# vertically in-bounds) rather than full horizontal containment.
+# Form" with separate security/level option rows; the cppx GameCreate panel must
+# keep that options list interactable. Flow: connect → auth → create character →
+# LOBBY → New Game, then assert option click + wheel scroll behavior and verify
+# the panel (Select Map rows, Game name display, Create, Go Back) across desktop,
+# small, and portrait sizes. The logical canvas pins height at 720 (width =
+# aspect*720, game_ui_pipeline.cpp), so a phone-narrow 390x844 window crops
+# horizontally BY DESIGN — at that size we assert the panel still mounts
+# vertically rather than full horizontal containment.
 set -euo pipefail
 . "$(dirname "$0")/lib.sh"
 
@@ -170,7 +166,7 @@ wait_for_widget "CreateGame"
 
 # Assert the GameCreate panel is present and laid out within the UI viewport at
 # the current window size. The modern origin-parity panel (lobby_screen.cppx)
-# is: a "Game Options" read-only table, a "Select Map" list of focusable MapRow
+# is: an interactable "Game Options" list, a "Select Map" list of focusable MapRow
 # entries, the "Game name:" display (plain text by design — no Input chrome),
 # the wide "Create" button (control_id CreateGame), and the cockpit "Go Back"
 # button (LobbyGoBack) that exits the create panel. Buttons are matched by
@@ -234,6 +230,19 @@ assert_create_panel_in_bounds() {
     }
     assertControl(n, id);
   };
+  const optList = nodes.find((w) => w.control_id === "GameOptionsList");
+  if (!optList || !optList.focusable) {
+    console.error(`${what}: GameOptionsList missing or not focusable`);
+    process.exit(1);
+  }
+  assertControl(optList, "GameOptionsList");
+  for (const id of ["GameOptionSecurity", "GameOptionMinLevel", "GameOptionMaxLevel", "GameOptionMaxPlayers", "GameOptionMaxTeams", "GameOptionSpectatable"]) {
+    const row = nodes.find((w) => w.control_id === id && w.focusable);
+    if (!row) {
+      console.error(`${what}: option row ${id} missing or not focusable`);
+      process.exit(1);
+    }
+  }
   // The Select Map list: at least one focusable MapRow entry, all in-bounds
   // (the maplist box clips with Overflow::Hidden, but the capped row count
   // must still lay out on-canvas).
@@ -256,6 +265,77 @@ assert_create_panel_in_bounds() {
 
   rm -f "$inspect_out"
 }
+
+option_center() {
+  cli --port "$CTRL_PORT" inspect | bun -e '
+  const r = JSON.parse(await new Response(Bun.stdin.stream()).text());
+  const n = (r.nodes ?? []).find((w) => w.control_id === "GameOptionsList");
+  if (!n) { console.error("GameOptionsList missing"); process.exit(1); }
+  console.log(`${Math.round(n.x + n.w / 2)} ${Math.round(n.y + n.h / 2)}`);
+  '
+}
+
+option_value() {
+  local id="$1"
+  cli --port "$CTRL_PORT" inspect | ID="$id" bun -e '
+  const id = process.env.ID;
+  const r = JSON.parse(await new Response(Bun.stdin.stream()).text());
+  const nodes = r.nodes ?? [];
+  const row = nodes.find((w) => w.control_id === id && w.focusable);
+  if (!row) { console.error(`row ${id} missing`); process.exit(1); }
+  const hit = (a,b) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
+  const value = nodes
+    .filter((w) => w.role === "text" && hit(w, row) && w.x > row.x + row.w * 0.45)
+    .sort((a,b) => b.x - a.x)[0]?.value;
+  if (!value) { console.error(`value for ${id} missing`); process.exit(1); }
+  console.log(value);
+  '
+}
+
+option_row_y() {
+  local id="$1"
+  cli --port "$CTRL_PORT" inspect | ID="$id" bun -e '
+  const id = process.env.ID;
+  const r = JSON.parse(await new Response(Bun.stdin.stream()).text());
+  const row = (r.nodes ?? []).find((w) => w.control_id === id && w.focusable);
+  if (!row) { console.error(`row ${id} missing`); process.exit(1); }
+  console.log(row.y.toFixed(2));
+  '
+}
+
+assert_game_options_interactable() {
+  wait_for_widget "GameOptionsList"
+  local value
+  value="$(option_value GameOptionSecurity)"
+  if [ "$value" != "Medium" ]; then
+    echo "Security option starts as $value, want Medium" >&2
+    exit 1
+  fi
+  cli --port "$CTRL_PORT" click --label "GameOptionSecurity" >/dev/null
+  cli --port "$CTRL_PORT" wait_frames --n 2 >/dev/null
+  value="$(option_value GameOptionSecurity)"
+  if [ "$value" != "High" ]; then
+    echo "Clicking Security left value at $value, want High" >&2
+    exit 1
+  fi
+
+  local ox oy before after
+  read -r ox oy <<< "$(option_center)"
+  before="$(option_row_y GameOptionSecurity)"
+  cli --port "$CTRL_PORT" scroll --x "$ox" --y "$oy" --dy -1 >/dev/null
+  cli --port "$CTRL_PORT" wait_frames --n 2 >/dev/null
+  after="$(option_row_y GameOptionSecurity)"
+  bun -e '
+  const before = Number(process.argv[1]);
+  const after = Number(process.argv[2]);
+  if (!(after < before - 10)) {
+    console.error(`Game Options did not scroll: before=${before} after=${after}`);
+    process.exit(1);
+  }
+  ' "$before" "$after"
+}
+
+assert_game_options_interactable
 
 # Desktop size (headless default is small, so resize explicitly).
 cli --port "$CTRL_PORT" resize --w 1280 --h 720 >/dev/null
