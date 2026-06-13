@@ -29,8 +29,8 @@ using ::ui::components::TextProps;
   // gated on a REAL input source — programmatic focus (our autofocus
   // convenience; origin never autofocuses) does not ramp, so rest-state
   // renders match the rest-state goldens. Oval/List always ramp by swapping
-  // sprite frames; Chrome can opt into same-art brightness feedback for real
-  // in-lobby actions while static dialog chrome remains unchanged.
+  // sprite frames; Chrome ramps its same-art brightness on hover/focus too
+  // (SIL-228) so rectangular buttons (Connect/Lobby) get the origin hover.
   client::ui::Clock clock = client::ui::use_clock();
   uint32_t *anim_accum = use_state<uint32_t>(0u);
   int *phase = use_state<int>(0);
@@ -44,7 +44,8 @@ using ::ui::components::TextProps;
                snap->source == ::ui::FocusSource::Keyboard ||
                snap->source == ::ui::FocusSource::Gamepad);
   const bool target_feedback =
-      props.target_feedback || props.variant == AppButtonVariant::Oval;
+      props.target_feedback || props.variant == AppButtonVariant::Oval ||
+      props.variant == AppButtonVariant::Chrome;
   const bool targeted =
       !props.disabled && (*hovered_now || (*focused_now && source_real));
   const uint32_t kFrameMs = 42; // legacy ~24fps animation step
