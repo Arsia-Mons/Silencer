@@ -213,8 +213,6 @@ struct GameBrowserProps {
   const char *sel_detail = "";
   bool can_join = false;
   bool can_spectate = false;
-  std::function<void()> on_prev = {};
-  std::function<void()> on_next = {};
   std::function<void()> on_join = {};
   std::function<void()> on_spectate = {};
 };
@@ -231,26 +229,6 @@ struct GameBrowserProps {
       .gap = 4.0f}}
   >
     <BodyText key="detail" variant={BodyTextVariant::Detail} value={props.sel_detail} />
-    <ActionRow key="browse">
-      <AppButton
-        key="prev"
-        controlId="GamePrev"
-        variant={AppButtonVariant::Chrome}
-        size={AppButtonSize::Sm}
-        targetFeedback={true}
-        label="Prev"
-        onPress={props.on_prev}
-      />
-      <AppButton
-        key="next"
-        controlId="GameNext"
-        variant={AppButtonVariant::Chrome}
-        size={AppButtonSize::Sm}
-        targetFeedback={true}
-        label="Next"
-        onPress={props.on_next}
-      />
-    </ActionRow>
     <AppButton
       key="join"
       controlId="JoinGame"
@@ -1759,8 +1737,6 @@ struct LobbyScreenProps {
   gp.sel_detail = sel_detail;
   gp.can_join = sel_joinable;
   gp.can_spectate = sel_spectatable;
-  gp.on_prev = [sel]() { if (*sel > 0) (*sel)--; };
-  gp.on_next = [sel, game_count]() { if (*sel < game_count - 1) (*sel)++; };
   gp.on_join = [join = games.join_game, sel_id]() {
     if (join) join(sel_id, std::string());
   };
