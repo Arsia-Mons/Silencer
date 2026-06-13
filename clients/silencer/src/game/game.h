@@ -53,6 +53,9 @@ Renderer & GetRenderer() { return renderer; }
 // retained UI tree and inject automation input (SIL-18) without a friend grant;
 // gameplay code drives navigation through the session-phase reconciler.
 GameUiPipeline & GetUiPipeline() { return gameUiPipeline; }
+// Public so the control socket can drive the self-updater into a static phase
+// (show_update_screen test op, SIL-212) without a friend grant.
+Updater & GetUpdater() { return updater; }
 bool ResizeRenderSurface(int width, int height);
 bool ResizeRenderSurfacePixels(int width, int height);
 bool SyncRenderSurfaceToWindowPixels();

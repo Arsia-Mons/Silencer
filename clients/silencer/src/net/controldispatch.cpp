@@ -333,6 +333,25 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 		cmd.reply->set_value(OkResult(cmd.id, nlohmann::json::object()));
 		return;
 	}
+	if(cmd.op == "show_update_screen"){
+		// Test-only: drive the game into UPDATING and force the updater into the
+		// requested static phase so the update modal (+ Cancel) renders headlessly.
+		// Mirrors show_message_modal/show_password_modal. Default phase: prompting.
+		std::string phase = cmd.args.value("phase", std::string("prompting"));
+		Updater::State s;
+		if(phase == "downloading") s = Updater::DOWNLOADING;
+		else if(phase == "failed") s = Updater::FAILED;
+		else if(phase == "prompting") s = Updater::PROMPTING;
+		else{
+			cmd.reply->set_value(Err(cmd.id, "BAD_ARG",
+				"phase must be one of: prompting, downloading, failed"));
+			return;
+		}
+		game.GetUpdater().ForceState(s);
+		game.GoToState(GameState::UPDATING);
+		cmd.reply->set_value(OkResult(cmd.id, nlohmann::json::object()));
+		return;
+	}
 	if(cmd.op == "ui_gallery"){
 		if(!game.GetUiPipeline().TryClientUi()){
 			cmd.reply->set_value(Err(cmd.id, "WRONG_STATE",

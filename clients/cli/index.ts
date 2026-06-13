@@ -29,6 +29,7 @@ function usage(): never {
       `       silencer-cli key --key enter|escape|up|down|left|right|tab|shift-tab|shift+tab|backspace|<char>\n` +
       `       silencer-cli show_password_modal [--title TEXT]\n` +
       `       silencer-cli show_message_modal --title TEXT --message TEXT\n` +
+      `       silencer-cli show_update_screen [--phase prompting|downloading|failed]\n` +
       `       silencer-cli password_modal_result\n` +
       `       silencer-cli back\n` +
       `       silencer-cli screenshot [--out /path/x.png]\n` +
@@ -143,6 +144,7 @@ const STRING_FLAGS_NO_SUBOP: Record<string, Set<string>> = {
   key: new Set(["key"]),
   show_password_modal: new Set(["title"]),
   show_message_modal: new Set(["title", "message"]),
+  show_update_screen: new Set(["phase"]),
 };
 // Bindings within VARIADIC_FLAGS that accept comma-separated chord syntax:
 // `--bindings KEY:Up,KEY:Left` becomes JSON `[["KEY:Up","KEY:Left"]]` (an

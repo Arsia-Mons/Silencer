@@ -4,7 +4,6 @@
 #include "client/ui/components/layout/layout.h"
 #include "client/ui/components/text/text.h"
 #include "client/ui/components/tokens.h"
-#include "client/ui/hooks/use_chrome.h"
 #include "client/ui/hooks/use_updater.h"
 #include "ui/components/box.h"
 #include "ui/runtime/react.h"
@@ -41,14 +40,15 @@ const char *phase_label(UpdaterPhase phase) {
   return i < std::size(kPhaseLabels) ? kPhaseLabels[i] : "";
 }
 
-// SIL-99: origin/main update screen — a bank-40 idx4 dialog sprite over the
-// prior screen (CenteredOverlay, no opaque menu), ONE Large-faced status line
-// per phase, an ASCII progress bar only while downloading, and a row of
-// state-gated chrome buttons. Conditional children use the fixed-slot
-// ternary-to-empty() idiom (UiChildren is non-owning — never a std::vector).
+// SIL-212: our own (non-golden) update modal — a clean themed column card that
+// CONTAINS its children at every window size. CenteredOverlay over the prior
+// screen, ONE status line per phase, an ASCII progress bar only while
+// downloading, and a row of state-gated chrome buttons. The panel is
+// content-driven (min/max width, auto height) so nothing clips. Conditional
+// children use the fixed-slot ternary-to-empty() idiom (UiChildren is
+// non-owning — never a std::vector).
 ::ui::UiElement UpdateScreenView(const UpdateScreenProps &) {
   UpdaterModel updater = use_updater();
-  ChromeTextures chrome = use_chrome();
   const UpdaterPhase phase = updater.phase;
   const int pct = static_cast<int>(updater.progress * 100.0f);
 
@@ -110,12 +110,11 @@ const char *phase_label(UpdaterPhase phase) {
           ? chrome_button("UpdateCancel", "Cancel", updater.cancel)
           : ::ui::empty();
 
-  const float w = chrome.dialog_msg_w ? (float)chrome.dialog_msg_w : 352.0f;
-  const float h = chrome.dialog_msg_h ? (float)chrome.dialog_msg_h : 178.0f;
+  // Themed panel (predictable containment) sized by content: a comfortable
+  // min/max width band and auto height so the status line + optional progress
+  // bar + button row always sit inside the surface with padding.
   ::ui::StylePatch panel_style =
-      chrome.dialog_msg ? tokens::image_patch(chrome.dialog_msg)
-                        : tokens::panel_patch(tokens::kSurfacePanel,
-                                              tokens::kBorderPanel);
+      tokens::panel_patch(tokens::kSurfacePanel, tokens::kBorderPanel);
 
   return <ScreenLayout key="root" variant={ScreenLayoutVariant::CenteredOverlay}>
     <Box
@@ -124,10 +123,10 @@ const char *phase_label(UpdaterPhase phase) {
         .direction = ::ui::FlexDirection::Column,
         .align_items = ::ui::AlignItems::Center,
         .justify_content = ::ui::JustifyContent::Center,
-        .width = ::ui::Length::points(w),
-        .height = ::ui::Length::points(h),
-        .padding = {34.0f, 34.0f, 42.0f, 42.0f},
-        .gap = 12.0f}}
+        .min_width = ::ui::Length::points(320.0f),
+        .max_width = ::ui::Length::points(420.0f),
+        .padding = {32.0f, 32.0f, 28.0f, 28.0f},
+        .gap = 18.0f}}
       style={panel_style}
     >
       <ScreenSubtitle key="status" value={status} />

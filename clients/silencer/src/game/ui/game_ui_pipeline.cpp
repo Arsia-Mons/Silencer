@@ -1115,7 +1115,13 @@ updater.retry_count = game.updater.GetRetryCount();
 updater.download_url = game.updater.GetDownloadURL();
 updater.can_retry = (game.updater.GetState() == ::Updater::FAILED);
 updater.consent = [this]{ game.updater.Consent(); };
-updater.cancel = [this]{ game.updater.Cancel(); };
+updater.cancel = [this]{
+// Cancel both aborts the in-flight download AND dismisses the update flow:
+// Updater::Cancel only flips the worker's cancel flag, so without the state
+// transition the game stays in UPDATING and the modal never unmounts.
+game.updater.Cancel();
+game.GoToState(GameState::MAINMENU);
+};
 updater.retry = [this]{ game.updater.Retry(); };
 updater.open_download_page = [this]{
 SDL_OpenURL(game.updater.GetDownloadURL().c_str());
