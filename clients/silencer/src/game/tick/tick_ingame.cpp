@@ -72,6 +72,18 @@ if(/*!world.map.loaded && */stateisnew){
 	renderer.palette.SetParallaxColors(world.map.parallax);
 	GetScreenBuffer().Clear(0);
 	gameRenderer.SetColors(renderer.palette.GetColors());
+	// SIL-236: the game loop's ambience-palette refresh (game_loop.cpp ~302)
+	// runs only on an ambience-level change or inside the fade-in window
+	// (FadePhase <= 15). Under the clock-based fade, the slow LoadMap above blows
+	// past that window before the block first runs, so on a non-first game (the
+	// cached oldambiencelevel already equals this map's) it is skipped on entry
+	// and the world keeps the un-ambience'd base palette — too bright, black sky,
+	// invisible weather — until a base round-trip finally changes the ambience.
+	// Init the lighted palette and invalidate the cached level so the loop
+	// applies the ambience palette once the fade settles.
+	Uint8 ambiencelevel = renderer.GetAmbienceLevel();
+	renderer.palette.CalculateLighted(ambiencelevel);
+	gameSession.AmbienceMixerRef().oldambiencelevel = ambiencelevel ^ 0xFF;
 	gameSession.AmbienceMixerRef().LoadRandomGameMusic();
 	// Activate the game mode specified by the lobby config.
 	delete world.gameMode;
