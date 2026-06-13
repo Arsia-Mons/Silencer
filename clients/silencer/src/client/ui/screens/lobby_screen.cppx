@@ -1444,7 +1444,8 @@ std::vector<::ui::UiElement> map_list_rows(const std::vector<std::string> &maps,
 // showing the hovered map's baked 172x62 minimap at ~2x. Absolutely positioned
 // at the screen root so it floats over the lobby. Returns empty when nothing is
 // hovered or the texture isn't baked.
-::ui::UiElement MapPreviewOverlay(uint32_t texture, float pointer_x,
+::ui::UiElement MapPreviewOverlay(uint32_t texture, const char *name,
+                                  const char *description, float pointer_x,
                                   float pointer_y, float origin_x,
                                   float origin_y) {
   if (!texture)
@@ -1453,8 +1454,13 @@ std::vector<::ui::UiElement> map_list_rows(const std::vector<std::string> &maps,
   constexpr float kPreviewW = 172.0f * 2.0f;
   constexpr float kPreviewH = 62.0f * 2.0f;
   constexpr float kPad = 4.0f;
+  // SIL-231: origin's preview captioned the minimap with the map name +
+  // description. Reserve a text band under the image (name line + ~2 desc lines).
+  const bool has_name = name && name[0];
+  const bool has_desc = description && description[0];
+  const float kTextH = (has_name || has_desc) ? 44.0f : 0.0f;
   constexpr float kCardW = kPreviewW + kPad * 2.0f;
-  constexpr float kCardH = kPreviewH + kPad * 2.0f;
+  const float kCardH = kPreviewH + kPad * 2.0f + kTextH;
   // The pointer is in full-canvas logical space; the overlay's absolute inset is
   // measured from the ScreenLayout root's content box (after its pad). Subtract
   // the root pad (origin_x/origin_y) so the card tracks the true cursor.
@@ -1478,23 +1484,44 @@ std::vector<::ui::UiElement> map_list_rows(const std::vector<std::string> &maps,
                                   {1.34f, 1.34f, 1.34f, 1.34f},
                                   {tokens::kChromeStroke, tokens::kChromeStroke,
                                    tokens::kChromeStroke, tokens::kChromeStroke}});
+  std::vector<::ui::UiElement> kids;
+  kids.push_back(Box(BoxProps{
+      .key = "img",
+      .layout = ::ui::LayoutStyle{
+          .width = ::ui::Length::points(kPreviewW),
+          .height = ::ui::Length::points(kPreviewH),
+          .flex_shrink = ::ui::StyleFloat::points(0.0f)},
+      .style = tokens::image_patch(texture)}));
+  if (has_name)
+    kids.push_back(BodyText(BodyTextProps{.key = "name",
+                                          .variant = BodyTextVariant::Strong,
+                                          .value = ::ui::copy_string(name)}));
+  if (has_desc)
+    kids.push_back(Box(BoxProps{
+        .key = "desc",
+        .layout = ::ui::LayoutStyle{.width = ::ui::Length::percent(100.0f)},
+        .children = ::ui::children({Text(TextProps{
+            .key = "t",
+            .value = ::ui::copy_string(description),
+            .layout = ::ui::LayoutStyle{.width = ::ui::Length::percent(100.0f)},
+            .style = tokens::text_patch(tokens::kTextWeaponDetail,
+                                        tokens::kFontBodyEm, tokens::kFaceBody,
+                                        tokens::kLineBody)})})}));
   return <Box
     key="map-preview"
     layout={::ui::LayoutStyle{
       .position = ::ui::PositionType::Absolute,
+      .overflow = ::ui::Overflow::Hidden,
+      .direction = ::ui::FlexDirection::Column,
+      .align_items = ::ui::AlignItems::Stretch,
       .width = ::ui::Length::points(kCardW),
       .height = ::ui::Length::points(kCardH),
       .padding = {kPad, kPad, kPad, kPad},
-      .position_inset = ::ui::EdgeSizes{left, {}, top, {}}}}
+      .position_inset = ::ui::EdgeSizes{left, {}, top, {}},
+      .gap = 2.0f}}
     style={card}
   >
-    <Box
-      key="img"
-      layout={::ui::LayoutStyle{
-        .width = ::ui::Length::points(kPreviewW),
-        .height = ::ui::Length::points(kPreviewH)}}
-      style={tokens::image_patch(texture)}
-    />
+    {::ui::children(kids)}
   </Box>
 }
 
@@ -1837,11 +1864,16 @@ struct LobbyScreenProps {
   // live pointer (logical canvas space) so the card tracks the cursor.
   ::ui::UiElement map_preview = ::ui::empty();
   if (*show_create && *hovered_map >= 0 && *hovered_map < map_count) {
-    uint32_t tex = map_previews.texture_for(games.bundled_maps[*hovered_map]);
-    if (tex && pipeline_frame)
-      map_preview = MapPreviewOverlay(tex, pipeline_frame->pointer.x,
+    const std::string &mf = games.bundled_maps[*hovered_map];
+    uint32_t tex = map_previews.texture_for(mf);
+    if (tex && pipeline_frame) {
+      const std::string mn = map_previews.name_for(mf);
+      const std::string md = map_previews.description_for(mf);
+      map_preview = MapPreviewOverlay(tex, mn.c_str(), md.c_str(),
+                                      pipeline_frame->pointer.x,
                                       pipeline_frame->pointer.y, panes.pad_x,
                                       panes.pad_top);
+    }
   } else if (!*show_create && *hovered_map != -1) {
     *hovered_map = -1; // leaving create mode clears the hover
   }

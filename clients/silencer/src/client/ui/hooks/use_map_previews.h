@@ -22,10 +22,22 @@ struct MapPreviews {
   static constexpr int kHeight = 62;
 
   std::unordered_map<std::string, uint32_t> by_filename = {};
+  // SIL-231: the hovered map's name + description (from the map header) so the
+  // cursor-following preview card shows them under the minimap, like origin.
+  std::unordered_map<std::string, std::string> name_by_filename = {};
+  std::unordered_map<std::string, std::string> desc_by_filename = {};
 
   uint32_t texture_for(const std::string &filename) const {
     auto it = by_filename.find(filename);
     return it == by_filename.end() ? 0 : it->second;
+  }
+  std::string name_for(const std::string &filename) const {
+    auto it = name_by_filename.find(filename);
+    return it == name_by_filename.end() ? std::string() : it->second;
+  }
+  std::string description_for(const std::string &filename) const {
+    auto it = desc_by_filename.find(filename);
+    return it == desc_by_filename.end() ? std::string() : it->second;
   }
 };
 

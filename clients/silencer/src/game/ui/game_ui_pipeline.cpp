@@ -962,7 +962,14 @@ if(!Map::UncompressMinimap(&pixels, header.minimapcompressed,
                            header.minimapcompressedsize))
 continue;
 uint32_t id = cppxHost->bake_chrome_sprite(pixels, w, h, palette);
-if(id) cppxMapPreviews_.by_filename[label] = id;
+if(id){
+cppxMapPreviews_.by_filename[label] = id;
+// SIL-231: carry the map name (filename) + header description to the preview.
+cppxMapPreviews_.name_by_filename[label] = label;
+size_t dlen = 0;
+while(dlen < sizeof(header.description) && header.description[dlen]) ++dlen;
+cppxMapPreviews_.desc_by_filename[label] = std::string(header.description, dlen);
+}
 }
 CDDataDir();
 }
