@@ -1342,6 +1342,39 @@ struct LobbyChatPanelProps {
   </Box>
 }
 
+// Themed hover/selected/focus styling for a selectable list row in the
+// green-phosphor lobby aesthetic. Token-driven, reusable: selected rows get a
+// translucent accent selection wash; hover/focus add a subtler wash (stronger
+// when already selected) so a hovered row reads distinctly from the selected
+// row, and keyboard focus also paints an accent border for arrow-key nav.
+::ui::StyleStatePatch selectable_row_style(bool selected) {
+  auto wash = [](uint8_t alpha) {
+    return ::ui::patch()
+        .background(::ui::Color{tokens::kAccent.r, tokens::kAccent.g,
+                                tokens::kAccent.b, alpha})
+        .corner_radius(2.0f);
+  };
+  auto edge = [](::ui::Color c) {
+    return ::ui::Border{{1.0f, 1.0f, 1.0f, 1.0f}, {c, c, c, c}};
+  };
+  // A translucent wash alone is lost against the busy lobby scene, so each
+  // active state also carries an accent outline (the border is what actually
+  // reads). Hierarchy: hover = dim outline; selected = brighter persistent
+  // outline (kept even when unfocused); focus = full-bright nav ring.
+  const ::ui::Color hov_edge{tokens::kAccent.r, tokens::kAccent.g,
+                             tokens::kAccent.b, 120};
+  const ::ui::Color sel_edge{tokens::kAccent.r, tokens::kAccent.g,
+                             tokens::kAccent.b, 190};
+  ::ui::StyleStatePatch s{};
+  s.base = selected ? wash(64).border(edge(sel_edge))
+                    : tokens::chromeless_clear_patch();
+  s.hover = selected ? wash(96).border(edge(sel_edge))
+                     : wash(56).border(edge(hov_edge));
+  s.pressed = wash(112).border(edge(sel_edge));
+  s.focus_visible = wash(selected ? 96 : 76).border(edge(tokens::kAccentBorder));
+  return s;
+}
+
 // Select-Map filename rows (create-game mode), capped at what the cell shows
 // without scrolling (golden lists ~13). origin kMapListLineH = 14 virtual px
 // -> 21 logical row slots; rows inset text 4 virtual (6) with a 2 top bias so
@@ -1365,6 +1398,7 @@ std::vector<::ui::UiElement> map_list_rows(const std::vector<std::string> &maps,
         .layout = ::ui::LayoutStyle{.height = ::ui::Length::points(21.0f),
                                     .flex_shrink = ::ui::StyleFloat::points(0.0f),
                                     .padding = {6.0f, 0.0f, 2.0f, 0.0f}},
+        .style = selectable_row_style(i == *map_index),
         .children = ::ui::children({BodyText(BodyTextProps{
             .key = "t",
             .variant = i == *map_index ? BodyTextVariant::Strong
