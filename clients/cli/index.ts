@@ -22,6 +22,8 @@ function usage(): never {
       `       silencer-cli resize --w 1280 --h 720\n` +
       `       silencer-cli click --label "OPTIONS"\n` +
       `       silencer-cli click_at --x 320 --y 240\n` +
+      `       silencer-cli pointer_down --label "Connect To Lobby"   (hold press; or --x N --y N)\n` +
+      `       silencer-cli pointer_up\n` +
       `       silencer-cli set_text --label TEXT_ID --text "hi"\n` +
       `       silencer-cli set_text --uid 1 --text "alice"   (textbox or textinput)\n` +
       `       silencer-cli select --label LISTBOX --index 0\n` +
@@ -139,6 +141,7 @@ const STRING_FLAGS_NO_SUBOP: Record<string, Set<string>> = {
   set_text: new Set(["label", "text"]),
   select: new Set(["label"]),
   scroll: new Set(["label"]),
+  pointer_down: new Set(["label"]),
   // `key` values like "enter"/"escape" are names, and single-digit keys ("1")
   // must stay strings so the C++ handler reads them as typed characters.
   key: new Set(["key"]),

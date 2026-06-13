@@ -526,6 +526,49 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 		cmd.reply->set_value(OkResult(cmd.id, nlohmann::json::object()));
 		return;
 	}
+	if(cmd.op == "pointer_down"){
+		// SIL-223 test affordance: hold the pointer DOWN at (x,y) across frames so
+		// the PRESSED interaction state (theme.pressed) can be screenshotted. Held
+		// until pointer_up. Accepts a --label (centers on that node) or --x/--y.
+		client::ui::ClientUi * ui = game.GetUiPipeline().TryClientUi();
+		if(!ui){
+			cmd.reply->set_value(Err(cmd.id, "WRONG_STATE",
+				"cppx UI has not rendered a frame yet"));
+			return;
+		}
+		std::string label = cmd.args.value("label", std::string());
+		float x = cmd.args.value("x", -1.0f);
+		float y = cmd.args.value("y", -1.0f);
+		if(!label.empty()){
+			const ::ui::UiTree & tree = ui->retained_tree();
+			::ui::NodeSnapshot s = {};
+			::ui::NodeId node = FindUiNode(tree, tree.root_id(), label, true, &s);
+			if(!node){
+				cmd.reply->set_value(Err(cmd.id, "NOT_FOUND", "no focusable widget: " + label));
+				return;
+			}
+			x = s.layout.x + s.layout.width * 0.5f;
+			y = s.layout.y + s.layout.height * 0.5f;
+		}
+		if(x < 0.0f || y < 0.0f){
+			cmd.reply->set_value(Err(cmd.id, "BAD_ARGS", "pointer_down requires --label or --x --y"));
+			return;
+		}
+		game.GetUiPipeline().InjectPointerPress(x, y);
+		cmd.reply->set_value(OkResult(cmd.id, nlohmann::json::object()));
+		return;
+	}
+	if(cmd.op == "pointer_up"){
+		// SIL-223 test affordance: release a held pointer_down.
+		if(!game.GetUiPipeline().TryClientUi()){
+			cmd.reply->set_value(Err(cmd.id, "WRONG_STATE",
+				"cppx UI has not rendered a frame yet"));
+			return;
+		}
+		game.GetUiPipeline().InjectPointerRelease();
+		cmd.reply->set_value(OkResult(cmd.id, nlohmann::json::object()));
+		return;
+	}
 	if(cmd.op == "scroll"){
 		// SIL-111: inject a scroll-wheel delta. Optionally park the pointer at
 		// (x,y) first so the runtime routes the wheel to that scrollable (wheel

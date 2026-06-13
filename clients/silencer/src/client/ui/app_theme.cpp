@@ -52,7 +52,11 @@ constexpr Color kHoverBottom = {10, 24, 12, 255};
 constexpr Color kHoverBorder = {92, 208, 92, 255};   // #5CD05C
 constexpr Color kPressedTop = {4, 12, 6, 255};
 constexpr Color kPressedBottom = {4, 12, 6, 255};
-constexpr Color kPressedBorder = {60, 255, 60, 255}; // #3CFF3C bright
+// SIL-223: pressed reads as "pushed in" (darker fill above) with a RESTRAINED
+// border, NOT a max-bright outline. The old #3CFF3C jumped the 1px edge to the
+// brightest green on mouse-down — a jarring bright-green rectangle. Sit it a
+// step below the dim base border (#2E7D45) so the press feels recessed, not lit.
+constexpr Color kPressedBorder = {37, 107, 60, 255}; // #256B3C green, recessed
 
 constexpr Color kDisabledTop = {6, 14, 8, 255};
 constexpr Color kDisabledBottom = {6, 14, 8, 255};

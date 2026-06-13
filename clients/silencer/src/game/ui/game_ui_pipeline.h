@@ -60,6 +60,13 @@ void InjectPointerClick(float x, float y);
 // position persists across frames until moved again; click injection is still a
 // one-frame edge and does not disturb it.
 void InjectPointerMove(float x, float y);
+// SIL-223: hold the pointer DOWN at a UI-space point across frames (press edge
+// on the first frame, then a sustained `pointer_down`) so the held PRESSED
+// interaction state can be screenshotted. Released by InjectPointerRelease.
+// Test affordance only (control socket); no real mouse exists headless.
+void InjectPointerPress(float x, float y);
+// SIL-223: release a held pointer press, emitting the release edge next frame.
+void InjectPointerRelease();
 // The live retained UI tree owner, or null before the first cppx frame. The
 // control socket reads it for introspection (read-only tree + focus snapshots,
 // no friend/handle leak).
@@ -192,6 +199,12 @@ float injectedPointerY_ = 0.0f;
 bool hasInjectedHover_ = false;
 float injectedHoverX_ = 0.0f;
 float injectedHoverY_ = 0.0f;
+// SIL-223 held-press automation: a sticky pointer-down at (x,y) that persists
+// across frames (press edge first frame, sustained down after) until released.
+bool injectedPressHeld_ = false;
+bool injectedPressIsNew_ = false;
+float injectedPressX_ = 0.0f;
+float injectedPressY_ = 0.0f;
 bool prevPointerDown_ = false;
 bool textInputActive_ = false;
 PasswordModalResult passwordModal_ = {};

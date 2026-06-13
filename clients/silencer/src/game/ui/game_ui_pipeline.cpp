@@ -1621,7 +1621,29 @@ frame.layout = {cppxLogicalW, cppxLogicalH};
 frame.input = uiInput_;
 float mx = -1000.0f;
 float my = -1000.0f;
-if(injectedPointer_){
+if(injectedPressHeld_){
+// SIL-223: sustained held press. Press edge on the first frame only, then a
+// continuous pointer_down so the PRESSED interaction state persists for a
+// screenshot. Released by InjectPointerRelease (emits the release edge below).
+mx = injectedPressX_;
+my = injectedPressY_;
+frame.input.pointer_pressed = injectedPressIsNew_;
+frame.input.pointer_down = true;
+frame.input.pointer_released = false;
+frame.input.source = ::ui::UiFocusSource::Mouse;
+prevPointerDown_ = true;
+injectedPressIsNew_ = false;
+}else if(!win && prevPointerDown_){
+// SIL-223: the frame after a held-press release (headless, no real mouse).
+// Emit the release edge at the last press point so the node deactivates
+// cleanly, then settle to idle.
+mx = injectedPressX_;
+my = injectedPressY_;
+frame.input.pointer_released = true;
+frame.input.pointer_down = false;
+frame.input.source = ::ui::UiFocusSource::Mouse;
+prevPointerDown_ = false;
+}else if(injectedPointer_){
 mx = injectedPointerX_;
 my = injectedPointerY_;
 frame.input.pointer_pressed = true;
@@ -1756,6 +1778,19 @@ void GameUiPipeline::InjectPointerMove(float x, float y) {
 hasInjectedHover_ = true;
 injectedHoverX_ = x;
 injectedHoverY_ = y;
+}
+
+void GameUiPipeline::InjectPointerPress(float x, float y) {
+injectedPressHeld_ = true;
+injectedPressIsNew_ = true;
+injectedPressX_ = x;
+injectedPressY_ = y;
+}
+
+void GameUiPipeline::InjectPointerRelease() {
+injectedPressHeld_ = false;
+injectedPressIsNew_ = false;
+// prevPointerDown_ stays true so the next frame emits the release edge.
 }
 
 client::ui::ClientUi * GameUiPipeline::TryClientUi() {
