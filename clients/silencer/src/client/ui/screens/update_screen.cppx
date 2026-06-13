@@ -4,6 +4,7 @@
 #include "client/ui/components/layout/layout.h"
 #include "client/ui/components/text/text.h"
 #include "client/ui/components/tokens.h"
+#include "client/ui/hooks/use_chrome.h"
 #include "client/ui/hooks/use_updater.h"
 #include "ui/components/box.h"
 #include "ui/runtime/react.h"
@@ -40,17 +41,20 @@ const char *phase_label(UpdaterPhase phase) {
   return i < std::size(kPhaseLabels) ? kPhaseLabels[i] : "";
 }
 
-// SIL-212: our own (non-golden) update modal — a clean themed column card that
-// CONTAINS its children at every window size. CenteredOverlay over the prior
-// screen, ONE status line per phase, an ASCII progress bar only while
-// downloading, and a row of state-gated chrome buttons. The panel is
-// content-driven (min/max width, auto height) so nothing clips. Conditional
+// SIL-227: match the sibling message/password modals — the bank-40 idx4 dialog
+// sprite (not a bespoke slate card) at its fixed 352x178, framing ONE status
+// line per phase, an ASCII progress bar only while downloading, and a row of
+// state-gated chrome buttons. CenteredOverlay over the prior screen. Conditional
 // children use the fixed-slot ternary-to-empty() idiom (UiChildren is
 // non-owning — never a std::vector).
+constexpr float kUpdateDialogW = 352.0f;
+constexpr float kUpdateDialogH = 178.0f;
+constexpr float kUpdateDialogPad = 34.0f;
 ::ui::UiElement UpdateScreenView(const UpdateScreenProps &) {
   UpdaterModel updater = use_updater();
   const UpdaterPhase phase = updater.phase;
   const int pct = static_cast<int>(updater.progress * 100.0f);
+  ChromeTextures chrome = use_chrome();
 
   // ONE status string (carries the Failed error + Downloading percent).
   std::string status_str;
@@ -110,11 +114,14 @@ const char *phase_label(UpdaterPhase phase) {
           ? chrome_button("UpdateCancel", "Cancel", updater.cancel)
           : ::ui::empty();
 
-  // Themed panel (predictable containment) sized by content: a comfortable
-  // min/max width band and auto height so the status line + optional progress
-  // bar + button row always sit inside the surface with padding.
+  // Sibling-modal treatment: the baked dialog sprite when available, falling
+  // back to the themed panel before the sprite bakes. Fixed to the sprite's
+  // 352x178 so the frame is undistorted; the status + optional progress bar +
+  // button row sit inside its safe area.
   ::ui::StylePatch panel_style =
-      tokens::panel_patch(tokens::kSurfacePanel, tokens::kBorderPanel);
+      chrome.dialog_msg ? tokens::image_patch_cover(chrome.dialog_msg)
+                        : tokens::panel_patch(tokens::kSurfacePanel,
+                                              tokens::kBorderPanel);
 
   return <ScreenLayout key="root" variant={ScreenLayoutVariant::CenteredOverlay}>
     <Box
@@ -123,10 +130,11 @@ const char *phase_label(UpdaterPhase phase) {
         .direction = ::ui::FlexDirection::Column,
         .align_items = ::ui::AlignItems::Center,
         .justify_content = ::ui::JustifyContent::Center,
-        .min_width = ::ui::Length::points(320.0f),
-        .max_width = ::ui::Length::points(420.0f),
-        .padding = {32.0f, 32.0f, 28.0f, 28.0f},
-        .gap = 18.0f}}
+        .width = ::ui::Length::points(kUpdateDialogW),
+        .height = ::ui::Length::points(kUpdateDialogH),
+        .padding = {kUpdateDialogPad, kUpdateDialogPad, kUpdateDialogPad,
+                    kUpdateDialogPad},
+        .gap = 12.0f}}
       style={panel_style}
     >
       <ScreenSubtitle key="status" value={status} />
