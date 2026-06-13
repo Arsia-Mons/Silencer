@@ -24,6 +24,12 @@ constexpr int kVisibleLogLines = 15;
 // Keep the joined connect log within the per-call-site text scratch the screen
 // renders it through (REACT_TEXT_STORAGE_CAP), preferring the recent tail.
 constexpr size_t kStatusLogCap = 180;
+// The lobby chat transcript wraps to multiple rows, so a single 180-byte tail
+// would discard most of the visible scrollback (and clip a long message). The
+// screen copies it through the per-frame string arena (copy_string), not the
+// 192-byte text scratch, so this larger tail renders in full. Bounded (one
+// well's worth of wrapped text), not unbounded.
+constexpr size_t kLobbyChatLogCap = 900;
 
 // Agency display names, indexed by Team::{NOXIS..BLACKROSE} / Character::agencyIdx.
 const char *const kAgency[5] = {"Noxis", "Lazarus", "Caliber", "Static",
@@ -400,8 +406,8 @@ client::ui::LobbySnapshot CaptureLobbySnapshot(Game &game,
         snap.lobby_chat += "\n";
       snap.lobby_chat += chat[(size_t)i];
     }
-    if (snap.lobby_chat.size() > kStatusLogCap)
-      snap.lobby_chat.erase(0, snap.lobby_chat.size() - kStatusLogCap);
+    if (snap.lobby_chat.size() > kLobbyChatLogCap)
+      snap.lobby_chat.erase(0, snap.lobby_chat.size() - kLobbyChatLogCap);
   }
 
   // The connect log lives on the game-owned flow (single-thread), not the lobby,

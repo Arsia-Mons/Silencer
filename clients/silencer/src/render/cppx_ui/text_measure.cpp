@@ -107,27 +107,35 @@ bool push_line(::ui::TextMetricsResult &out, uint32_t slice_off,
   return true;
 }
 
-::ui::TextMetricsResult measure_wrapped(const RunMetrics &m,
-                                        const ::ui::TextMetricsQuery &q,
-                                        float line_h, float box_w) {
-  ::ui::TextMetricsResult out = {};
-  const char *s = q.utf8;
-  const uint32_t n = q.len;
-  uint32_t line_start = 0;
-  float y = 0.0f;
-
-  uint32_t i = 0;
-  while (line_start < n) {
+// Word-wrap a SINGLE paragraph (no embedded '\n') of s[start, end) at box_w,
+// pushing each wrapped line into `out` at vertical pen `y`. Returns false (and
+// sets out.overflowed) if the line cap is hit. An empty paragraph emits one
+// empty line so blank lines (a bare '\n') keep their vertical slot.
+bool wrap_paragraph(::ui::TextMetricsResult &out, const RunMetrics &m,
+                    const ::ui::TextMetricsQuery &q, float line_h, float box_w,
+                    const char *s, uint32_t start, uint32_t end, float &y) {
+  uint32_t line_start = start;
+  if (line_start >= end) {
+    if (!push_line(out, line_start, 0, aligned_x(q.align, 0.0f, box_w), y, 0.0f,
+                   line_h)) {
+      out.overflowed = true;
+      return false;
+    }
+    y += line_h;
+    return true;
+  }
+  uint32_t guard = 0;
+  while (line_start < end) {
     uint32_t last_fit_end = line_start;
     uint32_t scan = line_start;
-    uint32_t next_line_start = n;
+    uint32_t next_line_start = end;
     bool placed = false;
-    while (scan <= n) {
+    while (scan <= end) {
       uint32_t word_start = scan;
-      while (word_start < n && s[word_start] == ' ')
+      while (word_start < end && s[word_start] == ' ')
         ++word_start;
       uint32_t word_end = word_start;
-      while (word_end < n && s[word_end] != ' ')
+      while (word_end < end && s[word_end] != ' ')
         ++word_end;
       if (word_end == word_start) {
         break;
@@ -137,18 +145,18 @@ bool push_line(::ui::TextMetricsResult &out, uint32_t slice_off,
         last_fit_end = word_end;
         placed = true;
         scan = word_end;
-        if (word_end >= n) {
-          next_line_start = n;
+        if (word_end >= end) {
+          next_line_start = end;
           break;
         }
       } else {
         next_line_start = last_fit_end;
-        while (next_line_start < n && s[next_line_start] == ' ')
+        while (next_line_start < end && s[next_line_start] == ' ')
           ++next_line_start;
         break;
       }
-      if (scan >= n) {
-        next_line_start = n;
+      if (scan >= end) {
+        next_line_start = end;
         break;
       }
     }
@@ -160,13 +168,36 @@ bool push_line(::ui::TextMetricsResult &out, uint32_t slice_off,
     float x = aligned_x(q.align, line_w, box_w);
     if (!push_line(out, line_start, slice_len, x, y, line_w, line_h)) {
       out.overflowed = true;
-      break;
+      return false;
     }
     y += line_h;
     line_start = next_line_start;
-    ++i;
-    if (i > n)
+    if (++guard > end - start)
       break;
+  }
+  return true;
+}
+
+::ui::TextMetricsResult measure_wrapped(const RunMetrics &m,
+                                        const ::ui::TextMetricsQuery &q,
+                                        float line_h, float box_w) {
+  // Honor explicit '\n' as a HARD line break, then soft-wrap each paragraph by
+  // width. The transcript (and any newline-joined text) thus renders one source
+  // line per row; a bare '\n' keeps an empty row.
+  ::ui::TextMetricsResult out = {};
+  const char *s = q.utf8;
+  const uint32_t n = q.len;
+  float y = 0.0f;
+  uint32_t para_start = 0;
+  while (para_start <= n) {
+    uint32_t para_end = para_start;
+    while (para_end < n && s[para_end] != '\n')
+      ++para_end;
+    if (!wrap_paragraph(out, m, q, line_h, box_w, s, para_start, para_end, y))
+      break;
+    if (para_end >= n)
+      break;
+    para_start = para_end + 1; // skip the '\n'
   }
   out.height = static_cast<float>(out.line_count) * line_h;
   return out;

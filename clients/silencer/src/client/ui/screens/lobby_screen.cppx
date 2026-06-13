@@ -1260,6 +1260,25 @@ struct LobbyChatComposeProps {
   />
 }
 
+// The chat transcript: a single multi-line Text in the Message face. Unlike the
+// single-line BodyText, it WRAPS long messages within the log column and honors
+// the '\n' the model joins messages with (one message per row). Width is pinned
+// to the column (percent 100% inside logcol, which has flex_grow + min_width 0)
+// so wrapped lines never overlap the presence column; logcol's overflow Hidden
+// clips it to the well.
+::ui::UiElement chat_transcript(const char *scrollback) {
+  ::ui::StylePatch st =
+      tokens::text_patch(tokens::kTextBodyMuted, tokens::kFontBodyEm,
+                         tokens::kFaceBody, tokens::kLineBody);
+  st.text.value.wrap = ::ui::TextWrap::Words;
+  return <Text
+    key="log"
+    value={scrollback}
+    layout={::ui::LayoutStyle{.width = ::ui::Length::percent(100.0f)}}
+    style={st}
+  />
+}
+
 // The lower-left chat panel: channel title, log well + presence column, and the
 // lobby chat compose field.
 struct LobbyChatPanelProps {
@@ -1304,7 +1323,7 @@ struct LobbyChatPanelProps {
           .flex_basis = ::ui::Length::points(0.0f),
           .min_width = ::ui::Length::points(0.0f)}}
       >
-        <BodyText key="log" variant={BodyTextVariant::Message} value={props.scrollback} />
+        {chat_transcript(props.scrollback)}
       </Box>
       <Box
         key="prescol"
@@ -1533,7 +1552,11 @@ struct LobbyScreenProps {
 
   // Per-call-site text scratch (stable order: computed every frame regardless of
   // the active panel so the hook sequence never shifts).
-  const char *scrollback = use_text_storage("%s", chat.scrollback.c_str());
+  // The chat transcript wraps to multiple rows and can run past the 192-byte
+  // use_text_storage scratch, so copy it through the per-frame string arena
+  // (copy_string is not a hook — it doesn't shift the hook sequence) to render
+  // the full kLobbyChatLogCap tail.
+  const char *scrollback = ::ui::copy_string(chat.scrollback.c_str());
   const char *presence = use_text_storage("%s", chat.presence.c_str());
   const char *sel_detail = use_text_storage(
       "%s", game_count > 0 ? games.entries[*sel].detail.c_str() : "");
