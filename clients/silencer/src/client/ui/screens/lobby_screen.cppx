@@ -1341,36 +1341,23 @@ struct LobbyChatPanelProps {
   </Box>
 }
 
-// Themed hover/selected/focus styling for a selectable list row in the
-// green-phosphor lobby aesthetic. Token-driven, reusable: selected rows get a
-// translucent accent selection wash; hover/focus add a subtler wash (stronger
-// when already selected) so a hovered row reads distinctly from the selected
-// row, and keyboard focus also paints an accent border for arrow-key nav.
+// Selected-row styling for the Select-Map list. origin draws the selected row
+// as a single solid filled rectangle (renderer.cpp SELECTBOX:
+// DrawFilledRectangle(..., 180)) — no border, no rounded corners, and no hover
+// or focus highlight (selecting is mouse-driven; the fill is the only feedback).
+// Matching that: selected = an opaque legacy-palette-180 bar, everything else
+// clear. No outline box (that was the SIL-233 regression).
 ::ui::StyleStatePatch selectable_row_style(bool selected) {
-  auto wash = [](uint8_t alpha) {
-    return ::ui::patch()
-        .background(::ui::Color{tokens::kAccent.r, tokens::kAccent.g,
-                                tokens::kAccent.b, alpha})
-        .corner_radius(2.0f);
-  };
-  auto edge = [](::ui::Color c) {
-    return ::ui::Border{{1.0f, 1.0f, 1.0f, 1.0f}, {c, c, c, c}};
-  };
-  // A translucent wash alone is lost against the busy lobby scene, so each
-  // active state also carries an accent outline (the border is what actually
-  // reads). Hierarchy: hover = dim outline; selected = brighter persistent
-  // outline (kept even when unfocused); focus = full-bright nav ring.
-  const ::ui::Color hov_edge{tokens::kAccent.r, tokens::kAccent.g,
-                             tokens::kAccent.b, 120};
-  const ::ui::Color sel_edge{tokens::kAccent.r, tokens::kAccent.g,
-                             tokens::kAccent.b, 190};
+  // The map rows are focusable for keyboard nav, but origin shows no focus ring
+  // on the list — selection is the only feedback. Both states carry
+  // `chromeless` so the renderer's intrinsic focus-ring injection is suppressed
+  // (draw_command_builder gates it on !chromeless, for any focused node — mouse
+  // or keyboard). The selected row keeps its explicit fill (an explicit
+  // background always draws, even on a chromeless node).
+  const ::ui::StylePatch selected_fill =
+      ::ui::patch().chromeless(true).background(tokens::kRowSelectFill);
   ::ui::StyleStatePatch s{};
-  s.base = selected ? wash(64).border(edge(sel_edge))
-                    : tokens::chromeless_clear_patch();
-  s.hover = selected ? wash(96).border(edge(sel_edge))
-                     : wash(56).border(edge(hov_edge));
-  s.pressed = wash(112).border(edge(sel_edge));
-  s.focus_visible = wash(selected ? 96 : 76).border(edge(tokens::kAccentBorder));
+  s.base = selected ? selected_fill : tokens::chromeless_clear_patch();
   return s;
 }
 
@@ -1408,11 +1395,10 @@ std::vector<::ui::UiElement> map_list_rows(const std::vector<std::string> &maps,
                                     .flex_shrink = ::ui::StyleFloat::points(0.0f),
                                     .padding = {6.0f, 0.0f, 2.0f, 0.0f}},
         .style = selectable_row_style(i == *map_index),
+        // origin draws every row's filename at the same palette-133 weight; the
+        // solid fill bar is the only selection feedback (no bolded text).
         .children = ::ui::children({BodyText(BodyTextProps{
-            .key = "t",
-            .variant = i == *map_index ? BodyTextVariant::Strong
-                                       : BodyTextVariant::Body,
-            .value = mv})})}));
+            .key = "t", .variant = BodyTextVariant::Body, .value = mv})})}));
   }
   return rows;
 }

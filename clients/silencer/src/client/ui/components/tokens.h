@@ -45,6 +45,11 @@ constexpr ::ui::Color kAccentHover = {136, 232, 136, 255};  // lighter on hover
 constexpr ::ui::Color kAccentHoverBorder = {60, 255, 60, 255};
 constexpr ::ui::Color kAccentPressed = {79, 184, 103, 255}; // darker on press
 constexpr ::ui::Color kAccentPressedBorder = {92, 208, 92, 255};
+// Select-map / list-row selection bar. origin draws the selected row as a solid
+// filled rectangle (renderer.cpp SELECTBOX: DrawFilledRectangle(..., 180)) — the
+// lobby palette-2 index 180 = dark red (72,16,0), opaque, no border. NOT an
+// outline box; the fill IS the selection feedback.
+constexpr ::ui::Color kRowSelectFill = {72, 16, 0, 255};    // legacy palette-2 idx 180
 constexpr ::ui::Color kDanger = {221, 80, 72, 255};         // #DD5048
 constexpr ::ui::Color kDangerBorder = {240, 120, 112, 255}; // brighter danger edge
 constexpr ::ui::Color kDangerHover = {236, 108, 100, 255};  // lighter on hover
