@@ -1,5 +1,8 @@
 #include "glyph_fonts.h"
 
+#include "ui_texture_key.h"
+
+#include <utility>
 #include <vector>
 
 namespace silencer::cppx_ui {
@@ -122,8 +125,10 @@ bool GlyphFonts::build_face(SDL_Renderer *renderer, int face_id,
   }
   const int atlas_w = pen > 0 ? pen : 1;
   const int atlas_h = max_h > 0 ? max_h : 1;
+  f.atlas_w = atlas_w;
   f.atlas_h = atlas_h;
   f.ascent = derive_ascent(glyphs, count, atlas_h);
+  f.gpu_key = ui_texture_key::glyph_face(static_cast<uint16_t>(face_id));
 
   // Pass 2: bake each glyph as a WHITE coverage mask (premultiplied) into the
   // atlas. Index 0 is transparent (the world renderer's sprite convention);
@@ -168,11 +173,14 @@ bool GlyphFonts::build_face(SDL_Renderer *renderer, int face_id,
   SDL_SetTextureBlendMode(tex, SDL_BLENDMODE_BLEND_PREMULTIPLIED);
   SDL_SetTextureScaleMode(tex, SDL_SCALEMODE_NEAREST);
 
+  // Retain the premultiplied atlas bytes for the GPU emitter (SIL-240); the
+  // texture above already holds its own copy, so the source can be moved.
+  f.atlas_rgba = std::move(rgba);
   if (faces_[face_id].atlas)
     SDL_DestroyTexture(faces_[face_id].atlas);
   f.atlas = tex;
   f.loaded = true;
-  faces_[face_id] = f;
+  faces_[face_id] = std::move(f);
   return true;
 }
 
@@ -216,8 +224,11 @@ bool GlyphFonts::build_color_face(SDL_Renderer *renderer, int face_id,
   }
   const int atlas_w = pen > 0 ? pen : 1;
   const int atlas_h = max_h > 0 ? max_h : 1;
+  f.atlas_w = atlas_w;
   f.atlas_h = atlas_h;
   f.ascent = derive_ascent(glyphs, count, atlas_h);
+  f.gpu_key = ui_texture_key::glyph_color(static_cast<uint16_t>(face_id), key_r,
+                                          key_g, key_b);
 
   // Verbatim palettized colors, opaque where index != 0 — origin's DrawText
   // blits the indexed glyph with no alpha blending, so the rendered text IS
@@ -256,6 +267,7 @@ bool GlyphFonts::build_color_face(SDL_Renderer *renderer, int face_id,
     return false;
   SDL_SetTextureBlendMode(tex, SDL_BLENDMODE_BLEND_PREMULTIPLIED);
   SDL_SetTextureScaleMode(tex, SDL_SCALEMODE_NEAREST);
+  f.atlas_rgba = std::move(rgba); // GPU emitter copy (SIL-240)
   f.atlas = tex;
   f.loaded = true;
 
@@ -282,7 +294,7 @@ bool GlyphFonts::build_color_face(SDL_Renderer *renderer, int face_id,
   }
   if (slot->face.atlas)
     SDL_DestroyTexture(slot->face.atlas);
-  slot->face = f;
+  slot->face = std::move(f);
   slot->face_id = static_cast<uint16_t>(face_id);
   slot->r = key_r;
   slot->g = key_g;

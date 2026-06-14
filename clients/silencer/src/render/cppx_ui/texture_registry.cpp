@@ -49,13 +49,35 @@ uint32_t TextureRegistry::upload_rgba(SDL_Renderer *renderer,
   // Nearest sampling keeps goldens crisp and deterministic; nine-slice corners
   // are 1:1 anyway. Callers wanting smoothing can override post-adopt.
   SDL_SetTextureScaleMode(tex, SDL_SCALEMODE_NEAREST);
-  return adopt(tex);
+  const uint32_t id = adopt(tex);
+  if (id) {
+    // SIL-240: keep the premultiplied bytes resident so the GPU emitter can
+    // upload them once (chrome / backdrop / glyph / legacy-variant bakes all
+    // flow through here).
+    rgba_[id - 1] = std::move(pm);
+    tw_[id - 1] = width;
+    th_[id - 1] = height;
+  }
+  return id;
 }
 
 SDL_Texture *TextureRegistry::lookup(uint32_t id) const {
   if (id == 0 || id > static_cast<uint32_t>(count_))
     return nullptr;
   return textures_[id - 1];
+}
+
+bool TextureRegistry::gpu_texture(uint32_t id, const uint8_t **rgba, int *w,
+                                  int *h) const {
+  if (id == 0 || id > static_cast<uint32_t>(count_))
+    return false;
+  const std::vector<uint8_t> &bytes = rgba_[id - 1];
+  if (bytes.empty())
+    return false;
+  *rgba = bytes.data();
+  *w = tw_[id - 1];
+  *h = th_[id - 1];
+  return true;
 }
 
 void TextureRegistry::register_legacy(uint32_t base_id,
@@ -147,6 +169,7 @@ bool TextureRegistry::resolve_legacy_sized(
   if (!tex)
     return false;
   out->texture = tex;
+  out->id = id;
   out->x = x;
   out->y = y;
   out->w = tw;
@@ -190,6 +213,7 @@ bool TextureRegistry::resolve_legacy_cell(
   if (!tex)
     return false;
   out->texture = tex;
+  out->id = id;
   out->x = x;
   out->y = y;
   out->w = tw;
@@ -202,6 +226,10 @@ void TextureRegistry::shutdown() {
     if (textures_[i])
       SDL_DestroyTexture(textures_[i]);
     textures_[i] = nullptr;
+    rgba_[i].clear();
+    rgba_[i].shrink_to_fit();
+    tw_[i] = 0;
+    th_[i] = 0;
   }
   count_ = 0;
   legacy_.clear();

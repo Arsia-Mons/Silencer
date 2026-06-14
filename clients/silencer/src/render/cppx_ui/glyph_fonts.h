@@ -26,6 +26,8 @@
 
 #include <stdint.h>
 
+#include <vector>
+
 namespace silencer::cppx_ui {
 
 class GlyphFonts {
@@ -49,6 +51,7 @@ public:
 
   struct Face {
     SDL_Texture *atlas = nullptr; // all glyphs packed left-to-right; owned
+    int atlas_w = 0;              // atlas width, px (SIL-240 GPU UV denominator)
     int atlas_h = 0;              // atlas (= max native glyph) height, px
     int ascent = 0;               // cap-top..baseline height, px (640-space):
                                   // the modal glyph ink-bottom row. Glyphs are
@@ -59,6 +62,10 @@ public:
     float line_height = 0.f;      // native bank line height, px (640-space)
     int16_t gx[kGlyphCount] = {}; // glyph x-origin in the atlas
     int16_t gw[kGlyphCount] = {}; // glyph width (0 = blank cell)
+    // SIL-240 GPU emitter: the premultiplied atlas bytes kept resident so the
+    // GPU backend can upload this atlas once, under the stable cache key.
+    uint64_t gpu_key = 0;
+    std::vector<uint8_t> atlas_rgba;
     bool loaded = false;
   };
 
