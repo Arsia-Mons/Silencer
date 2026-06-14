@@ -292,6 +292,14 @@ set(SILENCER_CPPX_SOURCES
 )
 cppx_transpile(SILENCER_CPPX_GENERATED ${SILENCER_CPPX_SOURCES})
 target_sources(${SILENCER_TARGET} PRIVATE ${SILENCER_CPPX_GENERATED})
+if(SILENCER_UNITY_BUILD)
+	# The generated cppx screens/components carry the same anonymous-namespace +
+	# file-local `using` patterns as their authored cppx sources (excluded above)
+	# — not jumbo-safe. Two screens batched into one TU collide on shared
+	# file-local symbols (e.g. message_modal + password_modal both define
+	# `kDialogW`). Build each generated TU on its own.
+	set_source_files_properties(${SILENCER_CPPX_GENERATED} PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON)
+endif()
 
 # Expose the generated root + the generated `src/` mirror + each generated
 # output's directory so authored `.cppx`/`.hx` resolve their generated `.h`
