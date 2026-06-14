@@ -1056,10 +1056,12 @@ return out;
 
 bool GameUiPipeline::UseGpuUi() {
 // SIL-240: route the cppx UI through the GPU geometry path when the backend
-// supports it. Gated behind SILENCER_GPU_UI during staging; the env flag is read
-// once. Headless/TUI (no geometry-capable device) keep the CPU raster path.
+// supports it. ON by default (the production path); SILENCER_GPU_UI=0 is a
+// kill switch back to the legacy CPU-raster upload. The flag is read once.
+// Headless/TUI (no geometry-capable device) always keep the CPU raster path.
 if(!gpuUiFlagChecked_){
-gpuUiFlagEnabled_ = std::getenv("SILENCER_GPU_UI") != nullptr;
+const char * v = std::getenv("SILENCER_GPU_UI");
+gpuUiFlagEnabled_ = !(v && v[0] == '0' && v[1] == '\0');
 gpuUiFlagChecked_ = true;
 }
 if(!gpuUiFlagEnabled_) return false;
