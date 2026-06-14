@@ -47,6 +47,13 @@ void RenderClientUiFrame(Surface & surface, float frametime);
 // the next RenderClientUiFrame.
 const uint8_t * CppxUiFrame(int & outW, int & outH) const;
 
+// SIL-237: true when this frame's draw-command IR was byte-identical to the
+// previous one, so the PipelineHost skipped the raster and CppxUiFrame returns
+// the SAME pixels as last frame. The caller may then skip the GPU UI upload —
+// but ONLY when the fade alpha it applies at upload time is also unchanged (the
+// fade is not in the IR). False whenever the raster ran (or no cppx frame yet).
+bool CppxUiUnchanged() const { return cppxUiUnchanged_; }
+
 // --- UI input + control-socket automation seam (SIL-18) ----------------
 // The per-frame UI input frame. The single SDL-event site (events.cpp, windowed)
 // and the control socket (headless automation) accumulate nav/confirm/cancel/
@@ -141,6 +148,9 @@ std::unique_ptr<silencer::cppx_ui::PipelineHost> cppxHost;
 const uint8_t * cppxUiRgba = nullptr;
 int cppxUiW = 0;
 int cppxUiH = 0;
+// SIL-237: set each frame in RenderCppxClientUiFrame — true when the raster was
+// skipped because the IR was unchanged. Drives the caller's upload-skip.
+bool cppxUiUnchanged_ = false;
 bool cppxReactInitialized = false;
 bool cppxAppRootPushed = false;
 // SIL-94: monotonic wall-clock of the previous UI frame, for the use_clock()

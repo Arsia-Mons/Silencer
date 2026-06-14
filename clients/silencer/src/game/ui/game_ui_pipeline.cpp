@@ -1055,6 +1055,7 @@ return out;
 
 void GameUiPipeline::RenderCppxClientUiFrame(Surface& surface) {
 cppxUiRgba = nullptr;
+cppxUiUnchanged_ = false;
 #ifdef SILENCER_CPPX_FONT_DIR
 // SIL-94: snapshot the per-frame wall clock ONCE per render frame. The
 // frame-provider lambda below runs once per visible SCREEN LAYER (base +
@@ -1774,12 +1775,17 @@ worldSessionSnapshot_ = silencer::game_ui::CaptureWorldSessionSnapshot(game, Cur
 
 int ow = 0;
 int oh = 0;
-const uint8_t * rgba = cppxHost->render(frame, &ow, &oh);
+bool unchanged = false;
+const uint8_t * rgba = cppxHost->render(frame, &ow, &oh, &unchanged);
 if(rgba){
 cppxUiRgba = rgba;
 cppxUiW = ow;
 cppxUiH = oh;
 }
+// SIL-237: report whether the raster was skipped (IR byte-identical). When the
+// raster ran, rgba is non-null; when it was skipped, rgba is still the cached
+// buffer. cppxUiRgba being null (host not ready) is not an "unchanged" frame.
+cppxUiUnchanged_ = unchanged && rgba != nullptr;
 
 // SIL-225: Options + its submenus are pushed/popped as Tier-1 overlays via
 // use_navigation, which never calls GoToState — the only RestartPaletteFade

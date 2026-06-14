@@ -58,6 +58,11 @@ SDL_Color palettecolors[256];
 SDL_Window * window;
 Uint8 fade_i;
 Uint64 fadeStartMs;
+// SIL-237: the fade alpha applied at the LAST cppx UI upload. The dirty-skip in
+// Present() only skips the upload when BOTH the IR is unchanged AND this alpha
+// is unchanged (the fade is applied at upload time, not in the IR). -1 forces
+// the first upload. Sentinel < 0 == "no prior upload".
+float lastUiFadeAlpha_ = -1.0f;
 std::unique_ptr<silencer::cppx_ui::UiDemoOverlay> cppxDemo; // SIL-11 flag-gated demo overlay
 };
 

@@ -133,7 +133,26 @@ int uh = 0;
 const uint8_t * uirgba = game.gameUiPipeline.CppxUiFrame(uw, uh);
 // SIL-219: fade the cppx UI layer in lockstep with the FADEOUT palette fade so
 // the UI fades out/in with the world on the transitions that already fade it.
-if(uirgba && uw > 0 && uh > 0) renderdevice->UploadUiFrame(uirgba, uw, uh, UiFadeAlpha());
+const float uiFadeAlpha = UiFadeAlpha();
+if(uirgba && uw > 0 && uh > 0){
+// SIL-237: skip the GPU UI upload when the pipeline rastered nothing new (the
+// IR was byte-identical) AND the fade alpha is unchanged. The backend retains
+// the last-uploaded ui_tex and re-composites it every Present, so the menu
+// stays on screen without re-uploading a static frame. The fade alpha is
+// applied at upload time (not in the IR), so a fade in progress MUST re-upload
+// even when the IR is identical, or the fade would freeze.
+const bool uiUnchanged =
+game.gameUiPipeline.CppxUiUnchanged() && uiFadeAlpha == lastUiFadeAlpha_;
+if(!uiUnchanged){
+renderdevice->UploadUiFrame(uirgba, uw, uh, uiFadeAlpha);
+lastUiFadeAlpha_ = uiFadeAlpha;
+}
+}else{
+// No cppx frame this present (host not ready): nothing to composite. Reset the
+// fade sentinel so the next real frame always re-uploads (matches the original
+// no-op-when-null behavior, just tracking the upload state for the skip).
+lastUiFadeAlpha_ = -1.0f;
+}
 }
 renderdevice->Present();
 }

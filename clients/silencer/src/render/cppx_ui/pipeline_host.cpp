@@ -67,6 +67,9 @@ bool PipelineHost::ensure(int w, int h, const char *font_dir) {
   w_ = w;
   h_ = h;
   packed_.assign((size_t)w * h * 4u, 0);
+  // The surface was just (re)created at a new size; any cached frame is stale.
+  packed_valid_ = false;
+  last_ir_sig_ = 0;
   return true;
 }
 
@@ -123,8 +126,40 @@ bool PipelineHost::build_glyph_color_face(int face_id, uint8_t key_r,
                                        alpha);
 }
 
+namespace {
+
+// FNV-1a over the LIVE bytes of the draw IR (the used prefix of each arena, not
+// the whole fixed-capacity arrays). Trivially-copyable POD, so a raw-byte hash
+// captures every visible change — colors, geometry, text, gradients. A false
+// "changed" only costs a redundant raster; a collision-driven false "unchanged"
+// is astronomically unlikely (and would have to collide on a real visual delta).
+uint64_t ir_signature(const ::ui::DrawCommandList &list) {
+  uint64_t h = 1469598103934665603ull;
+  auto mix_bytes = [&](const void *p, size_t n) {
+    const uint8_t *b = static_cast<const uint8_t *>(p);
+    for (size_t i = 0; i < n; ++i) {
+      h ^= b[i];
+      h *= 1099511628211ull;
+    }
+  };
+  const int count = list.count;
+  mix_bytes(&count, sizeof(count));
+  mix_bytes(list.commands, (size_t)(count > 0 ? count : 0) * sizeof(list.commands[0]));
+  const int text_len = list.text_len_used;
+  mix_bytes(&text_len, sizeof(text_len));
+  mix_bytes(list.text_arena, (size_t)(text_len > 0 ? text_len : 0));
+  const int grad = list.grad_count;
+  mix_bytes(&grad, sizeof(grad));
+  mix_bytes(list.grad_arena, (size_t)(grad > 0 ? grad : 0) * sizeof(list.grad_arena[0]));
+  return h;
+}
+
+} // namespace
+
 const uint8_t *PipelineHost::render(const client::ui::UiPipelineFrame &frame,
-                                    int *out_w, int *out_h) {
+                                    int *out_w, int *out_h, bool *out_unchanged) {
+  if (out_unchanged)
+    *out_unchanged = false;
   if (!surf_ || !r_ || !pipeline_)
     return nullptr;
 
@@ -140,24 +175,40 @@ const uint8_t *PipelineHost::render(const client::ui::UiPipelineFrame &frame,
   float device_scale = (frame.layout.height > 0.0f)
                            ? static_cast<float>(h_) / frame.layout.height
                            : 1.0f;
-  // Transparent clear: the UI composites over the already-rendered world frame.
-  const float scale = ui_.begin_frame(::ui::Color{0, 0, 0, 0}, device_scale, 1);
+  // SIL-237: the retained tree, layout, focus pass, and IR build always run —
+  // they advance the animation/interaction state. Only the native-resolution
+  // raster is conditional. `unchanged` is decided AFTER the IR is built (inside
+  // the render callback): if the IR is byte-identical to the last rastered
+  // frame and we hold a valid cached buffer, skip the clear/execute/SSAA-resolve
+  // /packed-copy entirely and reuse `packed_`.
+  bool unchanged = false;
   pipeline_->render_client_ui_frame(frame, [&] {
     const ::ui::DrawCommandList &list =
         pipeline_->client_ui().retained_command_list();
+    const uint64_t sig = ir_signature(list);
+    if (packed_valid_ && sig == last_ir_sig_) {
+      unchanged = true;
+      return; // cached packed_ is still correct for this IR
+    }
+    // Transparent clear: the UI composites over the already-rendered world.
+    const float scale =
+        ui_.begin_frame(::ui::Color{0, 0, 0, 0}, device_scale, 1);
     execute_draw_commands(r_, list, &fonts_, &textures_, scale, {},
                           &glyph_fonts_);
+    ui_.resolve_frame();
+    ui_.present();
+    // Copy to a tightly-packed buffer (the surface pitch may be padded).
+    const int pitch = surf_->pitch;
+    const uint8_t *src = (const uint8_t *)surf_->pixels;
+    for (int y = 0; y < h_; ++y)
+      memcpy(&packed_[(size_t)y * w_ * 4u], src + (size_t)y * pitch,
+             (size_t)w_ * 4u);
+    last_ir_sig_ = sig;
+    packed_valid_ = true;
   });
-  ui_.resolve_frame();
-  ui_.present();
 
-  // Copy to a tightly-packed buffer (the surface pitch may be padded).
-  const int pitch = surf_->pitch;
-  const uint8_t *src = (const uint8_t *)surf_->pixels;
-  for (int y = 0; y < h_; ++y)
-    memcpy(&packed_[(size_t)y * w_ * 4u], src + (size_t)y * pitch,
-           (size_t)w_ * 4u);
-
+  if (out_unchanged)
+    *out_unchanged = unchanged;
   if (out_w)
     *out_w = w_;
   if (out_h)

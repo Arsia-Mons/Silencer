@@ -47,8 +47,18 @@ public:
   // Run one pipeline frame for `frame` and return tightly-packed RGBA (w*h*4),
   // or null if not initialized. The buffer is owned by the host and valid until
   // the next render()/ensure().
+  //
+  // SIL-237 dirty-skip: the retained tree, layout, focus pass, and IR build
+  // always run (they carry the animation/interaction state). But the costly
+  // native-resolution raster (clear -> execute IR -> SSAA resolve -> packed
+  // copy) is skipped when the freshly-built DrawCommandList IR is byte-identical
+  // to the previous frame's: the cached `packed_` buffer is still valid, so we
+  // return it unchanged. `out_unchanged` (when non-null) reports whether the
+  // raster was skipped so the caller can also skip the GPU upload (the upload
+  // additionally depends on the fade alpha, which is NOT in the IR — the caller
+  // owns that check).
   const uint8_t *render(const client::ui::UiPipelineFrame &frame, int *out_w,
-                        int *out_h);
+                        int *out_h, bool *out_unchanged = nullptr);
 
   // ---- Chrome sprite bake seam (SIL-87) ----------------------------------
   // The SDL_Textures are bound to the software renderer `r_`, which ensure()
@@ -116,6 +126,11 @@ private:
   int w_ = 0;
   int h_ = 0;
   bool chrome_dirty_ = true; // re-bake chrome when r_ (and its textures) reset
+  // SIL-237 dirty-skip state: signature of the LAST rastered IR + whether
+  // `packed_` holds a valid frame for it. A signature of 0 / packed_valid_
+  // false forces a re-raster (e.g. after ensure() resizes the surface).
+  uint64_t last_ir_sig_ = 0;
+  bool packed_valid_ = false;
 };
 
 } // namespace silencer::cppx_ui
