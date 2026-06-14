@@ -18,7 +18,7 @@ internals — use `World` and its subsystems for that.
 | `actor/` | `Team` actor helpers, stats |
 | `input/` | `GameInput` — raw SDL event → keybind action mapping |
 | `render/` | `GameRenderer` — SDL3 GPU backend, surface resize, vsync, `kLegacyRenderWidth/Height` |
-| `ui/` | `GameUiPipeline` — the cppx UI composition root: builds the global provider chain each frame, drives the retained `client::ui::UiPipeline` via `PipelineHost`, projects the session phase (`session_phase.h`), and stashes the RGBA frame `GameRenderer::Present` uploads |
+| `ui/` | `GameUiPipeline` — the cppx UI composition root: builds the global provider chain each frame, drives the retained `client::ui::UiPipeline` via `PipelineHost`, projects the session phase (`session_phase.h`), and stashes what `GameRenderer::Present` submits — a `GpuUiProgram` (windowed GPU path, SIL-240) or the packed RGBA frame (CPU path) |
 | `replay/` | Replay recorder/playback |
 
 ## Key boundaries

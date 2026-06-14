@@ -265,9 +265,11 @@ window, sorted by cost. Sections (`src/platform/perf_trace.{h,cpp}`,
 hooked in `game/loop/game_loop.cpp` + the cppx render path):
 
 - `ui` — whole `RenderClientUiFrame`; `ui.pipeline` — cppx build+layout+IR
-  +raster; `ui.raster` — just the native-res raster (skipped when the IR
-  is byte-identical, SIL-237). `ui` − `ui.pipeline` ≈ per-frame provider
-  assembly; `ui.pipeline` − `ui.raster` ≈ build+Yoga layout+IR.
+  +lowering. On the windowed GPU path (SIL-240, default) the lowering is
+  `ui.gpu_build` (the IR→geometry emit, ~0.05 ms) and `ui.raster` is absent —
+  no CPU raster, no full-window upload, so fades stay ~0. On the CPU path
+  (`SILENCER_GPU_UI=0` / headless) the lowering is `ui.raster` — the native-res
+  software raster (skipped when the IR is byte-identical, SIL-237).
 - `world.draw` — 8-bit world raster (in-game only); `sim`/`game.tick` —
   world + state-machine tick; `present` — GPU upload + vsync wait;
   `idle.throttle` — the unfocused-window `SDL_Delay` (background cap, not
