@@ -1463,8 +1463,17 @@ std::vector<::ui::UiElement> map_list_rows(const std::vector<std::string> &maps,
   // The pointer is in full-canvas logical space; the overlay's absolute inset is
   // measured from the ScreenLayout root's content box (after its pad). Subtract
   // the root pad (origin_x/origin_y) so the card tracks the true cursor.
-  const float px = pointer_x - origin_x;
-  const float py = pointer_y - origin_y;
+  // SIL-237: snap the cursor-derived card anchor to a coarse logical-px grid.
+  // The whole cppx UI rasters on a CPU software renderer at native resolution
+  // (~42ms/frame); that cost is hidden by skipping the raster when the draw IR
+  // is byte-identical frame-to-frame. The IR FNV-hashes raw float DrawRect
+  // coords, so a card pinned to the unquantized live pointer flips the hash on
+  // any sub-pixel cursor jitter, defeating the skip and re-rastering every
+  // frame while the tooltip is up. Quantizing the anchor lets the skip fire
+  // again as long as the cursor stays within one grid cell. Do NOT remove.
+  constexpr float kAnchorGrid = 16.0f;
+  const float px = std::floor((pointer_x - origin_x) / kAnchorGrid) * kAnchorGrid;
+  const float py = std::floor((pointer_y - origin_y) / kAnchorGrid) * kAnchorGrid;
   // Offset the card up-left of the cursor (origin's preview sat to the cursor's
   // upper-left); flip below/right if it would clip off the top-left.
   float left = px - kCardW - 12.0f;
