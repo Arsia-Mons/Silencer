@@ -210,16 +210,77 @@ struct CenterColProps {
 struct GameBrowserProps {
   std::vector<GameBrowserEntry> entries = {};
   int selected = 0;
-  const char *sel_detail = "";
+  // origin game_select_panel info block (selected game): five Body lines in
+  // order — name, "Map: ..", "<Sec> Security", "Creator: ..", limits. Empty
+  // strings render as a blank slot (origin keeps the slot height stable).
+  const char *info_name = "";
+  const char *info_map = "";
+  const char *info_security = "";
+  const char *info_creator = "";
+  const char *info_limits = "";
   bool can_join = false;
   bool can_spectate = false;
   std::function<void()> on_join = {};
   std::function<void()> on_spectate = {};
 };
 
-// Browse/join actions — a separate element so GameBrowser can omit it for an
-// empty list (the JSX tag can't live inside a ternary expression).
+// One info-block line (origin BuildGameSelectInfoBlock: a fixed-height Body row,
+// blank when the field is empty).
+::ui::UiElement info_line(const char *key, const char *value) {
+  return <Box
+    key={key}
+    layout={::ui::LayoutStyle{
+      .height = ::ui::Length::points(tokens::kLineBody),
+      .flex_shrink = ::ui::StyleFloat::points(0.0f)}}
+  >
+    <BodyText key="t" variant={BodyTextVariant::Body} value={value} />
+  </Box>
+}
+
+// A fixed-height footer slot that holds an action button only when the action is
+// available (origin game_select_panel_layout: the Spectate/Join slots keep their
+// height regardless, the button is conditionally rendered inside — an unavailable
+// action shows an EMPTY slot, never a greyed button).
+::ui::UiElement action_slot(const char *key, ::ui::UiElement button) {
+  return <Box
+    key={key}
+    layout={::ui::LayoutStyle{
+      .direction = ::ui::FlexDirection::Row,
+      .align_items = ::ui::AlignItems::Center,
+      .justify_content = ::ui::JustifyContent::Center,
+      .width = ::ui::Length::percent(100.0f),
+      .height = ::ui::Length::points(31.5f),
+      .flex_shrink = ::ui::StyleFloat::points(0.0f)}}
+  >
+    {button}
+  </Box>
+}
+
+// Selection info block + actions — a separate element so GameBrowser can omit it
+// for an empty list (the JSX tag can't live inside a ternary expression). origin
+// game_select_panel_layout: the 5-field info block over the Spectate (top) +
+// Join Game (bottom) chrome buttons.
 ::ui::UiElement GameBrowserActions(const GameBrowserProps &props) {
+  ::ui::UiElement spectate_btn =
+      props.can_spectate
+          ? AppButton(AppButtonProps{.key = "spectate",
+                                     .control_id = "SpectateGame",
+                                     .variant = AppButtonVariant::Chrome,
+                                     .size = AppButtonSize::Sm,
+                                     .target_feedback = true,
+                                     .label = "Spectate",
+                                     .on_press = props.on_spectate})
+          : ::ui::empty();
+  ::ui::UiElement join_btn =
+      props.can_join
+          ? AppButton(AppButtonProps{.key = "join",
+                                     .control_id = "JoinGame",
+                                     .variant = AppButtonVariant::Chrome,
+                                     .size = AppButtonSize::Sm,
+                                     .target_feedback = true,
+                                     .label = "Join Game",
+                                     .on_press = props.on_join})
+          : ::ui::empty();
   return <Box
     key="acts"
     layout={::ui::LayoutStyle{
@@ -228,27 +289,22 @@ struct GameBrowserProps {
       .width = ::ui::Length::percent(100.0f),
       .gap = 4.0f}}
   >
-    <BodyText key="detail" variant={BodyTextVariant::Detail} value={props.sel_detail} />
-    <AppButton
-      key="join"
-      controlId="JoinGame"
-      variant={AppButtonVariant::Chrome}
-      size={AppButtonSize::Sm}
-      disabled={!props.can_join}
-      targetFeedback={true}
-      label="Join"
-      onPress={props.on_join}
-    />
-    <AppButton
-      key="spectate"
-      controlId="SpectateGame"
-      variant={AppButtonVariant::Chrome}
-      size={AppButtonSize::Sm}
-      disabled={!props.can_spectate}
-      targetFeedback={true}
-      label="Spectate"
-      onPress={props.on_spectate}
-    />
+    <Box
+      key="info"
+      layout={::ui::LayoutStyle{
+        .direction = ::ui::FlexDirection::Column,
+        .align_items = ::ui::AlignItems::Stretch,
+        .width = ::ui::Length::percent(100.0f),
+        .padding = {0.0f, 0.0f, 0.0f, 10.5f}}}
+    >
+      {info_line("iname", props.info_name)}
+      {info_line("imap", props.info_map)}
+      {info_line("isec", props.info_security)}
+      {info_line("icreator", props.info_creator)}
+      {info_line("ilimits", props.info_limits)}
+    </Box>
+    {action_slot("spectateslot", spectate_btn)}
+    {action_slot("joinslot", join_btn)}
   </Box>
 }
 
@@ -1438,52 +1494,48 @@ std::vector<::ui::UiElement> map_list_rows(const std::vector<std::string> &maps,
   return rows;
 }
 
-// SIL-216: the cursor-following minimap preview card. A small bordered panel
-// drawn at the live pointer (offset up-left so it doesn't sit under the cursor),
-// showing the hovered map's baked 172x62 minimap at ~2x. Absolutely positioned
-// at the screen root so it floats over the lobby. Returns empty when nothing is
-// hovered or the texture isn't baked.
+// SIL-216 / SIL-231: the cursor-following map preview. origin's
+// BuildHoverPreviewOverlay (game_create_panel_map_form.cpp) stacks three
+// chromeless elements TOP_TO_BOTTOM — name (BodySm, no wrap) -> 172x62 minimap
+// -> word-wrapped description (BodySm) — directly on the lobby backdrop (NO
+// panel/border), pinned to the screen root at pointer + (-185,-30) and clamped
+// to the screen. All origin-virtual values are scaled x1.5 onto the cppx logical
+// canvas (the rest of the lobby uses the same factor). The name/desc render in
+// origin's dim grey LegacyPalette(129,160) ramp (== tokens::kTextTechSlots).
+// Returns empty when nothing is hovered or the texture isn't baked.
 ::ui::UiElement MapPreviewOverlay(uint32_t texture, const char *name,
                                   const char *description, float pointer_x,
                                   float pointer_y, float origin_x,
-                                  float origin_y) {
+                                  float origin_y, float canvas_w) {
   if (!texture)
     return ::ui::empty();
-  // 172x62 at ~2x reads well at the logical 1280x720 canvas; 4px border card.
-  constexpr float kPreviewW = 172.0f * 2.0f;
-  constexpr float kPreviewH = 62.0f * 2.0f;
-  constexpr float kPad = 4.0f;
-  // SIL-231: origin's preview captioned the minimap with the map name +
-  // description. Reserve a text band under the image (name line + ~2 desc lines).
+  // origin kPreviewW/H 172x62, kPreviewGap 5, kPreviewOffset (-185,-30); x1.5.
+  constexpr float kPreviewW = 172.0f * 1.5f;
+  constexpr float kPreviewH = 62.0f * 1.5f;
+  constexpr float kGap = 5.0f * 1.5f;
+  constexpr float kOffsetX = -185.0f * 1.5f;
+  constexpr float kOffsetY = -30.0f * 1.5f;
   const bool has_name = name && name[0];
   const bool has_desc = description && description[0];
-  const float kTextH = (has_name || has_desc) ? 44.0f : 0.0f;
-  constexpr float kCardW = kPreviewW + kPad * 2.0f;
-  const float kCardH = kPreviewH + kPad * 2.0f + kTextH;
-  // The pointer is in full-canvas logical space; the overlay's absolute inset is
-  // measured from the ScreenLayout root's content box (after its pad). Subtract
-  // the root pad (origin_x/origin_y) so the card tracks the true cursor.
-  const float px = pointer_x - origin_x;
-  const float py = pointer_y - origin_y;
-  // Offset the card up-left of the cursor (origin's preview sat to the cursor's
-  // upper-left); flip below/right if it would clip off the top-left.
-  float left = px - kCardW - 12.0f;
-  float top = py - kCardH - 8.0f;
-  if (left < 0.0f)
-    left = px + 18.0f;
-  if (top < 0.0f)
-    top = py + 18.0f;
-  // Dark panel backing + the chrome hairline border, so the minimap reads as a
-  // floating card (frame_patch alone is a transparent interior).
-  ::ui::StylePatch card = ::ui::patch()
-                              .background(tokens::kSurfacePanel)
-                              .gradient(::ui::Gradient{})
-                              .corner_radius(0.0f)
-                              .border(::ui::Border{
-                                  {1.34f, 1.34f, 1.34f, 1.34f},
-                                  {tokens::kChromeStroke, tokens::kChromeStroke,
-                                   tokens::kChromeStroke, tokens::kChromeStroke}});
+
+  ::ui::StylePatch text_style = tokens::text_patch(
+      tokens::kTextTechSlots, tokens::kFontBodyEm, tokens::kFaceBodySm,
+      tokens::kLineBody);
+  // origin word-wraps the description at 29 chars and renders it newline-only;
+  // wrapping the cppx Text to the minimap width reproduces the multi-line block.
+  ::ui::StylePatch desc_style = text_style;
+  desc_style.text.value.wrap = ::ui::TextWrap::Words;
+
   std::vector<::ui::UiElement> kids;
+  if (has_name)
+    kids.push_back(Box(BoxProps{
+        .key = "name",
+        .layout = ::ui::LayoutStyle{.width = ::ui::Length::points(kPreviewW)},
+        .children = ::ui::children({Text(TextProps{
+            .key = "t",
+            .value = ::ui::copy_string(name),
+            .layout = {.height = ::ui::Length::points(tokens::kLineBody)},
+            .style = text_style})})}));
   kids.push_back(Box(BoxProps{
       .key = "img",
       .layout = ::ui::LayoutStyle{
@@ -1491,34 +1543,41 @@ std::vector<::ui::UiElement> map_list_rows(const std::vector<std::string> &maps,
           .height = ::ui::Length::points(kPreviewH),
           .flex_shrink = ::ui::StyleFloat::points(0.0f)},
       .style = tokens::image_patch(texture)}));
-  if (has_name)
-    kids.push_back(BodyText(BodyTextProps{.key = "name",
-                                          .variant = BodyTextVariant::Strong,
-                                          .value = ::ui::copy_string(name)}));
   if (has_desc)
     kids.push_back(Box(BoxProps{
         .key = "desc",
-        .layout = ::ui::LayoutStyle{.width = ::ui::Length::percent(100.0f)},
+        .layout = ::ui::LayoutStyle{.width = ::ui::Length::points(kPreviewW)},
         .children = ::ui::children({Text(TextProps{
             .key = "t",
             .value = ::ui::copy_string(description),
             .layout = ::ui::LayoutStyle{.width = ::ui::Length::percent(100.0f)},
-            .style = tokens::text_patch(tokens::kTextWeaponDetail,
-                                        tokens::kFontBodyEm, tokens::kFaceBody,
-                                        tokens::kLineBody)})})}));
+            .style = desc_style})})}));
+
+  // The pointer is in full-canvas logical space; the overlay's absolute inset is
+  // measured from the ScreenLayout root's content box (after its pad). Subtract
+  // the root pad (origin_x/origin_y) so the card tracks the true cursor, then
+  // apply origin's pointer offset.
+  float left = pointer_x - origin_x + kOffsetX;
+  float top = pointer_y - origin_y + kOffsetY;
+  // Clamp the card's left/top inside the canvas content box (origin clamps to
+  // the screen). Right/bottom clamps are approximate — the card height is
+  // content-driven; clamp the left edge against the known minimap width.
+  const float content_w = canvas_w - origin_x * 2.0f;
+  if (left < 0.0f)
+    left = 0.0f;
+  if (left > content_w - kPreviewW)
+    left = std::max(0.0f, content_w - kPreviewW);
+  if (top < 0.0f)
+    top = 0.0f;
   return <Box
     key="map-preview"
     layout={::ui::LayoutStyle{
       .position = ::ui::PositionType::Absolute,
-      .overflow = ::ui::Overflow::Hidden,
       .direction = ::ui::FlexDirection::Column,
-      .align_items = ::ui::AlignItems::Stretch,
-      .width = ::ui::Length::points(kCardW),
-      .height = ::ui::Length::points(kCardH),
-      .padding = {kPad, kPad, kPad, kPad},
+      .align_items = ::ui::AlignItems::Start,
+      .width = ::ui::Length::points(kPreviewW),
       .position_inset = ::ui::EdgeSizes{left, {}, top, {}},
-      .gap = 2.0f}}
-    style={card}
+      .gap = kGap}}
   >
     {::ui::children(kids)}
   </Box>
@@ -1661,8 +1720,21 @@ struct LobbyScreenProps {
   // the full kLobbyChatLogCap tail.
   const char *scrollback = ::ui::copy_string(chat.scrollback.c_str());
   const char *presence = use_text_storage("%s", chat.presence.c_str());
-  const char *sel_detail = use_text_storage(
-      "%s", game_count > 0 ? games.entries[*sel].detail.c_str() : "");
+  // The selected game's info-block fields (origin game_select_panel). copy_string
+  // (per-frame arena, not a hook) keeps the long padded strings out of the
+  // 192-byte text scratch without shifting the hook sequence.
+  const GameBrowserEntry *sel_entry =
+      game_count > 0 ? &games.entries[*sel] : nullptr;
+  const char *sel_info_name =
+      ::ui::copy_string(sel_entry ? sel_entry->name.c_str() : "");
+  const char *sel_info_map =
+      ::ui::copy_string(sel_entry ? sel_entry->info_map.c_str() : "");
+  const char *sel_info_security =
+      ::ui::copy_string(sel_entry ? sel_entry->info_security.c_str() : "");
+  const char *sel_info_creator =
+      ::ui::copy_string(sel_entry ? sel_entry->info_creator.c_str() : "");
+  const char *sel_info_limits =
+      ::ui::copy_string(sel_entry ? sel_entry->info_limits.c_str() : "");
   const char *ready_label = use_text_storage("%s", staging.ready_label.c_str());
   const char *chat_title = chat.channel.empty()
                                ? "Lobby"
@@ -1760,7 +1832,11 @@ struct LobbyScreenProps {
   GameBrowserProps gp;
   gp.entries = games.entries;
   gp.selected = *sel;
-  gp.sel_detail = sel_detail;
+  gp.info_name = sel_info_name;
+  gp.info_map = sel_info_map;
+  gp.info_security = sel_info_security;
+  gp.info_creator = sel_info_creator;
+  gp.info_limits = sel_info_limits;
   gp.can_join = sel_joinable;
   gp.can_spectate = sel_spectatable;
   gp.on_join = [join = games.join_game, sel_id]() {
@@ -1878,7 +1954,7 @@ struct LobbyScreenProps {
       map_preview = MapPreviewOverlay(tex, mn.c_str(), md.c_str(),
                                       pipeline_frame->pointer.x,
                                       pipeline_frame->pointer.y, panes.pad_x,
-                                      panes.pad_top);
+                                      panes.pad_top, app.canvas_w);
     }
   } else if (!*show_create && *hovered_map != -1) {
     *hovered_map = -1; // leaving create mode clears the hover
