@@ -11,10 +11,18 @@ namespace client::ui {
 // pre-formatted by the composition root (the screen never re-derives them);
 // `joinable` / `spectatable` gate the row's actions, `password_protected` flags
 // a locked game. `id` is the lobby game id the join/spectate intents take.
+//
+// The selection info block mirrors origin's game_select_panel RecomputeInfoBlock:
+// five Body lines (game name, "Map: <name>", "<Sec> Security", "Creator: <name>",
+// and "MinLv:.. MaxLv:.. MaxPl:.. MaxTm:.." while pre-game). Pre-formatted here so
+// the screen renders the selected entry's lines verbatim.
 struct GameBrowserEntry {
   uint32_t id = 0;
   std::string name = {};
-  std::string detail = {}; // "Map · Security · by Creator · N/M players"
+  std::string info_map = {};      // "Map: <mapname>"
+  std::string info_security = {}; // "<No/Low/Medium/High> Security[  *PASSWORD LOCK*]"
+  std::string info_creator = {};  // "Creator: <name>"
+  std::string info_limits = {};   // "MinLv:N MaxLv:N MaxPl:N MaxTm:N" (empty in-game)
   bool joinable = false;
   bool spectatable = false;
   bool password_protected = false;

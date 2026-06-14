@@ -56,6 +56,8 @@ std::string NormalizeTechDescription(const char *description) {
   return out;
 }
 
+// origin game_select_panel RecomputeInfoBlock security labels ("No" for the
+// default/none level, then Low/Medium/High).
 const char *SecurityLabel(Uint8 level) {
   switch (level) {
   case LobbyGame::SECHIGH:
@@ -65,7 +67,7 @@ const char *SecurityLabel(Uint8 level) {
   case LobbyGame::SECLOW:
     return "Low";
   default:
-    return "Open";
+    return "No";
   }
 }
 
@@ -229,19 +231,27 @@ void BuildLobbyPanels(client::ui::LobbySnapshot &snap, Lobby &lobby) {
     e.spectatable = ingame && g->spectatable;
     User *creator = lobby.GetUserInfo(g->accountid);
     const char *who =
-        (creator && !creator->retrieving) ? creator->DisplayName() : "?";
-    char detail[160];
-    if (ingame) {
-      snprintf(detail, sizeof(detail), "%s · %s Sec · by %s · in progress%s",
-               g->mapname, SecurityLabel(g->securitylevel), who,
-               e.password_protected ? " · locked" : "");
-    } else {
-      snprintf(detail, sizeof(detail), "%s · %s Sec · by %s · %u/%u players%s",
-               g->mapname, SecurityLabel(g->securitylevel), who,
-               (unsigned)g->players, (unsigned)g->maxplayers,
-               e.password_protected ? " · locked" : "");
+        (creator && !creator->retrieving) ? creator->DisplayName() : "";
+
+    // origin game_select_panel RecomputeInfoBlock: the selected game's info
+    // block is five Body lines (name row is the entry name itself).
+    e.info_map = std::string("Map: ") + g->mapname;
+
+    std::string security = std::string(SecurityLabel(g->securitylevel)) + " Security";
+    while (security.length() < 21)
+      security += " ";
+    if (e.password_protected)
+      security += "*PASSWORD LOCK*";
+    e.info_security = std::move(security);
+
+    e.info_creator = std::string("Creator: ") + who;
+
+    if (!ingame) {
+      e.info_limits = "MinLv:" + std::to_string((unsigned)g->minlevel) +
+                      " MaxLv:" + std::to_string((unsigned)g->maxlevel) +
+                      " MaxPl:" + std::to_string((unsigned)g->maxplayers) +
+                      " MaxTm:" + std::to_string((unsigned)g->maxteams);
     }
-    e.detail = detail;
     snap.games.push_back(std::move(e));
   }
 }
