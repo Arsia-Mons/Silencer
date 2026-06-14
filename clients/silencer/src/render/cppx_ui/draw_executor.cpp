@@ -4,6 +4,7 @@
 #include "glyph_fonts.h"
 #include "sdf_raster.h"
 #include "texture_registry.h"
+#include "ui_draw_geometry.h"
 #include "ui/runtime/geometry.h"
 
 #include <cmath>
@@ -99,14 +100,11 @@ bool render_text_glyphs(SDL_Renderer *r, const ::ui::DrawCommandList &list,
 
   // font_size is the target device CELL height in points; the executor scales
   // points -> device by `scale`. glyph scale maps native bank px -> device px.
-  const float gscale = (static_cast<float>(t.font_size) * scale) / gf->line_height;
-  const float adv = gf->advance * gscale;
-  const int ah = static_cast<int>(static_cast<float>(gf->atlas_h) * gscale + 0.5f);
-  // floor (not round) quantization: matches the legacy SW renderer's dst-rect
-  // floor, so 1:1-scale text (in-game 640x480, integer native advance) lands on
-  // exactly the pixels it always did.
-  const float penx = c.rect.x * scale;
-  const int peny = static_cast<int>(SDL_floorf(c.rect.y * scale));
+  // Canonical integer glyph cells + floor-quantized pen — the math is shared
+  // with the GPU emitter (ui_draw_geometry::text_layout/glyph_dst) so both paths
+  // land glyphs on identical device pixels.
+  const TextLayout L = text_layout(gf->advance, gf->line_height, gf->atlas_h,
+                                   t.font_size, scale, c.rect);
 
   // Tint: the coverage atlas is a white premultiplied mask; the IR color is
   // premultiplied, so color-mod(rgb) + alpha-mod(a) reproduces the token color
@@ -126,10 +124,8 @@ bool render_text_glyphs(SDL_Renderer *r, const ::ui::DrawCommandList &list,
         SDL_FRect src = {static_cast<float>(gf->gx[gi]), 0.f,
                          static_cast<float>(gw),
                          static_cast<float>(gf->atlas_h)};
-        SDL_FRect dst = {
-            SDL_floorf(penx + adv * i), static_cast<float>(peny),
-            static_cast<float>(static_cast<int>(gw * gscale + 0.5f)),
-            static_cast<float>(ah)};
+        const DevRect gd = glyph_dst(L, i, gw);
+        SDL_FRect dst = {gd.x, gd.y, gd.w, gd.h};
         SDL_RenderTexture(r, gf->atlas, &src, &dst);
       }
     }
@@ -257,29 +253,16 @@ void render_image(SDL_Renderer *r, const ::ui::DrawCommand &c,
     SDL_SetTextureColorMod(tex, tint.r, tint.g, tint.b);
     SDL_SetTextureAlphaMod(tex, tint.a);
 
-    const float sl = ns.left, sr = ns.right, st = ns.top, sb = ns.bottom;
-    const float dx0 = c.rect.x, dy0 = c.rect.y;
-    const float dx1 = c.rect.x + c.rect.w, dy1 = c.rect.y + c.rect.h;
-
-    // Column x-edges (src then dst): [0, left, w-right, w]. Source edges are
-    // texture-space (unscaled); dest edges are points -> device pixels (*scale).
-    const float sx[4] = {0.f, sl, tw - sr, tw};
-    const float sy[4] = {0.f, st, th - sb, th};
-    const float dx[4] = {dx0 * scale, (dx0 + sl) * scale, (dx1 - sr) * scale,
-                         dx1 * scale};
-    const float dy[4] = {dy0 * scale, (dy0 + st) * scale, (dy1 - sb) * scale,
-                         dy1 * scale};
-
-    for (int row = 0; row < 3; ++row) {
-      for (int col = 0; col < 3; ++col) {
-        SDL_FRect src = {sx[col], sy[row], sx[col + 1] - sx[col],
-                         sy[row + 1] - sy[row]};
-        SDL_FRect dst = {dx[col], dy[row], dx[col + 1] - dx[col],
-                         dy[row + 1] - dy[row]};
-        if (src.w <= 0.f || src.h <= 0.f || dst.w <= 0.f || dst.h <= 0.f)
-          continue;
-        SDL_RenderTexture(r, tex, &src, &dst);
-      }
+    // 3x3 grid (src texture-space, dst device-space) — shared with the GPU
+    // emitter so both paths place identical cells.
+    ImageCell cells[9];
+    const int nc = image_nine_cells(c.rect, scale, tw, th, ns, cells);
+    for (int k = 0; k < nc; ++k) {
+      SDL_FRect src = {cells[k].src.x, cells[k].src.y, cells[k].src.w,
+                       cells[k].src.h};
+      SDL_FRect dst = {cells[k].dst.x, cells[k].dst.y, cells[k].dst.w,
+                       cells[k].dst.h};
+      SDL_RenderTexture(r, tex, &src, &dst);
     }
 
     SDL_SetTextureColorMod(tex, 255, 255, 255);
@@ -348,34 +331,16 @@ void render_image(SDL_Renderer *r, const ::ui::DrawCommand &c,
       return;
     }
   }
-  if (img.fit == ::ui::ImageFit::Cover && c.rect.w > 0.f && c.rect.h > 0.f) {
-    const float box_aspect = c.rect.w / c.rect.h;
-    if (src.w / src.h > box_aspect) {
-      const float crop_w = src.h * box_aspect;
-      src.x += (src.w - crop_w) * 0.5f;
-      src.w = crop_w;
-    } else {
-      const float crop_h = src.w / box_aspect;
-      src.y += (src.h - crop_h) * 0.5f;
-      src.h = crop_h;
-    }
-  } else if (img.fit == ::ui::ImageFit::Contain && src.w > 0.f && src.h > 0.f) {
-    const float fit_scale = std::min(dst.w / src.w, dst.h / src.h);
-    const float fit_w = src.w * fit_scale, fit_h = src.h * fit_scale;
-    dst.x += (dst.w - fit_w) * 0.5f;
-    dst.y += (dst.h - fit_h) * 0.5f;
-    dst.w = fit_w;
-    dst.h = fit_h;
-  }
-  // Native 1:1 sprite draw (in-game HUD at the 640x480 surface): authored
-  // coords land within 1/3 device px of the integer cell — snap so the
-  // fractional rect can't bleed an extra row/column (stipple art is
-  // parity-sensitive).
-  if (std::fabs(dst.w - src.w) < 0.5f && std::fabs(dst.h - src.h) < 0.5f) {
-    dst.x = std::floor(dst.x + 0.5f);
-    dst.y = std::floor(dst.y + 0.5f);
-    dst.w = src.w;
-    dst.h = src.h;
+  // Cover/Contain aspect fit + the native-1:1 snap — shared with the GPU
+  // emitter (ui_draw_geometry::image_plain_rects) so both produce identical
+  // src/dst (the resolve_legacy fast path above used the un-fitted base dst).
+  {
+    DevRect fs, fd;
+    image_plain_rects(c.rect, scale, tw, th, has_src,
+                      ::ui::DrawRect{src_sub.x, src_sub.y, src_sub.w, src_sub.h},
+                      img.fit, &fs, &fd);
+    src = {fs.x, fs.y, fs.w, fs.h};
+    dst = {fd.x, fd.y, fd.w, fd.h};
   }
   if (img.flip_h)
     SDL_RenderTextureRotated(r, tex, &src, &dst, 0.0, nullptr,
@@ -399,101 +364,28 @@ struct LayerSlot {
   float opacity = 1.f;
 };
 
-// The two legacy chrome stroke/fill colors (palette idx216 connected frame,
-// idx220 inner well) — the eligibility palette for the legacy grid snaps.
-bool legacy_stroke(::ui::Color col) {
-  return col.a == 255 && ((col.r == 8 && col.g == 84 && col.b == 0) ||
-                          (col.r == 24 && col.g == 124 && col.b == 20));
-}
-
-// Quarter-integer virtual scale (device px per legacy virtual px), or 0 if
-// this scale has no legacy grid. Shared gate of the legacy snaps below.
-float legacy_virtual_scale(float scale) {
-  const float sv = scale * 1.5f;
-  const float q = sv * 4.f;
-  if (std::fabs(q - std::floor(q + 0.5f)) > 0.001f || sv < 1.f)
-    return 0.f;
-  return sv;
-}
-
 // Legacy hairline frame snap. origin draws the lobby panel chrome as
 // 1-VIRTUAL-px vector strokes on the 853x480 canvas and magnifies the whole
 // frame by s=2.25, so each edge line covers the device pixels
 // {p : int(p/s) == v} — alternating 2- and 3-px bands whose width/position
 // depend on the edge's absolute virtual coordinate. A uniform logical-width
 // border can land 1px off and can never produce the 3px phase, so (like
-// resolve_legacy for sprites) the
-// EXECUTOR owns the grid: each painted side of an eligible hairline border
-// is snapped to its origin virtual cell and filled directly. Eligible =
-// square corners, no outline, hairline widths, the exact legacy stroke
-// palette colors, and a quarter-integer virtual scale.
+// resolve_legacy for sprites) the EXECUTOR owns the grid: the band geometry is
+// computed by the shared legacy_hairline_bands (so the GPU emitter snaps
+// identically) and each band is filled here.
 bool snap_legacy_hairline_border(SDL_Renderer *r, const ::ui::DrawCommand &c,
                                  float scale) {
-  const ::ui::BorderData &b = c.payload.border;
-  if (b.corner_radius > 0.01f)
+  LegacyBand bands[4];
+  int n = 0;
+  if (!legacy_hairline_bands(c.payload.border, c.rect, scale, bands, &n))
     return false;
-  if (b.outline.width > 0.f && b.outline.color.a > 0)
-    return false;
-  if (b.has_fill && b.fill.a > 0)
-    return false; // fused fill takes the mesh path
-  const float sv = legacy_virtual_scale(scale);
-  if (sv <= 0.f)
-    return false;
-  const float kMaxHairline = 2.5f; // logical; anything wider isn't a hairline
-  const bool top = b.border.width.top > 0.f && b.border.color.top.a > 0;
-  const bool right = b.border.width.right > 0.f && b.border.color.right.a > 0;
-  const bool bottom =
-      b.border.width.bottom > 0.f && b.border.color.bottom.a > 0;
-  const bool left = b.border.width.left > 0.f && b.border.color.left.a > 0;
-  if (!(top || right || bottom || left))
-    return false;
-  if ((top && (b.border.width.top > kMaxHairline ||
-               !legacy_stroke(b.border.color.top))) ||
-      (right && (b.border.width.right > kMaxHairline ||
-                 !legacy_stroke(b.border.color.right))) ||
-      (bottom && (b.border.width.bottom > kMaxHairline ||
-                  !legacy_stroke(b.border.color.bottom))) ||
-      (left && (b.border.width.left > kMaxHairline ||
-                !legacy_stroke(b.border.color.left))))
-    return false;
-
-  // Device-space box edges -> virtual cells. cell(v) = [ceil(v*sv),
-  // ceil((v+1)*sv)) device px, i.e. exactly {p : int(p/sv) == v}.
-  const float dx0 = c.rect.x * scale, dy0 = c.rect.y * scale;
-  const float dx1 = (c.rect.x + c.rect.w) * scale;
-  const float dy1 = (c.rect.y + c.rect.h) * scale;
-  auto cell_lo = [&](float dev) { // line cell at a leading box edge
-    return (long)std::lround(dev / sv);
-  };
-  auto cell_hi = [&](float dev) { // line cell just inside a trailing edge
-    return (long)std::lround(dev / sv) - 1;
-  };
-  auto span_of = [&](long v, float *lo, float *hi) {
-    *lo = std::ceil((float)v * sv);
-    *hi = std::ceil((float)(v + 1) * sv);
-  };
-  float lx0, lx1, rx0, rx1, ty0, ty1, by0, by1;
-  span_of(cell_lo(dx0), &lx0, &lx1);
-  span_of(cell_hi(dx1), &rx0, &rx1);
-  span_of(cell_lo(dy0), &ty0, &ty1);
-  span_of(cell_hi(dy1), &by0, &by1);
-
-  auto fill = [&](float x0, float y0, float x1, float y1, ::ui::Color col) {
-    if (x1 <= x0 || y1 <= y0)
-      return;
+  for (int i = 0; i < n; ++i) {
+    const ::ui::Color col = bands[i].color;
     SDL_SetRenderDrawColor(r, col.r, col.g, col.b, col.a);
-    SDL_FRect fr{x0, y0, x1 - x0, y1 - y0};
+    SDL_FRect fr{bands[i].rect.x, bands[i].rect.y, bands[i].rect.w,
+                 bands[i].rect.h};
     SDL_RenderFillRect(r, &fr);
-  };
-  // Bands span the full outer extent (corners overlap; same opaque ink).
-  if (top)
-    fill(lx0, ty0, rx1, ty1, b.border.color.top);
-  if (bottom)
-    fill(lx0, by0, rx1, by1, b.border.color.bottom);
-  if (left)
-    fill(lx0, ty0, lx1, by1, b.border.color.left);
-  if (right)
-    fill(rx0, ty0, rx1, by1, b.border.color.right);
+  }
   return true;
 }
 
@@ -501,31 +393,17 @@ bool snap_legacy_hairline_border(SDL_Renderer *r, const ::ui::DrawCommand &c,
 // create_game scrollbar thumb) as integer rects on the same virtual canvas
 // its hairline strokes live on. Our box comes out of flex layout with
 // fractional logical edges, so the raw quad can raster half a cell off the
-// SNAPPED borders around it — a 1px gutter against one stroke and a 1px
-// overpaint of the opposite one. Same grid, same eligibility palette as
-// snap_legacy_hairline_border: snap each edge to its virtual cell so the
-// fill is flush with the snapped strokes by construction.
+// SNAPPED borders around it. The snapped rect comes from the shared
+// legacy_solid_fill_rect (so the GPU emitter snaps identically) and is filled
+// here.
 bool snap_legacy_solid_fill(SDL_Renderer *r, const ::ui::DrawCommand &c,
                             float scale) {
-  const ::ui::RectData &rd = c.payload.rect;
-  if (rd.corner_radius > 0.01f)
+  DevRect d;
+  if (!legacy_solid_fill_rect(c.payload.rect, c.rect, scale, &d))
     return false;
-  if (!legacy_stroke(rd.fill))
-    return false;
-  const float sv = legacy_virtual_scale(scale);
-  if (sv <= 0.f)
-    return false;
-  // Edge -> nearest virtual line, line -> first device px of its cell
-  // (cell(v) = [ceil(v*sv), ceil((v+1)*sv)), as in the border snap).
-  auto snap = [&](float logical) {
-    return std::ceil((float)std::lround(logical * scale / sv) * sv);
-  };
-  const float x0 = snap(c.rect.x), y0 = snap(c.rect.y);
-  const float x1 = snap(c.rect.x + c.rect.w), y1 = snap(c.rect.y + c.rect.h);
-  if (x1 <= x0 || y1 <= y0)
-    return false;
-  SDL_SetRenderDrawColor(r, rd.fill.r, rd.fill.g, rd.fill.b, rd.fill.a);
-  SDL_FRect fr{x0, y0, x1 - x0, y1 - y0};
+  const ::ui::Color fill = c.payload.rect.fill;
+  SDL_SetRenderDrawColor(r, fill.r, fill.g, fill.b, fill.a);
+  SDL_FRect fr{d.x, d.y, d.w, d.h};
   SDL_RenderFillRect(r, &fr);
   return true;
 }

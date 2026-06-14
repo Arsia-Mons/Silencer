@@ -570,6 +570,7 @@ add_executable(pipeline_host_tests
 	src/platform/perf_trace.cpp
 	src/render/cppx_ui/ui_surface.cpp
 	src/render/cppx_ui/draw_executor.cpp
+	src/render/cppx_ui/ui_draw_geometry.cpp
 	src/render/cppx_ui/glyph_fonts.cpp
 	src/render/cppx_ui/sdf_raster.cpp
 	src/render/cppx_ui/font_registry.cpp
@@ -680,6 +681,7 @@ add_test(NAME texture_registry_tests COMMAND texture_registry_tests)
 add_executable(draw_executor_tests
 	tests/draw_executor_tests.cpp
 	src/render/cppx_ui/draw_executor.cpp
+	src/render/cppx_ui/ui_draw_geometry.cpp
 	src/render/cppx_ui/glyph_fonts.cpp
 	src/render/cppx_ui/sdf_raster.cpp
 	src/render/cppx_ui/font_registry.cpp
@@ -703,6 +705,7 @@ add_executable(ui_surface_tests
 	tests/ui_surface_tests.cpp
 	src/render/cppx_ui/ui_surface.cpp
 	src/render/cppx_ui/draw_executor.cpp
+	src/render/cppx_ui/ui_draw_geometry.cpp
 	src/render/cppx_ui/glyph_fonts.cpp
 	src/render/cppx_ui/sdf_raster.cpp
 	src/render/cppx_ui/font_registry.cpp
@@ -725,6 +728,7 @@ add_test(NAME ui_surface_tests COMMAND ui_surface_tests)
 add_executable(draw_image_tests
 	tests/draw_image_tests.cpp
 	src/render/cppx_ui/draw_executor.cpp
+	src/render/cppx_ui/ui_draw_geometry.cpp
 	src/render/cppx_ui/glyph_fonts.cpp
 	src/render/cppx_ui/sdf_raster.cpp
 	src/render/cppx_ui/font_registry.cpp
