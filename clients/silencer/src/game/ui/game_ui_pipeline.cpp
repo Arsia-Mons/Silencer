@@ -1781,6 +1781,22 @@ cppxUiW = ow;
 cppxUiH = oh;
 }
 
+// SIL-225: Options + its submenus are pushed/popped as Tier-1 overlays via
+// use_navigation, which never calls GoToState — the only RestartPaletteFade
+// trigger — so menu->options (and submenu->submenu) cut instantly. The drain
+// inside render() above has applied this frame's push/pop, so a change in the
+// visible stack depth means an overlay just opened or closed; re-fire the
+// palette fade so the new overlay fades in (game_loop's fade-in loop +
+// UiFadeAlpha dim the UI/world for the next 16 phases). Skip during FADEOUT —
+// a real state transition already owns the fade.
+{
+const int stackCount = cppxHost->pipeline().client_ui().screens().count();
+if(stackCount != prevScreenStackCount_ && game.GetState() != GameState::FADEOUT){
+game.gameRenderer.RestartPaletteFade();
+}
+prevScreenStackCount_ = stackCount;
+}
+
 // UI interaction sounds (origin ClientUi.cpp:95-111 PlayMenuButtonSound):
 // hover-ENTER edge on an audible button (dedupe via the remembered id) or an
 // activate/keyboard-navigate landing on one -> GAS soundUIClick via

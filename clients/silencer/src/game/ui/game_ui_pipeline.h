@@ -164,6 +164,12 @@ uint64_t lastHoveredAudible_ = 0;
 uint32_t uiClickCount_ = 0;
 std::map<uint16_t, client::ui::ChromeTextures::Sprite> hudEmblems_;
 bool chromeDeferredBaked_ = false;
+// SIL-225: overlay push/pop (Options + its submenus are pushed via
+// use_navigation, never GoToState) bypasses the only RestartPaletteFade
+// trigger, so menu->options cut instantly. Track the visible screen-stack
+// depth so a change can re-fire the palette fade-in (the existing fade-in
+// machinery + UiFadeAlpha then fade the new overlay in). 1 = base AppRoot.
+int prevScreenStackCount_ = 1;
 
 // SIL-15 use_settings dirty tracking: snapshot of the four persisted prefs as
 // of the last commit/revert; live Config diverging from it => Settings.dirty.
