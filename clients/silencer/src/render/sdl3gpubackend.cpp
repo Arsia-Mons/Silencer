@@ -449,6 +449,9 @@ void SDL3GPUBackend::Shutdown() {
 	if (ui_tbuf)           { SDL_ReleaseGPUTransferBuffer(device, ui_tbuf);     ui_tbuf           = nullptr; }
 	if (ui_geom_pipeline)  { SDL_ReleaseGPUGraphicsPipeline(device, ui_geom_pipeline); ui_geom_pipeline = nullptr; }
 	if (ui_scene_composite_pipeline) { SDL_ReleaseGPUGraphicsPipeline(device, ui_scene_composite_pipeline); ui_scene_composite_pipeline = nullptr; }
+	if (ui_layer_composite_pipeline) { SDL_ReleaseGPUGraphicsPipeline(device, ui_layer_composite_pipeline); ui_layer_composite_pipeline = nullptr; }
+	for (auto &lt : ui_layer_tex) if (lt) { SDL_ReleaseGPUTexture(device, lt); lt = nullptr; }
+	ui_layer_w = ui_layer_h = 0;
 	if (ui_scene_tex)      { SDL_ReleaseGPUTexture(device, ui_scene_tex);       ui_scene_tex      = nullptr; }
 	if (ui_vbuf)           { SDL_ReleaseGPUBuffer(device, ui_vbuf);             ui_vbuf           = nullptr; }
 	if (ui_vbuf_tbuf)      { SDL_ReleaseGPUTransferBuffer(device, ui_vbuf_tbuf); ui_vbuf_tbuf      = nullptr; }
@@ -766,6 +769,74 @@ bool SDL3GPUBackend::CreateUiGeometryPipelines() {
 			SDL_Log("SDL3GPUBackend: ui scene composite pipeline failed: %s", SDL_GetError());
 			return false;
 		}
+	}
+	return true;
+}
+
+// Group-opacity layer resources (SIL-240 stage 3). Lazily created the first time
+// a program carries a LayerPush; the no-layer path never touches this.
+bool SDL3GPUBackend::EnsureUiLayerResources(int w, int h) {
+	if (w <= 0 || h <= 0)
+		return false;
+	// Composite pipeline: sample an RGBA layer * opacity, premultiplied-over an
+	// RGBA target (frag_ui_composite, same as the scene composite but targeting
+	// R8G8B8A8 instead of the swapchain format).
+	if (!ui_layer_composite_pipeline) {
+		SDL_GPUColorTargetBlendState blend = {};
+		blend.enable_blend          = true;
+		blend.src_color_blendfactor = SDL_GPU_BLENDFACTOR_ONE;
+		blend.dst_color_blendfactor = SDL_GPU_BLENDFACTOR_ONE_MINUS_SRC_ALPHA;
+		blend.color_blend_op        = SDL_GPU_BLENDOP_ADD;
+		blend.src_alpha_blendfactor = SDL_GPU_BLENDFACTOR_ONE;
+		blend.dst_alpha_blendfactor = SDL_GPU_BLENDFACTOR_ONE_MINUS_SRC_ALPHA;
+		blend.alpha_blend_op        = SDL_GPU_BLENDOP_ADD;
+		SDL_GPUShader *vs = LoadShader(SDL_GPU_SHADERSTAGE_VERTEX, kVertScreen, 0);
+		SDL_GPUShader *fs = LoadShader(SDL_GPU_SHADERSTAGE_FRAGMENT, kFragUiComposite,
+		                               /*num_samplers=*/1, /*num_uniform_buffers=*/1);
+		if (!vs || !fs) {
+			if (vs) SDL_ReleaseGPUShader(device, vs);
+			if (fs) SDL_ReleaseGPUShader(device, fs);
+			return false;
+		}
+		SDL_GPUColorTargetDescription ctd = {};
+		ctd.format      = SDL_GPU_TEXTUREFORMAT_R8G8B8A8_UNORM;
+		ctd.blend_state = blend;
+		SDL_GPUGraphicsPipelineCreateInfo pi = {};
+		pi.vertex_shader   = vs;
+		pi.fragment_shader = fs;
+		pi.primitive_type  = SDL_GPU_PRIMITIVETYPE_TRIANGLELIST;
+		pi.target_info.color_target_descriptions = &ctd;
+		pi.target_info.num_color_targets         = 1;
+		ui_layer_composite_pipeline = SDL_CreateGPUGraphicsPipeline(device, &pi);
+		SDL_ReleaseGPUShader(device, vs);
+		SDL_ReleaseGPUShader(device, fs);
+		if (!ui_layer_composite_pipeline) {
+			SDL_Log("SDL3GPUBackend: ui layer composite pipeline failed: %s", SDL_GetError());
+			return false;
+		}
+	}
+	// Transient layer targets, sized to the UI scene (recreated on resize).
+	if (ui_layer_w != w || ui_layer_h != h) {
+		for (auto &lt : ui_layer_tex)
+			if (lt) { SDL_ReleaseGPUTexture(device, lt); lt = nullptr; }
+		ui_layer_w = w;
+		ui_layer_h = h;
+	}
+	for (auto &lt : ui_layer_tex) {
+		if (lt)
+			continue;
+		SDL_GPUTextureCreateInfo ti = {};
+		ti.type                 = SDL_GPU_TEXTURETYPE_2D;
+		ti.format               = SDL_GPU_TEXTUREFORMAT_R8G8B8A8_UNORM;
+		ti.usage                = SDL_GPU_TEXTUREUSAGE_SAMPLER |
+		                          SDL_GPU_TEXTUREUSAGE_COLOR_TARGET;
+		ti.width                = (Uint32)w;
+		ti.height               = (Uint32)h;
+		ti.layer_count_or_depth = 1;
+		ti.num_levels           = 1;
+		lt = SDL_CreateGPUTexture(device, &ti);
+		if (!lt)
+			return false;
 	}
 	return true;
 }
@@ -1297,6 +1368,14 @@ void SDL3GPUBackend::Present() {
 			ui_scene_w = sw;
 			ui_scene_h = sh;
 		}
+		// Stage 3: only when the program carries group-opacity layers, ensure the
+		// layer composite pipeline + transient target pool (the common path
+		// allocates nothing here).
+		bool has_layers = false;
+		for (const auto &cm : prog.commands)
+			if (cm.op == silencer::cppx_ui::GpuUiOp::PushLayer) { has_layers = true; break; }
+		if (has_layers)
+			EnsureUiLayerResources(sw, sh);
 		// Vertex storage buffer, grown to hold the de-indexed vertex stream.
 		const Uint32 vcount = (Uint32)prog.verts.size();
 		if (vcount > 0) {
@@ -1650,54 +1729,120 @@ void SDL3GPUBackend::Present() {
 	if (ui_geom_present && pending_ui_program && ui_geom_pipeline && ui_scene_tex &&
 	    ui_vbuf && ui_white_ready) {
 		const silencer::cppx_ui::GpuUiProgram &prog = *pending_ui_program;
-		SDL_GPUColorTargetInfo ct = {};
-		ct.texture     = ui_scene_tex;
-		ct.load_op     = SDL_GPU_LOADOP_CLEAR;
-		ct.store_op    = SDL_GPU_STOREOP_STORE;
-		ct.clear_color = {0, 0, 0, 0};
-		SDL_GPURenderPass *pass = SDL_BeginGPURenderPass(cmd, &ct, 1, nullptr);
-		if (pass) {
-			SDL_BindGPUGraphicsPipeline(pass, ui_geom_pipeline);
-			SDL_GPUBufferBinding vbind = {ui_vbuf, 0};
-			SDL_BindGPUVertexBuffers(pass, 0, &vbind, 1);
-			const SDL_Rect full = {0, 0, ui_scene_w, ui_scene_h};
-			for (const auto &c : prog.commands) {
-				switch (c.op) {
-				case silencer::cppx_ui::GpuUiOp::DrawBatch: {
-					if (c.vertex_count == 0) break;
-					SDL_GPUTexture *tex = ui_white_tex;
-					if (c.texture_key != 0) {
-						auto it = ui_tex_cache.find(c.texture_key);
-						if (it != ui_tex_cache.end() && it->second) tex = it->second;
-					}
-					SDL_GPUTextureSamplerBinding bind = {tex, nearest_sampler};
-					SDL_BindGPUFragmentSamplers(pass, 0, &bind, 1);
-					// first_vertex offsets the input assembler into the bound buffer.
-					SDL_DrawGPUPrimitives(pass, c.vertex_count, 1, c.first_vertex, 0);
-					break;
-				}
-				case silencer::cppx_ui::GpuUiOp::SetClip: {
-					// Clamp to the target so SDL_GPU scissor validation passes.
-					SDL_Rect r = {c.clip_x, c.clip_y, c.clip_w, c.clip_h};
-					if (r.x < 0) { r.w += r.x; r.x = 0; }
-					if (r.y < 0) { r.h += r.y; r.y = 0; }
-					if (r.x + r.w > ui_scene_w) r.w = ui_scene_w - r.x;
-					if (r.y + r.h > ui_scene_h) r.h = ui_scene_h - r.y;
-					if (r.w < 0) r.w = 0;
-					if (r.h < 0) r.h = 0;
-					SDL_SetGPUScissor(pass, &r);
-					break;
-				}
-				case silencer::cppx_ui::GpuUiOp::ClearClip:
-					SDL_SetGPUScissor(pass, &full);
-					break;
-				case silencer::cppx_ui::GpuUiOp::PushLayer:
-				case silencer::cppx_ui::GpuUiOp::PopLayer:
-					break; // stage 3: group-opacity transient targets
-				}
+		const SDL_Rect full = {0, 0, ui_scene_w, ui_scene_h};
+		// Group-opacity layers (stage 3): each PushLayer redirects the subtree into
+		// a transient target, composited back over its parent at PopLayer. Resources
+		// are ready only when the program carries layers; otherwise Push/Pop fall
+		// back to inline (full-opacity) draws — the common path is then unchanged.
+		const bool layers_ready =
+		    ui_layer_composite_pipeline != nullptr && ui_layer_tex[0] != nullptr &&
+		    ui_layer_w == ui_scene_w && ui_layer_h == ui_scene_h;
+		SDL_GPUTexture *layer_stack[kMaxUiLayers];
+		float layer_opacity[kMaxUiLayers];
+		int layer_depth = 0;
+		SDL_Rect cur_clip = full; // tracked so a pass switch can re-apply it
+		bool clip_active = false;
+		SDL_GPUBufferBinding vbind = {ui_vbuf, 0};
+
+		// Begin a geometry pass on `target`, (re)binding the geometry pipeline +
+		// vertex buffer and re-applying the active clip (clip carries across the
+		// pass switches a layer push/pop forces).
+		auto begin_geom = [&](SDL_GPUTexture *target,
+		                      SDL_GPULoadOp load) -> SDL_GPURenderPass * {
+			SDL_GPUColorTargetInfo ct = {};
+			ct.texture     = target;
+			ct.load_op     = load;
+			ct.store_op    = SDL_GPU_STOREOP_STORE;
+			ct.clear_color = {0, 0, 0, 0};
+			SDL_GPURenderPass *p = SDL_BeginGPURenderPass(cmd, &ct, 1, nullptr);
+			if (p) {
+				SDL_BindGPUGraphicsPipeline(p, ui_geom_pipeline);
+				SDL_BindGPUVertexBuffers(p, 0, &vbind, 1);
+				SDL_SetGPUScissor(p, clip_active ? &cur_clip : &full);
 			}
-			SDL_EndGPURenderPass(pass);
+			return p;
+		};
+
+		SDL_GPURenderPass *pass = begin_geom(ui_scene_tex, SDL_GPU_LOADOP_CLEAR);
+		for (const auto &c : prog.commands) {
+			if (!pass) break; // a pass (re)begin failed; abandon the rest of the frame
+			switch (c.op) {
+			case silencer::cppx_ui::GpuUiOp::DrawBatch: {
+				if (c.vertex_count == 0) break;
+				SDL_GPUTexture *tex = ui_white_tex;
+				if (c.texture_key != 0) {
+					auto it = ui_tex_cache.find(c.texture_key);
+					if (it != ui_tex_cache.end() && it->second) tex = it->second;
+				}
+				SDL_GPUTextureSamplerBinding bind = {tex, nearest_sampler};
+				SDL_BindGPUFragmentSamplers(pass, 0, &bind, 1);
+				// first_vertex offsets the input assembler into the bound buffer.
+				SDL_DrawGPUPrimitives(pass, c.vertex_count, 1, c.first_vertex, 0);
+				break;
+			}
+			case silencer::cppx_ui::GpuUiOp::SetClip: {
+				// Clamp to the target so SDL_GPU scissor validation passes.
+				SDL_Rect r = {c.clip_x, c.clip_y, c.clip_w, c.clip_h};
+				if (r.x < 0) { r.w += r.x; r.x = 0; }
+				if (r.y < 0) { r.h += r.y; r.y = 0; }
+				if (r.x + r.w > ui_scene_w) r.w = ui_scene_w - r.x;
+				if (r.y + r.h > ui_scene_h) r.h = ui_scene_h - r.y;
+				if (r.w < 0) r.w = 0;
+				if (r.h < 0) r.h = 0;
+				cur_clip = r;
+				clip_active = true;
+				SDL_SetGPUScissor(pass, &cur_clip);
+				break;
+			}
+			case silencer::cppx_ui::GpuUiOp::ClearClip:
+				clip_active = false;
+				SDL_SetGPUScissor(pass, &full);
+				break;
+			case silencer::cppx_ui::GpuUiOp::PushLayer: {
+				if (!layers_ready || layer_depth >= kMaxUiLayers)
+					break; // fall back to inline (full-opacity) draw
+				SDL_EndGPURenderPass(pass);
+				SDL_GPUTexture *lt = ui_layer_tex[layer_depth];
+				layer_stack[layer_depth] = lt;
+				layer_opacity[layer_depth] = c.layer_opacity;
+				++layer_depth;
+				// Transparent clear; the active clip carries into the layer.
+				pass = begin_geom(lt, SDL_GPU_LOADOP_CLEAR);
+				break;
+			}
+			case silencer::cppx_ui::GpuUiOp::PopLayer: {
+				if (layer_depth <= 0)
+					break;
+				SDL_EndGPURenderPass(pass);
+				--layer_depth;
+				SDL_GPUTexture *lt = layer_stack[layer_depth];
+				const float op = layer_opacity[layer_depth];
+				SDL_GPUTexture *parent =
+				    layer_depth > 0 ? layer_stack[layer_depth - 1] : ui_scene_tex;
+				// Composite the flattened layer over its parent at `op` (premultiplied
+				// multiply, under the active clip) — the GPU analogue of the
+				// executor's color-mod/alpha-mod RenderTexture.
+				SDL_GPUColorTargetInfo ct = {};
+				ct.texture  = parent;
+				ct.load_op  = SDL_GPU_LOADOP_LOAD;
+				ct.store_op = SDL_GPU_STOREOP_STORE;
+				pass = SDL_BeginGPURenderPass(cmd, &ct, 1, nullptr);
+				if (!pass) break;
+				SDL_SetGPUScissor(pass, clip_active ? &cur_clip : &full);
+				SDL_BindGPUGraphicsPipeline(pass, ui_layer_composite_pipeline);
+				SDL_GPUTextureSamplerBinding b = {lt, nearest_sampler};
+				SDL_BindGPUFragmentSamplers(pass, 0, &b, 1);
+				const float u[4] = {op, 0.f, 0.f, 0.f};
+				SDL_PushGPUFragmentUniformData(cmd, 0, u, sizeof(u));
+				SDL_DrawGPUPrimitives(pass, 3, 1, 0, 0);
+				// Resume geometry drawing into the parent target.
+				SDL_BindGPUGraphicsPipeline(pass, ui_geom_pipeline);
+				SDL_BindGPUVertexBuffers(pass, 0, &vbind, 1);
+				break;
+			}
+			}
 		}
+		if (pass) SDL_EndGPURenderPass(pass);
 	}
 
 	// ---- 6. Acquire swapchain — null when minimized ----

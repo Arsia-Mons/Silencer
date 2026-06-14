@@ -462,9 +462,12 @@ void build_ui_draw_program(const ::ui::DrawCommandList &list,
         b.emit_clear_clip();
       break;
     case ::ui::DrawCommandKind::LayerPush:
+      // Group opacity (design §9.10): the subtree renders into a transient GPU
+      // target the backend composites back at this opacity (premultiplied).
+      b.emit_push_layer(c.payload.layer.opacity);
+      break;
     case ::ui::DrawCommandKind::LayerPop:
-      // Stage 3: group-opacity transient render targets. Until then the subtree
-      // draws inline (full opacity), which is correct for opacity==1.
+      b.emit_pop_layer();
       break;
     default:
       break;

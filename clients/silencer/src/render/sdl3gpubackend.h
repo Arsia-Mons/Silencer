@@ -76,6 +76,9 @@ private:
 	bool CreateParticlePipelines();
 	bool CreateLobbyPanelBlurPipeline();
 	bool CreateUiGeometryPipelines();
+	// Ensure the group-opacity layer composite pipeline + transient target pool
+	// exist at w x h (lazy; only called when a program carries layers).
+	bool EnsureUiLayerResources(int w, int h);
 	// Ensure a 1x1 white texture exists for solid (untextured) UI batches.
 	bool EnsureUiWhiteTexture(SDL_GPUCopyPass *copy);
 	// Ensure the key's premultiplied bytes are resident as a GPU texture; uploads
@@ -143,6 +146,17 @@ private:
 	const silencer::cppx_ui::GpuUiProgram *pending_ui_program = nullptr;
 	bool                   ui_geom_present = false;
 	Uint8                  ui_geom_fade    = 255;     // global fade, 0..255
+
+	// Group-opacity layers (SIL-240 stage 3): a LayerPush redirects the subtree
+	// into a transient RGBA target, composited back over its parent at the layer
+	// opacity (a fullscreen premultiplied multiply) at LayerPop. Pool indexed by
+	// nesting depth, sized to ui_scene_tex; allocated only when a program carries
+	// layers (group opacity < 1), so the common no-layer path stays untouched.
+	static constexpr int   kMaxUiLayers = 4;
+	SDL_GPUGraphicsPipeline *ui_layer_composite_pipeline = nullptr; // layer -> RGBA parent (opacity)
+	SDL_GPUTexture        *ui_layer_tex[kMaxUiLayers] = {};
+	int                    ui_layer_w   = 0;
+	int                    ui_layer_h   = 0;
 
 	// --- Swapchain capture (SIL-11 screenshot): download the final composited
 	// frame on request. Armed by RequestCapture(), filled during Present(). ---
