@@ -284,6 +284,41 @@ struct GameBrowserProps {
   </Box>
 }
 
+// SIL-234: the right-column "Connecting" hold. While a create/join is in flight
+// (clicked, not yet connected), the right column shows this stable panel instead
+// of flashing the games browser between the create form and staging — origin
+// masks the same window with a "Creating game..." progress modal. Top region.
+::ui::UiElement ConnectingPanel() {
+  return <Box
+    key="centercol"
+    layout={::ui::LayoutStyle{
+      .direction = ::ui::FlexDirection::Column,
+      .align_items = ::ui::AlignItems::Center,
+      .justify_content = ::ui::JustifyContent::Center,
+      .min_width = ::ui::Length::points(0.0f),
+      .flex_basis = ::ui::Length::points(0.0f),
+      .flex_grow = ::ui::StyleFloat::points(1.0f),
+      .padding = {6.0f, 6.0f, 7.0f, 0.0f}}}
+    style={lobby_panel_open_right()}
+  >
+    <ScreenTitle key="connecting" variant={ScreenTitleVariant::Console} value="Connecting..." />
+  </Box>
+}
+
+// SIL-234: the tall-cell counterpart of ConnectingPanel — keeps the right
+// cockpit cell occupied (same chrome as ActiveGamesCell) so the column reads as
+// one stable connecting state through the join window. Shares the "rightcell"
+// key so the slot reconciles in place when staging mounts.
+::ui::UiElement ConnectingCell(float tall_w) {
+  ::ui::LayoutStyle cell = lobby_right_cell_layout(tall_w);
+  cell.direction = ::ui::FlexDirection::Column;
+  cell.align_items = ::ui::AlignItems::Center;
+  cell.justify_content = ::ui::JustifyContent::Center;
+  return <Box key="rightcell" layout={cell} style={lobby_panel_open_left()}>
+    <ScreenTitle key="connecting" variant={ScreenTitleVariant::Console} value="Please wait" />
+  </Box>
+}
+
 // The lobby's right cockpit column: the Active Games browser, or (while creating
 // a game) the Select Map filename list (CreateRightCell). Both share the key
 // "rightcell" so the slot reconciles in place when the mode swaps.
@@ -1707,6 +1742,11 @@ struct LobbyScreenProps {
     right = TechUpperPanel([tech_open]() { *tech_open = false; });
   } else if (staging.active) {
     right = StagingPanel(sp);
+  } else if (staging.joining) {
+    // SIL-234: hold a stable Connecting panel through the async connect window
+    // (the create form already cleared show_create), so the right column never
+    // flashes the games browser before staging mounts.
+    right = ConnectingPanel();
   } else if (*show_create) {
     right = GameCreatePanel(options_props);
   } else {
@@ -1742,6 +1782,10 @@ struct LobbyScreenProps {
                               [tech_sel](int index) { *tech_sel = index; });
   } else if (staging.active) {
     right_cell = StagingRosterCell(sp, panes.tall_w);
+  } else if (staging.joining) {
+    // SIL-234: stable Connecting hold for the tall cell (mirrors the right
+    // region above) so the column doesn't flash the games browser mid-connect.
+    right_cell = ConnectingCell(panes.tall_w);
   } else if (*show_create) {
     CreateRightCellProps rc;
     rc.rows = ::ui::children(map_rows);

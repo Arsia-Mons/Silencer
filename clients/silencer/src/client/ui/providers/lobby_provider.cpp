@@ -130,6 +130,7 @@ Staging use_staging() {
   const LobbySnapshot &s = value->snapshot;
   return {
       .active = s.staging_active,
+      .joining = s.joining,
       .in_game_lobby = s.staging_in_lobby,
       .is_host = s.staging_is_host,
       .ready_blocked = s.staging_ready_blocked,

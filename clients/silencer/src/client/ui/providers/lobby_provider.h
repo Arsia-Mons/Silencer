@@ -41,6 +41,12 @@ struct LobbySnapshot {
   std::vector<GameBrowserEntry> games = {}; // open games (structured)
   std::vector<std::string> bundled_maps = {}; // create-form map choices
 
+  // --- create/join in flight (SIL-234) — masks the browser through the async
+  // connect so the right column doesn't flash the games browser between the
+  // create form and staging. True from the Create/Join click until the connect
+  // settles (staging takes over on connect; cleared on idle/failure). ---
+  bool joining = false;
+
   // --- staging room (LobbyScreen GameJoinPanel) — built when connected ---
   bool staging_active = false;       // connected to a game (staging or playing)
   bool staging_in_lobby = false;     // World::IsInLobby() — still pre-match

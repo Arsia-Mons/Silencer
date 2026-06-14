@@ -44,6 +44,10 @@ struct StagingTechRow {
 
 struct Staging {
   bool active = false;
+  // SIL-234: a create/join is in flight but the connect hasn't settled yet.
+  // The lobby right column holds a stable "Connecting" panel while this is true
+  // (and !active) so it never flashes the games browser before staging mounts.
+  bool joining = false;
   bool in_game_lobby = false;
   bool is_host = false;
   bool ready_blocked = false;
