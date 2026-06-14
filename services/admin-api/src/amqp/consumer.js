@@ -4,6 +4,7 @@ import Player from '../db/models/Player.js';
 import Session from '../db/models/Session.js';
 import Event from '../db/models/Event.js';
 import MatchStat from '../db/models/MatchStat.js';
+import KillEvent from '../db/models/KillEvent.js';
 import { handleLobbyEvent, setRabbitMQStatus } from '../ws/index.js';
 
 const EXCHANGE = 'silencer.events';
@@ -266,5 +267,19 @@ async function persistEvent(type, data) {
       }
       break;
     }
+
+    case 'game.kill_event':
+      await KillEvent.create({
+        gameId:          data.gameId,
+        mapName:         data.mapName,
+        x:               data.x,
+        y:               data.y,
+        killerAccountId: data.killerAccountId ?? null,
+        victimAccountId: data.victimAccountId ?? null,
+        weapon:          data.weapon ?? 0,
+        agencyIdx:       data.agencyIdx ?? 0,
+        ts:              new Date(data.ts || Date.now()),
+      });
+      break;
   }
 }

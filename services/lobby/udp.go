@@ -10,6 +10,9 @@ import (
 // [0x00][u32 gameid][u16 port][u8 state][u8 parkedcount][u32 acct]*parkedcount
 //         [u32 tickcount][u32 aliveMask]   ← extended fields, issue #23
 //
+// Kill events (opcode 0x01):
+// [0x01][u32 gameid][u32 killerAccountId][u32 victimAccountId][u8 weapon][u8 agencyIdx][i32 x][i32 y]
+//
 // The parkedcount + accountid list, and the extended fields, are optional for
 // forward-compat with older dedicated servers.
 func serveUDP(conn *net.UDPConn, hub *Hub) {
@@ -55,6 +58,19 @@ func serveUDP(conn *net.UDPConn, hub *Hub) {
 			hub.OnHeartbeat(gameID, addr.IP.String(), port, state, parked, tickCount, aliveMask)
 		default:
 			log.Printf("[udp] unknown opcode 0x%02x from %s", buf[0], addr)
+		case 0x01:
+			// Kill event: [u32 gameid][u32 killerAcct][u32 victimAcct][u8 weapon][u8 agencyIdx][i32 x][i32 y]
+			if n < 1+4+4+4+1+1+4+4 {
+				continue
+			}
+			gameID          := binary.LittleEndian.Uint32(buf[1:5])
+			killerAccountID := binary.LittleEndian.Uint32(buf[5:9])
+			victimAccountID := binary.LittleEndian.Uint32(buf[9:13])
+			weapon          := buf[13]
+			agencyIdx       := buf[14]
+			x               := int32(binary.LittleEndian.Uint32(buf[15:19]))
+			y               := int32(binary.LittleEndian.Uint32(buf[19:23]))
+			hub.OnKillEvent(gameID, killerAccountID, victimAccountID, weapon, agencyIdx, x, y)
 		}
 	}
 }

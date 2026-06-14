@@ -202,4 +202,14 @@ export const saveBehaviorTree = (id: string, bt: BehaviorTree): Promise<unknown>
 export const deleteBehaviorTree = (id: string): Promise<unknown> =>
   apiFetch(`/behaviortrees/${id}`, { method: 'DELETE' });
 
+// Analytics
+export const getAnalyticsMaps     = (): Promise<{ maps: { mapName: string; kills: number }[] }> =>
+  apiFetch('/analytics/maps') as Promise<{ maps: { mapName: string; kills: number }[] }>;
+export const getAnalyticsWeapons  = (mapName: string, params?: Record<string, string>): Promise<unknown> =>
+  apiFetch('/analytics/maps/' + encodeURIComponent(mapName) + '/weapons?' + new URLSearchParams(params ?? {}));
+export const getAnalyticsAgencies = (mapName: string, params?: Record<string, string>): Promise<unknown> =>
+  apiFetch('/analytics/maps/' + encodeURIComponent(mapName) + '/agencies?' + new URLSearchParams(params ?? {}));
+export const getAnalyticsHeatmap  = (mapName: string, params?: Record<string, string>): Promise<unknown> =>
+  apiFetch('/analytics/maps/' + encodeURIComponent(mapName) + '/heatmap?' + new URLSearchParams(params ?? {}));
+
 // Sound Studio — see web/admin/app/sound-studio/page.tsx for usage
