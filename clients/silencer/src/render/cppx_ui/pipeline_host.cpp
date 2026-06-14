@@ -1,5 +1,6 @@
 #include "pipeline_host.h"
 
+#include "perf_trace.h"
 #include "draw_executor.h"
 #include "sprite_bake.h"
 #include "text_measure.h"
@@ -190,6 +191,7 @@ const uint8_t *PipelineHost::render(const client::ui::UiPipelineFrame &frame,
       unchanged = true;
       return; // cached packed_ is still correct for this IR
     }
+    PERF_SCOPE("ui.raster");
     // Transparent clear: the UI composites over the already-rendered world.
     const float scale =
         ui_.begin_frame(::ui::Color{0, 0, 0, 0}, device_scale, 1);

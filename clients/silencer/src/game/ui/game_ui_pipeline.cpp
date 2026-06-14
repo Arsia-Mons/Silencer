@@ -12,6 +12,7 @@
 #include "detonator.h"
 #include "gasloader.h"
 #include "objecttypes.h"
+#include "perf_trace.h"
 #include "player.h"
 #include "buyableitem.h"
 // SIL-14 golden cppx render path.
@@ -1776,7 +1777,8 @@ worldSessionSnapshot_ = silencer::game_ui::CaptureWorldSessionSnapshot(game, Cur
 int ow = 0;
 int oh = 0;
 bool unchanged = false;
-const uint8_t * rgba = cppxHost->render(frame, &ow, &oh, &unchanged);
+const uint8_t * rgba;
+{ PERF_SCOPE("ui.pipeline"); rgba = cppxHost->render(frame, &ow, &oh, &unchanged); }
 if(rgba){
 cppxUiRgba = rgba;
 cppxUiW = ow;

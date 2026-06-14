@@ -250,6 +250,34 @@ usage patterns.
 | `--control-port <n>` | Open JSON-lines TCP control socket on port *n* |
 | `--tui` | Stream paletted framebuffer over TCP to the `silencer-tui` host (`SILENCER_TUI_FRAME_HOST/_PORT`); skips SDL video, keeps audio. See `clients/tui/CLAUDE.md`. |
 
+## Perf tracing
+
+Set the `SILENCER_PERF` env var (any value) to print a per-section
+frame-time breakdown to stdout once per second. Off by default; when
+unset every hook is a single bool test, so the scopes stay compiled in.
+
+```
+[perf] 60fps frame 16.67ms | present 13.9 | ui 2.30 | ui.pipeline 2.24 | ui.raster 0.00 | world.draw 0.01 | sim 0.01 | game.tick 0.00
+```
+
+`frame` is the wall-clock period; the rest are avg ms/frame over the
+window, sorted by cost. Sections (`src/platform/perf_trace.{h,cpp}`,
+hooked in `game/loop/game_loop.cpp` + the cppx render path):
+
+- `ui` — whole `RenderClientUiFrame`; `ui.pipeline` — cppx build+layout+IR
+  +raster; `ui.raster` — just the native-res raster (skipped when the IR
+  is byte-identical, SIL-237). `ui` − `ui.pipeline` ≈ per-frame provider
+  assembly; `ui.pipeline` − `ui.raster` ≈ build+Yoga layout+IR.
+- `world.draw` — 8-bit world raster (in-game only); `sim`/`game.tick` —
+  world + state-machine tick; `present` — GPU upload + vsync wait;
+  `idle.throttle` — the unfocused-window `SDL_Delay` (background cap, not
+  real cost — focus the window or run `--headless` for true numbers).
+
+Add a scope with `PERF_SCOPE("name")` (RAII, times its block). Reading it:
+windowed = vsync-bound real numbers (`present` ≈ vsync wait); `--headless`
+free-runs at 640×480 = pure CPU, no vsync/throttle. Drive menus via the
+CLI and `grep '\[perf\]'` the run log.
+
 ## Gotchas
 
 - **Build-time config is baked at configure.** Lobby host/port and

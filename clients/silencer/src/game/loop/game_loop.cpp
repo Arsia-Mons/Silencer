@@ -5,6 +5,7 @@
 #include "gasloader.h"
 #include "lobbygame.h"
 #include "objecttypes.h"
+#include "perf_trace.h"
 #include "player.h"
 #include "state.h"
 #include <stdio.h>
@@ -287,11 +288,13 @@ bool Game::Loop(void){
 			gameInput.UpdateInputState(world.localinput);
 		}
 		world.SendInput();
-		if(!Tick()){
+		bool tickOk;
+		{ PERF_SCOPE("game.tick"); tickOk = Tick(); }
+		if(!tickOk){
 			return false;
 		}
 		if(!world.replay.IsPlaying() || (world.replay.IsPlaying() && world.gameplaystate == World::INGAME)){
-			world.Tick();
+			{ PERF_SCOPE("sim"); world.Tick(); }
 			gameInput.TickRumble();
 		}
 		if(!world.dedicatedserver.active){
@@ -327,14 +330,14 @@ bool Game::Loop(void){
 			// gameplay; native-sized CPU frames are too expensive fullscreen.
 			ResizeRenderSurfacePixels(kLegacyRenderWidth, kLegacyRenderHeight);
 			GetScreenBuffer().Clear(0);
-			renderer.Draw(&GetScreenBuffer(), ft);
+			{ PERF_SCOPE("world.draw"); renderer.Draw(&GetScreenBuffer(), ft); }
 			gameUiPipeline.DrawInGameWorldInsets(GetScreenBuffer(), ft);
 		}else{
 			if(gameRenderer.GetWindow()) SyncRenderSurfaceToWindowPixels();
 			GetScreenBuffer().Clear(0);
-			renderer.Draw(&GetScreenBuffer(), ft);
+			{ PERF_SCOPE("world.draw"); renderer.Draw(&GetScreenBuffer(), ft); }
 		}
-		gameUiPipeline.RenderClientUiFrame(GetScreenBuffer(), ft);
+		{ PERF_SCOPE("ui"); gameUiPipeline.RenderClientUiFrame(GetScreenBuffer(), ft); }
 #ifdef POSIX
 		if(world.replay.IsPlaying() && world.replay.ffmpeg && world.replay.ffmpegvideo && gameSession.DeployMessageShownRef()){
 			std::vector<Uint8> buffer(GetScreenBuffer().w * GetScreenBuffer().h * 3);
@@ -355,11 +358,11 @@ bool Game::Loop(void){
 		sprintf(fpstext, "%d", fps);
 		renderer.DrawText(&screenbuffer, 10, 30, fpstext, 133, 7);*/
 		if(minimized){
-			SDL_Delay(wait);
+			PERF_SCOPE("idle.throttle"); SDL_Delay(wait);
 		}
 		world.DoNetwork();
 		//Uint32 drawtick = SDL_GetTicks();
-		if(!headless || tui) Present();
+		if(!headless || tui){ PERF_SCOPE("present"); Present(); }
 		// In TUI mode, the frontend owning our render output may disconnect
 		// (terminal closed, host process killed). TUIBackend tears the socket
 		// down on any write failure; we observe that here and exit cleanly
@@ -375,6 +378,7 @@ bool Game::Loop(void){
 		// cadence) and well below "burn a CPU core for no reason".
 		if(tui) SDL_Delay(33);
 		PostFrameReplies();
+		perf::FrameMark();
 		//Uint32 afterdrawtick = SDL_GetTicks();
 		/*if(1 || afterdrawtick - drawtick > wait){
 			printf("frame took %d ms to present\n", afterdrawtick - drawtick);
