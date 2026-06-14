@@ -63,19 +63,35 @@ constexpr float kViewportH = kRowH * 3.0f + kRowContentH; // 4 visible rows
 // used a 72-tick capture timeout; the capture hook delegates it to the screen).
 constexpr int kRebindTimeoutFrames = 72;
 
-// One combo's chips AND-joined (" + "); "" if the combo is absent. Primary =
-// combo 0, alternate = combo 1 — origin/main shows two bind slots per action.
-std::string combo_display(const KeyMapAction &a, size_t combo_index) {
-  if (combo_index >= a.combos.size())
-    return "";
-  const KeyMapCombo &c = a.combos[combo_index];
-  std::string out;
-  for (size_t k = 0; k < c.chips.size(); ++k) {
-    if (k)
-      out += " + ";
-    out += c.chips[k].label;
+// origin's two-slot binding view (options_controls_screen.cpp ViewLegacy):
+// every action renders as exactly two bind slots joined by an And/Or connector.
+//   - a 2-chip chord in combo 0  -> slot1 = chip0, slot2 = chip1, connector And
+//   - otherwise                  -> slot1 = combo0's first chip,
+//                                    slot2 = combo1's first chip, connector Or
+// (An action's first combo being a chord means the two keys are pressed
+// together — diagonal aim; separate combos are alternates.)
+struct BindingView {
+  std::string slot1; // left oval label ("" = unbound)
+  std::string slot2; // right oval label ("" = unbound)
+  bool and_ = false; // connector: true = "And" (chord), false = "Or"
+};
+
+BindingView binding_view(const KeyMapAction &a) {
+  BindingView v;
+  if (a.combos.empty())
+    return v;
+  const KeyMapCombo &c0 = a.combos[0];
+  if (c0.chips.size() >= 2) {
+    v.slot1 = c0.chips[0].label;
+    v.slot2 = c0.chips[1].label;
+    v.and_ = true;
+    return v;
   }
-  return out;
+  if (!c0.chips.empty())
+    v.slot1 = c0.chips[0].label;
+  if (a.combos.size() >= 2 && !a.combos[1].chips.empty())
+    v.slot2 = a.combos[1].chips[0].label;
+  return v;
 }
 
 // Index of the combo a Rebind replaces (0 if the action already has one, else
@@ -95,6 +111,7 @@ int rebind_combo_index(const KeyMap &km, Action action) {
 ::ui::UiElement make_binding_row(const char *key, const char *primary_id,
                                  const char *secondary_id, const char *label,
                                  const char *primary, const char *secondary,
+                                 bool is_and,
                                  std::function<void()> rebind_primary,
                                  std::function<void()> rebind_secondary) {
   return <Box
@@ -132,7 +149,7 @@ int rebind_combo_index(const KeyMap &km, Action action) {
     >
       <Text
         key="or"
-        value="OR"
+        value={is_and ? "AND" : "OR"}
         layout={::ui::LayoutStyle{
           .height = ::ui::Length::points(tokens::kLineLarge),
           .margin = ::ui::EdgeSizes{2.0f, {}, {}, {}}}}
@@ -239,10 +256,11 @@ struct OptionsControlsProps {
     const char *pid = ::ui::copy_string(("BindP" + std::to_string(i)).c_str());
     const char *sid = ::ui::copy_string(("BindS" + std::to_string(i)).c_str());
     const char *label = ::ui::copy_string((a.label + ":").c_str());
-    std::string p = combo_display(a, 0);
-    std::string s = combo_display(a, 1);
-    const char *prim = p.empty() ? nullptr : ::ui::copy_string(p.c_str());
-    const char *sec = s.empty() ? nullptr : ::ui::copy_string(s.c_str());
+    BindingView bv = binding_view(a);
+    const char *prim = bv.slot1.empty() ? nullptr
+                                        : ::ui::copy_string(bv.slot1.c_str());
+    const char *sec = bv.slot2.empty() ? nullptr
+                                       : ::ui::copy_string(bv.slot2.c_str());
     Action act = a.action;
     std::function<void()> rb0 = [cap, km, act]() {
       if (cap.begin_capture)
@@ -252,8 +270,8 @@ struct OptionsControlsProps {
       if (cap.begin_capture)
         cap.begin_capture(act, 1);
     };
-    rows.push_back(
-        make_binding_row(rkey, pid, sid, label, prim, sec, rb0, rb1));
+    rows.push_back(make_binding_row(rkey, pid, sid, label, prim, sec, bv.and_,
+                                    rb0, rb1));
   }
   // Viewport spans the five golden rows (Preset + 4 Move); extra actions scroll
   // through the sprite's baked rail. Full content width so the column lanes land
