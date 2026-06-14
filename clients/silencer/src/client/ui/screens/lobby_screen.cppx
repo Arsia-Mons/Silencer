@@ -76,14 +76,43 @@ std::string cap_lobby_chat_text(const std::string &value) {
   </Box>
 }
 
-// One game-browser entry as its own row (name + detail), caret-marked when
-// selected.
-::ui::UiElement game_line(const char *key, const char *value, bool selected) {
-  return <BodyText
-    key={key}
-    variant={selected ? BodyTextVariant::Strong : BodyTextVariant::Body}
-    value={value}
-  />
+// Selected-row styling shared by the Active-Games + Select-Map lists: origin
+// draws the selection as a single SOLID legacy-palette-180 fill bar (renderer
+// SELECTBOX), no caret/border/focus ring. Defined later; forward-declared here
+// so the game-browser rows above can use the same treatment.
+::ui::StyleStatePatch selectable_row_style(bool selected);
+
+// One game-browser entry as its own row: origin ScrollList draws the filename at
+// the same Body weight on every row; the selected row is the solid 180 highlight
+// bar (NOT a "> " caret). Mirrors map_list_rows' row treatment (height = origin
+// kListLineH 14 v -> 21 logical, text inset 6 logical).
+::ui::UiElement game_row(const char *key, const char *id, int offset,
+                         const char *value, bool selected,
+                         std::function<void()> on_select) {
+  std::function<void(const ::ui::ActivationEvent &)> activate =
+      [on_select](const ::ui::ActivationEvent &) {
+        if (on_select)
+          on_select();
+      };
+  std::function<void(const ::ui::FocusEvent &)> focus =
+      [on_select](const ::ui::FocusEvent &) {
+        if (on_select)
+          on_select();
+      };
+  return Box(BoxProps{
+      .key = key,
+      .id = id,
+      .id_offset = offset,
+      .focusable = true,
+      .accessibility = {.label = value},
+      .on_focus = focus,
+      .on_activate = activate,
+      .layout = ::ui::LayoutStyle{.height = ::ui::Length::points(21.0f),
+                                  .flex_shrink = ::ui::StyleFloat::points(0.0f),
+                                  .padding = {6.0f, 0.0f, 2.0f, 0.0f}},
+      .style = selectable_row_style(selected),
+      .children = ::ui::children({BodyText(BodyTextProps{
+          .key = "t", .variant = BodyTextVariant::Body, .value = value})})});
 }
 
 // The right tall column (origin rightTallW; 463 logical at the design canvas,
@@ -210,37 +239,53 @@ struct CenterColProps {
 struct GameBrowserProps {
   std::vector<GameBrowserEntry> entries = {};
   int selected = 0;
-  // origin game_select_panel info block (selected game): five Body lines in
-  // order — name, "Map: ..", "<Sec> Security", "Creator: ..", limits. Empty
-  // strings render as a blank slot (origin keeps the slot height stable).
+  // origin game_select_panel RecomputeInfoBlock (selected game): five Body lines
+  // in order — name, "Map: ..", "<Sec> Security", "Creator: ..", limits. Empty
+  // strings render as a blank fixed-height slot (origin keeps the slot height).
   const char *info_name = "";
   const char *info_map = "";
   const char *info_security = "";
   const char *info_creator = "";
   const char *info_limits = "";
-  bool can_join = false;
-  bool can_spectate = false;
+  // joinVisible / spectateVisible (RecomputeInfoBlock). When false the button is
+  // HIDDEN but its fixed-height slot stays reserved.
+  bool join_visible = false;
+  bool spectate_visible = false;
+  std::function<void(int)> on_select = {};
   std::function<void()> on_join = {};
   std::function<void()> on_spectate = {};
 };
 
-// One info-block line (origin BuildGameSelectInfoBlock: a fixed-height Body row,
-// blank when the field is empty).
+// origin layout knobs (game_select_panel_layout.cpp), virtual px x1.5 -> logical.
+constexpr float kTallInfoRowH = 12.0f * 1.5f;   // 18: fixed info-row slot height
+constexpr float kTallButtonRowH = 21.0f * 1.5f; // 31.5: fixed button-slot height
+constexpr float kTallButtonGap = 2.0f * 1.5f;   // 3
+constexpr float kTallFooterGap = 4.0f * 1.5f;   // 6
+constexpr float kTallFooterPadTop = 4.0f * 1.5f;// 6
+constexpr float kTallInfoPadLeft = 7.0f * 1.5f; // 10.5
+// footerH reserved below the list box: padTop 6 + 5*18 + gap 6 + 31.5 + 3 + 31.5.
+constexpr float kGameSelectFooterH = kTallFooterPadTop + 5.0f * kTallInfoRowH +
+                                     kTallFooterGap + kTallButtonRowH +
+                                     kTallButtonGap + kTallButtonRowH;
+
+// One info-block line (origin BuildGameSelectInfoBlock: a FIXED-height Body row,
+// blank when the field is empty so the block never reflows).
 ::ui::UiElement info_line(const char *key, const char *value) {
   return <Box
     key={key}
     layout={::ui::LayoutStyle{
-      .height = ::ui::Length::points(tokens::kLineBody),
+      .height = ::ui::Length::points(kTallInfoRowH),
       .flex_shrink = ::ui::StyleFloat::points(0.0f)}}
   >
     <BodyText key="t" variant={BodyTextVariant::Body} value={value} />
   </Box>
 }
 
-// A fixed-height footer slot that holds an action button only when the action is
-// available (origin game_select_panel_layout: the Spectate/Join slots keep their
-// height regardless, the button is conditionally rendered inside — an unavailable
-// action shows an EMPTY slot, never a greyed button).
+// One always-reserved button slot (origin GSelBtn*Wrap): a fixed-height row that
+// centers its button; the button is rendered only when its action is available
+// (an unavailable action shows an EMPTY slot, never a greyed button) — so the
+// footer height is stable and the reserved empty Spectate slot is the gap above
+// Join Game for a waiting game.
 ::ui::UiElement action_slot(const char *key, ::ui::UiElement button) {
   return <Box
     key={key}
@@ -249,20 +294,19 @@ struct GameBrowserProps {
       .align_items = ::ui::AlignItems::Center,
       .justify_content = ::ui::JustifyContent::Center,
       .width = ::ui::Length::percent(100.0f),
-      .height = ::ui::Length::points(31.5f),
+      .height = ::ui::Length::points(kTallButtonRowH),
       .flex_shrink = ::ui::StyleFloat::points(0.0f)}}
   >
     {button}
   </Box>
 }
 
-// Selection info block + actions — a separate element so GameBrowser can omit it
-// for an empty list (the JSX tag can't live inside a ternary expression). origin
-// game_select_panel_layout: the 5-field info block over the Spectate (top) +
-// Join Game (bottom) chrome buttons.
-::ui::UiElement GameBrowserActions(const GameBrowserProps &props) {
+// The Active-Games FOOTER (origin GSelFooter): the 5-field info block over the
+// two reserved button slots (Spectate top, Join Game bottom). Sits BELOW the
+// bordered list box, not inside it. Fixed total height (kGameSelectFooterH).
+::ui::UiElement GameBrowserFooter(const GameBrowserProps &props) {
   ::ui::UiElement spectate_btn =
-      props.can_spectate
+      props.spectate_visible
           ? AppButton(AppButtonProps{.key = "spectate",
                                      .control_id = "SpectateGame",
                                      .variant = AppButtonVariant::Chrome,
@@ -272,7 +316,7 @@ struct GameBrowserProps {
                                      .on_press = props.on_spectate})
           : ::ui::empty();
   ::ui::UiElement join_btn =
-      props.can_join
+      props.join_visible
           ? AppButton(AppButtonProps{.key = "join",
                                      .control_id = "JoinGame",
                                      .variant = AppButtonVariant::Chrome,
@@ -282,12 +326,15 @@ struct GameBrowserProps {
                                      .on_press = props.on_join})
           : ::ui::empty();
   return <Box
-    key="acts"
+    key="footer"
     layout={::ui::LayoutStyle{
       .direction = ::ui::FlexDirection::Column,
       .align_items = ::ui::AlignItems::Stretch,
       .width = ::ui::Length::percent(100.0f),
-      .gap = 4.0f}}
+      .height = ::ui::Length::points(kGameSelectFooterH),
+      .flex_shrink = ::ui::StyleFloat::points(0.0f),
+      .padding = {0.0f, 0.0f, kTallFooterPadTop, 0.0f},
+      .gap = kTallFooterGap}}
   >
     <Box
       key="info"
@@ -295,7 +342,7 @@ struct GameBrowserProps {
         .direction = ::ui::FlexDirection::Column,
         .align_items = ::ui::AlignItems::Stretch,
         .width = ::ui::Length::percent(100.0f),
-        .padding = {0.0f, 0.0f, 0.0f, 10.5f}}}
+        .padding = {kTallInfoPadLeft, 0.0f, 0.0f, 0.0f}}}
     >
       {info_line("iname", props.info_name)}
       {info_line("imap", props.info_map)}
@@ -303,40 +350,44 @@ struct GameBrowserProps {
       {info_line("icreator", props.info_creator)}
       {info_line("ilimits", props.info_limits)}
     </Box>
-    {action_slot("spectateslot", spectate_btn)}
-    {action_slot("joinslot", join_btn)}
+    <Box
+      key="buttons"
+      layout={::ui::LayoutStyle{
+        .direction = ::ui::FlexDirection::Column,
+        .align_items = ::ui::AlignItems::Stretch,
+        .width = ::ui::Length::percent(100.0f),
+        .gap = kTallButtonGap}}
+    >
+      {action_slot("spectateslot", spectate_btn)}
+      {action_slot("joinslot", join_btn)}
+    </Box>
   </Box>
 }
 
+// The Active-Games LIST: just the scrolling game rows (origin ScrollList). Lives
+// INSIDE the bordered list box; the footer (info + buttons) is a sibling BELOW
+// the box (GameBrowserFooter), never inside this well.
 ::ui::UiElement GameBrowser(const GameBrowserProps &props) {
   std::vector<::ui::UiElement> rows;
-  // origin/main shows an empty hairline frame when no games are open (no
-  // "No open games" placeholder).
-  if (!props.entries.empty()) {
-    for (int i = 0; i < (int)props.entries.size(); ++i) {
-      const bool on = i == props.selected;
-      std::string s = std::string(on ? "> " : "  ") + props.entries[i].name;
-      rows.push_back(game_line(::ui::copy_string(("gl" + std::to_string(i)).c_str()),
-                               ::ui::copy_string(s.c_str()), on));
-    }
+  for (int i = 0; i < (int)props.entries.size(); ++i) {
+    const bool on = i == props.selected;
+    const char *name = ::ui::copy_string(props.entries[i].name.c_str());
+    std::function<void()> select = [cb = props.on_select, i]() {
+      if (cb)
+        cb(i);
+    };
+    rows.push_back(game_row(::ui::copy_string(("gl" + std::to_string(i)).c_str()),
+                            "GameRow", i, name, on, select));
   }
-  ::ui::UiChildren game_rows = ::ui::children(rows);
-  // Browse/join actions only when there are games to act on; an empty list reads
-  // sparse like the golden (the panel mostly shows the backdrop through).
-  ::ui::UiElement actions =
-      props.entries.empty() ? ::ui::empty() : GameBrowserActions(props);
   return <Box
     key="browserbody"
     layout={::ui::LayoutStyle{
       .direction = ::ui::FlexDirection::Column,
       .align_items = ::ui::AlignItems::Stretch,
       .width = ::ui::Length::percent(100.0f),
-      .flex_grow = ::ui::StyleFloat::points(1.0f),
-      .gap = 4.0f}}
+      .flex_grow = ::ui::StyleFloat::points(1.0f)}}
   >
-    {game_rows}
-    <Box key="spacer" layout={::ui::LayoutStyle{.flex_grow = ::ui::StyleFloat::points(1.0f)}} />
-    {actions}
+    {::ui::children(rows)}
   </Box>
 }
 
@@ -378,10 +429,16 @@ struct GameBrowserProps {
 // The lobby's right cockpit column: the Active Games browser, or (while creating
 // a game) the Select Map filename list (CreateRightCell). Both share the key
 // "rightcell" so the slot reconciles in place when the mode swaps.
-::ui::UiElement ActiveGamesCell(float tall_w, ::ui::UiElement browser) {
-  // origin BuildGameSelectTallTree (virtual x1.5): heading wrap pad L7/T6,
-  // list wrap pad L9/T4, list box = panelW - 18 wide x listBoxH high (388 -
-  // 21 - 4 - footer 112 = 251 virtual -> 376.5), Inset stroke, 1px border pad.
+::ui::UiElement ActiveGamesCell(float tall_w, ::ui::UiElement browser,
+                                ::ui::UiElement footer) {
+  // origin BuildGameSelectTallTree (virtual x1.5): heading wrap pad L7/T6, then
+  // BuildGameSelectList (list wrap pad L9/T4 -> Inset bordered list BOX, fixed
+  // listBoxHeight, 1px border pad) holding ONLY the ScrollList, then GSelFooter
+  // (info block + the two reserved button slots) BELOW the list box. listBoxH =
+  // panelH - titleWrapH - listPadTop - footerH = 251 virtual -> 376.5 logical
+  // at the design panel; the footer (kGameSelectFooterH) is reserved by sitting
+  // outside the well, so the list box reads as a bordered fixed-height well with
+  // the info+buttons footer below it.
   ::ui::LayoutStyle cell = lobby_right_cell_layout(tall_w);
   cell.padding = {0.0f, 0.0f, 0.0f, 0.0f};
   cell.gap = 0.0f;
@@ -389,7 +446,7 @@ struct GameBrowserProps {
     <Box key="hwrap" layout={::ui::LayoutStyle{.padding = {10.5f, 0.0f, 10.0f, 0.0f}}}>
       <ScreenTitle key="h" variant={ScreenTitleVariant::Console} value="Active Games" />
     </Box>
-    <Box key="listwrap" layout={::ui::LayoutStyle{.padding = {13.0f, 13.0f, 5.0f, 0.0f}}}>
+    <Box key="listwrap" layout={::ui::LayoutStyle{.padding = {13.0f, 13.0f, 6.0f, 0.0f}}}>
       <Box
         key="well"
         layout={::ui::LayoutStyle{
@@ -402,6 +459,9 @@ struct GameBrowserProps {
       >
         {browser}
       </Box>
+    </Box>
+    <Box key="footerwrap" layout={::ui::LayoutStyle{.padding = {13.0f, 13.0f, 0.0f, 0.0f}}}>
+      {footer}
     </Box>
   </Box>
 }
@@ -1841,15 +1901,19 @@ struct LobbyScreenProps {
   gp.info_security = sel_info_security;
   gp.info_creator = sel_info_creator;
   gp.info_limits = sel_info_limits;
-  gp.can_join = sel_joinable;
-  gp.can_spectate = sel_spectatable;
+  gp.join_visible = sel_joinable;
+  gp.spectate_visible = sel_spectatable;
+  gp.on_select = [sel](int index) { *sel = index; };
   gp.on_join = [join = games.join_game, sel_id]() {
     if (join) join(sel_id, std::string());
   };
   gp.on_spectate = [spectate = games.spectate_game, sel_id]() {
     if (spectate) spectate(sel_id);
   };
+  // origin splits the tall cell into the bordered list BOX (rows only) and the
+  // footer (info block + reserved button slots) below it.
   ::ui::UiElement right_browser = GameBrowser(gp);
+  ::ui::UiElement right_footer = GameBrowserFooter(gp);
 
   // The right column is the "Select Map" filename list while creating a game,
   // otherwise the "Active Games" browser.
@@ -1906,7 +1970,7 @@ struct LobbyScreenProps {
     };
     right_cell = CreateRightCell(rc);
   } else {
-    right_cell = ActiveGamesCell(panes.tall_w, right_browser);
+    right_cell = ActiveGamesCell(panes.tall_w, right_browser, right_footer);
   }
 
   // Go Back cancels create-mode first (matching origin's single top button),
