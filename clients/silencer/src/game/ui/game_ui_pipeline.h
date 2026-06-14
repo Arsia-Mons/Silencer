@@ -19,6 +19,7 @@ class Game;
 
 namespace silencer::cppx_ui {
 class PipelineHost;
+struct GpuUiProgram;
 }
 namespace client::ui {
 enum class SessionPhase;
@@ -53,6 +54,12 @@ const uint8_t * CppxUiFrame(int & outW, int & outH) const;
 // but ONLY when the fade alpha it applies at upload time is also unchanged (the
 // fade is not in the IR). False whenever the raster ran (or no cppx frame yet).
 bool CppxUiUnchanged() const { return cppxUiUnchanged_; }
+
+// SIL-240: the GPU UI geometry program built this frame (windowed GPU path), or
+// null when the cppx path produced a CPU raster instead (headless/test) or did
+// not render. Owned by the PipelineHost; valid until the next RenderClientUiFrame.
+// GameRenderer::Present submits this to the backend instead of UploadUiFrame.
+const silencer::cppx_ui::GpuUiProgram * CppxUiProgram() const { return cppxUiProgram_; }
 
 // --- UI input + control-socket automation seam (SIL-18) ----------------
 // The per-frame UI input frame. The single SDL-event site (events.cpp, windowed)
@@ -151,6 +158,13 @@ int cppxUiH = 0;
 // SIL-237: set each frame in RenderCppxClientUiFrame — true when the raster was
 // skipped because the IR was unchanged. Drives the caller's upload-skip.
 bool cppxUiUnchanged_ = false;
+// SIL-240: the GPU UI program built this frame (windowed GPU path) + the gate.
+const silencer::cppx_ui::GpuUiProgram * cppxUiProgram_ = nullptr;
+bool gpuUiFlagChecked_ = false;
+bool gpuUiFlagEnabled_ = false;
+// True when the active backend draws the UI on the GPU and the geometry path is
+// enabled (SILENCER_GPU_UI during the SIL-240 staging; default once complete).
+bool UseGpuUi();
 bool cppxReactInitialized = false;
 bool cppxAppRootPushed = false;
 // SIL-94: monotonic wall-clock of the previous UI frame, for the use_clock()

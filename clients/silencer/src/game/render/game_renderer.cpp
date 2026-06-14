@@ -128,12 +128,19 @@ if(window && std::getenv("SILENCER_CPPX_UI_DEMO")){
 // SIL-14: when the golden cppx render path is active, composite its
 // premultiplied-RGBA frame over the world through the UI composite pass.
 {
-int uw = 0;
-int uh = 0;
-const uint8_t * uirgba = game.gameUiPipeline.CppxUiFrame(uw, uh);
 // SIL-219: fade the cppx UI layer in lockstep with the FADEOUT palette fade so
 // the UI fades out/in with the world on the transitions that already fade it.
 const float uiFadeAlpha = UiFadeAlpha();
+// SIL-240: GPU geometry path — submit the program built this frame. The fade is
+// a GPU multiply at composite time (no per-pixel CPU dim, no full-window upload),
+// so fades and minimap-hover re-render cheaply every frame.
+if(const silencer::cppx_ui::GpuUiProgram * prog = game.gameUiPipeline.CppxUiProgram()){
+renderdevice->SubmitUiFrame(*prog, uiFadeAlpha);
+lastUiFadeAlpha_ = uiFadeAlpha;
+}else{
+int uw = 0;
+int uh = 0;
+const uint8_t * uirgba = game.gameUiPipeline.CppxUiFrame(uw, uh);
 if(uirgba && uw > 0 && uh > 0){
 // SIL-237: skip the GPU UI upload when the pipeline rastered nothing new (the
 // IR was byte-identical) AND the fade alpha is unchanged. The backend retains
@@ -152,6 +159,7 @@ lastUiFadeAlpha_ = uiFadeAlpha;
 // fade sentinel so the next real frame always re-uploads (matches the original
 // no-op-when-null behavior, just tracking the upload state for the skip).
 lastUiFadeAlpha_ = -1.0f;
+}
 }
 }
 renderdevice->Present();

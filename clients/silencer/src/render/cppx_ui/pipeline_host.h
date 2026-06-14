@@ -6,6 +6,7 @@
 #include "font_registry.h"
 #include "glyph_fonts.h"
 #include "texture_registry.h"
+#include "ui_draw_program.h"
 #include "ui_surface.h"
 
 #include <cstdint>
@@ -59,6 +60,14 @@ public:
   // owns that check).
   const uint8_t *render(const client::ui::UiPipelineFrame &frame, int *out_w,
                         int *out_h, bool *out_unchanged = nullptr);
+
+  // SIL-240 GPU path: run the same build/layout/focus/IR as render(), but lower
+  // the IR to a backend-neutral GpuUiProgram (geometry + texture manifest) the
+  // GPU backend draws directly — no CPU raster, no full-window upload. Returns a
+  // pointer to the host-owned program (valid until the next build_gpu_frame()/
+  // ensure()), or null if not initialized. Used windowed; render() stays the
+  // headless/test path.
+  const GpuUiProgram *build_gpu_frame(const client::ui::UiPipelineFrame &frame);
 
   // ---- Chrome sprite bake seam (SIL-87) ----------------------------------
   // The SDL_Textures are bound to the software renderer `r_`, which ensure()
@@ -131,6 +140,11 @@ private:
   // false forces a re-raster (e.g. after ensure() resizes the surface).
   uint64_t last_ir_sig_ = 0;
   bool packed_valid_ = false;
+  // SIL-240 GPU path: the reusable draw program + a generation that bumps every
+  // time the registries reset (ensure() recreates r_ and re-bakes), so the GPU
+  // backend knows to flush its texture cache.
+  GpuUiProgram gpu_program_;
+  uint64_t texture_generation_ = 1;
 };
 
 } // namespace silencer::cppx_ui

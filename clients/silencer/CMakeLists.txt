@@ -141,9 +141,13 @@ silencer_compile_shader(frag_light    pixel   frag_light)
 silencer_compile_shader(vert_particle vertex  vert_particle)
 silencer_compile_shader(frag_particle pixel   frag_particle)
 silencer_compile_shader(comp_particle compute update_particles)
+silencer_compile_shader(vert_ui       vertex  vert_ui)
+silencer_compile_shader(frag_ui       pixel   frag_ui)
+silencer_compile_shader(frag_ui_composite pixel frag_ui_composite)
 silencer_finalize_shaders(
     vert_screen frag_remap frag_upscale frag_lobby_panel_blur frag_light
     vert_particle frag_particle comp_particle
+    vert_ui frag_ui frag_ui_composite
 )
 add_dependencies(${SILENCER_TARGET} silencer_shaders)
 target_include_directories(${SILENCER_TARGET} PRIVATE
@@ -562,6 +566,7 @@ add_test(NAME ui_pipeline_tests COMMAND ui_pipeline_tests)
 add_executable(pipeline_host_tests
 	tests/pipeline_host_tests.cpp
 	src/render/cppx_ui/pipeline_host.cpp
+	src/render/cppx_ui/ui_draw_program.cpp
 	src/platform/perf_trace.cpp
 	src/render/cppx_ui/ui_surface.cpp
 	src/render/cppx_ui/draw_executor.cpp

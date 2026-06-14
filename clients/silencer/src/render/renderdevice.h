@@ -5,6 +5,12 @@
 
 #include <vector>
 
+namespace silencer {
+namespace cppx_ui {
+struct GpuUiProgram;
+}
+} // namespace silencer
+
 // Abstract rendering interface. All game code talks through this; GPU-specific
 // types never leak into game code. SDL3GPUBackend is the Phase 2/3 implementation.
 // Console backends (NVN, GNM, D3D12) slot in without touching game code.
@@ -43,6 +49,18 @@ public:
 	// multiplies ALL four channels by the fraction. 1.0 (the default, at rest)
 	// is a no-op — the overlay composites byte-for-byte as uploaded.
 	virtual void UploadUiFrame(const Uint8 * /*rgba*/, int /*w*/, int /*h*/,
+	                           float /*global_alpha*/ = 1.0f) {}
+
+	// SIL-240: render the cppx UI as a GPU geometry program instead of a
+	// CPU-rasterized, full-window RGBA upload. Backends that draw the UI on the
+	// GPU return true from SupportsUiGeometry() and consume the program in
+	// Present(); the cppx composition root then builds geometry instead of
+	// software-rastering. `global_alpha` is the FADEOUT fraction (SIL-219),
+	// applied as a GPU multiply at composite time rather than a per-pixel CPU
+	// dim. The program is owned by the cppx host and must stay valid until the
+	// next Present(). Default no-op (headless/TUI keep the UploadUiFrame path).
+	virtual bool SupportsUiGeometry() const { return false; }
+	virtual void SubmitUiFrame(const silencer::cppx_ui::GpuUiProgram & /*program*/,
 	                           float /*global_alpha*/ = 1.0f) {}
 
 	// Capture the final composited frame (world + UI). Arm with RequestCapture()

@@ -4,6 +4,7 @@
 #include "draw_executor.h"
 #include "sprite_bake.h"
 #include "text_measure.h"
+#include "ui_draw_program_builder.h"
 
 #include <SDL3_ttf/SDL_ttf.h>
 
@@ -36,6 +37,9 @@ bool PipelineHost::ensure(int w, int h, const char *font_dir) {
   textures_.shutdown();
   glyph_fonts_.shutdown();
   chrome_dirty_ = true;
+  // SIL-240: the registries' textures are gone; bump the generation so the GPU
+  // backend flushes its texture cache (texture_ids may be reused for new art).
+  ++texture_generation_;
   if (r_) {
     SDL_DestroyRenderer(r_);
     r_ = nullptr;
@@ -216,6 +220,31 @@ const uint8_t *PipelineHost::render(const client::ui::UiPipelineFrame &frame,
   if (out_h)
     *out_h = h_;
   return packed_.data();
+}
+
+const GpuUiProgram *
+PipelineHost::build_gpu_frame(const client::ui::UiPipelineFrame &frame) {
+  if (!surf_ || !r_ || !pipeline_)
+    return nullptr;
+
+  // Same responsive content scale render() derives (production supersample is 1,
+  // so the executor's scale == this device_scale).
+  const float device_scale = (frame.layout.height > 0.0f)
+                                 ? static_cast<float>(h_) / frame.layout.height
+                                 : 1.0f;
+
+  // The retained tree, layout, focus pass, and IR build always run (they carry
+  // the animation/interaction state); only the lowering target differs from
+  // render() — geometry instead of a CPU raster.
+  pipeline_->render_client_ui_frame(frame, [&] {
+    const ::ui::DrawCommandList &list =
+        pipeline_->client_ui().retained_command_list();
+    PERF_SCOPE("ui.gpu_build");
+    build_ui_draw_program(list, &fonts_, &textures_, &glyph_fonts_, r_,
+                          device_scale, w_, h_, texture_generation_,
+                          gpu_program_);
+  });
+  return &gpu_program_;
 }
 
 } // namespace silencer::cppx_ui

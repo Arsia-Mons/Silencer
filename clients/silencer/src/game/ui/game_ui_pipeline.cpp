@@ -1054,8 +1054,22 @@ hudEmblems_[key] = out;
 return out;
 }
 
+bool GameUiPipeline::UseGpuUi() {
+// SIL-240: route the cppx UI through the GPU geometry path when the backend
+// supports it. Gated behind SILENCER_GPU_UI during staging; the env flag is read
+// once. Headless/TUI (no geometry-capable device) keep the CPU raster path.
+if(!gpuUiFlagChecked_){
+gpuUiFlagEnabled_ = std::getenv("SILENCER_GPU_UI") != nullptr;
+gpuUiFlagChecked_ = true;
+}
+if(!gpuUiFlagEnabled_) return false;
+RenderDevice * dev = game.gameRenderer.GetRenderDevice();
+return dev && dev->SupportsUiGeometry();
+}
+
 void GameUiPipeline::RenderCppxClientUiFrame(Surface& surface) {
 cppxUiRgba = nullptr;
+cppxUiProgram_ = nullptr;
 cppxUiUnchanged_ = false;
 #ifdef SILENCER_CPPX_FONT_DIR
 // SIL-94: snapshot the per-frame wall clock ONCE per render frame. The
@@ -1774,6 +1788,16 @@ lobbySnapshot_.bundled_maps = bundledMaps_;
 // state) on the game thread before the build. Empty outside the match phases.
 worldSessionSnapshot_ = silencer::game_ui::CaptureWorldSessionSnapshot(game, CurrentSessionPhase());
 
+if(UseGpuUi()){
+// SIL-240: lower the IR straight to a GPU geometry program — no full-res CPU
+// raster, no full-window upload. GameRenderer::Present hands it to the backend
+// via RenderDevice::SubmitUiFrame. The windowed screenshot path captures the
+// composited swapchain, so no packed RGBA is needed.
+{ PERF_SCOPE("ui.pipeline"); cppxUiProgram_ = cppxHost->build_gpu_frame(frame); }
+cppxUiRgba = nullptr;
+cppxUiUnchanged_ = false;
+}else{
+cppxUiProgram_ = nullptr;
 int ow = 0;
 int oh = 0;
 bool unchanged = false;
@@ -1788,6 +1812,7 @@ cppxUiH = oh;
 // raster ran, rgba is non-null; when it was skipped, rgba is still the cached
 // buffer. cppxUiRgba being null (host not ready) is not an "unchanged" frame.
 cppxUiUnchanged_ = unchanged && rgba != nullptr;
+}
 
 // SIL-225: Options + its submenus are pushed/popped as Tier-1 overlays via
 // use_navigation, which never calls GoToState — the only RestartPaletteFade
