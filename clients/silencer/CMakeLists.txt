@@ -562,6 +562,7 @@ add_test(NAME ui_pipeline_tests COMMAND ui_pipeline_tests)
 add_executable(pipeline_host_tests
 	tests/pipeline_host_tests.cpp
 	src/render/cppx_ui/pipeline_host.cpp
+	src/platform/perf_trace.cpp
 	src/render/cppx_ui/ui_surface.cpp
 	src/render/cppx_ui/draw_executor.cpp
 	src/render/cppx_ui/glyph_fonts.cpp
@@ -584,7 +585,8 @@ add_executable(pipeline_host_tests
 	${SILENCER_CPPX_GENERATED})
 target_compile_features(pipeline_host_tests PRIVATE cxx_std_20)
 target_include_directories(pipeline_host_tests PRIVATE
-	"${CMAKE_CURRENT_SOURCE_DIR}/src" ${SILENCER_CPPX_INCLUDE_DIRS})
+	"${CMAKE_CURRENT_SOURCE_DIR}/src" "${CMAKE_CURRENT_SOURCE_DIR}/src/platform"
+	${SILENCER_CPPX_INCLUDE_DIRS})
 target_link_libraries(pipeline_host_tests PRIVATE SDL3::SDL3 SDL3_ttf::SDL3_ttf yogacore)
 target_compile_definitions(pipeline_host_tests PRIVATE
 	SILENCER_TEST_FONT_DIR="${SILENCER_SHARED_DIR}/fonts")
