@@ -1974,12 +1974,19 @@ struct LobbyScreenProps {
     right_cell = ActiveGamesCell(panes.tall_w, right_browser, right_footer);
   }
 
-  // Go Back cancels create-mode first (matching origin's single top button),
-  // otherwise leaves the lobby. Hoisted out of the JSX (the transpiler can't
-  // parse a brace-bodied lambda inside an attribute).
-  std::function<void()> on_go_back = [show_create, leave = session.leave_to_menu]() {
+  // Go Back backs out one level at a time (matching origin's single top
+  // button): cancel create-mode, else close the tech detail view, else leave
+  // the joined game back to the main lobby. Only when not in a game does it
+  // leave the lobby entirely for the main menu. Hoisted out of the JSX (the
+  // transpiler can't parse a brace-bodied lambda inside an attribute).
+  std::function<void()> on_go_back = [show_create, tech_open,
+                                      in_game = staging.active,
+                                      leave_game = staging.leave,
+                                      leave_menu = session.leave_to_menu]() {
     if (*show_create) { *show_create = false; return; }
-    if (leave) leave();
+    if (in_game && *tech_open) { *tech_open = false; return; }
+    if (in_game) { if (leave_game) leave_game(); return; }
+    if (leave_menu) leave_menu();
   };
   // ESC / controller back / the `back` op route through the same Go Back policy
   // (the reported Lobby bug: ESC did nothing on the phase screen).
