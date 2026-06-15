@@ -19,6 +19,13 @@ struct SDL_Window;
 class GameRenderer
 {
 public:
+// Direction of the transition palette fade. The fade phase clock is the same
+// in both directions (16 phases); the direction decides whether the screen
+// dims to black (Out) or rises from black (In). Decoupled from
+// GameState::FADEOUT so Tier-1 overlay transitions (options/pause) can run a
+// full out->in fade without owning a gameplay state change.
+enum class FadeDir : Uint8 { In, Out };
+
 explicit GameRenderer(Game & game);
 ~GameRenderer();
 
@@ -42,7 +49,8 @@ bool WindowPixelSize(int & width, int & height) const {
 	return true;
 }
 void SetColors(SDL_Color * colors);
-void RestartPaletteFade();
+void RestartPaletteFade(FadeDir dir = FadeDir::In);
+FadeDir GetFadeDir() const { return fadeDir_; }
 bool PaletteFadeFinished() const;
 Uint8 PaletteFadePhaseFromClock() const;
 void ApplyPaletteFade(bool fadeOut);
@@ -73,6 +81,7 @@ int windowPixelW_ = 0; // last window pixel size (SIL-240 menu canvas source)
 int windowPixelH_ = 0;
 Uint8 fade_i;
 Uint64 fadeStartMs;
+FadeDir fadeDir_ = FadeDir::In;
 // SIL-237: the fade alpha applied at the LAST cppx UI upload. The dirty-skip in
 // Present() only skips the upload when BOTH the IR is unchanged AND this alpha
 // is unchanged (the fade is applied at upload time, not in the IR). -1 forces

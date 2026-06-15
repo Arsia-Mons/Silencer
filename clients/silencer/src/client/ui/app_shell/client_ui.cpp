@@ -32,7 +32,12 @@ ClientUi::ClientUi() { ::ui::focus_init(&retained_focus_); }
 
 void ClientUi::begin_frame(const ::ui::UiInputFrame &input) {
   (void)input;
-  clear_mutations();
+  // Defensive sweep of anything the previous frame's drain left behind. When
+  // structural mutations are held, the drain intentionally keeps the
+  // stack-changing entries queued for a gated commit — those must survive into
+  // this frame, so only sweep when nothing is being held.
+  if (!structural_hold_)
+    clear_mutations();
   cancel_slot_ = {};
   retained_element_frame_.reset();
 }
@@ -253,14 +258,14 @@ bool ClientUi::update_retained_runtime(const ::ui::FlexLayoutAdapter &layout,
                                        active);
 }
 
-bool ClientUi::push_screen(std::unique_ptr<UiScreen> screen,
-                           FadeOverride fade) {
-  return screens_.push(std::move(screen), fade);
+bool ClientUi::push_screen(std::unique_ptr<UiScreen> screen) {
+  // Immediate push (bypasses the queue + fade orchestration). Used only for the
+  // one-time AppRoot base mount, which never fades.
+  return screens_.push(std::move(screen));
 }
 
-bool ClientUi::replace_top(std::unique_ptr<UiScreen> screen,
-                           FadeOverride fade) {
-  return screens_.replace_top(std::move(screen), fade);
+bool ClientUi::replace_top(std::unique_ptr<UiScreen> screen) {
+  return screens_.replace_top(std::move(screen));
 }
 
 bool ClientUi::queue_push_screen(std::unique_ptr<UiScreen> screen,
@@ -312,29 +317,97 @@ bool ClientUi::queue_mutation(QueuedMutation mutation) {
   return true;
 }
 
+bool ClientUi::is_structural(MutationKind kind) {
+  return kind != MutationKind::Deferred;
+}
+
 void ClientUi::drain_deferred_mutations() {
+  // When structural mutations are held, apply the Deferred (domain) ones in
+  // place and keep the stack-changing ones queued (compacted to the front,
+  // order preserved) for a gated commit by the composition root.
+  int kept = 0;
   for (int i = 0; i < mutation_count_; ++i) {
     QueuedMutation &mutation = mutations_[i];
-    switch (mutation.kind) {
+    if (structural_hold_ && is_structural(mutation.kind)) {
+      if (kept != i)
+        mutations_[kept] = std::move(mutation);
+      ++kept;
+      continue;
+    }
+    apply_mutation(mutation);
+  }
+  for (int i = kept; i < mutation_count_; ++i)
+    mutations_[i] = {};
+  mutation_count_ = kept;
+}
+
+void ClientUi::commit_structural_mutations() {
+  const bool prev = structural_hold_;
+  structural_hold_ = false;
+  drain_deferred_mutations();
+  structural_hold_ = prev;
+}
+
+bool ClientUi::has_pending_structural_mutations() const {
+  for (int i = 0; i < mutation_count_; ++i) {
+    if (is_structural(mutations_[i].kind))
+      return true;
+  }
+  return false;
+}
+
+bool ClientUi::pending_structural_wants_fade() const {
+  // The composition root must know whether the queued stack swap should replay
+  // the transition fade BEFORE committing it (the Out leg dims the OUTGOING
+  // screen, so the swap waits for black). Resolve the first pending structural
+  // mutation's fade intent: a per-push FadeOverride, else the affected screen's
+  // wants_transition_fade(). Pops resolve against the screen being removed.
+  for (int i = 0; i < mutation_count_; ++i) {
+    const QueuedMutation &m = mutations_[i];
+    if (!is_structural(m.kind))
+      continue;
+    switch (m.kind) {
     case MutationKind::Push:
-      screens_.push(std::move(mutation.screen), mutation.fade);
-      break;
     case MutationKind::ResetTo:
-      screens_.reset_to(std::move(mutation.screen), mutation.fade);
-      break;
-    case MutationKind::PopCurrent:
-      screens_.pop_entry(mutation.entry_id);
-      break;
-    case MutationKind::PopTop:
-      screens_.pop_top();
-      break;
-    case MutationKind::Deferred:
-      if (mutation.deferred)
-        mutation.deferred();
-      break;
+      return m.screen && ScreenStack::resolve_fade(*m.screen, m.fade);
+    case MutationKind::PopTop: {
+      const UiScreen *top = screens_.top();
+      return top && ScreenStack::resolve_fade(*top, FadeOverride::Default);
+    }
+    case MutationKind::PopCurrent: {
+      for (int j = 0; j < screens_.count(); ++j) {
+        const UiScreen *s = screens_.at(j);
+        if (s && s->entry_id() == m.entry_id)
+          return ScreenStack::resolve_fade(*s, FadeOverride::Default);
+      }
+      return false;
+    }
+    default:
+      return false;
     }
   }
-  clear_mutations();
+  return false;
+}
+
+void ClientUi::apply_mutation(QueuedMutation &mutation) {
+  switch (mutation.kind) {
+  case MutationKind::Push:
+    screens_.push(std::move(mutation.screen));
+    break;
+  case MutationKind::ResetTo:
+    screens_.reset_to(std::move(mutation.screen));
+    break;
+  case MutationKind::PopCurrent:
+    screens_.pop_entry(mutation.entry_id);
+    break;
+  case MutationKind::PopTop:
+    screens_.pop_top();
+    break;
+  case MutationKind::Deferred:
+    if (mutation.deferred)
+      mutation.deferred();
+    break;
+  }
 }
 
 void ClientUi::clear_mutations() {

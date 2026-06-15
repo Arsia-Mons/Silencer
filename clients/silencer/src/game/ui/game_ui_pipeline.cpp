@@ -1653,10 +1653,11 @@ silencer::game_ui::ServerProviderValue{&game},
 tree = client::ui::ThemeProvider(::ui::children({tree}));
 return tree;
 });
-// The always-mounted base screen: a one-time init push, not a user-facing
-// navigation — never replay the transition fade (the entry GoToState owns it).
+// The always-mounted base screen: a one-time immediate init push, not a
+// user-facing navigation — push_screen bypasses the queue + fade orchestration,
+// so the base mount never fades (the entry GoToState owns the startup fade).
 cppxHost->pipeline().client_ui().push_screen(
-std::make_unique<client::ui::AppRoot>(), client::ui::FadeOverride::NoFade);
+std::make_unique<client::ui::AppRoot>());
 cppxAppRootPushed = true;
 }
 
@@ -1782,6 +1783,12 @@ lobbySnapshot_.bundled_maps = bundledMaps_;
 // state) on the game thread before the build. Empty outside the match phases.
 worldSessionSnapshot_ = silencer::game_ui::CaptureWorldSessionSnapshot(game, CurrentSessionPhase());
 
+// Hold stack-changing (Push/Pop/Reset) mutations so the composition root gates
+// the visible swap behind a transition fade (the overlay-fade orchestration
+// below commits them at black). Domain (Deferred) mutations still drain inside
+// the render call.
+cppxHost->pipeline().client_ui().set_structural_hold(true);
+
 if(UseGpuUi()){
 // SIL-240: lower the IR straight to a GPU geometry program — no full-res CPU
 // raster, no full-window upload. GameRenderer::Present hands it to the backend
@@ -1808,20 +1815,39 @@ cppxUiH = oh;
 cppxUiUnchanged_ = unchanged && rgba != nullptr;
 }
 
-// SIL-225: Options + its submenus are pushed/popped as Tier-1 overlays via
-// use_navigation, which never calls GoToState — the only RestartPaletteFade
-// trigger — so menu->options (and submenu->submenu) would cut instantly. The
-// drain inside render() above has applied this frame's push/pop; the screen
-// stack latched whether that transition wants a fade (per-push FadeOverride,
-// else the screen's wants_transition_fade() — e.g. PauseScreen opts out so it
-// cuts in over the live world). Re-fire the palette fade when it does
-// (game_loop's fade-in loop + UiFadeAlpha dim the UI/world for the next 16
-// phases). Skip during FADEOUT — a real state transition already owns the fade.
+// SIL-225: Options + its submenus (and pause/modals) are pushed/popped as
+// Tier-1 overlays via use_navigation, which never calls GoToState. They get the
+// SAME full out->in fade as a state transition, gated per screen: the swap is
+// held (above) and we drive a two-leg palette fade here, mirroring the FADEOUT
+// state machine:
+//   - idle + a queued swap that WANTS a fade (per-push FadeOverride, else the
+//     screen's wants_transition_fade()) -> start the Out leg (dim to black);
+//   - Out leg reaches black -> commit the held swap, start the In leg;
+//   - a queued swap that opts OUT (e.g. the in-match PauseScreen over the live
+//     world) commits immediately with no fade.
+// A real state FADEOUT already owns the fade, so it takes over when one begins:
+// it commits any pending overlay swap immediately (e.g. a PauseScreen popping
+// itself as leave_match fires) so the stack is correct under the state fade
+// instead of lingering over the next phase, and cancels any in-flight overlay
+// fade.
 {
-const bool wantsFade =
-    cppxHost->pipeline().client_ui().screens().consume_transition_fade();
-if(wantsFade && game.GetState() != GameState::FADEOUT){
-game.gameRenderer.RestartPaletteFade();
+client::ui::ClientUi & clientUi = cppxHost->pipeline().client_ui();
+if(game.GetState() == GameState::FADEOUT){
+clientUi.commit_structural_mutations();
+overlayFadingOut_ = false;
+}else if(overlayFadingOut_){
+if(game.gameRenderer.PaletteFadeFinished()){
+clientUi.commit_structural_mutations();
+game.gameRenderer.RestartPaletteFade(GameRenderer::FadeDir::In);
+overlayFadingOut_ = false;
+}
+}else if(clientUi.has_pending_structural_mutations()){
+if(clientUi.pending_structural_wants_fade()){
+game.gameRenderer.RestartPaletteFade(GameRenderer::FadeDir::Out);
+overlayFadingOut_ = true;
+}else{
+clientUi.commit_structural_mutations();
+}
 }
 }
 

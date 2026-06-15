@@ -17,7 +17,7 @@ cli --port "$PORT" wait_for_state --state MAINMENU --timeout-ms 15000 >/dev/null
 
 # --- submit path -----------------------------------------------------------
 cli --port "$PORT" show_password_modal >/dev/null
-cli --port "$PORT" wait_frames --n 3 >/dev/null
+wait_for_label "$PORT" "Password"
 
 cli --port "$PORT" inspect | bun -e '
 const r = JSON.parse(await new Response(Bun.stdin.stream()).text());
@@ -38,7 +38,9 @@ for ch in s w o r d f i s h; do
   cli --port "$PORT" key --key "$ch" >/dev/null
 done
 cli --port "$PORT" key --key enter >/dev/null
-cli --port "$PORT" wait_frames --n 2 >/dev/null
+# Enter submits and pops the modal; the pop is a Tier-1 overlay fade, so wait for
+# the field to disappear before asserting it popped.
+wait_for_label "$PORT" "Password" --gone
 cli --port "$PORT" password_modal_result | bun -e '
 const r = JSON.parse(await new Response(Bun.stdin.stream()).text());
 const res = r.result ?? r;
@@ -59,9 +61,9 @@ if ((r.nodes ?? []).some((n) => n.role === "input" && n.label === "Password")) {
 
 # --- cancel-auto-pop path --------------------------------------------------
 cli --port "$PORT" show_password_modal >/dev/null
-cli --port "$PORT" wait_frames --n 3 >/dev/null
+wait_for_label "$PORT" "Password"
 cli --port "$PORT" key --key escape >/dev/null
-cli --port "$PORT" wait_frames --n 3 >/dev/null
+wait_for_label "$PORT" "Password" --gone
 cli --port "$PORT" inspect | bun -e '
 const r = JSON.parse(await new Response(Bun.stdin.stream()).text());
 if ((r.nodes ?? []).some((n) => n.role === "input" && n.label === "Password")) {

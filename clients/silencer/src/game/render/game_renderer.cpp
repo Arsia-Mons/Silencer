@@ -108,26 +108,32 @@ using namespace GameState;
 // full); everything else mirrors the world fade. Ambience never enters FADEOUT
 // and never moves fade_i, so the HUD still does not dim with ambience.
 const Uint8 st = game.GetState();
-if(st != FADEOUT){
+const int phase = static_cast<int>(fade_i);
+const bool fading = phase < 16;
+// A real state transition (FADEOUT) always dims out; a Tier-1 overlay fade
+// dims out when its direction says so (fade_i is moving and dir == Out).
+const bool fadingOut = (st == FADEOUT) || (fading && fadeDir_ == FadeDir::Out);
+// In-match HUD stays at full brightness EXCEPT while a transition fades OUT
+// (leaving the match, or an in-match overlay dimming to black). Ambience
+// never moves fade_i, so it never dims the HUD through this path.
+if(!fadingOut){
 using ::client::ui::SessionPhase;
 const SessionPhase ph = silencer::game_ui::project_session_phase(st, game.fadefromstate);
 if(ph == SessionPhase::InMatch || ph == SessionPhase::SinglePlayer || ph == SessionPhase::PostMatch){
 return 1.0f;
 }
 }
-const int phase = static_cast<int>(fade_i);
+if(!fading) return 1.0f; // at rest
 // Mirror ApplyPaletteFade's brightness exactly so UI and world fade together.
 int brightness;
-if(st == FADEOUT){
+if(fadingOut){
 // Fading OUT: full at phase 0 -> black at phase 15.
 int p = phase > 15 ? 15 : phase;
 brightness = (15 - p) * 8;
-}else if(phase < 16){
-// Fading IN after the switch: dark at phase 0 -> full at phase >= 15.
+}else{
+// Fading IN: dark at phase 0 -> full at phase >= 15.
 if(phase >= 15) return 1.0f;
 brightness = phase * 8;
-}else{
-return 1.0f; // at rest
 }
 // Palette::Brightness maps brightness<128 to a linear (brightness/128) dim.
 float frac = static_cast<float>(brightness) / 128.0f;
@@ -225,9 +231,10 @@ renderdevice->SetPalette(colors, 256);
 }
 }
 
-void GameRenderer::RestartPaletteFade(){
+void GameRenderer::RestartPaletteFade(FadeDir dir){
 fadeStartMs = SDL_GetTicks();
 fade_i = 0;
+fadeDir_ = dir;
 }
 
 float GameRenderer::LegacyUiAnimationStepSeconds() const {

@@ -54,7 +54,7 @@ cli --port "$PORT" inspect > "$HOVER_OUT"
 #     its own focusable buttons) and moves focus into that surface. This proves
 #     click — unlike hover — changes focus / activates.
 cli --port "$PORT" click --label "Options" >/dev/null
-cli --port "$PORT" wait_frames --n 5 >/dev/null
+wait_for_label "$PORT" "Go Back"
 cli --port "$PORT" inspect > "$AFTER_CLICK"
 
 bun -e '

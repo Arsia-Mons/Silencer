@@ -61,9 +61,9 @@ cli --port "$PORT" keybind capture --op cancel >/dev/null
 
 # --- OptionsControls UI mounts with the selectable keybind table (SIL-108) ---
 cli --port "$PORT" click --label Options >/dev/null
-cli --port "$PORT" wait_frames --n 2 >/dev/null
+wait_for_label "$PORT" "OptionsControls"
 cli --port "$PORT" click --label OptionsControls >/dev/null
-cli --port "$PORT" wait_frames --n 3 >/dev/null
+wait_for_label "$PORT" "CyclePreset"
 cli --port "$PORT" inspect | bun -e '
 const r = JSON.parse(await new Response(Bun.stdin.stream()).text());
 const n = r.nodes ?? [];

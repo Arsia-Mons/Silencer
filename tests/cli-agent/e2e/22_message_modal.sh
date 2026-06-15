@@ -15,7 +15,7 @@ wait_alive "$PORT"
 cli --port "$PORT" wait_for_state --state MAINMENU --timeout-ms 15000 >/dev/null
 
 cli --port "$PORT" show_message_modal --title "Heads up" --message "Connection lost" >/dev/null
-cli --port "$PORT" wait_frames --n 3 >/dev/null
+wait_for_label "$PORT" "OK"
 cli --port "$PORT" inspect | bun -e '
 const r = JSON.parse(await new Response(Bun.stdin.stream()).text());
 const nodes = r.nodes ?? [];
@@ -25,7 +25,7 @@ if (!msg || !ok) { console.error("message modal did not render message + OK"); p
 '
 
 cli --port "$PORT" key --key escape >/dev/null
-cli --port "$PORT" wait_frames --n 3 >/dev/null
+wait_for_label "$PORT" "OK" --gone
 cli --port "$PORT" inspect | bun -e '
 const r = JSON.parse(await new Response(Bun.stdin.stream()).text());
 if ((r.nodes ?? []).some((n) => n.value === "Connection lost")) {

@@ -90,8 +90,10 @@ check_resize() {
   # Click at the UI-space center of the Options control. If the click routes
   # through the resized layout correctly it activates Options and the Options
   # overlay mounts in place.
+  # Tier-1 overlay opens with a fade and commits at black, so wait for its
+  # widget rather than a fixed frame count.
   cli --port "$PORT" click_at --x "$x" --y "$y" >/dev/null
-  cli --port "$PORT" wait_frames --n 5 >/dev/null
+  wait_for_label "$PORT" "Go Back"
   if [ "$(options_dialog_present)" != "YES" ]; then
     echo "click_at($x,$y) did not open the Options overlay at ${width}x${height}" >&2
     exit 1
@@ -99,7 +101,7 @@ check_resize() {
 
   # Dismiss the overlay and confirm we are back on the base menu.
   cli --port "$PORT" click --label OptionsGoBack >/dev/null
-  cli --port "$PORT" wait_frames --n 5 >/dev/null
+  wait_for_label "$PORT" "Go Back" --gone
   if [ "$(options_dialog_present)" != "NO" ]; then
     echo "Options overlay did not dismiss after Cancel at ${width}x${height}" >&2
     exit 1

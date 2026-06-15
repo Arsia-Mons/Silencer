@@ -21,16 +21,9 @@ bool ScreenStack::resolve_fade(const UiScreen &screen, FadeOverride fade) {
   }
 }
 
-bool ScreenStack::consume_transition_fade() {
-  bool pending = transition_fade_pending_;
-  transition_fade_pending_ = false;
-  return pending;
-}
-
-bool ScreenStack::push(std::unique_ptr<UiScreen> screen, FadeOverride fade) {
+bool ScreenStack::push(std::unique_ptr<UiScreen> screen) {
   if (!screen || count_ >= CLIENT_UI_MAX_SCREENS)
     return false;
-  note_fade(resolve_fade(*screen, fade));
   screen->set_entry_id(next_entry_id_++);
   screens_[count_++] = std::move(screen);
   return true;
@@ -39,8 +32,6 @@ bool ScreenStack::push(std::unique_ptr<UiScreen> screen, FadeOverride fade) {
 bool ScreenStack::pop_top() {
   if (count_ <= 0)
     return false;
-  if (screens_[count_ - 1])
-    note_fade(resolve_fade(*screens_[count_ - 1], FadeOverride::Default));
   screens_[--count_].reset();
   return true;
 }
@@ -48,7 +39,6 @@ bool ScreenStack::pop_top() {
 bool ScreenStack::pop_entry(UiScreenEntryId entry_id) {
   for (int i = count_ - 1; i >= 0; --i) {
     if (screens_[i] && screens_[i]->entry_id() == entry_id) {
-      note_fade(resolve_fade(*screens_[i], FadeOverride::Default));
       for (int j = i; j + 1 < count_; ++j) {
         screens_[j] = std::move(screens_[j + 1]);
       }
@@ -59,26 +49,24 @@ bool ScreenStack::pop_entry(UiScreenEntryId entry_id) {
   return false;
 }
 
-bool ScreenStack::replace_top(std::unique_ptr<UiScreen> screen,
-                              FadeOverride fade) {
+bool ScreenStack::replace_top(std::unique_ptr<UiScreen> screen) {
   if (!screen)
     return false;
   if (count_ <= 0)
-    return push(std::move(screen), fade);
-  note_fade(resolve_fade(*screen, fade));
+    return push(std::move(screen));
   screen->set_entry_id(next_entry_id_++);
   screens_[count_ - 1] = std::move(screen);
   return true;
 }
 
-bool ScreenStack::reset_to(std::unique_ptr<UiScreen> screen, FadeOverride fade) {
+bool ScreenStack::reset_to(std::unique_ptr<UiScreen> screen) {
   if (!screen)
     return false;
   for (int i = 0; i < count_; ++i) {
     screens_[i].reset();
   }
   count_ = 0;
-  return push(std::move(screen), fade);
+  return push(std::move(screen));
 }
 
 UiScreen *ScreenStack::at(int index) const {

@@ -73,7 +73,7 @@ check_resize() {
   # of the "Options" button must open that overlay, proving the resized
   # layout's reported coordinates are the real interactive coordinates.
   cli --port "$PORT" click_at --x "$options_x" --y "$options_y" >/dev/null
-  cli --port "$PORT" wait_frames --n 3 >/dev/null
+  wait_for_label "$PORT" "Go Back"
   cli --port "$PORT" inspect | bun -e '
   const r = JSON.parse(await new Response(Bun.stdin.stream()).text());
   const labels = new Set((r.nodes ?? []).filter((n) => n.role === "button").map((b) => b.label));
@@ -83,7 +83,7 @@ check_resize() {
   '
   # Go Back pops the overlay back to the main menu.
   cli --port "$PORT" click --label OptionsGoBack >/dev/null
-  cli --port "$PORT" wait_frames --n 3 >/dev/null
+  wait_for_label "$PORT" "Go Back" --gone
   cli --port "$PORT" inspect | bun -e '
   const r = JSON.parse(await new Response(Bun.stdin.stream()).text());
   const onMenu = (r.nodes ?? []).some((n) => n.role === "button" && n.label === "Connect To Lobby");

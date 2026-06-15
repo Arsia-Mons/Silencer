@@ -104,19 +104,18 @@ wls() { # wait for lobby_state
 cli --port "$PORT" wait_for_state --state MAINMENU --timeout-ms 15000 >/dev/null
 
 # --- 1. Overlay: ESC pops; back pops ----------------------------------------
+# Tier-1 overlays fade out->in; the push/pop commits at black (~1 fade leg after
+# the edge), so wait for "Go Back" to appear/disappear rather than a fixed frame
+# count.
 cli --port "$PORT" click --label "Options" >/dev/null
-cli --port "$PORT" wait_frames --n 3 >/dev/null
-if ! has_button "Go Back"; then echo "FAIL 91: Options overlay did not open" >&2; exit 1; fi
+wait_for_label "$PORT" "Go Back" || { echo "FAIL 91: Options overlay did not open" >&2; exit 1; }
 cli --port "$PORT" key --key escape >/dev/null
-cli --port "$PORT" wait_frames --n 3 >/dev/null
-if has_button "Go Back"; then echo "FAIL 91: ESC did not pop the Options overlay" >&2; exit 1; fi
+wait_for_label "$PORT" "Go Back" --gone || { echo "FAIL 91: ESC did not pop the Options overlay" >&2; exit 1; }
 
 cli --port "$PORT" click --label "Options" >/dev/null
-cli --port "$PORT" wait_frames --n 3 >/dev/null
-if ! has_button "Go Back"; then echo "FAIL 91: Options overlay did not reopen" >&2; exit 1; fi
+wait_for_label "$PORT" "Go Back" || { echo "FAIL 91: Options overlay did not reopen" >&2; exit 1; }
 cli --port "$PORT" back >/dev/null
-cli --port "$PORT" wait_frames --n 3 >/dev/null
-if has_button "Go Back"; then echo "FAIL 91: back op did not pop the Options overlay" >&2; exit 1; fi
+wait_for_label "$PORT" "Go Back" --gone || { echo "FAIL 91: back op did not pop the Options overlay" >&2; exit 1; }
 echo "ok: overlay ESC + back both pop (converged cancel edge)"
 
 # --- 2. Lobby (the reported bug): ESC returns toward the main menu -----------
@@ -169,27 +168,25 @@ cli --port "$PORT" wait_frames --n 4 >/dev/null
 expect "ESC closes buy first" "$(ui_flags buy_active)" false
 if has_button "Hit Enter To Quit"; then echo "FAIL 91: ESC pushed PauseScreen while buy was open" >&2; exit 1; fi
 
-# nothing open -> ESC pushes PauseScreen.
+# nothing open -> ESC pushes PauseScreen. The PauseScreen is a Tier-1 overlay,
+# so it fades out->in and commits at black — wait for its widget, not a fixed
+# frame count.
 cli --port "$PORT" key --key escape >/dev/null
-cli --port "$PORT" wait_frames --n 4 >/dev/null
-if ! has_button "Hit Enter To Quit"; then echo "FAIL 91: ESC did not push PauseScreen" >&2; exit 1; fi
+wait_for_label "$PORT" "Hit Enter To Quit" || { echo "FAIL 91: ESC did not push PauseScreen" >&2; exit 1; }
 echo "ok: in-match ESC closes chat/buy first, then pushes PauseScreen"
 
 # ESC again pops the PauseScreen (default overlay pop), still in match.
 cli --port "$PORT" key --key escape >/dev/null
-cli --port "$PORT" wait_frames --n 4 >/dev/null
-if has_button "Hit Enter To Quit"; then echo "FAIL 91: second ESC did not pop PauseScreen" >&2; exit 1; fi
+wait_for_label "$PORT" "Hit Enter To Quit" --gone || { echo "FAIL 91: second ESC did not pop PauseScreen" >&2; exit 1; }
 expect "still in match after dismiss" "$(stateof)" SINGLEPLAYERGAME
 
 # Re-push, then the primary action leaves the match (and pops itself).
 cli --port "$PORT" key --key escape >/dev/null
-cli --port "$PORT" wait_frames --n 4 >/dev/null
-if ! has_button "Hit Enter To Quit"; then echo "FAIL 91: PauseScreen did not re-open" >&2; exit 1; fi
+wait_for_label "$PORT" "Hit Enter To Quit" || { echo "FAIL 91: PauseScreen did not re-open" >&2; exit 1; }
 cli --port "$PORT" key --key enter >/dev/null
 cli --port "$PORT" wait_for_state --state MAINMENU --timeout-ms 15000 >/dev/null
-cli --port "$PORT" wait_frames --n 3 >/dev/null
 expect "leave_match landed on MAINMENU" "$(stateof)" MAINMENU
-if has_button "Hit Enter To Quit"; then echo "FAIL 91: PauseScreen lingered after leaving the match" >&2; exit 1; fi
+wait_for_label "$PORT" "Hit Enter To Quit" --gone || { echo "FAIL 91: PauseScreen lingered after leaving the match" >&2; exit 1; }
 echo "ok: PauseScreen primary action leaves the match and dismisses itself"
 
 echo "PASS 91_cancel_back_router"

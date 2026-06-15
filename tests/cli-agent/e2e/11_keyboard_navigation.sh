@@ -51,8 +51,10 @@ press_and_expect_focus shift-tab "Connect To Lobby"
 press_and_expect_focus tab "Options"
 
 # Enter activates the focused button -> Options overlay opens over the menu.
+# Tier-1 overlays fade out->in and commit at black, so wait for the overlay's
+# widget rather than a fixed frame count.
 cli --port "$PORT" key --key enter >/dev/null
-cli --port "$PORT" wait_frames --n 3 >/dev/null
+wait_for_label "$PORT" "Go Back"
 cli --port "$PORT" inspect | bun -e '
   const r = JSON.parse(require("fs").readFileSync(0, "utf8"));
   const labels = new Set((r.nodes ?? []).filter((n) => n.role === "button").map((b) => b.label));
@@ -68,7 +70,7 @@ cli --port "$PORT" state | bun -e '
 
 # Escape dismisses the overlay and returns to the bare main menu.
 cli --port "$PORT" key --key escape >/dev/null
-cli --port "$PORT" wait_frames --n 3 >/dev/null
+wait_for_label "$PORT" "Go Back" --gone
 cli --port "$PORT" inspect | bun -e '
   const r = JSON.parse(require("fs").readFileSync(0, "utf8"));
   const labels = new Set((r.nodes ?? []).filter((n) => n.role === "button").map((b) => b.label));

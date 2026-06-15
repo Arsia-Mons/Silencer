@@ -188,6 +188,12 @@ uint64_t lastHoveredAudible_ = 0;
 uint32_t uiClickCount_ = 0;
 std::map<uint16_t, client::ui::ChromeTextures::Sprite> hudEmblems_;
 bool chromeDeferredBaked_ = false;
+// SIL-225: overlay push/pop (Options + its submenus, pause, modals are pushed
+// via use_navigation, never GoToState) bypasses the GoToState fade. The stack
+// swap is gated behind a transition fade in RenderClientUiFrame; this latch is
+// true while the Out leg runs (held mutation waiting for black). See the
+// overlay-fade orchestration there.
+bool overlayFadingOut_ = false;
 
 // SIL-15 use_settings dirty tracking: snapshot of the four persisted prefs as
 // of the last commit/revert; live Config diverging from it => Settings.dirty.

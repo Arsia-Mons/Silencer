@@ -684,7 +684,10 @@ bool Game::Tick(void){
 		case REPLAYGAME: TickReplayGame(); break;
 	}
 	if(gameRenderer.FadePhaseRef() < 16 && state != FADEOUT){
-		gameRenderer.ApplyPaletteFade(false);
+		// Honor the fade direction: a Tier-1 overlay transition runs an Out leg
+		// (dim to black) then an In leg, same as a state FADEOUT. TickFadeOut owns
+		// the dimming while state == FADEOUT.
+		gameRenderer.ApplyPaletteFade(gameRenderer.GetFadeDir() == GameRenderer::FadeDir::Out);
 	}
 	if(!nextstateprocessed){
 		nextstateprocessed = true;
@@ -701,7 +704,7 @@ void Game::GoToState(Uint8 newstate){
 	if(state != FADEOUT) fadefromstate = state;
 	nextstate = newstate;
 	state = FADEOUT;
-	gameRenderer.RestartPaletteFade();
+	gameRenderer.RestartPaletteFade(GameRenderer::FadeDir::Out);
 	stateisnew = true;
 	nextstateprocessed = false;
 	// Keep the outgoing Clay screen mounted until TickFadeOut reaches black.

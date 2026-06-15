@@ -65,10 +65,8 @@ public:
   void register_frame_cancel_handler(UiScreenEntryId entry_id,
                                      std::function<void()> handler);
 
-  bool push_screen(std::unique_ptr<UiScreen> screen,
-                   FadeOverride fade = FadeOverride::Default);
-  bool replace_top(std::unique_ptr<UiScreen> screen,
-                   FadeOverride fade = FadeOverride::Default);
+  bool push_screen(std::unique_ptr<UiScreen> screen);
+  bool replace_top(std::unique_ptr<UiScreen> screen);
   bool queue_push_screen(std::unique_ptr<UiScreen> screen,
                          FadeOverride fade = FadeOverride::Default);
   bool queue_reset_to_screen(std::unique_ptr<UiScreen> screen,
@@ -78,6 +76,21 @@ public:
   bool queue_deferred_mutation(DeferredUiMutation mutation);
   int pending_mutation_count() const { return mutation_count_; }
   void drain_deferred_mutations();
+
+  // Structural-mutation gating. When held, drain_deferred_mutations applies the
+  // domain (Deferred) mutations but leaves stack-changing mutations
+  // (Push/ResetTo/Pop*) queued, so the composition root can gate the visible
+  // stack swap behind a transition fade. commit_structural_mutations applies
+  // the held entries regardless of the hold. has_pending_structural_mutations
+  // reports whether any are waiting.
+  void set_structural_hold(bool held) { structural_hold_ = held; }
+  bool has_pending_structural_mutations() const;
+  // Whether the first queued stack swap wants the transition fade replayed
+  // (per-push FadeOverride, else the affected screen's wants_transition_fade()).
+  // The composition root reads this before committing to choose a full out->in
+  // fade vs an instant cut (e.g. the in-match PauseScreen).
+  bool pending_structural_wants_fade() const;
+  void commit_structural_mutations();
 
 private:
   enum class MutationKind {
@@ -98,6 +111,8 @@ private:
 
   bool queue_mutation(QueuedMutation mutation);
   void clear_mutations();
+  void apply_mutation(QueuedMutation &mutation);
+  static bool is_structural(MutationKind kind);
 
   ScreenStack screens_;
   ::ui::UiElementFrame retained_element_frame_ = {};
@@ -119,6 +134,7 @@ private:
   ::ui::NodeId prev_hovered_node_ = 0;
   std::array<QueuedMutation, CLIENT_UI_MAX_QUEUED_MUTATIONS> mutations_ = {};
   int mutation_count_ = 0;
+  bool structural_hold_ = false;
   bool wants_text_input_ = false;
 
   // The use_cancel registration for this frame (last-writer-wins).
