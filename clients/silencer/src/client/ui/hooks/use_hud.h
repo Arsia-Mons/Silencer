@@ -7,8 +7,9 @@
 namespace client::ui {
 
 // In-game HUD read projection (origin ui/hud parity): the pulse clock, team
-// strip rows (with frame-resolved sprite variants), poison/quit flags, and the
-// center-message reveal state. Captured per tick by the composition root.
+// strip rows (with frame-resolved sprite variants), poison + mission-over
+// flags, and the center-message reveal state. Captured per tick by the
+// composition root.
 struct HudTeamRow {
   uint8_t secrets = 0;
   bool beaming = false;
@@ -51,7 +52,7 @@ struct Hud {
   uint8_t phase = 0;  // origin renderer.GetHudAnimationPhase()
   uint32_t tick = 0;  // world tick (secret flicker)
   bool poisoned = false;
-  uint8_t quit_state = 0;
+  bool mission_over = false; // END_MISSION reached => InGameScreen pushes PauseScreen
   std::string message = {};
   uint8_t message_i = 0, message_type = 0, message_time = 0;
   uint8_t trace_time = 0; // "Government Trace Time: N" when > 0

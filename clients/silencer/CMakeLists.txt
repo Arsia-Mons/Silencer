@@ -293,6 +293,10 @@ set(SILENCER_CPPX_SOURCES
 	# over the live world, composed from use_match + use_player_status.
 	src/client/ui/screens/in_game_screen.cppx
 	src/client/ui/screens/in_game_screen.hx
+	# PauseScreen: the in-match "Hit Enter To Quit" affordance as an Overlay
+	# pushed by InGameScreen's use_cancel (and the projected mission-over edge).
+	src/client/ui/screens/pause_screen.cppx
+	src/client/ui/screens/pause_screen.hx
 )
 cppx_transpile(SILENCER_CPPX_GENERATED ${SILENCER_CPPX_SOURCES})
 target_sources(${SILENCER_TARGET} PRIVATE ${SILENCER_CPPX_GENERATED})

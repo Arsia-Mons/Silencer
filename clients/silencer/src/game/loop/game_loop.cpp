@@ -219,11 +219,11 @@ bool Game::Loop(void){
 			Uint8 newkeystate[SDL_SCANCODE_COUNT];
 			if(inputserver.LatestScancodes(newkeystate)){
 				// Edge-detect: feed press/release transitions through the
-				// same handlers the SDL path uses, so the in-game ESC
-				// quitstate machine, F1 player-list, debug overlay etc.
-				// behave identically with a TUI keyboard. TUI has no SDL text
-				// events, so text-focus/chat key edges synthesize the cppx UI
-				// key/text/cancel channels that events.cpp normally fills.
+				// same handlers the SDL path uses, so the in-game F1
+				// player-list, debug overlay etc. behave identically with a
+				// TUI keyboard. TUI has no SDL text events, so text-focus/chat
+				// key edges synthesize the cppx UI key/text/cancel channels
+				// that events.cpp normally fills.
 				bool routeTextInput = TuiAllowsTextInput(*this, ViewedPlayerChatActive(*this));
 				for(int sc = 0; sc < SDL_SCANCODE_COUNT; ++sc){
 					bool was = gameInput.GetKeystate()[sc] != 0;
@@ -694,11 +694,15 @@ void Game::GoToState(Uint8 newstate){
 }
 
 bool Game::GoBack(void){
-	// SIL-14: per-screen "back" is now Tier-1 navigation — the cppx pipeline
-	// pops the top Overlay on cancel (ClientUi::end_layout). game.cpp no longer
-	// reaches into screens; a hard back request falls through to the main menu.
-	GoToState(MAINMENU);
-	return false;
+	// The `back` control op (and a controller "back") inject the SAME cancel edge
+	// the keyboard ESC / control `escape` path sets; the one UI-layer cancel
+	// router (ClientUi::end_layout, driven by each screen's use_cancel) owns the
+	// navigation policy. game.cpp holds no back/cancel policy — it only plumbs
+	// the edge.
+	::ui::UiInputFrame & ui = gameUiPipeline.UiInput();
+	ui.cancel_pressed = true;
+	ui.cancel_down = true;
+	return true;
 }
 
 const char* Game::StateName(Uint8 s){
@@ -741,7 +745,7 @@ WorldSummary Game::GetWorldSummary(){
 	summary.messageType = static_cast<int>(world.GetMessageType());
 	summary.messageTime = static_cast<int>(world.GetMessageTime());
 	summary.topMessageText = world.GetTopMessageText();
-	summary.quitState = world.quitstate;
+	summary.missionOver = world.missionover;
 	summary.showTeamColors = world.IsShowingTeamColors();
 	summary.topMessageProgress = static_cast<int>(world.GetTopMessageProgress());
 	for(unsigned int i = 0; i < world.maxpeers; i++){

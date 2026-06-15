@@ -1,17 +1,17 @@
 #!/usr/bin/env bash
-# In-game hardcoded bindings + the quit-prompt state machine vs origin
-# (game_input.cpp OnScancodeDown/Up, game_session.cpp CheckForQuit):
+# In-game hardcoded gameplay bindings vs origin (game_input.cpp
+# OnScancodeDown/Up):
 #   - F1 player list is HOLD semantics: down -> SetShowingPlayerList(true),
 #     up -> false.
 #   - F2 toggles team colors (SetShowingTeamColors flip per press).
 #   - F4 shows the "          *MUSIC PAUSED*" top ticker; headless audio is
 #     disabled so MusicPaused() is always false and a second press shows the
 #     SAME text (origin behavior).
-#   - quit machine: ESC down 0->1, up 1->2 (prompt latched); a second ESC
-#     press/release 2->3->0 CANCELS; with the prompt up, holding RETURN quits
-#     (CheckForQuit) -> MAINMENU (tutorial is not lobby-authenticated).
-# Raw scancodes go over the TUI input port (the control `key` op only feeds
-# the cppx UI channel, not the OS-scancode handlers).
+# Raw scancodes go over the TUI input port (these gameplay shortcut keys still
+# flow through the OS-scancode handlers). The old ESC raw-scancode quit-prompt
+# state machine (world.quitstate) was DELETED — cancel/back now routes through
+# the UI-layer cancel router (use_cancel) and is covered by
+# 91_cancel_back_router.sh via the control `key`/`back` ops.
 set -euo pipefail
 . "$(dirname "$0")/lib.sh"
 
@@ -109,18 +109,9 @@ tap 7 32
 expect "F4 again (audio disabled => never paused)" \
   "$(ws_field topmessage_text)" "          *MUSIC PAUSED*"
 
-# --- quit machine: prompt -> cancel -> prompt -> Enter quits ------------------
-expect "quitstate idle" "$(ws_field quit_state)" 0
-tap 5 2
-expect "ESC latches the prompt" "$(ws_field quit_state)" 2
-tap 5 2
-expect "second ESC cancels" "$(ws_field quit_state)" 0
-tap 5 2
-expect "prompt again" "$(ws_field quit_state)" 2
-send_scancodes 5 1   # hold RETURN: CheckForQuit reads the live keystate
-cli --port "$PORT" step --frames 2 >/dev/null
-cli --port "$PORT" resume >/dev/null
-cli --port "$PORT" wait_for_state --state MAINMENU --timeout-ms 15000 >/dev/null
-send_scancodes 5 0
+# --- mission-over signal is exposed (replaces the old quit_state machine) -----
+# The control-socket world_state now reports the mission-over bool (END_MISSION),
+# not the deleted quitstate machine. Idle in a fresh tutorial it must be false.
+expect "mission_over idle" "$(ws_field mission_over)" false
 
 echo "PASS 78_ingame_bindings_quit"

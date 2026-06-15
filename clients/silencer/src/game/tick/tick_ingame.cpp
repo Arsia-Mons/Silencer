@@ -300,18 +300,6 @@ if(/*!world.map.loaded && */stateisnew){
 		world.ShowMessage((char *)"Location : Base Arsia Mons, Surface Temperature : -7C", 96, 1);
 		gameSession.DeployMessageShownRef() = true;
 	}
-	if(gameSession.CheckForQuit()){
-		world.Disconnect();
-		if(world.lobby.state == Lobby::AUTHENTICATED){
-			GoToState(LOBBY);
-			world.lobby.JoinChannel(world.lobby.lastchannel);
-		}else{
-			if(world.replay.IsPlaying()){
-				world.replay.EndPlaying();
-			}
-			GoToState(MAINMENU);
-		}
-	}
 	if(gameSession.CheckForEndOfGame()){
 		if(world.lobby.state == Lobby::AUTHENTICATED){
 			GoToState(MISSIONSUMMARY);

@@ -26,7 +26,7 @@ World::World(bool mode) : messaging(*this), objects(*this), network(*this), peer
 	maxyvelocity    = GASLoader::Get().player.worldMaxYVelocity;
 	minwalldistance = GASLoader::Get().world.minWallDistance;
 	replaying = false;
-	quitstate = 0;
+	missionover = false;
 	winningteamid = 0;
 	gameplaystate = NONE;
 	// LoadBuyableItems() is called from Game::Init() after GAS loads via resources.Load()

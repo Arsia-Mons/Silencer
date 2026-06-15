@@ -77,7 +77,6 @@ Match use_match() {
       .winning_team_id = s.winning_team_id,
       .scores = s.scores,
       .message = s.message,
-      .confirm_quit = value->confirm_quit,
   };
 }
 
@@ -147,7 +146,7 @@ Hud use_hud() {
   out.phase = s.hud_phase;
   out.tick = s.hud_tick;
   out.poisoned = s.poisoned;
-  out.quit_state = s.quit_state;
+  out.mission_over = s.mission_over;
   out.message = s.message;
   out.message_i = s.message_i;
   out.message_type = s.message_type;

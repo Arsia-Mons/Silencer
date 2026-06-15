@@ -3,12 +3,15 @@
 #include "client/ui/components/layout/layout.h"
 #include "client/ui/components/tokens.h"
 #include "client/ui/hooks/use_buy_tech.h"
+#include "client/ui/hooks/use_cancel.h"
 #include "client/ui/hooks/use_chrome.h"
 #include "client/ui/hooks/use_hud.h"
 #include "client/ui/hooks/use_ingame_chat.h"
+#include "client/ui/hooks/use_navigation.h"
 #include "client/ui/hooks/use_player_status.h"
 #include "client/ui/hooks/use_teams.h"
 #include "client/ui/hooks/use_tech.h"
+#include "client/ui/screens/pause_screen.h"
 #include "ui/components/box.h"
 #include "ui/components/input.h"
 #include "ui/components/text.h"
@@ -18,6 +21,7 @@
 #include <cstdio>
 #include <cstring>
 #include <functional>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -48,7 +52,6 @@ constexpr int kAdvBodySm = 7;
 constexpr int kAdvHeading = 8;
 constexpr int kAdvTitle = 11;
 constexpr int kAdvHudCounter = 12;
-constexpr int kAdvPrompt = 16;
 
 // Device(640x480) -> logical(960x720). ceil(1.5d - .25) lands every integer
 // device coordinate exactly: even d maps to the exact 1.5d, odd d to
@@ -826,19 +829,6 @@ void build_center_message(std::vector<::ui::UiElement> &out, const Hud &hud) {
 }
 
 // ---------------------------------------------------------------------------
-// Quit prompt (origin InGameOverlays.cpp DrawQuitPrompt)
-// ---------------------------------------------------------------------------
-
-void build_quit_prompt(std::vector<::ui::UiElement> &out, const Hud &hud) {
-  if (hud.quit_state != 1 && hud.quit_state != 2)
-    return;
-  static const char *kText = "Hit Enter To Quit";
-  const int w = (int)std::strlen(kText) * kAdvPrompt;
-  out.push_back(hud_text("quit", (640 - w) / 2, 200, kText,
-                         tokens::kTextHudCredits, 34.5f, tokens::kFaceTitle));
-}
-
-// ---------------------------------------------------------------------------
 
 struct InGameScreenProps {
   uint32_t unused = 0;
@@ -852,6 +842,31 @@ struct InGameScreenProps {
   IngameChat chat = use_ingame_chat();
   Teams teams = use_teams();
   ChromeTextures chrome = use_chrome();
+  Navigation nav = use_navigation();
+
+  // In-match cancel chain (ESC / controller back / the `back` op, via the
+  // UI-layer cancel router). Captured intent closures only — never a Player /
+  // World flag. Priority: close chat compose, else close the buy/tech station,
+  // else push the PauseScreen ("Hit Enter To Quit"). All intents queue.
+  use_cancel([chat, tech, nav]() {
+    if (chat.active) {
+      if (chat.cancel)
+        chat.cancel();
+    } else if (tech.buy_active || tech.tech_active) {
+      if (tech.close)
+        tech.close();
+    } else if (nav.push) {
+      nav.push(std::make_unique<PauseScreen>());
+    }
+  });
+
+  // Scripted mission-end (END_MISSION) pushes the PauseScreen once on the
+  // rising edge of the projected mission-over flag (not a per-frame imperative
+  // check). nav.push queues a deferred mutation, so this is build-safe.
+  bool *prev_mission_over = use_state<bool>(false);
+  if (hud.mission_over && !*prev_mission_over && nav.push)
+    nav.push(std::make_unique<PauseScreen>());
+  *prev_mission_over = hud.mission_over;
 
   std::vector<::ui::UiElement> kids;
   if (ps.valid) {
@@ -873,7 +888,6 @@ struct InGameScreenProps {
     build_center_message(kids, hud);
     if (teams.showing)
       build_player_list(kids, hud);
-    build_quit_prompt(kids, hud);
   }
 
   ::ui::UiElement hud_root = Box(BoxProps{

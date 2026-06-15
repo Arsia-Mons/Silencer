@@ -18,7 +18,6 @@ void UnloadGame();
 void JoinGame(LobbyGame & lobbygame, char * password);
 void SpectateGame(LobbyGame & lobbygame, char * password);
 void LeaveJoinedGame();
-bool CheckForQuit();
 bool CheckForEndOfGame();
 bool CheckForConnectionLost();
 void ShowDeployMessage();

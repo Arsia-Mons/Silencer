@@ -204,19 +204,6 @@ gamepadstate.axes[a] = SDL_GetGamepadAxis(gamepad, (SDL_GamepadAxis)a);
 }
 
 void GameInput::OnScancodeDown(int sc){
-if(sc == game.quitscancode){
-Peer * lp = game.world.peers.peerlist[game.world.peers.localpeerid];
-bool isobserver = lp && lp->observer;
-Player * localplayer = game.world.GetPeerPlayer(game.world.peers.localpeerid);
-bool playerok = localplayer && !localplayer->chatActive && !localplayer->isbuying && !localplayer->techstationactive;
-if(isobserver || playerok){
-if(game.world.quitstate == 0){
-game.world.quitstate = 1;
-}else if(game.world.quitstate == 2){
-game.world.quitstate = 3;
-}
-}
-}
 if(sc == SDL_SCANCODE_F1){
 game.world.SetShowingPlayerList(true);
 }
@@ -245,14 +232,6 @@ game.world.ShowTopMessage(game.world.debugoverlay ? "        DEBUG OVERLAY ON" :
 }
 
 void GameInput::OnScancodeUp(int sc){
-if(sc == game.quitscancode){
-if(game.world.quitstate == 1){
-game.world.quitstate = 2;
-}
-if(game.world.quitstate == 3){
-game.world.quitstate = 0;
-}
-}
 if(sc == SDL_SCANCODE_F1){
 game.world.SetShowingPlayerList(false);
 }

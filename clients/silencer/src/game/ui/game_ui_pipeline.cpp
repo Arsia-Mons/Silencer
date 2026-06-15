@@ -1163,7 +1163,7 @@ session.current_game_id = game.currentlobbygameid;
 session.play_online = [this]{ game.GoToState(GameState::LOBBYCONNECT); };
 session.start_tutorial = [this]{ game.GoToState(GameState::SINGLEPLAYERGAME); };
 session.open_character_create = [this]{ game.GoToState(GameState::CREATECHARACTER); };
-session.leave_match = [this]{ game.LeaveJoinedGame(); };
+session.leave_match = [this]{ game.LeaveMatchToMenu(); };
 session.leave_to_menu = [this]{ game.GoToState(GameState::MAINMENU); };
 session.set_paused = [this](bool p){ game.paused = p; };
 
@@ -1523,12 +1523,6 @@ Player * p = game.world.GetPeerPlayer(game.world.GetLocalPeerId());
 if(p) p->currentinventoryitem = (Uint8)slot;
 });
 };
-world_session.confirm_quit = [this](){
-cppxHost->pipeline().client_ui().queue_deferred_mutation([this](){
-// Quit to the menu (the full pause/leave→summary flow lands with PauseScreen).
-game.GoToState(GameState::MAINMENU);
-});
-};
 // SIL-21 (5/n) in-match overlay intents (doc §6/§7a): buy/tech station, chat
 // compose, and the scoreboard toggle — queued over the public World/Player seam
 // (drained after render, FADEOUT-gated). The viewed agent matches the snapshot.
@@ -1660,29 +1654,10 @@ chromeDeferredBaked_ = true;
 }
 }
 
-// In-game Cancel routing (origin InGameUiController::ApplyActions): Esc
-// closes the chat compose (text dropped) or the buy/tech overlay. Handled
-// here because the in-game HUD is the BASE screen — ClientUi's cancel pass
-// only pops Overlay screens. The raw-ESC quit machine stays blocked this
-// frame (OnScancodeDown gates on !chatActive, which the deferred close
-// flips after render — same ordering as origin).
-// (direct mutation: this runs BEFORE begin_frame, which clears the deferred
-// queue — and pre-frame world writes are safe, the no-mutation rule guards
-// mid-build only)
-if(uiInput_.cancel_pressed && game.world.map.loaded){
-Player * p = game.world.GetPeerPlayer(game.world.viewedpeerid);
-if(p && (p->chatActive || p->isbuying || p->techstationactive)){
-if(p->chatActive){
-p->chatActive = false;
-p->chatText[0] = '\0';
-}else{
-p->isbuying = false;
-p->techstationactive = false;
-}
-uiInput_.cancel_pressed = false;
-uiInput_.cancel_down = false;
-}
-}
+// In-game cancel routing (chat compose / buy-tech close / push PauseScreen)
+// now lives entirely in InGameScreen's use_cancel chain, driven by the UI-layer
+// cancel router (ClientUi::end_layout). game.cpp/this composition root hold no
+// cancel policy — they only plumb the cancel edge into the UiInputFrame.
 
 // SIL-18 input: the accumulated per-frame edges (events.cpp windowed +
 // control-socket injection) plus the derived pointer. An injected click is a

@@ -211,7 +211,7 @@ static nlohmann::json WorldSummaryToJson(const WorldSummary& summary){
 	r["message_time"] = summary.messageTime;
 	r["topmessage_text"] = summary.topMessageText;
 	r["topmessage_progress"] = summary.topMessageProgress;
-	r["quit_state"] = summary.quitState;
+	r["mission_over"] = summary.missionOver;
 	r["show_team_colors"] = summary.showTeamColors;
 	return r;
 }

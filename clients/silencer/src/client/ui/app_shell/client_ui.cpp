@@ -33,7 +33,14 @@ ClientUi::ClientUi() { ::ui::focus_init(&retained_focus_); }
 void ClientUi::begin_frame(const ::ui::UiInputFrame &input) {
   (void)input;
   clear_mutations();
+  cancel_slot_ = {};
   retained_element_frame_.reset();
+}
+
+void ClientUi::register_frame_cancel_handler(UiScreenEntryId entry_id,
+                                             std::function<void()> handler) {
+  // Last-writer-wins: a screen rebuilt later this frame overwrites the slot.
+  cancel_slot_ = {true, entry_id, std::move(handler)};
 }
 
 void ClientUi::build_visible_screens(const UiElementWrapper &wrap_root) {
@@ -113,8 +120,21 @@ void ClientUi::build_visible_screens(const UiElementWrapper &wrap_root) {
 }
 
 void ClientUi::end_layout(const ::ui::UiInputFrame &input) {
+  // The central cancel pass (the use_cancel router). Runs after build, before
+  // drain_deferred_mutations — so handlers may only QUEUE work (nav.push,
+  // chat.cancel, …), never touch the retained tree. Honoring only the TOP
+  // screen's registration is what makes it correct when an overlay sits over
+  // the base phase screen: the overlay is top, so its handler (or the default
+  // pop) wins and the base screen's stale registration is ignored.
+  if (!input.cancel_pressed)
+    return;
   UiScreen *top = screens_.top();
-  if (input.cancel_pressed && top && top->kind() == ScreenKind::Overlay) {
+  if (!top)
+    return;
+  if (cancel_slot_.present && cancel_slot_.entry_id == top->entry_id() &&
+      cancel_slot_.handler) {
+    cancel_slot_.handler();
+  } else if (top->kind() == ScreenKind::Overlay) {
     queue_pop_current(top->entry_id());
   }
 }

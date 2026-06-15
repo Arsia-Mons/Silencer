@@ -2,6 +2,7 @@
 
 #include "client/ui/app_shell/client_ui.h"
 #include "client/ui/app_shell/deferred_ui_mutation.h"
+#include "client/ui/hooks/use_cancel.h"
 #include "client/ui/hooks/use_navigation.h"
 #include "ui/runtime/react.h"
 
@@ -54,6 +55,18 @@ Navigation use_navigation() {
                       entry_id] { client_ui->queue_pop_current(entry_id); },
       .pop_top = [client_ui] { client_ui->queue_pop_top(); },
   };
+}
+
+void use_cancel(std::function<void()> on_cancel) {
+  NavigationProviderValue *value =
+      use_navigation_provider_value("use_cancel");
+  if (!value || !value->is_top || !on_cancel)
+    return;
+  // Only the top screen owns the cancel edge; register its handler for this
+  // frame's central cancel pass. The closure is captured by value, surviving
+  // the arena reset at tree end_frame.
+  value->client_ui->register_frame_cancel_handler(value->current_entry_id,
+                                                  std::move(on_cancel));
 }
 
 namespace internal {

@@ -38,7 +38,7 @@ struct WorldSummary {
 	int messageTime = 0;
 	std::string topMessageText;
 	int topMessageProgress = 0;
-	int quitState = 0;          // origin quitstate machine (0/1/2/3)
+	bool missionOver = false;   // END_MISSION reached (was the quitstate machine)
 	bool showTeamColors = false;
 };
 

@@ -6,9 +6,11 @@
 #include "client/ui/components/surfaces/surfaces.h"
 #include "client/ui/components/text/text.h"
 #include "client/ui/components/tokens.h"
+#include "client/ui/hooks/use_cancel.h"
 #include "client/ui/hooks/use_character_create.h"
 #include "client/ui/hooks/use_characters.h"
 #include "client/ui/hooks/use_chrome.h"
+#include "client/ui/hooks/use_session.h"
 #include "client/ui/screens/character_create_data.h"
 #include "ui/components/box.h"
 #include "ui/components/input.h"
@@ -565,6 +567,9 @@ struct CharacterCreateContentProps {
 ::ui::UiElement CharacterCreateContent(const CharacterCreateContentProps &) {
   CharacterWizard w = use_character_create();
   Characters chars = use_characters();
+  Session session = use_session();
+  // ESC / controller back / the `back` op leave character create to the menu.
+  use_cancel(session.leave_to_menu);
 
   std::function<void(int)> on_pick = [create = chars.create, alias = w.alias,
                                       submitting = w.submitting,

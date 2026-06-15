@@ -102,7 +102,7 @@ struct WorldSessionSnapshot {
   uint8_t hud_phase = 0;  // renderer pulse clock (+1/sim frame)
   uint32_t hud_tick = 0;  // world tick (secret-slot flicker)
   bool poisoned = false;
-  uint8_t quit_state = 0; // 1/2 => "Hit Enter To Quit"
+  bool mission_over = false; // END_MISSION / mission-end reached => push PauseScreen
   uint8_t message_i = 0, message_type = 0, message_time = 0;
   std::vector<HudTeamStrip> hud_teams = {};
 
@@ -129,7 +129,6 @@ struct WorldSessionSnapshot {
 struct WorldSessionValue {
   WorldSessionSnapshot snapshot = {};
   std::function<void(int)> select_inventory_slot = {};
-  std::function<void()> confirm_quit = {};
 
   // Buy/tech station intents (use_tech / use_buy_tech).
   std::function<void(int)> buytech_select = {};

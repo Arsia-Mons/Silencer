@@ -178,7 +178,9 @@ class World {
     Uint8  gravity, maxyvelocity;
     int    minwalldistance;
     bool   replaying;
-    Uint8  quitstate;
+    // The scripted/HUD mission-over signal (origin END_MISSION). Rising edge
+    // pushes the UI-layer PauseScreen; NOT serialized (authority-local).
+    bool   missionover;
     std::vector<BuyableItem *> buyableitems;
     Uint32 tickcount;
     bool   choosingtech;

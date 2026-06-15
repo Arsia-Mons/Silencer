@@ -245,7 +245,7 @@ CaptureWorldSessionSnapshot(Game &game, client::ui::SessionPhase phase) {
   // --- in-game HUD (use_hud): pulse clock, message reveal, team strip ---
   snap.hud_phase = game.GetRenderer().GetHudAnimationPhase();
   snap.hud_tick = world.tickcount;
-  snap.quit_state = world.quitstate;
+  snap.mission_over = world.missionover;
   snap.message_i = world.messaging.message_i;
   snap.message_type = world.messaging.messagetype;
   snap.message_time = world.messaging.messagetime;

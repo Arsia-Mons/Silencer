@@ -38,6 +38,16 @@ if(mod & SDL_KMOD_ALT) out |= ::ui::UI_KEY_MOD_ALT;
 if(mod & SDL_KMOD_GUI) out |= ::ui::UI_KEY_MOD_SUPER;
 return out;
 }
+
+// Does this single gamepad button resolve to the active keymap's UiCancel
+// binding? Synthesizes a one-button GamepadState and asks the keymap (so
+// gamepad.json's "ui_cancel" stays authoritative — never a hardcoded PAD:east).
+bool GamepadButtonIsUiCancel(const KeyMap& keymap, int button){
+GamepadState gp = {};
+gp.connected = true;
+if(button >= 0 && button < 32) gp.buttons = (1u << (unsigned)button);
+return keymap.IsPressed(Action::UiCancel, nullptr, gp);
+}
 } // namespace
 
 bool Game::HandleSDLEvents(){
@@ -159,6 +169,21 @@ case SDL_EVENT_GAMEPAD_BUTTON_DOWN:
 if(gameUiPipeline.IsCapturingKeybind()){
 gameUiPipeline.FeedKeybindEdge({BindingDevice::GamepadButton,
                                 (int)event.gbutton.button, 0});
+}else if(GamepadButtonIsUiCancel(gameInput.GetKeyMap(), (int)event.gbutton.button)){
+// Controller "back" feeds the SAME cancel edge as keyboard ESC; the UI-layer
+// cancel router (ClientUi::end_layout) owns the policy.
+::ui::UiInputFrame & ui = gameUiPipeline.UiInput();
+ui.source = ::ui::UiFocusSource::Gamepad;
+ui.cancel_pressed = true;
+ui.cancel_down = true;
+}
+break;
+case SDL_EVENT_GAMEPAD_BUTTON_UP:
+if(!gameUiPipeline.IsCapturingKeybind() &&
+   GamepadButtonIsUiCancel(gameInput.GetKeyMap(), (int)event.gbutton.button)){
+::ui::UiInputFrame & ui = gameUiPipeline.UiInput();
+ui.source = ::ui::UiFocusSource::Gamepad;
+ui.cancel_released = true;
 }
 break;
 case SDL_EVENT_GAMEPAD_AXIS_MOTION:

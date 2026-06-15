@@ -175,9 +175,14 @@ mainmenu, options, options_audio, options_display, options_controls,
 lobby_connect, character_create, **lobby_screen** (captured as `lobby`),
 cc_alias, cc_select_agency, create_game, game_staging, tech_select.
 
-## In-game goldens (8) — captured 2026-06-11, 640×480
+## In-game goldens (7) — captured 2026-06-11, 640×480
 `ingame_hud_base, ingame_chat_open, ingame_chat_history, ingame_player_list,
-ingame_buy_tech, ingame_messages, ingame_tech_overlay, ingame_quit_prompt`
+ingame_buy_tech, ingame_messages, ingame_tech_overlay`
+
+(The 8th, `ingame_quit_prompt`, was RETIRED: the baked HUD "Hit Enter To Quit"
+prompt + the raw-scancode `world.quitstate` machine were deleted. The in-match
+cancel affordance is now the UI-layer PauseScreen overlay, covered behaviorally
+by `91_cancel_back_router.sh`.)
 
 (The earlier "HUD doesn't capture headless" deferral note was WRONG: origin renders
 world + HUD software-side into the 640×480 screenbuffer every frame; `--headless`
@@ -218,12 +223,6 @@ only skips Present. The control-port `screenshot` op captures HUD included.)
   - `ingame_tech_overlay` = next `message_i == 0` (`ingame_ui_mode tech` —
     creates/joins a team and teleports the player to the team base, so it is
     captured LAST; base interior has no sky → no rain → fully deterministic).
-  - `ingame_quit_prompt` = separate `--headless --tui` session (control ops
-    can't reach the quitstate machine — it listens to raw scancodes only):
-    throwaway TCP frame sink + scancode bitmask (ESC=41) over `--tui-input-port`,
-    press edge (quitstate 1) + release edge (quitstate 2, prompt latched), each
-    consuming one sim tick — anchored at `message_i == 254` so the capture
-    lands on `message_i == 0`.
 - **Nondeterministic regions (measured: 2 independent full runs, numpy diff):**
   - **Rain streaks** — sparse 1-2 px diagonal dashes anywhere in the world view
     (y0-~400), including THROUGH the transparent interiors of the chat/buy/
@@ -282,11 +281,6 @@ ingame_system_camera`
   behaviortree.cpp:81) that wall-clock rain also consumes — wandering
   civilians need masks: `270,230,330,290` (status_lines, by the terminal) and
   `395,230,480,320` (secret_overlay, deck right of the door).
-  quit_prompt addendum (2026-06-11): its longer TUI quit drive lets the civilians
-  wander the full deck — observed flapping tiles at (234,242) and (416,242) across
-  full-suite runs (3.6%→5.2% on the same tile). The 72 gate masks their whole
-  traversal band `0,242,624,296` (bodies above the already-masked ripple band
-  y296-340) for quit_prompt only; other surfaces keep the tighter per-spot boxes.
 
 - **ingame_system_camera is NOT render-gated:** after the first base entry,
   origin's ambience repaint (game_loop.cpp:184 `CopyWithBrightness(colors,

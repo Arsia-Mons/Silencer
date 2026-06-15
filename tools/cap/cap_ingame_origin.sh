@@ -33,15 +33,10 @@
 #   - `ingame_ui_mode tech` mutates the world irreversibly (creates/joins a
 #     team, teleports the player to its base) → captured LAST.
 #
-# Two sessions:
-#   A) plain --headless: hud_base, player_list, buy_tech, chat_open,
-#      chat_history, messages, tech_overlay (control ops only).
-#   B) --headless --tui + a throwaway frame sink: quit_prompt. The quitstate
-#      machine only listens to raw OS scancodes (game_input.cpp
-#      OnScancodeDown), which headless control ops can't inject — but TUI
-#      mode's input server accepts scancode bitmasks over TCP and routes them
-#      through the same edge-detect handlers (ESC down→quitstate 1,
-#      up→quitstate 2 → "Hit Enter To Quit" prompt persists).
+# One session, plain --headless: hud_base, player_list, buy_tech, chat_open,
+# chat_history, messages, tech_overlay (control ops only). (The retired
+# quit_prompt golden's TUI session was removed — the baked HUD quit prompt is
+# gone; the in-match cancel affordance is the cppx PauseScreen overlay.)
 #
 # Usage: tools/cap/cap_ingame_origin.sh [OUT_DIR]
 #   ORIGIN_ROOT  override origin worktree (default .worktrees/origin-capture
@@ -256,81 +251,6 @@ step_to_mp 0   # hide the center message again
 cli ingame_ui_mode --mode tech >/dev/null
 cli wait_frames --n 2 >/dev/null
 shot ingame_tech_overlay
-
-stop_session
-
-# ============================================================================
-# Session B — TUI input channel: quit prompt (needs a real ESC scancode)
-# ============================================================================
-PORT="$((PORT + 1))"
-FRAME_PORT="$((PORT + 1))"
-INPUT_PORT="$((PORT + 2))"
-
-# Throwaway frame sink: TUIBackend connects here at init and writes every
-# presented frame; we accept and discard.
-bun -e '
-  Bun.listen({ hostname: "127.0.0.1", port: Number(process.argv[1]), socket: { data() {} } });
-  setInterval(() => {}, 60_000);
-' "$FRAME_PORT" &
-SINK_PID=$!
-sleep 0.5
-
-SILENCER_TUI_FRAME_HOST=127.0.0.1 SILENCER_TUI_FRAME_PORT="$FRAME_PORT" \
-  "$BIN" --headless --tui --tui-input-port "$INPUT_PORT" --control-port "$PORT" \
-  >"/tmp/silencer-ingame-cap-$PORT.log" 2>&1 &
-PID=$!
-drive_to_anchor
-# Land 2 ticks BEFORE the message-hidden tick: the ESC press/release edges
-# below each consume one sim tick, so the capture itself sits at
-# message_i == 0 (no center message over the quit prompt).
-step_to_mp 254
-
-# send_scancodes <hex byte for mask byte 5> — ESC is scancode 41 = byte 5 bit 1.
-# One-shot connection: version handshake then a single SCANCODE_SNAPSHOT
-# (latest-wins, cached server-side after we disconnect).
-send_scancodes() {
-  bun -e '
-    const [port, byte5] = process.argv.slice(1).map(Number);
-    const mask = new Uint8Array(64);
-    mask[5] = byte5;
-    const frame = new Uint8Array(1 + 3 + 64);
-    frame[0] = 1;           // protocol version
-    frame[1] = 2;           // SCANCODE_SNAPSHOT
-    frame[2] = 64; frame[3] = 0; // len LE
-    frame.set(mask, 4);
-    const sock = await Bun.connect({
-      hostname: "127.0.0.1", port,
-      socket: { data() {}, error(_s, e) { console.error(e); process.exit(1); } },
-    });
-    sock.write(frame);
-    await sock.flush?.();
-    setTimeout(() => { sock.end(); process.exit(0); }, 200);
-  ' "$INPUT_PORT" "$1"
-}
-
-# ESC press edge (quitstate 0→1), one sim tick to consume it, release edge
-# (1→2: prompt latched), one more tick.
-send_scancodes 2
-cli step --frames 1 >/dev/null
-send_scancodes 0
-cli step --frames 1 >/dev/null
-cli wait_frames --n 2 >/dev/null
-
-# Verify the prompt actually rendered ("Hit Enter To Quit", centered ~y200)
-cli screenshot --out "/tmp/quit_probe_$PORT.png" >/dev/null
-python3 - "$PORT" <<'PY'
-import sys
-from PIL import Image
-import numpy as np
-port = sys.argv[1]
-a = np.array(Image.open(f"/tmp/quit_probe_{port}.png").convert("RGB"), dtype=int)
-band = a[190:230, 150:490]
-if (band.sum(axis=2) > 90).sum() < 50:
-    print("quit prompt not visible in y190-230 band", file=sys.stderr)
-    sys.exit(1)
-PY
-cp "/tmp/quit_probe_$PORT.png" "$OUT_DIR/ingame_quit_prompt.png"
-echo "captured ingame_quit_prompt"
 
 stop_session
 echo "all in-game origin goldens captured to $OUT_DIR"

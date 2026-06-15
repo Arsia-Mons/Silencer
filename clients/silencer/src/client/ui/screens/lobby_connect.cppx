@@ -4,8 +4,10 @@
 #include "client/ui/components/layout/pen_grid.h"
 #include "client/ui/components/text/text.h"
 #include "client/ui/components/tokens.h"
+#include "client/ui/hooks/use_cancel.h"
 #include "client/ui/hooks/use_chrome.h"
 #include "client/ui/hooks/use_lobby_session.h"
+#include "client/ui/hooks/use_session.h"
 #include "ui/components/box.h"
 #include "ui/components/input.h"
 #include "ui/components/text.h"
@@ -74,7 +76,10 @@ std::vector<::ui::UiElement> connect_status_log(const std::string &log) {
 // Inputs are chromeless (text + caret only) since their wells are in the sprite.
 ::ui::UiElement LobbyConnectView(const LobbyConnectProps &) {
   LobbySession lobby = use_lobby_session();
+  Session session = use_session();
   client::ui::ChromeTextures chrome = use_chrome();
+  // ESC / controller back / the `back` op leave the connect phase to the menu.
+  use_cancel(session.leave_to_menu);
   std::string *username = use_state<std::string>(std::string());
   std::string *password = use_state<std::string>(std::string());
   if (!username || !password)

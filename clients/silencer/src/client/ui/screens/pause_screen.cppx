@@ -1,0 +1,64 @@
+#include "client/ui/screens/pause_screen.h"
+
+#include "client/ui/components/actions/actions.h"
+#include "client/ui/components/layout/layout.h"
+#include "client/ui/hooks/use_navigation.h"
+#include "client/ui/hooks/use_session.h"
+#include "ui/runtime/react.h"
+
+#include <functional>
+
+namespace client::ui {
+namespace {
+
+// JSX lowering emits each tag's component function + `<Tag>Props` type
+// unqualified, so pull in the silencer semantic layer + the runtime children().
+using namespace silencer;
+using ::ui::children;
+
+struct PauseProps {
+  uint32_t unused = 0;
+};
+
+::ui::UiElement PauseView(const PauseProps &) {
+  Session session = use_session();
+  Navigation nav = use_navigation();
+
+  // The origin "Hit Enter To Quit" affordance: a single auto-focused primary
+  // action. Enter (confirm → focus runtime → activate) or a click leaves the
+  // match (origin CheckForQuit outcome, via use_session().leave_match) AND pops
+  // this overlay — leaving changes the game phase but the overlay sits above
+  // AppRoot, so it must dismiss itself or it lingers over the next phase.
+  // Dismiss-without-leaving (ESC/back again) is the cancel router's default
+  // overlay pop — no use_cancel handler here.
+  std::function<void()> leave = [leave_match = session.leave_match,
+                                 pop = nav.pop_current]() {
+    if (pop)
+      pop();
+    if (leave_match)
+      leave_match();
+  };
+
+  return <ScreenLayout key="root" variant={ScreenLayoutVariant::CenteredOverlay}>
+    <AppButton
+      key="quit"
+      controlId="PauseQuit"
+      variant={AppButtonVariant::Oval}
+      size={AppButtonSize::Lg}
+      label="Hit Enter To Quit"
+      defaultFocused={true}
+      onPress={leave}
+    />
+  </ScreenLayout>
+}
+
+} // namespace
+
+bool PauseScreen::build_element(::ui::UiElementFrame &, ::ui::UiElement *out) {
+  if (!out)
+    return false;
+  *out = ::ui::component("Pause", PauseProps{}, PauseView, "pause");
+  return true;
+}
+
+} // namespace client::ui

@@ -43,11 +43,6 @@ Game::Game()
 	minimized = false;
 	creategameclicked = false;
 	nextstateprocessed = false;
-#ifdef OUYA
-	quitscancode = SDL_SCANCODE_HOME;
-#else
-	quitscancode = SDL_SCANCODE_ESCAPE;
-#endif
 	chatEnterDebounce = false;
 	fullscreentoggled = false;
 	replayfile = 0;

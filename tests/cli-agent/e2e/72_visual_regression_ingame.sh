@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Visual regression: the 8 in-game HUD surfaces vs the origin/main goldens
+# Visual regression: the 7 in-game HUD surfaces vs the origin/main goldens
 # (golden/ingame_*.png, 640x480 — see golden/ORIGIN_GOLDENS.md).
 #
 # Capture runs through tools/cap/cap_ingame_cppx.sh (deterministic tutorial
@@ -8,11 +8,14 @@
 # nondeterminism masks (minimap inset; rain-ripple deck band; right-edge rain
 # sliver — ORIGIN_GOLDENS.md "Nondeterministic regions").
 #
+# (The old baked HUD quit prompt was deleted — the in-match cancel affordance is
+# now the PauseScreen overlay, covered behaviorally by 91_cancel_back_router.sh.)
+#
 # One bounded RE-CAPTURE on failure (same pattern as 74's race retry): the
 # goldens' frozen rain + rand()-driven NPC wander leave marginal world tiles
-# flapping around the 5% line under full-suite load (observed 3.6→5.2% on the
-# same quit_prompt tile run-to-run); a fresh drive re-rolls them. The gate
-# itself is untouched — a real regression fails both captures deterministically.
+# flapping around the 5% line under full-suite load; a fresh drive re-rolls
+# them. The gate itself is untouched — a real regression fails both captures
+# deterministically.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -31,15 +34,9 @@ MASKS=(--mask 235,419,406,479 --mask 0,296,640,340 --mask 624,0,640,419)
 gate_all() {
   local fail=0 s out verdict
   for s in hud_base chat_open chat_history player_list buy_tech tech_overlay \
-           messages quit_prompt; do
-    # quit_prompt's long TUI drive lets the rand()-driven civilians wander the
-    # whole deck (two flapping tiles at y242 across runs); mask their traversal
-    # band above the ripple band — ORIGIN_GOLDENS.md "NPC wander".
-    # (${extra[@]+...}: macOS bash 3.2 + set -u abort on empty-array expansion.)
-    local extra=()
-    [ "$s" = quit_prompt ] && extra=(--mask 0,242,624,296)
+           messages; do
     out="$(python3 "$TOLERANT" "$WORK/ingame_$s.png" \
-           "$GOLDEN_DIR/ingame_$s.png" "${MASKS[@]}" ${extra[@]+"${extra[@]}"})"
+           "$GOLDEN_DIR/ingame_$s.png" "${MASKS[@]}")"
     verdict="$(printf '%s\n' "$out" | head -1)"
     echo "ingame_$s: $verdict"
     case "$verdict" in

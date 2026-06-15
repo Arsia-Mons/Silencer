@@ -5,8 +5,10 @@
 #include "client/ui/components/surfaces/surfaces.h"
 #include "client/ui/components/text/text.h"
 #include "client/ui/components/tokens.h"
+#include "client/ui/hooks/use_cancel.h"
 #include "client/ui/hooks/use_chrome.h"
 #include "client/ui/hooks/use_progression.h"
+#include "client/ui/hooks/use_session.h"
 #include "ui/components/box.h"
 #include "ui/components/text.h"
 #include "ui/runtime/react.h"
@@ -145,6 +147,9 @@ struct MissionSummaryProps {
 ::ui::UiElement MissionSummaryView(const MissionSummaryProps &) {
   Progression prog = use_progression();
   client::ui::ChromeTextures chrome = use_chrome();
+  Session session = use_session();
+  // ESC / controller back / the `back` op leave the summary to the menu.
+  use_cancel(session.leave_to_menu);
 
   std::function<void(int)> upgrade = prog.upgrade;
   auto make_upgrade = [upgrade](int index) -> std::function<void()> {

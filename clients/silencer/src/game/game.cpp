@@ -101,3 +101,19 @@ gameSession.SpectateGame(lobbygame, password);
 void Game::LeaveJoinedGame() {
 gameSession.LeaveJoinedGame();
 }
+
+void Game::LeaveMatchToMenu() {
+// origin CheckForQuit outcome (game_session.cpp + tick_ingame.cpp): drop the
+// connection, then rejoin the lobby channel if authenticated, else end any
+// replay playback and return to the main menu.
+world.Disconnect();
+if(world.lobby.state == Lobby::AUTHENTICATED){
+GoToState(GameState::LOBBY);
+world.lobby.JoinChannel(world.lobby.lastchannel);
+}else{
+if(world.replay.IsPlaying()){
+world.replay.EndPlaying();
+}
+GoToState(GameState::MAINMENU);
+}
+}

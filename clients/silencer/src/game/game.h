@@ -92,6 +92,11 @@ SDL_Gamepad * GetGamepad() const { return gameInput.GetGamepad(); }
 void JoinGame(LobbyGame & lobbygame, char * password = 0);
 void SpectateGame(LobbyGame & lobbygame, char * password = 0);
 void LeaveJoinedGame();
+// Leave the in-progress match to the menu (origin CheckForQuit outcome): drop
+// the connection, then return to the lobby + rejoin the channel if
+// authenticated, else end any replay and go to the main menu. Driven by the
+// UI-layer PauseScreen via use_session().leave_match.
+void LeaveMatchToMenu();
 
 // The LobbyConnect status log, accumulated by the connect flow on the tick.
 // Public so the cppx composition root can snapshot it without a friend grant.
@@ -148,7 +153,6 @@ std::vector<std::string> lobbyChatLog;
 Uint16 sharedstate;
 Uint8 singleplayermessage;
 bool updatetitle;
-int quitscancode;
 bool chatEnterDebounce;
 bool fullscreentoggled;
 char * replayfile;

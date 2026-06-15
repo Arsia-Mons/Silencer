@@ -56,7 +56,7 @@ game.world.messaging.chatlines.clear();
 game.world.messaging.messagetype = 0;
 game.world.highlightminimap = false;
 game.world.highlightsecrets = false;
-game.world.quitstate = 0;
+game.world.missionover = false;
 game.world.ingameusers.clear();
 }
 
@@ -159,16 +159,6 @@ for(int i = 0; i < count; i++) player.AddInventoryItem(Player::INV_LAZARUSTRACT)
 }
 }
 }
-}
-
-bool GameSession::CheckForQuit(){
-if(game.gameInput.GetKeystate()[SDL_SCANCODE_RETURN]){
-if(game.world.quitstate == 1 || game.world.quitstate == 2){
-game.world.quitstate = 0;
-return true;
-}
-}
-return false;
 }
 
 bool GameSession::CheckForEndOfGame(){

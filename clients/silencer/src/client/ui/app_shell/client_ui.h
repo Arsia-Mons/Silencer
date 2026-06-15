@@ -57,6 +57,14 @@ public:
                                ::ui::LayoutViewport viewport,
                                const ::ui::InputFrame &input);
 
+  // Frame-scoped cancel handler (the use_cancel seam). The top screen
+  // registers its handler during build; end_layout invokes it on the cancel
+  // edge, else falls back to the default overlay pop. Last-writer-wins, keyed
+  // by entry_id so only the TOP screen's registration is honored (a stale base
+  // registration under an overlay is ignored). Cleared each begin_frame.
+  void register_frame_cancel_handler(UiScreenEntryId entry_id,
+                                     std::function<void()> handler);
+
   bool push_screen(std::unique_ptr<UiScreen> screen);
   bool replace_top(std::unique_ptr<UiScreen> screen);
   bool queue_push_screen(std::unique_ptr<UiScreen> screen);
@@ -107,6 +115,14 @@ private:
   std::array<QueuedMutation, CLIENT_UI_MAX_QUEUED_MUTATIONS> mutations_ = {};
   int mutation_count_ = 0;
   bool wants_text_input_ = false;
+
+  // The use_cancel registration for this frame (last-writer-wins).
+  struct FrameCancelSlot {
+    bool present = false;
+    UiScreenEntryId entry_id = 0;
+    std::function<void()> handler = {};
+  };
+  FrameCancelSlot cancel_slot_ = {};
 };
 
 } // namespace client::ui
