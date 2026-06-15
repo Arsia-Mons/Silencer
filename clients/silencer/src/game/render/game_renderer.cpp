@@ -52,17 +52,29 @@ screenbuffer.Resize(width, height, 0);
 return true;
 }
 
-bool GameRenderer::SyncRenderSurfaceToWindowPixels(){
-if(game.world.map.loaded){
-return ResizeRenderSurfacePixels(kLegacyRenderWidth, kLegacyRenderHeight);
-}
-if(!window) return false;
+void GameRenderer::RefreshWindowPixelSize(){
+if(!window) return;
 int width = 0;
 int height = 0;
 if(!SDL_GetWindowSizeInPixels(window, &width, &height) || width < 1 || height < 1){
 SDL_GetWindowSize(window, &width, &height);
 }
-return ResizeRenderSurfacePixels(width, height);
+if(width > 0 && height > 0){
+windowPixelW_ = width;
+windowPixelH_ = height;
+}
+}
+
+bool GameRenderer::SyncRenderSurfaceToWindowPixels(){
+// A resize/pixel-size event fired (or init) — this is the single point that
+// re-reads the window size, so the cached size the menu canvas keys off stays
+// authoritative and never lags a transient render-frame poll.
+RefreshWindowPixelSize();
+if(game.world.map.loaded){
+return ResizeRenderSurfacePixels(kLegacyRenderWidth, kLegacyRenderHeight);
+}
+if(windowPixelW_ < 1 || windowPixelH_ < 1) return false;
+return ResizeRenderSurfacePixels(windowPixelW_, windowPixelH_);
 }
 
 bool GameRenderer::ResizeRenderSurface(int width, int height){

@@ -1097,10 +1097,25 @@ cppxLastUiTicks_ = nowMs;
 int rw = surface.w;
 int rh = surface.h;
 SDL_Window * win = game.gameRenderer.GetWindow();
-if(win && !game.world.map.loaded){
+// The in-game HUD renders at the 640x480 surface (see above); menu/UI screens
+// render against the real window pixel size. Key this off the SESSION PHASE, not
+// map.loaded: on the FADEOUT->MAINMENU exit frame the phase is already MainMenu
+// but UnloadGame() (which clears map.loaded) doesn't run until the NEXT frame
+// (game_loop MAINMENU stateisnew branch), so a map.loaded gate rendered the menu
+// for one frame at the 640x480 surface scale (2/3) and it snapped to window scale
+// the next frame — a visible menu zoom on tutorial exit (SIL-240). The window
+// pixel size comes from the GameRenderer cache (refreshed on resize, never a
+// per-frame poll) so the menu aspect also stays stable across the HiDPI late-size.
+using ::client::ui::SessionPhase;
+const SessionPhase phase = CurrentSessionPhase();
+const bool worldHud = game.world.map.loaded &&
+                      (phase == SessionPhase::InMatch ||
+                       phase == SessionPhase::SinglePlayer ||
+                       phase == SessionPhase::PostMatch);
+if(win && !worldHud){
 int pw = 0;
 int ph = 0;
-if(SDL_GetWindowSizeInPixels(win, &pw, &ph) && pw > 0 && ph > 0){
+if(game.gameRenderer.WindowPixelSize(pw, ph)){
 rw = pw;
 rh = ph;
 }

@@ -28,6 +28,19 @@ void Present();
 bool ResizeRenderSurface(int width, int height);
 bool ResizeRenderSurfacePixels(int width, int height);
 bool SyncRenderSurfaceToWindowPixels();
+// SIL-240 menu reflow fix: the last window pixel size, refreshed only at window
+// creation and on real resize events (never per render frame). The menu's
+// logical canvas (game_ui_pipeline) derives its aspect from THIS so it stays
+// pinned across the in-game 640x480 surface pin (map load/unload) and across any
+// transient/late SDL_GetWindowSizeInPixels reading on a render frame. Falls back
+// to the surface size when no window has been sized yet (headless).
+void RefreshWindowPixelSize();
+bool WindowPixelSize(int & width, int & height) const {
+	if(windowPixelW_ < 1 || windowPixelH_ < 1) return false;
+	width = windowPixelW_;
+	height = windowPixelH_;
+	return true;
+}
 void SetColors(SDL_Color * colors);
 void RestartPaletteFade();
 bool PaletteFadeFinished() const;
@@ -56,6 +69,8 @@ RenderDevice * renderdevice;
 Surface screenbuffer;
 SDL_Color palettecolors[256];
 SDL_Window * window;
+int windowPixelW_ = 0; // last window pixel size (SIL-240 menu canvas source)
+int windowPixelH_ = 0;
 Uint8 fade_i;
 Uint64 fadeStartMs;
 // SIL-237: the fade alpha applied at the LAST cppx UI upload. The dirty-skip in
