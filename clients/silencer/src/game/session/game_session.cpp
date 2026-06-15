@@ -28,6 +28,13 @@ return false;
 if(!game.world.dedicatedserver.active){
 ambienceMixer.CreateAmbienceChannels();
 game.renderer.palette.SetParallaxColors(game.world.map.parallax);
+// Restart the transition fade clock now that the (slow, synchronous) map load
+// has finished. GoToState started the fade when we left the menu, but the load
+// blows past the ~16-phase window before the world is ready to show, so the fade
+// has already "finished" and the world would pop in at full brightness instead of
+// fading in. Restarting here gives a fresh fade-in over the freshly loaded world
+// (and lines up FadedIn(), which gates the in-game music start).
+game.gameRenderer.RestartPaletteFade();
 }
 return true;
 }

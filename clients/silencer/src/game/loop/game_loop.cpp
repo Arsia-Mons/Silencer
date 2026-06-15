@@ -307,15 +307,19 @@ bool Game::Loop(void){
 			const bool fadeJustFinished = !fading && ambienceFadeWasActive; // falling edge of the fade
 			if(newambiencelevel != gameSession.AmbienceMixerRef().oldambiencelevel || fading || fadeJustFinished){
 				// While the fade is actively dimming, fold ambience into the fade palette so
-				// the world fades in with ambience applied. ApplyPaletteFade stops refreshing
-				// temppalette at phase >= 15 (it pushes the full base palette there), so only
-				// read temppalette while it is still being written (phase < 15); on the
-				// boundary frame and once the fade settles, compose over the canonical base
-				// palette so the world latches the correct ambience instead of a stale,
-				// half-dimmed fade palette. The falling-edge reapply also covers the clock
-				// race where a slow map load skips the fade window entirely (phase -> 16).
+				// the world fades in/out with ambience applied. Read temppalette (the
+				// currently-displayed dimmed fade palette) whenever ApplyPaletteFade is still
+				// writing it: that's the WHOLE fade-OUT (state == FADEOUT, including the final
+				// black at phase 15) and the fade-IN up to phase 15 — ApplyPaletteFade(false)
+				// stops refreshing temppalette at phase >= 15, pushing the full base palette
+				// instead. Compose over the canonical base palette only when the fade has
+				// settled (or is in that fade-in tail). Reading the full base at phase 15 of a
+				// fade-OUT was what flashed the world bright for one frame when leaving a match.
+				// The falling-edge (fadeJustFinished) reapply also covers the clock race where
+				// a slow map load skips the fade window entirely (phase -> 16).
+				const bool fadingOutNow = state == FADEOUT;
 				SDL_Color * colors = renderer.palette.GetColors();
-				if(fadephase < 15){
+				if(fading && (fadingOutNow || fadephase < 15)){
 					colors = renderer.palette.GetTempPalette();
 				}
 				SDL_Color * ambiencepalette = renderer.palette.CopyWithBrightness(colors, newambiencelevel, 2, 114);
