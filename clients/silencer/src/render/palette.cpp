@@ -65,6 +65,15 @@ bool Palette::Load(void){
 			Calculate(2, 256 - 30);
 			Save();
 		}
+		// Load() just re-read every page from disk, where page 0's parallax band
+		// (256-30..255) is black; re-apply the active parallax band so any
+		// SetPalette()->Load() (e.g. the cppx UI's per-frame palette-page switches
+		// during chrome/glyph baking) can't wipe the in-level matte backdrop.
+		if(parallaxsource >= 0){
+			for(unsigned int i = 256 - 30; i < 256; i++){
+				colors[0][i] = colors[parallaxsource][i];
+			}
+		}
 		return true;
 	}else{
 		printf("Could not load PALETTE.BIN");
@@ -91,6 +100,7 @@ void Palette::SetParallaxColors(Uint8 parallax){
 			parallaxpalette = 9;
 		break;
 	}
+	parallaxsource = parallaxpalette;
 	for(unsigned int i = 256 - 30; i < 256; i++){
 		colors[currentpalette][i] = colors[parallaxpalette][i];
 	}
