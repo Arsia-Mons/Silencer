@@ -5,6 +5,7 @@
 #include "gasloader.h"
 #include "sdl3gpubackend.h"
 #include "tuibackend.h"
+#include "game/ui/session_phase.h"
 #include "render/cppx_ui/ui_demo.h"
 #include <algorithm>
 #include <cstdlib>
@@ -94,14 +95,30 @@ return ResizeRenderSurfacePixels(width, height);
 
 float GameRenderer::UiFadeAlpha() const {
 using namespace GameState;
-// In-match the world palette is driven by ambience, not the transition fade;
-// the cppx HUD shouldn't dim with it. Restrict the UI fade to the menu/UI
-// flow, where the FADEOUT palette fade is the only thing touching brightness.
-if(game.world.map.loaded) return 1.0f;
+// The cppx UI layer must fade with the world ONLY during a real screen
+// transition (the FADEOUT palette fade and the fade-in that follows it). At
+// in-match rest the world palette is driven by ambience, not the transition
+// fade, so the HUD must stay full — but we cannot gate that on map.loaded: it
+// stays true for the WHOLE FADEOUT leaving a match (UnloadGame runs a frame
+// late, in the MAINMENU stateisnew branch) and for the first menu frame after
+// the switch. That left the HUD + "standby" text at full brightness while the
+// world dimmed to black on exit, and flashed the first menu frame bright before
+// the fade-in took over. Gate on the projected session phase instead: an
+// in-match phase that is NOT mid-FADEOUT is ambience/overlay brightness (stay
+// full); everything else mirrors the world fade. Ambience never enters FADEOUT
+// and never moves fade_i, so the HUD still does not dim with ambience.
+const Uint8 st = game.GetState();
+if(st != FADEOUT){
+using ::client::ui::SessionPhase;
+const SessionPhase ph = silencer::game_ui::project_session_phase(st, game.fadefromstate);
+if(ph == SessionPhase::InMatch || ph == SessionPhase::SinglePlayer || ph == SessionPhase::PostMatch){
+return 1.0f;
+}
+}
 const int phase = static_cast<int>(fade_i);
 // Mirror ApplyPaletteFade's brightness exactly so UI and world fade together.
 int brightness;
-if(game.GetState() == FADEOUT){
+if(st == FADEOUT){
 // Fading OUT: full at phase 0 -> black at phase 15.
 int p = phase > 15 ? 15 : phase;
 brightness = (15 - p) * 8;

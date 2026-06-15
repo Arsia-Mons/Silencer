@@ -302,9 +302,20 @@ bool Game::Loop(void){
 		}
 		if(world.gameplaystate == World::INGAME){
 			Uint8 newambiencelevel = renderer.GetAmbienceLevel();
-			if(newambiencelevel != gameSession.AmbienceMixerRef().oldambiencelevel || gameRenderer.FadePhaseRef() <= 15){
+			const Uint8 fadephase = gameRenderer.FadePhaseRef();
+			const bool fading = fadephase < 16;                            // transition fade still dimming
+			const bool fadeJustFinished = !fading && ambienceFadeWasActive; // falling edge of the fade
+			if(newambiencelevel != gameSession.AmbienceMixerRef().oldambiencelevel || fading || fadeJustFinished){
+				// While the fade is actively dimming, fold ambience into the fade palette so
+				// the world fades in with ambience applied. ApplyPaletteFade stops refreshing
+				// temppalette at phase >= 15 (it pushes the full base palette there), so only
+				// read temppalette while it is still being written (phase < 15); on the
+				// boundary frame and once the fade settles, compose over the canonical base
+				// palette so the world latches the correct ambience instead of a stale,
+				// half-dimmed fade palette. The falling-edge reapply also covers the clock
+				// race where a slow map load skips the fade window entirely (phase -> 16).
 				SDL_Color * colors = renderer.palette.GetColors();
-				if(gameRenderer.FadePhaseRef() <= 15){
+				if(fadephase < 15){
 					colors = renderer.palette.GetTempPalette();
 				}
 				SDL_Color * ambiencepalette = renderer.palette.CopyWithBrightness(colors, newambiencelevel, 2, 114);
@@ -312,6 +323,7 @@ bool Game::Loop(void){
 				renderer.palette.CalculateLighted(newambiencelevel);
 				gameSession.AmbienceMixerRef().oldambiencelevel = newambiencelevel;
 			}
+			ambienceFadeWasActive = fading;
 		}
 		lasttick += wait;
 	}

@@ -253,8 +253,12 @@ fragment float4 frag_ui(VOut in [[stage_in]],
 )msl";
 
 // cppx UI composite fragment shader (SIL-240). Samples the rendered premultiplied
-// UI layer and dims it by the global fade fraction before the premultiplied-over
-// composite onto the swapchain (the GPU equivalent of the legacy CPU dim).
+// UI layer and composites it. fade.x is the global fade fraction. fade.y selects
+// the mode: y==0 is GROUP OPACITY (scale all four premultiplied channels -> the
+// subtree turns translucent, the parent shows through); y==1 is the SCREEN FADE
+// (scale RGB toward black but KEEP coverage, so the HUD dims to black opaquely
+// and the world doesn't bleed through mid-fade -- the whole screen fades to black
+// uniformly, matching the legacy single-buffer palette fade). See the HLSL twin.
 static const char *kFragUiCompositeMSL = R"msl(
 #include <metal_stdlib>
 using namespace metal;
@@ -263,7 +267,9 @@ fragment float4 frag_ui_composite(VOut in [[stage_in]],
     texture2d<float> ui [[texture(0)]],
     sampler samp [[sampler(0)]],
     constant float4& fade [[buffer(0)]]) {
-    return ui.sample(samp, in.uv) * fade.x;
+    float4 c = ui.sample(samp, in.uv);
+    float a = mix(c.a * fade.x, c.a, fade.y);
+    return float4(c.rgb * fade.x, a);
 }
 )msl";
 
@@ -1906,7 +1912,11 @@ void SDL3GPUBackend::Present() {
 			SDL_BindGPUGraphicsPipeline(pass, ui_scene_composite_pipeline);
 			SDL_GPUTextureSamplerBinding bind = {ui_scene_tex, nearest_sampler};
 			SDL_BindGPUFragmentSamplers(pass, 0, &bind, 1);
-			const float fade[4] = {ui_geom_fade / 255.0f, 0.f, 0.f, 0.f};
+			// fade.y = 1: SCREEN FADE — dim RGB toward black but keep coverage so
+			// the HUD stays opaque and the whole screen fades to black uniformly
+			// (not an opacity fade that lets the world bleed through). Group-opacity
+			// layers (PopLayer above) pass y = 0 for true translucency.
+			const float fade[4] = {ui_geom_fade / 255.0f, 1.f, 0.f, 0.f};
 			SDL_PushGPUFragmentUniformData(cmd, 0, fade, sizeof(fade));
 			SDL_DrawGPUPrimitives(pass, 3, 1, 0, 0);
 			SDL_EndGPURenderPass(pass);

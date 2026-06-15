@@ -142,6 +142,12 @@ Uint8 nextstate;
 // this (not nextstate) while state==FADEOUT so the outgoing screen stays
 // mounted and fades to black before the switch.
 Uint8 fadefromstate;
+// True on the previous in-game tick if the transition palette fade was still
+// dimming (FadePhase < 16). Used to detect the fade's falling edge so the
+// ambience palette is recomposed once over the canonical base palette when the
+// fade settles, instead of latching a stale, half-dimmed fade palette (the
+// level-entry lighting flicker).
+bool ambienceFadeWasActive = false;
 bool stateisnew;
 bool nextstateprocessed;
 // Roster size captured on entering CREATECHARACTER; when the roster grows past

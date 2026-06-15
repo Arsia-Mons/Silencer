@@ -45,9 +45,12 @@ bool Game::CaptureCompositedFrame(const char * path) {
 	int uw = 0;
 	int uh = 0;
 	const Uint8 * ui = gameUiPipeline.CppxUiFrame(uw, uh);
-	// SIL-219: match the GPU composite — dim the premultiplied UI layer by the
-	// transition fade so headless screenshots reflect the same UI fade the
-	// windowed backend applies in UploadUiFrame. 255 (at rest) is a no-op.
+	// SIL-219: match the GPU screen fade — dim the premultiplied UI layer toward
+	// black by the transition fade so headless screenshots reflect the same fade
+	// the windowed backend applies. The fade scales RGB only and KEEPS coverage
+	// (inv uses the ORIGINAL alpha, not the dimmed one), so the HUD stays opaque
+	// and dims to black instead of turning translucent and letting the world
+	// bleed through — the whole screen fades to black uniformly. 255 == no-op.
 	const Uint32 uia = (Uint32)(gameRenderer.UiFadeAlpha() * 255.0f + 0.5f);
 	auto dim = [uia](int v) -> int { return uia >= 255 ? v : (int)((v * uia + 127u) / 255u); };
 	if(ui && uw == buf.w && uh == buf.h && palette){
@@ -55,10 +58,10 @@ bool Game::CaptureCompositedFrame(const char * path) {
 		for(int i = 0; i < buf.w * buf.h; ++i){
 			SDL_Color c = palette[buf.pixels[i]];
 			// Branch on the ORIGINAL alpha so the fade dim never reroutes opaque
-			// UI through the translucent palette-mix path. The dim scales the
-			// premultiplied output (all channels) in the blend branch below.
+			// UI through the translucent palette-mix path. Coverage stays at the
+			// authored alpha; the fade only dims RGB (the blend branch below).
 			int sa = ui[i * 4 + 3];
-			int inv = 255 - dim(sa);
+			int inv = 255 - sa;
 			if(sa > 0 && sa < 255){
 				// Translucent UI over the palettized world (player-list dim
 				// fill): origin mixes in PALETTE space (alpha lookup table,
