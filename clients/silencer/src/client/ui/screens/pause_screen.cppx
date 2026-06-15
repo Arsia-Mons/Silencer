@@ -2,8 +2,11 @@
 
 #include "client/ui/components/actions/actions.h"
 #include "client/ui/components/layout/layout.h"
+#include "client/ui/components/tokens.h"
 #include "client/ui/hooks/use_navigation.h"
 #include "client/ui/hooks/use_session.h"
+#include "ui/components/box.h"
+#include "ui/components/text.h"
 #include "ui/runtime/react.h"
 
 #include <functional>
@@ -15,6 +18,10 @@ namespace {
 // unqualified, so pull in the silencer semantic layer + the runtime children().
 using namespace silencer;
 using ::ui::children;
+using ::ui::components::Box;
+using ::ui::components::BoxProps;
+using ::ui::components::Text;
+using ::ui::components::TextProps;
 
 struct PauseProps {
   uint32_t unused = 0;
@@ -39,16 +46,43 @@ struct PauseProps {
       leave_match();
   };
 
+  // ORIGIN LOOK (renderer.cpp DrawQuitPrompt): plain centered title text, no
+  // button chrome / panel / dim — bare ink over the live world. Reproduce it as
+  // a chromeless (Ghost) focusable control so Enter/click/controller-activate
+  // still fire `leave`, but the visible glyphs are a styled Text CHILD in the
+  // origin credits-green / Title face / 34.5px (NOT AppButton's Heading label).
+  // accessibility_label (not `label`) keeps the inspect/click "Hit Enter To
+  // Quit" handle while letting AppButton render our own label child instead of
+  // its chunky Heading text. The button box is centered horizontally and sat
+  // high-center (origin device y=200 of 480 → logical 300) by the wrapper, so
+  // the title overflows the box symmetrically and stays screen-centered.
+  static const char *kText = "Hit Enter To Quit";
+  ::ui::UiElement title = Text(TextProps{
+      .value = kText,
+      .style = tokens::text_patch(tokens::kTextHudCredits, tokens::kFontTitle,
+                                  tokens::kFaceTitle, tokens::kLineTitle)});
+
+  ::ui::UiElement prompt = AppButton(AppButtonProps{
+      .control_id = "PauseQuit",
+      .variant = AppButtonVariant::Ghost,
+      .default_focused = true,
+      .on_press = leave,
+      .accessibility_label = kText,
+      .children = children({std::move(title)})});
+
+  ::ui::UiElement placed = Box(BoxProps{
+      .key = "place",
+      .layout =
+          ::ui::LayoutStyle{.align_items = ::ui::AlignItems::Center,
+                            .position = ::ui::PositionType::Absolute,
+                            .width = ::ui::Length::percent(100.0f),
+                            // origin device pen (640x480) -> logical (960x720):
+                            // top y=200 device == 300 logical.
+                            .position_inset = ::ui::EdgeSizes{{}, {}, 300.0f, {}}},
+      .children = children({std::move(prompt)})});
+
   return <ScreenLayout key="root" variant={ScreenLayoutVariant::CenteredOverlay}>
-    <AppButton
-      key="quit"
-      controlId="PauseQuit"
-      variant={AppButtonVariant::Oval}
-      size={AppButtonSize::Lg}
-      label="Hit Enter To Quit"
-      defaultFocused={true}
-      onPress={leave}
-    />
+    {placed}
   </ScreenLayout>
 }
 

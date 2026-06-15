@@ -1653,8 +1653,10 @@ silencer::game_ui::ServerProviderValue{&game},
 tree = client::ui::ThemeProvider(::ui::children({tree}));
 return tree;
 });
+// The always-mounted base screen: a one-time init push, not a user-facing
+// navigation — never replay the transition fade (the entry GoToState owns it).
 cppxHost->pipeline().client_ui().push_screen(
-std::make_unique<client::ui::AppRoot>());
+std::make_unique<client::ui::AppRoot>(), client::ui::FadeOverride::NoFade);
 cppxAppRootPushed = true;
 }
 
@@ -1808,18 +1810,19 @@ cppxUiUnchanged_ = unchanged && rgba != nullptr;
 
 // SIL-225: Options + its submenus are pushed/popped as Tier-1 overlays via
 // use_navigation, which never calls GoToState — the only RestartPaletteFade
-// trigger — so menu->options (and submenu->submenu) cut instantly. The drain
-// inside render() above has applied this frame's push/pop, so a change in the
-// visible stack depth means an overlay just opened or closed; re-fire the
-// palette fade so the new overlay fades in (game_loop's fade-in loop +
-// UiFadeAlpha dim the UI/world for the next 16 phases). Skip during FADEOUT —
-// a real state transition already owns the fade.
+// trigger — so menu->options (and submenu->submenu) would cut instantly. The
+// drain inside render() above has applied this frame's push/pop; the screen
+// stack latched whether that transition wants a fade (per-push FadeOverride,
+// else the screen's wants_transition_fade() — e.g. PauseScreen opts out so it
+// cuts in over the live world). Re-fire the palette fade when it does
+// (game_loop's fade-in loop + UiFadeAlpha dim the UI/world for the next 16
+// phases). Skip during FADEOUT — a real state transition already owns the fade.
 {
-const int stackCount = cppxHost->pipeline().client_ui().screens().count();
-if(stackCount != prevScreenStackCount_ && game.GetState() != GameState::FADEOUT){
+const bool wantsFade =
+    cppxHost->pipeline().client_ui().screens().consume_transition_fade();
+if(wantsFade && game.GetState() != GameState::FADEOUT){
 game.gameRenderer.RestartPaletteFade();
 }
-prevScreenStackCount_ = stackCount;
 }
 
 // UI interaction sounds (origin ClientUi.cpp:95-111 PlayMenuButtonSound):

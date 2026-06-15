@@ -65,10 +65,14 @@ public:
   void register_frame_cancel_handler(UiScreenEntryId entry_id,
                                      std::function<void()> handler);
 
-  bool push_screen(std::unique_ptr<UiScreen> screen);
-  bool replace_top(std::unique_ptr<UiScreen> screen);
-  bool queue_push_screen(std::unique_ptr<UiScreen> screen);
-  bool queue_reset_to_screen(std::unique_ptr<UiScreen> screen);
+  bool push_screen(std::unique_ptr<UiScreen> screen,
+                   FadeOverride fade = FadeOverride::Default);
+  bool replace_top(std::unique_ptr<UiScreen> screen,
+                   FadeOverride fade = FadeOverride::Default);
+  bool queue_push_screen(std::unique_ptr<UiScreen> screen,
+                         FadeOverride fade = FadeOverride::Default);
+  bool queue_reset_to_screen(std::unique_ptr<UiScreen> screen,
+                             FadeOverride fade = FadeOverride::Default);
   bool queue_pop_current(UiScreenEntryId entry_id);
   bool queue_pop_top();
   bool queue_deferred_mutation(DeferredUiMutation mutation);
@@ -88,6 +92,7 @@ private:
     MutationKind kind = MutationKind::PopTop;
     UiScreenEntryId entry_id = 0;
     std::unique_ptr<UiScreen> screen = nullptr;
+    FadeOverride fade = FadeOverride::Default;
     DeferredUiMutation deferred = {};
   };
 

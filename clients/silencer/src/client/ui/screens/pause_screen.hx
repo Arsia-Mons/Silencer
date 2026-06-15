@@ -15,6 +15,8 @@ namespace client::ui {
 class PauseScreen final : public OverlayScreen {
 public:
   const char *debug_name() const override { return "Pause"; }
+  // Origin behavior: the quit prompt cuts in over the live world with no fade.
+  bool wants_transition_fade() const override { return false; }
   bool build_element(::ui::UiElementFrame &frame, ::ui::UiElement *out) override;
   void build_ui() override {}
 };

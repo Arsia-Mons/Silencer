@@ -47,6 +47,10 @@ Navigation use_navigation() {
           [client_ui](std::unique_ptr<UiScreen> screen) {
             client_ui->queue_push_screen(std::move(screen));
           },
+      .push_with_fade =
+          [client_ui](std::unique_ptr<UiScreen> screen, FadeOverride fade) {
+            client_ui->queue_push_screen(std::move(screen), fade);
+          },
       .reset_to =
           [client_ui](std::unique_ptr<UiScreen> screen) {
             client_ui->queue_reset_to_screen(std::move(screen));

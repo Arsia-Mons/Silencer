@@ -253,29 +253,35 @@ bool ClientUi::update_retained_runtime(const ::ui::FlexLayoutAdapter &layout,
                                        active);
 }
 
-bool ClientUi::push_screen(std::unique_ptr<UiScreen> screen) {
-  return screens_.push(std::move(screen));
+bool ClientUi::push_screen(std::unique_ptr<UiScreen> screen,
+                           FadeOverride fade) {
+  return screens_.push(std::move(screen), fade);
 }
 
-bool ClientUi::replace_top(std::unique_ptr<UiScreen> screen) {
-  return screens_.replace_top(std::move(screen));
+bool ClientUi::replace_top(std::unique_ptr<UiScreen> screen,
+                           FadeOverride fade) {
+  return screens_.replace_top(std::move(screen), fade);
 }
 
-bool ClientUi::queue_push_screen(std::unique_ptr<UiScreen> screen) {
+bool ClientUi::queue_push_screen(std::unique_ptr<UiScreen> screen,
+                                 FadeOverride fade) {
   if (!screen)
     return false;
   return queue_mutation({
       .kind = MutationKind::Push,
       .screen = std::move(screen),
+      .fade = fade,
   });
 }
 
-bool ClientUi::queue_reset_to_screen(std::unique_ptr<UiScreen> screen) {
+bool ClientUi::queue_reset_to_screen(std::unique_ptr<UiScreen> screen,
+                                     FadeOverride fade) {
   if (!screen)
     return false;
   return queue_mutation({
       .kind = MutationKind::ResetTo,
       .screen = std::move(screen),
+      .fade = fade,
   });
 }
 
@@ -311,10 +317,10 @@ void ClientUi::drain_deferred_mutations() {
     QueuedMutation &mutation = mutations_[i];
     switch (mutation.kind) {
     case MutationKind::Push:
-      screens_.push(std::move(mutation.screen));
+      screens_.push(std::move(mutation.screen), mutation.fade);
       break;
     case MutationKind::ResetTo:
-      screens_.reset_to(std::move(mutation.screen));
+      screens_.reset_to(std::move(mutation.screen), mutation.fade);
       break;
     case MutationKind::PopCurrent:
       screens_.pop_entry(mutation.entry_id);

@@ -300,7 +300,20 @@ app_button_variant_patch(AppButtonVariant variant) {
   case AppButtonVariant::Ghost: {
     const ::ui::Color transparent = {0, 0, 0, 0};
     ::ui::StyleStatePatch ov{};
+    // Truly chromeless: no fill/border AND no focus ring. A focusable Ghost
+    // (e.g. the in-match "Hit Enter To Quit" prompt) must read as bare ink.
+    // chromeless(true) suppresses the draw builder's legacy focus-ring
+    // injection (draw_command_builder.cpp:348). But the green ring (#5CD05C)
+    // also comes from the THEME's button focus_visible role — an Outline patch
+    // (app_theme.cpp) that resolve() layers ON TOP of base whenever the control
+    // is focus-visible, and a resolved outline draws regardless of chromeless
+    // (draw_command_builder.cpp:344). So clearing base.outline alone is not
+    // enough: re-clear the outline in the focus_visible slot too, or the
+    // auto-focused prompt shows the theme ring. Ghost owns its own (none) focus.
     ov.base = solid(transparent, transparent, 0.0f);
+    ov.base.chromeless = ::ui::opt(true);
+    ov.base.outline = ::ui::opt(::ui::Outline{});
+    ov.focus_visible = ::ui::patch().chromeless(true).outline(::ui::Outline{});
     // Own subtle washes as FLAT fills (not bare backgrounds): a resolved
     // gradient IS the fill (draw_command_builder.cpp:258), so the wash must be
     // emitted as a flat 2-stop gradient to REPLACE the theme-role's slate
