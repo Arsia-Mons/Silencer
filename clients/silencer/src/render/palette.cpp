@@ -103,6 +103,11 @@ void Palette::SetParallaxColors(Uint8 parallax){
 	parallaxsource = parallaxpalette;
 	for(unsigned int i = 256 - 30; i < 256; i++){
 		colors[currentpalette][i] = colors[parallaxpalette][i];
+		// Seed the shared upload buffer's band too. The per-frame in-game upload
+		// pushes temppalette, whose band is otherwise only refreshed by the
+		// full-range fade copy; if a slow map load finishes the fade before this
+		// runs, the band would stay stale (black) and the backdrop flickers black.
+		temppalette[i] = colors[parallaxpalette][i];
 	}
 	Calculate(256 - 30, 255);
 }
