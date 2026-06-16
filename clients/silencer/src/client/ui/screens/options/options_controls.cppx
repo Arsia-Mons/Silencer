@@ -8,6 +8,7 @@
 #include "client/ui/hooks/use_key_map.h"
 #include "client/ui/hooks/use_keybind_capture.h"
 #include "client/ui/hooks/use_navigation.h"
+#include "client/ui/screens/options/hooks/use_options_commit.h"
 #include "ui/components/box.h"
 #include "ui/components/scroll_view.h"
 #include "ui/components/text.h"
@@ -238,18 +239,7 @@ struct OptionsControlsProps {
   }
 
   const int action_count = static_cast<int>(km.actions.size());
-  std::function<void()> save = [nav, commit = km.commit]() {
-    if (commit)
-      commit();
-    if (nav.pop_current)
-      nav.pop_current();
-  };
-  std::function<void()> cancel = [nav, revert = km.revert]() {
-    if (revert)
-      revert();
-    if (nav.pop_current)
-      nav.pop_current();
-  };
+  OptionsCommit commit = use_options_commit(km.commit, km.revert);
 
   // Build the binding grid: a degenerate Preset row, then one row per action
   // (primary combo 0 + alternate combo 1), as a runtime list for the virtualized
@@ -365,14 +355,14 @@ struct OptionsControlsProps {
               controlId="SaveBinds"
               variant={AppButtonVariant::Oval}
               label="Save"
-              onPress={save}
+              onPress={commit.save}
             />
             <AppButton
               key="cancel"
               controlId="ControlsBack"
               variant={AppButtonVariant::Oval}
               label="Cancel"
-              onPress={cancel}
+              onPress={commit.cancel}
             />
           </ActionRow>
           </Box>

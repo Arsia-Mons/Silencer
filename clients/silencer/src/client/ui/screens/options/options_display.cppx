@@ -6,6 +6,7 @@
 #include "client/ui/components/text/text.h"
 #include "client/ui/hooks/use_navigation.h"
 #include "client/ui/hooks/use_settings.h"
+#include "client/ui/screens/options/hooks/use_options_commit.h"
 #include "ui/components/box.h"
 #include "ui/runtime/react.h"
 
@@ -33,18 +34,7 @@ struct OptionsDisplayProps {
 
   // origin/main: floating title + the two display toggles + Save/Cancel ovals over
   // the starfield — NO panel. Save persists, Cancel reverts the live edits.
-  std::function<void()> save = [nav, settings]() {
-    if (settings.commit)
-      settings.commit();
-    if (nav.pop_current)
-      nav.pop_current();
-  };
-  std::function<void()> cancel = [nav, settings]() {
-    if (settings.revert)
-      settings.revert();
-    if (nav.pop_current)
-      nav.pop_current();
-  };
+  OptionsCommit commit = use_options_commit(settings.commit, settings.revert);
 
   // origin/main anchors this dialog in the upper third (title baseline ~y168), not
   // screen-centered like the options root.
@@ -104,14 +94,14 @@ struct OptionsDisplayProps {
           controlId="OptionsSave"
           variant={AppButtonVariant::Oval}
           label="Save"
-          onPress={save}
+          onPress={commit.save}
         />
         <AppButton
           key="cancel"
           controlId="OptionsCancel"
           variant={AppButtonVariant::Oval}
           label="Cancel"
-          onPress={cancel}
+          onPress={commit.cancel}
         />
       </ActionRow>
       </Box>
