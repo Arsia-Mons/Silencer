@@ -86,6 +86,13 @@ void ClientUi::build_visible_screens(const UiElementWrapper &wrap_root) {
             "FocusScrollProvider", &::ui::FocusScrollContext,
             const_cast<::ui::FocusScrollRequest *>(&focus_scroll_request_),
             ::ui::children({provider}));
+        // Publish last frame's post-layout node heights so a flex-grown
+        // component (ScrollView) can read its own resolved size (one-frame lag,
+        // by design — matches FocusScrollProvider).
+        provider = ::ui::provider(
+            "MeasuredSizeProvider", &::ui::MeasuredSizeContext,
+            const_cast<::ui::MeasuredSizeRequest *>(&measured_sizes_),
+            ::ui::children({provider}));
         if (wrap_root) {
           provider = wrap_root(provider);
         }
@@ -149,6 +156,9 @@ bool ClientUi::update_retained_runtime(const ::ui::FlexLayoutAdapter &layout,
                                        const ::ui::InputFrame &input) {
   if (!::ui::compute_flex_layout(layout, retained_tree_, viewport))
     return false;
+  // Read back resolved node heights (keyed by control id) for next frame's build
+  // so flex-grown components can learn their own size. Must run after layout.
+  ::ui::compute_measured_sizes(retained_tree_, &measured_sizes_);
   if (!::ui::focus_update(&retained_focus_, retained_tree_, input))
     return false;
   ::ui::NodeId blurred = ::ui::focus_blurred_id(retained_focus_);

@@ -491,6 +491,7 @@ add_executable(ui_scroll_tests
 	src/ui/runtime/tree.cpp
 	src/ui/runtime/draw_command.cpp
 	src/ui/runtime/draw_command_builder.cpp
+	src/ui/runtime/focus.cpp
 	src/ui/style/text_measure.cpp
 	src/ui/runtime/flex_layout.cpp
 	src/ui/runtime/yoga_flex_layout.cpp)

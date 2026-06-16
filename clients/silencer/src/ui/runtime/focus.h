@@ -89,6 +89,25 @@ struct FocusScrollRequest {
   bool valid = false; // true when the focused node has a scrolling-clip ancestor
 };
 
+// Layout measurement read-back. Yoga sizes nodes during layout, but the
+// component tree is built BEFORE layout runs, so a component cannot know its own
+// resolved size during render. After layout the runtime walks the retained tree
+// and records each node's resolved height keyed by its control id; a component
+// reads its own measured height back the next build (one-frame lag, by design —
+// the same model as FocusScrollRequest). This is what lets ScrollView flex-grow
+// and learn its viewport/content sizes instead of taking height props.
+constexpr int UI_RETAINED_MAX_MEASURED = UI_RETAINED_MAX_NODES;
+
+struct MeasuredSize {
+  char control_id[UI_RETAINED_LABEL_CAP] = {};
+  float height = 0.0f;
+};
+
+struct MeasuredSizeRequest {
+  std::array<MeasuredSize, UI_RETAINED_MAX_MEASURED> sizes = {};
+  int count = 0;
+};
+
 struct FocusRuntime {
   std::array<FocusableLayout, UI_RETAINED_MAX_FOCUSABLES> focusables = {};
   int focusable_count = 0;
@@ -110,6 +129,10 @@ struct FocusRuntime {
 void focus_init(FocusRuntime *runtime);
 bool focus_update(FocusRuntime *runtime, const UiTree &tree,
                   const InputFrame &input);
+
+// Walk the laid-out retained tree and record each node's resolved height keyed by
+// its control id (only nodes with a non-empty control id). Must run AFTER layout.
+void compute_measured_sizes(const UiTree &tree, MeasuredSizeRequest *out);
 
 NodeId focus_focused_id(const FocusRuntime &runtime);
 NodeId focus_blurred_id(const FocusRuntime &runtime);

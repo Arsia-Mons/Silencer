@@ -225,6 +225,25 @@ FocusScrollRequest compute_scroll_request(const UiTree &tree, NodeId focused) {
   return request;
 }
 
+// Recursively record the resolved height of every node carrying a control id.
+void collect_measured_sizes(const UiTree &tree, NodeId id,
+                            MeasuredSizeRequest *out) {
+  NodeSnapshot node = {};
+  if (!tree.snapshot(id, &node))
+    return;
+  const char *cid = node.control_id ? node.control_id : "";
+  if (cid[0] != '\0' && out->count < UI_RETAINED_MAX_MEASURED) {
+    MeasuredSize &slot = out->sizes[out->count++];
+    size_t n = 0;
+    for (; cid[n] && n + 1 < UI_RETAINED_LABEL_CAP; ++n)
+      slot.control_id[n] = cid[n];
+    slot.control_id[n] = '\0';
+    slot.height = node.layout.height;
+  }
+  for (int i = 0; i < tree.child_count(id); ++i)
+    collect_measured_sizes(tree, tree.child_at(id, i), out);
+}
+
 const FocusableLayout *find_layout(const FocusRuntime &runtime, NodeId id) {
   if (id == 0)
     return nullptr;
@@ -564,6 +583,18 @@ bool focus_update(FocusRuntime *runtime, const UiTree &tree,
   }
 
   return runtime->error_count == 0;
+}
+
+void compute_measured_sizes(const UiTree &tree, MeasuredSizeRequest *out) {
+  if (!out)
+    return;
+  // Reset by zeroing the count only — the array is large (one slot per node), so
+  // value-initializing a `{}` temporary would materialize it on the stack and
+  // blow the frame. Stale tail entries past `count` are never read.
+  out->count = 0;
+  if (!tree.contains(tree.root_id()))
+    return;
+  collect_measured_sizes(tree, tree.root_id(), out);
 }
 
 NodeId focus_focused_id(const FocusRuntime &runtime) {

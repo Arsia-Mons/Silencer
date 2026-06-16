@@ -6,6 +6,7 @@ namespace ui {
 
 ReactContext InteractionContext = {};
 ReactContext FocusScrollContext = {};
+ReactContext MeasuredSizeContext = {};
 
 namespace {
 const InteractionSnapshot *current_snapshot() {
@@ -46,6 +47,18 @@ float use_scroll_into_view(const char *viewport_control_id) {
   if (strcmp(r->viewport_control_id, viewport_control_id) != 0)
     return 0.0f;
   return r->delta_y;
+}
+
+float use_measured_height(const char *control_id) {
+  const MeasuredSizeRequest *m =
+      static_cast<const MeasuredSizeRequest *>(use_context(&MeasuredSizeContext));
+  if (!m || !control_id || control_id[0] == '\0')
+    return 0.0f;
+  for (int i = 0; i < m->count; ++i) {
+    if (strcmp(m->sizes[i].control_id, control_id) == 0)
+      return m->sizes[i].height;
+  }
+  return 0.0f;
 }
 
 } // namespace ui

@@ -29,6 +29,13 @@ extern ReactContext InteractionContext; // current = const InteractionSnapshot*
 // request targets its own control id, applies the delta to its scroll offset.
 extern ReactContext FocusScrollContext; // current = const FocusScrollRequest*
 
+// Layout measurement read-back: the runtime publishes the previous frame's
+// post-layout node heights (keyed by control id) at the tree root via
+// MeasuredSizeContext. A component reads back its own resolved height during
+// render (one-frame lag, by design — matches FocusScrollContext). This is what
+// lets a flex-grown ScrollView learn its viewport/content sizes from layout.
+extern ReactContext MeasuredSizeContext; // current = const MeasuredSizeRequest*
+
 bool use_focused();       // this component's host is the focused node
 bool use_hovered();       // ... is the hovered node
 bool use_pressed();       // ... is the pressed (pointer-down) node
@@ -39,5 +46,9 @@ bool use_focus_visible(); // focused AND focus arrived via a non-pointer source
 // (no scroll) when there is no request, or it targets a different container.
 // SIL-213.
 float use_scroll_into_view(const char *viewport_control_id);
+
+// The resolved (post-layout) height of the node carrying `control_id`, from the
+// previous frame. Returns 0 until that node has been measured at least once.
+float use_measured_height(const char *control_id);
 
 } // namespace ui
