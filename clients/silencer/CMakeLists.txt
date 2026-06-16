@@ -174,7 +174,9 @@ silencer_finalize_shaders(
 add_dependencies(${SILENCER_TARGET} silencer_shaders)
 target_include_directories(${SILENCER_TARGET} PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}/shaders/generated")
-target_include_directories(${SILENCER_TARGET} PRIVATE
+# SYSTEM so vendored headers (stb_image_write.h, nlohmann/json) don't emit
+# -Wall/-Wextra advisories we don't own and can't fix.
+target_include_directories(${SILENCER_TARGET} SYSTEM PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}/third_party")
 # Expose src/ and every first-level subdomain so that bare-name includes
 # (#include "lobby.h") continue to resolve after the src/ reorganisation.
