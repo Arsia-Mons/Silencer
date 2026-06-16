@@ -37,7 +37,6 @@ using ::ui::components::TextProps;
 constexpr float kContentW = 729.0f;
 constexpr float kLabelCol = 270.0f;  // kActionNameW 180 x1.5
 constexpr float kColGap = 18.0f;     // kColumnGap 12 x1.5
-constexpr float kBindCol = 168.0f;   // Oval Sm 112 x1.5
 // kOperatorW 45 x1.5 = 67.5, +0.5 so the right bind lane lands at x=833
 // (device 1249 = origin vx 555 cell) instead of the ambiguous 832.5 — the
 // per-phase oval bake needs cells on the golden's virtual grid.
@@ -108,14 +107,21 @@ int rebind_combo_index(const KeyMap &km, Action action) {
 // secondary bind oval (an empty oval = BindingWell when the combo is unbound).
 // Pressing a bind oval arms capture for that action's combo slot. The fixed
 // column widths stack every row's ovals into aligned vertical lanes.
-::ui::UiElement make_binding_row(const char *key, const char *primary_id,
-                                 const char *secondary_id, const char *label,
-                                 const char *primary, const char *secondary,
-                                 bool is_and,
-                                 std::function<void()> rebind_primary,
-                                 std::function<void()> rebind_secondary) {
+struct BindingRowProps {
+  const char *key;
+  const char *primary_id;
+  const char *secondary_id;
+  const char *label;
+  const char *primary;
+  const char *secondary;
+  bool is_and;
+  std::function<void()> rebind_primary;
+  std::function<void()> rebind_secondary;
+};
+
+::ui::UiElement make_binding_row(const BindingRowProps &r) {
   return <Box
-    key={key}
+    key={r.key}
     layout={::ui::LayoutStyle{
       .direction = ::ui::FlexDirection::Row,
       .align_items = ::ui::AlignItems::Center,
@@ -130,15 +136,15 @@ int rebind_combo_index(const KeyMap &km, Action action) {
       .align_items = ::ui::AlignItems::Start,
       .width = ::ui::Length::points(kLabelCol)}}
     >
-      {grid_label(label)}
+      {grid_label(r.label)}
     </Box>
     <AppButton
       key="p"
-      controlId={primary_id}
+      controlId={r.primary_id}
       variant={AppButtonVariant::Oval}
       size={AppButtonSize::Sm}
-      label={primary}
-      onPress={rebind_primary}
+      label={r.primary}
+      onPress={r.rebind_primary}
     />
     <Box
       key="orc"
@@ -149,7 +155,7 @@ int rebind_combo_index(const KeyMap &km, Action action) {
     >
       <Text
         key="or"
-        value={is_and ? "AND" : "OR"}
+        value={r.is_and ? "AND" : "OR"}
         layout={::ui::LayoutStyle{
           .height = ::ui::Length::points(tokens::kLineLarge),
           .margin = ::ui::EdgeSizes{2.0f, {}, {}, {}}}}
@@ -158,11 +164,11 @@ int rebind_combo_index(const KeyMap &km, Action action) {
     </Box>
     <AppButton
       key="s"
-      controlId={secondary_id}
+      controlId={r.secondary_id}
       variant={AppButtonVariant::Oval}
       size={AppButtonSize::Sm}
-      label={secondary}
-      onPress={rebind_secondary}
+      label={r.secondary}
+      onPress={r.rebind_secondary}
     />
   </Box>
 }
@@ -270,8 +276,8 @@ struct OptionsControlsProps {
       if (cap.begin_capture)
         cap.begin_capture(act, 1);
     };
-    rows.push_back(make_binding_row(rkey, pid, sid, label, prim, sec, bv.and_,
-                                    rb0, rb1));
+    rows.push_back(make_binding_row(BindingRowProps{rkey, pid, sid, label, prim,
+                                                    sec, bv.and_, rb0, rb1}));
   }
   // Viewport spans the five golden rows (Preset + 4 Move); extra actions scroll
   // through the sprite's baked rail. Full content width so the column lanes land
