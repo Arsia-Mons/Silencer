@@ -1,7 +1,7 @@
 #include "client/ui/app_shell/app_root.h"
 
 #include "client/ui/hooks/use_session.h"
-#include "client/ui/screens/character_create.h"
+#include "client/ui/screens/character_create/character_create.h"
 #include "client/ui/screens/in_game_screen.h"
 #include "client/ui/screens/lobby_connect.h"
 #include "client/ui/screens/lobby_screen.h"

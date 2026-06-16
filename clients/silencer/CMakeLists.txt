@@ -308,8 +308,8 @@ set(SILENCER_CPPX_SOURCES
 	src/client/ui/screens/mission_summary.hx
 	# CharacterCreate (SIL-21): the fresh-account gateway — alias + agency →
 	# create → LOBBY (via the CREATECHARACTER tick reconcile).
-	src/client/ui/screens/character_create.cppx
-	src/client/ui/screens/character_create.hx
+	src/client/ui/screens/character_create/character_create.cppx
+	src/client/ui/screens/character_create/character_create.hx
 	# LobbyScreen (SIL-21 2/n + 3/n): the read cluster + the game-join cluster
 	# (GameSelect/GameCreate/Staging right-column swap over use_games/use_staging).
 	src/client/ui/screens/lobby_screen.cppx

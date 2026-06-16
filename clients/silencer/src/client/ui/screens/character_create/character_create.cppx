@@ -1,4 +1,4 @@
-#include "client/ui/screens/character_create.h"
+#include "client/ui/screens/character_create/character_create.h"
 
 #include "client/ui/components/actions/actions.h"
 #include "client/ui/components/layout/layout.h"
@@ -11,6 +11,7 @@
 #include "client/ui/hooks/use_characters.h"
 #include "client/ui/hooks/use_chrome.h"
 #include "client/ui/hooks/use_session.h"
+#include "client/ui/screens/character_create/lib/wizard_frame.h"
 #include "client/ui/screens/character_create_data.h"
 #include "ui/components/box.h"
 #include "ui/components/input.h"
@@ -170,10 +171,6 @@ constexpr ::ui::Color kAliasFrameBorder = {84, 156, 104, 255};
   />
 }
 
-int clamp_agency_index(int index) {
-  return index >= 0 && index < kAgencyCount ? index : 0;
-}
-
 ::ui::UiElement detail_text(const char *key, const std::string &value) {
   return BodyText(BodyTextProps{.key = key,
                                 .variant = BodyTextVariant::Body,
@@ -301,39 +298,6 @@ int clamp_agency_index(int index) {
   >
     <ScreenTitle key="title" variant={ScreenTitleVariant::Screen} value={value} />
   </Box>
-}
-
-// --- shared wizard chrome: every step sits in the same two-pane frame --------
-// (chrome_panel sprite, bank 7 idx 5) over the starfield; LEFT pane is the
-// 354-wide list column, RIGHT pane is step-specific (or empty — the Mars
-// backdrop reads through). The sprite bakes the double borders + divider.
-::ui::LayoutStyle wizard_frame_layout() {
-  return {.direction = ::ui::FlexDirection::Row,
-          .align_items = ::ui::AlignItems::Stretch,
-          .width = ::ui::Length::points(942.0f),
-          .height = ::ui::Length::points(661.5f),
-          .margin = {0.0f, 4.0f, 0.0f, 0.0f},
-          .padding = {82.5f, 33.0f, 27.0f, 51.0f},
-          .gap = 117.0f};
-}
-
-::ui::StylePatch wizard_frame_style(const ChromeTextures &chrome) {
-  return chrome.chrome_panel
-             ? tokens::image_patch(chrome.chrome_panel)
-             : tokens::panel_patch(tokens::kSurfaceHeroPanel, tokens::kBorderHeroPanel);
-}
-
-::ui::LayoutStyle wizard_left_pane_layout() {
-  return {.direction = ::ui::FlexDirection::Column,
-          .align_items = ::ui::AlignItems::Stretch,
-          .width = ::ui::Length::points(354.0f),
-          .gap = 7.5f};
-}
-
-::ui::LayoutStyle wizard_right_spacer_layout() {
-  return {.min_width = ::ui::Length::points(0.0f),
-          .flex_basis = ::ui::Length::points(0.0f),
-          .flex_grow = ::ui::StyleFloat::points(1.0f)};
 }
 
 // step 1 — origin/main "SILENCER ALIAS": the SELECT AGENT two-pane frame
