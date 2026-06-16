@@ -231,7 +231,10 @@ constexpr float kFooterBottom = 17.0f * kCompScale; // 25.5
             .gap = kActionStackGap}}
         >
           <Box key="r0" layout={::ui::LayoutStyle{.direction = ::ui::FlexDirection::Row}}>
-            <Box key="s0" layout={::ui::LayoutStyle{.width = ::ui::Length::points(kSpacerTutorial)}} />
+            <Box
+              key="s0"
+              layout={::ui::LayoutStyle{.width = ::ui::Length::points(kSpacerTutorial)}}
+            />
             <AppButton
               key="tutorial"
               controlId="Tutorial"
@@ -241,7 +244,10 @@ constexpr float kFooterBottom = 17.0f * kCompScale; // 25.5
             />
           </Box>
           <Box key="r1" layout={::ui::LayoutStyle{.direction = ::ui::FlexDirection::Row}}>
-            <Box key="s1" layout={::ui::LayoutStyle{.width = ::ui::Length::points(kSpacerConnect)}} />
+            <Box
+              key="s1"
+              layout={::ui::LayoutStyle{.width = ::ui::Length::points(kSpacerConnect)}}
+            />
             <AppButton
               key="connect"
               controlId="ConnectToLobby"
@@ -251,7 +257,10 @@ constexpr float kFooterBottom = 17.0f * kCompScale; // 25.5
             />
           </Box>
           <Box key="r2" layout={::ui::LayoutStyle{.direction = ::ui::FlexDirection::Row}}>
-            <Box key="s2" layout={::ui::LayoutStyle{.width = ::ui::Length::points(kSpacerOptions)}} />
+            <Box
+              key="s2"
+              layout={::ui::LayoutStyle{.width = ::ui::Length::points(kSpacerOptions)}}
+            />
             <AppButton
               key="options"
               controlId="Options"
