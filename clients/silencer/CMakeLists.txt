@@ -87,6 +87,28 @@ endif()
 
 target_compile_features(${SILENCER_TARGET} PUBLIC cxx_std_20)
 
+# --- Warnings ------------------------------------------------------------
+# Surface portability problems on the macOS/Linux (Clang/GCC) dev build that
+# would otherwise only appear on the MSVC Windows build. The big one is
+# initializer ordering: Clang/GCC accept out-of-order designated initializers
+# and member-init lists as warnings (a GNU extension), but MSVC rejects them
+# as hard errors — so a clean local build can still fail Windows CI. We turn
+# on the warning surface here; the ordering warnings are elevated to errors
+# (see _SILENCER_WARN_ERRORS below) so they break locally exactly like Windows.
+if(MSVC)
+	# C5038 (member-init reorder) is off even at /W4 — enable it explicitly.
+	target_compile_options(${SILENCER_TARGET} PRIVATE /w15038)
+else()
+	# -Wreorder / -Wreorder-init-list are elevated to ERRORS: out-of-order
+	# designated initializers are a hard error on MSVC, so failing the local
+	# build on them keeps Windows CI green. The rest of -Wall/-Wextra stays
+	# advisory (the legacy tree still has ~235 unrelated warnings).
+	target_compile_options(${SILENCER_TARGET} PRIVATE
+		-Wall -Wextra
+		-Werror=reorder
+		$<$<CXX_COMPILER_ID:Clang,AppleClang>:-Werror=reorder-init-list>)
+endif()
+
 if(WIN32)
 	# Strip <winsock.h> (and other legacy subsystems) out of <windows.h>.
 	# Without this, any TU that pulls in <windows.h> via zlib's zconf.h,

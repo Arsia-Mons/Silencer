@@ -73,8 +73,8 @@ struct PauseProps {
   ::ui::UiElement placed = Box(BoxProps{
       .key = "place",
       .layout =
-          ::ui::LayoutStyle{.align_items = ::ui::AlignItems::Center,
-                            .position = ::ui::PositionType::Absolute,
+          ::ui::LayoutStyle{.position = ::ui::PositionType::Absolute,
+                            .align_items = ::ui::AlignItems::Center,
                             .width = ::ui::Length::percent(100.0f),
                             // origin device pen (640x480) -> logical (960x720):
                             // top y=200 device == 300 logical.

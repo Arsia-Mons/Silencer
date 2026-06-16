@@ -35,7 +35,7 @@
 #include <math.h>
 #include <string>
 
-Renderer::Renderer(World & world) : world(world), camera(640, 480){
+Renderer::Renderer(World & world) : camera(640, 480), world(world){
 	ambience_r = 0;
 	ex = 0;
 	ey = 0;

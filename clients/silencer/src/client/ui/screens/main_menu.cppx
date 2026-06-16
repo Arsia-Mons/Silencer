@@ -202,10 +202,10 @@ constexpr float kFooterBottom = 17.0f * kCompScale; // 25.5
           .direction = ::ui::FlexDirection::Column,
           .align_items = ::ui::AlignItems::Center,
           .justify_content = ::ui::JustifyContent::Center,
-          .flex_basis = ::ui::Length::points(kLogoColWidth),
-          .flex_shrink = 1.0f,
           .min_width = ::ui::Length::points(kLogoColWidth),
           .max_width = ::ui::Length::points(kLogoColWidth),
+          .flex_basis = ::ui::Length::points(kLogoColWidth),
+          .flex_shrink = 1.0f,
           .padding = ::ui::EdgeSizes{kLogoColPadLeft, {}, kLogoColNudge, {}}}}
       >
         {logo}
@@ -216,10 +216,10 @@ constexpr float kFooterBottom = 17.0f * kCompScale; // 25.5
           .direction = ::ui::FlexDirection::Column,
           .align_items = ::ui::AlignItems::End,
           .justify_content = ::ui::JustifyContent::Center,
-          .flex_basis = ::ui::Length::points(kActionColWidth),
-          .flex_shrink = 1.0f,
           .min_width = ::ui::Length::points(kActionColWidth),
-          .max_width = ::ui::Length::points(kActionColWidth)}}
+          .max_width = ::ui::Length::points(kActionColWidth),
+          .flex_basis = ::ui::Length::points(kActionColWidth),
+          .flex_shrink = 1.0f}}
       >
         <Box
           key="stack"
