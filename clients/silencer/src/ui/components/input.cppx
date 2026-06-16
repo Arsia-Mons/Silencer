@@ -189,6 +189,10 @@ void publish_change(const std::function<void(const std::string &)> &on_change,
           break;
         case ::ui::UiKey::Enter:
         case ::ui::UiKey::Tab:
+        case ::ui::UiKey::Up:
+        case ::ui::UiKey::Down:
+        case ::ui::UiKey::PageUp:
+        case ::ui::UiKey::PageDown:
         case ::ui::UiKey::Unknown:
           break;
         }

@@ -39,7 +39,7 @@ Audio & Audio::GetInstance(void){
 	return instance;
 }
 
-bool Audio::Init(Game * game){
+bool Audio::Init(Game *){
 	mixer = MIX_CreateMixerDevice(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, NULL);
 	if(!mixer) return false;
 
@@ -411,6 +411,6 @@ void Audio::TrackStoppedCallback(void *userdata, MIX_Track *track){
 	MIX_SetTrackStereo(track, nullptr); // clear forced-stereo pan
 }
 
-void Audio::MixingFunction(void * udata, Uint8 * stream, int len){
+void Audio::MixingFunction(void *, Uint8 *, int){
 	// TODO: Post-mix ffmpeg callback not available in SDL3_mixer 3.x; replay audio export disabled
 }

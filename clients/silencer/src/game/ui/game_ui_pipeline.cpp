@@ -1361,14 +1361,14 @@ void GameUiPipeline::RenderCppxClientUiFrame(Surface &surface) {
                 settings.fullscreen = cfg.fullscreen;
                 settings.smooth_scaling = cfg.scalefilter;
                 settings.dirty = (cfg.music != committedSettings_.music || cfg.musicvolume != committedSettings_.musicvolume || cfg.fullscreen != committedSettings_.fullscreen || cfg.scalefilter != committedSettings_.scalefilter);
-                settings.set_music = [this](bool on) {
+                settings.set_music = [](bool on) {
                     Config::GetInstance().music = on;
                     if (on)
                         Audio::GetInstance().ResumeMusic();
                     else
                         Audio::GetInstance().PauseMusic();
                 };
-                settings.set_music_volume = [this](uint8_t v) {
+                settings.set_music_volume = [](uint8_t v) {
                     Config::GetInstance().musicvolume = v;
                     Audio::GetInstance().SetMusicVolume(v);
                 };

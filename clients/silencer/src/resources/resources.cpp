@@ -132,27 +132,6 @@ bool Resources::LoadSprites(Game * game, bool dedicatedserver){
 					}
 					std::vector<Uint8> sprite(width * height);
 					memcpy(sprite.data(), decompressed.data(), width * height);
-					unsigned int paletteoffset = 0;
-					switch(i){
-						case 0:
-							paletteoffset = 5;
-						break;
-						case 1:
-							paletteoffset = 6;
-						break;
-						case 2:
-							paletteoffset = 7;
-						break;
-						case 3:
-							paletteoffset = 8;
-						break;
-						case 6:
-							paletteoffset = 1;
-						break;
-						case 7:
-							paletteoffset = 2;
-						break;
-					}
 					spritebank[i][j] = std::make_shared<Surface>(width, height);
 					Surface * surface = spritebank[i][j].get();
 					memcpy(surface->pixels.data() , sprite.data(), width * height);
@@ -388,9 +367,8 @@ void Resources::RLESurface(Surface * surface){
 	std::vector<Uint8> rlebuf;
 	int maxn;
 	int y;
-	Uint8 *srcbuf, *curbuf, *lastline;
+	Uint8 *srcbuf, *lastline;
 	int maxsize = 0;
-	int skip, run;
 	int bpp = 1;
 	Uint32 ckey, rgbmask;
 	int w, h;
@@ -405,9 +383,7 @@ void Resources::RLESurface(Surface * surface){
 
 	/* Set up the conversion */
 	srcbuf = (Uint8 *) surface->pixels.data();
-	curbuf = srcbuf;
 	maxn = 255;
-	skip = run = 0;
 	dst = rlebuf.data();
 	rgbmask = 0xFF;//~surface->format->Amask;
 	ckey = 0;

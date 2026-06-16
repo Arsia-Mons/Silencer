@@ -295,7 +295,7 @@ void GameRenderer::ApplyPaletteFade(bool fadeOut) {
     SetColors(fadedpalette);
 }
 
-Uint32 GameRenderer::TimerCallback(void *userdata, SDL_TimerID timerID, Uint32 interval) {
+Uint32 GameRenderer::TimerCallback(void *userdata, SDL_TimerID, Uint32) {
     Game *g = static_cast<Game *>(userdata);
     g->updatetitle = true;
     g->fps = g->frames;

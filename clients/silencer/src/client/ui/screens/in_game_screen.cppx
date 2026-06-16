@@ -51,7 +51,6 @@ constexpr int kAdvBody = 6;
 constexpr int kAdvBodySm = 7;
 constexpr int kAdvHeading = 8;
 constexpr int kAdvTitle = 11;
-constexpr int kAdvHudCounter = 12;
 
 // Device(640x480) -> logical(960x720). ceil(1.5d - .25) lands every integer
 // device coordinate exactly: even d maps to the exact 1.5d, odd d to
