@@ -9,6 +9,7 @@
 #include "client/ui/hooks/use_keybind_capture.h"
 #include "client/ui/hooks/use_navigation.h"
 #include "client/ui/screens/options/hooks/use_options_commit.h"
+#include "client/ui/screens/options/hooks/use_rebind_timeout.h"
 #include "ui/components/box.h"
 #include "ui/components/scroll_view.h"
 #include "ui/components/text.h"
@@ -220,23 +221,8 @@ struct OptionsControlsProps {
   if (!nav.is_top)
     return ::ui::empty();
 
-  // 72-tick rebind timeout: a stalled capture auto-cancels. The counter resets
-  // whenever capture is inactive or the pending chord grows.
-  int *idle = use_state<int>(0);
-  size_t *last_chips = use_state<size_t>(0);
-  if (cap.capturing) {
-    if (cap.pending_chips.size() != *last_chips) {
-      *last_chips = cap.pending_chips.size();
-      *idle = 0;
-    } else if (++*idle > kRebindTimeoutFrames) {
-      if (cap.cancel_capture)
-        cap.cancel_capture();
-      *idle = 0;
-    }
-  } else {
-    *idle = 0;
-    *last_chips = 0;
-  }
+  // A stalled rebind capture auto-cancels after kRebindTimeoutFrames frames.
+  use_rebind_timeout(cap, kRebindTimeoutFrames);
 
   const int action_count = static_cast<int>(km.actions.size());
   OptionsCommit commit = use_options_commit(km.commit, km.revert);
