@@ -2,12 +2,8 @@
 
 #include "client/ui/screens/lobby/components/lobby_components.h"
 
-#include "client/ui/components/actions/actions.h"
 #include "client/ui/components/layout/layout.h"
 #include "client/ui/components/layout/lobby_panes.h"
-#include "client/ui/components/layout/pen_grid.h"
-#include "client/ui/components/surfaces/surfaces.h"
-#include "client/ui/components/text/text.h"
 #include "client/ui/hooks/use_app.h"
 #include "client/ui/hooks/use_cancel.h"
 #include "client/ui/hooks/use_characters.h"
@@ -20,14 +16,8 @@
 #include "client/ui/app_shell/ui_pipeline.h"
 #include "client/ui/hooks/use_staging.h"
 #include "client/ui/screens/character_create_data.h"
-#include "ui/components/box.h"
-#include "ui/components/input.h"
-#include "ui/components/scroll_view.h"
-#include "ui/components/text.h"
 #include "ui/runtime/react.h"
 
-#include <algorithm>
-#include <cmath>
 #include <functional>
 #include <string>
 
@@ -36,14 +26,6 @@ namespace {
 
 using namespace silencer;
 using ::ui::children;
-using ::ui::components::Box;
-using ::ui::components::BoxProps;
-using ::ui::components::Input;
-using ::ui::components::InputProps;
-using ::ui::components::ScrollView;
-using ::ui::components::ScrollViewProps;
-using ::ui::components::Text;
-using ::ui::components::TextProps;
 
 struct LobbyScreenProps {
   uint32_t unused = 0;
