@@ -7,7 +7,7 @@
 #   - our rain layer is disabled (`rain` op) — the goldens' frozen rain is the
 #     residual the masks/tile tolerance absorb;
 #   - the camera is phase-correlated to each golden before the shot (the
-#     follow-cam rest position is render-cadence-dependent, LESSONS.md).
+#     follow-cam rest position is render-cadence-dependent).
 #
 # Usage: tools/cap/cap_ingame_cppx_extra.sh [OUT_DIR]
 set -euo pipefail

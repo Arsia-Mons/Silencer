@@ -7,7 +7,7 @@
 # tutorial drive (F4 ticker, base-door build fail/success at the deck data
 # terminal, rocket purchase + flight). ingame_system_camera is captured but
 # NOT gated: the origin golden carries origin's stale-temppalette UI dim
-# (latched at base entry — see PARITY.md hud_system_camera row); the capture
+# (latched at base entry); the capture
 # script still asserts the inset/frame are present on our side.
 set -euo pipefail
 

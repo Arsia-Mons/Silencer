@@ -32,7 +32,7 @@
 #      at message_i == 200 (case-16 center message faded).
 #
 # NOT captured here: hud_trace_time (needs team.secretprogress >= 180 =
-# draining 4+ data terminals across the map; see PARITY.md).
+# draining 4+ data terminals across the map).
 #
 # Usage: tools/cap/cap_ingame_origin_extra.sh [OUT_DIR]
 #   ORIGIN_ROOT  override origin worktree

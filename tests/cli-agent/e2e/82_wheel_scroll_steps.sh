@@ -34,7 +34,7 @@
 #    and written NOWHERE; create-mode Scroll actions route exclusively to the
 #    Game Options box (game_create_panel.cpp:217-222). Our map list renders the
 #    bundled maps (≤14 rows, all visible) with no scroll surface — equivalent.
-#    Nothing to drive; recorded here + in PARITY.md.
+#    Nothing to drive; recorded here.
 set -euo pipefail
 . "$(dirname "$0")/lib.sh"
 

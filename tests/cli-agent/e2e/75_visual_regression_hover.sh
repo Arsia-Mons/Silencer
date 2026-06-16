@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Visual regression: hover/focus states (INGAME_SPECS.md Part II C).
+# Visual regression: hover/focus states.
 #
 # 1) Oval ramp steady state: hover the mainmenu's first oval (Tutorial) and
 #    gate the settled frame against the origin golden hover_mainmenu_oval.png
