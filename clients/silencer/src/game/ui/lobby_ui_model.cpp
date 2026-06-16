@@ -27,9 +27,13 @@ constexpr size_t kStatusLogCap = 180;
 // The lobby chat transcript wraps to multiple rows, so a single 180-byte tail
 // would discard most of the visible scrollback (and clip a long message). The
 // screen copies it through the per-frame string arena (copy_string), not the
-// 192-byte text scratch, so this larger tail renders in full. Bounded (one
-// well's worth of wrapped text), not unbounded.
-constexpr size_t kLobbyChatLogCap = 900;
+// 192-byte text scratch, so this larger tail renders in full. This must exceed
+// the chat well's height in lines so a transcript of one-line messages
+// overflows the auto-measuring ScrollView (which then stick-to-bottom fills the
+// well to the top); too small and short messages can never reach the top. Sized
+// to give a few wells' worth of scroll-back history while staying well within
+// the 16 KB shared per-frame string arena (UI_RETAINED_STRING_ARENA_BYTES).
+constexpr size_t kLobbyChatLogCap = 2048;
 
 // Agency display names, indexed by Team::{NOXIS..BLACKROSE} / Character::agencyIdx.
 const char *const kAgency[5] = {"Noxis", "Lazarus", "Caliber", "Static",
@@ -412,15 +416,20 @@ client::ui::LobbySnapshot CaptureLobbySnapshot(Game &game,
   lobby.UnlockMutex();
 
   // The lobby chat scrollback lives on the game-owned drain buffer (single
-  // thread), read outside the mutex; show the recent tail.
+  // thread), read outside the mutex. Hand the whole buffer to the
+  // auto-measuring ScrollView and let it fill/scroll/stick-to-bottom — do NOT
+  // pre-slice to a fixed visible-line count. A fixed count (e.g. the connect
+  // log's kVisibleLogLines) caps the content below the well's height when every
+  // message is one line, so the ScrollView bottom-anchors that short content and
+  // leaves a permanent gap above it (the newest line never reaches the top no
+  // matter how many one-liners arrive). The byte cap below is the only bound,
+  // keeping the tail within the shared per-frame string arena.
   if (lobbyPhase) {
     const std::vector<std::string> &chat = game.LobbyChatLog();
-    const int count = (int)chat.size();
-    const int start = std::max(0, count - kVisibleLogLines);
-    for (int i = start; i < count; ++i) {
+    for (size_t i = 0; i < chat.size(); ++i) {
       if (!snap.lobby_chat.empty())
         snap.lobby_chat += "\n";
-      snap.lobby_chat += chat[(size_t)i];
+      snap.lobby_chat += chat[i];
     }
     if (snap.lobby_chat.size() > kLobbyChatLogCap)
       snap.lobby_chat.erase(0, snap.lobby_chat.size() - kLobbyChatLogCap);

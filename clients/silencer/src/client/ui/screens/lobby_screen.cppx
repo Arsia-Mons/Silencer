@@ -1419,7 +1419,7 @@ struct ChatLogProps {
           .key = props.key,
           .id = "ChatLog",
           .step = tokens::kLineBody,
-          .show_scrollbar = true,
+          .show_scrollbar = false,
           .stick_to_bottom = true,
           .layout = ::ui::LayoutStyle{
               .align_items = ::ui::AlignItems::Start,
@@ -1458,6 +1458,7 @@ struct LobbyChatPanelProps {
     </Box>
     <Box
       key="logwell"
+      id="logwell"
       layout={::ui::LayoutStyle{
         .overflow = ::ui::Overflow::Hidden,
         .direction = ::ui::FlexDirection::Row,
@@ -1474,7 +1475,7 @@ struct LobbyChatPanelProps {
         layout={::ui::LayoutStyle{
           .direction = ::ui::FlexDirection::Column,
           .align_items = ::ui::AlignItems::Start,
-          .width = ::ui::Length::points(222.0f),
+          .width = ::ui::Length::points(150.0f),
           .flex_shrink = ::ui::StyleFloat::points(0.0f)}}
       >
         <Text

@@ -129,7 +129,17 @@ using ::ui::children;
   content.direction = ::ui::FlexDirection::Column;
   content.position_inset.left = ::ui::StyleValue::points(0.0f);
   content.position_inset.right = ::ui::StyleValue::points(0.0f);
-  content.position_inset.top = ::ui::StyleValue::points(-*offset);
+  // Stick-to-bottom transcripts (chat) bottom-anchor when the content underflows
+  // the viewport: the newest line sits flush to the bottom edge with the empty
+  // gap above it, instead of top-anchoring and leaving dead space below. Once
+  // content overflows (max_off > 0) the gap is <= 0 and this reduces to the
+  // normal top-anchored -offset, so scrolling/stick behave as before. Plain lists
+  // stay top-anchored.
+  float content_top = -*offset;
+  if (props.stick_to_bottom && content_height > 0.0f &&
+      content_height < viewport_height)
+    content_top = (viewport_height - content_height) - *offset;
+  content.position_inset.top = ::ui::StyleValue::points(content_top);
 
   // Virtualize uniform-height lists: render only the row slice intersecting the
   // window, with overscan on each side. The slice is a contiguous subrange of
