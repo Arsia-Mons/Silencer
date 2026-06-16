@@ -27,49 +27,6 @@ void bake_indexed_rgba(const uint8_t *indices, int w, int h,
   }
 }
 
-void bake_backdrop_rgba(const uint8_t *indices, int sw, int sh,
-                        const SDL_Color *palette256, bool stretch, int dw,
-                        int dh, uint8_t *out_rgba) {
-  if (sw < 1 || sh < 1 || dw < 1 || dh < 1)
-    return;
-  // Single-hop NEAREST fit, sprite -> device (U-3 / SIL-205). One resample
-  // gives every source px a uniform duplication footprint; origin resampled
-  // twice (sprite -> virtual canvas -> whole-frame magnify) and the compounded
-  // runs banded unevenly ({2,2,5} at 1080p where a single hop is exactly 3).
-  // Cover scales by max(dw/sw, dh/sh) and center-crops; stretch fills both
-  // axes. Fits fill all dw columns/dh rows. At dw==sw, dh==sh this is the
-  // identity.
-  const float xs_stretch = (float)dw / sw;
-  const float ys_stretch = (float)dh / sh;
-  const float cover = std::max(xs_stretch, ys_stretch);
-  const float xs = stretch ? xs_stretch : cover;
-  const float ys = stretch ? ys_stretch : cover;
-  const int draw_w = std::max(1, (int)(sw * xs + 0.5f));
-  const int draw_h = std::max(1, (int)(sh * ys + 0.5f));
-  const int ox = (dw - draw_w) / 2; // <= 0: crop is centered
-  const int oy = (dh - draw_h) / 2;
-  for (int dy = 0; dy < dh; ++dy) {
-    const int syi = (int)((dy - oy) / ys);
-    if (syi < 0 || syi >= sh)
-      continue;
-    uint8_t *orow = out_rgba + (size_t)dy * dw * 4;
-    const uint8_t *srow = indices + (size_t)syi * sw;
-    for (int dx = 0; dx < dw; ++dx) {
-      const int sxi = (int)((dx - ox) / xs);
-      if (sxi < 0 || sxi >= sw)
-        continue;
-      const uint8_t idx = srow[sxi];
-      if (idx == 0)
-        continue;
-      const SDL_Color &c = palette256[idx];
-      uint8_t *o = orow + (size_t)dx * 4;
-      o[0] = c.r;
-      o[1] = c.g;
-      o[2] = c.b;
-      o[3] = 255;
-    }
-  }
-}
 
 // ---- Canonical-phase element bakes (U-2 / SIL-204) -------------------------
 

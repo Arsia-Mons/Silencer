@@ -22,17 +22,6 @@ namespace silencer::cppx_ui {
 void bake_indexed_rgba(const uint8_t *indices, int w, int h,
                        const SDL_Color *palette256, uint8_t *out_rgba);
 
-// Bake a full-bleed menu backdrop at device resolution dw*dh: a SINGLE
-// NEAREST resample sprite -> device (cover fit with centered crop, or stretch
-// when `stretch`), so every source px gets a uniform duplication footprint
-// (U-3 / SIL-205 — origin resampled twice, sprite -> virtual canvas -> whole-
-// frame magnify, and the compounded runs banded unevenly). All dw*dh pixels
-// the sprite covers are filled; dw==sw && dh==sh is the identity.
-// `out_rgba` >= dw*dh*4, zeroed by caller; index 0 stays transparent.
-void bake_backdrop_rgba(const uint8_t *indices, int sw, int sh,
-                        const SDL_Color *palette256, bool stretch, int dw,
-                        int dh, uint8_t *out_rgba);
-
 // ---- Canonical-phase element bakes (U-2 / SIL-204) -------------------------
 // Origin whole-frame-magnified the composed virtual frame (src = int(dx/s)),
 // so a sprite's device pixels — and even its size — depended on its absolute

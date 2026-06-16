@@ -86,12 +86,6 @@ public:
   uint32_t bake_chrome_sprite(const uint8_t *indices, int w, int h,
                               const SDL_Color *palette256);
 
-  // Bake a full-bleed backdrop sprite at this host's device resolution via a
-  // single NEAREST resample (see bake_backdrop_rgba — U-3/SIL-205). Drawn 1:1
-  // full-screen, so the texture carries the fit (cover/stretch) baked in.
-  uint32_t bake_backdrop_sprite(const uint8_t *indices, int w, int h,
-                                const SDL_Color *palette256, bool stretch);
-
   // Register an already-baked chrome texture's indexed source so the executor
   // can swap qualifying draws for lazily-baked CANONICAL device-cell variants
   // (origin's magnify arithmetic at phase 0 — U-2/SIL-204). `fit`
