@@ -1,0 +1,485 @@
+#include "client/ui/screens/character_create/components/wizard_components.h"
+
+#include "client/ui/components/actions/actions.h"
+#include "client/ui/components/layout/layout.h"
+#include "client/ui/components/layout/pen_grid.h"
+#include "client/ui/components/surfaces/surfaces.h"
+#include "client/ui/components/text/text.h"
+#include "client/ui/components/tokens.h"
+#include "client/ui/hooks/use_character_create.h"
+#include "client/ui/hooks/use_characters.h"
+#include "client/ui/hooks/use_chrome.h"
+#include "client/ui/screens/character_create/lib/wizard_frame.h"
+#include "client/ui/screens/character_create_data.h"
+#include "ui/components/box.h"
+#include "ui/components/input.h"
+#include "ui/components/text.h"
+#include "ui/runtime/react.h"
+
+#include <cstring>
+#include <functional>
+#include <string>
+#include <vector>
+
+namespace client::ui {
+namespace {
+
+using namespace silencer;
+using ::ui::children;
+using ::ui::components::Box;
+using ::ui::components::BoxProps;
+using ::ui::components::Input;
+using ::ui::components::InputProps;
+using ::ui::components::Text;
+using ::ui::components::TextProps;
+
+// The floating ALIAS capsule + its header pill use a vector border (no baked
+// sprite). The golden draws that edge in a muted desaturated green (~84,156,104),
+// not the bright chrome stroke (kBorderHeroPanel 46,139,46) — sampled from the
+// cc_alias golden. Keep it file-local so it doesn't leak into other surfaces.
+constexpr ::ui::Color kAliasFrameBorder = {84, 156, 104, 255};
+
+// One agency row: a focusable selectable button (left column). Focusing a row
+// previews that agency in the right detail column; activating commits it and
+// creates the agent. The previewed row is shown selected.
+::ui::UiElement agency_row(int index, int preview,
+                           std::function<void(int)> on_pick,
+                           std::function<void(int)> set_preview) {
+  std::function<void()> on_press = [on_pick, index]() {
+    if (on_pick)
+      on_pick(index);
+  };
+  std::function<void()> on_focus = [set_preview, index]() {
+    if (set_preview)
+      set_preview(index);
+  };
+  std::function<void()> on_hover = [set_preview, index]() {
+    if (set_preview)
+      set_preview(index);
+  };
+  // The agency rows sit one virtual col left of the roster rows (origin blits
+  // the plate at int(box.x)); the rows wrapper carries the -1.5/+1.5 box nudge
+  // and pad-left 17.5 keeps the label pen on its own golden cell. The nudge
+  // must NOT shrink the box: the rows keep the pane's full 354 logical = 236
+  // virtual width so the Stretch row-plate bakes 1:1 — a narrower box
+  // nearest-decimates 236 src cols to 235 and drops the right cap's ring
+  // column (U-4 / SIL-206).
+  return <AppButton
+    key={kAgencies[index].control_id}
+    controlId={kAgencies[index].control_id}
+    controlOffset={index}
+    variant={AppButtonVariant::Oval}
+    size={AppButtonSize::List}
+    selected={index == preview}
+    defaultFocused={index == 0}
+    label={kAgencies[index].name}
+    onPress={on_press}
+    onFocus={on_focus}
+    onHover={on_hover}
+    accessibilityLabel={kAgencies[index].name}
+    padding={::ui::opt(::ui::EdgeSizes{17.5f, 14.5f, 11.0f, 1.5f})}
+  />
+}
+
+// One advantage line, origin AdvantageLineText: label, a 6px gap, then the
+// bonus wrapped in bracket glyphs ("Endurance [+3]"); ability rows are
+// label-only. Empty slots ({nullptr,...}) render nothing.
+::ui::UiElement advantage_row(const char *key, const Advantage &adv) {
+  if (!adv.label || adv.label[0] == '\0')
+    return ::ui::empty();
+  std::vector<::ui::UiElement> cells;
+  cells.push_back(BodyText(BodyTextProps{.key = "l",
+                                         .variant = BodyTextVariant::Body,
+                                         .tone = BodyTextTone::Prose,
+                                         .value = adv.label}));
+  if (adv.bonus && adv.bonus[0] != '\0') {
+    // origin: '[' at label-advance(7v per char) + gap 4v after the 20v
+    // indent; metadata is BodySm in the standard green (LegacyPalette(224)),
+    // ']' 18v after '['. Anchored absolutely on the pen grid — flow placement
+    // inherits the TTF-measured label width and Yoga's .5-rounding, which flip
+    // the bracket bakes off their golden cells per label-length parity.
+    const float bx =
+        PenGrid::L(7.0f * (float)std::strlen(adv.label)) + 35.0f;
+    auto abs_at = [](float left) {
+      return ::ui::LayoutStyle{
+          .position = ::ui::PositionType::Absolute,
+          .position_inset = ::ui::EdgeSizes{left, {}, 0.0f, {}}};
+    };
+    ::ui::LayoutStyle bl = abs_at(bx);
+    bl.width = ::ui::Length::points(6.0f);
+    bl.height = ::ui::Length::points(16.5f);
+    ::ui::LayoutStyle bt = abs_at(bx + 6.0f);
+    bt.height = ::ui::Length::points(tokens::kLineBody);
+    ::ui::LayoutStyle br = abs_at(bx + 27.0f);
+    br.width = ::ui::Length::points(6.0f);
+    br.height = ::ui::Length::points(16.5f);
+    client::ui::ChromeTextures chrome = client::ui::use_chrome();
+    if (chrome.bracket_l)
+      cells.push_back(Box(BoxProps{.key = "bl",
+                                   .layout = bl,
+                                   .style = tokens::image_patch(chrome.bracket_l)}));
+    cells.push_back(Text(TextProps{
+        .key = "b",
+        .value = adv.bonus,
+        .layout = bt,
+        .style = tokens::text_patch(tokens::kTextBody, tokens::kFontBodyEm,
+                                    tokens::kFaceBodySm, tokens::kLineBody)}));
+    if (chrome.bracket_r)
+      cells.push_back(Box(BoxProps{.key = "br",
+                                   .layout = br,
+                                   .style = tokens::image_patch(chrome.bracket_r)}));
+  }
+  // origin: rows pitch at lineHeight + 1 gap (16.5 + 1.5 at x1.5), indented 30
+  // (kAdvantageListIndent 20) under the "Advantages" header.
+  return <Box
+    key={key}
+    layout={::ui::LayoutStyle{
+      .direction = ::ui::FlexDirection::Row,
+      .align_items = ::ui::AlignItems::Start,
+      .width = ::ui::Length::percent(100.0f),
+      .height = ::ui::Length::points(18.0f),
+      .flex_shrink = ::ui::StyleFloat::points(0.0f),
+      .padding = {30.0f, 0.0f, 0.0f, 0.0f}}}
+  >
+    {::ui::children(cells)}
+  </Box>
+}
+
+// The lore paragraph: one wrapped Text using origin's DetailParagraph styling.
+// A single node keeps the line pitch on the exact 16.5 cell — per-line boxes
+// round through Yoga's pixel grid and drift ~0.75px/line against the golden.
+::ui::UiElement desc_paragraph(const char *value) {
+  ::ui::StylePatch st = tokens::text_patch(tokens::kTextProse,
+                                           tokens::kFontBodyEm,
+                                           tokens::kFaceBodySm,
+                                           tokens::kLineBody);
+  st.text.value.wrap = ::ui::TextWrap::Words;
+  return <Text
+    key="desc"
+    value={value}
+    layout={::ui::LayoutStyle{
+      .width = ::ui::Length::percent(100.0f),
+      .margin = ::ui::EdgeSizes{-0.75f, {}, -0.25f, {}}}}
+    style={st}
+  />
+}
+
+::ui::UiElement detail_text(const char *key, const std::string &value) {
+  return BodyText(BodyTextProps{.key = key,
+                                .variant = BodyTextVariant::Body,
+                                .tone = BodyTextTone::Prose,
+                                .value = ::ui::copy_string(value.c_str())});
+}
+
+::ui::UiElement agent_detail_panel(const Characters &chars, int preview) {
+  if (preview < 0 || preview >= (int)chars.profiles.size())
+    return ::ui::empty();
+  const CharacterProfile &profile = chars.profiles[preview];
+  const int agency_index = clamp_agency_index(profile.agency_index);
+  const AgencyInfo &agency = kAgencies[agency_index];
+  client::ui::ChromeTextures chrome = use_chrome();
+  const uint32_t emblem = chrome.agency_emblem[agency_index];
+  return <Box
+    key="rightpane"
+    layout={::ui::LayoutStyle{
+      .overflow = ::ui::Overflow::Hidden,
+      .direction = ::ui::FlexDirection::Column,
+      .align_items = ::ui::AlignItems::Stretch,
+      .width = ::ui::Length::points(294.0f),
+      .padding = {33.0f, 0.0f, 63.0f, 0.0f},
+      .gap = 7.5f}}
+  >
+    <ScreenTitle key="agencyh" variant={ScreenTitleVariant::Prose} value="Agency" />
+    <Box
+      key="agencyrow"
+      layout={::ui::LayoutStyle{
+        .direction = ::ui::FlexDirection::Row,
+        .align_items = ::ui::AlignItems::Center,
+        .height = ::ui::Length::points(45.0f),
+        .gap = 12.0f}}
+    >
+      <ScreenTitle key="agency" variant={ScreenTitleVariant::Prose} value={agency.name} />
+      <Box
+        key="emblem"
+        layout={::ui::LayoutStyle{
+          .width = ::ui::Length::points(48.0f),
+          .height = ::ui::Length::points(45.0f),
+          .flex_shrink = ::ui::StyleFloat::points(0.0f)}}
+        style={emblem ? tokens::image_patch(emblem) : ::ui::patch().background(tokens::kEmblemFallbackFill)}
+      />
+    </Box>
+    <ScreenTitle
+      key="security"
+      variant={ScreenTitleVariant::Prose}
+      value={::ui::copy_string(("Security Level " + std::to_string((unsigned)profile.level)).c_str())}
+    />
+    <Box
+      key="stats"
+      layout={::ui::LayoutStyle{
+        .direction = ::ui::FlexDirection::Column,
+        .align_items = ::ui::AlignItems::Stretch,
+        .gap = 1.5f}}
+    >
+      {detail_text("tech", "Technology Slots:" + std::to_string((unsigned)profile.techslots))}
+      {detail_text("xp", "Agency Points:" + std::to_string((unsigned)profile.xp))}
+      {detail_text("next", "Next Level At:" + std::to_string(((unsigned)profile.level + 1u) * 100u))}
+      {detail_text("wins", "Successful Missions:" + std::to_string((unsigned)profile.wins))}
+    </Box>
+    <ScreenTitle key="adv" variant={ScreenTitleVariant::Prose} value="Advantages" />
+    <Box
+      key="advrows"
+      layout={::ui::LayoutStyle{
+        .direction = ::ui::FlexDirection::Column,
+        .align_items = ::ui::AlignItems::Stretch,
+        .gap = 1.5f}}
+    >
+      {advantage_row("a0", agency.advantages[0])}
+      {advantage_row("a1", agency.advantages[1])}
+      {advantage_row("a2", agency.advantages[2])}
+      {advantage_row("a3", agency.advantages[3])}
+    </Box>
+  </Box>
+}
+
+// One roster row: select an existing agent. Out-of-range slots render nothing.
+::ui::UiElement roster_row(int index, const std::vector<CharacterProfile> &profiles,
+                           int preview, std::function<void(int)> on_select,
+                           std::function<void(int)> set_preview) {
+  if (index < 0 || index >= (int)profiles.size())
+    return ::ui::empty();
+  const char *label = ::ui::copy_string(profiles[index].name.c_str());
+  const char *key = ::ui::copy_string(("agent" + std::to_string(index)).c_str());
+  std::function<void()> on_press = [on_select, index]() {
+    if (on_select)
+      on_select(index);
+  };
+  std::function<void()> on_preview = [set_preview, index]() {
+    if (set_preview)
+      set_preview(index);
+  };
+  return <AppButton
+    key={key}
+    controlId="SelectAgent"
+    controlOffset={index}
+    variant={AppButtonVariant::Oval}
+    size={AppButtonSize::List}
+    selected={index == preview}
+    label={label}
+    onPress={on_press}
+    onFocus={on_preview}
+    onHover={on_preview}
+  />
+}
+
+// Left-pane header: the screen title centered in the baked chrome notch pill at
+// the pane top (golden pill y54-102), with a fixed gap below so the first list
+// item lands at the golden's y141 (~39px under the pill). The title text is
+// top-anchored inside the header zone so it reads inside the pill, not centered
+// down into the gap; the bottom margin (not a uniform flex gap) makes the
+// header-to-list gap larger than the 9px inter-row spacing.
+::ui::UiElement pane_header(const char *value) {
+  return <Box
+    key="hdr"
+    layout={::ui::LayoutStyle{
+      .direction = ::ui::FlexDirection::Row,
+      .align_items = ::ui::AlignItems::Center,
+      .justify_content = ::ui::JustifyContent::Center,
+      .width = ::ui::Length::percent(100.0f),
+      .height = ::ui::Length::points(49.5f),
+      .margin = ::ui::EdgeSizes{{}, {}, {}, 31.4f},
+      .padding = {33.0f, 0.0f, 0.0f, 0.0f}}}
+  >
+    <ScreenTitle key="title" variant={ScreenTitleVariant::Screen} value={value} />
+  </Box>
+}
+
+} // namespace
+
+// step 1 — origin/main "SILENCER ALIAS": the SELECT AGENT two-pane frame
+// behind + a floating ALIAS panel centered over it with a single editable
+// field (Enter confirms; no visible buttons). The frame reuses step 0's chrome.
+::ui::UiElement AliasStep(const CharacterWizard &w,
+                          std::function<void(const ::ui::ActivationEvent &)>
+                              on_alias_enter) {
+  client::ui::ChromeTextures chrome = use_chrome();
+  // Chromeless field over the baked input well in the dialog_pw modal sprite
+  // (origin's TextInput draws no well of its own); caret = palette idx 140 on
+  // the menu palette (yellow).
+  const ::ui::StyleStatePatch alias_field_style =
+      tokens::chromeless_field_style(chrome.caret_menu, tokens::kTextBody);
+  return <ScreenLayout key="aliasmodal" variant={ScreenLayoutVariant::Overlay}>
+    <Box key="frame" layout={wizard_frame_layout()} style={wizard_frame_style(chrome)}>
+      <Box key="leftpane" layout={wizard_left_pane_layout()}>
+        {pane_header("SELECT AGENT")}
+        <Box
+          key="neww"
+          layout={::ui::LayoutStyle{
+            .margin = {-1.0f, 1.0f, -3.5f, 3.5f}}}
+        >
+          <AppButton
+            key="new"
+            controlId="CreateNewCharacterBg"
+            variant={AppButtonVariant::Oval}
+            size={AppButtonSize::List}
+            label="Create New Character"
+            onPress={w.open_alias}
+          />
+        </Box>
+      </Box>
+      <Box key="rightpane" layout={wizard_right_spacer_layout()} />
+    </Box>
+    <Box
+      key="aliasfloat"
+      layout={::ui::LayoutStyle{
+        .position = ::ui::PositionType::Absolute,
+        .direction = ::ui::FlexDirection::Column,
+        .align_items = ::ui::AlignItems::Stretch,
+        .width = ::ui::Length::points(426.0f),
+        .height = ::ui::Length::points(162.0f),
+        .position_inset = ::ui::EdgeSizes{425.0f, {}, 241.5f, {}}}}
+      style={chrome.dialog_pw ? tokens::image_patch(chrome.dialog_pw) : tokens::panel_patch(tokens::kSurfaceHeroPanel, kAliasFrameBorder, 2.0f, 24.0f)}
+    >
+      <Box
+        key="title"
+        layout={::ui::LayoutStyle{
+          .direction = ::ui::FlexDirection::Row,
+          .align_items = ::ui::AlignItems::Center,
+          .width = ::ui::Length::percent(100.0f),
+          .height = ::ui::Length::points(49.5f),
+          .padding = {98.0f, 0.0f, 0.0f, 0.0f}}}
+      >
+        <ScreenTitle key="t" variant={ScreenTitleVariant::Dialog} value="SILENCER ALIAS" />
+      </Box>
+      <Box
+        key="inputrow"
+        layout={::ui::LayoutStyle{
+          .position = ::ui::PositionType::Absolute,
+          .direction = ::ui::FlexDirection::Row,
+          .align_items = ::ui::AlignItems::Stretch,
+          .width = ::ui::Length::points(354.0f),
+          .height = ::ui::Length::points(40.0f),
+          .position_inset = ::ui::EdgeSizes{45.5f, {}, 73.5f, {}}}}
+      >
+        <Input
+          key="alias"
+          id="Alias"
+          autofocus={true}
+          accessibility={{.label = "Alias"}}
+          onActivate={on_alias_enter}
+          value={w.alias.c_str()}
+          onChange={w.set_alias}
+          layout={::ui::LayoutStyle{
+            .align_items = ::ui::AlignItems::Center,
+            .justify_content = ::ui::JustifyContent::Start,
+            .height = ::ui::Length::points(40.0f),
+            .flex_grow = ::ui::StyleFloat::points(1.0f),
+            .padding = {7.0f, 0.0f, 0.0f, 0.0f}}}
+          style={alias_field_style}
+        />
+      </Box>
+    </Box>
+  </ScreenLayout>
+}
+
+// step 2 — origin/main "SELECT AGENCY": LEFT pane = SELECT AGENCY title + the
+// five agency ovals; RIGHT pane = Advantages + Description over the Mars
+// backdrop. No outer wizard panel, no Back button (Esc cancels), no subtitle.
+::ui::UiElement AgencyStep(const CharacterWizard &w,
+                           std::function<void(int)> on_pick) {
+  const int pi =
+      (w.preview_agency >= 0 && w.preview_agency < kAgencyCount) ? w.preview_agency : 0;
+  const AgencyInfo &a = kAgencies[pi];
+  std::function<void(int)> set_preview = w.set_preview_agency;
+  client::ui::ChromeTextures chrome = use_chrome();
+  return <ScreenLayout key="agencyscreen" variant={ScreenLayoutVariant::Overlay}>
+    <Box key="frame" layout={wizard_frame_layout()} style={wizard_frame_style(chrome)}>
+      <Box key="left" layout={wizard_left_pane_layout()}>
+        {pane_header("SELECT AGENCY")}
+        <Box
+          key="rows"
+          layout={::ui::LayoutStyle{
+            .direction = ::ui::FlexDirection::Column,
+            .align_items = ::ui::AlignItems::Stretch,
+            .margin = {-1.5f, 1.5f, -3.0f, 3.0f},
+            .gap = 7.5f}}
+        >
+          {agency_row(0, pi, on_pick, set_preview)}
+          {agency_row(1, pi, on_pick, set_preview)}
+          {agency_row(2, pi, on_pick, set_preview)}
+          {agency_row(3, pi, on_pick, set_preview)}
+          {agency_row(4, pi, on_pick, set_preview)}
+        </Box>
+      </Box>
+      <Box
+        key="right"
+        layout={::ui::LayoutStyle{
+          .overflow = ::ui::Overflow::Hidden,
+          .direction = ::ui::FlexDirection::Column,
+          .align_items = ::ui::AlignItems::Stretch,
+          .width = ::ui::Length::points(294.0f),
+          .padding = {0.0f, 0.0f, 63.0f, 0.0f},
+          .gap = 12.0f}}
+      >
+        <ScreenTitle key="adv" variant={ScreenTitleVariant::Prose} value="Advantages" />
+        <Box
+          key="advrows"
+          layout={::ui::LayoutStyle{
+            .direction = ::ui::FlexDirection::Column,
+            .align_items = ::ui::AlignItems::Stretch,
+            .margin = {0.0f, 0.0f, -1.0f, 1.0f},
+            .gap = 10.0f}}
+        >
+          {advantage_row("a0", a.advantages[0])}
+          <Box key="a1w" layout={::ui::LayoutStyle{.margin = {0.0f, 0.0f, 1.0f, -1.0f}}}>
+            {advantage_row("a1", a.advantages[1])}
+          </Box>
+          {advantage_row("a2", a.advantages[2])}
+          {advantage_row("a3", a.advantages[3])}
+        </Box>
+        <ScreenTitle key="dh" variant={ScreenTitleVariant::Prose} value="Description" />
+        {desc_paragraph(a.description)}
+      </Box>
+    </Box>
+  </ScreenLayout>
+}
+
+// step 0 — SELECT AGENT: LEFT pane = the roster + Create New Character; RIGHT
+// pane previews the currently focused/hovered existing agent, matching origin.
+::ui::UiElement RosterStep(const CharacterWizard &w, const Characters &chars,
+                           std::function<void(int)> on_select) {
+  client::ui::ChromeTextures chrome = use_chrome();
+  const int preview =
+      (w.preview_agent >= 0 && w.preview_agent < (int)chars.profiles.size())
+          ? w.preview_agent
+          : 0;
+  std::function<void(int)> set_preview = w.set_preview_agent;
+  return <ScreenLayout key="roster" variant={ScreenLayoutVariant::Overlay}>
+    <Box key="frame" layout={wizard_frame_layout()} style={wizard_frame_style(chrome)}>
+      <Box key="leftpane" layout={wizard_left_pane_layout()}>
+        {pane_header("SELECT AGENT")}
+        {roster_row(0, chars.profiles, preview, on_select, set_preview)}
+        {roster_row(1, chars.profiles, preview, on_select, set_preview)}
+        {roster_row(2, chars.profiles, preview, on_select, set_preview)}
+        {roster_row(3, chars.profiles, preview, on_select, set_preview)}
+        {roster_row(4, chars.profiles, preview, on_select, set_preview)}
+        <Box
+          key="neww"
+          layout={::ui::LayoutStyle{
+            .margin = {-1.0f, 1.0f, -3.5f, 3.5f}}}
+        >
+          <AppButton
+            key="new"
+            controlId="CreateNewCharacter"
+            variant={AppButtonVariant::Oval}
+            size={AppButtonSize::List}
+            label="Create New Character"
+            onPress={w.open_alias}
+          />
+        </Box>
+      </Box>
+      {agent_detail_panel(chars, preview)}
+    </Box>
+  </ScreenLayout>
+}
+
+} // namespace client::ui

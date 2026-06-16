@@ -310,6 +310,8 @@ set(SILENCER_CPPX_SOURCES
 	# create → LOBBY (via the CREATECHARACTER tick reconcile).
 	src/client/ui/screens/character_create/character_create.cppx
 	src/client/ui/screens/character_create/character_create.hx
+	src/client/ui/screens/character_create/components/wizard_components.cppx
+	src/client/ui/screens/character_create/components/wizard_components.hx
 	# LobbyScreen (SIL-21 2/n + 3/n): the read cluster + the game-join cluster
 	# (GameSelect/GameCreate/Staging right-column swap over use_games/use_staging).
 	src/client/ui/screens/lobby_screen.cppx
