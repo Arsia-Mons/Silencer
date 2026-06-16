@@ -163,7 +163,7 @@ bool Game::Loop(void){
 	if(updatetitle){
 		if(!headless && gameRenderer.GetWindow()){
 			char title[128];
-			sprintf(title, "Silencer - %d FPS  Latency: %d ms [%d]  B/s: D:%d U:%d", fps, world.GetPingTime(), (int)world.replication.snapshotqueue.size(), world.network.totalbytesread, world.network.totalbytessent);
+			snprintf(title, sizeof title, "Silencer - %d FPS  Latency: %d ms [%d]  B/s: D:%d U:%d", fps, world.GetPingTime(), (int)world.replication.snapshotqueue.size(), world.network.totalbytesread, world.network.totalbytessent);
 			SDL_SetWindowTitle(gameRenderer.GetWindow(), title);
 		}
 		updatetitle = false;

@@ -116,7 +116,7 @@ bool Game::Load(char * cmdline){
 					printf("name: %s, techslots: %d\n", user->name, user->agency[0].techslots);*/
 					world.dedicatedserver.Start(lobbyaddress, atoi(lobbyport), atoi(gameid), atoi(accountid));
 					char filename[256];
-					sprintf(filename, "replays/%d.zsr", atoi(gameid));
+					snprintf(filename, sizeof filename, "replays/%d.zsr", atoi(gameid));
 					world.replay.BeginRecording(filename);
 					if(world.replay.IsRecording()){
 						world.replay.WriteHeader(world);

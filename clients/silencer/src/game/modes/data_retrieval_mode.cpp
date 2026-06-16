@@ -65,8 +65,8 @@ void DataRetrievalMode::OnSecretBeamReady(World& world, Team& team) {
 
 	char teamtext[256];
 	char enemytext[256];
-	sprintf(teamtext, "TOP SECRET LOCATION DETERMINED\n\nApproximate time : %d seconds", terminal->beamingtime);
-	sprintf(enemytext, "ENEMY BEAMING DETECTED\n\nTracking location on radar");
+	snprintf(teamtext, sizeof teamtext, "TOP SECRET LOCATION DETERMINED\n\nApproximate time : %d seconds", terminal->beamingtime);
+	snprintf(enemytext, sizeof enemytext, "ENEMY BEAMING DETECTED\n\nTracking location on radar");
 	for(int i = 0; i < world.maxpeers; i++){
 		Peer* peer = world.peers.peerlist[i];
 		if(!peer) continue;
@@ -91,7 +91,7 @@ void DataRetrievalMode::OnSecretDelivered(World& world, Team& team) {
 			bool stolen = deliverer->secretteamid != team.id;
 			int remaining = GASLoader::Get().player.secretsNeededToWin - team.secrets;
 			char text[128];
-			sprintf(text, "%s returned a %s\n( %d remaining )\n\nTeam awarded %d credits",
+			snprintf(text, sizeof text, "%s returned a %s\n( %d remaining )\n\nTeam awarded %d credits",
 			        user->DisplayName(), stolen ? "stolen secret" : "secret", remaining,
 			        GASLoader::Get().player.secretDeliveryCredits);
 			if(!world.intutorialmode){
@@ -145,7 +145,7 @@ void DataRetrievalMode::OnSecretDelivered(World& world, Team& team) {
 		}
 
 		char message[256];
-		sprintf(message, "%sAll secrets retrieved\nby %s agents:\n\n", fs, team.GetAgencyName());
+		snprintf(message, sizeof message, "%sAll secrets retrieved\nby %s agents:\n\n", fs, team.GetAgencyName());
 		for(int j = 0; j < team.numpeers; j++){
 			Peer* tp = world.peers.peerlist[team.peers[j]];
 			if(tp){

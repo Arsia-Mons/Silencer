@@ -58,12 +58,12 @@ void Replay::BeginPlaying(const char * filename, const char * outfilename, bool 
 		ffmpegvideo = video;
 		if(video){
 			char cmd[256];
-			sprintf(cmd, "ffmpeg -v debug -y -f rawvideo -vcodec rawvideo -s 640x480 -pix_fmt rgb24 -r 50 -i pipe: -an -vcodec libx264 -preset veryslow -qp 0 %s", outfilename);
+			snprintf(cmd, sizeof cmd, "ffmpeg -v debug -y -f rawvideo -vcodec rawvideo -s 640x480 -pix_fmt rgb24 -r 50 -i pipe: -an -vcodec libx264 -preset veryslow -qp 0 %s", outfilename);
 			ffmpeg = popen(cmd, "w");
 			tick = 0;
 		}else{
 			char cmd[256];
-			sprintf(cmd, "ffmpeg -v debug -y -f s16le -ar 44100 -ac 1 -acodec pcm_s16le -i pipe: -vn -acodec libvo_aacenc %s", outfilename);
+			snprintf(cmd, sizeof cmd, "ffmpeg -v debug -y -f s16le -ar 44100 -ac 1 -acodec pcm_s16le -i pipe: -vn -acodec libvo_aacenc %s", outfilename);
 			ffmpeg = popen(cmd, "w");
 		}
 	}

@@ -31,7 +31,7 @@ bool Palette::Load(void){
 	currentbrightnesspalette = &brightness[currentpalette];
 	currentcoloredpalette = &colored[currentpalette];
 	char filename[256];
-	sprintf(filename, "PALETTECALC%d.BIN", currentpalette);
+	snprintf(filename, sizeof filename, "PALETTECALC%d.BIN", currentpalette);
 	/*system("rm PALETTECALC0.BIN");
 	system("rm PALETTECALC1.BIN");
 	system("rm PALETTECALC2.BIN");*/
@@ -129,7 +129,7 @@ SDL_Color * Palette::GetColors(void){
 
 void Palette::Save(void){
 	char filename[256];
-	sprintf(filename, "PALETTECALC%d.BIN", currentpalette);
+	snprintf(filename, sizeof filename, "PALETTECALC%d.BIN", currentpalette);
 	CDDataDir();
 	SDL_IOStream * file = SDL_IOFromFile((GetDataDir() + filename).c_str(), "wb");
 	if(!file){

@@ -55,7 +55,7 @@ bool Resources::LoadSprites(Game * game, bool dedicatedserver){
 		progress++;
 		if(game) game->LoadProgressCallback(progress, totalprogressitems);
 		if(headers[i][2]){
-			sprintf(FileName, "bin_spr/SPR_%.3d.BIN", i);
+			snprintf(FileName, sizeof FileName, "bin_spr/SPR_%.3d.BIN", i);
 			SDL_IOStream * file2 = SDL_IOFromFile((GetResDir() + FileName).c_str(), "rb");
 			if(file2){
 				Uint8 header2[(344 * 256) + 4];
@@ -166,7 +166,7 @@ bool Resources::LoadTiles(Game * game, bool dedicatedserver){
 		progress++;
 		if(game) game->LoadProgressCallback(progress, totalprogressitems);
 		if(headers[i][2]){
-			sprintf(filename, "bin_til/TIL_%.3d.BIN", i);
+			snprintf(filename, sizeof filename, "bin_til/TIL_%.3d.BIN", i);
 			SDL_IOStream * file2 = SDL_IOFromFile((GetResDir() + filename).c_str(), "rb");
 			if(file2){
 				Uint8 header2[(12 * 256) + 4];
