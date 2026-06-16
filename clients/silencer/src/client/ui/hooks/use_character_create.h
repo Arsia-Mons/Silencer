@@ -1,5 +1,7 @@
 #pragma once
 
+#include "ui/runtime/element.h"
+
 #include <functional>
 #include <string>
 
@@ -35,5 +37,15 @@ struct CharacterWizard {
 };
 
 CharacterWizard use_character_create();
+
+// The screen-local provider that owns the wizard cursor's use_state cells and
+// publishes them on CharacterCreateContext (read back by use_character_create()).
+// Declared here so character_create.cppx can mount it via JSX; defined in
+// use_character_create.cpp alongside the reducer.
+struct CharacterCreateProviderProps {
+  const char *key = nullptr;
+  ::ui::UiChildren children = {};
+};
+::ui::UiElement CharacterCreateProvider(const CharacterCreateProviderProps &props);
 
 } // namespace client::ui

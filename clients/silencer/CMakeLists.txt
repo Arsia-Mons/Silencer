@@ -148,6 +148,7 @@ if(SILENCER_UNITY_BUILD)
 		src/client/ui/*.cpp
 		src/client/ui/app_shell/*.cpp
 		src/client/ui/app_shell/navigation/*.cpp
+		src/client/ui/hooks/*.cpp
 		src/client/ui/providers/*.cpp)
 	set_source_files_properties(${_unity_excluded_sources} PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON)
 endif()
@@ -547,6 +548,7 @@ set(_cppx_app_shell_sources
 	src/client/ui/app_shell/client_ui.cpp
 	src/client/ui/app_shell/navigation/screen_stack.cpp
 	src/client/ui/app_theme.cpp
+	src/client/ui/hooks/use_character_create.cpp
 	src/client/ui/providers/app_provider.cpp
 	src/client/ui/providers/chrome_textures_provider.cpp
 	src/client/ui/providers/clock_provider.cpp
