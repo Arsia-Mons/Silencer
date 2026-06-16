@@ -581,6 +581,22 @@ int parse_u8_option(const std::string &value, int fallback, int lo, int hi) {
 // (agent card + upper-right swap over the chat row) beside the right tall
 // cell, joined by the elbow/column hairline seams.
 
+// origin security label (game_select_panel): the u8 → text mapping shown in the
+// Game Options panel. Internal — only the create-options rows use it.
+const char *security_label(uint8_t security) {
+  switch (security) {
+  case 0:
+    return "None";
+  case 1:
+    return "Low";
+  case 2:
+    return "Medium";
+  case 3:
+    return "High";
+  default:
+    return "Medium";
+  }
+}
 
 } // namespace
 
@@ -759,21 +775,6 @@ int parse_u8_option(const std::string &value, int fallback, int lo, int hi) {
       {footer}
     </Box>
   </Box>
-}
-
-const char *security_label(uint8_t security) {
-  switch (security) {
-  case 0:
-    return "None";
-  case 1:
-    return "Low";
-  case 2:
-    return "Medium";
-  case 3:
-    return "High";
-  default:
-    return "Medium";
-  }
 }
 
 std::function<void(const std::string &)> set_u8_text(uint8_t *slot, int lo,

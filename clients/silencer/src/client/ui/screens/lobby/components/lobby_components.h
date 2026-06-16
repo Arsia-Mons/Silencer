@@ -153,6 +153,5 @@ std::vector<::ui::UiElement> map_list_rows(const std::vector<std::string> &maps,
                                            int *map_index, int *hovered_map);
 std::function<void(const std::string &)> set_u8_text(uint8_t *slot, int lo,
                                                      int hi);
-const char *security_label(uint8_t security);
 
 } // namespace client::ui
