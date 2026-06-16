@@ -17,10 +17,6 @@ AmbienceMixer::AmbienceMixer(World & w, Renderer & r, MapDownloader & md, const 
 	currentmusictrack[0] = '\0';
 }
 
-void AmbienceMixer::GetGameChannelName(LobbyGame & lobbygame, char * name){
-	sprintf(name, "#%s-%d", lobbygame.name, lobbygame.id);
-}
-
 void AmbienceMixer::CreateAmbienceChannels(void){
 	const WorldDef& wd = GASLoader::Get().world;
 	const std::string bgchannelbanks[3] = {wd.soundAmbience1, wd.soundAmbience2, wd.soundAmbience3};
