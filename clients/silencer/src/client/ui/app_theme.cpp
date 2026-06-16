@@ -117,6 +117,10 @@ const Theme &app_theme() {
     seed_control(th.button);
     seed_control(th.input);
     seed_control(th.checkbox);
+    // A text field is not a button: holding the pointer on it must not paint a
+    // pressed fill. Drop the pressed patch so click-and-hold leaves the field's
+    // resting (or focused) look untouched.
+    th.input.pressed = {};
     // origin TextInput caret: a 1-virtual-px (1.5 logical) bar in legacy
     // palette idx 140, resolved per screen palette — sprite-chrome screens
     // override the color from use_chrome() via their field style patch.
