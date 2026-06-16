@@ -10,7 +10,7 @@ namespace silencer::game_ui {
 // golden ServerProvider (`shooter::`). Other hooks reach gameplay state through
 // the §7a public Game/World command seam (SIL-8), never a pipeline friend.
 struct Server {
-  Game *game = nullptr;
+    Game *game = nullptr;
 };
 
 Server use_server();
