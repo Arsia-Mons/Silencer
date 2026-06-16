@@ -2,7 +2,7 @@
 
 #include "client/ui/hooks/use_session.h"
 #include "client/ui/screens/character_create/character_create.h"
-#include "client/ui/screens/in_game_screen.h"
+#include "client/ui/screens/in_game/in_game_screen.h"
 #include "client/ui/screens/lobby_connect.h"
 #include "client/ui/screens/lobby_screen.h"
 #include "client/ui/screens/main_menu.h"

@@ -1,4 +1,4 @@
-#include "client/ui/screens/in_game_screen.h"
+#include "client/ui/screens/in_game/components/hud_painters.h"
 
 #include "client/ui/components/layout/layout.h"
 #include "client/ui/components/tokens.h"
@@ -24,15 +24,7 @@
 #include <memory>
 #include <string>
 #include <vector>
-
-// The in-game HUD is a verbatim port of origin's ui/hud/* surfaces
-// (INGAME_SPECS.md): sprites and text pens live at fixed 640x480 device
-// coordinates (absolute placement IS the origin design). All sprite art and
-// palette-resolved text come pre-baked through use_chrome()/use_hud(); this
-// file owns only origin's coordinate arithmetic.
-
 namespace client::ui {
-namespace {
 
 using namespace silencer;
 using ::ui::children;
@@ -44,6 +36,7 @@ using ::ui::components::Text;
 using ::ui::components::TextProps;
 
 using Sprite = ChromeTextures::Sprite;
+namespace {
 
 // Native glyph advances per face (origin text.cpp ResolveTextRenderStyle).
 constexpr int kAdvTiny = 4;
@@ -121,6 +114,7 @@ float L(int d) { return std::ceil(d * 1.5f - 0.25f); }
 int center_pen(int x, int box_w, int len, int advance) {
   return x + (box_w - len * advance) / 2;
 }
+} // namespace
 
 // ---------------------------------------------------------------------------
 // Status sprites + gauges (origin hud_status_sprites.cpp)
@@ -826,84 +820,4 @@ void build_center_message(std::vector<::ui::UiElement> &out, const Hud &hud) {
     }
   }
 }
-
-// ---------------------------------------------------------------------------
-
-struct InGameScreenProps {
-  uint32_t unused = 0;
-};
-
-::ui::UiElement InGameScreenView(const InGameScreenProps &) {
-  PlayerStatus ps = use_player_status();
-  Hud hud = use_hud();
-  Tech tech = use_tech();
-  BuyTech buy_tech = use_buy_tech();
-  IngameChat chat = use_ingame_chat();
-  Teams teams = use_teams();
-  ChromeTextures chrome = use_chrome();
-  Navigation nav = use_navigation();
-
-  // In-match cancel chain (ESC / controller back / the `back` op, via the
-  // UI-layer cancel router). Captured intent closures only — never a Player /
-  // World flag. Priority: close chat compose, else close the buy/tech station,
-  // else push the PauseScreen ("Hit Enter To Quit"). All intents queue.
-  use_cancel([chat, tech, nav]() {
-    if (chat.active) {
-      if (chat.cancel)
-        chat.cancel();
-    } else if (tech.buy_active || tech.tech_active) {
-      if (tech.close)
-        tech.close();
-    } else if (nav.push) {
-      nav.push(std::make_unique<PauseScreen>());
-    }
-  });
-
-  // Scripted mission-end (END_MISSION) pushes the PauseScreen once on the
-  // rising edge of the projected mission-over flag (not a per-frame imperative
-  // check). nav.push queues a deferred mutation, so this is build-safe.
-  bool *prev_mission_over = use_state<bool>(false);
-  if (hud.mission_over && !*prev_mission_over && nav.push)
-    nav.push(std::make_unique<PauseScreen>());
-  *prev_mission_over = hud.mission_over;
-
-  std::vector<::ui::UiElement> kids;
-  if (ps.valid) {
-    // origin BuildInGameHudUi order: system camera -> status sprites ->
-    // readouts -> team strip -> secret panel -> trace timer -> buy/tech ->
-    // chat; then InGameOverlays order: status lines -> top ticker -> center
-    // message -> player list -> quit prompt.
-    build_system_camera(kids, hud, chrome.hud);
-    build_status_sprites(kids, ps, hud, chrome.hud);
-    build_readouts(kids, ps);
-    build_team_strip(kids, hud, chrome.hud);
-    build_secret_overlay(kids, hud, chrome.hud);
-    build_trace_time(kids, hud);
-    if (tech.buy_active || tech.tech_active)
-      build_buy_tech(kids, tech, buy_tech, chrome.hud);
-    build_chat_overlay(kids, chat, chrome.hud, chrome.caret_game);
-    build_status_lines(kids, hud);
-    build_top_ticker(kids, hud);
-    build_center_message(kids, hud);
-    if (teams.showing)
-      build_player_list(kids, hud);
-  }
-
-  ::ui::UiElement hud_root = Box(BoxProps{
-      .key = "hud",
-      .layout = ::ui::LayoutStyle{.width = ::ui::Length::percent(100.0f),
-                                  .height = ::ui::Length::percent(100.0f)},
-      .children = children(std::move(kids))});
-  return <ScreenLayout key="root" variant={ScreenLayoutVariant::Hud}>
-    {hud_root}
-  </ScreenLayout>
-}
-
-} // namespace
-
-::ui::UiElement InGameScreen(const char *key) {
-  return ::ui::component("InGameScreen", InGameScreenProps{}, InGameScreenView,
-                         key);
-}
-
 } // namespace client::ui

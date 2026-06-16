@@ -318,8 +318,9 @@ set(SILENCER_CPPX_SOURCES
 	src/client/ui/screens/lobby_screen.hx
 	# InGameScreen (SIL-21 4/n): the in-match HUD — transparent ScreenLayout(Hud)
 	# over the live world, composed from use_match + use_player_status.
-	src/client/ui/screens/in_game_screen.cppx
-	src/client/ui/screens/in_game_screen.hx
+	src/client/ui/screens/in_game/in_game_screen.cppx
+	src/client/ui/screens/in_game/in_game_screen.hx
+	src/client/ui/screens/in_game/components/hud_painters.cppx
 	# PauseScreen: the in-match "Hit Enter To Quit" affordance as an Overlay
 	# pushed by InGameScreen's use_cancel (and the projected mission-over edge).
 	src/client/ui/screens/pause_screen.cppx
