@@ -10,7 +10,7 @@ class BodyPart : public Object
 {
 public:
 	BodyPart();
-	void Tick(World & world);
+	void Tick(World & world) override;
 	void Serialize(bool write, Serializer & data, Serializer * old = 0) override;
 	Uint8 type;
 	Uint8 suitcolor;
