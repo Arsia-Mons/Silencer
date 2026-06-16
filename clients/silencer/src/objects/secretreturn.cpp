@@ -12,7 +12,7 @@ SecretReturn::SecretReturn() : Object(ObjectTypes::SECRETRETURN){
 	state_i = 0;
 }
 
-void SecretReturn::Tick(World & world){
+void SecretReturn::Tick(World &){
 	for(int i = 0; i < 3; i++){
 		if(state_i % framespeed[i] == 0){
 			frame[i]++;

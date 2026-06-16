@@ -14,7 +14,7 @@ void Bipedal::Serialize(bool write, Serializer & data, Serializer * old){
 	data.Serialize(write, state_warp, old);
 }
 
-void Bipedal::Tick(Object & object, World & world){
+void Bipedal::Tick(Object & object, World &){
 	if(state_warp){
 		if(state_warp <= GASLoader::Get().player.warpNonCollidableTicks){
 			object.collidable = false;

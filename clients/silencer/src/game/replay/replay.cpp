@@ -316,7 +316,7 @@ void Replay::WriteStation(Uint8 peerid, Uint8 action, Uint8 itemid){
 	SDL_WriteIO(file, &itemid, 1);
 }
 
-void Replay::WriteInputCommand(World & world, Uint8 peerid, Serializer & data){
+void Replay::WriteInputCommand(World &, Uint8 peerid, Serializer & data){
 	Uint8 code = RPL_INPUT;
 	SDL_WriteIO(file, &code, 1);
 	SDL_WriteIO(file, &peerid, 1);
