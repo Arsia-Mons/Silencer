@@ -314,8 +314,9 @@ set(SILENCER_CPPX_SOURCES
 	src/client/ui/screens/character_create/components/wizard_components.hx
 	# LobbyScreen (SIL-21 2/n + 3/n): the read cluster + the game-join cluster
 	# (GameSelect/GameCreate/Staging right-column swap over use_games/use_staging).
-	src/client/ui/screens/lobby_screen.cppx
-	src/client/ui/screens/lobby_screen.hx
+	src/client/ui/screens/lobby/lobby_screen.cppx
+	src/client/ui/screens/lobby/lobby_screen.hx
+	src/client/ui/screens/lobby/components/lobby_components.cppx
 	# InGameScreen (SIL-21 4/n): the in-match HUD — transparent ScreenLayout(Hud)
 	# over the live world, composed from use_match + use_player_status.
 	src/client/ui/screens/in_game/in_game_screen.cppx

@@ -1,0 +1,457 @@
+#include "client/ui/screens/lobby/lobby_screen.h"
+
+#include "client/ui/screens/lobby/components/lobby_components.h"
+
+#include "client/ui/components/actions/actions.h"
+#include "client/ui/components/layout/layout.h"
+#include "client/ui/components/layout/lobby_panes.h"
+#include "client/ui/components/layout/pen_grid.h"
+#include "client/ui/components/surfaces/surfaces.h"
+#include "client/ui/components/text/text.h"
+#include "client/ui/hooks/use_app.h"
+#include "client/ui/hooks/use_cancel.h"
+#include "client/ui/hooks/use_characters.h"
+#include "client/ui/hooks/use_games.h"
+#include "client/ui/hooks/use_lobby_chat.h"
+#include "client/ui/hooks/use_progression.h"
+#include "client/ui/hooks/use_chrome.h"
+#include "client/ui/hooks/use_map_previews.h"
+#include "client/ui/hooks/use_session.h"
+#include "client/ui/app_shell/ui_pipeline.h"
+#include "client/ui/hooks/use_staging.h"
+#include "client/ui/screens/character_create_data.h"
+#include "ui/components/box.h"
+#include "ui/components/input.h"
+#include "ui/components/scroll_view.h"
+#include "ui/components/text.h"
+#include "ui/runtime/react.h"
+
+#include <algorithm>
+#include <cmath>
+#include <functional>
+#include <string>
+
+namespace client::ui {
+namespace {
+
+using namespace silencer;
+using ::ui::children;
+using ::ui::components::Box;
+using ::ui::components::BoxProps;
+using ::ui::components::Input;
+using ::ui::components::InputProps;
+using ::ui::components::ScrollView;
+using ::ui::components::ScrollViewProps;
+using ::ui::components::Text;
+using ::ui::components::TextProps;
+
+struct LobbyScreenProps {
+  uint32_t unused = 0;
+};
+
+// --- screen-local state hooks ------------------------------------------------
+// Extracted from LobbyScreenView so the view stays orchestration-only. Each
+// owns its use_state cells (called unconditionally in a fixed order — rules of
+// hooks) and assembles the derived props/closures. Behavior is identical to the
+// previous inline blocks; the absolute hook-slot order differs but is stable
+// per frame, which is all the runtime requires.
+
+// The create-game form: name/password + the six game options and their
+// cycle/set closures, plus the "form open" flag the mode ladders read.
+struct CreateFormState {
+  bool ok = false;
+  bool *show_create = nullptr;
+  const char *name = "";
+  std::function<void(const std::string &)> on_name = {};
+  const char *password = "";
+  std::function<void(const std::string &)> on_password = {};
+  GameCreateOptionsProps options;
+  // Owned cells (kept for make_create_submit; not a *Props struct).
+  std::string *name_cell = nullptr;
+  std::string *password_cell = nullptr;
+  uint8_t *security = nullptr;
+  uint8_t *min_level = nullptr;
+  uint8_t *max_level = nullptr;
+  uint8_t *max_players = nullptr;
+  uint8_t *max_teams = nullptr;
+  bool *spectatable_cell = nullptr;
+};
+
+CreateFormState use_create_form() {
+  CreateFormState s;
+  s.name_cell = use_state<std::string>(std::string("New Game"));
+  s.password_cell = use_state<std::string>(std::string());
+  s.show_create = use_state<bool>(false);
+  s.security = use_state<uint8_t>(2);
+  s.min_level = use_state<uint8_t>(0);
+  s.max_level = use_state<uint8_t>(99);
+  s.max_players = use_state<uint8_t>(24);
+  s.max_teams = use_state<uint8_t>(6);
+  s.spectatable_cell = use_state<bool>(true);
+  if (!s.name_cell || !s.password_cell || !s.show_create || !s.security ||
+      !s.min_level || !s.max_level || !s.max_players || !s.max_teams ||
+      !s.spectatable_cell)
+    return s; // ok stays false
+  s.ok = true;
+  s.name = s.name_cell->c_str();
+  s.on_name = [c = s.name_cell](const std::string &n) { *c = n.substr(0, 31); };
+  s.password = s.password_cell->c_str();
+  s.on_password =
+      [c = s.password_cell](const std::string &n) { *c = n.substr(0, 31); };
+  s.options.security = *s.security;
+  s.options.min_level = *s.min_level;
+  s.options.max_level = *s.max_level;
+  s.options.max_players = *s.max_players;
+  s.options.max_teams = *s.max_teams;
+  s.options.spectatable = *s.spectatable_cell;
+  s.options.cycle_security =
+      [c = s.security]() { *c = (uint8_t)((*c + 1) % 4); };
+  s.options.cycle_spectatable = [c = s.spectatable_cell]() { *c = !*c; };
+  s.options.set_min_level = set_u8_text(s.min_level, 0, 99);
+  s.options.set_max_level = set_u8_text(s.max_level, 0, 99);
+  s.options.set_max_players = set_u8_text(s.max_players, 1, 64);
+  s.options.set_max_teams = set_u8_text(s.max_teams, 1, 16);
+  return s;
+}
+
+// The Create handler bound to this frame's map list + selected index. Mirrors
+// the previous inline on_create closure exactly.
+std::function<void()>
+make_create_submit(const CreateFormState &cf,
+                   std::function<void(CreateGameRequest)> create,
+                   std::vector<std::string> maps, int map_index) {
+  return [create, maps, name_cell = cf.name_cell,
+          password_cell = cf.password_cell, show_create = cf.show_create,
+          security = *cf.security, min_level = *cf.min_level,
+          max_level = *cf.max_level, max_players = *cf.max_players,
+          max_teams = *cf.max_teams, spectatable = *cf.spectatable_cell,
+          idx = map_index < 0 ? 0 : map_index]() {
+    if (create && idx >= 0 && idx < (int)maps.size()) {
+      CreateGameRequest req;
+      req.name = name_cell->empty() ? "New Game" : *name_cell;
+      req.password = *password_cell;
+      req.map = maps[idx];
+      req.security = security;
+      req.min_level = min_level;
+      req.max_level = max_level < min_level ? min_level : max_level;
+      req.max_players = max_players;
+      req.max_teams = max_teams;
+      req.spectatable = spectatable;
+      create(req);
+      *show_create = false; // staging.active takes over once connected
+    }
+  };
+}
+
+// Active-games selection: the screen-local cursor (clamped to the live list) and
+// the fully assembled browser props (info block + join/spectate closures).
+struct GameSelection {
+  bool ok = false;
+  int *sel = nullptr;
+  GameBrowserProps browser;
+};
+
+GameSelection use_game_selection(const Games &games) {
+  GameSelection s;
+  s.sel = use_state<int>(0);
+  if (!s.sel)
+    return s;
+  s.ok = true;
+  const int game_count = (int)games.entries.size();
+  if (*s.sel < 0)
+    *s.sel = 0;
+  if (game_count > 0 && *s.sel > game_count - 1)
+    *s.sel = game_count - 1;
+  const uint32_t sel_id = game_count > 0 ? games.entries[*s.sel].id : 0;
+  const bool sel_joinable = game_count > 0 && games.entries[*s.sel].joinable;
+  const bool sel_spectatable =
+      game_count > 0 && games.entries[*s.sel].spectatable;
+  const GameBrowserEntry *sel_entry =
+      game_count > 0 ? &games.entries[*s.sel] : nullptr;
+  GameBrowserProps gp;
+  gp.entries = games.entries;
+  gp.selected = *s.sel;
+  gp.info_name = ::ui::copy_string(sel_entry ? sel_entry->name.c_str() : "");
+  gp.info_map = ::ui::copy_string(sel_entry ? sel_entry->info_map.c_str() : "");
+  gp.info_security =
+      ::ui::copy_string(sel_entry ? sel_entry->info_security.c_str() : "");
+  gp.info_creator =
+      ::ui::copy_string(sel_entry ? sel_entry->info_creator.c_str() : "");
+  gp.info_limits =
+      ::ui::copy_string(sel_entry ? sel_entry->info_limits.c_str() : "");
+  gp.join_visible = sel_joinable;
+  gp.spectate_visible = sel_spectatable;
+  gp.on_select = [sel = s.sel](int index) { *sel = index; };
+  gp.on_join = [join = games.join_game, sel_id]() {
+    if (join)
+      join(sel_id, std::string());
+  };
+  gp.on_spectate = [spectate = games.spectate_game, sel_id]() {
+    if (spectate)
+      spectate(sel_id);
+  };
+  s.browser = gp;
+  return s;
+}
+
+// SIL-216: the Select-Map cursors (selected + hovered row). Upper bound clamped
+// to the live map list; the hover clears when the create form closes.
+struct MapHover {
+  bool ok = false;
+  int *map_index = nullptr;
+  int *hovered = nullptr;
+};
+
+MapHover use_map_hover_preview(const Games &games, bool creating) {
+  MapHover s;
+  // origin starts with NO map selected (mapSelectedIndex -1, no highlight).
+  s.map_index = use_state<int>(-1);
+  s.hovered = use_state<int>(-1); // SIL-216: row under the cursor (-1 = none)
+  if (!s.map_index || !s.hovered)
+    return s;
+  s.ok = true;
+  const int map_count = (int)games.bundled_maps.size();
+  if (map_count > 0 && *s.map_index > map_count - 1)
+    *s.map_index = map_count - 1;
+  if (!creating && *s.hovered != -1)
+    *s.hovered = -1; // leaving create mode clears the hover
+  return s;
+}
+
+// Resolve the selected agent's agency index from the newline-separated summary
+// ("<alias>\n<agency>  Level N\n..."); the agency name may contain a space, so
+// it runs up to the double-space before "Level". Returns 0 when unparseable.
+int lobby_agency_index(const std::string &summary) {
+  size_t nl = summary.find('\n');
+  if (nl == std::string::npos)
+    return 0;
+  std::string line2 = summary.substr(nl + 1);
+  std::string ag = line2.substr(0, line2.find("  "));
+  for (int i = 0; i < kAgencyCount; ++i)
+    if (ag == kAgencies[i].name)
+      return i;
+  return 0;
+}
+
+// SIL-216: build the cursor-following minimap preview for the hovered row, or
+// empty when nothing is hovered / the minimap isn't baked.
+::ui::UiElement lobby_map_preview(const Games &games,
+                                  const MapPreviews &map_previews,
+                                  const UiPipelineFrame *frame,
+                                  const LobbyPanes &panes, float canvas_w,
+                                  int hovered) {
+  if (hovered < 0 || hovered >= (int)games.bundled_maps.size())
+    return ::ui::empty();
+  const std::string &mf = games.bundled_maps[hovered];
+  uint32_t tex = map_previews.texture_for(mf);
+  if (!tex || !frame)
+    return ::ui::empty();
+  const std::string mn = map_previews.name_for(mf);
+  const std::string md = map_previews.description_for(mf);
+  return MapPreviewOverlay(tex, mn.c_str(), md.c_str(), frame->pointer.x,
+                           frame->pointer.y, panes.pad_x, panes.pad_top,
+                           canvas_w);
+}
+
+::ui::UiElement LobbyScreenView(const LobbyScreenProps &) {
+  Characters chars = use_characters();
+  LobbyChat chat = use_lobby_chat();
+  Games games = use_games();
+  Staging staging = use_staging();
+  Session session = use_session();
+  App app = use_app();
+  Progression prog = use_progression();
+  client::ui::ChromeTextures chrome = use_chrome();
+  // SIL-216: baked per-map minimap previews + the live pointer, for the
+  // cursor-following Select-Map preview. Read unconditionally (stable hooks).
+  MapPreviews map_previews = use_map_previews();
+  const UiPipelineFrame *pipeline_frame = use_ui_pipeline_frame();
+  // Screen-local state, owned by the hooks above (each calls its use_state
+  // cells unconditionally so the hook order stays stable).
+  CreateFormState cf = use_create_form();
+  GameSelection gsel = use_game_selection(games);
+  const bool creating = cf.show_create && *cf.show_create;
+  MapHover mh = use_map_hover_preview(games, creating);
+  if (!cf.ok || !gsel.ok || !mh.ok)
+    return ::ui::empty();
+
+  // Per-call-site text scratch (stable order: computed every frame regardless of
+  // the active panel so the hook sequence never shifts).
+  // The chat transcript wraps to multiple rows and can run past the 192-byte
+  // use_text_storage scratch, so copy it through the per-frame string arena
+  // (copy_string is not a hook — it doesn't shift the hook sequence) to render
+  // the full kLobbyChatLogCap tail.
+  const char *scrollback = ::ui::copy_string(chat.scrollback.c_str());
+  const char *presence = use_text_storage("%s", chat.presence.c_str());
+  const char *ready_label = use_text_storage("%s", staging.ready_label.c_str());
+  const char *chat_title = chat.channel.empty()
+                               ? "Lobby"
+                               : ::ui::copy_string(chat.channel.c_str());
+  const char *map_name =
+      staging.map_name.empty() ? nullptr
+                               : ::ui::copy_string(staging.map_name.c_str());
+  const char *version_text =
+      use_text_storage("v.%s", app.version ? app.version : "");
+  const char *xp_line = use_text_storage("XP %u/100", (unsigned)prog.experience);
+  // selected_summary is newline-separated: "<alias>\n<agency>  Level N\n...".
+  std::string summary_str = chars.selected_summary;
+  std::string name_str = summary_str.substr(0, summary_str.find('\n'));
+  const char *agent_name =
+      use_text_storage("%s", name_str.empty() ? "Agent" : name_str.c_str());
+  const uint32_t emblem_tex =
+      chrome.agency_emblem[lobby_agency_index(summary_str)];
+
+  // Origin's stepped-pane widths reflowed to the live canvas (fixed authored
+  // values at the design canvas; shrink-to-fit below it, e.g. 4:3 windows).
+  // Resolved ONCE per frame; the cell/chat layout helpers take the values.
+  const LobbyPanes panes = resolve_lobby_panes(app.canvas_w);
+
+  // Right-column selection: connected -> Staging; else the create form when the
+  // player opened it; else the games browser. (No screen names a destination —
+  // staging.active is the game-owned connection state surfaced by the hook.)
+  StagingPanelProps sp;
+  sp.roster = staging.roster;
+  sp.ready_label = ready_label;
+  sp.ready_blocked = staging.ready_blocked;
+  sp.on_ready = staging.send_ready;
+  sp.on_team = staging.change_team;
+  bool *tech_open = use_state<bool>(false);
+  int *tech_sel = use_state<int>(0);
+  if (!tech_open || !tech_sel)
+    return ::ui::empty();
+  if (!staging.active && *tech_open)
+    *tech_open = false; // leaving staging closes the tech view
+  if (*tech_sel < 0)
+    *tech_sel = 0;
+  if (!staging.tech.empty() && *tech_sel > (int)staging.tech.size() - 1)
+    *tech_sel = (int)staging.tech.size() - 1;
+  sp.on_tech = [tech_open]() { *tech_open = true; };
+
+  ::ui::UiElement right;
+  if (staging.active && *tech_open) {
+    right = TechUpperPanel([tech_open]() { *tech_open = false; });
+  } else if (staging.active) {
+    right = StagingPanel(sp);
+  } else if (staging.joining) {
+    // SIL-234: hold a stable Connecting panel through the async connect window
+    // (the create form already cleared show_create), so the right column never
+    // flashes the games browser before staging mounts.
+    right = ConnectingPanel();
+  } else if (creating) {
+    right = GameCreatePanel(cf.options);
+  } else {
+    CenterColProps cc;
+    cc.on_create = [show_create = cf.show_create]() { *show_create = true; };
+    right = CenterCol(cc);
+  }
+
+  // The Active-Games browser lives in its own tall right cockpit cell, separate
+  // from the top-row swap above, so it is always built. origin splits the tall
+  // cell into the bordered list BOX (rows only) and the footer (info block +
+  // reserved button slots) below it.
+  ::ui::UiElement right_browser = GameBrowser(gsel.browser);
+  ::ui::UiElement right_footer = GameBrowserFooter(gsel.browser);
+
+  // The right column is the "Select Map" filename list while creating a game,
+  // otherwise the "Active Games" browser.
+  const int map_count = (int)games.bundled_maps.size();
+  std::vector<::ui::UiElement> map_rows =
+      creating ? map_list_rows(games.bundled_maps, mh.map_index, mh.hovered)
+               : std::vector<::ui::UiElement>{};
+  ::ui::UiElement right_cell;
+  if (staging.active && *tech_open) {
+    right_cell = TechListCell(staging, panes.tall_w, *tech_sel,
+                              [tech_sel](int index) { *tech_sel = index; });
+  } else if (staging.active) {
+    right_cell = StagingRosterCell(sp, panes.tall_w);
+  } else if (staging.joining) {
+    // SIL-234: stable Connecting hold for the tall cell (mirrors the right
+    // region above) so the column doesn't flash the games browser mid-connect.
+    right_cell = ConnectingCell(panes.tall_w);
+  } else if (creating) {
+    CreateRightCellProps rc;
+    rc.rows = ::ui::children(map_rows);
+    rc.name = cf.name;
+    rc.on_name = cf.on_name;
+    rc.password = cf.password;
+    rc.on_password = cf.on_password;
+    rc.caret_color = chrome.caret_lobby;
+    rc.tall_w = panes.tall_w;
+    rc.can_create = map_count > 0;
+    rc.on_create = make_create_submit(cf, games.create_game, games.bundled_maps,
+                                      *mh.map_index);
+    right_cell = CreateRightCell(rc);
+  } else {
+    right_cell = ActiveGamesCell(panes.tall_w, right_browser, right_footer);
+  }
+
+  // Go Back backs out one level at a time (matching origin's single top
+  // button): cancel create-mode, else close the tech detail view, else leave
+  // the joined game back to the main lobby. Only when not in a game does it
+  // leave the lobby entirely for the main menu. Hoisted out of the JSX (the
+  // transpiler can't parse a brace-bodied lambda inside an attribute).
+  std::function<void()> on_go_back = [show_create = cf.show_create, tech_open,
+                                      in_game = staging.active,
+                                      leave_game = staging.leave,
+                                      leave_menu = session.leave_to_menu]() {
+    if (*show_create) { *show_create = false; return; }
+    if (in_game && *tech_open) { *tech_open = false; return; }
+    if (in_game) { if (leave_game) leave_game(); return; }
+    if (leave_menu) leave_menu();
+  };
+  // ESC / controller back / the `back` op route through the same Go Back policy
+  // (the reported Lobby bug: ESC did nothing on the phase screen).
+  use_cancel(on_go_back);
+
+  ::ui::UiElement title_bar = LobbyTitleBar(LobbyTitleBarProps{
+      .version_text = version_text, .map_name = map_name, .on_go_back = on_go_back});
+  ::ui::UiElement agent_card = AgentCard(AgentCardProps{
+      .agent_name = agent_name,
+      .xp_line = xp_line,
+      .emblem_tex = emblem_tex,
+      .agent_w = panes.agent_w,
+      .on_agents = session.open_character_create});
+  ::ui::UiElement chat_panel = ::ui::component(
+      "LobbyChatPanel",
+      LobbyChatPanelProps{
+          .key = "chatPanel",
+          .title = chat_title,
+          .scrollback = scrollback,
+          .presence = presence,
+          .send = chat.send,
+          .caret_color = chrome.caret_lobby,
+          .pregame = staging.active,
+          .chat_w = panes.chat_w},
+      LobbyChatPanel);
+
+  ::ui::UiElement grid = LobbyPaneGrid(LobbyPaneGridProps{
+      .panes = panes,
+      .agent_card = agent_card,
+      .upper_right = right,
+      .chat_panel = chat_panel,
+      .right_cell = right_cell});
+
+  // SIL-216: the cursor-following minimap preview over the Select Map list. Only
+  // while creating a game, when a row is hovered and its minimap baked. Reads the
+  // live pointer (logical canvas space) so the card tracks the cursor. (The hover
+  // is cleared on leaving create mode inside use_map_hover_preview.)
+  ::ui::UiElement map_preview =
+      creating ? lobby_map_preview(games, map_previews, pipeline_frame, panes,
+                                   app.canvas_w, *mh.hovered)
+               : ::ui::empty();
+
+  return <ScreenLayout key="root" variant={ScreenLayoutVariant::Game}>
+    {title_bar}
+    {grid}
+    {map_preview}
+  </ScreenLayout>
+}
+
+} // namespace
+
+::ui::UiElement LobbyScreen(const char *key) {
+  return ::ui::component("LobbyScreen", LobbyScreenProps{}, LobbyScreenView,
+                         key);
+}
+
+} // namespace client::ui
