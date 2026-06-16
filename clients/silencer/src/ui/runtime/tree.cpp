@@ -32,10 +32,17 @@ UiTree::UiTree() = default;
 UiTree::~UiTree() { reset(); }
 
 void UiTree::reset() {
+  // destroy_node already resets each used slot to a default Node, and the
+  // invariant that only ensure_node dirties a slot (bumping node_capacity_used_)
+  // means every slot at/after node_capacity_used_ is already default. So the
+  // array is fully cleared by the loop alone. Do NOT bulk-assign `nodes_ = {}`:
+  // nodes_ is std::array<Node, 1024> (~8.7 MB), and the braced assignment
+  // materializes a value-initialized temporary of that size on the stack,
+  // overflowing the 8 MB main-thread stack and crashing in ~UiTree (SIGSEGV at
+  // the stack guard page) on shutdown.
   for (int i = 0; i < node_capacity_used_; ++i) {
     destroy_node(nodes_[i]);
   }
-  nodes_ = {};
   stack_ = {};
   unmounted_ = {};
   node_capacity_used_ = 0;
