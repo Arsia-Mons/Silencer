@@ -96,7 +96,7 @@ constexpr ::ui::Color kDialogFallbackFill = {12, 4, 4, 255};    // connect dialo
 constexpr ::ui::Color kEmblemFallbackFill = {40, 70, 150, 255}; // agent-card emblem slot
 
 // ---- In-game HUD exact-color text keys (variant faces baked on palette
-// page 0 — origin LegacyPalette(color, brightness) per INGAME_SPECS.md).
+// page 0 — origin LegacyPalette(color, brightness)).
 // The KEY is an arbitrary unique id; the baked pixels are origin's.
 constexpr ::ui::Color kTextHudDefault = {61, 233, 61, 255};  // (0, 128)
 constexpr ::ui::Color kTextHudBright = {62, 234, 62, 255};   // (0, 136) chat/hack/trace

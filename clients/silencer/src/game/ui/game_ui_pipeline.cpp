@@ -845,7 +845,7 @@ void GameUiPipeline::BakeChromeTextures(int rw, int rh, float uiScale,
             // (LegacyPalette(129, 144, ramp)).
             {0, 133, 6.f, 11.f, Fx::Raw, 0, 64, 2, silencer::tokens::kTextTechDim},
             {0, 133, 6.f, 11.f, Fx::Ramp, 129, 144, 2, silencer::tokens::kTextTechSlots},
-            // ---- in-game HUD (presentation palette page 0, INGAME_SPECS.md) ----
+            // ---- in-game HUD (presentation palette page 0) ----
             {3, 132, 4.f, 7.f, Fx::Raw, 0, 128, 0, silencer::tokens::kTextHudDefault},
             {3, 132, 4.f, 7.f, Fx::Color, 202, 128, 0, silencer::tokens::kTextHudCredits},
             {3, 132, 4.f, 7.f, Fx::Color, 161, 128, 0, silencer::tokens::kTextHudHealth},

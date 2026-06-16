@@ -749,8 +749,7 @@ void build_center_message(std::vector<::ui::UiElement> &out, const Hud &hud) {
   if (!hud.message_i || hud.message.empty())
     return;
   // Only type<10 (Title-face, color from the table) is ported — those are the
-  // golden-covered types; >=10 use MessageTitle/Subtitle faces (no goldens,
-  // PARITY.md tracks).
+  // golden-covered types; >=10 use MessageTitle/Subtitle faces (no goldens yet).
   // origin's type table (InGameOverlays.cpp DrawMessage): palette color + y.
   struct MsgStyle { uint8_t type, color; int liney; };
   static const MsgStyle kMsgStyles[] = {{1, 128, 190}, {2, 128, 60},

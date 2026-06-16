@@ -77,7 +77,7 @@ SDL_Color unpremultiply(::ui::Color c) {
 // round(atlas_h*gscale)) — same letter, byte-identical pixels anywhere on
 // screen. This deliberately diverges from origin, whose whole-frame nearest
 // magnify striped glyphs by absolute position (golden supersession documented
-// in ORIGIN_GOLDENS.md / PARITY.md). The pen still accumulates the DESIGN
+// in ORIGIN_GOLDENS.md). The pen still accumulates the DESIGN
 // metric (advance * gscale, fractional) and only snaps per glyph, so string
 // widths, wraps and centering keep origin's layout exactly (a uniform integer
 // advance was tried and re-wrapped prose out of its fixed containers).
