@@ -364,7 +364,7 @@ void Guard::InitBT(){
 		return BTResult::Running;
 	};
 
-	btctx_.actions["Stand"] = [this](BTContext&) -> BTResult {
+	btctx_.actions["Stand"] = [](BTContext&) -> BTResult {
 		return BTResult::Success;
 	};
 

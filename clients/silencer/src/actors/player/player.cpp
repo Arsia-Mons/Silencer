@@ -581,10 +581,8 @@ void Player::Tick(World & world){
 				if(state != DEAD && state != DYING){
 					peer->stats.secretsreturned++;
 					Team * team = GetTeam(world);
-					bool stolen = false;
 					if(team && secretteamid != team->id){
 						peer->stats.secretsstolen++;
-						stolen = true;
 					}
 				}else{
 					char text[128];
@@ -2881,7 +2879,7 @@ void Player::HandleDisconnect(World & world, Uint8 peerid){
 	}
 }
 
-void Player::OnDestroy(World & world){
+void Player::OnDestroy(World &){
 	if(ai){
 		delete ai;
 		ai = 0;
@@ -3801,7 +3799,7 @@ Projectile * Player::Fire(World & world, Uint8 direction){
 	return projectile;
 }
 
-bool Player::FireDelayPassed(World & world){
+bool Player::FireDelayPassed(World &){
 	if(weaponfirecool == 0){
 		return true;
 	}

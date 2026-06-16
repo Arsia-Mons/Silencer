@@ -1768,7 +1768,7 @@ void Renderer::DrawDebug(Surface * surface){
 	}
 }
 
-void Renderer::DrawScaled(Surface * src, Rect * srcrect, Surface *dst, Rect * dstrect, int factor){
+void Renderer::DrawScaled(Surface * src, Rect *, Surface *dst, Rect * dstrect, int factor){
 	for(int y = 0, y2 = 0; y < src->h; y += factor, y2++){
 		for(int x = 0, x2 = 0; x < src->w; x += factor, x2++){
 			Uint8 color = GetPixel(src, x, y);
@@ -1779,7 +1779,7 @@ void Renderer::DrawScaled(Surface * src, Rect * srcrect, Surface *dst, Rect * ds
 	}
 }
 
-void Renderer::DrawCheckered(Surface * src, Rect * srcrect, Surface * dst, Rect * dstrect){
+void Renderer::DrawCheckered(Surface * src, Rect *, Surface * dst, Rect * dstrect){
 	if(src->w % 2 == 0){
 		for(int y = 0; y < src->h; y++){
 			for(int x = y % 2; x < src->w; x += 2){
@@ -1806,7 +1806,7 @@ void Renderer::DrawCheckered(Surface * src, Rect * srcrect, Surface * dst, Rect 
 	}
 }
 
-void Renderer::DrawColored(Surface * src, Rect * srcrect, Surface * dst, Rect * dstrect){
+void Renderer::DrawColored(Surface * src, Rect *, Surface * dst, Rect * dstrect){
 	for(int y = 0; y < src->h; y++){
 		for(int x = 0; x < src->w; x++){
 			Uint8 srcpixel = GetPixel(src, x, y);
@@ -1818,7 +1818,7 @@ void Renderer::DrawColored(Surface * src, Rect * srcrect, Surface * dst, Rect * 
 	}
 }
 
-void Renderer::DrawRampColored(Surface * src, Rect * srcrect, Surface * dst, Rect * dstrect){
+void Renderer::DrawRampColored(Surface * src, Rect *, Surface * dst, Rect * dstrect){
 	for(int y = 0; y < src->h; y++){
 		for(int x = 0; x < src->w; x++){
 			Uint8 srcpixel = GetPixel(src, x, y);
@@ -1830,7 +1830,7 @@ void Renderer::DrawRampColored(Surface * src, Rect * srcrect, Surface * dst, Rec
 	}
 }
 
-void Renderer::DrawBrightened(Surface * src, Rect * srcrect, Surface * dst, Rect * dstrect, Uint8 brightness){
+void Renderer::DrawBrightened(Surface * src, Rect *, Surface * dst, Rect * dstrect, Uint8 brightness){
 	for(int y = 0; y < src->h; y++){
 		for(int x = 0; x < src->w; x++){
 			Uint8 srcpixel = GetPixel(src, x, y);
@@ -1842,7 +1842,7 @@ void Renderer::DrawBrightened(Surface * src, Rect * srcrect, Surface * dst, Rect
 	}
 }
 
-void Renderer::DrawAlphaed(Surface * src, Rect * srcrect, Surface * dst, Rect * dstrect){
+void Renderer::DrawAlphaed(Surface * src, Rect *, Surface * dst, Rect * dstrect){
 	for(int y = 0; y < src->h; y++){
 		for(int x = 0; x < src->w; x++){
 			Uint8 srcpixel = GetPixel(src, x, y);
@@ -1860,7 +1860,7 @@ Surface * Renderer::CreateSurfaceCopy(Surface * src){
 	return effectsurface;
 }
 
-void Renderer::EffectHacking(Surface * dst, Rect * dstrect, Uint8 color){
+void Renderer::EffectHacking(Surface * dst, Rect *, Uint8 color){
 	Uint8 index = state_i % 8;
 	if(index == 0){
 		ex = (rand() % 64);
@@ -1880,7 +1880,7 @@ void Renderer::EffectHacking(Surface * dst, Rect * dstrect, Uint8 color){
 	}
 }
 
-void Renderer::EffectTeamColor(Surface * dst, Rect * dstrect, Uint8 values, bool robot, bool ui){
+void Renderer::EffectTeamColor(Surface * dst, Rect *, Uint8 values, bool robot, bool ui){
 	// Palette dark-range (2-113): ambient-darkened. Lit-range (114-255): always vivid.
 	// Most group anchors are at bc*16 but yellow (bc=9/2) is pale cream at that index.
 	// Use idx 28/140 instead — both are RGB(252,252,0) pure saturated yellow.
@@ -2014,7 +2014,7 @@ void Renderer::EffectRampColorPlus(Surface * dst, Rect * dstrect, Uint8 color, U
     }
 }
 
-void Renderer::EffectHit(Surface * dst, Rect * dstrect, Uint8 hitx, Uint8 hity, Uint8 state_hit){
+void Renderer::EffectHit(Surface * dst, Rect *, Uint8 hitx, Uint8 hity, Uint8 state_hit){
 	Uint8 hit_type = state_hit / 32;
 	Uint8 index = (state_hit % 32) - 1;
 	if(index > 7){
@@ -2058,7 +2058,7 @@ void Renderer::EffectHit(Surface * dst, Rect * dstrect, Uint8 hitx, Uint8 hity, 
 	}
 }
 
-void Renderer::EffectShieldDamage(Surface * dst, Rect * dstrect, Uint8 color){
+void Renderer::EffectShieldDamage(Surface * dst, Rect *, Uint8 color){
 	// 177:0-7 is shield damage stencil
 	for(int y = 0; y < dst->h; y++){
 		for(int x = 0; x < dst->w; x++){
@@ -2071,7 +2071,7 @@ void Renderer::EffectShieldDamage(Surface * dst, Rect * dstrect, Uint8 color){
 	}
 }
 
-void Renderer::EffectWarp(Surface * dst, Rect * dstrect, Uint8 state_warp){
+void Renderer::EffectWarp(Surface * dst, Rect *, Uint8 state_warp){
 	Uint8 index = 7;
 	int yoffset = (state_warp - 8) * 12;
 	if(state_warp >= 12){
@@ -2135,7 +2135,7 @@ void Renderer::MiniMapCircle(int x, int y, Uint8 color){
 	DrawCircle(&world.map.minimap.surface, x1, y1, radius, newcolor);
 }
 
-void Renderer::DrawMirrored(Surface * src, Rect * srcrect, Surface * dst, Rect * dstrect){
+void Renderer::DrawMirrored(Surface * src, Rect *, Surface * dst, Rect * dstrect){
 	int srch = src->h;
 	int srcw = src->w;
 	int dstrectx = dstrect->x;
