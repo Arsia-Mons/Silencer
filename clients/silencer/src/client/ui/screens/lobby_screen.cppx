@@ -1392,23 +1392,81 @@ struct LobbyChatComposeProps {
   />
 }
 
-// The chat transcript: a single multi-line Text in the Message face. Unlike the
-// single-line BodyText, it WRAPS long messages within the log column and honors
-// the '\n' the model joins messages with (one message per row). Width is pinned
-// to the column (percent 100% inside logcol, which has flex_grow + min_width 0)
-// so wrapped lines never overlap the presence column; logcol's overflow Hidden
-// clips it to the well.
-::ui::UiElement chat_transcript(const char *scrollback) {
+// The scrollable chat transcript. The log column is the scroll VIEWPORT (overflow
+// Hidden, focusable so the wheel routes to it — only focusables get hover/wheel,
+// like ScrollView). The transcript Text (Message face, word-wrapped, one message
+// per '\n') rides in a bottom-anchored ABSOLUTE track so the NEWEST line is always
+// pinned to the bottom: at rest (scroll 0) `position_inset.bottom = 0` keeps the
+// latest message flush with the bottom edge and overflow:Hidden clips the oldest
+// off the top. The wheel scrolls UP into history by pushing the track DOWN
+// (bottom = -scroll), and because the anchor is the bottom, new messages arriving
+// while scrolled up don't yank the view — and once back at scroll 0 it auto-sticks
+// to the newest. `scroll` is px above the bottom, clamped to a generous line-count
+// estimate (the exact wrapped pixel height isn't known until layout).
+struct ChatLogProps {
+  const char *key = nullptr;
+  const char *scrollback = "";
+};
+
+::ui::UiElement ChatLog(const ChatLogProps &props) {
+  float *scroll = use_state<float>(0.0f);
+  if (!scroll)
+    return ::ui::empty();
+
+  int lines = 1;
+  for (const char *p = props.scrollback ? props.scrollback : ""; *p; ++p)
+    if (*p == '\n')
+      ++lines;
+  const float max_scroll = (float)lines * tokens::kLineBody;
+  if (*scroll > max_scroll)
+    *scroll = max_scroll;
+  if (*scroll < 0.0f)
+    *scroll = 0.0f;
+
+  std::function<void(const ::ui::WheelEvent &)> on_wheel =
+      [scroll, max_scroll](const ::ui::WheelEvent &e) {
+        // +dy = wheel up = reveal older history (scroll up); down returns to the
+        // newest. One line per wheel notch.
+        float v = *scroll + e.dy * tokens::kLineBody;
+        if (v < 0.0f)
+          v = 0.0f;
+        if (v > max_scroll)
+          v = max_scroll;
+        *scroll = v;
+      };
+
   ::ui::StylePatch st =
       tokens::text_patch(tokens::kTextBodyMuted, tokens::kFontBodyEm,
                          tokens::kFaceBody, tokens::kLineBody);
   st.text.value.wrap = ::ui::TextWrap::Words;
-  return <Text
-    key="log"
-    value={scrollback}
-    layout={::ui::LayoutStyle{.width = ::ui::Length::percent(100.0f)}}
-    style={st}
-  />
+
+  ::ui::LayoutStyle track = {};
+  track.position = ::ui::PositionType::Absolute;
+  track.position_inset.left = ::ui::StyleValue::points(0.0f);
+  track.position_inset.right = ::ui::StyleValue::points(0.0f);
+  track.position_inset.bottom = ::ui::StyleValue::points(-*scroll);
+
+  return <Box
+    key={props.key}
+    focusable={true}
+    onWheel={on_wheel}
+    layout={::ui::LayoutStyle{
+      .position = ::ui::PositionType::Relative,
+      .overflow = ::ui::Overflow::Hidden,
+      .align_items = ::ui::AlignItems::Start,
+      .min_width = ::ui::Length::points(0.0f),
+      .flex_basis = ::ui::Length::points(0.0f),
+      .flex_grow = ::ui::StyleFloat::points(1.0f)}}
+  >
+    <Box key="track" layout={track}>
+      <Text
+        key="log"
+        value={props.scrollback}
+        layout={::ui::LayoutStyle{.width = ::ui::Length::percent(100.0f)}}
+        style={st}
+      />
+    </Box>
+  </Box>
 }
 
 // The lower-left chat panel: channel title, log well + presence column, and the
@@ -1446,17 +1504,7 @@ struct LobbyChatPanelProps {
         .gap = 12.0f}}
       style={tokens::frame_patch(tokens::kInsetStroke)}
     >
-      <Box
-        key="logcol"
-        layout={::ui::LayoutStyle{
-          .overflow = ::ui::Overflow::Hidden,
-          .align_items = ::ui::AlignItems::Start,
-          .min_width = ::ui::Length::points(0.0f),
-          .flex_basis = ::ui::Length::points(0.0f),
-          .flex_grow = ::ui::StyleFloat::points(1.0f)}}
-      >
-        {chat_transcript(props.scrollback)}
-      </Box>
+      <ChatLog key="logcol" scrollback={props.scrollback} />
       <Box
         key="prescol"
         layout={::ui::LayoutStyle{

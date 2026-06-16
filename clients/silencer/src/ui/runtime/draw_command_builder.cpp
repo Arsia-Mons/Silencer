@@ -443,7 +443,8 @@ bool append_text(DrawCommandList &list, const NodeSnapshot &node,
 // (design §10.5) — never the old kCharWidth=8 hack — so the cursor lands exactly
 // under the glyph the same measurer laid out.
 bool append_input_contents(DrawCommandList &list, const NodeSnapshot &node,
-                           bool focused, bool inherited_disabled) {
+                           bool focused, bool inherited_disabled,
+                           InputScrollStore *input_scroll) {
   if (node.role != NodeRole::Input)
     return true;
 
@@ -486,11 +487,69 @@ bool append_input_contents(DrawCommandList &list, const NodeSnapshot &node,
                             font_size, line_height);
   };
 
+  // Single-line horizontal scroll (origin TextInput behavior): window the value
+  // so the caret stays visible — a value longer than the box scrolls instead of
+  // overflowing. The window leaves a caret-width sliver at the right edge so the
+  // end-of-text caret isn't clipped. An UNFOCUSED field shows from its start.
+  float caret_w =
+      node.visual.caret.width > 0.f ? node.visual.caret.width : kCaretWidth;
+  float caret_px = advance_to(clamp_int(node.text_edit.caret, 0, length));
+  float full_w = advance_to(display_length);
+  float visible_w = text_rect.width - caret_w;
+  if (visible_w < 0.f)
+    visible_w = 0.f;
+  float max_scroll = full_w - visible_w;
+  if (max_scroll < 0.f)
+    max_scroll = 0.f;
+  float scroll_x = 0.f;
+  if (focused && input_scroll) {
+    // Stateful minimal scroll: shift the window only when the caret would fall
+    // off an edge, so arrowing left through visible text keeps the rightmost
+    // glyph in view (the window doesn't chase the caret until it hits an edge).
+    auto it = input_scroll->find(node.id);
+    float prev = it != input_scroll->end() ? it->second : 0.f;
+    if (caret_px < prev)
+      prev = caret_px; // caret left of the window -> reveal left
+    else if (caret_px > prev + visible_w)
+      prev = caret_px - visible_w; // caret right of the window -> reveal right
+    if (prev > max_scroll)
+      prev = max_scroll;
+    if (prev < 0.f)
+      prev = 0.f;
+    (*input_scroll)[node.id] = prev;
+    scroll_x = prev;
+  } else if (focused) {
+    // Stateless right-pin fallback (no store, e.g. tests/goldens): keep the
+    // caret glued to the right edge once the value overflows.
+    scroll_x = caret_px - visible_w;
+    if (scroll_x < 0.f)
+      scroll_x = 0.f;
+  } else if (input_scroll) {
+    input_scroll->erase(node.id); // drop stale offset; unfocused shows the head
+  }
+
+  // Clip the value/selection/caret to the content window so the scrolled text
+  // never bleeds past the field's edges. The border was already painted (it runs
+  // before input contents), so this only scissors the glyphs.
+  Rect clip_rect = {};
+  clip_rect.x = text_rect.x;
+  clip_rect.y = node.layout.y;
+  clip_rect.width = text_rect.width;
+  clip_rect.height = node.layout.height;
+  {
+    DrawCommand clip = {};
+    clip.kind = DrawCommandKind::ClipPush;
+    clip.node_id = node.id;
+    clip.rect = to_draw_rect(clip_rect);
+    if (!list.push(clip))
+      return false;
+  }
+
   if (focused && selection_end > selection_start) {
     float start_x = advance_to(selection_start);
     float end_x = advance_to(selection_end);
     Rect sel = {};
-    sel.x = text_rect.x + start_x;
+    sel.x = text_rect.x + start_x - scroll_x;
     sel.y = text_rect.y;
     sel.width = end_x - start_x;
     sel.height = text_rect.height;
@@ -503,7 +562,9 @@ bool append_input_contents(DrawCommandList &list, const NodeSnapshot &node,
           ? node.visual.text.color
           : ((node.interaction.disabled || inherited_disabled) ? kTextDisabledFill
                                                                : kTextFill);
-  if (!push_text_command(list, node.id, text_rect, display_value, text_color,
+  Rect value_rect = text_rect;
+  value_rect.x -= scroll_x;
+  if (!push_text_command(list, node.id, value_rect, display_value, text_color,
                          font_size, TextAlign::Left))
     return false;
 
@@ -520,7 +581,7 @@ bool append_input_contents(DrawCommandList &list, const NodeSnapshot &node,
     const Caret &ck = node.visual.caret;
     float ascent = measured_ascent(font_id, font_size, line_height);
     Rect caret_rect = {};
-    caret_rect.x = text_rect.x + caret_x;
+    caret_rect.x = text_rect.x + caret_x - scroll_x;
     caret_rect.width = ck.width > 0.f ? ck.width : kCaretWidth;
     if (ascent > 0.f) {
       caret_rect.height = ascent;
@@ -536,6 +597,14 @@ bool append_input_contents(DrawCommandList &list, const NodeSnapshot &node,
     }
     Color caret_color = ck.color.a > 0 ? ck.color : kCaretFill;
     if (!push_rect_command(list, node.id, caret_rect, caret_color, 0.0f))
+      return false;
+  }
+
+  {
+    DrawCommand clip = {};
+    clip.kind = DrawCommandKind::ClipPop;
+    clip.node_id = node.id;
+    if (!list.push(clip))
       return false;
   }
   return true;
@@ -582,7 +651,8 @@ bool pop_clip(DrawCommandList &list, const NodeSnapshot &node) {
 }
 
 bool append_node(const UiTree &tree, DrawCommandList &list, NodeId id,
-                 bool inherited_disabled, NodeId focused_id) {
+                 bool inherited_disabled, NodeId focused_id,
+                 InputScrollStore *input_scroll) {
   NodeSnapshot node = {};
   if (!tree.snapshot(id, &node))
     return false;
@@ -610,14 +680,16 @@ bool append_node(const UiTree &tree, DrawCommandList &list, NodeId id,
       !append_image(list, node) ||
       !append_frame(list, node, focused) ||
       !append_text(list, node, inherited_disabled) ||
-      !append_input_contents(list, node, focused, inherited_disabled))
+      !append_input_contents(list, node, focused, inherited_disabled,
+                             input_scroll))
     return false;
 
   const bool clip = node.style.overflow != Overflow::Visible;
   if (clip && !push_clip(list, node))
     return false;
   for (int i = 0; i < tree.child_count(id); ++i) {
-    if (!append_node(tree, list, tree.child_at(id, i), disabled, focused_id))
+    if (!append_node(tree, list, tree.child_at(id, i), disabled, focused_id,
+                     input_scroll))
       return false;
   }
   if (clip && !pop_clip(list, node))
@@ -631,11 +703,12 @@ bool append_node(const UiTree &tree, DrawCommandList &list, NodeId id,
 } // namespace
 
 bool build_draw_command_list(const UiTree &tree, DrawCommandList *out,
-                             NodeId focused_id) {
+                             NodeId focused_id, InputScrollStore *input_scroll) {
   if (!out || !tree.contains(tree.root_id()))
     return false;
   out->reset();
-  return append_node(tree, *out, tree.root_id(), false, focused_id) &&
+  return append_node(tree, *out, tree.root_id(), false, focused_id,
+                     input_scroll) &&
          out->error_count == 0;
 }
 

@@ -255,7 +255,7 @@ bool ClientUi::update_retained_runtime(const ::ui::FlexLayoutAdapter &layout,
   // Build the tagged-union IR that the live render path executes via
   // renderer::execute_draw_commands.
   return ::ui::build_draw_command_list(retained_tree_, &retained_command_list_,
-                                       active);
+                                       active, &input_scroll_);
 }
 
 bool ClientUi::push_screen(std::unique_ptr<UiScreen> screen) {

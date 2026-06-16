@@ -101,6 +101,30 @@ float aligned_x(::ui::TextAlign align, float line_w, float box_w) {
   }
 }
 
+bool is_utf8_cont(char c) {
+  return (static_cast<unsigned char>(c) & 0xC0) == 0x80;
+}
+
+// Largest byte prefix [from, from+k) of s (k >= 1, landing on a UTF-8 char
+// boundary) whose advance fits box_w. Used to hard-break a run with no break
+// opportunity (a long unspaced token) so it wraps within the column instead of
+// overflowing. Always returns >= one whole char so wrapping makes progress.
+uint32_t char_fit(const RunMetrics &m, const char *s, uint32_t from,
+                  uint32_t end, float box_w) {
+  uint32_t k = 1;
+  while (from + k < end && is_utf8_cont(s[from + k]))
+    ++k; // first whole char (>= 1 byte)
+  while (from + k < end) {
+    uint32_t next = k + 1;
+    while (from + next < end && is_utf8_cont(s[from + next]))
+      ++next;
+    if (advance_of(m, s + from, next) > box_w)
+      break;
+    k = next;
+  }
+  return k;
+}
+
 bool push_line(::ui::TextMetricsResult &out, uint32_t slice_off,
                uint32_t slice_len, float x, float y, float w, float h) {
   if (out.line_count >= ::ui::UI_MAX_TEXT_LINES)
@@ -151,7 +175,7 @@ bool wrap_paragraph(::ui::TextMetricsResult &out, const RunMetrics &m,
         break;
       }
       float w = advance_of(m, s + line_start, word_end - line_start);
-      if (w <= box_w || !placed) {
+      if (w <= box_w) {
         last_fit_end = word_end;
         placed = true;
         scan = word_end;
@@ -160,6 +184,21 @@ bool wrap_paragraph(::ui::TextMetricsResult &out, const RunMetrics &m,
           break;
         }
       } else {
+        // The line-so-far plus this word overflows. A word wider than the whole
+        // column can never fit alone, so hard-break it at the char boundary that
+        // fills the remaining space (`char_fit` measures from line_start, so the
+        // placed words stay and the long run flows on from them) — e.g. a chat
+        // line "name: a;b;c;..." keeps the message on the name's line and wraps
+        // within the column instead of overflowing. Also char-break when nothing
+        // has been placed yet so a too-long first word still makes progress.
+        // Otherwise wrap the whole word to the next line (greedy word wrap).
+        float word_w = advance_of(m, s + word_start, word_end - word_start);
+        if (word_w > box_w || !placed) {
+          uint32_t fit = char_fit(m, s, line_start, end, box_w);
+          if (line_start + fit > last_fit_end)
+            last_fit_end = line_start + fit;
+          placed = true;
+        }
         next_line_start = last_fit_end;
         while (next_line_start < end && s[next_line_start] == ' ')
           ++next_line_start;

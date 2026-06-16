@@ -66,6 +66,10 @@ public:
     // key/text edges here; RenderCppxClientUiFrame consumes it, then clears the
     // one-frame edges.
     ::ui::UiInputFrame &UiInput() { return uiInput_; }
+    // True while the focused cppx node is a text field (mirrors the SDL text-input
+    // gate). events.cpp reads it to keep SPACE out of the confirm/activate edge
+    // when typing — a focused field types a space; only Enter submits.
+    bool WantsTextInput() const { return textInputActive_; }
     // Inject a single-frame pointer click (press+release) at a UI-space point, so
     // the control socket can activate a node by location.
     void InjectPointerClick(float x, float y);

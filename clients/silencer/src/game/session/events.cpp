@@ -144,9 +144,17 @@ bool Game::HandleSDLEvents() {
                 break;
             case SDLK_RETURN:
             case SDLK_KP_ENTER:
-            case SDLK_SPACE:
                 ui.confirm_pressed = true;
                 ui.confirm_down = true;
+                break;
+            // SPACE confirms/activates buttons, but inside a focused text field it
+            // must type a space (via SDL_EVENT_TEXT_INPUT), not submit. Only Enter
+            // submits.
+            case SDLK_SPACE:
+                if (!gameUiPipeline.WantsTextInput()) {
+                    ui.confirm_pressed = true;
+                    ui.confirm_down = true;
+                }
                 break;
             case SDLK_ESCAPE:
                 ui.cancel_pressed = true;

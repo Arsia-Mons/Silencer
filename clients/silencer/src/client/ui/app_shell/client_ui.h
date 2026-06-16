@@ -130,6 +130,11 @@ private:
   // frame's focus pass, published to the tree so the owning ScrollView reacts
   // (one-frame lag, by design — matches interaction_snapshot_).
   ::ui::FocusScrollRequest focus_scroll_request_ = {};
+  // Persistent per-input horizontal scroll offsets (keyed by node id) so a
+  // focused single-line field scrolls minimally — the window moves only when the
+  // caret leaves it. Owned here so it survives across frames; the IR builder
+  // reads + updates it. (See draw_command_builder.h InputScrollStore.)
+  ::ui::InputScrollStore input_scroll_ = {};
   // Last frame's hovered node — drives the on_hover enter/leave edge dispatch.
   ::ui::NodeId prev_hovered_node_ = 0;
   std::array<QueuedMutation, CLIENT_UI_MAX_QUEUED_MUTATIONS> mutations_ = {};

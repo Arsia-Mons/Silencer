@@ -10,9 +10,20 @@
 #include "draw_command.h"
 #include "tree.h"
 
+#include <unordered_map>
+
 namespace ui {
 
+// Persistent per-input horizontal scroll offsets (logical px), keyed by node id
+// and owned by the caller ACROSS frames. With it the focused single-line field
+// scrolls MINIMALLY — the window only shifts when the caret would leave it, so
+// arrowing left keeps the rightmost glyph in view instead of dragging the whole
+// value with the caret. Pass nullptr (the default, e.g. tests/goldens) for the
+// stateless right-pinned fallback.
+using InputScrollStore = std::unordered_map<NodeId, float>;
+
 bool build_draw_command_list(const UiTree &tree, DrawCommandList *out,
-                             NodeId focused_id = 0);
+                             NodeId focused_id = 0,
+                             InputScrollStore *input_scroll = nullptr);
 
 } // namespace ui
