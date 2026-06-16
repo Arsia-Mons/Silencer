@@ -289,16 +289,16 @@ set(SILENCER_CPPX_SOURCES
 	src/client/ui/screens/password_modal.hx
 	# Options cluster (SIL-19): the root + Audio/Display sub-screens are Overlays
 	# pushed via use_navigation; they live-preview use_settings (Cancel reverts).
-	src/client/ui/screens/options_screen.cppx
-	src/client/ui/screens/options_screen.hx
-	src/client/ui/screens/options_audio.cppx
-	src/client/ui/screens/options_audio.hx
-	src/client/ui/screens/options_display.cppx
-	src/client/ui/screens/options_display.hx
+	src/client/ui/screens/options/options_screen.cppx
+	src/client/ui/screens/options/options_screen.hx
+	src/client/ui/screens/options/options_audio.cppx
+	src/client/ui/screens/options/options_audio.hx
+	src/client/ui/screens/options/options_display.cppx
+	src/client/ui/screens/options/options_display.hx
 	# OptionsControls (SIL-19 part B): rows-of-combos + multi-device keybind
 	# capture (use_keybind_capture).
-	src/client/ui/screens/options_controls.cppx
-	src/client/ui/screens/options_controls.hx
+	src/client/ui/screens/options/options_controls.cppx
+	src/client/ui/screens/options/options_controls.hx
 	# Lobby phase screens (SIL-20): LobbyConnect (connect/auth via the game-tick
 	# connect flow + use_lobby_session) and MissionSummary (use_progression).
 	src/client/ui/screens/lobby_connect.cppx

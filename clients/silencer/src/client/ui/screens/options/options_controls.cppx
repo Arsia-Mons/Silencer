@@ -1,4 +1,4 @@
-#include "client/ui/screens/options_controls.h"
+#include "client/ui/screens/options/options_controls.h"
 
 #include "client/ui/components/actions/actions.h"
 #include "client/ui/components/layout/layout.h"

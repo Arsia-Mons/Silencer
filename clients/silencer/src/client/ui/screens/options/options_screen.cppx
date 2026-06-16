@@ -1,13 +1,13 @@
-#include "client/ui/screens/options_screen.h"
+#include "client/ui/screens/options/options_screen.h"
 
 #include "client/ui/components/actions/actions.h"
 #include "client/ui/components/layout/layout.h"
 #include "client/ui/components/text/text.h"
 #include "client/ui/hooks/use_navigation.h"
 #include "client/ui/hooks/use_settings.h"
-#include "client/ui/screens/options_audio.h"
-#include "client/ui/screens/options_controls.h"
-#include "client/ui/screens/options_display.h"
+#include "client/ui/screens/options/options_audio.h"
+#include "client/ui/screens/options/options_controls.h"
+#include "client/ui/screens/options/options_display.h"
 #include "ui/components/box.h"
 #include "ui/runtime/react.h"
 

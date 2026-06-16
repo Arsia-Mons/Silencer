@@ -9,7 +9,7 @@
 #include "client/ui/hooks/use_clock.h"
 #include "client/ui/hooks/use_navigation.h"
 #include "client/ui/hooks/use_session.h"
-#include "client/ui/screens/options_screen.h"
+#include "client/ui/screens/options/options_screen.h"
 #include "ui/components/box.h"
 #include "ui/components/text.h"
 #include "ui/runtime/react.h"
