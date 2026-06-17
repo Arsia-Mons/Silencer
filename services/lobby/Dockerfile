@@ -77,6 +77,7 @@ WORKDIR /src
 COPY clients/silencer/CMakeLists.txt clients/silencer/
 COPY clients/silencer/cmake/         clients/silencer/cmake/
 COPY clients/silencer/src/           clients/silencer/src/
+COPY clients/silencer/tests/          clients/silencer/tests/
 COPY clients/silencer/third_party/   clients/silencer/third_party/
 COPY clients/silencer/shaders/       clients/silencer/shaders/
 COPY shared/assets/ shared/assets/
