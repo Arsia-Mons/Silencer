@@ -1,5 +1,17 @@
 #include "client/ui/app_shell/app_root.h"
 
+#ifdef SILENCER_HEADLESS
+
+namespace client::ui {
+bool AppRoot::build_element(::ui::UiElementFrame &, ::ui::UiElement *out) {
+  if (out) *out = ::ui::empty();
+  return out != nullptr;
+}
+::ui::UiElement make_phase_element(SessionPhase) { return ::ui::empty(); }
+} // namespace client::ui
+
+#else
+
 #include "client/ui/hooks/use_session.h"
 #include "client/ui/screens/character_create/character_create.h"
 #include "client/ui/screens/in_game/in_game_screen.h"
@@ -88,3 +100,5 @@ bool AppRoot::build_element(::ui::UiElementFrame &, ::ui::UiElement *out) {
 }
 
 } // namespace client::ui
+
+#endif // SILENCER_HEADLESS
