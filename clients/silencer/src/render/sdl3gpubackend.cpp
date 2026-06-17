@@ -924,7 +924,13 @@ SDL_GPUTexture *SDL3GPUBackend::EnsureUiTexture(SDL_GPUCopyPass *copy, uint64_t 
 			region.h = (Uint32)h;
 			region.d = 1;
 			SDL_UploadToGPUTexture(copy, &src, &region, false);
+		} else {
+			SDL_ReleaseGPUTexture(device, tex);
+			return nullptr;
 		}
+	} else {
+		SDL_ReleaseGPUTexture(device, tex);
+		return nullptr;
 	}
 	ui_tex_cache[key] = tex;
 	return tex;
@@ -1526,7 +1532,7 @@ void SDL3GPUBackend::Present() {
 			// replacing the per-frame full-window pixel upload).
 			const size_t vbytes =
 			    prog.verts.size() * sizeof(silencer::cppx_ui::GpuUiVertex);
-			void *dst = SDL_MapGPUTransferBuffer(device, ui_vbuf_tbuf, false);
+			void *dst = SDL_MapGPUTransferBuffer(device, ui_vbuf_tbuf, true);
 			if (dst) {
 				memcpy(dst, prog.verts.data(), vbytes);
 				SDL_UnmapGPUTransferBuffer(device, ui_vbuf_tbuf);
@@ -1537,7 +1543,7 @@ void SDL3GPUBackend::Present() {
 				region.buffer = ui_vbuf;
 				region.offset = 0;
 				region.size = (Uint32)vbytes;
-				SDL_UploadToGPUBuffer(copy, &src, &region, false);
+				SDL_UploadToGPUBuffer(copy, &src, &region, true);
 			}
 		}
 
