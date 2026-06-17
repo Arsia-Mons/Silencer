@@ -33,6 +33,23 @@ RUN git clone --depth=1 https://github.com/libsdl-org/SDL_mixer.git /sdlmix && \
     cmake --install /sdlmix/build && \
     rm -rf /sdlmix
 
+RUN apt-get -o Acquire::Check-Valid-Until=false \
+            -o Acquire::AllowInsecureRepositories=true update \
+ && apt-get install -y --no-install-recommends --allow-unauthenticated \
+        libfreetype-dev \
+ && rm -rf /var/lib/apt/lists/*
+
+RUN git clone --depth=1 https://github.com/libsdl-org/SDL_ttf.git /sdlttf && \
+    cmake -B /sdlttf/build -S /sdlttf \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DSDL3_DIR=/opt/sdl3/lib/cmake/SDL3 \
+        -DCMAKE_INSTALL_PREFIX=/opt/sdl3 \
+        -DSDLTTF_HARFBUZZ=OFF \
+        -DSDLTTF_VENDORED=OFF && \
+    cmake --build /sdlttf/build -j"$(nproc)" && \
+    cmake --install /sdlttf/build && \
+    rm -rf /sdlttf
+
 # ── stage 2: Go lobby server ──────────────────────────────────────────────────
 FROM golang:1.22-alpine AS go-builder
 
@@ -71,6 +88,7 @@ RUN cmake -B build -S clients/silencer \
         -DSILENCER_LOBBY_PORT=15170 \
         -DSDL3_DIR=/opt/sdl3/lib/cmake/SDL3 \
         -DSDL3_mixer_DIR=/opt/sdl3/lib/cmake/SDL3_mixer \
+        -DSDL3_ttf_DIR=/opt/sdl3/lib/cmake/SDL3_ttf \
     && cmake --build build -j"$(nproc)"
 
 # ── stage 4: runtime ──────────────────────────────────────────────────────────
@@ -80,7 +98,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get -o Acquire::Check-Valid-Until=false \
             -o Acquire::AllowInsecureRepositories=true update \
  && apt-get install -y --no-install-recommends --allow-unauthenticated \
-        zlib1g libcurl4 libminizip1 \
+        zlib1g libcurl4 libminizip1 libfreetype6 \
         ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
