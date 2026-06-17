@@ -49,7 +49,7 @@ COPY --from=sdl3-builder /opt/sdl3 /opt/sdl3
 RUN apt-get -o Acquire::Check-Valid-Until=false \
             -o Acquire::AllowInsecureRepositories=true update \
  && apt-get install -y --no-install-recommends --allow-unauthenticated \
-        build-essential cmake pkg-config python3 \
+        build-essential cmake pkg-config python3 git \
         zlib1g-dev libcurl4-openssl-dev libminizip-dev \
         ca-certificates \
     && rm -rf /var/lib/apt/lists/*
