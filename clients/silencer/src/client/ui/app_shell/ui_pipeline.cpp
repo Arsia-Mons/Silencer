@@ -1,7 +1,9 @@
 #include "ui_pipeline.h"
 
 #include "../../../ui/runtime/react.h"
+#ifndef SILENCER_HEADLESS
 #include "../../../ui/runtime/yoga_flex_layout.h"
+#endif
 
 namespace client::ui {
 
@@ -69,7 +71,10 @@ const UiPipelineFrame *use_ui_pipeline_frame() {
 }
 
 UiPipeline::UiPipeline()
-    : retained_layout_(::ui::make_yoga_flex_layout_adapter()) {}
+#ifndef SILENCER_HEADLESS
+    : retained_layout_(::ui::make_yoga_flex_layout_adapter())
+#endif
+{}
 
 void UiPipeline::render_client_ui_frame(const UiPipelineFrame &frame,
                                         const RenderFrame &render_frame) {

@@ -1,5 +1,7 @@
 #include "yoga_flex_layout.h"
 
+#ifndef SILENCER_HEADLESS
+
 #include <yoga/Yoga.h>
 
 namespace ui {
@@ -586,3 +588,12 @@ make_yoga_flex_layout_adapter(const YogaLayoutConfig *config) {
 }
 
 } // namespace ui
+
+#else // SILENCER_HEADLESS
+
+namespace ui {
+FlexLayoutAdapter make_yoga_flex_layout_adapter() { return {}; }
+FlexLayoutAdapter make_yoga_flex_layout_adapter(const YogaLayoutConfig *) { return {}; }
+} // namespace ui
+
+#endif // SILENCER_HEADLESS

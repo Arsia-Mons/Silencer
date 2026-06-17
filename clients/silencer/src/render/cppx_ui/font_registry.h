@@ -7,7 +7,7 @@
 // the SDL-free ui/ runtime never touches it.
 
 #include <SDL3/SDL.h>
-#include <SDL3_ttf/SDL_ttf.h>
+typedef struct TTF_Font TTF_Font; // forward decl; font_registry.cpp owns the SDL3_ttf include
 
 #include <stdint.h>
 

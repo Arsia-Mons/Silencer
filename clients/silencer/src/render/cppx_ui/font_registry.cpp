@@ -1,10 +1,42 @@
 #include "font_registry.h"
 
-#include <SDL3_ttf/SDL_ttf.h>
-
 #include <string.h>
 
+#ifndef SILENCER_HEADLESS
+#include <SDL3_ttf/SDL_ttf.h>
+#endif
+
 namespace silencer::cppx_ui {
+
+// clear_text_cache is safe in headless mode (uses only SDL3, not SDL3_ttf).
+void FontRegistry::clear_text_cache() {
+  for (TextEntry &e : text_cache_) {
+    if (e.tex) {
+      SDL_DestroyTexture(e.tex);
+      e.tex = nullptr;
+    }
+    e.used = false;
+  }
+}
+
+#ifdef SILENCER_HEADLESS
+
+FontRegistry::~FontRegistry() { clear_text_cache(); }
+bool FontRegistry::load_faces(const char *) { return false; }
+void FontRegistry::shutdown() { clear_text_cache(); }
+TTF_Font *FontRegistry::face(uint16_t) const { return nullptr; }
+SDL_Texture *FontRegistry::cached_text_texture(SDL_Renderer *, uint16_t,
+                                               const char *, size_t, int,
+                                               SDL_Color color,
+                                               int *out_w, int *out_h) {
+  if (out_w) *out_w = 0;
+  if (out_h) *out_h = 0;
+  return nullptr;
+}
+
+} // namespace silencer::cppx_ui
+
+#else // !SILENCER_HEADLESS
 
 namespace {
 // Indexed by FaceId. shared/fonts/silencer-*.otf (generated from the legacy
@@ -53,16 +85,6 @@ bool FontRegistry::load_faces(const char *font_dir) {
     }
   }
   return ok;
-}
-
-void FontRegistry::clear_text_cache() {
-  for (TextEntry &e : text_cache_) {
-    if (e.tex) {
-      SDL_DestroyTexture(e.tex);
-      e.tex = nullptr;
-    }
-    e.used = false;
-  }
 }
 
 void FontRegistry::shutdown() {
@@ -157,3 +179,5 @@ SDL_Texture *FontRegistry::cached_text_texture(SDL_Renderer *renderer,
 }
 
 } // namespace silencer::cppx_ui
+
+#endif // !SILENCER_HEADLESS

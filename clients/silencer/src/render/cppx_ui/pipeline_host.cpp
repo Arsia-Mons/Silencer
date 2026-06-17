@@ -6,7 +6,9 @@
 #include "text_measure.h"
 #include "ui_draw_program_builder.h"
 
+#ifndef SILENCER_HEADLESS
 #include <SDL3_ttf/SDL_ttf.h>
+#endif
 
 #include <cstring>
 
@@ -57,8 +59,10 @@ bool PipelineHost::ensure(int w, int h, const char *font_dir) {
     return false;
 
   if (!fonts_.loaded()) {
+#ifndef SILENCER_HEADLESS
     if (!TTF_WasInit())
       TTF_Init();
+#endif
     if (!fonts_.load_faces(font_dir))
       return false;
     // Measure reads the glyph fonts first (bitmap parity), TTF as fallback.

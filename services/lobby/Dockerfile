@@ -33,23 +33,6 @@ RUN git clone --depth=1 https://github.com/libsdl-org/SDL_mixer.git /sdlmix && \
     cmake --install /sdlmix/build && \
     rm -rf /sdlmix
 
-RUN apt-get -o Acquire::Check-Valid-Until=false \
-            -o Acquire::AllowInsecureRepositories=true update \
- && apt-get install -y --no-install-recommends --allow-unauthenticated \
-        libfreetype-dev \
- && rm -rf /var/lib/apt/lists/*
-
-RUN git clone --depth=1 https://github.com/libsdl-org/SDL_ttf.git /sdlttf && \
-    cmake -B /sdlttf/build -S /sdlttf \
-        -DCMAKE_BUILD_TYPE=Release \
-        -DSDL3_DIR=/opt/sdl3/lib/cmake/SDL3 \
-        -DCMAKE_INSTALL_PREFIX=/opt/sdl3 \
-        -DSDLTTF_HARFBUZZ=OFF \
-        -DSDLTTF_VENDORED=OFF && \
-    cmake --build /sdlttf/build -j"$(nproc)" && \
-    cmake --install /sdlttf/build && \
-    rm -rf /sdlttf
-
 # ── stage 2: Go lobby server ──────────────────────────────────────────────────
 FROM golang:1.22-alpine AS go-builder
 
@@ -66,7 +49,7 @@ COPY --from=sdl3-builder /opt/sdl3 /opt/sdl3
 RUN apt-get -o Acquire::Check-Valid-Until=false \
             -o Acquire::AllowInsecureRepositories=true update \
  && apt-get install -y --no-install-recommends --allow-unauthenticated \
-        build-essential cmake pkg-config python3 git \
+        build-essential cmake pkg-config \
         zlib1g-dev libcurl4-openssl-dev libminizip-dev \
         ca-certificates \
     && rm -rf /var/lib/apt/lists/*
@@ -77,20 +60,18 @@ WORKDIR /src
 COPY clients/silencer/CMakeLists.txt clients/silencer/
 COPY clients/silencer/cmake/         clients/silencer/cmake/
 COPY clients/silencer/src/           clients/silencer/src/
-COPY clients/silencer/tests/          clients/silencer/tests/
-COPY clients/silencer/tools/          clients/silencer/tools/
 COPY clients/silencer/third_party/   clients/silencer/third_party/
 COPY clients/silencer/shaders/       clients/silencer/shaders/
 COPY shared/assets/ shared/assets/
 
 RUN cmake -B build -S clients/silencer \
         -DCMAKE_BUILD_TYPE=Release \
+        -DSILENCER_HEADLESS=ON \
         -DSILENCER_VERSION="${SILENCER_VERSION}" \
         -DSILENCER_LOBBY_HOST="127.0.0.1" \
         -DSILENCER_LOBBY_PORT=15170 \
         -DSDL3_DIR=/opt/sdl3/lib/cmake/SDL3 \
         -DSDL3_mixer_DIR=/opt/sdl3/lib/cmake/SDL3_mixer \
-        -DSDL3_ttf_DIR=/opt/sdl3/lib/cmake/SDL3_ttf \
     && cmake --build build -j"$(nproc)"
 
 # ── stage 4: runtime ──────────────────────────────────────────────────────────
@@ -100,7 +81,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get -o Acquire::Check-Valid-Until=false \
             -o Acquire::AllowInsecureRepositories=true update \
  && apt-get install -y --no-install-recommends --allow-unauthenticated \
-        zlib1g libcurl4 libminizip1 libfreetype6 \
+        zlib1g libcurl4 libminizip1 \
         ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 

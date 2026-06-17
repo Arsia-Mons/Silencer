@@ -4,7 +4,9 @@
 #include "glyph_fonts.h"
 #include "ui/style/text_measure.h"
 
+#ifndef SILENCER_HEADLESS
 #include <SDL3_ttf/SDL_ttf.h>
+#endif
 
 #include <string.h>
 
@@ -55,6 +57,7 @@ RunMetrics metrics_for(const ::ui::TextMetricsQuery &q) {
     return m;
   }
   // TTF: face for q.font_id, sized per-query (matches the TTF paint path).
+#ifndef SILENCER_HEADLESS
   if (g_fonts) {
     m.font = g_fonts->face(q.font_id);
     if (m.font && q.font_size > 0)
@@ -71,6 +74,10 @@ RunMetrics metrics_for(const ::ui::TextMetricsQuery &q) {
     if (asc > 0)
       m.ascent = static_cast<float>(asc);
   }
+#else
+  if (q.line_height > 0.0f)
+    m.line_h = q.line_height;
+#endif
   return m;
 }
 
@@ -81,10 +88,14 @@ float advance_of(const RunMetrics &m, const char *utf8, uint32_t len) {
     return static_cast<float>(len) * m.adv; // monospace: spaces advance too
   if (!m.font)
     return 0.0f;
+#ifndef SILENCER_HEADLESS
   int w = 0, h = 0;
   if (!TTF_GetStringSize(m.font, utf8, len, &w, &h))
     return 0.0f;
   return static_cast<float>(w);
+#else
+  return 0.0f;
+#endif
 }
 
 float aligned_x(::ui::TextAlign align, float line_w, float box_w) {

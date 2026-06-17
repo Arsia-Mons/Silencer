@@ -87,6 +87,11 @@ endif()
 
 target_compile_features(${SILENCER_TARGET} PUBLIC cxx_std_20)
 
+option(SILENCER_HEADLESS "Headless dedicated-server build: no UI, Yoga, SDL3_ttf, or tests" OFF)
+if(SILENCER_HEADLESS)
+	target_compile_definitions(${SILENCER_TARGET} PRIVATE SILENCER_HEADLESS=1)
+endif()
+
 # --- Warnings ------------------------------------------------------------
 # Surface portability problems on the macOS/Linux (Clang/GCC) dev build that
 # would otherwise only appear on the MSVC Windows build. The big one is
@@ -217,6 +222,8 @@ target_include_directories(${SILENCER_TARGET} PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}/src/gas"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/events"
 )
+
+if(NOT SILENCER_HEADLESS)
 
 # --- cppx authoring pipeline (SIL-7) -------------------------------------
 # `.cppx`/`.hx` view sources transpile to ordinary C++ at build time through
@@ -783,6 +790,8 @@ if(MSVC)
 endif()
 add_test(NAME draw_image_tests COMMAND draw_image_tests)
 
+endif() # NOT SILENCER_HEADLESS
+
 # /Z7 embeds debug info into .obj files instead of routing it through MSVC's
 # mspdbsrv.exe — which has a habit of failing with C1090 PDB errors on some
 # Windows installs. /Zi (the default) is faster but unreliable; /Z7 is rock
@@ -817,7 +826,12 @@ target_compile_definitions(${SILENCER_TARGET} PRIVATE
 find_package(ZLIB REQUIRED)
 find_package(SDL3 REQUIRED)
 find_package(SDL3_mixer REQUIRED)
-find_package(SDL3_ttf REQUIRED CONFIG)  # SIL-11: golden TTF FontRegistry / UI text
+if(NOT SILENCER_HEADLESS)
+	find_package(SDL3_ttf REQUIRED CONFIG)  # SIL-11: golden TTF FontRegistry / UI text
+	set(_sdl3ttf SDL3_ttf::SDL3_ttf)
+else()
+	set(_sdl3ttf "")
+endif()
 find_package(CURL REQUIRED)
 
 # Minizip: prefer vcpkg's CMake CONFIG packages (Windows CI), then fall back
@@ -864,16 +878,16 @@ endif()
 if(APPLE)
 	find_library(COCOA_FRAMEWORK Cocoa)
 	target_link_libraries(${SILENCER_TARGET}
-		SDL3::SDL3 SDL3_mixer::SDL3_mixer SDL3_ttf::SDL3_ttf ${ZLIB_LIBRARY}
+		SDL3::SDL3 SDL3_mixer::SDL3_mixer ${_sdl3ttf} ${ZLIB_LIBRARY}
 		CURL::libcurl
 		${COCOA_FRAMEWORK})
 elseif(WIN32)
 	target_link_libraries(${SILENCER_TARGET}
-		SDL3::SDL3 SDL3_mixer::SDL3_mixer SDL3_ttf::SDL3_ttf ${ZLIB_LIBRARY}
+		SDL3::SDL3 SDL3_mixer::SDL3_mixer ${_sdl3ttf} ${ZLIB_LIBRARY}
 		CURL::libcurl ws2_32)
 else()
 	target_link_libraries(${SILENCER_TARGET}
-		SDL3::SDL3 SDL3_mixer::SDL3_mixer SDL3_ttf::SDL3_ttf ${ZLIB_LIBRARY}
+		SDL3::SDL3 SDL3_mixer::SDL3_mixer ${_sdl3ttf} ${ZLIB_LIBRARY}
 		CURL::libcurl)
 endif()
 

@@ -3,7 +3,9 @@
 #include "draw_executor.h"
 #include "ui/runtime/draw_command.h"
 
+#ifndef SILENCER_HEADLESS
 #include <SDL3_ttf/SDL_ttf.h>
+#endif
 
 #include <string.h>
 
@@ -31,7 +33,9 @@ bool UiDemoOverlay::ensure(int w, int h, const char *font_dir) {
   if (!r_) return false;
 
   if (!fonts_.loaded()) {
+#ifndef SILENCER_HEADLESS
     if (!TTF_WasInit()) TTF_Init();
+#endif
     fonts_.load_faces(font_dir);
   }
   if (!ui_.initialize(r_, fonts_))
