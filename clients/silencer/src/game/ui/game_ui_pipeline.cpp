@@ -21,9 +21,14 @@
 #include "client/ui/app_shell/client_ui.h"
 #include "client/ui/app_theme.h"
 #include "client/ui/components/tokens.h"
+#ifndef SILENCER_HEADLESS
+// Generated cppx screen headers (transpiled from .hx) — absent in the headless
+// dedicated-server build, which skips the cppx pipeline entirely. Only the
+// Show* modal/gallery entry points below reference these; they no-op headless.
 #include "client/ui/screens/gallery.h"
 #include "client/ui/screens/message_modal.h"
 #include "client/ui/screens/password_modal.h"
+#endif
 #include "client/ui/hooks/use_key_map.h"
 #include "client/ui/hooks/use_keybind_capture.h"
 #include "client/ui/hooks/use_session.h"
@@ -2141,6 +2146,9 @@ client::ui::ClientUi *GameUiPipeline::TryClientUi() {
     return cppxHost ? &cppxHost->pipeline().client_ui() : nullptr;
 }
 
+// The Show* overlays push generated cppx screens, so they no-op in the headless
+// dedicated-server build (no cppx pipeline, no ClientUi to push onto anyway).
+#ifndef SILENCER_HEADLESS
 void GameUiPipeline::ShowPasswordModal(const char *title) {
     client::ui::ClientUi *ui = TryClientUi();
     if (!ui)
@@ -2168,6 +2176,11 @@ void GameUiPipeline::ShowGallery() {
         return;
     ui->push_screen(std::make_unique<client::ui::GalleryScreen>());
 }
+#else
+void GameUiPipeline::ShowPasswordModal(const char *) {}
+void GameUiPipeline::ShowMessageModal(const char *, const char *) {}
+void GameUiPipeline::ShowGallery() {}
+#endif
 
 void GameUiPipeline::BeginKeybindCapture(Action action, int comboIndex) {
     keybindCapture_.active = true;
