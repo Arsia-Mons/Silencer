@@ -332,6 +332,46 @@ void emit_text(Builder &b, GpuUiProgram &out, std::unordered_set<uint64_t> &seen
                                    t.font_size, scale, c.rect);
   if (!L.ok)
     return;
+  // Reveal ramp (origin DrawMessage typewriter "pop"): brighten the trailing
+  // glyphs by adding a falling boost to the green channel, then resolve the
+  // exact-color face PER GLYPH. The settled glyphs share one key (one batch);
+  // only the few edge glyphs get their own. Glyph metrics are identical across
+  // color variants, so L (built from the base face) positions all of them.
+  if (t.reveal_boost > 0 && t.color.a == 255) {
+    for (uint16_t i = 0; i < t.text_len; ++i) {
+      const unsigned char ch =
+          static_cast<unsigned char>(list.text_arena[t.text_off + i]);
+      if (ch < GlyphFonts::kFirstChar || ch > GlyphFonts::kLastChar)
+        continue;
+      const int gi = ch - GlyphFonts::kFirstChar;
+      const int dist = (int)t.text_len - (int)i; // 1 = last glyph
+      int boost = (int)t.reveal_boost - (dist - 1) * (int)t.reveal_step;
+      if (boost < 0)
+        boost = 0;
+      int g2 = (int)t.color.g + boost;
+      if (g2 > 255)
+        g2 = 255;
+      const GlyphFonts::Face *cfi =
+          glyphs->color_face(t.font_id, t.color.r, (uint8_t)g2, t.color.b);
+      const GlyphFonts::Face *gfi = cfi ? cfi : glyphs->face(t.font_id);
+      if (!gfi || !gfi->atlas || gfi->atlas_rgba.empty() || gfi->atlas_w <= 0)
+        continue;
+      const int16_t gw = gfi->gw[gi];
+      if (gw <= 0)
+        continue;
+      register_tex(out, seen, gfi->gpu_key, gfi->atlas_rgba.data(), gfi->atlas_w,
+                   gfi->atlas_h);
+      const float inv = 1.0f / (float)gfi->atlas_w;
+      const DevRect dd = glyph_dst(L, i, gw);
+      const float uu0 = (float)gfi->gx[gi] * inv;
+      const float uu1 = (float)(gfi->gx[gi] + gw) * inv;
+      const ::ui::Color col =
+          cfi ? ::ui::Color{255, 255, 255, 255}
+              : ::ui::Color{t.color.r, (uint8_t)g2, t.color.b, t.color.a};
+      b.append_quad(dd, uu0, 0.f, uu1, 1.f, col, gfi->gpu_key);
+    }
+    return;
+  }
   register_tex(out, seen, gf->gpu_key, gf->atlas_rgba.data(), gf->atlas_w,
                gf->atlas_h);
   // Coverage atlas: frag = token color * coverage. Color-face pixels are final

@@ -7,6 +7,7 @@
 #include <array>
 #include <functional>
 #include <stdint.h>
+#include <unordered_map>
 
 namespace ui {
 
@@ -553,6 +554,18 @@ private:
   int unmounted_count_ = 0;
   uint32_t generation_ = 0;
   int error_count_ = 0;
+
+  // O(1) NodeId -> slot index into nodes_. find()/find_mutable() used to linear-
+  // scan nodes_, and since child_count()/child_at()/snapshot() all route through
+  // find(), every per-frame tree walk over a wide node was O(children * total-
+  // nodes) = O(N^2). The in-game center-message reveal puts every glyph on one
+  // flat "hud" Box, so that quadratic was tanking the framerate as the message
+  // grew. This index keeps every lookup O(1).
+  std::unordered_map<NodeId, int> id_index_;
+  // Reclaimed slots (id == 0) ready for reuse, so ensure_node() never linear-
+  // scans for a free slot either. All indices are < node_capacity_used_.
+  std::array<int, UI_RETAINED_MAX_NODES> free_slots_ = {};
+  int free_count_ = 0;
 };
 
 } // namespace ui

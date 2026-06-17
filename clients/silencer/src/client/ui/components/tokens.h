@@ -265,13 +265,19 @@ inline ::ui::StylePatch frame_patch_sides(::ui::Color stroke, bool top,
 
 // Text paint (color + face + native-em size + legacy line height). font_id
 // selects the OTF face; line_height 0 falls back to the face's natural skip.
+// reveal_boost/step (default 0 = off) drive the renderer-side per-glyph
+// trailing-edge brightness ramp (the in-game typewriter "pop").
 inline ::ui::StylePatch text_patch(::ui::Color color, float font_size,
                                    uint16_t font_id = kFaceBody,
-                                   float line_height = 0.f) {
+                                   float line_height = 0.f,
+                                   uint8_t reveal_boost = 0,
+                                   uint8_t reveal_step = 0) {
   return ::ui::patch().text(::ui::TextVisual{.color = color,
                                              .font_id = font_id,
                                              .font_size = font_size,
-                                             .line_height = line_height});
+                                             .line_height = line_height,
+                                             .reveal_boost = reveal_boost,
+                                             .reveal_step = reveal_step});
 }
 
 // Ghost/chromeless paint: suppress the control role's chrome (fill, gradient,

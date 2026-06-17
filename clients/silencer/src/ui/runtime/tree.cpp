@@ -50,6 +50,8 @@ void UiTree::reset() {
   unmounted_count_ = 0;
   generation_ = 0;
   error_count_ = 0;
+  id_index_.clear();
+  free_count_ = 0;
 }
 
 void UiTree::begin_frame(float width, float height) {
@@ -453,19 +455,13 @@ NodeId UiTree::unmounted_at(int index) const {
 }
 
 UiTree::Node *UiTree::find_mutable(NodeId id) {
-  for (int i = 0; i < node_capacity_used_; ++i) {
-    if (nodes_[i].id == id)
-      return &nodes_[i];
-  }
-  return nullptr;
+  auto it = id_index_.find(id);
+  return it == id_index_.end() ? nullptr : &nodes_[it->second];
 }
 
 const UiTree::Node *UiTree::find(NodeId id) const {
-  for (int i = 0; i < node_capacity_used_; ++i) {
-    if (nodes_[i].id == id)
-      return &nodes_[i];
-  }
-  return nullptr;
+  auto it = id_index_.find(id);
+  return it == id_index_.end() ? nullptr : &nodes_[it->second];
 }
 
 UiTree::Node *UiTree::ensure_node(NodeId id, NodeId parent_id, const char *type,
@@ -508,23 +504,18 @@ UiTree::Node *UiTree::ensure_node(NodeId id, NodeId parent_id, const char *type,
     return existing;
   }
 
-  int slot = -1;
-  for (int i = 0; i < node_capacity_used_; ++i) {
-    if (nodes_[i].id == 0) {
-      slot = i;
-      break;
-    }
-  }
-  if (slot < 0) {
-    if (node_capacity_used_ >= UI_RETAINED_MAX_NODES) {
-      fprintf(stderr,
-              "ui/retained: node pool full (max=%d) adding %s; raise "
-              "UI_RETAINED_MAX_NODES in ui/runtime/tree.h\n",
-              UI_RETAINED_MAX_NODES, type ? type : "?");
-      report_error();
-      return nullptr;
-    }
+  int slot;
+  if (free_count_ > 0) {
+    slot = free_slots_[--free_count_];
+  } else if (node_capacity_used_ < UI_RETAINED_MAX_NODES) {
     slot = node_capacity_used_++;
+  } else {
+    fprintf(stderr,
+            "ui/retained: node pool full (max=%d) adding %s; raise "
+            "UI_RETAINED_MAX_NODES in ui/runtime/tree.h\n",
+            UI_RETAINED_MAX_NODES, type ? type : "?");
+    report_error();
+    return nullptr;
   }
 
   Node &node = nodes_[slot];
@@ -536,6 +527,7 @@ UiTree::Node *UiTree::ensure_node(NodeId id, NodeId parent_id, const char *type,
   node.mounted_this_frame = true;
   copy_label(node.type, type);
   copy_label(node.key, key);
+  id_index_[id] = slot;
   return &node;
 }
 
@@ -544,6 +536,9 @@ void UiTree::destroy_node(Node &node) {
     return;
   if (node.cleanup)
     node.cleanup(node.cleanup_user);
+  id_index_.erase(node.id);
+  if (free_count_ < UI_RETAINED_MAX_NODES)
+    free_slots_[free_count_++] = static_cast<int>(&node - nodes_.data());
   node = {};
 }
 

@@ -106,6 +106,50 @@ bool render_text_glyphs(SDL_Renderer *r, const ::ui::DrawCommandList &list,
   const TextLayout L = text_layout(gf->advance, gf->line_height, gf->atlas_h,
                                    t.font_size, scale, c.rect);
 
+  // Reveal ramp (origin DrawMessage typewriter "pop"): brighten the trailing
+  // glyphs by adding a falling boost to the green channel, resolving the exact-
+  // color face PER GLYPH. Glyph metrics are identical across color variants, so
+  // L (built from the base face) positions all of them. Mirrors emit_text.
+  if (t.reveal_boost > 0 && t.color.a == 255) {
+    for (uint16_t i = 0; i < t.text_len; ++i) {
+      const unsigned char ch =
+          static_cast<unsigned char>(list.text_arena[t.text_off + i]);
+      if (ch < GlyphFonts::kFirstChar || ch > GlyphFonts::kLastChar)
+        continue;
+      const int gi = ch - GlyphFonts::kFirstChar;
+      const int dist = (int)t.text_len - (int)i; // 1 = last glyph
+      int boost = (int)t.reveal_boost - (dist - 1) * (int)t.reveal_step;
+      if (boost < 0)
+        boost = 0;
+      int g2 = (int)t.color.g + boost;
+      if (g2 > 255)
+        g2 = 255;
+      const GlyphFonts::Face *cfi =
+          glyphs->color_face(t.font_id, t.color.r, (uint8_t)g2, t.color.b);
+      const GlyphFonts::Face *gfi = cfi ? cfi : glyphs->face(t.font_id);
+      if (!gfi || !gfi->atlas)
+        continue;
+      const int16_t gw = gfi->gw[gi];
+      if (gw <= 0)
+        continue;
+      if (!cfi) {
+        SDL_SetTextureColorMod(gfi->atlas, t.color.r, (uint8_t)g2, t.color.b);
+        SDL_SetTextureAlphaMod(gfi->atlas, t.color.a);
+      }
+      SDL_FRect src = {static_cast<float>(gfi->gx[gi]), 0.f,
+                       static_cast<float>(gw),
+                       static_cast<float>(gfi->atlas_h)};
+      const DevRect gd = glyph_dst(L, i, gw);
+      SDL_FRect dst = {gd.x, gd.y, gd.w, gd.h};
+      SDL_RenderTexture(r, gfi->atlas, &src, &dst);
+      if (!cfi) {
+        SDL_SetTextureColorMod(gfi->atlas, 255, 255, 255);
+        SDL_SetTextureAlphaMod(gfi->atlas, 255);
+      }
+    }
+    return true;
+  }
+
   // Tint: the coverage atlas is a white premultiplied mask; the IR color is
   // premultiplied, so color-mod(rgb) + alpha-mod(a) reproduces the token color
   // exactly (drawn under BLEND_PREMULTIPLIED). Exact-color variants already

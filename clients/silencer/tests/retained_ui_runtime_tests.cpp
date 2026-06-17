@@ -1,6 +1,7 @@
 #include "ui/runtime/flex_layout.h"
 #include "ui/runtime/tree.h"
 
+#include <memory>
 #include <stdio.h>
 #include <string.h>
 
@@ -21,7 +22,8 @@ static bool snapshot(UiTree &tree, NodeId id, NodeSnapshot *out) {
 }
 
 static bool positional_children_keep_identity_by_position(void) {
-  UiTree tree;
+  auto tree_owned = std::make_unique<UiTree>(); // ~8 MB: heap, not the stack
+  UiTree &tree = *tree_owned;
 
   tree.begin_frame(640.0f, 480.0f);
   NodeId first = tree.begin_node("Item");
@@ -47,7 +49,8 @@ static bool positional_children_keep_identity_by_position(void) {
 }
 
 static bool keyed_children_keep_identity_across_reorder(void) {
-  UiTree tree;
+  auto tree_owned = std::make_unique<UiTree>(); // ~8 MB: heap, not the stack
+  UiTree &tree = *tree_owned;
 
   tree.begin_frame(640.0f, 480.0f);
   NodeId alpha = tree.begin_keyed_node("Row", "alpha");
@@ -80,7 +83,8 @@ static void count_cleanup(void *user) {
 }
 
 static bool unmounted_nodes_run_cleanup_once(void) {
-  UiTree tree;
+  auto tree_owned = std::make_unique<UiTree>(); // ~8 MB: heap, not the stack
+  UiTree &tree = *tree_owned;
   g_cleanup_count = 0;
   int local_cleanup_count = 0;
 
@@ -116,7 +120,8 @@ static bool unmounted_nodes_run_cleanup_once(void) {
 }
 
 static bool style_layout_and_child_count_are_retained(void) {
-  UiTree tree;
+  auto tree_owned = std::make_unique<UiTree>(); // ~8 MB: heap, not the stack
+  UiTree &tree = *tree_owned;
   LayoutStyle panel_style = {};
   panel_style.width = Length::points(320.0f);
   panel_style.height = Length::grow();
@@ -173,7 +178,8 @@ static bool adapter_probe(UiTree &tree, NodeId root_id, LayoutViewport viewport,
 }
 
 static bool flex_layout_adapter_delegates_to_selected_engine(void) {
-  UiTree tree;
+  auto tree_owned = std::make_unique<UiTree>(); // ~8 MB: heap, not the stack
+  UiTree &tree = *tree_owned;
   tree.begin_frame(1024.0f, 768.0f);
   CHECK(tree.end_frame());
 
@@ -197,6 +203,114 @@ static bool flex_layout_adapter_delegates_to_selected_engine(void) {
   return true;
 }
 
+// Guards the O(1) NodeId->slot index + free-list (the find()/ensure_node()
+// rewrite that killed the O(N^2) per-frame tree walks). Exercises a wide flat
+// sibling list (the in-game center-message shape) plus grow/shrink churn so any
+// stale index entry or slot-reuse corruption surfaces as a lookup mismatch.
+static bool wide_tree_index_stays_correct_across_churn(void) {
+  auto tree_owned = std::make_unique<UiTree>(); // ~8 MB: heap, not the stack
+  UiTree &tree = *tree_owned;
+  const int WIDE = 400; // wide flat sibling list (< UI_RETAINED_MAX_CHILDREN),
+                        // the center-message shape that drove the O(N^2) walks
+
+  tree.begin_frame(640.0f, 480.0f);
+  NodeId ids1[WIDE];
+  for (int i = 0; i < WIDE; ++i) {
+    ids1[i] = tree.begin_node("Glyph");
+    CHECK(ids1[i] != 0);
+    CHECK(tree.end_node());
+  }
+  CHECK(tree.end_frame());
+
+  CHECK(tree.child_count(tree.root_id()) == WIDE);
+  for (int i = 0; i < WIDE; ++i) {
+    CHECK(tree.child_at(tree.root_id(), i) == ids1[i]);
+    CHECK(tree.contains(ids1[i]));
+    NodeSnapshot s = {};
+    CHECK(tree.snapshot(ids1[i], &s));
+    CHECK(s.id == ids1[i]);
+    CHECK(s.parent_id == tree.root_id());
+    if (i > 0)
+      CHECK(ids1[i] != ids1[i - 1]);
+  }
+
+  // Shrink to half: the back half unmounts and its slots are reclaimed.
+  const int HALF = WIDE / 2;
+  tree.begin_frame(640.0f, 480.0f);
+  for (int i = 0; i < HALF; ++i) {
+    CHECK(tree.begin_node("Glyph") == ids1[i]); // positional identity stable
+    CHECK(tree.end_node());
+  }
+  CHECK(tree.end_frame());
+  CHECK(tree.child_count(tree.root_id()) == HALF);
+  CHECK(tree.unmounted_count() == WIDE - HALF);
+  for (int i = 0; i < HALF; ++i)
+    CHECK(tree.contains(ids1[i]));
+  for (int i = HALF; i < WIDE; ++i)
+    CHECK(!tree.contains(ids1[i]));
+
+  // Grow back: reclaimed slots get reused; every lookup must still be correct.
+  tree.begin_frame(640.0f, 480.0f);
+  for (int i = 0; i < WIDE; ++i) {
+    NodeId again = tree.begin_node("Glyph");
+    CHECK(again == ids1[i]); // deterministic positional id, even after reuse
+    CHECK(tree.end_node());
+  }
+  CHECK(tree.end_frame());
+  CHECK(tree.child_count(tree.root_id()) == WIDE);
+  for (int i = 0; i < WIDE; ++i) {
+    CHECK(tree.child_at(tree.root_id(), i) == ids1[i]);
+    CHECK(tree.contains(ids1[i]));
+  }
+  return true;
+}
+
+// Middle removal of keyed siblings stresses index erase + slot reclaim/reuse:
+// a buggy free-list or stale index entry would mis-resolve a re-added key.
+static bool keyed_middle_removal_reuses_slots_correctly(void) {
+  auto tree_owned = std::make_unique<UiTree>(); // ~8 MB: heap, not the stack
+  UiTree &tree = *tree_owned;
+
+  tree.begin_frame(640.0f, 480.0f);
+  NodeId a = tree.begin_keyed_node("R", "a");
+  CHECK(tree.end_node());
+  NodeId b = tree.begin_keyed_node("R", "b");
+  CHECK(tree.end_node());
+  NodeId c = tree.begin_keyed_node("R", "c");
+  CHECK(tree.end_node());
+  NodeId d = tree.begin_keyed_node("R", "d");
+  CHECK(tree.end_node());
+  CHECK(tree.end_frame());
+
+  // Drop the two middle keys.
+  tree.begin_frame(640.0f, 480.0f);
+  CHECK(tree.begin_keyed_node("R", "a") == a);
+  CHECK(tree.end_node());
+  CHECK(tree.begin_keyed_node("R", "d") == d);
+  CHECK(tree.end_node());
+  CHECK(tree.end_frame());
+  CHECK(!tree.contains(b));
+  CHECK(!tree.contains(c));
+  CHECK(tree.contains(a));
+  CHECK(tree.contains(d));
+
+  // Re-add them: they take reclaimed slots; all four must resolve correctly.
+  tree.begin_frame(640.0f, 480.0f);
+  CHECK(tree.begin_keyed_node("R", "a") == a);
+  CHECK(tree.end_node());
+  CHECK(tree.begin_keyed_node("R", "b") == b);
+  CHECK(tree.end_node());
+  CHECK(tree.begin_keyed_node("R", "c") == c);
+  CHECK(tree.end_node());
+  CHECK(tree.begin_keyed_node("R", "d") == d);
+  CHECK(tree.end_node());
+  CHECK(tree.end_frame());
+  CHECK(tree.contains(a) && tree.contains(b) && tree.contains(c) &&
+        tree.contains(d));
+  CHECK(tree.child_count(tree.root_id()) == 4);
+  return true;
+}
+
 int main(void) {
   if (!positional_children_keep_identity_by_position())
     return 1;
@@ -207,6 +321,10 @@ int main(void) {
   if (!style_layout_and_child_count_are_retained())
     return 1;
   if (!flex_layout_adapter_delegates_to_selected_engine())
+    return 1;
+  if (!wide_tree_index_stays_correct_across_churn())
+    return 1;
+  if (!keyed_middle_removal_reuses_slots_correctly())
     return 1;
   return 0;
 }

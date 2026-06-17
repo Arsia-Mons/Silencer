@@ -53,6 +53,11 @@ struct TextData {
   float font_size = 0.f;
   uint16_t line_index = 0;
   TextAlign align = TextAlign::Left;
+  // Per-glyph trailing-edge brightness ramp (see TextVisual): the last glyph of
+  // this run gets +reveal_boost on the green channel, falling off by reveal_step
+  // per glyph toward the start. 0 = no ramp (the common single-batch path).
+  uint8_t reveal_boost = 0;
+  uint8_t reveal_step = 0;
 };
 struct ImageData {
   uint32_t texture_id = 0;

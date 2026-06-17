@@ -118,6 +118,12 @@ struct TextVisual {
   TextAlign align = TextAlign::Left;
   TextWrap wrap = TextWrap::None;
   float line_height = 0.f; // 0 => face natural line skip
+  // Per-glyph trailing-edge brightness ramp, applied by the renderer (NOT by
+  // spawning a node per glyph): the last glyph gets +boost on the green channel,
+  // falling off by `step` per glyph toward the start. 0 = no ramp. Drives the
+  // in-game typewriter "pop" as each character is revealed (origin DrawMessage).
+  uint8_t reveal_boost = 0;
+  uint8_t reveal_step = 0;
 };
 
 struct VisualStyle {

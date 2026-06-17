@@ -95,7 +95,8 @@ float L(int d) { return std::ceil(d * 1.5f - 0.25f); }
 
 // Text at an absolute device pen, one of the baked exact-color HUD faces.
 ::ui::UiElement hud_text(const char *key, int dx, int dy, const char *value,
-                         ::ui::Color color_key, float font, uint16_t face) {
+                         ::ui::Color color_key, float font, uint16_t face,
+                         uint8_t reveal_boost = 0, uint8_t reveal_step = 0) {
   if (!value || !value[0])
     return ::ui::empty();
   return Box(BoxProps{
@@ -104,7 +105,8 @@ float L(int d) { return std::ceil(d * 1.5f - 0.25f); }
                                   .position_inset = inset_lt(L(dx), L(dy))},
       .children = children({Text(TextProps{
           .value = value,
-          .style = tokens::text_patch(color_key, font, face)})})});
+          .style = tokens::text_patch(color_key, font, face, 0.f, reveal_boost,
+                                      reveal_step)})})});
 }
 
 // Centered like origin's fixed-box CLAY_ALIGN_X_CENTER: int pen arithmetic.
@@ -763,57 +765,64 @@ void build_center_message(std::vector<::ui::UiElement> &out, const Hud &hud) {
       color = ms.color;
       liney = ms.liney;
     }
+  // Uniform per-frame brightness (origin computes it in a Uint8 — the fade
+  // subtraction + pulse WRAP mod 256; keep the exact arithmetic). The per-glyph
+  // reveal "pop" is NOT computed here: it is the renderer's reveal ramp
+  // (reveal_boost/step), so the whole message is two Text runs per line instead
+  // of one node per glyph (was O(N) nodes + O(N^2) tree walks per frame).
+  uint8_t brightness = 128;
+  if (hud.message_type < 10) {
+    if ((int)hud.message_i - (int)hud.message_time + 8 >= 0)
+      brightness -= (uint8_t)((((int)hud.message_i - (int)hud.message_time + 8) *
+                               8) &
+                              0xFF);
+    if (hud.message_i % 32 >= 16)
+      brightness += (16 - (hud.message_i % 16)) * 2;
+    else
+      brightness += (hud.message_i % 16) * 2;
+  }
+  const int shadow_b = (int)brightness - 64 < 8 ? 8 : (int)brightness - 64;
+  const ::ui::Color main_key = tokens::hud_text_key(color, brightness);
+  const ::ui::Color shadow_key = tokens::hud_text_key(color, (uint8_t)shadow_b);
+
   const char *text = hud.message.c_str();
   const int total = (int)hud.message.size();
-  int linelength = total;
-  const char *nl = std::strchr(text, '\n');
-  if (nl)
-    linelength = (int)(nl - text);
-  int nextline = linelength;
   const int adv = kAdvTitle;
   const int lineheight = 20;
-  for (int i = 0; i < total; ++i) {
-    if (i >= (int)hud.message_i)
-      break;
-    // origin computes brightness in a Uint8 — the fade subtraction and pulse
-    // WRAP mod 256 (e.g. mp-time+8 == 32 subtracts 0, not 256). Keep the
-    // exact arithmetic; clamping instead leaves the message black where
-    // origin shows it at full brightness.
-    uint8_t brightness = 128;
-    if (hud.message_type < 10) {
-      if ((int)hud.message_i - (int)hud.message_time + 8 >= 0)
-        brightness -= (uint8_t)((((int)hud.message_i -
-                                  (int)hud.message_time + 8) * 8) & 0xFF);
-      if (hud.message_i % 32 >= 16)
-        brightness += (16 - (hud.message_i % 16)) * 2;
-      else
-        brightness += (hud.message_i % 16) * 2;
+  // origin reveal "pop": +40-d*8 over the last 5 revealed glyphs => +32 at the
+  // edge, falling by 8/glyph. The renderer applies it to the active line only.
+  const uint8_t kRevealBoost = 32, kRevealStep = 8;
+
+  int g = 0;    // global char index, counts '\n' (matches origin's reveal i)
+  int line = 0; // line index from the top
+  int id = 0;   // unique key suffix
+  while (g < total && g < (int)hud.message_i) {
+    const int line_start = g;
+    int line_len = 0;
+    while (line_start + line_len < total && text[line_start + line_len] != '\n')
+      ++line_len;
+    const int revealed = (int)hud.message_i - line_start < line_len
+                             ? (int)hud.message_i - line_start
+                             : line_len;
+    if (revealed > 0) {
+      const int x = (640 - line_len * adv) / 2; // center by the full line width
+      const int y = liney + line * lineheight;
+      const bool active = ((int)hud.message_i - line_start) <= line_len;
+      const uint8_t rb = active ? kRevealBoost : 0;
+      const uint8_t rs = active ? kRevealStep : 0;
+      const std::string value(text + line_start, (size_t)revealed);
+      const std::string sfx = std::to_string(id++);
+      out.push_back(hud_text(::ui::copy_string(("msgs" + sfx).c_str()), x + 1,
+                             y + 1, ::ui::copy_string(value.c_str()), shadow_key,
+                             28.5f, tokens::kFaceHeading, rb, rs));
+      out.push_back(hud_text(::ui::copy_string(("msg" + sfx).c_str()), x, y,
+                             ::ui::copy_string(value.c_str()), main_key, 28.5f,
+                             tokens::kFaceHeading, rb, rs));
     }
-    if ((int)hud.message_i - i <= 5)
-      brightness += 40 - (((int)hud.message_i - i) * 8);
-    int shadow = (int)brightness - 64 < 8 ? 8 : brightness - 64;
-    const int x = ((640 - linelength * adv) / 2) + adv * (linelength - nextline);
-    const char glyph[2] = {text[i], 0};
-    if (glyph[0] != '\n' && glyph[0] != ' ') {
-      const std::string id = std::to_string(i);
-      out.push_back(hud_text(::ui::copy_string(("msgs" + id).c_str()), x + 1,
-                             liney + 1, ::ui::copy_string(glyph),
-                             tokens::hud_text_key(color, (uint8_t)shadow),
-                             28.5f, tokens::kFaceHeading));
-      out.push_back(hud_text(::ui::copy_string(("msg" + id).c_str()), x, liney,
-                             ::ui::copy_string(glyph),
-                             tokens::hud_text_key(color, (uint8_t)brightness),
-                             28.5f, tokens::kFaceHeading));
-    }
-    --nextline;
-    if (nextline < 0) {
-      linelength = (int)std::strlen(&text[i + 1]);
-      const char *nn = std::strchr(&text[i + 1], '\n');
-      if (nn)
-        linelength = (int)(nn - &text[i + 1]);
-      nextline = linelength;
-      liney += lineheight;
-    }
+    g = line_start + line_len;
+    if (g < total && text[g] == '\n')
+      ++g; // the newline consumes one reveal count (origin per-char loop)
+    ++line;
   }
 }
 } // namespace client::ui

@@ -76,7 +76,8 @@ int clamp_int(int value, int low, int high) {
 bool push_text_line(DrawCommandList &list, NodeId node_id, const DrawRect &rect,
                     const char *bytes, uint32_t byte_len, Color straight_color,
                     uint16_t font_id, float font_size, uint16_t line_index,
-                    TextAlign align) {
+                    TextAlign align, uint8_t reveal_boost = 0,
+                    uint8_t reveal_step = 0) {
   uint16_t n = byte_len > 0xFFFFu ? static_cast<uint16_t>(0xFFFFu)
                                   : static_cast<uint16_t>(byte_len);
   uint32_t off = 0;
@@ -95,6 +96,8 @@ bool push_text_line(DrawCommandList &list, NodeId node_id, const DrawRect &rect,
       .font_size = font_size,
       .line_index = line_index,
       .align = align,
+      .reveal_boost = reveal_boost,
+      .reveal_step = reveal_step,
   };
   return list.push(command);
 }
@@ -426,8 +429,13 @@ bool append_text(DrawCommandList &list, const NodeSnapshot &node,
     if (line.slice_offset + line.slice_len > value_len)
       return false; // measurer returned an out-of-range slice — fail the frame
     DrawRect rect = {content.x + line.x, content.y + line.y, line.w, line.h};
+    // The reveal ramp lives at the trailing edge of the text, so it applies only
+    // to the last line of this node (earlier lines are fully settled).
+    const bool last_line = (i + 1 == metrics.line_count);
     if (!push_text_line(list, node.id, rect, value + line.slice_offset,
-                        line.slice_len, color, font_id, font_size, i, align))
+                        line.slice_len, color, font_id, font_size, i, align,
+                        last_line ? v.text.reveal_boost : 0,
+                        last_line ? v.text.reveal_step : 0))
       return false;
   }
 
