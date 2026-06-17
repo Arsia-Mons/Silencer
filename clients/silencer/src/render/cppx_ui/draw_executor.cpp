@@ -7,6 +7,10 @@
 #include "ui_draw_geometry.h"
 #include "ui/runtime/geometry.h"
 
+#ifndef SILENCER_HEADLESS
+#include <SDL3_ttf/SDL_ttf.h>
+#endif
+
 #include <cmath>
 #include <math.h>
 #include <string.h>
@@ -218,6 +222,7 @@ void render_text(SDL_Renderer *r, const ::ui::DrawCommandList &list,
   }
 
   // Uncached fallback (empty/over-long/failed): one-off rasterize + free.
+#ifndef SILENCER_HEADLESS
   TTF_Font *font = fonts->face(t.font_id);
   if (pixel_size > 0)
     TTF_SetFontSize(font, static_cast<float>(pixel_size));
@@ -232,6 +237,7 @@ void render_text(SDL_Renderer *r, const ::ui::DrawCommandList &list,
     SDL_DestroyTexture(texture);
   }
   SDL_DestroySurface(surface);
+#endif // SILENCER_HEADLESS
 }
 
 // Draw a textured Image command (design §9.7). Three paths:
