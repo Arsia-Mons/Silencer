@@ -1,5 +1,6 @@
 #include "react.h"
 
+#include <cstddef> // std::max_align_t (GCC needs the explicit include)
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -456,10 +457,10 @@ void **use_ref(void *initial) {
 // for every type we currently expect to store. Anything larger is rejected.
 
 static void *react_aligned_alloc(uint32_t size, uint32_t align) {
-    if (align > alignof(max_align_t)) {
+    if (align > alignof(std::max_align_t)) {
         react_report_error(
             "react: slot alignment %u exceeds max_align_t (%zu)\n",
-            (unsigned)align, (size_t)alignof(max_align_t));
+            (unsigned)align, (size_t)alignof(std::max_align_t));
         return nullptr;
     }
     if (size == 0)
