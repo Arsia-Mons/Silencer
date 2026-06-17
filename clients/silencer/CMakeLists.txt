@@ -306,10 +306,15 @@ set(SILENCER_CPPX_SOURCES
 	src/client/ui/screens/lobby_connect.hx
 	src/client/ui/screens/mission_summary.cppx
 	src/client/ui/screens/mission_summary.hx
-	# CharacterCreate (SIL-21): the fresh-account gateway — alias + agency →
-	# create → LOBBY (via the CREATECHARACTER tick reconcile).
+	# CharacterCreate (SIL-21): the fresh-account gateway — the roster phase screen
+	# + the alias modal and agency screen as ScreenStack overlays (back-nav is a
+	# stack pop), creating the agent → LOBBY (via the CREATECHARACTER tick reconcile).
 	src/client/ui/screens/character_create/character_create.cppx
 	src/client/ui/screens/character_create/character_create.hx
+	src/client/ui/screens/character_create/alias_modal.cppx
+	src/client/ui/screens/character_create/alias_modal.hx
+	src/client/ui/screens/character_create/agency_screen.cppx
+	src/client/ui/screens/character_create/agency_screen.hx
 	src/client/ui/screens/character_create/components/wizard_components.cppx
 	src/client/ui/screens/character_create/components/wizard_components.hx
 	# LobbyScreen (SIL-21 2/n + 3/n): the read cluster + the game-join cluster
@@ -552,7 +557,6 @@ set(_cppx_app_shell_sources
 	src/client/ui/app_shell/client_ui.cpp
 	src/client/ui/app_shell/navigation/screen_stack.cpp
 	src/client/ui/app_theme.cpp
-	src/client/ui/hooks/use_character_create.cpp
 	src/client/ui/providers/app_provider.cpp
 	src/client/ui/providers/chrome_textures_provider.cpp
 	src/client/ui/providers/clock_provider.cpp

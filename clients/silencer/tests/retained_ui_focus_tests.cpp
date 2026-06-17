@@ -12,6 +12,7 @@
 #include "ui/runtime/tree.h"
 #include "ui/runtime/yoga_flex_layout.h"
 
+#include <memory>
 #include <stdio.h>
 #include <string>
 
@@ -37,8 +38,17 @@ struct Menu {
   NodeId confirm = 0;
 };
 
+// A UiTree carries std::array<Node, UI_RETAINED_MAX_NODES> — multiple MB — so
+// Menu and FocusRuntime go on the heap; a stack instance blows the 1 MB stack.
+std::unique_ptr<Menu> new_menu() { return std::make_unique<Menu>(); }
+std::unique_ptr<FocusRuntime> new_focus() {
+  auto f = std::make_unique<FocusRuntime>();
+  focus_init(f.get());
+  return f;
+}
+
 NodeId push_button(UiTree &tree, const char *key, const char *control_id,
-                   const char *label, bool disabled) {
+                   const char *label, bool disabled, bool autofocus = false) {
   LayoutStyle style = {};
   style.width = Length::points(100.0f);
   style.height = Length::points(30.0f);
@@ -50,6 +60,7 @@ NodeId push_button(UiTree &tree, const char *key, const char *control_id,
   meta.accessibility_label = label;
   meta.interaction.focusable = true;
   meta.interaction.disabled = disabled;
+  meta.interaction.initial_focus = autofocus;
   tree.set_metadata(id, meta);
   tree.end_node();
   return id;
@@ -103,20 +114,52 @@ bool build_menu(Menu *out, bool with_modal) {
                              {320.0f, 240.0f});
 }
 
+// 3 buttons; the middle one autofocuses (slots: start=top, options=mid, confirm=bottom).
+bool build_autofocus_menu(Menu *out) {
+  out->tree.reset();
+
+  LayoutStyle root = {};
+  root.width = Length::points(320.0f);
+  root.height = Length::points(240.0f);
+  root.direction = FlexDirection::Column;
+  root.align_items = AlignItems::Start;
+  root.padding = {4.0f, 4.0f, 4.0f, 4.0f};
+  root.gap = 8.0f;
+
+  out->tree.begin_frame(320.0f, 240.0f);
+  out->tree.begin_keyed_node("Box", "root", root);
+  out->start = push_button(out->tree, "start", "StartButton", "Start", false);
+  out->options =
+      push_button(out->tree, "mid", "MidButton", "Mid", false, /*autofocus=*/true);
+  out->confirm = push_button(out->tree, "end", "EndButton", "End", false);
+  out->tree.end_node();
+  if (!out->tree.end_frame())
+    return false;
+  return compute_flex_layout(make_yoga_flex_layout_adapter(), out->tree,
+                             {320.0f, 240.0f});
+}
+
 bool navigation_skips_disabled_and_tracks_source() {
-  Menu menu = {};
+  auto menu_ = new_menu();
+  Menu &menu = *menu_;
   CHECK(build_menu(&menu, false));
 
-  FocusRuntime focus = {};
-  focus_init(&focus);
+  auto focus_ = new_focus();
+  FocusRuntime &focus = *focus_;
 
-  // No input: focus lands on the first enabled node, programmatically.
+  // No input: focus auto-defaults to the first enabled node.
   CHECK(focus_update(&focus, menu.tree, {}));
   CHECK(focus_focused_id(focus) == menu.start);
   CHECK(focus_changed_id(focus) == menu.start);
   CHECK(focus_source(focus) == FocusSource::Programmatic);
 
-  // Down skips the disabled middle button; keyboard source recorded.
+  // First Down enters from the top (seed is neutral) and becomes a real source.
+  CHECK(focus_update(&focus, menu.tree,
+                     {.nav_down = true, .source = FocusSource::Keyboard}));
+  CHECK(focus_focused_id(focus) == menu.start);
+  CHECK(focus_source(focus) == FocusSource::Keyboard);
+
+  // Now that focus is real, Down advances and skips the disabled middle button.
   CHECK(focus_update(&focus, menu.tree,
                      {.nav_down = true, .source = FocusSource::Keyboard}));
   CHECK(focus_focused_id(focus) == menu.options);
@@ -138,10 +181,11 @@ bool navigation_skips_disabled_and_tracks_source() {
 bool neutral_nav_enters_from_matching_edge() {
   // Down from neutral -> first enabled (start), not the second.
   {
-    Menu menu = {};
+    auto menu_ = new_menu();
+    Menu &menu = *menu_;
     CHECK(build_menu(&menu, false));
-    FocusRuntime focus = {};
-    focus_init(&focus);
+    auto focus_ = new_focus();
+    FocusRuntime &focus = *focus_;
     CHECK(focus_update(&focus, menu.tree,
                        {.nav_down = true, .source = FocusSource::Keyboard}));
     CHECK(focus_focused_id(focus) == menu.start);
@@ -149,10 +193,11 @@ bool neutral_nav_enters_from_matching_edge() {
 
   // Up from neutral -> last enabled (options), not the first.
   {
-    Menu menu = {};
+    auto menu_ = new_menu();
+    Menu &menu = *menu_;
     CHECK(build_menu(&menu, false));
-    FocusRuntime focus = {};
-    focus_init(&focus);
+    auto focus_ = new_focus();
+    FocusRuntime &focus = *focus_;
     CHECK(focus_update(&focus, menu.tree,
                        {.nav_up = true, .source = FocusSource::Keyboard}));
     CHECK(focus_focused_id(focus) == menu.options);
@@ -160,10 +205,11 @@ bool neutral_nav_enters_from_matching_edge() {
 
   // Tab from neutral -> first enabled (start).
   {
-    Menu menu = {};
+    auto menu_ = new_menu();
+    Menu &menu = *menu_;
     CHECK(build_menu(&menu, false));
-    FocusRuntime focus = {};
-    focus_init(&focus);
+    auto focus_ = new_focus();
+    FocusRuntime &focus = *focus_;
     CHECK(focus_update(&focus, menu.tree,
                        {.nav_next = true, .source = FocusSource::Keyboard}));
     CHECK(focus_focused_id(focus) == menu.start);
@@ -171,10 +217,11 @@ bool neutral_nav_enters_from_matching_edge() {
 
   // Shift+Tab from neutral -> last enabled (options).
   {
-    Menu menu = {};
+    auto menu_ = new_menu();
+    Menu &menu = *menu_;
     CHECK(build_menu(&menu, false));
-    FocusRuntime focus = {};
-    focus_init(&focus);
+    auto focus_ = new_focus();
+    FocusRuntime &focus = *focus_;
     CHECK(focus_update(&focus, menu.tree,
                        {.nav_previous = true, .source = FocusSource::Keyboard}));
     CHECK(focus_focused_id(focus) == menu.options);
@@ -182,8 +229,86 @@ bool neutral_nav_enters_from_matching_edge() {
   return true;
 }
 
+// After an idle frame auto-focuses the first node, the first nav must still
+// enter from the matching edge (Down->top, Up->bottom), not advance past it.
+bool auto_default_seed_does_not_defeat_neutral_entry() {
+  // Down from the seed -> top (start), now a real source.
+  {
+    auto menu_ = new_menu();
+    Menu &menu = *menu_;
+    CHECK(build_menu(&menu, false));
+    auto focus_ = new_focus();
+    FocusRuntime &focus = *focus_;
+    CHECK(focus_update(&focus, menu.tree, {}));
+    CHECK(focus_focused_id(focus) == menu.start);
+    CHECK(focus_source(focus) == FocusSource::Programmatic);
+    CHECK(focus_update(&focus, menu.tree,
+                       {.nav_down = true, .source = FocusSource::Keyboard}));
+    CHECK(focus_focused_id(focus) == menu.start);
+    CHECK(focus_source(focus) == FocusSource::Keyboard);
+  }
+  // Up from the seed -> bottom (options, skipping the disabled middle).
+  {
+    auto menu_ = new_menu();
+    Menu &menu = *menu_;
+    CHECK(build_menu(&menu, false));
+    auto focus_ = new_focus();
+    FocusRuntime &focus = *focus_;
+    CHECK(focus_update(&focus, menu.tree, {}));
+    CHECK(focus_focused_id(focus) == menu.start);
+    CHECK(focus_update(&focus, menu.tree,
+                       {.nav_up = true, .source = FocusSource::Keyboard}));
+    CHECK(focus_focused_id(focus) == menu.options);
+    CHECK(focus_source(focus) == FocusSource::Keyboard);
+  }
+  // Tab -> first.
+  {
+    auto menu_ = new_menu();
+    Menu &menu = *menu_;
+    CHECK(build_menu(&menu, false));
+    auto focus_ = new_focus();
+    FocusRuntime &focus = *focus_;
+    CHECK(focus_update(&focus, menu.tree, {}));
+    CHECK(focus_update(&focus, menu.tree,
+                       {.nav_next = true, .source = FocusSource::Keyboard}));
+    CHECK(focus_focused_id(focus) == menu.start);
+  }
+  // Shift+Tab -> last.
+  {
+    auto menu_ = new_menu();
+    Menu &menu = *menu_;
+    CHECK(build_menu(&menu, false));
+    auto focus_ = new_focus();
+    FocusRuntime &focus = *focus_;
+    CHECK(focus_update(&focus, menu.tree, {}));
+    CHECK(focus_update(&focus, menu.tree,
+                       {.nav_previous = true, .source = FocusSource::Keyboard}));
+    CHECK(focus_focused_id(focus) == menu.options);
+  }
+  return true;
+}
+
+// Explicit autofocus is a real focus: the first nav moves relative to it.
+bool explicit_autofocus_keeps_relative_nav() {
+  auto menu_ = new_menu();
+  Menu &menu = *menu_;
+  CHECK(build_autofocus_menu(&menu));
+
+  auto focus_ = new_focus();
+  FocusRuntime &focus = *focus_;
+  // Idle: explicit autofocus wins -> the middle button, not the first.
+  CHECK(focus_update(&focus, menu.tree, {}));
+  CHECK(focus_focused_id(focus) == menu.options);
+  // Down moves relative to it, to the last button.
+  CHECK(focus_update(&focus, menu.tree,
+                     {.nav_down = true, .source = FocusSource::Keyboard}));
+  CHECK(focus_focused_id(focus) == menu.confirm);
+  return true;
+}
+
 bool pointer_release_confirms_original_target() {
-  Menu menu = {};
+  auto menu_ = new_menu();
+  Menu &menu = *menu_;
   CHECK(build_menu(&menu, false));
 
   NodeSnapshot options = {};
@@ -191,8 +316,8 @@ bool pointer_release_confirms_original_target() {
   float x = options.layout.x + options.layout.width * 0.5f;
   float y = options.layout.y + options.layout.height * 0.5f;
 
-  FocusRuntime focus = {};
-  focus_init(&focus);
+  auto focus_ = new_focus();
+  FocusRuntime &focus = *focus_;
   CHECK(focus_update(&focus, menu.tree, {}));
 
   // Press over options focuses it (mouse source) but does not confirm yet.
@@ -220,19 +345,25 @@ bool pointer_release_confirms_original_target() {
 }
 
 bool modal_traps_then_restores_focus() {
-  Menu base = {};
+  auto base_ = new_menu();
+  Menu &base = *base_;
   CHECK(build_menu(&base, false));
 
-  FocusRuntime focus = {};
-  focus_init(&focus);
+  auto focus_ = new_focus();
+  FocusRuntime &focus = *focus_;
   CHECK(focus_update(&focus, base.tree, {}));
+  CHECK(focus_focused_id(focus) == base.start);
+  // First Down enters from the top; a second Down advances to options.
+  CHECK(focus_update(&focus, base.tree,
+                     {.nav_down = true, .source = FocusSource::Keyboard}));
   CHECK(focus_focused_id(focus) == base.start);
   CHECK(focus_update(&focus, base.tree,
                      {.nav_down = true, .source = FocusSource::Keyboard}));
   CHECK(focus_focused_id(focus) == base.options);
 
   // Opening a modal traps focus to the dialog subtree (its confirm button).
-  Menu modal = {};
+  auto modal_ = new_menu();
+  Menu &modal = *modal_;
   CHECK(build_menu(&modal, true));
   CHECK(focus_update(&focus, modal.tree, {}));
   CHECK(focus.active_scope_id == modal.dialog);
@@ -254,7 +385,8 @@ bool modal_traps_then_restores_focus() {
 // accessibility_label off the snapshot (the FindByLabel replacement). Assert
 // that data survives set_metadata -> snapshot.
 bool snapshot_exposes_automation_metadata() {
-  Menu menu = {};
+  auto menu_ = new_menu();
+  Menu &menu = *menu_;
   CHECK(build_menu(&menu, false));
 
   NodeSnapshot start = {};
@@ -277,6 +409,10 @@ int main() {
   if (!navigation_skips_disabled_and_tracks_source())
     return 1;
   if (!neutral_nav_enters_from_matching_edge())
+    return 1;
+  if (!auto_default_seed_does_not_defeat_neutral_entry())
+    return 1;
+  if (!explicit_autofocus_keeps_relative_nav())
     return 1;
   if (!pointer_release_confirms_original_target())
     return 1;

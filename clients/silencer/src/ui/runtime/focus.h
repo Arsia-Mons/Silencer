@@ -122,6 +122,9 @@ struct FocusRuntime {
   NodeId confirmed_id = 0;
   bool confirmed_by_pointer = false; // click-confirm vs keyboard confirm
   FocusSource source = FocusSource::None;
+  // focus came from auto-default, not real input; the next nav treats it as
+  // neutral and enters from the edge instead of advancing past it.
+  bool focused_is_auto_default = false;
   FocusScrollRequest scroll_request = {}; // SIL-213 scroll-into-view this frame
   int error_count = 0;
 };

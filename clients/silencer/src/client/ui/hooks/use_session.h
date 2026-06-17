@@ -41,6 +41,7 @@ struct Session {
   std::function<void()> open_character_create = {};
   std::function<void()> leave_match = {};
   std::function<void()> leave_to_menu = {};
+  std::function<void()> leave_to_previous = {};
   std::function<void(bool)> set_paused = {};
 };
 

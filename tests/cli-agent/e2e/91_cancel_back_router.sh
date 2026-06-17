@@ -130,8 +130,32 @@ cli --port "$PORT" wait_for_state --state CREATECHARACTER --timeout-ms 15000 >/d
 wfw "Create New Character"; cli --port "$PORT" click --label "Create New Character" >/dev/null
 wfw "Alias"; cli --port "$PORT" set_text --label "Alias" --text "Alice" >/dev/null
 cli --port "$PORT" key --key enter >/dev/null
+wfw "Noxis"
+
+# Wizard ESC pops one step at a time (agency -> alias -> roster), staying in
+# CREATECHARACTER; it leaves the screen only at the roster step.
+cli --port "$PORT" key --key escape >/dev/null
+wfw "Alias"
+expect "agency ESC -> alias step" "$(stateof)" CREATECHARACTER
+cli --port "$PORT" key --key escape >/dev/null
+wait_for_label "$PORT" "Alias" --gone
+expect "alias ESC -> roster step" "$(stateof)" CREATECHARACTER
+echo "ok: wizard ESC pops one step (agency -> alias -> roster)"
+
+# Re-advance and create a character to reach the lobby.
+wfw "Create New Character"; cli --port "$PORT" click --label "Create New Character" >/dev/null
+wfw "Alias"; cli --port "$PORT" set_text --label "Alias" --text "Alice" >/dev/null
+cli --port "$PORT" key --key enter >/dev/null
 wfw "Noxis"; cli --port "$PORT" click --label "Noxis" >/dev/null
 cli --port "$PORT" wait_for_state --state LOBBY --timeout-ms 15000 >/dev/null
+
+# From the lobby, open character select (Agents); ESC returns to the lobby, not
+# the main menu.
+wfw "Agents"; cli --port "$PORT" click --label "Agents" >/dev/null
+cli --port "$PORT" wait_for_state --state CREATECHARACTER --timeout-ms 15000 >/dev/null
+cli --port "$PORT" key --key escape >/dev/null
+cli --port "$PORT" wait_for_state --state LOBBY --timeout-ms 15000 >/dev/null
+echo "ok: character select ESC returns to the lobby (state=$(stateof))"
 
 cli --port "$PORT" key --key escape >/dev/null
 cli --port "$PORT" wait_for_state --state MAINMENU --timeout-ms 15000 >/dev/null

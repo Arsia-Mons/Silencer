@@ -1,0 +1,54 @@
+#include "client/ui/screens/character_create/alias_modal.h"
+
+#include "client/ui/hooks/use_navigation.h"
+#include "client/ui/screens/character_create/agency_screen.h"
+#include "client/ui/screens/character_create/components/wizard_components.h"
+#include "ui/runtime/react.h"
+
+#include <functional>
+#include <memory>
+#include <string>
+
+namespace client::ui {
+namespace {
+
+struct AliasModalProps {
+  uint32_t unused = 0;
+};
+
+::ui::UiElement AliasModalView(const AliasModalProps &) {
+  std::string *alias = use_state<std::string>(std::string());
+  if (!alias)
+    return ::ui::empty();
+  Navigation nav = use_navigation();
+
+  // origin cap: alias[17] (character_create_screen.h) — 16 chars.
+  std::function<void(const std::string &)> on_change =
+      [alias](const std::string &s) { *alias = s.substr(0, 16); };
+  // Enter confirms a non-empty alias: drop this overlay and open the agency
+  // overlay carrying it, so Escape from agency lands on the roster in one press.
+  std::function<void(const ::ui::ActivationEvent &)> on_enter =
+      [alias, nav](const ::ui::ActivationEvent &) {
+        if (alias->empty())
+          return;
+        if (nav.pop_current)
+          nav.pop_current();
+        if (nav.push)
+          nav.push(std::make_unique<AgencyScreen>(*alias));
+      };
+
+  return AliasFloat(alias->c_str(), on_change, on_enter);
+}
+
+} // namespace
+
+bool AliasModalScreen::build_element(::ui::UiElementFrame &,
+                                     ::ui::UiElement *out) {
+  if (!out)
+    return false;
+  *out = ::ui::component("AliasModalView", AliasModalProps{}, AliasModalView,
+                         "alias-modal");
+  return true;
+}
+
+} // namespace client::ui

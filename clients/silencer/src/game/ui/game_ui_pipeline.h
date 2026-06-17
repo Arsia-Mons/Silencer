@@ -179,6 +179,11 @@ private:
     // published to screens via the AppProvider (use_app().canvas_w).
     float cppxCanvasW_ = 0.0f;
 
+    // Previous projected phase, so a phase screen's back can return to it (phase
+    // screens aren't on the ScreenStack, so there's nothing to pop).
+    client::ui::SessionPhase sessionPhaseCurrent_{};
+    client::ui::SessionPhase sessionPhasePrevious_{};
+
     // SIL-87: baked legacy-sprite chrome ids, re-baked when the host resets its
     // renderer (resize). Populated after ensure(), read by the ChromeTexturesProvider
     // in the per-frame provider chain.

@@ -326,22 +326,18 @@ bool focused_text_input_should_handle_navigation(const UiTree &tree,
   return input.text_event_count > 0 || input.editing_event_count > 0;
 }
 
-NodeId first_enabled(const FocusRuntime &runtime) {
+// First enabled node that opts into autofocus, else 0.
+NodeId first_initial_focus(const FocusRuntime &runtime) {
   for (int i = 0; i < runtime.focusable_count; ++i) {
     if (runtime.focusables[i].initial_focus && !runtime.focusables[i].disabled)
-      return runtime.focusables[i].id;
-  }
-  for (int i = 0; i < runtime.focusable_count; ++i) {
-    if (!runtime.focusables[i].disabled)
       return runtime.focusables[i].id;
   }
   return 0;
 }
 
-// First/last enabled node in pure document (array) order. Unlike first_enabled
-// these have no initial_focus preference: edge entry from a neutral state must
-// be the true topmost/bottommost item, matching resolve_sequential's Tab /
-// Shift+Tab.
+// First/last enabled node in pure document (array) order, with no initial_focus
+// preference: edge entry from a neutral state must be the true topmost/bottommost
+// item, matching resolve_sequential's Tab / Shift+Tab.
 NodeId first_enabled_in_order(const FocusRuntime &runtime) {
   for (int i = 0; i < runtime.focusable_count; ++i) {
     if (!runtime.focusables[i].disabled)
@@ -468,6 +464,20 @@ NodeId resolve_spatial(const FocusRuntime &runtime, NodeId from_id,
   return best ? best->id : from_id;
 }
 
+// Apply a resolved nav target. If edge-entry landed back on the same
+// auto-default seed, set_focus no-ops, so promote its source to a real one.
+void commit_nav_focus(FocusRuntime &runtime, NodeId next,
+                      const InputFrame &input) {
+  if (next == 0)
+    return;
+  if (!set_focus(runtime, next, navigation_source(input)) &&
+      runtime.focused_is_auto_default && same_id(next, runtime.focused_id)) {
+    runtime.source = navigation_source(input);
+    runtime.focus_changed_id = next;
+  }
+  runtime.focused_is_auto_default = false;
+}
+
 } // namespace
 
 void focus_init(FocusRuntime *runtime) {
@@ -518,26 +528,26 @@ bool focus_update(FocusRuntime *runtime, const UiTree &tree,
     set_focus(*runtime, runtime->previous_focus_before_modal,
               FocusSource::Programmatic);
     runtime->previous_focus_before_modal = 0;
+    runtime->focused_is_auto_default = false;
   } else if (!nav_present && !contains_enabled(*runtime, runtime->focused_id)) {
-    NodeId next = first_enabled(*runtime);
+    NodeId explicit_focus = first_initial_focus(*runtime);
+    NodeId next = explicit_focus != 0 ? explicit_focus
+                                      : first_enabled_in_order(*runtime);
     set_focus(*runtime, next,
               next != 0 ? FocusSource::Programmatic : FocusSource::None);
+    runtime->focused_is_auto_default = (explicit_focus == 0 && next != 0);
   }
 
   FocusDirection dir = FocusDirection::Down;
+  NodeId nav_from = runtime->focused_is_auto_default ? 0 : runtime->focused_id;
   if (input.nav_next || input.nav_previous) {
-    NodeId next =
-        resolve_sequential(*runtime, runtime->focused_id, input.nav_previous);
-    if (next != 0 && !same_id(next, runtime->focused_id)) {
-      set_focus(*runtime, next, navigation_source(input));
-    }
+    NodeId next = resolve_sequential(*runtime, nav_from, input.nav_previous);
+    commit_nav_focus(*runtime, next, input);
   } else if (read_nav_dir(input, &dir) &&
              !focused_text_input_should_handle_navigation(tree, *runtime, input,
                                                           dir)) {
-    NodeId next = resolve_spatial(*runtime, runtime->focused_id, dir);
-    if (next != 0 && !same_id(next, runtime->focused_id)) {
-      set_focus(*runtime, next, navigation_source(input));
-    }
+    NodeId next = resolve_spatial(*runtime, nav_from, dir);
+    commit_nav_focus(*runtime, next, input);
   }
 
   if (input.pointer_pressed) {
@@ -545,6 +555,7 @@ bool focus_update(FocusRuntime *runtime, const UiTree &tree,
     runtime->pointer_press_origin = hovered;
     if (hovered != 0) {
       set_focus(*runtime, hovered, pointer_source(input));
+      runtime->focused_is_auto_default = false;
     }
   }
 

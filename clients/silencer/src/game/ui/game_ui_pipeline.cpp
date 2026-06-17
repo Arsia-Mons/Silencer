@@ -1307,7 +1307,12 @@ void GameUiPipeline::RenderCppxClientUiFrame(Surface &surface) {
             // Assemble the session model fresh each frame: read projection + intent
             // closures over the public Game command seam (no friend, no handle leak).
             client::ui::Session session = {};
-            session.phase = CurrentSessionPhase();
+            const client::ui::SessionPhase phase = CurrentSessionPhase();
+            if (phase != sessionPhaseCurrent_) {
+                sessionPhasePrevious_ = sessionPhaseCurrent_;
+                sessionPhaseCurrent_ = phase;
+            }
+            session.phase = phase;
             session.authenticated = (game.world.lobby.state == Lobby::AUTHENTICATED);
             session.paused = game.paused;
             session.is_live_multiplayer = game.IsLiveMultiplayer();
@@ -1317,6 +1322,11 @@ void GameUiPipeline::RenderCppxClientUiFrame(Surface &surface) {
             session.open_character_create = [this] { game.GoToState(GameState::CREATECHARACTER); };
             session.leave_match = [this] { game.LeaveMatchToMenu(); };
             session.leave_to_menu = [this] { game.GoToState(GameState::MAINMENU); };
+            session.leave_to_previous = [this] {
+                game.GoToState(sessionPhasePrevious_ == client::ui::SessionPhase::Lobby
+                                   ? GameState::LOBBY
+                                   : GameState::MAINMENU);
+            };
             session.set_paused = [this](bool p) { game.paused = p; };
 
             // Updater model: poll the self-updater's main-thread-safe atomics + map its

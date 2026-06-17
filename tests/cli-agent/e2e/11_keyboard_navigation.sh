@@ -41,6 +41,9 @@ if [ "$(focused_label)" != "Tutorial" ]; then
   echo "FAIL 11_keyboard_navigation: expected initial focus on Tutorial, got '$(focused_label)'" >&2
   exit 1
 fi
+# Nothing is really focused at rest, so the first Tab enters from the top (stays
+# on Tutorial); later Tabs cycle forward, Shift+Tab backward (both wrap).
+press_and_expect_focus tab "Tutorial"
 press_and_expect_focus tab "Connect To Lobby"
 press_and_expect_focus tab "Options"
 press_and_expect_focus tab "Exit"

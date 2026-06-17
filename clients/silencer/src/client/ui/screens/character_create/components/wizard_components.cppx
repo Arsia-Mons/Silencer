@@ -6,7 +6,6 @@
 #include "client/ui/components/surfaces/surfaces.h"
 #include "client/ui/components/text/text.h"
 #include "client/ui/components/tokens.h"
-#include "client/ui/hooks/use_character_create.h"
 #include "client/ui/hooks/use_characters.h"
 #include "client/ui/hooks/use_chrome.h"
 #include "client/ui/screens/character_create/lib/wizard_frame.h"
@@ -295,39 +294,20 @@ constexpr ::ui::Color kAliasFrameBorder = {84, 156, 104, 255};
 
 } // namespace
 
-// step 1 — origin/main "SILENCER ALIAS": the SELECT AGENT two-pane frame
-// behind + a floating ALIAS panel centered over it with a single editable
-// field (Enter confirms; no visible buttons). The frame reuses step 0's chrome.
-::ui::UiElement AliasStep(const CharacterWizard &w,
-                          std::function<void(const ::ui::ActivationEvent &)>
-                              on_alias_enter) {
+// "SILENCER ALIAS": the floating alias capsule over a transparent, focus-trapped
+// CenteredOverlay. The roster base screen shows through behind it; Enter confirms
+// (no visible buttons). Absolutely positioned at the origin/main capsule anchor.
+::ui::UiElement AliasFloat(
+    const char *alias_value,
+    std::function<void(const std::string &)> on_change,
+    std::function<void(const ::ui::ActivationEvent &)> on_enter) {
   client::ui::ChromeTextures chrome = use_chrome();
   // Chromeless field over the baked input well in the dialog_pw modal sprite
   // (origin's TextInput draws no well of its own); caret = palette idx 140 on
   // the menu palette (yellow).
   const ::ui::StyleStatePatch alias_field_style =
       tokens::chromeless_field_style(chrome.caret_menu, tokens::kTextBody);
-  return <ScreenLayout key="aliasmodal" variant={ScreenLayoutVariant::Overlay}>
-    <Box key="frame" layout={wizard_frame_layout()} style={wizard_frame_style(chrome)}>
-      <Box key="leftpane" layout={wizard_left_pane_layout()}>
-        {pane_header("SELECT AGENT")}
-        <Box
-          key="neww"
-          layout={::ui::LayoutStyle{
-            .margin = {-1.0f, 1.0f, -3.5f, 3.5f}}}
-        >
-          <AppButton
-            key="new"
-            controlId="CreateNewCharacterBg"
-            variant={AppButtonVariant::Oval}
-            size={AppButtonSize::List}
-            label="Create New Character"
-            onPress={w.open_alias}
-          />
-        </Box>
-      </Box>
-      <Box key="rightpane" layout={wizard_right_spacer_layout()} />
-    </Box>
+  return <ScreenLayout key="aliasmodal" variant={ScreenLayoutVariant::CenteredOverlay}>
     <Box
       key="aliasfloat"
       layout={::ui::LayoutStyle{
@@ -365,9 +345,9 @@ constexpr ::ui::Color kAliasFrameBorder = {84, 156, 104, 255};
           id="Alias"
           autofocus={true}
           accessibility={{.label = "Alias"}}
-          onActivate={on_alias_enter}
-          value={w.alias.c_str()}
-          onChange={w.set_alias}
+          onActivate={on_enter}
+          value={alias_value}
+          onChange={on_change}
           layout={::ui::LayoutStyle{
             .align_items = ::ui::AlignItems::Center,
             .justify_content = ::ui::JustifyContent::Start,
@@ -384,12 +364,10 @@ constexpr ::ui::Color kAliasFrameBorder = {84, 156, 104, 255};
 // step 2 — origin/main "SELECT AGENCY": LEFT pane = SELECT AGENCY title + the
 // five agency ovals; RIGHT pane = Advantages + Description over the Mars
 // backdrop. No outer wizard panel, no Back button (Esc cancels), no subtitle.
-::ui::UiElement AgencyStep(const CharacterWizard &w,
-                           std::function<void(int)> on_pick) {
-  const int pi =
-      (w.preview_agency >= 0 && w.preview_agency < kAgencyCount) ? w.preview_agency : 0;
+::ui::UiElement AgencyStep(int preview, std::function<void(int)> on_pick,
+                           std::function<void(int)> set_preview) {
+  const int pi = (preview >= 0 && preview < kAgencyCount) ? preview : 0;
   const AgencyInfo &a = kAgencies[pi];
-  std::function<void(int)> set_preview = w.set_preview_agency;
   client::ui::ChromeTextures chrome = use_chrome();
   return <ScreenLayout key="agencyscreen" variant={ScreenLayoutVariant::Overlay}>
     <Box key="frame" layout={wizard_frame_layout()} style={wizard_frame_style(chrome)}>
@@ -445,14 +423,13 @@ constexpr ::ui::Color kAliasFrameBorder = {84, 156, 104, 255};
 
 // step 0 — SELECT AGENT: LEFT pane = the roster + Create New Character; RIGHT
 // pane previews the currently focused/hovered existing agent, matching origin.
-::ui::UiElement RosterStep(const CharacterWizard &w, const Characters &chars,
-                           std::function<void(int)> on_select) {
+::ui::UiElement RosterStep(const Characters &chars, int preview_in,
+                           std::function<void(int)> on_select,
+                           std::function<void(int)> set_preview,
+                           std::function<void()> on_create) {
   client::ui::ChromeTextures chrome = use_chrome();
   const int preview =
-      (w.preview_agent >= 0 && w.preview_agent < (int)chars.profiles.size())
-          ? w.preview_agent
-          : 0;
-  std::function<void(int)> set_preview = w.set_preview_agent;
+      (preview_in >= 0 && preview_in < (int)chars.profiles.size()) ? preview_in : 0;
   return <ScreenLayout key="roster" variant={ScreenLayoutVariant::Overlay}>
     <Box key="frame" layout={wizard_frame_layout()} style={wizard_frame_style(chrome)}>
       <Box key="leftpane" layout={wizard_left_pane_layout()}>
@@ -473,7 +450,7 @@ constexpr ::ui::Color kAliasFrameBorder = {84, 156, 104, 255};
             variant={AppButtonVariant::Oval}
             size={AppButtonSize::List}
             label="Create New Character"
-            onPress={w.open_alias}
+            onPress={on_create}
           />
         </Box>
       </Box>

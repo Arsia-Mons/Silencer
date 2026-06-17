@@ -30,12 +30,23 @@ options_dialog_open() {
   '
 }
 
-# Main-menu focus order: Play Online -> Tutorial -> Options -> Quit, with
-# initial focus on "Play Online" (index 0). Two "down" presses move focus to
-# "Options". A third "down" would land on "Quit" and activating it quits the
-# app (the control connection would then refuse further ops).
+# Main-menu focus order: Tutorial -> Connect To Lobby -> Options -> Exit. The
+# first "down" enters from the top (Tutorial); each later "down" advances one,
+# so three downs land on "Options".
 cli --port "$PORT" key --key down >/dev/null
+cli --port "$PORT" wait_frames --n 2 >/dev/null
+
+# The first directional press must focus the top item, not the second.
+first="$(focused_label)"
+if [ "$first" != "Tutorial" ]; then
+  echo "FAIL 14_directional_navigation: first 'down' should focus top item 'Tutorial', got '$first'" >&2
+  exit 1
+fi
+
 cli --port "$PORT" key --key down >/dev/null
+cli --port "$PORT" wait_frames --n 2 >/dev/null
+cli --port "$PORT" key --key down >/dev/null
+cli --port "$PORT" wait_frames --n 2 >/dev/null
 
 # Verify directional nav landed focus on "Options" before activating it.
 landed="$(focused_label)"

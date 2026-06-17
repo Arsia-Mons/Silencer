@@ -1,72 +1,52 @@
 #include "client/ui/screens/character_create/character_create.h"
 
 #include "client/ui/hooks/use_cancel.h"
-#include "client/ui/hooks/use_character_create.h"
 #include "client/ui/hooks/use_characters.h"
+#include "client/ui/hooks/use_navigation.h"
 #include "client/ui/hooks/use_session.h"
+#include "client/ui/screens/character_create/alias_modal.h"
 #include "client/ui/screens/character_create/components/wizard_components.h"
 #include "ui/runtime/react.h"
-#include "ui/runtime/tree.h" // ActivationEvent
 
 #include <functional>
+#include <memory>
 
 namespace client::ui {
 namespace {
-
-using ::ui::children;
-
-// The wizard cursor state machine — CharacterCreateProvider (owns the use_state
-// cells) + use_character_create() (the reducer) — lives in
-// hooks/use_character_create.{h,cpp}. The step pages live in
-// components/wizard_components. This file is just the orchestration: mount the
-// provider, read the wizard cursor, and pick the step.
-
-struct CharacterCreateContentProps {
-  const char *key = nullptr;
-};
-
-// The wizard is a staged single-root view: roster → alias → agency. (Rendering
-// the alias/agency as true modals layered over the roster needs overlay
-// stack-entries, since the flex layout has no absolute/z stacking — a noted
-// follow-up for the test-17 background-trap semantics.)
-::ui::UiElement CharacterCreateContent(const CharacterCreateContentProps &) {
-  CharacterWizard w = use_character_create();
-  Characters chars = use_characters();
-  Session session = use_session();
-  // ESC / controller back / the `back` op leave character create to the menu.
-  use_cancel(session.leave_to_menu);
-
-  std::function<void(int)> on_pick = [create = chars.create, alias = w.alias,
-                                      submitting = w.submitting,
-                                      begin = w.begin_submit](int agency) {
-    if (submitting)
-      return;
-    if (begin)
-      begin();
-    if (create)
-      create(alias, agency);
-  };
-  std::function<void(const ::ui::ActivationEvent &)> on_alias_enter =
-      [confirm = w.confirm_alias](const ::ui::ActivationEvent &) {
-        if (confirm)
-          confirm();
-      };
-
-  if (w.step == 1)
-    return AliasStep(w, on_alias_enter);
-  if (w.step == 2)
-    return AgencyStep(w, on_pick);
-  return RosterStep(w, chars, chars.select);
-}
 
 struct CharacterCreateProps {
   uint32_t unused = 0;
 };
 
+// The CharacterCreate phase screen is now just the SELECT AGENT roster (stack
+// entry under AppRoot). The alias + agency steps are ScreenStack overlays
+// (AliasModalScreen → AgencyModalScreen) pushed above it, so back-nav is a
+// genuine stack pop and the roster stays mounted/visible behind the alias modal.
+// The only screen-local state is the agent preview cursor for the right pane.
 ::ui::UiElement CharacterCreateView(const CharacterCreateProps &) {
-  return <CharacterCreateProvider key="provider">
-    <CharacterCreateContent key="content" />
-  </CharacterCreateProvider>
+  int *preview = use_state<int>(0);
+  if (!preview)
+    return ::ui::empty();
+  Characters chars = use_characters();
+  Session session = use_session();
+  Navigation nav = use_navigation();
+
+  // At the roster (no overlay up), Escape leaves to the previous screen.
+  use_cancel([leave = session.leave_to_previous]() {
+    if (leave)
+      leave();
+  });
+
+  std::function<void(int)> set_preview = [preview](int idx) {
+    if (idx >= 0)
+      *preview = idx;
+  };
+  std::function<void()> open_alias = [nav]() {
+    if (nav.push)
+      nav.push(std::make_unique<AliasModalScreen>());
+  };
+
+  return RosterStep(chars, *preview, chars.select, set_preview, open_alias);
 }
 
 } // namespace
