@@ -313,12 +313,18 @@ int parse_u8_option(const std::string &value, int fallback, int lo, int hi) {
 
 
 ::ui::UiElement option_label(const char *key, const char *label) {
+  // The label column is sized to the WIDEST option label ("Max Players:" /
+  // "Spectatable:" measure 108pt in the body face), so every value starts at the
+  // same x — a left-aligned value column hugging the labels — instead of a fat
+  // fixed box that strands empty space between label and value. Flex can't
+  // auto-size a column across independent rows, so this is the measured longest
+  // label, not a flex_grow (which would shove values to the panel edge).
+  constexpr float kLabelColW = 108.0f;
   return <Box
     key={key}
     layout={::ui::LayoutStyle{
-      .min_width = ::ui::Length::points(0.0f),
-      .flex_basis = ::ui::Length::points(0.0f),
-      .flex_grow = ::ui::StyleFloat::points(1.0f)}}
+      .width = ::ui::Length::points(kLabelColW),
+      .flex_shrink = ::ui::StyleFloat::points(0.0f)}}
   >
     <BodyText key="l" variant={BodyTextVariant::Body} value={label} />
   </Box>
