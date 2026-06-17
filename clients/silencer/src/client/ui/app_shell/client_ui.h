@@ -113,6 +113,15 @@ private:
   void clear_mutations();
   void apply_mutation(QueuedMutation &mutation);
   static bool is_structural(MutationKind kind);
+  // Whether a PopCurrent for this entry is already queued (held behind the
+  // transition fade). Lets the cancel router skip screens that are already on
+  // their way out so rapid cancels chain DOWN the stack.
+  bool is_pending_pop(UiScreenEntryId entry_id) const;
+  // The screen a cancel edge should act on: the topmost screen not already
+  // queued for pop. With nothing pending this is just the top screen; mid-fade
+  // it is the next screen down, so mashing ESC walks back instead of re-firing
+  // the still-held top screen.
+  UiScreen *effective_cancel_target() const;
 
   ScreenStack screens_;
   ::ui::UiElementFrame retained_element_frame_ = {};

@@ -5,6 +5,7 @@
 #include "client/ui/components/text/text.h"
 #include "client/ui/components/tokens.h"
 #include "client/ui/hooks/use_app.h"
+#include "client/ui/hooks/use_cancel.h"
 #include "client/ui/hooks/use_chrome.h"
 #include "client/ui/hooks/use_clock.h"
 #include "client/ui/hooks/use_navigation.h"
@@ -128,6 +129,15 @@ constexpr float kFooterBottom = 17.0f * kCompScale; // 25.5
     if (nav.push)
       nav.push(std::make_unique<OptionsScreen>());
   };
+
+  // origin/main: ESC/back at the main menu quits (MainMenuScreen::HandleBack →
+  // RequestQuit). With the cancel router chaining pops down the stack, mashing
+  // ESC walks back from any menu to here and then exits — same as the Quit
+  // button (guarded by can_quit while a teardown is in flight).
+  use_cancel([app]() {
+    if (app.can_quit && app.quit)
+      app.quit();
+  });
 
   ::ui::UiElement logo = ScreenTitle(ScreenTitleProps{.key = "logotxt",
                                                       .variant = ScreenTitleVariant::Hero,

@@ -51,6 +51,13 @@ void ClientUi::register_frame_cancel_handler(UiScreenEntryId entry_id,
 void ClientUi::build_visible_screens(const UiElementWrapper &wrap_root) {
   ::ui::UiElementFrameScope frame_scope(retained_element_frame_);
   ::ui::Span<UiScreen *> visible = screens_.visible_screens();
+  // The screen that owns the cancel edge this frame: the topmost one not already
+  // queued for pop (held mutations from prior frames survive the fade). Equals
+  // the visible top unless a pop is mid-fade, in which case the cancel edge
+  // belongs to the screen below — so a chained ESC walks down past the screens
+  // already on their way out.
+  const UiScreen *cancel_top = effective_cancel_target();
+  const UiScreenEntryId cancel_top_id = cancel_top ? cancel_top->entry_id() : 0;
   for (int i = 0; i < visible.count; ++i) {
     // Descriptors and copied props only need to live through the immediate
     // commit below. Reset per visible screen so overlay stacks do not exhaust
@@ -64,6 +71,7 @@ void ClientUi::build_visible_screens(const UiElementWrapper &wrap_root) {
           .client_ui = this,
           .current_entry_id = screen->entry_id(),
           .is_top = i == visible.count - 1,
+          .is_cancel_top = screen->entry_id() == cancel_top_id,
       };
       ::ui::UiElement root = {};
       if (!screen->build_element(retained_element_frame_, &root)) {
@@ -138,17 +146,45 @@ void ClientUi::end_layout(const ::ui::UiInputFrame &input) {
   // screen's registration is what makes it correct when an overlay sits over
   // the base phase screen: the overlay is top, so its handler (or the default
   // pop) wins and the base screen's stale registration is ignored.
+  //
+  // The cancel acts on the topmost screen NOT already queued for pop, not the
+  // raw top. A menu pop is held behind the out→in transition fade (the
+  // composition root commits it at black), so the screen being popped stays on
+  // the stack for the duration. Targeting the raw top would make a second ESC
+  // re-pop that same held screen — the press is wasted and the fade looks like
+  // it just restarts. Skipping pending pops makes rapid ESC chain DOWN the
+  // stack: each press queues a distinct pop, and they all commit together at
+  // the next black, walking quickly back toward the main menu (origin feel).
   if (!input.cancel_pressed)
     return;
-  UiScreen *top = screens_.top();
-  if (!top)
+  UiScreen *target = effective_cancel_target();
+  if (!target)
     return;
-  if (cancel_slot_.present && cancel_slot_.entry_id == top->entry_id() &&
+  if (cancel_slot_.present && cancel_slot_.entry_id == target->entry_id() &&
       cancel_slot_.handler) {
     cancel_slot_.handler();
-  } else if (top->kind() == ScreenKind::Overlay) {
-    queue_pop_current(top->entry_id());
+  } else if (target->kind() == ScreenKind::Overlay) {
+    queue_pop_current(target->entry_id());
   }
+}
+
+bool ClientUi::is_pending_pop(UiScreenEntryId entry_id) const {
+  for (int i = 0; i < mutation_count_; ++i) {
+    const QueuedMutation &m = mutations_[i];
+    if (m.kind == MutationKind::PopCurrent && m.entry_id == entry_id)
+      return true;
+  }
+  return false;
+}
+
+UiScreen *ClientUi::effective_cancel_target() const {
+  for (int i = screens_.count() - 1; i >= 0; --i) {
+    UiScreen *s = screens_.at(i);
+    if (!s || is_pending_pop(s->entry_id()))
+      continue;
+    return s;
+  }
+  return nullptr;
 }
 
 bool ClientUi::update_retained_runtime(const ::ui::FlexLayoutAdapter &layout,

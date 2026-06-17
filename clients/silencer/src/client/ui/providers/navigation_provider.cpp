@@ -64,11 +64,14 @@ Navigation use_navigation() {
 void use_cancel(std::function<void()> on_cancel) {
   NavigationProviderValue *value =
       use_navigation_provider_value("use_cancel");
-  if (!value || !value->is_top || !on_cancel)
+  if (!value || !value->is_cancel_top || !on_cancel)
     return;
-  // Only the top screen owns the cancel edge; register its handler for this
-  // frame's central cancel pass. The closure is captured by value, surviving
-  // the arena reset at tree end_frame.
+  // The cancel-top screen (topmost not already queued for pop) owns the cancel
+  // edge — not necessarily the visible top. While a menu pop is held behind the
+  // fade, the dismissing screen stays visible but the screen below is cancel-top,
+  // so a chained ESC reaches it (e.g. the base main menu can quit mid-fade-out).
+  // The closure is captured by value, surviving the arena reset at tree
+  // end_frame.
   value->client_ui->register_frame_cancel_handler(value->current_entry_id,
                                                   std::move(on_cancel));
 }
