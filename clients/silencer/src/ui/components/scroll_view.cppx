@@ -179,14 +179,29 @@ using ::ui::children;
   if (props.show_scrollbar && max_off > 0.0f && viewport_height > 0.0f &&
       content_height > 0.0f) {
     constexpr float kTrackInset = 2.0f; // top+bottom clearance from the well edge
+    // The rail is a 1px-bordered box; the thumb is an absolutely-positioned
+    // child whose inset Yoga measures from the rail's OUTER border-box edge (not
+    // the padding edge). So the thumb must be inset by border + a clearance gap
+    // on every side, and it must TRAVEL only within that inner area — otherwise
+    // its fill paints over the rail's hairline (top border at offset 0, bottom
+    // border at max offset, and the left/right borders if it spans full width).
+    constexpr float kRailBorder = 1.0f; // rail hairline width (matches track_paint)
+    constexpr float kThumbGap = 1.0f;   // visible clearance thumb<->border inner edge
+    constexpr float kThumbInset = kRailBorder + kThumbGap; // thumb inset, every side
     const float track_h = std::max(0.0f, viewport_height - 2.0f * kTrackInset);
-    const float ratio = track_h > 0.0f ? track_h / content_height : 0.0f;
-    float thumb_h = track_h * ratio;
+    // Vertical area the thumb may occupy, clear of the top+bottom hairlines+gap.
+    const float thumb_travel = std::max(0.0f, track_h - 2.0f * kThumbInset);
+    const float ratio =
+        content_height > 0.0f ? thumb_travel / content_height : 0.0f;
+    float thumb_h = thumb_travel * ratio;
     if (thumb_h < 16.0f)
       thumb_h = 16.0f;
-    if (thumb_h > track_h)
-      thumb_h = track_h;
-    const float thumb_top = (track_h - thumb_h) * (*offset / max_off);
+    if (thumb_h > thumb_travel)
+      thumb_h = thumb_travel;
+    // Top inset (from the rail's outer edge) keeps a full kThumbInset above the
+    // thumb at offset 0 and below it at max offset.
+    const float thumb_top =
+        kThumbInset + (thumb_travel - thumb_h) * (*offset / max_off);
 
     ::ui::LayoutStyle track = {};
     track.position = ::ui::PositionType::Absolute;
@@ -196,19 +211,20 @@ using ::ui::children;
     track.height = ::ui::Length::points(track_h);
     // origin/main green-phosphor scroll box (measured from the v00058 goldens):
     // a bright idx220 inner-well rail outlines the gutter, with the thumb riding
-    // inside it (1px inset on each side) as a flat darker idx216 green fill. These
-    // mirror silencer::tokens kInsetStroke/kChromeStroke, which this
-    // screen-agnostic engine layer cannot include.
+    // inside it (1px border + 1px gap on each side) as a flat darker idx216 green
+    // fill that never touches the frame. These mirror silencer::tokens
+    // kInsetStroke/kChromeStroke, which this screen-agnostic engine layer cannot
+    // include.
     const ::ui::Color rail_stroke{24, 124, 20, 255};
     const ::ui::Color thumb_fill{8, 84, 0, 255};
     ::ui::StylePatch track_paint = ::ui::patch().border(::ui::Border{
-        {1.0f, 1.0f, 1.0f, 1.0f},
+        {kRailBorder, kRailBorder, kRailBorder, kRailBorder},
         {rail_stroke, rail_stroke, rail_stroke, rail_stroke}});
 
     ::ui::LayoutStyle thumb = {};
     thumb.position = ::ui::PositionType::Absolute;
-    thumb.position_inset.left = ::ui::StyleValue::points(1.0f);
-    thumb.position_inset.right = ::ui::StyleValue::points(1.0f);
+    thumb.position_inset.left = ::ui::StyleValue::points(kThumbInset);
+    thumb.position_inset.right = ::ui::StyleValue::points(kThumbInset);
     thumb.position_inset.top = ::ui::StyleValue::points(thumb_top);
     thumb.height = ::ui::Length::points(thumb_h);
 
