@@ -140,28 +140,14 @@ constexpr float kFooterBottom = 17.0f * kCompScale; // 25.5
     if (frame.id && frame.w > 0 && frame.h > 0) {
       const float stage_w = static_cast<float>(chrome.logo_stage_w) * kLogoScale;
       const float stage_h = static_cast<float>(chrome.logo_stage_h) * kLogoScale;
-      const float frame_w = static_cast<float>(frame.w) * kLogoScale;
-      const float frame_h = static_cast<float>(frame.h) * kLogoScale;
-      // The stage is a relative, content-sized containing block the logo column
-      // centers; the animation frame floats absolutely at its baked stage offset.
+      // Each animation frame is precomposited into this fixed stage so the
+      // renderer draws the same rect every frame.
       logo = Box(BoxProps{
           .key = "logostage",
           .layout = ::ui::LayoutStyle{
-              .always_forms_containing_block = true,
               .width = ::ui::Length::points(stage_w),
               .height = ::ui::Length::points(stage_h)},
-          .style = tokens::chromeless_clear_patch(),
-          .children = children({Box(BoxProps{
-              .key = "logoimg",
-              .layout = ::ui::LayoutStyle{
-                  .position = ::ui::PositionType::Absolute,
-                  .width = ::ui::Length::points(frame_w),
-                  .height = ::ui::Length::points(frame_h),
-                  .position_inset = ::ui::EdgeSizes{std::floor(static_cast<float>(frame.x) * kLogoScale),
-                                                    {},
-                                                    std::floor(static_cast<float>(frame.y) * kLogoScale),
-                                                    {}}},
-              .style = tokens::image_patch(frame.id)})})});
+          .style = tokens::image_patch(frame.id)});
     }
   } else if (chrome.logo) {
     const float logo_w = static_cast<float>(chrome.logo_w) * kLogoScale;

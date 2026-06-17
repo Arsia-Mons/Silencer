@@ -26,7 +26,7 @@ cli --port "$PORT" wait_for_state --state MAINMENU --timeout-ms 15000 >/dev/null
 # rather than transitioning the game state machine.
 options_dialog_present() {
   cli --port "$PORT" inspect | bun -e '
-  const i = JSON.parse(await Bun.stdin.text());
+  const i = JSON.parse(await new Response(Bun.stdin.stream()).text());
   const nodes = i.nodes ?? [];
   const hasDialog = nodes.some((n) => n.role === "dialog");
   const hasGoBack = nodes.some((n) => n.role === "button" && n.label === "Go Back");

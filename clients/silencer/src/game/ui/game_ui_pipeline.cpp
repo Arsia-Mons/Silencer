@@ -448,8 +448,9 @@ void GameUiPipeline::BakeChromeTextures(int rw, int rh, float uiScale,
         }
     }
     if (!deferredPass) {
-        // bank 208 frames 29..60 — the animated SILENCER logo. Origin draws each
-        // native-size frame inside a fixed union stage derived from sprite offsets.
+        // bank 208 frames 29..60 — the animated SILENCER logo. Compose each
+        // native frame into a fixed union stage so the UI swaps same-size cells
+        // instead of moving/resizing the rendered image rect as frames advance.
         {
             const size_t kLogoBank = 208;
             const int kFirst = client::ui::ChromeTextures::kLogoFirstFrame;
@@ -483,8 +484,10 @@ void GameUiPipeline::BakeChromeTextures(int rw, int rh, float uiScale,
                 }
             }
             if (any && maxRight > minLeft && maxBottom > minTop) {
-                cppxChrome.logo_stage_w = static_cast<uint16_t>(maxRight - minLeft);
-                cppxChrome.logo_stage_h = static_cast<uint16_t>(maxBottom - minTop);
+                const int stageW = maxRight - minLeft;
+                const int stageH = maxBottom - minTop;
+                cppxChrome.logo_stage_w = static_cast<uint16_t>(stageW);
+                cppxChrome.logo_stage_h = static_cast<uint16_t>(stageH);
                 int n = 0;
                 for (int frame = kFirst; frame <= kHeld; ++frame) {
                     const size_t index = static_cast<size_t>(frame);
@@ -493,22 +496,36 @@ void GameUiPipeline::BakeChromeTextures(int rw, int rh, float uiScale,
                     const std::shared_ptr<Surface> &sp = banks[kLogoBank][index];
                     if (!sp || sp->w < 1 || sp->h < 1 || sp->pixels.empty())
                         continue;
-                    uint32_t id = cppxHost->bake_chrome_sprite(sp->pixels.data(), sp->w, sp->h,
+                    std::vector<uint8_t> stage((size_t)stageW * stageH, 0u);
+                    const int dstX = -game.world.resources.spriteoffsetx[kLogoBank][index] - minLeft;
+                    const int dstY = -game.world.resources.spriteoffsety[kLogoBank][index] - minTop;
+                    for (int y = 0; y < sp->h; ++y) {
+                        const int sy = dstY + y;
+                        if (sy < 0 || sy >= stageH)
+                            continue;
+                        const int sx0 = std::max(0, dstX);
+                        const int sx1 = std::min(stageW, dstX + sp->w);
+                        if (sx1 <= sx0)
+                            continue;
+                        const int srcX = sx0 - dstX;
+                        std::memcpy(stage.data() + (size_t)sy * stageW + sx0,
+                                    sp->pixels.data() + (size_t)y * sp->w + srcX,
+                                    (size_t)(sx1 - sx0));
+                    }
+                    uint32_t id = cppxHost->bake_chrome_sprite(stage.data(), stageW, stageH,
                                                                page_for_bank(kLogoBank));
                     if (!id)
                         continue;
-                    cppxHost->register_legacy(id, sp->pixels.data(), sp->w, sp->h,
+                    cppxHost->register_legacy(id, stage.data(), stageW, stageH,
                                               page_for_bank(kLogoBank), kLegacyRenderWidth,
                                               kLegacyRenderHeight, LegacyFit::Cell);
                     const int i = frame - kFirst;
                     client::ui::ChromeTextures::LogoFrame &out = cppxChrome.logo_frame[i];
                     out.id = id;
-                    out.w = static_cast<uint16_t>(sp->w);
-                    out.h = static_cast<uint16_t>(sp->h);
-                    out.x = static_cast<int16_t>(
-                        -game.world.resources.spriteoffsetx[kLogoBank][index] - minLeft);
-                    out.y = static_cast<int16_t>(
-                        -game.world.resources.spriteoffsety[kLogoBank][index] - minTop);
+                    out.w = static_cast<uint16_t>(stageW);
+                    out.h = static_cast<uint16_t>(stageH);
+                    out.x = 0;
+                    out.y = 0;
                     if (frame == kHeld) {
                         cppxChrome.logo = id;
                         cppxChrome.logo_w = out.w;
