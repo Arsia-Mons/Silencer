@@ -16,8 +16,8 @@ namespace silencer::game_ui {
 // black does `state` flip to the target and the new screen fade in.
 //
 // Notes on the non-1:1 cases:
-//   * OPTIONS* are Tier-1 overlays over the menu in the retained model
-//     (SIL-19); until those land, the phase *under* them is MainMenu.
+//   * Options is a Tier-1 OverlayScreen pushed above MainMenu, not a game
+//     state — it never changes `state`, so the phase under it stays MainMenu.
 //   * HOST/JOIN are the connect-and-load path -> Loading; TEST/REPLAY are
 //     in-match variants -> InMatch.
 //   * NONE (boot) falls back to MainMenu.
@@ -47,10 +47,6 @@ inline client::ui::SessionPhase project_session_phase(Uint8 state,
   case HOSTGAME:
   case JOINGAME:
     return client::ui::SessionPhase::Loading;
-  case OPTIONS:
-  case OPTIONSCONTROLS:
-  case OPTIONSDISPLAY:
-  case OPTIONSAUDIO:
   case NONE:
   default:
     return client::ui::SessionPhase::MainMenu;

@@ -174,9 +174,8 @@ static bool session_phase_projection_maps_game_states() {
   CHECK(project_session_phase(GameState::CREATECHARACTER, 0) == P::CharacterCreate);
   CHECK(project_session_phase(GameState::JOINGAME, 0) == P::Loading);
   CHECK(project_session_phase(GameState::HOSTGAME, 0) == P::Loading);
-  // OPTIONS* are overlays over the menu in the retained model -> MainMenu under.
-  CHECK(project_session_phase(GameState::OPTIONS, 0) == P::MainMenu);
-  CHECK(project_session_phase(GameState::OPTIONSCONTROLS, 0) == P::MainMenu);
+  // Options is a Tier-1 overlay pushed above MainMenu, not a game state, so it
+  // never reaches the projection; the boot sentinel NONE falls back to MainMenu.
   CHECK(project_session_phase(GameState::NONE, 0) == P::MainMenu);
   // During a FADEOUT transition the OUTGOING screen stays mounted and fades to
   // black before the switch; the second arg is the state being faded FROM. Only

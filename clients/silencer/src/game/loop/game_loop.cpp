@@ -654,30 +654,6 @@ bool Game::Tick(void){
 			}
 		}break;
 		case SINGLEPLAYERGAME: TickSinglePlayerGame(); break;
-		case OPTIONS:{
-			if(stateisnew){
-				world.DestroyAllObjects();
-				stateisnew = false;
-			}
-		}break;
-		case OPTIONSCONTROLS:{
-			if(stateisnew){
-				world.DestroyAllObjects();
-				stateisnew = false;
-			}
-		}break;
-		case OPTIONSDISPLAY:{
-			if(stateisnew){
-				world.DestroyAllObjects();
-				stateisnew = false;
-			}
-		}break;
-		case OPTIONSAUDIO:{
-			if(stateisnew){
-				world.DestroyAllObjects();
-				stateisnew = false;
-			}
-		}break;
 		case HOSTGAME: TickHostGame(); break;
 		case JOINGAME: TickJoinGame(); break;
 		case TESTGAME: TickTestGame(); break;
@@ -735,10 +711,6 @@ const char* Game::StateName(Uint8 s){
 		case INGAME: return "INGAME";
 		case MISSIONSUMMARY: return "MISSIONSUMMARY";
 		case SINGLEPLAYERGAME: return "SINGLEPLAYERGAME";
-		case OPTIONS: return "OPTIONS";
-		case OPTIONSCONTROLS: return "OPTIONSCONTROLS";
-		case OPTIONSDISPLAY: return "OPTIONSDISPLAY";
-		case OPTIONSAUDIO: return "OPTIONSAUDIO";
 		case HOSTGAME: return "HOSTGAME";
 		case JOINGAME: return "JOINGAME";
 		case REPLAYGAME: return "REPLAYGAME";
