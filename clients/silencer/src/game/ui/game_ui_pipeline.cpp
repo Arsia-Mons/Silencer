@@ -57,9 +57,48 @@
 #include <cstdlib>
 #include <cstring>
 #include <memory>
+#include <string>
 #include <vector>
+#ifdef __APPLE__
+#include <unistd.h> // getcwd
+#endif
 
 namespace {
+
+// Resolve the font directory at runtime so release builds are not tied to the
+// compile-time source-tree path (SILENCER_CPPX_FONT_DIR) baked on the CI
+// machine. Search order:
+//   1. GetResDir()+"fonts" — Linux system-install and Windows: GetResDir()
+//      (platform/os.h) returns the absolute assets prefix; fonts are staged
+//      there at <prefix>/fonts/ by CMake and CI.
+//   2. macOS — CDResDir() set CWD to Contents/assets/ (fonts are bundled at
+//      Contents/assets/fonts/); capture the absolute path via getcwd so the
+//      result is CWD-independent (CDDataDir may change CWD later).
+//   3. SDL_GetBasePath()+"assets/fonts" — Linux packaged release and any
+//      platform where GetResDir() returned "" (no system install).
+//   4. SILENCER_CPPX_FONT_DIR — compile-time dev-environment fallback.
+static std::string ResolveFontDir() {
+    std::string res = GetResDir();
+    if (!res.empty())
+        return res + "fonts";
+#ifdef __APPLE__
+    CDResDir(); // Ensure CWD = Contents/assets/ (idempotent).
+    char buf[4096] = {};
+    if (getcwd(buf, sizeof(buf)) && buf[0])
+        return std::string(buf) + "/fonts";
+    return "fonts";
+#else
+    const char *base = SDL_GetBasePath();
+    if (base && *base)
+        return std::string(base) + "assets/fonts";
+# ifdef SILENCER_CPPX_FONT_DIR
+    return SILENCER_CPPX_FONT_DIR;
+# else
+    return "assets/fonts";
+# endif
+#endif
+}
+
 // SIL-15 use_key_map: convert UI chips back to an input Binding, enforcing the
 // chord cap (reject, never truncate). Returns false if the chord is empty or
 // over CHORD_CAP.
@@ -1263,7 +1302,8 @@ void GameUiPipeline::RenderCppxClientUiFrame(Surface &surface) {
     if (!cppxHost) {
         cppxHost = std::make_unique<silencer::cppx_ui::PipelineHost>();
     }
-    if (!cppxHost->ensure(rw, rh, SILENCER_CPPX_FONT_DIR))
+    static const std::string fontDir = ResolveFontDir();
+    if (!cppxHost->ensure(rw, rh, fontDir.c_str()))
         return;
 
     // SIL-87: bake the curated legacy chrome sprites into texture_ids once per
