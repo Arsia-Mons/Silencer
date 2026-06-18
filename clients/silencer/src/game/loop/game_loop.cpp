@@ -153,8 +153,7 @@ bool ViewedPlayerChatActive(Game & game){
 
 bool Game::Loop(void){
 	if(updater.IsStage2Spawned()){
-		// Stage-2 child has been spawned and is waiting on our PID to exit.
-		// Tell main to unwind so ~Game() tears down SDL/audio cleanly.
+		// Stage-2 child is waiting on our PID to exit; unwind so ~Game() tears down cleanly.
 		return false;
 	}
 	if(quitRequested) return false;
@@ -204,26 +203,14 @@ bool Game::Loop(void){
 		world.systemcameraactive[0] = false;
 		world.systemcameraactive[1] = false;
 		world.DoNetwork();
-		// In TUI mode, world.localinput is built from the binary input channel
-		// rather than SDL keyboard polling. Two layered sources, each
-		// latest-wins:
-		//   - scancode bitmask  → Game::keystate → UpdateInputState (same
-		//                          path as native SDL, so the user's keymap
-		//                          profile is honored)
-		//   - action snapshot   → ORed on top so programmatic / CLI clients
-		//                          can drive Input fields directly without
-		//                          knowing the keymap.
-		// Edge events (menu nav, text input) arrive as normalized per-frame
-		// UI input and are dispatched by ClientUi after layout.
+		// TUI mode: world.localinput comes from the binary input channel, not
+		// SDL polling. Two latest-wins layers: scancode bitmask (honors the
+		// keymap) then action snapshot ORed on top (bypasses the keymap).
 		if(tui){
 			Uint8 newkeystate[SDL_SCANCODE_COUNT];
 			if(inputserver.LatestScancodes(newkeystate)){
-				// Edge-detect: feed press/release transitions through the
-				// same handlers the SDL path uses, so the in-game F1
-				// player-list, debug overlay etc. behave identically with a
-				// TUI keyboard. TUI has no SDL text events, so text-focus/chat
-				// key edges synthesize the cppx UI key/text/cancel channels
-				// that events.cpp normally fills.
+				// TUI has no SDL text events, so synthesize the cppx UI
+				// key/text/cancel channels events.cpp normally fills.
 				bool routeTextInput = TuiAllowsTextInput(*this, ViewedPlayerChatActive(*this));
 				for(int sc = 0; sc < SDL_SCANCODE_COUNT; ++sc){
 					bool was = gameInput.GetKeystate()[sc] != 0;
@@ -274,9 +261,8 @@ bool Game::Loop(void){
 				if(action.mousey != 0xFFFF) world.localinput.mousey = action.mousey;
 				world.localinput.mousedown        |= action.mousedown;
 			}
-			// Latest mouse snapshot (TUI cell→pixel conversion already done
-			// host-side). Overwrites whatever UpdateInputState wrote — in TUI
-			// mode SDL_GetMouseState returns 0,0 since there's no video.
+			// SDL_GetMouseState returns 0,0 in TUI (no video), so overwrite with
+			// the host-side mouse snapshot.
 			Uint16 mx, my;
 			bool md;
 			if(inputserver.LatestMouse(mx, my, md)){
@@ -303,20 +289,15 @@ bool Game::Loop(void){
 		if(world.gameplaystate == World::INGAME){
 			Uint8 newambiencelevel = renderer.GetAmbienceLevel();
 			const Uint8 fadephase = gameRenderer.FadePhaseRef();
-			const bool fading = fadephase < 16;                            // transition fade still dimming
-			const bool fadeJustFinished = !fading && ambienceFadeWasActive; // falling edge of the fade
+			const bool fading = fadephase < 16;
+			const bool fadeJustFinished = !fading && ambienceFadeWasActive;
 			if(newambiencelevel != gameSession.AmbienceMixerRef().oldambiencelevel || fading || fadeJustFinished){
-				// While the fade is actively dimming, fold ambience into the fade palette so
-				// the world fades in/out with ambience applied. Read temppalette (the
-				// currently-displayed dimmed fade palette) whenever ApplyPaletteFade is still
-				// writing it: that's the WHOLE fade-OUT (state == FADEOUT, including the final
-				// black at phase 15) and the fade-IN up to phase 15 — ApplyPaletteFade(false)
-				// stops refreshing temppalette at phase >= 15, pushing the full base palette
-				// instead. Compose over the canonical base palette only when the fade has
-				// settled (or is in that fade-in tail). Reading the full base at phase 15 of a
-				// fade-OUT was what flashed the world bright for one frame when leaving a match.
-				// The falling-edge (fadeJustFinished) reapply also covers the clock race where
-				// a slow map load skips the fade window entirely (phase -> 16).
+				// While the fade dims, fold ambience into the fade palette. Read the
+				// in-progress temppalette during the whole fade-OUT and the fade-IN up
+				// to phase 15; compose over the canonical base palette only once the
+				// fade settles. Reading the full base mid-fade-OUT flashed the world
+				// bright for a frame when leaving a match. The fadeJustFinished reapply
+				// covers a slow map load skipping the fade window entirely (phase -> 16).
 				const bool fadingOutNow = state == FADEOUT;
 				SDL_Color * colors = renderer.palette.GetColors();
 				if(fading && (fadingOutNow || fadephase < 15)){
@@ -331,19 +312,16 @@ bool Game::Loop(void){
 		}
 		lasttick += wait;
 	}
-	// Tick multi-frame waits AFTER the sim loop so wait_frames --n 1 and
-	// step --frames 1 see at least one sim tick before resolving. Putting this
-	// inside DrainControlQueue (which runs before the sim loop) made the
-	// counter race the enqueue and resolve with zero ticks.
+	// MUST run after the sim loop, not inside DrainControlQueue (which runs
+	// before it): else wait_frames/step counters resolve with zero ticks.
 	ControlDispatch::TickWaits(*this);
 	world.DoNetwork();
 	if(!world.dedicatedserver.active){
 		world.DoNetwork();
 		float ft = 1 - (float(tickcheck - lasttick) / wait);
 		if(world.map.loaded){
-			// origin/main rendered one 640x480 paletted frame and let the GPU
-			// present pass stretch it to the window. Keep that path for
-			// gameplay; native-sized CPU frames are too expensive fullscreen.
+			// Pin gameplay to one 640x480 paletted frame (GPU stretches it);
+			// native-sized CPU frames are too expensive fullscreen.
 			ResizeRenderSurfacePixels(kLegacyRenderWidth, kLegacyRenderHeight);
 			GetScreenBuffer().Clear(0);
 			{ PERF_SCOPE("world.draw"); renderer.Draw(&GetScreenBuffer(), ft); }
@@ -379,19 +357,13 @@ bool Game::Loop(void){
 		world.DoNetwork();
 		//Uint32 drawtick = SDL_GetTicks();
 		if(!headless || tui){ PERF_SCOPE("present"); Present(); }
-		// In TUI mode, the frontend owning our render output may disconnect
-		// (terminal closed, host process killed). TUIBackend tears the socket
-		// down on any write failure; we observe that here and exit cleanly
-		// rather than burning CPU rendering frames nobody reads.
+		// TUI frontend may disconnect; TUIBackend drops the socket on write
+		// failure, so exit cleanly rather than render frames nobody reads.
 		if(tui && gameRenderer.GetRenderDevice() && !gameRenderer.GetRenderDevice()->IsAlive()){
 			quitRequested = true;
 		}
-		// SDL3GPUBackend's swapchain Present blocks on vsync (~16 ms) so the
-		// non-TUI loop self-throttles. TUIBackend writes to a TCP socket that
-		// never blocks the engine, so without an explicit cap the loop runs
-		// thousands of times per second. Sleep enough to land at ~30 fps —
-		// well above the 24 Hz sim rate (catch-up loop handles the sim
-		// cadence) and well below "burn a CPU core for no reason".
+		// The windowed path self-throttles on vsync; the TUI socket never
+		// blocks, so cap it. 33ms ~= 30fps, above the 24Hz sim, below a busy-loop.
 		if(tui) SDL_Delay(33);
 		PostFrameReplies();
 		perf::FrameMark();
@@ -409,8 +381,7 @@ bool Game::Loop(void){
 bool Game::Tick(void){
 	if(!world.dedicatedserver.active){
 		if(world.lobby.state == Lobby::AUTHENTICATED){
-			// 0 = main lobby, 1 = pregame (game-specific lobby, waiting for
-			// match start), 2 = playing (gameplaystate == INGAME).
+			// status: 0=main lobby, 1=pregame, 2=playing (INGAME).
 			Uint32 targetgid = 0;
 			Uint8 targetstatus = 0;
 			if(currentlobbygameid != 0 && world.network.state == World::CONNECTED){
@@ -440,8 +411,6 @@ bool Game::Tick(void){
 			}
 		}
 		if(world.gameplaystate == World::INLOBBY){
-			// Dedicated server pumps map transfers each frame; the client-side
-			// ready-button refresh is the cppx lobby screen's concern.
 			gameSession.MapDownloaderRef().ProcessMapDownload();
 		}
 		/*Peer * localpeer = world.peers.peerlist[world.peers.localpeerid];
@@ -506,12 +475,6 @@ bool Game::Tick(void){
 		}
 	}
 	
-	// The per-state blocks below keep their world side-effects and menu
-	// ambience, but no longer mount screens — the golden cppx AppRoot maps the
-	// session phase (projected from `state`) onto the owning screen. `game.cpp`
-	// names no screen. `stateisnew` stays: it is the game's state-entry latch,
-	// consumed by the gameplay tick handlers (TickInGame/HostGame/...), not a
-	// UI concern.
 	switch(state){
 		case FADEOUT: TickFadeOut(); break;
 		case MAINMENU:{
@@ -540,9 +503,6 @@ bool Game::Tick(void){
 			}else{
 				if(gameSession.AmbienceMixerRef().FadedIn()){
 					gameSession.AmbienceMixerRef().PlayMusic(world.resources.menumusic);
-					// Drive the connect FSM once the menu fade settles (mirrors the
-					// legacy gate); routing flips the game state, which the cppx
-					// session-phase reconciler turns into the destination screen.
 					lobbyConnectFlow.Advance(*this, updater);
 				}
 			}
@@ -561,9 +521,8 @@ bool Game::Tick(void){
 				if(gameSession.AmbienceMixerRef().FadedIn()){
 					gameSession.AmbienceMixerRef().PlayMusic(world.resources.menumusic);
 				}
-				// Drain the lobby chat queue into the scrollback the cppx
-				// ChatPanel reads (the queue would otherwise grow unboundedly).
-				// Each message is [text\0][color][brightness]; we keep the text.
+				// Drain the lobby chat queue (unbounded otherwise) into scrollback.
+				// Each message is [text\0][color][brightness]; keep the text.
 				world.lobby.LockMutex();
 				while(!world.lobby.chatmessages.empty()){
 					const std::vector<char> & msg = world.lobby.chatmessages.front();
@@ -574,12 +533,7 @@ bool Game::Tick(void){
 				if(lobbyChatLog.size() > 256)
 					lobbyChatLog.erase(lobbyChatLog.begin(), lobbyChatLog.begin() + (lobbyChatLog.size() - 256));
 
-				// Game-join pump (sibling of the chat drain). Drives a
-				// created/joined game from the LOBBY tick; the match-start transition
-				// (shared-state -> INGAME) stays in Game::Tick.
 				gameSession.MapDownloaderRef().ProcessMapDownload();
-				// Our own create succeeded -> seed world info + auto-join the spawned
-				// game (the cppx GameCreatePanel set creategameclicked).
 				if(world.lobby.creategamestatus == 1 && creategameclicked){
 					world.lobby.creategamestatus = 0;
 					creategameclicked = false;
@@ -593,11 +547,8 @@ bool Game::Tick(void){
 						JoinGame(*lg, lg->password[0] ? lg->password : nullptr);
 					}
 				}
-				// Join settle / fail: clear the in-flight flag once the connect
-				// resolves (connected -> staging; idle -> stayed in the browser).
-				// On connect origin applies the per-agency DEFAULT TECH LOADOUT
-				// (lobby_controller.cpp: SetTech(defaulttechchoices[agency]),
-				// Laser+Rocket out of the box).
+				// On connect, origin applies the per-agency default tech loadout
+				// (Laser+Rocket). Clear the in-flight flag once connect resolves.
 				if(joininggame && (world.IsConnected() || world.IsIdle())){
 					if(world.IsConnected()){
 						const Uint8 agency = world.lobby.GetSelectedAgencyOrDefault(
@@ -620,9 +571,6 @@ bool Game::Tick(void){
 				if(gameSession.AmbienceMixerRef().FadedIn()){
 					gameSession.AmbienceMixerRef().PlayMusic(world.resources.menumusic);
 				}
-				// Route to the lobby once a newly created character has
-				// round-tripped (the cppx wizard fires use_characters.create;
-				// select routes itself via GoToState).
 				world.lobby.LockMutex();
 				bool created = world.lobby.charactersreceived
 					&& world.lobby.characters.size() > charCreateCountOnEntry;
@@ -684,9 +632,8 @@ bool Game::Tick(void){
 		case REPLAYGAME: TickReplayGame(); break;
 	}
 	if(gameRenderer.FadePhaseRef() < 16 && state != FADEOUT){
-		// Honor the fade direction: a Tier-1 overlay transition runs an Out leg
-		// (dim to black) then an In leg, same as a state FADEOUT. TickFadeOut owns
-		// the dimming while state == FADEOUT.
+		// A Tier-1 overlay transition runs out->in like a state FADEOUT;
+		// TickFadeOut owns the dimming while state == FADEOUT.
 		gameRenderer.ApplyPaletteFade(gameRenderer.GetFadeDir() == GameRenderer::FadeDir::Out);
 	}
 	if(!nextstateprocessed){
@@ -698,26 +645,17 @@ bool Game::Tick(void){
 
 
 void Game::GoToState(Uint8 newstate){
-	// Remember the state we're leaving so the session-phase projection keeps the
-	// outgoing screen mounted through the fade. Guard against a re-entrant
-	// GoToState (already mid-FADEOUT) clobbering the real source with FADEOUT.
+	// Record the state we're leaving for the session-phase projection. Guard
+	// a re-entrant GoToState (mid-FADEOUT) from clobbering it with FADEOUT.
 	if(state != FADEOUT) fadefromstate = state;
 	nextstate = newstate;
 	state = FADEOUT;
 	gameRenderer.RestartPaletteFade(GameRenderer::FadeDir::Out);
 	stateisnew = true;
 	nextstateprocessed = false;
-	// Keep the outgoing Clay screen mounted until TickFadeOut reaches black.
-	// Legacy retained its world UI objects across FADEOUT, so there were still
-	// pixels for the palette fade to dim before the next state rebuilt UI.
 }
 
 bool Game::GoBack(void){
-	// The `back` control op (and a controller "back") inject the SAME cancel edge
-	// the keyboard ESC / control `escape` path sets; the one UI-layer cancel
-	// router (ClientUi::end_layout, driven by each screen's use_cancel) owns the
-	// navigation policy. game.cpp holds no back/cancel policy — it only plumbs
-	// the edge.
 	::ui::UiInputFrame & ui = gameUiPipeline.UiInput();
 	ui.cancel_pressed = true;
 	ui.cancel_down = true;

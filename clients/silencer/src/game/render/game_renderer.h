@@ -10,8 +10,7 @@ namespace silencer::cppx_ui {
 class UiDemoOverlay;
 }
 
-// Virtual resolution that the game was originally designed for.
-// Used by the renderer, UI pipeline, and game loop to compute scale factors.
+// Virtual resolution the game was originally designed for.
 inline constexpr int kLegacyRenderWidth = 640;
 inline constexpr int kLegacyRenderHeight = 480;
 
@@ -20,11 +19,9 @@ struct SDL_Window;
 
 class GameRenderer {
 public:
-    // Direction of the transition palette fade. The fade phase clock is the same
-    // in both directions (16 phases); the direction decides whether the screen
-    // dims to black (Out) or rises from black (In). Decoupled from
-    // GameState::FADEOUT so Tier-1 overlay transitions (options/pause) can run a
-    // full out->in fade without owning a gameplay state change.
+    // Direction of the transition palette fade (16 phases either way): dim to
+    // black (Out) or rise from black (In). Decoupled from GameState::FADEOUT so
+    // Tier-1 overlay transitions can run a full out->in fade without a state change.
     enum class FadeDir : Uint8 { In,
                                  Out };
 
@@ -37,12 +34,9 @@ public:
     bool ResizeRenderSurface(int width, int height);
     bool ResizeRenderSurfacePixels(int width, int height);
     bool SyncRenderSurfaceToWindowPixels();
-    // The last window pixel size, refreshed only at window
-    // creation and on real resize events (never per render frame). The menu's
-    // logical canvas (game_ui_pipeline) derives its aspect from THIS so it stays
-    // pinned across the in-game 640x480 surface pin (map load/unload) and across any
-    // transient/late SDL_GetWindowSizeInPixels reading on a render frame. Falls back
-    // to the surface size when no window has been sized yet (headless).
+    // Refresh the cached window pixel size. Called only at window creation and on
+    // real resize events (never per render frame) so the menu canvas's aspect
+    // source never lags a transient/late SDL_GetWindowSizeInPixels poll.
     void RefreshWindowPixelSize();
     bool WindowPixelSize(int &width, int &height) const {
         if (windowPixelW_ < 1 || windowPixelH_ < 1)
@@ -57,10 +51,8 @@ public:
     bool PaletteFadeFinished() const;
     Uint8 PaletteFadePhaseFromClock() const;
     void ApplyPaletteFade(bool fadeOut);
-    // The global opacity [0,1] the cppx UI layer should composite at so
-    // it fades in/out in lockstep with the world's transition palette fade. 1.0
-    // at rest (no fade); mirrors the brightness fraction ApplyPaletteFade applies
-    // to the world during a FADEOUT transition and the subsequent fade-in.
+    // Global opacity [0,1] for the cppx UI layer: mirrors ApplyPaletteFade's
+    // brightness fraction so UI fades in lockstep with the world. 1.0 at rest.
     float UiFadeAlpha() const;
     float LegacyUiAnimationStepSeconds() const;
     void LoadProgressCallback(int progress, int totalprogressitems);
@@ -85,10 +77,8 @@ private:
     Uint8 fade_i;
     Uint64 fadeStartMs;
     FadeDir fadeDir_ = FadeDir::In;
-    // The fade alpha applied at the LAST cppx UI upload. The dirty-skip in
-    // Present() only skips the upload when BOTH the IR is unchanged AND this alpha
-    // is unchanged (the fade is applied at upload time, not in the IR). -1 forces
-    // the first upload. Sentinel < 0 == "no prior upload".
+    // Fade alpha at the last cppx UI upload; the Present() dirty-skip keys off it
+    // (fade is applied at upload time, not in the IR). < 0 == no prior upload.
     float lastUiFadeAlpha_ = -1.0f;
     std::unique_ptr<silencer::cppx_ui::UiDemoOverlay> cppxDemo; // flag-gated demo overlay
 };

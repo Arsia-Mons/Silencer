@@ -27,9 +27,6 @@ struct OptionsAudioProps {
   uint32_t unused = 0;
 };
 
-// origin/main's Audio screen is the Music on/off toggle — there is NO
-// volume slider/stepper (the migration's invented -/+ control was removed for
-// parity).
 ::ui::UiElement OptionsAudioView(const OptionsAudioProps &) {
   Navigation nav = use_navigation();
   Settings settings = use_settings();
@@ -37,22 +34,12 @@ struct OptionsAudioProps {
   if (!nav.is_top)
     return ::ui::empty();
 
-  // origin/main: a floating title + the Music toggle + Save/Cancel ovals over the
-  // starfield — NO panel container. Save persists, Cancel reverts the live edits.
   OptionsCommit commit = use_options_commit(settings.commit, settings.revert);
 
-  // origin/main anchors this dialog in the upper third (title baseline ~y168), not
-  // screen-centered like the options root.
-  //
-  // Margin-right wrappers: centering row+1 / row+2 in 1280 lands the Lg oval
-  // at x=419 (device 628 = origin vx 279 cell) and Save/Cancel at x=336/648
-  // (vx 224/432) — the per-phase oval bake's virtual grid (bare centering
-  // gives 420/337, one device px right of the golden cells).
+  // Per-phase oval-bake virtual-grid nudges: bare centering lands these one
+  // device px right of the golden cells.
   const ::ui::LayoutStyle row_nudge{.margin = ::ui::EdgeSizes{{}, 1.0f, {}, {}}};
   const ::ui::LayoutStyle actions_nudge{.margin = ::ui::EdgeSizes{{}, 2.0f, {}, {}}};
-  // Asymmetric centering margin: the golden title reads one device px right
-  // of plain centering (origin ceils virtual text x). ml=1 nets +1 device
-  // after the centering/floor cascade (ml=2 measured +3).
   const ::ui::LayoutStyle title_nudge{.margin = ::ui::EdgeSizes{1.0f, {}, {}, {}}};
   return <ScreenLayout key="root" variant={ScreenLayoutVariant::Overlay}>
     <Box

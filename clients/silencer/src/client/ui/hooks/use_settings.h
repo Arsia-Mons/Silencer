@@ -5,15 +5,9 @@
 
 namespace client::ui {
 
-// Persisted user prefs (doc §6 use_settings). Mirrors the legacy
-// OptionsAudio/OptionsDisplay screens 1:1 — the only prefs those screens
-// edited. Read fields are the current (live, possibly-uncommitted) values;
-// set_* live-apply a preview immediately (LOCKED: live-apply preview);
-// commit() persists to disk; revert() restores the last-saved values and
-// re-applies them. `dirty` is true when live state diverges from disk.
-// App-shell, not game-coupled (never names Game) — the composition root
-// installs the routing closures over the public Audio/GameRenderer/window
-// seams.
+// Persisted user prefs. Read fields are the live (possibly-uncommitted) values;
+// set_* live-apply a preview immediately; commit() persists; revert() restores
+// + re-applies the last-saved values. `dirty` = live state diverges from disk.
 struct Settings {
   // ---- audio ----
   bool music = true;          // Config::music

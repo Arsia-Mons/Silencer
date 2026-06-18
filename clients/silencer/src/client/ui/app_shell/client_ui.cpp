@@ -32,10 +32,8 @@ ClientUi::ClientUi() { ::ui::focus_init(&retained_focus_); }
 
 void ClientUi::begin_frame(const ::ui::UiInputFrame &input) {
   (void)input;
-  // Defensive sweep of anything the previous frame's drain left behind. When
-  // structural mutations are held, the drain intentionally keeps the
-  // stack-changing entries queued for a gated commit — those must survive into
-  // this frame, so only sweep when nothing is being held.
+  // Sweep leftovers, but only when no structural mutations are held — those are
+  // intentionally kept queued across frames for a gated commit.
   if (!structural_hold_)
     clear_mutations();
   cancel_slot_ = {};
@@ -44,24 +42,17 @@ void ClientUi::begin_frame(const ::ui::UiInputFrame &input) {
 
 void ClientUi::register_frame_cancel_handler(UiScreenEntryId entry_id,
                                              std::function<void()> handler) {
-  // Last-writer-wins: a screen rebuilt later this frame overwrites the slot.
   cancel_slot_ = {true, entry_id, std::move(handler)};
 }
 
 void ClientUi::build_visible_screens(const UiElementWrapper &wrap_root) {
   ::ui::UiElementFrameScope frame_scope(retained_element_frame_);
   ::ui::Span<UiScreen *> visible = screens_.visible_screens();
-  // The screen that owns the cancel edge this frame: the topmost one not already
-  // queued for pop (held mutations from prior frames survive the fade). Equals
-  // the visible top unless a pop is mid-fade, in which case the cancel edge
-  // belongs to the screen below — so a chained ESC walks down past the screens
-  // already on their way out.
   const UiScreen *cancel_top = effective_cancel_target();
   const UiScreenEntryId cancel_top_id = cancel_top ? cancel_top->entry_id() : 0;
   for (int i = 0; i < visible.count; ++i) {
-    // Descriptors and copied props only need to live through the immediate
-    // commit below. Reset per visible screen so overlay stacks do not exhaust
-    // the transient frame before the top screen commits.
+    // Reset per visible screen so overlay stacks don't exhaust the transient
+    // frame before the top screen commits.
     retained_element_frame_.reset();
     UiScreen *screen = visible[i];
     if (!screen)
@@ -82,21 +73,14 @@ void ClientUi::build_visible_screens(const UiElementWrapper &wrap_root) {
       {
         ::ui::UiElement provider = NavigationProvider(
             context, ::ui::children({root}), screen_provider_key(screen->entry_id()));
-        // Publish last frame's interaction (one-frame lag, by design) as a
-        // declarative provider so components resolve focus/hover/press.
         provider = ::ui::provider(
             "InteractionProvider", &::ui::InteractionContext,
             const_cast<::ui::InteractionSnapshot *>(&interaction_snapshot_),
             ::ui::children({provider}));
-        // Publish last frame's scroll-into-view request so a scrollable
-        // container can follow keyboard focus (one-frame lag, by design).
         provider = ::ui::provider(
             "FocusScrollProvider", &::ui::FocusScrollContext,
             const_cast<::ui::FocusScrollRequest *>(&focus_scroll_request_),
             ::ui::children({provider}));
-        // Publish last frame's post-layout node heights so a flex-grown
-        // component (ScrollView) can read its own resolved size (one-frame lag,
-        // by design — matches FocusScrollProvider).
         provider = ::ui::provider(
             "MeasuredSizeProvider", &::ui::MeasuredSizeContext,
             const_cast<::ui::MeasuredSizeRequest *>(&measured_sizes_),
@@ -104,12 +88,9 @@ void ClientUi::build_visible_screens(const UiElementWrapper &wrap_root) {
         if (wrap_root) {
           provider = wrap_root(provider);
         }
-        // Composite every visible screen as a full-bleed ABSOLUTE layer. All
-        // visible screens commit into one retained tree as direct children of
-        // the root, whose default flex column would otherwise stack them
-        // vertically (an overlay would land below the viewport). Absolute +
-        // inset 0 makes each screen fill the viewport and OVERLAP; paint order
-        // equals stack order, so overlays draw on top of the base phase screen.
+        // Absolute + inset 0 full-bleed layer: visible screens are siblings in
+        // one tree; the root's default flex column would stack them vertically,
+        // so absolute makes them OVERLAP (paint order = stack order).
         ::ui::HostProps layer = {};
         layer.key = screen_layer_key(screen->entry_id());
         layer.style.position = ::ui::PositionType::Absolute;
@@ -140,21 +121,10 @@ void ClientUi::build_visible_screens(const UiElementWrapper &wrap_root) {
 }
 
 void ClientUi::end_layout(const ::ui::UiInputFrame &input) {
-  // The central cancel pass (the use_cancel router). Runs after build, before
-  // drain_deferred_mutations — so handlers may only QUEUE work (nav.push,
-  // chat.cancel, …), never touch the retained tree. Honoring only the TOP
-  // screen's registration is what makes it correct when an overlay sits over
-  // the base phase screen: the overlay is top, so its handler (or the default
-  // pop) wins and the base screen's stale registration is ignored.
-  //
-  // The cancel acts on the topmost screen NOT already queued for pop, not the
-  // raw top. A menu pop is held behind the out→in transition fade (the
-  // composition root commits it at black), so the screen being popped stays on
-  // the stack for the duration. Targeting the raw top would make a second ESC
-  // re-pop that same held screen — the press is wasted and the fade looks like
-  // it just restarts. Skipping pending pops makes rapid ESC chain DOWN the
-  // stack: each press queues a distinct pop, and they all commit together at
-  // the next black, walking quickly back toward the main menu (origin feel).
+  // The use_cancel router. Runs after build, before drain_deferred_mutations,
+  // so handlers may only QUEUE work, never touch the retained tree. Acts on the
+  // effective cancel target (topmost screen not already queued for pop) so
+  // rapid ESC chains DOWN the stack instead of re-popping a screen held mid-fade.
   if (!input.cancel_pressed)
     return;
   UiScreen *target = effective_cancel_target();
@@ -192,8 +162,6 @@ bool ClientUi::update_retained_runtime(const ::ui::FlexLayoutAdapter &layout,
                                        const ::ui::InputFrame &input) {
   if (!::ui::compute_flex_layout(layout, retained_tree_, viewport))
     return false;
-  // Read back resolved node heights (keyed by control id) for next frame's build
-  // so flex-grown components can learn their own size. Must run after layout.
   ::ui::compute_measured_sizes(retained_tree_, &measured_sizes_);
   if (!::ui::focus_update(&retained_focus_, retained_tree_, input))
     return false;
@@ -207,9 +175,8 @@ bool ClientUi::update_retained_runtime(const ::ui::FlexLayoutAdapter &layout,
   }
   ::ui::NodeId confirmed = ::ui::focus_confirmed_id(retained_focus_);
   if (confirmed != 0) {
-    // Clicking a text input focuses it but never activates (origin: inputs
-    // submit on RETURN only — a pointer click must not fire on_activate, or
-    // every submit-on-activate field fires on focus-click).
+    // A pointer click on a text input must not fire on_activate (origin: inputs
+    // submit on RETURN only).
     ::ui::NodeSnapshot cs = {};
     bool pointer_on_input = ::ui::focus_confirmed_by_pointer(retained_focus_) &&
                             retained_tree_.snapshot(confirmed, &cs) &&
@@ -218,9 +185,6 @@ bool ClientUi::update_retained_runtime(const ::ui::FlexLayoutAdapter &layout,
       retained_tree_.invoke_activate(confirmed);
   }
 
-  // Interaction-audio edges (origin ClientUi.cpp:95-111): hovered audible
-  // button + activate/keyboard-navigate onto one. Published as data; the
-  // composition root dedupes the hover edge and plays.
   audio_events_ = {};
   auto audible_button = [&](::ui::NodeId id) {
     if (id == 0)
@@ -230,10 +194,9 @@ bool ClientUi::update_retained_runtime(const ::ui::FlexLayoutAdapter &layout,
            !s.interaction.disabled;
   };
   ::ui::NodeId hovered_now = ::ui::focus_hovered_id(retained_focus_);
-  // Hover enter/leave edges (React onMouseEnter/Leave analog): components
-  // that animate on hover (the legacy oval ramp) track their own state via
-  // these callbacks — use_hovered() can't serve them, since the host node's
-  // fiber is the substrate Button's, not the product component's.
+  // Hover enter/leave edges: components that animate on hover track their own
+  // state here — use_hovered() can't serve them (the host fiber is the
+  // substrate Button's, not the product component's).
   if (hovered_now != prev_hovered_node_) {
     if (prev_hovered_node_ != 0)
       retained_tree_.invoke_hover(prev_hovered_node_, false);
@@ -255,10 +218,7 @@ bool ClientUi::update_retained_runtime(const ::ui::FlexLayoutAdapter &layout,
     retained_tree_.invoke_key(active, input.key_events[i]);
   }
   // Scroll wheel routes to the node under the pointer, then BUBBLES up the
-  // ancestor chain to the first node that handles it (its on_wheel) — mirrors
-  // DOM wheel bubbling. The topmost hovered node is often a child control (a
-  // button in a scrollable row) with no on_wheel; the scroll viewport that owns
-  // the wheel is an ancestor.
+  // ancestor chain to the first node that handles it (DOM wheel bubbling).
   if (input.wheel_x != 0.0f || input.wheel_y != 0.0f) {
     ::ui::NodeId n = ::ui::focus_hovered_id(retained_focus_);
     while (n != 0) {
@@ -284,7 +244,6 @@ bool ClientUi::update_retained_runtime(const ::ui::FlexLayoutAdapter &layout,
       (active_snapshot.role == ::ui::NodeRole::Input ||
        active_snapshot.semantic_role == ::ui::SemanticRole::TextBox);
 
-  // Capture this frame's interaction, keyed by fiber, for next frame's build.
   auto fiber_of = [&](::ui::NodeId id) -> uint64_t {
     ::ui::NodeSnapshot s = {};
     return (id != 0 && retained_tree_.snapshot(id, &s)) ? s.fiber_id : 0;
@@ -295,18 +254,14 @@ bool ClientUi::update_retained_runtime(const ::ui::FlexLayoutAdapter &layout,
       .pressed_fiber = fiber_of(::ui::focus_pressed_id(retained_focus_)),
       .source = ::ui::focus_source(retained_focus_),
   };
-  // Carry this frame's scroll-into-view request to next frame's build.
   focus_scroll_request_ = ::ui::focus_scroll_request(retained_focus_);
 
-  // Build the tagged-union IR that the live render path executes via
-  // renderer::execute_draw_commands.
   return ::ui::build_draw_command_list(retained_tree_, &retained_command_list_,
                                        active, &input_scroll_);
 }
 
 bool ClientUi::push_screen(std::unique_ptr<UiScreen> screen) {
-  // Immediate push (bypasses the queue + fade orchestration). Used only for the
-  // one-time AppRoot base mount, which never fades.
+  // Immediate push (bypasses the queue + fade). Only for the AppRoot base mount.
   return screens_.push(std::move(screen));
 }
 
@@ -368,9 +323,9 @@ bool ClientUi::is_structural(MutationKind kind) {
 }
 
 void ClientUi::drain_deferred_mutations() {
-  // When structural mutations are held, apply the Deferred (domain) ones in
-  // place and keep the stack-changing ones queued (compacted to the front,
-  // order preserved) for a gated commit by the composition root.
+  // When structural mutations are held, apply Deferred (domain) ones in place
+  // and keep stack-changing ones queued (compacted to front, order preserved)
+  // for a gated commit by the composition root.
   int kept = 0;
   for (int i = 0; i < mutation_count_; ++i) {
     QueuedMutation &mutation = mutations_[i];
@@ -403,11 +358,9 @@ bool ClientUi::has_pending_structural_mutations() const {
 }
 
 bool ClientUi::pending_structural_wants_fade() const {
-  // The composition root must know whether the queued stack swap should replay
-  // the transition fade BEFORE committing it (the Out leg dims the OUTGOING
-  // screen, so the swap waits for black). Resolve the first pending structural
-  // mutation's fade intent: a per-push FadeOverride, else the affected screen's
-  // wants_transition_fade(). Pops resolve against the screen being removed.
+  // Resolve the first pending structural mutation's fade intent (per-push
+  // FadeOverride, else the affected screen's wants_transition_fade); pops
+  // resolve against the screen being removed.
   for (int i = 0; i < mutation_count_; ++i) {
     const QueuedMutation &m = mutations_[i];
     if (!is_structural(m.kind))

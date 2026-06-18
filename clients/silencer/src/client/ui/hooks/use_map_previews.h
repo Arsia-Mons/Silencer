@@ -6,24 +6,17 @@
 
 namespace client::ui {
 
-// The per-map minimap previews surfaced to .cppx screens. The renderer
-// bridge bakes each bundled map's stored 172x62 indexed minimap + the active
-// palette into a premultiplied-RGBA texture once (keyed by map filename) and
-// hands the opaque `texture_id`s here, mirroring how use_chrome() surfaces baked
-// chrome sprites. The Create-Game map list shows the hovered map's preview by
-// looking its texture up via texture_for(filename); screens NEVER see SDL,
-// Surface, or the Palette.
+// The per-map minimap previews surfaced to .cppx screens. The renderer bridge
+// bakes each bundled map's 172x62 indexed minimap into premultiplied RGBA,
+// keyed by filename; screens look it up via texture_for(filename).
 //
-// An id of 0 means "no preview" (not baked yet, or the map header/minimap failed
-// to load): screens MUST tolerate it (render nothing) without a crash or flash.
+// An id of 0 means "no preview": screens MUST tolerate it (render nothing).
 struct MapPreviews {
-  // The stored minimap dimensions (fixed by the map format).
   static constexpr int kWidth = 172;
   static constexpr int kHeight = 62;
 
   std::unordered_map<std::string, uint32_t> by_filename = {};
-  // The hovered map's name + description (from the map header) so the
-  // cursor-following preview card shows them under the minimap, like origin.
+  // The map's name + description (from the header), shown under the minimap.
   std::unordered_map<std::string, std::string> name_by_filename = {};
   std::unordered_map<std::string, std::string> desc_by_filename = {};
 
@@ -41,9 +34,7 @@ struct MapPreviews {
   }
 };
 
-// Read the baked map-preview textures for the current frame. Requires a
-// MapPreviewsProvider above the caller (the composition root installs it);
-// returns a default (empty) table if absent.
+// Read the baked map-preview textures for the current frame; empty if no provider.
 MapPreviews use_map_previews();
 
 } // namespace client::ui

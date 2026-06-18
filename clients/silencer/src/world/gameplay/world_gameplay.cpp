@@ -41,7 +41,6 @@ void World::ActivateTerminals(void){
 			}
 		}
 	}
-	//std::random_shuffle(terminallist.begin(), terminallist.end());
 	for(int i = 0; i < terminallist.size(); i++){
 		int r = Random() % terminallist.size();
 		Terminal * temp = terminallist[i];
@@ -258,13 +257,11 @@ void World::SetTech(Uint32 techchoices){
 	Uint8 code = MSG_TECH;
 	data.Put(code);
 	data.Put(techchoices);
-	//printf("MSG_TECH %d\n", techchoices);
 	SendPacket(GetAuthorityPeer(), data.data, data.BitsToBytes(data.offset));
 }
 
 // Seed gameinfo from the lobby record of a newly created game so the host's
-// SendGameInfo path can push it to the dedicated server. Hides the private
-// gameinfo member behind a public command.
+// SendGameInfo path can push it to the dedicated server.
 void World::SeedGameInfo(LobbyGame & lg){
 	Serializer data;
 	lg.Serialize(Serializer::WRITE, data);
@@ -292,7 +289,6 @@ void World::SendMapDownloaded(void){
 		data[1] = MAP_DOWNLOADED;
 		SendPacket(GetAuthorityPeer(), data, sizeof(data));
 	}
-	//printf("sent MAP_DOWNLOADED\n");
 }
 
 void World::PutMapChunk(Uint32 offset, Peer & peer){
@@ -312,7 +308,6 @@ void World::PutMapChunk(Uint32 offset, Peer & peer){
 	*(Uint32 *)(&data[2 + sizeof(Uint32)]) = size;
 	memcpy(&data[2 + sizeof(Uint32) + sizeof(Uint32)], &currentmapdata[offset], size);
 	SendPacket(&peer, data, sizeof(data));
-	//printf("sent MAP_PUTCHUNK %d %d\n", offset, size);
 }
 
 void World::GetMapChunk(Uint32 offset){
@@ -332,11 +327,9 @@ void World::GetMapChunk(Uint32 offset){
 	}else{
 		SendPacket(GetAuthorityPeer(), data, sizeof(data));
 	}
-	//printf("sent MAP_GETCHUNK %d\n", offset);
 }
 
 void World::StoreMapChunk(unsigned char * data, Uint32 offset, Uint32 size){
-	//printf("StoreMapChunk %d %d\n", offset, size);
 	if(size == 0){
 		currentmapdataend = true;
 	}
@@ -352,7 +345,6 @@ void World::StoreMapChunk(unsigned char * data, Uint32 offset, Uint32 size){
 	}
 	memcpy(&currentmapdata[offset], data, size);
 	currentmapdataprocessed = false;
-	//printf("stored map chunk %d %d\n", offset, size);
 }
 
 bool World::SecurityIDCanSpawn(Uint8 securityid){

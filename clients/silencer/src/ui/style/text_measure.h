@@ -1,10 +1,8 @@
 #pragma once
 
 // The SDL-free text-measurement seam. ONE MeasureTextFn is installed once at
-// startup (by the renderer, which owns SDL_ttf) and used as BOTH the Yoga
-// per-node MeasureFn and the draw-time per-line emitter, so measure == draw by
-// construction. ui/ never touches SDL_ttf; this function pointer is the seam.
-// See design §10.
+// startup and used as BOTH the Yoga MeasureFn and the draw-time per-line emitter,
+// so measure == draw by construction. ui/ never touches SDL_ttf. See design §10.
 
 #include "visual_style.h" // TextAlign, TextWrap, LineRun
 
@@ -14,7 +12,7 @@
 
 namespace ui {
 
-constexpr int UI_MAX_TEXT_LINES = 32; // sized for the cc lore paragraph (~23 wrapped lines); overflow => failed frame, never silent drop
+constexpr int UI_MAX_TEXT_LINES = 32; // sized for the lore paragraph (~23 wrapped lines); overflow => failed frame
 
 struct TextMetricsQuery {
   const char *utf8 = nullptr; // borrowed; points into the shared string arena
@@ -30,11 +28,8 @@ struct TextMetricsQuery {
 struct TextMetricsResult {
   float width = 0.f;   // max line w (the node's content width)
   float height = 0.f;  // sum of line h
-  float ascent = 0.f;  // cap-top..baseline of the resolved face, in points (the
-                       // text ink height for non-descender glyphs). 0 => unknown
-                       // (caller falls back to the full line box). Drives the
-                       // input caret height so it tracks the glyph ink, not the
-                       // descender-inclusive cell.
+  float ascent = 0.f;  // cap-top..baseline, in points; 0 => unknown. Drives the
+                       // input caret height (glyph ink, not the full cell).
   uint8_t line_count = 0; // <= UI_MAX_TEXT_LINES
   LineRun lines[UI_MAX_TEXT_LINES] = {};
   bool overflowed = false; // wrapped output needed > UI_MAX_TEXT_LINES lines

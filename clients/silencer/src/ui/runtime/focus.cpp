@@ -129,14 +129,10 @@ bool collect_focusables(const UiTree &tree, FocusRuntime &runtime, NodeId id,
     return false;
 
   // A focusable inside a scrolling clip keeps its UNCLIPPED layout rect as its
-  // nav rect: directional/sequential nav must be able to REACH a row that is
-  // currently scrolled out of (or partially clipped by) the viewport, in true
-  // document order. The "don't rest on an invisible row" intent
-  // is preserved by scroll-into-view (focus_scroll_request below): once focus
-  // lands on such a row, the owning container scrolls it into view, so we never
-  // permanently rest on an off-viewport node. The full node.layout rect (not the
-  // clipped intersection) keeps ordering and direction tests aligned with the
-  // row's real document position even while it is off-screen.
+  // nav rect, so nav can reach a scrolled-off row in true document order. "Don't
+  // rest on an invisible row" is preserved by scroll-into-view below: focus
+  // landing on such a row scrolls it into view, so we never permanently rest
+  // off-viewport.
   NodeId child_focus_parent = focus_parent;
   if (node.interaction.focusable) {
     child_focus_parent = id;
@@ -155,8 +151,7 @@ bool collect_focusables(const UiTree &tree, FocusRuntime &runtime, NodeId id,
     };
   }
 
-  // The nearest scroll-clip ancestor for this node's descendants. A node is its
-  // children's scroll container when it clips overflow (Scroll/Hidden).
+  // A node is its children's scroll container when it clips overflow.
   NodeId child_scroll_container = scroll_container;
   if (node.style.overflow == Overflow::Scroll ||
       node.style.overflow == Overflow::Hidden) {
@@ -171,13 +166,10 @@ bool collect_focusables(const UiTree &tree, FocusRuntime &runtime, NodeId id,
   return true;
 }
 
-// Walk the focused node's ancestor chain in document order to find its nearest
-// scrolling-clip container (overflow Scroll/Hidden) and compute how far that
-// container must shift its scroll offset to bring the focused node fully into
-// its clip rect. Both rects are in absolute layout space, so the delta is
-// offset-independent: the container applies it to whatever local offset it
-// holds. Negative delta scrolls toward the top (reveal above), positive scrolls
-// down (reveal below); 0 = already in view.
+// How far the focused node's nearest scrolling-clip ancestor must shift its
+// offset to bring the node fully into the clip rect. Both rects are absolute, so
+// the delta is offset-independent. Negative = scroll up (reveal above), positive
+// = scroll down (reveal below); 0 = already in view.
 FocusScrollRequest compute_scroll_request(const UiTree &tree, NodeId focused) {
   FocusScrollRequest request = {};
   if (focused == 0)
@@ -197,22 +189,19 @@ FocusScrollRequest compute_scroll_request(const UiTree &tree, NodeId focused) {
         anc.style.overflow == Overflow::Hidden) {
       const Rect clip = anc.layout;
       float delta = 0.0f;
-      // Reveal a node clipped above the window (scroll up: negative delta), or
-      // below it (scroll down: positive delta). If the node is taller than the
-      // viewport, prefer aligning its top.
       if (focus_rect.y < clip.y) {
         delta = focus_rect.y - clip.y;
       } else if (focus_rect.y + focus_rect.height > clip.y + clip.height) {
         delta = (focus_rect.y + focus_rect.height) - (clip.y + clip.height);
-        // Never scroll so far down that the node's top leaves the top edge.
+        // For a node taller than the viewport, prefer aligning its top.
         const float max_up = focus_rect.y - clip.y;
         if (delta > max_up)
           delta = max_up;
       }
       request.delta_y = delta;
       request.valid = true;
-      // Copy the container's control id (truncating to the label cap) so a
-      // ScrollView can match against its own props.id without a node lookup.
+      // Copy the container's control id so a ScrollView can match its own
+      // props.id without a node lookup.
       const char *cid = anc.control_id ? anc.control_id : "";
       size_t n = 0;
       for (; cid[n] && n + 1 < UI_RETAINED_LABEL_CAP; ++n)
@@ -225,7 +214,6 @@ FocusScrollRequest compute_scroll_request(const UiTree &tree, NodeId focused) {
   return request;
 }
 
-// Recursively record the resolved height of every node carrying a control id.
 void collect_measured_sizes(const UiTree &tree, NodeId id,
                             MeasuredSizeRequest *out) {
   NodeSnapshot node = {};
@@ -335,9 +323,8 @@ NodeId first_initial_focus(const FocusRuntime &runtime) {
   return 0;
 }
 
-// First/last enabled node in pure document (array) order, with no initial_focus
-// preference: edge entry from a neutral state must be the true topmost/bottommost
-// item, matching resolve_sequential's Tab / Shift+Tab.
+// First enabled node in document order, ignoring initial_focus: neutral edge
+// entry must be the true topmost item, matching resolve_sequential's Tab.
 NodeId first_enabled_in_order(const FocusRuntime &runtime) {
   for (int i = 0; i < runtime.focusable_count; ++i) {
     if (!runtime.focusables[i].disabled)
@@ -428,12 +415,10 @@ NodeId resolve_spatial(const FocusRuntime &runtime, NodeId from_id,
     float dy = center_y(candidate->rect) - center_y(from->rect);
     float center = dx * dx + dy * dy;
 
-    // When `from` lives in a scrolling container, prefer candidates in
-    // that SAME container so directional nav walks every row in order (even ones
-    // scrolled off-screen, whose nav rect now sits outside the viewport) before
-    // it leaves the list. Without this, a row at the viewport edge would jump to
-    // a closer node OUTSIDE the list (e.g. the preset row just above the window),
-    // skipping the off-screen rows the user is trying to reach.
+    // When `from` lives in a scrolling container, prefer candidates in that SAME
+    // container so directional nav walks every row in order (including
+    // scrolled-off ones) before leaving the list — else a row at the viewport
+    // edge jumps to a closer node outside the list, skipping the off-screen rows.
     bool in_container = from->scroll_container != 0 &&
                         same_id(candidate->scroll_container,
                                 from->scroll_container);
@@ -442,7 +427,7 @@ NodeId resolve_spatial(const FocusRuntime &runtime, NodeId from_id,
     if (!best) {
       better = true;
     } else if (in_container != best_in_container) {
-      better = in_container; // same-container candidates always win
+      better = in_container;
     } else {
       better = perp < best_perp ||
                (perp == best_perp && primary < best_primary) ||
@@ -464,8 +449,8 @@ NodeId resolve_spatial(const FocusRuntime &runtime, NodeId from_id,
   return best ? best->id : from_id;
 }
 
-// Apply a resolved nav target. If edge-entry landed back on the same
-// auto-default seed, set_focus no-ops, so promote its source to a real one.
+// Apply a resolved nav target. If edge-entry lands back on the same auto-default
+// seed, set_focus no-ops, so promote its source to a real one.
 void commit_nav_focus(FocusRuntime &runtime, NodeId next,
                       const InputFrame &input) {
   if (next == 0)
@@ -518,9 +503,9 @@ bool focus_update(FocusRuntime *runtime, const UiTree &tree,
       previous_scope != 0 && !same_id(previous_scope, active_scope) &&
       runtime->previous_focus_before_modal != 0 &&
       contains_enabled(*runtime, runtime->previous_focus_before_modal);
-  // When a nav input is present this frame, leave focus neutral so the nav
-  // pass below enters from the direction's matching edge. Without
-  // nav (e.g. the focused element vanished), auto-focus the first enabled node.
+  // With a nav input this frame, leave focus neutral so the nav pass enters from
+  // the matching edge; without nav (e.g. focused element vanished), auto-focus
+  // the first enabled node.
   FocusDirection nav_probe = FocusDirection::Down;
   bool nav_present =
       input.nav_next || input.nav_previous || read_nav_dir(input, &nav_probe);
@@ -578,14 +563,11 @@ bool focus_update(FocusRuntime *runtime, const UiTree &tree,
 
   runtime->hovered_id = hovered_enabled(*runtime, input);
 
-  // Publish how far the focused node's nearest scrolling container must
-  // move to bring it into view. The owning ScrollView reads this next build and
-  // applies the delta to its local offset (one-frame lag, by design). Gate it on
-  // focus having MOVED this frame via a keyboard/gamepad/programmatic source: a
-  // continuously-published request would fight wheel/pointer scrolling (the user
-  // wheels a focused row off-screen and scroll-into-view yanks it back). Firing
-  // only on the nav edge means each Down/Up triggers exactly one follow-scroll,
-  // and free wheel/drag scrolling is untouched.
+  // Publish the focused node's scroll-into-view delta for its owning ScrollView
+  // (read next build, one-frame lag). Gate on focus having MOVED this frame via a
+  // visible source: a continuously-published request would fight wheel/pointer
+  // scrolling (wheel a focused row off-screen and it gets yanked back). Firing
+  // only on the nav edge leaves free wheel/drag scrolling untouched.
   runtime->scroll_request = {};
   if (runtime->focus_changed_id != 0 &&
       focus_source_is_visible(runtime->source)) {
@@ -599,9 +581,9 @@ bool focus_update(FocusRuntime *runtime, const UiTree &tree,
 void compute_measured_sizes(const UiTree &tree, MeasuredSizeRequest *out) {
   if (!out)
     return;
-  // Reset by zeroing the count only — the array is large (one slot per node), so
-  // value-initializing a `{}` temporary would materialize it on the stack and
-  // blow the frame. Stale tail entries past `count` are never read.
+  // Reset by zeroing count only — the array is large (one slot per node), so a
+  // `{}` temporary would blow the stack frame. Tail entries past `count` are
+  // never read.
   out->count = 0;
   if (!tree.contains(tree.root_id()))
     return;

@@ -14,10 +14,9 @@
 
 namespace client::ui {
 
-// A POD copy of the lobby read-state the UI needs, captured once per tick under
-// LockMutex by the composition root *before* the build phase (doc §5) — the
-// provider never locks at build time, and no raw Lobby*/mutex crosses into the
-// app shell. Populated only during lobby-relevant phases; otherwise default.
+// A POD copy of the lobby read-state, captured once per tick under LockMutex
+// *before* build — the provider never locks at build time and no raw
+// Lobby*/mutex crosses into the app shell.
 struct LobbySnapshot {
   // --- connect (LobbyConnect) ---
   std::string status_log = {};
@@ -41,10 +40,8 @@ struct LobbySnapshot {
   std::vector<GameBrowserEntry> games = {}; // open games (structured)
   std::vector<std::string> bundled_maps = {}; // create-form map choices
 
-  // --- create/join in flight — masks the browser through the async
-  // connect so the right column doesn't flash the games browser between the
-  // create form and staging. True from the Create/Join click until the connect
-  // settles (staging takes over on connect; cleared on idle/failure). ---
+  // --- create/join in flight: masks the browser through the async connect so
+  // the right column doesn't flash the games browser. ---
   bool joining = false;
 
   // --- staging room (LobbyScreen GameJoinPanel) — built when connected ---
@@ -62,47 +59,38 @@ struct LobbySnapshot {
   // --- progression (MissionSummary) ---
   bool progression_loaded = false;
   uint32_t experience = 0;
-  // The per-mission stat breakdown, one display line per entry — origin's
-  // summaryLines verbatim (value right-padded into a 30-char Body column).
+  // Per-mission stat breakdown, one display line per entry (value right-padded
+  // into a 30-char column).
   std::vector<std::string> summary_lines = {};
   bool upgrade_banner = false;
   uint8_t levels[6] = {0, 0, 0, 0, 0, 0};
   bool upgrades_available[6] = {false, false, false, false, false, false};
 };
 
-// The lobby frame value (doc §5): the per-tick snapshot + the queued intent
-// closures the composition root installs over the public Game/World/Lobby seam.
-// The lobby hooks (use_lobby_session / use_progression) read this; screens never
-// see it directly.
+// The lobby frame value: the per-tick snapshot + the queued intent closures.
+// The lobby hooks read this; screens never see it directly.
 struct LobbyProviderValue {
   LobbySnapshot snapshot = {};
   std::function<void(const std::string &, const std::string &)> connect = {};
   std::function<void()> cancel = {};
   std::function<void(int)> upgrade = {};
   std::function<void()> finish = {};
-  // CharacterCreate: create a new agent (alias, agency index 0..4) / select an
-  // existing one by roster index (routes to the lobby).
+  // CharacterCreate: create (alias, agency 0..4) / select by roster index.
   std::function<void(const std::string &, int)> create_character = {};
   std::function<void(int)> select_character = {};
-  // Lobby: post a chat message to the current channel.
   std::function<void(const std::string &)> send_chat = {};
-  // Games browser: id-based join / spectate / create over the public seam
-  // (queued; the LOBBY-tick pump drives the connect → staging transition).
+  // Games browser: id-based join / spectate / create.
   std::function<void(uint32_t, const std::string &)> join_game = {};
   std::function<void(uint32_t)> spectate_game = {};
   std::function<void(const CreateGameRequest &)> create_game = {};
-  // Staging room: ready / change-team / leave / tech loadout over the §7a
-  // public World seam.
+  // Staging room.
   std::function<void()> send_ready = {};
   std::function<void()> change_team = {};
   std::function<void()> leave_game = {};
   std::function<void(uint32_t)> set_tech = {};
 };
 
-// Publishes the lobby model to the component tree. Mounted in the global
-// FrameProvider chain by the composition root, which assembles the value once
-// per tick (snapshot + intents) and hands it in. The provider holds no game
-// handle — only the resolved value.
+// Publishes the lobby model to the component tree; holds no game handle.
 ::ui::UiElement LobbyProvider(const LobbyProviderValue &value,
                               ::ui::UiChildren children, const char *key = nullptr);
 

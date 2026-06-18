@@ -7,9 +7,8 @@
 
 namespace client::ui {
 
-// One peer in the pre-match staging room (doc §6). Display fields are
-// pre-formatted by the composition root; `is_local` marks the viewing player's
-// row, `ready` reflects the peer's ready flag, `team_number` groups rows.
+// One peer in the pre-match staging room. Display fields are pre-formatted by
+// the composition root.
 struct StagingRosterRow {
   std::string name = {};  // display name (+ " [BOT]" for bots, like origin)
   std::string level = {}; // "L:n" (origin Tiny palette-170 badge)
@@ -21,16 +20,11 @@ struct StagingRosterRow {
   bool is_local = false;
 };
 
-// The pre-match room model (doc §6): the roster + ready/team/leave intents over
-// the §7a public World seam (SendReady / ChangeTeam / IsInLobby /
-// AllPeersDownloadedMap). `ready_blocked` mirrors the host-side guard
-// (is_host && !AllPeersDownloadedMap) so the screen can label/disable Ready;
-// `ready_label` is the pre-resolved button text. `active` is true while
-// connected to a game (staging or playing); `in_game_lobby` while still
-// pre-match. Tech loadout (slots/buyable/wanted + set/toggle) joins later.
-// One selectable pre-match tech (origin tech_tree_grid row): the GAS buyable's
-// name + slot cost, whether the local peer has it chosen, and whether it can be
-// toggled (enough slots left, or already chosen so it can be un-chosen).
+// The pre-match room model: the roster + ready/team/leave intents. `ready_blocked`
+// mirrors the host-side guard so the screen can disable Ready; `active` is true
+// while connected, `in_game_lobby` while still pre-match.
+// One selectable pre-match tech: name + slot cost, whether the local peer has it
+// chosen, and whether it can be toggled.
 struct StagingTechRow {
   std::string name = {};
   std::string description_title = {};
@@ -43,9 +37,8 @@ struct StagingTechRow {
 
 struct Staging {
   bool active = false;
-  // A create/join is in flight but the connect hasn't settled yet.
-  // The lobby right column holds a stable "Connecting" panel while this is true
-  // (and !active) so it never flashes the games browser before staging mounts.
+  // A create/join is in flight but not settled: the lobby right column holds a
+  // stable "Connecting" panel (while !active) so it never flashes the browser.
   bool joining = false;
   bool in_game_lobby = false;
   bool is_host = false;
@@ -53,8 +46,6 @@ struct Staging {
   std::string ready_label = "Ready";
   std::string map_name = {}; // origin shows it in the lobby title bar
   std::vector<StagingRosterRow> roster = {};
-  // Pre-match tech loadout (origin GameTechPanel): the selectable techs, the
-  // local choice bitmask, and the slots-left readout.
   std::vector<StagingTechRow> tech = {};
   uint32_t tech_choices = 0;
   std::string tech_slots_label = {};

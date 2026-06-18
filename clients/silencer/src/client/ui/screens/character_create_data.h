@@ -1,18 +1,12 @@
 #pragma once
 
-// The Character Create "Select Agency" detail content, sourced from
-// origin/main character_create_layout.cpp kAgencies.
-// Advantage rows split origin's "Label +N" lines into label + bonus (the
-// brackets render as bank-134 glyph sprites, not text); "... Ability" lines
-// are label-only and origin orders them after the +N rows. The description is
-// origin's lore paragraph, word-wrapped by the text engine exactly as origin's
-// DetailParagraph (TextWrap::Words) wraps it in the 196-wide detail column.
+// Source of truth: origin/main character_create_layout.cpp kAgencies.
 
 namespace client::ui {
 
 struct Advantage {
-  const char *label; // e.g. "Endurance"
-  const char *bonus; // e.g. "+3" (nullptr => label-only ability row)
+  const char *label;
+  const char *bonus; // nullptr => label-only ability row
 };
 
 struct AgencyInfo {
@@ -20,7 +14,7 @@ struct AgencyInfo {
   const char *control_id;
   static constexpr int kMaxAdvantages = 4;
   Advantage advantages[kMaxAdvantages]; // trailing {nullptr,nullptr} => unused
-  const char *description;              // one paragraph; the engine wraps it
+  const char *description;
 };
 
 constexpr int kAgencyCount = 5;

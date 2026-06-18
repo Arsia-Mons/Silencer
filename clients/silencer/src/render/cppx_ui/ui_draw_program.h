@@ -1,39 +1,31 @@
 #pragma once
 
-// ui_draw_program.h — the backend-neutral UI render program.
+// The backend-neutral UI render program: a de-indexed vertex stream + a command
+// stream (draw / scissor / layer) + a texture manifest, emitted by
+// build_ui_draw_program and consumed directly by the SDL_GPU backend.
 //
-// The cppx-side emitter (build_ui_draw_program, ui_draw_program.cpp)
-// walks the same ::ui::DrawCommandList IR the software executor does and lowers
-// it to a flat GPU draw program — a de-indexed vertex stream + a small command
-// stream (draw / scissor / layer) + a manifest of the textures the batches
-// reference. The SDL_GPU backend (sdl3gpubackend.cpp) consumes it directly.
-//
-// This header is deliberately SDL-free (only <cstdint>/<vector>): it crosses the
-// cppx_ui -> renderdevice -> backend boundary, and only sdl3gpubackend.cpp is
-// allowed to include <SDL3/SDL_gpu.h>. All parity-critical geometry/UV/snap math
-// happens CPU-side in the emitter; the backend just binds + draws.
+// Deliberately SDL-free (it crosses the cppx_ui -> renderdevice -> backend
+// boundary; only sdl3gpubackend.cpp may include <SDL3/SDL_gpu.h>). All
+// parity-critical math happens CPU-side in the emitter; the backend just draws.
 
 #include <cstdint>
 #include <vector>
 
 namespace silencer::cppx_ui {
 
-// One UI vertex in the de-indexed geometry stream. Positions are in CLIP SPACE
-// (the points -> device-px -> clip transform is baked CPU-side in the emitter,
-// so the vertex shader is a pass-through and needs no uniform); color is
-// PREMULTIPLIED and normalized [0,1]; uv in [0,1]. Eight contiguous floats
-// (32 bytes) matching the vert_ui vertex-input layout (FLOAT2 pos @0, FLOAT2 uv
-// @8, FLOAT4 color @16).
+// One UI vertex (de-indexed). Position in clip space (transform baked CPU-side,
+// so the vertex shader is pass-through); color premultiplied, normalized; uv
+// [0,1]. Layout matches vert_ui (FLOAT2 pos @0, FLOAT2 uv @8, FLOAT4 color @16).
 struct GpuUiVertex {
   float x = 0.f, y = 0.f;                     // clip space [-1,1]
   float u = 0.f, v = 0.f;                     // [0,1]
   float r = 0.f, g = 0.f, b = 0.f, a = 0.f;   // premultiplied [0,1]
 };
 
-// A premultiplied-RGBA texture a textured batch references. `key` is opaque +
-// stable across frames (see ui_texture_key.h); `rgba`/`w`/`h` are the source
-// bytes (owned by a cppx_ui registry, valid through this frame's Present);
-// `version` bumps when the bytes change so the backend can skip re-upload.
+// A premultiplied-RGBA texture a batch references. `key` is opaque + stable
+// across frames (ui_texture_key.h); `rgba`/`w`/`h` are registry-owned source
+// bytes (valid through this frame's Present); `version` bumps on change so the
+// backend can skip re-upload.
 struct GpuUiTexture {
   uint64_t key = 0;
   const uint8_t *rgba = nullptr;
@@ -58,8 +50,8 @@ struct GpuUiCommand {
   float layer_opacity = 1.f;
 };
 
-// The full backend-neutral UI frame: a flat command stream over a shared
-// de-indexed vertex array, plus the manifest of textures the batches reference.
+// The full UI frame: a command stream over a shared de-indexed vertex array +
+// the texture manifest the batches reference.
 struct GpuUiProgram {
   std::vector<GpuUiVertex> verts;
   std::vector<GpuUiCommand> commands;

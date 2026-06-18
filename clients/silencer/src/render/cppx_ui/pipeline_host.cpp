@@ -34,13 +34,12 @@ bool PipelineHost::ensure(int w, int h, const char *font_dir) {
     return true;
 
   ui_.shutdown();
-  // The chrome + glyph textures are bound to the old renderer; drop them and
-  // flag a re-bake. The composition root re-bakes once after ensure() returns.
+  // Chrome + glyph textures are bound to the old renderer; drop them and flag a
+  // re-bake (the composition root re-bakes after ensure() returns).
   textures_.shutdown();
   glyph_fonts_.shutdown();
   chrome_dirty_ = true;
-  // The registries' textures are gone; bump the generation so the GPU
-  // backend flushes its texture cache (texture_ids may be reused for new art).
+  // Bump the generation so the GPU backend flushes its texture cache (ids reuse).
   ++texture_generation_;
   if (r_) {
     SDL_DestroyRenderer(r_);
@@ -65,7 +64,6 @@ bool PipelineHost::ensure(int w, int h, const char *font_dir) {
 #endif
     if (!fonts_.load_faces(font_dir))
       return false;
-    // Measure reads the glyph fonts first (bitmap parity), TTF as fallback.
     install_text_measurer(&fonts_, &glyph_fonts_);
   }
   if (!ui_.initialize(r_, fonts_))
@@ -76,8 +74,7 @@ bool PipelineHost::ensure(int w, int h, const char *font_dir) {
   w_ = w;
   h_ = h;
   packed_.assign((size_t)w * h * 4u, 0);
-  // The surface was just (re)created at a new size; any cached frame is stale.
-  packed_valid_ = false;
+  packed_valid_ = false; // new surface size: cached frame is stale
   last_ir_sig_ = 0;
   return true;
 }
@@ -126,11 +123,9 @@ bool PipelineHost::build_glyph_color_face(int face_id, uint8_t key_r,
 
 namespace {
 
-// FNV-1a over the LIVE bytes of the draw IR (the used prefix of each arena, not
-// the whole fixed-capacity arrays). Trivially-copyable POD, so a raw-byte hash
-// captures every visible change — colors, geometry, text, gradients. A false
-// "changed" only costs a redundant raster; a collision-driven false "unchanged"
-// is astronomically unlikely (and would have to collide on a real visual delta).
+// FNV-1a over the used prefix of the draw IR arenas (POD, so a raw-byte hash
+// captures every visible change). A false "changed" only costs a redundant
+// raster; a collision-driven false "unchanged" is astronomically unlikely.
 uint64_t ir_signature(const ::ui::DrawCommandList &list) {
   uint64_t h = 1469598103934665603ull;
   auto mix_bytes = [&](const void *p, size_t n) {
@@ -161,24 +156,14 @@ const uint8_t *PipelineHost::render(const client::ui::UiPipelineFrame &frame,
   if (!surf_ || !r_ || !pipeline_)
     return nullptr;
 
-  // Responsive content scale: screens lay out against a logical canvas (height
-  // pinned to 720, width = aspect*720) and the executor scales every primitive
-  // up to the physical surface, so the whole UI grows with the window like
-  // origin/main — fonts re-rasterized crisply at the scaled cell, sprites
-  // upscaled. Derived from the surface/logical-layout ratio the composition root
-  // set in frame.layout; 1.0 when the layout already matches the surface.
-  // May be < 1 (small windows render the 720-authored canvas at origin's
-  // native 480-virtual proportions) — keep it in lockstep with the
-  // composition root's cppxScale, never re-clamp here.
+  // Responsive content scale: surface height / logical-layout height (the ratio
+  // the composition root set in frame.layout). May be < 1 on small windows —
+  // keep it in lockstep with the composition root's cppxScale, never re-clamp.
   float device_scale = (frame.layout.height > 0.0f)
                            ? static_cast<float>(h_) / frame.layout.height
                            : 1.0f;
-  // The retained tree, layout, focus pass, and IR build always run —
-  // they advance the animation/interaction state. Only the native-resolution
-  // raster is conditional. `unchanged` is decided AFTER the IR is built (inside
-  // the render callback): if the IR is byte-identical to the last rastered
-  // frame and we hold a valid cached buffer, skip the clear/execute/SSAA-resolve
-  // /packed-copy entirely and reuse `packed_`.
+  // Tree/layout/focus/IR build always run (they advance animation/interaction
+  // state); only the raster is conditional, decided after the IR is built.
   bool unchanged = false;
   pipeline_->render_client_ui_frame(frame, [&] {
     const ::ui::DrawCommandList &list =
@@ -186,7 +171,7 @@ const uint8_t *PipelineHost::render(const client::ui::UiPipelineFrame &frame,
     const uint64_t sig = ir_signature(list);
     if (packed_valid_ && sig == last_ir_sig_) {
       unchanged = true;
-      return; // cached packed_ is still correct for this IR
+      return;
     }
     PERF_SCOPE("ui.raster");
     // Transparent clear: the UI composites over the already-rendered world.
@@ -220,15 +205,11 @@ PipelineHost::build_gpu_frame(const client::ui::UiPipelineFrame &frame) {
   if (!surf_ || !r_ || !pipeline_)
     return nullptr;
 
-  // Same responsive content scale render() derives (production supersample is 1,
-  // so the executor's scale == this device_scale).
+  // Same content scale render() derives.
   const float device_scale = (frame.layout.height > 0.0f)
                                  ? static_cast<float>(h_) / frame.layout.height
                                  : 1.0f;
 
-  // The retained tree, layout, focus pass, and IR build always run (they carry
-  // the animation/interaction state); only the lowering target differs from
-  // render() — geometry instead of a CPU raster.
   pipeline_->render_client_ui_frame(frame, [&] {
     const ::ui::DrawCommandList &list =
         pipeline_->client_ui().retained_command_list();

@@ -10,53 +10,47 @@
 
 #include <string.h>
 
-// Measure/wrap/align logic adapted from the golden renderer/text_measure_impl;
-// the Silencer changes are multi-face selection AND the bitmap glyph-font path
-// (when a face has a baked atlas, measure uses its MONOSPACE metrics so measure
-// == the executor's glyph paint — same advance, same line box).
+// When a face has a baked glyph atlas, measure uses its monospace metrics so
+// measure == the executor's glyph paint; otherwise TTF.
 
 namespace silencer::cppx_ui {
 
 namespace {
 
-// The registries the measurer reads. Set once by install_text_measurer; the
-// measurer is a free function (the seam is a plain function pointer). The app
-// owns these for the whole process, so they never dangle.
+// The registries the measurer reads. Set once by install_text_measurer; the app
+// owns them for the process lifetime, so they never dangle.
 FontRegistry *g_fonts = nullptr;
 GlyphFonts *g_glyphs = nullptr;
 
 // One query's resolved metrics: bitmap-glyph (monospace) when the face has an
-// atlas, else TTF. `adv` is per-character advance (points); `line_h` is the line
-// box height (points). For TTF, `adv` is unused (width comes from TTF_GetStringSize).
+// atlas, else TTF. For TTF, `adv` is unused (width via TTF_GetStringSize).
 struct RunMetrics {
   bool glyph = false;
   const GlyphFonts::Face *gf = nullptr; // glyph mode
   float adv = 0.0f;                     // glyph mode: per-char advance (points)
   TTF_Font *font = nullptr;             // TTF mode
   float line_h = 16.0f;
-  float ascent = 0.0f; // cap-top..baseline of the resolved face, points (0 = ?)
+  float ascent = 0.0f; // cap-top..baseline, points
 };
 
 RunMetrics metrics_for(const ::ui::TextMetricsQuery &q) {
   RunMetrics m;
   const GlyphFonts::Face *gf = g_glyphs ? g_glyphs->face(q.font_id) : nullptr;
   if (gf && gf->line_height > 0.0f && q.font_size > 0) {
-    // font_size is the target cell height (points). Scale native bank metrics by
-    // font_size/line_height (same mapping the executor uses) so measure==paint.
+    // Scale native bank metrics by font_size/line_height (the executor's mapping)
+    // so measure == paint.
     const float gscale = static_cast<float>(q.font_size) / gf->line_height;
     m.glyph = true;
     m.gf = gf;
     m.adv = gf->advance * gscale;
-    // The cell height IS font_size; ignore q.line_height so a small legacy
-    // line-height token can't clip the (now larger) glyph cell.
+    // Cell height IS font_size; ignore q.line_height so a small line-height
+    // token can't clip the larger glyph cell.
     m.line_h = static_cast<float>(q.font_size);
-    // Cap-top..baseline in points: native ascent scaled the same as the cell.
-    // Drives the caret height (glyph ink, not the descender-padded cell).
     if (gf->ascent > 0)
       m.ascent = static_cast<float>(gf->ascent) * gscale;
     return m;
   }
-  // TTF: face for q.font_id, sized per-query (matches the TTF paint path).
+  // TTF: face for q.font_id, sized per-query (matches the paint path).
 #ifndef SILENCER_HEADLESS
   if (g_fonts) {
     m.font = g_fonts->face(q.font_id);
@@ -85,7 +79,7 @@ float advance_of(const RunMetrics &m, const char *utf8, uint32_t len) {
   if (len == 0)
     return 0.0f;
   if (m.glyph)
-    return static_cast<float>(len) * m.adv; // monospace: spaces advance too
+    return static_cast<float>(len) * m.adv; // monospace; spaces advance too
   if (!m.font)
     return 0.0f;
 #ifndef SILENCER_HEADLESS
@@ -116,15 +110,14 @@ bool is_utf8_cont(char c) {
   return (static_cast<unsigned char>(c) & 0xC0) == 0x80;
 }
 
-// Largest byte prefix [from, from+k) of s (k >= 1, landing on a UTF-8 char
-// boundary) whose advance fits box_w. Used to hard-break a run with no break
-// opportunity (a long unspaced token) so it wraps within the column instead of
-// overflowing. Always returns >= one whole char so wrapping makes progress.
+// Largest UTF-8-boundary prefix [from, from+k) of s whose advance fits box_w,
+// to hard-break an unspaced token. Always returns >= one whole char so wrapping
+// makes progress.
 uint32_t char_fit(const RunMetrics &m, const char *s, uint32_t from,
                   uint32_t end, float box_w) {
   uint32_t k = 1;
   while (from + k < end && is_utf8_cont(s[from + k]))
-    ++k; // first whole char (>= 1 byte)
+    ++k;
   while (from + k < end) {
     uint32_t next = k + 1;
     while (from + next < end && is_utf8_cont(s[from + next]))
@@ -152,10 +145,9 @@ bool push_line(::ui::TextMetricsResult &out, uint32_t slice_off,
   return true;
 }
 
-// Word-wrap a SINGLE paragraph (no embedded '\n') of s[start, end) at box_w,
-// pushing each wrapped line into `out` at vertical pen `y`. Returns false (and
-// sets out.overflowed) if the line cap is hit. An empty paragraph emits one
-// empty line so blank lines (a bare '\n') keep their vertical slot.
+// Word-wrap a single paragraph (no embedded '\n') of s[start, end) at box_w.
+// Returns false (and sets out.overflowed) on the line cap. An empty paragraph
+// emits one empty line so a bare '\n' keeps its vertical slot.
 bool wrap_paragraph(::ui::TextMetricsResult &out, const RunMetrics &m,
                     const ::ui::TextMetricsQuery &q, float line_h, float box_w,
                     const char *s, uint32_t start, uint32_t end, float &y) {
@@ -195,14 +187,10 @@ bool wrap_paragraph(::ui::TextMetricsResult &out, const RunMetrics &m,
           break;
         }
       } else {
-        // The line-so-far plus this word overflows. A word wider than the whole
-        // column can never fit alone, so hard-break it at the char boundary that
-        // fills the remaining space (`char_fit` measures from line_start, so the
-        // placed words stay and the long run flows on from them) — e.g. a chat
-        // line "name: a;b;c;..." keeps the message on the name's line and wraps
-        // within the column instead of overflowing. Also char-break when nothing
-        // has been placed yet so a too-long first word still makes progress.
-        // Otherwise wrap the whole word to the next line (greedy word wrap).
+        // The line-so-far plus this word overflows. Char-break the word when it
+        // can't fit the column alone or nothing's been placed yet (char_fit
+        // measures from line_start, so placed words stay); else wrap the whole
+        // word to the next line (greedy).
         float word_w = advance_of(m, s + word_start, word_end - word_start);
         if (word_w > box_w || !placed) {
           uint32_t fit = char_fit(m, s, line_start, end, box_w);
@@ -241,9 +229,7 @@ bool wrap_paragraph(::ui::TextMetricsResult &out, const RunMetrics &m,
 ::ui::TextMetricsResult measure_wrapped(const RunMetrics &m,
                                         const ::ui::TextMetricsQuery &q,
                                         float line_h, float box_w) {
-  // Honor explicit '\n' as a HARD line break, then soft-wrap each paragraph by
-  // width. The transcript (and any newline-joined text) thus renders one source
-  // line per row; a bare '\n' keeps an empty row.
+  // '\n' is a hard break; soft-wrap each paragraph by width.
   ::ui::TextMetricsResult out = {};
   const char *s = q.utf8;
   const uint32_t n = q.len;
@@ -257,7 +243,7 @@ bool wrap_paragraph(::ui::TextMetricsResult &out, const RunMetrics &m,
       break;
     if (para_end >= n)
       break;
-    para_start = para_end + 1; // skip the '\n'
+    para_start = para_end + 1;
   }
   out.height = static_cast<float>(out.line_count) * line_h;
   return out;

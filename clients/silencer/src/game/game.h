@@ -43,29 +43,16 @@ public:
     Surface &GetScreenBuffer() { return gameRenderer.GetScreenBuffer(); }
     const Surface &GetScreenBuffer() const { return gameRenderer.GetScreenBuffer(); }
     const SDL_Color *GetPaletteColors() const { return gameRenderer.GetPaletteColors(); }
-    // Screenshot the final composited frame (world + cppx UI overlay) by capturing
-    // the GPU swapchain; falls back to the indexed Surface when the device can't
-    // capture (TUI/headless).
     bool CaptureCompositedFrame(const char *path);
     Renderer &GetRenderer() { return renderer; }
-    // The cppx UI composition root. Public so the control socket can introspect the
-    // retained UI tree and inject automation input without a friend grant;
-    // gameplay code drives navigation through the session-phase reconciler.
     GameUiPipeline &GetUiPipeline() { return gameUiPipeline; }
-    // Public so the control socket can drive the self-updater into a static phase
-    // (show_update_screen test op) without a friend grant.
     Updater &GetUpdater() { return updater; }
     bool ResizeRenderSurface(int width, int height);
     bool ResizeRenderSurfacePixels(int width, int height);
     bool SyncRenderSurfaceToWindowPixels();
     bool IsLiveMultiplayer() const;
     bool GoBack();
-    // State transition entry point. Public so the UI layer can drive navigation
-    // without a friend grant; ~21 internal callers unchanged.
     void GoToState(Uint8 newstate);
-    // Push the active palette colors into the render backend. Hides the private
-    // gameRenderer behind a public command (closed the old screen-context's
-    // ResetPresentation seam).
     void SetRenderPaletteColors(SDL_Color *colors) { gameRenderer.SetColors(colors); }
     struct PendingWait {
         ControlCommand cmd;
@@ -91,17 +78,9 @@ public:
     void JoinGame(LobbyGame &lobbygame, char *password = 0);
     void SpectateGame(LobbyGame &lobbygame, char *password = 0);
     void LeaveJoinedGame();
-    // Leave the in-progress match to the menu (origin CheckForQuit outcome): drop
-    // the connection, then return to the lobby + rejoin the channel if
-    // authenticated, else end any replay and go to the main menu. Driven by the
-    // UI-layer PauseScreen via use_session().leave_match.
     void LeaveMatchToMenu();
 
-    // The LobbyConnect status log, accumulated by the connect flow on the tick.
-    // Public so the cppx composition root can snapshot it without a friend grant.
     const std::vector<std::string> &LobbyConnectLog() const { return lobbyConnectFlow.Log(); }
-    // The lobby chat scrollback, drained from the lobby message queue on the tick
-    // (the queue would otherwise grow unboundedly). Snapshotted by the comp root.
     const std::vector<std::string> &LobbyChatLog() const { return lobbyChatLog; }
 
 private:
@@ -137,23 +116,18 @@ private:
     InputServer inputserver;
     Uint8 state;
     Uint8 nextstate;
-    // The state a FADEOUT transition is leaving. The session-phase projection holds
-    // this (not nextstate) while state==FADEOUT so the outgoing screen stays
-    // mounted and fades to black before the switch.
+    // The state a FADEOUT transition is leaving; the session-phase projection
+    // reads this (not nextstate) to keep the outgoing screen mounted through the fade.
     Uint8 fadefromstate;
-    // True on the previous in-game tick if the transition palette fade was still
-    // dimming (FadePhase < 16). Used to detect the fade's falling edge so the
-    // ambience palette is recomposed once over the canonical base palette when the
-    // fade settles, instead of latching a stale, half-dimmed fade palette (the
-    // level-entry lighting flicker).
+    // Previous-tick fade-active flag, for falling-edge detection: recompose the
+    // ambience palette once when the fade settles instead of latching a stale,
+    // half-dimmed fade palette (the level-entry lighting flicker).
     bool ambienceFadeWasActive = false;
     bool stateisnew;
     bool nextstateprocessed;
-    // Roster size captured on entering CREATECHARACTER; when the roster grows past
-    // it (a create round-tripped through the lobby), the tick routes to LOBBY.
+    // Roster size on entering CREATECHARACTER; when it grows (a create
+    // round-tripped through the lobby), the tick routes to LOBBY.
     size_t charCreateCountOnEntry = 0;
-    // Lobby chat scrollback, drained from world.lobby.chatmessages on the LOBBY
-    // tick (cleared on entry). The cppx ChatPanel reads it via LobbyChatLog().
     std::vector<std::string> lobbyChatLog;
     Uint16 sharedstate;
     Uint8 singleplayermessage;

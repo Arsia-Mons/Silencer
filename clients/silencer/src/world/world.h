@@ -160,9 +160,8 @@ class World {
     void   StoreMapChunk(unsigned char * data, Uint32 offset, Uint32 size);
     bool   SecurityIDCanSpawn(Uint8 securityid);
 
-    // Lobby / pre-match commands (local-player -> authority). Promoted from
-    // private to join the public ChangeTeam/SetTech family; the
-    // authority-side receive handlers (peerid overloads) stay private.
+    // Lobby / pre-match commands (local-player -> authority); the authority-side
+    // receive handlers (peerid overloads) stay private.
     void   SendReady()                                   { replication.SendReady(); }
     void   RequestPeerList()                             { peers.RequestPeerList(); }
     bool   AllPeersDownloadedMap()                       { return replication.AllPeersDownloadedMap(); }
@@ -178,8 +177,8 @@ class World {
     Uint8  gravity, maxyvelocity;
     int    minwalldistance;
     bool   replaying;
-    // The scripted/HUD mission-over signal (origin END_MISSION). Rising edge
-    // pushes the UI-layer PauseScreen; NOT serialized (authority-local).
+    // Scripted mission-over signal (origin END_MISSION). NOT serialized
+    // (authority-local); rising edge pushes the UI-layer PauseScreen.
     bool   missionover;
     std::vector<BuyableItem *> buyableitems;
     Uint32 tickcount;

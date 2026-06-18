@@ -20,17 +20,10 @@ using ::ui::components::Text;
 using ::ui::components::TextProps;
 
 ::ui::UiElement AppButton(const AppButtonProps &props) {
-  // origin button.cpp visual-state machine (StepVisualState/FrameForPhase):
-  // a TARGETED legacy button ramps phase 0→4 — sprite (base index + phase) at
-  // brightness 128 + phase*2, label at the same brightness — one phase per
-  // 42ms legacy frame; un-targeting ramps back down; disabled pins phase 0.
-  // origin targets on hover or real focus. Hover comes from the
-  // Button host's on_hover enter/leave edges; focus from its focus/blur edges,
-  // gated on a REAL input source — programmatic focus (our autofocus
-  // convenience; origin never autofocuses) does not ramp, so rest-state
-  // renders match the rest-state goldens. Oval/List always ramp by swapping
-  // sprite frames; Chrome ramps its same-art brightness on hover/focus too
-  // so rectangular buttons (Connect/Lobby) get the origin hover.
+  // A targeted button ramps phase 0->4 (one step per 42ms); un-targeting ramps
+  // down; disabled pins phase 0. Targeted = hover or REAL-source focus —
+  // programmatic autofocus must not ramp, or rest-state renders drift off the
+  // rest-state goldens.
   client::ui::Clock clock = client::ui::use_clock();
   uint32_t *anim_accum = use_state<uint32_t>(0u);
   int *phase = use_state<int>(0);
@@ -48,7 +41,7 @@ using ::ui::components::TextProps;
       props.variant == AppButtonVariant::Chrome;
   const bool targeted =
       !props.disabled && (*hovered_now || (*focused_now && source_real));
-  const uint32_t kFrameMs = 42; // legacy ~24fps animation step
+  const uint32_t kFrameMs = 42;
   *anim_accum += clock.delta_ms;
   while (*anim_accum >= kFrameMs) {
     *anim_accum -= kFrameMs;
@@ -61,10 +54,8 @@ using ::ui::components::TextProps;
     *phase = 0;
   const int p = *phase < 0 ? 0 : (*phase > 4 ? 4 : *phase);
 
-  // Wrap the no-arg semantic callbacks into the event-taking ui callbacks; the
-  // host events are intentionally ignored (the semantic API is event-free).
-  // Focus/blur edges also feed the ramp state (they fire in the focus pass,
-  // after this frame's build — the established deferred-mutation idiom).
+  // Wrap the no-arg semantic callbacks into the event-taking ui callbacks.
+  // Focus/blur/hover edges also feed the ramp state.
   std::function<void(const ::ui::ActivationEvent &)> on_activate = {};
   if (props.on_press) {
     on_activate = [on_press = props.on_press](const ::ui::ActivationEvent &) {
@@ -92,9 +83,7 @@ using ::ui::components::TextProps;
   ::ui::StyleStatePatch style = app_button_variant_patch(props.variant);
 
   // Oval is sprite-backed: it reads its baked bank-6 ramp frames from
-  // use_chrome() (composition-root provider) and paints image-only at the
-  // fixed legacy geometry. Selected by size: Md/Sm/Lg → idx7/idx28/idx23;
-  // List → the flat LegacyRow plate (idx2).
+  // use_chrome() and paints image-only, frame selected by size + phase.
   if (props.variant == AppButtonVariant::Oval) {
     client::ui::ChromeTextures chrome = client::ui::use_chrome();
     const uint32_t *frames = chrome.oval_md;
@@ -119,10 +108,9 @@ using ::ui::components::TextProps;
   if (props.padding.set)
     layout.padding = props.padding.value;
 
-  // The label is rendered as a styled Text CHILD (not the bare-string fallback):
-  // the runtime only paints text on Text-role nodes, so the Button's own value is
-  // never painted, and a bare string child paints with the engine's neutral grey.
-  // A Text child resolves the green app_theme text color + the variant's face.
+  // The label MUST be a styled Text CHILD: the runtime only paints text on
+  // Text-role nodes, so the Button's own value never renders and a bare string
+  // child would paint the engine's neutral grey.
   ::ui::StyleStatePatch label_style{};
   label_style.base = ::ui::patch().text(app_button_label_visual(
       props.variant, props.disabled, props.size, target_feedback ? p : 0));
@@ -131,9 +119,6 @@ using ::ui::components::TextProps;
           ? Text(TextProps{.value = props.label, .style = label_style})
           : ::ui::empty();
 
-  // Children are plain expressions: props.children, plus the styled label child
-  // used only when no children were provided. The two {expr} children lower into
-  // the appended `.children = children({...})` (last, after layout/style).
   return <Button
     key={props.key}
     id={props.control_id}

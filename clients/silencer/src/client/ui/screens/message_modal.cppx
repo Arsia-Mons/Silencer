@@ -52,9 +52,6 @@ struct MessageModalProps {
   return Text(props);
 }
 
-// origin/main message modal — the bank-40 idx4 dialog sprite (no slate
-// card, no title heading), a single Large-faced message line, and a chrome OK
-// button. The modal stays a CenteredOverlay (focus-trapped Dialog).
 ::ui::UiElement MessageModalView(const MessageModalProps &props) {
   Navigation nav = use_navigation();
   ChromeTextures chrome = use_chrome();

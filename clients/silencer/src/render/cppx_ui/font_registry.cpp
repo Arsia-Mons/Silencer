@@ -8,7 +8,7 @@
 
 namespace silencer::cppx_ui {
 
-// clear_text_cache is safe in headless mode (uses only SDL3, not SDL3_ttf).
+// Safe in headless mode (uses only SDL3, not SDL3_ttf).
 void FontRegistry::clear_text_cache() {
   for (TextEntry &e : text_cache_) {
     if (e.tex) {
@@ -39,8 +39,7 @@ SDL_Texture *FontRegistry::cached_text_texture(SDL_Renderer *, uint16_t,
 #else // !SILENCER_HEADLESS
 
 namespace {
-// Indexed by FaceId. shared/fonts/silencer-*.otf (generated from the legacy
-// bitmap banks 133/134/136/132/135 — exact in-game identity).
+// Indexed by FaceId.
 const char *kFaceFile[FontRegistry::FaceCount] = {
     "silencer-ui.otf",       // Body
     "silencer-ui-large.otf", // Large
@@ -49,8 +48,7 @@ const char *kFaceFile[FontRegistry::FaceCount] = {
     "silencer-135.otf",      // Heading (bank 135)
 };
 
-// FNV-1a over the cache key (font_id + bytes + size + color) — a fast reject
-// hash; the lookup still confirms with a full field compare.
+// FNV-1a fast-reject hash; lookup still confirms with a full field compare.
 uint64_t key_hash(uint16_t font_id, const char *text, size_t len,
                   int pixel_size, SDL_Color c) {
   uint64_t h = 1469598103934665603ull;
@@ -76,8 +74,7 @@ bool FontRegistry::load_faces(const char *font_dir) {
   for (int i = 0; i < FaceCount; ++i) {
     char path[1024];
     SDL_snprintf(path, sizeof(path), "%s/%s", font_dir, kFaceFile[i]);
-    // Open at a nominal base; the real size is set per-query/draw via
-    // TTF_SetFontSize so one face serves every size.
+    // Nominal base; real size set per-query via TTF_SetFontSize.
     faces_[i] = TTF_OpenFont(path, 16.0f);
     if (!faces_[i]) {
       SDL_Log("FontRegistry: TTF_OpenFont(%s) failed: %s", path, SDL_GetError());
@@ -88,7 +85,7 @@ bool FontRegistry::load_faces(const char *font_dir) {
 }
 
 void FontRegistry::shutdown() {
-  clear_text_cache(); // free cached textures before the renderer is destroyed
+  clear_text_cache(); // free textures before the renderer is destroyed
   for (int i = 0; i < FaceCount; ++i) {
     if (faces_[i]) {
       TTF_CloseFont(faces_[i]);
@@ -115,7 +112,6 @@ SDL_Texture *FontRegistry::cached_text_texture(SDL_Renderer *renderer,
   ++text_clock_;
   const uint64_t h = key_hash(font_id, text, len, pixel_size, color);
 
-  // Lookup: fast hash reject, then a full field compare (no collision risk).
   int lru = 0;
   uint64_t lru_tick = UINT64_MAX;
   for (int i = 0; i < kTextCacheCap; ++i) {
@@ -124,7 +120,7 @@ SDL_Texture *FontRegistry::cached_text_texture(SDL_Renderer *renderer,
       if (lru_tick != 0) {
         lru = i;
         lru_tick = 0;
-      } // prefer a free slot
+      }
       continue;
     }
     if (e.hash == h && e.len == static_cast<int>(len) &&
@@ -145,7 +141,6 @@ SDL_Texture *FontRegistry::cached_text_texture(SDL_Renderer *renderer,
     }
   }
 
-  // Miss: rasterize once at the requested device pixel size + straight color.
   TTF_SetFontSize(font, static_cast<float>(pixel_size));
   SDL_Surface *surface = TTF_RenderText_Blended(font, text, len, color);
   if (!surface)
@@ -156,7 +151,6 @@ SDL_Texture *FontRegistry::cached_text_texture(SDL_Renderer *renderer,
   if (!tex)
     return nullptr;
 
-  // Install into the chosen slot (free or LRU-evicted).
   TextEntry &e = text_cache_[lru];
   if (e.tex)
     SDL_DestroyTexture(e.tex);

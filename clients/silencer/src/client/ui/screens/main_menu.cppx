@@ -68,22 +68,10 @@ bool has_logo_animation(const ChromeTextures &chrome) {
          chrome.logo_frame_count == ChromeTextures::kLogoFrames;
 }
 
-// origin/main main menu — starfield root (ScreenLayout Menu), a left
-// SILENCER logo sprite + a right-anchored staggered stack of green oval buttons
-// with the legacy labels, and a bottom-left version footer. No slate card.
-//
-// Layout is expressed in FLEX, not pinned coordinates. All metrics below are the
-// original 480-unit design numbers x1.5 (the 720-tall logical canvas is origin's
-// 480 x1.5). The composition is a row of two columns — a 525-wide logo column and
-// a 435-wide action column (640 original x1.5) — that ScreenLayout(Menu) centers
-// horizontally for us. The columns are flex-basis + shrink (not hard widths) and
-// the composition's width is responsive (100% of the centered area, capped at
-// 960). When there is room it holds the parity widths; as the logical width
-// narrows, the columns shrink together — staying centered — down to a content
-// floor (min_width) the fixed-size logo/oval sprites can't go below. Once at that
-// floor the composition stops shrinking and stays centered, so a very narrow
-// viewport overflows symmetrically rather than letting the two columns' content
-// collide or one corner clip off-screen. One layout, no breakpoints.
+// Layout metrics are the original 480-unit design numbers x1.5. Columns are
+// flex-basis + shrink (not hard widths): they shrink together, staying centered,
+// down to a min_width floor the fixed-size logo/oval sprites can't go below;
+// past the floor the viewport overflows symmetrically rather than clipping.
 constexpr float kCompScale = 1.5f;
 constexpr float kCompWidth = 640.0f * kCompScale;      // 960 (logo 350 + action 290)
 constexpr float kLogoColWidth = 350.0f * kCompScale;   // 525
@@ -91,26 +79,17 @@ constexpr float kLogoColPadLeft = 7.0f * kCompScale;   // 10.5
 constexpr float kLogoColNudge = 6.0f * kCompScale;     // tiny downward bias (origin)
 constexpr float kActionColWidth = 290.0f * kCompScale; // 435
 constexpr float kActionStackGap = 34.0f * kCompScale;  // 51 (between oval rows)
-// Action stack is anchored to the action column's right-center, then offset
-// {x:-54, y:+31} in original units. Centering is flex: the action column is
-// justify_content Center (vertical) + align_items End (right). The -54 right
-// offset rides directly as the stack's right margin (align End is edge-relative,
-// not centered, so it is applied 1:1). The +31 down offset is a TOP margin —
-// but justify Center splits free space around BOTH margins, so a top-only margin
-// shifts the centroid by only half its value; the constant is pre-doubled so the
-// net downward shift lands at the full +46.5.
+// The +31 down offset is a TOP margin, but justify Center splits free space
+// around BOTH margins, so a top-only margin shifts the centroid by half its
+// value — the constant is pre-doubled so the net shift lands at +46.5.
 constexpr float kActionOffsetRight = 54.0f * kCompScale;       // 81 (left of right edge)
 constexpr float kActionOffsetDown = 2.0f * 31.0f * kCompScale; // 93 -> +46.5 net (centered)
-// The staggered "fan": each row is [fixed-width spacer][uniform oval]. Only the
-// spacer width varies, so same-width ovals land at staggered left offsets —
-// origin's positional fan reproduced purely with flex spacers. Spacer width =
-// columnOffset + 40 (original) x1.5: Tutorial 60, Connect 120, Options 60, Exit 0.
+// The staggered "fan": each row is [fixed-width spacer][uniform oval]; only the
+// spacer width varies, so same-width ovals land at staggered left offsets.
 constexpr float kSpacerTutorial = 40.0f * kCompScale; // 60
 constexpr float kSpacerConnect = 80.0f * kCompScale;  // 120
 constexpr float kSpacerOptions = 40.0f * kCompScale;  // 60
 constexpr float kSpacerExit = 0.0f * kCompScale;      // 0
-// Version footer: anchored to the root's bottom-left, offset {x:+10, y:-17}
-// (original) x1.5 — absolute with a left/bottom inset.
 constexpr float kFooterLeft = 10.0f * kCompScale;   // 15
 constexpr float kFooterBottom = 17.0f * kCompScale; // 25.5
 
@@ -130,10 +109,8 @@ constexpr float kFooterBottom = 17.0f * kCompScale; // 25.5
       nav.push(std::make_unique<OptionsScreen>());
   };
 
-  // origin/main: ESC/back at the main menu quits (MainMenuScreen::HandleBack →
-  // RequestQuit). With the cancel router chaining pops down the stack, mashing
-  // ESC walks back from any menu to here and then exits — same as the Quit
-  // button (guarded by can_quit while a teardown is in flight).
+  // ESC/back at the main menu quits, same as the Exit button (guarded by
+  // can_quit while a teardown is in flight).
   use_cancel([app]() {
     if (app.can_quit && app.quit)
       app.quit();
@@ -150,8 +127,7 @@ constexpr float kFooterBottom = 17.0f * kCompScale; // 25.5
     if (frame.id && frame.w > 0 && frame.h > 0) {
       const float stage_w = static_cast<float>(chrome.logo_stage_w) * kLogoScale;
       const float stage_h = static_cast<float>(chrome.logo_stage_h) * kLogoScale;
-      // Each animation frame is precomposited into this fixed stage so the
-      // renderer draws the same rect every frame.
+      // Fixed stage so the renderer draws the same rect every frame.
       logo = Box(BoxProps{
           .key = "logostage",
           .layout = ::ui::LayoutStyle{
@@ -162,7 +138,6 @@ constexpr float kFooterBottom = 17.0f * kCompScale; // 25.5
   } else if (chrome.logo) {
     const float logo_w = static_cast<float>(chrome.logo_w) * kLogoScale;
     const float logo_h = static_cast<float>(chrome.logo_h) * kLogoScale;
-    // Static logo sprite: a plain sized box the logo column centers.
     logo = Box(BoxProps{
         .key = "logoimg",
         .layout = ::ui::LayoutStyle{
@@ -171,17 +146,6 @@ constexpr float kFooterBottom = 17.0f * kCompScale; // 25.5
         .style = tokens::image_patch(chrome.logo)});
   }
 
-  // The button column is the legacy POSITIONAL FAN expressed as pure flex: each
-  // row is a [fixed-width spacer][uniform oval] pair. The ovals are same-width
-  // sprite cells, so varying ONLY the left spacer staggers their left edge —
-  // Connect (spacer 120) pushed rightmost, Exit (spacer 0) leftmost — exactly the
-  // origin fan without pinning a single coordinate.
-  //
-  // The composition's justify Center keeps the two columns centered inside its
-  // box: a wide viewport sizes the box to its 960 content width and ScreenLayout
-  // centers it; a narrow viewport clamps the box (max 960) to the available width
-  // and its fixed-size content overflows EVENLY left/right, staying centered
-  // rather than clipping one corner off-screen.
   return <ScreenLayout key="root" variant={ScreenLayoutVariant::Menu}>
     <Box
       key="composition"
