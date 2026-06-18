@@ -2110,7 +2110,9 @@ void GameUiPipeline::RenderCppxClientUiFrame(Surface &surface) {
     }
 
     // One-frame edges are consumed; reset for the next accumulation window.
-    uiInput_ = {};
+    // Name the type rather than `= {}`: GCC won't form the assignment RHS
+    // from a bare braced-init-list here (clang/MSVC accept it).
+    uiInput_ = ::ui::UiInputFrame{};
     injectedPointer_ = false;
 #else
     (void)surface;
