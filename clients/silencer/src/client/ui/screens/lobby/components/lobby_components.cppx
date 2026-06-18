@@ -299,8 +299,6 @@ int parse_u8_option(const std::string &value, int fallback, int lo, int hi) {
   return next;
 }
 
-
-
 ::ui::StyleStatePatch game_option_row_style() {
   ::ui::StylePatch p = tokens::chromeless_clear_patch();
   ::ui::StyleStatePatch s{};
@@ -421,7 +419,6 @@ int parse_u8_option(const std::string &value, int fallback, int lo, int hi) {
 }
 
 
-
 // origin/main "Game Options": a pill-notch title over a dense label:value table
 // backed by the CreateGameRequest fields. The Game name + Password + Create live
 // in the right Select-Map cell (CreateRightCell), matching golden.
@@ -454,7 +451,6 @@ int parse_u8_option(const std::string &value, int fallback, int lo, int hi) {
 
 // The upper-left agent card: emblem rail + name + WINS/LOSSES/XP column +
 // loadout stat well + the Agents button.
-
 
 
 ::ui::UiElement LobbyChatCompose(const LobbyChatComposeProps &props) {
