@@ -31,7 +31,7 @@ bool Palette::Load(void){
 	currentbrightnesspalette = &brightness[currentpalette];
 	currentcoloredpalette = &colored[currentpalette];
 	char filename[256];
-	sprintf(filename, "PALETTECALC%d.BIN", currentpalette);
+	snprintf(filename, sizeof filename, "PALETTECALC%d.BIN", currentpalette);
 	/*system("rm PALETTECALC0.BIN");
 	system("rm PALETTECALC1.BIN");
 	system("rm PALETTECALC2.BIN");*/
@@ -65,6 +65,15 @@ bool Palette::Load(void){
 			Calculate(2, 256 - 30);
 			Save();
 		}
+		// Load() just re-read every page from disk, where page 0's parallax band
+		// (256-30..255) is black; re-apply the active parallax band so any
+		// SetPalette()->Load() (e.g. the cppx UI's per-frame palette-page switches
+		// during chrome/glyph baking) can't wipe the in-level matte backdrop.
+		if(parallaxsource >= 0){
+			for(unsigned int i = 256 - 30; i < 256; i++){
+				colors[0][i] = colors[parallaxsource][i];
+			}
+		}
 		return true;
 	}else{
 		printf("Could not load PALETTE.BIN");
@@ -91,8 +100,14 @@ void Palette::SetParallaxColors(Uint8 parallax){
 			parallaxpalette = 9;
 		break;
 	}
+	parallaxsource = parallaxpalette;
 	for(unsigned int i = 256 - 30; i < 256; i++){
 		colors[currentpalette][i] = colors[parallaxpalette][i];
+		// Seed the shared upload buffer's band too. The per-frame in-game upload
+		// pushes temppalette, whose band is otherwise only refreshed by the
+		// full-range fade copy; if a slow map load finishes the fade before this
+		// runs, the band would stay stale (black) and the backdrop flickers black.
+		temppalette[i] = colors[parallaxpalette][i];
 	}
 	Calculate(256 - 30, 255);
 }
@@ -114,7 +129,7 @@ SDL_Color * Palette::GetColors(void){
 
 void Palette::Save(void){
 	char filename[256];
-	sprintf(filename, "PALETTECALC%d.BIN", currentpalette);
+	snprintf(filename, sizeof filename, "PALETTECALC%d.BIN", currentpalette);
 	CDDataDir();
 	SDL_IOStream * file = SDL_IOFromFile((GetDataDir() + filename).c_str(), "wb");
 	if(!file){

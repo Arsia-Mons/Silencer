@@ -1,31 +1,35 @@
 #!/usr/bin/env bash
+# Drives the cppx lobby GameCreate panel and proves it renders + stays usable
+# across window sizes. The legacy Clay GameCreate had a scrollable "Game Options
+# Form" with separate security/level option rows; the cppx GameCreate panel must
+# keep that options list interactable. Flow: connect → auth → create character →
+# LOBBY → New Game, then assert option click + wheel scroll behavior and verify
+# the panel (Select Map rows, Game name display, Create, Go Back) across desktop,
+# small, and portrait sizes. The logical canvas pins height at 720 (width =
+# aspect*720, game_ui_pipeline.cpp), so a phone-narrow 390x844 window crops
+# horizontally BY DESIGN — at that size we assert the panel still mounts
+# vertically rather than full horizontal containment.
 set -euo pipefail
 . "$(dirname "$0")/lib.sh"
 
 LOBBY_BIN="$(lobby_bin)"
 
-PIXDIFF="$REPO_ROOT/tools/pixdiff/build/pixdiff"
-[ -x "$PIXDIFF" ] || {
-  echo "pixdiff binary missing at $PIXDIFF" >&2
-  exit 1
-}
-
-TMP="$(mktemp -d)"
+# Per-run scratch — both for the lobby's user db (-db) and the silencer's
+# config dir (HOME-rooted on macOS / Linux). Two separate pid/log files so
+# the EXIT trap can tear both down cleanly.
+TMP=$(mktemp -d)
 LOBBY_LOG="$TMP/lobby.log"
 LOBBY_DB="$TMP/lobby.json"
 SILENCER_HOME="$TMP/home"
-OUT_DIR="$TMP/out"
-mkdir -p "$SILENCER_HOME/Library/Application Support/Silencer" "$TMP/maps" "$OUT_DIR"
+mkdir -p "$SILENCER_HOME"
 
-LOBBY_PORT="$(pick_port)"
-PLAYER_AUTH_PORT="$(pick_port)"
-MAP_API_PORT="$(pick_port)"
-CTRL_PORT="$(pick_port)"
+LOBBY_PORT=$(pick_port)
+PLAYER_AUTH_PORT=$(pick_port)
+MAP_API_PORT=$(pick_port)
+CTRL_PORT=$(pick_port)
 
-cat > "$SILENCER_HOME/Library/Application Support/Silencer/config.cfg" <<EOF
-mapapiurl=http://127.0.0.1:$MAP_API_PORT
-EOF
-
+# Match the version baked into the selected silencer binary — without this the
+# lobby rejects the handshake with "Wrong version".
 SILENCER_VERSION="$(silencer_version)"
 
 cleanup() {
@@ -40,6 +44,8 @@ cleanup() {
 }
 trap cleanup EXIT
 
+# Lobby on an unprivileged port. -version matches the binary so the handshake
+# passes; -maps-dir/-map-api-addr keep map traffic local.
 "$LOBBY_BIN" \
   -addr ":$LOBBY_PORT" \
   -db "$LOBBY_DB" \
@@ -51,6 +57,7 @@ trap cleanup EXIT
   >"$LOBBY_LOG" 2>&1 &
 LOBBY_PID=$!
 
+# Wait for the lobby's TCP listener to come up.
 for i in $(seq 1 60); do
   if (echo > "/dev/tcp/127.0.0.1/$LOBBY_PORT") 2>/dev/null; then
     break
@@ -63,6 +70,8 @@ for i in $(seq 1 60); do
   fi
 done
 
+# Silencer with a fresh HOME so the lobby host/port override doesn't get
+# persisted to the dev's real config.
 HOME="$SILENCER_HOME" "$SILENCER_BIN" \
   --headless \
   --control-port "$CTRL_PORT" \
@@ -72,14 +81,15 @@ HOME="$SILENCER_HOME" "$SILENCER_BIN" \
 SILENCER_PID=$!
 wait_alive "$CTRL_PORT"
 
+# Poll the retained cppx tree for a node whose control id OR accessibility label
+# equals the argument (the introspection `inspect` op returns `nodes`).
 wait_for_widget() {
   local label="$1"
   for i in $(seq 1 100); do
-    found="$(cli --port "$CTRL_PORT" inspect | LABEL="$label" bun -e \
-      'const t=await new Response(Bun.stdin.stream()).text();
-       const r=JSON.parse(t);
-       const label=process.env.LABEL;
-       console.log(r.widgets.some((w)=>w.label===label) ? "yes" : "no");' 2>/dev/null || echo no)"
+    found=$(cli --port "$CTRL_PORT" inspect | LABEL="$label" bun -e \
+      'const r = JSON.parse(await new Response(Bun.stdin.stream()).text());
+       const l = process.env.LABEL;
+       console.log((r.nodes||[]).some((w)=>w.label===l||w.control_id===l) ? "yes" : "no");' 2>/dev/null || echo no)
     if [ "$found" = "yes" ]; then return 0; fi
     sleep 0.05
   done
@@ -88,113 +98,270 @@ wait_for_widget() {
   return 1
 }
 
+# The Login button only submits credentials once the connect flow has advanced
+# (on the game tick) through Connect → version-check → AUTHENTICATING; a click
+# before that is silently consumed. `state` exposes lobby_state for this sync.
 wait_for_lobby_state() {
   local target="$1"
   for i in $(seq 1 80); do
-    ls="$(cli --port "$CTRL_PORT" state | bun -e \
-      'const t=await new Response(Bun.stdin.stream()).text(); console.log(JSON.parse(t).lobby_state||"");')"
+    ls=$(cli --port "$CTRL_PORT" state | bun -e \
+      'console.log(JSON.parse(await new Response(Bun.stdin.stream()).text()).lobby_state||"");')
     if [ "$ls" = "$target" ]; then return 0; fi
     sleep 0.1
   done
   echo "lobby_state never became $target (last=$ls)" >&2
+  cat "/tmp/silencer-e2e-$CTRL_PORT.log" >&2 || true
   return 1
 }
 
-cli --port "$CTRL_PORT" wait_for_state --state MAINMENU --timeout-ms 15000 >/dev/null
+cli --port "$CTRL_PORT" wait_for_state --state MAINMENU --timeout-ms 15000
 wait_for_widget "Connect To Lobby"
 cli --port "$CTRL_PORT" click --label "Connect To Lobby" >/dev/null
-cli --port "$CTRL_PORT" wait_for_state --state LOBBYCONNECT --timeout-ms 5000 >/dev/null
-wait_for_widget "Login/Create"
-cli --port "$CTRL_PORT" set_text --uid 1 --text "scrolltest" >/dev/null
-cli --port "$CTRL_PORT" set_text --uid 2 --text "secret" >/dev/null
+cli --port "$CTRL_PORT" wait_for_state --state LOBBYCONNECT --timeout-ms 5000
+wait_for_widget "Username"
+
+# Type the credentials through the same key path real text input uses
+# (auto-creates the account on first login). Username is autofocused; Tab moves
+# focus to the password field.
+for ch in a l i c e; do
+  cli --port "$CTRL_PORT" key --key "$ch" >/dev/null
+done
+cli --port "$CTRL_PORT" key --key tab >/dev/null
+for ch in s e c r e t; do
+  cli --port "$CTRL_PORT" key --key "$ch" >/dev/null
+done
+
 wait_for_lobby_state AUTHENTICATING
 cli --port "$CTRL_PORT" click --label "Login/Create" >/dev/null
-create_initial_character "Scrolltest"
-wait_for_widget "Create Game"
-cli --port "$CTRL_PORT" click --label "Create Game" >/dev/null
-cli --port "$CTRL_PORT" wait_frames --n 5 >/dev/null
 
-cli --port "$CTRL_PORT" resize --w 640 --h 360 >/dev/null
-cli --port "$CTRL_PORT" wait_frames --n 3 >/dev/null
+# Fresh account → server reports no characters → the connect flow routes to
+# character creation. The 3-step wizard: roster (step0) → alias (step1) →
+# agency (step2).
+cli --port "$CTRL_PORT" wait_for_state --state CREATECHARACTER --timeout-ms 15000
 
-scroll_crop="$(cli --port "$CTRL_PORT" inspect | bun -e '
-const text = await new Response(Bun.stdin.stream()).text();
-const response = JSON.parse(text);
-const widgets = response.widgets ?? [];
-const elements = response.elements ?? [];
-const scroll = elements.find((e) =>
-  e.source === "clay" &&
-  e.kind === "container" &&
-  e.label === "Game Options Form" &&
-  e.value === "scroll" &&
-  e.w > 0 &&
-  e.h > 0
-);
-if (!scroll) {
-  console.error("missing game options scroll element");
-  process.exit(1);
+# step0: roster — start a new character.
+wait_for_widget "Create New Character"
+cli --port "$CTRL_PORT" click --label "Create New Character" >/dev/null
+
+# step1: set the alias (the Alias input is not autofocused, so set_text by
+# accessibility label rather than raw key chars), then enter confirms
+# (AliasConfirm is disabled until the alias is non-empty) and advances to the
+# agency picker.
+wait_for_widget "Alias"
+cli --port "$CTRL_PORT" set_text --label "Alias" --text "Alice" >/dev/null
+cli --port "$CTRL_PORT" key --key enter >/dev/null
+
+# step2: pick an agency — creating the agent. Once it round-trips through the
+# lobby the CREATECHARACTER tick routes to the lobby.
+wait_for_widget "Black Rose"
+cli --port "$CTRL_PORT" click --label "Noxis" >/dev/null
+cli --port "$CTRL_PORT" wait_for_state --state LOBBY --timeout-ms 15000
+
+# GameSelect is the default right column; swap to GameCreate (screen-local
+# use_state<ActivePanel>) by clicking New Game — this mounts the create form.
+# The NewGame button's visible label is "Create Game"; click by control_id.
+wait_for_widget "NewGame"
+cli --port "$CTRL_PORT" click --label "NewGame" >/dev/null
+wait_for_widget "CreateGame"
+
+# Assert the GameCreate panel is present and laid out within the UI viewport at
+# the current window size. The modern origin-parity panel (lobby_screen.cppx)
+# is: an interactable "Game Options" list, a "Select Map" list of focusable MapRow
+# entries, the "Game name:" display (plain text by design — no Input chrome),
+# the wide "Create" button (control_id CreateGame), and the cockpit "Go Back"
+# button (LobbyGoBack) that exits the create panel. Buttons are matched by
+# control_id (stable across copy changes); the viewport is the retained tree's
+# Root node (the logical UI canvas). Each interactive control must have
+# positive size and sit fully inside the viewport — proving the panel renders
+# intact and never collapses or drifts off-canvas as the window resizes.
+# Second arg "vertical" relaxes the horizontal containment (for windows
+# narrower than the cockpit's authored min logical width, where horizontal
+# cropping is the designed behavior) while still requiring presence, positive
+# size, and vertical containment.
+assert_create_panel_in_bounds() {
+  local what="$1"
+  local mode="${2:-full}"
+  local inspect_out
+  inspect_out="$(mktemp)"
+  cli --port "$CTRL_PORT" inspect > "$inspect_out"
+
+  bun -e '
+  const inspectPath = process.argv[1];
+  const what = process.argv[2];
+  const fullBounds = process.argv[3] !== "vertical";
+  const inspect = JSON.parse(await Bun.file(inspectPath).text());
+  const nodes = inspect.nodes ?? [];
+  if (nodes.length === 0) {
+    console.error(`${what}: inspect returned no nodes`);
+    process.exit(1);
+  }
+  // UI viewport = the retained tree root (the logical UI canvas).
+  const root = nodes.find((n) => n.type === "Root") ?? nodes[0];
+  const maxX = root.x + root.w, maxY = root.y + root.h;
+  if (!(maxX > 0) || !(maxY > 0)) {
+    console.error(`${what}: degenerate UI viewport ${maxX}x${maxY}`);
+    process.exit(1);
+  }
+  const eps = 1;
+  const inBounds = (n) =>
+    n.y >= -eps && n.y + n.h <= maxY + eps &&
+    (!fullBounds || (n.x >= -eps && n.x + n.w <= maxX + eps));
+  const assertControl = (n, id) => {
+    if (!(n.w > 0) || !(n.h > 0)) {
+      console.error(`${what}: control ${id} has non-positive size ${n.w}x${n.h}`);
+      process.exit(1);
+    }
+    if (!inBounds(n)) {
+      console.error(`${what}: control ${id} outside UI viewport ${maxX}x${maxY}: ${JSON.stringify(n)}`);
+      process.exit(1);
+    }
+  };
+  // Required buttons: the Create submit + the cockpit Go Back that leaves the
+  // create panel.
+  for (const id of ["CreateGame", "LobbyGoBack"]) {
+    const n = nodes.find((w) => w.control_id === id);
+    if (!n) {
+      console.error(`${what}: GameCreate control ${id} missing`);
+      process.exit(1);
+    }
+    if (!n.focusable) {
+      console.error(`${what}: control ${id} not focusable`);
+      process.exit(1);
+    }
+    assertControl(n, id);
+  };
+  const optList = nodes.find((w) => w.control_id === "GameOptionsList");
+  if (!optList || !optList.focusable) {
+    console.error(`${what}: GameOptionsList missing or not focusable`);
+    process.exit(1);
+  }
+  assertControl(optList, "GameOptionsList");
+  for (const id of ["GameOptionSecurity", "GameOptionMinLevel", "GameOptionMaxLevel", "GameOptionMaxPlayers", "GameOptionMaxTeams", "GameOptionSpectatable"]) {
+    const row = nodes.find((w) => w.control_id === id && w.focusable);
+    if (!row) {
+      console.error(`${what}: option row ${id} missing or not focusable`);
+      process.exit(1);
+    }
+  }
+  // The Select Map list: at least one focusable MapRow entry, all in-bounds
+  // (the maplist box clips with Overflow::Hidden, but the capped row count
+  // must still lay out on-canvas).
+  const rows = nodes.filter((w) => w.control_id === "MapRow");
+  if (rows.length === 0) {
+    console.error(`${what}: no MapRow entries in the Select Map list`);
+    process.exit(1);
+  }
+  rows.forEach((n, i) => assertControl(n, `MapRow[${i}] ${n.label ?? ""}`));
+  // Panel copy that anchors the create form: the options table title, the map
+  // list title, and the game-name field label.
+  for (const text of ["Game Options", "Select Map", "Game name:"]) {
+    if (!nodes.some((w) => w.role === "text" && w.value === text)) {
+      console.error(`${what}: GameCreate text "${text}" missing`);
+      process.exit(1);
+    }
+  }
+  console.log(`${what}: CreateGame+LobbyGoBack+${rows.length} MapRows ${fullBounds ? "in-bounds" : "mounted + vertically in-bounds"} within ${maxX}x${maxY}`);
+  ' "$inspect_out" "$what" "$mode"
+
+  rm -f "$inspect_out"
 }
-const hasSecurity = widgets.some((w) => w.id === "lobby.game_create.security");
-const hasSpectatable = widgets.some((w) => w.id === "lobby.game_create.spectatable");
-if (!hasSecurity || hasSpectatable) {
-  console.error("tight viewport did not clip the options rows as expected");
-  process.exit(1);
+
+option_center() {
+  cli --port "$CTRL_PORT" inspect | bun -e '
+  const r = JSON.parse(await new Response(Bun.stdin.stream()).text());
+  const n = (r.nodes ?? []).find((w) => w.control_id === "GameOptionsList");
+  if (!n) { console.error("GameOptionsList missing"); process.exit(1); }
+  console.log(`${Math.round(n.x + n.w / 2)} ${Math.round(n.y + n.h / 2)}`);
+  '
 }
-console.log([
-  Math.max(0, Math.floor(scroll.x)),
-  Math.max(0, Math.floor(scroll.y)),
-  Math.max(1, Math.ceil(scroll.w)),
-  Math.max(1, Math.ceil(scroll.h)),
-].join(","));
-')"
-tight_h="${scroll_crop##*,}"
 
-before="$OUT_DIR/options-before.png"
-after="$OUT_DIR/options-after.png"
-cli --port "$CTRL_PORT" screenshot --out "$before" >/dev/null
-cli --port "$CTRL_PORT" scroll --label "Game Options Form" --amount 10 >/dev/null
-cli --port "$CTRL_PORT" wait_frames --n 2 >/dev/null
-cli --port "$CTRL_PORT" screenshot --out "$after" >/dev/null
-
-cli --port "$CTRL_PORT" inspect | bun -e '
-const text = await new Response(Bun.stdin.stream()).text();
-const response = JSON.parse(text);
-const widgets = response.widgets ?? [];
-const hasSecurity = widgets.some((w) => w.id === "lobby.game_create.security");
-const hasSpectatable = widgets.some((w) => w.id === "lobby.game_create.spectatable");
-if (hasSecurity || !hasSpectatable) {
-  console.error("scrolling did not reveal the lower game options row");
-  process.exit(1);
+option_value() {
+  local id="$1"
+  cli --port "$CTRL_PORT" inspect | ID="$id" bun -e '
+  const id = process.env.ID;
+  const r = JSON.parse(await new Response(Bun.stdin.stream()).text());
+  const nodes = r.nodes ?? [];
+  const row = nodes.find((w) => w.control_id === id && w.focusable);
+  if (!row) { console.error(`row ${id} missing`); process.exit(1); }
+  const hit = (a,b) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
+  const value = nodes
+    .filter((w) => w.role === "text" && hit(w, row) && w.x > row.x + row.w * 0.45)
+    .sort((a,b) => b.x - a.x)[0]?.value;
+  if (!value) { console.error(`value for ${id} missing`); process.exit(1); }
+  console.log(value);
+  '
 }
-'
 
-diff="$("$PIXDIFF" --crop "$scroll_crop" "$before" "$after")"
-bun -e '
-const diff = Number(process.argv[1]);
-if (!Number.isFinite(diff) || diff <= 0.01) {
-  console.error(`expected game options viewport to visibly scroll, got diff ${diff}`);
-  process.exit(1);
+option_row_y() {
+  local id="$1"
+  cli --port "$CTRL_PORT" inspect | ID="$id" bun -e '
+  const id = process.env.ID;
+  const r = JSON.parse(await new Response(Bun.stdin.stream()).text());
+  const row = (r.nodes ?? []).find((w) => w.control_id === id && w.focusable);
+  if (!row) { console.error(`row ${id} missing`); process.exit(1); }
+  console.log(row.y.toFixed(2));
+  '
 }
-' "$diff"
 
+assert_game_options_interactable() {
+  wait_for_widget "GameOptionsList"
+  local value
+  value="$(option_value GameOptionSecurity)"
+  if [ "$value" != "Medium" ]; then
+    echo "Security option starts as $value, want Medium" >&2
+    exit 1
+  fi
+  cli --port "$CTRL_PORT" click --label "GameOptionSecurity" >/dev/null
+  cli --port "$CTRL_PORT" wait_frames --n 2 >/dev/null
+  value="$(option_value GameOptionSecurity)"
+  if [ "$value" != "High" ]; then
+    echo "Clicking Security left value at $value, want High" >&2
+    exit 1
+  fi
+
+  local ox oy before after
+  read -r ox oy <<< "$(option_center)"
+  before="$(option_row_y GameOptionSecurity)"
+  cli --port "$CTRL_PORT" scroll --x "$ox" --y "$oy" --dy -1 >/dev/null
+  cli --port "$CTRL_PORT" wait_frames --n 2 >/dev/null
+  after="$(option_row_y GameOptionSecurity)"
+  bun -e '
+  const before = Number(process.argv[1]);
+  const after = Number(process.argv[2]);
+  if (!(after < before - 10)) {
+    console.error(`Game Options did not scroll: before=${before} after=${after}`);
+    process.exit(1);
+  }
+  ' "$before" "$after"
+}
+
+assert_game_options_interactable
+
+# Desktop size (headless default is small, so resize explicitly).
 cli --port "$CTRL_PORT" resize --w 1280 --h 720 >/dev/null
 cli --port "$CTRL_PORT" wait_frames --n 3 >/dev/null
+wait_for_widget "CreateGame"
+assert_create_panel_in_bounds "1280x720"
 
-cli --port "$CTRL_PORT" inspect | bun -e '
-const text = await new Response(Bun.stdin.stream()).text();
-const response = JSON.parse(text);
-const elements = response.elements ?? [];
-const scroll = elements.find((e) =>
-  e.source === "clay" &&
-  e.kind === "container" &&
-  e.label === "Game Options Form" &&
-  e.value === "scroll"
-);
-const tightH = Number(process.argv[1]);
-if (!scroll || !(scroll.h > tightH)) {
-  console.error(`expected game options viewport to grow from ${tightH}, got ${scroll?.h}`);
-  process.exit(1);
-}
-' "$tight_h"
+# Small desktop size.
+cli --port "$CTRL_PORT" resize --w 640 --h 480 >/dev/null
+cli --port "$CTRL_PORT" wait_frames --n 3 >/dev/null
+wait_for_widget "CreateGame"
+assert_create_panel_in_bounds "640x480"
 
-echo "PASS 53_lobby_create_options_scroll ($OUT_DIR)"
+# Tall portrait size whose logical width (1000/(1100/720) ≈ 654) still clears
+# the cockpit's authored min width — full containment must hold.
+cli --port "$CTRL_PORT" resize --w 1000 --h 1100 >/dev/null
+cli --port "$CTRL_PORT" wait_frames --n 3 >/dev/null
+wait_for_widget "CreateGame"
+assert_create_panel_in_bounds "1000x1100"
+
+# Phone-narrow portrait: the logical canvas (≈333x720) is narrower than the
+# cockpit's authored min width, so horizontal cropping is by design — the panel
+# must still mount with positive-size controls inside the vertical bounds.
+cli --port "$CTRL_PORT" resize --w 390 --h 844 >/dev/null
+cli --port "$CTRL_PORT" wait_frames --n 3 >/dev/null
+wait_for_widget "CreateGame"
+assert_create_panel_in_bounds "390x844" vertical
+
+echo "PASS 53_lobby_create_options_scroll"

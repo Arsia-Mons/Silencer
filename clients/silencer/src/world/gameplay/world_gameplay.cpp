@@ -262,6 +262,15 @@ void World::SetTech(Uint32 techchoices){
 	SendPacket(GetAuthorityPeer(), data.data, data.BitsToBytes(data.offset));
 }
 
+// Seed gameinfo from the lobby record of a newly created game so the host's
+// SendGameInfo path can push it to the dedicated server. Hides the private
+// gameinfo member behind a public command (SIL-8).
+void World::SeedGameInfo(LobbyGame & lg){
+	Serializer data;
+	lg.Serialize(Serializer::WRITE, data);
+	gameinfo.Serialize(Serializer::READ, data);
+}
+
 int World::TechSlotsUsed(Peer & peer){
 	int slotsused = 0;
 	for(std::vector<BuyableItem *>::iterator it = buyableitems.begin(); it != buyableitems.end(); it++){

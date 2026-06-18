@@ -136,7 +136,7 @@ void TriggerGraph::Tick(World & world, float dt) {
     }
 }
 
-void TriggerGraph::CompleteObjective(Uint16 id, World & world) {
+void TriggerGraph::CompleteObjective(Uint16 id, World &) {
     for (ObjectiveDef & obj : objectives_) {
         if (obj.id == id) {
             obj.complete = true;

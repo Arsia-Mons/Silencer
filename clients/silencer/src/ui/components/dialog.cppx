@@ -1,0 +1,22 @@
+#include "dialog.h"
+
+namespace ui::components {
+::ui::UiElement Dialog(const DialogProps &props) {
+  ::ui::NodeInteraction interaction = detail::interaction_from_props(props);
+  interaction.modal = props.modal;
+  return <detail.Host
+    kind={::ui::HostKind::Dialog}
+    key={props.key}
+    id={props.id}
+    idOffset={props.id_offset}
+    style={props.layout}
+    visual={::ui::resolve(::ui::use_theme().dialog, props.style, {})}
+    interaction={interaction}
+    accessibility={detail::accessibility_from_props(props, ::ui::SemanticRole::Dialog)}
+    callbacks={detail::callbacks_from_props(props)}
+  >
+    {props.children}
+  </detail.Host>
+}
+
+} // namespace ui::components

@@ -4,6 +4,9 @@
   "workspaces": {
     "": {
       "name": "silencer",
+      "devDependencies": {
+        "sharp": "^0.34.0",
+      },
     },
     "clients/cli": {
       "name": "silencer-cli",

@@ -98,8 +98,10 @@ void ActionSystem::Execute(const TriggerAction & action, World & world) {
             break;
         }
         case ActionType::END_MISSION: {
-            // param_u8: 0=neutral, 1=win, 2=lose
-            world.quitstate = (action.param_u8 == 0) ? 1 : action.param_u8;
+            // The win/lose distinction (param_u8) is not consumed by the UI —
+            // the mission-over signal just routes through PauseScreen (the
+            // winningteamid -> MISSIONSUMMARY path is separate). Raise the flag.
+            world.missionover = true;
             break;
         }
         case ActionType::DESTROY_ACTOR: {

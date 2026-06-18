@@ -69,8 +69,8 @@ typedef int socklen_t;
 #include <android/log.h>
 #include <jni.h>
 #define printf(...) __android_log_print(ANDROID_LOG_DEBUG, "TAG", __VA_ARGS__);
-extern JNIEnv * jenv;
-extern JavaVM * jvm;
+extern JNIEnv *jenv;
+extern JavaVM *jvm;
 #else
 #include <SDL3/SDL_opengl.h>
 #endif

@@ -131,6 +131,30 @@ stop_silencer() {
   wait "$pid" 2>/dev/null || true
 }
 
+# Poll inspect until a button/widget with the given label or control_id appears
+# (or disappears, with --gone). Use after any navigation: Tier-1 overlay
+# transitions (options/pause) fade out->in before the stack swap commits, so the
+# target screen is not present for ~1 fade leg after the click — a fixed
+# wait_frames races it. Usage: wait_for_label <port> <label> [--gone]
+wait_for_label() {
+  local port="$1" label="$2" mode="${3:-present}"
+  for i in $(seq 1 100); do
+    found=$(cli --port "$port" inspect | LABEL="$label" bun -e \
+      'const r = JSON.parse(await new Response(Bun.stdin.stream()).text());
+       const l = process.env.LABEL;
+       console.log((r.nodes||[]).some((w)=>w.label===l||w.control_id===l) ? "yes" : "no");' 2>/dev/null || echo no)
+    if [ "$mode" = "--gone" ]; then
+      [ "$found" = "no" ] && return 0
+    else
+      [ "$found" = "yes" ] && return 0
+    fi
+    sleep 0.1
+  done
+  echo "widget '$label' never reached state '$mode'" >&2
+  cli --port "$port" inspect >&2 || true
+  return 1
+}
+
 create_initial_character() {
   local alias="${1:-Agent}"
   cli --port "$CTRL_PORT" wait_for_state --state CREATECHARACTER --timeout-ms 15000 >/dev/null

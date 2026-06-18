@@ -34,116 +34,102 @@ Source under `src/` is organized by concern (`game/`, `render/`,
 `client/ui/`, `ui/`, etc.); keep new files in the owning concern
 instead of reviving the old flat layout.
 
+UI is authored in `.cppx`/`.hx` and transpiled to C++ at build time, so
+**configure requires `Python3`** (`find_package(Python3 ... REQUIRED)`).
+Generated `.cpp`/`.h` go to `<build>/generated/cppx/` — gitignored,
+never committed, regenerated each build. See
+[`../../docs/silencer-client-build.md`](../../docs/silencer-client-build.md)
+(*cppx UI pipeline*).
+
 ## Client UI dogma
 
-`ClientUi` is the only production owner of visible UI composition and
-screen/modal navigation. `Game::RenderClientUiFrame` collects the
-`UiInputState`, begins one `ClientUi`/`ClayService` frame, asks active screens,
-modals, HUD, and overlays to declare UI, ends the frame once, renders one
-command stream through the Clay compositor, then dispatches typed UI actions.
-Navigation mechanics
-live in `src/client/ui/navigation/ScreenStack`; `Game` may request transitions
-but must not store or traverse the stack itself.
+The live UI is the golden **retained cppx engine**: a React-style hook
+runtime + Yoga flex layout + a premultiplied-RGBA draw-command IR. The
+substrate lives in `src/ui` (runtime + styling); the app-shell lives in
+`src/client/ui`. `client::ui::ClientUi` owns the retained UI tree across
+frames; `GameUiPipeline` (`src/game/ui`) is the composition root that drives
+it. The legacy UI layer (and the third-party layout library it wrapped) was
+deleted — do not reintroduce its concepts.
+
+Each frame `GameUiPipeline::RenderClientUiFrame` builds the global provider
+chain and drives the retained `client::ui::UiPipeline` through the
+`PipelineHost` (`src/render/cppx_ui`): begin frame → build the visible screen
+set → run Yoga layout → run the focus/hit-test pass → emit the
+`::ui::DrawCommandList` IR → execute it to a window-sized RGBA buffer.
+`GameRenderer::Present` uploads that buffer via `RenderDevice::UploadUiFrame`,
+which the GPU backend composites over the upscaled world.
 
 Rules:
 
-- Screens and modals implement `Screen::BuildUi`; they only declare UI into the
-  current frame. They must not call `Clay_BeginLayout`, `Clay_EndLayout`,
-  `Clay_SetPointerState`, `clay_bridge::EnsureInitialized`, or
-  `clay_bridge::Render`.
-- HUD and overlays live under `src/client/ui/hud` and follow the same rule:
-  build UI into the current `ClientUi` frame. Do not add `Draw*Clay` methods to
-  `Renderer`.
-- `Renderer` owns world/pixel drawing primitives only. It must not own Clay
-  layout or UI screen/HUD composition.
-- Primitive frame arenas reset once in `ClientUi::BeginFrame`. A primitive's
-  per-frame begin-frame reset must not be called inside a screen, modal, HUD
-  block, or overlay block.
-- Modal overlays clear interaction metadata before their own `BuildUi`, so the
-  top modal owns keyboard/CLI focus while lower visual layers can still render.
-- Keep `ScreenStack` as the real single-stack owner for screens and modal
-  overlays. Add a separate modal stack only if real modal semantics are being
-  extracted, not as a placeholder.
+- `Game`/`game_loop` own the gameplay state machine (`GoToState`,
+  `stateisnew`, `FADEOUT`) but NO LONGER mount UI screens. The always-mounted
+  `AppRoot` (`src/client/ui/app_shell/app_root.h`, stack entry 0) reads
+  `use_session().phase` and renders the screen that owns that phase — the
+  declarative phase reconciler. The phase is a read-only projection of the
+  game state machine (`src/game/ui/session_phase.h`).
+- `ScreenStack` (`src/client/ui/app_shell/navigation`) is the single owner of
+  the screen stack. Tier-1 navigation (options, pause, modals) pushes
+  `OverlayScreen`s above `AppRoot`; overlays re-establish their own providers
+  and never change `phase`. Stack mutations are queued and drained after
+  render, never run mid-build.
+- Screens are `.cppx` view functions that compose the capability hooks
+  (`use_session`/`use_settings`/`use_key_map`/`use_navigation`/…) and return a
+  `::ui::UiElement` tree. They never own the frame lifecycle, never touch SDL,
+  `Renderer`, or `Surface`, and reach gameplay only through hook intent
+  closures — never a raw `Game`/`World` handle.
+- `Renderer` owns world/pixel (8-bit indexed) drawing only. It must not own UI
+  layout or composition. The `src/render/cppx_ui` bridge is the only place SDL
+  meets the UI (SDL_ttf fonts, `SDL_Texture`); the `src/ui` runtime stays
+  SDL-free.
 
-### UI primitive API contract
+### UI styling + theming
 
-These rules port shadcn's surfaced best practices onto Clay: a default style
-plus named `variant`s that encode the design system's identity, `size` for
-scale/fit, composition over per-call configuration. Treat shadcn as the north
-star for *why* an API shape is good — matching shadcn's exact API is
-explicitly a non-goal.
+Styling is a from-first-principles substrate (`src/ui/style`): a `Theme` of
+`RoleStyle`s, sparse `StylePatch` overlays, and `resolve()` layering role +
+override patches + interaction state into one dense `VisualStyle` at authoring
+time. The current theme (dark slate, accent blue, control gradients) lives in
+`src/client/ui/app_theme.cpp` and is installed OUTERMOST via `ThemeProvider`;
+`use_tokens()`/`use_theme()` read it. **NOTE: this slate/blue palette is a visual
+regression, not the target design.** The golden visual design is Silencer's
+**origin/main** (the Clay UI: cool-blue `#9FC9FF`/panel `#10141C`/border `#565E6F`,
+green oval sprite buttons, sprite chrome/starfield). Restoring it *while keeping the
+cppx engine* is tracked by **SIL-84**
+(`docs/plans/2026-06-01-cppx-design-parity-restore.md`). The golden `~/repos/ui` repo
+is the authority for the cppx **engine + authoring conventions** only — NOT the look. `src/ui` keeps only a neutral fallback
+(`default_theme()`). The renderer never sees the theme — components resolve
+their `VisualStyle` and the IR carries only resolved, premultiplied paint.
 
-- Primitives expose a **variant + size** API. `variant` names the visual
-  treatment (the design system's identity); `size` names scale/fit behavior.
-  Callers pass `{variant, size}` — never a palette index, sprite bank, or a
-  `B196x33`-style sprite code. Sprite-bank terms are private implementation
-  detail and must not appear in any public signature, enum, or doc comment.
-- Responsive/auto sizing is a `size` value backed by the nine-slice
-  custom-payload compositor path (`CustomKind::*`), never a new per-consumer
-  preset.
-- Public primitive names are plain nouns: `Button`, `Text`, `TextInput`,
-  `Checkbox`, `Toggle`, `Panel`. Runtime/service types that name a subsystem
-  keep their `Ui` prefix (`UiInteractionRegistry`, `UiInputState`,
-  `UiInputRouter`).
-- One primitive owns one visual/interaction concern. Checkbox/toggle state
-  belongs to `Checkbox`/`Toggle`, not a `Button` mode — don't overload a
-  primitive with a second widget's behavior.
-- Every declared element needs an explicit, stable Clay ID. A visible label
-  must never double as its ID. Dynamic label text must be copied into the
-  per-frame primitive arena before Clay renders it; Clay does not own the
-  string's lifetime.
-- When an all-params primitive grows callsites that all pass the same values,
-  add a named variant — not another required param. The rule is "no hidden
-  lobby coupling," not "no defaults ever."
+The legacy `src/ui/design/Colors.h` + `Spacing.h` constants were removed
+(SIL-17). `silencer::tokens` (`src/client/ui/components/tokens.h`) + the product
+theme (`app_theme.cpp`) are the single paint source.
 
 ### Input contract
 
-There is exactly one path from SDL events to UI screens:
+Raw SDL events are consumed in exactly one place: `src/game/session/events.cpp`
+(the only file under `src/` that calls `SDL_PollEvent`). It dispatches:
 
-1. **Collection (single site):** `src/game/events.cpp` is the only place that
-   consumes raw SDL events (`SDL_EVENT_KEY_DOWN`/`_UP`, `SDL_EVENT_TEXT_INPUT`,
-   mouse, wheel, gamepad). It pushes everything into `clientUiInput`
-   (`ClientUiInput`). No other file under `src/` calls `SDL_PollEvent` or
-   reads SDL key events.
-2. **Composition (single site):** `Game::RenderClientUiFrame` builds the
-   per-frame `UiInputState` (`preparedUiInput`) from `clientUiInput`.
-   `Game::ResetUiFrameDeltas` clears the queues at end of frame.
-3. **Dispatch (single site):** `ClientUi::DispatchInput` hands `UiInputState`
-   to `UiInputRouter::Route`, which translates pointer/text/nav/binding into
-   typed `UiAction`s queued on `UiInteractionRegistry`. Screens consume those
-   actions in `Screen::HandleUiIntent` (per the existing virtual). Screens
-   must NOT implement `OnTextInput` or `OnKey` virtuals — those don't exist.
+- **Gameplay shortcut keys** (F1 scoreboard, F2 team-color toggle, F4 music
+  pause, F5 reshuffle music, F9 debug overlay, quit) — read directly in
+  `OnScancodeDown`/`OnScancodeUp` and mutate `World` via its public setters
+  (`SetShowingPlayerList`, `SetShowingTeamColors`, etc.). New keys that toggle
+  world/gameplay state should follow this pattern.
+- **Gameplay movement / keybinds** — flow through `GameInput` (the
+  scancode/gamepad → keybind-action mapping).
+- **UI input** — collected into a per-frame `::ui::UiInputFrame` (`src/ui/
+  input.h`): nav (`nav_up`/…), `confirm`/`cancel`/`pointer` edges, and
+  key/text/editing event channels. The retained pipeline consumes it in
+  `ClientUi::begin_frame`/`end_layout` (focus + hit test); interactive cppx
+  screens read interaction state via the runtime hooks (`use_focused`,
+  `use_hovered`, `use_pressed`). The cppx UI currently polls the pointer
+  directly; full nav/text wiring lands with the interactive screens.
 
-`UiInputState` carries three input channels (`src/ui/runtime/UiInputState.h`):
-
-- `textInput` — typed ASCII characters from `SDL_EVENT_TEXT_INPUT`. Routed to
-  the focused text widget via `DispatchTextInput`.
-- `navActions` — semantic `UiNavAction` enums (Up/Down/Left/Right/Confirm/
-  Cancel/Backspace/FocusNext/FocusPrevious/NextSection/PreviousSection).
-  This is the channel screens read for keyboard/gamepad navigation.
-- `bindingInputs` — raw scancode / gamepad-button / gamepad-axis edges, used
-  only by the keybind capture flow (`controls_rebind_capture.cpp`). The
-  router emits a `CaptureBinding` action per edge; the registry no-ops it
-  unless a screen is in capture mode.
-
-There is intentionally no fourth "raw key event" channel — every keypress is
-either text, nav, or a binding edge.
-
-### Gameplay shortcut keys
-
-A few function keys (F1 scoreboard, F2 team-color toggle, F4 music pause,
-F5 reshuffle music, F9 debug overlay, quit) are gameplay state changes, not
-UI navigation. They are read directly in `events.cpp` `OnScancodeDown`/
-`OnScancodeUp` and mutate `World` via its public setters
-(`SetShowingPlayerList`, `SetShowingTeamColors`, etc.). They intentionally
-bypass the `UiInputState` → `UiAction` path: routing them through a typed-
-action layer would require a controller bridging UI input and world state
-for no real benefit. New keys that toggle world/gameplay state should follow
-the same pattern; new keys that affect a UI screen should go through
-`navActions`.
+Text-input platform gating (`SDL_StartTextInput`/`StopTextInput`) is owned by
+`GameUiPipeline`, gated on `ClientUi::wants_text_input()`. Never call SDL
+text-input functions elsewhere.
 
 Run `tests/cli-agent/e2e/60_ui_architecture_boundaries.sh` after UI ownership
-changes; it guards this boundary.
+changes; it guards this boundary (and bans the deleted-layer tokens under
+`src/`, including in docs).
 
 ## Object hierarchy
 
@@ -198,21 +184,23 @@ field reference, the two sound-helper variants, and NPC-wiring steps:
 - `src/actordef.h` / `src/actordef.cpp` — actor definition system (see above).
 - `src/behaviortree.h` / `src/behaviortree.cpp` — BT interpreter (see above).
 - Top-level state machine (menus, lobby, in-game): `src/game/`.
-  `game.cpp` is the dispatcher; `events.cpp` handles SDL input,
+  `game.cpp` is the dispatcher; `session/events.cpp` handles SDL input,
   `ingame.cpp` holds in-game lifecycle, `headless.cpp` glues the
   control queue, and each gameplay-state Tick body lives in
-  `tick/tick_<state>.cpp`. `Game::RenderClientUiFrame` starts the one
-  production Clay frame; `ClientUi` owns visible UI navigation.
+  `tick/tick_<state>.cpp`. `GameUiPipeline` (`src/game/ui`) is the cppx UI
+  composition root; the always-mounted `AppRoot` maps the session phase onto
+  the owning screen.
 - Simulation loop, socket, peer list, replay: `src/world.cpp`.
 - Rendering: `src/render/renderer.cpp`, `src/render/surface.cpp`,
   `src/render/sprite.cpp`, `src/render/palette.cpp`. Renderer is not a UI
-  owner; it supplies world/pixel drawing primitives used by the Clay compositor.
+  owner; it supplies world/pixel (8-bit) drawing primitives only. The
+  RGBA cppx UI layer is bridged separately in `src/render/cppx_ui`.
 - Audio (skipped in `-s`): `src/audio.cpp`.
-- Generic Clay runtime/primitives: `src/ui/runtime`, `src/ui/primitives`,
-  `src/ui/design`.
-- Silencer-specific UI surfaces: `src/client/ui/screens`,
-  `src/client/ui/modals`, `src/client/ui/hud`, and
-  `src/client/ui/navigation`.
+- cppx UI runtime + styling substrate (screen-agnostic): `src/ui/runtime`,
+  `src/ui/style`.
+- Silencer UI app-shell: `src/client/ui/app_shell` (ClientUi/UiPipeline/
+  ScreenStack/AppRoot), `src/client/ui/providers`, `src/client/ui/hooks`,
+  and `src/client/ui/app_theme.cpp` (product theme).
 - Projectiles: `src/*projectile.cpp` + `src/shrapnel.cpp`.
 - Stations: `src/healmachine.cpp`, `src/creditmachine.cpp`,
   `src/inventorystation.cpp`, `src/techstation.cpp`, `src/walldefense.cpp`,
@@ -261,6 +249,36 @@ usage patterns.
 | `--headless` | Skip SDL video/audio init (required in CI) |
 | `--control-port <n>` | Open JSON-lines TCP control socket on port *n* |
 | `--tui` | Stream paletted framebuffer over TCP to the `silencer-tui` host (`SILENCER_TUI_FRAME_HOST/_PORT`); skips SDL video, keeps audio. See `clients/tui/CLAUDE.md`. |
+
+## Perf tracing
+
+Set the `SILENCER_PERF` env var (any value) to print a per-section
+frame-time breakdown to stdout once per second. Off by default; when
+unset every hook is a single bool test, so the scopes stay compiled in.
+
+```
+[perf] 60fps frame 16.67ms | present 13.9 | ui 2.30 | ui.pipeline 2.24 | ui.raster 0.00 | world.draw 0.01 | sim 0.01 | game.tick 0.00
+```
+
+`frame` is the wall-clock period; the rest are avg ms/frame over the
+window, sorted by cost. Sections (`src/platform/perf_trace.{h,cpp}`,
+hooked in `game/loop/game_loop.cpp` + the cppx render path):
+
+- `ui` — whole `RenderClientUiFrame`; `ui.pipeline` — cppx build+layout+IR
+  +lowering. On the windowed GPU path (SIL-240, default) the lowering is
+  `ui.gpu_build` (the IR→geometry emit, ~0.05 ms) and `ui.raster` is absent —
+  no CPU raster, no full-window upload, so fades stay ~0. On the CPU path
+  (`SILENCER_GPU_UI=0` / headless) the lowering is `ui.raster` — the native-res
+  software raster (skipped when the IR is byte-identical, SIL-237).
+- `world.draw` — 8-bit world raster (in-game only); `sim`/`game.tick` —
+  world + state-machine tick; `present` — GPU upload + vsync wait;
+  `idle.throttle` — the unfocused-window `SDL_Delay` (background cap, not
+  real cost — focus the window or run `--headless` for true numbers).
+
+Add a scope with `PERF_SCOPE("name")` (RAII, times its block). Reading it:
+windowed = vsync-bound real numbers (`present` ≈ vsync wait); `--headless`
+free-runs at 640×480 = pure CPU, no vsync/throttle. Drive menus via the
+CLI and `grep '\[perf\]'` the run log.
 
 ## Gotchas
 

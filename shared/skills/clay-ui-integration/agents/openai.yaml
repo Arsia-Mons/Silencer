@@ -1,4 +1,0 @@
-interface:
-  display_name: "Silencer Clay UI"
-  short_description: "Implement Silencer's Clay UI with correct ownership and flex layout."
-  default_prompt: "Use this skill to design or audit Silencer's Clay UI integration with correct lifecycle, flexbox-style layout, input normalization, UiInteractionRegistry actions, stable IDs, render command dispatch, and backend boundaries."

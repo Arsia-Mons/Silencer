@@ -566,7 +566,7 @@ void Lobby::UnlockMutex(void){
 	SDL_UnlockMutex(mutex);
 }
 
-void Lobby::SendMessage(const char msg[256], Uint8 size){
+void Lobby::SendMessage(const char msg[0xFF], Uint8 size){
 	Send((char *)&size, sizeof(size));
 	Send(msg, size);
 }

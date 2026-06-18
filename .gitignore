@@ -69,4 +69,5 @@ cmake-build-*/
 
 clients/silencer/build_test/
 clients/silencer/installer/Output/
+clients/silencer/Testing/
 tools/refactor-baselines/

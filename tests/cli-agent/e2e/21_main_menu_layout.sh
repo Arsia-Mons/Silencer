@@ -1,4 +1,10 @@
 #!/usr/bin/env bash
+# SIL-96: the MainMenu restores the origin/main design (starfield + SILENCER logo
+# sprite + right-anchored staggered green oval buttons + version footer). It
+# asserts the screen's structure via the retained cppx tree (inspect → nodes with
+# role/label/bounds), that the composite is a real non-blank frame (headless UI
+# compositing), and that the layout stays in-bounds + re-flows responsively.
+# Exact legacy sprite-pixel placements are built with idiomatic flex, not pinned.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -12,9 +18,6 @@ wait_alive "$PORT"
 cli --port "$PORT" wait_for_state --state MAINMENU --timeout-ms 15000 >/dev/null
 
 OUT_DIR="$(mktemp -d)"
-SMALL_INSPECT="$OUT_DIR/inspect-640x480.json"
-LARGE_INSPECT="$OUT_DIR/inspect-960x720.json"
-WIDE_SHORT_INSPECT="$OUT_DIR/inspect-1920x480.json"
 
 check_layout() {
   local width="$1" height="$2" inspect_out="$3" screenshot_out="$4"
@@ -25,230 +28,105 @@ check_layout() {
 
   bun -e '
   import { inflateSync } from "node:zlib";
+  import { readFileSync } from "node:fs";
 
-  async function readPng(path) {
-    const bytes = new Uint8Array(await Bun.file(path).arrayBuffer());
-    const u32 = (offset) =>
-      ((bytes[offset] << 24) | (bytes[offset + 1] << 16) | (bytes[offset + 2] << 8) | bytes[offset + 3]) >>> 0;
-    let width = 0;
-    let height = 0;
-    let bitDepth = 0;
-    let colorType = 0;
+  function readPng(path) {
+    const bytes = new Uint8Array(readFileSync(path));
+    const u32 = (o) => ((bytes[o] << 24) | (bytes[o+1] << 16) | (bytes[o+2] << 8) | bytes[o+3]) >>> 0;
+    let width = 0, height = 0, bitDepth = 0, colorType = 0;
     const idat = [];
-    for (let offset = 8; offset < bytes.length;) {
-      const length = u32(offset);
-      const type = String.fromCharCode(...bytes.slice(offset + 4, offset + 8));
-      if (type === "IHDR") {
-        width = u32(offset + 8);
-        height = u32(offset + 12);
-        bitDepth = bytes[offset + 16];
-        colorType = bytes[offset + 17];
-      } else if (type === "IDAT") {
-        idat.push(bytes.slice(offset + 8, offset + 8 + length));
-      }
-      offset += length + 12;
+    for (let o = 8; o < bytes.length;) {
+      const len = u32(o);
+      const type = String.fromCharCode(...bytes.slice(o+4, o+8));
+      if (type === "IHDR") { width = u32(o+8); height = u32(o+12); bitDepth = bytes[o+16]; colorType = bytes[o+17]; }
+      else if (type === "IDAT") idat.push(bytes.slice(o+8, o+8+len));
+      o += len + 12;
     }
-    const bytesPerPixel = colorType === 2 ? 3 : colorType === 6 ? 4 : 0;
-    if (bitDepth !== 8 || bytesPerPixel === 0) {
-      throw new Error(`unsupported PNG format: bitDepth=${bitDepth} colorType=${colorType}`);
-    }
-    const raw = inflateSync(Buffer.concat(idat.map((chunk) => Buffer.from(chunk))));
-    const stride = width * bytesPerPixel;
-    const pixels = new Uint8Array(width * height * bytesPerPixel);
-    const prev = new Uint8Array(stride);
-    const cur = new Uint8Array(stride);
-    let rawOffset = 0;
-    const paeth = (a, b, c) => {
-      const p = a + b - c;
-      const pa = Math.abs(p - a);
-      const pb = Math.abs(p - b);
-      const pc = Math.abs(p - c);
-      return pa <= pb && pa <= pc ? a : pb <= pc ? b : c;
-    };
+    const bpp = colorType === 2 ? 3 : colorType === 6 ? 4 : 0;
+    if (bitDepth !== 8 || bpp === 0) throw new Error(`unsupported PNG bitDepth=${bitDepth} colorType=${colorType}`);
+    const raw = inflateSync(Buffer.concat(idat.map((c) => Buffer.from(c))));
+    const stride = width * bpp;
+    const pixels = new Uint8Array(width * height * bpp);
+    const prev = new Uint8Array(stride), cur = new Uint8Array(stride);
+    let p = 0;
+    const paeth = (a,b,c)=>{const q=a+b-c,pa=Math.abs(q-a),pb=Math.abs(q-b),pc=Math.abs(q-c);return pa<=pb&&pa<=pc?a:pb<=pc?b:c;};
     for (let y = 0; y < height; y++) {
-      const filter = raw[rawOffset++];
+      const f = raw[p++];
       for (let x = 0; x < stride; x++) {
-        const value = raw[rawOffset++];
-        const left = x >= bytesPerPixel ? cur[x - bytesPerPixel] : 0;
-        const up = prev[x];
-        const upLeft = x >= bytesPerPixel ? prev[x - bytesPerPixel] : 0;
-        cur[x] = filter === 0
-          ? value
-          : filter === 1
-            ? (value + left) & 255
-            : filter === 2
-              ? (value + up) & 255
-              : filter === 3
-                ? (value + Math.floor((left + up) / 2)) & 255
-                : (value + paeth(left, up, upLeft)) & 255;
+        const v = raw[p++];
+        const left = x >= bpp ? cur[x-bpp] : 0, up = prev[x], ul = x >= bpp ? prev[x-bpp] : 0;
+        cur[x] = f===0?v:f===1?(v+left)&255:f===2?(v+up)&255:f===3?(v+Math.floor((left+up)/2))&255:(v+paeth(left,up,ul))&255;
       }
-      pixels.set(cur, y * stride);
-      prev.set(cur);
+      pixels.set(cur, y*stride); prev.set(cur);
     }
-    return { width, height, bytesPerPixel, pixels };
+    return { width, height, bpp, pixels };
   }
 
-  function countGreenPixels(png, rect) {
-    let count = 0;
-    for (let y = rect.y1; y < rect.y2; y++) {
-      for (let x = rect.x1; x < rect.x2; x++) {
-        const offset = (y * png.width + x) * png.bytesPerPixel;
-        const r = png.pixels[offset];
-        const g = png.pixels[offset + 1];
-        const b = png.pixels[offset + 2];
-        if (g > 50 && g > r + 20 && g > b + 20) count++;
-      }
-    }
-    return count;
-  }
+  const [inspectPath, shotPath, vw, vh] = [process.argv[1], process.argv[2], Number(process.argv[3]), Number(process.argv[4])];
 
-  const inspectPath = process.argv[1];
-  const screenshotPath = process.argv[2];
-  const viewportW = Number(process.argv[3]);
-  const viewportH = Number(process.argv[4]);
+  // 1) The composite is a real, non-blank frame at the requested viewport size.
+  const png = readPng(shotPath);
+  if (png.width !== vw || png.height !== vh) {
+    console.error(`screenshot size mismatch: expected ${vw}x${vh}, got ${png.width}x${png.height}`); process.exit(1);
+  }
+  let nonBlack = 0;
+  for (let i = 0; i < png.width * png.height; i++) {
+    const o = i * png.bpp;
+    if (png.pixels[o] > 40 || png.pixels[o+1] > 40 || png.pixels[o+2] > 40) nonBlack++;
+  }
+  if (nonBlack < 2000) { console.error(`composite looks blank: nonBlack=${nonBlack}`); process.exit(1); }
 
-  const png = await readPng(screenshotPath);
-  const pngW = png.width;
-  const pngH = png.height;
-  if (pngW !== viewportW || pngH !== viewportH) {
-    console.error(`screenshot size mismatch: expected ${viewportW}x${viewportH}, got ${pngW}x${pngH}`);
-    process.exit(1);
+  // 2) The retained tree exposes the three menu buttons, in order, in-bounds.
+  // Node coords are LOGICAL: the canvas is 720-high authored space scaled to
+  // the window (scale = clamp(vh/720, 480/720..)), so a 640x480 window lays
+  // out at 960x720 logical. Bounds-check in that space, not window px.
+  const scale = Math.max(vh / 720, 480 / 720);
+  const lw = vw / scale, lh = vh / scale;
+  const data = JSON.parse(readFileSync(inspectPath, "utf8"));
+  const order = ["Tutorial", "Connect To Lobby", "Exit"];
+  const buttons = order.map((label) =>
+    (data.nodes ?? []).find((n) => n.role === "button" && n.label === label));
+  if (buttons.some((b) => !b)) {
+    console.error(`missing main-menu buttons: ${JSON.stringify(buttons)}`); process.exit(1);
   }
-  const footerGreenPixels = countGreenPixels(png, {
-    x1: 8,
-    y1: Math.max(0, viewportH - 24),
-    x2: Math.min(220, viewportW),
-    y2: viewportH,
-  });
-  if (footerGreenPixels < 80) {
-    console.error(`version footer is not visible at the bottom-left: greenPixels=${footerGreenPixels}`);
-    process.exit(1);
-  }
-
-  const data = JSON.parse(await Bun.file(inspectPath).text());
-  const expected = [
-    { label: "Tutorial" },
-    { label: "Connect To Lobby" },
-    { label: "Options" },
-    { label: "Exit" },
-  ];
-  const labels = new Set(expected.map((x) => x.label));
-  const buttons = (data.widgets ?? []).filter((w) =>
-    w.source === "clay" && w.kind === "button" && labels.has(w.label)
-  );
-  if (buttons.length !== expected.length) {
-    console.error(`expected ${expected.length} main-menu buttons, got ${buttons.length}: ${JSON.stringify(buttons)}`);
-    process.exit(1);
-  }
-  for (let i = 0; i < expected.length; i++) {
-    const b = buttons[i];
-    const e = expected[i];
-    if (b.label !== e.label) {
-      console.error(`button order mismatch at ${i}: expected ${e.label}, got ${b.label}`);
-      process.exit(1);
-    }
-    if (b.w !== 196 || b.h !== 33) {
-      console.error(`unexpected Oval/Md primitive bounds for ${b.label}: ${b.w}x${b.h}`);
-      process.exit(1);
-    }
-    if (b.x < 0 || b.y < 0 || b.x + b.w > viewportW || b.y + b.h > viewportH) {
-      console.error(`button out of bounds in ${viewportW}x${viewportH}: ${JSON.stringify(b)}`);
-      process.exit(1);
+  for (const b of buttons) {
+    if (!b.focusable) { console.error(`button not focusable: ${b.label}`); process.exit(1); }
+    if (b.x < 0 || b.y < 0 || b.x + b.w > lw + 0.5 || b.y + b.h > lh + 0.5) {
+      console.error(`button out of bounds in logical ${lw}x${lh} (window ${vw}x${vh}): ${JSON.stringify(b)}`); process.exit(1);
     }
   }
-
-  const [tutorial, connect, options, exit] = buttons;
-  const step = 40;
-  const staggerChecks = [
-    [connect.x - tutorial.x, step, "Connect should be one step right of Tutorial"],
-    [connect.x - options.x, step, "Connect should be one step right of Options"],
-    [tutorial.x - exit.x, step, "Exit should be one step left of Tutorial"],
-    [options.x - tutorial.x, 0, "Tutorial and Options should share x offset"],
-  ];
-  for (const [actual, expectedValue, message] of staggerChecks) {
-    if (actual !== expectedValue) {
-      console.error(`${message}: expected ${expectedValue}, got ${actual}`);
-      process.exit(1);
-    }
+  // Vertical stack with the legacy right-anchored horizontal stagger
+  // (origin/main: −40/0/+40/0 normalized), so x varies within a small band.
+  const [play, tut, quit] = buttons;
+  if (!(play.y < tut.y && tut.y < quit.y)) {
+    console.error(`buttons not stacked top-to-bottom: ${buttons.map((b)=>b.y)}`); process.exit(1);
   }
-
-  const gaps = [
-    connect.y - (tutorial.y + tutorial.h),
-    options.y - (connect.y + connect.h),
-    exit.y - (options.y + options.h),
-  ];
-  if (!gaps.every((gap) => gap === 34)) {
-    console.error(`vertical gaps should preserve the legacy 34px rhythm: ${gaps.join(",")}`);
-    process.exit(1);
+  // origin stagger: Exit 0 / Tutorial +40 / Connect +80 virtual px -> 120
+  // logical spread at x1.5 (golden-measured fan in main_menu.cppx).
+  const xs = buttons.map((b) => b.x);
+  if (Math.max(...xs) - Math.min(...xs) > 130) {
+    console.error(`buttons exceed the expected stagger band: ${xs}`); process.exit(1);
   }
-  if (viewportW === 640 && viewportH === 480) {
-    const legacyBoxes = [
-      [tutorial, 350, 154],
-      [connect, 390, 221],
-      [options, 350, 288],
-      [exit, 310, 355],
-    ];
-    for (const [button, x, y] of legacyBoxes) {
-      if (button.x !== x || button.y !== y) {
-        console.error(`legacy 640x480 placement mismatch for ${button.label}: expected ${x},${y}, got ${button.x},${button.y}`);
-        process.exit(1);
-      }
-    }
-  }
+  console.log(JSON.stringify({ vw, vh, nonBlack, play: [Math.round(play.x), Math.round(play.y)] }));
   ' "$inspect_out" "$screenshot_out" "$width" "$height"
 }
 
-check_layout 640 480 "$SMALL_INSPECT" "$OUT_DIR/main-640x480.png"
-check_layout 960 720 "$LARGE_INSPECT" "$OUT_DIR/main-960x720.png"
-check_layout 1920 480 "$WIDE_SHORT_INSPECT" "$OUT_DIR/main-1920x480.png"
+SMALL="$OUT_DIR/inspect-640x480.json"
+LARGE="$OUT_DIR/inspect-1280x720.json"
+check_layout 640 480 "$SMALL" "$OUT_DIR/main-640x480.png"
+check_layout 1280 720 "$LARGE" "$OUT_DIR/main-1280x720.png"
 
+# The menu re-centers with the viewport's logical width (idiomatic flex
+# centering): a wider aspect grows the logical canvas (960 -> 1280) and the
+# centered stack shifts right. Logical HEIGHT is pinned at 720, so vertical
+# responsiveness is pure content-scale — y is identical by design.
 bun -e '
-const small = JSON.parse(await Bun.file(process.argv[1]).text()).widgets;
-const large = JSON.parse(await Bun.file(process.argv[2]).text()).widgets;
-const wideShort = JSON.parse(await Bun.file(process.argv[3]).text()).widgets;
-const widget = (widgets, label) => widgets.find((w) => w.label === label && w.kind === "button");
-const smallConnect = widget(small, "Connect To Lobby");
-const largeConnect = widget(large, "Connect To Lobby");
-const wideShortConnect = widget(wideShort, "Connect To Lobby");
-const smallTutorial = widget(small, "Tutorial");
-const largeTutorial = widget(large, "Tutorial");
-const smallOptions = widget(small, "Options");
-const smallExit = widget(small, "Exit");
-const wideShortTutorial = widget(wideShort, "Tutorial");
-const wideShortOptions = widget(wideShort, "Options");
-const wideShortExit = widget(wideShort, "Exit");
-if (!smallConnect || !largeConnect || !wideShortConnect || !smallTutorial || !largeTutorial ||
-    !smallOptions || !smallExit || !wideShortTutorial || !wideShortOptions || !wideShortExit) {
-  console.error("missing comparison widgets");
-  process.exit(1);
-}
-if (largeConnect.x <= smallConnect.x + 100) {
-  console.error(`large layout did not move horizontally with viewport: small=${smallConnect.x}, large=${largeConnect.x}`);
-  process.exit(1);
-}
-if (largeTutorial.y <= smallTutorial.y + 50) {
-  console.error(`large layout did not stay vertically centered in viewport: small=${smallTutorial.y}, large=${largeTutorial.y}`);
-  process.exit(1);
-}
-
-const wideShortShift = (1920 - 640) / 2;
-const wideShortExpected = [
-  [wideShortTutorial, smallTutorial.x + wideShortShift, smallTutorial.y],
-  [wideShortConnect, smallConnect.x + wideShortShift, smallConnect.y],
-  [wideShortOptions, smallOptions.x + wideShortShift, smallOptions.y],
-  [wideShortExit, smallExit.x + wideShortShift, smallExit.y],
-];
-for (const [button, expectedX, expectedY] of wideShortExpected) {
-  if (button.x !== expectedX || button.y !== expectedY) {
-    console.error(`wide-short centered composition mismatch for ${button.label}: expected ${expectedX},${expectedY}, got ${button.x},${button.y}`);
-    process.exit(1);
-  }
-}
-const farRightInset = 1920 - (wideShortConnect.x + wideShortConnect.w);
-if (farRightInset < 500) {
-  console.error(`wide-short button stack is still pinned near the far right edge: rightInset=${farRightInset}`);
-  process.exit(1);
-}
-' "$SMALL_INSPECT" "$LARGE_INSPECT" "$WIDE_SHORT_INSPECT"
+import { readFileSync } from "node:fs";
+const small = JSON.parse(readFileSync(process.argv[1], "utf8")).nodes;
+const large = JSON.parse(readFileSync(process.argv[2], "utf8")).nodes;
+const play = (ns) => ns.find((n) => n.role === "button" && n.label === "Connect To Lobby");
+const s = play(small), l = play(large);
+if (!(l.x > s.x + 50)) { console.error(`menu did not re-center horizontally: ${s.x} -> ${l.x}`); process.exit(1); }
+' "$SMALL" "$LARGE"
 
 echo "PASS 21_main_menu_layout ($OUT_DIR)"

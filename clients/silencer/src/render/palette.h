@@ -12,6 +12,7 @@ public:
 	bool Load(void);
 	void SetParallaxColors(Uint8 parallax);
 	bool SetPalette(Uint8 palette);
+	Uint8 CurrentPalette(void) const { return currentpalette; }
 	SDL_Color * GetColors(void);
 	Uint8 ClosestMatch(SDL_Color color, bool upperonly = false);
 	inline Uint8 Brightness(Uint8 a, Uint8 i){
@@ -70,6 +71,12 @@ private:
 	std::vector<Uint8> colored[11];
 	std::vector<Uint8> alphaed[11];
 	Uint8 currentpalette;
+	// Active parallax source page (5..9), or -1 if none. The parallax color band
+	// (indices 256-30..255) is black on disk in page 0 and is only filled by
+	// SetParallaxColors. Every SetPalette()->Load() re-reads PALETTE.BIN and would
+	// wipe it; remembering the source lets Load() re-apply the band so the world
+	// backdrop survives the cppx UI's mid-frame palette-page switches.
+	int parallaxsource = -1;
 	std::vector<Uint8> * currentbrightnesspalette;
 	std::vector<Uint8> * currentcoloredpalette;
 	std::vector<Uint8> * currentalphaedpalette;

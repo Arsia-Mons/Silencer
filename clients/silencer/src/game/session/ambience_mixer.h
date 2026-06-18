@@ -21,7 +21,6 @@ public:
 	AmbienceMixer(const AmbienceMixer &) = delete;
 	AmbienceMixer & operator=(const AmbienceMixer &) = delete;
 
-	void GetGameChannelName(LobbyGame & lobbygame, char * name);
 	void CreateAmbienceChannels(void);
 	void UpdateAmbienceChannels(void);
 	bool FadedIn(void);

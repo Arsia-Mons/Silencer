@@ -1,0 +1,23 @@
+#include "client/ui/components/actions/action_row.h"
+
+#include "ui/components/box.h"
+#include "client/ui/components/tokens.h"
+
+namespace silencer {
+
+using ::ui::children;
+using ::ui::components::Box;
+using ::ui::components::BoxProps;
+
+::ui::UiElement ActionRow(const ActionRowProps &props) {
+  const ::ui::LayoutStyle layout = {
+      .direction = ::ui::FlexDirection::Row,
+      .align_items = ::ui::AlignItems::Start,
+      .gap = 18.0f, // origin kActionGap 12 x1.5
+  };
+  return <Box key={props.key} layout={layout}>
+    {props.children}
+  </Box>
+}
+
+} // namespace silencer

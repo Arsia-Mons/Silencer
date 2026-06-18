@@ -1,0 +1,173 @@
+#include "sprite_bake.h"
+
+#include <algorithm>
+#include <vector>
+
+namespace silencer::cppx_ui {
+
+void bake_indexed_rgba(const uint8_t *indices, int w, int h,
+                       const SDL_Color *palette256, uint8_t *out_rgba) {
+  const int n = w * h;
+  for (int i = 0; i < n; ++i) {
+    const uint8_t idx = indices[i];
+    uint8_t *o = out_rgba + i * 4;
+    if (idx == 0) { // transparent index (world renderer skips pixel==0)
+      o[0] = 0;
+      o[1] = 0;
+      o[2] = 0;
+      o[3] = 0;
+      continue;
+    }
+    const SDL_Color &c = palette256[idx];
+    // Opaque (alpha 255) => premultiplied RGB == straight RGB.
+    o[0] = c.r;
+    o[1] = c.g;
+    o[2] = c.b;
+    o[3] = 255;
+  }
+}
+
+
+// ---- Canonical-phase element bakes (U-2 / SIL-204) -------------------------
+
+namespace {
+
+// Shared hop 2: NEAREST-magnify a vw x vh virtual index buffer by s from
+// phase 0 (src = int(t/s), t from 0) into tex_w x tex_h RGBA. The footprint
+// ceil(vw*s) x ceil(vh*s) gives every virtual px its full duplication band;
+// index 0 stays transparent.
+void magnify_canonical(const uint8_t *vidx, int vw, int vh,
+                       const SDL_Color *palette256, float s, int tex_w,
+                       int tex_h, uint8_t *out_rgba) {
+  if (vw <= 0 || vh <= 0 || s <= 0.0f)
+    return;
+  for (int ty = 0; ty < tex_h; ++ty) {
+    const int syi = std::min((int)(ty / s), vh - 1);
+    const uint8_t *srow = vidx + (size_t)syi * vw;
+    uint8_t *orow = out_rgba + (size_t)ty * tex_w * 4;
+    for (int tx = 0; tx < tex_w; ++tx) {
+      const int sxi = std::min((int)(tx / s), vw - 1);
+      const uint8_t idx = srow[sxi];
+      if (idx == 0)
+        continue;
+      const SDL_Color &c = palette256[idx];
+      uint8_t *o = orow + (size_t)tx * 4;
+      o[0] = c.r;
+      o[1] = c.g;
+      o[2] = c.b;
+      o[3] = 255;
+    }
+  }
+}
+
+} // namespace
+
+void bake_canonical_cell_rgba(const uint8_t *indices, int sw, int sh,
+                              const SDL_Color *palette256, float s, int tex_w,
+                              int tex_h, uint8_t *out_rgba) {
+  magnify_canonical(indices, sw, sh, palette256, s, tex_w, tex_h, out_rgba);
+}
+
+void bake_canonical_stretch_rgba(const uint8_t *indices, int sw, int sh,
+                                 const SDL_Color *palette256, int bw, int bh,
+                                 float s, int tex_w, int tex_h,
+                                 uint8_t *out_rgba) {
+  if (bw <= 0 || bh <= 0 || sw <= 0 || sh <= 0)
+    return;
+  // Hop 1 (origin DispatchImage Stretch), box-local int arithmetic.
+  const float sx_scale = (float)bw / sw;
+  const float sy_scale = (float)bh / sh;
+  std::vector<uint8_t> vbuf((size_t)bw * bh, 0u);
+  for (int ly = 0; ly < bh; ++ly) {
+    const int syi = std::min((int)(ly / sy_scale), sh - 1);
+    const uint8_t *srow = indices + (size_t)syi * sw;
+    uint8_t *vrow = vbuf.data() + (size_t)ly * bw;
+    for (int lx = 0; lx < bw; ++lx)
+      vrow[lx] = srow[std::min((int)(lx / sx_scale), sw - 1)];
+  }
+  magnify_canonical(vbuf.data(), bw, bh, palette256, s, tex_w, tex_h,
+                    out_rgba);
+}
+
+void bake_canonical_nineslice_rgba(const uint8_t *indices, int sw, int sh,
+                                   const SDL_Color *palette256, int bw, int bh,
+                                   int cap_l, int cap_r, int cap_t, int cap_b,
+                                   float s, int tex_w, int tex_h,
+                                   uint8_t *out_rgba) {
+  if (bw <= 0 || bh <= 0 || sw <= 0 || sh <= 0)
+    return;
+  // origin DispatchButtonNineSlice cap clamps (virtual px).
+  const int src_l = std::min(cap_l, sw / 2);
+  const int src_r = std::min(cap_r, sw - src_l);
+  const int src_t = std::min(cap_t, sh / 2);
+  const int src_b = std::min(cap_b, sh - src_t);
+  const int dst_l = std::min(src_l, bw / 2);
+  const int dst_r = std::min(src_r, bw - dst_l);
+  const int dst_t = std::min(src_t, bh / 2);
+  const int dst_b = std::min(src_b, bh - dst_t);
+  const int src_mid_w = std::max(1, sw - src_l - src_r);
+  const int src_mid_h = std::max(1, sh - src_t - src_b);
+  std::vector<uint8_t> vbuf((size_t)bw * bh, 0u);
+  for (int ly = 0; ly < bh; ++ly) {
+    int syi;
+    if (ly < dst_t)
+      syi = ly; // top band (cropped corner row)
+    else if (ly >= bh - dst_b)
+      syi = sh - (bh - ly); // bottom band
+    else
+      syi = src_t + (ly - dst_t) % src_mid_h; // tiled middle
+    if (syi < 0 || syi >= sh)
+      continue;
+    const uint8_t *srow = indices + (size_t)syi * sw;
+    uint8_t *vrow = vbuf.data() + (size_t)ly * bw;
+    for (int lx = 0; lx < bw; ++lx) {
+      int sxi;
+      if (lx < dst_l)
+        sxi = lx;
+      else if (lx >= bw - dst_r)
+        sxi = sw - (bw - lx);
+      else
+        sxi = src_l + (lx - dst_l) % src_mid_w;
+      if (sxi < 0 || sxi >= sw)
+        continue;
+      vrow[lx] = srow[sxi];
+    }
+  }
+  magnify_canonical(vbuf.data(), bw, bh, palette256, s, tex_w, tex_h,
+                    out_rgba);
+}
+
+void bake_canonical_contain_rgba(const uint8_t *indices, int sw, int sh,
+                                 const SDL_Color *palette256, int bw, int bh,
+                                 float s, int tex_w, int tex_h,
+                                 uint8_t *out_rgba) {
+  if (bw <= 0 || bh <= 0 || sw <= 0 || sh <= 0)
+    return;
+  // origin DispatchImage Contain: float min-scale, int(+0.5) draw size,
+  // int-centered, per-pixel src = int((p - o) / scale) (C truncation).
+  const float cscale = std::min((float)bw / sw, (float)bh / sh);
+  if (cscale <= 0.0f)
+    return;
+  const int contain_w = std::max(1, (int)(sw * cscale + 0.5f));
+  const int contain_h = std::max(1, (int)(sh * cscale + 0.5f));
+  const int ox = (bw - contain_w) / 2; // box-relative
+  const int oy = (bh - contain_h) / 2;
+  std::vector<uint8_t> vbuf((size_t)bw * bh, 0u);
+  for (int ly = 0; ly < bh; ++ly) {
+    const int syi = (int)((ly - oy) / cscale);
+    if (syi < 0 || syi >= sh)
+      continue;
+    const uint8_t *srow = indices + (size_t)syi * sw;
+    uint8_t *vrow = vbuf.data() + (size_t)ly * bw;
+    for (int lx = 0; lx < bw; ++lx) {
+      const int sxi = (int)((lx - ox) / cscale);
+      if (sxi < 0 || sxi >= sw)
+        continue;
+      vrow[lx] = srow[sxi];
+    }
+  }
+  magnify_canonical(vbuf.data(), bw, bh, palette256, s, tex_w, tex_h,
+                    out_rgba);
+}
+
+} // namespace silencer::cppx_ui

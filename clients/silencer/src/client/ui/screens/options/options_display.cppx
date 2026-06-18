@@ -1,0 +1,123 @@
+#include "client/ui/screens/options/options_display.h"
+
+#include "client/ui/components/actions/actions.h"
+#include "client/ui/components/layout/layout.h"
+#include "client/ui/components/surfaces/surfaces.h"
+#include "client/ui/components/text/text.h"
+#include "client/ui/hooks/use_navigation.h"
+#include "client/ui/hooks/use_settings.h"
+#include "client/ui/screens/options/hooks/use_options_commit.h"
+#include "ui/components/box.h"
+#include "ui/runtime/react.h"
+
+#include <functional>
+
+namespace client::ui {
+namespace {
+
+// JSX lowering emits each tag's component function + `<Tag>Props` type
+// unqualified, so pull in the silencer semantic layer + the runtime children().
+using namespace silencer;
+using ::ui::children;
+using ::ui::components::Box;
+using ::ui::components::BoxProps;
+
+struct OptionsDisplayProps {
+  uint32_t unused = 0;
+};
+
+::ui::UiElement OptionsDisplayView(const OptionsDisplayProps &) {
+  Navigation nav = use_navigation();
+  Settings settings = use_settings();
+  if (!nav.is_top)
+    return ::ui::empty();
+
+  // origin/main: floating title + the two display toggles + Save/Cancel ovals over
+  // the starfield — NO panel. Save persists, Cancel reverts the live edits.
+  OptionsCommit commit = use_options_commit(settings.commit, settings.revert);
+
+  // origin/main anchors this dialog in the upper third (title baseline ~y168), not
+  // screen-centered like the options root.
+  //
+  // Wrapper margins land every oval on the golden's virtual grid for the
+  // per-phase bake: margin-right 1/2 centers rows at x=419 (Lg cell vx 279)
+  // and Save/Cancel at 336/648 (vx 224/432); smooth's -0.5 top puts row 2 at
+  // y=309 (vy 206) and actionpad 3.5 puts the action row at y=392 (vy 261 —
+  // also fixes the action band sitting ~4 device px below the golden).
+  // fullscreenw mr 3 (not 1): row -1 logical so the centered label pen lands
+  // on the golden TEXT cell too (vx 334 — Yoga's 501.5 half-up rounding sat
+  // one device px past the string-bake recovery window); the oval (vx 279)
+  // and left toggle (vx 523) stay in their windows, indDx 1 keeps the right
+  // toggle on vx 553.
+  return <ScreenLayout key="root" variant={ScreenLayoutVariant::Overlay}>
+    <Box
+      key="col"
+      layout={::ui::LayoutStyle{
+        .position = ::ui::PositionType::Absolute,
+        .direction = ::ui::FlexDirection::Column,
+        .align_items = ::ui::AlignItems::Center,
+        .position_inset = ::ui::EdgeSizes{0.0f, 0.0f, 168.0f, {}},
+        .gap = 30.0f}}
+    >
+      <Box key="titlewrap" layout={::ui::LayoutStyle{.margin = ::ui::EdgeSizes{{}, {}, {}, 3.5f}}}>
+        <ScreenTitle key="title" variant={ScreenTitleVariant::Dialog} value="Display Options" />
+      </Box>
+      <Box
+        key="fullscreenw"
+        layout={::ui::LayoutStyle{.margin = ::ui::EdgeSizes{{}, 3.0f, {}, {}}}}
+      >
+        <BooleanSettingRow
+          key="fullscreen"
+          controlId="FullscreenToggle"
+          checked={settings.fullscreen}
+          label="Fullscreen"
+          indDx={1.0f}
+          onChange={settings.set_fullscreen}
+        />
+      </Box>
+      <Box key="smoothw" layout={::ui::LayoutStyle{.margin = ::ui::EdgeSizes{{}, 1.0f, -0.5f, {}}}}>
+        <BooleanSettingRow
+          key="smooth"
+          controlId="SmoothScalingToggle"
+          checked={settings.smooth_scaling}
+          label="Smooth Scaling"
+          onChange={settings.set_smooth_scaling}
+        />
+      </Box>
+      <Box
+        key="actionpad"
+        layout={::ui::LayoutStyle{.margin = ::ui::EdgeSizes{{}, 2.0f, 3.5f, {}}}}
+      >
+      <ActionRow key="actions">
+        <AppButton
+          key="save"
+          controlId="OptionsSave"
+          variant={AppButtonVariant::Oval}
+          label="Save"
+          onPress={commit.save}
+        />
+        <AppButton
+          key="cancel"
+          controlId="OptionsCancel"
+          variant={AppButtonVariant::Oval}
+          label="Cancel"
+          onPress={commit.cancel}
+        />
+      </ActionRow>
+      </Box>
+    </Box>
+  </ScreenLayout>
+}
+
+} // namespace
+
+bool OptionsDisplayScreen::build_element(::ui::UiElementFrame &,
+                                         ::ui::UiElement *out) {
+  if (!out)
+    return false;
+  *out = ::ui::component("OptionsDisplay", OptionsDisplayProps{},
+                         OptionsDisplayView, "options-display");
+  return true;
+}
+
+} // namespace client::ui

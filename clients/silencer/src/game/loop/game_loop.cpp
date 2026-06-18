@@ -1,26 +1,154 @@
 #include "game.h"
+#include "client/ui/app_shell/client_ui.h"
+#include "config.h"
 #include "controldispatch.h"
 #include "gasloader.h"
+#include "lobbygame.h"
 #include "objecttypes.h"
+#include "perf_trace.h"
 #include "player.h"
 #include "state.h"
-#include "character_create_screen.h"
-#include "lobby_connect_screen.h"
-#include "main_menu_screen.h"
-#include "mission_summary_screen.h"
-#include "options_audio_screen.h"
-#include "options_controls_screen.h"
-#include "options_display_screen.h"
-#include "options_screen.h"
-#include "update_screen.h"
-#ifdef SILENCER_HAVE_LOBBY_UI
-#include "lobby_screen.h"
-#endif
 #include <stdio.h>
 #include <cstring>
 #include <vector>
 
 using namespace GameState;
+
+namespace {
+
+uint16_t TuiUiModsFromScancodes(const Uint8 * state){
+	uint16_t out = ::ui::UI_KEY_MOD_NONE;
+	if(state[SDL_SCANCODE_LSHIFT] || state[SDL_SCANCODE_RSHIFT]) out |= ::ui::UI_KEY_MOD_SHIFT;
+	if(state[SDL_SCANCODE_LCTRL] || state[SDL_SCANCODE_RCTRL]) out |= ::ui::UI_KEY_MOD_CTRL;
+	if(state[SDL_SCANCODE_LALT] || state[SDL_SCANCODE_RALT]) out |= ::ui::UI_KEY_MOD_ALT;
+	if(state[SDL_SCANCODE_LGUI] || state[SDL_SCANCODE_RGUI]) out |= ::ui::UI_KEY_MOD_SUPER;
+	return out;
+}
+
+::ui::UiKey TuiUiKeyFromScancode(SDL_Scancode sc){
+	switch(sc){
+	case SDL_SCANCODE_BACKSPACE: return ::ui::UiKey::Backspace;
+	case SDL_SCANCODE_DELETE: return ::ui::UiKey::DeleteForward;
+	case SDL_SCANCODE_LEFT: return ::ui::UiKey::Left;
+	case SDL_SCANCODE_RIGHT: return ::ui::UiKey::Right;
+	case SDL_SCANCODE_HOME: return ::ui::UiKey::Home;
+	case SDL_SCANCODE_END: return ::ui::UiKey::End;
+	case SDL_SCANCODE_UP: return ::ui::UiKey::Up;
+	case SDL_SCANCODE_DOWN: return ::ui::UiKey::Down;
+	case SDL_SCANCODE_PAGEUP: return ::ui::UiKey::PageUp;
+	case SDL_SCANCODE_PAGEDOWN: return ::ui::UiKey::PageDown;
+	case SDL_SCANCODE_RETURN:
+	case SDL_SCANCODE_KP_ENTER: return ::ui::UiKey::Enter;
+	case SDL_SCANCODE_TAB: return ::ui::UiKey::Tab;
+	case SDL_SCANCODE_A: return ::ui::UiKey::A;
+	default: return ::ui::UiKey::Unknown;
+	}
+}
+
+char TuiPrintableFromScancode(SDL_Scancode sc, uint16_t mods){
+	if(mods & (::ui::UI_KEY_MOD_CTRL | ::ui::UI_KEY_MOD_ALT | ::ui::UI_KEY_MOD_SUPER)) return '\0';
+	bool shift = (mods & ::ui::UI_KEY_MOD_SHIFT) != 0;
+	if(sc >= SDL_SCANCODE_A && sc <= SDL_SCANCODE_Z){
+		char c = (char)('a' + (sc - SDL_SCANCODE_A));
+		return shift ? (char)(c - 'a' + 'A') : c;
+	}
+	switch(sc){
+	case SDL_SCANCODE_1: return '1';
+	case SDL_SCANCODE_2: return '2';
+	case SDL_SCANCODE_3: return '3';
+	case SDL_SCANCODE_4: return '4';
+	case SDL_SCANCODE_5: return '5';
+	case SDL_SCANCODE_6: return '6';
+	case SDL_SCANCODE_7: return '7';
+	case SDL_SCANCODE_8: return '8';
+	case SDL_SCANCODE_9: return '9';
+	case SDL_SCANCODE_0: return '0';
+	case SDL_SCANCODE_SPACE: return ' ';
+	default: return '\0';
+	}
+}
+
+bool TuiAllowsTextInput(Game & game, bool chatWasActive){
+	if(chatWasActive) return true;
+	client::ui::ClientUi * ui = game.GetUiPipeline().TryClientUi();
+	return ui && ui->wants_text_input();
+}
+
+void FeedTuiUiScancodeDown(Game & game, SDL_Scancode sc, const Uint8 * newkeystate,
+                           bool routeTextInput){
+	if(game.GetUiPipeline().IsCapturingKeybind()){
+		game.GetUiPipeline().FeedKeybindEdge({BindingDevice::Keyboard, (int)sc, 0});
+		return;
+	}
+
+	::ui::UiInputFrame & ui = game.GetUiPipeline().UiInput();
+	uint16_t mods = TuiUiModsFromScancodes(newkeystate);
+	::ui::UiKey key = TuiUiKeyFromScancode(sc);
+	bool fedUi = false;
+	if(routeTextInput && key != ::ui::UiKey::Unknown){
+		::ui::ui_input_push_key(ui, key, mods, false);
+		fedUi = true;
+	}
+	switch(sc){
+	case SDL_SCANCODE_UP: ui.nav_up = true; fedUi = true; break;
+	case SDL_SCANCODE_DOWN: ui.nav_down = true; fedUi = true; break;
+	case SDL_SCANCODE_LEFT: ui.nav_left = true; fedUi = true; break;
+	case SDL_SCANCODE_RIGHT: ui.nav_right = true; fedUi = true; break;
+	case SDL_SCANCODE_TAB:
+		if(mods & ::ui::UI_KEY_MOD_SHIFT)
+			ui.nav_previous = true;
+		else
+			ui.nav_next = true;
+		fedUi = true;
+		break;
+	case SDL_SCANCODE_RETURN:
+	case SDL_SCANCODE_KP_ENTER:
+		if(!routeTextInput) break;
+		ui.confirm_pressed = true;
+		ui.confirm_down = true;
+		fedUi = true;
+		break;
+	case SDL_SCANCODE_ESCAPE:
+		if(!routeTextInput) break;
+		ui.cancel_pressed = true;
+		ui.cancel_down = true;
+		fedUi = true;
+		break;
+	default: break;
+	}
+	if(routeTextInput){
+		char c = TuiPrintableFromScancode(sc, mods);
+		if(c != '\0'){
+			char text[2] = {c, '\0'};
+			::ui::ui_input_push_text(ui, text);
+			fedUi = true;
+		}
+	}
+	if(fedUi) ui.source = ::ui::UiFocusSource::Keyboard;
+}
+
+void FeedTuiUiScancodeUp(Game & game, SDL_Scancode sc, bool routeTextInput){
+	if(!routeTextInput) return;
+	::ui::UiInputFrame & ui = game.GetUiPipeline().UiInput();
+	ui.source = ::ui::UiFocusSource::Keyboard;
+	switch(sc){
+	case SDL_SCANCODE_RETURN:
+	case SDL_SCANCODE_KP_ENTER:
+		ui.confirm_released = true;
+		break;
+	case SDL_SCANCODE_ESCAPE:
+		ui.cancel_released = true;
+		break;
+	default: break;
+	}
+}
+
+bool ViewedPlayerChatActive(Game & game){
+	Player * p = game.GetWorld().GetPeerPlayer(game.GetWorld().viewedpeerid);
+	return p && p->chatActive;
+}
+
+} // namespace
 
 
 bool Game::Loop(void){
@@ -35,7 +163,7 @@ bool Game::Loop(void){
 	if(updatetitle){
 		if(!headless && gameRenderer.GetWindow()){
 			char title[128];
-			sprintf(title, "Silencer - %d FPS  Latency: %d ms [%d]  B/s: D:%d U:%d", fps, world.GetPingTime(), (int)world.replication.snapshotqueue.size(), world.network.totalbytesread, world.network.totalbytessent);
+			snprintf(title, sizeof title, "Silencer - %d FPS  Latency: %d ms [%d]  B/s: D:%d U:%d", fps, world.GetPingTime(), (int)world.replication.snapshotqueue.size(), world.network.totalbytesread, world.network.totalbytessent);
 			SDL_SetWindowTitle(gameRenderer.GetWindow(), title);
 		}
 		updatetitle = false;
@@ -90,26 +218,26 @@ bool Game::Loop(void){
 		if(tui){
 			Uint8 newkeystate[SDL_SCANCODE_COUNT];
 			if(inputserver.LatestScancodes(newkeystate)){
-				std::vector<int> pressedScancodes;
 				// Edge-detect: feed press/release transitions through the
-				// same handlers the SDL path uses, so the in-game ESC
-				// quitstate machine, F1 player-list, debug overlay etc.
-				// behave identically with a TUI keyboard.
+				// same handlers the SDL path uses, so the in-game F1
+				// player-list, debug overlay etc. behave identically with a
+				// TUI keyboard. TUI has no SDL text events, so text-focus/chat
+				// key edges synthesize the cppx UI key/text/cancel channels
+				// that events.cpp normally fills.
+				bool routeTextInput = TuiAllowsTextInput(*this, ViewedPlayerChatActive(*this));
 				for(int sc = 0; sc < SDL_SCANCODE_COUNT; ++sc){
 					bool was = gameInput.GetKeystate()[sc] != 0;
 					bool now = newkeystate[sc] != 0;
 					if(was == now) continue;
 					if(now){
 						gameInput.OnScancodeDown(sc);
-						pressedScancodes.push_back(sc);
+						FeedTuiUiScancodeDown(*this, (SDL_Scancode)sc, newkeystate, routeTextInput);
 					}else{
 						gameInput.OnScancodeUp(sc);
+						FeedTuiUiScancodeUp(*this, (SDL_Scancode)sc, routeTextInput);
 					}
 				}
 				memcpy(gameInput.GetKeystate(), newkeystate, SDL_SCANCODE_COUNT * sizeof(Uint8));
-				for(int sc : pressedScancodes){
-					gameInput.QueueUiKeyboardInputForScancode(sc);
-				}
 			}
 			gameInput.UpdateInputState(world.localinput);
 			Input action;
@@ -158,17 +286,15 @@ bool Game::Loop(void){
 			}
 		} else {
 			gameInput.UpdateInputState(world.localinput);
-			UiInput().CaptureGamepadBindingEdges(
-				gameInput.GetGamepadState().buttons, gameInput.GetGamepadState().axes,
-				SDL_GAMEPAD_AXIS_COUNT, AXIS_DEADZONE);
-			gameInput.TickGamepadMenuNav();
 		}
 		world.SendInput();
-		if(!Tick()){
+		bool tickOk;
+		{ PERF_SCOPE("game.tick"); tickOk = Tick(); }
+		if(!tickOk){
 			return false;
 		}
 		if(!world.replay.IsPlaying() || (world.replay.IsPlaying() && world.gameplaystate == World::INGAME)){
-			world.Tick();
+			{ PERF_SCOPE("sim"); world.Tick(); }
 			gameInput.TickRumble();
 		}
 		if(!world.dedicatedserver.active){
@@ -176,9 +302,24 @@ bool Game::Loop(void){
 		}
 		if(world.gameplaystate == World::INGAME){
 			Uint8 newambiencelevel = renderer.GetAmbienceLevel();
-			if(newambiencelevel != gameSession.AmbienceMixerRef().oldambiencelevel || gameRenderer.FadePhaseRef() <= 15){
+			const Uint8 fadephase = gameRenderer.FadePhaseRef();
+			const bool fading = fadephase < 16;                            // transition fade still dimming
+			const bool fadeJustFinished = !fading && ambienceFadeWasActive; // falling edge of the fade
+			if(newambiencelevel != gameSession.AmbienceMixerRef().oldambiencelevel || fading || fadeJustFinished){
+				// While the fade is actively dimming, fold ambience into the fade palette so
+				// the world fades in/out with ambience applied. Read temppalette (the
+				// currently-displayed dimmed fade palette) whenever ApplyPaletteFade is still
+				// writing it: that's the WHOLE fade-OUT (state == FADEOUT, including the final
+				// black at phase 15) and the fade-IN up to phase 15 — ApplyPaletteFade(false)
+				// stops refreshing temppalette at phase >= 15, pushing the full base palette
+				// instead. Compose over the canonical base palette only when the fade has
+				// settled (or is in that fade-in tail). Reading the full base at phase 15 of a
+				// fade-OUT was what flashed the world bright for one frame when leaving a match.
+				// The falling-edge (fadeJustFinished) reapply also covers the clock race where
+				// a slow map load skips the fade window entirely (phase -> 16).
+				const bool fadingOutNow = state == FADEOUT;
 				SDL_Color * colors = renderer.palette.GetColors();
-				if(gameRenderer.FadePhaseRef() <= 15){
+				if(fading && (fadingOutNow || fadephase < 15)){
 					colors = renderer.palette.GetTempPalette();
 				}
 				SDL_Color * ambiencepalette = renderer.palette.CopyWithBrightness(colors, newambiencelevel, 2, 114);
@@ -186,6 +327,7 @@ bool Game::Loop(void){
 				renderer.palette.CalculateLighted(newambiencelevel);
 				gameSession.AmbienceMixerRef().oldambiencelevel = newambiencelevel;
 			}
+			ambienceFadeWasActive = fading;
 		}
 		lasttick += wait;
 	}
@@ -204,14 +346,14 @@ bool Game::Loop(void){
 			// gameplay; native-sized CPU frames are too expensive fullscreen.
 			ResizeRenderSurfacePixels(kLegacyRenderWidth, kLegacyRenderHeight);
 			GetScreenBuffer().Clear(0);
-			renderer.Draw(&GetScreenBuffer(), ft);
+			{ PERF_SCOPE("world.draw"); renderer.Draw(&GetScreenBuffer(), ft); }
 			gameUiPipeline.DrawInGameWorldInsets(GetScreenBuffer(), ft);
 		}else{
 			if(gameRenderer.GetWindow()) SyncRenderSurfaceToWindowPixels();
 			GetScreenBuffer().Clear(0);
-			renderer.Draw(&GetScreenBuffer(), ft);
+			{ PERF_SCOPE("world.draw"); renderer.Draw(&GetScreenBuffer(), ft); }
 		}
-		gameUiPipeline.RenderClientUiFrame(GetScreenBuffer(), ft);
+		{ PERF_SCOPE("ui"); gameUiPipeline.RenderClientUiFrame(GetScreenBuffer(), ft); }
 #ifdef POSIX
 		if(world.replay.IsPlaying() && world.replay.ffmpeg && world.replay.ffmpegvideo && gameSession.DeployMessageShownRef()){
 			std::vector<Uint8> buffer(GetScreenBuffer().w * GetScreenBuffer().h * 3);
@@ -232,11 +374,11 @@ bool Game::Loop(void){
 		sprintf(fpstext, "%d", fps);
 		renderer.DrawText(&screenbuffer, 10, 30, fpstext, 133, 7);*/
 		if(minimized){
-			SDL_Delay(wait);
+			PERF_SCOPE("idle.throttle"); SDL_Delay(wait);
 		}
 		world.DoNetwork();
 		//Uint32 drawtick = SDL_GetTicks();
-		if(!headless || tui) Present();
+		if(!headless || tui){ PERF_SCOPE("present"); Present(); }
 		// In TUI mode, the frontend owning our render output may disconnect
 		// (terminal closed, host process killed). TUIBackend tears the socket
 		// down on any write failure; we observe that here and exit cleanly
@@ -244,7 +386,6 @@ bool Game::Loop(void){
 		if(tui && gameRenderer.GetRenderDevice() && !gameRenderer.GetRenderDevice()->IsAlive()){
 			quitRequested = true;
 		}
-		gameUiPipeline.ResetUiFrameDeltas();
 		// SDL3GPUBackend's swapchain Present blocks on vsync (~16 ms) so the
 		// non-TUI loop self-throttles. TUIBackend writes to a TCP socket that
 		// never blocks the engine, so without an explicit cap the loop runs
@@ -253,6 +394,7 @@ bool Game::Loop(void){
 		// cadence) and well below "burn a CPU core for no reason".
 		if(tui) SDL_Delay(33);
 		PostFrameReplies();
+		perf::FrameMark();
 		//Uint32 afterdrawtick = SDL_GetTicks();
 		/*if(1 || afterdrawtick - drawtick > wait){
 			printf("frame took %d ms to present\n", afterdrawtick - drawtick);
@@ -265,11 +407,6 @@ bool Game::Loop(void){
 }
 
 bool Game::Tick(void){
-	gameUiPipeline.ClientUiRef().ClearScreensIfRequested(screenContext);
-	if(state != FADEOUT){
-		gameUiPipeline.ClientUiRef().TickVisibleScreens(screenContext);
-	}
-	gameUiPipeline.InGameUi().UpdateOverlayState(world.peers.localpeerid);
 	if(!world.dedicatedserver.active){
 		if(world.lobby.state == Lobby::AUTHENTICATED){
 			// 0 = main lobby, 1 = pregame (game-specific lobby, waiting for
@@ -303,9 +440,9 @@ bool Game::Tick(void){
 			}
 		}
 		if(world.gameplaystate == World::INLOBBY){
+			// Dedicated server pumps map transfers each frame; the client-side
+			// ready-button refresh is the cppx lobby screen's concern (SIL-20).
 			gameSession.MapDownloaderRef().ProcessMapDownload();
-			// Ready-button text refresh ("Waiting..." vs "Ready") happens
-			// in GameJoinPanelTick — runs each frame from LobbyScreen::Tick.
 		}
 		/*Peer * localpeer = world.peers.peerlist[world.peers.localpeerid];
 		if(localpeer){
@@ -369,6 +506,12 @@ bool Game::Tick(void){
 		}
 	}
 	
+	// SIL-14: the per-state blocks below keep their world side-effects and menu
+	// ambience, but no longer mount screens — the golden cppx AppRoot maps the
+	// session phase (projected from `state`) onto the owning screen. `game.cpp`
+	// names no screen. `stateisnew` stays: it is the game's state-entry latch,
+	// consumed by the gameplay tick handlers (TickInGame/HostGame/...), not a
+	// UI concern.
 	switch(state){
 		case FADEOUT: TickFadeOut(); break;
 		case MAINMENU:{
@@ -379,14 +522,11 @@ bool Game::Tick(void){
 				gameSession.UnloadGame();
 				world.GetAuthorityPeer()->controlledlist.clear();
 				world.DestroyAllObjects();
-				PushScreen(std::make_unique<MainMenuScreen>());
 				stateisnew = false;
 			}else{
 				if(gameSession.AmbienceMixerRef().FadedIn()){
 					gameSession.AmbienceMixerRef().PlayMusic(world.resources.menumusic);
 				}
-				// Button-click handling lives in MainMenuScreen::Tick, dispatched
-				// by ClientUi's navigation stack at the top of Game::Tick.
 			}
 		}break;
 		case LOBBYCONNECT:{
@@ -395,11 +535,15 @@ bool Game::Tick(void){
 				world.DestroyAllObjects();
 				world.lobby.ClearGames();
 				world.lobby.state = Lobby::WAITING;
-				PushScreen(std::make_unique<LobbyConnectScreen>());
+				lobbyConnectFlow.Reset();
 				stateisnew = false;
 			}else{
 				if(gameSession.AmbienceMixerRef().FadedIn()){
 					gameSession.AmbienceMixerRef().PlayMusic(world.resources.menumusic);
+					// Drive the connect FSM once the menu fade settles (mirrors the
+					// legacy gate); routing flips the game state, which the cppx
+					// session-phase reconciler turns into the destination screen.
+					lobbyConnectFlow.Advance(*this, updater);
 				}
 			}
 		}break;
@@ -411,36 +555,85 @@ bool Game::Tick(void){
 				world.Disconnect();
 				world.choosingtech = false;
 				world.lobby.channelchanged = true;
-#ifdef SILENCER_HAVE_LOBBY_UI
-				PushScreen(std::make_unique<LobbyScreen>());
-#endif
+				lobbyChatLog.clear();
 				stateisnew = false;
 			}else{
 				if(gameSession.AmbienceMixerRef().FadedIn()){
 					gameSession.AmbienceMixerRef().PlayMusic(world.resources.menumusic);
 				}
-				// Lobby pump (state-machine + deferred-create) lives in
-				// LobbyScreen::Tick, dispatched by ClientUi's navigation stack
-				// at the top of Game::Tick.
+				// Drain the lobby chat queue into the scrollback the cppx
+				// ChatPanel reads (the queue would otherwise grow unboundedly).
+				// Each message is [text\0][color][brightness]; we keep the text.
+				world.lobby.LockMutex();
+				while(!world.lobby.chatmessages.empty()){
+					const std::vector<char> & msg = world.lobby.chatmessages.front();
+					lobbyChatLog.push_back(std::string(msg.data()));
+					world.lobby.chatmessages.pop_front();
+				}
+				world.lobby.UnlockMutex();
+				if(lobbyChatLog.size() > 256)
+					lobbyChatLog.erase(lobbyChatLog.begin(), lobbyChatLog.begin() + (lobbyChatLog.size() - 256));
+
+				// SIL-21 (3/n) game-join pump (sibling of the chat drain). Drives a
+				// created/joined game from the LOBBY tick; the match-start transition
+				// (shared-state -> INGAME) stays in Game::Tick.
+				gameSession.MapDownloaderRef().ProcessMapDownload();
+				// Our own create succeeded -> seed world info + auto-join the spawned
+				// game (the cppx GameCreatePanel set creategameclicked).
+				if(world.lobby.creategamestatus == 1 && creategameclicked){
+					world.lobby.creategamestatus = 0;
+					creategameclicked = false;
+					world.lobby.LockMutex();
+					LobbyGame * lg = world.lobby.GetGameById(world.lobby.createdgameid);
+					world.lobby.UnlockMutex();
+					if(lg){
+						world.SeedGameInfo(*lg);
+						currentlobbygameid = lg->id;
+						gameSession.MapDownloaderRef().LoadMapData(gameSession.MapDownloaderRef().FindMap(lg->mapname, &lg->maphash).c_str());
+						JoinGame(*lg, lg->password[0] ? lg->password : nullptr);
+					}
+				}
+				// Join settle / fail: clear the in-flight flag once the connect
+				// resolves (connected -> staging; idle -> stayed in the browser).
+				// On connect origin applies the per-agency DEFAULT TECH LOADOUT
+				// (lobby_controller.cpp: SetTech(defaulttechchoices[agency]),
+				// Laser+Rocket out of the box).
+				if(joininggame && (world.IsConnected() || world.IsIdle())){
+					if(world.IsConnected()){
+						const Uint8 agency = world.lobby.GetSelectedAgencyOrDefault(
+							Config::GetInstance().defaultagency);
+						world.SetTech(Config::GetInstance().defaulttechchoices[agency]);
+					}
+					joininggame = false;
+				}
 			}
 		}break;
 		case CREATECHARACTER:{
 			if(stateisnew){
 				world.GetAuthorityPeer()->controlledlist.clear();
 				world.DestroyAllObjects();
-				PushScreen(std::make_unique<CharacterCreateScreen>());
+				world.lobby.LockMutex();
+				charCreateCountOnEntry = world.lobby.characters.size();
+				world.lobby.UnlockMutex();
 				stateisnew = false;
 			}else{
 				if(gameSession.AmbienceMixerRef().FadedIn()){
 					gameSession.AmbienceMixerRef().PlayMusic(world.resources.menumusic);
 				}
+				// Route to the lobby once a newly created character has
+				// round-tripped (the cppx wizard fires use_characters.create;
+				// select routes itself via GoToState).
+				world.lobby.LockMutex();
+				bool created = world.lobby.charactersreceived
+					&& world.lobby.characters.size() > charCreateCountOnEntry;
+				world.lobby.UnlockMutex();
+				if(created) GoToState(LOBBY);
 			}
 		}break;
 		case UPDATING:{
 			if(stateisnew){
 				world.GetAuthorityPeer()->controlledlist.clear();
 				world.DestroyAllObjects();
-				PushScreen(std::make_unique<UpdateScreen>());
 				stateisnew = false;
 			}else{
 				if(gameSession.AmbienceMixerRef().FadedIn()){
@@ -453,7 +646,6 @@ bool Game::Tick(void){
 			if(stateisnew){
 				gameSession.UnloadGame();
 				world.Disconnect();
-				PushScreen(std::make_unique<MissionSummaryScreen>());
 				stateisnew = false;
 			}else{
 				if(gameSession.AmbienceMixerRef().FadedIn()){
@@ -465,28 +657,24 @@ bool Game::Tick(void){
 		case OPTIONS:{
 			if(stateisnew){
 				world.DestroyAllObjects();
-				PushScreen(std::make_unique<OptionsScreen>());
 				stateisnew = false;
 			}
 		}break;
 		case OPTIONSCONTROLS:{
 			if(stateisnew){
 				world.DestroyAllObjects();
-				PushScreen(std::make_unique<OptionsControlsScreen>());
 				stateisnew = false;
 			}
 		}break;
 		case OPTIONSDISPLAY:{
 			if(stateisnew){
 				world.DestroyAllObjects();
-				PushScreen(std::make_unique<OptionsDisplayScreen>());
 				stateisnew = false;
 			}
 		}break;
 		case OPTIONSAUDIO:{
 			if(stateisnew){
 				world.DestroyAllObjects();
-				PushScreen(std::make_unique<OptionsAudioScreen>());
 				stateisnew = false;
 			}
 		}break;
@@ -496,7 +684,10 @@ bool Game::Tick(void){
 		case REPLAYGAME: TickReplayGame(); break;
 	}
 	if(gameRenderer.FadePhaseRef() < 16 && state != FADEOUT){
-		gameRenderer.ApplyPaletteFade(false);
+		// Honor the fade direction: a Tier-1 overlay transition runs an Out leg
+		// (dim to black) then an In leg, same as a state FADEOUT. TickFadeOut owns
+		// the dimming while state == FADEOUT.
+		gameRenderer.ApplyPaletteFade(gameRenderer.GetFadeDir() == GameRenderer::FadeDir::Out);
 	}
 	if(!nextstateprocessed){
 		nextstateprocessed = true;
@@ -507,9 +698,13 @@ bool Game::Tick(void){
 
 
 void Game::GoToState(Uint8 newstate){
+	// Remember the state we're leaving so the session-phase projection keeps the
+	// outgoing screen mounted through the fade. Guard against a re-entrant
+	// GoToState (already mid-FADEOUT) clobbering the real source with FADEOUT.
+	if(state != FADEOUT) fadefromstate = state;
 	nextstate = newstate;
 	state = FADEOUT;
-	gameRenderer.RestartPaletteFade();
+	gameRenderer.RestartPaletteFade(GameRenderer::FadeDir::Out);
 	stateisnew = true;
 	nextstateprocessed = false;
 	// Keep the outgoing Clay screen mounted until TickFadeOut reaches black.
@@ -518,10 +713,15 @@ void Game::GoToState(Uint8 newstate){
 }
 
 bool Game::GoBack(void){
-	Screen * top = GetTopScreen();
-	if(top && top->HandleBack(screenContext)) return true;
-	GoToState(MAINMENU);
-	return false;
+	// The `back` control op (and a controller "back") inject the SAME cancel edge
+	// the keyboard ESC / control `escape` path sets; the one UI-layer cancel
+	// router (ClientUi::end_layout, driven by each screen's use_cancel) owns the
+	// navigation policy. game.cpp holds no back/cancel policy — it only plumbs
+	// the edge.
+	::ui::UiInputFrame & ui = gameUiPipeline.UiInput();
+	ui.cancel_pressed = true;
+	ui.cancel_down = true;
+	return true;
 }
 
 const char* Game::StateName(Uint8 s){
@@ -564,6 +764,8 @@ WorldSummary Game::GetWorldSummary(){
 	summary.messageType = static_cast<int>(world.GetMessageType());
 	summary.messageTime = static_cast<int>(world.GetMessageTime());
 	summary.topMessageText = world.GetTopMessageText();
+	summary.missionOver = world.missionover;
+	summary.showTeamColors = world.IsShowingTeamColors();
 	summary.topMessageProgress = static_cast<int>(world.GetTopMessageProgress());
 	for(unsigned int i = 0; i < world.maxpeers; i++){
 		Peer * p = world.peers.peerlist[i];

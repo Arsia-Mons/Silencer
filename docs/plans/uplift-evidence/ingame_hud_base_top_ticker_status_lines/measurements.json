@@ -1,0 +1,125 @@
+{
+  "hashes": {
+    "hud_current": "ce603fe9e5423ef0b19082265625d53726c070c35254f7d556ac0a53e9418fe0",
+    "hud_golden": "73541410c73e31632115437b1483c3a28edb0d1d58d3629eb3431452e1bf8dce",
+    "status_current": "c73df2de863320bdb4a58c32e0d8c755a82fa3b6f92f5644dcf00d06068c64e0",
+    "status_golden": "625f078cd426580a3d0183f5be70c2f745ce012d9c9f4f0a43aec68506c23ded",
+    "ticker_current": "070173790c78851cd65bf2ec992e616e81d0373c98f842ce83bb7dd8c53ec708",
+    "ticker_golden": "fa1671360a2daa0f7584f5d68c2971d07d763b6faaae4397c9af4b4c6095e448"
+  },
+  "hud_base_current_vs_golden": {
+    "full_frame": {
+      "bbox": [
+        0,
+        0,
+        634,
+        468
+      ],
+      "box": null,
+      "changed_px": 1671
+    },
+    "lower_left_ammo_weapon": {
+      "bbox": null,
+      "box": [
+        0,
+        400,
+        180,
+        480
+      ],
+      "changed_px": 0
+    },
+    "lower_right_files_credits": {
+      "bbox": null,
+      "box": [
+        450,
+        400,
+        640,
+        480
+      ],
+      "changed_px": 0
+    },
+    "top_right_inventory": {
+      "bbox": null,
+      "box": [
+        520,
+        0,
+        640,
+        80
+      ],
+      "changed_px": 0
+    }
+  },
+  "image_size": [
+    640,
+    480
+  ],
+  "status_lines_current_vs_golden": {
+    "full_frame": {
+      "bbox": [
+        241,
+        143,
+        640,
+        465
+      ],
+      "box": null,
+      "changed_px": 471
+    },
+    "status_crop": {
+      "bbox": null,
+      "box": [
+        190,
+        340,
+        470,
+        390
+      ],
+      "changed_px": 0
+    },
+    "ticker_control_crop": {
+      "bbox": null,
+      "box": [
+        190,
+        0,
+        470,
+        35
+      ],
+      "changed_px": 0
+    }
+  },
+  "top_ticker_current_vs_golden": {
+    "full_frame": {
+      "bbox": [
+        5,
+        3,
+        630,
+        465
+      ],
+      "box": null,
+      "changed_px": 1659
+    },
+    "status_stack_control_crop": {
+      "bbox": null,
+      "box": [
+        190,
+        340,
+        470,
+        390
+      ],
+      "changed_px": 0
+    },
+    "ticker_crop": {
+      "bbox": [
+        98,
+        3,
+        254,
+        35
+      ],
+      "box": [
+        190,
+        0,
+        470,
+        35
+      ],
+      "changed_px": 62
+    }
+  }
+}

@@ -1,0 +1,1693 @@
+#include "client/ui/screens/lobby/components/lobby_components.h"
+
+#include "client/ui/components/actions/actions.h"
+#include "client/ui/components/layout/layout.h"
+#include "client/ui/components/layout/lobby_panes.h"
+#include "client/ui/components/layout/pen_grid.h"
+#include "client/ui/components/surfaces/surfaces.h"
+#include "client/ui/components/text/text.h"
+#include "client/ui/hooks/use_games.h"
+#include "client/ui/hooks/use_chrome.h"
+#include "client/ui/hooks/use_staging.h"
+#include "ui/components/box.h"
+#include "ui/components/input.h"
+#include "ui/components/scroll_view.h"
+#include "ui/components/text.h"
+#include "ui/runtime/react.h"
+
+#include <algorithm>
+#include <cmath>
+#include <functional>
+#include <string>
+
+namespace client::ui {
+namespace {
+
+using namespace silencer;
+using ::ui::children;
+using ::ui::components::Box;
+using ::ui::components::BoxProps;
+using ::ui::components::Input;
+using ::ui::components::InputProps;
+using ::ui::components::ScrollView;
+using ::ui::components::ScrollViewProps;
+using ::ui::components::Text;
+using ::ui::components::TextProps;
+
+constexpr size_t kLobbyChatMaxChars = 200;
+constexpr float kGameOptionRowH = 25.5f;
+constexpr int kGameOptionRowCount = 6;
+
+std::string cap_lobby_chat_text(const std::string &value) {
+  if (value.size() <= kLobbyChatMaxChars)
+    return value;
+  return value.substr(0, kLobbyChatMaxChars);
+}
+
+
+// One AgentCard stat row (WINS/LOSSES/XP): a fixed-width Body label column with
+// the value aligned after it, origin's StatRow convention (Body face, not tiny).
+::ui::UiElement stat_kv(const char *key, const char *label, const char *value) {
+  return <Box
+    key={key}
+    layout={::ui::LayoutStyle{
+      .direction = ::ui::FlexDirection::Row,
+      .align_items = ::ui::AlignItems::Center,
+      .height = ::ui::Length::points(tokens::kLineBody),
+      .gap = 12.0f}}
+  >
+    <Box
+      key="lc"
+      layout={::ui::LayoutStyle{
+        .width = ::ui::Length::points(60.0f),
+        .flex_shrink = ::ui::StyleFloat::points(0.0f)}}
+    >
+      <BodyText key="l" variant={BodyTextVariant::Body} value={label} />
+    </Box>
+    <BodyText key="v" variant={BodyTextVariant::Body} value={value} />
+  </Box>
+}
+
+
+// Selected-row styling shared by the Active-Games + Select-Map lists: origin
+// draws the selection as a single SOLID legacy-palette-180 fill bar (renderer
+// SELECTBOX), no caret/border/focus ring. Defined later; forward-declared here
+// so the game-browser rows above can use the same treatment.
+::ui::StyleStatePatch selectable_row_style(bool selected);
+
+
+// One game-browser entry as its own row: origin ScrollList draws the filename at
+// the same Body weight on every row; the selected row is the solid 180 highlight
+// bar (NOT a "> " caret). Mirrors map_list_rows' row treatment (height = origin
+// kListLineH 14 v -> 21 logical, text inset 6 logical).
+::ui::UiElement game_row(const char *key, const char *id, int offset,
+                         const char *value, bool selected,
+                         std::function<void()> on_select) {
+  std::function<void(const ::ui::ActivationEvent &)> activate =
+      [on_select](const ::ui::ActivationEvent &) {
+        if (on_select)
+          on_select();
+      };
+  std::function<void(const ::ui::FocusEvent &)> focus =
+      [on_select](const ::ui::FocusEvent &) {
+        if (on_select)
+          on_select();
+      };
+  return Box(BoxProps{
+      .key = key,
+      .id = id,
+      .id_offset = offset,
+      .focusable = true,
+      .accessibility = {.label = value},
+      .on_focus = focus,
+      .on_activate = activate,
+      .layout = ::ui::LayoutStyle{.height = ::ui::Length::points(21.0f),
+                                  .flex_shrink = ::ui::StyleFloat::points(0.0f),
+                                  .padding = {6.0f, 0.0f, 2.0f, 0.0f}},
+      .style = selectable_row_style(selected),
+      .children = ::ui::children({BodyText(BodyTextProps{
+          .key = "t", .variant = BodyTextVariant::Body, .value = value})})});
+}
+
+
+// The right tall column (origin rightTallW; 463 logical at the design canvas,
+// right edge on the root pad). tall_w resolved ONCE in LobbyScreenView and
+// passed down (same shape as lobby_chat_layout(chat_w) — layout helpers take
+// values, never call hooks).
+::ui::LayoutStyle lobby_right_cell_layout(float tall_w) {
+  ::ui::LayoutStyle l = {
+      .direction = ::ui::FlexDirection::Column,
+      .align_items = ::ui::AlignItems::Stretch,
+      .width = ::ui::Length::points(tall_w),
+      .min_height = ::ui::Length::points(0.0f),
+      .padding = {8.0f, 8.0f, 6.0f, 6.0f},
+      .gap = 4.0f};
+  l.flex_shrink = ::ui::StyleFloat::points(0.0f);
+  return l;
+}
+
+// The chat panel (origin chatW = topRowW - regionGap; 757 logical at the
+// design canvas), full height of the lower row (the seam fills the rest).
+::ui::LayoutStyle lobby_chat_layout(float chat_w) {
+  ::ui::LayoutStyle l = {
+      .direction = ::ui::FlexDirection::Column,
+      .align_items = ::ui::AlignItems::Stretch,
+      .width = ::ui::Length::points(chat_w),
+      .min_height = ::ui::Length::points(0.0f),
+      .padding = {10.0f, 10.0f, 8.0f, 7.0f},
+      .gap = 0.0f};
+  l.flex_shrink = ::ui::StyleFloat::points(0.0f);
+  return l;
+}
+
+
+// origin/main lobby panels are connected green hairline frames (vector strokes
+// at palette idx216, not sprites) over a transparent interior so the Mars
+// backdrop reads through.
+inline ::ui::StylePatch lobby_panel_style() {
+  return tokens::frame_patch(tokens::kChromeStroke);
+}
+
+// origin LobbyRightUpperBox: chrome on top/bottom/left, open right edge (it
+// reads as one connected region with the right tall panel).
+inline ::ui::StylePatch lobby_panel_open_right() {
+  return tokens::frame_patch_sides(tokens::kChromeStroke, true, false, true, true);
+}
+
+// origin LobbyRightTallBox: chrome on top/bottom/right, open left edge.
+inline ::ui::StylePatch lobby_panel_open_left() {
+  return tokens::frame_patch_sides(tokens::kChromeStroke, true, true, true, false);
+}
+
+
+// One "ENDURANCE:    0" loadout stat line (origin UpgradeRow): label in a
+// growing left cell, value right-aligned in a fixed 18-virtual (27 logical)
+// column; row 12 virtual (18) tall, gap 6 virtual (9).
+::ui::UiElement loadout_row(const char *key, const char *label, uint8_t value) {
+  const char *val = ::ui::copy_string(std::to_string((unsigned)value).c_str());
+  return <Box
+    key={key}
+    layout={::ui::LayoutStyle{
+      .direction = ::ui::FlexDirection::Row,
+      .align_items = ::ui::AlignItems::Start,
+      .width = ::ui::Length::percent(100.0f),
+      .height = ::ui::Length::points(18.0f),
+      .flex_shrink = ::ui::StyleFloat::points(0.0f),
+      .gap = 9.0f}}
+  >
+    <Box
+      key="lc"
+      layout={::ui::LayoutStyle{
+        .min_width = ::ui::Length::points(0.0f),
+        .flex_basis = ::ui::Length::points(0.0f),
+        .flex_grow = ::ui::StyleFloat::points(1.0f)}}
+    >
+      <BodyText key="l" variant={BodyTextVariant::Body} value={label} />
+    </Box>
+    <Box
+      key="vc"
+      layout={::ui::LayoutStyle{
+        .direction = ::ui::FlexDirection::Row,
+        .justify_content = ::ui::JustifyContent::End,
+        .width = ::ui::Length::points(27.0f),
+        .flex_shrink = ::ui::StyleFloat::points(0.0f)}}
+    >
+      <BodyText key="v" variant={BodyTextVariant::Body} value={val} />
+    </Box>
+  </Box>
+}
+
+
+// --- right-column panels (screen-local swap) ---------------------------------
+
+// The default center region (origin/main): a "Create Game" button floating at the
+// top over the backdrop. The "In Lobby" presence lives in the shared Lobby panel
+// (so it shows in create/staging modes too), not here.
+
+
+// The Active-Games browser body — chromeless (the panel chrome + "Active Games"
+// title live on the dedicated right cockpit cell). A flex spacer pushes the
+// browse/join actions to the bottom so the list reads sparse like the reference.
+
+// origin layout knobs (game_select_panel_layout.cpp), virtual px x1.5 -> logical.
+constexpr float kTallInfoRowH = 12.0f * 1.5f;   // 18: fixed info-row slot height
+constexpr float kTallButtonRowH = 21.0f * 1.5f; // 31.5: fixed button-slot height
+constexpr float kTallButtonGap = 2.0f * 1.5f;   // 3
+constexpr float kTallFooterGap = 4.0f * 1.5f;   // 6
+constexpr float kTallFooterPadTop = 4.0f * 1.5f;// 6
+constexpr float kTallInfoPadLeft = 7.0f * 1.5f; // 10.5
+// footerH reserved below the list box: padTop 6 + 5*18 + gap 6 + 31.5 + 3 + 31.5.
+constexpr float kGameSelectFooterH = kTallFooterPadTop + 5.0f * kTallInfoRowH +
+                                     kTallFooterGap + kTallButtonRowH +
+                                     kTallButtonGap + kTallButtonRowH;
+
+// One info-block line (origin BuildGameSelectInfoBlock: a FIXED-height Body row,
+// blank when the field is empty so the block never reflows).
+::ui::UiElement info_line(const char *key, const char *value) {
+  return <Box
+    key={key}
+    layout={::ui::LayoutStyle{
+      .height = ::ui::Length::points(kTallInfoRowH),
+      .flex_shrink = ::ui::StyleFloat::points(0.0f)}}
+  >
+    <BodyText key="t" variant={BodyTextVariant::Body} value={value} />
+  </Box>
+}
+
+
+// One always-reserved button slot (origin GSelBtn*Wrap): a fixed-height row that
+// centers its button; the button is rendered only when its action is available
+// (an unavailable action shows an EMPTY slot, never a greyed button) — so the
+// footer height is stable and the reserved empty Spectate slot is the gap above
+// Join Game for a waiting game.
+::ui::UiElement action_slot(const char *key, ::ui::UiElement button) {
+  return <Box
+    key={key}
+    layout={::ui::LayoutStyle{
+      .direction = ::ui::FlexDirection::Row,
+      .align_items = ::ui::AlignItems::Center,
+      .justify_content = ::ui::JustifyContent::Center,
+      .width = ::ui::Length::percent(100.0f),
+      .height = ::ui::Length::points(kTallButtonRowH),
+      .flex_shrink = ::ui::StyleFloat::points(0.0f)}}
+  >
+    {button}
+  </Box>
+}
+
+
+// The Active-Games FOOTER (origin GSelFooter): the 5-field info block over the
+// two reserved button slots (Spectate top, Join Game bottom). Sits BELOW the
+// bordered list box, not inside it. Fixed total height (kGameSelectFooterH).
+
+// The Active-Games LIST: just the scrolling game rows (origin ScrollList). Lives
+// INSIDE the bordered list box; the footer (info + buttons) is a sibling BELOW
+// the box (GameBrowserFooter), never inside this well.
+
+// SIL-234: the right-column "Connecting" hold. While a create/join is in flight
+// (clicked, not yet connected), the right column shows this stable panel instead
+// of flashing the games browser between the create form and staging — origin
+// masks the same window with a "Creating game..." progress modal. Top region.
+
+// SIL-234: the tall-cell counterpart of ConnectingPanel — keeps the right
+// cockpit cell occupied (same chrome as ActiveGamesCell) so the column reads as
+// one stable connecting state through the join window. Shares the "rightcell"
+// key so the slot reconciles in place when staging mounts.
+
+// The lobby's right cockpit column: the Active Games browser, or (while creating
+// a game) the Select Map filename list (CreateRightCell). Both share the key
+// "rightcell" so the slot reconciles in place when the mode swaps.
+
+// Game-Options row. origin renders cycle values (Security/Spectatable) as
+// BodySm text buttons centered in the row, and numeric values as inline
+// TextInputs whose Body pen sits 3 virtual px under the row top — so the
+// numeric value column is top-anchored at +4.5 logical, not centered.
+
+int parse_u8_option(const std::string &value, int fallback, int lo, int hi) {
+  if (value.empty())
+    return fallback;
+  int next = 0;
+  for (char c : value) {
+    if (c < '0' || c > '9')
+      return fallback;
+    next = next * 10 + (c - '0');
+    if (next > hi)
+      return hi;
+  }
+  if (next < lo)
+    return lo;
+  return next;
+}
+
+
+
+::ui::StyleStatePatch game_option_row_style() {
+  ::ui::StylePatch p = tokens::chromeless_clear_patch();
+  ::ui::StyleStatePatch s{};
+  s.base = p;
+  s.hover = p;
+  s.pressed = p;
+  s.focus_visible = p;
+  return s;
+}
+
+
+::ui::UiElement option_label(const char *key, const char *label) {
+  // The label column is sized to the WIDEST option label ("Max Players:" /
+  // "Spectatable:" measure 108pt in the body face), so every value starts at the
+  // same x — a left-aligned value column hugging the labels — instead of a fat
+  // fixed box that strands empty space between label and value. Flex can't
+  // auto-size a column across independent rows, so this is the measured longest
+  // label, not a flex_grow (which would shove values to the panel edge).
+  constexpr float kLabelColW = 108.0f;
+  return <Box
+    key={key}
+    layout={::ui::LayoutStyle{
+      .width = ::ui::Length::points(kLabelColW),
+      .flex_shrink = ::ui::StyleFloat::points(0.0f)}}
+  >
+    <BodyText key="l" variant={BodyTextVariant::Body} value={label} />
+  </Box>
+}
+
+
+::ui::UiElement option_value_text(const char *key, const char *value,
+                                  bool cycle) {
+  return <Box
+    key={key}
+    layout={::ui::LayoutStyle{
+      .width = ::ui::Length::points(96.0f),
+      .height = ::ui::Length::points(21.0f),
+      .flex_shrink = ::ui::StyleFloat::points(0.0f),
+      .padding = cycle ? ::ui::EdgeSizes{} : ::ui::EdgeSizes{0.0f, 0.0f, 5.5f, 0.0f}}}
+  >
+    <Text
+      key="v"
+      value={value}
+      layout={{.height = ::ui::Length::points(tokens::kLineBody)}}
+      style={tokens::text_patch(tokens::kTextBody, tokens::kFontBodyEm, cycle ? tokens::kFaceBodySm : tokens::kFaceBody, tokens::kLineBody)}
+    />
+  </Box>
+}
+
+
+::ui::UiElement option_cycle_row(const char *key, const char *id,
+                                 const char *label, const char *value,
+                                 std::function<void()> on_press) {
+  std::function<void(const ::ui::ActivationEvent &)> activate =
+      [on_press](const ::ui::ActivationEvent &) {
+        if (on_press)
+          on_press();
+      };
+  return <Box
+    key={key}
+    id={id}
+    focusable={true}
+    accessibility={{.label = id}}
+    onActivate={activate}
+    layout={::ui::LayoutStyle{
+      .direction = ::ui::FlexDirection::Row,
+      .align_items = ::ui::AlignItems::Center,
+      .width = ::ui::Length::percent(100.0f),
+      .height = ::ui::Length::points(kGameOptionRowH),
+      .flex_shrink = ::ui::StyleFloat::points(0.0f),
+      .padding = {0.0f, 0.0f, 0.0f, 0.0f},
+      .gap = 9.0f}}
+    style={game_option_row_style()}
+  >
+    {option_label("lc", label)}
+    {option_value_text("vc", value, true)}
+  </Box>
+}
+
+
+::ui::UiElement option_input_row(const char *key, const char *id,
+                                 const char *label, uint8_t value,
+                                 std::function<void(const std::string &)> on_change) {
+  ::ui::LayoutStyle vc_layout{.width = ::ui::Length::points(96.0f),
+                              .height = ::ui::Length::points(21.0f),
+                              .flex_shrink = ::ui::StyleFloat::points(0.0f),
+                              .padding = {0.0f, 0.0f, 5.5f, 0.0f}};
+  const char *display = ::ui::copy_string(std::to_string((unsigned)value).c_str());
+  return <Box
+    key={key}
+    layout={::ui::LayoutStyle{
+      .direction = ::ui::FlexDirection::Row,
+      .align_items = ::ui::AlignItems::Center,
+      .width = ::ui::Length::percent(100.0f),
+      .height = ::ui::Length::points(kGameOptionRowH),
+      .flex_shrink = ::ui::StyleFloat::points(0.0f),
+      .gap = 9.0f}}
+    style={game_option_row_style()}
+  >
+    {option_label("lc", label)}
+    <Box key="vc" layout={vc_layout}>
+      <Input
+        key="input"
+        id={id}
+        accessibility={{.label = id}}
+        value={display}
+        onChange={on_change}
+        layout={::ui::LayoutStyle{
+          .align_items = ::ui::AlignItems::Start,
+          .justify_content = ::ui::JustifyContent::Start,
+          .width = ::ui::Length::points(96.0f),
+          .height = ::ui::Length::points(21.0f),
+          .padding = {0.0f, 0.0f, 0.0f, 0.0f}}}
+        style={tokens::chromeless_field_style(tokens::kChromeStroke, tokens::kTextBody)}
+      />
+    </Box>
+  </Box>
+}
+
+
+
+// origin/main "Game Options": a pill-notch title over a dense label:value table
+// backed by the CreateGameRequest fields. The Game name + Password + Create live
+// in the right Select-Map cell (CreateRightCell), matching golden.
+
+// The right cockpit cell while creating a game: the Select Map filename list,
+// then (pushed to the bottom by a spring) the Game name + Password fields and
+// the wide Create button — origin/main stacks the create form under the map list.
+
+
+// origin staging CENTER column: three stacked full-width chrome buttons spread
+// down the upper column (origin gives them generous vertical spacing).
+// pad-right 6.5: the chrome buttons' nine-slice bake needs one more virtual
+// column (golden right cap ends device x1178; 8 put it at 1176).
+
+// Tech-select CENTER column (origin BuildGameTechUpperTree): the full-width
+// Back To Teams chrome button.
+
+// Tech-select RIGHT cell (origin BuildGameTechTallTree + tech_tree_grid):
+// slots readout at (57,36) pad in LegacyPalette(129,144,ramp); checkbox lanes
+// at x 543+14c (local col 3 = 585), rows y 128+13k; the local label column at
+// x 601, rows y 130+13k — "name (N)" Body at brightness 128/64. Anchors are
+// virtual; anchored on kLobbyTallGrid (the cell's design origin).
+
+
+// --- top-level sections -------------------------------------------------------
+
+// The full-width header strip: brand + amber version + (staging) map name in
+// aligned slots, spring, Go Back.
+
+
+// The upper-left agent card: emblem rail + name + WINS/LOSSES/XP column +
+// loadout stat well + the Agents button.
+
+
+
+::ui::UiElement LobbyChatCompose(const LobbyChatComposeProps &props) {
+  std::string *compose = use_state<std::string>(std::string());
+  std::string *live = use_state<std::string>(std::string());
+  if (!compose || !live)
+    return ::ui::empty();
+  *live = *compose;
+
+  std::function<void(const std::string &)> on_change =
+      [compose, live](const std::string &value) {
+        std::string next = cap_lobby_chat_text(value);
+        *compose = next;
+        *live = next;
+      };
+  std::function<void(const ::ui::ActivationEvent &)> on_activate =
+      [compose, live, send = props.send](const ::ui::ActivationEvent &) {
+        std::string message = cap_lobby_chat_text(*live);
+        if (message.empty())
+          return;
+        if (send)
+          send(message);
+        compose->clear();
+        live->clear();
+      };
+  const ::ui::StyleStatePatch field_style =
+      tokens::chromeless_field_style(props.caret_color, tokens::kTextBody);
+
+  return <Input
+    key="field"
+    id="LobbyChat"
+    accessibility={{.label = "Chat"}}
+    onActivate={on_activate}
+    value={compose->c_str()}
+    onChange={on_change}
+    layout={::ui::LayoutStyle{
+      .align_items = ::ui::AlignItems::Center,
+      .justify_content = ::ui::JustifyContent::Start,
+      .width = ::ui::Length::percent(100.0f),
+      .height = ::ui::Length::percent(100.0f),
+      .padding = {6.0f, 0.0f, 0.0f, 0.0f}}}
+    style={field_style}
+  />
+}
+
+
+// The scrollable chat transcript. A flex-grown auto-measuring ScrollView fills
+// the chat well: it learns its own viewport height and the (variable-height,
+// word-wrapped) transcript's content height from the layout read-back, so it
+// scrolls ONLY when the transcript overflows — a short chat neither rubber-bands
+// nor shows a scrollbar. `stick_to_bottom` keeps the newest line pinned and
+// auto-follows new messages (until the user scrolls up into history). The
+// viewport is focusable so the wheel routes to it; the chromeless style
+// suppresses the builder-injected focus ring (which gates on `chromeless`).
+
+::ui::UiElement ChatLog(const ChatLogProps &props) {
+  ::ui::StylePatch st =
+      tokens::text_patch(tokens::kTextBodyMuted, tokens::kFontBodyEm,
+                         tokens::kFaceBody, tokens::kLineBody);
+  st.text.value.wrap = ::ui::TextWrap::Words;
+  ::ui::StyleStatePatch text_style{};
+  text_style.base = st;
+
+  ::ui::StyleStatePatch scroll_style{};
+  scroll_style.base = tokens::chromeless_clear_patch();
+  scroll_style.focus_visible = scroll_style.base;
+
+  return ::ui::component(
+      "ScrollView",
+      ScrollViewProps{
+          .key = props.key,
+          .id = "ChatLog",
+          .step = tokens::kLineBody,
+          .show_scrollbar = false,
+          .stick_to_bottom = true,
+          .layout = ::ui::LayoutStyle{
+              .align_items = ::ui::AlignItems::Start,
+              .min_width = ::ui::Length::points(0.0f)},
+          .style = scroll_style,
+          .children = ::ui::children({Text(TextProps{
+              .key = "log",
+              .value = props.scrollback,
+              .layout = {.width = ::ui::Length::percent(100.0f)},
+              .style = text_style})})},
+      ScrollView);
+}
+
+
+// The lower-left chat panel: channel title, log well + presence column, and the
+// lobby chat compose field.
+
+
+// Selected-row styling for the Select-Map list. origin draws the selected row
+// as a single solid filled rectangle (renderer.cpp SELECTBOX:
+// DrawFilledRectangle(..., 180)) — no border, no rounded corners, and no hover
+// or focus highlight (selecting is mouse-driven; the fill is the only feedback).
+// Matching that: selected = an opaque legacy-palette-180 bar, everything else
+// clear. No outline box (that was the SIL-233 regression).
+::ui::StyleStatePatch selectable_row_style(bool selected) {
+  // The map rows are focusable for keyboard nav, but origin shows no focus ring
+  // on the list — selection is the only feedback. Both states carry
+  // `chromeless` so the renderer's intrinsic focus-ring injection is suppressed
+  // (draw_command_builder gates it on !chromeless, for any focused node — mouse
+  // or keyboard). The selected row keeps its explicit fill (an explicit
+  // background always draws, even on a chromeless node).
+  const ::ui::StylePatch selected_fill =
+      ::ui::patch().chromeless(true).background(tokens::kRowSelectFill);
+  ::ui::StyleStatePatch s{};
+  s.base = selected ? selected_fill : tokens::chromeless_clear_patch();
+  return s;
+}
+
+
+// Select-Map filename rows (create-game mode), capped at what the cell shows
+// without scrolling (golden lists ~13). origin kMapListLineH = 14 virtual px
+// -> 21 logical row slots; rows inset text 4 virtual (6) with a 2 top bias so
+// the ink-centered pen lands on origin's cell (94+14k).
+
+// SIL-216 / SIL-231: the cursor-following map preview. origin's
+// BuildHoverPreviewOverlay (game_create_panel_map_form.cpp) stacks three
+// chromeless elements TOP_TO_BOTTOM — name (BodySm, no wrap) -> 172x62 minimap
+// -> word-wrapped description (BodySm) — directly on the lobby backdrop (NO
+// panel/border), pinned to the screen root at pointer + (-185,-30) and clamped
+// to the screen. All origin-virtual values are scaled x1.5 onto the cppx logical
+// canvas (the rest of the lobby uses the same factor). The name/desc render in
+// origin's dim grey LegacyPalette(129,160) ramp (== tokens::kTextTechSlots).
+// Returns empty when nothing is hovered or the texture isn't baked.
+
+// The stepped-pane cockpit grid (origin ResolveSteppedPaneLayout): left stack
+// (agent card + upper-right swap over the chat row) beside the right tall
+// cell, joined by the elbow/column hairline seams.
+
+// origin security label (game_select_panel): the u8 → text mapping shown in the
+// Game Options panel. Internal — only the create-options rows use it.
+const char *security_label(uint8_t security) {
+  switch (security) {
+  case 0:
+    return "None";
+  case 1:
+    return "Low";
+  case 2:
+    return "Medium";
+  case 3:
+    return "High";
+  default:
+    return "Medium";
+  }
+}
+
+} // namespace
+
+// --- components composed by LobbyScreenView (external linkage) ---
+
+::ui::UiElement CenterCol(const CenterColProps &props) {
+  // origin's RightUpperBox: the Create Game chrome button is the single
+  // full-width child at the top of the box (GSelBtnCreateWrap pad L4 T4
+  // virtual, button width = panel - 8 virtual -> stretch inside pad 6).
+  return <Box
+    key="centercol"
+    layout={::ui::LayoutStyle{
+      .direction = ::ui::FlexDirection::Column,
+      .align_items = ::ui::AlignItems::Stretch,
+      .justify_content = ::ui::JustifyContent::Start,
+      .min_width = ::ui::Length::points(0.0f),
+      .flex_basis = ::ui::Length::points(0.0f),
+      .flex_grow = ::ui::StyleFloat::points(1.0f),
+      .padding = {6.0f, 6.0f, 7.0f, 0.0f}}}
+    style={lobby_panel_open_right()}
+  >
+    <AppButton
+      key="creategame"
+      controlId="NewGame"
+      variant={AppButtonVariant::Chrome}
+      targetFeedback={true}
+      label="Create Game"
+      onPress={props.on_create}
+    />
+  </Box>
+}
+
+::ui::UiElement GameBrowserFooter(const GameBrowserProps &props) {
+  ::ui::UiElement spectate_btn =
+      props.spectate_visible
+          ? AppButton(AppButtonProps{.key = "spectate",
+                                     .control_id = "SpectateGame",
+                                     .variant = AppButtonVariant::Chrome,
+                                     .size = AppButtonSize::Sm,
+                                     .target_feedback = true,
+                                     .label = "Spectate",
+                                     .on_press = props.on_spectate})
+          : ::ui::empty();
+  ::ui::UiElement join_btn =
+      props.join_visible
+          ? AppButton(AppButtonProps{.key = "join",
+                                     .control_id = "JoinGame",
+                                     .variant = AppButtonVariant::Chrome,
+                                     .size = AppButtonSize::Sm,
+                                     .target_feedback = true,
+                                     .label = "Join Game",
+                                     .on_press = props.on_join})
+          : ::ui::empty();
+  return <Box
+    key="footer"
+    layout={::ui::LayoutStyle{
+      .direction = ::ui::FlexDirection::Column,
+      .align_items = ::ui::AlignItems::Stretch,
+      .width = ::ui::Length::percent(100.0f),
+      .height = ::ui::Length::points(kGameSelectFooterH),
+      .flex_shrink = ::ui::StyleFloat::points(0.0f),
+      .padding = {0.0f, 0.0f, kTallFooterPadTop, 0.0f},
+      .gap = kTallFooterGap}}
+  >
+    <Box
+      key="info"
+      layout={::ui::LayoutStyle{
+        .direction = ::ui::FlexDirection::Column,
+        .align_items = ::ui::AlignItems::Stretch,
+        .width = ::ui::Length::percent(100.0f),
+        .padding = {kTallInfoPadLeft, 0.0f, 0.0f, 0.0f}}}
+    >
+      {info_line("iname", props.info_name)}
+      {info_line("imap", props.info_map)}
+      {info_line("isec", props.info_security)}
+      {info_line("icreator", props.info_creator)}
+      {info_line("ilimits", props.info_limits)}
+    </Box>
+    <Box
+      key="buttons"
+      layout={::ui::LayoutStyle{
+        .direction = ::ui::FlexDirection::Column,
+        .align_items = ::ui::AlignItems::Stretch,
+        .width = ::ui::Length::percent(100.0f),
+        .gap = kTallButtonGap}}
+    >
+      {action_slot("spectateslot", spectate_btn)}
+      {action_slot("joinslot", join_btn)}
+    </Box>
+  </Box>
+}
+
+::ui::UiElement GameBrowser(const GameBrowserProps &props) {
+  std::vector<::ui::UiElement> rows;
+  for (int i = 0; i < (int)props.entries.size(); ++i) {
+    const bool on = i == props.selected;
+    const char *name = ::ui::copy_string(props.entries[i].name.c_str());
+    std::function<void()> select = [cb = props.on_select, i]() {
+      if (cb)
+        cb(i);
+    };
+    rows.push_back(game_row(::ui::copy_string(("gl" + std::to_string(i)).c_str()),
+                            "GameRow", i, name, on, select));
+  }
+  return <Box
+    key="browserbody"
+    layout={::ui::LayoutStyle{
+      .direction = ::ui::FlexDirection::Column,
+      .align_items = ::ui::AlignItems::Stretch,
+      .width = ::ui::Length::percent(100.0f),
+      .flex_grow = ::ui::StyleFloat::points(1.0f)}}
+  >
+    {::ui::children(rows)}
+  </Box>
+}
+
+::ui::UiElement ConnectingPanel() {
+  return <Box
+    key="centercol"
+    layout={::ui::LayoutStyle{
+      .direction = ::ui::FlexDirection::Column,
+      .align_items = ::ui::AlignItems::Center,
+      .justify_content = ::ui::JustifyContent::Center,
+      .min_width = ::ui::Length::points(0.0f),
+      .flex_basis = ::ui::Length::points(0.0f),
+      .flex_grow = ::ui::StyleFloat::points(1.0f),
+      .padding = {6.0f, 6.0f, 7.0f, 0.0f}}}
+    style={lobby_panel_open_right()}
+  >
+    <ScreenTitle key="connecting" variant={ScreenTitleVariant::Console} value="Connecting..." />
+  </Box>
+}
+
+::ui::UiElement ConnectingCell(float tall_w) {
+  ::ui::LayoutStyle cell = lobby_right_cell_layout(tall_w);
+  cell.direction = ::ui::FlexDirection::Column;
+  cell.align_items = ::ui::AlignItems::Center;
+  cell.justify_content = ::ui::JustifyContent::Center;
+  return <Box key="rightcell" layout={cell} style={lobby_panel_open_left()}>
+    <ScreenTitle key="connecting" variant={ScreenTitleVariant::Console} value="Please wait" />
+  </Box>
+}
+
+::ui::UiElement ActiveGamesCell(float tall_w, ::ui::UiElement browser,
+                                ::ui::UiElement footer) {
+  // origin BuildGameSelectTallTree (virtual x1.5): heading wrap pad L7/T6, then
+  // BuildGameSelectList (list wrap pad L9/T4 -> Inset bordered list BOX, fixed
+  // listBoxHeight, 1px border pad) holding ONLY the ScrollList, then GSelFooter
+  // (info block + the two reserved button slots) BELOW the list box. listBoxH =
+  // panelH - titleWrapH - listPadTop - footerH = 251 virtual -> 376.5 logical
+  // at the design panel; the footer (kGameSelectFooterH) is reserved by sitting
+  // outside the well, so the list box reads as a bordered fixed-height well with
+  // the info+buttons footer below it.
+  ::ui::LayoutStyle cell = lobby_right_cell_layout(tall_w);
+  cell.padding = {0.0f, 0.0f, 0.0f, 0.0f};
+  cell.gap = 0.0f;
+  return <Box key="rightcell" layout={cell} style={lobby_panel_open_left()}>
+    <Box key="hwrap" layout={::ui::LayoutStyle{.padding = {10.5f, 0.0f, 10.0f, 0.0f}}}>
+      <ScreenTitle key="h" variant={ScreenTitleVariant::Console} value="Active Games" />
+    </Box>
+    <Box key="listwrap" layout={::ui::LayoutStyle{.padding = {13.0f, 13.0f, 6.0f, 0.0f}}}>
+      <Box
+        key="well"
+        layout={::ui::LayoutStyle{
+          .overflow = ::ui::Overflow::Hidden,
+          .direction = ::ui::FlexDirection::Column,
+          .align_items = ::ui::AlignItems::Stretch,
+          .height = ::ui::Length::points(376.5f),
+          .padding = {1.5f, 1.5f, 1.5f, 1.5f}}}
+        style={tokens::frame_patch(tokens::kInsetStroke)}
+      >
+        {browser}
+      </Box>
+    </Box>
+    <Box key="footerwrap" layout={::ui::LayoutStyle{.padding = {13.0f, 13.0f, 0.0f, 0.0f}}}>
+      {footer}
+    </Box>
+  </Box>
+}
+
+std::function<void(const std::string &)> set_u8_text(uint8_t *slot, int lo,
+                                                     int hi) {
+  return [slot, lo, hi](const std::string &value) {
+    if (!slot)
+      return;
+    *slot = (uint8_t)parse_u8_option(value, *slot, lo, hi);
+  };
+}
+
+::ui::UiElement GameCreatePanel(const GameCreateOptionsProps &props) {
+  // origin BuildGameCreateUpperTree at the 214x120 upper box: content pad 6,
+  // gap 3, Heading title, Inset form border (pad 4/2, gap 2) holding a
+  // 5-visible-row viewport (rows h14 gap 3, value col 64 left-aligned) and
+  // the 8-wide scrollbar track with a 5/6 thumb at top. Virtual x1.5,
+  // authored on the pen grid (title 110, well 137, rows 139+25.5k).
+  // Well pad-bottom 3 (2 virtual, like the top's 2): the well height is
+  // content-driven (rows 129 + pads), and 4.5 pushed its bottom hairline a
+  // virtual row below origin's (golden device y405-407). Scrollbar track pad:
+  // origin is 1 virtual all round; left 1 / right 2 logical raster the thumb
+  // fill onto exactly virtual cols 514-519 (golden device x1157-1169 — 1.5
+  // each side sat one device px right). Numeric value pens: vc pad-top 5.5
+  // (not 4.5) — the row tops alternate .5-logical fractions and 5.5 is the
+  // one offset whose floor(1.5y) lands every row in its golden cell window.
+  std::vector<::ui::UiElement> rows;
+  rows.reserve(kGameOptionRowCount);
+  rows.push_back(option_cycle_row("o0", "GameOptionSecurity", "Security:",
+                                  security_label(props.security),
+                                  props.cycle_security));
+  rows.push_back(option_input_row("o1", "GameOptionMinLevel", "Min Level:",
+                                  props.min_level, props.set_min_level));
+  rows.push_back(option_input_row("o2", "GameOptionMaxLevel", "Max Level:",
+                                  props.max_level, props.set_max_level));
+  rows.push_back(option_input_row("o3", "GameOptionMaxPlayers", "Max Players:",
+                                  props.max_players, props.set_max_players));
+  rows.push_back(option_input_row("o4", "GameOptionMaxTeams", "Max Teams:",
+                                  props.max_teams, props.set_max_teams));
+  rows.push_back(option_cycle_row("o5", "GameOptionSpectatable",
+                                  "Spectatable:",
+                                  props.spectatable ? "Yes" : "No",
+                                  props.cycle_spectatable));
+
+  ::ui::StyleStatePatch scroll_style{};
+  scroll_style.base = tokens::chromeless_clear_patch();
+  scroll_style.focus_visible = scroll_style.base;
+  ::ui::UiElement option_list = ::ui::component(
+      "ScrollView",
+      ScrollViewProps{
+          .key = "rows",
+          .id = "GameOptionsList",
+          .step = kGameOptionRowH,
+          .row_height = kGameOptionRowH,
+          .show_scrollbar = true,
+          .layout = ::ui::LayoutStyle{
+              .width = ::ui::Length::percent(100.0f),
+              .min_width = ::ui::Length::points(180.0f),
+              .flex_basis = ::ui::Length::points(0.0f),
+              .flex_grow = ::ui::StyleFloat::points(1.0f),
+              .flex_shrink = ::ui::StyleFloat::points(0.0f)},
+          .style = scroll_style,
+          .children = ::ui::children(rows)},
+      ScrollView);
+
+  return <Box
+    key="create"
+    layout={::ui::LayoutStyle{
+      .direction = ::ui::FlexDirection::Column,
+      .min_width = ::ui::Length::points(0.0f),
+      .flex_basis = ::ui::Length::points(0.0f),
+      .flex_grow = ::ui::StyleFloat::points(1.0f),
+      .padding = {9.0f, 9.0f, 10.0f, 8.0f},
+      .gap = 4.5f}}
+    style={lobby_panel_open_right()}
+  >
+    <Box
+      key="hwrap"
+      layout={::ui::LayoutStyle{
+        .height = ::ui::Length::points(22.5f),
+        .flex_shrink = ::ui::StyleFloat::points(0.0f)}}
+    >
+      <ScreenTitle key="h" variant={ScreenTitleVariant::Console} value="Game Options" />
+    </Box>
+    <Box
+      key="well"
+      layout={::ui::LayoutStyle{
+        .direction = ::ui::FlexDirection::Row,
+        .align_items = ::ui::AlignItems::Stretch,
+        .width = ::ui::Length::percent(100.0f),
+        .flex_grow = ::ui::StyleFloat::points(1.0f),
+        .padding = {6.0f, 6.0f, 2.0f, 3.0f}}}
+      style={tokens::frame_patch(tokens::kInsetStroke)}
+    >
+      {option_list}
+    </Box>
+  </Box>
+}
+
+::ui::UiElement CreateRightCell(const CreateRightCellProps &props) {
+  // origin BuildGameCreateTallTree at the 309x388 tall box: content pad 6,
+  // gap 4; "Select Map" Heading; Inset list box (297x172v -> 445x387 with the
+  // footer carved out: heading 15 + gaps + footer 95) with 14-virtual rows;
+  // footer = Game name/Password Heading labels + Body values + the full-width
+  // Create chrome button, all on the pen grid (abs anchors 531/561/587/642).
+  ::ui::LayoutStyle cell = lobby_right_cell_layout(props.tall_w);
+  cell.padding = {0.0f, 0.0f, 0.0f, 0.0f};
+  cell.gap = 0.0f;
+  const ::ui::StyleStatePatch field_style =
+      tokens::chromeless_field_style(props.caret_color, tokens::kTextBody);
+  auto field_layout = ::ui::LayoutStyle{
+      .align_items = ::ui::AlignItems::Center,
+      .justify_content = ::ui::JustifyContent::Start,
+      .width = ::ui::Length::percent(100.0f),
+      .height = ::ui::Length::percent(100.0f)};
+  return <Box key="rightcell" layout={cell} style={lobby_panel_open_left()}>
+    <Box key="hwrap" layout={::ui::LayoutStyle{.padding = {9.0f, 0.0f, 10.0f, 0.0f}}}>
+      <ScreenTitle key="h" variant={ScreenTitleVariant::Console} value="Select Map" />
+    </Box>
+    <Box key="listwrap" layout={::ui::LayoutStyle{.padding = {9.0f, 9.0f, 5.0f, 0.0f}}}>
+      <Box
+        key="maplist"
+        layout={::ui::LayoutStyle{
+          .overflow = ::ui::Overflow::Hidden,
+          .direction = ::ui::FlexDirection::Column,
+          .align_items = ::ui::AlignItems::Stretch,
+          .width = ::ui::Length::percent(100.0f),
+          .height = ::ui::Length::points(387.0f),
+          .padding = {1.0f, 1.0f, 1.0f, 1.0f}}}
+        style={tokens::frame_patch(tokens::kInsetStroke)}
+      >
+        {props.rows}
+      </Box>
+    </Box>
+    <Box
+      key="gnl"
+      layout={::ui::LayoutStyle{
+        .position = ::ui::PositionType::Absolute,
+        .position_inset = ::ui::EdgeSizes{9.0f, {}, 431.0f, {}}}}
+    >
+      <ScreenTitle key="t" variant={ScreenTitleVariant::Console} value="Game name:" />
+    </Box>
+    <Box
+      key="gnv"
+      layout={::ui::LayoutStyle{
+        .position = ::ui::PositionType::Absolute,
+        .width = ::ui::Length::points(264.0f),
+        .height = ::ui::Length::points(30.5f),
+        .position_inset = ::ui::EdgeSizes{9.0f, {}, 457.0f, {}}}}
+    >
+      <Input
+        key="t"
+        id="GameName"
+        accessibility={{.label = "Game name"}}
+        value={props.name}
+        onChange={props.on_name}
+        layout={field_layout}
+        style={field_style}
+      />
+    </Box>
+    <Box
+      key="pwl"
+      layout={::ui::LayoutStyle{
+        .position = ::ui::PositionType::Absolute,
+        .position_inset = ::ui::EdgeSizes{9.0f, {}, 487.0f, {}}}}
+    >
+      <ScreenTitle key="t" variant={ScreenTitleVariant::Console} value="Password (optional):" />
+    </Box>
+    <Box
+      key="pwv"
+      layout={::ui::LayoutStyle{
+        .position = ::ui::PositionType::Absolute,
+        .width = ::ui::Length::points(264.0f),
+        .height = ::ui::Length::points(30.5f),
+        .position_inset = ::ui::EdgeSizes{9.0f, {}, 510.0f, {}}}}
+    >
+      <Input
+        key="t"
+        id="GamePassword"
+        accessibility={{.label = "Password"}}
+        value={props.password}
+        onChange={props.on_password}
+        password={true}
+        layout={field_layout}
+        style={field_style}
+      />
+    </Box>
+    <Box
+      key="cbw"
+      layout={::ui::LayoutStyle{
+        .position = ::ui::PositionType::Absolute,
+        .position_inset = ::ui::EdgeSizes{9.0f, 9.0f, 542.0f, {}}}}
+    >
+      <AppButton
+        key="create"
+        controlId="CreateGame"
+        variant={AppButtonVariant::Chrome}
+        disabled={!props.can_create}
+        targetFeedback={true}
+        label="Create"
+        onPress={props.on_create}
+      />
+    </Box>
+  </Box>
+}
+
+::ui::UiElement StagingPanel(const StagingPanelProps &props) {
+  return <Box
+    key="centercol"
+    layout={::ui::LayoutStyle{
+      .direction = ::ui::FlexDirection::Column,
+      .align_items = ::ui::AlignItems::Stretch,
+      .justify_content = ::ui::JustifyContent::Start,
+      .min_width = ::ui::Length::points(0.0f),
+      .flex_basis = ::ui::Length::points(0.0f),
+      .flex_grow = ::ui::StyleFloat::points(1.0f),
+      .padding = {4.0f, 6.5f, 5.0f, 0.0f}}}
+    style={lobby_panel_open_right()}
+  >
+    <AppButton
+      key="tech"
+      controlId="ChooseTech"
+      variant={AppButtonVariant::Chrome}
+      targetFeedback={true}
+      label="Choose Tech"
+      onPress={props.on_tech}
+    />
+    <Box key="g1" layout={::ui::LayoutStyle{.height = ::ui::Length::points(16.5f)}} />
+    <AppButton
+      key="team"
+      controlId="ChangeTeam"
+      variant={AppButtonVariant::Chrome}
+      targetFeedback={true}
+      label="Change Team"
+      onPress={props.on_team}
+    />
+    <Box key="g2" layout={::ui::LayoutStyle{.height = ::ui::Length::points(58.5f)}} />
+    <AppButton
+      key="ready"
+      controlId="StagingReady"
+      variant={AppButtonVariant::Chrome}
+      disabled={props.ready_blocked}
+      targetFeedback={true}
+      label={props.ready_label}
+      onPress={props.on_ready}
+    />
+  </Box>
+}
+
+::ui::UiElement TechUpperPanel(std::function<void()> on_back) {
+  // origin BuildGameTechUpperTree: GTechBackWrap pad L4 T4 (virtual) and the
+  // full-width chrome Back To Teams button (panel - 8 wide).
+  return <Box
+    key="centercol"
+    layout={::ui::LayoutStyle{
+      .direction = ::ui::FlexDirection::Column,
+      .align_items = ::ui::AlignItems::Stretch,
+      .justify_content = ::ui::JustifyContent::Start,
+      .min_width = ::ui::Length::points(0.0f),
+      .flex_basis = ::ui::Length::points(0.0f),
+      .flex_grow = ::ui::StyleFloat::points(1.0f),
+      .padding = {6.0f, 6.0f, 7.0f, 0.0f}}}
+    style={lobby_panel_open_right()}
+  >
+    <AppButton
+      key="back"
+      controlId="BackToTeams"
+      variant={AppButtonVariant::Chrome}
+      targetFeedback={true}
+      label="Back To Teams"
+      onPress={on_back}
+    />
+  </Box>
+}
+
+::ui::UiElement TechListCell(const Staging &staging, float tall_w,
+                             int selected,
+                             std::function<void(int)> on_select) {
+  client::ui::ChromeTextures chrome = client::ui::use_chrome();
+  std::vector<::ui::UiElement> kids;
+  const PenGrid &g = kLobbyTallGrid;
+  kids.push_back(Box(BoxProps{
+      .key = "slots",
+      .layout = ::ui::LayoutStyle{
+          .position = ::ui::PositionType::Absolute,
+          .position_inset = g.at(588, 103)},
+      .children = ::ui::children({Text(TextProps{
+          .key = "t",
+          .value = ::ui::copy_string(staging.tech_slots_label.c_str()),
+          .layout = {.height = ::ui::Length::points(tokens::kLineBody)},
+          .style = tokens::text_patch(tokens::kTextTechSlots, tokens::kFontBodyEm,
+                                      tokens::kFaceBody, tokens::kLineBody)})})}));
+  for (int i = 0; i < (int)staging.tech.size(); ++i) {
+    const StagingTechRow &row = staging.tech[i];
+    const std::string k = std::to_string(i);
+    const uint32_t tex =
+        row.selected ? (row.interactable ? chrome.ready_on : chrome.ready_on_dim)
+                     : (row.interactable ? chrome.ready_off : chrome.ready_off_dim);
+    std::function<void(const ::ui::FocusEvent &)> select =
+        [on_select, i](const ::ui::FocusEvent &) {
+          if (on_select)
+            on_select(i);
+        };
+    std::function<void(const ::ui::ActivationEvent &)> toggle =
+        [row, choices = staging.tech_choices, set_tech = staging.set_tech,
+         on_select, i](
+            const ::ui::ActivationEvent &) {
+          if (on_select)
+            on_select(i);
+          if (row.interactable && set_tech)
+            set_tech(choices ^ row.choice_mask);
+        };
+    if (tex)
+      kids.push_back(Box(BoxProps{
+          .key = ::ui::copy_string(("cb" + k).c_str()),
+          .id = "TechRow",
+          .id_offset = i,
+          .focusable = true,
+          .accessibility = {.label = ::ui::copy_string(row.name.c_str())},
+          .on_focus = select,
+          .on_activate = toggle,
+          .layout = ::ui::LayoutStyle{
+              .position = ::ui::PositionType::Absolute,
+              // origin blits the toggle sprite NATIVE from the 13x13 box's
+              // top-left without clipping — size the box to the sprite.
+              .width = ::ui::Length::points(chrome.ready_w * 1.5f),
+              .height = ::ui::Length::points(chrome.ready_h * 1.5f),
+              .position_inset = g.at(585, 128 + 13 * i)},
+          .style = tokens::image_patch(tex)}));
+    const std::string lbl = row.name + " (" + std::to_string((unsigned)row.slots) + ")";
+    kids.push_back(Box(BoxProps{
+        .key = ::ui::copy_string(("tl" + k).c_str()),
+        .id = "TechRowLabel",
+        .id_offset = i,
+        .focusable = true,
+        .accessibility = {.label = ::ui::copy_string(lbl.c_str())},
+        .on_focus = select,
+        .on_activate = toggle,
+        .layout = ::ui::LayoutStyle{
+            .position = ::ui::PositionType::Absolute,
+            .position_inset = g.at(601, 130 + 13 * i)},
+        .children = ::ui::children({Text(TextProps{
+            .key = "t",
+            .value = ::ui::copy_string(lbl.c_str()),
+            .layout = {.height = ::ui::Length::points(tokens::kLineBody)},
+            .style = tokens::text_patch(
+                row.interactable ? tokens::kTextBody : tokens::kTextTechDim,
+                tokens::kFontBodyEm, tokens::kFaceBody, tokens::kLineBody)})})}));
+  }
+  if (!staging.tech.empty() && selected >= 0 && selected < (int)staging.tech.size()) {
+    const StagingTechRow &row = staging.tech[selected];
+    const char *title = ::ui::copy_string(row.description_title.c_str());
+    const float desc_x = g.x(538);
+    const float desc_w = tall_w - desc_x - 10.0f;
+    ::ui::StylePatch desc_style =
+        tokens::text_patch(tokens::kTextTechSlots, tokens::kFontBodyEm,
+                           tokens::kFaceBody, tokens::kLineBody);
+    desc_style.text.value.wrap = ::ui::TextWrap::Words;
+    kids.push_back(Box(BoxProps{
+        .key = "desc-title",
+        .layout = ::ui::LayoutStyle{
+            .position = ::ui::PositionType::Absolute,
+            .align_items = ::ui::AlignItems::Center,
+            .width = ::ui::Length::percent(100.0f),
+            .height = ::ui::Length::points(tokens::kLineLarge),
+            .position_inset = ::ui::EdgeSizes{0.0f, 0.0f, g.y(350), {}}},
+        .children = ::ui::children({Text(TextProps{
+            .key = "t",
+            .value = title,
+            .layout = {.height = ::ui::Length::points(tokens::kLineLarge)},
+            .style = tokens::text_patch(tokens::kTextBody, tokens::kFontLarge,
+                                        tokens::kFaceLarge,
+                                        tokens::kLineLarge)})})}));
+    if (!row.description.empty()) {
+      kids.push_back(Box(BoxProps{
+          .key = "desc-text",
+          .layout = ::ui::LayoutStyle{
+              .position = ::ui::PositionType::Absolute,
+              .width = ::ui::Length::points(desc_w),
+              .position_inset = ::ui::EdgeSizes{desc_x, {}, g.y(365), {}}},
+          .children = ::ui::children({Text(TextProps{
+              .key = "t",
+              .value = ::ui::copy_string(row.description.c_str()),
+              .layout = {.width = ::ui::Length::percent(100.0f)},
+              .style = desc_style})})}));
+    }
+  }
+  ::ui::LayoutStyle cell = lobby_right_cell_layout(tall_w);
+  cell.padding = {0.0f, 0.0f, 0.0f, 0.0f};
+  return Box(BoxProps{.key = "rightcell",
+                      .layout = cell,
+                      .style = lobby_panel_open_left(),
+                      .children = ::ui::children(kids)});
+}
+
+::ui::UiElement StagingRosterCell(const StagingPanelProps &props, float tall_w) {
+  // origin game_join_panel BuildGameJoinTallTree: floating anchors from the
+  // tall-panel origin (virtual): emblem (22-ox, 6+team*55-oy) native size,
+  // ready check bank7 idx18/19 (57-ox, 6+rowY-oy), name Body (75, 8+rowY),
+  // level Tiny LegacyPalette(170) at (75+len*6+3, 8+rowY); rowY = team*55 +
+  // slot*13. Panel at virtual (531,67); anchored on kLobbyTallGrid.
+  client::ui::ChromeTextures chrome = client::ui::use_chrome();
+  std::vector<::ui::UiElement> kids;
+  const PenGrid &g = kLobbyTallGrid;
+  for (int i = 0; i < (int)props.roster.size(); ++i) {
+    const StagingRosterRow &r = props.roster[i];
+    const int rowY = r.team_number * 55 + r.peer_slot * 13;
+    const std::string k = std::to_string(i);
+    if (r.draw_emblem && r.agency < 5 && chrome.agency_emblem[r.agency]) {
+      const int a = r.agency;
+      kids.push_back(Box(BoxProps{
+          .key = ::ui::copy_string(("em" + k).c_str()),
+          .layout = ::ui::LayoutStyle{
+              .position = ::ui::PositionType::Absolute,
+              .width = ::ui::Length::points(chrome.agency_emblem_ws[a] * 1.5f),
+              .height = ::ui::Length::points(chrome.agency_emblem_hs[a] * 1.5f),
+              .position_inset = g.at(553 - chrome.agency_emblem_ox[a],
+                                     73 + r.team_number * 55 -
+                                         chrome.agency_emblem_oy[a])},
+          .style = tokens::image_patch(chrome.agency_emblem[a])}));
+    }
+    const uint32_t rtex = r.ready ? chrome.ready_on : chrome.ready_off;
+    if (rtex && chrome.ready_w) {
+      kids.push_back(Box(BoxProps{
+          .key = ::ui::copy_string(("rc" + k).c_str()),
+          .layout = ::ui::LayoutStyle{
+              .position = ::ui::PositionType::Absolute,
+              .width = ::ui::Length::points(chrome.ready_w * 1.5f),
+              .height = ::ui::Length::points(chrome.ready_h * 1.5f),
+              .position_inset =
+                  g.at(588 - chrome.ready_ox, 73 + rowY - chrome.ready_oy)},
+          .style = tokens::image_patch(rtex)}));
+    }
+    kids.push_back(Box(BoxProps{
+        .key = ::ui::copy_string(("nm" + k).c_str()),
+        .layout = ::ui::LayoutStyle{
+            .position = ::ui::PositionType::Absolute,
+            .position_inset = ::ui::EdgeSizes{112.0f, {}, g.y(75 + rowY), {}}},
+        .children = ::ui::children({BodyText(BodyTextProps{
+            .key = "t",
+            .variant = BodyTextVariant::Body,
+            .value = ::ui::copy_string(r.name.c_str())})})}));
+    if (!r.level.empty()) {
+      kids.push_back(Box(BoxProps{
+          .key = ::ui::copy_string(("lv" + k).c_str()),
+          .layout = ::ui::LayoutStyle{
+              .position = ::ui::PositionType::Absolute,
+              .position_inset =
+                  g.at(609 + (int)r.name.size() * 6, 75 + rowY)},
+          .children = ::ui::children({Text(TextProps{
+              .key = "t",
+              .value = ::ui::copy_string(r.level.c_str()),
+              .layout = {.height = ::ui::Length::points(tokens::kLineTiny)},
+              .style = tokens::text_patch(tokens::kTextRosterLevel,
+                                          tokens::kFontTiny, tokens::kFaceTiny,
+                                          tokens::kLineTiny)})})}));
+    }
+  }
+  ::ui::LayoutStyle cell = lobby_right_cell_layout(tall_w);
+  cell.padding = {0.0f, 0.0f, 0.0f, 0.0f};
+  return Box(BoxProps{.key = "rightcell",
+                      .layout = cell,
+                      .style = lobby_panel_open_left(),
+                      .children = ::ui::children(kids)});
+}
+
+::ui::UiElement LobbyTitleBar(const LobbyTitleBarProps &props) {
+  // origin staging title bar shows the joined game's map name (Title face) in
+  // an aligned slot like the brand (BuildAlignedTextSlot, pad-top 3 virtual).
+  ::ui::UiElement map_overlay =
+      (props.map_name && props.map_name[0])
+          ? Box(BoxProps{
+                .key = "mapslot",
+                .layout = {.height = ::ui::Length::points(31.5f),
+                           .flex_shrink = ::ui::StyleFloat::points(0.0f),
+                           .padding = {0.0f, 0.0f, 4.5f, 0.0f}},
+                .children = ::ui::children({Text(TextProps{
+                    .key = "mapname",
+                    .value = props.map_name,
+                    .layout = {.height = ::ui::Length::points(tokens::kLineHeading)},
+                    .style = tokens::text_patch(tokens::kTextProse,
+                                                tokens::kFontHeading,
+                                                tokens::kFaceHeading,
+                                                tokens::kLineHeading)})})})
+          : ::ui::empty();
+  return <Box
+    key="titlebar"
+    layout={::ui::LayoutStyle{
+      .direction = ::ui::FlexDirection::Row,
+      .align_items = ::ui::AlignItems::Center,
+      .width = ::ui::Length::percent(100.0f),
+      .height = ::ui::Length::points(43.0f),
+      .flex_shrink = ::ui::StyleFloat::points(0.0f),
+      .padding = {8.0f, 9.0f, 5.5f, 6.0f},
+      .gap = ::ui::StyleValue::points(10.5f)}}
+    style={tokens::frame_patch(tokens::kChromeStroke)}
+  >
+    <Box
+      key="brandslot"
+      layout={::ui::LayoutStyle{
+        .height = ::ui::Length::points(31.5f),
+        .flex_shrink = ::ui::StyleFloat::points(0.0f),
+        .padding = {0.0f, 0.0f, 4.5f, 0.0f}}}
+    >
+      <ScreenTitle key="brand" variant={ScreenTitleVariant::Brand} value="Silencer" />
+    </Box>
+    <Box
+      key="verslot"
+      layout={::ui::LayoutStyle{
+        .height = ::ui::Length::points(31.5f),
+        .flex_shrink = ::ui::StyleFloat::points(0.0f),
+        .padding = {0.0f, 0.0f, 13.5f, 0.0f}}}
+    >
+      <BodyText
+        key="ver"
+        variant={BodyTextVariant::Detail}
+        tone={BodyTextTone::Warning}
+        value={props.version_text}
+      />
+    </Box>
+    {map_overlay}
+    <Box key="tbspace" layout={::ui::LayoutStyle{.flex_grow = ::ui::StyleFloat::points(1.0f)}} />
+    <AppButton
+      key="goback"
+      controlId="LobbyGoBack"
+      variant={AppButtonVariant::Chrome}
+      size={AppButtonSize::Sm}
+      targetFeedback={true}
+      label="Go Back"
+      onPress={props.on_go_back}
+    />
+  </Box>
+}
+
+::ui::UiElement AgentCard(const AgentCardProps &props) {
+  return <Box
+    key="agent"
+    layout={::ui::LayoutStyle{
+      .overflow = ::ui::Overflow::Hidden,
+      .direction = ::ui::FlexDirection::Row,
+      .align_items = ::ui::AlignItems::Start,
+      .width = ::ui::Length::points(props.agent_w),
+      .flex_shrink = ::ui::StyleFloat::points(0.0f),
+      .padding = {9.0f, 9.0f, 10.0f, 8.0f},
+      .gap = 15.0f}}
+    style={lobby_panel_style()}
+  >
+    <Box
+      key="leftrail"
+      layout={::ui::LayoutStyle{
+        .direction = ::ui::FlexDirection::Column,
+        .align_items = ::ui::AlignItems::Center,
+        .width = ::ui::Length::points(75.0f),
+        .flex_shrink = ::ui::StyleFloat::points(0.0f),
+        .gap = ::ui::StyleValue::points(6.0f)}}
+    >
+      <Box
+        key="avatar"
+        layout={::ui::LayoutStyle{
+          .width = ::ui::Length::points(75.0f),
+          .height = ::ui::Length::points(75.0f),
+          .flex_shrink = ::ui::StyleFloat::points(0.0f)}}
+        style={props.emblem_tex ? tokens::image_patch(props.emblem_tex) : ::ui::patch().background(tokens::kEmblemFallbackFill).corner_radius(2.0f)}
+      />
+      <Box
+        key="lvbox"
+        layout={::ui::LayoutStyle{
+          .align_items = ::ui::AlignItems::Center,
+          .justify_content = ::ui::JustifyContent::Center,
+          .width = ::ui::Length::points(75.0f),
+          .height = ::ui::Length::points(tokens::kLineBody)}}
+      >
+        <BodyText key="lv" variant={BodyTextVariant::Body} value="LV 0" />
+      </Box>
+    </Box>
+    <Box
+      key="infoArea"
+      layout={::ui::LayoutStyle{
+        .overflow = ::ui::Overflow::Hidden,
+        .direction = ::ui::FlexDirection::Column,
+        .align_items = ::ui::AlignItems::Stretch,
+        .min_width = ::ui::Length::points(0.0f),
+        .flex_basis = ::ui::Length::points(0.0f),
+        .flex_grow = ::ui::StyleFloat::points(1.0f),
+        .gap = ::ui::StyleValue::points(7.5f)}}
+    >
+      <Text
+        key="name"
+        value={props.agent_name}
+        layout={{.height = ::ui::Length::points(tokens::kLineLarge)}}
+        style={tokens::text_patch(tokens::kTextAgentName, tokens::kFontLarge, tokens::kFaceLarge, tokens::kLineLarge)}
+      />
+      <Box
+        key="detailsArea"
+        layout={::ui::LayoutStyle{
+          .direction = ::ui::FlexDirection::Row,
+          .align_items = ::ui::AlignItems::Stretch,
+          .flex_grow = ::ui::StyleFloat::points(1.0f),
+          .gap = ::ui::StyleValue::points(7.0f)}}
+      >
+        <Box
+          key="statsCol"
+          layout={::ui::LayoutStyle{
+            .direction = ::ui::FlexDirection::Column,
+            .width = ::ui::Length::points(138.0f),
+            .flex_shrink = ::ui::StyleFloat::points(0.0f),
+            .gap = ::ui::StyleValue::points(15.0f)}}
+        >
+          <Box
+            key="stattable"
+            layout={::ui::LayoutStyle{
+              .direction = ::ui::FlexDirection::Column,
+              .gap = ::ui::StyleValue::points(2.5f)}}
+          >
+            {stat_kv("wins", "WINS", "0")}
+            {stat_kv("loss", "LOSSES", "0")}
+          </Box>
+          <BodyText key="xp" variant={BodyTextVariant::Body} value={props.xp_line} />
+          <Box
+            key="actionsrow"
+            layout={::ui::LayoutStyle{
+              .direction = ::ui::FlexDirection::Row,
+              .align_items = ::ui::AlignItems::Center,
+              .height = ::ui::Length::points(31.5f),
+              .flex_shrink = ::ui::StyleFloat::points(0.0f)}}
+          >
+            <AppButton
+              key="agents"
+              controlId="LobbyAgents"
+              variant={AppButtonVariant::Chrome}
+              targetFeedback={true}
+              label="Agents"
+              onPress={props.on_agents}
+            />
+          </Box>
+        </Box>
+        <Box
+          key="statWell"
+          layout={::ui::LayoutStyle{
+            .direction = ::ui::FlexDirection::Column,
+            .align_items = ::ui::AlignItems::Stretch,
+            .min_width = ::ui::Length::points(0.0f),
+            .flex_basis = ::ui::Length::points(0.0f),
+            .flex_grow = ::ui::StyleFloat::points(1.0f),
+            .padding = {6.0f, 6.0f, 4.0f, 4.5f},
+            .gap = ::ui::StyleValue::points(3.0f)}}
+          style={tokens::frame_patch(tokens::kInsetStroke)}
+        >
+          {loadout_row("s0", "ENDURANCE:", 0)}
+          {loadout_row("s1", "SHIELD:", 0)}
+          {loadout_row("s2", "JETPACK:", 0)}
+          {loadout_row("s3", "TECH SLOTS:", 3)}
+          {loadout_row("s4", "HACKING:", 0)}
+          {loadout_row("s5", "CONTACTS:", 0)}
+        </Box>
+      </Box>
+    </Box>
+  </Box>
+}
+
+::ui::UiElement LobbyChatPanel(const LobbyChatPanelProps &props) {
+  return <Box key="chat" layout={lobby_chat_layout(props.chat_w)} style={lobby_panel_style()}>
+    <Box
+      key="chanrow"
+      layout={::ui::LayoutStyle{
+        .height = ::ui::Length::points(24.0f),
+        .flex_shrink = ::ui::StyleFloat::points(0.0f)}}
+    >
+      <ScreenTitle key="h" variant={ScreenTitleVariant::Console} value={props.title} />
+    </Box>
+    <Box
+      key="logwell"
+      id="logwell"
+      layout={::ui::LayoutStyle{
+        .overflow = ::ui::Overflow::Hidden,
+        .direction = ::ui::FlexDirection::Row,
+        .align_items = ::ui::AlignItems::Stretch,
+        .width = ::ui::Length::percent(100.0f),
+        .flex_grow = ::ui::StyleFloat::points(1.0f),
+        .padding = {8.0f, 8.0f, 6.0f, 3.0f},
+        .gap = 12.0f}}
+      style={tokens::frame_patch(tokens::kInsetStroke)}
+    >
+      <ChatLog key="logcol" scrollback={props.scrollback} />
+      <Box
+        key="prescol"
+        layout={::ui::LayoutStyle{
+          .direction = ::ui::FlexDirection::Column,
+          .align_items = ::ui::AlignItems::Start,
+          .width = ::ui::Length::points(150.0f),
+          .flex_shrink = ::ui::StyleFloat::points(0.0f)}}
+      >
+        <Text
+          key="il"
+          value={props.pregame ? "Pregame" : "In Lobby"}
+          layout={{.height = ::ui::Length::points(tokens::kLineBody)}}
+          style={tokens::text_patch(tokens::kTextPresenceHeader, tokens::kFontBodyEm, tokens::kFaceBody, tokens::kLineBody)}
+        />
+        <BodyText key="p" variant={BodyTextVariant::Detail} value={props.presence} />
+      </Box>
+    </Box>
+    <Box
+      key="ingap"
+      layout={::ui::LayoutStyle{
+        .height = ::ui::Length::points(6.0f),
+        .flex_shrink = ::ui::StyleFloat::points(0.0f)}}
+    />
+    <Box
+      key="inputstrip"
+      layout={::ui::LayoutStyle{
+        .width = ::ui::Length::percent(100.0f),
+        .height = ::ui::Length::points(25.0f),
+        .flex_shrink = ::ui::StyleFloat::points(0.0f)}}
+      style={tokens::frame_patch(tokens::kInsetStroke)}
+    >
+      <LobbyChatCompose key="compose" send={props.send} caretColor={props.caret_color} />
+    </Box>
+  </Box>
+}
+
+std::vector<::ui::UiElement> map_list_rows(const std::vector<std::string> &maps,
+                                           int *map_index, int *hovered_map) {
+  constexpr int kMaxMapRows = 14;
+  std::vector<::ui::UiElement> rows;
+  for (int i = 0; i < (int)maps.size() && i < kMaxMapRows; ++i) {
+    const char *mk = ::ui::copy_string(("m" + std::to_string(i)).c_str());
+    const char *mv = ::ui::copy_string(maps[i].c_str());
+    std::function<void(const ::ui::ActivationEvent &)> pick =
+        [map_index, i](const ::ui::ActivationEvent &) { *map_index = i; };
+    // SIL-216: track the hovered row so the screen can float that map's minimap
+    // preview at the cursor. Clear only if leaving the row we last set.
+    std::function<void(const ::ui::HoverEvent &)> hover =
+        [hovered_map, i](const ::ui::HoverEvent &e) {
+          if (e.entered)
+            *hovered_map = i;
+          else if (*hovered_map == i)
+            *hovered_map = -1;
+        };
+    rows.push_back(Box(BoxProps{
+        .key = mk,
+        .id = "MapRow",
+        .id_offset = i,
+        .focusable = true,
+        .accessibility = {.label = mv},
+        .on_hover = hover,
+        .on_activate = pick,
+        .layout = ::ui::LayoutStyle{.height = ::ui::Length::points(21.0f),
+                                    .flex_shrink = ::ui::StyleFloat::points(0.0f),
+                                    .padding = {6.0f, 0.0f, 2.0f, 0.0f}},
+        .style = selectable_row_style(i == *map_index),
+        // origin draws every row's filename at the same palette-133 weight; the
+        // solid fill bar is the only selection feedback (no bolded text).
+        .children = ::ui::children({BodyText(BodyTextProps{
+            .key = "t", .variant = BodyTextVariant::Body, .value = mv})})}));
+  }
+  return rows;
+}
+
+::ui::UiElement MapPreviewOverlay(uint32_t texture, const char *name,
+                                  const char *description, float pointer_x,
+                                  float pointer_y, float origin_x,
+                                  float origin_y, float canvas_w) {
+  if (!texture)
+    return ::ui::empty();
+  // origin kPreviewW/H 172x62, kPreviewGap 5, kPreviewOffset (-185,-30); x1.5.
+  constexpr float kPreviewW = 172.0f * 1.5f;
+  constexpr float kPreviewH = 62.0f * 1.5f;
+  constexpr float kGap = 5.0f * 1.5f;
+  constexpr float kOffsetX = -185.0f * 1.5f;
+  constexpr float kOffsetY = -30.0f * 1.5f;
+  const bool has_name = name && name[0];
+  const bool has_desc = description && description[0];
+
+  ::ui::StylePatch text_style = tokens::text_patch(
+      tokens::kTextTechSlots, tokens::kFontBodyEm, tokens::kFaceBodySm,
+      tokens::kLineBody);
+  // origin word-wraps the description at 29 chars and renders it newline-only;
+  // wrapping the cppx Text to the minimap width reproduces the multi-line block.
+  ::ui::StylePatch desc_style = text_style;
+  desc_style.text.value.wrap = ::ui::TextWrap::Words;
+
+  std::vector<::ui::UiElement> kids;
+  if (has_name)
+    kids.push_back(Box(BoxProps{
+        .key = "name",
+        .layout = ::ui::LayoutStyle{.width = ::ui::Length::points(kPreviewW)},
+        .children = ::ui::children({Text(TextProps{
+            .key = "t",
+            .value = ::ui::copy_string(name),
+            .layout = {.height = ::ui::Length::points(tokens::kLineBody)},
+            .style = text_style})})}));
+  kids.push_back(Box(BoxProps{
+      .key = "img",
+      .layout = ::ui::LayoutStyle{
+          .width = ::ui::Length::points(kPreviewW),
+          .height = ::ui::Length::points(kPreviewH),
+          .flex_shrink = ::ui::StyleFloat::points(0.0f)},
+      .style = tokens::image_patch(texture)}));
+  if (has_desc)
+    kids.push_back(Box(BoxProps{
+        .key = "desc",
+        .layout = ::ui::LayoutStyle{.width = ::ui::Length::points(kPreviewW)},
+        .children = ::ui::children({Text(TextProps{
+            .key = "t",
+            .value = ::ui::copy_string(description),
+            .layout = ::ui::LayoutStyle{.width = ::ui::Length::percent(100.0f)},
+            .style = desc_style})})}));
+
+  // The pointer is in full-canvas logical space; the overlay's absolute inset is
+  // measured from the ScreenLayout root's content box (after its pad). Subtract
+  // the root pad (origin_x/origin_y) so the card tracks the true cursor, then
+  // apply origin's pointer offset. SIL-237: snap the anchor to a coarse grid so
+  // the IR stays byte-identical under cursor jitter and the raster skip fires.
+  constexpr float kAnchorGrid = 16.0f;
+  const float px = std::floor((pointer_x - origin_x) / kAnchorGrid) * kAnchorGrid;
+  const float py = std::floor((pointer_y - origin_y) / kAnchorGrid) * kAnchorGrid;
+  float left = px + kOffsetX;
+  float top = py + kOffsetY;
+  // Clamp the card's left/top inside the canvas content box (origin clamps to
+  // the screen). Right/bottom clamps are approximate — the card height is
+  // content-driven; clamp the left edge against the known minimap width.
+  const float content_w = canvas_w - origin_x * 2.0f;
+  if (left < 0.0f)
+    left = 0.0f;
+  if (left > content_w - kPreviewW)
+    left = std::max(0.0f, content_w - kPreviewW);
+  if (top < 0.0f)
+    top = 0.0f;
+  return <Box
+    key="map-preview"
+    layout={::ui::LayoutStyle{
+      .position = ::ui::PositionType::Absolute,
+      .direction = ::ui::FlexDirection::Column,
+      .align_items = ::ui::AlignItems::Start,
+      .width = ::ui::Length::points(kPreviewW),
+      .position_inset = ::ui::EdgeSizes{left, {}, top, {}},
+      .gap = kGap}}
+  >
+    {::ui::children(kids)}
+  </Box>
+}
+
+::ui::UiElement LobbyPaneGrid(const LobbyPaneGridProps &props) {
+  const LobbyPanes &panes = props.panes;
+  return <Box
+    key="body"
+    layout={::ui::LayoutStyle{
+      .direction = ::ui::FlexDirection::Row,
+      .align_items = ::ui::AlignItems::Stretch,
+      .width = ::ui::Length::percent(100.0f),
+      .flex_grow = ::ui::StyleFloat::points(1.0f)}}
+  >
+    <Box
+      key="leftstack"
+      layout={::ui::LayoutStyle{
+        .direction = ::ui::FlexDirection::Column,
+        .align_items = ::ui::AlignItems::Stretch,
+        .width = ::ui::Length::points(panes.left_w),
+        .flex_shrink = ::ui::StyleFloat::points(0.0f)}}
+    >
+      <Box
+        key="toprow"
+        layout={::ui::LayoutStyle{
+          .direction = ::ui::FlexDirection::Row,
+          .align_items = ::ui::AlignItems::Stretch,
+          .width = ::ui::Length::percent(100.0f),
+          .height = ::ui::Length::points(panes.upper_h),
+          .flex_shrink = ::ui::StyleFloat::points(0.0f),
+          .gap = ::ui::StyleValue::points(panes.gap)}}
+      >
+        {props.agent_card}
+        {props.upper_right}
+      </Box>
+      <Box
+        key="elbowrow"
+        layout={::ui::LayoutStyle{
+          .direction = ::ui::FlexDirection::Row,
+          .height = ::ui::Length::points(panes.gap),
+          .flex_shrink = ::ui::StyleFloat::points(0.0f)}}
+      >
+        <Box key="efill" layout={::ui::LayoutStyle{.flex_grow = ::ui::StyleFloat::points(1.0f)}} />
+        <Box
+          key="eseam"
+          layout={::ui::LayoutStyle{
+            .width = ::ui::Length::points(panes.gap),
+            .flex_shrink = ::ui::StyleFloat::points(0.0f)}}
+          style={tokens::frame_patch_sides(tokens::kChromeStroke, false, true, false, false)}
+        />
+      </Box>
+      <Box
+        key="lowerrow"
+        layout={::ui::LayoutStyle{
+          .direction = ::ui::FlexDirection::Row,
+          .align_items = ::ui::AlignItems::Stretch,
+          .flex_grow = ::ui::StyleFloat::points(1.0f)}}
+      >
+        {props.chat_panel}
+        <Box
+          key="cseam"
+          layout={::ui::LayoutStyle{
+            .width = ::ui::Length::points(panes.gap),
+            .flex_shrink = ::ui::StyleFloat::points(0.0f)}}
+          style={tokens::frame_patch_sides(tokens::kChromeStroke, false, true, false, false)}
+        />
+      </Box>
+    </Box>
+    {props.right_cell}
+  </Box>
+}
+
+} // namespace client::ui

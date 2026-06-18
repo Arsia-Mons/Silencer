@@ -61,6 +61,9 @@ void Logf(const char *fmt, ...) {
     if (fp) { fprintf(fp, "[stage2] %s\n", buf); fclose(fp); }
 }
 
+#if defined(__GNUC__) || defined(__clang__)
+__attribute__((unused))
+#endif
 bool CopyFile_(const std::string &from, const std::string &to) {
     FILE *in = fopen(from.c_str(), "rb");
     if (!in) return false;

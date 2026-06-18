@@ -1,0 +1,21 @@
+#include "client/ui/components/actions/app_input.h"
+
+#include "ui/components/input.h"
+#include "client/ui/components/tokens.h"
+
+namespace silencer {
+
+using ::ui::components::Input;
+using ::ui::components::InputProps;
+
+::ui::UiElement AppInput(const AppInputProps &props) {
+  return <Input
+    key={props.key}
+    id={props.control_id}
+    accessibility={{.label = props.accessibility_label}}
+    value={props.value}
+    onChange={props.on_change}
+  />
+}
+
+} // namespace silencer
