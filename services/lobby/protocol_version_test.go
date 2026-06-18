@@ -10,7 +10,7 @@ import (
 )
 
 const currentProtocolVersion = "00058"
-const currentWireFingerprint = "c16c0106632b187bff8887ecf00fdef413aa9a46434b90a7caaf8d96d8da80eb"
+const currentWireFingerprint = "a7360f375ff6416867ded7cdb463b8288fa97fa976ad2f8e70b1f0d4b7eb233d"
 
 var wireFingerprintPaths = []string{
 	"shared/lobby-protocol/protocol.md",
