@@ -6,8 +6,9 @@ usage() {
     cat <<'USAGE'
 Usage: tools/dev/run-local-lobby-client.sh [--preset win-ninja|win-ninja-release|win-ninja-unity] [--lobby-port PORT]
 
-Builds the client, builds the Go lobby, starts the lobby on 127.0.0.1:15170
-by default, then launches the client pointed at that local lobby.
+Builds the interactive client + a headless dedicated server (the lobby spawns
+the latter via -game-binary), builds the Go lobby, starts the lobby on
+127.0.0.1:15170 by default, then launches the client pointed at that local lobby.
 USAGE
 }
 
@@ -114,6 +115,12 @@ echo "Building client ($preset)..."
 "$client_dir/build.sh" "$preset"
 client_bin="$(client_binary "$(client_build_dir)")"
 
+# The lobby spawns the dedicated server as `silencer -s`; build it headless
+# (no UI/SDL3_ttf), matching what deploy.yml ships to the prod lobby box.
+echo "Building headless dedicated server (win-ninja-headless)..."
+"$client_dir/build.sh" win-ninja-headless
+server_bin="$(client_binary "$client_dir/build-headless")"
+
 echo "Building lobby..."
 (cd "$lobby_dir" && go build -o "$lobby_bin")
 
@@ -121,7 +128,7 @@ echo "Starting lobby on 127.0.0.1:$lobby_port..."
 "$lobby_bin" \
     -addr ":$lobby_port" \
     -db "$lobby_db" \
-    -game-binary "$client_bin" \
+    -game-binary "$server_bin" \
     -public-addr 127.0.0.1 \
     -update-manifest= \
     -player-auth-addr ":$player_auth_port" \
