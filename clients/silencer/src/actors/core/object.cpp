@@ -85,19 +85,19 @@ void Object::Serialize(bool write, Serializer & data, Serializer * old){
 	}
 }
 
-void Object::OnDestroy(World & world){
+void Object::OnDestroy(World &){
 	
 }
 
-void Object::HandleHit(World & world, Uint8 x, Uint8 y, Object & projectile){
+void Object::HandleHit(World &, Uint8, Uint8, Object &){
 
 }
 
-void Object::HandleInput(Input & input){
+void Object::HandleInput(Input &){
 	
 }
 
-void Object::HandleDisconnect(World & world, Uint8 peerid){
+void Object::HandleDisconnect(World &, Uint8){
 	
 }
 

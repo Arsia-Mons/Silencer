@@ -54,7 +54,7 @@ std::vector<std::string> MapDownloader::ListFiles(const char * directory){
 	if(dir != INVALID_HANDLE_VALUE){
 		do{
 			char fullname[MAX_PATH];
-			sprintf(fullname, "%s\\%s", directory, info.cFileName);
+			snprintf(fullname, sizeof fullname, "%s\\%s", directory, info.cFileName);
 			if(!(GetFileAttributes(fullname) & FILE_ATTRIBUTE_DIRECTORY)){
 				files.push_back(std::string(info.cFileName));
 			}
@@ -180,7 +180,7 @@ std::string MapDownloader::StringFromHash(unsigned char (*hash)[20]){
 	memset(hashstring, 0, sizeof(hashstring));
 	for(int i = 0; i < 20; i++){
 		unsigned char byte = (*hash)[i];
-		sprintf(&hashstring[i * 2], "%.2X", byte);
+		snprintf(&hashstring[i * 2], sizeof(hashstring) - i * 2, "%.2X", byte);
 	}
 	return std::string(hashstring);
 }

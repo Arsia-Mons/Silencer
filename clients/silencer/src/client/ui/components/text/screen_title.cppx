@@ -1,0 +1,82 @@
+#include "client/ui/components/text/screen_title.h"
+
+#include "ui/components/box.h"
+#include "ui/components/text.h"
+
+#include "client/ui/components/tokens.h"
+
+#include <cstddef>
+#include <iterator>
+
+namespace silencer {
+
+using ::ui::children;
+using ::ui::components::Box;
+using ::ui::components::BoxProps;
+using ::ui::components::Text;
+using ::ui::components::TextProps;
+
+// Variant -> {color, face, em} map, indexed by ScreenTitleVariant. Origin/main
+// renders screen/section titles in bank 135 (the dominant heading face) and
+// the big brand/prompt in bank 136; the cppx glyph atlas renders those bitmap
+// banks directly. Notes per row:
+//   Screen  — origin TextSize::ScreenTitle: bank 135 tracked at advance 12
+//             (the wider letterspacing of "Configure Controls" etc.).
+//   Brand   — origin lobby header "Silencer": TextSize::Title, bank 135 at its
+//             native advance (not the heavy bank-136 prompt face).
+//   Console — lobby/console panel titles (Game Options, Select Map, Lobby):
+//             origin TextSize::Heading (bank 134) at native 1:1 metrics, which
+//             also makes them string-bake eligible.
+//   Prose   — white section headers (Advantages/Description): also bank 134
+//             (character_create_layout.cpp AdvantageLines).
+struct TitleSpec {
+  ::ui::Color color;
+  uint16_t face;
+  float em; // font_size == line_height == box height for every variant
+};
+constexpr TitleSpec kTitleSpecs[] = {
+    /* Hero */ {tokens::kTextHeroTitle, tokens::kFaceTitle, tokens::kFontTitle},
+    /* Screen */ {tokens::kTextTitle, tokens::kFaceScreenTitle, tokens::kFontHeading},
+    /* Dialog */ {tokens::kTextTitle, tokens::kFaceHeading, tokens::kFontHeading},
+    /* Popup */ {tokens::kTextDialogTitle, tokens::kFaceHeading, tokens::kFontHeading},
+    /* Brand */ {tokens::kTextBrand, tokens::kFaceHeading, tokens::kFontHeading},
+    /* Console */ {tokens::kTextTitle, tokens::kFaceLarge, tokens::kFontLarge},
+    /* Prose */ {tokens::kTextProse, tokens::kFaceLarge, tokens::kFontLarge},
+};
+
+::ui::UiElement ScreenTitle(const ScreenTitleProps &props) {
+  size_t vi = static_cast<size_t>(props.variant);
+  if (vi >= std::size(kTitleSpecs))
+    vi = static_cast<size_t>(ScreenTitleVariant::Screen);
+  const TitleSpec &spec = kTitleSpecs[vi];
+  const float height = spec.em;
+  ::ui::StylePatch style = ::ui::patch().text(::ui::TextVisual{
+      .color = spec.color, .font_id = spec.face, .font_size = spec.em,
+      .line_height = spec.em});
+  if (!props.centered)
+    return <Text
+      key={props.key}
+      value={props.value}
+      layout={{.height = ::ui::Length::points(height)}}
+      style={style}
+    />
+  // A full-width row that centers its content-sized label (origin titles sit
+  // centered in a baked notch).
+  return <Box
+    key={props.key}
+    layout={::ui::LayoutStyle{
+      .direction = ::ui::FlexDirection::Row,
+      .justify_content = ::ui::JustifyContent::Center,
+      .width = ::ui::Length::percent(100.0f),
+      .height = ::ui::Length::points(height)}}
+  >
+    <Text
+      key="t"
+      value={props.value}
+      layout={{.height = ::ui::Length::points(height)}}
+      style={style}
+    />
+  </Box>
+}
+
+} // namespace silencer

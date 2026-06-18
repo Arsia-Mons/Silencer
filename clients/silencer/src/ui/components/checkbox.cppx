@@ -1,0 +1,66 @@
+#include "checkbox.h"
+#include "box.h"
+
+namespace ui::components {
+namespace {
+
+// Layout-only mark style: the mark's paint (fill on checked, border) is resolved
+// from theme.checkbox_mark as .visual; only the box metrics live here. The 1px
+// border_width reserves the Yoga border box (parity with the prior look).
+::ui::LayoutStyle checkbox_mark_style() {
+  return {
+      .width = ::ui::Length::points(18.0f),
+      .height = ::ui::Length::points(18.0f),
+      .border_width = 1.0f,
+  };
+}
+
+} // namespace
+
+::ui::UiElement Checkbox(const CheckboxProps &props) {
+  ::ui::HostCallbacks callbacks = detail::callbacks_from_props(props);
+  callbacks.on_activate =
+      [checked = props.checked, on_change = props.on_change,
+       original = callbacks.on_activate](const ::ui::ActivationEvent &event) {
+        if (original)
+          original(event);
+        if (on_change)
+          on_change(!checked);
+      };
+
+  ::ui::NodeInteraction interaction =
+      detail::interaction_from_props(props, true);
+  interaction.checked = props.checked;
+
+  // Box body + inner mark each resolve from their theme role (dual-path; the
+  // renderer consumes .visual once P3 flips the builder).
+  const ::ui::Theme &theme = ::ui::use_theme();
+  // The body does NOT react to `checked` (only the mark does).
+  const ::ui::VisualStyle box_visual = ::ui::resolve(
+      theme.checkbox, props.style, detail::interaction_state(props.disabled));
+  const ::ui::VisualStyle mark_visual = ::ui::resolve(
+      theme.checkbox_mark, {}, detail::interaction_state(props.disabled, props.checked));
+
+  return <detail.Host
+    kind={::ui::HostKind::Checkbox}
+    key={props.key}
+    id={props.id}
+    idOffset={props.id_offset}
+    style={detail::control_layout_style(props.layout)}
+    visual={box_visual}
+    text={::ui::HostTextProps{.value = props.label}}
+    interaction={interaction}
+    accessibility={detail::accessibility_from_props(props, ::ui::SemanticRole::Checkbox)}
+    callbacks={callbacks}
+  >
+    <detail.Host
+      kind={::ui::HostKind::Box}
+      key="mark"
+      style={checkbox_mark_style()}
+      visual={mark_visual}
+    />
+    {props.label}
+  </detail.Host>
+}
+
+} // namespace ui::components

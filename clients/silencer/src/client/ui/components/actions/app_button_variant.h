@@ -1,0 +1,332 @@
+#pragma once
+
+// AppButton design-system enums + impl-only layout/variant helpers.
+//
+// Host detail (::ui::LayoutStyle / ::ui::StyleStatePatch) is allowed in this
+// component-impl header because it is consumed only by app_button.cppx and the
+// leaf components that adapt ui::components::Button directly. Screen authors see
+// only the semantic AppButtonVariant / AppButtonSize enums on AppButtonProps.
+//
+// BASELINE (byte-exact): AppButton reproduces the CURRENT ui Button DEFAULT
+// geometry, which has NO border. `selected` does NOT change AppButton layout at
+// baseline (the selection-border belongs to weapon tiles / equipment slots,
+// which are authored later and adapt Button directly). The `selected` param is
+// kept on the API for forward-compat but is intentionally ignored here.
+
+#include "ui/components/common.h" // ::ui::LayoutStyle, ::ui::StyleStatePatch
+#include "ui/style/style_patch.h" // ::ui::patch()
+#include "client/ui/components/tokens.h" // silencer::tokens accent/danger
+
+namespace silencer {
+
+enum class AppButtonVariant { Primary, Secondary, Danger, Ghost, Oval, Chrome };
+// List = the compact stadium row used by scrolling rosters (character-create
+// agency/agent lists): shorter than the Md menu pill, stretched to the pane width.
+enum class AppButtonSize { Md, Sm, Lg, List };
+
+// Per-variant label TextVisual (color + face + size + centered). The runtime only
+// paints text on Text-role nodes (draw_command_builder append_text), so a Button's
+// own `value` is never painted — the visible label must be a styled Text CHILD.
+// AppButton renders this through ui::components::Text so it resolves the green
+// app_theme text color + the variant's legacy face, instead of the bare-string
+// child fallback (which paints with the engine's neutral kTextFill grey).
+inline ::ui::TextVisual app_button_label_visual(AppButtonVariant variant,
+                                                bool disabled,
+                                                AppButtonSize size = AppButtonSize::Md,
+                                                int ramp_phase = 0) {
+  ::ui::Color c = disabled ? tokens::kTextBodyMuted : tokens::kTextTitle;
+  // Chrome labels and the cc List rows are a tier smaller than the chunky
+  // menu oval pills (golden login/list caps ~17px vs the menu's ~21px).
+  // origin renders them in TextSize::Heading — bank 134 at native metrics
+  // (button.cpp ResolveButton: Chrome/LegacyRow textSize Heading) — so use the
+  // matching exact-color face 1:1 (also makes the labels string-bake eligible).
+  float sz = tokens::kFontHeading;
+  uint16_t face = tokens::kFaceHeading;
+  if (variant == AppButtonVariant::Chrome || size == AppButtonSize::List) {
+    sz = tokens::kFontLarge;
+    face = tokens::kFaceLarge;
+  }
+  // Hover/focus ramp: origin EmitButtonText re-renders sprite-backed labels at
+  // LegacyPalette(color, 128 + phase*2) — the registered hud_text_key faces
+  // carry those exact-brightness bakes. Callers pass phase 0 for static chrome.
+  if (ramp_phase > 0 && !disabled &&
+      (variant == AppButtonVariant::Oval || variant == AppButtonVariant::Chrome))
+    c = tokens::hud_text_key(0, (uint8_t)(128 + ramp_phase * 2));
+  return {.color = c,
+          .font_id = face,
+          .font_size = sz,
+          .align = ::ui::TextAlign::Center,
+          .line_height = sz};
+}
+
+// Layout-only baseline geometry. Mirrors ui::components::ButtonProps default
+// LayoutStyle (button.hx:23-29) for Md; Sm shrinks height/padding to the
+// loadout tab metrics. border_width stays 0 (Button's own resolved chrome owns
+// paint).
+inline ::ui::LayoutStyle app_button_layout(AppButtonSize size, bool /*selected*/) {
+  switch (size) {
+  case AppButtonSize::Sm:
+    return {
+        .align_items = ::ui::AlignItems::Center,
+        .justify_content = ::ui::JustifyContent::Center,
+        .width = ::ui::Length::points(132.0f),
+        .height = ::ui::Length::points(34.0f),
+        .padding = {12.0f, 12.0f, 7.0f, 7.0f},
+    };
+  case AppButtonSize::Md:
+  default:
+    return {
+        .align_items = ::ui::AlignItems::Center,
+        .justify_content = ::ui::JustifyContent::Center,
+        .width = ::ui::Length::points(132.0f),
+        .height = ::ui::Length::points(38.0f),
+        .padding = {14.0f, 14.0f, 8.0f, 8.0f},
+    };
+  }
+}
+
+// Oval-sprite geometry. The whole sprite STRETCHES to the box (origin blits the
+// stadium into the button bounds — a wide label like "Connect To Lobby" gets
+// gently elongated end caps exactly as origin does; nine-slicing instead draws
+// the caps at texture-pixel size, visibly squarer than the golden). Native cell
+// 196x33 (Md) -> 294x49.5 at the x1.5 logical scale; labels size wider ovals.
+inline ::ui::LayoutStyle app_button_oval_layout(AppButtonSize size) {
+  if (size == AppButtonSize::List) {
+    // origin LegacyRow plate (bank 6 idx2, 236x27): 40.5 tall at x1.5,
+    // stretched to the pane width (grow-able min, unlike the fixed ovals).
+    return {
+        .align_items = ::ui::AlignItems::Center,
+        .justify_content = ::ui::JustifyContent::Start,
+        .height = ::ui::Length::points(40.5f),
+        .min_width = ::ui::Length::points(104.0f),
+        // golden-measured: the row-plate label ink sits at plate+9 virtual
+        // (origin LegacyRow yOffset 6 + ink-centering bias).
+        .padding = {16.0f, 16.0f, 11.0f, 1.5f},
+    };
+  }
+  float w = 294.0f; // Md: native 196x33 cell x1.5
+  if (size == AppButtonSize::Sm)
+    w = 168.0f; // keybind bind-slot oval (only Oval Sm user): native 112x33
+  else if (size == AppButtonSize::Lg)
+    w = 330.0f; // native 220x33
+  // Origin ovals are FIXED sprite cells — a long label ("Connect To Lobby")
+  // squeezes inside the cell, never widens it (golden: all menu pills 441
+  // device px wide). Vertical padding asymmetric: origin's label baseline
+  // sits ~2 device px lower than symmetric centering. The +0.25/+0.5 logical
+  // label bias (left/top padding) is floor-tuned against the goldens: glyph
+  // device positions are floor(1.5 * float-centered-x); labels whose fraction
+  // is .75 (odd box coord or odd centering offset) sit 1 device px LEFT/UP of
+  // origin's ceil-based virtual text placement, while .25/.125-fraction labels
+  // are already exact (corr 1.0 on the options column). +0.375/+0.75 device
+  // bumps only the former across the floor without moving the latter.
+  return {
+      .align_items = ::ui::AlignItems::Center,
+      .justify_content = ::ui::JustifyContent::Center,
+      .width = ::ui::Length::points(w),
+      .height = ::ui::Length::points(49.5f),
+      .padding = {16.75f, 15.25f, 8.0f, 4.0f},
+  };
+}
+
+
+// Green oval sprite-button paint (SIL-89). Image-only patch over a baked bank-6
+// oval texture (use_chrome()), label in the Heading face centered on top.
+// texture_id 0 (not-yet-baked frame or seam slip) falls back to a vector
+// stadium-radius oval. The hover/focus ramp swaps the TEXTURE per phase
+// (AppButton owns the phase machine), so every state slot here draws the
+// caller's frame at full bright — never a tint ramp.
+inline ::ui::StyleStatePatch app_button_oval_patch(uint32_t tex) {
+  const ::ui::TextVisual label{.color = tokens::kTextTitle,
+                               .font_id = tokens::kFaceHeading,
+                               .font_size = tokens::kFontHeading,
+                               .align = ::ui::TextAlign::Center,
+                               .line_height = tokens::kLineHeading};
+  ::ui::StyleStatePatch ov{};
+  if (!tex) {
+    ::ui::StylePatch p =
+        ::ui::patch()
+            .background(tokens::kControlFallbackFill)
+            .gradient(::ui::Gradient{})
+            .corner_radius(16.5f) // h/2 for the 33px stadium
+            .border(::ui::Border{{1, 1, 1, 1},
+                                 {tokens::kAccent, tokens::kAccent,
+                                  tokens::kAccent, tokens::kAccent}});
+    p.text = ::ui::opt(label);
+    ov.base = p;
+    return ov;
+  }
+  auto oval = [&](::ui::Color tint) -> ::ui::StylePatch {
+    ::ui::StylePatch p = tokens::image_patch(tex, tint);
+    p.text = ::ui::opt(label);
+    return p;
+  };
+  const ::ui::Color bright{255, 255, 255, 255};
+  ov.base = oval(bright);
+  ov.hover = oval(bright);
+  ov.pressed = oval(bright); // SIL-223: override the theme's pressed border so
+                             // no rectangular box leaks over the oval sprite on
+                             // mouse-down (the sprite ramp is the press feedback)
+  ov.focus_visible = oval(bright);
+  return ov;
+}
+
+// Chrome-button geometry. origin/main draws these nine-sliced and SIZED TO THE
+// LABEL (ButtonVariant::Chrome size Auto): native height 21 -> 31.5 logical
+// (x1.5), paddingX 10 -> 15; a small min-width keeps short labels (OK) from
+// collapsing. The bank-7 sprite's caps keep the metal corners crisp.
+inline ::ui::LayoutStyle app_button_chrome_layout(AppButtonSize size = AppButtonSize::Md) {
+  // Sm = origin's DEFAULT fixed chrome plate (156x21 native -> 234x31.5): the
+  // lobby Go Back. Other sizes keep the Auto label-fit (origin size Auto).
+  // origin top-aligns the label 4 virtual px (yOffset 4) below the plate top
+  // (Chrome has no centerContentY) — justify Start + pad-top 6 logical.
+  if (size == AppButtonSize::Sm) {
+    return {
+        .align_items = ::ui::AlignItems::Center,
+        .justify_content = ::ui::JustifyContent::Start,
+        .width = ::ui::Length::points(234.0f),
+        .height = ::ui::Length::points(31.5f),
+        .padding = {15.0f, 15.0f, 5.0f, 0.0f},
+    };
+  }
+  // Lg = origin's label-fit chrome with paddingX 10 and NO min width (the
+  // lobby-connect Login/Create + Cancel pair). The Button host adds 1 logical
+  // px per side, so 14 + 1 = origin's 10 virtual.
+  if (size == AppButtonSize::Lg) {
+    return {
+        .align_items = ::ui::AlignItems::Center,
+        .justify_content = ::ui::JustifyContent::Start,
+        .height = ::ui::Length::points(31.5f),
+        .padding = {14.0f, 14.0f, 5.0f, 0.0f},
+    };
+  }
+  return {
+      .align_items = ::ui::AlignItems::Center,
+      .justify_content = ::ui::JustifyContent::Start,
+      .height = ::ui::Length::points(31.5f),     // origin Chrome plate 21 virtual
+      .min_width = ::ui::Length::points(138.0f), // origin kActionButtonMinWidth 92 virtual
+      .padding = {18.0f, 18.0f, 5.0f, 0.0f},     // origin paddingX 12 virtual; pad-top
+                                                 // 5 lands the label on vy_btn+4
+  };
+}
+
+// Metal-chrome sprite-button paint (SIL-90). Nine-sliced bank-7 idx24 sprite
+// (caps {l12,r12,t4,b4}) with the label in the Large face. The caller supplies
+// the phase-resolved texture when target feedback is enabled; texture_id 0
+// falls back to a rounded slate button.
+inline ::ui::StyleStatePatch app_button_chrome_patch(uint32_t tex) {
+  const ::ui::TextVisual label{.color = tokens::kTextTitle,
+                               .font_id = tokens::kFaceHeading,
+                               .font_size = tokens::kFontHeading,
+                               .align = ::ui::TextAlign::Center,
+                               .line_height = tokens::kLineHeading};
+  ::ui::StyleStatePatch ov{};
+  if (!tex) {
+    ::ui::StylePatch p =
+        ::ui::patch()
+            .background(tokens::kControlFallbackFill)
+            .gradient(::ui::Gradient{})
+            .corner_radius(3.0f)
+            .border(::ui::Border{{1, 1, 1, 1},
+                                 {tokens::kBorderPanel, tokens::kBorderPanel,
+                                  tokens::kBorderPanel, tokens::kBorderPanel}});
+    p.text = ::ui::opt(label);
+    ov.base = p;
+    return ov;
+  }
+  const ::ui::SideWidths caps{.top = 4.0f, .right = 12.0f, .bottom = 4.0f,
+                              .left = 12.0f};
+  auto chrome = [&](uint32_t tex, ::ui::Color tint) -> ::ui::StylePatch {
+    ::ui::StylePatch p = tokens::image_patch(tex, tint, caps);
+    p.text = ::ui::opt(label);
+    return p;
+  };
+  const ::ui::Color bright{255, 255, 255, 255};
+  ov.base = chrome(tex, bright);
+  ov.hover = chrome(tex, bright);
+  ov.pressed = chrome(tex, bright); // SIL-223: override the theme's pressed
+                                    // border so no rectangular box leaks over
+                                    // the chrome sprite on mouse-down
+  ov.focus_visible = chrome(tex, bright);
+  return ov;
+}
+
+// State-aware variant paint overlay over the theme's slate Button role. The
+// returned StyleStatePatch owns its OWN base/hover/pressed slots, which
+// resolve() layers OVER the matching theme-role slot per active interaction
+// flag. Because each non-Secondary variant supplies its own hover/pressed
+// patch, the variant keeps its branded look across interaction states instead
+// of reverting to the slate hover/pressed chrome. Each solid fill sets a FLAT
+// 2-stop gradient (top==bottom) so the slate base gradient never bleeds through.
+//
+// - Ghost: transparent base (no fill, no border); hover/pressed paint a subtle
+//   white wash so the control stays borderless yet reacts to interaction.
+// - Primary: accent fill+border base, with on-palette lighter hover / darker
+//   pressed accents (tokens::kAccentHover / kAccentPressed).
+// - Danger: same treatment on the danger palette.
+// - Secondary: returns {} on purpose — the empty patch IS the theme default
+//   slate button, so a plain AppButton with no variant paints unchanged
+//   (including the theme's own slate hover/pressed deltas).
+inline ::ui::StyleStatePatch
+app_button_variant_patch(AppButtonVariant variant) {
+  auto solid = [](::ui::Color fill, ::ui::Color border,
+                  float border_width) -> ::ui::StylePatch {
+    return ::ui::patch()
+        .background(fill)
+        .gradient(::ui::Gradient{.angle_deg = 0.0f,
+                                 .stop_count = 2,
+                                 .stops = {{0.0f, fill}, {1.0f, fill}}})
+        .border(::ui::Border{
+            {border_width, border_width, border_width, border_width},
+            {border, border, border, border}});
+  };
+
+  switch (variant) {
+  case AppButtonVariant::Primary: {
+    ::ui::StyleStatePatch ov{};
+    ov.base = solid(tokens::kAccent, tokens::kAccentBorder, 1.0f);
+    ov.hover = solid(tokens::kAccentHover, tokens::kAccentHoverBorder, 1.0f);
+    ov.pressed =
+        solid(tokens::kAccentPressed, tokens::kAccentPressedBorder, 1.0f);
+    return ov;
+  }
+  case AppButtonVariant::Danger: {
+    ::ui::StyleStatePatch ov{};
+    ov.base = solid(tokens::kDanger, tokens::kDangerBorder, 1.0f);
+    ov.hover = solid(tokens::kDangerHover, tokens::kDangerHoverBorder, 1.0f);
+    ov.pressed =
+        solid(tokens::kDangerPressed, tokens::kDangerPressedBorder, 1.0f);
+    return ov;
+  }
+  case AppButtonVariant::Ghost: {
+    const ::ui::Color transparent = {0, 0, 0, 0};
+    ::ui::StyleStatePatch ov{};
+    // Truly chromeless: no fill/border AND no focus ring. A focusable Ghost
+    // (e.g. the in-match "Hit Enter To Quit" prompt) must read as bare ink.
+    // chromeless(true) suppresses the draw builder's legacy focus-ring
+    // injection (draw_command_builder.cpp:348). But the green ring (#5CD05C)
+    // also comes from the THEME's button focus_visible role — an Outline patch
+    // (app_theme.cpp) that resolve() layers ON TOP of base whenever the control
+    // is focus-visible, and a resolved outline draws regardless of chromeless
+    // (draw_command_builder.cpp:344). So clearing base.outline alone is not
+    // enough: re-clear the outline in the focus_visible slot too, or the
+    // auto-focused prompt shows the theme ring. Ghost owns its own (none) focus.
+    ov.base = solid(transparent, transparent, 0.0f);
+    ov.base.chromeless = ::ui::opt(true);
+    ov.base.outline = ::ui::opt(::ui::Outline{});
+    ov.focus_visible = ::ui::patch().chromeless(true).outline(::ui::Outline{});
+    // Own subtle washes as FLAT fills (not bare backgrounds): a resolved
+    // gradient IS the fill (draw_command_builder.cpp:258), so the wash must be
+    // emitted as a flat 2-stop gradient to REPLACE the theme-role's slate
+    // hover/pressed gradient rather than sit invisibly behind it. Border stays
+    // zero so a hovered/pressed Ghost remains borderless.
+    ov.hover = solid({255, 255, 255, 18}, transparent, 0.0f);
+    ov.pressed = solid({255, 255, 255, 30}, transparent, 0.0f);
+    return ov;
+  }
+  case AppButtonVariant::Secondary:
+  default:
+    return {};
+  }
+}
+
+} // namespace silencer

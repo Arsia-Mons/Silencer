@@ -1,0 +1,828 @@
+#include "client/ui/screens/in_game/components/hud_painters.h"
+
+#include "client/ui/components/layout/layout.h"
+#include "client/ui/components/tokens.h"
+#include "client/ui/hooks/use_buy_tech.h"
+#include "client/ui/hooks/use_chrome.h"
+#include "client/ui/hooks/use_hud.h"
+#include "client/ui/hooks/use_ingame_chat.h"
+#include "client/ui/hooks/use_player_status.h"
+#include "client/ui/hooks/use_teams.h"
+#include "client/ui/hooks/use_tech.h"
+#include "ui/components/box.h"
+#include "ui/components/input.h"
+#include "ui/components/text.h"
+#include "ui/runtime/react.h"
+
+#include <cmath>
+#include <cstdio>
+#include <cstring>
+#include <functional>
+#include <memory>
+#include <string>
+#include <vector>
+namespace client::ui {
+
+using namespace silencer;
+using ::ui::children;
+using ::ui::components::Box;
+using ::ui::components::BoxProps;
+using ::ui::components::Input;
+using ::ui::components::InputProps;
+using ::ui::components::Text;
+using ::ui::components::TextProps;
+
+using Sprite = ChromeTextures::Sprite;
+namespace {
+
+// Native glyph advances per face (origin text.cpp ResolveTextRenderStyle).
+constexpr int kAdvTiny = 4;
+constexpr int kAdvBody = 6;
+constexpr int kAdvBodySm = 7;
+constexpr int kAdvHeading = 8;
+constexpr int kAdvTitle = 11;
+
+// Device(640x480) -> logical(960x720). ceil(1.5d - .25) lands every integer
+// device coordinate exactly: even d maps to the exact 1.5d, odd d to
+// (3d+1)/2 whose device floor recovers d (the SW renderer floors rects).
+float L(int d) { return std::ceil(d * 1.5f - 0.25f); }
+
+::ui::EdgeSizes inset_lt(float left, float top) {
+  ::ui::EdgeSizes e;
+  e.left = ::ui::StyleValue::points(left);
+  e.top = ::ui::StyleValue::points(top);
+  return e;
+}
+
+::ui::LayoutStyle abs_at(int dx, int dy, int dw, int dh) {
+  return ::ui::LayoutStyle{.position = ::ui::PositionType::Absolute,
+                           .width = ::ui::Length::points(L(dw)),
+                           .height = ::ui::Length::points(L(dh)),
+                           .position_inset = inset_lt(L(dx), L(dy))};
+}
+
+// A baked texture drawn at a device rect.
+::ui::UiElement tex_at(const char *key, uint32_t id, int dx, int dy, int dw,
+                       int dh) {
+  if (!id)
+    return ::ui::empty();
+  return Box(BoxProps{.key = key,
+                      .layout = abs_at(dx, dy, dw, dh),
+                      .style = tokens::image_patch(id)});
+}
+
+// A HUD sprite at its origin anchor: pos = anchor - authored sheet offset
+// (origin SpriteX/Y), native size.
+::ui::UiElement sprite_at(const char *key, const Sprite &sp, int ax = 0,
+                          int ay = 0) {
+  return tex_at(key, sp.id, ax - sp.x, ay - sp.y, sp.w, sp.h);
+}
+
+// A sub-rect of a HUD sprite (gauge fills), src in native texture px.
+::ui::UiElement sprite_slice(const char *key, const Sprite &sp, int dx, int dy,
+                             int sx, int sy, int sw, int sh) {
+  if (!sp.id || sw <= 0 || sh <= 0)
+    return ::ui::empty();
+  ::ui::BackgroundImage img{sp.id};
+  img.src_x = (float)sx;
+  img.src_y = (float)sy;
+  img.src_w = (float)sw;
+  img.src_h = (float)sh;
+  return Box(BoxProps{.key = key,
+                      .layout = abs_at(dx, dy, sw, sh),
+                      .style = tokens::image_patch(img)});
+}
+
+// Text at an absolute device pen, one of the baked exact-color HUD faces.
+::ui::UiElement hud_text(const char *key, int dx, int dy, const char *value,
+                         ::ui::Color color_key, float font, uint16_t face,
+                         uint8_t reveal_boost = 0, uint8_t reveal_step = 0) {
+  if (!value || !value[0])
+    return ::ui::empty();
+  return Box(BoxProps{
+      .key = key,
+      .layout = ::ui::LayoutStyle{.position = ::ui::PositionType::Absolute,
+                                  .position_inset = inset_lt(L(dx), L(dy))},
+      .children = children({Text(TextProps{
+          .value = value,
+          .style = tokens::text_patch(color_key, font, face, 0.f, reveal_boost,
+                                      reveal_step)})})});
+}
+
+// Centered like origin's fixed-box CLAY_ALIGN_X_CENTER: int pen arithmetic.
+int center_pen(int x, int box_w, int len, int advance) {
+  return x + (box_w - len * advance) / 2;
+}
+} // namespace
+
+// ---------------------------------------------------------------------------
+// Status sprites + gauges (origin hud_status_sprites.cpp)
+// ---------------------------------------------------------------------------
+
+void build_status_sprites(std::vector<::ui::UiElement> &out,
+                          const PlayerStatus &ps, const Hud &hud,
+                          const ChromeTextures::HudChrome &c) {
+  const uint8_t phase = hud.phase;
+  out.push_back(sprite_at("minimap", c.minimap_frame));
+  if (ps.fuel_low)
+    out.push_back(sprite_at("fuellow", c.fuel_low));
+  const int fuel_w =
+      ps.max_fuel ? (int)(((float)ps.fuel / ps.max_fuel) * c.fuel_bar.w) : 0;
+  out.push_back(sprite_slice("fuel", c.fuel_bar, -c.fuel_bar.x, -c.fuel_bar.y,
+                             0, 0, fuel_w, c.fuel_bar.h));
+  out.push_back(sprite_at("fuelmask", c.fuel_mask));
+
+  const int health_y =
+      ps.max_health
+          ? c.health_bar.h - (int)(((float)ps.health / ps.max_health) *
+                                   c.health_bar.h)
+          : c.health_bar.h;
+  out.push_back(sprite_slice("health", c.health_bar, -c.health_bar.x,
+                             -c.health_bar.y + health_y, 0, health_y,
+                             c.health_bar.w, c.health_bar.h - health_y));
+  int shield_y =
+      ps.max_shield
+          ? c.shield_bar.h - (int)(((float)ps.shield / ps.max_shield) *
+                                   c.shield_bar.h)
+          : c.shield_bar.h;
+  if (shield_y < 0)
+    shield_y = 0;
+  out.push_back(sprite_slice("shield", c.shield_bar, -c.shield_bar.x,
+                             -c.shield_bar.y + shield_y, 0, shield_y,
+                             c.shield_bar.w, c.shield_bar.h - shield_y));
+
+  if (hud.poisoned)
+    out.push_back(sprite_at("poison", c.poison, 183 + c.poison.x,
+                            453 + c.poison.y));
+  const int files_w =
+      ps.max_files ? (int)(((float)ps.files / ps.max_files) * c.files_bar.w)
+                   : 0;
+  out.push_back(sprite_slice("files", c.files_bar, -c.files_bar.x,
+                             -c.files_bar.y, 0, 0, files_w, c.files_bar.h));
+
+  const int w = ps.current_weapon < 4 ? ps.current_weapon : 0;
+  out.push_back(sprite_at("wface", c.weapon_face[w]));
+  out.push_back(sprite_at("wglow", c.weapon_glow[w]));
+  out.push_back(sprite_at("wsel", c.weapon_bracket, 0, w * 14));
+  if (ps.health && ps.max_health &&
+      (float)ps.health / ps.max_health <= 0.5f && phase % 8 <= 3)
+    out.push_back(sprite_at("hwarn", c.health_warn));
+  if (ps.shield && ps.max_shield &&
+      (float)ps.shield / ps.max_shield <= 0.5f && phase % 8 <= 3)
+    out.push_back(sprite_at("swarn", c.shield_warn));
+  out.push_back(sprite_at("invframe", c.inv_frame));
+
+  static const int xoffsets[] = {612, 584, 556, 528};
+  static const int yoffsets[] = {13, 13, 11, 7};
+  for (int i = 0; i < 4; ++i) {
+    const uint8_t res = ps.inventory_res_index[i];
+    const bool sel = ps.current_inventory == i;
+    if (res < ChromeTextures::HudChrome::kInvIcons) {
+      const Sprite &icon = sel ? c.inv_icon[res] : c.inv_icon_dim[res];
+      const char *k =
+          ::ui::copy_string(("inv" + std::to_string(i)).c_str());
+      out.push_back(sprite_at(k, icon, xoffsets[i], yoffsets[i]));
+    }
+    if (ps.inventory_letters[i]) {
+      const char letter[2] = {ps.inventory_letters[i], 0};
+      const char *k =
+          ::ui::copy_string(("invl" + std::to_string(i)).c_str());
+      out.push_back(hud_text(k, xoffsets[i] - 2, yoffsets[i],
+                             ::ui::copy_string(letter),
+                             sel ? tokens::kTextHudDefault
+                                 : tokens::kTextHudDim32,
+                             tokens::kFontTiny, tokens::kFaceTiny));
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Numeric readouts (origin hud_readouts.cpp)
+// ---------------------------------------------------------------------------
+
+std::string ammo_string(unsigned v) {
+  return (v < 10 ? " " : "") + std::to_string(v);
+}
+
+void build_readouts(std::vector<::ui::UiElement> &out, const PlayerStatus &ps) {
+  unsigned currentammo = 99;
+  switch (ps.current_weapon) {
+  case 1: currentammo = ps.laser_ammo; break;
+  case 2: currentammo = ps.rocket_ammo; break;
+  case 3: currentammo = ps.flamer_ammo; break;
+  default: break;
+  }
+  out.push_back(hud_text("ammo", 117, 457,
+                         use_text_storage("%s", ammo_string(currentammo).c_str()),
+                         tokens::kTextHudAmmo, 28.5f, tokens::kFaceHudCounter));
+  auto tiny_centered = [&](const char *key, int x, int y, int box_w,
+                           const std::string &text, ::ui::Color color) {
+    if (text.empty())
+      return;
+    out.push_back(hud_text(key,
+                           center_pen(x, box_w, (int)text.size(), kAdvTiny), y,
+                           use_text_storage("%s", text.c_str()), color,
+                           tokens::kFontTiny, tokens::kFaceTiny));
+  };
+  tiny_centered("ammob", 0, 414, 20, "99", tokens::kTextHudDefault);
+  tiny_centered("ammol", 0, 428, 20,
+                ps.laser_ammo ? ammo_string(ps.laser_ammo) : std::string(),
+                tokens::kTextHudDefault);
+  tiny_centered("ammor", 0, 442, 20,
+                ps.rocket_ammo ? ammo_string(ps.rocket_ammo) : std::string(),
+                tokens::kTextHudDefault);
+  tiny_centered("ammof", 0, 456, 20,
+                ps.flamer_ammo ? ammo_string(ps.flamer_ammo) : std::string(),
+                tokens::kTextHudDefault);
+  out.push_back(hud_text("credits", 572, 456,
+                         use_text_storage("%u", (unsigned)ps.credits),
+                         tokens::kTextHudCredits, 28.5f,
+                         tokens::kFaceHudCounter));
+  tiny_centered("hp", 145, 463, 26, std::to_string(ps.health),
+                tokens::kTextHudHealth);
+  tiny_centered("sh", 468, 463, 26, std::to_string(ps.shield),
+                tokens::kTextHudCredits);
+  static const int xoffsets[] = {612, 584, 556, 528};
+  static const int yoffsets[] = {13, 13, 11, 7};
+  for (int i = 0; i < 4; ++i) {
+    if (ps.inventory_counts[i] > 1) {
+      const char *k =
+          ::ui::copy_string(("invc" + std::to_string(i)).c_str());
+      out.push_back(hud_text(k, xoffsets[i] + 20, yoffsets[i] + 20,
+                             use_text_storage("%u",
+                                              (unsigned)ps.inventory_counts[i]),
+                             tokens::kTextHudDefault, 10.5f,
+                             tokens::kFaceTinyCounter));
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Team strip (origin hud_teams.cpp)
+// ---------------------------------------------------------------------------
+
+void build_team_strip(std::vector<::ui::UiElement> &out, const Hud &hud,
+                      const ChromeTextures::HudChrome &c) {
+  if (hud.teams.empty())
+    return;
+  if (hud.teams.size() == 1) {
+    out.push_back(sprite_at("teamframe", c.team_frame));
+  } else {
+    out.push_back(tex_at("teamcap", c.team_cap.id, -c.team_cap.x,
+                         (-133 + ((int)hud.teams.size() - 1) * 20) -
+                             c.team_cap.y,
+                         c.team_cap.w, c.team_cap.h));
+    out.push_back(sprite_at("teambody", c.team_body));
+  }
+  int teamy = 5;
+  for (size_t t = 0; t < hud.teams.size(); ++t) {
+    const HudTeamRow &team = hud.teams[t];
+    for (int i = 0; i < team.num_peers && i < 4; ++i) {
+      const auto &slot = team.peers[i];
+      if (!slot.present)
+        continue;
+      const Sprite &base = slot.dead ? c.peer_dead[i] : c.peer_alive[i];
+      const char *k = ::ui::copy_string(
+          ("peer" + std::to_string(t) + std::to_string(i)).c_str());
+      out.push_back(tex_at(k, slot.sprite ? slot.sprite : base.id,
+                           (25 + 17 * i) - base.x, teamy - base.y, base.w,
+                           base.h));
+    }
+    int with_secret = 0;
+    for (int i = 0; i < team.num_peers && i < 4; ++i)
+      if (team.peers[i].present && team.peers[i].has_secret)
+        ++with_secret;
+    // Secret slots x3: filled/empty, carried-secret uncertainty flicker
+    // (tick%12), beaming recolor (origin hud_teams.cpp).
+    for (int i = 0; i < 3; ++i) {
+      const Sprite *sp = team.secrets > i ? &c.secret_full : &c.secret_empty;
+      if (sp == &c.secret_empty && with_secret > i - (int)team.secrets &&
+          hud.tick % 12 < 6)
+        sp = &c.secret_full;
+      if (team.beaming && team.secrets == i && sp == &c.secret_empty)
+        sp = &c.secret_beaming;
+      const char *k = ::ui::copy_string(
+          ("secret" + std::to_string(t) + std::to_string(i)).c_str());
+      out.push_back(sprite_at(k, *sp, -(9 * (3 - i)) + 11, teamy));
+    }
+    if (team.emblem) {
+      const char *k =
+          ::ui::copy_string(("emblem" + std::to_string(t)).c_str());
+      out.push_back(tex_at(k, team.emblem, 5, teamy + 1, team.emblem_w,
+                           team.emblem_h));
+    }
+    teamy += 20;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Chat overlay (origin hud_chat_overlay.cpp)
+// ---------------------------------------------------------------------------
+
+constexpr int kChatX = 400, kChatY = 280, kChatW = 231;
+constexpr int kChatInteriorH = 30, kChatTextX = 10, kChatTextStartY = 10;
+constexpr int kChatLineStep = 10, kMaxHistoryChars = 36;
+constexpr int kChatVisibleChars = 28, kChatRightCapX = 36;
+
+void build_chat_edge_row(std::vector<::ui::UiElement> &out,
+                         const ChromeTextures::HudChrome &c, int first_idx,
+                         int rel_y, int &ordinal) {
+  const Sprite &capl = c.chat_edge[first_idx];
+  const Sprite &tile = c.chat_edge[first_idx + 1];
+  const Sprite &capr = c.chat_edge[first_idx + 2];
+  auto emit = [&](const Sprite &sp, int lx, int sw) {
+    const char *k =
+        ::ui::copy_string(("chatbg" + std::to_string(ordinal++)).c_str());
+    if (sw > 0)
+      out.push_back(sprite_slice(k, sp, kChatX + lx - sp.x,
+                                 kChatY + rel_y - sp.y, 0, 0, sw, sp.h));
+    else
+      out.push_back(sprite_at(k, sp, kChatX + lx, kChatY + rel_y));
+  };
+  emit(capl, 0, 0);
+  int xoff = capl.w;
+  while (tile.w > 0 && xoff < kChatW - capr.w) {
+    int tw = kChatW - xoff - kChatRightCapX;
+    if (tw > tile.w)
+      tw = tile.w;
+    if (tw <= 0)
+      break;
+    emit(tile, xoff, tw);
+    xoff += tw;
+  }
+  emit(capr, kChatW - kChatRightCapX, 0);
+}
+
+// The compose row is its OWN component: the Input's internal edit state is a
+// hook, and hooks must not run conditionally inside InGameScreenView (the
+// overlay mounts/unmounts with chat.active — a fiber boundary keeps the hook
+// order stable).
+struct ChatComposeProps {
+  int x = 0, y = 0; // device pen of the input (after the channel prefix)
+  std::string text = {};
+  bool caret_on = false;
+  ::ui::Color caret_color = {};
+  std::function<void(const std::string &)> on_change = {};
+  std::function<void(const std::string &)> send = {};
+};
+
+::ui::UiElement ChatComposeView(const ChatComposeProps &p) {
+  // Enter sends the CURRENT text (origin SubmitText carries the live value):
+  // edits flow through on_change before the key event dispatches, so track
+  // them in fiber state — the snapshot prop is one frame stale.
+  std::string *live = use_state(std::string(p.text));
+  *live = p.text;
+  // Chromeless input over the chrome: typed text Body (0,128); caret = palette
+  // idx 140 (page 0), blinking on origin's wall-clock phase.
+  const ::ui::StyleStatePatch field =
+      tokens::chromeless_field_style(p.caret_color, tokens::kTextHudDefault);
+  return Box(BoxProps{
+      .key = "chatinwrap",
+      .layout = abs_at(p.x, p.y, kChatVisibleChars * kAdvBody, 11),
+      .children = children({Input(InputProps{
+          .key = "msg",
+          .id = "IngameChat",
+          .autofocus = true,
+          .accessibility = {.label = "Chat"},
+          // Enter arrives as confirm->activation on the focused node (the
+          // key channel only carries editing keys).
+          .on_activate =
+              [live, send = p.send](const ::ui::ActivationEvent &) {
+                if (send)
+                  send(*live);
+              },
+          .value = ::ui::copy_string(p.text.c_str()),
+          .on_change =
+              [live, on_change = p.on_change](const std::string &v) {
+                *live = v;
+                if (on_change)
+                  on_change(v);
+              },
+          .show_caret = p.caret_on,
+          .layout =
+              ::ui::LayoutStyle{.align_items = ::ui::AlignItems::Center,
+                                .width = ::ui::Length::percent(100.0f),
+                                .height = ::ui::Length::percent(100.0f)},
+          .style = field})})});
+}
+
+void build_chat_overlay(std::vector<::ui::UiElement> &out,
+                        const IngameChat &chat,
+                        const ChromeTextures::HudChrome &c,
+                        ::ui::Color caret_color) {
+  if (!chat.active && chat.show_ticks <= 0)
+    return;
+  std::vector<std::string> lines;
+  for (size_t i = 0; i < chat.log.size(); ++i) {
+    if (chat.active && i == 0 && chat.log.size() == 5)
+      continue;
+    lines.push_back(chat.log[i].substr(0, kMaxHistoryChars));
+  }
+  if (lines.empty() && !chat.active)
+    return;
+
+  int ordinal = 0;
+  build_chat_edge_row(out, c, 0, 0, ordinal);
+  build_chat_edge_row(out, c, 6, kChatInteriorH, ordinal);
+
+  int yoffset = kChatTextStartY;
+  for (size_t i = 0; i < lines.size(); ++i) {
+    const char *k =
+        ::ui::copy_string(("chatln" + std::to_string(i)).c_str());
+    out.push_back(hud_text(k, kChatX + kChatTextX, kChatY + yoffset,
+                           ::ui::copy_string(lines[i].c_str()),
+                           tokens::kTextHudBright, tokens::kFontBodyEm,
+                           tokens::kFaceBody));
+    yoffset += kChatLineStep;
+  }
+  if (!chat.active)
+    return;
+
+  const char *prefix = chat.with_team ? "(TEAM):" : "(ALL):";
+  const int prefix_w = (int)std::strlen(prefix) * kAdvBody;
+  out.push_back(hud_text("chatpre", kChatX + kChatTextX, kChatY + yoffset,
+                         prefix, tokens::kTextHudBright, tokens::kFontBodyEm,
+                         tokens::kFaceBody));
+  // Channel toggle over the prefix (origin "ingame.chat.channel"
+  // interactable): activate flips TEAM/ALL. Ghost paint — the prefix text is
+  // the whole visual.
+  {
+    std::function<void()> toggle = chat.toggle_channel;
+    ::ui::StyleStatePatch ghost{};
+    ghost.base = tokens::chromeless_clear_patch();
+    ghost.hover = ghost.base;
+    ghost.focus_visible = ghost.base;
+    out.push_back(Box(BoxProps{
+        .key = "chatchan",
+        .id = "IngameChatChannel",
+        .focusable = true,
+        .on_activate =
+            [toggle](const ::ui::ActivationEvent &) {
+              if (toggle)
+                toggle();
+            },
+        .layout = abs_at(kChatX + kChatTextX, kChatY + yoffset, prefix_w, 11),
+        .style = ghost}));
+  }
+  ChatComposeProps compose;
+  compose.x = kChatX + kChatTextX + prefix_w;
+  compose.y = kChatY + yoffset;
+  compose.text = chat.text;
+  compose.caret_on = chat.caret_on;
+  compose.caret_color = caret_color;
+  compose.on_change = chat.set_text;
+  compose.send = chat.send;
+  out.push_back(
+      ::ui::component("HudChatCompose", compose, ChatComposeView, "compose"));
+}
+
+// ---------------------------------------------------------------------------
+// Buy / tech overlay (origin hud_buy_tech_overlay.cpp)
+// ---------------------------------------------------------------------------
+
+void build_buy_tech(std::vector<::ui::UiElement> &out, const Tech &tech,
+                    const BuyTech &cursor, const ChromeTextures::HudChrome &c) {
+  if (tech.items.empty())
+    return;
+  out.push_back(sprite_at("btbg", c.buy_bg));
+  for (size_t r = 0; r < tech.items.size(); ++r) {
+    const TechItem &row = tech.items[r];
+    const int yoffset = (int)r * 25;
+    const std::string id = std::to_string(r);
+    // Focusable (but unpainted + silent) row target: selection follows focus,
+    // Enter purchases — origin registers these as ListRow interactables.
+    {
+      const int item_index = row.index;
+      std::function<void(int)> select = cursor.select;
+      std::function<void(int)> purchase = tech.purchase;
+      std::function<void(const ::ui::FocusEvent &)> on_focus =
+          [select, item_index](const ::ui::FocusEvent &) {
+            if (select)
+              select(item_index);
+          };
+      std::function<void(const ::ui::ActivationEvent &)> on_activate =
+          [purchase, item_index](const ::ui::ActivationEvent &) {
+            if (purchase)
+              purchase(item_index);
+          };
+      // Ghost paint: the selection visual is the bank-102 highlight sprite,
+      // never a theme focus ring (origin draws no focus chrome here).
+      ::ui::StyleStatePatch ghost{};
+      ghost.base = tokens::chromeless_clear_patch();
+      ghost.hover = ghost.base;
+      ghost.focus_visible = ghost.base;
+      out.push_back(Box(BoxProps{
+          .key = ::ui::copy_string(("btrow" + id).c_str()),
+          .id = "BuyTechRow",
+          .id_offset = row.index,
+          .focusable = true,
+          .autofocus = row.selected,
+          .on_focus = on_focus,
+          .on_activate = on_activate,
+          .layout = abs_at(-c.buy_highlight.x, -c.buy_highlight.y + yoffset,
+                           c.buy_highlight.w, c.buy_highlight.h),
+          .style = ghost}));
+    }
+    if (row.selected)
+      out.push_back(sprite_at(::ui::copy_string(("bth" + id).c_str()),
+                              c.buy_highlight, 0, yoffset));
+    if (row.icon)
+      out.push_back(tex_at(::ui::copy_string(("bti" + id).c_str()), row.icon,
+                           169 - row.icon_ox, 139 + yoffset - row.icon_oy,
+                           row.icon_w, row.icon_h));
+    const ::ui::Color key = row.brightness == 128
+                                ? tokens::kTextHudDefault
+                                : tokens::hud_text_key(0, row.brightness);
+    out.push_back(hud_text(::ui::copy_string(("btn" + id).c_str()), 222,
+                           145 + yoffset,
+                           ::ui::copy_string(row.label.c_str()), key, 22.5f,
+                           tokens::kFaceLarge));
+    const int price_w = (int)row.price.size() * kAdvHeading;
+    out.push_back(hud_text(::ui::copy_string(("btp" + id).c_str()),
+                           440 - price_w / 2, 145 + yoffset,
+                           ::ui::copy_string(row.price.c_str()), key, 22.5f,
+                           tokens::kFaceLarge));
+  }
+  const int footer_w = (int)tech.footer.size() * kAdvHeading;
+  out.push_back(hud_text("btf", 320 - footer_w / 2, 275,
+                         ::ui::copy_string(tech.footer.c_str()),
+                         tokens::kTextHudDefault, 22.5f, tokens::kFaceLarge));
+}
+
+// ---------------------------------------------------------------------------
+// Player list (F1, origin hud_player_list_overlay.cpp)
+// ---------------------------------------------------------------------------
+
+void build_player_list(std::vector<::ui::UiElement> &out, const Hud &hud) {
+  if (hud.teams.empty())
+    return;
+  bool any = false;
+  for (const HudTeamRow &t : hud.teams)
+    for (int i = 0; i < t.num_peers && i < 4; ++i)
+      if (t.peers[i].present)
+        any = true;
+  if (!any)
+    return;
+  // Panel: centered between 50px margins, height 10 + teams*58, bg black/128.
+  const int panel_x = 50, panel_w = 640 - 100;
+  const int panel_h = 10 + (int)hud.teams.size() * 58;
+  out.push_back(Box(BoxProps{
+      .key = "plbg",
+      .layout = abs_at(panel_x, 50, panel_w, panel_h),
+      .style = tokens::fill_patch(tokens::kHudListDim)}));
+  for (size_t t = 0; t < hud.teams.size(); ++t) {
+    const HudTeamRow &team = hud.teams[t];
+    const int row_y = 50 + 10 + (int)t * 58; // panel padding {10,10,10,0}
+    int peers_present = 0;
+    for (int i = 0; i < team.num_peers && i < 4; ++i)
+      if (team.peers[i].present)
+        ++peers_present;
+    // Emblem slot 40 wide, emblem centered vertically in the 58 row.
+    if (team.emblem) {
+      // origin centers the emblem's CLAY box (2x the source sprite = 4x the
+      // half-res art) in the 58px row; the art draws at the box top-left.
+      const char *k = ::ui::copy_string(("ple" + std::to_string(t)).c_str());
+      out.push_back(tex_at(k, team.emblem, panel_x + 10,
+                           row_y + (58 - team.emblem_h * 4) / 2, team.emblem_w,
+                           team.emblem_h));
+    }
+    int yoffset = ((4 - peers_present) * 12) / 2;
+    if (yoffset < 0)
+      yoffset = 0;
+    int peer_row = 0;
+    for (int i = 0; i < team.num_peers && i < 4; ++i) {
+      const auto &peer = team.peers[i];
+      if (!peer.present)
+        continue;
+      char stats[100];
+      std::snprintf(stats, sizeof(stats),
+                    "L:%d    E:%d  S:%d  J:%d  H:%d  C:%d", peer.level,
+                    peer.endurance, peer.shield, peer.jetpack, peer.hacking,
+                    peer.contacts);
+      const int py = row_y + yoffset + peer_row * 12;
+      const int name_x = panel_x + 10 + 40;
+      const std::string id = std::to_string(t) + std::to_string(i);
+      out.push_back(hud_text(::ui::copy_string(("pln" + id).c_str()), name_x,
+                             py + (12 - 11) / 2,
+                             ::ui::copy_string(peer.name.c_str()),
+                             tokens::kTextHudDefault, tokens::kFontBodyEm,
+                             tokens::kFaceBody));
+      const int stats_w = ((int)std::strlen(stats) + 1) * kAdvBody;
+      out.push_back(hud_text(::ui::copy_string(("pls" + id).c_str()),
+                             panel_x + panel_w - 10 - stats_w,
+                             py + (12 - 11) / 2,
+                             use_text_storage("%s", stats),
+                             tokens::kTextHudDefault, tokens::kFontBodyEm,
+                             tokens::kFaceBody));
+      ++peer_row;
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// System camera inset frames (origin hud_system_camera.cpp)
+// ---------------------------------------------------------------------------
+
+void build_system_camera(std::vector<::ui::UiElement> &out, const Hud &hud,
+                         const ChromeTextures::HudChrome &c) {
+  static const int kLogicalY[2] = {381, 318};
+  for (int slot = 0; slot < 2; ++slot) {
+    if (!hud.system_camera[slot])
+      continue;
+    const Sprite &sp = c.syscam_frame[slot];
+    const char *k = slot ? "syscam1" : "syscam0";
+    // y anchors to bank 92's sheet offset, not the frame sprite's own.
+    out.push_back(tex_at(k, sp.id, -sp.x, kLogicalY[slot] - c.syscam_oy[slot],
+                         sp.w, sp.h));
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Secret hack panel + highlight flashes (origin hud_secret_overlays.cpp)
+// ---------------------------------------------------------------------------
+
+void build_secret_overlay(std::vector<::ui::UiElement> &out, const Hud &hud,
+                          const ChromeTextures::HudChrome &c) {
+  const HudSecretOverlay &sec = hud.secret;
+  if (!sec.visible)
+    return;
+  const int yoffset = sec.yoffset;
+  out.push_back(sprite_at("secbg",
+                          sec.beaming ? c.secret_bg_beaming : c.secret_bg, 0,
+                          yoffset));
+  if (sec.highlight_secrets)
+    out.push_back(tex_at("hlsec", sec.highlight_secrets,
+                         -c.highlight_secrets.x,
+                         yoffset - c.highlight_secrets.y,
+                         c.highlight_secrets.w, c.highlight_secrets.h));
+  if (sec.highlight_minimap)
+    out.push_back(tex_at("hlmap", sec.highlight_minimap,
+                         -c.highlight_minimap.x, -c.highlight_minimap.y,
+                         c.highlight_minimap.w, c.highlight_minimap.h));
+  if (sec.beaming)
+    return;
+  static const char *kNames[9] = {
+      "Guv Net", "OS",       "Protocol", "Cypher Lock 1", "Cypher Lock 2",
+      "Cypher Lock 3", "Header", "Schedule", "Location"};
+  int progress = sec.progress;
+  const bool hack_shift = sec.hacking_tick && hud.phase % 16 < 8;
+  ::ui::Color color = tokens::kTextHudBright;
+  for (int i = 0; i < 9; ++i) {
+    progress -= 20;
+    if (progress < (hack_shift ? -20 : 0))
+      color = tokens::hud_text_key(114, 96);
+    const char *k = ::ui::copy_string(("hack" + std::to_string(i)).c_str());
+    out.push_back(hud_text(k, 10, 54 + i * 13 + yoffset, kNames[i], color,
+                           tokens::kFontBodyEm, tokens::kFaceBody));
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Trace timer (origin hud_readouts.cpp BuildHudTraceTime)
+// ---------------------------------------------------------------------------
+
+void build_trace_time(std::vector<::ui::UiElement> &out, const Hud &hud) {
+  if (!hud.trace_time)
+    return;
+  out.push_back(hud_text(
+      "trace", 20, 350,
+      use_text_storage("Government Trace Time: %u", (unsigned)hud.trace_time),
+      tokens::kTextHudBright, tokens::kFontBodyEm, tokens::kFaceBody));
+}
+
+// ---------------------------------------------------------------------------
+// Status line stack (origin InGameOverlays.cpp DrawStatus)
+// ---------------------------------------------------------------------------
+
+void build_status_lines(std::vector<::ui::UiElement> &out, const Hud &hud) {
+  int liney = 0;
+  int i = 0;
+  for (const HudStatusLine &line : hud.status_lines) {
+    int brightness = 128;
+    if (line.time <= 16)
+      brightness -= (16 - line.time) * 8;
+    const int shadow = brightness - 64 < 8 ? 8 : brightness - 64;
+    // (0,128) is the pre-baked default face; other combos use the fade bakes.
+    auto key = [&](int b) {
+      return (line.color == 0 && b == 128)
+                 ? tokens::kTextHudDefault
+                 : tokens::hud_text_key(line.color, (uint8_t)b);
+    };
+    const int x = (640 - (int)line.text.size() * kAdvBodySm) / 2;
+    const std::string id = std::to_string(i++);
+    out.push_back(hud_text(::ui::copy_string(("stats" + id).c_str()), x + 1,
+                           370 + liney + 1,
+                           ::ui::copy_string(line.text.c_str()), key(shadow),
+                           tokens::kFontBodyEm, tokens::kFaceBodySm));
+    out.push_back(hud_text(::ui::copy_string(("stat" + id).c_str()), x,
+                           370 + liney, ::ui::copy_string(line.text.c_str()),
+                           key(brightness), tokens::kFontBodyEm,
+                           tokens::kFaceBodySm));
+    liney -= 10;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Top ticker (origin InGameOverlays.cpp DrawTopMessage)
+// ---------------------------------------------------------------------------
+
+void build_top_ticker(std::vector<::ui::UiElement> &out, const Hud &hud) {
+  if (!hud.top_message_i || hud.top_message.empty())
+    return;
+  const int slen = (int)hud.top_message.size();
+  int start = 0;
+  if (hud.top_message_i / 2 > 24) {
+    start = (hud.top_message_i / 2) - 24;
+    if (start > slen)
+      start = slen;
+  }
+  const std::string window = hud.top_message.substr(start, 35);
+  out.push_back(hud_text("ticker", 200, 10,
+                         ::ui::copy_string(window.c_str()),
+                         tokens::kTextHudDefault, tokens::kFontBodyEm,
+                         tokens::kFaceBodySm));
+}
+
+// ---------------------------------------------------------------------------
+// Center message reveal (origin InGameOverlays.cpp DrawMessage)
+// ---------------------------------------------------------------------------
+
+void build_center_message(std::vector<::ui::UiElement> &out, const Hud &hud) {
+  if (!hud.message_i || hud.message.empty())
+    return;
+  // Only type<10 (Title-face, color from the table) is ported — those are the
+  // golden-covered types; >=10 use MessageTitle/Subtitle faces (no goldens yet).
+  // origin's type table (InGameOverlays.cpp DrawMessage): palette color + y.
+  struct MsgStyle { uint8_t type, color; int liney; };
+  static const MsgStyle kMsgStyles[] = {{1, 128, 190}, {2, 128, 60},
+                                        {3, 192, 60},  {4, 153, 60},
+                                        {10, 224, 60}, {11, 153, 60},
+                                        {20, 153, 200}};
+  uint8_t color = 208;
+  int liney = 60;
+  for (const MsgStyle &ms : kMsgStyles)
+    if (ms.type == hud.message_type) {
+      color = ms.color;
+      liney = ms.liney;
+    }
+  // Uniform per-frame brightness (origin computes it in a Uint8 — the fade
+  // subtraction + pulse WRAP mod 256; keep the exact arithmetic). The per-glyph
+  // reveal "pop" is NOT computed here: it is the renderer's reveal ramp
+  // (reveal_boost/step), so the whole message is two Text runs per line instead
+  // of one node per glyph (was O(N) nodes + O(N^2) tree walks per frame).
+  uint8_t brightness = 128;
+  if (hud.message_type < 10) {
+    if ((int)hud.message_i - (int)hud.message_time + 8 >= 0)
+      brightness -= (uint8_t)((((int)hud.message_i - (int)hud.message_time + 8) *
+                               8) &
+                              0xFF);
+    if (hud.message_i % 32 >= 16)
+      brightness += (16 - (hud.message_i % 16)) * 2;
+    else
+      brightness += (hud.message_i % 16) * 2;
+  }
+  const int shadow_b = (int)brightness - 64 < 8 ? 8 : (int)brightness - 64;
+  const ::ui::Color main_key = tokens::hud_text_key(color, brightness);
+  const ::ui::Color shadow_key = tokens::hud_text_key(color, (uint8_t)shadow_b);
+
+  const char *text = hud.message.c_str();
+  const int total = (int)hud.message.size();
+  const int adv = kAdvTitle;
+  const int lineheight = 20;
+  // origin reveal "pop": +40-d*8 over the last 5 revealed glyphs => +32 at the
+  // edge, falling by 8/glyph. The renderer applies it to the active line only.
+  const uint8_t kRevealBoost = 32, kRevealStep = 8;
+
+  int g = 0;    // global char index, counts '\n' (matches origin's reveal i)
+  int line = 0; // line index from the top
+  int id = 0;   // unique key suffix
+  while (g < total && g < (int)hud.message_i) {
+    const int line_start = g;
+    int line_len = 0;
+    while (line_start + line_len < total && text[line_start + line_len] != '\n')
+      ++line_len;
+    const int revealed = (int)hud.message_i - line_start < line_len
+                             ? (int)hud.message_i - line_start
+                             : line_len;
+    if (revealed > 0) {
+      const int x = (640 - line_len * adv) / 2; // center by the full line width
+      const int y = liney + line * lineheight;
+      const bool active = ((int)hud.message_i - line_start) <= line_len;
+      const uint8_t rb = active ? kRevealBoost : 0;
+      const uint8_t rs = active ? kRevealStep : 0;
+      const std::string value(text + line_start, (size_t)revealed);
+      const std::string sfx = std::to_string(id++);
+      out.push_back(hud_text(::ui::copy_string(("msgs" + sfx).c_str()), x + 1,
+                             y + 1, ::ui::copy_string(value.c_str()), shadow_key,
+                             28.5f, tokens::kFaceHeading, rb, rs));
+      out.push_back(hud_text(::ui::copy_string(("msg" + sfx).c_str()), x, y,
+                             ::ui::copy_string(value.c_str()), main_key, 28.5f,
+                             tokens::kFaceHeading, rb, rs));
+    }
+    g = line_start + line_len;
+    if (g < total && text[g] == '\n')
+      ++g; // the newline consumes one reveal count (origin per-char loop)
+    ++line;
+  }
+}
+} // namespace client::ui

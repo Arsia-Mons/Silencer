@@ -91,7 +91,7 @@ std::string FetchMapFromServer(const char * mapname,
     // Build URL: {apiURL}/api/maps/by-sha1/{sha1hex}
     char sha1hex[41];
     for (int i = 0; i < 20; i++) {
-        sprintf(&sha1hex[i * 2], "%.2x", sha1hash[i]);
+        snprintf(&sha1hex[i * 2], sizeof(sha1hex) - i * 2, "%.2x", sha1hash[i]);
     }
     sha1hex[40] = '\0';
 

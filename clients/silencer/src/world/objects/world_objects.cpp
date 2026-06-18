@@ -320,7 +320,7 @@ void WorldObjectRegistry::DestroyAllObjects(void){
 	}
 }
 
-bool WorldObjectRegistry::TestAABB(int x1, int y1, int x2, int y2, Object * object, std::vector<Uint8> & types, bool onlycollidable){
+bool WorldObjectRegistry::TestAABB(int x1, int y1, int x2, int y2, Object * object, std::vector<Uint8> & types, bool){
 	int sx1 = 0, sy1 = 0, sx2 = 0, sy2 = 0;
 	object->GetAABB(world.resources, &sx1, &sy1, &sx2, &sy2);
 	Uint8 type = object->type;

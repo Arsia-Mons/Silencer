@@ -216,7 +216,9 @@ static bool ParseBinding(const json& je, Binding& out) {
 			if (!ParseBindingKey(s.get<std::string>(), k)) return false;
 			out.keys.push_back(k);
 		}
-		return !out.keys.empty();
+		// Reject (don't truncate) an over-cap chord: a combo past CHORD_CAP
+		// keys is malformed for the rows-of-combos model.
+		return !out.keys.empty() && (int)out.keys.size() <= CHORD_CAP;
 	}
 	return false;
 }
@@ -241,6 +243,8 @@ bool KeyMap::LoadFile(const std::string& path) {
 		if (!body.contains("bindings") || !body["bindings"].is_array()) continue;
 		ActionBindings& ab = actions_[(int)info->action];
 		for (const auto& je : body["bindings"]) {
+			// Reject over-cap rows: keep at most COMBO_CAP combos per action.
+			if ((int)ab.bindings.size() >= COMBO_CAP) break;
 			Binding b;
 			if (ParseBinding(je, b)) ab.bindings.push_back(std::move(b));
 		}

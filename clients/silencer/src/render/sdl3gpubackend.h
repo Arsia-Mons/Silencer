@@ -3,6 +3,8 @@
 
 #include "renderdevice.h"
 
+#include <cstdint>
+#include <unordered_map>
 #include <vector>
 
 // SDL3 GPU API backend — Metal on macOS, D3D12 on Windows.
@@ -45,6 +47,12 @@ public:
 
 	void SetPalette(const SDL_Color *colors, int count) override;
 	void UploadFrame(const Uint8 *indexed_pixels, int w, int h) override;
+	void UploadUiFrame(const Uint8 *rgba, int w, int h, float global_alpha = 1.0f) override;
+	bool SupportsUiGeometry() const override { return true; }
+	void SubmitUiFrame(const silencer::cppx_ui::GpuUiProgram &program,
+	                   float global_alpha = 1.0f) override;
+	void RequestCapture() override;
+	bool TakeCapturedFrame(std::vector<Uint8> &rgba, int &w, int &h) override;
 	void Present() override;
 	void SetScaleFilter(bool linear) override;
 	void BeginLobbyPanelBorderBlur(int virtualWidth, int virtualHeight, float uiScale) override;
@@ -67,6 +75,17 @@ private:
 	bool CreateLightPipeline();
 	bool CreateParticlePipelines();
 	bool CreateLobbyPanelBlurPipeline();
+	bool CreateUiGeometryPipelines();
+	// Ensure the group-opacity layer composite pipeline + transient target pool
+	// exist at w x h (lazy; only called when a program carries layers).
+	bool EnsureUiLayerResources(int w, int h);
+	// Ensure a 1x1 white texture exists for solid (untextured) UI batches.
+	bool EnsureUiWhiteTexture(SDL_GPUCopyPass *copy);
+	// Ensure the key's premultiplied bytes are resident as a GPU texture; uploads
+	// once on a generation change, then reuses the cached SDL_GPUTexture.
+	SDL_GPUTexture *EnsureUiTexture(SDL_GPUCopyPass *copy, uint64_t key,
+	                                const uint8_t *rgba, int w, int h);
+	void ReleaseUiTextureCache();
 	SDL_GPUShader *LoadShader(SDL_GPUShaderStage stage,
 	                          const ShaderBundle &b,
 	                          Uint32 num_samplers,
@@ -95,6 +114,60 @@ private:
 	int             scene_tex_w = 0;
 	int             scene_tex_h = 0;
 
+	// --- cppx UI overlay (SIL-11): premultiplied RGBA composited over the
+	// swapchain after upscale. Dormant until UploadUiFrame is called. ---
+	SDL_GPUTexture        *ui_tex      = nullptr;
+	int                    ui_tex_w    = 0;
+	int                    ui_tex_h    = 0;
+	SDL_GPUTransferBuffer *ui_tbuf     = nullptr;
+	Uint32                 ui_tbuf_sz  = 0;
+
+	// --- SIL-240 GPU UI geometry path ---
+	// The cppx UI is drawn on the GPU from a vertex storage buffer into
+	// ui_scene_tex (premultiplied), then composited over the swapchain with the
+	// fade as a uniform. Replaces the per-frame CPU raster + full-window upload.
+	SDL_GPUGraphicsPipeline *ui_geom_pipeline      = nullptr; // verts -> ui_scene_tex
+	SDL_GPUGraphicsPipeline *ui_scene_composite_pipeline = nullptr; // ui_scene_tex -> swapchain (fade)
+	SDL_GPUTexture        *ui_scene_tex   = nullptr; // RGBA, UI device res, COLOR_TARGET|SAMPLER
+	int                    ui_scene_w     = 0;
+	int                    ui_scene_h     = 0;
+	SDL_GPUBuffer         *ui_vbuf        = nullptr; // de-indexed UI vertex stream (storage)
+	Uint32                 ui_vbuf_cap    = 0;       // capacity in vertices
+	SDL_GPUTransferBuffer *ui_vbuf_tbuf   = nullptr;
+	Uint32                 ui_vbuf_tbuf_sz = 0;      // bytes
+	SDL_GPUTexture        *ui_white_tex   = nullptr; // 1x1 white for solid batches
+	bool                   ui_white_ready = false;
+	SDL_GPUTransferBuffer *ui_texup_tbuf  = nullptr; // grow-on-demand texture upload staging
+	Uint32                 ui_texup_tbuf_sz = 0;
+	std::unordered_map<uint64_t, SDL_GPUTexture *> ui_tex_cache; // key -> resident texture
+	uint64_t               ui_tex_generation = 0;    // last seen program generation
+	// Pending UI geometry submission for this frame (program owned by the cppx
+	// host, valid until Present). ui_geom_present mirrors ui_present's role.
+	const silencer::cppx_ui::GpuUiProgram *pending_ui_program = nullptr;
+	bool                   ui_geom_present = false;
+	Uint8                  ui_geom_fade    = 255;     // global fade, 0..255
+
+	// Group-opacity layers (SIL-240 stage 3): a LayerPush redirects the subtree
+	// into a transient RGBA target, composited back over its parent at the layer
+	// opacity (a fullscreen premultiplied multiply) at LayerPop. Pool indexed by
+	// nesting depth, sized to ui_scene_tex; allocated only when a program carries
+	// layers (group opacity < 1), so the common no-layer path stays untouched.
+	static constexpr int   kMaxUiLayers = 4;
+	SDL_GPUGraphicsPipeline *ui_layer_composite_pipeline = nullptr; // layer -> RGBA parent (opacity)
+	SDL_GPUTexture        *ui_layer_tex[kMaxUiLayers] = {};
+	int                    ui_layer_w   = 0;
+	int                    ui_layer_h   = 0;
+
+	// --- Swapchain capture (SIL-11 screenshot): download the final composited
+	// frame on request. Armed by RequestCapture(), filled during Present(). ---
+	bool                   capture_pending = false;
+	SDL_GPUTransferBuffer *capture_tbuf    = nullptr;
+	Uint32                 capture_tbuf_sz = 0;
+	std::vector<Uint8>     captured_rgba;
+	int                    captured_w      = 0;
+	int                    captured_h      = 0;
+	bool                   captured_valid  = false;
+
 	// --- Lobby panel-border blur source ---
 	SDL_GPUTexture *lobby_panel_source_tex = nullptr; // full-res scene copy
 	SDL_GPUTexture *lobby_panel_mask_tex = nullptr; // border pixels only
@@ -106,6 +179,7 @@ private:
 	// --- Pipelines ---
 	SDL_GPUGraphicsPipeline *remap_pipeline    = nullptr; // indexed → scene_tex
 	SDL_GPUGraphicsPipeline *upscale_pipeline  = nullptr; // scene_tex → swapchain
+	SDL_GPUGraphicsPipeline *ui_composite_pipeline = nullptr; // ui_tex → swapchain (premult blend)
 	SDL_GPUGraphicsPipeline *lobby_panel_blur_pipeline = nullptr; // scene taps → scene_tex
 	SDL_GPUGraphicsPipeline *lobby_panel_copy_pipeline = nullptr; // source → scene_tex
 	SDL_GPUGraphicsPipeline *light_pipeline    = nullptr; // additive disc → scene_tex
@@ -125,6 +199,16 @@ private:
 	const Uint8 *pending_pixels = nullptr;
 	int          pending_w      = 0;
 	int          pending_h      = 0;
+
+	// --- Pending UI overlay upload (SIL-11) ---
+	const Uint8 *pending_ui_pixels = nullptr;
+	int          pending_ui_w      = 0;
+	int          pending_ui_h      = 0;
+	bool         ui_dirty          = false;
+	bool         ui_present        = false; // an overlay exists to composite
+	// SIL-219: global opacity (0..255) the UI layer is dimmed by during a
+	// FADEOUT transition so it fades with the world. 255 = no change (at rest).
+	Uint8        ui_global_alpha   = 255;
 	bool         frame_dirty    = false;
 
 	// --- Pending lighting (Phase 3) ---

@@ -1,0 +1,14 @@
+#include "cppx_smoke.h"
+
+// SIL-7 pipeline smoke test. See cppx_smoke.hx for why this exists and
+// when to delete it. The JSX below lowers to host-element construction.
+
+namespace silencer::cppx_smoke {
+
+Node sample_tree() {
+  return <detail.Host id="cppx-smoke">
+    Hello from cppx
+  </detail.Host>
+}
+
+}  // namespace silencer::cppx_smoke

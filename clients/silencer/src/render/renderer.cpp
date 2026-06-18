@@ -35,7 +35,7 @@
 #include <math.h>
 #include <string>
 
-Renderer::Renderer(World & world) : world(world), camera(640, 480){
+Renderer::Renderer(World & world) : camera(640, 480), world(world){
 	ambience_r = 0;
 	ex = 0;
 	ey = 0;
@@ -72,7 +72,7 @@ void Renderer::Draw(Surface * surface, float frametime){
 	if(world.resources.spritebank[ex][ey]){
 		BlitSurface(world.resources.spritebank[ex][ey], 0, surface, 0);
 		char temp[1234];
-		sprintf(temp, "(%d)(%d) %d x %d   %d %d", ex, ey, world.resources.spritebank[ex][ey]->w, world.resources.spritebank[ex][ey]->h, world.resources.spriteoffsetx[ex][ey], world.resources.spriteoffsety[ex][ey]);
+		snprintf(temp, sizeof temp, "(%d)(%d) %d x %d   %d %d", ex, ey, world.resources.spritebank[ex][ey]->w, world.resources.spritebank[ex][ey]->h, world.resources.spriteoffsetx[ex][ey], world.resources.spriteoffsety[ex][ey]);
 		DrawText(surface, 10, 200, temp, 133, 7);
 	}
 	SDL_Delay(100);
@@ -330,8 +330,10 @@ void Renderer::DrawWorld(Surface * surface, Camera & camera, bool drawminimap, b
 			DrawParallax(surface, camera);
 		}
 		DrawBackground(surface, camera, drawluminance);
-		DrawRain(surface, camera, frametime);
-		DrawRainPuddles(surface, camera);
+		if(!rainDisabled){
+			DrawRain(surface, camera, frametime);
+			DrawRainPuddles(surface, camera);
+		}
 	}
 	objectlights.clear();
 	// Gather map lights using radius-aware screen overlap, not the sprite bounds.
@@ -662,7 +664,7 @@ void Renderer::DrawWorld(Surface * surface, Camera & camera, bool drawminimap, b
 										User * user = world.lobby.GetUserInfo(peer->accountid);
 										if(team && user && user->agency[team->agency].contacts > 0){
 											char text[16];
-											sprintf(text, "%d", terminal->beamingseconds - terminal->beamingcount);
+											snprintf(text, sizeof text, "%d", terminal->beamingseconds - terminal->beamingcount);
 											DrawText(surface, object->x + camera.GetXOffset() - 3, object->y + camera.GetYOffset(), text, 133, 6, false, 126, 128, true);
 										}
 									}
@@ -973,7 +975,7 @@ void Renderer::DrawWorld(Surface * surface, Camera & camera, bool drawminimap, b
 				dstrect.y = object->y - world.resources.spriteoffsety[85][1] + camera.GetYOffset();
 				BlitSurface(world.resources.spritebank[85][1].get(), 0, surface, &dstrect);
 				char text[16];
-				sprintf(text, "%d", warper->GetCountdown());
+				snprintf(text, sizeof text, "%d", warper->GetCountdown());
 				DrawText(surface, object->x + camera.GetXOffset() - 3, object->y + camera.GetYOffset(), text, 133, 6, false, 126, 128, true);
 			}
 			if(object->type == ObjectTypes::WALLPROJECTILE && renderpass == object->renderpass){
@@ -1737,9 +1739,9 @@ Uint8 Renderer::GetPixel(Surface * surface, unsigned int x, unsigned int y){
 
 void Renderer::DrawDebug(Surface * surface){
 	char temp[1234];
-	sprintf(temp, "%d %d %d %d %d %d", world.localinput.keymovedown, world.localinput.keymoveup, world.localinput.keymoveleft, world.localinput.keymoveright, world.localinput.keyjump, world.localinput.keyjetpack);
+	snprintf(temp, sizeof temp, "%d %d %d %d %d %d", world.localinput.keymovedown, world.localinput.keymoveup, world.localinput.keymoveleft, world.localinput.keymoveright, world.localinput.keyjump, world.localinput.keyjetpack);
 	DrawText(surface, 10, 30, temp, 133, 7, false, -16);
-	sprintf(temp, "mode: %s(%d), snapshots: %d, input packets: %d, ambience: %d objects: %d", world.mode ? "REPLICA" : "AUTHORITY", world.peers.localpeerid, world.replication.totalsnapshots, world.replication.totalinputpackets, world.map.ambience, int(world.objects.objectlist.size()));
+	snprintf(temp, sizeof temp, "mode: %s(%d), snapshots: %d, input packets: %d, ambience: %d objects: %d", world.mode ? "REPLICA" : "AUTHORITY", world.peers.localpeerid, world.replication.totalsnapshots, world.replication.totalinputpackets, world.map.ambience, int(world.objects.objectlist.size()));
 	DrawText(surface, 10, 40, temp, 133, 7, false, -64);
 	for(int i = 0; i < world.maxpeers; i++){
 		if(world.peers.peerlist[i]){
@@ -1748,17 +1750,17 @@ void Renderer::DrawDebug(Surface * surface){
 			for(std::list<Uint16>::iterator it = world.peers.peerlist[i]->controlledlist.begin(); it != world.peers.peerlist[i]->controlledlist.end(); it++){
 				Object * object = world.GetObjectFromId(*it);
 				if(object){
-					sprintf(controlled, " %d(%d, %d) ", (*it), object->x, object->y);
+					snprintf(controlled, sizeof controlled, " %d(%d, %d) ", (*it), object->x, object->y);
 				}
 			}
 			char temp[1234];
-			sprintf(temp, "peerlist(%d)->controlled = (%s) ", i, controlled);
+			snprintf(temp, sizeof temp, "peerlist(%d)->controlled = (%s) ", i, controlled);
 			DrawText(surface, 10, 50 + (10 * i), temp, 133, 7, false, -48);
 			
 			/*for(int j = 0; j < world.maxoldsnapshots; j++){
 				Serializer * oldsnapshot = world.replication.oldsnapshots[i][j];
 				if(oldsnapshot){
-					sprintf(temp, "peerlist(%d)->oldsnapshots[%d] = offset:%d", i, j, oldsnapshot->offset);
+					snprintf(temp, sizeof temp, "peerlist(%d)->oldsnapshots[%d] = offset:%d", i, j, oldsnapshot->offset);
 					DrawText(surface, 10, 100 + (10 * j), temp, 133, 7, false, -48);
 				}
 			}*/
@@ -1766,7 +1768,7 @@ void Renderer::DrawDebug(Surface * surface){
 	}
 }
 
-void Renderer::DrawScaled(Surface * src, Rect * srcrect, Surface *dst, Rect * dstrect, int factor){
+void Renderer::DrawScaled(Surface * src, Rect *, Surface *dst, Rect * dstrect, int factor){
 	for(int y = 0, y2 = 0; y < src->h; y += factor, y2++){
 		for(int x = 0, x2 = 0; x < src->w; x += factor, x2++){
 			Uint8 color = GetPixel(src, x, y);
@@ -1777,7 +1779,7 @@ void Renderer::DrawScaled(Surface * src, Rect * srcrect, Surface *dst, Rect * ds
 	}
 }
 
-void Renderer::DrawCheckered(Surface * src, Rect * srcrect, Surface * dst, Rect * dstrect){
+void Renderer::DrawCheckered(Surface * src, Rect *, Surface * dst, Rect * dstrect){
 	if(src->w % 2 == 0){
 		for(int y = 0; y < src->h; y++){
 			for(int x = y % 2; x < src->w; x += 2){
@@ -1804,7 +1806,7 @@ void Renderer::DrawCheckered(Surface * src, Rect * srcrect, Surface * dst, Rect 
 	}
 }
 
-void Renderer::DrawColored(Surface * src, Rect * srcrect, Surface * dst, Rect * dstrect){
+void Renderer::DrawColored(Surface * src, Rect *, Surface * dst, Rect * dstrect){
 	for(int y = 0; y < src->h; y++){
 		for(int x = 0; x < src->w; x++){
 			Uint8 srcpixel = GetPixel(src, x, y);
@@ -1816,7 +1818,7 @@ void Renderer::DrawColored(Surface * src, Rect * srcrect, Surface * dst, Rect * 
 	}
 }
 
-void Renderer::DrawRampColored(Surface * src, Rect * srcrect, Surface * dst, Rect * dstrect){
+void Renderer::DrawRampColored(Surface * src, Rect *, Surface * dst, Rect * dstrect){
 	for(int y = 0; y < src->h; y++){
 		for(int x = 0; x < src->w; x++){
 			Uint8 srcpixel = GetPixel(src, x, y);
@@ -1828,7 +1830,7 @@ void Renderer::DrawRampColored(Surface * src, Rect * srcrect, Surface * dst, Rec
 	}
 }
 
-void Renderer::DrawBrightened(Surface * src, Rect * srcrect, Surface * dst, Rect * dstrect, Uint8 brightness){
+void Renderer::DrawBrightened(Surface * src, Rect *, Surface * dst, Rect * dstrect, Uint8 brightness){
 	for(int y = 0; y < src->h; y++){
 		for(int x = 0; x < src->w; x++){
 			Uint8 srcpixel = GetPixel(src, x, y);
@@ -1840,7 +1842,7 @@ void Renderer::DrawBrightened(Surface * src, Rect * srcrect, Surface * dst, Rect
 	}
 }
 
-void Renderer::DrawAlphaed(Surface * src, Rect * srcrect, Surface * dst, Rect * dstrect){
+void Renderer::DrawAlphaed(Surface * src, Rect *, Surface * dst, Rect * dstrect){
 	for(int y = 0; y < src->h; y++){
 		for(int x = 0; x < src->w; x++){
 			Uint8 srcpixel = GetPixel(src, x, y);
@@ -1858,7 +1860,7 @@ Surface * Renderer::CreateSurfaceCopy(Surface * src){
 	return effectsurface;
 }
 
-void Renderer::EffectHacking(Surface * dst, Rect * dstrect, Uint8 color){
+void Renderer::EffectHacking(Surface * dst, Rect *, Uint8 color){
 	Uint8 index = state_i % 8;
 	if(index == 0){
 		ex = (rand() % 64);
@@ -1878,7 +1880,7 @@ void Renderer::EffectHacking(Surface * dst, Rect * dstrect, Uint8 color){
 	}
 }
 
-void Renderer::EffectTeamColor(Surface * dst, Rect * dstrect, Uint8 values, bool robot, bool ui){
+void Renderer::EffectTeamColor(Surface * dst, Rect *, Uint8 values, bool robot, bool ui){
 	// Palette dark-range (2-113): ambient-darkened. Lit-range (114-255): always vivid.
 	// Most group anchors are at bc*16 but yellow (bc=9/2) is pale cream at that index.
 	// Use idx 28/140 instead — both are RGB(252,252,0) pure saturated yellow.
@@ -2012,7 +2014,7 @@ void Renderer::EffectRampColorPlus(Surface * dst, Rect * dstrect, Uint8 color, U
     }
 }
 
-void Renderer::EffectHit(Surface * dst, Rect * dstrect, Uint8 hitx, Uint8 hity, Uint8 state_hit){
+void Renderer::EffectHit(Surface * dst, Rect *, Uint8 hitx, Uint8 hity, Uint8 state_hit){
 	Uint8 hit_type = state_hit / 32;
 	Uint8 index = (state_hit % 32) - 1;
 	if(index > 7){
@@ -2056,7 +2058,7 @@ void Renderer::EffectHit(Surface * dst, Rect * dstrect, Uint8 hitx, Uint8 hity, 
 	}
 }
 
-void Renderer::EffectShieldDamage(Surface * dst, Rect * dstrect, Uint8 color){
+void Renderer::EffectShieldDamage(Surface * dst, Rect *, Uint8 color){
 	// 177:0-7 is shield damage stencil
 	for(int y = 0; y < dst->h; y++){
 		for(int x = 0; x < dst->w; x++){
@@ -2069,7 +2071,7 @@ void Renderer::EffectShieldDamage(Surface * dst, Rect * dstrect, Uint8 color){
 	}
 }
 
-void Renderer::EffectWarp(Surface * dst, Rect * dstrect, Uint8 state_warp){
+void Renderer::EffectWarp(Surface * dst, Rect *, Uint8 state_warp){
 	Uint8 index = 7;
 	int yoffset = (state_warp - 8) * 12;
 	if(state_warp >= 12){
@@ -2133,7 +2135,7 @@ void Renderer::MiniMapCircle(int x, int y, Uint8 color){
 	DrawCircle(&world.map.minimap.surface, x1, y1, radius, newcolor);
 }
 
-void Renderer::DrawMirrored(Surface * src, Rect * srcrect, Surface * dst, Rect * dstrect){
+void Renderer::DrawMirrored(Surface * src, Rect *, Surface * dst, Rect * dstrect){
 	int srch = src->h;
 	int srcw = src->w;
 	int dstrectx = dstrect->x;
@@ -2819,5 +2821,11 @@ bool Renderer::CapturePNG(const Surface& buf, const SDL_Color* palette, const ch
 		rgb[i*3+2] = palette[idx].b;
 	}
 	int rc = stbi_write_png(path, buf.w, buf.h, 3, rgb.data(), buf.w * 3);
+	return rc != 0;
+}
+
+bool Renderer::WriteRGBAPNG(const Uint8* rgba, int w, int h, const char* path){
+	if(!rgba || w <= 0 || h <= 0) return false;
+	int rc = stbi_write_png(path, w, h, 4, rgba, w * 4);
 	return rc != 0;
 }

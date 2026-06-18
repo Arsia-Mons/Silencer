@@ -7,7 +7,7 @@ InventoryStation::InventoryStation() : Object(ObjectTypes::INVENTORYSTATION){
 	state_i = 0;
 }
 
-void InventoryStation::Tick(World & world){
+void InventoryStation::Tick(World &){
 	state_i++;
 	if(state_i > 4 * 3){
 		state_i = 0;

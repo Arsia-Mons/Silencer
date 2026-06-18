@@ -1,0 +1,136 @@
+#include "client/ui/screens/gallery.h"
+
+#include "client/ui/components/actions/actions.h"
+#include "client/ui/components/layout/layout.h"
+#include "client/ui/components/surfaces/surfaces.h"
+#include "client/ui/components/text/text.h"
+#include "ui/components/box.h"
+#include "ui/components/scroll_view.h"
+#include "ui/runtime/react.h"
+
+namespace client::ui {
+namespace {
+
+using namespace silencer;
+using ::ui::children;
+using ::ui::components::Box;
+using ::ui::components::BoxProps;
+using ::ui::components::ScrollView;
+using ::ui::components::ScrollViewProps;
+
+struct GalleryProps {
+  uint32_t unused = 0;
+};
+
+// A deterministic, stateless showcase of every semantic component variant. The
+// buttons carry stable control_ids (gal_btn_*) so the visual-regression runner
+// can crop individual variants; the rest are golden-checked as the whole
+// gallery surface. Variants that no product screen exercises (Danger / Ghost /
+// Sm / ScreenTitle Popup / BodyText Summary) live here so they still regress.
+::ui::UiElement GalleryView(const GalleryProps &) {
+  return <ScreenLayout key="root" variant={ScreenLayoutVariant::Game}>
+    <ScreenTitle key="t" variant={ScreenTitleVariant::Screen} value="Component Gallery" />
+    <ActionRow key="cols">
+      <Panel key="scroll" variant={PanelVariant::Sunken}>
+        <ScreenTitle key="sh" variant={ScreenTitleVariant::Dialog} value="ScrollView" />
+        <Box
+          key="svwell"
+          layout={::ui::LayoutStyle{
+            .height = ::ui::Length::points(120.0f),
+            .flex_shrink = ::ui::StyleFloat::points(0.0f)}}
+        >
+          <ScrollView key="sv" id="gal_scroll" step={40.0f}>
+            <BodyText key="r0" variant={BodyTextVariant::Strong} value="Row 01 - top" />
+            <BodyText key="r1" variant={BodyTextVariant::Strong} value="Row 02" />
+            <BodyText key="r2" variant={BodyTextVariant::Strong} value="Row 03" />
+            <BodyText key="r3" variant={BodyTextVariant::Strong} value="Row 04" />
+            <BodyText key="r4" variant={BodyTextVariant::Strong} value="Row 05" />
+            <BodyText key="r5" variant={BodyTextVariant::Strong} value="Row 06" />
+            <BodyText key="r6" variant={BodyTextVariant::Strong} value="Row 07" />
+            <BodyText key="r7" variant={BodyTextVariant::Strong} value="Row 08" />
+            <BodyText key="r8" variant={BodyTextVariant::Strong} value="Row 09" />
+            <BodyText key="r9" variant={BodyTextVariant::Strong} value="Row 10" />
+            <BodyText key="r10" variant={BodyTextVariant::Strong} value="Row 11" />
+            <BodyText key="r11" variant={BodyTextVariant::Strong} value="Row 12" />
+            <BodyText key="r12" variant={BodyTextVariant::Strong} value="Row 13" />
+            <BodyText key="r13" variant={BodyTextVariant::Strong} value="Row 14 - bottom" />
+          </ScrollView>
+        </Box>
+      </Panel>
+      <Panel key="buttons" variant={PanelVariant::Sunken}>
+        <ScreenTitle key="bh" variant={ScreenTitleVariant::Dialog} value="Buttons" />
+        <AppButton
+          key="bp"
+          controlId="gal_btn_primary"
+          variant={AppButtonVariant::Primary}
+          label="Primary"
+        />
+        <AppButton
+          key="bs"
+          controlId="gal_btn_secondary"
+          variant={AppButtonVariant::Secondary}
+          label="Secondary"
+        />
+        <AppButton
+          key="bd"
+          controlId="gal_btn_danger"
+          variant={AppButtonVariant::Danger}
+          label="Danger"
+        />
+        <AppButton
+          key="bg"
+          controlId="gal_btn_ghost"
+          variant={AppButtonVariant::Ghost}
+          label="Ghost"
+        />
+        <AppButton
+          key="bx"
+          controlId="gal_btn_disabled"
+          variant={AppButtonVariant::Primary}
+          disabled={true}
+          label="Disabled"
+        />
+        <AppButton key="bsm" controlId="gal_btn_sm" size={AppButtonSize::Sm} label="Small" />
+        <AppButton
+          key="boval"
+          controlId="gal_btn_oval"
+          variant={AppButtonVariant::Oval}
+          label="Oval"
+        />
+        <AppButton
+          key="bchrome"
+          controlId="gal_btn_chrome"
+          variant={AppButtonVariant::Chrome}
+          label="Chrome"
+        />
+        <AppInput key="in" controlId="gal_input" accessibilityLabel="Input" value="text input" />
+        <AppCheckbox key="ck1" controlId="gal_check_on" checked={true} label="Checked" />
+        <AppCheckbox key="ck0" controlId="gal_check_off" checked={false} label="Unchecked" />
+      </Panel>
+      <Panel key="text" variant={PanelVariant::Sunken}>
+        <ScreenTitle key="th" variant={ScreenTitleVariant::Dialog} value="Type" />
+        <ScreenTitle key="t_hero" variant={ScreenTitleVariant::Hero} value="Hero Title" />
+        <ScreenTitle key="t_screen" variant={ScreenTitleVariant::Screen} value="Screen Title" />
+        <ScreenTitle key="t_dialog" variant={ScreenTitleVariant::Dialog} value="Dialog Title" />
+        <ScreenTitle key="t_popup" variant={ScreenTitleVariant::Popup} value="Popup Title" />
+        <ScreenSubtitle key="t_sub" value="Screen subtitle sample" />
+        <BodyText key="b_normal" variant={BodyTextVariant::Body} value="Body Normal 14px" />
+        <BodyText key="b_strong" variant={BodyTextVariant::Strong} value="Body Strong 16px" />
+        <BodyText key="b_msg" variant={BodyTextVariant::Message} value="Body Message 15px" />
+        <BodyText key="b_detail" variant={BodyTextVariant::Detail} value="Body Detail 12px" />
+        <BodyText key="b_summary" variant={BodyTextVariant::Summary} value="Body Summary 14px" />
+      </Panel>
+    </ActionRow>
+  </ScreenLayout>
+}
+
+} // namespace
+
+bool GalleryScreen::build_element(::ui::UiElementFrame &, ::ui::UiElement *out) {
+  if (!out)
+    return false;
+  *out = ::ui::component("Gallery", GalleryProps{}, GalleryView, "gallery");
+  return true;
+}
+
+} // namespace client::ui

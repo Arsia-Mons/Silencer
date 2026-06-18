@@ -7,7 +7,6 @@ void Game::TickFadeOut(){
 	world.intutorialmode = false;
 	gameRenderer.ApplyPaletteFade(true);
 	if(gameRenderer.PaletteFadeFinished()){
-		gameUiPipeline.ClientUiRef().RequestClearScreens();
 		state = nextstate;
 		gameRenderer.RestartPaletteFade();
 		stateisnew = true;

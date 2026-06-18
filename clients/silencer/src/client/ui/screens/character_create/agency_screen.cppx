@@ -1,0 +1,60 @@
+#include "client/ui/screens/character_create/agency_screen.h"
+
+#include "client/ui/hooks/use_characters.h"
+#include "client/ui/hooks/use_navigation.h"
+#include "client/ui/screens/character_create/components/wizard_components.h"
+#include "client/ui/screens/character_create_data.h" // kAgencyCount
+#include "ui/runtime/react.h"
+
+#include <functional>
+#include <string>
+
+namespace client::ui {
+namespace {
+
+struct AgencyScreenProps {
+  const char *alias = "";
+};
+
+::ui::UiElement AgencyScreenView(const AgencyScreenProps &props) {
+  int *preview = use_state<int>(0);
+  bool *submitting = use_state<bool>(false);
+  if (!preview || !submitting)
+    return ::ui::empty();
+  Characters chars = use_characters();
+  Navigation nav = use_navigation();
+
+  std::function<void(int)> set_preview = [preview](int idx) {
+    if (idx >= 0 && idx < kAgencyCount)
+      *preview = idx;
+  };
+  // Pick: create the agent once (the submitting latch guards a double-click from
+  // creating two), then pop back to the roster. The CREATECHARACTER tick routes
+  // the new agent to the lobby and flips the phase to LOBBY.
+  std::function<void(int)> on_pick = [submitting, create = chars.create,
+                                      alias = std::string(props.alias),
+                                      nav](int agency) {
+    if (*submitting)
+      return;
+    *submitting = true;
+    if (create)
+      create(alias, agency);
+    if (nav.pop_current)
+      nav.pop_current();
+  };
+
+  return AgencyStep(*preview, on_pick, set_preview);
+}
+
+} // namespace
+
+bool AgencyScreen::build_element(::ui::UiElementFrame &, ::ui::UiElement *out) {
+  if (!out)
+    return false;
+  *out = ::ui::component("AgencyScreenView",
+                         AgencyScreenProps{.alias = alias_.c_str()},
+                         AgencyScreenView, "agency-screen");
+  return true;
+}
+
+} // namespace client::ui

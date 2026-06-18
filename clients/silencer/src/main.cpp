@@ -74,7 +74,7 @@ extern "C" void Java_com_silencer_game_Silencer_OuyaControllerKeyEvent(JNIEnv * 
 void CDDataDir(void){
 #ifdef __APPLE__
 	char path[PATH_MAX];
-	sprintf(path, "%s/Silencer", GetAppSupportDirectory());
+	snprintf(path, sizeof path, "%s/Silencer", GetAppSupportDirectory());
 	mkdir(path, 0777);
 	chdir(path);
 #endif

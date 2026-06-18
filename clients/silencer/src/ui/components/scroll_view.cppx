@@ -1,0 +1,268 @@
+#include "ui/components/scroll_view.h"
+
+#include "ui/components/box.h"
+#include "ui/runtime/interaction_hooks.h"
+#include "ui/runtime/react.h"
+
+#include <algorithm>
+#include <functional>
+
+namespace ui::components {
+
+using ::ui::children;
+
+::ui::UiElement ScrollView(const ScrollViewProps &props) {
+  float *offset = use_state<float>(0.0f);
+
+  // Layout measurement read-back (one-frame lag, by design): the viewport
+  // flex-grows and Yoga sizes it; we learn that resolved size — and the inner
+  // content track's height — back from the previous frame keyed by control id.
+  // 0 until first measured: treat as "no overflow yet" so the first frame is
+  // inert, then the real sizes arrive next build.
+  const char *viewport_id = props.id ? props.id : "ScrollView";
+  const char *content_id = use_text_storage("%sContent", viewport_id);
+  const float viewport_height = use_measured_height(viewport_id);
+
+  // When virtualizing, the content track only holds the visible row slice, so
+  // its measured height is the slice — not the full extent. Derive the full
+  // content height from the row count instead. Otherwise read the measured
+  // content track (it holds every child, so its height is the true extent).
+  float content_height = use_measured_height(content_id);
+  if (props.row_height > 0.0f && props.children.count > 0)
+    content_height = props.row_height * (float)props.children.count;
+
+  // SIL-213 scroll-into-view: if keyboard/gamepad focus moved to one of our
+  // descendants and that node is outside the viewport, the focus pass published
+  // a signed delta (keyed by our control id). Apply it so the focused row scrolls
+  // into view. One frame lagged, matching the runtime's interaction model.
+  *offset += use_scroll_into_view(viewport_id);
+
+  const float max_off = std::max(0.0f, content_height - viewport_height);
+
+  // Stick-to-bottom (chat transcripts): once measured, pin the offset to the
+  // bottom and follow content growth. `stuck` stays true until the user scrolls
+  // away (wheel/key set it false below) and flips back on once they return to
+  // the bottom. Initialized true so a fresh chat opens pinned to the newest line.
+  bool *stuck = use_state<bool>(true);
+  if (props.stick_to_bottom && stuck && *stuck && max_off > 0.0f)
+    *offset = max_off;
+
+  if (*offset > max_off)
+    *offset = max_off;
+  if (*offset < 0.0f)
+    *offset = 0.0f;
+  const float step = props.step > 0.0f ? props.step : 32.0f;
+  const float page = viewport_height > 0.0f ? viewport_height : step;
+
+  const bool follow = props.stick_to_bottom;
+  // Re-stick once the user scrolls back to (within a px of) the bottom.
+  auto restick = [stuck, follow, max_off](float v) {
+    if (follow && stuck)
+      *stuck = v >= max_off - 0.5f;
+  };
+  // Wheel: +dy = wheel up, which scrolls toward the top (offset decreases).
+  std::function<void(const ::ui::WheelEvent &)> on_wheel =
+      [offset, max_off, step, restick](const ::ui::WheelEvent &e) {
+        float v = *offset - e.dy * step;
+        if (v < 0.0f)
+          v = 0.0f;
+        if (v > max_off)
+          v = max_off;
+        *offset = v;
+        restick(v);
+      };
+  std::function<void(const ::ui::KeyEvent &)> on_key =
+      [offset, max_off, step, page, restick](const ::ui::KeyEvent &e) {
+        float v = *offset;
+        switch (e.key) {
+        case ::ui::UiKey::Up:
+          v -= step;
+          break;
+        case ::ui::UiKey::Down:
+          v += step;
+          break;
+        case ::ui::UiKey::PageUp:
+          v -= page;
+          break;
+        case ::ui::UiKey::PageDown:
+          v += page;
+          break;
+        case ::ui::UiKey::Home:
+          v = 0.0f;
+          break;
+        case ::ui::UiKey::End:
+          v = max_off;
+          break;
+        default:
+          return;
+        }
+        if (v < 0.0f)
+          v = 0.0f;
+        if (v > max_off)
+          v = max_off;
+        *offset = v;
+        restick(v);
+      };
+
+  // Viewport window: flex-grows to fill the parent (Yoga sizes it); focusable so
+  // it receives hover (wheel routing) + keyboard focus (arrow/page scroll);
+  // overflow Hidden scissors the content track to it.
+  ::ui::LayoutStyle viewport = props.layout;
+  viewport.position = ::ui::PositionType::Relative;
+  viewport.overflow = ::ui::Overflow::Hidden;
+  if (!viewport.flex_grow.is_defined())
+    viewport.flex_grow = ::ui::StyleFloat::points(1.0f);
+  // A flex child with content wants its min-content height as its floor, which
+  // would let a tall content track stretch the viewport instead of clipping it.
+  // Pin the basis to 0 so flex-grow alone decides the height (the parent's free
+  // space), and the overflow:Hidden clip kicks in.
+  if (viewport.flex_basis.kind == ::ui::LengthKind::Undefined ||
+      viewport.flex_basis.kind == ::ui::LengthKind::Auto)
+    viewport.flex_basis = ::ui::Length::points(0.0f);
+  viewport.min_height = ::ui::Length::points(0.0f);
+
+  // Content track: out of flow, translated up by the offset. left/right 0 give
+  // it the viewport width; height auto = natural content height. Its own control
+  // id lets us measure the true content extent back next frame.
+  ::ui::LayoutStyle content = {};
+  content.position = ::ui::PositionType::Absolute;
+  content.direction = ::ui::FlexDirection::Column;
+  content.position_inset.left = ::ui::StyleValue::points(0.0f);
+  content.position_inset.right = ::ui::StyleValue::points(0.0f);
+  // Stick-to-bottom transcripts (chat) bottom-anchor when the content underflows
+  // the viewport: the newest line sits flush to the bottom edge with the empty
+  // gap above it, instead of top-anchoring and leaving dead space below. Once
+  // content overflows (max_off > 0) the gap is <= 0 and this reduces to the
+  // normal top-anchored -offset, so scrolling/stick behave as before. Plain lists
+  // stay top-anchored.
+  float content_top = -*offset;
+  if (props.stick_to_bottom && content_height > 0.0f &&
+      content_height < viewport_height)
+    content_top = (viewport_height - content_height) - *offset;
+  content.position_inset.top = ::ui::StyleValue::points(content_top);
+
+  // Virtualize uniform-height lists: render only the row slice intersecting the
+  // window, with overscan on each side. The slice is a contiguous subrange of
+  // the already-built children arena, so we just retarget the pointer — no copy
+  // — and shift the content track so global row `first` lands at first*row_height.
+  //
+  // The below-fold overscan (kOverscan rows past the last fully-visible row) is
+  // load-bearing for keyboard scroll-into-view (SIL-213): focus can only land on
+  // a COMMITTED row, and scroll-into-view fires only AFTER focus moves onto an
+  // off-viewport row. So the row immediately past the fold must already be
+  // committed for Down to reach it (which then drives the scroll, sliding the
+  // window down to commit the next one).
+  ::ui::UiChildren kids = props.children;
+  if (props.row_height > 0.0f && kids.count > 0) {
+    const float rh = props.row_height;
+    constexpr int kOverscan = 2;
+    int first = (int)(*offset / rh) - 1;
+    if (first < 0)
+      first = 0;
+    int visible = (int)(viewport_height / rh) + 2 + kOverscan;
+    if (first > kids.count - 1)
+      first = kids.count - 1;
+    int last = first + visible;
+    if (last > kids.count)
+      last = kids.count;
+    content.position_inset.top =
+        ::ui::StyleValue::points((float)first * rh - *offset);
+    kids.items = props.children.items + first;
+    kids.count = last - first;
+  }
+
+  // Optional thin scrollbar thumb on the right edge (only when overflowing).
+  // Inset the track top/bottom so it stays inside the enclosing well's
+  // top/bottom border + padding rather than painting over the inset stroke
+  // (the well is typically a 1px frame; 2px of breathing room clears it).
+  ::ui::UiElement bar = ::ui::empty();
+  if (props.show_scrollbar && max_off > 0.0f && viewport_height > 0.0f &&
+      content_height > 0.0f) {
+    constexpr float kTrackInset = 2.0f; // top+bottom clearance from the well edge
+    // The rail is a 1px-bordered box; the thumb is an absolutely-positioned
+    // child whose inset Yoga measures from the rail's OUTER border-box edge (not
+    // the padding edge). So the thumb must be inset by border + a clearance gap
+    // on every side, and it must TRAVEL only within that inner area — otherwise
+    // its fill paints over the rail's hairline (top border at offset 0, bottom
+    // border at max offset, and the left/right borders if it spans full width).
+    constexpr float kRailBorder = 1.0f; // rail hairline width (matches track_paint)
+    constexpr float kThumbGap = 1.0f;   // visible clearance thumb<->border inner edge
+    constexpr float kThumbInset = kRailBorder + kThumbGap; // thumb inset, every side
+    const float track_h = std::max(0.0f, viewport_height - 2.0f * kTrackInset);
+    // Vertical area the thumb may occupy, clear of the top+bottom hairlines+gap.
+    const float thumb_travel = std::max(0.0f, track_h - 2.0f * kThumbInset);
+    const float ratio =
+        content_height > 0.0f ? thumb_travel / content_height : 0.0f;
+    float thumb_h = thumb_travel * ratio;
+    if (thumb_h < 16.0f)
+      thumb_h = 16.0f;
+    if (thumb_h > thumb_travel)
+      thumb_h = thumb_travel;
+    // Top inset (from the rail's outer edge) keeps a full kThumbInset above the
+    // thumb at offset 0 and below it at max offset.
+    const float thumb_top =
+        kThumbInset + (thumb_travel - thumb_h) * (*offset / max_off);
+
+    ::ui::LayoutStyle track = {};
+    track.position = ::ui::PositionType::Absolute;
+    track.position_inset.right = ::ui::StyleValue::points(2.0f);
+    track.position_inset.top = ::ui::StyleValue::points(kTrackInset);
+    track.width = ::ui::Length::points(8.0f);
+    track.height = ::ui::Length::points(track_h);
+    // origin/main green-phosphor scroll box (measured from the v00058 goldens):
+    // a bright idx220 inner-well rail outlines the gutter, with the thumb riding
+    // inside it (1px border + 1px gap on each side) as a flat darker idx216 green
+    // fill that never touches the frame. These mirror silencer::tokens
+    // kInsetStroke/kChromeStroke, which this screen-agnostic engine layer cannot
+    // include.
+    const ::ui::Color rail_stroke{24, 124, 20, 255};
+    const ::ui::Color thumb_fill{8, 84, 0, 255};
+    ::ui::StylePatch track_paint = ::ui::patch().border(::ui::Border{
+        {kRailBorder, kRailBorder, kRailBorder, kRailBorder},
+        {rail_stroke, rail_stroke, rail_stroke, rail_stroke}});
+
+    ::ui::LayoutStyle thumb = {};
+    thumb.position = ::ui::PositionType::Absolute;
+    thumb.position_inset.left = ::ui::StyleValue::points(kThumbInset);
+    thumb.position_inset.right = ::ui::StyleValue::points(kThumbInset);
+    thumb.position_inset.top = ::ui::StyleValue::points(thumb_top);
+    thumb.height = ::ui::Length::points(thumb_h);
+
+    ::ui::StylePatch thumb_paint = ::ui::patch().background(thumb_fill);
+    // Give the thumb a stable control id derived from the ScrollView's id so it
+    // is inspectable/testable (e.g. "GameOptionsList" -> "GameOptionsListThumb").
+    const char *thumb_id =
+        props.id ? use_text_storage("%sThumb", props.id) : "ScrollThumb";
+    // Built via the component factory (not JSX) so the whole scrollbar is one
+    // local expression dropped into the return tree as {bar}.
+    bar = ::ui::component(
+        "Box", BoxProps{.key = "bar",
+                        .layout = track,
+                        .style = track_paint,
+                        .children = children({::ui::component(
+                            "Box",
+                            BoxProps{.key = "thumb",
+                                     .id = thumb_id,
+                                     .layout = thumb,
+                                     .style = thumb_paint},
+                            Box)})},
+        Box);
+  }
+
+  return <Box
+    key={props.key}
+    id={props.id}
+    focusable={true}
+    onKey={on_key}
+    onWheel={on_wheel}
+    layout={viewport}
+    style={props.style}
+  >
+    <Box key="content" id={content_id} layout={content}>
+      {kids}
+    </Box>
+    {bar}
+  </Box>
+}
+
+} // namespace ui::components

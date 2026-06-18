@@ -23,18 +23,18 @@ void Config::Save(void){
 		WriteString(file, "scalefilter", scalefilter ? "1" : "0");
 		WriteString(file, "teamcolors", teamcolors ? "1" : "0");
 		WriteString(file, "music", music ? "1" : "0");
-		sprintf(temp, "%d", musicvolume); WriteString(file, "musicvolume", temp);
-		sprintf(temp, "%d", defaultagency); WriteString(file, "defaultagency", temp);
+		snprintf(temp, sizeof temp, "%d", musicvolume); WriteString(file, "musicvolume", temp);
+		snprintf(temp, sizeof temp, "%d", defaultagency); WriteString(file, "defaultagency", temp);
 		WriteString(file, "lobbyhost", lobbyhost);
-		sprintf(temp, "%d", lobbyport); WriteString(file, "lobbyport", temp);
+		snprintf(temp, sizeof temp, "%d", lobbyport); WriteString(file, "lobbyport", temp);
 		WriteString(file, "mapapiurl", mapapiurl);
 		WriteString(file, "adminapiurl", adminapiurl);
 		WriteString(file, "defaultgamename", defaultgamename);
-		sprintf(temp, "%d", defaulttechchoices[0]); WriteString(file, "defaulttechchoices0", temp);
-		sprintf(temp, "%d", defaulttechchoices[1]); WriteString(file, "defaulttechchoices1", temp);
-		sprintf(temp, "%d", defaulttechchoices[2]); WriteString(file, "defaulttechchoices2", temp);
-		sprintf(temp, "%d", defaulttechchoices[3]); WriteString(file, "defaulttechchoices3", temp);
-		sprintf(temp, "%d", defaulttechchoices[4]); WriteString(file, "defaulttechchoices4", temp);
+		snprintf(temp, sizeof temp, "%d", defaulttechchoices[0]); WriteString(file, "defaulttechchoices0", temp);
+		snprintf(temp, sizeof temp, "%d", defaulttechchoices[1]); WriteString(file, "defaulttechchoices1", temp);
+		snprintf(temp, sizeof temp, "%d", defaulttechchoices[2]); WriteString(file, "defaulttechchoices2", temp);
+		snprintf(temp, sizeof temp, "%d", defaulttechchoices[3]); WriteString(file, "defaulttechchoices3", temp);
+		snprintf(temp, sizeof temp, "%d", defaulttechchoices[4]); WriteString(file, "defaulttechchoices4", temp);
 		WriteString(file, "active_keybind_profile", active_keybind_profile);
 		WriteString(file, "lastspectatable", lastspectatable ? "1" : "0");
 		SDL_CloseIO(file);
@@ -110,7 +110,7 @@ bool Config::CompareString(const char * str1, const char * str2){
 
 void Config::WriteString(SDL_IOStream * file, const char * variable, const char * string){
 	char line[256];
-	sprintf(line, "%s = %s\r\n", variable, string);
+	snprintf(line, sizeof line, "%s = %s\r\n", variable, string);
 	SDL_WriteIO(file, line, strlen(line));
 }
 

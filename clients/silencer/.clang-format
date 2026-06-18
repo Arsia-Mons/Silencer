@@ -1,0 +1,8 @@
+# Silencer C++ style. Matches the cppx UI code: LLVM base, 4-space indent.
+BasedOnStyle: LLVM
+IndentWidth: 4
+TabWidth: 4
+UseTab: Never
+AccessModifierOffset: -4
+ColumnLimit: 0
+SortIncludes: Never

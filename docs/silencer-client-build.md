@@ -70,6 +70,21 @@ local build means reconfiguring with the `-D` set).
   bump both together or the handshake fails. `CPACK_PACKAGE_VERSION`
   is installer metadata only — unrelated to the handshake.
 
+## cppx UI pipeline (Python3 build dependency)
+
+The UI is authored in `.cppx`/`.hx` (JSX-like C++) and transpiled to
+ordinary C++ at **build time** by `tools/cppx_transpile.py`, wired into
+CMake via `cmake/cppx_transpile.cmake`. Configure therefore requires
+`Python3` (`find_package(Python3 COMPONENTS Interpreter REQUIRED)`) — a
+hard build dependency; install it if configure errors with a missing
+Python3.
+
+Generated `.cpp`/`.h` land under `<build>/generated/cppx/`, are
+**gitignored, never committed**, and regenerate every build (same model
+as Unreal's UHT → `Intermediate/`). Authored sources are formatted by
+`tools/cppx_format.py`; the `cppx_format_check` CTest gates them
+(`ctest --test-dir <build> -R cppx_format_check`).
+
 ## vcpkg dependencies
 
 `libmodplug` was removed from `vcpkg.json`: `sdl3-mixer` no longer

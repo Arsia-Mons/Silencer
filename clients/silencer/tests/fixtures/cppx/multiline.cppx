@@ -1,0 +1,16 @@
+#include "panel_components.h"
+
+UiElement BuildMultiline(Actions &actions) {
+  return <Panel
+    key="pause"
+    style={Style{
+          .width = Length::points(320),
+          .height = Length::points(180),
+      }}
+    modal
+  >
+    <Button id="ResumeButton" onActivate={actions.resume}>
+      Resume
+    </Button>
+  </Panel>
+}

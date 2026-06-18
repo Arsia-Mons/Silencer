@@ -1,0 +1,112 @@
+#include "client/ui/screens/options/options_audio.h"
+
+#include "client/ui/components/actions/actions.h"
+#include "client/ui/components/layout/layout.h"
+#include "client/ui/components/surfaces/surfaces.h"
+#include "client/ui/components/text/text.h"
+#include "client/ui/hooks/use_navigation.h"
+#include "client/ui/hooks/use_settings.h"
+#include "client/ui/screens/options/hooks/use_options_commit.h"
+#include "ui/components/box.h"
+#include "ui/runtime/react.h"
+
+#include <cstdint>
+#include <functional>
+
+namespace client::ui {
+namespace {
+
+// JSX lowering emits each tag's component function + `<Tag>Props` type
+// unqualified, so pull in the silencer semantic layer + the runtime children().
+using namespace silencer;
+using ::ui::children;
+using ::ui::components::Box;
+using ::ui::components::BoxProps;
+
+struct OptionsAudioProps {
+  uint32_t unused = 0;
+};
+
+// SIL-108: origin/main's Audio screen is the Music on/off toggle — there is NO
+// volume slider/stepper (the migration's invented -/+ control was removed for
+// parity).
+::ui::UiElement OptionsAudioView(const OptionsAudioProps &) {
+  Navigation nav = use_navigation();
+  Settings settings = use_settings();
+  // Covered overlays render nothing (only the top overlay is interactive).
+  if (!nav.is_top)
+    return ::ui::empty();
+
+  // origin/main: a floating title + the Music toggle + Save/Cancel ovals over the
+  // starfield — NO panel container. Save persists, Cancel reverts the live edits.
+  OptionsCommit commit = use_options_commit(settings.commit, settings.revert);
+
+  // origin/main anchors this dialog in the upper third (title baseline ~y168), not
+  // screen-centered like the options root.
+  //
+  // Margin-right wrappers: centering row+1 / row+2 in 1280 lands the Lg oval
+  // at x=419 (device 628 = origin vx 279 cell) and Save/Cancel at x=336/648
+  // (vx 224/432) — the per-phase oval bake's virtual grid (bare centering
+  // gives 420/337, one device px right of the golden cells).
+  const ::ui::LayoutStyle row_nudge{.margin = ::ui::EdgeSizes{{}, 1.0f, {}, {}}};
+  const ::ui::LayoutStyle actions_nudge{.margin = ::ui::EdgeSizes{{}, 2.0f, {}, {}}};
+  // Asymmetric centering margin: the golden title reads one device px right
+  // of plain centering (origin ceils virtual text x). ml=1 nets +1 device
+  // after the centering/floor cascade (ml=2 measured +3).
+  const ::ui::LayoutStyle title_nudge{.margin = ::ui::EdgeSizes{1.0f, {}, {}, {}}};
+  return <ScreenLayout key="root" variant={ScreenLayoutVariant::Overlay}>
+    <Box
+      key="col"
+      layout={::ui::LayoutStyle{
+        .position = ::ui::PositionType::Absolute,
+        .direction = ::ui::FlexDirection::Column,
+        .align_items = ::ui::AlignItems::Center,
+        .position_inset = ::ui::EdgeSizes{0.0f, 0.0f, 168.0f, {}},
+        .gap = 33.0f}}
+    >
+      <Box key="titlew" layout={title_nudge}>
+        <ScreenTitle key="title" variant={ScreenTitleVariant::Dialog} value="Audio Options" />
+      </Box>
+      <Box key="musicw" layout={row_nudge}>
+        <BooleanSettingRow
+          key="music"
+          controlId="MusicToggle"
+          checked={settings.music}
+          label="Music"
+          onChange={settings.set_music}
+        />
+      </Box>
+      <Box key="actionsw" layout={actions_nudge}>
+      <ActionRow key="actions">
+        <AppButton
+          key="save"
+          controlId="OptionsSave"
+          variant={AppButtonVariant::Oval}
+          label="Save"
+          onPress={commit.save}
+        />
+        <AppButton
+          key="cancel"
+          controlId="OptionsCancel"
+          variant={AppButtonVariant::Oval}
+          label="Cancel"
+          onPress={commit.cancel}
+        />
+      </ActionRow>
+      </Box>
+    </Box>
+  </ScreenLayout>
+}
+
+} // namespace
+
+bool OptionsAudioScreen::build_element(::ui::UiElementFrame &,
+                                       ::ui::UiElement *out) {
+  if (!out)
+    return false;
+  *out = ::ui::component("OptionsAudio", OptionsAudioProps{}, OptionsAudioView,
+                         "options-audio");
+  return true;
+}
+
+} // namespace client::ui

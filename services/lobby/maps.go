@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -233,6 +234,14 @@ func (s *MapStore) List() []*MapMeta {
 	for _, m := range s.bySHA1 {
 		out = append(out, m)
 	}
+	// Deterministic order (Go map iteration is randomized): oldest upload
+	// first, name as the tiebreaker. Clients render the list as-served.
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].UploadedAt != out[j].UploadedAt {
+			return out[i].UploadedAt < out[j].UploadedAt
+		}
+		return out[i].Name < out[j].Name
+	})
 	return out
 }
 

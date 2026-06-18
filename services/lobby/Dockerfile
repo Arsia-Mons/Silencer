@@ -66,6 +66,7 @@ COPY shared/assets/ shared/assets/
 
 RUN cmake -B build -S clients/silencer \
         -DCMAKE_BUILD_TYPE=Release \
+        -DSILENCER_HEADLESS=ON \
         -DSILENCER_VERSION="${SILENCER_VERSION}" \
         -DSILENCER_LOBBY_HOST="127.0.0.1" \
         -DSILENCER_LOBBY_PORT=15170 \

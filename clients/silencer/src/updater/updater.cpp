@@ -73,6 +73,22 @@ void Updater::Retry() {
     Consent();
 }
 
+void Updater::ForceState(State s) {
+    std::lock_guard<std::mutex> lk(mu);
+    state = s;
+    if (s == DOWNLOADING) {
+        // Seed a synthetic progress fraction so the bar renders mid-flight.
+        bytes_got = 42;
+        bytes_total = 100;
+        error.clear();
+    } else if (s == FAILED) {
+        if (error.empty()) error = "Network error (test)";
+    } else if (s == PROMPTING) {
+        error.clear();
+    }
+    fprintf(stderr, "[updater] ForceState(%d) (test)\n", (int)s);
+}
+
 Updater::State Updater::GetState() {
     std::lock_guard<std::mutex> lk(mu);
     return state;
