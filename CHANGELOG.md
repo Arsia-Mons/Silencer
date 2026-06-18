@@ -4,6 +4,14 @@ All notable changes to Silencer are documented here.
 
 ## [Unreleased]
 
+## [v00061] — 2026-06-17
+
+### Lobby
+
+- Re-baselined the wire-protocol fingerprint guard (#282). An incidental no-op
+  edit to `lobby.cpp` in v00060 tripped `TestWireProtocolFingerprint`; the wire
+  protocol is unchanged, so only the stored fingerprint was updated.
+
 ## [v00060] — 2026-06-17
 
 ### Game client
