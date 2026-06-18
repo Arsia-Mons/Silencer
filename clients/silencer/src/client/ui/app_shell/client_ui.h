@@ -135,7 +135,7 @@ private:
   // component tree during the next build so use_focused()/use_hovered()/etc.
   // resolve (one-frame lag, by design — styling design §7).
   ::ui::InteractionSnapshot interaction_snapshot_ = {};
-  // SIL-213: the focused node's scroll-into-view request from the PREVIOUS
+  // The focused node's scroll-into-view request from the PREVIOUS
   // frame's focus pass, published to the tree so the owning ScrollView reacts
   // (one-frame lag, by design — matches interaction_snapshot_).
   ::ui::FocusScrollRequest focus_scroll_request_ = {};

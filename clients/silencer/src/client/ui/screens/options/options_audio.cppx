@@ -27,7 +27,7 @@ struct OptionsAudioProps {
   uint32_t unused = 0;
 };
 
-// SIL-108: origin/main's Audio screen is the Music on/off toggle — there is NO
+// origin/main's Audio screen is the Music on/off toggle — there is NO
 // volume slider/stepper (the migration's invented -/+ control was removed for
 // parity).
 ::ui::UiElement OptionsAudioView(const OptionsAudioProps &) {

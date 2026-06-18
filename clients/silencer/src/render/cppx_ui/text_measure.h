@@ -1,6 +1,6 @@
 #pragma once
 
-// SIL-11: the SDL_ttf-backed MeasureTextFn for the cppx UI. The ONLY
+// The SDL_ttf-backed MeasureTextFn for the cppx UI. The ONLY
 // implementation of the SDL-free ui/ text-measure seam (ui::set_text_measurer);
 // it lives in renderer/ because it owns SDL_ttf. Installed once at startup after
 // FontRegistry::load_faces. Multi-face: selects the TTF face by query font_id.

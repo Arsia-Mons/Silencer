@@ -52,7 +52,7 @@ using ::ui::components::DialogProps;
     </Box>
   }
   if (props.variant == ScreenLayoutVariant::Overlay) {
-    // Full-screen options overlays carry the starfield (SIL-100); the sprite
+    // Full-screen options overlays carry the starfield; the sprite
     // covers the screen behind so the legacy space backdrop reads, with the flat
     // overlay surface as the not-yet-baked fallback.
     client::ui::ChromeTextures chrome = client::ui::use_chrome();

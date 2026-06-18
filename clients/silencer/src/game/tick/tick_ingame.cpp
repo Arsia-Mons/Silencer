@@ -72,7 +72,7 @@ if(/*!world.map.loaded && */stateisnew){
 	renderer.palette.SetParallaxColors(world.map.parallax);
 	GetScreenBuffer().Clear(0);
 	gameRenderer.SetColors(renderer.palette.GetColors());
-	// SIL-236: the game loop's ambience-palette refresh (game_loop.cpp ~302)
+	// The game loop's ambience-palette refresh (game_loop.cpp ~302)
 	// runs only on an ambience-level change or inside the fade-in window
 	// (FadePhase <= 15). Under the clock-based fade, the slow LoadMap above blows
 	// past that window before the block first runs, so on a non-first game (the

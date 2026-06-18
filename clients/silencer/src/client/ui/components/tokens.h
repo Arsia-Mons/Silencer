@@ -36,7 +36,7 @@ constexpr ::ui::Color kBorderHudBand = {46, 125, 69, 255};
 // rather than reverting to the theme's slate hover/pressed deltas.
 // Legacy accent #9FC9FF. In origin/main the accent edge was a baked sprite, not
 // a fill ramp; these hover/pressed/border stops are re-derived on the cool-blue
-// palette as a vector interim (the oval sprite button replaces them in SIL-89).
+// palette.
 // Green-phosphor accent (focus ring + selection wash). origin/main's accent edge
 // was a baked sprite, not a fill ramp; these stops are the green-phosphor family.
 constexpr ::ui::Color kAccent = {92, 208, 92, 255};         // #5CD05C green-bright
@@ -136,7 +136,7 @@ constexpr uint16_t kFaceLarge = 1;   // bank 134, advance 8  (origin Heading)
 constexpr uint16_t kFaceTitle = 2;   // bank 136, advance 16 (origin Prompt)
 constexpr uint16_t kFaceTiny = 3;    // bank 132, advance 4  (origin Tiny)
 constexpr uint16_t kFaceHeading = 4; // bank 135, advance 11 (origin Title — the
-                                     // dominant button-label/title face, SIL-95)
+                                     // dominant button-label/title face)
 // origin tracks the SAME bank at a wider advance for some styles (text.cpp
 // TextRenderStyle advance is per-style, not per-bank); each tracking gets its
 // own baked face since the glyph atlas advance is fixed at bake time.
@@ -193,7 +193,7 @@ inline ::ui::StylePatch panel_patch(::ui::Color background, ::ui::Color border,
           {border, border, border, border}});
 }
 
-// Sprite-backed surface paint (SIL-88). Emits a baked legacy sprite (texture_id
+// Sprite-backed surface paint. Emits a baked legacy sprite (texture_id
 // from use_chrome()) and EXPLICITLY clears the fill/gradient/border/rounding so
 // the role's opaque control paint can't slab behind it: the sprite's index-0
 // transparent corners must reveal the background, not a rectangle. EVERY

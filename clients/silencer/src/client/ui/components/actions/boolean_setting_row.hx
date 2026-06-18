@@ -1,6 +1,6 @@
 #pragma once
 
-// BooleanSettingRow: the origin/main boolean setting control (SIL-100) — an Oval
+// BooleanSettingRow: the origin/main boolean setting control — an Oval
 // Lg button carrying the label (click toggles) + a bank-6 two-cell sprite
 // indicator (off = idx12|13 hollow, on = idx14|15 filled). Replaces the vector
 // AppCheckbox on the options screens. Pulls its sprite ids from use_chrome().

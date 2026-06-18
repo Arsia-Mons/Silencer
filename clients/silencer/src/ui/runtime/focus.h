@@ -43,7 +43,7 @@ struct InputFrame {
   float pointer_y = 0.0f;
 
   // Scroll-wheel delta this frame (+y = wheel up); routed to the hovered
-  // scrollable. SIL-111.
+  // scrollable.
   float wheel_x = 0.0f;
   float wheel_y = 0.0f;
 
@@ -65,7 +65,7 @@ struct FocusableLayout {
   // Nearest ancestor that scroll-clips this node (overflow Scroll/Hidden), or 0
   // if none. Directional nav prefers staying within the same scroll container so
   // it traverses every row in order (including scrolled-off ones) before leaving
-  // the container — SIL-213.
+  // the container.
   NodeId scroll_container = 0;
   Rect rect = {};
   bool disabled = false;
@@ -73,7 +73,7 @@ struct FocusableLayout {
   uint32_t order = 0;
 };
 
-// Scroll-into-view request (SIL-213). After the focus pass resolves, the runtime
+// Scroll-into-view request. After the focus pass resolves, the runtime
 // computes — for the focused node's nearest scrolling-clip ancestor — how far
 // that container must move its scroll offset to bring the focused node fully
 // inside its clip rect. `delta_y` is signed (negative = scroll toward the top to
@@ -125,7 +125,7 @@ struct FocusRuntime {
   // focus came from auto-default, not real input; the next nav treats it as
   // neutral and enters from the edge instead of advancing past it.
   bool focused_is_auto_default = false;
-  FocusScrollRequest scroll_request = {}; // SIL-213 scroll-into-view this frame
+  FocusScrollRequest scroll_request = {}; // scroll-into-view this frame
   int error_count = 0;
 };
 

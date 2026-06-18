@@ -1,7 +1,7 @@
 #pragma once
 
 // ui_draw_program_builder.h — the cppx-side lowering of the DrawCommandList IR
-// into a backend-neutral GpuUiProgram (SIL-240). Split from ui_draw_program.h
+// into a backend-neutral GpuUiProgram. Split from ui_draw_program.h
 // so the data types stay SDL-free for the backend boundary while the builder
 // (which needs the SDL-bound registries) lives on the cppx side.
 

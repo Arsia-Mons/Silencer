@@ -14,7 +14,7 @@ namespace client::ui {
 // (CreateCharacter / SelectCharacter), queued + drained after render; a
 // successful create routes to the lobby via the CREATECHARACTER tick reconcile,
 // a select routes immediately. (rename / set_agency join with the lobby
-// CharacterPanel in a later SIL-21 sub-slice.)
+// CharacterPanel later.)
 struct CharacterProfile {
   std::string name = {};
   int agency_index = 0;

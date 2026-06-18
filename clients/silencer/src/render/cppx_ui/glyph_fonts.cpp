@@ -15,7 +15,7 @@ namespace {
 // all bottom out on the shared baseline; descenders (g/j/p/q/y) extend below it.
 // The baseline is therefore the MODAL ink-bottom row across the glyph set — the
 // row where the bulk of glyphs sit. atlas_h - ascent is the empty descender zone
-// that used to push the centered caret too low (SIL-217). Falls back to atlas_h
+// that used to push the centered caret too low. Falls back to atlas_h
 // when no ink is found.
 int derive_ascent(const GlyphFonts::GlyphSrc *glyphs, int count, int atlas_h) {
   if (atlas_h < 1)
@@ -173,7 +173,7 @@ bool GlyphFonts::build_face(SDL_Renderer *renderer, int face_id,
   SDL_SetTextureBlendMode(tex, SDL_BLENDMODE_BLEND_PREMULTIPLIED);
   SDL_SetTextureScaleMode(tex, SDL_SCALEMODE_NEAREST);
 
-  // Retain the premultiplied atlas bytes for the GPU emitter (SIL-240); the
+  // Retain the premultiplied atlas bytes for the GPU emitter; the
   // texture above already holds its own copy, so the source can be moved.
   f.atlas_rgba = std::move(rgba);
   if (faces_[face_id].atlas)
@@ -267,7 +267,7 @@ bool GlyphFonts::build_color_face(SDL_Renderer *renderer, int face_id,
     return false;
   SDL_SetTextureBlendMode(tex, SDL_BLENDMODE_BLEND_PREMULTIPLIED);
   SDL_SetTextureScaleMode(tex, SDL_SCALEMODE_NEAREST);
-  f.atlas_rgba = std::move(rgba); // GPU emitter copy (SIL-240)
+  f.atlas_rgba = std::move(rgba); // GPU emitter copy
   f.atlas = tex;
   f.loaded = true;
 

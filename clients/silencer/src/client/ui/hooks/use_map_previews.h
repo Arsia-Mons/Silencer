@@ -6,7 +6,7 @@
 
 namespace client::ui {
 
-// SIL-216: the per-map minimap previews surfaced to .cppx screens. The renderer
+// The per-map minimap previews surfaced to .cppx screens. The renderer
 // bridge bakes each bundled map's stored 172x62 indexed minimap + the active
 // palette into a premultiplied-RGBA texture once (keyed by map filename) and
 // hands the opaque `texture_id`s here, mirroring how use_chrome() surfaces baked
@@ -22,7 +22,7 @@ struct MapPreviews {
   static constexpr int kHeight = 62;
 
   std::unordered_map<std::string, uint32_t> by_filename = {};
-  // SIL-231: the hovered map's name + description (from the map header) so the
+  // The hovered map's name + description (from the map header) so the
   // cursor-following preview card shows them under the minimap, like origin.
   std::unordered_map<std::string, std::string> name_by_filename = {};
   std::unordered_map<std::string, std::string> desc_by_filename = {};

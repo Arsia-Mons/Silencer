@@ -2,7 +2,7 @@
 
 #include "game.h"
 #include "world.h"
-#include "resources/resources.h" // spritebank (SIL-87 chrome bake)
+#include "resources/resources.h" // spritebank (chrome bake)
 #include "lobby.h"
 #include "lobbygame.h"
 #include "peer.h"
@@ -15,7 +15,7 @@
 #include "perf_trace.h"
 #include "player.h"
 #include "buyableitem.h"
-// SIL-14 golden cppx render path.
+// golden cppx render path.
 #include "render/cppx_ui/pipeline_host.h"
 #include "client/ui/app_shell/app_root.h"
 #include "client/ui/app_shell/client_ui.h"
@@ -65,7 +65,7 @@
 #include <vector>
 
 namespace {
-// SIL-15 use_key_map: convert UI chips back to an input Binding, enforcing the
+// use_key_map: convert UI chips back to an input Binding, enforcing the
 // chord cap (reject, never truncate). Returns false if the chord is empty or
 // over CHORD_CAP.
 bool ChipsToBinding(const std::vector<client::ui::KeyMapChip> &chips,
@@ -157,9 +157,8 @@ void GameUiPipeline::DrawInGameWorldInsets(Surface &surface, float frametime) {
 
 void GameUiPipeline::RenderClientUiFrame(Surface &surface, float frametime) {
     (void)frametime;
-    // SIL-14: the golden retained cppx path is the live UI. GameRenderer::Present
-    // uploads the RGBA we stash here. The Clay frame path is gone; the Clay
-    // runtime/objects themselves are retired in SIL-22.
+    // The golden retained cppx path is the live UI. GameRenderer::Present
+    // uploads the RGBA we stash here.
     RenderCppxClientUiFrame(surface);
 }
 
@@ -263,7 +262,7 @@ void GameUiPipeline::BakeChromeTextures(int rw, int rh, float uiScale,
     // The ovals (and the toggle cells below) are drawn 1:1 in origin's virtual
     // canvas. Register the indexed source so the executor swaps each draw for the
     // canonical device-cell variant (resolve_legacy) — origin's NEAREST-magnify
-    // duplication bands at phase 0, identical at every position (U-2/SIL-204).
+    // duplication bands at phase 0, identical at every position.
     using silencer::cppx_ui::LegacyFit;
     auto register_legacy = [&](size_t bank, size_t index, uint32_t id,
                                LegacyFit fit = LegacyFit::Cell, int cl = 0,
@@ -599,7 +598,7 @@ void GameUiPipeline::BakeChromeTextures(int rw, int rh, float uiScale,
             bake_bracket('[', 0, cppxChrome.bracket_l);
             bake_bracket(']', 1, cppxChrome.bracket_r);
         }
-        // bank 181 idx0-4 — the five agency emblems (SIL-102 Character Create detail).
+        // bank 181 idx0-4 — the five agency emblems (Character Create detail).
         // origin draws them PackImageContain into their element box, so register the
         // contain flavor: the executor swaps each draw for a canonical per-size
         // variant baked through origin's letterbox + magnify arithmetic.
@@ -1045,7 +1044,7 @@ void GameUiPipeline::BakeChromeTextures(int rw, int rh, float uiScale,
 }
 
 void GameUiPipeline::BakeMapPreviews() {
-    // SIL-216: decompress each bundled map's stored 172x62 minimap and bake it to a
+    // Decompress each bundled map's stored 172x62 minimap and bake it to a
     // preview texture_id, once (maps don't change at runtime). This is the only
     // place that reads the map files + indexed minimap + palette for the UI; the
     // opaque ids travel to screens via the MapPreviewsProvider. The Create-Game map
@@ -1085,7 +1084,7 @@ void GameUiPipeline::BakeMapPreviews() {
         uint32_t id = cppxHost->bake_chrome_sprite(pixels, w, h, palette);
         if (id) {
             cppxMapPreviews_.by_filename[label] = id;
-            // SIL-231: carry the map name (filename) + header description to the preview.
+            // carry the map name (filename) + header description to the preview.
             cppxMapPreviews_.name_by_filename[label] = label;
             size_t dlen = 0;
             while (dlen < sizeof(header.description) && header.description[dlen])
@@ -1193,7 +1192,7 @@ GameUiPipeline::EnsureHudTeamEmblem(uint8_t agency, uint8_t color) {
 }
 
 bool GameUiPipeline::UseGpuUi() {
-    // SIL-240: route the cppx UI through the GPU geometry path when the backend
+    // Route the cppx UI through the GPU geometry path when the backend
     // supports it. ON by default (the production path); SILENCER_GPU_UI=0 is a
     // kill switch back to the legacy CPU-raster upload. The flag is read once.
     // Headless/TUI (no geometry-capable device) always keep the CPU raster path.
@@ -1213,7 +1212,7 @@ void GameUiPipeline::RenderCppxClientUiFrame(Surface &surface) {
     cppxUiProgram_ = nullptr;
     cppxUiUnchanged_ = false;
 #ifdef SILENCER_CPPX_FONT_DIR
-    // SIL-94: snapshot the per-frame wall clock ONCE per render frame. The
+    // Snapshot the per-frame wall clock ONCE per render frame. The
     // frame-provider lambda below runs once per visible SCREEN LAYER (base +
     // overlays), so computing the delta there collapsed it to 0 on every layer
     // after the first — animation hooks never advanced.
@@ -1223,7 +1222,7 @@ void GameUiPipeline::RenderCppxClientUiFrame(Surface &surface) {
         cppxLastUiTicks_ = nowMs;
     }
     // Menus render at native window-pixel resolution so the UI composite maps 1:1
-    // over the upscaled world frame (matches the SIL-11 demo). Headless / no
+    // over the upscaled world frame. Headless / no
     // window falls back to the surface size so the path still runs (UploadUiFrame
     // is a no-op on devices without a UI composite pass).
     // IN-GAME the UI renders at the SURFACE size (640x480, kLegacyRender) on ALL
@@ -1242,7 +1241,7 @@ void GameUiPipeline::RenderCppxClientUiFrame(Surface &surface) {
     // but UnloadGame() (which clears map.loaded) doesn't run until the NEXT frame
     // (game_loop MAINMENU stateisnew branch), so a map.loaded gate rendered the menu
     // for one frame at the 640x480 surface scale (2/3) and it snapped to window scale
-    // the next frame — a visible menu zoom on tutorial exit (SIL-240). The window
+    // the next frame — a visible menu zoom on tutorial exit. The window
     // pixel size comes from the GameRenderer cache (refreshed on resize, never a
     // per-frame poll) so the menu aspect also stays stable across the HiDPI late-size.
     using ::client::ui::SessionPhase;
@@ -1288,14 +1287,14 @@ void GameUiPipeline::RenderCppxClientUiFrame(Surface &surface) {
     if (!cppxHost->ensure(rw, rh, SILENCER_CPPX_FONT_DIR))
         return;
 
-    // SIL-87: bake the curated legacy chrome sprites into texture_ids once per
+    // Bake the curated legacy chrome sprites into texture_ids once per
     // renderer lifetime (re-baked after a resize reset, never per frame). The
     // composition root is the only place that may read the indexed spritebank +
     // palette; the ids flow to screens through the ChromeTexturesProvider below.
     if (cppxHost->chrome_needs_bake()) {
         BakeChromeTextures(rw, rh, cppxScale, false);
         cppxHost->mark_chrome_baked();
-        // SIL-216: a renderer reset (e.g. resize) clears the texture registry and
+        // a renderer reset (e.g. resize) clears the texture registry and
         // re-IDs every chrome texture, so the map-preview ids baked earlier now alias
         // other textures. Invalidate them so BakeMapPreviews re-bakes against the fresh
         // registry on the next lobby frame.
@@ -1379,7 +1378,7 @@ void GameUiPipeline::RenderCppxClientUiFrame(Surface &surface) {
             };
 
             // Settings model (doc §6): read the live Config + install live-apply preview
-            // closures over the public subsystems (SIL-6 LOCKED: live-apply preview). dirty
+            // closures over the public subsystems. dirty
             // = live Config diverges from the last-committed snapshot.
             client::ui::Settings settings = {};
             {
@@ -1556,7 +1555,7 @@ void GameUiPipeline::RenderCppxClientUiFrame(Surface &surface) {
             // public lobby seam. Consumed by LobbyConnect (connect/auth) and MissionSummary
             // (progression). The connect *orchestration* lives on the game tick
             // (LobbyConnectFlow); this carries only the credential-submit/cancel + upgrade/
-            // finish intents. SIL-20.
+            // finish intents.
             client::ui::LobbyProviderValue lobby = {};
             lobby.snapshot = lobbySnapshot_;
             lobby.connect = [this](const std::string &user, const std::string &pass) {
@@ -1730,7 +1729,7 @@ void GameUiPipeline::RenderCppxClientUiFrame(Surface &surface) {
                         p->currentinventoryitem = (Uint8)slot;
                 });
             };
-            // SIL-21 (5/n) in-match overlay intents (doc §6/§7a): buy/tech station, chat
+            // in-match overlay intents (doc §6/§7a): buy/tech station, chat
             // compose, and the scoreboard toggle — queued over the public World/Player seam
             // (drained after render, FADEOUT-gated). The viewed agent matches the snapshot.
             world_session.buytech_select = [this](int index) {
@@ -1850,13 +1849,13 @@ void GameUiPipeline::RenderCppxClientUiFrame(Surface &surface) {
                                              .version = SILENCER_VERSION,
                                              .canvas_w = cppxCanvasW_},
                 ::ui::children({tree}));
-            // SIL-94: per-frame wall-clock for component animation (use_clock) —
+            // per-frame wall-clock for component animation (use_clock) —
             // snapshotted once per render frame in RenderCppxClientUiFrame (this lambda
             // runs once per visible screen layer).
             tree = client::ui::ClockProvider(cppxClock_, ::ui::children({tree}));
-            // SIL-87: baked legacy-sprite chrome ids (read by use_chrome()).
+            // baked legacy-sprite chrome ids (read by use_chrome()).
             tree = client::ui::ChromeTexturesProvider(cppxChrome, ::ui::children({tree}));
-            // SIL-216: baked per-map minimap previews (read by use_map_previews()).
+            // baked per-map minimap previews (read by use_map_previews()).
             tree = client::ui::MapPreviewsProvider(cppxMapPreviews_, ::ui::children({tree}));
             tree = silencer::game_ui::ServerProvider(
                 silencer::game_ui::ServerProviderValue{&game},
@@ -1888,7 +1887,7 @@ void GameUiPipeline::RenderCppxClientUiFrame(Surface &surface) {
     // cancel router (ClientUi::end_layout). game.cpp/this composition root hold no
     // cancel policy — they only plumb the cancel edge into the UiInputFrame.
 
-    // SIL-18 input: the accumulated per-frame edges (events.cpp windowed +
+    // input: the accumulated per-frame edges (events.cpp windowed +
     // control-socket injection) plus the derived pointer. An injected click is a
     // single-frame press+release at a UI-space point (so the control socket can
     // activate a node by location); otherwise the real mouse drives hover/press.
@@ -1898,7 +1897,7 @@ void GameUiPipeline::RenderCppxClientUiFrame(Surface &surface) {
     float mx = -1000.0f;
     float my = -1000.0f;
     if (injectedPressHeld_) {
-        // SIL-223: sustained held press. Press edge on the first frame only, then a
+        // Sustained held press. Press edge on the first frame only, then a
         // continuous pointer_down so the PRESSED interaction state persists for a
         // screenshot. Released by InjectPointerRelease (emits the release edge below).
         mx = injectedPressX_;
@@ -1910,7 +1909,7 @@ void GameUiPipeline::RenderCppxClientUiFrame(Surface &surface) {
         prevPointerDown_ = true;
         injectedPressIsNew_ = false;
     } else if (!win && prevPointerDown_) {
-        // SIL-223: the frame after a held-press release (headless, no real mouse).
+        // The frame after a held-press release (headless, no real mouse).
         // Emit the release edge at the last press point so the node deactivates
         // cleanly, then settle to idle.
         mx = injectedPressX_;
@@ -1954,11 +1953,11 @@ void GameUiPipeline::RenderCppxClientUiFrame(Surface &surface) {
     }
     frame.pointer = {mx, my};
 
-    // SIL-20: capture the lobby read-state once per tick, under LockMutex, *before*
+    // Capture the lobby read-state once per tick, under LockMutex, *before*
     // the build below reads it (the frame provider copies lobbySnapshot_ with no
     // build-time lock). Default/empty outside lobby phases.
     lobbySnapshot_ = silencer::game_ui::CaptureLobbySnapshot(game, CurrentSessionPhase());
-    // SIL-21 (3/n): fold in the bundled-map choices for the GameCreatePanel. Maps
+    // Fold in the bundled-map choices for the GameCreatePanel. Maps
     // don't change at runtime, so list them once (disk read on the game thread).
     if (!bundledMapsListed_) {
         // origin BuildMapList: bundled res-dir maps + the player's downloaded maps
@@ -1984,13 +1983,13 @@ void GameUiPipeline::RenderCppxClientUiFrame(Surface &surface) {
         }
         bundledMapsListed_ = true;
     }
-    // SIL-216: bake each local bundled map's minimap to a preview texture once the
+    // Bake each local bundled map's minimap to a preview texture once the
     // list is known (server-only maps have no local file and are skipped). Self-
     // guards on mapPreviewsBaked_, so this re-bakes after a renderer reset cleared
     // the ids but is otherwise a no-op.
     BakeMapPreviews();
     lobbySnapshot_.bundled_maps = bundledMaps_;
-    // SIL-21 (4/n): capture the in-match read-state (viewed agent + replicated match
+    // Capture the in-match read-state (viewed agent + replicated match
     // state) on the game thread before the build. Empty outside the match phases.
     worldSessionSnapshot_ = silencer::game_ui::CaptureWorldSessionSnapshot(game, CurrentSessionPhase());
 
@@ -2001,7 +2000,7 @@ void GameUiPipeline::RenderCppxClientUiFrame(Surface &surface) {
     cppxHost->pipeline().client_ui().set_structural_hold(true);
 
     if (UseGpuUi()) {
-        // SIL-240: lower the IR straight to a GPU geometry program — no full-res CPU
+        // Lower the IR straight to a GPU geometry program — no full-res CPU
         // raster, no full-window upload. GameRenderer::Present hands it to the backend
         // via RenderDevice::SubmitUiFrame. The windowed screenshot path captures the
         // composited swapchain, so no packed RGBA is needed.
@@ -2026,13 +2025,13 @@ void GameUiPipeline::RenderCppxClientUiFrame(Surface &surface) {
             cppxUiW = ow;
             cppxUiH = oh;
         }
-        // SIL-237: report whether the raster was skipped (IR byte-identical). When the
+        // Report whether the raster was skipped (IR byte-identical). When the
         // raster ran, rgba is non-null; when it was skipped, rgba is still the cached
         // buffer. cppxUiRgba being null (host not ready) is not an "unchanged" frame.
         cppxUiUnchanged_ = unchanged && rgba != nullptr;
     }
 
-    // SIL-225: Options + its submenus (and pause/modals) are pushed/popped as
+    // Options + its submenus (and pause/modals) are pushed/popped as
     // Tier-1 overlays via use_navigation, which never calls GoToState. They get the
     // SAME full out->in fade as a state transition, gated per screen: the swap is
     // held (above) and we drive a two-leg palette fade here, mirroring the FADEOUT

@@ -15,11 +15,9 @@
 
 namespace silencer::cppx_ui {
 
-// The production render seam SIL-13 deferred: drives the golden
-// client::ui::UiPipeline and turns one frame into a tightly-packed RGBA buffer
-// that the GPU backend uploads via RenderDevice::UploadUiFrame (the same
-// software-raster -> upload -> GPU-composite path SIL-11 proved with the demo
-// overlay, now fed by the real pipeline instead of a hand-built command list).
+// The production render seam: drives the client::ui::UiPipeline and turns one
+// frame into a tightly-packed RGBA buffer that the GPU backend uploads via
+// RenderDevice::UploadUiFrame (software-raster -> upload -> GPU-composite).
 //
 // Each frame: begin the UiSurface, run render_client_ui_frame() — which builds
 // the retained tree, lays it out, focuses, and builds the tagged-union IR, then
@@ -49,7 +47,7 @@ public:
   // or null if not initialized. The buffer is owned by the host and valid until
   // the next render()/ensure().
   //
-  // SIL-237 dirty-skip: the retained tree, layout, focus pass, and IR build
+  // Dirty-skip: the retained tree, layout, focus pass, and IR build
   // always run (they carry the animation/interaction state). But the costly
   // native-resolution raster (clear -> execute IR -> SSAA resolve -> packed
   // copy) is skipped when the freshly-built DrawCommandList IR is byte-identical
@@ -61,7 +59,7 @@ public:
   const uint8_t *render(const client::ui::UiPipelineFrame &frame, int *out_w,
                         int *out_h, bool *out_unchanged = nullptr);
 
-  // SIL-240 GPU path: run the same build/layout/focus/IR as render(), but lower
+  // GPU path: run the same build/layout/focus/IR as render(), but lower
   // the IR to a backend-neutral GpuUiProgram (geometry + texture manifest) the
   // GPU backend draws directly — no CPU raster, no full-window upload. Returns a
   // pointer to the host-owned program (valid until the next build_gpu_frame()/
@@ -69,7 +67,7 @@ public:
   // headless/test path.
   const GpuUiProgram *build_gpu_frame(const client::ui::UiPipelineFrame &frame);
 
-  // ---- Chrome sprite bake seam (SIL-87) ----------------------------------
+  // ---- Chrome sprite bake seam ----------------------------------
   // The SDL_Textures are bound to the software renderer `r_`, which ensure()
   // recreates on a size change — so baked chrome must be re-baked whenever `r_`
   // is recreated (tracked by `chrome_dirty_`), NOT every frame. The composition
@@ -88,7 +86,7 @@ public:
 
   // Register an already-baked chrome texture's indexed source so the executor
   // can swap qualifying draws for lazily-baked CANONICAL device-cell variants
-  // (origin's magnify arithmetic at phase 0 — U-2/SIL-204). `fit`
+  // (origin's magnify arithmetic at phase 0). `fit`
   // picks the box arithmetic (TextureRegistry::LegacyFit); caps (virtual px)
   // apply to NineSlice only.
   void register_legacy(uint32_t texture_id, const uint8_t *indices, int w,
@@ -129,12 +127,12 @@ private:
   int w_ = 0;
   int h_ = 0;
   bool chrome_dirty_ = true; // re-bake chrome when r_ (and its textures) reset
-  // SIL-237 dirty-skip state: signature of the LAST rastered IR + whether
+  // Dirty-skip state: signature of the LAST rastered IR + whether
   // `packed_` holds a valid frame for it. A signature of 0 / packed_valid_
   // false forces a re-raster (e.g. after ensure() resizes the surface).
   uint64_t last_ir_sig_ = 0;
   bool packed_valid_ = false;
-  // SIL-240 GPU path: the reusable draw program + a generation that bumps every
+  // GPU path: the reusable draw program + a generation that bumps every
   // time the registries reset (ensure() recreates r_ and re-bakes), so the GPU
   // backend knows to flush its texture cache.
   GpuUiProgram gpu_program_;

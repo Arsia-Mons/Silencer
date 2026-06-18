@@ -28,7 +28,7 @@ void bake_indexed_rgba(const uint8_t *indices, int w, int h,
 }
 
 
-// ---- Canonical-phase element bakes (U-2 / SIL-204) -------------------------
+// ---- Canonical-phase element bakes -------------------------
 
 namespace {
 

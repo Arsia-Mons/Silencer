@@ -34,7 +34,7 @@ struct TextMetricsResult {
                        // text ink height for non-descender glyphs). 0 => unknown
                        // (caller falls back to the full line box). Drives the
                        // input caret height so it tracks the glyph ink, not the
-                       // descender-inclusive cell (SIL-217).
+                       // descender-inclusive cell.
   uint8_t line_count = 0; // <= UI_MAX_TEXT_LINES
   LineRun lines[UI_MAX_TEXT_LINES] = {};
   bool overflowed = false; // wrapped output needed > UI_MAX_TEXT_LINES lines

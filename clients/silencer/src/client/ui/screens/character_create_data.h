@@ -1,7 +1,7 @@
 #pragma once
 
-// SIL-101 / parity: the Character Create "Select Agency" detail content,
-// ported verbatim from origin/main character_create_layout.cpp kAgencies.
+// The Character Create "Select Agency" detail content, sourced from
+// origin/main character_create_layout.cpp kAgencies.
 // Advantage rows split origin's "Label +N" lines into label + bonus (the
 // brackets render as bank-134 glyph sprites, not text); "... Ability" lines
 // are label-only and origin orders them after the +N rows. The description is

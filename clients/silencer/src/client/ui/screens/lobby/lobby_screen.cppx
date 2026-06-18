@@ -176,7 +176,7 @@ GameSelection use_game_selection(const Games &games) {
   return s;
 }
 
-// SIL-216: the Select-Map cursors (selected + hovered row). Upper bound clamped
+// The Select-Map cursors (selected + hovered row). Upper bound clamped
 // to the live map list; the hover clears when the create form closes.
 struct MapHover {
   bool ok = false;
@@ -188,7 +188,7 @@ MapHover use_map_hover_preview(const Games &games, bool creating) {
   MapHover s;
   // origin starts with NO map selected (mapSelectedIndex -1, no highlight).
   s.map_index = use_state<int>(-1);
-  s.hovered = use_state<int>(-1); // SIL-216: row under the cursor (-1 = none)
+  s.hovered = use_state<int>(-1); // row under the cursor (-1 = none)
   if (!s.map_index || !s.hovered)
     return s;
   s.ok = true;
@@ -215,7 +215,7 @@ int lobby_agency_index(const std::string &summary) {
   return 0;
 }
 
-// SIL-216: build the cursor-following minimap preview for the hovered row, or
+// Build the cursor-following minimap preview for the hovered row, or
 // empty when nothing is hovered / the minimap isn't baked.
 ::ui::UiElement lobby_map_preview(const Games &games,
                                   const MapPreviews &map_previews,
@@ -244,7 +244,7 @@ int lobby_agency_index(const std::string &summary) {
   App app = use_app();
   Progression prog = use_progression();
   client::ui::ChromeTextures chrome = use_chrome();
-  // SIL-216: baked per-map minimap previews + the live pointer, for the
+  // Baked per-map minimap previews + the live pointer, for the
   // cursor-following Select-Map preview. Read unconditionally (stable hooks).
   MapPreviews map_previews = use_map_previews();
   const UiPipelineFrame *pipeline_frame = use_ui_pipeline_frame();
@@ -315,7 +315,7 @@ int lobby_agency_index(const std::string &summary) {
   } else if (staging.active) {
     right = StagingPanel(sp);
   } else if (staging.joining) {
-    // SIL-234: hold a stable Connecting panel through the async connect window
+    // Hold a stable Connecting panel through the async connect window
     // (the create form already cleared show_create), so the right column never
     // flashes the games browser before staging mounts.
     right = ConnectingPanel();
@@ -347,7 +347,7 @@ int lobby_agency_index(const std::string &summary) {
   } else if (staging.active) {
     right_cell = StagingRosterCell(sp, panes.tall_w);
   } else if (staging.joining) {
-    // SIL-234: stable Connecting hold for the tall cell (mirrors the right
+    // Stable Connecting hold for the tall cell (mirrors the right
     // region above) so the column doesn't flash the games browser mid-connect.
     right_cell = ConnectingCell(panes.tall_w);
   } else if (creating) {
@@ -413,7 +413,7 @@ int lobby_agency_index(const std::string &summary) {
       .chat_panel = chat_panel,
       .right_cell = right_cell});
 
-  // SIL-216: the cursor-following minimap preview over the Select Map list. Only
+  // The cursor-following minimap preview over the Select Map list. Only
   // while creating a game, when a row is hovered and its minimap baked. Reads the
   // live pointer (logical canvas space) so the card tracks the cursor. (The hover
   // is cleared on leaving create mode inside use_map_hover_preview.)

@@ -1,6 +1,6 @@
 #pragma once
 
-// ui_texture_key.h — stable uint64 keys for the GPU UI texture cache (SIL-240).
+// ui_texture_key.h — stable uint64 keys for the GPU UI texture cache.
 //
 // The GPU backend caches resident SDL_GPUTextures by an opaque uint64 key
 // (sdl3gpubackend ui_tex_cache), flushing the whole cache when the cppx

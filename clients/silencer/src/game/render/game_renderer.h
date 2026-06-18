@@ -37,7 +37,7 @@ public:
     bool ResizeRenderSurface(int width, int height);
     bool ResizeRenderSurfacePixels(int width, int height);
     bool SyncRenderSurfaceToWindowPixels();
-    // SIL-240 menu reflow fix: the last window pixel size, refreshed only at window
+    // The last window pixel size, refreshed only at window
     // creation and on real resize events (never per render frame). The menu's
     // logical canvas (game_ui_pipeline) derives its aspect from THIS so it stays
     // pinned across the in-game 640x480 surface pin (map load/unload) and across any
@@ -57,7 +57,7 @@ public:
     bool PaletteFadeFinished() const;
     Uint8 PaletteFadePhaseFromClock() const;
     void ApplyPaletteFade(bool fadeOut);
-    // SIL-219: the global opacity [0,1] the cppx UI layer should composite at so
+    // The global opacity [0,1] the cppx UI layer should composite at so
     // it fades in/out in lockstep with the world's transition palette fade. 1.0
     // at rest (no fade); mirrors the brightness fraction ApplyPaletteFade applies
     // to the world during a FADEOUT transition and the subsequent fade-in.
@@ -80,17 +80,17 @@ private:
     Surface screenbuffer;
     SDL_Color palettecolors[256];
     SDL_Window *window;
-    int windowPixelW_ = 0; // last window pixel size (SIL-240 menu canvas source)
+    int windowPixelW_ = 0; // last window pixel size (menu canvas source)
     int windowPixelH_ = 0;
     Uint8 fade_i;
     Uint64 fadeStartMs;
     FadeDir fadeDir_ = FadeDir::In;
-    // SIL-237: the fade alpha applied at the LAST cppx UI upload. The dirty-skip in
+    // The fade alpha applied at the LAST cppx UI upload. The dirty-skip in
     // Present() only skips the upload when BOTH the IR is unchanged AND this alpha
     // is unchanged (the fade is applied at upload time, not in the IR). -1 forces
     // the first upload. Sentinel < 0 == "no prior upload".
     float lastUiFadeAlpha_ = -1.0f;
-    std::unique_ptr<silencer::cppx_ui::UiDemoOverlay> cppxDemo; // SIL-11 flag-gated demo overlay
+    std::unique_ptr<silencer::cppx_ui::UiDemoOverlay> cppxDemo; // flag-gated demo overlay
 };
 
 #endif

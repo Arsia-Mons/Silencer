@@ -7,7 +7,7 @@
 
 namespace client::ui {
 
-// SIL-108: a stalled rebind capture auto-cancels after `timeout_frames` frames
+// A stalled rebind capture auto-cancels after `timeout_frames` frames
 // of inactivity (origin/main used a 72-tick capture timeout; the capture hook
 // delegates the countdown to the screen). The counter resets whenever capture is
 // inactive or the pending chord grows. Owns its two state cells, so call it

@@ -131,7 +131,7 @@ bool collect_focusables(const UiTree &tree, FocusRuntime &runtime, NodeId id,
   // A focusable inside a scrolling clip keeps its UNCLIPPED layout rect as its
   // nav rect: directional/sequential nav must be able to REACH a row that is
   // currently scrolled out of (or partially clipped by) the viewport, in true
-  // document order (SIL-213). SIL-199's "don't rest on an invisible row" intent
+  // document order. The "don't rest on an invisible row" intent
   // is preserved by scroll-into-view (focus_scroll_request below): once focus
   // lands on such a row, the owning container scrolls it into view, so we never
   // permanently rest on an off-viewport node. The full node.layout rect (not the
@@ -177,7 +177,7 @@ bool collect_focusables(const UiTree &tree, FocusRuntime &runtime, NodeId id,
 // its clip rect. Both rects are in absolute layout space, so the delta is
 // offset-independent: the container applies it to whatever local offset it
 // holds. Negative delta scrolls toward the top (reveal above), positive scrolls
-// down (reveal below); 0 = already in view. SIL-213.
+// down (reveal below); 0 = already in view.
 FocusScrollRequest compute_scroll_request(const UiTree &tree, NodeId focused) {
   FocusScrollRequest request = {};
   if (focused == 0)
@@ -428,7 +428,7 @@ NodeId resolve_spatial(const FocusRuntime &runtime, NodeId from_id,
     float dy = center_y(candidate->rect) - center_y(from->rect);
     float center = dx * dx + dy * dy;
 
-    // SIL-213: when `from` lives in a scrolling container, prefer candidates in
+    // When `from` lives in a scrolling container, prefer candidates in
     // that SAME container so directional nav walks every row in order (even ones
     // scrolled off-screen, whose nav rect now sits outside the viewport) before
     // it leaves the list. Without this, a row at the viewport edge would jump to
@@ -519,7 +519,7 @@ bool focus_update(FocusRuntime *runtime, const UiTree &tree,
       runtime->previous_focus_before_modal != 0 &&
       contains_enabled(*runtime, runtime->previous_focus_before_modal);
   // When a nav input is present this frame, leave focus neutral so the nav
-  // pass below enters from the direction's matching edge (SIL-211). Without
+  // pass below enters from the direction's matching edge. Without
   // nav (e.g. the focused element vanished), auto-focus the first enabled node.
   FocusDirection nav_probe = FocusDirection::Down;
   bool nav_present =
@@ -578,7 +578,7 @@ bool focus_update(FocusRuntime *runtime, const UiTree &tree,
 
   runtime->hovered_id = hovered_enabled(*runtime, input);
 
-  // SIL-213: publish how far the focused node's nearest scrolling container must
+  // Publish how far the focused node's nearest scrolling container must
   // move to bring it into view. The owning ScrollView reads this next build and
   // applies the delta to its local offset (one-frame lag, by design). Gate it on
   // focus having MOVED this frame via a keyboard/gamepad/programmatic source: a

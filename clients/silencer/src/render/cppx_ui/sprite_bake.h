@@ -1,6 +1,6 @@
 #pragma once
 
-// SIL-11 sprite->RGBA bake (doc §3). Flattens an 8-bit indexed sprite + the
+// sprite->RGBA bake. Flattens an 8-bit indexed sprite + the
 // active 256-entry palette into PREMULTIPLIED RGBA8, the form the golden UI
 // draw model speaks. The result is uploaded via TextureRegistry::upload_rgba and
 // referenced by texture_id in VisualStyle.image. Renderer-side code (knows the
@@ -22,7 +22,7 @@ namespace silencer::cppx_ui {
 void bake_indexed_rgba(const uint8_t *indices, int w, int h,
                        const SDL_Color *palette256, uint8_t *out_rgba);
 
-// ---- Canonical-phase element bakes (U-2 / SIL-204) -------------------------
+// ---- Canonical-phase element bakes -------------------------
 // Origin whole-frame-magnified the composed virtual frame (src = int(dx/s)),
 // so a sprite's device pixels — and even its size — depended on its absolute
 // screen position. The canonical bakes evaluate the same NEAREST chain at

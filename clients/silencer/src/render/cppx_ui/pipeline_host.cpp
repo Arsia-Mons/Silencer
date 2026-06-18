@@ -39,7 +39,7 @@ bool PipelineHost::ensure(int w, int h, const char *font_dir) {
   textures_.shutdown();
   glyph_fonts_.shutdown();
   chrome_dirty_ = true;
-  // SIL-240: the registries' textures are gone; bump the generation so the GPU
+  // The registries' textures are gone; bump the generation so the GPU
   // backend flushes its texture cache (texture_ids may be reused for new art).
   ++texture_generation_;
   if (r_) {
@@ -173,7 +173,7 @@ const uint8_t *PipelineHost::render(const client::ui::UiPipelineFrame &frame,
   float device_scale = (frame.layout.height > 0.0f)
                            ? static_cast<float>(h_) / frame.layout.height
                            : 1.0f;
-  // SIL-237: the retained tree, layout, focus pass, and IR build always run —
+  // The retained tree, layout, focus pass, and IR build always run —
   // they advance the animation/interaction state. Only the native-resolution
   // raster is conditional. `unchanged` is decided AFTER the IR is built (inside
   // the render callback): if the IR is byte-identical to the last rastered

@@ -1,12 +1,11 @@
 #pragma once
 
-// SIL-11: the renderer-side texture_id -> SDL_Texture* map. The ONLY place a
+// The renderer-side texture_id -> SDL_Texture* map. The ONLY place a
 // ui/ texture_id (the opaque uint32_t carried in the draw IR's ImageData arm)
 // meets a real SDL handle (doc §3: "texture_id never appears in any public
 // prop"). ui/ never sees SDL_Texture; the executor asks this registry by id.
 // Textures are stored premultiplied so the executor draws them under
-// SDL_BLENDMODE_BLEND_PREMULTIPLIED. Adapted from golden renderer/texture_registry
-// (namespace + the Silencer cap note); logic verbatim.
+// SDL_BLENDMODE_BLEND_PREMULTIPLIED.
 
 #include <SDL3/SDL.h>
 
@@ -48,14 +47,14 @@ public:
   // Maps an id back to its SDL_Texture* (nullptr for id==0 or unknown).
   SDL_Texture *lookup(uint32_t id) const;
 
-  // SIL-240: the premultiplied RGBA bytes (+ dims) backing slot `id`, for the
+  // The premultiplied RGBA bytes (+ dims) backing slot `id`, for the
   // GPU emitter to upload as a resident SDL_GPUTexture. Returns false for
   // id==0 / unknown / a slot adopted without source bytes. The bytes are owned
   // here and valid until the next shutdown(). `upload_rgba` (and thus every
   // chrome/backdrop/legacy-variant bake) retains them; `adopt` does not.
   bool gpu_texture(uint32_t id, const uint8_t **rgba, int *w, int *h) const;
 
-  // ---- Legacy virtual-grid sprites (canonical-phase bake, U-2/SIL-204) ----
+  // ---- Legacy virtual-grid sprites (canonical-phase bake) ----
   // origin composited menus on a virtual int(W/s) x int(H/s) canvas and then
   // NEAREST-magnified the whole frame by s (src = int(dx/s)) — a sprite's
   // device pixels (and size) depended on its absolute position, an accident
@@ -77,7 +76,7 @@ public:
   // sprite's full device cell (the box is Yoga-rounded, the cell is not).
   struct LegacyVariant {
     SDL_Texture *texture = nullptr;
-    uint32_t id = 0; // registry slot (SIL-240 GPU emitter: ui_texture_key::image)
+    uint32_t id = 0; // registry slot (GPU emitter: ui_texture_key::image)
     int x = 0, y = 0, w = 0, h = 0;
   };
 
@@ -99,7 +98,7 @@ private:
   // ramp/team palette variants register many base sprites.
   static constexpr int kMaxTextures = 256;
   SDL_Texture *textures_[kMaxTextures] = {};
-  // SIL-240: the premultiplied source bytes kept resident per slot so the GPU
+  // The premultiplied source bytes kept resident per slot so the GPU
   // emitter can upload them once. Empty for a slot adopted without bytes.
   std::vector<uint8_t> rgba_[kMaxTextures];
   int tw_[kMaxTextures] = {};

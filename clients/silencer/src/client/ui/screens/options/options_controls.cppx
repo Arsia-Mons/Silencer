@@ -60,8 +60,8 @@ constexpr float kViewportH = kRowH * 3.0f + kRowContentH; // 4 visible rows
   />
 }
 
-// SIL-108: rebind auto-cancels after this many frames of inactivity (origin/main
-// used a 72-tick capture timeout; the capture hook delegates it to the screen).
+// Rebind auto-cancels after this many frames of inactivity (origin/main used a
+// 72-tick capture timeout; the capture hook delegates it to the screen).
 constexpr int kRebindTimeoutFrames = 72;
 
 // origin's two-slot binding view (options_controls_screen.cpp ViewLegacy):

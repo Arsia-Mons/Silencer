@@ -100,7 +100,7 @@ bool Game::HandleSDLEvents() {
         case SDL_EVENT_WINDOW_RESTORED:
             minimized = false;
             break;
-        // SIL-18: the single SDL-event site builds the per-frame UI input frame
+        // The single SDL-event site builds the per-frame UI input frame
         // (src/game/CLAUDE.md). Gameplay shortcut keys + the keymap still flow
         // through OnScancodeDown/Up; in parallel we collect nav/confirm/cancel +
         // the text-editing key/text/editing channels into the cppx UiInputFrame the
@@ -108,7 +108,7 @@ bool Game::HandleSDLEvents() {
         case SDL_EVENT_KEY_DOWN: {
             gameInput.OnScancodeDown(event.key.scancode);
             gameInput.GetKeystate()[event.key.scancode] = true;
-            // While rebinding (SIL-19 §7b), keyboard edges build the pending chord
+            // While rebinding, keyboard edges build the pending chord
             // instead of driving UI nav/confirm — so Escape/Enter and arrows are
             // themselves bindable. Confirm/Cancel happen via the capture UI buttons.
             if (gameUiPipeline.IsCapturingKeybind()) {
@@ -182,7 +182,7 @@ bool Game::HandleSDLEvents() {
             }
         } break;
         case SDL_EVENT_MOUSE_WHEEL: {
-            // SIL-111: accumulate the scroll-wheel delta into the cppx input frame; the
+            // Accumulate the scroll-wheel delta into the cppx input frame; the
             // runtime routes it to the hovered scrollable. SDL reports +y = wheel up;
             // FLIPPED (natural-scroll) inverts both axes.
             if (gameUiPipeline.IsCapturingKeybind())
@@ -208,7 +208,7 @@ bool Game::HandleSDLEvents() {
                                         event.edit.length);
             ui.source = ::ui::UiFocusSource::Keyboard;
         } break;
-        // Multi-device keybind capture edges (SIL-19 §7b). Mouse-left is gated to
+        // Multi-device keybind capture edges. Mouse-left is gated to
         // active capture so it never steals a UI click; gamepad button/axis are
         // event-driven only while capturing (gameplay reads the polled snapshot).
         case SDL_EVENT_MOUSE_BUTTON_DOWN:

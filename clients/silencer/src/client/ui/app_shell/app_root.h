@@ -24,9 +24,9 @@ public:
   void build_ui() override {}
 };
 
-// Maps a session phase to the element that owns it. The migration seam: today
-// it returns a per-phase scaffold view; SIL-18..SIL-21 swap in the real screen
-// views (MainMenu, Lobby, InGame, …) here without touching AppRoot itself.
+// Maps a session phase to the element that owns it. Today it returns a
+// per-phase scaffold view; the real screen views (MainMenu, Lobby, InGame, …)
+// swap in here without touching AppRoot itself.
 ::ui::UiElement make_phase_element(SessionPhase phase);
 
 } // namespace client::ui

@@ -16,8 +16,8 @@ namespace silencer::game_ui {
 // black does `state` flip to the target and the new screen fade in.
 //
 // Notes on the non-1:1 cases:
-//   * OPTIONS* are Tier-1 overlays over the menu in the retained model
-//     (SIL-19); until those land, the phase *under* them is MainMenu.
+//   * OPTIONS* are Tier-1 overlays over the menu in the retained model;
+//     until those land, the phase *under* them is MainMenu.
 //   * HOST/JOIN are the connect-and-load path -> Loading; TEST/REPLAY are
 //     in-match variants -> InMatch.
 //   * NONE (boot) falls back to MainMenu.

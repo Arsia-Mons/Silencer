@@ -4,7 +4,7 @@
 
 namespace ui::components {
 
-// Scroll-viewport primitive (SIL-111): a clipped window over a taller content
+// Scroll-viewport primitive: a clipped window over a taller content
 // track, scrolled by wheel + keyboard (arrows / PageUp·Down / Home·End). The
 // viewport flex-GROWS to fill its parent (Yoga sizes it); the component learns
 // both its own viewport height and the inner content-track height from the

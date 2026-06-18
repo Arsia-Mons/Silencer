@@ -154,7 +154,7 @@ void GameRenderer::Present() {
     if (renderdevice) {
         renderdevice->UploadFrame(screenbuffer.pixels.data(), screenbuffer.w, screenbuffer.h);
 #ifdef SILENCER_CPPX_FONT_DIR
-        // SIL-11 end-to-end demo: when SILENCER_CPPX_UI_DEMO is set, render a cppx
+        // When SILENCER_CPPX_UI_DEMO is set, render a cppx
         // nine-slice button + TTF text and hand it to the device's UI composite pass.
         if (window && std::getenv("SILENCER_CPPX_UI_DEMO")) {
             int pw = 0, ph = 0;
@@ -170,13 +170,13 @@ void GameRenderer::Present() {
             }
         }
 #endif
-        // SIL-14: when the golden cppx render path is active, composite its
+        // When the golden cppx render path is active, composite its
         // premultiplied-RGBA frame over the world through the UI composite pass.
         {
-            // SIL-219: fade the cppx UI layer in lockstep with the FADEOUT palette fade so
+            // Fade the cppx UI layer in lockstep with the FADEOUT palette fade so
             // the UI fades out/in with the world on the transitions that already fade it.
             const float uiFadeAlpha = UiFadeAlpha();
-            // SIL-240: GPU geometry path — submit the program built this frame. The fade is
+            // GPU geometry path — submit the program built this frame. The fade is
             // a GPU multiply at composite time (no per-pixel CPU dim, no full-window upload),
             // so fades and minimap-hover re-render cheaply every frame.
             if (const silencer::cppx_ui::GpuUiProgram *prog = game.gameUiPipeline.CppxUiProgram()) {
@@ -187,7 +187,7 @@ void GameRenderer::Present() {
                 int uh = 0;
                 const uint8_t *uirgba = game.gameUiPipeline.CppxUiFrame(uw, uh);
                 if (uirgba && uw > 0 && uh > 0) {
-                    // SIL-237: skip the GPU UI upload when the pipeline rastered nothing new (the
+                    // Skip the GPU UI upload when the pipeline rastered nothing new (the
                     // IR was byte-identical) AND the fade alpha is unchanged. The backend retains
                     // the last-uploaded ui_tex and re-composites it every Present, so the menu
                     // stays on screen without re-uploading a static frame. The fade alpha is

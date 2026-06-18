@@ -52,7 +52,7 @@ struct MessageModalProps {
   return Text(props);
 }
 
-// SIL-98: origin/main message modal — the bank-40 idx4 dialog sprite (no slate
+// origin/main message modal — the bank-40 idx4 dialog sprite (no slate
 // card, no title heading), a single Large-faced message line, and a chrome OK
 // button. The modal stays a CenteredOverlay (focus-trapped Dialog).
 ::ui::UiElement MessageModalView(const MessageModalProps &props) {

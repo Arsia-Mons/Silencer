@@ -45,15 +45,15 @@ public:
     const SDL_Color *GetPaletteColors() const { return gameRenderer.GetPaletteColors(); }
     // Screenshot the final composited frame (world + cppx UI overlay) by capturing
     // the GPU swapchain; falls back to the indexed Surface when the device can't
-    // capture (TUI/headless). SIL-11.
+    // capture (TUI/headless).
     bool CaptureCompositedFrame(const char *path);
     Renderer &GetRenderer() { return renderer; }
     // The cppx UI composition root. Public so the control socket can introspect the
-    // retained UI tree and inject automation input (SIL-18) without a friend grant;
+    // retained UI tree and inject automation input without a friend grant;
     // gameplay code drives navigation through the session-phase reconciler.
     GameUiPipeline &GetUiPipeline() { return gameUiPipeline; }
     // Public so the control socket can drive the self-updater into a static phase
-    // (show_update_screen test op, SIL-212) without a friend grant.
+    // (show_update_screen test op) without a friend grant.
     Updater &GetUpdater() { return updater; }
     bool ResizeRenderSurface(int width, int height);
     bool ResizeRenderSurfacePixels(int width, int height);
@@ -61,7 +61,7 @@ public:
     bool IsLiveMultiplayer() const;
     bool GoBack();
     // State transition entry point. Public so the UI layer can drive navigation
-    // without a friend grant (SIL-8); ~21 internal callers unchanged.
+    // without a friend grant; ~21 internal callers unchanged.
     void GoToState(Uint8 newstate);
     // Push the active palette colors into the render backend. Hides the private
     // gameRenderer behind a public command (closed the old screen-context's

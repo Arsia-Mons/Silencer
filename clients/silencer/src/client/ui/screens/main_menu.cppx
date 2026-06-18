@@ -68,7 +68,7 @@ bool has_logo_animation(const ChromeTextures &chrome) {
          chrome.logo_frame_count == ChromeTextures::kLogoFrames;
 }
 
-// SIL-96: origin/main main menu — starfield root (ScreenLayout Menu), a left
+// origin/main main menu — starfield root (ScreenLayout Menu), a left
 // SILENCER logo sprite + a right-anchored staggered stack of green oval buttons
 // with the legacy labels, and a bottom-left version footer. No slate card.
 //

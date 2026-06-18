@@ -1,7 +1,7 @@
 #pragma once
 
-// SIL-11 cppx UI renderer bridge. Multi-face TTF registry for the retained UI
-// (SIL-6 decision 1): font_id maps to the four silencer faces. The measure seam
+// cppx UI renderer bridge. Multi-face TTF registry for the retained UI:
+// font_id maps to the four silencer faces. The measure seam
 // (ui::set_text_measurer) and the draw executor's text path both read faces
 // from here, so measure == paint. This is renderer-side code — it owns SDL_ttf;
 // the SDL-free ui/ runtime never touches it.
@@ -17,7 +17,7 @@ class FontRegistry {
 public:
   // font_id contract: 0=body (silencer-ui), 1=large (ui-large), 2=title,
   // 3=tiny (HUD digits), 4=heading (bank-135, the dominant legacy title/heading
-  // face — SIL-95). Matches doc §SIL-6 decision 1's face wiring.
+  // face).
   enum FaceId : uint16_t {
     Body = 0,
     Large = 1,

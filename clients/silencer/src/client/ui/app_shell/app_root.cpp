@@ -32,8 +32,7 @@ namespace {
 // --- Per-phase scaffold view (migration placeholder) ---------------------
 // A full-viewport fill tinted per phase, so the phase reconciliation is
 // observable on-screen and in tests for the phases whose real screens have not
-// landed yet. SIL-19..21 replace the remaining scaffold cases with the authored
-// screen views; AppRoot and the session projection stay put.
+// landed yet.
 struct PhaseScaffoldProps {
   ::ui::Color color = {};
 };

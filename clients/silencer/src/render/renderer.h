@@ -82,7 +82,7 @@ public:
 	Uint8 GetAmbienceLevel(void);
 	bool CapturePNG(const class Surface & buf, const SDL_Color * palette, const char * path);
 	// Write tightly-packed RGBA8 (w*h*4) directly to a PNG (the GPU-composited
-	// screenshot path, SIL-11).
+	// screenshot path).
 	bool WriteRGBAPNG(const Uint8 * rgba, int w, int h, const char * path);
 	Camera camera;
 	Palette palette;

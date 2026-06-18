@@ -1,10 +1,8 @@
 #pragma once
 
-// ui_draw_program.h — the backend-neutral UI render program (SIL-240).
+// ui_draw_program.h — the backend-neutral UI render program.
 //
-// The cppx UI used to be CPU-rasterized to a window-sized RGBA buffer and
-// uploaded whole to the GPU every changed frame. This type is the replacement
-// hand-off: the cppx-side emitter (build_ui_draw_program, ui_draw_program.cpp)
+// The cppx-side emitter (build_ui_draw_program, ui_draw_program.cpp)
 // walks the same ::ui::DrawCommandList IR the software executor does and lowers
 // it to a flat GPU draw program — a de-indexed vertex stream + a small command
 // stream (draw / scissor / layer) + a manifest of the textures the batches

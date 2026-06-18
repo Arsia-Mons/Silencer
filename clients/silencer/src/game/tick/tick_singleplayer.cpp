@@ -42,7 +42,7 @@ if(stateisnew){
 	renderer.palette.SetParallaxColors(world.map.parallax);
 	GetScreenBuffer().Clear(0);
 	gameRenderer.SetColors(renderer.palette.GetColors());
-	// SIL-236: init the lighted palette and invalidate the cached ambience level
+	// Init the lighted palette and invalidate the cached ambience level
 	// so the game loop applies the ambience palette once the fade-in settles —
 	// the slow map load otherwise skips that refresh on entry, leaving the world
 	// too bright with a black sky and no weather (see tick_ingame.cpp).

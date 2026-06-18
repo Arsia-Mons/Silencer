@@ -4,7 +4,7 @@
 
 namespace client::ui {
 
-// Per-frame wall-clock for component animation (SIL-94). `now_ms` is the
+// Per-frame wall-clock for component animation. `now_ms` is the
 // composition root's monotonic time at frame build (SDL_GetTicks — frame-rate
 // independent, unaffected by the inter-tick interpolation `frametime` the render
 // path used to discard); `delta_ms` is the elapsed time since the previous UI

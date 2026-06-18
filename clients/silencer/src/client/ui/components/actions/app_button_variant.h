@@ -129,7 +129,7 @@ inline ::ui::LayoutStyle app_button_oval_layout(AppButtonSize size) {
 }
 
 
-// Green oval sprite-button paint (SIL-89). Image-only patch over a baked bank-6
+// Green oval sprite-button paint. Image-only patch over a baked bank-6
 // oval texture (use_chrome()), label in the Heading face centered on top.
 // texture_id 0 (not-yet-baked frame or seam slip) falls back to a vector
 // stadium-radius oval. The hover/focus ramp swaps the TEXTURE per phase
@@ -163,8 +163,8 @@ inline ::ui::StyleStatePatch app_button_oval_patch(uint32_t tex) {
   const ::ui::Color bright{255, 255, 255, 255};
   ov.base = oval(bright);
   ov.hover = oval(bright);
-  ov.pressed = oval(bright); // SIL-223: override the theme's pressed border so
-                             // no rectangular box leaks over the oval sprite on
+  ov.pressed = oval(bright); // override the theme's pressed border so no
+                             // rectangular box leaks over the oval sprite on
                              // mouse-down (the sprite ramp is the press feedback)
   ov.focus_visible = oval(bright);
   return ov;
@@ -209,7 +209,7 @@ inline ::ui::LayoutStyle app_button_chrome_layout(AppButtonSize size = AppButton
   };
 }
 
-// Metal-chrome sprite-button paint (SIL-90). Nine-sliced bank-7 idx24 sprite
+// Metal-chrome sprite-button paint. Nine-sliced bank-7 idx24 sprite
 // (caps {l12,r12,t4,b4}) with the label in the Large face. The caller supplies
 // the phase-resolved texture when target feedback is enabled; texture_id 0
 // falls back to a rounded slate button.
@@ -243,9 +243,9 @@ inline ::ui::StyleStatePatch app_button_chrome_patch(uint32_t tex) {
   const ::ui::Color bright{255, 255, 255, 255};
   ov.base = chrome(tex, bright);
   ov.hover = chrome(tex, bright);
-  ov.pressed = chrome(tex, bright); // SIL-223: override the theme's pressed
-                                    // border so no rectangular box leaks over
-                                    // the chrome sprite on mouse-down
+  ov.pressed = chrome(tex, bright); // override the theme's pressed border so no
+                                    // rectangular box leaks over the chrome
+                                    // sprite on mouse-down
   ov.focus_visible = chrome(tex, bright);
   return ov;
 }

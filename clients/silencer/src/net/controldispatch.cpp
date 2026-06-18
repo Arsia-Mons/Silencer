@@ -30,13 +30,13 @@ namespace ControlDispatch {
 
 namespace {
 // A handful of list-oriented UI ops (select/scroll/hover_at) are bound to
-// screens that land in later slices (Options/lobby lists, SIL-19/20). They
+// screens that land in later slices (Options/lobby lists). They
 // return a structured UNSUPPORTED error until then. inspect/click/set_text/key
-// and the modal ops are live against the retained cppx tree (SIL-18).
+// and the modal ops are live against the retained cppx tree.
 const char * const kUiUnsupportedMsg =
 	"UI op unavailable on cppx path yet (pending later screen slices)";
 
-// --- cppx UI introspection + automation (SIL-18) -------------------------
+// --- cppx UI introspection + automation ----------------------------------
 // Read-only walks of the retained UiTree (client::ui::ClientUi) + a small
 // injection seam through GameUiPipeline. No friend grant, no handle leak: the
 // control socket sees node snapshots and pushes UiInputFrame edges only.
@@ -250,7 +250,7 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 		cmd.reply->set_value(OkResult(cmd.id, r));
 		return;
 	}
-	// SIL-23: the legacy clay_*_check probes are retired — the cppx-primitive
+	// The legacy clay_*_check probes are retired — the cppx-primitive
 	// ops (inspect / click / set_text over the retained UiTree) are the
 	// supported automation checks. Removed ops fall through to UNKNOWN_OP.
 	if(cmd.op == "state"){
@@ -358,7 +358,7 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 				"cppx UI has not rendered a frame yet"));
 			return;
 		}
-		// SIL-24: push the design-system gallery overlay so the visual-regression
+		// Push the design-system gallery overlay so the visual-regression
 		// suite can golden every component variant in isolation. Pop via `back`.
 		game.GetUiPipeline().ShowGallery();
 		cmd.reply->set_value(OkResult(cmd.id, nlohmann::json::object()));
@@ -527,7 +527,7 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 		return;
 	}
 	if(cmd.op == "pointer_down"){
-		// SIL-223 test affordance: hold the pointer DOWN at (x,y) across frames so
+		// Test affordance: hold the pointer DOWN at (x,y) across frames so
 		// the PRESSED interaction state (theme.pressed) can be screenshotted. Held
 		// until pointer_up. Accepts a --label (centers on that node) or --x/--y.
 		client::ui::ClientUi * ui = game.GetUiPipeline().TryClientUi();
@@ -559,7 +559,7 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 		return;
 	}
 	if(cmd.op == "pointer_up"){
-		// SIL-223 test affordance: release a held pointer_down.
+		// Test affordance: release a held pointer_down.
 		if(!game.GetUiPipeline().TryClientUi()){
 			cmd.reply->set_value(Err(cmd.id, "WRONG_STATE",
 				"cppx UI has not rendered a frame yet"));
@@ -570,7 +570,7 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 		return;
 	}
 	if(cmd.op == "scroll"){
-		// SIL-111: inject a scroll-wheel delta. Optionally park the pointer at
+		// Inject a scroll-wheel delta. Optionally park the pointer at
 		// (x,y) first so the runtime routes the wheel to that scrollable (wheel
 		// goes to the hovered node, mirroring a real mouse). +dy = wheel up.
 		if(!game.GetUiPipeline().TryClientUi()){
@@ -1150,7 +1150,7 @@ static void HandleKeybind(Game& game, ControlCommand& cmd) {
 	}
 
 	// ---- capture ------------------------------------------------------
-	// Drives the multi-device keybind-capture state machine (SIL-19 §7b) without
+	// Drives the multi-device keybind-capture state machine without
 	// SDL: begin → feed (one device edge per call, as a "KEY:..|MOUSE:..|PAD:.."
 	// string) → confirm/cancel. The same state machine the windowed event path
 	// feeds, so this exercises the real capture → use_key_map commit path.

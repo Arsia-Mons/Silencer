@@ -27,8 +27,7 @@ struct StagingRosterRow {
 // (is_host && !AllPeersDownloadedMap) so the screen can label/disable Ready;
 // `ready_label` is the pre-resolved button text. `active` is true while
 // connected to a game (staging or playing); `in_game_lobby` while still
-// pre-match. Tech loadout (slots/buyable/wanted + set/toggle) joins in
-// SIL-21 (4/n).
+// pre-match. Tech loadout (slots/buyable/wanted + set/toggle) joins later.
 // One selectable pre-match tech (origin tech_tree_grid row): the GAS buyable's
 // name + slot cost, whether the local peer has it chosen, and whether it can be
 // toggled (enough slots left, or already chosen so it can be un-chosen).
@@ -44,7 +43,7 @@ struct StagingTechRow {
 
 struct Staging {
   bool active = false;
-  // SIL-234: a create/join is in flight but the connect hasn't settled yet.
+  // A create/join is in flight but the connect hasn't settled yet.
   // The lobby right column holds a stable "Connecting" panel while this is true
   // (and !active) so it never flashes the games browser before staging mounts.
   bool joining = false;

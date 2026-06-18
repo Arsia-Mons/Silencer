@@ -155,7 +155,7 @@ float measured_advance(const char *value, uint32_t len, uint16_t font_id,
 // Cap-top..baseline of the resolved face, in points, via the injected measurer.
 // Returns 0 when no measurer/ascent is available (caller falls back to the line
 // box). Drives the input caret height so it spans the glyph ink, not the
-// descender-inclusive cell (SIL-217).
+// descender-inclusive cell.
 float measured_ascent(uint16_t font_id, float font_size, float line_height) {
   MeasureTextFn measurer = text_measurer();
   if (!measurer)
@@ -582,7 +582,7 @@ bool append_input_contents(DrawCommandList &list, const NodeSnapshot &node,
     // Caret height tracks the glyph INK, not the box. The glyph atlas cell
     // includes descender space below the baseline (g/j/p/q/y), and glyphs are
     // top-aligned at text_y; a caret sized to the full cell / box therefore
-    // hangs ~1-2px below the visible baseline of non-descender text (SIL-217).
+    // hangs ~1-2px below the visible baseline of non-descender text.
     // Span cap-top..baseline (the measured ascent), top-aligned with the text,
     // so the caret matches the ink for ALL inputs. Fall back to the legacy
     // min(boxH*4/5, line box) when ascent is unavailable (no measurer).
@@ -641,7 +641,7 @@ bool pop_layer(DrawCommandList &list, const NodeSnapshot &node) {
 // CLIP: overflow != Visible brackets the node's children in a ClipPush/ClipPop
 // so content outside the node's box is scissored away (design §9.7). The clip
 // rect is the node's layout (border) box; the executor intersects nested clips.
-// Required by the scroll-viewport primitive (SIL-111): the content track is
+// Required by the scroll-viewport primitive: the content track is
 // translated up by the scroll offset and clipped to the viewport window.
 bool push_clip(DrawCommandList &list, const NodeSnapshot &node) {
   DrawCommand command = {};

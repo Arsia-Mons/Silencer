@@ -45,7 +45,7 @@ bool Game::CaptureCompositedFrame(const char * path) {
 	int uw = 0;
 	int uh = 0;
 	const Uint8 * ui = gameUiPipeline.CppxUiFrame(uw, uh);
-	// SIL-219: match the GPU screen fade — dim the premultiplied UI layer toward
+	// Match the GPU screen fade — dim the premultiplied UI layer toward
 	// black by the transition fade so headless screenshots reflect the same fade
 	// the windowed backend applies. The fade scales RGB only and KEEPS coverage
 	// (inv uses the ORIGINAL alpha, not the dimmed one), so the HUD stays opaque

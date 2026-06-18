@@ -31,7 +31,7 @@ struct GameBrowserEntry {
 // A create-game request the GameCreatePanel assembles (doc §6). `map` is a
 // bundled map filename (from Games::bundled_maps); the composition root hashes
 // it and sends MSG_NEWGAME. The security/level/player knobs default to a sane
-// quick-create; the full options form lands in SIL-21 (4/n).
+// quick-create; the full options form lands later.
 struct CreateGameRequest {
   std::string name = {};
   std::string map = {};
@@ -49,7 +49,7 @@ struct CreateGameRequest {
 // mutations over the public lobby/Game seam; the game-join pump (LOBBY tick)
 // drives the connect → staging transition. `bundled_maps` feeds the
 // create-form map picker. (Server-map discovery / upload — use_map_downloader —
-// joins in SIL-21 (4/n).)
+// joins later.)
 struct Games {
   std::vector<GameBrowserEntry> entries = {};
   std::vector<std::string> bundled_maps = {};

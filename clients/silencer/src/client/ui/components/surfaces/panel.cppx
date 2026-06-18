@@ -77,7 +77,7 @@ float panel_size_width(PanelSize size) {
     overlay = tokens::fill_patch(kSunkenBg);
     break;
   case PanelVariant::Bordered:
-    // Legacy console panel (SIL-104): #10141C fill + 1px #565E6F border. The
+    // Legacy console panel: #10141C fill + 1px #565E6F border. The
     // origin/main lobby uses bordered console panels, not the borderless slate
     // Sunken. Stretch + tighter padding for dense lobby columns.
     layout = ::ui::LayoutStyle{
@@ -118,7 +118,7 @@ float panel_size_width(PanelSize size) {
     // (top-center) + right-edge scrollbar rail, so the screen draws neither.
     // Absolutely positioned at the logical rect of origin's virtual element
     // box; the executor swaps the draw for the canonical per-size Stretch
-    // variant (U-2/SIL-204). Padding re-centers the
+    // variant. Padding re-centers the
     // content where the previous flow layout put it (the keybind grid was
     // pixdiff-tuned against the golden there): the baked title notch is
     // cleared by the top padding, content centers horizontally (origin

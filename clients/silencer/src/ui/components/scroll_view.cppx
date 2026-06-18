@@ -31,7 +31,7 @@ using ::ui::children;
   if (props.row_height > 0.0f && props.children.count > 0)
     content_height = props.row_height * (float)props.children.count;
 
-  // SIL-213 scroll-into-view: if keyboard/gamepad focus moved to one of our
+  // Scroll-into-view: if keyboard/gamepad focus moved to one of our
   // descendants and that node is outside the viewport, the focus pass published
   // a signed delta (keyed by our control id). Apply it so the focused row scrolls
   // into view. One frame lagged, matching the runtime's interaction model.
@@ -147,7 +147,7 @@ using ::ui::children;
   // — and shift the content track so global row `first` lands at first*row_height.
   //
   // The below-fold overscan (kOverscan rows past the last fully-visible row) is
-  // load-bearing for keyboard scroll-into-view (SIL-213): focus can only land on
+  // load-bearing for keyboard scroll-into-view: focus can only land on
   // a COMMITTED row, and scroll-into-view fires only AFTER focus moves onto an
   // off-viewport row. So the row immediately past the fold must already be
   // committed for Down to reach it (which then drives the scroll, sliding the

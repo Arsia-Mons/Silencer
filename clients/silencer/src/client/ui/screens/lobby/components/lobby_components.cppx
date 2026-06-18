@@ -200,15 +200,6 @@ inline ::ui::StylePatch lobby_panel_open_left() {
 
 // --- right-column panels (screen-local swap) ---------------------------------
 
-// The default center region (origin/main): a "Create Game" button floating at the
-// top over the backdrop. The "In Lobby" presence lives in the shared Lobby panel
-// (so it shows in create/staging modes too), not here.
-
-
-// The Active-Games browser body — chromeless (the panel chrome + "Active Games"
-// title live on the dedicated right cockpit cell). A flex spacer pushes the
-// browse/join actions to the bottom so the list reads sparse like the reference.
-
 // origin layout knobs (game_select_panel_layout.cpp), virtual px x1.5 -> logical.
 constexpr float kTallInfoRowH = 12.0f * 1.5f;   // 18: fixed info-row slot height
 constexpr float kTallButtonRowH = 21.0f * 1.5f; // 31.5: fixed button-slot height
@@ -256,33 +247,6 @@ constexpr float kGameSelectFooterH = kTallFooterPadTop + 5.0f * kTallInfoRowH +
 }
 
 
-// The Active-Games FOOTER (origin GSelFooter): the 5-field info block over the
-// two reserved button slots (Spectate top, Join Game bottom). Sits BELOW the
-// bordered list box, not inside it. Fixed total height (kGameSelectFooterH).
-
-// The Active-Games LIST: just the scrolling game rows (origin ScrollList). Lives
-// INSIDE the bordered list box; the footer (info + buttons) is a sibling BELOW
-// the box (GameBrowserFooter), never inside this well.
-
-// SIL-234: the right-column "Connecting" hold. While a create/join is in flight
-// (clicked, not yet connected), the right column shows this stable panel instead
-// of flashing the games browser between the create form and staging — origin
-// masks the same window with a "Creating game..." progress modal. Top region.
-
-// SIL-234: the tall-cell counterpart of ConnectingPanel — keeps the right
-// cockpit cell occupied (same chrome as ActiveGamesCell) so the column reads as
-// one stable connecting state through the join window. Shares the "rightcell"
-// key so the slot reconciles in place when staging mounts.
-
-// The lobby's right cockpit column: the Active Games browser, or (while creating
-// a game) the Select Map filename list (CreateRightCell). Both share the key
-// "rightcell" so the slot reconciles in place when the mode swaps.
-
-// Game-Options row. origin renders cycle values (Security/Spectatable) as
-// BodySm text buttons centered in the row, and numeric values as inline
-// TextInputs whose Body pen sits 3 virtual px under the row top — so the
-// numeric value column is top-anchored at +4.5 logical, not centered.
-
 int parse_u8_option(const std::string &value, int fallback, int lo, int hi) {
   if (value.empty())
     return fallback;
@@ -329,6 +293,10 @@ int parse_u8_option(const std::string &value, int fallback, int lo, int hi) {
 }
 
 
+// origin renders cycle values (Security/Spectatable) as BodySm text buttons
+// centered in the row, and numeric values as inline TextInputs whose Body pen
+// sits 3 virtual px under the row top — so the numeric value column is
+// top-anchored at +4.5 logical, not centered.
 ::ui::UiElement option_value_text(const char *key, const char *value,
                                   bool cycle) {
   return <Box
@@ -419,39 +387,7 @@ int parse_u8_option(const std::string &value, int fallback, int lo, int hi) {
 }
 
 
-// origin/main "Game Options": a pill-notch title over a dense label:value table
-// backed by the CreateGameRequest fields. The Game name + Password + Create live
-// in the right Select-Map cell (CreateRightCell), matching golden.
-
-// The right cockpit cell while creating a game: the Select Map filename list,
-// then (pushed to the bottom by a spring) the Game name + Password fields and
-// the wide Create button — origin/main stacks the create form under the map list.
-
-
-// origin staging CENTER column: three stacked full-width chrome buttons spread
-// down the upper column (origin gives them generous vertical spacing).
-// pad-right 6.5: the chrome buttons' nine-slice bake needs one more virtual
-// column (golden right cap ends device x1178; 8 put it at 1176).
-
-// Tech-select CENTER column (origin BuildGameTechUpperTree): the full-width
-// Back To Teams chrome button.
-
-// Tech-select RIGHT cell (origin BuildGameTechTallTree + tech_tree_grid):
-// slots readout at (57,36) pad in LegacyPalette(129,144,ramp); checkbox lanes
-// at x 543+14c (local col 3 = 585), rows y 128+13k; the local label column at
-// x 601, rows y 130+13k — "name (N)" Body at brightness 128/64. Anchors are
-// virtual; anchored on kLobbyTallGrid (the cell's design origin).
-
-
 // --- top-level sections -------------------------------------------------------
-
-// The full-width header strip: brand + amber version + (staging) map name in
-// aligned slots, spring, Go Back.
-
-
-// The upper-left agent card: emblem rail + name + WINS/LOSSES/XP column +
-// loadout stat well + the Agents button.
-
 
 ::ui::UiElement LobbyChatCompose(const LobbyChatComposeProps &props) {
   std::string *compose = use_state<std::string>(std::string());
@@ -539,16 +475,12 @@ int parse_u8_option(const std::string &value, int fallback, int lo, int hi) {
 }
 
 
-// The lower-left chat panel: channel title, log well + presence column, and the
-// lobby chat compose field.
-
-
 // Selected-row styling for the Select-Map list. origin draws the selected row
 // as a single solid filled rectangle (renderer.cpp SELECTBOX:
 // DrawFilledRectangle(..., 180)) — no border, no rounded corners, and no hover
 // or focus highlight (selecting is mouse-driven; the fill is the only feedback).
 // Matching that: selected = an opaque legacy-palette-180 bar, everything else
-// clear. No outline box (that was the SIL-233 regression).
+// clear. No outline box.
 ::ui::StyleStatePatch selectable_row_style(bool selected) {
   // The map rows are focusable for keyboard nav, but origin shows no focus ring
   // on the list — selection is the only feedback. Both states carry
@@ -563,25 +495,6 @@ int parse_u8_option(const std::string &value, int fallback, int lo, int hi) {
   return s;
 }
 
-
-// Select-Map filename rows (create-game mode), capped at what the cell shows
-// without scrolling (golden lists ~13). origin kMapListLineH = 14 virtual px
-// -> 21 logical row slots; rows inset text 4 virtual (6) with a 2 top bias so
-// the ink-centered pen lands on origin's cell (94+14k).
-
-// SIL-216 / SIL-231: the cursor-following map preview. origin's
-// BuildHoverPreviewOverlay (game_create_panel_map_form.cpp) stacks three
-// chromeless elements TOP_TO_BOTTOM — name (BodySm, no wrap) -> 172x62 minimap
-// -> word-wrapped description (BodySm) — directly on the lobby backdrop (NO
-// panel/border), pinned to the screen root at pointer + (-185,-30) and clamped
-// to the screen. All origin-virtual values are scaled x1.5 onto the cppx logical
-// canvas (the rest of the lobby uses the same factor). The name/desc render in
-// origin's dim grey LegacyPalette(129,160) ramp (== tokens::kTextTechSlots).
-// Returns empty when nothing is hovered or the texture isn't baked.
-
-// The stepped-pane cockpit grid (origin ResolveSteppedPaneLayout): left stack
-// (agent card + upper-right swap over the chat row) beside the right tall
-// cell, joined by the elbow/column hairline seams.
 
 // origin security label (game_select_panel): the u8 → text mapping shown in the
 // Game Options panel. Internal — only the create-options rows use it.
@@ -631,6 +544,9 @@ const char *security_label(uint8_t security) {
   </Box>
 }
 
+// The Active-Games FOOTER (origin GSelFooter): the 5-field info block over the
+// two reserved button slots (Spectate top, Join Game bottom). Sits BELOW the
+// bordered list box, not inside it. Fixed total height (kGameSelectFooterH).
 ::ui::UiElement GameBrowserFooter(const GameBrowserProps &props) {
   ::ui::UiElement spectate_btn =
       props.spectate_visible
@@ -691,6 +607,9 @@ const char *security_label(uint8_t security) {
   </Box>
 }
 
+// The Active-Games browser body — chromeless (the panel chrome + "Active Games"
+// title live on the dedicated right cockpit cell). A flex spacer pushes the
+// browse/join actions to the bottom so the list reads sparse like the reference.
 ::ui::UiElement GameBrowser(const GameBrowserProps &props) {
   std::vector<::ui::UiElement> rows;
   for (int i = 0; i < (int)props.entries.size(); ++i) {
@@ -715,6 +634,10 @@ const char *security_label(uint8_t security) {
   </Box>
 }
 
+// The right-column "Connecting" hold. While a create/join is in flight
+// (clicked, not yet connected), the right column shows this stable panel instead
+// of flashing the games browser between the create form and staging — origin
+// masks the same window with a "Creating game..." progress modal. Top region.
 ::ui::UiElement ConnectingPanel() {
   return <Box
     key="centercol"
@@ -732,6 +655,10 @@ const char *security_label(uint8_t security) {
   </Box>
 }
 
+// The tall-cell counterpart of ConnectingPanel — keeps the right cockpit cell
+// occupied (same chrome as ActiveGamesCell) so the column reads as one stable
+// connecting state through the join window. Shares the "rightcell" key so the
+// slot reconciles in place when staging mounts.
 ::ui::UiElement ConnectingCell(float tall_w) {
   ::ui::LayoutStyle cell = lobby_right_cell_layout(tall_w);
   cell.direction = ::ui::FlexDirection::Column;
@@ -982,6 +909,10 @@ std::function<void(const std::string &)> set_u8_text(uint8_t *slot, int lo,
   </Box>
 }
 
+// origin staging CENTER column: three stacked full-width chrome buttons spread
+// down the upper column (origin gives them generous vertical spacing).
+// pad-right 6.5: the chrome buttons' nine-slice bake needs one more virtual
+// column (golden right cap ends device x1178; 8 put it at 1176).
 ::ui::UiElement StagingPanel(const StagingPanelProps &props) {
   return <Box
     key="centercol"
@@ -1051,6 +982,11 @@ std::function<void(const std::string &)> set_u8_text(uint8_t *slot, int lo,
   </Box>
 }
 
+// Tech-select RIGHT cell (origin BuildGameTechTallTree + tech_tree_grid):
+// slots readout at (57,36) pad in LegacyPalette(129,144,ramp); checkbox lanes
+// at x 543+14c (local col 3 = 585), rows y 128+13k; the local label column at
+// x 601, rows y 130+13k — "name (N)" Body at brightness 128/64. Anchors are
+// virtual; anchored on kLobbyTallGrid (the cell's design origin).
 ::ui::UiElement TechListCell(const Staging &staging, float tall_w,
                              int selected,
                              std::function<void(int)> on_select) {
@@ -1242,6 +1178,8 @@ std::function<void(const std::string &)> set_u8_text(uint8_t *slot, int lo,
                       .children = ::ui::children(kids)});
 }
 
+// The full-width header strip: brand + amber version + (staging) map name in
+// aligned slots, spring, Go Back.
 ::ui::UiElement LobbyTitleBar(const LobbyTitleBarProps &props) {
   // origin staging title bar shows the joined game's map name (Title face) in
   // an aligned slot like the brand (BuildAlignedTextSlot, pad-top 3 virtual).
@@ -1310,6 +1248,8 @@ std::function<void(const std::string &)> set_u8_text(uint8_t *slot, int lo,
   </Box>
 }
 
+// The upper-left agent card: emblem rail + name + WINS/LOSSES/XP column +
+// loadout stat well + the Agents button.
 ::ui::UiElement AgentCard(const AgentCardProps &props) {
   return <Box
     key="agent"
@@ -1436,6 +1376,8 @@ std::function<void(const std::string &)> set_u8_text(uint8_t *slot, int lo,
   </Box>
 }
 
+// The lower-left chat panel: channel title, log well + presence column, and the
+// lobby chat compose field.
 ::ui::UiElement LobbyChatPanel(const LobbyChatPanelProps &props) {
   return <Box key="chat" layout={lobby_chat_layout(props.chat_w)} style={lobby_panel_style()}>
     <Box
@@ -1496,6 +1438,10 @@ std::function<void(const std::string &)> set_u8_text(uint8_t *slot, int lo,
   </Box>
 }
 
+// Select-Map filename rows (create-game mode), capped at what the cell shows
+// without scrolling (golden lists ~13). origin kMapListLineH = 14 virtual px
+// -> 21 logical row slots; rows inset text 4 virtual (6) with a 2 top bias so
+// the ink-centered pen lands on origin's cell (94+14k).
 std::vector<::ui::UiElement> map_list_rows(const std::vector<std::string> &maps,
                                            int *map_index, int *hovered_map) {
   constexpr int kMaxMapRows = 14;
@@ -1505,7 +1451,7 @@ std::vector<::ui::UiElement> map_list_rows(const std::vector<std::string> &maps,
     const char *mv = ::ui::copy_string(maps[i].c_str());
     std::function<void(const ::ui::ActivationEvent &)> pick =
         [map_index, i](const ::ui::ActivationEvent &) { *map_index = i; };
-    // SIL-216: track the hovered row so the screen can float that map's minimap
+    // Track the hovered row so the screen can float that map's minimap
     // preview at the cursor. Clear only if leaving the row we last set.
     std::function<void(const ::ui::HoverEvent &)> hover =
         [hovered_map, i](const ::ui::HoverEvent &e) {
@@ -1534,6 +1480,15 @@ std::vector<::ui::UiElement> map_list_rows(const std::vector<std::string> &maps,
   return rows;
 }
 
+// The cursor-following map preview. origin's BuildHoverPreviewOverlay
+// (game_create_panel_map_form.cpp) stacks three chromeless elements
+// TOP_TO_BOTTOM — name (BodySm, no wrap) -> 172x62 minimap -> word-wrapped
+// description (BodySm) — directly on the lobby backdrop (NO panel/border),
+// pinned to the screen root at pointer + (-185,-30) and clamped to the screen.
+// All origin-virtual values are scaled x1.5 onto the cppx logical canvas (the
+// rest of the lobby uses the same factor). The name/desc render in origin's dim
+// grey LegacyPalette(129,160) ramp (== tokens::kTextTechSlots). Returns empty
+// when nothing is hovered or the texture isn't baked.
 ::ui::UiElement MapPreviewOverlay(uint32_t texture, const char *name,
                                   const char *description, float pointer_x,
                                   float pointer_y, float origin_x,
@@ -1587,7 +1542,7 @@ std::vector<::ui::UiElement> map_list_rows(const std::vector<std::string> &maps,
   // The pointer is in full-canvas logical space; the overlay's absolute inset is
   // measured from the ScreenLayout root's content box (after its pad). Subtract
   // the root pad (origin_x/origin_y) so the card tracks the true cursor, then
-  // apply origin's pointer offset. SIL-237: snap the anchor to a coarse grid so
+  // apply origin's pointer offset. Snap the anchor to a coarse grid so
   // the IR stays byte-identical under cursor jitter and the raster skip fires.
   constexpr float kAnchorGrid = 16.0f;
   const float px = std::floor((pointer_x - origin_x) / kAnchorGrid) * kAnchorGrid;
@@ -1618,6 +1573,9 @@ std::vector<::ui::UiElement> map_list_rows(const std::vector<std::string> &maps,
   </Box>
 }
 
+// The stepped-pane cockpit grid (origin ResolveSteppedPaneLayout): left stack
+// (agent card + upper-right swap over the chat row) beside the right tall
+// cell, joined by the elbow/column hairline seams.
 ::ui::UiElement LobbyPaneGrid(const LobbyPaneGridProps &props) {
   const LobbyPanes &panes = props.panes;
   return <Box

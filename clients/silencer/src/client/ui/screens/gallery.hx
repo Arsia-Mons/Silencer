@@ -5,7 +5,7 @@
 
 namespace client::ui {
 
-// A static design-system showcase overlay (SIL-24 visual-regression harness).
+// A static design-system showcase overlay (visual-regression harness).
 // Renders every semantic component variant — including the ones no live screen
 // exercises (Button Danger/Ghost, Sm size, ScreenTitle Popup, BodyText Summary)
 // — in a deterministic grid so the visual-regression suite can golden them.

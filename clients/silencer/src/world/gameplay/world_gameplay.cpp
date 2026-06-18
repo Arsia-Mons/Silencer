@@ -264,7 +264,7 @@ void World::SetTech(Uint32 techchoices){
 
 // Seed gameinfo from the lobby record of a newly created game so the host's
 // SendGameInfo path can push it to the dedicated server. Hides the private
-// gameinfo member behind a public command (SIL-8).
+// gameinfo member behind a public command.
 void World::SeedGameInfo(LobbyGame & lg){
 	Serializer data;
 	lg.Serialize(Serializer::WRITE, data);

@@ -5,7 +5,7 @@
 
 namespace client::ui {
 
-// Installs the baked per-map minimap-preview textures for `children` (SIL-216).
+// Installs the baked per-map minimap-preview textures for `children`.
 // The composition root (src/game/ui) decompresses each bundled map's stored
 // 172x62 minimap and bakes it through the renderer bridge, supplying the
 // resolved `MapPreviews` table; the provider holds only the opaque texture_ids,

@@ -18,7 +18,7 @@ namespace client::ui {
 // The cool-blue legacy palette: black/Panel #10141C surfaces, PanelBorder
 // #565E6F edges, text #E0E7F1, a single cool-blue accent #9FC9FF for the focus
 // ring + checked/selection, danger #DD5048. The control gradient is collapsed
-// to a flat Panel fill (legacy had no gradient; sprite buttons land in SIL-89).
+// to a flat Panel fill (legacy had no gradient).
 // STRAIGHT alpha throughout; premultiplied at IR emit.
 namespace {
 using ::ui::Border;
@@ -37,8 +37,7 @@ constexpr float kRadius = 8.f; // uniform corner radius on all control surfaces
 
 // Accent: the legacy cool blue (#9FC9FF), reused for the focus ring +
 // checked/selection. In origin/main the accent was a baked sprite edge, not a
-// fill; this constant drives only the focus ring + selection wash here (the
-// oval sprite button lands in SIL-89).
+// fill; this constant drives only the focus ring + selection wash here.
 constexpr Color kAccent = {92, 208, 92, 255}; // #5CD05C green-bright
 
 // Control surface (green phosphor): near-black green-glass fill with a green-dim
@@ -52,7 +51,7 @@ constexpr Color kHoverBottom = {10, 24, 12, 255};
 constexpr Color kHoverBorder = {92, 208, 92, 255};   // #5CD05C
 constexpr Color kPressedTop = {4, 12, 6, 255};
 constexpr Color kPressedBottom = {4, 12, 6, 255};
-// SIL-223: pressed reads as "pushed in" (darker fill above) with a RESTRAINED
+// Pressed reads as "pushed in" (darker fill above) with a RESTRAINED
 // border, NOT a max-bright outline. The old #3CFF3C jumped the 1px edge to the
 // brightest green on mouse-down — a jarring bright-green rectangle. Sit it a
 // step below the dim base border (#2E7D45) so the press feels recessed, not lit.

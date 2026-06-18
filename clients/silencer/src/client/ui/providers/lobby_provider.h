@@ -41,7 +41,7 @@ struct LobbySnapshot {
   std::vector<GameBrowserEntry> games = {}; // open games (structured)
   std::vector<std::string> bundled_maps = {}; // create-form map choices
 
-  // --- create/join in flight (SIL-234) — masks the browser through the async
+  // --- create/join in flight — masks the browser through the async
   // connect so the right column doesn't flash the games browser between the
   // create form and staging. True from the Create/Join click until the connect
   // settles (staging takes over on connect; cleared on idle/failure). ---

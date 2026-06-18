@@ -396,7 +396,7 @@ client::ui::LobbySnapshot CaptureLobbySnapshot(Game &game,
   if (lobbyPhase) {
     BuildLobbyPanels(snap, lobby);
     snap.chat_channel = lobby.channel;
-    // SIL-234: a create/join is in flight (clicked, not yet connected). The
+    // A create/join is in flight (clicked, not yet connected). The
     // right column holds a stable "Connecting" panel through this window so it
     // never flashes the games browser before staging mounts. creategameclicked
     // covers create-from-form; joininggame covers the post-create/join connect.

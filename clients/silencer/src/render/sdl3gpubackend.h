@@ -114,7 +114,7 @@ private:
 	int             scene_tex_w = 0;
 	int             scene_tex_h = 0;
 
-	// --- cppx UI overlay (SIL-11): premultiplied RGBA composited over the
+	// --- cppx UI overlay: premultiplied RGBA composited over the
 	// swapchain after upscale. Dormant until UploadUiFrame is called. ---
 	SDL_GPUTexture        *ui_tex      = nullptr;
 	int                    ui_tex_w    = 0;
@@ -122,7 +122,7 @@ private:
 	SDL_GPUTransferBuffer *ui_tbuf     = nullptr;
 	Uint32                 ui_tbuf_sz  = 0;
 
-	// --- SIL-240 GPU UI geometry path ---
+	// --- GPU UI geometry path ---
 	// The cppx UI is drawn on the GPU from a vertex storage buffer into
 	// ui_scene_tex (premultiplied), then composited over the swapchain with the
 	// fade as a uniform. Replaces the per-frame CPU raster + full-window upload.
@@ -147,7 +147,7 @@ private:
 	bool                   ui_geom_present = false;
 	Uint8                  ui_geom_fade    = 255;     // global fade, 0..255
 
-	// Group-opacity layers (SIL-240 stage 3): a LayerPush redirects the subtree
+	// Group-opacity layers: a LayerPush redirects the subtree
 	// into a transient RGBA target, composited back over its parent at the layer
 	// opacity (a fullscreen premultiplied multiply) at LayerPop. Pool indexed by
 	// nesting depth, sized to ui_scene_tex; allocated only when a program carries
@@ -158,7 +158,7 @@ private:
 	int                    ui_layer_w   = 0;
 	int                    ui_layer_h   = 0;
 
-	// --- Swapchain capture (SIL-11 screenshot): download the final composited
+	// --- Swapchain capture (screenshot): download the final composited
 	// frame on request. Armed by RequestCapture(), filled during Present(). ---
 	bool                   capture_pending = false;
 	SDL_GPUTransferBuffer *capture_tbuf    = nullptr;
@@ -200,13 +200,13 @@ private:
 	int          pending_w      = 0;
 	int          pending_h      = 0;
 
-	// --- Pending UI overlay upload (SIL-11) ---
+	// --- Pending UI overlay upload ---
 	const Uint8 *pending_ui_pixels = nullptr;
 	int          pending_ui_w      = 0;
 	int          pending_ui_h      = 0;
 	bool         ui_dirty          = false;
 	bool         ui_present        = false; // an overlay exists to composite
-	// SIL-219: global opacity (0..255) the UI layer is dimmed by during a
+	// Global opacity (0..255) the UI layer is dimmed by during a
 	// FADEOUT transition so it fades with the world. 255 = no change (at rest).
 	Uint8        ui_global_alpha   = 255;
 	bool         frame_dirty    = false;

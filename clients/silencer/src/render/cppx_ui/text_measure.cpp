@@ -51,7 +51,7 @@ RunMetrics metrics_for(const ::ui::TextMetricsQuery &q) {
     // line-height token can't clip the (now larger) glyph cell.
     m.line_h = static_cast<float>(q.font_size);
     // Cap-top..baseline in points: native ascent scaled the same as the cell.
-    // Drives the SIL-217 caret height (glyph ink, not the descender-padded cell).
+    // Drives the caret height (glyph ink, not the descender-padded cell).
     if (gf->ascent > 0)
       m.ascent = static_cast<float>(gf->ascent) * gscale;
     return m;

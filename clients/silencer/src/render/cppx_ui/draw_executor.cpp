@@ -76,7 +76,7 @@ SDL_Color unpremultiply(::ui::Color c) {
 // chunky look the golden has and TTF cannot reproduce. Returns false if this
 // face has no baked glyph atlas (caller falls back to the TTF path).
 //
-// Canonical glyph cells (SIL-190): every glyph draws into an INTEGER device
+// Canonical glyph cells: every glyph draws into an INTEGER device
 // rect whose size is rounded ONCE from the native art (round(gw*gscale) x
 // round(atlas_h*gscale)) — same letter, byte-identical pixels anywhere on
 // screen. This deliberately diverges from origin, whose whole-frame nearest
@@ -280,8 +280,8 @@ void render_image(SDL_Renderer *r, const ::ui::DrawCommand &c,
   if (nine) {
     // Legacy chrome nine-slice (origin DispatchButtonNineSlice): swap the
     // draw for a canonical per-size variant baked through origin's virtual
-    // nine-slice + NEAREST magnify at phase 0 (U-2/SIL-204 — identical
-    // pixels at every position; see resolve_legacy).
+    // nine-slice + NEAREST magnify at phase 0 (identical pixels at every
+    // position; see resolve_legacy).
     {
       int out_w = 0, out_h = 0;
       TextureRegistry::LegacyVariant v;
@@ -361,7 +361,7 @@ void render_image(SDL_Renderer *r, const ::ui::DrawCommand &c,
                    c.rect.h * scale};
   // Legacy virtual-grid sprite (origin menu chrome): swap the draw for the
   // canonical variant baked through origin's NEAREST magnify at phase 0,
-  // drawn 1:1 at the floor-quantized device cell (U-2/SIL-204) — GPU/SW
+  // drawn 1:1 at the floor-quantized device cell — GPU/SW
   // resampling of the native sprite can't reproduce the int(lx/s)
   // duplication bands.
   if (!has_src && !img.flip_h) {
@@ -439,7 +439,7 @@ bool snap_legacy_hairline_border(SDL_Renderer *r, const ::ui::DrawCommand &c,
   return true;
 }
 
-// Legacy solid-fill snap (SIL-207). origin fills chrome plates (the
+// Legacy solid-fill snap. origin fills chrome plates (the
 // create_game scrollbar thumb) as integer rects on the same virtual canvas
 // its hairline strokes live on. Our box comes out of flex layout with
 // fractional logical edges, so the raw quad can raster half a cell off the

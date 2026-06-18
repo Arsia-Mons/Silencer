@@ -38,12 +38,12 @@ public:
 	// Upload is deferred to Present(); pixels must remain valid until then.
 	virtual void UploadFrame(const Uint8 *indexed_pixels, int w, int h) = 0;
 
-	// Queue a premultiplied-RGBA8 UI overlay (the cppx renderer bridge, SIL-11)
+	// Queue a premultiplied-RGBA8 UI overlay (the cppx renderer bridge)
 	// to be composited over the final frame. `w*h*4` tightly-packed bytes;
 	// upload deferred to Present(), pixels must stay valid until then. Default
 	// no-op (TUI / headless ignore it). Pass null/0 to clear the overlay.
 	//
-	// `global_alpha` (SIL-219) scales the whole layer's opacity in lockstep with
+	// `global_alpha` scales the whole layer's opacity in lockstep with
 	// the game's FADEOUT palette fade so the cppx UI fades in/out together with
 	// the world on screen transitions. The buffer is PREMULTIPLIED, so dimming
 	// multiplies ALL four channels by the fraction. 1.0 (the default, at rest)
@@ -51,11 +51,11 @@ public:
 	virtual void UploadUiFrame(const Uint8 * /*rgba*/, int /*w*/, int /*h*/,
 	                           float /*global_alpha*/ = 1.0f) {}
 
-	// SIL-240: render the cppx UI as a GPU geometry program instead of a
+	// Render the cppx UI as a GPU geometry program instead of a
 	// CPU-rasterized, full-window RGBA upload. Backends that draw the UI on the
 	// GPU return true from SupportsUiGeometry() and consume the program in
 	// Present(); the cppx composition root then builds geometry instead of
-	// software-rastering. `global_alpha` is the FADEOUT fraction (SIL-219),
+	// software-rastering. `global_alpha` is the FADEOUT fraction,
 	// applied as a GPU multiply at composite time rather than a per-pixel CPU
 	// dim. The program is owned by the cppx host and must stay valid until the
 	// next Present(). Default no-op (headless/TUI keep the UploadUiFrame path).

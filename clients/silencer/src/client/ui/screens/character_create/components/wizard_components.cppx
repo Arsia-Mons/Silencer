@@ -62,7 +62,7 @@ constexpr ::ui::Color kAliasFrameBorder = {84, 156, 104, 255};
   // must NOT shrink the box: the rows keep the pane's full 354 logical = 236
   // virtual width so the Stretch row-plate bakes 1:1 — a narrower box
   // nearest-decimates 236 src cols to 235 and drops the right cap's ring
-  // column (U-4 / SIL-206).
+  // column.
   return <AppButton
     key={kAgencies[index].control_id}
     controlId={kAgencies[index].control_id}

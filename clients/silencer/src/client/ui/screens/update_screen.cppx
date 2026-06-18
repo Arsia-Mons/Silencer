@@ -41,7 +41,7 @@ const char *phase_label(UpdaterPhase phase) {
   return i < std::size(kPhaseLabels) ? kPhaseLabels[i] : "";
 }
 
-// SIL-227: match the sibling message/password modals — the bank-40 idx4 dialog
+// Match the sibling message/password modals — the bank-40 idx4 dialog
 // sprite (not a bespoke slate card) at its fixed 352x178, framing ONE status
 // line per phase, an ASCII progress bar only while downloading, and a row of
 // state-gated chrome buttons. CenteredOverlay over the prior screen. Conditional

@@ -1,10 +1,9 @@
 #pragma once
 
-// SIL-11 end-to-end demo overlay. Renders a nine-slice button + TTF text to a
+// End-to-end demo overlay. Renders a nine-slice button + TTF text to a
 // window-sized premultiplied-RGBA buffer through the cppx bridge (UiSurface ->
 // draw_executor), which the GPU backend composites over the frame. Flag-gated
-// (SILENCER_CPPX_UI_DEMO) — proves the whole bridge on the real screen; the
-// pipeline-driven UI (cppx screens) is SIL-13.
+// (SILENCER_CPPX_UI_DEMO).
 
 #include "font_registry.h"
 #include "texture_registry.h"

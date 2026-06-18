@@ -161,7 +161,7 @@ class World {
     bool   SecurityIDCanSpawn(Uint8 securityid);
 
     // Lobby / pre-match commands (local-player -> authority). Promoted from
-    // private in SIL-8 to join the public ChangeTeam/SetTech family; the
+    // private to join the public ChangeTeam/SetTech family; the
     // authority-side receive handlers (peerid overloads) stay private.
     void   SendReady()                                   { replication.SendReady(); }
     void   RequestPeerList()                             { peers.RequestPeerList(); }

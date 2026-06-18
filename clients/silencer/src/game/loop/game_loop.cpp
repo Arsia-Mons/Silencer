@@ -441,7 +441,7 @@ bool Game::Tick(void){
 		}
 		if(world.gameplaystate == World::INLOBBY){
 			// Dedicated server pumps map transfers each frame; the client-side
-			// ready-button refresh is the cppx lobby screen's concern (SIL-20).
+			// ready-button refresh is the cppx lobby screen's concern.
 			gameSession.MapDownloaderRef().ProcessMapDownload();
 		}
 		/*Peer * localpeer = world.peers.peerlist[world.peers.localpeerid];
@@ -506,7 +506,7 @@ bool Game::Tick(void){
 		}
 	}
 	
-	// SIL-14: the per-state blocks below keep their world side-effects and menu
+	// The per-state blocks below keep their world side-effects and menu
 	// ambience, but no longer mount screens — the golden cppx AppRoot maps the
 	// session phase (projected from `state`) onto the owning screen. `game.cpp`
 	// names no screen. `stateisnew` stays: it is the game's state-entry latch,
@@ -574,7 +574,7 @@ bool Game::Tick(void){
 				if(lobbyChatLog.size() > 256)
 					lobbyChatLog.erase(lobbyChatLog.begin(), lobbyChatLog.begin() + (lobbyChatLog.size() - 256));
 
-				// SIL-21 (3/n) game-join pump (sibling of the chat drain). Drives a
+				// Game-join pump (sibling of the chat drain). Drives a
 				// created/joined game from the LOBBY tick; the match-start transition
 				// (shared-state -> INGAME) stays in Game::Tick.
 				gameSession.MapDownloaderRef().ProcessMapDownload();

@@ -6,7 +6,7 @@
 
 namespace client::ui {
 
-// Opaque legacy-sprite chrome surfaced to .cppx screens (SIL-87). The renderer
+// Opaque legacy-sprite chrome surfaced to .cppx screens. The renderer
 // bridge bakes curated indexed sprites + the active palette into premultiplied
 // RGBA textures and hands their opaque `texture_id`s here, mirroring how
 // `font_id` surfaces a baked face. Screens set `VisualStyle.image{texture_id}`
@@ -20,16 +20,16 @@ namespace client::ui {
 // ---- Texture budget (single owning artifact; cap = 64) ------------------
 // Running tally of every baked chrome index across all surfaces. Keep this in
 // sync as surfaces add sprites; atlasing (source-rect UV) is the relief valve.
-//   bank 6  idx 7..11  oval_md ramp   196x33 ×5 (SIL-89 + hover phases)
+//   bank 6  idx 7..11  oval_md ramp   196x33 ×5 (+ hover phases)
 //   bank 6  idx 28..32 oval_sm ramp   112x33 ×5
 //   bank 6  idx 23..27 oval_lg ramp   220x33 ×5
 //   bank 6  idx 2..6   row_plate ramp 236x27 ×5
-//   bank 7  idx 24   chrome_btn ramp   156x21 ×5 (SIL-90, same art, brightness ramp)
-//   bank 7  idx 5    chrome_panel     ~628x441 (SIL-91, plain native)
+//   bank 7  idx 24   chrome_btn ramp   156x21 ×5 (same art, brightness ramp)
+//   bank 7  idx 5    chrome_panel     ~628x441 (plain native)
 //   bank 7  idx 7    chrome_controls  ~628x441 (Options·Controls single-pane, stretch)
-//   bank 40 idx 4    dialog_msg       ~352x178 (SIL-91, plain native)
-//   bank 40 idx 2    dialog_pw        ~284x277 (SIL-91, plain native)
-//   bank 6  idx 0    starfield        full-bleed (SIL-92, stretch)
+//   bank 40 idx 4    dialog_msg       ~352x178 (plain native)
+//   bank 40 idx 2    dialog_pw        ~284x277 (plain native)
+//   bank 6  idx 0    starfield        full-bleed (stretch)
 //   bank 95 idx 2    hud_bezel_top    native       (in-game HUD top bezel)
 //   bank 95 idx 11   hud_bezel_bottom native       (in-game HUD bottom dash)
 //   bank 94 idx 0    hud_radar        native       (in-game minimap frame)
@@ -86,10 +86,10 @@ struct ChromeTextures {
   // drawn with origin's stretch fit (PackImageStretch(7,1)).
   uint32_t lobby_backdrop = 0;
   // Static SILENCER logo (bank 208 frame 60 — the final frame of the legacy
-  // reveal animation; SIL-195 animates the full 29..60 sequence).
+  // reveal animation; the full 29..60 sequence animates elsewhere).
   uint32_t logo = 0;
   uint16_t logo_w = 0, logo_h = 0;
-  // SIL-195: bank-208 reveal frames 29..60 as individual native-size textures.
+  // Bank-208 reveal frames 29..60 as individual native-size textures.
   // `x/y` are the frame's offset inside the fixed union stage, matching
   // origin/main SilencerLogo::EnsureBounds and draw positioning. count == 0 or
   // missing stage dimensions => static `logo` fallback.
@@ -110,7 +110,7 @@ struct ChromeTextures {
   uint32_t toggle_l_on = 0, toggle_l_off = 0; // idx12, idx13
   uint32_t toggle_r_off = 0, toggle_r_on = 0; // idx14, idx15
   uint16_t toggle_w = 0, toggle_h = 0;
-  // SIL-102: the five agency emblems (bank 181 idx0..4), shown in the Character
+  // The five agency emblems (bank 181 idx0..4), shown in the Character
   // Create detail column for the previewed agency. Indexed by agency 0..4.
   // Per-agency native size + sprite-sheet offsets (origin's roster anchors
   // subtract the offsets when placing the native-size sprite).

@@ -2,7 +2,7 @@
 
 // ui_draw_geometry.h — the parity-critical snap/cell/image rect+UV math, shared
 // by the CPU software executor (draw_executor.cpp) and the GPU geometry emitter
-// (ui_draw_program.cpp) so both produce byte-identical device rects/UVs (SIL-240).
+// (ui_draw_program.cpp) so both produce byte-identical device rects/UVs.
 //
 // The origin-parity behaviors (legacy hairline-border grid snap, legacy
 // solid-fill snap, canonical integer glyph cells, image nine-slice / plain /

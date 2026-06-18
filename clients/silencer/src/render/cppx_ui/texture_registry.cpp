@@ -51,7 +51,7 @@ uint32_t TextureRegistry::upload_rgba(SDL_Renderer *renderer,
   SDL_SetTextureScaleMode(tex, SDL_SCALEMODE_NEAREST);
   const uint32_t id = adopt(tex);
   if (id) {
-    // SIL-240: keep the premultiplied bytes resident so the GPU emitter can
+    // Keep the premultiplied bytes resident so the GPU emitter can
     // upload them once (chrome / backdrop / glyph / legacy-variant bakes all
     // flow through here).
     rgba_[id - 1] = std::move(pm);
@@ -127,7 +127,7 @@ bool TextureRegistry::resolve_legacy_sized(
   if (s < 1.0f)
     s = 1.0f;
   // Recover the authored virtual box SIZE (design metric); position no longer
-  // participates (canonical phase, U-2/SIL-204).
+  // participates (canonical phase).
   const int vw = (int)std::floor(dev_w / s + 0.5f);
   const int vh = (int)std::floor(dev_h / s + 0.5f);
   if (vw < 1 || vh < 1 || vw > 4095 || vh > 4095)
@@ -187,7 +187,7 @@ bool TextureRegistry::resolve_legacy_cell(
   // Only 1:1-virtual draws qualify (box == the sprite cell at the menu scale).
   if (std::fabs(dev_w - sp.w * s) > 4.0f || std::fabs(dev_h - sp.h * s) > 4.0f)
     return false;
-  // Canonical cell (U-2/SIL-204): ONE variant per (sprite, scale), drawn at
+  // Canonical cell: ONE variant per (sprite, scale), drawn at
   // the floor-quantized device position (legacy SW dst-rect floor — s==1
   // in-game draws land byte-identical). Same sprite, same pixels, same size,
   // anywhere on screen.

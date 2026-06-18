@@ -40,7 +40,7 @@ SDL_Texture *FontRegistry::cached_text_texture(SDL_Renderer *, uint16_t,
 
 namespace {
 // Indexed by FaceId. shared/fonts/silencer-*.otf (generated from the legacy
-// bitmap banks 133/134/136/132/135 — exact in-game identity, per SIL-6/SIL-95).
+// bitmap banks 133/134/136/132/135 — exact in-game identity).
 const char *kFaceFile[FontRegistry::FaceCount] = {
     "silencer-ui.otf",       // Body
     "silencer-ui-large.otf", // Large
