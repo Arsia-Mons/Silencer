@@ -37,6 +37,10 @@ runs:
         version: 3-latest
         version-sdl-mixer: 3-latest
         version-sdl-ttf: 3-latest
+        # Build SDL_ttf against its vendored freetype/harfbuzz (sources
+        # setup-sdl already fetches) so libSDL3_ttf is self-contained — no
+        # system freetype/harfbuzz to install or bundle alongside the binary.
+        cmake-arguments: -DSDLTTF_VENDORED=ON
 
     - name: Setup sccache
       uses: mozilla-actions/sccache-action@v0.0.10
