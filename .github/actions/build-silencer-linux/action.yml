@@ -66,7 +66,12 @@ runs:
 
     - name: Build
       shell: bash
-      run: cmake --build build -j"$(nproc)"
+      # Build only the shippable client. CMake pulls in its real deps
+      # (updater-stage-2, silencer_shaders) via add_dependencies, so the
+      # bundle/release path is complete. The unit-test targets aren't run
+      # here (no ctest step) — they're compile-gated on Windows PR CI — and
+      # building them was the only thing failing this release-artifact job.
+      run: cmake --build build --target silencer -j"$(nproc)"
 
     - name: sccache stats
       if: always()
