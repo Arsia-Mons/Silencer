@@ -26,6 +26,7 @@ poisoned cache. Don't hand-roll `rm`/reconfigure loops.
 | `win-ninja` (default) | Debug | `build/` | day-to-day |
 | `win-ninja-release` | Release | `build-release/` | |
 | `win-ninja-unity` | Release + `SILENCER_UNITY_BUILD=ON` | `build-unity/` | fastest clean build |
+| `win-ninja-headless` | Release + unity + `SILENCER_HEADLESS=ON` | `build-headless/` | dedicated-server build (no UI/Yoga/SDL3_ttf); the config `deploy.yml` ships to the lobby box |
 
 Names are shared across platforms even though `win-` is a misnomer
 off Windows. On Windows the preset is a real `CMakePresets.json`
