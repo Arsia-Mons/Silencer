@@ -902,19 +902,29 @@ endif()
 
 target_link_libraries(${SILENCER_TARGET} minizip_dep)
 
-# Dev-build asset staging (Windows/Linux): copy shared/assets/ and shared/fonts/
-# next to the binary so the runtime resolver (ResolveFontDir via
-# SDL_GetBasePath()+"assets/fonts") finds them without needing `cmake --install`.
-# macOS bakes both into the .app bundle via the bundle_extras list above.
+# Dev-build asset staging (Windows/Linux): copy shared/assets/ next to the
+# binary so the runtime resolver (`GetResDir() + "<subdir>/..."`) finds the
+# game data without needing `cmake --install`. macOS bakes assets into the
+# .app bundle via the bundle_extras list above.
 if(NOT APPLE)
 	add_custom_command(TARGET ${SILENCER_TARGET} POST_BUILD
 		COMMAND ${CMAKE_COMMAND} -E copy_directory
 				"${SILENCER_SHARED_DIR}/assets"
 				"$<TARGET_FILE_DIR:${SILENCER_TARGET}>/assets"
-		COMMAND ${CMAKE_COMMAND} -E copy_directory
-				"${SILENCER_SHARED_DIR}/fonts"
-				"$<TARGET_FILE_DIR:${SILENCER_TARGET}>/assets/fonts"
-		COMMENT "Staging shared/assets/ + fonts next to ${SILENCER_TARGET}")
+		COMMENT "Staging shared/assets/ next to ${SILENCER_TARGET}")
+
+	# The cppx UI .otf fonts are only loaded by the windowed client (via
+	# ResolveFontDir → SDL_GetBasePath()+"assets/fonts"). The headless
+	# dedicated server has no UI and never loads them, and the lobby Docker
+	# build context (services/lobby/Dockerfile) doesn't ship shared/fonts/ —
+	# so stage fonts only for full client builds.
+	if(NOT SILENCER_HEADLESS)
+		add_custom_command(TARGET ${SILENCER_TARGET} POST_BUILD
+			COMMAND ${CMAKE_COMMAND} -E copy_directory
+					"${SILENCER_SHARED_DIR}/fonts"
+					"$<TARGET_FILE_DIR:${SILENCER_TARGET}>/assets/fonts"
+			COMMENT "Staging shared/fonts/ next to ${SILENCER_TARGET}")
+	endif()
 endif()
 
 install(TARGETS "${SILENCER_TARGET}" RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}" BUNDLE DESTINATION "${CMAKE_INSTALL_BINDIR}")
