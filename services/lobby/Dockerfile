@@ -1,7 +1,10 @@
 # ── stage 1: build SDL3 + SDL3_mixer from source ─────────────────────────────
-# Ubuntu 22.04 ships SDL2 only; SDL3 must be built from source.
+# Ubuntu ships SDL2 only; SDL3 must be built from source.
 # We disable all optional audio decoders — the dedicated server doesn't need them.
-FROM ubuntu:22.04 AS sdl3-builder
+# 24.04 (GCC 13) matches the native CI/release runners; the older 22.04 GCC 11
+# took ~8 min to optimize the cppx UI composition root (game_ui_pipeline.cpp)
+# at -O3, ballooning this build to ~11 min — GCC 13 compiles it in seconds.
+FROM ubuntu:24.04 AS sdl3-builder
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get -o Acquire::Check-Valid-Until=false \
             -o Acquire::AllowInsecureRepositories=true update \
@@ -41,7 +44,7 @@ COPY services/lobby/ .
 RUN go build -trimpath -ldflags="-s -w" -o silencer-lobby .
 
 # ── stage 3: C++ dedicated server (Linux) ─────────────────────────────────────
-FROM ubuntu:22.04 AS cpp-builder
+FROM ubuntu:24.04 AS cpp-builder
 
 ENV DEBIAN_FRONTEND=noninteractive
 COPY --from=sdl3-builder /opt/sdl3 /opt/sdl3
@@ -75,17 +78,17 @@ RUN cmake -B build -S clients/silencer \
     && cmake --build build -j"$(nproc)"
 
 # ── stage 4: runtime ──────────────────────────────────────────────────────────
-FROM ubuntu:22.04
+FROM ubuntu:24.04
 
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get -o Acquire::Check-Valid-Until=false \
             -o Acquire::AllowInsecureRepositories=true update \
  && apt-get install -y --no-install-recommends --allow-unauthenticated \
-        zlib1g libcurl4 libminizip1 \
+        zlib1g libcurl4t64 libminizip1t64 \
         ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
-# SDL3 shared libs (built from source; not in Ubuntu 22.04 apt)
+# SDL3 shared libs (built from source; not in Ubuntu apt)
 COPY --from=sdl3-builder /opt/sdl3/lib /opt/sdl3/lib
 RUN echo /opt/sdl3/lib > /etc/ld.so.conf.d/sdl3.conf && ldconfig
 
