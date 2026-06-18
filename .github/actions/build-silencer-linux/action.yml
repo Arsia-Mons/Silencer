@@ -31,11 +31,16 @@ runs:
           libxi-dev libxfixes-dev libxtst-dev libwayland-dev \
           libxkbcommon-dev libdbus-1-dev libibus-1.0-dev
 
-    - name: Install SDL3 + SDL3_mixer
+    - name: Install SDL3 + SDL3_mixer + SDL3_ttf
       uses: libsdl-org/setup-sdl@main
       with:
         version: 3-latest
         version-sdl-mixer: 3-latest
+        version-sdl-ttf: 3-latest
+        # Build SDL_ttf against its vendored freetype/harfbuzz (sources
+        # setup-sdl already fetches) so libSDL3_ttf is self-contained — no
+        # system freetype/harfbuzz to install or bundle alongside the binary.
+        cmake-arguments: -DSDLTTF_VENDORED=ON
 
     - name: Setup sccache
       uses: mozilla-actions/sccache-action@v0.0.10
@@ -61,7 +66,12 @@ runs:
 
     - name: Build
       shell: bash
-      run: cmake --build build -j"$(nproc)"
+      # Build only the shippable client. CMake pulls in its real deps
+      # (updater-stage-2, silencer_shaders) via add_dependencies, so the
+      # bundle/release path is complete. The unit-test targets aren't run
+      # here (no ctest step) — they're compile-gated on Windows PR CI — and
+      # building them was the only thing failing this release-artifact job.
+      run: cmake --build build --target silencer -j"$(nproc)"
 
     - name: sccache stats
       if: always()
@@ -81,11 +91,13 @@ runs:
         echo "--- SDL3 install roots ---"
         echo "  SDL3_ROOT=$SDL3_ROOT"
         echo "  SDL3_mixer_ROOT=$SDL3_mixer_ROOT"
+        echo "  SDL3_ttf_ROOT=$SDL3_ttf_ROOT"
         stage="build/package/silencer"
         mkdir -p "$stage"
         cp build/silencer "$stage/"
         cp -L "$SDL3_ROOT/lib/libSDL3.so.0" "$stage/"
         cp -L "$SDL3_mixer_ROOT/lib/libSDL3_mixer.so.0" "$stage/"
+        cp -L "$SDL3_ttf_ROOT/lib/libSDL3_ttf.so.0" "$stage/"
         patchelf --set-rpath '$ORIGIN' "$stage/silencer"
         cp -r shared/assets "$stage/assets"
         echo "--- bundled files ---"
