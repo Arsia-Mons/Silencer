@@ -7,13 +7,15 @@
 # VCPKG_ROOT, and serializes against concurrent builds so CLion, CLI
 # agents, and parallel agents can't corrupt the shared CMake cache.
 #
-# Usage:  ./build.ps1 [win-ninja|win-ninja-release|win-ninja-unity] [-Clean]
-#   default preset : win-ninja (Debug)
-#   -Clean         : wipe CMakeCache.txt + CMakeFiles (keep vcpkg_installed) first
+# Usage:  ./build.ps1 [win-ninja|win-ninja-release|win-ninja-unity|win-ninja-headless] [-Clean]
+#   default preset   : win-ninja (Debug)
+#   win-ninja-headless : dedicated-server build (no UI/Yoga/SDL3_ttf) — the
+#                        config deploy.yml ships to the lobby box
+#   -Clean           : wipe CMakeCache.txt + CMakeFiles (keep vcpkg_installed) first
 
 [CmdletBinding()]
 param(
-    [ValidateSet('win-ninja', 'win-ninja-release', 'win-ninja-unity')]
+    [ValidateSet('win-ninja', 'win-ninja-release', 'win-ninja-unity', 'win-ninja-headless')]
     [string]$Preset = 'win-ninja',
     [switch]$Clean
 )
@@ -25,9 +27,10 @@ function Fail($msg) { Write-Host "build.ps1: $msg" -ForegroundColor Red; exit 1 
 
 $silencerDir = $PSScriptRoot
 $binaryDir = switch ($Preset) {
-    'win-ninja'         { Join-Path $silencerDir 'build' }
-    'win-ninja-release' { Join-Path $silencerDir 'build-release' }
-    'win-ninja-unity'   { Join-Path $silencerDir 'build-unity' }
+    'win-ninja'          { Join-Path $silencerDir 'build' }
+    'win-ninja-release'  { Join-Path $silencerDir 'build-release' }
+    'win-ninja-unity'    { Join-Path $silencerDir 'build-unity' }
+    'win-ninja-headless' { Join-Path $silencerDir 'build-headless' }
 }
 
 # --- Resolve Visual Studio: newest install with the C++ x64 toolset ---

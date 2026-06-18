@@ -18,11 +18,12 @@ runs:
       shell: bash
       run: brew install minizip dylibbundler
 
-    - name: Install SDL3 + SDL3_mixer
+    - name: Install SDL3 + SDL3_mixer + SDL3_ttf
       uses: libsdl-org/setup-sdl@main
       with:
         version: 3-latest
         version-sdl-mixer: 3-latest
+        version-sdl-ttf: 3-latest
 
     - name: Setup sccache
       uses: mozilla-actions/sccache-action@v0.0.10
@@ -66,10 +67,12 @@ runs:
         echo "--- SDL3 install roots ---"
         echo "  SDL3_ROOT=$SDL3_ROOT"
         echo "  SDL3_mixer_ROOT=$SDL3_mixer_ROOT"
+        echo "  SDL3_ttf_ROOT=$SDL3_ttf_ROOT"
         mkdir -p Silencer.app/Contents/Frameworks
         dylibbundler \
           -s "$SDL3_ROOT/lib" \
           -s "$SDL3_mixer_ROOT/lib" \
+          -s "$SDL3_ttf_ROOT/lib" \
           --overwrite-dir \
           --bundle-deps \
           --create-dir \

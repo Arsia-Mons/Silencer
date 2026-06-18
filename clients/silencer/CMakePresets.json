@@ -28,6 +28,14 @@
             "displayName": "Windows / Ninja / Release / Unity (fastest clean build)",
             "binaryDir": "${sourceDir}/build-unity",
             "cacheVariables": { "SILENCER_UNITY_BUILD": "ON" }
+        },
+        {
+            "name": "win-ninja-headless",
+            "inherits": "win-ninja-unity",
+            "displayName": "Windows / Ninja / Release / Unity / Headless (dedicated-server build)",
+            "description": "Headless dedicated-server build: no UI, Yoga, SDL3_ttf, or tests. Mirrors the config deploy.yml ships to the lobby box.",
+            "binaryDir": "${sourceDir}/build-headless",
+            "cacheVariables": { "SILENCER_HEADLESS": "ON" }
         }
     ],
     "buildPresets": [
@@ -44,6 +52,11 @@
         {
             "name": "win-ninja-unity",
             "configurePreset": "win-ninja-unity",
+            "targets": [ "silencer" ]
+        },
+        {
+            "name": "win-ninja-headless",
+            "configurePreset": "win-ninja-headless",
             "targets": [ "silencer" ]
         }
     ]
