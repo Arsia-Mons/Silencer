@@ -35,12 +35,22 @@ static bool test_designated_init() {
 static bool test_push_overflow() {
   static DrawCommandList list; // large; keep off the stack
   list.reset();
-  for (int i = 0; i < UI_MAX_DRAW_COMMANDS; ++i)
+  // Content push() stops at the reserve boundary (defined overflow: the command
+  // is dropped, the frame is not failed) so closing brackets always have room.
+  const int content_cap = UI_MAX_DRAW_COMMANDS - UI_DRAW_COMMANDS_RESERVE;
+  for (int i = 0; i < content_cap; ++i)
     CHECK(list.push({.kind = DrawCommandKind::Rect}));
+  CHECK(list.count == content_cap);
+  CHECK(list.dropped_count == 0);
+  CHECK(!list.push({.kind = DrawCommandKind::Rect})); // content saturated -> dropped
+  CHECK(list.dropped_count == 1);
+  // push_close() may use the reserved tail so every open clip/layer still
+  // balances even on a saturated frame (INV4).
+  for (int i = 0; i < UI_DRAW_COMMANDS_RESERVE; ++i)
+    CHECK(list.push_close({.kind = DrawCommandKind::ClipPop}));
   CHECK(list.count == UI_MAX_DRAW_COMMANDS);
-  CHECK(list.error_count == 0);
-  CHECK(!list.push({.kind = DrawCommandKind::Rect})); // overflow
-  CHECK(list.error_count == 1);
+  CHECK(!list.push_close({.kind = DrawCommandKind::ClipPop})); // hard cap
+  CHECK(list.dropped_count == 2);
   return true;
 }
 
@@ -54,9 +64,9 @@ static bool test_text_arena() {
   uint32_t off2 = 0;
   CHECK(list.push_text("hi", 2, &off2));
   CHECK(off2 == 5);
-  // overflow is a hard fail, not a clamp:
+  // a full text arena drops the bytes (defined overflow), never fails the frame:
   list.reset();
-  CHECK(list.text_len_used == 0 && list.error_count == 0);
+  CHECK(list.text_len_used == 0 && list.dropped_count == 0);
   return true;
 }
 
@@ -69,7 +79,7 @@ static bool test_stops_and_reset() {
   CHECK(off == 0 && list.grad_count == 2);
   list.reset();
   CHECK(list.count == 0 && list.grad_count == 0 && list.text_len_used == 0 &&
-        list.error_count == 0);
+        list.dropped_count == 0);
   return true;
 }
 

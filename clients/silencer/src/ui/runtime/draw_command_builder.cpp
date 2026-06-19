@@ -206,10 +206,10 @@ bool push_gradient_command(DrawCommandList &list, NodeId node_id,
 
 // Shadow command, emitted before the fill so it sits behind the node
 // (design §9.8 order: Shadow -> fill/Gradient/Image -> children -> Border).
-bool append_shadow(DrawCommandList &list, const NodeSnapshot &node) {
+void append_shadow(DrawCommandList &list, const NodeSnapshot &node) {
   const Shadow &sh = node.visual.shadow;
   if (sh.color.a == 0)
-    return true;
+    return;
 
   DrawCommand command = {};
   command.kind = DrawCommandKind::Shadow;
@@ -222,15 +222,15 @@ bool append_shadow(DrawCommandList &list, const NodeSnapshot &node) {
       .spread = sh.spread,
       .corner_radius = node.visual.corner_radius,
   };
-  return list.push(command);
+  list.push(command);
 }
 
 // Image command (textured rect), emitted after the fill (design §9.8). The
 // executor cuts corner_radius on nine-slice per §9.7.
-bool append_image(DrawCommandList &list, const NodeSnapshot &node) {
+void append_image(DrawCommandList &list, const NodeSnapshot &node) {
   const BackgroundImage &bi = node.visual.image;
   if (bi.texture_id == 0)
-    return true;
+    return;
 
   DrawCommand command = {};
   command.kind = DrawCommandKind::Image;
@@ -248,12 +248,12 @@ bool append_image(DrawCommandList &list, const NodeSnapshot &node) {
       .flip_h = bi.flip_h,
       .fit = bi.fit,
   };
-  return list.push(command);
+  list.push(command);
 }
 
 // Rect command carrying only the resolved fill; the stroke is a separate Border
 // command emitted by append_frame.
-bool append_rect(DrawCommandList &list, const NodeSnapshot &node,
+void append_rect(DrawCommandList &list, const NodeSnapshot &node,
                  bool focused) {
   const VisualStyle &v = node.visual;
   bool visual_box = has_color(v.background) || v.gradient.stop_count > 0 ||
@@ -263,13 +263,14 @@ bool append_rect(DrawCommandList &list, const NodeSnapshot &node,
                      node.role == NodeRole::Checkbox ||
                      node.role == NodeRole::Input;
   if (!visual_box && !control_box && !focused) {
-    return true;
+    return;
   }
 
   // A resolved gradient IS the fill — emit it in place of the solid Rect.
   if (v.gradient.stop_count > 0) {
-    return push_gradient_command(list, node.id, node.layout, v.gradient,
-                                 v.corner_radius);
+    push_gradient_command(list, node.id, node.layout, v.gradient,
+                          v.corner_radius);
+    return;
   }
 
   // Sprite-backed (image) controls carry their own baked interior, so skip the
@@ -281,12 +282,12 @@ bool append_rect(DrawCommandList &list, const NodeSnapshot &node,
                           ? control_fill(node)
                           : kTransparent);
 
-  return push_rect_command(list, node.id, node.layout, fill, v.corner_radius);
+  push_rect_command(list, node.id, node.layout, fill, v.corner_radius);
 }
 
 // The per-side border + signed-offset outline (focus ring): the resolved border,
 // else a control-role default; the resolved outline, else the focus-ring fallback.
-bool append_frame(DrawCommandList &list, const NodeSnapshot &node,
+void append_frame(DrawCommandList &list, const NodeSnapshot &node,
                   bool focused) {
   const VisualStyle &v = node.visual;
   bool control_box = node.role == NodeRole::Button ||
@@ -329,7 +330,7 @@ bool append_frame(DrawCommandList &list, const NodeSnapshot &node,
   }
 
   if (!has_border && !has_outline)
-    return true;
+    return;
 
   if (has_border) {
     border.color.top = premul(border.color.top);
@@ -352,16 +353,18 @@ bool append_frame(DrawCommandList &list, const NodeSnapshot &node,
       .has_fill = false,
       .has_outline = has_outline,
   };
-  return list.push(command);
+  list.push(command);
 }
 
 // TEXT (role==Text): measure-driven, multi-line. Emits one Text command per
-// measured LineRun. Measure == layout (same measurer, design §10.4). Overflow
-// beyond UI_MAX_TEXT_LINES is a failed frame, never a silent drop.
-bool append_text(DrawCommandList &list, const NodeSnapshot &node,
+// measured LineRun. Measure == layout (same measurer, design §10.4). Content
+// exceeding UI_MAX_TEXT_LINES is truncated to what fits and clipped by the
+// node's own/ancestor clip (INV2: graceful content overflow, never a frame
+// abort). A scrolled text node's off-window lines are clipped by its viewport.
+void append_text(DrawCommandList &list, const NodeSnapshot &node,
                  bool inherited_disabled) {
   if (node.role != NodeRole::Text)
-    return true;
+    return;
 
   const VisualStyle &v = node.visual;
   Color color = has_color(v.text.color)
@@ -380,8 +383,8 @@ bool append_text(DrawCommandList &list, const NodeSnapshot &node,
   MeasureTextFn measurer = text_measurer();
   if (!measurer) {
     // Hermetic fallback (no measurer installed): one line at the content rect.
-    return push_text_command(list, node.id, content, value, color, font_size,
-                             align);
+    push_text_command(list, node.id, content, value, color, font_size, align);
+    return;
   }
 
   TextMetricsQuery query = {};
@@ -398,32 +401,30 @@ bool append_text(DrawCommandList &list, const NodeSnapshot &node,
   for (uint8_t i = 0; i < metrics.line_count; ++i) {
     const LineRun &line = metrics.lines[i];
     if (line.slice_offset + line.slice_len > value_len)
-      return false; // measurer returned an out-of-range slice — fail the frame
+      continue; // measurer returned an out-of-range slice — skip just this line
     DrawRect rect = {content.x + line.x, content.y + line.y, line.w, line.h};
     // The reveal ramp lives at the text's trailing edge: last line only.
     const bool last_line = (i + 1 == metrics.line_count);
-    if (!push_text_line(list, node.id, rect, value + line.slice_offset,
-                        line.slice_len, color, font_id, font_size, i, align,
-                        last_line ? v.text.reveal_boost : 0,
-                        last_line ? v.text.reveal_step : 0))
-      return false;
+    push_text_line(list, node.id, rect, value + line.slice_offset,
+                   line.slice_len, color, font_id, font_size, i, align,
+                   last_line ? v.text.reveal_boost : 0,
+                   last_line ? v.text.reveal_step : 0);
   }
-
-  if (metrics.overflowed) {
-    ++list.error_count; // text needed > UI_MAX_TEXT_LINES — never a silent drop
-    return false;
-  }
-  return true;
+  // metrics.overflowed (content needed > UI_MAX_TEXT_LINES) is a graceful
+  // truncation: the lines that fit are emitted, the rest clip. Recorded as a
+  // degradation, never a frame failure.
+  if (metrics.overflowed)
+    ++list.dropped_count;
 }
 
 // INPUT contents (role==Input): selection rect, value text, caret rect. Caret
 // and selection x come from real measured advances of the value's byte prefixes
 // (design §10.5), so the cursor lands exactly under the laid-out glyph.
-bool append_input_contents(DrawCommandList &list, const NodeSnapshot &node,
+void append_input_contents(DrawCommandList &list, const NodeSnapshot &node,
                            bool focused, bool inherited_disabled,
                            InputScrollStore *input_scroll) {
   if (node.role != NodeRole::Input)
-    return true;
+    return;
 
   // The text pen sits at the input's content box (border + padding), so the
   // screen owns the inset — the transcriber adds none of its own.
@@ -508,13 +509,13 @@ bool append_input_contents(DrawCommandList &list, const NodeSnapshot &node,
   clip_rect.y = node.layout.y;
   clip_rect.width = text_rect.width;
   clip_rect.height = node.layout.height;
+  bool clip_pushed = false;
   {
     DrawCommand clip = {};
     clip.kind = DrawCommandKind::ClipPush;
     clip.node_id = node.id;
     clip.rect = to_draw_rect(clip_rect);
-    if (!list.push(clip))
-      return false;
+    clip_pushed = list.push(clip);
   }
 
   if (focused && selection_end > selection_start) {
@@ -525,8 +526,7 @@ bool append_input_contents(DrawCommandList &list, const NodeSnapshot &node,
     sel.y = text_rect.y;
     sel.width = end_x - start_x;
     sel.height = text_rect.height;
-    if (!push_rect_command(list, node.id, sel, kSelectionFill, 0.0f))
-      return false;
+    push_rect_command(list, node.id, sel, kSelectionFill, 0.0f);
   }
 
   Color text_color =
@@ -536,9 +536,8 @@ bool append_input_contents(DrawCommandList &list, const NodeSnapshot &node,
                                                                : kTextFill);
   Rect value_rect = text_rect;
   value_rect.x -= scroll_x;
-  if (!push_text_command(list, node.id, value_rect, display_value, text_color,
-                         font_size, TextAlign::Left))
-    return false;
+  push_text_command(list, node.id, value_rect, display_value, text_color,
+                    font_size, TextAlign::Left);
 
   if (focused && node.text_edit.show_caret) {
     int caret = clamp_int(node.text_edit.caret, 0, length);
@@ -565,18 +564,15 @@ bool append_input_contents(DrawCommandList &list, const NodeSnapshot &node,
           node.layout.y + (node.layout.height - caret_rect.height) * 0.5f;
     }
     Color caret_color = ck.color.a > 0 ? ck.color : kCaretFill;
-    if (!push_rect_command(list, node.id, caret_rect, caret_color, 0.0f))
-      return false;
+    push_rect_command(list, node.id, caret_rect, caret_color, 0.0f);
   }
 
-  {
+  if (clip_pushed) {
     DrawCommand clip = {};
     clip.kind = DrawCommandKind::ClipPop;
     clip.node_id = node.id;
-    if (!list.push(clip))
-      return false;
+    list.push_close(clip); // reserved tail: the input clip always balances
   }
-  return true;
 }
 
 // LayerPush bracketing the node's subtree (design §9.10): the executor renders
@@ -595,7 +591,7 @@ bool pop_layer(DrawCommandList &list, const NodeSnapshot &node) {
   DrawCommand command = {};
   command.kind = DrawCommandKind::LayerPop;
   command.node_id = node.id;
-  return list.push(command);
+  return list.push_close(command); // reserved tail: a LayerPush always balances
 }
 
 // CLIP: overflow != Visible brackets the children in ClipPush/ClipPop, scissoring
@@ -613,54 +609,54 @@ bool pop_clip(DrawCommandList &list, const NodeSnapshot &node) {
   DrawCommand command = {};
   command.kind = DrawCommandKind::ClipPop;
   command.node_id = node.id;
-  return list.push(command);
+  return list.push_close(command); // reserved tail: a ClipPush always balances
 }
 
-bool append_node(const UiTree &tree, DrawCommandList &list, NodeId id,
+// Transcribe one node + its subtree. Each node paints independently: a node or
+// subtree that cannot fully emit (a saturated arena, a measurer truncation)
+// degrades in place and never aborts a sibling or ancestor (INV3 failure
+// isolation). Clip/layer brackets are emitted as matched pairs gated on whether
+// the push landed, and the pops draw from the reserved tail, so push/pop balance
+// always holds — no dangling LayerPush, no composite smudge (INV4).
+void append_node(const UiTree &tree, DrawCommandList &list, NodeId id,
                  bool inherited_disabled, NodeId focused_id,
                  InputScrollStore *input_scroll) {
   NodeSnapshot node = {};
   if (!tree.snapshot(id, &node))
-    return false;
+    return; // node vanished mid-walk: skip just this subtree (structural)
 
   // hidden => skip paint for the node and its subtree (design §9.10 / §8.5).
   if (node.visual.hidden)
-    return true;
+    return;
 
   bool disabled = inherited_disabled || node.interaction.disabled;
   bool focused = focused_id != 0 && focused_id == node.id;
 
   // Group opacity < 1 brackets the node's paint + subtree in a LayerPush/Pop so
-  // the executor composites the group as a unit (design §9.10).
-  const bool layer = node.visual.opacity < 1.0f;
-  if (layer && !push_layer(list, node))
-    return false;
+  // the executor composites the group as a unit (design §9.10). Only emit the
+  // pop if the push landed.
+  const bool layer_pushed = node.visual.opacity < 1.0f && push_layer(list, node);
 
   // Paint order per design §9.8: Shadow -> fill/Gradient -> Image -> [children]
-  // -> Border+Outline.
-  if (!append_shadow(list, node) ||
-      !append_rect(list, node, focused) ||
-      !append_image(list, node) ||
-      !append_frame(list, node, focused) ||
-      !append_text(list, node, inherited_disabled) ||
-      !append_input_contents(list, node, focused, inherited_disabled,
-                             input_scroll))
-    return false;
+  // -> Border+Outline. Each is best-effort; a dropped command degrades only its
+  // own paint, not the node or its siblings.
+  append_shadow(list, node);
+  append_rect(list, node, focused);
+  append_image(list, node);
+  append_frame(list, node, focused);
+  append_text(list, node, inherited_disabled);
+  append_input_contents(list, node, focused, inherited_disabled, input_scroll);
 
-  const bool clip = node.style.overflow != Overflow::Visible;
-  if (clip && !push_clip(list, node))
-    return false;
-  for (int i = 0; i < tree.child_count(id); ++i) {
-    if (!append_node(tree, list, tree.child_at(id, i), disabled, focused_id,
-                     input_scroll))
-      return false;
-  }
-  if (clip && !pop_clip(list, node))
-    return false;
+  const bool clip_pushed =
+      node.style.overflow != Overflow::Visible && push_clip(list, node);
+  for (int i = 0; i < tree.child_count(id); ++i)
+    append_node(tree, list, tree.child_at(id, i), disabled, focused_id,
+                input_scroll);
+  if (clip_pushed)
+    pop_clip(list, node);
 
-  if (layer && !pop_layer(list, node))
-    return false;
-  return true;
+  if (layer_pushed)
+    pop_layer(list, node);
 }
 
 } // namespace
@@ -668,11 +664,13 @@ bool append_node(const UiTree &tree, DrawCommandList &list, NodeId id,
 bool build_draw_command_list(const UiTree &tree, DrawCommandList *out,
                              NodeId focused_id, InputScrollStore *input_scroll) {
   if (!out || !tree.contains(tree.root_id()))
-    return false;
+    return false; // structural precondition (no buffer / no root), not content
   out->reset();
-  return append_node(tree, *out, tree.root_id(), false, focused_id,
-                     input_scroll) &&
-         out->error_count == 0;
+  // INV1 totality: any valid tree yields a presentable frame. Content that does
+  // not fit degrades (clip/truncate/drop) and is recorded in out->dropped_count;
+  // it is never a frame failure, so the last good frame is never corrupted.
+  append_node(tree, *out, tree.root_id(), false, focused_id, input_scroll);
+  return true;
 }
 
 } // namespace ui

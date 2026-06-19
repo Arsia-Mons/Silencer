@@ -3,8 +3,17 @@
 namespace ui {
 
 bool DrawCommandList::push(const DrawCommand &command) {
+  if (count >= UI_MAX_DRAW_COMMANDS - UI_DRAW_COMMANDS_RESERVE) {
+    ++dropped_count;
+    return false;
+  }
+  commands[count++] = command;
+  return true;
+}
+
+bool DrawCommandList::push_close(const DrawCommand &command) {
   if (count >= UI_MAX_DRAW_COMMANDS) {
-    ++error_count;
+    ++dropped_count;
     return false;
   }
   commands[count++] = command;
@@ -14,7 +23,7 @@ bool DrawCommandList::push(const DrawCommand &command) {
 bool DrawCommandList::push_text(const char *bytes, uint16_t len,
                                 uint32_t *out_off) {
   if (text_len_used + static_cast<int>(len) > UI_DRAW_TEXT_ARENA_BYTES) {
-    ++error_count;
+    ++dropped_count;
     return false;
   }
   if (out_off)
@@ -27,7 +36,7 @@ bool DrawCommandList::push_text(const char *bytes, uint16_t len,
 bool DrawCommandList::push_stops(const GradientStop *stops, uint8_t n,
                                  uint16_t *out_off) {
   if (grad_count + static_cast<int>(n) > UI_DRAW_GRAD_STOPS) {
-    ++error_count;
+    ++dropped_count;
     return false;
   }
   if (out_off)
@@ -41,7 +50,7 @@ void DrawCommandList::reset() {
   count = 0;
   text_len_used = 0;
   grad_count = 0;
-  error_count = 0;
+  dropped_count = 0;
 }
 
 } // namespace ui
