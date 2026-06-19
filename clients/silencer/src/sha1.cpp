@@ -4,7 +4,7 @@ namespace sha1
 {
     namespace
     {
-        inline const unsigned int rol(const unsigned int value, const unsigned int steps){
+        inline unsigned int rol(const unsigned int value, const unsigned int steps){
             return ((value << steps) | (value >> (32 - steps)));
         }
         inline void clearWBuffert(unsigned int * buffert){

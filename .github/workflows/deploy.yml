@@ -105,6 +105,7 @@ jobs:
             -DCMAKE_C_COMPILER_LAUNCHER=sccache \
             -DCMAKE_CXX_COMPILER_LAUNCHER=sccache \
             -DSILENCER_UNITY_BUILD=ON \
+            -DSILENCER_HEADLESS=ON \
             -DSILENCER_LOBBY_HOST="${LOBBY_HOST:-lobby.arsiamons.com}"
           cmake --build build -j"$(nproc)"
 

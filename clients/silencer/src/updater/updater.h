@@ -49,6 +49,12 @@ public:
     int  GetRetryCount();             // starts at 0, bumped on Retry()
     std::string GetDownloadURL();     // for the "open download page" escape hatch
 
+    // Test-only seam: force the state machine + a synthetic prompt/error so the
+    // control socket can surface the update modal headlessly (mirrors the
+    // show_*_modal test ops). Does NOT touch the worker thread; intended only
+    // for the static phases the modal renders (Prompting/Downloading/Failed).
+    void ForceState(State s);
+
     // Set by UpdateScreen after a successful UpdaterStage2::Launch. Game::Loop
     // reads this and returns false so main() unwinds and ~Game tears down
     // SDL/audio cleanly before the new client process opens the device —

@@ -1,0 +1,304 @@
+#include "client/ui/screens/main_menu.h"
+
+#include "client/ui/components/actions/actions.h"
+#include "client/ui/components/layout/layout.h"
+#include "client/ui/components/text/text.h"
+#include "client/ui/components/tokens.h"
+#include "client/ui/hooks/use_app.h"
+#include "client/ui/hooks/use_cancel.h"
+#include "client/ui/hooks/use_chrome.h"
+#include "client/ui/hooks/use_clock.h"
+#include "client/ui/hooks/use_navigation.h"
+#include "client/ui/hooks/use_session.h"
+#include "client/ui/screens/options/options_screen.h"
+#include "ui/components/box.h"
+#include "ui/components/text.h"
+#include "ui/runtime/react.h"
+
+#include <cmath>
+#include <functional>
+#include <memory>
+#include <string>
+
+namespace client::ui {
+namespace {
+
+using namespace silencer;
+using ::ui::children;
+using ::ui::components::Box;
+using ::ui::components::BoxProps;
+using ::ui::components::Text;
+using ::ui::components::TextProps;
+
+const char *version_text(const char *v) {
+  std::string s = std::string("Silencer v") + (v ? v : "");
+  return ::ui::copy_string(s.c_str());
+}
+
+struct MainMenuProps {
+  uint32_t unused = 0;
+};
+
+constexpr float kLogoScale = 1.5f;
+constexpr uint32_t kLogoLegacyTickMs = 42;
+constexpr uint32_t kLogoRevealTicks = 60;
+constexpr uint32_t kLogoHeldEndTicks = 180;
+constexpr uint32_t kLogoCycleTicks = 240;
+
+uint32_t current_logo_frame(uint32_t now_ms, uint32_t start_ms) {
+  if (!start_ms || now_ms <= start_ms)
+    return ChromeTextures::kLogoFirstFrame;
+
+  const uint32_t legacy_tick =
+      ((now_ms - start_ms) / kLogoLegacyTickMs) % kLogoCycleTicks;
+  if (legacy_tick < kLogoRevealTicks)
+    return ChromeTextures::kLogoFirstFrame + legacy_tick / 2;
+  if (legacy_tick < kLogoHeldEndTicks)
+    return ChromeTextures::kLogoHeldFrame;
+
+  const int frame =
+      120 - static_cast<int>(legacy_tick / 2) + ChromeTextures::kLogoFirstFrame;
+  return frame <= ChromeTextures::kLogoFirstFrame
+             ? ChromeTextures::kLogoFirstFrame
+             : static_cast<uint32_t>(frame);
+}
+
+bool has_logo_animation(const ChromeTextures &chrome) {
+  return chrome.logo_stage_w > 0 && chrome.logo_stage_h > 0 &&
+         chrome.logo_frame_count == ChromeTextures::kLogoFrames;
+}
+
+// SIL-96: origin/main main menu — starfield root (ScreenLayout Menu), a left
+// SILENCER logo sprite + a right-anchored staggered stack of green oval buttons
+// with the legacy labels, and a bottom-left version footer. No slate card.
+//
+// Layout is expressed in FLEX, not pinned coordinates. All metrics below are the
+// original 480-unit design numbers x1.5 (the 720-tall logical canvas is origin's
+// 480 x1.5). The composition is a row of two columns — a 525-wide logo column and
+// a 435-wide action column (640 original x1.5) — that ScreenLayout(Menu) centers
+// horizontally for us. The columns are flex-basis + shrink (not hard widths) and
+// the composition's width is responsive (100% of the centered area, capped at
+// 960). When there is room it holds the parity widths; as the logical width
+// narrows, the columns shrink together — staying centered — down to a content
+// floor (min_width) the fixed-size logo/oval sprites can't go below. Once at that
+// floor the composition stops shrinking and stays centered, so a very narrow
+// viewport overflows symmetrically rather than letting the two columns' content
+// collide or one corner clip off-screen. One layout, no breakpoints.
+constexpr float kCompScale = 1.5f;
+constexpr float kCompWidth = 640.0f * kCompScale;      // 960 (logo 350 + action 290)
+constexpr float kLogoColWidth = 350.0f * kCompScale;   // 525
+constexpr float kLogoColPadLeft = 7.0f * kCompScale;   // 10.5
+constexpr float kLogoColNudge = 6.0f * kCompScale;     // tiny downward bias (origin)
+constexpr float kActionColWidth = 290.0f * kCompScale; // 435
+constexpr float kActionStackGap = 34.0f * kCompScale;  // 51 (between oval rows)
+// Action stack is anchored to the action column's right-center, then offset
+// {x:-54, y:+31} in original units. Centering is flex: the action column is
+// justify_content Center (vertical) + align_items End (right). The -54 right
+// offset rides directly as the stack's right margin (align End is edge-relative,
+// not centered, so it is applied 1:1). The +31 down offset is a TOP margin —
+// but justify Center splits free space around BOTH margins, so a top-only margin
+// shifts the centroid by only half its value; the constant is pre-doubled so the
+// net downward shift lands at the full +46.5.
+constexpr float kActionOffsetRight = 54.0f * kCompScale;       // 81 (left of right edge)
+constexpr float kActionOffsetDown = 2.0f * 31.0f * kCompScale; // 93 -> +46.5 net (centered)
+// The staggered "fan": each row is [fixed-width spacer][uniform oval]. Only the
+// spacer width varies, so same-width ovals land at staggered left offsets —
+// origin's positional fan reproduced purely with flex spacers. Spacer width =
+// columnOffset + 40 (original) x1.5: Tutorial 60, Connect 120, Options 60, Exit 0.
+constexpr float kSpacerTutorial = 40.0f * kCompScale; // 60
+constexpr float kSpacerConnect = 80.0f * kCompScale;  // 120
+constexpr float kSpacerOptions = 40.0f * kCompScale;  // 60
+constexpr float kSpacerExit = 0.0f * kCompScale;      // 0
+// Version footer: anchored to the root's bottom-left, offset {x:+10, y:-17}
+// (original) x1.5 — absolute with a left/bottom inset.
+constexpr float kFooterLeft = 10.0f * kCompScale;   // 15
+constexpr float kFooterBottom = 17.0f * kCompScale; // 25.5
+
+::ui::UiElement MainMenuView(const MainMenuProps &) {
+  Session session = use_session();
+  App app = use_app();
+  Navigation nav = use_navigation();
+  ChromeTextures chrome = use_chrome();
+
+  Clock clock = use_clock();
+  uint32_t *logo_start_ms = use_state<uint32_t>(0u);
+  if (!*logo_start_ms && clock.now_ms)
+    *logo_start_ms = clock.now_ms;
+
+  std::function<void()> open_options = [nav]() {
+    if (nav.push)
+      nav.push(std::make_unique<OptionsScreen>());
+  };
+
+  // origin/main: ESC/back at the main menu quits (MainMenuScreen::HandleBack →
+  // RequestQuit). With the cancel router chaining pops down the stack, mashing
+  // ESC walks back from any menu to here and then exits — same as the Quit
+  // button (guarded by can_quit while a teardown is in flight).
+  use_cancel([app]() {
+    if (app.can_quit && app.quit)
+      app.quit();
+  });
+
+  ::ui::UiElement logo = ScreenTitle(ScreenTitleProps{.key = "logotxt",
+                                                      .variant = ScreenTitleVariant::Hero,
+                                                      .value = "SILENCER"});
+  if (has_logo_animation(chrome)) {
+    const uint32_t frame_no = current_logo_frame(clock.now_ms, *logo_start_ms);
+    const int frame_index =
+        static_cast<int>(frame_no) - ChromeTextures::kLogoFirstFrame;
+    const ChromeTextures::LogoFrame &frame = chrome.logo_frame[frame_index];
+    if (frame.id && frame.w > 0 && frame.h > 0) {
+      const float stage_w = static_cast<float>(chrome.logo_stage_w) * kLogoScale;
+      const float stage_h = static_cast<float>(chrome.logo_stage_h) * kLogoScale;
+      // Each animation frame is precomposited into this fixed stage so the
+      // renderer draws the same rect every frame.
+      logo = Box(BoxProps{
+          .key = "logostage",
+          .layout = ::ui::LayoutStyle{
+              .width = ::ui::Length::points(stage_w),
+              .height = ::ui::Length::points(stage_h)},
+          .style = tokens::image_patch(frame.id)});
+    }
+  } else if (chrome.logo) {
+    const float logo_w = static_cast<float>(chrome.logo_w) * kLogoScale;
+    const float logo_h = static_cast<float>(chrome.logo_h) * kLogoScale;
+    // Static logo sprite: a plain sized box the logo column centers.
+    logo = Box(BoxProps{
+        .key = "logoimg",
+        .layout = ::ui::LayoutStyle{
+            .width = ::ui::Length::points(logo_w),
+            .height = ::ui::Length::points(logo_h)},
+        .style = tokens::image_patch(chrome.logo)});
+  }
+
+  // The button column is the legacy POSITIONAL FAN expressed as pure flex: each
+  // row is a [fixed-width spacer][uniform oval] pair. The ovals are same-width
+  // sprite cells, so varying ONLY the left spacer staggers their left edge —
+  // Connect (spacer 120) pushed rightmost, Exit (spacer 0) leftmost — exactly the
+  // origin fan without pinning a single coordinate.
+  //
+  // The composition's justify Center keeps the two columns centered inside its
+  // box: a wide viewport sizes the box to its 960 content width and ScreenLayout
+  // centers it; a narrow viewport clamps the box (max 960) to the available width
+  // and its fixed-size content overflows EVENLY left/right, staying centered
+  // rather than clipping one corner off-screen.
+  return <ScreenLayout key="root" variant={ScreenLayoutVariant::Menu}>
+    <Box
+      key="composition"
+      layout={::ui::LayoutStyle{
+        .direction = ::ui::FlexDirection::Row,
+        .justify_content = ::ui::JustifyContent::Center,
+        .width = ::ui::Length::percent(100.0f),
+        .height = ::ui::Length::grow(),
+        .max_width = ::ui::Length::points(kCompWidth)}}
+    >
+      <Box
+        key="logocol"
+        layout={::ui::LayoutStyle{
+          .direction = ::ui::FlexDirection::Column,
+          .align_items = ::ui::AlignItems::Center,
+          .justify_content = ::ui::JustifyContent::Center,
+          .min_width = ::ui::Length::points(kLogoColWidth),
+          .max_width = ::ui::Length::points(kLogoColWidth),
+          .flex_basis = ::ui::Length::points(kLogoColWidth),
+          .flex_shrink = 1.0f,
+          .padding = ::ui::EdgeSizes{kLogoColPadLeft, {}, kLogoColNudge, {}}}}
+      >
+        {logo}
+      </Box>
+      <Box
+        key="actioncol"
+        layout={::ui::LayoutStyle{
+          .direction = ::ui::FlexDirection::Column,
+          .align_items = ::ui::AlignItems::End,
+          .justify_content = ::ui::JustifyContent::Center,
+          .min_width = ::ui::Length::points(kActionColWidth),
+          .max_width = ::ui::Length::points(kActionColWidth),
+          .flex_basis = ::ui::Length::points(kActionColWidth),
+          .flex_shrink = 1.0f}}
+      >
+        <Box
+          key="stack"
+          layout={::ui::LayoutStyle{
+            .direction = ::ui::FlexDirection::Column,
+            .width = ::ui::Length::auto_size(),
+            .height = ::ui::Length::auto_size(),
+            .margin = ::ui::EdgeSizes{{}, kActionOffsetRight, kActionOffsetDown, {}},
+            .gap = kActionStackGap}}
+        >
+          <Box key="r0" layout={::ui::LayoutStyle{.direction = ::ui::FlexDirection::Row}}>
+            <Box
+              key="s0"
+              layout={::ui::LayoutStyle{.width = ::ui::Length::points(kSpacerTutorial)}}
+            />
+            <AppButton
+              key="tutorial"
+              controlId="Tutorial"
+              variant={AppButtonVariant::Oval}
+              label="Tutorial"
+              onPress={session.start_tutorial}
+            />
+          </Box>
+          <Box key="r1" layout={::ui::LayoutStyle{.direction = ::ui::FlexDirection::Row}}>
+            <Box
+              key="s1"
+              layout={::ui::LayoutStyle{.width = ::ui::Length::points(kSpacerConnect)}}
+            />
+            <AppButton
+              key="connect"
+              controlId="ConnectToLobby"
+              variant={AppButtonVariant::Oval}
+              label="Connect To Lobby"
+              onPress={session.play_online}
+            />
+          </Box>
+          <Box key="r2" layout={::ui::LayoutStyle{.direction = ::ui::FlexDirection::Row}}>
+            <Box
+              key="s2"
+              layout={::ui::LayoutStyle{.width = ::ui::Length::points(kSpacerOptions)}}
+            />
+            <AppButton
+              key="options"
+              controlId="Options"
+              variant={AppButtonVariant::Oval}
+              label="Options"
+              onPress={open_options}
+            />
+          </Box>
+          <Box key="r3" layout={::ui::LayoutStyle{.direction = ::ui::FlexDirection::Row}}>
+            <Box key="s3" layout={::ui::LayoutStyle{.width = ::ui::Length::points(kSpacerExit)}} />
+            <AppButton
+              key="exit"
+              controlId="Exit"
+              variant={AppButtonVariant::Oval}
+              disabled={!app.can_quit}
+              label="Exit"
+              onPress={app.quit}
+            />
+          </Box>
+        </Box>
+      </Box>
+    </Box>
+    <Box
+      key="footer"
+      layout={::ui::LayoutStyle{
+        .position = ::ui::PositionType::Absolute,
+        .position_inset = ::ui::EdgeSizes{kFooterLeft, {}, {}, kFooterBottom}}}
+    >
+      <Text
+        key="ver"
+        value={version_text(app.version)}
+        layout={::ui::LayoutStyle{.height = ::ui::Length::points(tokens::kLineBody)}}
+        style={tokens::text_patch(tokens::kTextBody, tokens::kFontBodyEm, tokens::kFaceFooter, tokens::kLineBody)}
+      />
+    </Box>
+  </ScreenLayout>
+}
+
+} // namespace
+
+::ui::UiElement MainMenu(const char *key) {
+  return ::ui::component("MainMenu", MainMenuProps{}, MainMenuView, key);
+}
+
+} // namespace client::ui

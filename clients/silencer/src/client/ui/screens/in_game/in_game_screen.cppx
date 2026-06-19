@@ -1,0 +1,94 @@
+#include "client/ui/screens/in_game/in_game_screen.h"
+
+#include "client/ui/components/layout/layout.h"
+#include "client/ui/hooks/use_buy_tech.h"
+#include "client/ui/hooks/use_chrome.h"
+#include "client/ui/hooks/use_hud.h"
+#include "client/ui/hooks/use_ingame_chat.h"
+#include "client/ui/hooks/use_navigation.h"
+#include "client/ui/hooks/use_player_status.h"
+#include "client/ui/hooks/use_teams.h"
+#include "client/ui/hooks/use_tech.h"
+#include "client/ui/screens/in_game/components/hud_painters.h"
+#include "client/ui/screens/in_game/hooks/use_ingame_cancel.h"
+#include "client/ui/screens/in_game/hooks/use_mission_over_effect.h"
+#include "ui/components/box.h"
+#include "ui/runtime/react.h"
+
+#include <vector>
+
+// The in-game HUD screen: reads the match hooks and composes the HUD painters
+// (in components/hud_painters) in origin's z-order into a transparent
+// ScreenLayout(Hud) over the live world. The painters + their coordinate toolkit
+// live in components/hud_painters.{cppx,hx}.
+
+namespace client::ui {
+namespace {
+
+using namespace silencer;
+using ::ui::children;
+using ::ui::components::Box;
+using ::ui::components::BoxProps;
+
+
+// ---------------------------------------------------------------------------
+
+struct InGameScreenProps {
+  uint32_t unused = 0;
+};
+
+::ui::UiElement InGameScreenView(const InGameScreenProps &) {
+  PlayerStatus ps = use_player_status();
+  Hud hud = use_hud();
+  Tech tech = use_tech();
+  BuyTech buy_tech = use_buy_tech();
+  IngameChat chat = use_ingame_chat();
+  Teams teams = use_teams();
+  ChromeTextures chrome = use_chrome();
+  Navigation nav = use_navigation();
+
+  // ESC/back router (chat → buy/tech → pause) and the scripted mission-end
+  // PauseScreen push — both screen-local, in hooks/.
+  use_ingame_cancel(chat, tech, nav);
+  use_mission_over_effect(hud, nav);
+
+  std::vector<::ui::UiElement> kids;
+  if (ps.valid) {
+    // origin BuildInGameHudUi order: system camera -> status sprites ->
+    // readouts -> team strip -> secret panel -> trace timer -> buy/tech ->
+    // chat; then InGameOverlays order: status lines -> top ticker -> center
+    // message -> player list -> quit prompt.
+    build_system_camera(kids, hud, chrome.hud);
+    build_status_sprites(kids, ps, hud, chrome.hud);
+    build_readouts(kids, ps);
+    build_team_strip(kids, hud, chrome.hud);
+    build_secret_overlay(kids, hud, chrome.hud);
+    build_trace_time(kids, hud);
+    if (tech.buy_active || tech.tech_active)
+      build_buy_tech(kids, tech, buy_tech, chrome.hud);
+    build_chat_overlay(kids, chat, chrome.hud, chrome.caret_game);
+    build_status_lines(kids, hud);
+    build_top_ticker(kids, hud);
+    build_center_message(kids, hud);
+    if (teams.showing)
+      build_player_list(kids, hud);
+  }
+
+  ::ui::UiElement hud_root = Box(BoxProps{
+      .key = "hud",
+      .layout = ::ui::LayoutStyle{.width = ::ui::Length::percent(100.0f),
+                                  .height = ::ui::Length::percent(100.0f)},
+      .children = children(std::move(kids))});
+  return <ScreenLayout key="root" variant={ScreenLayoutVariant::Hud}>
+    {hud_root}
+  </ScreenLayout>
+}
+
+} // namespace
+
+::ui::UiElement InGameScreen(const char *key) {
+  return ::ui::component("InGameScreen", InGameScreenProps{}, InGameScreenView,
+                         key);
+}
+
+} // namespace client::ui

@@ -15,6 +15,7 @@ class Object : public Sprite, public Physical, public Hittable, public Bipedal, 
 {
 public:
 	Object(Uint8 type);
+	virtual ~Object() = default;
 	bool RequiresAuthority(void);
 	virtual void Tick(class World & world);
 	virtual void Serialize(bool write, Serializer & data, Serializer * old = 0);

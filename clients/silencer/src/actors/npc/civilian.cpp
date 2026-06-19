@@ -47,7 +47,7 @@ void Civilian::InitBT(){
 		if(state != RUNNING){ state = RUNNING; state_i = (Uint8)-1; }
 		return BTResult::Success;
 	};
-	btctx_.actions["Wander"] = [this](BTContext& ctx) -> BTResult {
+	btctx_.actions["Wander"] = [](BTContext& ctx) -> BTResult {
 		if(ctx.props){
 			int spd = ctx.props->value("speed", -1);
 			if(spd >= 0) ctx.bbSet("bt_walk_speed", spd);

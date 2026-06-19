@@ -8,9 +8,11 @@
 # agents / an IDE can't corrupt the shared CMake cache by configuring at the
 # same time.
 #
-# Usage:  ./build.sh [win-ninja|win-ninja-release|win-ninja-unity] [--clean]
-#   default preset : win-ninja (Debug)
-#   --clean        : wipe CMakeCache.txt + CMakeFiles (keep vcpkg_installed) first
+# Usage:  ./build.sh [win-ninja|win-ninja-release|win-ninja-unity|win-ninja-headless] [--clean]
+#   default preset     : win-ninja (Debug)
+#   win-ninja-headless : dedicated-server build (no UI/Yoga/SDL3_ttf) — the
+#                        config deploy.yml ships to the lobby box
+#   --clean            : wipe CMakeCache.txt + CMakeFiles (keep vcpkg_installed) first
 set -euo pipefail
 
 fail() { echo "build.sh: $*" >&2; exit 1; }
@@ -35,10 +37,11 @@ for a in "$@"; do [ "$a" = "--clean" ] && clean=1; done
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 case "$preset" in
-    win-ninja)         bdir="$script_dir/build";         btype=Debug;   unity=OFF ;;
-    win-ninja-release) bdir="$script_dir/build-release"; btype=Release; unity=OFF ;;
-    win-ninja-unity)   bdir="$script_dir/build-unity";   btype=Release; unity=ON  ;;
-    *) fail "unknown preset '$preset' (use win-ninja | win-ninja-release | win-ninja-unity)" ;;
+    win-ninja)          bdir="$script_dir/build";          btype=Debug;   unity=OFF; headless=OFF ;;
+    win-ninja-release)  bdir="$script_dir/build-release";  btype=Release; unity=OFF; headless=OFF ;;
+    win-ninja-unity)    bdir="$script_dir/build-unity";    btype=Release; unity=ON;  headless=OFF ;;
+    win-ninja-headless) bdir="$script_dir/build-headless"; btype=Release; unity=ON;  headless=ON  ;;
+    *) fail "unknown preset '$preset' (use win-ninja | win-ninja-release | win-ninja-unity | win-ninja-headless)" ;;
 esac
 
 # --- Optional vcpkg toolchain (macOS/Linux can also use system packages) ---
@@ -123,6 +126,7 @@ fi
 cmake -S "$script_dir" -B "$bdir" "${gen[@]+"${gen[@]}"}" \
     -DCMAKE_BUILD_TYPE="$btype" \
     -DSILENCER_UNITY_BUILD="$unity" \
+    -DSILENCER_HEADLESS="$headless" \
     ${toolchain+"${toolchain[@]}"}
 cmake --build "$bdir" --parallel
 echo "build.sh: OK ($preset)"

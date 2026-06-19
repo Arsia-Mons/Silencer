@@ -28,6 +28,13 @@ return false;
 if(!game.world.dedicatedserver.active){
 ambienceMixer.CreateAmbienceChannels();
 game.renderer.palette.SetParallaxColors(game.world.map.parallax);
+// Restart the transition fade clock now that the (slow, synchronous) map load
+// has finished. GoToState started the fade when we left the menu, but the load
+// blows past the ~16-phase window before the world is ready to show, so the fade
+// has already "finished" and the world would pop in at full brightness instead of
+// fading in. Restarting here gives a fresh fade-in over the freshly loaded world
+// (and lines up FadedIn(), which gates the in-game music start).
+game.gameRenderer.RestartPaletteFade();
 }
 return true;
 }
@@ -56,7 +63,7 @@ game.world.messaging.chatlines.clear();
 game.world.messaging.messagetype = 0;
 game.world.highlightminimap = false;
 game.world.highlightsecrets = false;
-game.world.quitstate = 0;
+game.world.missionover = false;
 game.world.ingameusers.clear();
 }
 
@@ -159,16 +166,6 @@ for(int i = 0; i < count; i++) player.AddInventoryItem(Player::INV_LAZARUSTRACT)
 }
 }
 }
-}
-
-bool GameSession::CheckForQuit(){
-if(game.gameInput.GetKeystate()[SDL_SCANCODE_RETURN]){
-if(game.world.quitstate == 1 || game.world.quitstate == 2){
-game.world.quitstate = 0;
-return true;
-}
-}
-return false;
 }
 
 bool GameSession::CheckForEndOfGame(){

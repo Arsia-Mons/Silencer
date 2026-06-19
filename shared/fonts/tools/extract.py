@@ -56,6 +56,7 @@ BANKS = [
     {"bank": 132, "filename": "silencer-tiny.otf",     "family": "Silencer Tiny",     "ioffset": 34, "advance": 4},
     {"bank": 133, "filename": "silencer-ui.otf",       "family": "Silencer UI",       "ioffset": 33, "advance": 7},
     {"bank": 134, "filename": "silencer-ui-large.otf", "family": "Silencer UI Large", "ioffset": 33, "advance": 9},
+    {"bank": 135, "filename": "silencer-135.otf",      "family": "Silencer Heading",  "ioffset": 33, "advance": 8},
     {"bank": 136, "filename": "silencer-title.otf",    "family": "Silencer Title",    "ioffset": 33, "advance": 16},
 ]
 

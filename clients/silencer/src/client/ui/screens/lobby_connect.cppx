@@ -1,0 +1,275 @@
+#include "client/ui/screens/lobby_connect.h"
+
+#include "client/ui/components/actions/actions.h"
+#include "client/ui/components/layout/pen_grid.h"
+#include "client/ui/components/text/text.h"
+#include "client/ui/components/tokens.h"
+#include "client/ui/hooks/use_cancel.h"
+#include "client/ui/hooks/use_chrome.h"
+#include "client/ui/hooks/use_lobby_session.h"
+#include "client/ui/hooks/use_session.h"
+#include "ui/components/box.h"
+#include "ui/components/input.h"
+#include "ui/components/text.h"
+#include "ui/runtime/react.h"
+
+#include <cmath>
+#include <functional>
+#include <string>
+#include <vector>
+
+namespace client::ui {
+namespace {
+
+using namespace silencer;
+using ::ui::children;
+using ::ui::components::Box;
+using ::ui::components::BoxProps;
+using ::ui::components::Input;
+using ::ui::components::InputProps;
+using ::ui::components::Text;
+using ::ui::components::TextProps;
+
+struct LobbyConnectProps {
+  uint32_t unused = 0;
+};
+
+// origin authors this dialog in the 640x480 virtual space; the cppx logical
+// canvas is 1.5x that, so its fixed offsets carry through at x1.5.
+constexpr float kLCS = 1.5f;
+
+// The status log is multi-line; each line is an absolutely-anchored Body text
+// on origin's ScrollTextBox pen grid: panel-virtual (291, 109 + 11k), anchored
+// on the dialog's design origin (427, 152); the x pen carries its recorded -1
+// golden-cell nudge.
+std::vector<::ui::UiElement> connect_status_log(const std::string &log) {
+  const PenGrid grid{427.0f, 152.0f};
+  std::vector<::ui::UiElement> lines;
+  size_t start = 0;
+  for (int i = 0; start <= log.size(); ++i) {
+    size_t nl = log.find('\n', start);
+    std::string line =
+        log.substr(start, nl == std::string::npos ? std::string::npos : nl - start);
+    if (!line.empty()) {
+      const char *lk = ::ui::copy_string(("ln" + std::to_string(i)).c_str());
+      const char *lv = ::ui::copy_string(line.c_str());
+      lines.push_back(Box(BoxProps{
+          .key = lk,
+          .layout = ::ui::LayoutStyle{
+              .position = ::ui::PositionType::Absolute,
+              .position_inset = ::ui::EdgeSizes{
+                  grid.x(291) - 1.0f, {}, grid.y(109.0f + 11.0f * i), {}}},
+          .children = ::ui::children({BodyText(BodyTextProps{
+              .key = "t", .variant = BodyTextVariant::Body, .value = lv})})}));
+    }
+    if (nl == std::string::npos)
+      break;
+    start = nl + 1;
+  }
+  return lines;
+}
+
+// origin/main Lobby Connect IS one baked sprite: PackImage(7,2) (chrome.dialog_connect,
+// 284x277) bakes the outer frame + soft glow, the log well, the form sub-panel and
+// the field/label/button wells. The connect log, Username/Password labels + inputs,
+// and the Login/Create + Cancel chrome buttons are laid ON TOP at origin's offsets.
+// Inputs are chromeless (text + caret only) since their wells are in the sprite.
+::ui::UiElement LobbyConnectView(const LobbyConnectProps &) {
+  LobbySession lobby = use_lobby_session();
+  Session session = use_session();
+  client::ui::ChromeTextures chrome = use_chrome();
+  // ESC / controller back / the `back` op leave the connect phase to the menu.
+  use_cancel(session.leave_to_menu);
+  std::string *username = use_state<std::string>(std::string());
+  std::string *password = use_state<std::string>(std::string());
+  if (!username || !password)
+    return ::ui::empty();
+
+  std::function<void()> submit = [lobby, username, password]() {
+    if (lobby.connect)
+      lobby.connect(*username, *password);
+  };
+  // origin caps: username[17] / password[29] (lobby_connect_screen.h)
+  std::function<void(const std::string &)> set_username =
+      [username](const std::string &next) { *username = next.substr(0, 16); };
+  std::function<void(const std::string &)> set_password =
+      [password](const std::string &next) { *password = next.substr(0, 28); };
+  std::function<void(const ::ui::ActivationEvent &)> on_activate =
+      [submit](const ::ui::ActivationEvent &) { submit(); };
+
+  std::vector<::ui::UiElement> log_lines = connect_status_log(lobby.status_log);
+
+  const float panel_w =
+      chrome.dialog_connect ? chrome.dialog_connect_w * kLCS : 284.0f * kLCS;
+  const float panel_h =
+      chrome.dialog_connect ? chrome.dialog_connect_h * kLCS : 277.0f * kLCS;
+  // The sprite rides an absolute child at -1 logical: origin draws the dialog
+  // at virtual cell 284 (device x639), but the centered panel box floors to
+  // device 640, clipping the frame's 3px left column. Anchoring the sprite box
+  // one logical px left restores the cell without moving the panel's children.
+  // Without the baked sprite, the panel itself paints the vector fallback.
+  ::ui::StylePatch panel_style{};
+  ::ui::UiElement chrome_frame = ::ui::empty();
+  if (chrome.dialog_connect) {
+    chrome_frame = Box(BoxProps{
+        .key = "chromeframe",
+        .layout = ::ui::LayoutStyle{
+            .position = ::ui::PositionType::Absolute,
+            .width = ::ui::Length::points(panel_w),
+            .height = ::ui::Length::points(panel_h),
+            .position_inset = ::ui::EdgeSizes{-1.0f, {}, 0.0f, {}}},
+        .style = tokens::image_patch(chrome.dialog_connect)});
+  } else {
+    panel_style =
+        tokens::panel_patch(tokens::kDialogFallbackFill, tokens::kBorderPanel, 2.0f);
+  }
+
+  // Chromeless fields over the sprite's baked wells; caret = palette idx 140
+  // resolved on the lobby palette (sage).
+  const ::ui::StyleStatePatch field_style =
+      tokens::chromeless_field_style(chrome.caret_lobby, tokens::kTextBody);
+  // Field height 30.5 (not the well's authored 31.5): the engine centers the
+  // 16.5-logical caret in the field box, and (30.5-16.5)/2 = 7 lands the caret
+  // on origin's exact device row (678 at 1080p; 31.5 put it half a device px
+  // low and rasterized one row down).
+  auto field_layout = ::ui::LayoutStyle{
+      .align_items = ::ui::AlignItems::Center,
+      .justify_content = ::ui::JustifyContent::Start,
+      .width = ::ui::Length::percent(100.0f),
+      .height = ::ui::Length::points(30.5f)};
+  // The 116x24 stipple patch covering the dialog's baked button wells
+  // (panel-virtual (368, 347), origin EnsureButtonPatch).
+  ::ui::UiElement btn_patch =
+      chrome.dialog_btn_patch
+          ? Box(BoxProps{
+                .key = "btnpatch",
+                .layout = ::ui::LayoutStyle{
+                    .position = ::ui::PositionType::Absolute,
+                    .width = ::ui::Length::points(174.0f),
+                    .height = ::ui::Length::points(36.0f),
+                    .position_inset = ::ui::EdgeSizes{126.0f, {}, 369.0f, {}}},
+                .style = tokens::image_patch(chrome.dialog_btn_patch)})
+          : ::ui::empty();
+
+  return <Box
+    key="root"
+    layout={::ui::LayoutStyle{
+      .align_items = ::ui::AlignItems::Center,
+      .justify_content = ::ui::JustifyContent::Center,
+      .width = ::ui::Length::percent(100.0f),
+      .height = ::ui::Length::percent(100.0f)}}
+    style={tokens::fill_patch(tokens::kSurfaceMenu)}
+  >
+    <Box
+      key="panel"
+      layout={::ui::LayoutStyle{
+        .width = ::ui::Length::points(panel_w),
+        .height = ::ui::Length::points(panel_h)}}
+      style={panel_style}
+    >
+      {chrome_frame}
+      {::ui::children(log_lines)}
+      <Box
+        key="ulblw"
+        layout={::ui::LayoutStyle{
+          .position = ::ui::PositionType::Absolute,
+          .position_inset = ::ui::EdgeSizes{21.0f, {}, 296.0f, {}}}}
+      >
+        <Text
+          key="t"
+          value="Username"
+          layout={::ui::LayoutStyle{.height = ::ui::Length::points(tokens::kLineLarge)}}
+          style={tokens::text_patch(tokens::kTextBody, tokens::kFontLarge, tokens::kFaceLarge, tokens::kLineLarge)}
+        />
+      </Box>
+      <Box
+        key="plblw"
+        layout={::ui::LayoutStyle{
+          .position = ::ui::PositionType::Absolute,
+          .position_inset = ::ui::EdgeSizes{21.0f, {}, 337.0f, {}}}}
+      >
+        <Text
+          key="t"
+          value="Password"
+          layout={::ui::LayoutStyle{.height = ::ui::Length::points(tokens::kLineLarge)}}
+          style={tokens::text_patch(tokens::kTextBody, tokens::kFontLarge, tokens::kFaceLarge, tokens::kLineLarge)}
+        />
+      </Box>
+      <Box
+        key="uwell"
+        layout={::ui::LayoutStyle{
+          .position = ::ui::PositionType::Absolute,
+          .width = ::ui::Length::points(264.0f),
+          .height = ::ui::Length::points(30.5f),
+          .position_inset = ::ui::EdgeSizes{144.0f, {}, 293.0f, {}}}}
+      >
+        <Input
+          key="username"
+          id="Username"
+          autofocus={true}
+          accessibility={{.label = "Username"}}
+          onActivate={on_activate}
+          value={username->c_str()}
+          onChange={set_username}
+          layout={field_layout}
+          style={field_style}
+        />
+      </Box>
+      <Box
+        key="pwell"
+        layout={::ui::LayoutStyle{
+          .position = ::ui::PositionType::Absolute,
+          .width = ::ui::Length::points(264.0f),
+          .height = ::ui::Length::points(30.5f),
+          .position_inset = ::ui::EdgeSizes{144.0f, {}, 333.5f, {}}}}
+      >
+        <Input
+          key="password"
+          id="Password"
+          accessibility={{.label = "Password"}}
+          onActivate={on_activate}
+          value={password->c_str()}
+          onChange={set_password}
+          password={true}
+          layout={field_layout}
+          style={field_style}
+        />
+      </Box>
+      {btn_patch}
+      <Box
+        key="btnrow"
+        layout={::ui::LayoutStyle{
+          .position = ::ui::PositionType::Absolute,
+          .direction = ::ui::FlexDirection::Row,
+          .position_inset = ::ui::EdgeSizes{74.0f, {}, 373.0f, {}},
+          .gap = 0.0f}}
+      >
+        <AppButton
+          key="login"
+          controlId="Login"
+          variant={AppButtonVariant::Chrome}
+          size={AppButtonSize::Lg}
+          label="Login/Create"
+          onPress={submit}
+        />
+        <AppButton
+          key="cancel"
+          controlId="Cancel"
+          variant={AppButtonVariant::Chrome}
+          size={AppButtonSize::Lg}
+          label="Cancel"
+          onPress={lobby.cancel}
+        />
+      </Box>
+    </Box>
+  </Box>
+}
+
+} // namespace
+
+::ui::UiElement LobbyConnect(const char *key) {
+  return ::ui::component("LobbyConnect", LobbyConnectProps{}, LobbyConnectView,
+                         key);
+}
+
+} // namespace client::ui

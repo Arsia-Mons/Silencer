@@ -1,38 +1,81 @@
-# clients/silencer/src/client/ui - Client UI
+# clients/silencer/src/client/ui - Client UI app-shell
 
-This subtree owns Silencer's app-side UI composition: screen/modal navigation, HUD/overlay declaration, screen-local components, and the bridge from semantic UI actions back into game state.
+This subtree owns Silencer's app-side UI composition: the retained
+`client::ui::ClientUi` shell, screen/overlay navigation, the global
+provider chain, the capability hooks screens read, and the product theme.
+Screens themselves are authored as `.cppx` view functions composing these
+hooks + the `src/ui` runtime; they land in later slices (today `AppRoot`
+renders per-phase scaffolds).
 
-Clay is a frame layout and render-command generator. It is not the application state owner, event loop, renderer, widget toolkit, or navigation stack.
-
-This UI is actively migrating toward good flexbox layout, Clay lifecycle, and shadcn-style primitive API first principles. If you touch stale code that conflicts with those principles, update it in the same change instead of preserving the old pattern.
+The live UI is the golden RETAINED cppx engine (a React-style hook runtime
++ Yoga flex layout + an RGBA draw-command IR — `src/ui`). This layer adds
+Silencer's product concerns on top of that screen-agnostic substrate; it is
+not the renderer, event loop, or game state owner.
 
 ## Ownership
 
-- `ClientUi` owns one visible UI frame. `Game::RenderClientUiFrame` prepares input, begins one `ClientUi`/`ClayService` frame, asks visible layers to declare UI, ends the frame, renders commands, then dispatches typed UI actions.
-- Screens, modals, HUD, and overlays only declare UI into the current frame. They must not call `Clay_BeginLayout`, `Clay_EndLayout`, `Clay_SetPointerState`, `clay_bridge::EnsureInitialized`, or `clay_bridge::Render`.
-- Clay owns layout, wrapping, clipping, hover state, scroll containers, and final bounds. `UiInteractionRegistry` owns semantic metadata, focus, text editing, pointer hit testing, keyboard/gamepad navigation, automation, and typed actions.
-- Prefer flexbox-style Clay layout: sizing, grow/fit, padding, gaps, alignment, and stable containers. Treat absolute coordinates and sprite-offset nudges as legacy escape hatches to remove when practical.
-- The compositor/render layer owns sprite banks, palette effects, text drawing, clipping, and custom-payload dispatch. UI screens and ordinary primitives do not call SDL, `Renderer`, or `Surface` APIs directly.
-- Screen-specific components stay under the owning screen directory. Promote a component only after there is real reuse.
+- `ClientUi` (`app_shell/client_ui.h`) owns one retained UI tree across
+  frames. Per frame the `UiPipeline` (`app_shell/ui_pipeline.h`) calls
+  `begin_frame` → `build_visible_screens` (wrapped by the App's
+  `FrameProvider`) → `end_layout` → `update_retained_runtime`, which builds
+  the retained tree, runs Yoga layout, the focus/hit-test pass, and emits the
+  `::ui::DrawCommandList` the renderer executes. Screens never run this
+  lifecycle themselves.
+- `ScreenStack` (`app_shell/navigation/`) is the single owner of the screen
+  stack. Entry 0 is the always-mounted `AppRoot` (`app_shell/app_root.h`):
+  each frame it reads `use_session().phase` and renders the screen that owns
+  that phase as its child (the declarative phase reconciler). Tier-1
+  navigation (options, pause, modals) pushes `OverlayScreen`s *above* AppRoot
+  via `use_navigation()`; overlays re-establish their own providers and never
+  change `phase`.
+- Screens declare UI by returning a `::ui::UiElement` tree (`UiScreen::
+  build_element`). Stack mutations that change persisted/navigation state are
+  queued and drained after render — never mutate the stack, world, or domain
+  state mid-build. Use `queue_push_screen` / `queue_pop_*` /
+  `queue_deferred_mutation` (`app_shell/deferred_ui_mutation.h`).
+- The renderer bridge (`src/render/cppx_ui`) owns rasterization, fonts,
+  textures, and text measurement. Screens and components emit the SDL-free
+  draw IR only; they do not call SDL, `Renderer`, or `Surface`.
 
-## Primitive API
+## Hooks (capability seams)
 
-- Target public primitives are plain nouns: `Button`, `TextInput`, `Toggle`, `Panel`. Runtime/service types keep the `Ui` prefix: `UiInteractionRegistry`, `UiInputState`, `UiInputRouter`.
-- Public primitive API follows shadcn's core shape, not its exact implementation: `variant + size`, composition, and named defaults. `variant` names the visual treatment; `size` names scale or fit behavior.
-- Existing bridge primitives may still expose bank/palette details. Do not spread that into new or cleaned-up primitive signatures, enums, or comments.
-- If many call sites pass the same option values, grow a named variant or size. Do not let padding, min/max width, wrap, or effect-color escape hatches become the normal API.
-- One primitive owns one concern. Checkbox/toggle state belongs to checkbox/toggle primitives, not a `Button` mode.
-- Every interactive, animated, scrollable, custom-rendered, tested, or automation-visible element needs an explicit stable Clay ID. A visible label must never double as the element ID.
-- Dynamic strings and custom payloads must live until after Clay render command consumption. Use per-frame primitive arenas; reset them once from `ClientUi::BeginFrame`, never from a screen.
+Screens read app state through hooks under `hooks/`; the composition root
+(`src/game/ui/game_ui_pipeline.cpp`) builds the model + intent closures fresh
+each frame and installs them via the providers under `providers/`. Hooks
+expose read state + named intent closures — never a raw `Game`/`World` handle.
 
-## Interaction
+- `use_server()` — the live `Game*` (game-coupled; `silencer::game_ui`).
+- `use_session()` — `SessionPhase` projection + transition intents
+  (`play_online`, `leave_match`, `set_paused`, …). AppRoot's reconciler reads
+  `phase`.
+- `use_app()` — app-global affordances (today `quit`).
+- `use_settings()` — persisted prefs (music/volume/fullscreen/scaling) with
+  live-apply `set_*`, `commit`, `revert`, and a `dirty` flag.
+- `use_key_map()` — rows-of-combos keybind model + the six mutation intents
+  (cap-enforcing, fork-if-builtin).
+- `use_updater()` — self-updater phase/progress + consent/cancel/retry.
+- `use_navigation()` — push/pop/reset against the `ScreenStack`.
+- `use_tokens()` — the resolved product `::ui::Theme` (forwards to
+  `::ui::use_theme()`).
 
-- Normalize input once at the platform boundary. The same coordinate space must feed `Clay_SetLayoutDimensions`, pointer state, registry hit testing, and compositor output.
-- Queue state changes as typed `UiAction`s and handle them after layout. Do not mutate screen stacks, world state, or domain state from inside a Clay declaration block.
-- Target UI feedback is declared by the widget/primitive and executed by the client layer from normalized transitions such as pointer enter, focus enter, press, release, and activate. Existing `ClientUi` button/toggle audio inference is migration debt; do not extend it.
+## Theme
+
+`app_theme.{h,cpp}` holds the current theme (dark slate, accent blue, control
+gradients). `ThemeProvider` installs it OUTERMOST into `ui::ThemeContext` so
+`use_tokens()`/`use_theme()` resolves the palette tree-wide. **NOTE: the slate/blue
+palette is a visual regression** — the golden design is Silencer's **origin/main**
+(cool-blue `#9FC9FF`, green oval sprite buttons, sprite chrome); the restore (keeping
+the cppx engine) is tracked by **SIL-84**. `~/repos/ui` governs engine/conventions,
+not the visual design. The neutral
+fallback (`ui::default_theme()`) lives in `src/ui` and applies only when no
+provider is mounted. Components resolve their own `VisualStyle` at authoring
+time from the theme; the renderer never sees the theme.
 
 ## Verification
 
-- Build through `clients/silencer/build.ps1` or `clients/silencer/build.sh`; do not run raw CMake/Ninja commands.
-- For primitive/API work, run the relevant `clay_*_check` control-socket ops through `clients/cli/index.ts`. Add `tests/cli-agent/e2e/60_ui_architecture_boundaries.sh` when ownership boundaries change.
-- If visual or interaction behavior is in question, verify the real runtime through the client/control socket/screenshots, not compile success alone.
+- Build through `clients/silencer/build.ps1` or `clients/silencer/build.sh`;
+  do not run raw CMake/Ninja commands.
+- Verify visual/interaction behavior through the real runtime (control socket
+  + screenshots via `clients/cli/index.ts`), not compile success alone.
+- Update `tests/cli-agent/e2e/60_ui_architecture_boundaries.sh` when ownership
+  boundaries change; it guards this layer's seams.

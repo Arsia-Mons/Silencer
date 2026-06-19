@@ -46,6 +46,15 @@ if(APPLE)
 		endif()
 		list(APPEND bundle_extras "${f}")
 	endforeach()
+
+	# Bundle the cppx UI font .otf files under Contents/assets/fonts/ so the
+	# runtime resolver (ResolveFontDir via GetResDir()+"/fonts") finds them
+	# in the release .app instead of the CI build machine's source-tree path.
+	file(GLOB font_files "${SILENCER_SHARED_DIR}/fonts/*.otf")
+	foreach(f ${font_files})
+		set_source_files_properties("${f}" PROPERTIES MACOSX_PACKAGE_LOCATION "assets/fonts")
+		list(APPEND bundle_extras "${f}")
+	endforeach()
 endif()
 
 if(APPLE)
@@ -87,6 +96,33 @@ endif()
 
 target_compile_features(${SILENCER_TARGET} PUBLIC cxx_std_20)
 
+option(SILENCER_HEADLESS "Headless dedicated-server build: no UI, Yoga, SDL3_ttf, or tests" OFF)
+if(SILENCER_HEADLESS)
+	target_compile_definitions(${SILENCER_TARGET} PRIVATE SILENCER_HEADLESS=1)
+endif()
+
+# --- Warnings ------------------------------------------------------------
+# Surface portability problems on the macOS/Linux (Clang/GCC) dev build that
+# would otherwise only appear on the MSVC Windows build. The big one is
+# initializer ordering: Clang/GCC accept out-of-order designated initializers
+# and member-init lists as warnings (a GNU extension), but MSVC rejects them
+# as hard errors — so a clean local build can still fail Windows CI. We turn
+# on the warning surface here; the ordering warnings are elevated to errors
+# (see _SILENCER_WARN_ERRORS below) so they break locally exactly like Windows.
+if(MSVC)
+	# C5038 (member-init reorder) is off even at /W4 — enable it explicitly.
+	target_compile_options(${SILENCER_TARGET} PRIVATE /w15038)
+else()
+	# -Wreorder / -Wreorder-init-list are elevated to ERRORS: out-of-order
+	# designated initializers are a hard error on MSVC, so failing the local
+	# build on them keeps Windows CI green. The rest of -Wall/-Wextra stays
+	# advisory (the legacy tree still has ~235 unrelated warnings).
+	target_compile_options(${SILENCER_TARGET} PRIVATE
+		-Wall -Wextra
+		-Werror=reorder
+		$<$<CXX_COMPILER_ID:Clang,AppleClang>:-Werror=reorder-init-list>)
+endif()
+
 if(WIN32)
 	# Strip <winsock.h> (and other legacy subsystems) out of <windows.h>.
 	# Without this, any TU that pulls in <windows.h> via zlib's zconf.h,
@@ -114,25 +150,21 @@ if(SILENCER_UNITY_BUILD)
 		file(GLOB_RECURSE _mm_sources src/*.mm)
 		set_source_files_properties(${_mm_sources} PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON)
 	endif()
-	# The Clay primitives and the lobby panels each use an anonymous
-	# namespace with a shared vocabulary (`g_payloads`, `g_customData`,
-	# `kPayloadCapacity`, `AllocCustomData`, `FromStd`, `kScrollbarBank`,
-	# `OnCreateClicked`, …). Anonymous namespaces re-open in the same
-	# translation unit, so concatenating two of these into one jumbo TU
-	# produces redefinition errors on every shared symbol — and the
-	# panel files also bring `TextInput` / `Box` / etc. into the global
-	# namespace via `using`, which trips sibling screen TUs in the same
-	# batch (e.g. lobby_connect_screen.cpp's `TextInput * passwordinput`
-	# becomes ambiguous). Until the per-file arenas + `using` decls are
-	# refactored into uniquely-scoped storage, build these as individual
-	# TUs.
-	file(GLOB _clay_unsafe_sources
-		src/ui/primitives/*.cpp
+	# The vendored retained cppx engine (ui/runtime, ui/style, render/cppx_ui)
+	# and the app-shell (client/ui: app_theme, app_shell, providers) use
+	# anonymous namespaces + file-local `using` decls that are not jumbo-safe —
+	# concatenating two into one TU collides on shared symbols. Build them as
+	# individual TUs (exclude from unity batches).
+	file(GLOB _unity_excluded_sources
 		src/ui/runtime/*.cpp
-		src/render/clay_ui_tests/*.cpp
-		src/client/ui/screens/character_create/*.cpp
-		src/client/ui/screens/lobby/*.cpp)
-	set_source_files_properties(${_clay_unsafe_sources} PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON)
+		src/ui/style/*.cpp
+		src/render/cppx_ui/*.cpp
+		src/client/ui/*.cpp
+		src/client/ui/app_shell/*.cpp
+		src/client/ui/app_shell/navigation/*.cpp
+		src/client/ui/hooks/*.cpp
+		src/client/ui/providers/*.cpp)
+	set_source_files_properties(${_unity_excluded_sources} PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON)
 endif()
 
 # Compile HLSL → DXIL bytecode headers for the SDL3 GPU backend. macOS keeps
@@ -146,14 +178,20 @@ silencer_compile_shader(frag_light    pixel   frag_light)
 silencer_compile_shader(vert_particle vertex  vert_particle)
 silencer_compile_shader(frag_particle pixel   frag_particle)
 silencer_compile_shader(comp_particle compute update_particles)
+silencer_compile_shader(vert_ui       vertex  vert_ui)
+silencer_compile_shader(frag_ui       pixel   frag_ui)
+silencer_compile_shader(frag_ui_composite pixel frag_ui_composite)
 silencer_finalize_shaders(
     vert_screen frag_remap frag_upscale frag_lobby_panel_blur frag_light
     vert_particle frag_particle comp_particle
+    vert_ui frag_ui frag_ui_composite
 )
 add_dependencies(${SILENCER_TARGET} silencer_shaders)
 target_include_directories(${SILENCER_TARGET} PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}/shaders/generated")
-target_include_directories(${SILENCER_TARGET} PRIVATE
+# SYSTEM so vendored headers (stb_image_write.h, nlohmann/json) don't emit
+# -Wall/-Wextra advisories we don't own and can't fix.
+target_include_directories(${SILENCER_TARGET} SYSTEM PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}/third_party")
 # Expose src/ and every first-level subdomain so that bare-name includes
 # (#include "lobby.h") continue to resolve after the src/ reorganisation.
@@ -181,15 +219,6 @@ target_include_directories(${SILENCER_TARGET} PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}/src/ui"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/ui/runtime"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/client/ui"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/client/ui/modals"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/client/ui/screens"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/client/ui/screens/main_menu"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/client/ui/screens/character_create"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/client/ui/screens/options"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/client/ui/screens/lobby_connect"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/client/ui/screens/update"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/client/ui/screens/lobby"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/client/ui/screens/mission_summary"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/net"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/game"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/game/modes"
@@ -202,6 +231,575 @@ target_include_directories(${SILENCER_TARGET} PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}/src/gas"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/events"
 )
+
+if(NOT SILENCER_HEADLESS)
+
+# --- cppx authoring pipeline (SIL-7) -------------------------------------
+# `.cppx`/`.hx` view sources transpile to ordinary C++ at build time through
+# the vendored Python tooling. Generated `.cpp`/`.h` land under
+# <build>/generated/cppx/ (gitignored, never committed) and regenerate every
+# build; Python3 is a documented build dependency. The authored-source list
+# below is the single source of truth — both the transpile step and the
+# format gate consume it.
+find_package(Python3 COMPONENTS Interpreter REQUIRED)
+include(cppx_transpile)
+
+set(SILENCER_CPPX_SOURCES
+	src/ui/cppx_smoke.cppx
+	src/ui/cppx_smoke.hx
+	# Generic UI primitive layer (SIL-16): game-agnostic, theme-based,
+	# sprite-free components. common.h/components.h are plain headers
+	# resolved via the src/ include dir, not authored cppx sources.
+	src/ui/components/box.cppx
+	src/ui/components/box.hx
+	src/ui/components/button.cppx
+	src/ui/components/button.hx
+	src/ui/components/text.cppx
+	src/ui/components/text.hx
+	src/ui/components/checkbox.cppx
+	src/ui/components/checkbox.hx
+	src/ui/components/input.cppx
+	src/ui/components/input.hx
+	src/ui/components/dialog.cppx
+	src/ui/components/dialog.hx
+	src/ui/components/scroll_view.cppx
+	src/ui/components/scroll_view.hx
+	# Product-intent semantic component layer (SIL-17): the shadcn-style app
+	# components over the generic primitives, in namespace silencer::. Paint
+	# resolves through silencer::tokens + the product theme. The plain headers
+	# (tokens.h, app_button_variant.h, and the per-family umbrella headers
+	# actions.h/layout.h/surfaces.h/text.h) are resolved via the src/ include
+	# dir, not authored cppx sources.
+	src/client/ui/components/actions/app_button.cppx
+	src/client/ui/components/actions/app_button.hx
+	src/client/ui/components/actions/app_checkbox.cppx
+	src/client/ui/components/actions/app_checkbox.hx
+	src/client/ui/components/actions/boolean_setting_row.cppx
+	src/client/ui/components/actions/boolean_setting_row.hx
+	src/client/ui/components/actions/app_input.cppx
+	src/client/ui/components/actions/app_input.hx
+	src/client/ui/components/actions/action_row.cppx
+	src/client/ui/components/actions/action_row.hx
+	src/client/ui/components/layout/screen_layout.cppx
+	src/client/ui/components/layout/screen_layout.hx
+	src/client/ui/components/surfaces/panel.cppx
+	src/client/ui/components/surfaces/panel.hx
+	src/client/ui/components/text/screen_title.cppx
+	src/client/ui/components/text/screen_title.hx
+	src/client/ui/components/text/screen_subtitle.cppx
+	src/client/ui/components/text/screen_subtitle.hx
+	src/client/ui/components/text/body_text.cppx
+	src/client/ui/components/text/body_text.hx
+	# Screens (SIL-18): the lowest-coupling screen views authored as cppx. Phase
+	# screens (MainMenu/UpdateScreen) are keyed component factories returned by
+	# AppRoot::make_phase_element; the modals are props-only OverlayScreens
+	# pushed via use_navigation.
+	src/client/ui/screens/main_menu.cppx
+	src/client/ui/screens/main_menu.hx
+	src/client/ui/screens/gallery.cppx
+	src/client/ui/screens/gallery.hx
+	src/client/ui/screens/update_screen.cppx
+	src/client/ui/screens/update_screen.hx
+	src/client/ui/screens/message_modal.cppx
+	src/client/ui/screens/message_modal.hx
+	src/client/ui/screens/password_modal.cppx
+	src/client/ui/screens/password_modal.hx
+	# Options cluster (SIL-19): the root + Audio/Display sub-screens are Overlays
+	# pushed via use_navigation; they live-preview use_settings (Cancel reverts).
+	src/client/ui/screens/options/options_screen.cppx
+	src/client/ui/screens/options/options_screen.hx
+	src/client/ui/screens/options/options_audio.cppx
+	src/client/ui/screens/options/options_audio.hx
+	src/client/ui/screens/options/options_display.cppx
+	src/client/ui/screens/options/options_display.hx
+	# OptionsControls (SIL-19 part B): rows-of-combos + multi-device keybind
+	# capture (use_keybind_capture).
+	src/client/ui/screens/options/options_controls.cppx
+	src/client/ui/screens/options/options_controls.hx
+	# Lobby phase screens (SIL-20): LobbyConnect (connect/auth via the game-tick
+	# connect flow + use_lobby_session) and MissionSummary (use_progression).
+	src/client/ui/screens/lobby_connect.cppx
+	src/client/ui/screens/lobby_connect.hx
+	src/client/ui/screens/mission_summary.cppx
+	src/client/ui/screens/mission_summary.hx
+	# CharacterCreate (SIL-21): the fresh-account gateway — the roster phase screen
+	# + the alias modal and agency screen as ScreenStack overlays (back-nav is a
+	# stack pop), creating the agent → LOBBY (via the CREATECHARACTER tick reconcile).
+	src/client/ui/screens/character_create/character_create.cppx
+	src/client/ui/screens/character_create/character_create.hx
+	src/client/ui/screens/character_create/alias_modal.cppx
+	src/client/ui/screens/character_create/alias_modal.hx
+	src/client/ui/screens/character_create/agency_screen.cppx
+	src/client/ui/screens/character_create/agency_screen.hx
+	src/client/ui/screens/character_create/components/wizard_components.cppx
+	src/client/ui/screens/character_create/components/wizard_components.hx
+	# LobbyScreen (SIL-21 2/n + 3/n): the read cluster + the game-join cluster
+	# (GameSelect/GameCreate/Staging right-column swap over use_games/use_staging).
+	src/client/ui/screens/lobby/lobby_screen.cppx
+	src/client/ui/screens/lobby/lobby_screen.hx
+	src/client/ui/screens/lobby/components/lobby_components.cppx
+	# InGameScreen (SIL-21 4/n): the in-match HUD — transparent ScreenLayout(Hud)
+	# over the live world, composed from use_match + use_player_status.
+	src/client/ui/screens/in_game/in_game_screen.cppx
+	src/client/ui/screens/in_game/in_game_screen.hx
+	src/client/ui/screens/in_game/components/hud_painters.cppx
+	# PauseScreen: the in-match "Hit Enter To Quit" affordance as an Overlay
+	# pushed by InGameScreen's use_cancel (and the projected mission-over edge).
+	src/client/ui/screens/pause_screen.cppx
+	src/client/ui/screens/pause_screen.hx
+)
+cppx_transpile(SILENCER_CPPX_GENERATED ${SILENCER_CPPX_SOURCES})
+target_sources(${SILENCER_TARGET} PRIVATE ${SILENCER_CPPX_GENERATED})
+if(SILENCER_UNITY_BUILD)
+	# The generated cppx screens/components carry the same anonymous-namespace +
+	# file-local `using` patterns as their authored cppx sources (excluded above)
+	# — not jumbo-safe. Two screens batched into one TU collide on shared
+	# file-local symbols (e.g. message_modal + password_modal both define
+	# `kDialogW`). Build each generated TU on its own.
+	set_source_files_properties(${SILENCER_CPPX_GENERATED} PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON)
+endif()
+
+# Expose the generated root + the generated `src/` mirror + each generated
+# output's directory so authored `.cppx`/`.hx` resolve their generated `.h`
+# siblings both by bare name (generic primitives: `#include "button.h"`) and
+# src-rooted (semantic layer: `#include "client/ui/components/.../foo.h"`). The
+# generated tree mirrors `src/`, so its `src/` root must be on the include path
+# exactly like the real `src/` root is for the authored sources. Generated TUs
+# use named namespaces (no anon-namespace / global `using` vocabulary), so they
+# are unity-safe — unlike the legacy Clay `_clay_unsafe_sources`. Re-audit when
+# adding generated TUs.
+set(SILENCER_CPPX_INCLUDE_DIRS
+	"${CMAKE_CURRENT_BINARY_DIR}/generated/cppx"
+	"${CMAKE_CURRENT_BINARY_DIR}/generated/cppx/src")
+foreach(_gen ${SILENCER_CPPX_GENERATED})
+	get_filename_component(_gen_dir "${_gen}" DIRECTORY)
+	list(APPEND SILENCER_CPPX_INCLUDE_DIRS "${_gen_dir}")
+endforeach()
+list(REMOVE_DUPLICATES SILENCER_CPPX_INCLUDE_DIRS)
+target_include_directories(${SILENCER_TARGET} PRIVATE ${SILENCER_CPPX_INCLUDE_DIRS})
+
+# Format gate on the authored sources (CI: `ctest -R cppx_format_check`).
+# Always registered so it does not depend on the full SILENCER_BUILD_TESTS
+# tree. There is no drift gate: nothing generated lives in source.
+enable_testing()
+set(_cppx_format_files "")
+foreach(_src ${SILENCER_CPPX_SOURCES})
+	list(APPEND _cppx_format_files "${CMAKE_CURRENT_SOURCE_DIR}/${_src}")
+endforeach()
+add_test(NAME cppx_format_check
+	COMMAND ${Python3_EXECUTABLE}
+		"${CMAKE_CURRENT_SOURCE_DIR}/tools/cppx_format.py" --check ${_cppx_format_files})
+
+# --- cppx retained runtime (SIL-9) ---------------------------------------
+# The golden react+element+tree trio (+ SDL-free contract deps input.h,
+# style/visual_style.h, style/text_measure.*) is vendored under src/ui/ and
+# compiles into the client via the source glob. It is dead until the pipeline
+# wires it (SIL-13+), but proves the vendor integrates build-clean here.
+#
+# react_runtime_tests: the golden hook-runtime unit test (a trivial component
+# renders, hooks keep per-instance state across reorders). Built always so a
+# normal build.sh produces it; run via `ctest -R react_runtime_tests`.
+add_executable(react_runtime_tests
+	tests/react_runtime_tests.cpp
+	src/ui/runtime/react.cpp)
+target_compile_features(react_runtime_tests PRIVATE cxx_std_20)
+target_include_directories(react_runtime_tests PRIVATE
+	"${CMAKE_CURRENT_SOURCE_DIR}/src")
+if(MSVC)
+	target_compile_definitions(react_runtime_tests PRIVATE NOMINMAX)
+endif()
+add_test(NAME react_runtime_tests COMMAND react_runtime_tests)
+
+# SDL-free guard on the vendored runtime (scoped allowlist while the legacy
+# Clay runtime still lives under src/ui/; SIL-23 broadens it post-Clay).
+add_test(NAME cppx_runtime_sdl_free
+	COMMAND ${Python3_EXECUTABLE}
+		"${CMAKE_CURRENT_SOURCE_DIR}/tools/cppx_runtime_guard.py")
+
+# SIL-23: cppx transpiler golden-output regression. Transpiles the authored
+# fixtures and diffs against the committed *.expected.* (+ asserts the two error
+# fixtures emit their precise diagnostics). The transpiler is byte-identical to
+# the golden repo's, so the fixtures are reused verbatim.
+add_test(NAME cppx_transpiler_tests
+	COMMAND ${Python3_EXECUTABLE}
+		"${CMAKE_CURRENT_SOURCE_DIR}/tests/cppx_transpiler_tests.py"
+		--tool "${CMAKE_CURRENT_SOURCE_DIR}/tools/cppx_transpile.py"
+		--fixtures "tests/fixtures/cppx")
+# Run from the client root so the source paths the transpiler bakes into #line
+# directives are repo-relative (matching the committed *.expected.*).
+set_tests_properties(cppx_transpiler_tests PROPERTIES
+	WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")
+
+# SIL-23: component-descriptor architecture guard (ported from golden). Public
+# API is descriptor factories — no Component<T> wrapper, no direct generic
+# component bodies, no manual retained-provider macros; the transpiler lowers
+# .cppx into ::ui::component(...) descriptors.
+add_test(NAME component_descriptor_guard
+	COMMAND ${Python3_EXECUTABLE}
+		"${CMAKE_CURRENT_SOURCE_DIR}/tools/component_descriptor_guard.py"
+		--root "${CMAKE_CURRENT_SOURCE_DIR}"
+		--tool "${CMAKE_CURRENT_SOURCE_DIR}/tools/cppx_transpile.py")
+
+# React/shadcn architecture guard: deterministic smells in src/client/ui —
+# raw Color{} paint outside tokens/theme, big switches, fat props/signatures,
+# god view functions, same-line conditional hooks.
+add_test(NAME react_architecture_guard
+	COMMAND ${Python3_EXECUTABLE}
+		"${CMAKE_CURRENT_SOURCE_DIR}/tools/react_architecture_guard.py"
+		--root "${CMAKE_CURRENT_SOURCE_DIR}")
+
+# --- Yoga flex layout (SIL-10) -------------------------------------------
+# Yoga v3.2.1, the layout backend behind the retained runtime. flex_layout.*
+# is a Yoga-free adapter (FlexLayoutAdapter seam over UiTree); only
+# yoga_flex_layout.cpp touches <yoga/Yoga.h>. Both compile into the client via
+# the source glob (unity-excluded under src/ui/runtime) — dead until the
+# pipeline drives compute_flex_layout (SIL-13), but matches the end state, so
+# the client links yogacore now.
+include(FetchContent)
+FetchContent_Declare(
+	yoga
+	GIT_REPOSITORY https://github.com/facebook/yoga.git
+	GIT_TAG v3.2.1
+	GIT_SHALLOW TRUE
+	SOURCE_SUBDIR yoga
+)
+FetchContent_MakeAvailable(yoga)
+target_link_libraries(${SILENCER_TARGET} yogacore)
+
+# Retained tree-reconciliation contract (injected layout backend, no Yoga).
+add_executable(retained_ui_runtime_tests
+	tests/retained_ui_runtime_tests.cpp
+	src/ui/runtime/tree.cpp
+	src/ui/style/text_measure.cpp
+	src/ui/runtime/flex_layout.cpp)
+target_compile_features(retained_ui_runtime_tests PRIVATE cxx_std_20)
+target_include_directories(retained_ui_runtime_tests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src")
+if(MSVC)
+	target_compile_definitions(retained_ui_runtime_tests PRIVATE NOMINMAX)
+endif()
+add_test(NAME retained_ui_runtime_tests COMMAND retained_ui_runtime_tests)
+
+# Real Yoga layout: resolves absolute bounds for a nested flex tree.
+add_executable(retained_ui_yoga_tests
+	tests/retained_ui_yoga_tests.cpp
+	src/ui/runtime/tree.cpp
+	src/ui/style/text_measure.cpp
+	src/ui/runtime/flex_layout.cpp
+	src/ui/runtime/yoga_flex_layout.cpp)
+target_compile_features(retained_ui_yoga_tests PRIVATE cxx_std_20)
+target_include_directories(retained_ui_yoga_tests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src")
+target_link_libraries(retained_ui_yoga_tests PRIVATE yogacore)
+if(MSVC)
+	target_compile_definitions(retained_ui_yoga_tests PRIVATE NOMINMAX)
+endif()
+add_test(NAME retained_ui_yoga_tests COMMAND retained_ui_yoga_tests)
+
+# --- Focus runtime + interaction hooks (SIL-12) --------------------------
+# The vendored golden focus runtime, driven over a real Yoga-laid-out UiTree:
+# keyboard/gamepad nav (skip-disabled + source tracking), pointer press/release
+# confirm, and modal scope trap+restore. focus.cpp is a pure function over
+# UiTree + a POD InputFrame (SDL-free); compiles into the client via the glob.
+add_executable(retained_ui_focus_tests
+	tests/retained_ui_focus_tests.cpp
+	src/ui/runtime/focus.cpp
+	src/ui/runtime/tree.cpp
+	src/ui/style/text_measure.cpp
+	src/ui/runtime/flex_layout.cpp
+	src/ui/runtime/yoga_flex_layout.cpp)
+target_compile_features(retained_ui_focus_tests PRIVATE cxx_std_20)
+target_include_directories(retained_ui_focus_tests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src")
+target_link_libraries(retained_ui_focus_tests PRIVATE yogacore)
+if(MSVC)
+	target_compile_definitions(retained_ui_focus_tests PRIVATE NOMINMAX)
+endif()
+add_test(NAME retained_ui_focus_tests COMMAND retained_ui_focus_tests)
+
+add_executable(ui_scroll_tests
+	tests/ui_scroll_tests.cpp
+	src/ui/runtime/tree.cpp
+	src/ui/runtime/draw_command.cpp
+	src/ui/runtime/draw_command_builder.cpp
+	src/ui/runtime/focus.cpp
+	src/ui/style/text_measure.cpp
+	src/ui/runtime/flex_layout.cpp
+	src/ui/runtime/yoga_flex_layout.cpp)
+target_compile_features(ui_scroll_tests PRIVATE cxx_std_20)
+target_include_directories(ui_scroll_tests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src")
+target_link_libraries(ui_scroll_tests PRIVATE yogacore)
+if(MSVC)
+	target_compile_definitions(ui_scroll_tests PRIVATE NOMINMAX)
+endif()
+add_test(NAME ui_scroll_tests COMMAND ui_scroll_tests)
+
+# Fiber-keyed interaction hooks (use_focused/hovered/pressed/focus_visible).
+# Hermetic — reads a published InteractionSnapshot via ReactContext, no UiTree.
+add_executable(ui_interaction_hooks_tests
+	tests/ui_interaction_hooks_tests.cpp
+	src/ui/runtime/interaction_hooks.cpp
+	src/ui/runtime/react.cpp)
+target_compile_features(ui_interaction_hooks_tests PRIVATE cxx_std_20)
+target_include_directories(ui_interaction_hooks_tests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src")
+if(MSVC)
+	target_compile_definitions(ui_interaction_hooks_tests PRIVATE NOMINMAX)
+endif()
+add_test(NAME ui_interaction_hooks_tests COMMAND ui_interaction_hooks_tests)
+
+# --- App-shell 5-phase pipeline (SIL-13) ---------------------------------
+# The golden frame contract: UiPipeline + ClientUi + ScreenStack/UiScreen +
+# the NavigationProvider/use_navigation it compile-depends on (namespace
+# client::ui, distinct from the live silencer::ui ClientUi/ScreenStack). All
+# SDL-free; the render seam is an injected std::function. Vendored ALONGSIDE
+# the live Clay pipeline — the production cutover is SIL-14+. The two CTests
+# drive the full retained closure (react+element+tree+focus+yoga+draw IR).
+set(_cppx_retained_sources
+	src/ui/runtime/react.cpp
+	src/ui/runtime/element.cpp
+	src/ui/runtime/tree.cpp
+	src/ui/runtime/focus.cpp
+	src/ui/runtime/interaction_hooks.cpp
+	src/ui/runtime/flex_layout.cpp
+	src/ui/runtime/yoga_flex_layout.cpp
+	src/ui/runtime/draw_command.cpp
+	src/ui/runtime/draw_command_builder.cpp
+	src/ui/style/text_measure.cpp
+	src/ui/style/default_theme.cpp
+	src/ui/style/resolve.cpp)
+# NOTE: app_root.cpp is deliberately NOT here. Its make_phase_element names the
+# real screens (which transitively pull the keybinds/config/os game deps), so it
+# is added only to the target that exercises the phase reconciler with real
+# screens (pipeline_host_tests). The lean shell tests below use their own test
+# screens and never name AppRoot.
+set(_cppx_app_shell_sources
+	src/client/ui/app_shell/client_ui.cpp
+	src/client/ui/app_shell/navigation/screen_stack.cpp
+	src/client/ui/app_theme.cpp
+	src/client/ui/providers/app_provider.cpp
+	src/client/ui/providers/chrome_textures_provider.cpp
+	src/client/ui/providers/clock_provider.cpp
+	src/client/ui/providers/key_map_provider.cpp
+	src/client/ui/providers/keybind_capture_provider.cpp
+	src/client/ui/providers/lobby_provider.cpp
+	src/client/ui/providers/map_previews_provider.cpp
+	src/client/ui/providers/navigation_provider.cpp
+	src/client/ui/providers/server_provider.cpp
+	src/client/ui/providers/session_provider.cpp
+	src/client/ui/providers/settings_provider.cpp
+	src/client/ui/providers/updater_provider.cpp
+	src/client/ui/providers/world_session_provider.cpp)
+
+add_executable(client_ui_tests
+	tests/client_ui_tests.cpp
+	${_cppx_app_shell_sources}
+	${_cppx_retained_sources})
+target_compile_features(client_ui_tests PRIVATE cxx_std_20)
+target_include_directories(client_ui_tests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src")
+target_link_libraries(client_ui_tests PRIVATE yogacore)
+if(MSVC)
+	target_compile_definitions(client_ui_tests PRIVATE NOMINMAX)
+endif()
+add_test(NAME client_ui_tests COMMAND client_ui_tests)
+
+add_executable(ui_pipeline_tests
+	tests/ui_pipeline_tests.cpp
+	src/client/ui/app_shell/ui_pipeline.cpp
+	${_cppx_app_shell_sources}
+	${_cppx_retained_sources})
+target_compile_features(ui_pipeline_tests PRIVATE cxx_std_20)
+target_include_directories(ui_pipeline_tests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src")
+target_link_libraries(ui_pipeline_tests PRIVATE yogacore)
+if(MSVC)
+	target_compile_definitions(ui_pipeline_tests PRIVATE NOMINMAX)
+endif()
+add_test(NAME ui_pipeline_tests COMMAND ui_pipeline_tests)
+
+# --- Production render seam: PipelineHost (SIL-14) ------------------------
+# Drives the real client::ui::UiPipeline and executes its IR to pixels via the
+# SIL-11 UiSurface/execute_draw_commands path (the render-lambda -> UiSurface
+# bridge SIL-13 deferred). Headless software renderer; a stub fill-box screen
+# proves pipeline -> renderer end-to-end. pipeline_host.cpp compiles into the
+# client via the src/render/cppx_ui glob.
+add_executable(pipeline_host_tests
+	tests/pipeline_host_tests.cpp
+	src/render/cppx_ui/pipeline_host.cpp
+	src/render/cppx_ui/ui_draw_program.cpp
+	src/platform/perf_trace.cpp
+	src/render/cppx_ui/ui_surface.cpp
+	src/render/cppx_ui/draw_executor.cpp
+	src/render/cppx_ui/ui_draw_geometry.cpp
+	src/render/cppx_ui/glyph_fonts.cpp
+	src/render/cppx_ui/sdf_raster.cpp
+	src/render/cppx_ui/font_registry.cpp
+	src/render/cppx_ui/texture_registry.cpp
+	src/render/cppx_ui/sprite_bake.cpp
+	src/render/cppx_ui/text_measure.cpp
+	src/ui/runtime/geometry.cpp
+	src/client/ui/app_shell/ui_pipeline.cpp
+	# AppRoot's make_phase_element renders the real phase screens (SIL-18/19); this
+	# is the one test that exercises the reconciler with them. The screen graph is
+	# kept game-dep-free (labels are pre-resolved by the composition root), so no
+	# keybinds/config/os link is needed here.
+	src/client/ui/app_shell/app_root.cpp
+	${_cppx_app_shell_sources}
+	${_cppx_retained_sources}
+	# SIL-16: the generated ui::components primitives, so the render test can
+	# drive them headlessly.
+	${SILENCER_CPPX_GENERATED})
+target_compile_features(pipeline_host_tests PRIVATE cxx_std_20)
+target_include_directories(pipeline_host_tests PRIVATE
+	"${CMAKE_CURRENT_SOURCE_DIR}/src" "${CMAKE_CURRENT_SOURCE_DIR}/src/platform"
+	${SILENCER_CPPX_INCLUDE_DIRS})
+target_link_libraries(pipeline_host_tests PRIVATE SDL3::SDL3 SDL3_ttf::SDL3_ttf yogacore)
+target_compile_definitions(pipeline_host_tests PRIVATE
+	SILENCER_TEST_FONT_DIR="${SILENCER_SHARED_DIR}/fonts")
+if(MSVC)
+	target_compile_definitions(pipeline_host_tests PRIVATE NOMINMAX)
+endif()
+add_test(NAME pipeline_host_tests COMMAND pipeline_host_tests)
+
+# --- SDL-free draw model (SIL-11 foundation) -----------------------------
+# RGBA DrawCommand IR + tessellation math. draw_command_builder.cpp compiles
+# into the client via the source glob; the renderer-side SDL executor/
+# registries are a separate bridge layer (later in SIL-11).
+add_executable(ui_geometry_tests
+	tests/ui_geometry_tests.cpp
+	src/ui/runtime/geometry.cpp)
+target_compile_features(ui_geometry_tests PRIVATE cxx_std_20)
+target_include_directories(ui_geometry_tests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src")
+if(MSVC)
+	target_compile_definitions(ui_geometry_tests PRIVATE NOMINMAX)
+endif()
+add_test(NAME ui_geometry_tests COMMAND ui_geometry_tests)
+
+add_executable(ui_draw_command_tests
+	tests/ui_draw_command_tests.cpp
+	src/ui/runtime/draw_command.cpp)
+target_compile_features(ui_draw_command_tests PRIVATE cxx_std_20)
+target_include_directories(ui_draw_command_tests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src")
+if(MSVC)
+	target_compile_definitions(ui_draw_command_tests PRIVATE NOMINMAX)
+endif()
+add_test(NAME ui_draw_command_tests COMMAND ui_draw_command_tests)
+
+# SIL-11 font path: SDL_ttf + the four silencer .otf faces load + measure.
+# Foundation for the golden FontRegistry + install_text_measurer (next).
+add_executable(ttf_font_smoke_tests tests/ttf_font_smoke_tests.cpp)
+target_link_libraries(ttf_font_smoke_tests PRIVATE SDL3::SDL3 SDL3_ttf::SDL3_ttf)
+target_compile_definitions(ttf_font_smoke_tests PRIVATE
+	SILENCER_TEST_FONT_DIR="${SILENCER_SHARED_DIR}/fonts")
+add_test(NAME ttf_font_smoke_tests COMMAND ttf_font_smoke_tests)
+
+# Multi-face text-measure seam: FontRegistry + install_text_measurer wired into
+# the SDL-free ui/ measurer, exercised through ui::text_measurer().
+add_executable(ui_text_measure_tests
+	tests/ui_text_measure_tests.cpp
+	src/render/cppx_ui/font_registry.cpp
+	src/render/cppx_ui/glyph_fonts.cpp
+	src/render/cppx_ui/text_measure.cpp
+	src/ui/style/text_measure.cpp)
+target_compile_features(ui_text_measure_tests PRIVATE cxx_std_20)
+target_include_directories(ui_text_measure_tests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src")
+target_link_libraries(ui_text_measure_tests PRIVATE SDL3::SDL3 SDL3_ttf::SDL3_ttf)
+target_compile_definitions(ui_text_measure_tests PRIVATE
+	SILENCER_TEST_FONT_DIR="${SILENCER_SHARED_DIR}/fonts")
+if(MSVC)
+	target_compile_definitions(ui_text_measure_tests PRIVATE NOMINMAX)
+endif()
+add_test(NAME ui_text_measure_tests COMMAND ui_text_measure_tests)
+
+# Sprite->RGBA bake: indexed Surface + palette -> premultiplied RGBA8.
+add_executable(sprite_bake_tests
+	tests/sprite_bake_tests.cpp
+	src/render/cppx_ui/sprite_bake.cpp)
+target_compile_features(sprite_bake_tests PRIVATE cxx_std_20)
+target_include_directories(sprite_bake_tests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src")
+target_link_libraries(sprite_bake_tests PRIVATE SDL3::SDL3)
+if(MSVC)
+	target_compile_definitions(sprite_bake_tests PRIVATE NOMINMAX)
+endif()
+add_test(NAME sprite_bake_tests COMMAND sprite_bake_tests)
+
+# texture_id -> SDL_Texture registry (upload_rgba premultiplies). Headless via
+# a software SDL_Renderer.
+add_executable(texture_registry_tests
+	tests/texture_registry_tests.cpp
+	src/render/cppx_ui/texture_registry.cpp
+	src/render/cppx_ui/sprite_bake.cpp)
+target_compile_features(texture_registry_tests PRIVATE cxx_std_20)
+target_include_directories(texture_registry_tests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src")
+target_link_libraries(texture_registry_tests PRIVATE SDL3::SDL3)
+if(MSVC)
+	target_compile_definitions(texture_registry_tests PRIVATE NOMINMAX)
+endif()
+add_test(NAME texture_registry_tests COMMAND texture_registry_tests)
+
+# DrawCommand IR -> pixels executor, verified by headless pixel readback.
+add_executable(draw_executor_tests
+	tests/draw_executor_tests.cpp
+	src/render/cppx_ui/draw_executor.cpp
+	src/render/cppx_ui/ui_draw_geometry.cpp
+	src/render/cppx_ui/glyph_fonts.cpp
+	src/render/cppx_ui/sdf_raster.cpp
+	src/render/cppx_ui/font_registry.cpp
+	src/render/cppx_ui/texture_registry.cpp
+	src/render/cppx_ui/sprite_bake.cpp
+	src/ui/runtime/draw_command.cpp
+	src/ui/runtime/geometry.cpp)
+target_compile_features(draw_executor_tests PRIVATE cxx_std_20)
+target_include_directories(draw_executor_tests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src")
+target_link_libraries(draw_executor_tests PRIVATE SDL3::SDL3 SDL3_ttf::SDL3_ttf)
+target_compile_definitions(draw_executor_tests PRIVATE
+	SILENCER_TEST_FONT_DIR="${SILENCER_SHARED_DIR}/fonts")
+if(MSVC)
+	target_compile_definitions(draw_executor_tests PRIVATE NOMINMAX)
+endif()
+add_test(NAME draw_executor_tests COMMAND draw_executor_tests)
+
+# UiSurface: the per-frame clear -> execute IR -> resolve -> present wrapper
+# (direct + supersample), driving the executor. Headless software renderer.
+add_executable(ui_surface_tests
+	tests/ui_surface_tests.cpp
+	src/render/cppx_ui/ui_surface.cpp
+	src/render/cppx_ui/draw_executor.cpp
+	src/render/cppx_ui/ui_draw_geometry.cpp
+	src/render/cppx_ui/glyph_fonts.cpp
+	src/render/cppx_ui/sdf_raster.cpp
+	src/render/cppx_ui/font_registry.cpp
+	src/render/cppx_ui/texture_registry.cpp
+	src/render/cppx_ui/sprite_bake.cpp
+	src/ui/runtime/draw_command.cpp
+	src/ui/runtime/geometry.cpp)
+target_compile_features(ui_surface_tests PRIVATE cxx_std_20)
+target_include_directories(ui_surface_tests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src")
+target_link_libraries(ui_surface_tests PRIVATE SDL3::SDL3 SDL3_ttf::SDL3_ttf)
+target_compile_definitions(ui_surface_tests PRIVATE
+	SILENCER_TEST_FONT_DIR="${SILENCER_SHARED_DIR}/fonts")
+if(MSVC)
+	target_compile_definitions(ui_surface_tests PRIVATE NOMINMAX)
+endif()
+add_test(NAME ui_surface_tests COMMAND ui_surface_tests)
+
+# Executor Image path: plain textured rect + nine-slice (9-patch) button,
+# corners 1:1. Headless software renderer + texture_registry upload.
+add_executable(draw_image_tests
+	tests/draw_image_tests.cpp
+	src/render/cppx_ui/draw_executor.cpp
+	src/render/cppx_ui/ui_draw_geometry.cpp
+	src/render/cppx_ui/glyph_fonts.cpp
+	src/render/cppx_ui/sdf_raster.cpp
+	src/render/cppx_ui/font_registry.cpp
+	src/render/cppx_ui/texture_registry.cpp
+	src/render/cppx_ui/sprite_bake.cpp
+	src/ui/runtime/draw_command.cpp
+	src/ui/runtime/geometry.cpp)
+target_compile_features(draw_image_tests PRIVATE cxx_std_20)
+target_include_directories(draw_image_tests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src")
+target_link_libraries(draw_image_tests PRIVATE SDL3::SDL3 SDL3_ttf::SDL3_ttf)
+if(MSVC)
+	target_compile_definitions(draw_image_tests PRIVATE NOMINMAX)
+endif()
+add_test(NAME draw_image_tests COMMAND draw_image_tests)
+
+endif() # NOT SILENCER_HEADLESS
 
 # /Z7 embeds debug info into .obj files instead of routing it through MSVC's
 # mspdbsrv.exe — which has a habit of failing with C1090 PDB errors on some
@@ -230,11 +828,19 @@ target_compile_definitions(${SILENCER_TARGET} PRIVATE
 	SILENCER_MAP_API_URL="${SILENCER_MAP_API_URL}"
 	SILENCER_ADMIN_API_URL="${SILENCER_ADMIN_API_URL}"
 	SILENCER_HAVE_LOBBY_UI=1
+	# SIL-11 demo overlay (SILENCER_CPPX_UI_DEMO env) loads UI fonts from here.
+	SILENCER_CPPX_FONT_DIR="${SILENCER_SHARED_DIR}/fonts"
 )
 
 find_package(ZLIB REQUIRED)
 find_package(SDL3 REQUIRED)
 find_package(SDL3_mixer REQUIRED)
+if(NOT SILENCER_HEADLESS)
+	find_package(SDL3_ttf REQUIRED CONFIG)  # SIL-11: golden TTF FontRegistry / UI text
+	set(_sdl3ttf SDL3_ttf::SDL3_ttf)
+else()
+	set(_sdl3ttf "")
+endif()
 find_package(CURL REQUIRED)
 
 # Minizip: prefer vcpkg's CMake CONFIG packages (Windows CI), then fall back
@@ -281,38 +887,50 @@ endif()
 if(APPLE)
 	find_library(COCOA_FRAMEWORK Cocoa)
 	target_link_libraries(${SILENCER_TARGET}
-		SDL3::SDL3 SDL3_mixer::SDL3_mixer ${ZLIB_LIBRARY}
+		SDL3::SDL3 SDL3_mixer::SDL3_mixer ${_sdl3ttf} ${ZLIB_LIBRARY}
 		CURL::libcurl
 		${COCOA_FRAMEWORK})
 elseif(WIN32)
 	target_link_libraries(${SILENCER_TARGET}
-		SDL3::SDL3 SDL3_mixer::SDL3_mixer ${ZLIB_LIBRARY}
+		SDL3::SDL3 SDL3_mixer::SDL3_mixer ${_sdl3ttf} ${ZLIB_LIBRARY}
 		CURL::libcurl ws2_32)
 else()
 	target_link_libraries(${SILENCER_TARGET}
-		SDL3::SDL3 SDL3_mixer::SDL3_mixer ${ZLIB_LIBRARY}
+		SDL3::SDL3 SDL3_mixer::SDL3_mixer ${_sdl3ttf} ${ZLIB_LIBRARY}
 		CURL::libcurl)
 endif()
 
 target_link_libraries(${SILENCER_TARGET} minizip_dep)
 
 # Dev-build asset staging (Windows/Linux): copy shared/assets/ next to the
-# binary so the runtime fallback (`GetResDir() + "<subdir>/..."` in
-# `src/platform/os.cpp`) resolves without needing `cmake --install`. Affects
-# gas/, keybinds/, behaviortrees/, and any future runtime asset subdir;
-# without this every fresh build silently runs with empty GAS/keybind data.
-# macOS bakes assets into the .app bundle directly via the bundle_extras
-# list above, so this branch is no-op there.
+# binary so the runtime resolver (`GetResDir() + "<subdir>/..."`) finds the
+# game data without needing `cmake --install`. macOS bakes assets into the
+# .app bundle via the bundle_extras list above.
 if(NOT APPLE)
 	add_custom_command(TARGET ${SILENCER_TARGET} POST_BUILD
 		COMMAND ${CMAKE_COMMAND} -E copy_directory
 				"${SILENCER_SHARED_DIR}/assets"
 				"$<TARGET_FILE_DIR:${SILENCER_TARGET}>/assets"
 		COMMENT "Staging shared/assets/ next to ${SILENCER_TARGET}")
+
+	# The cppx UI .otf fonts are only loaded by the windowed client (via
+	# ResolveFontDir → SDL_GetBasePath()+"assets/fonts"). The headless
+	# dedicated server has no UI and never loads them, and the lobby Docker
+	# build context (services/lobby/Dockerfile) doesn't ship shared/fonts/ —
+	# so stage fonts only for full client builds.
+	if(NOT SILENCER_HEADLESS)
+		add_custom_command(TARGET ${SILENCER_TARGET} POST_BUILD
+			COMMAND ${CMAKE_COMMAND} -E copy_directory
+					"${SILENCER_SHARED_DIR}/fonts"
+					"$<TARGET_FILE_DIR:${SILENCER_TARGET}>/assets/fonts"
+			COMMENT "Staging shared/fonts/ next to ${SILENCER_TARGET}")
+	endif()
 endif()
 
 install(TARGETS "${SILENCER_TARGET}" RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}" BUNDLE DESTINATION "${CMAKE_INSTALL_BINDIR}")
 install(DIRECTORY "${SILENCER_SHARED_DIR}/assets/" DESTINATION "${CMAKE_INSTALL_DATADIR}/silencer")
+install(DIRECTORY "${SILENCER_SHARED_DIR}/fonts/" DESTINATION "${CMAKE_INSTALL_DATADIR}/silencer/fonts"
+        FILES_MATCHING PATTERN "*.otf")
 install(FILES "${SILENCER_SHARED_DIR}/icons/icon_16.png"  DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/icons/hicolor/16x16/apps"   RENAME "silencer.png")
 install(FILES "${SILENCER_SHARED_DIR}/icons/icon_32.png"  DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/icons/hicolor/32x32/apps"   RENAME "silencer.png")
 install(FILES "${SILENCER_SHARED_DIR}/icons/icon_64.png"  DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/icons/hicolor/64x64/apps"   RENAME "silencer.png")

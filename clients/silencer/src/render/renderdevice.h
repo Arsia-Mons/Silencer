@@ -3,6 +3,14 @@
 
 #include "shared.h"
 
+#include <vector>
+
+namespace silencer {
+namespace cppx_ui {
+struct GpuUiProgram;
+}
+} // namespace silencer
+
 // Abstract rendering interface. All game code talks through this; GPU-specific
 // types never leak into game code. SDL3GPUBackend is the Phase 2/3 implementation.
 // Console backends (NVN, GNM, D3D12) slot in without touching game code.
@@ -29,6 +37,40 @@ public:
 	// Copy the 8-bit indexed pixel buffer for the current frame.
 	// Upload is deferred to Present(); pixels must remain valid until then.
 	virtual void UploadFrame(const Uint8 *indexed_pixels, int w, int h) = 0;
+
+	// Queue a premultiplied-RGBA8 UI overlay (the cppx renderer bridge, SIL-11)
+	// to be composited over the final frame. `w*h*4` tightly-packed bytes;
+	// upload deferred to Present(), pixels must stay valid until then. Default
+	// no-op (TUI / headless ignore it). Pass null/0 to clear the overlay.
+	//
+	// `global_alpha` (SIL-219) scales the whole layer's opacity in lockstep with
+	// the game's FADEOUT palette fade so the cppx UI fades in/out together with
+	// the world on screen transitions. The buffer is PREMULTIPLIED, so dimming
+	// multiplies ALL four channels by the fraction. 1.0 (the default, at rest)
+	// is a no-op — the overlay composites byte-for-byte as uploaded.
+	virtual void UploadUiFrame(const Uint8 * /*rgba*/, int /*w*/, int /*h*/,
+	                           float /*global_alpha*/ = 1.0f) {}
+
+	// SIL-240: render the cppx UI as a GPU geometry program instead of a
+	// CPU-rasterized, full-window RGBA upload. Backends that draw the UI on the
+	// GPU return true from SupportsUiGeometry() and consume the program in
+	// Present(); the cppx composition root then builds geometry instead of
+	// software-rastering. `global_alpha` is the FADEOUT fraction (SIL-219),
+	// applied as a GPU multiply at composite time rather than a per-pixel CPU
+	// dim. The program is owned by the cppx host and must stay valid until the
+	// next Present(). Default no-op (headless/TUI keep the UploadUiFrame path).
+	virtual bool SupportsUiGeometry() const { return false; }
+	virtual void SubmitUiFrame(const silencer::cppx_ui::GpuUiProgram & /*program*/,
+	                           float /*global_alpha*/ = 1.0f) {}
+
+	// Capture the final composited frame (world + UI). Arm with RequestCapture()
+	// before a Present(); afterwards TakeCapturedFrame() yields the swapchain
+	// pixels as tightly-packed RGBA8 (out = w*h*4 bytes), returning false if no
+	// capture is available (default backends don't capture — the screenshot op
+	// falls back to the indexed Surface).
+	virtual void RequestCapture() {}
+	virtual bool TakeCapturedFrame(std::vector<Uint8> & /*rgba*/, int & /*w*/,
+	                               int & /*h*/) { return false; }
 
 	// Flush all pending work: uploads, compute, render passes, swap buffers.
 	// Skips the render pass silently when the window is minimized.

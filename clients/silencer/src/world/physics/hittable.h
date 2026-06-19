@@ -17,6 +17,7 @@ public:
 	bool IsAlive() const { return health > 0; }
 	Uint16 GetHealth() const { return health; }
 	Uint16 GetMaxHealth() const { return maxhealth; }
+	Uint16 GetShield() const { return shield; }
 	void ApplyDamage(Uint16 dmg) { health = (health > dmg) ? health - dmg : 0; }
 
 	// Set both health and maxhealth together (e.g. during actor init).

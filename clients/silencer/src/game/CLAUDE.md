@@ -9,7 +9,7 @@ internals — use `World` and its subsystems for that.
 
 | Dir | What it owns |
 |---|---|
-| `loop/` | `Game::Loop()` — the per-frame pump: polls SDL events, dispatches input, ticks world, renders UI, drives screen transitions |
+| `loop/` | `Game::Loop()` — the per-frame pump: polls SDL events, dispatches input, ticks world, renders the cppx UI frame, drives the gameplay state machine |
 | `init/` | `Game::Init()` — SDL setup, window creation, GAS load, SDL hints (including `SDL_HINT_ENABLE_SCREEN_KEYBOARD`) |
 | `tick/` | Per-state tick handlers split by `GameState`: `tick_ingame`, `tick_hostjoin`, `tick_singleplayer`, `tick_replay`, `tick_misc` |
 | `session/` | `GameSession` — load/unload map, join/leave/spectate game, ambience mixer, map downloader |
@@ -18,7 +18,7 @@ internals — use `World` and its subsystems for that.
 | `actor/` | `Team` actor helpers, stats |
 | `input/` | `GameInput` — raw SDL event → keybind action mapping |
 | `render/` | `GameRenderer` — SDL3 GPU backend, surface resize, vsync, `kLegacyRenderWidth/Height` |
-| `ui/` | `GameUiPipeline` — Clay UI frame lifecycle, client UI dispatch, `SDL_StartTextInput` gating |
+| `ui/` | `GameUiPipeline` — the cppx UI composition root: builds the global provider chain each frame, drives the retained `client::ui::UiPipeline` via `PipelineHost`, projects the session phase (`session_phase.h`), and stashes what `GameRenderer::Present` submits — a `GpuUiProgram` (windowed GPU path, SIL-240) or the packed RGBA frame (CPU path) |
 | `replay/` | Replay recorder/playback |
 
 ## Key boundaries
@@ -27,9 +27,12 @@ internals — use `World` and its subsystems for that.
   and `world.DoNetwork()` but does not reach into world subsystems directly.
 - `GameSession` is the only place that calls `world.map.Load*` and
   `world.UnloadGame()`.
-- `GameUiPipeline` owns `SDL_StartTextInput` / `SDL_StopTextInput` — call
-  `clientUi.Interactions().HasTextInputFocus()` to gate them; never call
-  SDL text input functions elsewhere.
+- `GameUiPipeline` is the UI composition root and the only owner of
+  `SDL_StartTextInput` / `SDL_StopTextInput` gating; the cppx `ClientUi`
+  exposes `wants_text_input()` as the gate seam (text-input wiring lands with
+  the interactive cppx screens). Never call SDL text-input functions
+  elsewhere. `GameUiPipeline` does NOT mount UI screens — the always-mounted
+  cppx `AppRoot` maps the projected session phase onto the owning screen.
 - `GameRenderer` owns `kLegacyRenderWidth` / `kLegacyRenderHeight` (640/480)
   as `inline constexpr` in `render/game_renderer.h`. Import from there;
   do not redefine locally.

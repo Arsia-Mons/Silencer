@@ -1,0 +1,67 @@
+#include "client/ui/components/text/body_text.h"
+
+#include "ui/components/text.h"
+
+#include "client/ui/components/tokens.h"
+
+namespace silencer {
+
+using ::ui::components::Text;
+using ::ui::components::TextProps;
+
+::ui::UiElement BodyText(const BodyTextProps &props) {
+  // All body variants render in the Body face at its native em; the variant
+  // selects color + box height (the slate point-size deltas were inventions).
+  float height = 16.5f;
+  ::ui::Color color = tokens::kTextBody;
+  switch (props.variant) {
+  case BodyTextVariant::Body:
+    height = 16.5f;
+    color = tokens::kTextBody;
+    break;
+  case BodyTextVariant::Strong:
+    height = 18.0f;
+    color = tokens::kTextWeaponName;
+    break;
+  case BodyTextVariant::Message:
+    height = 18.0f;
+    color = tokens::kTextBodyMuted;
+    break;
+  case BodyTextVariant::Detail:
+    height = 16.5f;
+    color = tokens::kTextWeaponDetail;
+    break;
+  case BodyTextVariant::Summary:
+    height = 18.0f;
+    color = tokens::kTextBody;
+    break;
+  }
+  switch (props.tone) {
+  case BodyTextTone::Default:
+    break;
+  case BodyTextTone::Muted:
+    color = tokens::kTextBodyMuted;
+    break;
+  case BodyTextTone::Disabled:
+    color = tokens::kTextWeaponDetailOff;
+    break;
+  case BodyTextTone::Warning:
+    color = tokens::kTextVersion;
+    break;
+  case BodyTextTone::Prose:
+    color = tokens::kTextProse;
+    break;
+  }
+  // Prose (the cc detail/lore tone) is origin's BodySm: bank 133 tracked at
+  // advance 7 instead of Body's 6.
+  uint16_t face = props.tone == BodyTextTone::Prose ? tokens::kFaceBodySm
+                                                    : tokens::kFaceBody;
+  return <Text
+    key={props.key}
+    value={props.value}
+    layout={{.height = ::ui::Length::points(height)}}
+    style={tokens::text_patch(color, tokens::kFontBodyEm, face, tokens::kLineBody)}
+  />
+}
+
+} // namespace silencer

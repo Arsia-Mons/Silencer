@@ -25,7 +25,7 @@ void Hittable::Serialize(bool write, Serializer & data, Serializer * old){
 	data.Serialize(write, hity, old);
 }
 
-void Hittable::Tick(Object & object, World & world){
+void Hittable::Tick(Object &, World &){
 	if(state_hit){
 		state_hit++;
 	}

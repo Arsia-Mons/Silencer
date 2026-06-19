@@ -1,0 +1,138 @@
+{
+  "source_capture": "/tmp/cppx_uplift_ingame_chat_20260612",
+  "visual_gate": "bash tests/cli-agent/e2e/72_visual_regression_ingame.sh PASS",
+  "behavior_gate": "bash tests/cli-agent/e2e/77_ingame_chat_behavior.sh PASS",
+  "documented_masks": [
+    [
+      235,
+      419,
+      406,
+      479
+    ],
+    [
+      0,
+      296,
+      640,
+      340
+    ],
+    [
+      624,
+      0,
+      640,
+      419
+    ]
+  ],
+  "ingame_chat_open": {
+    "panel_constants_from_origin": "x=400 y=280 w=231 chrome_h=70 text_x=10 text_y=10 line_step=10",
+    "compare": {
+      "crop": [
+        380,
+        270,
+        640,
+        370
+      ],
+      "changed_px": 209,
+      "changed_px_outside_documented_masks": 35,
+      "changed_px_inside_documented_masks": 174,
+      "unmasked_diff_bbox_abs": [
+        475,
+        270,
+        539,
+        294
+      ]
+    },
+    "current_panel_greenish_bbox": {
+      "crop": [
+        390,
+        275,
+        640,
+        355
+      ],
+      "greenish_bbox_current": [
+        390,
+        278,
+        634,
+        349
+      ],
+      "greenish_px_current": 2170
+    }
+  },
+  "ingame_chat_history": {
+    "panel_constants_from_origin": "same panel; two seeded lines and no active compose",
+    "compare": {
+      "crop": [
+        380,
+        270,
+        640,
+        370
+      ],
+      "changed_px": 189,
+      "changed_px_outside_documented_masks": 18,
+      "changed_px_inside_documented_masks": 171,
+      "unmasked_diff_bbox_abs": [
+        471,
+        270,
+        579,
+        295
+      ]
+    },
+    "current_panel_greenish_bbox": {
+      "crop": [
+        390,
+        275,
+        640,
+        355
+      ],
+      "greenish_bbox_current": [
+        390,
+        278,
+        634,
+        349
+      ],
+      "greenish_px_current": 2730
+    }
+  },
+  "ingame_messages": {
+    "origin_anchor": "base tick + 94, message_i==94, type 0; liney=60, title advance=11, lineheight=20",
+    "compare": {
+      "crop": [
+        70,
+        50,
+        570,
+        125
+      ],
+      "changed_px": 134,
+      "changed_px_outside_documented_masks": 134,
+      "changed_px_inside_documented_masks": 0,
+      "unmasked_diff_bbox_abs": [
+        74,
+        50,
+        567,
+        124
+      ]
+    },
+    "high_blue_text_mask": {
+      "crop": [
+        70,
+        50,
+        570,
+        125
+      ],
+      "current_text_bbox": [
+        156,
+        60,
+        483,
+        96
+      ],
+      "golden_text_bbox": [
+        156,
+        60,
+        483,
+        96
+      ],
+      "current_text_px": 2244,
+      "golden_text_px": 2244,
+      "text_mask_xor_px": 0
+    }
+  }
+}

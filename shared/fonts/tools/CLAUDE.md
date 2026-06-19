@@ -20,6 +20,7 @@ Four OpenType fonts, one per bitmap font bank:
 | 132  | `shared/fonts/silencer-tiny.otf`     |
 | 133  | `shared/fonts/silencer-ui.otf`       |
 | 134  | `shared/fonts/silencer-ui-large.otf` |
+| 135  | `shared/fonts/silencer-135.otf`      |
 | 136  | `shared/fonts/silencer-title.otf`    |
 
 Each font has both:

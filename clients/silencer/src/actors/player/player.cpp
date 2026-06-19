@@ -325,10 +325,10 @@ void Player::Tick(World & world){
 					}
 					char temp[256];
 					if(killedself){
-						sprintf(temp, "%s committed suicide", world.lobby.GetUserInfo(peer->accountid)->DisplayName());
+						snprintf(temp, sizeof temp,"%s committed suicide", world.lobby.GetUserInfo(peer->accountid)->DisplayName());
 						peer->stats.suicides++;
 					}else{
-						sprintf(temp, "%s was killed by %s", world.lobby.GetUserInfo(peer->accountid)->DisplayName(), killedby);
+						snprintf(temp, sizeof temp,"%s was killed by %s", world.lobby.GetUserInfo(peer->accountid)->DisplayName(), killedby);
 						peer->stats.deaths++;
 					}
 					world.ShowStatus(temp, 160, true);
@@ -572,7 +572,7 @@ void Player::Tick(World & world){
 			if(peer && !world.intutorialmode){
 				User * user = world.lobby.GetUserInfo(peer->accountid);
 				char text[128];
-				sprintf(text, "Secret picked up by\n%s", user->DisplayName());
+				snprintf(text, sizeof text,"Secret picked up by\n%s", user->DisplayName());
 				world.ShowMessage(text, 128, 2, true);
 				peer->stats.secretspickedup++;
 			}
@@ -582,14 +582,12 @@ void Player::Tick(World & world){
 				if(state != DEAD && state != DYING){
 					peer->stats.secretsreturned++;
 					Team * team = GetTeam(world);
-					bool stolen = false;
 					if(team && secretteamid != team->id){
 						peer->stats.secretsstolen++;
-						stolen = true;
 					}
 				}else{
 					char text[128];
-					sprintf(text, "%s dropped a secret", user->DisplayName());
+					snprintf(text, sizeof text,"%s dropped a secret", user->DisplayName());
 					if(!world.intutorialmode){
 						world.ShowMessage(text, 128, 3, true);
 					}
@@ -2787,10 +2785,10 @@ void Player::HandleHit(World & world, Uint8 x, Uint8 y, Object & projectile){
 			}
 			char temp[256];
 			if(killedself){
-				sprintf(temp, "%s committed suicide", world.lobby.GetUserInfo(peer->accountid)->DisplayName());
+				snprintf(temp, sizeof temp,"%s committed suicide", world.lobby.GetUserInfo(peer->accountid)->DisplayName());
 				peer->stats.suicides++;
 			}else{
-				sprintf(temp, "%s was killed by %s", world.lobby.GetUserInfo(peer->accountid)->DisplayName(), killedby);
+				snprintf(temp, sizeof temp,"%s was killed by %s", world.lobby.GetUserInfo(peer->accountid)->DisplayName(), killedby);
 				peer->stats.deaths++;
 			}
 			world.ShowStatus(temp, 160, true);
@@ -2902,7 +2900,7 @@ void Player::HandleDisconnect(World & world, Uint8 peerid){
 			User * user = world.lobby.GetUserInfo(peer->accountid);
 			if(user){
 				char temp[256];
-				sprintf(temp, "%s has left the game", user->DisplayName());
+				snprintf(temp, sizeof temp,"%s has left the game", user->DisplayName());
 				world.ShowStatus(temp, 176, true);
 				Team * team = GetTeam(world);
 				if(team){
@@ -2915,7 +2913,7 @@ void Player::HandleDisconnect(World & world, Uint8 peerid){
 	}
 }
 
-void Player::OnDestroy(World & world){
+void Player::OnDestroy(World &){
 	if(ai){
 		delete ai;
 		ai = 0;
@@ -3835,7 +3833,7 @@ Projectile * Player::Fire(World & world, Uint8 direction){
 	return projectile;
 }
 
-bool Player::FireDelayPassed(World & world){
+bool Player::FireDelayPassed(World &){
 	if(weaponfirecool == 0){
 		return true;
 	}
@@ -4336,7 +4334,7 @@ bool Player::PickUpItem(World & world, PickUp & pickup){
 			}
 			if(islocalplayer){
 				char temp[256];
-				sprintf(temp, "Picked up %d files", filespickedup);
+				snprintf(temp, sizeof temp,"Picked up %d files", filespickedup);
 				world.ShowStatus(temp);
 			}
 			effecthacking = true;
@@ -4353,7 +4351,7 @@ bool Player::PickUpItem(World & world, PickUp & pickup){
 			}
 			if(islocalplayer){
 				char temp[256];
-				sprintf(temp, "Picked up %d Laser ammo", pickup.quantity);
+				snprintf(temp, sizeof temp,"Picked up %d Laser ammo", pickup.quantity);
 				world.ShowStatus(temp);
 			}
 			{ auto _r = ResolveSound(GASLoader::Get().player.soundReload, world.resources); if (_r.chunk) EmitSound(world, _r.chunk, static_cast<int>(96 * _r.volume), false, 2); };
@@ -4368,7 +4366,7 @@ bool Player::PickUpItem(World & world, PickUp & pickup){
 			}
 			if(islocalplayer){
 				char temp[256];
-				sprintf(temp, "Picked up %d Rocket ammo", pickup.quantity);
+				snprintf(temp, sizeof temp,"Picked up %d Rocket ammo", pickup.quantity);
 				world.ShowStatus(temp);
 			}
 			{ auto _r = ResolveSound(GASLoader::Get().player.soundReload, world.resources); if (_r.chunk) EmitSound(world, _r.chunk, static_cast<int>(96 * _r.volume), false, 2); };
@@ -4383,7 +4381,7 @@ bool Player::PickUpItem(World & world, PickUp & pickup){
 			}
 			if(islocalplayer){
 				char temp[256];
-				sprintf(temp, "Picked up %d Flamer ammo", pickup.quantity);
+				snprintf(temp, sizeof temp,"Picked up %d Flamer ammo", pickup.quantity);
 				world.ShowStatus(temp);
 			}
 			{ auto _r = ResolveSound(GASLoader::Get().player.soundReload, world.resources); if (_r.chunk) EmitSound(world, _r.chunk, static_cast<int>(96 * _r.volume), false, 2); };
@@ -4438,7 +4436,7 @@ bool Player::PickUpItem(World & world, PickUp & pickup){
 			{ auto _r = ResolveSound(GASLoader::Get().player.soundReload, world.resources); if (_r.chunk) EmitSound(world, _r.chunk, static_cast<int>(96 * _r.volume), false, 2); };
 			if(islocalplayer){
 				char temp[256];
-				sprintf(temp, "Picked up %d %s", pickup.quantity, invname);
+				snprintf(temp, sizeof temp,"Picked up %d %s", pickup.quantity, invname);
 				world.ShowStatus(temp);
 			}
 		}else{
@@ -4466,7 +4464,7 @@ bool Player::PickUpItem(World & world, PickUp & pickup){
 						User * user = world.lobby.GetUserInfo(peer->accountid);
 						username = user->DisplayName();
 					}
-					sprintf(text, "NEUTRON BOMB\nACTIVATION IN\n15 SECONDS\n\nACTIVATED BY\n%s", username);
+					snprintf(text, sizeof text,"NEUTRON BOMB\nACTIVATION IN\n15 SECONDS\n\nACTIVATED BY\n%s", username);
 					world.ShowMessage(text, 128, 4, true);
 					//AddInventoryItem(INV_NEUTRONBOMB);
 				}break;
@@ -4500,7 +4498,7 @@ bool Player::PickUpItem(World & world, PickUp & pickup){
 			}
 			if(islocalplayer){
 				char temp[256];
-				sprintf(temp, "%s", powerupname);
+				snprintf(temp, sizeof temp,"%s", powerupname);
 				world.ShowStatus(temp);
 			}
 			{ auto _r = ResolveSound(GASLoader::Get().player.soundPowerUp, world.resources); if (_r.chunk) EmitSound(world, _r.chunk, static_cast<int>(96 * _r.volume), false, 2); };

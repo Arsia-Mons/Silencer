@@ -1,0 +1,117 @@
+#include "client/ui/screens/message_modal.h"
+
+#include "client/ui/components/actions/actions.h"
+#include "client/ui/components/layout/layout.h"
+#include "client/ui/components/text/text.h"
+#include "client/ui/components/tokens.h"
+#include "client/ui/hooks/use_chrome.h"
+#include "client/ui/hooks/use_navigation.h"
+#include "ui/components/box.h"
+#include "ui/components/text.h"
+#include "ui/runtime/react.h"
+
+#include <functional>
+#include <utility>
+
+namespace client::ui {
+namespace {
+
+using namespace silencer;
+using ::ui::children;
+using ::ui::components::Box;
+using ::ui::components::BoxProps;
+using ::ui::components::Text;
+using ::ui::components::TextProps;
+
+constexpr float kDialogW = 352.0f;
+constexpr float kDialogH = 178.0f;
+constexpr float kDialogPadX = 34.0f;
+constexpr float kDialogPadY = 44.0f;
+constexpr float kMessageW = kDialogW - kDialogPadX * 2.0f;
+
+struct MessageModalProps {
+  const char *title = "";
+  const char *message = "";
+  std::function<void()> on_dismiss = {};
+};
+
+::ui::UiElement ModalMessageText(const char *value) {
+  ::ui::StyleStatePatch text_style{};
+  text_style.base = ::ui::patch().text(::ui::TextVisual{
+      .color = tokens::kTextSubtitle,
+      .font_id = tokens::kFaceLarge,
+      .font_size = tokens::kFontLarge,
+      .wrap = ::ui::TextWrap::Words,
+      .line_height = tokens::kLineLarge,
+  });
+  TextProps props{};
+  props.key = "message";
+  props.value = value;
+  props.layout.width = ::ui::Length::points(kMessageW);
+  props.style = text_style;
+  return Text(props);
+}
+
+// SIL-98: origin/main message modal — the bank-40 idx4 dialog sprite (no slate
+// card, no title heading), a single Large-faced message line, and a chrome OK
+// button. The modal stays a CenteredOverlay (focus-trapped Dialog).
+::ui::UiElement MessageModalView(const MessageModalProps &props) {
+  Navigation nav = use_navigation();
+  ChromeTextures chrome = use_chrome();
+  std::function<void()> dismiss = [nav, on_dismiss = props.on_dismiss]() {
+    if (nav.pop_current)
+      nav.pop_current();
+    if (on_dismiss)
+      on_dismiss();
+  };
+
+  ::ui::StylePatch panel_style =
+      chrome.dialog_msg ? tokens::image_patch_cover(chrome.dialog_msg)
+                        : tokens::panel_patch(tokens::kSurfacePanel,
+                                              tokens::kBorderPanel);
+
+  return <ScreenLayout key="root" variant={ScreenLayoutVariant::CenteredOverlay}>
+    <Box
+      key="panel"
+      layout={::ui::LayoutStyle{
+        .direction = ::ui::FlexDirection::Column,
+        .align_items = ::ui::AlignItems::Center,
+        .justify_content = ::ui::JustifyContent::Center,
+        .width = ::ui::Length::points(kDialogW),
+        .height = ::ui::Length::points(kDialogH),
+        .padding = {kDialogPadX, kDialogPadX, kDialogPadY, kDialogPadY},
+        .gap = 18.0f}}
+      style={panel_style}
+    >
+      {ModalMessageText(props.message)}
+      <AppButton
+        key="ok"
+        controlId="MessageModalOk"
+        variant={AppButtonVariant::Chrome}
+        size={AppButtonSize::Sm}
+        defaultFocused={true}
+        label="OK"
+        onPress={dismiss}
+      />
+    </Box>
+  </ScreenLayout>
+}
+
+} // namespace
+
+bool MessageModalScreen::build_element(::ui::UiElementFrame &,
+                                       ::ui::UiElement *out) {
+  if (!out)
+    return false;
+  *out = ::ui::component(
+      "MessageModal",
+      MessageModalProps{
+          .title = title_.c_str(),
+          .message = message_.c_str(),
+          .on_dismiss = on_dismiss_,
+      },
+      MessageModalView, "message-modal");
+  return true;
+}
+
+} // namespace client::ui

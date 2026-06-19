@@ -9,6 +9,7 @@ same fonts (and the same colors via CSS `color:`) the game uses.
 | `silencer-tiny.otf`     | 132         | 5px       | 4px     | HUD digits (`DrawTinyText`) |
 | `silencer-ui.otf`       | 133         | 11px      | 7px     | Main UI text                |
 | `silencer-ui-large.otf` | 134         | 13px      | 9px     | Toggle labels / headers     |
+| `silencer-135.otf`      | 135         | 17px      | 8px     | Screen titles / headings    |
 | `silencer-title.otf`    | 136         | 24px      | 16px    | Announcement titles         |
 
 ## Source of truth
@@ -17,7 +18,7 @@ These `.otf` files are **generated artifacts** — never hand-edit
 them. Source data lives in:
 
 - `shared/assets/BIN_SPR.DAT` (sprite bank counts)
-- `shared/assets/bin_spr/SPR_{132,133,134,136}.BIN` (glyph bitmaps)
+- `shared/assets/bin_spr/SPR_{132,133,134,135,136}.BIN` (glyph bitmaps)
 - `shared/assets/PALETTE.BIN` (palette ramp definitions)
 
 To regenerate after the source bitmaps change:

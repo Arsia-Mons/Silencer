@@ -86,6 +86,14 @@ struct GamepadState {
 // is [-32768, 32767]; we treat |v| > AXIS_DEADZONE as held.
 static constexpr int16_t AXIS_DEADZONE = 16384;
 
+// Binding shape caps for the rows-of-combos model. An action holds an OR-list
+// of up to COMBO_CAP combos; each combo is an AND-chord of up to CHORD_CAP
+// keys. Over-cap rows are rejected (never truncated) at every funnel that
+// admits bindings — profile load and CLI put — so a hand-edited or malformed
+// profile can't smuggle an unbounded chord/combo past the editor's surface.
+static constexpr int COMBO_CAP = 4; // max OR-combos per action
+static constexpr int CHORD_CAP = 3; // max AND-keys per combo
+
 class KeyMap {
 public:
 	// Human-readable label for an SDL scancode, e.g. "Space", "F5", "Up".

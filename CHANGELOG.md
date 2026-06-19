@@ -4,6 +4,21 @@ All notable changes to Silencer are documented here.
 
 ## [Unreleased]
 
+## [v00060] — 2026-06-17
+
+### Game client
+
+- Migrated the entire client UI from the Clay layout engine to the cppx
+  retained-mode UI engine (#267). Every screen was rebuilt on the new engine:
+  the main menu, lobby connect, the lobby, character create, options, and the
+  in-game HUD.
+
+### Lobby
+
+- Re-baselined the wire-protocol fingerprint guard (#282). An incidental no-op
+  edit to `lobby.cpp` tripped `TestWireProtocolFingerprint`; the wire protocol
+  is unchanged, so only the stored fingerprint was updated.
+
 ## [v00059] — 2026-06-11
 
 ### Game client

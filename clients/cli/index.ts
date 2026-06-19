@@ -22,11 +22,16 @@ function usage(): never {
       `       silencer-cli resize --w 1280 --h 720\n` +
       `       silencer-cli click --label "OPTIONS"\n` +
       `       silencer-cli click_at --x 320 --y 240\n` +
+      `       silencer-cli pointer_down --label "Connect To Lobby"   (hold press; or --x N --y N)\n` +
+      `       silencer-cli pointer_up\n` +
       `       silencer-cli set_text --label TEXT_ID --text "hi"\n` +
       `       silencer-cli set_text --uid 1 --text "alice"   (textbox or textinput)\n` +
       `       silencer-cli select --label LISTBOX --index 0\n` +
       `       silencer-cli scroll --label "Controls List" [--amount 3]\n` +
-      `       silencer-cli show_password_modal\n` +
+      `       silencer-cli key --key enter|escape|up|down|left|right|tab|shift-tab|shift+tab|backspace|<char>\n` +
+      `       silencer-cli show_password_modal [--title TEXT]\n` +
+      `       silencer-cli show_message_modal --title TEXT --message TEXT\n` +
+      `       silencer-cli show_update_screen [--phase prompting|downloading|failed]\n` +
       `       silencer-cli password_modal_result\n` +
       `       silencer-cli back\n` +
       `       silencer-cli screenshot [--out /path/x.png]\n` +
@@ -108,6 +113,9 @@ const STRING_FLAGS: Record<string, Record<string, Set<string>>> = {
     use: new Set(["profile"]),
     new: new Set(["profile", "from"]),
     delete: new Set(["profile"]),
+    // capture: --op begin|feed|confirm|cancel|status; --binding "KEY:K"/"PAD:south";
+    // --action stays a string id (e.g. "fire").
+    capture: new Set(["op", "action", "binding"]),
   },
   gas: {
     validate: new Set(["dir"]),
@@ -130,9 +138,16 @@ const STRING_FLAGS: Record<string, Record<string, Set<string>>> = {
 const STRING_FLAGS_NO_SUBOP: Record<string, Set<string>> = {
   click: new Set(["label"]),
   ingame_ui_mode: new Set(["mode", "chat_line"]),
-  set_text: new Set(["label"]),
+  set_text: new Set(["label", "text"]),
   select: new Set(["label"]),
   scroll: new Set(["label"]),
+  pointer_down: new Set(["label"]),
+  // `key` values like "enter"/"escape" are names, and single-digit keys ("1")
+  // must stay strings so the C++ handler reads them as typed characters.
+  key: new Set(["key"]),
+  show_password_modal: new Set(["title"]),
+  show_message_modal: new Set(["title", "message"]),
+  show_update_screen: new Set(["phase"]),
 };
 // Bindings within VARIADIC_FLAGS that accept comma-separated chord syntax:
 // `--bindings KEY:Up,KEY:Left` becomes JSON `[["KEY:Up","KEY:Left"]]` (an

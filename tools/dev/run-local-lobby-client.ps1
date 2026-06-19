@@ -42,9 +42,10 @@ function Wait-ForTcp($hostName, $port, $process, $stdoutPath, $stderrPath) {
 
 function Get-ClientBinary($clientDir, $preset) {
     $buildDir = switch ($preset) {
-        'win-ninja'         { Join-Path $clientDir 'build' }
-        'win-ninja-release' { Join-Path $clientDir 'build-release' }
-        'win-ninja-unity'   { Join-Path $clientDir 'build-unity' }
+        'win-ninja'          { Join-Path $clientDir 'build' }
+        'win-ninja-release'  { Join-Path $clientDir 'build-release' }
+        'win-ninja-unity'    { Join-Path $clientDir 'build-unity' }
+        'win-ninja-headless' { Join-Path $clientDir 'build-headless' }
     }
     $binary = Join-Path $buildDir 'Silencer.exe'
     if (-not (Test-Path $binary)) {
@@ -76,6 +77,13 @@ Write-Host "Building client ($Preset)..."
 if ($LASTEXITCODE -ne 0) { Fail "client build failed" }
 $clientBin = Get-ClientBinary $clientDir $Preset
 
+# The lobby spawns the dedicated server as `silencer -s`; build it headless
+# (no UI/SDL3_ttf), matching what deploy.yml ships to the prod lobby box.
+Write-Host "Building headless dedicated server (win-ninja-headless)..."
+& (Join-Path $clientDir 'build.ps1') 'win-ninja-headless'
+if ($LASTEXITCODE -ne 0) { Fail "headless server build failed" }
+$serverBin = Get-ClientBinary $clientDir 'win-ninja-headless'
+
 Write-Host "Building lobby..."
 Push-Location $lobbyDir
 try {
@@ -89,7 +97,7 @@ Write-Host "Starting lobby on 127.0.0.1:$LobbyPort..."
 $lobbyArgs = @(
     '-addr', ":$LobbyPort",
     '-db', "`"$lobbyDb`"",
-    '-game-binary', "`"$clientBin`"",
+    '-game-binary', "`"$serverBin`"",
     '-public-addr', '127.0.0.1',
     '-update-manifest=',
     '-player-auth-addr', ":$playerAuthPort",

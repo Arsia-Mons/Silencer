@@ -3,8 +3,10 @@ build-new/
 build-old/
 build-release/
 build-unity/
+build-headless/
 clients/silencer/build-release/
 clients/silencer/build-unity/
+clients/silencer/build-headless/
 test-update-host/
 test-updater.*.log
 update.json
@@ -69,4 +71,5 @@ cmake-build-*/
 
 clients/silencer/build_test/
 clients/silencer/installer/Output/
+clients/silencer/Testing/
 tools/refactor-baselines/

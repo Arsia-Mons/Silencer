@@ -1,5 +1,6 @@
 #include "playerai.h"
 #include <algorithm>
+#include <climits> // INT_MAX (GCC needs the explicit include)
 #include <map>
 #include "basedoor.h"
 #include "../gas/gasloader.h"

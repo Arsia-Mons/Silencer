@@ -22,10 +22,6 @@ before relying on the skill's content.
 
 - `cli/` — drive the Silencer game via the CLI agent control channel for
   end-to-end UI testing. Harness path: `.claude/skills/using-silencer-cli`.
-- `clay-ui-integration/` — design, implement, or audit the current Clay-backed
-  Silencer UI with correct `ClientUi`/`ClayService` lifecycle, responsive
-  primitives, `UiInteractionRegistry` actions, stable IDs, render dispatch, and
-  runtime verification.
 - `image-comparison-review/` — compare screenshots, video grabs, current
   captures, design references, and sprite frames by first stitching them into
   one side-by-side composite for reliable visual review. Harness paths:

@@ -26,6 +26,7 @@ poisoned cache. Don't hand-roll `rm`/reconfigure loops.
 | `win-ninja` (default) | Debug | `build/` | day-to-day |
 | `win-ninja-release` | Release | `build-release/` | |
 | `win-ninja-unity` | Release + `SILENCER_UNITY_BUILD=ON` | `build-unity/` | fastest clean build |
+| `win-ninja-headless` | Release + unity + `SILENCER_HEADLESS=ON` | `build-headless/` | dedicated-server build (no UI/Yoga/SDL3_ttf); the config `deploy.yml` ships to the lobby box |
 
 Names are shared across platforms even though `win-` is a misnomer
 off Windows. On Windows the preset is a real `CMakePresets.json`
@@ -69,6 +70,21 @@ local build means reconfiguring with the `-D` set).
   match the lobby's `-version` (which defaults to the same value);
   bump both together or the handshake fails. `CPACK_PACKAGE_VERSION`
   is installer metadata only — unrelated to the handshake.
+
+## cppx UI pipeline (Python3 build dependency)
+
+The UI is authored in `.cppx`/`.hx` (JSX-like C++) and transpiled to
+ordinary C++ at **build time** by `tools/cppx_transpile.py`, wired into
+CMake via `cmake/cppx_transpile.cmake`. Configure therefore requires
+`Python3` (`find_package(Python3 COMPONENTS Interpreter REQUIRED)`) — a
+hard build dependency; install it if configure errors with a missing
+Python3.
+
+Generated `.cpp`/`.h` land under `<build>/generated/cppx/`, are
+**gitignored, never committed**, and regenerate every build (same model
+as Unreal's UHT → `Intermediate/`). Authored sources are formatted by
+`tools/cppx_format.py`; the `cppx_format_check` CTest gates them
+(`ctest --test-dir <build> -R cppx_format_check`).
 
 ## vcpkg dependencies
 

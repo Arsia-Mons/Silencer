@@ -1,0 +1,67 @@
+{
+  "prompt_band": {
+    "box": [
+      150,
+      185,
+      490,
+      235
+    ],
+    "changed_px": 152,
+    "diff_bbox_abs": [
+      174,
+      185,
+      469,
+      234
+    ]
+  },
+  "full_prompt_context": {
+    "box": [
+      0,
+      150,
+      640,
+      260
+    ],
+    "changed_px": 686,
+    "diff_bbox_abs": [
+      0,
+      150,
+      629,
+      259
+    ]
+  },
+  "npc_mask_band_context": {
+    "box": [
+      0,
+      230,
+      640,
+      345
+    ],
+    "changed_px": 1813,
+    "diff_bbox_abs": [
+      0,
+      230,
+      639,
+      325
+    ]
+  },
+  "prompt_text_mask": {
+    "method": "golden quit_prompt vs golden hud_base, saturated prompt-blue pixels in expected prompt band",
+    "selected_px": 1828,
+    "same_rgb_px": 1828,
+    "different_rgb_px": 0,
+    "bbox_abs": [
+      184,
+      200,
+      453,
+      219
+    ]
+  },
+  "expected_prompt": {
+    "text": "Hit Enter To Quit",
+    "chars": 17,
+    "advance_px": 16,
+    "expected_x": 184,
+    "expected_y": 200,
+    "expected_w": 272
+  }
+}

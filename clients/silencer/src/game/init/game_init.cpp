@@ -30,14 +30,12 @@ Game::Game()
 	  gameUiPipeline(*this),
 	  gameSession(*this),
 	  currentlobbygameid(gameSession.CurrentLobbyGameIdRef()),
-	  joininggame(gameSession.JoiningGameRef()),
-	  screenContext(*this, world, renderer, world.lobby, gameInput.GetKeyMap(), updater,
-	                gameSession.AmbienceMixerRef(), gameSession.MapDownloaderRef(),
-	                gameRenderer.WindowRef(), gameRenderer.RenderDeviceRef()) {
+	  joininggame(gameSession.JoiningGameRef()) {
 	world.SetVersion(SILENCER_VERSION);
 	frames = 0;
 	fps = 0;
 	state = MAINMENU;
+	fadefromstate = MAINMENU;
 	stateisnew = true;
 	sharedstate = 0;
 	singleplayermessage = 0;
@@ -45,11 +43,6 @@ Game::Game()
 	minimized = false;
 	creategameclicked = false;
 	nextstateprocessed = false;
-#ifdef OUYA
-	quitscancode = SDL_SCANCODE_HOME;
-#else
-	quitscancode = SDL_SCANCODE_ESCAPE;
-#endif
 	chatEnterDebounce = false;
 	fullscreentoggled = false;
 	replayfile = 0;
@@ -123,7 +116,7 @@ bool Game::Load(char * cmdline){
 					printf("name: %s, techslots: %d\n", user->name, user->agency[0].techslots);*/
 					world.dedicatedserver.Start(lobbyaddress, atoi(lobbyport), atoi(gameid), atoi(accountid));
 					char filename[256];
-					sprintf(filename, "replays/%d.zsr", atoi(gameid));
+					snprintf(filename, sizeof filename, "replays/%d.zsr", atoi(gameid));
 					world.replay.BeginRecording(filename);
 					if(world.replay.IsRecording()){
 						world.replay.WriteHeader(world);

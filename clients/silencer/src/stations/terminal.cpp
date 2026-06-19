@@ -83,7 +83,7 @@ void Terminal::Tick(World & world){
 								if(peer){
 									if(!world.intutorialmode){
 										char text[256];
-										sprintf(text, "TOP SECRET AVAILABLE\n\nGovernment will be able to trace in %d seconds", tracetime);
+										snprintf(text, sizeof text, "TOP SECRET AVAILABLE\n\nGovernment will be able to trace in %d seconds", tracetime);
 										world.ShowMessage(text, 255, 0, true, peer);
 									}
 								}

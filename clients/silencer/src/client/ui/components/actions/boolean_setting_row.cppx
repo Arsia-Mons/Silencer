@@ -1,0 +1,56 @@
+#include "client/ui/components/actions/boolean_setting_row.h"
+
+#include "client/ui/components/actions/app_button.h"
+#include "client/ui/components/tokens.h"
+#include "client/ui/hooks/use_chrome.h"
+#include "ui/components/box.h"
+
+#include <functional>
+
+namespace silencer {
+
+using ::ui::children;
+using ::ui::components::Box;
+using ::ui::components::BoxProps;
+
+::ui::UiElement BooleanSettingRow(const BooleanSettingRowProps &props) {
+  client::ui::ChromeTextures chrome = client::ui::use_chrome();
+  const bool checked = props.checked;
+  std::function<void()> toggle = [on_change = props.on_change, checked]() {
+    if (on_change)
+      on_change(!checked);
+  };
+
+  const uint32_t left = checked ? chrome.toggle_l_on : chrome.toggle_l_off;
+  const uint32_t right = checked ? chrome.toggle_r_on : chrome.toggle_r_off;
+  // origin BooleanIndicator: two 20x33-virtual cells (30x49.5 logical),
+  // cover-fit, distinct sprites per side — never a mirrored single cell.
+  auto cell = ::ui::LayoutStyle{.width = ::ui::Length::points(30.0f),
+                                .height = ::ui::Length::points(49.5f)};
+
+  return <Box
+    key={props.key}
+    layout={::ui::LayoutStyle{
+      .direction = ::ui::FlexDirection::Row,
+      .align_items = ::ui::AlignItems::Center,
+      .gap = 36.0f}}
+  >
+    <AppButton
+      key="lbl"
+      controlId={props.control_id}
+      variant={AppButtonVariant::Oval}
+      size={AppButtonSize::Lg}
+      label={props.label}
+      onPress={toggle}
+    />
+    <Box
+      key="ind"
+      layout={::ui::LayoutStyle{.direction = ::ui::FlexDirection::Row, .margin = ::ui::EdgeSizes{props.ind_dx, {}, {}, {}}, .gap = 15.0f}}
+    >
+      <Box key="cl" layout={cell} style={tokens::image_patch_cover(left)} />
+      <Box key="cr" layout={cell} style={tokens::image_patch_cover(right)} />
+    </Box>
+  </Box>
+}
+
+} // namespace silencer
