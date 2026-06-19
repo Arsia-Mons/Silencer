@@ -128,6 +128,23 @@ constexpr int UI_MAX_DRAW_COMMANDS = UI_RETAINED_MAX_NODES * UI_MAX_CMDS_PER_NOD
 constexpr int UI_DRAW_TEXT_ARENA_BYTES = 8 * 1024;
 constexpr int UI_DRAW_GRAD_STOPS = 256;
 
+// A node holds at most this many clip/layer brackets open across its child
+// recursion: one LayerPush (group opacity) + one ClipPush (overflow clip). The
+// input field's own clip opens and closes within the node's own paint, before
+// the child loop, so it is never simultaneously open with these. Bump this if
+// you add a new per-node bracket kind — the reserve below depends on it.
+constexpr int UI_MAX_OPEN_BRACKETS_PER_NODE = 2;
+
+// Closing-bracket commands (ClipPop/LayerPop) draw from a reserved tail of the
+// command buffer so a content-saturated frame can still emit a matching pop for
+// every open clip/layer (INV4: clip/layer balance holds unconditionally). The
+// reserve covers the worst case — every level of the retained tree's max-depth
+// recursion holding all of its brackets open at once — so a dropped pop, and the
+// unbalanced LayerPush composite smudge it would cause, is structurally
+// impossible.
+constexpr int UI_DRAW_COMMANDS_RESERVE =
+    UI_MAX_OPEN_BRACKETS_PER_NODE * UI_RETAINED_MAX_DEPTH;
+
 struct DrawCommandList {
   DrawCommand commands[UI_MAX_DRAW_COMMANDS] = {};
   int count = 0;
@@ -135,11 +152,15 @@ struct DrawCommandList {
   int text_len_used = 0;
   GradientStop grad_arena[UI_DRAW_GRAD_STOPS] = {};
   int grad_count = 0;
-  int error_count = 0;
+  int dropped_count = 0; // degradation telemetry; never gates the frame
 
-  // Every variable-capacity write is bounds-checked; overflow bumps error_count
-  // and fails the frame (never a silent clamp/truncate).
+  // Fixed-capacity, defined-overflow writes (INV5): a full arena drops the one
+  // command and bumps dropped_count, never fails the frame. push() leaves the
+  // reserve for closing brackets; push_close() (ClipPop/LayerPop) may use it so
+  // balance always holds. Returns whether the command landed — callers gate the
+  // matching pop on the push's return, never abort the walk.
   bool push(const DrawCommand &command);
+  bool push_close(const DrawCommand &command);
   bool push_text(const char *bytes, uint16_t len, uint32_t *out_off);
   bool push_stops(const GradientStop *stops, uint8_t n, uint16_t *out_off);
   void reset(); // cursors only; never memset the arrays

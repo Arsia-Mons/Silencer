@@ -436,7 +436,7 @@ static bool client_ui_owns_retained_runtime_outputs(void) {
   // The live IR is the tagged-union DrawCommandList; the focused fill box emits
   // a Rect/Gradient fill carrying its node id.
   const ::ui::DrawCommandList &draw = client_ui.retained_command_list();
-  CHECK(draw.error_count == 0);
+  CHECK(draw.dropped_count == 0);
   CHECK(draw.count > 0);
   bool saw_button_fill = false;
   for (int i = 0; i < draw.count; ++i) {

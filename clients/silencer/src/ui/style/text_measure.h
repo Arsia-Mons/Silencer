@@ -12,7 +12,7 @@
 
 namespace ui {
 
-constexpr int UI_MAX_TEXT_LINES = 32; // sized for the lore paragraph (~23 wrapped lines); overflow => failed frame
+constexpr int UI_MAX_TEXT_LINES = 32; // sized for the lore paragraph (~23 wrapped lines); content beyond this truncates to what fits (graceful overflow, INV2)
 
 struct TextMetricsQuery {
   const char *utf8 = nullptr; // borrowed; points into the shared string arena

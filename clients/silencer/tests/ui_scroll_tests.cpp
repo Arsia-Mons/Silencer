@@ -80,7 +80,7 @@ bool clip_brackets_overflow_children() {
 
   static DrawCommandList list;
   CHECK(build_draw_command_list(tree, &list, 0));
-  CHECK(list.error_count == 0);
+  CHECK(list.dropped_count == 0);
 
   // Exactly one push + one pop, and the push carries the viewport's window rect.
   CHECK(count_kind(list, DrawCommandKind::ClipPush) == 1);
