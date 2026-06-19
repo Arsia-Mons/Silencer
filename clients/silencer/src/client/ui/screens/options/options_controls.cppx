@@ -56,7 +56,14 @@ constexpr float kViewportH = kRowH * 3.0f + kRowContentH; // 4 visible rows
   />
 }
 
-constexpr int kRebindTimeoutFrames = 72;
+// A waiting rebind (oval showing "-", no key pressed yet) auto-cancels after
+// this many idle frames so an abandoned capture can't strand the screen and
+// keep stealing input. ~10s at 60fps; the first device edge commits instead.
+constexpr int kRebindTimeoutFrames = 600;
+
+// Origin's waiting-for-input glyph: the target oval shows "-" until the new
+// key is pressed (controls_keybind_list.cpp: display = rebinding ? "-" : text).
+constexpr const char *kRebindWaitGlyph = "-";
 
 // Two bind slots joined by an And/Or connector. A 2-chip chord in combo 0 is
 // And (both keys pressed together — diagonal aim); separate combos are Or
@@ -208,6 +215,13 @@ struct OptionsControlsProps {
     return ::ui::empty();
 
   use_rebind_timeout(cap, kRebindTimeoutFrames);
+  // Origin commits the new binding on the first key/button press. The cppx
+  // capture state machine only ever committed from the headless control socket,
+  // so the in-game flow was dead: drive the commit here off the first captured
+  // edge. Mirrors use_rebind_timeout, which also issues a capture intent from
+  // build.
+  if (cap.capturing && !cap.pending_chips.empty() && cap.confirm_chord)
+    cap.confirm_chord();
 
   const int action_count = static_cast<int>(km.actions.size());
   OptionsCommit commit = use_options_commit(km.commit, km.revert);
@@ -221,11 +235,19 @@ struct OptionsControlsProps {
     const char *sid = ::ui::copy_string(("BindS" + std::to_string(i)).c_str());
     const char *label = ::ui::copy_string((a.label + ":").c_str());
     BindingView bv = binding_view(a);
-    const char *prim = bv.slot1.empty() ? nullptr
-                                        : ::ui::copy_string(bv.slot1.c_str());
-    const char *sec = bv.slot2.empty() ? nullptr
-                                       : ::ui::copy_string(bv.slot2.c_str());
     Action act = a.action;
+    // While this action's slot is armed for rebind, its oval shows "-" until
+    // the new key is pressed. Primary capture targets combo 0 (or -1 to append);
+    // the secondary "OR" slot is combo 1.
+    bool cap_here = cap.capturing && cap.target_action == act;
+    bool prim_wait = cap_here && cap.target_combo_index != 1;
+    bool sec_wait = cap_here && cap.target_combo_index == 1;
+    const char *prim = prim_wait ? kRebindWaitGlyph
+                       : bv.slot1.empty() ? nullptr
+                                          : ::ui::copy_string(bv.slot1.c_str());
+    const char *sec = sec_wait ? kRebindWaitGlyph
+                      : bv.slot2.empty() ? nullptr
+                                         : ::ui::copy_string(bv.slot2.c_str());
     std::function<void()> rb0 = [cap, km, act]() {
       if (cap.begin_capture)
         cap.begin_capture(act, rebind_combo_index(km, act));
