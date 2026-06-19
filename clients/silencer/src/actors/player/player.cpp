@@ -2720,9 +2720,9 @@ void Player::HandleHit(World & world, Uint8 x, Uint8 y, Object & projectile){
 	if(health == 0 && state != DYING && state != DEAD){
 		Peer * peer = GetPeer(world);
 		Object * owner = world.GetObjectFromId(projectile.ownerid);
+		bool killedself = false;
 		if(peer){
 			const char * killedby = "?";
-			bool killedself = false;
 			if(owner){
 				switch(owner->type){
 					case ObjectTypes::WALLDEFENSE:{
