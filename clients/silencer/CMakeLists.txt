@@ -46,6 +46,15 @@ if(APPLE)
 		endif()
 		list(APPEND bundle_extras "${f}")
 	endforeach()
+
+	# Bundle the cppx UI font .otf files under Contents/assets/fonts/ so the
+	# runtime resolver (ResolveFontDir via GetResDir()+"/fonts") finds them
+	# in the release .app instead of the CI build machine's source-tree path.
+	file(GLOB font_files "${SILENCER_SHARED_DIR}/fonts/*.otf")
+	foreach(f ${font_files})
+		set_source_files_properties("${f}" PROPERTIES MACOSX_PACKAGE_LOCATION "assets/fonts")
+		list(APPEND bundle_extras "${f}")
+	endforeach()
 endif()
 
 if(APPLE)
@@ -894,22 +903,34 @@ endif()
 target_link_libraries(${SILENCER_TARGET} minizip_dep)
 
 # Dev-build asset staging (Windows/Linux): copy shared/assets/ next to the
-# binary so the runtime fallback (`GetResDir() + "<subdir>/..."` in
-# `src/platform/os.cpp`) resolves without needing `cmake --install`. Affects
-# gas/, keybinds/, behaviortrees/, and any future runtime asset subdir;
-# without this every fresh build silently runs with empty GAS/keybind data.
-# macOS bakes assets into the .app bundle directly via the bundle_extras
-# list above, so this branch is no-op there.
+# binary so the runtime resolver (`GetResDir() + "<subdir>/..."`) finds the
+# game data without needing `cmake --install`. macOS bakes assets into the
+# .app bundle via the bundle_extras list above.
 if(NOT APPLE)
 	add_custom_command(TARGET ${SILENCER_TARGET} POST_BUILD
 		COMMAND ${CMAKE_COMMAND} -E copy_directory
 				"${SILENCER_SHARED_DIR}/assets"
 				"$<TARGET_FILE_DIR:${SILENCER_TARGET}>/assets"
 		COMMENT "Staging shared/assets/ next to ${SILENCER_TARGET}")
+
+	# The cppx UI .otf fonts are only loaded by the windowed client (via
+	# ResolveFontDir → SDL_GetBasePath()+"assets/fonts"). The headless
+	# dedicated server has no UI and never loads them, and the lobby Docker
+	# build context (services/lobby/Dockerfile) doesn't ship shared/fonts/ —
+	# so stage fonts only for full client builds.
+	if(NOT SILENCER_HEADLESS)
+		add_custom_command(TARGET ${SILENCER_TARGET} POST_BUILD
+			COMMAND ${CMAKE_COMMAND} -E copy_directory
+					"${SILENCER_SHARED_DIR}/fonts"
+					"$<TARGET_FILE_DIR:${SILENCER_TARGET}>/assets/fonts"
+			COMMENT "Staging shared/fonts/ next to ${SILENCER_TARGET}")
+	endif()
 endif()
 
 install(TARGETS "${SILENCER_TARGET}" RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}" BUNDLE DESTINATION "${CMAKE_INSTALL_BINDIR}")
 install(DIRECTORY "${SILENCER_SHARED_DIR}/assets/" DESTINATION "${CMAKE_INSTALL_DATADIR}/silencer")
+install(DIRECTORY "${SILENCER_SHARED_DIR}/fonts/" DESTINATION "${CMAKE_INSTALL_DATADIR}/silencer/fonts"
+        FILES_MATCHING PATTERN "*.otf")
 install(FILES "${SILENCER_SHARED_DIR}/icons/icon_16.png"  DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/icons/hicolor/16x16/apps"   RENAME "silencer.png")
 install(FILES "${SILENCER_SHARED_DIR}/icons/icon_32.png"  DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/icons/hicolor/32x32/apps"   RENAME "silencer.png")
 install(FILES "${SILENCER_SHARED_DIR}/icons/icon_64.png"  DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/icons/hicolor/64x64/apps"   RENAME "silencer.png")
