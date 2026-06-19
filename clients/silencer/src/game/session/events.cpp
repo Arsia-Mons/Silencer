@@ -203,6 +203,22 @@ bool Game::HandleSDLEvents() {
             if (gameUiPipeline.IsCapturingKeybind()) {
                 gameUiPipeline.FeedKeybindEdge({BindingDevice::Mouse,
                                                 (int)event.button.button, 0});
+            } else if (event.button.button == SDL_BUTTON_LEFT) {
+                // Latch the press EDGE from the event queue (sticky for the frame)
+                // so a click that begins and ends between two per-frame pointer
+                // polls is never dropped when the frame rate dips. Mirrors how
+                // keyboard confirm and the wheel already accumulate here.
+                ::ui::UiInputFrame &ui = gameUiPipeline.UiInput();
+                ui.pointer_pressed = true;
+                ui.source = ::ui::UiFocusSource::Mouse;
+            }
+            break;
+        case SDL_EVENT_MOUSE_BUTTON_UP:
+            if (!gameUiPipeline.IsCapturingKeybind() &&
+                event.button.button == SDL_BUTTON_LEFT) {
+                ::ui::UiInputFrame &ui = gameUiPipeline.UiInput();
+                ui.pointer_released = true;
+                ui.source = ::ui::UiFocusSource::Mouse;
             }
             break;
         case SDL_EVENT_GAMEPAD_BUTTON_DOWN:
