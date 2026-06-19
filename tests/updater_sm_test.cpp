@@ -31,3 +31,19 @@ TEST_CASE("VerifyOnly catches sha mismatch") {
     CHECK(Updater::VerifyFile(path, correct));
     CHECK_FALSE(Updater::VerifyFile(path, wrong));
 }
+
+// PumpStage2 (driven every frame from Game::Loop) must stay a no-op until the
+// worker actually reaches STAGING — otherwise it would spawn stage-2 mid-flight
+// or in steady state. The STAGING→spawn path itself runs a real process and is
+// covered by manual/e2e verification, not here.
+TEST_CASE("PumpStage2 does nothing before STAGING") {
+    Updater u;
+    u.PumpStage2();  // fresh updater is IDLE
+    CHECK(u.GetState() == Updater::IDLE);
+    CHECK_FALSE(u.IsStage2Spawned());
+
+    u.ForceState(Updater::DOWNLOADING);
+    u.PumpStage2();
+    CHECK(u.GetState() == Updater::DOWNLOADING);
+    CHECK_FALSE(u.IsStage2Spawned());
+}

@@ -1,6 +1,7 @@
 #include "updater.h"
 #include "updaterdownload.h"
 #include "updatersha256.h"
+#include "updaterstage2.h"
 #include "updaterzip.h"
 
 #include <cstdio>
@@ -30,7 +31,28 @@ Updater::~Updater() {
     if (worker.joinable()) worker.join();
 }
 
-void Updater::MarkStage2Spawned() { stage2spawned = true; }
+void Updater::PumpStage2() {
+    // stage2spawned/stage2attempted are touched only on the main thread (this
+    // function), so the post-handoff steady state needs no lock.
+    if (stage2spawned || stage2attempted) return;
+    std::string zip;
+    {
+        std::lock_guard<std::mutex> lk(mu);
+        if (state != STAGING) return;
+        stage2attempted = true;  // one-shot, even if the spawn below fails
+        zip = stage2zip;
+    }
+    fprintf(stderr, "[updater] launching stage-2 with zip=%s\n", zip.c_str());
+    if (UpdaterStage2::Launch(zip)) {
+        stage2spawned = true;  // Game::Loop sees this next and unwinds
+    } else {
+        std::lock_guard<std::mutex> lk(mu);
+        state = FAILED;
+        error = "Could not launch the updater";
+        fprintf(stderr, "[updater] stage-2 launch failed\n");
+    }
+}
+
 bool Updater::IsStage2Spawned() const { return stage2spawned; }
 
 void Updater::PresentUpdate(const std::string &u, const uint8_t s[32]) {
@@ -51,6 +73,7 @@ void Updater::Consent() {
         bytes_got = 0;
         bytes_total = 0;
         cancel_flag = false;  // reset under the lock, before worker starts
+        stage2attempted = false;  // let a fresh STAGING re-arm PumpStage2 (retry path)
         error.clear();
     }
     worker = std::thread(&Updater::Run, this);
@@ -177,11 +200,13 @@ void Updater::Run() {
         return;
     }
 
-    // 3. Hand off to stage-2. Caller (main loop) sees state=STAGING and
-    //    performs the exec + exit. We don't fork from the worker thread —
-    //    that needs to happen after SDL is torn down.
+    // 3. Hand off to stage-2. The main loop (Updater::PumpStage2) sees
+    //    state=STAGING and spawns the child + exits. We don't fork from the
+    //    worker thread — that needs to happen on the main thread, while SDL is
+    //    still owned, so ~Game can tear it down cleanly afterwards.
     {
         std::lock_guard<std::mutex> lk(mu);
+        stage2zip = zippath;
         state = STAGING;
     }
     fprintf(stderr, "[updater] download + verify ok, handing off to stage-2\n");
