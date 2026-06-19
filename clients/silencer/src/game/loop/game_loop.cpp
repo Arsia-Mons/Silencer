@@ -152,20 +152,23 @@ bool ViewedPlayerChatActive(Game & game){
 
 
 bool Game::Loop(void){
-	// Self-update stage-2 handoff (windowed client only — a dedicated server is
-	// updated out-of-band and must never fork a GUI client). When the updater
-	// worker reaches STAGING it has a verified build staged but can't fork itself
-	// — the spawn must run here on the main thread while we still own SDL.
-	// PumpStage2() spawns the child once and latches IsStage2Spawned(); we then
-	// unwind so ~Game() releases the audio/video device before the replacement
-	// client opens it (the child blocks on our PID until we exit).
+	// Check if we're updating the client
 	if(!headless) updater.PumpStage2();
+	// Close current client if we're ready to open the new version
 	if(updater.IsStage2Spawned()){
 		return false;
 	}
+
+	// Goodbye, Mr. Anderson.
 	if(quitRequested) return false;
+
+	// Process commands from CLI
 	DrainControlQueue();
+
+	// Get tick interval from GAS config
 	unsigned int wait = GASLoader::Get().gameengine.tickIntervalMs;
+
+	// Update window title every 1000ms
 	if(updatetitle){
 		if(!headless && gameRenderer.GetWindow()){
 			char title[128];
@@ -177,12 +180,15 @@ bool Game::Loop(void){
 		world.network.totalbytesread = 0;
 		world.network.totalbytessent = 0;
 	}
-	/*while(SDL_GetTicks() - lasttick <= wait){
-		//SDL_Delay(1);
-		world.DoNetwork();
-	}*/
+
+	// Mostly sends/receives data between client and server.
+	// Also does in-game state reconciliation.
 	world.DoNetwork();
+
+	// ms since SDL init
 	Uint64 tickcheck = SDL_GetTicks();
+
+	// Adjust tick speed for replay
 	if(world.replay.IsPlaying()){
 		wait = GASLoader::Get().gameengine.tickIntervalMs * world.replay.speed;
 		if(world.replay.ffmpeg && world.replay.ffmpegvideo){
@@ -193,26 +199,34 @@ bool Game::Loop(void){
 			world.replay.tick += 20; // 50 fps
 		}
 	}
+
+	// Tick until we've caught up
 	while(lasttick <= tickcheck && tickcheck - lasttick > wait){
-		//printf("%d\n", tickcheck - lasttick);
 		if(paused){
+			// Don't advance the sim if we've already caught up
 			bool budgetFrames = stepFramesRemaining > 0;
 			bool budgetMs = stepWallclockDeadlineMs > 0 && SDL_GetTicks() < stepWallclockDeadlineMs;
 			if(!budgetFrames && !budgetMs){
 				lasttick = tickcheck; // freeze the catch-up clock
 				break;
 			}
+
+			// To accommodate the CLI requesting multiple frames to execute
 			if(stepFramesRemaining > 0) --stepFramesRemaining;
 			if(stepWallclockDeadlineMs > 0 && SDL_GetTicks() >= stepWallclockDeadlineMs){
 				stepWallclockDeadlineMs = 0;
 			}
 		}
+
+		// Camera for thrown object or projectile
 		world.systemcameraactive[0] = false;
+		// Camera for remote detonator or remote camera
 		world.systemcameraactive[1] = false;
+
+		// Reconcile again
 		world.DoNetwork();
-		// TUI mode: world.localinput comes from the binary input channel, not
-		// SDL polling. Two latest-wins layers: scancode bitmask (honors the
-		// keymap) then action snapshot ORed on top (bypasses the keymap).
+
+		// Process inputs from TUI
 		if(tui){
 			Uint8 newkeystate[SDL_SCANCODE_COUNT];
 			if(inputserver.LatestScancodes(newkeystate)){
@@ -277,23 +291,40 @@ bool Game::Loop(void){
 				world.localinput.mousey    = my;
 				world.localinput.mousedown = md;
 			}
-		} else {
+		}
+		// Process inputs normally
+		else {
 			gameInput.UpdateInputState(world.localinput);
 		}
+
+		// Player pawn processes inputs and ticks
 		world.SendInput();
+
+		// Tick the game
+		// - talk to lobby
+		// - talk to dedicated server
+		// - invokes handlers for game state enum
 		bool tickOk;
 		{ PERF_SCOPE("game.tick"); tickOk = Tick(); }
 		if(!tickOk){
 			return false;
 		}
+
+		// Tick the world sim
+		// loops through every object's Tick() (except player controlled pawn)
 		if(!world.replay.IsPlaying() || (world.replay.IsPlaying() && world.gameplaystate == World::INGAME)){
 			{ PERF_SCOPE("sim"); world.Tick(); }
 			gameInput.TickRumble();
 		}
+
+		// Tick the renderer on clients with GUIs
 		if(!world.dedicatedserver.active){
 			renderer.Tick();
 		}
+
+		// Visual fading for transitions
 		if(world.gameplaystate == World::INGAME){
+			// "ambience" is referring to brightness
 			Uint8 newambiencelevel = renderer.GetAmbienceLevel();
 			const Uint8 fadephase = gameRenderer.FadePhaseRef();
 			const bool fading = fadephase < 16;
@@ -317,14 +348,21 @@ bool Game::Loop(void){
 			}
 			ambienceFadeWasActive = fading;
 		}
+
+		// WE DID IT
 		lasttick += wait;
 	}
-	// MUST run after the sim loop, not inside DrainControlQueue (which runs
-	// before it): else wait_frames/step counters resolve with zero ticks.
+
+	// Reply to the CLI listener who requested to `wait`
+	// that everything is done
 	ControlDispatch::TickWaits(*this);
+
+	// Sync with network again because we're having fun
+	// mostly used for dedicated server?
 	world.DoNetwork();
+
 	if(!world.dedicatedserver.active){
-		world.DoNetwork();
+
 		float ft = 1 - (float(tickcheck - lasttick) / wait);
 		if(world.map.loaded){
 			// Pin gameplay to one 640x480 paletted frame (GPU stretches it);
@@ -355,29 +393,27 @@ bool Game::Loop(void){
 			fwrite(buffer.data(), buffer.size(), 1, world.replay.ffmpeg);
 		}
 #endif
-		/*char fpstext[16];
-		sprintf(fpstext, "%d", fps);
-		renderer.DrawText(&screenbuffer, 10, 30, fpstext, 133, 7);*/
-		if(minimized){
+		if(minimized) {
 			PERF_SCOPE("idle.throttle"); SDL_Delay(wait);
 		}
+
 		world.DoNetwork();
-		//Uint32 drawtick = SDL_GetTicks();
-		if(!headless || tui){ PERF_SCOPE("present"); Present(); }
+
+		if(!headless || tui) {
+			PERF_SCOPE("present"); Present();
+		}
+
 		// TUI frontend may disconnect; TUIBackend drops the socket on write
 		// failure, so exit cleanly rather than render frames nobody reads.
 		if(tui && gameRenderer.GetRenderDevice() && !gameRenderer.GetRenderDevice()->IsAlive()){
 			quitRequested = true;
 		}
+
 		// The windowed path self-throttles on vsync; the TUI socket never
 		// blocks, so cap it. 33ms ~= 30fps, above the 24Hz sim, below a busy-loop.
 		if(tui) SDL_Delay(33);
 		PostFrameReplies();
 		perf::FrameMark();
-		//Uint32 afterdrawtick = SDL_GetTicks();
-		/*if(1 || afterdrawtick - drawtick > wait){
-			printf("frame took %d ms to present\n", afterdrawtick - drawtick);
-		}*/
 	}else{
 		SDL_Delay(1);
 	}
