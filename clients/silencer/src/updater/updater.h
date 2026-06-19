@@ -55,11 +55,15 @@ public:
     // for the static phases the modal renders (Prompting/Downloading/Failed).
     void ForceState(State s);
 
-    // Set by UpdateScreen after a successful UpdaterStage2::Launch. Game::Loop
-    // reads this and returns false so main() unwinds and ~Game tears down
-    // SDL/audio cleanly before the new client process opens the device —
-    // skipping that teardown produces an audible pop on the restarted client.
-    void MarkStage2Spawned();
+    // Called every frame by Game::Loop on the main thread. When the worker has
+    // reached STAGING (download + verify complete), spawns the stage-2 child via
+    // UpdaterStage2::Launch — once. The worker can't do this itself: the spawn
+    // must run on the main thread while we still own SDL. On success
+    // IsStage2Spawned() latches true, so Game::Loop returns false and main()
+    // unwinds, letting ~Game tear down SDL/audio before the replacement client
+    // opens the device (skipping that teardown pops the audio device). On a
+    // spawn failure the state machine transitions to FAILED. No-op otherwise.
+    void PumpStage2();
     bool IsStage2Spawned() const;
 
     // Trampolines into the private atomic state from the progress callback.
@@ -79,7 +83,9 @@ private:
     std::atomic<bool> cancel_flag;
     std::thread worker;
     int retries;
-    bool stage2spawned = false;
+    std::string stage2zip;                     // verified update zip, set when entering STAGING
+    std::atomic<bool> stage2spawned{false};    // stage-2 child launched; Game::Loop unwinds
+    std::atomic<bool> stage2attempted{false};  // launch tried (one-shot; success or failure)
 };
 
 void UpdaterSetProgress(Updater &u, uint64_t got, uint64_t total);

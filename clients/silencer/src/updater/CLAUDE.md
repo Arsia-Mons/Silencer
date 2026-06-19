@@ -20,7 +20,7 @@ IDLE → PROMPTING → DOWNLOADING → VERIFYING → STAGING → DONE
 ```
 
 - `PROMPTING` — lobby rejected connection and sent an update URL; waiting for user consent.
-- `STAGING` — `UpdaterStage2::Launch` was called; UI must tear down SDL before main returns.
+- `STAGING` — worker finished download + verify. `Game::Loop` drives `Updater::PumpStage2()`, which spawns the stage-2 child on the main thread (the worker can't fork itself) and tears SDL down before main returns.
 - `DONE` — stage-2 is running; `Game::Loop` should return `false` so `~Game()` runs and releases audio/video before the new client opens the device.
 
 ## Key APIs
@@ -39,8 +39,10 @@ updater.GetState();
 updater.GetProgress();      // 0.0 – 1.0
 updater.GetErrorMessage();
 
-// Called by the game loop after stage-2 spawned:
-if (updater.IsStage2Spawned()) return false; // exits Game::Loop
+// Called every frame by the game loop (main thread). At STAGING it spawns
+// stage-2 once, then latches IsStage2Spawned():
+updater.PumpStage2();
+if (updater.IsStage2Spawned()) return false; // exits Game::Loop → ~Game() teardown
 ```
 
 ## Security
@@ -50,7 +52,7 @@ if (updater.IsStage2Spawned()) return false; // exits Game::Loop
 
 ## Stage-2 flow
 
-1. Normal client (`--self-update-stage2` absent): reaches STAGING, calls `UpdaterStage2::Launch(zippath)`, marks spawned, returns from game loop so `~Game()` tears down SDL cleanly.
+1. Normal client (`--self-update-stage2` absent): reaches STAGING; `Game::Loop` calls `Updater::PumpStage2()`, which calls `UpdaterStage2::Launch(zippath)` (one-shot) and latches `IsStage2Spawned()`; the loop then returns so `~Game()` tears down SDL cleanly. A failed spawn transitions the state machine to FAILED.
 2. Stage-2 process (invoked with `--self-update-stage2`): `UpdaterStage2::Run` overwrites the binary, then `exec`-replaces itself with the new client.
    - macOS launches the nested signed helper at `Silencer.app/Contents/Helpers/updater-stage-2`. Do not recreate a temporary `.app` bundle at runtime.
    - Windows/Linux still copy the current executable to a temp path for the handoff.

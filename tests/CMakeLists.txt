@@ -15,6 +15,7 @@ set(TEST_SRC
     ${CMAKE_SOURCE_DIR}/src/updater/updatersha256.cpp
     ${CMAKE_SOURCE_DIR}/src/updater/updaterdownload.cpp
     ${CMAKE_SOURCE_DIR}/src/updater/updaterzip.cpp
+    ${CMAKE_SOURCE_DIR}/src/updater/updaterstage2.cpp
     ${CMAKE_SOURCE_DIR}/src/updater/updater.cpp
 )
 
