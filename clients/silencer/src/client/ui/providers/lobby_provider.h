@@ -32,7 +32,7 @@ struct LobbySnapshot {
 
   // --- lobby (LobbyScreen, read panels) — recent tails, newline-joined ---
   std::string lobby_agent = {};    // selected agent name + compact summary
-  std::string lobby_chat = {};     // chat scrollback (drained on the tick)
+  std::vector<std::string> lobby_chat = {}; // chat scrollback (bounded ring, oldest -> newest), virtualized per-message
   std::string lobby_presence = {}; // who's online
   std::string chat_channel = {};   // lobby.channel — the game channel in staging
 

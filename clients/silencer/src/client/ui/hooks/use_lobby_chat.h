@@ -2,17 +2,18 @@
 
 #include <functional>
 #include <string>
+#include <vector>
 
 namespace client::ui {
 
 // The lobby chat model (doc §6): the chat scrollback + online presence the
 // LobbyScreen's ChatPanel shows, plus the send intent. The scrollback is
 // drained from the lobby's message queue on the game tick (a sibling of
-// DoNetwork) into a buffer the snapshot exposes here as recent, newline-joined
-// tails. `send` posts to the current channel over the public lobby seam,
-// queued + drained after render. (Channel switching joins in a later sub-slice.)
+// DoNetwork) into a buffer the snapshot exposes here as a bounded message ring
+// (oldest -> newest); the ChatLog virtualizes it per message. `send` posts to
+// the current channel over the public lobby seam, queued + drained after render.
 struct LobbyChat {
-  std::string scrollback = {};
+  std::vector<std::string> messages = {}; // oldest -> newest, virtualized per row
   std::string presence = {};
   std::string channel = {}; // panel header: "Lobby", or the game channel in staging
 

@@ -16,6 +16,12 @@ struct ScrollViewProps {
   // the window (plus overscan) render, keeping large tables within the node
   // budget. Children must be a flat, uniform-height list in row order.
   float row_height = 0.0f;
+  // Per-row heights, parallel to children (children.count entries). When set the
+  // viewport VIRTUALIZES with variable row heights (e.g. a wrapping chat
+  // transcript): cumulative offsets map the scroll position to the visible row
+  // window. Each row's own laid-out height must equal its row_heights entry so
+  // layout and the window math agree. Takes precedence over row_height.
+  const float *row_heights = nullptr;
   bool show_scrollbar = true;
   // Pin to the bottom and auto-follow growing content (e.g. a chat transcript);
   // unsticks when the user scrolls up, re-sticks on return to the bottom.

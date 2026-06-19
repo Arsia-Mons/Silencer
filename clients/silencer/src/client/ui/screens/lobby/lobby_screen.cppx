@@ -242,9 +242,8 @@ int lobby_agency_index(const std::string &summary) {
   if (!cf.ok || !gsel.ok || !mh.ok)
     return ::ui::empty();
 
-  // The chat transcript can run past the 192-byte use_text_storage scratch, so
-  // copy it through the per-frame string arena to render the full tail.
-  const char *scrollback = ::ui::copy_string(chat.scrollback.c_str());
+  // Chat messages are read directly by ChatLog (use_lobby_chat) and virtualized
+  // per row, so the transcript is no longer flattened and threaded as a string.
   const char *presence = use_text_storage("%s", chat.presence.c_str());
   const char *ready_label = use_text_storage("%s", staging.ready_label.c_str());
   const char *chat_title = chat.channel.empty()
@@ -359,7 +358,6 @@ int lobby_agency_index(const std::string &summary) {
       LobbyChatPanelProps{
           .key = "chatPanel",
           .title = chat_title,
-          .scrollback = scrollback,
           .presence = presence,
           .send = chat.send,
           .caret_color = chrome.caret_lobby,

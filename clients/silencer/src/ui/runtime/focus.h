@@ -91,6 +91,7 @@ constexpr int UI_RETAINED_MAX_MEASURED = UI_RETAINED_MAX_NODES;
 
 struct MeasuredSize {
   char control_id[UI_RETAINED_LABEL_CAP] = {};
+  float width = 0.0f;
   float height = 0.0f;
 };
 

@@ -8,17 +8,21 @@
 #include "client/ui/components/text/text.h"
 #include "client/ui/hooks/use_games.h"
 #include "client/ui/hooks/use_chrome.h"
+#include "client/ui/hooks/use_lobby_chat.h"
 #include "client/ui/hooks/use_staging.h"
 #include "ui/components/box.h"
 #include "ui/components/input.h"
 #include "ui/components/scroll_view.h"
 #include "ui/components/text.h"
+#include "ui/runtime/interaction_hooks.h"
 #include "ui/runtime/react.h"
+#include "ui/style/text_measure.h"
 
 #include <algorithm>
 #include <cmath>
 #include <functional>
 #include <string>
+#include <vector>
 
 namespace client::ui {
 namespace {
@@ -401,7 +405,16 @@ int parse_u8_option(const std::string &value, int fallback, int lo, int hi) {
 
 // The viewport is focusable so the wheel routes to it; the chromeless style
 // suppresses the builder-injected focus ring (which gates on `chromeless`).
+//
+// The transcript is VIRTUALIZED per message: each message is one row, only the
+// rows visible in the well commit to the retained tree (the ScrollView windows
+// them), so the chat holds unbounded history within the node budget. Each row's
+// wrapped height is measured at the well width to feed the variable-height
+// virtualizer. Rows/heights/keys live in persistent use_state storage so the
+// lazily-reconciled rows and the row_heights pointer outlive this build.
 ::ui::UiElement ChatLog(const ChatLogProps &props) {
+  LobbyChat chat = use_lobby_chat();
+
   ::ui::StylePatch st =
       tokens::text_patch(tokens::kTextBodyMuted, tokens::kFontBodyEm,
                          tokens::kFaceBody, tokens::kLineBody);
@@ -413,23 +426,65 @@ int parse_u8_option(const std::string &value, int fallback, int lo, int hi) {
   scroll_style.base = tokens::chromeless_clear_patch();
   scroll_style.focus_visible = scroll_style.base;
 
+  // Wrap width = the content track's measured width from the previous frame
+  // (one-frame lag; 0 before first layout -> rows fall back to one line and
+  // settle next frame).
+  const float well_w = ::ui::use_measured_width("ChatLogContent");
+
+  auto *msgs = use_state<std::vector<std::string>>({});
+  auto *keys = use_state<std::vector<std::string>>({});
+  auto *heights = use_state<std::vector<float>>({});
+  *msgs = chat.messages;
+  const size_t n = msgs->size();
+  keys->resize(n);
+  heights->clear();
+  heights->reserve(n);
+
+  ::ui::MeasureTextFn measurer = ::ui::text_measurer();
+  std::vector<::ui::UiElement> rows;
+  rows.reserve(n);
+  for (size_t i = 0; i < n; ++i) {
+    float h = tokens::kLineBody;
+    if (measurer && well_w > 0.0f) {
+      ::ui::TextMetricsQuery q = {};
+      q.utf8 = (*msgs)[i].c_str();
+      q.len = static_cast<uint32_t>((*msgs)[i].size());
+      q.font_id = tokens::kFaceBody;
+      q.font_size = tokens::kFontBodyEm;
+      q.align = ::ui::TextAlign::Left;
+      q.wrap = ::ui::TextWrap::Words;
+      q.line_height = tokens::kLineBody;
+      q.wrap_width = well_w;
+      const float mh = measurer(q).height;
+      if (mh > h)
+        h = mh;
+    }
+    heights->push_back(h);
+    (*keys)[i] = "m" + std::to_string(i);
+    ::ui::LayoutStyle rl = {};
+    rl.width = ::ui::Length::percent(100.0f);
+    rl.height = ::ui::Length::points(h);
+    rl.flex_shrink = ::ui::StyleFloat::points(0.0f);
+    rows.push_back(Text(TextProps{.key = (*keys)[i].c_str(),
+                                  .value = (*msgs)[i].c_str(),
+                                  .layout = rl,
+                                  .style = text_style}));
+  }
+
   return ::ui::component(
       "ScrollView",
       ScrollViewProps{
           .key = props.key,
           .id = "ChatLog",
           .step = tokens::kLineBody,
+          .row_heights = heights->data(),
           .show_scrollbar = false,
           .stick_to_bottom = true,
           .layout = ::ui::LayoutStyle{
               .align_items = ::ui::AlignItems::Start,
               .min_width = ::ui::Length::points(0.0f)},
           .style = scroll_style,
-          .children = ::ui::children({Text(TextProps{
-              .key = "log",
-              .value = props.scrollback,
-              .layout = {.width = ::ui::Length::percent(100.0f)},
-              .style = text_style})})},
+          .children = ::ui::children(rows)},
       ScrollView);
 }
 
@@ -1300,7 +1355,7 @@ std::function<void(const std::string &)> set_u8_text(uint8_t *slot, int lo,
         .gap = 12.0f}}
       style={tokens::frame_patch(tokens::kInsetStroke)}
     >
-      <ChatLog key="logcol" scrollback={props.scrollback} />
+      <ChatLog key="logcol" />
       <Box
         key="prescol"
         layout={::ui::LayoutStyle{

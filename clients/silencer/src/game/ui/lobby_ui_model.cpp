@@ -23,11 +23,10 @@ namespace {
 constexpr int kVisibleLogLines = 15;
 // Keep the joined connect log within the screen's text scratch (REACT_TEXT_STORAGE_CAP).
 constexpr size_t kStatusLogCap = 180;
-// Chat renders through the per-frame string arena (copy_string), not the text
-// scratch, so it gets a larger tail. Must exceed the chat well's height in lines
-// so one-line transcripts overflow the ScrollView and stick to the bottom; stays
-// within the 16 KB shared arena (UI_RETAINED_STRING_ARENA_BYTES).
-constexpr size_t kLobbyChatLogCap = 2048;
+// Chat is virtualized per message: only the messages visible in the well commit
+// to the retained tree, so the snapshot keeps a generous bounded history ring
+// (the ScrollView windows it). The game's full LobbyChatLog is the source.
+constexpr size_t kLobbyChatHistory = 200;
 
 // Agency display names, indexed by Team::{NOXIS..BLACKROSE} / Character::agencyIdx.
 const char *const kAgency[5] = {"Noxis", "Lazarus", "Caliber", "Static",
@@ -390,18 +389,13 @@ client::ui::LobbySnapshot CaptureLobbySnapshot(Game &game,
   lobby.UnlockMutex();
 
   // Chat scrollback lives on the game-owned drain buffer (single thread), read
-  // outside the mutex. Hand the whole buffer to the ScrollView — do NOT pre-slice
-  // to a fixed line count: that caps content below the well height for one-line
-  // messages, leaving a permanent gap above. The byte cap below is the only bound.
+  // outside the mutex. Pass the messages as a bounded history ring (newest tail);
+  // the ChatLog virtualizes them per message, so only the visible window commits.
   if (lobbyPhase) {
     const std::vector<std::string> &chat = game.LobbyChatLog();
-    for (size_t i = 0; i < chat.size(); ++i) {
-      if (!snap.lobby_chat.empty())
-        snap.lobby_chat += "\n";
-      snap.lobby_chat += chat[i];
-    }
-    if (snap.lobby_chat.size() > kLobbyChatLogCap)
-      snap.lobby_chat.erase(0, snap.lobby_chat.size() - kLobbyChatLogCap);
+    const size_t start =
+        chat.size() > kLobbyChatHistory ? chat.size() - kLobbyChatHistory : 0;
+    snap.lobby_chat.assign(chat.begin() + start, chat.end());
   }
 
   // The connect log is game-owned (single thread), read outside the mutex.
