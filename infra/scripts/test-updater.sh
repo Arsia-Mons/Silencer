@@ -44,11 +44,10 @@ ZIP_NAME="silencer-update.zip"
 # POSIX-rename swap + the Windows minizip extract (no Linux-unique path), and
 # its asset paths are cwd-relative (GetResDir()=="" for a portable build) —
 # which an in-place self-replace + CleanupPreviousUpdate() actively breaks,
-# whereas macOS/Windows resolve assets from the executable path. See
-# docs/plans/2026-06-19-e2e-auto-updater-test.md.
+# whereas macOS/Windows resolve assets from the executable path.
 case "$(uname)" in
   Darwin) OS=mac ;;
-  *) echo "test-updater.sh: macOS only (Windows: test-updater.ps1; Linux: intentionally excluded — see docs/plans/2026-06-19-e2e-auto-updater-test.md)" >&2; exit 1 ;;
+  *) echo "test-updater.sh: macOS only (Windows: test-updater.ps1; Linux: intentionally excluded)" >&2; exit 1 ;;
 esac
 
 ncpu()      { if command -v nproc >/dev/null 2>&1; then nproc; else sysctl -n hw.ncpu; fi; }

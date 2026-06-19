@@ -65,8 +65,7 @@ run as a step in `release.yml` on macOS + Windows. They drive the real cppx
 `UpdateConsent` button and assert the auto-relaunched process reports the new
 version over the control socket — closing the "STAGING→spawn needs manual/e2e
 verification" gap (#301/#302/#303). This is what the unit tests deliberately
-don't cover (`updater_sm_test.cpp` runs a real process only here). Design:
-[`../../../../docs/plans/2026-06-19-e2e-auto-updater-test.md`](../../../../docs/plans/2026-06-19-e2e-auto-updater-test.md).
+don't cover (`updater_sm_test.cpp` runs a real process only here).
 
 ## Rules
 

@@ -42,7 +42,6 @@ jobs:
         # release objects). Runs on a scratch copy, before signing, so the
         # shipped artifact stays pristine. The harness drives the real headless
         # update path and asserts `ping`==99999 on the auto-relaunched process.
-        # See docs/plans/2026-06-19-e2e-auto-updater-test.md.
         env:
           OLD_BUILD_DIR: ${{ github.workspace }}/build
         run: bash infra/scripts/test-updater.sh

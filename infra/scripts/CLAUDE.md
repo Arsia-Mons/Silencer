@@ -33,10 +33,9 @@ because this directory is two levels deep.
   (handing the client a download URL + sha256) is injected via the
   `show_update_screen` control op, which keeps the test uniform and lets it run
   fully headless. Reuse a prebuilt client with `OLD_BUILD_DIR` / `NEW_BUILD_DIR`
-  (CI passes the release `build/` as OLD). Design:
-  [`../../docs/plans/2026-06-19-e2e-auto-updater-test.md`](../../docs/plans/2026-06-19-e2e-auto-updater-test.md).
-  Linux is intentionally excluded (not a shipped self-update platform; its
-  cwd-relative asset paths break an in-place self-replace).
+  (CI passes the release `build/` as OLD). Linux is intentionally excluded (not
+  a shipped self-update platform; its cwd-relative asset paths break an
+  in-place self-replace).
 
 ## Gotchas
 
