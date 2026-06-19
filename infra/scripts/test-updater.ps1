@@ -84,11 +84,17 @@ if ($buildOld -or $buildNew) {
         $bundledNinja = Join-Path $vsInstall 'Common7\IDE\CommonExtensions\Microsoft\CMake\Ninja'
         if (Test-Path (Join-Path $bundledNinja 'ninja.exe')) { $env:PATH = "$bundledNinja;$env:PATH" }
     }
+    # Prefer VCPKG_INSTALLATION_ROOT (the runner's standalone vcpkg, C:\vcpkg) —
+    # this is what build-silencer-windows uses. Do NOT prefer VCPKG_ROOT: vcvars/
+    # ilammy-msvc-dev-cmd set it to the VS-bundled vcpkg (...\VC\vcpkg), a classic
+    # install with no default-registry baseline, which fails manifest-mode resolve
+    # with "requires a manifest with a specified baseline". Local dev (no
+    # VCPKG_INSTALLATION_ROOT) falls through to VCPKG_ROOT / bootstrap.
     $VcpkgRoot = $null
-    if ($env:VCPKG_ROOT -and (Test-Path (Join-Path $env:VCPKG_ROOT 'scripts/buildsystems/vcpkg.cmake'))) {
-        $VcpkgRoot = (Resolve-Path $env:VCPKG_ROOT).Path
-    } elseif ($env:VCPKG_INSTALLATION_ROOT -and (Test-Path (Join-Path $env:VCPKG_INSTALLATION_ROOT 'scripts/buildsystems/vcpkg.cmake'))) {
+    if ($env:VCPKG_INSTALLATION_ROOT -and (Test-Path (Join-Path $env:VCPKG_INSTALLATION_ROOT 'scripts/buildsystems/vcpkg.cmake'))) {
         $VcpkgRoot = (Resolve-Path $env:VCPKG_INSTALLATION_ROOT).Path
+    } elseif ($env:VCPKG_ROOT -and (Test-Path (Join-Path $env:VCPKG_ROOT 'scripts/buildsystems/vcpkg.cmake'))) {
+        $VcpkgRoot = (Resolve-Path $env:VCPKG_ROOT).Path
     } else {
         $VcpkgRoot = Join-Path $Repo '.vcpkg'
         if (-not (Test-Path (Join-Path $VcpkgRoot 'scripts/buildsystems/vcpkg.cmake'))) {
