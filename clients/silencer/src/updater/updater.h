@@ -83,9 +83,9 @@ private:
     std::atomic<bool> cancel_flag;
     std::thread worker;
     int retries;
-    std::string stage2zip;          // verified update zip, set when entering STAGING
-    bool stage2spawned = false;     // stage-2 child launched; Game::Loop unwinds
-    bool stage2attempted = false;   // launch tried (one-shot; success or failure)
+    std::string stage2zip;                     // verified update zip, set when entering STAGING
+    std::atomic<bool> stage2spawned{false};    // stage-2 child launched; Game::Loop unwinds
+    std::atomic<bool> stage2attempted{false};  // launch tried (one-shot; success or failure)
 };
 
 void UpdaterSetProgress(Updater &u, uint64_t got, uint64_t total);
