@@ -89,7 +89,7 @@ LobbyChat use_lobby_chat() {
     return {};
   }
   return {
-      .scrollback = value->snapshot.lobby_chat,
+      .messages = value->snapshot.lobby_chat,
       .presence = value->snapshot.lobby_presence,
       .channel = value->snapshot.chat_channel,
       .send = value->send_chat,

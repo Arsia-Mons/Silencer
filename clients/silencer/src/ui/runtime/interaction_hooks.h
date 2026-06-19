@@ -36,8 +36,9 @@ bool use_focus_visible(); // focused AND focus arrived via a non-pointer source
 // different control id (or there is none).
 float use_scroll_into_view(const char *viewport_control_id);
 
-// Resolved height of the node carrying `control_id` from the previous frame;
-// 0 until measured at least once.
+// Resolved height/width of the node carrying `control_id` from the previous
+// frame; 0 until measured at least once.
 float use_measured_height(const char *control_id);
+float use_measured_width(const char *control_id);
 
 } // namespace ui

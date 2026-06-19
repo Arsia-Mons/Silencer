@@ -226,6 +226,7 @@ void collect_measured_sizes(const UiTree &tree, NodeId id,
     for (; cid[n] && n + 1 < UI_RETAINED_LABEL_CAP; ++n)
       slot.control_id[n] = cid[n];
     slot.control_id[n] = '\0';
+    slot.width = node.layout.width;
     slot.height = node.layout.height;
   }
   for (int i = 0; i < tree.child_count(id); ++i)

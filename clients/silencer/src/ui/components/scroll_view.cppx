@@ -19,10 +19,16 @@ using ::ui::children;
   const float viewport_height = use_measured_height(viewport_id);
 
   // When virtualizing, the content track holds only the visible row slice, so
-  // derive the full content height from the row count instead of its measure.
+  // derive the full content height from the rows instead of its measure: the
+  // sum of per-row heights (variable) or row_height * count (uniform).
   float content_height = use_measured_height(content_id);
-  if (props.row_height > 0.0f && props.children.count > 0)
+  if (props.row_heights && props.children.count > 0) {
+    content_height = 0.0f;
+    for (int i = 0; i < props.children.count; ++i)
+      content_height += props.row_heights[i];
+  } else if (props.row_height > 0.0f && props.children.count > 0) {
     content_height = props.row_height * (float)props.children.count;
+  }
 
   *offset += use_scroll_into_view(viewport_id);
 
@@ -125,9 +131,40 @@ using ::ui::children;
   // moves onto an off-viewport row — so the row past the fold must already be
   // committed for Down to reach it (which then drives the follow-scroll).
   ::ui::UiChildren kids = props.children;
-  if (props.row_height > 0.0f && kids.count > 0) {
+  constexpr int kOverscan = 2;
+  if (props.row_heights && kids.count > 0) {
+    // Variable-height window: walk cumulative row offsets to the first row whose
+    // bottom is past the viewport top, back off by the overscan, then walk on
+    // until past the viewport bottom (+ overscan). content_top is the cumulative
+    // offset of the first committed row, minus the scroll offset.
+    int first = 0;
+    float top = 0.0f;
+    while (first < kids.count && top + props.row_heights[first] <= *offset) {
+      top += props.row_heights[first];
+      ++first;
+    }
+    for (int o = 0; o < kOverscan && first > 0; ++o) {
+      --first;
+      top -= props.row_heights[first];
+    }
+    int last = first;
+    float y = top;
+    const float bottom = *offset + viewport_height;
+    while (last < kids.count && y < bottom) {
+      y += props.row_heights[last];
+      ++last;
+    }
+    for (int o = 0; o < kOverscan && last < kids.count; ++o)
+      ++last;
+    float vtop = top - *offset;
+    if (props.stick_to_bottom && content_height > 0.0f &&
+        content_height < viewport_height)
+      vtop = (viewport_height - content_height); // bottom-anchor on underflow
+    content.position_inset.top = ::ui::StyleValue::points(vtop);
+    kids.items = props.children.items + first;
+    kids.count = last - first;
+  } else if (props.row_height > 0.0f && kids.count > 0) {
     const float rh = props.row_height;
-    constexpr int kOverscan = 2;
     int first = (int)(*offset / rh) - 1;
     if (first < 0)
       first = 0;

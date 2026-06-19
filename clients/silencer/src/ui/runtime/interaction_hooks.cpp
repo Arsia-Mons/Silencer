@@ -61,4 +61,16 @@ float use_measured_height(const char *control_id) {
   return 0.0f;
 }
 
+float use_measured_width(const char *control_id) {
+  const MeasuredSizeRequest *m =
+      static_cast<const MeasuredSizeRequest *>(use_context(&MeasuredSizeContext));
+  if (!m || !control_id || control_id[0] == '\0')
+    return 0.0f;
+  for (int i = 0; i < m->count; ++i) {
+    if (strcmp(m->sizes[i].control_id, control_id) == 0)
+      return m->sizes[i].width;
+  }
+  return 0.0f;
+}
+
 } // namespace ui

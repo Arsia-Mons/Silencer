@@ -104,13 +104,11 @@ struct LobbyChatComposeProps {
 
 struct ChatLogProps {
   const char *key = nullptr;
-  const char *scrollback = "";
 };
 
 struct LobbyChatPanelProps {
   const char *key = nullptr;
   const char *title = "Lobby";
-  const char *scrollback = "";
   const char *presence = "";
   std::function<void(const std::string &)> send = {};
   ::ui::Color caret_color = {};
