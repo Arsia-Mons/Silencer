@@ -7,9 +7,8 @@
 #include <cstring>
 
 namespace {
-// SDL keycode -> the runtime's text-editing UiKey vocabulary (src/ui/input.h).
-// Only the keys the cppx Input cares about map; everything else stays Unknown
-// (printable characters arrive as SDL_EVENT_TEXT_INPUT, not as key events).
+// SDL keycode -> the runtime's text-editing UiKey vocabulary. Printable
+// characters arrive as SDL_EVENT_TEXT_INPUT, not as key events.
 ::ui::UiKey UiKeyFromSdl(SDL_Keycode key) {
     switch (key) {
     case SDLK_BACKSPACE:
@@ -38,7 +37,7 @@ namespace {
     case SDLK_TAB:
         return ::ui::UiKey::Tab;
     case SDLK_A:
-        return ::ui::UiKey::A; // Ctrl/Cmd+A select-all
+        return ::ui::UiKey::A;
     default:
         return ::ui::UiKey::Unknown;
     }
@@ -57,9 +56,8 @@ uint16_t UiModsFromSdl(SDL_Keymod mod) {
     return out;
 }
 
-// Does this single gamepad button resolve to the active keymap's UiCancel
-// binding? Synthesizes a one-button GamepadState and asks the keymap (so
-// gamepad.json's "ui_cancel" stays authoritative — never a hardcoded PAD:east).
+// Does this gamepad button resolve to the keymap's UiCancel binding? Asks the
+// keymap so gamepad.json's "ui_cancel" stays authoritative (no hardcoded button).
 bool GamepadButtonIsUiCancel(const KeyMap &keymap, int button) {
     GamepadState gp = {};
     gp.connected = true;
@@ -100,17 +98,11 @@ bool Game::HandleSDLEvents() {
         case SDL_EVENT_WINDOW_RESTORED:
             minimized = false;
             break;
-        // SIL-18: the single SDL-event site builds the per-frame UI input frame
-        // (src/game/CLAUDE.md). Gameplay shortcut keys + the keymap still flow
-        // through OnScancodeDown/Up; in parallel we collect nav/confirm/cancel +
-        // the text-editing key/text/editing channels into the cppx UiInputFrame the
-        // pipeline consumes. Printable characters arrive as TEXT_INPUT below.
         case SDL_EVENT_KEY_DOWN: {
             gameInput.OnScancodeDown(event.key.scancode);
             gameInput.GetKeystate()[event.key.scancode] = true;
-            // While rebinding (SIL-19 §7b), keyboard edges build the pending chord
-            // instead of driving UI nav/confirm — so Escape/Enter and arrows are
-            // themselves bindable. Confirm/Cancel happen via the capture UI buttons.
+            // While rebinding, keyboard edges build the pending chord instead of
+            // driving UI nav/confirm, so Escape/Enter/arrows are themselves bindable.
             if (gameUiPipeline.IsCapturingKeybind()) {
                 gameUiPipeline.FeedKeybindEdge({BindingDevice::Keyboard,
                                                 (int)event.key.scancode, 0});
@@ -147,9 +139,8 @@ bool Game::HandleSDLEvents() {
                 ui.confirm_pressed = true;
                 ui.confirm_down = true;
                 break;
-            // SPACE confirms/activates buttons, but inside a focused text field it
-            // must type a space (via SDL_EVENT_TEXT_INPUT), not submit. Only Enter
-            // submits.
+            // SPACE confirms a button, but in a focused text field it types a
+            // space (via TEXT_INPUT) instead of submitting. Only Enter submits.
             case SDLK_SPACE:
                 if (!gameUiPipeline.WantsTextInput()) {
                     ui.confirm_pressed = true;
@@ -182,9 +173,7 @@ bool Game::HandleSDLEvents() {
             }
         } break;
         case SDL_EVENT_MOUSE_WHEEL: {
-            // SIL-111: accumulate the scroll-wheel delta into the cppx input frame; the
-            // runtime routes it to the hovered scrollable. SDL reports +y = wheel up;
-            // FLIPPED (natural-scroll) inverts both axes.
+            // SDL reports +y = wheel up; FLIPPED (natural-scroll) inverts both axes.
             if (gameUiPipeline.IsCapturingKeybind())
                 break;
             ::ui::UiInputFrame &ui = gameUiPipeline.UiInput();
@@ -195,7 +184,7 @@ bool Game::HandleSDLEvents() {
         } break;
         case SDL_EVENT_TEXT_INPUT: {
             if (gameUiPipeline.IsCapturingKeybind())
-                break; // no text while rebinding
+                break;
             ::ui::UiInputFrame &ui = gameUiPipeline.UiInput();
             ::ui::ui_input_push_text(ui, event.text.text);
             ui.source = ::ui::UiFocusSource::Keyboard;
@@ -208,9 +197,8 @@ bool Game::HandleSDLEvents() {
                                         event.edit.length);
             ui.source = ::ui::UiFocusSource::Keyboard;
         } break;
-        // Multi-device keybind capture edges (SIL-19 §7b). Mouse-left is gated to
-        // active capture so it never steals a UI click; gamepad button/axis are
-        // event-driven only while capturing (gameplay reads the polled snapshot).
+        // Keybind-capture edges. Mouse-left is gated to active capture so it never
+        // steals a UI click; gamepad button/axis are event-driven only while capturing.
         case SDL_EVENT_MOUSE_BUTTON_DOWN:
             if (gameUiPipeline.IsCapturingKeybind()) {
                 gameUiPipeline.FeedKeybindEdge({BindingDevice::Mouse,
@@ -222,8 +210,6 @@ bool Game::HandleSDLEvents() {
                 gameUiPipeline.FeedKeybindEdge({BindingDevice::GamepadButton,
                                                 (int)event.gbutton.button, 0});
             } else if (GamepadButtonIsUiCancel(gameInput.GetKeyMap(), (int)event.gbutton.button)) {
-                // Controller "back" feeds the SAME cancel edge as keyboard ESC; the UI-layer
-                // cancel router (ClientUi::end_layout) owns the policy.
                 ::ui::UiInputFrame &ui = gameUiPipeline.UiInput();
                 ui.source = ::ui::UiFocusSource::Gamepad;
                 ui.cancel_pressed = true;

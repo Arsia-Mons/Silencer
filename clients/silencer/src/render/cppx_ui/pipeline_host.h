@@ -15,20 +15,12 @@
 
 namespace silencer::cppx_ui {
 
-// The production render seam SIL-13 deferred: drives the golden
-// client::ui::UiPipeline and turns one frame into a tightly-packed RGBA buffer
-// that the GPU backend uploads via RenderDevice::UploadUiFrame (the same
-// software-raster -> upload -> GPU-composite path SIL-11 proved with the demo
-// overlay, now fed by the real pipeline instead of a hand-built command list).
+// Drives the client::ui::UiPipeline for one frame, producing either a packed
+// RGBA buffer (CPU path, render()) or a GpuUiProgram (GPU path,
+// build_gpu_frame()). SDL-side; owns the SDL-bound registries.
 //
-// Each frame: begin the UiSurface, run render_client_ui_frame() — which builds
-// the retained tree, lays it out, focuses, and builds the tagged-union IR, then
-// calls our render lambda that executes that IR via execute_draw_commands —
-// resolve, and copy the surface to a packed buffer. SDL-side; lives in
-// renderer/ alongside the executor it drives.
-//
-// react_init_runtime() must have been called once before use (the host does not
-// own the global hook runtime). Caller sets frame.layout to ensure()'s w x h.
+// react_init_runtime() must have been called once before use. Caller sets
+// frame.layout to ensure()'s w x h.
 class PipelineHost {
 public:
   PipelineHost();
@@ -37,77 +29,57 @@ public:
   PipelineHost(const PipelineHost &) = delete;
   PipelineHost &operator=(const PipelineHost &) = delete;
 
-  // (Re)create the w x h software surface + renderer + pipeline. Loads the four
-  // UI faces from `font_dir` on first call (the UiSurface requires a default
-  // font) and installs the text measurer. Idempotent for an unchanged size.
-  // Returns false if SDL surface/renderer creation or font load fails.
+  // (Re)create the w x h software surface + renderer + pipeline. Loads the UI
+  // faces from `font_dir` and installs the text measurer on first call.
+  // Idempotent for an unchanged size. False on SDL/font failure.
   bool ensure(int w, int h, const char *font_dir);
 
   client::ui::UiPipeline &pipeline() { return *pipeline_; }
 
-  // Run one pipeline frame for `frame` and return tightly-packed RGBA (w*h*4),
-  // or null if not initialized. The buffer is owned by the host and valid until
-  // the next render()/ensure().
-  //
-  // SIL-237 dirty-skip: the retained tree, layout, focus pass, and IR build
-  // always run (they carry the animation/interaction state). But the costly
-  // native-resolution raster (clear -> execute IR -> SSAA resolve -> packed
-  // copy) is skipped when the freshly-built DrawCommandList IR is byte-identical
-  // to the previous frame's: the cached `packed_` buffer is still valid, so we
-  // return it unchanged. `out_unchanged` (when non-null) reports whether the
-  // raster was skipped so the caller can also skip the GPU upload (the upload
-  // additionally depends on the fade alpha, which is NOT in the IR — the caller
-  // owns that check).
+  // Run one pipeline frame and return host-owned packed RGBA (w*h*4, valid
+  // until the next render()/ensure()), or null if not initialized. The raster
+  // is dirty-skipped when the new IR is byte-identical to the last frame's;
+  // `out_unchanged` (when non-null) reports the skip so the caller can also skip
+  // the GPU upload (the upload additionally depends on the fade alpha, not in
+  // the IR — the caller owns that check).
   const uint8_t *render(const client::ui::UiPipelineFrame &frame, int *out_w,
                         int *out_h, bool *out_unchanged = nullptr);
 
-  // SIL-240 GPU path: run the same build/layout/focus/IR as render(), but lower
-  // the IR to a backend-neutral GpuUiProgram (geometry + texture manifest) the
-  // GPU backend draws directly — no CPU raster, no full-window upload. Returns a
-  // pointer to the host-owned program (valid until the next build_gpu_frame()/
-  // ensure()), or null if not initialized. Used windowed; render() stays the
-  // headless/test path.
+  // GPU path: same build/layout/focus/IR as render(), but lowers the IR to a
+  // backend-neutral GpuUiProgram the backend draws directly. Returns the
+  // host-owned program (valid until the next build_gpu_frame()/ensure()), or
+  // null if not initialized. Windowed; render() stays the headless/test path.
   const GpuUiProgram *build_gpu_frame(const client::ui::UiPipelineFrame &frame);
 
-  // ---- Chrome sprite bake seam (SIL-87) ----------------------------------
-  // The SDL_Textures are bound to the software renderer `r_`, which ensure()
-  // recreates on a size change — so baked chrome must be re-baked whenever `r_`
-  // is recreated (tracked by `chrome_dirty_`), NOT every frame. The composition
-  // root (src/game/ui) owns WHICH legacy sprites to bake (it has Game/Surface/
-  // Palette); this host just bakes arbitrary indexed pixels into a texture_id.
-  //
-  // Usage per frame, after ensure():
-  //   if (host.chrome_needs_bake()) { /* bake_chrome_sprite()… */ host.mark_chrome_baked(); }
+  // ---- Chrome sprite bake seam ----------------------------------
+  // Baked chrome textures are bound to `r_`, which ensure() recreates on a size
+  // change, so they must be re-baked whenever `r_` resets (tracked by
+  // chrome_dirty_), not every frame. The composition root owns WHICH sprites to
+  // bake; this host bakes arbitrary indexed pixels into a texture_id.
   bool chrome_needs_bake() const { return chrome_dirty_; }
 
-  // Bake w*h palette indices (row-major) + a 256-entry palette into a
-  // premultiplied-RGBA texture owned by this host's registry; returns its
-  // texture_id (0 on failure / not initialized / registry full).
+  // Bake w*h palette indices + a 256-entry palette into a premultiplied-RGBA
+  // texture owned by this host's registry; returns its texture_id (0 on
+  // failure / not initialized / registry full).
   uint32_t bake_chrome_sprite(const uint8_t *indices, int w, int h,
                               const SDL_Color *palette256);
 
-  // Register an already-baked chrome texture's indexed source so the executor
-  // can swap qualifying draws for lazily-baked CANONICAL device-cell variants
-  // (origin's magnify arithmetic at phase 0 — U-2/SIL-204). `fit`
-  // picks the box arithmetic (TextureRegistry::LegacyFit); caps (virtual px)
-  // apply to NineSlice only.
+  // Register a baked chrome texture's indexed source so the executor can swap
+  // qualifying draws for lazily-baked canonical device-cell variants. `fit`
+  // picks the box arithmetic; caps (virtual px) apply to NineSlice only.
   void register_legacy(uint32_t texture_id, const uint8_t *indices, int w,
                        int h, const SDL_Color *palette256, int legacy_w,
                        int legacy_h, LegacyFit fit, int cap_l = 0,
                        int cap_r = 0, int cap_t = 0, int cap_b = 0);
 
-  // Build one bitmap glyph FACE atlas (origin/main text parity). `glyphs[i]` is
-  // the source sprite for char GlyphFonts::kFirstChar + i (null/empty = blank
-  // cell). advance/line_height are the native (640-space) bank metrics. Baked
-  // into a host-owned atlas texture re-created on each renderer reset (re-baked
-  // in the same pass as the chrome). Returns false on failure.
+  // Build one bitmap glyph face atlas. `glyphs[i]` is the source for char
+  // GlyphFonts::kFirstChar + i. advance/line_height are native (640-space).
+  // Re-baked on each renderer reset (same pass as chrome). False on failure.
   bool build_glyph_face(int face_id, const GlyphFonts::GlyphSrc *glyphs,
                         int count, const SDL_Color *palette256, float advance,
                         float line_height);
 
-  // Exact-color glyph variant (see GlyphFonts::build_color_face): the caller
-  // pre-applies the legacy Effect* pipeline to the indexed art; the variant is
-  // selected at draw time when a Text command carries the key color.
+  // Exact-color glyph variant; see GlyphFonts::build_color_face.
   bool build_glyph_color_face(int face_id, uint8_t key_r, uint8_t key_g,
                               uint8_t key_b, const GlyphFonts::GlyphSrc *glyphs,
                               int count, const SDL_Color *palette256,
@@ -129,16 +101,10 @@ private:
   int w_ = 0;
   int h_ = 0;
   bool chrome_dirty_ = true; // re-bake chrome when r_ (and its textures) reset
-  // SIL-237 dirty-skip state: signature of the LAST rastered IR + whether
-  // `packed_` holds a valid frame for it. A signature of 0 / packed_valid_
-  // false forces a re-raster (e.g. after ensure() resizes the surface).
-  uint64_t last_ir_sig_ = 0;
+  uint64_t last_ir_sig_ = 0; // dirty-skip: signature of the last rastered IR
   bool packed_valid_ = false;
-  // SIL-240 GPU path: the reusable draw program + a generation that bumps every
-  // time the registries reset (ensure() recreates r_ and re-bakes), so the GPU
-  // backend knows to flush its texture cache.
   GpuUiProgram gpu_program_;
-  uint64_t texture_generation_ = 1;
+  uint64_t texture_generation_ = 1; // bumps on registry reset (cache flush)
 };
 
 } // namespace silencer::cppx_ui

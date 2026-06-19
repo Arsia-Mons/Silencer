@@ -7,11 +7,9 @@
 
 namespace client::ui {
 
-// SIL-108: a stalled rebind capture auto-cancels after `timeout_frames` frames
-// of inactivity (origin/main used a 72-tick capture timeout; the capture hook
-// delegates the countdown to the screen). The counter resets whenever capture is
-// inactive or the pending chord grows. Owns its two state cells, so call it
-// unconditionally each frame.
+// A stalled rebind capture auto-cancels after `timeout_frames` frames of
+// inactivity; the counter resets when capture is inactive or the chord grows.
+// Owns two state cells, so call it unconditionally each frame.
 inline void use_rebind_timeout(const KeybindCapture &cap, int timeout_frames) {
   int *idle = use_state<int>(0);
   size_t *last_chips = use_state<size_t>(0);

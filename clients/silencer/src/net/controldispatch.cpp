@@ -29,17 +29,12 @@
 namespace ControlDispatch {
 
 namespace {
-// A handful of list-oriented UI ops (select/scroll/hover_at) are bound to
-// screens that land in later slices (Options/lobby lists, SIL-19/20). They
-// return a structured UNSUPPORTED error until then. inspect/click/set_text/key
-// and the modal ops are live against the retained cppx tree (SIL-18).
+	// Ops bound to not-yet-sliced screens return a structured UNSUPPORTED error.
 const char * const kUiUnsupportedMsg =
 	"UI op unavailable on cppx path yet (pending later screen slices)";
 
-// --- cppx UI introspection + automation (SIL-18) -------------------------
-// Read-only walks of the retained UiTree (client::ui::ClientUi) + a small
-// injection seam through GameUiPipeline. No friend grant, no handle leak: the
-// control socket sees node snapshots and pushes UiInputFrame edges only.
+	// --- cppx UI introspection + automation (read-only UiTree walks + an
+	// injection seam through GameUiPipeline; no friend grant) ----------------
 
 const char * NodeRoleName(::ui::NodeRole role){
 	switch(role){
@@ -54,8 +49,7 @@ const char * NodeRoleName(::ui::NodeRole role){
 	return "generic";
 }
 
-// A node matches a name if its control id OR accessibility label OR text value
-// equals it (control id first — it's the stable automation handle).
+	// Match on control id (the stable handle) first, then label, then value.
 bool NodeMatchesName(const ::ui::NodeSnapshot& s, const std::string& name){
 	if(s.control_id && name == s.control_id) return true;
 	if(s.accessibility_label && name == s.accessibility_label) return true;
@@ -63,9 +57,8 @@ bool NodeMatchesName(const ::ui::NodeSnapshot& s, const std::string& name){
 	return false;
 }
 
-// First node (pre-order) matching `name`. When focusableOnly, a non-focusable
-// match (e.g. a label text node) never shadows the focusable control carrying
-// the same label.
+	// First pre-order node matching `name`; focusableOnly skips label text nodes
+	// so they don't shadow the focusable control carrying the same label.
 ::ui::NodeId FindUiNode(const ::ui::UiTree& tree, ::ui::NodeId id,
                         const std::string& name, bool focusableOnly,
                         ::ui::NodeSnapshot* out){
@@ -112,9 +105,8 @@ void CollectUiNodes(const ::ui::UiTree& tree, ::ui::NodeId id,
 	}
 }
 
-// Translate a `key` op value into per-frame UiInputFrame edges. Single-character
-// values are typed text (routed to the focused field); named keys map to nav /
-// confirm / cancel / editing keys.
+	// Translate a `key` op value into UiInputFrame edges: single chars are typed
+	// text; named keys map to nav/confirm/cancel/editing.
 void InjectKeyOp(::ui::UiInputFrame& ui, const std::string& key){
 	ui.source = ::ui::UiFocusSource::Keyboard;
 	if(key.size() == 1){
@@ -216,9 +208,7 @@ static nlohmann::json WorldSummaryToJson(const WorldSummary& summary){
 	return r;
 }
 
-// Forward decl for the keybind sub-dispatcher implemented at the bottom of
-// this file. Lives in the same TU because it only ever reads/mutates Game's
-// KeyMap and Config; no other consumers.
+// Defined at the bottom of this TU.
 static void HandleKeybind(Game& game, ControlCommand& cmd);
 static void HandleGas(Game& game, ControlCommand& cmd);
 
@@ -250,18 +240,13 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 		cmd.reply->set_value(OkResult(cmd.id, r));
 		return;
 	}
-	// SIL-23: the legacy clay_*_check probes are retired — the cppx-primitive
-	// ops (inspect / click / set_text over the retained UiTree) are the
-	// supported automation checks. Removed ops fall through to UNKNOWN_OP.
 	if(cmd.op == "state"){
 		nlohmann::json r;
 		r["state"] = Game::StateName(game.GetState());
 		r["frame"] = game.GetFrameCount();
 		r["paused"] = game.paused;
-		// Expose the lobby connection sub-state so test scripts can wait for
-		// AUTHENTICATING before dispatching a Login/Create click — the LobbyConnect
-		// state machine progresses asynchronously through Connect/version
-		// check, and a click before AUTHENTICATING is silently consumed.
+			// Expose the async lobby sub-state: a click before AUTHENTICATING is
+			// silently consumed, so scripts must wait for it first.
 		static const char * lobbyStateNames[] = {
 			"IDLE","WAITING","CONNECTING","RESOLVING","WAITINGFORRESOLVER",
 			"RESOLVED","RESOLVEFAILED","CONNECTIONFAILED","CONNECTED",
@@ -334,9 +319,7 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 		return;
 	}
 	if(cmd.op == "show_update_screen"){
-		// Test-only: drive the game into UPDATING and force the updater into the
-		// requested static phase so the update modal (+ Cancel) renders headlessly.
-		// Mirrors show_message_modal/show_password_modal. Default phase: prompting.
+		// Test-only: force UPDATING + a static updater phase so the modal renders.
 		std::string phase = cmd.args.value("phase", std::string("prompting"));
 		Updater::State s;
 		if(phase == "downloading") s = Updater::DOWNLOADING;
@@ -358,23 +341,20 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 				"cppx UI has not rendered a frame yet"));
 			return;
 		}
-		// SIL-24: push the design-system gallery overlay so the visual-regression
-		// suite can golden every component variant in isolation. Pop via `back`.
+		// Design-system gallery overlay for the visual-regression suite. Pop via `back`.
 		game.GetUiPipeline().ShowGallery();
 		cmd.reply->set_value(OkResult(cmd.id, nlohmann::json::object()));
 		return;
 	}
 	if(cmd.op == "ui_audio"){
-		// Interaction-sound edge counter (hover-enter/activate/nav on audible
-		// buttons) — observable headless where Audio itself is disabled.
+		// Interaction-sound edge counter, observable headless (Audio is disabled).
 		nlohmann::json j;
 		j["clicks"] = game.GetUiPipeline().UiClickCount();
 		cmd.reply->set_value(OkResult(cmd.id, j));
 		return;
 	}
 	if(cmd.op == "rain"){
-		// Capture plumbing: disable the (rand-driven, wall-clock) rain layer so
-		// in-game renders are deterministic against the origin goldens.
+		// Disable the rand/wall-clock rain layer for deterministic golden renders.
 		game.GetRenderer().rainDisabled = !cmd.args.value("enabled", 0);
 		nlohmann::json j;
 		j["enabled"] = !game.GetRenderer().rainDisabled;
@@ -382,9 +362,8 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 		return;
 	}
 	if(cmd.op == "camera"){
-		// Test/capture plumbing: read or pin the world camera. The in-game
-		// camera's follow window has a 100px y-hysteresis (Camera::Follow
-		// h=100/yoffset=30), so its rest position depends on render cadence
+		// Read or pin the world camera. Its follow window has a 100px y-hysteresis
+		// (Camera::Follow h=100/yoffset=30), so its rest depends on render cadence
 		// during the spawn fall — capture scripts pin it to the golden's.
 		Camera & cam = game.GetRenderer().camera;
 		if(cmd.args.contains("x") && cmd.args.contains("y")){
@@ -456,8 +435,6 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 			cmd.reply->set_value(Err(cmd.id, "NOT_FOUND", "no focusable widget: " + label));
 			return;
 		}
-		// Activate by location: a single-frame pointer press+release at the
-		// node center drives the real focus/hit-test path next render.
 		game.GetUiPipeline().InjectPointerClick(s.layout.x + s.layout.width * 0.5f,
 		                                        s.layout.y + s.layout.height * 0.5f);
 		nlohmann::json r;
@@ -501,8 +478,7 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 			cmd.reply->set_value(Err(cmd.id, "NOT_FOUND", "no text field: " + label));
 			return;
 		}
-		// Focus the field (click) and deliver the text in the same frame: the
-		// focus pass runs before text dispatch, so the field receives the insert.
+		// Focus pass runs before text dispatch, so click+text in one frame inserts.
 		game.GetUiPipeline().InjectPointerClick(s.layout.x + s.layout.width * 0.5f,
 		                                        s.layout.y + s.layout.height * 0.5f);
 		::ui::ui_input_push_text(game.GetUiPipeline().UiInput(), text.c_str());
@@ -521,15 +497,13 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 			cmd.reply->set_value(Err(cmd.id, "BAD_ARGS", "hover_at requires --x --y"));
 			return;
 		}
-		// Park a sticky pointer at (x,y); focus-follows-hover tracks it next render.
 		game.GetUiPipeline().InjectPointerMove(x, y);
 		cmd.reply->set_value(OkResult(cmd.id, nlohmann::json::object()));
 		return;
 	}
 	if(cmd.op == "pointer_down"){
-		// SIL-223 test affordance: hold the pointer DOWN at (x,y) across frames so
-		// the PRESSED interaction state (theme.pressed) can be screenshotted. Held
-		// until pointer_up. Accepts a --label (centers on that node) or --x/--y.
+		// Hold the pointer DOWN across frames so the PRESSED state can be
+		// screenshotted; held until pointer_up. Accepts --label or --x/--y.
 		client::ui::ClientUi * ui = game.GetUiPipeline().TryClientUi();
 		if(!ui){
 			cmd.reply->set_value(Err(cmd.id, "WRONG_STATE",
@@ -559,7 +533,6 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 		return;
 	}
 	if(cmd.op == "pointer_up"){
-		// SIL-223 test affordance: release a held pointer_down.
 		if(!game.GetUiPipeline().TryClientUi()){
 			cmd.reply->set_value(Err(cmd.id, "WRONG_STATE",
 				"cppx UI has not rendered a frame yet"));
@@ -570,9 +543,8 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 		return;
 	}
 	if(cmd.op == "scroll"){
-		// SIL-111: inject a scroll-wheel delta. Optionally park the pointer at
-		// (x,y) first so the runtime routes the wheel to that scrollable (wheel
-		// goes to the hovered node, mirroring a real mouse). +dy = wheel up.
+		// Inject a scroll-wheel delta; optional --x/--y parks the pointer so the
+		// wheel routes to that scrollable. +dy = wheel up.
 		if(!game.GetUiPipeline().TryClientUi()){
 			cmd.reply->set_value(Err(cmd.id, "WRONG_STATE",
 				"cppx UI has not rendered a frame yet"));
@@ -677,7 +649,6 @@ void EnqueueWait(Game& game, ControlCommand cmd){
 			w.cmd.reply->set_value(Err(w.cmd.id, "BAD_REQUEST", "step needs frames>0 or ms>0"));
 			return;
 		}
-		// step assumes the caller wanted the sim to advance and re-pause.
 		game.paused = true;
 	}
 	game.pendingWaits.push_back(std::move(w));
@@ -694,11 +665,9 @@ void TickWaits(Game& game){
 			if(w.frames_left == 0) done = true;
 			if(w.deadline_ms > 0 && now >= w.deadline_ms) done = true;
 		} else if(w.cmd.op == "step"){
-			// Frame-based step: completion is when the sim has consumed all step
-			// ticks. stepFramesRemaining is decremented per sim tick (which can
-			// fire multiple times per Loop during catch-up), so it's the canonical
-			// signal — using w.frames_left here would drift when catch-up runs.
-			// w.frames_left > 0 just marks "this step is frame-based".
+			// Frame-based step completes when stepFramesRemaining hits 0 (decremented
+			// per sim tick, which can fire several times per Loop) — the canonical
+			// signal; w.frames_left just marks the step as frame-based.
 			if(w.frames_left > 0 && game.stepFramesRemaining == 0) done = true;
 			if(w.deadline_ms > 0 && now >= w.deadline_ms) done = true;
 		} else if(w.cmd.op == "wait_ms"){
@@ -754,10 +723,9 @@ void HandlePostRender(Game& game, ControlCommand& cmd) {
 }
 
 // ---------------------------------------------------------------------------
-// keybind sub-dispatch (SSM-shaped: list / actions / get / put / unset / use /
-// new / delete). All ops run on the game thread (IMMEDIATE phase) so they can
-// mutate Game's live KeyMap without any locking — the per-frame poll reads
-// the same KeyMap on the same thread.
+// keybind sub-dispatch. All ops run on the game thread (IMMEDIATE phase),
+// so they mutate the live KeyMap without locking (the poll reads it on the
+// same thread).
 // ---------------------------------------------------------------------------
 
 namespace {
@@ -862,11 +830,9 @@ static void HandleKeybind(Game& game, ControlCommand& cmd) {
 		return;
 	}
 
-	// Profile names flow into filesystem paths via WritableProfilePath /
-	// ResolveProfilePath. Reject anything that isn't a plain identifier
-	// before we touch disk — without this, a name like "../foo" can escape
-	// the keybinds directory (and `delete`'s std::remove() could nuke
-	// arbitrary user files). Skip subops that don't take a profile name.
+		// Profile names become filesystem paths; reject non-identifiers before
+		// touching disk (a name like "../foo" escapes the keybinds dir, and
+		// delete's std::remove could nuke arbitrary files).
 	if (subop != "list" && subop != "actions" && cmd.args.contains("profile")) {
 		const std::string profile = cmd.args.value("profile", std::string());
 		if (!profile.empty() && !IsValidProfileName(profile)) {
@@ -898,7 +864,6 @@ static void HandleKeybind(Game& game, ControlCommand& cmd) {
 
 	// ---- actions ------------------------------------------------------
 	if (subop == "actions") {
-		// Defaults come from the built-in "default" profile if it exists.
 		KeyMap def;
 		LoadProfileByName("default", def);
 		nlohmann::json arr = nlohmann::json::array();
@@ -964,8 +929,7 @@ static void HandleKeybind(Game& game, ControlCommand& cmd) {
 			cmd.reply->set_value(Err(cmd.id, "BAD_REQUEST", "put requires --bindings (array)"));
 			return;
 		}
-		// Parse-validate everything BEFORE mutating, so a bad binding never
-		// half-applies. Mirrors SSM's atomic put semantics.
+		// Parse-validate all bindings BEFORE mutating so a bad one never half-applies.
 		std::vector<Binding> parsed;
 		for (const auto& je : cmd.args["bindings"]) {
 			Binding b;
@@ -982,7 +946,6 @@ static void HandleKeybind(Game& game, ControlCommand& cmd) {
 			return;
 		}
 
-		// Load (or copy-on-write) the target profile.
 		KeyMap edit;
 		bool isActive = (profile == activeName);
 		if (isActive) {
@@ -1008,9 +971,8 @@ static void HandleKeybind(Game& game, ControlCommand& cmd) {
 	}
 
 	// ---- unset --------------------------------------------------------
-	// Replace the action's bindings in the writable copy with whatever the
-	// built-in profile of the same name has. If no built-in exists, the
-	// action becomes empty. Other actions in the writable copy are left alone.
+	// unset reverts one action to the built-in profile's value (empty if no
+	// built-in); other actions in the writable copy are untouched.
 	if (subop == "unset") {
 		std::string profile  = cmd.args.value("profile", activeName);
 		std::string actionId = cmd.args.value("action",  std::string());
@@ -1031,7 +993,6 @@ static void HandleKeybind(Game& game, ControlCommand& cmd) {
 			cmd.reply->set_value(Err(cmd.id, "NOT_FOUND", "no such profile: " + profile));
 			return;
 		}
-		// Look up built-in's value.
 		std::string builtinPath;
 		if (BuiltinPathFor(profile, builtinPath)) {
 			KeyMap builtin;
@@ -1150,10 +1111,8 @@ static void HandleKeybind(Game& game, ControlCommand& cmd) {
 	}
 
 	// ---- capture ------------------------------------------------------
-	// Drives the multi-device keybind-capture state machine (SIL-19 §7b) without
-	// SDL: begin → feed (one device edge per call, as a "KEY:..|MOUSE:..|PAD:.."
-	// string) → confirm/cancel. The same state machine the windowed event path
-	// feeds, so this exercises the real capture → use_key_map commit path.
+		// Drives the keybind-capture state machine without SDL (begin -> feed one
+		// device edge per call -> confirm/cancel), exercising the real commit path.
 	if (subop == "capture") {
 		const std::string op = cmd.args.value("op", std::string());
 		GameUiPipeline& pipe = game.GetUiPipeline();
@@ -1214,13 +1173,9 @@ static void HandleKeybind(Game& game, ControlCommand& cmd) {
 // ---------------------------------------------------------------------------
 // gas sub-dispatch
 //
-// `reload` is the only subop. It re-runs GASLoader::Load() against the
-// shipped gas dir. State-gated: actor cache invalidation isn't worth the
-// risk mid-match (per-instance state in robot.cpp/guard.cpp/civilian.cpp
-// caches values from the def at construction), so reload only fires from
-// non-INGAME states. Errors round-trip in the same {file, instancePath,
-// code, message} shape as shared/gas-validation/errors.ts so the agent's
-// remediation loop is platform-agnostic.
+// `reload` re-runs GASLoader::Load(). State-gated: actor caches read def
+// values at construction (robot/guard/civilian), so reload only fires from
+// non-INGAME states. Errors match shared/gas-validation/errors.ts shape.
 // ---------------------------------------------------------------------------
 
 static void HandleGas(Game& game, ControlCommand& cmd) {
@@ -1231,10 +1186,7 @@ static void HandleGas(Game& game, ControlCommand& cmd) {
 	}
 
 	if (subop == "reload") {
-		// Hot-reload is unsafe mid-match: actors cached EnemyDef values at
-		// construction. Restrict to quiescent states. Game's state enum is
-		// private to the class, so compare via the StateName string keys
-		// (same approach as wait_for_state).
+		// Restrict to quiescent states (actors cache def values at construction).
 		const std::string st = Game::StateName(game.GetState());
 		const bool safe = (st == "NONE" || st == "MAINMENU" ||
 		                   st == "LOBBY" || st == "MISSIONSUMMARY");
@@ -1245,10 +1197,8 @@ static void HandleGas(Game& game, ControlCommand& cmd) {
 			return;
 		}
 
-		// On macOS GetResDir() returns "" and the bundle resources are reached
-		// via a chdir set up by CDResDir(); other code paths (CDDataDir, replay
-		// readers) may have moved the cwd since startup. Re-anchor before the
-		// relative "gas" lookup, mirroring resources.cpp::Load.
+		// Re-anchor cwd before the relative "gas" lookup: on macOS resources are
+		// reached via a chdir other code paths may have moved. See resources.cpp::Load.
 		CDResDir();
 		GASLoader& gas = GASLoader::Get();
 		gas.Reload(GetResDir() + "gas");

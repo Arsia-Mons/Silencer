@@ -29,11 +29,6 @@ bool AppRoot::build_element(::ui::UiElementFrame &, ::ui::UiElement *out) {
 namespace client::ui {
 namespace {
 
-// --- Per-phase scaffold view (migration placeholder) ---------------------
-// A full-viewport fill tinted per phase, so the phase reconciliation is
-// observable on-screen and in tests for the phases whose real screens have not
-// landed yet. SIL-19..21 replace the remaining scaffold cases with the authored
-// screen views; AppRoot and the session projection stay put.
 struct PhaseScaffoldProps {
   ::ui::Color color = {};
 };
@@ -57,8 +52,7 @@ struct PhaseScaffoldProps {
 }
 
 // Phase -> screen-factory map, indexed by SessionPhase. Distinct keys per
-// phase so a phase flip is a genuine unmount/mount (the real screens are
-// distinct component types, so this falls out naturally).
+// phase so a phase flip is a genuine unmount/mount.
 struct PhaseScreen {
   ::ui::UiElement (*make)(const char *key);
   const char *key;
@@ -75,7 +69,6 @@ constexpr PhaseScreen kPhaseScreens[] = {
     /* SinglePlayer */ {InGameScreen, "phase-single-player"},
 };
 
-// --- AppRoot view --------------------------------------------------------
 struct AppRootProps {};
 
 ::ui::UiElement AppRootView(const AppRootProps &) {

@@ -11,7 +11,7 @@ void bake_indexed_rgba(const uint8_t *indices, int w, int h,
   for (int i = 0; i < n; ++i) {
     const uint8_t idx = indices[i];
     uint8_t *o = out_rgba + i * 4;
-    if (idx == 0) { // transparent index (world renderer skips pixel==0)
+    if (idx == 0) { // transparent index
       o[0] = 0;
       o[1] = 0;
       o[2] = 0;
@@ -19,7 +19,7 @@ void bake_indexed_rgba(const uint8_t *indices, int w, int h,
       continue;
     }
     const SDL_Color &c = palette256[idx];
-    // Opaque (alpha 255) => premultiplied RGB == straight RGB.
+    // Opaque => premultiplied == straight.
     o[0] = c.r;
     o[1] = c.g;
     o[2] = c.b;
@@ -28,14 +28,12 @@ void bake_indexed_rgba(const uint8_t *indices, int w, int h,
 }
 
 
-// ---- Canonical-phase element bakes (U-2 / SIL-204) -------------------------
+// ---- Canonical-phase element bakes -------------------------
 
 namespace {
 
-// Shared hop 2: NEAREST-magnify a vw x vh virtual index buffer by s from
-// phase 0 (src = int(t/s), t from 0) into tex_w x tex_h RGBA. The footprint
-// ceil(vw*s) x ceil(vh*s) gives every virtual px its full duplication band;
-// index 0 stays transparent.
+// Shared hop 2: NEAREST-magnify a vw x vh virtual index buffer by s from phase
+// 0 (src = int(t/s)) into tex_w x tex_h RGBA. Index 0 stays transparent.
 void magnify_canonical(const uint8_t *vidx, int vw, int vh,
                        const SDL_Color *palette256, float s, int tex_w,
                        int tex_h, uint8_t *out_rgba) {
@@ -74,7 +72,7 @@ void bake_canonical_stretch_rgba(const uint8_t *indices, int sw, int sh,
                                  uint8_t *out_rgba) {
   if (bw <= 0 || bh <= 0 || sw <= 0 || sh <= 0)
     return;
-  // Hop 1 (origin DispatchImage Stretch), box-local int arithmetic.
+  // Hop 1 (Stretch): box-local int arithmetic into a bw x bh virtual buffer.
   const float sx_scale = (float)bw / sw;
   const float sy_scale = (float)bh / sh;
   std::vector<uint8_t> vbuf((size_t)bw * bh, 0u);
@@ -96,7 +94,7 @@ void bake_canonical_nineslice_rgba(const uint8_t *indices, int sw, int sh,
                                    uint8_t *out_rgba) {
   if (bw <= 0 || bh <= 0 || sw <= 0 || sh <= 0)
     return;
-  // origin DispatchButtonNineSlice cap clamps (virtual px).
+  // Nine-slice cap clamps (virtual px).
   const int src_l = std::min(cap_l, sw / 2);
   const int src_r = std::min(cap_r, sw - src_l);
   const int src_t = std::min(cap_t, sh / 2);
@@ -111,11 +109,11 @@ void bake_canonical_nineslice_rgba(const uint8_t *indices, int sw, int sh,
   for (int ly = 0; ly < bh; ++ly) {
     int syi;
     if (ly < dst_t)
-      syi = ly; // top band (cropped corner row)
+      syi = ly;
     else if (ly >= bh - dst_b)
-      syi = sh - (bh - ly); // bottom band
+      syi = sh - (bh - ly);
     else
-      syi = src_t + (ly - dst_t) % src_mid_h; // tiled middle
+      syi = src_t + (ly - dst_t) % src_mid_h; // tiled (not stretched) middle
     if (syi < 0 || syi >= sh)
       continue;
     const uint8_t *srow = indices + (size_t)syi * sw;
@@ -143,8 +141,8 @@ void bake_canonical_contain_rgba(const uint8_t *indices, int sw, int sh,
                                  uint8_t *out_rgba) {
   if (bw <= 0 || bh <= 0 || sw <= 0 || sh <= 0)
     return;
-  // origin DispatchImage Contain: float min-scale, int(+0.5) draw size,
-  // int-centered, per-pixel src = int((p - o) / scale) (C truncation).
+  // Contain: float min-scale, int(+0.5) draw size, int-centered, per-pixel
+  // src = int((p - o) / scale) (C truncation).
   const float cscale = std::min((float)bw / sw, (float)bh / sh);
   if (cscale <= 0.0f)
     return;

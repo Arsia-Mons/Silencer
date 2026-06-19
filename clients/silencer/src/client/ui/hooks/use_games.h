@@ -7,15 +7,8 @@
 
 namespace client::ui {
 
-// One open game in the lobby browser (doc §6). The display fields are
-// pre-formatted by the composition root (the screen never re-derives them);
-// `joinable` / `spectatable` gate the row's actions, `password_protected` flags
-// a locked game. `id` is the lobby game id the join/spectate intents take.
-//
-// The selection info block mirrors origin's game_select_panel RecomputeInfoBlock:
-// five Body lines (game name, "Map: <name>", "<Sec> Security", "Creator: <name>",
-// and "MinLv:.. MaxLv:.. MaxPl:.. MaxTm:.." while pre-game). Pre-formatted here so
-// the screen renders the selected entry's lines verbatim.
+// One open game in the lobby browser. Display fields are pre-formatted by the
+// composition root; the screen renders the info_* lines verbatim.
 struct GameBrowserEntry {
   uint32_t id = 0;
   std::string name = {};
@@ -28,10 +21,9 @@ struct GameBrowserEntry {
   bool password_protected = false;
 };
 
-// A create-game request the GameCreatePanel assembles (doc §6). `map` is a
-// bundled map filename (from Games::bundled_maps); the composition root hashes
-// it and sends MSG_NEWGAME. The security/level/player knobs default to a sane
-// quick-create; the full options form lands in SIL-21 (4/n).
+// A create-game request the GameCreatePanel assembles. `map` is a bundled map
+// filename (Games::bundled_maps); the composition root hashes it and sends
+// MSG_NEWGAME.
 struct CreateGameRequest {
   std::string name = {};
   std::string map = {};
@@ -44,12 +36,8 @@ struct CreateGameRequest {
   bool spectatable = true;
 };
 
-// The games-browser model (doc §6): the open games + the single id-based
-// join/spectate/create intents (no LobbyGame leak). Intents queue deferred
-// mutations over the public lobby/Game seam; the game-join pump (LOBBY tick)
-// drives the connect → staging transition. `bundled_maps` feeds the
-// create-form map picker. (Server-map discovery / upload — use_map_downloader —
-// joins in SIL-21 (4/n).)
+// The games-browser model: the open games + id-based join/spectate/create
+// intents. `bundled_maps` feeds the create-form map picker.
 struct Games {
   std::vector<GameBrowserEntry> entries = {};
   std::vector<std::string> bundled_maps = {};

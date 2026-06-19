@@ -15,27 +15,16 @@ using ::ui::components::BoxProps;
 using ::ui::components::Dialog;
 using ::ui::components::DialogProps;
 
-// Each variant returns a single-root JSX element; the Box-vs-Dialog choice and
-// the per-variant style+visual are encoded here (never exposed as props). Paint
-// resolves through tokens:: surfaces; no frame carries a border (borders belong
-// to panels). Dialog's modal=true default is unchanged, so the Overlay frames
-// keep today's modal behavior.
 ::ui::UiElement ScreenLayout(const ScreenLayoutProps &props) {
   if (props.variant == ScreenLayoutVariant::Game) {
-    // The lobby uses its own dim backdrop (bank 7 idx1), not the bright menu
-    // starfield; origin stretches it (PackImageStretch(7,1)), so no cover here.
-    // Falls back to starfield then flat black until baked.
+    // The lobby's dim backdrop (bank 7 idx1), stretched; falls back to starfield
+    // then flat black until baked.
     client::ui::ChromeTextures chrome = client::ui::use_chrome();
     uint32_t backdrop = chrome.lobby_backdrop ? chrome.lobby_backdrop
                                               : chrome.starfield;
     ::ui::StylePatch game_bg =
         backdrop ? tokens::image_patch(backdrop)
                  : tokens::fill_patch(tokens::kSurfaceGame);
-    // origin lobby_screen.cpp root: rootPadX/regionGap respond to the canvas
-    // width (ScaleLegacyPx), rootPadTop/Bottom 25v. resolve_lobby_panes owns
-    // the arithmetic + the golden-cell logical mapping (at the 853x480 design
-    // canvas: padX 20 (v13), padTop 38 (title top line at v25), gap 19 (body
-    // top at v67 = L100), padBottom 38 (body bottom edge at L682 = v455)).
     LobbyPanes panes = resolve_lobby_panes(client::ui::use_app().canvas_w);
     return <Box
       key={props.key}
@@ -52,9 +41,6 @@ using ::ui::components::DialogProps;
     </Box>
   }
   if (props.variant == ScreenLayoutVariant::Overlay) {
-    // Full-screen options overlays carry the starfield (SIL-100); the sprite
-    // covers the screen behind so the legacy space backdrop reads, with the flat
-    // overlay surface as the not-yet-baked fallback.
     client::ui::ChromeTextures chrome = client::ui::use_chrome();
     uint32_t starfield = props.stretched_backdrop && chrome.starfield_stretched
                              ? chrome.starfield_stretched
@@ -65,15 +51,11 @@ using ::ui::components::DialogProps;
     ::ui::StylePatch overlay_bg =
         starfield ? tokens::image_patch(overlay_img)
                   : tokens::fill_patch(tokens::kSurfaceOverlay);
-    // Clear the Dialog role's default slate border — an image/fill patch leaves
-    // border unset, so resolve() would otherwise draw theme.dialog's rounded
-    // frame as a spurious inner rect over the baked sprite chrome.
+    // Clear the Dialog role's default border, else resolve() draws a spurious
+    // inner rect over the baked sprite chrome.
     overlay_bg.border = ::ui::opt(::ui::Border{
         {0.0f, 0.0f, 0.0f, 0.0f},
         {{0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}}});
-    // Small inset so the near-full-bleed cc/controls frames reach the golden
-    // extents; the options menus center their content so it's unaffected.
-    // gap 28.5 = origin options_screen kButtonGap (19 virtual px x1.5).
     return <Dialog
       key={props.key}
       layout={::ui::LayoutStyle{
@@ -91,10 +73,8 @@ using ::ui::components::DialogProps;
     </Dialog>
   }
   if (props.variant == ScreenLayoutVariant::Hud) {
-    // The in-match HUD floats over the live world: a transparent full-screen
-    // Box (the UI frame composites over the world, so the root must NOT paint
-    // a surface). Children are absolutely positioned at origin's 640x480
-    // sprite anchors (x1.5 logical) — absolute placement IS the origin design.
+    // The in-match HUD floats over the live world: a transparent full-screen Box
+    // (the root must NOT paint a surface). Children are absolutely positioned.
     return <Box
       key={props.key}
       layout={::ui::LayoutStyle{
@@ -107,11 +87,9 @@ using ::ui::components::DialogProps;
     </Box>
   }
   if (props.variant == ScreenLayoutVariant::CenteredOverlay) {
-    // A transparent full-screen centering container (the centered Panel paints
-    // itself). An un-patched Dialog would now resolve theme.dialog.base — an
-    // OPAQUE slate panel — so explicitly clear background + border to preserve
-    // the prior empty-visual look. modal=true (Dialog default) is kept for the
-    // focus trap.
+    // Transparent full-screen centering container. An un-patched Dialog resolves
+    // theme.dialog.base (an opaque panel), so clear background + border; modal
+    // (Dialog default) is kept for the focus trap.
     return <Dialog
       key={props.key}
       layout={::ui::LayoutStyle{
@@ -130,8 +108,7 @@ using ::ui::components::DialogProps;
       {props.children}
     </Dialog>
   }
-  // Menu root: paint the full-bleed bank-6 starfield behind the content.
-  // Falls back to flat black until baked.
+  // Menu root: full-bleed bank-6 starfield, flat black until baked.
   client::ui::ChromeTextures chrome = client::ui::use_chrome();
   ::ui::StylePatch menu_bg = chrome.starfield
                                  ? tokens::image_patch_cover(chrome.starfield)

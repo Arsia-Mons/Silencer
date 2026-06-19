@@ -8,11 +8,8 @@ namespace ui {
 
 namespace {
 
-// Default paint for nodes whose resolved VisualStyle leaves a slot unset (a
-// bare text node with no .visual.text.color; an input's intrinsic
-// selection/caret). These are role/intrinsic defaults — NOT a node.style paint
-// fallback (that legacy path is gone; the transcriber reads node.visual only).
-// Premultiplication happens at emit (premul()), never here.
+// Role/intrinsic default paint for nodes whose resolved VisualStyle leaves a
+// slot unset (bare text color; an input's selection/caret).
 constexpr Color kTransparent = {0, 0, 0, 0};
 constexpr Color kButtonFill = {6, 16, 8, 255};       // near-black green glass
 constexpr Color kButtonDisabledFill = {6, 14, 8, 255};
@@ -24,8 +21,6 @@ constexpr float kFocusBorderOffset = 2.0f;
 constexpr Color kCheckedFill = {34, 192, 76, 255};   // #22C04C toggle-on green
 constexpr Color kInputFill = {18, 22, 28, 255};
 constexpr Color kSelectionFill = {72, 116, 164, 180};
-// Intrinsic caret fallback when the resolved VisualStyle leaves caret unset
-// (no themed app does — the theme's input role carries Caret).
 constexpr Color kCaretFill = {232, 240, 248, 255};
 constexpr float kCaretWidth = 1.0f;
 constexpr Color kTextFill = {92, 208, 92, 255};      // #5CD05C green (bare-text fallback)
@@ -33,8 +28,7 @@ constexpr Color kTextDisabledFill = {46, 90, 55, 255};
 
 bool has_color(Color color) { return color.a > 0; }
 
-// Straight-alpha -> premultiplied (the IR's storage convention). The only
-// transparent color is (0,0,0,0); a==0 always maps to fully transparent.
+// Straight-alpha -> premultiplied (the IR's storage convention).
 Color premul(Color c) {
   return {
       static_cast<uint8_t>(static_cast<int>(c.r) * c.a / 255),
@@ -70,9 +64,8 @@ int clamp_int(int value, int low, int high) {
   return value;
 }
 
-// Emit one Text command for a byte slice at an explicit draw rect. The rect is
-// the already-positioned per-line box (the measurer baked alignment + line y);
-// the executor blits at rect.x/rect.y verbatim.
+// Emit one Text command for a byte slice at an explicit, already-positioned
+// per-line draw rect (the measurer baked in alignment + line y).
 bool push_text_line(DrawCommandList &list, NodeId node_id, const DrawRect &rect,
                     const char *bytes, uint32_t byte_len, Color straight_color,
                     uint16_t font_id, float font_size, uint16_t line_index,
@@ -113,7 +106,6 @@ bool push_text_command(DrawCommandList &list, NodeId node_id, const Rect &rect,
 }
 
 // The content box of a node: its laid-out rect minus its own border + padding.
-// Text layout (wrap width, alignment, line origin) happens inside this box.
 Rect content_rect(const Rect &layout) {
   Rect r = layout;
   r.x = layout.x + layout.border.left + layout.padding.left;
@@ -131,7 +123,7 @@ Rect content_rect(const Rect &layout) {
 
 // Measured pen advance for a byte sub-slice [0,len) of value, via the injected
 // measurer (design §10.5). No measurer (hermetic tests) => fixed 8px/byte so
-// caret math stays deterministic. wrap=None, no box (single run advance).
+// caret math stays deterministic.
 float measured_advance(const char *value, uint32_t len, uint16_t font_id,
                        float font_size, float line_height) {
   if (len == 0)
@@ -153,9 +145,8 @@ float measured_advance(const char *value, uint32_t len, uint16_t font_id,
 }
 
 // Cap-top..baseline of the resolved face, in points, via the injected measurer.
-// Returns 0 when no measurer/ascent is available (caller falls back to the line
-// box). Drives the input caret height so it spans the glyph ink, not the
-// descender-inclusive cell (SIL-217).
+// 0 when unavailable (caller falls back to the line box). Drives the caret
+// height so it spans the glyph ink, not the descender-inclusive cell.
 float measured_ascent(uint16_t font_id, float font_size, float line_height) {
   MeasureTextFn measurer = text_measurer();
   if (!measurer)
@@ -185,9 +176,6 @@ bool push_rect_command(DrawCommandList &list, NodeId node_id, const Rect &rect,
   return list.push(command);
 }
 
-// GRADIENT FILL: emit a Gradient command (the gradient IS the fill, replacing
-// the solid Rect). Authored stops are STRAIGHT alpha; premultiply at emit, the
-// IR's storage convention. Stops live in the list's grad_arena via push_stops.
 bool push_gradient_command(DrawCommandList &list, NodeId node_id,
                            const Rect &rect, const Gradient &gradient,
                            float corner_radius) {
@@ -216,15 +204,12 @@ bool push_gradient_command(DrawCommandList &list, NodeId node_id,
   return list.push(command);
 }
 
-// SHADOW: emit a Shadow command BEFORE the fill so it sits behind the node
-// (design §9.8 ordering: Shadow -> fill/Gradient/Image -> children -> Border).
-// Only the component-resolved VisualStyle carries a shadow (no legacy source);
-// emit when shadow.color.a>0. The shadow color is authored straight; premultiply
-// at emit, the IR's storage convention.
+// Shadow command, emitted before the fill so it sits behind the node
+// (design §9.8 order: Shadow -> fill/Gradient/Image -> children -> Border).
 bool append_shadow(DrawCommandList &list, const NodeSnapshot &node) {
   const Shadow &sh = node.visual.shadow;
   if (sh.color.a == 0)
-    return true; // no shadow => emit nothing (resolved-output presence cue).
+    return true;
 
   DrawCommand command = {};
   command.kind = DrawCommandKind::Shadow;
@@ -240,15 +225,12 @@ bool append_shadow(DrawCommandList &list, const NodeSnapshot &node) {
   return list.push(command);
 }
 
-// IMAGE: emit an Image command (textured rect) AFTER the fill (design §9.8:
-// fill/Gradient/Image). Only the component-resolved VisualStyle carries an
-// image; emit when image.texture_id!=0. The tint is authored straight;
-// premultiply at emit. nine_slice + corner_radius pass through verbatim (the
-// executor cuts radius on nine-slice per §9.7).
+// Image command (textured rect), emitted after the fill (design §9.8). The
+// executor cuts corner_radius on nine-slice per §9.7.
 bool append_image(DrawCommandList &list, const NodeSnapshot &node) {
   const BackgroundImage &bi = node.visual.image;
   if (bi.texture_id == 0)
-    return true; // no image => emit nothing (resolved-output presence cue).
+    return true;
 
   DrawCommand command = {};
   command.kind = DrawCommandKind::Image;
@@ -269,9 +251,8 @@ bool append_image(DrawCommandList &list, const NodeSnapshot &node) {
   return list.push(command);
 }
 
-// FILL: emit a Rect command carrying only the resolved fill (the legacy
-// append_rect fused fill + border + focus into one command; the new IR splits
-// the stroke into a separate Border command, emitted by append_frame).
+// Rect command carrying only the resolved fill; the stroke is a separate Border
+// command emitted by append_frame.
 bool append_rect(DrawCommandList &list, const NodeSnapshot &node,
                  bool focused) {
   const VisualStyle &v = node.visual;
@@ -285,17 +266,15 @@ bool append_rect(DrawCommandList &list, const NodeSnapshot &node,
     return true;
   }
 
-  // A resolved gradient (stop_count>0) IS the fill — emit it in place of the
-  // solid Rect. Gradients only ever come from the resolved VisualStyle.
+  // A resolved gradient IS the fill — emit it in place of the solid Rect.
   if (v.gradient.stop_count > 0) {
     return push_gradient_command(list, node.id, node.layout, v.gradient,
                                  v.corner_radius);
   }
 
   // Sprite-backed (image) controls carry their own baked interior, so skip the
-  // intrinsic vector control fill — mirror append_frame's texture_id guard. Without
-  // this, a control_fill rect slabs an opaque pill behind a transparent-interior
-  // oval/chrome sprite (the golden ovals are transparent over the backdrop).
+  // intrinsic vector control fill — else a control_fill rect slabs an opaque pill
+  // behind a transparent-interior sprite. Mirrors append_frame's texture_id guard.
   Color fill = has_color(v.background)
                    ? v.background
                    : (control_box && v.image.texture_id == 0 && !v.chromeless
@@ -305,10 +284,8 @@ bool append_rect(DrawCommandList &list, const NodeSnapshot &node,
   return push_rect_command(list, node.id, node.layout, fill, v.corner_radius);
 }
 
-// FRAME: the fused per-side border + signed-offset outline (focus ring). Mirror
-// append_rect's source-selection: component-resolved border preferred, else the
-// legacy single-color style/control border mapped to all four sides; outline is
-// the component-resolved focus ring, else the legacy focus injection.
+// The per-side border + signed-offset outline (focus ring): the resolved border,
+// else a control-role default; the resolved outline, else the focus-ring fallback.
 bool append_frame(DrawCommandList &list, const NodeSnapshot &node,
                   bool focused) {
   const VisualStyle &v = node.visual;
@@ -316,10 +293,8 @@ bool append_frame(DrawCommandList &list, const NodeSnapshot &node,
                      node.role == NodeRole::Checkbox ||
                      node.role == NodeRole::Input;
 
-  // Border: the resolved per-side VisualStyle border, else a control-role
-  // default (a 1px border in the role's border color). Non-control boxes with
-  // no resolved border get none. ANY painted side qualifies (side-masked
-  // frames — e.g. the lobby stepped-pane seams — paint right/bottom only).
+  // ANY painted side qualifies — side-masked frames (e.g. the lobby
+  // stepped-pane seams) paint right/bottom only.
   Border border = {};
   bool has_border = false;
   const bool any_border_side =
@@ -331,8 +306,8 @@ bool append_frame(DrawCommandList &list, const NodeSnapshot &node,
     border = v.border;
     has_border = true;
   } else if (control_box && v.image.texture_id == 0 && !v.chromeless) {
-    // Sprite-backed (image) or chromeless controls carry their own baked edge
-    // (or none), so skip the intrinsic vector control border.
+    // Sprite-backed or chromeless controls carry their own baked edge, so skip
+    // the intrinsic vector control border.
     Color border_color =
         node.interaction.disabled ? kButtonDisabledBorder : kButtonBorder;
     border.width = {1.0f, 1.0f, 1.0f, 1.0f};
@@ -340,8 +315,6 @@ bool append_frame(DrawCommandList &list, const NodeSnapshot &node,
     has_border = true;
   }
 
-  // Outline / focus ring: prefer the component-resolved outline, else the
-  // legacy any-source injection (focused && !disabled).
   Outline outline = {};
   bool has_outline = false;
   if (v.outline.color.a > 0 && v.outline.width > 0.0f) {
@@ -349,8 +322,8 @@ bool append_frame(DrawCommandList &list, const NodeSnapshot &node,
     has_outline = true;
   } else if (focused && !node.interaction.disabled &&
              v.image.texture_id == 0 && !v.chromeless) {
-    // Sprite-backed (image) or chromeless controls own their own focus look, so
-    // the vector fallback focus ring is injected only for vector controls.
+    // Sprite-backed or chromeless controls own their focus look; the vector
+    // fallback focus ring applies only to vector controls.
     outline = {kFocusBorderWidth, kFocusBorder, kFocusBorderOffset};
     has_outline = true;
   }
@@ -358,7 +331,6 @@ bool append_frame(DrawCommandList &list, const NodeSnapshot &node,
   if (!has_border && !has_outline)
     return true;
 
-  // Premultiply every color into the IR.
   if (has_border) {
     border.color.top = premul(border.color.top);
     border.color.right = premul(border.color.right);
@@ -383,10 +355,9 @@ bool append_frame(DrawCommandList &list, const NodeSnapshot &node,
   return list.push(command);
 }
 
-// TEXT (role==Text): measure-driven, multi-line. Asks the injected measurer for
-// per-line layout (alignment + wrap baked in) and emits one Text command per
-// LineRun, line_index propagated. Measure == layout because both call the same
-// measurer (design §10.4). Overflow beyond UI_MAX_TEXT_LINES is a failed frame.
+// TEXT (role==Text): measure-driven, multi-line. Emits one Text command per
+// measured LineRun. Measure == layout (same measurer, design §10.4). Overflow
+// beyond UI_MAX_TEXT_LINES is a failed frame, never a silent drop.
 bool append_text(DrawCommandList &list, const NodeSnapshot &node,
                  bool inherited_disabled) {
   if (node.role != NodeRole::Text)
@@ -429,8 +400,7 @@ bool append_text(DrawCommandList &list, const NodeSnapshot &node,
     if (line.slice_offset + line.slice_len > value_len)
       return false; // measurer returned an out-of-range slice — fail the frame
     DrawRect rect = {content.x + line.x, content.y + line.y, line.w, line.h};
-    // The reveal ramp lives at the trailing edge of the text, so it applies only
-    // to the last line of this node (earlier lines are fully settled).
+    // The reveal ramp lives at the text's trailing edge: last line only.
     const bool last_line = (i + 1 == metrics.line_count);
     if (!push_text_line(list, node.id, rect, value + line.slice_offset,
                         line.slice_len, color, font_id, font_size, i, align,
@@ -447,9 +417,8 @@ bool append_text(DrawCommandList &list, const NodeSnapshot &node,
 }
 
 // INPUT contents (role==Input): selection rect, value text, caret rect. Caret
-// and selection x come from REAL measured advances of the value's byte prefixes
-// (design §10.5) — never the old kCharWidth=8 hack — so the cursor lands exactly
-// under the glyph the same measurer laid out.
+// and selection x come from real measured advances of the value's byte prefixes
+// (design §10.5), so the cursor lands exactly under the laid-out glyph.
 bool append_input_contents(DrawCommandList &list, const NodeSnapshot &node,
                            bool focused, bool inherited_disabled,
                            InputScrollStore *input_scroll) {
@@ -457,8 +426,7 @@ bool append_input_contents(DrawCommandList &list, const NodeSnapshot &node,
     return true;
 
   // The text pen sits at the input's content box (border + padding), so the
-  // screen owns the inset (origin TextInput contentInsetX analog) — the
-  // transcriber adds none of its own.
+  // screen owns the inset — the transcriber adds none of its own.
   constexpr float kTextHeight = 16.0f;
   const float inset_l = node.layout.border.left + node.layout.padding.left;
   const float inset_r = node.layout.border.right + node.layout.padding.right;
@@ -488,17 +456,15 @@ bool append_input_contents(DrawCommandList &list, const NodeSnapshot &node,
     selection_end = tmp;
   }
 
-  // Measured pen x for the prefix [0, idx) of the value.
   auto advance_to = [&](int idx) -> float {
     int display_idx = clamp_int(idx, 0, display_length);
     return measured_advance(display_value, static_cast<uint32_t>(display_idx), font_id,
                             font_size, line_height);
   };
 
-  // Single-line horizontal scroll (origin TextInput behavior): window the value
-  // so the caret stays visible — a value longer than the box scrolls instead of
-  // overflowing. The window leaves a caret-width sliver at the right edge so the
-  // end-of-text caret isn't clipped. An UNFOCUSED field shows from its start.
+  // Single-line horizontal scroll: window the value so the caret stays visible.
+  // The window leaves a caret-width sliver at the right edge so the end-of-text
+  // caret isn't clipped. An unfocused field shows from its start.
   float caret_w =
       node.visual.caret.width > 0.f ? node.visual.caret.width : kCaretWidth;
   float caret_px = advance_to(clamp_int(node.text_edit.caret, 0, length));
@@ -511,15 +477,14 @@ bool append_input_contents(DrawCommandList &list, const NodeSnapshot &node,
     max_scroll = 0.f;
   float scroll_x = 0.f;
   if (focused && input_scroll) {
-    // Stateful minimal scroll: shift the window only when the caret would fall
-    // off an edge, so arrowing left through visible text keeps the rightmost
-    // glyph in view (the window doesn't chase the caret until it hits an edge).
+    // Stateful minimal scroll: shift the window only when the caret falls off an
+    // edge, so the window doesn't chase the caret until it hits an edge.
     auto it = input_scroll->find(node.id);
     float prev = it != input_scroll->end() ? it->second : 0.f;
     if (caret_px < prev)
-      prev = caret_px; // caret left of the window -> reveal left
+      prev = caret_px;
     else if (caret_px > prev + visible_w)
-      prev = caret_px - visible_w; // caret right of the window -> reveal right
+      prev = caret_px - visible_w;
     if (prev > max_scroll)
       prev = max_scroll;
     if (prev < 0.f)
@@ -527,8 +492,7 @@ bool append_input_contents(DrawCommandList &list, const NodeSnapshot &node,
     (*input_scroll)[node.id] = prev;
     scroll_x = prev;
   } else if (focused) {
-    // Stateless right-pin fallback (no store, e.g. tests/goldens): keep the
-    // caret glued to the right edge once the value overflows.
+    // Stateless right-pin fallback (no store, e.g. tests/goldens).
     scroll_x = caret_px - visible_w;
     if (scroll_x < 0.f)
       scroll_x = 0.f;
@@ -536,9 +500,9 @@ bool append_input_contents(DrawCommandList &list, const NodeSnapshot &node,
     input_scroll->erase(node.id); // drop stale offset; unfocused shows the head
   }
 
-  // Clip the value/selection/caret to the content window so the scrolled text
-  // never bleeds past the field's edges. The border was already painted (it runs
-  // before input contents), so this only scissors the glyphs.
+  // Clip value/selection/caret to the content window so scrolled text doesn't
+  // bleed past the field edges. The border was already painted, so this only
+  // scissors the glyphs.
   Rect clip_rect = {};
   clip_rect.x = text_rect.x;
   clip_rect.y = node.layout.y;
@@ -579,13 +543,10 @@ bool append_input_contents(DrawCommandList &list, const NodeSnapshot &node,
   if (focused && node.text_edit.show_caret) {
     int caret = clamp_int(node.text_edit.caret, 0, length);
     float caret_x = advance_to(caret);
-    // Caret height tracks the glyph INK, not the box. The glyph atlas cell
-    // includes descender space below the baseline (g/j/p/q/y), and glyphs are
-    // top-aligned at text_y; a caret sized to the full cell / box therefore
-    // hangs ~1-2px below the visible baseline of non-descender text (SIL-217).
-    // Span cap-top..baseline (the measured ascent), top-aligned with the text,
-    // so the caret matches the ink for ALL inputs. Fall back to the legacy
-    // min(boxH*4/5, line box) when ascent is unavailable (no measurer).
+    // Caret height tracks the glyph ink (measured ascent, cap-top..baseline,
+    // top-aligned with the text), not the descender-inclusive cell — else it
+    // hangs ~1-2px below the visible baseline. Falls back to min(boxH*4/5, line
+    // box) when ascent is unavailable.
     const Caret &ck = node.visual.caret;
     float ascent = measured_ascent(font_id, font_size, line_height);
     Rect caret_rect = {};
@@ -593,7 +554,7 @@ bool append_input_contents(DrawCommandList &list, const NodeSnapshot &node,
     caret_rect.width = ck.width > 0.f ? ck.width : kCaretWidth;
     if (ascent > 0.f) {
       caret_rect.height = ascent;
-      caret_rect.y = text_y; // top-aligned with the top-aligned glyph cell
+      caret_rect.y = text_y;
     } else {
       float caret_h = node.layout.height * 0.8f;
       float line_box = line_height > 0.f ? line_height : kTextHeight;
@@ -618,10 +579,9 @@ bool append_input_contents(DrawCommandList &list, const NodeSnapshot &node,
   return true;
 }
 
-// Emit a LayerPush bracketing the node's subtree (design §9.10). The header rect
-// is the node's border-box; the executor sizes a transient render-to-target to
-// it and composites the whole subtree back at the layer opacity, so overlapping
-// translucent children flatten once (no double-darkening).
+// LayerPush bracketing the node's subtree (design §9.10): the executor renders
+// it to a transient target and composites back at the layer opacity, so
+// overlapping translucent children flatten once (no double-darkening).
 bool push_layer(DrawCommandList &list, const NodeSnapshot &node) {
   DrawCommand command = {};
   command.kind = DrawCommandKind::LayerPush;
@@ -638,11 +598,9 @@ bool pop_layer(DrawCommandList &list, const NodeSnapshot &node) {
   return list.push(command);
 }
 
-// CLIP: overflow != Visible brackets the node's children in a ClipPush/ClipPop
-// so content outside the node's box is scissored away (design §9.7). The clip
-// rect is the node's layout (border) box; the executor intersects nested clips.
-// Required by the scroll-viewport primitive (SIL-111): the content track is
-// translated up by the scroll offset and clipped to the viewport window.
+// CLIP: overflow != Visible brackets the children in ClipPush/ClipPop, scissoring
+// content outside the node's border box (design §9.7; the executor intersects
+// nested clips). Required by the scroll-viewport primitive.
 bool push_clip(DrawCommandList &list, const NodeSnapshot &node) {
   DrawCommand command = {};
   command.kind = DrawCommandKind::ClipPush;
@@ -665,24 +623,21 @@ bool append_node(const UiTree &tree, DrawCommandList &list, NodeId id,
   if (!tree.snapshot(id, &node))
     return false;
 
-  // hidden => skip paint entirely (layout already happened upstream; design
-  // §9.10 / §8.5). The node and its subtree contribute nothing to the IR.
+  // hidden => skip paint for the node and its subtree (design §9.10 / §8.5).
   if (node.visual.hidden)
     return true;
 
   bool disabled = inherited_disabled || node.interaction.disabled;
   bool focused = focused_id != 0 && focused_id == node.id;
 
-  // Group opacity: opacity < 1 brackets the node's own paint + subtree in a
-  // LayerPush/LayerPop so the executor composites the group as a unit (design
-  // §9.10). opacity >= 1 emits no layer (the common path). Brackets are
-  // contiguous and balanced by construction (push before paint, pop after).
+  // Group opacity < 1 brackets the node's paint + subtree in a LayerPush/Pop so
+  // the executor composites the group as a unit (design §9.10).
   const bool layer = node.visual.opacity < 1.0f;
   if (layer && !push_layer(list, node))
     return false;
 
   // Paint order per design §9.8: Shadow -> fill/Gradient -> Image -> [children]
-  // -> Border+Outline. (Children are appended after this node's own paint.)
+  // -> Border+Outline.
   if (!append_shadow(list, node) ||
       !append_rect(list, node, focused) ||
       !append_image(list, node) ||

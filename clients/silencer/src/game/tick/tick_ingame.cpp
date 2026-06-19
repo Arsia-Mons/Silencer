@@ -72,20 +72,14 @@ if(/*!world.map.loaded && */stateisnew){
 	renderer.palette.SetParallaxColors(world.map.parallax);
 	GetScreenBuffer().Clear(0);
 	gameRenderer.SetColors(renderer.palette.GetColors());
-	// SIL-236: the game loop's ambience-palette refresh (game_loop.cpp ~302)
-	// runs only on an ambience-level change or inside the fade-in window
-	// (FadePhase <= 15). Under the clock-based fade, the slow LoadMap above blows
-	// past that window before the block first runs, so on a non-first game (the
-	// cached oldambiencelevel already equals this map's) it is skipped on entry
-	// and the world keeps the un-ambience'd base palette — too bright, black sky,
-	// invisible weather — until a base round-trip finally changes the ambience.
-	// Init the lighted palette and invalidate the cached level so the loop
-	// applies the ambience palette once the fade settles.
+	// The slow LoadMap above can outrun the game loop's ambience-refresh window,
+	// so init the lighted palette and invalidate the cached level (oldambiencelevel
+	// ^ 0xFF) to force one ambience apply once the fade settles — else a non-first
+	// game keeps the un-ambience'd base palette (too bright, black sky, no weather).
 	Uint8 ambiencelevel = renderer.GetAmbienceLevel();
 	renderer.palette.CalculateLighted(ambiencelevel);
 	gameSession.AmbienceMixerRef().oldambiencelevel = ambiencelevel ^ 0xFF;
 	gameSession.AmbienceMixerRef().LoadRandomGameMusic();
-	// Activate the game mode specified by the lobby config.
 	delete world.gameMode;
 	world.gameMode = GameModeFactory((GameModeId)world.gameinfo.modeId);
 	world.gameMode->OnMatchStart(world);
@@ -96,7 +90,6 @@ if(/*!world.map.loaded && */stateisnew){
 		gameSession.AmbienceMixerRef().PlayMusic(world.resources.gamemusic);
 	}
 	if(world.replay.IsPlaying()){
-		// replay controls
 		if(world.peers.localpeerid == world.peers.authoritypeer && !gameSession.DeployMessageShownRef()){
 			for(int i = 0; i < world.maxpeers; i++){
 				if(world.peers.peerlist[i] && i != world.peers.authoritypeer){
@@ -194,18 +187,15 @@ if(/*!world.map.loaded && */stateisnew){
 		}else{
 			world.replay.showallnames = false;
 		}
-		//
 		if(!world.replay.ReadToNextTick(world)){
 			world.replay.EndPlaying();
 			GoToState(MAINMENU);
 		}
 	}
-	// Spectator controls. Mirrors the replay block above but reads from
-	// localinput edges and writes to World::viewedpeerid + World::spectator,
-	// not localpeerid (network identity stays put for observers).
+		// Spectator controls: write viewedpeerid/spectator, NOT localpeerid
+		// (an observer's network identity stays put).
 	if(world.IsLocalObserver()){
 		Input & prevtick = world.replication.localinputhistory[(world.tickcount - 1) % world.maxlocalinputhistory];
-		// Default-mode follow: first applicable tick after a candidate exists.
 		if(!world.spectator.initialized){
 			Uint8 picked = world.viewedpeerid;
 			bool found = false;
@@ -239,9 +229,8 @@ if(/*!world.map.loaded && */stateisnew){
 				world.spectator.initialized = true;
 			}
 		}
-		// If currently-followed peer became invalid (disconnected, lost
-		// its Player), auto-step to the next valid candidate so the
-		// spectator's view doesn't freeze.
+			// Auto-step to the next valid peer if the followed one went invalid
+			// (disconnected / lost its Player), so the view doesn't freeze.
 		if(world.spectator.initialized && !world.spectator.freecam){
 			Peer * cur = world.peers.peerlist[world.viewedpeerid];
 			bool stale = !cur || cur->observer || cur->controlledlist.empty()
@@ -259,9 +248,8 @@ if(/*!world.map.loaded && */stateisnew){
 				}
 			}
 		}
-		// Move Right cycles to the next player; Move Left to the previous.
-		// Reusing movement bindings means observers don't need a separate
-		// keybind row — the inputs are unused for them otherwise.
+			// Reuse movement bindings to cycle players (unused for observers):
+			// Move Right -> next, Move Left -> previous.
 		if(world.localinput.keymoveright && !prevtick.keymoveright){
 			for(int step = 1; step <= (int)world.maxpeers; step++){
 				int i = (world.viewedpeerid + step) % world.maxpeers;
@@ -286,8 +274,7 @@ if(/*!world.map.loaded && */stateisnew){
 				break;
 			}
 		}
-		// Hold Activate to reveal all player names. Free-cam state/renderer
-		// path is preserved but no input drives it.
+			// Hold Activate to reveal all player names.
 		world.spectator.holdshowallnames = world.localinput.keyactivate;
 	}
 	Peer * localpeer = world.peers.peerlist[world.peers.localpeerid];

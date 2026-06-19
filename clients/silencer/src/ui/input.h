@@ -79,8 +79,8 @@ struct UiInputFrame {
   bool pointer_down = false;
   bool pointer_released = false;
 
-  // Accumulated scroll-wheel delta this frame (lines/notches; +y = wheel up).
-  // Routed to the hovered scrollable in the runtime. SIL-111.
+  // Scroll-wheel delta this frame (+y = wheel up); routed to the hovered
+  // scrollable.
   float wheel_x = 0.0f;
   float wheel_y = 0.0f;
 

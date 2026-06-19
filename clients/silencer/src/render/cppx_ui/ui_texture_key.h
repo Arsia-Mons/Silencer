@@ -1,14 +1,10 @@
 #pragma once
 
-// ui_texture_key.h — stable uint64 keys for the GPU UI texture cache (SIL-240).
-//
-// The GPU backend caches resident SDL_GPUTextures by an opaque uint64 key
-// (sdl3gpubackend ui_tex_cache), flushing the whole cache when the cppx
-// registries reset (texture_generation bump). The keys only need to be:
-//   - injective across the distinct texture sources within one generation, and
-//   - stable frame-to-frame so a texture uploads once and is reused.
-// The high byte tags the source so the small per-source ids (TextureRegistry
-// 1-based slots, GlyphFonts face ids) can't collide.
+// Stable uint64 keys for the GPU UI texture cache. The backend caches resident
+// textures by this key, flushing on a texture_generation bump. The high byte
+// tags the source so the small per-source ids (TextureRegistry slots, GlyphFonts
+// face ids) can't collide; keys must be injective within a generation and stable
+// frame-to-frame.
 
 #include <cstdint>
 

@@ -69,9 +69,8 @@ void GameRenderer::RefreshWindowPixelSize() {
 }
 
 bool GameRenderer::SyncRenderSurfaceToWindowPixels() {
-    // A resize/pixel-size event fired (or init) — this is the single point that
-    // re-reads the window size, so the cached size the menu canvas keys off stays
-    // authoritative and never lags a transient render-frame poll.
+    // The single point that re-reads the window size (resize/init), so the cached
+    // size the menu canvas keys off never lags a transient render-frame poll.
     RefreshWindowPixelSize();
     if (game.world.map.loaded) {
         return ResizeRenderSurfacePixels(kLegacyRenderWidth, kLegacyRenderHeight);
@@ -99,27 +98,16 @@ bool GameRenderer::ResizeRenderSurface(int width, int height) {
 
 float GameRenderer::UiFadeAlpha() const {
     using namespace GameState;
-    // The cppx UI layer must fade with the world ONLY during a real screen
-    // transition (the FADEOUT palette fade and the fade-in that follows it). At
-    // in-match rest the world palette is driven by ambience, not the transition
-    // fade, so the HUD must stay full — but we cannot gate that on map.loaded: it
-    // stays true for the WHOLE FADEOUT leaving a match (UnloadGame runs a frame
-    // late, in the MAINMENU stateisnew branch) and for the first menu frame after
-    // the switch. That left the HUD + "standby" text at full brightness while the
-    // world dimmed to black on exit, and flashed the first menu frame bright before
-    // the fade-in took over. Gate on the projected session phase instead: an
-    // in-match phase that is NOT mid-FADEOUT is ambience/overlay brightness (stay
-    // full); everything else mirrors the world fade. Ambience never enters FADEOUT
-    // and never moves fade_i, so the HUD still does not dim with ambience.
+    // The cppx UI fades with the world only during a real screen transition (a
+    // FADEOUT and its fade-in). Gate on the projected session phase, NOT
+    // map.loaded: map.loaded stays true through the whole FADEOUT leaving a match
+    // (UnloadGame runs a frame late) and into the first menu frame, which would
+    // hold the HUD bright while the world dimmed. Ambience never moves fade_i, so
+    // it never dims the HUD through this path.
     const Uint8 st = game.GetState();
     const int phase = static_cast<int>(fade_i);
     const bool fading = phase < 16;
-    // A real state transition (FADEOUT) always dims out; a Tier-1 overlay fade
-    // dims out when its direction says so (fade_i is moving and dir == Out).
     const bool fadingOut = (st == FADEOUT) || (fading && fadeDir_ == FadeDir::Out);
-    // In-match HUD stays at full brightness EXCEPT while a transition fades OUT
-    // (leaving the match, or an in-match overlay dimming to black). Ambience
-    // never moves fade_i, so it never dims the HUD through this path.
     if (!fadingOut) {
         using ::client::ui::SessionPhase;
         const SessionPhase ph = silencer::game_ui::project_session_phase(st, game.fadefromstate);
@@ -128,15 +116,13 @@ float GameRenderer::UiFadeAlpha() const {
         }
     }
     if (!fading)
-        return 1.0f; // at rest
+        return 1.0f;
     // Mirror ApplyPaletteFade's brightness exactly so UI and world fade together.
     int brightness;
     if (fadingOut) {
-        // Fading OUT: full at phase 0 -> black at phase 15.
         int p = phase > 15 ? 15 : phase;
         brightness = (15 - p) * 8;
     } else {
-        // Fading IN: dark at phase 0 -> full at phase >= 15.
         if (phase >= 15)
             return 1.0f;
         brightness = phase * 8;
@@ -154,8 +140,6 @@ void GameRenderer::Present() {
     if (renderdevice) {
         renderdevice->UploadFrame(screenbuffer.pixels.data(), screenbuffer.w, screenbuffer.h);
 #ifdef SILENCER_CPPX_FONT_DIR
-        // SIL-11 end-to-end demo: when SILENCER_CPPX_UI_DEMO is set, render a cppx
-        // nine-slice button + TTF text and hand it to the device's UI composite pass.
         if (window && std::getenv("SILENCER_CPPX_UI_DEMO")) {
             int pw = 0, ph = 0;
             if (SDL_GetWindowSizeInPixels(window, &pw, &ph) && pw > 0 && ph > 0) {
@@ -170,15 +154,10 @@ void GameRenderer::Present() {
             }
         }
 #endif
-        // SIL-14: when the golden cppx render path is active, composite its
-        // premultiplied-RGBA frame over the world through the UI composite pass.
         {
-            // SIL-219: fade the cppx UI layer in lockstep with the FADEOUT palette fade so
-            // the UI fades out/in with the world on the transitions that already fade it.
             const float uiFadeAlpha = UiFadeAlpha();
-            // SIL-240: GPU geometry path — submit the program built this frame. The fade is
-            // a GPU multiply at composite time (no per-pixel CPU dim, no full-window upload),
-            // so fades and minimap-hover re-render cheaply every frame.
+            // GPU geometry path: submit this frame's program. The fade is a GPU
+            // multiply at composite time, so fades/hover re-render cheaply.
             if (const silencer::cppx_ui::GpuUiProgram *prog = game.gameUiPipeline.CppxUiProgram()) {
                 renderdevice->SubmitUiFrame(*prog, uiFadeAlpha);
                 lastUiFadeAlpha_ = uiFadeAlpha;
@@ -187,12 +166,10 @@ void GameRenderer::Present() {
                 int uh = 0;
                 const uint8_t *uirgba = game.gameUiPipeline.CppxUiFrame(uw, uh);
                 if (uirgba && uw > 0 && uh > 0) {
-                    // SIL-237: skip the GPU UI upload when the pipeline rastered nothing new (the
-                    // IR was byte-identical) AND the fade alpha is unchanged. The backend retains
-                    // the last-uploaded ui_tex and re-composites it every Present, so the menu
-                    // stays on screen without re-uploading a static frame. The fade alpha is
-                    // applied at upload time (not in the IR), so a fade in progress MUST re-upload
-                    // even when the IR is identical, or the fade would freeze.
+                    // Skip the upload only when the IR is byte-identical AND the fade
+                    // alpha is unchanged: the backend re-composites the retained
+                    // ui_tex each Present. The fade is applied at upload time (not in
+                    // the IR), so an in-progress fade MUST re-upload or it freezes.
                     const bool uiUnchanged =
                         game.gameUiPipeline.CppxUiUnchanged() && uiFadeAlpha == lastUiFadeAlpha_;
                     if (!uiUnchanged) {
@@ -200,9 +177,8 @@ void GameRenderer::Present() {
                         lastUiFadeAlpha_ = uiFadeAlpha;
                     }
                 } else {
-                    // No cppx frame this present (host not ready): nothing to composite. Reset the
-                    // fade sentinel so the next real frame always re-uploads (matches the original
-                    // no-op-when-null behavior, just tracking the upload state for the skip).
+                    // No cppx frame this present: reset the fade sentinel so the next
+                    // real frame always re-uploads.
                     lastUiFadeAlpha_ = -1.0f;
                 }
             }

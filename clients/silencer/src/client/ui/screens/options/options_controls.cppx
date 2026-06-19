@@ -31,11 +31,8 @@ using ::ui::components::ScrollViewProps;
 using ::ui::components::Text;
 using ::ui::components::TextProps;
 
-// Keybind-grid geometry, origin options_controls_screen.cpp x1.5: a FIXED
-// 729-wide content column centered in the panel; rows are [label 270 | bind
-// oval 168 | OR 67.5 | bind oval 168] with 18 column gaps (270+18+168+18+67.5+
-// 18+168 = 727.5). Keybind rows flex-grow in origin; the golden resolves to
-// an 81px row with a 15px gap (96 pitch, origin 54+10), 4 rows visible.
+// Keybind-grid geometry, origin options_controls_screen.cpp x1.5. Row =
+// [label 270 | bind oval 168 | OR 67.5 | bind oval 168] with 18 col gaps.
 constexpr float kContentW = 729.0f;
 constexpr float kLabelCol = 270.0f;  // kActionNameW 180 x1.5
 constexpr float kColGap = 18.0f;     // kColumnGap 12 x1.5
@@ -50,7 +47,6 @@ constexpr float kPresetRowH = 64.5f; // kPresetRowH 43 x1.5
 constexpr float kSectionGap = 10.5f; // kSectionGap 8 x1.5, -1.5 golden-measured
 constexpr float kViewportH = kRowH * 3.0f + kRowContentH; // 4 visible rows
 
-// One left-aligned grid label (origin TextSize::Heading, bank 134).
 ::ui::UiElement grid_label(const char *value) {
   return <Text
     key="lbl"
@@ -60,17 +56,11 @@ constexpr float kViewportH = kRowH * 3.0f + kRowContentH; // 4 visible rows
   />
 }
 
-// SIL-108: rebind auto-cancels after this many frames of inactivity (origin/main
-// used a 72-tick capture timeout; the capture hook delegates it to the screen).
 constexpr int kRebindTimeoutFrames = 72;
 
-// origin's two-slot binding view (options_controls_screen.cpp ViewLegacy):
-// every action renders as exactly two bind slots joined by an And/Or connector.
-//   - a 2-chip chord in combo 0  -> slot1 = chip0, slot2 = chip1, connector And
-//   - otherwise                  -> slot1 = combo0's first chip,
-//                                    slot2 = combo1's first chip, connector Or
-// (An action's first combo being a chord means the two keys are pressed
-// together — diagonal aim; separate combos are alternates.)
+// Two bind slots joined by an And/Or connector. A 2-chip chord in combo 0 is
+// And (both keys pressed together — diagonal aim); separate combos are Or
+// alternates (slot1 = combo0's first chip, slot2 = combo1's first chip).
 struct BindingView {
   std::string slot1; // left oval label ("" = unbound)
   std::string slot2; // right oval label ("" = unbound)
@@ -105,10 +95,8 @@ int rebind_combo_index(const KeyMap &km, Action action) {
   return -1;
 }
 
-// One selectable binding row: left-aligned label | primary bind oval | "OR" |
-// secondary bind oval (an empty oval = BindingWell when the combo is unbound).
-// Pressing a bind oval arms capture for that action's combo slot. The fixed
-// column widths stack every row's ovals into aligned vertical lanes.
+// label | primary bind oval | "OR" | secondary bind oval. The fixed column
+// widths stack every row's ovals into aligned vertical lanes.
 struct BindingRowProps {
   const char *key;
   const char *primary_id;
@@ -175,8 +163,6 @@ struct BindingRowProps {
   </Box>
 }
 
-// Degenerate row: "Preset:" label + a single wide value oval (origin spans the
-// preset oval across both bind lanes) cycling the preset.
 ::ui::UiElement make_preset_row(const char *label, const char *value,
                                 std::function<void()> cycle) {
   // padding-bottom 2 biases the centered oval to y=122 (device 183 = origin
@@ -221,15 +207,11 @@ struct OptionsControlsProps {
   if (!nav.is_top)
     return ::ui::empty();
 
-  // A stalled rebind capture auto-cancels after kRebindTimeoutFrames frames.
   use_rebind_timeout(cap, kRebindTimeoutFrames);
 
   const int action_count = static_cast<int>(km.actions.size());
   OptionsCommit commit = use_options_commit(km.commit, km.revert);
 
-  // Build the binding grid: a degenerate Preset row, then one row per action
-  // (primary combo 0 + alternate combo 1), as a runtime list for the virtualized
-  // ScrollView (only the visible window hits the retained tree / fiber budget).
   std::vector<::ui::UiElement> rows;
   rows.reserve(km.actions.size());
   for (int i = 0; i < action_count; ++i) {
@@ -255,13 +237,9 @@ struct OptionsControlsProps {
     rows.push_back(make_binding_row(BindingRowProps{rkey, pid, sid, label, prim,
                                                     sec, bv.and_, rb0, rb1}));
   }
-  // Viewport spans the five golden rows (Preset + 4 Move); extra actions scroll
-  // through the sprite's baked rail. Full content width so the column lanes land
-  // under the baked scrollbar rail at the right edge.
-  // Chromeless viewport: the baked sprite already draws the frame, and the
-  // focusable viewport would otherwise paint the injected focus-ring outline
-  // (the spurious inner frame at x~54 — chromeless gates it; clearing
-  // .outline() alone just re-injects).
+  // Chromeless viewport: the focusable viewport would otherwise paint the
+  // injected focus-ring outline (a spurious inner frame). Chromeless gates it;
+  // clearing .outline() alone just re-injects.
   ::ui::StyleStatePatch table_style{};
   table_style.base = tokens::chromeless_clear_patch();
   table_style.focus_visible = table_style.base;
@@ -277,9 +255,7 @@ struct OptionsControlsProps {
           .style = table_style,
           .children = ::ui::children(rows)},
       ScrollView);
-  // The ScrollView flex-grows to fill this fixed-height well (the golden
-  // 4-visible-row window); it measures its own viewport/content back to drive
-  // scrolling. The well's bounded height is what gives flex-grow a target.
+  // The well's bounded height is what gives the ScrollView's flex-grow a target.
   ::ui::UiElement table = Box(BoxProps{
       .key = "tablewell",
       .layout = ::ui::LayoutStyle{
@@ -290,13 +266,9 @@ struct OptionsControlsProps {
 
   const char *pval = ::ui::copy_string(km.preset_label.c_str());
 
-  // Virtual-grid nudges for the per-phase oval bake (golden cells): content
-  // margin-right 2 -> column x=273 so bind/preset lanes start at x=561
-  // (device 841.5, origin vx 374); actiongap 48.5 + the margin-left-1
-  // ActionRow wrapper put Save/Cancel at (335,608) -> device (502.5,912) =
-  // origin vx 223 / vy 405. Text-cell nudges for the per-phase STRING bake:
-  // titlewrap inset-top 13 (not 12) puts the title pen on golden vy 14, and
-  // the OR label's margin-left 2 centers its pen on golden vx 513.
+  // Virtual-grid nudges so the per-phase oval/string bakes land on golden cells:
+  // content margin-right 2, actiongap 48.5 + ActionRow margin-left 1, titlewrap
+  // inset-top 13 (not 12), and the OR label's margin-left 2 (in make_binding_row).
   return <ScreenLayout key="root" variant={ScreenLayoutVariant::Overlay} stretchedBackdrop={true}>
     <Panel key="frame" variant={PanelVariant::ControlsFrame}>
       <Box

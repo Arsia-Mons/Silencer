@@ -1,13 +1,9 @@
 #pragma once
 
-// Shared client-UI design tokens (the shadcn "design tokens" analogue for this
-// retained UI). One palette + the three generic visual builders that app-authored
-// surfaces and text paint resolve through. This is the single source of app paint,
-// replacing the former per-screen `silencer::theme` namespace.
-//
-// Tokens-only by design: no component exports, no recipe layer. Each semantic
-// component owns its variant->token switch locally. Colors are STRAIGHT alpha;
-// the IR premultiplies at emit. Header-only (constexpr + inline), not transpiled.
+// Shared client-UI design tokens: the single source of app paint (one palette +
+// the visual builders surfaces/text resolve through). Each component owns its
+// variant->token switch locally. Colors are STRAIGHT alpha; the IR premultiplies
+// at emit.
 
 #include "ui/components/common.h"
 #include "ui/style/style_patch.h"
@@ -16,8 +12,7 @@
 
 namespace silencer::tokens {
 
-// ---- Surface backgrounds (green-phosphor: black menu/game roots, near-black
-// faint-green panels so the green chrome reads as glass over the starfield) ----
+// ---- Surface backgrounds ----
 constexpr ::ui::Color kSurfaceMenu = {0, 0, 0, 255};       // #000000
 constexpr ::ui::Color kSurfaceGame = {0, 0, 0, 255};       // #000000
 constexpr ::ui::Color kSurfaceOverlay = {6, 16, 8, 238};   // near-black green glass
@@ -25,20 +20,14 @@ constexpr ::ui::Color kSurfacePanel = {6, 16, 8, 235};     // near-black green g
 constexpr ::ui::Color kSurfaceHeroPanel = {6, 16, 8, 238};
 constexpr ::ui::Color kSurfaceHudBand = {4, 12, 6, 238};
 
-// ---- Borders (green-phosphor: green-dim #2E7D45 idle frame stroke) ----
+// ---- Borders ----
 constexpr ::ui::Color kBorderPanel = {46, 125, 69, 255};   // #2E7D45 green-dim
 constexpr ::ui::Color kBorderHeroPanel = {46, 139, 46, 255}; // #2E8B2E chrome-border
 constexpr ::ui::Color kBorderHudBand = {46, 125, 69, 255};
 
 // ---- Accent / semantic action colors (AppButton variant fills) ----
-// Each variant owns a base + hover (lighter) + pressed (darker) on-palette
-// triple so the AppButton variant patch can supply its own interaction states
-// rather than reverting to the theme's slate hover/pressed deltas.
-// Legacy accent #9FC9FF. In origin/main the accent edge was a baked sprite, not
-// a fill ramp; these hover/pressed/border stops are re-derived on the cool-blue
-// palette as a vector interim (the oval sprite button replaces them in SIL-89).
-// Green-phosphor accent (focus ring + selection wash). origin/main's accent edge
-// was a baked sprite, not a fill ramp; these stops are the green-phosphor family.
+// Each variant owns a base + hover (lighter) + pressed (darker) triple so its
+// patch supplies its own interaction states.
 constexpr ::ui::Color kAccent = {92, 208, 92, 255};         // #5CD05C green-bright
 constexpr ::ui::Color kAccentBorder = {60, 255, 60, 255};   // #3CFF3C focus stroke
 constexpr ::ui::Color kAccentHover = {136, 232, 136, 255};  // lighter on hover
@@ -58,10 +47,8 @@ constexpr ::ui::Color kDangerPressed = {190, 58, 52, 255};  // darker on press
 constexpr ::ui::Color kDangerPressedBorder = {220, 96, 88, 255};
 
 // ---- Text (green-phosphor family — measured from the v00058 goldens) ----
-// The dominant UI text green is (24,124,20) with a darker AA ramp; it appears for
-// titles, button labels, body, and log lines. Description prose runs lighter and
-// desaturated (84,156,104). The glyph atlas is a white coverage mask, so these
-// token colors ARE the rendered text color (tinted at draw time).
+// The glyph atlas is a white coverage mask, so these token colors ARE the
+// rendered text color (tinted at draw time).
 constexpr ::ui::Color kTextTitle = {24, 124, 20, 255};        // standard green
 constexpr ::ui::Color kTextHeroTitle = {48, 168, 44, 255};    // brand/hero (brighter)
 constexpr ::ui::Color kTextSubtitle = {84, 156, 104, 255};    // description prose (lighter)
@@ -83,7 +70,6 @@ constexpr ::ui::Color kTextTechSlots = {184, 184, 184, 255};
 constexpr ::ui::Color kTextWeaponDetailOff = {10, 72, 8, 255}; // disabled
 constexpr ::ui::Color kTextHud = {61, 232, 61, 255};          // #3DE83D hud-green
 
-// origin/main UI text is multi-color, not uniform green (measured from v00058).
 constexpr ::ui::Color kTextBrand = {152, 28, 28, 255};     // "Silencer" wordmark (red)
 constexpr ::ui::Color kTextVersion = {140, 64, 8, 255};    // build version (amber)
 constexpr ::ui::Color kTextAgentName = {40, 96, 200, 255}; // agent names (cornflower blue)
@@ -111,10 +97,9 @@ constexpr ::ui::Color hud_text_key(uint8_t color_idx, uint8_t brightness) {
   return {color_idx, brightness, 7, 255};
 }
 
-// ---- In-game HUD LCD palette (overlay over live world; spec §1.1) ----
-// SEPARATE from the menu green family above: these read against the live world,
-// not the starfield, so they run brighter/saturated. own-data=green,
-// economy=blue, warnings=red, radar schematic=amber, lozenge/scoreboard=black.
+// ---- In-game HUD LCD palette (overlay over live world) ----
+// SEPARATE from the menu green family: these read against the live world, so
+// they run brighter/saturated.
 constexpr ::ui::Color kHudGreen = {61, 232, 61, 255};    // #3DE83D own data/chat/scoreboard
 constexpr ::ui::Color kHudGreenDim = {30, 122, 30, 255}; // #1E7A1E chat body / inactive
 constexpr ::ui::Color kHudBlue = {58, 107, 255, 255};    // #3A6BFF economy/files/credits/dots
@@ -128,18 +113,14 @@ constexpr ::ui::Color kBlipAlly = {255, 255, 255, 255};
 constexpr ::ui::Color kBlipEnemy = {224, 48, 48, 255};
 
 // ---- Font faces (font_id; see render/cppx_ui/font_registry.h FaceId) ----
-// The four bitmap-derived legacy OTF faces. The product layer sets font_id per
-// role so titles/headings/body/tiny each render in their own face (everything
-// previously collapsed to Body face 0 at arbitrary point sizes).
 constexpr uint16_t kFaceBody = 0;    // bank 133, advance 6  (origin Body)
 constexpr uint16_t kFaceLarge = 1;   // bank 134, advance 8  (origin Heading)
 constexpr uint16_t kFaceTitle = 2;   // bank 136, advance 16 (origin Prompt)
 constexpr uint16_t kFaceTiny = 3;    // bank 132, advance 4  (origin Tiny)
 constexpr uint16_t kFaceHeading = 4; // bank 135, advance 11 (origin Title — the
-                                     // dominant button-label/title face, SIL-95)
-// origin tracks the SAME bank at a wider advance for some styles (text.cpp
-// TextRenderStyle advance is per-style, not per-bank); each tracking gets its
-// own baked face since the glyph atlas advance is fixed at bake time.
+                                     // dominant button-label/title face)
+// The same bank at a different advance needs its own face — the glyph atlas
+// advance is fixed at bake time.
 constexpr uint16_t kFaceScreenTitle = 5; // bank 135, advance 12 (origin ScreenTitle)
 constexpr uint16_t kFaceFooter = 6;      // bank 133, advance 11 (origin Footer)
 constexpr uint16_t kFaceBodySm = 7;      // bank 133, advance 7  (origin BodySm)
@@ -172,8 +153,7 @@ constexpr float kLineTiny = 10.5f;
 constexpr float kBorderWidth = 1.0f;
 constexpr float kBorderWidthSelected = 2.0f;
 
-// ---- Patch builders (sparse overrides; verbatim semantics from the former
-// per-screen theme, now emitting StylePatch instead of dense VisualStyle) ----
+// ---- Patch builders (sparse overrides) ----
 
 // Solid-fill surface (no border).
 inline ::ui::StylePatch fill_patch(::ui::Color background) {
@@ -193,14 +173,10 @@ inline ::ui::StylePatch panel_patch(::ui::Color background, ::ui::Color border,
           {border, border, border, border}});
 }
 
-// Sprite-backed surface paint (SIL-88). Emits a baked legacy sprite (texture_id
-// from use_chrome()) and EXPLICITLY clears the fill/gradient/border/rounding so
-// the role's opaque control paint can't slab behind it: the sprite's index-0
-// transparent corners must reveal the background, not a rectangle. EVERY
-// sprite-backed variant (oval/chrome button, sprite panel, dialog frame) MUST
-// paint through this helper — never through the gradient-painting solid() path.
-// A texture_id of 0 yields a fully transparent patch (screens tolerate the
-// not-yet-baked frame without a flash).
+// Sprite-backed surface paint. EXPLICITLY clears fill/gradient/border/rounding
+// so the role's opaque control paint can't slab behind the sprite's transparent
+// corners. EVERY sprite-backed variant MUST paint through this helper, never the
+// gradient-painting solid() path. texture_id 0 yields a transparent patch.
 inline ::ui::StylePatch image_patch(::ui::BackgroundImage image) {
   return ::ui::patch()
       .image(image)
@@ -219,26 +195,20 @@ inline ::ui::StylePatch image_patch(uint32_t texture_id,
   return image_patch(img);
 }
 
-// Full-bleed backdrop variant: aspect-preserving centered-crop fill, matching
-// origin's PackImage default (CSS background-size: cover). Use for the
-// starfield / lobby backdrops so a 4:3 sprite isn't stretched on 16:9.
+// Full-bleed backdrop: aspect-preserving centered-crop (CSS cover) so a 4:3
+// sprite isn't stretched on 16:9.
 inline ::ui::StylePatch image_patch_cover(uint32_t texture_id) {
   ::ui::BackgroundImage img{texture_id};
   img.fit = ::ui::ImageFit::Cover;
   return image_patch(img);
 }
 
-// origin lobby panels are vector strokes, not sprites: Box(Chrome) = a 1px idx216
-// stroke (the connected frame), Box(Inset) = an idx220 stroke (inner wells).
-// Transparent fill so the Mars backdrop reads through, like origin. Colors are
-// the golden's MEASURED rendered stroke pixels (the earlier "brightened to
-// compensate for origin's glow" reading was wrong — origin renders these flat):
-// outer frame (8,84,0); inner wells brighter at the standard text green.
+// Lobby panel strokes: golden-MEASURED flat pixels (not brightened to
+// compensate for glow — origin renders these flat).
 constexpr ::ui::Color kChromeStroke = {8, 84, 0, 255};    // idx216 connected frame
 constexpr ::ui::Color kInsetStroke = {24, 124, 20, 255};  // idx220 inner well
 
-// Hairline frame over a transparent interior. Width 1.33 logical = the
-// golden's 2 device px stroke.
+// Hairline frame over a transparent interior. Width 1.34 logical = 2 device px.
 inline ::ui::StylePatch frame_patch(::ui::Color stroke, float width = 1.34f) {
   return ::ui::patch()
       .background(::ui::Color{0, 0, 0, 0})
@@ -247,10 +217,8 @@ inline ::ui::StylePatch frame_patch(::ui::Color stroke, float width = 1.34f) {
       .border(::ui::Border{{width, width, width, width}, {stroke, stroke, stroke, stroke}});
 }
 
-// Side-masked hairline frame (origin BoxSides): the lobby stepped pane
-// composes its connected chrome out of open-sided rectangles (e.g. the right
-// tall panel is open-left, the upper game panel open-right). A zero width
-// suppresses that edge entirely.
+// Side-masked hairline frame: a zero width suppresses that edge entirely, so the
+// lobby stepped pane composes its connected chrome from open-sided rectangles.
 inline ::ui::StylePatch frame_patch_sides(::ui::Color stroke, bool top,
                                           bool right, bool bottom, bool left,
                                           float width = 1.34f) {
@@ -263,10 +231,8 @@ inline ::ui::StylePatch frame_patch_sides(::ui::Color stroke, bool top,
                            {stroke, stroke, stroke, stroke}});
 }
 
-// Text paint (color + face + native-em size + legacy line height). font_id
-// selects the OTF face; line_height 0 falls back to the face's natural skip.
-// reveal_boost/step (default 0 = off) drive the renderer-side per-glyph
-// trailing-edge brightness ramp (the in-game typewriter "pop").
+// Text paint. line_height 0 falls back to the face's natural skip;
+// reveal_boost/step drive the in-game typewriter brightness "pop" (0 = off).
 inline ::ui::StylePatch text_patch(::ui::Color color, float font_size,
                                    uint16_t font_id = kFaceBody,
                                    float line_height = 0.f,
@@ -280,10 +246,8 @@ inline ::ui::StylePatch text_patch(::ui::Color color, float font_size,
                                              .reveal_step = reveal_step});
 }
 
-// Ghost/chromeless paint: suppress the control role's chrome (fill, gradient,
-// border, rounding) AND the builder-injected focus-ring outline (chromeless
-// gates it; clearing .outline() alone re-injects) — the visual is a baked
-// sprite well or sibling text, never theme chrome.
+// Chromeless paint: suppress the role's chrome AND the builder-injected
+// focus-ring outline (chromeless gates it; clearing .outline() alone re-injects).
 inline ::ui::StylePatch chromeless_clear_patch() {
   return ::ui::patch()
       .chromeless(true)
@@ -294,9 +258,8 @@ inline ::ui::StylePatch chromeless_clear_patch() {
       .outline(::ui::Outline{});
 }
 
-// Chromeless input field over a sprite's baked well: typed text in the Body
-// face + origin's 1-virtual-px caret (palette idx 140 resolved per screen
-// palette, fed from use_chrome()). Same paint across rest/hover/focus.
+// Chromeless input field over a sprite's baked well. Same paint across
+// rest/hover/focus.
 inline ::ui::StyleStatePatch chromeless_field_style(::ui::Color caret,
                                                     ::ui::Color text_color) {
   ::ui::StylePatch p = chromeless_clear_patch();

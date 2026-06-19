@@ -32,15 +32,10 @@ using ::ui::components::InputProps;
 using ::ui::components::Text;
 using ::ui::components::TextProps;
 
-// The floating ALIAS capsule + its header pill use a vector border (no baked
-// sprite). The golden draws that edge in a muted desaturated green (~84,156,104),
-// not the bright chrome stroke (kBorderHeroPanel 46,139,46) — sampled from the
-// cc_alias golden. Keep it file-local so it doesn't leak into other surfaces.
+// Muted desaturated green border (sampled from the cc_alias golden), not the
+// bright chrome stroke. File-local so it doesn't leak into other surfaces.
 constexpr ::ui::Color kAliasFrameBorder = {84, 156, 104, 255};
 
-// One agency row: a focusable selectable button (left column). Focusing a row
-// previews that agency in the right detail column; activating commits it and
-// creates the agent. The previewed row is shown selected.
 ::ui::UiElement agency_row(int index, int preview,
                            std::function<void(int)> on_pick,
                            std::function<void(int)> set_preview) {
@@ -56,13 +51,9 @@ constexpr ::ui::Color kAliasFrameBorder = {84, 156, 104, 255};
     if (set_preview)
       set_preview(index);
   };
-  // The agency rows sit one virtual col left of the roster rows (origin blits
-  // the plate at int(box.x)); the rows wrapper carries the -1.5/+1.5 box nudge
-  // and pad-left 17.5 keeps the label pen on its own golden cell. The nudge
-  // must NOT shrink the box: the rows keep the pane's full 354 logical = 236
-  // virtual width so the Stretch row-plate bakes 1:1 — a narrower box
-  // nearest-decimates 236 src cols to 235 and drops the right cap's ring
-  // column (U-4 / SIL-206).
+  // The nudge must NOT shrink the box: the rows keep the pane's full 354 logical
+  // = 236 virtual width so the Stretch row-plate bakes 1:1 — a narrower box
+  // nearest-decimates 236 src cols to 235 and drops the right cap's ring column.
   return <AppButton
     key={kAgencies[index].control_id}
     controlId={kAgencies[index].control_id}
@@ -80,9 +71,6 @@ constexpr ::ui::Color kAliasFrameBorder = {84, 156, 104, 255};
   />
 }
 
-// One advantage line, origin AdvantageLineText: label, a 6px gap, then the
-// bonus wrapped in bracket glyphs ("Endurance [+3]"); ability rows are
-// label-only. Empty slots ({nullptr,...}) render nothing.
 ::ui::UiElement advantage_row(const char *key, const Advantage &adv) {
   if (!adv.label || adv.label[0] == '\0')
     return ::ui::empty();
@@ -92,11 +80,9 @@ constexpr ::ui::Color kAliasFrameBorder = {84, 156, 104, 255};
                                          .tone = BodyTextTone::Prose,
                                          .value = adv.label}));
   if (adv.bonus && adv.bonus[0] != '\0') {
-    // origin: '[' at label-advance(7v per char) + gap 4v after the 20v
-    // indent; metadata is BodySm in the standard green (LegacyPalette(224)),
-    // ']' 18v after '['. Anchored absolutely on the pen grid — flow placement
-    // inherits the TTF-measured label width and Yoga's .5-rounding, which flip
-    // the bracket bakes off their golden cells per label-length parity.
+    // Brackets are anchored absolutely on the pen grid (not flow-placed): flow
+    // placement inherits the TTF-measured label width and Yoga's .5-rounding,
+    // which flip the bracket bakes off their golden cells per label length.
     const float bx =
         PenGrid::L(7.0f * (float)std::strlen(adv.label)) + 35.0f;
     auto abs_at = [](float left) {
@@ -128,8 +114,6 @@ constexpr ::ui::Color kAliasFrameBorder = {84, 156, 104, 255};
                                    .layout = br,
                                    .style = tokens::image_patch(chrome.bracket_r)}));
   }
-  // origin: rows pitch at lineHeight + 1 gap (16.5 + 1.5 at x1.5), indented 30
-  // (kAdvantageListIndent 20) under the "Advantages" header.
   return <Box
     key={key}
     layout={::ui::LayoutStyle{
@@ -144,9 +128,9 @@ constexpr ::ui::Color kAliasFrameBorder = {84, 156, 104, 255};
   </Box>
 }
 
-// The lore paragraph: one wrapped Text using origin's DetailParagraph styling.
-// A single node keeps the line pitch on the exact 16.5 cell — per-line boxes
-// round through Yoga's pixel grid and drift ~0.75px/line against the golden.
+// One wrapped Text node, NOT per-line boxes: a single node keeps the line pitch
+// on the exact 16.5 cell — per-line boxes round through Yoga's pixel grid and
+// drift ~0.75px/line against the golden.
 ::ui::UiElement desc_paragraph(const char *value) {
   ::ui::StylePatch st = tokens::text_patch(tokens::kTextProse,
                                            tokens::kFontBodyEm,
@@ -240,7 +224,6 @@ constexpr ::ui::Color kAliasFrameBorder = {84, 156, 104, 255};
   </Box>
 }
 
-// One roster row: select an existing agent. Out-of-range slots render nothing.
 ::ui::UiElement roster_row(int index, const std::vector<CharacterProfile> &profiles,
                            int preview, std::function<void(int)> on_select,
                            std::function<void(int)> set_preview) {
@@ -270,12 +253,9 @@ constexpr ::ui::Color kAliasFrameBorder = {84, 156, 104, 255};
   />
 }
 
-// Left-pane header: the screen title centered in the baked chrome notch pill at
-// the pane top (golden pill y54-102), with a fixed gap below so the first list
-// item lands at the golden's y141 (~39px under the pill). The title text is
-// top-anchored inside the header zone so it reads inside the pill, not centered
-// down into the gap; the bottom margin (not a uniform flex gap) makes the
-// header-to-list gap larger than the 9px inter-row spacing.
+// The title is top-anchored inside the header zone so it reads inside the baked
+// chrome pill, not centered down into the gap below; the bottom margin (not a
+// uniform flex gap) keeps the header-to-list gap larger than the inter-row gap.
 ::ui::UiElement pane_header(const char *value) {
   return <Box
     key="hdr"
@@ -294,17 +274,12 @@ constexpr ::ui::Color kAliasFrameBorder = {84, 156, 104, 255};
 
 } // namespace
 
-// "SILENCER ALIAS": the floating alias capsule over a transparent, focus-trapped
-// CenteredOverlay. The roster base screen shows through behind it; Enter confirms
-// (no visible buttons). Absolutely positioned at the origin/main capsule anchor.
 ::ui::UiElement AliasFloat(
     const char *alias_value,
     std::function<void(const std::string &)> on_change,
     std::function<void(const ::ui::ActivationEvent &)> on_enter) {
   client::ui::ChromeTextures chrome = use_chrome();
-  // Chromeless field over the baked input well in the dialog_pw modal sprite
-  // (origin's TextInput draws no well of its own); caret = palette idx 140 on
-  // the menu palette (yellow).
+  // Chromeless field over the baked input well in the dialog_pw modal sprite.
   const ::ui::StyleStatePatch alias_field_style =
       tokens::chromeless_field_style(chrome.caret_menu, tokens::kTextBody);
   return <ScreenLayout key="aliasmodal" variant={ScreenLayoutVariant::CenteredOverlay}>
@@ -361,9 +336,6 @@ constexpr ::ui::Color kAliasFrameBorder = {84, 156, 104, 255};
   </ScreenLayout>
 }
 
-// step 2 — origin/main "SELECT AGENCY": LEFT pane = SELECT AGENCY title + the
-// five agency ovals; RIGHT pane = Advantages + Description over the Mars
-// backdrop. No outer wizard panel, no Back button (Esc cancels), no subtitle.
 ::ui::UiElement AgencyStep(int preview, std::function<void(int)> on_pick,
                            std::function<void(int)> set_preview) {
   const int pi = (preview >= 0 && preview < kAgencyCount) ? preview : 0;
@@ -421,8 +393,6 @@ constexpr ::ui::Color kAliasFrameBorder = {84, 156, 104, 255};
   </ScreenLayout>
 }
 
-// step 0 — SELECT AGENT: LEFT pane = the roster + Create New Character; RIGHT
-// pane previews the currently focused/hovered existing agent, matching origin.
 ::ui::UiElement RosterStep(const Characters &chars, int preview_in,
                            std::function<void(int)> on_select,
                            std::function<void(int)> set_preview,

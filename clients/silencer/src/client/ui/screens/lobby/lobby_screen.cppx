@@ -32,14 +32,9 @@ struct LobbyScreenProps {
 };
 
 // --- screen-local state hooks ------------------------------------------------
-// Extracted from LobbyScreenView so the view stays orchestration-only. Each
-// owns its use_state cells (called unconditionally in a fixed order — rules of
-// hooks) and assembles the derived props/closures. Behavior is identical to the
-// previous inline blocks; the absolute hook-slot order differs but is stable
-// per frame, which is all the runtime requires.
+// Each owns its use_state cells (called unconditionally in a fixed order —
+// rules of hooks) and assembles the derived props/closures.
 
-// The create-game form: name/password + the six game options and their
-// cycle/set closures, plus the "form open" flag the mode ladders read.
 struct CreateFormState {
   bool ok = false;
   bool *show_create = nullptr;
@@ -96,8 +91,6 @@ CreateFormState use_create_form() {
   return s;
 }
 
-// The Create handler bound to this frame's map list + selected index. Mirrors
-// the previous inline on_create closure exactly.
 std::function<void()>
 make_create_submit(const CreateFormState &cf,
                    std::function<void(CreateGameRequest)> create,
@@ -125,8 +118,7 @@ make_create_submit(const CreateFormState &cf,
   };
 }
 
-// Active-games selection: the screen-local cursor (clamped to the live list) and
-// the fully assembled browser props (info block + join/spectate closures).
+// Active-games selection: the cursor (clamped to the live list) + browser props.
 struct GameSelection {
   bool ok = false;
   int *sel = nullptr;
@@ -176,8 +168,7 @@ GameSelection use_game_selection(const Games &games) {
   return s;
 }
 
-// SIL-216: the Select-Map cursors (selected + hovered row). Upper bound clamped
-// to the live map list; the hover clears when the create form closes.
+// The Select-Map cursors (selected + hovered row).
 struct MapHover {
   bool ok = false;
   int *map_index = nullptr;
@@ -188,7 +179,7 @@ MapHover use_map_hover_preview(const Games &games, bool creating) {
   MapHover s;
   // origin starts with NO map selected (mapSelectedIndex -1, no highlight).
   s.map_index = use_state<int>(-1);
-  s.hovered = use_state<int>(-1); // SIL-216: row under the cursor (-1 = none)
+  s.hovered = use_state<int>(-1); // row under the cursor (-1 = none)
   if (!s.map_index || !s.hovered)
     return s;
   s.ok = true;
@@ -215,8 +206,6 @@ int lobby_agency_index(const std::string &summary) {
   return 0;
 }
 
-// SIL-216: build the cursor-following minimap preview for the hovered row, or
-// empty when nothing is hovered / the minimap isn't baked.
 ::ui::UiElement lobby_map_preview(const Games &games,
                                   const MapPreviews &map_previews,
                                   const UiPipelineFrame *frame,
@@ -244,12 +233,8 @@ int lobby_agency_index(const std::string &summary) {
   App app = use_app();
   Progression prog = use_progression();
   client::ui::ChromeTextures chrome = use_chrome();
-  // SIL-216: baked per-map minimap previews + the live pointer, for the
-  // cursor-following Select-Map preview. Read unconditionally (stable hooks).
   MapPreviews map_previews = use_map_previews();
   const UiPipelineFrame *pipeline_frame = use_ui_pipeline_frame();
-  // Screen-local state, owned by the hooks above (each calls its use_state
-  // cells unconditionally so the hook order stays stable).
   CreateFormState cf = use_create_form();
   GameSelection gsel = use_game_selection(games);
   const bool creating = cf.show_create && *cf.show_create;
@@ -257,12 +242,8 @@ int lobby_agency_index(const std::string &summary) {
   if (!cf.ok || !gsel.ok || !mh.ok)
     return ::ui::empty();
 
-  // Per-call-site text scratch (stable order: computed every frame regardless of
-  // the active panel so the hook sequence never shifts).
-  // The chat transcript wraps to multiple rows and can run past the 192-byte
-  // use_text_storage scratch, so copy it through the per-frame string arena
-  // (copy_string is not a hook — it doesn't shift the hook sequence) to render
-  // the full kLobbyChatLogCap tail.
+  // The chat transcript can run past the 192-byte use_text_storage scratch, so
+  // copy it through the per-frame string arena to render the full tail.
   const char *scrollback = ::ui::copy_string(chat.scrollback.c_str());
   const char *presence = use_text_storage("%s", chat.presence.c_str());
   const char *ready_label = use_text_storage("%s", staging.ready_label.c_str());
@@ -283,14 +264,9 @@ int lobby_agency_index(const std::string &summary) {
   const uint32_t emblem_tex =
       chrome.agency_emblem[lobby_agency_index(summary_str)];
 
-  // Origin's stepped-pane widths reflowed to the live canvas (fixed authored
-  // values at the design canvas; shrink-to-fit below it, e.g. 4:3 windows).
   // Resolved ONCE per frame; the cell/chat layout helpers take the values.
   const LobbyPanes panes = resolve_lobby_panes(app.canvas_w);
 
-  // Right-column selection: connected -> Staging; else the create form when the
-  // player opened it; else the games browser. (No screen names a destination —
-  // staging.active is the game-owned connection state surfaced by the hook.)
   StagingPanelProps sp;
   sp.roster = staging.roster;
   sp.ready_label = ready_label;
@@ -315,9 +291,6 @@ int lobby_agency_index(const std::string &summary) {
   } else if (staging.active) {
     right = StagingPanel(sp);
   } else if (staging.joining) {
-    // SIL-234: hold a stable Connecting panel through the async connect window
-    // (the create form already cleared show_create), so the right column never
-    // flashes the games browser before staging mounts.
     right = ConnectingPanel();
   } else if (creating) {
     right = GameCreatePanel(cf.options);
@@ -327,15 +300,9 @@ int lobby_agency_index(const std::string &summary) {
     right = CenterCol(cc);
   }
 
-  // The Active-Games browser lives in its own tall right cockpit cell, separate
-  // from the top-row swap above, so it is always built. origin splits the tall
-  // cell into the bordered list BOX (rows only) and the footer (info block +
-  // reserved button slots) below it.
   ::ui::UiElement right_browser = GameBrowser(gsel.browser);
   ::ui::UiElement right_footer = GameBrowserFooter(gsel.browser);
 
-  // The right column is the "Select Map" filename list while creating a game,
-  // otherwise the "Active Games" browser.
   const int map_count = (int)games.bundled_maps.size();
   std::vector<::ui::UiElement> map_rows =
       creating ? map_list_rows(games.bundled_maps, mh.map_index, mh.hovered)
@@ -347,8 +314,6 @@ int lobby_agency_index(const std::string &summary) {
   } else if (staging.active) {
     right_cell = StagingRosterCell(sp, panes.tall_w);
   } else if (staging.joining) {
-    // SIL-234: stable Connecting hold for the tall cell (mirrors the right
-    // region above) so the column doesn't flash the games browser mid-connect.
     right_cell = ConnectingCell(panes.tall_w);
   } else if (creating) {
     CreateRightCellProps rc;
@@ -367,10 +332,7 @@ int lobby_agency_index(const std::string &summary) {
     right_cell = ActiveGamesCell(panes.tall_w, right_browser, right_footer);
   }
 
-  // Go Back backs out one level at a time (matching origin's single top
-  // button): cancel create-mode, else close the tech detail view, else leave
-  // the joined game back to the main lobby. Only when not in a game does it
-  // leave the lobby entirely for the main menu. Hoisted out of the JSX (the
+  // Go Back backs out one level at a time. Hoisted out of the JSX (the
   // transpiler can't parse a brace-bodied lambda inside an attribute).
   std::function<void()> on_go_back = [show_create = cf.show_create, tech_open,
                                       in_game = staging.active,
@@ -381,8 +343,7 @@ int lobby_agency_index(const std::string &summary) {
     if (in_game) { if (leave_game) leave_game(); return; }
     if (leave_menu) leave_menu();
   };
-  // ESC / controller back / the `back` op route through the same Go Back policy
-  // (the reported Lobby bug: ESC did nothing on the phase screen).
+  // ESC / controller back / the `back` op route through the same Go Back policy.
   use_cancel(on_go_back);
 
   ::ui::UiElement title_bar = LobbyTitleBar(LobbyTitleBarProps{
@@ -413,10 +374,6 @@ int lobby_agency_index(const std::string &summary) {
       .chat_panel = chat_panel,
       .right_cell = right_cell});
 
-  // SIL-216: the cursor-following minimap preview over the Select Map list. Only
-  // while creating a game, when a row is hovered and its minimap baked. Reads the
-  // live pointer (logical canvas space) so the card tracks the cursor. (The hover
-  // is cleared on leaving create mode inside use_map_hover_preview.)
   ::ui::UiElement map_preview =
       creating ? lobby_map_preview(games, map_previews, pipeline_frame, panes,
                                    app.canvas_w, *mh.hovered)

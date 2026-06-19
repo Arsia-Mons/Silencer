@@ -41,9 +41,7 @@ bool UiDemoOverlay::ensure(int w, int h, const char *font_dir) {
   if (!ui_.initialize(r_, fonts_))
     return false;
 
-  // Synthetic green-bordered nine-slice button: 16x16 with a 3px opaque green
-  // border and a translucent dark-green fill (straight alpha; upload_rgba
-  // premultiplies). 4px caps leave a real stretchable middle.
+  // Synthetic 16x16 nine-slice button (straight alpha; upload_rgba premultiplies).
   uint8_t t[16 * 16 * 4];
   for (int y = 0; y < 16; ++y)
     for (int x = 0; x < 16; ++x) {
@@ -70,7 +68,6 @@ const uint8_t *UiDemoOverlay::render(int *out_w, int *out_h) {
 
   const float bx = w_ * 0.34f, by = h_ * 0.44f, bw = w_ * 0.30f, bh = 64.f;
 
-  // Nine-slice button background.
   ui::DrawCommand btn{
       .kind = ui::DrawCommandKind::Image,
       .rect = {bx, by, bw, bh},
@@ -79,7 +76,6 @@ const uint8_t *UiDemoOverlay::render(int *out_w, int *out_h) {
                             .nine_slice = {4.f, 4.f, 4.f, 4.f}}}};
   g_demo_list.push(btn);
 
-  // Button label (body face).
   static const char *kLabel = "cppx button + TTF";
   uint32_t loff = 0;
   g_demo_list.push_text(kLabel, (uint16_t)strlen(kLabel), &loff);
@@ -93,7 +89,6 @@ const uint8_t *UiDemoOverlay::render(int *out_w, int *out_h) {
                            .font_size = 22}}};
   g_demo_list.push(lbl);
 
-  // Title (title face) above the button.
   static const char *kTitle = "SIL-11 cppx UI bridge";
   uint32_t toff = 0;
   g_demo_list.push_text(kTitle, (uint16_t)strlen(kTitle), &toff);

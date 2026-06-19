@@ -42,8 +42,7 @@ struct InputFrame {
   float pointer_x = 0.0f;
   float pointer_y = 0.0f;
 
-  // Scroll-wheel delta this frame (+y = wheel up); routed to the hovered
-  // scrollable. SIL-111.
+  // +y = wheel up; routed to the hovered scrollable.
   float wheel_x = 0.0f;
   float wheel_y = 0.0f;
 
@@ -62,10 +61,9 @@ struct InputFrame {
 struct FocusableLayout {
   NodeId id = 0;
   NodeId focus_parent = 0;
-  // Nearest ancestor that scroll-clips this node (overflow Scroll/Hidden), or 0
-  // if none. Directional nav prefers staying within the same scroll container so
-  // it traverses every row in order (including scrolled-off ones) before leaving
-  // the container — SIL-213.
+  // Nearest scroll-clipping ancestor, or 0. Directional nav prefers staying
+  // within the same scroll container so it traverses every row in order
+  // (including scrolled-off ones) before leaving it.
   NodeId scroll_container = 0;
   Rect rect = {};
   bool disabled = false;
@@ -73,29 +71,22 @@ struct FocusableLayout {
   uint32_t order = 0;
 };
 
-// Scroll-into-view request (SIL-213). After the focus pass resolves, the runtime
-// computes — for the focused node's nearest scrolling-clip ancestor — how far
-// that container must move its scroll offset to bring the focused node fully
-// inside its clip rect. `delta_y` is signed (negative = scroll toward the top to
-// reveal a node above the window; positive = scroll down to reveal one below);
-// 0 means the focused node is already in view. A scrollable container reacts to
-// this each frame (matching its own `control_id`) and applies the delta to its
-// local offset. Keyed by control_id (a stable, screen-supplied scroll id) rather
-// than node id so the SDL-free ScrollView component — which knows only its own
-// `props.id` — can match without a fiber→node self-id lookup.
+// Scroll-into-view request for the focused node's nearest scrolling-clip
+// ancestor. `delta_y` is signed (negative = scroll up to reveal a node above the
+// window; positive = scroll down; 0 = already in view). Keyed by control_id (not
+// node id) so the SDL-free ScrollView, which knows only its own `props.id`, can
+// match without a fiber→node self-id lookup.
 struct FocusScrollRequest {
   char viewport_control_id[UI_RETAINED_LABEL_CAP] = {};
   float delta_y = 0.0f;
   bool valid = false; // true when the focused node has a scrolling-clip ancestor
 };
 
-// Layout measurement read-back. Yoga sizes nodes during layout, but the
-// component tree is built BEFORE layout runs, so a component cannot know its own
-// resolved size during render. After layout the runtime walks the retained tree
-// and records each node's resolved height keyed by its control id; a component
-// reads its own measured height back the next build (one-frame lag, by design —
-// the same model as FocusScrollRequest). This is what lets ScrollView flex-grow
-// and learn its viewport/content sizes instead of taking height props.
+// Layout measurement read-back. The component tree is built BEFORE layout, so a
+// component can't know its resolved size during render. After layout the runtime
+// records each node's height keyed by control id; the component reads it back
+// next build (one-frame lag, by design). This lets ScrollView flex-grow and
+// learn its viewport/content sizes instead of taking height props.
 constexpr int UI_RETAINED_MAX_MEASURED = UI_RETAINED_MAX_NODES;
 
 struct MeasuredSize {
@@ -117,15 +108,15 @@ struct FocusRuntime {
   NodeId focused_id = 0;
   NodeId blurred_id = 0;
   NodeId focus_changed_id = 0;
-  NodeId hovered_id = 0; // top-most enabled focusable under the pointer this frame
+  NodeId hovered_id = 0;
   NodeId pointer_press_origin = 0;
   NodeId confirmed_id = 0;
   bool confirmed_by_pointer = false; // click-confirm vs keyboard confirm
   FocusSource source = FocusSource::None;
-  // focus came from auto-default, not real input; the next nav treats it as
-  // neutral and enters from the edge instead of advancing past it.
+  // Focus from auto-default, not real input; the next nav treats it as neutral
+  // and enters from the edge instead of advancing past it.
   bool focused_is_auto_default = false;
-  FocusScrollRequest scroll_request = {}; // SIL-213 scroll-into-view this frame
+  FocusScrollRequest scroll_request = {};
   int error_count = 0;
 };
 
@@ -133,8 +124,7 @@ void focus_init(FocusRuntime *runtime);
 bool focus_update(FocusRuntime *runtime, const UiTree &tree,
                   const InputFrame &input);
 
-// Walk the laid-out retained tree and record each node's resolved height keyed by
-// its control id (only nodes with a non-empty control id). Must run AFTER layout.
+// Record each control-id node's resolved height. Must run AFTER layout.
 void compute_measured_sizes(const UiTree &tree, MeasuredSizeRequest *out);
 
 NodeId focus_focused_id(const FocusRuntime &runtime);
@@ -149,7 +139,7 @@ const FocusScrollRequest &focus_scroll_request(const FocusRuntime &runtime);
 int focus_error_count(const FocusRuntime &runtime);
 
 // Focus is "visible" (gets a focus ring) only when it arrived via a non-pointer
-// source. Used to derive focus_visible for the interaction snapshot.
+// source.
 inline bool focus_source_is_visible(FocusSource s) {
   return s == FocusSource::Keyboard || s == FocusSource::Gamepad ||
          s == FocusSource::Programmatic;

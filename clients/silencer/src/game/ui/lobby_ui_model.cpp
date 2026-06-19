@@ -21,18 +21,12 @@ namespace silencer::game_ui {
 namespace {
 
 constexpr int kVisibleLogLines = 15;
-// Keep the joined connect log within the per-call-site text scratch the screen
-// renders it through (REACT_TEXT_STORAGE_CAP), preferring the recent tail.
+// Keep the joined connect log within the screen's text scratch (REACT_TEXT_STORAGE_CAP).
 constexpr size_t kStatusLogCap = 180;
-// The lobby chat transcript wraps to multiple rows, so a single 180-byte tail
-// would discard most of the visible scrollback (and clip a long message). The
-// screen copies it through the per-frame string arena (copy_string), not the
-// 192-byte text scratch, so this larger tail renders in full. This must exceed
-// the chat well's height in lines so a transcript of one-line messages
-// overflows the auto-measuring ScrollView (which then stick-to-bottom fills the
-// well to the top); too small and short messages can never reach the top. Sized
-// to give a few wells' worth of scroll-back history while staying well within
-// the 16 KB shared per-frame string arena (UI_RETAINED_STRING_ARENA_BYTES).
+// Chat renders through the per-frame string arena (copy_string), not the text
+// scratch, so it gets a larger tail. Must exceed the chat well's height in lines
+// so one-line transcripts overflow the ScrollView and stick to the bottom; stays
+// within the 16 KB shared arena (UI_RETAINED_STRING_ARENA_BYTES).
 constexpr size_t kLobbyChatLogCap = 2048;
 
 // Agency display names, indexed by Team::{NOXIS..BLACKROSE} / Character::agencyIdx.
@@ -60,8 +54,7 @@ std::string NormalizeTechDescription(const char *description) {
   return out;
 }
 
-// origin game_select_panel RecomputeInfoBlock security labels ("No" for the
-// default/none level, then Low/Medium/High).
+// Security labels: "No" for the default/none level, then Low/Medium/High.
 const char *SecurityLabel(Uint8 level) {
   switch (level) {
   case LobbyGame::SECHIGH:
@@ -75,9 +68,8 @@ const char *SecurityLabel(Uint8 level) {
   }
 }
 
-// One origin summaryLine: label + spaces padding the value flush-right into
-// the 30-char Body column (origin mission_summary_screen AddSummaryLine —
-// kSummaryW 180 / advance 6; non-percentage values carry a trailing space).
+// label + spaces padding the value flush-right into the 30-char Body column;
+// non-percentage values carry a trailing space.
 void AddSummaryLine(std::vector<std::string> &out, const char *name,
                     Uint32 value, bool percentage = false) {
   char valuetext[64];
@@ -92,10 +84,8 @@ void AddSummaryLine(std::vector<std::string> &out, const char *name,
   out.push_back(line);
 }
 
-// Build the post-match progression fields from the local user's stats copy.
-// Lobby mutex is held by the caller. Leaves `progression_loaded` false until
-// the user record arrives. The summary lines mirror origin's Refresh()
-// verbatim (mission_summary_screen.cpp) — order, labels, indent and padding.
+// Post-match progression fields from the local user's stats copy. Caller holds
+// the Lobby mutex. Summary lines mirror mission_summary_screen.cpp Refresh().
 void BuildProgression(client::ui::LobbySnapshot &snap, Lobby &lobby) {
   User *user = lobby.GetUserInfo(lobby.accountid);
   if (!user || user->retrieving)
@@ -182,15 +172,13 @@ void BuildProgression(client::ui::LobbySnapshot &snap, Lobby &lobby) {
   }
 }
 
-// Cap a joined display string to the screen's text-scratch buffer (keeps the
-// head — fine for name lists; the chat tail is capped separately).
+// Cap a joined string to the text-scratch buffer, keeping the head (name lists).
 void CapHead(std::string &s, size_t cap = 180) {
   if (s.size() > cap)
     s.erase(cap);
 }
 
-// Build the lobby read panels (selected agent + presence + games). Lobby mutex
-// held by the caller. Chat is drained on the tick and joined separately.
+// Lobby read panels (selected agent + presence + games). Caller holds the mutex.
 void BuildLobbyPanels(client::ui::LobbySnapshot &snap, Lobby &lobby) {
   const Lobby::Character *ch = lobby.GetSelectedCharacter();
   if (ch) {
@@ -210,8 +198,7 @@ void BuildLobbyPanels(client::ui::LobbySnapshot &snap, Lobby &lobby) {
     if (!snap.lobby_presence.empty())
       snap.lobby_presence += "\n";
     snap.lobby_presence += kv.second.name;
-    // origin chat_panel RebuildPresenceEntries: peers in a game append
-    // " [<game name>]" (bank 133 renders the brackets as dashes).
+    // Peers in a game append " [<game name>]" (bank 133 renders brackets as dashes).
     if (kv.second.gameid != 0) {
       LobbyGame *g = lobby.GetGameById(kv.second.gameid);
       if (g) {
@@ -237,8 +224,6 @@ void BuildLobbyPanels(client::ui::LobbySnapshot &snap, Lobby &lobby) {
     const char *who =
         (creator && !creator->retrieving) ? creator->DisplayName() : "";
 
-    // origin game_select_panel RecomputeInfoBlock: the selected game's info
-    // block is five Body lines (name row is the entry name itself).
     e.info_map = std::string("Map: ") + g->mapname;
 
     std::string security = std::string(SecurityLabel(g->securitylevel)) + " Security";
@@ -260,11 +245,8 @@ void BuildLobbyPanels(client::ui::LobbySnapshot &snap, Lobby &lobby) {
   }
 }
 
-// Build the pre-match staging roster from the connected world (doc §6). Called
-// only while connected to a game; reads world teams/peers (single-thread game
-// state) + the lobby user records (caller holds Lobby::LockMutex). Mirrors the
-// legacy GameJoinPanel: one row per non-observer peer, the host-ready guard
-// (is_host && !AllPeersDownloadedMap) pre-resolved into the Ready label.
+// Pre-match staging roster from the connected world. Reads world teams/peers
+// (single-thread game state) + lobby user records (caller holds Lobby::LockMutex).
 void BuildStaging(client::ui::LobbySnapshot &snap, World &world, Lobby &lobby) {
   snap.staging_active = true;
   snap.staging_in_lobby = world.IsInLobby();
@@ -277,9 +259,7 @@ void BuildStaging(client::ui::LobbySnapshot &snap, World &world, Lobby &lobby) {
       (snap.staging_in_lobby && snap.staging_ready_blocked) ? "Waiting..."
                                                             : "Ready";
 
-  // Pre-match tech loadout (origin GameTechPanelTick): slots-left from the
-  // user's agency techslots minus the chosen items; one row per GAS buyable
-  // that participates in tech choice.
+  // Pre-match tech loadout: slots-left from agency techslots minus chosen items.
   if (localpeer) {
     Team *team = world.GetPeerTeam(localid);
     int slotsleft = 0;
@@ -296,8 +276,6 @@ void BuildStaging(client::ui::LobbySnapshot &snap, World &world, Lobby &lobby) {
     for (BuyableItem *item : world.buyableitems) {
       if (!item || item->techchoice == 0)
         continue;
-      // origin tech_tree_grid: agency-specific items only show for their
-      // agency (and !techslots rows are skipped — techchoice==0 covers it).
       if (item->agencyspecific != -1 && techteam &&
           item->agencyspecific != techteam->agency)
         continue;
@@ -334,7 +312,6 @@ void BuildStaging(client::ui::LobbySnapshot &snap, World &world, Lobby &lobby) {
       row.agency = team->agency;
       row.draw_emblem = !drew_emblem;
       drew_emblem = true;
-      // origin game_join_panel: plain display name; bots get " [BOT]".
       row.name = user->DisplayName();
       if (peer->isbot)
         row.name += " [BOT]";
@@ -396,18 +373,15 @@ client::ui::LobbySnapshot CaptureLobbySnapshot(Game &game,
   if (lobbyPhase) {
     BuildLobbyPanels(snap, lobby);
     snap.chat_channel = lobby.channel;
-    // SIL-234: a create/join is in flight (clicked, not yet connected). The
-    // right column holds a stable "Connecting" panel through this window so it
-    // never flashes the games browser before staging mounts. creategameclicked
-    // covers create-from-form; joininggame covers the post-create/join connect.
+    // A create/join is in flight (clicked, not yet connected): hold a stable
+    // "Connecting" panel so the right column never flashes the games browser before
+    // staging mounts. creategameclicked = create-from-form; joininggame = the connect.
     snap.joining = (game.creategameclicked || game.joininggame) &&
                    !world.IsConnected();
     if (world.IsConnected()) {
       BuildStaging(snap, world, lobby);
       if (LobbyGame *lg = lobby.GetGameById(game.currentlobbygameid)) {
         snap.staging_map_name = lg->mapname;
-        // origin joins the game channel on connect ("#<name>-<id>", ambience_
-        // mixer GetGameChannelName); the chat header shows it.
         snap.chat_channel =
             "#" + std::string(lg->name) + "-" + std::to_string(lg->id);
       }
@@ -415,15 +389,10 @@ client::ui::LobbySnapshot CaptureLobbySnapshot(Game &game,
   }
   lobby.UnlockMutex();
 
-  // The lobby chat scrollback lives on the game-owned drain buffer (single
-  // thread), read outside the mutex. Hand the whole buffer to the
-  // auto-measuring ScrollView and let it fill/scroll/stick-to-bottom — do NOT
-  // pre-slice to a fixed visible-line count. A fixed count (e.g. the connect
-  // log's kVisibleLogLines) caps the content below the well's height when every
-  // message is one line, so the ScrollView bottom-anchors that short content and
-  // leaves a permanent gap above it (the newest line never reaches the top no
-  // matter how many one-liners arrive). The byte cap below is the only bound,
-  // keeping the tail within the shared per-frame string arena.
+  // Chat scrollback lives on the game-owned drain buffer (single thread), read
+  // outside the mutex. Hand the whole buffer to the ScrollView — do NOT pre-slice
+  // to a fixed line count: that caps content below the well height for one-line
+  // messages, leaving a permanent gap above. The byte cap below is the only bound.
   if (lobbyPhase) {
     const std::vector<std::string> &chat = game.LobbyChatLog();
     for (size_t i = 0; i < chat.size(); ++i) {
@@ -435,8 +404,7 @@ client::ui::LobbySnapshot CaptureLobbySnapshot(Game &game,
       snap.lobby_chat.erase(0, snap.lobby_chat.size() - kLobbyChatLogCap);
   }
 
-  // The connect log lives on the game-owned flow (single-thread), not the lobby,
-  // so it is read outside the mutex. Show the last lines, newline-joined.
+  // The connect log is game-owned (single thread), read outside the mutex.
   if (connectPhase) {
     const std::vector<std::string> &log = game.LobbyConnectLog();
     const int count = (int)log.size();
@@ -446,7 +414,6 @@ client::ui::LobbySnapshot CaptureLobbySnapshot(Game &game,
         snap.status_log += "\n";
       snap.status_log += log[(size_t)i];
     }
-    // Keep the recent tail within the screen's text-scratch cap.
     if (snap.status_log.size() > kStatusLogCap)
       snap.status_log.erase(0, snap.status_log.size() - kStatusLogCap);
   }

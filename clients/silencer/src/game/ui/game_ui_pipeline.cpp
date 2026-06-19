@@ -2,7 +2,7 @@
 
 #include "game.h"
 #include "world.h"
-#include "resources/resources.h" // spritebank (SIL-87 chrome bake)
+#include "resources/resources.h"
 #include "lobby.h"
 #include "lobbygame.h"
 #include "peer.h"
@@ -15,16 +15,13 @@
 #include "perf_trace.h"
 #include "player.h"
 #include "buyableitem.h"
-// SIL-14 golden cppx render path.
 #include "render/cppx_ui/pipeline_host.h"
 #include "client/ui/app_shell/app_root.h"
 #include "client/ui/app_shell/client_ui.h"
 #include "client/ui/app_theme.h"
 #include "client/ui/components/tokens.h"
 #ifndef SILENCER_HEADLESS
-// Generated cppx screen headers (transpiled from .hx) — absent in the headless
-// dedicated-server build, which skips the cppx pipeline entirely. Only the
-// Show* modal/gallery entry points below reference these; they no-op headless.
+// Generated cppx screen headers — absent in the headless dedicated-server build.
 #include "client/ui/screens/gallery.h"
 #include "client/ui/screens/message_modal.h"
 #include "client/ui/screens/password_modal.h"
@@ -104,9 +101,7 @@ static std::string ResolveFontDir() {
 #endif
 }
 
-// SIL-15 use_key_map: convert UI chips back to an input Binding, enforcing the
-// chord cap (reject, never truncate). Returns false if the chord is empty or
-// over CHORD_CAP.
+// Reject (never truncate) an empty or over-CHORD_CAP chord.
 bool ChipsToBinding(const std::vector<client::ui::KeyMapChip> &chips,
                     Binding &out) {
     if (chips.empty() || (int)chips.size() > CHORD_CAP)
@@ -125,9 +120,7 @@ bool KeybindProfileIsBuiltin(const std::string &name) {
     return name == "default" || name == "wasd" || name == "gamepad";
 }
 
-// Label a BindingKey for the UI (the UI never re-derives labels): keyboard via
-// GetKeyName, mouse to LMB/MMB/RMB, gamepad button/axis via GamepadShortLabel
-// (type-aware). Shared by the use_key_map read view + the capture pending chord.
+// Label a BindingKey for the UI (the UI never re-derives labels).
 client::ui::KeyMapChip ChipFromBindingKey(const BindingKey &bk,
                                           SDL_GamepadType padType) {
     client::ui::KeyMapChip chip;
@@ -144,7 +137,7 @@ client::ui::KeyMapChip ChipFromBindingKey(const BindingKey &bk,
                      : (bk.code == 3) ? "RMB"
                                       : ("M" + std::to_string(bk.code));
         break;
-    default: { // GamepadButton / GamepadAxis
+    default: {
         std::string s = Stringify(bk);
         auto colon = s.find(':');
         std::string raw = (colon != std::string::npos) ? s.substr(colon + 1) : s;
@@ -196,16 +189,13 @@ void GameUiPipeline::DrawInGameWorldInsets(Surface &surface, float frametime) {
 
 void GameUiPipeline::RenderClientUiFrame(Surface &surface, float frametime) {
     (void)frametime;
-    // SIL-14: the golden retained cppx path is the live UI. GameRenderer::Present
-    // uploads the RGBA we stash here. The Clay frame path is gone; the Clay
-    // runtime/objects themselves are retired in SIL-22.
     RenderCppxClientUiFrame(surface);
 }
 
 GameUiPipeline::GameUiPipeline(Game &g) : game(g) {}
 
 GameUiPipeline::~GameUiPipeline() {
-    // Tear the cppx host down before the global hook runtime it depends on.
+    // Tear down the host before the global hook runtime it depends on.
     cppxHost.reset();
     if (cppxReactInitialized) {
         react_shutdown();
@@ -225,10 +215,8 @@ const uint8_t *GameUiPipeline::CppxUiFrame(int &outW, int &outH) const {
 
 void GameUiPipeline::BakeChromeTextures(int rw, int rh, float uiScale,
                                         bool deferredPass) {
-    // Bake the curated legacy chrome sprites into texture_ids. Runs once per host
-    // renderer lifetime (guarded by PipelineHost::chrome_needs_bake). This is the
-    // ONLY place that reads the indexed spritebank + active palette; the resulting
-    // opaque ids travel to screens via the ChromeTexturesProvider.
+    // The only place that reads the indexed spritebank + active palette; the baked
+    // ids travel to screens via the ChromeTexturesProvider.
     if (!deferredPass) {
         cppxChrome = {};
         hudRampVariants_.clear();
@@ -237,18 +225,15 @@ void GameUiPipeline::BakeChromeTextures(int rw, int rh, float uiScale,
     }
     if (!cppxHost)
         return;
-    // Use the BASE palette, not GetPaletteColors(): the latter is the display cache
-    // that is faded to black on menu/transition screens, which would bake the chrome
-    // sprites pure black. The base palette carries the authored sprite colors (the
-    // green oval lives at indices 210/213-224).
+    // BASE palette, not GetPaletteColors(): the latter is faded to black on menu/
+    // transition screens and would bake the chrome sprites pure black.
     const SDL_Color *palette = game.renderer.palette.GetColors();
     if (!palette)
         return;
     const auto &banks = game.world.resources.spritebank;
 
-    // origin TextInput caret = legacy palette idx 140 resolved against the screen's
-    // presentation palette page (menus/cc ResetPresentation(1), lobby cluster (2),
-    // in-game (0)); screens read these off use_chrome().
+    // Caret = legacy palette idx 140, resolved against each screen's presentation
+    // page (menus/cc 1, lobby cluster 2, in-game 0).
     auto page_color = [&](int pageIdx, int colorIdx) {
         const SDL_Color &c = game.renderer.palette.colors[pageIdx][colorIdx];
         return ::ui::Color{c.r, c.g, c.b, 255};
@@ -257,11 +242,9 @@ void GameUiPipeline::BakeChromeTextures(int rw, int rh, float uiScale,
     cppxChrome.caret_lobby = page_color(2, 140);
     cppxChrome.caret_game = page_color(0, 140);
 
-    // Each sprite bank's pixel indices are authored against a SPECIFIC palette page
+    // Each bank's indices are authored against a specific palette page
     // (resources.cpp Load: bank 0->5, 1->6, 2->7, 3->8, 6->1, 7->2; others base).
-    // Baking every bank with the single current page mapped bank 6's planet/oval and
-    // bank 7's chrome indices onto the wrong colors — the rainbow-speckle Mars bug.
-    // Select each bank's authored page so the bake matches the in-game palettization.
+    // Baking with the wrong page = the rainbow-speckle Mars bug.
     auto page_for_bank = [&](size_t bank) -> const SDL_Color * {
         switch (bank) {
         case 0:
@@ -299,10 +282,6 @@ void GameUiPipeline::BakeChromeTextures(int rw, int rh, float uiScale,
         }
     };
 
-    // The ovals (and the toggle cells below) are drawn 1:1 in origin's virtual
-    // canvas. Register the indexed source so the executor swaps each draw for the
-    // canonical device-cell variant (resolve_legacy) — origin's NEAREST-magnify
-    // duplication bands at phase 0, identical at every position (U-2/SIL-204).
     using silencer::cppx_ui::LegacyFit;
     auto register_legacy = [&](size_t bank, size_t index, uint32_t id,
                                LegacyFit fit = LegacyFit::Cell, int cl = 0,
@@ -316,12 +295,8 @@ void GameUiPipeline::BakeChromeTextures(int rw, int rh, float uiScale,
                                   page_for_bank(bank), kLegacyRenderWidth,
                                   kLegacyRenderHeight, fit, cl, cr, ct, cb);
     };
-    // bank 6 — the green oval menu button (idx7 Md / idx28 Sm / idx23 Lg) and
-    // the LegacyRow list-row plate (idx2; cc roster + agency rows), each as
-    // origin's 5-frame hover/focus ramp: frame p = sprite (base index + p) at
-    // brightness 128 + p*2 (button.cpp SpriteIndexForFrame + FrameForPhase).
-    // Frame 0 is the rest sprite every rest-state golden shows; every frame
-    // registers so the canonical device-cell variant swap covers hover states.
+    // bank 6 oval buttons (idx7 Md / idx28 Sm / idx23 Lg) + LegacyRow plate (idx2),
+    // each a 5-frame hover/focus ramp: frame p = sprite base+p at brightness 128+p*2.
     auto bake_ramp = [&](size_t bank, size_t base, uint32_t *ids, LegacyFit fit,
                          uint16_t *w_out = nullptr, uint16_t *h_out = nullptr) {
         for (int p = 0; p < client::ui::ChromeTextures::kOvalPhases; ++p) {
@@ -362,8 +337,8 @@ void GameUiPipeline::BakeChromeTextures(int rw, int rh, float uiScale,
     bake_ramp(6, 2, cppxChrome.row_plate, LegacyFit::Stretch,
               &cppxChrome.row_plate_w, &cppxChrome.row_plate_h);
     if (deferredPass) {
-        // bank 7 — the metal-chrome nine-slice button. origin never swaps Chrome art
-        // (always idx24), but StepVisualState still ramps brightness 128..136.
+        // bank 7 idx24 — metal-chrome nine-slice button; art never swaps, only
+        // brightness ramps 128..136.
         {
             const size_t bank = 7, index = 24;
             for (int p = 0; p < client::ui::ChromeTextures::kOvalPhases; ++p) {
@@ -394,21 +369,16 @@ void GameUiPipeline::BakeChromeTextures(int rw, int rh, float uiScale,
                     cppxChrome.chrome_btn_idle = id;
             }
         }
-        // Frame sprites (plain, native size): bank-7 chrome panel + bank-40 dialog
-        // frames. All drawn 1:1 in virtual space — register for the canonical swap.
         bake(7, 5, cppxChrome.chrome_panel, &cppxChrome.chrome_panel_w, &cppxChrome.chrome_panel_h);
         bake(40, 4, cppxChrome.dialog_msg, &cppxChrome.dialog_msg_w, &cppxChrome.dialog_msg_h);
         bake(40, 2, cppxChrome.dialog_pw, &cppxChrome.dialog_pw_w, &cppxChrome.dialog_pw_h);
         register_legacy(7, 5, cppxChrome.chrome_panel);
         register_legacy(40, 4, cppxChrome.dialog_msg);
         register_legacy(40, 2, cppxChrome.dialog_pw);
-        // bank 7 idx 2 — the lobby-connect dialog (origin PackImage(7,2)): frame, soft
-        // glow, log well, form sub-panel + field/button wells all baked in. Drawn 1:1
-        // in virtual space — register for the canonical variant swap.
+        // bank 7 idx2 — the lobby-connect dialog (frame + wells baked in).
         bake(7, 2, cppxChrome.dialog_connect, &cppxChrome.dialog_connect_w, &cppxChrome.dialog_connect_h);
         register_legacy(7, 2, cppxChrome.dialog_connect);
-        // The 116x24 stipple strip that covers the dialog's baked 52px button wells
-        // (origin lobby_connect EnsureButtonPatch: panel-coord parity, idx 210/146).
+        // Stipple strip (idx 210/146) covering the dialog's baked button wells.
         {
             constexpr int kPatchW = 116, kPatchH = 24;
             constexpr int kPatchX = 84, kPatchY = 246; // panel-relative parity anchors
@@ -427,9 +397,8 @@ void GameUiPipeline::BakeChromeTextures(int rw, int rh, float uiScale,
             }
         }
     }
-    // Full-bleed backdrops stay as native source textures. Baking them at device
-    // resolution made the first menu frame upload multiple full-screen RGBA copies;
-    // the draw executor can scale these static backgrounds directly.
+    // Backdrops stay native: baking at device res uploaded multiple full-screen
+    // RGBA copies on the first menu frame.
     auto bake_backdrop = [&](size_t bank, size_t index, uint32_t &id_out) {
         if (bank >= banks.size() || index >= banks[bank].size())
             return;
@@ -448,13 +417,8 @@ void GameUiPipeline::BakeChromeTextures(int rw, int rh, float uiScale,
         bake_backdrop(7, 1, cppxChrome.lobby_backdrop);
     }
     if (deferredPass) {
-        // Options·Controls frame (bank 7 idx 7, origin PackImageStretch(7,7)): a
-        // STRETCHED element. Recreate origin's virtual element box
-        // (options_controls_screen.cpp: root padding = legacy margins L5/R7/T6/B20
-        // scaled into the virtual canvas, panel GROWs to fill, height min 420) and
-        // hand the Panel its logical rect; the executor swaps the draw for the
-        // canonical per-size Stretch variant (register_legacy below) — no
-        // device-footprint bake, position no longer affects the pattern (U-2).
+        // Options·Controls stretched frame (bank 7 idx7): margins L5/R7/T6/B20,
+        // panel min-height 420.
         if (7 < banks.size() && 7 < banks[7].size()) {
             const std::shared_ptr<Surface> &sp = banks[7][7];
             if (sp && sp->w > 0 && sp->h > 0 && !sp->pixels.empty()) {
@@ -470,7 +434,6 @@ void GameUiPipeline::BakeChromeTextures(int rw, int rh, float uiScale,
                 const int by = scale_legacy(6, vh, kLegacyRenderHeight);
                 const int bw = vw - bx - scale_legacy(7, vw, kLegacyRenderWidth);
                 const int bh = std::max(420, vh - by - scale_legacy(20, vh, kLegacyRenderHeight));
-                // Logical rect of the box under the centered whole-frame magnify.
                 const int scaledW = (int)(vw * s + 0.5f);
                 const int scaledH = (int)(vh * s + 0.5f);
                 const int offX = scaledW < rw ? (rw - scaledW) / 2 : 0;
@@ -492,9 +455,8 @@ void GameUiPipeline::BakeChromeTextures(int rw, int rh, float uiScale,
         }
     }
     if (!deferredPass) {
-        // bank 208 frames 29..60 — the animated SILENCER logo. Compose each
-        // native frame into a fixed union stage so the UI swaps same-size cells
-        // instead of moving/resizing the rendered image rect as frames advance.
+        // bank 208 frames 29..60 — animated SILENCER logo. Composite each frame into
+        // a fixed union stage so the UI swaps same-size cells as frames advance.
         {
             const size_t kLogoBank = 208;
             const int kFirst = client::ui::ChromeTextures::kLogoFirstFrame;
@@ -586,8 +548,7 @@ void GameUiPipeline::BakeChromeTextures(int rw, int rh, float uiScale,
             }
         }
     }
-    // bank 6 idx12-15 — boolean toggle indicator cells (origin: left = 12 on /
-    // 13 off, right = 15 on / 14 off).
+    // bank 6 idx12-15 — toggle cells (left 12 on / 13 off, right 15 on / 14 off).
     if (deferredPass) {
         bake(6, 12, cppxChrome.toggle_l_on, &cppxChrome.toggle_w, &cppxChrome.toggle_h);
         bake(6, 13, cppxChrome.toggle_l_off);
@@ -597,12 +558,8 @@ void GameUiPipeline::BakeChromeTextures(int rw, int rh, float uiScale,
         register_legacy(6, 13, cppxChrome.toggle_l_off);
         register_legacy(6, 14, cppxChrome.toggle_r_off);
         register_legacy(6, 15, cppxChrome.toggle_r_on);
-        // bank 134 '['/']' — the advantage-metadata bracket glyphs (origin borrows the
-        // bank-134 art because bank 133's bracket cells are dash-shaped). origin's
-        // AdvantageBracket draws a 4x11 crop (srcX 0 left / 1 right) through
-        // EffectColor(224) at 1:1 virtual — bake the cropped+tinted cells and
-        // register them so the canonical variant swap applies (src-cropped draws are
-        // not bake-eligible).
+        // bank 134 '['/']' bracket glyphs (bank 133's are dash-shaped): a 4x11 crop
+        // (srcX 0 left / 1 right) tinted via EffectColor(224).
         {
             auto bake_bracket = [&](char ch, int src_x, uint32_t &id_out) {
                 if (134 >= banks.size())
@@ -638,10 +595,7 @@ void GameUiPipeline::BakeChromeTextures(int rw, int rh, float uiScale,
             bake_bracket('[', 0, cppxChrome.bracket_l);
             bake_bracket(']', 1, cppxChrome.bracket_r);
         }
-        // bank 181 idx0-4 — the five agency emblems (SIL-102 Character Create detail).
-        // origin draws them PackImageContain into their element box, so register the
-        // contain flavor: the executor swaps each draw for a canonical per-size
-        // variant baked through origin's letterbox + magnify arithmetic.
+        // bank 181 idx0-4 — the five agency emblems (Contain-fit).
         const auto &res = game.world.resources;
         for (int i = 0; i < 5; ++i) {
             bake(181, (size_t)i, cppxChrome.agency_emblem[i],
@@ -663,15 +617,13 @@ void GameUiPipeline::BakeChromeTextures(int rw, int rh, float uiScale,
                     cppxChrome.agency_emblem_oy[i] = (int16_t)res.spriteoffsety[181][i];
             }
         }
-        // Staging roster ready checks (bank 7 idx18/19), drawn 1:1 in virtual space —
-        // register as plain legacy sprites for the canonical variant swap.
+        // Staging roster ready checks (bank 7 idx18/19).
         bake(7, 18, cppxChrome.ready_on, &cppxChrome.ready_w, &cppxChrome.ready_h);
         bake(7, 19, cppxChrome.ready_off);
         register_legacy(7, 18, cppxChrome.ready_on);
         register_legacy(7, 19, cppxChrome.ready_off);
-        // Brightness-64 copies (origin tech_tree_grid non-interactable toggles). The
-        // tech grid presents on palette page 2 — the brightness index table must be
-        // page 2's, like the dim text variant.
+        // Brightness-64 copies for tech-grid non-interactable toggles. The grid
+        // presents on page 2, so the brightness index table must be page 2's.
         auto bake_dim = [&](size_t bank, size_t index, uint32_t &id_out) {
             if (bank >= banks.size() || index >= banks[bank].size())
                 return;
@@ -706,10 +658,7 @@ void GameUiPipeline::BakeChromeTextures(int rw, int rh, float uiScale,
             cppxChrome.ready_ox = (int16_t)res.spriteoffsetx[7][18];
         if (7 < res.spriteoffsety.size() && 18 < res.spriteoffsety[7].size())
             cppxChrome.ready_oy = (int16_t)res.spriteoffsety[7][18];
-        // In-game HUD sprites (origin ui/hud/*). Authored against the base palette
-        // page (resources.cpp leaves banks 94-103 at paletteoffset 0). Each entry
-        // carries native size + sheet offsets so the screen reproduces origin's
-        // SpriteX/Y(bank,idx) = anchor - offset placement from data.
+        // In-game HUD sprites — banks 94-103 sit at base palette page (offset 0).
         {
             auto hud_bake = [&](size_t bank, size_t index,
                                 client::ui::ChromeTextures::Sprite &out,
@@ -784,7 +733,7 @@ void GameUiPipeline::BakeChromeTextures(int rw, int rh, float uiScale,
             hud_bake(86, 2, hud.highlight_secrets);
             hud_bake(95, 2, hud.syscam_frame[0]);
             hud_bake(95, 11, hud.syscam_frame[1]);
-            // origin anchors the frame's y to bank 92's offset at the same index.
+            // Frame y anchors to bank 92's offset at the same index.
             if (92 < res.spriteoffsety.size()) {
                 if (2 < res.spriteoffsety[92].size())
                     hud.syscam_oy[0] = (int16_t)res.spriteoffsety[92][2];
@@ -794,12 +743,8 @@ void GameUiPipeline::BakeChromeTextures(int rw, int rh, float uiScale,
         }
     }
 
-    // ---- Bitmap glyph fonts (origin/main text parity) -----------------------
-    // origin/main renders ALL UI text from the legacy bitmap font banks 132..136
-    // (renderer.cpp::DrawText), monospace, glyph index = char - ioffset (34 for
-    // bank 132, else 33). Bake one atlas per cppx face; FaceId -> {bank, advance,
-    // lineHeight} mirrors origin text.cpp's TextRenderStyle table (640-space native
-    // metrics; the cppx token font sizes scale them up to the 960 window).
+    // Bitmap glyph fonts: banks 132..136, monospace, glyph index = char - ioffset
+    // (34 for bank 132, else 33). One atlas per cppx face.
     if (!deferredPass) {
         {
             using GF = silencer::cppx_ui::GlyphFonts;
@@ -809,34 +754,33 @@ void GameUiPipeline::BakeChromeTextures(int rw, int rh, float uiScale,
                 float advance;
                 float line_height;
             };
-            // advance/lineHeight mirror origin text.cpp ResolveTextRenderStyle EXACTLY.
-            // Origin tracks the same bank at different advances per style (ScreenTitle/
-            // Footer/BodySm), so each tracking is its own baked face.
+            // advance/lineHeight mirror text.cpp ResolveTextRenderStyle (source of
+            // truth); same bank at different trackings = its own baked face.
             static const FaceBake kFaceBakes[] = {
-                {0, 133, 6.f, 11.f},   // Body        — bank 133 advance 6
-                {1, 134, 8.f, 15.f},   // Heading     — bank 134 advance 8
-                {2, 136, 16.f, 23.f},  // Prompt      — bank 136 advance 16
-                {3, 132, 4.f, 7.f},    // Tiny        — bank 132 advance 4
-                {4, 135, 11.f, 19.f},  // Title       — bank 135 advance 11
-                {5, 135, 12.f, 19.f},  // ScreenTitle — bank 135 tracked wider
-                {6, 133, 11.f, 11.f},  // Footer      — bank 133 tracked wide (version line)
-                {7, 133, 7.f, 11.f},   // BodySm      — bank 133 tracked +1
-                {8, 132, 6.f, 7.f},    // TinyCounter — bank 132 tracked wide (HUD inv counts)
-                {9, 134, 10.f, 15.f},  // MessageHeading — bank 134 tracked wide
-                {10, 136, 25.f, 23.f}, // MessageTitle   — bank 136 tracked wide
-                {11, 135, 13.f, 19.f}, // MessageSubtitle— bank 135 tracked wide
+                {0, 133, 6.f, 11.f},   // Body
+                {1, 134, 8.f, 15.f},   // Heading
+                {2, 136, 16.f, 23.f},  // Prompt
+                {3, 132, 4.f, 7.f},    // Tiny
+                {4, 135, 11.f, 19.f},  // Title
+                {5, 135, 12.f, 19.f},  // ScreenTitle
+                {6, 133, 11.f, 11.f},  // Footer
+                {7, 133, 7.f, 11.f},   // BodySm
+                {8, 132, 6.f, 7.f},    // TinyCounter
+                {9, 134, 10.f, 15.f},  // MessageHeading
+                {10, 136, 25.f, 23.f}, // MessageTitle
+                {11, 135, 13.f, 19.f}, // MessageSubtitle
             };
             for (const FaceBake &fb : kFaceBakes) {
                 if ((size_t)fb.bank >= banks.size())
                     continue;
                 const auto &glyphbank = banks[fb.bank];
-                const int ioffset = (fb.bank == 132) ? 34 : 33; // legacy GlyphOffsetForBank
+                const int ioffset = (fb.bank == 132) ? 34 : 33;
                 GF::GlyphSrc src[GF::kGlyphCount] = {};
                 for (int i = 0; i < GF::kGlyphCount; ++i) {
-                    const int ch = GF::kFirstChar + i; // 32..126
+                    const int ch = GF::kFirstChar + i;
                     const int gi = ch - ioffset;
                     if (ch == ' ' || gi < 0 || (size_t)gi >= glyphbank.size())
-                        continue; // blank cell
+                        continue;
                     const std::shared_ptr<Surface> &sp = glyphbank[gi];
                     if (!sp || sp->w < 1 || sp->h < 1 || sp->pixels.empty())
                         continue;
@@ -844,19 +788,13 @@ void GameUiPipeline::BakeChromeTextures(int rw, int rh, float uiScale,
                     src[i].w = sp->w;
                     src[i].h = sp->h;
                 }
-                // Font banks 132-136 are authored against the base palette page (page_for_bank's
-                // default arm), so the base `palette` resolves their glyph ramp colors.
                 cppxHost->build_glyph_face(fb.face, src, GF::kGlyphCount, palette, fb.advance, fb.line_height);
             }
         }
     }
 
-    // Exact-color variants: bake origin's RENDERED text pixels per (face, token
-    // color) by running the legacy Effect* pipeline on indexed copies of the
-    // glyph art — the same transform origin's DrawText applies — and registering
-    // the result under the cppx token color screens author with. Text drawn in a
-    // registered color reproduces origin's palette-ramp pixels verbatim (opaque,
-    // no alpha AA); other colors keep the coverage-tint path.
+    // Exact-color variants: bake the rendered glyph pixels per (face, token color)
+    // through the Effect* pipeline, keyed by the cppx token color screens author with.
     {
         using GF = silencer::cppx_ui::GlyphFonts;
         enum class Fx { Raw,
@@ -870,25 +808,22 @@ void GameUiPipeline::BakeChromeTextures(int rw, int rh, float uiScale,
             Fx fx;
             Uint8 fx_color;
             Uint8 brightness;
-            Uint8 page; // presentation palette page: the Effect* index tables AND the
-                        // final RGB resolve through it (lobby cluster presents on page 2;
-                        // page 0's tables map e.g. brightness-160 green and EffectColor-189
-                        // amber to measurably different ramps than the lobby golden)
+            Uint8 page; // presentation page: drives the Effect* tables + RGB resolve;
+                        // page 0 vs page 2 yield different ramps for the same color
             ::ui::Color key;
-            Uint8 alpha = 255; // <255: premultiplied translucent bake (origin DrawAlphaed)
+            Uint8 alpha = 255; // <255: premultiplied translucent bake
         };
         static const VariantBake kVariantBakes[] = {
-            // The authored art IS the standard green (24,124,20 core + dark ramp).
+            // Raw art IS the standard green (24,124,20 core + dark ramp).
             {0, 133, 6.f, 11.f, Fx::Raw, 0, 128, 0, silencer::tokens::kTextBody},
             {1, 134, 8.f, 15.f, Fx::Raw, 0, 128, 0, silencer::tokens::kTextBody},
             {4, 135, 11.f, 19.f, Fx::Raw, 0, 128, 0, silencer::tokens::kTextBody},
             {5, 135, 12.f, 19.f, Fx::Raw, 0, 128, 0, silencer::tokens::kTextBody},
             {6, 133, 11.f, 11.f, Fx::Raw, 0, 128, 0, silencer::tokens::kTextBody},
             {7, 133, 7.f, 11.f, Fx::Raw, 0, 128, 0, silencer::tokens::kTextBody},
-            // mission_summary "+ N XP": origin TextSize::Prompt (bank 136) default green.
+            // mission_summary "+ N XP": Prompt (bank 136) default green.
             {2, 136, 16.f, 23.f, Fx::Raw, 0, 128, 0, silencer::tokens::kTextBody},
-            // cc detail prose: origin LegacyPalette(129, 160, ramp). The Title-face
-            // entry covers the staging title-bar map name (lobby_chrome mapText).
+            // cc detail prose / staging title-bar map name: LegacyPalette(129, 160, ramp).
             {0, 133, 6.f, 11.f, Fx::Ramp, 129, 160, 0, silencer::tokens::kTextProse},
             {1, 134, 8.f, 15.f, Fx::Ramp, 129, 160, 0, silencer::tokens::kTextProse},
             {7, 133, 7.f, 11.f, Fx::Ramp, 129, 160, 0, silencer::tokens::kTextProse},
@@ -975,10 +910,8 @@ void GameUiPipeline::BakeChromeTextures(int rw, int rh, float uiScale,
                                              GF::kGlyphCount, vpal, vb.advance,
                                              vb.line_height, vb.alpha);
         }
-        // Pulse-driven HUD text (page 0): center-message reveal (Title face, color
-        // 208, brightness 64..160 — text + shadow ramps) and buy-row selection
-        // (Heading face, color 0, brightness 128..136). Baked under the generic
-        // tokens::hud_text_key(color, brightness) keys.
+        // Pulse-driven HUD text (page 0): center-message reveal (color 208, 64..160)
+        // and buy-row selection (color 0, 128..136), keyed by hud_text_key.
         {
             const Uint8 prevPage = game.renderer.palette.CurrentPalette();
             if (prevPage != 0)
@@ -1019,24 +952,19 @@ void GameUiPipeline::BakeChromeTextures(int rw, int rh, float uiScale,
             if (deferredPass) {
                 for (int b = 64; b <= 160; b += 2)
                     bake_pulse(4, 135, 11.f, 19.f, 208, (Uint8)b);
-                // Status-line fade (BodySm, color 208): brightness 128-(16-time)*8 plus the
-                // max(8, b-64) shadow ramp — all multiples of 8 in 8..128.
+                // Status-line fade (BodySm, color 208): brightness multiples of 8, 8..128.
                 for (int b = 8; b <= 128; b += 8)
                     bake_pulse(7, 133, 7.f, 11.f, 208, (Uint8)b);
                 // Buy/tech selected-row pulse (Heading face, color 0, 129..136).
                 for (int b = 129; b <= 136; ++b)
                     bake_pulse(1, 134, 8.f, 15.f, 0, (Uint8)b);
             }
-            // Oval-button hover/focus label ramp (Title face — the bank-135 oval label —
-            // color 0, brightness 130/132/134/136 = origin FrameForPhase 128 + p*2; the
-            // bank-134 List-row labels reuse the buy/tech entries above).
+            // Oval-button hover/focus label ramp (Title face, color 0, 130..136 = 128+p*2).
             if (!deferredPass)
                 for (int b = 130; b <= 136; b += 2)
                     bake_pulse(4, 135, 11.f, 19.f, 0, (Uint8)b);
-            // Ammo counter: origin draws it DrawAlphaed — each glyph pixel is the
-            // palette ALPHA-TABLE mix of the glyph index over the pixel under it. The
-            // counter sits on the dash well's flat interior, so baking the face through
-            // Alpha(glyph, well_index) reproduces origin's exact quantized mix.
+            // Ammo counter: DrawAlphaed quantized mix of each glyph index over the
+            // dash well's flat interior — bake the face through Alpha(glyph, well).
             if (deferredPass) {
                 Uint8 well = 0;
                 if (94 < banks.size() && 0 < banks[94].size() && banks[94][0] &&
@@ -1048,7 +976,7 @@ void GameUiPipeline::BakeChromeTextures(int rw, int rh, float uiScale,
                         ox = game.world.resources.spriteoffsetx[94][0];
                         oy = game.world.resources.spriteoffsety[94][0];
                     }
-                    const int sx = 124 + ox, sy = 462 + oy; // inside the counter well
+                    const int sx = 124 + ox, sy = 462 + oy;
                     if (sx >= 0 && sy >= 0 && sx < dash->w && sy < dash->h)
                         well = dash->pixels[(size_t)sy * dash->w + sx];
                 }
@@ -1084,24 +1012,18 @@ void GameUiPipeline::BakeChromeTextures(int rw, int rh, float uiScale,
 }
 
 void GameUiPipeline::BakeMapPreviews() {
-    // SIL-216: decompress each bundled map's stored 172x62 minimap and bake it to a
-    // preview texture_id, once (maps don't change at runtime). This is the only
-    // place that reads the map files + indexed minimap + palette for the UI; the
-    // opaque ids travel to screens via the MapPreviewsProvider. The Create-Game map
-    // list shows the hovered map's preview, cursor-following.
+    // The only place that reads map files + minimap + palette for the UI; the baked
+    // ids travel to screens via the MapPreviewsProvider.
     if (mapPreviewsBaked_ || !cppxHost)
         return;
     mapPreviewsBaked_ = true;
-    // The minimap indices render against the base palette page 0 (the world's
-    // palette), index 0 transparent — exactly the sprite_bake contract. GetColors()
-    // is the base page.
+    // Minimap indices are base palette page 0, index 0 transparent.
     const SDL_Color *palette = game.renderer.palette.GetColors();
     if (!palette)
         return;
     const int w = client::ui::MapPreviews::kWidth;
     const int h = client::ui::MapPreviews::kHeight;
-    // FindMap resolves the bundled filename to a full path (level / download /
-    // archive). CDResDir before the lookup like the list pass; restore after.
+    // CDResDir before the FindMap lookup (like the list pass); restore after.
     CDResDir();
     for (const std::string &label : bundledMaps_) {
         if (cppxMapPreviews_.by_filename.count(label))
@@ -1124,7 +1046,6 @@ void GameUiPipeline::BakeMapPreviews() {
         uint32_t id = cppxHost->bake_chrome_sprite(pixels, w, h, palette);
         if (id) {
             cppxMapPreviews_.by_filename[label] = id;
-            // SIL-231: carry the map name (filename) + header description to the preview.
             cppxMapPreviews_.name_by_filename[label] = label;
             size_t dlen = 0;
             while (dlen < sizeof(header.description) && header.description[dlen])
@@ -1196,9 +1117,8 @@ GameUiPipeline::EnsureHudTeamEmblem(uint8_t agency, uint8_t color) {
     const SDL_Color *palette = game.renderer.palette.GetColors();
     if (!palette)
         return out;
-    // origin TeamEmblem custom draw: team-colorize + outline the VISIBLE-pixel
-    // border (color 17), then DrawScaled factor 2 — a pixel-SKIPPING downsample
-    // to half size. Bake the skipped pixels so the texture draws 1:1.
+    // Team-colorize + outline the visible-pixel border (color 17), then
+    // pixel-skipping downsample to half size; bake the result so it draws 1:1.
     Surface *copy = game.renderer.CreateSurfaceCopy(sp.get());
     if (!copy)
         return out;
@@ -1232,10 +1152,8 @@ GameUiPipeline::EnsureHudTeamEmblem(uint8_t agency, uint8_t color) {
 }
 
 bool GameUiPipeline::UseGpuUi() {
-    // SIL-240: route the cppx UI through the GPU geometry path when the backend
-    // supports it. ON by default (the production path); SILENCER_GPU_UI=0 is a
-    // kill switch back to the legacy CPU-raster upload. The flag is read once.
-    // Headless/TUI (no geometry-capable device) always keep the CPU raster path.
+    // GPU geometry path by default; SILENCER_GPU_UI=0 is the CPU-raster kill switch.
+    // Headless/TUI (no geometry-capable device) always use the CPU raster.
     if (!gpuUiFlagChecked_) {
         const char *v = std::getenv("SILENCER_GPU_UI");
         gpuUiFlagEnabled_ = !(v && v[0] == '0' && v[1] == '\0');
@@ -1252,38 +1170,25 @@ void GameUiPipeline::RenderCppxClientUiFrame(Surface &surface) {
     cppxUiProgram_ = nullptr;
     cppxUiUnchanged_ = false;
 #ifdef SILENCER_CPPX_FONT_DIR
-    // SIL-94: snapshot the per-frame wall clock ONCE per render frame. The
-    // frame-provider lambda below runs once per visible SCREEN LAYER (base +
-    // overlays), so computing the delta there collapsed it to 0 on every layer
-    // after the first — animation hooks never advanced.
+    // Snapshot the wall clock ONCE per frame: the frame-provider lambda runs once
+    // per screen layer, so computing the delta there collapsed it to 0 after layer 0.
     {
         const uint32_t nowMs = SDL_GetTicks();
         cppxClock_ = {nowMs, cppxLastUiTicks_ ? (nowMs - cppxLastUiTicks_) : 0u};
         cppxLastUiTicks_ = nowMs;
     }
-    // Menus render at native window-pixel resolution so the UI composite maps 1:1
-    // over the upscaled world frame (matches the SIL-11 demo). Headless / no
-    // window falls back to the surface size so the path still runs (UploadUiFrame
-    // is a no-op on devices without a UI composite pass).
-    // IN-GAME the UI renders at the SURFACE size (640x480, kLegacyRender) on ALL
-    // paths: origin draws world + HUD into one 640x480 screenbuffer and the
-    // present pass stretches the whole frame NON-uniformly to the window, so
-    // right-anchored HUD elements land at the window edge with non-square pixels.
-    // The backend's UI composite is a fullscreen quad like the world upscale, so a
-    // 640x480 ui_tex reproduces origin's stretch verbatim; window-res rendering
-    // here uniformly scaled the HUD (a 612-virtual anchor landed mid-screen).
+    // Menus render at native window-pixel resolution (UI composite maps 1:1 over the
+    // upscaled world); headless falls back to the surface size. IN-GAME the UI renders
+    // at the 640x480 surface on all paths so it shares origin's NON-uniform present
+    // stretch — right-anchored HUD lands at the window edge with non-square pixels.
     int rw = surface.w;
     int rh = surface.h;
     SDL_Window *win = game.gameRenderer.GetWindow();
-    // The in-game HUD renders at the 640x480 surface (see above); menu/UI screens
-    // render against the real window pixel size. Key this off the SESSION PHASE, not
-    // map.loaded: on the FADEOUT->MAINMENU exit frame the phase is already MainMenu
-    // but UnloadGame() (which clears map.loaded) doesn't run until the NEXT frame
-    // (game_loop MAINMENU stateisnew branch), so a map.loaded gate rendered the menu
-    // for one frame at the 640x480 surface scale (2/3) and it snapped to window scale
-    // the next frame — a visible menu zoom on tutorial exit (SIL-240). The window
-    // pixel size comes from the GameRenderer cache (refreshed on resize, never a
-    // per-frame poll) so the menu aspect also stays stable across the HiDPI late-size.
+    // Key the HUD-vs-menu resolution off the SESSION PHASE, not map.loaded: on the
+    // FADEOUT->MAINMENU exit frame the phase is already MainMenu but UnloadGame()
+    // (clearing map.loaded) runs a frame later, so a map.loaded gate flashed a
+    // one-frame menu zoom on tutorial exit. Window size comes from the cached resize
+    // value, not a per-frame poll.
     using ::client::ui::SessionPhase;
     const SessionPhase phase = CurrentSessionPhase();
     const bool worldHud = game.world.map.loaded &&
@@ -1300,14 +1205,10 @@ void GameUiPipeline::RenderCppxClientUiFrame(Surface &surface) {
     }
     if (rw < 1 || rh < 1)
         return;
-    // Responsive logical canvas: screens are authored against a height-pinned 720
-    // space (width = aspect*720), and PipelineHost::render scales that to the
-    // physical rw x rh surface (fonts re-rasterized crisply, sprites scaled) so
-    // the UI tracks the window like origin/main. Scale may drop BELOW 1: the
-    // 720-space metrics are origin's 480-virtual metrics x1.5, so a 480-high
-    // window at scale 2/3 reproduces origin's native 640x480 layout exactly —
-    // clamping at 1 rendered the UI 1.5x oversized there (e2e 21/53 overflow).
-    // Floor 480/720 mirrors origin (its virtual canvas never exceeds the window).
+    // Responsive logical canvas: height-pinned 720 space, scaled to the physical
+    // surface. Scale may drop BELOW 1 — floor 480/720, NOT 1: the 720-space metrics
+    // are origin's 480-virtual metrics x1.5, so a 480-high window at scale 2/3
+    // reproduces origin's native 640x480 layout; clamping at 1 oversized it 1.5x.
     const float kLogicalH = 720.0f;
     float cppxScale = static_cast<float>(rh) / kLogicalH;
     const float kMinScale = 480.0f / 720.0f;
@@ -1328,29 +1229,18 @@ void GameUiPipeline::RenderCppxClientUiFrame(Surface &surface) {
     if (!cppxHost->ensure(rw, rh, fontDir.c_str()))
         return;
 
-    // SIL-87: bake the curated legacy chrome sprites into texture_ids once per
-    // renderer lifetime (re-baked after a resize reset, never per frame). The
-    // composition root is the only place that may read the indexed spritebank +
-    // palette; the ids flow to screens through the ChromeTexturesProvider below.
+    // Bake chrome sprites once per renderer lifetime (re-baked after a resize reset).
     if (cppxHost->chrome_needs_bake()) {
         BakeChromeTextures(rw, rh, cppxScale, false);
         cppxHost->mark_chrome_baked();
-        // SIL-216: a renderer reset (e.g. resize) clears the texture registry and
-        // re-IDs every chrome texture, so the map-preview ids baked earlier now alias
-        // other textures. Invalidate them so BakeMapPreviews re-bakes against the fresh
-        // registry on the next lobby frame.
+        // A renderer reset re-IDs every texture, so the earlier map-preview ids now
+        // alias other textures — invalidate so the next lobby frame re-bakes them.
         cppxMapPreviews_.by_filename.clear();
         mapPreviewsBaked_ = false;
     }
 
     if (!cppxAppRootPushed) {
-        // The global FrameProvider chain (doc §5), outermost-first. ServerProvider
-        // carries the live Game handle; SessionProvider publishes the projected phase
-        // to AppRoot's reconciler. Theme/App/Settings/KeyMap/Updater join as their
-        // hooks land.
         cppxHost->pipeline().set_frame_provider([this](::ui::UiElement child) {
-            // Assemble the session model fresh each frame: read projection + intent
-            // closures over the public Game command seam (no friend, no handle leak).
             client::ui::Session session = {};
             const client::ui::SessionPhase phase = CurrentSessionPhase();
             if (phase != sessionPhaseCurrent_) {
@@ -1374,8 +1264,6 @@ void GameUiPipeline::RenderCppxClientUiFrame(Surface &surface) {
             };
             session.set_paused = [this](bool p) { game.paused = p; };
 
-            // Updater model: poll the self-updater's main-thread-safe atomics + map its
-            // state to the UI phase; intents route to the public ::Updater methods.
             client::ui::UpdaterModel updater = {};
             switch (game.updater.GetState()) {
             case ::Updater::IDLE:
@@ -1407,9 +1295,8 @@ void GameUiPipeline::RenderCppxClientUiFrame(Surface &surface) {
             updater.can_retry = (game.updater.GetState() == ::Updater::FAILED);
             updater.consent = [this] { game.updater.Consent(); };
             updater.cancel = [this] {
-                // Cancel both aborts the in-flight download AND dismisses the update flow:
-                // Updater::Cancel only flips the worker's cancel flag, so without the state
-                // transition the game stays in UPDATING and the modal never unmounts.
+                // Cancel only flips the worker's flag; without the state transition the
+                // game stays in UPDATING and the modal never unmounts.
                 game.updater.Cancel();
                 game.GoToState(GameState::MAINMENU);
             };
@@ -1418,9 +1305,6 @@ void GameUiPipeline::RenderCppxClientUiFrame(Surface &surface) {
                 SDL_OpenURL(game.updater.GetDownloadURL().c_str());
             };
 
-            // Settings model (doc §6): read the live Config + install live-apply preview
-            // closures over the public subsystems (SIL-6 LOCKED: live-apply preview). dirty
-            // = live Config diverges from the last-committed snapshot.
             client::ui::Settings settings = {};
             {
                 Config &cfg = Config::GetInstance();
@@ -1475,9 +1359,8 @@ void GameUiPipeline::RenderCppxClientUiFrame(Surface &surface) {
                 };
             }
 
-            // KeyMap model (doc §6/§7b): rows-of-combos read view (labels rendered here,
-            // since only the comp root has the gamepad type) + the six mutation intents.
-            // Binding mutations fork-if-builtin + enforce caps, all drained after render.
+            // KeyMap model: labels are rendered here since only the comp root has the
+            // gamepad type.
             client::ui::KeyMap key_map = {};
             {
                 const KeyMap &km = game.GetKeyMap();
@@ -1571,10 +1454,8 @@ void GameUiPipeline::RenderCppxClientUiFrame(Surface &surface) {
                 };
             }
 
-            // Keybind capture model (doc §7b): the comp-root-owned capture state, with the
-            // pending chord labeled, + the begin/cancel/confirm closures. Published
-            // globally (the raw multi-device edge source is global) though only
-            // OptionsControls consumes it.
+            // Keybind capture model: published globally because the raw multi-device
+            // edge source is global, though only OptionsControls consumes it.
             client::ui::KeybindCapture capture = {};
             {
                 SDL_Gamepad *pad = game.GetGamepad();
@@ -1591,12 +1472,8 @@ void GameUiPipeline::RenderCppxClientUiFrame(Surface &surface) {
                 capture.confirm_chord = [this]() { ConfirmKeybindChord(); };
             }
 
-            // Lobby model (doc §5/§6): the per-tick snapshot — captured under LockMutex
-            // before this build, so no build-time lock — plus the queued intents over the
-            // public lobby seam. Consumed by LobbyConnect (connect/auth) and MissionSummary
-            // (progression). The connect *orchestration* lives on the game tick
-            // (LobbyConnectFlow); this carries only the credential-submit/cancel + upgrade/
-            // finish intents. SIL-20.
+            // Lobby model: the per-tick snapshot was captured under LockMutex before
+            // this build, so reading it here needs no lock.
             client::ui::LobbyProviderValue lobby = {};
             lobby.snapshot = lobbySnapshot_;
             lobby.connect = [this](const std::string &user, const std::string &pass) {
@@ -1654,7 +1531,6 @@ void GameUiPipeline::RenderCppxClientUiFrame(Surface &surface) {
                     lb.charactersreceived = false;
                     lb.CreateCharacter(alias.c_str(), (Uint8)agency);
                     lb.UnlockMutex();
-                    // Routing waits for the roster to grow (CREATECHARACTER tick reconcile).
                 });
             };
             lobby.select_character = [this](int index) {
@@ -1681,9 +1557,6 @@ void GameUiPipeline::RenderCppxClientUiFrame(Surface &surface) {
                     lb.UnlockMutex();
                 });
             };
-            // Games browser intents (doc §6): id-based join/spectate/create over the public
-            // seam, queued. The LOBBY-tick game-join pump drives connect → staging and the
-            // create finalization (auto-join on creategamestatus==1 && creategameclicked).
             lobby.join_game = [this](uint32_t id, const std::string &password) {
                 cppxHost->pipeline().client_ui().queue_deferred_mutation([this, id, password]() {
                     Lobby &lb = game.world.lobby;
@@ -1726,12 +1599,10 @@ void GameUiPipeline::RenderCppxClientUiFrame(Surface &surface) {
                                   req.security, req.min_level, req.max_level,
                                   req.max_players, req.max_teams, req.spectatable);
                     lb.UnlockMutex();
-                    // The pump auto-joins our own created game once the lobby confirms it.
+                    // The LOBBY-tick pump auto-joins our created game once confirmed.
                     game.creategameclicked = true;
                 });
             };
-            // Staging room intents (doc §6/§7a): ready/change-team/leave over the public
-            // World seam. Host-ready is guarded hook-side (ishost && !AllPeersDownloadedMap).
             lobby.send_ready = [this]() {
                 cppxHost->pipeline().client_ui().queue_deferred_mutation([this]() {
                     Peer *lp = game.world.GetPeer(game.world.GetLocalPeerId());
@@ -1756,9 +1627,6 @@ void GameUiPipeline::RenderCppxClientUiFrame(Surface &surface) {
                 });
             };
 
-            // In-match model (doc §5/§6): the per-tick world-session snapshot + the queued
-            // intents over the public Game/World seam. Consumed by InGameScreen
-            // (use_player_status / use_match). Snapshot is empty outside the in-match phases.
             client::ui::WorldSessionValue world_session = {};
             world_session.snapshot = worldSessionSnapshot_;
             world_session.select_inventory_slot = [this](int slot) {
@@ -1770,9 +1638,6 @@ void GameUiPipeline::RenderCppxClientUiFrame(Surface &surface) {
                         p->currentinventoryitem = (Uint8)slot;
                 });
             };
-            // SIL-21 (5/n) in-match overlay intents (doc §6/§7a): buy/tech station, chat
-            // compose, and the scoreboard toggle — queued over the public World/Player seam
-            // (drained after render, FADEOUT-gated). The viewed agent matches the snapshot.
             world_session.buytech_select = [this](int index) {
                 cppxHost->pipeline().client_ui().queue_deferred_mutation([this, index]() {
                     Player *p = game.world.GetPeerPlayer(game.world.viewedpeerid);
@@ -1868,9 +1733,7 @@ void GameUiPipeline::RenderCppxClientUiFrame(Surface &surface) {
                 });
             };
 
-            // Global FrameProvider chain (doc §5), outermost (Theme) → innermost
-            // (WorldSession): Theme ▸ Server ▸ App ▸ Session ▸ Settings ▸ KeyMap ▸ Updater ▸
-            // KeybindCapture ▸ Lobby ▸ WorldSession ▸ <screen>.
+            // Provider chain, innermost (WorldSession) → outermost (Theme).
             ::ui::UiElement tree = client::ui::WorldSessionProvider(
                 client::ui::WorldSessionValue{std::move(world_session)}, ::ui::children({child}));
             tree = client::ui::LobbyProvider(
@@ -1890,13 +1753,8 @@ void GameUiPipeline::RenderCppxClientUiFrame(Surface &surface) {
                                              .version = SILENCER_VERSION,
                                              .canvas_w = cppxCanvasW_},
                 ::ui::children({tree}));
-            // SIL-94: per-frame wall-clock for component animation (use_clock) —
-            // snapshotted once per render frame in RenderCppxClientUiFrame (this lambda
-            // runs once per visible screen layer).
             tree = client::ui::ClockProvider(cppxClock_, ::ui::children({tree}));
-            // SIL-87: baked legacy-sprite chrome ids (read by use_chrome()).
             tree = client::ui::ChromeTexturesProvider(cppxChrome, ::ui::children({tree}));
-            // SIL-216: baked per-map minimap previews (read by use_map_previews()).
             tree = client::ui::MapPreviewsProvider(cppxMapPreviews_, ::ui::children({tree}));
             tree = silencer::game_ui::ServerProvider(
                 silencer::game_ui::ServerProviderValue{&game},
@@ -1904,9 +1762,8 @@ void GameUiPipeline::RenderCppxClientUiFrame(Surface &surface) {
             tree = client::ui::ThemeProvider(::ui::children({tree}));
             return tree;
         });
-        // The always-mounted base screen: a one-time immediate init push, not a
-        // user-facing navigation — push_screen bypasses the queue + fade orchestration,
-        // so the base mount never fades (the entry GoToState owns the startup fade).
+        // Base screen mount: push_screen bypasses the queue + fade orchestration, so
+        // it never fades (the entry GoToState owns the startup fade).
         cppxHost->pipeline().client_ui().push_screen(
             std::make_unique<client::ui::AppRoot>());
         cppxAppRootPushed = true;
@@ -1923,24 +1780,13 @@ void GameUiPipeline::RenderCppxClientUiFrame(Surface &surface) {
         }
     }
 
-    // In-game cancel routing (chat compose / buy-tech close / push PauseScreen)
-    // now lives entirely in InGameScreen's use_cancel chain, driven by the UI-layer
-    // cancel router (ClientUi::end_layout). game.cpp/this composition root hold no
-    // cancel policy — they only plumb the cancel edge into the UiInputFrame.
-
-    // SIL-18 input: the accumulated per-frame edges (events.cpp windowed +
-    // control-socket injection) plus the derived pointer. An injected click is a
-    // single-frame press+release at a UI-space point (so the control socket can
-    // activate a node by location); otherwise the real mouse drives hover/press.
     client::ui::UiPipelineFrame frame = {};
     frame.layout = {cppxLogicalW, cppxLogicalH};
     frame.input = uiInput_;
     float mx = -1000.0f;
     float my = -1000.0f;
     if (injectedPressHeld_) {
-        // SIL-223: sustained held press. Press edge on the first frame only, then a
-        // continuous pointer_down so the PRESSED interaction state persists for a
-        // screenshot. Released by InjectPointerRelease (emits the release edge below).
+        // Press edge on the first frame, then a sustained pointer_down.
         mx = injectedPressX_;
         my = injectedPressY_;
         frame.input.pointer_pressed = injectedPressIsNew_;
@@ -1950,9 +1796,8 @@ void GameUiPipeline::RenderCppxClientUiFrame(Surface &surface) {
         prevPointerDown_ = true;
         injectedPressIsNew_ = false;
     } else if (!win && prevPointerDown_) {
-        // SIL-223: the frame after a held-press release (headless, no real mouse).
-        // Emit the release edge at the last press point so the node deactivates
-        // cleanly, then settle to idle.
+        // Frame after a held-press release (headless): emit the release edge at the
+        // last press point, then settle to idle.
         mx = injectedPressX_;
         my = injectedPressY_;
         frame.input.pointer_released = true;
@@ -1967,8 +1812,6 @@ void GameUiPipeline::RenderCppxClientUiFrame(Surface &surface) {
         frame.input.pointer_down = false;
         frame.input.source = ::ui::UiFocusSource::Mouse;
     } else if (hasInjectedHover_) {
-        // Sticky headless hover: park the pointer at the injected point (no press) so
-        // focus-follows-hover tracks it. Persists until the next InjectPointerMove.
         mx = injectedHoverX_;
         my = injectedHoverY_;
         frame.input.source = ::ui::UiFocusSource::Mouse;
@@ -1979,8 +1822,7 @@ void GameUiPipeline::RenderCppxClientUiFrame(Surface &surface) {
         int ww = 0;
         int wh = 0;
         SDL_GetWindowSize(win, &ww, &wh);
-        // Map window pixels into the logical layout space (the tree lays out logical,
-        // not physical — see frame.layout above).
+        // Window pixels → logical layout space.
         mx = (ww > 0) ? (wx / static_cast<float>(ww)) * cppxLogicalW : wx;
         my = (wh > 0) ? (wy / static_cast<float>(wh)) * cppxLogicalH : wy;
         bool down = (buttons & SDL_BUTTON_MASK(SDL_BUTTON_LEFT)) != 0;
@@ -1994,17 +1836,12 @@ void GameUiPipeline::RenderCppxClientUiFrame(Surface &surface) {
     }
     frame.pointer = {mx, my};
 
-    // SIL-20: capture the lobby read-state once per tick, under LockMutex, *before*
-    // the build below reads it (the frame provider copies lobbySnapshot_ with no
-    // build-time lock). Default/empty outside lobby phases.
+    // Capture the lobby read-state under LockMutex BEFORE the frame provider copies
+    // lobbySnapshot_ (which then takes no build-time lock).
     lobbySnapshot_ = silencer::game_ui::CaptureLobbySnapshot(game, CurrentSessionPhase());
-    // SIL-21 (3/n): fold in the bundled-map choices for the GameCreatePanel. Maps
-    // don't change at runtime, so list them once (disk read on the game thread).
     if (!bundledMapsListed_) {
-        // origin BuildMapList: bundled res-dir maps + the player's downloaded maps
-        // (data-dir level/download), deduped and sorted. On macOS GetResDir() is
-        // empty and "level" resolves against the CWD, so pin it like origin does
-        // (CDResDir before the res listing, CDDataDir after).
+        // On macOS GetResDir() is empty and "level" resolves against the CWD, so pin
+        // it (CDResDir before the res listing, CDDataDir after).
         CDResDir();
         bundledMaps_ = game.gameSession.MapDownloaderRef().ListFiles((GetResDir() + "level").c_str());
         CDDataDir();
@@ -2015,36 +1852,22 @@ void GameUiPipeline::RenderCppxClientUiFrame(Surface &surface) {
                 bundledMaps_.push_back(f);
         }
         std::sort(bundledMaps_.begin(), bundledMaps_.end());
-        // origin appends the map-api server's list after the sorted local maps (the
-        // "[DL] " tag is stripped at render, so they show as plain names in server
-        // order). Names already local are skipped.
+        // Append the map-api server's list after the sorted local maps; skip dupes.
         for (auto &entry : FetchServerMapList(Config::GetInstance().mapapiurl)) {
             if (std::find(bundledMaps_.begin(), bundledMaps_.end(), entry.first) == bundledMaps_.end())
                 bundledMaps_.push_back(entry.first);
         }
         bundledMapsListed_ = true;
     }
-    // SIL-216: bake each local bundled map's minimap to a preview texture once the
-    // list is known (server-only maps have no local file and are skipped). Self-
-    // guards on mapPreviewsBaked_, so this re-bakes after a renderer reset cleared
-    // the ids but is otherwise a no-op.
     BakeMapPreviews();
     lobbySnapshot_.bundled_maps = bundledMaps_;
-    // SIL-21 (4/n): capture the in-match read-state (viewed agent + replicated match
-    // state) on the game thread before the build. Empty outside the match phases.
     worldSessionSnapshot_ = silencer::game_ui::CaptureWorldSessionSnapshot(game, CurrentSessionPhase());
 
-    // Hold stack-changing (Push/Pop/Reset) mutations so the composition root gates
-    // the visible swap behind a transition fade (the overlay-fade orchestration
-    // below commits them at black). Domain (Deferred) mutations still drain inside
-    // the render call.
+    // Hold structural (Push/Pop/Reset) mutations so the overlay-fade orchestration
+    // below commits them at black; domain mutations still drain inside render.
     cppxHost->pipeline().client_ui().set_structural_hold(true);
 
     if (UseGpuUi()) {
-        // SIL-240: lower the IR straight to a GPU geometry program — no full-res CPU
-        // raster, no full-window upload. GameRenderer::Present hands it to the backend
-        // via RenderDevice::SubmitUiFrame. The windowed screenshot path captures the
-        // composited swapchain, so no packed RGBA is needed.
         {
             PERF_SCOPE("ui.pipeline");
             cppxUiProgram_ = cppxHost->build_gpu_frame(frame);
@@ -2066,27 +1889,14 @@ void GameUiPipeline::RenderCppxClientUiFrame(Surface &surface) {
             cppxUiW = ow;
             cppxUiH = oh;
         }
-        // SIL-237: report whether the raster was skipped (IR byte-identical). When the
-        // raster ran, rgba is non-null; when it was skipped, rgba is still the cached
-        // buffer. cppxUiRgba being null (host not ready) is not an "unchanged" frame.
+        // null rgba (host not ready) is not an "unchanged" frame.
         cppxUiUnchanged_ = unchanged && rgba != nullptr;
     }
 
-    // SIL-225: Options + its submenus (and pause/modals) are pushed/popped as
-    // Tier-1 overlays via use_navigation, which never calls GoToState. They get the
-    // SAME full out->in fade as a state transition, gated per screen: the swap is
-    // held (above) and we drive a two-leg palette fade here, mirroring the FADEOUT
-    // state machine:
-    //   - idle + a queued swap that WANTS a fade (per-push FadeOverride, else the
-    //     screen's wants_transition_fade()) -> start the Out leg (dim to black);
-    //   - Out leg reaches black -> commit the held swap, start the In leg;
-    //   - a queued swap that opts OUT (e.g. the in-match PauseScreen over the live
-    //     world) commits immediately with no fade.
-    // A real state FADEOUT already owns the fade, so it takes over when one begins:
-    // it commits any pending overlay swap immediately (e.g. a PauseScreen popping
-    // itself as leave_match fires) so the stack is correct under the state fade
-    // instead of lingering over the next phase, and cancels any in-flight overlay
-    // fade.
+    // Overlay swaps get the same two-leg out->in palette fade as a state transition,
+    // gated per screen (swaps that opt out commit immediately). A real state FADEOUT
+    // owns the fade: it commits any pending overlay swap immediately (so the stack is
+    // correct under the state fade) and cancels any in-flight overlay fade.
     {
         client::ui::ClientUi &clientUi = cppxHost->pipeline().client_ui();
         if (game.GetState() == GameState::FADEOUT) {
@@ -2108,12 +1918,8 @@ void GameUiPipeline::RenderCppxClientUiFrame(Surface &surface) {
         }
     }
 
-    // UI interaction sounds (origin ClientUi.cpp:95-111 PlayMenuButtonSound):
-    // hover-ENTER edge on an audible button (dedupe via the remembered id) or an
-    // activate/keyboard-navigate landing on one -> GAS soundUIClick via
-    // Audio::PlayUI. The edges come from the UI side as data; only this
-    // composition root touches Audio. Count edges even when audio is disabled
-    // (headless) so e2e can assert the triggers.
+    // UI interaction sounds: only this comp root touches Audio. Count edges even
+    // when audio is disabled (headless) so e2e can assert the triggers.
     {
         const client::ui::ClientUi::UiAudioEvents &ev =
             cppxHost->pipeline().client_ui().audio_events();
@@ -2135,9 +1941,7 @@ void GameUiPipeline::RenderCppxClientUiFrame(Surface &surface) {
         }
     }
 
-    // Text-input platform gating (windowed only): the cppx pipeline reports whether
-    // the focused node is a text field; toggle SDL text input to match. This is the
-    // only owner of SDL_StartTextInput/StopTextInput (see src/game/CLAUDE.md).
+    // The only owner of SDL_StartTextInput/StopTextInput (see src/game/CLAUDE.md).
     if (win) {
         bool wants = cppxHost->pipeline().client_ui().wants_text_input();
         if (wants != textInputActive_) {
@@ -2149,9 +1953,7 @@ void GameUiPipeline::RenderCppxClientUiFrame(Surface &surface) {
         }
     }
 
-    // One-frame edges are consumed; reset for the next accumulation window.
-    // Name the type rather than `= {}`: GCC won't form the assignment RHS
-    // from a bare braced-init-list here (clang/MSVC accept it).
+    // Name the type (not `= {}`): GCC rejects a bare braced-init RHS here.
     uiInput_ = ::ui::UiInputFrame{};
     injectedPointer_ = false;
 #else
@@ -2188,8 +1990,6 @@ client::ui::ClientUi *GameUiPipeline::TryClientUi() {
     return cppxHost ? &cppxHost->pipeline().client_ui() : nullptr;
 }
 
-// The Show* overlays push generated cppx screens, so they no-op in the headless
-// dedicated-server build (no cppx pipeline, no ClientUi to push onto anyway).
 #ifndef SILENCER_HEADLESS
 void GameUiPipeline::ShowPasswordModal(const char *title) {
     client::ui::ClientUi *ui = TryClientUi();
@@ -2238,7 +2038,7 @@ bool GameUiPipeline::FeedKeybindEdge(const BindingKey &key) {
         return false;
     for (const BindingKey &k : keybindCapture_.pending) {
         if (k.device == key.device && k.code == key.code && k.axisDir == key.axisDir) {
-            return false; // dedup: a held edge only adds its chip once
+            return false; // dedup a held edge
         }
     }
     keybindCapture_.pending.push_back(key);
@@ -2256,10 +2056,9 @@ void GameUiPipeline::ConfirmKeybindChord() {
         CancelKeybindCapture();
         return;
     }
-    // Apply directly (not via the after-render mutation queue): this also runs
-    // from the control socket, which fires before begin_frame clears that queue.
-    // A keymap edit is local config — not a structural tree mutation or a wire
-    // message — so a direct, immediate write is safe and FADEOUT-gating-exempt.
+    // Apply directly, not via the after-render queue: this also runs from the
+    // control socket (which fires before begin_frame clears that queue), and a
+    // keymap edit is local config, not a structural or wire mutation.
     if ((int)keybindCapture_.pending.size() <= CHORD_CAP) {
         ForkActiveProfileIfBuiltin(game.GetKeyMap());
         ActionBindings &ab = game.GetKeyMap().Get(keybindCapture_.targetAction);

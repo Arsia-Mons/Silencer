@@ -41,12 +41,8 @@ const char *phase_label(UpdaterPhase phase) {
   return i < std::size(kPhaseLabels) ? kPhaseLabels[i] : "";
 }
 
-// SIL-227: match the sibling message/password modals — the bank-40 idx4 dialog
-// sprite (not a bespoke slate card) at its fixed 352x178, framing ONE status
-// line per phase, an ASCII progress bar only while downloading, and a row of
-// state-gated chrome buttons. CenteredOverlay over the prior screen. Conditional
-// children use the fixed-slot ternary-to-empty() idiom (UiChildren is
-// non-owning — never a std::vector).
+// Conditional children use the fixed-slot ternary-to-empty() idiom (UiChildren
+// is non-owning — never a std::vector).
 constexpr float kUpdateDialogW = 352.0f;
 constexpr float kUpdateDialogH = 178.0f;
 constexpr float kUpdateDialogPad = 34.0f;
@@ -56,7 +52,6 @@ constexpr float kUpdateDialogPad = 34.0f;
   const int pct = static_cast<int>(updater.progress * 100.0f);
   ChromeTextures chrome = use_chrome();
 
-  // ONE status string (carries the Failed error + Downloading percent).
   std::string status_str;
   if (phase == UpdaterPhase::Downloading)
     status_str = std::string("Downloading update  ") + std::to_string(pct) + "%";
@@ -67,7 +62,6 @@ constexpr float kUpdateDialogPad = 34.0f;
     status_str = phase_label(phase);
   const char *status = use_text_storage("%s", status_str.c_str());
 
-  // 20-cell ASCII progress bar (shown only while downloading).
   int filled = static_cast<int>(updater.progress * 20.0f + 0.5f);
   if (filled < 0)
     filled = 0;
@@ -114,10 +108,7 @@ constexpr float kUpdateDialogPad = 34.0f;
           ? chrome_button("UpdateCancel", "Cancel", updater.cancel)
           : ::ui::empty();
 
-  // Sibling-modal treatment: the baked dialog sprite when available, falling
-  // back to the themed panel before the sprite bakes. Fixed to the sprite's
-  // 352x178 so the frame is undistorted; the status + optional progress bar +
-  // button row sit inside its safe area.
+  // Baked dialog sprite when available, themed panel fallback before it bakes.
   ::ui::StylePatch panel_style =
       chrome.dialog_msg ? tokens::image_patch_cover(chrome.dialog_msg)
                         : tokens::panel_patch(tokens::kSurfacePanel,

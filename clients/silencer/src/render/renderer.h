@@ -13,9 +13,6 @@
 class Renderer
 {
 public:
-	// Public so external dispatchers (e.g. the Clay-to-Surface bridge in
-	// src/ui/runtime/) can call BlitSurface / ClipRect without a friend
-	// declaration. Just a 4-int box; nothing to encapsulate.
 	struct Rect { int w, h, x, y; };
 
 	Renderer(class World & world);
@@ -81,14 +78,12 @@ public:
 		Uint8 GetHudAnimationPhase(void) const { return state_i; }
 	Uint8 GetAmbienceLevel(void);
 	bool CapturePNG(const class Surface & buf, const SDL_Color * palette, const char * path);
-	// Write tightly-packed RGBA8 (w*h*4) directly to a PNG (the GPU-composited
-	// screenshot path, SIL-11).
+	// rgba is tightly-packed (w*h*4).
 	bool WriteRGBAPNG(const Uint8 * rgba, int w, int h, const char * path);
 	Camera camera;
 	Palette palette;
-	// Capture plumbing (`rain` control op): rain + puddle ripples are
-	// wall-clock/rand-driven — golden gating disables ours so renders are
-	// deterministic against the origin goldens' frozen rain.
+	// Rain/puddles are wall-clock/rand-driven; golden gating disables them for
+	// deterministic renders against the frozen-rain goldens (`rain` control op).
 	bool rainDisabled = false;
 
 private:
@@ -99,8 +94,7 @@ private:
 	Uint8 state_i;
 	Uint8 ex, ey;
 	bool playerinbaseold;
-	std::vector<Object *> objectlights; // rebuilt each DrawWorld call; used by debug overlay
-	// FPS counter
+	std::vector<Object *> objectlights; // rebuilt each DrawWorld call
 	Uint32 fpsLastTick = 0;
 	int fpsFrameCount = 0;
 	int fpsDisplay = 0;

@@ -1,13 +1,9 @@
 #pragma once
 
-// SIL-7 pipeline smoke test for the cppx transpile -> compile -> link flow.
-//
-// Self-contained on purpose: it defines a tiny element model so the
-// generated translation unit compiles before the retained runtime
-// (react/element/tree) is vendored in SIL-9. It exercises the host-tag
-// lowering path (`detail.Host`), text children, designated-init props,
-// and `children({...})`. DELETE this pair once real `.cppx` components
-// (SIL-16+) exercise the pipeline end-to-end.
+// Pipeline smoke test for the cppx transpile -> compile -> link flow.
+// Self-contained (defines its own tiny element model) so it compiles
+// independently of the retained runtime. DELETE this pair once real
+// `.cppx` components exercise the pipeline end-to-end.
 
 #include <string>
 #include <vector>
@@ -40,7 +36,6 @@ inline Node Host(HostProps props) {
 
 }  // namespace detail
 
-// Built by the generated cppx_smoke.cpp; proves the generated TU links.
 Node sample_tree();
 
 }  // namespace silencer::cppx_smoke

@@ -1,25 +1,10 @@
 #include "client/ui/app_theme.h"
 
-// app_theme(): the v1 product design system (moved verbatim out of
-// src/ui/style/default_theme.cpp). src/ui/ now keeps only a neutral, flat
-// fallback; the PRODUCT look lives here in client/ and is installed via
-// ThemeProvider.
-//
-// Which patches are populated:
-//   base          - always (dense)
-//   disabled      - button/input/checkbox (dimmed fill + border)
-//   checked       - checkbox / checkbox_mark
-//   focus_visible - every focusable role (the ONLY wiring that produces the focus ring)
-//   hover/pressed - every focusable role (subtle surface response)
+// The product theme, installed via ThemeProvider; src/ui keeps only a neutral
+// fallback. STRAIGHT alpha throughout; premultiplied at IR emit.
 
 namespace client::ui {
 
-// ---- design tokens (legacy origin/main palette) ----------------------------
-// The cool-blue legacy palette: black/Panel #10141C surfaces, PanelBorder
-// #565E6F edges, text #E0E7F1, a single cool-blue accent #9FC9FF for the focus
-// ring + checked/selection, danger #DD5048. The control gradient is collapsed
-// to a flat Panel fill (legacy had no gradient; sprite buttons land in SIL-89).
-// STRAIGHT alpha throughout; premultiplied at IR emit.
 namespace {
 using ::ui::Border;
 using ::ui::Color;
@@ -33,17 +18,13 @@ using ::ui::opt;
 using ::ui::Outline;
 using ::ui::patch;
 
-constexpr float kRadius = 8.f; // uniform corner radius on all control surfaces
+constexpr float kRadius = 8.f;
 
-// Accent: the legacy cool blue (#9FC9FF), reused for the focus ring +
-// checked/selection. In origin/main the accent was a baked sprite edge, not a
-// fill; this constant drives only the focus ring + selection wash here (the
-// oval sprite button lands in SIL-89).
+// Accent: drives the focus ring + selection wash.
 constexpr Color kAccent = {92, 208, 92, 255}; // #5CD05C green-bright
 
-// Control surface (green phosphor): near-black green-glass fill with a green-dim
-// edge; hover/pressed brighten the green stroke (origin/main never used slate).
-// Sprite-backed controls (oval/chrome) override this via image_patch.
+// Control surface (green phosphor). Sprite-backed controls (oval/chrome)
+// override this via image_patch.
 constexpr Color kControlTop = {6, 16, 8, 255};      // near-black green glass
 constexpr Color kControlBottom = {6, 16, 8, 255};
 constexpr Color kControlBorder = {46, 125, 69, 255}; // #2E7D45 green-dim
@@ -52,10 +33,8 @@ constexpr Color kHoverBottom = {10, 24, 12, 255};
 constexpr Color kHoverBorder = {92, 208, 92, 255};   // #5CD05C
 constexpr Color kPressedTop = {4, 12, 6, 255};
 constexpr Color kPressedBottom = {4, 12, 6, 255};
-// SIL-223: pressed reads as "pushed in" (darker fill above) with a RESTRAINED
-// border, NOT a max-bright outline. The old #3CFF3C jumped the 1px edge to the
-// brightest green on mouse-down — a jarring bright-green rectangle. Sit it a
-// step below the dim base border (#2E7D45) so the press feels recessed, not lit.
+// Pressed border sits a step BELOW the dim base border so the press reads as
+// recessed; a brighter edge (e.g. #3CFF3C) flashes a jarring green rectangle.
 constexpr Color kPressedBorder = {37, 107, 60, 255}; // #256B3C green, recessed
 
 constexpr Color kDisabledTop = {6, 14, 8, 255};
@@ -72,7 +51,7 @@ const Theme &app_theme() {
     th.caret = {60, 255, 60, 255};        // #3CFF3C bright caret
     th.selection = {92, 208, 92, 96};     // green wash; premultiplied at IR emit
 
-    // A vertical 2-stop gradient helper (top -> bottom). angle 90deg = downward.
+    // Vertical 2-stop gradient (top -> bottom).
     auto vgrad = [](Color top, Color bottom) {
       Gradient g{};
       g.angle_deg = 90.f;
@@ -82,14 +61,12 @@ const Theme &app_theme() {
       return g;
     };
 
-    // Focus ring patch: ONLY outline is set; everything else inherits from base.
-    // A crisp 2px accent ring, outset 2px so it sits just outside the control.
     const StylePatch focus_ring_patch =
         patch().outline(Outline{2.f, th.focus_ring, 2.f});
 
     auto seed_control = [&](RoleStyle &r) {
-      // background is the gradient's bottom stop so any path that reads the flat
-      // fill (e.g. a non-gradient executor) still lands on-palette.
+      // background = the gradient's bottom stop so a non-gradient executor still
+      // lands on-palette.
       r.base.background = kControlBottom;
       r.base.corner_radius = kRadius;
       r.base.gradient = vgrad(kControlTop, kControlBottom);
@@ -112,32 +89,26 @@ const Theme &app_theme() {
           Border{{1, 1, 1, 1},
                  {kPressedBorder, kPressedBorder, kPressedBorder,
                   kPressedBorder}});
-      r.focus_visible = focus_ring_patch; // the locked focus ring
+      r.focus_visible = focus_ring_patch;
     };
     seed_control(th.button);
     seed_control(th.input);
     seed_control(th.checkbox);
-    // A text field is not a button: holding the pointer on it must not paint a
-    // pressed fill. Drop the pressed patch so click-and-hold leaves the field's
-    // resting (or focused) look untouched.
+    // A text field is not a button: drop the pressed patch so click-and-hold
+    // doesn't paint a pressed fill.
     th.input.pressed = {};
-    // origin TextInput caret: a 1-virtual-px (1.5 logical) bar in legacy
-    // palette idx 140, resolved per screen palette — sprite-chrome screens
-    // override the color from use_chrome() via their field style patch.
+    // origin caret: legacy palette idx 140, resolved per screen palette —
+    // sprite-chrome screens override the color from use_chrome().
     th.input.base.caret = {th.caret, 1.5f};
 
-    // The checkbox BODY does not react to `checked` (only the mark does). The
-    // mark inherits the body's 8px radius so the fill sits flush inside.
+    // The checkbox BODY does not react to `checked` (only the mark does).
     th.checkbox_mark.base.background = {0, 0, 0, 0}; // hidden until checked
     th.checkbox_mark.base.corner_radius = 4.f;
     th.checkbox_mark.checked.background = opt(kAccent); // visible accent mark
 
     th.box.base = VisualStyle{};
-    // Base text role: Body face (0) at the legacy native em (11).
     th.text.base.text = TextVisual{th.text_default, 0, 11};
 
-    // Dialog: a rounded, slightly elevated panel a step darker than the controls
-    // so stacked controls read as raised against it.
     th.dialog.base.background = {6, 16, 8, 255}; // near-black green glass
     th.dialog.base.corner_radius = kRadius + 2.f;
     th.dialog.base.border.width = {1, 1, 1, 1};
@@ -151,11 +122,8 @@ const Theme &app_theme() {
 }
 
 ::ui::UiElement ThemeProvider(::ui::UiChildren children) {
-  // app_theme() is a function-local `static const Theme` with program-duration
-  // lifetime and a stable address, and use_theme() only ever reads it back as
-  // const — so we hand the context a pointer to it directly. This intentionally
-  // supersedes the spec's copy_value() suggestion: no per-frame copy of the
-  // (large) Theme into the element arena is needed when the value is static.
+  // app_theme() is a static const with a stable address read only as const, so
+  // hand the context a direct pointer — no per-frame copy of the large Theme.
   return ::ui::provider("ThemeProvider", &::ui::ThemeContext,
                         const_cast<::ui::Theme *>(&app_theme()), children);
 }

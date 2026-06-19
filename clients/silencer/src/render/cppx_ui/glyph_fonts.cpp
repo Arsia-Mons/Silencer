@@ -9,14 +9,9 @@ namespace silencer::cppx_ui {
 
 namespace {
 
-// Derive the face baseline (ascent in native px) from the glyph art. Glyphs are
-// baked TOP-ALIGNED (y=0 = cell top), so a glyph's ink-bottom row is its descent
-// from the cap-top. Non-descender glyphs (letters, digits, the bulk of the bank)
-// all bottom out on the shared baseline; descenders (g/j/p/q/y) extend below it.
-// The baseline is therefore the MODAL ink-bottom row across the glyph set — the
-// row where the bulk of glyphs sit. atlas_h - ascent is the empty descender zone
-// that used to push the centered caret too low (SIL-217). Falls back to atlas_h
-// when no ink is found.
+// Face ascent (native px) = modal ink-bottom row across the glyph set. Glyphs
+// are baked top-aligned, so atlas_h - ascent is the descender zone; the ascent
+// drives the caret height. Falls back to atlas_h when no ink is found.
 int derive_ascent(const GlyphFonts::GlyphSrc *glyphs, int count, int atlas_h) {
   if (atlas_h < 1)
     return atlas_h;
@@ -25,7 +20,7 @@ int derive_ascent(const GlyphFonts::GlyphSrc *glyphs, int count, int atlas_h) {
     const GlyphFonts::GlyphSrc &g = glyphs[i];
     if (!g.indices || g.w <= 0 || g.h <= 0)
       continue;
-    int ink_bottom = 0; // 1-based row count to the lowest inked row
+    int ink_bottom = 0; // 1-based count to the lowest inked row
     for (int y = 0; y < g.h; ++y) {
       const uint8_t *row = g.indices + static_cast<size_t>(y) * g.w;
       for (int x = 0; x < g.w; ++x) {
@@ -79,8 +74,7 @@ bool GlyphFonts::build_face(SDL_Renderer *renderer, int face_id,
   if (count > kGlyphCount)
     count = kGlyphCount;
 
-  // Peak luminance across the face's glyph art, so the brightest pixel maps to
-  // full coverage (1.0) and a flat tint reproduces the original color exactly.
+  // Peak luminance across the face so the brightest pixel maps to full coverage.
   auto lum = [&](uint8_t idx) -> int {
     const SDL_Color &c = palette256[idx];
     int m = c.r > c.g ? c.r : c.g;
@@ -106,8 +100,8 @@ bool GlyphFonts::build_face(SDL_Renderer *renderer, int face_id,
   f.advance = advance;
   f.line_height = line_height;
 
-  // Pass 1: lay glyphs out in a row, 1px gutter so nearest-neighbor sampling of
-  // one glyph never bleeds into the next. atlas_h = tallest glyph.
+  // Pass 1: lay glyphs out in a row, 1px gutter so nearest sampling of one
+  // glyph never bleeds into the next. atlas_h = tallest glyph.
   int pen = 0;
   int max_h = 0;
   for (int i = 0; i < count; ++i) {
@@ -130,11 +124,9 @@ bool GlyphFonts::build_face(SDL_Renderer *renderer, int face_id,
   f.ascent = derive_ascent(glyphs, count, atlas_h);
   f.gpu_key = ui_texture_key::glyph_face(static_cast<uint16_t>(face_id));
 
-  // Pass 2: bake each glyph as a WHITE coverage mask (premultiplied) into the
-  // atlas. Index 0 is transparent (the world renderer's sprite convention);
-  // every other index becomes white with alpha = its luminance / peak — the
-  // original art's ramp preserved as coverage falloff. The executor tints at
-  // draw time (premultiplied white * cov, color-modded by the token color).
+  // Pass 2: bake each glyph as a white premultiplied coverage mask. Index 0 is
+  // transparent; every other index becomes white with alpha = luminance / peak
+  // (the art's ramp preserved as coverage). The executor tints at draw time.
   std::vector<uint8_t> rgba(static_cast<size_t>(atlas_w) * atlas_h * 4u, 0);
   for (int i = 0; i < count; ++i) {
     const GlyphSrc &g = glyphs[i];
@@ -151,7 +143,7 @@ bool GlyphFonts::build_face(SDL_Renderer *renderer, int face_id,
         int cov = lum(idx) * 255 / peak;
         if (cov > 255)
           cov = 255;
-        const uint8_t c = static_cast<uint8_t>(cov); // premultiplied white*cov
+        const uint8_t c = static_cast<uint8_t>(cov);
         drow[x * 4 + 0] = c;
         drow[x * 4 + 1] = c;
         drow[x * 4 + 2] = c;
@@ -168,13 +160,11 @@ bool GlyphFonts::build_face(SDL_Renderer *renderer, int face_id,
   SDL_DestroySurface(surf);
   if (!tex)
     return false;
-  // Premultiplied (mask is white premul) + nearest sampling for the chunky
-  // upscaled-bitmap look that matches the golden's 640->960 nearest upscale.
+  // Premultiplied mask + nearest sampling for the chunky upscaled-bitmap look.
   SDL_SetTextureBlendMode(tex, SDL_BLENDMODE_BLEND_PREMULTIPLIED);
   SDL_SetTextureScaleMode(tex, SDL_SCALEMODE_NEAREST);
 
-  // Retain the premultiplied atlas bytes for the GPU emitter (SIL-240); the
-  // texture above already holds its own copy, so the source can be moved.
+  // Retain the premultiplied bytes for the GPU emitter (tex holds its own copy).
   f.atlas_rgba = std::move(rgba);
   if (faces_[face_id].atlas)
     SDL_DestroyTexture(faces_[face_id].atlas);
@@ -230,9 +220,8 @@ bool GlyphFonts::build_color_face(SDL_Renderer *renderer, int face_id,
   f.gpu_key = ui_texture_key::glyph_color(static_cast<uint16_t>(face_id), key_r,
                                           key_g, key_b);
 
-  // Verbatim palettized colors, opaque where index != 0 — origin's DrawText
-  // blits the indexed glyph with no alpha blending, so the rendered text IS
-  // these exact pixels (the AA lives in the art's color ramp, not in alpha).
+  // Verbatim palettized colors, opaque where index != 0 (AA lives in the art's
+  // color ramp, not in alpha) — these are origin's exact rendered text pixels.
   std::vector<uint8_t> rgba(static_cast<size_t>(atlas_w) * atlas_h * 4u, 0);
   for (int i = 0; i < count; ++i) {
     const GlyphSrc &g = glyphs[i];
@@ -247,8 +236,7 @@ bool GlyphFonts::build_color_face(SDL_Renderer *renderer, int face_id,
         if (idx == 0)
           continue;
         const SDL_Color &c = palette256[idx];
-        // Premultiplied: alpha<255 reproduces origin's DrawAlphaed text
-        // (palette-table ~50% mix with whatever is under it).
+        // Premultiplied; alpha<255 reproduces origin's DrawAlphaed text.
         drow[x * 4 + 0] = (uint8_t)((c.r * alpha + 127) / 255);
         drow[x * 4 + 1] = (uint8_t)((c.g * alpha + 127) / 255);
         drow[x * 4 + 2] = (uint8_t)((c.b * alpha + 127) / 255);
@@ -267,7 +255,7 @@ bool GlyphFonts::build_color_face(SDL_Renderer *renderer, int face_id,
     return false;
   SDL_SetTextureBlendMode(tex, SDL_BLENDMODE_BLEND_PREMULTIPLIED);
   SDL_SetTextureScaleMode(tex, SDL_SCALEMODE_NEAREST);
-  f.atlas_rgba = std::move(rgba); // GPU emitter copy (SIL-240)
+  f.atlas_rgba = std::move(rgba);
   f.atlas = tex;
   f.loaded = true;
 

@@ -12,15 +12,10 @@ using ::ui::components::BoxProps;
 
 namespace {
 
-// Loadout "details" column background. This is a loadout-feature-local color
-// that no other shared surface consumes, so it is kept file-local rather than
-// added to the shared palette in tokens.h. (The plan permits it to live in
-// screens/loadout/loadout_tokens.h, but because Panel is a shared component it
-// must resolve its own paint without depending on a screen-local header.)
+// Loadout "details" column background; file-local (no other surface uses it).
 constexpr ::ui::Color kSunkenBg = {22, 30, 36, 255};
 
-// Canonical width (points) for each PanelSize tier. Auto defers to the
-// variant's canonical width (handled by the caller).
+// Canonical width (points) per PanelSize tier; Auto defers to the variant.
 float panel_size_width(PanelSize size) {
   switch (size) {
   case PanelSize::Sm:
@@ -77,9 +72,8 @@ float panel_size_width(PanelSize size) {
     overlay = tokens::fill_patch(kSunkenBg);
     break;
   case PanelVariant::Bordered:
-    // Legacy console panel (SIL-104): #10141C fill + 1px #565E6F border. The
-    // origin/main lobby uses bordered console panels, not the borderless slate
-    // Sunken. Stretch + tighter padding for dense lobby columns.
+    // Legacy console panel (the origin/main lobby columns): stretch + tighter
+    // padding for dense columns.
     layout = ::ui::LayoutStyle{
         .direction = ::ui::FlexDirection::Column,
         .align_items = ::ui::AlignItems::Stretch,
@@ -91,10 +85,8 @@ float panel_size_width(PanelSize size) {
     overlay = tokens::panel_patch(tokens::kSurfacePanel, tokens::kBorderPanel);
     break;
   case PanelVariant::Chrome: {
-    // Sprite-backed full chrome panel (bank 7 idx5), drawn as a PLAIN image at
-    // its native sprite size so the baked frame border + internal wells stay
-    // aligned. Content padding keeps children inside the frame chrome. Falls
-    // back to a vector Hero panel for the not-yet-baked frame.
+    // Sprite-backed chrome panel (bank 7 idx5), drawn at native sprite size so
+    // the baked frame border + wells stay aligned; falls back to a Hero panel.
     client::ui::ChromeTextures chrome = client::ui::use_chrome();
     const float w = chrome.chrome_panel_w ? (float)chrome.chrome_panel_w : 628.0f;
     const float h = chrome.chrome_panel_h ? (float)chrome.chrome_panel_h : 441.0f;
@@ -113,16 +105,9 @@ float panel_size_width(PanelSize size) {
     break;
   }
   case PanelVariant::ControlsFrame: {
-    // Single-pane Options·Controls frame (bank 7 idx7), STRETCHED in origin
-    // (PackImageStretch(7,7)). The sprite bakes its own title-header notch
-    // (top-center) + right-edge scrollbar rail, so the screen draws neither.
-    // Absolutely positioned at the logical rect of origin's virtual element
-    // box; the executor swaps the draw for the canonical per-size Stretch
-    // variant (U-2/SIL-204). Padding re-centers the
-    // content where the previous flow layout put it (the keybind grid was
-    // pixdiff-tuned against the golden there): the baked title notch is
-    // cleared by the top padding, content centers horizontally (origin
-    // childAlignment CENTER_X). Falls back to a vector green panel.
+    // Single-pane Options·Controls frame (bank 7 idx7), stretched. The sprite
+    // bakes its own title notch + scrollbar rail, so the screen draws neither;
+    // the top padding clears the notch. Falls back to a vector green panel.
     client::ui::ChromeTextures chrome = client::ui::use_chrome();
     if (chrome.chrome_controls && chrome.chrome_controls_w > 0.0f) {
       layout = ::ui::LayoutStyle{

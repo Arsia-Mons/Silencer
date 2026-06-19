@@ -1,10 +1,7 @@
 #pragma once
 
-// SIL-11 end-to-end demo overlay. Renders a nine-slice button + TTF text to a
-// window-sized premultiplied-RGBA buffer through the cppx bridge (UiSurface ->
-// draw_executor), which the GPU backend composites over the frame. Flag-gated
-// (SILENCER_CPPX_UI_DEMO) — proves the whole bridge on the real screen; the
-// pipeline-driven UI (cppx screens) is SIL-13.
+// Flag-gated (SILENCER_CPPX_UI_DEMO) end-to-end smoke overlay: a nine-slice
+// button + TTF text rendered through the cppx bridge to a packed RGBA buffer.
 
 #include "font_registry.h"
 #include "texture_registry.h"
@@ -21,12 +18,11 @@ class UiDemoOverlay {
 public:
   ~UiDemoOverlay();
 
-  // (Re)create the software-rendered surface at w*h and load fonts from
-  // `font_dir`. Cheap no-op when already sized.
+  // (Re)create the w*h surface and load fonts. No-op when already sized.
   bool ensure(int w, int h, const char *font_dir);
 
-  // Render the demo scene; returns a tightly-packed premultiplied-RGBA8 buffer
-  // (w*h*4, valid until the next render) or nullptr.
+  // Render the demo scene; returns packed premultiplied RGBA8 (w*h*4, valid
+  // until the next render) or nullptr.
   const uint8_t *render(int *out_w, int *out_h);
 
 private:

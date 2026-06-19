@@ -5,13 +5,9 @@
 
 namespace client::ui {
 
-// A static design-system showcase overlay (SIL-24 visual-regression harness).
-// Renders every semantic component variant — including the ones no live screen
-// exercises (Button Danger/Ghost, Sm size, ScreenTitle Popup, BodyText Summary)
-// — in a deterministic grid so the visual-regression suite can golden them.
-// Pushed via use_navigation().push (GameUiPipeline::ShowGallery / the
-// `ui_gallery` control op); carries no state and no provider. Not reachable
-// from the product UI — automation/debug only.
+// Static design-system showcase overlay for the visual-regression suite. Not
+// reachable from the product UI — automation/debug only (GameUiPipeline::
+// ShowGallery / the `ui_gallery` control op).
 class GalleryScreen final : public OverlayScreen {
 public:
   GalleryScreen() = default;

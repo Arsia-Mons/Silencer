@@ -4,12 +4,8 @@
 
 namespace client::ui {
 
-// Design tokens (read-only): the resolved product Theme for the current
-// subtree. Backed by ui::ThemeContext, installed OUTERMOST by ThemeProvider
-// (app_theme.h). Falls back to ui::default_theme() when no provider is mounted.
-// Doc §6: use_tokens() — read-only. SIL-17 enriches the VALUES inside
-// app_theme(); the hook surface is stable. Header-inline forward to the
-// vendored golden ui::use_theme() (kept verbatim, hence the wrapper).
+// Design tokens (read-only): the resolved product Theme, installed by
+// ThemeProvider. Forwards to the vendored ui::use_theme().
 inline const ::ui::Theme &use_tokens() { return ::ui::use_theme(); }
 
 } // namespace client::ui

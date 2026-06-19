@@ -14,7 +14,6 @@ TextureRegistry::~TextureRegistry() { shutdown(); }
 uint32_t TextureRegistry::adopt(SDL_Texture *texture) {
   if (!texture || count_ >= kMaxTextures)
     return 0;
-  // Premultiplied compositing for every UI texture.
   SDL_SetTextureBlendMode(texture, SDL_BLENDMODE_BLEND_PREMULTIPLIED);
   textures_[count_++] = texture;
   return static_cast<uint32_t>(count_); // id == 1-based slot (0 reserved "none")
@@ -26,8 +25,7 @@ uint32_t TextureRegistry::upload_rgba(SDL_Renderer *renderer,
   if (!renderer || !rgba || width <= 0 || height <= 0)
     return 0;
 
-  // Premultiply at upload: the executor draws every texture under
-  // SDL_BLENDMODE_BLEND_PREMULTIPLIED, so stored texels must be premultiplied.
+  // Premultiply at upload (textures are drawn under BLEND_PREMULTIPLIED).
   std::vector<uint8_t> pm(static_cast<size_t>(width) * height * 4u);
   for (size_t i = 0; i < pm.size(); i += 4) {
     const int a = rgba[i + 3];
@@ -46,14 +44,11 @@ uint32_t TextureRegistry::upload_rgba(SDL_Renderer *renderer,
     SDL_DestroyTexture(tex);
     return 0;
   }
-  // Nearest sampling keeps goldens crisp and deterministic; nine-slice corners
-  // are 1:1 anyway. Callers wanting smoothing can override post-adopt.
+  // Nearest sampling keeps goldens crisp and deterministic.
   SDL_SetTextureScaleMode(tex, SDL_SCALEMODE_NEAREST);
   const uint32_t id = adopt(tex);
   if (id) {
-    // SIL-240: keep the premultiplied bytes resident so the GPU emitter can
-    // upload them once (chrome / backdrop / glyph / legacy-variant bakes all
-    // flow through here).
+    // Keep the premultiplied bytes resident so the GPU emitter uploads once.
     rgba_[id - 1] = std::move(pm);
     tw_[id - 1] = width;
     th_[id - 1] = height;
@@ -126,21 +121,19 @@ bool TextureRegistry::resolve_legacy_sized(
   float s = std::min(out_w / (float)sp.legacy_w, out_h / (float)sp.legacy_h);
   if (s < 1.0f)
     s = 1.0f;
-  // Recover the authored virtual box SIZE (design metric); position no longer
-  // participates (canonical phase, U-2/SIL-204).
+  // Recover the authored virtual box size; position drops out (canonical phase).
   const int vw = (int)std::floor(dev_w / s + 0.5f);
   const int vh = (int)std::floor(dev_h / s + 0.5f);
   if (vw < 1 || vh < 1 || vw > 4095 || vh > 4095)
     return false;
-  // Floor-quantized device cell (legacy SW dst-rect floor — s==1 in-game
-  // draws land byte-identical); footprint = the canonical chain's ceil(v*s).
+  // Floor-quantized device cell (matches legacy SW dst-rect floor); footprint =
+  // ceil(v*s).
   const int x = (int)std::floor(dev_x), y = (int)std::floor(dev_y);
   const int tw = (int)std::ceil(vw * s - 0.001f);
   const int th = (int)std::ceil(vh * s - 0.001f);
   if (tw <= 0 || th <= 0)
     return false;
-  // One variant per (sprite, scale, virtual box size). Scale is in the key:
-  // after a window resize the same box recurs at a different magnify and a
+  // Key includes s: a window resize recurs the box at a different magnify, and a
   // stale-scale texture would draw at its bake-time dims.
   const int s_q = (int)(s * 1000.0f + 0.5f);
   const uint64_t key = (1ull << 63) | ((uint64_t)(base_id & 0xFFFF) << 40) |
@@ -157,7 +150,7 @@ bool TextureRegistry::resolve_legacy_sized(
     else if (sp.fit == LegacyFit::Contain)
       bake_canonical_contain_rgba(sp.indices.data(), sp.w, sp.h, sp.palette,
                                   vw, vh, s, tw, th, rgba.data());
-    else // LegacyFit::Stretch (origin DispatchImage Stretch)
+    else // LegacyFit::Stretch
       bake_canonical_stretch_rgba(sp.indices.data(), sp.w, sp.h, sp.palette,
                                   vw, vh, s, tw, th, rgba.data());
     id = upload_rgba(renderer, rgba.data(), tw, th);
@@ -187,10 +180,7 @@ bool TextureRegistry::resolve_legacy_cell(
   // Only 1:1-virtual draws qualify (box == the sprite cell at the menu scale).
   if (std::fabs(dev_w - sp.w * s) > 4.0f || std::fabs(dev_h - sp.h * s) > 4.0f)
     return false;
-  // Canonical cell (U-2/SIL-204): ONE variant per (sprite, scale), drawn at
-  // the floor-quantized device position (legacy SW dst-rect floor — s==1
-  // in-game draws land byte-identical). Same sprite, same pixels, same size,
-  // anywhere on screen.
+  // One variant per (sprite, scale), drawn at the floor-quantized device cell.
   const int x = (int)std::floor(dev_x), y = (int)std::floor(dev_y);
   const int tw = (int)std::ceil(sp.w * s - 0.001f);
   const int th = (int)std::ceil(sp.h * s - 0.001f);
