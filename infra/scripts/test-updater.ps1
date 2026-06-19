@@ -1,184 +1,209 @@
-﻿param(
+# Automated end-to-end auto-updater test for Windows (headless; runs in CI).
+#
+# Mirror of infra/scripts/test-updater.sh. Proves the FULL self-update path:
+# an installed client downloads a new build over loopback HTTP, verifies its
+# sha256, self-replaces in place via stage-2, and the NEW version relaunches
+# AUTOMATICALLY — confirmed by pinging the auto-relaunched process over the
+# control socket and asserting its version.
+#
+# Drives the REAL cppx "Update" button headlessly; bypasses the lobby
+# (show_update_screen injects a real url+sha256). The relaunched client comes
+# up via env fallbacks (SILENCER_HEADLESS + SILENCER_CONTROL_PORT) that the
+# binary honors when the matching flag is absent — stage-2 relaunches with no
+# argv, but the environment IS inherited across CreateProcess.
+param(
     [string]$OldVer = "00023",
-    [string]$NewVer = "00024"
+    [string]$NewVer = "99999",
+    [string]$OldBuildDir = "",
+    [string]$NewBuildDir = "",
+    [switch]$KeepWork
 )
 
 $ErrorActionPreference = "Stop"
 $Repo = (Resolve-Path "$PSScriptRoot\..\..").Path
 Set-Location $Repo
+$ZipName = "silencer-update.zip"
+$CliJs = "$Repo\clients\cli\index.ts"
 
-$PlatformZip = "silencer-windows-x64.zip"
+function Pick-Port {
+    $l = [System.Net.Sockets.TcpListener]::new([System.Net.IPAddress]::Loopback, 0)
+    $l.Start(); $p = $l.LocalEndpoint.Port; $l.Stop(); return $p
+}
+function Get-PingVersion([int]$Port) {
+    $out = & bun $CliJs --port $Port ping 2>$null
+    if (-not $out) { return "" }
+    try { return [string]((($out -join "`n") | ConvertFrom-Json).version) } catch { return "" }
+}
+function Wait-ForLabel([int]$Port, [string]$Label, [int]$Tries = 150) {
+    for ($i = 0; $i -lt $Tries; $i++) {
+        $out = & bun $CliJs --port $Port inspect 2>$null
+        if ($out) {
+            try {
+                $nodes = (($out -join "`n") | ConvertFrom-Json).nodes
+                if ($nodes | Where-Object { $_.label -eq $Label -or $_.control_id -eq $Label }) { return $true }
+            } catch {}
+        }
+        Start-Sleep -Milliseconds 100
+    }
+    return $false
+}
 
-# Bring MSVC + bundled Ninja into the current PowerShell environment by
-# sourcing vcvars64.bat and replaying its env vars. CI uses ilammy/msvc-dev-cmd
-# for the same effect; locally we use vswhere to find the install. Skipped
-# when the env is already initialised (e.g. running from a Developer prompt).
-if (-not $env:VSINSTALLDIR) {
-    $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
-    if (-not (Test-Path $vswhere)) { throw "vswhere.exe not found at $vswhere" }
-    $vsInstall = (& $vswhere -latest -property installationPath).Trim()
-    if (-not $vsInstall) { throw "no Visual Studio install found by vswhere" }
-    $vcvars = Join-Path $vsInstall 'VC\Auxiliary\Build\vcvars64.bat'
-    if (-not (Test-Path $vcvars)) { throw "vcvars64.bat not found at $vcvars" }
-    Write-Host "Sourcing vcvars64 from $vcvars"
-    & cmd /c "`"$vcvars`" >nul && set" | ForEach-Object {
-        if ($_ -match '^([^=]+)=(.*)$') {
-            Set-Item -Path "env:$($Matches[1])" -Value $Matches[2]
+# Lay a runnable install (silencer\ dir: exe + vcpkg DLLs + assets + fonts)
+# matching release.yml's package layout, and return its exe path.
+function Stage-Install([string]$BuildDir, [string]$DestDir) {
+    $app = Join-Path $DestDir "silencer"
+    New-Item -ItemType Directory -Force -Path $app | Out-Null
+    Copy-Item (Join-Path $BuildDir "Silencer.exe") $app -Force
+    $vcpkgBin = Join-Path $BuildDir "vcpkg_installed\x64-windows\bin"
+    if (Test-Path $vcpkgBin) { Copy-Item "$vcpkgBin\*.dll" $app -Force }
+    Copy-Item -Recurse -Force "$Repo\shared\assets" (Join-Path $app "assets")
+    New-Item -ItemType Directory -Force -Path (Join-Path $app "assets\fonts") | Out-Null
+    Copy-Item "$Repo\shared\fonts\*.otf" (Join-Path $app "assets\fonts") -Force
+    return (Join-Path $app "Silencer.exe")
+}
+
+if (-not $OldBuildDir) { $OldBuildDir = "$Repo\e2e-build-old" }
+if (-not $NewBuildDir) { $NewBuildDir = "$Repo\e2e-build-new" }
+$buildOld = -not (Test-Path $OldBuildDir)
+$buildNew = -not (Test-Path $NewBuildDir)
+
+if ($buildOld -or $buildNew) {
+    # --- Build environment: MSVC + bundled Ninja, then a vcpkg toolchain.
+    # Skipped when already initialised (a Developer prompt, or CI's
+    # ilammy/msvc-dev-cmd + VCPKG_INSTALLATION_ROOT).
+    if (-not $env:VSINSTALLDIR) {
+        $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+        if (-not (Test-Path $vswhere)) { throw "vswhere.exe not found at $vswhere" }
+        $vsInstall = (& $vswhere -latest -property installationPath).Trim()
+        if (-not $vsInstall) { throw "no Visual Studio install found by vswhere" }
+        $vcvars = Join-Path $vsInstall 'VC\Auxiliary\Build\vcvars64.bat'
+        if (-not (Test-Path $vcvars)) { throw "vcvars64.bat not found at $vcvars" }
+        & cmd /c "`"$vcvars`" >nul && set" | ForEach-Object {
+            if ($_ -match '^([^=]+)=(.*)$') { Set-Item -Path "env:$($Matches[1])" -Value $Matches[2] }
+        }
+        $bundledNinja = Join-Path $vsInstall 'Common7\IDE\CommonExtensions\Microsoft\CMake\Ninja'
+        if (Test-Path (Join-Path $bundledNinja 'ninja.exe')) { $env:PATH = "$bundledNinja;$env:PATH" }
+    }
+    $VcpkgRoot = $null
+    if ($env:VCPKG_ROOT -and (Test-Path (Join-Path $env:VCPKG_ROOT 'scripts/buildsystems/vcpkg.cmake'))) {
+        $VcpkgRoot = (Resolve-Path $env:VCPKG_ROOT).Path
+    } elseif ($env:VCPKG_INSTALLATION_ROOT -and (Test-Path (Join-Path $env:VCPKG_INSTALLATION_ROOT 'scripts/buildsystems/vcpkg.cmake'))) {
+        $VcpkgRoot = (Resolve-Path $env:VCPKG_INSTALLATION_ROOT).Path
+    } else {
+        $VcpkgRoot = Join-Path $Repo '.vcpkg'
+        if (-not (Test-Path (Join-Path $VcpkgRoot 'scripts/buildsystems/vcpkg.cmake'))) {
+            if (-not (Test-Path $VcpkgRoot)) {
+                git clone --depth 1 https://github.com/microsoft/vcpkg.git $VcpkgRoot
+                if ($LASTEXITCODE -ne 0) { throw "git clone vcpkg failed" }
+            }
+            & (Join-Path $VcpkgRoot 'bootstrap-vcpkg.bat') -disableMetrics
+            if ($LASTEXITCODE -ne 0) { throw "bootstrap-vcpkg.bat failed" }
         }
     }
-    # Bundled Ninja ships with VS but isn't on PATH after vcvars64; prepend it.
-    $bundledNinja = Join-Path $vsInstall 'Common7\IDE\CommonExtensions\Microsoft\CMake\Ninja'
-    if (Test-Path (Join-Path $bundledNinja 'ninja.exe')) {
-        $env:PATH = "$bundledNinja;$env:PATH"
-    }
-}
+    $Toolchain = Join-Path $VcpkgRoot 'scripts/buildsystems/vcpkg.cmake'
+    if (-not (Test-Path $Toolchain)) { throw "vcpkg toolchain not found at $Toolchain" }
 
-# Resolve vcpkg toolchain. Prefer an existing install; bootstrap a repo-local
-# one into .vcpkg/ if the user has none. Mirrors release.yml so the test
-# harness and CI resolve SDL3/zlib/curl/minizip the same way.
-#
-# Inlined (not a function) because PowerShell functions capture native-command
-# stdout into their output pipeline — bootstrap-vcpkg.bat's lines would get
-# concatenated with the return value and turn $VcpkgRoot into an array.
-$VcpkgRoot = $null
-if ($env:VCPKG_ROOT -and (Test-Path (Join-Path $env:VCPKG_ROOT 'scripts/buildsystems/vcpkg.cmake'))) {
-    $VcpkgRoot = (Resolve-Path $env:VCPKG_ROOT).Path
-} elseif ($env:VCPKG_INSTALLATION_ROOT -and (Test-Path (Join-Path $env:VCPKG_INSTALLATION_ROOT 'scripts/buildsystems/vcpkg.cmake'))) {
-    $VcpkgRoot = (Resolve-Path $env:VCPKG_INSTALLATION_ROOT).Path
-} else {
-    $VcpkgRoot = Join-Path $Repo '.vcpkg'
-    if (-not (Test-Path (Join-Path $VcpkgRoot 'scripts/buildsystems/vcpkg.cmake'))) {
-        Write-Host "=== Bootstrapping vcpkg into $VcpkgRoot (one-time) ===" -ForegroundColor Cyan
-        if (-not (Test-Path $VcpkgRoot)) {
-            git clone --depth 1 https://github.com/microsoft/vcpkg.git $VcpkgRoot
-            if ($LASTEXITCODE -ne 0) { throw "git clone vcpkg failed" }
+    function Build-Version([string]$BuildDir, [string]$Version) {
+        Write-Host "=== building client $Version -> $BuildDir ===" -ForegroundColor Cyan
+        $fresh = @(); if (-not (Test-Path (Join-Path $BuildDir 'vcpkg_installed'))) { $fresh = @('--fresh') }
+        # Release + unity match release.yml so sccache reuses its objects; the
+        # launcher is added only when CI has sccache enabled.
+        $sccache = @()
+        if ($env:SCCACHE_GHA_ENABLED -eq "true" -and (Get-Command sccache -ErrorAction SilentlyContinue)) {
+            $sccache = @("-DCMAKE_C_COMPILER_LAUNCHER=sccache", "-DCMAKE_CXX_COMPILER_LAUNCHER=sccache")
         }
-        & (Join-Path $VcpkgRoot 'bootstrap-vcpkg.bat') -disableMetrics
-        if ($LASTEXITCODE -ne 0) { throw "bootstrap-vcpkg.bat failed" }
+        cmake -B $BuildDir -S clients/silencer @fresh -G Ninja `
+            -DCMAKE_BUILD_TYPE=Release -DSILENCER_UNITY_BUILD=ON @sccache `
+            "-DCMAKE_TOOLCHAIN_FILE=$Toolchain" "-DVCPKG_TARGET_TRIPLET=x64-windows" `
+            "-DSILENCER_VERSION=$Version" `
+            "-DSILENCER_LOBBY_HOST=127.0.0.1" "-DSILENCER_LOBBY_PORT=15170"
+        if ($LASTEXITCODE -ne 0) { throw "cmake configure ($BuildDir) failed" }
+        cmake --build $BuildDir --target silencer -j
+        if ($LASTEXITCODE -ne 0) { throw "cmake build ($BuildDir) failed" }
     }
+    if ($buildOld) { Build-Version $OldBuildDir $OldVer }
+    if ($buildNew) { Build-Version $NewBuildDir $NewVer }
 }
-$Toolchain = Join-Path $VcpkgRoot 'scripts/buildsystems/vcpkg.cmake'
-if (-not (Test-Path $Toolchain)) { throw "vcpkg toolchain not found at $Toolchain" }
-Write-Host "Using vcpkg toolchain: $Toolchain"
 
-function Invoke-CMakeConfigure {
-    param([string]$BuildDir, [string]$Version)
-    # --fresh drops CMakeCache.txt + CMakeFiles/ so the toolchain flag
-    # actually takes effect on a build dir seeded by a toolchain-less
-    # configure. But it also nukes MSBuild .obj/.tlog files, turning every
-    # run into a full rebuild. Only force it when the build dir clearly
-    # hasn't been configured with vcpkg yet; presence of vcpkg_installed/
-    # is a reliable signal that the previous configure was toolchain-aware,
-    # so the cache + incremental compile are both trustworthy.
-    $fresh = @()
-    if (-not (Test-Path (Join-Path $BuildDir 'vcpkg_installed'))) {
-        $fresh = @('--fresh')
+$Work = Join-Path ([System.IO.Path]::GetTempPath()) ("silencer-updater-e2e-" + [System.Guid]::NewGuid().ToString("N").Substring(0, 8))
+$HostDir = Join-Path $Work "host"
+$InstallDir = Join-Path $Work "install"
+New-Item -ItemType Directory -Force -Path $HostDir, $InstallDir | Out-Null
+
+$http = $null; $old = $null; $CtrlQ = 0; $exit = 1
+try {
+    Write-Host "=== staging NEW ($NewVer) update package ==="
+    $newPkg = Join-Path $Work "new-pkg"
+    Stage-Install $NewBuildDir $newPkg | Out-Null
+    $zipPath = Join-Path $HostDir $ZipName
+    Compress-Archive -Path (Join-Path $newPkg "silencer") -DestinationPath $zipPath -Force
+    # .NET SHA256 directly: Get-FileHash can fail to resolve after vcvars64's
+    # env replay mangles PSModulePath.
+    $fs = [System.IO.File]::OpenRead($zipPath)
+    try { $sha = ([System.Security.Cryptography.SHA256]::Create().ComputeHash($fs) | ForEach-Object { '{0:x2}' -f $_ }) -join '' }
+    finally { $fs.Dispose() }
+    Write-Host "NEW zip: $zipPath  sha256=$sha"
+
+    Write-Host "=== staging OLD ($OldVer) install (stage-2 swaps this in place) ==="
+    $oldBin = Stage-Install $OldBuildDir $InstallDir
+    $oldDir = Split-Path $oldBin -Parent
+
+    $HttpPort = Pick-Port
+    Write-Host "=== HTTP server on :$HttpPort serving $HostDir ==="
+    $http = Start-Process -PassThru -WindowStyle Hidden python -ArgumentList "-m", "http.server", "$HttpPort" -WorkingDirectory $HostDir
+
+    $CtrlP = Pick-Port   # OLD client, driven by us (flag)
+    $CtrlQ = Pick-Port   # relaunched NEW client, observed by us (env)
+    $url = "http://127.0.0.1:$HttpPort/$ZipName"
+
+    Write-Host "=== launching OLD client (drive-port=$CtrlP, relaunch-env-port=$CtrlQ) ==="
+    $env:SILENCER_HEADLESS = "1"
+    $env:SILENCER_CONTROL_PORT = "$CtrlQ"
+    $old = Start-Process -PassThru -WindowStyle Hidden -FilePath $oldBin `
+        -ArgumentList "--headless", "--control-port", "$CtrlP" -WorkingDirectory $oldDir
+    # Clear from THIS session so our own CLI calls don't default to Q (we always
+    # pass --port, but keep it tidy). OLD already captured the env at launch, so
+    # the relaunched NEW still inherits it.
+    Remove-Item Env:\SILENCER_HEADLESS -ErrorAction SilentlyContinue
+    Remove-Item Env:\SILENCER_CONTROL_PORT -ErrorAction SilentlyContinue
+
+    $oldSeen = ""
+    for ($i = 0; $i -lt 60; $i++) { $oldSeen = Get-PingVersion $CtrlP; if ($oldSeen) { break }; Start-Sleep -Milliseconds 500 }
+    if (-not $oldSeen) { throw "OLD client never answered ping" }
+    if ($oldSeen -eq $NewVer) { throw "OLD and NEW share version $NewVer; pick distinct OldVer/NewVer" }
+    Write-Host "OLD client up, version=$oldSeen"
+
+    Write-Host "=== driving the real update UI: present -> consent ==="
+    & bun $CliJs --port $CtrlP show_update_screen --url $url --sha256 $sha | Out-Null
+    & bun $CliJs --port $CtrlP wait_for_state --state UPDATING --timeout-ms 15000 | Out-Null
+    if (-not (Wait-ForLabel $CtrlP "UpdateConsent")) { throw "Update button never rendered" }
+    & bun $CliJs --port $CtrlP click --label UpdateConsent | Out-Null
+    Write-Host "clicked Update — download -> verify -> STAGING -> stage-2 -> relaunch in flight"
+
+    Write-Host "=== waiting for OLD client to exit (stage-2 spawned) ==="
+    for ($i = 0; $i -lt 120; $i++) { if ($old.HasExited) { break }; Start-Sleep -Milliseconds 500 }
+    if (-not $old.HasExited) { throw "OLD client did not exit — stage-2 handoff never happened" }
+    $old = $null
+    Write-Host "OLD client exited; awaiting auto-relaunched NEW client on :$CtrlQ"
+
+    Write-Host "=== polling relaunched client until it reports the NEW version ==="
+    $final = ""
+    for ($i = 0; $i -lt 120; $i++) { $final = Get-PingVersion $CtrlQ; if ($final -eq $NewVer) { break }; Start-Sleep -Milliseconds 500 }
+
+    if ($final -eq $NewVer) {
+        Write-Host ""
+        Write-Host "PASS test-updater: $oldSeen auto-updated and relaunched as $final" -ForegroundColor Green
+        $exit = 0
+    } else {
+        Write-Host "FAIL: relaunched client never reported NEW version $NewVer (last ping: '$final')" -ForegroundColor Red
+        $log = Join-Path $env:TEMP "silencer-update.log"
+        if (Test-Path $log) { Write-Host "--- stage-2 log ---"; Get-Content $log -Tail 30 }
+        $exit = 1
     }
-    # Quote every -D value. PowerShell fragments unquoted `127.0.0.1` into
-    # `-D...=127` plus a stray `.0.0.1` positional arg, which cmake then warns
-    # about and silently drops — leaving LOBBY_HOST baked in as "127".
-    cmake -B $BuildDir -S clients/silencer @fresh `
-        -G Ninja `
-        -DCMAKE_BUILD_TYPE=Release `
-        "-DCMAKE_TOOLCHAIN_FILE=$Toolchain" `
-        "-DVCPKG_TARGET_TRIPLET=x64-windows" `
-        "-DSILENCER_VERSION=$Version" `
-        "-DSILENCER_LOBBY_HOST=127.0.0.1" `
-        "-DSILENCER_LOBBY_PORT=15170"
-    if ($LASTEXITCODE -ne 0) { throw "cmake configure ($BuildDir) failed" }
-    cmake --build $BuildDir -j
-    if ($LASTEXITCODE -ne 0) { throw "cmake build ($BuildDir) failed" }
-}
-
-Write-Host "=== Building NEW version ($NewVer) ===" -ForegroundColor Cyan
-Invoke-CMakeConfigure -BuildDir "build-new" -Version $NewVer
-
-# Stage files under a `silencer/` wrapper dir and zip that dir, matching
-# release.yml's `Compress-Archive -Path "build/package/silencer"` layout.
-# Stage-2 detects the single-top-dir wrapper and hoists its contents into
-# the install path during the atomic swap.
-$stage = "build-new/package/silencer"
-if (Test-Path "build-new/package") { Remove-Item -Recurse -Force "build-new/package" }
-New-Item -ItemType Directory -Force -Path $stage | Out-Null
-Copy-Item build-new/Silencer.exe $stage/ -Force
-# Ship the same vcpkg runtime DLLs production does, so the unzipped install
-# can actually launch without the system having vcpkg.
-$vcpkgBin = "build-new/vcpkg_installed/x64-windows/bin"
-if (Test-Path $vcpkgBin) { Copy-Item "$vcpkgBin/*.dll" $stage/ -Force }
-Copy-Item -Recurse -Force shared/assets  $stage/assets
-
-New-Item -ItemType Directory -Force -Path test-update-host | Out-Null
-if (Test-Path "test-update-host/$PlatformZip") { Remove-Item "test-update-host/$PlatformZip" }
-Compress-Archive -Path $stage -DestinationPath "test-update-host/$PlatformZip" -Force
-
-# Use .NET SHA256 directly — Get-FileHash auto-loads via PSModulePath, which
-# vcvars64.bat's env replay can leave in a state that breaks cmdlet resolution.
-$zipPath = (Resolve-Path "test-update-host/$PlatformZip").Path
-$fs = [System.IO.File]::OpenRead($zipPath)
-try {
-    $sha = ([System.Security.Cryptography.SHA256]::Create().ComputeHash($fs) `
-        | ForEach-Object { '{0:x2}' -f $_ }) -join ''
 } finally {
-    $fs.Dispose()
+    if ($CtrlQ -gt 0) { & bun $CliJs --port $CtrlQ quit 2>$null | Out-Null }
+    if ($old -and -not $old.HasExited) { Stop-Process -Id $old.Id -ErrorAction SilentlyContinue }
+    if ($http) { Stop-Process -Id $http.Id -ErrorAction SilentlyContinue }
+    if ($KeepWork) { Write-Host "kept scratch: $Work" } else { Remove-Item -Recurse -Force $Work -ErrorAction SilentlyContinue }
 }
-Write-Host "NEW zip sha256=$sha"
-
-Write-Host "=== Building OLD version ($OldVer) ===" -ForegroundColor Cyan
-Invoke-CMakeConfigure -BuildDir "build-old" -Version $OldVer
-
-# Stage the OLD install the same way production ships it, so the install
-# parent directory actually has a `silencer/` dir that stage-2 can
-# rename to `silencer.old` and replace atomically.
-$oldInstall = "build-old/install/silencer"
-if (Test-Path "build-old/install") { Remove-Item -Recurse -Force "build-old/install" }
-New-Item -ItemType Directory -Force -Path $oldInstall | Out-Null
-Copy-Item build-old/Silencer.exe $oldInstall/ -Force
-$vcpkgBinOld = "build-old/vcpkg_installed/x64-windows/bin"
-if (Test-Path $vcpkgBinOld) { Copy-Item "$vcpkgBinOld/*.dll" $oldInstall/ -Force }
-Copy-Item -Recurse -Force shared/assets  $oldInstall/assets
-
-$manifest = @"
-{
-  "version":        "$NewVer",
-  "macos_url":      "http://127.0.0.1:8000/$PlatformZip",
-  "macos_sha256":   "$sha",
-  "windows_url":    "http://127.0.0.1:8000/$PlatformZip",
-  "windows_sha256": "$sha"
-}
-"@
-Set-Content -Path update.json -Value $manifest
-
-Write-Host "=== Starting HTTP server on :8000 ==="
-# -NoNewWindow streams HTTP logs into this console so you can see GETs for
-# the update zip. Without it, Start-Process opens a detached window.
-$http = Start-Process -PassThru -NoNewWindow python `
-    -ArgumentList "-m","http.server","8000" `
-    -WorkingDirectory "$Repo/test-update-host"
-
-Push-Location services/lobby
-go build
-if ($LASTEXITCODE -ne 0) { Pop-Location; throw "go build failed" }
-Pop-Location
-
-Write-Host "=== Starting lobby on :15170 ==="
-# Pass the manifest as a relative path ("update.json") with -WorkingDirectory
-# instead of the full $Repo\update.json. Start-Process's -ArgumentList does
-# NOT auto-quote array elements, so the space in "Space Command" silently
-# truncates the path to "C:\Users\Space", LoadManifest fails, and the client
-# gets a bare reject + legacy "software is out of date" message.
-$lobby = Start-Process -PassThru -NoNewWindow .\services\lobby\silencer-lobby.exe `
-    -ArgumentList "-addr",":15170","-version","$NewVer","-update-manifest","update.json" `
-    -WorkingDirectory $Repo
-
-Start-Sleep -Seconds 1
-Write-Host "=== Launching OLD client — expect update modal ===" -ForegroundColor Cyan
-try {
-    # Start-Process -Wait because Silencer.exe is built WIN32 subsystem;
-    # PowerShell's `&` call operator returns immediately for GUI apps,
-    # which would drop us straight into `finally` and kill the servers
-    # before the client even gets past the lobby handshake.
-    Start-Process -FilePath ".\$oldInstall\Silencer.exe" -Wait
-} finally {
-    Stop-Process -Id $http.Id -ErrorAction SilentlyContinue
-    Stop-Process -Id $lobby.Id -ErrorAction SilentlyContinue
-}
+exit $exit

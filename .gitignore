@@ -4,6 +4,9 @@ build-old/
 build-release/
 build-unity/
 build-headless/
+e2e-build-old/
+e2e-build-new/
+e2e-build-tests/
 clients/silencer/build-release/
 clients/silencer/build-unity/
 clients/silencer/build-headless/

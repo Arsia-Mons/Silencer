@@ -47,6 +47,15 @@ these change): `services/`, `web/`, `infra/`, `docs/`, `designer/`,
 (stages and publishes the five npm packages described in
 `clients/tui/CLAUDE.md`).
 
+`build-macos` and `build-windows` each run an **auto-updater e2e** step
+(`infra/scripts/test-updater.{sh,ps1}`) after the build and before
+signing/upload: it builds a second `99999`-versioned client, has the
+just-built (unsigned) release client self-update to it headlessly, and asserts
+the new version relaunches — gating the release on a working self-updater
+(issue #303). It runs on a scratch copy so the shipped artifact is untouched,
+and needs `oven-sh/setup-bun` (the harness drives the game via `clients/cli`).
+`build-linux` has no such step (Linux isn't a shipped self-update platform).
+
 `publish-npm` requires the `NPM_TOKEN` secret (granular publish
 token for the `arsia-mons` scope + the unscoped `silencer-tui`
 name) and uses GitHub OIDC for `npm publish --provenance`. It's

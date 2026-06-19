@@ -152,14 +152,16 @@ bool ViewedPlayerChatActive(Game & game){
 
 
 bool Game::Loop(void){
-	// Self-update stage-2 handoff (windowed client only — a dedicated server is
-	// updated out-of-band and must never fork a GUI client). When the updater
+	// Self-update stage-2 handoff. Gated on the dedicated server, NOT on
+	// headless: a dedicated server (-s) is updated out-of-band and must never
+	// fork a GUI client, but a headless windowed client (e.g. the cli-agent
+	// self-update e2e) is a legitimate self-update host. When the updater
 	// worker reaches STAGING it has a verified build staged but can't fork itself
 	// — the spawn must run here on the main thread while we still own SDL.
 	// PumpStage2() spawns the child once and latches IsStage2Spawned(); we then
 	// unwind so ~Game() releases the audio/video device before the replacement
 	// client opens it (the child blocks on our PID until we exit).
-	if(!headless) updater.PumpStage2();
+	if(!world.dedicatedserver.active) updater.PumpStage2();
 	if(updater.IsStage2Spawned()){
 		return false;
 	}

@@ -22,10 +22,21 @@ because this directory is two levels deep.
 - `build-mac-local.sh` — local macOS client build pointed at a local
   lobby (default `127.0.0.1:15170`, override with `LOBBY_HOST`/`LOBBY_PORT`
   env vars). Builds via Homebrew + cmake.
-- `test-updater.sh` / `test-updater.ps1` — end-to-end auto-updater
-  smoke test. Builds two client versions, packages the new one into a
-  zip the way `release.yml` does, starts a local HTTP server + lobby,
-  launches the old client and watches it self-update.
+- `test-updater.sh` (macOS) / `test-updater.ps1` (Windows) — **automated**
+  end-to-end auto-updater test, run as a step in `release.yml` (issue #303).
+  Builds an OLD + NEW client (distinct `SILENCER_VERSION`), packages NEW into a
+  zip the way `release.yml` does, serves it over a local HTTP server, launches
+  OLD **headless** with a control port, drives the real cppx update flow
+  (`show_update_screen --url --sha256` → click `UpdateConsent`), and after
+  stage-2 swaps + relaunches, pings the auto-relaunched process and asserts its
+  version is NEW. Exits non-zero on any failure. No lobby — the lobby's role
+  (handing the client a download URL + sha256) is injected via the
+  `show_update_screen` control op, which keeps the test uniform and lets it run
+  fully headless. Reuse a prebuilt client with `OLD_BUILD_DIR` / `NEW_BUILD_DIR`
+  (CI passes the release `build/` as OLD). Design:
+  [`../../docs/plans/2026-06-19-e2e-auto-updater-test.md`](../../docs/plans/2026-06-19-e2e-auto-updater-test.md).
+  Linux is intentionally excluded (not a shipped self-update platform; its
+  cwd-relative asset paths break an in-place self-replace).
 
 ## Gotchas
 

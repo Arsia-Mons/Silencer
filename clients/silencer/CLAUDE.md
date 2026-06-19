@@ -250,6 +250,12 @@ usage patterns.
 | `--control-port <n>` | Open JSON-lines TCP control socket on port *n* |
 | `--tui` | Stream paletted framebuffer over TCP to the `silencer-tui` host (`SILENCER_TUI_FRAME_HOST/_PORT`); skips SDL video, keeps audio. See `clients/tui/CLAUDE.md`. |
 
+`--headless` and `--control-port` also fall back to the `SILENCER_HEADLESS`
+and `SILENCER_CONTROL_PORT` env vars (flags win). This is for the auto-updater
+e2e: stage-2 relaunches the new client with **no argv**, but the environment is
+inherited across the exec, so the relaunched build can be brought up headless +
+observable on the control socket. See `infra/scripts/test-updater.sh`.
+
 ## Perf tracing
 
 Set the `SILENCER_PERF` env var (any value) to print a per-section
