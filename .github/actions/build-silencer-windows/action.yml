@@ -98,5 +98,12 @@ runs:
         $vcpkgBin = "build/vcpkg_installed/x64-windows/bin"
         Copy-Item "$vcpkgBin/*.dll" $stage/
         Copy-Item -Recurse shared/assets $stage/assets
+        # Stage the cppx UI .otf fonts at assets/fonts/ (mirrors the Linux
+        # action + macOS bundle). The runtime resolver (ResolveFontDir in
+        # game_ui_pipeline.cpp → GetResDir()+"fonts" = <exe-dir>\assets\fonts)
+        # needs them here; without them PipelineHost::ensure() fails every
+        # frame and the release build launches to a black screen (#289).
+        New-Item -ItemType Directory -Force -Path "$stage/assets/fonts" | Out-Null
+        Copy-Item shared/fonts/*.otf "$stage/assets/fonts/"
         Write-Host "--- packaged files ---"
         Get-ChildItem $stage
