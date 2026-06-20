@@ -49,6 +49,10 @@ public:
 	// Skips the render pass silently when the window is minimized.
 	virtual void Present() = 0;
 
+	// Backend driver name for telemetry (e.g. "metal", "vulkan", "direct3d12").
+	// Empty when not applicable (TUI). Best-effort device identity.
+	virtual const char * GpuDriverName() const { return ""; }
+
 	virtual void SetScaleFilter(bool linear) = 0;
 
 	virtual void BeginLobbyPanelBorderBlur(int /*virtualWidth*/,

@@ -1162,6 +1162,12 @@ void SDL3GPUBackend::DrawParticles(int handle, Uint32 count) {
 }
 
 // Executes all queued work in a single command buffer.
+const char *SDL3GPUBackend::GpuDriverName() const {
+	if (!device) return "";
+	const char *d = SDL_GetGPUDeviceDriver(device);
+	return d ? d : "";
+}
+
 void SDL3GPUBackend::Present() {
 	if (!device || !remap_pipeline || !upscale_pipeline) return;
 

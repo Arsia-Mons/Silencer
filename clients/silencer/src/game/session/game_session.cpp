@@ -12,6 +12,7 @@
 #include "team.h"
 #include "user.h"
 #include "world.h"
+#include "perf_trace.h"
 #include <cstring>
 #include <vector>
 
@@ -22,10 +23,16 @@ GameSession::GameSession(Game & g)
 }
 
 bool GameSession::LoadMap(const char * name){
-if(!game.world.map.Load(name, game.world)){
+// A level load is one logical operation → one trace (always emitted). The
+// scopes below light up as children for the flame graph.
+perf::Operation _levelLoad("level_load", perf::Sampling::Always, "map", name ? name : "");
+bool mapOk;
+{ PERF_SCOPE("level.map_parse"); mapOk = game.world.map.Load(name, game.world); }
+if(!mapOk){
 return false;
 }
 if(!game.world.dedicatedserver.active){
+PERF_SCOPE("level.ambience");
 ambienceMixer.CreateAmbienceChannels();
 game.renderer.palette.SetParallaxColors(game.world.map.parallax);
 // Restart the transition fade clock now that the (slow, synchronous) map load

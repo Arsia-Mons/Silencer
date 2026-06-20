@@ -623,6 +623,7 @@ add_executable(pipeline_host_tests
 	src/render/cppx_ui/pipeline_host.cpp
 	src/render/cppx_ui/ui_draw_program.cpp
 	src/platform/perf_trace.cpp
+	src/platform/perf_otlp.cpp
 	src/render/cppx_ui/ui_surface.cpp
 	src/render/cppx_ui/draw_executor.cpp
 	src/render/cppx_ui/ui_draw_geometry.cpp
@@ -648,7 +649,7 @@ target_compile_features(pipeline_host_tests PRIVATE cxx_std_20)
 target_include_directories(pipeline_host_tests PRIVATE
 	"${CMAKE_CURRENT_SOURCE_DIR}/src" "${CMAKE_CURRENT_SOURCE_DIR}/src/platform"
 	${SILENCER_CPPX_INCLUDE_DIRS})
-target_link_libraries(pipeline_host_tests PRIVATE SDL3::SDL3 SDL3_ttf::SDL3_ttf yogacore)
+target_link_libraries(pipeline_host_tests PRIVATE SDL3::SDL3 SDL3_ttf::SDL3_ttf yogacore CURL::libcurl)
 target_compile_definitions(pipeline_host_tests PRIVATE
 	SILENCER_TEST_FONT_DIR="${SILENCER_SHARED_DIR}/fonts")
 if(MSVC)

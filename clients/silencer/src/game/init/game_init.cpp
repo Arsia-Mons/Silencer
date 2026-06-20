@@ -1,6 +1,8 @@
 #include "game.h"
 #include "config.h"
 #include "objecttypes.h"
+#include "perf_otlp.h"
+#include "perf_trace.h"
 #include "state.h"
 #include "sdl3gpubackend.h"
 #include "tuibackend.h"
@@ -56,6 +58,7 @@ Game::Game()
 }
 
 Game::~Game(){
+	perf::Shutdown(); // flush + stop the telemetry exporter thread
 	gameSession.MapDownloaderRef().JoinAndShutdown();
 	controlserver.Stop();
 	inputserver.Stop();
@@ -78,6 +81,10 @@ Game::~Game(){
 }
 
 bool Game::Load(char * cmdline){
+	// Anchor the perf clock + start the OTLP exporter (no-ops unless the env
+	// switches are set) before opening the startup trace.
+	perf::Init();
+	perf::Operation _startup("startup", perf::Sampling::Always);
 	// CLI overrides for the lobby host / port — applied AFTER Config::Load
 	// below so the on-disk config doesn't clobber them. Empty strings / 0
 	// mean "no override; use the config value".
@@ -202,7 +209,9 @@ bool Game::Load(char * cmdline){
 		}
 		if(!headless && !tui) gameInput.OpenFirstGamepad();
 		printf("Loading palette...\n");
-		if(!renderer.palette.SetPalette(0)){
+		bool paletteOk;
+		{ PERF_SCOPE("startup.palette"); paletteOk = renderer.palette.SetPalette(0); }
+		if(!paletteOk){
 			return false;
 		}
 		if(tui){
@@ -250,7 +259,9 @@ bool Game::Load(char * cmdline){
 		// so the palette is always populated by the time a screenshot is captured.
 	}
 	printf("Loading resources...\n");
-	if(!world.resources.Load(this, world.dedicatedserver.active)){
+	bool resourcesOk;
+	{ PERF_SCOPE("startup.resources"); resourcesOk = world.resources.Load(this, world.dedicatedserver.active); }
+	if(!resourcesOk){
 		printf("Could not load resources\n");
 		return false;
 	}
@@ -258,6 +269,42 @@ bool Game::Load(char * cmdline){
 	// GASLoader::Get().items is populated (World constructor ran too early).
 	world.LoadBuyableItems();
 	printf("Resources loaded\n");
+
+	// Publish the session-constant identity/device block into the OTLP Resource
+	// (no-op unless SILENCER_PERF_OTLP is set). Per-span data stays off spans.
+	if(perf::g_trace_enabled){
+		perf::otlp::ResourceInfo ri;
+		ri.service_name = "silencer";
+		ri.build_version = SILENCER_VERSION;
+		ri.os = SDL_GetPlatform();
+		ri.cpu_cores = SDL_GetNumLogicalCPUCores();
+		ri.ram_mb = SDL_GetSystemRAM();
+		RenderDevice * dev = gameRenderer.GetRenderDevice();
+		if(dev){
+			ri.gpu_driver = dev->GpuDriverName();
+			ri.gpu = ri.gpu_driver; // SDL3 GPU exposes the driver, not the adapter name
+		}
+		const char * gpuUiEnv = SDL_getenv("SILENCER_GPU_UI");
+		bool gpuUi = !headless && !tui && dev && dev->SupportsUiGeometry() &&
+		             (!gpuUiEnv || strcmp(gpuUiEnv, "0") != 0);
+		ri.ui_path = gpuUi ? "gpu" : "cpu";
+		ri.fullscreen = Config::GetInstance().fullscreen;
+		ri.vsync = true; // windowed GPU swapchain presents vsynced by default
+		SDL_Window * win = gameRenderer.GetWindow();
+		if(win){
+			int vw = 0, vh = 0;
+			if(!SDL_GetWindowSizeInPixels(win, &vw, &vh) || vw < 1)
+				SDL_GetWindowSize(win, &vw, &vh);
+			ri.viewport_w = vw; ri.viewport_h = vh;
+			SDL_DisplayID disp = SDL_GetDisplayForWindow(win);
+			const SDL_DisplayMode * dm = SDL_GetCurrentDisplayMode(disp);
+			if(dm){
+				ri.disp_w = dm->w; ri.disp_h = dm->h;
+				ri.refresh = (int)(dm->refresh_rate + 0.5f);
+			}
+		}
+		perf::otlp::SetResource(ri);
+	}
 	lasttick = SDL_GetTicks();
 	gameRenderer.RestartPaletteFade();
 	if(controlPort > 0){

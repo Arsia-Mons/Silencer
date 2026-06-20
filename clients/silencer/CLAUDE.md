@@ -280,6 +280,21 @@ windowed = vsync-bound real numbers (`present` ≈ vsync wait); `--headless`
 free-runs at 640×480 = pure CPU, no vsync/throttle. Drive menus via the
 CLI and `grep '\[perf\]'` the run log.
 
+### OTLP export (metrics + traces → OpenObserve)
+
+`SILENCER_PERF_OTLP=<base-url>` turns on a second, independent output:
+Layer-1 **metrics** (fps + frame-ms p50/p95/p99 + per-section avg, one
+OTLP-metrics flush/sec) and Layer-2 **operation traces** (`startup`,
+`level_load`, tail-sampled over-budget `frame`) as flame graphs. The same
+`PERF_SCOPE`s nest under a `perf::Operation` trace root via a thread-local
+scope stack; identity/device live in the OTLP **Resource** (set once,
+batched once per POST — never stamped per span). Export runs on a
+background curl thread (bounded queue, drops on overflow, never stalls a
+frame). `SILENCER_PERF` (stdout) and `SILENCER_PERF_OTLP` are independent.
+Code: `src/platform/perf_trace.{h,cpp}` + `perf_otlp.{h,cpp}`. Local
+Docker + dashboard + Traces-filter how-to:
+[`../../docs/silencer-perf-otlp.md`](../../docs/silencer-perf-otlp.md).
+
 ## Gotchas
 
 - **Build-time config is baked at configure.** Lobby host/port and
