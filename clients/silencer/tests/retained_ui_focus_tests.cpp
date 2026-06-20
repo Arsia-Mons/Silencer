@@ -344,6 +344,38 @@ bool pointer_release_confirms_original_target() {
   return true;
 }
 
+// A click whose press and release both land in ONE frame must still confirm.
+// This is the sub-frame click the event-latched pointer model produces at low
+// frame rates (issue #306) — the old poll-based model could never set both
+// edges in a single frame, so fast clicks were silently dropped.
+bool pointer_press_and_release_same_frame_confirms() {
+  auto menu_ = new_menu();
+  Menu &menu = *menu_;
+  CHECK(build_menu(&menu, false));
+
+  NodeSnapshot options = {};
+  CHECK(menu.tree.snapshot(menu.options, &options));
+  float x = options.layout.x + options.layout.width * 0.5f;
+  float y = options.layout.y + options.layout.height * 0.5f;
+
+  auto focus_ = new_focus();
+  FocusRuntime &focus = *focus_;
+  CHECK(focus_update(&focus, menu.tree, {}));
+
+  // Both edges in the same update, with the button already back up (down=false,
+  // exactly what a sub-frame click looks like once polled hold-state catches up).
+  CHECK(focus_update(&focus, menu.tree,
+                     {.pointer_pressed = true,
+                      .pointer_down = false,
+                      .pointer_released = true,
+                      .pointer_valid = true,
+                      .pointer_x = x,
+                      .pointer_y = y,
+                      .source = FocusSource::Mouse}));
+  CHECK(focus_confirmed_id(focus) == menu.options);
+  return true;
+}
+
 bool modal_traps_then_restores_focus() {
   auto base_ = new_menu();
   Menu &base = *base_;
@@ -415,6 +447,8 @@ int main() {
   if (!explicit_autofocus_keeps_relative_nav())
     return 1;
   if (!pointer_release_confirms_original_target())
+    return 1;
+  if (!pointer_press_and_release_same_frame_confirms())
     return 1;
   if (!modal_traps_then_restores_focus())
     return 1;

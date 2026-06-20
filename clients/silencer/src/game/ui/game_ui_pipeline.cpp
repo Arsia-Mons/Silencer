@@ -1825,10 +1825,13 @@ void GameUiPipeline::RenderCppxClientUiFrame(Surface &surface) {
         // Window pixels → logical layout space.
         mx = (ww > 0) ? (wx / static_cast<float>(ww)) * cppxLogicalW : wx;
         my = (wh > 0) ? (wy / static_cast<float>(wh)) * cppxLogicalH : wy;
+        // The press/release EDGES are latched from SDL button events in
+        // HandleSDLEvents (already copied into frame.input above), so a sub-frame
+        // click survives a low frame rate. The poll supplies only the cursor
+        // position and the sustained HOLD state; the hold lets the focus pass drop
+        // a press whose release we never saw (e.g. button released off-window).
         bool down = (buttons & SDL_BUTTON_MASK(SDL_BUTTON_LEFT)) != 0;
         frame.input.pointer_down = down;
-        frame.input.pointer_pressed = down && !prevPointerDown_;
-        frame.input.pointer_released = !down && prevPointerDown_;
         if (down || frame.input.pointer_pressed || frame.input.pointer_released) {
             frame.input.source = ::ui::UiFocusSource::Mouse;
         }
