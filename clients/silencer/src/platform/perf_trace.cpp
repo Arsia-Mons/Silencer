@@ -35,6 +35,7 @@ double g_nsPerTick = 0.0;
 
 // ---- metrics window (Layer-1) --------------------------------------------
 uint64_t g_lastMarkCounter = 0;
+bool g_skipNextFrameMs = true; // first FrameMark period == startup load, not a frame
 std::vector<float> g_frameMs; // per-frame periods since last metrics flush
 constexpr double kWindowMs = 1000.0;
 
@@ -101,12 +102,17 @@ void FlushMetrics(uint64_t now) {
 	m.ts_ns = CounterToWallNs(now);
 	m.gauges.push_back({"frame.fps", elapsedS > 0 ? (double)g_frames / elapsedS : 0.0});
 
-	std::vector<float> sorted = g_frameMs;
-	std::sort(sorted.begin(), sorted.end());
-	m.gauges.push_back({"frame.ms.p50", Percentile(sorted, 50.0)});
-	m.gauges.push_back({"frame.ms.p95", Percentile(sorted, 95.0)});
-	m.gauges.push_back({"frame.ms.p99", Percentile(sorted, 99.0)});
-	m.gauges.push_back({"frame.ms.worst", sorted.empty() ? 0.0 : sorted.back()});
+	// Only emit frame-ms percentiles when the window actually has frame samples.
+	// The startup window's single period is skipped (it's the load, not a frame),
+	// so emitting 0s there would dip the charts misleadingly.
+	if (!g_frameMs.empty()) {
+		std::vector<float> sorted = g_frameMs;
+		std::sort(sorted.begin(), sorted.end());
+		m.gauges.push_back({"frame.ms.p50", Percentile(sorted, 50.0)});
+		m.gauges.push_back({"frame.ms.p95", Percentile(sorted, 95.0)});
+		m.gauges.push_back({"frame.ms.p99", Percentile(sorted, 99.0)});
+		m.gauges.push_back({"frame.ms.worst", sorted.back()});
+	}
 
 	// Per-section avg ms/frame (present/ui/sim/world.draw/...): the same arena
 	// the stdout layer prints, exported as low-cardinality gauges.
@@ -239,8 +245,12 @@ void FrameMark() {
 	uint64_t now = SDL_GetPerformanceCounter();
 
 	if (g_trace_enabled) {
+		// The first period measured here spans Init()→first frame, i.e. the
+		// synchronous startup load (~seconds). That's the `startup` trace, not a
+		// frame — skip it so it can't pin frame-ms p95/worst to a bogus outlier.
 		double ms = (double)(now - g_lastMarkCounter) * g_msPerTick;
-		if (g_frameMs.size() < 4096) g_frameMs.push_back((float)ms);
+		if (g_skipNextFrameMs) g_skipNextFrameMs = false;
+		else if (g_frameMs.size() < 4096) g_frameMs.push_back((float)ms);
 	}
 	g_lastMarkCounter = now;
 
