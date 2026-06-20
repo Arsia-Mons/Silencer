@@ -12,7 +12,7 @@ concurrency:
 jobs:
   build-macos:
     runs-on: macos-latest
-    timeout-minutes: 20
+    timeout-minutes: 45
     env:
       SCCACHE_GHA_ENABLED: "true"
     steps:
@@ -30,6 +30,21 @@ jobs:
         with:
           lobby-host: ${{ vars.LOBBY_HOST || 'lobby.arsiamons.com' }}
           silencer-version: ${{ env.SILENCER_VERSION }}
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Auto-updater e2e (headless self-update)
+        # Issue #303: prove the released client self-updates and the new version
+        # relaunches AUTOMATICALLY. OLD = the just-built (still unsigned) release
+        # bundle; NEW = a second build versioned 99999 (sccache-warm off the
+        # release objects). Runs on a scratch copy, before signing, so the
+        # shipped artifact stays pristine. The harness drives the real headless
+        # update path and asserts `ping`==99999 on the auto-relaunched process.
+        env:
+          OLD_BUILD_DIR: ${{ github.workspace }}/build
+        run: bash infra/scripts/test-updater.sh
 
       - name: Import Developer ID cert
         env:
@@ -153,7 +168,7 @@ jobs:
 
   build-windows:
     runs-on: windows-latest
-    timeout-minutes: 30
+    timeout-minutes: 60
     env:
       SCCACHE_GHA_ENABLED: "true"
     steps:
@@ -168,6 +183,20 @@ jobs:
         with:
           lobby-host: ${{ vars.LOBBY_HOST || 'lobby.arsiamons.com' }}
           silencer-version: ${{ env.SILENCER_VERSION }}
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Auto-updater e2e (headless self-update)
+        shell: pwsh
+        # Issue #303 — mirror of the macOS step (see it + the design doc for the
+        # rationale). OLD = the just-built release tree; NEW = a second build
+        # versioned 99999. VCPKG_BINARY_SOURCES reuses the binary cache the main
+        # build populated so NEW's vcpkg deps are cache hits, not source rebuilds.
+        env:
+          VCPKG_BINARY_SOURCES: "clear;files,${{ github.workspace }}/.vcpkg-cache,readwrite"
+        run: .\infra\scripts\test-updater.ps1 -OldBuildDir "$env:GITHUB_WORKSPACE\build"
 
       - name: Zip portable bundle
         shell: pwsh

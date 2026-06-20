@@ -152,8 +152,12 @@ bool ViewedPlayerChatActive(Game & game){
 
 
 bool Game::Loop(void){
-	// Check if we're updating the client
-	if(!headless) updater.PumpStage2();
+	// Check if we're updating the client. Gated on the dedicated server, NOT on
+	// headless: a -s dedicated server must never fork a GUI client, but a
+	// headless windowed client (e.g. the self-update e2e) is a valid update
+	// host. PumpStage2 spawns the stage-2 child once, on the main thread while
+	// we still own SDL, and latches IsStage2Spawned.
+	if(!world.dedicatedserver.active) updater.PumpStage2();
 	// Close current client if we're ready to open the new version
 	if(updater.IsStage2Spawned()){
 		return false;

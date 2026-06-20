@@ -164,6 +164,22 @@ bool Game::Load(char * cmdline){
 			}
 		}while((cmdline = strtok(0, " ")));
 	}
+	// Env fallbacks for the control port + headless flag. Stage-2 relaunches the
+	// new client with NO argv (production launches it with none either), so the
+	// auto-updater e2e can't hand --control-port/--headless to the relaunched
+	// process — but the environment IS inherited across the exec. These let the
+	// e2e observe the auto-relaunched build over the control socket. Flags win;
+	// env is only consulted when the flag is absent.
+	if(controlPort == 0){
+		const char * envPort = getenv("SILENCER_CONTROL_PORT");
+		if(envPort && atoi(envPort) > 0) controlPort = atoi(envPort);
+	}
+	if(!headless){
+		const char * envHeadless = getenv("SILENCER_HEADLESS");
+		if(envHeadless && envHeadless[0] != '\0' && strcmp(envHeadless, "0") != 0){
+			headless = true;
+		}
+	}
 	Config::GetInstance().Load();
 	if(lobbyHostOverride[0]){
 		strncpy(Config::GetInstance().lobbyhost, lobbyHostOverride, sizeof(Config::GetInstance().lobbyhost) - 1);

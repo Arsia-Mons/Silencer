@@ -57,6 +57,26 @@ bool NodeMatchesName(const ::ui::NodeSnapshot& s, const std::string& name){
 	return false;
 }
 
+	// Decode a 64-char hex string into 32 bytes. False on wrong length or a
+	// non-hex digit. Used by show_update_screen's real-payload path so the
+	// auto-updater e2e can drive a live download with a real sha256.
+bool DecodeSha256Hex(const std::string& hex, uint8_t out[32]){
+	if(hex.size() != 64) return false;
+	auto nib = [](char c) -> int {
+		if(c >= '0' && c <= '9') return c - '0';
+		if(c >= 'a' && c <= 'f') return c - 'a' + 10;
+		if(c >= 'A' && c <= 'F') return c - 'A' + 10;
+		return -1;
+	};
+	for(int i = 0; i < 32; i++){
+		int hi = nib(hex[2 * i]);
+		int lo = nib(hex[2 * i + 1]);
+		if(hi < 0 || lo < 0) return false;
+		out[i] = (uint8_t)((hi << 4) | lo);
+	}
+	return true;
+}
+
 	// First pre-order node matching `name`; focusableOnly skips label text nodes
 	// so they don't shadow the focusable control carrying the same label.
 ::ui::NodeId FindUiNode(const ::ui::UiTree& tree, ::ui::NodeId id,
@@ -319,6 +339,31 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 		return;
 	}
 	if(cmd.op == "show_update_screen"){
+		// Test seam: surface the update modal headlessly. Two modes:
+		//  - phase only: ForceState a static phase so the modal renders (no
+		//    worker; used by the modal-render tests).
+		//  - url + sha256: real PresentUpdate with a live download target, so a
+		//    subsequent click on the "UpdateConsent" button runs the real
+		//    download -> verify -> STAGING -> stage-2 path (auto-updater e2e).
+		std::string url = cmd.args.value("url", std::string());
+		std::string sha = cmd.args.value("sha256", std::string());
+		if(!url.empty() || !sha.empty()){
+			if(url.empty()){
+				cmd.reply->set_value(Err(cmd.id, "BAD_ARG",
+					"url is required when sha256 is given"));
+				return;
+			}
+			uint8_t sha256[32];
+			if(!DecodeSha256Hex(sha, sha256)){
+				cmd.reply->set_value(Err(cmd.id, "BAD_ARG",
+					"sha256 must be 64 hex chars"));
+				return;
+			}
+			game.GetUpdater().PresentUpdate(url, sha256);
+			game.GoToState(GameState::UPDATING);
+			cmd.reply->set_value(OkResult(cmd.id, nlohmann::json::object()));
+			return;
+		}
 		// Test-only: force UPDATING + a static updater phase so the modal renders.
 		std::string phase = cmd.args.value("phase", std::string("prompting"));
 		Updater::State s;

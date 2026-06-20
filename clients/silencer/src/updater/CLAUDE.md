@@ -52,10 +52,20 @@ if (updater.IsStage2Spawned()) return false; // exits Game::Loop → ~Game() tea
 
 ## Stage-2 flow
 
-1. Normal client (`--self-update-stage2` absent): reaches STAGING; `Game::Loop` calls `Updater::PumpStage2()`, which calls `UpdaterStage2::Launch(zippath)` (one-shot) and latches `IsStage2Spawned()`; the loop then returns so `~Game()` tears down SDL cleanly. A failed spawn transitions the state machine to FAILED.
+1. Normal client (`--self-update-stage2` absent): reaches STAGING; `Game::Loop` calls `Updater::PumpStage2()`, which calls `UpdaterStage2::Launch(zippath)` (one-shot) and latches `IsStage2Spawned()`; the loop then returns so `~Game()` tears down SDL cleanly. A failed spawn transitions the state machine to FAILED. `PumpStage2()` is gated on `!world.dedicatedserver.active` (a dedicated `-s` server must never fork a GUI client) — NOT on `!headless`, so a headless windowed client (the e2e below) is a valid self-update host.
 2. Stage-2 process (invoked with `--self-update-stage2`): `UpdaterStage2::Run` overwrites the binary, then `exec`-replaces itself with the new client.
    - macOS launches the nested signed helper at `Silencer.app/Contents/Helpers/updater-stage-2`. Do not recreate a temporary `.app` bundle at runtime.
    - Windows/Linux still copy the current executable to a temp path for the handoff.
+
+## End-to-end test
+
+`infra/scripts/test-updater.{sh,ps1}` exercise the WHOLE path headlessly
+(download → verify → STAGING → `PumpStage2` → stage-2 swap → auto-relaunch),
+run as a step in `release.yml` on macOS + Windows. They drive the real cppx
+`UpdateConsent` button and assert the auto-relaunched process reports the new
+version over the control socket — closing the "STAGING→spawn needs manual/e2e
+verification" gap (#301/#302/#303). This is what the unit tests deliberately
+don't cover (`updater_sm_test.cpp` runs a real process only here).
 
 ## Rules
 
