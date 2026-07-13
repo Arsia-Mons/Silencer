@@ -4,6 +4,15 @@ All notable changes to Silencer are documented here.
 
 ## [Unreleased]
 
+### Admin dashboard
+
+- Editable roadmap page (#312). New `[ ROADMAP ]` view groups proposed features
+  by section (modes, mechanics, weapons, NPCs, objects, items) with status and
+  effort badges. Manager+ roles can change item status inline and add / edit /
+  delete items; lower roles get a read-only view. Backed by a new
+  `/api/roadmap` resource (RoadmapItem model + role-gated CRUD) in admin-api,
+  seeded from `docs/roadmap.md` (#310) on first boot.
+
 ## [v00060] — 2026-06-17
 
 ### Game client

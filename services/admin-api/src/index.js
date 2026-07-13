@@ -20,8 +20,11 @@ import behaviortreesRoutes from './routes/behaviortrees.js';
 import mapsRoutes from './routes/maps.js';
 import soundsRoutes from './routes/sounds.js';
 import soundCuesRoutes from './routes/soundcues.js';
+import roadmapRoutes from './routes/roadmap.js';
 import { startBackupScheduler } from './backup/scheduler.js';
 import AdminUser from './db/models/AdminUser.js';
+import RoadmapItem from './db/models/RoadmapItem.js';
+import { ROADMAP_SEED } from './db/roadmapSeed.js';
 
 const app    = express();
 const server = http.createServer(app);
@@ -48,6 +51,7 @@ api.use('/behaviortrees', behaviortreesRoutes);
 api.use('/maps',          mapsRoutes);
 api.use('/sounds',        soundsRoutes);
 api.use('/sound-cues',   soundCuesRoutes);
+api.use('/roadmap',       roadmapRoutes);
 api.get('/health',        (_req, res) => res.json({ ok: true }));
 app.use('/api', api);
 
@@ -57,6 +61,12 @@ async function seed() {
     const passHash = await AdminUser.hashPassword('admin');
     await AdminUser.create({ username: 'admin', passHash, role: 'superadmin', createdBy: 'seed' });
     console.log('[seed] created default admin user (username: admin, password: admin) — CHANGE THIS!');
+  }
+
+  const roadmapCount = await RoadmapItem.countDocuments();
+  if (roadmapCount === 0) {
+    await RoadmapItem.insertMany(ROADMAP_SEED.map((item, i) => ({ ...item, order: i, createdBy: 'seed' })));
+    console.log(`[seed] inserted ${ROADMAP_SEED.length} roadmap items`);
   }
 }
 

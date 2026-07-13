@@ -15,6 +15,26 @@ export interface ChangelogRelease {
 
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: 'v00054',
+    date: '2026-07-13',
+    title: 'Roadmap page in admin dashboard',
+    entries: [
+      {
+        category: 'DASHBOARD',
+        changes: [
+          'Roadmap page (#312) — new [ ROADMAP ] nav entry showing proposed features grouped by section (modes, mechanics, weapons, NPCs, objects, items) with status and effort badges. Seeded from docs/roadmap.md (#310).',
+          'Manager+ roles can change an item\u2019s status inline and add / edit / delete items; lower roles see a read-only view. Mutations are role-gated server-side.',
+        ],
+      },
+      {
+        category: 'SERVER',
+        changes: [
+          'admin-api: new /api/roadmap resource (RoadmapItem model + CRUD routes). GET requires auth; POST/PATCH/DELETE require the manager role. Seeds 32 initial items on first boot when the collection is empty.',
+        ],
+      },
+    ],
+  },
+  {
     version: 'v00053',
     date: '2026-05-18',
     title: 'On-screen keyboard for handheld Windows',
