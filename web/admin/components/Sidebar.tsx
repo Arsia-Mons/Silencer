@@ -34,6 +34,7 @@ const NAV = [
   { href: '/items',           label: '[ ITEMS ]',              icon: '⊟', minRank: 3 },
   { href: '/vfx',             label: '[ EFFECT EDITOR ]',        icon: '✦', minRank: 3 },
   { href: '/health',          label: '[ SERVER HEALTH ]',     icon: '◎', minRank: 0 },
+  { href: '/roadmap',         label: '[ ROADMAP ]',           icon: '◇', minRank: 0 },
   { href: '/changelog',       label: '[ CHANGELOG ]',         icon: '◑', minRank: 0 },
 ];
 

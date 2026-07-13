@@ -203,3 +203,37 @@ export const deleteBehaviorTree = (id: string): Promise<unknown> =>
   apiFetch(`/behaviortrees/${id}`, { method: 'DELETE' });
 
 // Sound Studio — see web/admin/app/sound-studio/page.tsx for usage
+
+// Roadmap — editable, DB-backed feature roadmap. See app/roadmap/page.tsx.
+export type RoadmapStatus = 'proposed' | 'designing' | 'in-progress' | 'shipped';
+export type RoadmapEffort = 'S' | 'M' | 'L';
+
+export interface RoadmapItem {
+  _id: string;
+  section: string;
+  title: string;
+  detail: string;
+  buildsOn: string;
+  status: RoadmapStatus;
+  effort: RoadmapEffort;
+  order: number;
+  createdBy?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface RoadmapResponse {
+  items: RoadmapItem[];
+  sections: string[];
+  statuses: RoadmapStatus[];
+  efforts: RoadmapEffort[];
+}
+
+export const getRoadmap = (): Promise<RoadmapResponse> =>
+  apiFetch('/roadmap') as Promise<RoadmapResponse>;
+export const createRoadmapItem = (data: Partial<RoadmapItem>): Promise<RoadmapItem> =>
+  apiFetch('/roadmap', { method: 'POST', body: JSON.stringify(data) }) as Promise<RoadmapItem>;
+export const updateRoadmapItem = (id: string, data: Partial<RoadmapItem>): Promise<RoadmapItem> =>
+  apiFetch(`/roadmap/${id}`, { method: 'PATCH', body: JSON.stringify(data) }) as Promise<RoadmapItem>;
+export const deleteRoadmapItem = (id: string): Promise<unknown> =>
+  apiFetch(`/roadmap/${id}`, { method: 'DELETE' });
