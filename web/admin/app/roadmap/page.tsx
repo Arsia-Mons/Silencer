@@ -28,11 +28,11 @@ const SECTION_META: Record<string, { icon: string; label: string }> = {
   items:     { icon: '✦', label: 'ITEMS & ECONOMY' },
 };
 
-const STATUS_META: Record<RoadmapStatus, { label: string; cls: string }> = {
-  'proposed':    { label: 'PROPOSED',    cls: 'text-game-muted border-game-border bg-game-dark' },
-  'designing':   { label: 'DESIGNING',   cls: 'text-sky-300 border-sky-500/40 bg-sky-500/10' },
-  'in-progress': { label: 'IN PROGRESS', cls: 'text-amber-300 border-amber-500/40 bg-amber-500/10' },
-  'shipped':     { label: 'SHIPPED',     cls: 'text-emerald-300 border-emerald-500/40 bg-emerald-500/10' },
+const STATUS_META: Record<RoadmapStatus, { label: string; cls: string; border: string }> = {
+  'proposed':    { label: 'PROPOSED',    cls: 'text-game-muted border-game-border bg-game-dark',        border: 'border-game-border' },
+  'designing':   { label: 'DESIGNING',   cls: 'text-sky-300 border-sky-500/40 bg-sky-500/10',           border: 'border-sky-500/60' },
+  'in-progress': { label: 'IN PROGRESS', cls: 'text-amber-300 border-amber-500/40 bg-amber-500/10',     border: 'border-amber-500/60' },
+  'shipped':     { label: 'SHIPPED',     cls: 'text-emerald-300 border-emerald-500/40 bg-emerald-500/10', border: 'border-emerald-500/60' },
 };
 
 const EFFORT_META: Record<RoadmapEffort, string> = { S: 'S · quick', M: 'M · medium', L: 'L · large' };
@@ -181,8 +181,8 @@ export default function RoadmapPage() {
                     <div className="flex items-center gap-2 shrink-0">
                       {canEdit ? (
                         <select value={it.status} onChange={(e) => patch(it._id, { status: e.target.value as RoadmapStatus })}
-                          className={`text-[10px] font-mono rounded border px-1.5 py-1 bg-game-dark ${STATUS_META[it.status].cls}`}>
-                          {statuses.map((s) => <option key={s} value={s}>{STATUS_META[s]?.label || s}</option>)}
+                          className={`text-[10px] font-mono font-bold tracking-wide rounded border px-1.5 py-1 bg-game-dark text-game-text [color-scheme:dark] ${STATUS_META[it.status].border}`}>
+                          {statuses.map((s) => <option key={s} value={s} className="bg-game-dark text-game-text">{STATUS_META[s]?.label || s}</option>)}
                         </select>
                       ) : (
                         <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-mono border ${STATUS_META[it.status].cls}`}>
@@ -225,7 +225,7 @@ interface ItemFormProps {
 }
 
 function ItemForm({ form, setForm, sections, statuses, efforts, isEdit, onSubmit, onCancel }: ItemFormProps) {
-  const input = 'w-full bg-game-dark border border-game-border rounded px-2 py-1 text-xs font-mono text-game-text';
+  const input = 'w-full bg-game-dark border border-game-border rounded px-2 py-1 text-xs font-mono text-game-text [color-scheme:dark]';
   return (
     <div className="mb-6 rounded border border-game-primary/40 bg-game-bgCard p-4">
       <div className="text-game-primary font-mono text-xs tracking-widest mb-3">{isEdit ? '✎ EDIT ITEM' : '+ NEW ITEM'}</div>
