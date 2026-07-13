@@ -28,11 +28,11 @@ const SECTION_META: Record<string, { icon: string; label: string }> = {
   items:     { icon: '✦', label: 'ITEMS & ECONOMY' },
 };
 
-const STATUS_META: Record<RoadmapStatus, { label: string; cls: string; border: string }> = {
-  'proposed':    { label: 'PROPOSED',    cls: 'text-game-muted border-game-border bg-game-dark',        border: 'border-game-border' },
-  'designing':   { label: 'DESIGNING',   cls: 'text-sky-300 border-sky-500/40 bg-sky-500/10',           border: 'border-sky-500/60' },
-  'in-progress': { label: 'IN PROGRESS', cls: 'text-amber-300 border-amber-500/40 bg-amber-500/10',     border: 'border-amber-500/60' },
-  'shipped':     { label: 'SHIPPED',     cls: 'text-emerald-300 border-emerald-500/40 bg-emerald-500/10', border: 'border-emerald-500/60' },
+const STATUS_META: Record<RoadmapStatus, { label: string; cls: string; border: string; dot: string }> = {
+  'proposed':    { label: 'PROPOSED',    cls: 'text-game-muted border-game-border bg-game-dark',        border: 'border-game-border',    dot: 'bg-game-muted' },
+  'designing':   { label: 'DESIGNING',   cls: 'text-sky-300 border-sky-500/40 bg-sky-500/10',           border: 'border-sky-500/60',     dot: 'bg-sky-400' },
+  'in-progress': { label: 'IN PROGRESS', cls: 'text-amber-300 border-amber-500/40 bg-amber-500/10',     border: 'border-amber-500/60',   dot: 'bg-amber-400' },
+  'shipped':     { label: 'SHIPPED',     cls: 'text-emerald-300 border-emerald-500/40 bg-emerald-500/10', border: 'border-emerald-500/60', dot: 'bg-emerald-400' },
 };
 
 const EFFORT_META: Record<RoadmapEffort, string> = { S: 'S · quick', M: 'M · medium', L: 'L · large' };
@@ -69,6 +69,15 @@ export default function RoadmapPage() {
     }
   }
   useEffect(() => { load(); }, []);
+
+  function closeForm() { setAdding(false); setEditingId(null); setForm({ ...BLANK }); }
+
+  useEffect(() => {
+    if (!adding && !editingId) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') closeForm(); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [adding, editingId]);
 
   const grouped = useMemo(() => {
     const by: Record<string, RoadmapItem[]> = {};
@@ -133,8 +142,10 @@ export default function RoadmapPage() {
           </div>
           <div className="flex gap-2 items-center flex-wrap justify-end">
             {(Object.keys(STATUS_META) as RoadmapStatus[]).map((s) => (
-              <span key={s} className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-mono border ${STATUS_META[s].cls}`}>
-                {STATUS_META[s].label} {counts[s] ? `· ${counts[s]}` : ''}
+              <span key={s} className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] font-mono border border-game-border bg-game-dark text-game-text">
+                <span className={`w-2 h-2 rounded-full ${STATUS_META[s].dot}`} />
+                {STATUS_META[s].label}
+                <span className="text-game-textDim">· {counts[s] || 0}</span>
               </span>
             ))}
             {canEdit && (
@@ -150,11 +161,16 @@ export default function RoadmapPage() {
         {loading && <div className="text-xs font-mono text-game-textDim">Loading…</div>}
 
         {(adding || editingId) && canEdit && (
-          <ItemForm
-            form={form} setForm={setForm} sections={sections} statuses={statuses} efforts={efforts}
-            isEdit={!!editingId} onSubmit={submitForm}
-            onCancel={() => { setAdding(false); setEditingId(null); setForm({ ...BLANK }); }}
-          />
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70"
+            onClick={closeForm}>
+            <div className="w-full max-w-2xl max-h-[90vh] overflow-auto" onClick={(e) => e.stopPropagation()}>
+              <ItemForm
+                form={form} setForm={setForm} sections={sections} statuses={statuses} efforts={efforts}
+                isEdit={!!editingId} onSubmit={submitForm}
+                onCancel={closeForm}
+              />
+            </div>
+          </div>
         )}
 
         {sections.map((section) => {
