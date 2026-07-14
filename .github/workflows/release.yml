@@ -11,7 +11,12 @@ concurrency:
 
 jobs:
   build-macos:
-    runs-on: macos-latest
+    # Pinned to macos-15 (arm64): macos-latest migrated to macOS 26 (2026-06-15),
+    # whose stricter dyld (duplicate LC_RPATH abort) + local-network/loopback
+    # behavior break the release bundle + auto-updater e2e. macos-15 is where the
+    # e2e passed for every prior release. Revisit once the e2e is macOS-26-ready
+    # (issue #321).
+    runs-on: macos-15
     timeout-minutes: 45
     env:
       SCCACHE_GHA_ENABLED: "true"
