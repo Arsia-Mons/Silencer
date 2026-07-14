@@ -4,6 +4,8 @@ All notable changes to Silencer are documented here.
 
 ## [Unreleased]
 
+## [v00061] — 2026-07-13
+
 ### Admin dashboard
 
 - Editable roadmap page (#312). New `[ ROADMAP ]` view groups proposed features
