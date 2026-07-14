@@ -87,12 +87,18 @@ jobs:
       # The action above logs apt fetch errors (e.g. mirror desync) but
       # still reports step success, so a failed install silently falls
       # through to a confusing unrelated error deep in the cmake configure
-      # step. Fail here instead, at the point the real problem occurred.
+      # step. Check installed package state directly rather than the
+      # action's own install log — it deletes that file during its
+      # cleanup before this step runs.
       - name: Verify C++ build deps installed
         run: |
-          if grep -q '^E: ' /home/runner/cache-apt-pkgs/install.log; then
-            echo "::error::apt reported errors while installing build deps:"
-            grep '^E: ' /home/runner/cache-apt-pkgs/install.log
+          set -euo pipefail
+          missing=""
+          for pkg in cmake ninja-build build-essential zlib1g-dev libcurl4-openssl-dev libminizip-dev patchelf; do
+            dpkg -s "$pkg" >/dev/null 2>&1 || missing="$missing $pkg"
+          done
+          if [ -n "$missing" ]; then
+            echo "::error::apt failed to install:$missing"
             exit 1
           fi
 
