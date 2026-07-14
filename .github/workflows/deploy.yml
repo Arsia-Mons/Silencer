@@ -76,7 +76,13 @@ jobs:
         uses: awalsh128/cache-apt-pkgs-action@v1
         with:
           packages: cmake ninja-build build-essential zlib1g-dev libcurl4-openssl-dev libminizip-dev patchelf
-          version: 2.0
+          # Bumped 2.0 -> 2.1: a prior run's apt fetch failure (mirror
+          # desync) got cached as an empty/incomplete package set under the
+          # 2.0 key, since the action reports step success even when apt
+          # errors. That poisoned cache then silently no-ops on every
+          # subsequent restore. Bump this whenever the cache needs a clean
+          # slate; the verify step below should catch it earlier next time.
+          version: 2.1
 
       # The action above logs apt fetch errors (e.g. mirror desync) but
       # still reports step success, so a failed install silently falls
