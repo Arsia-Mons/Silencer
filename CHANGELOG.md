@@ -4,7 +4,7 @@ All notable changes to Silencer are documented here.
 
 ## [Unreleased]
 
-## [v00061] — 2026-07-13
+## [v00062] — 2026-07-13
 
 ### Admin dashboard
 
@@ -14,6 +14,12 @@ All notable changes to Silencer are documented here.
   delete items; lower roles get a read-only view. Backed by a new
   `/api/roadmap` resource (RoadmapItem model + role-gated CRUD) in admin-api,
   seeded from `docs/roadmap.md` (#310) on first boot.
+
+### CI / release
+
+- Fixed the macOS release bundle producing a duplicate `@rpath/` `LC_RPATH`
+  that newer dyld hard-aborts on (#318), which broke the release auto-updater
+  e2e and would abort the shipped app on newer macOS.
 
 ## [v00060] — 2026-06-17
 
