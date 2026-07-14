@@ -91,6 +91,23 @@ runs:
           </dev/null
         install_name_tool -add_rpath @executable_path/../Frameworks \
           Silencer.app/Contents/MacOS/Silencer 2>/dev/null || true
+        # Newer dyld (Xcode 26.5+ runners) HARD-ABORTS on duplicate LC_RPATH
+        # (older dyld only warned). dylibbundler's `--install-path @rpath/`
+        # leaves a redundant, self-referential `@rpath/` LC_RPATH that can
+        # duplicate an existing one, aborting the app at launch (Abort trap 6)
+        # — which broke the auto-updater e2e and would break users on newer
+        # macOS. Strip every literal `@rpath/` entry; the bundled dylibs
+        # resolve through the real `@executable_path/../Frameworks` rpath above.
+        BIN=Silencer.app/Contents/MacOS/Silencer
+        for _ in $(seq 1 16); do
+          otool -l "$BIN" | grep -q 'path @rpath/ ' || break
+          install_name_tool -delete_rpath '@rpath/' "$BIN" 2>/dev/null || break
+        done
+        # Guard: the functional Frameworks rpath must survive.
+        otool -l "$BIN" | grep -q 'path @executable_path/../Frameworks ' \
+          || install_name_tool -add_rpath @executable_path/../Frameworks "$BIN"
+        echo "--- LC_RPATH after dedupe ---"
+        otool -l "$BIN" | grep -A2 LC_RPATH || true
         echo "--- bundled dylibs ---"
         ls Silencer.app/Contents/Frameworks/
         echo "--- main binary linkage ---"
